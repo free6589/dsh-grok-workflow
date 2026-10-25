@@ -148,3 +148,7 @@ The regression tests use a fake `gh` executable. They baseline one issue, replay
 a new comment/new issue, assert the prompt's untrusted-data boundary, and verify
 that a credential env file cannot override `DSH_HOME`, `DSH_PROFILE`,
 `DSH_PATCH`, or the session. They do not call GitHub or a model.
+
+A one-off live smoke also passed: a temporary issue caused the running watcher
+to start a DSH headless wake, whose final answer contained `WATCH_WAKE_OK` and
+whose `last-wake.status` was `0`. The temporary issue was closed afterward.

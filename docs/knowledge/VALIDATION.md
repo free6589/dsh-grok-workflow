@@ -341,6 +341,18 @@ tests:
 
 ## Issue watcher validation (2026-10-25)
 
+### Live wake smoke
+
+- Created temporary issue #13 (`[TEST] watcher wake smoke`) after the watcher
+  was running with the hardened script.
+- The watcher detected the new issue at `08:25:06Z`, started wake
+  `pid=540837`, and wrote `last-wake.status=0`.
+- The DSH final answer contained `WATCH_WAKE_OK`; its trace shows the prompt
+  included the JSON array and both security-boundary messages. No repository
+  files were modified and no credentials were read or printed.
+- Closed #13 after the check. This is a real watcher → DSH headless wake, not
+  a mocked unit test.
+
 - `bash -n scripts/watch-issues.sh` — **PASS**.
 - `npx vitest run test/issue-watch.spec.ts` — **PASS**, 2 tests; fake `gh`
   executable, no GitHub or model calls; includes hostile issue text and
