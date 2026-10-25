@@ -109,3 +109,11 @@ CI. Keep memory synchronized with any new commit.
 - **Validation:** main CI `40182707932` PASS on Node 22/24; release workflow `40182751006` PASS on Node 22 only, including typecheck, lint, build, committed `lib/`, tests, package checks, and release creation.
 - **Backup boundary:** Git history/Releases are version recovery, not independent disaster-recovery backup. Repository mirror and local DSH data backups remain a separate operational task.
 - **Next action:** follow `docs/RELEASING.md` for future versions; do not move the published `v0.1.0` tag.
+
+## Active design discussion — mandatory workflow, model routing, fallback
+
+- **Status:** brainstorming only; plugin implementation remains unchanged by this discussion.
+- **Persistent notes:** [WORKFLOW-DESIGN.md](WORKFLOW-DESIGN.md).
+- **Confirmed requirement:** every user message, including greetings and trivial questions, must go through the full workflow; no silent bypass to ordinary direct answering.
+- **Desired capabilities still being designed:** per-role model selection, ordered model fallback chains, and a settings UI.
+- **Working rule:** update `WORKFLOW-DESIGN.md` after each substantive discussion; mark user-confirmed decisions separately from proposals and technical unknowns.
