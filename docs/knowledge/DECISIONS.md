@@ -121,3 +121,21 @@ Each entry records the decision, evidence, alternatives, and status.
 - **Reason:** The project currently has Git commits and CI but no GitHub Releases, so end users have no named, easy-to-install release version or curated release notes.
 - **Alternatives rejected:** Release every development commit automatically (exposes intermediate states); publish to npm (not the project's current distribution model).
 - **Consequences:** A published tag must never be moved or overwritten. GitHub Release/version history is not an independent backup mirror.
+
+## D-009 — U 决策定案（用户 2026-10-26 批准 U-1..U-7，U-8/U-9 采安全默认）
+
+- U-1 答案路线：in-turn 为默认（t25/t26 真实 headless A/B 证据在用户批准 (a) relay 建议后升级了默认形态）；relay/append 保留给长驻 UI。
+- U-2 重试所有权：v1 仅脚本层 L1 备用链，不注册 agent/request-error，不与 dsh-llm-retry 争所有权。
+- U-3 synthesizer：确定性聚合为默认，synthesis:'model' 为可选开关（失败自动回落，不丢已验证内容）。
+- U-4 并行写路径：planner 任务声明 writesPaths，重叠任务串行化（实施任务已排）。
+- U-5 严格模式成本：用户接受每消息完整工作流的延迟与调用开销。
+- U-6 设置：YAML/配置层先行；带模型下拉的链编辑器（client module）= Phase 9 backlog。
+- U-7 强制范围：preset 作用域（gateScope/gatePreset 白名单），非全进程。
+- U-8 拦截面：维持 source.kind='user' 边界并显式文档化（不扩拦 user-question-reply/team-message/webhook/schedule 等）。
+- U-9 时长体感：维持 timeoutMs 默认（30 分钟）；流式进度提示入 backlog。
+
+## D-010 — 夜间自主执行与发布纪律（用户 2026-10-26 授权）
+
+- 计划执行无需逐步批准；实施→测试→独立复查→修复→重测的循环照旧，严格验收标准。
+- 每个批次整合后即时 push 同步 GitHub；版本里程碑设 tag：v0.2.0-rc.1（功能收口）→ v0.2.0 + GitHub Release（阶段 7 验收后）。v0.1.0 tag 永不移动。
+- 模型：wb/cn:deepseek-v4.1-flash 优先，wb/global:deepseek-v4.1-flash 全局并发 ≤2；模型故障即换（成员重指派/换路由）。
