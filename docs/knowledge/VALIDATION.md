@@ -438,3 +438,12 @@ tests:
 - **Install-order review finding:** the first README revision told users to run `dsh plugin add` before creating a missing profile. In an isolated `DSH_HOME` check, `plugin add` auto-created a base-only profile; the later `--from-default-profile headless` rewrote that profile and removed the installed plugin dependency.
 - **Correction:** both READMEs and `docs/LOCAL-TESTING.md` now create the headless profile first, then install the plugin, and explicitly warn not to run `--from-default-profile` after `plugin add`.
 - Install command verified against project metadata: `dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow`; requirements remain DSH `0.2.1-rc.2`, Node.js >=22, and a profile with workflow/subagent services.
+
+
+### Release workflow proposal — NOT_RUN
+
+- Reviewed the proposed workflow at `.github/workflows/release.yml` on branch `chore/release-and-versioning`.
+- Verified from DSH `0.2.1-rc.2` source that install specs accept a GitHub shorthand with a `#ref` suffix; the upstream parser tests include examples such as `gitlab:a/b#main` and hosted URLs with `#v1`.
+- **NOT_RUN:** Actual GitHub Release workflow execution. No version tag was pushed as part of this proposal, so the automated publish steps have not run.
+- **NOT_RUN:** Local DSH install from a version tag; no first-release tag exists yet.
+- The release workflow's first end-to-end validation is intentionally deferred until after merge and push of `v0.1.0`.
