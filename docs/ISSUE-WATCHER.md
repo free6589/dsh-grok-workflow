@@ -123,13 +123,13 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/fish/projects_mine/dsh-grok-workflow
-Environment=DSH_HOME=/home/fish/projects_mine/dsh-grok-workflow/.dsh-home
+WorkingDirectory=/path/to/dsh-grok-workflow
+Environment=DSH_HOME=/path/to/dsh-grok-workflow/.dsh-home
 Environment=DSH_PROFILE=grok-workflow-dev
-Environment=WATCH_STATE_DIR=/home/fish/.local/state/dsh-grok-workflow/issue-watch
+Environment=WATCH_STATE_DIR=/path/to/state/dsh-grok-workflow/issue-watch
 Environment=WATCH_POLL_SECONDS=60
-EnvironmentFile=-/home/fish/.dsh/bifrost.env
-ExecStart=/home/fish/projects_mine/dsh-grok-workflow/scripts/watch-issues.sh
+EnvironmentFile=-/path/to/bifrost.env
+ExecStart=/path/to/dsh-grok-workflow/scripts/watch-issues.sh
 Restart=on-failure
 RestartSec=10
 

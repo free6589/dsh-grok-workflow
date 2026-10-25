@@ -67,6 +67,12 @@ remains.
   as `NODE_OPTIONS`, `LD_PRELOAD`, `PYTHONPATH`, and `DYLD_*` are ignored.
   The watcher test covers the injection attempt and the help text says the
   file is parsed, not sourced.
+- Fixed issue #17: host report validation now accepts a fallback plan whose
+  single task is verified as `partial`, requires the planning error as
+  provenance, and keeps `completed` forbidden for fallback plans. Non-fallback
+  `partial` reports still require both verified and failed tasks. The generated
+  fallback report is now exercised through `assertWorkflowReport()`; the suite
+  has 6 files / 56 tests.
 
 ## Remaining / optional
 

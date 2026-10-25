@@ -158,12 +158,22 @@ The suite has **56 deterministic tests** across 6 files and does not call an onl
 
 ## Security and compatibility
 
-- Verified only with DSH **`0.2.1-rc.2`** and Node.js **22 or newer**; the package declares the exact peer versions. This is an external DSH bundle and does not modify DSH core.
+- Verified only with DSH **`0.2.1-rc.2`** and Node.js **22 or newer**; the package declares the exact DSH peer versions (`@deepseek-ai/cordis` uses a compatible `~4.0.5` range). This is an external DSH bundle and does not modify DSH core.
 - It does not bypass DSH approvals, sandbox policy, or tool policy. Child agents cannot recursively invoke `grok_workflow`; their other tools remain subject to DSH's own policy.
 - Child agents inherit the parent session's available tools and permissions. There is no read-only capability mode; the verifier prompt asks it not to modify files, but this is not a hard sandbox guarantee.
 - Redaction is best-effort: do not put credentials in objectives, task text, or logs. Reports are not a guarantee that a child agent never touched a secret.
 - Parallel tasks share the session working directory. Use disjoint file scopes or `maxConcurrency: 1` for write-heavy work; verification is independent evidence checking, not a formal proof.
 - No npm package is published; install from this GitHub repository.
+
+## Known limitations
+
+- No pause/resume, journaling, or cross-process resume; cancellation is cooperative.
+- No background job mode; calls run in the foreground.
+- No task dependency graph; tasks are independent by design.
+- No per-task model/provider routing; children inherit the parent route.
+- No custom Web UI; results use DSH's generic tool card.
+- Parallel workers share the session working directory; use disjoint file scopes or `maxConcurrency: 1` for write-heavy work.
+- See [known architecture limits](docs/ARCHITECTURE.md#known-architecture-limits-mvp) for the full list.
 
 ## Documentation
 

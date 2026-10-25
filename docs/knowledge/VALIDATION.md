@@ -407,6 +407,21 @@ tests:
   retained, `DSH_SESSION_ID`/profile overrides absent, first poll `no changes`.
   The prior live wake (`WATCH_WAKE_OK`, status 0) used the previous script.
 
+### Fallback partial host validation (#17)
+
+- Issue #17: a planner fallback creates one task, verifies it, and the script
+  deliberately reports `partial` because planning was degraded. The host
+  `assertWorkflowReport()` previously rejected that report because its
+  `partial` invariant required both verified and failed tasks.
+- `src/report.ts` now accepts `partial` with all tasks verified only when
+  `plan.source === 'fallback'` and `plan.error` is non-empty. It still rejects
+  an all-verified non-fallback `partial` report, keeps `partial` requiring at
+  least one verified task, and keeps fallback `completed` forbidden.
+- `test/orchestrator.spec.ts` now runs the generated fallback report through
+  the real host validator and also checks the non-fallback rejection. The suite
+  has 17 orchestrator tests and 6 files / 56 tests total.
+- `npm run ci` — **PASS**, 6 files / 56 tests.
+
 ## Remaining gap
 
 - Clean-DSH-profile installation is executed locally; CI has not yet added a
@@ -418,7 +433,7 @@ tests:
 - PR #16 merged to `main` as `ea3e8e31`; CI runs `40178081351`, `40178539805`, and `40178848058` passed on Node 22 and Node 24.
 - Root README is a concise English quick-start; `README.zh-CN.md` is the full Simplified Chinese counterpart. Both link to each other at the top.
 - Added `docs/images/workflow-overview.svg` and `docs/images/workflow-overview.zh-CN.svg`; both parse as well-formed XML.
-- Added `README.zh-CN.md` to `package.json` `files`; `npm pack --dry-run` lists both READMEs and 31 total files (54.4 kB package).
+- Added `README.zh-CN.md` to `package.json` `files`; `npm pack --dry-run` lists both READMEs and 31 total files (56.5 kB package).
 - The merged PR initially omitted the explicit configuration table, disable/uninstall, security, and compatibility sections; the local follow-up restored compact equivalents in both languages.
 - **Install-order review finding:** the first README revision told users to run `dsh plugin add` before creating a missing profile. In an isolated `DSH_HOME` check, `plugin add` auto-created a base-only profile; the later `--from-default-profile headless` rewrote that profile and removed the installed plugin dependency.
 - **Correction:** both READMEs and `docs/LOCAL-TESTING.md` now create the headless profile first, then install the plugin, and explicitly warn not to run `--from-default-profile` after `plugin add`.

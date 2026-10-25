@@ -123,9 +123,13 @@ The final report contains:
 Status rules:
 
 - `completed` only when every planned task is verified and no planning fallback
-  or unresolved failure exists.
+  or unresolved failure exists. A fallback or unavailable plan can never be
+  `completed`.
 - `partial` when at least one task is verified but the workflow is not fully
-  clean, or when planning degraded to fallback.
+  clean, or when planning degraded to fallback. A fallback plan whose single
+  task verifies successfully is still `partial`; the report keeps the fallback
+  provenance and the planning error. For non-fallback plans, `partial` requires
+  a mix of verified and failed tasks.
 - `failed` when no task is verified.
 
 ## Lifecycle and cancellation

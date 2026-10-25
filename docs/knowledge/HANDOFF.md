@@ -1,5 +1,29 @@
 # Agent Handoff
 
+## 2026-10-25 — Issue #17 fallback partial validation
+
+- **From:** local agent (watcher wake for issue #17)
+- **To:** cloud reviewer / next local agent
+- **Base commit:** `a2b2f9f`
+- **Work commit:** `9c2cc29` (`fix: accept verified fallback reports as partial`)
+- **Changes:**
+  - Host validation now permits a fallback plan whose single task is verified
+    to remain `partial`, provided the planning error is present.
+  - Non-fallback `partial` still requires both verified and failed tasks;
+    fallback plans can never be `completed`; `partial` still requires at least
+    one verified task.
+  - Added a host-validation regression test using the real generated fallback
+    report, plus the existing orchestrator coverage.
+- **Tests run:**
+  - `npx vitest run test/orchestrator.spec.ts` — PASS, 17 tests.
+  - `npm run ci` — PASS, 6 files / 56 tests.
+  - `git diff --exit-code -- lib/` — PASS after build.
+- **Test results:** PASS.
+- **Local runtime verified:** no; this is deterministic report validation
+  logic, not a DSH lifecycle change.
+- **Blockers:** none.
+- **Next action:** cloud review `9c2cc29`; issue #17 remains open until review.
+
 ## 2026-10-25 — Issue #15 watcher credential-env allowlist
 
 - **From:** local agent
