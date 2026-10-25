@@ -52,6 +52,9 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Check package file list
+        run: npm pack --dry-run
+
       - name: Verify tag, package version, and changelog; prepare release notes
         env:
           RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
