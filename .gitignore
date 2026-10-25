@@ -15,3 +15,6 @@ coverage/
 
 # DSH session staging artifacts
 .session-stage/
+
+# DSH session snapshots
+sessions/
