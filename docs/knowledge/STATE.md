@@ -22,8 +22,9 @@ Last updated: 2026-10-25 (local)
 
 Implementation and remote acceptance are complete: deterministic tests, real
 DSH profile installation from both local and GitHub sources, real-model
-end-to-end runs, remote Actions, and the coordination Issue all passed. Only the
-optional live timeout/cancellation exercise remains.
+end-to-end runs (including a live deadline cancellation), remote Actions, and
+the coordination Issue all passed. Only an optional clean-profile CI check
+remains.
 
 ## Completed
 
@@ -67,5 +68,5 @@ None.
 
 ## Next priority
 
-Monitor coordination Issue #1 and decide whether to add the optional live
-timeout/cancellation test. Keep memory synchronized with any new commit.
+Monitor coordination Issue #1; optionally add a clean-profile install check to
+CI. Keep memory synchronized with any new commit.
