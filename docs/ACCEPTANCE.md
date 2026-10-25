@@ -28,7 +28,7 @@ Legend: PASS = actually executed and observed; FAIL = executed and failed;
 | T3 | Verification failure and bounded retry | PASS | Evidence-free and retry-success tests. |
 | T4 | Concurrency limit | PASS | Five tasks with `maxConcurrency=2`; observed peak 2. |
 | T5 | Cancellation and resource cleanup | PASS | Plugin lifecycle tests. |
-| T6 | Invalid input and boundary conditions | PASS | `test/input.spec.ts`; exact-criterion and malformed verifier tests. |
+| T6 | Invalid input and boundary conditions | PASS | `test/input.spec.ts`; exact-criterion, duplicate-criteria, objective, and aggregate-budget tests. |
 | T7 | Credential redaction | PASS | `test/redact.spec.ts`. |
 | T8 | Plugin registration and unload | PASS | `test/loader.spec.ts` real Loader composition. |
 | T9 | Real DSH Loader + plugin composition integration | PASS | `test/loader.spec.ts`, 2 tests pass. |
@@ -39,7 +39,7 @@ Legend: PASS = actually executed and observed; FAIL = executed and failed;
 |---|---|---|---|
 | Q1 | Typecheck passes | PASS | `npm run typecheck`. |
 | Q2 | Lint passes | PASS | `npm run lint`, 0 warnings/errors. |
-| Q3 | Unit tests pass | PASS | `npm test`, 36 tests. |
+| Q3 | Unit tests pass | PASS | `npm test`, 50 tests. |
 | Q4 | Build passes | PASS | `npm run build`; package contents inspected. |
 | Q5 | Applicable GitHub Actions checks pass | PASS | GitHub Actions runs `40168892831`, `40169133016`, `40169816856`, `40169885633`, `40170034851`, `40172141078`, and `40172376450` passed on Node 22 and Node 24. |
 | Q6 | README and test commands match implementation | PASS | README commands and documented defaults match source/tests. |

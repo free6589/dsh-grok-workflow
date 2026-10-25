@@ -213,7 +213,7 @@ npm test
 What the suite covers:
 
 - Real generated workflow script: planning, two parallel tasks, concurrency cap, completed/partial/failed, exact-criterion verifier matching, evidence rejection, bounded retry, planner fallback.
-- Caller task validation and configuration hard limits.
+- Caller task validation, objective and aggregate payload caps, and configuration hard limits.
 - Credential redaction (API keys, tokens, private keys, JWTs, URL secrets) and non-secret prose preservation.
 - Plugin lifecycle: max active runs, cancellation, deadline, unload cleanup, recursive-subagent rejection.
 - A real DSH Loader composition with the real DSH tool registry and system prompt; only the workflow/subagent boundary is faked. It verifies registration, prompt-section registration, unload, and disabled-row inertness.
@@ -250,6 +250,10 @@ performed locally and recorded in `docs/knowledge/VALIDATION.md`.
   route; the optional provider only selects the subagent provider, not a model.
 - Verification is independent-agent plus evidence validation, not a formal
   proof of correctness.
+- Parallel tasks share the session working directory. With `maxConcurrency > 1`,
+  two workers can edit the same file or a verifier can observe another task's
+  partially written file. The MVP has no worktree/workspace isolation; use
+  disjoint file scopes or set `maxConcurrency: 1` for write-heavy work.
 - No custom Web UI panel; the tool uses DSH's generic tool card.
 - The plugin has only been verified against DSH `0.2.1-rc.2`; `engines.dsh`
   declares that exact version to match the exact peer dependencies. Other DSH

@@ -8,12 +8,14 @@ export declare class GrokWorkflowInputError extends Error {
  * exceeds them; the script never silently shortens a caller requirement.
  */
 export declare const TASK_LIMITS: {
+    readonly objectiveChars: 4000;
     readonly titleChars: 160;
     readonly taskTextChars: 4000;
     readonly criteriaItems: 20;
     readonly criteriaChars: 1000;
     readonly constraintItems: 20;
     readonly constraintChars: 1000;
+    readonly aggregateChars: 48000;
 };
 /**
  * Validate and normalize caller-supplied tasks before starting a workflow.

@@ -32,6 +32,12 @@ describe('caller task validation', () => {
     ], 6)).toThrow(/duplicate task id/)
   })
 
+  it('rejects duplicate acceptance criteria', () => {
+    expect(() => normalizeCallerTasks([
+      { title: 'x', objective: 'x', expectedOutput: 'x', acceptanceCriteria: ['same', 'same'] },
+    ], 6)).toThrow(/acceptanceCriteria must not contain duplicates/)
+  })
+
   it('rejects empty criteria, missing fields, and dependencies', () => {
     expect(() => normalizeCallerTasks([
       { title: 'a', objective: 'a', expectedOutput: 'a', acceptanceCriteria: [] },
@@ -42,6 +48,16 @@ describe('caller task validation', () => {
     expect(() => normalizeCallerTasks([
       { title: 'a', objective: 'a', expectedOutput: 'a', acceptanceCriteria: ['a'], dependsOn: ['b'] } as never,
     ], 6)).toThrow(/dependsOn/)
+  })
+
+  it('rejects an aggregate task payload over budget', () => {
+    const tasks = Array.from({ length: 12 }, (_, index) => ({
+      title: `task ${index}`,
+      objective: 'o',
+      expectedOutput: 'e',
+      acceptanceCriteria: Array.from({ length: TASK_LIMITS.criteriaItems }, (_, criterion) => `${criterion}`.padEnd(TASK_LIMITS.criteriaChars, 'x')),
+    }))
+    expect(() => normalizeCallerTasks(tasks, 12)).toThrow(/aggregate 48000-character budget/)
   })
 
   it('enforces maxTasks', () => {

@@ -78,9 +78,10 @@ The planner returns object-rooted structured output:
   independent so concurrency and partial status are well-defined.
 
 Host/script validation enforces unique IDs, non-empty required fields, at most
-`maxTasks` tasks, and no dependency graph. A planner failure or invalid plan
-falls back to one task containing the original objective; the report records
-`planning.source: "fallback"` and cannot claim fully clean completion.
+`maxTasks` tasks, no dependency graph, a 4,000-character objective, and a
+48,000-character aggregate serialized task budget. A planner failure or invalid
+plan falls back to one task containing the original objective; the report
+records `planning.source: "fallback"` and cannot claim fully clean completion.
 
 ### Execute
 
@@ -188,3 +189,7 @@ as local runtime evidence.
 - No dependency graph between tasks; tasks are independent by design.
 - Verification is independent-agent plus evidence validation, not a formal
   proof of correctness.
+- All child agents in one workflow share the DSH session `cwd`. Parallel
+  workers/verifiers are not filesystem-isolated; concurrent writers can
+  clobber each other and a verifier can see another task's partial state.
+  Keep write scopes disjoint or set `maxConcurrency: 1` for write-heavy work.

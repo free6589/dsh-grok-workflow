@@ -5,14 +5,14 @@
 
 const PRIVATE_KEY = /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z0-9 ]*PRIVATE KEY-----/g
 const JWT = /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g
-const OPENAI_STYLE = /\b(?:sk|rk|pk)-[A-Za-z0-9_-]{16,}\b/g
+const OPENAI_STYLE = /\b(?:sk|rk|pk)[-_](?:live|test)[-_][A-Za-z0-9_-]{10,}\b|\b(?:sk|rk|pk)-[A-Za-z0-9_-]{16,}\b/g
 const GITHUB_TOKEN = /\bgh[pousr]_[A-Za-z0-9]{20,}\b/g
 const SLACK_TOKEN = /\bxox[abprs]-[A-Za-z0-9-]{10,}\b/g
 const AWS_ACCESS_KEY = /\bAKIA[0-9A-Z]{16}\b/g
 const GOOGLE_API_KEY = /\bAIza[0-9A-Za-z_-]{30,}\b/g
 const BEARER = /\b(Bearer\s+)[A-Za-z0-9._~+/=-]{12,}/gi
 const URL_SECRET = /([?&](?:token|key|secret|password|passwd|api[_-]?key|apikey|access[_-]?token)=)[^&#\s]+/gi
-const KEY_VALUE = /(?<![A-Za-z0-9])(api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret|token|secret|password|passwd)(\s*[:=]\s*)(?:"[^"\n]*"|'[^'\n]*'|[^\s,;]+)/gi
+const KEY_VALUE = /(?<![A-Za-z0-9])(?:[A-Za-z0-9]+[_-])*(?:api[_-]?key|access[_-]?key(?:[_-]?id)?|private[_-]?key|secret[_-]?access[_-]?key|secret[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret|token|secret|password|passwd)(\s*[:=]\s*)(?:"[^"\n]*"|'[^'\n]*'|[^\s,;]+)/gi
 const URL_USERINFO = /(\bhttps?:\/\/)[^\s/@]+:[^\s/@]+@/gi
 
 /** Replace known credential shapes in arbitrary text. */

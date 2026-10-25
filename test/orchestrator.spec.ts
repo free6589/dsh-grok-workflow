@@ -190,6 +190,39 @@ describe('generated workflow script', () => {
     expect(report.errors.some(error => error.phase === 'Plan')).toBe(true)
   })
 
+  it('rejects an aggregate planner payload over budget', async () => {
+    const bad = Array.from({ length: 12 }, (_, index) => task(`t${index}`, Array.from(
+      { length: 20 },
+      (_, criterion) => `${criterion}`.padEnd(1000, 'x'),
+    )))
+    const agent: ScriptAgent = async (_prompt, options) => {
+      if (options.label === 'grok-planner') return { tasks: bad }
+      if (options.label === 'grok-worker-task-1-a1') return execution('fallback completed')
+      if (options.label === 'grok-verifier-task-1-a1') {
+        return verification(task('task-1', ['The expected output is completed and supported by concrete evidence']))
+      }
+      throw new Error(`unexpected label ${options.label}`)
+    }
+    const { report } = await runWorkflowScript(WORKFLOW_SCRIPT, args(null, { maxTasks: 12 }), agent)
+    expect(report.plan.source).toBe('fallback')
+    expect(report.plan.error).toContain('planner returned no valid plan')
+  })
+
+  it('rejects duplicate planner acceptance criteria instead of creating an impossible task', async () => {
+    const bad = task('a', ['same', 'same'])
+    const agent: ScriptAgent = async (_prompt, options) => {
+      if (options.label === 'grok-planner') return { tasks: [bad] }
+      if (options.label === 'grok-worker-task-1-a1') return execution('fallback completed')
+      if (options.label === 'grok-verifier-task-1-a1') {
+        return verification(task('task-1', ['The expected output is completed and supported by concrete evidence']))
+      }
+      throw new Error(`unexpected label ${options.label}`)
+    }
+    const { report } = await runWorkflowScript(WORKFLOW_SCRIPT, args(null), agent)
+    expect(report.plan.source).toBe('fallback')
+    expect(report.plan.error).toContain('planner returned no valid plan')
+  })
+
   it('rejects an oversized planner task instead of truncating its criteria', async () => {
     const bad = task('a')
     bad.acceptanceCriteria = Array.from({ length: 21 }, (_, index) => `criterion ${index}`)
@@ -219,6 +252,54 @@ describe('generated workflow script', () => {
     expect(report.tasks.map(item => item.status)).toEqual(['failed', 'failed'])
     expect(report.confirmed).toHaveLength(0)
     expect(report.incomplete).toHaveLength(2)
+  })
+
+  it('redacts worker output and errors before verifier and retry prompts', async () => {
+    const secret = ['sk', 'proj', 'FAKEEXAMPLE1234567890'].join('-')
+    const apiValue = ['FAKE', 'VALUE', '123456'].join('')
+    const callerTasks = [task('a')]
+    let workerCalls = 0
+    let verifierCalls = 0
+    const agent: ScriptAgent = async (_prompt, options) => {
+      if (options.label.startsWith('grok-worker-')) {
+        workerCalls += 1
+        return workerCalls === 1
+          ? execution(`leaked ${secret} api_key=${apiValue}`)
+          : execution('clean retry')
+      }
+      if (options.label.startsWith('grok-verifier-')) {
+        verifierCalls += 1
+        return verifierCalls === 1 ? failingVerification(callerTasks[0]!, 'first failure') : verification(callerTasks[0]!)
+      }
+      throw new Error(`unexpected label ${options.label}`)
+    }
+    const { report, calls } = await runWorkflowScript(WORKFLOW_SCRIPT, args(callerTasks), agent)
+    const firstVerifier = calls.find(call => call.label === 'grok-verifier-a-a1')!
+    const retryWorker = calls.find(call => call.label === 'grok-worker-a-a2')!
+    expect(firstVerifier.prompt).not.toContain(secret)
+    expect(firstVerifier.prompt).not.toContain(apiValue)
+    expect(retryWorker.prompt).not.toContain(secret)
+    expect(retryWorker.prompt).not.toContain(apiValue)
+    expect(report.status).toBe('completed')
+  })
+
+  it('redacts worker exceptions before the retry prompt', async () => {
+    const secret = ['sk', 'proj', 'FAKEEXAMPLE1234567890'].join('-')
+    const callerTasks = [task('a')]
+    let workerCalls = 0
+    const agent: ScriptAgent = async (_prompt, options) => {
+      if (options.label.startsWith('grok-worker-')) {
+        workerCalls += 1
+        if (workerCalls === 1) throw new Error(`worker failed with ${secret}`)
+        return execution('retry succeeded')
+      }
+      if (options.label.startsWith('grok-verifier-')) return verification(callerTasks[0]!)
+      throw new Error(`unexpected label ${options.label}`)
+    }
+    const { report, calls } = await runWorkflowScript(WORKFLOW_SCRIPT, args(callerTasks), agent)
+    const retryWorker = calls.find(call => call.label === 'grok-worker-a-a2')!
+    expect(retryWorker.prompt).not.toContain(secret)
+    expect(report.status).toBe('completed')
   })
 
   it('rejects an overlong verifier criterion instead of truncating its suffix', async () => {

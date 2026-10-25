@@ -3,7 +3,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
 import type { WorkflowRun, WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
 import { resolveConfig } from './config.js'
-import { normalizeCallerTasks, GrokWorkflowInputError } from './input.js'
+import { normalizeCallerTasks, GrokWorkflowInputError, TASK_LIMITS } from './input.js'
 import { assertWorkflowReport, failureReport, renderReport } from './report.js'
 import { buildWorkflowRequest } from './script.js'
 import { redactDeep, redactError, redactSecrets } from './redact.js'
@@ -158,6 +158,9 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
       }
       const objective = args.objective.trim()
       if (!objective) throw new GrokWorkflowInputError('objective must be a non-empty string')
+      if (objective.length > TASK_LIMITS.objectiveChars) {
+        throw new GrokWorkflowInputError(`objective must be at most ${TASK_LIMITS.objectiveChars} characters`)
+      }
       const callerTasks = normalizeCallerTasks(args.tasks as TaskInput[] | undefined, config.maxTasks)
       const request = buildWorkflowRequest(objective, callerTasks, config)
       if (state.runs.size + state.pending >= config.maxActiveRuns) {
@@ -172,6 +175,12 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
       }, config.timeoutMs)
       timer.unref?.()
       const signal = anySignal([exec.signal, state.controller.signal, timeoutController.signal])
+      const timeoutReport = () => redactDeep(failureReport(
+        objective,
+        config,
+        'Timeout',
+        `workflow exceeded the ${config.timeoutMs} ms deadline and was cancelled`,
+      )) as never
       state.pending += 1
       let run: WorkflowRun | undefined
       try {
@@ -185,12 +194,21 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
             maxTotalAgents: request.maxTotalAgents,
             ...config.subagentProvider === undefined ? {} : { subagentProvider: config.subagentProvider },
           }
-          run = await ctx.workflowEngine.start(start)
+          try {
+            run = await ctx.workflowEngine.start(start)
+          } catch (error) {
+            if (timedOut) return timeoutReport()
+            throw error
+          }
           if (state.disposed) {
             run.cancel('grok-workflow plugin unloaded')
             throw new Error(`${config.toolName} cancelled: plugin unloaded`)
           }
           state.runs.add(run)
+          if (timedOut) {
+            run.cancel('workflow deadline exceeded during startup')
+            return timeoutReport()
+          }
         } finally {
           state.pending -= 1
         }
@@ -198,19 +216,12 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
         const activeRun = run
         if (activeRun === undefined) throw new Error('workflow engine did not return a run')
         const result = await activeRun.result
+        if (timedOut) return timeoutReport()
         if (result.stopReason === 'completed') {
-          assertWorkflowReport(result.value, objective, config)
-          return redactDeep(result.value as WorkflowReport) as never
+          const validated = assertWorkflowReport(result.value, objective, config)
+          return redactDeep(validated) as never
         }
         if (result.stopReason === 'cancelled') {
-          if (timedOut) {
-            return redactDeep(failureReport(
-              objective,
-              config,
-              'Timeout',
-              `workflow exceeded the ${config.timeoutMs} ms deadline and was cancelled`,
-            )) as never
-          }
           throw new Error(`${config.toolName} cancelled`)
         }
         throw new Error(redactSecrets(`${config.toolName} engine error: ${result.error ?? 'unknown workflow failure'}`))

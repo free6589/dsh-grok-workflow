@@ -16,11 +16,13 @@ class FakeEngine {
   autoRun = false
   startError: Error | undefined
   startGate: Promise<void> | undefined
+  startGateError: Error | undefined
 
   async start(request: WorkflowStartRequest): Promise<FakeRun> {
     this.startCalls.push(request)
     if (this.startError) throw this.startError
     if (this.startGate) await this.startGate
+    if (this.startGateError) throw this.startGateError
     const run = new FakeRun(request)
     this.runs.push(run)
     request.signal?.addEventListener('abort', () => { run.cancel('signal aborted') }, { once: true })
@@ -124,6 +126,24 @@ describe('plugin lifecycle and tool boundary', () => {
     expect(ctx.engine.startCalls).toHaveLength(0)
   })
 
+  it('accepts an objective exactly at the limit', async () => {
+    const ctx = new FakeContext()
+    apply(ctx as never)
+    ctx.engine.autoRun = true
+    const objective = 'x'.repeat(4000)
+    const report = await ctx.tool!.execute({ objective, tasks: [{ ...task('a'), id: 'a' }] }, exec()) as { status: string; objective: string }
+    expect(report.status).toBe('completed')
+    expect(report.objective).toBe(objective)
+    await ctx.dispose()
+  })
+
+  it('rejects an overlong objective before starting an engine run', async () => {
+    const ctx = new FakeContext()
+    apply(ctx as never)
+    await expect(ctx.tool!.execute({ objective: 'x'.repeat(4001) }, exec())).rejects.toThrow(/objective must be at most 4000 characters/)
+    expect(ctx.engine.startCalls).toHaveLength(0)
+  })
+
   it('rejects invalid caller tasks before starting an engine run', async () => {
     const ctx = new FakeContext()
     apply(ctx as never)
@@ -193,6 +213,89 @@ describe('plugin lifecycle and tool boundary', () => {
     await vi.waitFor(() => expect(ctx.engine.runs).toHaveLength(1))
     ctx.engine.runs[0]!.complete({ schemaVersion: 1, status: 'completed', objective: 'bad report', plan: { source: 'caller', tasks: [] }, tasks: [] })
     await expect(pending).rejects.toThrow(/unsupported schemaVersion|invalid workflow report/)
+    await ctx.dispose()
+  })
+
+  it('returns the canonical validated report and drops unknown engine fields', async () => {
+    const ctx = new FakeContext()
+    apply(ctx as never)
+    const pending = ctx.tool!.execute({ objective: 'canonical report' }, exec())
+    await vi.waitFor(() => expect(ctx.engine.runs).toHaveLength(1))
+    const request = ctx.engine.startCalls[0]!
+    const fakeTasks = [task('a')]
+    const result = await runWorkflowScript(request.script, request.args as Record<string, unknown>, async (_prompt, options) => {
+      if (options.label === 'grok-worker-a-a1') return execution('done')
+      if (options.label === 'grok-verifier-a-a1') return verification(fakeTasks[0]!)
+      throw new Error(`unexpected label ${options.label}`)
+    })
+    const secret = ['sk', 'proj', 'FAKEEXAMPLE1234567890'].join('-')
+    ctx.engine.runs[0]!.complete({ ...result.report, extra: { secret } })
+    const report = await pending as Record<string, unknown>
+    expect(report).not.toHaveProperty('extra')
+    expect(JSON.stringify(report)).not.toContain(secret)
+    await ctx.dispose()
+  })
+
+  it('rejects a complete-shaped report whose task status contradicts completed', async () => {
+    const ctx = new FakeContext()
+    apply(ctx as never)
+    const pending = ctx.tool!.execute({ objective: 'contradictory report', tasks: [task('a')] }, exec())
+    await vi.waitFor(() => expect(ctx.engine.runs).toHaveLength(1))
+    const request = ctx.engine.startCalls[0]!
+    const fakeTasks = [task('a')]
+    const result = await runWorkflowScript(request.script, request.args as Record<string, unknown>, async (_prompt, options) => {
+      if (options.label === 'grok-worker-a-a1') return execution('done')
+      if (options.label === 'grok-verifier-a-a1') return verification(fakeTasks[0]!)
+      throw new Error(`unexpected label ${options.label}`)
+    })
+    const taskReport = result.report.tasks[0]!
+    const contradictory = {
+      ...result.report,
+      status: 'completed',
+      tasks: [{
+        ...taskReport,
+        status: 'failed',
+        attempts: taskReport.attempts.map(attempt => ({ ...attempt, passed: false })),
+        error: 'contradictory failure',
+      }],
+      confirmed: [],
+      incomplete: [{ taskId: 'a', reason: 'contradictory failure' }],
+    }
+    ctx.engine.runs[0]!.complete(contradictory)
+    await expect(pending).rejects.toThrow(/completed requires every task to be verified/)
+    await ctx.dispose()
+  })
+
+  it('returns timeout when startup resolves after the deadline', async () => {
+    const ctx = new FakeContext()
+    apply(ctx as never, { timeoutMs: 1000 })
+    let release!: () => void
+    ctx.engine.startGate = new Promise(resolve => { release = resolve })
+    const pending = ctx.tool!.execute({ objective: 'late startup' }, exec())
+    await vi.waitFor(() => expect(ctx.engine.startCalls).toHaveLength(1))
+    await new Promise(resolve => setTimeout(resolve, 1100))
+    release()
+    const report = await pending as { status: string; errors: { phase: string }[] }
+    expect(report.status).toBe('failed')
+    expect(report.errors[0]!.phase).toBe('Timeout')
+    expect(ctx.engine.runs[0]!.cancel).toHaveBeenCalled()
+    expect(ctx.engine.runs[0]!.dispose).toHaveBeenCalled()
+    await ctx.dispose()
+  })
+
+  it('returns timeout when startup rejects after the deadline', async () => {
+    const ctx = new FakeContext()
+    apply(ctx as never, { timeoutMs: 1000 })
+    let release!: () => void
+    ctx.engine.startGate = new Promise(resolve => { release = resolve })
+    const pending = ctx.tool!.execute({ objective: 'late rejection' }, exec())
+    await vi.waitFor(() => expect(ctx.engine.startCalls).toHaveLength(1))
+    await new Promise(resolve => setTimeout(resolve, 1100))
+    ctx.engine.startGateError = new Error('startup aborted')
+    release()
+    const report = await pending as { status: string; errors: { phase: string }[] }
+    expect(report.status).toBe('failed')
+    expect(report.errors[0]!.phase).toBe('Timeout')
     await ctx.dispose()
   })
 

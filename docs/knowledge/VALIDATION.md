@@ -36,18 +36,24 @@ npm run ci
 Result: **PASS**
 
 - `npm run typecheck`: PASS.
-- `npm run lint`: PASS, 0 warnings/0 errors (`oxlint` over 14 files).
-- `npm test`: PASS, 5 test files, 36 tests.
-  - `test/orchestrator.spec.ts`: 11 tests (planner, caller plan, parallel pool,
+- `npm run lint`: PASS, 0 warnings/0 errors (`oxlint` over 15 files).
+- `npm test`: PASS, 6 test files, 50 tests.
+  - `test/orchestrator.spec.ts`: 15 tests (planner, caller plan, parallel pool,
     partial, failed, evidence rejection, retry bound, fallback, oversized
-    planner rejection, overlong verifier-criterion rejection, exact criteria).
-  - `test/plugin-lifecycle.spec.ts`: 9 tests (registration, invalid input,
+    planner rejection, duplicate planner criteria, overlong verifier-criterion
+    rejection, prompt/error redaction, exact criteria).
+  - `test/plugin-lifecycle.spec.ts`: 15 tests (registration, invalid input,
     startup rejection timer cleanup, startup-unload cleanup, max active runs,
-    unload cancellation/disposal, deadline report).
+    unload cancellation/disposal, canonical report filtering, contradictory
+    report rejection, late startup timeout (resolve/reject), deadline report).
   - `test/loader.spec.ts`: 2 tests (real DSH Loader + real tool registry;
     disabled row inertness; registration/unregistration and prompt section).
-  - `test/input.spec.ts`: 8 tests, including exact-bound and over-bound input.
-  - `test/redact.spec.ts`: 6 tests, including compound environment names.
+  - `test/input.spec.ts`: 10 tests, including exact-bound, over-bound, and
+    duplicate-criteria input.
+  - `test/redact.spec.ts`: 7 tests, including compound environment names,
+    access/private/secret keys, and Stripe underscore tokens.
+  - `test/issue-watch.spec.ts`: 1 test using a fake `gh` executable; baselines
+    one issue, replays a new comment, and asserts the generated prompt.
 
 Toolchain: Node `v26.8.1`, Vitest `4.1.12`, TypeScript `6.x`, DSH packages
 `0.2.1-rc.2`, real `@deepseek-ai/cordis-plugin-loader` `1.0.6`.
@@ -254,6 +260,48 @@ Independent review found five gaps; fixes were implemented and retested:
   suffix is rejected rather than silently truncated into a match. Regression
   test added.
 
+### Issue-report fixes (2026-10-25)
+
+Open issue reports #2-#7 were reproduced from source and covered by deterministic
+tests:
+
+- **#2 redaction:** `KEY_VALUE` now covers access/private/secret key names and
+  compound prefixes; OpenAI-style tokens include `sk_live_` / `sk_test_`
+  underscore forms. `redactSecrets` and recursive `redactDeep` tests pass.
+- **#3 report invariants:** `assertWorkflowReport` now compares immutable plan
+  and task fields, validates sequential attempts within the retry limit, rejects
+  passed attempts on failed tasks, and enforces status invariants (`completed`
+  all verified with evidence/no fallback, `partial` mixed, `failed` no verified
+  tasks).
+- **#4 startup deadline:** a deadline that elapses while `start()` is pending
+  now returns the canonical timeout report whether startup later resolves or
+  rejects; the late run is cancelled and disposed.
+- **#5 prompt redaction:** worker/verifier results and error messages are
+  redacted inside the generated script before being serialized into verifier
+  and retry prompts; regression tests assert fake markers never reach prompts.
+- **#6 duplicate criteria:** caller input rejects duplicate acceptance criteria;
+  planner output with duplicates is rejected and falls back, rather than
+  creating an impossible verifier match.
+- **#7 canonical result:** the tool returns the object produced by
+  `assertWorkflowReport`, not the raw engine value; a test adds an unknown field
+  containing a fake secret and verifies it is absent.
+
+`npm run ci` — **PASS**, 6 files / 50 tests.
+
+### Additional issue-report fixes (#8-#10)
+
+- **#8 payload bounds:** the objective is capped at 4,000 characters and the
+  aggregate serialized caller/planner task payload at 48,000 characters, in
+  both host input validation and generated-script planner normalization.
+  Boundary and over-bound tests pass.
+- **#9 shared working directory:** documented as a concrete MVP limitation.
+  Parallel workers and verifiers share the DSH session `cwd`; the plugin has no
+  worktree isolation, so write-heavy work must use disjoint scopes or
+  `maxConcurrency: 1`.
+- **#10 artifact drift:** CI now runs `npm run build`, then
+  `git diff --exit-code -- lib/`, then tests and `npm pack --dry-run`, so a
+  commit cannot silently ship stale `lib/` output.
+
 ### Post-fix real DSH revalidation
 
 - Reinstalled the local bundle into the isolated `grok-workflow-dev` profile
@@ -269,6 +317,21 @@ Independent review found five gaps; fixes were implemented and retested:
   after the exact-engine commit (`6a0c32a`), showed the bundle row, booted with
   `REVIEW_OK`, and a one-task workflow returned `COMPLETED` 1/1 verified.
   **PASS**.
+
+## Issue watcher validation (2026-10-25)
+
+- `bash -n scripts/watch-issues.sh` — **PASS**.
+- `npx vitest run test/issue-watch.spec.ts` — **PASS**, 1 test; fake `gh`
+  executable, no GitHub or model calls.
+- `WATCH_STATE_DIR=.dsh-home/watch-live WATCH_WAKE_MODE=noop scripts/watch-issues.sh --once`
+  — **PASS**; baselined 10 open issues at 08:02 UTC with no wake.
+- Real DSH headless stdin smoke:
+  `printf 'Reply with exactly: WAKE_SMOKE_OK\n' | dsh --profile grok-workflow-dev --patch .dsh-home/gw-model.patch.yml --json`
+  — **PASS**; final text `WAKE_SMOKE_OK`. The watcher uses the same
+  `--profile ... --patch ... --json` argument shape and feeds the prompt on
+  stdin.
+- The live watcher is started separately; its state and logs stay under the
+  ignored `.dsh-home/` directory.
 
 ## Remaining gap
 

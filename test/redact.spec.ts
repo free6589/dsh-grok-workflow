@@ -46,20 +46,40 @@ describe('credential redaction', () => {
     expect(output.match(/\[REDACTED\]/g)).toHaveLength(3)
   })
 
+  it('redacts access/private/secret keys and Stripe underscore tokens', () => {
+    const awsSecret = fake('not-a-real-', 'secret')
+    const appKey = fake('not-a-real-', 'private-key')
+    const stripe = fake('sk_live_', 'NOT_A_REAL_SECRET_VALUE')
+    const output = redactSecrets([
+      `AWS_SECRET_ACCESS_KEY=${awsSecret}`,
+      `APP_PRIVATE_KEY=${appKey}`,
+      `STRIPE_SECRET_KEY=${stripe}`,
+      `AWS_ACCESS_KEY_ID=${fake('AKIA', 'ABCDEFGH', 'IJKLMNOP')}`,
+    ].join('\n'))
+    expect(output).not.toContain(awsSecret)
+    expect(output).not.toContain(appKey)
+    expect(output).not.toContain(stripe)
+    expect(output).not.toContain('AKIA')
+    expect(output.match(/\[REDACTED/g)?.length).toBeGreaterThanOrEqual(4)
+  })
+
   it('does not redact ordinary words or numbers', () => {
     const input = 'The password policy has 12 characters; tokenization is not a token. maxRetries = 1.'
     expect(redactSecrets(input)).toBe(input)
   })
 
   it('redacts recursively without mutating the source', () => {
+    const stripe = fake('sk_live_', 'NOT_A_REAL_SECRET_VALUE')
     const source = {
       message: `failed with ${fake('sk-proj-', 'abcdefghijklmnopqrstuvwxyz', '0123456789')}`,
       nested: ['Bearer abcdefghijklmnopqrstuvwxyz', { note: 'api_key=abcdefghijk' }],
+      stripe: `STRIPE_SECRET_KEY=${stripe}`,
     }
     const output = redactDeep(source)
     expect(output.message).toContain('[REDACTED API KEY]')
     expect(output.nested[0]).toContain('[REDACTED]')
     expect((output.nested[1] as { note: string }).note).toContain('[REDACTED]')
+    expect(output.stripe).not.toContain(stripe)
     expect(source.message).toContain('sk-proj-')
   })
 
