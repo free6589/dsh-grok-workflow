@@ -225,6 +225,8 @@ Result: **PASS**.
   `npm pack --dry-run`.
 - Run `40176223802` (commit `03c9a43`): **PASS**, Node 22 and Node 24 jobs;
   watcher security tests (51 total) included.
+- Run `40176627051` (commit `aa0e9bb`): **PASS**, Node 22 and Node 24 jobs;
+  final documentation and live-watcher evidence.
 - The workflow uses `actions/checkout@v4` and `actions/setup-node@v4`; GitHub
   reports a Node 20 deprecation annotation but both jobs completed successfully.
 
