@@ -440,10 +440,12 @@ tests:
 - Install command verified against project metadata: `dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow`; requirements remain DSH `0.2.1-rc.2`, Node.js >=22, and a profile with workflow/subagent services.
 
 
-### Release workflow proposal — NOT_RUN
+### First release v0.1.0 — published
 
-- Reviewed the proposed workflow at `.github/workflows/release.yml` on branch `chore/release-and-versioning`.
-- Verified from DSH `0.2.1-rc.2` source that install specs accept a GitHub shorthand with a `#ref` suffix; the upstream parser tests include examples such as `gitlab:a/b#main` and hosted URLs with `#v1`.
-- **NOT_RUN:** Actual GitHub Release workflow execution. No version tag was pushed as part of this proposal, so the automated publish steps have not run.
-- **NOT_RUN:** Local DSH install from a version tag; no first-release tag exists yet.
-- The release workflow's first end-to-end validation is intentionally deferred until after merge and push of `v0.1.0`.
+- PR #18 merged to `main` as `7904e23`; main CI `40182707932` passed on Node 22 and Node 24.
+- First tag-triggered release run `40182588171` failed in the changelog extractor: the regex literal contained an extra backslash from the YAML/heredoc escaping.
+- Fixed in `a7d5a62` (`fix: correct changelog section regex in release workflow`); the tag was recreated at that commit before any GitHub Release existed.
+- Final tag `v0.1.0` (tag object `f175ada8a7533a5f61c06a75e5a457e32b37579b`) points to `a7d5a6267c471a6ed73e44ac02092f59942c508a`.
+- Release workflow `40182751006` — **PASS** on Node 22 and Node 24, including typecheck, lint, build, `lib/` consistency, tests, package checks, and release creation.
+- GitHub Release: https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.1.0; asset `dsh-grok-workflow-0.1.0.tgz` (61,281 bytes).
+- **NOT_RUN:** local DSH install from the `#v0.1.0` spec. The release/tag and asset are published; tag-pinned installation still needs a separate isolated-profile smoke test.

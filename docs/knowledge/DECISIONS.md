@@ -114,7 +114,7 @@ Each entry records the decision, evidence, alternatives, and status.
 
 ## D-008 — Publish version-tagged GitHub Releases with preflight checks
 
-- **Status:** PROPOSED (pending PR review)
+- **Status:** CONFIRMED; `v0.1.0` released on 2026-10-25.
 - **Date:** 2026-10-25
 - **Decision:** Release only from a version tag `vMAJOR.MINOR.PATCH` after the matching release commit has been merged to `main` and CI passes. Use one bilingual changelog and keep `package.json` and `package-lock.json` in sync.
 - **Preflight:** Release Actions checks the tag/package version match, requires a changelog section for that version, runs typecheck/lint/build/tests, checks committed `lib/` artifacts, and validates the package file list before attaching an npm-format tarball to a GitHub Release.

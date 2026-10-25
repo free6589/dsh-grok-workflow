@@ -147,13 +147,13 @@ dsh plugin --profile grok-workflow-dev remove dsh-grok-workflow
 
 ## 版本与更新日志
 
-当前仓库的 package 版本号是 `0.1.0`。代码提交不会自动变成正式版本。GitHub 上存在对应 Release 和标签后，可以通过标签固定安装版本或回退，例如：
+当前仓库的 package 版本号是 `0.1.0`，`v0.1.0` 的 GitHub Release 和标签已经发布。可以通过标签固定安装版本或回退，例如：
 
 ```sh
 dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.1.0
 ```
 
-请只使用 GitHub 上真实存在的版本标签。首个 `v0.1.0` 标签会在发布流程合并、主分支检查通过后创建；在此之前，请继续使用上面的未固定版本安装命令。版本规则和回退步骤见[更新日志](CHANGELOG.md)与[版本发布指南](docs/RELEASING.md)。
+请只使用 GitHub 上真实存在的版本标签。`v0.1.0` 标签已经发布；上面的未固定版本命令跟随 `main`，不会固定到某个发布版本。版本规则和回退步骤见[更新日志](CHANGELOG.md)与[版本发布指南](docs/RELEASING.md)。
 
 ## 测试与开发
 

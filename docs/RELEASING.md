@@ -42,20 +42,13 @@ Every user-visible fix or feature should first be listed under `[Unreleased]` in
 
 ## First version / 首次发版
 
-The manifest currently declares `0.1.0`, and the repository has no GitHub Release yet. After this release-management change is merged into `main` and the main-branch CI passes, create the first tag on the merged `main` commit:
+`v0.1.0` was published on 2026-10-25 from commit `a7d5a62`; the release workflow run `40182751006` passed and created the GitHub Release with the package tarball.
 
-当前 package manifest 中的版本号是 `0.1.0`，仓库还没有 GitHub Release。版本管理改动合并到 `main` 且主分支 CI 通过后，在合并后的 `main` 提交上创建首个标签：
+`v0.1.0` 已于 2026-10-25 从提交 `a7d5a62` 发布；Release workflow `40182751006` 通过，并创建了带插件压缩包的 GitHub Release。
 
-```sh
-git switch main
-git pull --ff-only
-git tag v0.1.0
-git push origin v0.1.0
-```
+For the next release, follow the checklist below. The tag must point to a commit on `main` whose `package.json` version and `CHANGELOG.md` section match the tag. The workflow runs typecheck, lint, build, `lib/` consistency, tests, package checks, and only then creates the Release.
 
-That tag triggers `.github/workflows/release.yml`. It will verify that the tag is exactly the version in `package.json`, verify that a `[0.1.0]` section exists in the changelog, run tests on Node.js 22 and 24, check `lib/` consistency, and attach the package archive to the Release.
-
-推送标签会触发 `.github/workflows/release.yml`。工作流会确认标签版本与 `package.json` 完全一致、更新日志中存在 `[0.1.0]` 章节，在 Node.js 22 和 24 上运行测试、检查 `lib/` 构建产物，并将插件压缩包附加到 Release。
+后续发版按下面的检查清单执行。标签必须指向 `main` 上的提交，且 `package.json` 版本和 `CHANGELOG.md` 章节都要与标签一致。工作流会依次运行 typecheck、lint、build、`lib/` 一致性检查、测试和打包检查，全部通过后才创建 Release。
 
 ## Publish a later version / 发布后续版本
 
@@ -108,6 +101,6 @@ dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.
 dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.1.0
 ```
 
-Replace `v0.1.0` with a tag that is present on GitHub. Until the first tag is published, keep using the unpinned install command in the README. Restart the profile after changing the installed version.
+Replace `v0.1.0` with a tag that is present on GitHub. The `v0.1.0` tag is published; the unpinned README command follows `main` and does not pin a release. Restart the profile after changing the installed version.
 
-请把示例中的 `v0.1.0` 替换成 GitHub 上实际存在的标签。首个标签发布前，仍使用 README 中未固定版本的安装命令。切换版本后请重启对应 DSH profile。
+请把示例中的 `v0.1.0` 替换成 GitHub 上实际存在的标签。`v0.1.0` 已发布；README 中未固定版本的命令跟随 `main`，不会固定到发布版本。切换版本后请重启对应 DSH profile。
