@@ -337,3 +337,11 @@ tests:
 
 - Clean-DSH-profile installation is executed locally; CI has not yet added a
   separate clean-profile install job.
+
+
+## Issue #11 cloud PR — watcher prompt injection boundary
+
+- **Scope:** Convert issue watcher event payloads from plain-text interpolation to compact JSON; mark the payload as untrusted before and after the block; add a fake hostile comment with an embedded delimiter to `test/issue-watch.spec.ts`.
+- **Local commands:** `bash -n scripts/watch-issues.sh` and the Vitest watcher test are **NOT_RUN** in the cloud environment. The container cannot access GitHub directly and does not have the repository checkout/dependencies mounted.
+- **CI:** NOT_RUN at time this record was written. Do not mark this change PASS until the PR's actual Node 22 and Node 24 Actions results are inspected.
+- **Real DSH runtime:** NOT_RUN; this is local-agent-only validation.
