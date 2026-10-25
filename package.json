@@ -45,6 +45,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "oxlint src test",
     "test": "npm run build && vitest run",
+    "test:e2e": "scripts/e2e-headless-in-turn.sh",
     "test:unit": "vitest run test/composition.spec.ts test/orchestrator.spec.ts test/redact.spec.ts test/input.spec.ts test/criterion.spec.ts test/report.spec.ts test/plugin-lifecycle.spec.ts test/engine-contract.spec.ts test/gate.spec.ts test/history.spec.ts test/routing.spec.ts",
     "test:loader": "npm run build && vitest run test/loader.spec.ts",
     "ci": "npm run typecheck && npm run lint && npm test"

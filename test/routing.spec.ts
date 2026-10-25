@@ -83,6 +83,15 @@ describe('per-role routing configuration', () => {
     expect(config.synthesis).toBe('model')
   })
 
+  it('defaults the answer strategy to in-turn and keeps the older two selectable', () => {
+    // t24 measured that a one-shot headless app tears the tree down when the turn
+    // closes, which loses a relayed/apped answer (G-18/F9). `in-turn` is therefore
+    // the default; the other two stay available and revertible.
+    expect(resolveConfig({}).answerStrategy).toBe('in-turn')
+    expect(resolveConfig({ answerStrategy: 'relay' }).answerStrategy).toBe('relay')
+    expect(resolveConfig({ answerStrategy: 'append' }).answerStrategy).toBe('append')
+  })
+
   it('derives the child cap from the effective chains, not from attempts alone', () => {
     const plain = resolveConfig({})
     const routed = resolveConfig({ roles: roles([{ model: 'a' }, { model: 'b' }], [{ model: 'c' }]) })
@@ -187,6 +196,39 @@ describe('generated script routing', () => {
       'format-error',
       'unknown',
     ])
+  })
+
+  it('treats a null structured result as a format error and advances the chain', async () => {
+    // The guest collapses "child failed" and "no structured value" into `null`, so
+    // a null result must be classified, never read as success (R-14 fail-closed).
+    const calls: string[] = []
+    const agent: ScriptAgent = async (_prompt, options) => {
+      calls.push(options.model ?? 'inherit')
+      if (options.label.startsWith('grok-worker')) {
+        if (options.model === 'w1') return null
+        return execution()
+      }
+      return verification(task('a'))
+    }
+    const run = await runWorkflowScript(WORKFLOW_SCRIPT, args({ roles: roles([{ model: 'w1' }, { model: 'w2' }]) }), agent)
+    const failed = run.report.routes.find(entry => entry.outcome === 'failed')!
+    expect(failed).toMatchObject({ role: 'worker', chainIndex: 0, route: 'w1', failureClass: 'format-error' })
+    expect(failed.reason).toContain('no valid structured result')
+    expect(run.report.status).toBe('completed')
+    expect(calls).toContain('w2')
+  })
+
+  it('does not call the rest of the chain when the first route answers', async () => {
+    const calls: string[] = []
+    const agent: ScriptAgent = async (_prompt, options) => {
+      calls.push(options.model ?? 'inherit')
+      if (options.label.startsWith('grok-worker')) return execution()
+      return verification(task('a'))
+    }
+    const run = await runWorkflowScript(WORKFLOW_SCRIPT, args({ roles: roles([{ model: 'w1' }, { model: 'w2' }, { model: 'w3' }]) }), agent)
+    expect(calls.filter(model => model.startsWith('w'))).toEqual(['w1'])
+    expect(run.report.routes.filter(entry => entry.outcome === 'failed')).toHaveLength(0)
+    expect(run.report.routes.map(entry => entry.chainIndex)).toEqual([0, 0])
   })
 
   it('retries the same route when the verifier rejects the work', async () => {

@@ -17,13 +17,23 @@
  * step and states the reason, because passing the message through would let the
  * main model answer directly.
  *
- * Deployment precondition (design note, not a guarantee): the run continues
- * after the turn ends, so the agent tree must stay alive until the workflow
- * settles. A one-shot app tears the tree down as soon as the turn closes
- * `blocked`, which aborts the run and fails the delivery. Long-lived apps are
- * unaffected. Keep-alive options — a dedicated maintenance task or a child run
- * held open until the run settles — are **not implemented and not measured**;
- * the measured facts are in docs/knowledge/WORKFLOW-DESIGN.md (G-18, F9, NR-1).
+ * Three answer strategies, all fail-closed:
+ * - `in-turn` (**default**): await the run inside this listener, then `enter`
+ *   the step with the report, so the main model finalises it while the turn is
+ *   still open. The only strategy that survives a one-shot app: with `relay`
+ *   and `append` the run continues after the turn closes `blocked`, and a
+ *   one-shot process tears the agent tree down at that moment (G-18/F9), which
+ *   loses the answer and breaks R-001. Measured end to end with this plugin's own
+ *   strategy (t25: exit 0 with the report vs exit 1 and no output for `relay`).
+ * - `relay`: return `reject`, run in the background, deliver in a new turn.
+ *   Needs a long-lived app to keep the tree alive; not measurable in headless
+ *   one-shot mode (NR-1).
+ * - `append`: like `relay`, but writes into the closed turn (`surfaceOp:'append'`);
+ *   degraded, no stream and no usage accounting (NR-3).
+ *
+ * Only `relay`/`append` use the per-agent queue, because only they can have several
+ * runs in flight for one agent. `in-turn` is already serialized by the loop (one step
+ * at a time) and keeps its own bound through `maxActiveRuns`.
  */
 
 import type { Context } from '@deepseek-ai/cordis'
@@ -31,7 +41,7 @@ import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
 import type { Session } from '@deepseek-ai/dsh-session'
 import { createAssistantMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
-import { noticeText, relayText, RELAY_SOURCE_KIND } from './answer.js'
+import { noticeEnterText, noticeText, relayText, RELAY_SOURCE_KIND } from './answer.js'
 import { collectHistory, composeObjective } from './history.js'
 import { TASK_LIMITS } from './input.js'
 import { alreadyRouted, deliveryKey, recordDelivery } from './records.js'
@@ -39,7 +49,7 @@ import type { DeliveryPhase } from './records.js'
 import { redactError } from './redact.js'
 import type { ActiveState, RunOutcome, WorkflowLogger } from './run.js'
 import { runWorkflow } from './run.js'
-import type { ResolvedConfig } from './types.js'
+import type { ResolvedConfig, WorkflowReport } from './types.js'
 
 /** Payload shape of one `agent/pre-step` dispatch. */
 export interface PreStepPayload {
@@ -80,6 +90,17 @@ interface AgentQueue {
 type Classification =
   | { kind: 'pass'; reason: string }
   | { kind: 'admit'; agent: Agent; agentId: string; key: string; request: string; turn: number }
+
+/**
+ * Workflow answer for one admitted batch, before a transport is chosen.
+ *
+ * `report` and `notice` are kept apart because they are not interchangeable: a
+ * report means a run happened and the batch is claimed for good, while a notice
+ * means nothing ran and the batch must stay routable.
+ */
+type Answer =
+  | { kind: 'report'; report: WorkflowReport; outcome: string }
+  | { kind: 'notice'; reason: string; outcome: string }
 
 /** Plain text of one user message. */
 function textOf(message: UserMessage): string {
@@ -243,8 +264,92 @@ export function installGate(deps: GateDeps): boolean {
     }, logger)
   }
 
+  const entryOf = (verdict: Extract<Classification, { kind: 'admit' }>, payload: PreStepPayload): GateEntry => ({
+    key: verdict.key,
+    agentId: verdict.agentId,
+    messageIds: payload.messages.map(message => String(message.id)).sort(),
+    turn: verdict.turn,
+    step: payload.step,
+  })
+
   /**
-   * Deliver one text and record the outcome; never throws.
+   * Refusals that need no run at all.
+   *
+   * Both are stated to the user instead of letting the model answer, and neither
+   * claims the batch (`failed`, not `delivered`), so a corrected message can
+   * still be routed later.
+   */
+  const refusalOf = (
+    verdict: Extract<Classification, { kind: 'admit' }>,
+  ): { reason: string; outcome: string } | undefined => {
+    if (verdict.request.trim() === '') {
+      // An attachment-only or empty message has nothing to route: refuse it
+      // explicitly instead of spending a full workflow run on an empty objective.
+      return { reason: 'the message contains no text to route', outcome: 'empty-request' }
+    }
+    if (`Current request:\n${verdict.request}`.length > TASK_LIMITS.objectiveChars) {
+      // Too large to route: refuse and say so instead of letting the model answer.
+      return {
+        reason: `the message is longer than the ${TASK_LIMITS.objectiveChars}-character workflow objective limit`,
+        outcome: 'objective-too-long',
+      }
+    }
+    return undefined
+  }
+
+  /**
+   * Run the workflow for one admitted batch and produce its answer.
+   *
+   * Composes the objective here, not at admission: a queued follow-up must see
+   * the answer the previous run just delivered, so history is read as late as
+   * possible. Never throws — a run that cannot start becomes a notice.
+   */
+  const produceAnswer = async (
+    agent: Agent,
+    request: string,
+    signal?: AbortSignal,
+  ): Promise<Answer> => {
+    const objective = composeObjective(
+      collectHistory(sessionOf(agent), { turns: config.historyTurns, chars: config.historyChars }),
+      request,
+      TASK_LIMITS.objectiveChars,
+    )
+    if (objective === undefined) {
+      return {
+        kind: 'notice',
+        reason: `the message is longer than the ${TASK_LIMITS.objectiveChars}-character workflow objective limit`,
+        outcome: 'objective-too-long',
+      }
+    }
+    let outcome: RunOutcome
+    try {
+      // The gate owns the user-visible answer, so failures become reports here;
+      // only conditions that prevent starting at all reach the catch below.
+      outcome = await runWorkflow({
+        ctx, config, state, logger, agent, objective, failureMode: 'report',
+        ...signal === undefined ? {} : { signals: [signal] },
+      })
+    } catch (error) {
+      // Busy instance, unloaded plugin or an unbuildable request: state it, do not bypass.
+      const reason = redactError(error)
+      logger.warn(`gate could not start the workflow: ${reason}`)
+      return { kind: 'notice', reason, outcome: 'start-failed' }
+    }
+    return {
+      kind: 'report',
+      report: outcome.report,
+      outcome: outcome.ok ? outcome.report.status : (outcome.cause ?? 'failed'),
+    }
+  }
+
+  /** User-visible text for one answer under one strategy. */
+  const answerText = (answer: Answer, inTurn: boolean): string => {
+    if (answer.kind === 'report') return relayText(answer.report)
+    return inTurn ? noticeEnterText(answer.reason) : noticeText(answer.reason)
+  }
+
+  /**
+   * Deliver one answer in a later turn and record the outcome; never throws.
    *
    * Only a real workflow report may mark the batch `delivered`: a notice means no
    * run happened, so the batch must stay routable (phase `failed`).
@@ -252,55 +357,103 @@ export function installGate(deps: GateDeps): boolean {
   const deliverAndRecord = async (
     agent: Agent,
     entry: GateEntry,
-    text: string,
-    outcome: string,
-    kind: 'report' | 'notice' = 'report',
+    answer: Answer,
   ): Promise<void> => {
+    const text = answerText(answer, false)
     const delivered = config.answerStrategy === 'append'
       ? await deliverAppend(agent, text, entry.turn, entry.step ?? 0)
       : await deliverRelay(agent, text)
-    if (kind === 'report' && delivered) {
-      record(agent, entry, 'delivered', outcome)
+    if (answer.kind === 'report' && delivered) {
+      record(agent, entry, 'delivered', answer.outcome)
       return
     }
-    record(agent, entry, 'failed', delivered ? outcome : 'delivery-failed')
+    record(agent, entry, 'failed', delivered ? answer.outcome : 'delivery-failed')
     if (!delivered) logger.warn(`gate could not deliver the workflow answer for ${entry.key}`)
   }
 
-  /** Run the workflow for one admitted batch, then deliver its report. */
-  const runAdmitted = async (
-    agent: Agent,
-    entry: GateEntry,
-    request: string,
-  ): Promise<void> => {
-    // Compose here, not at admission: a queued follow-up must see the answer the
-    // previous run just delivered, so history is read as late as possible.
-    const objective = composeObjective(
-      collectHistory(sessionOf(agent), { turns: config.historyTurns, chars: config.historyChars }),
-      request,
-      TASK_LIMITS.objectiveChars,
-    )
-    if (objective === undefined) {
-      record(agent, entry, 'failed', 'objective-too-long')
-      await deliverAndRecord(agent, entry, noticeText(
-        `the message is longer than the ${TASK_LIMITS.objectiveChars}-character workflow objective limit`,
-      ), 'objective-too-long', 'notice')
+  /**
+   * Admit one batch and answer it after the turn closes (`relay`/`append`).
+   *
+   * Kept separate so the listener itself stays total: this function may throw,
+   * the listener turns any throw into a refusal (never a silent pass).
+   */
+  const admitInBackground = (
+    verdict: Extract<Classification, { kind: 'admit' }>,
+    payload: PreStepPayload,
+  ): void => {
+    const { agent } = verdict
+    const entry = entryOf(verdict, payload)
+    const refusal = refusalOf(verdict)
+    if (refusal !== undefined) {
+      record(agent, entry, 'failed', refusal.outcome)
+      void deliverAndRecord(agent, entry, { kind: 'notice', reason: refusal.reason, outcome: refusal.outcome })
       return
     }
-    let outcome: RunOutcome
-    try {
-      // The gate owns the user-visible answer, so failures become reports here;
-      // only conditions that prevent starting at all reach the catch below.
-      outcome = await runWorkflow({ ctx, config, state, logger, agent, objective, failureMode: 'report' })
-    } catch (error) {
-      // Busy instance, unloaded plugin or an unbuildable request: state it, do not bypass.
-      const reason = redactError(error)
-      logger.warn(`gate could not start the workflow: ${reason}`)
-      await deliverAndRecord(agent, entry, noticeText(reason), 'start-failed', 'notice')
+    const accepted = enqueue(verdict.agentId, async () => {
+      await deliverAndRecord(agent, entry, await produceAnswer(agent, verdict.request))
+    })
+    if (accepted) {
+      // Recorded only once the run is really queued: a refused batch must stay
+      // routable, while an accepted one is claimed for good.
+      record(agent, entry, 'started', 'admitted')
       return
     }
-    const status = outcome.report.status
-    await deliverAndRecord(agent, entry, relayText(outcome.report), outcome.ok ? status : (outcome.cause ?? 'failed'))
+    logger.warn(`gate queue is full for ${verdict.agentId}: refusing ${verdict.key}`)
+    record(agent, entry, 'failed', 'queue-full')
+    // Never await delivery here: this listener runs inside the step driver and
+    // `whenIdle()` cannot resolve until it returns.
+    void deliverAndRecord(agent, entry, {
+      kind: 'notice',
+      reason: `this agent already has ${config.maxQueuedMessages} queued message(s) waiting for the workflow`,
+      outcome: 'queue-full',
+    })
+  }
+
+  /** The step message that carries the report into the open turn. */
+  const enterMessage = (text: string): UserMessage => createUserMessage({
+    content: [{ type: 'text', text }],
+    source: { kind: RELAY_SOURCE_KIND },
+  })
+
+  /**
+   * Answer inside the open step (`in-turn`).
+   *
+   * The turn stays open for the whole run, so the report is entered as the step's
+   * message and the main model finalises it in the same turn. Cancellation stays
+   * honest: the turn's own signal is passed into the run, and an aborted turn
+   * returns `reject` instead of entering a step nobody will read. This path never
+   * waits for `whenIdle()` — the turn is the thing that would go idle.
+   */
+  const answerInTurn = async (
+    verdict: Extract<Classification, { kind: 'admit' }>,
+    payload: PreStepPayload,
+  ): Promise<PreStepDecision> => {
+    const { agent } = verdict
+    const entry = entryOf(verdict, payload)
+    const signal = payload.signal
+    const aborted = (): boolean => signal?.aborted === true
+    const enter = (text: string): PreStepDecision => ({ kind: 'enter', messages: [enterMessage(text)] })
+    if (aborted()) {
+      record(agent, entry, 'failed', 'aborted')
+      return { kind: 'reject' }
+    }
+    const refusal = refusalOf(verdict)
+    if (refusal !== undefined) {
+      record(agent, entry, 'failed', refusal.outcome)
+      return enter(answerText({ kind: 'notice', reason: refusal.reason, outcome: refusal.outcome }, true))
+    }
+    // `started` before the wait: a crash inside the run must not leave the batch
+    // routable, because the workflow may already have executed tool effects.
+    record(agent, entry, 'started', 'admitted')
+    const answer = await produceAnswer(agent, verdict.request, signal)
+    if (aborted()) {
+      // The turn was cancelled while the run was in flight: nobody will read an
+      // entered step, and the run already stopped on the same signal.
+      record(agent, entry, 'failed', 'aborted')
+      return { kind: 'reject' }
+    }
+    record(agent, entry, answer.kind === 'report' ? 'delivered' : 'failed', answer.outcome)
+    return enter(answerText(answer, true))
   }
 
   /** Serialize one agent's batches and bound the queue. */
@@ -322,55 +475,6 @@ export function installGate(deps: GateDeps): boolean {
     return true
   }
 
-  /**
-   * Admit one batch: bound the queue, start the run, and arrange delivery.
-   *
-   * Kept separate so the listener itself stays total: this function may throw,
-   * the listener turns any throw into a refusal (never a silent pass).
-   */
-  const admit = (verdict: Extract<Classification, { kind: 'admit' }>, payload: PreStepPayload): void => {
-    const { agent } = verdict
-    const entry: GateEntry = {
-      key: verdict.key,
-      agentId: verdict.agentId,
-      messageIds: payload.messages.map(message => String(message.id)).sort(),
-      turn: verdict.turn,
-      step: payload.step,
-    }
-    if (verdict.request.trim() === '') {
-      // An attachment-only or empty message has nothing to route: refuse it
-      // explicitly instead of spending a full workflow run on an empty objective.
-      record(agent, entry, 'failed', 'empty-request')
-      void deliverAndRecord(agent, entry, noticeText('the message contains no text to route'), 'empty-request', 'notice')
-      return
-    }
-    if (`Current request:\n${verdict.request}`.length > TASK_LIMITS.objectiveChars) {
-      // Too large to route: refuse and say so instead of letting the model answer.
-      // A refusal that launched nothing must not become a permanent block.
-      record(agent, entry, 'failed', 'objective-too-long')
-      void deliverAndRecord(agent, entry, noticeText(
-        `the message is longer than the ${TASK_LIMITS.objectiveChars}-character workflow objective limit`,
-      ), 'objective-too-long', 'notice')
-      return
-    }
-    const accepted = enqueue(verdict.agentId, async () => {
-      await runAdmitted(agent, entry, verdict.request)
-    })
-    if (accepted) {
-      // Recorded only once the run is really queued: a refused batch must stay
-      // routable, while an accepted one is claimed for good.
-      record(agent, entry, 'started', 'admitted')
-      return
-    }
-    logger.warn(`gate queue is full for ${verdict.agentId}: refusing ${verdict.key}`)
-    record(agent, entry, 'failed', 'queue-full')
-    // Never await delivery here: this listener runs inside the step driver and
-    // `whenIdle()` cannot resolve until it returns.
-    void deliverAndRecord(agent, entry, noticeText(
-      `this agent already has ${config.maxQueuedMessages} queued message(s) waiting for the workflow`,
-    ), 'queue-full', 'notice')
-  }
-
   const handle = async (payload: PreStepPayload, next: () => Promise<PreStepDecision>): Promise<PreStepDecision> => {
     let verdict: Classification
     try {
@@ -383,8 +487,23 @@ export function installGate(deps: GateDeps): boolean {
     // Pass-through calls the next listener untouched: a foreign failure must
     // surface as that listener's failure, not as this gate's refusal.
     if (verdict.kind === 'pass') return next()
+    if (config.answerStrategy === 'in-turn') {
+      try {
+        return await answerInTurn(verdict, payload)
+      } catch (error) {
+        // Totality with an answer: an internal failure is still stated, because a
+        // plain refusal would leave a one-shot app with no user-visible output.
+        const reason = redactError(error)
+        logger.warn(`gate could not answer in-turn: ${reason}`)
+        try {
+          return { kind: 'enter', messages: [enterMessage(noticeEnterText(reason))] }
+        } catch {
+          return { kind: 'reject' }
+        }
+      }
+    }
     try {
-      admit(verdict, payload)
+      admitInBackground(verdict, payload)
     } catch (error) {
       // Totality: a throw here would end the turn with an error and no answer.
       logger.warn(`gate could not admit the message: ${redactError(error)}`)

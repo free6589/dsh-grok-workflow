@@ -118,6 +118,8 @@ Paths are inside
 | E-34 | Failures raised while preparing a request (e.g. `UNSUPPORTED_REASONING_EFFORT` at `dsh-llm/lib/index.js:2191`, `:2195`) escape the retry loop and never reach `agent/request-error` | SOURCE (`:1130-1146` dispatch condition) | SOURCE-CONFIRMED |
 | E-35 | An `enter` override does **not** lose the runtime-context: `step()` appends an unadmitted context message at the end of the batch | `dsh-agent-loop/lib/index.js:1066-1073` | SOURCE-CONFIRMED (corrects the t6 E-2 claim) |
 | E-37 | The guest `agent()` hook accepts per-child `provider`/`model` (`SUPPORTED_AGENT_OPTIONS`), passes them as `ChildStartRequest.provider/model` → subagent `agentOptions`; `effort`/`isolation`/`agentType` are **deferred** and throw `UNSUPPORTED_OPTION`, so per-role reasoning effort is not routable in v1 | `dsh-workflow-ptc/lib/index.js` guest `agent()` + host `startChild` | SOURCE-CONFIRMED; runtime-exercised through the contract harness (`test/engine-harness.ts`) |
+| E-38 | **in-turn delivery works end to end in a one-shot app**: the gate awaits the run inside `agent/pre-step`, then `enter`s the step with the validated report; real `dsh headless` run with the plugin's own `answerStrategy: in-turn` printed the report (`Grok workflow: COMPLETED`, 6 s of child sessions) and exited **0** | t25 headless run, `scripts/e2e-headless-in-turn.sh` | RUNTIME (real model: `bifrost-completions/runanywhere/deepseek-v4.1-flash`) |
+| E-39 | **the same prompt, profile and plugin with `answerStrategy: relay` produce nothing**: exit **1**, stdout empty, no report marker — the t18 EXP1c teardown reproduced with the shipped gate, which is why the default had to change | t25 contrast run, same script with a `relay` overlay | RUNTIME |
 | E-36 | `inbox.claim(target,turn)` returns the whole `next-step` batch plus at most one `next-turn` message, and emits no `discarded` record, so a claimed message cannot be recovered | `dsh-agent-loop/lib/index.js:103-111` | SOURCE-CONFIRMED (G-17) |
 
 ---
@@ -200,7 +202,7 @@ Paths are inside
 | **G-15** | `{kind:'enter', messages:[]}` is **not** a zero-cost swallow — other listeners inject context, so a model request still happens and the user sees an unrelated reply (E-19) | RUNTIME t18 EXP0 | A (routes a/b) | use `reject`; never rely on empty batches |
 | **G-16** | a `steer()` issued inside a `pre-step` listener is parked after a `reject` and never consumed (E-24) | RUNTIME t18 EXP3c | A | deliver from outside the listener, after `whenIdle`/turn close |
 | **G-17** | `inbox.claim` is irreversible and emits no `discarded` record, so a claimed user message cannot be restored (E-36) | SOURCE | A | the plugin must keep the original text for its own records/delivery |
-| **G-18** | a one-shot app tears the tree down when the turn ends `blocked`: the run aborts (`runtime disposed`) and later delivery fails (`scope is disposed`) (E-20) | RUNTIME t18 EXP1c | A (a/a') | hard precondition: a live tree while the run finishes (keep-alive child or long-lived app); headless/CI cannot verify (a)/(a') without it |
+| **G-18** | a one-shot app tears the tree down when the turn ends `blocked`: the run aborts (`runtime disposed`) and later delivery fails (`scope is disposed`) (E-20) | RUNTIME t18 EXP1c, re-measured t25 (E-39) | A (a/a') | **resolved for v1**: `answerStrategy: 'in-turn'` keeps the turn open and is now the default (E-38). The precondition still applies to `relay`/`append`, which stay selectable for long-lived surfaces and must be documented as such |
 | **G-19** | a plugin `assistant/message` written during the turn races the loop's own step messages; the later model message wins (E-26) | RUNTIME t18 EXP2a | (a') | write only after the turn closed |
 | **G-20** | a `blocked` turn produces a non-zero headless exit code, so successful gating looks like failure to scripts/CI (E-27) | RUNTIME | (a')/CI | document; optionally follow with a normal turn |
 | **G-21** | unguarded per-step `steer`/turn-stopping causes step runaway (10 steps in one turn) (E-25) | RUNTIME t18 EXP3-B | A | one-shot state flags for any step-level intervention |
@@ -279,9 +281,12 @@ verification matrix (ROADMAP §5.2).
 7. **Scope (U-7):** registering these hooks in a preset limits them to joined sessions;
    a global plugin row covers every agent in the process. The chosen scope must be stated
    in the user-facing docs together with the blast radius.
-8. **Deployment precondition (G-18):** the tree must stay alive while the run finishes.
-   One-shot headless runs abort the run at teardown; a long-lived app does not (web
-   `NOT_RUN`).
+8. **Deployment precondition (G-18) — removed by `in-turn`:** `relay`/`append` need the
+   tree to stay alive while the run finishes, which a one-shot headless app violates
+   (E-39). The default `in-turn` strategy holds the turn open instead, so the run cannot
+   outlive its tree and the answer is entered in the same turn (E-38); the precondition
+   now applies only to the two older strategies, which remain selectable for long-lived
+   surfaces (NR-1 for the GUI half).
 
 ### DD-2 — Answer production (one path, one switch)
 
@@ -299,12 +304,30 @@ Requirements the delivered answer must satisfy:
 - **N-7** `(a)` fidelity is model-dependent → the deliverable states that the host cannot
   verify relay wording (one exact-match sample only).
 
-Strategy `(a)` (default): `pre-step` reject → run → `await agent.whenIdle()` →
-`agent.followup(relayMessage(source.kind='grok-workflow'))` → normal turn, normal stream
-and usage. Strategy `(a')` (degraded): after the turn closed, append `user/message` then
-`assistant/message {turn, step, message, stream:[]}` with a truthful provider/model; accept
-G-19 ordering constraints and G-20 exit code. `(b)` advisory: redirect + gates, with the
-guarantee explicitly downgraded.
+**Implemented as three interchangeable strategies (`answerStrategy`), one path each:**
+
+| strategy | mechanism | survives a one-shot app | stream/usage | status |
+|---|---|---|---|---|
+| `in-turn` (**default**) | `pre-step` awaits `runWorkflow`, then `enter`s the step with the report message (`source.kind='grok-workflow'`); the main model finalises it in the **same** turn | **yes** (the turn never closes early) — E-38 | yes (ordinary turn) | shipped, measured |
+| `relay` | `pre-step` rejects → run in the background → `await agent.whenIdle()` → `agent.followup(relayMessage)` in a new turn | no — a one-shot process tears the tree down at `blocked` and the answer is lost (E-39) | yes | shipped, kept for long-lived surfaces (NR-1) |
+| `append` | reject → run → after the turn closed, append `user/message` + `assistant/message {turn, step, message, stream:[]}` with a truthful provider/model | no (same teardown; plus G-19 ordering, G-20 exit code) | degraded: no stream, no usage | shipped, degraded |
+
+**Why the default moved to `in-turn` (t25):** with `relay` — the previous default — the
+same prompt, profile and plugin produced *exit 1, empty stdout, no report at all* in
+`dsh headless` (E-39), which violates R-001 outright. The mechanism was never the workflow
+but the delivery timing. `in-turn` keeps the turn open, so the run cannot outlive its tree.
+Keeping the turn open costs one thing only: the turn lasts as long as the run, bounded by
+`timeoutMs` (default 30 min) — and `runWorkflow` also cancels the run when the turn's own
+signal aborts, so the wait always terminates (`exec.signal`/deadline/unload).
+
+**Fail-closed is unchanged and now stronger:** with the turn open there is no "later" that
+can be lost, so a failed run, a report-validation failure, a start failure, an over-long
+message and a queue refusal all reach the user as an entered notice or failure report in
+the same turn (`test/gate.spec.ts` "in-turn delivery" suite). The only silent case is a
+turn cancelled while the run is in flight: nobody would read an entered step, so the gate
+returns `reject` and the run is cancelled on the same signal.
+
+`(b)` advisory: redirect + gates, with the guarantee explicitly downgraded (not implemented).
 
 ### DD-3 — Conversation context and redaction
 
@@ -357,7 +380,10 @@ guarantee explicitly downgraded.
   (`routeBudgetFor` + `maxTotalAgentsFor`); without that, a run would abort mid-flight with
   `AGENT_CAP` the first time a fallback route is used.
 - Records: one redacted `plugin:grok-workflow/routing` ledger per run (switches and
-  failures only, ≤ 64 entries, ≤ 200-char reasons).
+  failures only, ≤ 64 entries, ≤ 200-char reasons). The ledger is written **only from
+  the validated `completed` branch**: when the engine fails or the script throws there
+  is no validated route trail to record, and a synthesised one would be invented evidence.
+  The failure itself still reaches the user (the gate answers with a failure report).
 
 **v1 = script layer (L1).** `runTask` already owns a bounded retry loop and `agent()`
 already accepts `{provider,model}`, so the chain is a lookup keyed by attempt index. This
@@ -499,6 +525,7 @@ FAIL**.
 | V-3 | the gate only recognises `source.kind === 'user'` | **scope kept, documented** (below) and raised as **U-8** for the user to decide whether to widen it |
 | V-4 | `installGate` fails open with a warning when the runtime has no `agent/pre-step` | **documented + switch added**: `gateRequired` (default `false`) turns the silent degradation into a load-time error; test `fails loading when the hook is missing and the gate is required` |
 | V-5 | composed-bundle listeners (`session-controller:2516`, `goal-round-driver:311/346`) can decide before our `reject` | **known limitation** recorded; composed-bundle anti-bypass is its own item after phase 3–4 acceptance |
+| t12-V5 | `recordRouting` writes only from the `completed` report branch, so an engine-level failure leaves no routing ledger | **documented** (DD-5, below) and covered by `writes no routing ledger when the engine failed before a report existed`: a failed run has no validated routes, and inventing one would fabricate evidence |
 
 **Gate scope boundary (V-3).** The gate polices `agent/pre-step` batches that carry at
 least one message whose `source.kind === 'user'`. Covered: CLI, Web GUI, headless (all
@@ -516,7 +543,7 @@ not be cited as working:
 
 | # | item | level achieved | why it matters |
 |---|---|---|---|
-| NR-1 | web long-lived profile, delivery while the parent is idle | nothing (deployment precondition inferred from G-18) | decides whether `(a)`/`(a')` work in the GUI at all |
+| NR-1 | web long-lived profile, delivery while the parent is idle | **partly closed by t25**: the one-shot half is measured both ways (E-38 works with `in-turn`, E-39 produces nothing with `relay`); the long-lived GUI half is still unmeasured | decides whether `relay`/`append` remain usable in the GUI at all — `in-turn` does not depend on it |
 | NR-2 | relay fidelity over many samples | one exact-match sample (E-22) | relay wording is unverifiable by design; a sample of one is not a guarantee |
 | NR-3 | `(a')` correct write order (after the turn closed) | the race was measured (E-26), the fix was not | the degraded strategy's viability |
 | NR-4 | settings `update`/`replace`/`mutate` writing to disk through a real Loader entry | nested path ops are source-confirmed (E-32) | whether stage 2 can edit chains at all |

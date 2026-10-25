@@ -180,9 +180,19 @@ safe assumption about the final decision.
 
 ### 5.2 One implementation path, one strategy switch (U-1)
 
-G-15 collapses the earlier two-route design: both viable routes start with `reject`, both
-run the workflow while the turn is closing, and both deliver afterwards. They differ only
-in **who writes the final answer**.
+**Updated by t25.** G-15 collapsed the earlier two-route design into "reject, then deliver
+after the turn closed". Real headless measurement then showed that this *timing* is what
+breaks a one-shot app: the tree is torn down when the turn closes, so the run aborts and the
+user gets nothing (E-39). The shipped switch therefore has three values, and the default is
+the one that keeps the turn open:
+
+| strategy | turn | delivery | one-shot app |
+|---|---|---|---|
+| `in-turn` **default (t25)** | stays open; `pre-step` awaits the run | `enter` the step with the validated report; the main model finalises it in the same turn | **works** (E-38: exit 0, report printed) |
+| `relay` | rejected, closes `blocked` | background run, then `agent.followup()` in a new turn | loses the answer (E-39: exit 1, zero output) |
+| `append` | rejected, closes `blocked` | plugin appends `assistant/message` after the turn closed | loses the answer; degraded (no stream/usage, G-19/G-20) |
+
+The steps below describe the `relay`/`append` timing (still accurate for those two).
 
 | step | what happens | evidence |
 |---|---|---|
@@ -193,12 +203,13 @@ in **who writes the final answer**.
 
 | strategy | writer | strengths | weaknesses |
 |---|---|---|---|
-| **(a) relay turn — DEFAULT** | main model, in a **new turn** opened by `agent.followup()` carrying the report with the plugin's own `source.kind` | real model turn: live stream, usage accounting, true provider/model metadata; GUI and headless both consume it normally; the relay message is precisely identifiable at the gate (RUNTIME-VERIFIED t18 ④); fidelity measured **exact** in the single sample taken | one extra turn of latency; relay text depends on model obedience (host cannot verify it); in a one-shot app the run is aborted when the tree tears down (G-18) |
+| **(a) relay turn — legacy** | main model, in a **new turn** opened by `agent.followup()` carrying the report with the plugin's own `source.kind` | real model turn: live stream, usage accounting, true provider/model metadata; GUI and headless both consume it normally; the relay message is precisely identifiable at the gate (RUNTIME-VERIFIED t18 ④); fidelity measured **exact** in the single sample taken | one extra turn of latency; relay text depends on model obedience (host cannot verify it); in a one-shot app the run is aborted when the tree tears down (G-18) |
 | **(a') direct append — DEGRADED** | plugin appends `assistant/message` | no second model call; the answer is the deterministic report text | level-B undocumented path; no stream/usage; plugin must fill provider/model; **ordering race** with the loop's own step messages unless written after the turn closes (G-19, RUNTIME-VERIFIED); the turn still ends `blocked` → one-shot exit code 1 (G-20); same teardown constraint (G-18) |
 | **(b) redirect + three gates — ADVISORY ONLY** | main model at the admitted step | no extra latency | not enforceable: `agent/request` cannot force `tool_choice` (E-6) and turn-stopping runs after the answer is committed (E-4); the model can answer directly and the workflow may not run at all |
 
-**Default = (a).** (a') is the switch for deployments that cannot accept a second model
-turn, with the G-19/G-20 consequences documented. (b) is retained only as an explicit
+**Default = `in-turn` since t25** (measured: E-38 vs E-39). `relay` (a) and `append` (a')
+remain selectable and revertible through `answerStrategy`; both keep the G-18 teardown
+precondition, so they are only safe in long-lived surfaces. (b) is retained only as an explicit
 advisory mode with a documented downgrade of the guarantee. `U-1` keeps the final choice
 with the user; the ordering above is the technical recommendation, not a user decision.
 
@@ -289,6 +300,7 @@ roles:
   synthesizer: []          # only with synthesis: model
 synthesis: deterministic   # deterministic | model
 maxRetries: 1
+answerStrategy: in-turn    # in-turn (default) | relay | append
 ```
 
 Rules enforced at load: chains ≤ 3 entries, ids ≤ 120 chars, no duplicate route inside a
@@ -472,6 +484,13 @@ concurrently.
 
 ## 12. Test strategy
 
+Layer 4 needs a real model, so it cannot run in CI. `scripts/e2e-headless-in-turn.sh` runs
+one real `dsh headless` turn with the plugin overlaid by file URL and asserts that the report
+reaches the user (exit 0 + report marker). It is the check that caught G-18/F9 and is the
+regression guard for `answerStrategy`; the in-turn *timing* itself is covered in CI by the
+`in-turn delivery` suite in `test/gate.spec.ts` (the listener must not settle before the run,
+must not open a follow-up turn, and must resolve on abort/deadline/unload).
+
 - **Layer 1 — deterministic unit:** role/chain ordering, cursor monotonicity, the
   classification table, budget accounting (including the R-12 invariants and their
   negative cases), the delivery key, config fail-fast (empty chain, missing role,
@@ -604,8 +623,9 @@ script-level v1 fallback and the merged answer path.
   rejected with a specific message.
 - **Phase 4 (old scope, superseded).** Role chains passed to the script, chain traversal in
   `runTask`, transport-vs-semantic separation, records.
-- **Phase 5 — mandatory entry (A).** Gate + delivery under the chosen strategy and scope,
-  including the F6 totality rule and the F9 precondition.
+- **Phase 5 — mandatory entry (A) — IMPLEMENTED (t9/t25).** Gate + delivery shipped; F9 is
+  closed for one-shot apps by the `in-turn` default (E-38/E-39), and the F6 totality rule is
+  covered by injected-throw tests and the composed-waterfall suites.
   Exit: Layer-5 anti-bypass assertions pass against the composed bundle; headless and
   (where available) Web GUI evidence recorded.
 - **Phase 6 — L2 request-level routing (optional, U-2).** Only if the loss of in-child
@@ -624,7 +644,7 @@ script-level v1 fallback and the merged answer path.
 
 | # | decision | options | recorded recommendation |
 |---|---|---|---|
-| U-1 | answer strategy | `(a)` relay turn / `(a')` direct append / `(b)` advisory | **(a)**, then (a'), then (b) |
+| U-1 | answer strategy | `in-turn` (keep the turn open) / `relay` / `append` / advisory | **`in-turn`, now the default** (t25: only strategy a one-shot app survives, E-38/E-39); `relay`/`append` stay selectable for long-lived surfaces |
 | U-2 | request-level routing ownership (only if L2 is adopted) | plugin-exclusive `prepend` + never delegate / none | plugin-exclusive — the cooperative option does not exist mechanically (t19 H-4); item kept for confirmation |
 | U-3 | dedicated synthesizer model call | yes / no (v1 keeps pure JS) | **no for v1**, revisit after cost measurement |
 | U-4 | parallel tasks on a shared working directory | serialize writes / read-only parallelism / as-is | serialize on overlap |

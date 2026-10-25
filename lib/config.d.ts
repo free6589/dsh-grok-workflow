@@ -24,7 +24,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     gateRequired: z<boolean, boolean, "defined">;
     gateScope: z<"process" | "preset", "process" | "preset", "defined">;
     gatePreset: z<string, string, "defined">;
-    answerStrategy: z<"relay" | "append", "relay" | "append", "defined">;
+    answerStrategy: z<"relay" | "append" | "in-turn", "relay" | "append" | "in-turn", "defined">;
     historyTurns: z<number, number, "defined">;
     historyChars: z<number, number, "defined">;
     maxQueuedMessages: z<number, number, "defined">;
@@ -100,7 +100,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     gateRequired: z<boolean, boolean, "defined">;
     gateScope: z<"process" | "preset", "process" | "preset", "defined">;
     gatePreset: z<string, string, "defined">;
-    answerStrategy: z<"relay" | "append", "relay" | "append", "defined">;
+    answerStrategy: z<"relay" | "append" | "in-turn", "relay" | "append" | "in-turn", "defined">;
     historyTurns: z<number, number, "defined">;
     historyChars: z<number, number, "defined">;
     maxQueuedMessages: z<number, number, "defined">;

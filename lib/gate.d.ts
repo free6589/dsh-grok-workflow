@@ -17,13 +17,23 @@
  * step and states the reason, because passing the message through would let the
  * main model answer directly.
  *
- * Deployment precondition (design note, not a guarantee): the run continues
- * after the turn ends, so the agent tree must stay alive until the workflow
- * settles. A one-shot app tears the tree down as soon as the turn closes
- * `blocked`, which aborts the run and fails the delivery. Long-lived apps are
- * unaffected. Keep-alive options — a dedicated maintenance task or a child run
- * held open until the run settles — are **not implemented and not measured**;
- * the measured facts are in docs/knowledge/WORKFLOW-DESIGN.md (G-18, F9, NR-1).
+ * Three answer strategies, all fail-closed:
+ * - `in-turn` (**default**): await the run inside this listener, then `enter`
+ *   the step with the report, so the main model finalises it while the turn is
+ *   still open. The only strategy that survives a one-shot app: with `relay`
+ *   and `append` the run continues after the turn closes `blocked`, and a
+ *   one-shot process tears the agent tree down at that moment (G-18/F9), which
+ *   loses the answer and breaks R-001. Measured end to end with this plugin's own
+ *   strategy (t25: exit 0 with the report vs exit 1 and no output for `relay`).
+ * - `relay`: return `reject`, run in the background, deliver in a new turn.
+ *   Needs a long-lived app to keep the tree alive; not measurable in headless
+ *   one-shot mode (NR-1).
+ * - `append`: like `relay`, but writes into the closed turn (`surfaceOp:'append'`);
+ *   degraded, no stream and no usage accounting (NR-3).
+ *
+ * Only `relay`/`append` use the per-agent queue, because only they can have several
+ * runs in flight for one agent. `in-turn` is already serialized by the loop (one step
+ * at a time) and keeps its own bound through `maxActiveRuns`.
  */
 import type { Context } from '@deepseek-ai/cordis';
 import type { Agent } from '@deepseek-ai/dsh-agent';

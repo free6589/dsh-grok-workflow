@@ -9,6 +9,16 @@ import { execution, task, verification } from './fixtures.js'
 import { runWorkflowScript } from './helpers.js'
 import { ROUTING_RECORD } from '../src/records.js'
 
+/**
+ * Install the gate with the `relay` strategy.
+ *
+ * `in-turn` is the default since t25 (it is the only strategy a one-shot app
+ * survives), so every test below names the strategy it is actually about.
+ */
+function applyWith(ctx: unknown, overrides: Record<string, unknown> = {}): void {
+  apply(ctx as never, { answerStrategy: 'relay', ...overrides })
+}
+
 /* ------------------------------------------------------------------ engine -- */
 
 interface EngineResult {
@@ -52,6 +62,10 @@ class FakeEngine {
     if (this.startError !== undefined) throw this.startError
     const run = new FakeRun(request)
     this.runs.push(run)
+    // Documented engine contract: `signal` "cancels the run when aborted". A fake
+    // that ignored it would let an in-turn wait hang forever, which is exactly the
+    // failure mode the cancellation tests must rule out.
+    request.signal?.addEventListener('abort', () => run.cancel('signal aborted'), { once: true })
     if (this.autoRun) {
       const tasks = [(request.args as { tasks?: unknown }).tasks].flat().filter(Boolean)
       const plan = tasks.length > 0 ? tasks as ReturnType<typeof task>[] : [task('a')]
@@ -191,8 +205,14 @@ function userMessage(text: string, kind: 'user' | 'runtime-context' | 'grok-work
   return createUserMessage({ content: [{ type: 'text', text }], source: { kind } as never }) as UserMessage
 }
 
-function payload(agent: FakeAgent, messages: UserMessage[], turn = 1, step = 1): Record<string, unknown> {
-  return { agent, messages, turn, step, signal: new AbortController().signal }
+function payload(
+  agent: FakeAgent,
+  messages: UserMessage[],
+  turn = 1,
+  step = 1,
+  signal: AbortSignal = new AbortController().signal,
+): Record<string, unknown> {
+  return { agent, messages, turn, step, signal }
 }
 
 function passingNext(messages: UserMessage[]) {
@@ -231,7 +251,7 @@ async function waitFor(predicate: () => boolean): Promise<void> {
 describe('mandatory entry gate', () => {
   it('passes an empty batch through so a tool continuation never starts a run', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never)
+    applyWith(ctx)
     const agent = new FakeAgent()
     const next = passingNext([])
     const decision = await ctx.preStep()(payload(agent, []), next)
@@ -242,7 +262,7 @@ describe('mandatory entry gate', () => {
 
   it('passes context-only batches through', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never)
+    applyWith(ctx)
     const agent = new FakeAgent()
     const context = [userMessage('runtime context', 'runtime-context')]
     const next = passingNext(context)
@@ -253,7 +273,7 @@ describe('mandatory entry gate', () => {
 
   it('passes the plugin relay message through instead of starting a second workflow', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never)
+    applyWith(ctx)
     const agent = new FakeAgent()
     const relay = [userMessage('report', 'grok-workflow')]
     const next = passingNext(relay)
@@ -264,7 +284,7 @@ describe('mandatory entry gate', () => {
 
   it('passes subagent steps through so recursion is impossible', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never)
+    applyWith(ctx)
     const agent = new FakeAgent({ header: { origin: 'subagent', delegationDepth: 1 } })
     const messages = [userMessage('child prompt')]
     const next = passingNext(messages)
@@ -275,7 +295,7 @@ describe('mandatory entry gate', () => {
 
   it('rejects an admitted user message and starts exactly one run', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never)
+    applyWith(ctx)
     const agent = new FakeAgent()
     const messages = [userMessage('summarize the repo')]
     const next = passingNext(messages)
@@ -288,7 +308,7 @@ describe('mandatory entry gate', () => {
 
   it('routes one user message only once even when pre-step fires again', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never)
+    applyWith(ctx)
     const session = Session.create('sess-dedupe' as never)
     const agent = new FakeAgent({ session })
     const messages = [userMessage('same message')]
@@ -304,7 +324,7 @@ describe('mandatory entry gate', () => {
 
   it('serializes a second message instead of running it concurrently', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never)
+    applyWith(ctx)
     const agent = new FakeAgent()
     await ctx.preStep()(payload(agent, [userMessage('first')]), passingNext([]))
     await waitFor(() => ctx.engine.startCalls.length === 1)
@@ -318,7 +338,7 @@ describe('mandatory entry gate', () => {
 
   it('refuses a message when the per-agent queue is full, without bypassing', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { maxQueuedMessages: 1 })
+    applyWith(ctx, { maxQueuedMessages: 1 })
     const agent = new FakeAgent()
     await ctx.preStep()(payload(agent, [userMessage('first')]), passingNext([]))
     await waitFor(() => ctx.engine.startCalls.length === 1)
@@ -333,7 +353,7 @@ describe('mandatory entry gate', () => {
 
   it('returns from the listener without waiting for the agent to become idle', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { maxQueuedMessages: 1 })
+    applyWith(ctx, { maxQueuedMessages: 1 })
     const agent = new FakeAgent()
     let releaseIdle: (() => void) | undefined
     agent.whenIdle.mockImplementation(() => new Promise<void>(resolve => { releaseIdle = resolve }))
@@ -353,7 +373,7 @@ describe('mandatory entry gate', () => {
 
   it('reads history when the run starts so a queued follow-up sees the previous answer', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never)
+    applyWith(ctx)
     const session = new FakeSession({ header: {} })
     const agent = new FakeAgent({ session })
     await ctx.preStep()(payload(agent, [userMessage('first request')]), passingNext([]))
@@ -373,7 +393,7 @@ describe('mandatory entry gate', () => {
 
   it('refuses a message explicitly when the queue is full and never retries it on its own', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { maxQueuedMessages: 1 })
+    applyWith(ctx, { maxQueuedMessages: 1 })
     const agent = new FakeAgent({ session: Session.create('sess-refusal' as never) })
     await ctx.preStep()(payload(agent, [userMessage('first')]), passingNext([]))
     await waitFor(() => ctx.engine.startCalls.length === 1)
@@ -395,7 +415,7 @@ describe('mandatory entry gate', () => {
 
   it('refuses a message with no text instead of burning a workflow run', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never)
+    applyWith(ctx)
     const agent = new FakeAgent({ session: Session.create('sess-empty' as never) })
     const decision = await ctx.preStep()(payload(agent, [userMessage('   ')]), passingNext([]))
     expect(decision).toEqual({ kind: 'reject' })
@@ -415,7 +435,7 @@ describe('mandatory entry gate', () => {
 
   it('writes a redacted routing ledger when a route switched during the run', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { roles: { worker: [{ model: 'good' }, { model: 'backup' }] } })
+    applyWith(ctx, { roles: { worker: [{ model: 'good' }, { model: 'backup' }] } })
     const session = Session.create('sess-routing' as never)
     const agent = new FakeAgent({ session })
     await ctx.preStep()(payload(agent, [userMessage('route me')]), passingNext([]))
@@ -444,7 +464,7 @@ describe('mandatory entry gate', () => {
   it('delivers the validated report as a relay message owned by the plugin', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
-    apply(ctx as never)
+    applyWith(ctx)
     const agent = new FakeAgent()
     await ctx.preStep()(payload(agent, [userMessage('do the thing')]), passingNext([]))
     await waitFor(() => agent.followups.length === 1)
@@ -459,7 +479,7 @@ describe('mandatory entry gate', () => {
 
   it('delivers an explicit failure answer when the engine reports an error', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never)
+    applyWith(ctx)
     const agent = new FakeAgent()
     await ctx.preStep()(payload(agent, [userMessage('doomed')]), passingNext([]))
     await waitFor(() => ctx.engine.runs.length === 1)
@@ -473,7 +493,7 @@ describe('mandatory entry gate', () => {
 
   it('delivers a failure answer when report validation rejects the engine value', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never)
+    applyWith(ctx)
     const agent = new FakeAgent()
     await ctx.preStep()(payload(agent, [userMessage('bad report')]), passingNext([]))
     await waitFor(() => ctx.engine.runs.length === 1)
@@ -486,7 +506,7 @@ describe('mandatory entry gate', () => {
   it('states a notice instead of throwing when the workflow cannot start', async () => {
     const ctx = new FakeContext()
     ctx.engine.startError = new Error('engine unavailable')
-    apply(ctx as never)
+    applyWith(ctx)
     const agent = new FakeAgent()
     const decision = await ctx.preStep()(payload(agent, [userMessage('anything')]), passingNext([]))
     expect(decision).toEqual({ kind: 'reject' })
@@ -498,7 +518,7 @@ describe('mandatory entry gate', () => {
 
   it('forwards bounded conversation history for a follow-up message', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never)
+    applyWith(ctx)
     const history = [
       createUserMessage({ content: [{ type: 'text', text: 'summarize README' }], source: { kind: 'user' } }),
       createAssistantMessage({ content: [{ type: 'text', text: 'README summary' }], source: { kind: 'model', provider: 'p', model: 'm' } as never }),
@@ -516,7 +536,7 @@ describe('mandatory entry gate', () => {
 
   it('refuses a message longer than the objective limit without running the workflow', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never)
+    applyWith(ctx)
     const agent = new FakeAgent()
     const decision = await ctx.preStep()(payload(agent, [userMessage('x'.repeat(4_001))]), passingNext([]))
     expect(decision).toEqual({ kind: 'reject' })
@@ -528,7 +548,7 @@ describe('mandatory entry gate', () => {
   it('records the delivery durably so a restart cannot start the run again', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
-    apply(ctx as never)
+    applyWith(ctx)
     const session = Session.create('sess-records' as never)
     const agent = new FakeAgent({ session })
     await ctx.preStep()(payload(agent, [userMessage('recorded')]), passingNext([]))
@@ -545,7 +565,7 @@ describe('mandatory entry gate', () => {
   it('keeps working when the session refuses the delivery record', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
-    apply(ctx as never)
+    applyWith(ctx)
     const broken = new FakeSession({ header: {} })
     const agent = new FakeAgent({ session: broken })
     await ctx.preStep()(payload(agent, [userMessage('no records')]), passingNext([]))
@@ -556,7 +576,7 @@ describe('mandatory entry gate', () => {
 
   it('never throws out of the listener when classification itself fails', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never)
+    applyWith(ctx)
     const exploding = {
       id: 'sess-explode',
       header: {},
@@ -577,14 +597,14 @@ describe('mandatory entry gate', () => {
 
   it('does not register the gate when mandatory entry is disabled', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { enforceGate: false })
+    applyWith(ctx, { enforceGate: false })
     expect(ctx.handlers.has('agent/pre-step')).toBe(false)
     expect(ctx.registeredTools).toHaveLength(1)
   })
 
   it('fails closed after the plugin was unloaded', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never)
+    applyWith(ctx)
     const agent = new FakeAgent()
     await ctx.dispose()
     const decision = await ctx.preStep()(payload(agent, [userMessage('late message')]), passingNext([]))
@@ -597,7 +617,7 @@ describe('mandatory entry gate', () => {
   it('writes the answer into the session when the append strategy is selected', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
-    apply(ctx as never, { answerStrategy: 'append' })
+    applyWith(ctx, { answerStrategy: 'append' })
     const session = new RecordingSession()
     const agent = new FakeAgent({ session })
     await ctx.preStep()(payload(agent, [userMessage('append please')]), passingNext([]))
@@ -613,7 +633,7 @@ describe('mandatory entry gate', () => {
   it('commits both messages of the append strategy to a real session log', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
-    apply(ctx as never, { answerStrategy: 'append' })
+    applyWith(ctx, { answerStrategy: 'append' })
     const session = Session.create('sess-append' as never)
     const agent = new FakeAgent({ session })
     await ctx.preStep()(payload(agent, [userMessage('append durably')]), passingNext([]))
@@ -628,7 +648,7 @@ describe('mandatory entry gate', () => {
   it('appends nothing when the session refuses the write', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
-    apply(ctx as never, { answerStrategy: 'append' })
+    applyWith(ctx, { answerStrategy: 'append' })
     const session = new RecordingSession()
     session.appendError = new Error('read-only session')
     const agent = new FakeAgent({ session })
@@ -639,7 +659,7 @@ describe('mandatory entry gate', () => {
 
   it('polices only sessions composed from the configured preset', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { gateScope: 'preset', gatePreset: 'strict-workflow' })
+    applyWith(ctx, { gateScope: 'preset', gatePreset: 'strict-workflow' })
     const outside = new FakeAgent({ session: new FakeSession({ header: { agentPreset: 'other-preset' } }) })
     const outsideNext = passingNext([])
     await ctx.preStep()(payload(outside, [userMessage('outside')]), outsideNext)
@@ -653,7 +673,7 @@ describe('mandatory entry gate', () => {
 
   it('requires a preset id when the scope is preset', () => {
     const ctx = new FakeContext()
-    expect(() => apply(ctx as never, { gateScope: 'preset' })).toThrow(/gatePreset/)
+    expect(() => applyWith(ctx, { gateScope: 'preset' })).toThrow(/gatePreset/)
   })
 })
 
@@ -663,3 +683,167 @@ function textOf(message: UserMessage): string {
     .map(block => (block as { type: string; text?: string }).type === 'text' ? (block as { text?: string }).text ?? '' : '')
     .join('\n')
 }
+
+/* -------------------------------------------------------------- in-turn -- */
+
+/** Session that exposes its plugin records, for ledger/record assertions. */
+function realSession(id: string): Session {
+  return Session.create(id as never)
+}
+
+function recordsOf(session: Session, type: string): unknown[] {
+  return session.ownEvents()
+    .map(event => pluginRecordOf(event))
+    .filter(record => record !== undefined && record.type === type)
+    .map(record => record!.data)
+}
+
+describe('in-turn delivery (default strategy)', () => {
+  it('keeps the turn open, then enters the step with the validated report', async () => {
+    const ctx = new FakeContext()
+    apply(ctx as never) // no override: the default strategy is under test
+    const agent = new FakeAgent({ session: realSession('sess-in-turn') })
+    let settled = false
+    const pending = ctx.preStep()(payload(agent, [userMessage('run the workflow')]), passingNext([]))
+      .then((decision: unknown) => { settled = true; return decision })
+
+    await waitFor(() => ctx.engine.startCalls.length === 1)
+    // The listener is still awaiting: the turn must stay open for the whole run.
+    expect(settled).toBe(false)
+    expect(agent.whenIdle).not.toHaveBeenCalled()
+
+    const request = ctx.engine.startCalls[0]!
+    const result = await runWorkflowScript(request.script, request.args as Record<string, unknown>, async (_prompt, options) => {
+      if (options.label === 'grok-planner') return { tasks: [task('a')] }
+      if (options.label.startsWith('grok-worker')) return execution('work done')
+      return verification(task('a'))
+    })
+    ctx.engine.runs[0]!.complete(result.report)
+
+    const decision = await pending as { kind: string; messages: UserMessage[] }
+    expect(decision.kind).toBe('enter')
+    const text = textOf(decision.messages[0]!)
+    expect(text).toContain(REPORT_BEGIN)
+    expect(text).toContain('Grok workflow: COMPLETED')
+    expect(text).toContain(REPORT_END)
+    // Delivery happened in this turn: no follow-up turn was scheduled.
+    expect(agent.followups).toHaveLength(0)
+    expect(agent.whenIdle).not.toHaveBeenCalled()
+  })
+
+  it('enters a failure report when the run failed, so the user is never left without output', async () => {
+    const ctx = new FakeContext()
+    apply(ctx as never)
+    const session = realSession('sess-in-turn-failed')
+    const agent = new FakeAgent({ session })
+    const pending = ctx.preStep()(payload(agent, [userMessage('run the workflow')]), passingNext([]))
+    await waitFor(() => ctx.engine.runs.length === 1)
+    ctx.engine.runs[0]!.fail('error', 'engine exploded')
+    const decision = await pending as { kind: string; messages: UserMessage[] }
+    expect(decision.kind).toBe('enter')
+    const text = textOf(decision.messages[0]!)
+    expect(text).toContain('could not complete the workflow')
+    expect(text).toContain('engine exploded')
+    expect(agent.followups).toHaveLength(0)
+    expect(recordsOf(session, 'plugin:grok-workflow/delivery').some(
+      record => (record as { phase?: string }).phase === 'delivered',
+    )).toBe(true)
+  })
+
+  it('enters a notice when the workflow cannot start at all', async () => {
+    const ctx = new FakeContext()
+    apply(ctx as never)
+    const agent = new FakeAgent({ session: realSession('sess-in-turn-busy') })
+    ctx.engine.startError = new Error('already has 2 active run(s)')
+    const decision = await ctx.preStep()(payload(agent, [userMessage('run the workflow')]), passingNext([])) as {
+      kind: string
+      messages: UserMessage[]
+    }
+    expect(decision.kind).toBe('enter')
+    const text = textOf(decision.messages[0]!)
+    expect(text).toContain('no workflow result exists')
+    expect(text).toContain('2 active run(s)')
+    expect(agent.followups).toHaveLength(0)
+  })
+
+  it('refuses an over-long message in the same turn instead of staying silent', async () => {
+    const ctx = new FakeContext()
+    apply(ctx as never)
+    const agent = new FakeAgent({ session: realSession('sess-in-turn-long') })
+    const decision = await ctx.preStep()(payload(agent, [userMessage('x'.repeat(20_000))]), passingNext([])) as {
+      kind: string
+      messages: UserMessage[]
+    }
+    expect(decision.kind).toBe('enter')
+    expect(textOf(decision.messages[0]!)).toContain('workflow objective limit')
+    expect(ctx.engine.startCalls).toHaveLength(0)
+  })
+
+  it('rejects instead of entering when the turn is already aborted', async () => {
+    const ctx = new FakeContext()
+    apply(ctx as never)
+    const agent = new FakeAgent({ session: realSession('sess-in-turn-aborted') })
+    const controller = new AbortController()
+    controller.abort()
+    const decision = await ctx.preStep()(payload(agent, [userMessage('run the workflow')], 1, 1, controller.signal), passingNext([]))
+    expect(decision).toEqual({ kind: 'reject' })
+    expect(ctx.engine.startCalls).toHaveLength(0)
+  })
+
+  it('stops waiting when the turn aborts mid-run and does not hang', async () => {
+    const ctx = new FakeContext()
+    apply(ctx as never)
+    const agent = new FakeAgent({ session: realSession('sess-in-turn-cancel') })
+    const controller = new AbortController()
+    const pending = ctx.preStep()(
+      payload(agent, [userMessage('run the workflow')], 1, 1, controller.signal),
+      passingNext([]),
+    )
+    await waitFor(() => ctx.engine.runs.length === 1)
+    controller.abort()
+    // The run was cancelled through its own signal, so the listener resolves.
+    const decision = await pending
+    expect(decision).toEqual({ kind: 'reject' })
+    expect(ctx.engine.runs[0]!.cancel).toHaveBeenCalled()
+    expect(agent.followups).toHaveLength(0)
+  })
+
+  it('turns its own deadline into a failure report instead of waiting forever', async () => {
+    const ctx = new FakeContext()
+    apply(ctx as never, { timeoutMs: 1_000 })
+    const agent = new FakeAgent({ session: realSession('sess-in-turn-timeout') })
+    const decision = await ctx.preStep()(payload(agent, [userMessage('run the workflow')]), passingNext([])) as {
+      kind: string
+      messages: UserMessage[]
+    }
+    expect(decision.kind).toBe('enter')
+    const text = textOf(decision.messages[0]!)
+    expect(text).toContain('deadline')
+    expect(ctx.engine.runs[0]!.cancel).toHaveBeenCalled()
+  })
+
+  it('answers when the plugin is unloaded mid-run', async () => {
+    const ctx = new FakeContext()
+    apply(ctx as never)
+    const agent = new FakeAgent({ session: realSession('sess-in-turn-unload') })
+    const pending = ctx.preStep()(payload(agent, [userMessage('run the workflow')]), passingNext([]))
+    await waitFor(() => ctx.engine.runs.length === 1)
+    await ctx.dispose()
+    const decision = await pending as { kind: string; messages?: UserMessage[] }
+    // Either an explicit notice or a rejection is acceptable; hanging is not.
+    if (decision.kind === 'enter') expect(textOf(decision.messages![0]!)).toContain('workflow')
+    else expect(decision.kind).toBe('reject')
+  })
+
+  it('writes no routing ledger when the engine failed before a report existed', async () => {
+    const ctx = new FakeContext()
+    apply(ctx as never)
+    const session = realSession('sess-in-turn-no-ledger')
+    const agent = new FakeAgent({ session })
+    const pending = ctx.preStep()(payload(agent, [userMessage('run the workflow')]), passingNext([]))
+    await waitFor(() => ctx.engine.runs.length === 1)
+    ctx.engine.runs[0]!.fail('error', 'boom')
+    await pending
+    expect(recordsOf(session, ROUTING_RECORD)).toHaveLength(0)
+  })
+})

@@ -38,7 +38,7 @@ export interface NormalizedTask {
  * degraded, experimental switch (no stream/usage, non-zero exit on a blocked
  * turn) kept because the answer route is not finally decided (U-1).
  */
-export type AnswerStrategy = 'relay' | 'append';
+export type AnswerStrategy = 'relay' | 'append' | 'in-turn';
 /**
  * Which agents the gate polices.
  *

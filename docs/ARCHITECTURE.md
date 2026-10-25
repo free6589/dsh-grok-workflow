@@ -206,6 +206,19 @@ in-tree reproductions still match the installed DSH; re-run the audit command in
 Those must be run locally with a real DSH profile and are recorded separately
 as local runtime evidence.
 
+For the delivery path there is one local check worth running after any change to
+`answerStrategy`, the gate, or the DSH version:
+
+```bash
+npm run build
+E2E_MODEL_PATCH=scripts/e2e-model-patch.yml scripts/e2e-headless-in-turn.sh
+```
+
+It boots one real `dsh headless` turn with this plugin overlaid by file URL (nothing is
+installed into a profile) and fails unless the validated report actually reaches the user
+in that single turn. The `in-turn` timing itself needs no model and is covered in CI by
+the `in-turn delivery` suite in `test/gate.spec.ts`.
+
 ## Known architecture limits (MVP)
 
 - No pause/resume, journaling, or cross-process resume.

@@ -103,7 +103,11 @@ function harness(options: HarnessOptions = {}): ComposedHarness {
       systemPrompt: { section: () => () => {}, getSectionOrder: () => 2600 },
       workflowEngine: engine,
     }
-    apply(shim as never, { historyTurns: 4, historyChars: 4_000 })
+    // These suites are about the `reject` veto and its composition with in-tree
+    // listeners, so they pin the strategy that refuses the batch. The default
+    // `in-turn` strategy keeps the step open instead of refusing it (see
+    // test/gate.spec.ts for that path).
+    apply(shim as never, { answerStrategy: 'relay', historyTurns: 4, historyChars: 4_000 })
   }
 
   if (options.gatePlacement === 'first') installGate()

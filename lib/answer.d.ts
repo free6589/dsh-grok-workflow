@@ -21,6 +21,25 @@ export declare const REPORT_END = "<<<END-GROK-WORKFLOW-REPORT>>>";
  */
 export declare function relayText(report: WorkflowReport): string;
 /**
+ * Build the message text for in-turn delivery (strategy `in-turn`).
+ *
+ * Wording is deliberately identical to {@link relayText}: the contract with the
+ * main model (reproduce the validated report, add no claims) does not depend on
+ * *when* the message arrives, only on the fact that the model composes the final
+ * reply. Keeping one wording keeps the t24 measurement applicable.
+ *
+ * @param report - a validated report, or an explicit failure report.
+ * @returns the message text entered into the open step.
+ */
+export declare function reportEnterText(report: WorkflowReport): string;
+/**
+ * Build the message text for an in-turn notice (no run happened).
+ *
+ * @param reason - human-readable cause.
+ * @returns the message text entered into the open step.
+ */
+export declare function noticeEnterText(reason: string): string;
+/**
  * Build a short notice delivered when the workflow cannot even be started
  * (busy instance, queue full, unreadable request). The notice keeps the failure
  * explicit instead of letting the model answer on its own.

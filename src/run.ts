@@ -164,6 +164,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
   }
   state.pending += 1
   let run: WorkflowRun | undefined
+  let cancelOnAbort: (() => void) | undefined
   try {
     try {
       const start: WorkflowStartRequest = {
@@ -186,6 +187,14 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
         throw new Error(`${workflowLabel(config)} cancelled: plugin unloaded`)
       }
       state.runs.add(run)
+      // Belt and braces for in-turn delivery: `start({signal})` documents that an
+      // aborted signal cancels the run, but an in-turn wait lives inside the open
+      // turn, so a forgotten cancel would hang the turn until the deadline. This
+      // listener makes the guarantee independent of the engine's implementation.
+      const active = run
+      cancelOnAbort = () => { void active.cancel('workflow cancelled by its caller') }
+      signal.addEventListener('abort', cancelOnAbort, { once: true })
+      if (signal.aborted) cancelOnAbort()
       if (timedOut) {
         run.cancel('workflow deadline exceeded during startup')
         return timeout(`workflow exceeded the ${config.timeoutMs} ms deadline and was cancelled`)
@@ -224,6 +233,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
     return failure('Engine error', detail, 'engine-error')
   } finally {
     clearTimeout(timer)
+    if (cancelOnAbort !== undefined) signal.removeEventListener('abort', cancelOnAbort)
     combined.dispose()
     if (run !== undefined) {
       state.runs.delete(run)

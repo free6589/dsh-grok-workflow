@@ -1,0 +1,25 @@
+# Example model overlay for scripts/e2e-headless-in-turn.sh.
+#
+# A headless profile usually boots with a default route that has no credential in
+# the launching environment ("MISSING_CREDENTIAL: llm-deepseek: no API key…").
+# This overlay registers one provider route and points the agent at it, using the
+# environment variable that already holds the key — no secret is written here.
+#
+# Replace the placeholders with a route that exists in your environment, then:
+#   E2E_MODEL_PATCH=scripts/e2e-model-patch.yml scripts/e2e-headless-in-turn.sh
+- id: llm-pi-ai
+  config:
+    providers:
+      example-provider:
+        displayName: Example Provider
+        api: openai-completions
+        baseURL: https://example.invalid/openai/v1
+        apiKeyEnv: EXAMPLE_API_KEY
+        models:
+          - id: example/chat-model
+            name: Example Chat Model
+            contextWindow: 262144
+- id: agent-default-model
+  config:
+    provider: example-provider
+    model: example/chat-model
