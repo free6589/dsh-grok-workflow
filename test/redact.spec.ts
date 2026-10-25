@@ -1,5 +1,7 @@
+import vm from 'node:vm'
 import { describe, expect, it } from 'vitest'
-import { redactDeep, redactError, redactSecrets } from '../src/redact.js'
+import { redactDeep, redactError, redactSecrets, REDACTION_RULES } from '../src/redact.js'
+import { WORKFLOW_SCRIPT } from '../src/script.js'
 
 const fake = (...parts: string[]) => parts.join('')
 
@@ -133,5 +135,92 @@ describe('credential redaction', () => {
   it('renders errors without leaking secrets', () => {
     expect(redactError(new Error('token=abcdefghijk failed'))).toContain('[REDACTED]')
     expect(redactError('plain failure')).toBe('plain failure')
+  })
+
+  it('redacts Azure SAS signatures', () => {
+    const signature = fake('FAKE', 'SIGNATURE', 'VALUE')
+    const output = redactSecrets([
+      `https://acct.blob.core.windows.net/c/blob?sig=${signature}&se=2026-01-01`,
+      `https://acct.blob.core.windows.net/c/blob?signature=${signature}`,
+      `https://acct.queue.core.windows.net/q?sharedaccesssignature=${signature}`,
+    ].join('\n'))
+    expect(output).not.toContain(signature)
+    expect(output.match(/\[REDACTED\]/g)).toHaveLength(3)
+    // The non-secret query parameters must survive.
+    expect(output).toContain('se=2026-01-01')
+    expect(output).toContain('https://acct.blob.core.windows.net/c/blob?sig=')
+  })
+
+  it('redacts Basic authorization in header and JSON form', () => {
+    const credentials = fake('dXNlcj', 'pwRkZXI=', 'ZmFrZQ==')
+    const output = redactSecrets([
+      `Authorization: Basic ${credentials}`,
+      `{"headers":{"authorization":"Basic ${credentials}"}}`,
+      `authorization=Basic ${credentials}`,
+    ].join('\n'))
+    expect(output).not.toContain(credentials)
+    expect(output.match(/\[REDACTED\]/g)).toHaveLength(3)
+    expect(output).toContain('Authorization: Basic [REDACTED]')
+    expect(output).toContain('"Basic [REDACTED]"')
+  })
+})
+
+/**
+ * Pull the workflow script's own prompt redactor out of the generated source so
+ * the host list (src/redact.ts) and the in-sandbox copy are compared directly.
+ * The script cannot import host code, so this parity test is what keeps the
+ * generated mirror faithful to the single source of truth.
+ */
+function scriptRedactPromptText(): (value: string) => string {
+  const start = WORKFLOW_SCRIPT.indexOf('function redactPromptText(value) {')
+  expect(start).toBeGreaterThan(-1)
+  const end = WORKFLOW_SCRIPT.indexOf('\n}\n', start)
+  expect(end).toBeGreaterThan(start)
+  const source = WORKFLOW_SCRIPT.slice(start, end + 3)
+  const context = vm.createContext({})
+  return vm.runInContext(`(() => { ${source}; return redactPromptText })()`, context) as (value: string) => string
+}
+
+describe('prompt redaction parity', () => {
+  const corpus = [
+    `key ${fake('sk-proj-', 'abcdefghijklmnopqrstuvwxyz', '0123456789')}`,
+    `github ${fake('ghp_', 'abcdefghijklmnopqrstuvwxyz', '0123456789')}`,
+    `gitlab ${fake('glpat-', 'abcdefghijklmnopqrstuvwxyz')}`,
+    `npm ${fake('npm_', 'abcdefghijklmnopqrstuvwxyz')}`,
+    `slack ${fake('xoxb-', '123456789012-', 'abcdefghijkl')}`,
+    `aws ${fake('AKIA', 'ABCDEFGH', 'IJKLMNOP')}`,
+    `google ${fake('AIza', 'abcdefghijklmnopqrstuvwxyz', '0123456789')}`,
+    `Authorization: Bearer ${fake('abcdefghijklmnopqrstuvwxyz', '.1234567890')}`,
+    `Authorization: Basic ${fake('dXNlcj', 'pwRkZXI=', 'ZmFrZQ==')}`,
+    `{"authorization":"Basic ${fake('dXNlcj', 'pwRkZXI=', 'ZmFrZQ==')}"}`,
+    'https://example.test/callback?token=super-secret-token&ok=1',
+    'https://acct.blob.core.windows.net/c/blob?sig=FAKESIGNATURE&se=2026-01-01',
+    'https://acct.blob.core.windows.net/c/blob?sharedaccesssignature=FAKESIGNATURE',
+    'api_key = "my-production-secret"',
+    'OPENAI_API_KEY=custom-secret',
+    'DATABASE_PASSWORD=custom-secret',
+    'https://user:password@example.test/path',
+    `jwt ${fake('eyJhbGciOiJIUzI1NiJ9', '.eyJzdWIiOiIxMjM0NTY3ODkwIn0', '.signature12345')}`,
+    '-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBg\n-----END PRIVATE KEY-----',
+    'plain prose about a workflow with 42 tasks and no secrets',
+    'the token count is 3 and the key insight is spacing',
+  ]
+
+  it('applies the same rules in the generated script as on the host', () => {
+    const inScript = scriptRedactPromptText()
+    for (const value of corpus) {
+      expect(inScript(value)).toBe(redactSecrets(value))
+    }
+  })
+
+  it('exposes every rule to the generated script', () => {
+    const inScript = scriptRedactPromptText()
+    // Each rule must actually fire inside the script realm, not just on the host.
+    for (const rule of REDACTION_RULES) {
+      const sample = corpus.find(value => redactSecrets(value) !== value && rule.pattern.test(value))
+      if (sample === undefined) continue
+      rule.pattern.lastIndex = 0
+      expect(inScript(sample)).not.toBe(sample)
+    }
   })
 })

@@ -1,4 +1,19 @@
+import { REDACTION_RULES } from './redact.js'
 import type { NormalizedTask, ResolvedConfig } from './types.js'
+
+/**
+ * Render the shared redaction rules (src/redact.ts) as script-realm JS source.
+ *
+ * The workflow script cannot import host code, so its prompt-side redactor is
+ * generated from the single host list instead of being maintained as a second
+ * copy. `String.raw` performs no escape processing, so a rule's pattern source
+ * (including `\\`-escapes and lookbehinds) is injected verbatim.
+ */
+function redactionRulesSource(): string {
+  return REDACTION_RULES
+    .map(rule => `    .replace(/${rule.pattern.source}/${rule.pattern.flags}, ${JSON.stringify(rule.replacement)})`)
+    .join('\n')
+}
 
 /**
  * The orchestration script is static. User data crosses the workflow boundary as
@@ -59,19 +74,7 @@ function isFatal(error) {
 function redactPromptText(value) {
   if (typeof value !== 'string') return value;
   return value
-    .replace(/-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z0-9 ]*PRIVATE KEY-----/g, '[REDACTED PRIVATE KEY]')
-    .replace(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g, '[REDACTED JWT]')
-    .replace(/\b(?:sk|rk|pk)[-_](?:live|test)[-_][A-Za-z0-9_-]{10,}\b|\b(?:sk|rk|pk)-[A-Za-z0-9_-]{16,}\b/g, '[REDACTED API KEY]')
-    .replace(/\bgh[pousr]_[A-Za-z0-9]{20,}\b/g, '[REDACTED GITHUB TOKEN]')
-    .replace(/\bglpat-[A-Za-z0-9_-]{20,}\b/g, '[REDACTED GITLAB TOKEN]')
-    .replace(/\bnpm_[A-Za-z0-9_-]{20,}\b/g, '[REDACTED NPM TOKEN]')
-    .replace(/\bxox[abprs]-[A-Za-z0-9-]{10,}\b/g, '[REDACTED SLACK TOKEN]')
-    .replace(/\bAKIA[0-9A-Z]{16}\b/g, '[REDACTED AWS ACCESS KEY]')
-    .replace(/\bAIza[0-9A-Za-z_-]{30,}\b/g, '[REDACTED GOOGLE API KEY]')
-    .replace(/\b(Bearer\s+)[A-Za-z0-9._~+/=-]{12,}/gi, '$1[REDACTED]')
-    .replace(/([?&](?:token|key|secret|password|passwd|api[_-]?key|apikey|access[_-]?token)=)[^&#\s]+/gi, '$1[REDACTED]')
-    .replace(/(\b[a-z][a-z0-9+.-]*:\/\/)[^\s/@]*:[^\s/@]+@/gi, '$1[REDACTED]@')
-    .replace(/(?<![A-Za-z0-9])(?:[A-Za-z0-9]+[_-])*(?:api[_-]?key|access[_-]?key(?:[_-]?id)?|private[_-]?key|secret[_-]?access[_-]?key|secret[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret|token|secret|password|passwd)(\s*[:=]\s*)(?:"[^"\n]*"|'[^'\n]*'|[^\s,;]+)/gi, '$1$2[REDACTED]');
+${redactionRulesSource()};
 }
 
 function redactPromptValue(value, depth) {
@@ -196,7 +199,7 @@ function planPrompt() {
     'Do not include credentials, tokens, passwords, or private keys in any field.',
     '',
     'OBJECTIVE:',
-    objective
+    safePromptJson(objective)
   ].join('\n');
 }
 

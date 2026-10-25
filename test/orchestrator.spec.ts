@@ -1,20 +1,24 @@
 import { describe, expect, it } from 'vitest'
 import { resolveConfig } from '../src/config.js'
+import { redactDeep } from '../src/redact.js'
 import { assertWorkflowReport } from '../src/report.js'
-import { WORKFLOW_SCRIPT } from '../src/script.js'
+import { maxTotalAgentsFor, WORKFLOW_SCRIPT } from '../src/script.js'
 import { delay, runWorkflowScript, type ScriptAgent } from './helpers.js'
 import { execution, failingVerification, task, verification } from './fixtures.js'
 
 function args(tasks: unknown[] | null, overrides: Record<string, unknown> = {}): Record<string, unknown> {
-  return {
+  const base: Record<string, unknown> = {
     objective: 'Ship the verified result',
     tasks,
     maxConcurrency: 2,
     maxRetries: 1,
     maxTasks: 6,
-    maxTotalAgents: 30,
     ...overrides,
   }
+  // Mirror the request builder: the child cap is derived from the task count
+  // (exact for a caller plan, the configured maximum otherwise).
+  const taskCount = tasks === null ? (base.maxTasks as number) : tasks.length
+  return { ...base, maxTotalAgents: maxTotalAgentsFor(taskCount, base.maxRetries as number) }
 }
 
 function idFrom(label: string): string {
@@ -501,6 +505,26 @@ describe('generated workflow script', () => {
     const { report } = await runWorkflowScript(WORKFLOW_SCRIPT, args(callerTasks), agent)
     expect(report.status).toBe('failed')
     expect(report.tasks[0]!.error).toContain('criterion not matched exactly once: the file exists with content')
+  })
+
+  it('redacts the objective before the planner prompt', async () => {
+    const secret = ['sk', 'proj', 'FAKEEXAMPLE1234567890'].join('-')
+    const plannerTasks = [task('a')]
+    const agent: ScriptAgent = async (_prompt, options) => {
+      if (options.label === 'grok-planner') return { tasks: plannerTasks }
+      if (options.label.startsWith('grok-worker-')) return execution('done')
+      if (options.label.startsWith('grok-verifier-')) return verification(plannerTasks[0]!)
+      throw new Error(`unexpected label ${options.label}`)
+    }
+    const objective = `Ship the result for token ${secret}`
+    const { report, calls } = await runWorkflowScript(WORKFLOW_SCRIPT, args(null, { objective }), agent)
+    const planner = calls.find(call => call.label === 'grok-planner')!
+    expect(planner.prompt).not.toContain(secret)
+    expect(planner.prompt).toContain('[REDACTED API KEY]')
+    // The script returns the objective verbatim; the host redacts it at the
+    // boundary before any of it reaches the model.
+    expect(report.objective).toContain(secret)
+    expect(redactDeep(report).objective).not.toContain(secret)
   })
 
   it('rejects a planner task whose criteria collide after normalization', async () => {

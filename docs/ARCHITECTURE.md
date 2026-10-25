@@ -83,6 +83,15 @@ Host/script validation enforces unique IDs, non-empty required fields, at most
 plan falls back to one task containing the original objective; the report
 records `planning.source: "fallback"` and cannot claim fully clean completion.
 
+`acceptanceCriteria` is a non-empty list whose entries must stay distinct under
+the comparison used to match a verifier's answer: trailing sentence punctuation,
+collapsed whitespace, and letter case are ignored. A task whose criteria collide
+after that normalization is rejected (host input validation and planner output
+alike) because two criteria that compare equal cannot each be confirmed by
+exactly one verifier entry. This makes some inputs that were previously accepted
+invalid, for example `["Do X.", "do x"]` or `["alpha works", "alpha works!"]`;
+write each requirement once, with distinct wording.
+
 ### Execute
 
 Tasks run through a bounded worker pool implemented in the script. The pool size

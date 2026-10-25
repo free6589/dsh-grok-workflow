@@ -1,5 +1,7 @@
-import type { FinalStatus, WorkflowReport } from './types.js'
+import type { ExecutionResult, FinalStatus, VerificationResult, WorkflowReport } from './types.js'
 import type { ResolvedConfig } from './types.js'
+import { criterionKey } from './input.js'
+import { maxTotalAgentsFor } from './script.js'
 
 const STATUSES: readonly FinalStatus[] = ['completed', 'partial', 'failed']
 const MAX_RENDER_CHARS = 8_000
@@ -30,6 +32,98 @@ function number(value: unknown, path: string): number {
 
 function sameStrings(left: readonly string[], right: readonly string[]): boolean {
   return left.length === right.length && left.every((value, index) => value === right[index])
+}
+
+const EXECUTION_STATUSES = ['completed', 'partial', 'failed'] as const
+const COMMAND_STATUSES = ['passed', 'failed', 'not_run'] as const
+const VERDICTS = ['pass', 'fail'] as const
+const CONFIDENCES = ['high', 'medium', 'low'] as const
+
+function boolean(value: unknown, path: string): boolean {
+  if (typeof value !== 'boolean') throw new Error(`workflow result ${path} must be a boolean`)
+  return value
+}
+
+/**
+ * A closed-union string field. The generated script normalizes an out-of-union
+ * model answer to a safe default (`status: 'partial'`, `confidence: 'low'`,
+ * command `status: 'not_run'`), so those defaults are the only legal fallbacks
+ * and any other value means the report was not produced by this plugin.
+ */
+function enumeration<T extends string>(value: unknown, allowed: readonly T[], path: string): T {
+  const text = string(value, path)
+  if (!(allowed as readonly string[]).includes(text)) {
+    throw new Error(`workflow result ${path} must be one of ${allowed.join('/')} (got "${text}")`)
+  }
+  return text as T
+}
+
+function stringList(value: unknown, path: string): string[] {
+  return array(value, path).map((item, index) => string(item, `${path}[${index}]`))
+}
+
+function commandRuns(value: unknown, path: string): ExecutionResult['testsRun'] {
+  return array(value, path).map((item, index) => {
+    const entry = record(item, `${path}[${index}]`)
+    return {
+      command: string(entry.command, `${path}[${index}].command`),
+      status: enumeration(entry.status, COMMAND_STATUSES, `${path}[${index}].status`),
+      detail: string(entry.detail, `${path}[${index}].detail`),
+    }
+  })
+}
+
+/** Deep-validate one attempt's executor payload instead of trusting its shape. */
+function executionResult(value: unknown, path: string): ExecutionResult {
+  const root = record(value, path)
+  return {
+    summary: string(root.summary, `${path}.summary`),
+    status: enumeration(root.status, EXECUTION_STATUSES, `${path}.status`),
+    deliverables: array(root.deliverables, `${path}.deliverables`).map((item, index) => {
+      const entry = record(item, `${path}.deliverables[${index}]`)
+      return {
+        description: string(entry.description, `${path}.deliverables[${index}].description`),
+        locator: string(entry.locator, `${path}.deliverables[${index}].locator`),
+      }
+    }),
+    evidence: array(root.evidence, `${path}.evidence`).map((item, index) => {
+      const entry = record(item, `${path}.evidence[${index}]`)
+      return {
+        claim: string(entry.claim, `${path}.evidence[${index}].claim`),
+        source: string(entry.source, `${path}.evidence[${index}].source`),
+      }
+    }),
+    testsRun: commandRuns(root.testsRun, `${path}.testsRun`),
+    filesChanged: stringList(root.filesChanged, `${path}.filesChanged`),
+    uncertainties: stringList(root.uncertainties, `${path}.uncertainties`),
+  }
+}
+
+/** Deep-validate one attempt's verifier payload; `verdict` is a closed union. */
+function verificationResult(value: unknown, path: string): VerificationResult {
+  const root = record(value, path)
+  return {
+    verdict: enumeration(root.verdict, VERDICTS, `${path}.verdict`),
+    criteria: array(root.criteria, `${path}.criteria`).map((item, index) => {
+      const entry = record(item, `${path}.criteria[${index}]`)
+      return {
+        criterion: string(entry.criterion, `${path}.criteria[${index}].criterion`),
+        met: boolean(entry.met, `${path}.criteria[${index}].met`),
+        evidence: string(entry.evidence, `${path}.criteria[${index}].evidence`),
+      }
+    }),
+    checkedEvidence: array(root.checkedEvidence, `${path}.checkedEvidence`).map((item, index) => {
+      const entry = record(item, `${path}.checkedEvidence[${index}]`)
+      return {
+        kind: string(entry.kind, `${path}.checkedEvidence[${index}].kind`),
+        locator: string(entry.locator, `${path}.checkedEvidence[${index}].locator`),
+        finding: string(entry.finding, `${path}.checkedEvidence[${index}].finding`),
+      }
+    }),
+    commandsRun: commandRuns(root.commandsRun, `${path}.commandsRun`),
+    issues: stringList(root.issues, `${path}.issues`),
+    confidence: enumeration(root.confidence, CONFIDENCES, `${path}.confidence`),
+  }
 }
 
 /**
@@ -89,8 +183,8 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
         const entry = record(attempt, `tasks[${index}].attempts[${a}]`)
         return {
           attempt: number(entry.attempt, `tasks[${index}].attempts[${a}].attempt`),
-          execution: entry.execution === null ? null : record(entry.execution, `tasks[${index}].attempts[${a}].execution`),
-          verification: entry.verification === null ? null : record(entry.verification, `tasks[${index}].attempts[${a}].verification`),
+          execution: entry.execution === null ? null : executionResult(entry.execution, `tasks[${index}].attempts[${a}].execution`),
+          verification: entry.verification === null ? null : verificationResult(entry.verification, `tasks[${index}].attempts[${a}].verification`),
           passed: entry.passed === true,
           error: string(entry.error ?? '', `tasks[${index}].attempts[${a}].error`),
         }
@@ -120,8 +214,34 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
   const maxConcurrency = number(limits.maxConcurrency, 'limits.maxConcurrency')
   const maxRetries = number(limits.maxRetries, 'limits.maxRetries')
   const maxTasks = number(limits.maxTasks, 'limits.maxTasks')
+  const maxTotalAgents = number(limits.maxTotalAgents, 'limits.maxTotalAgents')
   if (maxConcurrency !== config.maxConcurrency || maxRetries !== config.maxRetries || maxTasks !== config.maxTasks) {
     throw new Error('workflow result limits do not match the configured limits')
+  }
+  if (tasks.length > maxTasks) {
+    throw new Error(`workflow result has ${tasks.length} tasks but maxTasks is ${maxTasks}`)
+  }
+  if (tasks.length > 0) {
+    // The plugin sizes the child cap from the task count: exact for a caller plan,
+    // the configured maximum for a planner or fallback plan. Anything outside that
+    // window did not come from this plugin's request builder.
+    const minimumAgents = maxTotalAgentsFor(tasks.length, maxRetries)
+    const maximumAgents = maxTotalAgentsFor(maxTasks, maxRetries)
+    if (maxTotalAgents < minimumAgents || maxTotalAgents > maximumAgents) {
+      throw new Error(
+        `workflow result limits.maxTotalAgents ${maxTotalAgents} is outside the allowed range ${minimumAgents}-${maximumAgents}`,
+      )
+    }
+  }
+  const taskIds = new Set<string>()
+  for (const task of tasks) {
+    if (taskIds.has(task.id)) {
+      throw new Error(`workflow result has duplicate task id "${task.id}"`)
+    }
+    taskIds.add(task.id)
+    if (task.acceptanceCriteria.length === 0) {
+      throw new Error(`workflow result task ${task.id} has no acceptance criteria`)
+    }
   }
   for (const task of tasks) {
     if (task.attempts.length === 0) {
@@ -218,6 +338,40 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
     }
   } else if (verifiedCount > 0) {
     throw new Error('workflow result failed cannot contain a verified task')
+  }
+  // Every confirmed item must be traceable to the last attempt's own verification
+  // record: same task, same criterion (formatting-insensitive, matching how the
+  // script pairs them), met, and byte-identical evidence. This is what stops a
+  // report from asserting evidence that no verifier ever produced.
+  for (const item of confirmed) {
+    const task = tasks.find(candidate => candidate.id === item.taskId)
+    if (task === undefined) {
+      throw new Error(`workflow result confirmed evidence references unknown task ${item.taskId}`)
+    }
+    const lastVerification = task.attempts[task.attempts.length - 1]!.verification
+    const supported = lastVerification !== null && lastVerification.criteria.some(criterion =>
+      criterion.met
+      && criterion.evidence === item.evidence
+      && criterionKey(criterion.criterion) === criterionKey(item.criterion))
+    if (!supported) {
+      throw new Error(
+        `workflow result confirmed evidence for task ${item.taskId} is not supported by that task's last attempt verification`,
+      )
+    }
+  }
+  if (status !== 'completed') {
+    // A non-completed report must account for every failed task exactly once, with
+    // a real reason. A fallback partial whose single task verified legitimately has
+    // no failed task, so this stays vacuous there (its provenance is plan.error).
+    for (const task of tasks) {
+      if (task.status !== 'failed') continue
+      const entries = incomplete.filter(item => item.taskId === task.id)
+      if (entries.length !== 1 || entries[0]!.reason.trim() === '') {
+        throw new Error(
+          `workflow result task ${task.id} failed but is not reported exactly once in incomplete with a non-empty reason`,
+        )
+      }
+    }
   }
   return {
     schemaVersion: 'grok-workflow/v1',
