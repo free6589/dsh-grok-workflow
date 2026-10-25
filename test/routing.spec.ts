@@ -260,6 +260,7 @@ describe('generated script routing', () => {
     expect(run.report.tasks[0]!.attempts[0]!.failure).toEqual({
       class: 'verification-failed',
       reason: expect.stringContaining('verifier verdict was fail') as unknown as string,
+      category: 'quality',
     })
   })
 
@@ -297,16 +298,28 @@ describe('generated script routing', () => {
     expect(run.report.routes.some(entry => (entry.reason ?? '').includes('REDACTED'))).toBe(true)
   })
 
-  it('keeps a fatal budget error fatal instead of switching routes', async () => {
+  it('stops the chain on a setup fault but still produces a failure report (G-4)', async () => {
     const seen: string[] = []
     const agent: ScriptAgent = async (_prompt, options) => {
       seen.push(options.model ?? 'inherit')
       const error = Object.assign(new Error('agent cap reached'), { code: 'AGENT_CAP', fatal: true })
       throw error
     }
-    await expect(runWorkflowScript(WORKFLOW_SCRIPT, args({ roles: roles([{ model: 'w1' }, { model: 'w2' }]) }), agent))
-      .rejects.toThrow(/agent cap reached/)
-    expect(seen.filter(model => model !== 'inherit')).toHaveLength(1)
+    // Before G-4 this rejected: the fatal error escaped the task and killed the
+    // whole run, so every per-task result disappeared. A setup fault still must
+    // not be retried on another route, which is what the call count asserts.
+    const { report } = await runWorkflowScript(WORKFLOW_SCRIPT, args({ roles: roles([{ model: 'w1' }, { model: 'w2' }]) }), agent)
+    // The chain stops on the first route (no route is tried again) and the task
+    // stops after one attempt (a setup fault cannot heal), so one call total.
+    expect(seen).toEqual(['w1'])
+    expect(report.tasks[0]?.attempts).toHaveLength(1)
+    expect(report.tasks[0]?.attempts[0]?.failure).toEqual({
+      class: 'budget-exhausted',
+      reason: expect.stringContaining('agent cap reached') as unknown as string,
+      category: 'configuration',
+    })
+    expect(report.incomplete[0]?.category).toBe('configuration')
+    expect(report.incomplete[0]?.reason).toContain('budget-exhausted')
   })
 
   it('writes no narrative when synthesis is deterministic', async () => {

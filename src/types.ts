@@ -98,7 +98,11 @@ export interface GrokWorkflowConfig {
   roles?: RoleRouting
   /** Final-answer strategy (U-3): deterministic aggregation, or one model call. */
   synthesis?: SynthesisMode
-  /** Answer production strategy (U-1); `relay` is the verified default. */
+  /**
+   * Answer production strategy (U-1). `in-turn` is the default because it is
+   * the only one that survives a one-shot app (G-18/F9); `relay` and `append`
+   * remain selectable for long-lived surfaces.
+   */
   answerStrategy?: AnswerStrategy
   /** Enforcement scope (U-7): whole process, or only one agent preset. */
   gateScope?: GateScope
@@ -157,12 +161,16 @@ export interface ConfirmedEvidence {
 export interface IncompleteItem {
   taskId: string
   reason: string
+  /** Failure kind of the task that produced this item (G-4). */
+  category?: FailureCategory
 }
 
 /** One workflow-level error. */
 export interface ReportError {
   phase: string
   message: string
+  /** Failure kind, so infrastructure faults are not read as quality failures. */
+  category?: FailureCategory
 }
 
 /** One unresolved uncertainty reported by a worker or verifier. */
@@ -221,11 +229,22 @@ export type FailureClass =
   | 'budget-exhausted'
   | 'unknown'
 
+/**
+ * Who has to fix a failure (G-4). `infrastructure` = the model service, the
+ * network or a deadline failed, so a retry, another route or a later run may
+ * succeed; `quality` = the work or its verification fell short, so the same
+ * route must retry with the same evidence; `configuration` = caps, options or
+ * schemas are wrong, so no retry can help; `unknown` = unclassified.
+ */
+export type FailureCategory = 'infrastructure' | 'quality' | 'configuration' | 'unknown'
+
 /** One classified failure attached to an attempt or a route switch. */
 export interface AttemptFailure {
   class: FailureClass
   /** Redacted, bounded human-readable reason. */
   reason: string
+  /** Failure kind; absent only in reports produced before G-4. */
+  category?: FailureCategory
 }
 
 /** One recorded child call: the model, its chain position, and the outcome. */
@@ -274,6 +293,8 @@ export interface PlanReport {
   source: 'caller' | 'planner' | 'fallback' | 'unavailable'
   tasks: NormalizedTask[]
   error?: string
+  /** Why the plan is not the planner's own (planner fault, with a category). */
+  failure?: AttemptFailure | null
 }
 
 /** Final canonical tool result. */

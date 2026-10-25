@@ -830,9 +830,13 @@ describe('in-turn delivery (default strategy)', () => {
     await waitFor(() => ctx.engine.runs.length === 1)
     await ctx.dispose()
     const decision = await pending as { kind: string; messages?: UserMessage[] }
-    // Either an explicit notice or a rejection is acceptable; hanging is not.
-    if (decision.kind === 'enter') expect(textOf(decision.messages![0]!)).toContain('workflow')
-    else expect(decision.kind).toBe('reject')
+    // Pinned behaviour (t26 N4): unloading cancels the in-flight run and the
+    // listener still settles with an *entered* notice, because the cancellation
+    // is a workflow outcome, not a turn abort. What matters is that it settles
+    // instead of hanging, and that the run was cancelled.
+    expect(decision.kind).toBe('enter')
+    expect(textOf(decision.messages![0]!)).toContain('cancelled')
+    expect(ctx.engine.runs[0]!.cancel).toHaveBeenCalled()
   })
 
   it('writes no routing ledger when the engine failed before a report existed', async () => {

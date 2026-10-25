@@ -39,6 +39,12 @@ export interface ChildAnswer {
   output?: { type: 'text'; text: string }[]
   stopReason?: string
   structured?: unknown
+  /**
+   * Reject the child's result instead of answering it — the real engine's
+   * "child run failed" path, which it reports as `WorkflowError(AGENT_RESULT)`
+   * with `fatal: true`. Needed to test infrastructure-failure handling (G-4).
+   */
+  reject?: Error
 }
 
 export interface EngineHarness {
@@ -141,13 +147,17 @@ export function createEngineHarness(answer: (call: ChildCall) => ChildAnswer | P
       }
       children.push(call)
       const settled = await answer(call)
-      return {
-        childId: `child-${children.length}`,
-        result: Promise.resolve({
+      const result = settled.reject === undefined
+        ? Promise.resolve({
           output: settled.output ?? [{ type: 'text' as const, text: '' }],
           stopReason: settled.stopReason ?? 'completed',
           ...settled.structured === undefined ? {} : { structured: settled.structured },
-        }),
+        })
+        : Promise.reject(settled.reject)
+      result.catch(() => {})
+      return {
+        childId: `child-${children.length}`,
+        result,
         async dispose() {},
       }
     },

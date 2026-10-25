@@ -66,10 +66,6 @@ function errorMessage(error) {
   try { return String(error); } catch (_) { return 'unknown error'; }
 }
 
-function isFatal(error) {
-  return Boolean(error && typeof error === 'object' && error.fatal === true);
-}
-
 // The workflow script cannot import host code, so prompt-facing redaction is
 // kept here as a small mirror of src/redact.ts. It is a safety net for worker
 // output and errors that would otherwise be replayed into verifier/retry
@@ -190,18 +186,40 @@ function routeReason(value) {
   return redactPromptText(String(value || '')).slice(0, ROUTE_LIMITS.reasonChars);
 }
 
+// Who has to fix a failure. The category is reported next to the class so a
+// reader can tell "the provider was down" (infrastructure: a retry, another
+// route or a later run may succeed) from "the work was not good enough"
+// (quality: the same route must retry with the same evidence).
+function failureCategory(failureClass, code) {
+  if (failureClass === 'task-failed' || failureClass === 'verification-failed') return 'quality';
+  if (failureClass === 'budget-exhausted') return 'configuration';
+  // The guest engine raises AGENT_RESULT for a child run that failed, crashed
+  // or was disposed. Whatever the text says, the failure came from below the
+  // task's own work, so it is infrastructure even when it cannot be classified
+  // further (class stays 'unknown' rather than inventing a cause).
+  if (code === 'AGENT_RESULT' || code === 'AGENT_START') return 'infrastructure';
+  if (failureClass === 'unknown') return 'unknown';
+  return 'infrastructure';
+}
+
 function classifyCallFailure(role, error) {
   const code = failureCode(error);
   const message = safeError(error);
   // Budget and configuration faults are not model faults: another model cannot
-  // fix them, and retrying would hide a broken setup or a runaway script.
-  if (code === 'AGENT_CAP') return { role: role, class: 'budget-exhausted', reason: routeReason(message), switchModel: false, fatal: true };
-  if (code === 'UNSUPPORTED_OPTION' || code === 'INVALID_ARGUMENT' || code === 'UNSUPPORTED_SCHEMA' || code === 'SCRIPT_PARSE' || code === 'ITEM_CAP') {
-    return { role: role, class: 'unknown', reason: routeReason(message), switchModel: false, fatal: true };
+  // fix them, and retrying would hide a broken setup or a runaway script. They
+  // are marked "setup" so the caller stops retrying — but they are never
+  // rethrown: a broken setup must still yield a failure report (G-4).
+  if (code === 'AGENT_CAP') {
+    return { role: role, class: 'budget-exhausted', reason: routeReason(message), switchModel: false, setup: true, category: 'configuration' };
   }
-  if (code === 'AGENT_START') return { role: role, class: 'agent-start-failed', reason: routeReason(message), switchModel: true, fatal: false };
+  if (code === 'UNSUPPORTED_OPTION' || code === 'INVALID_ARGUMENT' || code === 'UNSUPPORTED_SCHEMA' || code === 'SCRIPT_PARSE' || code === 'ITEM_CAP') {
+    return { role: role, class: 'unknown', reason: routeReason(message), switchModel: false, setup: true, category: 'configuration' };
+  }
+  if (code === 'AGENT_START') {
+    return { role: role, class: 'agent-start-failed', reason: routeReason(message), switchModel: true, setup: false, category: 'infrastructure' };
+  }
   const failureClass = classifyFailureText(message);
-  return { role: role, class: failureClass, reason: routeReason(message), switchModel: true, fatal: false };
+  return { role: role, class: failureClass, reason: routeReason(message), switchModel: true, setup: false, category: failureCategory(failureClass, code) };
 }
 
 const routeTrail = [];
@@ -236,7 +254,13 @@ async function callRole(role, prompt, options) {
     } catch (error) {
       const failure = classifyCallFailure(role, error);
       traceRoute(role, index, route, attempt, 'failed', failure);
-      if (failure.fatal) throw error;
+      if (failure.setup) {
+        // A setup fault cannot be fixed by another route. Returning it (instead
+        // of rethrowing) is what keeps the run alive: the caller turns it into
+        // a per-task failure, so one misconfigured task no longer deletes the
+        // whole report (G-4).
+        return { ok: false, value: null, route: null, label: 'exhausted', failure: failure };
+      }
       lastFailure = failure;
       if (!failure.switchModel) break;
       continue;
@@ -245,7 +269,7 @@ async function callRole(role, prompt, options) {
       // The guest engine collapses "child run failed" and "child returned no
       // structured value" to null, so this is reported as a format failure on
       // this route and the next route is tried.
-      const failure = { role: role, class: 'format-error', reason: 'child returned no valid structured result', switchModel: true, fatal: false };
+      const failure = { role: role, class: 'format-error', reason: 'child returned no valid structured result', switchModel: true, setup: false, category: 'infrastructure' };
       traceRoute(role, index, route, attempt, 'failed', failure);
       lastFailure = failure;
       continue;
@@ -258,7 +282,7 @@ async function callRole(role, prompt, options) {
     value: null,
     route: null,
     label: 'exhausted',
-    failure: lastFailure || { role: role, class: 'unknown', reason: 'no route produced a result', switchModel: false, fatal: false }
+    failure: lastFailure || { role: role, class: 'unknown', reason: 'no route produced a result', switchModel: false, setup: false, category: 'unknown' }
   };
 }
 
@@ -695,10 +719,11 @@ async function mapLimit(items, limit, fn) {
   return results;
 }
 
-async function runTask(task) {
+async function runTaskUnsafe(task) {
   const attempts = [];
   const maxAttempts = maxRetries + 1;
   let lastError = '';
+  let lastFailure = null;
   let previous = null;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     let execution = null;
@@ -719,14 +744,15 @@ async function runTask(task) {
         execution = normalizeExecution(worker.value);
         if (!execution) {
           executionError = 'worker returned no valid structured result';
-          attemptFailure = { role: 'worker', class: 'format-error', reason: executionError, switchModel: false, fatal: false };
+          attemptFailure = { role: 'worker', class: 'format-error', reason: executionError, switchModel: false, setup: false, category: 'infrastructure' };
         }
       } else {
         attemptFailure = worker.failure;
         executionError = 'worker failed on every route: [' + worker.failure.class + '] ' + worker.failure.reason;
       }
     } catch (error) {
-      if (isFatal(error)) throw error;
+      // Only an unexpected throw (a bug in this script, not a child failure)
+      // arrives here; it is still recorded per attempt instead of aborting.
       executionError = 'worker failed: ' + safeError(error);
       attemptFailure = classifyCallFailure('worker', error);
     }
@@ -743,14 +769,14 @@ async function runTask(task) {
           verification = normalizeVerification(verifier.value);
           if (!verification) {
             verifyError = 'verifier returned no valid structured result';
-            attemptFailure = { role: 'verifier', class: 'format-error', reason: verifyError, switchModel: false, fatal: false };
+            attemptFailure = { role: 'verifier', class: 'format-error', reason: verifyError, switchModel: false, setup: false, category: 'infrastructure' };
           } else {
             const check = checkVerification(task, execution, verification);
             if (!check.passed) {
               // Content failure: the same route is retried, because another
               // model would be given the same evidence.
               verifyError = redactPromptText(check.reason);
-              attemptFailure = { role: 'verifier', class: 'verification-failed', reason: verifyError, switchModel: false, fatal: false };
+              attemptFailure = { role: 'verifier', class: 'verification-failed', reason: verifyError, switchModel: false, setup: false, category: 'quality' };
             }
           }
         } else {
@@ -758,7 +784,6 @@ async function runTask(task) {
           verifyError = 'verifier failed on every route: [' + verifier.failure.class + '] ' + verifier.failure.reason;
         }
       } catch (error) {
-        if (isFatal(error)) throw error;
         verifyError = 'verifier failed: ' + safeError(error);
         attemptFailure = classifyCallFailure('verifier', error);
       }
@@ -773,7 +798,12 @@ async function runTask(task) {
       passed: passed
     };
     if (attemptRoute !== '') attemptRecord.route = attemptRoute;
-    if (attemptFailure) attemptRecord.failure = { class: attemptFailure.class, reason: routeReason(attemptFailure.reason) };
+    if (attemptFailure) {
+      attemptRecord.failure = { class: attemptFailure.class, reason: routeReason(attemptFailure.reason), category: attemptFailure.category };
+      // Carried to the task row below: the report keeps one category per failed
+      // task, so the incomplete list says who has to fix it (G-4).
+      lastFailure = attemptRecord.failure;
+    }
     attemptRecord.error = executionError || verifyError || '';
     attempts.push(attemptRecord);
     if (passed) {
@@ -782,13 +812,39 @@ async function runTask(task) {
     }
     lastError = redactPromptText(executionError || verifyError || 'verification failed');
     previous = { execution: execution, verification: verification, error: lastError };
+    if (attemptFailure && attemptFailure.setup) {
+      // A setup fault repeats by definition (a cap, a bad option, a bad schema):
+      // spending the remaining attempts would only burn budget.
+      log('task ' + task.id + ' stopped after a setup fault: ' + attemptFailure.class);
+      break;
+    }
     if (attempt < maxAttempts) log('task ' + task.id + ' attempt ' + attempt + ' failed; retrying');
   }
-  return { task: task, status: 'failed', attempts: attempts, error: lastError };
+  return { task: task, status: 'failed', attempts: attempts, error: lastError, failure: lastFailure };
+}
+
+// A task's own failure never escapes this function: the per-task report (and
+// every other task's result) must survive an infrastructure fault (G-4). The
+// only way to reach the catch is a bug in runTaskUnsafe, which is still
+// reported as that task's failure rather than as a bare exception.
+async function runTask(task) {
+  try {
+    return await runTaskUnsafe(task);
+  } catch (error) {
+    const failure = classifyCallFailure('worker', error);
+    return {
+      task: task,
+      status: 'failed',
+      attempts: [],
+      error: redactPromptText('task aborted before any attempt: [' + failure.class + '/' + failure.category + '] ' + failure.reason),
+      failure: failure
+    };
+  }
 }
 
 phase('Plan');
 let plan = null;
+let planFailure = null;
 let planError = '';
 if (suppliedTasks && suppliedTasks.length > 0) {
   plan = normalizePlan({ tasks: suppliedTasks }, 'caller');
@@ -805,19 +861,38 @@ if (suppliedTasks && suppliedTasks.length > 0) {
       plan = normalizePlan(planned.value, 'planner');
       if (!plan) planError = 'planner returned no valid plan';
     } else {
-      planError = 'planner failed on every route: [' + planned.failure.class + '] ' + planned.failure.reason;
+      planError = 'planner failed on every route: [' + planned.failure.class + '/' + planned.failure.category + '] ' + planned.failure.reason;
+      planFailure = planned.failure;
     }
   } catch (error) {
-    if (isFatal(error)) throw error;
+    // An unusable planner must degrade to the fallback plan, never abort.
+    planFailure = classifyCallFailure('planner', error);
     planError = 'planner failed: ' + errorMessage(error);
   }
 }
 if (!plan) {
   plan = fallbackPlan(planError || 'planner returned no valid plan');
+  if (planFailure) plan.failure = { class: planFailure.class, reason: routeReason(planFailure.reason), category: planFailure.category };
 }
 
 phase('Execute');
-const results = await mapLimit(plan.tasks, maxConcurrency, runTask);
+let results;
+try {
+  results = await mapLimit(plan.tasks, maxConcurrency, runTask);
+} catch (error) {
+  // Bug guard: every task is already reporting its own failure, so a throw here
+  // means the runner itself broke. Still produce a report, one failed row each.
+  const failure = classifyCallFailure('worker', error);
+  results = plan.tasks.map(function (task) {
+    return {
+      task: task,
+      status: 'failed',
+      attempts: [],
+      error: redactPromptText('task runner crashed: [' + failure.class + '/' + failure.category + '] ' + failure.reason),
+      failure: failure
+    };
+  });
+}
 
 phase('Synthesize');
 const confirmed = [];
@@ -850,11 +925,18 @@ for (let i = 0; i < results.length; i++) {
       }
     }
   } else {
-    incomplete.push({ taskId: task.id, reason: result.error || result.task.expectedOutput });
-    errors.push({ phase: 'Execute', message: task.id + ': ' + (result.error || 'task failed') });
+    const taskCategory = result.failure ? result.failure.category : 'unknown';
+    incomplete.push({ taskId: task.id, reason: result.error || result.task.expectedOutput, category: taskCategory });
+    errors.push({ phase: 'Execute', message: task.id + ': ' + (result.error || 'task failed'), category: taskCategory });
     for (let a = 0; a < result.attempts.length; a++) {
       const attempt = result.attempts[a];
-      if (attempt.error) errors.push({ phase: 'Attempt ' + attempt.attempt, message: task.id + ': ' + attempt.error });
+      if (attempt.error) {
+        errors.push({
+          phase: 'Attempt ' + attempt.attempt,
+          message: task.id + ': ' + attempt.error,
+          category: attempt.failure ? attempt.failure.category : 'unknown'
+        });
+      }
       if (attempt.execution && attempt.execution.uncertainties) {
         for (let u = 0; u < attempt.execution.uncertainties.length; u++) {
           uncertainties.push({ taskId: task.id, text: attempt.execution.uncertainties[u] });
@@ -863,7 +945,7 @@ for (let i = 0; i < results.length; i++) {
     }
   }
 }
-if (plan.error) errors.push({ phase: 'Plan', message: plan.error });
+if (plan.error) errors.push({ phase: 'Plan', message: plan.error, category: plan.failure ? plan.failure.category : 'unknown' });
 const verifiedCount = results.filter(function (item) { return item.status === 'verified'; }).length;
 const planningFallback = plan.source === 'fallback';
 let status = 'failed';
@@ -888,10 +970,9 @@ if (synthesisMode === 'model') {
       synthesisError = 'synthesizer failed on every route: [' + summarized.failure.class + '] ' + summarized.failure.reason;
     }
   } catch (error) {
-    // A fatal synthesizer failure must not lose verified work: the deterministic
-    // aggregation below is already complete, so the narrative is optional.
-    if (isFatal(error)) synthesisError = 'synthesizer could not run: ' + safeError(error);
-    else throw error;
+    // The deterministic aggregation is already complete, so the narrative is
+    // optional: a synthesizer fault is reported, never propagated (G-4).
+    synthesisError = 'synthesizer could not run: [' + classifyCallFailure('synthesizer', error).class + '] ' + safeError(error);
   }
 }
 
@@ -906,7 +987,8 @@ const report = {
   plan: {
     source: plan.source,
     tasks: plan.tasks,
-    error: plan.error || ''
+    error: plan.error || '',
+    failure: plan.failure || null
   },
   tasks: results.map(function (result) {
     return {

@@ -269,7 +269,11 @@ describe('generated workflow script on the real engine', () => {
     const validated = assertWorkflowReport(result.value, 'Ship the verified result', resolveConfig({ maxConcurrency: 2, maxRetries: 1, maxTasks: 6 }))
     expect(validated.status).toBe('failed')
     expect(validated.tasks[0]!.attempts).toHaveLength(2)
-    expect(validated.incomplete).toEqual([{ taskId: 'a', reason: expect.stringContaining('verifier verdict was fail') }])
+    expect(validated.incomplete).toEqual([{
+      taskId: 'a',
+      reason: expect.stringContaining('verifier verdict was fail'),
+      category: 'quality',
+    }])
     // one worker + one verifier per attempt, two attempts
     expect(engine.children).toHaveLength(4)
   })

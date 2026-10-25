@@ -1,6 +1,6 @@
 import type {
   AttemptFailure,
-  RouteTrailEntry, ExecutionResult, FinalStatus, VerificationResult, WorkflowReport } from './types.js'
+  RouteTrailEntry, ExecutionResult, FailureCategory, FinalStatus, VerificationResult, WorkflowReport } from './types.js'
 import type { ResolvedConfig, RoleName } from './types.js'
 import { criterionKey } from './input.js'
 import { maxTotalAgentsFor, routeBudgetFor } from './script.js'
@@ -149,11 +149,21 @@ const FAILURE_CLASSES = [
   'unknown',
 ] as const
 
+const FAILURE_CATEGORIES = ['infrastructure', 'quality', 'configuration', 'unknown'] as const
+
+/** Parse an optional failure category; unknown values are rejected, not coerced. */
+function failureCategory(value: unknown, path: string): FailureCategory | undefined {
+  if (value === undefined || value === null) return undefined
+  return enumeration(value, FAILURE_CATEGORIES, `${path}.category`) as FailureCategory
+}
+
 function attemptFailure(value: unknown, path: string): AttemptFailure {
   const entry = record(value, path)
+  const category = failureCategory(entry.category, path)
   return {
     class: enumeration(entry.class, FAILURE_CLASSES, `${path}.class`),
     reason: string(entry.reason ?? '', `${path}.reason`),
+    ...category === undefined ? {} : { category },
   }
 }
 
@@ -202,6 +212,9 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
   if (!['caller', 'planner', 'fallback', 'unavailable'].includes(source)) {
     throw new Error(`workflow result has invalid plan.source "${source}"`)
   }
+  const planFailure = plan.failure === undefined || plan.failure === null
+    ? undefined
+    : attemptFailure(plan.failure, 'plan.failure')
   const planTasks = array(plan.tasks, 'plan.tasks').map((item, index) => {
     const task = record(item, `plan.tasks[${index}]`)
     return {
@@ -336,16 +349,20 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
   })
   const incomplete = array(root.incomplete, 'incomplete').map((item, index) => {
     const entry = record(item, `incomplete[${index}]`)
+    const category = failureCategory(entry.category, `incomplete[${index}]`)
     return {
       taskId: string(entry.taskId, `incomplete[${index}].taskId`),
       reason: string(entry.reason, `incomplete[${index}].reason`),
+      ...category === undefined ? {} : { category },
     }
   })
   const errors = array(root.errors, 'errors').map((item, index) => {
     const entry = record(item, `errors[${index}]`)
+    const category = failureCategory(entry.category, `errors[${index}]`)
     return {
       phase: string(entry.phase, `errors[${index}].phase`),
       message: string(entry.message, `errors[${index}].message`),
+      ...category === undefined ? {} : { category },
     }
   })
   const uncertainties = array(root.uncertainties, 'uncertainties').map((item, index) => {
@@ -461,6 +478,7 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
       source: source as WorkflowReport['plan']['source'],
       tasks: planTasks,
       error: planError,
+      ...planFailure === undefined ? {} : { failure: planFailure },
     },
     tasks: tasks as WorkflowReport['tasks'],
     confirmed,
@@ -477,7 +495,13 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
 }
 
 /** A failure report for a run that never produced a script result. */
-export function failureReport(objective: string, config: ResolvedConfig, phase: string, message: string): WorkflowReport {
+export function failureReport(
+  objective: string,
+  config: ResolvedConfig,
+  phase: string,
+  message: string,
+  category: FailureCategory = 'infrastructure',
+): WorkflowReport {
   return {
     schemaVersion: 'grok-workflow/v1',
     status: 'failed',
@@ -485,8 +509,8 @@ export function failureReport(objective: string, config: ResolvedConfig, phase: 
     plan: { source: 'unavailable', tasks: [], error: message },
     tasks: [],
     confirmed: [],
-    incomplete: [{ taskId: 'workflow', reason: message }],
-    errors: [{ phase, message }],
+    incomplete: [{ taskId: 'workflow', reason: message, category }],
+    errors: [{ phase, message, category }],
     uncertainties: [],
     routes: [],
     routing: { planner: [], worker: [], verifier: [], synthesizer: [] },
@@ -500,6 +524,45 @@ export function failureReport(objective: string, config: ResolvedConfig, phase: 
   }
 }
 
+/**
+ * Failure category of a failed task, from its last classified attempt.
+ * @param task - report row to inspect.
+ * @returns The category, or undefined when no attempt carried one.
+ */
+function categoryOfTask(task: WorkflowReport['tasks'][number]): FailureCategory | undefined {
+  for (let index = task.attempts.length - 1; index >= 0; index--) {
+    const failure = task.attempts[index]?.failure
+    if (failure?.category !== undefined) return failure.category
+  }
+  return undefined
+}
+
+/**
+ * Count failures per category across the report, so a reader can separate
+ * "the provider was down" from "the work was not good enough" at a glance.
+ * @param report - validated report.
+ * @returns Category counts in report order.
+ */
+export function failureSummary(report: WorkflowReport): { category: FailureCategory; count: number }[] {
+  const counts = new Map<FailureCategory, number>()
+  const add = (category: FailureCategory | undefined): void => {
+    if (category === undefined) return
+    counts.set(category, (counts.get(category) ?? 0) + 1)
+  }
+  for (const task of report.tasks) {
+    const classified = task.attempts.filter(attempt => attempt.failure?.category !== undefined)
+    // One count per attempt that actually failed; a task with no classified
+    // attempt (runner failure) still counts once, from its incomplete row.
+    if (classified.length === 0) {
+      add(report.incomplete.find(item => item.taskId === task.id)?.category)
+      continue
+    }
+    for (const attempt of classified) add(attempt.failure?.category)
+  }
+  const order: FailureCategory[] = ['infrastructure', 'quality', 'configuration', 'unknown']
+  return order.filter(category => counts.has(category)).map(category => ({ category, count: counts.get(category) ?? 0 }))
+}
+
 /** Render a concise model-facing view; the canonical JSON remains available to PTC. */
 export function renderReport(report: WorkflowReport): string {
   const verified = report.tasks.filter(task => task.status === 'verified').length
@@ -508,11 +571,19 @@ export function renderReport(report: WorkflowReport): string {
     `Objective: ${oneLine(report.objective, 300)}`,
     `Plan: ${report.plan.source}; ${report.tasks.length} task(s); ${verified} verified`,
   ]
+  const failures = failureSummary(report)
+  if (failures.length > 0) {
+    lines.push(`Failures: ${failures.map(entry => `${entry.count} ${entry.category}`).join(', ')}`)
+  }
+  if (report.plan.failure !== undefined && report.plan.failure !== null && report.plan.failure.category !== undefined) {
+    lines.push(`Plan failure: ${report.plan.failure.class} (${report.plan.failure.category})`)
+  }
   for (const task of report.tasks) {
     const attempts = task.attempts.length
     lines.push(`- ${task.id}: ${task.status} (${attempts} attempt${attempts === 1 ? '' : 's'}) — ${oneLine(task.title, 160)}`)
     if (task.status === 'failed') {
-      lines.push(`  incomplete: ${oneLine(task.error || task.expectedOutput, 500)}`)
+      const category = categoryOfTask(task)
+      lines.push(`  incomplete${category === undefined ? '' : ` (${category})`}: ${oneLine(task.error || task.expectedOutput, 500)}`)
     }
   }
   if (report.confirmed.length > 0) {
@@ -524,7 +595,7 @@ export function renderReport(report: WorkflowReport): string {
   if (report.incomplete.length > 0) {
     lines.push('Incomplete:')
     for (const item of report.incomplete.slice(0, 12)) {
-      lines.push(`- ${item.taskId}: ${oneLine(item.reason, 500)}`)
+      lines.push(`- ${item.taskId}${item.category === undefined ? '' : ` (${item.category})`}: ${oneLine(item.reason, 500)}`)
     }
   }
   if (report.synthesis.summary !== undefined) {

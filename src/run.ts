@@ -14,7 +14,7 @@ import { buildWorkflowRequest } from './script.js'
 import { assertWorkflowReport, failureReport } from './report.js'
 import { recordRouting } from './records.js'
 import { redactDeep, redactError, redactSecrets } from './redact.js'
-import type { NormalizedTask, ResolvedConfig, WorkflowReport } from './types.js'
+import type { FailureCategory, NormalizedTask, ResolvedConfig, WorkflowReport } from './types.js'
 
 /** Minimal logger surface used by the runtime modules. */
 export interface WorkflowLogger {
@@ -150,8 +150,13 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
   timer.unref?.()
   const combined = anySignal([state.controller.signal, timeoutController.signal, ...options.signals ?? []])
   const signal = combined.signal
+  // The category tells a reader who failed: a deadline or a broken engine is
+  // infrastructure (a retry may succeed), while a deliberate stop or a report
+  // we could not validate is a configuration/runtime problem of ours (G-4).
+  const categoryFor = (cause: string): FailureCategory =>
+    cause === 'timeout' || cause === 'engine-error' ? 'infrastructure' : 'configuration'
   const asReport = (phase: string, message: string, cause: string): RunOutcome => ({
-    report: redactDeep(failureReport(objective, config, phase, message)),
+    report: redactDeep(failureReport(objective, config, phase, message, categoryFor(cause))),
     ok: false,
     cause,
   })

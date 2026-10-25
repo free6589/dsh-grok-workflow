@@ -101,7 +101,11 @@ describe('generated workflow script', () => {
     expect(ok.status).toBe('verified')
     expect(broken.status).toBe('failed')
     expect(broken.attempts).toHaveLength(2)
-    expect(report.incomplete).toEqual([{ taskId: 'broken', reason: expect.stringContaining('no valid structured result') }])
+    expect(report.incomplete).toEqual([{
+      taskId: 'broken',
+      reason: expect.stringContaining('no valid structured result'),
+      category: 'infrastructure',
+    }])
     expect(calls.filter(label => label.startsWith('grok-verifier-broken-'))).toHaveLength(0)
   })
 
@@ -216,7 +220,13 @@ describe('generated workflow script', () => {
     expect(validated.plan.source).toBe('fallback')
     expect(validated.plan.error).toContain('planner failed')
     expect(validated.tasks.map(item => item.status)).toEqual(['verified'])
-    expect(validated.errors).toContainEqual({ phase: 'Plan', message: expect.stringContaining('planner failed') })
+    expect(validated.errors).toContainEqual({
+      phase: 'Plan',
+      message: expect.stringContaining('planner failed'),
+      // A host-side planner throw carries no engine code, so the class stays
+      // 'unknown'; the category is reported honestly rather than guessed.
+      category: 'unknown',
+    })
 
     const nonFallback = { ...report, plan: { ...report.plan, source: 'planner' } }
     expect(() => assertWorkflowReport(nonFallback, 'Ship the verified result', config))

@@ -584,7 +584,7 @@ Every row must state who answers and how the turn ends, otherwise the path is un
 | F2 | run `partial` | same, text states verified vs incomplete | as above | run + gate | satisfied (no false success) |
 | F3 | all routes exhausted | explicit failure/partial report as the answer | as above | run + route | satisfied, never a direct answer |
 | F4 | report validation fails (`assertWorkflowReport` throws) | host builds a `failureReport`-grade answer with the validation cause | `blocked` + delivery | gate + error record | satisfied |
-| F5 | engine `stopReason:'error'` (G-4, today loses partial evidence) | `failureReport` with the engine cause (t17 work) | `blocked` + delivery | gate + error record | degraded until t17 |
+| F5 | engine `stopReason:'error'` (G-4) used to lose all partial evidence | per-task failure rows + category in the report, never a bare exception | `blocked` + delivery | gate + error record | **resolved (t17)**: see DESIGN DD-6 |
 | F6 | `pre-step` listener throws | there is no answer; the turn ends `error` | `error` | gate record (best effort) | violation — must be prevented by making the listener total (catch-all) |
 | F7 | deadline / cancellation | deadline: failure answer; user cancel: no answer | `aborted` | run | cancel is user-initiated, acceptable |
 | F8 | prepare-phase failure (R-14 codes) | script catches → task-level failure → partial/failed answer | `blocked` + delivery | route/attempt | satisfied under v1 |
@@ -631,7 +631,11 @@ script-level v1 fallback and the merged answer path.
 - **Phase 6 — L2 request-level routing (optional, U-2).** Only if the loss of in-child
   tool results proves unacceptable. Requires `prepend` ownership + durable self-pushed
   cursor + the R-14 caveat.
-- **Phase 7 — reliability work (t17 G-4, report hardening, redaction/context fixes).**
+- **Phase 7 — reliability work — G-4 DONE (t17).** The fatal policy moved into the plugin:
+  infrastructure failures are classified, never rethrown, and every failure carries a
+  category (`infrastructure` / `quality` / `configuration` / `unknown`) so the report cannot
+  confuse a dead provider with work that fell short (DESIGN DD-6). Remaining: report
+  hardening follow-ups, redaction/context fixes.
   Exit: F4/F5 produce failure answers; the seven report holes each have a negative test.
 - **Phase 8 — synthesizer role (optional, U-3)** with its post-check rule.
 - **Phase 9 — settings GUI page (optional, after Phase 3)** using path operations.

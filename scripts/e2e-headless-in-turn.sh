@@ -15,6 +15,8 @@
 #
 # The run writes a session into $DSH_HOME (the DSH home you point at), which is
 # why the script never sets DSH_HOME itself: choose the home you want polluted.
+# The work directory is removed on exit unless E2E_WORKDIR was supplied (then it
+# is kept for inspection) or E2E_KEEP=1 is set.
 #
 # Exit codes: 0 = the report reached the user in one turn; 1 = usage/precondition
 # failure; 2 = the turn produced no report (the exact regression this guards).
@@ -22,11 +24,25 @@ set -u
 
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 WORK=${E2E_WORKDIR:-$(mktemp -d "${TMPDIR:-/tmp}/dsh-grok-e2e-XXXXXX")}
+# A caller-supplied E2E_WORKDIR may not exist yet; mktemp already created ours.
+mkdir -p "$WORK"
 LOG="$WORK/headless-in-turn.log"
 PROMPT=${E2E_PROMPT:-"In one short sentence: why is a stub better than a mock for interfaces you do not own?"}
 TIMEOUT=${E2E_TIMEOUT:-900}
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit "${2:-1}"; }
+
+# The run writes a real session into $DSH_HOME, so the log is worth keeping on a
+# failure. Keep the directory when the caller named it or asked for it.
+KEEP=${E2E_KEEP:-0}
+cleanup() {
+  if [ "$KEEP" = "1" ] || [ -n "${E2E_WORKDIR:-}" ]; then
+    printf 'kept: %s\n' "$WORK"
+    return
+  fi
+  rm -rf "$WORK"
+}
+trap cleanup EXIT
 
 command -v dsh >/dev/null 2>&1 || fail "dsh is not on PATH"
 [ -f "$REPO/lib/index.js" ] || fail "build the bundle first: npm run build"

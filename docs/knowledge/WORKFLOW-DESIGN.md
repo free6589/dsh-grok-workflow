@@ -188,7 +188,7 @@ Paths are inside
 | G-1 | no forced entry (tool + prompt only) | t2 | A | DD-1 |
 | G-2 | no conversation-context forwarding | t2 | R-001 follow-ups | DD-3 |
 | G-3 | no synthesizer role (Synthesize is pure JS) | t2 | B | U-3 |
-| G-4 | an infrastructure failure destroys all partial evidence (`stopReason:'error'`, `value:null`) | t2/t5 | C, OQ-009 | t17 / F5 |
+| G-4 | an infrastructure failure destroys all partial evidence (`stopReason:'error'`, `value:null`) | t2/t5, mechanism re-read t17 | C, OQ-009 | **resolved (t17)**: the plugin's fatal policy, not the script's `try/catch`, was the cause — see DD-6 |
 | G-5 | no role identity (label/phase are progress-only) | t2 | B, L2 | DD-4 |
 | G-6 | `provider`/`model` never passed although the engine supports it | t2 | B | DD-4 |
 | G-7 | no settings registration | t2 | D | DD-9 |
@@ -226,7 +226,7 @@ silently dropped.
 | R-08 | high | **adopted** | gate classification keys on `payload.messages`; empty batch ⇒ pass-through; tool-continuation negative test added | DD-1; ROADMAP §5, §12 |
 | R-09 | medium | **adopted** | non-`user` message sources pass through; the plugin declares its own relay `source.kind`; N-5 rewritten | DD-1, DD-2; E-23 |
 | R-10 | medium | **adopted** | failure-path table added with 12 rows including report-validation failure, engine error, listener throw, teardown and exit code | ROADMAP §15; DD-11 |
-| R-11b | low | **adopted** | a batch refused for a full queue is claimed by the host and not returned, so it is refused explicitly and never retried by this plugin; only a client re-send can start the run (V-2, t24) |
+| R-11b | low | **adopted** | a batch refused for a full queue is claimed by the host and not returned, so it is refused explicitly and never retried by this plugin; only a client re-send can start the run (V-2, t24). The same rule covers `in-turn`: the `started` delivery record is written *before* the run is awaited, so if the process dies mid-run that message is **not** routed again after a restart — deliberate (a crash may already have executed tools, so re-running could duplicate side effects), with the consequence that a user must re-send to retry (t25/t26) |
 | R-11 | medium | **adopted** | running-input policy defined (queue, then a follow-up turn); G-16 registered as a known limitation | ROADMAP §5 rule 4; G-16 |
 | R-12 | medium | **adopted** | composable budget invariants with load-time enforcement and negative tests | ROADMAP §7; DD-9 |
 | R-13 | medium | **adopted** | "effective = min(script pool, engine slots)"; the "must be equal" requirement is deleted | ROADMAP §11; DD-8 |
@@ -414,13 +414,55 @@ cancellable wait; I5 the three-way guard (attempts, cursor, deadline/token) is c
 before each attempt; **I6 (new, R-12)** `chainLen × perModelAttempts ≥ totalAttempts` and
 `transport + semantic ≤ totalAttemptsHard`, enforced at load.
 
-### DD-6 — Infrastructure failure paths (G-4)
+### DD-6 — Infrastructure failure paths (G-4) — RESOLVED in t17
 
-Today a child failure becomes `WorkflowError(AGENT_RESULT, fatal)`, the script rethrows,
-the engine returns `stopReason:'error'` with `value:null`, and the host throws: **one 429
-or timeout destroys all partial per-task evidence**. Recorded, not changed here; the fix is
-task t17 and failure row F5. Prepare-phase failures (E-34) take the same route and are
-today caught only by the script.
+**The mechanism, re-read from the engine source in t17.** `WorkflowError.fatal` defaults to
+`true` for *every* error code (`dsh-workflow/lib/index.js`, `WorkflowError` constructor:
+`this.fatal = options?.fatal ?? true`), and `agent()` raises `AGENT_RESULT` for any child run
+that rejects — including a 429, a timeout or a disposed child. The script's old
+`if (isFatal(error)) throw error` therefore rethrew a *transport* failure; the throw left the
+task, and `parallel()`/the run loop propagated a fatal error, so `drive()` returned
+`stopReason:'error'` with `value:null` and every per-task result was lost. A script-side
+`try/catch` cannot fix this class of bug on its own — the flag is host-set and the escape
+happens above the script — so the fix is a **fatal policy change in the plugin's script**:
+
+- `classifyCallFailure` no longer marks infrastructure failures fatal. Only *setup* faults
+  (AGENT_CAP, unsupported option, invalid argument, unsupported schema, script parse, item
+  cap) stop the chain, and they are **returned**, never rethrown: the caller records them as
+  that task's failure and the run continues with the remaining tasks.
+- Every task runs inside a wrapper, and the task pool is wrapped too, so no throw from a
+  task can end the run: the worst case is a failed row per task, never a bare exception.
+- A setup fault also stops further *attempts* for that task: a cap or a bad schema repeats
+  by definition, so retrying only burns budget.
+- The planner degrades to the fallback plan on any fault (recorded in `plan.failure`), and a
+  synthesizer fault only empties the narrative, because the deterministic aggregation is
+  already complete.
+
+**Distinguishable in the report layer.** A failure now carries a *class* (what happened:
+`rate-limit`, `timeout`, `server-error`, `connection`, `model-unavailable`, `format-error`,
+`task-failed`, `verification-failed`, `agent-start-failed`, `budget-exhausted`, `unknown`)
+**and a category** (who has to fix it):
+
+| category | classes | meaning |
+|---|---|---|
+| `infrastructure` | rate-limit, timeout, server-error, connection, model-unavailable, format-error, agent-start-failed, and any child failure whose text cannot be classified (decided by the engine code `AGENT_RESULT`) | the model service, the network or a deadline failed; a retry, another route or a later run may succeed |
+| `quality` | task-failed, verification-failed | the work or its verification fell short; the same route retries with the same evidence |
+| `configuration` | budget-exhausted, and the setup-fault classes above; also a deliberate stop or an unvalidatable report at the run level | no retry can help; a human must change something |
+| `unknown` | unmatched non-engine throwables | unclassified on purpose — never guessed |
+
+The category is carried on `tasks[].attempts[].failure.category`,
+`incomplete[].category`, `errors[].category`, `plan.failure.category` and the run-level
+failure report (`src/run.ts` maps timeout/engine-error to `infrastructure`, cancellation and
+report-invalid to `configuration`). `renderReport` prints a `Failures: 1 infrastructure,
+1 quality` line plus a per-item marker, so the answer a user reads cannot confuse "the
+provider was down" with "the work was not good enough".
+
+**Evidence.** `test/failure-paths.spec.ts` covers 429 / timeout / crashed child / exhausted
+chain / non-Error throw / one-task-down-while-another-verifies / both categories in one
+report, and the same 429 path through the **real PTC engine**
+(`stopReason:'completed'` with a validated failed-task report — the exact opposite of the old
+`'error'`), using the harness's new `reject` capability. Prepare-phase failures (E-34) take
+the same route and are covered by the planner arm.
 
 ### DD-7 — Report validation hardening
 
@@ -494,7 +536,7 @@ recursion. F6 (listener totality) and F9 (teardown) are blocking preconditions f
 | OQ-006 | model identity and configuration source | **PARTIALLY** — ids validated against the catalog; a dropdown needs a custom page (E-32) |
 | OQ-007 | settings UI and persistence | **DOWNGRADED** — stage 1 (YAML + `volatile` + validation) is operable; the page needs a client package |
 | OQ-008 | context, privacy, recursion | **PARTIALLY** — DD-3, DD-1 rules, `maxDepth` caveat |
-| OQ-009 | failure reporting and partial results | **PARTIALLY** — F-table defined; F5/G-4 needs t17 |
+| OQ-009 | failure reporting and partial results | **yes (t17)** — infrastructure vs quality vs configuration is explicit in the report (DD-6), and a failure never costs the rest of the report |
 | OQ-010 | runtime cost and latency | **PARTIALLY** — budgets and the extra relay turn are specified; measurement is `NOT_RUN` |
 | OQ-011 | support risk of plugin-authored answers | **ANSWERED for planning** — level B with documented degradation; ordering case `NOT_RUN` |
 | OQ-012 | duplicate user events | **ANSWERED** — plugin relay message carries its own `source.kind` (E-23) and is not a user message |
