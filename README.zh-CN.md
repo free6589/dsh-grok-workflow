@@ -17,7 +17,7 @@
 
 你不需要编写工作流脚本。安装插件、重启 DSH 配置，然后让模型调用 `grok_workflow` 即可。
 
-![工作流程：规划、执行、验证、有限重试、汇总](docs/images/workflow-overview.svg)
+![工作流程：规划、执行、验证、有限重试、汇总](docs/images/workflow-overview.zh-CN.svg)
 
 ## 一条命令安装
 
