@@ -145,6 +145,16 @@ When disabled or absent, the tool and prompt section are not registered; normal 
 - **You want to understand the design:** see [Architecture](docs/ARCHITECTURE.md) and the [acceptance checklist](docs/ACCEPTANCE.md).
 - **You found a bug:** [Open an issue](https://github.com/free6589/dsh-grok-workflow/issues).
 
+## Versions and release notes
+
+The package version currently declared in this repository is `0.1.0`. Code commits are not automatically public releases. Once a matching GitHub Release and tag exist, you can install or roll back to an exact version with a tag suffix, for example:
+
+```sh
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.1.0
+```
+
+Use only a version tag that exists on GitHub. The first `v0.1.0` tag will be created after the release workflow is merged and the main-branch checks pass; until then, use the unpinned install command above. See the [changelog](CHANGELOG.md) and [release guide](docs/RELEASING.md) for versioning and rollback steps.
+
 ## Testing and development
 
 Clone the repository and run:
@@ -181,6 +191,8 @@ The suite has **56 deterministic tests** across 6 files and does not call an onl
 - [Architecture](docs/ARCHITECTURE.md)
 - [Acceptance checklist](docs/ACCEPTANCE.md)
 - [Issue watcher (optional)](docs/ISSUE-WATCHER.md)
+- [Changelog](CHANGELOG.md)
+- [Versioning and release guide](docs/RELEASING.md)
 - [Project state and handoff notes](docs/knowledge/STATE.md)
 
 ## License
