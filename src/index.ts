@@ -1,12 +1,12 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
-import type { WorkflowRun, WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
 import { resolveConfig } from './config.js'
+import { installGate } from './gate.js'
 import { normalizeCallerTasks, GrokWorkflowInputError, TASK_LIMITS } from './input.js'
-import { assertWorkflowReport, failureReport, renderReport } from './report.js'
-import { buildWorkflowRequest } from './script.js'
-import { redactDeep, redactError, redactSecrets } from './redact.js'
+import { renderReport } from './report.js'
+import { createActiveState, disposeActiveState, runWorkflow } from './run.js'
+import type { ActiveState } from './run.js'
 import type { GrokWorkflowConfig, TaskInput, WorkflowReport } from './types.js'
 
 export { Config, HARD_LIMITS } from './config.js'
@@ -35,49 +35,14 @@ export const name = 'dsh-grok-workflow'
 /** Required DSH services. The base/web/headless bundles provide them. */
 export const inject = ['tools', 'workflowEngine', 'systemPrompt'] as const
 
-interface ActiveState {
-  disposed: boolean
-  pending: number
-  readonly controller: AbortController
-  readonly runs: Set<WorkflowRun>
-}
-
-/** Combine signals without depending on AbortSignal.any availability. */
-function anySignal(signals: AbortSignal[]): AbortSignal {
-  const anyFn = (AbortSignal as unknown as { any?: (values: AbortSignal[]) => AbortSignal }).any
-  if (typeof anyFn === 'function') return anyFn(signals)
-  const controller = new AbortController()
-  const abort = (): void => controller.abort()
-  for (const signal of signals) {
-    if (signal.aborted) {
-      abort()
-      break
-    }
-    signal.addEventListener('abort', abort, { once: true })
-  }
-  return controller.signal
-}
-
 /** Install the workflow tool and its lifetime-scoped state. */
 export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
   const config = resolveConfig(rawConfig)
   const logger = ctx.logger('dsh-grok-workflow')
-  const state: ActiveState = {
-    disposed: false,
-    pending: 0,
-    controller: new AbortController(),
-    runs: new Set<WorkflowRun>(),
-  }
+  const state: ActiveState = createActiveState()
 
   ctx.effect(() => async () => {
-    state.disposed = true
-    state.controller.abort('grok-workflow plugin unloaded')
-    const runs = [...state.runs]
-    state.runs.clear()
-    await Promise.allSettled(runs.map(async run => {
-      run.cancel('grok-workflow plugin unloaded')
-      await run.dispose()
-    }))
+    await disposeActiveState(state)
   }, 'dsh-grok-workflow: active runs')
 
   ctx.systemPrompt.section({
@@ -142,10 +107,11 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
     timeoutMs: Math.min(config.timeoutMs + 60_000, 86_400_000),
     isConcurrencySafe: () => false,
     async execute(args, exec: ToolRunContext) {
-      if (!exec.agent) {
+      const { agent } = exec
+      if (!agent) {
         throw new Error(`${config.toolName} requires a calling agent (exec.agent was undefined)`)
       }
-      const sessionHeader = exec.agent.session?.header
+      const sessionHeader = agent.session?.header
       const delegationDepth = sessionHeader?.delegationDepth ?? 0
       if (sessionHeader?.origin === 'subagent' || delegationDepth > 0) {
         throw new Error(`${config.toolName} cannot be invoked from a subagent (delegation depth ${delegationDepth})`)
@@ -162,82 +128,24 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
         throw new GrokWorkflowInputError(`objective must be at most ${TASK_LIMITS.objectiveChars} characters`)
       }
       const callerTasks = normalizeCallerTasks(args.tasks as TaskInput[] | undefined, config.maxTasks)
-      const request = buildWorkflowRequest(objective, callerTasks, config)
-      if (state.runs.size + state.pending >= config.maxActiveRuns) {
-        throw new Error(`${config.toolName} already has ${state.runs.size + state.pending} active run(s); maxActiveRuns is ${config.maxActiveRuns}`)
-      }
-
-      const timeoutController = new AbortController()
-      let timedOut = false
-      const timer = setTimeout(() => {
-        timedOut = true
-        timeoutController.abort()
-      }, config.timeoutMs)
-      timer.unref?.()
-      const signal = anySignal([exec.signal, state.controller.signal, timeoutController.signal])
-      const timeoutReport = () => redactDeep(failureReport(
-        objective,
+      const outcome = await runWorkflow({
+        ctx,
         config,
-        'Timeout',
-        `workflow exceeded the ${config.timeoutMs} ms deadline and was cancelled`,
-      )) as never
-      state.pending += 1
-      let run: WorkflowRun | undefined
-      try {
-        try {
-          const start: WorkflowStartRequest = {
-            script: request.script,
-            meta: request.meta,
-            args: request.args,
-            parent: exec.agent,
-            signal,
-            maxTotalAgents: request.maxTotalAgents,
-            ...config.subagentProvider === undefined ? {} : { subagentProvider: config.subagentProvider },
-          }
-          try {
-            run = await ctx.workflowEngine.start(start)
-          } catch (error) {
-            if (timedOut) return timeoutReport()
-            throw error
-          }
-          if (state.disposed) {
-            run.cancel('grok-workflow plugin unloaded')
-            throw new Error(`${config.toolName} cancelled: plugin unloaded`)
-          }
-          state.runs.add(run)
-          if (timedOut) {
-            run.cancel('workflow deadline exceeded during startup')
-            return timeoutReport()
-          }
-        } finally {
-          state.pending -= 1
-        }
-
-        const activeRun = run
-        if (activeRun === undefined) throw new Error('workflow engine did not return a run')
-        const result = await activeRun.result
-        if (timedOut) return timeoutReport()
-        if (result.stopReason === 'completed') {
-          const validated = assertWorkflowReport(result.value, objective, config)
-          return redactDeep(validated) as never
-        }
-        if (result.stopReason === 'cancelled') {
-          throw new Error(`${config.toolName} cancelled`)
-        }
-        throw new Error(redactSecrets(`${config.toolName} engine error: ${result.error ?? 'unknown workflow failure'}`))
-      } finally {
-        clearTimeout(timer)
-        if (run !== undefined) {
-          state.runs.delete(run)
-          try {
-            await run.dispose()
-          } catch (error) {
-            logger.warn(`run disposal failed: ${redactError(error)}`)
-          }
-        }
-      }
+        state,
+        logger,
+        agent,
+        objective,
+        signals: [exec.signal],
+        ...callerTasks === undefined ? {} : { callerTasks },
+        failureMode: 'throw',
+      })
+      return outcome.report as never
     },
   })
 
   ctx.tools.register(tool)
+
+  if (config.enforceGate) {
+    installGate({ ctx, config, state, logger })
+  }
 }

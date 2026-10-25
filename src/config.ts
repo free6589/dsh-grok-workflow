@@ -3,6 +3,9 @@ import type { GrokWorkflowConfig, ResolvedConfig } from './types.js'
 
 /** Hard limits; user configuration can only tighten these. */
 export const HARD_LIMITS = {
+  historyTurns: 20,
+  historyChars: 8_000,
+  maxQueuedMessages: 8,
   maxConcurrency: 6,
   maxRetries: 3,
   maxTasks: 12,
@@ -15,6 +18,13 @@ const TOOL_NAME = /^[a-z][a-z0-9_]{1,40}$/
 /** DSH profile configuration schema. */
 export const Config = z.object({
   toolName: z.string().default('grok_workflow'),
+  enforceGate: z.boolean().default(true),
+  gateScope: z.union([z.const('process'), z.const('preset')]).default('process'),
+  gatePreset: z.string().default(''),
+  answerStrategy: z.union([z.const('relay'), z.const('append')]).default('relay'),
+  historyTurns: z.natural().min(0).max(HARD_LIMITS.historyTurns).default(4),
+  historyChars: z.natural().min(0).max(HARD_LIMITS.historyChars).default(4_000),
+  maxQueuedMessages: z.natural().min(0).max(HARD_LIMITS.maxQueuedMessages).default(4),
   maxConcurrency: z.natural().min(1).max(HARD_LIMITS.maxConcurrency).default(3),
   maxRetries: z.natural().min(0).max(HARD_LIMITS.maxRetries).default(1),
   maxTasks: z.natural().min(1).max(HARD_LIMITS.maxTasks).default(6),
@@ -37,8 +47,21 @@ export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
     throw new Error(`toolName must match ${TOOL_NAME.source}`)
   }
   const provider = config.subagentProvider?.trim()
+  const answerStrategy = config.answerStrategy ?? 'relay'
+  const gateScope = config.gateScope ?? 'process'
+  const gatePreset = (config.gatePreset ?? '').trim()
+  if (gateScope === 'preset' && gatePreset === '') {
+    throw new Error('gateScope "preset" requires gatePreset to name the agent preset that owns the gate')
+  }
   return {
     toolName,
+    enforceGate: config.enforceGate ?? true,
+    gateScope,
+    ...gatePreset === '' ? {} : { gatePreset },
+    answerStrategy,
+    historyTurns: integer('historyTurns', config.historyTurns ?? 4, 0, HARD_LIMITS.historyTurns),
+    historyChars: integer('historyChars', config.historyChars ?? 4_000, 0, HARD_LIMITS.historyChars),
+    maxQueuedMessages: integer('maxQueuedMessages', config.maxQueuedMessages ?? 4, 0, HARD_LIMITS.maxQueuedMessages),
     maxConcurrency: integer('maxConcurrency', config.maxConcurrency ?? 3, 1, HARD_LIMITS.maxConcurrency),
     maxRetries: integer('maxRetries', config.maxRetries ?? 1, 0, HARD_LIMITS.maxRetries),
     maxTasks: integer('maxTasks', config.maxTasks ?? 6, 1, HARD_LIMITS.maxTasks),

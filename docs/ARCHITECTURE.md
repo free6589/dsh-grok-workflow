@@ -185,6 +185,13 @@ CI can run:
 
 - TypeScript typecheck, lint, unit tests with a fake workflow engine and fake
   agent boundary;
+- engine contract tests (`test/engine-contract.spec.ts`) that run the generated
+  script against the **real** `@deepseek-ai/dsh-workflow-ptc` engine with a fake
+  subagent provider — the real `dsh-ptc-runtime`, `dsh-sandbox`, `dsh-scope`,
+  `dsh-session` and `dsh-workflow-ptc` devDependencies exist for that suite, not
+  for the published plugin;
+- mandatory-entry tests (`test/gate.spec.ts`, `test/history.spec.ts`) that drive
+  `agent/pre-step` through a fake agent boundary, including the refusal paths;
 - build and package-content checks;
 - a Loader integration test using the real DSH Loader and real DSH tool
   registry, with only the subagent boundary faked.

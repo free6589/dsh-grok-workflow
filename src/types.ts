@@ -1,3 +1,10 @@
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    /** A validated workflow report relayed by the mandatory-entry gate. */
+    'grok-workflow': { kind: 'grok-workflow' }
+  }
+}
+
 /** Public and report types for dsh-grok-workflow. */
 
 /** Final workflow status. These are the only values the plugin may report. */
@@ -26,10 +33,43 @@ export interface NormalizedTask {
   constraints: string[]
 }
 
+/**
+ * How the mandatory-entry gate delivers the validated report to the user.
+ *
+ * `relay` opens a new turn with the plugin's own message source (the verified
+ * default). `append` writes the answer directly after the turn closed; it is a
+ * degraded, experimental switch (no stream/usage, non-zero exit on a blocked
+ * turn) kept because the answer route is not finally decided (U-1).
+ */
+export type AnswerStrategy = 'relay' | 'append'
+
+/**
+ * Which agents the gate polices.
+ *
+ * `process` covers every agent in the process (blast radius: everything).
+ * `preset` restricts it to sessions composed from `gatePreset`, which is the
+ * smallest scope an external plugin can express (U-7).
+ */
+export type GateScope = 'process' | 'preset'
+
 /** Plugin configuration (also the DSH Schemastery schema shape). */
 export interface GrokWorkflowConfig {
   /** Model-facing tool name. */
   toolName?: string
+  /** Route every top-level user message through the workflow (mandatory entry). */
+  enforceGate?: boolean
+  /** Answer production strategy (U-1); `relay` is the verified default. */
+  answerStrategy?: AnswerStrategy
+  /** Enforcement scope (U-7): whole process, or only one agent preset. */
+  gateScope?: GateScope
+  /** Preset id that owns the gate when `gateScope` is `preset`. */
+  gatePreset?: string
+  /** Prior conversation turns forwarded as context for follow-up messages. */
+  historyTurns?: number
+  /** Character budget for the forwarded conversation history. */
+  historyChars?: number
+  /** Maximum user messages in flight or waiting per agent; further ones are refused. */
+  maxQueuedMessages?: number
   /** Maximum concurrent child agents per workflow run. Hard maximum 6. */
   maxConcurrency?: number
   /** Maximum retries per task after the initial attempt. Hard maximum 3. */
@@ -47,6 +87,13 @@ export interface GrokWorkflowConfig {
 /** Fully resolved limits. */
 export interface ResolvedConfig {
   toolName: string
+  enforceGate: boolean
+  gateScope: GateScope
+  gatePreset?: string
+  answerStrategy: AnswerStrategy
+  historyTurns: number
+  historyChars: number
+  maxQueuedMessages: number
   maxConcurrency: number
   maxRetries: number
   maxTasks: number
