@@ -75,3 +75,13 @@ None.
 
 Monitor coordination Issue #1; optionally add a clean-profile install check to
 CI. Keep memory synchronized with any new commit.
+
+
+## Homepage redesign — cloud branch
+
+- **Status:** In review; PR pending.
+- **Branch:** `docs/beginner-friendly-bilingual-homepage`, based on `99454d1a830ca42ed051d232de4104161357b581`.
+- **Scope:** Rewrite the English landing page for beginners, add a separate Simplified Chinese README with language links, add matching English/Chinese workflow illustrations, and include the Chinese README in package files.
+- **Install command:** Confirmed against current README/docs: `dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow`; requirement remains DSH `0.2.1-rc.2` plus Node.js >=22 and a profile with workflow/subagent services.
+- **Validation:** Source/document review complete. PR CI is pending; no local shell, browser rendering, or DSH runtime test was run by cloud.
+- **Next action:** Open PR, inspect Node 22/24 CI and package metadata, then update validation state with observed result.
