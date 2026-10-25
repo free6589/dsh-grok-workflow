@@ -12,3 +12,6 @@ coverage/
 .dsh-home/
 
 .pnpm-store/
+
+# DSH session staging artifacts
+.session-stage/

@@ -70,8 +70,8 @@ Command:
 npm --cache /tmp/npm-cache-dshgw pack --dry-run
 ```
 
-Result: **PASS**. Tarball `dsh-grok-workflow-0.1.0.tgz`, 27 files, 32.4 kB
-packed, includes `lib/index.js`, declarations, `cordis.patch.yml`, README,
+Result: **PASS**. Tarball `dsh-grok-workflow-0.1.0.tgz`, 27 files, about 37 kB packed
+(later docs additions changed the size), includes `lib/index.js`, declarations, `cordis.patch.yml`, README,
 LICENSE, and docs.
 
 ### Real DSH profile installation
@@ -234,5 +234,6 @@ Result: **PASS**.
 - Run `40169133016` (commit `7b78db9`): **PASS**, Node 22 and Node 24 jobs.
 - Run `40169816856` (commit `8ec3ad4`): **PASS**, Node 22 and Node 24 jobs.
 - Run `40169885633` (commit `602918e`): **PASS**, Node 22 and Node 24 jobs.
+- Run `40170034851` (commit `b23d360`): **PASS**, Node 22 and Node 24 jobs.
 - The workflow uses `actions/checkout@v4` and `actions/setup-node@v4`; GitHub
   reports a Node 20 deprecation annotation but both jobs completed successfully.

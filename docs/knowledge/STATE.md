@@ -37,7 +37,7 @@ optional live timeout/cancellation exercise remains.
 - Added deterministic tests: 5 files / 29 tests; all pass.
 - Added a real DSH Loader composition test (real ToolRuntime, SystemPrompt,
   Loader, plugin artifact) with only the engine boundary faked; 2 tests pass.
-- Built `lib/` and verified npm pack contents (27 files, 32.4 kB packed).
+- Built `lib/` and verified npm pack contents (27 files; local pack is about 37 kB after docs additions).
 - Installed the plugin into an isolated real DSH profile
   (`DSH_HOME=.dsh-home`, profile `grok-workflow-dev`) with `dsh plugin`.
 - Ran a real headless model smoke (`MODEL_OK`) and three real
