@@ -141,7 +141,7 @@ dsh plugin --profile grok-workflow-dev remove dsh-grok-workflow
 
 - **找不到工具：** 重启 DSH 配置，并确认它包含 workflow 引擎和 subagent provider。
 - **DSH 版本不一致：** 当前只验证过 DSH `0.2.1-rc.2`。
-- **想调整并发数或重试次数：** 查看[本机安装与故障排查](docs/LOCAL-TESTING.md)。
+- **想调整并发数或重试次数：** 查看[配置说明](#配置禁用与卸载)和[故障排查](docs/LOCAL-TESTING.md#troubleshooting)。
 - **想了解技术设计：** 查看[架构说明](docs/ARCHITECTURE.md)和[验收清单](docs/ACCEPTANCE.md)。
 - **发现 Bug：** [提交 Issue](https://github.com/free6589/dsh-grok-workflow/issues)。
 
@@ -154,12 +154,13 @@ npm ci
 npm run ci
 ```
 
-测试套件包含 **6 个文件、55 个确定性测试**，不会调用在线模型；覆盖生成的工作流、并发/重试边界、脱敏、生命周期和真实 DSH Loader 组合。GitHub Actions 还会检查提交的 `lib/` 产物和 `npm pack --dry-run`。真实 DSH/模型验收结果记录在[验证日志](docs/knowledge/VALIDATION.md)中。
+测试套件包含 **6 个文件、56 个确定性测试**，不会调用在线模型；覆盖生成的工作流、并发/重试边界、脱敏、生命周期和真实 DSH Loader 组合。GitHub Actions 还会检查提交的 `lib/` 产物和 `npm pack --dry-run`。真实 DSH/模型验收结果记录在[验证日志](docs/knowledge/VALIDATION.md)中。
 
 ## 安全与兼容性
 
 - 当前仅验证 DSH **`0.2.1-rc.2`** 和 Node.js **22 或更高版本**；包中声明了精确的 peer 版本。这是外部 DSH bundle，不修改 DSH 核心。
 - 不会绕过 DSH 的审批、沙箱或工具权限策略。子 Agent 不能递归调用 `grok_workflow`；它们继承的其他工具仍受 DSH 自身策略约束。
+- 子 Agent 继承父会话可用的工具和权限；当前没有只读能力模式。验证器提示会要求它不要修改文件，但这不是强制沙箱保证。
 - 脱敏是尽力而为：不要把凭据放进 objective、任务文本或日志；报告不能保证子 Agent 从未接触过敏感信息。
 - 并行任务共享会话工作目录。写文件多的任务应使用互不重叠的文件范围，或设置 `maxConcurrency: 1`；独立验证是证据检查，不是数学证明。
 - 本项目未发布 npm 包，请从 GitHub 仓库安装。

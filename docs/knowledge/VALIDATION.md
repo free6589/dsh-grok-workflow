@@ -37,8 +37,8 @@ Result: **PASS**
 
 - `npm run typecheck`: PASS.
 - `npm run lint`: PASS, 0 warnings/0 errors (`oxlint` over 15 files).
-- `npm test`: PASS, 6 test files, 55 tests.
-  - `test/orchestrator.spec.ts`: 16 tests (planner, caller plan, parallel pool,
+- `npm test`: PASS, 6 test files, 56 tests.
+  - `test/orchestrator.spec.ts`: 17 tests (planner, caller plan, parallel pool,
     partial, failed, evidence rejection, retry bound, fallback, oversized
     planner rejection, duplicate planner criteria, overlong verifier-criterion
     rejection, prompt/error redaction, exact criteria, URL/token prompt
@@ -418,7 +418,7 @@ tests:
 - PR #16 merged to `main` as `ea3e8e31`; CI runs `40178081351`, `40178539805`, and `40178848058` passed on Node 22 and Node 24.
 - Root README is a concise English quick-start; `README.zh-CN.md` is the full Simplified Chinese counterpart. Both link to each other at the top.
 - Added `docs/images/workflow-overview.svg` and `docs/images/workflow-overview.zh-CN.svg`; both parse as well-formed XML.
-- Added `README.zh-CN.md` to `package.json` `files`; `npm pack --dry-run` lists both READMEs and 31 total files (54.2 kB package).
+- Added `README.zh-CN.md` to `package.json` `files`; `npm pack --dry-run` lists both READMEs and 31 total files (54.4 kB package).
 - The merged PR initially omitted the explicit configuration table, disable/uninstall, security, and compatibility sections; the local follow-up restored compact equivalents in both languages.
 - **Install-order review finding:** the first README revision told users to run `dsh plugin add` before creating a missing profile. In an isolated `DSH_HOME` check, `plugin add` auto-created a base-only profile; the later `--from-default-profile headless` rewrote that profile and removed the installed plugin dependency.
 - **Correction:** both READMEs and `docs/LOCAL-TESTING.md` now create the headless profile first, then install the plugin, and explicitly warn not to run `--from-default-profile` after `plugin add`.

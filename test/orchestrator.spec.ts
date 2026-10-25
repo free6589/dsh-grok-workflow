@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { resolveConfig } from '../src/config.js'
+import { assertWorkflowReport } from '../src/report.js'
 import { WORKFLOW_SCRIPT } from '../src/script.js'
 import { delay, runWorkflowScript, type ScriptAgent } from './helpers.js'
 import { execution, failingVerification, task, verification } from './fixtures.js'
@@ -188,6 +190,37 @@ describe('generated workflow script', () => {
     expect(report.tasks).toHaveLength(1)
     expect(report.tasks[0]!.status).toBe('verified')
     expect(report.errors.some(error => error.phase === 'Plan')).toBe(true)
+  })
+
+  it('accepts a verified fallback report as partial through host validation', async () => {
+    const agent: ScriptAgent = async (_prompt, options) => {
+      if (options.label === 'grok-planner') throw new Error('planner unavailable')
+      if (options.label === 'grok-worker-task-1-a1') return execution('fallback completed')
+      if (options.label === 'grok-verifier-task-1-a1') {
+        return verification(task('task-1', ['The expected output is completed and supported by concrete evidence']))
+      }
+      throw new Error(`unexpected label ${options.label}`)
+    }
+    const { report } = await runWorkflowScript(WORKFLOW_SCRIPT, args(null), agent)
+    expect(report.status).toBe('partial')
+    expect(report.plan.source).toBe('fallback')
+    expect(report.plan.error).toContain('planner failed')
+
+    const config = resolveConfig({ maxConcurrency: 2, maxRetries: 1, maxTasks: 6 })
+    const validated = assertWorkflowReport(report, 'Ship the verified result', config)
+    expect(validated.status).toBe('partial')
+    expect(validated.plan.source).toBe('fallback')
+    expect(validated.plan.error).toContain('planner failed')
+    expect(validated.tasks.map(item => item.status)).toEqual(['verified'])
+    expect(validated.errors).toContainEqual({ phase: 'Plan', message: expect.stringContaining('planner failed') })
+
+    const nonFallback = { ...report, plan: { ...report.plan, source: 'planner' } }
+    expect(() => assertWorkflowReport(nonFallback, 'Ship the verified result', config))
+      .toThrow(/partial requires both verified and failed tasks/)
+
+    const claimedCompleted = { ...report, status: 'completed' }
+    expect(() => assertWorkflowReport(claimedCompleted, 'Ship the verified result', config))
+      .toThrow(/cannot be completed from a fallback/)
   })
 
   it('rejects an aggregate planner payload over budget', async () => {

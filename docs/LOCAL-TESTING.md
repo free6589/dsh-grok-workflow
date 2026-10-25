@@ -30,12 +30,21 @@ after `plugin add` would remove the installed bundle:
 
 ```sh
 dsh --profile grok-workflow-dev --from-default-profile headless --dump-config
-dsh plugin --profile grok-workflow-dev add /home/fish/projects_mine/dsh-grok-workflow
+dsh plugin --profile grok-workflow-dev add /path/to/dsh-grok-workflow
 dsh --profile grok-workflow-dev --dump-config | grep -n -A6 'grok-workflow'
 ```
 
-The bundle is a local checkout, so this is a development-mode install. It is
-not an npm release.
+Replace `/path/to/dsh-grok-workflow` with the checkout path. The bundle is a
+local checkout, so this is a development-mode install. It is not an npm
+release.
+
+## Configuration
+
+Configuration keys and their hard limits are listed in the
+[README configuration table](../README.md#configure-disable-and-uninstall).
+The plugin defaults are `maxConcurrency: 3`, `maxRetries: 1`, `maxTasks: 6`,
+`timeoutMs: 1800000`, and `maxActiveRuns: 2`; values are tightened by the
+calling profile, not by editing this repository.
 
 ## Enable
 

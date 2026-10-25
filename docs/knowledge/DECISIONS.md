@@ -90,3 +90,23 @@ Each entry records the decision, evidence, alternatives, and status.
 - **Reason:** New users should see the purpose, exact prerequisites, one-command GitHub installation, one natural-language example, workflow stages and troubleshooting before advanced implementation detail.
 - **Alternatives:** Keep one long bilingual README (harder to scan); move English to another filename (would remove the default GitHub landing page); use remote screenshots (adds external image dependency).
 - **Impact:** Adds a second README and two small SVG assets; package `files` allowlist includes the Chinese README. Install compatibility requirements are unchanged.
+
+## D-007 — Allow a verified fallback task to remain `partial`
+
+- **Status:** CONFIRMED; fixes issue #17.
+- **Date:** 2026-10-25.
+- **Decision:** Host report validation permits `partial` with all tasks verified
+  when `plan.source === 'fallback'`, provided the plan error is non-empty. A
+  fallback plan still can never be `completed`. For `caller` and `planner`
+  plans, `partial` retains the stricter mixed verified/failed requirement.
+- **Reason:** The generated script deliberately degrades planning to a
+  single-task fallback and reports `partial` even when that task verifies. The
+  host invariant previously assumed every `partial` report had a failed task,
+  so it rejected a legitimate, intentionally conservative result. Verification
+  success and planning provenance are independent signals.
+- **Alternatives rejected:** Reporting the fallback run as `completed` (hides
+  degraded planning); dropping the fallback task's verification (discards real
+  evidence); accepting `partial` with no planning error (loses provenance).
+- **Consequences:** The canonical report can be `partial` with
+  `verifiedCount === tasks.length` only for a fallback plan; every other
+  all-verified `partial` report remains invalid.

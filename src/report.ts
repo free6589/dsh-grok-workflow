@@ -177,6 +177,7 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
     }
   })
   const verifiedCount = tasks.filter(task => task.status === 'verified').length
+  const planError = string(plan.error ?? '', 'plan.error')
   if (source === 'unavailable' && tasks.length > 0) {
     throw new Error('workflow result unavailable plan must not contain tasks')
   }
@@ -187,7 +188,7 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
     if (tasks.length === 0 || verifiedCount !== tasks.length) {
       throw new Error('workflow result completed requires every task to be verified')
     }
-    if (incomplete.length > 0 || errors.length > 0 || string(plan.error ?? '', 'plan.error') !== '') {
+    if (incomplete.length > 0 || errors.length > 0 || planError !== '') {
       throw new Error('workflow result completed cannot contain incomplete work or errors')
     }
     const verifiedTasks = tasks.filter(task => task.status === 'verified')
@@ -203,7 +204,16 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
       throw new Error('workflow result confirmed evidence references a task that is not verified')
     }
   } else if (status === 'partial') {
-    if (tasks.length === 0 || verifiedCount === 0 || verifiedCount === tasks.length) {
+    if (tasks.length === 0 || verifiedCount === 0) {
+      throw new Error('workflow result partial requires at least one verified task')
+    }
+    if (source === 'fallback') {
+      // A degraded fallback plan is never a clean completion, but its only task
+      // may legitimately be verified. Require the planning error as provenance.
+      if (planError.trim() === '') {
+        throw new Error('workflow result fallback partial requires the planning error')
+      }
+    } else if (verifiedCount === tasks.length) {
       throw new Error('workflow result partial requires both verified and failed tasks')
     }
   } else if (verifiedCount > 0) {
@@ -216,7 +226,7 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
     plan: {
       source: source as WorkflowReport['plan']['source'],
       tasks: planTasks,
-      error: string(plan.error ?? '', 'plan.error'),
+      error: planError,
     },
     tasks: tasks as WorkflowReport['tasks'],
     confirmed,
