@@ -420,4 +420,6 @@ tests:
 - Added `docs/images/workflow-overview.svg` and `docs/images/workflow-overview.zh-CN.svg`; both parse as well-formed XML.
 - Added `README.zh-CN.md` to `package.json` `files`; `npm pack --dry-run` lists both READMEs and 31 total files (54.2 kB package).
 - The merged PR initially omitted the explicit configuration table, disable/uninstall, security, and compatibility sections; the local follow-up restored compact equivalents in both languages.
+- **Install-order review finding:** the first README revision told users to run `dsh plugin add` before creating a missing profile. In an isolated `DSH_HOME` check, `plugin add` auto-created a base-only profile; the later `--from-default-profile headless` rewrote that profile and removed the installed plugin dependency.
+- **Correction:** both READMEs and `docs/LOCAL-TESTING.md` now create the headless profile first, then install the plugin, and explicitly warn not to run `--from-default-profile` after `plugin add`.
 - Install command verified against project metadata: `dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow`; requirements remain DSH `0.2.1-rc.2`, Node.js >=22, and a profile with workflow/subagent services.

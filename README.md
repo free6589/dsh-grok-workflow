@@ -23,17 +23,19 @@ You do not need to write a workflow script. Install the plugin, restart your DSH
 
 **Before you start:** DSH **`0.2.1-rc.2`** and Node.js **22 or newer** are required. Your DSH profile must include the workflow and subagent services (the standard base/headless bundles provide them).
 
-Run this in your terminal:
+If you do not have a profile yet, create it from the headless template **before** installing the plugin:
+
+```sh
+dsh --profile grok-workflow-dev --from-default-profile headless --dump-config
+```
+
+Then install the plugin:
 
 ```sh
 dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow
 ```
 
-This installs the plugin from GitHub and adds it to the profile. If your profile has a different name, replace `grok-workflow-dev` with that name. If you do not have a profile yet, create one from the headless template first:
-
-```sh
-dsh --profile grok-workflow-dev --from-default-profile headless --dump-config
-```
+This installs the plugin from GitHub and adds it to the profile. If your profile has a different name, replace `grok-workflow-dev` with that name. Do not run `--from-default-profile` after `plugin add`: it replaces the profile and removes the plugin you just installed.
 
 Then restart the profile so DSH loads the new plugin:
 

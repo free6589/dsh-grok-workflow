@@ -24,9 +24,12 @@ test with a fake subagent boundary. It does not call a model.
 
 ## Install into a DSH profile (development mode)
 
-From the repository parent directory:
+From the repository parent directory, create the profile **before** installing
+the plugin. `--from-default-profile` replaces profile content, so running it
+after `plugin add` would remove the installed bundle:
 
 ```sh
+dsh --profile grok-workflow-dev --from-default-profile headless --dump-config
 dsh plugin --profile grok-workflow-dev add /home/fish/projects_mine/dsh-grok-workflow
 dsh --profile grok-workflow-dev --dump-config | grep -n -A6 'grok-workflow'
 ```

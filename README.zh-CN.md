@@ -23,17 +23,19 @@
 
 **开始之前：** 需要 DSH **`0.2.1-rc.2`** 和 Node.js **22 或更高版本**。你的 DSH 配置需要包含 workflow 和 subagent 服务；标准 base/headless 组合已提供这些服务。
 
-打开终端，运行：
+如果还没有配置，请先从 headless 模板创建配置，**再安装插件**：
+
+```sh
+dsh --profile grok-workflow-dev --from-default-profile headless --dump-config
+```
+
+然后安装插件：
 
 ```sh
 dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow
 ```
 
-这条命令会从 GitHub 安装插件，并把它添加到指定配置中。如果你的配置名称不同，把 `grok-workflow-dev` 换成自己的配置名称。如果还没有配置，可以先从 headless 模板创建：
-
-```sh
-dsh --profile grok-workflow-dev --from-default-profile headless --dump-config
-```
+这条命令会从 GitHub 安装插件，并把它添加到指定配置中。如果你的配置名称不同，把 `grok-workflow-dev` 换成自己的配置名称。不要在 `plugin add` 之后运行 `--from-default-profile`：它会覆盖配置，并删除刚安装的插件。
 
 然后重启该配置，让 DSH 加载插件：
 
