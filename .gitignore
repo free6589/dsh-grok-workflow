@@ -18,3 +18,9 @@ coverage/
 
 # DSH session snapshots
 sessions/
+
+# Serena MCP project state (LSP cache, local overrides, memories)
+.serena/
+
+# Local AgentTeams session state
+.agent-teams/
