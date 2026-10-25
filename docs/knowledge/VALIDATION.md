@@ -373,3 +373,12 @@ tests:
 
 - Clean-DSH-profile installation is executed locally; CI has not yet added a
   separate clean-profile install job.
+
+
+## Homepage redesign PR — pending CI
+
+- Root README is now a concise English quick-start; `README.zh-CN.md` is the full Simplified Chinese counterpart. Both link to each other at the top.
+- Added `docs/images/workflow-overview.svg` and `docs/images/workflow-overview.zh-CN.svg`, authored in-repository (no remote image dependency). The Chinese page uses the Chinese diagram.
+- Added `README.zh-CN.md` to package.json `files`, so a package created from this repository can include both language versions.
+- Install command was checked against the existing repository docs and package metadata: `dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow`. Requirements are DSH `0.2.1-rc.2`, Node.js >=22 and a profile with workflow/subagent services.
+- **NOT_RUN:** local markdown rendering, SVG visual inspection, shell commands, and DSH runtime. Awaiting PR GitHub Actions for typecheck/lint/build/test/package validation.
