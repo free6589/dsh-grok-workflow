@@ -5,7 +5,7 @@
 - **From:** local lead agent
 - **To:** next local/cloud agent
 - **Base commit:** none (empty repo; first push `beb55c6`)
-- **Work commit:** remote `main` after the evidence commits (use `git rev-parse origin/main`)
+- **Work commit:** remote `main` at final handoff (use `git rev-parse origin/main`)
 - **Changes:**
   - Added the full external DSH bundle (`src/`, `lib/`, `cordis.patch.yml`,
     package manifest, README, docs).
@@ -19,13 +19,13 @@
     shows the bundle row in both profiles.
   - Real headless model smoke and real `grok_workflow` runs (see
     `VALIDATION.md`).
-- **Test results:** PASS; GitHub Actions run `40169133016` passed Node 22/24.
+- **Test results:** PASS; GitHub Actions run `40172376450` passed Node 22/24, after the review fixes (35 tests).
 - **Local runtime verified:** yes for plugin load, model route, completed
   caller-plan workflow, completed parallel timing workflow, completed
-  planner-only workflow, GitHub-installed workflow, and a partial strict-failure
-  workflow.
+  planner-only workflow, fresh GitHub-installed workflow, a partial
+  strict-failure workflow, and a live deadline cancellation.
 - **Blockers:** none.
-- **Next action:** monitor coordination Issue #1 and optionally run a live
-  timeout/cancellation exercise. Do not modify the active
+- **Next action:** independent re-review of the current head; optionally add a
+  clean-profile install check to CI. Do not modify the active
   `/home/fish/dsh-layerfs` home; the verified install is isolated under the
   workspace `.dsh-home`.
