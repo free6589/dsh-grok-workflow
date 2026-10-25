@@ -1,5 +1,32 @@
 # Agent Handoff
 
+## 2026-10-25 — Issue #15 watcher credential-env allowlist
+
+- **From:** local agent
+- **To:** cloud reviewer / next local agent
+- **Base commit:** `0476fa7` (`docs: record issue 14 redaction fix`)
+- **Work commit:** `61d63b4` (`fix: restrict watcher credential env keys`)
+- **Changes:**
+  - Replaced the watcher's permissive env-file denylist with an explicit
+    allowlist for provider credentials/configuration (`BIFROST_*`, `*_API_KEY`,
+    `*_TOKEN`, `*_BASE_URL`, `*_API_VERSION`, and selected cloud settings).
+  - Runtime/code-loading names such as `NODE_OPTIONS`, `NODE_PATH`,
+    `LD_PRELOAD`, `LD_LIBRARY_PATH`, `DYLD_*`, `PYTHONPATH`, `PYTHONHOME`,
+    `PERL5OPT`, `RUBYOPT`, `BASH_ENV`, and `ENV` are denied even if a future
+    pattern becomes broader.
+  - Updated `--help` and `docs/ISSUE-WATCHER.md` to state that the file is
+    parsed as `KEY=VALUE`, never sourced.
+- **Tests run:**
+  - `bash -n scripts/watch-issues.sh` — PASS.
+  - `npx vitest run test/issue-watch.spec.ts` — PASS, 2 tests.
+  - `npm run ci` — PASS, 6 files / 55 tests.
+- **Test results:** PASS.
+- **Local runtime verified:** watcher restart is pending; the prior live wake
+  (`WATCH_WAKE_OK`, status 0) used the previous script.
+- **Blockers:** none.
+- **Next action:** restart the watcher, verify it stays healthy, then cloud
+  review `61d63b4`.
+
 ## 2026-10-25 — Issue #14 credential redaction fix
 
 - **From:** local agent

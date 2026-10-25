@@ -37,11 +37,12 @@ Result: **PASS**
 
 - `npm run typecheck`: PASS.
 - `npm run lint`: PASS, 0 warnings/0 errors (`oxlint` over 15 files).
-- `npm test`: PASS, 6 test files, 51 tests.
-  - `test/orchestrator.spec.ts`: 15 tests (planner, caller plan, parallel pool,
+- `npm test`: PASS, 6 test files, 55 tests.
+  - `test/orchestrator.spec.ts`: 16 tests (planner, caller plan, parallel pool,
     partial, failed, evidence rejection, retry bound, fallback, oversized
     planner rejection, duplicate planner criteria, overlong verifier-criterion
-    rejection, prompt/error redaction, exact criteria).
+    rejection, prompt/error redaction, exact criteria, URL/token prompt
+    redaction).
   - `test/plugin-lifecycle.spec.ts`: 15 tests (registration, invalid input,
     startup rejection timer cleanup, startup-unload cleanup, max active runs,
     unload cancellation/disposal, canonical report filtering, contradictory
@@ -50,11 +51,13 @@ Result: **PASS**
     disabled row inertness; registration/unregistration and prompt section).
   - `test/input.spec.ts`: 10 tests, including exact-bound, over-bound, and
     duplicate-criteria input.
-  - `test/redact.spec.ts`: 7 tests, including compound environment names,
-    access/private/secret keys, and Stripe underscore tokens.
+  - `test/redact.spec.ts`: 10 tests, including compound environment names,
+    access/private/secret keys, Stripe underscore tokens, non-HTTP URL
+    userinfo, and GitLab/npm token prefixes.
   - `test/issue-watch.spec.ts`: 2 tests using a fake `gh` executable; baselines
     issues, replays a comment/new issue, asserts the untrusted-data prompt
-    boundary, and verifies credential-env isolation.
+    boundary, verifies credential-env isolation, and rejects runtime-loading
+    variables from the credentials file.
 
 Toolchain: Node `v26.8.1`, Vitest `4.1.12`, TypeScript `6.x`, DSH packages
 `0.2.1-rc.2`, real `@deepseek-ai/cordis-plugin-loader` `1.0.6`.
@@ -386,6 +389,22 @@ tests:
 - `npm run ci` — **PASS**, 6 files / 55 tests.
 - Post-fix check on the built artifact: the issue examples return `[REDACTED]`
   markers while ordinary prose (`ratio 3:4 at example.test`) is unchanged.
+
+### Watcher credential-env allowlist (#15)
+
+- `bash -n scripts/watch-issues.sh` — **PASS**.
+- `npx vitest run test/issue-watch.spec.ts` — **PASS**, 2 tests; the
+  credentials file contains inert `NODE_OPTIONS`, `NODE_PATH`, `LD_PRELOAD`,
+  `LD_LIBRARY_PATH`, `DYLD_*`, `PYTHONPATH`, `PYTHONHOME`, `PERL5OPT`,
+  `RUBYOPT`, `BASH_ENV`, `ENV`, `SHELLOPTS`, `BASHOPTS`, and an unlisted
+  setting; the command wake does not receive any of them, while
+  `BIFROST_VIRTUAL_KEY` and `OPENAI_API_KEY` still arrive.
+- `bash scripts/watch-issues.sh --help` — **PASS**; it describes
+  `DSH_ENV_FILE` as a parsed `KEY=VALUE` credentials file, not a sourced
+  environment file.
+- `npm run ci` — **PASS**, 6 files / 55 tests.
+- Live watcher restart: `NOT_RUN` at the time of this note; the long-running
+  watcher must be restarted to load the new script.
 
 ## Remaining gap
 

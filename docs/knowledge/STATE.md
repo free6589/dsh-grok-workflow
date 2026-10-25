@@ -57,11 +57,16 @@ remains.
   task text instead of truncating it, redact compound environment-variable
   names, clear the deadline timer on startup rejection/unload, remove stale
   validation status blocks, and align `engines.dsh` with the exact peer set.
-  The suite now has 51 tests.
+  The suite now has 55 tests.
 - Fixed issue #14: redaction now covers non-HTTP URI userinfo (including
   database URLs and empty-username forms) and GitLab/npm token prefixes in
   both the host redactor and the prompt-facing mirror. Regression tests bring
   the suite to 55 tests.
+- Fixed issue #15: `DSH_ENV_FILE` now exports only an explicit allowlist of
+  provider credential/configuration keys; runtime/code-loading variables such
+  as `NODE_OPTIONS`, `LD_PRELOAD`, `PYTHONPATH`, and `DYLD_*` are ignored.
+  The watcher test covers the injection attempt and the help text says the
+  file is parsed, not sourced.
 
 ## Remaining / optional
 
