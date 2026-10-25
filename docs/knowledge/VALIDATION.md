@@ -212,6 +212,7 @@ Result: **PASS**.
 - Run `40169816856` (commit `8ec3ad4`): **PASS**, Node 22 and Node 24 jobs.
 - Run `40169885633` (commit `602918e`): **PASS**, Node 22 and Node 24 jobs.
 - Run `40170034851` (commit `b23d360`): **PASS**, Node 22 and Node 24 jobs.
+- Run `40172141078` (commit `6a0c32a`): **PASS**, Node 22 and Node 24 jobs.
 - The workflow uses `actions/checkout@v4` and `actions/setup-node@v4`; GitHub
   reports a Node 20 deprecation annotation but both jobs completed successfully.
 
@@ -260,6 +261,10 @@ Independent review found five gaps; fixes were implemented and retested:
 - Re-ran the 2-second deadline against a 30-second worker: `FAILED` with
   `Timeout: workflow exceeded the 2000 ms deadline and was cancelled`; no
   leftover child process. **PASS**.
+- Fresh profile `grok-workflow-review` installed the public GitHub package
+  after the exact-engine commit (`6a0c32a`), showed the bundle row, booted with
+  `REVIEW_OK`, and a one-task workflow returned `COMPLETED` 1/1 verified.
+  **PASS**.
 
 ## Remaining gap
 
