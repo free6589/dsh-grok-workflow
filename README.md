@@ -193,6 +193,14 @@ dsh plugin --profile <profile> remove dsh-grok-workflow
 When disabled or absent, the tool and prompt section are not registered; normal
 DSH sessions are unaffected.
 
+## Issue watcher (optional utility)
+
+`scripts/watch-issues.sh` polls this repository's open issues every 60 seconds
+and can wake a DSH headless turn for new issues or comments. It is a standalone
+checkout utility, not part of the plugin's runtime. See
+[`docs/ISSUE-WATCHER.md`](docs/ISSUE-WATCHER.md) for setup, the self-reply
+marker, state/log locations, and a user-service example.
+
 ## Testing
 
 ```sh
