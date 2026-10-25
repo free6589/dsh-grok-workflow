@@ -224,6 +224,7 @@ silently dropped.
 | R-08 | high | **adopted** | gate classification keys on `payload.messages`; empty batch ⇒ pass-through; tool-continuation negative test added | DD-1; ROADMAP §5, §12 |
 | R-09 | medium | **adopted** | non-`user` message sources pass through; the plugin declares its own relay `source.kind`; N-5 rewritten | DD-1, DD-2; E-23 |
 | R-10 | medium | **adopted** | failure-path table added with 12 rows including report-validation failure, engine error, listener throw, teardown and exit code | ROADMAP §15; DD-11 |
+| R-11b | low | **adopted** | a batch refused for a full queue is claimed by the host and not returned, so it is refused explicitly and never retried by this plugin; only a client re-send can start the run (V-2, t24) |
 | R-11 | medium | **adopted** | running-input policy defined (queue, then a follow-up turn); G-16 registered as a known limitation | ROADMAP §5 rule 4; G-16 |
 | R-12 | medium | **adopted** | composable budget invariants with load-time enforcement and negative tests | ROADMAP §7; DD-9 |
 | R-13 | medium | **adopted** | "effective = min(script pool, engine slots)"; the "must be equal" requirement is deleted | ROADMAP §11; DD-8 |

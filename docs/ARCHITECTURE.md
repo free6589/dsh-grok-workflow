@@ -192,11 +192,17 @@ CI can run:
   for the published plugin;
 - mandatory-entry tests (`test/gate.spec.ts`, `test/history.spec.ts`) that drive
   `agent/pre-step` through a fake agent boundary, including the refusal paths;
+- composition tests (`test/composition.spec.ts`) that dispatch `agent/pre-step`
+  through a **real cordis waterfall** shared with faithful reproductions of the
+  in-tree listeners (provenance in `test/composition-listeners.ts`), so the
+  ordering, `prepend` placement and veto semantics are the runtime's own;
 - build and package-content checks;
 - a Loader integration test using the real DSH Loader and real DSH tool
   registry, with only the subagent boundary faked.
 
-CI cannot prove a real model-produced workflow or a real DSH UI session.
+CI cannot prove a real model-produced workflow, a real DSH UI session, or that the
+in-tree reproductions still match the installed DSH; re-run the audit command in
+`docs/knowledge/PRE-STEP-COMPOSITION.md` after a DSH upgrade.
 Those must be run locally with a real DSH profile and are recorded separately
 as local runtime evidence.
 

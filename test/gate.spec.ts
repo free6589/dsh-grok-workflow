@@ -371,7 +371,7 @@ describe('mandatory entry gate', () => {
     expect(objective).toContain('second request')
   })
 
-  it('lets a refused message run once capacity is free again', async () => {
+  it('refuses a message explicitly when the queue is full and never retries it on its own', async () => {
     const ctx = new FakeContext()
     apply(ctx as never, { maxQueuedMessages: 1 })
     const agent = new FakeAgent({ session: Session.create('sess-refusal' as never) })
@@ -383,6 +383,9 @@ describe('mandatory entry gate', () => {
     ctx.engine.runs[0]!.complete(report())
     await waitFor(() => agent.followups.length >= 1)
     await new Promise(resolve => setTimeout(resolve, 5))
+    // The host claims the rejected batch and does not give it back (V-2), so
+    // nothing retries on its own: the dispatch below is a client re-send of the
+    // same message, which is the only path that can start the run.
     const retried = passingNext(refused)
     const decision = await ctx.preStep()(payload(agent, refused, 2, 1), retried)
     expect(decision).toEqual({ kind: 'reject' })
