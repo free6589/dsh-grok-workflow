@@ -63,6 +63,14 @@ Update memory immediately when a durable fact changes:
 Before ending a session: update `STATE.md`, `HANDOFF.md`, and the relevant
 validation/decision/research records, then commit and push shareable changes.
 
+## Release and version discipline
+
+- Record each user-visible feature, bug fix, or security fix under `[Unreleased]` in `CHANGELOG.md`, in both English and Simplified Chinese.
+- Do not bump the package version for every development commit. Bump `package.json` and `package-lock.json` together when preparing a release, and update the matching changelog section.
+- Use version tags in the form `vMAJOR.MINOR.PATCH`. Publish only from a merged `main` commit after CI passes.
+- The Release workflow must validate the tag against `package.json`, run tests, verify committed `lib/` artifacts, require matching changelog notes, and only then create a GitHub Release.
+- Never move or overwrite a published tag. A GitHub Release and Git history help recovery but are not a substitute for an independent repository backup. Never commit credentials or private runtime data.
+
 ## GitHub coordination protocol
 
 Use Issue `[COORDINATION] Cloud ↔ Local Agent` for task assignment and status.
