@@ -38,7 +38,7 @@ remains.
 - Added deterministic tests: 6 files / 56 tests; all pass.
 - Added a real DSH Loader composition test (real ToolRuntime, SystemPrompt,
   Loader, plugin artifact) with only the engine boundary faked; 2 tests pass.
-- Built `lib/` and verified npm pack contents (33 files; local pack is about 63.1 kB after the bilingual docs and release-policy additions).
+- Built `lib/` and verified npm pack contents (33 files; local pack is about 62.9 kB after the bilingual docs and release-policy additions).
 - Installed the plugin into an isolated real DSH profile
   (`DSH_HOME=.dsh-home`, profile `grok-workflow-dev`) with `dsh plugin`.
 - Ran a real headless model smoke (`MODEL_OK`) and three real
@@ -105,7 +105,7 @@ CI. Keep memory synchronized with any new commit.
 
 - **Status:** PR #18 merged as `7904e23`; `v0.1.0` tag points to `a7d5a62`; GitHub Release published on 2026-10-25.
 - **Release workflow:** first run `40182588171` failed on a JavaScript regex escaping bug in the changelog extractor; fixed in `a7d5a62`. The tag was recreated at the fixed commit before any Release existed. Run `40182751006` passed and created the Release.
-- **Artifact:** `dsh-grok-workflow-0.1.0.tgz` (61,281 bytes) attached to the GitHub Release; URL `https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.1.0`.
+- **Artifact:** `dsh-grok-workflow-0.1.0.tgz` (61,281 bytes) attached to the GitHub Release; URL `https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.1.0`. Tag-pinned install from `#v0.1.0` was smoke-tested in an isolated profile; config row present, real model call NOT_RUN.
 - **Validation:** main CI `40182707932` PASS on Node 22/24; release workflow `40182751006` PASS on Node 22 only, including typecheck, lint, build, committed `lib/`, tests, package checks, and release creation.
 - **Backup boundary:** Git history/Releases are version recovery, not independent disaster-recovery backup. Repository mirror and local DSH data backups remain a separate operational task.
 - **Next action:** follow `docs/RELEASING.md` for future versions; do not move the published `v0.1.0` tag.
