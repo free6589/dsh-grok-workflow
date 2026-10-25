@@ -170,6 +170,22 @@ compositions provide the workflow engine and a subagent provider (`spawn`).
 If they are absent, the plugin remains pending/fails loudly rather than
 silently degrading.
 
+### Settings surface
+
+The exported `Config` schema is the settings surface. DSH's `ctx.settings`
+(`SettingsForms`) projects every Loader entry's own schema into a form keyed by
+the entry id (`grok-workflow`), reports `applies: 'live'` and `autoGenerate`
+(default true), and writes edits through `update`/`replace`/`mutate` with a
+revision check (`SETTINGS_CONFLICT`) into the profile patch file. The plugin
+declares `ctx.settings.configure({ auto: true })` in `apply()` (soft failure on
+runtimes without the hook) and validates its own configuration at load:
+unknown keys are refused, `configVersion` is bounded, and every configured
+route is checked against `llm.listProviders()` plus — where the provider
+enumerates them — its declared model ids. Nothing here is decorative: the
+generated fields are the fields `resolveConfig()` reads. A bespoke chain editor
+with model dropdowns would be a client-half package (`dsh.client`), not a core
+change (see ROADMAP §9.2).
+
 ## Non-interference
 
 When the bundle is not installed or its row is disabled:

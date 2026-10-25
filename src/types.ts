@@ -114,6 +114,18 @@ export interface GrokWorkflowConfig {
   historyChars?: number
   /** Maximum user messages in flight or waiting per agent; further ones are refused. */
   maxQueuedMessages?: number
+  /**
+   * Which failure classes advance a role's fallback chain. Empty (default) uses
+   * the built-in policy: every transport/model class switches, content failures
+   * never do. Setup faults (budget, schema, options) never switch regardless.
+   */
+  switchOn?: FailureClass[]
+  /** Write the routing/delivery ledger into the session (default true). */
+  recordRuns?: boolean
+  /** Maximum ledger entries kept per run (hard maximum 256). */
+  recordLimit?: number
+  /** Configuration surface version; unknown/newer versions are refused. */
+  configVersion?: number
   /** Maximum concurrent child agents per workflow run. Hard maximum 6. */
   maxConcurrency?: number
   /** Maximum retries per task after the initial attempt. Hard maximum 3. */
@@ -148,6 +160,11 @@ export interface ResolvedConfig {
   timeoutMs: number
   maxActiveRuns: number
   subagentProvider?: string
+  /** Effective switching policy; empty means the built-in policy. */
+  switchOn: FailureClass[]
+  recordRuns: boolean
+  recordLimit: number
+  configVersion: number
 }
 
 /** One evidence item confirmed by a verifier. */

@@ -1,5 +1,5 @@
 import z from '@deepseek-ai/schemastery';
-import type { GrokWorkflowConfig, ResolvedConfig } from './types.js';
+import type { GrokWorkflowConfig, ModelRoute, ResolvedConfig } from './types.js';
 /** Hard limits; user configuration can only tighten these. */
 export declare const HARD_LIMITS: {
     readonly historyTurns: 20;
@@ -16,7 +16,18 @@ export declare const HARD_LIMITS: {
     readonly routeChars: 120;
     /** Hard ceiling on child calls charged against one task (worker + verifier). */
     readonly maxAttemptsPerTask: 6;
+    /** Hard ceiling on routing ledger entries kept per run. */
+    readonly recordEntries: 256;
 };
+/** Version of the configuration surface this build understands. */
+export declare const CONFIG_VERSION = 1;
+/**
+ * Every top-level key the configuration accepts, in schema order.
+ * Kept explicit so an unknown key can be rejected instead of silently dropped:
+ * a typo that is silently ignored looks exactly like a setting that "does not
+ * work", which is the failure mode the settings surface must not have.
+ */
+export declare const CONFIG_KEYS: readonly ["toolName", "enforceGate", "gateRequired", "gateScope", "gatePreset", "answerStrategy", "historyTurns", "historyChars", "maxQueuedMessages", "maxConcurrency", "maxRetries", "maxTasks", "timeoutMs", "maxActiveRuns", "subagentProvider", "roles", "synthesis", "switchOn", "recordRuns", "recordLimit", "configVersion"];
 /** DSH profile configuration schema. */
 export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     toolName: z<string, string, "defined">;
@@ -94,6 +105,10 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
         }>>[], "defined">;
     }>>, "defined">;
     synthesis: z<"deterministic" | "model", "deterministic" | "model", "defined">;
+    switchOn: z<string[], string[], "defined">;
+    recordRuns: z<boolean, boolean, "defined">;
+    recordLimit: z<number, number, "defined">;
+    configVersion: z<number, number, "defined">;
 }>>, Schemastery.ObjectT<NoInfer<{
     toolName: z<string, string, "defined">;
     enforceGate: z<boolean, boolean, "defined">;
@@ -170,7 +185,31 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
         }>>[], "defined">;
     }>>, "defined">;
     synthesis: z<"deterministic" | "model", "deterministic" | "model", "defined">;
+    switchOn: z<string[], string[], "defined">;
+    recordRuns: z<boolean, boolean, "defined">;
+    recordLimit: z<number, number, "defined">;
+    configVersion: z<number, number, "defined">;
 }>>, "plain">;
+/**
+ * Validate one role's chain and return the normalized routes.
+ *
+ * Fail-fast (R-06): an unusable chain is rejected at load, never discovered
+ * mid-run, because a silently ignored chain looks like routing that works.
+ */
+/** One config route as written: an object, or a bare model id shorthand. */
+export type RouteInput = ModelRoute | string;
+/** Failure classes a user may name in `switchOn`. */
+export declare const SWITCHABLE_CLASSES: readonly ["rate-limit", "server-error", "connection", "timeout", "model-unavailable", "format-error", "agent-start-failed"];
+/**
+ * Reject unknown top-level keys instead of letting the schema drop them.
+ *
+ * A silently ignored key is indistinguishable from a setting that does not
+ * work, and the whole point of the configuration layer (D) is that a user can
+ * tell those apart. The message names the closest accepted key.
+ * @param config - raw user configuration.
+ * @throws If a key is not part of the configuration surface.
+ */
+export declare function assertKnownKeys(config: Record<string, unknown>): void;
 /** Resolve defaults and enforce the hard limits for direct construction paths. */
 export declare function resolveConfig(config?: GrokWorkflowConfig): ResolvedConfig;
 //# sourceMappingURL=config.d.ts.map

@@ -290,16 +290,25 @@ why the verdict stays "partially feasible" rather than "feasible".
   validated at load time against the model catalog.
 - Model IDs are validated against the configured catalog; nothing is assumed.
 
-**Implemented configuration (phase 3–4, `src/config.ts`):**
+**Implemented configuration (phases 3–5, `src/config.ts`):**
 
 ```yaml
+configVersion: 1            # a config written for a newer build is refused
 roles:
   planner:    [{ provider: anthropic, model: claude-sonnet-4 }, { model: claude-haiku-4 }]
-  worker:     [{ provider: anthropic, model: claude-sonnet-4 }]
+  worker:     [anthropic/claude-sonnet-4, openai/gpt-5]   # shorthand: bare model ids
   verifier:   [{ provider: openai,    model: gpt-5 }]
   synthesizer: []          # only with synthesis: model
 synthesis: deterministic   # deterministic | model
+switchOn: []               # [] = built-in policy; else the classes that advance a chain
+recordRuns: true           # write the routing ledger into the session
+recordLimit: 64            # 0…256 entries; 0 writes nothing
+maxConcurrency: 3
 maxRetries: 1
+maxTasks: 6
+timeoutMs: 1800000
+maxActiveRuns: 2
+enforceGate: true
 answerStrategy: in-turn    # in-turn (default) | relay | append
 ```
 
@@ -307,7 +316,22 @@ Rules enforced at load: chains ≤ 3 entries, ids ≤ 120 chars, no duplicate ro
 chain, an empty chain means "inherit the run's route" (reported as empty),
 `synthesis: model` requires a `synthesizer` chain and vice versa, and
 `(maxRetries+1) × (|worker|+|verifier|) ≤ 6` calls per task. Every rejection is a specific
-message, and each has a negative test in `test/routing.spec.ts`.
+message, and each has a negative test in `test/routing.spec.ts` or `test/config.spec.ts`.
+
+Stage 5 adds three things a user can actually act on:
+
+1. **Unknown keys are refused**, not dropped (`maxRetires` → "did you mean `maxRetries`?").
+   A silently ignored key is indistinguishable from a setting that does not work, which is
+   the one outcome a settings surface must never produce.
+2. **Providers and enumerated models are checked at load** against the live runtime:
+   `llm.listProviders()` for the route id, and — where the provider itself enumerates
+   models in its settings section — the declared model ids. A provider that enumerates
+   nothing keeps free-form ids and only produces a note; an empty registry (boot order) is
+   also only a note, so a bad route fails loudly and an unknown one never blocks a load.
+3. **`switchOn` makes the fallback policy inspectable**: `[]` is the built-in rule (every
+   transport/model class advances the chain, content failures never do), and naming
+   `verification-failed` (or any content/setup class) is refused because another model
+   receives the same evidence. `recordRuns`/`recordLimit` make the ledger a choice.
 
 ---
 
@@ -405,37 +429,78 @@ reach `agent/request-error` (E-34/R-14). The whitelist, in match order:
 | `format-error` | null structured result, `invalid json`, `schema mismatch`, `could not parse` | advance chain |
 | `agent-start-failed` | fatal `AGENT_START` | advance chain |
 | `task-failed` / `verification-failed` | executor reported failure / verifier verdict or criteria failed | retry the **same** route |
-| `budget-exhausted`, `unknown` | `AGENT_CAP`; anything unmatched | `budget-exhausted` is fatal; `unknown` advances and is reported unclassified |
+| `budget-exhausted`, `unknown` | `AGENT_CAP`; anything unmatched | `budget-exhausted` stops the chain (setup fault); `unknown` advances and is reported unclassified |
 
 Fail-closed rules: a null structured result is never treated as success; an unmatched
-message is `unknown` (never "probably fine"); `AGENT_CAP` and configuration faults are
-re-thrown so a broken setup cannot be hidden by retrying.
+message is `unknown` (never "probably fine"); `AGENT_CAP` and configuration faults stop the
+chain **and the remaining attempts** (a definitional fault only burns budget when retried)
+but are never re-thrown, so the run still produces a structured failure report (G-4, t17).
+`switchOn` narrows which classes advance the chain; content and setup classes cannot be
+added to it.
 
 ## 9. Settings system (D)
 
-Stage 1 (required) is YAML + settings namespace; Stage 2 is a dedicated page.
+**Implemented (t13).** Stage 1 is the configuration layer itself; the settings page is not
+hand-written, because the runtime generates it from the schema this plugin already exports.
+Stage 2 (a bespoke client page) stays a later deliverable (U-6), and no display-only page
+exists anywhere in this plugin.
 
-1. **`volatile()` is not cosmetic.** A volatile field is "editable without remounting";
-   writing a non-volatile field remounts the plugin, which **kills an in-flight workflow
-   run**. Every user-editable field must be volatile.
-2. **Read at use time, not at `apply()` time.** The current `resolveConfig()` snapshots
-   scalars into a resolved object during `apply`, so even volatile fields would never be
-   seen live. Fields become volatile holders read with `.get()` at the request/attempt
-   boundary (t19 H-5 pattern: `config.provider.get()`).
-3. **Shape:** `roles: z.dict(z.array(z.object({provider, model, reasoningEffort?, maxAttempts?})).min(1).max(5)).volatile()`.
-   **Schema cannot enforce emptiness:** `z.array(z.object(...)).min(1)` accepts `[]`
-   (measured, t19 H-5) and `z.dict` accepts a missing key. Chain non-emptiness, all four
-   roles present, in-chain uniqueness and the budget invariants must be enforced by
-   plugin-side fail-fast validation with negative tests.
-4. **No generic form for nested chains:** the automatic settings form accepts only scalar
-   top-level fields; nested role→chain editing needs a dedicated client page using path
-   operations (`set`/`unset`/`mutate` with a path array; `deletePath` splices array
-   indices). All in-tree pages that edit dicts are custom pages.
-5. Consequently **OQ-007 is only partially answered**: Stage 1 (YAML + validation) is
-   operable; the GUI page is a later deliverable with a real `dsh.client` package.
-   `autoGenerate` still has no consumer (E-11).
+### 9.1 Configuration layer (the operable half)
 
----
+One reader — `resolveConfig()` — serves the tool, the gate and the script, so a value a user
+sets is the value the run uses. Keys, defaults and hard caps:
+
+| key | default | hard cap | rejected when |
+|---|---|---|---|
+| `toolName` | `grok_workflow` | `^[a-z][a-z0-9_]{1,40}$` | pattern mismatch |
+| `enforceGate` / `gateRequired` | `true` / `false` | — | — |
+| `gateScope` / `gatePreset` | `process` / — | — | `preset` without a preset id |
+| `answerStrategy` | `in-turn` | — | not one of `in-turn`/`relay`/`append` |
+| `roles.{planner,worker,verifier,synthesizer}` | `[]` (inherit) | 3 routes, 120 chars/field | empty model, duplicate route in a chain, too long |
+| `synthesis` | `deterministic` | — | `model` without a synthesizer chain, or a chain without `model` |
+| `switchOn` | `[]` (built-in policy) | switchable classes only | a content/setup class, an unknown class |
+| `recordRuns` / `recordLimit` | `true` / `64` | `0…256` | out of range |
+| `maxConcurrency` / `maxRetries` / `maxTasks` | `3` / `1` / `6` | `6` / `3` / `12` | out of range, or the per-task call budget is exceeded |
+| `timeoutMs` / `maxActiveRuns` | `1800000` / `2` | `86400000` / `4` | out of range |
+| `historyTurns` / `historyChars` / `maxQueuedMessages` | `4` / `4000` / `4` | `20` / `8000` / `8` | out of range |
+| `configVersion` | `1` | `1…1` | a config written for a newer build |
+| unknown key | — | — | always, with the closest accepted key named |
+
+Model and provider existence is checked at load against the live runtime, and the check
+degrades to a note — never a false failure — when the runtime cannot judge it (no `llm`
+service, an unsettled provider registry, or a provider that enumerates no models).
+
+### 9.2 Settings surface (why there is no page in this repo)
+
+`ctx.settings` (`SettingsForms`) projects **every Loader entry's own `Config` schema** into a
+form: `describe()` returns `{ ns: entry.options.id, schema, value, base, user, revision,
+applies: 'live', autoGenerate, secrets? }`, `autoGenerate` defaults to `true`
+(`presentations.get(fiber)?.auto ?? true`), writes go through `update` / `replace` /
+`mutate` with an optional `expectedRevision` (`SETTINGS_CONFLICT` on a stale form), and edits
+land in the profile patch (`writable`, `documentPath`, `prepareDocument()`). Path operations
+(`set`/`unset` by path) exist exactly so a nested field can be edited without restating
+redacted secrets.
+
+Consequences, in the order they matter:
+
+1. **The page exists as soon as the schema does.** This plugin exports `Config`, and
+   `src/settings.ts` calls `ctx.settings.configure({ auto: true })` to declare intent, so
+   the Web client can render and **live-apply** the same fields the run reads. There is
+   nothing to fake, and nothing decorative to drift.
+2. **What we do not have is a chain editor with model dropdowns.** The generated form is
+   schema-shaped: `roles` renders as an array of small route forms. A dropdown needs the
+   provider catalogue client-side plus a match against the model list, i.e. a client half
+   (`"dsh": { "client": { "platform": "web" } }` + an `exports['./client']` entry, the way
+   `dsh-client-ui-settings-plugins` ships its section). That is U-6, and it is a UI
+   deliverable, not a capability gap: every field is already editable.
+3. **Volatility remains an open item.** `SettingsForms` reports `applies: 'live'` for every
+   entry, but "live" for a *remount-sensitive* field still needs the `volatile()` shape and
+   `.get()` reads of DD-9 items 1–2; today `resolveConfig()` snapshots at `apply()`, so a
+   value edit is picked up by the next run, not by an in-flight one. That sentence is the
+   honest limit of the current implementation.
+4. **Not measured (NOT_RUN):** whether the stock Web form renders our `roles` array
+   acceptably in a browser, and whether a mid-run edit is visible to a queued message.
+   Both need the Web GUI with this plugin loaded; the headless evidence cannot answer them.
 
 ## 10. Data flow and redaction
 
@@ -607,10 +672,16 @@ script-level v1 fallback and the merged answer path.
 - **Phase 1 — exact-version audit — DONE** (t1–t5, t18, t19; capability matrix §13).
 - **Phase 2 — architecture and message lifecycle — DESIGN COMPLETE, awaits U-1/U-7.**
   Exit: answer strategy chosen by the user, gate scope chosen, F6/F9 addressed.
-- **Phase 3 — settings and configuration — IMPLEMENTED (t11, together with Phase 4).**
+- **Phase 3 — settings and configuration — IMPLEMENTED (t11 + t13, with Phase 4).**
   Shipped: `roles.{planner,worker,verifier,synthesizer}` chains, `synthesis` switch,
   `gateRequired`, plus load-time validation (empty chain, duplicate route, chain longer than
-  3, oversized ids, per-task budget overflow) each with a negative test.
+  3, oversized ids, per-task budget overflow) each with a negative test. t13 completed the
+  layer: `switchOn` (inspectable switching policy), `recordRuns`/`recordLimit` (the run
+  ledger as a choice), `configVersion` + unknown-key rejection + route shorthand migration,
+  **provider/model existence checked against the live runtime** (`llm.listProviders`, the
+  provider's own enumerated models), and the settings surface declared through
+  `ctx.settings.configure({ auto: true })` — the page is generated from this plugin's
+  `Config`, so §9.2 ships no page of its own. 17 tests in `test/config.spec.ts`.
 - **Phase 4 — role models and v1 script-level fallback — IMPLEMENTED (t11).**
   Shipped: `callRole` in the generated script (one try per chain entry, inside the existing
   attempt loop), the failure whitelist + fail-closed `unknown`, the advance-vs-retry rule,
@@ -638,7 +709,10 @@ script-level v1 fallback and the merged answer path.
   hardening follow-ups, redaction/context fixes.
   Exit: F4/F5 produce failure answers; the seven report holes each have a negative test.
 - **Phase 8 — synthesizer role (optional, U-3)** with its post-check rule.
-- **Phase 9 — settings GUI page (optional, after Phase 3)** using path operations.
+- **Phase 9 — settings GUI page (optional, after Phase 3; the generated page already ships).**
+  A bespoke chain editor with model dropdowns would use `ctx.settings.mutate`/path operations
+  and ship a client half (`package.json` `dsh.client` + `exports['./client']`). See §9.2 and
+  U-6; nothing blocks it, and nothing is faked while it is missing.
 - **Phase 10 — documentation, release, rollout** (bilingual, changelog, migration,
   rollback, explicit statement of the added latency/cost).
 
@@ -653,7 +727,7 @@ script-level v1 fallback and the merged answer path.
 | U-3 | dedicated synthesizer model call | yes / no (v1 keeps pure JS) | **no for v1**, revisit after cost measurement |
 | U-4 | parallel tasks on a shared working directory | serialize writes / read-only parallelism / as-is | serialize on overlap |
 | U-5 | accept strict-mode latency and cost for trivial messages | accept / lighter but not skippable | accept (already confirmed in R-001) |
-| U-6 | first-release settings surface | YAML only / YAML + GUI page | YAML only |
+| U-6 | first-release settings surface | generated page (ships free from the schema) / generated page + bespoke chain editor with model dropdowns | generated page; the bespoke editor is Phase 9 |
 | U-7 | enforcement scope | whole process (plugin row) / preset-scoped sessions | preset-scoped if available in the deployment, else whole process with a documented blast radius |
 | U-8 | which message sources the gate polices (t10 V-3) | `source.kind='user'` only (v1) / also `user-question-reply`, `team-message`, `webhook`, `schedule` | keep `user` only; the others are machine-produced and have no presenter to fail closed to |
 

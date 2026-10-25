@@ -171,11 +171,15 @@ export function recordRouting(
     routes: readonly RouteTrailEntry[]
   },
   logger?: WorkflowLogger,
+  limit: number = ROUTING_RECORD_LIMIT,
 ): void {
   if (session === undefined) return
+  // The caller's `recordLimit` bounds the ledger; 0 means "write nothing".
+  const cap = Math.max(0, Math.min(limit, ROUTING_RECORD_LIMIT))
+  if (cap === 0) return
   const switches = entry.routes
     .filter(route => route.outcome === 'failed' || route.chainIndex > 0)
-    .slice(0, ROUTING_RECORD_LIMIT)
+    .slice(0, cap)
     .map(route => ({
       role: route.role,
       chainIndex: route.chainIndex,

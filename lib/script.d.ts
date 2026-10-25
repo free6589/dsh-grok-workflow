@@ -1,4 +1,4 @@
-import type { ModelRoute, NormalizedTask, ResolvedConfig, RoleName, SynthesisMode } from './types.js';
+import type { FailureClass, ModelRoute, NormalizedTask, ResolvedConfig, RoleName, SynthesisMode } from './types.js';
 /**
  * The orchestration script is static. User data crosses the workflow boundary as
  * `args` JSON, never as source text; this keeps the sandbox contract explicit
@@ -25,6 +25,8 @@ export interface WorkflowRequestPayload {
         maxTotalAgents: number;
         roles: Record<RoleName, ModelRoute[]>;
         synthesis: SynthesisMode;
+        /** Failure classes that advance a role's chain; empty = built-in policy. */
+        switchOn: FailureClass[];
     };
     maxTotalAgents: number;
 }

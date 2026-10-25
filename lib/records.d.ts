@@ -104,5 +104,5 @@ export declare function recordRouting(session: Session | undefined, entry: {
     routing: Record<RoleName, string[]>;
     synthesis: SynthesisMode;
     routes: readonly RouteTrailEntry[];
-}, logger?: WorkflowLogger): void;
+}, logger?: WorkflowLogger, limit?: number): void;
 //# sourceMappingURL=records.d.ts.map

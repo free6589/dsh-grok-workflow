@@ -216,3 +216,58 @@ describe('infrastructure failure through the real engine (G-4)', () => {
     }
   })
 })
+
+/**
+ * The two task-level safety nets (t27/F1).
+ *
+ * They exist for bugs in the runner, so no black-box input reaches them; these
+ * tests inject the bug by mutating the generated script text and then require
+ * that the run still produces a validated failure report. Delete either catch
+ * (or make the loop rethrow) and one of these fails — that is the point.
+ */
+describe('task-level safety nets', () => {
+  const sabotage = (needle: string, replacement: string): string => {
+    expect(WORKFLOW_SCRIPT).toContain(needle)
+    return WORKFLOW_SCRIPT.replace(needle, replacement)
+  }
+
+  it('turns a crash inside the task runner into that task\'s failure row', async () => {
+    const script = sabotage('  const attempts = [];', "  throw new Error('sabotage-in-runner');\n  const attempts = [];")
+    const run = await runWorkflowScript(script, args(), async () => verification(task('a')))
+    expect(run.report.status).toBe('failed')
+    expect(run.report.incomplete).toHaveLength(1)
+    expect(run.report.incomplete[0]?.reason).toContain('task aborted before any attempt')
+    expect(run.report.incomplete[0]?.reason).toContain('sabotage-in-runner')
+    // A bug in our own runner is not infrastructure and not quality: the class
+    // stays "unknown" rather than guessing who is to blame (G-4).
+    expect(run.report.incomplete[0]?.category).toBe('unknown')
+    expect(() => assertWorkflowReport(run.report, 'Ship the verified result', config())).not.toThrow()
+  })
+
+  it('turns a crash in the task pool into one failed row per task', async () => {
+    const script = sabotage(
+      'results = await mapLimit(plan.tasks, maxConcurrency, runTask);',
+      'results = await mapLimit(plan.tasks, maxConcurrency, function (t) { return runTask(t).then(function () { throw new Error(\'sabotage-in-pool\'); }); });',
+    )
+    const run = await runWorkflowScript(script, args(), async () => verification(task('a')))
+    expect(run.report.status).toBe('failed')
+    expect(run.report.tasks).toHaveLength(1)
+    expect(run.report.tasks[0]?.error).toContain('task runner crashed')
+    expect(run.report.tasks[0]?.error).toContain('sabotage-in-pool')
+    expect(run.report.errors.length).toBeGreaterThan(0)
+    expect(() => assertWorkflowReport(run.report, 'Ship the verified result', config())).not.toThrow()
+  })
+
+  it('does not rethrow an error merely because the engine marked it fatal', async () => {
+    // Mutation guard: restoring `if (error?.fatal) throw error` in the call
+    // classifier makes this run reject instead of reporting, which is G-4 all
+    // over again. The engine sets `fatal` on every WorkflowError, so the flag
+    // must not decide whether a report exists.
+    const fatal = Object.assign(new Error('429 Too Many Requests'), { code: 'AGENT_RESULT', fatal: true })
+    const run = await runWorkflowScript(WORKFLOW_SCRIPT, args(), async () => {
+      throw fatal
+    })
+    expect(run.report.status).toBe('failed')
+    expect(run.report.tasks[0]?.attempts[0]?.failure?.class).toBe('rate-limit')
+  })
+})

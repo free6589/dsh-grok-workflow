@@ -1,5 +1,5 @@
 import { REDACTION_RULES } from './redact.js'
-import type { ModelRoute, NormalizedTask, ResolvedConfig, RoleName, SynthesisMode } from './types.js'
+import type { FailureClass, ModelRoute, NormalizedTask, ResolvedConfig, RoleName, SynthesisMode } from './types.js'
 
 /**
  * Render the shared redaction rules (src/redact.ts) as script-realm JS source.
@@ -28,6 +28,9 @@ const maxConcurrency = Math.max(1, Math.min(6, Number(args && args.maxConcurrenc
 const maxRetries = Math.max(0, Math.min(3, Number(args && args.maxRetries) || 0));
 const maxTasks = Math.max(1, Math.min(12, Number(args && args.maxTasks) || 6));
 const suppliedTasks = args && Array.isArray(args.tasks) ? args.tasks : null;
+// Switching policy (阶段5): an empty list means the built-in rule — every
+// transport/model class advances the chain, content failures never do.
+const switchOn = args && Array.isArray(args.switchOn) ? args.switchOn : [];
 
 const ROLE_NAMES = ['planner', 'worker', 'verifier', 'synthesizer'];
 const ROUTE_LIMITS = { chainLength: 3, textChars: 120, trail: 256, reasonChars: 200 };
@@ -216,10 +219,24 @@ function classifyCallFailure(role, error) {
     return { role: role, class: 'unknown', reason: routeReason(message), switchModel: false, setup: true, category: 'configuration' };
   }
   if (code === 'AGENT_START') {
-    return { role: role, class: 'agent-start-failed', reason: routeReason(message), switchModel: true, setup: false, category: 'infrastructure' };
+    return {
+      role: role,
+      class: 'agent-start-failed',
+      reason: routeReason(message),
+      switchModel: switchOn.length === 0 ? true : switchOn.indexOf('agent-start-failed') !== -1,
+      setup: false,
+      category: 'infrastructure'
+    };
   }
   const failureClass = classifyFailureText(message);
-  return { role: role, class: failureClass, reason: routeReason(message), switchModel: true, setup: false, category: failureCategory(failureClass, code) };
+  return {
+    role: role,
+    class: failureClass,
+    reason: routeReason(message),
+    switchModel: switchOn.length === 0 ? true : switchOn.indexOf(failureClass) !== -1,
+    setup: false,
+    category: failureCategory(failureClass, code)
+  };
 }
 
 const routeTrail = [];
@@ -254,14 +271,12 @@ async function callRole(role, prompt, options) {
     } catch (error) {
       const failure = classifyCallFailure(role, error);
       traceRoute(role, index, route, attempt, 'failed', failure);
-      if (failure.setup) {
-        // A setup fault cannot be fixed by another route. Returning it (instead
-        // of rethrowing) is what keeps the run alive: the caller turns it into
-        // a per-task failure, so one misconfigured task no longer deletes the
-        // whole report (G-4).
-        return { ok: false, value: null, route: null, label: 'exhausted', failure: failure };
-      }
       lastFailure = failure;
+      // One mechanism, not two: a setup fault (budget/schema/options) is built
+      // with switchModel false, and a content failure (task-failed,
+      // verification-failed) likewise. Both stop the chain here — never by
+      // rethrowing, which is what keeps the run alive and the report present
+      // (G-4).
       if (!failure.switchModel) break;
       continue;
     }
@@ -823,6 +838,23 @@ async function runTaskUnsafe(task) {
   return { task: task, status: 'failed', attempts: attempts, error: lastError, failure: lastFailure };
 }
 
+// One synthetic attempt for a task whose runner crashed before it could record
+// anything. Report validation requires at least one attempt per task row, and a
+// report that fails validation is rejected wholesale — every other task's
+// evidence dies with it (G-4). The attempt carries the classified failure, so
+// the summary still says what happened, and its class stays "unknown" for a bug
+// in this script instead of blaming the provider.
+function abortedAttempt(failure, errorText) {
+  return {
+    attempt: 1,
+    execution: null,
+    verification: null,
+    passed: false,
+    failure: { class: failure.class, reason: routeReason(failure.reason), category: failure.category },
+    error: errorText
+  };
+}
+
 // A task's own failure never escapes this function: the per-task report (and
 // every other task's result) must survive an infrastructure fault (G-4). The
 // only way to reach the catch is a bug in runTaskUnsafe, which is still
@@ -832,11 +864,12 @@ async function runTask(task) {
     return await runTaskUnsafe(task);
   } catch (error) {
     const failure = classifyCallFailure('worker', error);
+    const text = redactPromptText('task aborted before any attempt: [' + failure.class + '/' + failure.category + '] ' + failure.reason);
     return {
       task: task,
       status: 'failed',
-      attempts: [],
-      error: redactPromptText('task aborted before any attempt: [' + failure.class + '/' + failure.category + '] ' + failure.reason),
+      attempts: [abortedAttempt(failure, text)],
+      error: text,
       failure: failure
     };
   }
@@ -884,11 +917,12 @@ try {
   // means the runner itself broke. Still produce a report, one failed row each.
   const failure = classifyCallFailure('worker', error);
   results = plan.tasks.map(function (task) {
+    const text = redactPromptText('task runner crashed: [' + failure.class + '/' + failure.category + '] ' + failure.reason);
     return {
       task: task,
       status: 'failed',
-      attempts: [],
-      error: redactPromptText('task runner crashed: [' + failure.class + '/' + failure.category + '] ' + failure.reason),
+      attempts: [abortedAttempt(failure, text)],
+      error: text,
       failure: failure
     };
   });
@@ -1043,6 +1077,8 @@ export interface WorkflowRequestPayload {
     maxTotalAgents: number
     roles: Record<RoleName, ModelRoute[]>
     synthesis: SynthesisMode
+    /** Failure classes that advance a role's chain; empty = built-in policy. */
+    switchOn: FailureClass[]
   }
   maxTotalAgents: number
 }
@@ -1090,7 +1126,10 @@ export function buildWorkflowRequest(
   tasks: NormalizedTask[] | undefined,
   config: ResolvedConfig,
 ): WorkflowRequestPayload {
-  const taskCount = tasks?.length ?? config.maxTasks
+  // `[]` means "no plan supplied" exactly like `undefined`: the script falls back
+  // to a planner and then runs at least one task, so budgeting for 0 tasks would
+  // produce a limit the validated report can exceed (a lost-evidence rejection).
+  const taskCount = tasks === undefined || tasks.length === 0 ? config.maxTasks : tasks.length
   const maxTotalAgents = maxTotalAgentsFor(taskCount, config.maxRetries, routeBudgetFor(config))
   return {
     script: WORKFLOW_SCRIPT,
@@ -1106,13 +1145,15 @@ export function buildWorkflowRequest(
     },
     args: {
       objective,
-      tasks: tasks ?? null,
+      // An empty plan is the same request as no plan: the script plans instead.
+      tasks: tasks === undefined || tasks.length === 0 ? null : tasks,
       maxConcurrency: config.maxConcurrency,
       maxRetries: config.maxRetries,
       maxTasks: config.maxTasks,
       maxTotalAgents,
       roles: config.roles,
       synthesis: config.synthesis,
+      switchOn: config.switchOn,
     },
     maxTotalAgents,
   }

@@ -2,6 +2,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
 import { resolveConfig } from './config.js'
+import { declareSettingsSurface, validateRoutes } from './settings.js'
 import { installGate } from './gate.js'
 import { normalizeCallerTasks, GrokWorkflowInputError, TASK_LIMITS } from './input.js'
 import { renderReport } from './report.js'
@@ -40,6 +41,19 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
   const config = resolveConfig(rawConfig)
   const logger = ctx.logger('dsh-grok-workflow')
   const state: ActiveState = createActiveState()
+
+  // Settings surface: the generated form comes from the `Config` schema this
+  // module exports, so the fields a user edits in the Web UI are the fields the
+  // run reads. Declaring it is intent, not enablement (auto defaults to true).
+  if (declareSettingsSurface(ctx) === 'unsupported') {
+    logger.warn('this runtime has a settings service without the automatic-page hook: configure this plugin through the profile patch instead')
+  }
+  // Route validation (D): fail the load on a provider or enumerated model that
+  // the runtime does not have, because a silently ignored chain looks like
+  // routing that works. Anything the runtime cannot judge becomes a warning.
+  const routes = validateRoutes(ctx, config)
+  for (const note of routes.notes) logger.warn(note)
+  if (routes.errors.length > 0) throw new Error(routes.errors.join('; '))
 
   ctx.effect(() => async () => {
     await disposeActiveState(state)

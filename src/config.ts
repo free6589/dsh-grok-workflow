@@ -1,5 +1,5 @@
 import z from '@deepseek-ai/schemastery'
-import type { GrokWorkflowConfig, ModelRoute, ResolvedConfig } from './types.js'
+import type { FailureClass, GrokWorkflowConfig, ModelRoute, ResolvedConfig } from './types.js'
 
 /** Hard limits; user configuration can only tighten these. */
 export const HARD_LIMITS = {
@@ -17,7 +17,42 @@ export const HARD_LIMITS = {
   routeChars: 120,
   /** Hard ceiling on child calls charged against one task (worker + verifier). */
   maxAttemptsPerTask: 6,
+  /** Hard ceiling on routing ledger entries kept per run. */
+  recordEntries: 256,
 } as const
+
+/** Version of the configuration surface this build understands. */
+export const CONFIG_VERSION = 1
+
+/**
+ * Every top-level key the configuration accepts, in schema order.
+ * Kept explicit so an unknown key can be rejected instead of silently dropped:
+ * a typo that is silently ignored looks exactly like a setting that "does not
+ * work", which is the failure mode the settings surface must not have.
+ */
+export const CONFIG_KEYS = [
+  'toolName',
+  'enforceGate',
+  'gateRequired',
+  'gateScope',
+  'gatePreset',
+  'answerStrategy',
+  'historyTurns',
+  'historyChars',
+  'maxQueuedMessages',
+  'maxConcurrency',
+  'maxRetries',
+  'maxTasks',
+  'timeoutMs',
+  'maxActiveRuns',
+  'subagentProvider',
+  'roles',
+  'synthesis',
+  'switchOn',
+  'recordRuns',
+  'recordLimit',
+  'configVersion',
+] as const
 
 const TOOL_NAME = /^[a-z][a-z0-9_]{1,40}$/
 
@@ -50,6 +85,15 @@ export const Config = z.object({
     synthesizer: z.array(z.object({ provider: z.string().default(''), model: z.string() })).default([]),
   }).default({ planner: [], worker: [], verifier: [], synthesizer: [] }),
   synthesis: z.union([z.const('deterministic'), z.const('model')]).default('deterministic'),
+  // Switching policy (阶段5): which failure classes advance the fallback chain.
+  // Empty means "use the built-in policy" (every transport/model class switches;
+  // content failures never do), which is what phases 3-4 shipped.
+  switchOn: z.array(z.string()).default([]),
+  // Run records: the routing/delivery ledger written into the session.
+  recordRuns: z.boolean().default(true),
+  recordLimit: z.natural().min(0).max(HARD_LIMITS.recordEntries).default(64),
+  // Config version, so a future rename can be migrated instead of guessed.
+  configVersion: z.natural().default(CONFIG_VERSION),
 })
 
 /**
@@ -58,7 +102,89 @@ export const Config = z.object({
  * Fail-fast (R-06): an unusable chain is rejected at load, never discovered
  * mid-run, because a silently ignored chain looks like routing that works.
  */
-function resolveChain(role: string, chain: ModelRoute[] | undefined): ModelRoute[] {
+/** One config route as written: an object, or a bare model id shorthand. */
+export type RouteInput = ModelRoute | string
+
+/** Failure classes a user may name in `switchOn`. */
+export const SWITCHABLE_CLASSES = [
+  'rate-limit',
+  'server-error',
+  'connection',
+  'timeout',
+  'model-unavailable',
+  'format-error',
+  'agent-start-failed',
+] as const
+
+/**
+ * Reject unknown top-level keys instead of letting the schema drop them.
+ *
+ * A silently ignored key is indistinguishable from a setting that does not
+ * work, and the whole point of the configuration layer (D) is that a user can
+ * tell those apart. The message names the closest accepted key.
+ * @param config - raw user configuration.
+ * @throws If a key is not part of the configuration surface.
+ */
+export function assertKnownKeys(config: Record<string, unknown>): void {
+  const known = new Set<string>(CONFIG_KEYS)
+  for (const key of Object.keys(config)) {
+    if (known.has(key)) continue
+    const suggestion = CONFIG_KEYS.find(candidate => candidate.toLowerCase().startsWith(key.toLowerCase().slice(0, 4)))
+      ?? CONFIG_KEYS.find(candidate => key.toLowerCase().startsWith(candidate.toLowerCase().slice(0, 4)))
+    throw new Error(
+      `unknown configuration key "${key}"${suggestion === undefined ? '' : ` (did you mean "${suggestion}"?)`}; ` +
+      `accepted keys: ${CONFIG_KEYS.join(', ')}`,
+    )
+  }
+}
+
+/**
+ * Validate and normalize the switching policy.
+ *
+ * An unknown class name would silently never switch, so it is refused: the
+ * policy is a whitelist, and a typo in it must not look like "no fallback".
+ * @param list - the configured classes, or undefined for the built-in policy.
+ * @returns The normalized list (empty means the built-in policy).
+ */
+function resolveSwitchOn(list: FailureClass[] | undefined): FailureClass[] {
+  if (list === undefined || list.length === 0) return []
+  const allowed = new Set<string>(SWITCHABLE_CLASSES)
+  const out: FailureClass[] = []
+  for (const entry of list) {
+    const name = typeof entry === 'string' ? entry.trim() : ''
+    if (!allowed.has(name)) {
+      throw new Error(
+        `switchOn has "${String(entry)}", which is not a switchable failure class; ` +
+        `accepted: ${SWITCHABLE_CLASSES.join(', ')} ` +
+        '(content and setup failures never switch: task-failed, verification-failed, budget-exhausted)',
+      )
+    }
+    if (!out.includes(name as FailureClass)) out.push(name as FailureClass)
+  }
+  return out
+}
+
+/**
+ * Accept a bare model id where a route object is expected.
+ *
+ * Written as a migration aid: `worker: ['fast', 'slow']` reads naturally, and
+ * normalizing it here keeps one shape downstream instead of teaching every
+ * consumer two spellings.
+ * @param entry - route object, or a bare model id string.
+ * @param path - configuration path used in the error message.
+ * @returns A route object.
+ */
+function normalizeRoute(entry: RouteInput, path: string): ModelRoute {
+  if (typeof entry === 'string') {
+    const model = entry.trim()
+    if (model === '') throw new Error(`${path} must name a model, not an empty string`)
+    return { model }
+  }
+  if (entry === null || typeof entry !== 'object') throw new Error(`${path} must be a route object or a model id string`)
+  return entry
+}
+
+function resolveChain(role: string, chain: Array<RouteInput> | undefined): ModelRoute[] {
   if (chain === undefined) return []
   if (!Array.isArray(chain)) throw new Error(`roles.${role} must be an array of routes`)
   // An empty chain means "inherit the run's route". The schema default fills every
@@ -70,7 +196,8 @@ function resolveChain(role: string, chain: ModelRoute[] | undefined): ModelRoute
   }
   const seen = new Set<string>()
   const out: ModelRoute[] = []
-  for (const [index, entry] of chain.entries()) {
+  for (const [index, raw] of chain.entries()) {
+    const entry = normalizeRoute(raw, `roles.${role}[${index}]`)
     const model = entry?.model?.trim() ?? ''
     if (model === '') throw new Error(`roles.${role}[${index}].model must be a non-empty model id`)
     if (model.length > HARD_LIMITS.routeChars) {
@@ -97,6 +224,8 @@ function integer(name: string, value: number, min: number, max: number): number 
 
 /** Resolve defaults and enforce the hard limits for direct construction paths. */
 export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
+  assertKnownKeys(config as Record<string, unknown>)
+  const configVersion = integer('configVersion', config.configVersion ?? CONFIG_VERSION, 1, CONFIG_VERSION)
   const toolName = config.toolName ?? 'grok_workflow'
   if (!TOOL_NAME.test(toolName)) {
     throw new Error(`toolName must match ${TOOL_NAME.source}`)
@@ -152,6 +281,10 @@ export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
     maxTasks: integer('maxTasks', config.maxTasks ?? 6, 1, HARD_LIMITS.maxTasks),
     timeoutMs: integer('timeoutMs', config.timeoutMs ?? 1_800_000, 1_000, HARD_LIMITS.timeoutMs),
     maxActiveRuns: integer('maxActiveRuns', config.maxActiveRuns ?? 2, 1, HARD_LIMITS.maxActiveRuns),
+    switchOn: resolveSwitchOn(config.switchOn),
+    recordRuns: config.recordRuns ?? true,
+    recordLimit: integer('recordLimit', config.recordLimit ?? 64, 0, HARD_LIMITS.recordEntries),
+    configVersion,
     ...provider === undefined || provider === '' ? {} : { subagentProvider: provider },
   }
 }
