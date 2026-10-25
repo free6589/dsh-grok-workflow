@@ -127,6 +127,17 @@ The current development sandbox has no user systemd bus; use `nohup` or the
 service on the real host. The script owns its child wake process and terminates
 it on `SIGINT`/`SIGTERM`.
 
+## Prompt/data boundary
+
+Issue titles and comment bodies are untrusted external content. The generated
+wake prompt serializes event fields as compact JSON inside an explicit
+`BEGIN_UNTRUSTED_GITHUB_EVENT_JSON` / `END_UNTRUSTED_GITHUB_EVENT_JSON` block.
+It instructs the agent to treat those fields as data, not instructions, and not
+to let them override `AGENTS.md`, tool policy, or secret-handling rules. JSON
+serialization keeps embedded newlines from becoming separate prompt lines; it
+does not make the content trustworthy or replace the model/deployment's
+permission controls.
+
 ## Verification
 
 ```sh
@@ -135,5 +146,5 @@ npm test -- --run test/issue-watch.spec.ts
 ```
 
 The regression test uses a fake `gh` executable, baselines one issue, then
-replays a new comment and asserts that the generated prompt contains the
-comment. It does not call GitHub or a model.
+replays a new comment and asserts that generated prompt JSON contains the comment as untrusted data, including
+hostile-looking text and an injected delimiter. It does not call GitHub or a model.
