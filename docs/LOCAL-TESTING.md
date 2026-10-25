@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Node.js 24+ (verified locally with Node 26.8.1)
+- Node.js 22+ (verified locally with Node 26.8.1)
 - npm or pnpm
 - DSH CLI `0.2.1-rc.2` (verified)
 - A DSH profile with `@deepseek-ai/dsh-base` / `dsh-web-app` or

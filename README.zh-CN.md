@@ -43,6 +43,16 @@ dsh --profile grok-workflow-dev
 
 可以用 `dsh --version` 和 `node --version` 检查版本。本项目**没有发布到 npm**，上面的安装命令直接使用 GitHub。
 
+## 启用与验证
+
+`dsh plugin add` 会添加 bundle 行。重启后确认它已组合进配置：
+
+```sh
+dsh --profile grok-workflow-dev --dump-config | grep -A4 'grok-workflow'
+```
+
+正常输出应包含 `id: grok-workflow` 和 `name: dsh-grok-workflow`。
+
 ## 试用一下
 
 启动 DSH 后，对模型说：
@@ -84,6 +94,47 @@ dsh --profile grok-workflow-dev
 
 **需要注意：** 当前版本的并行任务共享 DSH 会话的工作目录。若任务会修改文件，请给每个任务分配不重叠的文件范围，或者将 `maxConcurrency` 设为 `1`。独立验证能提高可靠性，但不等于数学意义上的正确性证明。
 
+## 配置、禁用与卸载
+
+配置写在 profile 的 `cordis.patch.yml`（或 `--patch` 覆盖层）的 bundle 行中：
+
+```yaml
+- id: grok-workflow
+  config:
+    toolName: grok_workflow
+    maxConcurrency: 3
+    maxRetries: 1
+    maxTasks: 6
+    timeoutMs: 1800000
+    maxActiveRuns: 2
+    # subagentProvider: spawn
+```
+
+| 配置项 | 默认值 | 硬上限 | 含义 |
+|---|---:|---:|---|
+| `toolName` | `grok_workflow` | 模式 `^[a-z][a-z0-9_]{1,40}$` | 模型看到的工具名 |
+| `maxConcurrency` | `3` | `6` | 每次运行同时执行的子 Agent 数 |
+| `maxRetries` | `1` | `3` | 每个任务首次执行后的重试次数 |
+| `maxTasks` | `6` | `12` | caller 或 planner 生成的最大任务数 |
+| `timeoutMs` | `1800000` | `86400000` | 单次运行总时限 |
+| `maxActiveRuns` | `2` | `4` | 同一插件实例中并发的 `grok_workflow` 调用数 |
+| `subagentProvider` | 引擎默认（`spawn`） | 字符串 | 可选的 subagent provider 覆盖 |
+
+只禁用这一行：
+
+```yaml
+- id: grok-workflow
+  disabled: true
+```
+
+卸载插件：
+
+```sh
+dsh plugin --profile grok-workflow-dev remove dsh-grok-workflow
+```
+
+禁用或移除后不会注册工具和提示词段落，普通 DSH 会话不受影响。
+
 ## 遇到问题怎么办？
 
 - **找不到工具：** 重启 DSH 配置，并确认它包含 workflow 引擎和 subagent provider。
@@ -92,7 +143,7 @@ dsh --profile grok-workflow-dev
 - **想了解技术设计：** 查看[架构说明](docs/ARCHITECTURE.md)和[验收清单](docs/ACCEPTANCE.md)。
 - **发现 Bug：** [提交 Issue](https://github.com/free6589/dsh-grok-workflow/issues)。
 
-## 开发者
+## 测试与开发
 
 克隆仓库后执行：
 
@@ -101,7 +152,15 @@ npm ci
 npm run ci
 ```
 
-自动化测试会检查工作流、输入限制、重试、脱敏、插件生命周期和真实 DSH Loader 组合，但不会调用在线模型。真实 DSH/模型验收结果另行记录在[验证日志](docs/knowledge/VALIDATION.md)中。
+测试套件包含 **6 个文件、55 个确定性测试**，不会调用在线模型；覆盖生成的工作流、并发/重试边界、脱敏、生命周期和真实 DSH Loader 组合。GitHub Actions 还会检查提交的 `lib/` 产物和 `npm pack --dry-run`。真实 DSH/模型验收结果记录在[验证日志](docs/knowledge/VALIDATION.md)中。
+
+## 安全与兼容性
+
+- 当前仅验证 DSH **`0.2.1-rc.2`** 和 Node.js **22 或更高版本**；包中声明了精确的 peer 版本。这是外部 DSH bundle，不修改 DSH 核心。
+- 不会绕过 DSH 的审批、沙箱或工具权限策略。子 Agent 不能递归调用 `grok_workflow`；它们继承的其他工具仍受 DSH 自身策略约束。
+- 脱敏是尽力而为：不要把凭据放进 objective、任务文本或日志；报告不能保证子 Agent 从未接触过敏感信息。
+- 并行任务共享会话工作目录。写文件多的任务应使用互不重叠的文件范围，或设置 `maxConcurrency: 1`；独立验证是证据检查，不是数学证明。
+- 本项目未发布 npm 包，请从 GitHub 仓库安装。
 
 ## 更多文档
 

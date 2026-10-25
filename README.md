@@ -43,6 +43,16 @@ dsh --profile grok-workflow-dev
 
 Check your versions with `dsh --version` and `node --version`. This project is **not published to npm**; the install command above uses GitHub.
 
+## Enable and verify
+
+The bundle row is added by `dsh plugin add`. After restarting, confirm it is composed:
+
+```sh
+dsh --profile grok-workflow-dev --dump-config | grep -A4 'grok-workflow'
+```
+
+A healthy row includes `id: grok-workflow` and `name: dsh-grok-workflow`.
+
 ## Try it
 
 After DSH starts, ask your model something like:
@@ -84,6 +94,47 @@ The plugin reuses DSH's workflow engine and subagents. It does not replace DSH's
 
 **Important limitation:** parallel tasks share the DSH session's working directory in this MVP. For tasks that edit files, give each task a non-overlapping file scope or set `maxConcurrency: 1`. The verifier is an independent check, not a mathematical proof of correctness.
 
+## Configure, disable, and uninstall
+
+Configuration belongs to the profile's `cordis.patch.yml` (or a `--patch` overlay), under the bundle row:
+
+```yaml
+- id: grok-workflow
+  config:
+    toolName: grok_workflow
+    maxConcurrency: 3
+    maxRetries: 1
+    maxTasks: 6
+    timeoutMs: 1800000
+    maxActiveRuns: 2
+    # subagentProvider: spawn
+```
+
+| Key | Default | Hard limit | Meaning |
+|---|---:|---:|---|
+| `toolName` | `grok_workflow` | pattern `^[a-z][a-z0-9_]{1,40}$` | Model-facing tool name |
+| `maxConcurrency` | `3` | `6` | Maximum child agents in flight per run |
+| `maxRetries` | `1` | `3` | Retries per task after the initial attempt |
+| `maxTasks` | `6` | `12` | Maximum caller or planner tasks |
+| `timeoutMs` | `1800000` | `86400000` | Overall run deadline |
+| `maxActiveRuns` | `2` | `4` | Concurrent `grok_workflow` calls per plugin instance |
+| `subagentProvider` | engine default (`spawn`) | string | Optional subagent provider override |
+
+To disable just this row:
+
+```yaml
+- id: grok-workflow
+  disabled: true
+```
+
+To remove the package:
+
+```sh
+dsh plugin --profile grok-workflow-dev remove dsh-grok-workflow
+```
+
+When disabled or absent, the tool and prompt section are not registered; normal DSH sessions are unaffected.
+
 ## If something does not work
 
 - **The tool does not appear:** restart the profile and confirm it contains the workflow engine and a subagent provider.
@@ -92,7 +143,7 @@ The plugin reuses DSH's workflow engine and subagents. It does not replace DSH's
 - **You want to understand the design:** see [Architecture](docs/ARCHITECTURE.md) and the [acceptance checklist](docs/ACCEPTANCE.md).
 - **You found a bug:** [Open an issue](https://github.com/free6589/dsh-grok-workflow/issues).
 
-## For developers
+## Testing and development
 
 Clone the repository and run:
 
@@ -101,7 +152,15 @@ npm ci
 npm run ci
 ```
 
-The automated suite checks the generated workflow, bounds, retries, redaction, lifecycle, and real DSH Loader composition. It does not call an online model. Real DSH/model acceptance checks are recorded separately in [the validation log](docs/knowledge/VALIDATION.md).
+The suite has **55 deterministic tests** across 6 files and does not call an online model. It covers the generated workflow, concurrency/retry bounds, redaction, lifecycle, and real DSH Loader composition. The GitHub Actions workflow also checks committed `lib/` artifacts and `npm pack --dry-run`. Real DSH/model acceptance checks are recorded in [the validation log](docs/knowledge/VALIDATION.md).
+
+## Security and compatibility
+
+- Verified only with DSH **`0.2.1-rc.2`** and Node.js **22 or newer**; the package declares the exact peer versions. This is an external DSH bundle and does not modify DSH core.
+- It does not bypass DSH approvals, sandbox policy, or tool policy. Child agents cannot recursively invoke `grok_workflow`; their other tools remain subject to DSH's own policy.
+- Redaction is best-effort: do not put credentials in objectives, task text, or logs. Reports are not a guarantee that a child agent never touched a secret.
+- Parallel tasks share the session working directory. Use disjoint file scopes or `maxConcurrency: 1` for write-heavy work; verification is independent evidence checking, not a formal proof.
+- No npm package is published; install from this GitHub repository.
 
 ## Documentation
 

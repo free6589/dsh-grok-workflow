@@ -84,7 +84,7 @@ Each entry records the decision, evidence, alternatives, and status.
 
 ## D-006 — README landing page and language toggle
 
-- **Status:** PROPOSED pending PR review.
+- **Status:** CONFIRMED; PR #16 merged as `ea3e8e31`.
 - **Date:** 2026-10-25.
 - **Decision:** Keep root `README.md` as the English landing page and add `README.zh-CN.md` as the complete Simplified Chinese version. Add reciprocal language links near the top of both pages. Include a simple workflow illustration in each language; keep detailed configuration, architecture and acceptance material in `docs/`.
 - **Reason:** New users should see the purpose, exact prerequisites, one-command GitHub installation, one natural-language example, workflow stages and troubleshooting before advanced implementation detail.
