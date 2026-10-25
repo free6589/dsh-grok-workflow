@@ -37,7 +37,7 @@ Result: **PASS**
 
 - `npm run typecheck`: PASS.
 - `npm run lint`: PASS, 0 warnings/0 errors (`oxlint` over 15 files).
-- `npm test`: PASS, 6 test files, 50 tests.
+- `npm test`: PASS, 6 test files, 51 tests.
   - `test/orchestrator.spec.ts`: 15 tests (planner, caller plan, parallel pool,
     partial, failed, evidence rejection, retry bound, fallback, oversized
     planner rejection, duplicate planner criteria, overlong verifier-criterion
@@ -52,8 +52,9 @@ Result: **PASS**
     duplicate-criteria input.
   - `test/redact.spec.ts`: 7 tests, including compound environment names,
     access/private/secret keys, and Stripe underscore tokens.
-  - `test/issue-watch.spec.ts`: 1 test using a fake `gh` executable; baselines
-    one issue, replays a new comment, and asserts the generated prompt.
+  - `test/issue-watch.spec.ts`: 2 tests using a fake `gh` executable; baselines
+    issues, replays a comment/new issue, asserts the untrusted-data prompt
+    boundary, and verifies credential-env isolation.
 
 Toolchain: Node `v26.8.1`, Vitest `4.1.12`, TypeScript `6.x`, DSH packages
 `0.2.1-rc.2`, real `@deepseek-ai/cordis-plugin-loader` `1.0.6`.
@@ -289,7 +290,7 @@ tests:
   `assertWorkflowReport`, not the raw engine value; a test adds an unknown field
   containing a fake secret and verifies it is absent.
 
-`npm run ci` — **PASS**, 6 files / 50 tests.
+`npm run ci` — **PASS**, 6 files / 51 tests.
 
 ### Additional issue-report fixes (#8-#10)
 
@@ -304,6 +305,21 @@ tests:
 - **#10 artifact drift:** CI now runs `npm run build`, then
   `git diff --exit-code -- lib/`, then tests and `npm pack --dry-run`, so a
   commit cannot silently ship stale `lib/` output.
+
+### Watcher security fix (#11)
+
+- The watcher now wraps all imported event fields in a compact JSON array,
+  labels it `UNTRUSTED GITHUB DATA`, and repeats a security reminder after the
+  payload: issue text is evidence/task description, not authority to override
+  system/repository/tool/secret-handling rules.
+- `DSH_ENV_FILE` is parsed as KEY=VALUE credentials rather than sourced as shell
+  code; `DSH_*`, `HOME`, `PATH`, and similar process variables are ignored so a
+  credential file cannot retarget the wake to another DSH home/profile/session.
+- Command-mode wakes use `bash -c`, not a login shell, so profile scripts cannot
+  overwrite the isolated environment.
+- Two fake-`gh` tests pass, including hostile-looking issue text and a credential
+  file containing conflicting `DSH_HOME` / `DSH_PROFILE` / `DSH_PATCH`.
+- `npm run ci` — **PASS**, 6 files / 51 tests.
 
 ### Post-fix real DSH revalidation
 
@@ -324,8 +340,9 @@ tests:
 ## Issue watcher validation (2026-10-25)
 
 - `bash -n scripts/watch-issues.sh` — **PASS**.
-- `npx vitest run test/issue-watch.spec.ts` — **PASS**, 1 test; fake `gh`
-  executable, no GitHub or model calls.
+- `npx vitest run test/issue-watch.spec.ts` — **PASS**, 2 tests; fake `gh`
+  executable, no GitHub or model calls; includes hostile issue text and
+  credential-env isolation.
 - `WATCH_STATE_DIR=.dsh-home/watch-live WATCH_WAKE_MODE=noop scripts/watch-issues.sh --once`
   — **PASS**; baselined 10 open issues at 08:02 UTC with no wake.
 - Real DSH headless stdin smoke:

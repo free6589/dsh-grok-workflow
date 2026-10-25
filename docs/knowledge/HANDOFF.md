@@ -12,14 +12,14 @@
   - Added deterministic and real-Loader tests.
   - Updated `STATE.md`, `VALIDATION.md`, `ACCEPTANCE.md`, `RESEARCH.md`.
 - **Tests run:**
-  - `npm run ci` — typecheck, lint, 50 tests pass.
+  - `npm run ci` — typecheck, lint, 51 tests pass.
   - `npm run test:loader` — 2 real Loader tests pass.
   - `npm pack --dry-run` — package contents verified.
   - Real DSH install from local checkout and from GitHub; `--dump-config`
     shows the bundle row in both profiles.
   - Real headless model smoke and real `grok_workflow` runs (see
     `VALIDATION.md`).
-- **Test results:** PASS; GitHub Actions run `40175621646` passed Node 22/24, including build-artifact consistency and pack checks (50 tests).
+- **Test results:** PASS; GitHub Actions run `40175621646` passed Node 22/24, including build-artifact consistency and pack checks (51 tests).
 - **Local runtime verified:** yes for plugin load, model route, completed
   caller-plan workflow, completed parallel timing workflow, completed
   planner-only workflow, fresh GitHub-installed workflow, a partial

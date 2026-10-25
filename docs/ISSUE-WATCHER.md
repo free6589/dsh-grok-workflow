@@ -20,8 +20,15 @@ a webhook, a public callback URL, or a GitHub token in the repository.
 - **Bounded:** one wake runs at a time; additional prompts are queued. A wake
   is killed after `WATCH_WAKE_TIMEOUT` seconds (default 3600).
 - **No credential logging:** the script never prints `DSH_ENV_FILE` or its
-  values. Issue/comment text is kept in the private state directory and is
-  passed to the wake prompt.
+  values. Issue/comment text is kept in the private state directory.
+- **Untrusted input boundary:** issue titles, bodies, comments, and URLs are
+  copied into a JSON payload and explicitly labelled as untrusted data in the
+  wake prompt. The fixed instructions tell the agent not to follow directives
+  found inside that payload.
+- **DSH env isolation:** `DSH_ENV_FILE` is parsed as `KEY=VALUE` credentials,
+  not sourced as shell code. `DSH_*`, `HOME`, `PATH`, and similar process
+  variables from that file are ignored, so a credentials file cannot silently
+  retarget the watcher to a different DSH home, profile, patch, or session.
 
 ## Run
 
@@ -89,7 +96,7 @@ scripts/watch-issues.sh
 | `DSH_PROFILE` | `grok-workflow-dev` | DSH headless profile to boot |
 | `DSH_PATCH` | detected `gw-model.patch.yml` | Optional DSH patch overlay |
 | `DSH_SESSION_ID` | empty | Existing DSH session to resume |
-| `DSH_ENV_FILE` | `$HOME/.dsh/bifrost.env` | Optional env file for the wake child |
+| `DSH_ENV_FILE` | `$HOME/.dsh/bifrost.env` | Optional `KEY=VALUE` credentials file for the wake child; `DSH_*` keys are ignored |
 
 ## Persistent user service
 
@@ -124,16 +131,20 @@ journalctl --user -u dsh-issue-watch.service -f
 ```
 
 The current development sandbox has no user systemd bus; use `nohup` or the
-service on the real host. The script owns its child wake process and terminates
-it on `SIGINT`/`SIGTERM`.
+service on the real host. If the service uses an `EnvironmentFile` for model
+credentials, keep `DSH_HOME`, `DSH_PROFILE`, `DSH_PATCH`, and `DSH_SESSION_ID`
+out of that file: systemd applies them to the watcher process before the
+script's own isolation logic runs. The script owns its child wake process and
+terminates it on `SIGINT`/`SIGTERM`.
 
 ## Verification
 
 ```sh
 bash -n scripts/watch-issues.sh
-npm test -- --run test/issue-watch.spec.ts
+npx vitest run test/issue-watch.spec.ts
 ```
 
-The regression test uses a fake `gh` executable, baselines one issue, then
-replays a new comment and asserts that the generated prompt contains the
-comment. It does not call GitHub or a model.
+The regression tests use a fake `gh` executable. They baseline one issue, replay
+a new comment/new issue, assert the prompt's untrusted-data boundary, and verify
+that a credential env file cannot override `DSH_HOME`, `DSH_PROFILE`,
+`DSH_PATCH`, or the session. They do not call GitHub or a model.
