@@ -14,7 +14,7 @@ Legend: PASS = actually executed and observed; FAIL = executed and failed;
 | F5 | Success, partial success, and failure are distinguished correctly | PASS | Deterministic tests cover completed, partial, and failed reports; a real DSH run returned `PARTIAL` (1/2 verified) and the assistant explicitly did not claim success. |
 | F6 | Independent verification detects failure or evidence-free results | PASS | Evidence-free verifier pass is rejected; retry bound tested (`test/orchestrator.spec.ts`). |
 | F7 | Retries never exceed the configured limit | PASS | `maxRetries=1` produces exactly 2 worker and verifier calls; hard cap tested in config tests. |
-| F8 | Cancellation cleans up child tasks and resources | PASS | Plugin unload and max-active-run tests assert `cancel` and `dispose` on live runs. |
+| F8 | Cancellation cleans up child tasks and resources | PASS | Plugin unload and max-active-run tests assert `cancel` and `dispose`; a real DSH deadline run returned `FAILED` with `Timeout` and left no child process. |
 | F9 | Plugin unload releases listeners and registrations | PASS | Real Loader test disposes the plugin fiber and asserts the tool and prompt section disappear. |
 | F10 | Ordinary DSH behavior is unaffected when the plugin is disabled | PASS | Real Loader test with `disabled: true` asserts no tool and no prompt section. |
 | F11 | Credential redaction test passes | PASS | 5 redaction tests pass. |
@@ -44,4 +44,4 @@ Legend: PASS = actually executed and observed; FAIL = executed and failed;
 | Q5 | Applicable GitHub Actions checks pass | PASS | GitHub Actions runs `40168892831`, `40169133016`, `40169816856`, `40169885633`, and `40170034851` passed on Node 22 and Node 24. |
 | Q6 | README and test commands match implementation | PASS | README commands and documented defaults match source/tests. |
 | Q7 | Every executed check has a real result | PASS | `VALIDATION.md` records commands and outputs. |
-| Q8 | Un-executed checks marked NOT_RUN/BLOCKED | PASS | Optional live timeout/cancellation and clean-profile CI remain marked; all executed checks have recorded results. |
+| Q8 | Un-executed checks marked NOT_RUN/BLOCKED | PASS | Clean-profile CI remains explicitly local-only; all executed checks have recorded results. |

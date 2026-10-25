@@ -50,11 +50,11 @@ optional live timeout/cancellation exercise remains.
     assistant explicitly did not claim success.
 - Created/pushed the public repository, passed GitHub Actions on Node 22/24,
   and opened coordination Issue #1.
+- Confirmed a real DSH deadline cancellation: 2 s timeout returned `FAILED`
+  with a `Timeout` report and no leftover child process.
 
 ## Remaining / optional
 
-- Run a real timeout/cancellation path through DSH. Unit/lifecycle tests cover
-  it; runtime cancellation has not been observed in a live DSH process.
 - Add a clean-DSH-profile install test to CI (currently local only).
 - A larger over-broad planner objective hit the outer 600 s test timeout; use
   realistic task scope. The default plugin deadline is 30 minutes.

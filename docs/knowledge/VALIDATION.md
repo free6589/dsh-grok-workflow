@@ -237,3 +237,21 @@ Result: **PASS**.
 - Run `40170034851` (commit `b23d360`): **PASS**, Node 22 and Node 24 jobs.
 - The workflow uses `actions/checkout@v4` and `actions/setup-node@v4`; GitHub
   reports a Node 20 deprecation annotation but both jobs completed successfully.
+
+### Real end-to-end deadline cancellation
+
+A real `grok_workflow` call ran with a profile overlay setting `timeoutMs: 2000`
+and one task that asked the worker to `sleep 30`.
+
+Result: **PASS**.
+
+- `tool_result` status: `completed` at the transport level, report
+  `Grok workflow: FAILED`.
+- Report showed `Plan: unavailable; 0 task(s); 0 verified`, with
+  `Timeout: workflow exceeded the 2000 ms deadline and was cancelled`.
+- Final assistant answer reported `FAILED` and explicitly said the sleep did
+  not complete.
+- No leftover `sleep 30` or `dsh --profile grok-workflow-dev` process was
+  observed after the call.
+
+This is a live DSH cancellation/deadline path, not only a mocked unit test.
