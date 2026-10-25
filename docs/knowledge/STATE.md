@@ -117,3 +117,11 @@ CI. Keep memory synchronized with any new commit.
 - **Confirmed requirement:** every user message, including greetings and trivial questions, must go through the full workflow; no silent bypass to ordinary direct answering.
 - **Desired capabilities still being designed:** per-role model selection, ordered model fallback chains, and a settings UI.
 - **Working rule:** update `WORKFLOW-DESIGN.md` after each substantive discussion; mark user-confirmed decisions separately from proposals and technical unknowns.
+
+## Overall roadmap for the next design phase
+
+- **Roadmap:** [WORKFLOW-ROADMAP.md](WORKFLOW-ROADMAP.md) is the project-wide plan and phase order.
+- **Detailed discussion:** [WORKFLOW-DESIGN.md](WORKFLOW-DESIGN.md) records confirmed requirements, proposals, and open questions.
+- **Current phase:** Phase 0 — requirements and plan written; user review pending.
+- **Recommended next phase:** Phase 1 — audit exact DSH `0.2.1-rc.2` interfaces and compatibility before choosing implementation details.
+- **Implementation boundary:** discussion and documentation only until the user explicitly authorizes code changes.
