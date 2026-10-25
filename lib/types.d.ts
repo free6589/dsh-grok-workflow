@@ -47,12 +47,48 @@ export type AnswerStrategy = 'relay' | 'append';
  * smallest scope an external plugin can express (U-7).
  */
 export type GateScope = 'process' | 'preset';
+/** The four roles a workflow run assigns model routes to. */
+export type RoleName = 'planner' | 'worker' | 'verifier' | 'synthesizer';
+/**
+ * One entry of an ordered fallback chain.
+ *
+ * `provider` is a subagent/provider route id registered in the deployment;
+ * `model` is the model id that adapter understands. Both cross the workflow
+ * boundary as plain data (`agent({provider, model})`), which is why the guest
+ * never needs to know how a provider is resolved.
+ */
+export interface ModelRoute {
+    /** Provider route id; omitted means "inherit the run's provider". */
+    provider?: string;
+    /** Model id interpreted by that provider adapter. */
+    model: string;
+}
+/** Per-role ordered chains. An absent role inherits the run's route. */
+export type RoleRouting = Partial<Record<RoleName, ModelRoute[]>>;
+/**
+ * Who writes the final answer narrative (U-3).
+ *
+ * `deterministic` keeps the current behaviour: the host renders the aggregated
+ * report. `model` adds one bounded synthesizer call that writes a narrative
+ * summary on top of the same aggregations; it falls back to the deterministic
+ * text when the call fails, so it can never lose verified content.
+ */
+export type SynthesisMode = 'deterministic' | 'model';
 /** Plugin configuration (also the DSH Schemastery schema shape). */
 export interface GrokWorkflowConfig {
     /** Model-facing tool name. */
     toolName?: string;
     /** Route every top-level user message through the workflow (mandatory entry). */
     enforceGate?: boolean;
+    /**
+     * Fail loading instead of degrading when the runtime exposes no
+     * `agent/pre-step` hook. Default false: a missing hook only warns.
+     */
+    gateRequired?: boolean;
+    /** Per-role ordered model chains (planner/worker/verifier/synthesizer). */
+    roles?: RoleRouting;
+    /** Final-answer strategy (U-3): deterministic aggregation, or one model call. */
+    synthesis?: SynthesisMode;
     /** Answer production strategy (U-1); `relay` is the verified default. */
     answerStrategy?: AnswerStrategy;
     /** Enforcement scope (U-7): whole process, or only one agent preset. */
@@ -82,9 +118,13 @@ export interface GrokWorkflowConfig {
 export interface ResolvedConfig {
     toolName: string;
     enforceGate: boolean;
+    gateRequired: boolean;
     gateScope: GateScope;
     gatePreset?: string;
     answerStrategy: AnswerStrategy;
+    /** Effective per-role chains; an empty array means "inherit the run's route". */
+    roles: Record<RoleName, ModelRoute[]>;
+    synthesis: SynthesisMode;
     historyTurns: number;
     historyChars: number;
     maxQueuedMessages: number;
@@ -159,12 +199,45 @@ export interface VerificationResult {
     issues: string[];
     confidence: 'high' | 'medium' | 'low';
 }
+/**
+ * Failure classes a single child call can be mapped to.
+ *
+ * The first six are *route* failures: another model may succeed, so the chain
+ * advances. `task-failed` and `verification-failed` are content failures: a
+ * different model would see the same evidence, so the same route is retried.
+ * `budget-exhausted` and `unknown` are reported honestly and never silently
+ * treated as success.
+ */
+export type FailureClass = 'rate-limit' | 'server-error' | 'connection' | 'timeout' | 'model-unavailable' | 'format-error' | 'task-failed' | 'verification-failed' | 'agent-start-failed' | 'budget-exhausted' | 'unknown';
+/** One classified failure attached to an attempt or a route switch. */
+export interface AttemptFailure {
+    class: FailureClass;
+    /** Redacted, bounded human-readable reason. */
+    reason: string;
+}
+/** One recorded child call: the model, its chain position, and the outcome. */
+export interface RouteTrailEntry {
+    role: RoleName;
+    /** 0-based position in the role's chain; 0 when the role inherits the route. */
+    chainIndex: number;
+    /** Route label (`provider/model`, or `inherit`). */
+    route: string;
+    /** 1-based task attempt this call belongs to (0 for run-level roles). */
+    attempt: number;
+    outcome: 'ok' | 'failed';
+    failureClass?: FailureClass;
+    reason?: string;
+}
 /** One attempt's observed result. */
 export interface AttemptReport {
     attempt: number;
     execution: ExecutionResult | null;
     verification: VerificationResult | null;
     passed: boolean;
+    /** Route that produced the attempt, when routing is configured. */
+    route?: string;
+    /** Classified failure of this attempt, when it failed. */
+    failure?: AttemptFailure;
     error?: string;
 }
 /** Per-task report. */
@@ -197,6 +270,16 @@ export interface WorkflowReport {
     incomplete: IncompleteItem[];
     errors: ReportError[];
     uncertainties: UncertaintyItem[];
+    /** Every recorded child call, in call order (bounded, redacted). */
+    routes: RouteTrailEntry[];
+    /** Effective chains, for transparency about what was configured. */
+    routing: Record<RoleName, string[]>;
+    /** Final-answer strategy and its outcome. */
+    synthesis: {
+        mode: SynthesisMode;
+        error?: string;
+        summary?: string;
+    };
     limits: {
         maxConcurrency: number;
         maxRetries: number;

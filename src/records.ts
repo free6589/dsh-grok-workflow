@@ -10,8 +10,10 @@
 
 import type { Session } from '@deepseek-ai/dsh-session'
 import { appendPluginRecord, pluginRecordOf } from '@deepseek-ai/dsh-session'
+import { redactError, redactSecrets } from './redact.js'
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import type { WorkflowLogger } from './run.js'
+import type { RouteTrailEntry, RoleName, SynthesisMode } from './types.js'
 
 /** Record type owned by this plugin. */
 export const DELIVERY_RECORD = 'plugin:grok-workflow/delivery'
@@ -36,8 +38,42 @@ export interface DeliveryRecord {
   outcome: string
 }
 
+/** Record type owned by this plugin: the model-route ledger of one run. */
+export const ROUTING_RECORD = 'plugin:grok-workflow/routing'
+
+/**
+ * Payload stored for one run's routing ledger.
+ *
+ * Only *switches* and *failures* are kept (a successful first-route call is not
+ * a switch), every free-text field is redacted and bounded, and the whole entry
+ * list is capped so a long run cannot grow the record without limit.
+ */
+export interface RoutingRecord {
+  v: 1
+  /** Run objective, redacted and bounded; correlates the ledger with a report. */
+  objective: string
+  /** Effective chains at run time (`provider/model`, or empty for inherit). */
+  routing: Record<RoleName, string[]>
+  synthesis: SynthesisMode
+  /** One entry per route switch or failed call. */
+  switches: {
+    role: RoleName
+    chainIndex: number
+    route: string
+    attempt: number
+    outcome: 'ok' | 'failed'
+    failureClass?: string
+    reason?: string
+  }[]
+}
+
+/** Maximum switches kept in one ledger record. */
+const ROUTING_RECORD_LIMIT = 64
+
 declare module '@deepseek-ai/dsh-session' {
   interface PluginRecordMap {
+    /** The model-route ledger written after a workflow run. */
+    'plugin:grok-workflow/routing': RoutingRecord
     'plugin:grok-workflow/delivery': DeliveryRecord
   }
 }
@@ -111,5 +147,55 @@ export function recordDelivery(
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
     logger.warn(`delivery record not persisted (${record.key}): ${detail}`)
+  }
+}
+
+/** Redact and bound one free-text ledger field. */
+function ledgerText(value: string, max: number): string {
+  return redactSecrets(value).replace(/\s+/g, ' ').trim().slice(0, max)
+}
+
+/**
+ * Record the model-route ledger of one run.
+ *
+ * A run may switch routes many times, so the ledger is one plugin record (not
+ * one record per switch): bounded, redacted, and never allowed to throw into
+ * the caller that is delivering a workflow answer.
+ */
+export function recordRouting(
+  session: Session | undefined,
+  entry: {
+    objective: string
+    routing: Record<RoleName, string[]>
+    synthesis: SynthesisMode
+    routes: readonly RouteTrailEntry[]
+  },
+  logger?: WorkflowLogger,
+): void {
+  if (session === undefined) return
+  const switches = entry.routes
+    .filter(route => route.outcome === 'failed' || route.chainIndex > 0)
+    .slice(0, ROUTING_RECORD_LIMIT)
+    .map(route => ({
+      role: route.role,
+      chainIndex: route.chainIndex,
+      route: route.route,
+      attempt: route.attempt,
+      outcome: route.outcome,
+      ...route.failureClass === undefined ? {} : { failureClass: route.failureClass },
+      ...route.reason === undefined ? {} : { reason: ledgerText(route.reason, 200) },
+    }))
+  if (switches.length === 0) return
+  const payload: RoutingRecord = {
+    v: 1,
+    objective: ledgerText(entry.objective, 400),
+    routing: entry.routing,
+    synthesis: entry.synthesis,
+    switches,
+  }
+  try {
+    appendPluginRecord(session, ROUTING_RECORD, payload)
+  } catch (error) {
+    logger?.warn(`could not record the routing ledger: ${redactError(error)}`)
   }
 }

@@ -220,7 +220,13 @@ export function installGate(deps: GateDeps): boolean {
   const host = ctx as unknown as { on?: (event: string, handler: unknown) => () => void }
   const on = host.on
   if (typeof on !== 'function') {
-    logger.warn('agent/pre-step is unavailable: mandatory entry is disabled in this runtime')
+    // Fail-open by default (a runtime without the hook cannot be policed), but a
+    // deployment that promises mandatory entry sets gateRequired to turn this
+    // silent degradation into a load-time error.
+    if (config.gateRequired === true) {
+      throw new Error('enforceGate requires the agent/pre-step hook, which this runtime does not expose (gateRequired is true)')
+    }
+    logger.warn('agent/pre-step is unavailable: mandatory entry is disabled in this runtime; set gateRequired to fail instead')
     return false
   }
   const queues = new Map<string, AgentQueue>()
@@ -330,6 +336,13 @@ export function installGate(deps: GateDeps): boolean {
       messageIds: payload.messages.map(message => String(message.id)).sort(),
       turn: verdict.turn,
       step: payload.step,
+    }
+    if (verdict.request.trim() === '') {
+      // An attachment-only or empty message has nothing to route: refuse it
+      // explicitly instead of spending a full workflow run on an empty objective.
+      record(agent, entry, 'failed', 'empty-request')
+      void deliverAndRecord(agent, entry, noticeText('the message contains no text to route'), 'empty-request', 'notice')
+      return
     }
     if (`Current request:\n${verdict.request}`.length > TASK_LIMITS.objectiveChars) {
       // Too large to route: refuse and say so instead of letting the model answer.

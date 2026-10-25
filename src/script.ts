@@ -1,5 +1,5 @@
 import { REDACTION_RULES } from './redact.js'
-import type { NormalizedTask, ResolvedConfig } from './types.js'
+import type { ModelRoute, NormalizedTask, ResolvedConfig, RoleName, SynthesisMode } from './types.js'
 
 /**
  * Render the shared redaction rules (src/redact.ts) as script-realm JS source.
@@ -28,6 +28,9 @@ const maxConcurrency = Math.max(1, Math.min(6, Number(args && args.maxConcurrenc
 const maxRetries = Math.max(0, Math.min(3, Number(args && args.maxRetries) || 0));
 const maxTasks = Math.max(1, Math.min(12, Number(args && args.maxTasks) || 6));
 const suppliedTasks = args && Array.isArray(args.tasks) ? args.tasks : null;
+
+const ROLE_NAMES = ['planner', 'worker', 'verifier', 'synthesizer'];
+const ROUTE_LIMITS = { chainLength: 3, textChars: 120, trail: 256, reasonChars: 200 };
 
 function text(value, max) {
   if (typeof value !== 'string') return '';
@@ -105,6 +108,159 @@ const TASK_LIMITS = {
   constraintChars: 1000,
   aggregateChars: 48000
 };
+
+// ---------------------------------------------------------------- routing --
+// Per-role ordered fallback chains (v1: script level only, U-2). Each entry is a
+// plain {provider, model} pair handed to agent(); the host resolves it. No
+// request-error hook is registered, so a failure that the host classifies before
+// the request would otherwise bypass routing. The script therefore classifies
+// every child failure itself (whitelist + fail-closed) and never turns an
+// unclassified failure into a success.
+function normalizeChain(value) {
+  if (!Array.isArray(value)) return [];
+  const out = [];
+  const seen = {};
+  for (let index = 0; index < value.length && out.length < ROUTE_LIMITS.chainLength; index++) {
+    const entry = value[index];
+    if (!entry || typeof entry !== 'object') continue;
+    const model = text(entry.model, ROUTE_LIMITS.textChars);
+    const provider = text(entry.provider, ROUTE_LIMITS.textChars);
+    if (model === '') continue;
+    const key = provider + '/' + model;
+    if (seen[key]) continue;
+    seen[key] = true;
+    out.push(provider === '' ? { model: model } : { provider: provider, model: model });
+  }
+  return out;
+}
+
+const roleRoutes = (function () {
+  const source = args && args.roles && typeof args.roles === 'object' ? args.roles : {};
+  const out = {};
+  for (let index = 0; index < ROLE_NAMES.length; index++) {
+    const role = ROLE_NAMES[index];
+    out[role] = normalizeChain(source[role]);
+  }
+  return out;
+})();
+
+const synthesisMode = args && args.synthesis === 'model' && roleRoutes.synthesizer.length > 0 ? 'model' : 'deterministic';
+
+const ROUTE_FAILURE_CLASSES = {
+  'rate-limit': 1,
+  'server-error': 1,
+  connection: 1,
+  timeout: 1,
+  'model-unavailable': 1,
+  'format-error': 1,
+  'agent-start-failed': 1
+};
+
+function routeLabel(route) {
+  if (!route) return 'inherit';
+  return (route.provider ? route.provider + '/' : '') + route.model;
+}
+
+function roleChainLabels(role) {
+  const chain = roleRoutes[role];
+  const out = [];
+  for (let index = 0; index < chain.length; index++) out.push(routeLabel(chain[index]));
+  return out;
+}
+
+function classifyFailureText(value) {
+  const message = String(value || '');
+  if (/rate.?limit|too many requests|\b429\b|quota exceeded|resource[_ ]exhausted/i.test(message)) return 'rate-limit';
+  if (/\b5\d{2}\b|internal server error|bad gateway|service unavailable|gateway time|overloaded/i.test(message)) return 'server-error';
+  if (/ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|socket hang up|network error|fetch failed|connection (reset|refused|closed|dropped)/i.test(message)) return 'connection';
+  if (/timed? ?out|timeout|deadline exceeded|aborted/i.test(message)) return 'timeout';
+  if (/model .*(not found|not available|does not exist|is unavailable)|unknown model|no adapter|NO_ADAPTER|unsupported model|model_not_found/i.test(message)) return 'model-unavailable';
+  if (/structured output|schema (violation|mismatch|mismatched)|invalid (json|output|response)|could not parse|format error/i.test(message)) return 'format-error';
+  return 'unknown';
+}
+
+function failureCode(error) {
+  try {
+    if (error && typeof error === 'object' && typeof error.code === 'string') return error.code;
+  } catch (_) { /* a hostile getter must not hide the failure */ }
+  return '';
+}
+
+function routeReason(value) {
+  return redactPromptText(String(value || '')).slice(0, ROUTE_LIMITS.reasonChars);
+}
+
+function classifyCallFailure(role, error) {
+  const code = failureCode(error);
+  const message = safeError(error);
+  // Budget and configuration faults are not model faults: another model cannot
+  // fix them, and retrying would hide a broken setup or a runaway script.
+  if (code === 'AGENT_CAP') return { role: role, class: 'budget-exhausted', reason: routeReason(message), switchModel: false, fatal: true };
+  if (code === 'UNSUPPORTED_OPTION' || code === 'INVALID_ARGUMENT' || code === 'UNSUPPORTED_SCHEMA' || code === 'SCRIPT_PARSE' || code === 'ITEM_CAP') {
+    return { role: role, class: 'unknown', reason: routeReason(message), switchModel: false, fatal: true };
+  }
+  if (code === 'AGENT_START') return { role: role, class: 'agent-start-failed', reason: routeReason(message), switchModel: true, fatal: false };
+  const failureClass = classifyFailureText(message);
+  return { role: role, class: failureClass, reason: routeReason(message), switchModel: true, fatal: false };
+}
+
+const routeTrail = [];
+
+function traceRoute(role, chainIndex, route, attempt, outcome, failure) {
+  if (routeTrail.length >= ROUTE_LIMITS.trail) return;
+  const entry = { role: role, chainIndex: chainIndex, route: routeLabel(route), attempt: attempt, outcome: outcome };
+  if (failure) {
+    entry.failureClass = failure.class;
+    entry.reason = failure.reason;
+  }
+  routeTrail.push(entry);
+}
+
+// One role call with ordered fallback: a route failure advances the chain, a
+// content failure (from the caller's own checks) does not.
+async function callRole(role, prompt, options) {
+  const chain = roleRoutes[role];
+  const total = Math.max(1, chain.length);
+  const attempt = options.attempt || 0;
+  let lastFailure = null;
+  for (let index = 0; index < total; index++) {
+    const route = index < chain.length ? chain[index] : null;
+    const call = { label: options.label + (index > 0 ? '-r' + index : ''), phase: options.phase, schema: options.schema };
+    if (route) {
+      if (route.provider) call.provider = route.provider;
+      call.model = route.model;
+    }
+    let value;
+    try {
+      value = await agent(prompt, call);
+    } catch (error) {
+      const failure = classifyCallFailure(role, error);
+      traceRoute(role, index, route, attempt, 'failed', failure);
+      if (failure.fatal) throw error;
+      lastFailure = failure;
+      if (!failure.switchModel) break;
+      continue;
+    }
+    if (value === null || value === undefined) {
+      // The guest engine collapses "child run failed" and "child returned no
+      // structured value" to null, so this is reported as a format failure on
+      // this route and the next route is tried.
+      const failure = { role: role, class: 'format-error', reason: 'child returned no valid structured result', switchModel: true, fatal: false };
+      traceRoute(role, index, route, attempt, 'failed', failure);
+      lastFailure = failure;
+      continue;
+    }
+    traceRoute(role, index, route, attempt, 'ok', null);
+    return { ok: true, value: value, route: route, label: routeLabel(route), failure: null };
+  }
+  return {
+    ok: false,
+    value: null,
+    route: null,
+    label: 'exhausted',
+    failure: lastFailure || { role: role, class: 'unknown', reason: 'no route produced a result', switchModel: false, fatal: false }
+  };
+}
 
 function boundedText(value, max) {
   if (typeof value !== 'string') return null;
@@ -472,6 +628,55 @@ function checkVerification(task, execution, verification) {
   return { passed: true, reason: '' };
 }
 
+const SUMMARY_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['summary'],
+  properties: {
+    summary: { type: 'string' }
+  }
+};
+
+function synthesizerPrompt(status, verifiedCount, total, confirmed, incomplete, uncertainties) {
+  const digest = [];
+  digest.push('Status: ' + status);
+  digest.push('Verified tasks: ' + verifiedCount + '/' + total);
+  if (confirmed.length > 0) {
+    digest.push('Confirmed evidence:');
+    for (let index = 0; index < confirmed.length && index < 20; index++) {
+      digest.push('- ' + confirmed[index].taskId + ': ' + confirmed[index].criterion + ' — ' + confirmed[index].evidence);
+    }
+  }
+  if (incomplete.length > 0) {
+    digest.push('Incomplete:');
+    for (let index = 0; index < incomplete.length && index < 20; index++) {
+      digest.push('- ' + incomplete[index].taskId + ': ' + incomplete[index].reason);
+    }
+  }
+  if (uncertainties.length > 0) {
+    digest.push('Uncertainties:');
+    for (let index = 0; index < uncertainties.length && index < 20; index++) {
+      digest.push('- ' + uncertainties[index].taskId + ': ' + uncertainties[index].text);
+    }
+  }
+  return [
+    'You write the final answer narrative for a completed workflow run.',
+    'Use ONLY the data below. Do not add facts, files, or results that are not listed.',
+    'If something is incomplete or uncertain, say so plainly; never claim it succeeded.',
+    'Write at most 200 words of plain prose, no headings and no bullet lists.',
+    '',
+    'DATA:',
+    safePromptJson(digest.join('\n')).slice(0, 6000)
+  ].join('\n');
+}
+
+function normalizeSummary(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const summary = boundedText(raw.summary, 4000);
+  if (!summary) return null;
+  return { summary: summary };
+}
+
 async function mapLimit(items, limit, fn) {
   const results = new Array(items.length);
   let next = 0;
@@ -500,46 +705,77 @@ async function runTask(task) {
     let verification = null;
     let executionError = '';
     let verifyError = '';
+    let attemptRoute = '';
+    let attemptFailure = null;
     try {
-      const raw = await agent(workerPrompt(task, attempt, previous), {
+      const worker = await callRole('worker', workerPrompt(task, attempt, previous), {
         schema: EXECUTION_SCHEMA,
         label: 'grok-worker-' + task.id + '-a' + attempt,
-        phase: 'Execute'
+        phase: 'Execute',
+        attempt: attempt
       });
-      execution = normalizeExecution(raw);
-      if (!execution) executionError = 'worker returned no valid structured result';
+      if (worker.ok) {
+        attemptRoute = worker.label;
+        execution = normalizeExecution(worker.value);
+        if (!execution) {
+          executionError = 'worker returned no valid structured result';
+          attemptFailure = { role: 'worker', class: 'format-error', reason: executionError, switchModel: false, fatal: false };
+        }
+      } else {
+        attemptFailure = worker.failure;
+        executionError = 'worker failed on every route: [' + worker.failure.class + '] ' + worker.failure.reason;
+      }
     } catch (error) {
       if (isFatal(error)) throw error;
       executionError = 'worker failed: ' + safeError(error);
+      attemptFailure = classifyCallFailure('worker', error);
     }
     if (execution) {
       try {
-        const raw = await agent(verifierPrompt(task, execution), {
+        const verifier = await callRole('verifier', verifierPrompt(task, execution), {
           schema: VERIFICATION_SCHEMA,
           label: 'grok-verifier-' + task.id + '-a' + attempt,
-          phase: 'Verify'
+          phase: 'Verify',
+          attempt: attempt
         });
-        verification = normalizeVerification(raw);
-        if (!verification) verifyError = 'verifier returned no valid structured result';
-        else {
-          const check = checkVerification(task, execution, verification);
-          if (!check.passed) verifyError = redactPromptText(check.reason);
+        if (verifier.ok) {
+          if (attemptRoute === '') attemptRoute = verifier.label;
+          verification = normalizeVerification(verifier.value);
+          if (!verification) {
+            verifyError = 'verifier returned no valid structured result';
+            attemptFailure = { role: 'verifier', class: 'format-error', reason: verifyError, switchModel: false, fatal: false };
+          } else {
+            const check = checkVerification(task, execution, verification);
+            if (!check.passed) {
+              // Content failure: the same route is retried, because another
+              // model would be given the same evidence.
+              verifyError = redactPromptText(check.reason);
+              attemptFailure = { role: 'verifier', class: 'verification-failed', reason: verifyError, switchModel: false, fatal: false };
+            }
+          }
+        } else {
+          attemptFailure = verifier.failure;
+          verifyError = 'verifier failed on every route: [' + verifier.failure.class + '] ' + verifier.failure.reason;
         }
       } catch (error) {
         if (isFatal(error)) throw error;
         verifyError = 'verifier failed: ' + safeError(error);
+        attemptFailure = classifyCallFailure('verifier', error);
       }
     } else {
       verifyError = 'verification skipped: no execution result';
     }
     const passed = Boolean(verification) && verifyError === '';
-    attempts.push({
+    const attemptRecord = {
       attempt: attempt,
       execution: execution,
       verification: verification,
-      passed: passed,
-      error: executionError || verifyError || ''
-    });
+      passed: passed
+    };
+    if (attemptRoute !== '') attemptRecord.route = attemptRoute;
+    if (attemptFailure) attemptRecord.failure = { class: attemptFailure.class, reason: routeReason(attemptFailure.reason) };
+    attemptRecord.error = executionError || verifyError || '';
+    attempts.push(attemptRecord);
     if (passed) {
       log('task ' + task.id + ' verified on attempt ' + attempt);
       return { task: task, status: 'verified', attempts: attempts, error: '' };
@@ -559,13 +795,18 @@ if (suppliedTasks && suppliedTasks.length > 0) {
   if (!plan) planError = 'caller tasks were invalid after host validation';
 } else {
   try {
-    const rawPlan = await agent(planPrompt(), {
+    const planned = await callRole('planner', planPrompt(), {
       schema: PLAN_SCHEMA,
       label: 'grok-planner',
-      phase: 'Plan'
+      phase: 'Plan',
+      attempt: 0
     });
-    plan = normalizePlan(rawPlan, 'planner');
-    if (!plan) planError = 'planner returned no valid plan';
+    if (planned.ok) {
+      plan = normalizePlan(planned.value, 'planner');
+      if (!plan) planError = 'planner returned no valid plan';
+    } else {
+      planError = 'planner failed on every route: [' + planned.failure.class + '] ' + planned.failure.reason;
+    }
   } catch (error) {
     if (isFatal(error)) throw error;
     planError = 'planner failed: ' + errorMessage(error);
@@ -629,6 +870,35 @@ let status = 'failed';
 if (verifiedCount === results.length && results.length > 0 && !planningFallback) status = 'completed';
 else if (verifiedCount > 0) status = 'partial';
 
+let synthesisError = '';
+let synthesisSummary = '';
+if (synthesisMode === 'model') {
+  try {
+    const summarized = await callRole('synthesizer', synthesizerPrompt(status, verifiedCount, results.length, confirmed, incomplete, uncertainties), {
+      schema: SUMMARY_SCHEMA,
+      label: 'grok-synthesizer',
+      phase: 'Synthesize',
+      attempt: 0
+    });
+    if (summarized.ok) {
+      const normalized = normalizeSummary(summarized.value);
+      if (normalized) synthesisSummary = normalized.summary;
+      else synthesisError = 'synthesizer returned no valid summary';
+    } else {
+      synthesisError = 'synthesizer failed on every route: [' + summarized.failure.class + '] ' + summarized.failure.reason;
+    }
+  } catch (error) {
+    // A fatal synthesizer failure must not lose verified work: the deterministic
+    // aggregation below is already complete, so the narrative is optional.
+    if (isFatal(error)) synthesisError = 'synthesizer could not run: ' + safeError(error);
+    else throw error;
+  }
+}
+
+const synthesisReport = { mode: synthesisMode };
+if (synthesisSummary !== '') synthesisReport.summary = synthesisSummary;
+if (synthesisError !== '') synthesisReport.error = synthesisError;
+
 const report = {
   schemaVersion: 'grok-workflow/v1',
   status: status,
@@ -656,6 +926,14 @@ const report = {
   incomplete: incomplete,
   errors: errors,
   uncertainties: uncertainties,
+  routes: routeTrail,
+  routing: {
+    planner: roleChainLabels('planner'),
+    worker: roleChainLabels('worker'),
+    verifier: roleChainLabels('verifier'),
+    synthesizer: roleChainLabels('synthesizer')
+  },
+  synthesis: synthesisReport,
   limits: {
     maxConcurrency: maxConcurrency,
     maxRetries: maxRetries,
@@ -681,13 +959,47 @@ export interface WorkflowRequestPayload {
     maxRetries: number
     maxTasks: number
     maxTotalAgents: number
+    roles: Record<RoleName, ModelRoute[]>
+    synthesis: SynthesisMode
   }
   maxTotalAgents: number
 }
 
-/** Calculate the hard child cap for a run, including planner/worker/verifier attempts. */
-export function maxTotalAgentsFor(tasks: number, retries: number): number {
-  return 1 + tasks * (retries + 1) * 2 + 2
+/** Child calls one role may charge, derived from its configured chain. */
+export interface RouteBudget {
+  /** Calls the planner may make (1 when it inherits the route). */
+  planner: number
+  /** Worker calls per task attempt. */
+  worker: number
+  /** Verifier calls per task attempt. */
+  verifier: number
+  /** Synthesizer calls per run (0 when synthesis is deterministic). */
+  synthesizer: number
+}
+
+/** Derive the per-run call budget from the configured chains. */
+export function routeBudgetFor(config: ResolvedConfig): RouteBudget {
+  return {
+    planner: Math.max(1, config.roles.planner.length),
+    worker: Math.max(1, config.roles.worker.length),
+    verifier: Math.max(1, config.roles.verifier.length),
+    synthesizer: config.synthesis === 'model' ? Math.max(1, config.roles.synthesizer.length) : 0,
+  }
+}
+
+/**
+ * Calculate the hard child cap for a run.
+ *
+ * Chains multiply the per-attempt cost, so the cap must be derived from the
+ * effective routes; a cap that only counts attempts would abort a run mid-flight
+ * with AGENT_CAP as soon as a fallback route is used.
+ */
+export function maxTotalAgentsFor(tasks: number, retries: number, budget?: RouteBudget): number {
+  const planner = budget?.planner ?? 1
+  const worker = budget?.worker ?? 1
+  const verifier = budget?.verifier ?? 1
+  const synthesizer = budget?.synthesizer ?? 0
+  return planner + synthesizer + tasks * (retries + 1) * (worker + verifier) + 2
 }
 
 /** Build the static script and data-only arguments for one run. */
@@ -697,7 +1009,7 @@ export function buildWorkflowRequest(
   config: ResolvedConfig,
 ): WorkflowRequestPayload {
   const taskCount = tasks?.length ?? config.maxTasks
-  const maxTotalAgents = maxTotalAgentsFor(taskCount, config.maxRetries)
+  const maxTotalAgents = maxTotalAgentsFor(taskCount, config.maxRetries, routeBudgetFor(config))
   return {
     script: WORKFLOW_SCRIPT,
     meta: {
@@ -717,6 +1029,8 @@ export function buildWorkflowRequest(
       maxRetries: config.maxRetries,
       maxTasks: config.maxTasks,
       maxTotalAgents,
+      roles: config.roles,
+      synthesis: config.synthesis,
     },
     maxTotalAgents,
   }

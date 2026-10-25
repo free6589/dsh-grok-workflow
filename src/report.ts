@@ -1,7 +1,9 @@
-import type { ExecutionResult, FinalStatus, VerificationResult, WorkflowReport } from './types.js'
-import type { ResolvedConfig } from './types.js'
+import type {
+  AttemptFailure,
+  RouteTrailEntry, ExecutionResult, FinalStatus, VerificationResult, WorkflowReport } from './types.js'
+import type { ResolvedConfig, RoleName } from './types.js'
 import { criterionKey } from './input.js'
-import { maxTotalAgentsFor } from './script.js'
+import { maxTotalAgentsFor, routeBudgetFor } from './script.js'
 
 const STATUSES: readonly FinalStatus[] = ['completed', 'partial', 'failed']
 const MAX_RENDER_CHARS = 8_000
@@ -131,6 +133,58 @@ function verificationResult(value: unknown, path: string): VerificationResult {
  * The script is trusted code, but a malformed engine result must not be
  * presented as a successful workflow.
  */
+const ROLE_NAMES = ['planner', 'worker', 'verifier', 'synthesizer'] as const
+
+const FAILURE_CLASSES = [
+  'rate-limit',
+  'server-error',
+  'connection',
+  'timeout',
+  'model-unavailable',
+  'format-error',
+  'task-failed',
+  'verification-failed',
+  'agent-start-failed',
+  'budget-exhausted',
+  'unknown',
+] as const
+
+function attemptFailure(value: unknown, path: string): AttemptFailure {
+  const entry = record(value, path)
+  return {
+    class: enumeration(entry.class, FAILURE_CLASSES, `${path}.class`),
+    reason: string(entry.reason ?? '', `${path}.reason`),
+  }
+}
+
+function routeTrail(value: unknown, path: string, max: number): RouteTrailEntry[] {
+  return array(value, path).slice(0, max).map((item, index) => {
+    const entry = record(item, `${path}[${index}]`)
+    const outcome = string(entry.outcome, `${path}[${index}].outcome`)
+    if (outcome !== 'ok' && outcome !== 'failed') {
+      throw new Error(`workflow result ${path}[${index}].outcome must be "ok" or "failed"`)
+    }
+    return {
+      role: enumeration(entry.role, ROLE_NAMES, `${path}[${index}].role`),
+      chainIndex: number(entry.chainIndex, `${path}[${index}].chainIndex`),
+      route: string(entry.route, `${path}[${index}].route`),
+      attempt: number(entry.attempt, `${path}[${index}].attempt`),
+      outcome,
+      ...entry.failureClass === undefined ? {} : { failureClass: enumeration(entry.failureClass, FAILURE_CLASSES, `${path}[${index}].failureClass`) },
+      ...entry.reason === undefined ? {} : { reason: string(entry.reason, `${path}[${index}].reason`) },
+    }
+  })
+}
+
+function routeLabels(value: unknown, path: string): Record<RoleName, string[]> {
+  const root = record(value, path)
+  const out = {} as Record<RoleName, string[]>
+  for (const role of ROLE_NAMES) {
+    out[role] = stringList(root[role] ?? [], `${path}.${role}`)
+  }
+  return out
+}
+
 export function assertWorkflowReport(value: unknown, objective: string, config: ResolvedConfig): WorkflowReport {
   const root = record(value, 'root')
   if (root.schemaVersion !== 'grok-workflow/v1') {
@@ -186,6 +240,10 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
           execution: entry.execution === null ? null : executionResult(entry.execution, `tasks[${index}].attempts[${a}].execution`),
           verification: entry.verification === null ? null : verificationResult(entry.verification, `tasks[${index}].attempts[${a}].verification`),
           passed: entry.passed === true,
+          ...entry.route === undefined ? {} : { route: string(entry.route, `tasks[${index}].attempts[${a}].route`) },
+          ...entry.failure === undefined || entry.failure === null
+            ? {}
+            : { failure: attemptFailure(entry.failure, `tasks[${index}].attempts[${a}].failure`) },
           error: string(entry.error ?? '', `tasks[${index}].attempts[${a}].error`),
         }
       }),
@@ -225,8 +283,9 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
     // The plugin sizes the child cap from the task count: exact for a caller plan,
     // the configured maximum for a planner or fallback plan. Anything outside that
     // window did not come from this plugin's request builder.
-    const minimumAgents = maxTotalAgentsFor(tasks.length, maxRetries)
-    const maximumAgents = maxTotalAgentsFor(maxTasks, maxRetries)
+    const budget = routeBudgetFor(config)
+    const minimumAgents = maxTotalAgentsFor(tasks.length, maxRetries, budget)
+    const maximumAgents = maxTotalAgentsFor(maxTasks, maxRetries, budget)
     if (maxTotalAgents < minimumAgents || maxTotalAgents > maximumAgents) {
       throw new Error(
         `workflow result limits.maxTotalAgents ${maxTotalAgents} is outside the allowed range ${minimumAgents}-${maximumAgents}`,
@@ -373,9 +432,30 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
       }
     }
   }
+  const routes = root.routes === undefined ? [] : routeTrail(root.routes, 'routes', 256)
+  for (const entry of routes) {
+    if (entry.chainIndex < 0 || entry.chainIndex >= config.roles[entry.role].length + 1) {
+      throw new Error(`workflow result routes entry for ${entry.role} has out-of-range chainIndex ${entry.chainIndex}`)
+    }
+  }
+  const routing = root.routing === undefined
+    ? { planner: [], worker: [], verifier: [], synthesizer: [] }
+    : routeLabels(root.routing, 'routing')
+  const synthesisRoot = root.synthesis === undefined ? {} : record(root.synthesis, 'synthesis')
+  const synthesisMode = string(synthesisRoot.mode ?? config.synthesis, 'synthesis.mode')
+  if (synthesisMode !== 'deterministic' && synthesisMode !== 'model') {
+    throw new Error(`workflow result synthesis.mode must be "deterministic" or "model", got "${synthesisMode}"`)
+  }
   return {
     schemaVersion: 'grok-workflow/v1',
     status: status as FinalStatus,
+    routes,
+    routing,
+    synthesis: {
+      mode: synthesisMode,
+      ...synthesisRoot.error === undefined ? {} : { error: string(synthesisRoot.error, 'synthesis.error') },
+      ...synthesisRoot.summary === undefined ? {} : { summary: string(synthesisRoot.summary, 'synthesis.summary') },
+    },
     objective: string(root.objective, 'objective'),
     plan: {
       source: source as WorkflowReport['plan']['source'],
@@ -408,6 +488,9 @@ export function failureReport(objective: string, config: ResolvedConfig, phase: 
     incomplete: [{ taskId: 'workflow', reason: message }],
     errors: [{ phase, message }],
     uncertainties: [],
+    routes: [],
+    routing: { planner: [], worker: [], verifier: [], synthesizer: [] },
+    synthesis: { mode: config.synthesis },
     limits: {
       maxConcurrency: config.maxConcurrency,
       maxRetries: config.maxRetries,
@@ -442,6 +525,26 @@ export function renderReport(report: WorkflowReport): string {
     lines.push('Incomplete:')
     for (const item of report.incomplete.slice(0, 12)) {
       lines.push(`- ${item.taskId}: ${oneLine(item.reason, 500)}`)
+    }
+  }
+  if (report.synthesis.summary !== undefined) {
+    lines.push('Final answer:')
+    lines.push(oneLine(report.synthesis.summary, 2_000))
+  }
+  if (report.synthesis.error !== undefined) {
+    lines.push(`Synthesis: model narrative unavailable (${oneLine(report.synthesis.error, 300)}); the report above is complete`)
+  }
+  const configured = (['planner', 'worker', 'verifier', 'synthesizer'] as const)
+    .map(role => [role, report.routing[role]] as const)
+    .filter(([, chain]) => chain.length > 0)
+  if (configured.length > 0) {
+    lines.push(`Model routes: ${configured.map(([role, chain]) => `${role}=${chain.join(' → ')}`).join('; ')}`)
+  }
+  const routeFailures = report.routes.filter(entry => entry.outcome === 'failed')
+  if (routeFailures.length > 0) {
+    lines.push('Route switches:')
+    for (const entry of routeFailures.slice(0, 12)) {
+      lines.push(`- ${entry.role} attempt ${entry.attempt} via ${entry.route}: ${entry.failureClass ?? 'unknown'} — ${oneLine(entry.reason ?? '', 200)}`)
     }
   }
   if (report.uncertainties.length > 0) {

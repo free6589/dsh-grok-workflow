@@ -7,6 +7,7 @@ import { apply } from '../src/index.js'
 import { REPORT_BEGIN, REPORT_END } from '../src/answer.js'
 import { execution, task, verification } from './fixtures.js'
 import { runWorkflowScript } from './helpers.js'
+import { ROUTING_RECORD } from '../src/records.js'
 
 /* ------------------------------------------------------------------ engine -- */
 
@@ -387,6 +388,54 @@ describe('mandatory entry gate', () => {
     expect(decision).toEqual({ kind: 'reject' })
     expect(retried).not.toHaveBeenCalled()
     await waitFor(() => ctx.engine.startCalls.length === 2)
+  })
+
+  it('refuses a message with no text instead of burning a workflow run', async () => {
+    const ctx = new FakeContext()
+    apply(ctx as never)
+    const agent = new FakeAgent({ session: Session.create('sess-empty' as never) })
+    const decision = await ctx.preStep()(payload(agent, [userMessage('   ')]), passingNext([]))
+    expect(decision).toEqual({ kind: 'reject' })
+    await waitFor(() => agent.followups.length === 1)
+    expect(textOf(agent.followups[0]!)).toContain('no text to route')
+    expect(ctx.engine.startCalls).toHaveLength(0)
+  })
+
+  it('fails loading when the hook is missing and the gate is required', () => {
+    const ctx = new FakeContext()
+    // A runtime that exposes everything except the pre-step registration hook.
+    const withoutHook = new Proxy(ctx, {
+      get: (target, property, receiver) => property === 'on' ? undefined : Reflect.get(target, property, receiver),
+    })
+    expect(() => apply(withoutHook as never, { gateRequired: true })).toThrow(/agent\/pre-step/)
+  })
+
+  it('writes a redacted routing ledger when a route switched during the run', async () => {
+    const ctx = new FakeContext()
+    apply(ctx as never, { roles: { worker: [{ model: 'good' }, { model: 'backup' }] } })
+    const session = Session.create('sess-routing' as never)
+    const agent = new FakeAgent({ session })
+    await ctx.preStep()(payload(agent, [userMessage('route me')]), passingNext([]))
+    await waitFor(() => ctx.engine.startCalls.length === 1)
+    const request = ctx.engine.startCalls[0]!
+    const result = await runWorkflowScript(request.script, request.args as Record<string, unknown>, async (_prompt, options) => {
+      if (options.label === 'grok-planner') return { tasks: [task('a')] }
+      if (options.label.startsWith('grok-worker')) {
+        // The first route fails with a rate limit; the chain must advance.
+        if (options.model === 'good') throw new Error('429 Too Many Requests')
+        return execution('work done')
+      }
+      return verification(task('a'))
+    })
+    ctx.engine.runs[0]!.complete(result.report)
+    await waitFor(() => agent.followups.length === 1)
+    const ledger = session.ownEvents()
+      .map(event => pluginRecordOf(event))
+      .filter(record => record !== undefined && record.type === ROUTING_RECORD)
+      .map(record => record!.data as { switches: { route: string; failureClass?: string }[] })
+      .at(-1)
+    expect(ledger?.switches[0]?.route).toBe('good')
+    expect(ledger?.switches[0]?.failureClass).toBe('rate-limit')
   })
 
   it('delivers the validated report as a relay message owned by the plugin', async () => {

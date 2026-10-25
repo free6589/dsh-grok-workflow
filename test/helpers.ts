@@ -6,9 +6,13 @@ export interface AgentCall {
   label: string
   phase?: string
   schema?: unknown
+  provider?: string
+  model?: string
 }
 
-export type ScriptAgent = (prompt: string, options: { label: string; phase?: string; schema?: unknown }) => Promise<unknown>
+export type ScriptAgentOptions = { label: string; phase?: string; schema?: unknown; provider?: string; model?: string }
+
+export type ScriptAgent = (prompt: string, options: ScriptAgentOptions) => Promise<unknown>
 
 export interface ScriptRun {
   report: WorkflowReport
@@ -25,7 +29,14 @@ export async function runWorkflowScript(
   const events: string[] = []
   const calls: AgentCall[] = []
   const wrapped: ScriptAgent = async (prompt, options) => {
-    calls.push({ prompt, label: options.label, ...options.phase === undefined ? {} : { phase: options.phase }, ...options.schema === undefined ? {} : { schema: options.schema } })
+    calls.push({
+      prompt,
+      label: options.label,
+      ...options.phase === undefined ? {} : { phase: options.phase },
+      ...options.schema === undefined ? {} : { schema: options.schema },
+      ...options.provider === undefined ? {} : { provider: options.provider },
+      ...options.model === undefined ? {} : { model: options.model },
+    })
     return agent(prompt, options)
   }
   const context = vm.createContext({

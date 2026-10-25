@@ -117,6 +117,7 @@ Paths are inside
 | E-33 | Inside `agent/request` on the **first** attempt the session log holds no evidence of the attempt (no `request/header`, no `assistant/attempt`), and `request/header` carries no turn field ⇒ a route cursor must be self-written and self-advanced | t19 H-3b | RUNTIME |
 | E-34 | Failures raised while preparing a request (e.g. `UNSUPPORTED_REASONING_EFFORT` at `dsh-llm/lib/index.js:2191`, `:2195`) escape the retry loop and never reach `agent/request-error` | SOURCE (`:1130-1146` dispatch condition) | SOURCE-CONFIRMED |
 | E-35 | An `enter` override does **not** lose the runtime-context: `step()` appends an unadmitted context message at the end of the batch | `dsh-agent-loop/lib/index.js:1066-1073` | SOURCE-CONFIRMED (corrects the t6 E-2 claim) |
+| E-37 | The guest `agent()` hook accepts per-child `provider`/`model` (`SUPPORTED_AGENT_OPTIONS`), passes them as `ChildStartRequest.provider/model` → subagent `agentOptions`; `effort`/`isolation`/`agentType` are **deferred** and throw `UNSUPPORTED_OPTION`, so per-role reasoning effort is not routable in v1 | `dsh-workflow-ptc/lib/index.js` guest `agent()` + host `startChild` | SOURCE-CONFIRMED; runtime-exercised through the contract harness (`test/engine-harness.ts`) |
 | E-36 | `inbox.claim(target,turn)` returns the whole `next-step` batch plus at most one `next-turn` message, and emits no `discarded` record, so a claimed message cannot be recovered | `dsh-agent-loop/lib/index.js:103-111` | SOURCE-CONFIRMED (G-17) |
 
 ---
@@ -330,6 +331,33 @@ guarantee explicitly downgraded.
 
 ### DD-5 — Ordered fallback (requirement C)
 
+**Status: implemented in phases 3–4** (`src/config.ts` chains, `src/script.ts` `callRole`,
+`src/records.ts` ledger). What shipped, precisely:
+
+- Config: `roles.{planner,worker,verifier,synthesizer}` = ordered `{provider?, model}` lists,
+  each ≤ `HARD_LIMITS.chainLength` (3), unique within a chain, non-empty ids ≤ 120 chars.
+  An empty chain means "inherit the run's route" (the schema default fills every role with
+  `[]`, so emptiness cannot be distinguished from "not configured"); the effective chains are
+  reported in `report.routing` and rendered in the answer, so an empty chain is visible
+  rather than silently assumed to work.
+- Selection rule (v1, one try per entry, inside the existing attempt loop):
+  **route failure → advance the chain** (`rate-limit`, `server-error`, `connection`,
+  `timeout`, `model-unavailable`, `format-error`, `agent-start-failed`);
+  **content failure → retry the same route** (`task-failed`, `verification-failed`),
+  because a different model would receive the same evidence;
+  **fatal → rethrow** (`AGENT_CAP`, `UNSUPPORTED_OPTION`, `INVALID_ARGUMENT`,
+  `UNSUPPORTED_SCHEMA`, `SCRIPT_PARSE`, `ITEM_CAP`), because those are setup or budget
+  faults that another model cannot fix.
+- Classification is a whitelist with a fail-closed default: an unrecognised failure is
+  reported as `unknown` and never becomes a success (R-14: prepare-phase failures never
+  reach `agent/request-error`, so the script is the only place that can see them).
+- Budget: `(retries+1) × (|worker|+|verifier|) ≤ HARD_LIMITS.maxAttemptsPerTask (6)` is
+  enforced at load, and `maxTotalAgents` is derived from the effective chains
+  (`routeBudgetFor` + `maxTotalAgentsFor`); without that, a run would abort mid-flight with
+  `AGENT_CAP` the first time a fallback route is used.
+- Records: one redacted `plugin:grok-workflow/routing` ledger per run (switches and
+  failures only, ≤ 64 entries, ≤ 200-char reasons).
+
 **v1 = script layer (L1).** `runTask` already owns a bounded retry loop and `agent()`
 already accepts `{provider,model}`, so the chain is a lookup keyed by attempt index. This
 keeps prepare-phase failures inside the script's own `try/catch`, needs no durable cursor,
@@ -451,12 +479,32 @@ recursion. F6 (listener totality) and F9 (teardown) are blocking preconditions f
 | OQ-018 | settings write-to-disk through a real Loader entry | **NOT_RUN** — nested path writes are source-confirmed only |
 | OQ-019 | is preset-scoped registration available in the target deployment | **OPEN (U-7)** — source-confirmed registry, not exercised |
 | OQ-020 | how is F6 (listener totality) proven | **OPEN** — needs an injected-throw test in the composed bundle |
+| OQ-021 | which message sources must the gate police | **OPEN (U-8)** — v1 covers `source.kind='user'` only; see the scope boundary in §D |
 
 **Closed hypotheses (t19):** H-1 **PASS** (`providerRetryPolicy` readable → `mode:'always'`
 self-check), H-2 **PASS** (`appendPluginRecord` has no runtime gate), H-3 **PASS** (scan cost
 linear; **H-3b**: the cursor must be self-written), H-4 **PASS** (`prepend` wins over mount
 order; without it our listener is never called), H-5 **config layer PASS / generic form
 FAIL**.
+
+---
+
+## §D Disposition of the t10 acceptance findings
+
+| # | finding | disposition |
+|---|---|---|
+| V-1 | an attachment-only message produced an empty objective and still burned a full run | **fixed**: an empty request is refused with an explicit `no text to route` notice and a `failed` delivery record (fail-closed, no bypass); test `refuses a message with no text instead of burning a workflow run` |
+| V-2 | a queue-full refusal does not return the claimed message | **behaviour kept** (G-17: `inbox.claim` is irreversible); wording corrected — it is an *explicit refusal with no automatic retry; the client may resend manually* |
+| V-3 | the gate only recognises `source.kind === 'user'` | **scope kept, documented** (below) and raised as **U-8** for the user to decide whether to widen it |
+| V-4 | `installGate` fails open with a warning when the runtime has no `agent/pre-step` | **documented + switch added**: `gateRequired` (default `false`) turns the silent degradation into a load-time error; test `fails loading when the hook is missing and the gate is required` |
+| V-5 | composed-bundle listeners (`session-controller:2516`, `goal-round-driver:311/346`) can decide before our `reject` | **known limitation** recorded; composed-bundle anti-bypass is its own item after phase 3–4 acceptance |
+
+**Gate scope boundary (V-3).** The gate polices `agent/pre-step` batches that carry at
+least one message whose `source.kind === 'user'`. Covered: CLI, Web GUI, headless (all
+produce `user`-kind messages). **Not covered by design**: `user-question-reply`,
+`team-message`, `webhook`, `schedule` and any other producer kind, subagent steps
+(`header.origin === 'subagent'` or `delegationDepth > 0`), tool continuations (empty batch),
+and sessions outside `gatePreset` when `gateScope === 'preset'`. Widening this is **U-8**.
 
 ---
 
@@ -471,6 +519,8 @@ not be cited as working:
 | NR-2 | relay fidelity over many samples | one exact-match sample (E-22) | relay wording is unverifiable by design; a sample of one is not a guarantee |
 | NR-3 | `(a')` correct write order (after the turn closed) | the race was measured (E-26), the fix was not | the degraded strategy's viability |
 | NR-4 | settings `update`/`replace`/`mutate` writing to disk through a real Loader entry | nested path ops are source-confirmed (E-32) | whether stage 2 can edit chains at all |
+| NR-5 | failure-text classification against **real** provider errors (429/5xx/connection/timeout/model-unavailable) | the whitelist is exercised against synthetic messages only (`test/routing.spec.ts`) | a real adapter may word an error so that it lands in `unknown`; `unknown` still switches routes but is reported as unclassified |
+| NR-6 | route switching with real children and real providers end to end | source-confirmed option plumbing (E-37) + simulated failures in the contract harness | whether a real provider/model combination actually starts and answers after a switch |
 
 ---
 

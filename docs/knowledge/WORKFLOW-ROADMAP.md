@@ -279,6 +279,24 @@ why the verdict stays "partially feasible" rather than "feasible".
   validated at load time against the model catalog.
 - Model IDs are validated against the configured catalog; nothing is assumed.
 
+**Implemented configuration (phase 3–4, `src/config.ts`):**
+
+```yaml
+roles:
+  planner:    [{ provider: anthropic, model: claude-sonnet-4 }, { model: claude-haiku-4 }]
+  worker:     [{ provider: anthropic, model: claude-sonnet-4 }]
+  verifier:   [{ provider: openai,    model: gpt-5 }]
+  synthesizer: []          # only with synthesis: model
+synthesis: deterministic   # deterministic | model
+maxRetries: 1
+```
+
+Rules enforced at load: chains ≤ 3 entries, ids ≤ 120 chars, no duplicate route inside a
+chain, an empty chain means "inherit the run's route" (reported as empty),
+`synthesis: model` requires a `synthesizer` chain and vice versa, and
+`(maxRetries+1) × (|worker|+|verifier|) ≤ 6` calls per task. Every rejection is a specific
+message, and each has a negative test in `test/routing.spec.ts`.
+
 ---
 
 ## 7. Fallback decisions (C)
@@ -358,6 +376,28 @@ harmless (the script catches them); when L2 is added it must be documented as "n
 routable at request level".
 
 ---
+
+
+### 8.1 Implemented classifier (phase 4, `src/script.ts`)
+
+v1 classifies every child failure **inside the script**, because prepare-phase errors never
+reach `agent/request-error` (E-34/R-14). The whitelist, in match order:
+
+| class | matches | action |
+|---|---|---|
+| `rate-limit` | `429`, `rate limit`, `too many requests`, `quota exceeded`, `resource_exhausted` | advance chain |
+| `server-error` | `5xx`, `internal server error`, `bad gateway`, `service unavailable`, `overloaded` | advance chain |
+| `connection` | `ECONNRESET`, `ECONNREFUSED`, `ENOTFOUND`, `EAI_AGAIN`, `socket hang up`, `network error`, `fetch failed` | advance chain |
+| `timeout` | `timed out`, `timeout`, `deadline exceeded`, `aborted` | advance chain |
+| `model-unavailable` | `unknown model`, `no adapter`, `NO_ADAPTER`, `model not found/available` | advance chain |
+| `format-error` | null structured result, `invalid json`, `schema mismatch`, `could not parse` | advance chain |
+| `agent-start-failed` | fatal `AGENT_START` | advance chain |
+| `task-failed` / `verification-failed` | executor reported failure / verifier verdict or criteria failed | retry the **same** route |
+| `budget-exhausted`, `unknown` | `AGENT_CAP`; anything unmatched | `budget-exhausted` is fatal; `unknown` advances and is reported unclassified |
+
+Fail-closed rules: a null structured result is never treated as success; an unmatched
+message is `unknown` (never "probably fine"); `AGENT_CAP` and configuration faults are
+re-thrown so a broken setup cannot be hidden by retrying.
 
 ## 9. Settings system (D)
 
@@ -548,14 +588,22 @@ script-level v1 fallback and the merged answer path.
 - **Phase 1 — exact-version audit — DONE** (t1–t5, t18, t19; capability matrix §13).
 - **Phase 2 — architecture and message lifecycle — DESIGN COMPLETE, awaits U-1/U-7.**
   Exit: answer strategy chosen by the user, gate scope chosen, F6/F9 addressed.
-- **Phase 3 — settings and configuration (moved earlier: it no longer depends on routing).**
+- **Phase 3 — settings and configuration — IMPLEMENTED (t11, together with Phase 4).**
+  Shipped: `roles.{planner,worker,verifier,synthesizer}` chains, `synthesis` switch,
+  `gateRequired`, plus load-time validation (empty chain, duplicate route, chain longer than
+  3, oversized ids, per-task budget overflow) each with a negative test.
+- **Phase 4 — role models and v1 script-level fallback — IMPLEMENTED (t11).**
+  Shipped: `callRole` in the generated script (one try per chain entry, inside the existing
+  attempt loop), the failure whitelist + fail-closed `unknown`, the advance-vs-retry rule,
+  the chain-derived `maxTotalAgents`, the redacted `plugin:grok-workflow/routing` ledger, and
+  22 tests in `test/routing.spec.ts`. Exit criteria met in simulation; real-provider switching
+  is NR-6.
+- **Phase 3 (old scope, superseded).**
   Schema, `volatile()` + `.get()` plumbing, load-time validation with negative tests.
   Exit: a YAML configuration can express roles/chains/limits and every invalid config is
   rejected with a specific message.
-- **Phase 4 — role models and v1 script-level fallback (B + C-L1).** Role chains passed to
-  the script, chain traversal in `runTask`, transport-vs-semantic separation, records.
-  Exit: forced-failure tests show the chain advancing and stopping correctly, and the
-  budget invariants hold.
+- **Phase 4 (old scope, superseded).** Role chains passed to the script, chain traversal in
+  `runTask`, transport-vs-semantic separation, records.
 - **Phase 5 — mandatory entry (A).** Gate + delivery under the chosen strategy and scope,
   including the F6 totality rule and the F9 precondition.
   Exit: Layer-5 anti-bypass assertions pass against the composed bundle; headless and
@@ -583,6 +631,7 @@ script-level v1 fallback and the merged answer path.
 | U-5 | accept strict-mode latency and cost for trivial messages | accept / lighter but not skippable | accept (already confirmed in R-001) |
 | U-6 | first-release settings surface | YAML only / YAML + GUI page | YAML only |
 | U-7 | enforcement scope | whole process (plugin row) / preset-scoped sessions | preset-scoped if available in the deployment, else whole process with a documented blast radius |
+| U-8 | which message sources the gate polices (t10 V-3) | `source.kind='user'` only (v1) / also `user-question-reply`, `team-message`, `webhook`, `schedule` | keep `user` only; the others are machine-produced and have no presenter to fail closed to |
 
 ---
 

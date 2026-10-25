@@ -8,9 +8,11 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
+import type { Session } from '@deepseek-ai/dsh-session'
 import type { WorkflowRun, WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
 import { buildWorkflowRequest } from './script.js'
 import { assertWorkflowReport, failureReport } from './report.js'
+import { recordRouting } from './records.js'
 import { redactDeep, redactError, redactSecrets } from './redact.js'
 import type { NormalizedTask, ResolvedConfig, WorkflowReport } from './types.js'
 
@@ -120,6 +122,15 @@ export interface RunOutcome {
  * the caller can classify (busy/unavailable); engine failures become an explicit
  * failure report so that no caller can silently answer without the workflow.
  */
+/** Read the session attached to an agent, when the runtime exposes one. */
+function sessionOfAgent(agent: Agent): Session | undefined {
+  try {
+    return (agent as unknown as { session?: Session }).session
+  } catch {
+    return undefined
+  }
+}
+
 export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutcome> {
   const { ctx, config, state, logger, agent, objective } = options
   if (state.disposed) throw new Error(`${workflowLabel(config)} is unavailable: plugin has been unloaded`)
@@ -190,7 +201,16 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
     }
     if (result.stopReason === 'completed') {
       try {
-        return { report: redactDeep(assertWorkflowReport(result.value, objective, config)), ok: true }
+        const report = redactDeep(assertWorkflowReport(result.value, objective, config))
+        // The ledger is plugin-owned state: the deterministic report is the truth,
+        // the record survives for diagnostics and for the next run's audit trail.
+        recordRouting(sessionOfAgent(agent), {
+          objective,
+          routing: report.routing,
+          synthesis: report.synthesis.mode,
+          routes: report.routes,
+        }, logger)
+        return { report, ok: true }
       } catch (error) {
         const detail = redactError(error)
         logger.warn(`report validation failed: ${detail}`)

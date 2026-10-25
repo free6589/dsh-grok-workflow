@@ -68,10 +68,5 @@ export interface RunOutcome {
     /** Failure cause for logs and record keeping, when `ok` is false. */
     cause?: string;
 }
-/**
- * Start one workflow run and resolve with a report. Throws only for conditions
- * the caller can classify (busy/unavailable); engine failures become an explicit
- * failure report so that no caller can silently answer without the workflow.
- */
 export declare function runWorkflow(options: RunWorkflowOptions): Promise<RunOutcome>;
 //# sourceMappingURL=run.d.ts.map

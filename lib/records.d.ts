@@ -10,6 +10,7 @@
 import type { Session } from '@deepseek-ai/dsh-session';
 import type { UserMessage } from '@deepseek-ai/dsh-llm';
 import type { WorkflowLogger } from './run.js';
+import type { RouteTrailEntry, RoleName, SynthesisMode } from './types.js';
 /** Record type owned by this plugin. */
 export declare const DELIVERY_RECORD = "plugin:grok-workflow/delivery";
 /** Phases a delivery passes through. */
@@ -30,8 +31,37 @@ export interface DeliveryRecord {
     /** Explicit outcome label for diagnostics (status or failure cause). */
     outcome: string;
 }
+/** Record type owned by this plugin: the model-route ledger of one run. */
+export declare const ROUTING_RECORD = "plugin:grok-workflow/routing";
+/**
+ * Payload stored for one run's routing ledger.
+ *
+ * Only *switches* and *failures* are kept (a successful first-route call is not
+ * a switch), every free-text field is redacted and bounded, and the whole entry
+ * list is capped so a long run cannot grow the record without limit.
+ */
+export interface RoutingRecord {
+    v: 1;
+    /** Run objective, redacted and bounded; correlates the ledger with a report. */
+    objective: string;
+    /** Effective chains at run time (`provider/model`, or empty for inherit). */
+    routing: Record<RoleName, string[]>;
+    synthesis: SynthesisMode;
+    /** One entry per route switch or failed call. */
+    switches: {
+        role: RoleName;
+        chainIndex: number;
+        route: string;
+        attempt: number;
+        outcome: 'ok' | 'failed';
+        failureClass?: string;
+        reason?: string;
+    }[];
+}
 declare module '@deepseek-ai/dsh-session' {
     interface PluginRecordMap {
+        /** The model-route ledger written after a workflow run. */
+        'plugin:grok-workflow/routing': RoutingRecord;
         'plugin:grok-workflow/delivery': DeliveryRecord;
     }
 }
@@ -62,4 +92,17 @@ export declare function alreadyRouted(session: Session | undefined, key: string)
  * still happens (the gate never answers by itself).
  */
 export declare function recordDelivery(session: Session | undefined, record: DeliveryRecord, logger: WorkflowLogger): void;
+/**
+ * Record the model-route ledger of one run.
+ *
+ * A run may switch routes many times, so the ledger is one plugin record (not
+ * one record per switch): bounded, redacted, and never allowed to throw into
+ * the caller that is delivering a workflow answer.
+ */
+export declare function recordRouting(session: Session | undefined, entry: {
+    objective: string;
+    routing: Record<RoleName, string[]>;
+    synthesis: SynthesisMode;
+    routes: readonly RouteTrailEntry[];
+}, logger?: WorkflowLogger): void;
 //# sourceMappingURL=records.d.ts.map
