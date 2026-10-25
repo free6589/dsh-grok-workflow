@@ -403,8 +403,9 @@ tests:
   `DSH_ENV_FILE` as a parsed `KEY=VALUE` credentials file, not a sourced
   environment file.
 - `npm run ci` — **PASS**, 6 files / 55 tests.
-- Live watcher restart: `NOT_RUN` at the time of this note; the long-running
-  watcher must be restarted to load the new script.
+- Live watcher restart: **PASS** at `08:54:06Z`; new PID `568469`, state
+  retained, `DSH_SESSION_ID`/profile overrides absent, first poll `no changes`.
+  The prior live wake (`WATCH_WAKE_OK`, status 0) used the previous script.
 
 ## Remaining gap
 

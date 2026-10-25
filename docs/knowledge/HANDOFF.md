@@ -21,11 +21,10 @@
   - `npx vitest run test/issue-watch.spec.ts` — PASS, 2 tests.
   - `npm run ci` — PASS, 6 files / 55 tests.
 - **Test results:** PASS.
-- **Local runtime verified:** watcher restart is pending; the prior live wake
-  (`WATCH_WAKE_OK`, status 0) used the previous script.
+- **Local runtime verified:** yes after restart at `08:54:06Z` (PID `568469`);
+  the previous live wake (`WATCH_WAKE_OK`, status 0) was on the prior script.
 - **Blockers:** none.
-- **Next action:** restart the watcher, verify it stays healthy, then cloud
-  review `61d63b4`.
+- **Next action:** cloud review `e26e297`; PR #16 needs separate README review.
 
 ## 2026-10-25 — Issue #14 credential redaction fix
 
