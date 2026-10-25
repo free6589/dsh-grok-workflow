@@ -283,6 +283,38 @@ describe('generated workflow script', () => {
     expect(report.status).toBe('completed')
   })
 
+  it('redacts database URL credentials and scoped tokens before verifier and retry prompts', async () => {
+    const password = ['FAKE_DB_', 'PASSWORD'].join('')
+    const gitlab = ['glpat-', 'FAKE_VALUE_FOR_REDACTION_TEST_ONLY'].join('')
+    const npm = ['npm_', 'FAKE_VALUE_FOR_REDACTION_TEST_ONLY'].join('')
+    const callerTasks = [task('a')]
+    let workerCalls = 0
+    let verifierCalls = 0
+    const agent: ScriptAgent = async (_prompt, options) => {
+      if (options.label.startsWith('grok-worker-')) {
+        workerCalls += 1
+        return workerCalls === 1
+          ? execution(`connect failed postgres://demo_user:${password}@example.test/app ${gitlab} ${npm}`)
+          : execution('clean retry')
+      }
+      if (options.label.startsWith('grok-verifier-')) {
+        verifierCalls += 1
+        return verifierCalls === 1 ? failingVerification(callerTasks[0]!, 'first failure') : verification(callerTasks[0]!)
+      }
+      throw new Error(`unexpected label ${options.label}`)
+    }
+    const { report, calls } = await runWorkflowScript(WORKFLOW_SCRIPT, args(callerTasks), agent)
+    const firstVerifier = calls.find(call => call.label === 'grok-verifier-a-a1')!
+    const retryWorker = calls.find(call => call.label === 'grok-worker-a-a2')!
+    for (const prompt of [firstVerifier.prompt, retryWorker.prompt]) {
+      expect(prompt).not.toContain(password)
+      expect(prompt).not.toContain(gitlab)
+      expect(prompt).not.toContain(npm)
+      expect(prompt).toContain('[REDACTED]@')
+    }
+    expect(report.status).toBe('completed')
+  })
+
   it('redacts worker exceptions before the retry prompt', async () => {
     const secret = ['sk', 'proj', 'FAKEEXAMPLE1234567890'].join('-')
     const callerTasks = [task('a')]

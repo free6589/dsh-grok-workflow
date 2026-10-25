@@ -63,6 +63,36 @@ describe('credential redaction', () => {
     expect(output.match(/\[REDACTED/g)?.length).toBeGreaterThanOrEqual(4)
   })
 
+  it('redacts userinfo in non-HTTP URIs without touching ordinary text', () => {
+    const password = fake('FAKE_DB_', 'PASSWORD')
+    const input = [
+      `postgres://demo_user:${password}@example.test:5432/app`,
+      `mongodb+srv://demo_user:${password}@example.test/app`,
+      `redis://demo_user:${password}@example.test:6379/0`,
+      `redis://:${password}@example.test:6379/1`,
+      'Connect to example.test:5432 with user demo_user.',
+      'The password policy has 12 characters.',
+    ].join('\n')
+    const output = redactSecrets(input)
+    expect(output).not.toContain(password)
+    expect(output).toContain('postgres://[REDACTED]@example.test:5432/app')
+    expect(output).toContain('mongodb+srv://[REDACTED]@example.test/app')
+    expect(output).toContain('redis://[REDACTED]@example.test:6379/0')
+    expect(output).toContain('redis://[REDACTED]@example.test:6379/1')
+    expect(output).toContain('Connect to example.test:5432 with user demo_user.')
+    expect(output).toContain('The password policy has 12 characters.')
+  })
+
+  it('redacts GitLab and npm token prefixes', () => {
+    const gitlab = fake('glpat-', 'FAKE_VALUE_FOR_REDACTION_TEST_ONLY')
+    const npm = fake('npm_', 'FAKE_VALUE_FOR_REDACTION_TEST_ONLY')
+    const output = redactSecrets(`failed with ${gitlab} and ${npm}`)
+    expect(output).not.toContain(gitlab)
+    expect(output).not.toContain(npm)
+    expect(output).toContain('[REDACTED GITLAB TOKEN]')
+    expect(output).toContain('[REDACTED NPM TOKEN]')
+  })
+
   it('does not redact ordinary words or numbers', () => {
     const input = 'The password policy has 12 characters; tokenization is not a token. maxRetries = 1.'
     expect(redactSecrets(input)).toBe(input)
@@ -81,6 +111,23 @@ describe('credential redaction', () => {
     expect((output.nested[1] as { note: string }).note).toContain('[REDACTED]')
     expect(output.stripe).not.toContain(stripe)
     expect(source.message).toContain('sk-proj-')
+  })
+
+  it('redacts database URLs and scoped tokens recursively', () => {
+    const password = fake('FAKE_DB_', 'PASSWORD')
+    const gitlab = fake('glpat-', 'FAKE_VALUE_FOR_REDACTION_TEST_ONLY')
+    const npm = fake('npm_', 'FAKE_VALUE_FOR_REDACTION_TEST_ONLY')
+    const source = {
+      message: `connect failed: postgres://demo_user:${password}@example.test:5432/app`,
+      tokens: [gitlab, { value: npm }],
+    }
+    const output = redactDeep(source)
+    expect(output.message).not.toContain(password)
+    expect(output.message).toContain('postgres://[REDACTED]@example.test:5432/app')
+    expect(output.tokens[0]).toContain('[REDACTED GITLAB TOKEN]')
+    expect((output.tokens[1] as { value: string }).value).toContain('[REDACTED NPM TOKEN]')
+    expect(output.tokens.join(' ')).not.toContain('glpat-')
+    expect(source.message).toContain(password)
   })
 
   it('renders errors without leaking secrets', () => {
