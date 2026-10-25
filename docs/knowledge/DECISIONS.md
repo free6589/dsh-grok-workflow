@@ -110,3 +110,14 @@ Each entry records the decision, evidence, alternatives, and status.
 - **Consequences:** The canonical report can be `partial` with
   `verifiedCount === tasks.length` only for a fallback plan; every other
   all-verified `partial` report remains invalid.
+
+
+## D-008 — Publish version-tagged GitHub Releases with preflight checks
+
+- **Status:** PROPOSED (pending PR review)
+- **Date:** 2026-10-25
+- **Decision:** Release only from a version tag `vMAJOR.MINOR.PATCH` after the matching release commit has been merged to `main` and CI passes. Use one bilingual changelog and keep `package.json` and `package-lock.json` in sync.
+- **Preflight:** Release Actions checks the tag/package version match, requires a changelog section for that version, runs typecheck/lint/build/tests, checks committed `lib/` artifacts, and validates the package file list before attaching an npm-format tarball to a GitHub Release.
+- **Reason:** The project currently has Git commits and CI but no GitHub Releases, so end users have no named, easy-to-install release version or curated release notes.
+- **Alternatives rejected:** Release every development commit automatically (exposes intermediate states); publish to npm (not the project's current distribution model).
+- **Consequences:** A published tag must never be moved or overwritten. GitHub Release/version history is not an independent backup mirror.

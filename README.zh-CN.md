@@ -145,6 +145,16 @@ dsh plugin --profile grok-workflow-dev remove dsh-grok-workflow
 - **想了解技术设计：** 查看[架构说明](docs/ARCHITECTURE.md)和[验收清单](docs/ACCEPTANCE.md)。
 - **发现 Bug：** [提交 Issue](https://github.com/free6589/dsh-grok-workflow/issues)。
 
+## 版本与更新日志
+
+当前仓库的 package 版本号是 `0.1.0`。代码提交不会自动变成正式版本。GitHub 上存在对应 Release 和标签后，可以通过标签固定安装版本或回退，例如：
+
+```sh
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.1.0
+```
+
+请只使用 GitHub 上真实存在的版本标签。首个 `v0.1.0` 标签会在发布流程合并、主分支检查通过后创建；在此之前，请继续使用上面的未固定版本安装命令。版本规则和回退步骤见[更新日志](CHANGELOG.md)与[版本发布指南](docs/RELEASING.md)。
+
 ## 测试与开发
 
 克隆仓库后执行：
@@ -181,6 +191,8 @@ npm run ci
 - [架构说明](docs/ARCHITECTURE.md)
 - [验收清单](docs/ACCEPTANCE.md)
 - [Issue 监控脚本（可选）](docs/ISSUE-WATCHER.md)
+- [更新日志](CHANGELOG.md)
+- [版本管理与发布指南](docs/RELEASING.md)
 - [项目状态与交接记录](docs/knowledge/STATE.md)
 
 ## 许可证

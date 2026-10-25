@@ -1,0 +1,98 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to validate and release (for example v0.1.0)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Validate and publish ${{ inputs.tag || github.ref_name }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the version tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Verify committed build artifacts
+        run: git diff --exit-code -- lib/
+
+      - name: Test
+        run: npm test
+
+      - name: Check package file list
+        run: npm pack --dry-run
+
+      - name: Verify tag, package version, and changelog; prepare release notes
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "Expected a semantic version tag like v0.1.0; got: $RELEASE_TAG" >&2
+            exit 1
+          fi
+          version="${RELEASE_TAG#v}"
+          package_version="$(node -p "require('./package.json').version")"
+          if [[ "$package_version" != "$version" ]]; then
+            echo "Tag $RELEASE_TAG does not match package.json version $package_version" >&2
+            exit 1
+          fi
+          VERSION="$version" node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs'
+          const version = process.env.VERSION
+          const changelog = readFileSync('CHANGELOG.md', 'utf8').split(/\r?\n/)
+          const escaped = version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+          const start = changelog.findIndex(line => new RegExp('^## \\[' + escaped + '\\](?:\\s+-.*)?$').test(line))
+          if (start < 0) throw new Error('CHANGELOG.md is missing a section for [' + version + ']')
+          let end = start + 1
+          while (end < changelog.length && !/^## \\[/.test(changelog[end])) end++
+          const section = changelog.slice(start, end).join('\n').trim()
+          if (section.split('\n').length < 4) throw new Error('The changelog section for [' + version + '] is empty')
+          writeFileSync('release-notes.md', section + '\n')
+          NODE
+
+      - name: Package release artifact
+        run: |
+          mkdir -p release-assets
+          npm pack --pack-destination release-assets
+          test "$(find release-assets -maxdepth 1 -type f -name '*.tgz' | wc -l)" -eq 1
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: gh release create "$RELEASE_TAG" --verify-tag --title "Grok Workflow for DSH $RELEASE_TAG" --notes-file release-notes.md --latest release-assets/*.tgz
