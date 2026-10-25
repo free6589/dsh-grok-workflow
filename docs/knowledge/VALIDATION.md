@@ -23,18 +23,6 @@ Real commands and results only. Do not add expected results here.
 | GitHub auth | `gh auth status` | PASS | account `free6589`, `repo` scope |
 | DSH version | `dsh --version` | PASS | `0.2.1-rc.2` |
 
-## Plugin tests
-
-Not run yet.
-
-## Real DSH installation
-
-Not run yet.
-
-## GitHub Actions
-
-Not run yet.
-
 ## Implementation validation — 2026-10-25
 
 ### Deterministic test suite
@@ -49,15 +37,17 @@ Result: **PASS**
 
 - `npm run typecheck`: PASS.
 - `npm run lint`: PASS, 0 warnings/0 errors (`oxlint` over 14 files).
-- `npm test`: PASS, 5 test files, 29 tests.
-  - `test/orchestrator.spec.ts`: 9 tests (planner, caller plan, parallel pool,
-    partial, failed, evidence rejection, retry bound, fallback, exact criteria).
-  - `test/plugin-lifecycle.spec.ts`: 7 tests (registration, invalid input,
-    max active runs, unload cancellation/disposal, deadline report).
+- `npm test`: PASS, 5 test files, 35 tests.
+  - `test/orchestrator.spec.ts`: 10 tests (planner, caller plan, parallel pool,
+    partial, failed, evidence rejection, retry bound, fallback, oversized
+    planner rejection, exact criteria).
+  - `test/plugin-lifecycle.spec.ts`: 9 tests (registration, invalid input,
+    startup rejection timer cleanup, startup-unload cleanup, max active runs,
+    unload cancellation/disposal, deadline report).
   - `test/loader.spec.ts`: 2 tests (real DSH Loader + real tool registry;
     disabled row inertness; registration/unregistration and prompt section).
-  - `test/input.spec.ts`: 6 tests.
-  - `test/redact.spec.ts`: 5 tests.
+  - `test/input.spec.ts`: 8 tests, including exact-bound and over-bound input.
+  - `test/redact.spec.ts`: 6 tests, including compound environment names.
 
 Toolchain: Node `v26.8.1`, Vitest `4.1.12`, TypeScript `6.x`, DSH packages
 `0.2.1-rc.2`, real `@deepseek-ai/cordis-plugin-loader` `1.0.6`.
@@ -70,7 +60,7 @@ Command:
 npm --cache /tmp/npm-cache-dshgw pack --dry-run
 ```
 
-Result: **PASS**. Tarball `dsh-grok-workflow-0.1.0.tgz`, 27 files, about 37 kB packed
+Result: **PASS**. Tarball `dsh-grok-workflow-0.1.0.tgz`, 27 files, about 38 kB packed
 (later docs additions changed the size), includes `lib/index.js`, declarations, `cordis.patch.yml`, README,
 LICENSE, and docs.
 
@@ -128,13 +118,6 @@ Result: **PASS**.
 - Final assistant text reported `COMPLETED` with both task statuses verified.
 - The audit trail (`--json`) is retained locally under `.dsh-home/` (ignored by Git).
 
-## Pending real-runtime checks
-
-- Real parallel timing run: see next update.
-- Real partial/failure status path through a model: not run; deterministic tests
-  cover the status logic.
-- GitHub Actions: not run yet.
-
 ### Real end-to-end grok_workflow run (parallel timing, completed)
 
 Command: same profile/model override as above, with two caller tasks that each
@@ -167,12 +150,6 @@ correctly rejected by the independent verifier:
 
 This is evidence that a worker's claim does not become success when the
 verifier cannot support it, and that partial results remain explicit.
-
-### Remaining real-runtime gaps
-
-- Planner-only real-model run: `NOT_RUN`.
-- Real DSH cancellation/deadline path: `NOT_RUN` (unit/lifecycle tests pass).
-- Remote GitHub Actions: `NOT_RUN`.
 
 ### Real end-to-end grok_workflow run (planner, completed)
 
@@ -255,3 +232,36 @@ Result: **PASS**.
   observed after the call.
 
 This is a live DSH cancellation/deadline path, not only a mocked unit test.
+
+## Review boundary fixes (2026-10-25)
+
+Independent review found five gaps; fixes were implemented and retested:
+
+- Caller acceptance criteria now reject more than 20 items or more than 1,000
+  characters per item instead of being silently truncated. The same bounds are
+  enforced when normalizing planner output.
+- Credential redaction now matches compound environment names such as
+  `OPENAI_API_KEY`, `GITHUB_TOKEN`, and `DATABASE_PASSWORD`.
+- The deadline timer is cleared in an outer `finally`, including when
+  `workflowEngine.start()` rejects; a fake-timer test asserts zero pending
+  timers after startup rejection.
+- Obsolete pending/not-run sections were removed from this validation log.
+- `engines.dsh` is now the exact `0.2.1-rc.2`, matching the exact DSH peer
+  dependency set.
+
+### Post-fix real DSH revalidation
+
+- Reinstalled the local bundle into the isolated `grok-workflow-dev` profile
+  with the exact engine declaration; `--dump-config` still shows the
+  `grok-workflow` row. **PASS**.
+- Clean one-task caller workflow returned `COMPLETED`, plan `caller`, 1/1
+  verified; `.dsh-home/fix-e2e/check.txt` was a 6-byte regular file containing
+  exactly `FIX_OK`. **PASS**.
+- Re-ran the 2-second deadline against a 30-second worker: `FAILED` with
+  `Timeout: workflow exceeded the 2000 ms deadline and was cancelled`; no
+  leftover child process. **PASS**.
+
+## Remaining gap
+
+- Clean-DSH-profile installation is executed locally; CI has not yet added a
+  separate clean-profile install job.

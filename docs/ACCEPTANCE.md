@@ -17,7 +17,7 @@ Legend: PASS = actually executed and observed; FAIL = executed and failed;
 | F8 | Cancellation cleans up child tasks and resources | PASS | Plugin unload and max-active-run tests assert `cancel` and `dispose`; a real DSH deadline run returned `FAILED` with `Timeout` and left no child process. |
 | F9 | Plugin unload releases listeners and registrations | PASS | Real Loader test disposes the plugin fiber and asserts the tool and prompt section disappear. |
 | F10 | Ordinary DSH behavior is unaffected when the plugin is disabled | PASS | Real Loader test with `disabled: true` asserts no tool and no prompt section. |
-| F11 | Credential redaction test passes | PASS | 5 redaction tests pass. |
+| F11 | Credential redaction test passes | PASS | 6 redaction tests pass. |
 
 ## Test acceptance
 
@@ -39,7 +39,7 @@ Legend: PASS = actually executed and observed; FAIL = executed and failed;
 |---|---|---|---|
 | Q1 | Typecheck passes | PASS | `npm run typecheck`. |
 | Q2 | Lint passes | PASS | `npm run lint`, 0 warnings/errors. |
-| Q3 | Unit tests pass | PASS | `npm test`, 29 tests. |
+| Q3 | Unit tests pass | PASS | `npm test`, 35 tests. |
 | Q4 | Build passes | PASS | `npm run build`; package contents inspected. |
 | Q5 | Applicable GitHub Actions checks pass | PASS | GitHub Actions runs `40168892831`, `40169133016`, `40169816856`, `40169885633`, and `40170034851` passed on Node 22 and Node 24. |
 | Q6 | README and test commands match implementation | PASS | README commands and documented defaults match source/tests. |

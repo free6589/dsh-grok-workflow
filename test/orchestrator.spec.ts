@@ -190,6 +190,24 @@ describe('generated workflow script', () => {
     expect(report.errors.some(error => error.phase === 'Plan')).toBe(true)
   })
 
+  it('rejects an oversized planner task instead of truncating its criteria', async () => {
+    const bad = task('a')
+    bad.acceptanceCriteria = Array.from({ length: 21 }, (_, index) => `criterion ${index}`)
+    const agent: ScriptAgent = async (_prompt, options) => {
+      if (options.label === 'grok-planner') return { tasks: [bad] }
+      if (options.label === 'grok-worker-task-1-a1') return execution('fallback completed')
+      if (options.label === 'grok-verifier-task-1-a1') {
+        return verification(task('task-1', ['The expected output is completed and supported by concrete evidence']))
+      }
+      throw new Error(`unexpected label ${options.label}`)
+    }
+    const { report } = await runWorkflowScript(WORKFLOW_SCRIPT, args(null), agent)
+    expect(report.plan.source).toBe('fallback')
+    expect(report.plan.error).toContain('planner returned no valid plan')
+    expect(report.tasks).toHaveLength(1)
+    expect(report.tasks[0]!.acceptanceCriteria).toEqual(['The expected output is completed and supported by concrete evidence'])
+  })
+
   it('reports failed when no task can be verified', async () => {
     const callerTasks = [task('a'), task('b')]
     const agent: ScriptAgent = async (_prompt, options) => {

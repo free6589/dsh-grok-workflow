@@ -30,7 +30,7 @@
     "verification"
   ],
   "engines": {
-    "dsh": ">=0.2.1-rc.2 <0.3.0",
+    "dsh": "0.2.1-rc.2",
     "node": ">=22"
   },
   "dsh": {

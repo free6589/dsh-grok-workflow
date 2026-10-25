@@ -175,28 +175,29 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
       state.pending += 1
       let run: WorkflowRun | undefined
       try {
-        const start: WorkflowStartRequest = {
-          script: request.script,
-          meta: request.meta,
-          args: request.args,
-          parent: exec.agent,
-          signal,
-          maxTotalAgents: request.maxTotalAgents,
-          ...config.subagentProvider === undefined ? {} : { subagentProvider: config.subagentProvider },
+        try {
+          const start: WorkflowStartRequest = {
+            script: request.script,
+            meta: request.meta,
+            args: request.args,
+            parent: exec.agent,
+            signal,
+            maxTotalAgents: request.maxTotalAgents,
+            ...config.subagentProvider === undefined ? {} : { subagentProvider: config.subagentProvider },
+          }
+          run = await ctx.workflowEngine.start(start)
+          if (state.disposed) {
+            run.cancel('grok-workflow plugin unloaded')
+            throw new Error(`${config.toolName} cancelled: plugin unloaded`)
+          }
+          state.runs.add(run)
+        } finally {
+          state.pending -= 1
         }
-        run = await ctx.workflowEngine.start(start)
-        if (state.disposed) {
-          run.cancel('grok-workflow plugin unloaded')
-          await run.dispose()
-          throw new Error(`${config.toolName} cancelled: plugin unloaded`)
-        }
-        state.runs.add(run)
-      } finally {
-        state.pending -= 1
-      }
 
-      try {
-        const result = await run.result
+        const activeRun = run
+        if (activeRun === undefined) throw new Error('workflow engine did not return a run')
+        const result = await activeRun.result
         if (result.stopReason === 'completed') {
           assertWorkflowReport(result.value, objective, config)
           return redactDeep(result.value as WorkflowReport) as never
@@ -215,11 +216,13 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
         throw new Error(redactSecrets(`${config.toolName} engine error: ${result.error ?? 'unknown workflow failure'}`))
       } finally {
         clearTimeout(timer)
-        state.runs.delete(run)
-        try {
-          await run.dispose()
-        } catch (error) {
-          logger.warn(`run disposal failed: ${redactError(error)}`)
+        if (run !== undefined) {
+          state.runs.delete(run)
+          try {
+            await run.dispose()
+          } catch (error) {
+            logger.warn(`run disposal failed: ${redactError(error)}`)
+          }
         }
       }
     },

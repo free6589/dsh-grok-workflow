@@ -38,6 +38,14 @@ describe('credential redaction', () => {
     expect(output).not.toContain('MIIEvQIBADANBg')
   })
 
+  it('redacts compound environment-variable assignments', () => {
+    const output = redactSecrets(
+      'OPENAI_API_KEY=custom-secret GITHUB_TOKEN=custom-secret DATABASE_PASSWORD=custom-secret',
+    )
+    expect(output).not.toContain('custom-secret')
+    expect(output.match(/\[REDACTED\]/g)).toHaveLength(3)
+  })
+
   it('does not redact ordinary words or numbers', () => {
     const input = 'The password policy has 12 characters; tokenization is not a token. maxRetries = 1.'
     expect(redactSecrets(input)).toBe(input)

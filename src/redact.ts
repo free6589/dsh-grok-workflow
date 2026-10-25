@@ -12,7 +12,7 @@ const AWS_ACCESS_KEY = /\bAKIA[0-9A-Z]{16}\b/g
 const GOOGLE_API_KEY = /\bAIza[0-9A-Za-z_-]{30,}\b/g
 const BEARER = /\b(Bearer\s+)[A-Za-z0-9._~+/=-]{12,}/gi
 const URL_SECRET = /([?&](?:token|key|secret|password|passwd|api[_-]?key|apikey|access[_-]?token)=)[^&#\s]+/gi
-const KEY_VALUE = /\b(api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret|token|secret|password|passwd)\b(\s*[:=]\s*)(?:"[^"\n]*"|'[^'\n]*'|[^\s,;]+)/gi
+const KEY_VALUE = /(?<![A-Za-z0-9])(api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret|token|secret|password|passwd)(\s*[:=]\s*)(?:"[^"\n]*"|'[^'\n]*'|[^\s,;]+)/gi
 const URL_USERINFO = /(\bhttps?:\/\/)[^\s/@]+:[^\s/@]+@/gi
 
 /** Replace known credential shapes in arbitrary text. */

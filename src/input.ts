@@ -8,36 +8,66 @@ export class GrokWorkflowInputError extends Error {
   }
 }
 
+/**
+ * Bounds mirrored by the generated workflow. Caller input is rejected when it
+ * exceeds them; the script never silently shortens a caller requirement.
+ */
+export const TASK_LIMITS = {
+  titleChars: 160,
+  taskTextChars: 4_000,
+  criteriaItems: 20,
+  criteriaChars: 1_000,
+  constraintItems: 20,
+  constraintChars: 1_000,
+} as const
+
 const TASK_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/
 
-/** Trim a string and reject a non-string or empty value. */
-function requiredText(value: unknown, field: string): string {
+/** Trim a string and reject a non-string, empty, or overlong value. */
+function requiredText(value: unknown, field: string, maxChars: number): string {
   if (typeof value !== 'string' || value.trim() === '') {
     throw new GrokWorkflowInputError(`${field} must be a non-empty string`)
   }
-  return value.trim()
+  const trimmed = value.trim()
+  if (trimmed.length > maxChars) {
+    throw new GrokWorkflowInputError(`${field} must be at most ${maxChars} characters`)
+  }
+  return trimmed
 }
 
 /** Trim an optional string field; an explicitly empty string is allowed. */
-function stringField(value: unknown, field: string): string {
+function stringField(value: unknown, field: string, maxChars: number): string {
   if (typeof value !== 'string') {
     throw new GrokWorkflowInputError(`${field} must be a string`)
   }
-  return value.trim()
+  const trimmed = value.trim()
+  if (trimmed.length > maxChars) {
+    throw new GrokWorkflowInputError(`${field} must be at most ${maxChars} characters`)
+  }
+  return trimmed
 }
 
-/** Normalize a string list, dropping blank entries. */
-function stringList(value: unknown, field: string): string[] {
+/** Normalize a bounded string list, dropping blank entries. */
+function stringList(value: unknown, field: string, maxItems: number, maxChars: number): string[] {
   if (!Array.isArray(value) || value.some(item => typeof item !== 'string')) {
     throw new GrokWorkflowInputError(`${field} must be an array of strings`)
   }
-  return value.map(item => item.trim()).filter(Boolean)
+  if (value.length > maxItems) {
+    throw new GrokWorkflowInputError(`${field} must contain at most ${maxItems} items`)
+  }
+  return value.map((item, index) => {
+    const trimmed = item.trim()
+    if (trimmed.length > maxChars) {
+      throw new GrokWorkflowInputError(`${field}[${index}] must be at most ${maxChars} characters`)
+    }
+    return trimmed
+  }).filter(Boolean)
 }
 
 /**
  * Validate and normalize caller-supplied tasks before starting a workflow.
  * Caller tasks are explicit input: invalid input rejects instead of silently
- * degrading to a one-task fallback.
+ * degrading to a one-task fallback or shortening a requirement.
  */
 export function normalizeCallerTasks(tasks: readonly TaskInput[] | undefined, maxTasks: number): NormalizedTask[] | undefined {
   if (tasks === undefined) return undefined
@@ -57,26 +87,36 @@ export function normalizeCallerTasks(tasks: readonly TaskInput[] | undefined, ma
     }
     const id = task.id === undefined
       ? `task-${index + 1}`
-      : requiredText(task.id, `tasks[${index}].id`)
+      : requiredText(task.id, `tasks[${index}].id`, 64)
     if (!TASK_ID.test(id)) {
       throw new GrokWorkflowInputError(`tasks[${index}].id must match ${TASK_ID.source}`)
     }
     if (ids.has(id)) throw new GrokWorkflowInputError(`duplicate task id "${id}"`)
     ids.add(id)
-    const criteria = stringList(task.acceptanceCriteria, `tasks[${index}].acceptanceCriteria`)
+    const criteria = stringList(
+      task.acceptanceCriteria,
+      `tasks[${index}].acceptanceCriteria`,
+      TASK_LIMITS.criteriaItems,
+      TASK_LIMITS.criteriaChars,
+    )
     if (criteria.length === 0) {
       throw new GrokWorkflowInputError(`tasks[${index}].acceptanceCriteria must contain at least one non-empty item`)
     }
     const constraints = task.constraints === undefined
       ? []
-      : stringList(task.constraints, `tasks[${index}].constraints`)
+      : stringList(
+        task.constraints,
+        `tasks[${index}].constraints`,
+        TASK_LIMITS.constraintItems,
+        TASK_LIMITS.constraintChars,
+      )
     return {
       id,
-      title: requiredText(task.title, `tasks[${index}].title`),
-      objective: requiredText(task.objective, `tasks[${index}].objective`),
-      expectedOutput: requiredText(task.expectedOutput, `tasks[${index}].expectedOutput`),
+      title: requiredText(task.title, `tasks[${index}].title`, TASK_LIMITS.titleChars),
+      objective: requiredText(task.objective, `tasks[${index}].objective`, TASK_LIMITS.taskTextChars),
+      expectedOutput: requiredText(task.expectedOutput, `tasks[${index}].expectedOutput`, TASK_LIMITS.taskTextChars),
       acceptanceCriteria: criteria,
-      context: task.context === undefined ? '' : stringField(task.context, `tasks[${index}].context`),
+      context: task.context === undefined ? '' : stringField(task.context, `tasks[${index}].context`, TASK_LIMITS.taskTextChars),
       constraints,
     }
   })

@@ -101,12 +101,13 @@ Source: `/home/fish/dsh-tasks/grok-build`
 
 ## Open questions / not verified
 
-- HYPOTHESIS: `engines.dsh: ">=0.2.1-rc.2 <0.3.0"` will satisfy DSH's own
-  SemVer evaluator for the installed prerelease. Must verify by actual install.
-- NOT_VERIFIED: headless profile with a Bifrost model route can run a real
-  end-to-end `grok_workflow` call on this host. Must test without logging keys.
-- NOT_VERIFIED: GitHub Actions runner can install DSH `0.2.1-rc.2` packages
-  from the public npm registry. Must verify in CI.
+- CONFIRMED: `engines.dsh: "0.2.1-rc.2"` (exact, matching the exact DSH peer
+  dependency set) installs successfully in the isolated local profile and from
+  GitHub.
+- CONFIRMED: a headless profile with a Bifrost model route ran real end-to-end
+  `grok_workflow` calls on this host without logging keys.
+- CONFIRMED: GitHub Actions installed DSH `0.2.1-rc.2` packages from the public
+  npm registry and passed on Node 22 and Node 24.
 
 ## Grok Build deep-research specifics (CONFIRMED, detailed)
 

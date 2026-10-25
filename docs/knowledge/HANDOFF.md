@@ -12,7 +12,7 @@
   - Added deterministic and real-Loader tests.
   - Updated `STATE.md`, `VALIDATION.md`, `ACCEPTANCE.md`, `RESEARCH.md`.
 - **Tests run:**
-  - `npm run ci` — typecheck, lint, 29 tests pass.
+  - `npm run ci` — typecheck, lint, 35 tests pass.
   - `npm run test:loader` — 2 real Loader tests pass.
   - `npm pack --dry-run` — package contents verified.
   - Real DSH install from local checkout and from GitHub; `--dump-config`

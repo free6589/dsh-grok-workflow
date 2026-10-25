@@ -14,9 +14,13 @@ class FakeEngine {
   readonly startCalls: WorkflowStartRequest[] = []
   readonly runs: FakeRun[] = []
   autoRun = false
+  startError: Error | undefined
+  startGate: Promise<void> | undefined
 
   async start(request: WorkflowStartRequest): Promise<FakeRun> {
     this.startCalls.push(request)
+    if (this.startError) throw this.startError
+    if (this.startGate) await this.startGate
     const run = new FakeRun(request)
     this.runs.push(run)
     request.signal?.addEventListener('abort', () => { run.cancel('signal aborted') }, { once: true })
@@ -130,6 +134,21 @@ describe('plugin lifecycle and tool boundary', () => {
     expect(ctx.engine.startCalls).toHaveLength(0)
   })
 
+  it('clears the deadline timer when workflow startup rejects', async () => {
+    const ctx = new FakeContext()
+    apply(ctx as never, { timeoutMs: 5000 })
+    ctx.engine.startError = new Error('start failed')
+    vi.useFakeTimers()
+    try {
+      await expect(ctx.tool!.execute({ objective: 'startup failure' }, exec())).rejects.toThrow(/start failed/)
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
+    expect(ctx.engine.startCalls).toHaveLength(1)
+    await ctx.dispose()
+  })
+
   it('enforces maxActiveRuns', async () => {
     const ctx = new FakeContext()
     apply(ctx as never, { maxActiveRuns: 1 })
@@ -138,6 +157,21 @@ describe('plugin lifecycle and tool boundary', () => {
     await expect(ctx.tool!.execute({ objective: 'second' }, exec())).rejects.toThrow(/maxActiveRuns/)
     await ctx.dispose()
     await expect(first).rejects.toThrow(/cancelled/)
+  })
+
+  it('cancels a run that arrives after plugin unload during startup', async () => {
+    const ctx = new FakeContext()
+    apply(ctx as never)
+    let release!: () => void
+    ctx.engine.startGate = new Promise(resolve => { release = resolve })
+    const pending = ctx.tool!.execute({ objective: 'startup then unload' }, exec())
+    await vi.waitFor(() => expect(ctx.engine.startCalls).toHaveLength(1))
+    await ctx.dispose()
+    release()
+    await expect(pending).rejects.toThrow(/plugin unloaded|cancelled/)
+    const run = ctx.engine.runs[0]!
+    expect(run.cancel).toHaveBeenCalled()
+    expect(run.dispose).toHaveBeenCalled()
   })
 
   it('cancels and disposes active runs during plugin unload', async () => {

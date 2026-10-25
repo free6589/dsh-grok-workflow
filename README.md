@@ -21,7 +21,7 @@ The implementation is intentionally small at the harness boundary: the workflow 
 
 | Component | Requirement |
 |---|---|
-| DSH | `0.2.1-rc.2` verified; package declares `>=0.2.1-rc.2 <0.3.0` |
+| DSH | `0.2.1-rc.2` exact; package declares the same exact version |
 | Node.js | 22 or newer (verified locally with 26.8.1) |
 | DSH composition | A bundle that provides `workflow-ptc`, `subagent`, and a subagent provider (`spawn` is the default) |
 | Model | Any DSH model route; child agents inherit the deployment/parent route |
@@ -243,8 +243,9 @@ performed locally and recorded in `docs/knowledge/VALIDATION.md`.
 - Verification is independent-agent plus evidence validation, not a formal
   proof of correctness.
 - No custom Web UI panel; the tool uses DSH's generic tool card.
-- The plugin has only been verified against DSH `0.2.1-rc.2`. Other versions in
-  the declared range are untested.
+- The plugin has only been verified against DSH `0.2.1-rc.2`; `engines.dsh`
+  declares that exact version to match the exact peer dependencies. Other DSH
+  versions are untested and are not claimed.
 
 ## Architecture
 
