@@ -29,3 +29,17 @@
   clean-profile install check to CI. Do not modify the active
   `/home/fish/dsh-layerfs` home; the verified install is isolated under the
   workspace `.dsh-home`.
+
+
+## 2026-10-25 — Cloud-owned Issue #11 prompt-boundary hardening
+
+- **From:** cloud
+- **To:** local
+- **Base commit:** `b6b649b52707f9be7ce901ae60f4d8fa6a7d0e0c`
+- **Work commit:** cloud branch `cloud/harden-issue-watcher-prompt-boundary` (PR pending)
+- **Changes:** Issue watcher serializes imported GitHub issue/comment fields as compact JSON within explicit untrusted-data markers; prompt instructions before and after the block prohibit following injected commands or revealing credentials. Added a deterministic hostile-comment/delimiter test and documentation.
+- **Tests run:** none locally from this remote-only environment; GitHub Actions PR checks pending.
+- **Test results:** NOT_RUN
+- **Local runtime verified:** no; local agent retains responsibility for real DSH runtime and Issue #9 workspace-isolation validation.
+- **Blockers:** remote container cannot reach GitHub directly; use repository GitHub Actions for test execution.
+- **Next action:** open the PR and record the real CI result; local agent should avoid editing the watcher script/test until the cloud PR is reviewed.
