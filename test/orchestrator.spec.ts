@@ -221,6 +221,24 @@ describe('generated workflow script', () => {
     expect(report.incomplete).toHaveLength(2)
   })
 
+  it('rejects an overlong verifier criterion instead of truncating its suffix', async () => {
+    const longCriterion = 'x'.repeat(1000)
+    const callerTasks = [task('a', [longCriterion])]
+    const agent: ScriptAgent = async (_prompt, options) => {
+      if (options.label.startsWith('grok-worker-')) return execution('done')
+      if (options.label.startsWith('grok-verifier-')) {
+        return verification(callerTasks[0]!, {
+          criteria: [{ criterion: `${longCriterion}EXTRA`, met: true, evidence: 'file:1' }],
+        })
+      }
+      throw new Error(`unexpected label ${options.label}`)
+    }
+    const { report } = await runWorkflowScript(WORKFLOW_SCRIPT, args(callerTasks), agent)
+    expect(report.status).toBe('failed')
+    expect(report.tasks[0]!.error).toContain('criteria count does not match')
+    expect(report.confirmed).toHaveLength(0)
+  })
+
   it('rejects a malformed verifier pass that omits a criterion', async () => {
     const callerTasks = [task('a', ['first', 'second'])]
     const agent: ScriptAgent = async (_prompt, options) => {

@@ -35,7 +35,7 @@ remains.
 - Implemented bounded planning, execution, independent verification, bounded
   retry, status synthesis, cancellation/deadline handling, active-run caps,
   report validation, and credential redaction.
-- Added deterministic tests: 5 files / 35 tests; all pass.
+- Added deterministic tests: 5 files / 36 tests; all pass.
 - Added a real DSH Loader composition test (real ToolRuntime, SystemPrompt,
   Loader, plugin artifact) with only the engine boundary faked; 2 tests pass.
 - Built `lib/` and verified npm pack contents (27 files; local pack is about 38 kB after docs additions).
@@ -57,7 +57,7 @@ remains.
   task text instead of truncating it, redact compound environment-variable
   names, clear the deadline timer on startup rejection/unload, remove stale
   validation status blocks, and align `engines.dsh` with the exact peer set.
-  The suite now has 35 tests.
+  The suite now has 36 tests.
 
 ## Remaining / optional
 

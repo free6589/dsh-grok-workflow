@@ -37,10 +37,10 @@ Result: **PASS**
 
 - `npm run typecheck`: PASS.
 - `npm run lint`: PASS, 0 warnings/0 errors (`oxlint` over 14 files).
-- `npm test`: PASS, 5 test files, 35 tests.
-  - `test/orchestrator.spec.ts`: 10 tests (planner, caller plan, parallel pool,
+- `npm test`: PASS, 5 test files, 36 tests.
+  - `test/orchestrator.spec.ts`: 11 tests (planner, caller plan, parallel pool,
     partial, failed, evidence rejection, retry bound, fallback, oversized
-    planner rejection, exact criteria).
+    planner rejection, overlong verifier-criterion rejection, exact criteria).
   - `test/plugin-lifecycle.spec.ts`: 9 tests (registration, invalid input,
     startup rejection timer cleanup, startup-unload cleanup, max active runs,
     unload cancellation/disposal, deadline report).
@@ -249,6 +249,10 @@ Independent review found five gaps; fixes were implemented and retested:
 - Obsolete pending/not-run sections were removed from this validation log.
 - `engines.dsh` is now the exact `0.2.1-rc.2`, matching the exact DSH peer
   dependency set.
+- **Residual re-review edge case:** verifier criterion strings are now parsed
+  with `boundedText(..., 1000)`, so a 1,000-character caller criterion plus a
+  suffix is rejected rather than silently truncated into a match. Regression
+  test added.
 
 ### Post-fix real DSH revalidation
 

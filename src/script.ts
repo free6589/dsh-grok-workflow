@@ -351,7 +351,7 @@ function normalizeVerification(raw) {
   if (!Array.isArray(raw.criteria)) return null;
   const criteria = objectList(raw.criteria, function (item) {
     if (!item || typeof item !== 'object') return null;
-    const criterion = text(item.criterion, 1000);
+    const criterion = boundedText(item.criterion, 1000);
     if (!criterion) return null;
     return { criterion: criterion, met: item.met === true, evidence: text(item.evidence, 4000) };
   }, 40);
