@@ -173,3 +173,33 @@ verifier cannot support it, and that partial results remain explicit.
 - Planner-only real-model run: `NOT_RUN`.
 - Real DSH cancellation/deadline path: `NOT_RUN` (unit/lifecycle tests pass).
 - Remote GitHub Actions: `NOT_RUN`.
+
+### Real end-to-end grok_workflow run (planner, completed)
+
+A planner-only call (no `tasks` array) with the objective
+`Create the file .dsh-home/planner-only.txt containing exactly PLANNER_ONLY, then verify its content.`
+returned:
+
+- `tool_result` status: `completed`.
+- Report: `Grok workflow: COMPLETED`, `Plan: planner; 1 task(s); 1 verified`.
+- Task `write-verify-planner-only`: verified after 2 attempts; evidence included
+  `realpath`, `ls`, `test -f`, `cat`, `wc`, `od`, `stat`, `cmp`, and `sha256sum`.
+- File content: exactly `PLANNER_ONLY` (12 bytes, no trailing newline).
+- The report surfaced a planner-generated constraint that said "do not execute
+  work in this planning step"; this was a planner wording defect, not a false
+  success. The planner prompt was clarified to forbid planning-phase
+  instructions in task constraints.
+
+A larger planner run (two marker files plus an over-broad "no other file in
+`.dsh-home` changed" criterion) was killed by the outer 600 s test timeout before
+returning a report. It demonstrated that the default 30-minute plugin deadline
+and bounded retries are not a substitute for realistic task scope. It is not
+counted as a passed acceptance run.
+
+### Recursion guard (real-model lesson)
+
+The first large planner attempt spawned multiple child agents and one child
+appeared to be verifying by starting more work. The plugin now rejects
+`grok_workflow` calls from subagent sessions (`origin === 'subagent'` or
+`delegationDepth > 0`); a deterministic test covers the rejection. This guard
+was added before the successful small planner run.

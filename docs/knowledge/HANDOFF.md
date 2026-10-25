@@ -24,7 +24,7 @@
   caller-plan workflow, completed parallel timing workflow, and a partial
   strict-failure workflow.
 - **Blockers:** none.
-- **Next action:** create the initial commit, push to
-  `free6589/dsh-grok-workflow`, verify remote visibility, and create the
-  coordination Issue. Do not modify the active `/home/fish/dsh-layerfs` home;
-  the verified install is isolated under the workspace `.dsh-home`.
+- **Next action:** verify the GitHub Actions run, create the coordination
+  Issue, and record the remote commit/run URLs. Do not modify the active
+  `/home/fish/dsh-layerfs` home; the verified install is isolated under the
+  workspace `.dsh-home`.

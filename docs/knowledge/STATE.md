@@ -6,10 +6,10 @@ Last updated: 2026-10-25 (local)
 
 - Local path: `/home/fish/projects_mine/dsh-grok-workflow`
 - Branch: `main`
-- Git history: initial commit pending (repository was initialized empty by the user)
-- Remote: none configured yet
+- Git history: initial commit created (`beb55c6` at time of writing)
+- Remote: `origin` = https://github.com/free6589/dsh-grok-workflow.git (main pushed)
 - Target GitHub repository: `https://github.com/free6589/dsh-grok-workflow`
-- Target repository existence: **CONFIRMED absent** via `gh repo view` and `git ls-remote` on 2026-10-25.
+- Target repository: **CONFIRMED public and reachable** after creation on 2026-10-25; it was confirmed absent immediately before creation.
 - GitHub CLI: **CONFIRMED authenticated** as `free6589` with `repo` scope.
 
 ## Reference environments
@@ -53,8 +53,9 @@ push and remote CI remain.
 - Push local commits and verify remote visibility.
 - Open the coordination Issue `[COORDINATION] Cloud ↔ Local Agent`.
 - Run GitHub Actions remotely (Q5 remains `NOT_RUN`).
-- Run a real planner-only (no caller tasks) workflow through a model. The
-  planner path is covered deterministically, but not yet by a real-model run.
+- Real planner-only workflow: **CONFIRMED completed** on a small objective
+  (see `VALIDATION.md`). A larger over-broad planner objective hit the outer
+  600 s test timeout; this is a scope limitation, not a plugin pass.
 - Run a real timeout/cancellation path through DSH. The unit/lifecycle tests
   cover it; runtime cancellation has not been observed in a live DSH process.
 

@@ -8,7 +8,7 @@ Legend: PASS = actually executed and observed; FAIL = executed and failed;
 | # | Criterion | Status | Evidence |
 |---|---|---|---|
 | F1 | Plugin registers through the real DSH plugin loading mechanism | PASS | `test/loader.spec.ts` uses real Cordis Loader + ToolRuntime; local profile `dsh --dump-config` shows the row; 2 tests pass. |
-| F2 | At least one end-to-end workflow runs successfully | PASS | Real DSH headless run called `grok_workflow`; report status `completed`, 2/2 tasks verified; `VALIDATION.md` 2026-10-25. |
+| F2 | At least one end-to-end workflow runs successfully | PASS | Real DSH headless runs called `grok_workflow`: caller plan completed 2/2 verified; planner-only plan completed 1/1 verified; `VALIDATION.md` 2026-10-25. |
 | F3 | At least two independent subtasks run in parallel | PASS | Real DSH run executed two 4-second timing tasks with a measured 538 ms overlap; deterministic test also asserts peak concurrency. |
 | F4 | Concurrency cap is effective | PASS | Five tasks with `maxConcurrency=2`; observed peak 2 in the real generated script. |
 | F5 | Success, partial success, and failure are distinguished correctly | PASS | Deterministic tests cover completed, partial, and failed reports; a real DSH run returned `PARTIAL` (1/2 verified) and the assistant explicitly did not claim success. |

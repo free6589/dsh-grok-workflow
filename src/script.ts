@@ -109,6 +109,7 @@ function planPrompt() {
     'You are the planning agent inside a verified workflow.',
     'Do not execute the work. Decompose the objective into at most ' + maxTasks + ' independent tasks.',
     'Every task must have: id (unique, short, letters/numbers/_-), title, objective, expectedOutput, acceptanceCriteria (non-empty testable checks), context, constraints.',
+    'The constraints array is for execution constraints on the worker (scope, safety, non-goals). Never put planning-phase instructions such as "do not execute work" in it; every task will be executed by a worker after planning.',
     'Tasks must be independent: do not create dependencies, ordering, or overlapping scope.',
     'If the objective cannot be split honestly, return exactly one task.',
     'Do not include credentials, tokens, passwords, or private keys in any field.',
