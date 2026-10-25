@@ -1,5 +1,33 @@
 # Agent Handoff
 
+## 2026-10-25 — Issue #14 credential redaction fix
+
+- **From:** local agent
+- **To:** cloud reviewer / next local agent
+- **Base commit:** `99454d1a830ca42ed051d232de4104161357b581`
+- **Work commit:** `24b6619` (`fix: redact non-HTTP URL userinfo and scoped tokens`); docs follow-up commit after it
+- **Changes:**
+  - Extended `src/redact.ts` URL userinfo matching from `http(s)` to any
+    `scheme://` URI (covers `postgres`, `postgresql`, `mongodb+srv`, `redis`,
+    etc., including empty-username `redis://:password@host`).
+  - Added `glpat-` (GitLab) and `npm_` token patterns.
+  - Mirrored the same patterns in the `redactPromptText` copy inside
+    `src/script.ts`.
+  - Added `redactSecrets`, `redactDeep`, and verifier/retry prompt regression
+    tests with fake values.
+- **Tests run:**
+  - `npm run typecheck` — PASS.
+  - `npm run lint` — PASS, 0 warnings/0 errors.
+  - `npx vitest run test/redact.spec.ts test/orchestrator.spec.ts` — PASS,
+    26 tests.
+  - `npm run ci` — PASS, 6 files / 55 tests.
+- **Test results:** PASS.
+- **Local runtime verified:** no for this change; it is redaction logic covered
+  by deterministic unit and prompt-rendering tests, not a DSH lifecycle change.
+- **Blockers:** none.
+- **Next action:** cloud review of `24b6619`; do not use real credentials in
+  future regression vectors.
+
 ## 2026-10-25 — Implementation and local runtime verification
 
 - **From:** local lead agent

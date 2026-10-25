@@ -369,6 +369,24 @@ tests:
 - The live watcher is started separately; its state and logs stay under the
   ignored `.dsh-home/` directory.
 
+### Credential redaction formats (#14)
+
+- Reproduced on the built `lib/redact.js` from `99454d1`: both database URLs
+  (`postgres://demo_user:FAKE_DB_PASSWORD@...`, `mongodb+srv://...`) and bare
+  `glpat-...` / `npm_...` values passed through unchanged.
+- `src/redact.ts` now matches username/password userinfo for any `scheme://`
+  URI, including database schemes and empty-username forms such as
+  `redis://:password@host`; it also recognizes `glpat-` and `npm_` token
+  prefixes. `src/script.ts` carries the same patterns for prompt-facing
+  redaction.
+- Regression tests added in `test/redact.spec.ts` for `redactSecrets` and
+  `redactDeep`, and in `test/orchestrator.spec.ts` for verifier/retry prompts.
+- `npx vitest run test/redact.spec.ts test/orchestrator.spec.ts` — **PASS**,
+  2 files / 26 tests.
+- `npm run ci` — **PASS**, 6 files / 55 tests.
+- Post-fix check on the built artifact: the issue examples return `[REDACTED]`
+  markers while ordinary prose (`ratio 3:4 at example.test`) is unchanged.
+
 ## Remaining gap
 
 - Clean-DSH-profile installation is executed locally; CI has not yet added a
