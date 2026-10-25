@@ -7,7 +7,7 @@ Legend: PASS = actually executed and observed; FAIL = executed and failed;
 
 | # | Criterion | Status | Evidence |
 |---|---|---|---|
-| F1 | Plugin registers through the real DSH plugin loading mechanism | PASS | `test/loader.spec.ts` uses real Cordis Loader + ToolRuntime; local profile `dsh --dump-config` shows the row; 2 tests pass. |
+| F1 | Plugin registers through the real DSH plugin loading mechanism | PASS | `test/loader.spec.ts` uses real Cordis Loader + ToolRuntime; local profile and GitHub-installed profile both show the bundle row; 2 loader tests pass. |
 | F2 | At least one end-to-end workflow runs successfully | PASS | Real DSH headless runs called `grok_workflow`: caller plan completed 2/2 verified; planner-only plan completed 1/1 verified; `VALIDATION.md` 2026-10-25. |
 | F3 | At least two independent subtasks run in parallel | PASS | Real DSH run executed two 4-second timing tasks with a measured 538 ms overlap; deterministic test also asserts peak concurrency. |
 | F4 | Concurrency cap is effective | PASS | Five tasks with `maxConcurrency=2`; observed peak 2 in the real generated script. |
@@ -41,7 +41,7 @@ Legend: PASS = actually executed and observed; FAIL = executed and failed;
 | Q2 | Lint passes | PASS | `npm run lint`, 0 warnings/errors. |
 | Q3 | Unit tests pass | PASS | `npm test`, 29 tests. |
 | Q4 | Build passes | PASS | `npm run build`; package contents inspected. |
-| Q5 | Applicable GitHub Actions checks pass | NOT_RUN | Local CI-equivalent checks pass; remote Actions have not run. |
+| Q5 | Applicable GitHub Actions checks pass | PASS | GitHub Actions runs `40168892831` and `40169133016` passed on Node 22 and Node 24. |
 | Q6 | README and test commands match implementation | PASS | README commands and documented defaults match source/tests. |
 | Q7 | Every executed check has a real result | PASS | `VALIDATION.md` records commands and outputs. |
 | Q8 | Un-executed checks marked NOT_RUN/BLOCKED | PASS | Remote CI and real partial/failure paths remain marked. |

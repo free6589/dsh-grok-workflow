@@ -33,3 +33,11 @@ The canonical files are `AGENTS.md` and `docs/knowledge/*.md`.
 - If a remote change conflicts with local uncommitted work, stop and report.
 - If GitHub is unavailable, continue local work and record unsynced files and
   the exact failure in `STATE.md` and the final report.
+
+
+## Active coordination issue
+
+- `https://github.com/free6589/dsh-grok-workflow/issues/1`
+- Title: `[COORDINATION] Cloud ↔ Local Agent`
+- The issue contains the required FROM/TO/TASK/BASE_COMMIT/WORK_COMMIT/CHANGES/
+  TESTS_RUN/TEST_RESULTS/LOCAL_RUNTIME_VERIFIED/BLOCKERS/NEXT_ACTION fields.

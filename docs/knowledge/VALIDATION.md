@@ -203,3 +203,34 @@ appeared to be verifying by starting more work. The plugin now rejects
 `grok_workflow` calls from subagent sessions (`origin === 'subagent'` or
 `delegationDepth > 0`); a deterministic test covers the rejection. This guard
 was added before the successful small planner run.
+
+### GitHub installation and workflow
+
+Repository: `https://github.com/free6589/dsh-grok-workflow`, public, default
+branch `main`; initial commit `beb55c6`, current work commit `7b78db9`.
+
+Commands:
+
+```sh
+DSH_HOME=.dsh-home dsh --profile grok-workflow-github --from-default-profile headless --dump-config
+DSH_HOME=.dsh-home dsh plugin --profile grok-workflow-github add github:free6589/dsh-grok-workflow
+DSH_HOME=.dsh-home dsh --profile grok-workflow-github --dump-config
+```
+
+Result: **PASS**.
+
+- pnpm resolved and added `dsh-grok-workflow github:free6589/dsh-grok-workflow`
+  (+4 packages); it emitted only peer-dependency warnings, no install failure.
+- `--dump-config` shows `- id: grok-workflow / name: dsh-grok-workflow`.
+- A real headless boot replied `GITHUB_INSTALL_OK`.
+- A real `grok_workflow` call in the GitHub-installed profile returned
+  `COMPLETED` with one verified task; the file
+  `.dsh-home/github-install-marker.txt` contains exactly
+  `GITHUB_WORKFLOW_OK` (18 bytes, no trailing newline).
+
+### GitHub Actions
+
+- Run `40168892831` (commit `beb55c6`): **PASS**, Node 22 and Node 24 jobs.
+- Run `40169133016` (commit `7b78db9`): **PASS**, Node 22 and Node 24 jobs.
+- The workflow uses `actions/checkout@v4` and `actions/setup-node@v4`; GitHub
+  reports a Node 20 deprecation annotation but both jobs completed successfully.

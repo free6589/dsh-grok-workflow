@@ -6,7 +6,7 @@ Last updated: 2026-10-25 (local)
 
 - Local path: `/home/fish/projects_mine/dsh-grok-workflow`
 - Branch: `main`
-- Git history: initial commit created (`beb55c6` at time of writing)
+- Git history: `beb55c6` initial commit; `7b78db9` planner/recursion/validation update (current at time of writing)
 - Remote: `origin` = https://github.com/free6589/dsh-grok-workflow.git (main pushed)
 - Target GitHub repository: `https://github.com/free6589/dsh-grok-workflow`
 - Target repository: **CONFIRMED public and reachable** after creation on 2026-10-25; it was confirmed absent immediately before creation.
@@ -20,9 +20,10 @@ Last updated: 2026-10-25 (local)
 
 ## Current phase
 
-Implementation complete enough for acceptance; local deterministic tests, real
-DSH profile installation, and real-model end-to-end runs have passed. GitHub
-push and remote CI remain.
+Implementation and remote acceptance are complete: deterministic tests, real
+DSH profile installation from both local and GitHub sources, real-model
+end-to-end runs, remote Actions, and the coordination Issue all passed. Only the
+optional live timeout/cancellation exercise remains.
 
 ## Completed
 
@@ -39,31 +40,32 @@ push and remote CI remain.
 - Built `lib/` and verified npm pack contents (27 files, 32.4 kB packed).
 - Installed the plugin into an isolated real DSH profile
   (`DSH_HOME=.dsh-home`, profile `grok-workflow-dev`) with `dsh plugin`.
-- Ran a real headless model smoke (`MODEL_OK`) and two real
+- Ran a real headless model smoke (`MODEL_OK`) and three real
   `grok_workflow` end-to-end workflows:
   - completed caller plan with 2/2 verified tasks;
   - completed parallel timing plan with 2/2 verified tasks and a measured
     overlap of 538 ms;
+  - completed planner-only plan with 1/1 verified task;
   - a separate strict-failure run produced `partial` (1/2 verified) and the
     assistant explicitly did not claim success.
+- Created/pushed the public repository, passed GitHub Actions on Node 22/24,
+  and opened coordination Issue #1.
 
-## Not completed
+## Remaining / optional
 
-- Create the initial commit and GitHub repository.
-- Push local commits and verify remote visibility.
-- Open the coordination Issue `[COORDINATION] Cloud ↔ Local Agent`.
-- Run GitHub Actions remotely (Q5 remains `NOT_RUN`).
-- Real planner-only workflow: **CONFIRMED completed** on a small objective
-  (see `VALIDATION.md`). A larger over-broad planner objective hit the outer
-  600 s test timeout; this is a scope limitation, not a plugin pass.
-- Run a real timeout/cancellation path through DSH. The unit/lifecycle tests
-  cover it; runtime cancellation has not been observed in a live DSH process.
+- Run a real timeout/cancellation path through DSH. Unit/lifecycle tests cover
+  it; runtime cancellation has not been observed in a live DSH process.
+- Add a clean-DSH-profile install test to CI (currently local only).
+- A larger over-broad planner objective hit the outer 600 s test timeout; use
+  realistic task scope. The default plugin deadline is 30 minutes.
+- Child agents inherit all parent tools; only recursive `grok_workflow` calls
+  are blocked. Use deployment tool policy for stricter isolation.
 
 ## Blockers
 
-None at this time. GitHub is available; remote CI depends on repo creation.
+None.
 
 ## Next priority
 
-Commit, create/push `free6589/dsh-grok-workflow`, verify the remote tree and
-Actions, then update the coordination Issue and final report.
+Monitor coordination Issue #1 and decide whether to add the optional live
+timeout/cancellation test. Keep memory synchronized with any new commit.
