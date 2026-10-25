@@ -345,3 +345,12 @@ tests:
 - **Local commands:** `bash -n scripts/watch-issues.sh` and the Vitest watcher test are **NOT_RUN** in the cloud environment. The container cannot access GitHub directly and does not have the repository checkout/dependencies mounted.
 - **CI:** NOT_RUN at time this record was written. Do not mark this change PASS until the PR's actual Node 22 and Node 24 Actions results are inspected.
 - **Real DSH runtime:** NOT_RUN; this is local-agent-only validation.
+
+
+### Follow-up: cloud PR #12 CI (2026-10-25)
+
+- PR: https://github.com/free6589/dsh-grok-workflow/pull/12
+- Head tested: `707c933`; Actions run [40176002857](https://github.com/free6589/dsh-grok-workflow/actions/runs/40176002857).
+- **PASS** on Node 22 and Node 24. Both jobs passed `npm ci`, `npm run typecheck`, `npm run lint`, `npm run build`, `git diff --exit-code -- lib/`, `npm test`, and `npm pack --dry-run`.
+- The watcher regression test ran under `npm test` with a fake `gh` executable; it does not call GitHub or a model. No real DSH runtime is claimed for this change.
+- Direct `bash -n scripts/watch-issues.sh` was not run separately; shell parsing is exercised by the watcher test under CI.
