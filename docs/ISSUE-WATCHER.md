@@ -25,10 +25,23 @@ a webhook, a public callback URL, or a GitHub token in the repository.
   copied into a JSON payload and explicitly labelled as untrusted data in the
   wake prompt. The fixed instructions tell the agent not to follow directives
   found inside that payload.
-- **DSH env isolation:** `DSH_ENV_FILE` is parsed as `KEY=VALUE` credentials,
-  not sourced as shell code. `DSH_*`, `HOME`, `PATH`, and similar process
-  variables from that file are ignored, so a credentials file cannot silently
-  retarget the watcher to a different DSH home, profile, patch, or session.
+- **DSH env isolation:** `DSH_ENV_FILE` is parsed as `KEY=VALUE` data, never
+  sourced or evaluated as shell code. Only allowlisted provider
+  credential/configuration keys are exported to the wake child:
+  - `BIFROST_*` (the local Bifrost gateway, including
+    `BIFROST_VIRTUAL_KEY`);
+  - `*_API_KEY` and `*_TOKEN` provider credentials;
+  - `*_BASE_URL` and `*_API_VERSION` provider endpoint/version configuration;
+  - `OPENAI_ORG_ID`, `OPENAI_PROJECT_ID`, `AWS_ACCESS_KEY_ID`,
+    `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `AWS_DEFAULT_REGION`, and
+    `AWS_PROFILE`.
+
+  Every other key is ignored. In particular, `DSH_*`, `HOME`, `PATH`, and
+  process-control variables cannot retarget the watcher to another DSH
+  home/profile/patch/session, and runtime/code-loading variables such as
+  `NODE_OPTIONS`, `NODE_PATH`, `LD_PRELOAD`, `LD_LIBRARY_PATH`, `DYLD_*`,
+  `PYTHONPATH`, `PYTHONHOME`, `PERL5OPT`, and `RUBYOPT` never reach the wake
+  child.
 
 ## Run
 
@@ -96,7 +109,7 @@ scripts/watch-issues.sh
 | `DSH_PROFILE` | `grok-workflow-dev` | DSH headless profile to boot |
 | `DSH_PATCH` | detected `gw-model.patch.yml` | Optional DSH patch overlay |
 | `DSH_SESSION_ID` | empty | Existing DSH session to resume |
-| `DSH_ENV_FILE` | `$HOME/.dsh/bifrost.env` | Optional `KEY=VALUE` credentials file for the wake child; `DSH_*` keys are ignored |
+| `DSH_ENV_FILE` | `$HOME/.dsh/bifrost.env` | Optional `KEY=VALUE` credentials file for the wake child (parsed, not sourced); only allowlisted provider keys are exported |
 
 ## Persistent user service
 
@@ -131,11 +144,13 @@ journalctl --user -u dsh-issue-watch.service -f
 ```
 
 The current development sandbox has no user systemd bus; use `nohup` or the
-service on the real host. If the service uses an `EnvironmentFile` for model
-credentials, keep `DSH_HOME`, `DSH_PROFILE`, `DSH_PATCH`, and `DSH_SESSION_ID`
-out of that file: systemd applies them to the watcher process before the
-script's own isolation logic runs. The script owns its child wake process and
-terminates it on `SIGINT`/`SIGTERM`.
+service on the real host. The watcher's allowlist applies only to
+`DSH_ENV_FILE` parsing. A systemd `EnvironmentFile=` is applied to the watcher
+process by systemd before the script runs, so every key in it becomes part of
+the parent environment. Keep `DSH_HOME`, `DSH_PROFILE`, `DSH_PATCH`, and
+`DSH_SESSION_ID` out of that file, and do not put runtime/code-loading
+variables such as `NODE_OPTIONS`, `LD_PRELOAD`, or `PYTHONPATH` there. The
+script owns its child wake process and terminates it on `SIGINT`/`SIGTERM`.
 
 ## Verification
 
@@ -147,7 +162,12 @@ npx vitest run test/issue-watch.spec.ts
 The regression tests use a fake `gh` executable. They baseline one issue, replay
 a new comment/new issue, assert the prompt's untrusted-data boundary, and verify
 that a credential env file cannot override `DSH_HOME`, `DSH_PROFILE`,
-`DSH_PATCH`, or the session. They do not call GitHub or a model.
+`DSH_PATCH`, or the session. They also verify that runtime-loading names
+(`NODE_OPTIONS`, `NODE_PATH`, `LD_PRELOAD`, `LD_LIBRARY_PATH`, `DYLD_*`,
+`PYTHONPATH`, `PYTHONHOME`, `PERL5OPT`, `RUBYOPT`) and arbitrary non-allowlisted
+settings never reach the wake child, while quoted/single-quoted values and
+comments in the credentials file still parse. They do not call GitHub or a
+model.
 
 A one-off live smoke also passed: a temporary issue caused the running watcher
 to start a DSH headless wake, whose final answer contained `WATCH_WAKE_OK` and

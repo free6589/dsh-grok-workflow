@@ -70,7 +70,8 @@ Environment:
   DSH_BIN=dsh                        DSH executable
   DSH_PROFILE=grok-workflow-dev      DSH profile to wake
   DSH_SESSION_ID=...                 Optional existing DSH session to resume
-  DSH_ENV_FILE=...                   Optional environment file to source
+  DSH_ENV_FILE=...                   Optional KEY=VALUE credentials file; parsed, not sourced
+                                     (only allowlisted provider keys are exported)
   WATCH_WAKE_TIMEOUT=3600            Kill a wake after this many seconds
 
 The DSH wake receives the event text on stdin. With WATCH_WAKE_MODE=noop the
@@ -104,10 +105,32 @@ if [[ ! -f "$STATE_FILE" ]]; then
   printf '%s\n' "{\"version\":1,\"repo\":\"$REPO\",\"lastPollAt\":null,\"issues\":{}}" > "$STATE_FILE"
 fi
 
+# DSH_ENV_FILE is a credentials/configuration file, not a shell environment.
+# Only these explicit credential/configuration families are exported to the
+# wake child. Runtime and code-loading variables (NODE_OPTIONS, LD_PRELOAD,
+# PYTHONPATH, DYLD_*, ...) never match and are therefore ignored.
+is_allowed_wake_key() {
+  local key="$1"
+  # Deny runtime/code-loading and process-control names first, as defense in
+  # depth against a future allowlist pattern becoming too broad.
+  case "$key" in
+    NODE_OPTIONS|NODE_PATH|NODE_REPL_EXTERNAL_MODULE|LD_PRELOAD|LD_LIBRARY_PATH|DYLD_*|\
+    PYTHONPATH|PYTHONHOME|PYTHONSTARTUP|PYTHONINSPECT|PERL5OPT|PERL5LIB|RUBYOPT|RUBYLIB|\
+    BASH_ENV|ENV|SHELLOPTS|BASHOPTS|CDPATH|GLOBIGNORE|IFS|PS4|PROMPT_COMMAND|\
+    JAVA_TOOL_OPTIONS|_JAVA_OPTIONS|CLASSPATH|GIT_SSH_COMMAND|GIT_ASKPASS|SSH_ASKPASS|\
+    DSH_*|HOME|PATH|PWD|OLDPWD|SHELL|USER|LOGNAME)
+      return 1
+      ;;
+  esac
+  case "$key" in
+    BIFROST_*|*_API_KEY|*_TOKEN|*_BASE_URL|*_API_VERSION) return 0 ;;
+    OPENAI_ORG_ID|OPENAI_PROJECT_ID|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|AWS_REGION|AWS_DEFAULT_REGION|AWS_PROFILE) return 0 ;;
+  esac
+  return 1
+}
+
 # Read optional model credentials only in the wake child (never print them).
-# Do not source the file as shell code: a credential file may contain DSH_*
-# values for another session, and sourcing it would silently retarget this
-# watcher at the wrong DSH home/profile/session.
+# Parse the file as KEY=VALUE data; never source or evaluate it.
 source_wake_env() {
   [[ -n "$DSH_ENV_FILE" && -f "$DSH_ENV_FILE" ]] || return 0
   local line key value
@@ -121,9 +144,7 @@ source_wake_env() {
     key="${line%%=*}"
     key="${key//[[:space:]]/}"
     [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
-    case "$key" in
-      DSH_*|HOME|PATH|PWD|OLDPWD|SHELL|USER|LOGNAME|IFS|CDPATH|GLOBIGNORE|PS4|BASH_ENV|ENV|SHELLOPTS|BASHOPTS) continue ;;
-    esac
+    is_allowed_wake_key "$key" || continue
     value="${line#*=}"
     if (( ${#value} >= 2 )); then
       if [[ "${value:0:1}" == '"' && "${value: -1}" == '"' ]]; then
