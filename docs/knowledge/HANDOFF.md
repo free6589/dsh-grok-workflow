@@ -39,5 +39,6 @@
 - **Base commit:** `99454d1a830ca42ed051d232de4104161357b581`.
 - **Branch:** `docs/beginner-friendly-bilingual-homepage`.
 - **Changes:** Replaced root `README.md` with a shorter English quick-start homepage; added `README.zh-CN.md`; added separate English and Chinese SVG workflow illustrations; updated `package.json` files allowlist to include the Chinese README; installation command and DSH/Node requirements are derived from current project files.
-- **Tests:** NOT_RUN in local shell; PR CI pending. No real DSH runtime is claimed.
-- **Next action:** Review PR after CI. Local agent should avoid editing the two root README files and `docs/images/workflow-overview*.svg` until review is complete; continue unrelated runtime/issue work.
+- **Tests:** GitHub Actions run `40178007292` PASS on Node 22/24: `npm ci`, typecheck, lint, build, `git diff --exit-code -- lib/`, `npm test`, and `npm pack --dry-run`. No real DSH runtime is claimed for this documentation-only change.
+- **PR:** https://github.com/free6589/dsh-grok-workflow/pull/16
+- **Next action:** Review PR #16. Local agent should avoid editing the two root README files and `docs/images/workflow-overview*.svg` until review/merge is complete; continue unrelated runtime/issue work.
