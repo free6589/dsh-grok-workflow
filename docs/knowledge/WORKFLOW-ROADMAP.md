@@ -1,343 +1,409 @@
 # Overall Roadmap — Mandatory Workflow, Per-role Models, Ordered Fallback, Settings
 
-Last updated: 2026-10-25 — **consolidation round** (integrates the four independent
-read-only reviews t2–t5 with source re-verification).
+Last updated: 2026-10-25 — **revision round (t8)**, superseding the t6 consolidation.
 
-- **Baseline:** plugin source at `main` = `b231660`; DSH target = installed
+- **Baseline:** plugin source at `main` = `d82c245`; DSH target = installed
   `@deepseek-ai/dsh@0.2.1-rc.2` (source checkout `687f282e`, tag `dsh-v0.2.1-rc.2`).
-- **What this document is:** the whole-system plan for requirements **A** (every user
-  message goes through the full workflow), **B** (per-role model selection), **C**
-  (ordered per-role fallback chains), **D** (operable settings).
-- **What this document is not:** authorization to change plugin code. R-005 still
-  applies — implementation needs the user's explicit go-ahead.
-- **Status of Phase 2 gate:** **NOT CLOSED.** Two experiments are still running and
-  are inputs to the entry design: **t18** (B-1 live experiment: how the final
-  assistant answer is produced) and **t19** (live verification of hypotheses
-  H-1…H-5). Everything they touch is marked `PENDING(t18)` / `PENDING(t19)` in this
-  document and must be finalized in the t8 revision round after the user confirms.
-- **Detailed design, evidence ledger, and open questions:** [WORKFLOW-DESIGN.md](WORKFLOW-DESIGN.md).
+- **Inputs consumed by this revision:** t1–t5 read-only reviews, t6 consolidation,
+  **t7 independent review (21 findings R-01…R-21)**, **t18 B-1 live experiment**, and
+  **t19 API capability experiment (H-1…H-5)**. Every `PENDING(t18)`/`PENDING(t19)`
+  marker from the t6 draft has been replaced by the measured result; the four items
+  that were **not** run are listed as `NOT_RUN` in DESIGN §"NOT_RUN ledger" and are not
+  used as premises anywhere.
+- **Finding-by-finding disposition of t7's 21 findings is in DESIGN §C** (adopted /
+  partially adopted / not adopted, with reasons and the section that changed).
+- **What this document is not:** authorization to change plugin code (R-005).
 
 ## Status vocabulary
 
 - `CONFIRMED` — observed in source, a real command, or a real test on this machine.
-- `HYPOTHESIS` — plausible, not yet verified.
-- `PENDING(t18)` / `PENDING(t19)` — an in-flight experiment owns this answer; do not
-  read it as a decided design point.
-- `NOT_RUN` — intentionally not executed.
-- `BLOCKED` — needs an external capability or a user decision.
-
-Every claim below carries either a `file:line`/command evidence pointer or one of
-these labels. Sub-agent reports were treated as source material only; where two
-reports disagreed, the ruling was made against source or test evidence and is
-recorded in §17 and in DESIGN §A.
+- `RUNTIME-VERIFIED` — measured in a real DSH run (t18/t19 probes); the strongest form
+  of evidence used here, and the only kind cited as "works".
+- `SOURCE-CONFIRMED` — read in the 0.2.1-rc.2 sources; behaviour follows the code but
+  was not exercised end to end.
+- `HYPOTHESIS` / `NOT_RUN` / `BLOCKED` — as before; `NOT_RUN` items are never premises.
 
 ---
 
 ## 1. Confirmed product requirements
 
-Unchanged from the user's 2026-10-25 decisions; authoritative wording lives in
-[WORKFLOW-DESIGN.md](WORKFLOW-DESIGN.md) §"Confirmed requirements".
+Authoritative wording is in [WORKFLOW-DESIGN.md](WORKFLOW-DESIGN.md) §"Confirmed
+requirements": **R-001** every user message runs the full workflow and the main model
+cannot bypass it; **R-002** per-role model selection; **R-003** ordered per-role
+fallback chains; **R-004** operable settings; **R-005** no code changes without
+explicit authorization.
 
-- **R-001** every user message (greeting, trivial question, follow-up, complex task)
-  runs the full workflow; the main model must not decide whether to bypass it.
-- **R-002** the user wants per-role model selection instead of one inherited route.
-- **R-003** the user wants ordered fallback `A -> B -> C` per role, stopping at the
-  first usable result.
-- **R-004** the user wants operable settings, not only hand-edited YAML.
-- **R-005** discussion and documentation only until implementation is authorized.
-
-Hard consequence used throughout: **no silent fallback to ordinary direct answering**
-when the workflow or all model routes fail. Failures are reported explicitly.
+Hard consequence: **no silent fallback to ordinary direct answering** when the workflow
+or all model routes fail. Failures are reported explicitly.
 
 ---
 
-## 2. Current call chain (what exists today) — CONFIRMED
+## 2. Current call chain (what exists today)
 
-The plugin is currently a **tool + prompt suggestion**. There is no enforced entry.
+The plugin is a **tool + prompt suggestion**; there is no enforced entry.
 
 | # | Layer | Component | Evidence |
 |---|---|---|---|
-| L0 | client input | `agent.followup()` / `agent.steer()` | `dsh-agent/lib/types/runtime-types.d.ts:192`, `:200` |
-| L1 | step admission | `step()` → `inbox.claim()` → `dispatch.waterfall('agent/pre-step', …)` | `dsh-agent-loop/lib/index.js:909` (claim at `:906`) |
+| L0 | client input | `agent.followup()` / `agent.steer()` / `agent.inject()` | `dsh-agent/lib/types/runtime-types.d.ts:192`, `:200` |
+| L1 | step admission | `step()` → `inbox.claim(target, turn)` → `dispatch.waterfall('agent/pre-step', …)` — dispatched on **every** step, including tool-continuation steps | `dsh-agent-loop/lib/index.js:909` (claim `:906`, inbox `claim()` at `:103-111`) |
 | L2 | plugin registration | `ctx.systemPrompt.section(...)` + `ctx.tools.register(tool)`; `inject=['tools','workflowEngine','systemPrompt']` | `src/index.ts` |
-| L3 | model decides | main model reads the prompt section and the tool schema, then may or may not call `grok_workflow` | `src/index.ts` (`defineTool`) |
+| L3 | model decides | main model reads the prompt section and the tool schema, then may call `grok_workflow` | `src/index.ts` |
 | L4 | tool guard | `exec.agent` required; recursion refusal (`origin==='subagent'` / `delegationDepth>0`); disposed/aborted; objective ≤ 4000; caller-task normalization; active-run cap | `src/index.ts`, `src/input.ts` |
 | L5 | engine start | `ctx.workflowEngine.start({script, meta, args, parent, signal, maxTotalAgents, subagentProvider?})` | `src/index.ts`, `src/script.ts` |
-| L6 | PTC guest script | globals only `agent/parallel/pipeline/phase/log/args`; `agent()` options restricted to `{label,phase,schema,provider,model}` | `dsh-workflow-ptc/lib/index.js` (`SUPPORTED_AGENT_OPTIONS`) |
-| L7 | stages | Plan (planner agent) → Execute (per-task worker + verifier + bounded retry) → **Synthesize = pure JS aggregation, no `agent()` call** | `src/script.ts` |
+| L6 | PTC guest script | globals `agent/parallel/pipeline/phase/log/args`; `agent()` accepts only `{label,phase,schema,provider,model}` | `dsh-workflow-ptc/lib/index.js` |
+| L7 | stages | Plan → Execute (worker + verifier + bounded retry) → **Synthesize = pure JS aggregation, no `agent()` call** | `src/script.ts` |
 | L8 | host report validation | `assertWorkflowReport(...)` + `redactDeep` | `src/report.ts` |
-| L9 | back to model | `output.render → renderReport()` | `src/index.ts`, `src/report.ts` |
+| L9 | back to model | `output.render → renderReport()` (≤ 8000 chars, 12 items per section) | `src/report.ts` |
 
-Measured gaps at `b231660` (CONFIRMED by grep, not by inference):
+Two facts about the environment that the earlier draft missed:
 
-- `src/` contains **no** `agent/pre-step`, `agent/request`, `agent/request-error`,
-  `agent/turn-stopping`, `tools/pre-execute`, or `ctx.settings` usage → A/B/C/D have
-  **zero** implementation and **zero** test coverage today.
-- Test suite at `b231660`: 6 spec files / 56 tests, all green, plus typecheck and lint
-  clean (measured by t5). The suite covers the tool-mode contract of
-  plan/execute/verify/retry/synthesize only.
+- **An in-tree workflow tool exists.** DSH 0.2.1-rc.2 ships `@deepseek-ai/dsh-tool-workflow`
+  (default tool name `workflow`), which runs the *same* `ctx.workflowEngine` but does not
+  go through this plugin's report validation or redaction. Under route (b) it must be in
+  the deny/restrict list, otherwise it is a bypass channel (t7 R-17).
+- **Tool-continuation steps reach the gate with an empty message batch.** `claim()`
+  returns the `next-step` batch plus at most one `next-turn` message
+  (`dsh-agent-loop/lib/index.js:103-111`), so a continuation step delivers
+  `payload.messages === []` to every `agent/pre-step` listener. Gate logic must key on
+  that, never on `decision.messages` (§5).
+
+Current implementation gaps are registered as G-1…G-21 in DESIGN §B.
 
 ---
 
-## 3. Target architecture (four new layers)
+## 3. Target architecture
 
 ```text
 user message
-   |  (turn/start -> inbox.claim -> agent/pre-step waterfall)   <-- the only unavoidable point
+   |  turn/start -> inbox.claim -> agent/pre-step (only unavoidable point; every step)
    v
-[L-GATE]  entry gate (new): recursion pass-through, idempotency, mandatory routing
-   |                \-> explicit refusal / degraded report (never a silent direct answer)
+[L-GATE]  entry gate: pass-through rules -> mandatory routing -> reject
+   |            \-> explicit refusal / degraded report (never a silent direct answer)
    v
-[L-RUN]   one workflow run per user message (engine already exists)
-   |   plan -> execute -> independent verify -> bounded retry -> synthesize (JS)
-   |        role-aware model assignment (B) + ordered fallback (C)
+[L-RUN]   one workflow run per user message (existing engine)
+   |   plan -> execute -> independent verify -> bounded retry -> synthesize
+   |        role-aware model assignment (B) + ordered fallback (C), v1 = script-level
    v
-[L-ANS]   final answer production (route a / a' / b, see §5) — PENDING(t18)
-   |
+[L-ANS]   answer production: turn closes -> deliver (relay turn, or direct append)
    v
-[L-CFG]   settings + validation (D), shared single source of truth for roles, chains, limits
+[L-CFG]   settings + load-time validation (D), one source of truth
 ```
 
-Layer ownership (nothing else changes):
+- **L-GATE** — new host module using `agent/pre-step` (routing/refusal),
+  `tools/pre-execute` + scoped `ctx.tools.restrict` (tool surface),
+  `tools/pre-execute` deny list including the in-tree `workflow` tool, and
+  `agent.followup()` after the turn closes. **Scope decision pending (U-7):** a global
+  plugin row affects every agent in the process, while registering the same hooks inside
+  an `AgentPreset` limits the blast radius to the sessions that join the preset
+  (SOURCE-CONFIRMED: preset registry `mount/composeFrom/composedPreset`; "a preset's
+  standing declaration covers every agent joined under it").
+- **L-RUN** — existing engine path, extended with role→chain lookup in the script (v1)
+  and a new synthesizer stage only if U-3 says so.
+- **L-ANS** — one implementation path with a **strategy switch** (§5.2).
+- **L-CFG** — role/chain/limit schema in `src/config.ts`, `volatile()` fields, `.get()`
+  reads, settings namespace, optional client page.
 
-- **L-GATE** — new host-side hooks module. Uses `agent/pre-step` (mandatory routing),
-  `tools/pre-execute` (deny non-workflow tools while a gate is pending), scoped
-  `ctx.tools.restrict` (`dsh-tools/lib/types/index.d.ts:645` — per-agent only, never
-  global), `agent/turn-stopping` (`runtime-types.d.ts:387`) as a *supplement*, and
-  `agent.followup()/steer()` for relay. Idempotency and diagnostics are durable
-  session records, not memory counters.
-- **L-RUN** — the existing engine path, extended: roles passed through
-  `buildWorkflowRequest` → `args.roles` → script `agent(...,{provider,model})`; plus a
-  new synthesizer `agent()` call (today's Synthesize stage has none).
-- **L-ANS** — the entry-gate companion that turns a workflow result into the final
-  assistant answer. Route choice is the single largest open decision (B-1).
-- **L-CFG** — `src/config.ts` grows into the role/chain/limit schema; `ctx.settings`
-  namespace for operability; GUI page only in a later phase (§10).
-
-**Hard constraint:** no DSH core change. Every mechanism above is a documented
-0.2.1-rc.2 extension point (§14).
+**Hard constraint:** no DSH core change. All mechanisms are 0.2.1-rc.2 extension points;
+their support levels are in §13.
 
 ---
 
 ## 4. Module responsibilities
 
-| Module | Status | Responsibility | Explicitly not responsible for |
+| Module | Status | Responsibility | Not responsible for |
 |---|---|---|---|
-| `src/index.ts` | exists, extended | registration, `inject` list gains `agents`; tool schema unchanged for compatibility; wires gate + routing + settings | model call policy, answer text |
-| `src/gate.ts` | **new** | `agent/pre-step` classification (own subagent? already handled? route), idempotency registry, `tools/pre-execute` deny, scoped restrict, turn-stopping supplement, relay via `followup/steer` | producing verified content |
-| `src/router.ts` | **new** | per-role cursor & model selection at `agent/request`; classification at `agent/request-error`; ownership of the retry waterfall (`{prepend:true}`, never delegate) | plan/verify semantics |
-| `src/roles.ts` | **new** | role ids (`planner`/`worker`/`verifier`/`synthesizer`), childId→role registry, `onUnknownRole` policy | config persistence |
-| `src/config.ts` | exists, extended | schemastery schema for roles, chains, budgets, gate mode; hard caps; load-time validation | runtime routing decisions |
-| `src/script.ts` | exists, extended | role-aware `agent()` calls, synthesizer stage, writes-path reporting for the shared-cwd mitigation, transport-vs-semantic failure separation (G-4) | model ordering/fallback (host-side) |
-| `src/report.ts` | exists, extended | report validation hardening (§9 of DESIGN), deterministic failure/partial reports for fatal paths | choosing models |
-| `src/records.ts` | **new** | durable `grok-workflow/route`, `grok-workflow/gate`, `grok-workflow/run` session-event augmentation + redaction | user-facing text |
-| `src/redact.ts` | exists | single redaction source; today duplicated inside the generated script (must stay test-locked) | transcript-level privacy |
-| `cordis.patch.yml` | exists | one bundle row; may need a second row only if a client (GUI) module is added in Phase 6 | — |
+| `src/index.ts` | extended | registration; `inject` gains `agents`; wires gate + settings; keeps the current tool for backward compatibility | model policy, answer text |
+| `src/gate.ts` | **new** | `agent/pre-step` classification and routing; idempotency scan via session plugin records; `tools/pre-execute` deny (+ in-tree `workflow` tool); scoped restrict; delivery after the turn closes | producing verified content |
+| `src/answer.ts` | **new** | the strategy switch: relay turn (default) vs direct append (degraded); delivery keying and dedupe | deciding the workflow outcome |
+| `src/router.ts` | **new, optional (v1.5)** | request-level routing at `agent/request` + `agent/request-error`; only if L2 is adopted (U-2) | v1 fallback (that lives in the script) |
+| `src/roles.ts` | **new** | role ids, `childId → role` registry, chain selection helper, `onUnknownRole` | persistence |
+| `src/config.ts` | extended | schemastery schema, `volatile()` fields, load-time validation, hard caps | runtime decisions |
+| `src/script.ts` | extended | role-aware `agent()` calls, script-level chain traversal (v1 fallback), transport-vs-semantic separation, writes-path reporting | model ownership, retry policy ownership |
+| `src/report.ts` | extended | report hardening (7 holes), failure reports for fatal/prepare-phase failures | model choice |
+| `src/records.ts` | **new** | `appendPluginRecord` writers/readers for run/gate/route; redaction of recorded fields | user-facing text |
+| `src/redact.ts` | unchanged | single redaction source (script mirror stays test-locked) | transcript privacy |
+| `cordis.patch.yml` | extended | one row; a second row only if a preset-scoped variant (U-7) or a client page is chosen | — |
 
 ---
 
 ## 5. Message lifecycle
 
-Per user message, target state machine (all transitions durable):
-
 ```text
-M0 claimed by inbox
- -> G1 classify: own subagent / already handled / normal user message
-      subagent or duplicate -> PASS (enter, untouched)
-      normal -> G2
- -> G2 mandatory routing (route a/a'/b — PENDING(t18))
- -> R1 run workflow (one run per message; key = sessionId+turn+messageSeq)
+M0 claimed by inbox (payload.messages = claimed batch)
+ -> G0 pass-through rules (checked against payload.messages, never decision.messages)
+      payload.messages.length === 0                 -> PASS (tool continuation / wake)
+      any message source.kind !== 'user'            -> PASS (plugin relay, notice, …)
+      own subagent (origin==='subagent' || depth>0) -> PASS
+      delivery key already recorded                 -> PASS
+ -> G1 mandatory routing (single path + strategy switch, §5.2)
+ -> R1 one workflow run for this claimed batch
  -> R2 report validated + redacted
- -> R3 final answer produced (single artefact, explicit status)
- -> R4 turn/end: completed | blocked, plus grok-workflow/run record
+ -> R3 turn closes (blocked), then the answer is delivered per strategy
+ -> R4 records: run/gate/route plugin records + turn/end reason
 ```
 
-Rules that hold regardless of the B-1 route:
+Non-negotiable rules:
 
-1. **One user message → one workflow run.** Duplicate suppression is durable
-   (session event), not in-memory: an in-memory counter is reset by resume/fork and
-   silently refunds budget (t4 R-1).
-2. **No assistant text may be produced before the workflow result exists.** Any
-   mechanism that lets the main model answer first is a bypass and is rejected.
-3. **Child agents never re-enter the gate** (`origin==='subagent'` or
-   `delegationDepth>0` → pass-through). Grandchildren are additionally stopped by
-   `dsh-subagent` `maxDepth=1`, but that is a *volatile user setting* and is not
-   counted as a guarantee (t5 §3).
-4. **Failure is a first-class outcome:** explicit failure/partial report; never a
-   silent direct answer (R-001).
-5. **Context:** objective = the new user message + a bounded slice of prior turns
-   (count/size capped, redacted). Today the objective is only the tool argument, so
-   follow-ups lose all context (t2 G-2) — this must be fixed for R-001's
-   "follow-up questions" clause.
+1. **Classification uses `payload.messages` only.** `decision.messages` is contaminated by
+   other listeners (G-15), so it cannot identify "a new user message".
+2. **One user message → one workflow run.** The delivery key is
+   `agentId + sorted(claimed message ids)`; dedupe scans `agent.session.ownEvents()` for
+   a plugin record with that key (RUNTIME-VERIFIED, t18 EXP2a). Never an in-memory map:
+   resume/fork/restart reset it.
+3. **A run never starts on a continuation step.** Otherwise every tool round-trip starts
+   another workflow (cost explosion) — the empty-batch rule above prevents it.
+4. **`steer` while a run is in flight** (R-11): the message enters `next-step`, is claimed
+   by the next `pre-step`, and would start a second run. v1 policy: if a run is in
+   flight, **queue** the message and deliver it as a follow-up turn after the run
+   completes (and say so in the answer), rather than starting a concurrent run. G-16
+   (a steer issued from inside the `pre-step` listener parks forever) means the plugin
+   never steers from there.
+5. **Child agents never re-enter the gate**; grandchildren are additionally limited by
+   `maxDepth=1`, a volatile user setting, so this is not counted as a guarantee.
+6. **Failure is a first-class outcome**: explicit failure/partial report, never a silent
+   direct answer.
 
-### 5.1 The three candidate routes for the final answer — PENDING(t18)
+### 5.1 Why the gate must `reject`
 
-All three are technically possible in 0.2.1-rc.2; they differ in *guarantee strength*.
-`(a')` and `(b)` were previously reported with opposite recommendations by t1 and t3;
-the ruling is in DESIGN §A-3 and rests on two source facts verified in this round:
+`{kind:'enter', messages: []}` looks like a free "swallow" primitive, because
+`step()` ends the turn when the batch is empty (`dsh-agent-loop/lib/index.js:965-968`).
+It is not: other `pre-step` listeners (`time-context`, `agent-instructions`, …) run
+`await next()` and inject their context into **any** `enter` decision, so the batch is
+non-empty, a real model request is issued with the user text already swallowed, and the
+user sees an unrelated "I don't see a task" assistant reply. This was measured
+(RUNTIME-VERIFIED, t18 EXP0) and is registered as **G-15**. At least eight in-tree
+packages already register `agent/pre-step` listeners, so "the batch is empty" is never a
+safe assumption about the final decision.
 
-- `agent/request` can only change `{provider, model, reasoningEffort, temperature,
-  maxTokens, stop}` (`dsh-llm/lib/types/call-config.d.ts:11-26`). It **cannot** force
-  `tool_choice` or a tool call, so no request-level mechanism can compel the main
-  model to invoke the workflow tool.
-- `agent/turn-stopping` is dispatched only after a step produced a turn end
-  (`dsh-agent-loop/lib/index.js:1000-1005`), and `agent/pre-step` `reject` returns from the
-  turn loop *before* that point (`:960-963`). A rejected step therefore can never be
-  "recovered" by turn-stopping.
+⇒ The only decision that reliably yields zero model calls is `{kind:'reject'}`
+(`:960-963`; `agent-instructions` explicitly passes on that case).
 
-| route | mechanism | guarantee vs R-001 | user-visible artefact | known risks / unverified |
-|---|---|---|---|---|
-| **(a)** enter-empty + `whenIdle` + `followup` relay | `pre-step` returns `enter` with `messages: []` → turn ends `completed` with no model request (`:965-968`); plugin runs the workflow, then relays the result as a user message via `agent.followup()` (`runtime-types.d.ts:164`, `:192`) | **medium** — the first answer the main model produces is already constrained to the relayed workflow result, but the main model still writes it (paraphrase drift, possible added claims) | assistant message authored by main model | `PENDING(t18)`; relay ordering, turn accounting, and whether an idle agent can be woken reliably need measurement |
-| **(a')** reject + plugin appends `assistant/message` | `pre-step` `reject` (turn ends `blocked`, `:960-963`), plugin runs the workflow, appends `user/message` (compensating B-2) and `assistant/message` `{turn,step,message,stream:[]}` with `surfaceOp:'append'` | **strongest** — the main model has no request at all in that turn; the answer is the deterministic workflow report | assistant message authored by plugin | support level **B**: no in-tree precedent, no API promise, no live stream, no usage accounting, plugin must fill a truthful provider/model; needs headless *and* Web GUI smoke (`PENDING(t18)`) |
-| **(b)** redirect + three gates | `pre-step` returns `enter` with rewritten messages (workflow directive), scoped `tools.restrict(['grok_workflow'])`, `tools/pre-execute` deny, turn-stopping supplement | **weak** — the model can still emit a text-only answer at the admitted step, and turn-stopping runs after that text is already committed | assistant message authored by main model, unverified | cannot be made airtight with the available hooks (see the two facts above); usable only as a degraded/advisory mode |
+### 5.2 One implementation path, one strategy switch (U-1)
 
-**Default policy recorded here:** preference order `(a') > (a) > (b)`, with the final
-choice deferred to t18's evidence plus user confirmation. Whichever route is chosen,
-the *fallback ladder* if it proves unstable is: `(a')` → `(a)` → `(b)` **with an
-explicitly documented downgrade of the guarantee** — never a silent downgrade.
+G-15 collapses the earlier two-route design: both viable routes start with `reject`, both
+run the workflow while the turn is closing, and both deliver afterwards. They differ only
+in **who writes the final answer**.
+
+| step | what happens | evidence |
+|---|---|---|
+| 1 | `pre-step` returns `{kind:'reject'}` → zero model calls, turn ends `blocked` | `:960-963` (SOURCE-CONFIRMED) |
+| 2 | plugin starts the run inside the listener (parent + signal held) | RUNTIME-VERIFIED t18 EXP1d (`stopReason=completed, agentsStarted=1`) |
+| 3 | run settles → plugin records the delivery key and delivers per strategy, **after the turn closed** | RUNTIME-VERIFIED t18 EXP1d/EXP2a |
+| 4 | user-visible answer | strategy switch below |
+
+| strategy | writer | strengths | weaknesses |
+|---|---|---|---|
+| **(a) relay turn — DEFAULT** | main model, in a **new turn** opened by `agent.followup()` carrying the report with the plugin's own `source.kind` | real model turn: live stream, usage accounting, true provider/model metadata; GUI and headless both consume it normally; the relay message is precisely identifiable at the gate (RUNTIME-VERIFIED t18 ④); fidelity measured **exact** in the single sample taken | one extra turn of latency; relay text depends on model obedience (host cannot verify it); in a one-shot app the run is aborted when the tree tears down (G-18) |
+| **(a') direct append — DEGRADED** | plugin appends `assistant/message` | no second model call; the answer is the deterministic report text | level-B undocumented path; no stream/usage; plugin must fill provider/model; **ordering race** with the loop's own step messages unless written after the turn closes (G-19, RUNTIME-VERIFIED); the turn still ends `blocked` → one-shot exit code 1 (G-20); same teardown constraint (G-18) |
+| **(b) redirect + three gates — ADVISORY ONLY** | main model at the admitted step | no extra latency | not enforceable: `agent/request` cannot force `tool_choice` (E-6) and turn-stopping runs after the answer is committed (E-4); the model can answer directly and the workflow may not run at all |
+
+**Default = (a).** (a') is the switch for deployments that cannot accept a second model
+turn, with the G-19/G-20 consequences documented. (b) is retained only as an explicit
+advisory mode with a documented downgrade of the guarantee. `U-1` keeps the final choice
+with the user; the ordering above is the technical recommendation, not a user decision.
+
+**Guarantee wording (R-15):** under (a)/(a'), "the main model cannot answer before the
+workflow ran" holds **for the current composition**: any listener registered *outside*
+ours can rewrite the decision (cordis waterfall semantics), so the anti-bypass assertion
+belongs in the test suite against the real composed bundle, not in prose.
+
+### 5.3 Verdict on mandatory-entry feasibility (t8 conclusion)
+
+**VERDICT: PARTIALLY FEASIBLE — no DSH core change is required, but "the main model can
+never answer without the workflow" cannot be guaranteed unconditionally with the 0.2.1-rc.2
+extension points.**
+
+*Feasible today (runtime-verified):*
+1. `pre-step` sees every step and `{kind:'reject'}` yields zero model calls with the turn
+   ending `blocked` (E-1/E-3/E-19).
+2. A workflow run started inside that listener completes normally across the turn boundary
+   **while the app is alive** (E-21).
+3. The validated report can be delivered afterwards as a real model turn carrying the
+   plugin's own message source, byte-identical to the report in the sample taken
+   (E-22/E-23), or appended directly as a degraded path (E-8).
+4. Idempotency, records and route self-checks all have runtime-verified mechanisms
+   (A-13, E-28, E-29, E-30).
+
+*Not guaranteed (boundaries that make the verdict "partially"):*
+1. **Composition dependency (R-15):** any listener outside ours may rewrite the waterfall
+   decision; at least eight in-tree packages register `agent/pre-step` listeners, so this is
+   a real risk, not a theoretical one.
+2. **One-shot app teardown (G-18/F9):** a headless run aborts the workflow when the turn
+   ends `blocked`, so the strongest routes cannot be verified — or used — in CI or in any
+   one-shot invocation without a keep-alive child.
+3. **Relay fidelity (OQ-015/NR-2):** the host cannot verify that the main model copied the
+   report faithfully; one exact-match sample is not a guarantee.
+4. **Direct append (a') (G-19/G-20):** ordering races unless written after the turn closes,
+   and the turn still ends `blocked` (non-zero exit).
+
+*If the user requires an unconditional guarantee, the minimum upstream changes are (in
+preference order):*
+1. a supported "commit this turn's answer" API (session write ownership for
+   `assistant/message`, or a documented `turn/end` outcome the plugin can set), which would
+   make `(a')` a first-class route; **or**
+2. a `pre-step` **final-decision lock** (a decision mode that outer listeners cannot
+   rewrite), which would make `reject` airtight regardless of composition; **or**
+3. a turn-outcome hook that lets a plugin end a turn with `completed` while supplying the
+   answer, which would also fix G-20.
+
+*Alternatives without touching upstream:* preset-scoped registration to shrink the
+composition risk (U-7), a keep-alive child so the run survives teardown, and `(a)` relay as
+the default. All three are already in this plan; none of them removes the boundary, which is
+why the verdict stays "partially feasible" rather than "feasible".
 
 ---
 
 ## 6. Role model rules (B)
 
-- Roles: `planner`, `worker` (executor), `verifier`, `synthesizer`. The synthesizer
-  role **does not exist today** — Synthesize is pure JS (`src/script.ts`), so R-002's
-  fourth role currently has zero implementation (t2 G-3). Adding a synthesizer
-  `agent()` call is part of B, not an optional extra.
-- Assignment path: `args.roles` → script → `agent(prompt,{provider,model})` → engine
-  maps to `agentOptions` (`dsh-workflow-ptc/lib/index.js`, host mapping) → child
-  inherits nothing except what is set.
-- **Capability gate (hard, fail-fast at load):** the configured subagent provider must
-  declare `agentOptions: true`. `spawn` and `fork` do
+- Roles: `planner`, `worker` (executor), `verifier`, and — **only if U-3 says yes** —
+  `synthesizer`. Today Synthesize is pure JS (`src/script.ts`), so a synthesizer role is
+  a scope addition rather than a missing piece of the existing design (t7 R-20). v1
+  default: keep the JS aggregation; adding a model call costs one more call per user
+  message and introduces "the synthesizer may add unverified claims", which would then
+  need a post-check (no claim outside `confirmed[]`). Cost/risk of both options is a
+  user decision (U-3).
+- Assignment: `args.roles[role].chain` → script `agent(prompt,{provider,model})` →
+  engine maps to `agentOptions` → child starts on that route.
+- **Capability gate (hard, fail-fast at load):** the subagent provider must declare
+  `agentOptions: true`. `spawn`/`fork` do
   (`dsh-subagent-spawn-in-process/lib/index.js:22`,
-  `dsh-subagent-fork-in-process/lib/index.js:36`); the ACP provider declares `false`
-  (`dsh-subagent/lib/index.js:2790`). Routing to an incapable provider must fail
-  loudly at startup, never silently inherit the parent model (else R-002 appears to
-  work while doing nothing).
-- **Role identity is not free:** `AgentOptions` has no metadata field and
-  `agent/request` payload carries no role, so the plugin must maintain its own
-  `childId → role` registry and use label/phase only as display hints. Unknown role →
-  policy `onUnknownRole` (default `fail-fast`).
-- `effort` cannot be passed through the engine (`DEFERRED_AGENT_OPTIONS` includes
-  `effort`); `reasoningEffort` on a *route* is applied at `agent/request`, and must be
-  omitted (not defaulted) when a chain entry does not declare it.
-- Model IDs are **never** assumed: they are validated against the configured
-  provider/model catalog at load time (OQ-006).
+  `dsh-subagent-fork-in-process/lib/index.js:36`); ACP declares `false`
+  (`dsh-subagent/lib/index.js:2790`). Never silently inherit the parent model.
+- **Role identity is self-managed:** `AgentOptions` has no metadata field and
+  `agent/request` carries no role, so the plugin keeps `childId → role`; unknown role →
+  `onUnknownRole` (`fail-fast` by default). Under v1 the script knows the role directly
+  when it calls `agent()`, so the registry is only needed once L2 exists (U-2).
+- `effort` cannot be passed through the engine (`DEFERRED_AGENT_OPTIONS`);
+  `reasoningEffort` belongs to a route. Because a bad effort surfaces as
+  `UNSUPPORTED_REASONING_EFFORT` **during request preparation** (R-14), the value must be
+  validated at load time against the model catalog.
+- Model IDs are validated against the configured catalog; nothing is assumed.
 
 ---
 
 ## 7. Fallback decisions (C)
 
-**Ownership (decision, needs user confirmation):** the plugin registers
-`agent/request-error` with `{prepend:true}` and **never delegates** (t4 D4/P1).
-Rationale: `dsh-llm-retry` registers the same event without `prepend`
-(`dsh-llm-retry/lib/index.js:175`) and counts retries per `[provider, policyKey]`
-while resetting per `step/start`/`turn/end`, so letting both run multiplies budgets
-(worst case 3 chain entries × 5 llm-retry attempts × 2 = 30 calls per task).
-Load-time self-check: if any provider's retry policy is `mode:'always'`, warn or
-refuse to start (`PENDING(t19)` for the readable interface, H-1).
+**v1 scope decision (t7 R-18, adopted).** The v1 fallback lives **entirely in the
+script** (L1): `runTask` already owns a bounded retry loop and `agent()` already accepts
+`{provider,model}`, so "advance to the next chain entry" is a chain lookup keyed by the
+attempt index. This needs no `agent/request` listener, no `prepend` ownership, no
+durable cursor, and no interaction with `dsh-llm-retry`; prepare-phase failures are caught
+by the script's own `try/catch`.
 
-**Two routing layers, mutually exclusive per task:**
+| aspect | v1 (script L1) | L2 (request-level, later) |
+|---|---|---|
+| implementation | chain lookup in `runTask` | `agent/request` + `agent/request-error` listeners + durable cursor |
+| keeps in-child tool results on switch | **no** (a switch restarts the child) | yes |
+| covers prepare-phase errors | yes (script catches) | no (they escape the retry loop, R-14) |
+| conflicts with `dsh-llm-retry` | none | must own the waterfall |
+| status | required for Phase 3 | optional optimization; **U-2** |
 
-- **L1 task-level** — restart the child with the next chain entry's model. Used when
-  the child cannot continue; loses in-child tool results.
-- **L2 request-level** — live child, replace the route at `agent/request` and decide
-  retry/advance at `agent/request-error`; keeps completed tool results.
-- Invariant: at any moment exactly one recovery mechanism is in flight for a
-  `(runId, taskId)`; L2 exhaustion writes a durable `exhausted` record that L1 reads
-  before restarting.
+**Ownership (when L2 is adopted) is not a preference.** t19 H-4 measured four
+combinations: a listener registered without `{prepend:true}` is **never called** when
+`dsh-llm-retry` owns recovery; `prepend` + never calling `next()` makes our listener the
+outermost and produces zero `llm/retry` events, i.e. full ownership. There is no
+"cooperative" middle setting, so the hard constraint is: `{prepend:true}` **and** never
+delegate. `U-2` therefore stays on the user list only as "confirm that only one option
+exists"; the alternative is not implementable.
 
-**Chain state machine (summary):** `IDLE → PREFLIGHT → ROUTE_SELECT → ATTEMPT →
-CLASSIFY`, branches `BACKOFF_SAME_MODEL`, `ADVANCE_CURSOR`, `COOLDOWN_SKIP`,
-`SEMANTIC_REPAIR`, terminals `SUCCESS | PARTIAL | FAILED | ABORTED`.
-Anti-runaway invariants: every retry increments exactly one of attempts/cursor; the
-cursor is monotone (no revisiting a failed route); every state has a terminal exit;
-accounting is durable **before** any cancellable wait; three-way guard (attempts,
-cursor, deadline/token budget).
+**Load-time self-check:** `ctx.llm.listProviders()` then `ctx.llm.providerRetryPolicy(id)`
+per provider; a provider reporting `mode:'always'` must warn or refuse to start
+(RUNTIME-VERIFIED, t19 H-1).
 
-**Budgets (defaults / hard caps — user-confirmable):** chain length 3/5, attempts per
-model 2/3, total transport attempts per task 6/12, semantic retries 1/3 (aligns with
-the existing `maxRetries` cap), task deadline 300 s, run deadline 1.8 M s / 8.64 M s,
-token budget per task 500 k/5 M, route cooldown 60 s after 3 consecutive terminal
-failures of the same route. Cost note: DSH re-injects the runtime-context user message
-on every attempt (`dsh-agent-loop/lib/index.js` retry loop, t4 R-3), so attempts raise
-input tokens linearly — another reason to prefer advancing the cursor over retrying.
+**Budget invariants (R-12), enforced at load time:**
 
-**Semantic plane is separate:** malformed structured output, "task not finished", and
-verification failure never consume transport budget; they consume the semantic retry
-pool and share the per-task hard attempt cap. "All routes exhausted" produces an
-explicit `failed`/`partial` report — never a direct answer (D7/R-001).
+- `chainLength × perModelAttempts ≥ totalAttemptsPerTask` — otherwise the configured
+  chain can never be exhausted within the task cap and the config is self-contradictory.
+- `transportAttempts + semanticRetries ≤ totalAttemptsHard`.
+- Hard caps: chain 5, per-model 3, total 12, semantic 3; defaults 3 / 2 / 6 / 1. With the
+  hard values, 5 × 3 = 15 > 12, so a configuration near the cap is rejected unless the
+  product of the first two is lowered — the validator must check the product, not the
+  factors individually.
+- Deadlines and token budgets bound the rest (§11). Every retry increments exactly one
+  of attempts/cursor; accounting is durable **before** any cancellable wait (t19 H-3b:
+  the first attempt has no readable history, so the cursor must be self-pushed).
+
+**Semantic plane stays separate:** malformed structured output, `finish.kind==='max-tokens'`
+(which produces no failure event at all) and verification failure never consume transport
+budget; they consume the semantic pool and share the per-task hard cap.
 
 ---
 
 ## 8. Error classification
 
-Route on the provider-neutral `code` only; **never parse messages**. Unknown code →
-fail-closed terminal state.
+Route on the provider-neutral `code`; never parse messages. Unknown code → fail-closed
+terminal state.
 
 | class | codes (0.2.1-rc.2) | action | budget |
 |---|---|---|---|
 | rate limit | `RATE_LIMIT` | same-model retry (respect `providerRetryAfterMs`) then advance | transport |
 | server | `SERVER` | same-model retry then advance | transport |
 | transport | `TRANSPORT` | prefer advancing across providers | transport |
-| timeout | `TIMEOUT` | prefer advancing (attempt already expensive) | transport |
+| timeout | `TIMEOUT` | prefer advancing | transport |
 | model/route fatal | `NO_ADAPTER`, `INVALID_MODEL_*`, `UNKNOWN`, `PI_AI_ERROR` | no same-model retry; advance; preflight should have removed it | route-level, no attempt |
+| reasoning effort mismatch | `UNSUPPORTED_REASONING_EFFORT` (`dsh-llm/lib/index.js:2191`, `:2195`) | route-level fatal: preflight must catch it (validate effort against the catalog); advance without consuming an attempt | route-level |
 | quota | `QUOTA`, `ACCOUNT_QUOTA` | no same-model retry; advance across providers; all-quota ⇒ partial/failed | none |
-| credential | `INVALID_CREDENTIAL` | terminal or cross-provider; never retry same key | none |
+| credential | `INVALID_CREDENTIAL` | terminal or cross-provider; never retry the same key | none |
 | context overflow | `CONTEXT_WINDOW_EXCEEDED` | larger-context route or hand to compaction | none |
 | empty output | `EMPTY_RESPONSE` | one fast same-model retry, then advance | transport |
-| image offload | `IMAGE_OFFLOAD_REQUIRED` | **must** delegate to the engine (`next()`), never self-retry | none |
-| aborted | `ABORTED`, `signal.aborted` | immediate terminal, no retry, no charge | — |
-| semantic | structure mismatch, `finish.kind==='max-tokens'`, verification fail | semantic repair / advance, distinct bookkeeping | semantic |
+| image offload | `IMAGE_OFFLOAD_REQUIRED` | **must** delegate to the engine, never self-retry | none |
+| aborted | `ABORTED`, `signal.aborted` | immediate terminal, no retry | — |
+| semantic | structure mismatch, `max-tokens`, verification fail | repair / advance on the semantic pool | semantic |
 
-Two extra preflight duties: `NO_ADAPTER` is silently swallowed during request
-preparation (`dsh-agent-loop/lib/index.js` prepare path), so routes must be validated
-*before* they are attempted; and `max-tokens` truncation produces no failure event at
-all, so it can only be caught on the semantic plane.
+**Known limit (R-14):** `agent/request-error` is dispatched only when the stream finished
+with `error`/`aborted` (`dsh-agent-loop/lib/index.js:1130-1146`). Failures raised while
+preparing the request — including `UNSUPPORTED_REASONING_EFFORT` and a swallowed
+`NO_ADAPTER` that only fails later — never reach a request-error listener. In v1 this is
+harmless (the script catches them); when L2 is added it must be documented as "not
+routable at request level".
 
 ---
 
 ## 9. Settings system (D)
 
-Staged, single source of truth (`src/config.ts` schema, surfaced two ways):
+Stage 1 (required) is YAML + settings namespace; Stage 2 is a dedicated page.
 
-- **Stage 1 (required for "operable"):** profile-YAML settings with schemastery,
-  `volatile()` fields so the settings controller can write them
-  (`dsh-settings/lib/types/index.d.ts:80` configure, `:96` describe). Load-time
-  validation: unknown role → fail; empty chain → fail; duplicate `(provider,model)`
-  in a chain → fail; unknown provider/model → fail with the catalog suggestion;
-  provider without `agentOptions` → fail; every cap clamped to its hard maximum.
-- **Stage 2 (optional GUI):** a real page needs a `dsh.client` dual package plus
-  `configForms.whileServed([ns], …)` client registration (as the in-tree settings
-  pages do). **`SettingsDescriptor.autoGenerate` has no GUI consumer in 0.2.1-rc.2**
-  (CONFIRMED: the flag is produced by
-  `dsh-api-settings-controller/lib/index.js:277` and read only by the cordis tool
-  catalog) — an external plugin therefore does *not* get a settings page for free.
-  Do not promise one.
-- Settings surface (draft): gate mode, per-role ordered chains, per-model attempts,
-  total attempts, semantic retries, concurrency, `maxTasks`, task/run deadlines,
-  token budget, cooldown, diagnostic verbosity, `onUnknownRole`.
-- Secrets never live in settings; only provider/model identifiers and limits.
+1. **`volatile()` is not cosmetic.** A volatile field is "editable without remounting";
+   writing a non-volatile field remounts the plugin, which **kills an in-flight workflow
+   run**. Every user-editable field must be volatile.
+2. **Read at use time, not at `apply()` time.** The current `resolveConfig()` snapshots
+   scalars into a resolved object during `apply`, so even volatile fields would never be
+   seen live. Fields become volatile holders read with `.get()` at the request/attempt
+   boundary (t19 H-5 pattern: `config.provider.get()`).
+3. **Shape:** `roles: z.dict(z.array(z.object({provider, model, reasoningEffort?, maxAttempts?})).min(1).max(5)).volatile()`.
+   **Schema cannot enforce emptiness:** `z.array(z.object(...)).min(1)` accepts `[]`
+   (measured, t19 H-5) and `z.dict` accepts a missing key. Chain non-emptiness, all four
+   roles present, in-chain uniqueness and the budget invariants must be enforced by
+   plugin-side fail-fast validation with negative tests.
+4. **No generic form for nested chains:** the automatic settings form accepts only scalar
+   top-level fields; nested role→chain editing needs a dedicated client page using path
+   operations (`set`/`unset`/`mutate` with a path array; `deletePath` splices array
+   indices). All in-tree pages that edit dicts are custom pages.
+5. Consequently **OQ-007 is only partially answered**: Stage 1 (YAML + validation) is
+   operable; the GUI page is a later deliverable with a real `dsh.client` package.
+   `autoGenerate` still has no consumer (E-11).
 
 ---
 
 ## 10. Data flow and redaction
 
-- **Into child prompts:** task JSON only, deep-redacted (`safePromptJson`); the
-  objective must also be redacted — today `planPrompt()` interpolates the raw
-  objective (t5 §4 gap) and must be fixed.
-- **Out of the workflow:** report → `redactDeep`; engine errors → `redactSecrets`;
-  logs → `redactError`. One redaction implementation (the script-embedded mirror must
-  be test-locked against `src/redact.ts`, or removed).
-- **Route/attempt records:** role, ids, provider, model, cursor moves, outcome, code,
-  status, delay, duration, tokens, reason, redaction version. **Never** prompt or
-  response bodies, keys, `Authorization`, credential-bearing URLs, or raw provider
-  request ids (hash prefix only).
-- **Honest limit:** child agents are real DSH sessions; their transcripts are outside
-  plugin control. Do not claim transcript-level privacy in docs.
-- **Hardening:** if the configured subagent provider is `fork` (which inherits the
-  parent conversation), warn or refuse — that defeats the "task JSON only" model and
-  copies parent history (including possibly credentials) into every child.
+- **Into prompts:** task JSON + bounded history, deep-redacted; the objective must be
+  redacted too (today `planPrompt()` interpolates it raw).
+- **Out:** report → `redactDeep`; engine errors → `redactSecrets`; logs → `redactError`;
+  one redaction implementation, the script mirror test-locked against `src/redact.ts`.
+- **Records:** written with `appendPluginRecord(session, 'plugin:grok-workflow/…', data)`
+  and read back with `pluginRecordOf` (RUNTIME-VERIFIED, t19 H-2: no runtime gate, records
+  are `ignorable: true`, survive fork/resume, never enter the model-visible surface).
+  This replaces the earlier `SessionEventMap` augmentation plan. **Support level:**
+  experimental API, "best-effort preserved" across session-format migrations — do not
+  describe it as plain "durable".
+- Recorded fields: run/gate/route identifiers, role, provider, model, attempt and cursor
+  indices, outcome, failure code/status, delay, duration, token counts, reason,
+  redaction version. Never prompt/response text, keys, `Authorization`, credential-bearing
+  URLs, or raw provider request ids (hash prefix only).
+- **Honest limits:** child transcripts are real DSH sessions outside plugin control; and
+  a `fork` provider inherits the parent conversation, which defeats "task JSON only" —
+  warn or refuse.
 
 ---
 
@@ -345,183 +411,203 @@ Staged, single source of truth (`src/config.ts` schema, surfaced two ways):
 
 | dimension | mechanism | default / hard cap | notes |
 |---|---|---|---|
-| per-task transport attempts | router budget | 6 / 12 | shared with semantic retries |
+| per-task attempts | script chain traversal + retry loop | 6 / 12 | transport and semantic share this cap; see the §7 invariants |
 | chain length | config | 3 / 5 | duplicates rejected |
-| per-model attempts | config | 2 / 3 | context re-injection makes retries costly |
+| per-model attempts | config | 2 / 3 | retries are expensive (context re-injection) |
 | semantic retries | script | 1 / 3 | existing `maxRetries` cap |
-| concurrency | script pool ∧ engine slots | 3 / 6 | actual = min(script, engine `maxConcurrentAgents`); the two defaults must agree |
-| task count | config | 6 / 12 | report validator must enforce `tasks ≤ maxTasks` (hole today) |
-| total child agents | engine `maxTotalAgents` | ≤ ~4× tasks | counts only workflow `agent()` calls, **not** grandchildren |
-| recursion | gate pass-through + subagent `maxDepth` | depth 1 | `maxDepth` is a volatile user setting ⇒ not a guarantee |
-| task / run deadline | script timer + `AbortSignal` | 300 s / 30 min | cancellation must map to the engine signal and dispose children |
-| token budget | route records + `assistant/message` usage | 500 k / 5 M per task | computed from usage, not from estimates |
-| turn occupancy | gate awaits the run | bounded by run deadline | a rejected/blocked turn must still end deterministically |
+| concurrency | script pool ∧ engine slots | 3 / 6 | **effective = min(script pool, engine slots)**: `maxConcurrentAgents` is engine deployment config (default `min(16, cores-2)`), not settable by the plugin, so the plugin can only tighten. Read the effective value for diagnostics; do not assume the two are equal (R-13) |
+| task count | config | 6 / 12 | the report validator must enforce `tasks ≤ maxTasks` (hole today) |
+| total child agents | engine `maxTotalAgents` = `1 + tasks·(retries+1)·2 + 2` (`src/script.ts:689-691`) | derived | ≈ 4·tasks **only** when `retries = 1`; with `retries = 3` it is `8·tasks + 3`. Counts only workflow `agent()` calls, not grandchildren |
+| recursion | gate pass-through + subagent `maxDepth` | depth 1 | `maxDepth` is user-volatile ⇒ not a guarantee |
+| task deadline | script timer + `AbortSignal` | 300 000 ms | cancellation maps to the engine signal and disposes children |
+| run deadline | `timeoutMs` | 1 800 000 ms / hard 86 400 000 ms (`src/config.ts:10`, `:21`) | 30 min default, 24 h hard |
+| token budget | record + `assistant/message` usage | 500 k / 5 M per task (proposal) | computed from usage, not estimates |
+| turn occupancy | gate holds the listener | bounded by the run deadline | a rejected turn must still end deterministically |
 
-Two known limit leaks to fix or document: `maxTotalAgents` does not bound
-grandchildren (cost ceiling not closed), and the plugin's `mapLimit` and the engine's
-slot limiter are independent (silent degradation when the engine config is lower).
+Known leaks: `maxTotalAgents` does not count grandchildren; a switch under L1 discards
+in-child tool results; and a steer during a run is queued (§5 rule 4) rather than run
+concurrently.
 
 ---
 
 ## 12. Test strategy
 
-Tests must prove *observable behavior on the target version*, not helpers only.
-
-- **Layer 1 — deterministic unit (exists, extend):** role/chain ordering, cursor
-  monotonicity, classification table, budget accounting, idempotency key, redaction,
-  report invariants (close t5's 7 holes), config validation.
-- **Layer 2 — real-contract tests:** use the real `dsh-workflow-ptc` engine with a
-  fake subagent provider (no model calls) to cover `schema → structured`,
-  `stopReason !== 'completed' → null`, `MaterializeError` paths, `AGENT_*` failures, and
-  the new synthesizer stage. Today the engine is faked by a hand-written VM, which is
-  why the real contract is untested (t5 §6).
+- **Layer 1 — deterministic unit:** role/chain ordering, cursor monotonicity, the
+  classification table, budget accounting (including the R-12 invariants and their
+  negative cases), the delivery key, config fail-fast (empty chain, missing role,
+  duplicate entry, cap overflow, bad effort), report invariants, redaction.
+- **Layer 2 — real-contract tests:** the real `dsh-workflow-ptc` engine with a fake
+  subagent provider (no model calls): `schema → structured`, `stopReason !== 'completed'
+  → null`, materialize failures, `AGENT_*` paths, the new synthesizer stage if adopted.
 - **Layer 3 — fault injection:** 429/5xx/timeout/connection loss, malformed structured
   output, whole chain unavailable, quota on every provider, verifier rejection,
-  cancellation mid-run, deadline expiry, provider without `agentOptions`.
-- **Layer 4 — live E2E on 0.2.1-rc.2 (local only; `NOT_RUN` in CI):** headless run +
-  Web GUI run for the chosen answer route (both sides are mandatory for `(a')`: the
-  GUI must render a settled bubble for the plugin-appended message).
-- **Layer 5 — anti-bypass regression:** a suite asserting no user message yields an
-  assistant answer without a validated report — including the trivial-message case.
-- **Layer 6 — cost/latency measurement:** trivial message, single task, multi-task,
-  and a forced-fallback run (to observe the retry-amplification guard).
+  cancellation, deadline, provider without `agentOptions`, unsupported reasoning effort.
+- **Layer 4 — live E2E on 0.2.1-rc.2 (local only; `NOT_RUN` in CI):** one headless run and
+  one Web GUI run per adopted answer strategy.
+- **Layer 5 — anti-bypass regression:** assertions against the **composed bundle**
+  (which already contains ≥8 in-tree `agent/pre-step` listeners), not against our listener
+  in isolation: (i) a normal user message still reaches the gate and
+  is rejected, (ii) a tool-continuation step does **not** start a run, (iii) a plugin relay
+  message (own `source.kind`) passes through, (iv) no assistant text exists before a
+  validated report.
+- **Layer 6 — cost/latency:** trivial message, single task, multi-task, forced-fallback
+  run, and one run under `(a)` vs `(a')` to measure the extra turn.
 
-Priority additions agreed from t5: criterion comparison normalization (exact `===`
-matching is the most likely source of *systematic false failures*), the 7 report
-semantic holes each with a negative test, dual-redaction consistency, provider
-capability preflight, and shared-working-directory write-overlap detection.
+Priority additions from t5/t7: criterion normalization (landed in `023887d`), the report
+semantic holes with negative tests, dual-redaction consistency, provider capability
+preflight, shared-directory write-overlap detection.
 
 ---
 
 ## 13. Compatibility and version differences
 
-Target = installed `0.2.1-rc.2` only. No claim below is derived from upstream `main`.
+Target = installed `0.2.1-rc.2` only.
 
-| capability | 0.2.1-rc.2 | evidence |
+| capability | status in 0.2.1-rc.2 | evidence |
 |---|---|---|
-| `agent/pre-step` mandatory gate | ✅ | `dsh-agent/lib/types/runtime-types.d.ts:304-310`; dispatch `dsh-agent-loop/lib/index.js:909` |
-| `reject` ⇒ turn ends `blocked`, no request | ✅ | `dsh-agent-loop/lib/index.js:960-963` |
-| plugin-written `assistant/message` | ⚠️ runtime-possible, no API promise (level **B**) | `dsh-session/lib/index.js append()` has no per-role ownership guard; verified by runtime probe (t3); consumed by Web GUI fallback + headless `summarize` |
-| dedicated "submit final answer" API | ❌ | absent in 0.2.1-rc.2 |
-| per-child provider/model (`agentOptions`) | ✅ for `spawn`/`fork`; ❌ for ACP | spawn `:22` true, fork `:36` true, ACP `false` at `dsh-subagent/lib/index.js:2790` |
-| `effort` through `agent()` | ❌ (deferred by the engine) | `SUPPORTED_AGENT_OPTIONS`/`DEFERRED_AGENT_OPTIONS` |
-| per-attempt route replacement | ✅ | `dsh-agent-loop/lib/index.js:1051` loop, `:1191` `agent/request` |
-| error classification codes | ✅ | `LlmFailure{code,status,providerRetryAfterMs}` + retryable-code set |
-| settings namespace describe/write | ✅ | `dsh-settings/lib/types/index.d.ts:80`, `:96` |
-| auto-generated settings page | ❌ | `autoGenerate` has no consumer (see §9) |
-| per-child working directory | ❌ | workflow-ptc resolves one cwd per run |
-| `tool_choice` forcing | ❌ | `LlmCallControls` is `{reasoningEffort,temperature,maxTokens,stop}` only |
+| `agent/pre-step` gate, every step | ✅ CONFIRMED | `dsh-agent/lib/types/runtime-types.d.ts:304-310`; `dsh-agent-loop/lib/index.js:909` |
+| `{kind:'reject'}` ⇒ zero model calls, turn `blocked` | ✅ RUNTIME-VERIFIED | `:960-963`; t18 EXP1c/EXP3c |
+| `{kind:'enter', messages:[]}` ⇒ zero model calls | ❌ **false** (composition-dependent) | t18 EXP0; G-15 |
+| plugin-written `assistant/message` | ⚠️ level **B**, ordering race | t18 EXP2a; G-19/G-20 |
+| in-turn relay via `followup` after the turn closes | ✅ RUNTIME-VERIFIED (exact fidelity, 1 sample) | t18 EXP1d |
+| custom `MessageSourceMap` kind for idempotency | ✅ RUNTIME-VERIFIED | t18 EXP1d (persisted, visible in `pre-step`) |
+| `appendPluginRecord` / `pluginRecordOf` | ✅ RUNTIME-VERIFIED, experimental API, no gate | t19 H-2 |
+| `ctx.llm.providerRetryPolicy(id)` | ✅ RUNTIME-VERIFIED | t19 H-1 |
+| `prepend` precedence over `dsh-llm-retry` | ✅ RUNTIME-VERIFIED (4 combinations) | t19 H-4 |
+| settings dict→array→object config layer | ✅ RUNTIME-VERIFIED | t19 H-5 |
+| generic settings form for nested chains | ❌ FAIL — custom page required | t19 H-5 |
+| automatic settings page from `autoGenerate` | ❌ no consumer | E-11 |
+| per-child provider/model (`agentOptions`) | ✅ spawn/fork; ❌ ACP | `dsh-subagent/lib/index.js:2790` |
+| `effort` through `agent()` | ❌ deferred by the engine | `DEFERRED_AGENT_OPTIONS` |
+| forcing `tool_choice` / a tool call | ❌ (`LlmCallControls` has no such field) | `dsh-llm/lib/types/call-config.d.ts:11-26` |
+| per-child working directory | ❌ one cwd per run | E-16 |
+| preset-scoped hook registration | ✅ SOURCE-CONFIRMED (not exercised) | preset registry |
+| in-tree `@deepseek-ai/dsh-tool-workflow` (tool `workflow`) | present, bypasses this plugin's validation | t7 R-17 |
 
-Environment note: CI covers Node 22/24; local is Node 26.8.1. The plugin declares
-`engines.dsh = 0.2.1-rc.2`; any future DSH change to session-write ownership or hook
-signatures invalidates the `(a')` route and must be re-audited before upgrading.
+Environment: CI covers Node 22/24; local is Node 26.8.1. `engines.dsh = 0.2.1-rc.2`.
+Upstream changes to session-write ownership, `plugin:` record retention, or preset
+composition invalidate parts of this design and must be re-audited before upgrading.
 
 ---
 
 ## 14. Capabilities that cannot be implemented as designed — alternatives
 
-1. **No supported "plugin writes the final answer" API** → use `(a')` with a
-   documented level-B dependency, or `(a)` relay. If a future version rejects direct
-   appends: fall back to `(a)`, then to `(b)` in explicit advisory mode. The downgrade
-   must be visible in the settings and in the report.
-2. **No per-child cwd** → per-task worktrees are impossible. Alternatives: planner
-   emits `writesPaths`, host serializes or rejects overlapping tasks; parallelism
-   restricted to read-only tasks; verifier serialized after write tasks.
-3. **No `tool_choice`** → the workflow tool cannot be *forced* at request level; only
-   `reject`-based gating guarantees the workflow actually runs.
-4. **No `effort` passthrough** → per-role reasoning effort is applied only at
-   `agent/request` on the surviving child, not at child creation.
-5. **No automatic settings page** → YAML stage first; GUI page only with a real
-   client package.
-6. **No grandchild accounting** → document the cost ceiling as "per workflow `agent()`
-   calls only"; optionally refuse to run when the user raises subagent `maxDepth`.
-7. **Rejecting a message discards its user event** → the plugin must append a
-   compensating `user/message`, otherwise the durable history is missing the user's side
-   (B-2).
-8. **Verifier criterion matching is byte-exact** → normalizing it is the fix; until
-   then, false failures are expected and must be reported honestly rather than
-   silently retried.
+1. **No supported "plugin writes the final answer" API** → default the relay turn `(a)`;
+   keep direct append `(a')` as a documented level-B switch with G-19/G-20 consequences.
+2. **No `tool_choice`** → the workflow cannot be *forced* to run by request-level means;
+   only `reject` guarantees it (route (b) stays advisory).
+3. **One-shot apps tear down after a blocked turn** (G-18) → (a)/(a') need a live tree
+   while the run finishes: a keep-alive child run, or a long-lived app (Web GUI). This is
+   a hard precondition for headless/CI verification and is `NOT_RUN` for the web profile.
+4. **No per-child cwd** → per-task worktrees are impossible; the planner emits
+   `writesPaths`, the host serializes or rejects overlapping write tasks, and parallelism
+   is limited to read-only tasks.
+5. **No automatic settings page, no generic nested form** → YAML first; a custom page with
+   path operations later.
+6. **No `effort` passthrough** → per-route effort is applied at `agent/request` only (L2);
+   under v1 it is a per-chain-entry hint validated against the catalog.
+7. **Request-preparation failures are not routable** (R-14) → v1 relies on the script's own
+   error handling; L2 must document the gap.
+8. **`maxTotalAgents` does not bound grandchildren** → document the ceiling as "workflow
+   `agent()` calls only".
+9. **A rejected message's inbox entry is consumed irreversibly** (claim has no
+   `discardRemoved`; `inbox.js:103-111`) → the plugin must carry the original text itself.
 
 ---
 
-## 15. Phased plan
+## 15. Failure-path table
 
-Phases are ordered by dependency; each needs its own explicit go-ahead.
+Every row must state who answers and how the turn ends, otherwise the path is undefined.
 
-### Phase 0 — Requirements and project rules — **DONE**
-Roadmap + design log exist, user-confirmed requirements recorded separately from
-proposals.
+| # | path / trigger | who produces the answer | turn ends | records | R-001 impact |
+|---|---|---|---|---|---|
+| F1 | normal run, report `completed` | relay turn `(a)` or append `(a')` | `blocked` (gate) then a normal turn `(a)` | run + gate | satisfied |
+| F2 | run `partial` | same, text states verified vs incomplete | as above | run + gate | satisfied (no false success) |
+| F3 | all routes exhausted | explicit failure/partial report as the answer | as above | run + route | satisfied, never a direct answer |
+| F4 | report validation fails (`assertWorkflowReport` throws) | host builds a `failureReport`-grade answer with the validation cause | `blocked` + delivery | gate + error record | satisfied |
+| F5 | engine `stopReason:'error'` (G-4, today loses partial evidence) | `failureReport` with the engine cause (t17 work) | `blocked` + delivery | gate + error record | degraded until t17 |
+| F6 | `pre-step` listener throws | there is no answer; the turn ends `error` | `error` | gate record (best effort) | violation — must be prevented by making the listener total (catch-all) |
+| F7 | deadline / cancellation | deadline: failure answer; user cancel: no answer | `aborted` | run | cancel is user-initiated, acceptable |
+| F8 | prepare-phase failure (R-14 codes) | script catches → task-level failure → partial/failed answer | `blocked` + delivery | route/attempt | satisfied under v1 |
+| F9 | one-shot app teardown (G-18) | none — run aborted | `blocked`, exit 1 (G-20) | gate only | **BLOCKED**: needs keep-alive or a long-lived app |
+| F10 | steer during a run | queued; answer for the current message, then a follow-up turn | normal | run + gate | satisfied by the §5 rule 4 |
+| F11 | client retries the same message | delivery key suppresses the second run | normal | gate (dedupe) | satisfied |
+| F12 | recursion (child → workflow) | child is told the workflow is unavailable | child turn | none | satisfied |
 
-### Phase 1 — Exact-version environment audit — **DONE**
-Four independent read-only reviews (t1 environment, t2 architecture, t3 API
-feasibility, t5 security/tests) plus t4's fallback design, all against
-installed 0.2.1-rc.2. Deliverable: requirement→capability matrix (§13) and the blocker
-list in DESIGN §OQ.
-
-### Phase 2 — Target architecture and message lifecycle — **IN PROGRESS / gate NOT closed**
-Remaining work: t18 (answer route) and t19 (H-1…H-5). Exit criteria: one chosen answer
-route with measured evidence from both headless and Web GUI, the three-gate design
-finalized or dropped, and the failure-path table accepted by the user.
-
-### Phase 3 — Role routing and fallback policy — **design complete, pending confirmation**
-Deliverable: DESIGN §DD-3/§DD-4 (roles, identity, chain machine, classification,
-budgets, records). Open: H-1 (retry-policy readability), H-4 (prepend ordering).
-
-### Phase 4 — Settings and operability — **design complete (stage 1), stage 2 deferred**
-Deliverable: config schema, validation rules, YAML examples; GUI explicitly out of the
-first release.
-
-### Phase 5 — Reliability, safety, observability — **design complete**
-Deliverables: failure-path table, redaction matrix, limit table (§11), route records.
-
-### Phase 6 — Implementation in small increments — **NOT STARTED (needs authorization)**
-Suggested order: (1) settings schema + validation; (2) roles + route records;
-(3) `agent/request` / `request-error` router with chain state machine;
-(4) synthesizer stage; (5) entry gate (per t18 outcome); (6) Fatal-path partial
-reporting (G-4); (7) report hardening; (8) redaction/context fixes; (9) optional GUI.
-Every increment: focused tests, documented rollback, `lib/` regenerated.
-
-### Phase 7 — Full-behavior testing — **NOT STARTED**
-Layer 1–6 from §12, including live GUI evidence for the answer route.
-
-### Phase 8 — Documentation, release, rollout — **NOT STARTED**
-Bilingual README/architecture/config/troubleshooting updates, changelog, migration and
-rollback notes, explicit statement of the added latency/cost for trivial messages.
+F6 and F9 are the two rows that are **not** currently satisfiable and are carried as
+blocking work (see §16 Phase gates and DESIGN §B).
 
 ---
 
-## 16. Decisions that need the user (blocking or shaping)
+## 16. Phased plan (re-ordered after t7 R-18 and the t18/t19 results)
 
-| # | decision | options | default if silent |
+Each phase needs its own explicit go-ahead. The re-order is a consequence of adopting the
+script-level v1 fallback and the merged answer path.
+
+- **Phase 0 — requirements and rules — DONE.**
+- **Phase 1 — exact-version audit — DONE** (t1–t5, t18, t19; capability matrix §13).
+- **Phase 2 — architecture and message lifecycle — DESIGN COMPLETE, awaits U-1/U-7.**
+  Exit: answer strategy chosen by the user, gate scope chosen, F6/F9 addressed.
+- **Phase 3 — settings and configuration (moved earlier: it no longer depends on routing).**
+  Schema, `volatile()` + `.get()` plumbing, load-time validation with negative tests.
+  Exit: a YAML configuration can express roles/chains/limits and every invalid config is
+  rejected with a specific message.
+- **Phase 4 — role models and v1 script-level fallback (B + C-L1).** Role chains passed to
+  the script, chain traversal in `runTask`, transport-vs-semantic separation, records.
+  Exit: forced-failure tests show the chain advancing and stopping correctly, and the
+  budget invariants hold.
+- **Phase 5 — mandatory entry (A).** Gate + delivery under the chosen strategy and scope,
+  including the F6 totality rule and the F9 precondition.
+  Exit: Layer-5 anti-bypass assertions pass against the composed bundle; headless and
+  (where available) Web GUI evidence recorded.
+- **Phase 6 — L2 request-level routing (optional, U-2).** Only if the loss of in-child
+  tool results proves unacceptable. Requires `prepend` ownership + durable self-pushed
+  cursor + the R-14 caveat.
+- **Phase 7 — reliability work (t17 G-4, report hardening, redaction/context fixes).**
+  Exit: F4/F5 produce failure answers; the seven report holes each have a negative test.
+- **Phase 8 — synthesizer role (optional, U-3)** with its post-check rule.
+- **Phase 9 — settings GUI page (optional, after Phase 3)** using path operations.
+- **Phase 10 — documentation, release, rollout** (bilingual, changelog, migration,
+  rollback, explicit statement of the added latency/cost).
+
+---
+
+## 17. Decisions awaiting the user
+
+| # | decision | options | recorded recommendation |
 |---|---|---|---|
-| U-1 | final-answer route (B-1) | `(a')` / `(a)` / `(b)` or hybrid | `(a')`, dependent on t18 evidence |
-| U-2 | retry ownership vs `dsh-llm-retry` | plugin-exclusive (`prepend`, never delegate) / cooperative | plugin-exclusive |
-| U-3 | does the synthesizer get its own model call | yes / reuse another role | yes (needed for R-002 completeness) |
-| U-4 | parallel tasks on a shared working directory | serialize writes / read-only parallelism / keep as is | serialize on overlap |
-| U-5 | strict-mode latency/cost acceptance for trivial messages | accept / make the workflow lighter but not skippable | accept, as already confirmed in R-001 |
-| U-6 | settings first release | YAML only / YAML + GUI | YAML only |
+| U-1 | answer strategy | `(a)` relay turn / `(a')` direct append / `(b)` advisory | **(a)**, then (a'), then (b) |
+| U-2 | request-level routing ownership (only if L2 is adopted) | plugin-exclusive `prepend` + never delegate / none | plugin-exclusive — the cooperative option does not exist mechanically (t19 H-4); item kept for confirmation |
+| U-3 | dedicated synthesizer model call | yes / no (v1 keeps pure JS) | **no for v1**, revisit after cost measurement |
+| U-4 | parallel tasks on a shared working directory | serialize writes / read-only parallelism / as-is | serialize on overlap |
+| U-5 | accept strict-mode latency and cost for trivial messages | accept / lighter but not skippable | accept (already confirmed in R-001) |
+| U-6 | first-release settings surface | YAML only / YAML + GUI page | YAML only |
+| U-7 | enforcement scope | whole process (plugin row) / preset-scoped sessions | preset-scoped if available in the deployment, else whole process with a documented blast radius |
 
 ---
 
-## 17. Conflict adjudications from this round (short form; details in DESIGN §A)
+## 18. Adjudications recorded in this round
 
 | conflict | reports | ruling | basis |
 |---|---|---|---|
-| does `ctx.settings` give an external plugin a Web GUI page automatically | t1 yes vs t3 no | **t3 wins: no** | `autoGenerate` has exactly one reader (cordis tool catalog); pages come from `whileServed` client registration |
-| is "gate + redirect + tool deny" (route b) sufficient | t1/t2 recommend vs t3 says reject is the only hard guarantee | **source wins: route b is not airtight** | `agent/request` cannot force `tool_choice`; turn-stopping never runs after a reject |
-| where fallback lives | t2 "host layer only" vs t4 "L1 + L2 layers" | **both: L1 (child restart) + L2 (request-level), mutually exclusive** | `agent/request` per attempt + child restart path both exist |
-| is `maxTotalAgents` a real cost ceiling | t2 fine vs t5 not closed | **t5 wins: not closed** | grandchildren are not counted; `maxDepth` is user-volatile |
-| does `materializeFromRealm` reject `-0` | t5 says yes | **t5 corrected: no** | realm `materialize` only rejects non-finite numbers; `-0` rejection exists only in the tools JSON-schema walker |
-| 56 tests vs A/B/C coverage | — | tests are adequate for their declared scope, zero for A/B/C | grep shows no hook code in `src/`/`test/` |
+| does `ctx.settings` give an automatic GUI page | t1 yes vs t3 no | **no** | `autoGenerate` has a single consumer (cordis tool catalog) |
+| is "gate + redirect + tool deny" sufficient | t1/t2 yes vs t3 no | **no** — advisory only | no `toolChoice`; turn-stopping runs after the answer |
+| is `enter-empty` a zero-cost swallow | t2 (implied) vs t7/t18 no | **no** — composition-dependent, still one model request | t18 EXP0 (G-15) |
+| which answer strategy is the default | t6 `(a') > (a)` vs t18 `(a)` | **(a)**, per t18 | level-B limits, G-19/G-20 |
+| is retry ownership a user choice | t4/t6 "choice" vs t19 "hard" | **hard constraint**, item kept for confirmation | t19 H-4 four-combination matrix |
+| durable records mechanism | t6 `SessionEventMap` vs t19 `appendPluginRecord` | **`appendPluginRecord`** | t19 H-2 |
+| does an `enter` override lose runtime-context | t6 yes vs source no | **no** — context is appended at the end of the step | `dsh-agent-loop/lib/index.js:1066-1073` |
+| is `maxTotalAgents` a closed ceiling | t2 yes vs t5 no | **no** | grandchildren uncounted, `maxDepth` volatile |
+| does `materializeFromRealm` reject `-0` | t5 yes vs source no | **no** | realm materializer only rejects non-finite numbers |
+| where should fallback live in v1 | t4/t6 "L1+L2" vs t7 "v1 = L1 only" | **v1 = script L1**, L2 optional later | implementation cost/risk comparison (§7) |
 
 ---
 
-## 18. Immediate next step
+## 19. Immediate next step
 
-1. Wait for **t18** (answer route) and **t19** (H-1…H-5) results; absorb them in the
-   **t8** revision round, replacing every `PENDING(...)` marker.
-2. Have the user confirm **U-1…U-6** (§16).
-3. Only then authorize Phase 6 increment 1 (settings schema + validation), which is
-   independent of the answer route and unblocks roles/fallback work.
+1. User confirms **U-1 … U-7** (§17).
+2. Then Phase 3 (settings + validation) starts, because it no longer depends on routing.
+3. F6 (gate listener totality) and F9 (one-shot teardown) are carried into Phase 5 as
+   explicit preconditions; the web long-lived case stays `NOT_RUN` until measured.
 
 No plugin source change is authorized by this roadmap.
