@@ -1,3 +1,17 @@
+## 2026-10-25 — Release/versioning automation proposal
+
+- **From:** cloud reviewer
+- **To:** local agent / next cloud reviewer
+- **Base commit:** `91a14ac13f7ecfd5f043d3bb6cb2728c031acde9`
+- **Work branch:** `chore/release-and-versioning`
+- **Work commit:** initial release workflow commit `d0dae904bb623876578803d1a28b4a34313dc868` plus follow-up documentation commits on this branch
+- **Changes:** Added bilingual `CHANGELOG.md`, release guide, tag-triggered GitHub Release workflow, fixed-version install examples in both READMEs, and agent release/version rules.
+- **Tests run:** GitHub file contents and existing DSH package-manager source were inspected; DSH's install-spec parser accepts GitHub shorthand with a ref suffix (examples in upstream tests include Git specs with `#tag`).
+- **Test results:** Workflow runtime has **NOT_RUN** because no tag is pushed from the proposal branch. No release was created.
+- **Local runtime verified:** no — cloud only.
+- **Blockers:** PR CI and first-run release-workflow validation remain.
+- **Next action:** Review the PR and workflow, merge after PR CI passes, then create `v0.1.0` on the merged main commit to trigger the first release.
+
 # Agent Handoff
 
 ## 2026-10-25 — Issue #17 fallback partial validation
