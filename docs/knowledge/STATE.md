@@ -79,9 +79,9 @@ CI. Keep memory synchronized with any new commit.
 
 ## Homepage redesign — cloud branch
 
-- **Status:** In review; PR pending.
+- **Status:** PR #16 open; GitHub Actions run `40178007292` PASS on Node 22 and Node 24.
 - **Branch:** `docs/beginner-friendly-bilingual-homepage`, based on `99454d1a830ca42ed051d232de4104161357b581`.
 - **Scope:** Rewrite the English landing page for beginners, add a separate Simplified Chinese README with language links, add matching English/Chinese workflow illustrations, and include the Chinese README in package files.
 - **Install command:** Confirmed against current README/docs: `dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow`; requirement remains DSH `0.2.1-rc.2` plus Node.js >=22 and a profile with workflow/subagent services.
-- **Validation:** Source/document review complete. PR CI is pending; no local shell, browser rendering, or DSH runtime test was run by cloud.
-- **Next action:** Open PR, inspect Node 22/24 CI and package metadata, then update validation state with observed result.
+- **Validation:** GitHub Actions run `40178007292` PASS: `npm ci`, typecheck, lint, build, `git diff --exit-code -- lib/`, `npm test`, and `npm pack --dry-run` on Node 22 and Node 24. Local browser rendering and DSH runtime were NOT_RUN by cloud.
+- **Next action:** Review PR #16. Keep the README files and SVG assets on the cloud branch until the PR is approved/merged; local agent can continue unrelated runtime tasks.
