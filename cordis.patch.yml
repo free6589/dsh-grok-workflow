@@ -1,0 +1,6 @@
+# Bundle patch: one row over the profile's existing base composition.
+# The base/web/headless bundles already provide workflow-ptc, subagent,
+# and the spawn provider; this plugin only adds the grok_workflow tool.
+- insert:
+    - id: grok-workflow
+      name: dsh-grok-workflow

@@ -1,0 +1,14 @@
+node_modules/
+coverage/
+*.tgz
+.env
+.env.*
+!.env.example
+.DS_Store
+*.log
+.vitest/
+
+# local DSH development home and E2E evidence
+.dsh-home/
+
+.pnpm-store/

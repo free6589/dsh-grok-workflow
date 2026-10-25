@@ -1,0 +1,73 @@
+import { describe, expect, it } from 'vitest'
+import { resolveConfig } from '../src/config.js'
+import { normalizeCallerTasks } from '../src/input.js'
+
+describe('caller task validation', () => {
+  it('defaults ids and trims inputs', () => {
+    const tasks = normalizeCallerTasks([
+      {
+        title: '  Scan  ',
+        objective: ' Find TODOs ',
+        expectedOutput: ' A list ',
+        acceptanceCriteria: [' paths exist ', ''],
+        context: ' repo root ',
+        constraints: [' read-only '],
+      },
+    ], 6)
+    expect(tasks).toEqual([{
+      id: 'task-1',
+      title: 'Scan',
+      objective: 'Find TODOs',
+      expectedOutput: 'A list',
+      acceptanceCriteria: ['paths exist'],
+      context: 'repo root',
+      constraints: ['read-only'],
+    }])
+  })
+
+  it('rejects duplicate ids', () => {
+    expect(() => normalizeCallerTasks([
+      { id: 'same', title: 'a', objective: 'a', expectedOutput: 'a', acceptanceCriteria: ['a'] },
+      { id: 'same', title: 'b', objective: 'b', expectedOutput: 'b', acceptanceCriteria: ['b'] },
+    ], 6)).toThrow(/duplicate task id/)
+  })
+
+  it('rejects empty criteria, missing fields, and dependencies', () => {
+    expect(() => normalizeCallerTasks([
+      { title: 'a', objective: 'a', expectedOutput: 'a', acceptanceCriteria: [] },
+    ], 6)).toThrow(/at least one/)
+    expect(() => normalizeCallerTasks([
+      { title: '', objective: 'a', expectedOutput: 'a', acceptanceCriteria: ['a'] },
+    ], 6)).toThrow(/title/)
+    expect(() => normalizeCallerTasks([
+      { title: 'a', objective: 'a', expectedOutput: 'a', acceptanceCriteria: ['a'], dependsOn: ['b'] } as never,
+    ], 6)).toThrow(/dependsOn/)
+  })
+
+  it('enforces maxTasks', () => {
+    const tasks = Array.from({ length: 3 }, (_, index) => ({
+      title: `t${index}`, objective: 'o', expectedOutput: 'e', acceptanceCriteria: ['c'],
+    }))
+    expect(() => normalizeCallerTasks(tasks, 2)).toThrow(/maxTasks/)
+  })
+})
+
+describe('configuration limits', () => {
+  it('applies safe defaults', () => {
+    expect(resolveConfig()).toMatchObject({
+      toolName: 'grok_workflow',
+      maxConcurrency: 3,
+      maxRetries: 1,
+      maxTasks: 6,
+      timeoutMs: 1_800_000,
+      maxActiveRuns: 2,
+    })
+  })
+
+  it('rejects values above the hard cap', () => {
+    expect(() => resolveConfig({ maxConcurrency: 7 })).toThrow(/maxConcurrency/)
+    expect(() => resolveConfig({ maxRetries: 4 })).toThrow(/maxRetries/)
+    expect(() => resolveConfig({ maxTasks: 13 })).toThrow(/maxTasks/)
+    expect(() => resolveConfig({ toolName: 'Bad Name' })).toThrow(/toolName/)
+  })
+})
