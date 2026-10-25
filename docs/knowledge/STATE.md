@@ -6,7 +6,7 @@ Last updated: 2026-10-25 (local)
 
 - Local path: `/home/fish/projects_mine/dsh-grok-workflow`
 - Branch: `main`
-- Git history: `beb55c6` initial commit; `7b78db9` planner/recursion/validation update (current at time of writing)
+- Git history: `beb55c6` initial commit; `7b78db9` planner/recursion/validation update; `8ec3ad4` remote evidence update (current at time of writing)
 - Remote: `origin` = https://github.com/free6589/dsh-grok-workflow.git (main pushed)
 - Target GitHub repository: `https://github.com/free6589/dsh-grok-workflow`
 - Target repository: **CONFIRMED public and reachable** after creation on 2026-10-25; it was confirmed absent immediately before creation.

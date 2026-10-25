@@ -5,7 +5,7 @@
 - **From:** local lead agent
 - **To:** next local/cloud agent
 - **Base commit:** none (empty repo; first push `beb55c6`)
-- **Work commit:** `7b78db9` (remote `main`)
+- **Work commit:** `8ec3ad4` (remote `main`; final docs evidence commit follows)
 - **Changes:**
   - Added the full external DSH bundle (`src/`, `lib/`, `cordis.patch.yml`,
     package manifest, README, docs).

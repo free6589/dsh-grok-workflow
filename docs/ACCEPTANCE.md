@@ -41,7 +41,7 @@ Legend: PASS = actually executed and observed; FAIL = executed and failed;
 | Q2 | Lint passes | PASS | `npm run lint`, 0 warnings/errors. |
 | Q3 | Unit tests pass | PASS | `npm test`, 29 tests. |
 | Q4 | Build passes | PASS | `npm run build`; package contents inspected. |
-| Q5 | Applicable GitHub Actions checks pass | PASS | GitHub Actions runs `40168892831` and `40169133016` passed on Node 22 and Node 24. |
+| Q5 | Applicable GitHub Actions checks pass | PASS | GitHub Actions runs `40168892831`, `40169133016`, and `40169816856` passed on Node 22 and Node 24. |
 | Q6 | README and test commands match implementation | PASS | README commands and documented defaults match source/tests. |
 | Q7 | Every executed check has a real result | PASS | `VALIDATION.md` records commands and outputs. |
 | Q8 | Un-executed checks marked NOT_RUN/BLOCKED | PASS | Remote CI and real partial/failure paths remain marked. |
