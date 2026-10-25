@@ -79,7 +79,7 @@ jobs:
           const start = changelog.findIndex(line => new RegExp('^## \\[' + escaped + '\\](?:\\s+-.*)?$').test(line))
           if (start < 0) throw new Error('CHANGELOG.md is missing a section for [' + version + ']')
           let end = start + 1
-          while (end < changelog.length && !/^## \\[/.test(changelog[end])) end++
+          while (end < changelog.length && !/^## \[/.test(changelog[end])) end++
           const section = changelog.slice(start, end).join('\n').trim()
           if (section.split('\n').length < 4) throw new Error('The changelog section for [' + version + '] is empty')
           writeFileSync('release-notes.md', section + '\n')
