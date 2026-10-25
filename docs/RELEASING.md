@@ -85,7 +85,7 @@ For the next release, follow the checklist below. The tag must point to a commit
 
 5. Open the Actions tab and check the Release workflow. It creates the GitHub Release and attaches the package tarball when all checks pass.
 
-6. Do not move or overwrite a published tag. If release validation fails because the source/version is wrong, fix it through a PR and publish a new version. If only the runner or GitHub service failed after checks completed, rerun the failed workflow.
+6. Do not move or overwrite a tag after a GitHub Release exists. If the first release validation fails before any Release is created, fix the workflow/source, delete and recreate the tag at the fixed commit, and record the move. After a Release exists, publish a new version instead. The release workflow currently runs on Node.js 22 only; main CI covers Node 22 and 24.
 
 ## Install or return to a fixed version / 安装指定版本或回退
 

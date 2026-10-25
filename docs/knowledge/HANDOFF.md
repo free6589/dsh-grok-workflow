@@ -1,17 +1,3 @@
-## 2026-10-25 — Release/versioning automation proposal
-
-- **From:** cloud reviewer
-- **To:** local agent / next cloud reviewer
-- **Base commit:** `91a14ac13f7ecfd5f043d3bb6cb2728c031acde9`
-- **Work branch:** `chore/release-and-versioning`
-- **Work commit:** initial release workflow commit `d0dae904bb623876578803d1a28b4a34313dc868` plus follow-up documentation commits on this branch
-- **Changes:** Added bilingual `CHANGELOG.md`, release guide, tag-triggered GitHub Release workflow, fixed-version install examples in both READMEs, and agent release/version rules.
-- **Tests run:** GitHub file contents and existing DSH package-manager source were inspected; DSH's install-spec parser accepts GitHub shorthand with a ref suffix (examples in upstream tests include Git specs with `#tag`).
-- **Test results:** Workflow runtime has **NOT_RUN** because no tag is pushed from the proposal branch. No release was created.
-- **Local runtime verified:** no — cloud only.
-- **Blockers:** PR CI and first-run release-workflow validation remain.
-- **Next action:** Review the PR and workflow, merge after PR CI passes, then create `v0.1.0` on the merged main commit to trigger the first release.
-
 # Agent Handoff
 
 ## 2026-10-25 — First release v0.1.0
@@ -25,7 +11,7 @@
   - Created and pushed the annotated `v0.1.0` tag after PR #18 merged and main CI passed.
   - First release run `40182588171` failed because the changelog-boundary regex had an extra backslash from YAML/heredoc escaping; fixed `a7d5a62`, then recreated the tag before any release existed.
   - Final release run `40182751006` created the GitHub Release and attached `dsh-grok-workflow-0.1.0.tgz`.
-- **Tests run:** release workflow `40182751006` — PASS on Node 22/24, including typecheck, lint, build, `lib/` consistency, tests, package checks, and attachment.
+- **Tests run:** release workflow `40182751006` — PASS on Node 22 only, including typecheck, lint, build, `lib/` consistency, tests, package checks, and attachment. Main CI `40182707932` covered Node 22/24.
 - **Test results:** PASS.
 - **Local runtime verified:** no for tag-pinned DSH installation; **NOT_RUN**. Release publication itself is confirmed by GitHub.
 - **Blockers:** none.

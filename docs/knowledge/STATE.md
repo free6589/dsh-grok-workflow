@@ -38,7 +38,7 @@ remains.
 - Added deterministic tests: 6 files / 56 tests; all pass.
 - Added a real DSH Loader composition test (real ToolRuntime, SystemPrompt,
   Loader, plugin artifact) with only the engine boundary faked; 2 tests pass.
-- Built `lib/` and verified npm pack contents (31 files; local pack is about 54.4 kB after the bilingual docs additions).
+- Built `lib/` and verified npm pack contents (33 files; local pack is about 63.1 kB after the bilingual docs and release-policy additions).
 - Installed the plugin into an isolated real DSH profile
   (`DSH_HOME=.dsh-home`, profile `grok-workflow-dev`) with `dsh plugin`.
 - Ran a real headless model smoke (`MODEL_OK`) and three real
@@ -97,7 +97,7 @@ CI. Keep memory synchronized with any new commit.
 - **Status:** PR #16 merged to `main` as `ea3e8e31`; GitHub Actions runs `40178081351`, `40178539805`, and `40178848058` PASS on Node 22 and Node 24.
 - **Scope:** English quick-start landing page, complete Simplified Chinese README, matching SVG workflow illustrations, and `README.zh-CN.md` in package files.
 - **Local follow-up:** Restored the compact reference sections required for configuration, disable/uninstall, testing, security, and exact compatibility, in both languages. Corrected the install order so a missing headless profile is created before `plugin add`; running `--from-default-profile` afterward would remove the installed plugin. Added local SVG XML and pack checks.
-- **Validation:** SVG XML parsing PASS for both diagrams; `npm pack --dry-run` lists both READMEs and 31 files. Detailed DSH runtime behavior is unchanged and covered by the existing 56-test suite.
+- **Validation:** SVG XML parsing PASS for both diagrams; current `npm pack --dry-run` lists 33 files and both READMEs. Detailed DSH runtime behavior is unchanged and covered by the existing 56-test suite.
 - **Next action:** Keep `README.md` and `README.zh-CN.md` synchronized for future changes; do not remove the reference sections when editing the landing page.
 
 
@@ -106,6 +106,6 @@ CI. Keep memory synchronized with any new commit.
 - **Status:** PR #18 merged as `7904e23`; `v0.1.0` tag points to `a7d5a62`; GitHub Release published on 2026-10-25.
 - **Release workflow:** first run `40182588171` failed on a JavaScript regex escaping bug in the changelog extractor; fixed in `a7d5a62`. The tag was recreated at the fixed commit before any Release existed. Run `40182751006` passed and created the Release.
 - **Artifact:** `dsh-grok-workflow-0.1.0.tgz` (61,281 bytes) attached to the GitHub Release; URL `https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.1.0`.
-- **Validation:** main CI `40182707932` PASS; release workflow Node 22/24 PASS, including typecheck, lint, build, committed `lib/`, tests, package checks, and release creation.
+- **Validation:** main CI `40182707932` PASS on Node 22/24; release workflow `40182751006` PASS on Node 22 only, including typecheck, lint, build, committed `lib/`, tests, package checks, and release creation.
 - **Backup boundary:** Git history/Releases are version recovery, not independent disaster-recovery backup. Repository mirror and local DSH data backups remain a separate operational task.
 - **Next action:** follow `docs/RELEASING.md` for future versions; do not move the published `v0.1.0` tag.

@@ -433,7 +433,7 @@ tests:
 - PR #16 merged to `main` as `ea3e8e31`; CI runs `40178081351`, `40178539805`, and `40178848058` passed on Node 22 and Node 24.
 - Root README is a concise English quick-start; `README.zh-CN.md` is the full Simplified Chinese counterpart. Both link to each other at the top.
 - Added `docs/images/workflow-overview.svg` and `docs/images/workflow-overview.zh-CN.svg`; both parse as well-formed XML.
-- Added `README.zh-CN.md` to `package.json` `files`; `npm pack --dry-run` lists both READMEs and 31 total files (56.5 kB package).
+- Added `README.zh-CN.md` to `package.json` `files`; current `npm pack --dry-run` lists both READMEs and 33 total files (63.1 kB package). The published v0.1.0 asset predates the `CHANGELOG.md` package addition and has 31 files.
 - The merged PR initially omitted the explicit configuration table, disable/uninstall, security, and compatibility sections; the local follow-up restored compact equivalents in both languages.
 - **Install-order review finding:** the first README revision told users to run `dsh plugin add` before creating a missing profile. In an isolated `DSH_HOME` check, `plugin add` auto-created a base-only profile; the later `--from-default-profile headless` rewrote that profile and removed the installed plugin dependency.
 - **Correction:** both READMEs and `docs/LOCAL-TESTING.md` now create the headless profile first, then install the plugin, and explicitly warn not to run `--from-default-profile` after `plugin add`.
@@ -446,6 +446,6 @@ tests:
 - First tag-triggered release run `40182588171` failed in the changelog extractor: the regex literal contained an extra backslash from the YAML/heredoc escaping.
 - Fixed in `a7d5a62` (`fix: correct changelog section regex in release workflow`); the tag was recreated at that commit before any GitHub Release existed.
 - Final tag `v0.1.0` (tag object `f175ada8a7533a5f61c06a75e5a457e32b37579b`) points to `a7d5a6267c471a6ed73e44ac02092f59942c508a`.
-- Release workflow `40182751006` — **PASS** on Node 22 and Node 24, including typecheck, lint, build, `lib/` consistency, tests, package checks, and release creation.
+- Release workflow `40182751006` — **PASS** on **Node 22 only**, including typecheck, lint, build, `lib/` consistency, tests, package checks, and release creation. Main CI `40182707932` covered Node 22/24.
 - GitHub Release: https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.1.0; asset `dsh-grok-workflow-0.1.0.tgz` (61,281 bytes).
 - **NOT_RUN:** local DSH install from the `#v0.1.0` spec. The release/tag and asset are published; tag-pinned installation still needs a separate isolated-profile smoke test.
