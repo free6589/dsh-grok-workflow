@@ -19,7 +19,7 @@
     shows the bundle row in both profiles.
   - Real headless model smoke and real `grok_workflow` runs (see
     `VALIDATION.md`).
-- **Test results:** PASS; GitHub Actions run `40172376450` passed Node 22/24, after the review fixes (50 tests).
+- **Test results:** PASS; GitHub Actions run `40175621646` passed Node 22/24, including build-artifact consistency and pack checks (50 tests).
 - **Local runtime verified:** yes for plugin load, model route, completed
   caller-plan workflow, completed parallel timing workflow, completed
   planner-only workflow, fresh GitHub-installed workflow, a partial

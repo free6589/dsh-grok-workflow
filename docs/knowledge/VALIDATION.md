@@ -219,6 +219,9 @@ Result: **PASS**.
 - Run `40169885633` (commit `602918e`): **PASS**, Node 22 and Node 24 jobs.
 - Run `40170034851` (commit `b23d360`): **PASS**, Node 22 and Node 24 jobs.
 - Run `40172141078` (commit `6a0c32a`): **PASS**, Node 22 and Node 24 jobs.
+- Run `40175621646` (commit `b6b649b`): **PASS**, Node 22 and Node 24 jobs;
+  includes `npm run build`, `git diff --exit-code -- lib/`, and
+  `npm pack --dry-run`.
 - The workflow uses `actions/checkout@v4` and `actions/setup-node@v4`; GitHub
   reports a Node 20 deprecation annotation but both jobs completed successfully.
 
