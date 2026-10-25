@@ -415,7 +415,7 @@ tests:
 
 ### Homepage PR #16 — merged and locally rechecked
 
-- PR #16 merged to `main` as `ea3e8e31`; CI runs `40178081351` and `40178539805` passed on Node 22 and Node 24.
+- PR #16 merged to `main` as `ea3e8e31`; CI runs `40178081351`, `40178539805`, and `40178848058` passed on Node 22 and Node 24.
 - Root README is a concise English quick-start; `README.zh-CN.md` is the full Simplified Chinese counterpart. Both link to each other at the top.
 - Added `docs/images/workflow-overview.svg` and `docs/images/workflow-overview.zh-CN.svg`; both parse as well-formed XML.
 - Added `README.zh-CN.md` to `package.json` `files`; `npm pack --dry-run` lists both READMEs and 31 total files (54.2 kB package).
