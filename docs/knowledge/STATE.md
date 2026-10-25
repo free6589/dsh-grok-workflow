@@ -79,9 +79,9 @@ CI. Keep memory synchronized with any new commit.
 
 ## Cloud PR work — Issue #11 (in progress)
 
-- **Status:** IN_PROGRESS; branch `cloud/harden-issue-watcher-prompt-boundary`, based on `b6b649b`.
+- **Status:** PR #12 open; CI PASS on head `707c933` (run `40176002857`, Node 22 and Node 24). Branch `cloud/harden-issue-watcher-prompt-boundary`, based on `b6b649b`.
 - **Scope:** Isolate issue watcher title/comment input as compact JSON and explicitly mark it as untrusted prompt data; add a deterministic hostile-comment regression case.
 - **Overlap avoidance:** cloud owns `scripts/watch-issues.sh`, `test/issue-watch.spec.ts`, and the related issue-watcher notes for this PR. Local agent can continue the workspace-isolation work tracked by Issue #9.
-- **Tests:** NOT_RUN from the cloud execution environment; GitHub Actions on the PR will be the executable validation path.
+- **Tests:** GitHub Actions run `40176002857` PASS on Node 22/24: `npm run typecheck`, `npm run lint`, `npm run build`, `git diff --exit-code -- lib/`, `npm test`, and `npm pack --dry-run`.
 - **Local DSH runtime:** NOT_RUN / not claimed.
-- **Next action:** open PR #11, inspect Node 22/24 CI, then refresh the validation record with actual run evidence.
+- **Next action:** review PR #12; local agent continues real DSH runtime work and workspace-isolation (#9) investigation.
