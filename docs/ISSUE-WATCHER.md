@@ -146,5 +146,6 @@ npm test -- --run test/issue-watch.spec.ts
 ```
 
 The regression test uses a fake `gh` executable, baselines one issue, then
-replays a new comment and asserts that generated prompt JSON contains the comment as untrusted data, including
-hostile-looking text and an injected delimiter. It does not call GitHub or a model.
+replays a new comment and asserts that the generated prompt JSON contains the comment as
+untrusted data, including hostile-looking text and an injected delimiter. It does not
+call GitHub or a model.
