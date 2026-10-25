@@ -111,3 +111,7 @@ The user has explicitly selected strict routing for every message, including tri
 - The user explicitly selected **all messages must use the full workflow**, including simple questions.
 - Role-based model selection, ordered fallback chains, and a UI settings page were identified as desired capabilities.
 - No implementation changes are authorized yet; continue brainstorming and updating this document.
+
+## Overall roadmap
+
+The project-wide sequence and acceptance gates are maintained in [WORKFLOW-ROADMAP.md](WORKFLOW-ROADMAP.md). Use that roadmap to choose the next phase before diving into a local design question. The current recommended next step is Phase 1: audit the exact target DSH version and available interfaces. Do not implement until the user explicitly authorizes it.
