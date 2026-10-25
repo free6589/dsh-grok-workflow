@@ -38,6 +38,19 @@ describe('caller task validation', () => {
     ], 6)).toThrow(/acceptanceCriteria must not contain duplicates/)
   })
 
+  it('rejects acceptance criteria that collide after normalization', () => {
+    expect(() => normalizeCallerTasks([
+      { title: 'x', objective: 'x', expectedOutput: 'x', acceptanceCriteria: ['Do X.', '  do   x'] },
+    ], 6)).toThrow(/stay distinct after normalization/)
+  })
+
+  it('keeps criteria distinct when only inner content differs', () => {
+    const tasks = normalizeCallerTasks([
+      { title: 'x', objective: 'x', expectedOutput: 'x', acceptanceCriteria: ['Do X, then Y', 'Do X then Y'] },
+    ], 6)
+    expect(tasks![0]!.acceptanceCriteria).toEqual(['Do X, then Y', 'Do X then Y'])
+  })
+
   it('rejects empty criteria, missing fields, and dependencies', () => {
     expect(() => normalizeCallerTasks([
       { title: 'a', objective: 'a', expectedOutput: 'a', acceptanceCriteria: [] },

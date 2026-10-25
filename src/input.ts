@@ -25,6 +25,29 @@ export const TASK_LIMITS = {
 
 const TASK_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/
 
+/**
+ * Comparison key for one acceptance criterion.
+ *
+ * Verification compares a verifier's criterion text against the task's own
+ * criterion text. A byte-exact comparison turns a formatting difference (a
+ * trailing period, collapsed spacing, or a different case) into a failed
+ * attempt, so a correct result burns every retry and is finally reported as
+ * failed. The key removes exactly those formatting differences and nothing
+ * else: the requirement's words must still match, so distinct criteria stay
+ * distinct.
+ *
+ * Mirrored by `criterionKey` in the generated workflow script; keep both in
+ * sync (test/criterion.spec.ts asserts the parity).
+ */
+export function criterionKey(value: string): string {
+  return value
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
+    .replace(/[.\u3002\uFF0E,\uFF0C;\uFF1B:\uFF1A!\uFF01?\uFF1F]+$/, '')
+    .trim()
+}
+
 /** Trim a string and reject a non-string, empty, or overlong value. */
 function requiredText(value: unknown, field: string, maxChars: number): string {
   if (typeof value !== 'string' || value.trim() === '') {
@@ -106,6 +129,12 @@ export function normalizeCallerTasks(tasks: readonly TaskInput[] | undefined, ma
     }
     if (new Set(criteria).size !== criteria.length) {
       throw new GrokWorkflowInputError(`tasks[${index}].acceptanceCriteria must not contain duplicates`)
+    }
+    const criterionKeys = criteria.map(criterionKey)
+    if (new Set(criterionKeys).size !== criterionKeys.length) {
+      throw new GrokWorkflowInputError(
+        `tasks[${index}].acceptanceCriteria must stay distinct after normalization (whitespace, case, and trailing punctuation are ignored when matching a verifier result)`,
+      )
     }
     const constraints = task.constraints === undefined
       ? []

@@ -400,4 +400,122 @@ describe('generated workflow script', () => {
     expect(report.status).toBe('failed')
     expect(report.tasks[0]!.error).toContain('criteria count does not match')
   })
+
+  it('accepts a verifier criterion that differs only by trailing punctuation', async () => {
+    const callerTasks = [task('a', ['alpha works'])]
+    let workerCalls = 0
+    const agent: ScriptAgent = async (_prompt, options) => {
+      if (options.label.startsWith('grok-worker-')) {
+        workerCalls += 1
+        return execution('done')
+      }
+      if (options.label.startsWith('grok-verifier-')) {
+        return verification(callerTasks[0]!, {
+          criteria: [{ criterion: 'alpha works.', met: true, evidence: 'file:///tmp/proof' }],
+        })
+      }
+      throw new Error(`unexpected label ${options.label}`)
+    }
+    const { report } = await runWorkflowScript(WORKFLOW_SCRIPT, args(callerTasks), agent)
+    // Formatting drift no longer burns a retry: one attempt, verified.
+    expect(workerCalls).toBe(1)
+    expect(report.status).toBe('completed')
+    expect(report.tasks[0]!.attempts).toHaveLength(1)
+    // The report keeps the task's own criterion text, so host validation (which
+    // compares confirmed evidence against the task criteria) still matches.
+    expect(report.confirmed).toEqual([{ taskId: 'a', criterion: 'alpha works', evidence: 'file:///tmp/proof' }])
+    const config = resolveConfig({ maxConcurrency: 2, maxRetries: 1, maxTasks: 6 })
+    expect(assertWorkflowReport(report, 'Ship the verified result', config).status).toBe('completed')
+  })
+
+  it('accepts a verifier criterion that differs only by whitespace and case', async () => {
+    const callerTasks = [task('a', ['Deploy the service to staging'])]
+    let verifierCalls = 0
+    const agent: ScriptAgent = async (_prompt, options) => {
+      if (options.label.startsWith('grok-worker-')) return execution('deployed')
+      if (options.label.startsWith('grok-verifier-')) {
+        verifierCalls += 1
+        return verification(callerTasks[0]!, {
+          criteria: [{ criterion: '  deploy   THE service to   staging ', met: true, evidence: 'cmd:deploy' }],
+        })
+      }
+      throw new Error(`unexpected label ${options.label}`)
+    }
+    const { report } = await runWorkflowScript(WORKFLOW_SCRIPT, args(callerTasks), agent)
+    expect(verifierCalls).toBe(1)
+    expect(report.status).toBe('completed')
+    expect(report.tasks[0]!.attempts).toHaveLength(1)
+  })
+
+  it('still rejects a verifier criterion that names different content', async () => {
+    const callerTasks = [task('a', ['alpha works'])]
+    const agent: ScriptAgent = async (_prompt, options) => {
+      if (options.label.startsWith('grok-worker-')) return execution('done')
+      if (options.label.startsWith('grok-verifier-')) {
+        return verification(callerTasks[0]!, {
+          criteria: [{ criterion: 'beta works', met: true, evidence: 'file:1' }],
+        })
+      }
+      throw new Error(`unexpected label ${options.label}`)
+    }
+    const { report } = await runWorkflowScript(WORKFLOW_SCRIPT, args(callerTasks), agent)
+    expect(report.status).toBe('failed')
+    expect(report.tasks[0]!.error).toContain('criterion not matched exactly once: alpha works')
+    expect(report.confirmed).toHaveLength(0)
+  })
+
+  it('still rejects a verifier that reports one criterion twice', async () => {
+    const callerTasks = [task('a', ['alpha works', 'beta works'])]
+    const agent: ScriptAgent = async (_prompt, options) => {
+      if (options.label.startsWith('grok-worker-')) return execution('done')
+      if (options.label.startsWith('grok-verifier-')) {
+        return verification(callerTasks[0]!, {
+          criteria: [
+            { criterion: 'alpha works', met: true, evidence: 'file:1' },
+            { criterion: 'ALPHA works.', met: true, evidence: 'file:2' },
+          ],
+        })
+      }
+      throw new Error(`unexpected label ${options.label}`)
+    }
+    const { report } = await runWorkflowScript(WORKFLOW_SCRIPT, args(callerTasks), agent)
+    expect(report.status).toBe('failed')
+    expect(report.tasks[0]!.error).toContain('criterion not matched exactly once: alpha works')
+    expect(report.confirmed).toHaveLength(0)
+  })
+
+  it('does not collapse criteria that differ only in trailing words', async () => {
+    const callerTasks = [task('a', ['the file exists', 'the file exists with content'])]
+    const agent: ScriptAgent = async (_prompt, options) => {
+      if (options.label.startsWith('grok-worker-')) return execution('done')
+      if (options.label.startsWith('grok-verifier-')) {
+        return verification(callerTasks[0]!, {
+          criteria: [
+            { criterion: 'the file exists', met: true, evidence: 'file:1' },
+            { criterion: 'the file exists', met: true, evidence: 'file:2' },
+          ],
+        })
+      }
+      throw new Error(`unexpected label ${options.label}`)
+    }
+    const { report } = await runWorkflowScript(WORKFLOW_SCRIPT, args(callerTasks), agent)
+    expect(report.status).toBe('failed')
+    expect(report.tasks[0]!.error).toContain('criterion not matched exactly once: the file exists with content')
+  })
+
+  it('rejects a planner task whose criteria collide after normalization', async () => {
+    const bad = task('a', ['same criterion.', 'Same criterion'])
+    const agent: ScriptAgent = async (_prompt, options) => {
+      if (options.label === 'grok-planner') return { tasks: [bad] }
+      if (options.label === 'grok-worker-task-1-a1') return execution('fallback completed')
+      if (options.label === 'grok-verifier-task-1-a1') {
+        return verification(task('task-1', ['The expected output is completed and supported by concrete evidence']))
+      }
+      throw new Error(`unexpected label ${options.label}`)
+    }
+    const { report } = await runWorkflowScript(WORKFLOW_SCRIPT, args(null), agent)
+    expect(report.plan.source).toBe('fallback')
+    expect(report.plan.error).toContain('planner returned no valid plan')
+    expect(report.tasks).toHaveLength(1)
+  })
 })
