@@ -121,7 +121,8 @@ CI. Keep memory synchronized with any new commit.
 ## Overall roadmap for the next design phase
 
 - **Roadmap:** [WORKFLOW-ROADMAP.md](WORKFLOW-ROADMAP.md) is the project-wide plan and phase order.
-- **Detailed discussion:** [WORKFLOW-DESIGN.md](WORKFLOW-DESIGN.md) records confirmed requirements, proposals, and open questions.
-- **Current phase:** Phase 0 — requirements and plan written; user review pending.
-- **Recommended next phase:** Phase 1 — audit exact DSH `0.2.1-rc.2` interfaces and compatibility before choosing implementation details.
-- **Implementation boundary:** discussion and documentation only until the user explicitly authorizes code changes.
+- **Detailed discussion:** [WORKFLOW-DESIGN.md](WORKFLOW-DESIGN.md) records confirmed requirements, evidence ledger, rulings, and open questions.
+- **Current phase:** Phase 1 (environment/API audit) and Phase 2 (target design) are complete as of team round 1 (2026-10-25): four independent audits, two live experiment batches (t18 delivery routes, t19 H-1..H-5), synthesis, independent review with 21 findings, and revision. QA batch committed: 023887d (criterion normalization) and 2403a10 (report validation hardening, redaction consolidation, real-engine contract tests); suite is 106 tests / 9 files.
+- **Pending user decisions:** U-1..U-7 in WORKFLOW-ROADMAP §16 — answer route, retry ownership, synthesizer role, shared-directory policy, strict-mode cost, YAML-first settings, enforcement scope. Mandatory-entry feasibility verdict is "partially feasible without DSH core changes" (ROADMAP §5.3 / DESIGN A-14).
+- **Recommended next phase:** implementation after U decisions; entry-first priority means the merged gate+delivery unit, then role model chains (L1), then settings, then optional L2 host routing.
+- **Implementation boundary:** code changes now proceed through the team's single-writer implementer with independent review per batch; DSH core and global installs remain out of bounds.
