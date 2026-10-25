@@ -80,3 +80,13 @@ Each entry records the decision, evidence, alternatives, and status.
   engine and subagent seam.
 - **Consequences:** Pause/resume/journaling and Grok's budget leases are out of
   scope for the MVP; cancellation/unload and per-run bounds remain in scope.
+
+
+## D-006 — README landing page and language toggle
+
+- **Status:** PROPOSED pending PR review.
+- **Date:** 2026-10-25.
+- **Decision:** Keep root `README.md` as the English landing page and add `README.zh-CN.md` as the complete Simplified Chinese version. Add reciprocal language links near the top of both pages. Include a simple workflow illustration in each language; keep detailed configuration, architecture and acceptance material in `docs/`.
+- **Reason:** New users should see the purpose, exact prerequisites, one-command GitHub installation, one natural-language example, workflow stages and troubleshooting before advanced implementation detail.
+- **Alternatives:** Keep one long bilingual README (harder to scan); move English to another filename (would remove the default GitHub landing page); use remote screenshots (adds external image dependency).
+- **Impact:** Adds a second README and two small SVG assets; package `files` allowlist includes the Chinese README. Install compatibility requirements are unchanged.

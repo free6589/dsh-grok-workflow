@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-labelledby="title desc">
+  <title id="title">Grok Workflow for DSH 工作流程</title>
+  <desc id="desc">将复杂目标拆分，执行任务，独立验证，有限重试并汇总结果。</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#f5f7ff"/><stop offset="100%" stop-color="#eef9f7"/></linearGradient>
+    <linearGradient id="hero" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#343c91"/><stop offset="100%" stop-color="#147d83"/></linearGradient>
+    <filter id="shadow" x="-15%" y="-15%" width="130%" height="140%"><feDropShadow dx="0" dy="5" stdDeviation="6" flood-color="#1e293b" flood-opacity=".10"/></filter>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L8 4.5 L0 9 Z" fill="#8b95b3"/></marker>
+    <style>
+      .title{font:700 26px system-ui,-apple-system,Segoe UI,sans-serif;fill:#fff}
+      .sub{font:400 14px system-ui,-apple-system,Segoe UI,sans-serif;fill:#e3eaff}
+      .step{font:700 19px system-ui,-apple-system,Segoe UI,sans-serif;fill:#17213b}
+      .detail{font:400 14px system-ui,-apple-system,Segoe UI,sans-serif;fill:#56617a}
+      .num{font:700 12px system-ui,-apple-system,Segoe UI,sans-serif;fill:#fff}
+      .status{font:700 13px system-ui,-apple-system,Segoe UI,sans-serif}
+    </style>
+  </defs>
+  <rect x="1" y="1" width="1198" height="358" rx="24" fill="url(#bg)" stroke="#dbe3f0"/>
+  <rect x="20" y="18" width="1160" height="78" rx="17" fill="url(#hero)"/>
+  <text x="46" y="51" class="title">复杂目标，得到经过验证的结果</text>
+  <text x="46" y="75" class="sub">有界并行 · 独立检查 · 不会无限重试</text>
+  <g filter="url(#shadow)">
+    <rect x="28" y="133" width="202" height="132" rx="16" fill="#fff" stroke="#dce2f1"/>
+    <rect x="268" y="133" width="202" height="132" rx="16" fill="#fff" stroke="#dce2f1"/>
+    <rect x="508" y="133" width="202" height="132" rx="16" fill="#fff" stroke="#dce2f1"/>
+    <rect x="748" y="133" width="202" height="132" rx="16" fill="#fff" stroke="#dce2f1"/>
+    <rect x="988" y="133" width="184" height="132" rx="16" fill="#fff" stroke="#dce2f1"/>
+  </g>
+  <g>
+    <circle cx="54" cy="158" r="13" fill="#5b61c9"/><text x="54" y="162" text-anchor="middle" class="num">1</text>
+    <text x="46" y="193" class="step">规划</text><text x="46" y="216" class="detail">拆成清晰的小任务</text><text x="46" y="235" class="detail">并定义验收标准</text>
+    <circle cx="294" cy="158" r="13" fill="#298b94"/><text x="294" y="162" text-anchor="middle" class="num">2</text>
+    <text x="286" y="193" class="step">执行</text><text x="286" y="216" class="detail">默认最多 3 项并行</text><text x="286" y="235" class="detail">硬上限为 6 项</text>
+    <circle cx="534" cy="158" r="13" fill="#287a58"/><text x="534" y="162" text-anchor="middle" class="num">3</text>
+    <text x="526" y="193" class="step">验证</text><text x="526" y="216" class="detail">独立验证 Agent</text><text x="526" y="235" class="detail">核对标准与证据</text>
+    <circle cx="774" cy="158" r="13" fill="#b7791f"/><text x="774" y="162" text-anchor="middle" class="num">4</text>
+    <text x="766" y="193" class="step">重试</text><text x="766" y="216" class="detail">失败后有限返工</text><text x="766" y="235" class="detail">默认 1 次，最多 3 次</text>
+    <circle cx="1014" cy="158" r="13" fill="#5b61c9"/><text x="1014" y="162" text-anchor="middle" class="num">5</text>
+    <text x="1006" y="193" class="step">汇总</text><text x="1006" y="216" class="detail">证据、错误与</text><text x="1006" y="235" class="detail">待完成事项</text>
+  </g>
+  <g stroke="#8b95b3" stroke-width="2.2" fill="none" marker-end="url(#arrow)"><path d="M232 199 H260"/><path d="M472 199 H500"/><path d="M712 199 H740"/><path d="M952 199 H980"/></g>
+  <text x="30" y="300" class="detail">最终状态</text>
+  <rect x="30" y="312" width="146" height="30" rx="15" fill="#d9f6e8"/><text x="103" y="332" text-anchor="middle" class="status" fill="#176343">已完成</text>
+  <rect x="188" y="312" width="126" height="30" rx="15" fill="#fff0c7"/><text x="251" y="332" text-anchor="middle" class="status" fill="#85580b">部分完成</text>
+  <rect x="326" y="312" width="118" height="30" rx="15" fill="#ffe0e0"/><text x="385" y="332" text-anchor="middle" class="status" fill="#9b2c2c">失败</text>
+  <text x="1168" y="330" text-anchor="end" class="detail">复用 DSH 自带工作流引擎</text>
+</svg>

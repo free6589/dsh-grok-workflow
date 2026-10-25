@@ -411,3 +411,20 @@ tests:
 
 - Clean-DSH-profile installation is executed locally; CI has not yet added a
   separate clean-profile install job.
+
+
+## Homepage redesign PR — pending CI
+
+- Root README is now a concise English quick-start; `README.zh-CN.md` is the full Simplified Chinese counterpart. Both link to each other at the top.
+- Added `docs/images/workflow-overview.svg` and `docs/images/workflow-overview.zh-CN.svg`, authored in-repository (no remote image dependency). The Chinese page uses the Chinese diagram.
+- Added `README.zh-CN.md` to package.json `files`, so a package created from this repository can include both language versions.
+- Install command was checked against the existing repository docs and package metadata: `dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow`. Requirements are DSH `0.2.1-rc.2`, Node.js >=22 and a profile with workflow/subagent services.
+- **NOT_RUN:** local markdown rendering, SVG visual inspection, shell commands, and DSH runtime. GitHub Actions run `40178007292` — **PASS** on Node 22 and Node 24.
+
+
+### Homepage PR #16 — observed CI result
+
+- PR: https://github.com/free6589/dsh-grok-workflow/pull/16
+- Actions run: [40178007292](https://github.com/free6589/dsh-grok-workflow/actions/runs/40178007292), tested head `bd720264a6ee05e2be81c88f07cf3b44a133727a`.
+- **PASS** on Node 22 and Node 24. Both jobs passed `npm ci`, `npm run typecheck`, `npm run lint`, `npm run build`, `git diff --exit-code -- lib/`, `npm test`, and `npm pack --dry-run`.
+- Not run by cloud: visual rendering in GitHub/browser and real DSH installation/runtime. No product code changed; this PR only changes docs, SVG diagrams and the package files allowlist.
