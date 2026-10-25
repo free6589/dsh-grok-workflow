@@ -99,3 +99,15 @@ CI. Keep memory synchronized with any new commit.
 - **Local follow-up:** Restored the compact reference sections required for configuration, disable/uninstall, testing, security, and exact compatibility, in both languages. Corrected the install order so a missing headless profile is created before `plugin add`; running `--from-default-profile` afterward would remove the installed plugin. Added local SVG XML and pack checks.
 - **Validation:** SVG XML parsing PASS for both diagrams; `npm pack --dry-run` lists both READMEs and 31 files. Detailed DSH runtime behavior is unchanged and covered by the existing 56-test suite.
 - **Next action:** Keep `README.md` and `README.zh-CN.md` synchronized for future changes; do not remove the reference sections when editing the landing page.
+
+
+## Release/versioning rollout — PR proposal
+
+- **Status:** proposed on branch `chore/release-and-versioning`; not merged and no release/tag created by this change.
+- **Base:** `main` at `91a14ac13f7ecfd5f043d3bb6cb2728c031acde9`.
+- **Current package version:** `0.1.0`; GitHub Releases endpoint was confirmed empty when reviewed.
+- **Added in proposal:** bilingual `CHANGELOG.md`, `docs/RELEASING.md`, and `.github/workflows/release.yml`. README files document fixed-tag installs, and AGENTS.md requires user-facing changes to update the changelog.
+- **Release contract:** tags use `vMAJOR.MINOR.PATCH`; matching `package.json` version and changelog entry are required; the release job validates Node 22, tests, build artifact consistency, and package tarball before creating a GitHub Release.
+- **First release:** after this PR is merged and main CI passes, push tag `v0.1.0` to the merged main commit. Until then, no tag-pinned version should be represented as already available.
+- **Backup boundary:** Git history/Releases are version recovery, not independent disaster-recovery backup. Repository mirror and local DSH data backups remain a separate operational task.
+- **Validation:** release workflow has not yet been triggered because its tag is intentionally not created on the feature branch. Verify PR CI and inspect the workflow before the first tag.
