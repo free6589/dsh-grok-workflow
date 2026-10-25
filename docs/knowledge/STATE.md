@@ -75,3 +75,13 @@ None.
 
 Monitor coordination Issue #1; optionally add a clean-profile install check to
 CI. Keep memory synchronized with any new commit.
+
+
+## Cloud PR work — Issue #11 (in progress)
+
+- **Status:** IN_PROGRESS; branch `cloud/harden-issue-watcher-prompt-boundary`, based on `b6b649b`.
+- **Scope:** Isolate issue watcher title/comment input as compact JSON and explicitly mark it as untrusted prompt data; add a deterministic hostile-comment regression case.
+- **Overlap avoidance:** cloud owns `scripts/watch-issues.sh`, `test/issue-watch.spec.ts`, and the related issue-watcher notes for this PR. Local agent can continue the workspace-isolation work tracked by Issue #9.
+- **Tests:** NOT_RUN from the cloud execution environment; GitHub Actions on the PR will be the executable validation path.
+- **Local DSH runtime:** NOT_RUN / not claimed.
+- **Next action:** open PR #11, inspect Node 22/24 CI, then refresh the validation record with actual run evidence.
