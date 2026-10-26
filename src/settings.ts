@@ -251,22 +251,21 @@ export function describeSelf(ctx: Context, entryIds?: readonly string[]): Settin
     //  2. the schema uid, when the descriptor carries our own schema object;
     //  3. the projected value, when the runtime rebuilt the schema (a volatile form
     //     gets a fresh uid, so uid equality alone reports "not ours" - t30/F2).
-    // A distinctive subset is used for (3): a config that happens to share one key
-    // with us is not us.
-    const distinctive = ['toolName', 'roles', 'switchOn']
+    // The signal for (3) must exist in the *projected* value: `describe()` reports
+    // `projectForm(volatileForm(schema), config)`, which drops every non-volatile
+    // key, so `toolName` is never there (17 volatile fields, measured against the
+    // real projection in `test/settings-fixture.ts`). `roles` and `switchOn` are
+    // volatile and together are specific enough: a config that happens to share
+    // one key with us is not us.
+    const distinctive = ['roles', 'switchOn']
     const looksLikeUs = (item: SettingsDescriptorLike): boolean => {
       const value = (item.value ?? {}) as Record<string, unknown>
       return distinctive.every(key => key in value)
     }
-    const pick = <T>(candidates: readonly SettingsDescriptorLike[], test: (item: SettingsDescriptorLike) => T | undefined): { item: SettingsDescriptorLike; how: 'id' | 'uid' | 'value' } | undefined => {
-      for (const item of candidates) {
-        if (test(item) !== undefined) return { item, how: 'id' }
-      }
-      return undefined
-    }
     let found: { item: SettingsDescriptorLike; how: 'id' | 'uid' | 'value' } | undefined
     if (entryIds !== undefined) {
-      found = pick(descriptors.filter(item => entryIds.includes(item.ns)), () => true)
+      const byId = descriptors.find(item => entryIds.includes(item.ns))
+      if (byId !== undefined) found = { item: byId, how: 'id' }
     }
     if (found === undefined && ownUid !== undefined) {
       const byUid = descriptors.find(item => uidOf(item) === ownUid)

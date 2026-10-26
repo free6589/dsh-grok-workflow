@@ -117,3 +117,22 @@ dsh --profile grok-workflow-dev headless 'Use grok_workflow ...'
 
 Record the exact model, profile, command, and result in
 `docs/knowledge/VALIDATION.md`; do not record the key.
+
+## Settings identity against the real projection / 用真实投影校验设置面识别
+
+The settings identity check has a manual companion that uses the DSH installation's own
+`dsh-settings` module instead of a fixture:
+
+```sh
+npm run build
+node scripts/smoke-settings-identity.mjs            # discovers dsh-settings next to `dsh`
+node scripts/smoke-settings-identity.mjs <path>     # or point at lib/types/schema.js
+```
+
+It prints the projected field set and the diagnostics line the plugin would emit, and exits
+non-zero when the plugin fails to recognise its own descriptor. `npm run ci` does not run it,
+because the module belongs to the installation rather than to this package.
+
+设置面识别的手工配套检查使用 DSH 安装自带的 `dsh-settings`，而不是夹具：打印真实投影出的
+字段集合与插件会输出的诊断行，识别失败时以非零码退出。`npm run ci` 不跑它，因为该模块属于
+安装环境而不属于本包。

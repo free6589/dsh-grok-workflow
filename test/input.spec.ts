@@ -26,6 +26,34 @@ describe('caller task validation', () => {
     }])
   })
 
+  it('accepts write paths, normalizes them, and refuses malformed ones', () => {
+    // U-4, caller side: a caller states its write paths explicitly, so a malformed
+    // declaration is an input error (a planner answer degrades to "unknown"
+    // instead, because losing a task is worse than serializing it).
+    const ok = normalizeCallerTasks([{
+      title: 'Doc', objective: 'Write it', expectedOutput: 'File',
+      acceptanceCriteria: ['exists'], writesPaths: ['docs/A.md', './docs/a.md', 'lib'],
+    }], 6)
+    expect(ok?.at(0)?.writesPaths).toEqual(['docs/a.md', 'lib'])
+    const empty = normalizeCallerTasks([{
+      title: 'Read', objective: 'Read it', expectedOutput: 'Answer',
+      acceptanceCriteria: ['given'], writesPaths: [],
+    }], 6)
+    expect(empty?.at(0)?.writesPaths).toEqual([])
+    const absent = normalizeCallerTasks([{
+      title: 'Unknown', objective: 'Do it', expectedOutput: 'Done',
+      acceptanceCriteria: ['works'],
+    }], 6)
+    expect(absent?.at(0)?.writesPaths).toBeNull()
+    const malformed: unknown[] = ['docs/a.md', [1], ['x'.repeat(301)], Array.from({ length: 17 }, () => 'p')]
+    for (const bad of malformed) {
+      expect(() => normalizeCallerTasks([{
+        title: 'Bad', objective: 'Do it', expectedOutput: 'Done',
+        acceptanceCriteria: ['works'], writesPaths: bad,
+      } as never], 6)).toThrow(/writesPaths/)
+    }
+  })
+
   it('rejects duplicate ids', () => {
     expect(() => normalizeCallerTasks([
       { id: 'same', title: 'a', objective: 'a', expectedOutput: 'a', acceptanceCriteria: ['a'] },

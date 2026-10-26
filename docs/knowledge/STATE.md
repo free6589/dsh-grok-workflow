@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-10-25 (local)
+Last updated: 2026-10-26 (local)
 
 ## Repository
 
@@ -20,67 +20,57 @@ Last updated: 2026-10-25 (local)
 
 ## Current phase
 
-Implementation and remote acceptance are complete: deterministic tests, real
-DSH profile installation from both local and GitHub sources, real-model
-end-to-end runs (including a live deadline cancellation), remote Actions, and
-the coordination Issue all passed. Only an optional clean-profile CI check
-remains.
+`0.2.0` release preparation (phase 7). Implementation through phase 6 is merged on
+`main`; the version, changelog, both READMEs and this knowledge base are updated
+for `0.2.0`. The tag and the GitHub Release are created by the captain **after**
+the final acceptance pass (t16) — this file does not claim a published release
+that does not exist yet.
+
+Authoritative numbers for this state (measured, not planned):
+
+- `npm run ci` — typecheck, lint (0 warnings / 0 errors), build, **264 tests /
+  18 files**.
+- `lib/` rebuilt and reproducible (md5 of the artifact set identical before and
+  after a rebuild).
+- Real headless one-shot run with a live model: the report reaches the user in
+  the same turn (`scripts/e2e-headless-in-turn.sh`, PASS).
+
+## What `0.2.0` changed (short form)
+
+| Area | State |
+|---|---|
+| Mandatory entry (gate on `agent/pre-step`) | implemented and the default (`enforceGate: true`); one-shot delivery measured (E-38/E-41), GUI long-lived half NOT_RUN (NR-1) |
+| Per-role model routing + ordered chains | implemented (L1 in the generated script, U-2); real-provider switching NOT_RUN (NR-6) |
+| Failure taxonomy (class + category) | implemented, rendered in the answer; real provider texts NOT_RUN (NR-5) |
+| Settings surface (live values, validation) | implemented; the generated page is identified by the runtime, a live GUI edit is NOT_RUN (NR-7/NR-8) |
+| Write-path isolation (U-4) | implemented (`src/paths.ts` + `mapLimitIsolated`); planner fill-rate NOT_RUN (NR-9) |
+| Reliability and safety set | implemented (cancellation, deadline, concurrency, duplicates, recursion, context bounds, redaction, partial, unload/reload) |
 
 ## Completed
 
-- Created all required memory and architecture docs.
-- Implemented the external bundle: `src/`, `cordis.patch.yml`, `package.json`.
-- Implemented a static JS workflow executed by `ctx.workflowEngine`, with
-  `agent()` fan-out through DSH subagents.
-- Implemented bounded planning, execution, independent verification, bounded
-  retry, status synthesis, cancellation/deadline handling, active-run caps,
-  report validation, and credential redaction.
-- Added deterministic tests: 6 files / 56 tests; all pass.
-- Added a real DSH Loader composition test (real ToolRuntime, SystemPrompt,
-  Loader, plugin artifact) with only the engine boundary faked; 2 tests pass.
-- Built `lib/` and verified npm pack contents (33 files; local pack is about 62.9 kB after the bilingual docs and release-policy additions).
-- Installed the plugin into an isolated real DSH profile
-  (`DSH_HOME=.dsh-home`, profile `grok-workflow-dev`) with `dsh plugin`.
-- Ran a real headless model smoke (`MODEL_OK`) and three real
-  `grok_workflow` end-to-end workflows:
-  - completed caller plan with 2/2 verified tasks;
-  - completed parallel timing plan with 2/2 verified tasks and a measured
-    overlap of 538 ms;
-  - completed planner-only plan with 1/1 verified task;
-  - a separate strict-failure run produced `partial` (1/2 verified) and the
-    assistant explicitly did not claim success.
-- Created/pushed the public repository, passed GitHub Actions on Node 22/24,
-  and opened coordination Issue #1.
-- Confirmed a real DSH deadline cancellation: 2 s timeout returned `FAILED`
-  with a `Timeout` report and no leftover child process.
-- Addressed the independent cloud review: reject oversized caller/planner
-  task text instead of truncating it, redact compound environment-variable
-  names, clear the deadline timer on startup rejection/unload, remove stale
-  validation status blocks, and align `engines.dsh` with the exact peer set.
-  The suite now has 55 tests.
-- Fixed issue #14: redaction now covers non-HTTP URI userinfo (including
-  database URLs and empty-username forms) and GitLab/npm token prefixes in
-  both the host redactor and the prompt-facing mirror. Regression tests bring
-  the suite to 55 tests.
-- Fixed issue #15: `DSH_ENV_FILE` now exports only an explicit allowlist of
-  provider credential/configuration keys; runtime/code-loading variables such
-  as `NODE_OPTIONS`, `LD_PRELOAD`, `PYTHONPATH`, and `DYLD_*` are ignored.
-  The watcher test covers the injection attempt and the help text says the
-  file is parsed, not sourced.
-- Fixed issue #17: host report validation now accepts a fallback plan whose
-  single task is verified as `partial`, requires the planning error as
-  provenance, and keeps `completed` forbidden for fallback plans. Non-fallback
-  `partial` reports still require both verified and failed tasks. The generated
-  fallback report is now exercised through `assertWorkflowReport()`; the suite
-  has 6 files / 56 tests.
+- External bundle (`src/`, `cordis.patch.yml`, `package.json`), `lib/` output,
+  composed by a real DSH Loader.
+- Bounded plan → parallel execute → independent verify → bounded retry →
+  synthesis, with report validation, cancellation/deadline handling, active-run
+  caps, credential redaction and a routing/delivery ledger.
+- The gate: `agent/pre-step` interception, `in-turn`/`relay`/`append` delivery,
+  per-message de-duplication, queue bounds, explicit refusal, live configuration.
+- Configuration surface: 21 keys, unknown-key rejection, `configVersion` gate,
+  route shorthand migration, chain validation against the live runtime.
+- Documentation set kept in step with the code: DESIGN (DD-1..DD-9b, A/E/R/NR
+  ledgers), ROADMAP (phases, U ledger, D-009 decisions), ARCHITECTURE, ACCEPTANCE,
+  LOCAL-TESTING, RELEASING, VALIDATION, this STATE, HANDOFF, DECISIONS.
+- `0.1.0` was published (tag `v0.1.0` → `a7d5a62`, Release run `40182751006`).
 
 ## Remaining / optional
 
-- Add a clean-DSH-profile install test to CI (currently local only).
-- A larger over-broad planner objective hit the outer 600 s test timeout; use
-  realistic task scope. The default plugin deadline is 30 minutes.
-- Child agents inherit all parent tools; only recursive `grok_workflow` calls
-  are blocked. Use deployment tool policy for stricter isolation.
+- A clean-DSH-profile install check in CI (currently a local scripted smoke).
+- The GUI half of the delivery measurements (NR-1), the stock form rendering of
+  `roles` (NR-7) and an in-place settings `update()` against a holder (NR-8) all
+  need a Web GUI with this plugin loaded.
+- L2 host-level routing (registering `agent/request-error` consumers) stays out
+  of scope for `0.2.0` by decision U-2.
+- Client-side chain editor (settings UI with model dropdowns) is Phase 9 / U-6.
 
 ## Blockers
 
@@ -88,9 +78,8 @@ None.
 
 ## Next priority
 
-Monitor coordination Issue #1; optionally add a clean-profile install check to
-CI. Keep memory synchronized with any new commit.
-
+Create `v0.2.0` and the GitHub Release from the accepted commit (captain, after
+t16), then keep this file and the changelog synchronized with `main`.
 
 ## Homepage redesign — merged
 
@@ -110,19 +99,41 @@ CI. Keep memory synchronized with any new commit.
 - **Backup boundary:** Git history/Releases are version recovery, not independent disaster-recovery backup. Repository mirror and local DSH data backups remain a separate operational task.
 - **Next action:** follow `docs/RELEASING.md` for future versions; do not move the published `v0.1.0` tag.
 
-## Active design discussion — mandatory workflow, model routing, fallback
+## Mandatory workflow, model routing, fallback — implemented
 
-- **Status:** brainstorming only; plugin implementation remains unchanged by this discussion.
-- **Persistent notes:** [WORKFLOW-DESIGN.md](WORKFLOW-DESIGN.md).
-- **Confirmed requirement:** every user message, including greetings and trivial questions, must go through the full workflow; no silent bypass to ordinary direct answering.
-- **Desired capabilities still being designed:** per-role model selection, ordered model fallback chains, and a settings UI.
-- **Working rule:** update `WORKFLOW-DESIGN.md` after each substantive discussion; mark user-confirmed decisions separately from proposals and technical unknowns.
+- **Status:** implemented and merged (phases 1–6); the design discussion below is
+  history, not a plan.
+- **Requirement:** every user message, including greetings and trivial
+  questions, goes through the full workflow; the gate never silently falls back
+  to ordinary direct answering (`enforceGate: true`, `gateRequired` for
+  deployments that must fail instead of warn).
+- **Capabilities delivered:** per-role model selection, ordered fallback chains
+  per role, a switch policy (`switchOn`), failure classification with categories,
+  a live settings surface, and write-path isolation for parallel tasks.
+- **Persistent notes:** [WORKFLOW-DESIGN.md](WORKFLOW-DESIGN.md) (evidence ledger
+  A/E/R + decisions DD + NOT_RUN ledger NR); decisions in
+  [DECISIONS.md](DECISIONS.md) D-009/D-010/D-011.
+- **What is deliberately not delivered:** L2 host routing (U-2), a chain editor
+  with model dropdowns (U-6 / phase 9), and the GUI-side measurements NR-1,
+  NR-7, NR-8.
 
-## Overall roadmap for the next design phase
+## Overall roadmap — round 2 (phases 1–7), 2026-10-26
 
 - **Roadmap:** [WORKFLOW-ROADMAP.md](WORKFLOW-ROADMAP.md) is the project-wide plan and phase order.
-- **Detailed discussion:** [WORKFLOW-DESIGN.md](WORKFLOW-DESIGN.md) records confirmed requirements, evidence ledger, rulings, and open questions.
-- **Current phase:** Phase 1 (environment/API audit) and Phase 2 (target design) are complete as of team round 1 (2026-10-25): four independent audits, two live experiment batches (t18 delivery routes, t19 H-1..H-5), synthesis, independent review with 21 findings, and revision. QA batch committed: 023887d (criterion normalization) and 2403a10 (report validation hardening, redaction consolidation, real-engine contract tests); suite is 106 tests / 9 files.
-- **Pending user decisions:** U-1..U-7 in WORKFLOW-ROADMAP §16 — answer route, retry ownership, synthesizer role, shared-directory policy, strict-mode cost, YAML-first settings, enforcement scope. Mandatory-entry feasibility verdict is "partially feasible without DSH core changes" (ROADMAP §5.3 / DESIGN A-14).
-- **Recommended next phase:** implementation after U decisions; entry-first priority means the merged gate+delivery unit, then role model chains (L1), then settings, then optional L2 host routing.
-- **Implementation boundary:** code changes now proceed through the team's single-writer implementer with independent review per batch; DSH core and global installs remain out of bounds.
+- **Design record:** [WORKFLOW-DESIGN.md](WORKFLOW-DESIGN.md) holds the confirmed
+  requirements, the evidence ledger (A/E/R), the decisions (DD) and the NOT_RUN
+  ledger (NR).
+- **Decisions:** U-1..U-9 are answered in [DECISIONS.md](DECISIONS.md) **D-009**
+  (user-approved 2026-10-26); the `0.2.0` breaking boundary is **D-011**;
+  overnight execution and release discipline are **D-010**.
+- **Release preparation:** the human draft of the release announcement lives in
+  [docs/releases/RELEASE-NOTES-0.2.0.md](../releases/RELEASE-NOTES-0.2.0.md); the text the
+  release workflow publishes is the `## [0.2.0]` section of [CHANGELOG.md](../../CHANGELOG.md).
+- **Phase status:** 1 (environment/API audit), 2 (target design), 3–4 (role
+  routing + ordered chains), 5 (configuration + settings surface), 6 (reliability
+  and safety) and 7 (documentation, compatibility, release preparation) are
+  implemented; only the tag and the GitHub Release remain, and they are created
+  after the final acceptance pass.
+- **Implementation boundary:** code changes go through the team's single-writer
+  implementer with an independent review per batch; DSH core and global installs
+  remain out of bounds.

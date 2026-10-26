@@ -422,6 +422,43 @@ tests:
   has 17 orchestrator tests and 6 files / 56 tests total.
 - `npm run ci` — **PASS**, 6 files / 56 tests.
 
+## Round 2 / `0.2.0` release preparation — 2026-10-26
+
+Real commands and results only.
+
+| Check | Command | Result | Evidence |
+|---|---|---|---|
+| Full CI | `npm run ci` | PASS | typecheck OK; `oxlint` "Found 0 warnings and 0 errors" (35 files); build OK; **264 tests / 18 files** passed |
+| Unit subset | `npm run test:unit` | PASS | 16 files / 260 tests (the two Loader/issue-watch suites are excluded by design) |
+| Build reproducible | build twice, then `md5sum lib/*.js lib/*.d.ts \| md5sum` | PASS | `304de3768ceefa0a8af459785a570b51` both times |
+| Package contents | `npm pack --pack-destination /tmp/t15-pack` | PASS | 42 files, 107,990 bytes; contains `lib/`, `package.json`, `cordis.patch.yml`, `LICENSE`, both READMEs, `CHANGELOG.md`, `docs/*.md`, `docs/images/*.svg`; **no** `test/`, `scripts/`, `docs/knowledge/` |
+| Clean copy install | `rsync` the worktree to `/tmp/t15-clean2` (no `node_modules`, no `.git`) → `npm ci` → `npm run ci` | PASS | install completed; CI on the copy: lint "Found 0 warnings and 0 errors", **264 tests / 18 files** passed |
+| Isolated profile install | fresh `DSH_HOME=/tmp/t15-dsh-home`, `dsh --profile smoke --from-default-profile headless`, then `dsh plugin --profile smoke add /tmp/t15-pack/dsh-grok-workflow-0.2.0.tgz` | PASS | pnpm reported `+ dsh-grok-workflow file:/tmp/t15-pack/dsh-grok-workflow-0.2.0.tgz`; `--dump-config` shows the `grok-workflow` bundle row |
+| Isolated profile, real turn | `DSH_HOME=/tmp/t15-dsh-home dsh --profile smoke --patch <route> "hi"` | PASS | 46 lines; the answer contains a `<<<GROK-WORKFLOW-REPORT>>>` block with `Grok workflow: COMPLETED` and per-criterion evidence for a conversational task |
+| Settings identity end-to-end (t31/F1) | `node scripts/smoke-settings-identity.mjs` | PASS | with the built `lib/` and the **real** `dsh-settings` projection of the DSH installation: "projected fields: 17 (toolName present: false)", `INFO settings surface: page auto-generated for "grok-workflow" (21 field(s), applies live, schema not matched by uid, identified by value)`; mutating the distinctive-key set back to include `toolName` makes the same script print the old `no generated descriptor was readable yet` line and exit 1 |
+| Real headless one-shot delivery | `scripts/e2e-headless-in-turn.sh` with a live model route | PASS | `PASS: the report reached the user in one turn`, `Grok workflow: COMPLETED` |
+| `writesPaths` planner fill-rate (NR-9) | same script with an objective that explicitly asked for per-task write paths | **INCONCLUSIVE run, informative field value** | the run hit the 900 s script timeout while task 1 of 2 was still retrying; the session transcript shows the task handed to the worker carried `"writesPaths": null`, i.e. the planner declared nothing. n = 1 |
+| Settings descriptor identity (t31/F1) | `npx vitest run test/settings-projection.spec.ts test/config.spec.ts` | PASS | real projection rules pinned (17 volatile fields, structural keys absent, `{uid, refs}`, uid mismatch); mutating the distinctive-key set back to include `toolName` fails the tests |
+
+### A limitation the smoke run exposed
+
+The plugin's diagnostics go through `ctx.logger(...).info()`. The headless app's exporter does
+not surface DSH logger records on stdout/stderr (every `INFO` line in the run came from the
+Serena MCP server, not from DSH), so the settings line cannot be read out of a headless turn.
+That is why the identity check above drives the built `lib/` directly with a real descriptor
+instead of grepping a log. The same reason keeps NR-7/NR-8 open: no GUI has ever rendered
+this page.
+
+### Notes on what these runs changed in the repository
+
+- The `writesPaths` experiment's child agents ran with full tool access and **made a git
+  commit** (`e38ac8e docs: add plan-a three-line workflow gate summary`). The artifact
+  (`docs/plan-a.md`) and the second, uncommitted artefact (`docs/plan-b.md`) were removed from
+  the working tree; the commit itself stays in history for the captain to handle in the final
+  integration, because rewriting history is not a member's decision. This is also a real
+  observation about the plugin's blast radius: children inherit the session's tools, so a
+  workflow can commit.
+
 ## Remaining gap
 
 - Clean-DSH-profile installation is executed locally; CI has not yet added a

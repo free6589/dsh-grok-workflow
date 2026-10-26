@@ -221,3 +221,76 @@ describe('conflict-aware scheduling (U-4)', () => {
     expect(tracker.peak).toBe(2)
   })
 })
+
+/* ------------------------------------------------- script / host equivalence -- */
+
+/**
+ * The generated script cannot import TypeScript, so the write-path predicate
+ * exists twice: `src/paths.ts` (host, unit-tested) and a mirror inside
+ * `WORKFLOW_SCRIPT` (what actually schedules). A drift between them would let a
+ * host-side test pass while the runtime does something else, so the mirror is
+ * executed here and compared sample by sample.
+ */
+function scriptMirror(): {
+  normalizeWritePath: (raw: string) => string | null
+  writePathOverlap: (left: string, right: string) => boolean
+  writesConflict: (left?: string[], right?: string[]) => boolean
+} {
+  const start = WORKFLOW_SCRIPT.indexOf('function normalizeWritePath(')
+  const end = WORKFLOW_SCRIPT.indexOf('function hasDeclaredPaths(')
+  expect(start).toBeGreaterThan(-1)
+  expect(end).toBeGreaterThan(start)
+  const source = WORKFLOW_SCRIPT.slice(start, end)
+  const factory = new Function(
+    `${source}; return { normalizeWritePath, writePathOverlap, writesConflict };`,
+  ) as () => ReturnType<typeof scriptMirror>
+  return factory()
+}
+
+describe('the script mirror agrees with the host predicate', () => {
+  const samples = [
+    'src/a.ts', 'src//a.ts', './src/a.ts', 'src/./a.ts', 'src/b/../a.ts',
+    'SRC/A.TS', 'src\\a.ts', 'src/a.ts/', '/abs/./p', 'a/../../b', '../b',
+    '.', '/', '   ', 'src', 'src/a', 'src/ab', 'lib/a', 'src/a.ts.bak',
+  ]
+
+  it('normalizes identically', () => {
+    const mirror = scriptMirror()
+    for (const sample of samples) {
+      expect({ sample, value: mirror.normalizeWritePath(sample) })
+        .toEqual({ sample, value: normalizeWritePath(sample) ?? null })
+    }
+  })
+
+  it('agrees on overlap for every pair', () => {
+    const mirror = scriptMirror()
+    for (const left of samples) {
+      for (const right of samples) {
+        const hostLeft = normalizeWritePath(left)
+        const hostRight = normalizeWritePath(right)
+        if (hostLeft === undefined || hostRight === undefined) continue
+        const expected = pathsOverlap(hostLeft, hostRight)
+        expect({ left, right, overlap: mirror.writePathOverlap(hostLeft, hostRight) })
+          .toEqual({ left, right, overlap: expected })
+      }
+    }
+  })
+
+  it('agrees on the task-level three-state rule', () => {
+    const mirror = scriptMirror()
+    const cases: Array<[string[] | undefined, string[] | undefined]> = [
+      [['src/a.ts'], ['src/a.ts']],
+      [['src'], ['src/a.ts']],
+      [['src/a'], ['src/ab']],
+      [['src/a.ts'], undefined],
+      [undefined, undefined],
+      [[], ['src/a.ts']],
+      [[], []],
+      [['src/a.ts'], ['lib/b.ts']],
+    ]
+    for (const [left, right] of cases) {
+      expect({ left, right, conflict: mirror.writesConflict(left, right) })
+        .toEqual({ left, right, conflict: tasksConflict(left, right) })
+    }
+  })
+})

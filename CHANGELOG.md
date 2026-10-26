@@ -6,61 +6,189 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 ## [Unreleased] / 未发布
 
 ### Added / 新增
-- A real-engine contract test base: the tests now drive the actual
-  `@deepseek-ai/dsh-workflow-ptc` engine (script VM, guest program, `agent()`
-  contract, result materialization) with a scripted subagent provider, so the
-  JavaScript contract is verified without a model. Process confinement, sandbox
-  policy and capability gating remain out of scope.
-  / 新增真实引擎契约测试基座：测试直接驱动真正的 `@deepseek-ai/dsh-workflow-ptc`
-  引擎（脚本 VM、guest 程序、`agent()` 契约、结果物化），配合脚本化的子代理 provider，
-  无需模型即可验证 JavaScript 契约。进程隔离、沙箱策略与能力门禁仍不在覆盖范围内。
-- Redaction rules now have a single source (`REDACTION_RULES`), and the workflow
-  script's prompt-side redactor is generated from it instead of being a second
-  hand-maintained copy. Added Azure SAS (`sig`/`signature`) and
-  `Authorization: Basic` coverage.
-  / 脱敏规则改为单一来源（`REDACTION_RULES`），工作流脚本内的提示词脱敏器由它生成，
-  不再手工维护第二份副本；新增 Azure SAS（`sig`/`signature`）与
-  `Authorization: Basic` 覆盖。
+- (nothing yet) / （暂无）
 
-### Changed / 变更
-- **Behaviour change (can reject previously valid input):** acceptance criteria
-  must stay distinct after normalization (trailing sentence punctuation,
-  collapsed whitespace, and case are ignored when matching a verifier result).
-  Inputs such as `["Do X.", "do x"]` or `["alpha works", "alpha works!"]` are now
-  rejected instead of accepted, because two criteria that compare equal cannot
-  each be confirmed by exactly one verifier entry.
-  / **行为变更（可能拒绝此前合法的输入）**：验收标准在归一化后必须互不相同（匹配
-  验证结果时忽略结尾句读、多余空白与大小写）。`["Do X.", "do x"]`、
-  `["alpha works", "alpha works!"]` 这类输入现在会被拒绝，因为比较相等的两条标准
-  无法各自被恰好一条验证条目确认。
-- The planner prompt receives the objective as redacted JSON data rather than raw
-  interpolated text, matching how worker and verifier prompts are built.
-  / 规划提示词改为接收经脱敏的 JSON 形式目标，与 worker、verifier 提示词的构造方式一致。
+## [0.2.0] - 2026-10-26
 
-### Fixed / 修复
-- Verification no longer compares acceptance-criterion text byte-for-byte. A
-  verifier that copies a criterion with a trailing period, different spacing, or
-  different case used to fail every attempt, exhaust the retry budget, and report
-  a correct result as `failed`; the comparison now normalizes those formatting
-  differences while still requiring the same requirement wording.
-  / 验证不再逐字比较验收标准文本。验证者若把标准抄成结尾多一个句号、空白或大小写不同，
-  过去会导致每次尝试都失败、重试耗尽，并把正确的结果报成 `failed`；现在比较会归一化这些
-  格式差异，但仍要求同一需求措辞。
-- The report validator now enforces what it documented: attempt-level executor and
-  verifier payloads are deep-checked against closed unions (`verdict`,
-  `status`, `confidence`, command status), confirmed evidence must trace to the
-  task's last attempt verification with byte-identical evidence, a task may not
-  have zero acceptance criteria, `tasks` may not exceed `maxTasks`, task ids must
-  be unique, `limits.maxTotalAgents` must match the request builder's window, and
-  every failed task must appear exactly once in `incomplete` with a non-empty
-  reason.
-  / 报告校验器补齐了它自己声明的约束：逐次尝试的执行/验证载荷按闭合枚举深度校验
-  （`verdict`、`status`、`confidence`、命令状态）；confirmed 证据必须能追溯到该任务
-  最后一次尝试的验证记录且证据逐字相同；任务不得没有任何验收标准；`tasks` 不得超过
-  `maxTasks`；任务 id 必须唯一；`limits.maxTotalAgents` 必须落在请求构造器的取值区间内；
-  每个失败任务必须在 `incomplete` 中恰好出现一次且原因非空。
-- `npm run test:unit` now includes the criterion-comparison suite.
-  / `npm run test:unit` 现在包含验收标准比较测试。
+### English
+
+#### Added
+- **Mandatory entry (the gate).** The plugin now claims every user message
+  through `agent/pre-step`, runs the full plan → execute → verify → synthesise
+  workflow, and delivers the result inside the same turn (`answerStrategy:
+  in-turn`, the default). Turning a message away is a stated decision: an empty
+  or over-long message (over 4000 characters) is refused with its reason
+  printed, and nothing is executed. Delivery is de-duplicated per message, so
+  re-dispatching a batch cannot start a second run, and the queue per agent is
+  bounded (`maxQueuedMessages`).
+- **Per-role model routing with ordered fallback chains.** `roles.planner`,
+  `roles.worker`, `roles.verifier` and `roles.synthesizer` each take up to three
+  routes (`{ provider, model }`, or a bare model id as shorthand). Every child
+  call is routed by role, and a route-level failure advances that role's chain.
+  The routes actually used are recorded in the report (`routing`) and rendered in
+  the answer, so a chain that never took effect cannot look like routing that
+  works.
+- **Switch policy you can inspect.** `switchOn` lists the failure classes that
+  advance a chain (default: the built-in policy). Content failures
+  (`task-failed`, `verification-failed`) never advance — a different model would
+  be looking at the same evidence — and a typo in `switchOn` is refused at load
+  instead of silently never switching.
+- **Failure class and category in every report.** Each failure carries what
+  happened (`class`, e.g. `rate-limit`, `timeout`, `verification-failed`) and
+  who has to fix it (`category`: `infrastructure`, `quality`, `configuration`,
+  `cancelled`, `unknown`). The rendered answer adds a `Failures:` line, so a
+  provider outage is not read as poorly done work.
+- **A settings surface that is the same truth as the runtime.** The exported
+  `Config` is projected into the standard DSH settings UI; fields are live
+  (an edit reaches the next message, an invalid edit is refused with its reason
+  while delivery keeps the last valid snapshot). Unknown configuration keys are
+  rejected with the closest accepted key instead of being ignored, and
+  `roles`/`synthesis` are validated against the providers the runtime actually
+  has. Run records (`recordRuns`, `recordLimit`) can be turned off or capped.
+- **Write-path isolation for parallel tasks.** A plan task may declare
+  `writesPaths`; tasks whose declared paths overlap run one after another, and
+  everything else keeps running in parallel. `[]` means "writes nothing";
+  declaring nothing means "unknown" and is treated conservatively. Overlap is
+  decided lexically (`.`, `..`, separators, case) with segment-wise prefixes, so
+  `src` covers `src/a.ts` while `src/a` does not cover `src/ab`.
+- **A real-engine contract test base and a reliability suite.** The tests drive
+  the actual `@deepseek-ai/dsh-workflow-ptc` engine (script VM, guest program,
+  `agent()` contract, result materialization) with a scripted subagent provider,
+  and cover cancellation, deadlines, the concurrency cap, duplicate starts,
+  recursion refusal, context bounds, secret redaction, partial results, unload
+  and reload. 264 deterministic tests across 18 files; no online model is needed.
+  Process confinement, sandbox policy and capability gating remain out of scope.
+
+#### Changed
+- **`enforceGate` is `true` by default: every user message now goes through the
+  workflow.** This is the point of the release and also the biggest visible
+  change from `0.1.0`, where the tool only ran when a model chose to call it.
+  Set `enforceGate: false` to get the `0.1.0` behaviour back (the tool stays
+  available, the gate does not intercept).
+- The answer is delivered inside the turn by default (`answerStrategy:
+  in-turn`). `relay` and `append` remain selectable for long-lived surfaces; on a
+  one-shot headless run they deliver after the process has begun tearing down.
+- Acceptance criteria must stay distinct after normalization (trailing sentence
+  punctuation, collapsed whitespace and case are ignored when matching a
+  verifier result), so `["Do X.", "do x"]` is now rejected.
+- The planner prompt receives the objective as redacted JSON data rather than
+  raw interpolated text, matching how worker and verifier prompts are built.
+- The report validator now enforces what it documented: deep-checked attempt
+  payloads against closed unions, confirmed evidence traceable to the task's
+  last attempt, unique task ids, `limits.maxTotalAgents` inside the request
+  builder's window, and every failed task present exactly once in `incomplete`.
+- The package version is `0.2.0`, the changelog keeps one bilingual section per
+  version, and `npm run ci` runs typecheck, lint, build and the full suite.
+
+#### Fixed
+- An infrastructure failure no longer escapes as a raw exception. Every
+  transport-level failure (429, timeout, connection reset, missing model, a
+  crashed child) now produces a structured report with
+  `category: infrastructure`; the worst case is one failed row per task.
+- Redaction rules have a single source (`REDACTION_RULES`) and the workflow
+  script's prompt-side redactor is generated from it. Added Azure SAS
+  (`sig`/`signature`) and `Authorization: Basic` coverage.
+- Verification no longer compares acceptance-criterion text byte-for-byte, so a
+  verifier that copies a criterion with a trailing period, different spacing or
+  different case no longer fails every attempt.
+- A run-level failure (deadline, cancellation, an unvalidatable report) now
+  prints its `Failures:` line from the run-level error categories instead of
+  showing none.
+- A malformed routing record no longer discards the whole ledger, and the
+  delivery fallback keeps the last valid configuration instead of the load-time
+  one, so a later invalid edit cannot silently undo an edit that had taken
+  effect.
+
+#### Breaking notes (`0.1.0` → `0.2.0`)
+- **Mandatory entry is on by default.** If you want the old opt-in behaviour,
+  set `enforceGate: false`. A deployment that must never degrade silently should
+  also set `gateRequired: true`, which turns "this runtime has no `agent/pre-step`
+  hook" into a load error instead of a warning.
+- **The report is additive but extended:** task rows gain `writesPaths` (array or
+  `null`), failures gain `class` and `category`, and `plan.tasks` must match
+  `tasks` field for field. Consumers that reject unknown fields must be updated;
+  consumers that ignore them keep working.
+- **Configuration keys are validated.** Unknown keys are rejected at load with a
+  suggestion, and `roles` chains are refused when empty models, duplicate routes
+  or more than three routes are present. A configuration that loaded under
+  `0.1.0` because a key was silently ignored may now fail loudly — that is
+  intentional.
+- **Criteria distinctness** can reject input that `0.1.0` accepted.
+- Requires DSH `0.2.1-rc.2` and Node.js 22 or newer; the `0.1.0` peer set is not
+  supported.
+
+### 简体中文
+
+#### 新增
+- **强制入口（闸门）**：插件现在通过 `agent/pre-step` 认领每一条用户消息，执行完整的
+  规划 → 执行 → 验证 → 汇总工作流，并在**同一轮**内交付结果（`answerStrategy:
+  in-turn` 为默认）。拒绝一条消息也是明示决定：空消息或超过 4000 字符的消息会被打印
+  拒绝原因且不执行任何工作。每个消息的交付做了去重，同一批被重复派发也不会启动第二次
+  运行；每个 agent 的等待队列有上限（`maxQueuedMessages`）。
+- **按角色模型路由 + 有序备用链**：`roles.planner`、`roles.worker`、`roles.verifier`、
+  `roles.synthesizer` 各自最多三条路由（`{ provider, model }`，也接受裸模型 id 简写）。
+  每次子代理调用按角色取路由，路由级失败会推进该角色的链。实际用到的路由写进报告
+  (`routing`) 并渲染在答案里，因此"配了但没生效"不会被误当成"配好了"。
+- **可检视的切换策略**：`switchOn` 列出允许推进备用链的失败类别（默认=内置策略）。
+  内容类失败（`task-failed`、`verification-failed`）永不推进——换模型看到的是同样的
+  证据；`switchOn` 里写错类别会在载入时被拒绝，不会变成"永不切换"。
+- **每份报告都带失败类别与归类**：每个失败同时给出发生了什么（`class`，例如
+  `rate-limit`、`timeout`、`verification-failed`）和该谁修（`category`：
+  `infrastructure`、`quality`、`configuration`、`cancelled`、`unknown`）。渲染的答案
+  增加 `Failures:` 行，provider 故障不会被读成"活干得不好"。
+- **设置面与运行时同一真相**：导出的 `Config` 会被投影成 DSH 标准设置页；字段是活值
+  （编辑对下一条消息生效，非法编辑以原因被拒绝，投递继续使用上一次合法快照）。未知
+  配置键会被拒绝并给出最接近的合法键，而不是被静默忽略；`roles`/`synthesis` 会对照
+  运行时实际拥有的 provider 校验。运行记录可用 `recordRuns`/`recordLimit` 关闭或封顶。
+- **并行任务的写路径隔离**：计划任务可声明 `writesPaths`，声明路径重叠的任务依次执行，
+  其余保持并行。`[]` 表示"不写文件"；什么都不声明表示"未知"，按保守方式处理。重叠判定
+  是词法的（`.`、`..`、分隔符、大小写）且按段比较前缀，因此 `src` 覆盖 `src/a.ts`，
+  而 `src/a` 不覆盖 `src/ab`。
+- **真实引擎契约测试基座与可靠性套件**：测试直接驱动真正的
+  `@deepseek-ai/dsh-workflow-ptc` 引擎（脚本 VM、guest 程序、`agent()` 契约、结果
+  物化），配合脚本化的子代理 provider，覆盖取消、超时、并发上限、重复启动、递归拒绝、
+  上下文边界、密钥脱敏、部分完成、卸载与重载。264 个确定性测试 / 18 个文件，无需在线
+  模型。进程隔离、沙箱策略与能力门禁仍不在覆盖范围内。
+
+#### 变更
+- **`enforceGate` 默认 `true`：每条用户消息都会走完整工作流。** 这正是本版本的目的，
+  也是相对 `0.1.0` 最大的可见变化——`0.1.0` 只有模型主动调用工具时才运行。若想恢复
+  `0.1.0` 的行为，设 `enforceGate: false`（工具仍可用，闸门不再拦截）。
+- 答案默认在同一轮内交付（`answerStrategy: in-turn`）。`relay`、`append` 仍可选用，
+  适用于长驻界面；在一次性 headless 运行中它们在进程开始销毁后才投递。
+- 验收标准归一化后必须互不相同（匹配验证结果时忽略结尾句读、多余空白与大小写），
+  `["Do X.", "do x"]` 这类输入现在会被拒绝。
+- 规划提示词接收经脱敏的 JSON 形式目标，与 worker、verifier 提示词的构造方式一致。
+- 报告校验器补齐了声明的约束：逐次尝试载荷按闭合枚举深度校验、confirmed 证据必须可追溯
+  到该任务最后一次验证、任务 id 唯一、`limits.maxTotalAgents` 落在请求构造器取值区间、
+  每个失败任务在 `incomplete` 中恰好出现一次。
+- 版本号改为 `0.2.0`；更新日志每个版本保持中英对照；`npm run ci` 运行 typecheck、
+  lint、build 与完整测试。
+
+#### 修复
+- 基础设施故障不再以裸异常逃逸。所有传输层故障（429、超时、连接重置、模型不存在、
+  子代理崩溃）都会产出结构化报告并标注 `category: infrastructure`；最坏情况是每个任务
+  一行失败。
+- 脱敏规则改为单一来源（`REDACTION_RULES`），工作流脚本内的提示词脱敏器由它生成；
+  新增 Azure SAS（`sig`/`signature`）与 `Authorization: Basic` 覆盖。
+- 验证不再逐字比较验收标准文本，验证者抄错结尾句号、空白或大小写不会再导致每次尝试失败。
+- 运行级失败（超时、取消、报告无法校验）也会打印 `Failures:` 行（取自运行级错误类别），
+  而不是什么都不显示。
+- 单条畸形路由记录不再毁掉整份台账；投递回落改取**上一次合法配置**，因此后续非法编辑
+  无法静默撤销已经生效的编辑。
+
+#### 破坏性说明（`0.1.0` → `0.2.0`）
+- **强制入口默认开启。** 需要旧的可选行为请设 `enforceGate: false`。要求"绝不静默降级"
+  的部署还应收紧 `gateRequired: true`：把"运行时没有 `agent/pre-step` 钩子"从警告变成
+  载入错误。
+- **报告为纯增量但已扩展**：任务行新增 `writesPaths`（数组或 `null`），失败新增 `class`
+  与 `category`，且 `plan.tasks` 必须与 `tasks` 逐字段一致。拒绝未知字段的消费方需要
+  适配；忽略未知字段的消费方不受影响。
+- **配置键会校验**：未知键在载入时被拒绝并给出建议；`roles` 链出现空模型、重复路由或
+  超过三条会被拒绝。`0.1.0` 下因键被静默忽略而"能用"的配置，现在可能直接报错——这是
+  有意为之。
+- **验收标准去重**可能拒绝 `0.1.0` 曾接受的输入。
+- 需要 DSH `0.2.1-rc.2` 与 Node.js 22 及以上；`0.1.0` 的 peer 集合不再受支持。
 
 ## [0.1.0] - 2026-10-25
 

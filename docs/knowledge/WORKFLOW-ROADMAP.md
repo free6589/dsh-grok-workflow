@@ -716,7 +716,7 @@ script-level v1 fallback and the merged answer path.
   covered by injected-throw tests and the composed-waterfall suites.
   Exit: Layer-5 anti-bypass assertions pass against the composed bundle; headless and
   (where available) Web GUI evidence recorded.
-- **Phase 6 — reliability and safety hardening — DONE (t14 + t29 + t30 fixes).** Cancellation, deadline,
+- **Phase 6 — reliability and safety hardening — DONE (t14 + t29, with the t30/t31 review fixes: last-good fallback, descriptor identity, wiring tests, run-level failure summary).** Cancellation, deadline,
   concurrency cap, duplicate-start defence, recursion limit, context bounds, secret
   handling, error records, partial-completion semantics, and unload/reload cleanup, each with
   a test (`test/reliability.spec.ts`, 18 cases); `volatile()` + `.get()` holder-isation with
@@ -785,7 +785,10 @@ implements or records it.
 ## 19. Immediate next step
 
 1. ~~User confirms U-1 … U-7~~ — **done** (D-009): every decision is resolved (§17).
-2. Phases 3–6 are implemented (t11, t13, t14, t17, t25); Phase 7 reliability work is done;
+2. Phases 3–6 are implemented (t11, t13, t14, t17, t25); Phase 7 (documentation,
+   compatibility, release preparation) is done apart from the tag and the Release, which the
+   release operator creates after the final acceptance pass (see
+   [RELEASING](../RELEASING.md) and the [0.2.0 draft notes](../releases/RELEASE-NOTES-0.2.0.md));
    Phase 9 (chain editor) and the progress-notice backlog (U-9) remain.
 3. F6 (gate listener totality) and F9 (one-shot teardown) are covered as written;
    the web long-lived case stays `NOT_RUN` (NR-1) until a GUI run measures it.

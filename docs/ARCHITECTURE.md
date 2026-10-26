@@ -2,10 +2,12 @@
 
 ## Goal
 
-`dsh-grok-workflow` adds one model-facing tool, `grok_workflow`, that turns a
-complex objective into a bounded, verifiable multi-subagent workflow using DSH
-capabilities. It does not implement a new agent loop, model adapter, sandbox, or
-subagent runtime.
+`dsh-grok-workflow` adds two things to DSH, using only documented capabilities:
+a model-facing tool, `grok_workflow`, that turns a complex objective into a
+bounded, verifiable multi-subagent workflow; and — since `0.2.0`, on by default —
+an **entry gate** on `agent/pre-step` that makes that workflow mandatory for user
+messages instead of opt-in. It does not implement a new agent loop, model
+adapter, sandbox, or subagent runtime.
 
 ## Reused DSH capabilities
 
@@ -186,14 +188,46 @@ generated fields are the fields `resolveConfig()` reads. A bespoke chain editor
 with model dropdowns would be a client-half package (`dsh.client`), not a core
 change (see ROADMAP §9.2).
 
+## Mandatory entry (the gate)
+
+```
+user message ──► agent/pre-step ──► classify
+                                     ├─ not ours (subagent, non-user source, empty batch, out of scope, already routed) ──► pass through
+                                     ├─ unusable (empty text, over 4000 chars) ──► refuse out loud, nothing runs
+                                     └─ admit ──► run the workflow ──► deliver the validated report in this turn
+```
+
+- **Classification is a whitelist** (`src/gate.ts`): only `source.kind === 'user'`
+  messages for the scoped agents are claimed. Subagent prompts, team messages,
+  webhooks, schedules, user-question replies and empty batches pass through — a
+  gate that claims everything would recurse.
+- **Claiming is recorded, not guessed.** A per-message delivery record is written
+  into the session, so a re-dispatched batch cannot start a second run and an
+  interrupted delivery is not silently re-run.
+- **Delivery is in-turn by default.** The turn stays open, the report is entered
+  as the step's message, and the main model finalises it in the same turn. The
+  alternatives (`relay`, `append`) deliver after the turn closes and therefore
+  need a long-lived surface.
+- **The gate reads the live configuration** on every decision (holders, see the
+  settings section), so an edit applies to the next message while an in-flight
+  run keeps its snapshot; an invalid edit refuses that message with its reason
+  and delivery falls back to the last good snapshot.
+- **Failure modes are bounded:** the queue per agent is capped
+  (`maxQueuedMessages`), the run is bounded (`maxActiveRuns`, `timeoutMs`), and a
+  broken configuration is reported rather than swallowed.
+
 ## Non-interference
 
 When the bundle is not installed or its row is disabled:
 
 - no tool is registered;
 - no prompt section is added;
-- no listeners or workflow runs exist;
+- no `agent/pre-step` listener exists, so no message is claimed;
+- no workflow runs exist;
 - ordinary DSH sessions behave exactly as before.
+
+Setting `enforceGate: false` keeps the tool and drops the listener, which is the
+`0.1.0` behaviour.
 
 ## CI versus local-only tests
 
@@ -252,12 +286,17 @@ hands `.volatile()` configuration over as holders and the plugin unwraps them (D
 
 - No pause/resume, journaling, or cross-process resume.
 - No background job mode; the tool runs in the foreground and uses `exec.signal`.
-- No per-task model/provider routing; children inherit the parent/deployment
-  route.
+- Model routing is **script-level (L1) only**: each call passes
+  `{ provider, model }` from the role's chain, but the plugin does not register
+  `agent/request`/`agent/request-error` consumers, so host-level (L2) rerouting
+  and any interaction with `dsh-llm-retry` stay out of scope (decision U-2).
 - No dependency graph between tasks; tasks are independent by design.
 - Verification is independent-agent plus evidence validation, not a formal
   proof of correctness.
 - All child agents in one workflow share the DSH session `cwd`. Parallel
   workers/verifiers are not filesystem-isolated; concurrent writers can
   clobber each other and a verifier can see another task's partial state.
-  Keep write scopes disjoint or set `maxConcurrency: 1` for write-heavy work.
+  Declaration-driven mitigation exists (`writesPaths`, DESIGN DD-8a): tasks whose
+  declared paths overlap are serialized. It is a mitigation, not a sandbox —
+  a task that writes outside its declaration is invisible to the scheduler, so
+  keep write scopes disjoint or set `maxConcurrency: 1` for write-heavy work.

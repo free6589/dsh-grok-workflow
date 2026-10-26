@@ -586,13 +586,28 @@ is `SettingsForms`, a scheme-derived form service:
 | `configure({ auto }, owner?)` | types | Per-instance policy; `auto:false` suppresses the generated page |
 | `describe({ redactSecrets: true })` + `redactSecrets` | types | Remote readers always see secrets redacted |
 
-**Identifying our own descriptor (t30/F2).** No single signal survives every runtime: the
-Loader entry id is not passed to `apply()`, and a volatile form **rebuilds** the schema, so
-`form.toJSON().uid` changes (measured 155 vs 156) while the descriptor is still ours. Identity
-is therefore layered — entry id when known, then schema uid, then the projected `value`
-carrying our distinctive keys (`toolName`, `roles`, `switchOn`) — and the view reports which
-path matched (`matchedBy`), which the diagnostics line prints. A descriptor that matches
-nothing is still reported as not found rather than guessed.
+**Identifying our own descriptor (t30/F2, corrected in t31/F1).** No single signal
+survives every runtime: the Loader entry id is not passed to `apply()`, and a volatile form
+**rebuilds** the schema, so `form.toJSON().uid` differs from `Config.toJSON().uid` while the
+descriptor is still ours. Identity is therefore layered — entry id when known, then schema
+uid, then the projected `value` — and the view reports which path matched (`matchedBy`),
+which the diagnostics line prints.
+
+The value signal must be computed from what `describe()` actually projects:
+`value = projectForm(volatileForm(schema), plainConfig(config))` keeps **only the 17
+volatile fields**, so `toolName`, `enforceGate`, `gateRequired` and `configVersion` are never
+present. The first attempt keyed on `toolName` and therefore **never** matched in a real
+runtime: the diagnostics line kept saying the page was unreadable while the page existed
+(t31/F1). The signal is now `roles` + `switchOn` (both volatile, together specific enough).
+
+The test fixture is no longer hand-shaped — three separate hand-shaped versions were wrong
+in ways that hid this bug. `test/settings-fixture.ts` applies the runtime's own projection
+rules (`volatileForm`/`plainConfig`/`projectForm`, transcribed from
+`@deepseek-ai/dsh-settings@0.2.1-rc.2` `lib/types/schema.js` because installing that package
+pulls `@deepseek-ai/dsh-config-editor`, which breaks the real-Loader test), and
+`test/settings-projection.spec.ts` pins the measured facts (17 fields, the structural four
+absent, `{uid, refs}` schema, uid mismatch) and cross-checks the transcription against a real
+`dsh-settings` whenever one is resolvable.
 
 **What this plugin does with it (implemented, `src/settings.ts`).**
 
@@ -772,6 +787,7 @@ cited as working:
 | NR-6 | route switching with real children and real providers end to end | source-confirmed option plumbing (E-37) + simulated failures in the contract harness | whether a real provider/model combination actually starts and answers after a switch |
 | NR-7 | the stock Web form rendering this plugin's `roles` (array-of-object) section against a live Loader | `SettingsForms` contract source-read; `describeSelf()` is now pinned to the **real descriptor shape** (`form.toJSON()` = `{uid, refs}`, no `properties` — t28/F1) with a fake context, but no GUI ever rendered the form | decides whether the generated page is usable for chains or whether U-6 (custom editor) is needed sooner |
 | NR-8 | whether a **real settings-form edit against a live Loader** reaches a queued message, and what an in-flight run does with it | semantics implemented and unit-tested in t14 (`volatile()` holders + `createConfigReader()`: next admission re-reads, a started run keeps its snapshot, an invalid edit refuses with its reason and delivery falls back to the last good snapshot). E-40 now *does* measure the runtime half of the holder mechanism (the real Loader hands `{get()}` holders and the plugin unwraps them, in a real headless turn). What is still unmeasured is the last step — a settings-form `update()` mutating that holder in place while a message waits — because that needs the Web GUI | the code path is honest and tested; what remains unproven is the runtime's in-place update, so the user-facing sentence stays: a settings edit applies to the **next message**, a hand-edited patch file needs a reload |
+| NR-9 | whether a **real planner model fills `writesPaths`**, and at what rate | one real headless run was made with an objective that explicitly asked for per-task write paths. The run did not finish inside the 900 s script timeout (it was still retrying task 1 of 2), so it produced no report — **and that timeout is not evidence in either direction**. What the session transcript does show is decisive for the field itself: the task the script handed the worker carried `"writesPaths": null`, i.e. the planner did **not** declare paths even when asked. n = 1, explicitly prompted | the mitigation is only automatic for plans that declare paths; with a planner that does not, `0.2.0` behaves exactly like the pre-U-4 scheduler. Anything stronger needs a measured fill-rate over many runs, and possibly a planner-prompt change — not a code change |
 
 ---
 

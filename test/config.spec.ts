@@ -8,6 +8,7 @@ import {
   snapshotConfig,
 } from '../src/config.js'
 import { declareSettingsSurface, describeSelf, describeSurface, validateRoutes } from '../src/settings.js'
+import { realSettingsDescriptor } from './settings-fixture.js'
 import { Session, pluginRecordOf } from '@deepseek-ai/dsh-session'
 import type { Context } from '@deepseek-ai/cordis'
 import type { ResolvedConfig } from '../src/types.js'
@@ -164,60 +165,54 @@ describe('route validation against the runtime', () => {
   })
 
   it('reports the generated settings page for this plugin', () => {
-    // The real descriptor carries `form.toJSON()`, which is schemastery's
-    // `{ uid, refs }` and has no `properties` map (t28 measured this shape), so
-    // the field list must come from our own schema and identity from the uid.
-    const schema = Config.toJSON() as { uid: number; refs: unknown }
-    expect(Object.keys(schema).sort()).toEqual(['refs', 'uid'])
+    // The descriptor is built by the runtime's own projection helpers
+    // (`volatileForm`/`projectForm`, imported in test/settings-fixture.ts), not by
+    // hand: the real form is `{ uid, refs }` with no `properties` map, its uid
+    // differs from `Config.toJSON()`'s, and its projected value holds only the
+    // volatile fields. Two earlier hand-written fixtures were wrong in exactly the
+    // ways that let a broken identity check pass, so nothing here is hand-shaped.
+    const descriptor = realSettingsDescriptor()
+    expect(Object.keys(descriptor.schema as Record<string, unknown>).sort()).toEqual(['refs', 'uid'])
+    const projected = Object.keys(descriptor.value).sort()
+    expect(projected).not.toContain('toolName')   // not volatile => not projected
+    expect(projected).toContain('roles')
+    expect(projected).toContain('switchOn')
+    expect(projected).toHaveLength(17)
     const ctx = ctxWith({
-      settings: {
-        configure: () => () => {},
-        describe: () => [{ ns: 'grok-workflow', autoGenerate: true, applies: 'live', schema }],
-      },
+      settings: { configure: () => () => {}, describe: () => [descriptor] },
     })
     expect(declareSettingsSurface(ctx)).toBe('declared')
-    const view = describeSelf(ctx, ['grok-workflow'])
-    expect(view).toEqual({
+    // With the entry id known, identity is exact.
+    expect(describeSelf(ctx, ['grok-workflow'])).toEqual({
       ns: 'grok-workflow',
       autoGenerate: true,
       applies: 'live',
       fields: [...CONFIG_KEYS],
-      schemaMatches: true,
+      schemaMatches: false,   // the volatile form rebuilt the schema, so the uid differs
       matchedBy: 'id',
     })
-    // Matching by schema identity alone finds the same descriptor without an id.
-    expect(describeSelf(ctx)).toMatchObject({ ns: 'grok-workflow', matchedBy: 'uid', schemaMatches: true })
-    // A foreign schema is not ours, and no field list may be invented from it.
-    const foreign = ctxWith({
-      settings: { describe: () => [{ ns: 'other', schema: { uid: 999_999, refs: {} }, value: { theme: 'dark' } }] },
-    })
-    expect(describeSelf(foreign)).toBeUndefined()
-  })
-
-  it('still finds the entry when a volatile form rebuilt the schema (t30/F2)', () => {
-    // Measured in the real runtime: the volatile form gets a fresh uid (155 vs 156),
-    // so uid equality reports "not ours" even though the descriptor is ours. The
-    // projected value is the signal that survives, and the diagnostics line must say
-    // which path identified it instead of claiming the page is missing.
-    const ctx = ctxWith({
-      settings: {
-        configure: () => () => {},
-        describe: () => [{
-          ns: 'grok-workflow',
-          autoGenerate: true,
-          applies: 'live',
-          schema: { uid: 155, refs: {} },
-          value: { toolName: 'grok_workflow', roles: { planner: [] }, switchOn: [] },
-        }],
-      },
-    })
-    const view = describeSelf(ctx)
-    expect(view).toMatchObject({ ns: 'grok-workflow', matchedBy: 'value', schemaMatches: false })
-    expect(view?.fields).toEqual([...CONFIG_KEYS])
+    // Without the id, the runtime shape must still be recognised end to end: the
+    // projected value is what survives a schema rebuild (t30/F2).
+    expect(describeSelf(ctx)).toMatchObject({ ns: 'grok-workflow', matchedBy: 'value' })
     const surface = describeSurface(ctx)
     expect(surface.level).toBe('info')
     expect(surface.text).toContain('identified by value')
     expect(surface.text).toContain(`${CONFIG_KEYS.length} field(s)`)
+    // A foreign schema is not ours, and no field list may be invented from it.
+    const foreign = ctxWith({
+      settings: {
+        describe: () => [{ ns: 'other', schema: { uid: 999_999, refs: {} }, value: { theme: 'dark' } }],
+      },
+    })
+    expect(describeSelf(foreign)).toBeUndefined()
+  })
+
+  it('matches the plain Config schema by uid when no volatile rebound happened', () => {
+    // The other identification path: a descriptor carrying our own schema object
+    // (no volatile form) matches by uid, so the layer below is exercised too.
+    const schema = Config.toJSON() as { uid: number; refs: unknown }
+    const ctx = ctxWith({ settings: { configure: () => () => {}, describe: () => [{ ns: 'grok-workflow', autoGenerate: true, applies: 'live', schema }] } })
+    expect(describeSelf(ctx)).toMatchObject({ ns: 'grok-workflow', matchedBy: 'uid', schemaMatches: true })
   })
 
   it('degrades quietly on a runtime without a settings service', () => {

@@ -1,5 +1,61 @@
 # Agent Handoff
 
+## 2026-10-26 — Security observation (captain integration note)
+
+- During t15's writesPaths experiment a workflow subagent inherited session tools including git and committed `docs/plan-a.md` as `e38ac8e` (`dsh-agent@localhost`) without authorization. Artifacts removed in the v0.2.0 release batch; history kept intact deliberately (audit trail).
+- Risk: subagents of the workflow inherit the parent session's toolset — including VCS write access. Operators running the workflow in profiles with git-capable tools should treat this as a documented limitation (see WORKFLOW-DESIGN limits). Mitigation options for future versions: tool pre-execute deny list for subagents, or documented operator guidance.
+- The plugin's own recursion guard blocks workflow re-entry in subagents, but it cannot (and does not) restrict which unrelated tools a workflow subagent may call.
+
+
+## 2026-10-26 — Round 2 (phases 1–7): mandatory entry, routing, settings, reliability, release prep
+
+- **From:** local team (AgentTeams dshgw-workflow-planning), implementer + independent reviewers
+- **To:** captain / next local agent / independent reviewer
+- **Base commit:** `bd1f261` (U-4 write-path isolation; phase 6 landed in `32a7f4a`)
+- **Package version:** `0.2.0` (tag and GitHub Release **not yet created** — the captain creates them after the final acceptance pass)
+- **Release-readiness artefacts:**
+  - `docs/releases/RELEASE-NOTES-0.2.0.md` — human draft of the announcement, artifact table
+    (`0.1.0`: 33 files / 61,281 B → `0.2.0`: 42 files / 107,991 B) and operator steps pointing at
+    [RELEASING](../RELEASING.md).
+  - `scripts/smoke-settings-identity.mjs` — feeds the **built** plugin the descriptor produced by
+    the DSH installation's own `dsh-settings` projection and prints the diagnostics line; the
+    end-to-end check for the t31/F1 identity fix.
+  - `test/settings-fixture.ts` + `test/settings-projection.spec.ts` — the settings descriptor is
+    no longer hand-shaped: the runtime's projection rules are applied, the measured facts are
+    pinned, and the transcription is cross-checked against the real module when discoverable.
+- **What is now true:**
+  - The gate claims every user message through `agent/pre-step` and answers it
+    from a validated report in the same turn (`in-turn`, the default;
+    `enforceGate: true` is the default, `gateRequired` turns a missing hook into a
+    load error).
+  - Per-role ordered fallback chains (`roles.{planner,worker,verifier,synthesizer}`,
+    ≤3 routes), a `switchOn` whitelist, and routing recorded in the report.
+  - Failure `class` + `category` (`infrastructure`/`quality`/`configuration`/
+    `cancelled`/`unknown`) end to end, including a rendered `Failures:` line.
+  - A live settings surface derived from the exported `Config`: unknown keys
+    rejected with a suggestion, chains validated against the runtime's providers,
+    edits apply to the next message with a last-good fallback.
+  - Write-path isolation (U-4): `writesPaths` per task, conflict-aware pool,
+    normalized lexical overlap, echoed in the report.
+  - Documentation set synchronized: README (EN + zh), CHANGELOG (bilingual
+    `0.2.0`), DESIGN (DD-1..DD-9b + NR ledger), ROADMAP (phases marked), STATE,
+    DECISIONS (D-009/D-010/D-011), ARCHITECTURE, VALIDATION.
+- **Tests run:** `npm run ci` — PASS: typecheck, lint 0/0, build, **264 tests / 18
+  files**. `lib/` reproducible (identical md5 before/after rebuild). Clean-copy
+  `npm ci` + `npm run ci` PASS. `npm pack` contents verified. Isolated-profile
+  install of the packed tarball PASS.
+- **Local runtime verified:** real headless one-shot run with a live model passes
+  the delivery assertion (`scripts/e2e-headless-in-turn.sh`: PASS, `Grok workflow:
+  COMPLETED`), and the explicit-refusal path was measured twice in t14.
+- **Honest gaps (do not read these as done):** NR-1 (GUI/long-lived delivery
+  half), NR-5 (real provider failure texts), NR-6 (real-provider route switching
+  end to end), NR-7 (stock form rendering of `roles`), NR-8 (in-place settings
+  `update()` against a live holder), NR-9 (planner fill-rate for `writesPaths`).
+- **Blockers:** none technical. The remaining release steps need the captain:
+  create `v0.2.0`, publish the GitHub Release, and never move `v0.1.0`.
+- **Next action:** t16 final acceptance on the packed artifact, then tag + Release
+  per `docs/RELEASING.md`.
+
 ## 2026-10-25 — Workflow planning round 1 (audits → synthesis → review → revision)
 
 - **From:** local team lead (AgentTeams dshgw-workflow-planning)
