@@ -545,6 +545,19 @@ Known leaks: `maxTotalAgents` does not count grandchildren; a switch under L1 di
 in-child tool results; and a steer during a run is queued (§5 rule 4) rather than run
 concurrently.
 
+**Guarantees around those limits (阶段6, t14 — one test each in `test/reliability.spec.ts`).**
+
+| guarantee | behaviour |
+|---|---|
+| cancellation | a caller abort cancels the engine run and becomes a `Cancelled` report with `category: cancelled` (report mode) or a `cancelled` error (throw mode); a cancelled message is *not* re-routed automatically |
+| deadline | expiry cancels the run and returns a report (`phase: Timeout`, `category: infrastructure`) — never an exception that a transport can swallow |
+| duplicate start | at most one workflow per user message, enforced by the durable delivery key, across restarts |
+| recursion | the tool refuses `delegationDepth > 0`; the gate passes subagent sessions through |
+| context bounds | turns **and** characters, per-message truncation, and an over-long request yields no objective rather than a silently cut one |
+| secrets | redacted when recorded and again when rendered; a provider message carrying a key never reaches the report or the answer |
+| unload / reload | `dispose` aborts the shared controller, cancels every live run and refuses later tool calls; a fresh `apply()` starts with an empty queue |
+| live configuration | an edit applies to the **next** message; a started run keeps its snapshot; a broken edit refuses the next message with its reason and delivery falls back to the last good snapshot |
+
 ---
 
 ## 12. Test strategy
@@ -556,8 +569,11 @@ regression guard for `answerStrategy`; the in-turn *timing* itself is covered in
 `in-turn delivery` suite in `test/gate.spec.ts` (the listener must not settle before the run,
 must not open a follow-up turn, and must resolve on abort/deadline/unload).
 
-- **Layer 1 — deterministic unit:** role/chain ordering, cursor monotonicity, the
-  classification table, budget accounting (including the R-12 invariants and their
+- **Layer 1 — deterministic unit:** `test/reliability.spec.ts` holds the stage-6 guarantees
+  (cancellation, deadline, concurrency peak, duplicate start, recursion, context bounds,
+  secrets, records, partial semantics, unload/reload, live configuration, surface
+  diagnostics); role/chain ordering, cursor monotonicity, the classification table,
+  budget accounting (including the R-12 invariants and their
   negative cases), the delivery key, config fail-fast (empty chain, missing role,
   duplicate entry, cap overflow, bad effort), report invariants, redaction.
 - **Layer 2 — real-contract tests:** the real `dsh-workflow-ptc` engine with a fake
@@ -651,12 +667,12 @@ Every row must state who answers and how the turn ends, otherwise the path is un
 | F4 | report validation fails (`assertWorkflowReport` throws) | host builds a `failureReport`-grade answer with the validation cause | `blocked` + delivery | gate + error record | satisfied |
 | F5 | engine `stopReason:'error'` (G-4) used to lose all partial evidence | per-task failure rows + category in the report, never a bare exception | `blocked` + delivery | gate + error record | **resolved (t17)**: see DESIGN DD-6 |
 | F6 | `pre-step` listener throws | there is no answer; the turn ends `error` | `error` | gate record (best effort) | violation — must be prevented by making the listener total (catch-all) |
-| F7 | deadline / cancellation | deadline: failure answer; user cancel: no answer | `aborted` | run | cancel is user-initiated, acceptable |
+| F7 | deadline / cancellation | deadline: failure answer (`phase: Timeout`, `category: infrastructure`); user cancel: no answer, but a `cancelled` report/error that says so | `aborted` | run | satisfied (t14): both are reported, never silently swallowed; a cancelled run is not filed as a configuration fault |
 | F8 | prepare-phase failure (R-14 codes) | script catches → task-level failure → partial/failed answer | `blocked` + delivery | route/attempt | satisfied under v1 |
-| F9 | one-shot app teardown (G-18) | none — run aborted | `blocked`, exit 1 (G-20) | gate only | **BLOCKED**: needs keep-alive or a long-lived app |
+| F9 | one-shot app teardown (G-18) | none — run aborted | `blocked`, exit 1 (G-20) | gate only | **resolved for one-shot apps (t25)**: the `in-turn` default keeps the turn open (E-38/E-39); a long-lived/Web surface stays NR-1 |
 | F10 | steer during a run | queued; answer for the current message, then a follow-up turn | normal | run + gate | satisfied by the §5 rule 4 |
-| F11 | client retries the same message | delivery key suppresses the second run | normal | gate (dedupe) | satisfied |
-| F12 | recursion (child → workflow) | child is told the workflow is unavailable | child turn | none | satisfied |
+| F11 | client retries the same message | delivery key suppresses the second run, across restarts | normal | gate (dedupe) | satisfied (t14 test: two pre-steps, one run) |
+| F12 | recursion (child → workflow) | child is told the workflow is unavailable; the tool refuses `delegationDepth > 0` | child turn | none | satisfied (t14 test) |
 
 F6 and F9 are the two rows that are **not** currently satisfiable and are carried as
 blocking work (see §16 Phase gates and DESIGN §B).
@@ -699,13 +715,22 @@ script-level v1 fallback and the merged answer path.
   covered by injected-throw tests and the composed-waterfall suites.
   Exit: Layer-5 anti-bypass assertions pass against the composed bundle; headless and
   (where available) Web GUI evidence recorded.
-- **Phase 6 — L2 request-level routing (optional, U-2).** Only if the loss of in-child
-  tool results proves unacceptable. Requires `prepend` ownership + durable self-pushed
-  cursor + the R-14 caveat.
+- **Phase 6 — reliability and safety hardening — IMPLEMENTED (t14).** Cancellation, deadline,
+  concurrency cap, duplicate-start defence, recursion limit, context bounds, secret
+  handling, error records, partial-completion semantics, and unload/reload cleanup, each with
+  a test (`test/reliability.spec.ts`, 18 cases); `volatile()` + `.get()` holder-isation with
+  a re-validating reader (so an edit applies to the next message and a started run keeps its
+  snapshot), the settings-surface diagnostics line, and a `cancelled` failure category for a
+  deliberate stop. Honest gaps stay in the NOT_RUN ledger (NR-1 GUI half, NR-7 form
+  rendering, NR-8 runtime in-place update).
+- **Phase 6 (old scope, superseded) — L2 request-level routing (optional, U-2).** Only if the
+  loss of in-child tool results proves unacceptable. Requires `prepend` ownership + durable
+  self-pushed cursor + the R-14 caveat; D-009 keeps v1 at L1.
 - **Phase 7 — reliability work — G-4 DONE (t17).** The fatal policy moved into the plugin:
   infrastructure failures are classified, never rethrown, and every failure carries a
-  category (`infrastructure` / `quality` / `configuration` / `unknown`) so the report cannot
-  confuse a dead provider with work that fell short (DESIGN DD-6). Remaining: report
+  category (`infrastructure` / `quality` / `configuration` / `cancelled` / `unknown`, the last
+  two added by t17 and t14) so the report cannot confuse a dead provider with work that fell
+  short or with a stop the caller asked for (DESIGN DD-6). Remaining: report
   hardening follow-ups, redaction/context fixes.
   Exit: F4/F5 produce failure answers; the seven report holes each have a negative test.
 - **Phase 8 — synthesizer role (optional, U-3)** with its post-check rule.
@@ -718,18 +743,23 @@ script-level v1 fallback and the merged answer path.
 
 ---
 
-## 17. Decisions awaiting the user
+## 17. Decisions — RESOLVED (user approval 2026-10-26, D-009)
+
+All nine items below are decided; nothing in this document is waiting on the user.
+The recommendations column is what shipped, and each row names the artefact that
+implements or records it.
 
 | # | decision | options | recorded recommendation |
 |---|---|---|---|
-| U-1 | answer strategy | `in-turn` (keep the turn open) / `relay` / `append` / advisory | **`in-turn`, now the default** (t25: only strategy a one-shot app survives, E-38/E-39); `relay`/`append` stay selectable for long-lived surfaces |
-| U-2 | request-level routing ownership (only if L2 is adopted) | plugin-exclusive `prepend` + never delegate / none | plugin-exclusive — the cooperative option does not exist mechanically (t19 H-4); item kept for confirmation |
-| U-3 | dedicated synthesizer model call | yes / no (v1 keeps pure JS) | **no for v1**, revisit after cost measurement |
-| U-4 | parallel tasks on a shared working directory | serialize writes / read-only parallelism / as-is | serialize on overlap |
-| U-5 | accept strict-mode latency and cost for trivial messages | accept / lighter but not skippable | accept (already confirmed in R-001) |
-| U-6 | first-release settings surface | generated page (ships free from the schema) / generated page + bespoke chain editor with model dropdowns | generated page; the bespoke editor is Phase 9 |
-| U-7 | enforcement scope | whole process (plugin row) / preset-scoped sessions | preset-scoped if available in the deployment, else whole process with a documented blast radius |
-| U-8 | which message sources the gate polices (t10 V-3) | `source.kind='user'` only (v1) / also `user-question-reply`, `team-message`, `webhook`, `schedule` | keep `user` only; the others are machine-produced and have no presenter to fail closed to |
+| U-1 | answer strategy | `in-turn` / `relay` / `append` / advisory | **RESOLVED — `in-turn` default** (D-009; t25: the only strategy a one-shot app survives, E-38/E-39); `relay`/`append` stay selectable for long-lived surfaces |
+| U-2 | request-level routing ownership | plugin-exclusive `prepend` / none | **RESOLVED — L1 only** (D-009): the script owns the fallback chain, no `agent/request-error` listener, no contention with `dsh-llm-retry` |
+| U-3 | dedicated synthesizer model call | yes / no | **RESOLVED — deterministic default** (D-009); `synthesis: 'model'` is a switch that falls back without losing verified work |
+| U-4 | parallel tasks on a shared working directory | serialize writes / read-only parallelism / as-is | **RESOLVED — serialize on overlap** (D-009): tasks declare `writesPaths`, overlapping tasks are serialized (t29); read-only parallelism is not used because a task cannot prove it writes nothing |
+| U-5 | strict-mode latency and cost | accept / lighter but not skippable | **RESOLVED — accept** (D-009, already implied by R-001) |
+| U-6 | first-release settings surface | generated page / generated page + bespoke chain editor | **RESOLVED — generated page** (D-009); the chain editor is Phase 9 backlog (§9.2) |
+| U-7 | enforcement scope | whole process / preset-scoped | **RESOLVED — preset scope when configured** (D-009): `gateScope: 'preset'` + `gatePreset`, whole process otherwise, blast radius documented |
+| U-8 | which message sources the gate polices (t10 V-3) | `source.kind='user'` only / also machine sources | **RESOLVED — `user` only** (D-009): the other sources are machine-produced and have no presenter to fail closed to |
+| U-9 | timeout posture | default deadline + progress notices / no deadline | **RESOLVED — keep the default deadline** (D-009); mid-run progress notices are backlog |
 
 ---
 
@@ -752,9 +782,8 @@ script-level v1 fallback and the merged answer path.
 
 ## 19. Immediate next step
 
-1. User confirms **U-1 … U-7** (§17).
-2. Then Phase 3 (settings + validation) starts, because it no longer depends on routing.
-3. F6 (gate listener totality) and F9 (one-shot teardown) are carried into Phase 5 as
-   explicit preconditions; the web long-lived case stays `NOT_RUN` until measured.
-
-No plugin source change is authorized by this roadmap.
+1. ~~User confirms U-1 … U-7~~ — **done** (D-009): every decision is resolved (§17).
+2. Phases 3–6 are implemented (t11, t13, t14, t17, t25); Phase 7 reliability work is done;
+   Phase 9 (chain editor) and the progress-notice backlog (U-9) remain.
+3. F6 (gate listener totality) and F9 (one-shot teardown) are covered as written;
+   the web long-lived case stays `NOT_RUN` (NR-1) until a GUI run measures it.

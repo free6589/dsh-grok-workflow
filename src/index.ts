@@ -1,14 +1,15 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
-import { resolveConfig } from './config.js'
-import { declareSettingsSurface, validateRoutes } from './settings.js'
+import { createConfigReader } from './config.js'
+import { describeSurface, validateRoutes } from './settings.js'
 import { installGate } from './gate.js'
 import { normalizeCallerTasks, GrokWorkflowInputError, TASK_LIMITS } from './input.js'
 import { renderReport } from './report.js'
+import { redactError } from './redact.js'
 import { createActiveState, disposeActiveState, runWorkflow } from './run.js'
 import type { ActiveState } from './run.js'
-import type { GrokWorkflowConfig, TaskInput, WorkflowReport } from './types.js'
+import type { GrokWorkflowConfig, ResolvedConfig, TaskInput, WorkflowReport } from './types.js'
 
 export { Config, HARD_LIMITS } from './config.js'
 export { GrokWorkflowInputError } from './input.js'
@@ -38,16 +39,22 @@ export const inject = ['tools', 'workflowEngine', 'systemPrompt'] as const
 
 /** Install the workflow tool and its lifetime-scoped state. */
 export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
-  const config = resolveConfig(rawConfig)
   const logger = ctx.logger('dsh-grok-workflow')
+  // One reader, re-validated per admission (DD-9 1-2): a settings edit applies to
+  // the next message, and a run that already started keeps the snapshot it was
+  // given, so its limits cannot move under it.
+  const reader = createConfigReader(rawConfig as Record<string, unknown>, logger)
+  const config = reader.read()
   const state: ActiveState = createActiveState()
 
   // Settings surface: the generated form comes from the `Config` schema this
   // module exports, so the fields a user edits in the Web UI are the fields the
-  // run reads. Declaring it is intent, not enablement (auto defaults to true).
-  if (declareSettingsSurface(ctx) === 'unsupported') {
-    logger.warn('this runtime has a settings service without the automatic-page hook: configure this plugin through the profile patch instead')
-  }
+  // run reads. Declaring it is intent, not enablement (auto defaults to true);
+  // the diagnostics line below makes "the page is real" answerable from the log
+  // alone, and says what the only surface is when there is none (R-004).
+  const surface = describeSurface(ctx)
+  if (surface.level === 'warn') logger.warn(surface.text)
+  else logger.info?.(surface.text)
   // Route validation (D): fail the load on a provider or enumerated model that
   // the runtime does not have, because a silently ignored chain looks like
   // routing that works. Anything the runtime cannot judge becomes a warning.
@@ -121,6 +128,15 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
     timeoutMs: Math.min(config.timeoutMs + 60_000, 86_400_000),
     isConcurrencySafe: () => false,
     async execute(args, exec: ToolRunContext) {
+      // Read at execution time, not at registration: a settings edit applies to
+      // the next call. An invalid edit is reported as the reason the call cannot
+      // run (never silently replaced by defaults).
+      let live: ResolvedConfig
+      try {
+        live = reader.read()
+      } catch (error) {
+        throw new Error(`${config.toolName} cannot run: the current configuration is invalid: ${redactError(error)}`)
+      }
       const { agent } = exec
       if (!agent) {
         throw new Error(`${config.toolName} requires a calling agent (exec.agent was undefined)`)
@@ -141,10 +157,10 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
       if (objective.length > TASK_LIMITS.objectiveChars) {
         throw new GrokWorkflowInputError(`objective must be at most ${TASK_LIMITS.objectiveChars} characters`)
       }
-      const callerTasks = normalizeCallerTasks(args.tasks as TaskInput[] | undefined, config.maxTasks)
+      const callerTasks = normalizeCallerTasks(args.tasks as TaskInput[] | undefined, live.maxTasks)
       const outcome = await runWorkflow({
         ctx,
-        config,
+        config: live,
         state,
         logger,
         agent,
@@ -160,6 +176,6 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
   ctx.tools.register(tool)
 
   if (config.enforceGate) {
-    installGate({ ctx, config, state, logger })
+    installGate({ ctx, config, state, logger, readConfig: () => reader.read() })
   }
 }

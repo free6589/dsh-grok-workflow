@@ -50,6 +50,12 @@ export interface PreStepPayload {
 }
 /** Dependencies of the gate. */
 export interface GateDeps {
+    /**
+     * Read the current configuration. Called at every decision so a settings edit
+     * applies to the next admitted message; when absent the load-time snapshot is
+     * used (tests and embeddings without a settings surface).
+     */
+    readConfig?: () => ResolvedConfig;
     ctx: Context;
     config: ResolvedConfig;
     state: ActiveState;
@@ -73,7 +79,7 @@ type Classification = {
  * Classification reads `payload.messages` only: `decision.messages` is appended
  * to by other listeners, so it cannot identify a new user message.
  */
-export declare function classifyPreStep(deps: Pick<GateDeps, 'config'>, payload: PreStepPayload): Classification;
+export declare function classifyPreStep(deps: Pick<GateDeps, 'config' | 'readConfig'>, payload: PreStepPayload): Classification;
 /** Install the gate; returns false when the runtime cannot host `agent/pre-step`. */
 export declare function installGate(deps: GateDeps): boolean;
 export {};

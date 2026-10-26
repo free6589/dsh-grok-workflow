@@ -56,42 +56,52 @@ export const CONFIG_KEYS = [
 
 const TOOL_NAME = /^[a-z][a-z0-9_]{1,40}$/
 
-/** DSH profile configuration schema. */
+/**
+ * DSH profile configuration schema.
+ *
+ * Every user-editable field is `volatile()`: the runtime then hands it over as a
+ * live holder (`.get()`) and an edit does not remount the plugin — a remount
+ * would kill an in-flight run (E-12/E-31). The structural fields stay plain:
+ * `toolName` is fixed at registration, `enforceGate`/`gateRequired` decide
+ * whether the gate exists at all, and `configVersion` is a wire contract.
+ * `snapshotConfig()` below turns holders back into plain values, so one reader
+ * serves a hand-written config, a profile patch and a live settings form alike.
+ */
 export const Config = z.object({
   toolName: z.string().default('grok_workflow'),
   enforceGate: z.boolean().default(true),
   gateRequired: z.boolean().default(false),
-  gateScope: z.union([z.const('process'), z.const('preset')]).default('process'),
-  gatePreset: z.string().default(''),
+  gateScope: z.union([z.const('process'), z.const('preset')]).default('process').volatile(),
+  gatePreset: z.string().default('').volatile(),
   // `in-turn` is the default because it is the only strategy that survives a
   // one-shot app: `relay`/`append` deliver after the turn closes, and a one-shot
   // process tears the agent tree down at that point (G-18/F9), which loses the
   // answer entirely and breaks R-001. Measured in t24 (NR-1 probe, exit 0 with a
   // real model). Both older strategies stay selectable for long-lived surfaces.
-  answerStrategy: z.union([z.const('in-turn'), z.const('relay'), z.const('append')]).default('in-turn'),
-  historyTurns: z.natural().min(0).max(HARD_LIMITS.historyTurns).default(4),
-  historyChars: z.natural().min(0).max(HARD_LIMITS.historyChars).default(4_000),
-  maxQueuedMessages: z.natural().min(0).max(HARD_LIMITS.maxQueuedMessages).default(4),
-  maxConcurrency: z.natural().min(1).max(HARD_LIMITS.maxConcurrency).default(3),
-  maxRetries: z.natural().min(0).max(HARD_LIMITS.maxRetries).default(1),
-  maxTasks: z.natural().min(1).max(HARD_LIMITS.maxTasks).default(6),
-  timeoutMs: z.natural().min(1_000).max(HARD_LIMITS.timeoutMs).default(1_800_000),
-  maxActiveRuns: z.natural().min(1).max(HARD_LIMITS.maxActiveRuns).default(2),
-  subagentProvider: z.string().default(''),
+  answerStrategy: z.union([z.const('in-turn'), z.const('relay'), z.const('append')]).default('in-turn').volatile(),
+  historyTurns: z.natural().min(0).max(HARD_LIMITS.historyTurns).default(4).volatile(),
+  historyChars: z.natural().min(0).max(HARD_LIMITS.historyChars).default(4_000).volatile(),
+  maxQueuedMessages: z.natural().min(0).max(HARD_LIMITS.maxQueuedMessages).default(4).volatile(),
+  maxConcurrency: z.natural().min(1).max(HARD_LIMITS.maxConcurrency).default(3).volatile(),
+  maxRetries: z.natural().min(0).max(HARD_LIMITS.maxRetries).default(1).volatile(),
+  maxTasks: z.natural().min(1).max(HARD_LIMITS.maxTasks).default(6).volatile(),
+  timeoutMs: z.natural().min(1_000).max(HARD_LIMITS.timeoutMs).default(1_800_000).volatile(),
+  maxActiveRuns: z.natural().min(1).max(HARD_LIMITS.maxActiveRuns).default(2).volatile(),
+  subagentProvider: z.string().default('').volatile(),
   roles: z.object({
     planner: z.array(z.object({ provider: z.string().default(''), model: z.string() })).default([]),
     worker: z.array(z.object({ provider: z.string().default(''), model: z.string() })).default([]),
     verifier: z.array(z.object({ provider: z.string().default(''), model: z.string() })).default([]),
     synthesizer: z.array(z.object({ provider: z.string().default(''), model: z.string() })).default([]),
-  }).default({ planner: [], worker: [], verifier: [], synthesizer: [] }),
-  synthesis: z.union([z.const('deterministic'), z.const('model')]).default('deterministic'),
+  }).default({ planner: [], worker: [], verifier: [], synthesizer: [] }).volatile(),
+  synthesis: z.union([z.const('deterministic'), z.const('model')]).default('deterministic').volatile(),
   // Switching policy (阶段5): which failure classes advance the fallback chain.
   // Empty means "use the built-in policy" (every transport/model class switches;
   // content failures never do), which is what phases 3-4 shipped.
-  switchOn: z.array(z.string()).default([]),
+  switchOn: z.array(z.string()).default([]).volatile(),
   // Run records: the routing/delivery ledger written into the session.
-  recordRuns: z.boolean().default(true),
-  recordLimit: z.natural().min(0).max(HARD_LIMITS.recordEntries).default(64),
+  recordRuns: z.boolean().default(true).volatile(),
+  recordLimit: z.natural().min(0).max(HARD_LIMITS.recordEntries).default(64).volatile(),
   // Config version, so a future rename can be migrated instead of guessed.
   configVersion: z.natural().default(CONFIG_VERSION),
 })
@@ -286,5 +296,102 @@ export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
     recordLimit: integer('recordLimit', config.recordLimit ?? 64, 0, HARD_LIMITS.recordEntries),
     configVersion,
     ...provider === undefined || provider === '' ? {} : { subagentProvider: provider },
+  }
+}
+
+/** A volatile field as the runtime hands it over. */
+export interface ConfigHolder<T> { get(): T }
+
+/** Field value: plain, or a live holder for a volatile field. */
+export type ConfigValue<T> = T | ConfigHolder<T>
+
+/** True for a value the runtime wrapped because the field is volatile. */
+function isHolder(value: unknown): value is ConfigHolder<unknown> {
+  return value !== null
+    && typeof value === 'object'
+    && typeof (value as { get?: unknown }).get === 'function'
+}
+
+/**
+ * Unwrap every volatile holder into a plain configuration object.
+ *
+ * The plugin reads its configuration through this function and never through
+ * `rawConfig` directly, so a value edited in the settings UI (which writes the
+ * holder) and a value written in a profile patch (which stays plain) reach
+ * `resolveConfig()` in exactly one shape.
+ * @param raw - configuration as the runtime provided it.
+ * @returns Plain configuration.
+ */
+export function snapshotConfig(raw: GrokWorkflowConfig | Record<string, unknown> | undefined): GrokWorkflowConfig {
+  if (raw === undefined || raw === null) return {}
+  const out: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(raw)) {
+    if (value === undefined) continue
+    if (isHolder(value)) {
+      let unwrapped: unknown
+      try {
+        unwrapped = value.get()
+      } catch {
+        // A holder that cannot be read is a runtime fault, not user input; leaving
+        // the field out lets validation apply its own default instead of crashing.
+        continue
+      }
+      if (unwrapped === undefined) continue
+      out[key] = unwrapped
+      continue
+    }
+    out[key] = value
+  }
+  return out as GrokWorkflowConfig
+}
+
+/** Re-readable configuration, so an edit applies to the next admission. */
+export interface ConfigReader {
+  /**
+   * Read and validate the current configuration.
+   * @throws If the current values are invalid (the message names the field).
+   */
+  read(): ResolvedConfig
+  /** The last configuration that validated, for work that already started. */
+  lastGood(): ResolvedConfig
+}
+
+/**
+ * Build the reader used by the tool and the gate.
+ *
+ * A settings edit invalidates nothing by itself: the next `read()` validates the
+ * new values, so a broken edit refuses the next message with its exact reason
+ * instead of half-applying, and a run that already started keeps the snapshot it
+ * was given (`lastGood()`), which is what "live" has to mean for a run whose
+ * limits must not move under it.
+ * @param raw - live configuration object (holders included).
+ * @param logger - optional logger for the fallback warning.
+ * @returns A reader with a validated snapshot cache.
+ */
+export function createConfigReader(
+  raw: GrokWorkflowConfig | Record<string, unknown> | undefined,
+  logger?: { warn(message: string): void },
+): ConfigReader {
+  let lastGood: ResolvedConfig | undefined
+  let lastError = ''
+  return {
+    read(): ResolvedConfig {
+      const next = resolveConfig(snapshotConfig(raw))
+      lastGood = next
+      lastError = ''
+      return next
+    },
+    lastGood(): ResolvedConfig {
+      if (lastGood !== undefined) return lastGood
+      // Nothing has validated yet: fall back to defaults rather than to whatever
+      // was on the wire, because a delivery decision cannot be made from garbage.
+      const fallback = resolveConfig({})
+      lastGood = fallback
+      if (lastError === '') {
+        lastError = 'no configuration had validated yet'
+        logger?.warn('configuration was not readable yet; delivery fell back to defaults')
+      }
+      return fallback
+    },
   }
 }

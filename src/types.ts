@@ -253,7 +253,13 @@ export type FailureClass =
  * route must retry with the same evidence; `configuration` = caps, options or
  * schemas are wrong, so no retry can help; `unknown` = unclassified.
  */
-export type FailureCategory = 'infrastructure' | 'quality' | 'configuration' | 'unknown'
+export type FailureCategory =
+  | 'infrastructure'
+  | 'quality'
+  | 'configuration'
+  /** Stopped on purpose: the caller cancelled, or the plugin was unloaded (t14). */
+  | 'cancelled'
+  | 'unknown'
 
 /** One classified failure attached to an attempt or a route switch. */
 export interface AttemptFailure {

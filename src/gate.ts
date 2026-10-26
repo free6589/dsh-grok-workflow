@@ -62,6 +62,12 @@ export interface PreStepPayload {
 
 /** Dependencies of the gate. */
 export interface GateDeps {
+  /**
+   * Read the current configuration. Called at every decision so a settings edit
+   * applies to the next admitted message; when absent the load-time snapshot is
+   * used (tests and embeddings without a settings surface).
+   */
+  readConfig?: () => ResolvedConfig
   ctx: Context
   config: ResolvedConfig
   state: ActiveState
@@ -133,7 +139,7 @@ function agentIdOf(agent: Agent): string {
  * to by other listeners, so it cannot identify a new user message.
  */
 export function classifyPreStep(
-  deps: Pick<GateDeps, 'config'>,
+  deps: Pick<GateDeps, 'config' | 'readConfig'>,
   payload: PreStepPayload,
 ): Classification {
   const messages = Array.isArray(payload.messages) ? payload.messages : []
@@ -153,7 +159,11 @@ export function classifyPreStep(
   // U-7: an external plugin cannot register into a preset, so `preset` scope is
   // expressed as an allow-list on the session header. Sessions outside the named
   // preset keep their ordinary behaviour.
-  if (deps.config.gateScope === 'preset' && header?.agentPreset !== deps.config.gatePreset) {
+  // Live scope check: an edit that widens or narrows the gate applies to the next
+  // claimed message. A broken edit throws here and the listener refuses the
+  // message with its reason (fail-closed), never silently bypassing the gate.
+  const scoped = deps.readConfig === undefined ? deps.config : deps.readConfig()
+  if (scoped.gateScope === 'preset' && header?.agentPreset !== scoped.gatePreset) {
     return { kind: 'pass', reason: 'out-of-scope' }
   }
   const agentId = agentIdOf(agent)
@@ -238,6 +248,23 @@ async function deliverAppend(
 /** Install the gate; returns false when the runtime cannot host `agent/pre-step`. */
 export function installGate(deps: GateDeps): boolean {
   const { ctx, config, state, logger } = deps
+  // Live configuration (DD-9 1-2): a settings edit is picked up by the next
+  // admission, and never by work that already started. A broken edit refuses the
+  // next message with its reason instead of half-applying, and delivery decisions
+  // fall back to the last good snapshot so an in-flight answer still lands.
+  let warnedLiveFailure = false
+  const live = (): ResolvedConfig => deps.readConfig === undefined ? config : deps.readConfig()
+  const safe = (): ResolvedConfig => {
+    try {
+      return live()
+    } catch (error) {
+      if (!warnedLiveFailure) {
+        warnedLiveFailure = true
+        logger.warn(`configuration is invalid, keeping the last good snapshot: ${redactError(error)}`)
+      }
+      return config
+    }
+  }
   const host = ctx as unknown as { on?: (event: string, handler: unknown) => () => void }
   const on = host.on
   if (typeof on !== 'function') {
@@ -309,8 +336,9 @@ export function installGate(deps: GateDeps): boolean {
     request: string,
     signal?: AbortSignal,
   ): Promise<Answer> => {
+    const limits = safe()
     const objective = composeObjective(
-      collectHistory(sessionOf(agent), { turns: config.historyTurns, chars: config.historyChars }),
+      collectHistory(sessionOf(agent), { turns: limits.historyTurns, chars: limits.historyChars }),
       request,
       TASK_LIMITS.objectiveChars,
     )
@@ -360,7 +388,7 @@ export function installGate(deps: GateDeps): boolean {
     answer: Answer,
   ): Promise<void> => {
     const text = answerText(answer, false)
-    const delivered = config.answerStrategy === 'append'
+    const delivered = safe().answerStrategy === 'append'
       ? await deliverAppend(agent, text, entry.turn, entry.step ?? 0)
       : await deliverRelay(agent, text)
     if (answer.kind === 'report' && delivered) {
@@ -404,7 +432,7 @@ export function installGate(deps: GateDeps): boolean {
     // `whenIdle()` cannot resolve until it returns.
     void deliverAndRecord(agent, entry, {
       kind: 'notice',
-      reason: `this agent already has ${config.maxQueuedMessages} queued message(s) waiting for the workflow`,
+      reason: `this agent already has ${live().maxQueuedMessages} queued message(s) waiting for the workflow`,
       outcome: 'queue-full',
     })
   }
@@ -459,7 +487,7 @@ export function installGate(deps: GateDeps): boolean {
   /** Serialize one agent's batches and bound the queue. */
   const enqueue = (agentId: string, task: () => Promise<void>): boolean => {
     const current = queues.get(agentId)
-    if (current !== undefined && current.queued >= config.maxQueuedMessages) return false
+    if (current !== undefined && current.queued >= live().maxQueuedMessages) return false
     const queue: AgentQueue = current ?? { tail: Promise.resolve(), queued: 0 }
     queue.queued += 1
     queues.set(agentId, queue)
@@ -487,7 +515,7 @@ export function installGate(deps: GateDeps): boolean {
     // Pass-through calls the next listener untouched: a foreign failure must
     // surface as that listener's failure, not as this gate's refusal.
     if (verdict.kind === 'pass') return next()
-    if (config.answerStrategy === 'in-turn') {
+    if (safe().answerStrategy === 'in-turn') {
       try {
         return await answerInTurn(verdict, payload)
       } catch (error) {

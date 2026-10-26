@@ -120,6 +120,8 @@ Paths are inside
 | E-37 | The guest `agent()` hook accepts per-child `provider`/`model` (`SUPPORTED_AGENT_OPTIONS`), passes them as `ChildStartRequest.provider/model` → subagent `agentOptions`; `effort`/`isolation`/`agentType` are **deferred** and throw `UNSUPPORTED_OPTION`, so per-role reasoning effort is not routable in v1 | `dsh-workflow-ptc/lib/index.js` guest `agent()` + host `startChild` | SOURCE-CONFIRMED; runtime-exercised through the contract harness (`test/engine-harness.ts`) |
 | E-38 | **in-turn delivery works end to end in a one-shot app**: the gate awaits the run inside `agent/pre-step`, then `enter`s the step with the validated report; real `dsh headless` run with the plugin's own `answerStrategy: in-turn` printed the report (`Grok workflow: COMPLETED`, 6 s of child sessions) and exited **0** | t25 headless run, `scripts/e2e-headless-in-turn.sh` | RUNTIME (real model: `bifrost-completions/runanywhere/deepseek-v4.1-flash`) |
 | E-39 | **the same prompt, profile and plugin with `answerStrategy: relay` produce nothing**: exit **1**, stdout empty, no report marker — the t18 EXP1c teardown reproduced with the shipped gate, which is why the default had to change | t25 contrast run, same script with a `relay` overlay | RUNTIME |
+| E-40 | **the real Loader hands `.volatile()` fields over as holders, and the plugin unwraps them**: the same headless run as E-38, with every user-editable field now `volatile()`, still printed `Grok workflow: COMPLETED` and exited 0 — if `snapshotConfig()` did not unwrap `{get()}`, every default would have been an empty object and load-time validation would have failed | t14 headless run, `scripts/e2e-headless-in-turn.sh` (overlay `bifrost-completions/runanywhere/deepseek-v4.1-flash`) | RUNTIME |
+| E-41 | **the explicit-refusal path is visible to a real user**: a 4 238-character prompt in `dsh headless` printed the refusal verbatim with its reason (`the message is longer than the 4000-character workflow objective limit`), no `Grok workflow:` status line and no task lines — refused out loud, nothing executed, exit 0 | t14 headless run, `scripts/e2e-headless-in-turn.sh` with `E2E_EXPECT=refusal` (two consecutive passes) | RUNTIME |
 | E-36 | `inbox.claim(target,turn)` returns the whole `next-step` batch plus at most one `next-turn` message, and emits no `discarded` record, so a claimed message cannot be recovered | `dsh-agent-loop/lib/index.js:103-111` | SOURCE-CONFIRMED (G-17) |
 
 ---
@@ -447,19 +449,21 @@ happens above the script — so the fix is a **fatal policy change in the plugin
 |---|---|---|
 | `infrastructure` | rate-limit, timeout, server-error, connection, model-unavailable, format-error, agent-start-failed, and any child failure whose text cannot be classified (decided by the engine code `AGENT_RESULT`) | the model service, the network or a deadline failed; a retry, another route or a later run may succeed |
 | `quality` | task-failed, verification-failed | the work or its verification fell short; the same route retries with the same evidence |
-| `configuration` | budget-exhausted, and the setup-fault classes above; also a deliberate stop or an unvalidatable report at the run level | no retry can help; a human must change something |
+| `configuration` | budget-exhausted, the setup-fault classes above, and an unvalidatable report at the run level | no retry can help; a human must change something |
+| `cancelled` | run-level causes `cancelled` (the caller aborted) and `unloaded` (the plugin was disposed) — t14/F4 | **stopped on purpose**: neither a broken provider nor bad work, so nothing is "fixed" and a plain retry is not implied |
 | `unknown` | unmatched non-engine throwables | unclassified on purpose — never guessed |
 
 The category is carried on `tasks[].attempts[].failure.category`,
 `incomplete[].category`, `errors[].category`, `plan.failure.category` and the run-level
 failure report (`src/run.ts` maps timeout/engine-error to `infrastructure`, cancellation and
-report-invalid to `configuration`). `renderReport` prints a `Failures: 1 infrastructure,
+unload to `cancelled`, report-invalid to `configuration`). `renderReport` prints a `Failures: 1 infrastructure,
 1 quality` line plus a per-item marker, so the answer a user reads cannot confuse "the
 provider was down" with "the work was not good enough".
 
 **Evidence.** `test/failure-paths.spec.ts` covers 429 / timeout / crashed child / exhausted
 chain / non-Error throw / one-task-down-while-another-verifies / both categories in one
-report, and the same 429 path through the **real PTC engine**
+report, the `cancelled` category for a deliberate stop (`test/reliability.spec.ts`), and the
+same 429 path through the **real PTC engine**
 (`stopReason:'completed'` with a validated failed-task report — the exact opposite of the old
 `'error'`), using the harness's new `reject` capability. Prepare-phase failures (E-34) take
 the same route and are covered by the planner arm.
@@ -490,10 +494,19 @@ duplicate `taskId` accepted; and `-0` is not rejected by the materializer (A-5).
 
 ### DD-9 — Settings (stage 1) with the facts that make it operable
 
-1. Every user-editable field is `volatile()`; a non-volatile write remounts the plugin and
-   kills an in-flight run (E-12).
-2. The current `resolveConfig()` snapshots scalars at `apply()`; fields must become
-   volatile holders read with `.get()` at the attempt boundary (E-31).
+1. **DONE (t14).** Every user-editable field is `volatile()`; a non-volatile write remounts
+   the plugin and kills an in-flight run (E-12). Structural fields stay plain and are named
+   in the schema comment: `toolName` (fixed at registration), `enforceGate`/`gateRequired`
+   (decide whether the gate exists at all) and `configVersion` (a wire contract).
+2. **DONE (t14).** `snapshotConfig()` unwraps the `.volatile()` holders (`{get()}`) and
+   `createConfigReader()` re-validates on every read, so exactly one shape reaches
+   `resolveConfig()` — a hand-written patch value, a generated-form edit and a test default
+   all look the same. Semantics, now pinned by tests: **a run snapshots its configuration at
+   start** (`runWorkflow` receives a resolved snapshot, so limits cannot move under it), and
+   **the next admitted message re-reads it** (tool `execute`, gate admission, queue bound,
+   history bounds and answer strategy all read live). An edit that fails validation refuses
+   that message with its exact reason, and delivery decisions fall back to the last good
+   snapshot so an in-flight answer still lands (NR-8 below).
 3. Shape: `roles: z.dict(z.array(z.object({provider,model,reasoningEffort?,maxAttempts?})).min(1).max(5)).volatile()`;
    `budgets` and `limits` as volatile objects; no secrets.
 4. **Schema does not enforce emptiness** (E-31): the plugin must fail fast on missing
@@ -571,6 +584,49 @@ never be fixed by another model), `recordRuns` (write the routing ledger at all)
 `recordLimit` (0…256 entries, and 0 writes nothing). All three are read by the run, not just
 echoed: `switchOn` is passed into the script args and consulted by the classifier,
 `recordRuns`/`recordLimit` gate and bound `recordRouting`.
+
+**Scope of `recordRuns` (stated, because it is deliberately narrow).** The switch governs the
+**routing ledger** only — the `route` record that says which model was tried, in which order,
+and why it was left. It does **not** govern the *delivery* record (the gate's `started`/
+`delivered`/`failed` marker) or `alreadyRouted()` de-duplication. Those are correctness state,
+not diagnostics: switching them off would let one user message start two workflows after a
+restart, which is exactly the failure requirement A exists to prevent. Two tests pin this in
+both directions (`test/reliability.spec.ts`: a ledger appears when `recordRuns` is true and a
+route actually switched, and is absent when false; the delivery record is written either way).
+
+**How a settings edit takes effect (F4, honest user-facing wording).** The descriptor reports
+`applies: 'live'`, and with the `volatile()` holders of DD-9 items 1–2 that is now also what
+the plugin does — but with two limits a user must know:
+
+- An edit made through the settings form applies to the **next message**, never to a run that
+  already started (a run snapshots its config at start so its limits cannot move under it).
+- An edit made by hand in the profile **patch file** needs a **plugin reload**; only the
+  runtime's in-place holder update is live.
+- An edit that fails validation is not half-applied: the next message is refused with the
+  field and reason, and an answer already in flight is still delivered from the last good
+  snapshot.
+
+### DD-9b — Reliability and safety guarantees (阶段6, t14)
+
+Each guarantee below is one test in `test/reliability.spec.ts` (18 cases, plus the earlier
+suites it complements). The rule applied throughout: a stop or a fault must be **reported**,
+never swallowed, and never turned into a bare exception the transport can lose.
+
+| guarantee | what the code does | proof |
+|---|---|---|
+| cancellation | the tool refuses from a subagent and honours `exec.signal`; the engine run is `cancel()`ed, and a caller abort becomes a `Cancelled` report with `category: cancelled` (report mode) or a `cancelled` error (throw mode) | `cancels…`, `files a deliberate stop under its own category…` |
+| deadline | `timeoutMs` arms one deadline per run; expiry cancels the run and **returns a report** (`phase: Timeout`, `category: infrastructure`) — a deadline may succeed later, so it is never an exception | `turns a deadline into an infrastructure report…` |
+| concurrency ceiling | `maxConcurrency` bounds the in-run pool (`mapLimit`); the measured peak never exceeds it | `never exceeds the configured concurrency inside one run` |
+| duplicate start | one user message → at most one workflow, enforced by the durable delivery key (`started` written before the run, `delivered`/`failed` after) | `starts one workflow per user message even when pre-step fires again` |
+| recursion | the tool refuses `delegationDepth > 0`, so a workflow cannot nest inside its own child | `refuses the tool from a subagent…` |
+| context bounds | history is bounded by turns **and** characters, each message is truncated, and an over-long current request yields `undefined` instead of a truncated objective | `bounds forwarded context by turns, characters and the objective limit` |
+| secrets | every report field is redacted before it leaves the run, and again when rendered; a provider error text carrying a key does not reach the report or the answer | `keeps a secret out of the failure reason and the rendered answer` |
+| error records | a failed attempt records class + category + reason, and the routing ledger survives a malformed route entry (fields are coerced, not dropped) | `records every failed attempt…`, `keeps the ledger when one route entry is malformed` |
+| partial completion | verified work is kept, the unfinished task is listed with its category, and `status` says `partial` | `keeps verified results and accounts for the task that did not make it` |
+| unload | `dispose` aborts the shared controller, cancels every live run and refuses new tool calls (`… has been unloaded`) | `cancels in-flight runs and refuses new work when the plugin unloads` |
+| reload | a fresh `apply()` on the same context starts with an empty queue and admits again — no inherited pending work | `starts clean after a reload instead of inheriting the old queue` |
+| live configuration | `snapshotConfig`/`createConfigReader` unwrap holders, an edit lands on the next read, a broken edit throws with its reason while `lastGood()` keeps delivery working | `unwraps volatile holders…`, `keeps the last good snapshot…` |
+| surface diagnostics | the log line says whether the page is generated, how many fields it projects, what `applies` is, and whether the descriptor is really our schema (uid match) | `states the settings surface…` |
 
 ### DD-10 — Observability
 
@@ -658,8 +714,8 @@ cited as working:
 | NR-4 | settings `update`/`replace`/`mutate` writing to disk through a real Loader entry | host-side contract source-read in `dsh-settings` (descriptor shape, `autoGenerate` default, path ops, `SETTINGS_CONFLICT`, `prepareDocument`); no write was performed | whether stage 2 can edit chains at all |
 | NR-5 | failure-text classification against **real** provider errors (429/5xx/connection/timeout/model-unavailable) | the whitelist is exercised against synthetic messages only (`test/routing.spec.ts`) | a real adapter may word an error so that it lands in `unknown`; `unknown` still switches routes but is reported as unclassified |
 | NR-6 | route switching with real children and real providers end to end | source-confirmed option plumbing (E-37) + simulated failures in the contract harness | whether a real provider/model combination actually starts and answers after a switch |
-| NR-7 | the stock Web form rendering this plugin's `roles` (array-of-object) section, and `describeSelf()` against a live Loader | `SettingsForms` contract source-read; `describeSelf` covered by a fake context only | decides whether the generated page is usable for chains or whether U-6 (custom editor) is needed sooner |
-| NR-8 | whether a configuration edit is visible to a queued or in-flight run | `resolveConfig()` snapshots at `apply()` (code read); `applies: 'live'` is what the runtime reports, not what this plugin does with it | the `volatile()` + `.get()` work in DD-9 items 1–2 is unstarted, so the honest answer today is "the next run sees it" |
+| NR-7 | the stock Web form rendering this plugin's `roles` (array-of-object) section against a live Loader | `SettingsForms` contract source-read; `describeSelf()` is now pinned to the **real descriptor shape** (`form.toJSON()` = `{uid, refs}`, no `properties` — t28/F1) with a fake context, but no GUI ever rendered the form | decides whether the generated page is usable for chains or whether U-6 (custom editor) is needed sooner |
+| NR-8 | whether a **real settings-form edit against a live Loader** reaches a queued message, and what an in-flight run does with it | semantics implemented and unit-tested in t14 (`volatile()` holders + `createConfigReader()`: next admission re-reads, a started run keeps its snapshot, an invalid edit refuses with its reason and delivery falls back to the last good snapshot). E-40 now *does* measure the runtime half of the holder mechanism (the real Loader hands `{get()}` holders and the plugin unwraps them, in a real headless turn). What is still unmeasured is the last step — a settings-form `update()` mutating that holder in place while a message waits — because that needs the Web GUI | the code path is honest and tested; what remains unproven is the runtime's in-place update, so the user-facing sentence stays: a settings edit applies to the **next message**, a hand-edited patch file needs a reload |
 
 ---
 

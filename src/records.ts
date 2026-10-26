@@ -150,6 +150,15 @@ export function recordDelivery(
   }
 }
 
+/** Roles in report order; also the closed set a ledger switch may name. */
+const ROLES: readonly RoleName[] = ['planner', 'worker', 'verifier', 'synthesizer']
+
+/** Coerce a possibly-missing numeric field into a non-negative integer. */
+function counter(value: unknown, fallback: number): number {
+  const numeric = typeof value === 'number' && Number.isFinite(value) ? Math.trunc(value) : fallback
+  return numeric < 0 ? fallback : numeric
+}
+
 /** Redact and bound one free-text ledger field. */
 function ledgerText(value: string, max: number): string {
   return redactSecrets(value).replace(/\s+/g, ' ').trim().slice(0, max)
@@ -177,24 +186,35 @@ export function recordRouting(
   // The caller's `recordLimit` bounds the ledger; 0 means "write nothing".
   const cap = Math.max(0, Math.min(limit, ROUTING_RECORD_LIMIT))
   if (cap === 0) return
+  // Every field is coerced: one malformed route entry (a missing `attempt`, a
+  // non-string route id) must not cost the whole ledger, because the ledger is
+  // the only record of how a run picked its models (t28/F3).
+  const safeRoute = (route: RouteTrailEntry): RoutingRecord['switches'][number] => ({
+    role: ROLES.includes(route.role as RoleName) ? route.role as RoleName : 'worker',
+    chainIndex: counter(route.chainIndex, 0),
+    route: typeof route.route === 'string' ? route.route.slice(0, 160) : 'inherit',
+    attempt: Math.max(1, counter(route.attempt, 1)),
+    outcome: route.outcome === 'ok' ? 'ok' : 'failed',
+    ...typeof route.failureClass === 'string' ? { failureClass: route.failureClass.slice(0, 60) } : {},
+    ...typeof route.reason === 'string' ? { reason: ledgerText(route.reason, 200) } : {},
+  })
+  // Sanitize first, then select: filtering the raw entries would drop a route
+  // whose fields were malformed instead of recording its coerced form.
   const switches = entry.routes
+    .map(safeRoute)
     .filter(route => route.outcome === 'failed' || route.chainIndex > 0)
     .slice(0, cap)
-    .map(route => ({
-      role: route.role,
-      chainIndex: route.chainIndex,
-      route: route.route,
-      attempt: route.attempt,
-      outcome: route.outcome,
-      ...route.failureClass === undefined ? {} : { failureClass: route.failureClass },
-      ...route.reason === undefined ? {} : { reason: ledgerText(route.reason, 200) },
-    }))
   if (switches.length === 0) return
+  const routing: Record<RoleName, string[]> = { planner: [], worker: [], verifier: [], synthesizer: [] }
+  for (const role of ROLES) {
+    const chain = (entry.routing as Record<string, unknown> | undefined)?.[role]
+    routing[role] = Array.isArray(chain) ? chain.filter(item => typeof item === 'string').map(item => item.slice(0, 160)) : []
+  }
   const payload: RoutingRecord = {
     v: 1,
-    objective: ledgerText(entry.objective, 400),
-    routing: entry.routing,
-    synthesis: entry.synthesis,
+    objective: ledgerText(typeof entry.objective === 'string' ? entry.objective : '', 400),
+    routing,
+    synthesis: entry.synthesis === 'model' ? 'model' : 'deterministic',
     switches,
   }
   try {

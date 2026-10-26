@@ -1,4 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
+import { CONFIG_KEYS, Config } from './config.js'
 import type { ModelRoute, ResolvedConfig, RoleName } from './types.js'
 
 /**
@@ -39,6 +40,14 @@ export interface SettingsDescriptorLike {
   value?: unknown
   autoGenerate?: boolean
   revision?: number
+  /** How edits take effect, as the runtime reports it (never assumed). */
+  applies?: string
+  /**
+   * The projected form schema. In DSH 0.2.1-rc.2 this is `form.toJSON()`, i.e.
+   * schemastery's `{ uid, refs }` — it carries **no `properties` map**, so a
+   * reader must not derive field names from it.
+   */
+  schema?: unknown
 }
 
 /** One configurable-provider directory entry this module reads. */
@@ -205,10 +214,16 @@ export interface SettingsSelfView {
   ns?: string
   /** Whether the Web client may generate the page (default true upstream). */
   autoGenerate?: boolean
-  /** Whether edits are live-applied. */
+  /** How edits take effect, exactly as the descriptor reports it. */
   applies?: string
-  /** Top-level form fields the schema projects. */
+  /**
+   * The configuration surface this plugin exports. Taken from `CONFIG_KEYS`,
+   * not from the descriptor: `form.toJSON()` is `{ uid, refs }` with no
+   * `properties`, so deriving names from it silently yields an empty list (t28).
+   */
   fields: string[]
+  /** True when the descriptor's schema uid is this plugin's own `Config`. */
+  schemaMatches: boolean
 }
 
 /**
@@ -221,21 +236,78 @@ export interface SettingsSelfView {
  * @param entryIds - profile entry ids this plugin may have been loaded as.
  * @returns The self view, or undefined when the runtime cannot describe forms.
  */
-export function describeSelf(ctx: Context, entryIds: readonly string[]): SettingsSelfView | undefined {
+export function describeSelf(ctx: Context, entryIds?: readonly string[]): SettingsSelfView | undefined {
   try {
     const settings = serviceOf<SettingsFormsLike>(ctx, 'settings')
     if (settings === undefined || typeof settings.describe !== 'function') return undefined
     const descriptors = settings.describe({ redactSecrets: true })
-    const mine = descriptors.find(item => entryIds.includes(item.ns))
+    const ownUid = (Config.toJSON() as { uid?: unknown }).uid
+    const uidOf = (item: SettingsDescriptorLike): unknown =>
+      (item.schema as { uid?: unknown } | undefined)?.uid
+    // Identify our own entry without trusting an id: a profile may rename the row,
+    // so a descriptor is ours when its schema uid IS this plugin's Config.
+    const mine = entryIds === undefined
+      ? descriptors.find(item => ownUid !== undefined && uidOf(item) === ownUid)
+      : descriptors.find(item => entryIds.includes(item.ns))
     if (mine === undefined) return undefined
-    const schema = (mine as unknown as { schema?: { properties?: Record<string, unknown> } }).schema
     return {
       ns: mine.ns,
       ...mine.autoGenerate === undefined ? {} : { autoGenerate: mine.autoGenerate },
-      applies: 'live',
-      fields: Object.keys(schema?.properties ?? {}),
+      ...mine.applies === undefined ? {} : { applies: mine.applies },
+      fields: [...CONFIG_KEYS],
+      schemaMatches: ownUid !== undefined && uidOf(mine) === ownUid,
     }
   } catch {
     return undefined
+  }
+}
+
+/** One diagnostics line describing the settings surface. */
+export interface SurfaceReport {
+  /** Message for the attached logger. */
+  text: string
+  /** `warn` when the surface is degraded, `info` when it is as designed. */
+  level: 'info' | 'warn'
+}
+
+/**
+ * Describe the settings surface for the plugin's own diagnostics (R-004).
+ *
+ * "Is the settings page real?" is a question a user must be able to answer from
+ * the log alone: this line states which namespace the page writes to, whether
+ * the client may generate it, and how many fields it projects — or that there is
+ * no settings service at all and the profile patch is the only surface.
+ * @param ctx - plugin context.
+ * @param entryIds - optional candidate entry ids; when omitted the descriptor is
+ *   matched by its projected keys, so a renamed profile row still resolves.
+ * @returns Message and severity.
+ */
+export function describeSurface(ctx: Context, entryIds?: readonly string[]): SurfaceReport {
+  const declared = declareSettingsSurface(ctx)
+  if (declared === 'absent') {
+    return {
+      text: 'settings surface: none in this runtime (no settings service); configure through the profile patch',
+      level: 'warn',
+    }
+  }
+  if (declared === 'unsupported') {
+    return {
+      text: 'settings surface: this runtime has a settings service without the automatic-page hook; configure through the profile patch',
+      level: 'warn',
+    }
+  }
+  const view = describeSelf(ctx, entryIds)
+  if (view === undefined) {
+    return {
+      text: 'settings surface: declared auto, but no generated descriptor was readable yet; edits still land in the profile patch',
+      level: 'info',
+    }
+  }
+  const auto = view.autoGenerate === false ? 'page suppressed' : 'page auto-generated'
+  const applies = view.applies === undefined ? 'applies unknown' : `applies ${view.applies}`
+  const identity = view.schemaMatches ? 'schema matches' : 'schema not matched by uid'
+  return {
+    text: `settings surface: ${auto} for "${view.ns}" (${view.fields.length} field(s), ${applies}, ${identity}); edits apply to the next message`,
+    level: 'info',
   }
 }

@@ -29,6 +29,10 @@ mkdir -p "$WORK"
 LOG="$WORK/headless-in-turn.log"
 PROMPT=${E2E_PROMPT:-"In one short sentence: why is a stub better than a mock for interfaces you do not own?"}
 TIMEOUT=${E2E_TIMEOUT:-900}
+# E2E_EXPECT=refusal inverts the assertion: the message must be refused out loud
+# (V-2) and no workflow may run. Used with an over-long E2E_PROMPT to check that the
+# explicit-refusal path is visible to a real user without spending a run on it.
+EXPECT=${E2E_EXPECT:-report}
 
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit "${2:-1}"; }
 
@@ -69,6 +73,28 @@ status=$?
 set -e
 
 if [ "$status" -eq 124 ]; then fail "the turn did not finish within ${TIMEOUT}s (log: $LOG)" 2; fi
+
+if [ "$EXPECT" = "refusal" ]; then
+  # The refusal travels through the same answer envelope (the model is told to relay
+  # it verbatim), so "no run happened" is proven by the absence of a workflow status
+  # line and of any task line -- not by the absence of the envelope.
+  if ! grep -qi 'the message is longer than the 4000-character' "$LOG"; then
+    printf -- '--- captured output ---\n' >&2
+    sed -n '1,60p' "$LOG" >&2
+    fail "the refusal was not visible to the user (log: $LOG)" 2
+  fi
+  if grep -qE 'Grok workflow: (COMPLETED|PARTIAL|FAILED)' "$LOG"; then
+    fail "the refused message still ran a workflow (log: $LOG)" 2
+  fi
+  if grep -qE '^(Confirmed|Tasks|Failures):' "$LOG"; then
+    fail "the refused message produced workflow detail (log: $LOG)" 2
+  fi
+  if [ "$status" -ne 0 ]; then fail "dsh exited $status on a refused message (log: $LOG)" 2; fi
+  printf 'PASS: the refusal was stated to the user and no workflow ran\n'
+  grep -i 'longer than the 4000-character' "$LOG" | head -1
+  exit 0
+fi
+
 if ! grep -q 'GROK-WORKFLOW-REPORT' "$LOG"; then
   printf -- '--- captured output ---\n' >&2
   sed -n '1,60p' "$LOG" >&2

@@ -153,8 +153,14 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
   // The category tells a reader who failed: a deadline or a broken engine is
   // infrastructure (a retry may succeed), while a deliberate stop or a report
   // we could not validate is a configuration/runtime problem of ours (G-4).
-  const categoryFor = (cause: string): FailureCategory =>
-    cause === 'timeout' || cause === 'engine-error' ? 'infrastructure' : 'configuration'
+  const categoryFor = (cause: string): FailureCategory => {
+    if (cause === 'timeout' || cause === 'engine-error') return 'infrastructure'
+    // A deliberate stop is neither a broken provider nor bad work: it is the
+    // caller's decision, so it gets its own category instead of being filed as a
+    // configuration fault nobody can fix (t14, F4).
+    if (cause === 'cancelled' || cause === 'unloaded') return 'cancelled'
+    return 'configuration'
+  }
   const asReport = (phase: string, message: string, cause: string): RunOutcome => ({
     report: redactDeep(failureReport(objective, config, phase, message, categoryFor(cause))),
     ok: false,

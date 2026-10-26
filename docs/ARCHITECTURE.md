@@ -235,6 +235,19 @@ installed into a profile) and fails unless the validated report actually reaches
 in that single turn. The `in-turn` timing itself needs no model and is covered in CI by
 the `in-turn delivery` suite in `test/gate.spec.ts`.
 
+Two variants are worth knowing:
+
+```bash
+# a message the gate refuses on purpose must be refused OUT LOUD, with no run
+E2E_EXPECT=refusal E2E_PROMPT="$(cat /tmp/over-4000-chars.txt)" \
+  E2E_MODEL_PATCH=scripts/e2e-model-patch.yml scripts/e2e-headless-in-turn.sh
+```
+
+`E2E_EXPECT=refusal` inverts the assertion: the refusal text (and its reason) must appear,
+and no `Grok workflow:` status line and no task lines may appear — the user sees why nothing
+ran instead of a silent no-op (V-2). The positive run is also the check that the real Loader
+hands `.volatile()` configuration over as holders and the plugin unwraps them (DESIGN E-40).
+
 ## Known architecture limits (MVP)
 
 - No pause/resume, journaling, or cross-process resume.

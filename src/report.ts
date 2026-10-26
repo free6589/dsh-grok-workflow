@@ -149,7 +149,7 @@ const FAILURE_CLASSES = [
   'unknown',
 ] as const
 
-const FAILURE_CATEGORIES = ['infrastructure', 'quality', 'configuration', 'unknown'] as const
+const FAILURE_CATEGORIES = ['infrastructure', 'quality', 'configuration', 'cancelled', 'unknown'] as const
 
 /** Parse an optional failure category; unknown values are rejected, not coerced. */
 function failureCategory(value: unknown, path: string): FailureCategory | undefined {
@@ -559,7 +559,7 @@ export function failureSummary(report: WorkflowReport): { category: FailureCateg
     }
     for (const attempt of classified) add(attempt.failure?.category)
   }
-  const order: FailureCategory[] = ['infrastructure', 'quality', 'configuration', 'unknown']
+  const order: FailureCategory[] = ['infrastructure', 'quality', 'configuration', 'cancelled', 'unknown']
   return order.filter(category => counts.has(category)).map(category => ({ category, count: counts.get(category) ?? 0 }))
 }
 

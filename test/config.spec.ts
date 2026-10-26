@@ -5,6 +5,7 @@ import {
   Config,
   HARD_LIMITS,
   resolveConfig,
+  snapshotConfig,
 } from '../src/config.js'
 import { declareSettingsSurface, describeSelf, validateRoutes } from '../src/settings.js'
 import { Session, pluginRecordOf } from '@deepseek-ai/dsh-session'
@@ -91,7 +92,9 @@ describe('configuration surface', () => {
   })
 
   it('fills every documented default through the schema', () => {
-    const defaults = Config({}) as Record<string, unknown>
+    // Volatile fields arrive as live holders; `snapshotConfig` is the one place
+    // that turns them back into plain values (that is what the plugin reads).
+    const defaults = snapshotConfig(Config({}) as Record<string, unknown>) as Record<string, unknown>
     expect(defaults).toMatchObject({
       enforceGate: true,
       answerStrategy: 'in-turn',
@@ -161,19 +164,33 @@ describe('route validation against the runtime', () => {
   })
 
   it('reports the generated settings page for this plugin', () => {
+    // The real descriptor carries `form.toJSON()`, which is schemastery's
+    // `{ uid, refs }` and has no `properties` map (t28 measured this shape), so
+    // the field list must come from our own schema and identity from the uid.
+    const schema = Config.toJSON() as { uid: number; refs: unknown }
+    expect(Object.keys(schema).sort()).toEqual(['refs', 'uid'])
     const ctx = ctxWith({
       settings: {
         configure: () => () => {},
-        describe: () => [{ ns: 'grok-workflow', autoGenerate: true, schema: { properties: { roles: {}, switchOn: {} } } }],
+        describe: () => [{ ns: 'grok-workflow', autoGenerate: true, applies: 'live', schema }],
       },
     })
     expect(declareSettingsSurface(ctx)).toBe('declared')
-    expect(describeSelf(ctx, ['grok-workflow'])).toEqual({
+    const view = describeSelf(ctx, ['grok-workflow'])
+    expect(view).toEqual({
       ns: 'grok-workflow',
       autoGenerate: true,
       applies: 'live',
-      fields: ['roles', 'switchOn'],
+      fields: [...CONFIG_KEYS],
+      schemaMatches: true,
     })
+    // Matching by identity alone finds the same descriptor without an id.
+    expect(describeSelf(ctx)?.ns).toBe('grok-workflow')
+    // A foreign schema is not ours, and no field list may be invented from it.
+    const foreign = ctxWith({
+      settings: { describe: () => [{ ns: 'other', schema: { uid: 999_999, refs: {} } }] },
+    })
+    expect(describeSelf(foreign)).toBeUndefined()
   })
 
   it('degrades quietly on a runtime without a settings service', () => {
