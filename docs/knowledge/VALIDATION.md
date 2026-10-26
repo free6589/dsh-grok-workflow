@@ -486,3 +486,29 @@ this page.
 - Release workflow `40182751006` — **PASS** on **Node 22 only**, including typecheck, lint, build, `lib/` consistency, tests, package checks, and release creation. Main CI `40182707932` covered Node 22/24.
 - GitHub Release: https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.1.0; asset `dsh-grok-workflow-0.1.0.tgz` (61,281 bytes).
 - Tag-pinned install smoke **PASS** in an isolated `DSH_HOME=.dsh-home/tag-smoke`: created the headless profile first, ran `dsh plugin --profile tag-smoke add github:free6589/dsh-grok-workflow#v0.1.0` (pnpm installed the plugin dependency), and `--dump-config` showed the `grok-workflow` bundle row. A real `grok_workflow` model call was **NOT_RUN**.
+
+
+## 0.2.0 real-profile install matrix (2026-10-27, local operator machine)
+
+Environment: real profiles `headless` and `web` (layerfs root `/home/fish/dsh-layerfs/profiles/`),
+plugin `github:free6589/dsh-grok-workflow#v0.2.0`. Headless ran with a temporary model overlay
+(bifrost-completions / runanywhere+wb/cn, key via env, never written to disk); web uses the
+operator's own model routes. All artifacts under /tmp/mx/ and ~/dsh-profile-backups/.
+
+| # | Item | Profile | Result | Evidence |
+|---|---|---|---|---|
+| 1 | Mandatory entry: "hi" | headless | PASS | Full workflow (planner, 1 task verified), in-turn delivery, turn `completed`, no direct answer (02-hi.jsonl) |
+| 2 | Simple question | headless | PASS | EXIT 0, report delivered (03-2plus2) |
+| 3 | Follow-up on same session | headless | PASS | EXIT 0, follow-up also gated into workflow (04-followup) |
+| 4 | Broken model config | headless | PASS | EXIT 1 with explicit error, fail-closed, no silent answer (05-bad) |
+| 5 | Secret leakage | headless | PASS | Key value absent from all run logs and session store (06-scan) |
+| 6 | Stability | headless | PASS | 6 consecutive EXIT 0 runs with reports (02..09); one earlier 570s timeout was transient model congestion, not a defect |
+| 7 | Recursion guard | headless | PASS | One workflow run per message in every event stream; no nested runs |
+| 8 | Settings surface identity | both | PASS / NOT_RUN | CLI side: `scripts/smoke-settings-identity.mjs` over built lib (real projection). GUI rendering: NOT_RUN — operator check pending |
+| 9 | Web install + composition | web | PASS | `dsh plugin list` shows 0.2.0; dump-config composes `# == dsh-grok-workflow`; service restarted and serving (HTTP 401 = auth alive) |
+| 10 | Web GUI interactive | web | NOT_RUN | Requires operator login (HTTP 401); left for morning checklist |
+
+Install forensics: `dsh plugin add` writes the profile manifest under the layerfs root; a plugin is
+composed only when listed in `dsh.profile.bundles` (web install lost this step to an interrupted
+call and was repaired explicitly). Rollback: `dsh plugin --profile <p> remove dsh-grok-workflow`;
+backups in `~/dsh-profile-backups/` (pre-install and post-install snapshots).
