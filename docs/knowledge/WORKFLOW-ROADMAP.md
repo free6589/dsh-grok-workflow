@@ -687,7 +687,7 @@ script-level v1 fallback and the merged answer path.
 
 - **Phase 0 — requirements and rules — DONE.**
 - **Phase 1 — exact-version audit — DONE** (t1–t5, t18, t19; capability matrix §13).
-- **Phase 2 — architecture and message lifecycle — DESIGN COMPLETE, awaits U-1/U-7.**
+- **Phase 2 — architecture and message lifecycle — DONE** (U-1..U-9 resolved per D-009; delivered in 0.2.0).
   Exit: answer strategy chosen by the user, gate scope chosen, F6/F9 addressed.
 - **Phase 3 — settings and configuration — IMPLEMENTED (t11 + t13, with Phase 4).**
   Shipped: `roles.{planner,worker,verifier,synthesizer}` chains, `synthesis` switch,

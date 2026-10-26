@@ -428,10 +428,10 @@ Real commands and results only.
 
 | Check | Command | Result | Evidence |
 |---|---|---|---|
-| Full CI | `npm run ci` | PASS | typecheck OK; `oxlint` "Found 0 warnings and 0 errors" (35 files); build OK; **264 tests / 18 files** passed |
+| Full CI | `npm run ci` | PASS | typecheck OK; `oxlint` "Found 0 warnings and 0 errors" (37 files); build OK; **264 tests / 18 files** passed |
 | Unit subset | `npm run test:unit` | PASS | 16 files / 260 tests (the two Loader/issue-watch suites are excluded by design) |
 | Build reproducible | build twice, then `md5sum lib/*.js lib/*.d.ts \| md5sum` | PASS | `304de3768ceefa0a8af459785a570b51` both times |
-| Package contents | `npm pack --pack-destination /tmp/t15-pack` | PASS | 42 files, 107,990 bytes; contains `lib/`, `package.json`, `cordis.patch.yml`, `LICENSE`, both READMEs, `CHANGELOG.md`, `docs/*.md`, `docs/images/*.svg`; **no** `test/`, `scripts/`, `docs/knowledge/` |
+| Package contents | `npm pack --pack-destination /tmp/t15-pack` | PASS | 42 files, 108,428 bytes; contains `lib/`, `package.json`, `cordis.patch.yml`, `LICENSE`, both READMEs, `CHANGELOG.md`, `docs/*.md`, `docs/images/*.svg`; **no** `test/`, `scripts/`, `docs/knowledge/` |
 | Clean copy install | `rsync` the worktree to `/tmp/t15-clean2` (no `node_modules`, no `.git`) → `npm ci` → `npm run ci` | PASS | install completed; CI on the copy: lint "Found 0 warnings and 0 errors", **264 tests / 18 files** passed |
 | Isolated profile install | fresh `DSH_HOME=/tmp/t15-dsh-home`, `dsh --profile smoke --from-default-profile headless`, then `dsh plugin --profile smoke add /tmp/t15-pack/dsh-grok-workflow-0.2.0.tgz` | PASS | pnpm reported `+ dsh-grok-workflow file:/tmp/t15-pack/dsh-grok-workflow-0.2.0.tgz`; `--dump-config` shows the `grok-workflow` bundle row |
 | Isolated profile, real turn | `DSH_HOME=/tmp/t15-dsh-home dsh --profile smoke --patch <route> "hi"` | PASS | 46 lines; the answer contains a `<<<GROK-WORKFLOW-REPORT>>>` block with `Grok workflow: COMPLETED` and per-criterion evidence for a conversational task |

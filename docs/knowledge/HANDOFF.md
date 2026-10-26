@@ -39,7 +39,7 @@
     normalized lexical overlap, echoed in the report.
   - Documentation set synchronized: README (EN + zh), CHANGELOG (bilingual
     `0.2.0`), DESIGN (DD-1..DD-9b + NR ledger), ROADMAP (phases marked), STATE,
-    DECISIONS (D-009/D-010/D-011), ARCHITECTURE, VALIDATION.
+    DECISIONS (D-009..D-012), ARCHITECTURE, VALIDATION.
 - **Tests run:** `npm run ci` — PASS: typecheck, lint 0/0, build, **264 tests / 18
   files**. `lib/` reproducible (identical md5 before/after rebuild). Clean-copy
   `npm ci` + `npm run ci` PASS. `npm pack` contents verified. Isolated-profile

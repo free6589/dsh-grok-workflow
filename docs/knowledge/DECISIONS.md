@@ -150,7 +150,7 @@ Each entry records the decision, evidence, alternatives, and status.
 - **Alternatives rejected:** 默认关闭（默认不满足需求）；一次性大版本 `1.0.0`（内部仍有 L2 路由、链编辑器未做，版本号会虚高）。
 - **Consequences:** 升级者若不想要强制入口必须显式关闭；要求"绝不静默降级"的部署需再加 `gateRequired: true`。
 
-## D-011 — 安装后严格测试与修复发布闭环（用户 2026-10-26 指示）
+## D-012 — 安装后严格测试与修复发布闭环（用户 2026-10-26 指示）
 
 - 安装到真实 profiles 后执行严格功能测试矩阵（强制入口/幂等/失败路径/设置页渲染/组合共存/递归防护/secrets/稳定性），逐 profile 逐项记录通过与否。
 - 发现 bug 即修：单写者修复 → npm run ci 全绿 → 独立复查 → 整合 push → bump patch 版本 → 新 tag + GitHub Release → 重新安装新 tag → 重跑全部用例。

@@ -52,7 +52,7 @@ the model may call" into "the path every user message takes":
 | | `0.1.0` | `0.2.0` |
 |---|---:|---:|
 | Files in the tarball | 33 | **42** |
-| Tarball size | 61,281 B | **107,991 B** |
+| Tarball size | 61,281 B | **108,428 B** |
 | Both READMEs (EN + zh) | yes | yes |
 | `CHANGELOG.md` in the package | yes | yes |
 | `test/`, `scripts/`, `docs/knowledge/` in the package | no | no |

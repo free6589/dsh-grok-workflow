@@ -124,8 +124,9 @@ t16), then keep this file and the changelog synchronized with `main`.
   requirements, the evidence ledger (A/E/R), the decisions (DD) and the NOT_RUN
   ledger (NR).
 - **Decisions:** U-1..U-9 are answered in [DECISIONS.md](DECISIONS.md) **D-009**
-  (user-approved 2026-10-26); the `0.2.0` breaking boundary is **D-011**;
-  overnight execution and release discipline are **D-010**.
+  (user-approved 2026-10-26); the `0.2.0` breaking boundary is **D-011**; overnight
+  execution and release discipline are **D-010**; the post-install strict-testing
+  loop is **D-012**.
 - **Release preparation:** the human draft of the release announcement lives in
   [docs/releases/RELEASE-NOTES-0.2.0.md](../releases/RELEASE-NOTES-0.2.0.md); the text the
   release workflow publishes is the `## [0.2.0]` section of [CHANGELOG.md](../../CHANGELOG.md).
