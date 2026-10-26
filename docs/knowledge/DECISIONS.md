@@ -127,7 +127,7 @@ Each entry records the decision, evidence, alternatives, and status.
 - U-1 答案路线：in-turn 为默认（t25/t26 真实 headless A/B 证据在用户批准 (a) relay 建议后升级了默认形态）；relay/append 保留给长驻 UI。
 - U-2 重试所有权：v1 仅脚本层 L1 备用链，不注册 agent/request-error，不与 dsh-llm-retry 争所有权。
 - U-3 synthesizer：确定性聚合为默认，synthesis:'model' 为可选开关（失败自动回落，不丢已验证内容）。
-- U-4 并行写路径：planner 任务声明 writesPaths，重叠任务串行化（实施任务已排）。
+- U-4 并行写路径：planner 任务声明 writesPaths，重叠任务串行化（**已实施**：t29 / `bd1f261`，判定函数 `src/paths.ts`、调度 `mapLimitIsolated`、文档 DD-8a + ROADMAP §11；规划器真实填充率仍为 NR-9）。
 - U-5 严格模式成本：用户接受每消息完整工作流的延迟与调用开销。
 - U-6 设置：YAML/配置层先行；带模型下拉的链编辑器（client module）= Phase 9 backlog。
 - U-7 强制范围：preset 作用域（gateScope/gatePreset 白名单），非全进程。
@@ -139,3 +139,19 @@ Each entry records the decision, evidence, alternatives, and status.
 - 计划执行无需逐步批准；实施→测试→独立复查→修复→重测的循环照旧，严格验收标准。
 - 每个批次整合后即时 push 同步 GitHub；版本里程碑设 tag：v0.2.0-rc.1（功能收口）→ v0.2.0 + GitHub Release（阶段 7 验收后）。v0.1.0 tag 永不移动。
 - 模型：wb/cn:deepseek-v4.1-flash 优先，wb/global:deepseek-v4.1-flash 全局并发 ≤2；模型故障即换（成员重指派/换路由）。
+
+## D-011 — 0.2.0 的破坏性边界（阶段 7 定稿）
+
+- **Status:** CONFIRMED（随 0.2.0 发布说明一并发布）
+- **Date:** 2026-10-26
+- **Decision:** `0.2.0` 把强制入口（`enforceGate`）默认设为 `true`，即"每条用户消息走完整工作流"成为默认行为；`0.1.0` 的"仅模型主动调用工具"改为需要显式 `enforceGate: false`。
+- **Reason:** 用户核心需求 A 就是"每条消息强制完整工作流"；把它做成默认关闭的可选项，等于交付了一个不满足需求的默认形态。
+- **Compatibility:** 报告为纯增量扩展（`writesPaths`、失败 `class`/`category`），但配置面收紧（未知键拒绝、链校验、`switchOn` 白名单），且验收标准归一化去重会拒绝部分旧输入——这三点必须在更新日志的 breaking notes 明写。
+- **Alternatives rejected:** 默认关闭（默认不满足需求）；一次性大版本 `1.0.0`（内部仍有 L2 路由、链编辑器未做，版本号会虚高）。
+- **Consequences:** 升级者若不想要强制入口必须显式关闭；要求"绝不静默降级"的部署需再加 `gateRequired: true`。
+
+## D-011 — 安装后严格测试与修复发布闭环（用户 2026-10-26 指示）
+
+- 安装到真实 profiles 后执行严格功能测试矩阵（强制入口/幂等/失败路径/设置页渲染/组合共存/递归防护/secrets/稳定性），逐 profile 逐项记录通过与否。
+- 发现 bug 即修：单写者修复 → npm run ci 全绿 → 独立复查 → 整合 push → bump patch 版本 → 新 tag + GitHub Release → 重新安装新 tag → 重跑全部用例。
+- 已发布 tag 永不移动（v0.2.1/v0.2.2… 递增）；安装一律锁 tag；每步证据进 docs/knowledge；可随时回滚上一 tag。
