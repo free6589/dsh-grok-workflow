@@ -1,6 +1,10 @@
 import type { ExecutionResult, NormalizedTask, VerificationResult } from '../src/types.js'
 
-export function task(id: string, criteria?: string[]): NormalizedTask {
+export function task(
+  id: string,
+  criteria?: string[],
+  writesPaths: string[] | null = null,
+): NormalizedTask {
   return {
     id,
     title: `Task ${id}`,
@@ -9,6 +13,27 @@ export function task(id: string, criteria?: string[]): NormalizedTask {
     acceptanceCriteria: criteria ?? [`${id} works`],
     context: '',
     constraints: [],
+    writesPaths,
+  }
+}
+
+/**
+ * Task shaped as a tool caller passes it (TaskInput).
+ *
+ * The normalized fixture carries `writesPaths: null` ("the plan did not say"),
+ * which is a report-side value; a caller either omits the field or names paths.
+ */
+export function callerTask(id: string, criteria?: string[], writesPaths?: string[]): Record<string, unknown> {
+  const base = task(id, criteria)
+  return {
+    id: base.id,
+    title: base.title,
+    objective: base.objective,
+    expectedOutput: base.expectedOutput,
+    acceptanceCriteria: base.acceptanceCriteria,
+    context: base.context,
+    constraints: base.constraints,
+    ...writesPaths === undefined ? {} : { writesPaths },
   }
 }
 

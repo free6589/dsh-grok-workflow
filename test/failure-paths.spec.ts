@@ -194,6 +194,7 @@ describe('infrastructure failure through the real engine (G-4)', () => {
     acceptanceCriteria: ['a works'],
     context: '',
     constraints: [],
+    writesPaths: null,
   }
 
   function runArgs(): Record<string, unknown> {
@@ -247,7 +248,7 @@ describe('task-level safety nets', () => {
   it('turns a crash in the task pool into one failed row per task', async () => {
     const script = sabotage(
       'results = await mapLimit(plan.tasks, maxConcurrency, runTask);',
-      'results = await mapLimit(plan.tasks, maxConcurrency, function (t) { return runTask(t).then(function () { throw new Error(\'sabotage-in-pool\'); }); });',
+      'results = await mapLimit(plan.tasks, maxConcurrency, function (t) { throw new Error(\'sabotage-in-pool\'); });',
     )
     const run = await runWorkflowScript(script, args(), async () => verification(task('a')))
     expect(run.report.status).toBe('failed')

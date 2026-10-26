@@ -373,12 +373,10 @@ export function createConfigReader(
   logger?: { warn(message: string): void },
 ): ConfigReader {
   let lastGood: ResolvedConfig | undefined
-  let lastError = ''
   return {
     read(): ResolvedConfig {
       const next = resolveConfig(snapshotConfig(raw))
       lastGood = next
-      lastError = ''
       return next
     },
     lastGood(): ResolvedConfig {
@@ -387,10 +385,7 @@ export function createConfigReader(
       // was on the wire, because a delivery decision cannot be made from garbage.
       const fallback = resolveConfig({})
       lastGood = fallback
-      if (lastError === '') {
-        lastError = 'no configuration had validated yet'
-        logger?.warn('configuration was not readable yet; delivery fell back to defaults')
-      }
+      logger?.warn('configuration was not readable yet; delivery fell back to defaults')
       return fallback
     },
   }

@@ -101,6 +101,24 @@ function executionResult(value: unknown, path: string): ExecutionResult {
   }
 }
 
+/**
+ * Parse the optional `writesPaths` declaration (U-4).
+ *
+ * `null`/absent means "unknown", which the scheduler treated conservatively; the
+ * report echoes whatever the plan carried so an audit can see the declaration the
+ * scheduling decision was made from.
+ */
+function writesPaths(value: unknown, path: string): string[] | null {
+  if (value === undefined || value === null) return null
+  return array(value, path).map((item, index) => string(item, `${path}[${index}]`))
+}
+
+/** Compare two optional string lists, treating `null` and absent as equal. */
+function sameOptionalStrings(left: readonly string[] | null, right: readonly string[] | null): boolean {
+  if (left === null || right === null) return left === right
+  return sameStrings(left, right)
+}
+
 /** Deep-validate one attempt's verifier payload; `verdict` is a closed union. */
 function verificationResult(value: unknown, path: string): VerificationResult {
   const root = record(value, path)
@@ -227,6 +245,7 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
       context: string(task.context, `plan.tasks[${index}].context`),
       constraints: array(task.constraints, `plan.tasks[${index}].constraints`)
         .map((constraint, c) => string(constraint, `plan.tasks[${index}].constraints[${c}]`)),
+      writesPaths: writesPaths(task.writesPaths, `plan.tasks[${index}].writesPaths`),
     }
   })
   const tasks = array(root.tasks, 'tasks').map((item, index) => {
@@ -245,6 +264,7 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
       context: string(task.context, `tasks[${index}].context`),
       constraints: array(task.constraints, `tasks[${index}].constraints`)
         .map((constraint, c) => string(constraint, `tasks[${index}].constraints[${c}]`)),
+      writesPaths: writesPaths(task.writesPaths, `tasks[${index}].writesPaths`),
       status: taskStatus,
       attempts: array(task.attempts, `tasks[${index}].attempts`).map((attempt, a) => {
         const entry = record(attempt, `tasks[${index}].attempts[${a}]`)
@@ -277,7 +297,8 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
       || planTask.expectedOutput !== task.expectedOutput
       || planTask.context !== task.context
       || !sameStrings(planTask.acceptanceCriteria, task.acceptanceCriteria)
-      || !sameStrings(planTask.constraints, task.constraints)) {
+      || !sameStrings(planTask.constraints, task.constraints)
+      || !sameOptionalStrings(planTask.writesPaths, task.writesPaths)) {
       throw new Error(`workflow result plan.tasks and tasks disagree at index ${index}`)
     }
   }
@@ -558,6 +579,12 @@ export function failureSummary(report: WorkflowReport): { category: FailureCateg
       continue
     }
     for (const attempt of classified) add(attempt.failure?.category)
+  }
+  if (counts.size === 0) {
+    // A run-level failure has no task rows at all (deadline, cancellation, an
+    // unvalidatable report), so its only categories live on errors[]. Counting them
+    // keeps the rendered "Failures:" line honest instead of silently omitting it.
+    for (const entry of report.errors) add(entry.category)
   }
   const order: FailureCategory[] = ['infrastructure', 'quality', 'configuration', 'cancelled', 'unknown']
   return order.filter(category => counts.has(category)).map(category => ({ category, count: counts.get(category) ?? 0 }))

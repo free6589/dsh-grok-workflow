@@ -7,11 +7,11 @@ import { Config, CONFIG_KEYS, createConfigReader, resolveConfig, snapshotConfig 
 import { DELIVERY_RECORD, ROUTING_RECORD, recordRouting } from '../src/records.js'
 import { describeSurface } from '../src/settings.js'
 import { collectHistory, composeObjective, renderHistory } from '../src/history.js'
-import { renderReport } from '../src/report.js'
+import { assertWorkflowReport, failureReport, failureSummary, renderReport } from '../src/report.js'
 import { buildWorkflowRequest, WORKFLOW_SCRIPT } from '../src/script.js'
 import { createActiveState, runWorkflow } from '../src/run.js'
 import { runWorkflowScript, type ScriptAgent } from './helpers.js'
-import { execution, failingVerification, task, verification } from './fixtures.js'
+import { callerTask, execution, failingVerification, task, verification } from './fixtures.js'
 
 /**
  * 阶段6 — reliability and safety, one test per guarantee.
@@ -131,8 +131,18 @@ function session(id = 'sess-reliability'): Session {
   return Session.create(id as never)
 }
 
+/** Messages the gate delivered through the agent, in order. */
+const delivered: string[] = []
+
 function agentOf(target: Session): Record<string, unknown> {
-  return { session: target }
+  return {
+    session: target,
+    // Relay delivery goes through the agent, so the fake records what a user would
+    // have received instead of dropping it.
+    whenIdle: async () => {},
+    followup: (message: unknown) => { delivered.push(JSON.stringify(message)) },
+    steer: (message: unknown) => { delivered.push(JSON.stringify(message)) },
+  }
 }
 
 function userMessage(text: string): ReturnType<typeof createUserMessage> {
@@ -166,7 +176,7 @@ describe('reliability: cancellation and deadlines', () => {
     ctx.engine.hang = true
     apply(ctx as never, { maxConcurrency: 1, timeoutMs: 60_000 })
     const controller = new AbortController()
-    const pending = ctx.tool!.execute({ objective: 'do the thing', tasks: [task('a')] }, exec(controller.signal))
+    const pending = ctx.tool!.execute({ objective: 'do the thing', tasks: [callerTask('a')] }, exec(controller.signal))
     await vi.waitFor(() => { if (ctx.engine.runs.length === 0) throw new Error('run did not start') })
     controller.abort()
     // The tool contract reports the stop as an error, and the engine run is
@@ -181,7 +191,7 @@ describe('reliability: cancellation and deadlines', () => {
     ctx.engine.hang = true
     apply(ctx as never, { maxConcurrency: 1, timeoutMs: 1_000 })
     const started = Date.now()
-    const report = await ctx.tool!.execute({ objective: 'do the thing', tasks: [task('a')] }, exec()) as {
+    const report = await ctx.tool!.execute({ objective: 'do the thing', tasks: [callerTask('a')] }, exec()) as {
       status: string
       errors: { phase: string; category: string }[]
     }
@@ -340,7 +350,7 @@ describe('reliability: unload and reload', () => {
     const ctx = new FakeContext()
     ctx.engine.hang = true
     apply(ctx as never, { maxConcurrency: 1 })
-    const pending = ctx.tool!.execute({ objective: 'do the thing', tasks: [task('a')] }, exec())
+    const pending = ctx.tool!.execute({ objective: 'do the thing', tasks: [callerTask('a')] }, exec())
     await vi.waitFor(() => { if (ctx.engine.runs.length === 0) throw new Error('run did not start') })
     await ctx.dispose()
     expect(ctx.engine.runs[0]!.cancel).toHaveBeenCalled()
@@ -376,7 +386,7 @@ describe('reliability: run records', () => {
       ctx.engine.failFirstWorker = true
       apply(ctx as never, { maxConcurrency: 1, maxRetries: 0, recordRuns, roles: { worker: [{ model: 'w1' }, { model: 'w2' }] } })
       const target = session(`sess-records-${String(recordRuns)}`)
-      await ctx.tool!.execute({ objective: 'do the thing', tasks: [task('a')] }, { ...exec(), agent: agentOf(target) })
+      await ctx.tool!.execute({ objective: 'do the thing', tasks: [callerTask('a')] }, { ...exec(), agent: agentOf(target) })
       return ledgerOf(target)
     }
     expect(await run(true)).toHaveLength(1)
@@ -459,5 +469,90 @@ describe('reliability: live configuration and diagnostics', () => {
     expect(described.text).toContain('grok-workflow')
     expect(described.text).toContain(`${CONFIG_KEYS.length} field(s)`)
     expect(described.text).toContain('schema matches')
+  })
+})
+
+describe('reliability: wiring the live configuration and the category vocabulary', () => {
+  it('applies a live gate scope edit to the next claimed message (F3)', async () => {
+    // The gate reads its scope live: a session outside the named preset passes
+    // while `gateScope` is preset-scoped, and is admitted once the edit widens it.
+    let scope: 'process' | 'preset' = 'preset'
+    const ctx = new FakeContext()
+    // A volatile field reaches the plugin as a live holder; reading it on every
+    // decision is what makes an edit apply to the next message.
+    apply(ctx as never, {
+      maxConcurrency: 1,
+      gateScope: { get: () => scope },
+      gatePreset: 'workflow-only',
+    } as never)
+    const target = session('sess-scope')
+    const payload = stepPayload(agentOf(target), [userMessage('scope check')])
+    await ctx.preStep(payload, passThrough([]))
+    expect(ctx.engine.startCalls).toHaveLength(0)
+    scope = 'process'
+    await ctx.preStep(stepPayload(agentOf(target), [userMessage('scope check again')]), passThrough([]))
+    expect(ctx.engine.startCalls).toHaveLength(1)
+  })
+
+  it('uses the live configuration for a tool call, not the load-time snapshot (F3)', async () => {
+    let maxTasks = 1
+    const ctx = new FakeContext()
+    apply(ctx as never, { maxConcurrency: 1, maxTasks: { get: () => maxTasks } } as never)
+    // Two tasks against a load-time snapshot of maxTasks=1 would be refused; the
+    // live reader is raised first, so the call is accepted.
+    maxTasks = 3
+    const report = await ctx.tool!.execute({
+      objective: 'do two things',
+      tasks: [callerTask('a'), callerTask('b')],
+    }, exec()) as { status: string, tasks: unknown[] }
+    expect(report.tasks).toHaveLength(2)
+  })
+
+  it('falls back to the last good snapshot, not the load-time config (F1)', async () => {
+    // Sequence that kills the M3 mutation: a valid edit takes effect, then an
+    // invalid edit arrives. Delivery must keep the last *valid* value, because
+    // falling back to load-time values would silently undo a live edit.
+    let queued = 1
+    let broken = false
+    const ctx = new FakeContext()
+    ctx.engine.hang = true
+    apply(ctx as never, {
+      // `relay` queueing is where the live bound is read, and it returns before the
+      // run settles, so the refusal can be observed while the first run hangs.
+      answerStrategy: 'relay',
+      maxConcurrency: 1,
+      maxQueuedMessages: { get: () => queued },
+      roles: { get: () => broken ? { worker: [{ model: '' }] } : {} },
+    } as never)
+    const target = session('sess-lastgood')
+    void ctx.preStep(stepPayload(agentOf(target), [userMessage('first message')]), passThrough([]))
+    await vi.waitFor(() => { if (ctx.engine.startCalls.length === 0) throw new Error('run did not start') })
+    // A valid edit takes effect: the live bound is 0 and the read makes it the last
+    // good snapshot.
+    queued = 0
+    delivered.length = 0
+    await ctx.preStep(
+      stepPayload(agentOf(target), [userMessage('second message')]),
+      async () => ({ kind: 'enter' }),
+    )
+    expect(delivered.join('\n')).toContain('already has 0 queued message(s)')
+    // Now the edit is broken. Delivery must keep the *last good* bound (0); falling
+    // back to the load-time snapshot (1) would silently undo the live edit.
+    broken = true
+    delivered.length = 0
+    await ctx.preStep(
+      stepPayload(agentOf(target), [userMessage('third message')]),
+      async () => ({ kind: 'enter' }),
+    )
+    expect(delivered.join('\n')).toContain('already has 0 queued message(s)')
+  })
+
+  it('parses the cancelled category and still rejects an invented one (F3)', () => {
+    const cancelled = failureReport('x', resolveConfig({}), 'Cancelled', 'stopped', 'cancelled')
+    expect(() => assertWorkflowReport(cancelled, 'x', resolveConfig({}))).not.toThrow()
+    expect(failureSummary(cancelled)).toEqual([{ category: 'cancelled', count: 1 }])
+    expect(renderReport(cancelled)).toContain('Failures: 1 cancelled')
+    const invented = { ...cancelled, incomplete: [{ ...cancelled.incomplete[0]!, category: 'weird' }] }
+    expect(() => assertWorkflowReport(invented as never, 'x', resolveConfig({}))).toThrow(/category/)
   })
 })

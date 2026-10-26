@@ -5,7 +5,7 @@ import { createAssistantMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import { Session, pluginRecordOf } from '@deepseek-ai/dsh-session'
 import { apply } from '../src/index.js'
 import { REPORT_BEGIN, REPORT_END } from '../src/answer.js'
-import { execution, task, verification } from './fixtures.js'
+import { callerTask, execution, task, verification } from './fixtures.js'
 import { runWorkflowScript } from './helpers.js'
 import { ROUTING_RECORD } from '../src/records.js'
 
@@ -442,7 +442,7 @@ describe('mandatory entry gate', () => {
     await waitFor(() => ctx.engine.startCalls.length === 1)
     const request = ctx.engine.startCalls[0]!
     const result = await runWorkflowScript(request.script, request.args as Record<string, unknown>, async (_prompt, options) => {
-      if (options.label === 'grok-planner') return { tasks: [task('a')] }
+      if (options.label === 'grok-planner') return { tasks: [callerTask('a')] }
       if (options.label.startsWith('grok-worker')) {
         // The first route fails with a rate limit; the chain must advance.
         if (options.model === 'good') throw new Error('429 Too Many Requests')
@@ -714,7 +714,7 @@ describe('in-turn delivery (default strategy)', () => {
 
     const request = ctx.engine.startCalls[0]!
     const result = await runWorkflowScript(request.script, request.args as Record<string, unknown>, async (_prompt, options) => {
-      if (options.label === 'grok-planner') return { tasks: [task('a')] }
+      if (options.label === 'grok-planner') return { tasks: [callerTask('a')] }
       if (options.label.startsWith('grok-worker')) return execution('work done')
       return verification(task('a'))
     })

@@ -20,6 +20,12 @@ export interface TaskInput {
   acceptanceCriteria: string[]
   context?: string
   constraints?: string[]
+  /**
+   * Paths this task writes (U-4), so overlapping tasks are serialized. Omit it
+   * when unknown — the scheduler then treats the task as possibly writing
+   * anything. `[]` declares a task that writes nothing.
+   */
+  writesPaths?: string[]
 }
 
 /** Fully normalized task used inside the generated workflow. */
@@ -31,6 +37,11 @@ export interface NormalizedTask {
   acceptanceCriteria: string[]
   context: string
   constraints: string[]
+  /**
+   * Normalized write paths, or `null` when the plan did not say (U-4). `[]` means
+   * the task declared that it writes nothing.
+   */
+  writesPaths: string[] | null
 }
 
 /**
@@ -306,6 +317,8 @@ export interface TaskReport {
   acceptanceCriteria: string[]
   context: string
   constraints: string[]
+  /** Declared write paths echoed for audit (U-4); `null` = the plan did not say. */
+  writesPaths: string[] | null
   status: 'verified' | 'failed'
   attempts: AttemptReport[]
   error?: string

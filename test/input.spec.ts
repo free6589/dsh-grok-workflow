@@ -22,6 +22,7 @@ describe('caller task validation', () => {
       acceptanceCriteria: ['paths exist'],
       context: 'repo root',
       constraints: ['read-only'],
+      writesPaths: null,
     }])
   })
 

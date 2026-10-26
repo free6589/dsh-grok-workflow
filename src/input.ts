@@ -1,3 +1,4 @@
+import { normalizeWritesPaths, WRITE_PATH_LIMITS } from './paths.js'
 import type { NormalizedTask, TaskInput } from './types.js'
 
 /** Invalid user input for a grok_workflow call. */
@@ -144,6 +145,14 @@ export function normalizeCallerTasks(tasks: readonly TaskInput[] | undefined, ma
         TASK_LIMITS.constraintItems,
         TASK_LIMITS.constraintChars,
       )
+    // A caller states its write paths explicitly, so a malformed value is an input
+    // error (unlike a planner response, where it degrades to "unknown").
+    const writesPaths = normalizeWritesPaths(task.writesPaths)
+    if (task.writesPaths !== undefined && writesPaths === undefined) {
+      throw new GrokWorkflowInputError(
+        `tasks[${index}].writesPaths must be an array of at most ${WRITE_PATH_LIMITS.items} path strings`,
+      )
+    }
     return {
       id,
       title: requiredText(task.title, `tasks[${index}].title`, TASK_LIMITS.titleChars),
@@ -152,6 +161,7 @@ export function normalizeCallerTasks(tasks: readonly TaskInput[] | undefined, ma
       acceptanceCriteria: criteria,
       context: task.context === undefined ? '' : stringField(task.context, `tasks[${index}].context`, TASK_LIMITS.taskTextChars),
       constraints,
+      writesPaths: writesPaths === undefined ? null : writesPaths,
     }
   })
   if (JSON.stringify(normalized).length > TASK_LIMITS.aggregateChars) {

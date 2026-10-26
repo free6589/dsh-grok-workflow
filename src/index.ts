@@ -105,6 +105,11 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
             description: 'Optional constraints and non-goals.',
             items: { type: 'string' as const },
           },
+          writesPaths: {
+            type: 'array' as const,
+            description: 'File or directory paths this task writes. Overlapping tasks are serialized (they share one working directory); omit when unknown.',
+            items: { type: 'string' as const },
+          },
         },
       },
     },
@@ -176,6 +181,13 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
   ctx.tools.register(tool)
 
   if (config.enforceGate) {
-    installGate({ ctx, config, state, logger, readConfig: () => reader.read() })
+    installGate({
+      ctx,
+      config,
+      state,
+      logger,
+      readConfig: () => reader.read(),
+      lastGoodConfig: () => reader.lastGood(),
+    })
   }
 }

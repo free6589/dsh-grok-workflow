@@ -486,11 +486,58 @@ duplicate `taskId` accepted; and `-0` is not rejected by the materializer (A-5).
 
 - One cwd per run, no per-child cwd (E-16) ⇒ write races, verifier observing another
   task's intermediate state, and "tasks are independent" being prompt-only.
-- Mitigation: planner emits `writesPaths`; host serializes or refuses overlapping write
-  tasks; parallel work limited to read-only tasks; verifier ordered after writers.
+- Mitigation (**implemented in t29**, see DD-8a): every task may declare `writesPaths`; the
+  scheduler serializes overlapping tasks and keeps the rest parallel. Read-only parallelism
+  is *not* used, because a task cannot prove it writes nothing — only an explicit `[]`
+  declaration says so, and that is the task's own claim, echoed in the report for audit.
 - Concurrency: **effective = min(script pool, engine slots)** (R-13). The engine value is
   deployment config (default `min(16, cores-2)`), so the plugin can only tighten; read it
   for diagnostics rather than assuming equality.
+
+### DD-8a — Write-path isolation for parallel tasks (U-4, t29)
+
+The engine hands every child the same working directory (E-16), so "tasks are independent"
+is only true if the plan says which paths each task writes. U-4 therefore makes the
+declaration part of the plan and the scheduler honest about it.
+
+**Three declaration states, deliberately distinct.**
+
+| declaration | meaning | scheduling |
+| --- | --- | --- |
+| `['src/a.ts']` | known writes | runs in parallel with tasks that do not overlap |
+| `[]` | the task declares it writes nothing | runs in parallel with everything |
+| absent, or unparseable | unknown | conflicts with **every** other task (conservative) |
+
+**Normalization is lexical and total** (`src/paths.ts`, mirrored inside the generated
+script): backslashes become separators, `.`/`..` are resolved, repeated and trailing
+separators collapse, and the result is lowercased. Nothing touches the filesystem, so a path
+that does not exist yet compares correctly, and a case-insensitive filesystem cannot hide an
+overlap behind a difference in case (the same comparison on a case-sensitive filesystem can
+only serialize *more*, never less). Overlap is **segment-wise**: `src` covers `src/a.ts`,
+while `src/a` does not cover `src/ab`.
+
+**Scheduling** (`mapLimitIsolated` in the generated script) keeps `maxConcurrency` as an
+upper bound — serialization only ever lowers concurrency — and keeps the plan order as the
+tie-break, so the same plan reproduces the same schedule. When a plan declares nothing at
+all, the plain pool is used: with no information, serializing everything would be a pure
+slowdown (the documented trade-off; the caller can still declare paths to get the
+serialization).
+
+**Fail-safe boundaries.** A planner answer whose `writesPaths` is malformed degrades that
+task to "unknown" instead of rejecting the task: losing a work item to a validation detail is
+worse than serializing it. A *caller's* explicit `writesPaths` is validated strictly (wrong
+type = a real input error, refused before any run starts).
+
+**Audit.** Every task row in the report echoes the declaration it was scheduled from
+(`writesPaths`, or `null` for unknown), so a reviewer can see why two tasks ran one after the
+other.
+
+**Evidence.** `test/paths.spec.ts` (15 cases) pins the predicate (same file, directory prefix,
+segment boundary, case, `.`/`..`, root) and the scheduling consequence in the generated
+script: non-overlapping tasks reach `maxConcurrency`, same-file tasks peak at 2 of 3,
+directory-vs-file serializes to 1, an undeclared task runs alone (interval-checked, not just a
+peak), a fully undeclared plan keeps pre-U-4 behaviour, and `maxConcurrency` is never
+exceeded. The report echo is asserted shape-for-shape.
 
 ### DD-9 — Settings (stage 1) with the facts that make it operable
 
@@ -538,6 +585,14 @@ is `SettingsForms`, a scheme-derived form service:
 | `writable`, `documentPath`, `prepareDocument()` | types | Edits land in the **profile patch file**, which is a real, inspectable document |
 | `configure({ auto }, owner?)` | types | Per-instance policy; `auto:false` suppresses the generated page |
 | `describe({ redactSecrets: true })` + `redactSecrets` | types | Remote readers always see secrets redacted |
+
+**Identifying our own descriptor (t30/F2).** No single signal survives every runtime: the
+Loader entry id is not passed to `apply()`, and a volatile form **rebuilds** the schema, so
+`form.toJSON().uid` changes (measured 155 vs 156) while the descriptor is still ours. Identity
+is therefore layered — entry id when known, then schema uid, then the projected `value`
+carrying our distinctive keys (`toolName`, `roles`, `switchOn`) — and the view reports which
+path matched (`matchedBy`), which the diagnostics line prints. A descriptor that matches
+nothing is still reported as not found rather than guessed.
 
 **What this plugin does with it (implemented, `src/settings.ts`).**
 
@@ -625,7 +680,8 @@ never swallowed, and never turned into a bare exception the transport can lose.
 | partial completion | verified work is kept, the unfinished task is listed with its category, and `status` says `partial` | `keeps verified results and accounts for the task that did not make it` |
 | unload | `dispose` aborts the shared controller, cancels every live run and refuses new tool calls (`… has been unloaded`) | `cancels in-flight runs and refuses new work when the plugin unloads` |
 | reload | a fresh `apply()` on the same context starts with an empty queue and admits again — no inherited pending work | `starts clean after a reload instead of inheriting the old queue` |
-| live configuration | `snapshotConfig`/`createConfigReader` unwrap holders, an edit lands on the next read, a broken edit throws with its reason while `lastGood()` keeps delivery working | `unwraps volatile holders…`, `keeps the last good snapshot…` |
+| live configuration | `snapshotConfig`/`createConfigReader` unwrap holders, an edit lands on the next read, a broken edit throws with its reason while `lastGood()` keeps delivery working — and the gate's fallback is the **last good** snapshot, not the load-time one, so an applied edit survives a later invalid edit (t30/F1) | `unwraps volatile holders…`, `keeps the last good snapshot…`, `falls back to the last good snapshot, not the load-time config` |
+| wiring, proven not assumed | the live scope edit, the tool's live `maxTasks`, and the `cancelled` category each have a case (t30/F3); the run-level failure summary counts `errors[].category`, so a deadline/cancel/unvalidatable report still prints a `Failures:` line (t30/F4) | `applies a live gate scope edit…`, `uses the live configuration for a tool call…`, `parses the cancelled category…` |
 | surface diagnostics | the log line says whether the page is generated, how many fields it projects, what `applies` is, and whether the descriptor is really our schema (uid match) | `states the settings surface…` |
 
 ### DD-10 — Observability

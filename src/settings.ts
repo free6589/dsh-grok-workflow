@@ -224,6 +224,8 @@ export interface SettingsSelfView {
   fields: string[]
   /** True when the descriptor's schema uid is this plugin's own `Config`. */
   schemaMatches: boolean
+  /** How the descriptor was identified; `undefined` when nothing matched by id. */
+  matchedBy?: 'id' | 'uid' | 'value'
 }
 
 /**
@@ -244,18 +246,45 @@ export function describeSelf(ctx: Context, entryIds?: readonly string[]): Settin
     const ownUid = (Config.toJSON() as { uid?: unknown }).uid
     const uidOf = (item: SettingsDescriptorLike): unknown =>
       (item.schema as { uid?: unknown } | undefined)?.uid
-    // Identify our own entry without trusting an id: a profile may rename the row,
-    // so a descriptor is ours when its schema uid IS this plugin's Config.
-    const mine = entryIds === undefined
-      ? descriptors.find(item => ownUid !== undefined && uidOf(item) === ownUid)
-      : descriptors.find(item => entryIds.includes(item.ns))
-    if (mine === undefined) return undefined
+    // Identification is layered, because no single signal survives every runtime:
+    //  1. the Loader entry id, when the caller knows it;
+    //  2. the schema uid, when the descriptor carries our own schema object;
+    //  3. the projected value, when the runtime rebuilt the schema (a volatile form
+    //     gets a fresh uid, so uid equality alone reports "not ours" - t30/F2).
+    // A distinctive subset is used for (3): a config that happens to share one key
+    // with us is not us.
+    const distinctive = ['toolName', 'roles', 'switchOn']
+    const looksLikeUs = (item: SettingsDescriptorLike): boolean => {
+      const value = (item.value ?? {}) as Record<string, unknown>
+      return distinctive.every(key => key in value)
+    }
+    const pick = <T>(candidates: readonly SettingsDescriptorLike[], test: (item: SettingsDescriptorLike) => T | undefined): { item: SettingsDescriptorLike; how: 'id' | 'uid' | 'value' } | undefined => {
+      for (const item of candidates) {
+        if (test(item) !== undefined) return { item, how: 'id' }
+      }
+      return undefined
+    }
+    let found: { item: SettingsDescriptorLike; how: 'id' | 'uid' | 'value' } | undefined
+    if (entryIds !== undefined) {
+      found = pick(descriptors.filter(item => entryIds.includes(item.ns)), () => true)
+    }
+    if (found === undefined && ownUid !== undefined) {
+      const byUid = descriptors.find(item => uidOf(item) === ownUid)
+      if (byUid !== undefined) found = { item: byUid, how: 'uid' }
+    }
+    if (found === undefined) {
+      const byValue = descriptors.find(looksLikeUs)
+      if (byValue !== undefined) found = { item: byValue, how: 'value' }
+    }
+    if (found === undefined) return undefined
+    const mine = found.item
     return {
       ns: mine.ns,
       ...mine.autoGenerate === undefined ? {} : { autoGenerate: mine.autoGenerate },
       ...mine.applies === undefined ? {} : { applies: mine.applies },
       fields: [...CONFIG_KEYS],
       schemaMatches: ownUid !== undefined && uidOf(mine) === ownUid,
+      matchedBy: found.how,
     }
   } catch {
     return undefined
@@ -305,7 +334,9 @@ export function describeSurface(ctx: Context, entryIds?: readonly string[]): Sur
   }
   const auto = view.autoGenerate === false ? 'page suppressed' : 'page auto-generated'
   const applies = view.applies === undefined ? 'applies unknown' : `applies ${view.applies}`
-  const identity = view.schemaMatches ? 'schema matches' : 'schema not matched by uid'
+  const identity = view.schemaMatches
+    ? 'schema matches'
+    : `schema not matched by uid, identified by ${view.matchedBy ?? 'nothing'}`
   return {
     text: `settings surface: ${auto} for "${view.ns}" (${view.fields.length} field(s), ${applies}, ${identity}); edits apply to the next message`,
     level: 'info',

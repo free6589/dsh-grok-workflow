@@ -7,7 +7,7 @@ import {
   resolveConfig,
   snapshotConfig,
 } from '../src/config.js'
-import { declareSettingsSurface, describeSelf, validateRoutes } from '../src/settings.js'
+import { declareSettingsSurface, describeSelf, describeSurface, validateRoutes } from '../src/settings.js'
 import { Session, pluginRecordOf } from '@deepseek-ai/dsh-session'
 import type { Context } from '@deepseek-ai/cordis'
 import type { ResolvedConfig } from '../src/types.js'
@@ -183,14 +183,41 @@ describe('route validation against the runtime', () => {
       applies: 'live',
       fields: [...CONFIG_KEYS],
       schemaMatches: true,
+      matchedBy: 'id',
     })
-    // Matching by identity alone finds the same descriptor without an id.
-    expect(describeSelf(ctx)?.ns).toBe('grok-workflow')
+    // Matching by schema identity alone finds the same descriptor without an id.
+    expect(describeSelf(ctx)).toMatchObject({ ns: 'grok-workflow', matchedBy: 'uid', schemaMatches: true })
     // A foreign schema is not ours, and no field list may be invented from it.
     const foreign = ctxWith({
-      settings: { describe: () => [{ ns: 'other', schema: { uid: 999_999, refs: {} } }] },
+      settings: { describe: () => [{ ns: 'other', schema: { uid: 999_999, refs: {} }, value: { theme: 'dark' } }] },
     })
     expect(describeSelf(foreign)).toBeUndefined()
+  })
+
+  it('still finds the entry when a volatile form rebuilt the schema (t30/F2)', () => {
+    // Measured in the real runtime: the volatile form gets a fresh uid (155 vs 156),
+    // so uid equality reports "not ours" even though the descriptor is ours. The
+    // projected value is the signal that survives, and the diagnostics line must say
+    // which path identified it instead of claiming the page is missing.
+    const ctx = ctxWith({
+      settings: {
+        configure: () => () => {},
+        describe: () => [{
+          ns: 'grok-workflow',
+          autoGenerate: true,
+          applies: 'live',
+          schema: { uid: 155, refs: {} },
+          value: { toolName: 'grok_workflow', roles: { planner: [] }, switchOn: [] },
+        }],
+      },
+    })
+    const view = describeSelf(ctx)
+    expect(view).toMatchObject({ ns: 'grok-workflow', matchedBy: 'value', schemaMatches: false })
+    expect(view?.fields).toEqual([...CONFIG_KEYS])
+    const surface = describeSurface(ctx)
+    expect(surface.level).toBe('info')
+    expect(surface.text).toContain('identified by value')
+    expect(surface.text).toContain(`${CONFIG_KEYS.length} field(s)`)
   })
 
   it('degrades quietly on a runtime without a settings service', () => {

@@ -56,6 +56,11 @@ export interface GateDeps {
      * used (tests and embeddings without a settings surface).
      */
     readConfig?: () => ResolvedConfig;
+    /**
+     * The last configuration that validated. Delivery decisions fall back to it, so
+     * a broken edit cannot silently undo an edit that had already taken effect.
+     */
+    lastGoodConfig?: () => ResolvedConfig;
     ctx: Context;
     config: ResolvedConfig;
     state: ActiveState;

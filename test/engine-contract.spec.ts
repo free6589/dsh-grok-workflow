@@ -237,6 +237,7 @@ describe('generated workflow script on the real engine', () => {
     acceptanceCriteria: ['a works'],
     context: '',
     constraints: [],
+    writesPaths: null,
   }
 
   it('plans, executes, verifies and reports through the real engine', async () => {

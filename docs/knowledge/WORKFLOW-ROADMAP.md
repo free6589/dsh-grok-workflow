@@ -532,6 +532,7 @@ Consequences, in the order they matter:
 | chain length | config | 3 / 5 | duplicates rejected |
 | per-model attempts | config | 2 / 3 | retries are expensive (context re-injection) |
 | semantic retries | script | 1 / 3 | existing `maxRetries` cap |
+| write-path isolation | plan `writesPaths` + conflict-aware pool | serialized on overlap | U-4/t29: overlap = same file or directory prefix after lexical normalization (case-insensitive); a task that declares nothing is treated as unknown and conflicts with everything; a plan that declares nothing keeps the pre-U-4 pool. Serialization only lowers concurrency |
 | concurrency | script pool ∧ engine slots | 3 / 6 | **effective = min(script pool, engine slots)**: `maxConcurrentAgents` is engine deployment config (default `min(16, cores-2)`), not settable by the plugin, so the plugin can only tighten. Read the effective value for diagnostics; do not assume the two are equal (R-13) |
 | task count | config | 6 / 12 | the report validator must enforce `tasks ≤ maxTasks` (hole today) |
 | total child agents | engine `maxTotalAgents` = `1 + tasks·(retries+1)·2 + 2` (`src/script.ts:689-691`) | derived | ≈ 4·tasks **only** when `retries = 1`; with `retries = 3` it is `8·tasks + 3`. Counts only workflow `agent()` calls, not grandchildren |
@@ -715,14 +716,15 @@ script-level v1 fallback and the merged answer path.
   covered by injected-throw tests and the composed-waterfall suites.
   Exit: Layer-5 anti-bypass assertions pass against the composed bundle; headless and
   (where available) Web GUI evidence recorded.
-- **Phase 6 — reliability and safety hardening — IMPLEMENTED (t14).** Cancellation, deadline,
+- **Phase 6 — reliability and safety hardening — DONE (t14 + t29 + t30 fixes).** Cancellation, deadline,
   concurrency cap, duplicate-start defence, recursion limit, context bounds, secret
   handling, error records, partial-completion semantics, and unload/reload cleanup, each with
   a test (`test/reliability.spec.ts`, 18 cases); `volatile()` + `.get()` holder-isation with
   a re-validating reader (so an edit applies to the next message and a started run keeps its
   snapshot), the settings-surface diagnostics line, and a `cancelled` failure category for a
   deliberate stop. Honest gaps stay in the NOT_RUN ledger (NR-1 GUI half, NR-7 form
-  rendering, NR-8 runtime in-place update).
+  rendering, NR-8 runtime in-place update). U-4 write-path isolation landed in t29
+  (DESIGN DD-8a): declared overlap is serialized, the rest stays parallel.
 - **Phase 6 (old scope, superseded) — L2 request-level routing (optional, U-2).** Only if the
   loss of in-child tool results proves unacceptable. Requires `prepend` ownership + durable
   self-pushed cursor + the R-14 caveat; D-009 keeps v1 at L1.

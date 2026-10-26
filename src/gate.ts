@@ -68,6 +68,11 @@ export interface GateDeps {
    * used (tests and embeddings without a settings surface).
    */
   readConfig?: () => ResolvedConfig
+  /**
+   * The last configuration that validated. Delivery decisions fall back to it, so
+   * a broken edit cannot silently undo an edit that had already taken effect.
+   */
+  lastGoodConfig?: () => ResolvedConfig
   ctx: Context
   config: ResolvedConfig
   state: ActiveState
@@ -133,6 +138,19 @@ function agentIdOf(agent: Agent): string {
 }
 
 /**
+ * Read the configuration for one classification, degrading to the load-time
+ * snapshot when the live values do not validate.
+ */
+function readScope(deps: Pick<GateDeps, 'config' | 'readConfig'>): ResolvedConfig {
+  if (deps.readConfig === undefined) return deps.config
+  try {
+    return deps.readConfig()
+  } catch {
+    return deps.config
+  }
+}
+
+/**
  * Decide what to do with one claimed batch.
  *
  * Classification reads `payload.messages` only: `decision.messages` is appended
@@ -160,9 +178,10 @@ export function classifyPreStep(
   // expressed as an allow-list on the session header. Sessions outside the named
   // preset keep their ordinary behaviour.
   // Live scope check: an edit that widens or narrows the gate applies to the next
-  // claimed message. A broken edit throws here and the listener refuses the
-  // message with its reason (fail-closed), never silently bypassing the gate.
-  const scoped = deps.readConfig === undefined ? deps.config : deps.readConfig()
+  // claimed message. A broken edit degrades to the load-time snapshot instead of
+  // throwing here: classification runs outside the gate's error handling, and a
+  // throw would replace the workflow answer with an opaque rejection.
+  const scoped = readScope(deps)
   if (scoped.gateScope === 'preset' && header?.agentPreset !== scoped.gatePreset) {
     return { kind: 'pass', reason: 'out-of-scope' }
   }
@@ -254,15 +273,18 @@ export function installGate(deps: GateDeps): boolean {
   // fall back to the last good snapshot so an in-flight answer still lands.
   let warnedLiveFailure = false
   const live = (): ResolvedConfig => deps.readConfig === undefined ? config : deps.readConfig()
+  const fallback = (): ResolvedConfig => deps.lastGoodConfig === undefined ? config : deps.lastGoodConfig()
   const safe = (): ResolvedConfig => {
     try {
       return live()
     } catch (error) {
+      // Not the load-time snapshot: an edit that already took effect must survive a
+      // later invalid edit, so delivery falls back to the last good one (F1).
       if (!warnedLiveFailure) {
         warnedLiveFailure = true
         logger.warn(`configuration is invalid, keeping the last good snapshot: ${redactError(error)}`)
       }
-      return config
+      return fallback()
     }
   }
   const host = ctx as unknown as { on?: (event: string, handler: unknown) => () => void }
@@ -432,7 +454,7 @@ export function installGate(deps: GateDeps): boolean {
     // `whenIdle()` cannot resolve until it returns.
     void deliverAndRecord(agent, entry, {
       kind: 'notice',
-      reason: `this agent already has ${live().maxQueuedMessages} queued message(s) waiting for the workflow`,
+      reason: `this agent already has ${safe().maxQueuedMessages} queued message(s) waiting for the workflow`,
       outcome: 'queue-full',
     })
   }
@@ -487,7 +509,7 @@ export function installGate(deps: GateDeps): boolean {
   /** Serialize one agent's batches and bound the queue. */
   const enqueue = (agentId: string, task: () => Promise<void>): boolean => {
     const current = queues.get(agentId)
-    if (current !== undefined && current.queued >= live().maxQueuedMessages) return false
+    if (current !== undefined && current.queued >= safe().maxQueuedMessages) return false
     const queue: AgentQueue = current ?? { tail: Promise.resolve(), queued: 0 }
     queue.queued += 1
     queues.set(agentId, queue)

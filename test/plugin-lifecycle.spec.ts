@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { apply } from '../src/index.js'
 import type { WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
-import { execution, task, verification } from './fixtures.js'
+import { callerTask, execution, task, verification } from './fixtures.js'
 import { runWorkflowScript } from './helpers.js'
 
 interface ExecutableTool {
@@ -109,7 +109,7 @@ describe('plugin lifecycle and tool boundary', () => {
     expect(ctx.promptSections).toHaveLength(1)
     const report = await ctx.tool!.execute({
       objective: 'do the thing',
-      tasks: [{ ...task('a'), id: 'a' }],
+      tasks: [callerTask('a')],
     }, exec()) as { status: string; tasks: { status: string }[] }
     expect(report.status).toBe('completed')
     expect(report.tasks[0]!.status).toBe('verified')
@@ -131,7 +131,7 @@ describe('plugin lifecycle and tool boundary', () => {
     apply(ctx as never)
     ctx.engine.autoRun = true
     const objective = 'x'.repeat(4000)
-    const report = await ctx.tool!.execute({ objective, tasks: [{ ...task('a'), id: 'a' }] }, exec()) as { status: string; objective: string }
+    const report = await ctx.tool!.execute({ objective, tasks: [callerTask('a')] }, exec()) as { status: string; objective: string }
     expect(report.status).toBe('completed')
     expect(report.objective).toBe(objective)
     await ctx.dispose()
@@ -239,7 +239,7 @@ describe('plugin lifecycle and tool boundary', () => {
   it('rejects a complete-shaped report whose task status contradicts completed', async () => {
     const ctx = new FakeContext()
     apply(ctx as never)
-    const pending = ctx.tool!.execute({ objective: 'contradictory report', tasks: [task('a')] }, exec())
+    const pending = ctx.tool!.execute({ objective: 'contradictory report', tasks: [callerTask('a')] }, exec())
     await vi.waitFor(() => expect(ctx.engine.runs).toHaveLength(1))
     const request = ctx.engine.startCalls[0]!
     const fakeTasks = [task('a')]

@@ -110,6 +110,8 @@ export interface SettingsSelfView {
     fields: string[];
     /** True when the descriptor's schema uid is this plugin's own `Config`. */
     schemaMatches: boolean;
+    /** How the descriptor was identified; `undefined` when nothing matched by id. */
+    matchedBy?: 'id' | 'uid' | 'value';
 }
 /**
  * Read back this plugin's own settings descriptor.

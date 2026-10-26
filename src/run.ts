@@ -19,6 +19,8 @@ import type { FailureCategory, NormalizedTask, ResolvedConfig, WorkflowReport } 
 /** Minimal logger surface used by the runtime modules. */
 export interface WorkflowLogger {
   warn(message: string): void
+  /** Diagnostics channel; absent on a logger that only carries warnings. */
+  info?(message: string): void
 }
 
 /** Lifetime-scoped state shared by the tool and the gate. */
