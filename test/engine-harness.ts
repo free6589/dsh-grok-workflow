@@ -56,6 +56,12 @@ export interface EngineHarness {
   }): Promise<{ stopReason: string; value: unknown; error?: string; agentsStarted: number }>
   readonly children: ChildCall[]
   readonly events: string[]
+  /**
+   * The real cordis context the engine runs on. Exposed so a test can hand it to
+   * `runWorkflow` and observe what the *real* `workflow/*` events look like —
+   * the only honest way to test code that subscribes to them.
+   */
+  readonly ctx: Context
   dispose(): Promise<void>
 }
 
@@ -192,6 +198,7 @@ export function createEngineHarness(answer: (call: ChildCall) => ChildAnswer | P
   return {
     children,
     events,
+    ctx,
     async run(script, options = {}) {
       const request: WorkflowStartRequest = {
         script,

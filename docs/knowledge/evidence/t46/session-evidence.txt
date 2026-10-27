@@ -1,0 +1,41 @@
+# t46 session-log evidence (server side, decompressed session.v4.jsonl.zstd)
+# home: /home/fish/dsh-v022-home   profile: web-v022-test   port 3100
+
+## 1. forced entry / idempotence (a, f)
+session        runs  admitted  delivered  dup   turn/end reasons
+2b2fa765-d8a   1     1         1          0     "completed"
+6561b3db-dd6   1     1         0          0     "aborted"
+664084e6-188   3     3         3          0     "completed","completed","completed"
+67d59551-869   1     1         1          0     "completed"
+b35a0afd-78f   2     2         1          0     "completed"
+
+## 2. recursion (f): the gate admits only user-driven sessions
+  sessions with a delivery record (user-driven): 5
+  sessions without one (child agents): 19
+  child sessions that started a workflow run: 0  <-- must be 0
+  (classification: a session that the gate admitted carries a
+   plugin:grok-workflow/delivery record; child agent sessions never do)
+
+## 3. role routing (d): model actually used by each child agent session
+    19 session(s)  bifrost-completions/wb/cn:deepseek-v4.1-flash
+     4 session(s)  bifrost-completions/wb/cn:mimo-v2.6-pro
+
+## 4. caller cancellation (e): the stopped run
+  run-end stopReason=cancelled
+  turn/end reason={"kind": "aborted", "reason": {"kind": "user"}}
+  assistant messages in that turn: 0
+
+## 5. secrets (f): the provider key never reaches a session log
+  scan: grep -r the first 12 chars of BIFROST_VIRTUAL_KEY over every session file
+  files containing it: 0
+  grep -rhoE 'sk-[A-Za-z0-9]{10,}' hits: 0
+
+## 6. the unload notice: written, not rendered (t45 NOT_RUN #1, closed as negative)
+  session 2b2fa765: seq 10 assistant/message turn=1 step=0, model=workflow-notice,
+  no surfaceOp field, text starts "[grok-workflow] The plugin was unloaded while this
+  session had 1 workflow run in flight, so that work was cancelled."
+  seq 11 plugin:grok-workflow/dispose (trigger=unknown, callSite=lib/index.js:55:38 runDisposable)
+  seq 12 tool-workflow/run-end stopReason=cancelled
+  seq 14 step/start turn=1 step=1 -> the turn then continued and delivered the gate's report
+  the transcript the GUI renders for that turn contains only the step=1 assistant row,
+  i.e. no notice row (E3-conversation-after-toggle.txt).

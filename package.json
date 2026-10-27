@@ -1,6 +1,6 @@
 {
   "name": "dsh-grok-workflow",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Bounded plan-execute-verify-retry-synthesize workflows for DeepSeek Harness",
   "license": "MIT",
   "type": "module",

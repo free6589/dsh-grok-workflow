@@ -1,0 +1,58 @@
+# t46 instance facts — 127.0.0.1:3100 (test copy, live :3090 untouched)
+# generated 2026-10-28T03:16:50+08:00
+
+## build under test
+repo HEAD: cecc065 (uncommitted tree)
+candidate tarball: /tmp/t46-pack/dsh-grok-workflow-0.2.2-rc1.tgz md5 0a2190b6c79c3d9d3050af4945d1dbcc
+installed package version: 0.2.1
+
+## installed bytes vs repo build (md5, both sides identical)
+lib/client.js installed=81165b0c1bb86a39f0aad72318b26649 repo=81165b0c1bb86a39f0aad72318b26649 IDENTICAL
+lib/records.js installed=01e51c4b9ee8b16dd27503d3f53b5b83 repo=01e51c4b9ee8b16dd27503d3f53b5b83 IDENTICAL
+lib/run.js installed=4c25ff48ba8764e37a791855b66c964c repo=4c25ff48ba8764e37a791855b66c964c IDENTICAL
+lib/config.js installed=0c5255f521324b921ffdd14fbb6e2b13 repo=0c5255f521324b921ffdd14fbb6e2b13 IDENTICAL
+lib/index.js installed=0a63404a4798951251b279c2f2925eff repo=0a63404a4798951251b279c2f2925eff IDENTICAL
+client.js == src/client/index.js: 81165b0c1bb86a39f0aad72318b26649 vs 81165b0c1bb86a39f0aad72318b26649
+
+## effective grok-workflow config in the copied profile (test values)
+- id: grok-workflow
+  name: dsh-grok-workflow
+  config:
+    maxConcurrency: 1
+    maxRetries: 0
+    maxTasks: 1
+    maxActiveRuns: 1
+    maxActiveRunsTotal: 4
+    subagentProvider: spawn
+    roles:
+      planner:
+        - provider: bifrost-completions
+          model: wb/cn:deepseek-v4.1-flash
+      worker:
+        - provider: bifrost-completions
+          model: wb/cn:no-such-model-probe
+        - provider: bifrost-completions
+          model: wb/cn:deepseek-v4.1-flash
+      verifier:
+        - provider: bifrost-completions
+          model: wb/cn:deepseek-v4.1-flash
+      synthesizer: []
+    synthesis: deterministic
+    showProgress: true
+  disabled: false
+
+## boot warnings (identical to the source profile: same 19 bundles, same two missing layerfs packages)
+dsh: warning: 3 entries did not activate
+account-controller (@deepseek-ai/dsh-api-account-controller): pending (waiting for service: deepseekAccount)
+layerfs-host (@dsh-layerfs/host): failed to import: Error [ERR_MODULE_NOT_FOUND]: Cannot find package '@dsh-layerfs/host' imported from /home/fish/dsh-v022-home/profiles/web-v022-test/
+
+## how to reach the test instance (left running)
+URL:   http://127.0.0.1:3100/?token=<redacted>
+token: <redacted>   (t49/R5: the literal value was scrubbed — it belonged to that day's
+                    process and died with the restart; re-read it from the instance log:
+                    grep -oE 'token=[A-Za-z0-9_-]+' <instance.log> | tail -1)
+local: http://127.0.0.1:3100/?token=<token>   (bound to 127.0.0.1 only, no LAN exposure)
+from another host: ssh -L 3100:127.0.0.1:3100 <this machine>, then open the same URL
+pid:   2129314
+log:   /tmp/t46-evidence/instance.log
+stop:  kill $(ss -ltnp | grep :3100 | sed -n 's/.*pid=\([0-9]*\).*/\1/p')

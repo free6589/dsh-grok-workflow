@@ -124,6 +124,11 @@ export interface GrokWorkflowConfig {
     switchOn?: FailureClass[];
     /** Write the routing/delivery ledger into the session (default true). */
     recordRuns?: boolean;
+    /**
+     * Write the Web GUI's workflow-run progress events (one node, one member row
+     * per subagent). Presentation only: the run is identical either way.
+     */
+    showProgress?: boolean;
     /** Maximum ledger entries kept per run (hard maximum 256). */
     recordLimit?: number;
     /** Configuration surface version; unknown/newer versions are refused. */
@@ -136,8 +141,10 @@ export interface GrokWorkflowConfig {
     maxTasks?: number;
     /** Overall workflow deadline in milliseconds. */
     timeoutMs?: number;
-    /** Maximum concurrent tool runs in one plugin instance. Hard maximum 4. */
+    /** Maximum concurrent workflow runs per session. Hard maximum 4. */
     maxActiveRuns?: number;
+    /** Maximum concurrent workflow runs across every session in the process. Hard maximum 16. */
+    maxActiveRunsTotal?: number;
     /** Optional DSH subagent provider override; defaults to the engine/provider default. */
     subagentProvider?: string;
 }
@@ -160,10 +167,12 @@ export interface ResolvedConfig {
     maxTasks: number;
     timeoutMs: number;
     maxActiveRuns: number;
+    maxActiveRunsTotal: number;
     subagentProvider?: string;
     /** Effective switching policy; empty means the built-in policy. */
     switchOn: FailureClass[];
     recordRuns: boolean;
+    showProgress: boolean;
     recordLimit: number;
     configVersion: number;
 }
@@ -337,6 +346,8 @@ export interface WorkflowReport {
         maxRetries: number;
         maxTasks: number;
         maxTotalAgents: number;
+        /** The deadline the run actually ran under (t47: it used to live only in memory). */
+        timeoutMs?: number;
     };
 }
 //# sourceMappingURL=types.d.ts.map

@@ -41,12 +41,12 @@ dsh --profile grok-workflow-dev --from-default-profile headless --dump-config
 Then install the plugin:
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.2.1
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.2.2
 ```
 
-> `#v0.2.1` is installable from the moment the `v0.2.1` tag is published; before that, use `#v0.2.0`.
+> `#v0.2.2` is installable from the moment the `v0.2.2` tag is published; before that, use `#v0.2.1`.
 
-Pin the tag you actually want. Omitting `#v0.2.1` follows `main`, which is not a release. Do not run `--from-default-profile` after `plugin add`: it replaces the profile and removes the plugin you just installed.
+Pin the tag you actually want. Omitting `#v0.2.2` follows `main`, which is not a release. Do not run `--from-default-profile` after `plugin add`: it replaces the profile and removes the plugin you just installed.
 
 Then restart the profile so DSH loads the new plugin:
 
@@ -251,15 +251,15 @@ The plugin reuses DSH's workflow engine and subagents. It does not replace DSH's
 
 ## Versions and release notes
 
-The package version in this repository is `0.2.1`. Install or roll back to an exact release with a tag suffix:
+The package version in this repository is `0.2.2`. Install or roll back to an exact release with a tag suffix:
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.2.1
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.2.2
 ```
 
-> `#v0.2.1` is installable from the moment the `v0.2.1` tag is published; before that, use `#v0.2.0`.
+> `#v0.2.2` is installable from the moment the `v0.2.2` tag is published; before that, use `#v0.2.1`.
 
-Use only a tag that exists on GitHub. Published: `v0.1.0` and `v0.2.0`; `v0.2.1` is the version in this tree, tagged by the release process that publishes this commit. The unpinned command follows `main` and does not pin a release. See the [changelog](CHANGELOG.md) and the [release guide](docs/RELEASING.md) for the versioning and rollback rules.
+Use only a tag that exists on GitHub. Published: `v0.1.0`, `v0.2.0` and `v0.2.1`; `v0.2.2` is the version in this tree, tagged by the release process that publishes this commit. The unpinned command follows `main` and does not pin a release. See the [changelog](CHANGELOG.md) and the [release guide](docs/RELEASING.md) for the versioning and rollback rules.
 
 ## Testing and development
 

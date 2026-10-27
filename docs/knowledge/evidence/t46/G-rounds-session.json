@@ -1,0 +1,41 @@
+{
+ "session": "b35a0afd-78ff-453e-8e56-13d479f0d3ce",
+ "source": "session.v4.jsonl.zstd (server side)",
+ "rounds": [
+  {
+   "round": 1,
+   "runId": "96291b80-23ec-4841-95cf-f44b9b01e73a",
+   "startedAt": 1793127904772,
+   "durationSeconds": 154.7,
+   "stopReason": "completed"
+  },
+  {
+   "round": 2,
+   "runId": "90991bba-5f29-4f01-9862-2f36ce98289f",
+   "startedAt": 1793128096996,
+   "durationSeconds": 472.4,
+   "stopReason": "completed"
+  },
+  {
+   "round": 3,
+   "runId": "15481a34-217c-471e-9f29-ceb49ebf3269",
+   "startedAt": 1793128599434,
+   "durationSeconds": 362.5,
+   "stopReason": "completed"
+  },
+  {
+   "round": 4,
+   "runId": "60c85168-5d8a-44f3-b077-4c2e3a406c88",
+   "startedAt": 1793129007435,
+   "durationSeconds": 317.8,
+   "stopReason": "completed"
+  },
+  {
+   "round": 5,
+   "runId": "dbc86481-7161-41eb-8622-0a341a12677c",
+   "startedAt": 1793129366911,
+   "durationSeconds": 492.7,
+   "stopReason": "completed"
+  }
+ ]
+}

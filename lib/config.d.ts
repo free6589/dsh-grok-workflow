@@ -9,6 +9,7 @@ export declare const HARD_LIMITS: {
     readonly maxRetries: 3;
     readonly maxTasks: 12;
     readonly maxActiveRuns: 4;
+    readonly maxActiveRunsTotal: 16;
     readonly timeoutMs: 86400000;
     /** Maximum routes in one role's fallback chain. */
     readonly chainLength: 3;
@@ -19,6 +20,25 @@ export declare const HARD_LIMITS: {
     /** Hard ceiling on routing ledger entries kept per run. */
     readonly recordEntries: 256;
 };
+/**
+ * Default deadline for one workflow run: 60 minutes (t45, P1-4).
+ *
+ * The old 30-minute default was measured to be wrong twice in one afternoon —
+ * two four-task runs were killed at exactly 30m00s and 30m01s — while real
+ * four-task runs finish in 878 s / 1148 s / 1801 s. 60 minutes keeps a hung run
+ * bounded and gives the observed worst case roughly 2x headroom; a caller with a
+ * longer objective raises it in the profile patch (t45 D-017).
+ */
+export declare const DEFAULT_TIMEOUT_MS = 3600000;
+/** Default concurrent workflow runs per session (t45, P1-3). */
+export declare const DEFAULT_MAX_ACTIVE_RUNS = 2;
+/**
+ * Default concurrent workflow runs across every session.
+ *
+ * The per-session cap is what a user reasons about; this one only keeps the
+ * number of child agents in one process bounded.
+ */
+export declare const DEFAULT_MAX_ACTIVE_RUNS_TOTAL = 8;
 /** Version of the configuration surface this build understands. */
 export declare const CONFIG_VERSION = 1;
 /**
@@ -27,7 +47,7 @@ export declare const CONFIG_VERSION = 1;
  * a typo that is silently ignored looks exactly like a setting that "does not
  * work", which is the failure mode the settings surface must not have.
  */
-export declare const CONFIG_KEYS: readonly ["toolName", "enforceGate", "gateRequired", "gateScope", "gatePreset", "answerStrategy", "historyTurns", "historyChars", "maxQueuedMessages", "maxConcurrency", "maxRetries", "maxTasks", "timeoutMs", "maxActiveRuns", "subagentProvider", "roles", "synthesis", "switchOn", "recordRuns", "recordLimit", "configVersion"];
+export declare const CONFIG_KEYS: readonly ["toolName", "enforceGate", "gateRequired", "gateScope", "gatePreset", "answerStrategy", "historyTurns", "historyChars", "maxQueuedMessages", "maxConcurrency", "maxRetries", "maxTasks", "timeoutMs", "maxActiveRuns", "maxActiveRunsTotal", "subagentProvider", "roles", "synthesis", "switchOn", "recordRuns", "recordLimit", "showProgress", "configVersion"];
 /**
  * DSH profile configuration schema.
  *
@@ -54,6 +74,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     maxTasks: z<number, number, "volatile-defined">;
     timeoutMs: z<number, number, "volatile-defined">;
     maxActiveRuns: z<number, number, "volatile-defined">;
+    maxActiveRunsTotal: z<number, number, "volatile-defined">;
     subagentProvider: z<string, string, "volatile-defined">;
     roles: z<NoInfer<Schemastery.ObjectS<NoInfer<{
         planner: z<({
@@ -118,6 +139,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     switchOn: z<NoInfer<string[]>, NoInfer<string[]>, "volatile-defined">;
     recordRuns: z<boolean, boolean, "volatile-defined">;
     recordLimit: z<number, number, "volatile-defined">;
+    showProgress: z<boolean, boolean, "volatile-defined">;
     configVersion: z<number, number, "defined">;
 }>>, Schemastery.ObjectT<NoInfer<{
     toolName: z<string, string, "defined">;
@@ -134,6 +156,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     maxTasks: z<number, number, "volatile-defined">;
     timeoutMs: z<number, number, "volatile-defined">;
     maxActiveRuns: z<number, number, "volatile-defined">;
+    maxActiveRunsTotal: z<number, number, "volatile-defined">;
     subagentProvider: z<string, string, "volatile-defined">;
     roles: z<NoInfer<Schemastery.ObjectS<NoInfer<{
         planner: z<({
@@ -198,6 +221,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     switchOn: z<NoInfer<string[]>, NoInfer<string[]>, "volatile-defined">;
     recordRuns: z<boolean, boolean, "volatile-defined">;
     recordLimit: z<number, number, "volatile-defined">;
+    showProgress: z<boolean, boolean, "volatile-defined">;
     configVersion: z<number, number, "defined">;
 }>>, "plain">;
 /**
@@ -261,6 +285,15 @@ export interface ConfigReader {
  * @param logger - optional logger for the fallback warning.
  * @returns A reader with a validated snapshot cache.
  */
+/** One-line summary of a resolved config, for the load-time and per-edit log line.
+ *
+ * t47: the t46 acceptance round could not answer "what did the runtime actually
+ * read?" from any artefact — the deadline and the role chains only existed in
+ * memory, so a settings save and a patch edit were indistinguishable from the
+ * outside. This string is written to the log whenever the effective config
+ * changes, and the deadline travels into the run's report as well.
+ */
+export declare function describeResolvedConfig(config: ResolvedConfig): string;
 export declare function createConfigReader(raw: GrokWorkflowConfig | Record<string, unknown> | undefined, logger?: {
     warn(message: string): void;
 }): ConfigReader;

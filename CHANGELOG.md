@@ -3,10 +3,177 @@
 Notable user-facing changes are recorded here in English and Simplified Chinese.
 用户可见的功能和修复会在这里以英文和简体中文记录。
 
-## [Unreleased] / 未发布
+## [0.2.2] - 2026-10-28
+
+Incremental release on top of the published `0.2.1`: the deadline became a real bound, model
+routing became visible in every report, and a verified task stopped being failed for the
+verifier's prose. Nothing here restates a `0.2.1` change.
+
+**On "quality":** this release fixes a decision defect, it does not raise the quality of the
+models. Measured in the test home before the fix: 12 reports — 1 `COMPLETED`, 8 failed for the
+defect described under Fixed, 3 cancelled by deliberate probes (deadline / unload). With the
+shipped default chains (one `deepseek-v4.1-flash` route per role, `maxRetries: 0`) a verifier
+that reports a *blocking* problem still fails the task, and that is the intended behaviour. If
+you want stricter or looser verification, that is a model choice
+(`roles.verifier`), not something this release tunes for you.
+
+`0.2.1` 之上的增量版本：截止时间成为真正的上限、模型路由在每份报告里可见、已通过的任务不再
+因为 verifier 的一句散文备注被判失败；不重复 `0.2.1` 已经发布过的改动。
+
+**关于"质量"：** 本版修的是**判定缺陷**，不是把模型变强。修复前测试 home 实测：12 份报告 ——
+1 份 `COMPLETED`、8 份因 Fixed 里描述的缺陷失败、3 份是被刻意取消的探针（超时 / 卸载）。按默认
+链（每角色一条 `deepseek-v4.1-flash`、`maxRetries: 0`），verifier 报告**阻塞性**问题时任务依然
+会失败，这是预期行为。想要更严或更松的验证属于模型选择（`roles.verifier`），本版不替你调。
 
 ### Added / 新增
-- (nothing yet) / （暂无）
+- **The Web GUI shows the run while it happens / Web 界面现在能看见工作流在跑。** The plugin
+  writes the four session events the stock conversation panel folds into a **workflow-run
+  node** (`tool-workflow/run-start`, `agent-start`, `agent-end`, `run-end` — the same family
+  and the same payload fields the in-tree workflow tool writes, pinned by a contract test).
+  A message now produces a live node ~60 ms after the turn opens — before any subagent
+  exists, which is exactly the window that used to be empty — with one member row per
+  subagent appearing and settling as the run proceeds (planner → workers → verifiers) and a
+  terminal status (`Completed` / `Cancelled` / `Failed`) at the end. Measured on a real
+  profile: node at ~0.26 s after Send, members 0 → 1 → 2 → 3, `run-start` written at turn
+  level 78 s before the step opened, and a run stopped from the GUI closing as `cancelled`.
+  / 插件写入会话面板折叠成 **工作流运行节点** 的四个事件（`tool-workflow/run-start`、
+  `agent-start`、`agent-end`、`run-end`，事件族与字段形状与 in-tree 工作流工具完全一致，
+  由契约测试钉死）。发一条消息后 **约 60 ms** 主窗口即出现运行节点——**早于任何子代理存在**，
+  正是过去那段空白；成员行随子代理出现与结束逐条增长（planner → worker → verifier），
+  结束时给出终态（已完成 / 已取消 / 失败）。真机实测：点发送后约 0.26 s 节点可见，成员
+  0 → 1 → 2 → 3，`run-start` 写在 turn 级、比 step 出现早 78 s，GUI 上停止的运行以
+  `cancelled` 收尾。
+- **Settings: `showProgress` switch / 设置页新增 `showProgress` 开关。** One checkbox, on by
+  default, in both languages: turn it off and the run writes nothing but its messages, so a
+  session log carries no run events at all. That makes 23 configuration keys.
+  / 设置页加一个默认开启的双语复选框：关掉后运行只写消息不写任何运行事件，会话日志里完全
+  没有运行痕迹。配置面因此变为 23 个键。
+- **Run name carries the task count when it is known / 已知任务数时，运行名带任务数。**
+  A run started with a caller-supplied plan is titled `grok-workflow · 3 tasks` (the panel's
+  title is the run name). A run that plans first keeps the bare name, because the count does
+  not exist at the moment the node must appear — the panel's live member count covers it.
+  / 调用方给了计划时运行名形如 `grok-workflow · 3 tasks`（面板标题就是运行名）；先规划后
+  执行的运行保持裸名——节点出现的那一刻任务数还不存在，此时由面板的实时成员计数代替。
+
+### Fixed / 修复
+- **A verified task is no longer failed for the verifier's opinion / 已通过的任务不再因为
+  verifier 的一句备注被判失败。** The task decision now belongs to the verifier's structured
+  judgement — `verdict` plus one `criteria` entry per acceptance criterion with `met` and
+  evidence. Its prose `issues` list used to override that judgement, so a verifier that said
+  `pass` with every criterion met still failed the task for writing down a caveat. The cost was
+  visible: in the test home **8 of 12 recorded reports failed for this reason** — including all
+  five t46 acceptance rounds, whose notes say "non-blocking", "minor observation rather than a
+  failure", "does not affect any acceptance criterion". A verified task's notes are now carried
+  into the report's `Uncertainties` as `verifier note: …` instead of being turned into a
+  failure, and the verifier prompt states that `issues` is for blocking problems only (residual
+  doubt belongs in `confidence`). A criterion marked `met: false`, or `verdict: fail`, still
+  fails the task — that part is unchanged and pinned by tests.
+  / 任务判定回归 verifier 的**结构化判断**：`verdict`，加上每条验收标准一条带 `met` 与证据的
+  `criteria`。此前它的散文字段 `issues` 会覆盖该判断——verifier 判定 `pass` 且每条标准都满足，
+  只要它顺手写下一句保留意见，任务依然判失败。代价是实测的：测试 home **12 份报告里有 8 份**
+  因此失败，包括 t46 的 5 轮验收，而那些备注自己写着"non-blocking"（非阻塞）、"minor
+  observation rather than a failure"（只是小观察不是失败）、"不影响任何验收条款"。现在已通过
+  任务的备注会以 `verifier note: …` 进入报告 `Uncertainties` 而不是变成失败，verifier 提示词
+  也写明 `issues` 只用于**阻塞性问题**（残余疑虑请写 `confidence`）。`met: false` 或
+  `verdict: fail` 仍然判失败——这部分没变，且有测试钉住。
+- **The deadline is now the plugin's own hard bound, and it says so / 截止时间现在是插件自己
+  的硬上限，并说明它的数值。** `timeoutMs` was enforced by aborting a signal and then waiting
+  for the engine to settle; a measured run was still working minutes after its 60 s deadline,
+  and its cancellation was reported as "cancelled by its caller" — pointing at the wrong actor.
+  The run result now races the plugin's own deadline, so the caller always gets the timeout
+  report on time, the cancel reason names the deadline it hit, and every report carries a
+  `Deadline: <n> ms per run` line. / 过去的 `timeoutMs` 只是中断一个 signal 然后等引擎收尾；
+  实测有运行在 60 s 截止后数分钟仍在工作，取消原因还写成"由调用方取消"，把责任指错了人。
+  现在运行结果与插件自己的截止时间赛跑：调用方总能按时拿到超时报告，取消原因写明打中的
+  截止值，每份报告带一行 `Deadline: <n> ms per run`。
+- **`Model routes:` is always printed, and a failure report no longer claims `inherit` /
+  报告始终打印 `Model routes:`，失败报告不再谎称 `inherit`。** The line used to be skipped
+  whenever every configured chain was empty, so "nothing configured" and "the line is missing"
+  looked identical; a timeout or unload report hard-coded an all-empty routing block even when
+  the run had been handed a chain. Unset roles now say `inherit`, and failure reports derive
+  their chains from the configuration in force. / 该行过去在所有角色链为空时被整行省略，
+  "没配置"与"这行没打印"看起来一样；超时/卸载报告还用写死的空路由块，哪怕运行确实拿到了
+  链。现在未配置的角色显示 `inherit`，失败报告按生效配置生成链。
+- **An unload can finally be explained / 插件被卸载终于能查到原因。** When the plugin is
+  unloaded, it now writes a `plugin:grok-workflow/dispose` record into every affected session
+  *before* cancelling anything — time, uptime, trigger class (`management` / `shutdown` /
+  `test` / `unknown`), the redacted call-site frames,
+  how many runs were live, and each run's id and age — plus one diagnostics line. The
+  cancelled report is also split by cause: a run killed by an unload now says so
+  (`grok_workflow was cancelled because the plugin was unloaded while the run was in flight`),
+  distinct from `cancelled by its caller`. Before this, two runs in two workspaces were
+  cancelled 573 ms apart and the only trace was "was cancelled before it produced a report".
+  The class is decided by a **signal probe**, not by guessing from the stack: the plugin
+  subscribes to shutdown signals at load time and records any that arrive before disposal
+  (a shutdown signal ⇒ `shutdown`). The redacted call-site frames are a tie-breaker only,
+  because on a real instance both a SIGTERM and a settings-page toggle show nothing but
+  cordis internals within the frame budget. `unknown` is a legitimate answer — an
+  in-process unload on the test instance recorded `signals: []` and `trigger: unknown` —
+  and the record always carries the raw material so the class can be re-derived.
+  / 插件被卸载时，**先**写入 `plugin:grok-workflow/dispose` 记录再取消运行：时间、存活时长、
+  触发类别（`management`/`shutdown`/`test`/`unknown`）、脱敏调用栈帧、
+  当时活跃 run 数与每个 run 的 id 与时长，并输出一行诊断日志。取消报告同时按原因拆分：
+  被卸载打断的运行明说"插件在运行期间被卸载"，与"被调用方取消"区分开。此前两个 workspace
+  的 run 相隔 573 ms 被取消，唯一痕迹只有一句"was cancelled before it produced a report"。
+  触发类别由**信号探针**决定而非从调用栈猜：插件加载时订阅关闭信号，并记录在卸载之前是否
+  收到过（收到即 `shutdown`）。脱敏调用栈帧只作并列依据——真机上 SIGTERM 与设置页停用两者
+  可见帧全是 cordis 内部帧，单靠栈只能答 `unknown`。`unknown` 是合法答案（测试实例上一次
+  进程内卸载记录到 `signals: []`、`trigger: unknown`），记录里始终带着原始材料可复核。
+- **A cut run tells the user through its report, and an idle disable stays silent /
+  被切断的运行通过报告告知用户，空闲停用则完全安静。** If a run was actually interrupted, its
+  session gets one notice row (no model call): what was interrupted, that the cause was an
+  unload and not a deadline, and that messages until re-enable are answered directly. That row
+  is **written to the session log but not rendered** by the stock conversation panel in DSH
+  `0.2.1-rc.2` — it sits at a `(turn, step)` that never opens a step, and the panel starts an
+  assistant row only on `step/start` — so the row's job is the ledger plus the next turn's
+  context, and the **report is the user-visible channel**: the cancelled run's report names the
+  unload as the cause. Disabling the plugin on purpose while nothing runs writes **nothing**
+  into any session — a direct answer is the expected behaviour there.
+  / 只有在**确有运行被切断**时，该会话才会写入一条提示行（不花模型调用）：说清被中断的工作、
+  原因是卸载而非超时、以及恢复前的消息将直答。该行在 DSH `0.2.1-rc.2` 的原生会话面板里
+  **只写入、不渲染**——它落在一个从未开启 step 的 `(turn, step)` 上，而面板只为 `step/start`
+  开启助手行——因此它的作用是台账 + 下一轮上下文，**用户可见的告知通道是报告**：被取消那次
+  运行的报告明说原因是插件卸载。**空闲**时停用插件（用户有意为之）不向任何会话写入任何内容
+  ——此时直答就是预期行为。
+- **One session can no longer starve the others / 一个会话不再能饿死其它会话。** The active-run
+  cap is now per session (`maxActiveRuns`, default 2) with a process-wide backstop
+  (`maxActiveRunsTotal`, default 8), and a refusal names the holders: `already has 2 active
+  run(s) in this session; maxActiveRuns is 2 per session (holding: run 3f5c… (running 14m38s),
+  run 9b02… (running 2m01s))`. Measured before the fix: two long runs in one session refused
+  three other sessions across three workspaces.
+  / 并发槽位改为**按会话**（`maxActiveRuns`，默认 2）+ 进程级兜底（`maxActiveRunsTotal`，默认 8），
+  拒绝文案写明占槽者（run id 与已跑时长）。修复前实测：一个会话两个长 run 拒掉了三个 workspace 的
+  三个会话。
+- **Default deadline raised to 60 minutes / 默认超时提高到 60 分钟。** The 30-minute default was
+  measured to be a knife-edge, not a margin: two four-task runs were killed at 30m00s and
+  30m01s, while real four-task runs finish in 878 s / 1148 s / 1801 s. Hard ceiling unchanged
+  (24 h), settings page range unchanged.
+  / 30 分钟默认值是刀口而非余量：两个四任务运行分别在 30m00s 与 30m01s 被杀，而真实四任务运行用时
+  878 s / 1148 s / 1801 s。硬上限（24 h）与设置页范围不变。
+
+### Changed / 变更
+- **The settings page speaks the language DSH is set to / 设置页跟随 DSH 的语言设置（中英双语）。**
+  Every string on the page — card title and one-line summary, group headings, per-field labels,
+  numeric ranges, the per-role chain editor (add / remove / placeholder / empty-chain hint),
+  read-only rows, Save / Discard / Saving, the save outcome and every validation finding — now
+  resolves through the composition's own locale plugin (`@deepseek-ai/dsh-client-locale`) instead
+  of being printed as one hardcoded bilingual line. The bundle registers its dictionary
+  (`ctx.locale.register('grok-workflow', { zh, en })`) and declares `locale: 'grok-workflow'` on its
+  `plugins.item` slot, so Settings → General → Language switches the page, the card title and the
+  card summary in place — the same setting that drives `<html lang>`. The browser's `navigator`
+  language is never consulted, and a composition with no locale service still mounts the page in
+  English rather than not at all.
+  / 页面全部文案（卡片标题与一行简介、分组标题、字段标签、数值范围、按角色链编辑器、只读行、
+  保存/放弃/保存中、保存结果、以及全部校验错误）改为经由组合自带的 locale 插件
+  （`@deepseek-ai/dsh-client-locale`）解析，不再打印硬编码的中英混排一行字；bundle 注册自己的
+  字典并给 `plugins.item` 槽声明 `locale`，因此"设置 → 通用 → 语言"切换即让页面、卡片标题与
+  简介就地换语言——与驱动 `<html lang>` 的是同一个设置。**不**读取浏览器 `navigator` 语言；
+  组合里没有 locale 服务时页面仍以英文挂载，而不是整页缺失。
+- **Validation findings are data, not prose / 校验结果是数据而不是成品句子。** `validate()`
+  returns `{ key, params }` findings and the page renders them through the active language, so one
+  draft reports identically in both languages and a language switch re-renders findings already on
+  screen instead of stranding the old wording. / `validate()` 返回 `{ key, params }`，由页面按当前
+  语言渲染；同一份草稿在中英文下报同一批问题，切换语言时已在屏幕上的错误会一起换语言。
 
 ## [0.2.1] - 2026-10-27
 

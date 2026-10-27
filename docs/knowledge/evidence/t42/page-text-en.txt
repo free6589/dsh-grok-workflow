@@ -1,0 +1,149 @@
+New Session
+Plugins
+Automation tasks
+Workspaces
+any2api
+doubao2api
+wenxinyiyan
+dsh-books
+dsh-grok-workflow
+dsh-model-fix
+aa-scrape
+chatgpt2api
+dsh-our-free-model
+dsh-model-list
+语音识别打字工具
+MEMLENS
+dsh-token-usage
+substack_jail
+douyin订阅
+Socratopia
+workbuddy2api
+workspace
+projects_mine
+New Session
+zcode反向代理方案
+22min
+360teams 通讯录
+1d
+dsh 删除会话插件与 "loopback only" 报错
+3d
+插件添加索引源配置
+3d
+dsh 有没有一个插件 可以跨工
+3d
+Show 1 more sessions
+Ungrouped
+Settings
+Plugins
+Grok workflow
+
+A mandatory workflow for every message: entry gate, per-role model chains, concurrency and run records.
+
+Grok workflow
+
+Every user message runs plan → execute → verify → synthesise. This page controls the entry gate, the per-role model chains, the concurrency limits and the run records.
+
+Entry and gate
+Gate scope
+gateScope
+process
+preset
+Gate preset name
+gatePreset
+Answer strategy
+answerStrategy
+in-turn
+relay
+append
+Context and concurrency
+History turn limit
+historyTurns
+0 – 20, default 4
+History character limit
+historyChars
+0 – 8000, default 4000
+Queued message limit
+maxQueuedMessages
+0 – 8, default 4
+Concurrent task limit
+maxConcurrency
+1 – 6, default 3
+Retries per task
+maxRetries
+0 – 3, default 1
+Task count limit
+maxTasks
+1 – 12, default 6
+Run timeout (ms)
+timeoutMs
+1000 – 86400000, default 1800000
+Active run limit
+maxActiveRuns
+1 – 4, default 2
+Subagent provider
+subagentProvider
+Synthesis, switching and records
+Synthesis mode
+synthesis
+deterministic
+model
+Failure classes that switch models
+switchOn
+rate-limit
+server-error
+connection
+timeout
+model-unavailable
+format-error
+agent-start-failed
+Record runs
+recordRuns
+Run record limit
+recordLimit
+0 – 256, default 64
+Per-role model chains
+
+Up to 3 routes per chain, tried in order; empty means this role uses the session default model.
+
+planner
+2/3 routes
++ Add route
+1
+Remove
+2
+Remove
+worker
+1/3 routes
++ Add route
+1
+Remove
+verifier
+1/3 routes
++ Add route
+1
+Remove
+synthesizer
+1/3 routes
++ Add route
+1
+Remove
+Structural fields (read-only)
+
+These keys are not part of the live form; change them in the profile patch and restart.
+
+Tool name
+toolName
+grok_workflow (fixed at registration)
+Enforce gate
+enforceGate
+true (default; editable in the profile patch)
+Gate required
+gateRequired
+false (default; editable in the profile patch)
+Config version
+configVersion
+1 (wire contract)
+Save
+Discard
+revision 0

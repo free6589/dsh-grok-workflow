@@ -1,0 +1,55 @@
+t49 commands and timings
+========================
+
+Analysis of the twelve reports (read-only)
+  zstdcat <session>/session.v4.jsonl.zstd | python3 -c '<typed extraction of assistant/message
+    payloads containing <<<GROK-WORKFLOW-REPORT>>>'      -> 12 reports in 6 sessions
+  classification + the eight reason strings        -> A-report-verdicts.txt
+  Note: never dump a session log wholesale (a live log once cost 15M tokens); extract typed fields.
+
+The fix
+  src/script.ts : checkVerification — the `issues.length > 0` branch removed; the decision is
+                  verdict + per-criterion met/evidence. Verified tasks copy issues into the report
+                  as `verifier note: …`. verifierPrompt now defines `issues` as blocking-only.
+  test/config.spec.ts : three cases (verbatim live note strings) + the mutant run below.
+
+Mutation check (the point of the regression tests)
+  cp src/script.ts /tmp/t49/script.ts.bak
+  # re-insert  if (verification.issues.length > 0) return { passed: false, … }
+  npx vitest run test/config.spec.ts        -> 2 failed | 22 passed
+  cp /tmp/t49/script.ts.bak src/script.ts
+  npx vitest run test/config.spec.ts        -> 24 passed
+
+Build + install into the test profile
+  npm run build                              client bundle 40751 bytes -> lib/client.js
+  npm pack --pack-destination /tmp/t49-pack  -> dsh-grok-workflow-0.2.2.tgz (renamed gw-rc6.tgz;
+                                                pnpm needs a new path or it no-ops)
+  cd /home/fish/dsh-v022-home/profiles/web-v022-test
+  sed -i 's|file:/tmp/t47-pack/…rc5.tgz|file:/tmp/t49-pack/gw-rc6.tgz|' package.json && pnpm install
+  md5sum lib/script.js both sides            -> 6037216de9b24957e0f5365716223704 (identical)
+
+Instance restarts (test instance only)
+  PID=$(ss -ltnp | grep ':3100' | sed -n 's/.*pid=\([0-9]*\).*/\1/p'); kill $PID
+  set -a; . /home/fish/.dsh/bifrost.env; set +a
+  DSH_HOME=/home/fish/dsh-v022-home dsh --profile web-v022-test --host 127.0.0.1 --port 3100 --no-open
+  # every restart rotates the token; always re-read and re-check:
+  grep -oE 'token=[A-Za-z0-9_-]+' instance.log | tail -1
+  curl -o /dev/null -s -w '%{http_code}\n' "http://127.0.0.1:3100/?token=$TOKEN"    # 303 = valid
+
+The three live runs (playwright probes /tmp/pw/t49-quality{,2,3}.mjs)
+  run 1  "回答：三加四等于几？只回答一句。"                       -> COMPLETED, 76.4 s   (Q2)
+  run 2  "用一句话（中文）说明什么是幂等，直接作为回复正文输出"     -> COMPLETED, 55.8 s   (Q4)
+  run 3  "Run `echo round-3` … workspace-verifiable evidence file" -> COMPLETED, 103.2 s (Q5)
+  (probe wall times include page load + workspace click; the run node's own durations are the
+   figures in Q*_run.log)
+
+What was deliberately NOT done
+  * No second model was tried and no "use a stronger verifier" experiment was run: the data showed
+    the failures were not model-caused, so the honest deliverable is the fix plus the statement that
+    a stricter/looser verifier is a `roles.verifier` choice. Running a stronger verifier would have
+    produced a green sample without fixing the defect users actually hit.
+  * The post-fix live runs never exercised the `verifier note:` path (no issues at all in those
+    three runs), so no live run is presented as proof of that path; README §4 states this.
+  * Docs-only items were not taken as licence to touch code: R3 (CHANGELOG wording), R4 (t46
+    correction notes), R5 (token redaction), R6 (20-bundle re-boot), R7 (STATE) are text/evidence
+    changes; only R2 needed source changes, and those are confined to src/script.ts + one test file.

@@ -1,0 +1,43 @@
+t47 instance facts — DSH 0.2.1-rc.2, external plugin boundary, no DSH core change
+================================================================================
+
+DSH checkout        /home/fish/.local/share/mise/installs/node/26.8.1/lib/node_modules/@deepseek-ai/dsh
+                    (version string reported by the Web UI: 0.2.1-rc.2-332895e)
+Test home           /home/fish/dsh-v022-home          (profile web-v022-test, copy of the live profiles/web)
+Test listener       127.0.0.1:3100  pid 2334824 during the final probe series
+Live listener       100.111.111.88:3090  pid 1773499 — never restarted, stopped or reconfigured in t47
+                    (the user's live profile keeps `dsh-grok-workflow: disabled: true`)
+
+Installed package   /home/fish/dsh-v022-home/profiles/web-v022-test/node_modules/dsh-grok-workflow
+                    from /tmp/t47-pack/dsh-grok-workflow-0.2.2-rc5.tgz (npm pack of this tree)
+
+lib/*.js md5 — installed == repo build, re-verified on both sides before every probe run
+(0 mismatched files):
+
+d554feb165675f3e7c59a50615ed8fe0  answer.js
+81165b0c1bb86a39f0aad72318b26649  client.js  (== src/client/index.js, unchanged in t47)
+748ec21afc1926e0dc4ad9a521fe5fb9  config.js  (t47: describeResolvedConfig)
+b16ccd2dac6cd90d67580b9ce030ccc1  gate.js
+105d8a1823f421f6a9777d9b02f4f0a5  history.js
+787176cc28a20a67462a0b4dc4ae10d2  index.js  (t47: per-change "configuration in effect" log line)
+2934276bca6395ad7c09775aedff3c9c  input.js
+5aa7fa743f5c95e433c97246cd0e8515  paths.js
+01e51c4b9ee8b16dd27503d3f53b5b83  records.js
+086c5e0a9530656db8406c5ff3697904  redact.js
+f0adbf63ecbeed769f3bf52c486267fb  report.js  (t47: unconditional Model routes, Deadline line, failure-report routing)
+a3cd4871b28228168fa84c88817b686a  run.js  (t47: deadline race + deadline-aware cancel reason)
+13b71d6e2eb663a95a6d7c53bfd86c3a  script.js  (t47: args.timeoutMs -> report limits)
+a4364097aa418b993b09d022e9b21f7e  settings.js
+099809e5f2145f0123c3f8e4d76cc2c2  types.js
+
+Profile patch used for the probes (/home/fish/dsh-v022-home/profiles/web-v022-test/cordis.patch.yml,
+entry `- id: grok-workflow`): maxConcurrency 1, maxRetries 0, maxTasks 1, maxActiveRuns 1,
+maxActiveRunsTotal 4, subagentProvider spawn, showProgress true, synthesis deterministic,
+roles planner/worker/verifier = [bifrost-completions/wb/cn:deepseek-v4.1-flash], synthesizer [],
+`timeoutMs: 60000` for the deadline probe only (restored to 3600000 afterwards).
+
+Start command:
+  DSH_HOME=/home/fish/dsh-v022-home dsh --profile web-v022-test --host 127.0.0.1 --port 3100 --no-open
+
+Env note: the instance inherits /home/fish/.dsh/bifrost.env (provider keys). No key value appears in
+any artefact here (t46 measured 0 key hits; t47 added no new provider surface).

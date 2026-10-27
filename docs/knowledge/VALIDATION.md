@@ -674,3 +674,201 @@ Install forensics: `dsh plugin add` writes the profile manifest under the layerf
 composed only when listed in `dsh.profile.bundles` (web install lost this step to an interrupted
 call and was repaired explicitly). Rollback: `dsh plugin --profile <p> remove dsh-grok-workflow`;
 backups in `~/dsh-profile-backups/` (pre-install and post-install snapshots).
+
+
+## Round 4 — progress visibility in the Web GUI (2026-10-27, t44)
+
+Goal: the conversation panel must show the run while it runs, not a blank window. Method: own
+debug profile (`web-grok-debug`, `:3199`), the packed build installed there, three real GUI
+sessions driven by Playwright, and the server's own session log as ground truth (decompressed
+`session.v4.jsonl.zstd`, so the timings are host-clock). Artifacts:
+`docs/knowledge/evidence/t44/`. Live `:3090` was not touched.
+
+| # | Item | Result | Evidence |
+|---|---|---|---|
+| 1 | Node appears immediately | **PASS** | `run-start` **60 ms** after `turn/start` in the session log; first paint of the node **~0.26 s** after the Send click (browser + WS round trip), showing "0 members / No members started" before any subagent exists |
+| 2 | Member rows grow with the subagents | **PASS** | 0 → 1 (`grok-planner`, Plan) at 0.45 s → 2 (`grok-worker-…-a1`, Execute) at 10.1 s → 3 (`grok-verifier-…-a1`, Verify) at 35.4 s; header count follows ("1 member"… "3 members") |
+| 3 | Terminal state renders | **PASS** | Completed run: `data-run-status="completed"`, header "Completed" at 78.7 s. Run stopped from the GUI at ~8 s: `agent-end {outcome:"cancelled"}`, `run-end {stopReason:"cancelled"}`, panel shows `cancelled` |
+| 4 | **Risk item**: does a node anchored before `step/start` render? | **PASS (measured)** | `run-start` at seq 7 (60 ms) vs `step/start` at seq 19 (**78 651 ms**) — the node is visible and live for the entire run. Plan B is not needed |
+| 5 | `showProgress: false` writes nothing | **PASS (test)** | `test/progress.spec.ts` runs the real engine with the switch off: zero `tool-workflow/*` events, workflow still returns a validated report |
+| 6 | Recording cannot break a run | **PASS (test + mutation)** | A session that refuses the write only costs the entry (one warning); deleting the `try/catch` fails that test, deleting the ownership guard fails the isolation tests, deleting the `run-start` call fails the ordering tests |
+| 7 | Contract shapes match the in-tree recorder | **PASS (test)** | Field-for-field payload assertions, including the absent `phase` key |
+| 8 | Whole suite | **PASS** | `npm run ci` → 20 files / **306 tests** (294 before, +12), typecheck and oxlint clean (0 warnings, 0 errors) |
+| 9 | A live **failed** run | **NOT_RUN** | The short objective verified, so the run completed; `error → failed` is the stock fold's own mapping, and the cancelled case exercises the same "leave `running`" transition. Not claimed as measured |
+
+Two facts worth keeping: (a) the pre-t44 emptiness was not a GUI defect — the events simply did
+not exist, and reproducing the tool layer's recorder is enough to reuse the panel that
+`dsh-web-app` already ships; (b) in-turn ordering puts `run-start` at turn level, so any future
+event this plugin writes must be assumed to arrive before the step and be anchored accordingly.
+
+## Round 5 — unload observability, the notice, per-session slots, the deadline default (2026-10-27, t45)
+
+Goal: close the four defects t41 diagnosed from real logs (silent unload, no user-visible
+explanation, a process-wide run cap that let one session starve the others, and a 30-minute
+deadline that killed two four-task runs at 30m00s / 30m01s). Method: `test/lifecycle-disposal.spec.ts`
+(15 tests, driven through `runWorkflow` + `disposeActiveState` with a hanging fake engine), five
+mutation checks, and a live round on the own debug profile `:3199` with **two** GUI sessions and a
+`SIGTERM` / settings-toggle unload. Artifacts: `docs/knowledge/evidence/t45/`. Live `:3090` untouched.
+
+| # | Item | Result | Evidence |
+|---|---|---|---|
+| 1 | An unload writes a `plugin:grok-workflow/dispose` record before cancelling | **PASS** | Live `SIGTERM`: `at 17:22:05.532Z, uptimeMs 34352, signals ["SIGTERM"], trigger "shutdown", activeRuns 1, notices 1`, six call-site frames; the record precedes the abort, so it survives even when the runs never report |
+| 2 | The record names *who* as far as it is knowable | **PASS** | `signals` is a fact the process records (probe installed at `apply`): non-empty = shutdown, empty = in-process unload. Stack-only attribution was measured to be useless here — on a real instance both paths show only cordis frames, so `trigger` stays `unknown` when nothing else proves otherwise and the frames travel with the record |
+| 3 | A cut run is reported as `unloaded`, not as a plain cancel | **PASS (test)** | `failure('Unloaded', …)`, `outcome.cause === 'unloaded'`, message "cancelled because the plugin was unloaded …"; a caller stop keeps `cause === 'cancelled'` and "cancelled by its caller". Mutation: forcing the unloaded branch off makes both tests fail |
+| 4 | The user is told **once**, and only when something was damaged | **PASS (write) / NOT_RUN (render)** | One `assistant/message` (`model: workflow-notice`, `surfaceOp: append`) per affected session — measured with 1 run in 1 session, 2 runs in 1 session (still one row) and 2 runs in 2 sessions (one row each). The row was never seen **on screen** (see the README's "not proven" section) |
+| 5 | An idle unload (the case a user causes on purpose) is silent | **PASS** | Zero session events, one `logger.info` line; live: disabling from the plugin switch with nothing running left the transcript's notice count at 0/0 |
+| 6 | A refusing session cannot block the cancellation | **PASS (test)** | Session that throws on `append`: `notices: 0`, both warnings logged, the run is still cancelled *and* disposed, exit cause still `unloaded` |
+| 7 | One session cannot starve another | **PASS (live + test)** | `maxActiveRuns: 1`; session A's run at 16:46:20 and session B's at 16:46:29 both `running` (`slots.json`). Unit: session B starts while A holds two runs; A's third refusal names `holding: run run-1 (running 14m38s), run run-2 (…)`. Mutation to a process-wide count fails all three cap tests |
+| 8 | A process-wide backstop still exists | **PASS (test)** | `maxActiveRunsTotal` (default 8, hard cap 16) refuses the third run across sessions and names the holding sessions with their run counts and oldest age |
+| 9 | The deadline default is 60 minutes | **PASS** | `resolveConfig().timeoutMs === 3_600_000`, hard ceiling still `86_400_000`, settings page shows `3600000`; the deadline report names the value actually used ("1000 ms deadline" in the test). Mutation back to `1_800_000` fails two assertions |
+| 10 | Whole suite | **PASS** | `npm run ci` → 21 files / **321 tests** (306 before, +15), typecheck clean, oxlint 0 warnings 0 errors |
+| 11 | The settings page renders the new labels | **NOT_RUN** | The Settings dialog did not open in the scripted GUI runs; covered structurally by `test/client.spec.ts` (bounds table + both dictionaries) and `test/settings-projection.spec.ts` (19 volatile fields) |
+| 12 | A process that *starts* disabled tells the user | **NOT_RUN (by design)** | Nothing of the plugin runs in that case, so nothing can speak. Documented in DD-13 rather than papered over; a second always-on bundle entry would be the only fix and is out of scope for 0.2.2 |
+
+Two facts worth keeping: (a) "who unloaded me" is not recoverable from a JavaScript stack in this
+host — the reliable signal is a *process fact* (a shutdown signal we observe ourselves), and the
+record says `unknown` when even that is absent instead of guessing; (b) the per-session cap is the
+one change in this round that a user will notice as an improvement rather than a fix, because it
+turns a refusal into a working run.
+
+## Round 6 — v0.2.2 acceptance on a second, independent instance (`:3100`, t46)
+
+Question this round answers: does the v0.2.2 tree behave *as a product* on a profile that is a
+byte-for-byte copy of the user's live one, without touching that live instance? Method: the live
+`profiles/web` was copied (19 third-party bundles, `node_modules` included) to a new home
+(`/home/fish/dsh-v022-home`) because DSH keys sessions by **workspace path**, so a shared home
+would mix the user's own sessions; the copy listens on `127.0.0.1:3100`. The installed package is
+`npm pack` output of the t45 tree (md5 `0a2190b6…`); all five `lib` files are byte-identical to
+the repo build and `lib/client.js` equals `src/client/index.js` (`evidence/t46/instance-facts.txt`).
+Live `:3090` was never restarted, stopped or reconfigured — it still runs `disabled: true`.
+Artifacts: `docs/knowledge/evidence/t46/`.
+
+| # | Item | Result | Evidence |
+|---|---|---|---|
+| 1 | (a) Every user message is forced through the workflow — `hi`, a one-line question, and a bare follow-up | **PASS** | Three messages in one session produced exactly three runs (`hi` → planner+1 task+verifier verdict "quality", `1+1 等于几？` → `COMPLETED … 1 verified`, `那 2+2 呢？` → ran and reported one quality finding); no turn produced a direct answer. `A-reports.txt`, `session-evidence.txt` §1 |
+| 2 | (b) Progress is visible while the run is live | **PASS** | The run node first paints at **358 ms** / 40 ms / 21 ms after send (`B-samples-*.json`), carries `data-run-status` through `running` → `completed`/`completed`, and the member list grows with each child agent; `B1-node-hi.png` |
+| 3 | (c) The settings page renders the v0.2.2 fields in both locales, with the 60-minute default | **PASS** | ZH: `每会话活跃运行上限`, `全部会话活跃运行上限`, `3600000`, `按角色模型链`, `保存`; EN: the same four labels in English; card title `Grok workflow` in both; `<html lang>` round-trips `zh-CN` → `en` → `zh-CN`. `C1-settings-zh.*`, `C2-settings-en.*`, `C-settings.log` |
+| 4 | (d) Role chains are editable **through the product** and take effect per role | **PASS with a discrepancy** | Edited the worker chain on the page (second route added by hand), saved: banner "已保存，下一条消息生效。", patch then holds `worker: [wb/cn:no-such-model-probe, wb/cn:deepseek-v4.1-flash]` (`instance-facts.txt`). Effect: the parent session's own requests use `wb/cn:mimo-v2.6-pro` while **all 19 child agents** use `wb/cn:deepseek-v4.1-flash` (`session-evidence.txt` §3). Discrepancy: the report's `Model routes:` line appears only after a settings-page save — the same chain written directly into the profile patch produced no such line (see "open questions") |
+| 5 | (e) A cut run is explained, not silently dropped | **PASS for unload and caller stop, INCONCLUSIVE for the deadline** | Unload mid-run (plugin switch off with a run live): the delivered report says `FAILED … Failures: 1 cancelled … grok_workflow was cancelled because the plugin was unloaded while the run was in flight (not a deadline and not a manual stop)`. Caller stop: `run-end stopReason=cancelled`, `turn/end aborted/user`, and no report, because the user aborted the turn themselves. Deadline: a 60 000 ms value saved through the page did **not** stop a run that was still working at 2 m 40 s and beyond (`I1-deadline-conversation.txt`), and the value could not be re-read afterwards because the patch was only inspected after the restore — so either the save did not reach the runtime or `ctx.workflowEngine.start` does not act on the aborted signal while a child call is in flight (`src/run.ts:383`, the timer aborts a signal handed to the engine). `E4-report-after-unload.txt`, `F-stop.log`, `I-deadline.log` |
+| 6 | (f) Idempotence, no recursion into subagents, no secret leakage | **PASS** | Runs == deliveries admitted == delivered, 0 duplicates in all 5 user-driven sessions; 19 child sessions, **0** of them started a run; the provider key does not appear in any session file (0 hits) and no `sk-…` string does either. `session-evidence.txt` §1, §2, §5 |
+| 7 | (g) Five consecutive rounds without degradation | **PASS for stability, FAILED for quality — corrected in t49** | Five objectives in a row on the same instance: 155.0 s, 181.9 s, 181.8 s, 181.7 s, and the fifth round finishing `completed`; every run reached a terminal state, none needed a retry — that is exactly what this row measured, and it holds. What it did **not** measure, and what t48 spot-checked: every one of those five rounds' *reports* says `Grok workflow: FAILED` with `Failures: 1 quality` and `0 verified`. The engine finishing (`stopReason: completed`) is not an accepted result. Whole test home, 12 reports: `COMPLETED` 1, failed-for-quality 8, cancelled by deliberate probes 3. Root cause (t49): all 8 quality failures were **one defect** — `checkVerification` failed a task whenever the verifier's prose `issues` was non-empty, even though the verifier had returned `verdict: pass` and its own notes say "non-blocking" / "minor observation rather than a failure" / "does not affect any acceptance criterion". Fixed in `src/script.ts` with regression tests; see Round 8. So: 流程稳定 5/5，质量结果 0/5 `COMPLETED`，根因＝我方判定缺陷（已修），不是模型能力问题。`G-rounds.log`, `G-rounds.json`, `G{1..5}-round.png` |
+| 8 | (h) Coexistence with the other 18 third-party bundles | **PASS** (t48 re-ran the same profile with **20** bundles — `@orbisapp/remote-dsh` restored — and the boot picture did not change; see Round 8) | Same bundle set as the live profile; boot reports three non-activations and all three are pre-existing properties of that profile, not of this plugin: `@dsh-layerfs/host` and `@dsh-layerfs/client` cannot be resolved from the profile directory (identical in the source profile) and `account-controller` waits for a `deepseekAccount` service this profile does not provide. `instance-facts.txt`, `H-plugins-page.png` |
+| 9 | t45 NOT_RUN ② — settings page, new labels + default, EN and ZH | **CLOSED, PASS** | Row 3 above |
+| 10 | t45 NOT_RUN ① — the notice row **on screen** | **CLOSED, FAIL** | The row is written (`assistant/message`, `model: workflow-notice`, text verified in the log) but the transcript never shows it: it sits at `turn=1 step=0`, the persisted event carries **no `surfaceOp`** field *(corrected in Round 7: the field **is** present, `surfaceOp: "append"`, as a top-level sibling of `data`; the row is dropped because that `(turn, step)` never had a `step/start`)*, and after the cancellation the turn continues at `step=1` and delivers the gate's report instead (`session-evidence.txt` §6, `E3-conversation-after-toggle.txt`). The information still reaches the user — through the report — so this is a redundant-channel defect, not silence |
+| 11 | Whole suite | **PASS** | `npm run ci` → 21 files / **321 tests**, typecheck clean, oxlint 0 warnings 0 errors |
+
+### Open questions this round leaves behind
+
+1. **`Model routes:` is conditional on a settings-page save.** Before the save the report carried
+   no such line while the same chain was already in the profile patch; after the save it did. One
+   plausible reading is that the settings layer only publishes `roles` to the runtime once it has
+   been written by the product, but that has not been root-caused and is not claimed here.
+2. **A bogus first route did not show up as a `Route switches:` entry.** The saved worker chain's
+   first route named a model that cannot answer, yet the run used the second route and reported no
+   switch. Either the route was pruned before use, or switching was silent. Worth a dedicated task.
+3. **The deadline did not fire live.** See row 5: one experiment, two candidate causes, no
+   verdict. Re-running it needs the saved value to be read back from the patch *before* the run,
+   which is the first thing the next attempt should do.
+4. **The notice row needs a render path.** `assistant/message` at `step=0` with `surfaceOp:
+   append` is dropped by the client's transcript projection; whatever shape the client *does*
+   render (a row inside the live step, or a `system/message`) is the fix to design.
+
+One thing this round deliberately did **not** do: provoke the per-session slot refusal from the GUI
+(a second message is queued by the client, so one session never holds two runs on this instance);
+that wording remains covered by `test/lifecycle-disposal.spec.ts` and the t45 live run.
+
+## Round 7 (t47) — the three leftovers, plus one correction
+
+Same instance discipline as Round 6: test home `/home/fish/dsh-v022-home`, profile `web-v022-test`,
+listener `127.0.0.1:3100`; live `:3090` (pid 1773499) was never restarted, stopped or reconfigured.
+Twelve new tests, `npm run ci` → 21 files / **333 tests**. Artifacts:
+`docs/knowledge/evidence/t47/` (README, `instance-facts.txt`, `notes.txt` + the measurements).
+
+| # | Question left open by Round 6 | Verdict | Evidence |
+|---|---|---|---|
+| 1 | `Model routes:` appeared only after a settings-page save | **FIXED (ambiguity removed) + one real defect found** | Patch-only configuration (no settings page) reaches the runtime — a temporary dump of what the loader hands `apply()` shows `roles.get()` returning the planner/worker/verifier chains — and the live report names them: `Model routes: planner=bifrost-completions/wb/cn:deepseek-v4.1-flash; worker=…; verifier=…; synthesizer=inherit`. Two code paths could print nothing and both are gone: the line was skipped when every chain was empty (now always printed, `inherit` spelled out) and `failureReport()` hard-coded an empty routing block, so a timeout or unload report claimed `inherit` for a run that had a chain (now derived from the config). `raw-config.json`, `B1-deadline-report.txt`, `test/report.spec.ts`, `test/config.spec.ts` |
+| 2 | A deliberately broken first route produced no `Route switches:` entry | **ANSWERED: that configuration never ran** | A chain whose first route names a model the provider does not enumerate is rejected **at load** (`roles.worker names model "wb/cn:no-such-model-probe", which provider "bifrost-completions" does not enumerate`) — the entry fails to apply, so t46 did not see a silent switch, it saw a chain that never existed. Runtime failures do switch and are traced: a 429 on the first route advances to the second and the trail records `w1` failed → `w2`. The `Route switches:` renderer had **no test at all** before t47; it has two now. `A2-load-rejection.txt`, `test/config.spec.ts`, `test/report.spec.ts` |
+| 3 | The deadline did not fire live (settings never reached the runtime vs engine ignores abort) | **ANSWERED: the second. FIXED.** | With `timeoutMs: 60000` in the profile patch (no settings page) the run's own report says `workflow exceeded the 60000 ms deadline and was cancelled; **the engine had not settled**`, and the UI run node leaves `running` at 61.5 s. `src/run.ts` used to abort a signal and then wait for the engine; it now races the run result against its own deadline, cancels with a reason that names the deadline (it used to say "cancelled by its caller"), and returns the timeout report immediately. Regression test: a stubborn engine whose `cancel()` is a no-op returns in ~1.0 s for a 1 000 ms deadline. `B1-deadline-report.txt`, `A-run.log`, `test/reliability.spec.ts` |
+| 4 | The notice row needs a render path | **CLOSED: not reachable from a plugin in this build — downgraded deliberately** | The persisted event **does** carry `surfaceOp: "append"` (t46's "no such field" was wrong). The client starts an assistant node only on `step/start` (`dsh-client-ui-chat/lib/client.js:8094-8108`); `assistant/message` is an `update` there, and the notice sits at a `(turn, step)` whose `step/start` never happened. `system/message` renders as the system-prompt card (`client.js:9947-9966`), `conversation.chat.node` is a keyed renderer seat whose nodes only the chat package's own projections can create (`client.js:7180-7215`, module-private `chatNode()`), and no toast/notice API ships. Downgrade: the notice stays in the ledger (it also puts the fact into the next turn's context on purpose) and the **report is the only user-facing channel** — verified in the same session. `E5-notice-event.json`, `E3-conversation-after-unload.txt`, `E5-report-relay.txt` |
+
+Round 7 also corrected a Round 6 claim rather than quietly dropping it: row 10 above now says the
+notice event carries `surfaceOp: "append"`, and that the drop is the projection's `step/start`
+requirement, not a missing marker.
+
+**Deferred to 0.2.3 (with the reason, not a silent drop):** a rendered notice needs a DSH-side way
+for a plugin to contribute a chat node, or a notice event with its own projection. Both are DSH API
+surfaces, outside the "external plugin, no core change" boundary this work runs under.
+
+## Round 8 (t49) — why the quality results were 0/5, and what the release may claim
+
+Triggered by t48's R2: the test home held 12 reports, one `COMPLETED`, and t46's five acceptance
+rounds all reported `FAILED / Failures: 1 quality`. Same instance discipline as Rounds 6–7
+(test home `/home/fish/dsh-v022-home`, profile `web-v022-test`, `127.0.0.1:3100`); the live
+`:3090` instance (pid 1773499) was not touched, and its profile — which the user has since
+edited — was not read or written. Artifacts: `docs/knowledge/evidence/t49/`.
+
+### What the twelve reports actually were
+
+| Group | Count | Reason in the report |
+|---|---|---|
+| `COMPLETED` | 1 | — (`session-664084e6`, second round) |
+| failed — quality | **8** | every one: `incomplete (quality): verifier reported issues: …` |
+| failed — infrastructure / cancelled | 3 | the two 60 000 ms deadline probes and the unload probe from t47 — deliberate kills, not quality |
+
+Not one report said `verifier verdict was fail`, `criterion not met` or
+`verifier supplied no checked evidence`.
+
+### Root cause: prose overrode the verdict (our defect, not the models')
+
+`checkVerification` (`src/script.ts`) tested, in this order: no result → executor failed →
+**verdict ≠ pass** → **`issues.length > 0`** → no checked evidence → criteria count → per-criterion
+`met`/evidence. The observed reason string is produced by the fourth test, so in all eight cases
+the verifier had returned **`verdict: pass`** and the task failed purely because its prose `issues`
+list was non-empty. The notes themselves say so: "Minor inaccuracy, **non-blocking**…", "recorded
+as a **minor observation rather than a failure**", "**does not affect any acceptance criterion**",
+"处理合理，不影响本次字节级验证结论", "故**判定为满足**".
+
+So the answer to *"flash as verifier too strict, or worker too weak?"* is **neither**: the verifier
+was passing the work and adding a caveat, and the plugin turned the caveat into a failure. A
+secondary finding from the same data: the flash verifier never once failed a criterion outright —
+the model was *not* the limiting factor in these twelve runs.
+
+### The fix
+
+- `issues` no longer decides anything. The decision is `verdict` + one `criteria` entry per
+  acceptance criterion with `met` and non-empty evidence; `met: false` or `verdict: fail` still
+  fails the task (unchanged, and now pinned by tests).
+- A verified task's notes are carried into the report as `Uncertainties` → `verifier note: …`, so
+  nothing is lost and the reader still sees the caveat.
+- The verifier prompt now defines `issues` as **blocking problems only** (each must be reflected in
+  `verdict: fail` / `met: false`) and points residual doubt at `confidence`.
+
+### Verification of the fix
+
+| Check | Result |
+|---|---|
+| New regression tests (`test/config.spec.ts`, three cases: notes-only pass → `COMPLETED` + notes in `Uncertainties`; `met: false` despite `pass` → failed; `verdict: fail` → failed), using the verbatim live note strings | pass; suite 24/24 in that file |
+| Mutation: restore `if (issues.length > 0) return {passed:false…}` | **2 of the 3 new tests fail** — the tests do detect the old behaviour |
+| Live A/B on :3100 with the *same* flash chains (planner/worker/verifier all `deepseek-v4.1-flash`), same objectives as t46 rounds 1, 4 and 3 | before the fix: all of them failed (`Failures: 1 quality`); after: **three runs, each `COMPLETED`, 1 task, 1 verified** (`Q2-report.txt`, `Q4-report.txt`, `Q5-report.txt`) |
+| Honest limit of that A/B | in all three post-fix runs the verifier recorded **no** issues at all, so the live delta is *consistent* with the fix but not *discriminating*; the discriminating proofs are the branch-order argument above and the mutation-verified tests |
+| `npm run ci` | 21 files / **336 tests**, typecheck + lint clean |
+
+### Configuration advice (asked for explicitly)
+
+Nothing about the default chains needs to change to get *correct* decisions any more. What the
+recorded data does support: with `maxRetries: 0` a task gets exactly one worker attempt, so any
+real quality problem surfaces as a hard failure instead of a repaired one. If a user wants
+verification to be stricter or looser, that is `roles.verifier` — a model choice, deliberately not
+tuned by the plugin.
+
+### Two operational notes for whoever runs the next instance
+
+1. **Check the plugin card's switch before trusting "no run happened".** On a fresh boot at
+   05:12 the card read *disabled* while `cordis.patch.yml` said `disabled: false`, and a message
+   sent then was answered directly — no gate, no `plugin:grok-workflow/delivery` record (verified in
+   the session log). Clicking the switch on armed the gate immediately: no restart, and the patch
+   file's mtime did not change. After the next fresh boot the switch read *enabled*. The rule that
+   survives all three observations: read the switch, do not infer it from the patch.
+2. **This instance now carries 20 bundles**, including `@orbisapp/remote-dsh` (t48 R6 restored it),
+   which closes the one-bundle gap in Round 6 row (h): boot still reports exactly the same three
+   pre-existing non-activations.

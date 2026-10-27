@@ -1,0 +1,52 @@
+DSH 本地构建
+0.2.1-rc.2-332895e
+会话
+生图
+新会话
+插件
+自动化任务
+工作区
+project_jobs
+进行中
+1 个子智能体运行中
+未命名
+11分钟
+进行中
+未命名
+52分钟
+boss
+any2api
+doubao2api
+wenxinyiyan
+dsh-books
+dsh-grok-workflow
+dsh-model-fix
+aa-scrape
+chatgpt2api
+dsh-our-free-model
+dsh-model-list
+语音识别打字工具
+MEMLENS
+dsh-token-usage
+substack_jail
+douyin订阅
+Socratopia
+workbuddy2api
+workspace
+projects_mine
+OpenWrite
+设置
+project_jobs
+智能体团队
+LayerFS × DSH minimalist
+3 个子智能体
+对话
+轨迹
+正在分析请求
+深度求索中
+深度求索中，用时 4分49秒 ···
+2 条排队消息
+Cmd/Ctrl+Enter 插话发送全部排队消息
+工作区内修改
+MiMo V2.6 Pro (cn)
+最大 · Max

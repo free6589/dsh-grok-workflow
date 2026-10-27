@@ -1,0 +1,12 @@
+The user wants me to reply with the text between the markers exactly as given, without describing it as success, adding nothing before or after, and not calling any tool. <<<GROK-WORKFLOW-REPORT>>>
+Grok workflow: FAILED
+Objective: Current request: 运行 echo deadline-probe 命令并报告输出。
+Plan: unavailable; 0 task(s); 0 verified
+Failures: 1 infrastructure
+Incomplete:
+- workflow (infrastructure): workflow exceeded the 60000 ms deadline and was cancelled; the engine had not settled, so this report is the authoritative result
+Model routes: planner=bifrost-completions/wb/cn:deepseek-v4.1-flash; worker=bifrost-completions/wb/cn:deepseek-v4.1-flash; verifier=bifrost-completions/wb/cn:deepseek-v4.1-flash; synthesizer=inherit
+Deadline: 60000 ms per run (enforced by the plugin)
+Errors:
+- Timeout: workflow exceeded the 60000 ms deadline and was cancelled; the engine had not settled, so this report is the authoritative result
+<<<END-GROK-WORKFLOW-REPORT>>>

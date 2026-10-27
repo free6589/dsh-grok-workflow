@@ -4,6 +4,7 @@ import {
   CONFIG_VERSION,
   Config,
   HARD_LIMITS,
+  describeResolvedConfig,
   resolveConfig,
   snapshotConfig,
 } from '../src/config.js'
@@ -14,7 +15,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { ResolvedConfig } from '../src/types.js'
 import { ROUTING_RECORD, recordRouting } from '../src/records.js'
 import { buildWorkflowRequest, WORKFLOW_SCRIPT } from '../src/script.js'
-import { task, verification } from './fixtures.js'
+import { execution, failingVerification, task, verification } from './fixtures.js'
 import { runWorkflowScript, type ScriptAgent } from './helpers.js'
 
 /**
@@ -177,7 +178,8 @@ describe('route validation against the runtime', () => {
     expect(projected).not.toContain('toolName')   // not volatile => not projected
     expect(projected).toContain('roles')
     expect(projected).toContain('switchOn')
-    expect(projected).toHaveLength(17)
+    expect(projected).toContain('maxActiveRunsTotal')
+    expect(projected).toHaveLength(19)
     const ctx = ctxWith({
       settings: { configure: () => () => {}, describe: () => [descriptor] },
     })
@@ -243,6 +245,18 @@ describe('configuration reaches the run', () => {
     const a = await runWorkflowScript(WORKFLOW_SCRIPT, builtIn.args, agent)
     expect(a.calls.filter(call => call.label.startsWith('grok-worker'))).toHaveLength(2)
     expect(a.report.status).toBe('failed')
+    // t47: the switch is only *visible* if the trail records which route failed.
+    // t46 wrote a model the provider does not enumerate and saw no switch entry —
+    // that configuration never ran at all (validateRoutes rejects it at load), so
+    // the line had no data. A runtime failure on an enumerated route is the case
+    // that has to reach the ledger.
+    const failed = (a.report.routes as { role: string; route: string; outcome: string; failureClass?: string }[])
+      .filter(entry => entry.outcome === 'failed')
+    // Both routes were tried (this agent fails every worker call), so the trail
+    // names both in chain order: that is what makes a switch auditable.
+    expect(failed.map(entry => entry.route)).toEqual(['w1', 'w2'])
+    expect(failed.every(entry => entry.role === 'worker')).toBe(true)
+    expect(failed[0]?.failureClass).toBe('rate-limit')
     // Configured policy that omits rate-limit: the same failure does NOT advance.
     const narrowed = build(['server-error'])
     const b = await runWorkflowScript(WORKFLOW_SCRIPT, narrowed.args, agent)
@@ -282,5 +296,118 @@ describe('configuration reaches the run', () => {
     }
     expect(count(0)).toBe(0)
     expect(count(64)).toBe(1)
+  })
+})
+
+/* ------------------------------------------------------------------ t47 -- */
+/**
+ * t46 could not answer "what did the runtime read?" from any artefact: the deadline
+ * and the role chains existed only in memory, so a settings save and a profile-patch
+ * edit were indistinguishable from outside. This one-line summary is written to the
+ * log whenever the effective configuration changes, and the deadline also travels
+ * into every run report.
+ */
+describe('t47: the effective configuration is nameable', () => {
+  it('names the deadline and every role chain, with "inherit" for an unset role', () => {
+    const described = describeResolvedConfig(resolveConfig({}))
+    expect(described).toContain(`timeoutMs=${3_600_000}`)
+    expect(described).toContain('roles=planner:inherit worker:inherit verifier:inherit synthesizer:inherit')
+  })
+
+  it('shows the chains in order, so a fallback is visible without a run', () => {
+    const described = describeResolvedConfig(resolveConfig({
+      roles: {
+        worker: [
+          { provider: 'bifrost-completions', model: 'wb/cn:no-such-model-probe' },
+          { provider: 'bifrost-completions', model: 'wb/cn:deepseek-v4.1-flash' },
+        ],
+      },
+    }))
+    expect(described).toContain('worker:bifrost-completions/wb/cn:no-such-model-probe→bifrost-completions/wb/cn:deepseek-v4.1-flash')
+    expect(described).toContain('planner:inherit')
+  })
+
+  it('travels into the workflow request, so the report can state the deadline', () => {
+    const config = resolveConfig({ timeoutMs: 60_000, maxConcurrency: 1 })
+    const request = buildWorkflowRequest('Ship the verified result', [task('a')], config)
+    expect((request.args as { timeoutMs: number }).timeoutMs).toBe(60_000)
+  })
+})
+
+/* ------------------------------------------------------------------ t49 -- */
+/**
+ * What decides a verified task (t49, from the 12 reports in the test home).
+ *
+ * Every quality failure in that log — 8 of 12 reports, including all five of the
+ * t46 acceptance rounds — carried the reason `verifier reported issues: …`. The
+ * reason string is produced *after* the verdict check in `checkVerification`, so
+ * `verdict` was `pass` in all of them: the task failed only because the verifier
+ * wrote down a caveat, and the caveats themselves say "non-blocking", "minor
+ * observation rather than a failure", "does not affect any acceptance criterion".
+ * The structured judgement decides; prose is recorded, not fatal.
+ */
+describe('t49: a non-blocking verifier note does not fail a verified task', () => {
+  it('keeps the task verified and carries the notes into the report', async () => {
+    const config = resolveConfig({ maxConcurrency: 1, maxRetries: 0, maxTasks: 4 })
+    const plan = [task('a')]
+    const agent: ScriptAgent = async (_prompt, options) => {
+      if (options.label.startsWith('grok-worker')) return execution('did it')
+      if (options.label.startsWith('grok-verifier')) {
+        return verification(plan[0]!, {
+          // Verbatim strings from the recorded failures (test home, t46 rounds 3 and
+          // 5); both were reported as `incomplete (quality): verifier reported issues`.
+          issues: [
+            'Minor inaccuracy, non-blocking: the executor summary says "All five acceptance checks pass" although there are seven acceptance criteria. The substance of all seven still verified true on disk.',
+            'Criterion 5 is verifiable only by attribution, not by a VCS diff: the workspace is not a git repository.',
+          ],
+        })
+      }
+      throw new Error(`unexpected label ${options.label}`)
+    }
+    const { args } = buildWorkflowRequest('Ship the verified result', plan, config)
+    const out = await runWorkflowScript(WORKFLOW_SCRIPT, { ...args }, agent)
+    expect(out.report.status).toBe('completed')
+    expect(out.report.incomplete).toHaveLength(0)
+    const notes = (out.report.uncertainties as { taskId: string; text: string }[])
+      .filter(item => item.text.startsWith('verifier note:'))
+    expect(notes).toHaveLength(2)
+    expect(notes[0]?.taskId).toBe('a')
+    expect(notes[0]?.text).toContain('Minor inaccuracy')
+  })
+
+  it('still fails when the same verifier marks a criterion unmet', async () => {
+    const config = resolveConfig({ maxConcurrency: 1, maxRetries: 0, maxTasks: 4 })
+    const plan = [task('a', ['first holds', 'second holds'])]
+    const agent: ScriptAgent = async (_prompt, options) => {
+      if (options.label.startsWith('grok-worker')) return execution('did it')
+      if (options.label.startsWith('grok-verifier')) {
+        return verification(plan[0]!, {
+          criteria: [
+            { criterion: 'first holds', met: true, evidence: 'seen in file:///tmp/x' },
+            { criterion: 'second holds', met: false, evidence: 'not found' },
+          ],
+          issues: ['the second criterion is not satisfied'],
+        })
+      }
+      throw new Error(`unexpected label ${options.label}`)
+    }
+    const { args } = buildWorkflowRequest('Ship the verified result', plan, config)
+    const out = await runWorkflowScript(WORKFLOW_SCRIPT, { ...args }, agent)
+    expect(out.report.status).toBe('failed')
+    expect(JSON.stringify(out.report.incomplete)).toContain('criterion not met')
+  })
+
+  it('still fails when the verifier verdict is fail, notes or not', async () => {
+    const config = resolveConfig({ maxConcurrency: 1, maxRetries: 0, maxTasks: 4 })
+    const plan = [task('a')]
+    const agent: ScriptAgent = async (_prompt, options) => {
+      if (options.label.startsWith('grok-worker')) return execution('did it')
+      if (options.label.startsWith('grok-verifier')) return failingVerification(plan[0]!)
+      throw new Error(`unexpected label ${options.label}`)
+    }
+    const { args } = buildWorkflowRequest('Ship the verified result', plan, config)
+    const out = await runWorkflowScript(WORKFLOW_SCRIPT, { ...args }, agent)
+    expect(out.report.status).toBe('failed')
+    expect(JSON.stringify(out.report.incomplete)).toContain('verifier verdict was fail')
   })
 })

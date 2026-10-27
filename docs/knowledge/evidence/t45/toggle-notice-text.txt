@@ -1,0 +1,1 @@
+[grok-workflow] The plugin was unloaded while this session had 1 workflow run in flight, so that work was cancelled. Cause: plugin unload (unknown), not a deadline and not a manual stop. This notice is written once, at unload time. Messages sent until the plugin is enabled again are answered directly and are no longer forced through the mandatory workflow.

@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-10-26 (local)
+Last updated: 2026-10-28 (local)
 
 ## Repository
 
@@ -20,21 +20,36 @@ Last updated: 2026-10-26 (local)
 
 ## Current phase
 
-`0.2.1` release preparation (phase 7 continued). `0.2.0` **is published** — tag `v0.2.0` on
-`f7a244c`, GitHub Release 2026-10-26T17:10:16Z, 42 files / 108,428 B — and `0.2.1` is the
-incremental release on top of it (Web GUI settings page + the documented activation
-prerequisite). The version, changelog, both READMEs and this knowledge base are updated for
-`0.2.1`; its tag and GitHub Release are created by the captain after the acceptance pass, so this
-file must not claim `0.2.1` as published.
+`0.2.2` release preparation (phase 8). `0.2.0` and `0.2.1` **are published** (`v0.2.0` on
+`f7a244c`, GitHub Release 2026-10-26T17:10:16Z; `v0.2.1` on `cecc065`). `0.2.2` is the increment
+on top of `v0.2.1`: the plugin-enforced deadline, model routes in every report, the per-session
+run cap, the unload diagnose record, and the verifier-decision fix. The version is bumped in
+`package.json`/`package-lock.json`, `CHANGELOG.md` carries `## [0.2.2] - 2026-10-28`, and both
+READMEs point at `#v0.2.2`; **the tag and the GitHub Release are created by the captain after the
+acceptance pass**, so this file must not claim `0.2.2` as published.
 
 Authoritative numbers for this state (measured, not planned):
 
-- `npm run ci` — typecheck, lint (0 warnings / 0 errors), build, **264 tests /
-  18 files**.
-- `lib/` rebuilt and reproducible (md5 of the artifact set identical before and
-  after a rebuild).
-- Real headless one-shot run with a live model: the report reaches the user in
-  the same turn (`scripts/e2e-headless-in-turn.sh`, PASS).
+- `npm run ci` — typecheck, lint (0 warnings / 0 errors), build, **336 tests / 21 files**.
+- `lib/` rebuilt and reproducible; the test instance's installed `lib/*.js` md5s equal the repo's
+  build byte for byte (t47 `instance-facts.txt`, re-checked in t49).
+- Real-instance evidence: `docs/knowledge/evidence/t42` (settings page, EN/ZH), `t44` (in-tree run
+  records), `t45` (unload diagnosis, per-session caps), `t46` (7-item matrix on a second
+  instance), `t47` (deadline/route/notice closure), `t49` (quality-failure root cause).
+- **Quality claims are bounded by measurement**: before 0.2.2's verifier-decision fix, the test
+  home produced 1 `COMPLETED` in 12 reports (8 failed for that defect, 3 were deliberate probe
+  kills). See `VALIDATION.md` Round 8; do not describe the workflow as "accepting" work it has
+  not accepted.
+
+## Where the open questions live
+
+- `docs/knowledge/VALIDATION.md` — Rounds 1–8. Round 6 row (g) is annotated: stability 5/5,
+  accepted results 0/5, root cause fixed in 0.2.2. Round 7 closed the notice/route/deadline
+  questions; Round 8 answers the quality question and records the operational caveat that the
+  Plugins-page switch — not `cordis.patch.yml` — is what says whether the gate is armed.
+- `docs/knowledge/DECISIONS.md` — D-016…D-019 (per-session caps, 60-minute default, plugin-owned
+  deadline, notice downgrade). D-020 covers the verifier-decision rule.
+- Deferred to 0.2.3: rendering a plugin-authored chat row (needs a DSH-side API), see D-019.
 
 ## What `0.2.0` changed (short form)
 
@@ -56,7 +71,8 @@ Authoritative numbers for this state (measured, not planned):
   caps, credential redaction and a routing/delivery ledger.
 - The gate: `agent/pre-step` interception, `in-turn`/`relay`/`append` delivery,
   per-message de-duplication, queue bounds, explicit refusal, live configuration.
-- Configuration surface: 21 keys, unknown-key rejection, `configVersion` gate,
+- Configuration surface: 23 keys (+`showProgress` since t44, +`maxActiveRunsTotal` since t45),
+  unknown-key rejection, `configVersion` gate,
   route shorthand migration, chain validation against the live runtime.
 - Documentation set kept in step with the code: DESIGN (DD-1..DD-9b, A/E/R/NR
   ledgers), ROADMAP (phases, U ledger, D-009 decisions), ARCHITECTURE, ACCEPTANCE,
@@ -79,9 +95,9 @@ None.
 
 ## Next priority
 
-Create `v0.2.1` and its GitHub Release from the accepted commit (captain), then keep this file and
-the changelog synchronized with `main`. `v0.2.0` was released on 2026-10-26 and its tag never
-moves.
+Create `v0.2.2` and its GitHub Release from the accepted commit (captain), then keep this file and
+the changelog synchronized with `main`. `v0.2.0` was released on 2026-10-26 and `v0.2.1` on
+2026-10-27; neither tag ever moves.
 
 ## Homepage redesign — merged
 
@@ -116,7 +132,7 @@ moves.
   A/E/R + decisions DD + NOT_RUN ledger NR); decisions in
   [DECISIONS.md](DECISIONS.md) D-009/D-010/D-011.
 - **Delivered after the first draft (2026-10-27, t32):** a plugin-owned settings page in
-  the Web GUI — all 21 keys, per-role chain editing, validation, save applied to the next
+  the Web GUI — all 23 keys, per-role chain editing, validation, save applied to the next
   message. This closes NR-7 and NR-8 as *measured*; see
   [VALIDATION.md](VALIDATION.md) Round 3 and WORKFLOW-DESIGN.md DD-9c.
 - **Activation (t33/t32, D-014):** installing the bundle puts the row into the composed

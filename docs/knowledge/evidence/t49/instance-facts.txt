@@ -1,0 +1,36 @@
+Test instance (t49), measured 2026-10-28
+========================================
+DSH_HOME : /home/fish/dsh-v022-home
+profile  : web-v022-test          bundles: 20 (includes @orbisapp/remote-dsh, restored by t48)
+listener : 127.0.0.1:3100         pid: restarted three times during t49; the last one is the one
+                                  whose reports are cited (see /tmp transcript in notes.txt)
+live      : 127.0.0.1:3090 (pid 1773499) — never restarted, stopped, reconfigured or read for edits.
+            The user has since edited that profile (t48 R8); nothing in t49 touched it.
+
+boot warning set (identical on every boot in this task):
+  3 entries did not activate
+    account-controller (@deepseek-ai/dsh-api-account-controller): pending (waiting for service: deepseekAccount)
+    layerfs-host (@ds-layerfs/host)   -> ERR_MODULE_NOT_FOUND (pre-existing in the source profile)
+    layerfs-client (@dsh-layerfs/client) -> ERR_MODULE_NOT_FOUND (pre-existing)
+  => the same three with 19 and with 20 bundles: Round 6 row (h) holds at 20.
+
+installed build == repo build (md5, byte for byte):
+  script.js 6037216de9b24957e0f5365716223704
+  (compare: md5sum /home/fish/projects_mine/dsh-grok-workflow/lib/script.js)
+
+what the instance is running
+  package.json dependency: file:/tmp/t49-pack/gw-rc6.tgz  (built from the t49 working tree,
+  i.e. after the verifier-decision fix; the tgz is a scratch artefact, not part of the release)
+
+plugin switch state, three observations in this task
+  1. fresh boot 05:12 (patch says disabled: false) -> Plugins card switch: OFF; a message sent
+     then was answered directly, no plugin:grok-workflow/delivery record (P1-plugins-switch.png)
+  2. clicking the switch ON -> armed immediately, no restart, cordis.patch.yml mtime unchanged
+  3. fresh boot later -> switch: ON
+  Rule: read the switch, do not infer it from cordis.patch.yml.
+
+runs cited
+  Q2  objective "回答：三加四等于几？只回答一句。"                -> COMPLETED (t46 round 1 failed the same objective)
+  Q4  objective "用一句话（中文）说明什么是幂等，直接作为回复正文输出" -> COMPLETED (t46 round 4 failed the same objective)
+  Q5  objective "Run `echo round-3` ... workspace-verifiable evidence file" -> COMPLETED (t46 round 3 failed)
+  all three: planner/worker/verifier = bifrost-completions/wb/cn:deepseek-v4.1-flash, one attempt each

@@ -763,6 +763,47 @@ id, by renamed row, missing, and a half-signature namespace that must not be cap
 live GUI run in `docs/knowledge/VALIDATION.md` (Round 3) shows the entry rendering next to
 `subagent`, `web-search`, `agent-loop` and `shell`.
 
+### DD-9e — The page's copy follows the Host language setting, not the browser (t42)
+
+The settings page shipped in 0.2.1 with every string written as one bilingual line
+(`保存 / Save`). That reads acceptably at 21 keys and badly everywhere else: it doubles the
+visual weight of every label, it cannot inline a value into a sentence, and it ignores the
+language the user actually picked. Copy now resolves through
+`@deepseek-ai/dsh-client-locale` — the package that owns Settings → General → Language and
+`<html lang>` — through the two mechanisms that package documents:
+
+- `ctx.locale.register('grok-workflow', { zh, en })` publishes this plugin's dictionary. Both
+  locales are mandatory (the plugin rejects a half pair), and its chain terminates at `en`,
+  which is also why this bundle keeps an English fallback of its own.
+- a slot registration carrying `locale: 'grok-workflow'` receives the framework's `t` seat,
+  and the renderer re-derives that seat on every locale revision (`useLocaleRevision` in
+  `@deepseek-ai/dsh-client-ui-renderer`), so an open page — and the plugin-manager's card
+  list, which recomputes its ledger on `ctx.locale.subscribe` — repaints in place on a switch.
+  Nothing here re-implements language detection.
+
+**Why the service is injected late instead of declared in `inject`.** Cordis has no optional
+injection: a name in `inject` is required, and a missing service leaves the plugin `pending`,
+which DSH reports as a **boot failure** for the whole web client. Requiring `locale` for a
+page whose fallback is a working English page would trade a cosmetic degradation for a broken
+GUI. `apply()` therefore mounts the page immediately with its own translator and reaches the
+service through a nested `ctx.inject(['locale'], …)` fiber; when that fiber runs (it always
+does in the shipped web composition) it registers the dictionary and remounts the entry so the
+registration carries `locale`. `inject` itself stays `['slots', 'configForms']`.
+(`ctx.get('locale')` is *not* an alternative: `Context#_getImpl` resolves through the fiber's
+own isolate map, so an uninjected service is invisible to it and the property read throws
+`cannot get property "locale" without inject` — measured, first attempt at this feature.)
+
+**Validation stays locale-free.** `validate(draft)` returns findings (`{ key, params }`) rather
+than sentences; `formatError(finding, t)` renders one, and role ids become localized role
+names at render time. That keeps one draft reporting the same findings in every language, and
+lets a language switch re-render findings already on screen. `test/client.spec.ts` pins: the
+two dictionaries carry an identical key set; every key the page derives from data
+(`field.*`, `readonly.*`, `readonlyValue.*`, `role.*`, `group.*`) exists in both locales and
+does not degrade to its key; every finding differs between the two languages; and `apply()`
+registers both dictionaries, declares `locale` on the slot, and still mounts in a composition
+with no locale service. Bilingual GUI evidence:
+`docs/knowledge/evidence/t42/` (English and Chinese, switched through Settings → Language).
+
 ### DD-10 — Observability
 
 One `plugin:grok-workflow/run` record per run, one `plugin:grok-workflow/gate` per gate
@@ -781,6 +822,103 @@ prepare-phase failure, one-shot teardown, running-input queueing, client retry, 
 recursion. F6 (listener totality) and F9 (teardown) are blocking preconditions for Phase 5.
 
 ---
+
+### DD-12 — Progress is visible because *we* write the panel's events (t44)
+
+The gate calls `ctx.workflowEngine.start()` itself (`src/run.ts`), which is why the run was
+invisible: the four `tool-workflow/*` session events are written by the in-tree **tool** layer
+(`@deepseek-ai/dsh-tool-workflow`, `lib/index.js:83-135`), not by the engine, and the plugin
+was not going through that layer. t43 measured the consequence exactly — `turn/start` at 22 ms,
+then **nothing** for the whole run (2031 ms in the probe, 30 min by default), then
+`step/start`: the user saw one message, a blank window, and child sessions multiplying.
+
+The remedy is deliberately narrow: reproduce that recorder, nothing else.
+
+- **Same events, same fields.** `createWorkflowProgressRecorder` (`src/records.ts`) appends
+  `tool-workflow/run-start {runId,name}`, `agent-start {runId,seq,label,phase?,childId}`,
+  `agent-end {runId,seq,outcome}` and `run-end {runId,stopReason}`, subscribing to the engine's
+  `workflow/agent-start|end`. `test/progress.spec.ts` asserts the payloads field-for-field
+  (including "no `phase` key at all" when a call declares none), so a DSH upgrade that renames
+  a field fails a test instead of silently emptying the panel. The GUI half is untouched: the
+  stock `workflow-run` node (`dsh-client-ui-workflow-run`, fold at `lib/client.js:591-640`,
+  status map at `:508-514`) already ships with `dsh-web-app` and only needed something to fold.
+- **The in-turn ordering risk is resolved by measurement, not by hope.** t43 flagged that in
+  turn mode `run-start` lands *before* `step/start`, so the node's anchor is turn-level. Live:
+  `run-start` at seq 7, 78 s before `step/start` at seq 19 — and the node renders, stays
+  expanded, and carries `data-run-status` throughout
+  (`docs/knowledge/evidence/t44/session-timeline.txt`). Plan B (a plugin-owned
+  `conversation.chat.node`) is therefore **not** needed and stays unbuilt.
+- **Three rules, all inherited and all tested.** (1) Only the recorder's own run id is written —
+  engine events are process-wide, so a concurrent or nested run shares the bus; each run gets
+  its own recorder and its own session, and each run's events reach only its own conversation.
+  (2) Every append is contained: a session that refuses the write costs the panel entry, the
+  run continues, and that run stops recording (the in-tree recorder does the same — retrying a
+  permanently failing append would just spam the log). The *subscription* is inside the same
+  discipline, because a context without an event bus must not break a run either.
+  (3) Pre-adoption buffering: `engine.start()` is synchronous but the caller awaits it, so a
+  first `agent()` call can win the microtask race; events are buffered by run id (bounded: 8
+  runs × 64 events) and replayed in arrival order when the run is adopted. A foreign run's
+  buffered events are simply dropped.
+- **`showProgress` is a presentation switch** (default on, 22nd configuration key, bilingual
+  checkbox). Off means the session log carries no run events at all — a user who wants a log of
+  only messages can have one — and the workflow itself is byte-for-byte the same.
+- **The name is honest or it is bare.** `workflowRunName()` titles a run
+  `grok-workflow · N tasks` only when the caller supplied the plan (the tool path). The gate
+  plans first, so at the moment the node must appear the count does not exist; the title stays
+  `grok-workflow` and the panel's live member count carries the information. Advertising
+  `maxTasks` there would be a lie the title never retracts.
+- **Cost of borrowing an event family.** These types belong to `dsh-tool-workflow`'s module
+  augmentation; this package does not depend on that package (that would drag the tool layer in
+  to borrow four type names), so the append goes through a narrow local interface and the
+  payload shapes are pinned by tests. If DSH changes the family, the contract test fails on the
+  next `npm run ci` — that is the whole compatibility story, and it is deliberate.
+
+Evidence: `docs/knowledge/evidence/t44/` (three GUI runs + the decompressed session logs) and
+`docs/knowledge/VALIDATION.md` Round 4. Design alternative rejected: Plan B — a plugin-owned
+progress node (+200–300 client lines, needs `ui-conversation`/`ui-chat`/`ui-renderer` injections
+and its own GUI tests) — buys task-level narration, not visibility, and can be layered on top
+of this later without undoing it.
+
+### DD-13 — An unload must be explicable, and its damage must be stated once (t45)
+
+t41 produced the worst kind of support story: two runs in two workspaces ended 573 ms apart,
+both reports read `Grok workflow: FAILED … Failures: 1 cancelled`, and **nothing anywhere said
+who unloaded the plugin**. The code was not silent by design — it simply never looked. The
+disposer aborted `state.controller` and that was all; `run.js` had exactly four exits, and
+`cancelled` was whatever the engine echoed back regardless of whether a caller, a deadline or
+the plugin's own teardown asked for it.
+
+Three commitments, each pinned by a test that fails if the commitment is dropped:
+
+- **Record before you break.** `disposeActiveState` writes one
+  `plugin:grok-workflow/dispose` record per affected session *before* aborting: ISO time,
+  uptime, trigger class, the redacted head of the disposer stack, live/starting counts and
+  each run's id with its age. The trigger class is honest about its own limits — it is a
+  *classification of a stack*, so `unknown` is a normal answer and the raw frames travel with
+  it. Idle disposals log one `info` line and write nothing anywhere.
+- **Say what was damaged, once, at the damage.** A session whose run was actually cut gets one
+  `user/message` carrying this plugin's notice source kind (a chat row, zero model calls,
+  never mistaken for a user request by the gate). A session with nothing running gets
+  **silence**: a user who disables the plugin on purpose wants a direct answer, not a banner
+  on every message. The discriminator is *damage*, not guessed intent — an unload and a
+  settings toggle reach the disposer through the same cordis path, and the runtime exposes no
+  "was this your idea?" flag (`dsh-plugin-manager/lib/index.js:1058-1075` writes
+  `disabled: !enabled` into the profile patch and the loader simply disposes the entry).
+- **Name the cause in the report.** The cancelled exit splits into `unloaded` and `cancelled`,
+  so `Failures: 1 cancelled` no longer hides the two indistinguishable cases. The unloaded
+  variant points the reader at the dispose record in the same session.
+
+Two things this design deliberately does **not** claim:
+
+1. A process that starts with the plugin disabled is unobservable by the plugin — nothing of
+   ours runs, so nothing can speak. Covering that would need a second always-on entry; it is
+   recorded as a gap (VALIDATION Round 5, NOT_RUN) rather than papered over with a misleading
+   "the plugin will tell you" claim.
+2. A user-intended disable while a run is in flight still gets the one notice — because the
+   run really did die — but the notice is tied to that run, not to future messages.
+
+Related: **DD-12** (progress visibility) — the same "write the events the surface already
+folds" instinct, applied to the run instead of its end.
 
 ## Open questions
 

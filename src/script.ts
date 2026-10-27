@@ -501,6 +501,8 @@ function verifierPrompt(task, execution) {
     'For every acceptance criterion, copy its text EXACTLY into one criteria item, set met, and provide concrete evidence. Evidence must be non-empty and specific.',
     'Return at least one checkedEvidence item with a real kind, locator, and finding.',
     'verdict must be pass only when every criterion is met. If any criterion is unverified, met is false and verdict is fail.',
+    'issues is for BLOCKING problems only: a problem belongs there when it makes some criterion unmet or the result unsafe. Every issue must be reflected in verdict=fail and/or met=false for the criterion it concerns.',
+    'Do not put caveats, caveat-like observations, minor inaccuracies or notes about the environment in issues — they do not change the verdict, and a pass verdict with a non-blocking note is not a failed task. Express residual doubt through confidence (medium/low) instead.',
     'Do not print, store, or return credentials, tokens, passwords, or private keys.',
     '',
     'TASK:',
@@ -720,11 +722,19 @@ function matchesCriterion(verification, criterion) {
   return verification.criteria.filter(function (item) { return criterionKey(item.criterion) === key; });
 }
 
+// The decision belongs to the structured judgement: verdict, plus one criteria
+// entry per acceptance criterion carrying met and evidence. issues is prose — the
+// verifier's notes — and it used to override that judgement, so a verifier that
+// said pass with every criterion met still failed the task for listing a caveat.
+// Measured (t49: 8 of the 12 reports in the test home): every quality failure in
+// that log was this branch, and the notes themselves say "non-blocking", "minor
+// observation rather than a failure", "does not affect any acceptance criterion".
+// The notes are not lost: a verified task copies them into the report's
+// uncertainties.
 function checkVerification(task, execution, verification) {
   if (!verification) return { passed: false, reason: 'verifier returned no valid structured result' };
   if (execution && execution.status === 'failed') return { passed: false, reason: 'executor reported failure' };
   if (verification.verdict !== 'pass') return { passed: false, reason: 'verifier verdict was fail' };
-  if (verification.issues.length > 0) return { passed: false, reason: 'verifier reported issues: ' + verification.issues.join('; ') };
   if (verification.checkedEvidence.length === 0) return { passed: false, reason: 'verifier supplied no checked evidence' };
   if (verification.criteria.length !== task.acceptanceCriteria.length) {
     return { passed: false, reason: 'verifier criteria count does not match the task acceptance criteria' };
@@ -1105,8 +1115,10 @@ for (let i = 0; i < results.length; i++) {
       if (last.verification.confidence === 'low') {
         uncertainties.push({ taskId: task.id, text: 'verifier reported low confidence' });
       }
+      // Non-blocking verifier notes: they no longer fail the task, so they are
+      // carried into the report instead of being dropped on the floor.
       for (let u = 0; u < last.verification.issues.length; u++) {
-        uncertainties.push({ taskId: task.id, text: last.verification.issues[u] });
+        uncertainties.push({ taskId: task.id, text: 'verifier note: ' + last.verification.issues[u] });
       }
       if (last.execution && last.execution.uncertainties) {
         for (let u = 0; u < last.execution.uncertainties.length; u++) {
@@ -1213,7 +1225,8 @@ const report = {
     maxConcurrency: maxConcurrency,
     maxRetries: maxRetries,
     maxTasks: maxTasks,
-    maxTotalAgents: Number(args && args.maxTotalAgents) || 0
+    maxTotalAgents: Number(args && args.maxTotalAgents) || 0,
+    timeoutMs: Number(args && args.timeoutMs) || 0
   }
 };
 return report;
@@ -1234,6 +1247,8 @@ export interface WorkflowRequestPayload {
     maxRetries: number
     maxTasks: number
     maxTotalAgents: number
+    /** The deadline the plugin enforces for this run (0 = unknown/legacy). */
+    timeoutMs: number
     roles: Record<RoleName, ModelRoute[]>
     synthesis: SynthesisMode
     /** Failure classes that advance a role's chain; empty = built-in policy. */
@@ -1279,6 +1294,23 @@ export function maxTotalAgentsFor(tasks: number, retries: number, budget?: Route
   return planner + synthesizer + tasks * (retries + 1) * (worker + verifier) + 2
 }
 
+/** Stable base label of a run: the GUI card title and the log's run name. */
+export const WORKFLOW_RUN_LABEL = 'grok-workflow'
+
+/**
+ * Name one run as the GUI will show it.
+ *
+ * `grok-workflow · 3 tasks` when the work is known up front, otherwise the bare
+ * label: a progress row must never advertise a task count nobody promised.
+ * Bounded because the name lands in the session log and in a 42%-width title.
+ */
+export function workflowRunName(label: string, taskCount: number | undefined): string {
+  if (taskCount === undefined || !Number.isFinite(taskCount)) return label
+  const count = Math.trunc(taskCount)
+  if (count <= 0) return label
+  return `${label} · ${count} ${count === 1 ? 'task' : 'tasks'}`.slice(0, 80)
+}
+
 /** Build the static script and data-only arguments for one run. */
 export function buildWorkflowRequest(
   objective: string,
@@ -1293,7 +1325,13 @@ export function buildWorkflowRequest(
   return {
     script: WORKFLOW_SCRIPT,
     meta: {
-      name: 'grok-workflow',
+      // The name is the GUI panel's title (`workflowRun` dict: `run.title {name}`)
+      // and the run's identity in the session log, so it carries what is known
+      // *before* the script runs: the task count when the caller supplied a plan.
+      // When the script plans first the count does not exist yet at this point,
+      // and guessing the cap would be a lie the title never retracts — the panel's
+      // live member count covers that case instead.
+      name: workflowRunName(WORKFLOW_RUN_LABEL, tasks === undefined || tasks.length === 0 ? undefined : tasks.length),
       description: 'Plan, execute, independently verify, retry, and synthesize a complex objective with bounded concurrency.',
       phases: [
         { title: 'Plan', detail: 'Decompose the objective into independent tasks.' },
@@ -1310,6 +1348,8 @@ export function buildWorkflowRequest(
       maxRetries: config.maxRetries,
       maxTasks: config.maxTasks,
       maxTotalAgents,
+      // t47: the deadline the plugin will enforce, so the run report can name it.
+      timeoutMs: config.timeoutMs,
       roles: config.roles,
       synthesis: config.synthesis,
       switchOn: config.switchOn,

@@ -28,7 +28,7 @@ import { Config } from '../src/config.js'
  * bisecting showed `dsh-config-editor` is the package that does it).
  *
  * The transcription cannot drift silently: `settings-projection.spec.ts` stores
- * the concrete facts the runtime produced (17 volatile fields, no `toolName`,
+ * the concrete facts the runtime produced (19 volatile fields, no `toolName`,
  * `{uid, refs}` schema) and, when a real `dsh-settings` happens to be installed,
  * cross-checks this copy against it function by function.
  */

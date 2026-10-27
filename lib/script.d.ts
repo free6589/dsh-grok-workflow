@@ -23,6 +23,8 @@ export interface WorkflowRequestPayload {
         maxRetries: number;
         maxTasks: number;
         maxTotalAgents: number;
+        /** The deadline the plugin enforces for this run (0 = unknown/legacy). */
+        timeoutMs: number;
         roles: Record<RoleName, ModelRoute[]>;
         synthesis: SynthesisMode;
         /** Failure classes that advance a role's chain; empty = built-in policy. */
@@ -51,6 +53,16 @@ export declare function routeBudgetFor(config: ResolvedConfig): RouteBudget;
  * with AGENT_CAP as soon as a fallback route is used.
  */
 export declare function maxTotalAgentsFor(tasks: number, retries: number, budget?: RouteBudget): number;
+/** Stable base label of a run: the GUI card title and the log's run name. */
+export declare const WORKFLOW_RUN_LABEL = "grok-workflow";
+/**
+ * Name one run as the GUI will show it.
+ *
+ * `grok-workflow · 3 tasks` when the work is known up front, otherwise the bare
+ * label: a progress row must never advertise a task count nobody promised.
+ * Bounded because the name lands in the session log and in a 42%-width title.
+ */
+export declare function workflowRunName(label: string, taskCount: number | undefined): string;
 /** Build the static script and data-only arguments for one run. */
 export declare function buildWorkflowRequest(objective: string, tasks: NormalizedTask[] | undefined, config: ResolvedConfig): WorkflowRequestPayload;
 //# sourceMappingURL=script.d.ts.map

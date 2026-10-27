@@ -1,0 +1,98 @@
+{
+ "t0": 9370.700000017881,
+ "samples": [
+  {
+   "t": 9369.90000000596,
+   "key": "[]",
+   "nodes": []
+  },
+  {
+   "t": 9627.5,
+   "key": "[{\"status\":\"running\",\"text\":\"grok-workflow 0 members Running No members started\",\"members\":0}]",
+   "nodes": [
+    {
+     "status": "running",
+     "text": "grok-workflow 0 members Running No members started",
+     "members": 0
+    }
+   ]
+  },
+  {
+   "t": 10229.300000011921,
+   "key": "[{\"status\":\"running\",\"text\":\"grok-workflow 1 member Running Plan 1 member Running 1 grok-planner Running\",\"members\":1}]",
+   "nodes": [
+    {
+     "status": "running",
+     "text": "grok-workflow 1 member Running Plan 1 member Running 1 grok-planner Running",
+     "members": 1
+    }
+   ]
+  },
+  {
+   "t": 30513.5,
+   "key": "[{\"status\":\"running\",\"text\":\"grok-workflow 1 member Running Plan 1 member Completed 1\",\"members\":0}]",
+   "nodes": [
+    {
+     "status": "running",
+     "text": "grok-workflow 1 member Running Plan 1 member Completed 1",
+     "members": 0
+    }
+   ]
+  },
+  {
+   "t": 30729.90000000596,
+   "key": "[{\"status\":\"running\",\"text\":\"grok-workflow 2 members Running Plan 1 member Completed 1 Execute 1 member Running 1 grok-worker-run-echo-hello-t44-a1 Running\",\"members\":1}]",
+   "nodes": [
+    {
+     "status": "running",
+     "text": "grok-workflow 2 members Running Plan 1 member Completed 1 Execute 1 member Running 1 grok-worker-run-echo-hello-t44-a1 Running",
+     "members": 1
+    }
+   ]
+  },
+  {
+   "t": 63819.90000000596,
+   "key": "[{\"status\":\"running\",\"text\":\"grok-workflow 2 members Running Plan 1 member Completed 1 Execute 1 member Completed 1\",\"members\":0}]",
+   "nodes": [
+    {
+     "status": "running",
+     "text": "grok-workflow 2 members Running Plan 1 member Completed 1 Execute 1 member Completed 1",
+     "members": 0
+    }
+   ]
+  },
+  {
+   "t": 63986.80000001192,
+   "key": "[{\"status\":\"running\",\"text\":\"grok-workflow 3 members Running Plan 1 member Completed 1 Execute 1 member Completed 1 Verify 1 member Running 1 grok-verifier-run-echo-hello-t44-a1 Running\",\"members\":1}]",
+   "nodes": [
+    {
+     "status": "running",
+     "text": "grok-workflow 3 members Running Plan 1 member Completed 1 Execute 1 member Completed 1 Verify 1 member Running 1 grok-verifier-run-echo-hello-t44-a1 Running",
+     "members": 1
+    }
+   ]
+  },
+  {
+   "t": 103444.20000001788,
+   "key": "[{\"status\":\"running\",\"text\":\"grok-workflow 3 members Running Plan 1 member Completed 1 Execute 1 member Completed 1 Verify 1 member Completed 1\",\"members\":0}]",
+   "nodes": [
+    {
+     "status": "running",
+     "text": "grok-workflow 3 members Running Plan 1 member Completed 1 Execute 1 member Completed 1 Verify 1 member Completed 1",
+     "members": 0
+    }
+   ]
+  },
+  {
+   "t": 103476.30000001192,
+   "key": "[{\"status\":\"completed\",\"text\":\"grok-workflow 3 members Completed\",\"members\":0}]",
+   "nodes": [
+    {
+     "status": "completed",
+     "text": "grok-workflow 3 members Completed",
+     "members": 0
+    }
+   ]
+  }
+ ]
+}

@@ -150,8 +150,11 @@ describe('configuration limits', () => {
       maxConcurrency: 3,
       maxRetries: 1,
       maxTasks: 6,
-      timeoutMs: 1_800_000,
+      // 60 minutes since t45 (P1-4): the 30-minute default killed two real
+      // four-task runs at 30m00s / 30m01s.
+      timeoutMs: 3_600_000,
       maxActiveRuns: 2,
+      maxActiveRunsTotal: 8,
     })
   })
 

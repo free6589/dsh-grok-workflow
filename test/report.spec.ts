@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { resolveConfig } from '../src/config.js'
-import { assertWorkflowReport } from '../src/report.js'
-import { maxTotalAgentsFor } from '../src/script.js'
+import { assertWorkflowReport, failureReport, renderReport } from '../src/report.js'
+import { maxTotalAgentsFor, routeBudgetFor } from '../src/script.js'
 
 const config = resolveConfig({ maxConcurrency: 2, maxRetries: 1, maxTasks: 6 })
 const OBJECTIVE = 'Ship the verified result'
@@ -84,6 +84,12 @@ interface ReportSpec {
   errors?: unknown[]
   maxTotalAgents?: number
   objective?: string
+  /** t47: which chains the script reported it was given. */
+  routing?: Record<string, string[]>
+  /** t47: the deadline the run says it ran under (omitted = legacy result). */
+  timeoutMs?: number
+  /** t47: the child-call trail, so a switch can be rendered from a fixture. */
+  routes?: unknown[]
 }
 
 function report(spec: ReportSpec = {}): Record<string, unknown> {
@@ -112,11 +118,14 @@ function report(spec: ReportSpec = {}): Record<string, unknown> {
     incomplete,
     errors: spec.errors ?? [],
     uncertainties: [],
+    ...spec.routing === undefined ? {} : { routing: spec.routing },
+    ...spec.routes === undefined ? {} : { routes: spec.routes },
     limits: {
       maxConcurrency: 2,
       maxRetries: 1,
       maxTasks: 6,
       maxTotalAgents: spec.maxTotalAgents ?? maxTotalAgentsFor(tasks.length, 1),
+      ...spec.timeoutMs === undefined ? {} : { timeoutMs: spec.timeoutMs },
     },
   }
 }
@@ -322,5 +331,121 @@ describe('workflow report semantic contract', () => {
     const validated = assertWorkflowReport(fallback, OBJECTIVE, config)
     expect(validated.status).toBe('partial')
     expect(validated.incomplete).toEqual([])
+  })
+})
+
+/* ------------------------------------------------------------------ t47 -- */
+/**
+ * The t46 acceptance round left two report observations unfixed: `Model routes:`
+ * appeared only for some runs (so "no chain configured" and "the line is missing"
+ * looked identical), and the deadline the run actually ran under never left the
+ * process (`timeoutMs` was not in the report at all). Both are contract now.
+ */
+describe('t47: the report states its routes and its deadline', () => {
+  it('prints Model routes with "inherit" when no chain was configured', () => {
+    const text = renderReport(assertWorkflowReport(report(), OBJECTIVE, config))
+    expect(text).toContain('Model routes: planner=inherit; worker=inherit; verifier=inherit; synthesizer=inherit')
+  })
+
+  it('prints the configured chains, in chain order, when they exist', () => {
+    const text = renderReport(assertWorkflowReport(report({
+      routing: {
+        planner: ['bifrost-completions/wb/cn:no-such-model-probe', 'bifrost-completions/wb/cn:deepseek-v4.1-flash'],
+        worker: ['bifrost-completions/wb/cn:deepseek-v4.1-flash'],
+        verifier: [],
+        synthesizer: [],
+      },
+    }), OBJECTIVE, config))
+    expect(text).toContain('planner=bifrost-completions/wb/cn:no-such-model-probe → bifrost-completions/wb/cn:deepseek-v4.1-flash')
+    expect(text).toContain('worker=bifrost-completions/wb/cn:deepseek-v4.1-flash')
+    expect(text).toContain('verifier=inherit')
+  })
+
+  it('carries the deadline the run actually ran under', () => {
+    const accepted = assertWorkflowReport(report({ timeoutMs: config.timeoutMs }), OBJECTIVE, config)
+    expect(accepted.limits.timeoutMs).toBe(config.timeoutMs)
+    expect(renderReport(accepted)).toContain(`Deadline: ${config.timeoutMs} ms per run`)
+  })
+
+  it('rejects a result that ran under a different deadline than the plugin enforces', () => {
+    expect(() => assertWorkflowReport(report({ timeoutMs: config.timeoutMs + 1_000 }), OBJECTIVE, config))
+      .toThrow(/deadline/)
+  })
+
+  it('names the configured chains in a failure report too, instead of all-empty', () => {
+    const configured = resolveConfig({ roles: { worker: [{ provider: 'bifrost-completions', model: 'wb/cn:deepseek-v4.1-flash' }] } })
+    const text = renderReport(failureReport(OBJECTIVE, configured, 'Timeout', 'the deadline fired'))
+    // A timeout report is still a report about this configuration: printing the
+    // all-empty default made "no chain" and "chain unknown here" look the same (t46).
+    expect(text).toContain('worker=bifrost-completions/wb/cn:deepseek-v4.1-flash')
+    expect(text).toContain('planner=inherit')
+    expect(text).toContain(`Deadline: ${configured.timeoutMs} ms per run`)
+  })
+
+  it('accepts a legacy result that does not mention a deadline', () => {
+    const accepted = assertWorkflowReport(report(), OBJECTIVE, config)
+    expect(accepted.limits.timeoutMs).toBeUndefined()
+    expect(renderReport(accepted)).not.toContain('Deadline:')
+  })
+})
+
+describe('t47: a route switch is visible in the report', () => {
+  // t46 wrote a deliberately broken first worker route and saw no `Route switches:`
+  // line. The reason is not the renderer: a model the provider does not enumerate
+  // is rejected at load (`validateRoutes`), so that configuration never ran. The
+  // line itself had no test until now, which is why nobody could tell.
+  it('renders the failed attempt that caused the switch', () => {
+    // The trail is checked against the configured chain, so the fixture needs a
+    // two-route worker chain — which is also what makes the switch reachable.
+    const twoRoutes = resolveConfig({
+      maxConcurrency: 2,
+      maxRetries: 1,
+      maxTasks: 6,
+      roles: {
+        worker: [
+          { provider: 'bifrost-completions', model: 'wb/cn:deepseek-v4.1-flash' },
+          { provider: 'bifrost-completions', model: 'wb/cn:deepseek-v4-pro' },
+        ],
+      },
+    })
+    const text = renderReport(assertWorkflowReport(report({
+      maxTotalAgents: maxTotalAgentsFor(1, 1, routeBudgetFor(twoRoutes)),
+      routing: {
+        planner: [],
+        worker: ['bifrost-completions/wb/cn:deepseek-v4.1-flash', 'bifrost-completions/wb/cn:deepseek-v4-pro'],
+        verifier: [],
+        synthesizer: [],
+      },
+      routes: [{
+        role: 'worker',
+        chainIndex: 0,
+        route: 'bifrost-completions/wb/cn:deepseek-v4.1-flash',
+        attempt: 1,
+        outcome: 'failed',
+        failureClass: 'rate-limit',
+        reason: '429 Too Many Requests',
+      }, {
+        role: 'worker',
+        chainIndex: 1,
+        route: 'bifrost-completions/wb/cn:deepseek-v4-pro',
+        attempt: 1,
+        outcome: 'ok',
+      }],
+    }), OBJECTIVE, twoRoutes))
+    expect(text).toContain('Route switches:')
+    expect(text).toContain('- worker attempt 1 via bifrost-completions/wb/cn:deepseek-v4.1-flash: rate-limit — 429 Too Many Requests')
+  })
+
+  it('says nothing about switches when every call succeeded', () => {
+    const text = renderReport(assertWorkflowReport(report({
+      routes: [{
+        role: 'worker',
+        chainIndex: 0,
+        route: 'bifrost-completions/wb/cn:deepseek-v4.1-flash',
+        attempt: 1,
+        outcome: 'ok',
+      }],
+    }), OBJECTIVE, config))
+    expect(text).not.toContain('Route switches:')
   })
 })

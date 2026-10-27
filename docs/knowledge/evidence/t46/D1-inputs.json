@@ -1,0 +1,266 @@
+[
+ {
+  "i": 0,
+  "type": "text",
+  "value": "",
+  "name": null,
+  "ph": "搜索会话名称",
+  "label": null
+ },
+ {
+  "i": 1,
+  "type": "text",
+  "value": "",
+  "name": null,
+  "ph": "搜索提示词或模型…",
+  "label": "搜索提示词或模型…"
+ },
+ {
+  "i": 2,
+  "type": "text",
+  "value": "",
+  "name": null,
+  "ph": null,
+  "label": null
+ },
+ {
+  "i": 3,
+  "type": "number",
+  "value": "4",
+  "name": null,
+  "ph": null,
+  "label": null
+ },
+ {
+  "i": 4,
+  "type": "number",
+  "value": "4000",
+  "name": null,
+  "ph": null,
+  "label": null
+ },
+ {
+  "i": 5,
+  "type": "number",
+  "value": "4",
+  "name": null,
+  "ph": null,
+  "label": null
+ },
+ {
+  "i": 6,
+  "type": "number",
+  "value": "1",
+  "name": null,
+  "ph": null,
+  "label": null
+ },
+ {
+  "i": 7,
+  "type": "number",
+  "value": "0",
+  "name": null,
+  "ph": null,
+  "label": null
+ },
+ {
+  "i": 8,
+  "type": "number",
+  "value": "1",
+  "name": null,
+  "ph": null,
+  "label": null
+ },
+ {
+  "i": 9,
+  "type": "number",
+  "value": "3600000",
+  "name": null,
+  "ph": null,
+  "label": null
+ },
+ {
+  "i": 10,
+  "type": "number",
+  "value": "1",
+  "name": null,
+  "ph": null,
+  "label": null
+ },
+ {
+  "i": 11,
+  "type": "number",
+  "value": "4",
+  "name": null,
+  "ph": null,
+  "label": null
+ },
+ {
+  "i": 12,
+  "type": "text",
+  "value": "spawn",
+  "name": null,
+  "ph": null,
+  "label": null
+ },
+ {
+  "i": 13,
+  "type": "checkbox",
+  "value": "on",
+  "name": null,
+  "ph": null,
+  "label": null
+ },
+ {
+  "i": 14,
+  "type": "checkbox",
+  "value": "on",
+  "name": null,
+  "ph": null,
+  "label": null
+ },
+ {
+  "i": 15,
+  "type": "checkbox",
+  "value": "on",
+  "name": null,
+  "ph": null,
+  "label": null
+ },
+ {
+  "i": 16,
+  "type": "checkbox",
+  "value": "on",
+  "name": null,
+  "ph": null,
+  "label": null
+ },
+ {
+  "i": 17,
+  "type": "checkbox",
+  "value": "on",
+  "name": null,
+  "ph": null,
+  "label": null
+ },
+ {
+  "i": 18,
+  "type": "checkbox",
+  "value": "on",
+  "name": null,
+  "ph": null,
+  "label": null
+ },
+ {
+  "i": 19,
+  "type": "checkbox",
+  "value": "on",
+  "name": null,
+  "ph": null,
+  "label": null
+ },
+ {
+  "i": 20,
+  "type": "checkbox",
+  "value": "on",
+  "name": null,
+  "ph": null,
+  "label": null
+ },
+ {
+  "i": 21,
+  "type": "checkbox",
+  "value": "on",
+  "name": null,
+  "ph": null,
+  "label": null
+ },
+ {
+  "i": 22,
+  "type": "number",
+  "value": "64",
+  "name": null,
+  "ph": null,
+  "label": null
+ },
+ {
+  "i": 23,
+  "type": "text",
+  "value": "bifrost-completions",
+  "name": null,
+  "ph": "provider（可空）",
+  "label": null
+ },
+ {
+  "i": 24,
+  "type": "text",
+  "value": "wb/cn:deepseek-v4.1-flash",
+  "name": null,
+  "ph": "model（必填）",
+  "label": null
+ },
+ {
+  "i": 25,
+  "type": "text",
+  "value": "bifrost-completions",
+  "name": null,
+  "ph": "provider（可空）",
+  "label": null
+ },
+ {
+  "i": 26,
+  "type": "text",
+  "value": "wb/cn:deepseek-v4.1-flash",
+  "name": null,
+  "ph": "model（必填）",
+  "label": null
+ },
+ {
+  "i": 27,
+  "type": "text",
+  "value": "bifrost-completions",
+  "name": null,
+  "ph": "provider（可空）",
+  "label": null
+ },
+ {
+  "i": 28,
+  "type": "text",
+  "value": "wb/cn:deepseek-v4.1-flash",
+  "name": null,
+  "ph": "model（必填）",
+  "label": null
+ },
+ {
+  "i": 29,
+  "type": "checkbox",
+  "value": "on",
+  "name": null,
+  "ph": null,
+  "label": null
+ },
+ {
+  "i": 30,
+  "type": "file",
+  "value": "",
+  "name": null,
+  "ph": null,
+  "label": null
+ },
+ {
+  "i": 31,
+  "type": "radio",
+  "value": "on",
+  "name": "ppt-ocr",
+  "ph": null,
+  "label": null
+ },
+ {
+  "i": 32,
+  "type": "radio",
+  "value": "on",
+  "name": "ppt-ocr",
+  "ph": null,
+  "label": null
+ }
+]

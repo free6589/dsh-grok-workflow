@@ -42,12 +42,12 @@ dsh --profile grok-workflow-dev --from-default-profile headless --dump-config
 然后安装插件：
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.2.1
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.2.2
 ```
 
-> （`#v0.2.1` 于本 tag 发布后可用；发布前请用 `#v0.2.0`。）
+> （`#v0.2.2` 于本 tag 发布后可用；发布前请用 `#v0.2.1`。）
 
-请固定你真正想要的标签；省略 `#v0.2.1` 会跟随 `main`，那不是发布版本。不要在 `plugin add` 之后再运行 `--from-default-profile`：它会重建 profile 并移除你刚装好的插件。
+请固定你真正想要的标签；省略 `#v0.2.2` 会跟随 `main`，那不是发布版本。不要在 `plugin add` 之后再运行 `--from-default-profile`：它会重建 profile 并移除你刚装好的插件。
 
 最后重启 profile，让 DSH 加载新插件：
 
@@ -248,15 +248,15 @@ dsh plugin --profile grok-workflow-dev remove dsh-grok-workflow
 
 ## 版本与发布说明
 
-本仓库声明的包版本是 `0.2.1`。需要安装或回退到某个已发布版本时，在地址后加标签：
+本仓库声明的包版本是 `0.2.2`。需要安装或回退到某个已发布版本时，在地址后加标签：
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.2.1
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.2.2
 ```
 
-> （`#v0.2.1` 于本 tag 发布后可用；发布前请用 `#v0.2.0`。）
+> （`#v0.2.2` 于本 tag 发布后可用；发布前请用 `#v0.2.1`。）
 
-只使用 GitHub 上确实存在的标签。已发布：`v0.1.0`、`v0.2.0`；`v0.2.1` 是本仓库当前的版本，由发布本次提交的流程打标签。未固定版本的命令跟随 `main`，不会固定到发布版本。版本规则与回退流程见[更新日志](CHANGELOG.md)与[发布指南](docs/RELEASING.md)。
+只使用 GitHub 上确实存在的标签。已发布：`v0.1.0`、`v0.2.0`、`v0.2.1`；`v0.2.2` 是本仓库当前的版本，由发布本次提交的流程打标签。未固定版本的命令跟随 `main`，不会固定到发布版本。版本规则与回退流程见[更新日志](CHANGELOG.md)与[发布指南](docs/RELEASING.md)。
 
 ## 测试与开发
 

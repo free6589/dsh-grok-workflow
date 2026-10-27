@@ -59,30 +59,52 @@ Every user-visible fix or feature should first be listed under `[Unreleased]` in
 `## [0.2.0] - 2026-10-26` 章节即为当时发布流程提取的文本。`0.2.1` 是它之上的增量版本，
 只新增 Web GUI 设置页与"激活前提"文档，配置面与报告格式不变。
 
-## 0.2.1 (prepared, tag not yet created) / 0.2.1（已准备，尚未打标签）
+## 0.2.1 — released 2026-10-27 / 0.2.1 — 已于 2026-10-27 发布
 
-`0.2.1` is prepared on `main`: `package.json` and `package-lock.json` both say `0.2.1`, and
-`CHANGELOG.md` carries the bilingual `## [0.2.1]` section the release workflow extracts. The
-tag and the GitHub Release are created **after** the final acceptance pass, from the merged
-commit, exactly as for `0.1.0`; `v0.1.0` must not be moved.
+| | |
+|---|---|
+| Tag | `v0.2.1` on commit `cecc065` |
+| Artifact | 43 files, ~121 KB |
 
-What to expect from the artifact: `npm pack` currently produces **43 files, ~121 KB**
-(`0.2.0` was 42 files / 108,428 B, `0.1.0` 33 files / 61,281 bytes), containing `lib/` (including
-the browser bundle `lib/client.js`), `package.json`, `cordis.patch.yml`, `LICENSE`, both READMEs,
-`CHANGELOG.md` and `docs/*.md` + `docs/images/`. `test/`, `scripts/` and `docs/knowledge/` are
-deliberately **not** shipped: the knowledge base is a development record, and the README links to
-it resolve on GitHub rather than inside an installed package.
+`0.2.1` added the Web GUI settings page and documented the activation prerequisite; the published
+notes are [docs/releases/RELEASE-NOTES-0.2.1.md](releases/RELEASE-NOTES-0.2.1.md). Its tag must not
+be moved.
 
-`0.2.1` 已在 `main` 上准备好：`package.json` 与 `package-lock.json` 都是 `0.2.1`，
-`CHANGELOG.md` 含发布工作流要提取的双语 `## [0.2.1]` 章节。标签与 GitHub Release 在最终
-验收通过后、从合并后的提交创建，与 `0.1.0` 流程一致；`v0.1.0` 不得移动。
+`0.2.1` 新增 Web GUI 设置页并记录激活前提，发布说明见
+[docs/releases/RELEASE-NOTES-0.2.1.md](releases/RELEASE-NOTES-0.2.1.md)；该标签不得移动。
 
-产物预期：当前 `npm pack` 生成 **43 个文件、约 121 KB**（`0.2.0` 为 42 个文件 / 108,428 B，
-`0.1.0` 为 33 个文件 / 61,281 字节），包含 `lib/`（含浏览器 bundle `lib/client.js`）、
-`package.json`、`cordis.patch.yml`、`LICENSE`、两份 README、`CHANGELOG.md`，以及
-`docs/*.md` 与 `docs/images/`。`test/`、`scripts/`、`docs/knowledge/`
-有意**不打进包**：知识库是开发记录，README 里指向它的链接在 GitHub 上有效，而不是在安装
-后的包里。
+## 0.2.2 (prepared, tag not yet created) / 0.2.2（已准备，尚未打标签）
+
+`0.2.2` is prepared on `main`: `package.json` and `package-lock.json` both say `0.2.2`, and
+`CHANGELOG.md` carries the bilingual `## [0.2.2] - 2026-10-28` section the release workflow
+extracts. `0.2.1` is published (`v0.2.1` on `cecc065`) and its tag must not be moved. What 0.2.2
+contains: the plugin-enforced deadline, `Model routes:` in every report, the per-session run cap,
+the unload diagnosis record, and the verifier-decision fix (a non-empty `issues` list no longer
+fails a task whose verdict is `pass`).
+
+**Release-note constraint:** the changelog states the measured record (1 `COMPLETED` in 12 reports
+before the fix) and says plainly that this release fixes a decision defect rather than raising
+model quality. Do not let a summary soften that into "quality improved" — see
+`docs/knowledge/VALIDATION.md` Round 8.
+
+Artifact: `npm pack` produces **43 files, ~150 kB**, `dsh-grok-workflow-0.2.2.tgz` (same file set as
+`0.2.1`: `lib/` incl. `lib/client.js`, `package.json`, `cordis.patch.yml`, `LICENSE`, both READMEs,
+`CHANGELOG.md`, `docs/*.md` + `docs/images/`; `test/`, `scripts/`, `docs/knowledge/` excluded).
+
+`0.2.2` 已在 `main` 上准备好：`package.json` 与 `package-lock.json` 都是 `0.2.2`，
+`CHANGELOG.md` 含发布工作流要提取的双语 `## [0.2.2] - 2026-10-28` 章节。`0.2.1` 已发布
+（`v0.2.1` 指向 `cecc065`），其标签不得移动。本版内容：插件自持 deadline、每份报告的
+`Model routes:`、按会话的运行槽位、卸载诊断记录，以及 verifier 判定修复（`issues` 非空不再
+否决 `pass` 的结论）。
+
+**发布说明的硬约束：**更新日志写的是实测口径（修复前 12 份报告仅 1 份 `COMPLETED`），并明说
+本版修的是判定缺陷而非提升模型质量；任何摘要都不得把它软化成效能提升——见
+`docs/knowledge/VALIDATION.md` Round 8。
+
+产物：`npm pack` 生成 **43 个文件、约 150 kB**，文件名 `dsh-grok-workflow-0.2.2.tgz`（文件集合
+与 `0.2.1` 相同：`lib/`（含 `lib/client.js`）、`package.json`、`cordis.patch.yml`、`LICENSE`、
+两份 README、`CHANGELOG.md`、`docs/*.md` 与 `docs/images/`；`test/`、`scripts/`、`docs/knowledge/`
+不打进包）。
 
 For the next release, follow the checklist below. The tag must point to a commit on `main` whose `package.json` version and `CHANGELOG.md` section match the tag. The workflow runs typecheck, lint, build, `lib/` consistency, tests, package checks, and only then creates the Release.
 

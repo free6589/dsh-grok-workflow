@@ -1,7 +1,6 @@
 import type { FailureCategory, WorkflowReport } from './types.js';
 import type { ResolvedConfig } from './types.js';
 export declare function assertWorkflowReport(value: unknown, objective: string, config: ResolvedConfig): WorkflowReport;
-/** A failure report for a run that never produced a script result. */
 export declare function failureReport(objective: string, config: ResolvedConfig, phase: string, message: string, category?: FailureCategory): WorkflowReport;
 /**
  * Count failures per category across the report, so a reader can separate

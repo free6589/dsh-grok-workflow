@@ -1,9 +1,10 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
-import { createConfigReader } from './config.js'
+import { createConfigReader, describeResolvedConfig } from './config.js'
 import { describeSurface, validateRoutes } from './settings.js'
 import { installGate } from './gate.js'
+import { installShutdownProbe } from './records.js'
 import { normalizeCallerTasks, GrokWorkflowInputError, TASK_LIMITS } from './input.js'
 import { renderReport } from './report.js'
 import { redactError } from './redact.js'
@@ -44,7 +45,20 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
   // the next message, and a run that already started keeps the snapshot it was
   // given, so its limits cannot move under it.
   const reader = createConfigReader(rawConfig as Record<string, unknown>, logger)
-  const config = reader.read()
+  // t47: every effective-configuration change is announced once. The t46 round could
+  // not tell a settings save from a profile-patch edit — and could not read the
+  // deadline the run actually used — because both lived only in memory.
+  let configSignature = ''
+  const readConfig = (): ResolvedConfig => {
+    const next = reader.read()
+    const signature = describeResolvedConfig(next)
+    if (signature !== configSignature) {
+      configSignature = signature
+      logger.info?.(`configuration in effect: ${signature}`)
+    }
+    return next
+  }
+  const config = readConfig()
   const state: ActiveState = createActiveState()
 
   // Settings surface: the generated form comes from the `Config` schema this
@@ -62,8 +76,21 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
   for (const note of routes.notes) logger.warn(note)
   if (routes.errors.length > 0) throw new Error(routes.errors.join('; '))
 
+  // t45: remember shutdown signals, so the dispose record can say "the process is
+  // shutting down" instead of "cause unknown". Removed again on reload.
+  ctx.effect(() => installShutdownProbe(state))
+
   ctx.effect(() => async () => {
-    await disposeActiveState(state)
+    // The disposer is where the t41 blind spot lived: two runs in two workspaces
+    // were cancelled 573 ms apart with no way to tell who unloaded the plugin.
+    // The raw stack is captured here, at the only place that knows the answer,
+    // and `disposeActiveState` records what it attributes it to (t45, P0-1).
+    await disposeActiveState(state, {
+      logger,
+      ...new Error('dsh-grok-workflow disposer').stack === undefined
+        ? {}
+        : { callSite: String(new Error('dsh-grok-workflow disposer').stack) },
+    })
   }, 'dsh-grok-workflow: active runs')
 
   ctx.systemPrompt.section({
@@ -138,7 +165,7 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
       // run (never silently replaced by defaults).
       let live: ResolvedConfig
       try {
-        live = reader.read()
+        live = readConfig()
       } catch (error) {
         throw new Error(`${config.toolName} cannot run: the current configuration is invalid: ${redactError(error)}`)
       }
@@ -186,7 +213,7 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
       config,
       state,
       logger,
-      readConfig: () => reader.read(),
+      readConfig,
       lastGoodConfig: () => reader.lastGood(),
     })
   }

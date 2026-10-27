@@ -1,5 +1,5 @@
 import z from '@deepseek-ai/schemastery'
-import type { FailureClass, GrokWorkflowConfig, ModelRoute, ResolvedConfig } from './types.js'
+import type { FailureClass, GrokWorkflowConfig, ModelRoute, ResolvedConfig, RoleName } from './types.js'
 
 /** Hard limits; user configuration can only tighten these. */
 export const HARD_LIMITS = {
@@ -10,6 +10,7 @@ export const HARD_LIMITS = {
   maxRetries: 3,
   maxTasks: 12,
   maxActiveRuns: 4,
+  maxActiveRunsTotal: 16,
   timeoutMs: 86_400_000,
   /** Maximum routes in one role's fallback chain. */
   chainLength: 3,
@@ -20,6 +21,28 @@ export const HARD_LIMITS = {
   /** Hard ceiling on routing ledger entries kept per run. */
   recordEntries: 256,
 } as const
+
+/**
+ * Default deadline for one workflow run: 60 minutes (t45, P1-4).
+ *
+ * The old 30-minute default was measured to be wrong twice in one afternoon —
+ * two four-task runs were killed at exactly 30m00s and 30m01s — while real
+ * four-task runs finish in 878 s / 1148 s / 1801 s. 60 minutes keeps a hung run
+ * bounded and gives the observed worst case roughly 2x headroom; a caller with a
+ * longer objective raises it in the profile patch (t45 D-017).
+ */
+export const DEFAULT_TIMEOUT_MS = 3_600_000
+
+/** Default concurrent workflow runs per session (t45, P1-3). */
+export const DEFAULT_MAX_ACTIVE_RUNS = 2
+
+/**
+ * Default concurrent workflow runs across every session.
+ *
+ * The per-session cap is what a user reasons about; this one only keeps the
+ * number of child agents in one process bounded.
+ */
+export const DEFAULT_MAX_ACTIVE_RUNS_TOTAL = 8
 
 /** Version of the configuration surface this build understands. */
 export const CONFIG_VERSION = 1
@@ -45,12 +68,14 @@ export const CONFIG_KEYS = [
   'maxTasks',
   'timeoutMs',
   'maxActiveRuns',
+  'maxActiveRunsTotal',
   'subagentProvider',
   'roles',
   'synthesis',
   'switchOn',
   'recordRuns',
   'recordLimit',
+  'showProgress',
   'configVersion',
 ] as const
 
@@ -85,8 +110,17 @@ export const Config = z.object({
   maxConcurrency: z.natural().min(1).max(HARD_LIMITS.maxConcurrency).default(3).volatile(),
   maxRetries: z.natural().min(0).max(HARD_LIMITS.maxRetries).default(1).volatile(),
   maxTasks: z.natural().min(1).max(HARD_LIMITS.maxTasks).default(6).volatile(),
-  timeoutMs: z.natural().min(1_000).max(HARD_LIMITS.timeoutMs).default(1_800_000).volatile(),
-  maxActiveRuns: z.natural().min(1).max(HARD_LIMITS.maxActiveRuns).default(2).volatile(),
+  // 60 minutes, not 30 (t45, P1-4): the two measured deadline kills were 30m00s
+  // and 30m01s on four-task objectives, and a real four-task run took 878 s / 1148 s
+  // / 1801 s. 60 minutes keeps the "a hung run cannot run forever" property while
+  // giving the observed worst case ~2x headroom; a longer objective raises it in
+  // the profile patch, where the run's own tool timeout follows it (t45 D-017).
+  timeoutMs: z.natural().min(1_000).max(HARD_LIMITS.timeoutMs).default(DEFAULT_TIMEOUT_MS).volatile(),
+  // Per session, not per process (t45, P1-3): one session's long runs must not
+  // starve another session's message. `maxActiveRunsTotal` is the process-wide
+  // backstop that keeps the child-agent count bounded.
+  maxActiveRuns: z.natural().min(1).max(HARD_LIMITS.maxActiveRuns).default(DEFAULT_MAX_ACTIVE_RUNS).volatile(),
+  maxActiveRunsTotal: z.natural().min(1).max(HARD_LIMITS.maxActiveRunsTotal).default(DEFAULT_MAX_ACTIVE_RUNS_TOTAL).volatile(),
   subagentProvider: z.string().default('').volatile(),
   roles: z.object({
     planner: z.array(z.object({ provider: z.string().default(''), model: z.string() })).default([]),
@@ -102,6 +136,11 @@ export const Config = z.object({
   // Run records: the routing/delivery ledger written into the session.
   recordRuns: z.boolean().default(true).volatile(),
   recordLimit: z.natural().min(0).max(HARD_LIMITS.recordEntries).default(64).volatile(),
+  // Progress visibility: the Web GUI folds four `tool-workflow/*` session events
+  // into one run node (members = subagents). On by default — a user watching a
+  // multi-minute run should see it — and off for a user who wants the session log
+  // to carry nothing but messages.
+  showProgress: z.boolean().default(true).volatile(),
   // Config version, so a future rename can be migrated instead of guessed.
   configVersion: z.natural().default(CONFIG_VERSION),
 })
@@ -289,10 +328,12 @@ export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
     maxConcurrency: integer('maxConcurrency', config.maxConcurrency ?? 3, 1, HARD_LIMITS.maxConcurrency),
     maxRetries,
     maxTasks: integer('maxTasks', config.maxTasks ?? 6, 1, HARD_LIMITS.maxTasks),
-    timeoutMs: integer('timeoutMs', config.timeoutMs ?? 1_800_000, 1_000, HARD_LIMITS.timeoutMs),
-    maxActiveRuns: integer('maxActiveRuns', config.maxActiveRuns ?? 2, 1, HARD_LIMITS.maxActiveRuns),
+    timeoutMs: integer('timeoutMs', config.timeoutMs ?? DEFAULT_TIMEOUT_MS, 1_000, HARD_LIMITS.timeoutMs),
+    maxActiveRuns: integer('maxActiveRuns', config.maxActiveRuns ?? DEFAULT_MAX_ACTIVE_RUNS, 1, HARD_LIMITS.maxActiveRuns),
+    maxActiveRunsTotal: integer('maxActiveRunsTotal', config.maxActiveRunsTotal ?? DEFAULT_MAX_ACTIVE_RUNS_TOTAL, 1, HARD_LIMITS.maxActiveRunsTotal),
     switchOn: resolveSwitchOn(config.switchOn),
     recordRuns: config.recordRuns ?? true,
+    showProgress: config.showProgress ?? true,
     recordLimit: integer('recordLimit', config.recordLimit ?? 64, 0, HARD_LIMITS.recordEntries),
     configVersion,
     ...provider === undefined || provider === '' ? {} : { subagentProvider: provider },
@@ -368,6 +409,31 @@ export interface ConfigReader {
  * @param logger - optional logger for the fallback warning.
  * @returns A reader with a validated snapshot cache.
  */
+/** One-line summary of a resolved config, for the load-time and per-edit log line.
+ *
+ * t47: the t46 acceptance round could not answer "what did the runtime actually
+ * read?" from any artefact — the deadline and the role chains only existed in
+ * memory, so a settings save and a patch edit were indistinguishable from the
+ * outside. This string is written to the log whenever the effective config
+ * changes, and the deadline travels into the run's report as well.
+ */
+export function describeResolvedConfig(config: ResolvedConfig): string {
+  const role = (name: RoleName): string => {
+    const chain = config.roles[name]
+    return chain.length === 0 ? 'inherit' : chain.map(route => route.provider === '' ? route.model : `${route.provider}/${route.model}`).join('→')
+  }
+  return [
+    `timeoutMs=${config.timeoutMs}`,
+    `maxTasks=${config.maxTasks}`,
+    `maxConcurrency=${config.maxConcurrency}`,
+    `maxRetries=${config.maxRetries}`,
+    `maxActiveRuns=${config.maxActiveRuns}/${config.maxActiveRunsTotal}`,
+    `gate=${config.enforceGate ? 'on' : 'off'}/${config.gateScope}${config.gateRequired ? ' (required)' : ''}`,
+    `synthesis=${config.synthesis}`,
+    `roles=planner:${role('planner')} worker:${role('worker')} verifier:${role('verifier')} synthesizer:${role('synthesizer')}`,
+  ].join(' ')
+}
+
 export function createConfigReader(
   raw: GrokWorkflowConfig | Record<string, unknown> | undefined,
   logger?: { warn(message: string): void },

@@ -1,0 +1,8 @@
+Grok workflow: FAILED
+Objective: Current request: 运行 echo notice-probe 命令，报告输出与命令作为证据。
+Plan: unavailable; 0 task(s); 0 verified
+Failures: 1 cancelled
+Incomplete:
+- workflow (cancelled): grok_workflow was cancelled because the plugin was unloaded while the run was in flight (not a deadline and not a manual stop); the plugin's dispose record in this session says when and by what
+Errors:
+- Unloaded: grok_workflow was cancelled because the plugin was unloaded while the run was in flight (not a deadline and not a manual stop); the plugin's dispose record in this session says when and by what

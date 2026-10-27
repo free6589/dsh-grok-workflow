@@ -1,0 +1,54 @@
+DSH 本地构建
+0.2.1-rc.2-332895e
+会话
+生图
+新会话
+插件
+自动化任务
+工作区
+project_jobs
+进行中
+未命名
+刚刚
+未命名
+22分钟
+未命名
+1小时
+boss
+any2api
+doubao2api
+wenxinyiyan
+dsh-books
+dsh-grok-workflow
+dsh-model-fix
+aa-scrape
+chatgpt2api
+dsh-our-free-model
+dsh-model-list
+语音识别打字工具
+MEMLENS
+dsh-token-usage
+substack_jail
+douyin订阅
+Socratopia
+workbuddy2api
+workspace
+projects_mine
+OpenWrite
+设置
+project_jobs
+智能体团队
+LayerFS × DSH minimalist
+1 个子智能体
+对话
+轨迹
+已完成分析
+
+[grok-workflow] The plugin was unloaded while this session had 1 workflow run in flight, so that work was cancelled. Cause: the plugin was unloaded inside a running process (a settings toggle, a reload or an upgrade); the host does not disclose which, and the disposal call path is recorded in this session for whoever asks. This notice is written once, at unload time. Messages sent until the plugin is enabled again are answered directly and are no longer forced through the mandatory workflow.
+
+深度求索中
+深度求索中，用时 19秒 ···
+发消息或创建任务, / 调用指令, @ 文件或对话
+工作区内修改
+MiMo V2.6 Pro (cn)
+最大 · Max

@@ -1,0 +1,47 @@
+t47 commands and timings
+=======================
+
+Build / verification
+  npm run build            tsc -p tsconfig.build.json && node scripts/build-client.mjs
+  npm test                 333 tests / 21 files (baseline was 321; t47 adds 12)
+  npm run ci               typecheck + oxlint + test
+
+Package + install into the test profile (dodging pnpm's same-path no-op with a new tarball name)
+  npm pack --pack-destination /tmp/t47-pack
+  mv /tmp/t47-pack/dsh-grok-workflow-0.2.1.tgz /tmp/t47-pack/dsh-grok-workflow-0.2.2-rcN.tgz
+  cd /home/fish/dsh-v022-home/profiles/web-v022-test
+  sed -i 's|rcN-1.tgz|rcN.tgz|' package.json && pnpm install
+  md5sum node_modules/dsh-grok-workflow/lib/*.js  vs  <repo>/lib/*.js        (0 mismatches)
+
+Instance restart (test only; live :3090 was never touched)
+  PID=$(ss -ltnp | grep ':3100' | sed -n 's/.*pid=\([0-9]*\).*/\1/p'); kill $PID
+  set -a; . /home/fish/.dsh/bifrost.env; set +a
+  DSH_HOME=/home/fish/dsh-v022-home dsh --profile web-v022-test --host 127.0.0.1 --port 3100 --no-open
+  # token rotates on every restart — always re-read it:
+  grep -oE 'token=[A-Za-z0-9_-]+' instance.log | tail -1
+  curl -o /dev/null -s -w '%{http_code}\n' "http://127.0.0.1:3100/?token=$TOKEN"   # 303 = valid
+
+Deadline probe (60 s written in the profile patch, no settings page involved)
+  playwright /tmp/pw/t47-deadline.mjs   -> A-run.log  (run leaves `running` at 61.5 s)
+  # the report is delivered by the model *after* the run, so it is read from the session log:
+  zstdcat .../sessions/--home-fish-project_jobs--/<id>/session.v4.jsonl.zstd | python3 -c '<typed extraction>'
+  -> B1-deadline-report.txt
+
+Unload probe (the notice)
+  playwright /tmp/pw/t47-notice.mjs     -> E1..E4  (run live -> plugin switch off -> transcript)
+  Notice event + relayed report read from the same session log:
+  -> E5-notice-event.json, E5-report-relay.txt
+
+Temporary diagnostic (added, used, removed before the final build)
+  An env-gated hook in `apply()` wrote the received config to $DSH_GROK_DUMP_CONFIG, with one extra
+  level for holder objects (`{holder, keys, got}`), so the question "does the loader hand us the role
+  chains?" could be answered instead of argued. Output: raw-config.json. The hook is not in the
+  shipped build — md5 of lib/index.js in instance-facts.txt is the post-removal build, byte-identical
+  on both sides.
+
+Known limits of this round
+  * A live `Route switches:` entry was not produced: forcing one deterministically needs an
+    enumerated model that fails at runtime, and the only handle available here (a non-enumerated id)
+    is rejected at load by design (A2-load-rejection.txt). The switch path is covered by tests.
+  * The notice row cannot be rendered by a plugin in this DSH build (see README §1); the downgrade
+    is deliberate and the report was verified to carry the same information.

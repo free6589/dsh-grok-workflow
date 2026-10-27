@@ -1,7 +1,7 @@
 import type {
   AttemptFailure,
   RouteTrailEntry, ExecutionResult, FailureCategory, FinalStatus, VerificationResult, WorkflowReport } from './types.js'
-import type { ResolvedConfig, RoleName } from './types.js'
+import type { ModelRoute, ResolvedConfig, RoleName } from './types.js'
 import { criterionKey } from './input.js'
 import { maxTotalAgentsFor, routeBudgetFor } from './script.js'
 
@@ -307,6 +307,12 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
   const maxRetries = number(limits.maxRetries, 'limits.maxRetries')
   const maxTasks = number(limits.maxTasks, 'limits.maxTasks')
   const maxTotalAgents = number(limits.maxTotalAgents, 'limits.maxTotalAgents')
+  // t47: the deadline travels with the result. It used to live only in memory, so
+  // "which deadline was in force?" was unanswerable from the session log.
+  const timeoutMs = limits.timeoutMs === undefined ? undefined : number(limits.timeoutMs, 'limits.timeoutMs')
+  if (timeoutMs !== undefined && timeoutMs !== 0 && timeoutMs !== config.timeoutMs) {
+    throw new Error(`workflow result ran under a ${timeoutMs} ms deadline but the plugin enforces ${config.timeoutMs} ms`)
+  }
   if (maxConcurrency !== config.maxConcurrency || maxRetries !== config.maxRetries || maxTasks !== config.maxTasks) {
     throw new Error('workflow result limits do not match the configured limits')
   }
@@ -511,11 +517,17 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
       maxRetries,
       maxTasks,
       maxTotalAgents: number(limits.maxTotalAgents, 'limits.maxTotalAgents'),
+      ...timeoutMs === undefined || timeoutMs === 0 ? {} : { timeoutMs },
     },
   }
 }
 
 /** A failure report for a run that never produced a script result. */
+/** Render one configured chain the way the report names it: `provider/model`. */
+function chainLabelsFor(chain: readonly ModelRoute[]): string[] {
+  return chain.map(route => route.provider === '' ? route.model : `${route.provider}/${route.model}`)
+}
+
 export function failureReport(
   objective: string,
   config: ResolvedConfig,
@@ -534,13 +546,23 @@ export function failureReport(
     errors: [{ phase, message, category }],
     uncertainties: [],
     routes: [],
-    routing: { planner: [], worker: [], verifier: [], synthesizer: [] },
+    // t47: a failure report is still a report about *this* configuration, so it has
+    // to name the chains that were in force. It used to print the all-empty default,
+    // which read as "no chain configured" even when the run was handed one — the
+    // exact ambiguity the t46 round could not resolve.
+    routing: {
+      planner: chainLabelsFor(config.roles.planner),
+      worker: chainLabelsFor(config.roles.worker),
+      verifier: chainLabelsFor(config.roles.verifier),
+      synthesizer: chainLabelsFor(config.roles.synthesizer),
+    },
     synthesis: { mode: config.synthesis },
     limits: {
       maxConcurrency: config.maxConcurrency,
       maxRetries: config.maxRetries,
       maxTasks: config.maxTasks,
       maxTotalAgents: 0,
+      timeoutMs: config.timeoutMs,
     },
   }
 }
@@ -632,11 +654,14 @@ export function renderReport(report: WorkflowReport): string {
   if (report.synthesis.error !== undefined) {
     lines.push(`Synthesis: model narrative unavailable (${oneLine(report.synthesis.error, 300)}); the report above is complete`)
   }
+  // t47: always printed. The t46 round saw the line appear only after a settings
+  // save and could not tell "no chain configured" from "the line was skipped", so
+  // an unset role now says `inherit` instead of silently vanishing.
   const configured = (['planner', 'worker', 'verifier', 'synthesizer'] as const)
     .map(role => [role, report.routing[role]] as const)
-    .filter(([, chain]) => chain.length > 0)
-  if (configured.length > 0) {
-    lines.push(`Model routes: ${configured.map(([role, chain]) => `${role}=${chain.join(' → ')}`).join('; ')}`)
+  lines.push(`Model routes: ${configured.map(([role, chain]) => `${role}=${chain.length === 0 ? 'inherit' : chain.join(' → ')}`).join('; ')}`)
+  if (report.limits.timeoutMs !== undefined) {
+    lines.push(`Deadline: ${report.limits.timeoutMs} ms per run (enforced by the plugin)`)
   }
   const routeFailures = report.routes.filter(entry => entry.outcome === 'failed')
   if (routeFailures.length > 0) {

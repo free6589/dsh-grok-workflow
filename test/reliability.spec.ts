@@ -54,11 +54,17 @@ class FakeEngine {
   hang = false
   /** When true the first worker call fails with a rate limit, forcing a switch. */
   failFirstWorker = false
+  /** When true `cancel()` is accepted and ignored, like an engine that keeps working. */
+  stubborn = false
 
   async start(request: WorkflowStartRequest): Promise<FakeRun> {
     this.startCalls.push(request)
     const run = new FakeRun(request)
     this.runs.push(run)
+    // t46 measured a real engine still working five minutes after its deadline.
+    // A cancel that settles was the only shape the fake engine could produce, so
+    // the deadline's own promise went untested; this flag closes that hole.
+    if (this.stubborn) run.cancel.mockImplementation(() => {})
     if (!this.hang) {
       let workerCalls = 0
       const result = await runWorkflowScript(request.script, request.args as Record<string, unknown>, async (_prompt, options) => {
@@ -183,7 +189,9 @@ describe('reliability: cancellation and deadlines', () => {
     // cancelled rather than left burning child agents.
     await expect(pending).rejects.toThrow(/cancelled/)
     expect(ctx.engine.runs[0]!.cancel).toHaveBeenCalled()
-    expect(ctx.engine.runs[0]!.meta.name).toBe('grok-workflow')
+    // The run's name is the GUI node's title, and a supplied plan makes it carry
+    // the task count (t44, plan D from t43).
+    expect(ctx.engine.runs[0]!.meta.name).toBe('grok-workflow · 1 task')
   })
 
   it('turns a deadline into an infrastructure report instead of an exception', async () => {
@@ -202,6 +210,36 @@ describe('reliability: cancellation and deadlines', () => {
     // verdict — and it is a report, never an exception the transport can swallow.
     expect(report.errors[0]?.category).toBe('infrastructure')
     expect(ctx.engine.runs[0]!.cancel).toHaveBeenCalled()
+  })
+
+  /**
+   * t47, from t46's live observation: with a 60 000 ms deadline saved through the
+   * settings page, a run was still working past five minutes. The plugin asked the
+   * engine to cancel and then waited for an engine that never settled, so the bound
+   * was only as good as the engine's cooperation. The deadline is now a race the
+   * plugin wins on its own.
+   */
+  it('reports the deadline on time even when the engine ignores the cancel', async () => {
+    const ctx = new FakeContext()
+    ctx.engine.hang = true
+    ctx.engine.stubborn = true
+    apply(ctx as never, { maxConcurrency: 1, timeoutMs: 1_000 })
+    const started = Date.now()
+    const report = await ctx.tool!.execute({ objective: 'do the thing', tasks: [callerTask('a')] }, exec()) as {
+      status: string
+      errors: { phase: string; category: string }[]
+    }
+    const elapsed = Date.now() - started
+    expect(elapsed).toBeGreaterThanOrEqual(900)
+    // Not "eventually": the caller must not wait for an engine that never settles.
+    expect(elapsed).toBeLessThan(4_000)
+    expect(report.status).toBe('failed')
+    expect(report.errors[0]?.phase).toBe('Timeout')
+    expect(report.errors[0]?.category).toBe('infrastructure')
+    // The engine was told why, and the reason names the deadline, not the caller.
+    const reason = String(ctx.engine.runs[0]!.cancel.mock.calls[0]?.[0] ?? '')
+    expect(reason).toContain('workflow deadline exceeded')
+    expect(reason).not.toContain('by its caller')
   })
 })
 

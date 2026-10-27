@@ -623,9 +623,15 @@ describe('mandatory entry gate', () => {
     await ctx.preStep()(payload(agent, [userMessage('append please')]), passingNext([]))
     await waitFor(() => session.appends.length >= 2)
     const types = session.appends.map(append => append.type)
-    expect(types).toEqual(['user/message', 'assistant/message'])
+    // The run's progress events share the log with its messages (t44): the panel
+    // needs them, and they are appended while the run is live, not after it.
+    expect(types.filter(type => !type.startsWith('tool-workflow/'))).toEqual(['user/message', 'assistant/message'])
+    expect(types).toContain('tool-workflow/run-start')
+    expect(types).toContain('tool-workflow/run-end')
     expect(agent.followups).toHaveLength(0)
-    const answer = session.appends[1]!.data as { message: { content: { text?: string }[] }; stream: unknown[] }
+    // Find the message by type: the run's own progress events interleave with it.
+    const answer = session.appends.find(append => append.type === 'assistant/message')!
+      .data as { message: { content: { text?: string }[] }; stream: unknown[] }
     expect(answer.stream).toEqual([])
     expect(answer.message.content[0]?.text ?? '').toContain('COMPLETED')
   })

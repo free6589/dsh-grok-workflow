@@ -1,0 +1,2 @@
+roles.worker names model "wb/cn:no-such-model-probe", which provider "bifrost-completions" does not enumerate
+56:    at new apply (file:///home/fish/dsh-v022-home/profiles/web-v022-test/node_modules/dsh-grok-workflow/lib/index.js:55:15)

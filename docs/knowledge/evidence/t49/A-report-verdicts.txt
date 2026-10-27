@@ -1,0 +1,60 @@
+Per-report verdicts in the test home (pre-fix), extracted from the session logs
+source: DSH_HOME=/home/fish/dsh-v022-home, sessions/--home-fish-project_jobs--/
+extraction: assistant/message payloads containing <<<GROK-WORKFLOW-REPORT>>>
+
+report (session-id-n)                          status     failure bucket   reason (verbatim, cut)
+------------------------------------------------------------------------------------------------------------------------------------------------------
+2b8dfd19-034a-4f7a-be53-458ea01862d6-1         FAILED     1 quality        verifier reported issues: executor 在报告中声称“未创建、修改或删除任何文件”，但工作区内存在本轮新建的
+2f9237ac-90fc-4d12-ae6d-599a6580ceb8-1         FAILED     1 infrastructu   -
+664084e6-188e-4904-8818-0609cfeece39-1         FAILED     1 quality        verifier reported issues: Criterion 5 is not provable by diff: /home/f
+664084e6-188e-4904-8818-0609cfeece39-2         COMPLETED  -                -
+664084e6-188e-4904-8818-0609cfeece39-3         FAILED     1 quality        verifier reported issues: Executor evidence note states the reply is "
+7e122a50-b168-4b30-98f8-4dbffca8d27b-1         FAILED     1 cancelled      -
+b35a0afd-78ff-453e-8e56-13d479f0d3ce-1         FAILED     1 quality        verifier reported issues: 可验证证据种类受限：该任务的交付物是对话回答本身，没有落盘文件可供读取，因此回答文本只能
+b35a0afd-78ff-453e-8e56-13d479f0d3ce-2         FAILED     1 quality        verifier reported issues: Criterion 5 is verifiable only by attributio
+b35a0afd-78ff-453e-8e56-13d479f0d3ce-3         FAILED     1 quality        verifier reported issues: Minor inaccuracy, non-blocking: the executor
+b35a0afd-78ff-453e-8e56-13d479f0d3ce-4         FAILED     1 quality        verifier reported issues: 工作目录 /home/fish/project_jobs 不是 git 仓库且被多个并行
+b35a0afd-78ff-453e-8e56-13d479f0d3ce-5         FAILED     1 quality        verifier reported issues: 验收标准第 2 条在任务 JSON 原文中确有一处乱码字符（“字节内���恰好”），执行
+db6736bc-0830-4e0e-8cd6-8358df9fbcbf-1         FAILED     1 infrastructu   -
+
+The eight quality failures, reason strings in full
+============================================================
+
+[2b8dfd19-034a-4f7a-be53-458ea01862d6-1]
+verifier reported issues: executor 在报告中声称“未创建、修改或删除任何文件”，但工作区内存在本轮新建的 evidence/round-5/command.txt 与 output.txt（03:31:54），该说法不准确；且这些文件未在 deliverables/evidence 中披露为写入产物。此项违反任务约束（不得创建文件），但不属于五条验收标准中的任何一条。; 实际执行的 bash 调用为复合命令（echo round-5 后追加 EXIT/PWD/SHELL 探测），并非字面上的单条 `echo round-5`；任务约束允许在同一命令内最小方式合并，报告亦已在 uncertainties 中如实披露，故不构成验收标准失败。; 执行器的原始工具调用记录无法直接复核（无会话日志可读），标准输出/退出码/工作目录三项事实系通过独立重跑与落盘证据双向印证，而非依赖执行器自述。
+
+[664084e6-188e-4904-8818-0609cfeece39-1]
+verifier reported issues: Criterion 5 is not provable by diff: /home/fish/project_jobs is not a git repository, so 'no file created/modified/deleted' rests on (a) absence of any greeting-derived artifact/text and (b) the executor's tool log. Attribution is therefore indirect, though consistent.; The workspace does contain files modified minutes ago (boss/OPERATIONS.md 02:33:13, .agent-teams/bosshunter-local-deploy/team.json 02:34:52), but inspection shows they belong to a separate concurrent Bo…
+
+[664084e6-188e-4904-8818-0609cfeece39-3]
+verifier reported issues: Executor evidence note states the reply is "11 characters"; the actual string "2+2 等于 4。" is 9 characters. This is a miscount inside an evidence field and does not affect the reply text or any acceptance criterion, so it is recorded as a minor observation rather than a failure.; Task constraints forbade the executor from running shell commands or inspecting the workspace, so no artifact/diff-based evidence exists for the "pure conversation" aspects; per the task contra…
+
+[b35a0afd-78ff-453e-8e56-13d479f0d3ce-1]
+verifier reported issues: 可验证证据种类受限：该任务的交付物是对话回答本身，没有落盘文件可供读取，因此回答文本只能取自 EXECUTOR RESULT.summary 中的引述；不过该引述短小且四条验收条款均可直接逐字核对，风险很低。; 执行器把「验收条款对应关系」本身当作证据（自证），缺乏外部锚点；本次已用只读命令独立复算 3+4=7 并检查工作区，补足了这一点。
+
+[b35a0afd-78ff-453e-8e56-13d479f0d3ce-2]
+verifier reported issues: Criterion 5 is verifiable only by attribution, not by a VCS diff: the workspace is not a git repository, so 'no other file modified' rests on mtime/birth-time forensics plus the absence of any reference to answer.txt in the concurrently written paths.; Two workspace paths were created after answer.txt (.agent-teams/auto-job-hunter/team.json, born 03:14:37, and 脚手架选型清单_综合蓝领门店.md, born 03:13:47 with mtime still advancing). Both belong to the unrelated concurrent 'auto-jo…
+
+[b35a0afd-78ff-453e-8e56-13d479f0d3ce-3]
+verifier reported issues: Minor inaccuracy, non-blocking: the executor summary says "All five acceptance checks pass" although there are seven acceptance criteria. The substance of all seven still verified true on disk.; The workspace is a shared, non-git directory with concurrent tasks actively writing (e.g. 企业官网/.vendor_cache created at 03:19, after the evidence file). File-set attribution therefore relies on mtimes plus the worker's single-item filesChanged list rather than a clean workspace…
+
+[b35a0afd-78ff-453e-8e56-13d479f0d3ce-4]
+verifier reported issues: 工作目录 /home/fish/project_jobs 不是 git 仓库且被多个并行任务持续写入，无法对“未修改文件”做严格的变更归属取证（无 diff 基线）；只能通过“全目录搜索交付句特征短语无命中 + 无写入类命令痕迹”间接证明，属可接受的间接证据。; “一句话”判定基于句末标点数量（1 个「。」）；句内有逗号分隔的分句，该判读已在标准文本中由标点定义明确，不构成歧义。
+
+[b35a0afd-78ff-453e-8e56-13d479f0d3ce-5]
+verifier reported issues: 验收标准第 2 条在任务 JSON 原文中确有一处乱码字符（“字节内���恰好”），执行摘要按语义理解为“字节内容恰好”，处理合理，不影响本次字节级验证结论。; 摘要披露 `mkdir -p evidence/round-5` 同时创建了父目录 evidence/，严格而言这是 evidence/round-5/ 之外的一次目录创建；因第 6 条针对的是“文件”且摘要已如实披露、未在该目录内写入任何文件，故判定为满足，但属于需注意的边界事实。; 工作区非 git 仓库且被并行任务写入，无法对“目录外未修改文件”做独立归属取证；本次验证仅基于 evidence/round-5/ 内自包含内容与摘要声明的一致性。
+
+Why these eight are one defect and not eight model problems
+============================================================
+In src/script.ts, checkVerification tests in this order:
+  1 no structured result -> 'verifier returned no valid structured result'
+  2 executor failed     -> 'executor reported failure'
+  3 verdict !== 'pass'  -> 'verifier verdict was fail'
+  4 issues.length > 0   -> 'verifier reported issues: ...'   <-- all eight stopped here
+  5 no checkedEvidence  -> 'verifier supplied no checked evidence'
+  6 criteria count      -> 'verifier criteria count does not match ...'
+  7 per criterion       -> 'criterion not met: ...' / 'criterion has no evidence: ...'
+
+Test 4 is only reachable when test 3 did not fire, so in all eight runs the verifier
+returned verdict: 'pass'. The task failed because its prose issues list was non-empty.
+No report anywhere says 'verifier verdict was fail' or 'criterion not met'.

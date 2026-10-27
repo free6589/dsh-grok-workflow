@@ -1,0 +1,159 @@
+{
+ "toolName": "grok_workflow",
+ "enforceGate": true,
+ "gateRequired": false,
+ "gateScope": {
+  "holder": true,
+  "keys": [
+   "get"
+  ],
+  "got": "process"
+ },
+ "gatePreset": {
+  "holder": true,
+  "keys": [
+   "get"
+  ],
+  "got": ""
+ },
+ "answerStrategy": {
+  "holder": true,
+  "keys": [
+   "get"
+  ],
+  "got": "in-turn"
+ },
+ "historyTurns": {
+  "holder": true,
+  "keys": [
+   "get"
+  ],
+  "got": 4
+ },
+ "historyChars": {
+  "holder": true,
+  "keys": [
+   "get"
+  ],
+  "got": 4000
+ },
+ "maxQueuedMessages": {
+  "holder": true,
+  "keys": [
+   "get"
+  ],
+  "got": 4
+ },
+ "maxConcurrency": {
+  "holder": true,
+  "keys": [
+   "get"
+  ],
+  "got": 1
+ },
+ "maxRetries": {
+  "holder": true,
+  "keys": [
+   "get"
+  ],
+  "got": 0
+ },
+ "maxTasks": {
+  "holder": true,
+  "keys": [
+   "get"
+  ],
+  "got": 1
+ },
+ "timeoutMs": {
+  "holder": true,
+  "keys": [
+   "get"
+  ],
+  "got": 60000
+ },
+ "maxActiveRuns": {
+  "holder": true,
+  "keys": [
+   "get"
+  ],
+  "got": 1
+ },
+ "maxActiveRunsTotal": {
+  "holder": true,
+  "keys": [
+   "get"
+  ],
+  "got": 4
+ },
+ "subagentProvider": {
+  "holder": true,
+  "keys": [
+   "get"
+  ],
+  "got": "spawn"
+ },
+ "roles": {
+  "holder": true,
+  "keys": [
+   "get"
+  ],
+  "got": {
+   "planner": [
+    {
+     "provider": "bifrost-completions",
+     "model": "wb/cn:deepseek-v4.1-flash"
+    }
+   ],
+   "worker": [
+    {
+     "provider": "bifrost-completions",
+     "model": "wb/cn:deepseek-v4.1-flash"
+    }
+   ],
+   "verifier": [
+    {
+     "provider": "bifrost-completions",
+     "model": "wb/cn:deepseek-v4.1-flash"
+    }
+   ],
+   "synthesizer": []
+  }
+ },
+ "synthesis": {
+  "holder": true,
+  "keys": [
+   "get"
+  ],
+  "got": "deterministic"
+ },
+ "switchOn": {
+  "holder": true,
+  "keys": [
+   "get"
+  ],
+  "got": []
+ },
+ "recordRuns": {
+  "holder": true,
+  "keys": [
+   "get"
+  ],
+  "got": true
+ },
+ "recordLimit": {
+  "holder": true,
+  "keys": [
+   "get"
+  ],
+  "got": 64
+ },
+ "showProgress": {
+  "holder": true,
+  "keys": [
+   "get"
+  ],
+  "got": true
+ },
+ "configVersion": 1
+}

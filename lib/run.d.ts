@@ -7,7 +7,9 @@
  */
 import type { Context } from '@deepseek-ai/cordis';
 import type { Agent } from '@deepseek-ai/dsh-agent';
+import type { Session } from '@deepseek-ai/dsh-session';
 import type { WorkflowRun } from '@deepseek-ai/dsh-workflow';
+import type { DisposeRecord } from './records.js';
 import type { NormalizedTask, ResolvedConfig, WorkflowReport } from './types.js';
 /** Minimal logger surface used by the runtime modules. */
 export interface WorkflowLogger {
@@ -15,19 +17,71 @@ export interface WorkflowLogger {
     /** Diagnostics channel; absent on a logger that only carries warnings. */
     info?(message: string): void;
 }
+/** Identity and timing of one run, kept so an unload can name what it cancelled. */
+export interface ActiveRunInfo {
+    runId: string;
+    /** Session that owns the run; also the key of the per-session cap (P1-3). */
+    sessionId: string;
+    /** Session object, so a disposal can write the interrupted run's notice. */
+    session?: Session;
+    startedAtMs: number;
+}
 /** Lifetime-scoped state shared by the tool and the gate. */
 export interface ActiveState {
     disposed: boolean;
     pending: number;
+    /** Epoch milliseconds at which the plugin instance was applied. */
+    readonly createdAt: number;
     readonly controller: AbortController;
     readonly runs: Set<WorkflowRun>;
+    /** Identity of every live run, keyed by the run the engine handed back. */
+    readonly active: Map<WorkflowRun, ActiveRunInfo>;
+    /** Admitted-but-not-yet-started runs per session id (the cap counts these too). */
+    readonly starting: Map<string, number>;
+    /** Set by {@link disposeActiveState}; read by the cancelled exit to name the cause. */
+    unloadedAt?: number;
+    /**
+     * Shutdown signals seen before disposal (t45). Empty means the unload happened
+     * inside a live process — a settings toggle, a reload or a test — which is the
+     * distinction the dispose record and the notice need.
+     */
+    signals?: string[];
 }
 /** Create the lifetime state owned by one plugin instance. */
 export declare function createActiveState(): ActiveState;
+/** Human-shaped elapsed time for a message a user may read (`14m38s`, `820ms`). */
+export declare function formatElapsed(ms: number): string;
+/** How many runs (started + starting) one session holds against its cap. */
+export declare function activeCountOfSession(state: ActiveState, sessionId: string): number;
 /** Short label used in thrown messages and rendered failures. */
 export declare function workflowLabel(config: ResolvedConfig): string;
-/** Cancel every live run; called from the plugin disposer. */
-export declare function disposeActiveState(state: ActiveState): Promise<void>;
+/** Inputs the plugin disposer can offer about how it was reached. */
+export interface DisposalContext {
+    logger?: WorkflowLogger;
+    /** Stack of the disposer call, used for attribution (t45, P0-1). */
+    callSite?: string;
+}
+/**
+ * Cancel every live run; called from the plugin disposer.
+ *
+ * Two obligations that t41 showed were missing (t45, P0):
+ *
+ * 1. **Be observable.** Before anything is aborted this writes one
+ *    `plugin:grok-workflow/dispose` record per affected session (time, uptime,
+ *    shutdown signals, trigger class, redacted call site, run count and per-run
+ *    elapsed) and one diagnostics line, so "who unloaded the plugin" is answerable
+ *    from the log.
+ * 2. **Say what it broke, once.** A session whose run is interrupted gets one
+ *    user-visible notice; an *idle* unload — what a user does on purpose when
+ *    disabling the plugin from the settings surface — stays silent, because a
+ *    direct answer is the expected behaviour there and a per-message banner
+ *    would be noise.
+ *
+ * Every write is contained: this runs inside a disposer, where the session
+ * service may already be gone, and a refused record must never stop the
+ * cancellation that follows it.
+ */
+export declare function disposeActiveState(state: ActiveState, context?: DisposalContext): Promise<DisposeRecord>;
 /** A combined signal plus the hook that releases its listeners. */
 export interface CombinedSignal {
     signal: AbortSignal;

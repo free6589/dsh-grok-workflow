@@ -1,0 +1,51 @@
+====================================================================================================
+completed run — session-199c077f (run 2, "date" objective)
+source: session-199c077f-b82e-4ede-b29b-6234e188175b/session.v4.jsonl.zstd (zstd, DSH session log — server clock, no browser involved)
+====================================================================================================
+seq=  4  Δ from turn/start       0 ms  turn/start                   {}
+seq=  7  Δ from turn/start      60 ms  tool-workflow/run-start      {"runId": "977e078f-b00c-409e-9201-4c8edaba1fbf", "name": "grok-workflow"}
+seq=  9  Δ from turn/start     450 ms  tool-workflow/agent-start    {"runId": "977e078f-b00c-409e-9201-4c8edaba1fbf", "seq": 1, "label": "grok-planner", "phase": "Plan", "childId": "b7b35ea2-e5e3-4e3b-bbe8-f1ef4b6dc47d
+seq= 10  Δ from turn/start    9951 ms  tool-workflow/agent-end      {"runId": "977e078f-b00c-409e-9201-4c8edaba1fbf", "seq": 1, "outcome": "completed"}
+seq= 12  Δ from turn/start   10149 ms  tool-workflow/agent-start    {"runId": "977e078f-b00c-409e-9201-4c8edaba1fbf", "seq": 2, "label": "grok-worker-run-date-evidence-a1", "phase": "Execute", "childId": "f68a6bb8-97d0
+seq= 13  Δ from turn/start   35316 ms  tool-workflow/agent-end      {"runId": "977e078f-b00c-409e-9201-4c8edaba1fbf", "seq": 2, "outcome": "completed"}
+seq= 15  Δ from turn/start   35390 ms  tool-workflow/agent-start    {"runId": "977e078f-b00c-409e-9201-4c8edaba1fbf", "seq": 3, "label": "grok-verifier-run-date-evidence-a1", "phase": "Verify", "childId": "c7f7597a-2d7
+seq= 16  Δ from turn/start   78598 ms  tool-workflow/agent-end      {"runId": "977e078f-b00c-409e-9201-4c8edaba1fbf", "seq": 3, "outcome": "completed"}
+seq= 17  Δ from turn/start   78651 ms  tool-workflow/run-end        {"runId": "977e078f-b00c-409e-9201-4c8edaba1fbf", "stopReason": "completed"}
+seq= 19  Δ from turn/start   78653 ms  step/start                   {}
+seq= 21  Δ from turn/start   78655 ms  user/message                 {}
+seq= 22  Δ from turn/start   78656 ms  user/message                 {}
+seq= 23  Δ from turn/start   78656 ms  user/message                 {}
+seq= 27  Δ from turn/start   84771 ms  step/end                     {}
+seq= 28  Δ from turn/start   84771 ms  turn/end                     {}
+
+====================================================================================================
+cancelled run — session-eed6d66e (run 3, stopped from the GUI)
+source: session-eed6d66e-f99f-495c-bb53-c950a08f0401/session.v4.jsonl.zstd (zstd, DSH session log — server clock, no browser involved)
+====================================================================================================
+seq=  4  Δ from turn/start       0 ms  turn/start                   {}
+seq=  7  Δ from turn/start     225 ms  tool-workflow/run-start      {"runId": "da9e1b9d-0288-484a-9593-739322f6999a", "name": "grok-workflow"}
+seq=  9  Δ from turn/start     576 ms  tool-workflow/agent-start    {"runId": "da9e1b9d-0288-484a-9593-739322f6999a", "seq": 1, "label": "grok-planner", "phase": "Plan", "childId": "49d21420-718b-4db1-98a0-0a3a3821fa3d
+seq= 10  Δ from turn/start    8146 ms  tool-workflow/agent-end      {"runId": "da9e1b9d-0288-484a-9593-739322f6999a", "seq": 1, "outcome": "cancelled"}
+seq= 11  Δ from turn/start    8147 ms  tool-workflow/run-end        {"runId": "da9e1b9d-0288-484a-9593-739322f6999a", "stopReason": "cancelled"}
+seq= 13  Δ from turn/start    8148 ms  turn/end                     {}
+
+====================================================================================================
+completed run — session-a61e6c44 (run 1, first observation)
+source: session-a61e6c44-d349-458c-bc22-0975b91d7634/session.v4.jsonl.zstd (zstd, DSH session log — server clock, no browser involved)
+====================================================================================================
+seq=  4  Δ from turn/start       0 ms  turn/start                   {}
+seq=  7  Δ from turn/start      64 ms  tool-workflow/run-start      {"runId": "e7801569-e116-40f4-89ed-37a29778bfe6", "name": "grok-workflow"}
+seq=  9  Δ from turn/start     690 ms  tool-workflow/agent-start    {"runId": "e7801569-e116-40f4-89ed-37a29778bfe6", "seq": 1, "label": "grok-planner", "phase": "Plan", "childId": "7da659c0-5f5e-47b4-a310-2de3bc129746
+seq= 10  Δ from turn/start   21009 ms  tool-workflow/agent-end      {"runId": "e7801569-e116-40f4-89ed-37a29778bfe6", "seq": 1, "outcome": "completed"}
+seq= 12  Δ from turn/start   21197 ms  tool-workflow/agent-start    {"runId": "e7801569-e116-40f4-89ed-37a29778bfe6", "seq": 2, "label": "grok-worker-run-echo-hello-t44-a1", "phase": "Execute", "childId": "28319b20-79b
+seq= 13  Δ from turn/start   54251 ms  tool-workflow/agent-end      {"runId": "e7801569-e116-40f4-89ed-37a29778bfe6", "seq": 2, "outcome": "completed"}
+seq= 15  Δ from turn/start   54445 ms  tool-workflow/agent-start    {"runId": "e7801569-e116-40f4-89ed-37a29778bfe6", "seq": 3, "label": "grok-verifier-run-echo-hello-t44-a1", "phase": "Verify", "childId": "4e6d430c-aa
+seq= 16  Δ from turn/start   93955 ms  tool-workflow/agent-end      {"runId": "e7801569-e116-40f4-89ed-37a29778bfe6", "seq": 3, "outcome": "completed"}
+seq= 17  Δ from turn/start   94004 ms  tool-workflow/run-end        {"runId": "e7801569-e116-40f4-89ed-37a29778bfe6", "stopReason": "completed"}
+seq= 19  Δ from turn/start   94006 ms  step/start                   {}
+seq= 21  Δ from turn/start   94009 ms  user/message                 {}
+seq= 22  Δ from turn/start   94009 ms  user/message                 {}
+seq= 23  Δ from turn/start   94010 ms  user/message                 {}
+seq= 26  Δ from turn/start  109968 ms  assistant/message            {}
+seq= 27  Δ from turn/start  109969 ms  step/end                     {}
+seq= 28  Δ from turn/start  109969 ms  turn/end                     {}

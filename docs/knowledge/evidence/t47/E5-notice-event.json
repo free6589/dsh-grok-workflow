@@ -1,0 +1,12 @@
+{
+ "seq": 10,
+ "turn": 1,
+ "step": 0,
+ "surfaceOp": "append",
+ "source": {
+  "kind": "model",
+  "provider": "grok-workflow",
+  "model": "workflow-notice"
+ },
+ "text": "[grok-workflow] The plugin was unloaded while this session had 1 workflow run in flight, so that work was cancelled. Cause: the plugin was unloaded inside a running process (a settings toggle, a reload or an upgrade); the host does not disclose which, and the disposal call path is recorded in this session for whoever asks. This notice is written once, at unload time. Messages sent until the plugin is enabled again are answered directly and are no longer forced through the mandatory workflow."
+}
