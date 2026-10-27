@@ -8,11 +8,53 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 ### Added / 新增
 - (nothing yet) / （暂无）
 
+## [0.2.1] - 2026-10-27
+
+Incremental release on top of the published `0.2.0`: everything below is **new since** that tag —
+nothing in this section restates a change that `0.2.0` already shipped.
+
+`0.2.0` 之上的增量版本：本节全部是**自该 tag 以来新增**的内容，不重复 `0.2.0` 已经发布过的改动。
+
+### English
+
+#### Added
+- **Settings page in the Web GUI / Web 图形界面的设置页。** The plugin now ships its own
+  browser bundle, so the Plugins page shows a **Grok workflow** card with all 21
+  configuration keys: the 17 live fields (gate, context and concurrency limits,
+  synthesis, failure classes, run records) and the 4 structural keys read-only with
+  their reason. Per-role fallback chains are edited in place (add / remove / edit a
+  route, up to three per role), invalid input is refused before it reaches the Host,
+  and a save applies to the **next** message. The page appears only while the Host
+  serves the namespace, so an inactive plugin shows no card instead of a dead form.
+  / 插件自带浏览器端 bundle：插件页出现 **Grok workflow** 卡片，渲染全部 21 个配置键
+  （17 个可编辑的活动字段 + 4 个只读结构性字段并给出原因），支持按角色链的增删改
+  （每角色最多 3 条），非法输入在提交前被拦下并列出原因，保存后对**下一条消息**生效；
+  命名空间未提供时整页不出现，而不是显示一个坏掉的表单。
+- **Activation prerequisite documented / 记录激活前提。** `@deepseek-ai/dsh-web-app` ships
+  `workflow-ptc` disabled, so installing the bundle puts the row in the graph while the
+  plugin stays `pending (waiting for service: workflowEngine)`. The install steps now
+  include re-enabling a workflow provider, plus the four checks that prove activation
+  (clean boot, served namespace, GUI card, `grok_workflow` in a real session's tool
+  list). / `dsh-web-app` 层默认禁用 `workflow-ptc`，装包只让行进入组合图而插件停在
+  `pending`；安装步骤已补上"启用一个工作流 provider"和四条激活校验。
+
+### 简体中文
+
+#### 新增
+- **Web 图形界面的设置页。** 插件自带浏览器端 bundle：插件页出现 **Grok workflow** 卡片，
+  渲染全部 21 个配置键（17 个可编辑的活动字段 + 4 个只读结构性字段并给出原因），支持按角色
+  链的增删改（每角色最多 3 条），非法输入在提交前被拦下并列出原因，保存后对**下一条消息**
+  生效；命名空间未提供时整页不出现，而不是显示一个坏掉的表单。
+- **记录激活前提。** `@deepseek-ai/dsh-web-app` 层默认禁用 `workflow-ptc`，装包只让行进入
+  组合图而插件停在 `pending (waiting for service: workflowEngine)`；安装步骤已补上"启用一个
+  工作流 provider"和四条激活校验。
+
 ## [0.2.0] - 2026-10-26
 
 ### English
 
 #### Added
+
 - **Mandatory entry (the gate).** The plugin now claims every user message
   through `agent/pre-step`, runs the full plan → execute → verify → synthesise
   workflow, and delivers the result inside the same turn (`answerStrategy:
@@ -120,6 +162,7 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 ### 简体中文
 
 #### 新增
+
 - **强制入口（闸门）**：插件现在通过 `agent/pre-step` 认领每一条用户消息，执行完整的
   规划 → 执行 → 验证 → 汇总工作流，并在**同一轮**内交付结果（`answerStrategy:
   in-turn` 为默认）。拒绝一条消息也是明示决定：空消息或超过 4000 字符的消息会被打印

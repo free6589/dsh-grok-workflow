@@ -1,0 +1,17 @@
+# Invalid input refused before the Host (0.2.1, tarball md5 ffb22ca4a2e249b41303fbbbcf9cb450)
+# edits: maxRetries=99 (outside its hard limit) and two verifier rows without a model
+{
+  "errors": [
+    "maxRetries 必须是 0 到 3 之间的整数",
+    "verifier 第 1 条缺少 model",
+    "verifier 第 2 条缺少 model"
+  ],
+  "saveDisabled": true,
+  "saveLabel": "保存 (2) / Save"
+}
+
+# assertions
+error rows shown: 3
+numeric bound reported: true
+missing model reported: 2
+Save disabled while invalid: true

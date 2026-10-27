@@ -699,6 +699,70 @@ never swallowed, and never turned into a bare exception the transport can lose.
 | wiring, proven not assumed | the live scope edit, the tool's live `maxTasks`, and the `cancelled` category each have a case (t30/F3); the run-level failure summary counts `errors[].category`, so a deadline/cancel/unvalidatable report still prints a `Failures:` line (t30/F4) | `applies a live gate scope edit…`, `uses the live configuration for a tool call…`, `parses the cancelled category…` |
 | surface diagnostics | the log line says whether the page is generated, how many fields it projects, what `applies` is, and whether the descriptor is really our schema (uid match) | `states the settings surface…` |
 
+### DD-9c — The settings page must be a browser bundle of this plugin (t32, measured)
+
+The Host's generated settings form and the Web GUI are two different layers, and only the
+first one existed before t32:
+
+- **Host side (present since stage 1).** Each plugin row registers a settings namespace;
+  `POST /api/settings/describe` answers it with `autoGenerate: true` and the *volatile*
+  fields only (`17` of the `21` keys here — `toolName`, `enforceGate`, `gateRequired`,
+  `configVersion` are structural and never projected).
+- **Client side (missing).** `@deepseek-ai/dsh-client-ui-settings` renders nothing for a
+  namespace by itself. Every feature ships a browser bundle that registers a
+  `plugins.item` entry and stays registered through
+  `configForms.whileServed([ns], …)`. Measured consequence in t32: 20 namespaces served,
+  `grok-workflow` among them, and the Plugins page showed no card; the plugin was invisible
+  in the GUI and NR-7 could not be answered by the stock shell at all.
+
+The page therefore ships in this package:
+
+- `src/client/index.js` — plain browser module in the Host's `__ModuleLoader__` format
+  (`window.__ModuleLoader__.load({ id, factory })`), served verbatim as
+  `dsh-grok-workflow/client.js`. `scripts/build-client.mjs` copies it to `lib/client.js`
+  during `npm run build`, and `test/client.spec.ts` fails when the two differ, so a stale
+  bundle cannot ship.
+- Manifest: `exports["./client"]` → `./lib/client.js` and `dsh.client = { platform: 'web',
+  inject: [...] }`. The two are what makes the Host serve the bundle at all.
+- Data path: reads go through `configForms.describe()` (the subscribable mirror), writes
+  through `configForms.get(ns).mutate(ops, revision)` — the same ordering, revision fence
+  and recovery the stock pages use. The page never re-implements settings I/O.
+- Field table: `test/client.spec.ts` pins it against `CONFIG_KEYS`, `HARD_LIMITS` and
+  `SWITCHABLE_CLASSES`, so the page cannot drift from `resolveConfig`. The four structural
+  keys are rendered read-only with the reason ("change them in the profile patch").
+
+Two consequences worth keeping: a settings write lands in the **profile's
+`cordis.patch.yml`** (that is the settings document), and the page is gated by
+`whileServed`, so an inactive plugin shows no card instead of a broken form.
+
+### DD-9d — Where the settings page attaches, and the two dependencies that follow (t35)
+
+The browser half is not only "a page": it depends on two Host-side surfaces, and both are worth
+writing down because neither is contractual in the way a service injection is.
+
+- **The settings namespace name is the Loader row id.** The page used to bind to the literal
+  `'grok-workflow'`, so a profile that renamed the row (`- id: not-grok-workflow`) would project
+  the same fields under another name and the page would **silently disappear** — no error, no
+  hint. `resolveNamespace()` now identifies the namespace the way the Host identifies its own
+  descriptor: the shipped id first, then the projected value (`roles` + `switchOn` are volatile
+  and together specific enough). When it has to move, it says so on the console
+  (`settings namespace is "<ns>", not the shipped "grok-workflow"`); when nothing projects the
+  fields it says *that* instead, because the plugin being invisible is precisely the failure that
+  swallowed the whole feature in t33. A renamed row therefore degrades to "the page follows the
+  row", not to "no page".
+- **`plugins.item` is the plugin manager's own slot.** Registering into it is what makes the
+  plugin appear in the same list as the stock pages, with the same card/detail rendering — and it
+  is the reason a host-side change to that slot's contract (or to the plugin manager's page)
+  would affect this page. There is no narrower, plugin-owned alternative in 0.2.1-rc.2: the
+  settings UI has no route of its own. Risk registered here rather than discovered later; the
+  page's own content depends on nothing but `configForms`, so a slot rename would cost the entry
+  point, not the functionality.
+
+Both are checked where they can be checked: `test/client.spec.ts` pins `resolveNamespace()` (by
+id, by renamed row, missing, and a half-signature namespace that must not be captured), and the
+live GUI run in `docs/knowledge/VALIDATION.md` (Round 3) shows the entry rendering next to
+`subagent`, `web-search`, `agent-loop` and `shell`.
+
 ### DD-10 — Observability
 
 One `plugin:grok-workflow/run` record per run, one `plugin:grok-workflow/gate` per gate
@@ -785,8 +849,8 @@ cited as working:
 | NR-4 | settings `update`/`replace`/`mutate` writing to disk through a real Loader entry | host-side contract source-read in `dsh-settings` (descriptor shape, `autoGenerate` default, path ops, `SETTINGS_CONFLICT`, `prepareDocument`); no write was performed | whether stage 2 can edit chains at all |
 | NR-5 | failure-text classification against **real** provider errors (429/5xx/connection/timeout/model-unavailable) | the whitelist is exercised against synthetic messages only (`test/routing.spec.ts`) | a real adapter may word an error so that it lands in `unknown`; `unknown` still switches routes but is reported as unclassified |
 | NR-6 | route switching with real children and real providers end to end | source-confirmed option plumbing (E-37) + simulated failures in the contract harness | whether a real provider/model combination actually starts and answers after a switch |
-| NR-7 | the stock Web form rendering this plugin's `roles` (array-of-object) section against a live Loader | `SettingsForms` contract source-read; `describeSelf()` is now pinned to the **real descriptor shape** (`form.toJSON()` = `{uid, refs}`, no `properties` — t28/F1) with a fake context, but no GUI ever rendered the form | decides whether the generated page is usable for chains or whether U-6 (custom editor) is needed sooner |
-| NR-8 | whether a **real settings-form edit against a live Loader** reaches a queued message, and what an in-flight run does with it | semantics implemented and unit-tested in t14 (`volatile()` holders + `createConfigReader()`: next admission re-reads, a started run keeps its snapshot, an invalid edit refuses with its reason and delivery falls back to the last good snapshot). E-40 now *does* measure the runtime half of the holder mechanism (the real Loader hands `{get()}` holders and the plugin unwraps them, in a real headless turn). What is still unmeasured is the last step — a settings-form `update()` mutating that holder in place while a message waits — because that needs the Web GUI | the code path is honest and tested; what remains unproven is the runtime's in-place update, so the user-facing sentence stays: a settings edit applies to the **next message**, a hand-edited patch file needs a reload |
+| NR-7 | this plugin's settings page in the **stock Web GUI** | **closed in t32 (measured)**: the Host *serves* the namespace (`POST /api/settings/describe` → `grok-workflow`, `autoGenerate: true`, 17 projected fields) but the stock client renders **no page** for it — `autoGenerate` is a Host-side description, not a UI. The plugin now ships its own browser bundle (`src/client/index.js`, served as `dsh-grok-workflow/client.js`) that registers a `plugins.item` card while `configForms.whileServed(['grok-workflow'])` holds; the page renders all 21 keys (17 editable + 4 structural read-only) with per-role chain editing | the answer is "a generated page alone is unusable in the GUI"; U-6 is no longer a maybe — the custom editor shipped in 0.2.0 |
+| NR-8 | whether a **real settings edit against a live Loader** reaches the next message | **closed in t32 (measured, GUI)**: Playwright opened the plugin page on a separate profile, set `maxConcurrency` 3→5 and appended a `planner` route, pressed Save; `POST /api/settings/mutate` answered a new revision, the value showed up in the profile's `cordis.patch.yml`, survived a restart, and `settings/describe` reported it in the entry's `user` layer. Invalid input is refused in two places (the page disables Save and lists the reason; the Host/`resolveConfig` refuses the write) | a settings edit applies to the **next** message; a hand-edited patch file still needs a reload |
 | NR-9 | whether a **real planner model fills `writesPaths`**, and at what rate | one real headless run was made with an objective that explicitly asked for per-task write paths. The run did not finish inside the 900 s script timeout (it was still retrying task 1 of 2), so it produced no report — **and that timeout is not evidence in either direction**. What the session transcript does show is decisive for the field itself: the task the script handed the worker carried `"writesPaths": null`, i.e. the planner did **not** declare paths even when asked. n = 1, explicitly prompted | the mitigation is only automatic for plans that declare paths; with a planner that does not, `0.2.0` behaves exactly like the pre-U-4 scheduler. Anything stronger needs a measured fill-rate over many runs, and possibly a planner-prompt change — not a code change |
 
 ---

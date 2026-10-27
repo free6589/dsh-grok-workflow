@@ -422,6 +422,168 @@ tests:
   has 17 orchestrator tests and 6 files / 56 tests total.
 - `npm run ci` — **PASS**, 6 files / 56 tests.
 
+## Round 3 / GUI, activation and the settings page — 2026-10-27 (t32 + t33)
+
+All work happened on a **separate profile and a separate instance**
+(`DSH_HOME=/home/fish/dsh-layerfs`, profile `web-grok-debug`, `127.0.0.1:3199`). The
+user's live GUI (`:3090`, PID 825935) was never restarted, killed or reconfigured; it was
+checked alive (`ps -o pid -p 825935`) before and after every experiment.
+
+### Activation: composition is not activation (closes the t33 contradiction)
+
+| Step | Command / observation | Result |
+|---|---|---|
+| row present after install | `dsh plugin --profile web-grok-debug add <tgz>` then `dsh --profile web-grok-debug --dump-config` | `- id: grok-workflow` / `name: dsh-grok-workflow` — the row **is** in the composed config |
+| why it still did nothing | same dump, provider row | `- id: workflow-ptc … disabled: true` (shipped that way by `@deepseek-ai/dsh-web-app`) |
+| runtime consequence | boot of the new instance | `dsh: warning: 2 entries did not activate` / `grok-workflow (dsh-grok-workflow): pending (waiting for service: workflowEngine)` |
+| fix, same profile | `cordis.patch.yml`: `- id: workflow-ptc` / `config: { provider: spawn }` / `disabled: false` | boot is clean; no pending warning |
+| proof the seam arrived | `POST /api/settings/describe` | namespace `grok-workflow`, `autoGenerate: true`, **17** projected fields (`toolName`, `enforceGate`, `gateRequired`, `configVersion` absent) |
+| proof of the runtime tool surface (A1) | real GUI session, session transcript `request/header` | **32 tools**, `grok_workflow` among them; no `--dump-config` involved |
+| proof the gate claims messages (C1) | same session transcript | `plugin:grok-workflow/delivery` records per message id: `phase: started, outcome: admitted` … `phase: delivered`; the answer is the workflow's report, never a direct reply |
+
+So the t33 finding ("0 × `grok_workflow` in a 92,716-character prompt") is explained by a
+**missing service**, not by a broken package: `dsh plugin add` puts the bundle into
+`dsh.profile.bundles` (visible in `--dump-config`), while activation additionally needs an
+enabled workflow provider. See D-014 and
+[../LOCAL-TESTING.md](../LOCAL-TESTING.md#enable) for the reproducible steps.
+
+### Fail-closed path (C2), measured twice
+
+| Run | Config | Observed |
+|---|---|---|
+| 1 | `subagentProvider: bifrost-completions` (an LLM provider, not a DSH subagent provider) | delivery `started/admitted` → `failed/start-failed`; the user message is replaced by a report the model must relay verbatim: *"The mandatory workflow gate refused this message and no workflow result exists. Reason: no subagent provider registered for \"bifrost-completions\". Nothing was executed and no direct answer is available by design."* |
+| 2 | `subagentProvider: spawn` (correct), weak model | delivery `started/admitted` → `delivered/failed`; the visible answer is `Grok workflow: FAILED` with `Plan: planner; 1 task(s); 0 verified` and a `Failures: 2 quality` list — a report, still no direct answer |
+
+### The settings page (requirement D, closes NR-7/NR-8)
+
+| Check | Observation |
+|---|---|
+| namespace served but no page (the root cause) | `settings/describe` lists 20 namespaces including `grok-workflow`; the Plugins page showed **no** card for it: `autoGenerate` is a Host description, not a UI |
+| Fix | `src/client/index.js` shipped as `dsh-grok-workflow/client.js`; registers `plugins.item` under `configForms.whileServed(['grok-workflow'])`. Manifest: `exports["./client"]` + `dsh.client = { platform: 'web', inject: [...] }` |
+| B1 the entry exists | Plugins page renders a card **Grok workflow** (`data-plugin-item="grok-workflow"`) |
+| B2 the fields render | 15 `[data-field]` inputs + the class picker + 4 per-role chain editors + 4 read-only structural rows = all **21** `CONFIG_KEYS`; `test/client.spec.ts` pins the table against `CONFIG_KEYS` / `HARD_LIMITS` / `SWITCHABLE_CLASSES` |
+| B3 edit → save → effective | Playwright set `maxConcurrency` 3 → 5 and appended a `planner` route, pressed Save: page shows `已保存` and `revision 1`; `POST /api/settings/mutate` carried `{ns, ops, expectedRevision}`; the value is in the profile's `cordis.patch.yml`; after a **restart** the page and `settings/describe` still report `maxConcurrency: 5` and the planner route in the entry's `user` layer |
+| B4 invalid input | adding four empty `verifier` routes lists `verifier 第 N 条缺少 model` and disables Save; the Host also refuses (`resolveConfig`), e.g. boot prints `roles.synthesizer is set but synthesis is "deterministic"` and the row does not activate |
+| B5 no fake page | every rendered key is a real `resolveConfig` key (parity test), the page reads the Host mirror and writes through the settings queue — it has no local copy of the config |
+
+### Reproducible install in a pristine `DSH_HOME` (A3)
+
+A second, independent check with **no user data at all** (`DSH_HOME=/tmp/t32-dsh-home`,
+profile `smoke`, port 3198):
+
+| Step | Result |
+|---|---|
+| `dsh --profile smoke --from-default-profile web` | profile created |
+| `dsh plugin --profile smoke add /tmp/t32-pack/dsh-grok-workflow-0.2.0.tgz` | `+ dsh-grok-workflow file:/tmp/t32-pack/dsh-grok-workflow-0.2.0.tgz` |
+| profile `cordis.patch.yml`: `workflow-ptc` → `disabled: false`, `provider: spawn` | composed config shows the enabled provider and `- id: grok-workflow` |
+| boot on `127.0.0.1:3198` | no `pending` and no `did not activate` line |
+| `POST /api/settings/describe` | 22 namespaces, `grok-workflow` present, `autoGenerate: true`, the same 17 projected keys |
+| boot graph in the browser (`window.__DSH_BOOT__.entries`) | 70 entries including `dsh-grok-workflow` (the client bundle is served) |
+
+Two honest notes about this pristine profile: its `cordis.patch.yml` ships as a bare `[]`, so
+patch entries must **replace** that token (appending produced a YAML with two root nodes and
+`dsh` reported the line number); and its Plugins page never opened — no cards at all, ours or
+the stock ones (`subagent`/`web-search`/`agent-loop`/`shell`), with no console error, which is
+stock behaviour in a profile without sessions or packages. The card itself was therefore
+verified on the debug profile, where the Plugins page lists exactly
+`["subagent", "web-search", "agent-loop", "shell", "grok-workflow"]` — ours among the stock
+pages, same slot, same rendering path.
+
+### Evidence chain: the artefacts measured are the artefacts shipped (F1, t35)
+
+Every screenshot in this round was taken on the **0.2.1 tarball**, installed into the debug
+profile from a **fresh path** (the same `file:` spec is a pnpm no-op — the trap that made the
+first t32 evidence describe a stale build):
+
+| artefact | value |
+| --- | --- |
+| tarball the screenshots were taken on | `/tmp/t35-pack-A/dsh-grok-workflow-0.2.1.tgz`, 43 files, 118.7 kB, md5 `ffb22ca4a2e249b41303fbbbcf9cb450` |
+| tarball installed and re-checked last (`t35-pack-B`, 121.4 kB, `61723bda…`) | then the **release commit** added the tag-availability note to both shipped `README`s (t38/O1) |
+| **release tarball** (packed from the release commit; macro-identical to what the release workflow builds) | 43 files, 121.5 kB, md5 `b1401eeb9ba0f425ab646af7f9dc12be` (npm shasum `12ba3363ac515a02dc4125787c1c04508ef2edd8`) |
+| delivery build `src/client/index.js` | `68324a754a54ce36e6775618314592c5` |
+| `lib/client.js` in the repo | `68324a754a54ce36e6775618314592c5` (`cmp` → identical) |
+| `package/lib/client.js` **inside the tarball** | `68324a754a54ce36e6775618314592c5` |
+| installed copy `profiles/web-grok-debug/node_modules/dsh-grok-workflow/lib/client.js` | `68324a754a54ce36e6775618314592c5`, manifest version `0.2.1` |
+
+`npm pack` is reproducible here: packing the same tree twice gives the identical md5. Across the
+three packs the changed **shipped** files were `README.md`, `CHANGELOG.md`, `docs/LOCAL-TESTING.md`
+and `docs/RELEASING.md` (`files` ships `lib/**/*.js`, `docs/*.md` and `docs/images`); the edits
+under `docs/knowledge/` and `docs/releases/` are not shipped and do not move the tarball hash —
+which is why updating the document that *records* the hash cannot invalidate it. That is why the durable identity is the client bundle, not the tarball:
+**`src/client/index.js` = `lib/client.js` = `package/lib/client.js` in the tarball =
+`68324a754a54ce36e6775618314592c5`**. **The client bundle is the same bytes in both**, which
+is why the screenshots stay valid for the final pack — and `15-final-pack.png` +
+`15-final-pack.txt` re-run the page check on the final pack itself (card present, 15 fields, four
+read-only rows with labels, saved chain intact, no console error).
+
+So the bytes in the browser are the bytes in the tarball are the bytes in the delivery build.
+`test/client.spec.ts` keeps that true: a `lib/client.js` that differs from the source fails the
+suite (`ships lib/client.js byte-identical to the source`), which is how the stale-bundle class
+of mistake is caught from now on.
+
+### Screenshots and DOM assertions (`docs/knowledge/evidence/t32/`)
+
+Element-level captures plus the assertion output they belong to; the `.txt` files carry the
+numbers, so a claim can be checked without re-running Playwright.
+
+| file | what it shows |
+| --- | --- |
+| `01-plugins-cards.png` + `.txt` | Plugins page lists `subagent, web-search, agent-loop, shell, grok-workflow` — ours among the stock cards |
+| `02-page-initial.png` + `02-page-assertions.txt` | the page as served: 15 `[data-field]` inputs, 4 chain editors, 4 read-only rows **with labels** (no `undefined`), `revision 1`, nothing pending |
+| `03-readonly-rows.png` | element shot of the structural section: `grok_workflow（注册即固定…）`, `true（默认…）`, `false（默认…）`, `1（wire 契约…）` |
+| `04-page-edited.png`, `05-footer-edited.png` | staged edit (`maxConcurrency` 3 → 5, one extra `planner` route) with the footer visible |
+| `06-page-saved.png`, `07-footer-saved.png`, `04-save-assertions.txt` | after Save: `已保存，下一条消息生效 / Saved; applies to the next message`, `revision 4`, Save disabled, values re-read from the Host |
+| `08-page-validation.png`, `09-validation-errors.png`, `10-footer-disabled.png`, `08-validation-assertions.txt` | `maxRetries=99` and two verifier rows without a model: three reasons listed (red), Save disabled |
+| `11-page-persisted.png` + `11-persisted-assertions.txt` | **after a full restart**: `maxConcurrency=5` and both `planner` routes still there, `revision 0`, nothing pending |
+| `12-session-hi.png` + `12-session-assertions.txt` | a real GUI turn `hi`: `Grok workflow: COMPLETED … 1 verified`, completed in 1m 11s, delivered as the answer |
+| `15-final-pack.png` + `15-final-pack.txt` | the **final** tarball installed and re-opened: card, 15 fields, four labelled read-only rows, `maxConcurrency=5` and both planner routes still saved |
+| `14-host-refusal.txt` | a **real** Host-side refusal: a saved chain naming a model the provider does not enumerate stops the row from activating (`roles.planner names model "wb/global:deepseek-v4.1-flash", which provider "bifrost-completions" does not enumerate; declared: …`) — no namespace, no page, and the boot line says why |
+
+### What the page validates, and what only the Host can (an honest gap, t35)
+
+The two layers check different things, and the sequence in this round shows it:
+
+1. The page saved `maxConcurrency: 5` plus a second `planner` route
+   `bifrost-completions / wb/global:deepseek-v4.1-flash` (`04-save-assertions.txt`). Client-side
+   validation covers the *shape* of a configuration — numeric bounds, a missing model, duplicates,
+   three-route limit, unknown `switchOn` classes — and it cannot know which models a provider
+   enumerates, because the catalog lives on the Host.
+2. On the next start the row **did not activate**, and the boot line said exactly why:
+   `roles.planner names model "wb/global:deepseek-v4.1-flash", which provider "bifrost-completions"
+   does not enumerate; declared: wb/cn:deepseek-v4.1-flash, wb/cn:deepseek-v4-pro, agnes-3.0-flash`
+   (`14-host-refusal.txt`). The namespace disappeared, so the page did too — the failure is loud in
+   the log, not silent in the UI.
+3. Correcting the route to an enumerated model and restarting produced the measured pass:
+   values persisted (`11-persisted-assertions.txt`), a real `hi` turn completed
+   (`12-session-assertions.txt`), and the final tarball re-checked the same way
+   (`15-final-pack.txt`).
+
+So the page prevents the mistakes it can see and the Host refuses the rest at load time. A
+provider-aware model picker (which would close this gap) needs the client to read the model
+catalog; that is not in 0.2.1 and is recorded here rather than papered over.
+
+### Client-side tests for the browser half (F5, t35)
+
+`test/client.spec.ts` grew from 6 to 20 tests. Beyond the field/limit/class parity checks it now
+covers the two functions that decide what a Save writes: `validate()` (numeric bounds and
+fractional values, `gateScope=preset` without a preset name, chain longer than three, a route
+without a model, a duplicate route, two *blank* routes not being duplicates, a 121-character
+field, an unknown `switchOn` class) and `opsFor()` (no op when nothing changed, one op per
+changed field, `roles.<role>` path for a chain, never an op for a structural key), plus
+`draftOf()` (defaults, publishing a chain, filling omitted roles, and no aliasing of the Host
+document) and `resolveNamespace()` (shipped id, a renamed Loader row, a missing namespace, and a
+half-signature namespace not being captured).
+
+Both new behaviours were mutation-checked: restoring the "blank routes are duplicates" rule fails
+`treats two blank routes as unfinished rows, not duplicates (t32 regression)`, and forcing the
+value-based lookup off fails `follows a renamed Loader row instead of silently losing the page
+(t34 residual)`.
+
+### CI
+
+`npm run ci` → typecheck OK, `oxlint` "Found 0 warnings and 0 errors", **284 tests / 19 files**
+(`client.spec.ts` contributes 20 of them; the suite was 264/18 before the browser half existed).
+
 ## Round 2 / `0.2.0` release preparation — 2026-10-26
 
 Real commands and results only.

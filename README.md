@@ -41,10 +41,12 @@ dsh --profile grok-workflow-dev --from-default-profile headless --dump-config
 Then install the plugin:
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.2.0
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.2.1
 ```
 
-Pin the tag you actually want. Omitting `#v0.2.0` follows `main`, which is not a release. Do not run `--from-default-profile` after `plugin add`: it replaces the profile and removes the plugin you just installed.
+> `#v0.2.1` is installable from the moment the `v0.2.1` tag is published; before that, use `#v0.2.0`.
+
+Pin the tag you actually want. Omitting `#v0.2.1` follows `main`, which is not a release. Do not run `--from-default-profile` after `plugin add`: it replaces the profile and removes the plugin you just installed.
 
 Then restart the profile so DSH loads the new plugin:
 
@@ -60,7 +62,22 @@ The bundle row is added by `dsh plugin add`. After restarting, confirm it is com
 dsh --profile grok-workflow-dev --dump-config | grep -A4 'grok-workflow'
 ```
 
-A healthy row includes `id: grok-workflow` and `name: dsh-grok-workflow`. At startup the plugin also logs one diagnostics line about its settings surface — for example `grok-workflow settings: page auto-generated, 21 field(s), applies live`. If it says the generated page was not readable, the settings UI is not the problem: the profile patch is still the source of truth.
+A healthy row includes `id: grok-workflow` and `name: dsh-grok-workflow`. At startup the plugin also logs one diagnostics line about its settings surface — for example `settings surface: page auto-generated for "grok-workflow" (17 field(s), applies live, …)`.
+
+**Composed is not activated.** The plugin injects `workflowEngine`, and the Web app ships its workflow provider disabled, so on `dsh web` the row above is necessary but not sufficient:
+
+```yaml
+# <profile>/cordis.patch.yml
+- id: workflow-ptc
+  config:
+    provider: spawn
+  disabled: false
+```
+
+Four checks prove it is really active: the startup log has no `pending (waiting for service: workflowEngine)` line, `POST /api/settings/describe` lists the `grok-workflow` namespace, the Plugins page shows a **Grok workflow** card, and a real session's tool list contains `grok_workflow`. The full procedure — including how to move a running instance onto a new build, and which step needs your authorisation — is in [`docs/LOCAL-TESTING.md`](docs/LOCAL-TESTING.md#activate-in-an-existing-live-profile--needs-the-operators-authorisation).
+
+The **Grok workflow** card opens the settings page: 17 live fields, the four role chains (up to three routes each), and four structural keys shown read-only with the reason. Invalid input is refused before it reaches the Host, and a save applies to the next message.
+
 
 ## Try it
 
@@ -234,13 +251,15 @@ The plugin reuses DSH's workflow engine and subagents. It does not replace DSH's
 
 ## Versions and release notes
 
-The package version in this repository is `0.2.0`. Install or roll back to an exact release with a tag suffix:
+The package version in this repository is `0.2.1`. Install or roll back to an exact release with a tag suffix:
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.2.0
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.2.1
 ```
 
-Use only a tag that exists on GitHub: `v0.1.0` and `v0.2.0` are published; the unpinned command follows `main` and does not pin a release. See the [changelog](CHANGELOG.md) and the [release guide](docs/RELEASING.md) for the versioning and rollback rules.
+> `#v0.2.1` is installable from the moment the `v0.2.1` tag is published; before that, use `#v0.2.0`.
+
+Use only a tag that exists on GitHub. Published: `v0.1.0` and `v0.2.0`; `v0.2.1` is the version in this tree, tagged by the release process that publishes this commit. The unpinned command follows `main` and does not pin a release. See the [changelog](CHANGELOG.md) and the [release guide](docs/RELEASING.md) for the versioning and rollback rules.
 
 ## Testing and development
 

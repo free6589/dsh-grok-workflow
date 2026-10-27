@@ -1,0 +1,62 @@
+# Grok workflow settings page as rendered (0.2.1, tarball md5 ffb22ca4a2e249b41303fbbbcf9cb450)
+{
+  "fieldCount": 15,
+  "fields": [
+    "answerStrategy",
+    "gatePreset",
+    "gateScope",
+    "historyChars",
+    "historyTurns",
+    "maxActiveRuns",
+    "maxConcurrency",
+    "maxQueuedMessages",
+    "maxRetries",
+    "maxTasks",
+    "recordLimit",
+    "recordRuns",
+    "subagentProvider",
+    "synthesis",
+    "timeoutMs"
+  ],
+  "readOnlyRows": [
+    [
+      "toolName",
+      "grok_workflow（注册即固定 / fixed at registration）"
+    ],
+    [
+      "enforceGate",
+      "true（默认，profile patch 可改 / default, patch-editable）"
+    ],
+    [
+      "gateRequired",
+      "false（默认，profile patch 可改 / default, patch-editable）"
+    ],
+    [
+      "configVersion",
+      "1（wire 契约 / wire contract）"
+    ]
+  ],
+  "chainEditors": [
+    "planner",
+    "worker",
+    "verifier",
+    "synthesizer"
+  ],
+  "values": {
+    "maxConcurrency": "3",
+    "gateScope": "process",
+    "synthesis": "model",
+    "subagentProvider": "spawn",
+    "historyTurns": "4"
+  },
+  "showsUndefined": false,
+  "saveLabel": "保存 / Save",
+  "revisionLine": "revision 3"
+}
+
+# assertions
+editable fields rendered: 15 (expected 15)
+roles with chain editors: ["planner","worker","verifier","synthesizer"] (expected planner,worker,verifier,synthesizer)
+read-only rows rendered: 4 (expected 4)
+total config keys on the page: 20 (15 inputs + 4 chains-as-one-group + 4 read-only = 21 keys)
+no "undefined" text on the page: true

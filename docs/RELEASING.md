@@ -46,26 +46,41 @@ Every user-visible fix or feature should first be listed under `[Unreleased]` in
 
 `v0.1.0` 已于 2026-10-25 从提交 `a7d5a62` 发布；Release workflow `40182751006` 通过，并创建了带插件压缩包的 GitHub Release。
 
-## 0.2.0 (prepared, tag not yet created) / 0.2.0（已准备，尚未打标签）
+## 0.2.0 — released 2026-10-26 / 0.2.0 — 已于 2026-10-26 发布
 
-`0.2.0` is prepared on `main`: `package.json` and `package-lock.json` both say `0.2.0`, and
-`CHANGELOG.md` carries the bilingual `## [0.2.0]` section the release workflow extracts. The
+| | |
+|---|---|
+| Tag | `v0.2.0` on commit `f7a244c` |
+| GitHub Release | 2026-10-26T17:10:16Z |
+| Artifact | 42 files in the tarball, **108,428 B** |
+
+`v0.2.0` 已发布，标签永不移动。它的发布说明保留在
+[docs/releases/RELEASE-NOTES-0.2.0.md](releases/RELEASE-NOTES-0.2.0.md)，`CHANGELOG.md` 的
+`## [0.2.0] - 2026-10-26` 章节即为当时发布流程提取的文本。`0.2.1` 是它之上的增量版本，
+只新增 Web GUI 设置页与"激活前提"文档，配置面与报告格式不变。
+
+## 0.2.1 (prepared, tag not yet created) / 0.2.1（已准备，尚未打标签）
+
+`0.2.1` is prepared on `main`: `package.json` and `package-lock.json` both say `0.2.1`, and
+`CHANGELOG.md` carries the bilingual `## [0.2.1]` section the release workflow extracts. The
 tag and the GitHub Release are created **after** the final acceptance pass, from the merged
 commit, exactly as for `0.1.0`; `v0.1.0` must not be moved.
 
-What to expect from the artifact: `npm pack` currently produces 42 files, ~108 KB
-(`0.1.0` was 33 files / 61,281 bytes), containing `lib/`, `package.json`, `cordis.patch.yml`,
-`LICENSE`, both READMEs, `CHANGELOG.md` and `docs/*.md` + `docs/images/`. `test/`, `scripts/`
-and `docs/knowledge/` are deliberately **not** shipped: the knowledge base is a development
-record, and the README links to it resolve on GitHub rather than inside an installed package.
+What to expect from the artifact: `npm pack` currently produces **43 files, ~121 KB**
+(`0.2.0` was 42 files / 108,428 B, `0.1.0` 33 files / 61,281 bytes), containing `lib/` (including
+the browser bundle `lib/client.js`), `package.json`, `cordis.patch.yml`, `LICENSE`, both READMEs,
+`CHANGELOG.md` and `docs/*.md` + `docs/images/`. `test/`, `scripts/` and `docs/knowledge/` are
+deliberately **not** shipped: the knowledge base is a development record, and the README links to
+it resolve on GitHub rather than inside an installed package.
 
-`0.2.0` 已在 `main` 上准备好：`package.json` 与 `package-lock.json` 都是 `0.2.0`，
-`CHANGELOG.md` 含发布工作流要提取的双语 `## [0.2.0]` 章节。标签与 GitHub Release 在最终
+`0.2.1` 已在 `main` 上准备好：`package.json` 与 `package-lock.json` 都是 `0.2.1`，
+`CHANGELOG.md` 含发布工作流要提取的双语 `## [0.2.1]` 章节。标签与 GitHub Release 在最终
 验收通过后、从合并后的提交创建，与 `0.1.0` 流程一致；`v0.1.0` 不得移动。
 
-产物预期：当前 `npm pack` 生成 42 个文件、约 108 KB（`0.1.0` 为 33 个文件 / 61,281
-字节），包含 `lib/`、`package.json`、`cordis.patch.yml`、`LICENSE`、两份 README、
-`CHANGELOG.md`，以及 `docs/*.md` 与 `docs/images/`。`test/`、`scripts/`、`docs/knowledge/`
+产物预期：当前 `npm pack` 生成 **43 个文件、约 121 KB**（`0.2.0` 为 42 个文件 / 108,428 B，
+`0.1.0` 为 33 个文件 / 61,281 字节），包含 `lib/`（含浏览器 bundle `lib/client.js`）、
+`package.json`、`cordis.patch.yml`、`LICENSE`、两份 README、`CHANGELOG.md`，以及
+`docs/*.md` 与 `docs/images/`。`test/`、`scripts/`、`docs/knowledge/`
 有意**不打进包**：知识库是开发记录，README 里指向它的链接在 GitHub 上有效，而不是在安装
 后的包里。
 

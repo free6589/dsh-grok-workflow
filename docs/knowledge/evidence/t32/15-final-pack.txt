@@ -1,0 +1,46 @@
+# Final artifact installed and re-checked (t35)
+# tarball: /tmp/t35-pack-B/dsh-grok-workflow-0.2.1.tgz (md5 3132a852aaef196e6dde311dd1d62c5a, npm shasum b22595e9f0625182d5a2316c158d9ead1df64292, 43 files, 120.9 kB)
+# client bundle inside it and installed: 68324a754a54ce36e6775618314592c5 (identical to src/client/index.js and lib/client.js)
+cards: ["subagent","web-search","agent-loop","shell","grok-workflow"]
+{
+  "fields": 15,
+  "chains": [
+    "planner",
+    "worker",
+    "verifier",
+    "synthesizer"
+  ],
+  "readOnly": [
+    [
+      "toolName",
+      "grok_workflow（注册即固定 / fixed at registrat"
+    ],
+    [
+      "enforceGate",
+      "true（默认，profile patch 可改 / default, patc"
+    ],
+    [
+      "gateRequired",
+      "false（默认，profile patch 可改 / default, pat"
+    ],
+    [
+      "configVersion",
+      "1（wire 契约 / wire contract）"
+    ]
+  ],
+  "maxConcurrency": "5",
+  "plannerRoutes": [
+    "wb/cn:deepseek-v4-pro",
+    "wb/cn:deepseek-v4.1-flash"
+  ],
+  "showsUndefined": false,
+  "saveLabel": "保存 / Save"
+}
+console errors: []
+
+# assertions
+grok card present: true
+editable fields: 15 (expected 15)
+read-only rows: 4 (expected 4), none "undefined": true
+saved concurrency: 5, planner chain: ["wb/cn:deepseek-v4-pro","wb/cn:deepseek-v4.1-flash"]
+nothing pending on open: true

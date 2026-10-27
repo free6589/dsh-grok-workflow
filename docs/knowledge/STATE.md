@@ -20,11 +20,12 @@ Last updated: 2026-10-26 (local)
 
 ## Current phase
 
-`0.2.0` release preparation (phase 7). Implementation through phase 6 is merged on
-`main`; the version, changelog, both READMEs and this knowledge base are updated
-for `0.2.0`. The tag and the GitHub Release are created by the captain **after**
-the final acceptance pass (t16) — this file does not claim a published release
-that does not exist yet.
+`0.2.1` release preparation (phase 7 continued). `0.2.0` **is published** — tag `v0.2.0` on
+`f7a244c`, GitHub Release 2026-10-26T17:10:16Z, 42 files / 108,428 B — and `0.2.1` is the
+incremental release on top of it (Web GUI settings page + the documented activation
+prerequisite). The version, changelog, both READMEs and this knowledge base are updated for
+`0.2.1`; its tag and GitHub Release are created by the captain after the acceptance pass, so this
+file must not claim `0.2.1` as published.
 
 Authoritative numbers for this state (measured, not planned):
 
@@ -78,8 +79,9 @@ None.
 
 ## Next priority
 
-Create `v0.2.0` and the GitHub Release from the accepted commit (captain, after
-t16), then keep this file and the changelog synchronized with `main`.
+Create `v0.2.1` and its GitHub Release from the accepted commit (captain), then keep this file and
+the changelog synchronized with `main`. `v0.2.0` was released on 2026-10-26 and its tag never
+moves.
 
 ## Homepage redesign — merged
 
@@ -113,9 +115,17 @@ t16), then keep this file and the changelog synchronized with `main`.
 - **Persistent notes:** [WORKFLOW-DESIGN.md](WORKFLOW-DESIGN.md) (evidence ledger
   A/E/R + decisions DD + NOT_RUN ledger NR); decisions in
   [DECISIONS.md](DECISIONS.md) D-009/D-010/D-011.
-- **What is deliberately not delivered:** L2 host routing (U-2), a chain editor
-  with model dropdowns (U-6 / phase 9), and the GUI-side measurements NR-1,
-  NR-7, NR-8.
+- **Delivered after the first draft (2026-10-27, t32):** a plugin-owned settings page in
+  the Web GUI — all 21 keys, per-role chain editing, validation, save applied to the next
+  message. This closes NR-7 and NR-8 as *measured*; see
+  [VALIDATION.md](VALIDATION.md) Round 3 and WORKFLOW-DESIGN.md DD-9c.
+- **Activation (t33/t32, D-014):** installing the bundle puts the row into the composed
+  graph, but the plugin only activates when a workflow provider is enabled — the web app
+  ships `workflow-ptc` disabled. `docs/LOCAL-TESTING.md#enable` now carries the four
+  checks that prove activation.
+- **What is deliberately not delivered:** L2 host routing (U-2), model dropdowns in the
+  chain editor (free-text provider/model fields today), and the long-lived GUI delivery
+  measurement NR-1. 运维两条硬规则见 **D-013**（不重启在跑的 dsh 服务；队长只计划、实施交给子代理）。
 
 ## Overall roadmap — round 2 (phases 1–7), 2026-10-26
 
@@ -127,14 +137,33 @@ t16), then keep this file and the changelog synchronized with `main`.
   (user-approved 2026-10-26); the `0.2.0` breaking boundary is **D-011**; overnight
   execution and release discipline are **D-010**; the post-install strict-testing
   loop is **D-012**.
-- **Release preparation:** the human draft of the release announcement lives in
-  [docs/releases/RELEASE-NOTES-0.2.0.md](../releases/RELEASE-NOTES-0.2.0.md); the text the
-  release workflow publishes is the `## [0.2.0]` section of [CHANGELOG.md](../../CHANGELOG.md).
+- **Version (t35, corrected in t37):** `0.2.1` — an **incremental** release on top of the published
+  `0.2.0`; the changelog carries `## [0.2.0] - 2026-10-26` (unchanged history) and a separate
+  `## [0.2.1] - 2026-10-27` section that only lists what is new. The evidence chain is stated as a
+  **client-bundle invariant**, not as a tarball hash (a repack changes the tarball md5 whenever a
+  shipped file such as `README`/`CHANGELOG` changes): `src/client/index.js` = `lib/client.js` =
+  `package/lib/client.js` inside the tarball = the copy installed in the debug profile =
+  **`68324a754a54ce36e6775618314592c5`** (`docs/knowledge/VALIDATION.md`, Round 3).
+- **Known gap (t35):** the settings page validates the *shape* of a chain (bounds, missing model,
+  duplicates, three-route limit), while *catalog membership* is enforced by the Host at load — a
+  saved model the provider does not enumerate stops the row from activating and the boot line
+  names it. A provider-aware model picker is not in 0.2.1.
+- **Risk register (t35):** the settings page binds to whichever Loader row projects the plugin's
+  fields, so a renamed row moves the page instead of losing it, and the console names the case
+  when no row projects them (DD-9d). The entry point itself is the plugin manager's `plugins.item`
+  slot — a Host-side contract, deliberately depended on and registered as a risk, not discovered
+  later.
+- **Release preparation:** the announcement for the current release lives in
+  [docs/releases/RELEASE-NOTES-0.2.1.md](../releases/RELEASE-NOTES-0.2.1.md), and the text the
+  release workflow publishes is the `## [0.2.1]` section of [CHANGELOG.md](../../CHANGELOG.md).
+  The **published** `0.2.0` announcement is kept as
+  [docs/releases/RELEASE-NOTES-0.2.0.md](../releases/RELEASE-NOTES-0.2.0.md) (tag `v0.2.0` on
+  `f7a244c`, GitHub Release 2026-10-26T17:10:16Z, 42 files / 108,428 B).
 - **Phase status:** 1 (environment/API audit), 2 (target design), 3–4 (role
   routing + ordered chains), 5 (configuration + settings surface), 6 (reliability
   and safety) and 7 (documentation, compatibility, release preparation) are
-  implemented; only the tag and the GitHub Release remain, and they are created
-  after the final acceptance pass.
+  implemented and `0.2.0` shipped on 2026-10-26; only the `0.2.1` tag and its GitHub Release
+  remain, and they are created after the final acceptance pass.
 - **Implementation boundary:** code changes go through the team's single-writer
   implementer with an independent review per batch; DSH core and global installs
   remain out of bounds.

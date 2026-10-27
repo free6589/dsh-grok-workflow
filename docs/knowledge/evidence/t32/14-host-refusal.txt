@@ -1,0 +1,6 @@
+# Host-side refusal, measured on the debug profile (0.2.1)
+# A saved chain naming a model the provider does not enumerate stops the row from activating.
+# Boot line, verbatim:
+grok-workflow (dsh-grok-workflow): Error: roles.planner names model "wb/global:deepseek-v4.1-flash", which provider "bifrost-completions" does not enumerate; declared: wb/cn:deepseek-v4.1-flash, wb/cn:deepseek-v4-pro, agnes-3.0-flash
+
+# consequence: no namespace is served, so the page (and its card) cannot appear; the row is reported as not activated in the same boot output.

@@ -1,0 +1,18 @@
+# After a full restart of the instance (0.2.1, same tarball)
+{
+  "maxConcurrency": "5",
+  "maxRetries": "1",
+  "plannerRoutes": [
+    "wb/cn:deepseek-v4-pro",
+    "wb/cn:deepseek-v4.1-flash"
+  ],
+  "revisionLine": "revision 0",
+  "saveLabel": "保存 / Save",
+  "showsUndefined": false
+}
+
+# assertions
+maxConcurrency survived the restart: true
+planner chain survived the restart (2 routes): ["wb/cn:deepseek-v4-pro","wb/cn:deepseek-v4.1-flash"]
+nothing pending on a freshly opened page: true
+no "undefined" text: true

@@ -1,0 +1,7 @@
+# Plugins page, profile web-grok-debug, plugin build 0.2.1 (tarball md5 ffb22ca4a2e249b41303fbbbcf9cb450)
+# data-plugin-item values, in render order:
+["subagent","web-search","agent-loop","shell","grok-workflow"]
+
+# assertions
+has-grok-card: true
+card-count: 5

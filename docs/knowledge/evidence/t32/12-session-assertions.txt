@@ -1,0 +1,27 @@
+# Real GUI turn in the debug profile (0.2.1)
+# message: "hi"
+finished without the run indicator: true
+report block present: true
+
+# transcript tail (the delivered answer)
+subagents
+Chat
+Trajectory
+Completed
+Completed in 1m 11s
+
+<<<GROK-WORKFLOW-REPORT>>> Grok workflow: COMPLETED Objective: Current request: hi Plan: planner; 1 task(s); 1 verified
+
+greet-reply: verified (1 attempt) — Respond to the greeting "hi" Confirmed evidence:
+greet-reply: The reply acknowledges the user's greeting "hi". → The deliverable text begins with "Hi! Great to hear from you.", which directly acknowledges the greeting "hi".
+greet-reply: The reply invites the user to state what they want help with. → The deliverable text ends with "What would you like help with today?", inviting the user to state their need.
+greet-reply: The reply is concise and does not assume any specific task. → The reply is a single brief sentence with no mention of any specific task, tool, file, or action; it only greets and asks an open question. Synthesis: model narrative unavailable (synthesizer failed on every route: [format-error] child returned no valid structured result); the report above is complete Model routes: planner=bifrost-completions/wb/cn:deepseek-v4-pro → bifrost-completions/wb/cn:deepseek-v4.1-flash; worker=bifrost-completions/wb/cn:deepseek-v4-pro; verifier=bifrost-completions/wb/cn:deepseek-v4-pro; synthesizer=bifrost-completions/wb/cn:deepseek-v4-pro Route switches:
+synthesizer attempt 0 via bifrost-completions/wb/cn:deepseek-v4-pro: format-error — child returned no valid structured result <<<END-GROK-WORKFLOW-REPORT>>>
+Usage 25.3K tok
+10:54
+Message or run a task, / commands, @ files or sessions
+Workspace Write
+DeepSeek V4 Pro (cn)
+1 turns 1 steps·116 tok/s
+25.3K tok·Cache hit 1%
+5%

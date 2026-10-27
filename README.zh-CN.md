@@ -42,10 +42,12 @@ dsh --profile grok-workflow-dev --from-default-profile headless --dump-config
 然后安装插件：
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.2.0
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.2.1
 ```
 
-请固定你真正想要的标签；省略 `#v0.2.0` 会跟随 `main`，那不是发布版本。不要在 `plugin add` 之后再运行 `--from-default-profile`：它会重建 profile 并移除你刚装好的插件。
+> （`#v0.2.1` 于本 tag 发布后可用；发布前请用 `#v0.2.0`。）
+
+请固定你真正想要的标签；省略 `#v0.2.1` 会跟随 `main`，那不是发布版本。不要在 `plugin add` 之后再运行 `--from-default-profile`：它会重建 profile 并移除你刚装好的插件。
 
 最后重启 profile，让 DSH 加载新插件：
 
@@ -61,7 +63,22 @@ bundle 行由 `dsh plugin add` 写入。重启后确认它确实被组合进去�
 dsh --profile grok-workflow-dev --dump-config | grep -A4 'grok-workflow'
 ```
 
-健康的行包含 `id: grok-workflow` 与 `name: dsh-grok-workflow`。启动时插件还会打印一行设置面诊断，例如 `grok-workflow settings: page auto-generated, 21 field(s), applies live`。如果它说读不到生成的页面，问题不在设置界面：profile patch 仍然是唯一真相来源。
+健康的行包含 `id: grok-workflow` 与 `name: dsh-grok-workflow`。启动时插件还会打印一行设置面诊断，例如 `settings surface: page auto-generated for "grok-workflow" (17 field(s), …)`。
+
+**进了组合图 ≠ 被激活。** 插件注入 `workflowEngine`，而 Web 应用层默认禁用了工作流 provider，所以在 `dsh web` 上上面那行必要但不充分：
+
+```yaml
+# <profile>/cordis.patch.yml
+- id: workflow-ptc
+  config:
+    provider: spawn
+  disabled: false
+```
+
+四条校验才能证明它真的激活了：启动日志没有 `pending (waiting for service: workflowEngine)`、`POST /api/settings/describe` 里出现 `grok-workflow` 命名空间、插件页出现 **Grok workflow** 卡片、真实会话的工具列表里有 `grok_workflow`。完整流程（包括如何把"在跑的实例"迁到新构建、哪一步需要你授权）见 [`docs/LOCAL-TESTING.md`](docs/LOCAL-TESTING.md#activate-in-an-existing-live-profile--needs-the-operators-authorisation)。
+
+**Grok workflow** 卡片就是设置页：17 个可编辑字段、四条角色链（每角色最多 3 条）、4 个只读结构性字段并给出原因；非法输入在到达 Host 之前就被拦下，保存后对下一条消息生效。
+
 
 ## 试一试
 
@@ -231,13 +248,15 @@ dsh plugin --profile grok-workflow-dev remove dsh-grok-workflow
 
 ## 版本与发布说明
 
-本仓库声明的包版本是 `0.2.0`。需要安装或回退到某个已发布版本时，在地址后加标签：
+本仓库声明的包版本是 `0.2.1`。需要安装或回退到某个已发布版本时，在地址后加标签：
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.2.0
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.2.1
 ```
 
-只使用 GitHub 上确实存在的标签：`v0.1.0` 与 `v0.2.0` 已发布；未固定版本的命令跟随 `main`，不会固定到发布版本。版本规则与回退流程见[更新日志](CHANGELOG.md)与[发布指南](docs/RELEASING.md)。
+> （`#v0.2.1` 于本 tag 发布后可用；发布前请用 `#v0.2.0`。）
+
+只使用 GitHub 上确实存在的标签。已发布：`v0.1.0`、`v0.2.0`；`v0.2.1` 是本仓库当前的版本，由发布本次提交的流程打标签。未固定版本的命令跟随 `main`，不会固定到发布版本。版本规则与回退流程见[更新日志](CHANGELOG.md)与[发布指南](docs/RELEASING.md)。
 
 ## 测试与开发
 

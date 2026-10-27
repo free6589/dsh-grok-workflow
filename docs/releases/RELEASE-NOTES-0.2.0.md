@@ -1,10 +1,17 @@
-# Grok Workflow for DSH 0.2.0 — release notes draft
+# Grok Workflow for DSH 0.2.0 — release notes
 
-**Status: draft.** The `v0.2.0` tag and the GitHub Release are created by the release
-operator **after** the final acceptance pass, following
-[the release guide](../RELEASING.md). This file is the human draft of what that release says; the
-text the release workflow actually publishes is the bilingual `## [0.2.0]` section of
+**Status: released** — `v0.2.0` was tagged on 2026-10-26 (commit `f7a244c`) and its GitHub Release
+was published the same day (2026-10-26T17:10:16Z). This file is the announcement as published; the
+text the release workflow publishes is the bilingual `## [0.2.0]` section of
 [CHANGELOG.md](../../CHANGELOG.md), extracted verbatim.
+
+| | |
+|---|---|
+| Tag | `v0.2.0` (`f7a244c`) |
+| GitHub Release | 2026-10-26T17:10:16Z |
+| Assets | 42 files in the tarball, **108,428 B** |
+
+The next release's notes are [RELEASE-NOTES-0.2.1.md](RELEASE-NOTES-0.2.1.md).
 
 ## What this release is
 

@@ -1,0 +1,21 @@
+# Save round-trip (0.2.1, tarball md5 ffb22ca4a2e249b41303fbbbcf9cb450)
+button before save: "保存 (2) / Save"
+{
+  "savedMessage": true,
+  "englishSaved": true,
+  "maxConcurrency": "5",
+  "plannerRoutes": [
+    "wb/cn:deepseek-v4-pro",
+    "wb/global:deepseek-v4.1-flash"
+  ],
+  "revisionLine": "revision 4",
+  "saveDisabled": true,
+  "tail": "table）\ngateRequired\nfalse（默认，profile patch 可改 / default, patch-editable）\nconfigVersion\n1（wire 契约 / wire contract）\n\n已保存，下一条消息生效 / Saved; applies to the next message\n\n保存 / Save\n放弃修改 / Discard\nrevision 4"
+}
+
+# assertions
+the page said it saved: true
+the page named the semantics (applies to the next message): true
+value the page now reports: maxConcurrency=5
+planner route the page now reports: ["wb/cn:deepseek-v4-pro","wb/global:deepseek-v4.1-flash"]
+Save is disabled once nothing is pending: true

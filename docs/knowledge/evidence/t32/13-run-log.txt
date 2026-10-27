@@ -1,0 +1,4 @@
+# t35 Playwright phase 2 log (restart + real turn)
+CARDS ["subagent","web-search","agent-loop","shell","grok-workflow"]
+PERSISTED {"maxConcurrency":"5","maxRetries":"1","plannerRoutes":["wb/cn:deepseek-v4-pro","wb/cn:deepseek-v4.1-flash"],"revisionLine":"revision 0","saveLabel":"保存 / Save","showsUndefined":false}
+SESSION finished=true report=true

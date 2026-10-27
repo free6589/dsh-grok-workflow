@@ -8,6 +8,9 @@
 - **Rollback:** `dsh plugin --profile <p> remove dsh-grok-workflow`; backups under `~/dsh-profile-backups/`.
 - **Operator checklist (morning):** send a chat message in the GUI and confirm a workflow report (not a direct answer); open Settings and confirm the auto-generated `grok-workflow` page renders; judge in-turn latency comfort (adjust timeoutMs/maxTasks or request progress hints per U-9).
 - **Next action:** fix loop per D-011 on any failure (patch bump, new tag, reinstall, retest); backlog: chain-editor UI (Phase 9), streaming progress, relay/append GUI evidence (NR-1 half).
+- **Then (0.2.1):** the Web GUI settings page (plugin-owned browser bundle) and the documented
+  activation prerequisite are prepared on `main`; `v0.2.1` is created by the captain after the
+  acceptance pass. `v0.2.0` stays where it is.
 
 
 ## 2026-10-26 — Security observation (captain integration note)
@@ -22,11 +25,13 @@
 - **From:** local team (AgentTeams dshgw-workflow-planning), implementer + independent reviewers
 - **To:** captain / next local agent / independent reviewer
 - **Base commit:** `bd1f261` (U-4 write-path isolation; phase 6 landed in `32a7f4a`)
-- **Package version:** `0.2.0` (tag and GitHub Release **not yet created** — the captain creates them after the final acceptance pass)
+- **Package version:** `0.2.0` — **released** as `v0.2.0` on 2026-10-26 (tag on `f7a244c`,
+  GitHub Release 2026-10-26T17:10:16Z, 42 files / 108,428 B). This section was written before that
+  tag existed; the version in the tree today is `0.2.1` (its tag is still pending).
 - **Release-readiness artefacts:**
-  - `docs/releases/RELEASE-NOTES-0.2.0.md` — human draft of the announcement, artifact table
-    (`0.1.0`: 33 files / 61,281 B → `0.2.0`: 42 files / 107,991 B) and operator steps pointing at
-    [RELEASING](../RELEASING.md).
+  - `docs/releases/RELEASE-NOTES-0.2.0.md` — the announcement as published, artifact table
+    (`0.1.0`: 33 files / 61,281 B → `0.2.0`: 42 files / 108,428 B as released) and operator steps
+    pointing at [RELEASING](../RELEASING.md). (`0.2.1` has its own notes file next to it.)
   - `scripts/smoke-settings-identity.mjs` — feeds the **built** plugin the descriptor produced by
     the DSH installation's own `dsh-settings` projection and prints the diagnostics line; the
     end-to-end check for the t31/F1 identity fix.

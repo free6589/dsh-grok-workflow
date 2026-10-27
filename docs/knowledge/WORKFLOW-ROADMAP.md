@@ -788,7 +788,7 @@ implements or records it.
 2. Phases 3–6 are implemented (t11, t13, t14, t17, t25); Phase 7 (documentation,
    compatibility, release preparation) is done apart from the tag and the Release, which the
    release operator creates after the final acceptance pass (see
-   [RELEASING](../RELEASING.md) and the [0.2.0 draft notes](../releases/RELEASE-NOTES-0.2.0.md));
+   [RELEASING](../RELEASING.md) and the [0.2.1 draft notes](../releases/RELEASE-NOTES-0.2.1.md));
    Phase 9 (chain editor) and the progress-notice backlog (U-9) remain.
 3. F6 (gate listener totality) and F9 (one-shot teardown) are covered as written;
    the web long-lived case stays `NOT_RUN` (NR-1) until a GUI run measures it.

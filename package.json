@@ -1,6 +1,6 @@
 {
   "name": "dsh-grok-workflow",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Bounded plan-execute-verify-retry-synthesize workflows for DeepSeek Harness",
   "license": "MIT",
   "type": "module",
@@ -10,6 +10,9 @@
     ".": {
       "types": "./lib/index.d.ts",
       "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
     },
     "./package.json": "./package.json"
   },
@@ -37,17 +40,35 @@
     "node": ">=22"
   },
   "dsh": {
+    "pluginType": "feature",
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "compatibility": {
+      "dsh": ">=0.2.1-rc.2",
+      "profiles": [
+        "web",
+        "desktop"
+      ],
+      "dshReleases": {
+        "0.2.1-rc.2": "compatible"
+      }
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-api-remotes"
+      ]
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node scripts/build-client.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "oxlint src test",
     "test": "npm run build && vitest run",
     "test:e2e": "scripts/e2e-headless-in-turn.sh",
-    "test:unit": "vitest run test/composition.spec.ts test/orchestrator.spec.ts test/redact.spec.ts test/input.spec.ts test/criterion.spec.ts test/report.spec.ts test/plugin-lifecycle.spec.ts test/engine-contract.spec.ts test/gate.spec.ts test/history.spec.ts test/routing.spec.ts test/failure-paths.spec.ts test/config.spec.ts test/reliability.spec.ts test/paths.spec.ts test/settings-projection.spec.ts",
+    "test:unit": "vitest run test/composition.spec.ts test/orchestrator.spec.ts test/redact.spec.ts test/input.spec.ts test/criterion.spec.ts test/report.spec.ts test/plugin-lifecycle.spec.ts test/engine-contract.spec.ts test/gate.spec.ts test/history.spec.ts test/routing.spec.ts test/failure-paths.spec.ts test/config.spec.ts test/reliability.spec.ts test/paths.spec.ts test/settings-projection.spec.ts test/client.spec.ts",
     "test:loader": "npm run build && vitest run test/loader.spec.ts",
     "ci": "npm run typecheck && npm run lint && npm test"
   },
