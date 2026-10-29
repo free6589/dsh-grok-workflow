@@ -60,6 +60,9 @@ export const CONFIG_KEYS = [
   'gateScope',
   'gatePreset',
   'answerStrategy',
+  'mode',
+  'triageAsk',
+  'triageModel',
   'historyTurns',
   'historyChars',
   'maxQueuedMessages',
@@ -104,6 +107,14 @@ export const Config = z.object({
   // answer entirely and breaks R-001. Measured in t24 (NR-1 probe, exit 0 with a
   // real model). Both older strategies stay selectable for long-lived surfaces.
   answerStrategy: z.union([z.const('in-turn'), z.const('relay'), z.const('append')]).default('in-turn').volatile(),
+  // Front desk (t52, plan C): the mandatory entry became "every message passes
+  // the front desk and the front desk states its tier", not "every message runs
+  // the whole team". `full` restores the old rule exactly (D-021).
+  mode: z.union([z.const('full'), z.const('triage')]).default('triage').volatile(),
+  triageAsk: z.boolean().default(true).volatile(),
+  // Empty means "inherit the message's own route": the chat and fast tiers then
+  // spend exactly one child call on the run's provider instead of a second one.
+  triageModel: z.string().default('').volatile(),
   historyTurns: z.natural().min(0).max(HARD_LIMITS.historyTurns).default(4).volatile(),
   historyChars: z.natural().min(0).max(HARD_LIMITS.historyChars).default(4_000).volatile(),
   maxQueuedMessages: z.natural().min(0).max(HARD_LIMITS.maxQueuedMessages).default(4).volatile(),
@@ -264,6 +275,30 @@ function resolveChain(role: string, chain: Array<RouteInput> | undefined): Model
   return out
 }
 
+/**
+ * Parse one optional route written as a bare model id or `provider/model`.
+ *
+ * `triageModel` is one route, not a chain: the front desk has no fallback
+ * (a failed greeting must not become a second workflow), so a chain would imply
+ * a switch policy the tier does not have.
+ * @param path - configuration key, used in the error message.
+ * @param value - the raw value (`''` means unset).
+ * @returns the route, or `undefined` when unset.
+ */
+function parseSingleRoute(path: string, value: string | undefined): ModelRoute | undefined {
+  const raw = (value ?? '').trim()
+  if (raw === '') return undefined
+  if (raw.length > HARD_LIMITS.routeChars * 2) {
+    throw new Error(`${path} is longer than ${HARD_LIMITS.routeChars * 2} characters`)
+  }
+  const slash = raw.indexOf('/')
+  if (slash <= 0) return { model: raw }
+  const provider = raw.slice(0, slash).trim()
+  const model = raw.slice(slash + 1).trim()
+  if (provider === '' || model === '') throw new Error(`${path} must be "model" or "provider/model", got "${raw}"`)
+  return { provider, model }
+}
+
 function integer(name: string, value: number, min: number, max: number): number {
   if (!Number.isInteger(value) || value < min || value > max) {
     throw new Error(`${name} must be an integer between ${min} and ${max}`)
@@ -306,6 +341,8 @@ export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
       `(a ${HARD_LIMITS.chainLength}-route worker chain needs maxRetries 0 even with a single verifier route).`,
     )
   }
+  const mode = config.mode ?? 'triage'
+  const triageModel = parseSingleRoute('triageModel', config.triageModel)
   const synthesis = config.synthesis ?? 'deterministic'
   if (synthesis === 'model' && roles.synthesizer.length === 0) {
     throw new Error('synthesis "model" requires a non-empty roles.synthesizer chain')
@@ -322,6 +359,9 @@ export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
     gateScope,
     ...gatePreset === '' ? {} : { gatePreset },
     answerStrategy,
+    mode,
+    triageAsk: config.triageAsk ?? true,
+    ...triageModel === undefined ? {} : { triageModel },
     historyTurns: integer('historyTurns', config.historyTurns ?? 4, 0, HARD_LIMITS.historyTurns),
     historyChars: integer('historyChars', config.historyChars ?? 4_000, 0, HARD_LIMITS.historyChars),
     maxQueuedMessages: integer('maxQueuedMessages', config.maxQueuedMessages ?? 4, 0, HARD_LIMITS.maxQueuedMessages),
@@ -429,6 +469,7 @@ export function describeResolvedConfig(config: ResolvedConfig): string {
     `maxRetries=${config.maxRetries}`,
     `maxActiveRuns=${config.maxActiveRuns}/${config.maxActiveRunsTotal}`,
     `gate=${config.enforceGate ? 'on' : 'off'}/${config.gateScope}${config.gateRequired ? ' (required)' : ''}`,
+    `mode=${config.mode}${config.mode === 'triage' ? ` triage=${config.triageAsk ? 'ask' : 'escalate'} call=${config.triageModel === undefined ? 'inherit' : (config.triageModel.provider === undefined ? config.triageModel.model : `${config.triageModel.provider}/${config.triageModel.model}`)}` : ''}`,
     `synthesis=${config.synthesis}`,
     `roles=planner:${role('planner')} worker:${role('worker')} verifier:${role('verifier')} synthesizer:${role('synthesizer')}`,
   ].join(' ')

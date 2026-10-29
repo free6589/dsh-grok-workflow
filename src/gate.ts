@@ -41,14 +41,15 @@ import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
 import type { Session } from '@deepseek-ai/dsh-session'
 import { createAssistantMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
-import { noticeEnterText, noticeText, relayText, RELAY_SOURCE_KIND } from './answer.js'
+import { frontDeskText, noticeEnterText, noticeText, relayText, RELAY_SOURCE_KIND } from './answer.js'
 import { collectHistory, composeObjective } from './history.js'
 import { TASK_LIMITS } from './input.js'
 import { alreadyRouted, deliveryKey, recordDelivery } from './records.js'
 import type { DeliveryPhase } from './records.js'
 import { redactError } from './redact.js'
 import type { ActiveState, RunOutcome, WorkflowLogger } from './run.js'
-import { runWorkflow } from './run.js'
+import { runSingleCall, runWorkflow } from './run.js'
+import { askLine, chatReply, classifyTriage, greetingLine, singleCallPrompt, tierNote, triageLine } from './triage.js'
 import type { ResolvedConfig, WorkflowReport } from './types.js'
 
 /** Payload shape of one `agent/pre-step` dispatch. */
@@ -110,7 +111,19 @@ type Classification =
  * means nothing ran and the batch must stay routable.
  */
 type Answer =
-  | { kind: 'report'; report: WorkflowReport; outcome: string }
+  | {
+    kind: 'report'
+    report: WorkflowReport
+    outcome: string
+    /** Front-desk tier line and greeting, rendered above the report body. */
+    header?: string
+  }
+  | {
+    kind: 'direct'
+    /** Text the front desk produced itself (chat answer, quick answer, question). */
+    text: string
+    outcome: string
+  }
   | { kind: 'notice'; reason: string; outcome: string }
 
 /** Plain text of one user message. */
@@ -347,6 +360,24 @@ export function installGate(deps: GateDeps): boolean {
   }
 
   /**
+   * Sessions whose last message was the front desk's question (t52).
+   *
+   * Process-local and short-lived by design: the question is answered in the next
+   * message of the same conversation, so a Map is the right lifetime. The TTL
+   * stops a stale question from swallowing an unrelated message an hour later.
+   */
+  const pendingAsks = new Map<string, number>()
+  const PENDING_TTL_MS = 10 * 60_000
+
+  /** Consume the pending question for one agent; expired entries are dropped. */
+  const takePending = (agentId: string): boolean => {
+    const askedAt = pendingAsks.get(agentId)
+    if (askedAt === undefined) return false
+    pendingAsks.delete(agentId)
+    return Date.now() - askedAt <= PENDING_TTL_MS
+  }
+
+  /**
    * Run the workflow for one admitted batch and produce its answer.
    *
    * Composes the objective here, not at admission: a queued follow-up must see
@@ -354,6 +385,77 @@ export function installGate(deps: GateDeps): boolean {
    * possible. Never throws — a run that cannot start becomes a notice.
    */
   const produceAnswer = async (
+    agent: Agent,
+    request: string,
+    signal?: AbortSignal,
+  ): Promise<Answer> => {
+    const limits = safe()
+    // Front desk (t52, plan C): the tier is decided per message, before any run
+    // starts, and the decision is part of the answer text. `full` keeps the
+    // pre-t52 behaviour byte for byte: no tier line, no greeting, no cheap call.
+    if (limits.mode !== 'full') {
+      const agentId = agentIdOf(agent)
+      const tier = classifyTriage({
+        text: request,
+        mode: limits.mode,
+        ask: limits.triageAsk,
+        pending: takePending(agentId),
+      })
+      if (tier.tier === 'ask') {
+        // No run and no answer: the front desk asks, and the next message from
+        // this session is read as the answer (takePending above).
+        pendingAsks.set(agentId, Date.now())
+        return {
+          kind: 'direct',
+          text: [triageLine(tier), '', askLine(tier.lang)].join('\n'),
+          outcome: 'triaged-ask',
+        }
+      }
+      if (tier.tier === 'chat') {
+        // Instant by construction: a template, not a call (see chatReply).
+        return {
+          kind: 'direct',
+          text: [triageLine(tier), '', chatReply(tier, request), '', tierNote(tier)].join('\n'),
+          outcome: 'triaged-chat',
+        }
+      }
+      if (tier.tier === 'fast') {
+        const call = await runSingleCall({
+          ctx, config, state, logger, agent,
+          prompt: singleCallPrompt(tier, request),
+          label: 'quick-worker',
+          ...signal === undefined ? {} : { signals: [signal] },
+        })
+        if (!call.ok) {
+          // State the failure; never upgrade a "quick" answer into a team run,
+          // which would make the tier line a lie.
+          return {
+            kind: 'notice',
+            reason: `${triageLine(tier)} — the ${tier.tier} tier could not answer: ${call.reason}`,
+            outcome: 'front-desk-failed',
+          }
+        }
+        return {
+          kind: 'direct',
+          text: [triageLine(tier), '', call.text, '', tierNote(tier)].join('\n'),
+          outcome: 'triaged-fast',
+        }
+      }
+      const answer = await runTeam(agent, request, signal)
+      const header = [triageLine(tier), tier.greeting ? greetingLine(tier.lang) : ''].filter(line => line !== '').join('\n')
+      return answer.kind === 'report' ? { ...answer, header } : answer
+    }
+    return runTeam(agent, request, signal)
+  }
+
+  /**
+   * The team tier: the pre-t52 workflow run, unchanged.
+   *
+   * Kept as its own function so the triage path above cannot accidentally change
+   * what a full run does: it composes the objective as late as possible and turns
+   * every failure into a report.
+   */
+  const runTeam = async (
     agent: Agent,
     request: string,
     signal?: AbortSignal,
@@ -394,7 +496,8 @@ export function installGate(deps: GateDeps): boolean {
 
   /** User-visible text for one answer under one strategy. */
   const answerText = (answer: Answer, inTurn: boolean): string => {
-    if (answer.kind === 'report') return relayText(answer.report)
+    if (answer.kind === 'report') return relayText(answer.report, answer.header)
+    if (answer.kind === 'direct') return frontDeskText(answer.text)
     return inTurn ? noticeEnterText(answer.reason) : noticeText(answer.reason)
   }
 
@@ -413,7 +516,9 @@ export function installGate(deps: GateDeps): boolean {
     const delivered = safe().answerStrategy === 'append'
       ? await deliverAppend(agent, text, entry.turn, entry.step ?? 0)
       : await deliverRelay(agent, text)
-    if (answer.kind === 'report' && delivered) {
+    // A `report` and a front-desk answer both settle the batch: the user has the
+    // answer. Only a notice leaves it routable, because nothing was produced.
+    if ((answer.kind === 'report' || answer.kind === 'direct') && delivered) {
       record(agent, entry, 'delivered', answer.outcome)
       return
     }
@@ -502,7 +607,7 @@ export function installGate(deps: GateDeps): boolean {
       record(agent, entry, 'failed', 'aborted')
       return { kind: 'reject' }
     }
-    record(agent, entry, answer.kind === 'report' ? 'delivered' : 'failed', answer.outcome)
+    record(agent, entry, answer.kind === 'notice' ? 'failed' : 'delivered', answer.outcome)
     return enter(answerText(answer, true))
   }
 

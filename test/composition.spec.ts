@@ -107,7 +107,9 @@ function harness(options: HarnessOptions = {}): ComposedHarness {
     // listeners, so they pin the strategy that refuses the batch. The default
     // `in-turn` strategy keeps the step open instead of refusing it (see
     // test/gate.spec.ts for that path).
-    apply(shim as never, { answerStrategy: 'relay', historyTurns: 4, historyChars: 4_000 })
+    // `mode: 'full'` keeps the pre-t52 rule: these suites are about the reject veto
+    // and its composition, and the front desk has its own file (triage.spec.ts).
+    apply(shim as never, { answerStrategy: 'relay', mode: 'full', historyTurns: 4, historyChars: 4_000 })
   }
 
   if (options.gatePlacement === 'first') installGate()

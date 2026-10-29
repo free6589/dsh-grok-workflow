@@ -85,7 +85,12 @@ After DSH starts, just ask something:
 
 > Inspect this repository, find two independent issues, verify each finding against the current files, and summarize what remains uncertain. Do not modify files.
 
-From `0.2.0` the gate runs the workflow for that message whether or not the model would have called the tool. The answer ends with a short status line (`Grok workflow: COMPLETED`, `PARTIAL` or `FAILED`) and the verified tasks, failures and uncertainties.
+From `0.2.0` the gate claims that message whether or not the model would have called the tool. With the
+default `mode: 'triage'` the front desk decides first: a long objective like the one above runs the
+**team** tier and ends with a short status line (`Grok workflow: COMPLETED`, `PARTIAL` or `FAILED`)
+plus the verified tasks, failures and uncertainties, while "what is today's date" takes the **quick**
+tier and "hello" the **direct** tier — both stating their tier and reason in the first line. Set
+`mode: 'full'` for the older behaviour (everything runs the team).
 
 ## How it works
 
@@ -112,6 +117,31 @@ The workflow exists to avoid treating an agent's “done” message as proof tha
 - A message the plugin will not run is **refused out loud** with the reason (empty message, or an objective over 4000 characters). Nothing is executed and nothing is retried automatically.
 - Delivery is recorded per message: the same batch dispatched twice does not start a second run, and each agent's waiting queue is bounded by `maxQueuedMessages`.
 - Set `enforceGate: false` to keep only the `grok_workflow` tool and skip interception. A deployment that must never degrade silently should also set `gateRequired: true`, which turns “this runtime exposes no `agent/pre-step` hook” into a load error instead of a warning.
+
+## The front desk: four tiers, always stated (t52)
+
+Every user message passes a **front desk** first, and the answer always says which tier it took and
+why — the plugin may be cheap, but it may not be quiet about it:
+
+| Tier | What runs | Cost |
+|---|---|---|
+| `直答档` (direct) | small talk answered from a template | no model call |
+| `快手档` (quick) | one worker, one pass | one call (a structured retry if the first returns nothing) |
+| `团队档` (team) | the full workflow, with a greeting and the progress board | the normal run |
+| `确认档` (ask) | it asks `这个要动用团队吗？可回复：简单 / 团队` and remembers your answer | no model call |
+
+You can always force the team by saying `用团队` / "use the team". The wording follows the language
+of your message, not the interface language. `mode: 'full'` restores the older rule (every message
+runs the team, no tier line, no greeting).
+
+Questions are recognised as **shapes**, not from a word list — `A不A` / `A没A` (`多不多`, `有没有`), a `还是`
+choice (`yarn 还是 pnpm`) and `谁` (`被谁占了`) — with the statement boundaries pinned (`他还是走了`,
+`他问是谁`), so "a question never gets the template" holds for the shapes the rules recognise.
+Two honest limits of the confirm tier: the pending question and its answer live in **plugin memory
+for ten minutes** and are consumed when used, so a plugin reload or a longer pause forgets them; the
+next "简单" / "团队" then says so (`档位：直答档 — 上一轮没有待回答的分流问题…`) instead of guessing what
+it was answering. And the front desk answers a *pointer* with no object ("改一下那个") by asking,
+while a pointer that carries a path, an error code or a snippet is taken as work and dispatched.
 
 ## Models per role and fallback chains
 
@@ -167,6 +197,9 @@ Configuration belongs to the profile's `cordis.patch.yml` (or a `--patch` overla
 |---|---:|---:|---|
 | `toolName` | `grok_workflow` | pattern `^[a-z][a-z0-9_]{1,40}$` | Model-facing tool name (fixed at registration) |
 | `enforceGate` | `true` | boolean | Claim every user message through the gate |
+| `mode` | `triage` | `triage` \| `full` | `triage`: the front desk picks a tier and says so. `full`: every message runs the team (pre-t52 behaviour) |
+| `triageAsk` | `true` | boolean | When the tier signals conflict, ask instead of escalating to the team |
+| `triageModel` | *(empty)* | route string | The model the quick tier's call spends; empty uses the run's own route |
 | `gateRequired` | `false` | boolean | Fail to load when the runtime cannot host the gate |
 | `gateScope` | `process` | `process` \| `preset` | Which agents the gate claims |
 | `gatePreset` | `''` | string | Agent preset that owns the gate when `gateScope: preset` |
@@ -268,7 +301,7 @@ npm ci
 npm run ci
 ```
 
-`npm run ci` runs typecheck, lint, build and **264 deterministic tests across 18 files**; no online model is needed. The suite covers the generated workflow, the real PTC engine contract, the gate and delivery paths, routing and fallback chains, failure classification, the configuration surface, write-path isolation and a reliability set (cancellation, deadlines, concurrency, duplicates, recursion, context bounds, redaction, unload/reload). Model-backed end-to-end checks are separate scripts and are recorded in [the validation log](docs/knowledge/VALIDATION.md); the headless one-shot delivery check is `scripts/e2e-headless-in-turn.sh`.
+`npm run ci` runs typecheck, lint, build and **366 deterministic tests across 22 files**; no online model is needed. The suite covers the generated workflow, the real PTC engine contract, the gate and delivery paths, routing and fallback chains, failure classification, the configuration surface, write-path isolation and a reliability set (cancellation, deadlines, concurrency, duplicates, recursion, context bounds, redaction, unload/reload). Model-backed end-to-end checks are separate scripts and are recorded in [the validation log](docs/knowledge/VALIDATION.md); the headless one-shot delivery check is `scripts/e2e-headless-in-turn.sh`.
 
 ## Security and compatibility
 
@@ -281,6 +314,13 @@ npm run ci
 
 ## Known limitations
 
+- The confirm tier's memory lives in plugin process memory (ten minutes, consumed on use): after a
+  reload or a longer pause a bare "simple / team" is told there is no pending question, so put the
+  task and the choice in one message (DECISIONS D-024).
+- The greeting arrives with the final answer; during the run only the progress board is visible
+  (`in-turn` admits one plugin message per turn).
+- The direct tier's wording is a template with no model text in it. That is the design, not a
+  downgrade.
 - **Not measured with a real settings GUI:** the auto-generated page is proven to exist and to be identified by the runtime, but clicking through it in a live Web GUI, and editing a `roles` array on that page, is NOT_RUN (NR-1/NR-7/NR-8 in the [design ledger](docs/knowledge/WORKFLOW-DESIGN.md)).
 - **Planner fill-rate for `writesPaths` is not established:** in the single measured sample (with the objective explicitly asking for declarations) the planner declared nothing, so nothing was serialized. Only callers that declare their own paths get the mitigation automatically today.
 - **Real-provider failure texts are not exhaustively measured** (NR-5/NR-6): classification is a whitelist, and anything unmatched is reported as `unknown` rather than guessed.

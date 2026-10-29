@@ -1,0 +1,266 @@
+[
+ {
+  "id": "V1",
+  "text": "明天要带伞吗",
+  "ruleTier": "fast",
+  "ruleReason": "question"
+ },
+ {
+  "id": "V2",
+  "text": "这个函数的时间复杂度是多少",
+  "ruleTier": "fast",
+  "ruleReason": "question"
+ },
+ {
+  "id": "V3",
+  "text": "vue3 和 react 哪个更适合小项目",
+  "ruleTier": "fast",
+  "ruleReason": "question"
+ },
+ {
+  "id": "V4",
+  "text": "为什么 npm install 会卡住",
+  "ruleTier": "fast",
+  "ruleReason": "question"
+ },
+ {
+  "id": "V5",
+  "text": "node 版本最低要求是几",
+  "ruleTier": "fast",
+  "ruleReason": "question"
+ },
+ {
+  "id": "V6",
+  "text": "is this repo using esm or cjs",
+  "ruleTier": "fast",
+  "ruleReason": "question"
+ },
+ {
+  "id": "V7",
+  "text": "what does the -u flag do in npm ci",
+  "ruleTier": "fast",
+  "ruleReason": "question"
+ },
+ {
+  "id": "V8",
+  "text": "how long does the build take",
+  "ruleTier": "fast",
+  "ruleReason": "question"
+ },
+ {
+  "id": "V9",
+  "text": "先跑 lint 再提交",
+  "ruleTier": "team",
+  "ruleReason": "multi-step"
+ },
+ {
+  "id": "V10",
+  "text": "备份一下数据库并通知我",
+  "ruleTier": "team",
+  "ruleReason": "multi-step"
+ },
+ {
+  "id": "V11",
+  "text": "改完配置记得重启服务并回滚说明",
+  "ruleTier": "team",
+  "ruleReason": "multi-step"
+ },
+ {
+  "id": "V12",
+  "text": "一、拉取代码 二、跑测试 三、发版",
+  "ruleTier": "team",
+  "ruleReason": "multi-step"
+ },
+ {
+  "id": "V13",
+  "text": "1. 建分支 2. 改代码 3. 提 PR",
+  "ruleTier": "team",
+  "ruleReason": "multi-step"
+ },
+ {
+  "id": "V14",
+  "text": "改配置、重启、验证",
+  "ruleTier": "team",
+  "ruleReason": "multi-step"
+ },
+ {
+  "id": "V15",
+  "text": "这个报错 src/triage.ts:120 是什么引起的",
+  "ruleTier": "fast",
+  "ruleReason": "question"
+ },
+ {
+  "id": "V16",
+  "text": "那个配置 packages/dsh/tsconfig.json 里的 target 要不要改",
+  "ruleTier": "fast",
+  "ruleReason": "single-step"
+ },
+ {
+  "id": "V17",
+  "text": "早上好呀",
+  "ruleTier": "chat",
+  "ruleReason": "small-talk"
+ },
+ {
+  "id": "V18",
+  "text": "辛苦了",
+  "ruleTier": "chat",
+  "ruleReason": "small-talk"
+ },
+ {
+  "id": "V19",
+  "text": "团队",
+  "ruleTier": "chat",
+  "ruleReason": "stale-choice"
+ },
+ {
+  "id": "V20",
+  "text": "quick",
+  "ruleTier": "chat",
+  "ruleReason": "stale-choice"
+ },
+ {
+  "id": "V21",
+  "text": "加一个 --verbose 开关到 CLI",
+  "ruleTier": "fast",
+  "ruleReason": "single-step"
+ },
+ {
+  "id": "V22",
+  "text": "写一份 README 的安装章节",
+  "ruleTier": "fast",
+  "ruleReason": "single-step"
+ },
+ {
+  "id": "T1",
+  "text": "为什么天空是蓝的",
+  "ruleTier": "fast",
+  "ruleReason": "question"
+ },
+ {
+  "id": "T2",
+  "text": "今天几号",
+  "ruleTier": "fast",
+  "ruleReason": "question"
+ },
+ {
+  "id": "T3",
+  "text": "解释幂等",
+  "ruleTier": "fast",
+  "ruleReason": "question"
+ },
+ {
+  "id": "T4",
+  "text": "what is idempotency",
+  "ruleTier": "fast",
+  "ruleReason": "question"
+ },
+ {
+  "id": "T5",
+  "text": "how many files are in src/",
+  "ruleTier": "fast",
+  "ruleReason": "question"
+ },
+ {
+  "id": "T6",
+  "text": "先备份然后升级",
+  "ruleTier": "team",
+  "ruleReason": "multi-step"
+ },
+ {
+  "id": "T7",
+  "text": "先建目录再拷文件",
+  "ruleTier": "team",
+  "ruleReason": "multi-step"
+ },
+ {
+  "id": "T8",
+  "text": "备份数据库并通知我",
+  "ruleTier": "team",
+  "ruleReason": "multi-step"
+ },
+ {
+  "id": "T9",
+  "text": "1) 备份 2) 升级",
+  "ruleTier": "team",
+  "ruleReason": "multi-step"
+ },
+ {
+  "id": "T10",
+  "text": "一、备份 二、升级",
+  "ruleTier": "team",
+  "ruleReason": "multi-step"
+ },
+ {
+  "id": "T11",
+  "text": "备份；升级；通知我",
+  "ruleTier": "team",
+  "ruleReason": "multi-step"
+ },
+ {
+  "id": "T12",
+  "text": "这个报错 src/triage.ts:42",
+  "ruleTier": "fast",
+  "ruleReason": "single-step"
+ },
+ {
+  "id": "T13",
+  "text": "改一下那个",
+  "ruleTier": "ask",
+  "ruleReason": "ambiguous"
+ },
+ {
+  "id": "T14",
+  "text": "你好",
+  "ruleTier": "chat",
+  "ruleReason": "small-talk"
+ },
+ {
+  "id": "J1",
+  "text": "3+5等于几",
+  "ruleTier": "fast",
+  "ruleReason": "question"
+ },
+ {
+  "id": "J2",
+  "text": "这个得几",
+  "ruleTier": "fast",
+  "ruleReason": "question"
+ },
+ {
+  "id": "J3",
+  "text": "还剩几台机器",
+  "ruleTier": "fast",
+  "ruleReason": "question"
+ },
+ {
+  "id": "J4",
+  "text": "有几条记录",
+  "ruleTier": "fast",
+  "ruleReason": "question"
+ },
+ {
+  "id": "J5",
+  "text": "这是几",
+  "ruleTier": "fast",
+  "ruleReason": "question"
+ },
+ {
+  "id": "J6",
+  "text": "还剩几",
+  "ruleTier": "fast",
+  "ruleReason": "question"
+ },
+ {
+  "id": "J7",
+  "text": "5的平方是几",
+  "ruleTier": "fast",
+  "ruleReason": "question"
+ },
+ {
+  "id": "J8",
+  "text": "这台机器几核",
+  "ruleTier": "fast",
+  "ruleReason": "question"
+ }
+]

@@ -295,7 +295,9 @@ describe('reliability: concurrency and duplicate start', () => {
 
   it('starts one workflow per user message even when pre-step fires again', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { maxConcurrency: 1 })
+    // Duplicate suppression is about the gate's durable record, not about the
+    // front desk: run the pre-t52 rule so the message really starts a workflow.
+    apply(ctx as never, { maxConcurrency: 1, mode: 'full' })
     const target = session('sess-duplicate')
     const messages = [userMessage('do the thing')]
     await ctx.preStep(stepPayload(agentOf(target), messages), passThrough(messages as never))
@@ -398,13 +400,15 @@ describe('reliability: unload and reload', () => {
 
   it('starts clean after a reload instead of inheriting the old queue', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { maxConcurrency: 1 })
+    // `mode: 'full'`: this test measures the mount/reload lifecycle, and its short
+    // messages would otherwise be answered by the front desk instead of the team.
+    apply(ctx as never, { maxConcurrency: 1, mode: 'full' })
     const target = session('sess-reload')
     await ctx.preStep(stepPayload(agentOf(target), [userMessage('first')]), passThrough([]))
     await vi.waitFor(() => { if (ctx.engine.startCalls.length === 0) throw new Error('no run') })
     await ctx.dispose()
     // A fresh mount on the same context object admits a new message again.
-    apply(ctx as never, { maxConcurrency: 1 })
+    apply(ctx as never, { maxConcurrency: 1, mode: 'full' })
     await ctx.preStep(stepPayload(agentOf(target), [userMessage('second message')]), passThrough([]))
     await vi.waitFor(() => { if (ctx.engine.startCalls.length < 2) throw new Error('reload did not admit') })
     expect(ctx.engine.startCalls).toHaveLength(2)
@@ -449,7 +453,7 @@ describe('reliability: run records', () => {
 
   it('records the delivery outcome so a restart cannot re-route the message', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { maxConcurrency: 1 })
+    apply(ctx as never, { maxConcurrency: 1, mode: 'full' })
     const target = session('sess-delivery')
     await ctx.preStep(stepPayload(agentOf(target), [userMessage('do the thing')]), passThrough([]))
     await vi.waitFor(() => { if (ctx.engine.startCalls.length === 0) throw new Error('no run') })
@@ -520,6 +524,7 @@ describe('reliability: wiring the live configuration and the category vocabulary
     // decision is what makes an edit apply to the next message.
     apply(ctx as never, {
       maxConcurrency: 1,
+      mode: 'full',
       gateScope: { get: () => scope },
       gatePreset: 'workflow-only',
     } as never)
@@ -558,6 +563,9 @@ describe('reliability: wiring the live configuration and the category vocabulary
       // `relay` queueing is where the live bound is read, and it returns before the
       // run settles, so the refusal can be observed while the first run hangs.
       answerStrategy: 'relay',
+      // t52: this file measures the gate's durability, not the front desk, so it
+      // runs the pre-t52 rule (every message → team).
+      mode: 'full',
       maxConcurrency: 1,
       maxQueuedMessages: { get: () => queued },
       roles: { get: () => broken ? { worker: [{ model: '' }] } : {} },

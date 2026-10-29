@@ -2,6 +2,11 @@
 
 Real commands and results only. Do not add expected results here.
 
+**Before running any live matrix, read [TESTING.md](TESTING.md)** — the workspace-isolation rules are
+mandatory: no sample is sent to a test instance until its session workspace is a scratch directory
+under `/tmp`, and the proof of that (the `sessions/--tmp-…--` directory name plus the workspace name
+the UI shows) belongs in that round's evidence.
+
 ## Environment
 
 - Date: 2026-10-25
@@ -872,3 +877,239 @@ tuned by the plugin.
 2. **This instance now carries 20 bundles**, including `@orbisapp/remote-dsh` (t48 R6 restored it),
    which closes the one-bundle gap in Round 6 row (h): boot still reports exactly the same three
    pre-existing non-activations.
+
+## Round 9 (t52) — the front desk on `:3100`, and three defects it found
+
+Plan C was implemented and then measured on the same test instance as Rounds 6–8: test home
+`/home/fish/dsh-v022-home`, profile `web-v022-test`, listener `127.0.0.1:3100`, raw data in
+`docs/knowledge/evidence/t52/`. The live `:3090` instance and its profile were not touched.
+
+Each row is one message typed into one session of the web UI, in this order, with the answer text
+kept verbatim in the evidence directory.
+
+| # | Message | Tier the front desk stated | What the user saw | Time |
+|---|---|---|---|---|
+| M1 | `你好` | 直答档 — 这是问候/寒暄，没有要做的事 | template answer + `（这条没有动用团队，前台直答。）` | ~10 s (no call) |
+| M2 | `算一下 5×6 等于多少，只回答数字` | 快手档 — 单一动作、线索完整 | `30` + `（这条只派了一个工人，没有开完整团队。）` | ~21 s |
+| M3 | `把这个弄一下` | 确认档 — 信号互相矛盾或线索不足 | `这个要动用团队吗？可回复：简单 / 团队。` | ~10 s |
+| M4 | `简单` | 快手档 — 你刚才回答「简单」，按你的选择走快手档 | answer + quick-tier note (the pending answer is remembered) | ~18 s |
+| M5 | `用团队：只回答一个字` | 团队档 — 你的消息里点名了团队 | `收到！团队开工中，施工牌在旁边。` then a full report (plan, 1 task, 1 verified) | ~180 s |
+| M6 | `你好` | 直答档 | template answer again — the tier does not drift inside a session | ~11 s |
+| M7 | `先读一下 src/triage.ts 里的 TRIAGE_LIMITS，然后把两个阈值的意思写成三句说明` | **确认档 (defect)** | asked instead of starting | ~12 s |
+| M8 | same message, after the fix | 团队档 — sequencing (was 确认档 before the fix) | the full workflow started and ran to a **failed** report: the objective named a path outside the instance's workspace (`/home/fish/project_jobs`), and the report says so instead of inventing an answer | ~204 s |
+| M9 | `你好` with `mode: 'full'` | no tier line at all | the full workflow (`COMPLETED`, 1 task, 1 verified) — the pre-t52 behaviour, i.e. the rollback switch works | — |
+
+### Defects the live matrix found (none of them were visible in unit tests)
+
+1. **The chat tier's single call returned nothing.** `agentsStarted=1 value={"reply":null}`: the
+   child answered the social message in prose, and the guest collapses "child failed" and "child
+   returned no structured value" into `null`. Fix: the direct tier answers from a template — that
+   is also what "秒回" means — and `chatReply()` names what the plugin does.
+2. **The quick tier failed the same way, intermittently** (same prompt succeeded twice, returned
+   `{"reply":null}` twice). Fix: the plain call (no schema, the child's text is the answer) is the
+   primary and a schema-shaped call is the retry; the reason line now carries `agentsStarted`, so a
+   future failure is diagnosable instead of just "no text".
+3. **Sequencing lost to the conflict rule.** `先…然后…` scored one team point against two fast
+   points ⇒ the front desk asked about a plainly two-step request (M7). Fix: `multiStep` is decisive
+   before the score comparison; pinned by a test.
+4. **A front-desk answer was recorded as a failed delivery.** `answer.kind === 'report'` was the only
+   "delivered" case, so a direct answer left the batch routable and the plugin record said `failed`
+   (`phase: failed, outcome: triaged-chat` in the session log). Fix: `direct` also settles the batch;
+   only `notice` stays routable.
+
+### What this round does *not* establish
+
+- Latency numbers are single samples on a shared instance with a flash route; they are order-of-
+  magnitude evidence (seconds vs minutes), not a benchmark.
+- The quick tier's "one call" promise is "one call in the common case": when the plain call returns
+  nothing, a second (structured) call happens, and the failure text stays truthful.
+- M8 shows the team tier starts for a sequenced request; M5 shows a completed team run with the
+  greeting. Neither is a statement about the quality of the work the team produced.
+
+### Regression and compatibility
+
+| Check | Result |
+|---|---|
+| `npm run ci` | 22 files / **358 tests**, typecheck + lint clean (baseline was 21 files / 336) |
+| Pre-t52 behaviour preserved | `mode: 'full'` produces the pre-t52 answer shape (no tier line, no greeting); pinned by a test in `test/triage.spec.ts` |
+| Existing suites | gate, reliability and composition suites pass `mode: 'full'` explicitly, so their semantics are unchanged |
+| Settings page | three new volatile fields (`mode`, `triageAsk`, `triageModel`) projected to the browser form; volatile count 19 → 22, pinned by `test/settings-projection.spec.ts` |
+
+## Round 10 (t54) — the fourteen t53 F1 samples, re-run after the ordering fix
+
+The t53 review found the blocker described in DECISIONS D-025: the direct tier's "short and inert"
+shortcut ran before the sequencing and question rules, so short questions and short two-step
+instructions were answered from the greeting template — honest tier line, no work done. After the
+reorder, the fourteen directed samples were sent one at a time through the front desk of the test
+instance (`/home/fish/dsh-v022-home`, profile `web-v022-test`, `127.0.0.1:3100`; live `:3090`
+untouched). Page text, screenshots and timings: `docs/knowledge/evidence/t54/`.
+
+| # | Sample | Tier observed | Did it do the work? |
+|---|---|---|---|
+| 1 | `为什么天空是蓝的` | 快手档 (`question`) | yes — a Rayleigh-scattering answer from one worker |
+| 2 | `今天几号` | 快手档 (`question`) | yes — answered from the date |
+| 3 | `解释幂等` | 快手档 (`question`) | yes — an explanation |
+| 4 | `what is idempotency` | 快手档 (`question`) | yes — same, English |
+| 5 | `how many files are in src/` | 快手档 (`question`) | yes — the worker counted and reported |
+| 6 | `先备份然后升级` | team (work done; see note) | yes — produced `.backups/`, `upgrade/`, `UPGRADE_REPORT.md` |
+| 7 | `先建目录再拷文件` | team (work done; see note) | yes — produced `dsh-backup-copy-20261029/`, `COPY_REPORT.md` |
+| 8 | `备份数据库并通知我` | team (work done; see note) | yes — produced `.backups/db-backup-…/`, `DB_BACKUP_REPORT.md`, `NOTIFY.md` |
+| 9 | `1) 备份 2) 升级` | team (rule; unit test only) | not sent live — the budget went to the three above |
+| 10 | `这个报错 src/triage.ts:42` | 快手档 (`single-step`) | yes — dispatched instead of being asked about (this was the second defect) |
+| 11 | `改一下那个` | 确认档 (`ambiguous`) | asked back, nothing dispatched — still correct |
+| 12 | `简单` | 快手档 (`pending-fast`) | read as the answer to sample 11 |
+| 13 | `团队` | 直答档 (`stale-choice`) | said the pending question was gone; nothing dispatched, no crash |
+| 14 | `你好` | 直答档 (`small-talk`) | template, no dispatch |
+
+Note on rows 6–8: the answer had not arrived when the capture budget ran out (row 6 was still
+executing at 900 s), so their page captures carry no tier line. The team tier is nonetheless
+established for them by the work itself: the directories and reports listed above cannot be produced
+by the template or by a single quick worker, and the classifier returns `team`/`multi-step` for those
+exact strings in `test/triage.spec.ts`.
+
+### An operational hazard this round exposed (and what was done)
+
+The profile's workspace is `/home/fish/project_jobs`; **starting the instance from another directory
+does not change it**. Rows 6–8 therefore did their work in a live workspace: 329 MB of backups,
+copies and reports, all created by the samples themselves. Everything created was moved to
+`/tmp/t54-quarantine/` (listed in `evidence/t54/QUARANTINE-MANIFEST.txt`, restorable with one `mv`).
+Nothing pre-existing was modified or deleted, the dsh install is still `0.2.1-rc.2`, and `:3090` was
+never read or written. Any future matrix must either point the profile at a scratch workspace or
+use objectives that name no filesystem action at all.
+
+### Regression and compatibility
+
+| Check | Result |
+|---|---|
+| `npm run ci` | 22 files / **362 tests**, typecheck + lint clean (was 358; +4 regression groups for this blocker) |
+| The ordering contract | the four new test groups pin: questions → at least the quick tier in zh and en; short two-step / `1) 2)` / `一、二、` / semicolons → team; a path-, code- or snippet-bearing pointer → dispatched, while `改一下那个` still asks; bare `简单` / `团队` → direct tier with an explanation, with and without a pending question |
+| `mode: 'full'` | untouched by this change; still reproduces pre-t52 behaviour (Round 9, `evidence/t52/M9-full-mode-rollback.txt`) |
+| Version | `package.json` / `package-lock.json` at `0.2.3`, `CHANGELOG.md` `## [0.2.3]`, release-notes draft written; the `0.2.2` … `0.1.0` sections are byte-identical to their tags |
+
+## Round 11 (t56) — v0.2.3 收尾：残留清理、中文 README、分类器三处缺口 + 隔离工作区上的 44 条矩阵
+
+**这一轮的纪律前提**：真机矩阵跑在一次性工作区 `/tmp/t56-work` 上（[TESTING.md](TESTING.md) 规则 1/8/9），
+会话目录为 `sessions/--tmp-t56-work--/<uuid>/`，用户目录 `/home/fish/project_jobs` 本轮零新增。
+上一轮（t54）的第二批残留也在这一轮清掉，见 §1。
+
+### 1. 用户目录残留清理（N2）
+
+| 项 | 处理 | 结果 |
+|---|---|---|
+| `.backups/db-backup-20261029-104117`（3.6 MB，19 个库的只读副本 + `run_backup.sh` + `logs/`） | `realpath` 校验 → `mv` 到 `/tmp/t54-quarantine/batch2-1041/` | 已移出 |
+| `DB_BACKUP_REPORT.md`（87,282 B，md5 `8aabaf7b…`） | 同上 | 已移出 |
+| `NOTIFY.md`（2,617 B，md5 `64990a84…`） | 同上 | 已移出 |
+| 复扫 `/home/fish/project_jobs`（`-newermt 2026-10-29 10:39`，排除 SQLite 边车） | `find` | **命中 0 项** |
+| 既有文件是否被改 | 对比 mtime | 未被修改（如 `猎聘/data/liepin.db` 仍是 10-28 04:08） |
+| SQLite 边车 | 25 个 `*.db-shm`、25 个零字节 `*.db-wal` 的 mtime 被只读打开更新 | 如实记录，**不删除**（属 SQLite 自己，删除可能丢未合并 WAL） |
+
+隔离目录 `MANIFEST.txt` 记录批次/体积/md5，`batch2-1041.hashes.txt` 是 139 个文件的逐文件哈希；一条 `mv` 可还原。
+
+### 2. 分类器三处缺口（N3，改实现而非改契约，DECISIONS D-026）
+
+| 缺口 | 修法 | 用例 |
+|---|---|---|
+| 句尾"几" | `几[个号年月天时分秒]` → `几(?![十百千万乎])` | `3+5等于几`、`这个得几`、`还剩几台机器`、`有几条记录`、`这是几`、`还剩几`、`5的平方是几`、`这台机器几核` → 全部 `fast`/`question` |
+| 纯顿号列表 | 新增 `COMMA_LIST`（三个及以上顿号项算多步） | `改配置、重启、验证` → `team`；`读、写` → `fast`（两个项不算多步） |
+| `并+回滚` | 动词表补 `回滚\|回退\|重启\|验证\|灰度` | `并回滚到上一版`、`备份、升级后并回滚` → `team` |
+
+**真机抓到的两处误判（单测没覆盖）**：
+
+| 输入 | 修前（真机会话） | 修后（真机会话） |
+|---|---|---|
+| `is this repo using esm or cjs` | `Tier: confirm`（对一个问题反问了一遍） | `档位：快手档` |
+| `这个得几` | `确认档`（被"模糊即反问"拦住） | `快手档` |
+
+修法：英文是非问句按**助动词前置**识别（`is/are/does/do/can/… + this/that/it/…`），并给 `MULTI_STEP` 补英文顺序词
+（`then`/`first…then`/`afterwards`/`finally`），保证 `do this then another` 这类祈使多步不被误判为问句。
+
+### 3. 44 条真机矩阵（t55 的 22 + t53 的 14 + 新的 8）
+
+| # | 样本 | 规则判定 | 真机档位 | 判定 |
+|---|---|---|---|---|
+| 1 | `明天要带伞吗` | fast (`question`) | fast | 合理 |
+| 2 | `这个函数的时间复杂度是多少` | fast (`question`) | fast | 合理 |
+| 3 | `vue3 和 react 哪个更适合小项目` | fast (`question`) | fast | 合理 |
+| 4 | `为什么 npm install 会卡住` | fast (`question`) | fast | 合理 |
+| 5 | `node 版本最低要求是几` | fast (`question`) | fast | 合理 |
+| 6 | `is this repo using esm or cjs` | fast (`question`) | fast | 合理 |
+| 7 | `what does the -u flag do in npm ci` | fast (`question`) | fast | 合理 |
+| 8 | `how long does the build take` | fast (`question`) | fast | 合理 |
+| 9 | `先跑 lint 再提交` | team (`multi-step`) | team | 合理 |
+| 10 | `备份一下数据库并通知我` | team (`multi-step`) | team | 合理 |
+| 11 | `改完配置记得重启服务并回滚说明` | team (`multi-step`) | team | 合理 |
+| 12 | `一、拉取代码 二、跑测试 三、发版` | team (`multi-step`) | team | 合理 |
+| 13 | `1. 建分支 2. 改代码 3. 提 PR` | team (`multi-step`) | team | 合理 |
+| 14 | `改配置、重启、验证` | team (`multi-step`) | team | 合理 |
+| 15 | `这个报错 src/triage.ts:120 是什么引起的` | fast (`question`) | fast | 合理 |
+| 16 | `那个配置 packages/dsh/tsconfig.json 里的 target 要不要改` | fast (`single-step`) | fast | 合理 |
+| 17 | `早上好呀` | chat (`small-talk`) | chat | 合理 |
+| 18 | `辛苦了` | chat (`small-talk`) | chat | 合理 |
+| 19 | `团队` | chat (`stale-choice`) | chat | 合理 |
+| 20 | `quick` | chat (`stale-choice`) | chat | 合理 |
+| 21 | `加一个 --verbose 开关到 CLI` | fast (`single-step`) | fast | 合理 |
+| 22 | `写一份 README 的安装章节` | fast (`single-step`) | fast | 合理 |
+| 23 | `为什么天空是蓝的` | fast (`question`) | fast | 合理 |
+| 24 | `今天几号` | fast (`question`) | fast | 合理 |
+| 25 | `解释幂等` | fast (`question`) | fast | 合理 |
+| 26 | `what is idempotency` | fast (`question`) | fast | 合理 |
+| 27 | `how many files are in src/` | fast (`question`) | fast | 合理 |
+| 28 | `先备份然后升级` | team (`multi-step`) | — | 未覆盖（见说明） |
+| 29 | `先建目录再拷文件` | team (`multi-step`) | — | 未覆盖（见说明） |
+| 30 | `备份数据库并通知我` | team (`multi-step`) | — | 未覆盖（见说明） |
+| 31 | `1) 备份 2) 升级` | team (`multi-step`) | — | 未覆盖（见说明） |
+| 32 | `一、备份 二、升级` | team (`multi-step`) | — | 未覆盖（见说明） |
+| 33 | `备份；升级；通知我` | team (`multi-step`) | — | 未覆盖（见说明） |
+| 34 | `这个报错 src/triage.ts:42` | fast (`single-step`) | fast | 合理 |
+| 35 | `改一下那个` | ask (`ambiguous`) | ask | 合理 |
+| 36 | `你好` | chat (`small-talk`) | chat | 合理 |
+| 37 | `3+5等于几` | fast (`question`) | fast | 合理 |
+| 38 | `这个得几` | fast (`question`) | fast | 合理 |
+| 39 | `还剩几台机器` | fast (`question`) | fast | 合理 |
+| 40 | `有几条记录` | fast (`question`) | fast | 合理 |
+| 41 | `这是几` | fast (`question`) | fast | 合理 |
+| 42 | `还剩几` | fast (`question`) | fast | 合理 |
+| 43 | `5的平方是几` | fast (`question`) | fast | 合理 |
+| 44 | `这台机器几核` | fast (`question`) | fast | 合理 |
+
+真机覆盖 **38 / 44**，**误判 0 条**。覆盖方式（全部在隔离工作区 `/tmp/t56-work` 上跑，会话目录
+`sessions/--tmp-t56-work--/session-*` 为证）：第一轮 V1–V14、第二轮 V18–V22 + T1–T5 + T12–T14 + J1–J8、
+第三轮 V15–V17。**未覆盖的 6 条（T6–T11）都是团队档带文件系统动作的样本**：它们在预算内完成不了
+（`先备份然后升级` / `备份数据库并通知我` / 序号与分号形式的那几条），继续等待只会把一个"档位表"变成
+"性能测量"，所以它们以规则判定 + V9–V14 六条团队样本的真机结果为准（那六条在同一实例上全部显示
+`档位：团队档`）。这不是"没测"，是"测得起的部分都测了、测不起的部分如实标注"。
+
+> 复现注意：一次真机会话同时只能有一个 turn 在跑。第一轮脚本按固定预算发下一条，结果 20 多条消息被
+> 丢弃（会话里 `user/message` 只有 14 条），教训已写进 [TESTING.md](TESTING.md) 规则 10：**发下一条前
+> 必须等到本轮答案落地**，判据是会话日志里 `assistant/message` 计数增长，而不是页面里出现档位行。
+
+
+
+### 4. 两条不变量
+
+| 不变量 | 判定 | 证据 |
+|---|---|---|
+| **多步永不吃模板** | 所有多步样本（`先…再/然后`、`1)/一、`序号、顿号列表、分号、`并+动词`）落在 `团队档`，无一落 `直答档` | 本表 team 行 + `test/triage.spec.ts` 的 multi-step 回归组 |
+| **已识别的问句形态永不用模板** | 所有**被规则识别**的问句（中/英，含句尾"几"、`?`、wh-词、助动词前置，以及 t58 补的 `A不A`/`A没A`、`还是` 二选一、`谁`）落在 `快手档` 或以上，无一落 `直答档`、无一落 `确认档`；规则没认出来的形态不在此承诺之内（见 D-027） | 本表 question 行 + 6 组问句回归测试（规则级验证，本轮未跑真机） |
+
+### 5. 构建与回归
+
+| 检查 | 结果 |
+|---|---|
+| `npm run ci` | 22 文件 / **366 例**通过，typecheck 与 `oxlint` 0 警告 0 错误（362 → t56 的 365 → t58 的 366） |
+| `mode: 'full'` | 本轮未改动该分支；仍由既有测试与 Round 9（`evidence/t52/M9-full-mode-rollback.txt`）钉住 |
+| 版本 | `package.json` / `package-lock.json` = `0.2.3`；CHANGELOG `## [0.2.3]`；发布说明草稿已存在 |
+
+### Round 11 addendum (t58) — 规则级验证
+
+t57 的三条 low 修补在本轮完成，**本轮没有真机矩阵**（改动全在分类器规则内，单测是权威证据；真机只会重复
+Round 11 已经证明的"档位行照常出现"）：
+
+| 项 | 内容 | 结果 |
+|---|---|---|
+| L1 测试数统一 | README（EN/ZH）、RELEASE-NOTES-0.2.3、DECISIONS 的当前值统一为实际数（并保留 336→358→362→365→366 的历史链） | 366 |
+| L2 证据路径 | `evidence/t56/README.md` §0 里写错的路径改为 `/tmp/t56-evidence/W0-workspace.txt`（578 B），并说明它是临时证据、不在仓库内 | 已改 |
+| L3 问句形态 | 新增 `A不A`/`A没A`、`还是` 二选一、`谁` 三条**形态**规则与三条排除规则（见 D-027）；三条对抗探针原句全部 `fast`/`question` | 通过 |
+
+验证方式：`npm run ci` = typecheck + oxlint（0/0）+ build + **22 文件 / 366 例**。本轮**规则级验证**，
+无真机样本。

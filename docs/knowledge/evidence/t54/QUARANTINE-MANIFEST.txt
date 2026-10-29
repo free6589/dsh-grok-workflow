@@ -1,0 +1,13 @@
+Quarantine of artefacts written by the t54 live matrix into /home/fish/project_jobs.
+
+Why they exist: three team-tier samples were typed into the plugin on the :3100 test instance
+whose workspace is /home/fish/project_jobs. The team tier did real work (that is the point of
+the check): "先备份然后升级" produced .backups/ and upgrade/, "先建目录再拷文件" produced
+dsh-backup-copy-20261029/ and COPY_REPORT.md, "备份数据库并通知我" produced
+.backups/db-backup-20261029-103453/, DB_BACKUP_REPORT.md and NOTIFY.md. .npm-cache/ was a
+helper cache the worker created.
+
+Nothing pre-existing was modified or deleted (the worker's own reports say so, and the dsh
+install is still 0.2.1-rc.2 with :3090 untouched). To restore, move these back:
+  mv /tmp/t54-quarantine/<name> /home/fish/project_jobs/
+To discard them: rm -rf /tmp/t54-quarantine

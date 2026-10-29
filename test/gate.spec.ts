@@ -16,7 +16,10 @@ import { ROUTING_RECORD } from '../src/records.js'
  * survives), so every test below names the strategy it is actually about.
  */
 function applyWith(ctx: unknown, overrides: Record<string, unknown> = {}): void {
-  apply(ctx as never, { answerStrategy: 'relay', ...overrides })
+  // `mode: 'full'` on purpose: every test in this file is about the gate and the
+  // run, not about the front desk. t52's tiering has its own file (triage.spec.ts),
+  // and the front-desk branch is pinned there for each of its four tiers.
+  apply(ctx as never, { answerStrategy: 'relay', mode: 'full', ...overrides })
 }
 
 /* ------------------------------------------------------------------ engine -- */
@@ -707,7 +710,9 @@ function recordsOf(session: Session, type: string): unknown[] {
 describe('in-turn delivery (default strategy)', () => {
   it('keeps the turn open, then enters the step with the validated report', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never) // no override: the default strategy is under test
+    // Default strategy under test; the tier stays `full` so the message really
+    // starts a run (the front desk is covered in triage.spec.ts).
+    apply(ctx as never, { mode: 'full' })
     const agent = new FakeAgent({ session: realSession('sess-in-turn') })
     let settled = false
     const pending = ctx.preStep()(payload(agent, [userMessage('run the workflow')]), passingNext([]))
@@ -739,7 +744,7 @@ describe('in-turn delivery (default strategy)', () => {
 
   it('enters a failure report when the run failed, so the user is never left without output', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never)
+    apply(ctx as never, { mode: 'full' })
     const session = realSession('sess-in-turn-failed')
     const agent = new FakeAgent({ session })
     const pending = ctx.preStep()(payload(agent, [userMessage('run the workflow')]), passingNext([]))
@@ -758,7 +763,7 @@ describe('in-turn delivery (default strategy)', () => {
 
   it('enters a notice when the workflow cannot start at all', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never)
+    apply(ctx as never, { mode: 'full' })
     const agent = new FakeAgent({ session: realSession('sess-in-turn-busy') })
     ctx.engine.startError = new Error('already has 2 active run(s)')
     const decision = await ctx.preStep()(payload(agent, [userMessage('run the workflow')]), passingNext([])) as {
@@ -774,7 +779,7 @@ describe('in-turn delivery (default strategy)', () => {
 
   it('refuses an over-long message in the same turn instead of staying silent', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never)
+    apply(ctx as never, { mode: 'full' })
     const agent = new FakeAgent({ session: realSession('sess-in-turn-long') })
     const decision = await ctx.preStep()(payload(agent, [userMessage('x'.repeat(20_000))]), passingNext([])) as {
       kind: string
@@ -787,7 +792,7 @@ describe('in-turn delivery (default strategy)', () => {
 
   it('rejects instead of entering when the turn is already aborted', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never)
+    apply(ctx as never, { mode: 'full' })
     const agent = new FakeAgent({ session: realSession('sess-in-turn-aborted') })
     const controller = new AbortController()
     controller.abort()
@@ -798,7 +803,7 @@ describe('in-turn delivery (default strategy)', () => {
 
   it('stops waiting when the turn aborts mid-run and does not hang', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never)
+    apply(ctx as never, { mode: 'full' })
     const agent = new FakeAgent({ session: realSession('sess-in-turn-cancel') })
     const controller = new AbortController()
     const pending = ctx.preStep()(
@@ -830,7 +835,7 @@ describe('in-turn delivery (default strategy)', () => {
 
   it('answers when the plugin is unloaded mid-run', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never)
+    apply(ctx as never, { mode: 'full' })
     const agent = new FakeAgent({ session: realSession('sess-in-turn-unload') })
     const pending = ctx.preStep()(payload(agent, [userMessage('run the workflow')]), passingNext([]))
     await waitFor(() => ctx.engine.runs.length === 1)
@@ -847,7 +852,7 @@ describe('in-turn delivery (default strategy)', () => {
 
   it('writes no routing ledger when the engine failed before a report existed', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never)
+    apply(ctx as never, { mode: 'full' })
     const session = realSession('sess-in-turn-no-ledger')
     const agent = new FakeAgent({ session })
     const pending = ctx.preStep()(payload(agent, [userMessage('run the workflow')]), passingNext([]))

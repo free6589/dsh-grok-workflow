@@ -125,4 +125,51 @@ export interface RunOutcome {
     cause?: string;
 }
 export declare function runWorkflow(options: RunWorkflowOptions): Promise<RunOutcome>;
+/**
+ * One child call, no plan, no verifier: the answer a chat or fast tier spends.
+ *
+ * Added in t52 for the front desk (plan C). The cheap tiers must not pay for the
+ * full workflow — a greeting that costs a planner, a worker and a verifier is not
+ * a greeting — so they run a script of exactly one `agent()` and return its text.
+ * The call still goes through the engine rather than through a provider directly,
+ * because the engine is what attributes the child to the parent agent, applies
+ * the child ceiling and reports `workflow/agent-start` to the progress panel: a
+ * side channel would make those three facts untrue for the cheap tiers.
+ *
+ * The route is `config.triageModel` when set, else the run's own route (`agent()`'s
+ * default), which is why an unconfigured front desk costs no extra model.
+ */
+export interface SingleCallOptions {
+    ctx: Context;
+    config: ResolvedConfig;
+    state: ActiveState;
+    logger: WorkflowLogger;
+    agent: Agent;
+    /** The whole prompt handed to the child. */
+    prompt: string;
+    /** Label shown for the child in the progress panel and the session log. */
+    label: string;
+    /** Extra cancellation sources (the gate's step signal). */
+    signals?: AbortSignal[];
+}
+/** Outcome of one front-desk call. */
+export type SingleCallOutcome = {
+    ok: true;
+    text: string;
+    retried?: boolean;
+} | {
+    ok: false;
+    reason: string;
+};
+/**
+ * Answer one message with a single child call.
+ *
+ * Never throws: a provider failure, a deadline or a cancelled turn becomes
+ * `{ok: false, reason}`, and the caller states it in the answer instead of
+ * silently falling back to a full run (the front desk may not quietly upgrade a
+ * "quick" answer into a ten-minute team run).
+ * @param options - call request.
+ * @returns the text, or why there is none.
+ */
+export declare function runSingleCall(options: SingleCallOptions): Promise<SingleCallOutcome>;
 //# sourceMappingURL=run.d.ts.map

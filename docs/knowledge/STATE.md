@@ -71,7 +71,8 @@ Authoritative numbers for this state (measured, not planned):
   caps, credential redaction and a routing/delivery ledger.
 - The gate: `agent/pre-step` interception, `in-turn`/`relay`/`append` delivery,
   per-message de-duplication, queue bounds, explicit refusal, live configuration.
-- Configuration surface: 23 keys (+`showProgress` since t44, +`maxActiveRunsTotal` since t45),
+- Configuration surface: 26 keys (+`showProgress` since t44, +`maxActiveRunsTotal` since t45,
+  +`mode`, `triageAsk`, `triageModel` since t52),
   unknown-key rejection, `configVersion` gate,
   route shorthand migration, chain validation against the live runtime.
 - Documentation set kept in step with the code: DESIGN (DD-1..DD-9b, A/E/R/NR
@@ -95,9 +96,12 @@ None.
 
 ## Next priority
 
-Create `v0.2.2` and its GitHub Release from the accepted commit (captain), then keep this file and
-the changelog synchronized with `main`. `v0.2.0` was released on 2026-10-26 and `v0.2.1` on
-2026-10-27; neither tag ever moves.
+Create `v0.2.3` and its GitHub Release from the accepted commit (captain), then keep this file and
+the changelog synchronized with `main`. t56 closed the last three classifier gaps (trailing 几, 顿号
+lists, `并+回滚`, plus two live-found English/pointer misjudgements), so `0.2.3` is feature-complete
+for the front desk; the only open item is the release itself. Any future live matrix must follow
+[docs/knowledge/TESTING.md](TESTING.md) (isolated `/tmp` workspace, one turn at a time). `v0.2.0` was released on 2026-10-26, `v0.2.1` on
+2026-10-27 and `v0.2.2` on 2026-10-28; no tag ever moves.
 
 ## Homepage redesign — merged
 
@@ -132,7 +136,7 @@ the changelog synchronized with `main`. `v0.2.0` was released on 2026-10-26 and 
   A/E/R + decisions DD + NOT_RUN ledger NR); decisions in
   [DECISIONS.md](DECISIONS.md) D-009/D-010/D-011.
 - **Delivered after the first draft (2026-10-27, t32):** a plugin-owned settings page in
-  the Web GUI — all 23 keys, per-role chain editing, validation, save applied to the next
+  the Web GUI — all 26 keys, per-role chain editing, validation, save applied to the next
   message. This closes NR-7 and NR-8 as *measured*; see
   [VALIDATION.md](VALIDATION.md) Round 3 and WORKFLOW-DESIGN.md DD-9c.
 - **Activation (t33/t32, D-014):** installing the bundle puts the row into the composed

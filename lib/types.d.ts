@@ -49,6 +49,8 @@ export interface NormalizedTask {
  * degraded, experimental switch (no stream/usage, non-zero exit on a blocked
  * turn) kept because the answer route is not finally decided (U-1).
  */
+/** Front-desk routing mode (t52). */
+export type TriageMode = 'full' | 'triage';
 export type AnswerStrategy = 'relay' | 'append' | 'in-turn';
 /**
  * Which agents the gate polices.
@@ -96,6 +98,12 @@ export interface GrokWorkflowConfig {
      * `agent/pre-step` hook. Default false: a missing hook only warns.
      */
     gateRequired?: boolean;
+    /** Front-desk routing mode (t52). */
+    mode?: TriageMode;
+    /** Whether the front desk may ask instead of guessing an unclear tier. */
+    triageAsk?: boolean;
+    /** Route for the single call a chat or fast answer spends (`model` or `provider/model`). */
+    triageModel?: string;
     /** Per-role ordered model chains (planner/worker/verifier/synthesizer). */
     roles?: RoleRouting;
     /** Final-answer strategy (U-3): deterministic aggregation, or one model call. */
@@ -156,6 +164,15 @@ export interface ResolvedConfig {
     gateScope: GateScope;
     gatePreset?: string;
     answerStrategy: AnswerStrategy;
+    /**
+     * Front-desk mode (t52): `full` keeps the pre-t52 rule that every message runs
+     * the team; `triage` routes each message to chat / fast / team / ask.
+     */
+    mode: TriageMode;
+    /** Whether the front desk may ask instead of guessing a tier. */
+    triageAsk: boolean;
+    /** Optional route for the single call a chat or fast answer spends. */
+    triageModel?: ModelRoute;
     /** Effective per-role chains; an empty array means "inherit the run's route". */
     roles: Record<RoleName, ModelRoute[]>;
     synthesis: SynthesisMode;

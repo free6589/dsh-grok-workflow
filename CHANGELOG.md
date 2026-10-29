@@ -3,6 +3,64 @@
 Notable user-facing changes are recorded here in English and Simplified Chinese.
 用户可见的功能和修复会在这里以英文和简体中文记录。
 
+## [0.2.3] - 2026-10-28
+
+The front desk release: every user message now passes a front desk that states its tier in
+public. `0.2.2` behaved exactly as before unless `mode` was changed — nothing here restates a
+`0.2.2` change, and the `0.2.2` / `0.2.1` / `0.2.0` / `0.1.0` sections are untouched.
+
+**What the tiers actually do, after the t53 review:** the first draft of this feature answered
+short questions and short two-step instructions from the greeting template — it looked like it
+worked and did no work at all. That is fixed, and the ordering that caused it is now a tested
+contract (see Fixed).
+
+### Added / 新增
+
+- **Front desk with four tiers / 前台四档分流** — every user message now passes a front desk that
+  states which tier it chose and why, and never silently takes a cheaper path: `直答档` answers
+  small talk from a template (no model call), `快手档` answers a single-step request with one
+  worker, `团队档` runs the full workflow with a greeting and the progress panel, and `确认档` asks
+  `这个要动用团队吗？可回复：简单 / 团队` and remembers the answer. Tier wording, greeting and
+  answer follow the language of the message. 每条消息都先过前台：前台公开写明走了哪一档、为什么，
+  绝不静默降级——直答档用模板秒回（不花调用）、快手档派一个工人、团队档跑完整工作流（带开工迎宾
+  与进度面板）、拿不准就反问一句并记住回答；档位措辞跟随消息语言。
+- Three new settings, in the existing settings page and both languages: `mode` (`triage` /
+  `full`), `triageAsk`, `triageModel`. Configuration keys 23 → 26.
+  设置页新增三项（中英双语）：`mode`（分流 / 全团队）、`triageAsk`、`triageModel`；配置键 23 → 26。
+
+### Compatibility / 兼容
+
+- `mode: 'full'` reproduces the previous behaviour exactly — every message runs the team, no tier
+  line, no greeting — and is pinned by a test. `mode: 'full'` 逐字节复现旧行为（每条消息都走团队，
+  无档位行、无迎宾语），并有测试钉住。
+
+### Fixed / 修复
+
+- **Short questions and short two-step instructions were answered as small talk** (t53 F1, blocker).
+  The "short and inert ⇒ direct tier" shortcut ran before the sequencing and question rules, so
+  `为什么天空是蓝的`, `先备份然后升级` and `这个报错 src/triage.ts:42` were answered with a greeting
+  template: the tier line was honest, the work never happened. The shortcut now runs after every
+  strong signal, a question always costs at least one worker, and a pointer that carries a path, an
+  error code or a snippet is dispatched instead of being asked about. Enumerations (`1) … 2) …`,
+  `一、… 二、…`) and semicolons count as sequencing. 短问句与短两步指令曾被当成寒暄用模板答掉（档位
+  行诚实、活儿没干）：短路规则现在排在全部强信号之后，问句至少一个工人，带路径/错误码/代码片段的
+  "这个报错"直接派工而不反问；序号、顿号、分号都算多步。
+- A bare `简单` / `团队` with no question waiting no longer guesses (and no longer crashes): it says
+  that the pending question expired or the plugin reloaded. 无待答问题时的裸"简单/团队"不再猜、也不
+  崩，而是明说上一轮没有待回答的分流问题。
+
+### Notes / 说明
+
+- The pending question and its answer live in plugin memory for ten minutes and are consumed when
+  used, so a reload or a longer pause forgets them; the next bare choice word says so. 确认档的问题与
+  回答存在插件内存里，10 分钟、用后即弃，重载或超时后会明说。
+- The greeting arrives **with** the final answer, not before it: under `in-turn` a turn admits one
+  plugin message, so during the run the visible signal is the progress board. 迎宾语随最终回答一起
+  到达（`in-turn` 下一轮只允许一条插件消息），运行期间可见的是进度面板。
+- The quick tier is "one call in the common case": when the plain call returns nothing, one
+  structured retry follows, and the answer text still says one worker. 快手档常态一次调用；第一次
+  没有产出时会重试一次结构化调用，措辞仍是"一个工人"。
+
 ## [0.2.2] - 2026-10-28
 
 Incremental release on top of the published `0.2.1`: the deadline became a real bound, model

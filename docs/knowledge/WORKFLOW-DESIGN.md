@@ -920,6 +920,61 @@ Two things this design deliberately does **not** claim:
 Related: **DD-12** (progress visibility) — the same "write the events the surface already
 folds" instinct, applied to the run instead of its end.
 
+### DD-14 — The front desk: every message passes a tier, and the tier is public (t52)
+
+**The rule, restated.** Requirement A used to read "every user message runs the full
+workflow". It now reads: *every user message passes the front desk, the front desk
+states which tier it chose and why, and no message is quietly dropped to a cheaper
+path.* The obligation moved from "always run the team" to "never hide the decision".
+Per-message transparency is what makes the cheap tiers acceptable: a direct answer says
+`档位：直答档 — 因为：这是问候/寒暄…` followed by `（这条没有动用团队，前台直答。）`, and a quick
+answer says `（这条只派了一个工人，没有开完整团队。）`.
+
+**Four tiers, one decision function.**
+
+| tier | what runs | cost | when |
+| --- | --- | --- | --- |
+| `chat` (直答档) | nothing — a template answers | 0 calls | greetings, thanks, "what can you do", short acknowledgements |
+| `fast` (快手档) | one child call through the engine | 1 call (2 if the first returns nothing) | a single action with complete clues, short |
+| `team` (团队档) | the full workflow + greeting + progress panel | the normal run | deliverables ≥ 2, sequencing ("先…然后…"), long objectives, or an explicit "用团队" |
+| `ask` (确认档) | one question back | 0 calls | the signals conflict, or the message is a pointer with no referent ("把这个弄一下") |
+
+**Why rules, not a model call.** The tier decision is one pass over the message text
+(`classifyTriage` in `src/triage.ts`): no clock, no I/O, no provider. A model-based
+classifier would add a call and a latency to *every* message, including the "你好" it is
+supposed to answer instantly, and it would move the reason into something the user
+cannot audit. Rules are also testable case by case (`test/triage.spec.ts`, 22 cases).
+
+**Why the direct tier spends no call at all.** The tier's promise is instant. Measured on
+`:3100`, a one-call direct tier returned `{"reply":null}` — the child answered the social
+message in prose and the guest collapsed that to null — while the same script answered the
+quick tier correctly. A sentence whose shape is fixed does not need a model; the template
+also names what the plugin does, so "你能做什么" gets an answer instead of a deflection.
+
+**Why the quick tier still goes through the engine.** `runSingleCall` starts a one-child
+script instead of calling a provider directly, so the child is attributed to the parent,
+counts against the subagent cap, and emits `workflow/agent-start` for the t44 progress
+panel. A failed quick call is **reported**, never silently upgraded to a team run: the
+tier line would become a lie. The one retry is honest — the text keeps saying "one
+worker", while the log and the run record show two attempts.
+
+**The greeting arrives with the report, not before it.** Under `answerStrategy: 'in-turn'`
+a turn admits exactly one plugin message, so "收到！团队开工中，施工牌在旁边" is the first line
+of the final answer rather than a message sent at the start. During the run the visible
+signal is the progress panel (DD-12). Sending a real early message would need a chat-node
+contribution API that does not exist for external plugins (see D-019).
+
+**Language follows the message.** Tier wording, greeting and the front-desk answer use the
+language of the user's message (CJK detection), not the DSH interface language: a user can
+run an English UI and write Chinese, and the words they need are Chinese. The settings page
+keeps following the DSH language, because that is the browser-side i18n contract (DD-9e).
+
+**Configuration.** `mode: 'triage' | 'full'` (`full` reproduces pre-t52 behaviour exactly:
+every message runs the team, no tier line, no greeting), `triageAsk` (off ⇒ a conflict
+escalates to the team instead of asking), `triageModel` (the route the quick call spends;
+empty ⇒ the run's own route). The switch is documented in the settings page in both
+languages; 23 existing keys keep their behaviour.
+
 ## Open questions
 
 | id | question | status |

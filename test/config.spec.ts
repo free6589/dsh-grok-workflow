@@ -179,7 +179,7 @@ describe('route validation against the runtime', () => {
     expect(projected).toContain('roles')
     expect(projected).toContain('switchOn')
     expect(projected).toContain('maxActiveRunsTotal')
-    expect(projected).toHaveLength(19)
+    expect(projected).toHaveLength(22)
     const ctx = ctxWith({
       settings: { configure: () => () => {}, describe: () => [descriptor] },
     })

@@ -1,0 +1,77 @@
+DSH 本地构建
+0.2.1-rc.2-332895e
+会话
+生图
+新会话
+插件
+自动化任务
+工作区
+project_jobs
+未命名
+刚刚
+未命名
+18分钟
+未命名
+11小时
+未命名
+11小时
+未命名
+11小时
+展开其余 16 个会话
+boss
+any2api
+doubao2api
+wenxinyiyan
+dsh-books
+dsh-grok-workflow
+dsh-model-fix
+aa-scrape
+chatgpt2api
+dsh-our-free-model
+dsh-model-list
+语音识别打字工具
+MEMLENS
+dsh-token-usage
+substack_jail
+douyin订阅
+Socratopia
+workbuddy2api
+workspace
+projects_mine
+OpenWrite
+设置
+project_jobs
+智能体团队
+LayerFS × DSH minimalist
+1 个子智能体
+对话
+轨迹
+已完成
+已完成，用时 26秒
+
+<<<GROK-WORKFLOW-REPORT>>> 档位：直答档 — 因为：这是问候/寒暄，没有要做的事，前台直接回答。
+
+你好！我在。要做事就直接说：简单的我派一个工人，复杂的我开团队，拿不准我会先问你一句。
+
+（这条没有动用团队，前台直答。） <<<END-GROK-WORKFLOW-REPORT>>>
+
+用量 60.3K tok
+08:47
+已完成
+已完成，用时 18秒
+
+<<<GROK-WORKFLOW-REPORT>>> 档位：快手档 — 因为：目标是单一动作、线索完整，一个工人一次就能做完。
+
+30
+
+（这条只派了一个工人，没有开完整团队。） <<<END-GROK-WORKFLOW-REPORT>>>
+
+用量 60.5K tok
+08:48
+发消息或创建任务, / 调用指令, @ 文件或对话
+工作区内修改
+DeepSeek V4.1 Flash (cn)
+最大 · Max
+2 轮 2 步·142 tok/s
+121K tok·缓存命中 99.6%
+12%
