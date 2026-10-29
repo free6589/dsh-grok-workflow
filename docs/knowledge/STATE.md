@@ -96,8 +96,8 @@ None.
 
 ## Next priority
 
-Create `v0.2.3` and its GitHub Release from the accepted commit (captain), then keep this file and
-the changelog synchronized with `main`. t56 closed the last three classifier gaps (trailing 几, 顿号
+`v0.2.3` is **released** (tag on `538d1ab`, Release green, asset sha256 `65fd720c…`). The next release
+starts from a fresh `[Unreleased]` section; keep this file and the changelog synchronized with `main`. t56 closed the last three classifier gaps (trailing 几, 顿号
 lists, `并+回滚`, plus two live-found English/pointer misjudgements), so `0.2.3` is feature-complete
 for the front desk; the only open item is the release itself. Any future live matrix must follow
 [docs/knowledge/TESTING.md](TESTING.md) (isolated `/tmp` workspace, one turn at a time). `v0.2.0` was released on 2026-10-26, `v0.2.1` on

@@ -73,9 +73,13 @@ be moved.
 `0.2.1` 新增 Web GUI 设置页并记录激活前提，发布说明见
 [docs/releases/RELEASE-NOTES-0.2.1.md](releases/RELEASE-NOTES-0.2.1.md)；该标签不得移动。
 
-## 0.2.3 (prepared, tag not yet created) / 0.2.3（已准备，尚未打标签）
+## 0.2.3 (released 2026-10-29) / 0.2.3（已发布 2026-10-29）
 
-`0.2.3` is prepared on `main`: `package.json` and `package-lock.json` both say `0.2.3`, and
+`0.2.3` is released: tag `v0.2.3` on commit `538d1ab`, GitHub Release
+[Grok Workflow for DSH v0.2.3](https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.2.3),
+asset `dsh-grok-workflow-0.2.3.tgz` (175,113 bytes, sha256 `65fd720c…`), Release workflow run
+[40824592139](https://github.com/free6589/dsh-grok-workflow/actions/runs/40824592139) green.
+`package.json` and `package-lock.json` both say `0.2.3`, and
 `CHANGELOG.md` carries the bilingual `## [0.2.3] - 2026-10-28` section the release workflow
 extracts. `0.2.2` is published (`v0.2.2` on `5ecd96b`) and its tag must not be moved; the `0.2.2`,
 `0.2.1`, `0.2.0` and `0.1.0` changelog sections are byte-identical to what those tags carry.
@@ -86,7 +90,11 @@ D-021), plus the t53 review's blocker fix (short questions and short two-step in
 answered from the greeting template — DECISIONS D-025). Release notes draft:
 [docs/releases/RELEASE-NOTES-0.2.3.md](releases/RELEASE-NOTES-0.2.3.md).
 
-`0.2.3` 已在 `main` 上准备好：`package.json` 与 `package-lock.json` 都是 `0.2.3`，`CHANGELOG.md`
+`0.2.3` 已发布：标签 `v0.2.3` 指向提交 `538d1ab`，GitHub Release
+[Grok Workflow for DSH v0.2.3](https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.2.3)，
+资产 `dsh-grok-workflow-0.2.3.tgz`（175,113 字节，sha256 `65fd720c…`），Release 工作流
+[40824592139](https://github.com/free6589/dsh-grok-workflow/actions/runs/40824592139) 通过。
+`package.json` 与 `package-lock.json` 都是 `0.2.3`，`CHANGELOG.md`
 含发布工作流要提取的双语 `## [0.2.3] - 2026-10-28` 章节。`0.2.2` 已发布（`v0.2.2` 在 `5ecd96b`），
 其标签不得移动；`0.2.2`/`0.2.1`/`0.2.0`/`0.1.0` 的章节与那些标签逐字节一致。
 
