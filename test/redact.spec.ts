@@ -13,6 +13,14 @@ describe('credential redaction', () => {
       `slack ${fake('xoxb-', '123456789012-', 'abcdefghijkl')}`,
       `aws ${fake('AKIA', 'ABCDEFGH', 'IJKLMNOP')}`,
       `google ${fake('AIza', 'abcdefghijklmnopqrstuvwxyz', '0123456789')}`,
+    `github fine-grained ${fake('github_pat_', '11ABCDEFG0123456789_', 'abcdefghijklmnopqrstuvwxyz')}`,
+    `aws session ${fake('ASIA', 'ABCDEFGH', 'IJKLMNOP')}`,
+    `google oauth ${fake('ya29.', 'a0AfH6SMBexampleTokenValue', '1234567890')}`,
+    'Cookie: session=abc123; theme=dark',
+    'Set-Cookie: sid=abc123; HttpOnly',
+    '{"password":"abc\\"CANARY-7f3a9c","note":"keep"}',
+    '{"token":1234567890,"note":"keep"}',
+    '{"session":"opaque-session-id","credentials":"opaque"}',
       `Authorization: Bearer ${fake('abcdefghijklmnopqrstuvwxyz', '.1234567890')}`,
       'https://example.test/callback?token=super-secret-token&ok=1',
       'api_key = "my-production-secret"',
@@ -180,6 +188,131 @@ function scriptRedactPromptText(): (value: string) => string {
   const context = vm.createContext({})
   return vm.runInContext(`(() => { ${source}; return redactPromptText })()`, context) as (value: string) => string
 }
+
+describe('JSON, header and placeholder redaction', () => {
+  it('redacts a quoted JSON secret and keeps the JSON valid', () => {
+    const input = '{"token":"Sup3rSecretValue123","note":"keep me"}'
+    const output = redactSecrets(input)
+    expect(output).not.toContain('Sup3rSecretValue123')
+    expect(output).toContain('"note":"keep me"')
+    expect(JSON.parse(output)).toEqual({ token: '[REDACTED]', note: 'keep me' })
+  })
+
+  it('redacts sensitive values by JSON key name without touching other keys', () => {
+    const source = {
+      token: 'Sup3rSecretValue123',
+      nested: { password: 'hunter2' },
+      session: { id: 'opaque-session-id' },
+      note: 'keep me',
+      tokenCount: 42,
+    }
+    const output = redactDeep(source)
+    expect(output.token).toBe('[REDACTED]')
+    expect(output.nested.password).toBe('[REDACTED]')
+    expect(output.session).toBe('[REDACTED]')
+    expect(output.note).toBe('keep me')
+    expect(output.tokenCount).toBe(42)
+    // The source object is not mutated.
+    expect(source.token).toBe('Sup3rSecretValue123')
+  })
+
+  it('redacts db_pass, Cookie, fine-grained GitHub, ASIA and Google OAuth values', () => {
+    const input = [
+      'db_pass=hunter2',
+      'Cookie: session=abc123def456; theme=dark',
+      `github_pat_${'11ABCDEFG0123456789_abcdefghijklmnopqrstuvwxyz'}`,
+      'ASIAIOSFODNN7EXAMPLE',
+      'ya29.a0AfH6SMBexampleTokenValue1234567890',
+    ].join('\n')
+    const output = redactSecrets(input)
+    expect(output).not.toContain('hunter2')
+    expect(output).not.toContain('abc123def456')
+    expect(output).not.toContain('github_pat_')
+    expect(output).not.toContain('ASIA')
+    expect(output).not.toContain('ya29.')
+    expect(output).toContain('db_pass=[REDACTED]')
+    expect(output).toContain('Cookie: [REDACTED]')
+  })
+
+  it('redacts JSON secrets that contain escaped quotes and keeps the JSON valid', () => {
+    const cases = [
+      '{"password":"abc\\"CANARY-7f3a9c","note":"keep"}',
+      '{"password":"CANARY-7f3a9c\\"x"}',
+      '{"token":"line1\\nCANARY-7f3a9c","note":"keep"}',
+    ]
+    for (const input of cases) {
+      const output = redactSecrets(input)
+      expect(output).not.toContain('CANARY-7f3a9c')
+      expect(() => JSON.parse(output)).not.toThrow()
+    }
+    expect(JSON.parse(redactSecrets(cases[0]!))).toEqual({ password: '[REDACTED]', note: 'keep' })
+  })
+
+  it('redacts numeric JSON secrets without breaking JSON', () => {
+    const input = '{"token":1234567890,"note":"keep"}'
+    const output = redactSecrets(input)
+    expect(JSON.parse(output)).toEqual({ token: '[REDACTED]', note: 'keep' })
+  })
+
+  it('redacts short env-style values and camelCase keys', () => {
+    expect(redactSecrets('password=12345')).toBe('password=[REDACTED]')
+    expect(redactSecrets('api_key=short')).toBe('api_key=[REDACTED]')
+    expect(redactSecrets('API_KEY=x')).toBe('API_KEY=[REDACTED]')
+    expect(redactSecrets('pwd=a')).toBe('pwd=[REDACTED]')
+    expect(redactSecrets('password=ab')).toBe('password=[REDACTED]')
+    expect(redactSecrets('{"accessToken":"abc","refreshToken":"def","sessionId":"ghi","tokenCount":42}'))
+      .toBe('{"accessToken":"[REDACTED]","refreshToken":"[REDACTED]","sessionId":"[REDACTED]","tokenCount":42}')
+    expect(redactDeep({
+      accessToken: 'x',
+      refreshToken: 'y',
+      sessionId: 'z',
+      tokenCount: 1,
+      secretary: 'keep',
+    })).toEqual({
+      accessToken: '[REDACTED]',
+      refreshToken: '[REDACTED]',
+      sessionId: '[REDACTED]',
+      tokenCount: 1,
+      secretary: 'keep',
+    })
+  })
+
+  it('redacts session/credentials keys, indented Cookie headers and keeps non-secret words', () => {
+    expect(redactSecrets('{"session":"opaque-session-id","credentials":"opaque"}'))
+      .toBe('{"session":"[REDACTED]","credentials":"[REDACTED]"}')
+    expect(redactSecrets('  Cookie: session=abc123; theme=dark')).toBe('  Cookie: [REDACTED]')
+    expect(redactSecrets('password = 12345')).toBe('password = [REDACTED]')
+    expect(redactSecrets('password: required')).toBe('password: required')
+  })
+
+  it('redacts passphrase/pwd keys and values', () => {
+    expect(redactSecrets('passphrase=hunter2')).toBe('passphrase=[REDACTED]')
+    expect(redactSecrets('pwd=s3cret-value')).toBe('pwd=[REDACTED]')
+    expect(redactDeep({ passphrase: 'hunter2', pwd: 's3cret', secretary: 'keep' })).toEqual({
+      passphrase: '[REDACTED]',
+      pwd: '[REDACTED]',
+      secretary: 'keep',
+    })
+  })
+
+  it('preserves ordinary prose that merely mentions a secret-like word', () => {
+    const input = [
+      'the token: count is 3',
+      'The password policy has 12 characters.',
+      'Rotate the secret before Friday.',
+    ].join('\n')
+    expect(redactSecrets(input)).toBe(input)
+  })
+
+  it('keeps an adversarial 100 KB input under a measured time bound', () => {
+    // Regression: unbounded `(?:[A-Za-z0-9]+[_-])*` took ~19 s on this input.
+    const input = 'a_'.repeat(50_000)
+    const started = performance.now()
+    redactSecrets(input)
+    const elapsed = performance.now() - started
+    expect(elapsed).toBeLessThan(1_000)
+  })
+})
 
 describe('prompt redaction parity', () => {
   const corpus = [

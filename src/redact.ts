@@ -40,7 +40,8 @@ export const REDACTION_RULES: readonly RedactionRule[] = [
   },
   {
     name: 'github-token',
-    pattern: /\bgh[pousr]_[A-Za-z0-9]{20,}\b/g,
+    // `ghp_…` classic and `github_pat_…` fine-grained tokens.
+    pattern: /\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g,
     replacement: '[REDACTED GITHUB TOKEN]',
   },
   {
@@ -60,13 +61,36 @@ export const REDACTION_RULES: readonly RedactionRule[] = [
   },
   {
     name: 'aws-access-key',
-    pattern: /\bAKIA[0-9A-Z]{16}\b/g,
+    // AKIA = long-term access key, ASIA = temporary session key.
+    pattern: /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g,
     replacement: '[REDACTED AWS ACCESS KEY]',
   },
   {
     name: 'google-api-key',
     pattern: /\bAIza[0-9A-Za-z_-]{30,}\b/g,
     replacement: '[REDACTED GOOGLE API KEY]',
+  },
+  {
+    name: 'google-oauth-token',
+    pattern: /\bya29\.[0-9A-Za-z_-]{20,}\b/g,
+    replacement: '[REDACTED GOOGLE OAUTH TOKEN]',
+  },
+  {
+    // Cookie / Set-Cookie headers carry session identifiers; the whole value is
+    // secret even when no `token=`-shaped key appears in it.
+    name: 'cookie-header',
+    pattern: /(^|\n)([ \t]*(?:set-)?cookie\s*:\s*)[^\n]*/gi,
+    replacement: '$1$2[REDACTED]',
+  },
+  {
+    name: 'slack-webhook',
+    pattern: /https:\/\/hooks\.slack\.com\/services\/[A-Za-z0-9/_-]+/g,
+    replacement: '[REDACTED SLACK WEBHOOK]',
+  },
+  {
+    name: 'telegram-bot-token',
+    pattern: /\b\d{8,10}:[A-Za-z0-9_-]{35}\b/g,
+    replacement: '[REDACTED TELEGRAM TOKEN]',
   },
   {
     name: 'authorization-bearer',
@@ -98,9 +122,38 @@ export const REDACTION_RULES: readonly RedactionRule[] = [
     replacement: '$1[REDACTED]@',
   },
   {
-    name: 'key-value',
-    pattern: /(?<![A-Za-z0-9])(?:[A-Za-z0-9]+[_-])*(?:api[_-]?key|access[_-]?key(?:[_-]?id)?|private[_-]?key|secret[_-]?access[_-]?key|secret[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret|token|secret|password|passwd)(\s*[:=]\s*)(?:"[^"\n]*"|'[^'\n]*'|[^\s,;]+)/gi,
+    // JSON numeric secrets (`{"token":1234567890}`): replace with a quoted
+    // placeholder so the redacted document is still valid JSON.
+    name: 'key-value-json-number',
+    pattern: /(?<![A-Za-z0-9])((?:[A-Za-z0-9]+[_-]){0,8}(?:api[_-]?key|access[_-]?key(?:[_-]?id)?|private[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|session[_-]?id|client[_-]?secret|token|secret|passphrase|password|passwd|pass|pwd|session|credentials?))("\s*:\s*)(-?\d+(?:\.\d+)?)(?=\s*[,}])/g,
+    replacement: '$1$2"[REDACTED]"',
+  },
+  {
+    // Environment-style assignments (`password=12345`, `api_key=short`) are
+    // unambiguous even when the value is shorter than the 6-character prose
+    // threshold used by the bare rule. Requires `=` with no whitespace.
+    name: 'key-value-env',
+    pattern: /(?<![A-Za-z0-9])((?:[A-Za-z0-9]+[_-]){0,8}(?:api[_-]?key|access[_-]?key(?:[_-]?id)?|private[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|session[_-]?id|client[_-]?secret|token|secret|passphrase|password|passwd|pass|pwd|session|credentials?))(\s*=\s*)([^\s"'`]{1,})/gi,
     replacement: '$1$2[REDACTED]',
+  },
+  {
+    // Quoted values (`{"token":"…"}`, `password = '…'`) keep their quote style so
+    // the redacted text stays valid JSON / shell. Group 1 is the key's closing
+    // quote (if the key itself was quoted), group 2 the separator, group 3 the
+    // value quote. The repetition is bounded to 8 segments: unbounded
+    // `(?:[A-Za-z0-9]+[_-])*` backtracking took ~19 s on a 100 KB `a_` input.
+    name: 'key-value-quoted',
+    pattern: /(?<![A-Za-z0-9])((?:[A-Za-z0-9]+[_-]){0,8}(?:api[_-]?key|access[_-]?key(?:[_-]?id)?|private[_-]?key|secret[_-]?access[_-]?key|secret[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|session[_-]?id|client[_-]?secret|token|secret|passphrase|password|passwd|pass|pwd|session|credentials?))(["']?)(\s*[:=]\s*)(["'])(?:\\.|(?!\4)[^\\\n])*\4/gi,
+    replacement: '$1$2$3$4[REDACTED]$4',
+  },
+  {
+    // Bare values (`db_pass=hunter2`, `OPENAI_API_KEY=sk-…`). At least 6 chars so
+    // ordinary prose like `the token: count is 3` is left alone; values that
+    // start with a quote or a `[REDACTED` placeholder are handled by the rule
+    // above and must not be matched again.
+    name: 'key-value',
+    pattern: /(?<![A-Za-z0-9])((?:[A-Za-z0-9]+[_-]){0,8}(?:api[_-]?key|access[_-]?key(?:[_-]?id)?|private[_-]?key|secret[_-]?access[_-]?key|secret[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|session[_-]?id|client[_-]?secret|token|secret|passphrase|password|passwd|pass|pwd|session|credentials?))(["']?)(\s*[:=]\s*)(?!["'\[{]|required\b|optional\b|enabled\b|disabled\b|true\b|false\b|null\b|none\b)([^\s,;}\]]{6,})/gi,
+    replacement: '$1$2$3[REDACTED]',
   },
 ]
 
@@ -123,6 +176,7 @@ export function redactError(error: unknown): string {
   }
 }
 
+
 /**
  * Recursively copy a JSON-like value while redacting every string.
  * Cycles and non-JSON values are converted to a safe placeholder.
@@ -142,7 +196,24 @@ function walk(value: unknown, seen: WeakSet<object>, depth: number): unknown {
   }
   const out: Record<string, unknown> = {}
   for (const [key, child] of Object.entries(value)) {
-    out[redactSecrets(key)] = walk(child, seen, depth + 1)
+    // A key named token/password/cookie is a strong signal that the *value* is a
+    // secret even when it does not match any credential shape (e.g. a short
+    // password or an opaque session id). Redact the value wholesale instead of
+    // relying on the text patterns alone.
+    const redactedKey = redactSecrets(key)
+    out[redactedKey] = isSensitiveKey(key) ? '[REDACTED]' : walk(child, seen, depth + 1)
   }
   return out
+}
+
+/**
+ * True when a JSON key names a credential field. Handles snake_case and
+ * camelCase (`accessToken`, `sessionId`) but not `tokenCount`/`secretary`:
+ * the sensitive word must be the last segment or an exact known composite.
+ */
+function isSensitiveKey(key: string): boolean {
+  const normalized = key.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase()
+  const last = normalized.split(/[_-]/).pop() ?? ''
+  if (['token', 'secret', 'passphrase', 'password', 'passwd', 'pass', 'pwd', 'authorization', 'cookie', 'session', 'credential', 'credentials'].includes(last)) return true
+  return ['api_key', 'access_key', 'private_key', 'client_secret', 'session_id', 'access_token', 'refresh_token', 'id_token', 'auth_token'].includes(normalized)
 }
