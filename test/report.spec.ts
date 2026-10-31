@@ -290,7 +290,8 @@ describe('workflow report semantic contract', () => {
       passed: true,
       error: '',
     }]
-    expect(assertWorkflowReport(value, OBJECTIVE, config).status).toBe('completed')
+    ;(value as Record<string, unknown>).objective = 'What is the answer to life?'
+    expect(assertWorkflowReport(value, 'What is the answer to life?', config).status).toBe('completed')
   })
 
   it('rejects a change task whose only "artifact" is a not_run command', () => {
@@ -329,7 +330,126 @@ describe('workflow report semantic contract', () => {
       error: '',
     }]
     expect(() => assertWorkflowReport(value, OBJECTIVE, config))
-      .toThrow(/checked evidence entries are all empty/)
+      .toThrow(/checked evidence entries must have non-empty kind, locator and finding/)
+  })
+
+  it('accepts a summary-only answer for a Chinese factual question', () => {
+    const value = report({ tasks: [{ id: 'a', criteria: ['the answer is correct'] }] })
+    for (const task of [value.tasks, (value.plan as { tasks: Record<string, unknown>[] }).tasks]) {
+      ;(task as Record<string, unknown>[])[0]!.expectedOutput = '回答 42'
+    }
+    ;(value.tasks as Record<string, unknown>[])[0]!.attempts = [{
+      attempt: 1,
+      execution: {
+        summary: '42',
+        status: 'completed',
+        deliverables: [],
+        evidence: [],
+        testsRun: [],
+        filesChanged: [],
+        uncertainties: [],
+      },
+      verification: verificationResult(['the answer is correct']),
+      passed: true,
+      error: '',
+    }]
+    ;(value as Record<string, unknown>).objective = '42 是多少'
+    expect(assertWorkflowReport(value, '42 是多少', config).status).toBe('completed')
+  })
+
+  it('rejects a summary-only answer when the root objective asks for a change', () => {
+    // A-01 target drift: the planner softens "write the file / run the tests"
+    // into "explain the attempt". The task text has no change keyword and no
+    // writesPaths, but the original objective still forbids the summary-only
+    // exemption.
+    const value = report({ tasks: [{ id: 'a', criteria: ['the attempt is explained'] }] })
+    for (const task of [value.tasks, (value.plan as { tasks: Record<string, unknown>[] }).tasks]) {
+      ;(task as Record<string, unknown>[])[0]!.expectedOutput = 'Explain the attempt'
+    }
+    ;(value.tasks as Record<string, unknown>[])[0]!.attempts = [{
+      attempt: 1,
+      execution: {
+        summary: 'The write was blocked by the environment',
+        status: 'completed',
+        deliverables: [],
+        evidence: [],
+        testsRun: [],
+        filesChanged: [],
+        uncertainties: [],
+      },
+      verification: verificationResult(['the attempt is explained']),
+      passed: true,
+      error: '',
+    }]
+    ;(value as Record<string, unknown>).objective = 'Write the file /tmp/out.txt and run the tests'
+    expect(() => assertWorkflowReport(value, 'Write the file /tmp/out.txt and run the tests', config))
+      .toThrow(/verified without any execution artifact/)
+  })
+
+  it('does not grant the answer-only exemption to an ambiguous objective', () => {
+    const value = report({ tasks: [{ id: 'a', criteria: ['a works'] }] })
+    ;(value.tasks as Record<string, unknown>[])[0]!.attempts = [{
+      attempt: 1,
+      execution: {
+        summary: 'done',
+        status: 'completed',
+        deliverables: [],
+        evidence: [],
+        testsRun: [],
+        filesChanged: [],
+        uncertainties: [],
+      },
+      verification: verificationResult(['a works']),
+      passed: true,
+      error: '',
+    }]
+    expect(() => assertWorkflowReport(value, 'Ship the verified result', config))
+      .toThrow(/verified without any execution artifact/)
+  })
+
+  it('rejects a passed attempt whose checked evidence is missing kind', () => {
+    const value = report()
+    ;(value.tasks as Record<string, unknown>[])[0]!.attempts = [{
+      attempt: 1,
+      execution: executionResult(),
+      verification: verificationResult(['a works'], {
+        checkedEvidence: [{ kind: ' ', locator: 'file:///tmp/report', finding: 'observed' }],
+      }),
+      passed: true,
+      error: '',
+    }]
+    expect(() => assertWorkflowReport(value, OBJECTIVE, config))
+      .toThrow(/must have non-empty kind, locator and finding/)
+  })
+
+  it('rejects a passed attempt whose checked evidence is missing locator', () => {
+    const value = report()
+    ;(value.tasks as Record<string, unknown>[])[0]!.attempts = [{
+      attempt: 1,
+      execution: executionResult(),
+      verification: verificationResult(['a works'], {
+        checkedEvidence: [{ kind: 'file', locator: '', finding: 'observed' }],
+      }),
+      passed: true,
+      error: '',
+    }]
+    expect(() => assertWorkflowReport(value, OBJECTIVE, config))
+      .toThrow(/must have non-empty kind, locator and finding/)
+  })
+
+  it('rejects a passed attempt whose checked evidence is missing finding', () => {
+    const value = report()
+    ;(value.tasks as Record<string, unknown>[])[0]!.attempts = [{
+      attempt: 1,
+      execution: executionResult(),
+      verification: verificationResult(['a works'], {
+        checkedEvidence: [{ kind: 'file', locator: 'file:///tmp/report', finding: '' }],
+      }),
+      passed: true,
+      error: '',
+    }]
+    expect(() => assertWorkflowReport(value, OBJECTIVE, config))
+      .toThrow(/must have non-empty kind, locator and finding/)
   })
 
   it('rejects completed when a task result is failed', () => {

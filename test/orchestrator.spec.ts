@@ -334,10 +334,11 @@ describe('generated workflow script', () => {
       if (options.label.startsWith('grok-verifier-')) return verification(plannerTasks[0]!)
       throw new Error(`unexpected agent label ${options.label}`)
     }
-    const { report } = await runWorkflowScript(WORKFLOW_SCRIPT, args(null), agent)
+    const answerObjective = 'What is the answer to life?'
+    const { report } = await runWorkflowScript(WORKFLOW_SCRIPT, args(null, { objective: answerObjective }), agent)
     expect(report.status).toBe('completed')
     expect(report.tasks[0]!.status).toBe('verified')
-    expect(() => assertWorkflowReport(report, 'Ship the verified result', resolveConfig({ maxConcurrency: 2, maxRetries: 1, maxTasks: 6 })))
+    expect(() => assertWorkflowReport(report, answerObjective, resolveConfig({ maxConcurrency: 2, maxRetries: 1, maxTasks: 6 })))
       .not.toThrow()
   })
 
