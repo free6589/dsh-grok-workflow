@@ -315,6 +315,32 @@ describe('generated workflow script', () => {
     expect(report.incomplete.length).toBeGreaterThan(0)
   })
 
+  it('accepts a script-produced summary-only answer task through host validation', async () => {
+    // R-001/t52: a greeting or simple factual question is answered in
+    // execution.summary with no file/test artifact. The script and the host
+    // must both accept that shape, not turn a verified answer into a
+    // "Report validation" failure.
+    const plannerTasks = [task('a')]
+    const agent: ScriptAgent = async (_prompt, options) => {
+      if (options.label === 'grok-planner') return { tasks: plannerTasks }
+      if (options.label.startsWith('grok-worker-')) {
+        return execution('The answer is 42', {
+          deliverables: [],
+          evidence: [],
+          testsRun: [],
+          filesChanged: [],
+        })
+      }
+      if (options.label.startsWith('grok-verifier-')) return verification(plannerTasks[0]!)
+      throw new Error(`unexpected agent label ${options.label}`)
+    }
+    const { report } = await runWorkflowScript(WORKFLOW_SCRIPT, args(null), agent)
+    expect(report.status).toBe('completed')
+    expect(report.tasks[0]!.status).toBe('verified')
+    expect(() => assertWorkflowReport(report, 'Ship the verified result', resolveConfig({ maxConcurrency: 2, maxRetries: 1, maxTasks: 6 })))
+      .not.toThrow()
+  })
+
   it('reports failed when no task can be verified', async () => {
     const callerTasks = [task('a'), task('b')]
     const agent: ScriptAgent = async (_prompt, options) => {
