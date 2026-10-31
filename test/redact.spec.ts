@@ -257,6 +257,9 @@ describe('JSON, header and placeholder redaction', () => {
   it('redacts short env-style values and camelCase keys', () => {
     expect(redactSecrets('password=12345')).toBe('password=[REDACTED]')
     expect(redactSecrets('api_key=short')).toBe('api_key=[REDACTED]')
+    expect(redactSecrets('API_KEY=x')).toBe('API_KEY=[REDACTED]')
+    expect(redactSecrets('pwd=a')).toBe('pwd=[REDACTED]')
+    expect(redactSecrets('password=ab')).toBe('password=[REDACTED]')
     expect(redactSecrets('{"accessToken":"abc","refreshToken":"def","sessionId":"ghi","tokenCount":42}'))
       .toBe('{"accessToken":"[REDACTED]","refreshToken":"[REDACTED]","sessionId":"[REDACTED]","tokenCount":42}')
     expect(redactDeep({

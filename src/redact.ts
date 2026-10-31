@@ -133,7 +133,7 @@ export const REDACTION_RULES: readonly RedactionRule[] = [
     // unambiguous even when the value is shorter than the 6-character prose
     // threshold used by the bare rule. Requires `=` with no whitespace.
     name: 'key-value-env',
-    pattern: /(?<![A-Za-z0-9])((?:[A-Za-z0-9]+[_-]){0,8}(?:api[_-]?key|access[_-]?key(?:[_-]?id)?|private[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|session[_-]?id|client[_-]?secret|token|secret|passphrase|password|passwd|pass|pwd|session|credentials?))(\s*=\s*)([^\s"'`]{3,})/gi,
+    pattern: /(?<![A-Za-z0-9])((?:[A-Za-z0-9]+[_-]){0,8}(?:api[_-]?key|access[_-]?key(?:[_-]?id)?|private[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|session[_-]?id|client[_-]?secret|token|secret|passphrase|password|passwd|pass|pwd|session|credentials?))(\s*=\s*)([^\s"'`]{1,})/gi,
     replacement: '$1$2[REDACTED]',
   },
   {
