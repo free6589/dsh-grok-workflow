@@ -221,6 +221,31 @@ function routeLabels(value: unknown, path: string): Record<RoleName, string[]> {
   return out
 }
 
+/**
+ * Does this task claim a change (files, commands, tests) rather than a pure
+ * answer? Used only to decide whether a summary-only execution is a legitimate
+ * answer artifact or an empty result that must fail closed.
+ */
+const CHANGE_CLAIM = /(?:\b(?:file|files?|path|directory|write|writes?|create|edit|modify|delete|rename|move|test|tests?|command|run|build|lint|install|compile)\b|文件|目录|写入|创建|修改|删除|重命名|移动|测试|命令|运行|构建|编译)/i
+
+function claimsChange(task: {
+  objective: string
+  expectedOutput: string
+  acceptanceCriteria: readonly string[]
+  writesPaths: string[] | null
+}): boolean {
+  if (task.writesPaths !== null && task.writesPaths.length > 0) return true
+  return CHANGE_CLAIM.test([task.objective, task.expectedOutput, ...task.acceptanceCriteria].join('\n'))
+}
+
+/** A substantive artifact is one the executor actually produced, not a placeholder or a `not_run` command. */
+function hasSubstantiveArtifact(execution: ExecutionResult): boolean {
+  return execution.deliverables.some(item => item.description.trim() !== '' && item.locator.trim() !== '')
+    || execution.evidence.some(item => item.claim.trim() !== '' && item.source.trim() !== '')
+    || execution.testsRun.some(item => item.status === 'passed' && item.command.trim() !== '')
+    || execution.filesChanged.some(item => item.trim() !== '')
+}
+
 export function assertWorkflowReport(value: unknown, objective: string, config: ResolvedConfig): WorkflowReport {
   const root = record(value, 'root')
   if (root.schemaVersion !== 'grok-workflow/v1') {
@@ -380,6 +405,10 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
         if (attempt.verification!.checkedEvidence.length === 0) {
           throw new Error(`workflow result task ${task.id} has a passed attempt whose verifier returned no checked evidence`)
         }
+        if (!attempt.verification!.checkedEvidence.some(item =>
+          item.kind.trim() !== '' || item.locator.trim() !== '' || item.finding.trim() !== '')) {
+          throw new Error(`workflow result task ${task.id} has a passed attempt whose checked evidence entries are all empty`)
+        }
         if (attempt.verification!.criteria.length !== task.acceptanceCriteria.length) {
           throw new Error(`workflow result task ${task.id} has a passed attempt whose verifier criteria count does not match the task acceptance criteria`)
         }
@@ -398,15 +427,27 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
         throw new Error(`workflow result task ${task.id} is verified without exactly one final passed attempt`)
       }
       const lastExecution = task.attempts[task.attempts.length - 1]!.execution!
-      if (lastExecution.deliverables.length === 0
-        && lastExecution.evidence.length === 0
-        && lastExecution.testsRun.length === 0
-        && lastExecution.filesChanged.length === 0) {
-        // A verified task must have produced at least one observable artifact:
-        // a deliverable, a piece of evidence, a command run, or a changed file.
-        // "The verifier said pass" over an entirely empty execution is the
-        // t59/VE-2 failure mode: the report is well-formed but nothing happened.
-        throw new Error(`workflow result task ${task.id} is verified without any execution artifact`)
+      if (!hasSubstantiveArtifact(lastExecution)) {
+        // A verified change task must have produced at least one observable
+        // artifact: a real deliverable, a real piece of evidence, a command that
+        // actually passed, or a changed file. `not_run` commands, empty strings
+        // and placeholder entries do not count.
+        //
+        // A pure answer task is different: the answer itself lives in `summary`,
+        // and R-001/t52 show that greetings and simple factual questions are
+        // legitimately answered that way. Accept a non-empty summary only when
+        // the task declares no write/test work and the execution is otherwise
+        // empty; a change task with only a summary still fails closed.
+        const emptyExecution = lastExecution.deliverables.length === 0
+          && lastExecution.evidence.length === 0
+          && lastExecution.testsRun.length === 0
+          && lastExecution.filesChanged.length === 0
+        const answerOnly = emptyExecution
+          && !claimsChange(task)
+          && lastExecution.summary.trim() !== ''
+        if (!answerOnly) {
+          throw new Error(`workflow result task ${task.id} is verified without any execution artifact`)
+        }
       }
     } else if (passedAttempts.length > 0) {
       throw new Error(`workflow result task ${task.id} is failed but has a passed attempt`)
