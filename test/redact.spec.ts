@@ -226,6 +226,20 @@ describe('JSON, header and placeholder redaction', () => {
     expect(output).toContain('Cookie: [REDACTED]')
   })
 
+  it('redacts JSON secrets that contain escaped quotes and keeps the JSON valid', () => {
+    const cases = [
+      '{"password":"abc\\"CANARY-7f3a9c","note":"keep"}',
+      '{"password":"CANARY-7f3a9c\\"x"}',
+      '{"token":"line1\\nCANARY-7f3a9c","note":"keep"}',
+    ]
+    for (const input of cases) {
+      const output = redactSecrets(input)
+      expect(output).not.toContain('CANARY-7f3a9c')
+      expect(() => JSON.parse(output)).not.toThrow()
+    }
+    expect(JSON.parse(redactSecrets(cases[0]!))).toEqual({ password: '[REDACTED]', note: 'keep' })
+  })
+
   it('redacts passphrase/pwd keys and values', () => {
     expect(redactSecrets('passphrase=hunter2')).toBe('passphrase=[REDACTED]')
     expect(redactSecrets('pwd=s3cret-value')).toBe('pwd=[REDACTED]')
