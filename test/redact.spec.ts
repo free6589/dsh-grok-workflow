@@ -226,6 +226,16 @@ describe('JSON, header and placeholder redaction', () => {
     expect(output).toContain('Cookie: [REDACTED]')
   })
 
+  it('redacts passphrase/pwd keys and values', () => {
+    expect(redactSecrets('passphrase=hunter2')).toBe('passphrase=[REDACTED]')
+    expect(redactSecrets('pwd=s3cret-value')).toBe('pwd=[REDACTED]')
+    expect(redactDeep({ passphrase: 'hunter2', pwd: 's3cret', secretary: 'keep' })).toEqual({
+      passphrase: '[REDACTED]',
+      pwd: '[REDACTED]',
+      secretary: 'keep',
+    })
+  })
+
   it('preserves ordinary prose that merely mentions a secret-like word', () => {
     const input = [
       'the token: count is 3',
