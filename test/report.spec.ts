@@ -386,6 +386,31 @@ describe('workflow report semantic contract', () => {
       .toThrow(/verified without any execution artifact/)
   })
 
+  it('rejects summary-only when the Chinese root objective asks for a change', () => {
+    const value = report({ tasks: [{ id: 'a', criteria: ['说明这次尝试'] }] })
+    for (const task of [value.tasks, (value.plan as { tasks: Record<string, unknown>[] }).tasks]) {
+      ;(task as Record<string, unknown>[])[0]!.expectedOutput = '解释这次尝试'
+    }
+    ;(value.tasks as Record<string, unknown>[])[0]!.attempts = [{
+      attempt: 1,
+      execution: {
+        summary: '写入被环境阻止',
+        status: 'completed',
+        deliverables: [],
+        evidence: [],
+        testsRun: [],
+        filesChanged: [],
+        uncertainties: [],
+      },
+      verification: verificationResult(['说明这次尝试']),
+      passed: true,
+      error: '',
+    }]
+    ;(value as Record<string, unknown>).objective = '写文件 /tmp/out.txt 并运行测试'
+    expect(() => assertWorkflowReport(value, '写文件 /tmp/out.txt 并运行测试', config))
+      .toThrow(/verified without any execution artifact/)
+  })
+
   it('does not grant the answer-only exemption to an ambiguous objective', () => {
     const value = report({ tasks: [{ id: 'a', criteria: ['a works'] }] })
     ;(value.tasks as Record<string, unknown>[])[0]!.attempts = [{
