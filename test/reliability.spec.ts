@@ -338,6 +338,14 @@ describe('reliability: recursion, context and secrets', () => {
     expect(collectHistory(undefined, { turns: 2, chars: 500 })).toBe('')
   })
 
+  it('does not leak a partial secret at the history truncation boundary', () => {
+    const secret = 'CANARY-7f3a9c'
+    const message = 'x'.repeat(1_490) + ' token=' + secret
+    const rendered = renderHistory([{ role: 'user', content: [{ type: 'text', text: message }] }] as never, { turns: 1, chars: 8_000 })
+    expect(rendered).not.toContain('CAN')
+    expect(rendered.endsWith('…')).toBe(true)
+  })
+
   it('keeps a secret out of the failure reason and the rendered answer', async () => {
     const config = resolveConfig({ maxConcurrency: 1, maxRetries: 0, maxTasks: 2 })
     const request = buildWorkflowRequest('Ship the verified result', [task('a')], config)

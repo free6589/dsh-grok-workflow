@@ -61,7 +61,11 @@ export function renderHistory(messages: readonly Message[], bounds: HistoryBound
     // must not pay unbounded regex time just to be truncated below.
     const raw = textOf(message)
     const truncated = raw.length > MESSAGE_CAP
-    const text = redactSecrets(truncated ? raw.slice(0, MESSAGE_CAP) : raw)
+    // Cut at the last word boundary so a secret straddling the cap is not
+    // sliced into a short fragment that falls below the redaction thresholds.
+    const cut = truncated ? raw.slice(0, MESSAGE_CAP) : raw
+    const boundary = truncated ? cut.lastIndexOf(' ') : -1
+    const text = redactSecrets(boundary > MESSAGE_CAP * 0.5 ? cut.slice(0, boundary) : cut)
     if (text === '') continue
     recent.push({
       role: message.role === 'user' ? 'User' : 'Assistant',

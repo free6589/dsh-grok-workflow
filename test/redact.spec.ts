@@ -13,6 +13,14 @@ describe('credential redaction', () => {
       `slack ${fake('xoxb-', '123456789012-', 'abcdefghijkl')}`,
       `aws ${fake('AKIA', 'ABCDEFGH', 'IJKLMNOP')}`,
       `google ${fake('AIza', 'abcdefghijklmnopqrstuvwxyz', '0123456789')}`,
+    `github fine-grained ${fake('github_pat_', '11ABCDEFG0123456789_', 'abcdefghijklmnopqrstuvwxyz')}`,
+    `aws session ${fake('ASIA', 'ABCDEFGH', 'IJKLMNOP')}`,
+    `google oauth ${fake('ya29.', 'a0AfH6SMBexampleTokenValue', '1234567890')}`,
+    'Cookie: session=abc123; theme=dark',
+    'Set-Cookie: sid=abc123; HttpOnly',
+    '{"password":"abc\\"CANARY-7f3a9c","note":"keep"}',
+    '{"token":1234567890,"note":"keep"}',
+    '{"session":"opaque-session-id","credentials":"opaque"}',
       `Authorization: Bearer ${fake('abcdefghijklmnopqrstuvwxyz', '.1234567890')}`,
       'https://example.test/callback?token=super-secret-token&ok=1',
       'api_key = "my-production-secret"',
@@ -264,6 +272,14 @@ describe('JSON, header and placeholder redaction', () => {
       tokenCount: 1,
       secretary: 'keep',
     })
+  })
+
+  it('redacts session/credentials keys, indented Cookie headers and keeps non-secret words', () => {
+    expect(redactSecrets('{"session":"opaque-session-id","credentials":"opaque"}'))
+      .toBe('{"session":"[REDACTED]","credentials":"[REDACTED]"}')
+    expect(redactSecrets('  Cookie: session=abc123; theme=dark')).toBe('  Cookie: [REDACTED]')
+    expect(redactSecrets('password = 12345')).toBe('password = [REDACTED]')
+    expect(redactSecrets('password: required')).toBe('password: required')
   })
 
   it('redacts passphrase/pwd keys and values', () => {
