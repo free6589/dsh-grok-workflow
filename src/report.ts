@@ -75,7 +75,15 @@ function commandRuns(value: unknown, path: string): ExecutionResult['testsRun'] 
   })
 }
 
-/** Deep-validate one attempt's executor payload instead of trusting its shape. */
+/**
+ * Deep-validate one attempt's executor payload instead of trusting its shape.
+ *
+ * `deliverables`, `evidence`, `testsRun` and `filesChanged` are the executor
+ * model's own declarations. The host validates their structure and their
+ * traceability to the verifier's record, but it does not read the filesystem or
+ * re-run commands here: a non-empty string is a declared observation, not a
+ * host-verified fact.
+ */
 function executionResult(value: unknown, path: string): ExecutionResult {
   const root = record(value, path)
   return {
@@ -356,11 +364,49 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
       if (task.attempts[index]!.passed && (task.attempts[index]!.execution === null || task.attempts[index]!.verification === null)) {
         throw new Error(`workflow result task ${task.id} has a passed attempt without execution and verification`)
       }
+      const attempt = task.attempts[index]!
+      if (attempt.passed) {
+        // A passed attempt is the only thing that can make a task verified, so the
+        // host re-checks the invariant the script enforces instead of trusting the
+        // `passed` boolean. Without this, a report whose own fields contradict each
+        // other (`passed: true` with `verdict: "fail"`, a partial executor, or an
+        // empty evidence list) is accepted as COMPLETED by shape validation alone.
+        if (attempt.execution!.status !== 'completed') {
+          throw new Error(`workflow result task ${task.id} has a passed attempt whose executor reported ${attempt.execution!.status}`)
+        }
+        if (attempt.verification!.verdict !== 'pass') {
+          throw new Error(`workflow result task ${task.id} has a passed attempt whose verifier verdict is ${attempt.verification!.verdict}`)
+        }
+        if (attempt.verification!.checkedEvidence.length === 0) {
+          throw new Error(`workflow result task ${task.id} has a passed attempt whose verifier returned no checked evidence`)
+        }
+        if (attempt.verification!.criteria.length !== task.acceptanceCriteria.length) {
+          throw new Error(`workflow result task ${task.id} has a passed attempt whose verifier criteria count does not match the task acceptance criteria`)
+        }
+        for (const criterion of task.acceptanceCriteria) {
+          const matches = attempt.verification!.criteria.filter(item =>
+            criterionKey(item.criterion) === criterionKey(criterion))
+          if (matches.length !== 1 || !matches[0]!.met || matches[0]!.evidence.trim() === '') {
+            throw new Error(`workflow result task ${task.id} has a passed attempt whose criterion "${criterion}" is not met exactly once with evidence`)
+          }
+        }
+      }
     }
     const passedAttempts = task.attempts.filter(attempt => attempt.passed)
     if (task.status === 'verified') {
       if (passedAttempts.length !== 1 || !task.attempts[task.attempts.length - 1]!.passed) {
         throw new Error(`workflow result task ${task.id} is verified without exactly one final passed attempt`)
+      }
+      const lastExecution = task.attempts[task.attempts.length - 1]!.execution!
+      if (lastExecution.deliverables.length === 0
+        && lastExecution.evidence.length === 0
+        && lastExecution.testsRun.length === 0
+        && lastExecution.filesChanged.length === 0) {
+        // A verified task must have produced at least one observable artifact:
+        // a deliverable, a piece of evidence, a command run, or a changed file.
+        // "The verifier said pass" over an entirely empty execution is the
+        // t59/VE-2 failure mode: the report is well-formed but nothing happened.
+        throw new Error(`workflow result task ${task.id} is verified without any execution artifact`)
       }
     } else if (passedAttempts.length > 0) {
       throw new Error(`workflow result task ${task.id} is failed but has a passed attempt`)

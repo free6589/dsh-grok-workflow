@@ -288,6 +288,33 @@ describe('generated workflow script', () => {
     expect(report.tasks[0]!.acceptanceCriteria).toEqual(['The expected output is completed and supported by concrete evidence'])
   })
 
+  it('does not verify a task the executor reported as partial, even with a passing verifier', async () => {
+    // t59: a /proc write that failed was planned as "attempt and report honestly",
+    // verified against that rewritten criterion, and reported COMPLETED. A
+    // self-reported partial/failed status is an admission: it must cap the task
+    // at failed and the honest overall status at failed, no matter what the
+    // verifier says about the rewritten criteria.
+    const plannerTasks = [task('a')]
+    let workerCalls = 0
+    const agent: ScriptAgent = async (_prompt, options) => {
+      if (options.label === 'grok-planner') return { tasks: plannerTasks }
+      if (options.label.startsWith('grok-worker-')) {
+        workerCalls += 1
+        return execution('the write was blocked by the environment', { status: 'partial' })
+      }
+      if (options.label.startsWith('grok-verifier-')) return verification(plannerTasks[0]!)
+      throw new Error(`unexpected agent label ${options.label}`)
+    }
+
+    const { report } = await runWorkflowScript(WORKFLOW_SCRIPT, args(null), agent)
+    expect(report.status).toBe('failed')
+    expect(report.tasks[0]!.status).toBe('failed')
+    expect(report.tasks[0]!.error).toContain('executor reported partial')
+    // One initial attempt plus the configured retry, and the retry still fails.
+    expect(workerCalls).toBe(2)
+    expect(report.incomplete.length).toBeGreaterThan(0)
+  })
+
   it('reports failed when no task can be verified', async () => {
     const callerTasks = [task('a'), task('b')]
     const agent: ScriptAgent = async (_prompt, options) => {
