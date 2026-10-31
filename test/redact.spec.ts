@@ -240,6 +240,32 @@ describe('JSON, header and placeholder redaction', () => {
     expect(JSON.parse(redactSecrets(cases[0]!))).toEqual({ password: '[REDACTED]', note: 'keep' })
   })
 
+  it('redacts numeric JSON secrets without breaking JSON', () => {
+    const input = '{"token":1234567890,"note":"keep"}'
+    const output = redactSecrets(input)
+    expect(JSON.parse(output)).toEqual({ token: '[REDACTED]', note: 'keep' })
+  })
+
+  it('redacts short env-style values and camelCase keys', () => {
+    expect(redactSecrets('password=12345')).toBe('password=[REDACTED]')
+    expect(redactSecrets('api_key=short')).toBe('api_key=[REDACTED]')
+    expect(redactSecrets('{"accessToken":"abc","refreshToken":"def","sessionId":"ghi","tokenCount":42}'))
+      .toBe('{"accessToken":"[REDACTED]","refreshToken":"[REDACTED]","sessionId":"[REDACTED]","tokenCount":42}')
+    expect(redactDeep({
+      accessToken: 'x',
+      refreshToken: 'y',
+      sessionId: 'z',
+      tokenCount: 1,
+      secretary: 'keep',
+    })).toEqual({
+      accessToken: '[REDACTED]',
+      refreshToken: '[REDACTED]',
+      sessionId: '[REDACTED]',
+      tokenCount: 1,
+      secretary: 'keep',
+    })
+  })
+
   it('redacts passphrase/pwd keys and values', () => {
     expect(redactSecrets('passphrase=hunter2')).toBe('passphrase=[REDACTED]')
     expect(redactSecrets('pwd=s3cret-value')).toBe('pwd=[REDACTED]')

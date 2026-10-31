@@ -90,7 +90,10 @@ function redactPromptValue(value, depth) {
 }
 
 function safePromptJson(value) {
-  return JSON.stringify(redactPromptValue(value, 0));
+  // A second text pass catches quoted keys whose values are too short for the
+  // shape rules (e.g. {"accessToken":"abc"}), even though redactPromptValue
+  // already redacts every individual string value.
+  return redactPromptText(JSON.stringify(redactPromptValue(value, 0)));
 }
 
 function safeError(error) {
