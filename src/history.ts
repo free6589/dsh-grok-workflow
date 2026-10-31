@@ -57,11 +57,15 @@ export function renderHistory(messages: readonly Message[], bounds: HistoryBound
   for (const message of messages) {
     if (message.role !== 'user' && message.role !== 'assistant') continue
     if (isPluginMessage(message)) continue
-    const text = redactSecrets(textOf(message))
+    // Bound the input *before* running the redaction regexes: a very long message
+    // must not pay unbounded regex time just to be truncated below.
+    const raw = textOf(message)
+    const truncated = raw.length > MESSAGE_CAP
+    const text = redactSecrets(truncated ? raw.slice(0, MESSAGE_CAP) : raw)
     if (text === '') continue
     recent.push({
       role: message.role === 'user' ? 'User' : 'Assistant',
-      text: text.length > MESSAGE_CAP ? `${text.slice(0, MESSAGE_CAP)}…` : text,
+      text: truncated ? `${text.slice(0, MESSAGE_CAP)}…` : text,
     })
   }
   const selected: typeof recent = []

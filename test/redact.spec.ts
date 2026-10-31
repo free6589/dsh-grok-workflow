@@ -181,6 +181,70 @@ function scriptRedactPromptText(): (value: string) => string {
   return vm.runInContext(`(() => { ${source}; return redactPromptText })()`, context) as (value: string) => string
 }
 
+describe('JSON, header and placeholder redaction', () => {
+  it('redacts a quoted JSON secret and keeps the JSON valid', () => {
+    const input = '{"token":"Sup3rSecretValue123","note":"keep me"}'
+    const output = redactSecrets(input)
+    expect(output).not.toContain('Sup3rSecretValue123')
+    expect(output).toContain('"note":"keep me"')
+    expect(JSON.parse(output)).toEqual({ token: '[REDACTED]', note: 'keep me' })
+  })
+
+  it('redacts sensitive values by JSON key name without touching other keys', () => {
+    const source = {
+      token: 'Sup3rSecretValue123',
+      nested: { password: 'hunter2' },
+      session: { id: 'opaque-session-id' },
+      note: 'keep me',
+      tokenCount: 42,
+    }
+    const output = redactDeep(source)
+    expect(output.token).toBe('[REDACTED]')
+    expect(output.nested.password).toBe('[REDACTED]')
+    expect(output.session).toBe('[REDACTED]')
+    expect(output.note).toBe('keep me')
+    expect(output.tokenCount).toBe(42)
+    // The source object is not mutated.
+    expect(source.token).toBe('Sup3rSecretValue123')
+  })
+
+  it('redacts db_pass, Cookie, fine-grained GitHub, ASIA and Google OAuth values', () => {
+    const input = [
+      'db_pass=hunter2',
+      'Cookie: session=abc123def456; theme=dark',
+      `github_pat_${'11ABCDEFG0123456789_abcdefghijklmnopqrstuvwxyz'}`,
+      'ASIAIOSFODNN7EXAMPLE',
+      'ya29.a0AfH6SMBexampleTokenValue1234567890',
+    ].join('\n')
+    const output = redactSecrets(input)
+    expect(output).not.toContain('hunter2')
+    expect(output).not.toContain('abc123def456')
+    expect(output).not.toContain('github_pat_')
+    expect(output).not.toContain('ASIA')
+    expect(output).not.toContain('ya29.')
+    expect(output).toContain('db_pass=[REDACTED]')
+    expect(output).toContain('Cookie: [REDACTED]')
+  })
+
+  it('preserves ordinary prose that merely mentions a secret-like word', () => {
+    const input = [
+      'the token: count is 3',
+      'The password policy has 12 characters.',
+      'Rotate the secret before Friday.',
+    ].join('\n')
+    expect(redactSecrets(input)).toBe(input)
+  })
+
+  it('keeps an adversarial 100 KB input under a measured time bound', () => {
+    // Regression: unbounded `(?:[A-Za-z0-9]+[_-])*` took ~19 s on this input.
+    const input = 'a_'.repeat(50_000)
+    const started = performance.now()
+    redactSecrets(input)
+    const elapsed = performance.now() - started
+    expect(elapsed).toBeLessThan(1_000)
+  })
+})
+
 describe('prompt redaction parity', () => {
   const corpus = [
     `key ${fake('sk-proj-', 'abcdefghijklmnopqrstuvwxyz', '0123456789')}`,
