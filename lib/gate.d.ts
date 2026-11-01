@@ -91,6 +91,16 @@ type Classification = {
  * to by other listeners, so it cannot identify a new user message.
  */
 export declare function classifyPreStep(deps: Pick<GateDeps, 'config' | 'readConfig'>, payload: PreStepPayload): Classification;
+/**
+ * User-visible terminal for a cancelled turn (P0-4).
+ *
+ * A cancellation that ends silently is indistinguishable from a hang, and the two
+ * used to be exactly that. The text names the state, keeps the completed/partial
+ * split honest, and never reads as success.
+ *
+ * @param reason - Optional measured reason; empty when there is none to state.
+ */
+export declare function cancelledText(reason: string): string;
 /** Install the gate; returns false when the runtime cannot host `agent/pre-step`. */
 export declare function installGate(deps: GateDeps): boolean;
 export {};

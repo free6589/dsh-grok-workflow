@@ -1145,9 +1145,35 @@ DSH 安装：`/home/fish/.local/share/mise/installs/node/26.8.1/lib/node_modules
 | 检查 | 结果 |
 |---|---|
 | 既有测试的语义调整 | `test/gate.spec.ts` 3 处：分类失败由 `reject` 改为带原因的 `enter`（P0-3）；`append` 策略现在会多一条「用户原话」写入（P0-1）；in-turn 断言从 `messages[0]` 改为「首条是原话、末条是答复」 |
-| 新增 | `test/phase1-dialogue.spec.ts`（25 例，P0-1…P0-4，含重放/重开、TTL、串线、重复消费、脱敏、取消终态）与 `test/triage.spec.ts` 的 P0-2 纯函数组（3 例） |
+| 新增 | `test/phase1-dialogue.spec.ts`（27 例，P0-1…P0-4，含重放/重开、TTL、串线、重复消费、脱敏、取消终态）与 `test/triage.spec.ts` 的 P0-2 纯函数组（3 例） |
 
-#### R12-3 未包含（NOT_RUN / BLOCKED）
+#### R12-3 真实 DSH GUI + 真实模型（已测，证据在 `docs/knowledge/evidence/p1-gui/`）
 
-- 真实 DSH GUI（`:3090` 或新实例）截图：见 PR 描述中的 NOT_RUN/BLOCKED 说明。
-- 真实模型调用（`npm run test:e2e`）：本轮未执行，单元/集成证据不替代它。
+隔离实例（不是 live `:3090`：它需要自己 `dsh web` 打印的令牌，仓库 D-013 也禁止重启/改配它）
+用本分支 `npm run build` 产物加载插件，profile 从 shipped `web` 模板起，会话工作区是
+`<worktree>/.dsh-home/workspace` 这个一次性目录（快捷工人自己在回答里报了该路径）。模型走
+`bifrost-completions / wb/cn:deepseek-v4.1-flash`（密钥只在环境变量里）。四类路径都拍了真实浏览器截图：
+
+| 路径 | 证据 | 结论 |
+|---|---|---|
+| P0-1 原话保留 + 重开会话 | `01-p01-before-reload.png`、`02-p01-after-reload.png`、`p01.log` | 原话在报告之前、只出现一次；刷新并重开会话后仍在、顺序不变（`AFTER_RELOAD_OCCURRENCES=1`） |
+| P0-2 确认档往返 | `03-p02-question.png`、`04-p02-simple-answer.png`、`05-p02-team-running.png`、`p02sim.log`、`p02team.log` | 问句可见；答「简单」后快手档回答明说「『简单模式』只是对上一个确认档问题的回答，不是新的任务目标」，说明原任务与选择词同时到位；答「团队」后团队档真的开工 |
+| P0-3 内部错误可见终态 | `08-p03-error-terminal.png`、`p03.log`、`p03-probe.patch.yml` | 只有 workflow 角色指向坏端点（助手自己的模型仍可用）时，界面上出现带原因的失败报告，`HAS_SUCCESS_WORDING=false` |
+| P0-4 取消终态 | `06-p04-cancelled.png`、`07-p04-cancelled-after-reload.png`、`p02team.log` | 点一次停止后写出「运行已取消（cancelled）…」，刷新后仍在 |
+
+#### R12-4 真机复核查出的缺口：取消时原话与终态一起消失（已修）
+
+在同一实例上按停止后，会话事件里只有 `agent/inbox/spliced`（claim 走原话）→
+`tool-workflow/run-end cancelled` → `turn/end aborted`，**没有任何 `user/message`，也没有任何报告**：
+`answerInTurn` 在 abort 后只 `record(...)` 然后 `reject`，而那一批消息早已被 `inbox.claim` 取走，
+于是用户看到的是一段空白 + 一个没有原因的「已停止」。修复：`src/gate.ts` 新增
+`cancelledText()` 与 `commitCancelled()`，两条 abort 分支在 `reject` 之前先按原对象提交被 claim 的消息
+（整步已 reject，插件是唯一写入者，不重复），再写一条说明终态的助手消息。
+`test/phase1-dialogue.spec.ts` 的「P0-4: a cancelled turn keeps the message and states the terminal」
+两例锁定该行为（GUI 截图见 R12-3 的 P0-4 行）。
+
+#### R12-5 未包含（NOT_RUN）
+
+- `npm run test:e2e`（`scripts/e2e-headless-in-turn.sh`）：未执行——它会写真实 `$DSH_HOME` 会话，
+  本轮的真机证据改由上面的隔离 GUI 实例提供，两者不互相替代。
+- `relay` / `append` 策略的真机行为：只有单测覆盖，未在 GUI 上验证，PR 未声称其已支持。

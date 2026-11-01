@@ -791,3 +791,65 @@ describe('P0-4: cancellation reaches a terminal state', () => {
     expect(ctx.engine.runs[0]!.cancel).toHaveBeenCalled()
   })
 })
+
+/**
+ * Cancellation inside the open turn (P0-1 + P0-4).
+ *
+ * Found by driving the real GUI: pressing stop during an in-turn team run left the
+ * session with *no* `user/message` at all and no reason for the stop, because the
+ * gate returned `reject` and the claimed batch had already been taken out of the
+ * inbox. The tests below pin the transcript the user can see afterwards.
+ */
+describe('P0-4: a cancelled turn keeps the message and states the terminal', () => {
+  it('keeps the typed message once and writes the cancelled terminal when the run is stopped', async () => {
+    const ctx = new FakeContext()
+    ctx.engine.hang = true
+    apply(ctx as never, { mode: 'full' })
+    const live = session('sess-p04-keep-mid')
+    const agent = new FakeAgent(live)
+    const claimed = [userMessage('把这个表格整理成周报')]
+    const controller = new AbortController()
+
+    const pending = ctx.preStep()(payload(agent, claimed, controller.signal), nextWith(claimed)) as Promise<Decision>
+    await waitFor(() => ctx.engine.runs.length === 1)
+    controller.abort()
+    const decision = await pending
+
+    // Nothing can be entered into a cancelled turn: the decision must be a rejection.
+    expect(decision.kind).toBe('reject')
+    const derived = texts(live)
+    // The claimed batch never reaches the loop, so the plugin is the only writer and
+    // must not write the same words twice.
+    expect(derived.filter(text => text === '把这个表格整理成周报')).toHaveLength(1)
+    expect(derived[0]).toBe('把这个表格整理成周报')
+    const last = derived[derived.length - 1]!
+    expect(last).toContain('取消')
+    expect(last).toContain('cancelled')
+    // A stopped run must never read as success.
+    expect(last).not.toContain('COMPLETED')
+    expect(last).not.toContain('已开启')
+    // The user message is a durable event, not just a render-time echo.
+    expect(live.ownEvents().filter(event => event.type === 'user/message')).toHaveLength(1)
+  })
+
+  it('keeps the message and states the terminal when the signal was already aborted', async () => {
+    const ctx = new FakeContext()
+    apply(ctx as never, { mode: 'full' })
+    const live = session('sess-p04-keep-pre')
+    const agent = new FakeAgent(live)
+    const claimed = [userMessage('把登录接口改成 JWT 校验')]
+    const controller = new AbortController()
+    controller.abort()
+
+    const decision = await ctx.preStep()(payload(agent, claimed, controller.signal), nextWith(claimed)) as Decision
+
+    expect(decision.kind).toBe('reject')
+    expect(ctx.engine.startCalls).toHaveLength(0)
+    const derived = texts(live)
+    expect(derived.filter(text => text === '把登录接口改成 JWT 校验')).toHaveLength(1)
+    const last = derived[derived.length - 1]!
+    expect(last).toContain('取消')
+    expect(last).toContain('没有启动任何工人')
+    expect(last).not.toContain('COMPLETED')
+  })
+})

@@ -1,0 +1,63 @@
+# Phase 1 (Issue #22) GUI evidence profile — isolated .dsh-home inside the
+# worktree. Credentials stay in the environment (BIFROST_VIRTUAL_KEY); nothing
+# is written to disk here. Model route mirrors the known-good t24-live profile.
+- id: llm-pi-ai
+  name: '@deepseek-ai/dsh-llm-pi-ai'
+  config:
+    providers:
+      bifrost-completions:
+        displayName: Completions
+        api: openai-completions
+        baseURL: https://models.fyrali.com/openai/v1
+        apiKeyEnv: BIFROST_VIRTUAL_KEY
+        reasoning: high
+        compat:
+          supportsDeveloperRole: false
+          supportsStore: false
+        models:
+          - id: wb/cn:deepseek-v4.1-flash
+            name: DeepSeek V4.1 Flash (cn)
+            contextWindow: 500000
+            maxTokens: 65536
+            input:
+              - text
+            reasoningEfforts:
+              off: null
+              low: low
+              medium: medium
+              high: high
+- id: agent-default-model
+  name: '@deepseek-ai/dsh-agent-default-model'
+  config:
+    provider: bifrost-completions
+    model: wb/cn:deepseek-v4.1-flash
+    reasoningEffort: low
+# web layer disables workflow-ptc by default; dsh-grok-workflow injects the
+# workflowEngine service, so the provider has to be switched back on.
+- id: workflow-ptc
+  name: '@deepseek-ai/dsh-workflow-ptc'
+  config:
+    provider: spawn
+  disabled: false
+- id: grok-workflow
+  name: dsh-grok-workflow
+  config:
+    timeoutMs: 86400000
+    maxActiveRuns: 4
+    triageAsk: true
+    roles:
+      planner:
+        - provider: bifrost-completions
+          model: wb/cn:deepseek-v4.1-flash
+      worker:
+        - provider: bifrost-completions
+          model: wb/cn:deepseek-v4.1-flash
+      verifier:
+        - provider: bifrost-completions
+          model: wb/cn:deepseek-v4.1-flash
+      synthesizer: []
+  disabled: false
+- id: ui-settings-general
+  name: "@deepseek-ai/dsh-client-ui-settings-general"
+  config:
+    welcomeNoticeVersion: 2026-09-28.1

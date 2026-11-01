@@ -64,6 +64,13 @@ come from PR #23, still under review; no tag, no publication, and the version is
 - **P0-3 内部错误一定有用户可见终态 / every internal error ends visibly** — 分类失败过去是静默
   `reject`（用户看到空白回合），现在是带上原因的通知消息且保留原话；失败话术不会出现
   「已完成/已开启」这类成功措辞；有意取消、超时、插件卸载与内部异常各有独立终态。
+- **取消时原话与终态都不再消失 / a cancelled turn keeps the message and states its end** — 真机 GUI
+  复核发现的 P0-1 × P0-4 缺口：in-turn 路径里用户那句话已经被 `inbox.claim` 取走，若这一回合被取消，
+  决策只能 `reject`，于是 session 里既没有 `user/message` 也没有任何停止原因（实测会话事件只有
+  `inbox/spliced` → `run-end cancelled` → `turn/end aborted`）。现在取消走 `commitCancelled()`：先按
+  原对象提交被 claim 的那批消息（这一步整步已被 reject，插件是唯一写入者，不会重复），再写一条
+  助手消息说明 `运行已取消（cancelled）…已完成的部分保留…`。GUI 截图与回归用例见
+  `docs/knowledge/evidence/p1-gui/`。
 - **P0-4 取消到达终态并保留已完成的工作 / cancellation ends, and keeps finished work** — 已经 aborted
   的 signal 不会再启动引擎（过去会先启动再取消，白跑一次 planner/worker）；运行被停止时，引擎已经
   产出的报告会被保留：已验证任务原样保留，未完成的任务标为 `interrupted`、未开始的任务标为

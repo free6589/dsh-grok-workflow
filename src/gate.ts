@@ -217,6 +217,25 @@ export function classifyPreStep(
 }
 
 /**
+ * User-visible terminal for a cancelled turn (P0-4).
+ *
+ * A cancellation that ends silently is indistinguishable from a hang, and the two
+ * used to be exactly that. The text names the state, keeps the completed/partial
+ * split honest, and never reads as success.
+ *
+ * @param reason - Optional measured reason; empty when there is none to state.
+ */
+export function cancelledText(reason: string): string {
+  const lines = [
+    '运行已取消（cancelled）：这条消息没有完成，也没有可交付的结果。',
+    '已完成的部分保留，未完成的部分不再继续；要接着做，请把任务重新发一次。',
+  ]
+  const trimmed = reason.trim()
+  if (trimmed !== '') lines.push(`原因：${trimmed}`)
+  return lines.join('\n')
+}
+
+/**
  * Deliver the answer in a new turn owned by the plugin (strategy `relay`).
  *
  * The message carries this plugin's source kind, so the gate recognises its own
@@ -602,6 +621,50 @@ export function installGate(deps: GateDeps): boolean {
   }
 
   /**
+   * State a cancelled turn's terminal and keep what the user wrote (P0-1 + P0-4).
+   *
+   * A cancelled turn cannot be answered inside itself — the step is already gone,
+   * so the decision has to be `reject`. That made cancellation lose the batch twice
+   * over, which a real GUI session shows plainly: the message the user typed never
+   * became a `user/message` event, and the stopped run left no reason in the
+   * transcript. Because the step is rejected here, this plugin is the only writer,
+   * so committing the claimed message cannot duplicate it: the original message
+   * object is appended unchanged, then one assistant message carries the terminal.
+   *
+   * @param agent - Agent whose transcript keeps the batch.
+   * @param payload - Rejected step whose batch is being committed.
+   * @param text - User-visible terminal text; never a success sentence.
+   * @returns true when the batch reached the session surface.
+   */
+  const commitCancelled = (
+    agent: Agent,
+    payload: PreStepPayload,
+    text: string,
+  ): boolean => {
+    const kept = commitClaimed(agent, payload.messages)
+    const session = sessionOf(agent)
+    if (session === undefined) return kept
+    try {
+      const options = agent.options ?? {}
+      session.append('assistant/message', {
+        turn: payload.turn,
+        step: payload.step,
+        message: createAssistantMessage({
+          content: [{ type: 'text', text }],
+          source: {
+            provider: options.provider ?? 'grok-workflow',
+            model: options.model ?? 'workflow-report',
+          },
+        }),
+        stream: [],
+      }, { surfaceOp: 'append' })
+    } catch (error) {
+      logger.warn(`gate could not state the cancelled terminal: ${redactError(error)}`)
+    }
+    return kept
+  }
+
+  /**
    * Admit one batch and answer it after the turn closes (`relay`/`append`).
    *
    * Kept separate so the listener itself stays total: this function may throw,
@@ -707,7 +770,10 @@ export function installGate(deps: GateDeps): boolean {
       messages: [...base, enterMessage(text)],
     })
     if (aborted()) {
+      // Already cancelled when the message arrived: nothing ran, but the batch must
+      // still survive the rejection and say why (P0-1 + P0-4).
       record(agent, entry, 'failed', 'aborted')
+      commitCancelled(agent, payload, cancelledText('这条消息还没派工就被取消了，没有启动任何工人。'))
       return { kind: 'reject' }
     }
     const base = await stepBase(payload, next)
@@ -727,9 +793,11 @@ export function installGate(deps: GateDeps): boolean {
     record(agent, entry, 'started', 'admitted')
     const answer = await produceAnswer(agent, verdict.request, signal)
     if (aborted()) {
-      // The turn was cancelled while the run was in flight: nobody will read an
-      // entered step, and the run already stopped on the same signal.
+      // The turn was cancelled while the run was in flight: nobody can read an
+      // entered step, and the run already stopped on the same signal — so the
+      // transcript gets the batch and the cancelled terminal instead (P0-1 + P0-4).
       record(agent, entry, 'failed', 'aborted')
+      commitCancelled(agent, payload, cancelledText(answer.kind === 'notice' ? answer.reason : ''))
       return { kind: 'reject' }
     }
     record(agent, entry, answer.kind === 'notice' ? 'failed' : 'delivered', answer.outcome)
