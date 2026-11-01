@@ -3,21 +3,21 @@ import type { FailureClass, GrokWorkflowConfig, ModelRoute, ResolvedConfig, Role
 
 /** Hard limits; user configuration can only tighten these. */
 export const HARD_LIMITS = {
-  historyTurns: 20,
-  historyChars: 8_000,
+  historyTurns: 1_000_000,
+  historyChars: 1_000_000,
   maxQueuedMessages: 8,
-  maxConcurrency: 6,
-  maxRetries: 3,
-  maxTasks: 12,
+  maxConcurrency: 1_000_000,
+  maxRetries: 10,
+  maxTasks: 100,
   maxActiveRuns: 4,
   maxActiveRunsTotal: 16,
-  timeoutMs: 86_400_000,
+  timeoutMs: 604_800_000,
   /** Maximum routes in one role's fallback chain. */
-  chainLength: 3,
+  chainLength: 50,
   /** Maximum characters in one provider or model id. */
   routeChars: 120,
-  /** Hard ceiling on child calls charged against one task (worker + verifier). */
-  maxAttemptsPerTask: 6,
+  /** Extreme backstop on child calls charged against one task (worker + verifier). */
+  maxAttemptsPerTask: 1100,
   /** Hard ceiling on routing ledger entries kept per run. */
   recordEntries: 256,
 } as const
@@ -120,12 +120,12 @@ export const Config = z.object({
   // Empty means "inherit the message's own route": the chat and fast tiers then
   // spend exactly one child call on the run's provider instead of a second one.
   triageModel: z.string().default('').volatile(),
-  historyTurns: z.natural().min(0).max(HARD_LIMITS.historyTurns).default(4).volatile(),
-  historyChars: z.natural().min(0).max(HARD_LIMITS.historyChars).default(4_000).volatile(),
+  historyTurns: z.natural().min(0).max(HARD_LIMITS.historyTurns).default(12).volatile(),
+  historyChars: z.natural().min(0).max(HARD_LIMITS.historyChars).default(20_000).volatile(),
   maxQueuedMessages: z.natural().min(0).max(HARD_LIMITS.maxQueuedMessages).default(4).volatile(),
-  maxConcurrency: z.natural().min(1).max(HARD_LIMITS.maxConcurrency).default(3).volatile(),
-  maxRetries: z.natural().min(0).max(HARD_LIMITS.maxRetries).default(1).volatile(),
-  maxTasks: z.natural().min(1).max(HARD_LIMITS.maxTasks).default(6).volatile(),
+  maxConcurrency: z.natural().min(1).max(HARD_LIMITS.maxConcurrency).default(4).volatile(),
+  maxRetries: z.natural().min(0).max(HARD_LIMITS.maxRetries).default(2).volatile(),
+  maxTasks: z.natural().min(1).max(HARD_LIMITS.maxTasks).default(12).volatile(),
   // 60 minutes, not 30 (t45, P1-4): the two measured deadline kills were 30m00s
   // and 30m01s on four-task objectives, and a real four-task run took 878 s / 1148 s
   // / 1801 s. 60 minutes keeps the "a hung run cannot run forever" property while
@@ -332,18 +332,19 @@ export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
     verifier: resolveChain('verifier', config.roles?.verifier),
     synthesizer: resolveChain('synthesizer', config.roles?.synthesizer),
   }
-  const maxRetries = integer('maxRetries', config.maxRetries ?? 1, 0, HARD_LIMITS.maxRetries)
-  // Budget invariant (R-12): one task may charge at most
+  const maxRetries = integer('maxRetries', config.maxRetries ?? 2, 0, HARD_LIMITS.maxRetries)
+  // Budget backstop (R-12): one task may charge at most
   // HARD_LIMITS.maxAttemptsPerTask child calls, and every attempt pays for one
-  // worker and one verifier call per chain entry.
+  // worker and one verifier call per chain entry. The cap is deliberately
+  // extreme (1100): ordinary short-chain combinations always pass it; only a
+  // pathological long-chain + high-retry combination is refused at load.
   const callsPerAttempt = Math.max(1, roles.worker.length) + Math.max(1, roles.verifier.length)
   const attemptsPerTask = maxRetries + 1
   if (callsPerAttempt * attemptsPerTask > HARD_LIMITS.maxAttemptsPerTask) {
     throw new Error(
       `roles.worker + roles.verifier need ${callsPerAttempt} child calls per attempt; with maxRetries ${maxRetries} ` +
       `that is ${callsPerAttempt * attemptsPerTask} calls per task, over the ${HARD_LIMITS.maxAttemptsPerTask}-call ` +
-      'budget per task. Shorten the chains or lower maxRetries ' +
-      `(a ${HARD_LIMITS.chainLength}-route worker chain needs maxRetries 0 even with a single verifier route).`,
+      'backstop per task. Shorten the chains or lower maxRetries.',
     )
   }
   const mode = config.mode ?? 'triage'
@@ -368,12 +369,12 @@ export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
     grokDefault: config.grokDefault ?? 'off',
     triageAsk: config.triageAsk ?? true,
     ...triageModel === undefined ? {} : { triageModel },
-    historyTurns: integer('historyTurns', config.historyTurns ?? 4, 0, HARD_LIMITS.historyTurns),
-    historyChars: integer('historyChars', config.historyChars ?? 4_000, 0, HARD_LIMITS.historyChars),
+    historyTurns: integer('historyTurns', config.historyTurns ?? 12, 0, HARD_LIMITS.historyTurns),
+    historyChars: integer('historyChars', config.historyChars ?? 20_000, 0, HARD_LIMITS.historyChars),
     maxQueuedMessages: integer('maxQueuedMessages', config.maxQueuedMessages ?? 4, 0, HARD_LIMITS.maxQueuedMessages),
-    maxConcurrency: integer('maxConcurrency', config.maxConcurrency ?? 3, 1, HARD_LIMITS.maxConcurrency),
+    maxConcurrency: integer('maxConcurrency', config.maxConcurrency ?? 4, 1, HARD_LIMITS.maxConcurrency),
     maxRetries,
-    maxTasks: integer('maxTasks', config.maxTasks ?? 6, 1, HARD_LIMITS.maxTasks),
+    maxTasks: integer('maxTasks', config.maxTasks ?? 12, 1, HARD_LIMITS.maxTasks),
     timeoutMs: integer('timeoutMs', config.timeoutMs ?? DEFAULT_TIMEOUT_MS, 1_000, HARD_LIMITS.timeoutMs),
     maxActiveRuns: integer('maxActiveRuns', config.maxActiveRuns ?? DEFAULT_MAX_ACTIVE_RUNS, 1, HARD_LIMITS.maxActiveRuns),
     maxActiveRunsTotal: integer('maxActiveRunsTotal', config.maxActiveRunsTotal ?? DEFAULT_MAX_ACTIVE_RUNS_TOTAL, 1, HARD_LIMITS.maxActiveRunsTotal),

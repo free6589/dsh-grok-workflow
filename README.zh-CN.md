@@ -124,7 +124,7 @@ DSH 启动后，直接提问即可：
 | 4,001–32,000 字符 | 接受；整条消息原样成为目标。恰好 32,000 字符时会丢弃 `Current request:` 标签而不是裁剪消息，也不再附带历史。 |
 | 32,001 字符及以上 | 明确拒绝，提示 `the message is longer than the 32000-character workflow objective limit`；不会启动任何运行。 |
 
-其它限制保持不变：`historyChars` 默认仍为 `4000`（硬上限 `8000`），每个任务字段（`objective`、`expectedOutput`、`context`）仍各限 `4000` 字符（`taskTextChars`），任务 JSON 合计仍限 `48,000` 字符。因此更大的目标必须拆成多个任务，而不是放宽单个任务。
+其它限制保持不变：每个任务字段（`objective`、`expectedOutput`、`context`）仍各限 `4000` 字符（`taskTextChars`），任务 JSON 合计仍限 `48,000` 字符。`0.2.5` 为长任务放宽了历史与运行上限：`historyChars` 默认 `20000`（硬上限 `1000000`），`historyTurns` 默认 `12`（硬上限 `1000000`），`timeoutMs` 最长可到 7 天，每条角色链最多 `50` 条备用路由。因此更大的目标必须拆成多个任务，而不是放宽单个任务字段。
 
 规划失败时，fallback 计划会把整个目标切成若干连续分段，每段都不超过 4,000 字符的任务文本上限；分段按序拼接后与原始目标逐字一致，因此**不会**被二次拒绝，也不会丢失任何字符。运行以 `partial` 结束，并记录 `planning.source: "fallback"` 与规划错误。
 
@@ -196,9 +196,9 @@ DSH 启动后，直接提问即可：
 ```yaml
 - id: grok-workflow
   config:
-    maxConcurrency: 3
-    maxRetries: 1
-    maxTasks: 6
+    maxConcurrency: 4
+    maxRetries: 2
+    maxTasks: 12
 ```
 
 | 键 | 默认值 | 硬上限 | 含义 |
@@ -209,19 +209,19 @@ DSH 启动后，直接提问即可：
 | `gateScope` | `process` | `process` \| `preset` | 闸门认领哪些 agent |
 | `gatePreset` | `''` | 字符串 | `gateScope: preset` 时拥有闸门的 agent preset |
 | `answerStrategy` | `in-turn` | `in-turn` \| `relay` \| `append` | 答案如何到达用户 |
-| `historyTurns` | `4` | `20` | 作为上下文带上的对话轮数 |
-| `historyChars` | `4000` | `8000` | 该上下文的字符预算 |
+| `historyTurns` | `12` | `1000000` | 作为上下文带上的对话轮数 |
+| `historyChars` | `20000` | `1000000` | 该上下文的字符预算 |
 | `maxQueuedMessages` | `4` | `8` | 每个 agent 的等待消息上限，超过即拒绝 |
-| `maxConcurrency` | `3` | `6` | 每次运行的并行子代理数 |
-| `maxRetries` | `1` | `3` | 每个任务首次尝试后的重试次数 |
-| `maxTasks` | `6` | `12` | 调用方或规划器任务上限 |
-| `timeoutMs` | `1800000` | `86400000` | 整体运行时限 |
+| `maxConcurrency` | `4` | `1000000` | 每次运行的并行子代理数 |
+| `maxRetries` | `2` | `10` | 每个任务首次尝试后的重试次数 |
+| `maxTasks` | `12` | `100` | 调用方或规划器任务上限 |
+| `timeoutMs` | `3600000` | `604800000`（7 天） | 整体运行时限 |
 | `maxActiveRuns` | `2` | `4` | 每个插件实例并发的 `grok_workflow` 运行数 |
 | `mode` | `triage` | `triage` \| `full` | `triage`：前台选一档并写明；`full`：每条消息都跑团队（t52 之前的行为） |
 | `triageAsk` | `true` | 布尔 | 信号冲突时反问一句，而不是直接升级团队 |
 | `triageModel` | 空 | 路由字符串 | 快手档那次调用花哪个模型；空则用本次运行自己的路由 |
 | `subagentProvider` | 引擎默认 | 字符串 | 可选的子代理 provider 覆盖 |
-| `roles` | 空链 | 每个角色 ≤3 条 | `{ planner, worker, verifier, synthesizer }` 有序链 |
+| `roles` | 空链 | 每个角色 ≤50 条 | `{ planner, worker, verifier, synthesizer }` 有序链 |
 | `synthesis` | `deterministic` | `deterministic` \| `model` | 确定性聚合，或由模型撰写总结 |
 | `switchOn` | `[]`（内置） | 白名单 | 允许推进备用链的失败类别 |
 | `recordRuns` | `true` | 布尔 | 是否把路由/交付台账写进会话 |
@@ -234,7 +234,7 @@ DSH 启动后，直接提问即可：
 
 由于插件导出了自己的 `Config`，DSH 会把它投影到标准设置面上：页面上的字段就是插件读取的字段——不存在第二份装饰性的真相来源。编辑是活值：编辑对下一条消息生效，非法编辑会带原因被拒绝，而投递继续使用上一次合法快照。链会对照运行时实际拥有的 provider 校验，因此不存在的模型会在载入时被发现，并列出已声明的 id。
 
-设置页里能看到并直接改的分组成员包括前台三项：`mode`（分流 / 全团队）、`triageAsk`（信号冲突时反问还是直接升级）、`triageModel`（快手档那次调用花哪个模型；留空表示用本次运行自己的路由）。目前**还没有**带模型下拉的链编辑器；那需要客户端模块（登记为 U-6 / Phase 9）。在那之前，profile patch 与普通表单就是编辑同一批值的两种方式。
+设置页里能看到并直接改的分组成员包括前台三项：`mode`（分流 / 全团队）、`triageAsk`（信号冲突时反问还是直接升级）、`triageModel`（快手档那次调用花哪个模型；留空表示用本次运行自己的路由）。`0.2.5` 起设置页是新手向、严格单语的：只渲染 DSH 语言设置的那一种文字（不显示 raw 字段键，不中英混排），页头有一句跟随当前草稿的实时状态，控件按"模式 / 谁来干 / 上限 / 其他（默认折叠）/ 高级（别碰）"分组。角色链与分诊模型用"通道→模型"双下拉，目录读运行时已声明的模型；读不到就回退手写框。
 
 ### 停用与卸载
 

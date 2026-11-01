@@ -19,6 +19,7 @@ import { resolveConfig } from '../src/config.js'
 import { parseMemberLabel } from '../src/naming.js'
 import { DELIVERY_RECORD } from '../src/records.js'
 import { createActiveState, runWorkflow } from '../src/run.js'
+import { maxTotalAgentsFor, routeBudgetFor } from '../src/script.js'
 import { callerTask, execution, task, verification } from './fixtures.js'
 import { runWorkflowScript } from './helpers.js'
 
@@ -742,13 +743,16 @@ describe('P0-4: cancellation reaches a terminal state', () => {
       synthesis: { mode: 'deterministic' },
       // A report is only trusted when its limits echo the configuration that ran
       // (assertWorkflowReport refuses anything else), so the fixture echoes it.
+      // maxTotalAgents must sit inside the planner-budget window
+      // [maxTotalAgentsFor(taskCount), maxTotalAgentsFor(maxTasks)]: derive it
+      // from the config so a default change cannot strand this fixture.
       limits: {
         maxConcurrency: limitsConfig.maxConcurrency,
         maxRetries: limitsConfig.maxRetries,
         maxTasks: limitsConfig.maxTasks,
         // The report validator only trusts an agent budget inside the range the
         // planner budget allows (`report.ts`: min-max for this task count).
-        maxTotalAgents: 12,
+        maxTotalAgents: maxTotalAgentsFor(plan.length, limitsConfig.maxRetries, routeBudgetFor(limitsConfig)),
         timeoutMs: limitsConfig.timeoutMs,
       },
     }

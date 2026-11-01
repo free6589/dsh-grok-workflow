@@ -97,7 +97,7 @@ write each requirement once, with distinct wording.
 ### Execute
 
 Tasks run through a bounded worker pool implemented in the script. The pool size
-is `maxConcurrency` (default 3, schema maximum 6). The script calls `agent()`
+is `maxConcurrency` (default 4, schema maximum 1000000). The script calls `agent()`
 only from a pool worker, so at most that many child agents are in flight.
 `maxTotalAgents` is also passed to the engine as a second backstop.
 
@@ -116,8 +116,8 @@ converted to a failed verification and triggers a bounded retry.
 
 ### Retry
 
-Each task has at most `maxRetries` retries after the initial attempt (default 1,
-schema maximum 3). Retry attempts receive the prior result and verifier issues.
+Each task has at most `maxRetries` retries after the initial attempt (default 2,
+schema maximum 10). Retry attempts receive the prior result and verifier issues.
 Attempt counts are reported; failures are never collapsed into success.
 
 ### Synthesize
@@ -237,7 +237,7 @@ first refused length.
 only when the message itself exceeds the limit; when the 17-character
 `Current request:\n` label would push the composed objective over the limit, it
 returns the message unchanged instead of trimming it. Only the history block is
-truncated. `historyChars` (default 4,000, hard maximum 8,000) and
+truncated. `historyChars` (default 20,000, hard maximum 1,000,000) and
 `taskTextChars` (4,000 per task field) are unchanged.
 
 **Planner-failure fallback.** When planning fails, `fallbackPlan()` splits the

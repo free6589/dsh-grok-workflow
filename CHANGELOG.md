@@ -5,6 +5,66 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-11-01
+
+The novice settings page: the Settings → Plugins → `Grok workflow` page now speaks one
+language at a time — exactly the language DSH is set to — with plain words instead of
+field keys and jargon. On top of that: history, concurrency, retry, task and timeout
+bounds are relaxed for long jobs, and every role chain holds up to 50 backup routes.
+
+新手设置页：设置 → 插件 → `Grok workflow` 页面一次只说一种语言——严格跟随 DSH 的语言设置，
+用人话代替字段键与黑话。在此之外：历史、并发、重试、任务与超时上限为长任务放宽，每条角色链
+最多可放 50 条备用路由。
+
+### Added / 新增
+
+- **Novice-oriented settings page, strictly single-locale / 新手向设置页，严格单语** —
+  the page renders only the active system language (no raw field keys, no mixed bilingual
+  lines), shows a live one-line status under the intro (`OFF — plain chat` / `ON — smart
+  triage` / `ON — full team`, following the current draft and never saved), and groups the
+  controls into Mode / Who does it / Limits / More (collapsed) / Advanced — leave alone /
+  Status. Role names are plain words (Planner / Executor / Checker / Summarizer); every
+  row explains what happens if you leave it alone.
+  页面只渲染当前系统语言（不显示 raw 字段键，不中英混排），页头有一句跟随当前草稿的实时状态
+  （关着 / 智能分诊 / 全员出动，只展示、不保存），控件按"模式 / 谁来干 / 上限 / 其他（默认折叠）/
+  高级（别碰）/ 运行状态"分组。角色名是人话（规划 / 执行 / 检查 / 总结），每行都写了"不动会怎样"。
+- **Provider → model dropdowns fed by the runtime / 通道→模型双下拉，目录来自运行时** —
+  role chains and the triage model use provider→model dropdowns listing the models the
+  runtime declares; when the runtime exposes no catalog both controls fall back to free
+  text. Leaving a chain blank still means "use the model you are already talking to".
+  角色链与分诊模型用"通道→模型"双下拉，选项是运行时已声明的模型；读不到目录就回退手写框。
+  留空仍表示"用跟你对话的模型"。
+- **switchOn as seven checkboxes, all checked by default / switchOn 改为七个勾选框，默认全勾** —
+  one box per switchable failure class with plain names; all checked is the built-in
+  behavior (switch only when the road is broken). Content failures never switch, they
+  retry in place.
+  每个可切换失败类别一个勾选框，名字是人话；全勾就是内置行为（路不通才换人）。内容没做好
+  永远不换人，原地重试。
+- **Long-chain + high-retry heads-up / 长链+高重试提醒** — a long backup chain combined
+  with high retries shows a warning above the save button; it never blocks saving.
+  备用链很长、重试又高时，保存按钮上方会有一句提醒；只提醒，不拦保存。
+
+### Changed / 变更
+
+- **Bounds relaxed for long jobs / 上限为长任务放宽** — `historyTurns` 0–1000000
+  (default `12`), `historyChars` 0–1000000 (default `20000`), `maxConcurrency` 1–1000000
+  (default `4`), `maxRetries` 0–10 (default `2`), `maxTasks` 1–100 (default `12`),
+  `timeoutMs` up to 7 days (`604800000`, default still 60 minutes), each role chain up
+  to `50` backup routes (was 3). The generated script's defensive clamps mirror the
+  backend limits and a test pins them equal. The per-task call backstop is now an
+  extreme 1100-call guard instead of a 6-call budget.
+  `historyTurns` 0–1000000（默认 `12`）、`historyChars` 0–1000000（默认 `20000`）、
+  `maxConcurrency` 1–1000000（默认 `4`）、`maxRetries` 0–10（默认 `2`）、`maxTasks` 1–100
+  （默认 `12`）、`timeoutMs` 最长 7 天（`604800000`，默认仍 60 分钟）、每条角色链最多
+  `50` 条备用路由（原来 3 条）。生成脚本里的兜底值与后端上限对齐，并有测试钉死两者一致。
+  单任务调用预算从 6 次改为 1100 次的极端兜底。
+- **Option and error copy in plain words / 选项与报错改成人话** — answer strategy,
+  synthesis, gate scope and switch classes render localized display names (stored values
+  stay English); validation errors keep their `{key, params}` data shape but read as
+  plain sentences in both languages.
+  回答策略、汇总方式、门禁范围、切换类别显示本地化名称（存值保持英文）；校验错误保持
+  `{key, params}` 数据形态，但两边都是人话。
+
 ## [0.2.4] - 2026-11-01
 
 The opt-in release: the workflow no longer hijacks every message — a session is plain chat until

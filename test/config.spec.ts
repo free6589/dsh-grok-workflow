@@ -75,8 +75,8 @@ describe('configuration surface', () => {
     expect(() => resolveConfig({ roles: { worker: [{ model: '' }] } } as never)).toThrow(/model must be a non-empty model id/)
     expect(() => resolveConfig({ roles: { worker: [{ model: 'x'.repeat(HARD_LIMITS.routeChars + 1) }] } } as never))
       .toThrow(/longer than 120 characters/)
-    expect(() => resolveConfig({ roles: { worker: [{ model: 'a' }, { model: 'b' }, { model: 'c' }, { model: 'd' }] } } as never))
-      .toThrow(/maximum chain length is 3/)
+    expect(() => resolveConfig({ roles: { worker: Array.from({ length: HARD_LIMITS.chainLength + 1 }, (_unused, index) => ({ model: `m${index}` })) } } as never))
+      .toThrow(/maximum chain length is 50/)
   })
 
   it('refuses a switching policy naming a class that can never switch', () => {
@@ -100,9 +100,9 @@ describe('configuration surface', () => {
     expect(defaults).toMatchObject({
       enforceGate: true,
       answerStrategy: 'in-turn',
-      maxConcurrency: 3,
-      maxRetries: 1,
-      maxTasks: 6,
+      maxConcurrency: 4,
+      maxRetries: 2,
+      maxTasks: 12,
       maxActiveRuns: 2,
       switchOn: [],
       recordRuns: true,
@@ -232,6 +232,15 @@ describe('route validation against the runtime', () => {
     const schema = Config.toJSON() as { uid: number; refs: unknown }
     const ctx = ctxWith({ settings: { configure: () => () => {}, describe: () => [{ ns: 'grok-workflow', autoGenerate: true, applies: 'live', schema }] } })
     expect(describeSelf(ctx)).toMatchObject({ ns: 'grok-workflow', matchedBy: 'uid', schemaMatches: true })
+  })
+
+  it('keeps the generated script clamps identical to HARD_LIMITS (single source)', () => {
+    // script.ts cannot import host code, so its defensive clamps mirror HARD_LIMITS
+    // by value. This assertion fails the suite when one side is edited alone.
+    expect(WORKFLOW_SCRIPT).toContain(`Math.min(${HARD_LIMITS.maxConcurrency},`)
+    expect(WORKFLOW_SCRIPT).toContain(`Math.min(${HARD_LIMITS.maxRetries},`)
+    expect(WORKFLOW_SCRIPT).toContain(`Math.min(${HARD_LIMITS.maxTasks},`)
+    expect(WORKFLOW_SCRIPT).toContain(`chainLength: ${HARD_LIMITS.chainLength},`)
   })
 
   it('degrades quietly on a runtime without a settings service', () => {

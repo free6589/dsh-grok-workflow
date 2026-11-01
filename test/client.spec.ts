@@ -174,7 +174,7 @@ describe('client settings page: bilingual copy (t42)', () => {
     const findings: Finding[] = [
       { key: 'error.number', params: { key: 'maxConcurrency', min: 1, max: 6 } },
       { key: 'error.presetNeeded' },
-      { key: 'error.chainTooLong', params: { role: 'worker', limit: 3 } },
+      { key: 'error.chainTooLong', params: { role: 'worker', limit: 50 } },
       { key: 'error.missingModel', params: { role: 'planner', index: 2 } },
       { key: 'error.tooLong', params: { role: 'verifier', index: 1, limit: 120 } },
       { key: 'error.duplicate', params: { role: 'synthesizer', index: 3 } },
@@ -193,17 +193,17 @@ describe('client settings page: bilingual copy (t42)', () => {
 
   it('renders role ids as localized names and interpolates every parameter', () => {
     const finding: Finding = { key: 'error.chainTooLong', params: { role: 'worker', limit: bundle.GROK_WORKFLOW_CHAIN_LIMIT } }
-    expect(formatError(finding, zh)).toBe('执行者 备用链最多 3 条')
-    expect(formatError(finding, en)).toBe('worker may have at most 3 routes')
-    expect(formatError({ key: 'error.number', params: { key: 'timeoutMs', min: 1000, max: 86400000 } }, en))
-      .toBe('timeoutMs must be an integer between 1000 and 86400000')
+    expect(formatError(finding, zh)).toBe('执行 备用链最多 50 条，删掉多余的。')
+    expect(formatError(finding, en)).toBe('Worker can keep at most 50 backup routes — remove the extras.')
+    expect(formatError({ key: 'error.number', params: { key: 'timeoutMs', min: 1000, max: 604800000 } }, en))
+      .toBe('timeoutMs must be a whole number between 1000 and 604800000 — fix the number and save again.')
   })
 
   it('falls back to English for an unknown locale and to the key for an unknown entry', () => {
     expect(translate('ja', 'action.save')).toBe('Save')
     expect(translate('en', 'no.such.key')).toBe('no.such.key')
     // An unknown placeholder stays literal, exactly like the locale plugin's own translate.
-    expect(translate('en', 'error.unknownClass', { other: 'x' })).toBe('switchOn does not accept {entry}')
+    expect(translate('en', 'error.unknownClass', { other: 'x' })).toBe('This switch does not accept {entry}.')
   })
 })
 
@@ -368,18 +368,18 @@ describe('client settings page: draft, validation and path ops', () => {
     expect(validate({ ...draftOf(undefined), gateScope: 'preset', gatePreset: 'standard' })).toEqual([])
   })
 
-  it('bounds a chain at three routes and names the offending entry', () => {
+  it('bounds a chain at fifty routes and names the offending entry', () => {
     const draft = draftOf(undefined)
-    draft.roles.worker = [1, 2, 3, 4].map(index => ({ provider: 'p', model: `m${index}` }))
+    draft.roles.worker = Array.from({ length: 51 }, (_unused, index) => ({ provider: 'p', model: `m${index}` }))
     const tooLong = validate(draft)
     expect(tooLong.some(finding => finding.key === 'error.chainTooLong' && finding.params?.['role'] === 'worker')).toBe(true)
-    expect(messagesIn(tooLong, en).some(text => text.includes('worker') && text.includes('3'))).toBe(true)
+    expect(messagesIn(tooLong, en).some(text => /worker/i.test(text) && text.includes('50'))).toBe(true)
 
     const missing = draftOf(undefined)
     missing.roles.verifier = [{ provider: 'p', model: 'm' }, { provider: 'p', model: '  ' }]
     const findings = validate(missing)
     expect(findings).toEqual([{ key: 'error.missingModel', params: { role: 'verifier', index: 2 } }])
-    expect(formatError(findings[0]!, zh)).toBe('验证者 第 2 条缺少 model')
+    expect(formatError(findings[0]!, zh)).toBe('检查 第 2 条没有模型，选一个或删掉这一行。')
   })
 
   it('treats two blank routes as unfinished rows, not duplicates (t32 regression)', () => {
