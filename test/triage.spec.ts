@@ -5,7 +5,7 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { apply } from '../src/index.js'
 import {
   askLine, chatBucket, chatReply, classifyTriage, detectLanguage, greetingLine, resolvePending,
-  singleCallPrompt, tierNote, triageLine, triageSignals, TRIAGE_LIMITS,
+  singleCallPrompt, tierNote, triageLine, triageSignals, TRIAGE_LIMITS, resumedRequest, expiredAskNote, unusedAskNote,
 } from '../src/triage.js'
 import { callerTask, execution, task, verification } from './fixtures.js'
 import {runWorkflowScript, roleOf} from './helpers.js'
@@ -504,5 +504,37 @@ describe('t52 front desk: each tier behaves as promised', () => {
     expect(text).not.toContain('档位：')
     expect(text).not.toContain('团队开工中')
     expect(text).toContain('Grok workflow:')
+  })
+})
+
+describe('P0-2: a confirmation answer is not a task', () => {
+  const fast = classifyTriage({ text: '简单', mode: 'triage', ask: true, pending: true })
+  const team = classifyTriage({ text: '团队', mode: 'triage', ask: true, pending: true })
+
+  it('resumes the original request and names the choice in the worker text', () => {
+    const text = resumedRequest(fast, '改一下那个', '简单')
+    expect(text).toContain('改一下那个')
+    expect(text).toContain('用户选择简单模式')
+    expect(text).toContain('不是新的任务目标')
+    // The choice word never stands alone as the request.
+    expect(text.trim()).not.toBe('简单')
+  })
+
+  it('resumes the original request for the team tier too, in the message language', () => {
+    expect(resumedRequest(team, '改一下那个', '团队')).toContain('用户选择团队模式')
+    const english = resumedRequest(
+      classifyTriage({ text: 'team', mode: 'triage', ask: true, pending: true }),
+      'change that thing',
+      'team',
+    )
+    expect(english).toContain('change that thing')
+    expect(english).toContain('the user chose the team mode')
+  })
+
+  it('states an expired or void question instead of guessing the task', () => {
+    expect(expiredAskNote('zh')).toContain('过期')
+    expect(expiredAskNote('zh')).toContain('重新描述')
+    expect(unusedAskNote('zh')).toContain('作废')
+    expect(expiredAskNote('en')).toContain('expired')
   })
 })

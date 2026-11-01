@@ -138,6 +138,7 @@ export interface RunOutcome {
  * @returns the language the panel should render in.
  */
 export declare function progressNamingLanguage(ctx: Context): NamingLanguage;
+export declare function keepCancelledWork(value: unknown, objective: string, config: ResolvedConfig, phase: string, message: string): WorkflowReport | undefined;
 export declare function runWorkflow(options: RunWorkflowOptions): Promise<RunOutcome>;
 /**
  * One child call, no plan, no verifier: the answer a chat or fast tier spends.

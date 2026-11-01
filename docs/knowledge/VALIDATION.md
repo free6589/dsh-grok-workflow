@@ -1115,3 +1115,39 @@ Round 11 已经证明的"档位行照常出现"）：
 
 验证方式：`npm run ci` = typecheck + oxlint（0/0）+ build + **22 文件 / 366 例**。本轮**规则级验证**，
 无真机样本。
+
+### Round 12 (Issue #22 Phase 1) — 对话可靠性：源码级证据与结论
+
+本节只记录 Phase 1（P0-1…P0-4）的实测证据。分支 `fix/phase1-dialogue-reliability`，基准为
+`origin/main` = `3584ef1ec24cb487fed79943a687ca06fe3fccfd`（实施时 `git ls-remote origin main` 实测）。
+DSH 安装：`/home/fish/.local/share/mise/installs/node/26.8.1/lib/node_modules/@deepseek-ai/dsh/`
+（`package.json` 版本 `0.2.1-rc.2`）。
+
+#### R12-1 `agent/pre-step` 与 `enter.messages` 的真实语义（P0-1 根因）
+
+| 位置 | 结论 |
+|---|---|
+| `node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:902-921` `async preStep(target, position)` | 第 906 行 `const claimed = this.inbox.claim(target, position.turn)` 把本轮消息**从 inbox 取出**；第 909 行开始 waterfall，默认 `next()` 在第 918 行返回 `{kind:'enter', messages:[...claimed, context]}` |
+| `node_modules/@deepseek-ai/dsh-agent-loop/lib/index.js:1066-1073` `async step(decision)` | 真正写 session 的是这里：对 `decision.messages` 逐条 `session.append("user/message", message, {surfaceOp:"append"})`（`runtime-context` 除外）。**`enter.messages` 是这一批消息唯一的提交点** |
+| `node_modules/@deepseek-ai/dsh-agent/lib/types/runtime-types.d.ts:294-297` | 类型定义原文：`Reject a proposed step or replace the messages that enter it. Calling next() preserves the current messages.` / `payload.messages - messages removed from the inbox for this step.` |
+| `dsh-agent-loop/lib/index.js:921` | waterfall 之后立刻 `signal.throwIfAborted()`：**已经 abort 的回合会丢弃 enter 决策**，所以取消时返回 `notice` 没有意义，只能 `reject` 让宿主把回合标成 interrupted |
+
+结论：`preStep` 已经 `claim` 走的消息，只有 `enter.messages` 能把它写进 transcript；
+只把报告放进 `enter.messages` 等于**删掉用户原话**。而 `enter.messages` 与
+`session.append('user/message', …)` **不能同时用**——同一个对象会被写两次（一次在 `step()`，
+一次在插件），所以：
+
+- `in-turn`：把被 claim 的消息放回 `enter.messages`，报告追加在它后面（唯一写入者是 loop）；
+- `relay` / `append`：整步 `reject`，没有任何东西会提交这一批，插件才自己 `session.append` 那一条。
+
+#### R12-2 测试与回归
+
+| 检查 | 结果 |
+|---|---|
+| 既有测试的语义调整 | `test/gate.spec.ts` 3 处：分类失败由 `reject` 改为带原因的 `enter`（P0-3）；`append` 策略现在会多一条「用户原话」写入（P0-1）；in-turn 断言从 `messages[0]` 改为「首条是原话、末条是答复」 |
+| 新增 | `test/phase1-dialogue.spec.ts`（25 例，P0-1…P0-4，含重放/重开、TTL、串线、重复消费、脱敏、取消终态）与 `test/triage.spec.ts` 的 P0-2 纯函数组（3 例） |
+
+#### R12-3 未包含（NOT_RUN / BLOCKED）
+
+- 真实 DSH GUI（`:3090` 或新实例）截图：见 PR 描述中的 NOT_RUN/BLOCKED 说明。
+- 真实模型调用（`npm run test:e2e`）：本轮未执行，单元/集成证据不替代它。

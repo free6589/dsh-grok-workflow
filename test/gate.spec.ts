@@ -612,9 +612,17 @@ describe('mandatory entry gate', () => {
     }
     const agent = new FakeAgent({ session: exploding })
     const next = passingNext([])
-    const decision = await ctx.preStep()(payload(agent, [userMessage('boom')]), next)
-    expect(decision).toEqual({ kind: 'reject' })
+    const decision = await ctx.preStep()(payload(agent, [userMessage('boom')]), next) as {
+      kind: string
+      messages?: UserMessage[]
+    }
+    // P0-3: a classification fault used to be a silent `reject`, which a user reads
+    // as an empty turn. It is now a stated notice, with the user's own message kept.
     expect(next).not.toHaveBeenCalled()
+    expect(decision.kind).toBe('enter')
+    expect(textOf(decision.messages![0]!)).toBe('boom')
+    expect(answerOf(decision)).toContain('records unavailable')
+    expect(answerOf(decision)).toContain('no workflow result exists')
     expect(ctx.warnings.some(warning => warning.includes('gate classification failed'))).toBe(true)
   })
 
@@ -648,7 +656,13 @@ describe('mandatory entry gate', () => {
     const types = session.appends.map(append => append.type)
     // The run's progress events share the log with its messages (t44): the panel
     // needs them, and they are appended while the run is live, not after it.
-    expect(types.filter(type => !type.startsWith('tool-workflow/'))).toEqual(['user/message', 'assistant/message'])
+    // P0-1: the claimed message is committed by the plugin for `append`, so the log
+    // holds the user's own words, then the report, then the plugin's answer.
+    expect(types.filter(type => !type.startsWith('tool-workflow/'))).toEqual(['user/message', 'user/message', 'assistant/message'])
+    // A `user/message` event carries the message itself (the same shape the loop
+    // writes), so the first one is the user's request, verbatim.
+    const original = session.appends.find(append => append.type === 'user/message')!.data as { content: { text?: string }[] }
+    expect(original.content[0]?.text).toBe('append please')
     expect(types).toContain('tool-workflow/run-start')
     expect(types).toContain('tool-workflow/run-end')
     expect(agent.followups).toHaveLength(0)
@@ -668,8 +682,9 @@ describe('mandatory entry gate', () => {
     await ctx.preStep()(payload(agent, [userMessage('append durably')]), passingNext([]))
     await waitFor(() => session.deriveMessages().some(message => message.role === 'assistant'))
     const derived = session.deriveMessages()
-    expect(derived.map(message => message.role)).toEqual(['user', 'assistant'])
-    expect(JSON.stringify(derived[0]!.content)).toContain('workflow')
+    // P0-1: original request, then the report as a user message and its answer.
+    expect(derived.map(message => message.role)).toEqual(['user', 'user', 'assistant'])
+    expect(JSON.stringify(derived[0]!.content)).toContain('append durably')
     expect(JSON.stringify(derived[1]!.content)).toContain('COMPLETED')
     expect(agent.followups).toHaveLength(0)
   })
@@ -705,6 +720,18 @@ describe('mandatory entry gate', () => {
     expect(() => applyWith(ctx, { gateScope: 'preset' })).toThrow(/gatePreset/)
   })
 })
+
+/**
+ * Text of the answer the gate entered.
+ *
+ * P0-1: since the in-turn decision carries the claimed user message *and* the
+ * answer, the answer is the last message, never `messages[0]`.
+ */
+function answerOf(decision: { messages?: UserMessage[] }): string {
+  const messages = decision.messages ?? []
+  expect(messages.length).toBeGreaterThan(0)
+  return textOf(messages[messages.length - 1]!)
+}
 
 /** Concatenated text of one message. */
 function textOf(message: UserMessage): string {
@@ -753,7 +780,9 @@ describe('in-turn delivery (default strategy)', () => {
 
     const decision = await pending as { kind: string; messages: UserMessage[] }
     expect(decision.kind).toBe('enter')
-    const text = textOf(decision.messages[0]!)
+    // P0-1: the claimed message comes first, unchanged; the answer is entered after it.
+    expect(textOf(decision.messages[0]!)).toBe('run the workflow')
+    const text = answerOf(decision)
     expect(text).toContain(REPORT_BEGIN)
     expect(text).toContain('Grok workflow: COMPLETED')
     expect(text).toContain(REPORT_END)
@@ -772,7 +801,8 @@ describe('in-turn delivery (default strategy)', () => {
     ctx.engine.runs[0]!.fail('error', 'engine exploded')
     const decision = await pending as { kind: string; messages: UserMessage[] }
     expect(decision.kind).toBe('enter')
-    const text = textOf(decision.messages[0]!)
+    expect(textOf(decision.messages[0]!)).toBe('run the workflow')
+    const text = answerOf(decision)
     expect(text).toContain('could not complete the workflow')
     expect(text).toContain('engine exploded')
     expect(agent.followups).toHaveLength(0)
@@ -791,7 +821,8 @@ describe('in-turn delivery (default strategy)', () => {
       messages: UserMessage[]
     }
     expect(decision.kind).toBe('enter')
-    const text = textOf(decision.messages[0]!)
+    expect(textOf(decision.messages[0]!)).toBe('run the workflow')
+    const text = answerOf(decision)
     expect(text).toContain('no workflow result exists')
     expect(text).toContain('2 active run(s)')
     expect(agent.followups).toHaveLength(0)
@@ -806,7 +837,9 @@ describe('in-turn delivery (default strategy)', () => {
       messages: UserMessage[]
     }
     expect(decision.kind).toBe('enter')
-    expect(textOf(decision.messages[0]!)).toContain('32000-character workflow objective limit')
+    // main raised the limit to 32000 chars (PR #25); P0-1 makes the notice the
+    // *last* message because the claimed user message now comes first.
+    expect(answerOf(decision)).toContain('32000-character workflow objective limit')
     expect(ctx.engine.startCalls).toHaveLength(0)
   })
 
@@ -848,7 +881,7 @@ describe('in-turn delivery (default strategy)', () => {
       messages: UserMessage[]
     }
     expect(decision.kind).toBe('enter')
-    const text = textOf(decision.messages[0]!)
+    const text = answerOf(decision)
     expect(text).toContain('deadline')
     expect(ctx.engine.runs[0]!.cancel).toHaveBeenCalled()
   })
@@ -866,7 +899,7 @@ describe('in-turn delivery (default strategy)', () => {
     // is a workflow outcome, not a turn abort. What matters is that it settles
     // instead of hanging, and that the run was cancelled.
     expect(decision.kind).toBe('enter')
-    expect(textOf(decision.messages![0]!)).toContain('cancelled')
+    expect(answerOf(decision as { messages?: UserMessage[] })).toContain('cancelled')
     expect(ctx.engine.runs[0]!.cancel).toHaveBeenCalled()
   })
 
