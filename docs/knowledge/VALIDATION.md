@@ -1268,3 +1268,125 @@ node `26.8.1`，模型 `bifrost-completions / wb/cn:deepseek-v4.1-flash`（凭�
   WebSocket（`/api/remote.mux`）的 Typert Remote 协议，本轮未手搓 RPC；命令行为由
   `test/command.spec.ts`（真 cordis + 真 commands 服务 + 真 Session，11 例）覆盖，**GUI 交互未验**。
 - **设置页卡片在浏览器中的渲染**：未开浏览器，未验。
+
+## Round 15 (t57) — 真 Web GUI：`/grok` 可切 + 设置页卡片渲染（隔离实例，PASS）
+
+`CONFIRMED` — 在 `origin/main` `6806426` 上新建的一次性隔离实例里，用真 Chromium 驱动真 Web GUI，
+把 Round 14 §5 留下的两项 `NOT_RUN` 跑完了：`/grok` 在 GUI 里可切（默认普通聊天 → `/grok` 全流程 →
+`/grok off` 回普通聊天），设置页 `Grok workflow` 卡片可渲染、可保存、可持久化、并对**新会话**生效。
+本轮**未改任何源码**（`src/` `lib/` `test/` 的 diff 为空）。
+
+证据（只读，全部在本机 `.workflow-artifacts/gui-verify/` 下，未入库）：
+
+- `README.md` — 隔离证明、模型偏离、逐步结论（本轮的原始记录）。
+- `shots/` — 20 张 PNG（`A1`/`A2`、`B1`–`B4`、`C1`–`C4`、`D1`–`D5`、`E1`、`recon-*`/`probe-*`）。
+- `logs/` — `dumpconfig-step1.txt`、`dumpconfig-step2.txt`、`plugin-add.txt`、`stepB2.log`、`stepC.log`、
+  `stepD.log`、`stepD-recon.log`、`stepE.log`、`patch-before-settings.md5`。
+- `scripts/` — 产出上述证据的 Playwright 脚本（`lib.cjs`、`stepA.cjs`、`stepB2.cjs`、`stepC.cjs`、
+  `stepD.cjs`、`stepE-default-on.cjs`）。
+- `dsh-home/` — 一次性实例的 home（sessions、patch 层、node_modules）。
+
+### 0. 隔离边界（D-013：不碰在跑的服务）
+
+| 项 | 值 |
+| --- | --- |
+| `DSH_HOME` | `.workflow-artifacts/gui-verify/dsh-home`（本轮新建） |
+| Profile | `gw-gui`，由 `--from-default-profile web` 生成（stock 模板，未复用任何既有测试 home） |
+| 会话工作区 | `.workflow-artifacts/gui-verify/work`（UI 侧栏名 `gw-gui-verify-work`，每张截图可见） |
+| 实例端口 | `127.0.0.1:3199`（起前确认空闲；只杀自己的 PID） |
+| 在跑的 `:3090` | 全程在听，其 `profiles/web/cordis.patch.yml` mtime 保持 `19:00` 未变 |
+
+激活（D-014）：`cordis.patch.yml` 把 `workflow-ptc` 打开为 `disabled: false`，合成树确认该行生效
+（`logs/dumpconfig-step2.txt:337`），插件行为 `dsh-grok-workflow`（`:1257`）；启动行干净，无
+`pending (waiting for service: workflowEngine)`。
+
+### 1. 验证 1 —— `/grok` 在真 GUI 里可切（三步）
+
+同一实例、真 Chromium（Playwright `chromium-1248`）、真 Web GUI。
+
+| 步 | 配置 / 输入 | 结果 | 截图 / 日志 |
+| --- | --- | --- | --- |
+| (a) 默认态 | `grokDefault: off`，新会话 `session-baa80b7b…`，普通消息「用一句话说明什么是 HTTP 状态码 404。」 | **PASS**：`Completed in 12s`，一条直答，`1 turns 1 steps`；**无** `GROK-WORKFLOW-REPORT`、无档位行、无 subagent 徽标 | `shots/A1-default-empty-session.png`、`A2-default-plain-answer.png` |
+| (b) `/grok` | 新会话 `session-59bd9427…`，先 `/grok`，再「把 12、7、25 三个数字按升序排序…」 | **PASS**：GUI 渲染命令行 `grok — Grok workflow ON — every message now runs the full plan→execute→verify workflow.`；会话头出现 `3 subagents` 徽标；回答里是完整报告（`Grok workflow: COMPLETED`、`Plan: planner; 1 task(s); 1 verified`、`sort-average-123: verified (1 attempt)`、`Model routes: planner=inherit; worker=inherit; verifier=inherit; synthesizer=inherit`、`Deadline: 3600000 ms per run`）；`Completed in 1m 41s` | `shots/B1-command-menu.png`、`B2-command-submitted.png`、`B3-workflow-answer.png`、`B4-workflow-answer-top.png`、`logs/stepB2.log` |
+| (c) `/grok off` | **同一**会话，`/grok off`，再「用一句话解释什么是 JSON。」 | **PASS**：命令行 `grok — Grok workflow OFF — normal chat.`；下一条 `Completed in 11s`，直答，**无**报告、无 subagent | `shots/C1-reopened-session.png`（证明同一会话仍留着第 (b) 步的报告）、`C2`、`C3-command-off-done.png`、`C4-back-to-plain-chat.png`、`logs/stepC.log` |
+
+会话日志独立复核（本轮重跑，不只看 `README.md` 的自述）——`session.v4.jsonl.zstd` 解压后：
+
+```text
+session-59bd9427…: "command/run" name=grok args=" "        → command/done "…workflow ON…"
+                   plugin:grok-workflow/mode {"enabled":true,"setBy":"command:/grok","workflowMode":"full"}
+                   "command/run" name=grok args=" off"     → command/done "…workflow OFF…"
+                   plugin:grok-workflow/mode {"enabled":false,"setBy":"command:/grok off"}
+                   GROK-WORKFLOW-REPORT 出现 2 次；assistant/message 2 条；name=grok_workflow 1 次
+session-baa80b7b…: GROK-WORKFLOW-REPORT 0 次；plugin:grok-workflow/mode 0 次（纯普通聊天）
+```
+
+这条与 Round 14 的 BUG-59-2 修复对应：`/grok` 写入 `workflowMode: 'full'`，所以在部署默认
+`mode: triage` 下也走完整流程，而不是被前台分诊截走。
+
+### 2. 验证 2 —— 设置页卡片渲染、保存、持久化、生效
+
+Plugins 页 → `Grok workflow` 卡片存在（副标题 "A mandatory workflow for every message: entry gate,
+per-role model chains, concurrency and run records"），安装的 bundle 名为 `dsh-grok-workflow`
+（`shots/D1-plugins-page.png`）。打开卡片渲染出插件自己的页面，`Grok mode default` / `grokDefault`
+是一个活的 `off | on` 选择器（`shots/D2-grok-card-open.png`）。
+
+| 步 | revision | `grokDefault` | 保存按钮 | 截图 |
+| --- | --- | --- | --- | --- |
+| 打开 | `0` | `off` | `Save` | `D2-grok-card-open.png` |
+| 改为 `on` | `0` | `on` | `Save (1)` | `D3-grok-default-on-edited.png` |
+| 点保存 | **`1`** | `on` | `Save` | `D4-grok-default-saved.png` |
+| 整页刷新 | **`1`** | `on` | `Save` | `D5-grok-default-after-reload.png` |
+
+落盘证据：保存向 profile 的 `cordis.patch.yml` 写入新行，文件 md5
+**`d7830129b011b732dfa9bec4059f9ff4` → `1f628a0c984daa951aca818879f43a4e`**
+（`logs/patch-before-settings.md5` 存的是改前值；改后值本轮用 `md5sum` 重新核对，与 `README.md` 一致）：
+
+```yaml
+- id: grok-workflow
+  name: dsh-grok-workflow
+  config:
+    grokDefault: on
+```
+
+保存的值是**功能性**的，不是装饰：保存后**新开**一个会话，不发 `/grok`，只说
+「把 3 和 4 相加，只回答结果。」——工作流自己跑了起来，回的是快手档报告（`1 subagent`、
+`Completed in 30s`、`档位：快手档 … （这条只派了一个工人，没有开完整团队。）`），
+即 `grokDefault: on` 对新会话生效（`shots/E1-default-on-plain-message.png`、`logs/stepE.log`）。
+
+### 3. NOT_RUN → CONFIRMED 的两项
+
+| Round 14 §5 的 NOT_RUN | 本轮结论 |
+| --- | --- |
+| 真 Web GUI 里的 `/grok`（当时只到 WebSocket/Typert Remote 协议边界） | **CONFIRMED**：§1 (a)(b)(c) 三步在真 GUI 上通过，命令事件、模式事件、报告文本三处独立可查 |
+| 设置页卡片在浏览器中的渲染 | **CONFIRMED**：§2 卡片渲染、编辑、保存（revision 0→1）、刷新后保持、新会话生效 |
+
+### 4. 五处环境偏离（必须如实标注，勿当成"标准环境"证据）
+
+1. **`DSH_HOME` 不在 `/tmp`**，在 `.workflow-artifacts/gui-verify/dsh-home`。原因：本沙箱 `/tmp` 是
+   每次 shell 调用重建的 tmpfs（两次探针复现：上一次写的 `/tmp/gw-probe2/stamp.txt` 下一次即
+   `No such file or directory`），`/var/tmp` 只读，常驻服务无法把 home 放那儿。该位置与任何既有测试
+   home、与在跑的 home 都隔离。
+2. **Profile 用 `web` 模板而非 `headless`**：Web GUI 需要 `@deepseek-ai/dsh-web-app`。仍是 stock 模板、
+   本轮新建、非复用测试 home。
+3. **浏览器是离屏（headless）Chromium**：本机无 X11 显示（无 `/tmp/.X11-unix`、无 `DISPLAY`），
+   headed 不可能。页面、DOM、CSS、截图、网络都是真应用；只有窗口是离屏的。
+4. **模型换成 `wb/cn:glm-5.3-flash`**：建议的 `bifrost-completions / wb/cn:deepseek-v4.1-flash`
+   在 2026-11-01 直探得 `HTTP 400 model_unavailable`（"model is unavailable on every account
+   (per-model cooldown)"），首个 GUI 轮次也复现为 `INVALID_REQUEST`。同一 provider 下换活模型：
+   `wb/cn:glm-5.3-flash` 200 OK（本轮全部轮次用它）；`tokenrhythm/qwen3.8-flash` 502
+   `upstream_credentials_exhausted`、`wb/cn:kimi-k2.6` 403 `model_blocked`、
+   `freelane/deepseek-v4.1-flash-free` 429 免费额度用尽。凭据只经 `BIFROST_VIRTUAL_KEY` 环境变量
+   （`apiKeyEnv`），未落盘，任何工件里都没有 key 值。
+5. **Playwright 直驱模块，不用 `playwright-cli` daemon**：沙箱拒绝
+   `mkdir ~/.cache/ms-playwright/daemon`。
+
+### 5. 本轮不建立的东西（诚实边界）
+
+- **`relay` / `append` 在长驻 GUI 里的投递仍 `NOT_RUN`**（NR-1 的剩下半边）：本轮走的是默认
+  `in-turn` 投递，只证明"长驻 Web GUI 会话里 in-turn 投递能到达用户"，不证明另两条策略。
+- **质量断言仍受模型边界限制**：全部轮次是 `glm-5.3-flash`，不是 `deepseek-v4.1-flash`；
+  本轮没有跑质量矩阵（那需要多次运行与独立评分），所以不能据此扩大 `COMPLETED` 率的结论。
+- **只有一个浏览器内核**（Chromium），没有 Safari/Firefox 证据；也没有移动端证据。
+- **证据不入库**：`.workflow-artifacts/` 未提交，`shots/`、`logs/`、`dsh-home/` 只存在于本机；
+  本文件只给出路径与关键文本，便于复跑时对照。

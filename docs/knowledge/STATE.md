@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-10-28 (local)
+Last updated: 2026-11-01 (local)
 
 ## Repository
 
@@ -20,33 +20,52 @@ Last updated: 2026-10-28 (local)
 
 ## Current phase
 
-`0.2.2` release preparation (phase 8). `0.2.0` and `0.2.1` **are published** (`v0.2.0` on
-`f7a244c`, GitHub Release 2026-10-26T17:10:16Z; `v0.2.1` on `cecc065`). `0.2.2` is the increment
-on top of `v0.2.1`: the plugin-enforced deadline, model routes in every report, the per-session
-run cap, the unload diagnose record, and the verifier-decision fix. The version is bumped in
-`package.json`/`package-lock.json`, `CHANGELOG.md` carries `## [0.2.2] - 2026-10-28`, and both
-READMEs point at `#v0.2.2`; **the tag and the GitHub Release are created by the captain after the
-acceptance pass**, so this file must not claim `0.2.2` as published.
+`0.2.4` preparation (phase 9). Base of this state: **`origin/main` = `6806426`**.
+
+`v0.2.3` **is released** (tag `538d1ab`, Release green, asset sha256 `65fd720c…`), after `v0.2.2`
+(2026-10-28), `v0.2.1` (`cecc065`) and `v0.2.0` (`f7a244c`). `0.2.4` is **not** prepared in the tree
+yet: `package.json` still reads `0.2.3`, `CHANGELOG.md` carries a fresh `[Unreleased]` section, and
+no `v0.2.4` tag exists — so this file must not describe `0.2.4` as bumped, tagged or published. The
+tag and the GitHub Release are created by the captain after the acceptance pass.
+
+Merged into `main` since `v0.2.3` (each `CONFIRMED` in `git log`):
+
+| PR | Merge commit | What it landed |
+| --- | --- | --- |
+| #25 | `54083ea` | the 32,000-character objective limit |
+| #24 | `334daf6` | task-grouped progress panel (per-task groups, locale-following copy) |
+| #23 | `2e9c26a` | Phase 1 dialogue reliability (P0) |
+| #26 | `a000983` | segmented planner-failure fallback (`src/shards.ts`); review close-out is Round 13 |
+| #27 | `6806426` | `/grok` session switch (mode/command/gate, D-028/D-029) |
+
+So the `0.2.4` cut has to carry the `/grok` switch, the task-grouped progress panel, the
+32,000-character objective limit and the segmented fallback — all four are on `main`, none is
+tagged.
 
 Authoritative numbers for this state (measured, not planned):
 
-- `npm run ci` — typecheck, lint (0 warnings / 0 errors), build, **336 tests / 21 files**.
-- `lib/` rebuilt and reproducible; the test instance's installed `lib/*.js` md5s equal the repo's
-  build byte for byte (t47 `instance-facts.txt`, re-checked in t49).
-- Real-instance evidence: `docs/knowledge/evidence/t42` (settings page, EN/ZH), `t44` (in-tree run
-  records), `t45` (unload diagnosis, per-session caps), `t46` (7-item matrix on a second
-  instance), `t47` (deadline/route/notice closure), `t49` (quality-failure root cause).
-- **Quality claims are bounded by measurement**: before 0.2.2's verifier-decision fix, the test
-  home produced 1 `COMPLETED` in 12 reports (8 failed for that defect, 3 were deliberate probe
-  kills). See `VALIDATION.md` Round 8; do not describe the workflow as "accepting" work it has
-  not accepted.
+- `npm run ci` — last full run was on the PR #26 branch (Round 13, `68f3d15`): **27 files / 487
+  tests**, exit 0, oxlint 1 pre-existing warning (`src/redact.ts:155`). **`npm run ci` on `main`
+  `6806426` is `NOT_RUN`** — do not quote 487 as a `main` number until someone runs it there.
+- `lib/` reproducible: `npm run build && git diff --exit-code -- lib/` = exit 0 on that branch
+  (Round 13).
+- Real-instance evidence, newest first: `VALIDATION.md` Round 15 (real Web GUI on `6806426`:
+  `/grok` switch + settings card, isolated instance), Round 14 (real-model E2E, two bugs + fixes),
+  Round 13 (PR #26 close-out); `docs/knowledge/evidence/t42`…`t49` cover the 0.2.2 era.
+- **Quality claims are bounded by measurement**: Round 8's 1 `COMPLETED` in 12 reports was the
+  verifier-decision defect (fixed in 0.2.2), and Round 15's GUI round ran `glm-5.3-flash`, not
+  `deepseek-v4.1-flash`. Neither result may be generalised into "the workflow accepts what it did
+  not accept", nor into a per-model quality claim.
 
 ## Where the open questions live
 
-- `docs/knowledge/VALIDATION.md` — Rounds 1–8. Round 6 row (g) is annotated: stability 5/5,
+- `docs/knowledge/VALIDATION.md` — Rounds 1–15. Round 6 row (g) is annotated: stability 5/5,
   accepted results 0/5, root cause fixed in 0.2.2. Round 7 closed the notice/route/deadline
   questions; Round 8 answers the quality question and records the operational caveat that the
-  Plugins-page switch — not `cordis.patch.yml` — is what says whether the gate is armed.
+  Plugins-page switch — not `cordis.patch.yml` — is what says whether the gate is armed. Round 13
+  closed the PR #26 review, Round 14 the real-model E2E, and **Round 15 the two GUI checks that had
+  been `NOT_RUN` since Round 14** (`/grok` switchable in the real GUI, settings card rendering and
+  saving).
 - `docs/knowledge/DECISIONS.md` — D-016…D-019 (per-session caps, 60-minute default, plugin-owned
   deadline, notice downgrade). D-020 covers the verifier-decision rule.
 - Deferred to 0.2.3: rendering a plugin-authored chat row (needs a DSH-side API), see D-019.
@@ -55,10 +74,10 @@ Authoritative numbers for this state (measured, not planned):
 
 | Area | State |
 |---|---|
-| Mandatory entry (gate on `agent/pre-step`) | implemented and the default (`enforceGate: true`); one-shot delivery measured (E-38/E-41), GUI long-lived half NOT_RUN (NR-1) |
+| Mandatory entry (gate on `agent/pre-step`) | implemented and the default (`enforceGate: true`); one-shot delivery measured (E-38/E-41); **long-lived GUI half measured in Round 15 for `in-turn`** (real Web GUI, gate claims the message, report rendered in the same turn) — `relay`/`append` in a long-lived GUI remain NOT_RUN (NR-1) |
 | Per-role model routing + ordered chains | implemented (L1 in the generated script, U-2); real-provider switching NOT_RUN (NR-6) |
 | Failure taxonomy (class + category) | implemented, rendered in the answer; real provider texts NOT_RUN (NR-5) |
-| Settings surface (live values, validation) | implemented; the generated page is identified by the runtime, a live GUI edit is NOT_RUN (NR-7/NR-8) |
+| Settings surface (live values, validation) | implemented; the generated page is identified by the runtime; **a live GUI edit is measured — t32 for the 21-key page, and Round 15 re-measured it on `6806426`** (card renders, `grokDefault` `off`→`on`, revision 0→1, survives reload, applies to a new session) — NR-7/NR-8 |
 | Write-path isolation (U-4) | implemented (`src/paths.ts` + `mapLimitIsolated`); planner fill-rate NOT_RUN (NR-9) |
 | Reliability and safety set | implemented (cancellation, deadline, concurrency, duplicates, recursion, context bounds, redaction, partial, unload/reload) |
 
@@ -83,9 +102,14 @@ Authoritative numbers for this state (measured, not planned):
 ## Remaining / optional
 
 - A clean-DSH-profile install check in CI (currently a local scripted smoke).
-- The GUI half of the delivery measurements (NR-1), the stock form rendering of
-  `roles` (NR-7) and an in-place settings `update()` against a holder (NR-8) all
-  need a Web GUI with this plugin loaded.
+- **NR-1, NR-7 and NR-8 are no longer open GUI questions** — Round 15 measured all three on a real
+  Web GUI against `6806426` (isolated instance `127.0.0.1:3199`, real Chromium). What remains, and
+  what must be stated with the result: the browser was **offscreen (headless) Chromium** because the
+  host has no X11 display, and the model was **`wb/cn:glm-5.3-flash`** because the suggested
+  `wb/cn:deepseek-v4.1-flash` answered `400 model_unavailable` (per-model cooldown) that day. So the
+  GUI halves are verified for `in-turn` delivery and for the plugin settings card; **`relay` /
+  `append` delivery in a long-lived GUI session is still NOT_RUN**, and no per-model quality claim
+  follows from this round.
 - L2 host-level routing (registering `agent/request-error` consumers) stays out
   of scope for `0.2.0` by decision U-2.
 - Client-side chain editor (settings UI with model dropdowns) is Phase 9 / U-6.
@@ -96,12 +120,17 @@ None.
 
 ## Next priority
 
-`v0.2.3` is **released** (tag on `538d1ab`, Release green, asset sha256 `65fd720c…`). The next release
-starts from a fresh `[Unreleased]` section; keep this file and the changelog synchronized with `main`. t56 closed the last three classifier gaps (trailing 几, 顿号
-lists, `并+回滚`, plus two live-found English/pointer misjudgements), so `0.2.3` is feature-complete
-for the front desk; the only open item is the release itself. Any future live matrix must follow
-[docs/knowledge/TESTING.md](TESTING.md) (isolated `/tmp` workspace, one turn at a time). `v0.2.0` was released on 2026-10-26, `v0.2.1` on
-2026-10-27 and `v0.2.2` on 2026-10-28; no tag ever moves.
+**Next release to prepare: `0.2.4`.** `v0.2.3` is **released** (tag on `538d1ab`, Release green,
+asset sha256 `65fd720c…`) and `main` is at `6806426` with PR #23, #24, #25, #26 and #27 merged
+(see Current phase). The two GUI checks that blocked the acceptance narrative are now `CONFIRMED`
+(Round 15), so the remaining work for `0.2.4` is the ordinary release path, not more verification:
+run `npm run ci` on `main`, confirm `lib/` matches a fresh build, move the `[Unreleased]` entries
+under `## [0.2.4]`, bump `package.json`/`package-lock.json` together, then let the captain create
+the tag and the Release (no tag ever moves; `0.2.4` must not be described as published before that).
+
+Any future live matrix must follow [docs/knowledge/TESTING.md](TESTING.md) (isolated workspace, one
+turn at a time; Round 15's isolation proof is in `.workflow-artifacts/gui-verify/README.md`).
+`v0.2.0` was released on 2026-10-26, `v0.2.1` on 2026-10-27, `v0.2.2` and `v0.2.3` on 2026-10-28.
 
 ## Homepage redesign — merged
 

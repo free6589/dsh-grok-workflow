@@ -1,5 +1,48 @@
 # Agent Handoff
 
+## 2026-11-01 — real Web GUI verified: `/grok` switch + settings card (memory only)
+
+- **From:** local (gui-verify-memory) · **To:** lead / captain / next local agent
+- **Base commit:** `6806426` (`origin/main`, PR #27 merge — the tree this verification ran against)
+- **Work commit:** the docs-only commit carrying this section on `docs/gui-verify-memory`. No
+  `src/`, `lib/` or `test/` file changed (`git diff --stat 6806426 HEAD -- src lib test` is empty);
+  this branch exists only to record the result.
+- **What is now `CONFIRMED`** (previously `NOT_RUN` since Round 14 §5): on an isolated instance
+  (`DSH_HOME=.workflow-artifacts/gui-verify/dsh-home`, profile `gw-gui` from the stock `web`
+  template, `127.0.0.1:3199`, real Chromium, live `:3090` untouched):
+  1. **`/grok` is switchable in the real GUI** — default `off` gives a plain answer with no report;
+     `/grok` gives the command row, the `3 subagents` badge and a full `GROK-WORKFLOW-REPORT`
+     (`COMPLETED`, 1 verified, model routes, 3600000 ms deadline) in 1m41s; `/grok off` in the same
+     session returns to plain chat in 11s. Command events, `plugin:grok-workflow/mode` events and
+     the report text were each re-read from `session.v4.jsonl.zstd` this round.
+  2. **The settings card renders and saves** — Plugins → `Grok workflow` card → generated page with
+     `Grok mode default` / `grokDefault` `off | on`; edit → `Save (1)` → save takes `revision 0` to
+     `revision 1`; a full page reload keeps `revision 1` / `on`; the write lands in the profile's
+     `cordis.patch.yml` (md5 `d7830129…` → `1f628a0c…`) as `grokDefault: on`; and a **new** session
+     with no `/grok` runs the workflow (fast lane, 1 subagent, 30s), so the value is functional.
+- **Boundaries to repeat whenever this result is quoted:** the browser was **offscreen (headless)
+  Chromium** (no X11 display on this host) and the model was **`wb/cn:glm-5.3-flash`** because the
+  suggested `wb/cn:deepseek-v4.1-flash` returned `400 model_unavailable` (per-model cooldown) on
+  2026-11-01. Delivery verified is the default **`in-turn`**; `relay`/`append` in a long-lived GUI
+  session remain `NOT_RUN`. No quality/per-model claim follows. Five environment deviations are
+  listed in `VALIDATION.md` Round 15 §4.
+- **Evidence:** `.workflow-artifacts/gui-verify/README.md`, `shots/` (20 PNGs), `logs/`
+  (`stepB2.log`, `stepC.log`, `stepD.log`, `stepE.log`, `dumpconfig-step*.txt`,
+  `patch-before-settings.md5`), `scripts/` (the Playwright scripts). **These artifacts are not
+  committed** — `.workflow-artifacts/` is untracked; only the paths and the quoted text are in the
+  memory files.
+- **Tests run this round:** no source test suite was executed (docs-only change); the verification
+  evidence is the GUI run above. `npm run ci` on `main` `6806426` is still `NOT_RUN` — the last full
+  run (27 files / 487 tests) was on the PR #26 branch, see Round 13.
+- **Repository state:** `main` = `6806426` with PR **#23** (`2e9c26a`, Phase 1 dialogue reliability),
+  **#24** (`334daf6`, task-grouped progress panel), **#25** (`54083ea`, 32,000-char objective
+  limit), **#26** (`a000983`, segmented fallback) and **#27** (`6806426`, `/grok` switch) merged.
+  `v0.2.3` is released (tag `538d1ab`); `package.json` still reads `0.2.3`.
+- **Next action:** merge this docs branch, then prepare the **`0.2.4`** release from `main`
+  (`npm run ci` + `git diff --exit-code -- lib/` on `main`, move `[Unreleased]` under
+  `## [0.2.4]`, bump `package.json`/`package-lock.json` together). Do not tag, publish or restart
+  the running service without the captain.
+
 ## 2026-11-01 — PR #26 review close-out (three fallback findings)
 
 - **From:** local (pr26-closer) · **To:** lead / next local agent
