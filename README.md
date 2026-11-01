@@ -128,7 +128,7 @@ The workflow objective limit is **32,000 characters**, measured on the user mess
 | 4,001–32,000 characters | Accepted; the entire message is kept as the objective. At exactly 32,000 characters the `Current request:` label is dropped instead of trimming the message, and no conversation history is attached. |
 | 32,001 characters or more | Refused out loud with `the message is longer than the 32000-character workflow objective limit`; no run starts. |
 
-Other limits are unchanged: `historyChars` still defaults to `4000` (hard maximum `8000`), each task field (`objective`, `expectedOutput`, `context`) is still capped at `4000` characters (`taskTextChars`), and the aggregate serialized task budget stays at `48,000` characters. A larger objective therefore has to be decomposed into several tasks rather than widening one task.
+Other limits are unchanged: each task field (`objective`, `expectedOutput`, `context`) is still capped at `4000` characters (`taskTextChars`), and the aggregate serialized task budget stays at `48,000` characters. History and run bounds were relaxed for long jobs in `0.2.5`: `historyChars` defaults to `20000` (hard maximum `1000000`), `historyTurns` defaults to `12` (hard maximum `1000000`), `timeoutMs` may run up to 7 days, and each role chain holds up to `50` backup routes. A larger objective therefore has to be decomposed into several tasks rather than widening one task field.
 
 If planning fails, the fallback plan splits the whole objective into contiguous segments that each fit the 4,000-character task-text budget. Concatenating the segments reproduces the objective verbatim, so the fallback is **not** rejected a second time and no character is lost. The run reports `partial` with `planning.source: "fallback"` and the planner error.
 
@@ -202,9 +202,9 @@ Configuration belongs to the profile's `cordis.patch.yml` (or a `--patch` overla
 ```yaml
 - id: grok-workflow
   config:
-    maxConcurrency: 3
-    maxRetries: 1
-    maxTasks: 6
+    maxConcurrency: 4
+    maxRetries: 2
+    maxTasks: 12
 ```
 
 | Key | Default | Hard limit | Meaning |
@@ -218,16 +218,16 @@ Configuration belongs to the profile's `cordis.patch.yml` (or a `--patch` overla
 | `gateScope` | `process` | `process` \| `preset` | Which agents the gate claims |
 | `gatePreset` | `''` | string | Agent preset that owns the gate when `gateScope: preset` |
 | `answerStrategy` | `in-turn` | `in-turn` \| `relay` \| `append` | How the answer reaches the user |
-| `historyTurns` | `4` | `20` | Conversation turns included as context |
-| `historyChars` | `4000` | `8000` | Character budget for that context |
+| `historyTurns` | `12` | `1000000` | Conversation turns included as context |
+| `historyChars` | `20000` | `1000000` | Character budget for that context |
 | `maxQueuedMessages` | `4` | `8` | Waiting messages per agent before refusals start |
-| `maxConcurrency` | `3` | `6` | Child agents in flight per run |
-| `maxRetries` | `1` | `3` | Retries per task after the initial attempt |
-| `maxTasks` | `6` | `12` | Maximum caller or planner tasks |
-| `timeoutMs` | `1800000` | `86400000` | Overall run deadline |
+| `maxConcurrency` | `4` | `1000000` | Child agents in flight per run |
+| `maxRetries` | `2` | `10` | Retries per task after the initial attempt |
+| `maxTasks` | `12` | `100` | Maximum caller or planner tasks |
+| `timeoutMs` | `3600000` | `604800000` (7 days) | Overall run deadline |
 | `maxActiveRuns` | `2` | `4` | Concurrent `grok_workflow` runs per plugin instance |
 | `subagentProvider` | engine default | string | Optional subagent provider override |
-| `roles` | empty chains | ≤3 routes each | `{ planner, worker, verifier, synthesizer }` ordered chains |
+| `roles` | empty chains | ≤50 routes each | `{ planner, worker, verifier, synthesizer }` ordered chains |
 | `synthesis` | `deterministic` | `deterministic` \| `model` | Deterministic aggregation, or a model-written summary |
 | `switchOn` | `[]` (built-in) | whitelist | Failure classes that advance a role's chain |
 | `recordRuns` | `true` | boolean | Write the routing/delivery ledger into the session |
@@ -241,6 +241,8 @@ Unknown keys are **rejected** at load with the closest accepted key (`maxRetires
 Because the plugin exports its `Config`, DSH projects it into the standard settings surface automatically: the fields on that page are the fields this plugin reads — there is no second, decorative source of truth. Edits are live: an edit reaches the next message, and an invalid edit is refused with its reason while delivery keeps the last valid snapshot. Chains are validated against the providers the runtime actually has, so a model that does not exist is caught at load with the declared ids listed.
 
 What you will *not* find yet is a chain editor with model dropdowns; that needs a client-side module (tracked as U-6 / Phase 9). Until then the profile patch and the plain form are the two ways to edit the same values.
+
+Since `0.2.5` the page is novice-oriented and strictly single-locale: it renders only the language DSH is set to (no raw field keys, no mixed bilingual lines), shows a live one-line status under the intro, and groups the controls into "Mode", "Who does it", "Limits", a collapsed "More" and an "Advanced — leave alone" section. Role chains and the triage model use provider→model dropdowns fed by the runtime's declared models, falling back to free text when the runtime exposes no catalog.
 
 ### Disable and uninstall
 
