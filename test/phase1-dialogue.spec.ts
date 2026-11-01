@@ -16,6 +16,7 @@ import { Session, pluginRecordOf } from '@deepseek-ai/dsh-session'
 import { apply } from '../src/index.js'
 import { REPORT_BEGIN, REPORT_END } from '../src/answer.js'
 import { resolveConfig } from '../src/config.js'
+import { parseMemberLabel } from '../src/naming.js'
 import { DELIVERY_RECORD } from '../src/records.js'
 import { createActiveState, runWorkflow } from '../src/run.js'
 import { callerTask, execution, task, verification } from './fixtures.js'
@@ -73,9 +74,13 @@ class FakeEngine {
       const result = await runWorkflowScript(request.script, request.args as Record<string, unknown>, async (_prompt, options) => {
         // The front-desk single call (t52) returns a string answer.
         if (options.label === 'quick-worker') return 'quick answer'
-        if (options.label === 'grok-planner') return { tasks: [callerTask('a')] }
-        if (options.label.startsWith('grok-worker')) return execution('work done')
-        if (options.label.startsWith('grok-verifier')) return verification(task('a'))
+        // Roles are read back from the *user-visible* label (Issue #22 P1-1): the
+        // script no longer emits machine names like `grok-worker-t1-a2`, so the
+        // double must tell roles apart exactly the way the panel does.
+        const member = parseMemberLabel(options.label)
+        if (member?.role === 'planner') return { tasks: [callerTask('a')] }
+        if (member?.role === 'worker') return execution('work done')
+        if (member?.role === 'verifier') return verification(task('a'))
         throw new Error(`unexpected label ${options.label}`)
       })
       run.complete(result.report ?? result)
@@ -249,13 +254,16 @@ describe('P0-1: the user’s own message survives in the transcript', () => {
     apply(ctx as never, { mode: 'full' })
     const live = session('sess-p01-refusal')
     const agent = new FakeAgent(live)
-    const claimed = [userMessage('x'.repeat(20_000))]
+    // One character past the workflow objective limit (32000 since PR #25), which is
+    // the refusal this case needs; the length itself is not what is under test.
+    const tooLong = 'x'.repeat(32_001)
+    const claimed = [userMessage(tooLong)]
 
     const decision = await ctx.preStep()(payload(agent, claimed), nextWith(claimed)) as Decision
     commit(live, decision)
 
     expect(decision.kind).toBe('enter')
-    expect(textOf(decision.messages![0]!)).toBe('x'.repeat(20_000))
+    expect(textOf(decision.messages![0]!)).toBe(tooLong)
     expect(answerOf(decision)).toContain('workflow objective limit')
     expect(ctx.engine.startCalls).toHaveLength(0)
   })
