@@ -25,6 +25,7 @@ import type { WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
 import { Session } from '@deepseek-ai/dsh-session'
 import { resolveConfig } from '../src/config.js'
 import { apply } from '../src/index.js'
+import { parseMemberLabel } from '../src/naming.js'
 import { assertWorkflowReport } from '../src/report.js'
 import { WORKFLOW_SCRIPT } from '../src/script.js'
 import type { WorkflowReport } from '../src/types.js'
@@ -83,12 +84,18 @@ class FakeEngine {
     const planned = [task('a')]
     const scriptAgent: ScriptAgent = async (prompt, options) => {
       this.childCalls.push({ label: options.label, prompt })
-      if (options.label === 'grok-planner') {
+      // Roles are read back from the user-visible label: since the task-grouped
+      // progress panel (PR #24) the script emits `规划助手` / `执行` / `检查`
+      // instead of `grok-planner` / `grok-worker-*`, and this double was written
+      // against the machine names. `parseMemberLabel` is the plugin's own inverse
+      // of `memberLabel`, so the two cannot drift apart again.
+      const member = parseMemberLabel(options.label)
+      if (member?.role === 'planner') {
         if (this.planner === 'fail') throw new Error('planner unavailable')
         return { tasks: planned }
       }
-      if (options.label.startsWith('grok-worker-')) return execution('work done')
-      if (options.label.startsWith('grok-verifier-')) {
+      if (member?.role === 'worker') return execution('work done')
+      if (member?.role === 'verifier') {
         return this.planner === 'fail'
           ? verification(task('task-1', [FALLBACK_CRITERION]))
           : verification(planned[0]!)
@@ -337,8 +344,8 @@ describe('objective limit — planner-failure fallback path', () => {
       expect(report.tasks[0]!.objective).toBe(objective)
       // The whole objective reached the planner that failed, and the fallback
       // worker that replaced it.
-      expect(ctx.engine.childCalls.find(call => call.label === 'grok-planner')?.prompt.includes(objective)).toBe(true)
-      expect(ctx.engine.childCalls.find(call => call.label.startsWith('grok-worker-'))?.prompt.includes(objective)).toBe(true)
+      expect(ctx.engine.childCalls.find(call => parseMemberLabel(call.label)?.role === 'planner')?.prompt.includes(objective)).toBe(true)
+      expect(ctx.engine.childCalls.find(call => parseMemberLabel(call.label)?.role === 'worker')?.prompt.includes(objective)).toBe(true)
       // Host validation accepts a fallback report at this length.
       const config = resolveConfig({
         maxConcurrency: report.limits.maxConcurrency,
