@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolveConfig } from '../src/config.js'
+import { HARD_LIMITS, resolveConfig } from '../src/config.js'
 import { normalizeCallerTasks, TASK_LIMITS } from '../src/input.js'
 
 describe('caller task validation', () => {
@@ -147,9 +147,9 @@ describe('configuration limits', () => {
   it('applies safe defaults', () => {
     expect(resolveConfig()).toMatchObject({
       toolName: 'grok_workflow',
-      maxConcurrency: 3,
-      maxRetries: 1,
-      maxTasks: 6,
+      maxConcurrency: 4,
+      maxRetries: 2,
+      maxTasks: 12,
       // 60 minutes since t45 (P1-4): the 30-minute default killed two real
       // four-task runs at 30m00s / 30m01s.
       timeoutMs: 3_600_000,
@@ -159,9 +159,9 @@ describe('configuration limits', () => {
   })
 
   it('rejects values above the hard cap', () => {
-    expect(() => resolveConfig({ maxConcurrency: 7 })).toThrow(/maxConcurrency/)
-    expect(() => resolveConfig({ maxRetries: 4 })).toThrow(/maxRetries/)
-    expect(() => resolveConfig({ maxTasks: 13 })).toThrow(/maxTasks/)
+    expect(() => resolveConfig({ maxConcurrency: HARD_LIMITS.maxConcurrency + 1 })).toThrow(/maxConcurrency/)
+    expect(() => resolveConfig({ maxRetries: HARD_LIMITS.maxRetries + 1 })).toThrow(/maxRetries/)
+    expect(() => resolveConfig({ maxTasks: HARD_LIMITS.maxTasks + 1 })).toThrow(/maxTasks/)
     expect(() => resolveConfig({ toolName: 'Bad Name' })).toThrow(/toolName/)
   })
 })

@@ -1,7 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
-import { createConfigReader, describeResolvedConfig } from './config.js'
+import { HARD_LIMITS, createConfigReader, describeResolvedConfig } from './config.js'
 import { describeSurface, validateRoutes } from './settings.js'
 import { registerGrokCommand } from './command.js'
 import { installGate } from './gate.js'
@@ -163,7 +163,7 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
         text: renderReport(value as unknown as WorkflowReport),
       }],
     },
-    timeoutMs: Math.min(config.timeoutMs + 60_000, 86_400_000),
+    timeoutMs: Math.min(config.timeoutMs + 60_000, HARD_LIMITS.timeoutMs),
     isConcurrencySafe: () => false,
     async execute(args, exec: ToolRunContext) {
       // Read at execution time, not at registration: a settings edit applies to

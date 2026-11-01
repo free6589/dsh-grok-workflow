@@ -2,21 +2,21 @@ import z from '@deepseek-ai/schemastery';
 import type { GrokWorkflowConfig, ModelRoute, ResolvedConfig } from './types.js';
 /** Hard limits; user configuration can only tighten these. */
 export declare const HARD_LIMITS: {
-    readonly historyTurns: 20;
-    readonly historyChars: 8000;
+    readonly historyTurns: 1000000;
+    readonly historyChars: 1000000;
     readonly maxQueuedMessages: 8;
-    readonly maxConcurrency: 6;
-    readonly maxRetries: 3;
-    readonly maxTasks: 12;
+    readonly maxConcurrency: 1000000;
+    readonly maxRetries: 10;
+    readonly maxTasks: 100;
     readonly maxActiveRuns: 4;
     readonly maxActiveRunsTotal: 16;
-    readonly timeoutMs: 86400000;
+    readonly timeoutMs: 604800000;
     /** Maximum routes in one role's fallback chain. */
-    readonly chainLength: 3;
+    readonly chainLength: 50;
     /** Maximum characters in one provider or model id. */
     readonly routeChars: 120;
-    /** Hard ceiling on child calls charged against one task (worker + verifier). */
-    readonly maxAttemptsPerTask: 6;
+    /** Extreme backstop on child calls charged against one task (worker + verifier). */
+    readonly maxAttemptsPerTask: 1100;
     /** Hard ceiling on routing ledger entries kept per run. */
     readonly recordEntries: 256;
 };
