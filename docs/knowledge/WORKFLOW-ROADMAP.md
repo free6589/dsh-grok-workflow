@@ -48,7 +48,7 @@ The plugin is a **tool + prompt suggestion**; there is no enforced entry.
 | L1 | step admission | `step()` → `inbox.claim(target, turn)` → `dispatch.waterfall('agent/pre-step', …)` — dispatched on **every** step, including tool-continuation steps | `dsh-agent-loop/lib/index.js:909` (claim `:906`, inbox `claim()` at `:103-111`) |
 | L2 | plugin registration | `ctx.systemPrompt.section(...)` + `ctx.tools.register(tool)`; `inject=['tools','workflowEngine','systemPrompt']` | `src/index.ts` |
 | L3 | model decides | main model reads the prompt section and the tool schema, then may call `grok_workflow` | `src/index.ts` |
-| L4 | tool guard | `exec.agent` required; recursion refusal (`origin==='subagent'` / `delegationDepth>0`); disposed/aborted; objective ≤ 4000; caller-task normalization; active-run cap | `src/index.ts`, `src/input.ts` |
+| L4 | tool guard | `exec.agent` required; recursion refusal (`origin==='subagent'` / `delegationDepth>0`); disposed/aborted; objective ≤ 32000; caller-task normalization; active-run cap | `src/index.ts`, `src/input.ts` |
 | L5 | engine start | `ctx.workflowEngine.start({script, meta, args, parent, signal, maxTotalAgents, subagentProvider?})` | `src/index.ts`, `src/script.ts` |
 | L6 | PTC guest script | globals `agent/parallel/pipeline/phase/log/args`; `agent()` accepts only `{label,phase,schema,provider,model}` | `dsh-workflow-ptc/lib/index.js` |
 | L7 | stages | Plan → Execute (worker + verifier + bounded retry) → **Synthesize = pure JS aggregation, no `agent()` call** | `src/script.ts` |

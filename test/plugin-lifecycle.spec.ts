@@ -130,7 +130,7 @@ describe('plugin lifecycle and tool boundary', () => {
     const ctx = new FakeContext()
     apply(ctx as never)
     ctx.engine.autoRun = true
-    const objective = 'x'.repeat(4000)
+    const objective = 'x'.repeat(32000)
     const report = await ctx.tool!.execute({ objective, tasks: [callerTask('a')] }, exec()) as { status: string; objective: string }
     expect(report.status).toBe('completed')
     expect(report.objective).toBe(objective)
@@ -140,7 +140,7 @@ describe('plugin lifecycle and tool boundary', () => {
   it('rejects an overlong objective before starting an engine run', async () => {
     const ctx = new FakeContext()
     apply(ctx as never)
-    await expect(ctx.tool!.execute({ objective: 'x'.repeat(4001) }, exec())).rejects.toThrow(/objective must be at most 4000 characters/)
+    await expect(ctx.tool!.execute({ objective: 'x'.repeat(32001) }, exec())).rejects.toThrow(/objective must be at most 32000 characters/)
     expect(ctx.engine.startCalls).toHaveLength(0)
   })
 

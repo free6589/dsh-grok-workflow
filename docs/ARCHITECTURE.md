@@ -80,10 +80,13 @@ The planner returns object-rooted structured output:
   independent so concurrency and partial status are well-defined.
 
 Host/script validation enforces unique IDs, non-empty required fields, at most
-`maxTasks` tasks, no dependency graph, a 4,000-character objective, and a
-48,000-character aggregate serialized task budget. A planner failure or invalid
-plan falls back to one task containing the original objective; the report
-records `planning.source: "fallback"` and cannot claim fully clean completion.
+`maxTasks` tasks, no dependency graph, a **32,000-character workflow objective**,
+and a 48,000-character aggregate serialized task budget. Each task's own
+`objective`, `expectedOutput`, and `context` stay capped at 4,000 characters
+(`taskTextChars`) — those task-level limits are unchanged. A planner failure or
+invalid plan falls back to one task containing the original objective verbatim;
+the report records `planning.source: "fallback"` and cannot claim fully clean
+completion.
 
 `acceptanceCriteria` is a non-empty list whose entries must stay distinct under
 the comparison used to match a verifier's answer: trailing sentence punctuation,
@@ -193,7 +196,7 @@ change (see ROADMAP §9.2).
 ```
 user message ──► agent/pre-step ──► classify
                                      ├─ not ours (subagent, non-user source, empty batch, out of scope, already routed) ──► pass through
-                                     ├─ unusable (empty text, over 4000 chars) ──► refuse out loud, nothing runs
+                                     ├─ unusable (empty text, over 32000 chars) ──► refuse out loud, nothing runs
                                      └─ admit ──► run the workflow ──► deliver the validated report in this turn
 ```
 
@@ -215,6 +218,36 @@ user message ──► agent/pre-step ──► classify
 - **Failure modes are bounded:** the queue per agent is capped
   (`maxQueuedMessages`), the run is bounded (`maxActiveRuns`, `timeoutMs`), and a
   broken configuration is reported rather than swallowed.
+
+### Objective length boundary
+
+The objective limit is defined once as `TASK_LIMITS.objectiveChars` (`32_000`)
+in `src/input.ts`, mirrored by the generated script in `src/script.ts`, and
+enforced on the gate path (`src/gate.ts`), the direct `grok_workflow` tool call
+(`src/index.ts`), and `composeObjective()` (`src/history.ts`).
+
+| User message length | Gate (`agent/pre-step`) | Direct tool call | Result |
+|---|---|---|---|
+| 4,000 characters | admit | accept | run starts; the whole message is kept |
+| 4,001 characters | admit | accept | run starts; the whole message is kept |
+| 32,000 characters | admit | accept | run starts; the `Current request:` label is dropped and no history is attached, so the objective is exactly 32,000 characters |
+| 32,001 characters | refuse | reject | no run starts; the refusal names the 32,000-character limit |
+
+Every length from 4,001 through 32,000 characters is admitted; 32,001 is the
+first refused length.
+
+`composeObjective()` never shortens the current message. It returns `undefined`
+only when the message itself exceeds the limit; when the 17-character
+`Current request:\n` label would push the composed objective over the limit, it
+returns the message unchanged instead of trimming it. Only the history block is
+truncated. `historyChars` (default 4,000, hard maximum 8,000) and
+`taskTextChars` (4,000 per task field) are unchanged.
+
+**Planner-failure fallback.** When planning fails, `fallbackPlan()` carries the
+whole objective verbatim instead of shortening it. The fallback does not pass through
+`normalizeTask()`, so it is not re-checked against `taskTextChars`; a
+32,000-character objective is therefore not rejected a second time. The run
+reports `partial` with `planning.source: "fallback"` and the planner error.
 
 ## Non-interference
 
@@ -273,7 +306,7 @@ Two variants are worth knowing:
 
 ```bash
 # a message the gate refuses on purpose must be refused OUT LOUD, with no run
-E2E_EXPECT=refusal E2E_PROMPT="$(cat /tmp/over-4000-chars.txt)" \
+E2E_EXPECT=refusal E2E_PROMPT="$(cat /tmp/over-32000-chars.txt)" \
   E2E_MODEL_PATCH=scripts/e2e-model-patch.yml scripts/e2e-headless-in-turn.sh
 ```
 
