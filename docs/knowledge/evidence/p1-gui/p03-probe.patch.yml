@@ -1,0 +1,61 @@
+# P0-3 probe: one provider that works (the assistant's own model, so the notice can
+# still be rendered) and one whose endpoint is dead (used only by the workflow
+# roles). The failure is therefore an internal runtime error inside the plugin, not
+# a configuration rejection and not a policy refusal.
+- id: llm-pi-ai
+  name: '@deepseek-ai/dsh-llm-pi-ai'
+  config:
+    providers:
+      bifrost-completions:
+        displayName: Completions
+        api: openai-completions
+        baseURL: https://models.fyrali.com/openai/v1
+        apiKeyEnv: BIFROST_VIRTUAL_KEY
+        reasoning: high
+        compat:
+          supportsDeveloperRole: false
+          supportsStore: false
+        models:
+          - id: wb/cn:deepseek-v4.1-flash
+            name: DeepSeek V4.1 Flash (cn)
+            contextWindow: 500000
+            maxTokens: 65536
+            input:
+              - text
+            reasoningEfforts:
+              off: null
+              low: low
+              medium: medium
+              high: high
+      probe-broken:
+        displayName: Broken Probe
+        api: openai-completions
+        baseURL: http://127.0.0.1:9/openai/v1
+        apiKeyEnv: BIFROST_VIRTUAL_KEY
+        compat:
+          supportsDeveloperRole: false
+          supportsStore: false
+        models:
+          - id: wb/cn:deepseek-v4.1-flash
+            name: Probe
+            contextWindow: 500000
+            maxTokens: 65536
+            input:
+              - text
+- id: grok-workflow
+  name: dsh-grok-workflow
+  config:
+    timeoutMs: 180000
+    maxActiveRuns: 1
+    triageAsk: false
+    roles:
+      planner:
+        - provider: probe-broken
+          model: wb/cn:deepseek-v4.1-flash
+      worker:
+        - provider: probe-broken
+          model: wb/cn:deepseek-v4.1-flash
+      verifier:
+        - provider: probe-broken
+          model: wb/cn:deepseek-v4.1-flash
+      synthesizer: []

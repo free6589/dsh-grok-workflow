@@ -1,0 +1,17 @@
+TERMINAL_SEEN=true
+HAS_ORIGINAL=true
+HAS_SUCCESS_WORDING=false
+---TAIL---
+Incomplete:
+
+workflow (infrastructure): WorkflowError: the workflow's return value is not plain JSON data — workflow result.tasks[0].writesPaths: undefined is not JSON data. Return only JSON-serializable objects/arrays/scalars. at WorkflowExecution.materializeResult (dsh-workflow-guest.js:778:10) at WorkflowExecution.drive (dsh-workflow-guest.js:748:41) at process.processTicksAndRejections (node:internal/process/task_queues:104:5) at async runWorkflowGuest (dsh-workflow-guest.js:999:17) at async eval (eval at runProgram (file:///home… Model routes: planner=probe-broken/wb/cn:deepseek-v4.1-flash; worker=probe-broken/wb/cn:deepseek-v4.1-flash; verifier=probe-broken/wb/cn:deepseek-v4.1-flash; synthesizer=inherit Deadline: 180000 ms per run (enforced by the plugin) Errors:
+Engine error: WorkflowError: the workflow's return value is not plain JSON data — workflow result.tasks[0].writesPaths: undefined is not JSON data. Return only JSON-serializable objects/arrays/scalars. at WorkflowExecution.materializeResult (dsh-workflow-guest.js:778:10) at WorkflowExecution.drive (dsh-workflow-guest.js:748:41) at process.processTicksAndRejections (node:internal/process/task_queues:104:5) at async runWorkflowGuest (dsh-workflow-guest.js:999:17) at async eval (eval at runProgram (file:///home… <<<END-GROK-WORKFLOW-REPORT>>>
+Usage 34.2K tok
+13:33
+Message or run a task, / commands, @ files or sessions
+Workspace Write
+DeepSeek V4.1 Flash (cn)
+Low
+1 turns 1 steps·259 tok/s
+34.2K tok·Cache hit 81%
+7%

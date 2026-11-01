@@ -449,6 +449,76 @@ export function tierNote(verdict: TriageVerdict): string {
 }
 
 /**
+ * What the front desk remembers about its own question (P0-2).
+ *
+ * A confirmation answer names a *tier*, not a task: "简单" on its own is not an
+ * objective. The entry therefore keeps the request the question was about, so the
+ * tier the user picked can be executed against the work they actually asked for.
+ */
+export interface PendingAsk {
+  /** The request the front desk asked about, verbatim. */
+  originalRequest: string
+  /** When the question was asked (epoch ms); the TTL is measured from here. */
+  askedAt: number
+}
+
+/**
+ * Compose the text a worker/planner must see after a confirmation answer (P0-2).
+ *
+ * The selection is stated as a *decision about the original request*, not as a new
+ * request: a worker that received only "简单" would either do nothing or invent a
+ * task, and the phrase below is the one the acceptance for P0-2 pins.
+ * @param verdict - the tier the answer selected.
+ * @param originalRequest - the request the front-desk question was about.
+ * @param answer - the user's confirmation message, verbatim.
+ * @returns the resumed request text.
+ */
+export function resumedRequest(verdict: TriageVerdict, originalRequest: string, answer: string): string {
+  const trimmed = answer.trim()
+  if (verdict.lang === 'zh') {
+    const choice = verdict.tier === 'team' ? '用户选择团队模式' : '用户选择简单模式'
+    return [
+      '原始任务：',
+      originalRequest,
+      '',
+      `用户的确认：${choice}（「${trimmed}」只是对上一个确认档问题的回答，它不是新的任务目标）。`,
+    ].join('\n')
+  }
+  const choice = verdict.tier === 'team' ? 'the user chose the team mode' : 'the user chose the simple mode'
+  return [
+    'Original request:',
+    originalRequest,
+    '',
+    `User confirmation: ${choice} ("${trimmed}" answers the previous confirm question; it is not a new task objective).`,
+  ].join('\n')
+}
+
+/**
+ * User-visible note when a confirmation question expired before it was answered.
+ *
+ * The front desk may not reconstruct the original request from an expired entry:
+ * a ten-minute-old guess is worse than saying the question expired (P0-2).
+ * @param lang - language of the message.
+ * @returns one sentence to put at the top of the answer.
+ */
+export function expiredAskNote(lang: TriageLang): string {
+  return lang === 'zh'
+    ? '上一次的确认档问题已经过期（超过 10 分钟），我没有把它当作任务；要继续做，请把原来的任务重新描述一次。'
+    : 'The previous confirm question expired (more than 10 minutes ago), so it was not treated as a task; describe the original task again if you still want it done.'
+}
+
+/**
+ * User-visible note when a pending confirmation exists but the message is not an answer.
+ * @param lang - language of the message.
+ * @returns one sentence to put at the top of the answer.
+ */
+export function unusedAskNote(lang: TriageLang): string {
+  return lang === 'zh'
+    ? '上一条确认档问题没有得到「简单」或「团队」的回答，所以它已经作废；这条按新消息重新判断，要接着做请把任务再说一次。'
+    : 'The previous confirm question never got a "quick" or "team" answer, so it is void; this message was routed on its own, so restate the task if you want it continued.'
+}
+
+/**
  * The line that turns a natural answer into a schema-shaped one.
  *
  * Only used on the retry (see `runSingleCall`): measured on :3100, the plain call

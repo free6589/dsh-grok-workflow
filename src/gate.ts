@@ -10,8 +10,14 @@
  * - `{kind:'reject'}` is the only decision that reliably produces zero model
  *   calls; `{kind:'enter', messages: []}` still issues a request because other
  *   listeners inject context into any `enter` decision.
- * - A rejected batch never becomes a `user/message` event, so this plugin keeps
- *   its own delivery records and delivers the validated report afterwards.
+ * - A rejected batch never becomes a `user/message` event. P0-1: `preStep()` takes
+ *   the admitted batch out of the inbox (`inbox.claim`), and `step()` commits
+ *   exactly `decision.messages` — so a decision that lists only this plugin's
+ *   report deletes what the user typed, and no `session.append()` can be added on
+ *   top of `enter.messages` without writing the same words twice. The two
+ *   strategies therefore need two different writers: `in-turn` returns the claimed
+ *   messages plus the report (the loop writes them), while `relay`/`append` reject
+ *   the step, so the plugin commits the claimed message itself before delivering.
  *
  * The gate fails closed: when it cannot run the workflow it still refuses the
  * step and states the reason, because passing the message through would let the
@@ -49,7 +55,11 @@ import type { DeliveryPhase } from './records.js'
 import { redactError } from './redact.js'
 import type { ActiveState, RunOutcome, WorkflowLogger } from './run.js'
 import { runSingleCall, runWorkflow } from './run.js'
-import { askLine, chatReply, classifyTriage, greetingLine, singleCallPrompt, tierNote, triageLine } from './triage.js'
+import {
+  askLine, chatReply, classifyTriage, expiredAskNote, greetingLine, resolvePending, resumedRequest,
+  singleCallPrompt, tierNote, triageLine, unusedAskNote,
+} from './triage.js'
+import type { PendingAsk } from './triage.js'
 import type { ResolvedConfig, WorkflowReport } from './types.js'
 
 /** Payload shape of one `agent/pre-step` dispatch. */
@@ -204,6 +214,25 @@ export function classifyPreStep(
   if (alreadyRouted(session, key)) return { kind: 'pass', reason: 'already-routed' }
   const request = userMessages.map(textOf).filter(text => text !== '').join('\n\n')
   return { kind: 'admit', agent, agentId, key, request, turn: payload.turn }
+}
+
+/**
+ * User-visible terminal for a cancelled turn (P0-4).
+ *
+ * A cancellation that ends silently is indistinguishable from a hang, and the two
+ * used to be exactly that. The text names the state, keeps the completed/partial
+ * split honest, and never reads as success.
+ *
+ * @param reason - Optional measured reason; empty when there is none to state.
+ */
+export function cancelledText(reason: string): string {
+  const lines = [
+    '运行已取消（cancelled）：这条消息没有完成，也没有可交付的结果。',
+    '已完成的部分保留，未完成的部分不再继续；要接着做，请把任务重新发一次。',
+  ]
+  const trimmed = reason.trim()
+  if (trimmed !== '') lines.push(`原因：${trimmed}`)
+  return lines.join('\n')
 }
 
 /**
@@ -365,16 +394,31 @@ export function installGate(deps: GateDeps): boolean {
    * Process-local and short-lived by design: the question is answered in the next
    * message of the same conversation, so a Map is the right lifetime. The TTL
    * stops a stale question from swallowing an unrelated message an hour later.
+   *
+   * P0-2: the entry keeps the request the question was about, not just a clock
+   * reading. "简单" answered from a bare timestamp left the quick worker with one
+   * word as its whole task, and nothing could tell it what to do. Persisting this
+   * to disk is deliberately not done here: the in-memory Map is the same trust
+   * boundary the session history already has, and a lost entry is recoverable by
+   * asking the user (see {@link takePending}).
    */
-  const pendingAsks = new Map<string, number>()
+  const pendingAsks = new Map<string, PendingAsk>()
   const PENDING_TTL_MS = 10 * 60_000
 
-  /** Consume the pending question for one agent; expired entries are dropped. */
-  const takePending = (agentId: string): boolean => {
-    const askedAt = pendingAsks.get(agentId)
-    if (askedAt === undefined) return false
+  /** A consumed pending question, and whether its TTL had already run out. */
+  type PendingLookup = { kind: 'live', ask: PendingAsk } | { kind: 'expired', ask: PendingAsk }
+
+  /**
+   * Consume the pending question for one agent.
+   *
+   * The entry is removed either way: a question may be answered once, and an
+   * expired one must not be re-consumed by the message after that.
+   */
+  const takePending = (agentId: string): PendingLookup | undefined => {
+    const ask = pendingAsks.get(agentId)
+    if (ask === undefined) return undefined
     pendingAsks.delete(agentId)
-    return Date.now() - askedAt <= PENDING_TTL_MS
+    return Date.now() - ask.askedAt <= PENDING_TTL_MS ? { kind: 'live', ask } : { kind: 'expired', ask }
   }
 
   /**
@@ -395,19 +439,39 @@ export function installGate(deps: GateDeps): boolean {
     // pre-t52 behaviour byte for byte: no tier line, no greeting, no cheap call.
     if (limits.mode !== 'full') {
       const agentId = agentIdOf(agent)
+      // Consumed before classification: at most one message answers a question,
+      // and an expired entry has to be stated rather than silently reused (P0-2).
+      const pending = takePending(agentId)
+      const live = pending?.kind === 'live' ? pending.ask : undefined
       const tier = classifyTriage({
         text: request,
         mode: limits.mode,
         ask: limits.triageAsk,
-        pending: takePending(agentId),
+        pending: live !== undefined,
       })
+      // A confirmation question that is gone must be visible: the front desk may
+      // not guess what the user meant, and the user must know why nothing ran.
+      const expired = pending?.kind === 'expired' ? expiredAskNote(tier.lang) : ''
+      // A live question the user did not answer (they changed subject instead) is
+      // void as well, and saying so is cheaper than a wrong guess.
+      const unused = live !== undefined && resolvePending(request) === undefined && tier.reason !== 'pending-fast' && tier.reason !== 'pending-team'
+        ? unusedAskNote(tier.lang)
+        : ''
+      const note = expired !== '' ? expired : unused
+      const lead = note === '' ? [] : [note, '']
+      // The request a worker is given: the user's words, resumed against the
+      // request the question was about (P0-2). Without this the quick tier would
+      // be handed "简单" and nothing else.
+      const target = live === undefined || (tier.reason !== 'pending-fast' && tier.reason !== 'pending-team')
+        ? request
+        : resumedRequest(tier, live.originalRequest, request)
       if (tier.tier === 'ask') {
         // No run and no answer: the front desk asks, and the next message from
         // this session is read as the answer (takePending above).
-        pendingAsks.set(agentId, Date.now())
+        pendingAsks.set(agentId, { originalRequest: request, askedAt: Date.now() })
         return {
           kind: 'direct',
-          text: [triageLine(tier), '', askLine(tier.lang)].join('\n'),
+          text: [...lead, triageLine(tier), '', askLine(tier.lang)].join('\n'),
           outcome: 'triaged-ask',
         }
       }
@@ -415,14 +479,14 @@ export function installGate(deps: GateDeps): boolean {
         // Instant by construction: a template, not a call (see chatReply).
         return {
           kind: 'direct',
-          text: [triageLine(tier), '', chatReply(tier, request), '', tierNote(tier)].join('\n'),
+          text: [...lead, triageLine(tier), '', chatReply(tier, request), '', tierNote(tier)].join('\n'),
           outcome: 'triaged-chat',
         }
       }
       if (tier.tier === 'fast') {
         const call = await runSingleCall({
           ctx, config, state, logger, agent,
-          prompt: singleCallPrompt(tier, request),
+          prompt: singleCallPrompt(tier, target),
           label: 'quick-worker',
           ...signal === undefined ? {} : { signals: [signal] },
         })
@@ -437,12 +501,12 @@ export function installGate(deps: GateDeps): boolean {
         }
         return {
           kind: 'direct',
-          text: [triageLine(tier), '', call.text, '', tierNote(tier)].join('\n'),
+          text: [...lead, triageLine(tier), '', call.text, '', tierNote(tier)].join('\n'),
           outcome: 'triaged-fast',
         }
       }
-      const answer = await runTeam(agent, request, signal)
-      const header = [triageLine(tier), tier.greeting ? greetingLine(tier.lang) : ''].filter(line => line !== '').join('\n')
+      const answer = await runTeam(agent, target, signal)
+      const header = [...lead, triageLine(tier), tier.greeting ? greetingLine(tier.lang) : ''].filter(line => line !== '').join('\n')
       return answer.kind === 'report' ? { ...answer, header } : answer
     }
     return runTeam(agent, request, signal)
@@ -527,6 +591,80 @@ export function installGate(deps: GateDeps): boolean {
   }
 
   /**
+   * Keep the claimed user message in the transcript for a rejected batch (P0-1).
+   *
+   * `relay` and `append` answer in a later turn, so they must return `reject`: the
+   * claimed batch is then never committed by the loop and the user's own words would
+   * disappear from the transcript. This is the one strategy family where the plugin
+   * writes the message itself, and it is the reason `enter.messages` and
+   * `session.append()` must never be used for the same message: `in-turn` returns
+   * the claimed messages in its decision, `relay`/`append` append them here.
+   *
+   * The message object is written unchanged — same id, same source, same text and
+   * attachments — because a re-created "looks the same" message would lose its
+   * identity and could be routed a second time.
+   *
+   * @returns true when the message is in the session surface.
+   */
+  const commitClaimed = (agent: Agent, claimed: readonly UserMessage[]): boolean => {
+    const session = sessionOf(agent)
+    if (session === undefined || claimed.length === 0) return false
+    try {
+      for (const message of claimed) session.append('user/message', message, { surfaceOp: 'append' })
+      return true
+    } catch (error) {
+      // A session that refuses the write still gets the answer: losing the echo of
+      // the question is bad, losing the answer as well would be worse.
+      logger.warn(`gate could not keep the user message in the transcript: ${redactError(error)}`)
+      return false
+    }
+  }
+
+  /**
+   * State a cancelled turn's terminal and keep what the user wrote (P0-1 + P0-4).
+   *
+   * A cancelled turn cannot be answered inside itself — the step is already gone,
+   * so the decision has to be `reject`. That made cancellation lose the batch twice
+   * over, which a real GUI session shows plainly: the message the user typed never
+   * became a `user/message` event, and the stopped run left no reason in the
+   * transcript. Because the step is rejected here, this plugin is the only writer,
+   * so committing the claimed message cannot duplicate it: the original message
+   * object is appended unchanged, then one assistant message carries the terminal.
+   *
+   * @param agent - Agent whose transcript keeps the batch.
+   * @param payload - Rejected step whose batch is being committed.
+   * @param text - User-visible terminal text; never a success sentence.
+   * @returns true when the batch reached the session surface.
+   */
+  const commitCancelled = (
+    agent: Agent,
+    payload: PreStepPayload,
+    text: string,
+  ): boolean => {
+    const kept = commitClaimed(agent, payload.messages)
+    const session = sessionOf(agent)
+    if (session === undefined) return kept
+    try {
+      const options = agent.options ?? {}
+      session.append('assistant/message', {
+        turn: payload.turn,
+        step: payload.step,
+        message: createAssistantMessage({
+          content: [{ type: 'text', text }],
+          source: {
+            provider: options.provider ?? 'grok-workflow',
+            model: options.model ?? 'workflow-report',
+          },
+        }),
+        stream: [],
+      }, { surfaceOp: 'append' })
+    } catch (error) {
+      logger.warn(`gate could not state the cancelled terminal: ${redactError(error)}`)
+    }
+    return kept
+  }
+
+  /**
    * Admit one batch and answer it after the turn closes (`relay`/`append`).
    *
    * Kept separate so the listener itself stays total: this function may throw,
@@ -538,6 +676,8 @@ export function installGate(deps: GateDeps): boolean {
   ): void => {
     const { agent } = verdict
     const entry = entryOf(verdict, payload)
+    // Every path below rejects the step, so nothing else will commit this batch.
+    commitClaimed(agent, payload.messages)
     const refusal = refusalOf(verdict)
     if (refusal !== undefined) {
       record(agent, entry, 'failed', refusal.outcome)
@@ -571,6 +711,42 @@ export function installGate(deps: GateDeps): boolean {
   })
 
   /**
+   * The messages one `enter` decision must carry (P0-1).
+   *
+   * `AgentLoop.preStep()` takes the admitted batch out of the inbox
+   * (`inbox.claim`) and `step()` commits exactly `decision.messages` as
+   * `user/message` events (`dsh-agent-loop/lib/index.js`, `step()`: every message
+   * whose source is not `runtime-context` is appended). A decision that lists only
+   * this plugin's report therefore *replaces* what the user typed: the batch was
+   * already claimed, so the original message is never written and never appears in
+   * `deriveMessages()` or in the GUI transcript. P0-1 is that defect.
+   *
+   * Calling `next()` yields the default decision (`[...claimed, runtimeContext]`),
+   * so appending to it keeps the original message object — id, source, text and
+   * attachments untouched — and cannot duplicate it either: `enter.messages` is the
+   * only writer for a claimed batch, so a `session.append('user/message', …)` on top
+   * of it would be a second copy of the same words.
+   */
+  const stepBase = async (
+    payload: PreStepPayload,
+    next: () => Promise<PreStepDecision>,
+  ): Promise<UserMessage[] | undefined> => {
+    try {
+      const base = await next()
+      // `undefined` means a downstream listener refused the step; the caller must
+      // not enter a step that was refused, and the batch stays routable.
+      if (base.kind === 'reject') return undefined
+      // A listener that emptied the decision would drop the claimed message again,
+      // so the claimed batch is the floor: what the user typed is never deleted.
+      return base.messages.length > 0 ? [...base.messages] : [...payload.messages]
+    } catch (error) {
+      // A foreign listener's failure must not cost the user their own message.
+      logger.warn(`gate kept the claimed messages after a pre-step failure: ${redactError(error)}`)
+      return [...payload.messages]
+    }
+  }
+
+  /**
    * Answer inside the open step (`in-turn`).
    *
    * The turn stays open for the whole run, so the report is entered as the step's
@@ -582,33 +758,90 @@ export function installGate(deps: GateDeps): boolean {
   const answerInTurn = async (
     verdict: Extract<Classification, { kind: 'admit' }>,
     payload: PreStepPayload,
+    next: () => Promise<PreStepDecision>,
   ): Promise<PreStepDecision> => {
     const { agent } = verdict
     const entry = entryOf(verdict, payload)
     const signal = payload.signal
     const aborted = (): boolean => signal?.aborted === true
-    const enter = (text: string): PreStepDecision => ({ kind: 'enter', messages: [enterMessage(text)] })
+    /** Enter the answer after the batch, never instead of it (P0-1). */
+    const enterAfter = (base: readonly UserMessage[], text: string): PreStepDecision => ({
+      kind: 'enter',
+      messages: [...base, enterMessage(text)],
+    })
     if (aborted()) {
+      // Already cancelled when the message arrived: nothing ran, but the batch must
+      // still survive the rejection and say why (P0-1 + P0-4).
       record(agent, entry, 'failed', 'aborted')
+      commitCancelled(agent, payload, cancelledText('这条消息还没派工就被取消了，没有启动任何工人。'))
+      return { kind: 'reject' }
+    }
+    const base = await stepBase(payload, next)
+    if (base === undefined) {
+      // Downstream refused this step: nothing will be committed, so the batch must
+      // stay routable rather than be claimed by an answer nobody will read.
+      record(agent, entry, 'failed', 'pre-step-refused')
       return { kind: 'reject' }
     }
     const refusal = refusalOf(verdict)
     if (refusal !== undefined) {
       record(agent, entry, 'failed', refusal.outcome)
-      return enter(answerText({ kind: 'notice', reason: refusal.reason, outcome: refusal.outcome }, true))
+      return enterAfter(base, answerText({ kind: 'notice', reason: refusal.reason, outcome: refusal.outcome }, true))
     }
     // `started` before the wait: a crash inside the run must not leave the batch
     // routable, because the workflow may already have executed tool effects.
     record(agent, entry, 'started', 'admitted')
     const answer = await produceAnswer(agent, verdict.request, signal)
     if (aborted()) {
-      // The turn was cancelled while the run was in flight: nobody will read an
-      // entered step, and the run already stopped on the same signal.
+      // The turn was cancelled while the run was in flight: nobody can read an
+      // entered step, and the run already stopped on the same signal — so the
+      // transcript gets the batch and the cancelled terminal instead (P0-1 + P0-4).
       record(agent, entry, 'failed', 'aborted')
+      commitCancelled(agent, payload, cancelledText(answer.kind === 'notice' ? answer.reason : ''))
       return { kind: 'reject' }
     }
     record(agent, entry, answer.kind === 'notice' ? 'failed' : 'delivered', answer.outcome)
-    return enter(answerText(answer, true))
+    return enterAfter(base, answerText(answer, true))
+  }
+
+  /**
+   * Enter a user-visible refusal instead of a silent `reject` (P0-3).
+   *
+   * A bare rejection is invisible: the app shows an empty turn and the user has no
+   * way to tell an internal fault from a policy decision. The claimed message still
+   * comes first, so the transcript keeps what they wrote (P0-1).
+   */
+  const enterRefusal = (payload: PreStepPayload, text: string): PreStepDecision => {
+    try {
+      const claimed = Array.isArray(payload.messages) ? payload.messages : []
+      if (claimed.length === 0) return { kind: 'reject' }
+      return { kind: 'enter', messages: [...claimed, enterMessage(text)] }
+    } catch (error) {
+      logger.warn(`gate could not state the failure: ${redactError(error)}`)
+      return { kind: 'reject' }
+    }
+  }
+
+  /**
+   * Classification threw: still answer, with the reason (P0-3).
+   *
+   * Only a batch that carries a claimed user message is answered this way; a tool
+   * continuation or a runtime-context batch has nothing to refuse, and entering a
+   * notice there would answer a step the user never took.
+   */
+  const classificationFailure = (payload: PreStepPayload, reason: string): PreStepDecision => {
+    let userClaimed = false
+    try {
+      userClaimed = (Array.isArray(payload.messages) ? payload.messages : [])
+        .some(message => (message.source as { kind?: unknown } | undefined)?.kind === 'user')
+    } catch {
+      userClaimed = false
+    }
+    if (!userClaimed) return { kind: 'reject' }
+    return enterRefusal(
+      payload,
+      noticeEnterText(`the mandatory workflow gate failed while reading this message: ${reason}`),
+    )
   }
 
   /** Serialize one agent's batches and bound the queue. */
@@ -635,26 +868,25 @@ export function installGate(deps: GateDeps): boolean {
     try {
       verdict = classifyPreStep(deps, payload)
     } catch (error) {
-      // Fail closed: an internal error must not turn into a direct model answer.
-      logger.warn(`gate classification failed: ${redactError(error)}`)
-      return { kind: 'reject' }
+      // Fail closed (never a direct model answer) *and* visible (P0-3): the user
+      // learns that the gate failed, instead of watching an empty turn.
+      const reason = redactError(error)
+      logger.warn(`gate classification failed: ${reason}`)
+      return classificationFailure(payload, reason)
     }
     // Pass-through calls the next listener untouched: a foreign failure must
     // surface as that listener's failure, not as this gate's refusal.
     if (verdict.kind === 'pass') return next()
     if (safe().answerStrategy === 'in-turn') {
       try {
-        return await answerInTurn(verdict, payload)
+        return await answerInTurn(verdict, payload, next)
       } catch (error) {
         // Totality with an answer: an internal failure is still stated, because a
         // plain refusal would leave a one-shot app with no user-visible output.
+        // The claimed message is kept in front of the notice (P0-1).
         const reason = redactError(error)
         logger.warn(`gate could not answer in-turn: ${reason}`)
-        try {
-          return { kind: 'enter', messages: [enterMessage(noticeEnterText(reason))] }
-        } catch {
-          return { kind: 'reject' }
-        }
+        return enterRefusal(payload, noticeEnterText(reason))
       }
     }
     try {

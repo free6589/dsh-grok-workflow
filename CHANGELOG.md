@@ -45,6 +45,37 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
   「任务已完成」「检查通过」；不显示百分比、token 数、预计剩余时间或任何编造的活动。任务结论
   （「任务通过」「任务未通过」）只来自报告，面板与报告不一致时测试会失败。
 
+### Fixed — Issue #22 Phase 1 对话可靠性 / dialogue reliability
+
+**未发布（分支 `fix/phase1-dialogue-reliability`）。** 以下四条来自仍在远程审查中的 PR #23，
+没有打 tag、没有发布、版本号未变（`package.json` 仍为 `0.2.3`）。Not released: these four entries
+come from PR #23, still under review; no tag, no publication, and the version is unchanged.
+
+- **P0-1 用户原话不再丢失 / the user's own message stays in the transcript** — `in-turn` 路径过去只把
+  插件生成的 relay/report 消息放进 `enter.messages`，而 `AgentLoop.preStep()` 已经把这一批消息从
+  inbox 里 `claim` 走了，于是模型转写里根本没有用户自己那句话。现在本条决策先带上被 claim 的消息
+  （同一个对象：id、source、正文、附件结构都不变），报告紧随其后；`relay` / `append` 因为整步被
+  `reject`，由插件自己把那句话写进 session，两条路径各自只有一个写入者，因此不会重复。
+  过去 `enter.messages` 只放报告、而用户消息被 `inbox.claim` 移除后无人提交——这就是原话丢失的原因。
+- **P0-2 确认档不再丢上下文 / a confirmation answer keeps the task** — `pendingAsks` 过去只存时间戳，
+  用户回答「简单」后快手档只收到这两个字。现在 pending 保存 `originalRequest` 与 `askedAt`（TTL 仍为
+  10 分钟），快手档与团队档收到的都是「原始任务 + 用户选择简单/团队模式（选择词不是任务目标）」；
+  过期、插件重载、被别的消息顶掉时都会明说，不猜原始任务；同一 pending 只能被消费一次。
+- **P0-3 内部错误一定有用户可见终态 / every internal error ends visibly** — 分类失败过去是静默
+  `reject`（用户看到空白回合），现在是带上原因的通知消息且保留原话；失败话术不会出现
+  「已完成/已开启」这类成功措辞；有意取消、超时、插件卸载与内部异常各有独立终态。
+- **取消时原话与终态都不再消失 / a cancelled turn keeps the message and states its end** — 真机 GUI
+  复核发现的 P0-1 × P0-4 缺口：in-turn 路径里用户那句话已经被 `inbox.claim` 取走，若这一回合被取消，
+  决策只能 `reject`，于是 session 里既没有 `user/message` 也没有任何停止原因（实测会话事件只有
+  `inbox/spliced` → `run-end cancelled` → `turn/end aborted`）。现在取消走 `commitCancelled()`：先按
+  原对象提交被 claim 的那批消息（这一步整步已被 reject，插件是唯一写入者，不会重复），再写一条
+  助手消息说明 `运行已取消（cancelled）…已完成的部分保留…`。GUI 截图与回归用例见
+  `docs/knowledge/evidence/p1-gui/`。
+- **P0-4 取消到达终态并保留已完成的工作 / cancellation ends, and keeps finished work** — 已经 aborted
+  的 signal 不会再启动引擎（过去会先启动再取消，白跑一次 planner/worker）；运行被停止时，引擎已经
+  产出的报告会被保留：已验证任务原样保留，未完成的任务标为 `interrupted`、未开始的任务标为
+  `not started`，运行级错误分类为 `cancelled`（不是质量失败），面板随之收尾。
+
 ## [0.2.3] - 2026-10-28
 
 The front desk release: every user message now passes a front desk that states its tier in

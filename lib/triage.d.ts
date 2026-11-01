@@ -153,6 +153,46 @@ export declare function askLine(lang: TriageLang): string;
  */
 export declare function tierNote(verdict: TriageVerdict): string;
 /**
+ * What the front desk remembers about its own question (P0-2).
+ *
+ * A confirmation answer names a *tier*, not a task: "简单" on its own is not an
+ * objective. The entry therefore keeps the request the question was about, so the
+ * tier the user picked can be executed against the work they actually asked for.
+ */
+export interface PendingAsk {
+    /** The request the front desk asked about, verbatim. */
+    originalRequest: string;
+    /** When the question was asked (epoch ms); the TTL is measured from here. */
+    askedAt: number;
+}
+/**
+ * Compose the text a worker/planner must see after a confirmation answer (P0-2).
+ *
+ * The selection is stated as a *decision about the original request*, not as a new
+ * request: a worker that received only "简单" would either do nothing or invent a
+ * task, and the phrase below is the one the acceptance for P0-2 pins.
+ * @param verdict - the tier the answer selected.
+ * @param originalRequest - the request the front-desk question was about.
+ * @param answer - the user's confirmation message, verbatim.
+ * @returns the resumed request text.
+ */
+export declare function resumedRequest(verdict: TriageVerdict, originalRequest: string, answer: string): string;
+/**
+ * User-visible note when a confirmation question expired before it was answered.
+ *
+ * The front desk may not reconstruct the original request from an expired entry:
+ * a ten-minute-old guess is worse than saying the question expired (P0-2).
+ * @param lang - language of the message.
+ * @returns one sentence to put at the top of the answer.
+ */
+export declare function expiredAskNote(lang: TriageLang): string;
+/**
+ * User-visible note when a pending confirmation exists but the message is not an answer.
+ * @param lang - language of the message.
+ * @returns one sentence to put at the top of the answer.
+ */
+export declare function unusedAskNote(lang: TriageLang): string;
+/**
  * Prompt for the one call a quick answer spends.
  *
  * Both tiers share the call but not the contract: a chat answer is two sentences
