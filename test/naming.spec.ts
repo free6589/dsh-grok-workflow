@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   NAMING_COPY,
   TASK_TITLE_DISPLAY_LIMIT,
+  callStateText,
   memberLabel,
   namingLanguageFromSettings,
   namingSource,
@@ -10,6 +11,7 @@ import {
   resolveNamingLanguage,
   runTitle,
   taskGroupTitle,
+  taskVerdictText,
   truncateTaskTitle,
 } from '../src/naming.js'
 import { WORKFLOW_SCRIPT } from '../src/script.js'
@@ -177,6 +179,30 @@ describe('P1-1: a finished child call is not a verified task', () => {
     expect(run.report.tasks[0]!.status).toBe('failed')
     expect(run.report.tasks[0]!.attempts[0]!.passed).toBe(false)
     expect(run.report.status).toBe('failed')
+  })
+
+  it('words an ended call as an ended call and a pass only as a task verdict', () => {
+    // The two sentences a reader needs: what a finished agent is, and what a finished
+    // task is. They are different words, and only the second one is a verdict.
+    expect(callStateText('worker', 'ended')).toBe('执行代理已结束')
+    expect(callStateText('verifier', 'ended')).toBe('检查调用已结束')
+    expect(callStateText('worker', 'running')).toBe('执行代理进行中')
+    expect(callStateText('worker', 'ended', 'en')).toBe('Execute agent ended')
+    expect(taskVerdictText('verified')).toBe('任务通过')
+    expect(taskVerdictText('failed')).toBe('任务未通过')
+    // No call state, in either language, can produce a pass word.
+    for (const language of ['zh', 'en'] as const) {
+      for (const role of ['planner', 'worker', 'verifier', 'synthesizer'] as const) {
+        for (const state of ['running', 'ended', 'failed', 'cancelled', 'interrupted'] as const) {
+          const text = callStateText(role, state, language)
+          expect(text).not.toContain('通过')
+          expect(text).not.toContain('任务完成')
+        }
+      }
+    }
+    // And no shipped string is the sentence the old panel implied.
+    const copy = JSON.stringify(NAMING_COPY)
+    for (const forbidden of ['任务已完成', '检查通过', '执行完成']) expect(copy).not.toContain(forbidden)
   })
 })
 

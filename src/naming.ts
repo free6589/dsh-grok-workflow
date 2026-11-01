@@ -35,6 +35,12 @@ import type { RoleName } from './types.js'
 /** Languages this plugin ships copy for (the DSH client ships the same two ids). */
 export type NamingLanguage = 'zh' | 'en'
 
+/** Lifecycle of one child call, as the panel may word it. */
+export type CallState = 'running' | 'ended' | 'failed' | 'cancelled' | 'interrupted'
+
+/** Status of the whole run node (the stock dictionary's closed key set). */
+export type RunState = 'running' | 'completed' | 'failed' | 'cancelled' | 'interrupted'
+
 /** Shipped languages, in the order the settings page lists them. */
 export const NAMING_LANGUAGES: readonly NamingLanguage[] = ['zh', 'en']
 
@@ -63,6 +69,24 @@ interface NamingCopy {
   readonly phases: Record<'plan' | 'execute' | 'verify' | 'synthesize' | 'answer', string>
   /** Task-count suffix of the run title; `{n}` is the known task total. */
   readonly tasks: string
+  /**
+   * What one finished *child call* is called.
+   *
+   * A row describes a call, never a task: `agent-end: completed` means the subagent
+   * stopped working, so a row may say `检查调用已结束` and must never say `检查通过`
+   * (Issue #22, P1-1 semantic red line). The subject is per role because "执行代理
+   * 已结束" and "检查调用已结束" are the two sentences a reader needs to tell a
+   * worker apart from a verifier at a glance.
+   */
+  readonly callSubjects: Record<RoleName, string>
+  /** Call lifecycle words appended to {@link callSubjects}. */
+  readonly callStates: Record<CallState, string>
+  /** Task verdicts; only a task-level result may produce one of these. */
+  readonly taskVerdicts: Record<'verified' | 'failed', string>
+  /** Run-node status words, mirroring the stock dictionary's key set. */
+  readonly runStates: Record<RunState, string>
+  /** Group header for a member that declared no phase. */
+  readonly unphased: string
 }
 
 /**
@@ -80,6 +104,28 @@ export const NAMING_COPY: Record<NamingLanguage, NamingCopy> = {
     attempt: '{role}（尝试 {n}）',
     phases: { plan: '规划', execute: '执行', verify: '检查', synthesize: '汇总', answer: '回答' },
     tasks: '{n} 个任务',
+    callSubjects: {
+      planner: '规划助手调用',
+      worker: '执行代理',
+      verifier: '检查调用',
+      synthesizer: '汇总调用',
+    },
+    callStates: {
+      running: '进行中',
+      ended: '已结束',
+      failed: '失败',
+      cancelled: '已取消',
+      interrupted: '已中断',
+    },
+    taskVerdicts: { verified: '任务通过', failed: '任务未通过' },
+    runStates: {
+      running: '运行中',
+      completed: '已完成',
+      failed: '失败',
+      cancelled: '已取消',
+      interrupted: '已中断',
+    },
+    unphased: '未分阶段',
   },
   en: {
     workflow: 'Task team',
@@ -88,6 +134,28 @@ export const NAMING_COPY: Record<NamingLanguage, NamingCopy> = {
     attempt: '{role} (attempt {n})',
     phases: { plan: 'Plan', execute: 'Execute', verify: 'Verify', synthesize: 'Synthesize', answer: 'Answer' },
     tasks: '{n} tasks',
+    callSubjects: {
+      planner: 'Planner call',
+      worker: 'Execute agent',
+      verifier: 'Check call',
+      synthesizer: 'Summarizer call',
+    },
+    callStates: {
+      running: 'running',
+      ended: 'ended',
+      failed: 'failed',
+      cancelled: 'cancelled',
+      interrupted: 'interrupted',
+    },
+    taskVerdicts: { verified: 'Task verified', failed: 'Task not verified' },
+    runStates: {
+      running: 'Running',
+      completed: 'Completed',
+      failed: 'Failed',
+      cancelled: 'Cancelled',
+      interrupted: 'Interrupted',
+    },
+    unphased: 'Unphased',
   },
 }
 
@@ -274,6 +342,60 @@ export function phaseLabel(
   language: NamingLanguage = 'zh',
 ): string {
   return NAMING_COPY[language].phases[kind]
+}
+
+/**
+ * Word one child **call** by its lifecycle state.
+ *
+ * This is the copy the panel uses for a row, and it is deliberately about the call:
+ * `agent-end: completed` yields `执行代理已结束` / `检查调用已结束`, never `执行完成` or
+ * `检查通过`. A row that reads as a passed task would be the P1-1 semantic error
+ * this function exists to rule out.
+ * @param role - internal role name.
+ * @param state - lifecycle state of that call.
+ * @param language - copy language.
+ * @returns the row wording.
+ */
+export function callStateText(role: RoleName, state: CallState, language: NamingLanguage = 'zh'): string {
+  const copy = NAMING_COPY[language]
+  const subject = copy.callSubjects[role] ?? role
+  const word = copy.callStates[state] ?? copy.callStates.running
+  return language === 'en' ? `${subject} ${word}` : `${subject}${word}`
+}
+
+/**
+ * Word one *task-level* verdict.
+ *
+ * Only a report task row can supply `verified` / `failed`, so this is the only place
+ * a pass word exists: there is no input that would let a call produce it.
+ * @param status - the task's status in the report.
+ * @param language - copy language.
+ * @returns the verdict wording.
+ */
+export function taskVerdictText(status: 'verified' | 'failed', language: NamingLanguage = 'zh'): string {
+  return NAMING_COPY[language].taskVerdicts[status]
+}
+
+/**
+ * Word the run node's status.
+ *
+ * The key set is the stock dictionary's, so a projection of the recorded events and
+ * the stock component cannot disagree about which statuses exist.
+ * @param state - run status.
+ * @param language - copy language.
+ * @returns the status wording.
+ */
+export function runStateText(state: RunState, language: NamingLanguage = 'zh'): string {
+  return NAMING_COPY[language].runStates[state]
+}
+
+/**
+ * Header word for members that declared no phase.
+ * @param language - copy language.
+ * @returns the header.
+ */
+export function unphasedLabel(language: NamingLanguage = 'zh'): string {
+  return NAMING_COPY[language].unphased
 }
 
 /**

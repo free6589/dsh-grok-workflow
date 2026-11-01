@@ -19,12 +19,13 @@ import {
   callSiteFrames,
   classifyDisposeTrigger,
   createWorkflowProgressRecorder,
+  progressStopReason,
   recordDispose,
   recordRouting,
 } from './records.js'
 import type { DisposeRecord, DisposeRunInfo } from './records.js'
 import { redactDeep, redactError, redactSecrets } from './redact.js'
-import type { FailureCategory, NormalizedTask, ResolvedConfig, WorkflowReport } from './types.js'
+import type { FailureCategory, FinalStatus, NormalizedTask, ResolvedConfig, WorkflowReport } from './types.js'
 
 /** Minimal logger surface used by the runtime modules. */
 export interface WorkflowLogger {
@@ -453,6 +454,11 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
   // never settles (an engine throw) is reported as an error rather than silently
   // left open in the GUI.
   let settledStop: WorkflowStopReason | undefined
+  // Final status of the report this run actually returned. `run-end` is closed with
+  // the *task-level* result, not with the engine's stop reason: a verifier that
+  // rejects the work ends the program normally, so `completed` from the engine would
+  // render "任务已完成" for a task nobody verified (Issue #22, P1-1).
+  let reportStatus: FinalStatus | undefined
   // Progress recording is a presentation switch: one GUI node with a member row
   // per subagent. It is subscribed *before* the run exists so the first
   // `agent-start` cannot be missed, and it never affects the run itself.
@@ -562,6 +568,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
     if (result.stopReason === 'completed') {
       try {
         const report = redactDeep(assertWorkflowReport(result.value, objective, config))
+        reportStatus = report.status
         // The ledger is plugin-owned state: the deterministic report is the truth,
         // the record survives for diagnostics and for the next run's audit trail.
         // Run records are a configuration switch: a user who does not want the
@@ -608,7 +615,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
     if (cancelOnAbort !== undefined) signal.removeEventListener('abort', cancelOnAbort)
     // Close the node even when this function throws: an abandoned node would read
     // as "still running" in the panel until the turn ends.
-    if (run !== undefined) progress?.runEnd(run.id, settledStop ?? 'error')
+    if (run !== undefined) progress?.runEnd(run.id, progressStopReason(settledStop ?? 'error', reportStatus))
     progress?.dispose()
     for (const off of stopProgressListeners ?? []) off()
     combined.dispose()

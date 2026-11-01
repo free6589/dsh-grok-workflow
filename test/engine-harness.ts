@@ -45,6 +45,15 @@ export interface ChildAnswer {
    * with `fatal: true`. Needed to test infrastructure-failure handling (G-4).
    */
   reject?: Error
+  /**
+   * Hold the child's result open until this settles.
+   *
+   * The engine emits `workflow/agent-start` once the child *has started*, before it
+   * awaits the result, so a live panel snapshot ("this task is still executing") is
+   * only observable while a child's result is deliberately pending. Resolve the gate
+   * to let the child settle; nothing else about the harness changes.
+   */
+  gate?: Promise<unknown>
 }
 
 export interface EngineHarness {
@@ -153,13 +162,16 @@ export function createEngineHarness(answer: (call: ChildCall) => ChildAnswer | P
       }
       children.push(call)
       const settled = await answer(call)
-      const result = settled.reject === undefined
-        ? Promise.resolve({
-          output: settled.output ?? [{ type: 'text' as const, text: '' }],
-          stopReason: settled.stopReason ?? 'completed',
-          ...settled.structured === undefined ? {} : { structured: settled.structured },
-        })
-        : Promise.reject(settled.reject)
+      const payload = {
+        output: settled.output ?? [{ type: 'text' as const, text: '' }],
+        stopReason: settled.stopReason ?? 'completed',
+        ...settled.structured === undefined ? {} : { structured: settled.structured },
+      }
+      const result = settled.reject !== undefined
+        ? Promise.reject(settled.reject)
+        : settled.gate === undefined
+          ? Promise.resolve(payload)
+          : settled.gate.then(() => payload)
       result.catch(() => {})
       return {
         childId: `child-${children.length}`,

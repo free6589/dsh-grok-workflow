@@ -32,6 +32,7 @@ import { createActiveState, runWorkflow } from '../src/run.js'
 import { runTitle } from '../src/naming.js'
 import type { NormalizedTask } from '../src/types.js'
 import { createEngineHarness, type EngineHarness } from './engine-harness.js'
+import { foldLikeTheGui } from './gui-fold.js'
 
 /** A session that records appends and can be told to refuse them. */
 class FakeSession {
@@ -230,37 +231,6 @@ function verificationResult(task: NormalizedTask) {
   }
 }
 
-/** The stock panel's fold, transcribed: the four events in, one node out. */
-interface FoldedNode {
-  name: string
-  status: string
-  members: { seq: number, label: string, status: string }[]
-}
-
-function foldLikeTheGui(events: { type: string, data: Record<string, unknown> }[]): FoldedNode | undefined {
-  let node: FoldedNode | undefined
-  let stopReason: string | undefined
-  const settled = new Map<number, string>()
-  for (const event of events) {
-    if (event.type === PROGRESS_RUN_START) {
-      node = { name: String(event.data.name), status: 'running', members: [] }
-      continue
-    }
-    if (node === undefined) continue
-    if (event.type === PROGRESS_AGENT_START) {
-      node.members.push({ seq: Number(event.data.seq), label: String(event.data.label), status: 'running' })
-      continue
-    }
-    if (event.type === PROGRESS_AGENT_END) settled.set(Number(event.data.seq), String(event.data.outcome))
-    if (event.type === PROGRESS_RUN_END) stopReason = String(event.data.stopReason)
-  }
-  if (node === undefined) return undefined
-  for (const member of node.members) member.status = settled.get(member.seq) ?? member.status
-  // `statusFromStopReason` (dsh-client-ui-workflow-run/lib/client.js:508-514).
-  node.status = stopReason === undefined ? 'running' : stopReason === 'error' ? 'failed' : stopReason
-  return node
-}
-
 const PROGRESS_TYPES = [PROGRESS_RUN_START, PROGRESS_AGENT_START, PROGRESS_AGENT_END, PROGRESS_RUN_END]
 
 function progressEvents(session: SessionType): { type: string, data: Record<string, unknown> }[] {
@@ -298,15 +268,15 @@ describe('progress wiring: the real engine writes what the panel folds', () => {
     ])
     // A plan was supplied, so the title carries the count (D of the t43 plan).
     expect(events[0]!.data).toEqual({ runId: expect.any(String), name: '任务团队 · 1 个任务' })
+    // The fold under test is the stock component's (see test/gui-fold.ts): one node,
+    // two rows, both settled by their own call outcome.
     const node = foldLikeTheGui(events)
-    expect(node).toEqual({
-      name: '任务团队 · 1 个任务',
-      status: 'completed',
-      members: [
-        { seq: 1, label: expect.stringContaining('执行'), status: 'completed' },
-        { seq: 2, label: expect.stringContaining('检查'), status: 'completed' },
-      ],
-    })
+    expect(node?.name).toBe('任务团队 · 1 个任务')
+    expect(node?.status).toBe('completed')
+    expect(node?.members).toEqual([
+      { seq: 1, label: expect.stringContaining('执行'), status: 'completed' },
+      { seq: 2, label: expect.stringContaining('检查'), status: 'completed' },
+    ])
     expect(events.at(-1)!.data).toMatchObject({ stopReason: 'completed' })
   })
 

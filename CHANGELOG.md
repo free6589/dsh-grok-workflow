@@ -29,11 +29,21 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ### Fixed / 修复
 
+- **A rejected run no longer reads as finished / 被否决的运行不再显示成已完成** — the run node used
+  to be closed with the engine's stop reason, and a verifier rejection ends the program normally, so
+  a team where no task passed still showed `已完成` on the node and on both rows. The node is now
+  closed with the task-level result: every task verified → `已完成`; `partial`/`failed` → `失败`;
+  no report → `失败`. 运行节点以前用引擎的停止原因收尾，而核查否决是正常结束，所以一个没有任何任务
+  通过的运行，节点和两行都显示「已完成」。现在节点按任务级结果收尾：全部任务通过才是「已完成」，
+  `partial`/`失败` 显示「失败」，没有报告也显示「失败」。
 - **The panel no longer overstates what happened / 面板不再夸大结果** — a completed child call is
-  not a passed task: the panel never prints “任务已完成” or “检查通过”, and no percentage, token
-  count, ETA or invented activity is rendered anywhere. Task verdicts stay in the report and the
-  answer. 子调用结束不等于任务通过：面板不写「任务已完成」「检查通过」，也不显示百分比、token 数、
-  预计剩余时间或任何编造的活动；任务结论只出现在报告和回答里。
+  not a passed task: a finished call is worded `执行代理已结束` / `检查调用已结束`, an ended call can
+  never produce the words “任务已完成” or “检查通过”, and no percentage, token count, ETA or invented
+  activity is rendered anywhere. A task verdict (`任务通过` / `任务未通过`) comes only from the
+  report, and a test fails if the panel and the report disagree.
+  子调用结束不等于任务通过：结束的调用写作「执行代理已结束」「检查调用已结束」，永远不会变成
+  「任务已完成」「检查通过」；不显示百分比、token 数、预计剩余时间或任何编造的活动。任务结论
+  （「任务通过」「任务未通过」）只来自报告，面板与报告不一致时测试会失败。
 
 ## [0.2.3] - 2026-10-28
 
