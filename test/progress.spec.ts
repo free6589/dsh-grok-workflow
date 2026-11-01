@@ -29,7 +29,7 @@ import {
   PROGRESS_RUN_START,
 } from '../src/records.js'
 import { createActiveState, runWorkflow } from '../src/run.js'
-import { WORKFLOW_RUN_LABEL, workflowRunName } from '../src/script.js'
+import { runTitle } from '../src/naming.js'
 import type { NormalizedTask } from '../src/types.js'
 import { createEngineHarness, type EngineHarness } from './engine-harness.js'
 
@@ -53,21 +53,21 @@ describe('progress recorder: payload contract', () => {
   it('writes exactly the fields the in-tree recorder writes', () => {
     const target = new FakeSession()
     const recorder = createWorkflowProgressRecorder(target as unknown as SessionType, loggerWith([]))
-    recorder.runStart({ id: 'run-1', meta: { name: 'grok-workflow · 2 tasks' } })
-    recorder.agentStart('run-1', { seq: 1, label: 'grok-planner', childId: 'child-1' })
-    recorder.agentStart('run-1', { seq: 2, label: 'grok-worker-t1-a1', phase: '执行 Execution', childId: 'child-2' })
+    recorder.runStart({ id: 'run-1', meta: { name: '任务团队 · 2 个任务' } })
+    recorder.agentStart('run-1', { seq: 1, label: '规划助手', childId: 'child-1' })
+    recorder.agentStart('run-1', { seq: 2, label: '执行', phase: '任务 1 · 修复登录接口', childId: 'child-2' })
     recorder.agentEnd('run-1', { seq: 2, outcome: 'completed' })
     recorder.runEnd('run-1', 'completed')
 
     expect(target.writes).toEqual([
-      { type: PROGRESS_RUN_START, data: { runId: 'run-1', name: 'grok-workflow · 2 tasks' } },
+      { type: PROGRESS_RUN_START, data: { runId: 'run-1', name: '任务团队 · 2 个任务' } },
       // No `phase` key at all when the call declares none: the fold tests
       // `data.phase === undefined`, and an explicit `undefined` would be dropped
       // by the session's JSON snapshot anyway (so the two must not diverge).
-      { type: PROGRESS_AGENT_START, data: { runId: 'run-1', seq: 1, label: 'grok-planner', childId: 'child-1' } },
+      { type: PROGRESS_AGENT_START, data: { runId: 'run-1', seq: 1, label: '规划助手', childId: 'child-1' } },
       {
         type: PROGRESS_AGENT_START,
-        data: { runId: 'run-1', seq: 2, label: 'grok-worker-t1-a1', phase: '执行 Execution', childId: 'child-2' },
+        data: { runId: 'run-1', seq: 2, label: '执行', phase: '任务 1 · 修复登录接口', childId: 'child-2' },
       },
       { type: PROGRESS_AGENT_END, data: { runId: 'run-1', seq: 2, outcome: 'completed' } },
       { type: PROGRESS_RUN_END, data: { runId: 'run-1', stopReason: 'completed' } },
@@ -76,13 +76,15 @@ describe('progress recorder: payload contract', () => {
 
   it('names the run with the task count only when the count is known', () => {
     // The title of the GUI node is this name (`workflowRun.dict: "run.title": "{name}"`).
-    expect(workflowRunName(WORKFLOW_RUN_LABEL, undefined)).toBe('grok-workflow')
-    expect(workflowRunName(WORKFLOW_RUN_LABEL, 1)).toBe('grok-workflow · 1 task')
-    expect(workflowRunName(WORKFLOW_RUN_LABEL, 3)).toBe('grok-workflow · 3 tasks')
-    // No count nobody promised: the gate plans first, so 0/NaN mean "unknown".
-    expect(workflowRunName(WORKFLOW_RUN_LABEL, 0)).toBe('grok-workflow')
-    expect(workflowRunName(WORKFLOW_RUN_LABEL, Number.NaN)).toBe('grok-workflow')
-    expect(workflowRunName(WORKFLOW_RUN_LABEL, 10_000).length).toBeLessThanOrEqual(80)
+    // P1-4: the count is a fact the Host holds, never an estimate — and P1-3
+    // renders it in the user's language without any per-run configuration.
+    expect(runTitle('zh', undefined)).toBe('任务团队')
+    expect(runTitle('zh', 1)).toBe('任务团队 · 1 个任务')
+    expect(runTitle('zh', 3)).toBe('任务团队 · 3 个任务')
+    expect(runTitle('en', 3)).toBe('Task team · 3 tasks')
+    expect(runTitle('zh', 0)).toBe('任务团队')
+    expect(runTitle('zh', Number.NaN)).toBe('任务团队')
+    expect(runTitle('zh', 10_000).length).toBeLessThanOrEqual(80)
   })
 })
 
@@ -295,14 +297,14 @@ describe('progress wiring: the real engine writes what the panel folds', () => {
       PROGRESS_RUN_END,
     ])
     // A plan was supplied, so the title carries the count (D of the t43 plan).
-    expect(events[0]!.data).toEqual({ runId: expect.any(String), name: 'grok-workflow · 1 task' })
+    expect(events[0]!.data).toEqual({ runId: expect.any(String), name: '任务团队 · 1 个任务' })
     const node = foldLikeTheGui(events)
     expect(node).toEqual({
-      name: 'grok-workflow · 1 task',
+      name: '任务团队 · 1 个任务',
       status: 'completed',
       members: [
-        { seq: 1, label: expect.stringContaining('grok-worker'), status: 'completed' },
-        { seq: 2, label: expect.stringContaining('grok-verifier'), status: 'completed' },
+        { seq: 1, label: expect.stringContaining('执行'), status: 'completed' },
+        { seq: 2, label: expect.stringContaining('检查'), status: 'completed' },
       ],
     })
     expect(events.at(-1)!.data).toMatchObject({ stopReason: 'completed' })

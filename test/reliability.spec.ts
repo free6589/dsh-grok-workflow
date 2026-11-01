@@ -10,7 +10,7 @@ import { collectHistory, composeObjective, renderHistory } from '../src/history.
 import { assertWorkflowReport, failureReport, failureSummary, renderReport } from '../src/report.js'
 import { buildWorkflowRequest, WORKFLOW_SCRIPT } from '../src/script.js'
 import { createActiveState, runWorkflow } from '../src/run.js'
-import { runWorkflowScript, type ScriptAgent } from './helpers.js'
+import {runWorkflowScript, type ScriptAgent, roleOf, idOfPhase, indexOfPhase} from './helpers.js'
 import { callerTask, execution, failingVerification, task, verification } from './fixtures.js'
 
 /**
@@ -68,12 +68,12 @@ class FakeEngine {
     if (!this.hang) {
       let workerCalls = 0
       const result = await runWorkflowScript(request.script, request.args as Record<string, unknown>, async (_prompt, options) => {
-        if (options.label.startsWith('grok-worker-')) {
+        if (roleOf(options.label) === 'worker') {
           workerCalls += 1
           if (this.failFirstWorker && workerCalls === 1) throw new Error('429 Too Many Requests')
           return execution('work done')
         }
-        if (options.label.startsWith('grok-verifier-')) return verification((request.args as { tasks: ReturnType<typeof task>[] }).tasks[0]!)
+        if (roleOf(options.label) === 'verifier') return verification((request.args as { tasks: ReturnType<typeof task>[] }).tasks[0]!)
         throw new Error(`unexpected label ${options.label}`)
       })
       run.complete(result.report)
@@ -191,7 +191,7 @@ describe('reliability: cancellation and deadlines', () => {
     expect(ctx.engine.runs[0]!.cancel).toHaveBeenCalled()
     // The run's name is the GUI node's title, and a supplied plan makes it carry
     // the task count (t44, plan D from t43).
-    expect(ctx.engine.runs[0]!.meta.name).toBe('grok-workflow · 1 task')
+    expect(ctx.engine.runs[0]!.meta.name).toBe('任务团队 · 1 个任务')
   })
 
   it('turns a deadline into an infrastructure report instead of an exception', async () => {
@@ -278,14 +278,14 @@ describe('reliability: concurrency and duplicate start', () => {
     let inFlight = 0
     let peak = 0
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label.startsWith('grok-worker-')) {
+      if (roleOf(options.label) === 'worker') {
         inFlight += 1
         peak = Math.max(peak, inFlight)
         await new Promise(resolve => setTimeout(resolve, 5))
         inFlight -= 1
         return execution('work done')
       }
-      return verification(tasks.find(item => options.label.includes(`-${item.id}-`)) ?? tasks[0]!)
+      return verification(tasks[indexOfPhase(options.phase) - 1] ?? tasks[0]!)
     }
     const run = await runWorkflowScript(WORKFLOW_SCRIPT, request.args, agent)
     expect(run.report.status).toBe('completed')
@@ -364,7 +364,7 @@ describe('reliability: records and partial semantics', () => {
     const config = resolveConfig({ maxConcurrency: 1, maxRetries: 0, maxTasks: 2 })
     const request = buildWorkflowRequest('Ship the verified result', [task('a')], config)
     const run = await runWorkflowScript(WORKFLOW_SCRIPT, request.args, async (_prompt, options) => {
-      if (options.label.startsWith('grok-worker-')) throw new Error('429 Too Many Requests')
+      if (roleOf(options.label) === 'worker') throw new Error('429 Too Many Requests')
       return verification(task('a'))
     })
     expect(run.report.routes?.length).toBeGreaterThan(0)
@@ -379,11 +379,11 @@ describe('reliability: records and partial semantics', () => {
     const tasks = [task('a'), task('b')]
     const request = buildWorkflowRequest('Ship the verified result', tasks, config)
     const run = await runWorkflowScript(WORKFLOW_SCRIPT, request.args, async (_prompt, options) => {
-      if (options.label.includes('-b-')) {
-        if (options.label.startsWith('grok-worker-')) return execution('weak')
+      if (idOfPhase(options.phase) === 'b') {
+        if (roleOf(options.label) === 'worker') return execution('weak')
         return failingVerification(tasks[1]!)
       }
-      if (options.label.startsWith('grok-worker-')) return execution('work done')
+      if (roleOf(options.label) === 'worker') return execution('work done')
       return verification(tasks[0]!)
     })
     expect(run.report.status).toBe('partial')

@@ -9,6 +9,7 @@ import type { Context } from '@deepseek-ai/cordis';
 import type { Agent } from '@deepseek-ai/dsh-agent';
 import type { Session } from '@deepseek-ai/dsh-session';
 import type { WorkflowRun } from '@deepseek-ai/dsh-workflow';
+import type { NamingLanguage } from './naming.js';
 import type { DisposeRecord } from './records.js';
 import type { NormalizedTask, ResolvedConfig, WorkflowReport } from './types.js';
 /** Minimal logger surface used by the runtime modules. */
@@ -124,6 +125,19 @@ export interface RunOutcome {
     /** Failure cause for logs and record keeping, when `ok` is false. */
     cause?: string;
 }
+/**
+ * Copy language for every user-visible progress string (Issue #22, P1-3).
+ *
+ * Read from the Host's own settings projection, never guessed: the DSH locale
+ * plugin owns the `locale` namespace and stores the selection in its `preference`
+ * field (`@deepseek-ai/dsh-client-locale/lib/index.js:4-14`), and this plugin
+ * already reads the same projection for its settings page (`src/settings.ts`).
+ * An absent preference means "delegate to the browser", which a Host cannot
+ * observe, so it falls back to the shipped Chinese copy rather than inventing one.
+ * @param ctx - plugin context.
+ * @returns the language the panel should render in.
+ */
+export declare function progressNamingLanguage(ctx: Context): NamingLanguage;
 export declare function runWorkflow(options: RunWorkflowOptions): Promise<RunOutcome>;
 /**
  * One child call, no plan, no verifier: the answer a chat or fast tier spends.

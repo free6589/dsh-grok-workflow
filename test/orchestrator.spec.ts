@@ -3,7 +3,7 @@ import { resolveConfig } from '../src/config.js'
 import { redactDeep } from '../src/redact.js'
 import { assertWorkflowReport } from '../src/report.js'
 import { maxTotalAgentsFor, WORKFLOW_SCRIPT } from '../src/script.js'
-import { delay, runWorkflowScript, type ScriptAgent } from './helpers.js'
+import {delay, runWorkflowScript, type ScriptAgent, roleOf, idOfPhase, attemptOf, indexOfPhase} from './helpers.js'
 import { execution, failingVerification, task, verification } from './fixtures.js'
 
 function args(tasks: unknown[] | null, overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -21,12 +21,6 @@ function args(tasks: unknown[] | null, overrides: Record<string, unknown> = {}):
   return { ...base, maxTotalAgents: maxTotalAgentsFor(taskCount, base.maxRetries as number) }
 }
 
-function idFrom(label: string): string {
-  const match = /^grok-(?:worker|verifier)-(.+)-a\d+$/.exec(label)
-  if (!match) throw new Error(`unexpected label ${label}`)
-  return match[1]!
-}
-
 describe('generated workflow script', () => {
   it('plans, runs two independent tasks concurrently, verifies both, and reports completed', async () => {
     let active = 0
@@ -37,12 +31,12 @@ describe('generated workflow script', () => {
       peak = Math.max(peak, active)
       try {
         await delay(10)
-        if (options.label === 'grok-planner') return { tasks: plannerTasks }
-        if (options.label.startsWith('grok-worker-')) {
-          return execution(`worker ${idFrom(options.label)}`)
+        if (roleOf(options.label) === 'planner') return { tasks: plannerTasks }
+        if (roleOf(options.label) === 'worker') {
+          return execution(`worker ${idOfPhase(options.phase)}`)
         }
-        if (options.label.startsWith('grok-verifier-')) {
-          const id = idFrom(options.label)
+        if (roleOf(options.label) === 'verifier') {
+          const id = idOfPhase(options.phase)
           return verification(plannerTasks.find(item => item.id === id)!)
         }
         throw new Error(`unexpected agent label ${options.label}`)
@@ -58,39 +52,39 @@ describe('generated workflow script', () => {
     expect(report.confirmed).toHaveLength(2)
     expect(report.incomplete).toHaveLength(0)
     expect(peak).toBe(2)
-    expect(events).toContain('phase:Plan')
-    expect(events).toContain('phase:Execute')
-    expect(events).toContain('phase:Synthesize')
-    expect(calls.some(call => call.label === 'grok-planner')).toBe(true)
+    expect(events).toContain('phase:规划')
+    expect(events).toContain('phase:执行')
+    expect(events).toContain('phase:汇总')
+    expect(calls.some(call => roleOf(call.label) === 'planner')).toBe(true)
   })
 
   it('skips the planner when caller tasks are supplied', async () => {
     const callerTasks = [task('one'), task('two')]
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label === 'grok-planner') throw new Error('planner must not run')
-      if (options.label.startsWith('grok-worker-')) return execution(`worker ${idFrom(options.label)}`)
-      if (options.label.startsWith('grok-verifier-')) {
-        return verification(callerTasks.find(item => item.id === idFrom(options.label))!)
+      if (roleOf(options.label) === 'planner') throw new Error('planner must not run')
+      if (roleOf(options.label) === 'worker') return execution(`worker ${idOfPhase(options.phase)}`)
+      if (roleOf(options.label) === 'verifier') {
+        return verification(callerTasks.find(item => item.id === idOfPhase(options.phase))!)
       }
       throw new Error(`unexpected label ${options.label}`)
     }
     const { report, calls } = await runWorkflowScript(WORKFLOW_SCRIPT, args(callerTasks), agent)
     expect(report.status).toBe('completed')
     expect(report.plan.source).toBe('caller')
-    expect(calls.filter(call => call.label === 'grok-planner')).toHaveLength(0)
-    expect(calls.filter(call => call.label.startsWith('grok-worker-'))).toHaveLength(2)
+    expect(calls.filter(call => roleOf(call.label) === 'planner')).toHaveLength(0)
+    expect(calls.filter(call => roleOf(call.label) === 'worker')).toHaveLength(2)
   })
 
   it('reports partial when one task never produces a valid result', async () => {
     const callerTasks = [task('ok'), task('broken')]
-    const calls: string[] = []
+    const calls: Array<{ label: string, phase?: string }> = []
     const agent: ScriptAgent = async (_prompt, options) => {
-      calls.push(options.label)
-      if (options.label.startsWith('grok-worker-')) {
-        return idFrom(options.label) === 'broken' ? null : execution('ok')
+      calls.push({ label: options.label, ...options.phase === undefined ? {} : { phase: options.phase } })
+      if (roleOf(options.label) === 'worker') {
+        return idOfPhase(options.phase) === 'broken' ? null : execution('ok')
       }
-      if (options.label.startsWith('grok-verifier-')) {
-        return verification(callerTasks.find(item => item.id === idFrom(options.label))!)
+      if (roleOf(options.label) === 'verifier') {
+        return verification(callerTasks.find(item => item.id === idOfPhase(options.phase))!)
       }
       throw new Error(`unexpected label ${options.label}`)
     }
@@ -106,7 +100,7 @@ describe('generated workflow script', () => {
       reason: expect.stringContaining('no valid structured result'),
       category: 'infrastructure',
     }])
-    expect(calls.filter(label => label.startsWith('grok-verifier-broken-'))).toHaveLength(0)
+    expect(calls.filter(call => roleOf(call.label) === 'verifier' && idOfPhase(call.phase) === 'broken')).toHaveLength(0)
   })
 
   it('rejects an evidence-free verifier pass and retries only to the configured limit', async () => {
@@ -114,11 +108,11 @@ describe('generated workflow script', () => {
     let workerCalls = 0
     let verifierCalls = 0
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label.startsWith('grok-worker-')) {
+      if (roleOf(options.label) === 'worker') {
         workerCalls += 1
         return execution('self-reported success')
       }
-      if (options.label.startsWith('grok-verifier-')) {
+      if (roleOf(options.label) === 'verifier') {
         verifierCalls += 1
         return verification(callerTasks[0]!, {
           criteria: [{ criterion: 'a works', met: true, evidence: '' }],
@@ -140,8 +134,8 @@ describe('generated workflow script', () => {
     const callerTasks = [task('a')]
     let verifierCalls = 0
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label.startsWith('grok-worker-')) return execution('first then fixed')
-      if (options.label.startsWith('grok-verifier-')) {
+      if (roleOf(options.label) === 'worker') return execution('first then fixed')
+      if (roleOf(options.label) === 'verifier') {
         verifierCalls += 1
         return verifierCalls === 1
           ? failingVerification(callerTasks[0]!, 'the test failed')
@@ -167,9 +161,9 @@ describe('generated workflow script', () => {
       peak = Math.max(peak, active)
       try {
         await delay(8)
-        if (options.label.startsWith('grok-worker-')) return execution('ok')
-        if (options.label.startsWith('grok-verifier-')) {
-          return verification(callerTasks.find(item => item.id === idFrom(options.label))!)
+        if (roleOf(options.label) === 'worker') return execution('ok')
+        if (roleOf(options.label) === 'verifier') {
+          return verification(callerTasks.find(item => item.id === idOfPhase(options.phase))!)
         }
         throw new Error(`unexpected label ${options.label}`)
       } finally {
@@ -184,9 +178,9 @@ describe('generated workflow script', () => {
 
   it('falls back to one task and cannot report fully clean completion when planning fails', async () => {
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label === 'grok-planner') return { tasks: [] }
-      if (options.label === 'grok-worker-task-1-a1') return execution('fallback completed')
-      if (options.label === 'grok-verifier-task-1-a1') {
+      if (roleOf(options.label) === 'planner') return { tasks: [] }
+      if (roleOf(options.label) === 'worker' && indexOfPhase(options.phase) === 1 && attemptOf(options.label) === 1) return execution('fallback completed')
+      if (roleOf(options.label) === 'verifier' && indexOfPhase(options.phase) === 1 && attemptOf(options.label) === 1) {
         return verification(task('task-1', ['The expected output is completed and supported by concrete evidence']))
       }
       throw new Error(`unexpected label ${options.label}`)
@@ -202,9 +196,9 @@ describe('generated workflow script', () => {
 
   it('accepts a verified fallback report as partial through host validation', async () => {
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label === 'grok-planner') throw new Error('planner unavailable')
-      if (options.label === 'grok-worker-task-1-a1') return execution('fallback completed')
-      if (options.label === 'grok-verifier-task-1-a1') {
+      if (roleOf(options.label) === 'planner') throw new Error('planner unavailable')
+      if (roleOf(options.label) === 'worker' && indexOfPhase(options.phase) === 1 && attemptOf(options.label) === 1) return execution('fallback completed')
+      if (roleOf(options.label) === 'verifier' && indexOfPhase(options.phase) === 1 && attemptOf(options.label) === 1) {
         return verification(task('task-1', ['The expected output is completed and supported by concrete evidence']))
       }
       throw new Error(`unexpected label ${options.label}`)
@@ -243,9 +237,9 @@ describe('generated workflow script', () => {
       (_, criterion) => `${criterion}`.padEnd(1000, 'x'),
     )))
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label === 'grok-planner') return { tasks: bad }
-      if (options.label === 'grok-worker-task-1-a1') return execution('fallback completed')
-      if (options.label === 'grok-verifier-task-1-a1') {
+      if (roleOf(options.label) === 'planner') return { tasks: bad }
+      if (roleOf(options.label) === 'worker' && indexOfPhase(options.phase) === 1 && attemptOf(options.label) === 1) return execution('fallback completed')
+      if (roleOf(options.label) === 'verifier' && indexOfPhase(options.phase) === 1 && attemptOf(options.label) === 1) {
         return verification(task('task-1', ['The expected output is completed and supported by concrete evidence']))
       }
       throw new Error(`unexpected label ${options.label}`)
@@ -258,9 +252,9 @@ describe('generated workflow script', () => {
   it('rejects duplicate planner acceptance criteria instead of creating an impossible task', async () => {
     const bad = task('a', ['same', 'same'])
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label === 'grok-planner') return { tasks: [bad] }
-      if (options.label === 'grok-worker-task-1-a1') return execution('fallback completed')
-      if (options.label === 'grok-verifier-task-1-a1') {
+      if (roleOf(options.label) === 'planner') return { tasks: [bad] }
+      if (roleOf(options.label) === 'worker' && indexOfPhase(options.phase) === 1 && attemptOf(options.label) === 1) return execution('fallback completed')
+      if (roleOf(options.label) === 'verifier' && indexOfPhase(options.phase) === 1 && attemptOf(options.label) === 1) {
         return verification(task('task-1', ['The expected output is completed and supported by concrete evidence']))
       }
       throw new Error(`unexpected label ${options.label}`)
@@ -274,9 +268,9 @@ describe('generated workflow script', () => {
     const bad = task('a')
     bad.acceptanceCriteria = Array.from({ length: 21 }, (_, index) => `criterion ${index}`)
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label === 'grok-planner') return { tasks: [bad] }
-      if (options.label === 'grok-worker-task-1-a1') return execution('fallback completed')
-      if (options.label === 'grok-verifier-task-1-a1') {
+      if (roleOf(options.label) === 'planner') return { tasks: [bad] }
+      if (roleOf(options.label) === 'worker' && indexOfPhase(options.phase) === 1 && attemptOf(options.label) === 1) return execution('fallback completed')
+      if (roleOf(options.label) === 'verifier' && indexOfPhase(options.phase) === 1 && attemptOf(options.label) === 1) {
         return verification(task('task-1', ['The expected output is completed and supported by concrete evidence']))
       }
       throw new Error(`unexpected label ${options.label}`)
@@ -297,12 +291,12 @@ describe('generated workflow script', () => {
     const plannerTasks = [task('a')]
     let workerCalls = 0
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label === 'grok-planner') return { tasks: plannerTasks }
-      if (options.label.startsWith('grok-worker-')) {
+      if (roleOf(options.label) === 'planner') return { tasks: plannerTasks }
+      if (roleOf(options.label) === 'worker') {
         workerCalls += 1
         return execution('the write was blocked by the environment', { status: 'partial' })
       }
-      if (options.label.startsWith('grok-verifier-')) return verification(plannerTasks[0]!)
+      if (roleOf(options.label) === 'verifier') return verification(plannerTasks[0]!)
       throw new Error(`unexpected agent label ${options.label}`)
     }
 
@@ -322,8 +316,8 @@ describe('generated workflow script', () => {
     // "Report validation" failure.
     const plannerTasks = [task('a')]
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label === 'grok-planner') return { tasks: plannerTasks }
-      if (options.label.startsWith('grok-worker-')) {
+      if (roleOf(options.label) === 'planner') return { tasks: plannerTasks }
+      if (roleOf(options.label) === 'worker') {
         return execution('The answer is 42', {
           deliverables: [],
           evidence: [],
@@ -331,7 +325,7 @@ describe('generated workflow script', () => {
           filesChanged: [],
         })
       }
-      if (options.label.startsWith('grok-verifier-')) return verification(plannerTasks[0]!)
+      if (roleOf(options.label) === 'verifier') return verification(plannerTasks[0]!)
       throw new Error(`unexpected agent label ${options.label}`)
     }
     const answerObjective = 'What is the answer to life?'
@@ -345,7 +339,7 @@ describe('generated workflow script', () => {
   it('reports failed when no task can be verified', async () => {
     const callerTasks = [task('a'), task('b')]
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label.startsWith('grok-worker-')) return null
+      if (roleOf(options.label) === 'worker') return null
       throw new Error(`unexpected label ${options.label}`)
     }
     const { report } = await runWorkflowScript(WORKFLOW_SCRIPT, args(callerTasks), agent)
@@ -362,21 +356,21 @@ describe('generated workflow script', () => {
     let workerCalls = 0
     let verifierCalls = 0
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label.startsWith('grok-worker-')) {
+      if (roleOf(options.label) === 'worker') {
         workerCalls += 1
         return workerCalls === 1
           ? execution(`leaked ${secret} api_key=${apiValue}`)
           : execution('clean retry')
       }
-      if (options.label.startsWith('grok-verifier-')) {
+      if (roleOf(options.label) === 'verifier') {
         verifierCalls += 1
         return verifierCalls === 1 ? failingVerification(callerTasks[0]!, 'first failure') : verification(callerTasks[0]!)
       }
       throw new Error(`unexpected label ${options.label}`)
     }
     const { report, calls } = await runWorkflowScript(WORKFLOW_SCRIPT, args(callerTasks), agent)
-    const firstVerifier = calls.find(call => call.label === 'grok-verifier-a-a1')!
-    const retryWorker = calls.find(call => call.label === 'grok-worker-a-a2')!
+    const firstVerifier = calls.find(call => roleOf(call.label) === 'verifier' && idOfPhase(call.phase) === 'a' && attemptOf(call.label) === 1)!
+    const retryWorker = calls.find(call => roleOf(call.label) === 'worker' && idOfPhase(call.phase) === 'a' && attemptOf(call.label) === 2)!
     expect(firstVerifier.prompt).not.toContain(secret)
     expect(firstVerifier.prompt).not.toContain(apiValue)
     expect(retryWorker.prompt).not.toContain(secret)
@@ -392,21 +386,21 @@ describe('generated workflow script', () => {
     let workerCalls = 0
     let verifierCalls = 0
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label.startsWith('grok-worker-')) {
+      if (roleOf(options.label) === 'worker') {
         workerCalls += 1
         return workerCalls === 1
           ? execution(`connect failed postgres://demo_user:${password}@example.test/app ${gitlab} ${npm}`)
           : execution('clean retry')
       }
-      if (options.label.startsWith('grok-verifier-')) {
+      if (roleOf(options.label) === 'verifier') {
         verifierCalls += 1
         return verifierCalls === 1 ? failingVerification(callerTasks[0]!, 'first failure') : verification(callerTasks[0]!)
       }
       throw new Error(`unexpected label ${options.label}`)
     }
     const { report, calls } = await runWorkflowScript(WORKFLOW_SCRIPT, args(callerTasks), agent)
-    const firstVerifier = calls.find(call => call.label === 'grok-verifier-a-a1')!
-    const retryWorker = calls.find(call => call.label === 'grok-worker-a-a2')!
+    const firstVerifier = calls.find(call => roleOf(call.label) === 'verifier' && idOfPhase(call.phase) === 'a' && attemptOf(call.label) === 1)!
+    const retryWorker = calls.find(call => roleOf(call.label) === 'worker' && idOfPhase(call.phase) === 'a' && attemptOf(call.label) === 2)!
     for (const prompt of [firstVerifier.prompt, retryWorker.prompt]) {
       expect(prompt).not.toContain(password)
       expect(prompt).not.toContain(gitlab)
@@ -421,16 +415,16 @@ describe('generated workflow script', () => {
     const callerTasks = [task('a')]
     let workerCalls = 0
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label.startsWith('grok-worker-')) {
+      if (roleOf(options.label) === 'worker') {
         workerCalls += 1
         if (workerCalls === 1) throw new Error(`worker failed with ${secret}`)
         return execution('retry succeeded')
       }
-      if (options.label.startsWith('grok-verifier-')) return verification(callerTasks[0]!)
+      if (roleOf(options.label) === 'verifier') return verification(callerTasks[0]!)
       throw new Error(`unexpected label ${options.label}`)
     }
     const { report, calls } = await runWorkflowScript(WORKFLOW_SCRIPT, args(callerTasks), agent)
-    const retryWorker = calls.find(call => call.label === 'grok-worker-a-a2')!
+    const retryWorker = calls.find(call => roleOf(call.label) === 'worker' && idOfPhase(call.phase) === 'a' && attemptOf(call.label) === 2)!
     expect(retryWorker.prompt).not.toContain(secret)
     expect(report.status).toBe('completed')
   })
@@ -439,8 +433,8 @@ describe('generated workflow script', () => {
     const longCriterion = 'x'.repeat(1000)
     const callerTasks = [task('a', [longCriterion])]
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label.startsWith('grok-worker-')) return execution('done')
-      if (options.label.startsWith('grok-verifier-')) {
+      if (roleOf(options.label) === 'worker') return execution('done')
+      if (roleOf(options.label) === 'verifier') {
         return verification(callerTasks[0]!, {
           criteria: [{ criterion: `${longCriterion}EXTRA`, met: true, evidence: 'file:1' }],
         })
@@ -456,8 +450,8 @@ describe('generated workflow script', () => {
   it('rejects a malformed verifier pass that omits a criterion', async () => {
     const callerTasks = [task('a', ['first', 'second'])]
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label.startsWith('grok-worker-')) return execution('done')
-      if (options.label.startsWith('grok-verifier-')) {
+      if (roleOf(options.label) === 'worker') return execution('done')
+      if (roleOf(options.label) === 'verifier') {
         return verification(callerTasks[0]!, {
           criteria: [{ criterion: 'first', met: true, evidence: 'file:1' }],
         })
@@ -473,11 +467,11 @@ describe('generated workflow script', () => {
     const callerTasks = [task('a', ['alpha works'])]
     let workerCalls = 0
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label.startsWith('grok-worker-')) {
+      if (roleOf(options.label) === 'worker') {
         workerCalls += 1
         return execution('done')
       }
-      if (options.label.startsWith('grok-verifier-')) {
+      if (roleOf(options.label) === 'verifier') {
         return verification(callerTasks[0]!, {
           criteria: [{ criterion: 'alpha works.', met: true, evidence: 'file:///tmp/proof' }],
         })
@@ -500,8 +494,8 @@ describe('generated workflow script', () => {
     const callerTasks = [task('a', ['Deploy the service to staging'])]
     let verifierCalls = 0
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label.startsWith('grok-worker-')) return execution('deployed')
-      if (options.label.startsWith('grok-verifier-')) {
+      if (roleOf(options.label) === 'worker') return execution('deployed')
+      if (roleOf(options.label) === 'verifier') {
         verifierCalls += 1
         return verification(callerTasks[0]!, {
           criteria: [{ criterion: '  deploy   THE service to   staging ', met: true, evidence: 'cmd:deploy' }],
@@ -518,8 +512,8 @@ describe('generated workflow script', () => {
   it('still rejects a verifier criterion that names different content', async () => {
     const callerTasks = [task('a', ['alpha works'])]
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label.startsWith('grok-worker-')) return execution('done')
-      if (options.label.startsWith('grok-verifier-')) {
+      if (roleOf(options.label) === 'worker') return execution('done')
+      if (roleOf(options.label) === 'verifier') {
         return verification(callerTasks[0]!, {
           criteria: [{ criterion: 'beta works', met: true, evidence: 'file:1' }],
         })
@@ -535,8 +529,8 @@ describe('generated workflow script', () => {
   it('still rejects a verifier that reports one criterion twice', async () => {
     const callerTasks = [task('a', ['alpha works', 'beta works'])]
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label.startsWith('grok-worker-')) return execution('done')
-      if (options.label.startsWith('grok-verifier-')) {
+      if (roleOf(options.label) === 'worker') return execution('done')
+      if (roleOf(options.label) === 'verifier') {
         return verification(callerTasks[0]!, {
           criteria: [
             { criterion: 'alpha works', met: true, evidence: 'file:1' },
@@ -555,8 +549,8 @@ describe('generated workflow script', () => {
   it('does not collapse criteria that differ only in trailing words', async () => {
     const callerTasks = [task('a', ['the file exists', 'the file exists with content'])]
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label.startsWith('grok-worker-')) return execution('done')
-      if (options.label.startsWith('grok-verifier-')) {
+      if (roleOf(options.label) === 'worker') return execution('done')
+      if (roleOf(options.label) === 'verifier') {
         return verification(callerTasks[0]!, {
           criteria: [
             { criterion: 'the file exists', met: true, evidence: 'file:1' },
@@ -575,14 +569,14 @@ describe('generated workflow script', () => {
     const secret = ['sk', 'proj', 'FAKEEXAMPLE1234567890'].join('-')
     const plannerTasks = [task('a')]
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label === 'grok-planner') return { tasks: plannerTasks }
-      if (options.label.startsWith('grok-worker-')) return execution('done')
-      if (options.label.startsWith('grok-verifier-')) return verification(plannerTasks[0]!)
+      if (roleOf(options.label) === 'planner') return { tasks: plannerTasks }
+      if (roleOf(options.label) === 'worker') return execution('done')
+      if (roleOf(options.label) === 'verifier') return verification(plannerTasks[0]!)
       throw new Error(`unexpected label ${options.label}`)
     }
     const objective = `Ship the result for token ${secret}`
     const { report, calls } = await runWorkflowScript(WORKFLOW_SCRIPT, args(null, { objective }), agent)
-    const planner = calls.find(call => call.label === 'grok-planner')!
+    const planner = calls.find(call => roleOf(call.label) === 'planner')!
     expect(planner.prompt).not.toContain(secret)
     expect(planner.prompt).toContain('[REDACTED API KEY]')
     // The script returns the objective verbatim; the host redacts it at the
@@ -594,9 +588,9 @@ describe('generated workflow script', () => {
   it('rejects a planner task whose criteria collide after normalization', async () => {
     const bad = task('a', ['same criterion.', 'Same criterion'])
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label === 'grok-planner') return { tasks: [bad] }
-      if (options.label === 'grok-worker-task-1-a1') return execution('fallback completed')
-      if (options.label === 'grok-verifier-task-1-a1') {
+      if (roleOf(options.label) === 'planner') return { tasks: [bad] }
+      if (roleOf(options.label) === 'worker' && indexOfPhase(options.phase) === 1 && attemptOf(options.label) === 1) return execution('fallback completed')
+      if (roleOf(options.label) === 'verifier' && indexOfPhase(options.phase) === 1 && attemptOf(options.label) === 1) {
         return verification(task('task-1', ['The expected output is completed and supported by concrete evidence']))
       }
       throw new Error(`unexpected label ${options.label}`)

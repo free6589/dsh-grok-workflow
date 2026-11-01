@@ -5,7 +5,7 @@ import { buildWorkflowRequest, WORKFLOW_SCRIPT } from '../src/script.js'
 import type { NormalizedTask } from '../src/types.js'
 import { createEngineHarness } from './engine-harness.js'
 import { execution, failingVerification, task, verification } from './fixtures.js'
-import { runWorkflowScript, type ScriptAgent } from './helpers.js'
+import {runWorkflowScript, type ScriptAgent, roleOf, idOfPhase} from './helpers.js'
 
 /**
  * G-4: infrastructure failures must not delete the report.
@@ -58,7 +58,7 @@ function agentResultError(message: string): Error {
 describe('infrastructure failures still produce a report (G-4)', () => {
   it('reports a rate-limited chain as an infrastructure failure instead of aborting', async () => {
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label.startsWith('grok-worker')) throw agentResultError('429 Too Many Requests')
+      if (roleOf(options.label) === 'worker') throw agentResultError('429 Too Many Requests')
       return verification(task('a'))
     }
     const { report } = await runWorkflowScript(WORKFLOW_SCRIPT, args({ roles: roles([{ model: 'w1' }, { model: 'w2' }]) }), agent)
@@ -78,7 +78,7 @@ describe('infrastructure failures still produce a report (G-4)', () => {
 
   it('reports a timeout as an infrastructure failure and keeps the report valid', async () => {
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label.startsWith('grok-worker')) throw agentResultError('request timed out after 600000ms')
+      if (roleOf(options.label) === 'worker') throw agentResultError('request timed out after 600000ms')
       return verification(task('a'))
     }
     const { report } = await runWorkflowScript(WORKFLOW_SCRIPT, args({ roles: roles([{ model: 'w1' }]) }), agent)
@@ -93,7 +93,7 @@ describe('infrastructure failures still produce a report (G-4)', () => {
   it('treats a crashed child as infrastructure even when its text cannot be classified', async () => {
     const agent: ScriptAgent = async (_prompt, options) => {
       // No status code, no timeout wording: only the engine code identifies this.
-      if (options.label.startsWith('grok-worker')) throw agentResultError('workflow execution failed (abort): runtime disposed')
+      if (roleOf(options.label) === 'worker') throw agentResultError('workflow execution failed (abort): runtime disposed')
       return verification(task('a'))
     }
     const { report } = await runWorkflowScript(WORKFLOW_SCRIPT, args({ roles: roles([{ model: 'w1' }]) }), agent)
@@ -112,9 +112,9 @@ describe('infrastructure failures still produce a report (G-4)', () => {
     const okTask = task('ok')
     const downTask = task('down')
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label.startsWith('grok-worker-ok')) return execution('ok')
-      if (options.label.startsWith('grok-verifier-ok')) return verification(okTask)
-      if (options.label.startsWith('grok-worker-down')) throw agentResultError('503 Service Unavailable')
+      if (roleOf(options.label) === 'worker' && idOfPhase(options.phase) === 'ok') return execution('ok')
+      if (roleOf(options.label) === 'verifier' && idOfPhase(options.phase) === 'ok') return verification(okTask)
+      if (roleOf(options.label) === 'worker' && idOfPhase(options.phase) === 'down') throw agentResultError('503 Service Unavailable')
       return verification(downTask)
     }
     const { report } = await runWorkflowScript(
@@ -136,9 +136,9 @@ describe('infrastructure failures still produce a report (G-4)', () => {
     const flakyTask = task('flaky')
     const weakTask = task('weak', ['weak works'])
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label.startsWith('grok-worker-flaky')) throw agentResultError('429 Too Many Requests')
-      if (options.label.startsWith('grok-worker-weak')) return execution('weak work')
-      if (options.label.startsWith('grok-verifier-weak')) return failingVerification(weakTask, 'no evidence for weak works')
+      if (roleOf(options.label) === 'worker' && idOfPhase(options.phase) === 'flaky') throw agentResultError('429 Too Many Requests')
+      if (roleOf(options.label) === 'worker' && idOfPhase(options.phase) === 'weak') return execution('weak work')
+      if (roleOf(options.label) === 'verifier' && idOfPhase(options.phase) === 'weak') return failingVerification(weakTask, 'no evidence for weak works')
       return verification(flakyTask)
     }
     const { report } = await runWorkflowScript(
@@ -160,7 +160,7 @@ describe('infrastructure failures still produce a report (G-4)', () => {
 
   it('still yields a structured failure report when every route is exhausted', async () => {
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label.startsWith('grok-worker')) throw agentResultError('ECONNRESET socket hang up')
+      if (roleOf(options.label) === 'worker') throw agentResultError('ECONNRESET socket hang up')
       return verification(task('a'))
     }
     const { report } = await runWorkflowScript(WORKFLOW_SCRIPT, args({ roles: roles([{ model: 'w1' }, { model: 'w2' }]) }), agent)
@@ -176,7 +176,7 @@ describe('infrastructure failures still produce a report (G-4)', () => {
 
   it('contains a non-Error throw from a child as that task failure', async () => {
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label.startsWith('grok-worker')) throw 'boom' as unknown as Error
+      if (roleOf(options.label) === 'worker') throw 'boom' as unknown as Error
       return verification(task('a'))
     }
     const { report } = await runWorkflowScript(WORKFLOW_SCRIPT, args({ roles: roles([{ model: 'w1' }]) }), agent)

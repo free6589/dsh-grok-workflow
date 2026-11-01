@@ -10,6 +10,8 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { Session } from '@deepseek-ai/dsh-session'
 import type { WorkflowRun, WorkflowStartRequest, WorkflowStopReason } from '@deepseek-ai/dsh-workflow'
+import { namingLanguageFromSettings } from './naming.js'
+import type { NamingLanguage } from './naming.js'
 import { buildWorkflowRequest } from './script.js'
 import { assertWorkflowReport, failureReport } from './report.js'
 import {
@@ -336,11 +338,36 @@ function sessionOfAgent(agent: Agent): Session | undefined {
   }
 }
 
+/**
+ * Copy language for every user-visible progress string (Issue #22, P1-3).
+ *
+ * Read from the Host's own settings projection, never guessed: the DSH locale
+ * plugin owns the `locale` namespace and stores the selection in its `preference`
+ * field (`@deepseek-ai/dsh-client-locale/lib/index.js:4-14`), and this plugin
+ * already reads the same projection for its settings page (`src/settings.ts`).
+ * An absent preference means "delegate to the browser", which a Host cannot
+ * observe, so it falls back to the shipped Chinese copy rather than inventing one.
+ * @param ctx - plugin context.
+ * @returns the language the panel should render in.
+ */
+export function progressNamingLanguage(ctx: Context): NamingLanguage {
+  try {
+    const get = (ctx as unknown as { get?: unknown }).get
+    if (typeof get !== 'function') return 'zh'
+    const settings = (get as (key: string) => unknown).call(ctx, 'settings') as
+      { describe?: (options?: { redactSecrets?: boolean }) => { ns?: unknown, value?: unknown }[] } | undefined
+    if (settings === undefined || typeof settings.describe !== 'function') return 'zh'
+    return namingLanguageFromSettings(settings.describe({ redactSecrets: true }))
+  } catch {
+    return 'zh'
+  }
+}
+
 export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutcome> {
   const { ctx, config, state, logger, agent, objective } = options
   if (state.disposed) throw new Error(`${workflowLabel(config)} is unavailable: plugin has been unloaded`)
   const callerTasks = options.callerTasks
-  const request = buildWorkflowRequest(objective, callerTasks, config)
+  const request = buildWorkflowRequest(objective, callerTasks, config, progressNamingLanguage(ctx))
   // Two independent caps (t41, P1-3): the per-session one is what a user can
   // reason about ("this conversation already runs two workflows"), and the
   // process-wide one only exists so a fleet of sessions cannot unbounded the

@@ -6,7 +6,7 @@ import { Session, pluginRecordOf } from '@deepseek-ai/dsh-session'
 import { apply } from '../src/index.js'
 import { REPORT_BEGIN, REPORT_END } from '../src/answer.js'
 import { callerTask, execution, task, verification } from './fixtures.js'
-import { runWorkflowScript } from './helpers.js'
+import {runWorkflowScript, roleOf} from './helpers.js'
 import { ROUTING_RECORD } from '../src/records.js'
 
 /**
@@ -73,9 +73,9 @@ class FakeEngine {
       const tasks = [(request.args as { tasks?: unknown }).tasks].flat().filter(Boolean)
       const plan = tasks.length > 0 ? tasks as ReturnType<typeof task>[] : [task('a')]
       const result = await runWorkflowScript(request.script, request.args as Record<string, unknown>, async (_prompt, options) => {
-        if (options.label.startsWith('grok-worker-')) return execution('work done')
-        if (options.label.startsWith('grok-verifier-')) return verification(plan[0]!)
-        if (options.label === 'grok-planner') return { tasks: plan }
+        if (roleOf(options.label) === 'worker') return execution('work done')
+        if (roleOf(options.label) === 'verifier') return verification(plan[0]!)
+        if (roleOf(options.label) === 'planner') return { tasks: plan }
         throw new Error(`unexpected label ${options.label}`)
       })
       run.complete(result.report)
@@ -445,8 +445,8 @@ describe('mandatory entry gate', () => {
     await waitFor(() => ctx.engine.startCalls.length === 1)
     const request = ctx.engine.startCalls[0]!
     const result = await runWorkflowScript(request.script, request.args as Record<string, unknown>, async (_prompt, options) => {
-      if (options.label === 'grok-planner') return { tasks: [callerTask('a')] }
-      if (options.label.startsWith('grok-worker')) {
+      if (roleOf(options.label) === 'planner') return { tasks: [callerTask('a')] }
+      if (roleOf(options.label) === 'worker') {
         // The first route fails with a rate limit; the chain must advance.
         if (options.model === 'good') throw new Error('429 Too Many Requests')
         return execution('work done')
@@ -725,8 +725,8 @@ describe('in-turn delivery (default strategy)', () => {
 
     const request = ctx.engine.startCalls[0]!
     const result = await runWorkflowScript(request.script, request.args as Record<string, unknown>, async (_prompt, options) => {
-      if (options.label === 'grok-planner') return { tasks: [callerTask('a')] }
-      if (options.label.startsWith('grok-worker')) return execution('work done')
+      if (roleOf(options.label) === 'planner') return { tasks: [callerTask('a')] }
+      if (roleOf(options.label) === 'worker') return execution('work done')
       return verification(task('a'))
     })
     ctx.engine.runs[0]!.complete(result.report)

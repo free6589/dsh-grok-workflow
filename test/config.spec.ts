@@ -16,7 +16,7 @@ import type { ResolvedConfig } from '../src/types.js'
 import { ROUTING_RECORD, recordRouting } from '../src/records.js'
 import { buildWorkflowRequest, WORKFLOW_SCRIPT } from '../src/script.js'
 import { execution, failingVerification, task, verification } from './fixtures.js'
-import { runWorkflowScript, type ScriptAgent } from './helpers.js'
+import {runWorkflowScript, type ScriptAgent, roleOf} from './helpers.js'
 
 /**
  * 阶段5 (requirement D): one configuration layer, validated at load.
@@ -227,7 +227,7 @@ describe('route validation against the runtime', () => {
 describe('configuration reaches the run', () => {
   it('applies the configured switching policy to the fallback chain', async () => {
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label.startsWith('grok-worker')) throw Object.assign(new Error('429 Too Many Requests'), { code: 'AGENT_RESULT' })
+      if (roleOf(options.label) === 'worker') throw Object.assign(new Error('429 Too Many Requests'), { code: 'AGENT_RESULT' })
       return verification(task('a'))
     }
     const build = (switchOn: string[]) => {
@@ -243,7 +243,7 @@ describe('configuration reaches the run', () => {
     // Built-in policy: a rate limit advances the chain (both routes tried).
     const builtIn = build([])
     const a = await runWorkflowScript(WORKFLOW_SCRIPT, builtIn.args, agent)
-    expect(a.calls.filter(call => call.label.startsWith('grok-worker'))).toHaveLength(2)
+    expect(a.calls.filter(call => roleOf(call.label) === 'worker')).toHaveLength(2)
     expect(a.report.status).toBe('failed')
     // t47: the switch is only *visible* if the trail records which route failed.
     // t46 wrote a model the provider does not enumerate and saw no switch entry —
@@ -260,7 +260,7 @@ describe('configuration reaches the run', () => {
     // Configured policy that omits rate-limit: the same failure does NOT advance.
     const narrowed = build(['server-error'])
     const b = await runWorkflowScript(WORKFLOW_SCRIPT, narrowed.args, agent)
-    expect(b.calls.filter(call => call.label.startsWith('grok-worker'))).toHaveLength(1)
+    expect(b.calls.filter(call => roleOf(call.label) === 'worker')).toHaveLength(1)
     expect(b.report.tasks[0]?.attempts[0]?.failure?.class).toBe('rate-limit')
   })
 
@@ -351,8 +351,8 @@ describe('t49: a non-blocking verifier note does not fail a verified task', () =
     const config = resolveConfig({ maxConcurrency: 1, maxRetries: 0, maxTasks: 4 })
     const plan = [task('a')]
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label.startsWith('grok-worker')) return execution('did it')
-      if (options.label.startsWith('grok-verifier')) {
+      if (roleOf(options.label) === 'worker') return execution('did it')
+      if (roleOf(options.label) === 'verifier') {
         return verification(plan[0]!, {
           // Verbatim strings from the recorded failures (test home, t46 rounds 3 and
           // 5); both were reported as `incomplete (quality): verifier reported issues`.
@@ -379,8 +379,8 @@ describe('t49: a non-blocking verifier note does not fail a verified task', () =
     const config = resolveConfig({ maxConcurrency: 1, maxRetries: 0, maxTasks: 4 })
     const plan = [task('a', ['first holds', 'second holds'])]
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label.startsWith('grok-worker')) return execution('did it')
-      if (options.label.startsWith('grok-verifier')) {
+      if (roleOf(options.label) === 'worker') return execution('did it')
+      if (roleOf(options.label) === 'verifier') {
         return verification(plan[0]!, {
           criteria: [
             { criterion: 'first holds', met: true, evidence: 'seen in file:///tmp/x' },
@@ -401,8 +401,8 @@ describe('t49: a non-blocking verifier note does not fail a verified task', () =
     const config = resolveConfig({ maxConcurrency: 1, maxRetries: 0, maxTasks: 4 })
     const plan = [task('a')]
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label.startsWith('grok-worker')) return execution('did it')
-      if (options.label.startsWith('grok-verifier')) return failingVerification(plan[0]!)
+      if (roleOf(options.label) === 'worker') return execution('did it')
+      if (roleOf(options.label) === 'verifier') return failingVerification(plan[0]!)
       throw new Error(`unexpected label ${options.label}`)
     }
     const { args } = buildWorkflowRequest('Ship the verified result', plan, config)
