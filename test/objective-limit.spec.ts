@@ -30,12 +30,10 @@ import { assertWorkflowReport } from '../src/report.js'
 import { WORKFLOW_SCRIPT } from '../src/script.js'
 import type { WorkflowReport } from '../src/types.js'
 import { execution, task, verification } from './fixtures.js'
-import { roleOf, runWorkflowScript, type ScriptAgent } from './helpers.js'
+import { roleOf, runWorkflowScript, taskFromPrompt, type ScriptAgent } from './helpers.js'
 
 /** Mirrors TASK_LIMITS.objectiveChars in src/input.ts and src/script.ts. */
 const OBJECTIVE_LIMIT = 32_000
-/** The one acceptance criterion the fallback plan always uses. */
-const FALLBACK_CRITERION = 'The expected output is completed and supported by concrete evidence'
 
 /* ------------------------------------------------------------------ engine -- */
 
@@ -96,8 +94,10 @@ class FakeEngine {
       }
       if (member?.role === 'worker') return execution('work done')
       if (member?.role === 'verifier') {
+        // Answer the task that was actually handed over: the fallback plan words
+        // its criteria per segment, and a real verifier copies them verbatim.
         return this.planner === 'fail'
-          ? verification(task('task-1', [FALLBACK_CRITERION]))
+          ? verification(taskFromPrompt(prompt))
           : verification(planned[0]!)
       }
       throw new Error(`unexpected label ${options.label}`)
