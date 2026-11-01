@@ -83,10 +83,7 @@ Host/script validation enforces unique IDs, non-empty required fields, at most
 `maxTasks` tasks, no dependency graph, a **32,000-character workflow objective**,
 and a 48,000-character aggregate serialized task budget. Each task's own
 `objective`, `expectedOutput`, and `context` stay capped at 4,000 characters
-(`taskTextChars`) — those task-level limits are unchanged. A planner failure or
-invalid plan falls back to one task containing the original objective verbatim;
-the report records `planning.source: "fallback"` and cannot claim fully clean
-completion.
+(`taskTextChars`) — those task-level limits are unchanged. A planner failure or invalid plan falls back to sharded tasks covering the original objective verbatim: the objective is split into contiguous shards of at most 4,000 characters (`taskTextChars`), concatenating the shard objectives reproduces the original byte for byte, every shard carries the same `origin_goal_id`, and the shard count is bounded by `ceil(objectiveChars / taskTextChars)` rather than `maxTasks`; the report records `planning.source: "fallback"` and cannot claim fully clean completion.
 
 `acceptanceCriteria` is a non-empty list whose entries must stay distinct under
 the comparison used to match a verifier's answer: trailing sentence punctuation,
