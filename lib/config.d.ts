@@ -47,7 +47,7 @@ export declare const CONFIG_VERSION = 1;
  * a typo that is silently ignored looks exactly like a setting that "does not
  * work", which is the failure mode the settings surface must not have.
  */
-export declare const CONFIG_KEYS: readonly ["toolName", "enforceGate", "gateRequired", "gateScope", "gatePreset", "answerStrategy", "mode", "triageAsk", "triageModel", "historyTurns", "historyChars", "maxQueuedMessages", "maxConcurrency", "maxRetries", "maxTasks", "timeoutMs", "maxActiveRuns", "maxActiveRunsTotal", "subagentProvider", "roles", "synthesis", "switchOn", "recordRuns", "recordLimit", "showProgress", "configVersion"];
+export declare const CONFIG_KEYS: readonly ["toolName", "enforceGate", "gateRequired", "gateScope", "gatePreset", "answerStrategy", "mode", "grokDefault", "triageAsk", "triageModel", "historyTurns", "historyChars", "maxQueuedMessages", "maxConcurrency", "maxRetries", "maxTasks", "timeoutMs", "maxActiveRuns", "maxActiveRunsTotal", "subagentProvider", "roles", "synthesis", "switchOn", "recordRuns", "recordLimit", "showProgress", "configVersion"];
 /**
  * DSH profile configuration schema.
  *
@@ -67,6 +67,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     gatePreset: z<string, string, "volatile-defined">;
     answerStrategy: z<"relay" | "append" | "in-turn", "relay" | "append" | "in-turn", "volatile-defined">;
     mode: z<"full" | "triage", "full" | "triage", "volatile-defined">;
+    grokDefault: z<"on" | "off", "on" | "off", "volatile-defined">;
     triageAsk: z<boolean, boolean, "volatile-defined">;
     triageModel: z<string, string, "volatile-defined">;
     historyTurns: z<number, number, "volatile-defined">;
@@ -152,6 +153,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     gatePreset: z<string, string, "volatile-defined">;
     answerStrategy: z<"relay" | "append" | "in-turn", "relay" | "append" | "in-turn", "volatile-defined">;
     mode: z<"full" | "triage", "full" | "triage", "volatile-defined">;
+    grokDefault: z<"on" | "off", "on" | "off", "volatile-defined">;
     triageAsk: z<boolean, boolean, "volatile-defined">;
     triageModel: z<string, string, "volatile-defined">;
     historyTurns: z<number, number, "volatile-defined">;

@@ -1211,3 +1211,60 @@ lib/run.js lib/triage.js` is empty), so the P0 semantics merged in PR #23 are no
 `NOT_RUN` — `npm run test:e2e` and a real DSH GUI run: both need a live profile and
 model routing. Every case above executes the real generated script in `node:vm`
 with scripted children; no model API is called.
+
+## Round 14 (t59) — 隔离实例上的真模型 E2E（wb/cn:deepseek-v4.1-flash）：两个真 bug + 修复
+
+**环境**：全新隔离 home `.dsh-home/e2e1`（真实 `~/.dsh` 与 `~/dsh-layerfs` 零改动），dsh `0.2.1-rc.2`，
+node `26.8.1`，模型 `bifrost-completions / wb/cn:deepseek-v4.1-flash`（凭据仅经 `BIFROST_VIRTUAL_KEY`
+环境变量）。`grok-e2e` = headless profile（`workflow-ptc` 自带开启）；`grok-web` = web profile
+（插件行 + `workflow-ptc.disabled: false`）。证据：`.dsh-home/e2e1/evidence/t{1..7}`、`work.log`。
+
+### 1. 测试矩阵
+
+| # | 配置 / 输入 | 期望 | 结果 |
+|---|---|---|---|
+| T1 | `mode: triage` + `grokDefault: on`，一句问句 | 门控认领、前台分档 | **PASS**：`Tier: quick`，一个 worker，脚注"not the full team" |
+| T2 | `mode: full` + `on`，写 `hello.txt` 并回读 | 完整流程 + 真证据 | **PASS**：`COMPLETED`，1 task verified；`ls/stat/python/od/sha256` 独立证据；文件 15 B 无尾换行 |
+| T3 | `grokDefault: off`（默认），"reply PONG" | 不拦、直接答 | **PASS**：仅 `PONG`，无工作流 |
+| T4 | `mode: full`，两个独立文件任务 | 并行 + 2/2 验证 | **PASS**：`COMPLETED`，2 tasks 2 verified，内容精确；verifier 如实记录兄弟任务不确定性 |
+| T5 | 写 `/proc/grok-should-fail.txt` | 不谎报 | **FAIL（BUG-59-1）**：`COMPLETED`，1 verified —— 目标被 planner 软化成"尝试并如实报告（预期被拒）"，验证员对着软化标准全过 |
+| T5b | 同上，修复后 | `FAILED` | **PASS**：`FAILED`，0 verified，`executor reported failed`；planner 恢复真实目标 |
+| T6 | 一个成功 + 一个必然失败 | `PARTIAL` | **PASS**：`PARTIAL`，2 tasks，1 verified |
+| T7 | 回归：`mode: full` 写 `regress.txt` | 仍 `COMPLETED` | 见下（本轮实测） |
+
+### 2. BUG-59-1（质量，核心承诺）：失败的活被报成 COMPLETED
+
+- **现象**：T5 的目标在 `/proc` 下必然失败，worker 自报 `BLOCKED`，但最终 `Grok workflow: COMPLETED`。
+- **根因（两处叠加）**：
+  1. `checkVerification` 只在 `execution.status === 'failed'` 时否决，**`partial` 不被拦**；
+  2. planner 被允许把目标改写成"尝试 X 并如实报告"，验收标准因此绕开真实目标（T5 任务标题即
+     `Attempt /proc/... write, then report ... (expected denial)`）。
+- **修复**：`checkVerification` 改为 **只有 `execution.status === 'completed'` 才可能通过**
+  （自报 partial/failed 是承认未完成）；planner 提示词加"验收标准必须是目标要求的**终态**，不得改写成
+  '尝试并报告'/'预期失败'"；verifier 提示词加"executor 说被阻塞/拒绝/未达成时 verdict 必须 fail"。
+- **回归**：`test/orchestrator.spec.ts` 新增"worker 自报 partial + verifier 通过 → 任务必须 failed、
+  总状态 failed、尝试数 = 1 + maxRetries"。
+- **复测**：T5b `FAILED`。
+
+### 3. BUG-59-2（用户可见契约）：`/grok` 承诺完整流程，实际被前台分诊截走
+
+- **现象**：`/grok` 成功文案说"每条消息都走完整工作流"，但部署默认 `mode: triage`，简单消息走直答/快手档
+  （T1 已实测）。
+- **修复**：`ModeRecord` 增加可选 `workflowMode: 'full' | 'triage'`；`/grok` 写入 `workflowMode: 'full'`；
+  闸门在 `produceAnswer` 用会话记录的形状覆盖部署 `mode`（配置级 `grokDefault: on` 仍尊重 `mode`，
+  供部署方选择）。
+- **回归**：`test/triage.spec.ts` 新增"会话 `/grok` 记录 → 无档位行、引擎启动 1 次"；
+  `test/mode.spec.ts` 增加 `workflowMode` 校验；`test/command.spec.ts` 断言写入形状。
+
+### 4. 本轮测试数字
+
+- `npm run ci`：**24 文件 / 400 例 PASS**（t59 前 396；+1 orchestrator、+2 mode、+1 triage；
+  command/mode 既有断言随文案与形状更新）。
+- 真模型 E2E：T1–T7（7 次真实运行），仅 T5 为失败样本（即 BUG-59-1），其余 PASS。
+
+### 5. NOT_RUN（诚实边界）
+
+- **真 Web GUI 里的 `/grok`**：web 实例已起在 `127.0.0.1:3199` 并完成 token 交换，但 API 是
+  WebSocket（`/api/remote.mux`）的 Typert Remote 协议，本轮未手搓 RPC；命令行为由
+  `test/command.spec.ts`（真 cordis + 真 commands 服务 + 真 Session，11 例）覆盖，**GUI 交互未验**。
+- **设置页卡片在浏览器中的渲染**：未开浏览器，未验。

@@ -107,8 +107,24 @@ describe('configuration surface', () => {
       switchOn: [],
       recordRuns: true,
       recordLimit: 64,
+      grokDefault: 'off',
       configVersion: CONFIG_VERSION,
     })
+  })
+
+  it('gates the workflow behind the per-session grok-mode default, off by default', () => {
+    expect(resolveConfig({} as never).grokDefault).toBe('off')
+    expect(resolveConfig({ grokDefault: 'on' } as never).grokDefault).toBe('on')
+    expect(resolveConfig({ grokDefault: 'off' } as never).grokDefault).toBe('off')
+    expect((snapshotConfig(Config({} as never)) as Record<string, unknown>).grokDefault).toBe('off')
+    // Like the other enum keys, a bad value is refused by the schema instead of
+    // being silently dropped or defaulted.
+    expect(() => Config({ grokDefault: 'sometimes' } as never)).toThrow()
+  })
+
+  it('names grokDefault in the one-line effective-configuration signature', () => {
+    expect(describeResolvedConfig(resolveConfig({}))).toContain('grokDefault=off')
+    expect(describeResolvedConfig(resolveConfig({ grokDefault: 'on' } as never))).toContain('grokDefault=on')
   })
 })
 
@@ -179,7 +195,8 @@ describe('route validation against the runtime', () => {
     expect(projected).toContain('roles')
     expect(projected).toContain('switchOn')
     expect(projected).toContain('maxActiveRunsTotal')
-    expect(projected).toHaveLength(22)
+    expect(projected).toContain('grokDefault')
+    expect(projected).toHaveLength(23)
     const ctx = ctxWith({
       settings: { configure: () => () => {}, describe: () => [descriptor] },
     })

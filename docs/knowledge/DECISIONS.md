@@ -360,3 +360,54 @@ Each entry records the decision, evidence, alternatives, and status.
   以后再遇到新形态（例如 `V 不 V` 之外的 `要不要/行不行`——已被同一规则覆盖），应先写形态再写排除，而不是加词。
 - **Alternatives rejected:** 继续加词（`谁`/`还是`/`多不多` 各加一条，下一批探针照样漏）；不写排除规则
   （陈述句被当成问句反问一遍，比漏判更烦人）；用模型判断问句（每条消息一次调用，见 D-022）。
+
+## D-028 — `/grok` 会话级开关：默认关、正交于 `enforceGate`/`mode`、用插件记录持久化（整值替换）
+
+- **Status:** CONFIRMED（设计已定；phase 1 落地中：`src/mode.ts` 已测通，config/gate 接线在跑）
+- **Date:** 2026-10-28
+- **Decision:** 把"每条用户消息强制走工作流"从硬闸门改造成**会话级、运行时可用命令随时切**的 `/grok` 开关：
+  1. `/grok` 开（= 该会话走完整工作流）、`/grok off` 关（= 不拦，回普通聊天）。
+  2. **默认关**（`grokDefault: 'off'`）：装好是普通聊天，`/grok` 才开。
+  3. 状态存成一条插件记录 `plugin:grok-workflow/mode`（`{v:1, enabled, turn, setBy}`），
+     **整值替换**（后写覆盖先写），挺过 fork/resume/重启，读回走 `session.ownEvents()`。
+  4. 与现有三层**正交**：`enforceGate`（全局拦不拦）／`/grok`（本会话开不开）／`mode: full|triage`
+     （开了之后走全套还是前台分诊）。
+  5. 落点：`classifyPreStep` 新增一条 `pass, reason:'mode-off'` 放行分支（复用现成放行通道，
+     与 `subagent`/`out-of-scope`/`already-routed` 同路），只在"本会被认领"的批次上触发。
+- **Reason:** 用户要"可控、能命令随时切、别每条都硬拦"，同时保留"不静默降级"（默认关→开后仍走完整流程）。
+  plan-mode 式心智（命令 + 持久状态）比硬钩子更贴 DSH 原生、冲突更少。
+- **Evidence:** `src/mode.ts` + `test/mode.spec.ts`（13 例：读写、整值替换、坏记录不覆盖、fallback、写失败 warn-and-continue），
+  持久机制实测见 RESEARCH.md「plugin-record persistence」。config/gate 接线 + 全套回归由集成轮补证。
+- **Consequences:** 失去"每条消息都强制验证"的**默认**保证（默认关，靠用时 `/grok` 开）；换来可控、少冲突、好懂。
+  "状态跨重启/翻记录不丢"由插件记录天然提供，无需新机制。
+- **Alternatives rejected:** 保留硬闸门（不可控、易与其它插件/团队消息/webhook 冲突）；改成工具呈现模式
+  （native/ptc，语义错位，grok-workflow 本就跑在 PTC 运行时上）；状态只存内存（重启/翻记录就丢，违反"不静默降级"）。
+- **Follow-up (2026-10-28):** config/gate 接线落地（`grokDefault:'off'` 默认 + `classifyPreStep`
+  新增 `pass, reason:'mode-off'`，复用现成放行通道）；`npm run ci` **385 例 / 23 文件**全绿
+  （+4 gate、+2 config）。`/grok` 命令模块随后补，之后停给用户验收。
+- **Follow-up (2026-10-28, feature complete):** `/grok`、`/grok off` 命令落地（懒 `commands` 挂载，
+  plan-mode 同款；无命令面的 headless/ACP 退回 `grokDefault`）。阶段 1 全齐：`mode.ts` 开关 +
+  `grokDefault:'off'` 默认 + `mode-off` 放行 + `/grok` 命令。`npm run ci` **396 例 / 24 文件**全绿
+  （mode 13 + command 11 + gate 4 + config 2，其余为既有测试 opt-in 调整），零回归、零削弱。
+
+## D-029 — 自报状态是承认：只有 `completed` 的执行才可被验证通过；`/grok` 显式选择 `full`
+
+- **Status:** CONFIRMED（t59 真模型 E2E 发现并修复；`npm run ci` 400 例）
+- **Date:** 2026-10-29
+- **Decision:**
+  1. `checkVerification` 从"`execution.status === 'failed'` 才否决"改为"**必须 `completed` 才可通过**"。
+     自报 `partial`/`failed` 是执行者的承认，任何 verifier 的 pass 都不能把它翻成 verified。
+  2. planner 提示词禁止把目标改写成"尝试 X 并如实报告"/"预期失败"；验收标准必须是目标要求的**终态**。
+     verifier 提示词：executor 说被阻塞/拒绝/未达成时，verdict 必须 fail。
+  3. `ModeRecord` 增加可选 `workflowMode`；`/grok` 写入 `'full'`，闸门用它覆盖部署 `mode`。
+     配置级 `grokDefault: 'on'` 仍尊重 `mode`（部署方选择分诊还是全流程）。
+- **Reason:** T5（真模型）里 `/proc` 写入必然失败、worker 自报 BLOCKED，却因 planner 把目标软化 +
+  `partial` 不被拦而报 `COMPLETED`。这与插件存在的理由（"不把'做完了'当完成"）直接冲突，
+  属于最高优先级缺陷。`/grok` 文案承诺完整流程，但 `mode: triage` 会静默改走前台分诊，同样是"说假话"。
+- **Evidence:** `test/orchestrator.spec.ts`（partial + 通过 verifier → failed）；`test/triage.spec.ts`
+  （会话记录 → 无档位行）；`test/mode.spec.ts`（形状校验）；`test/command.spec.ts`（写入形状）。
+  真机：T5 → `COMPLETED`（修前）/ `FAILED`（修后 T5b），T6 `PARTIAL`，见 VALIDATION Round 12。
+- **Consequences:** 更严：执行者自报未完成的活不能再被"验收标准改写"洗白；代价是 worker 用词偏保守时
+  会更多地落 `partial`/`failed`（这与"绝不静默降级"一致；重试一次仍可救回）。
+- **Alternatives rejected:** 只拦 `failed`（`partial` 仍可洗白，T5 就是这个口子）；只在提示词里劝
+  planner（模型会漂移，必须有机械兜底）；把 `/grok` 文案改软（用户要的是完整流程，不是改文案）。

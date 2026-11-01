@@ -105,6 +105,8 @@ export interface GrokWorkflowConfig {
     gateRequired?: boolean;
     /** Front-desk routing mode (t52). */
     mode?: TriageMode;
+    /** Config-level default for the per-session grok-mode toggle (`off` = normal chat). */
+    grokDefault?: 'on' | 'off';
     /** Whether the front desk may ask instead of guessing an unclear tier. */
     triageAsk?: boolean;
     /** Route for the single call a chat or fast answer spends (`model` or `provider/model`). */
@@ -174,6 +176,8 @@ export interface ResolvedConfig {
      * the team; `triage` routes each message to chat / fast / team / ask.
      */
     mode: TriageMode;
+    /** Config-level default for the per-session grok-mode toggle (`off` = normal chat). */
+    grokDefault: 'on' | 'off';
     /** Whether the front desk may ask instead of guessing a tier. */
     triageAsk: boolean;
     /** Optional route for the single call a chat or fast answer spends. */

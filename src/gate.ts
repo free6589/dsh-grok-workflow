@@ -50,6 +50,7 @@ import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import { frontDeskText, noticeEnterText, noticeText, relayText, RELAY_SOURCE_KIND } from './answer.js'
 import { collectHistory, composeObjective } from './history.js'
 import { TASK_LIMITS } from './input.js'
+import { isModeEnabled, readModeRecord } from './mode.js'
 import { alreadyRouted, deliveryKey, recordDelivery } from './records.js'
 import type { DeliveryPhase } from './records.js'
 import { redactError } from './redact.js'
@@ -207,6 +208,14 @@ export function classifyPreStep(
   const scoped = readScope(deps)
   if (scoped.gateScope === 'preset' && header?.agentPreset !== scoped.gatePreset) {
     return { kind: 'pass', reason: 'out-of-scope' }
+  }
+  // Grok mode is a per-session, runtime toggle (default off). When it is not
+  // enabled this batch passes to the model untouched (normal chat); only
+  // toggle-admitted batches run the workflow. The config default comes from the
+  // same live scope the out-of-scope check reads, so a settings edit is honored;
+  // placed here so the more specific pass reasons above keep their labels.
+  if (!isModeEnabled(session, scoped.grokDefault === 'on')) {
+    return { kind: 'pass', reason: 'mode-off' }
   }
   const agentId = agentIdOf(agent)
   const key = deliveryKey(agentId, userMessages)
@@ -434,10 +443,16 @@ export function installGate(deps: GateDeps): boolean {
     signal?: AbortSignal,
   ): Promise<Answer> => {
     const limits = safe()
+    // A session-level `/grok` record selects the workflow shape explicitly; the
+    // deployment's `mode` only decides what a config-level default does. Without
+    // this, `/grok` would promise the full workflow while the front desk quietly
+    // answered from a template (t59 finding).
+    const sessionShape = readModeRecord(agent.session)?.workflowMode
+    const effectiveMode = sessionShape ?? limits.mode
     // Front desk (t52, plan C): the tier is decided per message, before any run
     // starts, and the decision is part of the answer text. `full` keeps the
     // pre-t52 behaviour byte for byte: no tier line, no greeting, no cheap call.
-    if (limits.mode !== 'full') {
+    if (effectiveMode !== 'full') {
       const agentId = agentIdOf(agent)
       // Consumed before classification: at most one message answers a question,
       // and an expired entry has to be stated rather than silently reused (P0-2).
@@ -445,7 +460,7 @@ export function installGate(deps: GateDeps): boolean {
       const live = pending?.kind === 'live' ? pending.ask : undefined
       const tier = classifyTriage({
         text: request,
-        mode: limits.mode,
+        mode: effectiveMode,
         ask: limits.triageAsk,
         pending: live !== undefined,
       })

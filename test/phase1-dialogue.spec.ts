@@ -220,11 +220,22 @@ afterEach(() => {
 
 /* ------------------------------------------------------------------- P0-1 -- */
 
+/**
+ * Every install below passes `grokDefault: 'on'` alongside its `mode`.
+ *
+ * Grok mode is a per-session runtime toggle whose default is `off`: an off
+ * session passes each batch straight to the model as normal chat (`mode-off`),
+ * so the gate never runs. These cases are about what the gate and the run do
+ * once a batch is admitted — the P0 dialogue-reliability behaviour — so they
+ * opt in explicitly. The toggle itself, including the default-off pass-through
+ * and the session override, is pinned in `test/gate.spec.ts`
+ * (`grok mode toggle (classifyPreStep)`).
+ */
 describe('P0-1: the user’s own message survives in the transcript', () => {
   it('enters the claimed message and the report, once each, in that order', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
-    apply(ctx as never, { mode: 'full' })
+    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
     const live = session('sess-p01-in-turn')
     const agent = new FakeAgent(live)
     const claimed = [userMessage('把登录接口改成 JWT 校验')]
@@ -251,7 +262,7 @@ describe('P0-1: the user’s own message survives in the transcript', () => {
 
   it('keeps the original message when the message is refused before any run', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'full' })
+    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
     const live = session('sess-p01-refusal')
     const agent = new FakeAgent(live)
     // One character past the workflow objective limit (32000 since PR #25), which is
@@ -271,7 +282,7 @@ describe('P0-1: the user’s own message survives in the transcript', () => {
   it('survives a reload: the transcript replays the original message then the report', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
-    apply(ctx as never, { mode: 'full' })
+    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
     const live = session('sess-p01-reload')
     const agent = new FakeAgent(live)
     const claimed = [userMessage('重放后仍然要看到我这句话')]
@@ -291,7 +302,7 @@ describe('P0-1: the user’s own message survives in the transcript', () => {
   it('relay: the plugin commits the claimed message itself, because the step is rejected', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
-    apply(ctx as never, { answerStrategy: 'relay', mode: 'full' })
+    apply(ctx as never, { answerStrategy: 'relay', mode: 'full', grokDefault: 'on' })
     const live = session('sess-p01-relay')
     const agent = new FakeAgent(live)
     const claimed = [userMessage('relay 也要留下原话')]
@@ -310,7 +321,7 @@ describe('P0-1: the user’s own message survives in the transcript', () => {
   it('append: the original message and the report are both in the durable log', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
-    apply(ctx as never, { answerStrategy: 'append', mode: 'full' })
+    apply(ctx as never, { answerStrategy: 'append', mode: 'full', grokDefault: 'on' })
     const live = session('sess-p01-append')
     const agent = new FakeAgent(live)
     const claimed = [userMessage('append 也要留下原话')]
@@ -325,7 +336,7 @@ describe('P0-1: the user’s own message survives in the transcript', () => {
 
   it('a downstream refusal is not claimed, so the batch stays routable', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'full' })
+    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
     const live = session('sess-p01-downstream')
     const agent = new FakeAgent(live)
     const claimed = [userMessage('downstream says no')]
@@ -361,7 +372,7 @@ async function askThenAnswer(options: {
 describe('P0-2: a confirmation answer keeps the original request', () => {
   it('asks before running when the request is ambiguous', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'triage' })
+    apply(ctx as never, { mode: 'triage', grokDefault: 'on' })
     const live = session('sess-p02-ask')
     const agent = new FakeAgent(live)
     const decision = await ctx.preStep()(payload(agent, [userMessage('改一下那个')]), nextWith([])) as Decision
@@ -373,7 +384,7 @@ describe('P0-2: a confirmation answer keeps the original request', () => {
   it('hands the quick worker the original request together with the choice', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
-    apply(ctx as never, { mode: 'triage' })
+    apply(ctx as never, { mode: 'triage', grokDefault: 'on' })
     const live = session('sess-p02-fast')
     const { answered } = await askThenAnswer({ ctx, live, ambiguous: '改一下那个', answer: '简单' })
 
@@ -393,7 +404,7 @@ describe('P0-2: a confirmation answer keeps the original request', () => {
   it('hands the team the original request together with the choice', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
-    apply(ctx as never, { mode: 'triage' })
+    apply(ctx as never, { mode: 'triage', grokDefault: 'on' })
     const live = session('sess-p02-team')
     const { answered } = await askThenAnswer({ ctx, live, ambiguous: '改一下那个', answer: '团队' })
 
@@ -406,7 +417,7 @@ describe('P0-2: a confirmation answer keeps the original request', () => {
 
   it('states that the confirmation expired instead of guessing the task', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'triage' })
+    apply(ctx as never, { mode: 'triage', grokDefault: 'on' })
     const live = session('sess-p02-expired')
     const agent = new FakeAgent(live)
     await ctx.preStep()(payload(agent, [userMessage('改一下那个')]), nextWith([]))
@@ -423,13 +434,13 @@ describe('P0-2: a confirmation answer keeps the original request', () => {
 
   it('starts nothing when the pending question was lost by a reload', async () => {
     const first = new FakeContext()
-    apply(first as never, { mode: 'triage' })
+    apply(first as never, { mode: 'triage', grokDefault: 'on' })
     const live = session('sess-p02-reload')
     await first.preStep()(payload(new FakeAgent(live), [userMessage('改一下那个')]), nextWith([]))
 
     // A fresh plugin instance is what a reload gives you: the Map is gone.
     const second = new FakeContext()
-    apply(second as never, { mode: 'triage' })
+    apply(second as never, { mode: 'triage', grokDefault: 'on' })
     const decision = await second.preStep()(
       payload(new FakeAgent(live), [userMessage('简单')]),
       nextWith([]),
@@ -441,7 +452,7 @@ describe('P0-2: a confirmation answer keeps the original request', () => {
   it('never lets another session answer this session’s question', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
-    apply(ctx as never, { mode: 'triage' })
+    apply(ctx as never, { mode: 'triage', grokDefault: 'on' })
     const one = session('sess-p02-one')
     const two = session('sess-p02-two')
     await ctx.preStep()(payload(new FakeAgent(one), [userMessage('改一下那个')]), nextWith([]))
@@ -461,7 +472,7 @@ describe('P0-2: a confirmation answer keeps the original request', () => {
   it('consumes a pending question once, so a repeated answer cannot start a second run', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
-    apply(ctx as never, { mode: 'triage' })
+    apply(ctx as never, { mode: 'triage', grokDefault: 'on' })
     const live = session('sess-p02-once')
     const agent = new FakeAgent(live)
     await ctx.preStep()(payload(agent, [userMessage('改一下那个')]), nextWith([]))
@@ -476,7 +487,7 @@ describe('P0-2: a confirmation answer keeps the original request', () => {
   it('says the question is void when the user answers something else', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
-    apply(ctx as never, { mode: 'triage' })
+    apply(ctx as never, { mode: 'triage', grokDefault: 'on' })
     const live = session('sess-p02-unused')
     const agent = new FakeAgent(live)
     await ctx.preStep()(payload(agent, [userMessage('改一下那个')]), nextWith([]))
@@ -493,7 +504,7 @@ describe('P0-2: a confirmation answer keeps the original request', () => {
 describe('P0-3: every internal error leaves a user-visible terminal state', () => {
   it('answers a classification failure instead of an empty turn', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'full' })
+    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
     const exploding = {
       id: 'sess-p03-explode',
       header: {},
@@ -515,7 +526,7 @@ describe('P0-3: every internal error leaves a user-visible terminal state', () =
 
   it('answers when answering in-turn throws, and keeps the claimed message', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'full' })
+    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
     const live = session('sess-p03-throw')
     const agent = new FakeAgent(live)
     // A batch classification can read but whose gate entry cannot be built: this is
@@ -540,7 +551,7 @@ describe('P0-3: every internal error leaves a user-visible terminal state', () =
 
   it('states a quick-tier failure and never celebrates it', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'triage' })
+    apply(ctx as never, { mode: 'triage', grokDefault: 'on' })
     ctx.engine.startError = new Error('provider unreachable')
     const live = session('sess-p03-fast')
     const agent = new FakeAgent(live)
@@ -556,7 +567,7 @@ describe('P0-3: every internal error leaves a user-visible terminal state', () =
 
   it('never prints a secret that the failure carried', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'full' })
+    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
     const live = session('sess-p03-secret')
     const agent = new FakeAgent(live)
     ctx.engine.startError = new Error('auth failed: api_key=sk-live-9f8e7d6c5b4a3210')
@@ -569,7 +580,7 @@ describe('P0-3: every internal error leaves a user-visible terminal state', () =
 
   it('does not re-enter the gate or start a second workflow to report an error', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'full' })
+    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
     ctx.engine.startError = new Error('engine refused')
     const live = session('sess-p03-reentry')
     const agent = new FakeAgent(live)
@@ -587,7 +598,7 @@ describe('P0-3: every internal error leaves a user-visible terminal state', () =
 
   it('tells a cancellation apart from a provider failure', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'full' })
+    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
     ctx.engine.hang = true
     const live = session('sess-p03-abort')
     const agent = new FakeAgent(live)
@@ -812,7 +823,7 @@ describe('P0-4: a cancelled turn keeps the message and states the terminal', () 
   it('keeps the typed message once and writes the cancelled terminal when the run is stopped', async () => {
     const ctx = new FakeContext()
     ctx.engine.hang = true
-    apply(ctx as never, { mode: 'full' })
+    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
     const live = session('sess-p04-keep-mid')
     const agent = new FakeAgent(live)
     const claimed = [userMessage('把这个表格整理成周报')]
@@ -842,7 +853,7 @@ describe('P0-4: a cancelled turn keeps the message and states the terminal', () 
 
   it('keeps the message and states the terminal when the signal was already aborted', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'full' })
+    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
     const live = session('sess-p04-keep-pre')
     const agent = new FakeAgent(live)
     const claimed = [userMessage('把登录接口改成 JWT 校验')]

@@ -5,6 +5,22 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Added / 新增
+
+- **`/grok` on/off workflow toggle / `/grok` 工作流开关** — the mandatory workflow is now a
+  per-session switch you flip with a command instead of something that hijacks every message out of
+  the box. `/grok` turns it ON (every user message runs the plan→execute→verify→report workflow);
+  `/grok off` turns it OFF (normal chat — the workflow only runs if the model calls the
+  `grok_workflow` tool). Default is **off** (`grokDefault: 'off'`): you opt in per session. The
+  toggle is durable (survives restart / resume / fork) and lives in the session log, so it is never
+  silently lost. `/grok` appears in interactive UIs (Web / CLI); headless and ACP surfaces have no
+  command menu and follow `grokDefault`.
+  把"每条消息强制走工作流"改成会话级、可用命令随时切的开关，不再一装上就每条都拦：`/grok` 开
+  （每条用户消息都走 规划→执行→验证→汇报 的完整流程），`/grok off` 关（回普通聊天，只有模型主动
+  调用 `grok_workflow` 工具才跑）。默认**关**（`grokDefault: 'off'`），按会话自行开启。开关状态
+  挺过 重启 / 恢复 / 分身，存在会话日志里、不会被静默丢掉。`/grok` 在有命令面的界面（Web / CLI）
+  可用；headless / ACP 无命令菜单，跟随 `grokDefault`。
+
 ### Changed / 变更
 
 - **The progress panel groups by task, not by role / 进度面板改为按任务分组** — a run used to
@@ -84,6 +100,29 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
   子调用结束不等于任务通过：结束的调用写作「执行代理已结束」「检查调用已结束」，永远不会变成
   「任务已完成」「检查通过」；不显示百分比、token 数、预计剩余时间或任何编造的活动。任务结论
   （「任务通过」「任务未通过」）只来自报告，面板与报告不一致时测试会失败。
+
+- **A failed job can no longer be reported `COMPLETED` / 失败的活不会再被报成 COMPLETED** — found by a
+  real-model E2E run (`wb/cn:deepseek-v4.1-flash`): a write into `/proc` that the worker itself
+  reported blocked still came back `Grok workflow: COMPLETED`, because the planner had rewritten the
+  objective into "attempt it and report honestly" and the verifier passed those rewritten criteria.
+  Verification now requires the executor's own status to be `completed` — a self-reported
+  `partial`/`failed` is an admission, not something a verifier can overturn — and the planner is
+  forbidden from substituting "attempt and report" for the requested end state. Regression test in
+  `test/orchestrator.spec.ts`; re-run now reports `FAILED`.
+  真模型 E2E 抓到的缺陷：worker 自己都报"被阻塞"的 `/proc` 写入，最终仍返回 `COMPLETED`——planner 把目标
+  改写成"尝试一下并如实报告"，验证员对着改写后的标准判了通过。现在要求执行者自报必须是 `completed`
+  才可能通过验证（自报 `partial`/`failed` 是承认，验证员不能翻案），并禁止 planner 用"尝试并报告"
+  替换目标要求的终态。`test/orchestrator.spec.ts` 加了回归，复测返回 `FAILED`。
+
+- **`/grok` now means the full workflow, not the front desk / `/grok` 真的走完整流程** — the command
+  promised the full plan→execute→verify workflow while a deployment `mode: triage` quietly answered
+  simple messages from a template. An explicit `/grok` now records `workflowMode: 'full'` on the
+  session and the gate honours it; a config-level `grokDefault: 'on'` still respects `mode`, so a
+  deployment can choose triage. Tests: `test/triage.spec.ts`, `test/mode.spec.ts`,
+  `test/command.spec.ts`.
+  命令文案承诺完整流程，但部署的 `mode: triage` 会把简单消息静默交给模板回答。现在显式 `/grok` 会在
+  会话里记 `workflowMode: 'full'`，闸门照此执行；配置级 `grokDefault: 'on'` 仍尊重 `mode`，部署方
+  仍可选分诊。测试见 `test/triage.spec.ts` / `test/mode.spec.ts` / `test/command.spec.ts`。
 
 ### Fixed — Issue #22 Phase 1 对话可靠性 / dialogue reliability
 

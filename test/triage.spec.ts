@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
+import { Session } from '@deepseek-ai/dsh-session'
 import type { WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import { setMode } from '../src/mode.js'
 import { apply } from '../src/index.js'
 import {
   askLine, chatBucket, chatReply, classifyTriage, detectLanguage, greetingLine, resolvePending,
@@ -382,7 +384,10 @@ async function route(
 ): Promise<string> {
   // One gate per context: `apply` again would install a second gate and reset the
   // front desk's pending-question memory, which is exactly what these tests read.
-  if (ctx.handlers.size === 0) apply(ctx as never, { answerStrategy: 'relay', ...overrides })
+  // `grokDefault: 'on'`: these tests are about admitted batches and the front
+  // desk; the default-off toggle passes messages through as normal chat (pinned
+  // in gate.spec.ts).
+  if (ctx.handlers.size === 0) apply(ctx as never, { answerStrategy: 'relay', grokDefault: 'on', ...overrides })
   const messages = [userMessage(text)]
   const seen = agent.followups.length
   await ctx.preStep()(
@@ -399,6 +404,20 @@ async function route(
 }
 
 describe('t52 front desk: each tier behaves as promised', () => {
+  it('a session /grok record forces the full workflow even when the deployment uses the front desk', async () => {
+    // t59: `/grok` promises the full plan -> execute -> verify workflow. The
+    // deployment's `mode: triage` must not quietly answer from a template instead.
+    const ctx = new FakeContext()
+    const agent = new FakeAgent()
+    const session = Session.create('sess-triage-grok-full' as never)
+    setMode(session, { v: 1, enabled: true, turn: 1, setBy: 'command:/grok', workflowMode: 'full' })
+    Object.defineProperty(agent, 'session', { value: session })
+    ctx.engine.reply = 'done'
+    const text = await route(ctx, agent, '你好')
+    expect(text).not.toContain('档位：')
+    expect(ctx.engine.startCalls).toHaveLength(1)
+  })
+
   it('answers a greeting directly, without starting the team or a call', async () => {
     const ctx = new FakeContext()
     const text = await route(ctx, new FakeAgent(), '你好')
