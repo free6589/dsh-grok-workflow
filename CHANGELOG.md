@@ -5,6 +5,20 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-11-01
+
+The opt-in release: the workflow no longer hijacks every message — a session is plain chat until
+you turn the workflow on with `/grok`. On top of that: the progress panel groups by task, the
+workflow objective limit is 32,000 characters, the planner-failure fallback is sharded, and the
+Issue #22 Phase 1 dialogue-reliability fixes (PR #23) ship in this version. Nothing here restates
+a `0.2.3` change, and the `0.2.3` / `0.2.2` / `0.2.1` / `0.2.0` / `0.1.0` sections are untouched.
+
+选择加入的版本：工作流不再拦截每条消息——会话默认是普通聊天，用 `/grok`
+显式开启后才走工作流。在此之外：进度面板按任务分组、工作流目标上限提到 32,000
+字符、规划失败回退改为分片、Issue #22 Phase 1 对话可靠性修复（PR #23）随本版发布。
+不重复 `0.2.3` 已发布的内容；`0.2.3` / `0.2.2` / `0.2.1` / `0.2.0` /
+`0.1.0` 章节保持不动。
+
 ### Added / 新增
 
 - **`/grok` on/off workflow toggle / `/grok` 工作流开关** — the mandatory workflow is now a
@@ -42,6 +56,17 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
   the words it was written with.
   中英文措辞来自同一张表（`src/naming.ts`），按 DSH 的 `locale` 偏好选择，默认中文；没有新增配置项，
   无需手工命名。已经显示出来的运行保持它写入时的措辞。
+
+- **The workflow objective limit is 32,000 characters / 工作流目标上限为 32,000 字符** — the gate
+  and the direct `grok_workflow` tool used to refuse any objective over 4,000 characters. The limit
+  is now 32,000 characters (`TASK_LIMITS.objectiveChars`); per-task bounds are unchanged (task
+  objective / expectedOutput / context ≤ 4,000 characters each). The 4,001–32,000 range used to be
+  the exact window where the planner-failure fallback was re-rejected; it is now covered by the
+  sharded fallback in Fixed. Tests: `test/objective-limit.spec.ts`.
+  闸门与直接调用 `grok_workflow` 工具以前拒绝任何超过 4,000 字符的目标，现在上限为 32,000 字符
+  （`TASK_LIMITS.objectiveChars`）；每任务边界不变（任务目标 / 预期输出 / 上下文各 ≤ 4,000
+  字符）。4,001–32,000 正是以前规划失败回退会被二次拒绝的窗口，现在由 Fixed 里的分片回退覆盖。
+  测试见 `test/objective-limit.spec.ts`。
 
 ### Fixed / 修复
 
@@ -124,11 +149,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
   会话里记 `workflowMode: 'full'`，闸门照此执行；配置级 `grokDefault: 'on'` 仍尊重 `mode`，部署方
   仍可选分诊。测试见 `test/triage.spec.ts` / `test/mode.spec.ts` / `test/command.spec.ts`。
 
-### Fixed — Issue #22 Phase 1 对话可靠性 / dialogue reliability
 
-**未发布（分支 `fix/phase1-dialogue-reliability`）。** 以下四条来自仍在远程审查中的 PR #23，
-没有打 tag、没有发布、版本号未变（`package.json` 仍为 `0.2.3`）。Not released: these four entries
-come from PR #23, still under review; no tag, no publication, and the version is unchanged.
+### Fixed — Issue #22 Phase 1 对话可靠性 / dialogue reliability (reviewed, ships in this release)
 
 - **P0-1 用户原话不再丢失 / the user's own message stays in the transcript** — `in-turn` 路径过去只把
   插件生成的 relay/report 消息放进 `enter.messages`，而 `AgentLoop.preStep()` 已经把这一批消息从
@@ -154,6 +176,28 @@ come from PR #23, still under review; no tag, no publication, and the version is
   的 signal 不会再启动引擎（过去会先启动再取消，白跑一次 planner/worker）；运行被停止时，引擎已经
   产出的报告会被保留：已验证任务原样保留，未完成的任务标为 `interrupted`、未开始的任务标为
   `not started`，运行级错误分类为 `cancelled`（不是质量失败），面板随之收尾。
+
+### Notes / 说明
+
+- **This release changes the default behaviour / 本版改变默认行为** — a fresh install no longer
+  runs the workflow for every message: sessions start as plain chat (`grokDefault: 'off'`) until
+  `/grok` turns the workflow on for that session. Set `grokDefault: 'on'` to keep the previous
+  always-on posture (deployments may still choose `mode` for triage).
+  新装插件不再对每条消息跑工作流：会话默认是普通聊天（`grokDefault: 'off'`），用 `/grok`
+  为该会话显式开启后才走工作流。需要以前常开姿态的部署请设 `grokDefault: 'on'`
+  （仍可用 `mode` 选择分诊）。
+- **Real-GUI verification, stated honestly / 真机 GUI 验证（诚实口径）** — `/grok` switching and
+  the settings-page card were verified on a real Web GUI driven by a real (off-screen headless)
+  Chromium against an isolated instance (VALIDATION Round 15): default plain chat → `/grok` full
+  run → `/grok off` back to plain chat, plus card render / save / persist / take-effect-on-new-session.
+  Two deviations are stated, not hidden: the browser window was off-screen (the machine has no
+  X11 display), and every model round ran on `wb/cn:glm-5.3-flash` instead of the originally
+  planned model. `relay` / `append` delivery on a long-lived GUI session remains `NOT_RUN`.
+  `/grok` 可切与设置页卡片已在真 Web GUI 上验证：真（离屏 headless）Chromium 驱动隔离实例，
+  默认普通聊天 → `/grok` 完整运行 → `/grok off` 回普通聊天，以及卡片渲染 / 保存 / 持久化 /
+  对新会话生效（VALIDATION Round 15）。两处偏离如实说明、不隐瞒：浏览器窗口是离屏的（本机无 X11
+  显示），全部模型轮次用的是 `wb/cn:glm-5.3-flash` 而非原定模型。长驻 GUI 会话里的 `relay` /
+  `append` 投递仍为 `NOT_RUN`。
 
 ## [0.2.3] - 2026-10-28
 
