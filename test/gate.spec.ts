@@ -5,6 +5,10 @@ import { createAssistantMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import { Session, pluginRecordOf } from '@deepseek-ai/dsh-session'
 import { apply } from '../src/index.js'
 import { REPORT_BEGIN, REPORT_END } from '../src/answer.js'
+import { resolveConfig } from '../src/config.js'
+import { classifyPreStep } from '../src/gate.js'
+import type { PreStepPayload } from '../src/gate.js'
+import { setMode } from '../src/mode.js'
 import { callerTask, execution, task, verification } from './fixtures.js'
 import {runWorkflowScript, roleOf} from './helpers.js'
 import { ROUTING_RECORD } from '../src/records.js'
@@ -19,7 +23,10 @@ function applyWith(ctx: unknown, overrides: Record<string, unknown> = {}): void 
   // `mode: 'full'` on purpose: every test in this file is about the gate and the
   // run, not about the front desk. t52's tiering has its own file (triage.spec.ts),
   // and the front-desk branch is pinned there for each of its four tiers.
-  apply(ctx as never, { answerStrategy: 'relay', mode: 'full', ...overrides })
+  // `grokDefault: 'on'` on purpose as well: these tests are about *admitted*
+  // batches, and the default-off toggle passes everything through as normal chat
+  // (pinned in `grok mode toggle (classifyPreStep)` below).
+  apply(ctx as never, { answerStrategy: 'relay', mode: 'full', grokDefault: 'on', ...overrides })
 }
 
 /* ------------------------------------------------------------------ engine -- */
@@ -553,7 +560,10 @@ describe('mandatory entry gate', () => {
     async (chars) => {
       const ctx = new FakeContext()
       ctx.engine.autoRun = true
-      apply(ctx as never, { mode: 'full' })
+      // Not `applyWith`: this case installs the gate directly. `grokDefault: 'on'`
+      // for the same reason `applyWith` sets it — an off session passes the batch
+      // through as normal chat, and this case is about an *admitted* batch.
+      apply(ctx as never, { mode: 'full', grokDefault: 'on' })
       const agent = new FakeAgent({ session: realSession(`sess-limit-${chars}`) })
       const decision = await ctx.preStep()(
         payload(agent, [userMessage('x'.repeat(chars))]),
@@ -733,6 +743,55 @@ function answerOf(decision: { messages?: UserMessage[] }): string {
   return textOf(messages[messages.length - 1]!)
 }
 
+/* ------------------------------------------------------------- grok mode -- */
+
+/**
+ * The per-session grok-mode toggle gates admission (src/mode.ts wired into
+ * classifyPreStep): with `grokDefault: 'off'` and no mode record a would-be
+ * admitted batch passes to the model untouched (normal chat), and only
+ * toggle-admitted batches run the workflow. Classification is asserted
+ * directly, so each pass reason is pinned by its label and the ordering with
+ * the more specific reasons is part of the contract.
+ */
+describe('grok mode toggle (classifyPreStep)', () => {
+  const batch = (agent: FakeAgent): PreStepPayload =>
+    payload(agent, [userMessage('do the thing')]) as unknown as PreStepPayload
+
+  it('passes a would-be-admitted batch through when grok mode is not enabled', () => {
+    const verdict = classifyPreStep({ config: resolveConfig({ grokDefault: 'off' }) }, batch(new FakeAgent()))
+    expect(verdict).toEqual({ kind: 'pass', reason: 'mode-off' })
+  })
+
+  it('admits the same batch when grokDefault is on and no record exists', () => {
+    const verdict = classifyPreStep({ config: resolveConfig({ grokDefault: 'on' }) }, batch(new FakeAgent()))
+    expect(verdict).toMatchObject({ kind: 'admit' })
+  })
+
+  it('lets a session mode record override the default in both directions', () => {
+    // Enabled record + default off: admitted (the runtime toggle wins).
+    const on = realSession('sess-mode-override-on')
+    setMode(on, { v: 1, enabled: true, turn: 1, setBy: 'command:/grok' })
+    expect(classifyPreStep({ config: resolveConfig({ grokDefault: 'off' }) }, batch(new FakeAgent({ session: on }))))
+      .toMatchObject({ kind: 'admit' })
+    // Disabled record + default on: passes (the runtime toggle wins again).
+    const off = realSession('sess-mode-override-off')
+    setMode(off, { v: 1, enabled: false, turn: 1, setBy: 'command:/grok off' })
+    expect(classifyPreStep({ config: resolveConfig({ grokDefault: 'on' }) }, batch(new FakeAgent({ session: off }))))
+      .toEqual({ kind: 'pass', reason: 'mode-off' })
+  })
+
+  it('keeps the more specific pass labels ahead of mode-off', () => {
+    const config = resolveConfig({ grokDefault: 'off' })
+    expect(classifyPreStep({ config }, payload(new FakeAgent(), []) as unknown as PreStepPayload))
+      .toEqual({ kind: 'pass', reason: 'empty-batch' })
+    const subagent = new FakeAgent({ header: { origin: 'subagent', delegationDepth: 1 } })
+    expect(classifyPreStep({ config }, batch(subagent))).toEqual({ kind: 'pass', reason: 'subagent' })
+    const outside = new FakeAgent({ session: new FakeSession({ header: { agentPreset: 'other-preset' } }) })
+    const scoped = resolveConfig({ grokDefault: 'off', gateScope: 'preset', gatePreset: 'strict-workflow' })
+    expect(classifyPreStep({ config: scoped }, batch(outside))).toEqual({ kind: 'pass', reason: 'out-of-scope' })
+  })
+})
+
 /** Concatenated text of one message. */
 function textOf(message: UserMessage): string {
   return message.content
@@ -759,7 +818,7 @@ describe('in-turn delivery (default strategy)', () => {
     const ctx = new FakeContext()
     // Default strategy under test; the tier stays `full` so the message really
     // starts a run (the front desk is covered in triage.spec.ts).
-    apply(ctx as never, { mode: 'full' })
+    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
     const agent = new FakeAgent({ session: realSession('sess-in-turn') })
     let settled = false
     const pending = ctx.preStep()(payload(agent, [userMessage('run the workflow')]), passingNext([]))
@@ -793,7 +852,7 @@ describe('in-turn delivery (default strategy)', () => {
 
   it('enters a failure report when the run failed, so the user is never left without output', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'full' })
+    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
     const session = realSession('sess-in-turn-failed')
     const agent = new FakeAgent({ session })
     const pending = ctx.preStep()(payload(agent, [userMessage('run the workflow')]), passingNext([]))
@@ -813,7 +872,7 @@ describe('in-turn delivery (default strategy)', () => {
 
   it('enters a notice when the workflow cannot start at all', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'full' })
+    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
     const agent = new FakeAgent({ session: realSession('sess-in-turn-busy') })
     ctx.engine.startError = new Error('already has 2 active run(s)')
     const decision = await ctx.preStep()(payload(agent, [userMessage('run the workflow')]), passingNext([])) as {
@@ -830,7 +889,7 @@ describe('in-turn delivery (default strategy)', () => {
 
   it('refuses an over-long message in the same turn instead of staying silent', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'full' })
+    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
     const agent = new FakeAgent({ session: realSession('sess-in-turn-long') })
     const decision = await ctx.preStep()(payload(agent, [userMessage('x'.repeat(32_001))]), passingNext([])) as {
       kind: string
@@ -845,7 +904,7 @@ describe('in-turn delivery (default strategy)', () => {
 
   it('rejects instead of entering when the turn is already aborted', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'full' })
+    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
     const agent = new FakeAgent({ session: realSession('sess-in-turn-aborted') })
     const controller = new AbortController()
     controller.abort()
@@ -856,7 +915,7 @@ describe('in-turn delivery (default strategy)', () => {
 
   it('stops waiting when the turn aborts mid-run and does not hang', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'full' })
+    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
     const agent = new FakeAgent({ session: realSession('sess-in-turn-cancel') })
     const controller = new AbortController()
     const pending = ctx.preStep()(
@@ -874,7 +933,7 @@ describe('in-turn delivery (default strategy)', () => {
 
   it('turns its own deadline into a failure report instead of waiting forever', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { timeoutMs: 1_000 })
+    apply(ctx as never, { timeoutMs: 1_000, grokDefault: 'on' })
     const agent = new FakeAgent({ session: realSession('sess-in-turn-timeout') })
     const decision = await ctx.preStep()(payload(agent, [userMessage('run the workflow')]), passingNext([])) as {
       kind: string
@@ -888,7 +947,7 @@ describe('in-turn delivery (default strategy)', () => {
 
   it('answers when the plugin is unloaded mid-run', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'full' })
+    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
     const agent = new FakeAgent({ session: realSession('sess-in-turn-unload') })
     const pending = ctx.preStep()(payload(agent, [userMessage('run the workflow')]), passingNext([]))
     await waitFor(() => ctx.engine.runs.length === 1)
@@ -905,7 +964,7 @@ describe('in-turn delivery (default strategy)', () => {
 
   it('writes no routing ledger when the engine failed before a report existed', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'full' })
+    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
     const session = realSession('sess-in-turn-no-ledger')
     const agent = new FakeAgent({ session })
     const pending = ctx.preStep()(payload(agent, [userMessage('run the workflow')]), passingNext([]))

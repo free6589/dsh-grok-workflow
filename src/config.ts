@@ -61,6 +61,7 @@ export const CONFIG_KEYS = [
   'gatePreset',
   'answerStrategy',
   'mode',
+  'grokDefault',
   'triageAsk',
   'triageModel',
   'historyTurns',
@@ -111,6 +112,10 @@ export const Config = z.object({
   // the front desk and the front desk states its tier", not "every message runs
   // the whole team". `full` restores the old rule exactly (D-021).
   mode: z.union([z.const('full'), z.const('triage')]).default('triage').volatile(),
+  // Config-level default for the per-session grok-mode toggle (src/mode.ts):
+  // `off` means a batch passes through to the model as normal chat until the
+  // session turns grok mode on (the runtime toggle overrides this default).
+  grokDefault: z.union([z.const('on'), z.const('off')]).default('off').volatile(),
   triageAsk: z.boolean().default(true).volatile(),
   // Empty means "inherit the message's own route": the chat and fast tiers then
   // spend exactly one child call on the run's provider instead of a second one.
@@ -360,6 +365,7 @@ export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
     ...gatePreset === '' ? {} : { gatePreset },
     answerStrategy,
     mode,
+    grokDefault: config.grokDefault ?? 'off',
     triageAsk: config.triageAsk ?? true,
     ...triageModel === undefined ? {} : { triageModel },
     historyTurns: integer('historyTurns', config.historyTurns ?? 4, 0, HARD_LIMITS.historyTurns),
@@ -470,6 +476,7 @@ export function describeResolvedConfig(config: ResolvedConfig): string {
     `maxActiveRuns=${config.maxActiveRuns}/${config.maxActiveRunsTotal}`,
     `gate=${config.enforceGate ? 'on' : 'off'}/${config.gateScope}${config.gateRequired ? ' (required)' : ''}`,
     `mode=${config.mode}${config.mode === 'triage' ? ` triage=${config.triageAsk ? 'ask' : 'escalate'} call=${config.triageModel === undefined ? 'inherit' : (config.triageModel.provider === undefined ? config.triageModel.model : `${config.triageModel.provider}/${config.triageModel.model}`)}` : ''}`,
+    `grokDefault=${config.grokDefault}`,
     `synthesis=${config.synthesis}`,
     `roles=planner:${role('planner')} worker:${role('worker')} verifier:${role('verifier')} synthesizer:${role('synthesizer')}`,
   ].join(' ')

@@ -200,7 +200,10 @@ function newContext(overrides: Record<string, unknown> = {}): FakeContext {
   // `mode: 'full'` keeps the front desk out of the picture: these tests are about
   // the objective limit, not about tiering. The answer strategy stays at its
   // default (`in-turn`), so the gate answers the turn it was given.
-  apply(ctx as never, { mode: 'full', ...overrides })
+  // `grokDefault: 'on'` on purpose: grok mode is a per-session toggle whose
+  // default is `off`, and an off session passes every batch through as normal
+  // chat (`mode-off`). These tests are about *admitted* batches, so they opt in.
+  apply(ctx as never, { mode: 'full', grokDefault: 'on', ...overrides })
   return ctx
 }
 

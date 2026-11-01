@@ -109,7 +109,10 @@ function harness(options: HarnessOptions = {}): ComposedHarness {
     // test/gate.spec.ts for that path).
     // `mode: 'full'` keeps the pre-t52 rule: these suites are about the reject veto
     // and its composition, and the front desk has its own file (triage.spec.ts).
-    apply(shim as never, { answerStrategy: 'relay', mode: 'full', historyTurns: 4, historyChars: 4_000 })
+    // `grokDefault: 'on'`: these suites are about admitted batches and the
+    // reject veto's composition; the default-off toggle passes messages through
+    // as normal chat (pinned in gate.spec.ts).
+    apply(shim as never, { answerStrategy: 'relay', mode: 'full', grokDefault: 'on', historyTurns: 4, historyChars: 4_000 })
   }
 
   if (options.gatePlacement === 'first') installGate()

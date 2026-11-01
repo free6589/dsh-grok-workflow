@@ -184,3 +184,81 @@ and `xai-grok-shell/` for `crates/codegen/xai-grok-shell/`.
 | read-only capability mode | prompt instruction only in MVP; no DSH capability mode | NOT_IMPLEMENTED |
 | citation marker validation | verifier evidence requirement; no report-marker synthesis | implementation differs |
 | 4 active runs/session | plugin `maxActiveRuns` default 2, hard 4 | implemented |
+
+## DSH plugin-record persistence — grok-mode toggle seam (CONFIRMED)
+
+Source: installed DSH `0.2.1-rc.2` (`dsh-session`), mirrored by `src/records.ts` and the
+new `src/mode.ts` (`test/mode.spec.ts`, 13 tests green; wired into gate/config next).
+
+- `appendPluginRecord(session, type, data)` writes an `ignorable` session event that never
+  enters the model-visible surface and survives fork/resume. It calls
+  `session.#appendRecord(type, data)` — a private method of the real `Session` class — so
+  passing a non-`Session` throws `TypeError: Receiver must be an instance of class Session`
+  before any `append` is touched. The `typeof session.append !== 'function'` guard in
+  `setMode`/`recordDelivery` is a capability check, not the throw source.
+- `#appendRecord` snapshots data with `snapshotJsonValue` (throws on non-JSON: NaN, functions,
+  undefined), builds a frozen event `{ type, seq, time, data, ignorable: true }`, enforces the
+  `plugin:` type grammar (`/^plugin:[a-z0-9][a-z0-9._-]*(?:\/[a-z0-9][a-z0-9._-]*)*$/`), and
+  commits to `session.log` — it never calls `session.append`, so overriding `append` does not
+  break plugin-record writes.
+- `pluginRecordOf(event)` returns `undefined` unless `event.ignorable === true` and the type
+  matches the grammar; otherwise `{ type, seq, time, data: unknown }`. `data` is `unknown` at
+  runtime, so owner-side revalidation (`isModeRecord`-style) is mandatory.
+- Read-back is `session.ownEvents()` filtered by `pluginRecordOf`. The grok-mode toggle is
+  whole-value-replace: the LAST valid record is the current state (survives restart because
+  `session.log` is the durable conversation record that `ownEvents()` replays).
+- `PluginRecordMap` declaration merging across files is fine: `records.ts` and `mode.ts` both
+  augment `@deepseek-ai/dsh-session`; TS merges them and the literal const key type-checks.
+- Test-harness convention (gate/routing/lifecycle specs): tests use the REAL
+  `@deepseek-ai/dsh-session` (real `Session.create(id as never)`, real
+  `appendPluginRecord`/`pluginRecordOf`); plain-object stubs only for failure paths; inject
+  malformed payloads with `data as never` (compile-time cast; runtime JSON check passes).
+- Build: `tsconfig.build.json` compiles ALL `src/**/*.ts` into `lib/` regardless of
+  reachability from `index.js`; `lib/` is git-tracked and Release verifies it, so each new src
+  file adds untracked `lib/<name>.*` to commit at release (`lib/mode.*` for this feature).
+
+## Adding a `grokDefault`-style volatile config key — the full ripple (CONFIRMED)
+
+Verified while landing `grokDefault` (`npm run ci` 385 tests / 23 files green). One key touches
+every key-enumerating surface:
+1. `src/config.ts`: zod schema (`.volatile()`), the `CONFIG_KEYS` list (schema order), the
+   `resolveConfig` return, and `describeResolvedConfig`'s one-line signature.
+2. `src/types.ts`: the field on BOTH `GrokWorkflowConfig` (optional) and `ResolvedConfig`
+   (required; inline union e.g. `'on' | 'off'`; no alias; no configVersion bump / migration).
+3. `src/client/index.js`: a `FIELDS` entry + `field.<key>` + `field.<key>.hint` in BOTH the zh and
+   en dicts (the settings-page bundle enumerates every key; bilingual-copy tests require both
+   dicts and equal key sets).
+4. Tests that pin the key set / descriptor: `test/settings-projection.spec.ts` (exact sorted
+   volatile list + count via `realSettingsDescriptor()`), `test/config.spec.ts` (page field
+   count), `test/client.spec.ts` (FIELDS + roles + read-only == CONFIG_KEYS sorted; numeric
+   bounds == HARD_LIMITS; dict parity; `lib/client.js` byte-identical to `src/client/index.js`).
+
+Semantics ripple for a default-OFF gate toggle: every test that asserts a batch is ADMITTED must
+opt in — `grokDefault: 'on'` in its apply config, or a `setMode(enabled:true)` record on a real
+`Session.create` session (FakeSession stubs can't hold mode records since `ownEvents→[]`).
+`classifyPreStep` pass-reason order is contract: empty-batch → non-user-source → subagent →
+out-of-scope → mode-off → already-routed; reason labels are asserted only via direct
+`classifyPreStep(deps,payload)` + `toEqual`, not through the dispatch handler.
+
+## `/grok` command — lazy `commands` mount + handler contract (CONFIRMED)
+
+- Mount exactly like `dsh-plan-mode` mounts `/plan`: lazy `ctx.inject(['commands'], cb)` only;
+  `'commands'` is deliberately ABSENT from the plugin's static `inject` (plan-mode's static
+  inject = `["tools","systemPrompt","sessionProjections"]`, no `commands`). Where no `commands`
+  service is composed (headless/ACP) the callback never runs and the command does not exist —
+  `grokDefault` governs there. `test/loader.spec.ts` stays green with the lazy mount pending.
+- `dsh-commands` register contract (its README, CONFIRMED): lowercase `name`;
+  `input: { hint }` (+ optional `attachments`/`recordInput`); `handler: ({ agent, rawInput }) =>
+  { kind: 'success' | 'error', text }`, runs directly against the agent (no model message);
+  `rawInput` = everything after the name incl. separator whitespace; duplicate names in one
+  scope throw. `dsh-commands` is NOT a bundle dependency, so `src/command.ts` types the
+  register/handler surface STRUCTURALLY (no import).
+- `/grok` grammar (pinned by tests): trim → `''`/`'on'` enable, `'off'` disable, anything else
+  `{kind:'error', text:'Usage: /grok [on|off]'}` with the toggle untouched. `setBy` =
+  `command:/grok` / `command:/grok off`. `turn` is informational (finite agent turn else 0); the
+  gate reads only `enabled`.
+- Cordis test seam (CONFIRMED): `ctx.provide('commands', value)` works outside a fiber on
+  `new Context()`; `ctx.inject(['commands'], cb)` fires cb async with `cb-ctx.commands === value`
+  and PENDS (never fires) until the service appears. `registerGrokCommand` carries a
+  `typeof ctx.inject === 'function'` guard so hand-rolled test fakes (no cordis registry) stay
+  inert without edits.

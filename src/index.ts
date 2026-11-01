@@ -3,6 +3,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
 import { createConfigReader, describeResolvedConfig } from './config.js'
 import { describeSurface, validateRoutes } from './settings.js'
+import { registerGrokCommand } from './command.js'
 import { installGate } from './gate.js'
 import { installShutdownProbe } from './records.js'
 import { normalizeCallerTasks, GrokWorkflowInputError, TASK_LIMITS } from './input.js'
@@ -102,6 +103,11 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
       'Do not use it for a single trivial lookup or a task whose result cannot be checked.',
     ].join(' '),
   })
+
+  // `/grok [on|off]`: the per-session toggle command. Lazy `commands` mount,
+  // exactly like plan-mode's `/plan` — interactive UIs only; headless surfaces
+  // compose no commands service and stay governed by `grokDefault`.
+  registerGrokCommand(ctx, logger)
 
   const parameters = {
     objective: {
