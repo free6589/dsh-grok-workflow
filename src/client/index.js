@@ -174,6 +174,18 @@ window.__ModuleLoader__.load({
       'field.recordLimit.hint': 'How many past run records are kept.',
       'field.range': '{min} – {max}, default {def}',
 
+      // Unit suffixes rendered after number inputs (paired keys, zh/en).
+      'unit.ms': 'ms',
+      'unit.retries': 'retries',
+      'unit.jobs': 'jobs',
+      'unit.tasks': 'tasks',
+      'unit.turns': 'turns',
+      'unit.chars': 'chars',
+      'unit.queued': 'queued',
+      'unit.runs': 'runs',
+      'unit.runsTotal': 'runs',
+      'unit.records': 'records',
+
       // Enum option display names (stored values stay English).
       'option.gateScope.process': 'Whole process (default)',
       'option.gateScope.preset': 'Named preset',
@@ -336,6 +348,18 @@ window.__ModuleLoader__.load({
       'field.recordLimit': '留几条记录',
       'field.recordLimit.hint': '过去的运行记录留几条。',
       'field.range': '{min} – {max}，默认 {def}',
+
+      // Unit suffixes rendered after number inputs (paired keys, zh/en).
+      'unit.ms': '毫秒',
+      'unit.retries': '次',
+      'unit.jobs': '个',
+      'unit.tasks': '个',
+      'unit.turns': '轮',
+      'unit.chars': '字',
+      'unit.queued': '条',
+      'unit.runs': '个',
+      'unit.runsTotal': '个',
+      'unit.records': '条',
 
       'option.gateScope.process': '整进程（默认）',
       'option.gateScope.preset': '指定预设',
@@ -565,31 +589,62 @@ window.__ModuleLoader__.load({
       return ops
     }
 
+    const HAIRLINE = 'rgba(128,128,128,0.14)'
     const styles = {
-      page: { display: 'flex', flexDirection: 'column', gap: '20px', padding: '4px 2px 24px', fontSize: '13px', lineHeight: 1.5 },
+      page: { display: 'flex', flexDirection: 'column', gap: '24px', padding: '4px 2px 32px', fontSize: '13px', lineHeight: 1.55 },
       section: { display: 'flex', flexDirection: 'column', gap: '10px' },
-      card: { display: 'flex', flexDirection: 'column', gap: '10px', border: '1px solid rgba(128,128,128,0.25)', borderRadius: '10px', padding: '14px 16px' },
-      heading: { fontSize: '13px', fontWeight: 600, margin: 0 },
+      card: { display: 'flex', flexDirection: 'column', gap: '0', border: '1px solid rgba(128,128,128,0.22)', borderRadius: '12px', padding: '18px 20px 10px', background: 'rgba(128,128,128,0.03)' },
+      heading: { fontSize: '15px', fontWeight: 650, margin: '0 0 4px', letterSpacing: '-0.01em' },
+      title: { fontSize: '17px', fontWeight: 650, margin: '0 0 6px', letterSpacing: '-0.01em' },
       sub: { fontSize: '12px', fontWeight: 600, margin: 0 },
-      row: { display: 'grid', gridTemplateColumns: 'minmax(180px, 240px) 1fr', gap: '12px', alignItems: 'center' },
-      label: { display: 'flex', flexDirection: 'column', gap: '2px' },
-      hint: { opacity: 0.65, fontSize: '11px' },
-      input: { width: '100%', padding: '5px 8px', borderRadius: '6px', border: '1px solid rgba(128,128,128,0.45)', background: 'transparent', color: 'inherit', font: 'inherit' },
-      narrow: { maxWidth: '160px' },
-      statusOn: { border: '1px solid #bfe6cc', background: '#e9f7ef', borderRadius: '8px', padding: '8px 12px', fontSize: '13px' },
-      statusOff: { border: '1px solid rgba(128,128,128,0.25)', background: 'rgba(128,128,128,0.08)', borderRadius: '8px', padding: '8px 12px', fontSize: '13px' },
-      warn: { border: '1px solid #f5c542', background: '#fff7e6', borderRadius: '8px', padding: '7px 11px', fontSize: '12px' },
-      danger: { border: '1px solid #f5c542', background: '#fff7e6', borderRadius: '8px', padding: '8px 12px', fontSize: '12px' },
-      chain: { display: 'flex', flexDirection: 'column', gap: '6px', borderLeft: '2px solid rgba(128,128,128,0.25)', paddingLeft: '10px' },
-      route: { display: 'flex', gap: '6px', alignItems: 'center' },
+      row: { display: 'grid', gridTemplateColumns: 'minmax(200px, 260px) minmax(0, 1fr)', gap: '16px', alignItems: 'start', padding: '12px 0' },
+      label: { display: 'flex', flexDirection: 'column', gap: '3px', paddingTop: '6px' },
+      labelTitle: { fontSize: '13px', fontWeight: 600 },
+      hint: { opacity: 0.75, fontSize: '12px', lineHeight: 1.6 },
+      control: { minWidth: 0, paddingTop: '6px' },
+      input: { width: '100%', minWidth: 0, boxSizing: 'border-box', height: '32px', padding: '0 10px', borderRadius: '8px', border: '1px solid rgba(128,128,128,0.4)', background: 'transparent', color: 'inherit', font: 'inherit', fontSize: '13px' },
+      narrow: { maxWidth: '220px' },
+      statusOn: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', rowGap: '4px', border: '1px solid #bfe6cc', background: '#e9f7ef', borderRadius: '10px', padding: '10px 14px', fontSize: '13px' },
+      statusOff: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', rowGap: '4px', border: '1px solid rgba(128,128,128,0.28)', background: 'rgba(128,128,128,0.08)', borderRadius: '10px', padding: '10px 14px', fontSize: '13px' },
+      statusDot: { display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', marginRight: '8px', flex: 'none' },
+      warn: { border: '1px solid #f5c542', background: '#fff7e6', borderRadius: '10px', padding: '9px 13px', fontSize: '12px', lineHeight: 1.6 },
+      danger: { display: 'flex', flexDirection: 'column', gap: '0', border: '1px solid #f5c542', background: '#fff7e6', borderRadius: '12px', padding: '16px 20px 8px' },
+      chain: { display: 'flex', flexDirection: 'column', gap: '8px', borderLeft: '2px solid rgba(128,128,128,0.25)', paddingLeft: '12px', maxHeight: '340px', overflowY: 'auto', paddingRight: '4px', paddingTop: '2px', paddingBottom: '2px' },
+      roleCard: { display: 'flex', flexDirection: 'column', gap: '10px', background: 'rgba(128,128,128,0.05)', border: '1px solid rgba(128,128,128,0.16)', borderRadius: '10px', padding: '12px 14px' },
+      roleHead: { display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' },
+      roleIndex: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '22px', height: '22px', borderRadius: '50%', background: 'rgba(59,110,246,0.12)', color: '#3b6ef6', fontSize: '12px', fontWeight: 700, flex: 'none' },
+      route: { display: 'flex', gap: '8px', alignItems: 'center' },
       switch: { position: 'relative', width: '38px', height: '21px', borderRadius: '999px', border: 0, cursor: 'pointer', flex: 'none', background: '#d1d5db' },
-      switchOn: { position: 'relative', width: '38px', height: '21px', borderRadius: '999px', border: 0, cursor: 'pointer', flex: 'none', background: '#3b6ef6' },
-      button: { padding: '4px 10px', borderRadius: '6px', border: '1px solid rgba(128,128,128,0.45)', background: 'transparent', color: 'inherit', cursor: 'pointer', font: 'inherit' },
-      primary: { padding: '5px 14px', borderRadius: '6px', border: '1px solid transparent', background: '#3b6ef6', color: '#fff', cursor: 'pointer', font: 'inherit' },
-      footer: { display: 'flex', gap: '8px', alignItems: 'center', position: 'sticky', bottom: 0, padding: '10px 0', background: 'var(--dsh-settings-footer-bg, transparent)' },
+      switchOn: { position: 'relative', width: '38px', height: '21px', borderRadius: '999px', border: 0, cursor: 'pointer', flex: 'none', background: '#2f9e44' },
+      checkbox: { width: '16px', height: '16px', accentColor: '#3b6ef6', flex: 'none' },
+      button: { minHeight: '32px', padding: '5px 12px', borderRadius: '8px', border: '1px solid rgba(128,128,128,0.45)', background: 'transparent', color: 'inherit', cursor: 'pointer', font: 'inherit' },
+      primary: { minHeight: '32px', padding: '5px 18px', borderRadius: '8px', border: '1px solid transparent', background: '#3b6ef6', color: '#fff', cursor: 'pointer', font: 'inherit', fontWeight: 600 },
+      footer: { display: 'flex', gap: '8px', alignItems: 'center', position: 'sticky', bottom: 0, padding: '12px 0', marginTop: '4px', borderTop: `1px solid ${HAIRLINE}`, background: 'var(--dsh-settings-footer-bg, rgba(128,128,128,0.12))', backdropFilter: 'blur(8px)' },
       error: { color: '#e5484d' },
+      errorBox: { background: 'rgba(229,72,77,0.07)', border: '1px solid rgba(229,72,77,0.35)', borderRadius: '10px', padding: '10px 14px' },
+      empty: { display: 'block', border: '1px dashed rgba(128,128,128,0.4)', borderRadius: '8px', padding: '10px 12px', background: 'transparent' },
       ok: { color: '#2f9e44' },
       mono: { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: '12px' },
+    }
+
+    // One injected rule set for what inline styles cannot express: hairline
+    // dividers between stacked rows (`.gw-row + .gw-row`), the disclosure
+    // marker for the collapsed group, and its inner indent.
+    function PageStyle() {
+      return h('style', null, [
+        '.gw-row + .gw-row { border-top: 1px solid rgba(128,128,128,0.14); }',
+        '.gw-adv > summary { list-style: none; }',
+        '.gw-adv > summary::-webkit-details-marker { display: none; }',
+        '.gw-adv > summary::before { content: "▸"; display: inline-block; width: 1.2em; color: rgba(128,128,128,0.9); }',
+        '.gw-adv[open] > summary::before { content: "▾"; }',
+        '.gw-adv-body { padding-left: 2px; }',
+        'input[data-field]:hover, select[data-field]:hover { border-color: rgba(59,110,246,0.55); }',
+        'input[data-field]:focus, select[data-field]:focus { outline: 2px solid rgba(59,110,246,0.35); outline-offset: 0; border-color: #3b6ef6; }',
+        'button[data-action]:hover:not(:disabled), button[data-add-route]:hover:not(:disabled), button[data-remove-route]:hover:not(:disabled) { border-color: rgba(59,110,246,0.6); }',
+        'button[data-action]:focus-visible, button[data-add-route]:focus-visible, button[data-remove-route]:focus-visible, summary:focus-visible { outline: 2px solid rgba(59,110,246,0.5); outline-offset: 2px; }',
+        'button:disabled, input:disabled, select:disabled { opacity: 0.55; cursor: not-allowed; }',
+        'input[data-field]:disabled, select[data-field]:disabled { background: rgba(128,128,128,0.08); }',
+      ].join('\n'))
     }
 
     /**
@@ -686,11 +741,11 @@ window.__ModuleLoader__.load({
      */
     function FieldRow(props) {
       const { fieldKey, title, hint, control } = props
-      return h('div', { style: styles.row, 'data-field': fieldKey },
+      return h('div', { style: styles.row, className: 'gw-row', 'data-field': fieldKey },
         h('span', { style: styles.label },
-          h('span', null, title),
+          h('span', { style: styles.labelTitle }, title),
           hint === undefined ? null : h('span', { style: styles.hint }, hint)),
-        h('div', null, control))
+        h('div', { style: styles.control }, control))
     }
 
     function Toggle(props) {
@@ -708,7 +763,7 @@ window.__ModuleLoader__.load({
       const { field, value, disabled, onChange, t } = props
       const optionKey = (option) => `option.${field.key}.${option}`
       return h('select', {
-        style: { ...styles.input, ...styles.narrow }, value: String(value), disabled,
+        style: { ...styles.input, ...styles.narrow, width: 'auto' }, value: String(value), disabled,
         onChange: (event) => onChange(field.key, event.target.value),
         'data-field': field.key,
       }, field.options.map((option) => {
@@ -725,6 +780,7 @@ window.__ModuleLoader__.load({
       if (field.kind === 'boolean') {
         return h('input', {
           type: 'checkbox', checked: value === true, disabled,
+          style: styles.checkbox,
           onChange: (event) => onChange(field.key, event.target.checked),
           'data-field': field.key,
         })
@@ -757,10 +813,11 @@ window.__ModuleLoader__.load({
         const key = `switch.${name}`
         return translate(undefined, key) === key ? name : t(key)
       }
-      return h('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
-        SWITCHABLE_CLASSES.map((name) => h('label', { key: name, style: { display: 'flex', gap: '7px', alignItems: 'center', fontWeight: 400, fontSize: '13px' } },
+      return h('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
+        SWITCHABLE_CLASSES.map((name) => h('label', { key: name, style: { display: 'flex', gap: '8px', alignItems: 'center', fontWeight: 400, fontSize: '13px', minHeight: '24px' } },
           h('input', {
             type: 'checkbox', checked: selected.has(name), disabled,
+            style: styles.checkbox,
             'data-switch-class': name,
             onChange: () => {
               const next = new Set(selected)
@@ -814,15 +871,17 @@ window.__ModuleLoader__.load({
         h('option', { key: '', value: '' }, t('roles.modelPlaceholder')),
         models.map((name) => h('option', { key: name, value: name }, name)))
       return h('div', { key: `${role}-${index}`, style: styles.route },
-        h('span', { style: { ...styles.hint, minWidth: '18px' } }, `${index + 1}`),
-        providerControl,
-        modelControl,
+        h('span', { style: { ...styles.hint, minWidth: '18px', textAlign: 'center' } }, `${index + 1}`),
+        h('span', { style: { flex: '1 1 0', minWidth: 0 } }, providerControl),
+        h('span', { style: { flex: '1 1 0', minWidth: 0 } }, modelControl),
         h('button', {
-          type: 'button', style: styles.button, disabled,
+          type: 'button', style: { ...styles.button, flex: 'none' }, disabled,
           onClick: onRemove,
           'data-remove-route': `${role}-${index}`,
         }, t('roles.remove')))
     }
+
+    const ROLE_ORDER = { planner: 1, worker: 2, verifier: 3, synthesizer: 4 }
 
     function RoleChain(props) {
       const { role, chain, disabled, onChange, catalog, t } = props
@@ -830,10 +889,12 @@ window.__ModuleLoader__.load({
         const next = chain.map((route, position) => (position === index ? { ...route, ...patch } : route))
         onChange(next)
       }
-      return h('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+      return h('div', { style: styles.roleCard },
+        h('div', { style: styles.roleHead },
+          h('span', { style: styles.roleIndex }, String(ROLE_ORDER[role] || '·')),
+          h('strong', null, t(`role.${role}`)),
+          h('span', { style: styles.hint }, t(`role.${role}.duty`))),
         h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' } },
-          h('strong', { style: { minWidth: '110px' } }, t(`role.${role}`)),
-          h('span', { style: styles.hint }, t(`role.${role}.duty`)),
           h('span', { style: styles.hint }, t('roles.count', { count: chain.length, limit: CHAIN_LIMIT })),
           h('button', {
             type: 'button', style: styles.button, disabled: disabled || chain.length >= CHAIN_LIMIT,
@@ -842,7 +903,7 @@ window.__ModuleLoader__.load({
           }, t('roles.add', { limit: CHAIN_LIMIT }))),
         h('div', { style: styles.chain },
           chain.length === 0
-            ? h('span', { style: styles.hint }, t('roles.empty'))
+            ? h('span', { style: { ...styles.hint, ...styles.empty } }, t('roles.empty'))
             : chain.map((route, index) => h(RouteRow, {
               key: `${role}-${index}`, role, index, route, disabled, catalog, t,
               onUpdate: (patch) => update(index, patch),
@@ -897,9 +958,9 @@ window.__ModuleLoader__.load({
         models.map((name) => h('option', { key: name, value: name }, name)))
       return h('div', null,
         h('div', { style: styles.route },
-          h('span', { style: { ...styles.hint, minWidth: '18px' } }, '·'),
-          providerControl,
-          modelControl),
+          h('span', { style: { ...styles.hint, minWidth: '18px', textAlign: 'center' } }, '·'),
+          h('span', { style: { flex: '1 1 0', minWidth: 0 } }, providerControl),
+          h('span', { style: { flex: '1 1 0', minWidth: 0 } }, modelControl)),
         h('div', { style: styles.hint }, t('field.triageModel.hint')))
     }
 
@@ -914,9 +975,11 @@ window.__ModuleLoader__.load({
       const full = draft.mode === 'full'
       const key = !on ? 'status.off' : (full ? 'status.full' : 'status.triage')
       const detailKey = `${key}.detail`
+      const dot = !on ? '#9aa0a6' : (full ? '#3b6ef6' : '#2f9e44')
       return h('div', { style: !on ? styles.statusOff : styles.statusOn },
+        h('span', { style: { ...styles.statusDot, background: dot } }),
         h('strong', null, t(key)),
-        h('span', { style: { marginLeft: '8px', opacity: 0.8 } }, t(detailKey)))
+        h('span', { style: { marginLeft: '8px', opacity: 0.75, fontSize: '12px' } }, t(detailKey)))
     }
 
     function GrokWorkflowPage(props) {
@@ -980,18 +1043,35 @@ window.__ModuleLoader__.load({
           control: h(EnumField, { field, value: draft[key], disabled, onChange, t }),
         })
       }
+      // Number input with a unit suffix (paired `unit.*` dict keys) and the
+      // range line beneath it. The FIELDS min/max/def stay untouched.
+      const NUMBER_UNITS = {
+        timeoutMs: 'unit.ms',
+        maxRetries: 'unit.retries',
+        maxConcurrency: 'unit.jobs',
+        maxTasks: 'unit.tasks',
+        historyTurns: 'unit.turns',
+        historyChars: 'unit.chars',
+        maxQueuedMessages: 'unit.queued',
+        maxActiveRuns: 'unit.runs',
+        maxActiveRunsTotal: 'unit.runsTotal',
+        recordLimit: 'unit.records',
+      }
       const numberRow = (key) => {
         const field = fieldByKey(key)
+        const unitKey = NUMBER_UNITS[key]
         return h(FieldRow, {
           key, fieldKey: key, title: t(`field.${key}`), hint: t(`field.${key}.hint`),
           control: h('span', null,
-            h('input', {
-              type: 'number', style: { ...styles.input, ...styles.narrow }, value: String(draft[key]), disabled,
-              min: field.min, max: field.max, step: 1,
-              onChange: (event) => onChange(key, event.target.value === '' ? '' : Number(event.target.value)),
-              'data-field': key,
-            }),
-            h('div', { style: styles.hint }, t('field.range', { min: field.min, max: field.max, def: field.def }))),
+            h('span', { style: { display: 'inline-flex', gap: '8px', alignItems: 'center' } },
+              h('input', {
+                type: 'number', style: { ...styles.input, ...styles.narrow }, value: String(draft[key]), disabled,
+                min: field.min, max: field.max, step: 1,
+                onChange: (event) => onChange(key, event.target.value === '' ? '' : Number(event.target.value)),
+                'data-field': key,
+              }),
+              unitKey === undefined ? null : h('span', { style: styles.hint }, t(unitKey))),
+            h('div', { style: { ...styles.hint, marginTop: '4px' } }, t('field.range', { min: field.min, max: field.max, def: field.def }))),
         })
       }
       const booleanRow = (key) => {
@@ -1000,6 +1080,7 @@ window.__ModuleLoader__.load({
           key, fieldKey: key, title: t(`field.${key}`), hint: t(`field.${key}.hint`),
           control: h('input', {
             type: 'checkbox', checked: draft[key] === true, disabled,
+            style: styles.checkbox,
             onChange: (event) => onChange(key, event.target.checked),
             'data-field': key,
           }),
@@ -1007,9 +1088,10 @@ window.__ModuleLoader__.load({
       }
 
       return h('div', { style: styles.page, 'data-page': 'grok-workflow' },
+        h(PageStyle, null),
         h('div', null,
-          h('h2', { style: { fontSize: '15px', margin: '0 0 4px' } }, t('card.title')),
-          h('p', { style: { ...styles.hint, margin: '0 0 8px' } }, t('page.intro')),
+          h('h2', { style: styles.title }, t('card.title')),
+          h('p', { style: { ...styles.hint, margin: '0 0 12px', fontSize: '13px' } }, t('page.intro')),
           h(StatusLine, { draft, t })),
         // --- Novice: mode ---
         h('div', { style: styles.card },
@@ -1031,19 +1113,18 @@ window.__ModuleLoader__.load({
         // --- Novice: who does it ---
         h('div', { style: styles.card },
           h('h3', { style: styles.heading }, t('novice.roles.title')),
-          h('p', { style: { ...styles.hint, margin: 0 } }, t('novice.roles.hint')),
-          h('p', { style: { ...styles.hint, margin: 0 } }, t('novice.roles.warn')),
-          h('p', { style: { ...styles.hint, margin: 0 } }, t('roles.firstRowHint')),
-          ROLES.map((role) => h('div', { key: role },
-            h('h4', { style: styles.sub }, `${t(`role.${role}`)} · ${t(`role.${role}.duty`)}`),
-            h(RoleChain, {
-              role, chain: draft.roles[role] || [], disabled, catalog, t,
+          h('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px', margin: '0 0 12px' } },
+            h('p', { style: { ...styles.hint, margin: 0 } }, t('novice.roles.hint')),
+            h('p', { style: { ...styles.hint, margin: 0 } }, t('novice.roles.warn'))),
+          h('div', { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
+            ROLES.map((role) => h(RoleChain, {
+              key: role, role, chain: draft.roles[role] || [], disabled, catalog, t,
               onChange: (next) => setChain(role, next),
             })))),
         // --- Novice: limits ---
         h('div', { style: styles.card },
           h('h3', { style: styles.heading }, `${t('novice.limits.title')} · ${t('novice.limits.relaxed')}`),
-          h('p', { style: { ...styles.hint, margin: 0 } }, t('novice.limits.hint')),
+          h('p', { style: { ...styles.hint, margin: '0 0 4px' } }, t('novice.limits.hint')),
           numberRow('timeoutMs'),
           numberRow('maxRetries'),
           numberRow('maxConcurrency'),
@@ -1051,10 +1132,10 @@ window.__ModuleLoader__.load({
           numberRow('historyTurns'),
           numberRow('historyChars')),
         // --- Advanced (collapsed by default) ---
-        h('details', { style: { border: '1px solid rgba(128,128,128,0.25)', borderRadius: '10px', padding: '10px 14px' } },
-          h('summary', { style: { cursor: 'pointer', fontWeight: 600 } },
+        h('details', { className: 'gw-adv', style: { border: '1px solid rgba(128,128,128,0.22)', background: 'rgba(128,128,128,0.03)', borderRadius: '12px', padding: '14px 20px' } },
+          h('summary', { style: { cursor: 'pointer', fontWeight: 650, fontSize: '15px' } },
             `${t('advanced.title')} · ${t('advanced.default')}`),
-          h('div', { style: { display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' } },
+          h('div', { className: 'gw-adv-body', style: { display: 'flex', flexDirection: 'column', marginTop: '4px' } },
             enumRow('answerStrategy'),
             h(FieldRow, {
               key: 'triageModel', fieldKey: 'triageModel',
@@ -1081,7 +1162,7 @@ window.__ModuleLoader__.load({
         // --- Danger ---
         h('div', { style: styles.danger },
           h('h3', { style: styles.heading }, t('danger.title')),
-          h('p', { style: { ...styles.hint, margin: 0 } }, t('danger.hint')),
+          h('p', { style: { ...styles.hint, margin: '0 0 4px' } }, t('danger.hint')),
           enumRow('gateScope'),
           h(FieldRow, {
             key: 'gatePreset', fieldKey: 'gatePreset',
@@ -1091,19 +1172,21 @@ window.__ModuleLoader__.load({
         // --- Structural (read-only) ---
         h('div', { style: styles.card },
           h('h3', { style: styles.heading }, t('group.structural')),
-          h('p', { style: { ...styles.hint, margin: 0 } }, t('structural.hint')),
-          READ_ONLY.map((key) => h('div', { key, style: styles.row },
+          h('p', { style: { ...styles.hint, margin: '0 0 4px' } }, t('structural.hint')),
+          READ_ONLY.map((key) => h('div', { key, style: styles.row, className: 'gw-row' },
             h('span', { style: styles.label },
-              h('span', null, t(`readonly.${key}`))),
-            h('span', { style: styles.mono, 'data-readonly-key': key }, t(`readonlyValue.${key}`))))),
+              h('span', { style: styles.labelTitle }, t(`readonly.${key}`))),
+            h('div', { style: styles.control },
+              h('span', { style: { ...styles.mono, paddingTop: '6px', display: 'inline-block' }, 'data-readonly-key': key }, t(`readonlyValue.${key}`)))))),
         warnCombo
           ? h('div', { style: styles.warn },
             h('strong', null, t('warn.combo.title')),
             h('div', null, t('warn.combo.detail')))
           : null,
         errors.length > 0
-          ? h('ul', { style: { ...styles.error, margin: 0, paddingLeft: '18px' } },
-            errors.map((error) => h('li', { key: errorId(error) }, formatError(error, t))))
+          ? h('div', { style: styles.errorBox },
+            h('ul', { style: { ...styles.error, margin: 0, paddingLeft: '18px' } },
+              errors.map((error) => h('li', { key: errorId(error) }, formatError(error, t)))))
           : null,
         message !== undefined
           ? h('p', { style: { ...(message.kind === 'error' ? styles.error : styles.ok), margin: 0 } }, t(message.key, message.params))
@@ -1117,7 +1200,7 @@ window.__ModuleLoader__.load({
             type: 'button', style: styles.button, disabled: disabled || ops.length === 0,
             onClick: () => { setDraft(draftOf(value)); setMessage(undefined) }, 'data-action': 'discard',
           }, t('action.discard')),
-          h('span', { style: styles.hint }, t('status.revision', { revision: String(revision) }))))
+          h('span', { style: { ...styles.hint, marginLeft: 'auto' } }, t('status.revision', { revision: String(revision) }))))
     }
 
     /** Required services for the page: the slot registry and the shared config forms. */

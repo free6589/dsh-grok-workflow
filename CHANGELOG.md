@@ -5,6 +5,21 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Changed / 变更
+
+- **Settings page visual polish, three live-screenshot passes / 设置页三轮视觉打磨，均有真机截图** —
+  info hierarchy and breathing (title ladder, hint styles, hairline row dividers, unified
+  32px/8px controls, unit suffixes like ms/retries/turns, restyled status line, card-ified
+  role chains with numbered badges, solid-blur sticky footer), alignment and rhythm
+  (two-column baselines, semantic green ON switch, disclosure markers, right-aligned
+  revision), and details (dashed empty state, tinted error box, hover/focus/disabled
+  states, 340px internal chain scroll, bilingual EN/ZH overflow checks). No config keys,
+  bounds, validation or wiring changed — styles, grouping order and copy only.
+  信息层级与呼吸感（标题阶梯、hint 样式、行分隔线、统一 32px/8px 控件、ms/次/轮等单位后缀、
+  状态行重塑、角色链卡片化+序号徽、实底毛玻璃吸底栏）、对齐与节奏（两列基线、语义绿 ON 开关、
+  折叠箭头、修订号右对齐）、细节定稿（虚线空态、红底错误框、hover/focus/disabled 三态、
+  链内 340px 滚动、中英双语溢出检查）。未动任何配置键、上限、校验与接线，只改样式、分组顺序与文案。
+
 ## [0.2.5] - 2026-11-01
 
 The novice settings page: the Settings → Plugins → `Grok workflow` page now speaks one
