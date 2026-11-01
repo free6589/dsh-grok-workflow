@@ -20,13 +20,14 @@ Last updated: 2026-11-01 (local)
 
 ## Current phase
 
-`0.2.4` preparation (phase 9). Base of this state: **`origin/main` = `6806426`**.
+`0.2.4` **released** (phase 9 close-out). Base of this state: **`origin/main` = `7357e5e`**.
 
-`v0.2.3` **is released** (tag `538d1ab`, Release green, asset sha256 `65fd720c…`), after `v0.2.2`
-(2026-10-28), `v0.2.1` (`cecc065`) and `v0.2.0` (`f7a244c`). `0.2.4` is **not** prepared in the tree
-yet: `package.json` still reads `0.2.3`, `CHANGELOG.md` carries a fresh `[Unreleased]` section, and
-no `v0.2.4` tag exists — so this file must not describe `0.2.4` as bumped, tagged or published. The
-tag and the GitHub Release are created by the captain after the acceptance pass.
+`v0.2.4` **is released** (tag `v0.2.4` on `7357e5e`, Release green
+`https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.2.4`, asset
+`dsh-grok-workflow-0.2.4.tgz`), after `v0.2.3` (`538d1ab`), `v0.2.2`
+(2026-10-28), `v0.2.1` (`cecc065`) and `v0.2.0` (`f7a244c`). `package.json` reads `0.2.4`,
+`CHANGELOG.md` carries `## [0.2.4] - 2026-11-01`, and the tag + GitHub Release were created by
+the captain after the acceptance pass.
 
 Merged into `main` since `v0.2.3` (each `CONFIRMED` in `git log`):
 
@@ -37,29 +38,32 @@ Merged into `main` since `v0.2.3` (each `CONFIRMED` in `git log`):
 | #23 | `2e9c26a` | Phase 1 dialogue reliability (P0) |
 | #26 | `a000983` | segmented planner-failure fallback (`src/shards.ts`); review close-out is Round 13 |
 | #27 | `6806426` | `/grok` session switch (mode/command/gate, D-028/D-029) |
+| #28 | `7357e5e` | release `0.2.4` (prepare: opt-in `/grok` switch, Phase 1, sharded fallback, task panel, 32000 limit, GUI notes; Round 15 memory) |
 
-So the `0.2.4` cut has to carry the `/grok` switch, the task-grouped progress panel, the
-32,000-character objective limit and the segmented fallback — all four are on `main`, none is
-tagged.
+So the `0.2.4` cut carries the `/grok` switch, the task-grouped progress panel, the
+32,000-character objective limit and the segmented fallback — all four are on `main` and tagged.
 
 Authoritative numbers for this state (measured, not planned):
 
 - `npm run ci` — last full run was on the PR #26 branch (Round 13, `68f3d15`): **27 files / 487
   tests**, exit 0, oxlint 1 pre-existing warning (`src/redact.ts:155`). **`npm run ci` on `main`
-  `6806426` is `NOT_RUN`** — do not quote 487 as a `main` number until someone runs it there.
+  `7357e5e` is `NOT_RUN`** — do not quote 487 as a `main` number until someone runs it there.
 - `lib/` reproducible: `npm run build && git diff --exit-code -- lib/` = exit 0 on that branch
   (Round 13).
-- Real-instance evidence, newest first: `VALIDATION.md` Round 15 (real Web GUI on `6806426`:
-  `/grok` switch + settings card, isolated instance), Round 14 (real-model E2E, two bugs + fixes),
-  Round 13 (PR #26 close-out); `docs/knowledge/evidence/t42`…`t49` cover the 0.2.2 era.
+- Real-instance evidence, newest first: `VALIDATION.md` Round 16 (v0.2.4 install matrix on
+  `7357e5e`: 8 PASS + 2 NOT_RUN, item 7 anomaly on record, item 8 partial), Round 15 (real Web
+  GUI on `6806426`: `/grok` switch + settings card, isolated instance), Round 14 (real-model E2E,
+  two bugs + fixes), Round 13 (PR #26 close-out); `docs/knowledge/evidence/t42`…`t49` cover the
+  0.2.2 era. `src`/`lib`/`test` are identical between `6806426` and `7357e5e` (`git diff --stat
+  6806426 7357e5e -- src lib test` is empty), so Round 15's GUI result carries over to `v0.2.4`.
 - **Quality claims are bounded by measurement**: Round 8's 1 `COMPLETED` in 12 reports was the
-  verifier-decision defect (fixed in 0.2.2), and Round 15's GUI round ran `glm-5.3-flash`, not
-  `deepseek-v4.1-flash`. Neither result may be generalised into "the workflow accepts what it did
-  not accept", nor into a per-model quality claim.
+  verifier-decision defect (fixed in 0.2.2), and Round 15's GUI round plus Round 16's matrix ran
+  `glm-5.3-flash`, not `deepseek-v4.1-flash`. None of these results may be generalised into "the
+  workflow accepts what it did not accept", nor into a per-model quality claim.
 
 ## Where the open questions live
 
-- `docs/knowledge/VALIDATION.md` — Rounds 1–15. Round 6 row (g) is annotated: stability 5/5,
+- `docs/knowledge/VALIDATION.md` — Rounds 1–16. Round 6 row (g) is annotated: stability 5/5,
   accepted results 0/5, root cause fixed in 0.2.2. Round 7 closed the notice/route/deadline
   questions; Round 8 answers the quality question and records the operational caveat that the
   Plugins-page switch — not `cordis.patch.yml` — is what says whether the gate is armed. Round 13
@@ -103,13 +107,19 @@ Authoritative numbers for this state (measured, not planned):
 
 - A clean-DSH-profile install check in CI (currently a local scripted smoke).
 - **NR-1, NR-7 and NR-8 are no longer open GUI questions** — Round 15 measured all three on a real
-  Web GUI against `6806426` (isolated instance `127.0.0.1:3199`, real Chromium). What remains, and
+  Web GUI against `6806426` (isolated instance `127.0.0.1:3199`, real Chromium), and Round 16's
+  install matrix (against `7357e5e`, identical `src`/`lib`/`test`) leaves the GUI halves exactly
+  where Round 15 put them: items 9–10 are `NOT_RUN` in the matrix **because** Round 15 already
+  covered settings-page render and web-chat behaviour on the same code. What remains, and
   what must be stated with the result: the browser was **offscreen (headless) Chromium** because the
   host has no X11 display, and the model was **`wb/cn:glm-5.3-flash`** because the suggested
   `wb/cn:deepseek-v4.1-flash` answered `400 model_unavailable` (per-model cooldown) that day. So the
   GUI halves are verified for `in-turn` delivery and for the plugin settings card; **`relay` /
-  `append` delivery in a long-lived GUI session is still NOT_RUN**, and no per-model quality claim
-  follows from this round.
+  `append` delivery in a long-lived GUI session is still NOT_RUN** (NR-1's remaining half), and no per-model quality claim
+  follows from either round. Round 16's own boundaries: item 7's one direct-answer anomaly is on
+  record (Rerun + run4 + run5 = 3 consecutive EXIT 0 + reports after it); item 8's web-profile
+  check stopped at HTTP `401 unauthorized` on `settings`/`describe` (composition + boot
+  `CONFIRMED`, API namespace not confirmed).
 - L2 host-level routing (registering `agent/request-error` consumers) stays out
   of scope for `0.2.0` by decision U-2.
 - Client-side chain editor (settings UI with model dropdowns) is Phase 9 / U-6.
@@ -120,16 +130,15 @@ None.
 
 ## Next priority
 
-**Next release to prepare: `0.2.4`.** `v0.2.3` is **released** (tag on `538d1ab`, Release green,
-asset sha256 `65fd720c…`) and `main` is at `6806426` with PR #23, #24, #25, #26 and #27 merged
-(see Current phase). The two GUI checks that blocked the acceptance narrative are now `CONFIRMED`
-(Round 15), so the remaining work for `0.2.4` is the ordinary release path, not more verification:
-run `npm run ci` on `main`, confirm `lib/` matches a fresh build, move the `[Unreleased]` entries
-under `## [0.2.4]`, bump `package.json`/`package-lock.json` together, then let the captain create
-the tag and the Release (no tag ever moves; `0.2.4` must not be described as published before that).
+**Next version to plan.** `v0.2.4` is **released** (tag `v0.2.4` on `7357e5e`, Release green,
+asset `dsh-grok-workflow-0.2.4.tgz`), and Round 16 recorded the install matrix
+(8 PASS + 2 NOT_RUN, item 7 anomaly on record, item 8 partial). Candidates for the next scope —
+none decided, all `HYPOTHESIS` until the captain picks: `relay`/`append` delivery in a
+long-lived GUI session (NR-1's remaining half), item 8's API-side auth/namespace confirmation,
+a quality matrix (not a 1-run claim), and the client-side chain editor (Phase 9 / U-6).
 
 Any future live matrix must follow [docs/knowledge/TESTING.md](TESTING.md) (isolated workspace, one
-turn at a time; Round 15's isolation proof is in `.workflow-artifacts/gui-verify/README.md`).
+turn at a time; Round 16's isolation proof is in `.workflow-artifacts/matrix-024/EVIDENCE.md`).
 `v0.2.0` was released on 2026-10-26, `v0.2.1` on 2026-10-27, `v0.2.2` and `v0.2.3` on 2026-10-28.
 
 ## Homepage redesign — merged

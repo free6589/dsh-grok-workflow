@@ -1,5 +1,33 @@
 # Agent Handoff
 
+## 2026-11-01 — v0.2.4 install matrix recorded: 8 PASS + 2 NOT_RUN (memory only)
+
+- **From:** matrix-memory · **To:** lead
+- **Base commit:** `7357e5e` (`origin/main`, PR #28 merge = the v0.2.4 release commit; tag `v0.2.4`
+  已打，Release 已建：`https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.2.4`，
+  资产 `dsh-grok-workflow-0.2.4.tgz`)
+- **Work commit:** the docs-only commit carrying this section on `docs/matrix-024-memory`. No
+  `src/`, `lib/` or `test/` file changed (`git diff --stat 7357e5e HEAD -- src lib test` is empty);
+  this branch exists only to record the result.
+- **Matrix result (read-only evidence, not committed):**
+  `.workflow-artifacts/matrix-024/EVIDENCE.md` + `logs/` (item1~item8). Items 1–7 **PASS**,
+  item 8 部分通过（composition + boot 确认；`settings`/`describe` 经 query-token + Bearer 均
+  `401 unauthorized`，namespace 未确认），items 9–10 **NOT_RUN**（本环境无浏览器自动化；
+  Round 15 已在真 GUI 上覆盖设置页与 web 聊天）。
+- **Anomaly on record:** item 7 run3 首轮 EXIT 0 直接答 `apple, banana, cherry` 无报告
+  (`logs/item7-run3.jsonl`，563 bytes)；同 prompt 重跑 `COMPLETED` verified
+  (`logs/item7-run3-rerun.jsonl`，3667 bytes)；异常之后连续 3 个 EXIT 0 + 报告。样本保留，
+  未掩盖。原文引用见 `VALIDATION.md` Round 16 §2。
+- **Details:** `VALIDATION.md` Round 16（逐项 1–10 + 异常原文引用 + `EVIDENCE.md` 路径）；
+  `STATE.md` 已对齐（Current phase = v0.2.4 已发布，Next priority = 下一版规划，
+  NR-1/7/8 与 Round 15/16 对齐）。
+- **Tests run this round:** no source test suite was executed (docs-only change). Read-only checks:
+  `git status`, `git diff --stat`, secret grep over the three files (0 hits). `npm run ci` on
+  `main` `7357e5e` is still `NOT_RUN` — the last full run (27 files / 487 tests) was on the
+  PR #26 branch, see Round 13.
+- **Next action:** merge `docs/matrix-024-memory` into `main`, then plan the next version scope
+  (`relay`/`append` 投递、item 8 的 API 认证、质量矩阵、U-6 chain editor 候选）.
+
 ## 2026-11-01 — real Web GUI verified: `/grok` switch + settings card (memory only)
 
 - **From:** local (gui-verify-memory) · **To:** lead / captain / next local agent

@@ -1390,3 +1390,65 @@ per-role model chains, concurrency and run records"），安装的 bundle 名为
 - **只有一个浏览器内核**（Chromium），没有 Safari/Firefox 证据；也没有移动端证据。
 - **证据不入库**：`.workflow-artifacts/` 未提交，`shots/`、`logs/`、`dsh-home/` 只存在于本机；
   本文件只给出路径与关键文本，便于复跑时对照。
+
+## Round 16 (t60) — v0.2.4 真机安装矩阵（隔离 headless + web，8 PASS + 2 NOT_RUN）
+
+`CONFIRMED` — 在 `origin/main` `7357e5e`（`v0.2.4` 发布提交，tag `v0.2.4` 已打，Release 已建）上，
+用全新隔离 `DSH_HOME` 跑完 10 项真机安装矩阵：item 1–7 `PASS`（item 7 带一次如实记录的直答异常），
+item 8 部分通过（composition + boot 确认，API 命名空间未确认），item 9–10 `NOT_RUN`
+（本环境无浏览器自动化；设置页与 web 聊天已在 Round 15 的真 GUI 上覆盖）。
+本轮只读证据 + 三个记忆文件，**未改任何源码**（`src`/`lib`/`test` 无 diff）。
+
+证据（只读，全部在本机 `.workflow-artifacts/matrix-024/` 下，未入库）：
+
+- `EVIDENCE.md` — 逐项结论与日志指针（本轮原始记录）。
+- `logs/` — `item1-boot*.txt`、`item1-dump-*.txt`、`item1-patch.yml`、`item2-*`、
+  `item3-*.jsonl`、`item4-*`、`item5-*.jsonl`、`item7-run*.jsonl`、`item8-*`
+  （含 `item8-create.txt`、`item8-dump-full.txt`、`item8-web-boot*.log`、`item8-describe.json`）。
+- `home/`、`work/` — 一次性实例的 home 与会话工作区。
+
+运行环境：`DSH_HOME=.workflow-artifacts/matrix-024/home`（本轮新建，未复用任何既有测试 home）；
+在跑的 `:3090` 全程未动（未重启、未 kill）；模型 `bifrost-completions / wb/cn:glm-5.3-flash`，
+凭据只经 `BIFROST_VIRTUAL_KEY` 环境变量（`apiKeyEnv`），未落盘，任何工件里都没有 key 值。
+
+### 1. 逐项结果（1–10）
+
+| # | 项 | 结论 | 关键证据 |
+| --- | --- | --- | --- |
+| 1 | install + boot | **PASS** | `item1-dump-full.txt:411` 有 `- id: grok-workflow / name: dsh-grok-workflow`；boot2 EXIT 0 `BOOT_OK`，stderr 空，无 pending/did-not-activate |
+| 2 | default off plain | **PASS** | EXIT 0 `PLAIN_OK`，0 report 匹配 |
+| 3 | full workflow | **PASS** | `item3-retry.jsonl`：`Grok workflow: COMPLETED`，`Plan: planner; 1 task(s); 1 verified`，EXIT 0。首轮 `item3-workflow.jsonl` 是被外层 `timeout 600` 杀掉（只有 turn_start + cancelled 提示，P0-4 路径），不是 verdict |
+| 4 | off back to plain | **PASS** | EXIT 0 直接 JSON 短句，0 report 匹配 |
+| 5 | bad model fail-closed | **PASS**（两种变体） | (a) 未知 role model → load-time row rejection，stderr 点名 model + 已声明目录，EXIT 0 直接 echo（row 从未激活，故无 gate）；(b) `bad subagentProvider=bifrost-completions` → EXIT 0 带显式 `GROK-WORKFLOW-REPORT` 拒绝 `no subagent provider registered for "bifrost-completions"`，什么都没执行、无直答 —— 运行时 fail-closed 实证。注：观测到的是 EXIT 0，不是 0.2.0 时代的 EXIT 1；(b) 的判定标准（显式错误 + 无静默直答）仍然成立 |
+| 6 | secret scan | **PASS** | key 值在全部 logs 里 0 命中；在全部 16 个 session zstd store 里 0 命中；token 模式 `(?<![a-zA-Z])sk-[A-Za-z0-9_-]{8,}` 在 logs + stores 里 0 命中；收紧的 `(?<!ta)sk-` 0 命中（裸 `sk-` 命中全是 `task-` 子串） |
+| 7 | stability | **PASS**（异常在案，见 §2） | run1/run2 `COMPLETED` verified EXIT 0；run3 首轮异常；同 prompt 重跑 `COMPLETED` verified EXIT 0；run4 `COMPLETED` EXIT 0；run5 `COMPLETED`（中文报告）verified EXIT 0。异常之后连续 3 个 EXIT 0 + 报告：rerun + run4 + run5 |
+| 8 | web profile | **部分通过**（composition + boot 确认；API 边界止于 401） | `mx024-web` 由 stock web 模板建，装的是 `#v0.2.4`（0.2.4）；patch 打开 `workflow-ptc`（`disabled: false`）+ model route + roles（`item8-dump-full.txt:340,1259`）；隔离实例 `127.0.0.1:3201` LISTENING，boot 日志无 pending/did-not-activate；HTTP `settings`/`describe` 经 query-token 与 Bearer 两次尝试均 `401 unauthorized`（`item8-describe.json` 正文只有 `unauthorized`），认证方式未解开、未继续深探（避免锁号）。服务存活确认到 socket + boot 层；namespace 经 API 未确认 |
+| 9 | settings page render | **NOT_RUN** | 本环境无浏览器自动化，留给 operator；设置页渲染已在 Round 15 的真 GUI 上 `CONFIRMED`（基点 `6806426`；与 `7357e5e` 之间 `src`/`lib`/`test` 无 diff，只有发版与文档，见 `git diff --stat 6806426 7357e5e -- src lib test` 为空） |
+| 10 | web chat behavior | **NOT_RUN** | 同上；web 聊天（`/grok` 可切、in-turn 投递）已在 Round 15 的真 GUI 上 `CONFIRMED` |
+
+### 2. item 7 异常原文（`logs/item7-run3.jsonl` 563 bytes；重跑 `logs/item7-run3-rerun.jsonl` 3667 bytes）
+
+run3 首轮 EXIT 0，但直接回答、无报告。文件中的两行原文：
+
+```jsonl
+{"type":"text","text":"apple, banana, cherry"}
+{"type":"final","text":"apple, banana, cherry"}
+```
+
+（其余只有 `turn_start` / `step_start` / `step_end`（`outputTokens: 7`）/ `turn_end`
+（`reason: completed`），全程无 `GROK-WORKFLOW-REPORT`。）同 prompt 重跑一次即 `COMPLETED`
+verified（3667 bytes，含完整报告 `Plan: planner; 1 task(s); 1 verified` + 独立证据行）。
+该异常样本保留在 `logs/` 里，未删除、未掩盖；稳定性结论按"异常之后连续 3 个 EXIT 0 + 报告"
+给出，不按"从未异常"给出。
+
+### 3. 本轮不建立的东西（诚实边界）
+
+- **item 8 的 namespace 经 API 未确认**：`401` 边界如 §1 表格；认证方式未解开，不猜、不深探。
+- **item 9–10 在矩阵里 `NOT_RUN`**：覆盖来自 Round 15（基点 `6806426`，`src`/`lib`/`test`
+  与 `v0.2.4` 一致），不是本轮重测。
+- **`relay` / `append` 在长驻 GUI 里的投递仍 `NOT_RUN`**（NR-1 的剩下半边）：Round 15 与本轮走的
+  都是默认 `in-turn` 投递。
+- **质量断言仍受模型边界限制**：本轮全部轮次是 `glm-5.3-flash`，不是 `deepseek-v4.1-flash`；
+  本轮没有跑质量矩阵，不能据此扩大 `COMPLETED` 率的结论。
+- **证据不入库**：`.workflow-artifacts/` 未提交，`home/`、`work/`、`logs/` 只存在于本机；
+  本文件只给出路径与关键文本，便于复跑时对照。
