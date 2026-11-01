@@ -11,7 +11,7 @@ import type { Session } from '@deepseek-ai/dsh-session';
 import type { WorkflowAgentOutcome, WorkflowStopReason } from '@deepseek-ai/dsh-workflow';
 import type { UserMessage } from '@deepseek-ai/dsh-llm';
 import type { WorkflowLogger } from './run.js';
-import type { RouteTrailEntry, RoleName, SynthesisMode } from './types.js';
+import type { FinalStatus, RouteTrailEntry, RoleName, SynthesisMode } from './types.js';
 /** Record type owned by this plugin. */
 export declare const DELIVERY_RECORD = "plugin:grok-workflow/delivery";
 /** Phases a delivery passes through. */
@@ -241,6 +241,33 @@ export interface ProgressRunEnd {
     runId: string;
     stopReason: WorkflowStopReason;
 }
+/**
+ * The stop reason the GUI node is closed with, derived from the *task-level* result.
+ *
+ * `run-end` is the only progress event whose payload this plugin authors, and the
+ * stock panel turns it straight into the node's status word
+ * (`statusFromStopReason`, `@deepseek-ai/dsh-client-ui-workflow-run/lib/client.js:508-514`:
+ * `completed` → 已完成). The engine's own stop reason says only that *the program
+ * finished*, which is exactly the case where a verifier rejected the work: the script
+ * returns a `failed` report through the normal return path, so the engine reports
+ * `completed` while no task passed. Forwarding that stop reason unchanged is what
+ * would render "任务已完成" for a rejected run (Issue #22, P1-1 semantic red line).
+ *
+ * The rule therefore reads the report, which is the only source of a task verdict:
+ *
+ * - every task verified (`status: 'completed'`) → `completed`, so the node reads 已完成;
+ * - a report exists but is `partial`/`failed` → `error` (the node reads 失败, never 已完成);
+ * - no report at all (invalid report, engine error, timeout) → `error`, because a run
+ *   that produced nothing a user can read has not passed anything;
+ * - `cancelled` / `error` from the engine are kept verbatim: they are already truthful.
+ *
+ * `partial` has no word of its own in the stock dictionary, so it is reported as
+ * `error`: a task team where one task failed must never read as a finished one.
+ * @param engineStop - the stop reason the engine settled on.
+ * @param reportStatus - final status of the report this run returned, when it returned one.
+ * @returns the stop reason to record on `run-end`.
+ */
+export declare function progressStopReason(engineStop: WorkflowStopReason, reportStatus: FinalStatus | undefined): WorkflowStopReason;
 /** One member row as the engine reports it. */
 export interface ProgressMember {
     seq: number;

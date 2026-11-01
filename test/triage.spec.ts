@@ -8,7 +8,7 @@ import {
   singleCallPrompt, tierNote, triageLine, triageSignals, TRIAGE_LIMITS,
 } from '../src/triage.js'
 import { callerTask, execution, task, verification } from './fixtures.js'
-import { runWorkflowScript } from './helpers.js'
+import {runWorkflowScript, roleOf} from './helpers.js'
 
 /* ------------------------------------------------------------- classifier -- */
 
@@ -314,9 +314,9 @@ class FakeEngine {
     if (!this.autoRunWorkflow) return run
     const args = request.args as Record<string, unknown>
     const result = await runWorkflowScript(request.script, args, async (_prompt, options) => {
-      if (options.label.startsWith('grok-worker-')) return execution('work done')
-      if (options.label.startsWith('grok-verifier-')) return verification(task('a'))
-      if (options.label === 'grok-planner') return { tasks: [callerTask('a')] }
+      if (roleOf(options.label) === 'worker') return execution('work done')
+      if (roleOf(options.label) === 'verifier') return verification(task('a'))
+      if (roleOf(options.label) === 'planner') return { tasks: [callerTask('a')] }
       throw new Error(`unexpected label ${options.label}`)
     })
     run.complete(result.report)
@@ -435,7 +435,7 @@ describe('t52 front desk: each tier behaves as promised', () => {
     const text = await route(ctx, new FakeAgent(), '帮我重构 run.ts 的超时逻辑，并补上回归测试')
     expect(ctx.engine.startCalls).toHaveLength(1)
     // The team tier uses the workflow script, not the one-call script.
-    expect(ctx.engine.startCalls[0]!.meta.name).toMatch(/^grok-workflow/)
+    expect(ctx.engine.startCalls[0]!.meta.name).toMatch(/^任务团队/)
     expect(text).toContain('档位：团队档')
     expect(text).toContain('收到！团队开工中')
     expect(text).toContain('Grok workflow:')
@@ -468,7 +468,7 @@ describe('t52 front desk: each tier behaves as promised', () => {
   it('upgrades to the team when the message asks for it', async () => {
     const ctx = new FakeContext()
     const text = await route(ctx, new FakeAgent(), '用团队帮我改个 typo')
-    expect(ctx.engine.startCalls[0]!.meta.name).toMatch(/^grok-workflow/)
+    expect(ctx.engine.startCalls[0]!.meta.name).toMatch(/^任务团队/)
     expect(text).toContain('你的消息里点名了团队')
   })
 
@@ -500,7 +500,7 @@ describe('t52 front desk: each tier behaves as promised', () => {
   it('keeps the pre-t52 text when the front desk is off', async () => {
     const ctx = new FakeContext()
     const text = await route(ctx, new FakeAgent(), '你好', { mode: 'full' })
-    expect(ctx.engine.startCalls[0]!.meta.name).toMatch(/^grok-workflow/)
+    expect(ctx.engine.startCalls[0]!.meta.name).toMatch(/^任务团队/)
     expect(text).not.toContain('档位：')
     expect(text).not.toContain('团队开工中')
     expect(text).toContain('Grok workflow:')

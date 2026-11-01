@@ -1,3 +1,5 @@
+import { namingSource, phaseLabel, runTitle } from './naming.js'
+import type { NamingLanguage } from './naming.js'
 import { REDACTION_RULES } from './redact.js'
 import type { FailureClass, ModelRoute, NormalizedTask, ResolvedConfig, RoleName, SynthesisMode } from './types.js'
 
@@ -22,6 +24,10 @@ function redactionRulesSource(): string {
  */
 export const WORKFLOW_SCRIPT = String.raw`
 'use strict';
+
+// User-visible naming (Issue #22 P1-1/P1-3): generated from src/naming.ts so the
+// panel's words and the Host's words come from one table.
+${namingSource()};
 
 const objective = String(args && args.objective ? args.objective : '').trim();
 const maxConcurrency = Math.max(1, Math.min(6, Number(args && args.maxConcurrency) || 3));
@@ -262,7 +268,9 @@ async function callRole(role, prompt, options) {
   let lastFailure = null;
   for (let index = 0; index < total; index++) {
     const route = index < chain.length ? chain[index] : null;
-    const call = { label: options.label + (index > 0 ? '-r' + index : ''), phase: options.phase, schema: options.schema };
+    // No -r<n> suffix: a user must not see which fallback route answered
+    // (Issue #22 P1-1). The route that answered stays in the report's routes trail.
+    const call = { label: options.label, phase: options.phase, schema: options.schema };
     if (route) {
       if (route.provider) call.provider = route.provider;
       call.model = route.model;
@@ -907,7 +915,10 @@ async function mapLimitIsolated(tasks, limit, fn) {
   return results;
 }
 
-async function runTaskUnsafe(task) {
+async function runTaskUnsafe(task, taskIndex) {
+  // The pool hands out a 0-based slot; the group header numbers tasks from 1 and
+  // that position is what makes a group stable and unique (Issue #22 P1-1).
+  const taskPosition = (typeof taskIndex === 'number' && taskIndex >= 0 ? taskIndex : 0) + 1;
   const attempts = [];
   const maxAttempts = maxRetries + 1;
   let lastError = '';
@@ -923,8 +934,8 @@ async function runTaskUnsafe(task) {
     try {
       const worker = await callRole('worker', workerPrompt(task, attempt, previous), {
         schema: EXECUTION_SCHEMA,
-        label: 'grok-worker-' + task.id + '-a' + attempt,
-        phase: 'Execute',
+        label: memberLabel('worker', attempt),
+        phase: taskGroupTitle(taskPosition, task.title),
         attempt: attempt
       });
       if (worker.ok) {
@@ -948,8 +959,8 @@ async function runTaskUnsafe(task) {
       try {
         const verifier = await callRole('verifier', verifierPrompt(task, execution), {
           schema: VERIFICATION_SCHEMA,
-          label: 'grok-verifier-' + task.id + '-a' + attempt,
-          phase: 'Verify',
+          label: memberLabel('verifier', attempt),
+          phase: taskGroupTitle(taskPosition, task.title),
           attempt: attempt
         });
         if (verifier.ok) {
@@ -1032,9 +1043,9 @@ function abortedAttempt(failure, errorText) {
 // every other task's result) must survive an infrastructure fault (G-4). The
 // only way to reach the catch is a bug in runTaskUnsafe, which is still
 // reported as that task's failure rather than as a bare exception.
-async function runTask(task) {
+async function runTask(task, index) {
   try {
-    return await runTaskUnsafe(task);
+    return await runTaskUnsafe(task, index);
   } catch (error) {
     const failure = classifyCallFailure('worker', error);
     const text = redactPromptText('task aborted before any attempt: [' + failure.class + '/' + failure.category + '] ' + failure.reason);
@@ -1048,7 +1059,7 @@ async function runTask(task) {
   }
 }
 
-phase('Plan');
+phase(phaseLabel('plan'));
 let plan = null;
 let planFailure = null;
 let planError = '';
@@ -1059,8 +1070,8 @@ if (suppliedTasks && suppliedTasks.length > 0) {
   try {
     const planned = await callRole('planner', planPrompt(), {
       schema: PLAN_SCHEMA,
-      label: 'grok-planner',
-      phase: 'Plan',
+      label: memberLabel('planner', 1),
+      phase: phaseLabel('plan'),
       attempt: 0
     });
     if (planned.ok) {
@@ -1081,7 +1092,7 @@ if (!plan) {
   if (planFailure) plan.failure = { class: planFailure.class, reason: routeReason(planFailure.reason), category: planFailure.category };
 }
 
-phase('Execute');
+phase(phaseLabel('execute'));
 let results;
 try {
   // A plan that declares no write paths at all carries no conflict information, so
@@ -1107,7 +1118,7 @@ try {
   });
 }
 
-phase('Synthesize');
+phase(phaseLabel('synthesize'));
 const confirmed = [];
 const incomplete = [];
 const errors = [];
@@ -1173,8 +1184,8 @@ if (synthesisMode === 'model') {
   try {
     const summarized = await callRole('synthesizer', synthesizerPrompt(status, verifiedCount, results.length, confirmed, incomplete, uncertainties), {
       schema: SUMMARY_SCHEMA,
-      label: 'grok-synthesizer',
-      phase: 'Synthesize',
+      label: memberLabel('synthesizer', 1),
+      phase: phaseLabel('synthesize'),
       attempt: 0
     });
     if (summarized.ok) {
@@ -1266,6 +1277,8 @@ export interface WorkflowRequestPayload {
     synthesis: SynthesisMode
     /** Failure classes that advance a role's chain; empty = built-in policy. */
     switchOn: FailureClass[]
+    /** Copy language for every user-visible progress string (Issue #22 P1-3). */
+    naming: { language: NamingLanguage }
   }
   maxTotalAgents: number
 }
@@ -1308,27 +1321,12 @@ export function maxTotalAgentsFor(tasks: number, retries: number, budget?: Route
 }
 
 /** Stable base label of a run: the GUI card title and the log's run name. */
-export const WORKFLOW_RUN_LABEL = 'grok-workflow'
-
-/**
- * Name one run as the GUI will show it.
- *
- * `grok-workflow · 3 tasks` when the work is known up front, otherwise the bare
- * label: a progress row must never advertise a task count nobody promised.
- * Bounded because the name lands in the session log and in a 42%-width title.
- */
-export function workflowRunName(label: string, taskCount: number | undefined): string {
-  if (taskCount === undefined || !Number.isFinite(taskCount)) return label
-  const count = Math.trunc(taskCount)
-  if (count <= 0) return label
-  return `${label} · ${count} ${count === 1 ? 'task' : 'tasks'}`.slice(0, 80)
-}
-
 /** Build the static script and data-only arguments for one run. */
 export function buildWorkflowRequest(
   objective: string,
   tasks: NormalizedTask[] | undefined,
   config: ResolvedConfig,
+  namingLanguage: NamingLanguage = 'zh',
 ): WorkflowRequestPayload {
   // `[]` means "no plan supplied" exactly like `undefined`: the script falls back
   // to a planner and then runs at least one task, so budgeting for 0 tasks would
@@ -1344,13 +1342,13 @@ export function buildWorkflowRequest(
       // When the script plans first the count does not exist yet at this point,
       // and guessing the cap would be a lie the title never retracts — the panel's
       // live member count covers that case instead.
-      name: workflowRunName(WORKFLOW_RUN_LABEL, tasks === undefined || tasks.length === 0 ? undefined : tasks.length),
+      name: runTitle(namingLanguage, tasks === undefined || tasks.length === 0 ? undefined : tasks.length),
       description: 'Plan, execute, independently verify, retry, and synthesize a complex objective with bounded concurrency.',
       phases: [
-        { title: 'Plan', detail: 'Decompose the objective into independent tasks.' },
-        { title: 'Execute', detail: 'Run tasks with a bounded worker pool.' },
-        { title: 'Verify', detail: 'Check evidence for every acceptance criterion.' },
-        { title: 'Synthesize', detail: 'Aggregate verified, incomplete, and uncertain results.' },
+        { title: phaseLabel('plan', namingLanguage), detail: 'Decompose the objective into independent tasks.' },
+        { title: phaseLabel('execute', namingLanguage), detail: 'Run tasks with a bounded worker pool.' },
+        { title: phaseLabel('verify', namingLanguage), detail: 'Check evidence for every acceptance criterion.' },
+        { title: phaseLabel('synthesize', namingLanguage), detail: 'Aggregate verified, incomplete, and uncertain results.' },
       ],
     },
     args: {
@@ -1366,6 +1364,7 @@ export function buildWorkflowRequest(
       roles: config.roles,
       synthesis: config.synthesis,
       switchOn: config.switchOn,
+      naming: { language: namingLanguage },
     },
     maxTotalAgents,
   }

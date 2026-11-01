@@ -3,6 +3,48 @@
 Notable user-facing changes are recorded here in English and Simplified Chinese.
 用户可见的功能和修复会在这里以英文和简体中文记录。
 
+## [Unreleased]
+
+### Changed / 变更
+
+- **The progress panel groups by task, not by role / 进度面板改为按任务分组** — a run used to
+  show two long role lists (`Execute`, `Verify`) with machine labels like
+  `grok-worker-t1-a2`. It now shows one group per task, headed `任务 1 · <任务标题>` /
+  `Task 1 · <task title>`, with rows `执行` / `执行（尝试 2）` / `检查` / `规划助手` /
+  `汇总助手`. No `grok-` prefix, attempt marker, fallback marker, internal task id or child run id
+  is shown any more; they all remain in the report. Two tasks with the same title never merge, a
+  long title is shortened to 24 characters plus `…` in the header only (the report keeps it whole),
+  and a retry is visible as “（尝试 2）” rather than as a second task.
+  一次运行以前显示两条按角色分的长列表（执行、检查），行名是 `grok-worker-t1-a2` 这类机器名。
+  现在每个任务一组，组头是 `任务 1 · <任务标题>`，行名是 `执行` / `执行（尝试 2）` / `检查` /
+  `规划助手` / `汇总助手`；不再出现 `grok-` 前缀、尝试标记、回退标记、内部任务 ID 或子运行 ID
+  （它们都还在报告里）。同名任务不会合并，过长的标题只在组头截断到 24 字加省略号（报告里保留全文），
+  重试写作「尝试 2」而不是第二个任务。
+- **Panel copy follows the language setting / 面板措辞跟随语言设置** — `zh` and `en` strings come
+  from one table (`src/naming.ts`), selected by the DSH `locale` preference with `zh` as the
+  default. No new configuration key: there is nothing to name by hand. A run already on screen keeps
+  the words it was written with.
+  中英文措辞来自同一张表（`src/naming.ts`），按 DSH 的 `locale` 偏好选择，默认中文；没有新增配置项，
+  无需手工命名。已经显示出来的运行保持它写入时的措辞。
+
+### Fixed / 修复
+
+- **A rejected run no longer reads as finished / 被否决的运行不再显示成已完成** — the run node used
+  to be closed with the engine's stop reason, and a verifier rejection ends the program normally, so
+  a team where no task passed still showed `已完成` on the node and on both rows. The node is now
+  closed with the task-level result: every task verified → `已完成`; `partial`/`failed` → `失败`;
+  no report → `失败`. 运行节点以前用引擎的停止原因收尾，而核查否决是正常结束，所以一个没有任何任务
+  通过的运行，节点和两行都显示「已完成」。现在节点按任务级结果收尾：全部任务通过才是「已完成」，
+  `partial`/`失败` 显示「失败」，没有报告也显示「失败」。
+- **The panel no longer overstates what happened / 面板不再夸大结果** — a completed child call is
+  not a passed task: a finished call is worded `执行代理已结束` / `检查调用已结束`, an ended call can
+  never produce the words “任务已完成” or “检查通过”, and no percentage, token count, ETA or invented
+  activity is rendered anywhere. A task verdict (`任务通过` / `任务未通过`) comes only from the
+  report, and a test fails if the panel and the report disagree.
+  子调用结束不等于任务通过：结束的调用写作「执行代理已结束」「检查调用已结束」，永远不会变成
+  「任务已完成」「检查通过」；不显示百分比、token 数、预计剩余时间或任何编造的活动。任务结论
+  （「任务通过」「任务未通过」）只来自报告，面板与报告不一致时测试会失败。
+
 ## [0.2.3] - 2026-10-28
 
 The front desk release: every user message now passes a front desk that states its tier in

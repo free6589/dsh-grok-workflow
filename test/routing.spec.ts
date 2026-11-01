@@ -5,7 +5,7 @@ import { ROUTING_RECORD, recordRouting } from '../src/records.js'
 import { redactDeep } from '../src/redact.js'
 import { assertWorkflowReport } from '../src/report.js'
 import { maxTotalAgentsFor, routeBudgetFor, WORKFLOW_SCRIPT } from '../src/script.js'
-import { runWorkflowScript, type ScriptAgent } from './helpers.js'
+import {runWorkflowScript, type ScriptAgent, roleOf} from './helpers.js'
 import { execution, task, verification } from './fixtures.js'
 
 function args(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -106,15 +106,15 @@ describe('generated script routing', () => {
     const models: string[] = []
     const agent: ScriptAgent = async (_prompt, options) => {
       models.push(`${options.label}:${options.provider ?? '-'}/${options.model ?? '-'}`)
-      if (options.label.startsWith('grok-planner')) return { tasks: [task('a')] }
-      if (options.label.startsWith('grok-worker')) return execution()
+      if (roleOf(options.label) === 'planner') return { tasks: [task('a')] }
+      if (roleOf(options.label) === 'worker') return execution()
       return verification(task('a'))
     }
     const routed = args({
       roles: roles([{ provider: 'pa', model: 'wa' }], [{ provider: 'pv', model: 'va' }], [{ provider: 'pp', model: 'pl' }]),
     })
     const run = await runWorkflowScript(WORKFLOW_SCRIPT, routed, agent)
-    expect(models).toEqual(['grok-worker:a-a1:pa/wa'.replace(':a-a1', '-a-a1'), 'grok-verifier-a-a1:pv/va'])
+    expect(models).toEqual(['执行:pa/wa', '检查:pv/va'])
     expect(run.report.routing).toEqual({ planner: ['pp/pl'], worker: ['pa/wa'], verifier: ['pv/va'], synthesizer: [] })
     expect(run.report.routes.map(entry => [entry.role, entry.chainIndex, entry.outcome])).toEqual([
       ['worker', 0, 'ok'],
@@ -125,20 +125,20 @@ describe('generated script routing', () => {
     const plannerModels: string[] = []
     const planning: ScriptAgent = async (_prompt, options) => {
       plannerModels.push(`${options.label}:${options.provider ?? '-'}/${options.model ?? '-'}`)
-      if (options.label.startsWith('grok-planner')) return { tasks: [task('a')] }
-      if (options.label.startsWith('grok-worker')) return execution()
+      if (roleOf(options.label) === 'planner') return { tasks: [task('a')] }
+      if (roleOf(options.label) === 'worker') return execution()
       return verification(task('a'))
     }
     await runWorkflowScript(WORKFLOW_SCRIPT, args({ tasks: null, roles: roles([], [], [{ provider: 'pp', model: 'pl' }]) }), planning)
-    expect(plannerModels[0]).toBe('grok-planner:pp/pl')
+    expect(plannerModels[0]).toBe('规划助手:pp/pl')
   })
 
   it('inherits the run route when no chain is configured', async () => {
     const seen: (string | undefined)[] = []
     const agent: ScriptAgent = async (_prompt, options) => {
       seen.push(options.model)
-      if (options.label.startsWith('grok-planner')) return { tasks: [task('a')] }
-      if (options.label.startsWith('grok-worker')) return execution()
+      if (roleOf(options.label) === 'planner') return { tasks: [task('a')] }
+      if (roleOf(options.label) === 'worker') return execution()
       return verification(task('a'))
     }
     const run = await runWorkflowScript(WORKFLOW_SCRIPT, args(), agent)
@@ -150,8 +150,8 @@ describe('generated script routing', () => {
     const calls: string[] = []
     const agent: ScriptAgent = async (_prompt, options) => {
       calls.push(options.model ?? 'inherit')
-      if (options.label.startsWith('grok-planner')) return { tasks: [task('a')] }
-      if (options.label.startsWith('grok-worker')) {
+      if (roleOf(options.label) === 'planner') return { tasks: [task('a')] }
+      if (roleOf(options.label) === 'worker') {
         if (options.model === 'first') throw new Error('429 Too Many Requests: slow down')
         return execution()
       }
@@ -181,7 +181,7 @@ describe('generated script routing', () => {
     const classes: (string | undefined)[] = []
     for (const message of messages) {
       const agent: ScriptAgent = async (_prompt, options) => {
-        if (options.label.startsWith('grok-planner')) return { tasks: [task('a')] }
+        if (roleOf(options.label) === 'planner') return { tasks: [task('a')] }
         throw new Error(message)
       }
       const run = await runWorkflowScript(WORKFLOW_SCRIPT, args(), agent)
@@ -204,7 +204,7 @@ describe('generated script routing', () => {
     const calls: string[] = []
     const agent: ScriptAgent = async (_prompt, options) => {
       calls.push(options.model ?? 'inherit')
-      if (options.label.startsWith('grok-worker')) {
+      if (roleOf(options.label) === 'worker') {
         if (options.model === 'w1') return null
         return execution()
       }
@@ -222,7 +222,7 @@ describe('generated script routing', () => {
     const calls: string[] = []
     const agent: ScriptAgent = async (_prompt, options) => {
       calls.push(options.model ?? 'inherit')
-      if (options.label.startsWith('grok-worker')) return execution()
+      if (roleOf(options.label) === 'worker') return execution()
       return verification(task('a'))
     }
     const run = await runWorkflowScript(WORKFLOW_SCRIPT, args({ roles: roles([{ model: 'w1' }, { model: 'w2' }, { model: 'w3' }]) }), agent)
@@ -236,8 +236,8 @@ describe('generated script routing', () => {
     let verifierCalls = 0
     const agent: ScriptAgent = async (_prompt, options) => {
       calls.push(`${options.label}:${options.model ?? 'inherit'}`)
-      if (options.label.startsWith('grok-planner')) return { tasks: [task('a')] }
-      if (options.label.startsWith('grok-worker')) return execution()
+      if (roleOf(options.label) === 'planner') return { tasks: [task('a')] }
+      if (roleOf(options.label) === 'worker') return execution()
       verifierCalls += 1
       if (verifierCalls === 1) {
         return {
@@ -252,9 +252,11 @@ describe('generated script routing', () => {
     const routed = args({ roles: roles([{ model: 'w1' }, { model: 'w2' }]) })
     const run = await runWorkflowScript(WORKFLOW_SCRIPT, routed, agent)
     // A content failure must not burn a fallback route: the same model is retried.
-    expect(calls.filter(call => call.startsWith('grok-worker'))).toEqual([
-      'grok-worker-a-a1:w1',
-      'grok-worker-a-a2:w1',
+    // The retry is the *only* visual difference between the two attempts: no
+    // `-a1`/`-a2`, no `-r1` fallback suffix (Issue #22 P1-1 / P1-3).
+    expect(calls.filter(call => call.startsWith('执行'))).toEqual([
+      '执行:w1',
+      '执行（尝试 2）:w1',
     ])
     expect(run.report.status).toBe('completed')
     expect(run.report.tasks[0]!.attempts[0]!.failure).toEqual({
@@ -266,8 +268,8 @@ describe('generated script routing', () => {
 
   it('reports an exhausted chain with every route in the trail', async () => {
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label.startsWith('grok-planner')) return { tasks: [task('a')] }
-      if (options.label.startsWith('grok-worker')) throw new Error('400 invalid request')
+      if (roleOf(options.label) === 'planner') return { tasks: [task('a')] }
+      if (roleOf(options.label) === 'worker') throw new Error('400 invalid request')
       return verification(task('a'))
     }
     const routed = args({ roles: roles([{ model: 'w1' }, { model: 'w2' }]) })
@@ -289,7 +291,7 @@ describe('generated script routing', () => {
 
   it('redacts secrets found in a failure reason', async () => {
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label.startsWith('grok-planner')) return { tasks: [task('a')] }
+      if (roleOf(options.label) === 'planner') return { tasks: [task('a')] }
       throw new Error('auth failed for api key sk-abcdef0123456789abcdef')
     }
     const run = await runWorkflowScript(WORKFLOW_SCRIPT, args(), agent)
@@ -324,22 +326,22 @@ describe('generated script routing', () => {
 
   it('writes no narrative when synthesis is deterministic', async () => {
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label.startsWith('grok-planner')) return { tasks: [task('a')] }
-      if (options.label.startsWith('grok-worker')) return execution()
+      if (roleOf(options.label) === 'planner') return { tasks: [task('a')] }
+      if (roleOf(options.label) === 'worker') return execution()
       return verification(task('a'))
     }
     const run = await runWorkflowScript(WORKFLOW_SCRIPT, args(), agent)
     expect(run.report.synthesis).toEqual({ mode: 'deterministic' })
-    expect(run.calls.some(call => call.label.startsWith('grok-synthesizer'))).toBe(false)
+    expect(run.calls.some(call => roleOf(call.label) === 'synthesizer')).toBe(false)
   })
 
   it('adds one synthesizer call in model mode and keeps verified work when it fails', async () => {
     const summary = 'One task was verified with file evidence; nothing is outstanding.'
     let synthesizerCalls = 0
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label.startsWith('grok-planner')) return { tasks: [task('a')] }
-      if (options.label.startsWith('grok-worker')) return execution()
-      if (options.label.startsWith('grok-synthesizer')) {
+      if (roleOf(options.label) === 'planner') return { tasks: [task('a')] }
+      if (roleOf(options.label) === 'worker') return execution()
+      if (roleOf(options.label) === 'synthesizer') {
         synthesizerCalls += 1
         return { summary }
       }
@@ -353,9 +355,9 @@ describe('generated script routing', () => {
     expect(run.report.confirmed).toHaveLength(1)
 
     const broken: ScriptAgent = async (_prompt, options) => {
-      if (options.label.startsWith('grok-synthesizer')) throw new Error('503 Service Unavailable')
-      if (options.label.startsWith('grok-planner')) return { tasks: [task('a')] }
-      if (options.label.startsWith('grok-worker')) return execution()
+      if (roleOf(options.label) === 'synthesizer') throw new Error('503 Service Unavailable')
+      if (roleOf(options.label) === 'planner') return { tasks: [task('a')] }
+      if (roleOf(options.label) === 'worker') return execution()
       return verification(task('a'))
     }
     const failedSynthesis = await runWorkflowScript(WORKFLOW_SCRIPT, routed, broken)
@@ -367,8 +369,8 @@ describe('generated script routing', () => {
 
   it('survives report validation with a routing ledger and rejects out-of-range chain indexes', async () => {
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (options.label.startsWith('grok-planner')) return { tasks: [task('a')] }
-      if (options.label.startsWith('grok-worker')) return execution()
+      if (roleOf(options.label) === 'planner') return { tasks: [task('a')] }
+      if (roleOf(options.label) === 'worker') return execution()
       return verification(task('a'))
     }
     const config = resolveConfig({ maxConcurrency: 2, maxRetries: 1, maxTasks: 6, roles: { worker: [{ model: 'w1' }, { model: 'w2' }] } })

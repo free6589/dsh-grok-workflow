@@ -1,5 +1,6 @@
 import vm from 'node:vm'
-import type { WorkflowReport } from '../src/types.js'
+import { parseMemberLabel } from '../src/naming.js'
+import type { RoleName, WorkflowReport } from '../src/types.js'
 
 export interface AgentCall {
   prompt: string
@@ -52,4 +53,48 @@ export async function runWorkflowScript(
 /** Let pending host timers and microtasks settle. */
 export function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+/**
+ * Read the role a user-visible member label names.
+ *
+ * Phase 2 (Issue #22 P1-1) replaced the machine labels (`grok-worker-t1-a2`) with
+ * the words a user actually sees (`执行（尝试 2）`), so a scripted child identifies
+ * its caller the same way a reader does — through `src/naming.ts`, which is the
+ * same table the panel renders. A label the plugin did not produce yields
+ * `undefined` instead of a guess.
+ */
+export function roleOf(label: string | undefined, language: 'zh' | 'en' = 'zh'): RoleName | undefined {
+  return parseMemberLabel(label ?? '', language)?.role
+}
+
+/** Attempt number a user-visible member label carries (1 when it carries none). */
+export function attemptOf(label: string | undefined, language: 'zh' | 'en' = 'zh'): number {
+  return parseMemberLabel(label ?? '', language)?.attempt ?? 0
+}
+
+/**
+ * The 1-based plan position a member belongs to, parsed from its group header.
+ *
+ * The stock panel groups a run by the exact `phase` string, so the header is where
+ * a task's identity now lives: `任务 1 · Task a`.
+ */
+export function indexOfPhase(phase: string | undefined): number {
+  const match = /(?:任务|Task) (\d+) ·/.exec(phase ?? '')
+  return match === null ? 0 : Number(match[1])
+}
+
+/**
+ * The fixture task id a member belongs to.
+ *
+ * Fixture titles are `Task <id>` (`test/fixtures.ts`), and the group header carries
+ * the (possibly truncated) title and nothing else — an internal task id is never
+ * shown to a user, which is the point of the change.
+ */
+export function idOfPhase(phase: string | undefined): string {
+  const match = /· (.+)$/.exec(phase ?? '')
+  if (match === null) return ''
+  const title = match[1]!.replace(/…$/, '')
+  const named = /^Task (.+)$/.exec(title)
+  return named === null ? title : named[1]!
 }

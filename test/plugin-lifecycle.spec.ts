@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { apply } from '../src/index.js'
 import type { WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
 import { callerTask, execution, task, verification } from './fixtures.js'
-import { runWorkflowScript } from './helpers.js'
+import {runWorkflowScript, roleOf, idOfPhase, attemptOf} from './helpers.js'
 
 interface ExecutableTool {
   name: string
@@ -29,9 +29,9 @@ class FakeEngine {
     if (this.autoRun) {
       const tasks = (request.args as { tasks?: ReturnType<typeof task>[] }).tasks ?? [task('a')]
       const result = await runWorkflowScript(request.script, request.args as Record<string, unknown>, async (_prompt, options) => {
-        if (options.label.startsWith('grok-worker-')) return execution('work done')
-        if (options.label.startsWith('grok-verifier-')) return verification(tasks[0]!)
-        if (options.label === 'grok-planner') return { tasks }
+        if (roleOf(options.label) === 'worker') return execution('work done')
+        if (roleOf(options.label) === 'verifier') return verification(tasks[0]!)
+        if (roleOf(options.label) === 'planner') return { tasks }
         throw new Error(`unexpected label ${options.label}`)
       })
       run.complete(result.report)
@@ -224,8 +224,8 @@ describe('plugin lifecycle and tool boundary', () => {
     const request = ctx.engine.startCalls[0]!
     const fakeTasks = [task('a')]
     const result = await runWorkflowScript(request.script, request.args as Record<string, unknown>, async (_prompt, options) => {
-      if (options.label === 'grok-worker-a-a1') return execution('done')
-      if (options.label === 'grok-verifier-a-a1') return verification(fakeTasks[0]!)
+      if (roleOf(options.label) === 'worker' && idOfPhase(options.phase) === 'a' && attemptOf(options.label) === 1) return execution('done')
+      if (roleOf(options.label) === 'verifier' && idOfPhase(options.phase) === 'a' && attemptOf(options.label) === 1) return verification(fakeTasks[0]!)
       throw new Error(`unexpected label ${options.label}`)
     })
     const secret = ['sk', 'proj', 'FAKEEXAMPLE1234567890'].join('-')
@@ -244,8 +244,8 @@ describe('plugin lifecycle and tool boundary', () => {
     const request = ctx.engine.startCalls[0]!
     const fakeTasks = [task('a')]
     const result = await runWorkflowScript(request.script, request.args as Record<string, unknown>, async (_prompt, options) => {
-      if (options.label === 'grok-worker-a-a1') return execution('done')
-      if (options.label === 'grok-verifier-a-a1') return verification(fakeTasks[0]!)
+      if (roleOf(options.label) === 'worker' && idOfPhase(options.phase) === 'a' && attemptOf(options.label) === 1) return execution('done')
+      if (roleOf(options.label) === 'verifier' && idOfPhase(options.phase) === 'a' && attemptOf(options.label) === 1) return verification(fakeTasks[0]!)
       throw new Error(`unexpected label ${options.label}`)
     })
     const taskReport = result.report.tasks[0]!

@@ -9,7 +9,7 @@ import {
   tasksConflict,
   WRITE_PATH_LIMITS,
 } from '../src/paths.js'
-import { runWorkflowScript, type ScriptAgent } from './helpers.js'
+import {runWorkflowScript, type ScriptAgent, roleOf, indexOfPhase} from './helpers.js'
 import { execution, task, verification } from './fixtures.js'
 
 /**
@@ -125,8 +125,8 @@ async function runPlan(
   const tracker: Tracker = { peak: 0, order: [], spans: [] }
   let inFlight = 0
   const agent: ScriptAgent = async (_prompt, options) => {
-    if (options.label.startsWith('grok-worker-')) {
-      const id = plan.find(item => options.label.includes(`-${item.id}-`))?.id ?? '?'
+    if (roleOf(options.label) === 'worker') {
+      const id = plan[indexOfPhase(options.phase) - 1]?.id ?? '?'
       inFlight += 1
       tracker.peak = Math.max(tracker.peak, inFlight)
       tracker.order.push(id)
@@ -137,7 +137,7 @@ async function runPlan(
       inFlight -= 1
       return execution('work done')
     }
-    return verification(plan.find(item => options.label.includes(`-${item.id}-`)) ?? plan[0]!)
+    return verification(plan[indexOfPhase(options.phase) - 1] ?? plan[0]!)
   }
   const run = await runWorkflowScript(WORKFLOW_SCRIPT, request.args, agent)
   return { tracker, report: run.report }
