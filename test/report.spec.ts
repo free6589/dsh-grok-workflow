@@ -12,6 +12,8 @@ interface ReportTask {
   status?: 'verified' | 'failed'
   passed?: boolean
   evidence?: string
+  /** Task objective; defaults to `Do <id>`. A fallback plan carries the request objective. */
+  objective?: string
   verification?: Record<string, unknown> | null
   execution?: Record<string, unknown> | null
 }
@@ -45,7 +47,7 @@ function taskReport(spec: ReportTask): Record<string, unknown> {
   return {
     id: spec.id,
     title: `Task ${spec.id}`,
-    objective: `Do ${spec.id}`,
+    objective: spec.objective ?? `Do ${spec.id}`,
     expectedOutput: `Output ${spec.id}`,
     acceptanceCriteria: spec.criteria,
     context: '',
@@ -596,6 +598,24 @@ describe('workflow report semantic contract', () => {
   it('still accepts a verified fallback plan as partial with no failed task', () => {
     // A degraded fallback plan whose single task verified is a legitimate
     // partial: its provenance is plan.error, not an incomplete entry.
+    // A fallback plan is the request objective split up, so its one task carries
+    // the whole objective here.
+    const fallback = report({
+      status: 'partial',
+      planSource: 'fallback',
+      planError: 'planner failed: unavailable',
+      tasks: [{ id: 'a', criteria: ['a works'], objective: OBJECTIVE }],
+      incomplete: [],
+      errors: [{ phase: 'Plan', message: 'planner failed: unavailable' }],
+    })
+    const validated = assertWorkflowReport(fallback, OBJECTIVE, config)
+    expect(validated.status).toBe('partial')
+    expect(validated.incomplete).toEqual([])
+  })
+
+  it('rejects a fallback plan whose tasks do not carry the request objective', () => {
+    // A fallback plan is not free-form: it is the objective, segmented. A report
+    // that calls itself a fallback while carrying unrelated task text is invalid.
     const fallback = report({
       status: 'partial',
       planSource: 'fallback',
@@ -603,9 +623,8 @@ describe('workflow report semantic contract', () => {
       incomplete: [],
       errors: [{ phase: 'Plan', message: 'planner failed: unavailable' }],
     })
-    const validated = assertWorkflowReport(fallback, OBJECTIVE, config)
-    expect(validated.status).toBe('partial')
-    expect(validated.incomplete).toEqual([])
+    expect(() => assertWorkflowReport(fallback, OBJECTIVE, config))
+      .toThrow(/is not segment 1 of the request objective/)
   })
 })
 

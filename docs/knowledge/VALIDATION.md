@@ -1177,3 +1177,37 @@ DSH 安装：`/home/fish/.local/share/mise/installs/node/26.8.1/lib/node_modules
 - `npm run test:e2e`（`scripts/e2e-headless-in-turn.sh`）：未执行——它会写真实 `$DSH_HOME` 会话，
   本轮的真机证据改由上面的隔离 GUI 实例提供，两者不互相替代。
 - `relay` / `append` 策略的真机行为：只有单测覆盖，未在 GUI 上验证，PR 未声称其已支持。
+
+## Round 13 (t59) — PR #26 review close-out: three fallback findings, reproduced then fixed
+
+`CONFIRMED` — every number below comes from a command run in a clean worktree on
+`fix/fallback-shards` (branch `pr26-closer`, base `2e9c26a` = `origin/main` after PR #23; the branch
+was rebased onto it from `334daf6`, work commit `68f3d15`, pre-rebase `5cbccf2`).
+
+The three findings are the codex review on PR #26 at commit `6e902e0` (all P2,
+`has_unresolved_findings: true`). Each was reproduced before it was fixed:
+
+| Finding | Reproduced as | Fix | Test that pins it |
+|---|---|---|---|
+| Surrogate back-off adds a segment, but the cap came from a formula | 32,000-char objective with a surrogate pair at every 4,000 boundary splits into 9 segments vs `ceil(chars / 4000)` = 8; with `maxTasks: 6` the report is rejected as "has 9 tasks but maxTasks is 6" | segment count now comes from `src/shards.ts` (`shardCountFor`), shared by the generated script and host validation | `test/fallback-shards.spec.ts` "accepts the extra segment that surrogate back-off adds at every boundary" |
+| JSON escaping tripped the 48,000-character aggregate budget | 32,000 quote characters serialize to 67,353 characters → `report-invalid` in `run.ts`, discarding the fallback | for `source: 'fallback'` the validator checks the segments themselves (exact equality with the splitter's output) instead of applying the authored-text budget | "...dense in JSON escapes" |
+| Arbitrary slices became independent tasks | 4,001 characters produced `[4000, 1]` (a one-character task), every shard shared one generic criterion, cuts could land mid-sentence | balanced segments, cuts moved onto a nearby paragraph/sentence/word break, segment-scoped criterion and context | "balances a 4,001-character objective...", "moves a segment boundary onto the sentence end...", "scopes each segment criterion..." |
+
+| Command | Result |
+|---|---|
+| `npm run ci` (typecheck + oxlint + build + vitest) | exit 0, **27 files / 487 tests passed**; oxlint 1 warning / 0 errors (pre-existing, `src/redact.ts:155`) |
+| `npx vitest run test/fallback-shards.spec.ts test/objective-limit.spec.ts` | 2 files / 32 tests passed |
+| `npm run build && git diff --exit-code -- lib/` | exit 0 — committed `lib/` matches the build |
+
+Rebase onto `2e9c26a` (PR #23, P0 dialogue reliability) conflicted in two files, both resolved by
+hand: `test/objective-limit.spec.ts` (main rewrote the scripted-child double to read
+`parseMemberLabel` labels, while this branch rewords the verifier to answer the task it was handed —
+kept main's label dispatch and the branch's `taskFromPrompt` answer) and this file (main's Phase 1
+record already owned "Round 12", so this record became Round 13 and both are kept).
+`src/gate.ts`, `src/run.ts` and `src/triage.ts` and their `lib/` outputs are unchanged from
+`2e9c26a` (`git diff --stat 2e9c26a HEAD -- src/gate.ts src/run.ts src/triage.ts lib/gate.js
+lib/run.js lib/triage.js` is empty), so the P0 semantics merged in PR #23 are not overwritten.
+
+`NOT_RUN` — `npm run test:e2e` and a real DSH GUI run: both need a live profile and
+model routing. Every case above executes the real generated script in `node:vm`
+with scripted children; no model API is called.

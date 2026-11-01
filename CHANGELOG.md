@@ -29,6 +29,46 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ### Fixed / 修复
 
+- **A failed planner no longer drops a long objective / 规划失败不再丢掉长目标** — when planning
+  failed, the fallback plan carried the whole objective in one task, which the 4,000-character
+  per-task bound then rejected: a 4,001–32,000 character objective could pass the front desk and
+  still fail with `workflow result fallback plan.tasks[0].objective is N characters, over the
+  4000-character per-task limit`. The fallback now splits the objective into contiguous shards of
+  at most `taskTextChars` characters; concatenating the shard objectives reproduces the original
+  byte for byte, every shard carries the same `origin_goal_id`, and the run reports `partial` with
+  `planning.source: "fallback"` instead of failing. The segment count follows the splitter rather
+  than `maxTasks`, so the configured task cap cannot reject the fallback a second time. 规划失败时，
+  回退计划以前把整个目标塞进一个任务，随后被每任务
+  4,000 字符上限拒绝：4,001–32,000 字符的目标能过前置检查，却仍会以
+  `workflow result fallback plan.tasks[0].objective is N characters, over the 4000-character
+  per-task limit` 失败。现在回退计划把目标切成每片不超过 `taskTextChars` 的连续分片，分片目标顺序
+  拼接后与原文逐字节一致，所有分片共享同一个 `origin_goal_id`，运行以 `partial` 收尾并保留
+  `planning.source: "fallback"`，不再失败。分段数由切分器本身决定而不是 `maxTasks`，
+  配置的任务上限不会二次拒绝回退计划。
+- **The fallback now survives objectives that used to knock it out / 极端目标不再把回退计划打回** —
+  three review findings on the segmented fallback, each reproduced by a test before it was fixed.
+  (1) A boundary that backs off a surrogate pair adds a segment, so a 32,000-character objective can
+  split into nine segments while the cap was derived from `ceil(chars / 4000)` = 8; with
+  `maxTasks: 6` that fallback was rejected as over the task cap. The cap now comes from the splitter
+  itself (`src/shards.ts`), which the generated script and host validation share. (2) An objective
+  dense in JSON escapes — 32,000 quote characters — serialized to ~67,000 characters and tripped the
+  48,000-character aggregate budget, which bounds task text a planner or caller *authored*; the
+  fallback carries the caller's own characters, so the validator now checks the segments directly
+  (they must be exactly what the splitter produces) instead of applying that budget. (3) Segments
+  were max-sized slices, so a 4,001-character objective produced a 4,000-character task and a
+  one-character one, every shard shared one generic criterion, and cuts could land mid-sentence.
+  Segments are now balanced, aligned to a nearby paragraph/sentence/word break, and each segment's
+  criterion names the segment it covers, so a verifier confirms the piece it was handed and no shard
+  stands in for the whole objective. 针对分段回退的三条审查意见，每条都先由测试复现再修：
+  ① 分片边界若切开代理对会后退一位，32,000 字符的目标可能切成 9 段，而上限仍按
+  `ceil(chars / 4000)` = 8 计算，`maxTasks: 6` 时该回退计划会被判为超出任务上限；现在上限直接取自
+  切分器（`src/shards.ts`），脚本与宿主校验共用同一份实现。② 充满 JSON 转义的目标（32,000 个引号）
+  序列化后约 67,000 字符，会撞上 48,000 字符的合计预算——那个预算约束的是规划器/调用方*撰写*的
+  任务文本，而回退计划只是调用方自己的字符，因此校验改为直接核对分段（必须与切分器产出完全一致），
+  不再套用该预算。③ 以前按上限切片，4,001 字符的目标会切出一个 4,000 字符任务和一个单字符任务，
+  所有分片共用一条通用验收标准，切点还可能落在句子中间；现在分段均衡、优先对齐附近的段落/句子/
+  词语边界，且每段的标准明确写出它覆盖的是哪一段，核查只确认它拿到的那一片，任何一片都不能代表
+  整个目标。
 - **A rejected run no longer reads as finished / 被否决的运行不再显示成已完成** — the run node used
   to be closed with the engine's stop reason, and a verifier rejection ends the program normally, so
   a team where no task passed still showed `已完成` on the node and on both rows. The node is now

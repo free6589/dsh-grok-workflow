@@ -2,8 +2,9 @@ import type {
   AttemptFailure,
   RouteTrailEntry, ExecutionResult, FailureCategory, FinalStatus, VerificationResult, WorkflowReport } from './types.js'
 import type { ModelRoute, ResolvedConfig, RoleName } from './types.js'
-import { criterionKey } from './input.js'
+import { criterionKey, TASK_LIMITS } from './input.js'
 import { maxTotalAgentsFor, routeBudgetFor } from './script.js'
+import { shardCountFor, splitObjective } from './shards.js'
 
 const STATUSES: readonly FinalStatus[] = ['completed', 'partial', 'failed']
 const MAX_RENDER_CHARS = 8_000
@@ -23,6 +24,16 @@ function array(value: unknown, path: string): unknown[] {
 function string(value: unknown, path: string): string {
   if (typeof value !== 'string') throw new Error(`workflow result ${path} must be a string`)
   return value
+}
+
+function optionalString(value: unknown, path: string): string | undefined {
+  return value === undefined || value === null ? undefined : string(value, path)
+}
+
+/** Spreadable origin-goal id: absent when the plan has no synthetic shards. */
+function originGoalIdField(value: unknown, path: string): { originGoalId?: string } {
+  const originGoalId = optionalString(value, path)
+  return originGoalId === undefined ? {} : { originGoalId }
 }
 
 function number(value: unknown, path: string): number {
@@ -285,6 +296,7 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
       constraints: array(task.constraints, `plan.tasks[${index}].constraints`)
         .map((constraint, c) => string(constraint, `plan.tasks[${index}].constraints[${c}]`)),
       writesPaths: writesPaths(task.writesPaths, `plan.tasks[${index}].writesPaths`),
+      ...originGoalIdField(task.originGoalId, `plan.tasks[${index}].originGoalId`),
     }
   })
   const tasks = array(root.tasks, 'tasks').map((item, index) => {
@@ -304,6 +316,7 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
       constraints: array(task.constraints, `tasks[${index}].constraints`)
         .map((constraint, c) => string(constraint, `tasks[${index}].constraints[${c}]`)),
       writesPaths: writesPaths(task.writesPaths, `tasks[${index}].writesPaths`),
+      ...originGoalIdField(task.originGoalId, `tasks[${index}].originGoalId`),
       status: taskStatus,
       attempts: array(task.attempts, `tasks[${index}].attempts`).map((attempt, a) => {
         const entry = record(attempt, `tasks[${index}].attempts[${a}]`)
@@ -337,7 +350,8 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
       || planTask.context !== task.context
       || !sameStrings(planTask.acceptanceCriteria, task.acceptanceCriteria)
       || !sameStrings(planTask.constraints, task.constraints)
-      || !sameOptionalStrings(planTask.writesPaths, task.writesPaths)) {
+      || !sameOptionalStrings(planTask.writesPaths, task.writesPaths)
+      || planTask.originGoalId !== task.originGoalId) {
       throw new Error(`workflow result plan.tasks and tasks disagree at index ${index}`)
     }
   }
@@ -355,8 +369,58 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
   if (maxConcurrency !== config.maxConcurrency || maxRetries !== config.maxRetries || maxTasks !== config.maxTasks) {
     throw new Error('workflow result limits do not match the configured limits')
   }
-  if (tasks.length > maxTasks) {
+  // A planner-failure fallback splits the objective into contiguous segments of at
+  // most taskTextChars characters. The segment count follows from the splitter, not
+  // from maxTasks and not from `ceil(chars / taskTextChars)` either: a boundary that
+  // backs off a surrogate pair (or moves onto a break) adds a segment, and a cap one
+  // segment short would reject the very fallback the script was forced to build.
+  // Every other source keeps the configured cap.
+  // The request builder always budgets the child cap for the larger of maxTasks
+  // and the fallback segment count, because the planner can fail after the request
+  // was built. The report check must allow that budget even when the plan that
+  // arrives is the planner's own (fewer tasks, same request-level cap).
+  const fallbackTaskCap = Math.max(maxTasks, shardCountFor(objective, TASK_LIMITS.taskTextChars))
+  const taskCap = source === 'fallback' ? fallbackTaskCap : maxTasks
+  if (tasks.length > taskCap) {
     throw new Error(`workflow result has ${tasks.length} tasks but maxTasks is ${maxTasks}`)
+  }
+  if (source === 'fallback') {
+    // The fallback must obey the same per-task text bound as a planner task; it is
+    // a size limit on one task, not a reason to drop part of the objective.
+    for (let index = 0; index < planTasks.length; index++) {
+      const planTask = planTasks[index]!
+      for (const field of ['objective', 'expectedOutput', 'context'] as const) {
+        if (planTask[field].length > TASK_LIMITS.taskTextChars) {
+          throw new Error(
+            `workflow result fallback plan.tasks[${index}].${field} is ${planTask[field].length} characters, over the ${TASK_LIMITS.taskTextChars}-character per-task limit`,
+          )
+        }
+      }
+    }
+    // A fallback plan is not authored text, it is the caller's objective cut up by
+    // `splitObjective`. Check that content directly: the segments must be exactly
+    // what the splitter produces, which also means the objective is carried whole
+    // and no character was trimmed, re-ordered, or dropped.
+    //
+    // The serialized aggregate budget is deliberately not applied here. It bounds
+    // task text that a planner or a caller authored, and JSON escaping inflates an
+    // objective past it without adding any work: 32,000 quote characters serialize
+    // to ~67,000 characters across eight segments, which used to reject a fallback
+    // that carried nothing but the caller's own 32,000 characters. Exact segment
+    // equality is the stronger check that check was standing in for.
+    const expectedSegments = splitObjective(objective, TASK_LIMITS.taskTextChars)
+    if (planTasks.length !== expectedSegments.length) {
+      throw new Error(
+        `workflow result fallback plan has ${planTasks.length} tasks but the objective splits into ${expectedSegments.length}`,
+      )
+    }
+    for (let index = 0; index < expectedSegments.length; index++) {
+      if (planTasks[index]!.objective !== expectedSegments[index]) {
+        throw new Error(
+          `workflow result fallback plan.tasks[${index}].objective is not segment ${index + 1} of the request objective`,
+        )
+      }
+    }
   }
   if (tasks.length > 0) {
     // The plugin sizes the child cap from the task count: exact for a caller plan,
@@ -364,7 +428,7 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
     // window did not come from this plugin's request builder.
     const budget = routeBudgetFor(config)
     const minimumAgents = maxTotalAgentsFor(tasks.length, maxRetries, budget)
-    const maximumAgents = maxTotalAgentsFor(maxTasks, maxRetries, budget)
+    const maximumAgents = maxTotalAgentsFor(fallbackTaskCap, maxRetries, budget)
     if (maxTotalAgents < minimumAgents || maxTotalAgents > maximumAgents) {
       throw new Error(
         `workflow result limits.maxTotalAgents ${maxTotalAgents} is outside the allowed range ${minimumAgents}-${maximumAgents}`,

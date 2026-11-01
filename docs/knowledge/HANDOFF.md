@@ -1,5 +1,29 @@
 # Agent Handoff
 
+## 2026-11-01 — PR #26 review close-out (three fallback findings)
+
+- **From:** local (pr26-closer) · **To:** lead / next local agent
+- **Base commit:** `2e9c26a` (`origin/main` after PR #23; the branch was rebased onto it, originally
+  cut from `334daf6`)
+- **Work commit:** `68f3d15` on `fix/fallback-shards` (rebased: `6e902e0` → `bba5dc9`, `5cbccf2` → `68f3d15`)
+- **Changed:** `src/shards.ts` (new: one splitter, rendered into the script and reused by host
+  validation), `src/script.ts`, `src/report.ts`, `test/fallback-shards.spec.ts` (16 cases),
+  `test/helpers.ts` (`taskFromPrompt`), `test/objective-limit.spec.ts`, `test/report.spec.ts`,
+  `docs/ARCHITECTURE.md`, `CHANGELOG.md`, `lib/**`.
+- **Tests:** `npm run ci` = exit 0, **27 files / 487 tests** (post-rebase, includes the PR #23 specs);
+  `npm run build && git diff --exit-code -- lib/` = exit 0.
+- **Not found:** the "1 medium test gap + 1 low boundary issue" an earlier review round was said to
+  have recorded is **not** in `.workflow-artifacts/` (that directory holds the objective-limit round
+  only: `baseline/`, `limit-core*`, `test-report.md`, `github-recon.md`, `pr-fallback-shards.md`), nor
+  in `docs/knowledge/`, `.agent-teams/`, or `.session-stage/`. Closest but unconfirmed:
+  `test-report.md` §9 items 1–3 (fallback sharding not yet implemented; the generated script has no
+  `objectiveChars` enforcement point; upstream boundary tests incomplete).
+- **Open, not fixed here:** the generated script still does not enforce `TASK_LIMITS.objectiveChars`
+  itself (`src/script.ts` declares it, nothing reads it); the host enforces it at gate/tool/input, so
+  bypassing the host a 32,001-character objective still yields a `partial` fallback.
+- **Next action:** review `68f3d15` on `origin/fix/fallback-shards`, then decide on merging PR #26
+  (merge is the lead's call). PR #26 is rebased on `2e9c26a` and no longer conflicts.
+
 ## 2026-10-27 — v0.2.0 released and installed on the operator machine
 
 - **Released:** `v0.2.0` tag + GitHub Release (tgz 42 files / 108,428 B, sha256 recorded by GitHub). CI and Release workflows green. `v0.1.0` untouched.

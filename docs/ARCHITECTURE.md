@@ -83,10 +83,7 @@ Host/script validation enforces unique IDs, non-empty required fields, at most
 `maxTasks` tasks, no dependency graph, a **32,000-character workflow objective**,
 and a 48,000-character aggregate serialized task budget. Each task's own
 `objective`, `expectedOutput`, and `context` stay capped at 4,000 characters
-(`taskTextChars`) — those task-level limits are unchanged. A planner failure or
-invalid plan falls back to one task containing the original objective verbatim;
-the report records `planning.source: "fallback"` and cannot claim fully clean
-completion.
+(`taskTextChars`) — those task-level limits are unchanged. A planner failure or invalid plan falls back to segmented tasks covering the original objective verbatim: the objective is split into contiguous segments of at most 4,000 characters (`taskTextChars`), as close to equal as the bound allows and cut on a nearby paragraph, sentence or word break, concatenating the segment objectives reproduces the original byte for byte, every segment carries the same `origin_goal_id`, and the segment count follows the splitter (`src/shards.ts`) rather than `maxTasks`; the report records `planning.source: "fallback"` and cannot claim fully clean completion.
 
 `acceptanceCriteria` is a non-empty list whose entries must stay distinct under
 the comparison used to match a verifier's answer: trailing sentence punctuation,
@@ -140,8 +137,8 @@ Status rules:
   or unresolved failure exists. A fallback or unavailable plan can never be
   `completed`.
 - `partial` when at least one task is verified but the workflow is not fully
-  clean, or when planning degraded to fallback. A fallback plan whose single
-  task verifies successfully is still `partial`; the report keeps the fallback
+  clean, or when planning degraded to fallback. A fallback plan whose shards
+  verify successfully is still `partial`; the report keeps the fallback
   provenance and the planning error. For non-fallback plans, `partial` requires
   a mix of verified and failed tasks.
 - `failed` when no task is verified.
@@ -243,11 +240,29 @@ returns the message unchanged instead of trimming it. Only the history block is
 truncated. `historyChars` (default 4,000, hard maximum 8,000) and
 `taskTextChars` (4,000 per task field) are unchanged.
 
-**Planner-failure fallback.** When planning fails, `fallbackPlan()` carries the
-whole objective verbatim instead of shortening it. The fallback does not pass through
-`normalizeTask()`, so it is not re-checked against `taskTextChars`; a
-32,000-character objective is therefore not rejected a second time. The run
-reports `partial` with `planning.source: "fallback"` and the planner error.
+**Planner-failure fallback.** When planning fails, `fallbackPlan()` splits the
+whole objective into contiguous segments of at most `taskTextChars` characters;
+concatenating the segment objectives reproduces the original objective byte for
+byte. The segments are as close to equal as the bound allows — a 4,001-character
+objective becomes two ~2,000-character segments, never a 4,000-character one plus
+a one-character stub — and a cut that lands near a paragraph break, a sentence end
+or a word break is moved onto it, so a segment ends where the text already ends.
+Every segment carries the same `origin_goal_id`, so the fallback is traceable to
+the one original goal, and each segment's acceptance criterion names the segment
+it covers, so a verifier confirms the piece it was handed and no shard stands in
+for the whole objective. `src/shards.ts` is the single implementation of that
+split: the generated script runs it, and host validation re-derives the expected
+segments with it and rejects a fallback plan carrying anything else. The segment
+count therefore follows the splitter — not `maxTasks`, and not
+`ceil(objectiveChars / taskTextChars)` either, because a boundary that backs off a
+surrogate pair adds a segment. Host validation accepts a fallback plan over the
+configured task cap (a fallback must not be rejected a second time) while still
+enforcing the per-task text bound, and it does not apply the authored-text
+aggregate budget to the fallback: that budget bounds task text a planner or caller
+wrote, and the fallback's text is the caller's own objective, whose JSON escaping
+can inflate the serialized plan past the budget without adding a character of
+work. The run reports `partial` with `planning.source: "fallback"` and the
+planner error.
 
 ## Non-interference
 

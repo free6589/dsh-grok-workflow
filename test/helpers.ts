@@ -1,6 +1,6 @@
 import vm from 'node:vm'
 import { parseMemberLabel } from '../src/naming.js'
-import type { RoleName, WorkflowReport } from '../src/types.js'
+import type { NormalizedTask, RoleName, WorkflowReport } from '../src/types.js'
 
 export interface AgentCall {
   prompt: string
@@ -53,6 +53,20 @@ export async function runWorkflowScript(
 /** Let pending host timers and microtasks settle. */
 export function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+/**
+ * The task a child was handed, read off the `TASK:` block of its prompt.
+ *
+ * A scripted verifier has to answer the task it actually received — a real
+ * verifier copies the acceptance criteria verbatim (`verifyPrompt` says so), and
+ * a fixture that hard-codes the criteria instead would silently stop matching
+ * the moment the plan words a criterion differently.
+ */
+export function taskFromPrompt(prompt: string): NormalizedTask {
+  const match = /TASK:\n(\{[\s\S]*?\})\n\n/.exec(prompt)
+  if (match === null) throw new Error(`prompt carries no task JSON: ${prompt.slice(0, 120)}`)
+  return JSON.parse(match[1]!) as NormalizedTask
 }
 
 /**

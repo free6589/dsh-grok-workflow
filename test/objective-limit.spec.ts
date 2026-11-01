@@ -30,12 +30,10 @@ import { assertWorkflowReport } from '../src/report.js'
 import { WORKFLOW_SCRIPT } from '../src/script.js'
 import type { WorkflowReport } from '../src/types.js'
 import { execution, task, verification } from './fixtures.js'
-import { runWorkflowScript, type ScriptAgent } from './helpers.js'
+import { roleOf, runWorkflowScript, taskFromPrompt, type ScriptAgent } from './helpers.js'
 
 /** Mirrors TASK_LIMITS.objectiveChars in src/input.ts and src/script.ts. */
 const OBJECTIVE_LIMIT = 32_000
-/** The one acceptance criterion the fallback plan always uses. */
-const FALLBACK_CRITERION = 'The expected output is completed and supported by concrete evidence'
 
 /* ------------------------------------------------------------------ engine -- */
 
@@ -96,8 +94,10 @@ class FakeEngine {
       }
       if (member?.role === 'worker') return execution('work done')
       if (member?.role === 'verifier') {
+        // Answer the task that was actually handed over: the fallback plan words
+        // its criteria per segment, and a real verifier copies them verbatim.
         return this.planner === 'fail'
-          ? verification(task('task-1', [FALLBACK_CRITERION]))
+          ? verification(taskFromPrompt(prompt))
           : verification(planned[0]!)
       }
       throw new Error(`unexpected label ${options.label}`)
@@ -335,18 +335,28 @@ describe('objective limit — planner-failure fallback path', () => {
       expect(report.plan.source).toBe('fallback')
       expect(report.plan.error ?? '').toContain('planner failed')
       expect(report.status).toBe('partial')
-      // The fallback mirrors the objective into its single task verbatim: no
-      // truncation and no silent shortening anywhere on the path.
+      // The fallback carries the objective whole. How it is packed into tasks is
+      // the script's business (one task, or contiguous segments that respect the
+      // per-task bound); what must never change is that concatenating the planned
+      // objectives reproduces the original byte for byte — no truncation.
       expect(report.objective).toBe(objective)
-      expect(report.plan.tasks).toHaveLength(1)
-      expect(report.plan.tasks[0]!.objective).toBe(objective)
-      expect(report.plan.tasks[0]!.objective).toHaveLength(chars)
-      expect(report.tasks[0]!.objective).toBe(objective)
-      // The whole objective reached the planner that failed, and the fallback
-      // worker that replaced it.
-      expect(ctx.engine.childCalls.find(call => parseMemberLabel(call.label)?.role === 'planner')?.prompt.includes(objective)).toBe(true)
-      expect(ctx.engine.childCalls.find(call => parseMemberLabel(call.label)?.role === 'worker')?.prompt.includes(objective)).toBe(true)
-      // Host validation accepts a fallback report at this length.
+      expect(report.plan.tasks.length).toBeGreaterThanOrEqual(1)
+      expect(report.plan.tasks.map(item => item.objective).join('')).toBe(objective)
+      expect(report.tasks).toHaveLength(report.plan.tasks.length)
+      for (let index = 0; index < report.plan.tasks.length; index += 1) {
+        expect(report.plan.tasks[index]!.objective.length).toBeGreaterThan(0)
+        expect(report.tasks[index]!.objective).toBe(report.plan.tasks[index]!.objective)
+      }
+      // The whole objective reached the planner that failed, and every fallback
+      // worker received its own piece of it, unshortened.
+      expect(ctx.engine.childCalls.find(call => roleOf(call.label) === 'planner')?.prompt.includes(objective)).toBe(true)
+      const workerPrompts = ctx.engine.childCalls
+        .filter(call => roleOf(call.label) === 'worker')
+        .map(call => call.prompt)
+      expect(workerPrompts).toHaveLength(report.plan.tasks.length)
+      for (const planned of report.plan.tasks) {
+        expect(workerPrompts.some(prompt => prompt.includes(planned.objective))).toBe(true)
+      }      // Host validation accepts a fallback report at this length.
       const config = resolveConfig({
         maxConcurrency: report.limits.maxConcurrency,
         maxRetries: report.limits.maxRetries,
