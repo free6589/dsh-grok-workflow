@@ -187,3 +187,17 @@ for the front desk; the only open item is the release itself. Any future live ma
 - **Implementation boundary:** code changes go through the team's single-writer
   implementer with an independent review per batch; DSH core and global installs
   remain out of bounds.
+
+## 2026-11-01 — PR #26 review close-out (`fix/fallback-shards`, work commit `68f3d15`, base `2e9c26a`)
+
+- **Status:** the three codex P2 findings on the segmented planner-failure fallback are
+  `CONFIRMED` and fixed (surrogate-adjusted segment count, JSON-escape aggregate false
+  rejection, arbitrary-slice segments). Details and numbers: VALIDATION.md Round 13.
+- **Shape:** `src/shards.ts` is now the only splitter — the generated script runs it, host
+  validation re-derives the expected segments with it, and a fallback plan carrying anything
+  else is rejected.
+- **Verification (after rebasing onto `origin/main` `2e9c26a`):** `npm run ci` exit 0, **27 files /
+  487 tests**; committed `lib/` matches a fresh build (`git diff --exit-code -- lib/` = 0). The
+  rebase left `src/gate.ts`, `src/run.ts` and `src/triage.ts` (PR #23 P0 semantics) untouched.
+- **Still open:** the generated script does not enforce `TASK_LIMITS.objectiveChars` itself; the
+  host does (gate/tool/input). Not a regression, not fixed in this branch.
