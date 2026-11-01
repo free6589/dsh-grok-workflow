@@ -29,6 +29,22 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ### Fixed / 修复
 
+- **A failed planner no longer drops a long objective / 规划失败不再丢掉长目标** — when planning
+  failed, the fallback plan carried the whole objective in one task, which the 4,000-character
+  per-task bound then rejected: a 4,001–32,000 character objective could pass the front desk and
+  still fail with `workflow result fallback plan.tasks[0].objective is N characters, over the
+  4000-character per-task limit`. The fallback now splits the objective into contiguous shards of
+  at most `taskTextChars` characters; concatenating the shard objectives reproduces the original
+  byte for byte, every shard carries the same `origin_goal_id`, and the run reports `partial` with
+  `planning.source: "fallback"` instead of failing. The shard count is bounded by
+  `ceil(objectiveChars / taskTextChars)` rather than `maxTasks`, so the configured task cap cannot
+  reject the fallback a second time. 规划失败时，回退计划以前把整个目标塞进一个任务，随后被每任务
+  4,000 字符上限拒绝：4,001–32,000 字符的目标能过前置检查，却仍会以
+  `workflow result fallback plan.tasks[0].objective is N characters, over the 4000-character
+  per-task limit` 失败。现在回退计划把目标切成每片不超过 `taskTextChars` 的连续分片，分片目标顺序
+  拼接后与原文逐字节一致，所有分片共享同一个 `origin_goal_id`，运行以 `partial` 收尾并保留
+  `planning.source: "fallback"`，不再失败。分片数上限由 `ceil(objectiveChars / taskTextChars)`
+  决定而不是 `maxTasks`，配置的任务上限不会二次拒绝回退计划。
 - **A rejected run no longer reads as finished / 被否决的运行不再显示成已完成** — the run node used
   to be closed with the engine's stop reason, and a verifier rejection ends the program normally, so
   a team where no task passed still showed `已完成` on the node and on both rows. The node is now

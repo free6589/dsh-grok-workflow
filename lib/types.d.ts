@@ -40,6 +40,11 @@ export interface NormalizedTask {
      * the task declared that it writes nothing.
      */
     writesPaths: string[] | null;
+    /**
+     * Original goal id shared by every shard of a planner-failure fallback plan.
+     * Absent for caller and planner plans, which have no synthetic shards.
+     */
+    originGoalId?: string;
 }
 /**
  * How the mandatory-entry gate delivers the validated report to the user.
@@ -325,6 +330,8 @@ export interface TaskReport {
     constraints: string[];
     /** Declared write paths echoed for audit (U-4); `null` = the plan did not say. */
     writesPaths: string[] | null;
+    /** Shared original-goal id for planner-failure fallback shards. */
+    originGoalId?: string;
     status: 'verified' | 'failed';
     attempts: AttemptReport[];
     error?: string;

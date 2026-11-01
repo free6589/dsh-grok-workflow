@@ -140,8 +140,8 @@ Status rules:
   or unresolved failure exists. A fallback or unavailable plan can never be
   `completed`.
 - `partial` when at least one task is verified but the workflow is not fully
-  clean, or when planning degraded to fallback. A fallback plan whose single
-  task verifies successfully is still `partial`; the report keeps the fallback
+  clean, or when planning degraded to fallback. A fallback plan whose shards
+  verify successfully is still `partial`; the report keeps the fallback
   provenance and the planning error. For non-fallback plans, `partial` requires
   a mix of verified and failed tasks.
 - `failed` when no task is verified.
@@ -243,10 +243,14 @@ returns the message unchanged instead of trimming it. Only the history block is
 truncated. `historyChars` (default 4,000, hard maximum 8,000) and
 `taskTextChars` (4,000 per task field) are unchanged.
 
-**Planner-failure fallback.** When planning fails, `fallbackPlan()` carries the
-whole objective verbatim instead of shortening it. The fallback does not pass through
-`normalizeTask()`, so it is not re-checked against `taskTextChars`; a
-32,000-character objective is therefore not rejected a second time. The run
+**Planner-failure fallback.** When planning fails, `fallbackPlan()` splits the
+whole objective into contiguous segments of at most `taskTextChars` characters;
+concatenating the segment objectives reproduces the original objective byte for
+byte. Every shard carries the same `origin_goal_id`, so the fallback is
+traceable to the one original goal. The shard count is bounded by
+`ceil(objectiveChars / taskTextChars)` rather than `maxTasks`: host validation
+accepts a fallback plan over the configured task cap (a fallback must not be
+rejected a second time) while still enforcing the per-task text bound. The run
 reports `partial` with `planning.source: "fallback"` and the planner error.
 
 ## Non-interference

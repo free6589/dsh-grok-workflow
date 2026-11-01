@@ -1,3 +1,4 @@
+import { TASK_LIMITS } from './input.js'
 import { namingSource, phaseLabel, runTitle } from './naming.js'
 import type { NamingLanguage } from './naming.js'
 import { REDACTION_RULES } from './redact.js'
@@ -29,7 +30,12 @@ export const WORKFLOW_SCRIPT = String.raw`
 // panel's words and the Host's words come from one table.
 ${namingSource()};
 
-const objective = String(args && args.objective ? args.objective : '').trim();
+// Keep the objective byte for byte: the host compares the report objective
+// against the exact string it passed in, so trimming here would fail that
+// check whenever the caller's objective ends with whitespace. Only an
+// all-whitespace objective is normalized to empty.
+const rawObjective = String(args && args.objective ? args.objective : '');
+const objective = rawObjective.trim() === '' ? '' : rawObjective;
 const maxConcurrency = Math.max(1, Math.min(6, Number(args && args.maxConcurrency) || 3));
 const maxRetries = Math.max(0, Math.min(3, Number(args && args.maxRetries) || 0));
 const maxTasks = Math.max(1, Math.min(12, Number(args && args.maxTasks) || 6));
@@ -419,6 +425,8 @@ function normalizeTask(value, index) {
   if (id === null) return null;
   if (!id) id = 'task-' + (index + 1);
   if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(id)) return null;
+  const originGoalId = value.originGoalId === undefined ? undefined : boundedText(value.originGoalId, 64);
+  if (originGoalId === null) return null;
   return {
     id: id,
     title: title,
@@ -427,7 +435,8 @@ function normalizeTask(value, index) {
     acceptanceCriteria: acceptanceCriteria,
     context: context,
     constraints: constraints,
-    writesPaths: writesPaths === undefined ? null : writesPaths
+    writesPaths: writesPaths === undefined ? null : writesPaths,
+    ...originGoalId === undefined ? {} : { originGoalId: originGoalId }
   };
 }
 
@@ -448,18 +457,62 @@ function normalizePlan(raw, source) {
   return { source: source, tasks: tasks };
 }
 
+// Planner failure fallback: the objective itself is the only work item left, so
+// it must reach the workers whole. A single task cannot carry it once it is
+// longer than TASK_LIMITS.taskTextChars (and the task count cannot depend on
+// maxTasks either), so the fallback splits it into contiguous segments that
+// each respect the per-task bound. Concatenating the segment objectives
+// reproduces the original objective byte for byte: the split never trims,
+// normalizes, or drops a character.
+function fallbackGoalId(value) {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return 'goal-' + (hash >>> 0).toString(36) + '-' + value.length;
+}
+
+function splitObjective(value, maxChars) {
+  const segments = [];
+  let start = 0;
+  while (start < value.length) {
+    let end = Math.min(start + maxChars, value.length);
+    // Never cut a surrogate pair in half. The two halves would still rejoin when
+    // the segments are concatenated, but one segment would be invalid Unicode on
+    // its own and would not survive a UTF-8 round trip.
+    if (end < value.length) {
+      const before = value.charCodeAt(end - 1);
+      const after = value.charCodeAt(end);
+      if (before >= 0xD800 && before <= 0xDBFF && after >= 0xDC00 && after <= 0xDFFF) end -= 1;
+    }
+    segments.push(value.slice(start, end));
+    start = end;
+  }
+  return segments;
+}
+
 function fallbackPlan(reason) {
+  const segments = splitObjective(objective, TASK_LIMITS.taskTextChars);
+  const originGoalId = fallbackGoalId(objective);
+  const total = segments.length;
   return {
     source: 'fallback',
-    tasks: [{
-      id: 'task-1',
-      title: 'Complete the objective',
-      objective: objective,
-      expectedOutput: objective,
-      acceptanceCriteria: ['The expected output is completed and supported by concrete evidence'],
-      context: '',
-      constraints: []
-    }],
+    tasks: segments.map(function (segment, index) {
+      const single = total === 1;
+      const label = 'segment ' + (index + 1) + '/' + total;
+      return {
+        id: 'task-' + (index + 1),
+        title: single ? 'Complete the objective' : 'Complete objective ' + label,
+        objective: segment,
+        expectedOutput: single ? segment : 'The requirement in objective ' + label + ' is completed and supported by concrete evidence',
+        acceptanceCriteria: ['The expected output is completed and supported by concrete evidence'],
+        context: 'origin_goal_id: ' + originGoalId + '; ' + label + ' of the original objective',
+        constraints: [],
+        writesPaths: null,
+        originGoalId: originGoalId
+      };
+    }),
     error: reason
   };
 }
@@ -1228,6 +1281,7 @@ const report = {
       context: result.task.context,
       constraints: result.task.constraints,
       writesPaths: result.task.writesPaths,
+      ...result.task.originGoalId === undefined ? {} : { originGoalId: result.task.originGoalId },
       status: result.status,
       attempts: result.attempts,
       error: result.error || ''
@@ -1331,7 +1385,12 @@ export function buildWorkflowRequest(
   // `[]` means "no plan supplied" exactly like `undefined`: the script falls back
   // to a planner and then runs at least one task, so budgeting for 0 tasks would
   // produce a limit the validated report can exceed (a lost-evidence rejection).
-  const taskCount = tasks === undefined || tasks.length === 0 ? config.maxTasks : tasks.length
+  // A planner failure degrades to the fallback plan, which splits the objective
+  // into `taskTextChars` segments. Budget for the larger of that shard count and
+  // `maxTasks`: the fallback must not be rejected by the configured task cap, and
+  // the child-agent cap has to cover every shard it will run.
+  const fallbackShards = Math.max(1, Math.ceil(objective.length / TASK_LIMITS.taskTextChars))
+  const taskCount = tasks === undefined || tasks.length === 0 ? Math.max(config.maxTasks, fallbackShards) : tasks.length
   const maxTotalAgents = maxTotalAgentsFor(taskCount, config.maxRetries, routeBudgetFor(config))
   return {
     script: WORKFLOW_SCRIPT,
