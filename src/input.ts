@@ -14,7 +14,7 @@ export class GrokWorkflowInputError extends Error {
  * exceeds them; the script never silently shortens a caller requirement.
  */
 export const TASK_LIMITS = {
-  objectiveChars: 4_000,
+  objectiveChars: 32_000,
   titleChars: 160,
   taskTextChars: 4_000,
   criteriaItems: 20,

@@ -30,7 +30,7 @@ export declare function collectHistory(session: Session | undefined, bounds: His
  *
  * @param history - already rendered history block, or an empty string.
  * @param request - the current user message text.
- * @param limit - maximum objective length accepted by the workflow builder.
+ * @param limit - maximum length of the composed objective; the current message is never shortened.
  * @returns the objective, or `undefined` when the current message alone exceeds the limit.
  */
 export declare function composeObjective(history: string, request: string, limit: number): string | undefined;

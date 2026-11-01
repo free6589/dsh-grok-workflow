@@ -107,7 +107,7 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
     objective: {
       type: 'string' as const,
       required: true as const,
-      description: 'The complete objective to plan, execute, verify, and report. Be specific about scope and desired deliverable.',
+      description: `The complete objective to plan, execute, verify, and report. At most ${TASK_LIMITS.objectiveChars} characters. Be specific about scope and desired deliverable.`,
     },
     tasks: {
       type: 'array' as const,

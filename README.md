@@ -114,9 +114,23 @@ The workflow exists to avoid treating an agent's “done” message as proof tha
 
 - The gate is **on by default** (`enforceGate: true`). Every *user* message is claimed. Messages from other sources — user-question replies, team messages, webhooks, schedules, subagent prompts — are deliberately **not** claimed, and an empty batch passes through.
 - The answer arrives **inside the same turn** (`answerStrategy: in-turn`). That is the only strategy that survives a one-shot process; `relay` and `append` remain available for long-lived surfaces.
-- A message the plugin will not run is **refused out loud** with the reason (empty message, or an objective over 4000 characters). Nothing is executed and nothing is retried automatically.
+- A message the plugin will not run is **refused out loud** with the reason (empty message, or an objective over 32,000 characters). Nothing is executed and nothing is retried automatically.
 - Delivery is recorded per message: the same batch dispatched twice does not start a second run, and each agent's waiting queue is bounded by `maxQueuedMessages`.
 - Set `enforceGate: false` to keep only the `grok_workflow` tool and skip interception. A deployment that must never degrade silently should also set `gateRequired: true`, which turns “this runtime exposes no `agent/pre-step` hook” into a load error instead of a warning.
+
+### Objective length limit
+
+The workflow objective limit is **32,000 characters**, measured on the user message itself. The whole message is carried into the objective; it is never shortened to fit.
+
+| Message length | What happens |
+|---|---|
+| 1–4,000 characters | Accepted (unchanged from earlier releases). |
+| 4,001–32,000 characters | Accepted; the entire message is kept as the objective. At exactly 32,000 characters the `Current request:` label is dropped instead of trimming the message, and no conversation history is attached. |
+| 32,001 characters or more | Refused out loud with `the message is longer than the 32000-character workflow objective limit`; no run starts. |
+
+Other limits are unchanged: `historyChars` still defaults to `4000` (hard maximum `8000`), each task field (`objective`, `expectedOutput`, `context`) is still capped at `4000` characters (`taskTextChars`), and the aggregate serialized task budget stays at `48,000` characters. A larger objective therefore has to be decomposed into several tasks rather than widening one task.
+
+If planning fails, the fallback plan copies the whole objective verbatim into its single task. That fallback is accepted — it is **not** rejected a second time by the 4,000-character task-text budget — and the run reports `partial` with `planning.source: "fallback"` and the planner error.
 
 ## The front desk: four tiers, always stated (t52)
 
@@ -276,7 +290,7 @@ The plugin reuses DSH's workflow engine and subagents. It does not replace DSH's
 
 - **The tool does not appear:** restart the profile and confirm it contains the workflow engine and a subagent provider.
 - **Every answer looks like a workflow now:** that is `enforceGate: true`. Set it to `false` to get the `0.1.0` behaviour.
-- **A message is refused instead of answered:** the reason is printed (empty message or an objective over 4000 characters). Nothing was executed and nothing will be retried automatically.
+- **A message is refused instead of answered:** the reason is printed (empty message or an objective over 32,000 characters). Nothing was executed and nothing will be retried automatically.
 - **A key is rejected at load:** the message names the closest accepted key. Silent ignoring is not offered on purpose.
 - **Your DSH version differs:** this release is verified only with DSH `0.2.1-rc.2`.
 - **You want to understand the design:** see [Architecture](docs/ARCHITECTURE.md), the [design knowledge base](docs/knowledge/WORKFLOW-DESIGN.md) and the [acceptance checklist](docs/ACCEPTANCE.md).

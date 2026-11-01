@@ -306,10 +306,12 @@ tests:
 
 ### Additional issue-report fixes (#8-#10)
 
-- **#8 payload bounds:** the objective is capped at 4,000 characters and the
-  aggregate serialized caller/planner task payload at 48,000 characters, in
-  both host input validation and generated-script planner normalization.
-  Boundary and over-bound tests pass.
+- **#8 payload bounds (historical: this validation ran when the limit was
+  4,000):** the objective was capped at 4,000 characters and the aggregate
+  serialized caller/planner task payload at 48,000 characters, in both host
+  input validation and generated-script planner normalization. Boundary and
+  over-bound tests pass. The objective limit is now 32,000 (see
+  `docs/ARCHITECTURE.md` §Objective length boundary).
 - **#9 shared working directory:** documented as a concrete MVP limitation.
   Parallel workers and verifiers share the DSH session `cwd`; the plugin has no
   worktree isolation, so write-heavy work must use disjoint scopes or

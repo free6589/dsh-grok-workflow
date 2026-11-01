@@ -537,16 +537,36 @@ describe('mandatory entry gate', () => {
     expect(objective).toContain('now do the same for CHANGELOG')
   })
 
-  it('refuses a message longer than the objective limit without running the workflow', async () => {
+  it('refuses a 32001-character message with the 32000-character limit without running the workflow', async () => {
     const ctx = new FakeContext()
     applyWith(ctx)
     const agent = new FakeAgent()
-    const decision = await ctx.preStep()(payload(agent, [userMessage('x'.repeat(4_001))]), passingNext([]))
+    const decision = await ctx.preStep()(payload(agent, [userMessage('x'.repeat(32_001))]), passingNext([]))
     expect(decision).toEqual({ kind: 'reject' })
     expect(ctx.engine.startCalls).toHaveLength(0)
     await waitFor(() => agent.followups.length === 1)
-    expect(textOf(agent.followups[0]!)).toContain('character workflow objective limit')
+    expect(textOf(agent.followups[0]!)).toContain('32000-character workflow objective limit')
   })
+
+  it.each([4_000, 4_001, 10_000, 32_000])(
+    'admits a %i-character message at the 32000-character objective limit',
+    async (chars) => {
+      const ctx = new FakeContext()
+      ctx.engine.autoRun = true
+      apply(ctx as never, { mode: 'full' })
+      const agent = new FakeAgent({ session: realSession(`sess-limit-${chars}`) })
+      const decision = await ctx.preStep()(
+        payload(agent, [userMessage('x'.repeat(chars))]),
+        passingNext([]),
+      ) as { kind: string }
+      expect(decision.kind).toBe('enter')
+      expect(ctx.engine.startCalls).toHaveLength(1)
+      const objective = String((ctx.engine.startCalls[0]!.args as { objective: string }).objective)
+      expect(objective).toContain('x'.repeat(chars))
+      expect(objective.length).toBeLessThanOrEqual(32_000)
+      expect(agent.followups.some(item => textOf(item).includes('workflow objective limit'))).toBe(false)
+    },
+  )
 
   it('records the delivery durably so a restart cannot start the run again', async () => {
     const ctx = new FakeContext()
@@ -781,12 +801,12 @@ describe('in-turn delivery (default strategy)', () => {
     const ctx = new FakeContext()
     apply(ctx as never, { mode: 'full' })
     const agent = new FakeAgent({ session: realSession('sess-in-turn-long') })
-    const decision = await ctx.preStep()(payload(agent, [userMessage('x'.repeat(20_000))]), passingNext([])) as {
+    const decision = await ctx.preStep()(payload(agent, [userMessage('x'.repeat(32_001))]), passingNext([])) as {
       kind: string
       messages: UserMessage[]
     }
     expect(decision.kind).toBe('enter')
-    expect(textOf(decision.messages[0]!)).toContain('workflow objective limit')
+    expect(textOf(decision.messages[0]!)).toContain('32000-character workflow objective limit')
     expect(ctx.engine.startCalls).toHaveLength(0)
   })
 
