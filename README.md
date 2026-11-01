@@ -130,7 +130,7 @@ The workflow objective limit is **32,000 characters**, measured on the user mess
 
 Other limits are unchanged: `historyChars` still defaults to `4000` (hard maximum `8000`), each task field (`objective`, `expectedOutput`, `context`) is still capped at `4000` characters (`taskTextChars`), and the aggregate serialized task budget stays at `48,000` characters. A larger objective therefore has to be decomposed into several tasks rather than widening one task.
 
-If planning fails, the fallback plan copies the whole objective verbatim into its single task. That fallback is accepted — it is **not** rejected a second time by the 4,000-character task-text budget — and the run reports `partial` with `planning.source: "fallback"` and the planner error.
+If planning fails, the fallback plan carries the whole objective verbatim instead of shortening it. That fallback is accepted — it is **not** rejected a second time by the 4,000-character task-text budget — and the run reports `partial` with `planning.source: "fallback"` and the planner error.
 
 ## The front desk: four tiers, always stated (t52)
 

@@ -243,8 +243,8 @@ returns the message unchanged instead of trimming it. Only the history block is
 truncated. `historyChars` (default 4,000, hard maximum 8,000) and
 `taskTextChars` (4,000 per task field) are unchanged.
 
-**Planner-failure fallback.** When planning fails, `fallbackPlan()` copies the
-whole objective verbatim into its single task. The fallback does not pass through
+**Planner-failure fallback.** When planning fails, `fallbackPlan()` carries the
+whole objective verbatim instead of shortening it. The fallback does not pass through
 `normalizeTask()`, so it is not re-checked against `taskTextChars`; a
 32,000-character objective is therefore not rejected a second time. The run
 reports `partial` with `planning.source: "fallback"` and the planner error.

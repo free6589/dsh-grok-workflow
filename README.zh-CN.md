@@ -126,7 +126,7 @@ DSH 启动后，直接提问即可：
 
 其它限制保持不变：`historyChars` 默认仍为 `4000`（硬上限 `8000`），每个任务字段（`objective`、`expectedOutput`、`context`）仍各限 `4000` 字符（`taskTextChars`），任务 JSON 合计仍限 `48,000` 字符。因此更大的目标必须拆成多个任务，而不是放宽单个任务。
 
-规划失败时，fallback 计划会把整个目标逐字放进唯一的任务。该计划会被接受，**不会**再被 4,000 字符的任务文本上限二次拒绝；运行以 `partial` 结束，并记录 `planning.source: "fallback"` 与规划错误。
+规划失败时，fallback 计划会逐字携带整个目标，不做缩短。该计划会被接受，**不会**再被 4,000 字符的任务文本上限二次拒绝；运行以 `partial` 结束，并记录 `planning.source: "fallback"` 与规划错误。
 
 ## 前台：四档分流，条条写明（t52）
 
