@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-11-02
+
 ### Changed / 变更
 
 - **Settings page visual polish, three live-screenshot passes / 设置页三轮视觉打磨，均有真机截图** —
