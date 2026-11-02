@@ -233,7 +233,7 @@ afterEach(() => {
  * (`grok mode toggle (classifyPreStep)`).
  */
 describe('P0-1: the user’s own message survives in the transcript', () => {
-  it('enters the claimed message and the report, once each, in that order', async () => {
+  it('publishes the claimed message, then the report, once each, in that order', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
     apply(ctx as never, { mode: 'full', grokDefault: 'on' })
@@ -242,23 +242,26 @@ describe('P0-1: the user’s own message survives in the transcript', () => {
     const claimed = [userMessage('把登录接口改成 JWT 校验')]
 
     const decision = await ctx.preStep()(payload(agent, claimed), nextWith(claimed)) as Decision
+    // P0-5: the gate already wrote the batch itself, so `commit()` (which replays
+    // the decision the way the loop does) only adds the report.
     commit(live, decision)
 
     const derived = live.deriveMessages()
-    // The object the loop claimed is the object that was entered: id, source and
+    // The object the gate claimed is the object in the transcript: id, source and
     // text are the user's, not a re-created copy.
-    expect(decision.messages![0]!.id).toBe(claimed[0]!.id)
-    expect((decision.messages![0]!.source as { kind?: string }).kind).toBe('user')
-    expect(textOf(decision.messages![0]!)).toBe('把登录接口改成 JWT 校验')
-    // Exactly one occurrence: `enter.messages` is the only writer on this path, and
-    // the gate must not also call session.append() for the same message.
+    expect((derived[0] as unknown as UserMessage).id).toBe(claimed[0]!.id)
+    expect((derived[0] as unknown as UserMessage).source).toMatchObject({ kind: 'user' })
+    expect(textOf(derived[0] as unknown as UserMessage)).toBe('把登录接口改成 JWT 校验')
+    // Exactly one occurrence: the gate published it and the decision no longer
+    // carries it, so the loop cannot write the same words a second time.
     expect(derived.filter(message => textOf(message as unknown as UserMessage) === '把登录接口改成 JWT 校验')).toHaveLength(1)
     // The report follows the original message and does not replace it.
-    expect(textOf(derived[0] as unknown as UserMessage)).toBe('把登录接口改成 JWT 校验')
     const last = textOf(derived[derived.length - 1] as unknown as UserMessage)
     expect(last).toContain(REPORT_BEGIN)
     expect(last).toContain(REPORT_END)
-    expect(derived.length).toBe(decision.messages!.length)
+    // The entered step owes the report only: the batch is already in the surface.
+    expect(decision.messages).toHaveLength(1)
+    expect(textOf(decision.messages![0]!)).toBe(last)
   })
 
   it('keeps the original message when the message is refused before any run', async () => {

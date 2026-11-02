@@ -839,8 +839,9 @@ describe('in-turn delivery (default strategy)', () => {
 
     const decision = await pending as { kind: string; messages: UserMessage[] }
     expect(decision.kind).toBe('enter')
-    // P0-1: the claimed message comes first, unchanged; the answer is entered after it.
-    expect(textOf(decision.messages[0]!)).toBe('run the workflow')
+    // P0-1/P0-5: the claimed message is in the transcript, written by the plugin
+    // before the wait; the entered step therefore owes the report only.
+    expect(textOf(decision.messages[0]!)).not.toBe('run the workflow')
     const text = answerOf(decision)
     expect(text).toContain(REPORT_BEGIN)
     expect(text).toContain('Grok workflow: COMPLETED')
@@ -848,6 +849,37 @@ describe('in-turn delivery (default strategy)', () => {
     // Delivery happened in this turn: no follow-up turn was scheduled.
     expect(agent.followups).toHaveLength(0)
     expect(agent.whenIdle).not.toHaveBeenCalled()
+  })
+
+  it('renders the first user message while the run is still in flight (P0-5)', async () => {
+    const ctx = new FakeContext()
+    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
+    const session = realSession('sess-in-turn-first-message')
+    const agent = new FakeAgent({ session })
+    const typed = '第一条消息：先把我说的话显示出来'
+    /** Durable `user/message` events, i.e. what the GUI transcript renders. */
+    const surfaced = (): string[] => session.ownEvents()
+      .filter(event => (event as { type?: string }).type === 'user/message')
+      .map(event => textOf((event as { data: UserMessage }).data))
+
+    let settled = false
+    const pending = ctx.preStep()(payload(agent, [userMessage(typed)]), passingNext([]))
+      .then((decision: unknown) => { settled = true; return decision })
+    await waitFor(() => ctx.engine.startCalls.length === 1)
+
+    // The reported defect: the run is in flight, the step has not been entered, so
+    // nothing was written and the session showed an empty turn plus the running
+    // status — the message itself was nowhere. It must be durable *now*.
+    expect(settled).toBe(false)
+    expect(surfaced()).toEqual([typed])
+
+    ctx.engine.runs[0]!.complete(report())
+    const decision = await pending as { kind: string; messages: UserMessage[] }
+    expect(decision.kind).toBe('enter')
+    // Exactly once: the batch is not re-entered on top of the published copy.
+    expect(decision.messages).toHaveLength(1)
+    expect(answerOf(decision)).toContain(REPORT_BEGIN)
+    expect(surfaced()).toEqual([typed])
   })
 
   it('enters a failure report when the run failed, so the user is never left without output', async () => {
@@ -860,7 +892,8 @@ describe('in-turn delivery (default strategy)', () => {
     ctx.engine.runs[0]!.fail('error', 'engine exploded')
     const decision = await pending as { kind: string; messages: UserMessage[] }
     expect(decision.kind).toBe('enter')
-    expect(textOf(decision.messages[0]!)).toBe('run the workflow')
+    // P0-5: the batch was published before the wait, so the notice stands alone.
+    expect(textOf(decision.messages[0]!)).not.toBe('run the workflow')
     const text = answerOf(decision)
     expect(text).toContain('could not complete the workflow')
     expect(text).toContain('engine exploded')
@@ -880,7 +913,8 @@ describe('in-turn delivery (default strategy)', () => {
       messages: UserMessage[]
     }
     expect(decision.kind).toBe('enter')
-    expect(textOf(decision.messages[0]!)).toBe('run the workflow')
+    // P0-5: the batch was published before the wait, so the notice stands alone.
+    expect(textOf(decision.messages[0]!)).not.toBe('run the workflow')
     const text = answerOf(decision)
     expect(text).toContain('no workflow result exists')
     expect(text).toContain('2 active run(s)')

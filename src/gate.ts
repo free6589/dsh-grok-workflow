@@ -154,6 +154,20 @@ function sessionOf(agent: Agent): Session | undefined {
   return agent.session
 }
 
+/**
+ * The messages an `enter` decision still owes after the batch was published.
+ *
+ * P0-5: `in-turn` writes the claimed batch itself before the run, so the decision
+ * must not carry it again — `AgentLoop.step()` appends every non-runtime-context
+ * entry of `decision.messages` as a `user/message` event, and the session has no
+ * id-based dedupe, so keeping the batch here would render the user's words twice.
+ * Runtime context (and anything else a downstream listener added) stays.
+ */
+function withoutClaimed(base: readonly UserMessage[], claimed: readonly UserMessage[]): UserMessage[] {
+  const claimedIds = new Set(claimed.map(message => message.id))
+  return base.filter(message => !claimedIds.has(message.id))
+}
+
 /** Stable identity used in delivery keys and queue keys. */
 function agentIdOf(agent: Agent): string {
   const session = sessionOf(agent)
@@ -435,12 +449,15 @@ export function installGate(deps: GateDeps): boolean {
    *
    * Composes the objective here, not at admission: a queued follow-up must see
    * the answer the previous run just delivered, so history is read as late as
-   * possible. Never throws — a run that cannot start becomes a notice.
+   * possible. `history` overrides that read for `in-turn`, which publishes the
+   * batch first and must not see it as prior conversation (P0-5). Never throws —
+   * a run that cannot start becomes a notice.
    */
   const produceAnswer = async (
     agent: Agent,
     request: string,
     signal?: AbortSignal,
+    history?: string,
   ): Promise<Answer> => {
     const limits = safe()
     // A session-level `/grok` record selects the workflow shape explicitly; the
@@ -520,11 +537,11 @@ export function installGate(deps: GateDeps): boolean {
           outcome: 'triaged-fast',
         }
       }
-      const answer = await runTeam(agent, target, signal)
+      const answer = await runTeam(agent, target, signal, history)
       const header = [...lead, triageLine(tier), tier.greeting ? greetingLine(tier.lang) : ''].filter(line => line !== '').join('\n')
       return answer.kind === 'report' ? { ...answer, header } : answer
     }
-    return runTeam(agent, request, signal)
+    return runTeam(agent, request, signal, history)
   }
 
   /**
@@ -538,10 +555,15 @@ export function installGate(deps: GateDeps): boolean {
     agent: Agent,
     request: string,
     signal?: AbortSignal,
+    history?: string,
   ): Promise<Answer> => {
     const limits = safe()
+    // P0-5: `in-turn` publishes the claimed message before the run, so the caller
+    // snapshots the history first and passes it here — otherwise the message the
+    // user just typed would also appear as "conversation so far" and the objective
+    // would carry it twice.
     const objective = composeObjective(
-      collectHistory(sessionOf(agent), { turns: limits.historyTurns, chars: limits.historyChars }),
+      history ?? collectHistory(sessionOf(agent), { turns: limits.historyTurns, chars: limits.historyChars }),
       request,
       TASK_LIMITS.objectiveChars,
     )
@@ -606,18 +628,22 @@ export function installGate(deps: GateDeps): boolean {
   }
 
   /**
-   * Keep the claimed user message in the transcript for a rejected batch (P0-1).
+   * Write a claimed user message into the transcript (P0-1, P0-5).
    *
-   * `relay` and `append` answer in a later turn, so they must return `reject`: the
-   * claimed batch is then never committed by the loop and the user's own words would
-   * disappear from the transcript. This is the one strategy family where the plugin
-   * writes the message itself, and it is the reason `enter.messages` and
-   * `session.append()` must never be used for the same message: `in-turn` returns
-   * the claimed messages in its decision, `relay`/`append` append them here.
+   * Two situations need this plugin as the writer:
+   * - `relay` and `append` answer in a later turn, so they must return `reject`:
+   *   the claimed batch is then never committed by the loop and the user's own
+   *   words would disappear from the transcript.
+   * - `in-turn` keeps the step open for the whole workflow, and the loop commits a
+   *   claimed batch only when the step begins (`AgentLoop.step()`). Publishing
+   *   before the wait is what makes the first message visible while the team runs;
+   *   otherwise the transcript holds no `user/message` for the entire run (P0-5).
    *
-   * The message object is written unchanged — same id, same source, same text and
-   * attachments — because a re-created "looks the same" message would lose its
-   * identity and could be routed a second time.
+   * The two writers must never touch the same message: `in-turn` excludes the
+   * published batch from `enter.messages` (`withoutClaimed`), `relay`/`append`
+   * reject the step. The message object is written unchanged — same id, same
+   * source, same text and attachments — because a re-created "looks the same"
+   * message would lose its identity and could be routed a second time.
    *
    * @returns true when the message is in the session surface.
    */
@@ -649,14 +675,17 @@ export function installGate(deps: GateDeps): boolean {
    * @param agent - Agent whose transcript keeps the batch.
    * @param payload - Rejected step whose batch is being committed.
    * @param text - User-visible terminal text; never a success sentence.
+   * @param alreadySurfaced - The batch is already in the surface (P0-5 `in-turn`
+   *   publishes it before the wait), so it must not be written a second time.
    * @returns true when the batch reached the session surface.
    */
   const commitCancelled = (
     agent: Agent,
     payload: PreStepPayload,
     text: string,
+    alreadySurfaced = false,
   ): boolean => {
-    const kept = commitClaimed(agent, payload.messages)
+    const kept = alreadySurfaced ? true : commitClaimed(agent, payload.messages)
     const session = sessionOf(agent)
     if (session === undefined) return kept
     try {
@@ -779,10 +808,24 @@ export function installGate(deps: GateDeps): boolean {
     const entry = entryOf(verdict, payload)
     const signal = payload.signal
     const aborted = (): boolean => signal?.aborted === true
-    /** Enter the answer after the batch, never instead of it (P0-1). */
-    const enterAfter = (base: readonly UserMessage[], text: string): PreStepDecision => ({
+    /**
+     * Enter the answer after the batch, never instead of it (P0-1).
+     *
+     * `surfaced` says this plugin already published the claimed batch to the
+     * session surface (`publishClaimed` below), so the decision carries only what
+     * is left — the report and any runtime context — and the user's words exist
+     * exactly once. Without it the loop is the only writer and the batch must
+     * stay in `messages`.
+     */
+    const enterAfter = (
+      base: readonly UserMessage[],
+      text: string,
+      surfaced = false,
+    ): PreStepDecision => ({
       kind: 'enter',
-      messages: [...base, enterMessage(text)],
+      messages: surfaced
+        ? [...withoutClaimed(base, payload.messages), enterMessage(text)]
+        : [...base, enterMessage(text)],
     })
     if (aborted()) {
       // Already cancelled when the message arrived: nothing ran, but the batch must
@@ -806,17 +849,27 @@ export function installGate(deps: GateDeps): boolean {
     // `started` before the wait: a crash inside the run must not leave the batch
     // routable, because the workflow may already have executed tool effects.
     record(agent, entry, 'started', 'admitted')
-    const answer = await produceAnswer(agent, verdict.request, signal)
+    // P0-5: publish the batch *before* waiting for the run. `in-turn` holds the
+    // step open for the whole workflow and the loop writes a claimed batch only
+    // when the step begins, so an `enter`-only design left the transcript with no
+    // `user/message` at all for the entire run: the GUI showed an empty turn with
+    // nothing but the running status, and a reload lost the message completely.
+    // The history snapshot is taken first, so the published message is not also
+    // read back as prior conversation.
+    const limits = safe()
+    const history = collectHistory(sessionOf(agent), { turns: limits.historyTurns, chars: limits.historyChars })
+    const surfaced = commitClaimed(agent, payload.messages)
+    const answer = await produceAnswer(agent, verdict.request, signal, history)
     if (aborted()) {
       // The turn was cancelled while the run was in flight: nobody can read an
       // entered step, and the run already stopped on the same signal — so the
       // transcript gets the batch and the cancelled terminal instead (P0-1 + P0-4).
       record(agent, entry, 'failed', 'aborted')
-      commitCancelled(agent, payload, cancelledText(answer.kind === 'notice' ? answer.reason : ''))
+      commitCancelled(agent, payload, cancelledText(answer.kind === 'notice' ? answer.reason : ''), surfaced)
       return { kind: 'reject' }
     }
     record(agent, entry, answer.kind === 'notice' ? 'failed' : 'delivered', answer.outcome)
-    return enterAfter(base, answerText(answer, true))
+    return enterAfter(base, answerText(answer, true), surfaced)
   }
 
   /**

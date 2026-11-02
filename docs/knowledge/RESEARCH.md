@@ -262,3 +262,20 @@ out-of-scope → mode-off → already-routed; reason labels are asserted only vi
   and PENDS (never fires) until the service appears. `registerGrokCommand` carries a
   `typeof ctx.inject === 'function'` guard so hand-rolled test fakes (no cordis registry) stay
   inert without edits.
+
+## A13 — 谁把被 claim 的批次写进 transcript（P0-5，2026-11-02，`CONFIRMED`）
+
+- **`AgentLoop.step()` 是唯一写入者**：`dsh-agent-loop/lib/index.js` 的 `step()` 在真正开始一步时
+  逐条 `session.append("user/message", message, { surfaceOp: "append" })`（`source.kind ===
+  "runtime-context"` 的走 context 分支）。`preStep()` 之前已把批次从 inbox `claim` 走，所以
+  **"claim 之后、step 开始之前"这段时间里，这条消息在会话中完全不存在**。
+- **`enter.messages` 的写入时机 = 监听器返回之后**。任何在 `agent/pre-step` 里 `await` 长时间
+  操作的监听器（本插件 `in-turn` 就是等整个工作流），都会把用户消息的可视化推迟到那一刻。
+  这不是 GUI bug，也不是持久化 bug：`session.append` 随时可写，缺的只是"先写"这一步。
+- **session 没有按 message id 去重**：同一 message 既 `session.append` 又放进 `enter.messages`
+  会渲染两份；两个写入者必须二选一（`withoutClaimed` 就是为此）。
+- **GUI 的乐观回显是本地状态**：`dsh-api-session-controller/lib/client.js`
+  `pendingSubmissions` 里的 `PendingSubmissionBubble` 只在**发起它的那个页面**里存在，
+  持久 `user/message` 到达或页面刷新即退场。所以"发送瞬间看得见、刷新后消失"是同一缺陷的两种表象。
+- **副作用**：先写消息再跑工作流时，`collectHistory()` 会把这条新消息当成"Conversation so far"，
+  令 objective 重复携带请求。历史快照必须在写入**之前**取（`answerInTurn` 现在这样做）。

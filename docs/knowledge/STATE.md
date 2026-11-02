@@ -239,3 +239,21 @@ turn at a time; Round 16's isolation proof is in `.workflow-artifacts/matrix-024
   rebase left `src/gate.ts`, `src/run.ts` and `src/triage.ts` (PR #23 P0 semantics) untouched.
 - **Still open:** the generated script does not enforce `TASK_LIMITS.objectiveChars` itself; the
   host does (gate/tool/input). Not a regression, not fixed in this branch.
+
+## 2026-11-02/03 — P0-5 首条消息不可见：根因 `CONFIRMED` + 修复（工作提交见 `git log`）
+
+- **缺陷**：默认 `in-turn` 策略在 `agent/pre-step` 里 `await` 整个工作流之后才返回 `enter`，
+  而 `AgentLoop.step()` 是被 claim 批次的唯一写入者 —— 运行期间会话里没有 `user/message`，
+  GUI 只剩「正在分析请求 / 深度求索中」。真实会话 `session-d3d9375f-…`（qqbot，「机器猫人格」）
+  的 transcript 51 条事件里 `user/message` = 0，`turnOutline.turns[0].prompt = ""`，
+  `titleInput.count = 0`，首轮 1h41m 未关闭。
+- **修复**：`src/gate.ts` `answerInTurn()` 在等待运行**之前**先 `commitClaimed()` 把原消息写进
+  surface（同 id/source，保留 `rpcId`），并先取历史快照；运行结束后 `enter.messages` 只带报告
+  （`withoutClaimed` 剔除已发布批次），`commitCancelled(..., alreadySurfaced)` 避免重复写。
+- **验证**：新增回归测试（修复前 FAIL / 修复后 PASS，离线确定性）；`npm run ci` exit 0，
+  **29 files / 522 tests**；`git diff --exit-code -- lib/` = 0；真机 Web GUI 前后对比截图见
+  [VALIDATION.md](VALIDATION.md) Round 17 与 `docs/knowledge/evidence/first-message-visible/`。
+- **契约变化（对后续 agent 重要）**：`in-turn` 的 `enter.messages` **不再**包含被 claim 的用户消息；
+  P0-1 的准确表述改为"用户原话在会话 surface 里恰好一次"，写入者随策略不同而不同
+  （`in-turn` 在等待前写、`relay`/`append` 在 reject 后写）。
+- **未做**：`:3090` 实例未热加载（D-013）；`relay`/`append` 长驻 GUI 投递仍 `NOT_RUN`。

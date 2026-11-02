@@ -5,6 +5,20 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Fixed / 修复
+
+- **The first message of a session no longer disappears while the team runs / 会话的第一条消息不再"消失"** —
+  with the default `in-turn` strategy the gate waited for the whole workflow before handing the
+  claimed message back to the loop, and the loop is the only writer of `user/message` events, so
+  the transcript held no message at all for the entire run: the GUI showed an empty turn with just
+  the running/planning status, and a page reload lost what the user had typed. The claimed message
+  is now published to the transcript before the wait (same id, source and `rpcId`, exactly once),
+  and the entered step carries only the report; thinking/planning stays a status indicator.
+  默认 `in-turn` 策略下，网关要等整个工作流跑完才把已认领的消息交回循环，而循环是 `user/message`
+  事件的唯一写入者 —— 于是整段运行期间会话里一条消息都没有：界面只剩「正在分析请求/规划中」状态，
+  刷新页面后用户输入的内容彻底消失。现在网关在等待之前就把原消息写进会话（同 id、同 source、
+  保留 `rpcId`，且只写一份），进入的步骤只携带报告；思考/规划只作为状态显示。
+
 ## [0.2.6] - 2026-11-02
 
 ### Changed / 变更

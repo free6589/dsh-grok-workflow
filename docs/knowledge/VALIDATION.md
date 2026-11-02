@@ -1452,3 +1452,119 @@ verified（3667 bytes，含完整报告 `Plan: planner; 1 task(s); 1 verified` +
   本轮没有跑质量矩阵，不能据此扩大 `COMPLETED` 率的结论。
 - **证据不入库**：`.workflow-artifacts/` 未提交，`home/`、`work/`、`logs/` 只存在于本机；
   本文件只给出路径与关键文本，便于复跑时对照。
+
+## Round 17 (2026-11-02/03) — 首条用户消息被隐藏（P0-5）：CONFIRMED 根因 + 修复 + 真机前后对比
+
+**报告**：2026-11-02（Asia/Singapore），会话 `session-d3d9375f-041a-4670-8256-13db46670b3c`
+（工作区 `qqbot`，标题「机器猫人格」）里，用户发的第一条消息从未出现在可见会话中，界面只有
+「正在分析请求 / 深度求索中」这类状态。
+
+### 1. 根因 —— `CONFIRMED`（一个机制，不是猜测）
+
+**机制**：默认 `answerStrategy: in-turn` 的 `answerInTurn()` 在
+`src/gate.ts` 里先 `record(..., 'started', 'admitted')`，然后 **`await produceAnswer(...)`
+——整个工作流跑完才返回 `PreStepDecision`**。DSH 的 `AgentLoop.step()` 是"被 claim 的批次"
+唯一的写入者，它在 step 真正开始时才把 `decision.messages` 逐条 `session.append('user/message')`
+（`dsh-agent-loop/lib/index.js` `step()`：`for (const message of decision.messages) … else
+this.session.append("user/message", message, { surfaceOp: "append" })`）。因此从 pre-step
+把批次从 inbox claim 走，到工作流结束之间，会话里 **一条 `user/message` 都没有**：消息既不在
+inbox（已被 claim），也不在 transcript（还没写）。GUI 只渲染持久事件，于是只剩运行状态；
+提交时浏览器那个乐观回显（`PendingSubmissionBubble`，仅在本次页面内有效）在刷新/换端后消失，
+用户就再也看不到自己发过什么。
+
+**证据 A — 真实会话的磁盘 transcript**（`CONFIRMED`）：
+
+```sh
+S=/home/fish/dsh-layerfs/sessions/--home-fish-projects_mine-qqbot--/session-d3d9375f-041a-4670-8256-13db46670b3c
+zstd -dc $S/session.v4.jsonl.zstd | python3 -c "import sys,json;[print(json.loads(l)['seq'],json.loads(l)['type']) for l in sys.stdin if l.strip()]"
+```
+
+51 条事件，`user/message` **0 条**。关键序列：
+
+| seq | 事件 | 内容要点 |
+|-----|------|----------|
+| 6 | `agent/inbox/spliced` | `target: next-turn`, `start: 0`, `inserted: [<用户消息 d8fe5255…>]` —— 用户消息进 inbox |
+| 7 | `turn/start` | `turn: 1` |
+| 8 | `agent/inbox/spliced` | `start: 0`, **`removedCount: 1`, `inserted: []`** —— 被 pre-step claim 走 |
+| 9 | `plugin:grok-workflow/delivery` | `phase: "started"`, `outcome: "admitted"`, `turn: 1` —— 插件已认领，等待运行 |
+| 10…48 | `tool-workflow/run-start` / `agent-start` / `agent-end` / `subagent/catalog` | 团队在跑（41 个子智能体） |
+| 49 | `session/title` | `messageSeqs: []` —— 标题生成也没拿到任何消息 |
+
+同一会话的 projcache（`/home/fish/dsh-layerfs/storages/session_projcache/sessions/session-d3d9375f-…json`）
+写着 `turnOutline.val.turns[0] = {turn:1, seq:7, prompt:"", response:""}`、
+`titleInput.val = {first:null, count:0}`、`turnBoundary.openTurnStartSeq: 7` —— 首轮 1 小时 41 分
+仍未关闭，宿主从未把这条消息当成 message 收下。
+
+**证据 B — 真机 GUI（`http://100.111.111.88:3090`，同一实例、同一会话）**：
+`docs/knowledge/evidence/first-message-visible/BEFORE-live-3090-session.png`
+（截图时间 2026-11-02 23:5x SGT）：标题「机器猫人格」、`41 个子智能体`，正文只有
+「正在分析请求」+「深度求索中，用时 1小时41分4秒…」，**没有任何用户消息气泡**。
+
+**证据 C — 代码位置**：`src/gate.ts` `answerInTurn()`
+（`record(agent, entry, 'started', 'admitted')` → `await produceAnswer(...)` → `enterAfter(...)`），
+以及 `stepBase()` 的注释（"`step()` commits exactly `decision.messages` as `user/message`
+events"）。旧实现把用户消息只放在 `enter.messages` 里，而 `enter` 发生在运行结束之后。
+
+**为什么报告只提到"第一条"**：缺陷对每条 `in-turn` 消息都成立，但第一条最显眼——那时 transcript
+里没有任何别的内容，空 turn + 状态就是全部画面。
+
+### 2. 修复（`src/gate.ts`，`lib/` 同步重建）
+
+- 新增 `withoutClaimed(base, claimed)`：按 message id 从 `enter.messages` 里剔除已发布批次
+  （session 没有按 id 去重，留着就会渲染两遍）。
+- `answerInTurn()`：在 `await produceAnswer(...)` **之前**取历史快照
+  （`collectHistory(...)`，否则刚发布的这条会被当成"Conversation so far"重复进 objective），
+  然后 `const surfaced = commitClaimed(agent, payload.messages)` —— 立即写 `user/message`
+  （同一对象、同 id、同 source，保留 `rpcId`，GUI 的乐观回显据此正常退场）。
+  运行结束后 `enterAfter(base, text, surfaced)`：`enter.messages` 只带报告（+ runtime context），
+  用户的话只存在一份。
+- `commitCancelled(..., alreadySurfaced)`：已经发布过的批次不再写第二遍。
+- 回归测试：`test/gate.spec.ts` › `in-turn delivery (default strategy)` ›
+  **"renders the first user message while the run is still in flight (P0-5)"**。断言运行还在飞时
+  会话里已有且仅有一条 `user/message`（内容为用户原文），运行结束后仍是 1 条、`enter.messages`
+  只余 1 条报告。离线、确定性、无模型/网络依赖。
+- 受影响的既有断言同步改为新契约（`test/gate.spec.ts` 两处 `messages[0]`、
+  `test/phase1-dialogue.spec.ts` 的 P0-1 用例改名为 "publishes the claimed message, then the
+  report, once each, in that order"）。
+
+### 3. 测试与 CI（`CONFIRMED`）
+
+| 命令 | 环境 | 结果 |
+|------|------|------|
+| `npx vitest run test/gate.spec.ts -t "renders the first user message"`（**修复前**，`git show HEAD:src/gate.ts` 覆盖 `src/gate.ts`） | 本机 Node 26.8.1 | **FAIL**：`expected [] to equal [ '第一条消息：先把我说的话显示出来' ]` |
+| 同上（修复后） | 同上 | PASS |
+| `npx vitest run` | 同上 | **29 files / 522 tests passed** |
+| `npm run ci`（typecheck + oxlint + build + vitest） | 同上 | **exit 0，29 files / 522 tests passed** |
+| `git diff --exit-code -- lib/`（提交后重建） | 同上 | **exit 0**（`lib/gate.js` / `.map` / `.d.ts.map` 与 `src` 同步） |
+
+### 4. 真机前后对比（同一台机器、真实 Web GUI）
+
+隔离实例（D-013：不碰在跑的 :3090 服务）：`DSH_HOME=/tmp/dsh-fm-home`、
+profile `fm`（`--from-default-profile web`）、`dsh plugin --profile fm add /home/fish/projects_mine/dsh-grok-workflow`
+（link 安装，直接跑仓库 `lib/`）、`dsh --profile fm --host 127.0.0.1 --port 3299 --no-open`、
+所有模型路由指向本机 mock（`MOCK_API_KEY=dummy-not-a-credential`，mock 接受请求后不回复），
+于是工作流一直处于"运行中"，正好能观察运行期间画面。
+
+| 状态 | 操作 | 结果 | 截图 |
+|------|------|------|------|
+| BEFORE（`lib/gate.js` = HEAD 未修复版） | 在 3299 发送首条消息 → 刷新页面并重新打开该会话 | 同标签页内消息可见（浏览器乐观回显）；**刷新后消息消失**，只剩「任务团队 / 规划 / 规划助手 Running」+「Deep diving for 13s」 | `docs/knowledge/evidence/first-message-visible/BEFORE-isolated-reload.png` |
+| AFTER（`lib/gate.js` = 修复版） | 同样发送首条消息 → 刷新页面并重新打开该会话 | **刷新后消息仍在**（`P0-5 AFTER: message must survive a reload` 00:35 气泡），状态只作为状态显示：「任务团队 · 1 member Running / 规划 · Running 1 / 规划助手 Running / Deep diving for 20s」 | `docs/knowledge/evidence/first-message-visible/AFTER-isolated-reload.png` |
+
+脚本化复跑（playwright-core + 本机 chromium 1248；token 只从日志取用，不写入任何文件）：
+
+```sh
+node iso_reload.mjs "$URL" OUT.png "P0-5 AFTER: message must survive a reload" "P0-5 AFTER"
+# 输出：--- same tab, before reload: transcript contains message? true
+#       --- after reload, message in transcript? true
+```
+
+### 5. 本轮不建立的东西（诚实边界）
+
+- **:3090 实例没有热加载本次修复**：插件在进程内已加载，重载会中断该会话正在跑的运行，
+  违反 D-013；因此 AFTER 证据来自同一 `dsh web` 产品的隔离实例（同版本 `0.2.1-rc.2`），
+  BEFORE 证据同时包含**真实 :3090 会话截图**与隔离实例复现。
+- **mock 模型**：隔离实例的规划/执行/校验都指向不回复的本地 mock，所以 AFTER 截图里团队
+  **不会**产出报告；本轮只验证"消息是否可见"，不验证答案质量。
+- **`relay` / `append` 的长驻 GUI 投递**仍 `NOT_RUN`（NR-1 剩余半边），本轮只覆盖默认 `in-turn`。
+- **`gh` Issue 状态评论**：本机 `gh` 已登录 `free6589`，但本轮未向 `[COORDINATION]` Issue
+  发状态块（`NOT_RUN`，由队长决定是否补发）。
