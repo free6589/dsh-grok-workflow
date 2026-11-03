@@ -1,5 +1,15 @@
 # Agent Handoff
 
+## 2026-11-03 — v0.2.7 released (per-route concurrency + P0-5 first-message fix)
+
+- **From:** lead · **To:** next agent / operator
+- **Base commit:** `16a11b7` (`origin/main`, PR #33 merge = the v0.2.7 release commit; tag `v0.2.7`
+  已打，Release 已建：`https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.2.7`，
+  资产 `dsh-grok-workflow-0.2.7.tgz`)
+- **What landed since v0.2.6:** P0-5 首条消息先发布再跑 (`d8cc6cc`)；按路由并发上限
+  `maxInFlight` + 打满让路 (`1b5ad75`, PR #32, D-030)；发版准备 (`0e8a7e7`, PR #33)。
+- **Install:** `dsh plugin --profile <p> add github:free6589/dsh-grok-workflow#v0.2.7`，装完重启该 profile。
+
 ## 2026-11-01 — v0.2.4 install matrix recorded: 8 PASS + 2 NOT_RUN (memory only)
 
 - **From:** matrix-memory · **To:** lead

@@ -20,14 +20,13 @@ Last updated: 2026-11-01 (local)
 
 ## Current phase
 
-`0.2.4` **released** (phase 9 close-out). Base of this state: **`origin/main` = `7357e5e`**.
+`0.2.7` **released**. Base of this state: **`origin/main` = `16a11b7`**.
 
-`v0.2.4` **is released** (tag `v0.2.4` on `7357e5e`, Release green
-`https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.2.4`, asset
-`dsh-grok-workflow-0.2.4.tgz`), after `v0.2.3` (`538d1ab`), `v0.2.2`
-(2026-10-28), `v0.2.1` (`cecc065`) and `v0.2.0` (`f7a244c`). `package.json` reads `0.2.4`,
-`CHANGELOG.md` carries `## [0.2.4] - 2026-11-01`, and the tag + GitHub Release were created by
-the captain after the acceptance pass.
+`v0.2.7` **is released** (tag `v0.2.7` on `16a11b7`, Release green
+`https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.2.7`, asset
+`dsh-grok-workflow-0.2.7.tgz`), after `v0.2.6` (`f6ec5f1`), `v0.2.5` (`bf853ac`),
+`v0.2.4` (`7357e5e`), `v0.2.3` (`538d1ab`). `package.json` reads `0.2.7`,
+`CHANGELOG.md` carries `## [0.2.7] - 2026-11-03`.
 
 Merged into `main` since `v0.2.3` (each `CONFIRMED` in `git log`):
 
@@ -39,6 +38,11 @@ Merged into `main` since `v0.2.3` (each `CONFIRMED` in `git log`):
 | #26 | `a000983` | segmented planner-failure fallback (`src/shards.ts`); review close-out is Round 13 |
 | #27 | `6806426` | `/grok` session switch (mode/command/gate, D-028/D-029) |
 | #28 | `7357e5e` | release `0.2.4` (prepare: opt-in `/grok` switch, Phase 1, sharded fallback, task panel, 32000 limit, GUI notes; Round 15 memory) |
+| #29 | `bf853ac` | novice settings page + relaxed limits (v6: `grokDefault` off, 50-route chains, single-locale UI) |
+| #30 | `e6d434d` | settings visual polish R1–R3 (hierarchy, rhythm, details; live screenshots) |
+| P0-5 | `d8cc6cc` | first user message published before the run (no longer hidden) |
+| #32 | `1b5ad75` | per-route concurrency cap (`maxInFlight`) + overflow to next route (D-030) |
+| #33 | `16a11b7` | release `0.2.7` (per-route concurrency + first-message fix) |
 
 So the `0.2.4` cut carries the `/grok` switch, the task-grouped progress panel, the
 32,000-character objective limit and the segmented fallback — all four are on `main` and tagged.
