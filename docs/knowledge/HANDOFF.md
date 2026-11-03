@@ -1,5 +1,17 @@
 # Agent Handoff
 
+## 2026-11-03 — web profile upgraded 0.2.6 → 0.2.7 (operator machine)
+
+- **From:** lead · **To:** next agent / operator
+- **Base commit:** `16a11b7` (`origin/main`, `v0.2.7` tag; `package.json` `0.2.7`)
+- **Action (CONFIRMED):** `dsh plugin --profile web add github:free6589/dsh-grok-workflow#v0.2.7`
+  (pnpm Done in 8.8s); `dsh plugin --profile web list | grep grok` →
+  `dsh-grok-workflow@0.2.7`; `why` → single copy under `dsh-profile-web (dependencies)`.
+- **Note:** D-013 respected — running `:3090` service was not restarted/reconfigured by this
+  task; new bundle code applies on next profile (re)load per DSH plugin semantics.
+- **Next action:** none required for the upgrade itself; restart/reload of `:3090` only with
+  operator approval if live verification is wanted.
+
 ## 2026-11-03 — v0.2.7 released (per-route concurrency + P0-5 first-message fix)
 
 - **From:** lead · **To:** next agent / operator

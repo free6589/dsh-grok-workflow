@@ -26,7 +26,9 @@ Last updated: 2026-11-01 (local)
 `https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.2.7`, asset
 `dsh-grok-workflow-0.2.7.tgz`), after `v0.2.6` (`f6ec5f1`), `v0.2.5` (`bf853ac`),
 `v0.2.4` (`7357e5e`), `v0.2.3` (`538d1ab`). `package.json` reads `0.2.7`,
-`CHANGELOG.md` carries `## [0.2.7] - 2026-11-03`.
+`CHANGELOG.md` carries `## [0.2.7] - 2026-11-03`. Operator `web` profile on
+`/home/fish/dsh-layerfs` runs `dsh-grok-workflow@0.2.7` (upgraded 2026-11-03
+from `0.2.6` via tag-pinned `add`; `CONFIRMED` in `plugin list`/`why`).
 
 Merged into `main` since `v0.2.3` (each `CONFIRMED` in `git log`):
 
