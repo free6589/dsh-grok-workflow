@@ -219,6 +219,8 @@ function routeTrail(value: unknown, path: string, max: number): RouteTrailEntry[
       outcome,
       ...entry.failureClass === undefined ? {} : { failureClass: enumeration(entry.failureClass, FAILURE_CLASSES, `${path}[${index}].failureClass`) },
       ...entry.reason === undefined ? {} : { reason: string(entry.reason, `${path}[${index}].reason`) },
+      ...entry.skippedBusy === undefined ? {} : { skippedBusy: stringList(entry.skippedBusy, `${path}[${index}].skippedBusy`) },
+      ...entry.queuedMs === undefined ? {} : { queuedMs: number(entry.queuedMs, `${path}[${index}].queuedMs`) },
     }
   })
 }
@@ -826,6 +828,18 @@ export function renderReport(report: WorkflowReport): string {
     lines.push('Route switches:')
     for (const entry of routeFailures.slice(0, 12)) {
       lines.push(`- ${entry.role} attempt ${entry.attempt} via ${entry.route}: ${entry.failureClass ?? 'unknown'} — ${oneLine(entry.reason ?? '', 200)}`)
+    }
+  }
+  // Overflow is not failure and never appears above: a full lane yields to the
+  // next route instead of failing. Record which calls yielded so the reader can
+  // tell "used route B because route A was full" apart from "route A failed".
+  const overflows = report.routes.filter(entry => entry.skippedBusy !== undefined && entry.skippedBusy.length > 0)
+  if (overflows.length > 0) {
+    lines.push('Route overflows (full lane yielded, not failures):')
+    for (const entry of overflows.slice(0, 12)) {
+      const skipped = entry.skippedBusy!.join(', ')
+      const waited = entry.queuedMs !== undefined && entry.queuedMs > 0 ? ` (waited ${entry.queuedMs} ms)` : ''
+      lines.push(`- ${entry.role} attempt ${entry.attempt} via ${entry.route}: skipped full ${skipped}${waited}`)
     }
   }
   if (report.uncertainties.length > 0) {

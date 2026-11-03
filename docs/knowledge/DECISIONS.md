@@ -411,3 +411,25 @@ Each entry records the decision, evidence, alternatives, and status.
   会更多地落 `partial`/`failed`（这与"绝不静默降级"一致；重试一次仍可救回）。
 - **Alternatives rejected:** 只拦 `failed`（`partial` 仍可洗白，T5 就是这个口子）；只在提示词里劝
   planner（模型会漂移，必须有机械兜底）；把 `/grok` 文案改软（用户要的是完整流程，不是改文案）。
+
+## D-030 — 路由并发上限是溢出，不是降级：打满就让路，不算失败
+
+- **Status:** CONFIRMED（`npm run ci` 全绿；`test/route-concurrency.spec.ts` 离线确定性回归）
+- **Date:** 2026-11-03
+- **Decision:**
+  1. 每条路由可选 `maxInFlight`（1–64，留空=不限）：`HARD_LIMITS.routeInFlight`
+     单一来源，`resolveChain` 校验整数范围，设置页第三框 + `error.badCap` 中英双语。
+  2. 打满的路由是让路，不是失败：按链顺序溢出到下一条未试过的路由；全部打满才等腾位
+     （`queuedMs` 累加），不推进备用链、不消耗重试、不触动 `switchOn`。
+  3. 证据与失败分离：`skippedBusy` / `queuedMs` 进 trail（`Route overflows …` 单独渲染，
+     不进 `Route switches:`），台账 `recordRouting` 同步透传并做截断/取整。
+- **Reason:** 并发上限与失败是两回事：前者是"这条路正忙"，后者是"这条路不通"。混为一谈会把
+  正常的负载分流读成故障切换，污染失败统计与重试预算。
+- **Evidence:** `test/route-concurrency.spec.ts`（7 例：校验拒绝、溢出分流、`skippedBusy`、
+  全满排队峰值=1、clamp 钉死 `HARD_LIMITS`、预算不变、渲染与台账透传）；
+  `test/client.spec.ts`（bounds parity + `error.badCap` 双语）；`test/config.spec.ts`
+  （script clamp 钉）。
+- **Consequences:** 上限只收窄并发，不改变调用总数（`routeBudgetFor` 不变）；报告多一行
+  `Route overflows …`，台账多两个可选字段（旧记录不受影响）。
+- **Alternatives rejected:** 打满当失败推进备用链（把忙碌误报为故障，消耗重试）；
+  打满直接报错（把可分流的负载变成失败）；排队等同一条（浪费空闲的下一条）。

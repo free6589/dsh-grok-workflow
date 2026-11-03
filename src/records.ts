@@ -57,7 +57,7 @@ export interface RoutingRecord {
   /** Effective chains at run time (`provider/model`, or empty for inherit). */
   routing: Record<RoleName, string[]>
   synthesis: SynthesisMode
-  /** One entry per route switch or failed call. */
+  /** One entry per route switch, failed call, or concurrency overflow. */
   switches: {
     role: RoleName
     chainIndex: number
@@ -66,6 +66,10 @@ export interface RoutingRecord {
     outcome: 'ok' | 'failed'
     failureClass?: string
     reason?: string
+    /** Routes skipped as full when this call was placed (overflow, not failure). */
+    skippedBusy?: string[]
+    /** Milliseconds this call waited for a full route to drain. */
+    queuedMs?: number
   }[]
 }
 
@@ -337,12 +341,21 @@ export function recordRouting(
     outcome: route.outcome === 'ok' ? 'ok' : 'failed',
     ...typeof route.failureClass === 'string' ? { failureClass: route.failureClass.slice(0, 60) } : {},
     ...typeof route.reason === 'string' ? { reason: ledgerText(route.reason, 200) } : {},
+    // Overflow evidence rides along: a full lane is not a failure, but the
+    // ledger is the only durable record of which lane a call actually took.
+    ...Array.isArray(route.skippedBusy) && route.skippedBusy.length > 0
+      ? { skippedBusy: route.skippedBusy.filter(item => typeof item === 'string').map(item => item.slice(0, 160)).slice(0, 16) }
+      : {},
+    ...typeof route.queuedMs === 'number' && Number.isFinite(route.queuedMs) ? { queuedMs: Math.max(0, Math.trunc(route.queuedMs)) } : {},
   })
   // Sanitize first, then select: filtering the raw entries would drop a route
   // whose fields were malformed instead of recording its coerced form.
+  // Overflow evidence (skippedBusy/queuedMs) is kept too: a yielded lane is
+  // neither a switch nor a failure, but the ledger is the only durable record
+  // of which lane a call actually took.
   const switches = entry.routes
     .map(safeRoute)
-    .filter(route => route.outcome === 'failed' || route.chainIndex > 0)
+    .filter(route => route.outcome === 'failed' || route.chainIndex > 0 || (route.skippedBusy !== undefined && route.skippedBusy.length > 0) || route.queuedMs !== undefined)
     .slice(0, cap)
   if (switches.length === 0) return
   const routing: Record<RoleName, string[]> = { planner: [], worker: [], verifier: [], synthesizer: [] }

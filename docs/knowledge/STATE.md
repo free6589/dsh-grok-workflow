@@ -257,3 +257,18 @@ turn at a time; Round 16's isolation proof is in `.workflow-artifacts/matrix-024
   P0-1 的准确表述改为"用户原话在会话 surface 里恰好一次"，写入者随策略不同而不同
   （`in-turn` 在等待前写、`relay`/`append` 在 reject 后写）。
 - **未做**：`:3090` 实例未热加载（D-013）；`relay`/`append` 长驻 GUI 投递仍 `NOT_RUN`。
+
+## 2026-11-03 — route-concurrency 每路由并发上限（`feat/route-concurrency`，未合并）
+
+- **分支**：worktree `.worktrees/route-concurrency`，分支 `feat/route-concurrency`，基线
+  `origin/main` `d8cc6cc`（v0.2.6 之后）。
+- **设计（D-030）**：`ModelRoute.maxInFlight?`（1–64，留空=不限）；
+  `HARD_LIMITS.routeInFlight={min:1,max:64}` 单一来源；打满=溢出到下一条未试路由，
+  全满才排队等腾位（`queuedMs`）；溢出不算失败，不推进备用链、不耗重试、不动 `switchOn`；
+  证据 `skippedBusy`/`queuedMs` 进 trail（`Route overflows …` 单独渲染）与台账。
+- **验证**：`npm run ci` 全绿（待本轮最终跑）；回归 `test/route-concurrency.spec.ts`
+  7 例（校验/溢出分流/排队峰值/预算不变/渲染与台账透传），`test/client.spec.ts`
+  bounds parity + `error.badCap` 双语，`test/config.spec.ts` script clamp 钉；
+  `git diff --exit-code -- lib/` 必须为 0（`src` 改必重建 `lib/`）。
+- **交付**：push 到 `origin feat/route-concurrency`，开 PR `base:main`
+  标题 `feat(routing): per-route concurrency with overflow to next route`。

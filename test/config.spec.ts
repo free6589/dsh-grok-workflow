@@ -241,6 +241,7 @@ describe('route validation against the runtime', () => {
     expect(WORKFLOW_SCRIPT).toContain(`Math.min(${HARD_LIMITS.maxRetries},`)
     expect(WORKFLOW_SCRIPT).toContain(`Math.min(${HARD_LIMITS.maxTasks},`)
     expect(WORKFLOW_SCRIPT).toContain(`chainLength: ${HARD_LIMITS.chainLength},`)
+    expect(WORKFLOW_SCRIPT).toContain(`routeInFlightMax: ${HARD_LIMITS.routeInFlight.max}`)
   })
 
   it('degrades quietly on a runtime without a settings service', () => {

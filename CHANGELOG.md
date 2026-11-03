@@ -5,6 +5,22 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Added / 新增
+
+- **Per-route concurrency cap with overflow to the next route / 每条路由的并发上限，打满就溢出到下一条** —
+  each route in a role's chain can carry an optional `maxInFlight` (1–64, blank = unlimited),
+  set in the settings page's third box per row or in the profile patch. While a capped route is
+  full, a new call overflows to the next route in chain order instead of queueing on the full one;
+  only when every route is full does the call wait for a drain. A full lane is never a failure:
+  it advances no fallback, costs no retry attempt, and is recorded separately (`skippedBusy` /
+  `queuedMs`, rendered as `Route overflows …` rather than `Route switches:`), so "used route B
+  because route A was full" never reads as "route A failed".
+  角色链里每条路由可配可选的 `maxInFlight`（1–64，留空=不限），在设置页每行第三个框或 profile
+  patch 里填写。某条路由打满时，新调用按链顺序溢出到下一条，而不是排队等它；只有所有路由都满
+  才等待腾位。打满不是失败：不推进备用链、不消耗重试，在报告里单独呈现（`skippedBusy` /
+  `queuedMs`，`Route overflows …` 而非 `Route switches:`），"因为 A 满了所以用了 B"
+  永远不会被读成"A 失败了"。
+
 ### Fixed / 修复
 
 - **The first message of a session no longer disappears while the team runs / 会话的第一条消息不再"消失"** —

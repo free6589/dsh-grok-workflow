@@ -50,7 +50,7 @@ const suppliedTasks = args && Array.isArray(args.tasks) ? args.tasks : null;
 const switchOn = args && Array.isArray(args.switchOn) ? args.switchOn : [];
 
 const ROLE_NAMES = ['planner', 'worker', 'verifier', 'synthesizer'];
-const ROUTE_LIMITS = { chainLength: 50, textChars: 120, trail: 256, reasonChars: 200 };
+const ROUTE_LIMITS = { chainLength: 50, textChars: 120, trail: 256, reasonChars: 200, routeInFlightMax: 64 };
 
 function text(value, max) {
   if (typeof value !== 'string') return '';
@@ -147,7 +147,17 @@ function normalizeChain(value) {
     const key = provider + '/' + model;
     if (seen[key]) continue;
     seen[key] = true;
-    out.push(provider === '' ? { model: model } : { provider: provider, model: model });
+    const route = provider === '' ? { model: model } : { provider: provider, model: model };
+    // Per-route in-flight ceiling (overflow, not fallback). Clamp into range;
+    // absent or unusable means unlimited. The dedupe key stays provider/model.
+    const rawCap = entry.maxInFlight;
+    const capIsNumber = typeof rawCap === 'number';
+    const capIsText = typeof rawCap === 'string' && rawCap.trim() !== '';
+    if (capIsNumber || capIsText) {
+      const cap = Number(rawCap);
+      if (isFinite(cap)) route.maxInFlight = Math.max(1, Math.min(ROUTE_LIMITS.routeInFlightMax, Math.floor(cap)));
+    }
+    out.push(route);
   }
   return out;
 }
@@ -260,12 +270,42 @@ function classifyCallFailure(role, error) {
 
 const routeTrail = [];
 
-function traceRoute(role, chainIndex, route, attempt, outcome, failure) {
+// Per-route in-flight counts, keyed by route label. A capped route that is
+// full overflows to the next chain entry instead of queueing on it; only when
+// every untried route is full does the call wait for a drain (one wake per
+// drain, no busy polling). A full lane is never a failure: it costs no
+// attempt and advances no fallback.
+const routeInFlight = {};
+const routeWaiters = [];
+
+function routeCapOf(route) {
+  if (!route) return Infinity;
+  const cap = Number(route.maxInFlight);
+  if (!isFinite(cap)) return Infinity;
+  return Math.max(1, Math.min(ROUTE_LIMITS.routeInFlightMax, Math.floor(cap)));
+}
+
+function notifyRouteWaiters() {
+  while (routeWaiters.length > 0) {
+    const wake = routeWaiters.shift();
+    try { wake(); } catch (_) { /* a stale waiter must not break the drain */ }
+  }
+}
+
+function nowMs() {
+  try { return Date.now(); } catch (_) { return 0; }
+}
+
+function traceRoute(role, chainIndex, route, attempt, outcome, failure, extra) {
   if (routeTrail.length >= ROUTE_LIMITS.trail) return;
   const entry = { role: role, chainIndex: chainIndex, route: routeLabel(route), attempt: attempt, outcome: outcome };
   if (failure) {
     entry.failureClass = failure.class;
     entry.reason = failure.reason;
+  }
+  if (extra) {
+    if (extra.skippedBusy && extra.skippedBusy.length > 0) entry.skippedBusy = extra.skippedBusy.slice();
+    if (typeof extra.queuedMs === 'number') entry.queuedMs = extra.queuedMs;
   }
   routeTrail.push(entry);
 }
@@ -277,8 +317,47 @@ async function callRole(role, prompt, options) {
   const total = Math.max(1, chain.length);
   const attempt = options.attempt || 0;
   let lastFailure = null;
-  for (let index = 0; index < total; index++) {
+  const tried = {};
+  let triedCount = 0;
+  const skipped = [];
+  const skippedSet = {};
+  let queuedMs = 0;
+  let waited = false;
+  function markSkipped(route) {
+    const label = routeLabel(route);
+    if (!skippedSet[label]) { skippedSet[label] = true; skipped.push(label); }
+  }
+  function overflowExtra() {
+    const extra = {};
+    if (skipped.length > 0) extra.skippedBusy = skipped.slice();
+    if (waited) extra.queuedMs = queuedMs;
+    return extra;
+  }
+  while (triedCount < total) {
+    // Chain order wins: the first untried route with room takes this call.
+    let index = -1;
+    for (let i = 0; i < total; i++) {
+      if (tried[i]) continue;
+      const candidate = i < chain.length ? chain[i] : null;
+      const inFlight = candidate ? (routeInFlight[routeLabel(candidate)] || 0) : 0;
+      if (inFlight < routeCapOf(candidate)) { index = i; break; }
+      markSkipped(candidate);
+    }
+    if (index === -1) {
+      // Every untried route is full: wait for a drain, then rescan. This is
+      // neither an attempt nor a failure, so the failure policy is untouched.
+      const waitStart = nowMs();
+      await new Promise(function (resolve) { routeWaiters.push(resolve); });
+      queuedMs += Math.max(0, nowMs() - waitStart);
+      waited = true;
+      continue;
+    }
+    tried[index] = true;
+    triedCount += 1;
     const route = index < chain.length ? chain[index] : null;
+    const key = routeLabel(route);
+    const capped = route !== null && isFinite(Number(route.maxInFlight));
+    if (capped) routeInFlight[key] = (routeInFlight[key] || 0) + 1;
     // No -r<n> suffix: a user must not see which fallback route answered
     // (Issue #22 P1-1). The route that answered stays in the report's routes trail.
     const call = { label: options.label, phase: options.phase, schema: options.schema };
@@ -286,12 +365,20 @@ async function callRole(role, prompt, options) {
       if (route.provider) call.provider = route.provider;
       call.model = route.model;
     }
-    let value;
+    let value = null;
+    let thrown = null;
     try {
       value = await agent(prompt, call);
     } catch (error) {
-      const failure = classifyCallFailure(role, error);
-      traceRoute(role, index, route, attempt, 'failed', failure);
+      thrown = error;
+    }
+    if (capped) {
+      routeInFlight[key] = Math.max(0, (routeInFlight[key] || 0) - 1);
+      notifyRouteWaiters();
+    }
+    if (thrown !== null) {
+      const failure = classifyCallFailure(role, thrown);
+      traceRoute(role, index, route, attempt, 'failed', failure, overflowExtra());
       lastFailure = failure;
       // One mechanism, not two: a setup fault (budget/schema/options) is built
       // with switchModel false, and a content failure (task-failed,
@@ -306,11 +393,11 @@ async function callRole(role, prompt, options) {
       // structured value" to null, so this is reported as a format failure on
       // this route and the next route is tried.
       const failure = { role: role, class: 'format-error', reason: 'child returned no valid structured result', switchModel: true, setup: false, category: 'infrastructure' };
-      traceRoute(role, index, route, attempt, 'failed', failure);
+      traceRoute(role, index, route, attempt, 'failed', failure, overflowExtra());
       lastFailure = failure;
       continue;
     }
-    traceRoute(role, index, route, attempt, 'ok', null);
+    traceRoute(role, index, route, attempt, 'ok', null, overflowExtra());
     return { ok: true, value: value, route: route, label: routeLabel(route), failure: null };
   }
   return {

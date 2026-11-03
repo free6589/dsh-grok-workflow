@@ -48,7 +48,7 @@ export interface RoutingRecord {
     /** Effective chains at run time (`provider/model`, or empty for inherit). */
     routing: Record<RoleName, string[]>;
     synthesis: SynthesisMode;
-    /** One entry per route switch or failed call. */
+    /** One entry per route switch, failed call, or concurrency overflow. */
     switches: {
         role: RoleName;
         chainIndex: number;
@@ -57,6 +57,10 @@ export interface RoutingRecord {
         outcome: 'ok' | 'failed';
         failureClass?: string;
         reason?: string;
+        /** Routes skipped as full when this call was placed (overflow, not failure). */
+        skippedBusy?: string[];
+        /** Milliseconds this call waited for a full route to drain. */
+        queuedMs?: number;
     }[];
 }
 /** Maximum switches kept in one ledger record. */
