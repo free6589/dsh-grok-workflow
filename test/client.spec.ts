@@ -187,6 +187,8 @@ describe('client settings page: bilingual copy (t42)', () => {
       { key: 'error.duplicate', params: { role: 'synthesizer', index: 3 } },
       { key: 'error.badCap', params: { role: 'worker', index: 1, min: 1, max: 64 } },
       { key: 'error.unknownClass', params: { entry: 'not-a-class' } },
+      { key: 'error.synthesisChainUnused' },
+      { key: 'error.synthesisChainMissing' },
     ]
     for (const finding of findings) {
       for (const locale of bundle.GROK_WORKFLOW_LOCALES) {
@@ -435,6 +437,37 @@ describe('client settings page: draft, validation and path ops', () => {
     const findings = validate({ ...draftOf(undefined), switchOn: ['rate-limit', 'not-a-class'] })
     expect(findings).toEqual([{ key: 'error.unknownClass', params: { entry: 'not-a-class' } }])
     expect(validate({ ...draftOf(undefined), switchOn: ['rate-limit'] })).toEqual([])
+  })
+
+  it('blocks Save when synthesis disagrees with the summarizer chain (P2 cross-field)', () => {
+    // (a) chain non-empty + deterministic: red, blocks Save, same meaning as the host warning.
+    const unused = draftOf(undefined)
+    unused.roles.synthesizer = [{ provider: 'p', model: 'm' }]
+    const unusedFindings = validate(unused)
+    expect(unusedFindings).toEqual([{ key: 'error.synthesisChainUnused' }])
+    expect(messagesIn(unusedFindings, en)[0]).toContain('Assemble by rule')
+    expect(messagesIn(unusedFindings, zh)[0]).toContain('按规则拼')
+
+    // (b) model + empty chain: red, blocks Save.
+    const missing = validate({ ...draftOf(undefined), synthesis: 'model' })
+    expect(missing).toEqual([{ key: 'error.synthesisChainMissing' }])
+    expect(messagesIn(missing, en)[0]).toContain('Rewrite with model')
+    expect(messagesIn(missing, zh)[0]).toContain('模型重写')
+
+    // Legal combinations pass: deterministic + empty, model + finished route.
+    expect(validate(draftOf(undefined))).toEqual([])
+    const legal = draftOf(undefined)
+    legal.synthesis = 'model'
+    legal.roles.synthesizer = [{ provider: 'p', model: 'm' }]
+    expect(validate(legal)).toEqual([])
+
+    // Blank unfinished rows do not count as a chain: they stay a missing-model
+    // problem, not a cross-field one.
+    const blank = draftOf(undefined)
+    blank.roles.synthesizer = [{}]
+    const blankFindings = validate(blank)
+    expect(blankFindings.some(finding => finding.key === 'error.synthesisChainUnused')).toBe(false)
+    expect(blankFindings.some(finding => finding.key === 'error.missingModel')).toBe(true)
   })
 
   it('sends only what changed, one path op per field and per role', () => {

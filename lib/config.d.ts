@@ -289,6 +289,27 @@ export declare const SWITCHABLE_CLASSES: readonly ["rate-limit", "server-error",
  * @throws If a key is not part of the configuration surface.
  */
 export declare function assertKnownKeys(config: Record<string, unknown>): void;
+/**
+ * Repair a recoverable synthesis/synthesizer mismatch without touching anything else.
+ *
+ * Only two shapes are recoverable (P1):
+ * - (a) the synthesizer chain is non-empty but `synthesis` is `deterministic`
+ *   → take effect as `model`;
+ * - (b) `synthesis` is `model` but the synthesizer chain is empty
+ *   → take effect as `deterministic`.
+ *
+ * Everything else (unknown keys, bad providers/models, out-of-range numbers,
+ * malformed chains, …) is left for `resolveConfig` to reject (R-06): this
+ * function never validates and never throws for those cases. It is pure: the
+ * input is not mutated, and a non-matching input returns unchanged with no
+ * warnings.
+ * @param raw - raw user configuration (plain snapshot shape).
+ * @returns The repaired config plus human-readable warnings (empty when nothing matched).
+ */
+export declare function repairSynthesisInconsistency(raw: GrokWorkflowConfig): {
+    repaired: GrokWorkflowConfig;
+    warnings: string[];
+};
 /** Resolve defaults and enforce the hard limits for direct construction paths. */
 export declare function resolveConfig(config?: GrokWorkflowConfig): ResolvedConfig;
 /** A volatile field as the runtime hands it over. */

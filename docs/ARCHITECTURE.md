@@ -203,6 +203,41 @@ generated fields are the fields `resolveConfig()` reads. A bespoke chain editor
 with model dropdowns would be a client-half package (`dsh.client`), not a core
 change (see ROADMAP §9.2).
 
+### Recoverable vs irrecoverable configuration (P1)
+
+Only two configuration shapes are **recoverable** — a `synthesis` /
+`roles.synthesizer` mismatch whose intent is unambiguous:
+
+| # | Raw shape | Effective value | Log |
+|---|---|---|---|
+| (a) | synthesizer chain non-empty + `synthesis: deterministic` | `model` | `warn` names `model` + `已按 model 生效，请在设置页确认` |
+| (b) | `synthesis: model` + empty synthesizer chain | `deterministic` | `warn` names `deterministic` + `已按 deterministic 生效，请在设置页确认` |
+
+Mechanism: `repairSynthesisInconsistency(raw)` in `src/config.ts` is a pure
+function — it returns `{ repaired, warnings[] }`, mutates nothing, validates
+nothing, and matches only the two shapes above (anything else returns
+unchanged with no warnings). `apply()` in `src/index.ts` calls
+`reader.read()` at load as before; only when that throws does it snapshot the
+raw config, run the repair, and re-resolve the repaired shape. The repaired
+shape must itself resolve cleanly before any warning is emitted — so a second,
+non-repairable defect behind the mismatch still fails hard. A repaired config
+activates normally (tool + gate + settings surface all start) and carries
+`synthesisRepaired: true`, which `describeResolvedConfig()` renders as
+`synthesis=<mode> (repaired)` so the load log is self-proving. The same
+fallback runs on every later `readConfig()`, so a bad settings save repairs
+the same way. The run-time gate path (`gate.safe()` / `lastGood` in
+`src/gate.ts`) is untouched.
+
+Everything else is **irrecoverable** and still fails hard at load (R-06):
+unknown keys, `configVersion` out of range, `gateScope: preset` without a
+preset name, out-of-range numbers, malformed/duplicated/over-long chains,
+unknown providers, models the provider enumerates but does not declare,
+unknown `switchOn` classes, and budget-backstop violations. The settings page
+mirrors the recoverable pair client-side (`src/client/index.js` `validate()`):
+chain non-empty + deterministic, or `model` + empty chain, is a red
+`error.synthesisChainUnused` / `error.synthesisChainMissing` finding (both
+languages) that disables Save; only a legal combination may be written.
+
 ## Mandatory entry (the gate)
 
 ```

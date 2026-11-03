@@ -204,6 +204,14 @@ export interface ResolvedConfig {
   /** Effective per-role chains; an empty array means "inherit the run's route". */
   roles: Record<RoleName, ModelRoute[]>
   synthesis: SynthesisMode
+  /**
+   * True when the load-time repair (`repairSynthesisInconsistency`) rewrote
+   * `synthesis` so a recoverable synthesis/synthesizer mismatch could still
+   * activate. Set by the caller after repairing, never by `resolveConfig`
+   * itself (which keeps failing hard on the mismatch, R-06). Surfaced by
+   * `describeResolvedConfig` as `synthesis=<mode> (repaired)`.
+   */
+  synthesisRepaired?: boolean
   historyTurns: number
   historyChars: number
   maxQueuedMessages: number

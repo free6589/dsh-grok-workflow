@@ -273,6 +273,8 @@ window.__ModuleLoader__.load({
       'error.duplicate': '{role} entry {index} repeats an earlier row — duplicates change nothing.',
       'error.badCap': '{role} entry {index}: the cap must be a whole number between {min} and {max}, or blank for unlimited.',
       'error.unknownClass': 'This switch does not accept {entry}.',
+      'error.synthesisChainUnused': 'The summarizer chain is set but summary style is "Assemble by rule" — switch to "Rewrite with model" or clear the chain.',
+      'error.synthesisChainMissing': 'Summary style is "Rewrite with model" but the summarizer chain is empty — add a route or switch back to "Assemble by rule".',
     }
 
     const ZH = {
@@ -449,6 +451,8 @@ window.__ModuleLoader__.load({
       'error.duplicate': '{role} 第 {index} 条跟前面的重复了，重复不顶用。',
       'error.badCap': '{role} 第 {index} 条的并发上限得是 {min} 到 {max} 之间的整数，留空就是不限。',
       'error.unknownClass': '这个开关不认识 {entry}。',
+      'error.synthesisChainUnused': '总结链已填但汇总方式是"按规则拼"——改成"模型重写"或清空总结链。',
+      'error.synthesisChainMissing': '汇总方式是"模型重写"但总结链是空的——加一条路由或改回"按规则拼"。',
     }
 
     /** Shipped locales, in the order the locale plugin registers them. */
@@ -561,6 +565,21 @@ window.__ModuleLoader__.load({
       }
       for (const entry of draft.switchOn || []) {
         if (!SWITCHABLE_CLASSES.includes(entry)) errors.push({ key: 'error.unknownClass', params: { entry } })
+      }
+      // Cross-field check: synthesis must agree with the summarizer chain.
+      // A finished summarizer route with "assemble by rule" can never run, and
+      // "rewrite with model" with no finished route can never run either —
+      // both are as fatal as a missing model, so both block Save (red, not a
+      // heads-up). Blank unfinished rows do not count: they are already blocked
+      // by `error.missingModel`. Mirrors the host's load-time rule
+      // (`resolveConfig`, synthesis/synthesizer bidirectional check) and its
+      // repair twin (`repairSynthesisInconsistency`, P1).
+      const finishedSynthesizer = (draft.roles.synthesizer || [])
+        .filter((route) => String((route && route.model) || '').trim() !== '').length
+      if (finishedSynthesizer > 0 && draft.synthesis === 'deterministic') {
+        errors.push({ key: 'error.synthesisChainUnused' })
+      } else if (finishedSynthesizer === 0 && draft.synthesis === 'model') {
+        errors.push({ key: 'error.synthesisChainMissing' })
       }
       return errors
     }

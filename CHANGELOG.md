@@ -5,6 +5,22 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Fixed / 修复
+
+- **Synthesis/synthesizer mismatch warns and repairs instead of deactivating / 合成配置不一致改为告警并修复，不再直接停用** —
+  only two recoverable shapes are repaired at load: a non-empty `roles.synthesizer` chain with
+  `synthesis: deterministic` now takes effect as `model`, and `synthesis: model` with an empty
+  chain takes effect as `deterministic`. Each repair logs a warning naming the effective value
+  （文案含"已按…生效，请在设置页确认"）, keeps the tool, gate and settings page fully active, and
+  marks the one-line signature as `synthesis=<mode> (repaired)`. Unknown keys, unknown providers,
+  undeclarated models, out-of-range numbers and malformed chains still fail hard (R-06 unchanged),
+  and the settings page blocks Save on the same two mismatches with a red bilingual error.
+  仅两种"可恢复不一致"做修复：总结链非空但汇总方式是 `deterministic` 时按 `model` 生效；
+  汇总方式是 `model` 但总结链为空时按 `deterministic` 生效。修复会打 warn 日志（文案含"已按…生效，
+  请在设置页确认"），工具/门禁/设置面照常启用，有效配置签名带 `synthesis=<mode> (repaired)` 自证标记。
+  未知键、未知 provider、不在目录的模型、越界数字、畸形链一律仍抛错（R-06 不动）；设置页对同样两种
+  不一致红字拦 Save（中英双语）。
+
 ## [0.2.7] - 2026-11-03
 
 ### Added / 新增
