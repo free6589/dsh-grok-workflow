@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-11-03
+
 ### Added / 新增
 
 - **Per-route concurrency cap with overflow to the next route / 每条路由的并发上限，打满就溢出到下一条** —
