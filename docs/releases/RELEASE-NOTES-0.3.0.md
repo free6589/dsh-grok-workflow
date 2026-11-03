@@ -1,9 +1,17 @@
 # Grok Workflow for DSH 0.3.0 — release notes
 
-**Status: draft.** The `v0.3.0` tag and its GitHub Release are created by the release operator
-**after** the final acceptance pass, following [the release guide](../RELEASING.md). The text the
+**Status: released** — `v0.3.0` was tagged on 2026-11-03 (commit `3f5ad0a`) and its GitHub Release
+was published the same day (2026-11-03T15:35:54Z) by Release workflow run
+[41665410667](https://github.com/free6589/dsh-grok-workflow/actions/runs/41665410667). The text the
 release workflow publishes is the bilingual `## [0.3.0] - 2026-11-03` section of
 [CHANGELOG.md](../../CHANGELOG.md), extracted verbatim.
+
+| | |
+|---|---|
+| Tag | `v0.3.0` (`3f5ad0a`) |
+| Release workflow | [41665410667](https://github.com/free6589/dsh-grok-workflow/actions/runs/41665410667) — green |
+| GitHub Release | [v0.3.0](https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.3.0), 2026-11-03T15:35:54Z |
+| Asset | `dsh-grok-workflow-0.3.0.tgz`, 56 files, **246,493 B** (sha256 `3a8bf81b…`) |
 
 ## What this release is
 

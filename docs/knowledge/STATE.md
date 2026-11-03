@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-11-01 (local)
+Last updated: 2026-11-03 (local)
 
 ## Repository
 
@@ -20,9 +20,14 @@ Last updated: 2026-11-01 (local)
 
 ## Current phase
 
-`0.2.7` **released**. Base of this state: **`origin/main` = `16a11b7`**.
+`0.3.0` **released**. Base of this state: **`origin/main` = `3f5ad0a`** (release commit; PR #36
+merge).
 
-`v0.2.7` **is released** (tag `v0.2.7` on `16a11b7`, Release green
+`v0.3.0` **is released** (tag `v0.3.0` on `3f5ad0a`, Release workflow run
+[41665410667](https://github.com/free6589/dsh-grok-workflow/actions/runs/41665410667) green,
+GitHub Release `https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.3.0`, asset
+`dsh-grok-workflow-0.3.0.tgz` 246,493 B). `package.json` reads `0.3.0` and `CHANGELOG.md` carries
+`## [0.3.0] - 2026-11-03` (Round 19). Prior: `v0.2.7` **is released** (tag `v0.2.7` on `16a11b7`, Release green
 `https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.2.7`, asset
 `dsh-grok-workflow-0.2.7.tgz`), after `v0.2.6` (`f6ec5f1`), `v0.2.5` (`bf853ac`),
 `v0.2.4` (`7357e5e`), `v0.2.3` (`538d1ab`). `package.json` reads `0.2.7`,
@@ -45,15 +50,22 @@ Merged into `main` since `v0.2.3` (each `CONFIRMED` in `git log`):
 | P0-5 | `d8cc6cc` | first user message published before the run (no longer hidden) |
 | #32 | `1b5ad75` | per-route concurrency cap (`maxInFlight`) + overflow to next route (D-030) |
 | #33 | `16a11b7` | release `0.2.7` (per-route concurrency + first-message fix) |
+| #35 | `af0394a` | synthesis/synthesizer mismatch warns + repairs instead of deactivating (D-031; closes #34) |
+| #36 | `3f5ad0a` | release `0.3.0` (bump + bilingual changelog + `RELEASE-NOTES-0.3.0.md`; Round 19) |
 
 So the `0.2.4` cut carries the `/grok` switch, the task-grouped progress panel, the
 32,000-character objective limit and the segmented fallback — all four are on `main` and tagged.
 
 Authoritative numbers for this state (measured, not planned):
 
-- `npm run ci` — last full run was on the PR #26 branch (Round 13, `68f3d15`): **27 files / 487
-  tests**, exit 0, oxlint 1 pre-existing warning (`src/redact.ts:155`). **`npm run ci` on `main`
-  `7357e5e` is `NOT_RUN`** — do not quote 487 as a `main` number until someone runs it there.
+- `npm test` on the `0.3.0` release commit `f8cb09e` (identical tree to the merge `3f5ad0a`):
+  **31 files / 540 tests PASS**, exit 0 (Round 19); the Release workflow re-ran the same suite on
+  `v0.3.0` and passed (run `41665410667`, step `Test` success). `npm ci` on `f8cb09e` = PASS
+  (17 high-severity `npm audit` advisories are the existing dependency baseline, unchanged by this
+  release).
+- `npm run ci` — last full run before this release was on the PR #26 branch (Round 13, `68f3d15`):
+  27 files / 487 tests. **`npm run ci` on `main` is `NOT_RUN`** since then; the quoted `main` number
+  is the `npm test` figure above, not the CI-script figure.
 - `lib/` reproducible: `npm run build && git diff --exit-code -- lib/` = exit 0 on that branch
   (Round 13).
 - Real-instance evidence, newest first: `VALIDATION.md` Round 16 (v0.2.4 install matrix on
@@ -69,13 +81,14 @@ Authoritative numbers for this state (measured, not planned):
 
 ## Where the open questions live
 
-- `docs/knowledge/VALIDATION.md` — Rounds 1–16. Round 6 row (g) is annotated: stability 5/5,
+- `docs/knowledge/VALIDATION.md` — Rounds 1–19. Round 6 row (g) is annotated: stability 5/5,
   accepted results 0/5, root cause fixed in 0.2.2. Round 7 closed the notice/route/deadline
   questions; Round 8 answers the quality question and records the operational caveat that the
   Plugins-page switch — not `cordis.patch.yml` — is what says whether the gate is armed. Round 13
   closed the PR #26 review, Round 14 the real-model E2E, and **Round 15 the two GUI checks that had
   been `NOT_RUN` since Round 14** (`/grok` switchable in the real GUI, settings card rendering and
-  saving).
+  saving). Round 17 is the P0-5 first-message root cause, Round 18 the synthesis-mismatch fix, and
+  Round 19 records the PR #35 merge plus the `0.3.0` release checks and workflow run.
 - `docs/knowledge/DECISIONS.md` — D-016…D-019 (per-session caps, 60-minute default, plugin-owned
   deadline, notice downgrade). D-020 covers the verifier-decision rule.
 - Deferred to 0.2.3: rendering a plugin-authored chat row (needs a DSH-side API), see D-019.
@@ -136,11 +149,12 @@ None.
 
 ## Next priority
 
-**PR #35 pending merge (lead-verified, not merged).** `feat/synthesis-fallback` (`7c4a05e`)
-closes #34: synthesis/synthesizer mismatch warns + repairs instead of deactivating
-(D-031, Round 18). Lead ran `npm run ci` on `7c4a05e`: **31 files / 540 tests PASS**,
-`lib/` in sync, lint 3 pre-existing warnings. Merge + release per `docs/RELEASING.md`
-is the next step; live `:3090` reload only with operator approval.
+**`0.3.0` is released; nothing is blocked on review.** PR #35 was merged (`af0394a`) and the
+release went out as PR #36 (`3f5ad0a`) + tag `v0.3.0` (Round 19). The one open action is outside
+this repo: the live DSH service on `:3090` still runs `dsh-grok-workflow@0.2.7` and the
+`web/cordis.patch.yml` change (owner's `synthesis: model` line) needs a profile reload to take
+effect — **that reload awaits explicit user approval (D-013); it is not done**. Upgrading the `web`
+profile to `v0.3.0` is likewise pending approval.
 
 Older candidates — none decided, all `HYPOTHESIS` until the captain picks:
 `relay`/`append` delivery in a long-lived GUI session (NR-1's remaining half), item 8's

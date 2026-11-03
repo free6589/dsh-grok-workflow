@@ -1,5 +1,38 @@
 # Agent Handoff
 
+## 2026-11-03 — PR #35 merged + v0.3.0 released (GitHub Release only, no npm)
+
+- **From:** release operator (local) · **To:** next agent / operator
+- **Base commit:** `af0394a` (PR #35 merge on `main`); **release commit** `3f5ad0a` (PR #36 merge);
+  **tag** `v0.3.0` → `3f5ad0a`. `package.json` and `package-lock.json` both read `0.3.0`;
+  `CHANGELOG.md` carries the bilingual `## [0.3.0] - 2026-11-03` section with a fresh empty
+  `## [Unreleased]` above it; `docs/releases/RELEASE-NOTES-0.3.0.md` exists.
+- **Merge of the feature (CONFIRMED):** `gh pr merge 35 --merge` after `gh pr checks 35` showed
+  Node 22 `pass` / Node 24 `pass` (run
+  `https://github.com/free6589/dsh-grok-workflow/actions/runs/41659656218`); merge commit
+  `af0394a`; `origin/main:src/config.ts` contains `repairSynthesisInconsistency`.
+- **Release (CONFIRMED):** branch `release/0.3.0` → PR #36 (`https://github.com/free6589/dsh-grok-workflow/pull/36`)
+  green on Node 22/24 (run `41664791714`) → merge `3f5ad0a`. `git tag v0.3.0 3f5ad0a` +
+  `git push origin v0.3.0`. Release workflow run
+  [41665410667](https://github.com/free6589/dsh-grok-workflow/actions/runs/41665410667) green end
+  to end (tag↔`package.json` validation, typecheck, lint, build, `lib/` consistency, tests, package
+  checks, bilingual changelog extraction, release creation). GitHub Release
+  `https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.3.0` with
+  `dsh-grok-workflow-0.3.0.tgz` (246,493 B, sha256 `3a8bf81b…`).
+- **Local checks on the release commit** (`f8cb09e`, identical tree to the merge `3f5ad0a`):
+  `npm ci` PASS; `npm run typecheck` PASS; `npm run lint` 3 warnings / 0 errors (pre-existing
+  baseline); `npm run build` PASS; `git diff --exit-code -- lib/` exit 0; `npm test` 31 files /
+  540 tests PASS; `npm pack --dry-run` 56 files / 246.5 kB / `dsh-grok-workflow-0.3.0.tgz`.
+- **Tags:** `git ls-remote --tags origin` taken before and after; `diff` over the pre-existing
+  tags = no changes. `v0.1.0`–`v0.2.7` untouched; only `refs/tags/v0.3.0` is new.
+- **Honest boundary:** real-machine coverage of the shipped change is **partial** (isolated
+  instance alive with a bad config; boot warn line not captured; `/api/settings/describe` + page
+  `401`, same as VALIDATION Round 16 item 8; settings-page render/save-back `NOT_RUN`).
+- **Next action (needs the operator, not an agent):** the live DSH service on `:3090` still runs
+  `dsh-grok-workflow@0.2.7`; the `web/cordis.patch.yml` `synthesis: model` line and the `0.3.0`
+  upgrade both take effect only after a profile reload/`plugin add …#v0.3.0`, and **that reload
+  still awaits explicit user approval (D-013)**. Do not restart the service on your own.
+
 ## 2026-11-03 — P0 web fix + PR #35 synthesis fallback (lead-reviewed, not merged)
 
 - **From:** lead · **To:** next agent / operator

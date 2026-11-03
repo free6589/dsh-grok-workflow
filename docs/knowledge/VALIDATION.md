@@ -1594,3 +1594,62 @@ P1–P3（PR #35，`feat/synthesis-fallback` `7c4a05e`，closes #34，lead 在 `
 确定性证据齐全（8 例 fallback spec + 跨字段 spec + 全量 CI）；隔离真机 GUI 一半缺失，
 见上表诚实边界。`resolveConfig` 硬规则未动（`test/config.spec.ts`/`routing.spec.ts`
 仍钉 throw），R-06 不变。
+
+## Round 19 (2026-11-03) — PR #35 merge + `v0.3.0` release: local checks, tag, workflow, GitHub Release
+
+Environment: operator machine, `main` of `/home/fish/projects_mine/dsh-grok-workflow`,
+Node `v26.8.1`, npm `11.19.0`, `gh` authenticated as `free6589` (`repo`, `workflow` scopes).
+
+### 1. Merge PR #35（feature 先合）
+
+| Check | Command | Result | Evidence |
+|---|---|---|---|
+| PR state before merge | `gh pr view 35 --json mergeable,mergeStateStatus,headRefOid` | MERGEABLE / CLEAN / `7c4a05e` | closes #34 |
+| PR CI | `gh pr checks 35` | PASS | Node 22 `pass` 42s, Node 24 `pass` 36s — run `41659656218` |
+| Merge | `gh pr merge 35 --merge --subject "Merge pull request #35 from free6589/feat/synthesis-fallback"` | MERGED | merge commit `af0394a`, `mergedAt 2026-11-03T15:24:10Z` |
+| main content | `grep -n repairSynthesisInconsistency src/config.ts` | PASS | `src/config.ts:345`, `lib/config.js:329` on `origin/main` |
+| main CHANGELOG | `git show origin/main:CHANGELOG.md` | PASS | bilingual `[Unreleased]` Fixed/修复 entry present before the release bump |
+
+### 2. Release preparation (`release/0.3.0`, commit `f8cb09e`)
+
+| Check | Command | Result | Evidence |
+|---|---|---|---|
+| branch | `git switch -c release/0.3.0` | PASS | based on `af0394a` |
+| bump | `npm version minor --no-git-tag-version` | PASS | `v0.3.0`; `package.json:3` and `package-lock.json:3` (+ root entry) all `0.3.0`; `grep -c '0\.2\.7' package*.json` = 0 |
+| install | `npm ci` | PASS | 17 high-severity `npm audit` advisories = existing baseline |
+| typecheck | `npm run typecheck` | PASS | exit 0 |
+| lint | `npm run lint` | 3 warnings / 0 errors, exit 0 | same three pre-existing warnings as `1024b1c` (`no-useless-escape`, `GROUPS_WITH_FIELDS`, `field`) |
+| build | `npm run build` | PASS | `client bundle: 79752 bytes → lib/client.js` |
+| lib sync | `git diff --exit-code -- lib/` | PASS | exit 0; `git status --porcelain --untracked-files=all -- lib/` empty |
+| tests | `npm test` | PASS | 31 files / 540 tests, exit 0, 20.51s |
+| package | `npm pack --dry-run` | PASS | `dsh-grok-workflow-0.3.0.tgz`, 56 files, package 246.5 kB |
+| secrets | `git diff --cached \| grep -Ei "(api[_-]?key\|secret\|password\|token\|PRIVATE KEY\|sk-…)"` | PASS | 0 hits; only `CHANGELOG.md`, `package.json`, `package-lock.json`, `docs/releases/RELEASE-NOTES-0.3.0.md` staged (`.workflow-artifacts/` left untracked) |
+
+### 3. Release PR and merge
+
+| Check | Command | Result | Evidence |
+|---|---|---|---|
+| open PR | `gh pr create --base main --head release/0.3.0` | PASS | PR #36 |
+| PR CI | `gh pr checks 36` | PASS | Node 22 `pass` 41s, Node 24 `pass` 38s — run `41664791714` |
+| merge | `gh pr merge 36 --merge` | MERGED | release commit `3f5ad0a`, `mergedAt 2026-11-03T15:33:50Z` |
+| main after | `git pull --ff-only` on `main` | PASS | `3f5ad0a`; `node -p "require('./package.json').version"` = `0.3.0`; `## [Unreleased]` then `## [0.3.0] - 2026-11-03` |
+
+### 4. Tag, workflow, GitHub Release
+
+| Check | Command | Result | Evidence |
+|---|---|---|---|
+| old tags baseline | `git ls-remote --tags origin` (before) | recorded | `v0.1.0`…`v0.2.7` SHAs |
+| tag | `git tag v0.3.0 3f5ad0a && git push origin v0.3.0` | PASS | `* [new tag] v0.3.0 -> v0.3.0` |
+| old tags untouched | `diff` of pre-existing tags before/after | PASS | `NO_CHANGES_TO_EXISTING_TAGS`; only `refs/tags/v0.3.0` added |
+| Release workflow | `gh run view 41665410667` | PASS | conclusion `success`, all steps 1–16 `success` (tag↔`package.json`, typecheck, lint, build, `lib/` consistency, no-untracked check, tests, package list, changelog extraction, packaging, release creation) |
+| GitHub Release | `gh release view v0.3.0 --json name,tagName,isDraft,assets` | PASS | `Grok Workflow for DSH v0.3.0`, `tagName v0.3.0`, `isDraft false`, asset `dsh-grok-workflow-0.3.0.tgz` 246,493 B, sha256 `3a8bf81b…`, published `2026-11-03T15:35:54Z` |
+
+### 5. Boundary (what this round does NOT claim)
+
+- The shipped behaviour change was not re-verified on a real GUI this round. Round 18's isolated
+  result stands as-is: bad-config instances stayed alive, boot warn line not captured,
+  `/api/settings/describe` + settings page `401` (same dead-end as Round 16 item 8), settings-page
+  render/save-back `NOT_RUN`.
+- The live `:3090` service was not reloaded, restarted or reconfigured (D-013); it still runs
+  `dsh-grok-workflow@0.2.7`, and the operator `web` profile was not upgraded to `0.3.0`.
+- npm publishing: not done and not planned (GitHub Releases only, per `docs/RELEASING.md`).
