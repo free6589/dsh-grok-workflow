@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-03
+
 ### Fixed / 修复
 
 - **Synthesis/synthesizer mismatch warns and repairs instead of deactivating / 合成配置不一致改为告警并修复，不再直接停用** —
