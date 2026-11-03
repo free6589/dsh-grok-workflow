@@ -325,6 +325,46 @@ function integer(name: string, value: number, min: number, max: number): number 
   return value
 }
 
+/**
+ * Repair a recoverable synthesis/synthesizer mismatch without touching anything else.
+ *
+ * Only two shapes are recoverable (P1):
+ * - (a) the synthesizer chain is non-empty but `synthesis` is `deterministic`
+ *   → take effect as `model`;
+ * - (b) `synthesis` is `model` but the synthesizer chain is empty
+ *   → take effect as `deterministic`.
+ *
+ * Everything else (unknown keys, bad providers/models, out-of-range numbers,
+ * malformed chains, …) is left for `resolveConfig` to reject (R-06): this
+ * function never validates and never throws for those cases. It is pure: the
+ * input is not mutated, and a non-matching input returns unchanged with no
+ * warnings.
+ * @param raw - raw user configuration (plain snapshot shape).
+ * @returns The repaired config plus human-readable warnings (empty when nothing matched).
+ */
+export function repairSynthesisInconsistency(raw: GrokWorkflowConfig): { repaired: GrokWorkflowConfig; warnings: string[] } {
+  const synthesis = raw.synthesis ?? 'deterministic'
+  const chain = raw.roles?.synthesizer
+  const length = Array.isArray(chain) ? chain.length : 0
+  if (length > 0 && synthesis === 'deterministic') {
+    return {
+      repaired: { ...raw, synthesis: 'model' },
+      warnings: [
+        'roles.synthesizer chain is non-empty but synthesis is "deterministic": synthesis now takes effect as "model" (repaired). 已按 model 生效，请在设置页确认',
+      ],
+    }
+  }
+  if (length === 0 && synthesis === 'model') {
+    return {
+      repaired: { ...raw, synthesis: 'deterministic' },
+      warnings: [
+        'synthesis is "model" but the roles.synthesizer chain is empty: synthesis now takes effect as "deterministic" (repaired). 已按 deterministic 生效，请在设置页确认',
+      ],
+    }
+  }
+  return { repaired: raw, warnings: [] }
+}
+
 /** Resolve defaults and enforce the hard limits for direct construction paths. */
 export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
   assertKnownKeys(config as Record<string, unknown>)
@@ -496,7 +536,7 @@ export function describeResolvedConfig(config: ResolvedConfig): string {
     `gate=${config.enforceGate ? 'on' : 'off'}/${config.gateScope}${config.gateRequired ? ' (required)' : ''}`,
     `mode=${config.mode}${config.mode === 'triage' ? ` triage=${config.triageAsk ? 'ask' : 'escalate'} call=${config.triageModel === undefined ? 'inherit' : (config.triageModel.provider === undefined ? config.triageModel.model : `${config.triageModel.provider}/${config.triageModel.model}`)}` : ''}`,
     `grokDefault=${config.grokDefault}`,
-    `synthesis=${config.synthesis}`,
+    `synthesis=${config.synthesis}${config.synthesisRepaired === true ? ' (repaired)' : ''}`,
     `roles=planner:${role('planner')} worker:${role('worker')} verifier:${role('verifier')} synthesizer:${role('synthesizer')}`,
   ].join(' ')
 }

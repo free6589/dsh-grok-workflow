@@ -1,7 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
-import { HARD_LIMITS, createConfigReader, describeResolvedConfig } from './config.js'
+import { HARD_LIMITS, createConfigReader, describeResolvedConfig, repairSynthesisInconsistency, resolveConfig, snapshotConfig } from './config.js'
 import { describeSurface, validateRoutes } from './settings.js'
 import { registerGrokCommand } from './command.js'
 import { installGate } from './gate.js'
@@ -49,15 +49,37 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
   // t47: every effective-configuration change is announced once. The t46 round could
   // not tell a settings save from a profile-patch edit — and could not read the
   // deadline the run actually used — because both lived only in memory.
+  //
+  // P1 (synthesis fallback): only the two recoverable synthesis/synthesizer
+  // mismatches are repaired at load (and on every later read, so the tool keeps
+  // working after a bad settings save). Everything else still throws (R-06).
   let configSignature = ''
   const readConfig = (): ResolvedConfig => {
-    const next = reader.read()
-    const signature = describeResolvedConfig(next)
-    if (signature !== configSignature) {
-      configSignature = signature
-      logger.info?.(`configuration in effect: ${signature}`)
+    try {
+      const next = reader.read()
+      const signature = describeResolvedConfig(next)
+      if (signature !== configSignature) {
+        configSignature = signature
+        logger.info?.(`configuration in effect: ${signature}`)
+      }
+      return next
+    } catch (error) {
+      const snap = snapshotConfig(rawConfig as Record<string, unknown>)
+      const { repaired, warnings } = repairSynthesisInconsistency(snap)
+      if (warnings.length === 0) throw error
+      // The mismatch is recoverable, but another defect may still hide behind
+      // it: resolving the repaired shape must succeed before any warning is
+      // emitted, otherwise the non-repairable error stays a hard fail.
+      const fixed = resolveConfig(repaired)
+      fixed.synthesisRepaired = true
+      for (const warning of warnings) logger.warn(warning)
+      const signature = describeResolvedConfig(fixed)
+      if (signature !== configSignature) {
+        configSignature = signature
+        logger.info?.(`configuration in effect: ${signature}`)
+      }
+      return fixed
     }
-    return next
   }
   const config = readConfig()
   const state: ActiveState = createActiveState()
