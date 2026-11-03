@@ -1568,3 +1568,29 @@ node iso_reload.mjs "$URL" OUT.png "P0-5 AFTER: message must survive a reload" "
 - **`relay` / `append` 的长驻 GUI 投递**仍 `NOT_RUN`（NR-1 剩余半边），本轮只覆盖默认 `in-turn`。
 - **`gh` Issue 状态评论**：本机 `gh` 已登录 `free6589`，但本轮未向 `[COORDINATION]` Issue
   发状态块（`NOT_RUN`，由队长决定是否补发）。
+
+## Round 18 (2026-11-03) — synthesis/synthesizer mismatch：配错也能起（P0 现场 + P1–P3 落地，lead 复核）
+
+现场（OPER）：`web/cordis.patch.yml` 的 `grok-workflow.config` 配了 `roles.synthesizer`
+链但缺 `synthesis`，落默认 `deterministic`，触发 `src/config.ts:371` throw，整行
+`1 entry did not activate`，设置页一并消失。P0 按用户拍板方案 A：
+`+ synthesis: model`（+1 行，备份
+`~/dsh-profile-backups/cordis.patch.yml.20261103-222020-pre-synthesis-model`），
+只读验证（grep + diff + plugin list `0.2.7`），未重启 `:3090`（D-013）。
+
+P1–P3（PR #35，`feat/synthesis-fallback` `7c4a05e`，closes #34，lead 在 `7c4a05e`
+独立复核后 reset 本地 main 回 `1024b1c`，工作只活在 feature 分支 + PR）：
+
+| Check | Command | Result | Evidence |
+|---|---|---|---|
+| typecheck | `npm run typecheck` | PASS | exit 0 |
+| focused tests | `npx vitest run test/config-synthesis-fallback.spec.ts test/client.spec.ts test/config.spec.ts test/routing.spec.ts` | PASS | 4 files / 93 tests |
+| full CI | `npm run ci` | PASS | 31 files / 540 tests |
+| lib sync | `git diff --exit-code -- lib/` | PASS | exit 0（`src` 改已重建 `lib/` 并同步提交） |
+| lint | `npm run lint` | 3 warnings / 0 errors | 3 个均为基线原有（`1024b1c` 同样 3 个），本次未引入 |
+| secrets | `grep` over changed `src/`+`test/` | PASS | 仅 `task-failed`/`id:` 等良性命中，无凭据 |
+| isolated verify (partial) | `DSH_HOME=/tmp/p1-verify-home` + profile `p1web` + `127.0.0.1:3297`，坏配置 a/b 各起一例 | PARTIAL | 进程存活（精确 PID kill，无 live `:3090` 触碰）；boot warn/签名日志未捕获（stdout 仅 URL 行）；`/api/settings/describe` + 页面抓取 = 401（与 Round 16 item 8 同类已知死胡同）；设置页渲染 + 改回合法 `NOT_RUN` |
+
+确定性证据齐全（8 例 fallback spec + 跨字段 spec + 全量 CI）；隔离真机 GUI 一半缺失，
+见上表诚实边界。`resolveConfig` 硬规则未动（`test/config.spec.ts`/`routing.spec.ts`
+仍钉 throw），R-06 不变。

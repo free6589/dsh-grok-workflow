@@ -136,12 +136,16 @@ None.
 
 ## Next priority
 
-**Next version to plan.** `v0.2.4` is **released** (tag `v0.2.4` on `7357e5e`, Release green,
-asset `dsh-grok-workflow-0.2.4.tgz`), and Round 16 recorded the install matrix
-(8 PASS + 2 NOT_RUN, item 7 anomaly on record, item 8 partial). Candidates for the next scope —
-none decided, all `HYPOTHESIS` until the captain picks: `relay`/`append` delivery in a
-long-lived GUI session (NR-1's remaining half), item 8's API-side auth/namespace confirmation,
-a quality matrix (not a 1-run claim), and the client-side chain editor (Phase 9 / U-6).
+**PR #35 pending merge (lead-verified, not merged).** `feat/synthesis-fallback` (`7c4a05e`)
+closes #34: synthesis/synthesizer mismatch warns + repairs instead of deactivating
+(D-031, Round 18). Lead ran `npm run ci` on `7c4a05e`: **31 files / 540 tests PASS**,
+`lib/` in sync, lint 3 pre-existing warnings. Merge + release per `docs/RELEASING.md`
+is the next step; live `:3090` reload only with operator approval.
+
+Older candidates — none decided, all `HYPOTHESIS` until the captain picks:
+`relay`/`append` delivery in a long-lived GUI session (NR-1's remaining half), item 8's
+API-side auth/namespace confirmation, a quality matrix (not a 1-run claim), and the
+client-side chain editor (Phase 9 / U-6).
 
 Any future live matrix must follow [docs/knowledge/TESTING.md](TESTING.md) (isolated workspace, one
 turn at a time; Round 16's isolation proof is in `.workflow-artifacts/matrix-024/EVIDENCE.md`).

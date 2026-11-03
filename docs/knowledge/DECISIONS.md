@@ -433,3 +433,31 @@ Each entry records the decision, evidence, alternatives, and status.
   `Route overflows …`，台账多两个可选字段（旧记录不受影响）。
 - **Alternatives rejected:** 打满当失败推进备用链（把忙碌误报为故障，消耗重试）；
   打满直接报错（把可分流的负载变成失败）；排队等同一条（浪费空闲的下一条）。
+
+## D-031 — 可恢复的合成配置不一致只告警不致停：配错也能起，设置页再改
+
+- **Status:** CONFIRMED（lead 独立复核 `7c4a05e`：`npm run ci` 31 文件 / 540 测试 PASS，
+  PR #35 待合；`resolveConfig` 硬规则未动，见 `test/config.spec.ts`/`routing.spec.ts` 钉）
+- **Date:** 2026-11-03
+- **Decision:** 只有两种 `synthesis` / `roles.synthesizer` 不一致是**可恢复**的，
+  load（含每次 `readConfig`）时 warn + 按修后值生效，工具/门禁/设置面照常激活：
+  (a) 链非空 + `deterministic` → 按 `model` 生效；(b) `synthesis: model` + 链空 →
+  按 `deterministic` 生效。warn 文案含"已按…生效，请在设置页确认"，有效配置签名带
+  `synthesis=<mode> (repaired)` 自证。其它（未知键/provider/模型、越界、畸形链、
+  `switchOn`、budget）一律仍 hard fail（R-06 不动）；修后形状若还带第二缺陷，
+  以第二缺陷为准抛错（修不掩错）。设置页对同样两种不一致红字拦 Save
+  （`error.synthesisChainUnused`/`Missing`，中英双语）；合法组合才放行。
+- **Reason:** 配错一行就整行 `did not activate`，连设置页都没了，等于"没地方改"的死锁
+  （本轮 oper 现场：`synthesis` 缺省 `deterministic` + 配了 synthesizer 链）。
+  这两形的用户意图是明确的（有链≈想要模型重写；要模型重写但链空≈先按规则跑），
+  修完意图不变；其它错误意图不明，一修就是"看起来能跑实际路由是错的"。
+- **Evidence:** `test/config-synthesis-fallback.spec.ts`（8 例：a/b 双向修复、
+  一致不动、未知键/越界数/畸形链不动、可恢复形下藏第二缺陷仍抛、`apply()` 三例、
+  `(repaired)` 标记）；`test/client.spec.ts` 跨字段拦 Save（含空行不算链）；
+  `npm run ci` 31 文件 / 540 测试；`lib/` 同步。
+- **Consequences:** `ResolvedConfig` 增可选 `synthesisRepaired?: boolean`
+ （仅修后置位，`resolveConfig` 本身不置）；`ARCHITECTURE` 增"可恢复 vs 不可恢复"小节；
+  `CHANGELOG [Unreleased]` 中英双语。
+- **Alternatives rejected:** 全局 lenient 默认（吞掉拼错 provider 这类真错误）；
+  只修 load 不修运行期 save（坏 save 仍杀下次启动）；只 host 修不加设置页联动
+  （用户下次手写 YAML 还会撞同一面墙）。

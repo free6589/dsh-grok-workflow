@@ -1,5 +1,36 @@
 # Agent Handoff
 
+## 2026-11-03 — P0 web fix + PR #35 synthesis fallback (lead-reviewed, not merged)
+
+- **From:** lead · **To:** next agent / operator
+- **Base commit:** `1024b1c` (`origin/main`); work commit `7c4a05e` on `feat/synthesis-fallback`
+  (local `main` reset back to `1024b1c` after review; work lives on the feature branch + PR).
+- **P0 (CONFIRMED, operator machine):** `web/cordis.patch.yml` `grok-workflow.config` +1 line
+  `synthesis: model` (line 1029, 4-space indent, same level as `grokDefault: on`).
+  Backup: `~/dsh-profile-backups/cordis.patch.yml.20261103-222020-pre-synthesis-model`.
+  `diff -u` = +1 line only; `grep -n -A16 "id: grok-workflow"` shows the line; `plugin list`
+  still `dsh-grok-workflow@0.2.7`. No service restarted (D-013 rule 1); live `:3090`
+  reload still needs operator approval.
+- **P1–P3 (lead-verified, PR #35):** `https://github.com/free6589/dsh-grok-workflow/pull/35`
+  closes #34. `repairSynthesisInconsistency(raw)` in `src/config.ts` (pure, only shapes
+  (a)/(b)); `apply()` in `src/index.ts` load-time catch → `logger.warn`（含"已按…生效，
+  请在设置页确认"）→ `resolveConfig(repaired)` must pass → activate with
+  `synthesisRepaired: true` (`describeResolvedConfig` renders `synthesis=<mode> (repaired)`).
+  Settings page (`src/client/index.js` `validate()`) red-blocks Save on the same two
+  mismatches (`error.synthesisChainUnused`/`Missing`, bilingual). R-06 unchanged.
+- **Tests run (lead, on `7c4a05e` before reset):** `npm run typecheck` PASS; `npm run lint`
+  3 warnings 0 errors (pre-existing — base `1024b1c` also 3, `GROUPS_WITH_FIELDS`/`field`/
+  `redact.ts:155` escape); `npx vitest run test/config-synthesis-fallback.spec.ts
+  test/client.spec.ts test/config.spec.ts test/routing.spec.ts` 4 files / 93 PASS;
+  `npm run ci` **31 files / 540 tests PASS**; `git diff --exit-code -- lib/` = 0.
+  Secret grep over changed src/test = only benign `task-failed`/`id:` matches.
+- **Local runtime (partial, honest boundary):** `DSH_HOME=/tmp/p1-verify-home`, profile `p1web`,
+  `127.0.0.1:3297`, bad-config instances stayed alive, but boot stdout had only URL lines
+  (warn/signature not captured); `/api/settings/describe` + page fetch = 401 (same known
+  dead-end as Round 16 item 8). Settings-page render + save-back `NOT_RUN`.
+- **Next action:** review/merge PR #35 (lead-verified, 1 commit ahead of `origin/main`);
+  then plan release per `docs/RELEASING.md`; live `:3090` reload only with approval.
+
 ## 2026-11-03 — web profile upgraded 0.2.6 → 0.2.7 (operator machine)
 
 - **From:** lead · **To:** next agent / operator
