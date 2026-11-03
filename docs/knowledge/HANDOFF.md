@@ -331,3 +331,21 @@
      队长拍板后再做；本轮的 AFTER 证据来自隔离实例（同版本 `0.2.1-rc.2`）。
   3. `relay` / `append` 在长驻 GUI 的投递仍是 `NOT_RUN`（NR-1 剩余半边）。
 - **未提交/未同步**：无。本轮未向 `[COORDINATION]` Issue 发状态块（`NOT_RUN`）。
+
+## 2026-11-03 — route-concurrency 每路由并发上限收尾（待提交/PR）
+
+- **做了什么**：`ModelRoute.maxInFlight?` + `HARD_LIMITS.routeInFlight={min:1,max:64}`；
+  `resolveChain` 整数范围校验；script `normalizeChain` 保留/clamp 上限，
+  `routeInFlight` 计数 + waiter 队列，`callRole` 选有空位的首条路由、全满等待，
+  `traceRoute` 带 `skippedBusy`/`queuedMs`；report 校验透传 + `Route overflows …`
+  单独渲染；records 台账透传溢出证据；`describeResolvedConfig` 显示 `(cap N)`；
+  设置页每行第三框 + 中英 `capLabel/capPlaceholder/capHint` + `error.badCap`；
+  导出 `GROK_WORKFLOW_ROUTE_INFLIGHT_MIN/MAX`；ARCHITECTURE 溢出-vs-回退小节 +
+  CHANGELOG Unreleased + D-030 + 新手指南并发上限注记。
+- **测试**：新增 `test/route-concurrency.spec.ts` 7 例（校验拒绝/溢出分流/排队峰值/
+  clamp 钉死/预算不变/渲染与台账透传）；`test/client.spec.ts` bounds parity +
+  `error.badCap` 双语 + 上限校验回归钉；`test/config.spec.ts` script clamp 钉。
+- **下一步**：`npm run build` 重建 `lib/` → `git diff --exit-code -- lib/` 为 0 →
+  `npm run ci` 全绿 → commit/push `origin feat/route-concurrency` → 开 PR
+  `base:main`（标题见 STATE）→ 向 lead 回报 FROM/TO/TASK/BASE_COMMIT/WORK_COMMIT/
+  CHANGES/TESTS_RUN/TEST_RESULTS/PR/BLOCKERS/NEXT_ACTION。

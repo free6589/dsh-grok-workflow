@@ -16,6 +16,8 @@ export const HARD_LIMITS = {
   chainLength: 50,
   /** Maximum characters in one provider or model id. */
   routeChars: 120,
+  /** Per-route in-flight ceiling (`maxInFlight`): 1 keeps a private lane, 64 is the widest share. */
+  routeInFlight: { min: 1, max: 64 },
   /** Extreme backstop on child calls charged against one task (worker + verifier). */
   maxAttemptsPerTask: 1100,
   /** Hard ceiling on routing ledger entries kept per run. */
@@ -139,10 +141,10 @@ export const Config = z.object({
   maxActiveRunsTotal: z.natural().min(1).max(HARD_LIMITS.maxActiveRunsTotal).default(DEFAULT_MAX_ACTIVE_RUNS_TOTAL).volatile(),
   subagentProvider: z.string().default('').volatile(),
   roles: z.object({
-    planner: z.array(z.object({ provider: z.string().default(''), model: z.string() })).default([]),
-    worker: z.array(z.object({ provider: z.string().default(''), model: z.string() })).default([]),
-    verifier: z.array(z.object({ provider: z.string().default(''), model: z.string() })).default([]),
-    synthesizer: z.array(z.object({ provider: z.string().default(''), model: z.string() })).default([]),
+    planner: z.array(z.object({ provider: z.string().default(''), model: z.string(), maxInFlight: z.natural().min(HARD_LIMITS.routeInFlight.min).max(HARD_LIMITS.routeInFlight.max) })).default([]),
+    worker: z.array(z.object({ provider: z.string().default(''), model: z.string(), maxInFlight: z.natural().min(HARD_LIMITS.routeInFlight.min).max(HARD_LIMITS.routeInFlight.max) })).default([]),
+    verifier: z.array(z.object({ provider: z.string().default(''), model: z.string(), maxInFlight: z.natural().min(HARD_LIMITS.routeInFlight.min).max(HARD_LIMITS.routeInFlight.max) })).default([]),
+    synthesizer: z.array(z.object({ provider: z.string().default(''), model: z.string(), maxInFlight: z.natural().min(HARD_LIMITS.routeInFlight.min).max(HARD_LIMITS.routeInFlight.max) })).default([]),
   }).default({ planner: [], worker: [], verifier: [], synthesizer: [] }).volatile(),
   synthesis: z.union([z.const('deterministic'), z.const('model')]).default('deterministic').volatile(),
   // Switching policy (阶段5): which failure classes advance the fallback chain.
@@ -272,10 +274,22 @@ function resolveChain(role: string, chain: Array<RouteInput> | undefined): Model
     if (provider.length > HARD_LIMITS.routeChars) {
       throw new Error(`roles.${role}[${index}].provider is longer than ${HARD_LIMITS.routeChars} characters`)
     }
+    // Per-route in-flight ceiling: absent means unlimited. A present value must
+    // be an integer in range; anything else would silently mis-shape the lane.
+    const maxInFlightRaw = (entry as { maxInFlight?: unknown }).maxInFlight
+    let maxInFlight: number | undefined
+    if (maxInFlightRaw !== undefined) {
+      if (!Number.isInteger(maxInFlightRaw) || (maxInFlightRaw as number) < HARD_LIMITS.routeInFlight.min || (maxInFlightRaw as number) > HARD_LIMITS.routeInFlight.max) {
+        throw new Error(`roles.${role}[${index}].maxInFlight must be an integer between ${HARD_LIMITS.routeInFlight.min} and ${HARD_LIMITS.routeInFlight.max}`)
+      }
+      maxInFlight = maxInFlightRaw as number
+    }
     const key = `${provider}/${model}`
     if (seen.has(key)) throw new Error(`roles.${role} repeats the same route twice: ${key}`)
     seen.add(key)
-    out.push(provider === '' ? { model } : { provider, model })
+    const route: ModelRoute = provider === '' ? { model } : { provider, model }
+    if (maxInFlight !== undefined) route.maxInFlight = maxInFlight
+    out.push(route)
   }
   return out
 }
@@ -465,9 +479,13 @@ export interface ConfigReader {
  * changes, and the deadline travels into the run's report as well.
  */
 export function describeResolvedConfig(config: ResolvedConfig): string {
+  const routeLabel = (route: ModelRoute): string => {
+    const base = route.provider === '' ? route.model : `${route.provider}/${route.model}`
+    return route.maxInFlight === undefined ? base : `${base} (cap ${route.maxInFlight})`
+  }
   const role = (name: RoleName): string => {
     const chain = config.roles[name]
-    return chain.length === 0 ? 'inherit' : chain.map(route => route.provider === '' ? route.model : `${route.provider}/${route.model}`).join('→')
+    return chain.length === 0 ? 'inherit' : chain.map(routeLabel).join('→')
   }
   return [
     `timeoutMs=${config.timeoutMs}`,

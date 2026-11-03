@@ -15,6 +15,11 @@ export declare const HARD_LIMITS: {
     readonly chainLength: 50;
     /** Maximum characters in one provider or model id. */
     readonly routeChars: 120;
+    /** Per-route in-flight ceiling (`maxInFlight`): 1 keeps a private lane, 64 is the widest share. */
+    readonly routeInFlight: {
+        readonly min: 1;
+        readonly max: 64;
+    };
     /** Extreme backstop on child calls charged against one task (worker + verifier). */
     readonly maxAttemptsPerTask: 1100;
     /** Hard ceiling on routing ledger entries kept per run. */
@@ -84,59 +89,75 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
         planner: z<({
             provider?: string | null;
             model?: string | null;
+            maxInFlight?: number | null;
         } & import("@deepseek-ai/cosmokit").Dict)[], Schemastery.ObjectT<NoInfer<{
             provider: z<string, string, "defined">;
             model: z<string, string, "plain">;
+            maxInFlight: z<number, number, "plain">;
         }>>[], "defined">;
         worker: z<({
             provider?: string | null;
             model?: string | null;
+            maxInFlight?: number | null;
         } & import("@deepseek-ai/cosmokit").Dict)[], Schemastery.ObjectT<NoInfer<{
             provider: z<string, string, "defined">;
             model: z<string, string, "plain">;
+            maxInFlight: z<number, number, "plain">;
         }>>[], "defined">;
         verifier: z<({
             provider?: string | null;
             model?: string | null;
+            maxInFlight?: number | null;
         } & import("@deepseek-ai/cosmokit").Dict)[], Schemastery.ObjectT<NoInfer<{
             provider: z<string, string, "defined">;
             model: z<string, string, "plain">;
+            maxInFlight: z<number, number, "plain">;
         }>>[], "defined">;
         synthesizer: z<({
             provider?: string | null;
             model?: string | null;
+            maxInFlight?: number | null;
         } & import("@deepseek-ai/cosmokit").Dict)[], Schemastery.ObjectT<NoInfer<{
             provider: z<string, string, "defined">;
             model: z<string, string, "plain">;
+            maxInFlight: z<number, number, "plain">;
         }>>[], "defined">;
     }>>>, NoInfer<Schemastery.ObjectT<NoInfer<{
         planner: z<({
             provider?: string | null;
             model?: string | null;
+            maxInFlight?: number | null;
         } & import("@deepseek-ai/cosmokit").Dict)[], Schemastery.ObjectT<NoInfer<{
             provider: z<string, string, "defined">;
             model: z<string, string, "plain">;
+            maxInFlight: z<number, number, "plain">;
         }>>[], "defined">;
         worker: z<({
             provider?: string | null;
             model?: string | null;
+            maxInFlight?: number | null;
         } & import("@deepseek-ai/cosmokit").Dict)[], Schemastery.ObjectT<NoInfer<{
             provider: z<string, string, "defined">;
             model: z<string, string, "plain">;
+            maxInFlight: z<number, number, "plain">;
         }>>[], "defined">;
         verifier: z<({
             provider?: string | null;
             model?: string | null;
+            maxInFlight?: number | null;
         } & import("@deepseek-ai/cosmokit").Dict)[], Schemastery.ObjectT<NoInfer<{
             provider: z<string, string, "defined">;
             model: z<string, string, "plain">;
+            maxInFlight: z<number, number, "plain">;
         }>>[], "defined">;
         synthesizer: z<({
             provider?: string | null;
             model?: string | null;
+            maxInFlight?: number | null;
         } & import("@deepseek-ai/cosmokit").Dict)[], Schemastery.ObjectT<NoInfer<{
             provider: z<string, string, "defined">;
             model: z<string, string, "plain">;
+            maxInFlight: z<number, number, "plain">;
         }>>[], "defined">;
     }>>>, "volatile-defined">;
     synthesis: z<"deterministic" | "model", "deterministic" | "model", "volatile-defined">;
@@ -170,59 +191,75 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
         planner: z<({
             provider?: string | null;
             model?: string | null;
+            maxInFlight?: number | null;
         } & import("@deepseek-ai/cosmokit").Dict)[], Schemastery.ObjectT<NoInfer<{
             provider: z<string, string, "defined">;
             model: z<string, string, "plain">;
+            maxInFlight: z<number, number, "plain">;
         }>>[], "defined">;
         worker: z<({
             provider?: string | null;
             model?: string | null;
+            maxInFlight?: number | null;
         } & import("@deepseek-ai/cosmokit").Dict)[], Schemastery.ObjectT<NoInfer<{
             provider: z<string, string, "defined">;
             model: z<string, string, "plain">;
+            maxInFlight: z<number, number, "plain">;
         }>>[], "defined">;
         verifier: z<({
             provider?: string | null;
             model?: string | null;
+            maxInFlight?: number | null;
         } & import("@deepseek-ai/cosmokit").Dict)[], Schemastery.ObjectT<NoInfer<{
             provider: z<string, string, "defined">;
             model: z<string, string, "plain">;
+            maxInFlight: z<number, number, "plain">;
         }>>[], "defined">;
         synthesizer: z<({
             provider?: string | null;
             model?: string | null;
+            maxInFlight?: number | null;
         } & import("@deepseek-ai/cosmokit").Dict)[], Schemastery.ObjectT<NoInfer<{
             provider: z<string, string, "defined">;
             model: z<string, string, "plain">;
+            maxInFlight: z<number, number, "plain">;
         }>>[], "defined">;
     }>>>, NoInfer<Schemastery.ObjectT<NoInfer<{
         planner: z<({
             provider?: string | null;
             model?: string | null;
+            maxInFlight?: number | null;
         } & import("@deepseek-ai/cosmokit").Dict)[], Schemastery.ObjectT<NoInfer<{
             provider: z<string, string, "defined">;
             model: z<string, string, "plain">;
+            maxInFlight: z<number, number, "plain">;
         }>>[], "defined">;
         worker: z<({
             provider?: string | null;
             model?: string | null;
+            maxInFlight?: number | null;
         } & import("@deepseek-ai/cosmokit").Dict)[], Schemastery.ObjectT<NoInfer<{
             provider: z<string, string, "defined">;
             model: z<string, string, "plain">;
+            maxInFlight: z<number, number, "plain">;
         }>>[], "defined">;
         verifier: z<({
             provider?: string | null;
             model?: string | null;
+            maxInFlight?: number | null;
         } & import("@deepseek-ai/cosmokit").Dict)[], Schemastery.ObjectT<NoInfer<{
             provider: z<string, string, "defined">;
             model: z<string, string, "plain">;
+            maxInFlight: z<number, number, "plain">;
         }>>[], "defined">;
         synthesizer: z<({
             provider?: string | null;
             model?: string | null;
+            maxInFlight?: number | null;
         } & import("@deepseek-ai/cosmokit").Dict)[], Schemastery.ObjectT<NoInfer<{
             provider: z<string, string, "defined">;
             model: z<string, string, "plain">;
+            maxInFlight: z<number, number, "plain">;
         }>>[], "defined">;
     }>>>, "volatile-defined">;
     synthesis: z<"deterministic" | "model", "deterministic" | "model", "volatile-defined">;

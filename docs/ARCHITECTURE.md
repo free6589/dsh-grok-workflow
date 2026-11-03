@@ -101,6 +101,21 @@ is `maxConcurrency` (default 4, schema maximum 1000000). The script calls `agent
 only from a pool worker, so at most that many child agents are in flight.
 `maxTotalAgents` is also passed to the engine as a second backstop.
 
+### Per-route concurrency: overflow, not fallback
+
+Each route in a role's chain may carry an optional `maxInFlight` (1–64, blank =
+unlimited). The counter is per route, not per run: while a capped route is full,
+a new call overflows to the next untried route in chain order instead of waiting
+on the full one. Only when every untried route is full does the call wait for a
+drain, and the wait is recorded as `queuedMs`.
+
+A full lane is never a failure: it advances no fallback, costs no retry attempt,
+and leaves the failure policy (`switchOn`) untouched. The distinction is visible
+where it matters — the child's trail entry carries `skippedBusy` (which lanes
+were yielded) and `queuedMs`, rendered as `Route overflows …` (separate from
+`Route switches:`) and kept in the routing ledger — so "used route B because
+route A was full" never reads as "route A failed".
+
 ### Verify
 
 Every worker result is followed by a fresh verifier agent that receives the

@@ -87,6 +87,14 @@ export interface ModelRoute {
   provider?: string
   /** Model id interpreted by that provider adapter. */
   model: string
+  /**
+   * Maximum child calls simultaneously in flight on this route. When full,
+   * the call overflows to the next route in the chain instead of waiting on
+   * this one. Absent means unlimited. A full route is not a failure: it
+   * never advances the failure fallback, counts no attempt, and is recorded
+   * in the trail (`skippedBusy` / `queuedMs`) instead of the failure fields.
+   */
+  maxInFlight?: number
 }
 
 /** Per-role ordered chains. An absent role inherits the run's route. */
@@ -329,6 +337,13 @@ export interface RouteTrailEntry {
   outcome: 'ok' | 'failed'
   failureClass?: FailureClass
   reason?: string
+  /**
+   * Routes skipped as full when this call was placed (overflow, not failure).
+   * Absent when nothing was skipped.
+   */
+  skippedBusy?: string[]
+  /** Milliseconds this call waited for a full route to drain. Absent when it did not wait. */
+  queuedMs?: number
 }
 
 /** One attempt's observed result. */

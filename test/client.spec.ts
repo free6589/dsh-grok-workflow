@@ -30,6 +30,8 @@ interface Bundle {
   GROK_WORKFLOW_GROUPS: string[]
   GROK_WORKFLOW_LOCALES: string[]
   GROK_WORKFLOW_CHAIN_LIMIT: number
+  GROK_WORKFLOW_ROUTE_INFLIGHT_MIN: number
+  GROK_WORKFLOW_ROUTE_INFLIGHT_MAX: number
   GROK_WORKFLOW_DICT: Record<string, Record<string, string>>
   GROK_WORKFLOW_INTERNALS: {
     draftOf(value?: Record<string, unknown>): Draft
@@ -43,7 +45,7 @@ interface Bundle {
   }
 }
 
-type Route = { provider?: string, model?: string }
+type Route = { provider?: string, model?: string, maxInFlight?: number }
 type Draft = Record<string, unknown> & { roles: Record<string, Route[]> }
 
 /** Load the bundle the way the host does: register, then run the factory with a stub React. */
@@ -117,6 +119,11 @@ describe('client settings page bundle', () => {
     expect([...numeric.keys()].sort()).toEqual(Object.keys(expected).sort())
   })
 
+  it('keeps the per-route cap bounds identical to HARD_LIMITS', () => {
+    expect(bundle.GROK_WORKFLOW_ROUTE_INFLIGHT_MIN).toBe(HARD_LIMITS.routeInFlight.min)
+    expect(bundle.GROK_WORKFLOW_ROUTE_INFLIGHT_MAX).toBe(HARD_LIMITS.routeInFlight.max)
+  })
+
   it('offers exactly the failure classes the Host accepts in switchOn', () => {
     expect(bundle.GROK_WORKFLOW_SWITCHABLE_CLASSES).toEqual([...SWITCHABLE_CLASSES])
   })
@@ -178,6 +185,7 @@ describe('client settings page: bilingual copy (t42)', () => {
       { key: 'error.missingModel', params: { role: 'planner', index: 2 } },
       { key: 'error.tooLong', params: { role: 'verifier', index: 1, limit: 120 } },
       { key: 'error.duplicate', params: { role: 'synthesizer', index: 3 } },
+      { key: 'error.badCap', params: { role: 'worker', index: 1, min: 1, max: 64 } },
       { key: 'error.unknownClass', params: { entry: 'not-a-class' } },
     ]
     for (const finding of findings) {
@@ -400,6 +408,27 @@ describe('client settings page: draft, validation and path ops', () => {
     const findings = validate(long)
     expect(findings.some(finding => finding.key === 'error.tooLong' && finding.params?.['limit'] === 120)).toBe(true)
     expect(messagesIn(findings, en).some(text => text.includes('120'))).toBe(true)
+  })
+
+  it('rejects a per-route cap outside 1..64 and accepts blank for unlimited', () => {
+    const bad = draftOf(undefined)
+    bad.roles.worker = [{ provider: 'p', model: 'm', maxInFlight: 0 }]
+    const findings = validate(bad)
+    expect(findings.some(finding => finding.key === 'error.badCap' && finding.params?.['min'] === 1 && finding.params?.['max'] === 64)).toBe(true)
+    expect(messagesIn(findings, en).some(text => text.includes('blank for unlimited'))).toBe(true)
+    expect(messagesIn(findings, zh).some(text => text.includes('留空就是不限'))).toBe(true)
+
+    const high = draftOf(undefined)
+    high.roles.worker = [{ provider: 'p', model: 'm', maxInFlight: 65 }]
+    expect(validate(high).some(finding => finding.key === 'error.badCap')).toBe(true)
+
+    const fractional = draftOf(undefined)
+    fractional.roles.worker = [{ provider: 'p', model: 'm', maxInFlight: 1.5 }]
+    expect(validate(fractional).some(finding => finding.key === 'error.badCap')).toBe(true)
+
+    const blank = draftOf(undefined)
+    blank.roles.worker = [{ provider: 'p', model: 'm' }, { provider: 'p', model: 'n', maxInFlight: 2 }]
+    expect(validate(blank)).toEqual([])
   })
 
   it('refuses a switchOn class the Host does not accept', () => {
