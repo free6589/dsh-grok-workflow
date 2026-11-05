@@ -195,8 +195,9 @@ describe('route validation against the runtime', () => {
     expect(projected).toContain('roles')
     expect(projected).toContain('switchOn')
     expect(projected).toContain('maxActiveRunsTotal')
-    expect(projected).toContain('grokDefault')
-    expect(projected).toHaveLength(23)
+    expect(projected).toContain('triageClassifier')
+    expect(projected).toContain('humanSummary')
+    expect(projected).toHaveLength(27)
     const ctx = ctxWith({
       settings: { configure: () => () => {}, describe: () => [descriptor] },
     })

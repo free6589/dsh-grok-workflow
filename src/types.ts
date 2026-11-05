@@ -60,6 +60,9 @@ export interface NormalizedTask {
 /** Front-desk routing mode (t52). */
 export type TriageMode = 'full' | 'triage'
 
+/** Front-desk classifier: pure rules, or rules with one model fallback for unclear cases. */
+export type TriageClassifier = 'rules' | 'hybrid'
+
 export type AnswerStrategy = 'relay' | 'append' | 'in-turn'
 
 /**
@@ -129,6 +132,14 @@ export interface GrokWorkflowConfig {
   triageAsk?: boolean
   /** Route for the single call a chat or fast answer spends (`model` or `provider/model`). */
   triageModel?: string
+  /** Front-desk classifier: pure rules (default), or rules with one model fallback. */
+  triageClassifier?: TriageClassifier
+  /** When true (default), a follow-up phrase with history routes fast. */
+  triageFollowupAsFast?: boolean
+  /** Team tier: append an instant receipt after claiming (default true). */
+  instantReceipt?: boolean
+  /** Team tier: append a 3-5 sentence Chinese summary after the run (default true). */
+  humanSummary?: boolean
   /** Per-role ordered model chains (planner/worker/verifier/synthesizer). */
   roles?: RoleRouting
   /** Final-answer strategy (U-3): deterministic aggregation, or one model call. */
@@ -201,6 +212,14 @@ export interface ResolvedConfig {
   triageAsk: boolean
   /** Optional route for the single call a chat or fast answer spends. */
   triageModel?: ModelRoute
+  /** Front-desk classifier: pure rules (default), or rules with one model fallback. */
+  triageClassifier: TriageClassifier
+  /** When false, the follow-up shortcut is disabled even with history. */
+  triageFollowupAsFast: boolean
+  /** Team tier: instant receipt after claiming so the user sees progress (default true). */
+  instantReceipt: boolean
+  /** Team tier: 3-5 sentence Chinese summary prepended to the report (default true). */
+  humanSummary: boolean
   /** Effective per-role chains; an empty array means "inherit the run's route". */
   roles: Record<RoleName, ModelRoute[]>
   synthesis: SynthesisMode

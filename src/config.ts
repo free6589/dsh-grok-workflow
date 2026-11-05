@@ -66,6 +66,10 @@ export const CONFIG_KEYS = [
   'grokDefault',
   'triageAsk',
   'triageModel',
+  'triageClassifier',
+  'triageFollowupAsFast',
+  'instantReceipt',
+  'humanSummary',
   'historyTurns',
   'historyChars',
   'maxQueuedMessages',
@@ -122,6 +126,17 @@ export const Config = z.object({
   // Empty means "inherit the message's own route": the chat and fast tiers then
   // spend exactly one child call on the run's provider instead of a second one.
   triageModel: z.string().default('').volatile(),
+  // Front-desk classifier: `rules` is pure string rules (default, zero behavior
+  // change); `hybrid` adds one model call only for unclear cases (see gate.ts).
+  triageClassifier: z.union([z.const('rules'), z.const('hybrid')]).default('rules').volatile(),
+  // When true (default), a follow-up phrase ("继续", "说人话" …) with history
+  // routes fast; when false the follow-up shortcut is disabled.
+  triageFollowupAsFast: z.boolean().default(true).volatile(),
+  // Team tier: append an instant receipt after claiming so the user sees the tier
+  // while the run is in flight (default on, pure addition).
+  instantReceipt: z.boolean().default(true).volatile(),
+  // Team tier: append a 3-5 sentence Chinese summary after the run (default on).
+  humanSummary: z.boolean().default(true).volatile(),
   historyTurns: z.natural().min(0).max(HARD_LIMITS.historyTurns).default(12).volatile(),
   historyChars: z.natural().min(0).max(HARD_LIMITS.historyChars).default(20_000).volatile(),
   maxQueuedMessages: z.natural().min(0).max(HARD_LIMITS.maxQueuedMessages).default(4).volatile(),
@@ -403,6 +418,13 @@ export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
   }
   const mode = config.mode ?? 'triage'
   const triageModel = parseSingleRoute('triageModel', config.triageModel)
+  const triageClassifier = config.triageClassifier ?? 'rules'
+  if (triageClassifier !== 'rules' && triageClassifier !== 'hybrid') {
+    throw new Error('triageClassifier must be "rules" or "hybrid"')
+  }
+  const triageFollowupAsFast = config.triageFollowupAsFast ?? true
+  const instantReceipt = config.instantReceipt ?? true
+  const humanSummary = config.humanSummary ?? true
   const synthesis = config.synthesis ?? 'deterministic'
   if (synthesis === 'model' && roles.synthesizer.length === 0) {
     throw new Error('synthesis "model" requires a non-empty roles.synthesizer chain')
@@ -422,6 +444,10 @@ export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
     mode,
     grokDefault: config.grokDefault ?? 'off',
     triageAsk: config.triageAsk ?? true,
+    triageClassifier,
+    triageFollowupAsFast,
+    instantReceipt,
+    humanSummary,
     ...triageModel === undefined ? {} : { triageModel },
     historyTurns: integer('historyTurns', config.historyTurns ?? 12, 0, HARD_LIMITS.historyTurns),
     historyChars: integer('historyChars', config.historyChars ?? 20_000, 0, HARD_LIMITS.historyChars),

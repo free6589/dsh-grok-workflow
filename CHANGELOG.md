@@ -5,6 +5,26 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Added / 新增
+
+- **History-aware follow-up triage / 追问可接上文，不再掉进寒暄** —
+  a follow-up fragment ("说人话", "继续", "详细点" …) with conversation history now routes
+  `fast/followup` instead of the greeting template; without history it asks instead of
+  answering from the template. Disable with `triageFollowupAsFast: false`.
+  有上文时"说人话/继续/详细点"走快手档（`fast/followup`），不再回寒暄模板；首条无上文时改为追问确认。
+  可用 `triageFollowupAsFast: false` 关闭。
+- **Hybrid front-desk classifier (opt-in) / 混合分诊（可选）** —
+  `triageClassifier: rules` (default) keeps pure string rules byte-for-byte; `hybrid` adds one
+  model call only for unclear cases (`ask`/`ambiguous-escalate`, or `chat` with history),
+  falling back to the rules verdict on any failure.
+  默认 `rules` 纯规则零行为变化；`hybrid` 仅在拿不准时多花一次模型调用，失败回退规则结果。
+- **Team-tier instant receipt + plain-language lead-in / 团队档即时回执与人话导读** —
+  the team tier posts its tier line immediately (`instantReceipt`, default on) so a long run
+  never looks blank, and prepends a deterministic `【人话结论】 verified/total` lead-in before
+  the machine report (`humanSummary`, default on). Both are pure additions with zero extra
+  model calls. 团队档先回档位行（`instantReceipt` 默认开），运行时不再白屏；报告前加确定性
+  `【人话结论】` 导读（`humanSummary` 默认开）。两者零额外模型调用。
+
 ## [0.3.0] - 2026-11-03
 
 ### Fixed / 修复

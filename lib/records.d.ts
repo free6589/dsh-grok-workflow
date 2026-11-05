@@ -335,6 +335,8 @@ export declare function createWorkflowProgressRecorder(session: Session | undefi
  * the cancellation that follows it.
  */
 export declare function recordDispose(session: Session | undefined, record: DisposeRecord, logger: WorkflowLogger): boolean;
+/** Append an instant team-tier receipt so the run never looks blank while in flight. */
+export declare function appendInstantReceipt(session: Session | undefined, text: string, logger: WorkflowLogger): boolean;
 /**
  * Write the one-shot interruption notice into the session whose run was cut.
  *

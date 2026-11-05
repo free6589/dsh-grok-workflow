@@ -667,6 +667,31 @@ export function recordDispose(
   }
 }
 
+/** Append an instant team-tier receipt so the run never looks blank while in flight. */
+export function appendInstantReceipt(
+  session: Session | undefined,
+  text: string,
+  logger: WorkflowLogger,
+): boolean {
+  if (session === undefined || typeof session.append !== 'function') return false
+  const { turn, step } = lastTurnOf(session)
+  try {
+    session.append('assistant/message', {
+      turn,
+      step,
+      message: createAssistantMessage({
+        content: [{ type: 'text', text }],
+        source: { provider: 'grok-workflow', model: 'workflow-receipt' },
+      }),
+      stream: [],
+    }, { surfaceOp: 'append' })
+    return true
+  } catch (error) {
+    logger.warn(`instant receipt not written: ${redactError(error)}`)
+    return false
+  }
+}
+
 /** The last turn/step the session recorded, for placing a notice in the transcript. */
 function lastTurnOf(session: Session): { turn: number, step: number } {
   try {
