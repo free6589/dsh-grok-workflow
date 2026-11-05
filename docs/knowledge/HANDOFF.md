@@ -1,5 +1,44 @@
 # Agent Handoff
 
+## 2026-11-06 — PR #37 merged + v0.4.0 released (GitHub Release only, no npm)
+
+- **From:** release operator (local) · **To:** next agent / operator
+- **Base commit:** `e89daf9` (PR #37 feature on `feat/triage-history-hybrid`); **merge commit** `9438b3d` (PR #37 merge);
+  **release commit** `708c315` (PR #38 merge); **tag** `v0.4.0` → `708c315`.
+  `package.json` and `package-lock.json` both read `0.4.0`;
+  `CHANGELOG.md` carries the bilingual `## [0.4.0] - 2026-11-06` section with a fresh empty
+  `## [Unreleased]` above it; `docs/releases/RELEASE-NOTES-0.4.0.md` exists.
+- **Feature (CONFIRMED):** history-aware follow-up (`FOLLOW_UP` + `historyNonEmpty`, `fast/followup`,
+  never `chat`; `triageFollowupAsFast` opt-out) + hybrid classifier opt-in (`triageClassifier`
+  `rules|hybrid`, default `rules`, one `runSingleCall` only for `ask`/ambiguous or `chat`+history,
+  fallback to rules) + team-tier instant receipt (`appendInstantReceipt`) + deterministic
+  `【人话结论】 verified/total` lead-in (`humanSummary`, zero extra calls).
+  `npm run ci` 32 files / 545 tests PASS (incl. new `test/triage-followup.spec.ts` 5 cases);
+  `npm run typecheck` clean; `npm run lint` 3 warnings / 0 errors (pre-existing);
+  `npm run build` clean; `git diff --exit-code -- lib/` exit 0; `npm pack --dry-run` 56 files / 250.7 kB.
+- **Merge of the feature (CONFIRMED):** `gh pr merge 37 --merge` after `gh pr checks 37` showed
+  Node 22 `pass` / Node 24 `pass` (run `42074144133`); merge commit `9438b3d`;
+  `origin/main:src/gate.ts` contains `triageClassifier === 'hybrid'` branch and `humanSummary` block.
+- **Release (CONFIRMED):** branch `release/0.4.0` → PR #38 green on Node 22/24 (run `42075028625`)
+  → merge `708c315`. `git tag v0.4.0 708c315` + `git push origin v0.4.0`. Release workflow run
+  [42075318386](https://github.com/free6589/dsh-grok-workflow/actions/runs/42075318386) green end
+  to end. GitHub Release `https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.4.0` with
+  `dsh-grok-workflow-0.4.0.tgz` (250,693 B, sha256 `e10802ca…`).
+- **Tags:** `git ls-remote --tags origin` taken before and after; `diff` over the pre-existing
+  tags = no changes. `v0.1.0`–`v0.3.0` untouched; only `refs/tags/v0.4.0` is new.
+- **Decisions:** D-032 (history-aware follow-up) + D-033 (hybrid opt-in) + D-034 (receipt +
+  deterministic summary, model-rewrite variant rejected after breaking 4 engine-count assertions).
+- **Honest boundary:** `humanSummary` model-rewrite variant was built then reverted (extra engine
+  call broke P0-2 ×3 + triage count ×1); shipped version is deterministic. Live multi-turn
+  follow-up (`说人话` with history in one session) is covered by deterministic unit tests, not by
+  one-shot headless (each headless turn is a fresh session). Isolated-profile live verification
+  (Round 20): greeting `chat` + fast `30` PASS on `wb/cn:deepseek-v4.1-flash`; team tier ran and
+  reported honestly (FAILED on an unresolvable `run.ts` path in an empty `/tmp` workspace — the
+  gate/report path itself PASS, not a model-quality claim).
+- **Next action (needs the operator, not an agent):** the live DSH service on `:3090` still runs
+  `dsh-grok-workflow@0.2.7`; upgrading the `web` profile to `v0.4.0` (and any profile reload)
+  still awaits explicit user approval (D-013). Do not restart the service on your own.
+
 ## 2026-11-03 — PR #35 merged + v0.3.0 released (GitHub Release only, no npm)
 
 - **From:** release operator (local) · **To:** next agent / operator

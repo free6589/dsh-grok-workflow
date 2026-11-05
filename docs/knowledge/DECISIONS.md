@@ -461,3 +461,34 @@ Each entry records the decision, evidence, alternatives, and status.
 - **Alternatives rejected:** 全局 lenient 默认（吞掉拼错 provider 这类真错误）；
   只修 load 不修运行期 save（坏 save 仍杀下次启动）；只 host 修不加设置页联动
   （用户下次手写 YAML 还会撞同一面墙）。
+
+## D-032 — 追问可接上文：有历史的跟进绝不进寒暄模板（v0.4.0）
+
+- **Status:** CONFIRMED（`npm run ci` 32 文件 / 545 测试 PASS；新增 `test/triage-followup.spec.ts` 5 例）
+- **Date:** 2026-11-06
+- **Decision:** `TriageInput` 新增 `historyNonEmpty?` + `followupAsFast?`；`FOLLOW_UP`
+  （说人话|人话|通俗|白话|接着说|继续|详细点|再讲|再说说|展开）有历史且开关开时判
+  `fast/followup`；无历史时短惰性分支判 `ask/ambiguous-escalate`，永不进 `chat`。
+  网关复用 in-turn 历史快照（relay 才重读），`triageFollowupAsFast: false` 可关。
+- **Reason:** “说人话”被当寒暄是前台无历史分类的必然结果；补正则不如先给历史。
+- **Evidence:** `test/triage-followup.spec.ts`（有历史→fast；无历史→非chat；其它短语全覆盖；`你好`仍chat）。
+- **Alternatives rejected:** 全量模型分诊默认（每条多 1-3s + 成本 + 不可审计）；无限补 FOLLOW_UP 词表。
+
+## D-033 — 混合分诊默认关、只兜不确定的（v0.4.0）
+
+- **Status:** CONFIRMED（默认 `rules` 路径逐字节不变；hybrid 仅 ask/ambiguous 或 chat+有历史时多花一次 `runSingleCall`，失败回退）
+- **Date:** 2026-11-06
+- **Decision:** 新增 `triageClassifier: rules|hybrid`（默认 rules）+ `triageModel` 复用；
+  hybrid prompt 只传历史前 2000 字 + 本条前 2000 字，要求 `{"tier":"chat|fast|team"}`，解析失败回退规则结果。
+- **Consequences:** 设置页 enum 双语；27 字段投影断言更新。
+- **Alternatives rejected:** 全量模型分诊（寒暄也变慢变贵）。
+
+## D-034 — 团队档即时回执 + 确定性人话导读，零额外调用（v0.4.0）
+
+- **Status:** CONFIRMED（`instantReceipt`/`humanSummary` 默认双开；`humanSummary` 为确定性 `verified/total` 拼接，不调模型）
+- **Date:** 2026-11-06
+- **Decision:** 团队档先 `appendInstantReceipt` 写档位行（失败只丢回执不丢运行）；
+  报告头加 `【人话结论】任务 verified/total` + synthesis 首两行（400 字截断）。
+  曾试过模型重写版，因多一次 engine 调用打爆 3 个 P0-2 单测 + triage 单测计数，已回退为确定性版。
+- **Reason:** 白屏是因为 `in-turn` await 整轮 + 最终 `relayText` 被勒令逐字复述；回执解决“运行时空白”，导读解决“只剩机器语言”。
+- **Alternatives rejected:** 模型重写人话总结（多调用、串改单测计数、预算不可控）；切 `relay` 全局（one-shot 会丢答案）。

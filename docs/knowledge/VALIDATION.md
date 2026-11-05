@@ -1653,3 +1653,50 @@ Node `v26.8.1`, npm `11.19.0`, `gh` authenticated as `free6589` (`repo`, `workfl
 - The live `:3090` service was not reloaded, restarted or reconfigured (D-013); it still runs
   `dsh-grok-workflow@0.2.7`, and the operator `web` profile was not upgraded to `0.3.0`.
 - npm publishing: not done and not planned (GitHub Releases only, per `docs/RELEASING.md`).
+
+## Round 20 (2026-11-06) — PR #37 feature + `v0.4.0` release + isolated-profile live verification
+
+Environment: operator machine, `main` of `/home/fish/projects_mine/dsh-grok-workflow`,
+Node `v26.8.1`, DSH `0.2.1-rc.2`, `gh` authenticated as `free6589` (`repo`, `workflow` scopes),
+model route `bifrost-completions/wb/cn:deepseek-v4.1-flash` via `BIFROST_VIRTUAL_KEY`.
+
+### 1. Feature PR #37 (history-aware follow-up + hybrid + receipt/summary)
+
+| Check | Command | Result | Evidence |
+|---|---|---|---|
+| PR CI | `gh pr checks 37` | PASS | Node 22 `pass` 38s, Node 24 `pass` 34s — run `42074144133` |
+| merge | `gh pr merge 37 --merge` | MERGED | merge commit `9438b3d` |
+| local CI on feature head | `npm run ci` on `e89daf9` | PASS | 32 files / 545 tests (incl. new `test/triage-followup.spec.ts` 5 cases); typecheck clean; lint 3 warnings / 0 errors (pre-existing); build clean; `lib/` in sync |
+| regression note | `npm test` after deterministic-summary revert | PASS | 32 files / 545 tests; model-rewrite `humanSummary` variant reverted because one extra engine call broke 3× P0-2 + 1× triage count assertions; shipped `humanSummary` is deterministic `verified/total` + synthesis lead-in, zero extra calls |
+
+### 2. Release preparation (`release/0.4.0`, commit `472d043`) + PR #38 + tag + workflow
+
+| Check | Command | Result | Evidence |
+|---|---|---|---|
+| bump | `npm version minor --no-git-tag-version` on `release/0.4.0` | PASS | `package.json` + `package-lock.json` both `0.4.0` |
+| changelog | `CHANGELOG.md` + `docs/releases/RELEASE-NOTES-0.4.0.md` | PASS | bilingual `## [0.4.0] - 2026-11-06` + 39-line release notes |
+| local checks | `npm run typecheck` / `lint` / `build` / `git diff --exit-code -- lib/` / `npm test` / `npm pack --dry-run` | PASS | typecheck exit 0; lint 3/0 pre-existing; `client bundle: 81835 bytes`; lib sync exit 0; 32/545 PASS; 56 files / 250.7 kB `dsh-grok-workflow-0.4.0.tgz` |
+| open PR | `gh pr create --base main --head release/0.4.0` | PASS | PR #38 |
+| PR CI | `gh pr checks 38` | PASS | Node 22 `pass` 32s, Node 24 `pass` 42s — run `42075028625` |
+| merge | `gh pr merge 38 --merge` | MERGED | release commit `708c315` |
+| tag | `git tag v0.4.0 708c315 && git push origin v0.4.0` | PASS | `* [new tag] v0.4.0 -> v0.4.0`; pre-existing tags untouched (`v0.1.0`–`v0.3.0`) |
+| Release workflow | `gh run view 42075318386` | PASS | conclusion `success`; `gh release view v0.4.0` → `Grok Workflow for DSH v0.4.0`, asset `dsh-grok-workflow-0.4.0.tgz` 250,693 B, sha256 `e10802ca…`, published `2026-11-05T17:31:21Z` |
+
+### 3. Isolated-profile live verification (`gw040`, `v0.4.0` tarball, `wb/cn:deepseek-v4.1-flash`)
+
+| Check | Command | Result | Evidence |
+|---|---|---|---|
+| isolated home | `DSH_HOME=./tmp-home040 dsh --profile gw040 --from-default-profile headless` | PASS | `gw040` created; `workflow-ptc provider: spawn` present in dump |
+| install | `dsh plugin --profile gw040 add ./tmp-pack040/dsh-grok-workflow-0.4.0.tgz` | PASS | `+ dsh-grok-workflow file:…tgz`; dump shows `- id: grok-workflow / name: dsh-grok-workflow` + patched `grokDefault: on`, 4 new keys |
+| chat tier | `dsh --profile gw040 --patch gw040.patch.yml "你好"` | PASS EXIT 0 | `级别：直接回答` + greeting template + `（本次未调用子代理团队…）`, `GROK-WORKFLOW-REPORT` envelope |
+| fast tier | `… "算一下 5×6等于多少，只回答数字"` | PASS EXIT 0 | `档位：快手档` + `30` + `（这条只派了一个工人…）` |
+| team tier | `… "帮我重构 run.ts 的超时逻辑，并补上回归测试"` in empty `/tmp/dshgw-040-work` | PASS (gate/report path) EXIT 0 | `档位：团队档` + `Grok workflow: FAILED` with honest `Incomplete (quality)` + uncertainties naming the unresolvable `run.ts` path; no writes outside `/tmp` (TESTING.md isolation kept; scratch dirs removed after) |
+
+### 4. Boundary (what this round does NOT claim)
+
+- Multi-turn follow-up (`说人话` with history in one live session) is covered by deterministic
+  unit tests (`test/triage-followup.spec.ts`), not by one-shot headless: each headless turn is a
+  fresh session, so `historyNonEmpty` is false there by construction.
+- The live `:3090` service was not reloaded, restarted or reconfigured (D-013); it still runs
+  `dsh-grok-workflow@0.2.7`, and the operator `web` profile was not upgraded to `v0.4.0`.
+- npm publishing: not done and not planned (GitHub Releases only, per `docs/RELEASING.md`).
