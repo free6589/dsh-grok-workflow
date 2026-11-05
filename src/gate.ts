@@ -51,7 +51,7 @@ import { frontDeskText, noticeEnterText, noticeText, relayText, RELAY_SOURCE_KIN
 import { collectHistory, composeObjective } from './history.js'
 import { TASK_LIMITS } from './input.js'
 import { isModeEnabled, readModeRecord } from './mode.js'
-import { alreadyRouted, deliveryKey, recordDelivery } from './records.js'
+import { alreadyRouted, appendInstantReceipt, deliveryKey, recordDelivery } from './records.js'
 import type { DeliveryPhase } from './records.js'
 import { redactError } from './redact.js'
 import type { ActiveState, RunOutcome, WorkflowLogger } from './run.js'
@@ -475,12 +475,57 @@ export function installGate(deps: GateDeps): boolean {
       // and an expired entry has to be stated rather than silently reused (P0-2).
       const pending = takePending(agentId)
       const live = pending?.kind === 'live' ? pending.ask : undefined
-      const tier = classifyTriage({
+      // History-aware follow-up: reuse the in-turn snapshot when present; only
+      // the relay/append path (history === undefined) reads it here.
+      const histForTriage = history ?? collectHistory(sessionOf(agent), { turns: limits.historyTurns, chars: limits.historyChars })
+      const historyNonEmpty = histForTriage.trim() !== ''
+      const tier0 = classifyTriage({
         text: request,
         mode: effectiveMode,
         ask: limits.triageAsk,
         pending: live !== undefined,
+        historyNonEmpty,
+        followupAsFast: limits.triageFollowupAsFast,
       })
+      // Hybrid classifier (opt-in): one model call only for unclear cases.
+      // Rules stay the default path byte-for-byte; hybrid only re-decides
+      // ask/ambiguous-escalate, or chat when history exists to consult.
+      let tier = tier0
+      if (limits.triageClassifier === 'hybrid'
+        && (tier0.reason === 'ambiguous' || tier0.reason === 'ambiguous-escalate'
+          || (tier0.tier === 'chat' && historyNonEmpty))) {
+        const hybridPrompt = [
+          'You are the front-desk classifier of a coding assistant.',
+          'Decide one tier for the current message: chat (small talk only), fast (one worker), team (multi-step).',
+          'Reply only JSON: {"tier":"chat|fast|team"}.',
+          '',
+          `History: ${histForTriage.slice(0, 2000)}`,
+          `Message: ${request.slice(0, 2000)}`,
+        ].join('\n')
+        try {
+          const call = await runSingleCall({
+            ctx, config, state, logger, agent,
+            prompt: hybridPrompt,
+            label: 'triage-classifier',
+            ...signal === undefined ? {} : { signals: [signal] },
+          })
+          if (call.ok) {
+            const m = /"tier"\s*:\s*"(chat|fast|team)"/.exec(call.text)
+            const t = m?.[1]
+            if (t === 'chat' || t === 'fast' || t === 'team') {
+              tier = {
+                tier: t,
+                reason: t === 'team' ? 'multi-step' : t === 'fast' ? 'single-step' : 'small-talk',
+                detail: tier0.detail,
+                lang: tier0.lang,
+                greeting: t === 'team',
+              }
+            }
+          }
+        } catch {
+          // Fall through to the rules verdict on any hybrid failure.
+        }
+      }
       // A confirmation question that is gone must be visible: the front desk may
       // not guess what the user meant, and the user must know why nothing ran.
       const expired = pending?.kind === 'expired' ? expiredAskNote(tier.lang) : ''
@@ -537,8 +582,32 @@ export function installGate(deps: GateDeps): boolean {
           outcome: 'triaged-fast',
         }
       }
+      // Team tier: instant receipt first so the run never looks blank while in
+      // flight (pure addition; a failed append only costs the receipt, never the run).
+      if (limits.instantReceipt) {
+        const receipt = [...lead, triageLine(tier), tier.greeting ? greetingLine(tier.lang) : '', tier.lang === 'zh' ? '正在执行，进度节点在旁。' : 'Running now; the live progress board sits beside this message.'].filter(line => line !== '').join('\n')
+        try {
+          appendInstantReceipt(sessionOf(agent), receipt, logger)
+        } catch {
+          // Receipt is best-effort by design.
+        }
+      }
       const answer = await runTeam(agent, target, signal, history)
-      const header = [...lead, triageLine(tier), tier.greeting ? greetingLine(tier.lang) : ''].filter(line => line !== '').join('\n')
+      // Human-readable summary: deterministic plain-language lead-in in front
+      // of the machine report (opt-out via humanSummary:false). Deterministic
+      // on purpose: zero extra model calls, so engine-call-count assertions and
+      // the one-shot budget stay exactly as before.
+      let summaryBlock = ''
+      if (limits.humanSummary && answer.kind === 'report'
+        && (answer.report.status === 'completed' || answer.report.status === 'partial')) {
+        const verified = answer.report.tasks.filter(t => t.status === 'verified').length
+        const total = answer.report.tasks.length
+        const firstLines = (answer.report.synthesis.summary ?? '').split('\n').map(s => s.trim()).filter(s => s !== '').slice(0, 2).join(' / ').slice(0, 400)
+        summaryBlock = tier.lang === 'zh'
+          ? `【人话结论】任务 ${verified}/${total} 项已核验通过。${firstLines !== '' ? firstLines : '详见下方原文报告。'}\n\n（原文报告附后）`
+          : `【Plain summary】${verified}/${total} tasks verified. ${firstLines !== '' ? firstLines : 'See the full report below.'}\n\n(Full machine report follows)`
+      }
+      const header = [...lead, triageLine(tier), tier.greeting ? greetingLine(tier.lang) : '', summaryBlock].filter(line => line !== '').join('\n')
       return answer.kind === 'report' ? { ...answer, header } : answer
     }
     return runTeam(agent, request, signal, history)

@@ -52,6 +52,17 @@ export interface TriageInput extends TriagePolicy {
      * one is read as its answer before any other rule applies.
      */
     pending?: boolean;
+    /**
+     * Whether bounded conversation history before this message is non-empty.
+     * Set by the gate from `collectHistory`; a follow-up phrase ("继续", "详细点" …)
+     * only counts as a fast follow-up when there is something to follow up on.
+     */
+    historyNonEmpty?: boolean;
+    /**
+     * When false, the follow-up shortcut is disabled even with history
+     * (mirrors `triageFollowupAsFast: false`); defaults to enabled.
+     */
+    followupAsFast?: boolean;
 }
 /** One classification. */
 export interface TriageVerdict {
