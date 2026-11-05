@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-06
+
 ### Added / 新增
 
 - **History-aware follow-up triage / 追问可接上文，不再掉进寒暄** —
