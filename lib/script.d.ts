@@ -34,6 +34,11 @@ export interface WorkflowRequestPayload {
         naming: {
             language: NamingLanguage;
         };
+        /**
+         * Compiled earlier rounds of this session (v0.5), already bounded and
+         * redacted by `src/carryover.ts`. Absent on a first round.
+         */
+        carryover?: string;
     };
     maxTotalAgents: number;
 }
@@ -58,7 +63,5 @@ export declare function routeBudgetFor(config: ResolvedConfig): RouteBudget;
  * with AGENT_CAP as soon as a fallback route is used.
  */
 export declare function maxTotalAgentsFor(tasks: number, retries: number, budget?: RouteBudget): number;
-/** Stable base label of a run: the GUI card title and the log's run name. */
-/** Build the static script and data-only arguments for one run. */
-export declare function buildWorkflowRequest(objective: string, tasks: NormalizedTask[] | undefined, config: ResolvedConfig, namingLanguage?: NamingLanguage): WorkflowRequestPayload;
+export declare function buildWorkflowRequest(objective: string, tasks: NormalizedTask[] | undefined, config: ResolvedConfig, namingLanguage?: NamingLanguage, carryover?: string): WorkflowRequestPayload;
 //# sourceMappingURL=script.d.ts.map

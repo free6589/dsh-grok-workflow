@@ -279,3 +279,47 @@ out-of-scope → mode-off → already-routed; reason labels are asserted only vi
   持久 `user/message` 到达或页面刷新即退场。所以"发送瞬间看得见、刷新后消失"是同一缺陷的两种表象。
 - **副作用**：先写消息再跑工作流时，`collectHistory()` 会把这条新消息当成"Conversation so far"，
   令 objective 重复携带请求。历史快照必须在写入**之前**取（`answerInTurn` 现在这样做）。
+
+## A14 — 跨轮上下文的唯一可信来源是插件自己写的报告（v0.5，2026-11-06，`CONFIRMED`）
+
+- **每一轮的子代理都是全新上下文**：`ctx.workflowEngine` 执行的脚本经 `agent()` hook 创建子代理，
+  它们看不到父会话对话，也看不到前序轮次。所谓"跨轮"只在**宿主侧**存在：会话 transcript 里有前几轮
+  的 `user/message` 和插件投递的报告。
+- **报告文本是唯一"未经过模型转述"的持久副本**：三种投递策略（`in-turn` 的 `enter` 消息、
+  `relay` 的 followup、`append` 的 surface 写入）都以 `source.kind === 'grok-workflow'` 写入会话，
+  因此 `collectCarryoverRounds()` 只认这个 source kind，模型那侧的复述（assistant/message）不参与编译。
+- **报告是可确定性解析的**：`renderReport()`（`src/report.ts`）的行格式固定——
+  `Grok workflow: <STATUS>` / `Objective: …` / `Confirmed evidence:` / `Incomplete:` /
+  `Final answer:` / `Uncertainties:`，每行 `- id: …`。`parseReportRound()` 按这组表头切段，
+  认不出签名就返回 `null`（=`不瞎编`），由 `test/carryover.spec.ts` 用真实 `renderReport` 输出钉住。
+- **预算复用既有 `historyTurns`/`historyChars`**：不新增配置键，也就没有新的设置页字段与投影断言；
+  两者为 0 时 digest 也为空（等于 0.4 行为）。
+- **注入点**：主机 `buildWorkflowRequest(..., carryover)` → `args.carryover` → 生成脚本的
+  `carryoverSection()` → planner / worker / verifier / synthesizer 四个提示词；脚本自带
+  `CARRYOVER_MAX_CHARS`（= `CARRYOVER_LIMITS.chars`），与主机侧夹取、carryover 模块夹取一起构成
+  三段式上限。校验者拿到 digest 时额外被告知"上文是先前工作，绝不是本任务判据的证据"。
+
+## A15 — 读子代理的产出：三个实测约束（v0.5，2026-11-06，`CONFIRMED`）
+
+三条都是在本机真机（`wb/cn:deepseek-v4.1-flash` + 真 `dsh-workflow-ptc`）上撞出来并复现的，
+不是从类型声明推的；它们决定了「子代理产出随做随存」只能怎么实现。
+
+1. **`ctx.sessions` 在插件 fiber 上直接抛**：`cannot get property "sessions" without inject`。
+   cordis 4 要求服务先 `inject` 才能用属性访问，而本插件故意不 inject `sessions`
+   （那样纯单测上下文里 `apply()` 根本不会启动）。可用的是注入口给出的只读入口
+   `ctx.get('sessions')`（返回 `undefined` 表示该组合没有这个服务）。
+   **症状**：不加这条时每条子代理条目都写着"读不到结果"，而轮次条目一切正常——很容易被误判成
+   "引擎没给结果"。
+2. **引擎在 `agent-end` 送到宿主之前就 dispose 了子会话**：`dsh-workflow-ptc` 的执行体
+   （`runWorkflowGuest`）把 `agent-start/agent-end` 走 **批量进度通道** 异步送出，随后
+   `await host.disposeChild({callId})`；等宿主收到 `workflow/agent-end` 再 `sessions.get(childId)`
+   已经查不到。可行做法是**在 `agent-start`（子会话还活着）捕获 Session 对象**，结算时读它的
+   `ownEvents()`。
+3. **结构化子代理不产出 assistant 文本**：真机子会话最后一条 `assistant/message` 只有
+   `reasoning` + `tool-call` 部件，`tool-call.arguments` 是**JSON 字符串**；结论在参数里——
+   校验者是 `structured_output`（`verdict`/`criteria`/`checkedEvidence`），执行体是 `submit`
+   （`summary`/`deliverables`/`evidence`/`testsRun`），规划者是 `tasks`。只读文本会让所有子代理
+   条目都变成"没有结果"。
+4. **闸门默认关**：`grokDefault` 默认 `off`，全新 profile 里用户消息根本不进分诊，
+   `runWorkflow` 从未运行——此时归档文件不会出现。排查"归档是空的"要先确认这一点
+   （真机 patch 里写 `grokDefault: "on"`）。

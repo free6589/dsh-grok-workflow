@@ -1,5 +1,31 @@
 # Agent Handoff
 
+## 2026-11-06 — 先回捞后提问（`history_first_no_reask`，v0.5 未发布，工作树内）
+
+- **From:** workflow execution agent · **To:** next agent / verifier · **Base commit:** `ac28a41`
+- **做了什么（`CONFIRMED`）：** `src/triage.ts` 新增 `recallFromPrior()`（去停用词的双字/词锚点 ≥2，
+  或指针式引用「刚才那份/上面说的/the above」+ 有实质材料 ≥120 字符）、`RECALL_LIMITS`、
+  `TriageInput.prior`、`DETAIL.recalled`、`recallPrompt()`、`recalledNote()`、`missingNote()`；
+  `classifyTriage()` 里 4 处 ask 判定统一改为 `ambiguousVerdict()`——`prior` 为命中则返回
+  `fast/recalled`，否则返回与改动前完全相同的 `ask`/`ambiguous-escalate`。
+  `src/gate.ts` 新增 `memoryDocRoots()`（默认 `<cwd>/docs/knowledge`，`GROK_WORKFLOW_KNOWLEDGE_DIRS`
+  可改）、`readMemoryDocs()`（只读、有界、过 `redactSecrets`、永不抛）、`collectRecallSources()`
+  （会话上文 + 前序轮次 digest + 记忆文件，**剔除本轮消息**），并在 `produceAnswer()` 的 ask 档前接线：
+  命中→快手档据材料作答；未命中且查过→提问后追加「先查后问，还缺 X」；无任何来源→提问逐字节不变。
+- **测试（`CONFIRMED`）：** `npm run ci` **35 文件 / 617 测试 PASS**、`Found 3 warnings and 0 errors`
+  （3 个既有 warning）；本轮新增 `test/triage-recall.spec.ts` **28 例**（命中/未命中/指针式/确定性/
+  上限/脱敏/默认根/逐字节回归/`session-7e079b80` 形态回放成对用例）。证据：
+  `docs/knowledge/evidence/history-first/{ci-summary,recall-spec,regression-suite}.txt`。
+- **决策：** D-037（提问前先读；只读、有界、无新配置键；`ask:false` 时命中仍走快手档）。
+- **现场发现（`CONFIRMED`，已修）：** 首版把本轮消息也算作"历史"（`relay` 在 `produceAnswer()` 前
+  就 `commitClaimed()`），导致任何追问都"命中自己"——现在 `collectRecallSources(…, exclude)` 按
+  `textOf(message) === request` 剔除，`before the fix` 用例守着它。
+- **诚实边界：** 真机在线模型回放 `NOT_RUN`（本轮未起隔离 profile）；语义同义改写不会命中，
+  会退化为提问；只读 `docs/knowledge/*.md`，不读 `archive.jsonl`。
+- **Next action：** ①等 verifier 复核判据 1/2/4；②若要真机收敛，按 VALIDATION Round 21/22 的隔离
+  home + `wb/cn:deepseek-v4.1-flash` 跑一次「先研究、后追问」两轮，确认追问不再要求重述；
+  ③`:3090` 未热加载（D-013），不要自行重启。
+
 ## 2026-11-06 — PR #37 merged + v0.4.0 released (GitHub Release only, no npm)
 
 - **From:** release operator (local) · **To:** next agent / operator
@@ -474,3 +500,41 @@
   `npm run ci` 全绿 → commit/push `origin feat/route-concurrency` → 开 PR
   `base:main`（标题见 STATE）→ 向 lead 回报 FROM/TO/TASK/BASE_COMMIT/WORK_COMMIT/
   CHANGES/TESTS_RUN/TEST_RESULTS/PR/BLOCKERS/NEXT_ACTION。
+
+## 2026-11-06 — 跨轮上下文延续（v0.5，工作树内，未提交）
+
+- **做了什么**：`src/carryover.ts`（新）+ `src/script.ts`（四角色提示词注入 + 脚本侧上限）+
+  `src/run.ts` / `src/gate.ts`（只改 `runTeam` 注入，提问判定零改动）/ `src/index.ts`（工具路径注入）；
+  测试 `test/carryover.spec.ts`（21 例）+ `test/gate.spec.ts`（+2 例）；
+  `CHANGELOG.md [Unreleased]` 中英条目；`docs/knowledge/{VALIDATION,RESEARCH,DECISIONS,STATE}.md`；
+  证据 `docs/knowledge/evidence/carryover-e2e/`。
+- **验证事实**：`npm test` 33 文件 / 568 测试 PASS；`npm run lint` 0 error（3 个既有 warning）；
+  `lib/` 由 `npm test` 的 build 重建；真机两轮 PASS（Round 21），digest 在真子代理提示词里可见。
+- **给下一个 agent 的三条硬约束**：
+  1. 不要为了"跨轮"改 `src/records.ts` 或归档存储——那是独立任务；本轮只用读路径。
+  2. `carryoverBounds` 复用 `historyTurns`/`historyChars`；若要新增配置键，必须同时改设置页
+     投影断言（`test/settings-projection.spec.ts` 的封闭键清单）。
+  3. 真机多轮验证不能靠"同一条命令里连发两条消息"（会被丢）；本轮的可行姿势是
+     `--session-id` 续跑，且**首条消息必须先走一次 gate-off**（F1 未修）。
+- **下一步**：提交 + 开 PR（`base:main`）；决定 F1 是否另立任务；`:3090` 升级仍需用户批准（D-013）。
+
+## 2026-11-06 — 增量记忆归档：轮次结算即写入、单次会话可读回（v0.5，工作树内，未提交）
+
+- **做了什么**：`src/memory/archive.ts` / `src/memory/recorder.ts` / `src/memory/cli.ts`（新）+
+  `src/run.ts` 两处接线（引擎事件订阅、`finally` 轮次结算，另加 `runSingleCall` 成功路径的前台档
+  归档）；测试 `test/memory-archive.spec.ts`（21 例）+ `vitest.config.ts`（测试期把
+  `GROK_WORKFLOW_MEMORY_DIR` 指向 `tmpdir()`，避免单测写进操作者的 `$DSH_HOME`）；
+  `CHANGELOG.md [Unreleased]` 中英条目；`docs/knowledge/{VALIDATION,RESEARCH,DECISIONS,STATE}.md`；
+  证据 `docs/knowledge/evidence/incremental-archive/`。
+- **验证事实**：`npm test` 34 文件 / 589 测试 PASS；`npx tsc -p tsconfig.json --noEmit` 干净；
+  `npm run lint` 0 error（3 个既有 warning）；`lib/memory/*` 由 `npm run build` 重建；
+  真机：团队档一轮结算即写入 4 条（3 agent + 1 round），另起一个会话用
+  `node lib/memory/cli.js recent` 直接读到该轮结果（Round 22）。
+- **给下一个 agent 的四条硬约束**：
+  1. **不要**把归档做成配置开关或挂到 `showProgress`：记忆不是展示偏好（D-036）。
+  2. **不要**改成"会话收尾再写"或"dispose 钩子写"——那正是用户点名的失败模式。
+  3. 读子代理产出必须走 `ctx.get('sessions')` 且在 **`agent-start`** 捕获会话对象，结论在
+     `tool-call.arguments`（JSON 字符串）里而不是 assistant 文本（RESEARCH A15，三条都实测过）。
+  4. 真机验证前先确认闸门开着（`grokDefault: "on"`），否则跑一整轮也不会有任何归档。
+- **下一步**：提交 + 开 PR（`base:main`）；`:3090` 升级仍需用户批准（D-013）；
+  两进程并发追加压测、换引擎的子代理形状复测仍是 `NOT_RUN`。

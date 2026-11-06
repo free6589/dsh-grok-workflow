@@ -1700,3 +1700,296 @@ model route `bifrost-completions/wb/cn:deepseek-v4.1-flash` via `BIFROST_VIRTUAL
 - The live `:3090` service was not reloaded, restarted or reconfigured (D-013); it still runs
   `dsh-grok-workflow@0.2.7`, and the operator `web` profile was not upgraded to `v0.4.0`.
 - npm publishing: not done and not planned (GitHub Releases only, per `docs/RELEASING.md`).
+
+## Round 21 (2026-11-06) — cross-round context carry-over (bounded digest, v0.5 unreleased)
+
+Environment: operator machine, checkout `/home/fish/projects_mine/dsh-grok-workflow`,
+Node `v26.8.1`, npm `11.19.0`, DSH CLI `0.2.1-rc.2`, model route
+`bifrost-completions/wb/cn:deepseek-v4.1-flash` (key through `apiKeyEnv: BIFROST_VIRTUAL_KEY`,
+no credential written to any file), plugin loaded as `file://…/lib/index.js` (this working tree).
+
+### 1. Deterministic suite
+
+| Check | Command | Result | Evidence |
+|---|---|---|---|
+| typecheck | `npx tsc -p tsconfig.json --noEmit` | PASS | exit 0, no diagnostics |
+| lint | `npm run lint` | PASS with same 3 pre-existing warnings | `0 errors`; warnings are the untouched `src/client/index.js` `GROUPS_WITH_FIELDS` / unused `field` sites |
+| full suite | `npm test` (build + `vitest run`) | PASS | **33 files / 568 tests**; new `test/carryover.spec.ts` 21 cases + 2 new cases in `test/gate.spec.ts`; committed `lib/` rebuilt by the same command |
+
+The acceptance-criterion tests are `test/carryover.spec.ts` "the real prompt path" and
+`test/gate.spec.ts` "cross-round carry-over":
+
+- round 1 is executed through the **real generated script** (`runWorkflowScript(WORKFLOW_SCRIPT, …)`),
+  its report is rendered by the **real** `renderReport`, parsed back by the digest compiler, and
+  round 2's planner/worker/verifier prompts are asserted to contain the round-1 finding while the
+  follow-up's own words do not contain it (`carry-over: the real prompt path`);
+- the same chain is asserted one level up, on the **real gate**: a session whose transcript holds
+  round 1's plugin-typed report yields `engine.startCalls[1].args.carryover` containing the finding,
+  and `args.objective` not containing it (`test/gate.spec.ts` "hands the second round a digest…");
+- the cap is pinned by four cases (`400`…`1_000_000` budget, no budget, round cap, surrogate pair):
+  the rendered digest never exceeds `min(callerCap, CARRYOVER_LIMITS.chars=12000)`, and the
+  oversized-input case proves the generated script clamps an unbounded `args.carryover` itself.
+
+### 2. Real DSH two-round test (isolated home + isolated workspace)
+
+Exact commands, environment and captured output: `docs/knowledge/evidence/carryover-e2e/README.md`
+(raw files in the same directory: `round-reports.txt`, `child-prompt-digest.txt`,
+`digest-per-child-session.txt`, `session-surface-events.txt`).
+
+| Check | Result | Evidence |
+|---|---|---|
+| isolated home/profile | PASS | `DSH_HOME=.carryover-e2e/home`, profile `carryover` from the shipped `headless` template; session workspace `.carryover-e2e/work` (encoded dir name `sessions/--home-fish-projects_mine-dsh-grok-workflow-.carryover-e2e-work--`) |
+| round 1 (gated) | PASS EXIT 0 | `Grok workflow: COMPLETED`, task `compute-product` verified, confirmed evidence quotes `17 × 23 = 391` |
+| round 2 (gated, same session, follow-up that never restates the number) | PASS EXIT 0 | `Grok workflow: COMPLETED`, task `add-nine-to-prior` verified, delivered answer `391 + 9 = 400，最终数字是 400。`; a criterion that explicitly forbids asking the user to repeat passes with the note "no question mark, no request for input, no hedge about missing context" |
+| digest reached the round-2 children | PASS | `grep -c 'PRIOR ROUNDS'` per child session log: round-1 children 09:38–09:39 → `0`, 09:46–09:47 → `0`, round-2 children 09:49–09:51 → `2` each |
+| digest content in a real child prompt | PASS | `child-prompt-digest.txt` shows the planner prompt carrying `PRIOR ROUNDS … Round -1 [completed] …` plus round 1's verified rows (`The final answer text contains the exact numeral 391 …`) |
+
+### 3. Findings (observed, not all fixed here)
+
+- **F1 — resuming a session whose first message went through the gate fails**:
+  `stored log is corrupt: SessionFormatError: system/message requires a protected first surface
+  head`. Cause: `in-turn` publishes the claimed message in `agent/pre-step` (P0-5 semantics,
+  Round 17) before the loop writes its first `system/message`. Not introduced by this change and
+  out of this task's scope (it is neither the digest nor its injection). Round 0 of the real test
+  works around it by running one gate-off message first; **the defect itself is `CONFIRMED` and
+  still open**.
+- **F2 — the carry-over info line is invisible in headless runs**: `logger.info` has no channel the
+  headless runner prints, so `grep 'carry-over' r2.err r2.jsonl` → `0`. The digest is evidenced by
+  child prompts, never by a log line.
+
+### 4. Scope check
+
+| Check | Result | Evidence |
+|---|---|---|
+| DSH core untouched | PASS | `git -C <dsh install> status` → `fatal: not a git repository` (it is an installed package, not a checkout), so the check is a modification scan: `find /home/fish/.local/share/mise/installs/node/26.8.1/lib/node_modules/@deepseek-ai/dsh -newermt '2026-11-06 00:00:00' -type f` → **0** hits out of 62 903 files |
+| `src/records.ts`, `src/triage.ts` untouched | PASS | `git status --short` lists only `src/carryover.ts` (new), `src/script.ts`, `src/run.ts`, `src/gate.ts`, `src/index.ts` (plumbing only; the gate's question-classification logic is byte-identical) |
+| no new storage/archive | PASS | the digest is compiled on read from the plugin's own report messages; no record type, no file, no archive was added |
+
+### 5. Boundary (what this round does NOT claim)
+
+- One model, one session, one task pair: this is a behavioural check that the second round answers
+  from the first, not a quality matrix.
+- The digest's value was measured with a short numeric follow-up; long research rounds are covered
+  by the deterministic tests (bounded compile, redaction, truncation) and not by live samples.
+- The live `:3090` profile was not reloaded (D-013) and still runs an older plugin build.
+- No npm publish, no version bump, no tag: this change is under `[Unreleased]`.
+
+## Round 22 (2026-11-06) — 随做随存的增量记忆归档（`src/memory/*`，`[Unreleased]`）
+
+**目标（用户原话）：** 每当一轮/子代理产出研究结果或完成阶段性工作，立即以结构化条目追加写入持久记忆，
+而不是只在会话收尾时手工更新 STATE/HANDOFF；结束状态是任何「单次进来」的会话查记忆都能找到最近的研究
+结果，「查了记忆，最近也没有存档」彻底消失。
+
+**范围：** 只加归档写入器与接线（`src/memory/archive.ts`、`src/memory/recorder.ts`、
+`src/memory/cli.ts`，`src/run.ts` 两处薄接线）。不改跨轮提示词/digest 构建，不改
+`src/triage.ts`，不改 `src/gate.ts` 的提问判定逻辑，不改 DSH 核心。
+
+### 1. 确定性测试（`CONFIRMED`）
+
+```bash
+npx vitest run test/memory-archive.spec.ts     # 21 tests PASS (3.05s)
+npm test                                        # 34 files / 589 tests PASS (22.84s)
+npx tsc -p tsconfig.json --noEmit               # no output = clean
+npm run lint                                    # 3 warnings / 0 errors (全部在既有 src/redact.ts、src/client/index.js)
+npm run build                                   # tsc -p tsconfig.build.json && node scripts/build-client.mjs
+```
+
+`test/memory-archive.spec.ts` 覆盖的判据：
+
+| 判据 | 用例 |
+|---|---|
+| 写入时刻 = 轮次结算时刻（不是会话退出/dispose 钩子） | 真引擎 harness：运行中途由 verifier 激活时读归档，只见 agent 条目且 `runSettled === false`；轮次结束后同一文件出现 round 条目 |
+| 子代理结算即写 | `agent-end` → `run:<runId>:agent:<seq>`，含 label/phase/outcome/发现 |
+| 无会话状态的独立进程能读回 | `spawnSync(process.execPath, ['--input-type=module','-e', …])` 导入 `lib/memory/archive.js` 读到最新结果；另跑随包 CLI `lib/memory/cli.js recent` |
+| 幂等 + 只追加 | 同一条目二次写入返回 `written:false, reason:'duplicate'`；追加后旧字节（含损坏行）逐字节保留 |
+| 子代理发现的可读性 | 结构化提交（`structured_output`/`submit` 的 JSON 参数）→ `verdict pass · N criterion/criteria`、`plan: N task(s)`；纯散文子代理 → 其最后一段文本 |
+| 失败不拖垮运行 | 写入目标不可写（同名文件当目录）→ `reason:'write-failed'`；引擎监听器内异常 → 只 warn |
+| 脱敏 | `github_pat_…`、`Bearer …` 落盘前被替换 |
+
+### 2. 真机（隔离 home，真模型，`CONFIRMED`）
+
+环境：`DSH_HOME=.workflow-artifacts/incr-archive-e2e/home`（`dsh --profile incr
+--from-default-profile headless` 建出，不碰 `:3090` 的 `/home/fish/dsh-layerfs`，D-013），
+模型 patch `wb/cn:deepseek-v4.1-flash`（`bifrost-completions` / `openai-completions`），
+插件 patch `file:///home/fish/projects_mine/dsh-grok-workflow/lib/index.js`，config
+`{answerStrategy: in-turn, showProgress: true, grokDefault: "on"}`。
+
+```bash
+cd .workflow-artifacts/incr-archive-e2e/work
+DSH_HOME=…/home dsh --profile incr --patch ../model.patch.yml --patch ../plugin.patch.yml --json \
+  "请分两步：第一步创建 facts.txt，内容为 41*37=1517；第二步创建 verify.mjs，读取 facts.txt 并用 node:assert 断言等于 37*41，运行 node verify.mjs 并贴出真实退出码与 stdout。"
+echo $?   # 0
+python3 -c "…"   # 归档里该轮 4 条：run:77babf9f…:agent:1/2/3 + run:77babf9f…
+```
+
+| 检查 | 结果 | 证据 |
+|---|---|---|
+| 团队档真跑并结算 | PASS | `Grok workflow: COMPLETED`，任务 `facts-verify-node` verified，8 条判据 confirmed |
+| 子代理条目按时写 | PASS | `plan: 1 task(s)`（规划）、其申报结果（执行）、`verdict pass · 8 criterion/criteria checked`（校验） |
+| 轮次条目带结果与证据 | PASS | `status completed · verified 1/1 task(s) · confirmed 8 criterion/criteria`，evidence 引用真实 `od -c` / `ls -l` / 退出码 |
+| 归档位置即默认约定 | PASS | `$DSH_HOME/memory/grok-workflow/archive.jsonl`（26 行累计，仅追加，无改写） |
+| 前台档也归档 | PASS | 后续快手档回答写出 `run:c72d7023…`（label `Front desk`） |
+
+### 3. 独立会话读回（判据 4，`CONFIRMED`）
+
+**新起一个与产出轮完全不同的 DSH 会话**，只让它跑随包 CLI：产出轮在
+`session-c9a1b100-1a81-43d9-9dc9-5c5cc09664b4`（04:19:31 写入 round 条目），读回会话是
+**另一个进程里新起的** `session-1f907d27-c003-4eb3-ad2d-01f1dcba3227`，两者不共享任何内存、
+没有前序上下文：
+
+```bash
+dsh --profile incr … --json "请在本机原样执行这条命令，并把输出前 14 行贴出来：node <repo>/lib/memory/cli.js recent --limit 4"
+```
+
+它引用了上一轮（另一会话产出）的条目：`run:77babf9f-2b5a-467b-9caa-cab8c5801664`（round）、
+`…:agent:2`、`…:agent:3`，连 `verdict pass · 8 criterion/criteria checked` 都在输出里
+（原始事件：`docs/knowledge/evidence/incremental-archive/fresh-session-quotes-archive.jsonl`；
+CLI 直读输出：`…/cli-recent.txt`；该轮 4 条条目：`…/archive-run-77babf9f.jsonl`）。
+**「查了记忆，最近也没有存档」不复现：新会话零上下文，未问用户，直接读到上一轮结果。**
+
+### 4. 现场发现（均为实测，不是推理）
+
+- **F0 — `grokDefault` 默认 `off`，全新 profile 里闸门根本没开：** 首轮真机 prompt 被当普通 chat
+  直答，`archive.jsonl` 根本没生成。归档只在闸门真的运行时有内容；patch 里写
+  `grokDefault: "on"` 后才进入分诊。**这是排除「无存档」时最容易误判的一条。**
+- **F1 — `ctx.sessions` 在插件 fiber 上直接抛：** `cannot get property "sessions" without inject`
+  （cordis 4 要求 `inject` 才能取服务；本插件故意不 inject，否则纯单测上下文里 `apply` 不会启动）。
+  修法：用文档给出的 `ctx.get('sessions')` 读取。**在此之前，所有子代理条目都只写「读不到文本」。**
+- **F2 — 引擎在 `agent-end` 送到宿主前就 dispose 了子会话：** 于是「结算时再查子会话」永远查不到；
+  必须在 `agent-start`（子会话还活着）捕获 Session 对象，结算时读它的 `ownEvents()`。
+- **F3 — 结构化子代理不产出 assistant 文本：** 真机子会话最后一条 `assistant/message` 只有
+  `reasoning` + `tool-call`，`tool-call.arguments` 是 **JSON 字符串**，真正的结论在参数里
+  （`structured_output` 的 `verdict`/`criteria`，执行体的 `summary`，规划的 `tasks`）。
+  只读文本会让每条子代理条目都写着「没有结果」——这正是需要被消灭的失败形态。
+
+### 5. 范围与安全
+
+| 检查 | 结果 | 证据 |
+|---|---|---|
+| DSH 核心未改 | PASS | 未在 `/home/fish/.local/share/mise/…/@deepseek-ai/dsh` 下写入任何文件；只用文档化扩展点（`ctx.workflowEngine`、`ctx.on`、`ctx.get`） |
+| `src/triage.ts`、gate 提问逻辑未改 | PASS | `git status --short` 中 `src/triage.ts` 不在列；`src/gate.ts` 无本次改动（其改动属另一任务的遗留工作） |
+| 只追加、幂等 | PASS | 单测断言旧字节逐字节保留 + 重复 id 返回 `duplicate`；真机 26 行累计无改写 |
+| 无凭据 | PASS | 条目写入前过 `redactSecrets`/`redactError`；证据文件里无 key（只做 `BIFROST_VIRTUAL_KEY` 存在性检查，从未打印其值） |
+| 无 npm 发布/无版本号变更 | PASS | `CHANGELOG.md` 只加 `[Unreleased]` 条目，`package.json` 未改 |
+
+### 6. 边界（本轮**不**声称）
+
+- 并发压力：两个进程同时追加同一文件未做压测（`O_APPEND` 单行写 + 读时按 id 去重是设计保证，
+  但 `NOT_RUN` 真机并发）。
+- 归档**不会**替代跨轮 digest：digest 仍从会话内报告编译（D-035），归档是给「单次进来」的新会话用的。
+- 在线模型只用了 `wb/cn:deepseek-v4.1-flash` 一个；子代理发现的可读性依赖该引擎的
+  tool-call 形状，换引擎需重测（`HYPOTHESIS`）。
+- 未重载 `:3090` 上的 operator profile（D-013），线上仍是旧构建。
+
+## Round 23 (2026-11-06) — 先回捞后提问：提问前先读会话上文与磁盘记忆（`[Unreleased]`）
+
+目标失败样本：`session-7e079b80-1a57-451b-aca4-795d24a14c4d`——会话里已有研究结果，随后的追问却被
+以「遗忘了上下文」为由要求用户重新说明。本轮只改**提问之前**这一步：`src/triage.ts`（`recallFromPrior`
+判定 + `recalled` 档 + 两条用户可见说明 + 回捞提示词）与 `src/gate.ts`（读取来源：会话上文、前序轮次
+digest、磁盘 `docs/knowledge/*.md`），其余路径不改。
+
+**范围纪律（本轮不声称）：** 不构建跨轮 digest 注入（属 D-035 另一任务，这里只**读**既有 digest）、
+不新增归档存储（属 D-036 另一任务）、不改 DSH 核心、不新增配置键。
+
+### 1. 确定性测试（`CONFIRMED`，无在线模型）
+
+```bash
+cd /home/fish/projects_mine/dsh-grok-workflow
+npm run ci          # typecheck + lint + build + vitest run
+npx vitest run test/triage-recall.spec.ts
+npx vitest run test/triage.spec.ts test/gate.spec.ts test/triage-followup.spec.ts
+```
+
+| 检查 | 命令 | 结果 | 证据文件 |
+|---|---|---|---|
+| 全量 CI | `npm run ci` | **PASS** — `Found 3 warnings and 0 errors.`（3 个均为既有 warning）、`Test Files 35 passed (35)`、`Tests 617 passed (617)` | `docs/knowledge/evidence/history-first/ci-summary.txt` |
+| 本轮新测试 | `npx vitest run test/triage-recall.spec.ts` | **PASS** — `Tests 28 passed (28)` | `docs/knowledge/evidence/history-first/recall-spec.txt` |
+| 既有 triage/gate 回归 | `npx vitest run test/triage.spec.ts test/gate.spec.ts test/triage-followup.spec.ts` | **PASS** — `Test Files 3 passed (3)`、`Tests 89 passed (89)` | `docs/knowledge/evidence/history-first/regression-suite.txt` |
+
+基线（改动前，见 Round 22）：34 文件 / 589 测试。当前 35 文件 / 617 测试 = 基线 + 1 文件 + 28 测试。
+
+### 2. 两条分支各自怎么被钉住（判据 1、2）
+
+| 分支 | 用例 | 断言 |
+|---|---|---|
+| 已存在（会话历史） | `replay: ... after the fix (earlier round has the research)` | 真 `Session` 里已有第 1 轮用户消息 + 插件写的 `grok-workflow` 报告；追问走**快手档** `recalled`，只 1 次前台调用，`script` 含报告里的 `dsh-web 进程占用` 与 `web.port`，正文含「先查后答」，**不含**「档位：确认档」「这个要动用团队吗」；`RE_ASK_AGAIN`（`重新说明/重新描述/restate/repeat what` 等）不匹配 |
+| 已存在（磁盘记忆） | `answers from a docs/knowledge file that holds the answer` | 临时 `docs/knowledge/STATE.md` 命中 → 快手档 `recalled`，调用提示词含文件内容，回答含「先查后答」 |
+| 真缺失 | `still asks once, and says what is missing, ...` | 会话里已说过话、记忆文件存在但**不覆盖**该问题 → 仍为确认档（只提问一次），提问正文含「先查后问」「还缺」，且 `startCalls` 为 0（**没有任何回答被编造**）；正文不含「重述/重新说明/restate」 |
+| 无历史无记忆（回归） | `changes nothing when the memory directory does not exist` / `keeps a brand-new session's question byte-identical even with memory files present` / `leaves a greeting untouched even with memory files present` | 投递正文与 `frontDeskText([triageLine, '', askLine])`、`frontDeskText([triageLine, '', chatReply, '', tierNote])` **逐字节相等**；`classifyTriage` 在 `prior` 缺失与 `prior=miss` 两种情况下返回对象 `toEqual` |
+| 判定本身 | `recallFromPrior` 7 例 + `classifyTriage` 5 例 + 说明/提示词 5 例 + 磁盘读取 4 例 | 命中/未命中/指针式引用/确定性/上限/脱敏/默认根目录与环境变量覆盖 |
+
+**默认行为不变的口径（判据 3）：** 一个还没说过话的会话，即使磁盘上有记忆文件，得到的仍是改动前
+那句提问（逐字节相等，`keeps a brand-new session's question byte-identical ...`）；只有"使用者已经说过话"
+的会话，未命中时才会在提问下方附加一行「先查后问，还缺 X」——那种情况下问题是可指认的，说明查过哪里
+才是有意义的。
+
+**同一句追问的前后对照（真实投递文本，`docs/knowledge/evidence/history-first/before-after.txt`）：**
+
+```text
+follow-up: 刚才那个端口的事你再说一下
+
+=== BEFORE (no earlier round) ===
+档位：确认档 — 因为：信号互相矛盾或线索不足，前台不猜。
+
+这个要动用团队吗？可回复：简单 / 团队。
+
+=== AFTER (earlier round present) ===
+档位：快手档 — 因为：这条本来会先问你一句，但所需信息已经在会话上文或磁盘记忆里，先回捞再作答。
+
+（示例回答）8080 被 dsh-web 占用，换端口改 web.port。
+
+（先查后答：这条据已有材料作答（本会话前序 1 轮报告），没有反过来问你。）
+（这条只派了一个工人，没有开完整团队。）
+
+=== worker calls: 1 ===
+```
+
+（"（示例回答）…" 是测试替身返回的固定串；这里被验证的是**材料进了提示词**与**正文形态**，
+不是模型答案质量。）
+
+### 3. 回放测试用的失败形态（判据 4）
+
+`test/triage-recall.spec.ts` 里 `replay: a follow-up about earlier research is answered, not bounced back`
+成对出现，前半段复现失败形态、后半段证明修复：
+
+- 后半段第 1 轮内容（即失败会话里的"研究结果"）：8080 端口被 `dsh-web` 占用、换端口只改
+  `cordis.patch.yml` 的 `web.port`、端口占用只表现为 GUI 白屏。
+- 追问句：`刚才那个端口的事你再说一下`——**改动前**该句是确认档（前半段用例断言
+  `档位：确认档` + `这个要动用团队吗？可回复：简单 / 团队`，且 0 次模型调用），**改动后**同一句
+  在带前序报告的会话里直接按历史作答（快手档 + 1 次前台调用 + 不反问）。
+- 该样本本身不在本机磁盘上（`ls -d ~/.dsh/sessions/*/session-7e079b80*` 无匹配），因此回放用的是
+  它的**形态**（先有研究结果、随后指针式追问），不是逐字节转录——这一点如实记录，不冒充原始会话。
+
+### 4. 实施中发现并修复的缺陷（`CONFIRMED`）
+
+- **F1 — 把当前消息当成"历史"，自己命中自己：** 首版 `collectRecallSources()` 直接调
+  `collectHistory(session)`。但 `relay`/`append` 策略在 `produceAnswer()` 之前就 `commitClaimed()`
+  把本轮消息写进了会话（P0-5），于是「刚才那个端口的事你再说一下」的锚点全部在同一句话里命中 →
+  任何问题都会"找到答案"并据自己作答。修法：给 `collectRecallSources()` 加 `exclude` 参数，按
+  `textOf(message) === request` 剔除本轮消息；`test/triage-recall.spec.ts` 的 `before the fix`
+  用例与两个磁盘记忆用例都依赖这一剔除（关掉剔除会立刻变红）。
+
+### 5. 范围与安全
+
+| 检查 | 结果 | 证据 |
+|---|---|---|
+| DSH 核心未改 | PASS | 只改 `src/triage.ts`、`src/gate.ts`、`test/triage-recall.spec.ts`；未写入 `/home/fish/.local/share/mise/.../@deepseek-ai/dsh` |
+| 无新配置键 | PASS | `src/config.ts` 未改；记忆目录走 `memoryDocRoots()` 默认 `<cwd>/docs/knowledge` 或环境变量 `GROK_WORKFLOW_KNOWLEDGE_DIRS` |
+| 只读 | PASS | 新增代码只 `readdirSync`/`readFileSync`；不写归档、不写记录、不新增事件类型 |
+| 无凭据 | PASS | 记忆文件内容过 `redactSecrets` 后才可能进提示词/回答；证据与文档中无任何 key（测试用 `github_pat_…` 假值验证脱敏） |
+| 有界 | PASS | `RECALL_LIMITS`：6 轮 / 3000 字符会话、4 轮 / 4000 字符 digest、12 文件 / 每个 2400 / 合计 16000 字符、摘录 700 字符 |
+| 默认行为不变 | PASS | 无 `prior` 时 `classifyTriage` 走原分支（4 处 ask 判定统一改为 `ambiguousVerdict()`，`prior` 缺失时返回与改动前相同的 `ask`/`ambiguous-escalate`）；无来源时不追加任何说明行 |
+| 真实加载 | PASS | `test/loader.spec.ts`（`npm test` 内含）用真 cordis Loader 载入 `lib/index.js` 并注册 `grok_workflow`，随构建产物一起跑过 |
+| 构建产物 | PASS | `npm run build` 后 `lib/gate.js`、`lib/triage.js`（含 `.d.ts`/`.map`）已更新，`npm test` 每次都先 build |
+
+### 6. 边界（本轮**不**声称）
+
+- **真机在线模型回放 `NOT_RUN`**：本轮没有起隔离 DSH profile 跑真模型（需在线模型与 profile 准备，
+  任务约束亦要求"单元测试不需要在线模型"）。判据 4 由上面的确定性回放用例满足；真机 GUI 上的
+  「追问不再被要求重述」仍待一次带模型的 e2e 复验。
+- **语义匹配是词面锚点，不是向量检索**：`recallFromPrior` 用去停用词的双字/词锚点 + 指针式引用，
+  同义改写（例如把「端口」说成「监听地址」）不会命中，会退化为提问（`HYPOTHESIS`：真实会话里
+  这类改写占比未知，本轮未采样）。
+- **记忆文件只读 `*.md` 且只看默认根目录**：`docs/knowledge/` 之外（例如 `~/.dsh/memory` 的
+  `archive.jsonl`）本轮不读——那是 D-036 的另一条路径，避免两处语义打架。
+- 未提交、未 push、未 bump 版本、未发布 npm；工作树里同时还存在 D-035 / D-036 两个任务的未提交改动。

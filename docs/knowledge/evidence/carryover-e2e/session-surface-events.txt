@@ -1,0 +1,44 @@
+# parent session session-c207cd96-a49c-404b-bd36-a2d575e5b5ec — surface event order (workspace isolation proof)
+session cwd: /home/fish/projects_mine/dsh-grok-workflow/.carryover-e2e/work
+total events: 64
+
+  5 turn/start
+  7 step/start
+  8 system/message
+  9 user/message | source=user | 你好，请用一句话回答：这是第 0 轮预热消息。
+ 10 user/message | source=agent-instructions | <system-reminder> The following workspace instructions may be relevant to your w
+ 11 user/message | source=runtime-context | Current runtime context. This snapshot supersedes earlier runtime-context snapsh
+ 12 user/message | source=skill-catalog | <system-reminder> A skill is a reusable set of task-specific instructions. The f
+ 17 assistant/message
+ 18 step/end
+ 19 turn/end
+ 22 turn/start
+ 24 user/message | source=user | 请计算 17 乘以 23 的准确结果，并在最终回答中明确写出这个乘积。
+ 25 tool-workflow/run-start
+ 27 tool-workflow/agent-start | label=规划助手 outcome=None
+ 28 tool-workflow/agent-end | label=None outcome=completed
+ 30 tool-workflow/agent-start | label=执行 outcome=None
+ 31 tool-workflow/agent-end | label=None outcome=completed
+ 33 tool-workflow/agent-start | label=检查 outcome=None
+ 34 tool-workflow/agent-end | label=None outcome=completed
+ 35 tool-workflow/run-end
+ 36 step/start
+ 37 user/message | source=grok-workflow | The mandatory workflow gate finished and the workflow produced the report below.
+ 39 assistant/message
+ 40 step/end
+ 41 turn/end
+ 44 turn/start
+ 46 user/message | source=user | 把上一轮得到的那个数字再加 9，直接告诉我最终数字，不需要我重复说明。
+ 47 tool-workflow/run-start
+ 49 tool-workflow/agent-start | label=规划助手 outcome=None
+ 50 tool-workflow/agent-end | label=None outcome=completed
+ 52 tool-workflow/agent-start | label=执行 outcome=None
+ 53 tool-workflow/agent-end | label=None outcome=completed
+ 55 tool-workflow/agent-start | label=检查 outcome=None
+ 56 tool-workflow/agent-end | label=None outcome=completed
+ 57 tool-workflow/run-end
+ 58 step/start
+ 59 user/message | source=grok-workflow | The mandatory workflow gate finished and the workflow produced the report below.
+ 61 assistant/message
+ 62 step/end
+ 63 turn/end

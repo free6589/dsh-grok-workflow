@@ -299,3 +299,75 @@ turn at a time; Round 16's isolation proof is in `.workflow-artifacts/matrix-024
   `git diff --exit-code -- lib/` 必须为 0（`src` 改必重建 `lib/`）。
 - **交付**：push 到 `origin feat/route-concurrency`，开 PR `base:main`
   标题 `feat(routing): per-route concurrency with overflow to next route`。
+
+## 2026-11-06 — 跨轮上下文延续：有界 digest 注入每一轮子代理（v0.5 未发布，工作树内）
+
+- **状态**：实现 + 确定性测试完成（`npm test` **33 文件 / 568 测试 PASS**，`npm run lint`
+  0 error / 3 个既有 warning），真机两轮实测 PASS（VALIDATION.md Round 21）。**未提交、未发布**。
+- **做了什么**：新增 `src/carryover.ts`（从会话里插件自己写的报告编译轮次 → 有界结构化 digest，
+  脱敏、双向预算、超限保留最新轮并写明丢弃数、无前序信息时返回空）；`src/script.ts`
+  在 planner/worker/verifier/synthesizer 四个提示词里注入 `args.carryover` 并自带
+  `CARRYOVER_MAX_CHARS` 夹取；`src/run.ts`/`src/gate.ts`（仅 `runTeam`）/`src/index.ts`（工具路径）
+  各加一层注入。首轮不带该键，payload 与此前逐字节一致（`test/carryover.spec.ts` 钉住）。
+- **测试**：`test/carryover.spec.ts` 21 例（解析/脱敏/降级/上限 6 档/轮数上限/代理对切割/
+  真实脚本第 1 轮→第 2 轮提示词含研究结果/首轮不变/脚本 clamp/请求 payload）；
+  `test/gate.spec.ts` 新增 2 例（真 Session + 真网关：第 2 轮 `args.carryover` 含第 1 轮证据、
+  而 `args.objective` 不含；首轮无该键）。
+- **真机**：隔离 home（`.carryover-e2e/home`，用后即删）+ 隔离工作区 `.carryover-e2e/work`，
+  `headless` 模板 profile，模型 `wb/cn:deepseek-v4.1-flash`；第 1 轮 391 已验证，第 2 轮
+  "再加 9" 直接答 `391 + 9 = 400`，未要求用户重述；3 个第 2 轮子代理日志出现 `PRIOR ROUNDS`，
+  第 1 轮子代理 0 次（`docs/knowledge/evidence/carryover-e2e/`）。
+- **新发现（未修，`CONFIRMED`）**：会话首条消息被 `in-turn` 在 `pre-step` 抢先写成
+  `user/message` 后，`--session-id` 恢复报
+  `SessionFormatError: system/message requires a protected first surface head`（F1）。
+  与本次改动无关（P0-5 语义），已记入 VALIDATION Round 21 与 D-035。
+- **未做**：`:3090` 未热加载（D-013）；未 bump 版本、未 tag、未发 npm；`relay`/`append` 长驻 GUI
+  投递仍 `NOT_RUN`（NR-1 剩余半边）。
+
+## 2026-11-06 — 增量记忆归档：轮次结算即写入、单次会话可读回（v0.5 未发布，工作树内）
+
+- **状态**：实现 + 确定性测试完成（`npm test` **34 文件 / 589 测试 PASS**，`npm run lint`
+  0 error / 3 个既有 warning），真机「团队档真跑 + 另一会话读回」实测 PASS（VALIDATION.md Round 22）。
+  **未提交、未发布**。
+- **做了什么**：新增 `src/memory/archive.ts`（只追加 JSONL 存储：`$DSH_HOME/memory/grok-workflow/
+  archive.jsonl`，`GROK_WORKFLOW_MEMORY_DIR` 可改；`ARCHIVE_LIMITS` 全部有界；`appendArchiveEntry()`
+  返回 `{written,id,reason}` 永不抛；`readArchive()` 新到旧 + 按 id 去重 + 4 MiB 尾部扫描），
+  `src/memory/recorder.ts`（引擎事件 → `run:<runId>:agent:<seq>` 与 `run:<runId>` 条目；
+  `agent-start` 捕获子会话、结算时读其 `ownEvents()`；子代理发现优先取结构化提交，退而取散文；
+  `archiveRoundNow()` 给前台档用），`src/memory/cli.ts`（`node lib/memory/cli.js recent|path`，
+  零依赖读回，不需要 DSH/插件在线）。`src/run.ts` 两处接线：引擎事件订阅与 `finally` 里的轮次
+  结算（都**不**受 `showProgress` 控制），以及 `runSingleCall` 成功路径的前台档归档。
+- **测试**：`test/memory-archive.spec.ts` 21 例——写入时刻（真引擎 harness 中途读只见 agent 条目
+  且 `runSettled === false`，结束后出现 round 条目）、独立进程读回（`node --input-type=module -e`
+  + 随包 CLI）、幂等/只追加（旧字节逐字节保留）、脱敏、写入失败不拖垮运行、子代理发现三形态
+  （`plan: N task(s)` / 申报结果 / `verdict pass · N criteria`）、`agent-start` 捕获语义、
+  会话服务不可达时的降级。
+- **真机**：隔离 home `.workflow-artifacts/incr-archive-e2e/home`（`headless` 模板 + patch
+  `grokDefault: "on"`）+ 隔离工作区 `…/work`，模型 `wb/cn:deepseek-v4.1-flash`；一轮两步骤任务
+  结算后归档 4 条（3 agent + 1 round），随后**新起一个会话**跑 CLI 直接读到该轮条目与
+  `verdict pass · 8 criterion/criteria checked`（`docs/knowledge/evidence/incremental-archive/`）。
+- **新发现（`CONFIRMED`，见 RESEARCH A15）**：①`ctx.sessions` 在插件 fiber 上抛
+  `cannot get property "sessions" without inject`，须用 `ctx.get('sessions')`；②引擎在
+  `agent-end` 送达宿主前就 dispose 子会话，必须在 `agent-start` 捕获；③结构化子代理不产出
+  assistant 文本，结论在 `tool-call.arguments`（JSON 字符串）；④`grokDefault` 默认 `off`，
+  闸门没开时根本没有轮次可归档。
+- **未做**：`:3090` 未热加载（D-013）；未 bump 版本、未 tag、未发 npm；两进程并发追加同一文件的
+  压测 `NOT_RUN`；换引擎的子代理形状复测 `NOT_RUN`。
+
+## 2026-11-06 — 先回捞后提问：ask 档提问前先读上文与磁盘记忆（v0.5 未发布，工作树内）
+
+- **状态**：实现 + 确定性测试完成（`npm run ci` **35 文件 / 617 测试 PASS**，`Found 3 warnings and
+  0 errors`，3 个均为既有 warning）；真机在线回放 `NOT_RUN`。**未提交、未发布**。
+- **做了什么**：`src/triage.ts` 加 `recallFromPrior()`（双字/词锚点 ≥2，或指针式引用 + ≥120 字符实质
+  材料）、`RECALL_LIMITS`、`TriageInput.prior`、`DETAIL.recalled`、`recallPrompt()`、`recalledNote()`、
+  `missingNote()`，并把 4 处 ask 判定收敛成 `ambiguousVerdict()`（无 `prior` 时行为不变）；
+  `src/gate.ts` 加 `memoryDocRoots()` / `readMemoryDocs()` / `collectRecallSources()` 并在
+  `produceAnswer()` 的 ask 档前接线：命中→快手档据材料作答（回答注明出处），未命中且查过→提问后追加
+  「先查后问，还缺 X」，无来源→提问逐字节不变。
+- **测试**：新增 `test/triage-recall.spec.ts` 28 例（命中/未命中/指针式/确定性/摘录上限/脱敏/默认根目录
+  与环境变量/ask 与 chat 逐字节回归/`session-7e079b80` 形态的回放成对用例/`readMemoryDocs` 降级）。
+  全量套件从 34 文件 589 测试 → **35 文件 617 测试**，既有 triage/gate/followup 89 例全绿。
+- **现场发现（`CONFIRMED`，已修）**：`relay` 在 `produceAnswer()` 之前就 `commitClaimed()`，首版召回把
+  本轮消息读成"历史"→ 自命中；`collectRecallSources(…, exclude)` 修复。
+- **决策**：D-037。**证据**：`docs/knowledge/evidence/history-first/`。
+- **未做**：真机在线模型两轮回放、`:3090` 热加载（D-013）、版本号与发布。

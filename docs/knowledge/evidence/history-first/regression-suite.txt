@@ -1,0 +1,8 @@
+ ✓ test/triage.spec.ts (34 tests) 758ms
+ ✓ test/triage-followup.spec.ts (5 tests) 10ms
+
+ Test Files  3 passed (3)
+      Tests  89 passed (89)
+   Start at  16:57:48
+   Duration  5.08s (transform 623ms, setup 0ms, import 788ms, tests 3.95s, environment 0ms)
+

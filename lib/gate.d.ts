@@ -43,8 +43,10 @@
  */
 import type { Context } from '@deepseek-ai/cordis';
 import type { Agent } from '@deepseek-ai/dsh-agent';
+import type { Session } from '@deepseek-ai/dsh-session';
 import type { UserMessage } from '@deepseek-ai/dsh-llm';
 import type { ActiveState, WorkflowLogger } from './run.js';
+import type { RecallSource } from './triage.js';
 import type { ResolvedConfig } from './types.js';
 /** Payload shape of one `agent/pre-step` dispatch. */
 export interface PreStepPayload {
@@ -67,6 +69,15 @@ export interface GateDeps {
      * a broken edit cannot silently undo an edit that had already taken effect.
      */
     lastGoodConfig?: () => ResolvedConfig;
+    /**
+     * Where the memory files the look-up pass may read live.
+     *
+     * Defaults to `<cwd>/docs/knowledge` (the directory this plugin's own
+     * `AGENTS.md` names as durable memory), or to `GROK_WORKFLOW_KNOWLEDGE_DIRS`
+     * when that environment variable is set. Tests pass a temporary directory so
+     * the pass is deterministic and never depends on the repository's own docs.
+     */
+    memoryDocRoots?: readonly string[];
     ctx: Context;
     config: ResolvedConfig;
     state: ActiveState;
@@ -84,6 +95,62 @@ type Classification = {
     request: string;
     turn: number;
 };
+/**
+ * Directories the look-up pass reads memory files from.
+ *
+ * The default is the workspace's own `docs/knowledge` — the directory this
+ * plugin's `AGENTS.md` defines as durable memory — so an installation that keeps
+ * that convention gets the behaviour with no configuration at all.
+ * `GROK_WORKFLOW_KNOWLEDGE_DIRS` (path-delimiter separated) replaces it for
+ * installations that keep memory somewhere else.
+ *
+ * @param env - process environment (injected for tests).
+ * @param cwd - working directory the default root is resolved against.
+ * @returns absolute or cwd-relative roots, in the order they are read.
+ */
+export declare function memoryDocRoots(env?: NodeJS.ProcessEnv, cwd?: string): string[];
+/** One memory file read from disk; `text` is already redacted and bounded. */
+export interface MemoryDoc {
+    path: string;
+    text: string;
+}
+/**
+ * Read the markdown memory files under the given roots.
+ *
+ * Read-only, bounded, and never fatal: a missing directory, an unreadable file
+ * or a permissions error skips that entry, because a look-up that cannot read is
+ * a look-up that found nothing — not a failed turn. Files are sorted by name so
+ * the same directory always yields the same material, and every body passes
+ * `redactSecrets` before it can reach a prompt or an answer.
+ *
+ * @param roots - directories to read (see {@link memoryDocRoots}).
+ * @param bounds - file count and character bounds.
+ * @returns the files that could be read, in deterministic order.
+ */
+export declare function readMemoryDocs(roots: readonly string[], bounds?: {
+    files: number;
+    fileChars: number;
+    totalChars: number;
+}): MemoryDoc[];
+/**
+ * Everything one look-up pass may answer from, in the order it is trusted.
+ *
+ * Only existing material is read — the durable conversation, the validated
+ * reports this plugin already wrote into it, and the memory files already on
+ * disk. Nothing is created, archived or written here: this is a read of what the
+ * session has, which is exactly what makes "answer from history" honest.
+ *
+ * The message being answered is excluded: both answer strategies publish the
+ * claimed batch before the answer is produced (P0-5), so the session already
+ * contains the very words being classified — and a look-up that matched them
+ * would "find" the message in itself and answer every question with the question.
+ *
+ * @param session - the session that owns the message; `undefined` is legal.
+ * @param roots - memory directories to read.
+ * @param exclude - text of the message being answered, dropped from the material.
+ * @returns bounded sources; empty when nothing exists yet.
+ */
+export declare function collectRecallSources(session: Session | undefined, roots: readonly string[], exclude?: string): RecallSource[];
 /**
  * Decide what to do with one claimed batch.
  *

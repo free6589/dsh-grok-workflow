@@ -5,6 +5,89 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Added / 新增
+
+- **Look it up before asking / 先回捞，后提问** —
+  when the front desk was about to ask the user a clarification ("please restate it"), it asked
+  without ever checking what the conversation already held: in
+  `session-7e079b80-1a57-451b-aca4-795d24a14c4d` the research results were right there in the
+  transcript and the follow-up was still met with a request to repeat them. The last step before a
+  clarification question now is a **read**: the conversation so far, the validated reports this
+  plugin already wrote for earlier rounds, and the memory markdown files already on disk
+  (`<cwd>/docs/knowledge/*.md`, override with `GROK_WORKFLOW_KNOWLEDGE_DIRS`). A hit answers from
+  that material — one worker, the material in the prompt, and an explicit instruction never to
+  claim it cannot see earlier turns and never to ask for work that is already there — and the
+  answer states where it came from. A miss in a session that has already said something asks exactly
+  once and adds one line saying where it looked and which specific detail is missing, instead of
+  asking for the whole task again. Nothing is ever invented, and a session that has not said
+  anything yet produces exactly the same question as before, byte for byte — even when memory files
+  exist on disk, because there is no earlier wording for the question to point at. This costs
+  nothing when it is not needed: the read runs only on messages that would otherwise be a
+  clarification question, is bounded (6 turns / 3 000 characters of conversation, 4 earlier rounds /
+  4 000 characters of digest, 12 files / 2 400 characters each / 16 000 characters total), is
+  redacted, and is read-only — it creates no archive and no new record type.
+  前台原本在准备向用户提问（"请重新说明"）时，从不检查会话里已经有什么：在
+  `session-7e079b80-1a57-451b-aca4-795d24a14c4d` 里研究结果就在会话中，追问却仍被要求重述。
+  现在发出澄清问题之前的最后一步是**先读**：本会话上文、插件自己为前序轮次写入的已验证报告、
+  以及磁盘上已有的记忆 markdown 文件（`<cwd>/docs/knowledge/*.md`，可用
+  `GROK_WORKFLOW_KNOWLEDGE_DIRS` 更改）。命中即据材料作答——只派一个工人、材料进提示词，并明确
+  要求"不得声称看不到前文、不得让用户重复已给出的内容"，回答里还会注明材料出处；未命中才提问**一次**，
+  若这个会话里已经说过话，提问下方再补一行"查过哪里、还缺哪一个具体信息"。全程不编造：还没说过话的
+  会话，得到的问题与改动前逐字节一致（即使磁盘上有记忆文件——此时没有可指认的上文，原来那句就是最
+  诚实的形式）。不需要时不花任何代价：只在"本来要提问"的消息上才检索，
+  且有界（会话 6 轮 / 3000 字符，前序 4 轮 / 4000 字符 digest，记忆文件 12 个 / 每个 2400 字符 /
+  合计 16000 字符）、脱敏、只读——不新增归档、不新增记录类型。
+
+- **Cross-round context carry-over / 跨轮上下文延续** —
+  every round is a fresh set of child agents, and until now the second round of a long
+  conversation started from zero: it could answer "I am a single turn, I cannot see the research
+  above" and ask the user to repeat what they had already given. Each run now compiles the
+  earlier rounds of the same session into one **bounded, structured digest** (round objective,
+  verified criteria with their evidence, open questions, uncertainties, final-answer excerpt and
+  the file/URL locators the evidence quoted) and injects it into the planner, worker, verifier
+  and synthesizer prompts, with explicit instructions never to claim it cannot see earlier turns
+  and never to ask for information that is already there. The digest is compiled from the
+  validated reports this plugin itself wrote into the transcript (never a model paraphrase), is
+  redacted, is capped by the existing `historyTurns` / `historyChars` budget and by a hard ceiling
+  of 24 rounds / 12 000 characters, keeps the newest round and names how many it dropped, and
+  renders nothing at all when the session has no earlier round — first-round prompts are
+  byte-identical to before. A child that needs more detail is told to read the listed prior
+  outputs instead of asking the user. No new configuration key, no new storage format, no extra
+  model call.
+  每一轮的子代理都是全新上下文：此前长会话的第 2 轮会从零开始，甚至自述"我这轮是单次进来的，
+  看不到刚才上面的研究结果"，要求用户重述已给出的信息。现在每轮都会把同一会话内的前序轮次编译成
+  **有界结构化 digest**（该轮目标、已核验判据及其证据、未决问题、不确定项、结论摘要、证据引用的
+  文件/URL 定位符），注入规划、执行、校验、汇总四个角色的提示词，并明确要求"不得声称看不到前文、
+  不得让用户重复已给出的信息"。digest 只从插件自己写入会话的已验证报告编译（不经模型转述）、经过
+  脱敏，受既有 `historyTurns` / `historyChars` 预算与硬上限（24 轮 / 12000 字符）双重约束，超限时
+  保留最新一轮并写明丢弃了多少轮；没有任何前序轮次时完全不渲染——首轮提示词与此前逐字节一致。
+  需要更多细节的子代理被要求去读列出的先前产物，而不是回头问用户。不新增配置键、不新增存储格式、
+  不增加任何模型调用。
+
+- **Incremental memory archive / 随做随存的增量记忆归档** —
+  a round's result now lands in a durable, greppable archive the moment the round settles,
+  instead of waiting for someone to hand-edit `STATE.md` / `HANDOFF.md` at session exit. A new
+  `src/memory/` module appends one JSON line per settled child agent and one per finished round
+  to `$DSH_HOME/memory/grok-workflow/archive.jsonl` (override with `GROK_WORKFLOW_MEMORY_DIR`),
+  carrying the objective, the status, the verified criteria with their evidence, the child's own
+  declared result — bounded and redacted. The file is append-only (`O_APPEND`, one line per
+  entry, existing bytes never rewritten), entry ids are deterministic (`run:<runId>`,
+  `run:<runId>:agent:<seq>`), and a repeated write is a no-op, so replaying a round cannot
+  duplicate history. Archiving is not a config switch and is not gated on the progress panel: a
+  memory gap is not a presentation choice. The front desk archives too — a cheap-tier answer is a
+  real round result — and a failed write only costs a warning line, never the run. Any later
+  session reads it back without the plugin loaded: `node lib/memory/cli.js recent [--limit N]
+  [--json] [--kinds round,agent] [--dir PATH]`.
+  一轮的结果现在在**轮次结算时刻**就落进可检索的持久归档，不再等会话收尾时有人手工改
+  `STATE.md` / `HANDOFF.md`。新增 `src/memory/`：每个结算的子代理、每个结束的轮次各向
+  `$DSH_HOME/memory/grok-workflow/archive.jsonl` 追加一行 JSON（可用 `GROK_WORKFLOW_MEMORY_DIR`
+  改位置），带目标、状态、已核验判据及其证据、子代理自己申报的结果，全部有界并脱敏。文件只追加
+  （`O_APPEND`、一条一行、已有字节永不改写），条目 id 确定（`run:<runId>`、
+  `run:<runId>:agent:<seq>`），重复写入是无操作，同一轮重放也不会重复历史。归档不是配置开关，
+  也不受进度面板开关控制：记忆缺口不是展示偏好。前台档同样归档（快手档回答也是真实的轮次结果），
+  写入失败只丢一行告警，绝不拖垮运行。任何后续会话无需加载插件即可读回：
+  `node lib/memory/cli.js recent [--limit N] [--json] [--kinds round,agent] [--dir PATH]`。
+
 ## [0.4.0] - 2026-11-06
 
 ### Added / 新增

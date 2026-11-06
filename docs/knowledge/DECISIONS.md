@@ -492,3 +492,69 @@ Each entry records the decision, evidence, alternatives, and status.
   曾试过模型重写版，因多一次 engine 调用打爆 3 个 P0-2 单测 + triage 单测计数，已回退为确定性版。
 - **Reason:** 白屏是因为 `in-turn` await 整轮 + 最终 `relayText` 被勒令逐字复述；回执解决“运行时空白”，导读解决“只剩机器语言”。
 - **Alternatives rejected:** 模型重写人话总结（多调用、串改单测计数、预算不可控）；切 `relay` 全局（one-shot 会丢答案）。
+
+## D-035 — 跨轮上下文：从 transcript 编译有界 digest，不新增存储、不新增配置键（v0.5 未发布）
+
+- **Status:** CONFIRMED（`npm test` 33 文件 / 568 测试 PASS；真机两轮见 VALIDATION.md Round 21）
+- **Date:** 2026-11-06
+- **Decision:** ①轮次信息只从会话里**插件自己写的报告**（`source.kind='grok-workflow'`）编译，
+  不读模型复述，不新增记录类型/归档文件（归档是独立任务）；②预算复用既有
+  `historyTurns`/`historyChars`，硬上限 `CARRYOVER_LIMITS = { rounds: 24, chars: 12000 }`，
+  超限保留最新一轮并写明丢弃轮数；③注入点为 `args.carryover` → 四个角色提示词，
+  首轮不带该键（payload 与此前逐字节一致）；④无前序信息时完全静默，不占位、不编造。
+- **Reason:** 用户可见失败是"我这轮是单次进来的，看不到刚才上面的研究结果"——子代理确实看不到，
+  所以修的是"让它看到"，而不是"让它别这么说"。改 records/归档会撞独立任务的写路径。
+- **Consequences:** 新增 `src/carryover.ts`；`src/script.ts`、`src/run.ts`、`src/gate.ts`
+  （仅 `runTeam` 注入，提问判定逻辑零改动）、`src/index.ts`（工具路径同样注入）各加薄薄一层。
+- **Alternatives rejected:** 新增持久 digest 记录（跨轮存储在 records/归档，属独立任务，且会多一份
+  可能与报告不一致的副本）；把整段上一轮报告塞进 objective（无界、且会把历史与指令混在一起）；
+  让子代理自己回读会话文件（`session.v4.jsonl.zstd` 是 zstd 二进制，子代理没有会话读取工具）。
+- **已知副作用（不在本次范围）：** 会话首条消息被 `in-turn` 在 `pre-step` 抢先写成
+  `user/message` 时，`--session-id` 恢复会因"system/message 必须是首个 surface head"失败
+  （VALIDATION.md Round 21 的 F1，`CONFIRMED` 且仍开放）。
+
+## D-036 — 存档不设开关、不分档：写入随轮次发生，读回不依赖插件（v0.5 未发布）
+
+- **Status:** CONFIRMED（`npm test` 34 文件 / 589 测试 PASS；真机见 VALIDATION.md Round 22）
+- **Date:** 2026-11-06
+- **Decision:** ①归档**不是配置项**，也不受 `showProgress` 控制——进度面板是展示，记忆是事实，
+  展示关掉不该等于历史消失；②前台档（`runSingleCall` 快手档）同样写轮次条目：快手档的回答
+  就是一轮真实结果，跳过它等于把用户最常走的那条路重新变成「查了记忆，最近也没有存档」；
+  ③位置 `$DSH_HOME/memory/grok-workflow/archive.jsonl`，`GROK_WORKFLOW_MEMORY_DIR` 可改，
+  idempotent（`run:<runId>` / `run:<runId>:agent:<seq>`）+ 只追加；④读回走随包 CLI
+  （`node lib/memory/cli.js recent`），**不需要** DSH 与插件在线，任何单次会话都能用。
+- **Reason:** 用户可见失败是「查了记忆，最近也没有存档」——根因是存档动作挂在会话收尾的人工步骤上。
+  把写入挂到轮次结算、把读取做成零依赖 CLI，这个失败形态才真正消失。
+- **Consequences:** 新增 `src/memory/{archive,recorder,cli}.ts`；`src/run.ts` 两处接线
+  （引擎事件订阅与轮次结算；`runSingleCall` 成功路径一处）。跨轮 digest（D-035）保持不变，
+  归档不替代它：digest 服务同一会话的下一轮，归档服务「单次进来」的新会话。
+- **Alternatives rejected:** 复用 `src/records.ts` 的记录类型（那是会话内 transcript 记录，
+  新会话不加载插件就读不到）；挂在 `dispose`/会话退出钩子（用户明确点名的失败模式）；
+  做成 `memory: on/off` 开关（记忆缺口不是偏好问题）；把条目写进 `STATE.md`（人读文件，
+  并发写会互相覆盖，且无法机器检索）。
+
+## D-037 — 提问前先回捞：ask 档先读会话上文与磁盘记忆，命中即作答（v0.5 未发布）
+
+- **Status:** CONFIRMED（`npm run ci` 35 文件 / 617 测试 PASS；`test/triage-recall.spec.ts` 28 例；
+  证据 `docs/knowledge/evidence/history-first/`；真机在线回放 `NOT_RUN`）
+- **Date:** 2026-11-06
+- **Decision:** ①`ask` 档（前台准备向用户要澄清）之前，先由 gate 读**既有**材料：会话上文（6 轮 /
+  3000 字符）、插件自己写的前序轮次 digest（4 轮 / 4000 字符，只读复用 D-035 的编译结果）、磁盘
+  `docs/knowledge/*.md`（12 文件 / 每个 2400 / 合计 16000 字符，`GROK_WORKFLOW_KNOWLEDGE_DIRS` 可改）；
+  ②判定在 `src/triage.ts` 内保持纯函数（`recallFromPrior(text, sources)`）：**≥2 个去停用词锚点**，
+  或**指针式引用**（刚才/上面那/the above…）**且**有 ≥120 字符的实质材料才命中；命中返回
+  `tier:'fast', reason:'recalled'`，未命中返回与改动前**逐字节相同**的 `ask`；
+  ③`ask:false`（不问就升级团队）时命中同样走快手档——材料已在手，一个工人就能答，没必要开团队；
+  ④未命中且**本例会话里已经说过话**时，提问下方追加一行「先查后问：查了 N 处，还缺 X」，只要一项；还没说过话的新会话不追加——那句原样提问本身就是最诚实的形式，因此逐字节不变；
+  ⑤只读、有界、脱敏、**不新增配置键、不新增记录类型、不新增归档**。
+- **Reason:** 用户可见失败是 `session-7e079b80` 型：研究结果就在会话里，追问却被要求重述。根因不是
+  "记忆不存在"，而是**提问前没查**。把"查"插在提问这一步之前，既修掉失败形态，又不改任何其他档位。
+- **Consequences:** `src/triage.ts`（召回判定/说明/提示词）、`src/gate.ts`（磁盘读取 + 接线 +
+  `GateDeps.memoryDocRoots`）。`src/config.ts`、`records.ts`、`carryover.ts` 未改。
+- **Alternatives rejected:** 让模型自己判断"要不要再问"（不确定、每次多一次调用、单测无法钉）；
+  把整段会话硬塞进 ask 判定（无界，且必然自命中）；用向量/语义检索（本轮约束是确定性单测，且会引入
+  依赖与在线能力）；改 `expiredAskNote`/`unusedAskNote`（那是 P0-2 的档位选择语义，与"知识是否存在"
+  无关，改它会削弱既有断言）。
+- **已知缺陷（本轮发现并已修，`CONFIRMED`）：** 首版把本轮消息当历史（`relay` 先 `commitClaimed()`
+  再 `produceAnswer()`），任何追问都会命中自己；`collectRecallSources(…, exclude=request)` 剔除后修复，
+  `test/triage-recall.spec.ts` 的 `before the fix` 用例守着。

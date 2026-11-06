@@ -108,6 +108,12 @@ export interface RunWorkflowOptions {
     objective: string;
     /** Optional caller-supplied plan. */
     callerTasks?: NormalizedTask[];
+    /**
+     * Compiled earlier rounds of this session (v0.5), produced by
+     * `src/carryover.ts`. Absent/empty on a first round, which keeps the request
+     * payload identical to the pre-0.5 one.
+     */
+    carryover?: string;
     /** Extra cancellation sources (the tool's exec signal, or the gate's own). */
     signals?: AbortSignal[];
     /**

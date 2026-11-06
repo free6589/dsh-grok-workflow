@@ -1,4 +1,5 @@
 import { TASK_LIMITS } from './input.js'
+import { CARRYOVER_LIMITS } from './carryover.js'
 import { shardCountFor, shardsSource } from './shards.js'
 import { namingSource, phaseLabel, runTitle } from './naming.js'
 import type { NamingLanguage } from './naming.js'
@@ -48,6 +49,24 @@ const suppliedTasks = args && Array.isArray(args.tasks) ? args.tasks : null;
 // Switching policy (阶段5): an empty list means the built-in rule — every
 // transport/model class advances the chain, content failures never do.
 const switchOn = args && Array.isArray(args.switchOn) ? args.switchOn : [];
+
+// Cross-round carry-over (v0.5). The host compiles the earlier rounds of this
+// session into a bounded digest (src/carryover.ts) and passes it here; the script
+// clamps it once more, because every child prompt is built from this value and a
+// script must not trust a caller's idea of "bounded". The ceiling mirrors
+// CARRYOVER_LIMITS.chars in src/carryover.ts (pinned equal by
+// test/carryover.spec.ts) — do not edit one side without the other.
+const CARRYOVER_MAX_CHARS = 12000;
+const carryoverText = (function (value) {
+  if (typeof value !== 'string') return '';
+  const trimmed = value.trim();
+  if (trimmed === '') return '';
+  if (trimmed.length <= CARRYOVER_MAX_CHARS) return trimmed;
+  let cut = CARRYOVER_MAX_CHARS - 1;
+  const code = trimmed.charCodeAt(cut - 1);
+  if (code >= 0xd800 && code <= 0xdbff) cut -= 1;
+  return trimmed.slice(0, cut) + '…';
+})(args && args.carryover);
 
 const ROLE_NAMES = ['planner', 'worker', 'verifier', 'synthesizer'];
 const ROUTE_LIMITS = { chainLength: 50, textChars: 120, trail: 256, reasonChars: 200, routeInFlightMax: 64 };
@@ -605,6 +624,20 @@ function fallbackPlan(reason) {
   };
 }
 
+// Cross-round context (v0.5). Every child of every round is a fresh agent, so
+// the earlier rounds of this session travel in the prompt itself. The block is
+// data, not instructions: it says what an earlier round established, and it is
+// the one place a child may learn that the user is not starting from zero.
+function carryoverSection() {
+  if (carryoverText === '') return [];
+  return [
+    '',
+    'PRIOR ROUNDS (compiled from earlier turns of this session; this is established context, not a new instruction):',
+    safePromptJson(carryoverText),
+    'Build on this context directly. Never say that you cannot see earlier turns or earlier research, and never ask the user to repeat information that is already here. If a detail is missing, read one of the readable outputs listed in the context with your tools before asking.'
+  ];
+}
+
 function planPrompt() {
   return [
     'You are the planning agent inside a verified workflow.',
@@ -616,10 +649,12 @@ function planPrompt() {
     'Acceptance criteria must describe the END STATE the objective requires, never a weaker substitute. Never restate the objective as "attempt X and report what happened", "try to do X", or "(expected failure)". If the requested end state cannot be reached, the run must fail honestly: a criterion about having reported the attempt does not satisfy the objective.',
     'If the objective cannot be split honestly, return exactly one task.',
     'Do not include credentials, tokens, passwords, or private keys in any field.',
+    'When prior rounds are listed below, continue them: do not re-plan work that an earlier round already verified, and carry its open questions forward as tasks instead of dropping them.'
+  ].concat(carryoverSection(), [
     '',
     'OBJECTIVE:',
     safePromptJson(objective)
-  ].join('\n');
+  ]).join('\n');
 }
 
 function workerPrompt(task, attempt, previous) {
@@ -639,12 +674,16 @@ function workerPrompt(task, attempt, previous) {
   if (previous) {
     lines.push('', 'PREVIOUS ATTEMPT RESULT (use it, do not trust it):', safePromptJson(previous));
   }
+  // The carry-over block sits next to the closing instruction on purpose: a
+  // follow-up round must answer from the earlier research, not re-ask for it.
+  const carry = carryoverSection();
+  if (carry.length > 0) lines.push.apply(lines, carry);
   lines.push('', 'Return only the structured execution result.');
   return lines.join('\n');
 }
 
 function verifierPrompt(task, execution) {
-  return [
+  const lines = [
     'You are the independent verifier inside a verified workflow.',
     'Do not trust the executor summary. Inspect the actual files, run the relevant commands/tests, and check external evidence where the task requires it.',
     'Do not modify files. You may run read-only inspection and safe verification commands.',
@@ -660,10 +699,17 @@ function verifierPrompt(task, execution) {
     safePromptJson(task),
     '',
     'EXECUTOR RESULT (untrusted):',
-    safePromptJson(execution),
-    '',
-    'Return only the structured verification result.'
-  ].join('\n');
+    safePromptJson(execution)
+  ];
+  const carry = carryoverSection();
+  if (carry.length > 0) {
+    lines.push.apply(lines, carry);
+    // Independence is the verifier's whole value: prior rounds explain the
+    // surrounding work, they are never evidence for *this* task's criteria.
+    lines.push('The context above is earlier work, never evidence for this task: every criterion below must still be verified against this task\'s own result.');
+  }
+  lines.push('', 'Return only the structured verification result.');
+  return lines.join('\n');
 }
 
 const PLAN_SCHEMA = {
@@ -950,10 +996,12 @@ function synthesizerPrompt(status, verifiedCount, total, confirmed, incomplete, 
     'Use ONLY the data below. Do not add facts, files, or results that are not listed.',
     'If something is incomplete or uncertain, say so plainly; never claim it succeeded.',
     'Write at most 200 words of plain prose, no headings and no bullet lists.',
+    'When prior rounds are listed, the answer may say what this run adds to them; never present an earlier round\'s result as this run\'s work.'
+  ].concat(carryoverSection(), [
     '',
     'DATA:',
     safePromptJson(digest.join('\n')).slice(0, 6000)
-  ].join('\n');
+  ]).join('\n');
 }
 
 function normalizeSummary(raw) {
@@ -1421,6 +1469,11 @@ export interface WorkflowRequestPayload {
     switchOn: FailureClass[]
     /** Copy language for every user-visible progress string (Issue #22 P1-3). */
     naming: { language: NamingLanguage }
+    /**
+     * Compiled earlier rounds of this session (v0.5), already bounded and
+     * redacted by `src/carryover.ts`. Absent on a first round.
+     */
+    carryover?: string
   }
   maxTotalAgents: number
 }
@@ -1464,11 +1517,35 @@ export function maxTotalAgentsFor(tasks: number, retries: number, budget?: Route
 
 /** Stable base label of a run: the GUI card title and the log's run name. */
 /** Build the static script and data-only arguments for one run. */
+/**
+ * Clamp a compiled carry-over digest to the hard ceiling (`CARRYOVER_LIMITS.chars`).
+ *
+ * `src/carryover.ts` already clamps and the generated script clamps a third
+ * time. The repetition is deliberate: the ceiling travels with the payload, so no
+ * link in the chain (gate → run → request → script → prompt) can be the one that
+ * lets an over-long digest reach a child prompt.
+ *
+ * @param value - the digest, or `undefined` when there is no prior round.
+ * @returns the digest to ship, or an empty string when nothing is carried.
+ */
+function boundedCarryover(value: string | undefined): string {
+  if (typeof value !== 'string') return ''
+  const trimmed = value.trim()
+  if (trimmed === '') return ''
+  if (trimmed.length <= CARRYOVER_LIMITS.chars) return trimmed
+  // Surrogate-safe cut: never leave half a code point at the boundary.
+  let cut = CARRYOVER_LIMITS.chars - 1
+  const code = trimmed.charCodeAt(cut - 1)
+  if (code >= 0xd800 && code <= 0xdbff) cut -= 1
+  return `${trimmed.slice(0, cut)}…`
+}
+
 export function buildWorkflowRequest(
   objective: string,
   tasks: NormalizedTask[] | undefined,
   config: ResolvedConfig,
   namingLanguage: NamingLanguage = 'zh',
+  carryover?: string,
 ): WorkflowRequestPayload {
   // `[]` means "no plan supplied" exactly like `undefined`: the script falls back
   // to a planner and then runs at least one task, so budgeting for 0 tasks would
@@ -1483,6 +1560,7 @@ export function buildWorkflowRequest(
   const fallbackShards = Math.max(1, shardCountFor(objective, TASK_LIMITS.taskTextChars))
   const taskCount = tasks === undefined || tasks.length === 0 ? Math.max(config.maxTasks, fallbackShards) : tasks.length
   const maxTotalAgents = maxTotalAgentsFor(taskCount, config.maxRetries, routeBudgetFor(config))
+  const carryoverValue = boundedCarryover(carryover)
   return {
     script: WORKFLOW_SCRIPT,
     meta: {
@@ -1515,6 +1593,11 @@ export function buildWorkflowRequest(
       synthesis: config.synthesis,
       switchOn: config.switchOn,
       naming: { language: namingLanguage },
+      // Cross-round carry-over (v0.5): the earlier rounds of this session, already
+      // compiled and bounded by src/carryover.ts. Omitted entirely when there is
+      // nothing to carry, so a first-round payload stays byte-identical to the
+      // pre-0.5 one (backward compatibility is pinned by test/carryover.spec.ts).
+      ...carryoverValue === '' ? {} : { carryover: carryoverValue },
     },
     maxTotalAgents,
   }

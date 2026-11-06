@@ -24,6 +24,7 @@ import {
   recordRouting,
 } from './records.js'
 import type { DisposeRecord, DisposeRunInfo } from './records.js'
+import { archiveRoundNow, createMemoryArchiver, memberFromEnd, memberFromStart, roundArchiveEvidence, roundArchiveSummary } from './memory/recorder.js'
 import { redactDeep, redactError, redactSecrets } from './redact.js'
 import type { FailureCategory, FinalStatus, IncompleteItem, NormalizedTask, ResolvedConfig, WorkflowReport } from './types.js'
 
@@ -306,6 +307,12 @@ export interface RunWorkflowOptions {
   objective: string
   /** Optional caller-supplied plan. */
   callerTasks?: NormalizedTask[]
+  /**
+   * Compiled earlier rounds of this session (v0.5), produced by
+   * `src/carryover.ts`. Absent/empty on a first round, which keeps the request
+   * payload identical to the pre-0.5 one.
+   */
+  carryover?: string
   /** Extra cancellation sources (the tool's exec signal, or the gate's own). */
   signals?: AbortSignal[]
   /**
@@ -491,7 +498,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
   const { ctx, config, state, logger, agent, objective } = options
   if (state.disposed) throw new Error(`${workflowLabel(config)} is unavailable: plugin has been unloaded`)
   const callerTasks = options.callerTasks
-  const request = buildWorkflowRequest(objective, callerTasks, config, progressNamingLanguage(ctx))
+  const request = buildWorkflowRequest(objective, callerTasks, config, progressNamingLanguage(ctx), options.carryover)
   // Two independent caps (t41, P1-3): the per-session one is what a user can
   // reason about ("this conversation already runs two workflows"), and the
   // process-wide one only exists so a fleet of sessions cannot unbounded the
@@ -557,11 +564,16 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
     if (cause === 'cancelled' || cause === 'unloaded') return 'cancelled'
     return 'configuration'
   }
-  const asReport = (phase: string, message: string, cause: string): RunOutcome => ({
-    report: redactDeep(failureReport(objective, config, phase, message, categoryFor(cause))),
-    ok: false,
-    cause,
-  })
+  // The report this run will return, captured for the archive write in `finally`:
+  // the round entry is written exactly once, from the authoritative verdict.
+  let lastReport: WorkflowReport | undefined
+  let lastCause: string | undefined
+  const asReport = (phase: string, message: string, cause: string): RunOutcome => {
+    const report = redactDeep(failureReport(objective, config, phase, message, categoryFor(cause)))
+    lastReport = report
+    lastCause = cause
+    return { report, ok: false, cause }
+  }
   // A deadline always yields a report: the caller asked for work and must learn
   // that it stopped, not receive an exception the transport may swallow.
   const timeout = (message: string): RunOutcome => asReport('Timeout', message, 'timeout')
@@ -603,6 +615,22 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
     : undefined
   const stopProgressListeners: (() => void)[] = []
   /**
+   * The incremental memory archive for this run.
+   *
+   * Unlike the progress panel this is NOT a presentation switch: it is the durable
+   * record a later session reads, so it is created on every run. It subscribes to
+   * the engine's own settlement events, which is what makes a finished round a
+   * durable fact *at the moment it finishes* rather than at session exit: the child
+   * that just answered is archived by `workflow/agent-end`, and the round's verdict
+   * is archived when this function settles. Every write is contained — a disk that
+   * refuses it costs a warning line, never the run.
+   */
+  const archiver = createMemoryArchiver({
+    ctx,
+    logger,
+    ...sessionId === undefined ? {} : { sessionId },
+  })
+  /**
    * Subscribe one engine event and keep its disposer.
    *
    * Subscribing is part of "recording never affects the run": a context with no
@@ -614,12 +642,17 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
       const off = register()
       if (typeof off === 'function') stopProgressListeners.push(off as () => void)
     } catch (error) {
-      logger.warn(`progress recording is unavailable: ${redactError(error)}`)
+      logger.warn(`engine event subscription is unavailable: ${redactError(error)}`)
     }
   }
-  if (progress !== undefined && typeof ctx.on === 'function') {
-    listen(() => ctx.on('workflow/agent-start', (info, member) => { progress.agentStart(String(info.id), member) }))
-    listen(() => ctx.on('workflow/agent-end', (info, member) => { progress.agentEnd(String(info.id), member) }))
+  if (typeof ctx.on === 'function') {
+    if (progress !== undefined) {
+      listen(() => ctx.on('workflow/agent-start', (info, member) => { progress.agentStart(String(info.id), member) }))
+      listen(() => ctx.on('workflow/agent-end', (info, member) => { progress.agentEnd(String(info.id), member) }))
+    }
+    // Memory subscriptions are separate from the panel's: archiving is not optional.
+    listen(() => ctx.on('workflow/agent-start', (info, member) => { archiver.agentStart(String(info.id), memberFromStart(member)) }))
+    listen(() => ctx.on('workflow/agent-end', (info, member) => { archiver.agentEnd(String(info.id), memberFromEnd(member)) }))
   }
   try {
     try {
@@ -641,6 +674,9 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
       // The node is announced before the script can produce anything, which is
       // what turns "several minutes of empty window" into a live row (t43).
       progress?.runStart(run)
+      // Adopt before the script can settle anything: `agent-start`/`agent-end` are
+      // process-wide, and only a run this archiver owns may write entries.
+      archiver.adopt(String(run.id), String(run.meta.name))
       if (state.disposed) {
         run.cancel('grok-workflow plugin unloaded')
         settledStop = 'cancelled'
@@ -718,6 +754,8 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
             routes: report.routes,
           }, logger, config.recordLimit)
         }
+        lastReport = report
+        lastCause = undefined
         return { report, ok: true }
       } catch (error) {
         const detail = redactError(error)
@@ -740,7 +778,11 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
         : `${workflowLabel(config)} was cancelled by its caller before the whole run finished; finished tasks are kept and unfinished ones are marked`
       const cause = state.unloadedAt !== undefined ? 'unloaded' : 'cancelled'
       const kept = keepCancelledWork(result.value, objective, config, phase, message)
-      if (kept !== undefined) return { report: kept, ok: false, cause }
+      if (kept !== undefined) {
+        lastReport = kept
+        lastCause = cause
+        return { report: kept, ok: false, cause }
+      }
       return failure(phase, message, cause)
     }
     const detail = redactSecrets(String(result.error ?? 'unknown workflow failure'))
@@ -752,6 +794,22 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
     // as "still running" in the panel until the turn ends.
     if (run !== undefined) progress?.runEnd(run.id, progressStopReason(settledStop ?? 'error', reportStatus))
     progress?.dispose()
+    // The round is archived here — before this function returns to the turn — so a
+    // later round that "checks memory" finds it, whether or not the session that
+    // produced it ever reaches its own end.
+    if (run !== undefined) {
+      archiver.round({
+        runId: String(run.id),
+        runName: String(run.meta.name),
+        ...sessionId === undefined ? {} : { sessionId },
+        objective,
+        ...lastReport === undefined ? {} : { status: lastReport.status },
+        ...lastCause === undefined ? {} : { cause: lastCause },
+        summary: roundArchiveSummary(lastReport, lastCause),
+        evidence: roundArchiveEvidence(lastReport),
+      })
+    }
+    archiver.dispose()
     for (const off of stopProgressListeners ?? []) off()
     combined.dispose()
     if (run !== undefined) {
@@ -939,6 +997,18 @@ export async function runSingleCall(options: SingleCallOptions): Promise<SingleC
         logger.warn(`front-desk call produced no reply (agentsStarted=${result.agentsStarted} value=${JSON.stringify(result.value)?.slice(0, 120) ?? 'undefined'})`)
         return { ok: false, reason: `the front-desk worker returned no text (agentsStarted=${result.agentsStarted})` }
       }
+      // The front-desk tier is a round as well: one child answered, and a later
+      // session must be able to find that answer. Archived here — before this call
+      // returns to the turn — for the same reason the full path archives at settle:
+      // a result nobody can look up afterwards is a result the next round redoes.
+      archiveRoundNow({
+        runId: String(live.id),
+        runName: TRIAGE_RUN_LABEL,
+        sessionId: sessionIdOf(agent),
+        objective: prompt,
+        status: 'completed',
+        summary: text,
+      }, { logger })
       return { ok: true, text }
     } catch (error) {
       logger.warn(`front-desk call failed: ${redactError(error)}`)
