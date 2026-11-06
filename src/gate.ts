@@ -747,9 +747,19 @@ export function installGate(deps: GateDeps): boolean {
         }
       }
       if (tier.tier === 'fast') {
+        // Fast-path context (v0.5.1): a follow-up like "用人话告诉我刚才…" is
+        // classified from history but the single worker used to receive only the
+        // bare request — so it answered blind ("I am a single turn, I cannot
+        // see the research above"). Hand it the same bounded conversation /
+        // digest the recall pass already read: empty on a first message (prompt
+        // stays byte-identical), bounded and redacted otherwise.
+        const fastContext = recalled !== undefined
+          ? [recalled.excerpt, `(${recalled.locators.join(' | ')})`].filter(part => part !== '').join('\n')
+          : [histForTriage, carryoverForSession(sessionOf(agent), { rounds: limits.historyTurns, chars: limits.historyChars }).digest]
+            .map(part => part.trim()).filter(part => part !== '').join('\n\n').slice(0, 4000)
         const call = await runSingleCall({
           ctx, config, state, logger, agent,
-          prompt: recalled === undefined ? singleCallPrompt(tier, target) : recallPrompt(tier, target, recalled),
+          prompt: recalled === undefined ? singleCallPrompt(tier, target, false, fastContext) : recallPrompt(tier, target, recalled),
           label: 'quick-worker',
           ...signal === undefined ? {} : { signals: [signal] },
         })

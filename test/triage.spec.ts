@@ -260,6 +260,15 @@ describe('t52 front desk: wording is bilingual and states the tier', () => {
     // (measured on :3100: agentsStarted=1 with value={"reply":null}).
     expect(fast).not.toMatch(/do not call tools/i)
     expect(fast).toContain('run npm test')
+    // Fast-path context (v0.5.1): empty by default so old prompts are byte-identical;
+    // non-empty renders a Context block before Request so a follow-up like
+    // "用人话告诉我刚才…" no longer answers blind.
+    expect(fast).not.toContain('Context (do not ask for what is already here):')
+    const withContext = singleCallPrompt(classifyTriage({ text: 'run npm test', mode: 'triage', ask: true }), 'run npm test', false, 'Conversation so far (context only):\nUser: earlier work')
+    expect(withContext).toContain('Context (do not ask for what is already here):')
+    expect(withContext).toContain('Conversation so far')
+    expect(withContext).toContain('run npm test')
+    expect(withContext.indexOf('Context (do not ask')).toBeLessThan(withContext.indexOf('Request:'))
   })
 })
 
