@@ -938,9 +938,17 @@ const JSON_DEMAND = 'Return only a JSON object with one field: {"reply": "<your 
  * prompt states the tier so the child cannot silently escalate either way.
  * @param verdict - the tier the front desk chose.
  * @param request - the user message (already composed with history).
+ * @param wantJson - when true, demand the `{"reply": ...}` shape (retry only).
+ * @param context - bounded conversation/carry-over block the child may answer from.
+ *   Empty keeps the pre-v0.5.1 prompt byte-identical; non-empty is rendered as a
+ *   `Context (do not ask for what is already here):` block before `Request:` so a
+ *   follow-up like "用人话告诉我刚才…" no longer answers blind.
  * @returns the child prompt.
  */
-export function singleCallPrompt(verdict: TriageVerdict, request: string, wantJson = false): string {
+export function singleCallPrompt(verdict: TriageVerdict, request: string, wantJson = false, context = ''): string {
+  const contextBlock = context.trim() === ''
+    ? []
+    : ['Context (do not ask for what is already here):', context.trim(), ''];
   if (verdict.tier === 'chat') {
     return [
       'You are the front desk of a coding assistant. Answer this message in one or two short sentences.',
@@ -965,6 +973,7 @@ export function singleCallPrompt(verdict: TriageVerdict, request: string, wantJs
     verdict.lang === 'zh' ? '用中文回答。' : 'Answer in English.',
     ...wantJson ? [JSON_DEMAND] : [],
     '',
+    ...contextBlock,
     'Request:',
     request,
   ].join('\n')

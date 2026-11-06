@@ -369,9 +369,14 @@ export declare function unusedAskNote(lang: TriageLang): string;
  * prompt states the tier so the child cannot silently escalate either way.
  * @param verdict - the tier the front desk chose.
  * @param request - the user message (already composed with history).
+ * @param wantJson - when true, demand the `{"reply": ...}` shape (retry only).
+ * @param context - bounded conversation/carry-over block the child may answer from.
+ *   Empty keeps the pre-v0.5.1 prompt byte-identical; non-empty is rendered as a
+ *   `Context (do not ask for what is already here):` block before `Request:` so a
+ *   follow-up like "用人话告诉我刚才…" no longer answers blind.
  * @returns the child prompt.
  */
-export declare function singleCallPrompt(verdict: TriageVerdict, request: string, wantJson?: boolean): string;
+export declare function singleCallPrompt(verdict: TriageVerdict, request: string, wantJson?: boolean, context?: string): string;
 /** Which canned answer a chat message gets. */
 export type ChatBucket = 'greeting' | 'thanks' | 'ack' | 'farewell' | 'about';
 /** Classify a chat message into one of the canned buckets. */
