@@ -5,6 +5,8 @@ import { createAssistantMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import { Session, pluginRecordOf } from '@deepseek-ai/dsh-session'
 import { apply } from '../src/index.js'
 import { REPORT_BEGIN, REPORT_END } from '../src/answer.js'
+import { renderReport } from '../src/report.js'
+import type { WorkflowReport } from '../src/types.js'
 import { resolveConfig } from '../src/config.js'
 import { classifyPreStep } from '../src/gate.js'
 import type { PreStepPayload } from '../src/gate.js'
@@ -1006,5 +1008,73 @@ describe('in-turn delivery (default strategy)', () => {
     ctx.engine.runs[0]!.fail('error', 'boom')
     await pending
     expect(recordsOf(session, ROUTING_RECORD)).toHaveLength(0)
+  })
+})
+
+/* --------------------------------------------------- cross-round carry-over -- */
+
+/** Research result that must survive from round 1 into round 2. */
+const CARRYOVER_FINDING = 'PYTEST-EVIDENCE-9f3c: the retry loop fails at 0.42% under load'
+
+/**
+ * One validated report rendered exactly as the gate writes it into the session.
+ *
+ * The digest is compiled from this durable text, so the fixture is produced by
+ * the real renderer rather than hand-written: if the report format changes, this
+ * test stops matching for the same reason production would.
+ */
+function reportText(): string {
+  const criterion = 'the retry behaviour is measured'
+  const value = {
+    schemaVersion: 'grok-workflow/v1',
+    status: 'completed',
+    objective: 'measure the retry loop',
+    plan: { source: 'caller', tasks: [task('a', [criterion])] },
+    tasks: [{
+      id: 'a',
+      title: 'Task a',
+      attempts: [{ attempt: 1, status: 'verified', execution: execution('measured'), verification: verification(task('a', [criterion])) }],
+      status: 'verified',
+      evidence: [{ criterion, met: true, evidence: CARRYOVER_FINDING }],
+    }],
+    confirmed: [{ taskId: 'a', criterion, evidence: CARRYOVER_FINDING }],
+    incomplete: [],
+    errors: [],
+    uncertainties: [],
+    routes: [],
+    routing: { planner: [], worker: [], verifier: [], synthesizer: [] },
+    synthesis: { mode: 'deterministic' },
+    limits: { maxConcurrency: 2, maxRetries: 1, maxTasks: 6, maxTotalAgents: 20 },
+  } as unknown as WorkflowReport
+  return renderReport(value)
+}
+
+describe('cross-round carry-over', () => {
+  it('hands the second round a digest of the first round instead of a blank slate', async () => {
+    const ctx = new FakeContext()
+    applyWith(ctx)
+    const session = Session.create('sess-carryover' as never)
+    // Round 1 already happened: the transcript holds the user's words and the
+    // plugin's own validated report (its durable, model-independent copy).
+    session.append('user/message', userMessage('measure the retry loop'), { surfaceOp: 'append' })
+    session.append('user/message', userMessage(reportText(), 'grok-workflow'), { surfaceOp: 'append' })
+    const agent = new FakeAgent({ session })
+    const followUp = 'now summarise it for my manager'
+    await ctx.preStep()(payload(agent, [userMessage(followUp)], 2, 1), passingNext([]))
+    await waitFor(() => ctx.engine.startCalls.length === 1)
+    const args = ctx.engine.startCalls[0]!.args as Record<string, unknown>
+    // The research result travels; the user's follow-up carries none of it.
+    expect(String(args.carryover)).toContain('PYTEST-EVIDENCE-9f3c')
+    expect(String(args.objective)).not.toContain('PYTEST-EVIDENCE-9f3c')
+    expect(String(args.objective)).toContain(followUp)
+  })
+
+  it('sends no carry-over on a first round', async () => {
+    const ctx = new FakeContext()
+    applyWith(ctx)
+    const agent = new FakeAgent({ session: Session.create('sess-carryover-first' as never) })
+    await ctx.preStep()(payload(agent, [userMessage('measure the retry loop')]), passingNext([]))
+    await waitFor(() => ctx.engine.startCalls.length === 1)
+    expect('carryover' in (ctx.engine.startCalls[0]!.args as Record<string, unknown>)).toBe(false)
   })
 })

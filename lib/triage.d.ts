@@ -22,6 +22,12 @@
  * 3. **Never guess silently.** When the signals conflict, the front desk asks
  *    one question instead of picking a tier; the answer is remembered for the
  *    next message ({@link resolvePending}).
+ *    …but it never asks for something it already has: before a clarification
+ *    question goes out, the conversation so far and the memory files on disk are
+ *    searched ({@link recallFromPrior}), and a hit is answered from instead of
+ *    asked about. That rule is the point of
+ *    `session-7e079b80-1a57-451b-aca4-795d24a14c4d`, where results the session
+ *    already held were met with a request to repeat them.
  * 4. **Escalation is always available.** A message that names the team is
  *    routed to the team regardless of every other signal ({@link FORCE_TEAM}).
  *
@@ -63,6 +69,18 @@ export interface TriageInput extends TriagePolicy {
      * (mirrors `triageFollowupAsFast: false`); defaults to enabled.
      */
     followupAsFast?: boolean;
+    /**
+     * Outcome of the "look it up before asking" pass, run by the gate right before
+     * a clarification question would go out: the conversation so far plus the
+     * memory files already on disk, read and bounded by the caller.
+     *
+     * `undefined` means the pass did not run, and the front desk behaves exactly
+     * as it did before this rule existed — that is what keeps a first message in a
+     * fresh session byte-identical. A `hit` turns the question into an answer
+     * (tier `fast`, reason `recalled`); a `miss` changes nothing here, and the gate
+     * states what is missing next to the question.
+     */
+    prior?: RecallResult;
 }
 /** One classification. */
 export interface TriageVerdict {
@@ -121,6 +139,109 @@ export interface TriageSignals {
  */
 export declare function triageSignals(text: string): TriageSignals;
 /**
+ * One piece of material the front desk may answer from, handed in by the gate.
+ *
+ * The front desk itself does no I/O (rule 1 of the module note), so it never
+ * reads a session or a file: it is given the text, already bounded and redacted,
+ * and only decides whether that text answers the message.
+ */
+export interface RecallSource {
+    /** `history` is the conversation so far; `memory` is a file already on disk. */
+    kind: 'history' | 'memory';
+    /** Where the text came from, shown to the user: a file path or a named block. */
+    locator: string;
+    /** The body, bounded by the caller. */
+    text: string;
+}
+/** The material answers the message: answer from it instead of asking. */
+export interface RecallHit {
+    kind: 'hit';
+    /**
+     * `content-match`: the message names things the material contains.
+     * `prior-reference`: the message points at earlier material ("刚才那份" / "the
+     * above") and the material is substantial enough to be what it points at.
+     */
+    reason: 'content-match' | 'prior-reference';
+    /** Distinct anchors that were found, in message order (bounded). */
+    tokens: string[];
+    /** Locators the answer comes from (bounded). */
+    locators: string[];
+    /** The part of the material that carries the answer, one bounded excerpt. */
+    excerpt: string;
+}
+/** Nothing in the material answers the message: ask once, and say what is missing. */
+export interface RecallMiss {
+    kind: 'miss';
+    /** The anchors the message asked about; what the user has to supply. */
+    tokens: string[];
+    /** Locators that were searched, so the question can state where it looked. */
+    checked: string[];
+}
+/** Result of one look-up-before-asking pass. */
+export type RecallResult = RecallHit | RecallMiss;
+/**
+ * Limits of the look-up pass.
+ *
+ * The matching limits keep the rule conservative: two anchors, or one anchor
+ * plus an explicit pointer at earlier material. One common bigram is not
+ * evidence that the material answers the message, and a false hit is worse than
+ * a question — it would answer with something the user did not ask about.
+ */
+export declare const RECALL_LIMITS: {
+    /** Distinct anchors a content match needs. */
+    readonly minTokens: 2;
+    /** Characters a source needs before a bare "刚才那份" may use it. */
+    readonly minSubstantive: 120;
+    /** Characters kept from the excerpt shown to the worker and the user. */
+    readonly excerptChars: 700;
+    /** Characters of lead-in kept before the first anchor in the excerpt. */
+    readonly excerptLead: 160;
+    /** Anchors reported back (to the user and in the ledger). */
+    readonly tokens: 8;
+    /** Locators reported back. */
+    readonly locators: 4;
+    /** Sources one pass may consider. */
+    readonly sources: 24;
+    /** Turns of conversation the gate forwards to the pass. */
+    readonly turns: 6;
+    /** Characters of conversation the gate forwards to the pass. */
+    readonly historyChars: 3000;
+    /** Earlier rounds compiled into the digest the pass may read. */
+    readonly rounds: 4;
+    /** Characters of that digest. */
+    readonly digestChars: 4000;
+    /** Memory files one pass reads. */
+    readonly files: 12;
+    /** Characters kept from one memory file. */
+    readonly fileChars: 2400;
+    /** Characters of memory files one pass reads in total. */
+    readonly totalChars: 16000;
+};
+/**
+ * Search the material already on hand for what this message asks about.
+ *
+ * Two ways to hit, in the order they are trusted:
+ *
+ * 1. **content-match** — the message names at least {@link RECALL_LIMITS.minTokens}
+ *    distinct anchors that one source contains. Two anchors sharing a source is
+ *    evidence; one common bigram is not.
+ * 2. **prior-reference** — the message points at earlier material ("刚才那份",
+ *    "上面说的", "the above") and at least one source is substantial
+ *    ({@link RECALL_LIMITS.minSubstantive} characters, so small talk cannot
+ *    masquerade as the thing being pointed at). Nothing new is asked here, which
+ *    is exactly the case that must never come back as "please repeat it".
+ *
+ * Nothing is invented: a miss reports the anchors that were looked for and the
+ * locators that were searched, so the question that follows can be specific.
+ *
+ * @param input - the message and the material already read by the gate.
+ * @returns a hit with an excerpt, or a miss with what was looked for.
+ */
+export declare function recallFromPrior(input: {
+    text: string;
+    sources: readonly RecallSource[];
+}): RecallResult;
+/**
  * Decide the tier of one message.
  *
  * Order of authority, highest first: `full` mode, the answer to a previous
@@ -157,6 +278,43 @@ export declare function greetingLine(lang: TriageLang): string;
  * @returns the question, with the two accepted replies.
  */
 export declare function askLine(lang: TriageLang): string;
+/**
+ * What the question says when the look-up pass ran and found nothing.
+ *
+ * Appended to {@link askLine} — never merged into it — because the two say
+ * different things: `askLine` asks the tier question, this one reports that the
+ * session and the memory files were searched first and states what is missing.
+ * It deliberately asks for one specific thing rather than for the whole task
+ * again: making the user restate what they already said is the failure this
+ * pass exists to remove.
+ *
+ * @param lang - language of the message.
+ * @param miss - the failed look-up, with the anchors and the locators searched.
+ * @returns one sentence to put under the question.
+ */
+export declare function missingNote(lang: TriageLang, miss: RecallMiss): string;
+/**
+ * Where a looked-up answer came from, stated in the answer itself.
+ * @param lang - language of the message.
+ * @param hit - the successful look-up.
+ * @returns one parenthetical naming the locators.
+ */
+export declare function recalledNote(lang: TriageLang, hit: RecallHit): string;
+/**
+ * Prompt for the one call a looked-up answer spends.
+ *
+ * The worker receives the material the session and the memory files already
+ * hold, and is told, in as many words, that it may not do what the failing
+ * session did: claim it cannot see earlier work, or ask the user to repeat it.
+ * When a detail really is absent it must name that detail — one line — rather
+ * than asking for the whole task again.
+ *
+ * @param verdict - the recalled verdict (for the language).
+ * @param request - the user message.
+ * @param hit - the material that answered it.
+ * @returns the child prompt.
+ */
+export declare function recallPrompt(verdict: TriageVerdict, request: string, hit: RecallHit): string;
 /**
  * Label of a completed front-desk answer (chat and fast tiers).
  * @param verdict - one classification.

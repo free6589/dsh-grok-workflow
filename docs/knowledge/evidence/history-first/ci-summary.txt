@@ -1,0 +1,4 @@
+Found 3 warnings and 0 errors.
+ Test Files  35 passed (35)
+      Tests  617 passed (617)
+   Duration  23.46s (transform 746ms, setup 0ms, import 2.28s, tests 17.14s, environment 4ms)

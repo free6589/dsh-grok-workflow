@@ -3,6 +3,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
 import { HARD_LIMITS, createConfigReader, describeResolvedConfig, repairSynthesisInconsistency, resolveConfig, snapshotConfig } from './config.js'
 import { describeSurface, validateRoutes } from './settings.js'
+import { carryoverBounds, carryoverForSession } from './carryover.js'
 import { registerGrokCommand } from './command.js'
 import { installGate } from './gate.js'
 import { installShutdownProbe } from './records.js'
@@ -218,6 +219,10 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
         throw new GrokWorkflowInputError(`objective must be at most ${TASK_LIMITS.objectiveChars} characters`)
       }
       const callerTasks = normalizeCallerTasks(args.tasks as TaskInput[] | undefined, live.maxTasks)
+      // Cross-round carry-over (v0.5): a tool call is also a new round inside the
+      // session, so it gets the same bounded digest of the earlier rounds that the
+      // gate hands to a message-driven run. Empty when the session has none.
+      const carryover = carryoverForSession(agent.session, carryoverBounds(live))
       const outcome = await runWorkflow({
         ctx,
         config: live,
@@ -227,6 +232,7 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
         objective,
         signals: [exec.signal],
         ...callerTasks === undefined ? {} : { callerTasks },
+        ...carryover.digest === '' ? {} : { carryover: carryover.digest },
         failureMode: 'throw',
       })
       return outcome.report as never

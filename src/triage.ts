@@ -22,6 +22,12 @@
  * 3. **Never guess silently.** When the signals conflict, the front desk asks
  *    one question instead of picking a tier; the answer is remembered for the
  *    next message ({@link resolvePending}).
+ *    …but it never asks for something it already has: before a clarification
+ *    question goes out, the conversation so far and the memory files on disk are
+ *    searched ({@link recallFromPrior}), and a hit is answered from instead of
+ *    asked about. That rule is the point of
+ *    `session-7e079b80-1a57-451b-aca4-795d24a14c4d`, where results the session
+ *    already held were met with a request to repeat them.
  * 4. **Escalation is always available.** A message that names the team is
  *    routed to the team regardless of every other signal ({@link FORCE_TEAM}).
  *
@@ -67,6 +73,18 @@ export interface TriageInput extends TriagePolicy {
    * (mirrors `triageFollowupAsFast: false`); defaults to enabled.
    */
   followupAsFast?: boolean
+  /**
+   * Outcome of the "look it up before asking" pass, run by the gate right before
+   * a clarification question would go out: the conversation so far plus the
+   * memory files already on disk, read and bounded by the caller.
+   *
+   * `undefined` means the pass did not run, and the front desk behaves exactly
+   * as it did before this rule existed — that is what keeps a first message in a
+   * fresh session byte-identical. A `hit` turns the question into an answer
+   * (tier `fast`, reason `recalled`); a `miss` changes nothing here, and the gate
+   * states what is missing next to the question.
+   */
+  prior?: RecallResult
 }
 
 /** One classification. */
@@ -259,6 +277,245 @@ export function triageSignals(text: string): TriageSignals {
   }
 }
 
+/* ------------------------------------------------- look it up, then ask ---- */
+
+/**
+ * One piece of material the front desk may answer from, handed in by the gate.
+ *
+ * The front desk itself does no I/O (rule 1 of the module note), so it never
+ * reads a session or a file: it is given the text, already bounded and redacted,
+ * and only decides whether that text answers the message.
+ */
+export interface RecallSource {
+  /** `history` is the conversation so far; `memory` is a file already on disk. */
+  kind: 'history' | 'memory'
+  /** Where the text came from, shown to the user: a file path or a named block. */
+  locator: string
+  /** The body, bounded by the caller. */
+  text: string
+}
+
+/** The material answers the message: answer from it instead of asking. */
+export interface RecallHit {
+  kind: 'hit'
+  /**
+   * `content-match`: the message names things the material contains.
+   * `prior-reference`: the message points at earlier material ("刚才那份" / "the
+   * above") and the material is substantial enough to be what it points at.
+   */
+  reason: 'content-match' | 'prior-reference'
+  /** Distinct anchors that were found, in message order (bounded). */
+  tokens: string[]
+  /** Locators the answer comes from (bounded). */
+  locators: string[]
+  /** The part of the material that carries the answer, one bounded excerpt. */
+  excerpt: string
+}
+
+/** Nothing in the material answers the message: ask once, and say what is missing. */
+export interface RecallMiss {
+  kind: 'miss'
+  /** The anchors the message asked about; what the user has to supply. */
+  tokens: string[]
+  /** Locators that were searched, so the question can state where it looked. */
+  checked: string[]
+}
+
+/** Result of one look-up-before-asking pass. */
+export type RecallResult = RecallHit | RecallMiss
+
+/**
+ * Limits of the look-up pass.
+ *
+ * The matching limits keep the rule conservative: two anchors, or one anchor
+ * plus an explicit pointer at earlier material. One common bigram is not
+ * evidence that the material answers the message, and a false hit is worse than
+ * a question — it would answer with something the user did not ask about.
+ */
+export const RECALL_LIMITS = {
+  /** Distinct anchors a content match needs. */
+  minTokens: 2,
+  /** Characters a source needs before a bare "刚才那份" may use it. */
+  minSubstantive: 120,
+  /** Characters kept from the excerpt shown to the worker and the user. */
+  excerptChars: 700,
+  /** Characters of lead-in kept before the first anchor in the excerpt. */
+  excerptLead: 160,
+  /** Anchors reported back (to the user and in the ledger). */
+  tokens: 8,
+  /** Locators reported back. */
+  locators: 4,
+  /** Sources one pass may consider. */
+  sources: 24,
+  /** Turns of conversation the gate forwards to the pass. */
+  turns: 6,
+  /** Characters of conversation the gate forwards to the pass. */
+  historyChars: 3_000,
+  /** Earlier rounds compiled into the digest the pass may read. */
+  rounds: 4,
+  /** Characters of that digest. */
+  digestChars: 4_000,
+  /** Memory files one pass reads. */
+  files: 12,
+  /** Characters kept from one memory file. */
+  fileChars: 2_400,
+  /** Characters of memory files one pass reads in total. */
+  totalChars: 16_000,
+} as const
+
+/**
+ * Words that carry no subject: an anchor built from them would match any text. *
+ * Latin tokens are filtered whole; CJK is reduced to bigrams, so the bigrams of
+ * the same function words are listed instead. Deictic bigrams ("刚才", "上面")
+ * are deliberately in here as well: they point at material without naming it,
+ * which is what {@link PRIOR_REF} handles on its own.
+ */
+const ANCHOR_STOP_EN = new Set([
+  'the', 'and', 'but', 'for', 'with', 'without', 'from', 'into', 'over', 'under', 'about', 'after',
+  'before', 'again', 'also', 'just', 'very', 'more', 'most', 'some', 'any', 'all', 'not', 'yes',
+  'you', 'your', 'yours', 'our', 'ours', 'their', 'them', 'they', 'this', 'that', 'these', 'those',
+  'there', 'here', 'what', 'when', 'where', 'which', 'while', 'who', 'whom', 'whose', 'why', 'how',
+  'can', 'could', 'should', 'would', 'will', 'shall', 'may', 'might', 'must', 'have', 'has', 'had',
+  'was', 'were', 'been', 'being', 'does', 'did', 'doing', 'done', 'its', 'it', 'them', 'then',
+  'than', 'too', 'such', 'same', 'other', 'another', 'each', 'few', 'both', 'own', 'only', 'onto',
+  'please', 'thanks', 'thank', 'okay', 'sure', 'well', 'now', 'still', 'yet', 'ever', 'once',
+  'say', 'said', 'tell', 'told', 'see', 'seen', 'look', 'looked', 'show', 'shown', 'give', 'gave',
+  'need', 'needs', 'want', 'wants', 'make', 'made', 'take', 'took', 'get', 'got', 'let', 'lets',
+  'again', 'above', 'below', 'earlier', 'previous', 'last', 'next', 'one', 'two', 'three',
+])
+const ANCHOR_STOP_ZH = new Set([
+  '这个', '那个', '这些', '那些', '这样', '那样', '这么', '那么', '这份', '那份', '这里', '那里',
+  '一下', '一点', '一些', '一个', '一件', '一起', '一样', '一直', '一遍', '一次', '一般',
+  '我们', '你们', '他们', '她们', '它们', '自己', '大家', '帮我', '给你', '给我', '帮忙',
+  '时候', '什么', '怎么', '怎样', '为什', '如何', '多少', '哪些', '哪个', '哪儿',
+  '可以', '可能', '不是', '就是', '还有', '已经', '因为', '所以', '但是', '然后', '接着',
+  '现在', '刚才', '刚刚', '上面', '前面', '之前', '以上', '下面', '后面', '之后', '上一',
+  '应该', '需要', '知道', '看看', '说说', '讲讲', '再说', '说出', '出来', '起来', '下去',
+  '是不', '是的', '没有', '有点', '也是', '也就', '还是', '或者', '如果', '虽然', '于是',
+])
+/** Latin anchors shorter than this carry no subject; numbers are kept from two digits. */
+const ANCHOR_MIN_LATIN = 3
+
+/**
+ * A message pointing at earlier material without naming it ("刚才那份", "上面说的",
+ * "the above", "previous round"). On its own this is not a question about anything
+ * new: it is a request to reuse what the session already has.
+ */
+const PRIOR_REF = /(?:刚才|刚刚|上面(?:说|那|提)?|前面(?:说|那|提)?|之前(?:说|那|提)?|上一轮|上一条|上一(?:个|份|次)|那份|这份|那个报告|你(?:刚|之前|前面)说|\b(?:earlier|previous|above|last round|before that|as you said)\b)/iu
+
+/** Anchors of one message: latin words, numbers and CJK bigrams, minus stop words. */
+function anchorsOf(text: string): string[] {
+  const out = new Set<string>()
+  const lowered = text.toLowerCase()
+  for (const match of lowered.matchAll(/[a-z0-9][a-z0-9_.:/-]*/g)) {
+    const token = match[0].replace(/[_.:/-]+$/, '')
+    if (token.length < ANCHOR_MIN_LATIN) continue
+    if (ANCHOR_STOP_EN.has(token)) continue
+    out.add(token)
+  }
+  for (const match of text.matchAll(/[\u4e00-\u9fff]+/g)) {
+    const run = match[0]
+    if (run.length < 2) continue
+    for (let index = 0; index + 1 < run.length; index += 1) {
+      const bigram = run.slice(index, index + 2)
+      if (ANCHOR_STOP_ZH.has(bigram)) continue
+      out.add(bigram)
+    }
+  }
+  return [...out]
+}
+
+/** Collapse whitespace and bound one line of material. */
+function clampLine(text: string, max: number): string {
+  const compact = text.replace(/\s+/g, ' ').trim()
+  return compact.length <= max ? compact : `${compact.slice(0, Math.max(0, max - 1))}…`
+}
+
+/** The part of one source that carries the first anchor found, bounded. */
+function excerptAround(text: string, anchors: readonly string[]): string {
+  const compact = text.replace(/\s+/g, ' ').trim()
+  const lower = compact.toLowerCase()
+  let at = -1
+  for (const anchor of anchors) {
+    const index = lower.indexOf(anchor.toLowerCase())
+    if (index < 0) continue
+    at = at < 0 ? index : Math.min(at, index)
+  }
+  if (at < 0) return clampLine(compact, RECALL_LIMITS.excerptChars)
+  const start = Math.max(0, at - RECALL_LIMITS.excerptLead)
+  const head = start === 0 ? '' : '…'
+  return head + clampLine(compact.slice(start, start + RECALL_LIMITS.excerptChars), RECALL_LIMITS.excerptChars)
+}
+
+/**
+ * Search the material already on hand for what this message asks about.
+ *
+ * Two ways to hit, in the order they are trusted:
+ *
+ * 1. **content-match** — the message names at least {@link RECALL_LIMITS.minTokens}
+ *    distinct anchors that one source contains. Two anchors sharing a source is
+ *    evidence; one common bigram is not.
+ * 2. **prior-reference** — the message points at earlier material ("刚才那份",
+ *    "上面说的", "the above") and at least one source is substantial
+ *    ({@link RECALL_LIMITS.minSubstantive} characters, so small talk cannot
+ *    masquerade as the thing being pointed at). Nothing new is asked here, which
+ *    is exactly the case that must never come back as "please repeat it".
+ *
+ * Nothing is invented: a miss reports the anchors that were looked for and the
+ * locators that were searched, so the question that follows can be specific.
+ *
+ * @param input - the message and the material already read by the gate.
+ * @returns a hit with an excerpt, or a miss with what was looked for.
+ */
+export function recallFromPrior(input: {
+  text: string
+  sources: readonly RecallSource[]
+}): RecallResult {
+  const anchors = anchorsOf(input.text)
+  const sources = input.sources
+    .filter(source => source.text.trim() !== '')
+    .slice(0, RECALL_LIMITS.sources)
+  const checked = sources.map(source => source.locator).slice(0, RECALL_LIMITS.locators)
+  const wanted = anchors.slice(0, RECALL_LIMITS.tokens)
+  if (sources.length === 0) return { kind: 'miss', tokens: wanted, checked: [] }
+  if (anchors.length === 0 && !PRIOR_REF.test(input.text)) {
+    return { kind: 'miss', tokens: [], checked }
+  }
+  // Best source first: the one that carries most of the message's anchors wins,
+  // and ties keep the earlier source (history before memory, as the gate passes
+  // them in that order), so the same input always yields the same excerpt.
+  let best: { source: RecallSource; matched: string[] } | undefined
+  for (const source of sources) {
+    const lower = source.text.toLowerCase()
+    const matched = anchors.filter(anchor => lower.includes(anchor.toLowerCase()))
+    if (matched.length < RECALL_LIMITS.minTokens) continue
+    if (best === undefined || matched.length > best.matched.length) best = { source, matched }
+  }
+  if (best !== undefined) {
+    return {
+      kind: 'hit',
+      reason: 'content-match',
+      tokens: best.matched.slice(0, RECALL_LIMITS.tokens),
+      locators: [best.source.locator],
+      excerpt: excerptAround(best.source.text, best.matched),
+    }
+  }
+  if (PRIOR_REF.test(input.text)) {
+    const substantial = sources.filter(source => source.text.trim().length >= RECALL_LIMITS.minSubstantive)
+    if (substantial.length > 0) {
+      const chosen = substantial[0]!
+      return {
+        kind: 'hit',
+        reason: 'prior-reference',
+        tokens: wanted,
+        locators: substantial.map(source => source.locator).slice(0, RECALL_LIMITS.locators),
+        excerpt: excerptAround(chosen.text, wanted),
+      }
+    }
+  }
+  return { kind: 'miss', tokens: wanted, checked }
+}
+
 /** Fallback sentence, also used by the two ambiguity rules. */
 const AMBIGUOUS: { zh: string, en: string } = {
   zh: '信号互相矛盾或线索不足，前台不猜。',
@@ -298,6 +555,10 @@ const DETAIL: Record<string, { zh: string, en: string }> = {
   followup: {
     zh: '这是对上文的追问，有历史可接，一个工人一次就能答。',
     en: 'this is a follow-up on the conversation so far, so one worker answers it in a single pass.',
+  },
+  recalled: {
+    zh: '这条本来会先问你一句，但所需信息已经在会话上文或磁盘记忆里，先回捞再作答。',
+    en: 'this would normally be a question, but the material the session already holds answers it, so it is looked up and answered instead of asked about.',
   },
   'stale-choice': {
     zh: '上一轮没有待回答的分流问题（可能插件重载或超时），所以这条没有派工；要用团队请直接说「用团队」加任务。',
@@ -353,6 +614,16 @@ export function classifyTriage(input: TriageInput): TriageVerdict {
     greeting,
   })
   if (input.mode === 'full') return verdict('team', 'mode-full')
+  // Look before asking ({@link recallFromPrior}): a message the rules cannot
+  // separate is not necessarily one the session cannot answer. When the gate's
+  // look-up pass found the material, the question becomes an answer — tier
+  // `fast`, reason `recalled` — and the user is never asked to repeat what the
+  // conversation already holds. Without a pass (`prior` undefined) this is the
+  // pre-existing choice, byte for byte.
+  const ambiguousVerdict = (): TriageVerdict => {
+    if (input.prior?.kind === 'hit') return verdict('fast', 'recalled')
+    return input.ask ? verdict('ask', 'ambiguous') : verdict('team', 'ambiguous-escalate', true)
+  }
   if (input.pending === true) {
     if (PENDING_FAST.test(text)) return verdict('fast', 'pending-fast')
     if (PENDING_TEAM.test(text)) return verdict('team', 'pending-team', true)
@@ -380,7 +651,7 @@ export function classifyTriage(input: TriageInput): TriageVerdict {
   // pointer inside a question ("这个得几") is answerable by looking, so it is not
   // "insufficient clues", it is a lookup.
   if (signals.vague && !signals.question) {
-    return input.ask ? verdict('ask', 'ambiguous') : verdict('team', 'ambiguous-escalate', true)
+    return ambiguousVerdict()
   }
   if (signals.long) return verdict('team', 'long-objective', true)
   // Sequencing is the strongest team signal there is: "先…然后…" is two steps by
@@ -408,16 +679,16 @@ export function classifyTriage(input: TriageInput): TriageVerdict {
   // follow up on, so ask instead of answering from a greeting template.
   if (text.length <= TRIAGE_LIMITS.chatChars && !signals.deliverables && !signals.action && !signals.concrete && signals.clauses === 1) {
     if (FOLLOW_UP.test(text)) {
-      return input.ask ? verdict('ask', 'ambiguous') : verdict('team', 'ambiguous-escalate', true)
+      return ambiguousVerdict()
     }
     return verdict('chat', 'small-talk')
   }
   if (teamPoints >= 1 && fastPoints >= 2) {
     // Both readings are defensible: this is exactly the case the question exists for.
-    return input.ask ? verdict('ask', 'ambiguous') : verdict('team', 'ambiguous-escalate', true)
+    return ambiguousVerdict()
   }
   if (fastPoints >= 2) return verdict('fast', 'single-step')
-  return input.ask ? verdict('ask', 'ambiguous') : verdict('team', 'ambiguous-escalate', true)
+  return ambiguousVerdict()
 }
 
 /**
@@ -467,6 +738,101 @@ export function askLine(lang: TriageLang): string {
   return lang === 'zh'
     ? '这个要动用团队吗？可回复：简单 / 团队。'
     : 'Should this use the full team? Reply "quick" or "team".'
+}
+
+/** One-line list of anchors, or the honest "no named object" fallback. */
+function anchorList(tokens: readonly string[], lang: TriageLang): string {
+  const kept = tokens.filter(token => token.trim() !== '').slice(0, RECALL_LIMITS.tokens)
+  if (kept.length > 0) return kept.join(lang === 'zh' ? '、' : ', ')
+  return lang === 'zh' ? '明确的对象（具体是哪一份/哪一段）' : 'the specific thing being referred to'
+}
+
+/**
+ * What the question says when the look-up pass ran and found nothing.
+ *
+ * Appended to {@link askLine} — never merged into it — because the two say
+ * different things: `askLine` asks the tier question, this one reports that the
+ * session and the memory files were searched first and states what is missing.
+ * It deliberately asks for one specific thing rather than for the whole task
+ * again: making the user restate what they already said is the failure this
+ * pass exists to remove.
+ *
+ * @param lang - language of the message.
+ * @param miss - the failed look-up, with the anchors and the locators searched.
+ * @returns one sentence to put under the question.
+ */
+export function missingNote(lang: TriageLang, miss: RecallMiss): string {
+  const anchors = anchorList(miss.tokens, lang)
+  const places = miss.checked.length
+  return lang === 'zh'
+    ? `（先查后问：已检索会话上文与磁盘记忆 ${places} 处，其中没有能回答这条的材料；还缺：${anchors}。补上这一项就够了。）`
+    : `(Looked first: ${places} piece(s) of the conversation and the memory files on disk were searched and none of them answers this. Still missing: ${anchors}. Adding just that is enough.)`
+}
+
+/**
+ * Where a looked-up answer came from, stated in the answer itself.
+ * @param lang - language of the message.
+ * @param hit - the successful look-up.
+ * @returns one parenthetical naming the locators.
+ */
+export function recalledNote(lang: TriageLang, hit: RecallHit): string {
+  const locators = hit.locators.slice(0, 3).map(locator => clampLine(locatorLabel(locator, lang), 80))
+  const where = locators.length === 0 ? (lang === 'zh' ? '已有材料' : 'material already on hand') : locators.join(lang === 'zh' ? '；' : '; ')
+  return lang === 'zh'
+    ? `（先查后答：这条据已有材料作答（${where}），没有反过来问你。）`
+    : `(Looked it up first: answered from material already on hand (${where}); nothing was asked back.)`
+}
+
+/**
+ * Chinese wording for the two location labels the gate passes in.
+ *
+ * A memory file is named by its path, which reads the same in any language; the
+ * conversation and the earlier rounds are named by the gate with English labels,
+ * and an answer written in Chinese should not end with a parenthetical in
+ * English. Anything else is passed through unchanged.
+ *
+ * @param locator - the locator the gate supplied.
+ * @param lang - language of the message.
+ * @returns the locator as the user should read it.
+ */
+function locatorLabel(locator: string, lang: TriageLang): string {
+  if (lang !== 'zh') return locator
+  if (locator === 'conversation so far') return '本会话上文'
+  const rounds = /^earlier rounds in this session \((\d+)\)$/.exec(locator)
+  if (rounds !== null) return `本会话前序 ${rounds[1]} 轮报告`
+  return locator
+}
+
+/**
+ * Prompt for the one call a looked-up answer spends.
+ *
+ * The worker receives the material the session and the memory files already
+ * hold, and is told, in as many words, that it may not do what the failing
+ * session did: claim it cannot see earlier work, or ask the user to repeat it.
+ * When a detail really is absent it must name that detail — one line — rather
+ * than asking for the whole task again.
+ *
+ * @param verdict - the recalled verdict (for the language).
+ * @param request - the user message.
+ * @param hit - the material that answered it.
+ * @returns the child prompt.
+ */
+export function recallPrompt(verdict: TriageVerdict, request: string, hit: RecallHit): string {
+  const material = hit.excerpt === '' ? '' : hit.excerpt
+  return [
+    'You are the single worker of a coding assistant, answering a follow-up from material the session already holds.',
+    'The material below was retrieved BEFORE anything was asked back: it is the conversation so far and the memory files on disk.',
+    'Answer from this material and quote the lines that carry the answer.',
+    'Never say you cannot see earlier turns, and never ask the user to repeat or restate work that is already here.',
+    'Only if a detail this request needs is genuinely absent from the material, name that one detail in a sentence — do not ask for the whole task again.',
+    verdict.lang === 'zh' ? '用中文回答，直接给结论。' : 'Answer in English, giving the conclusion directly.',
+    `--- MATERIAL (${hit.locators.join(' | ')}) ---`,
+    material,
+    '--- END MATERIAL ---',
+    '',
+    'Request:',
+    request,
+  ].join('\n')
 }
 
 /**
