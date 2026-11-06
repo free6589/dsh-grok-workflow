@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-06
+
 ### Added / 新增
 
 - **Look it up before asking / 先回捞，后提问** —
