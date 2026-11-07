@@ -1,5 +1,29 @@
 # Agent Handoff
 
+## 2026-11-07 — v0.6.0 发布 + 隔离验证收尾（release-runner，`release/0.6.0` 分支）
+
+- **From:** release-runner · **To:** lead · **Base:** `ca040e4`（`release/0.6.0` release-prep；`main` 已合入为 `1f9065d`，PR #43）
+- **发布（CONFIRMED）：** PR #43 CI Node 22 + 24 pass（run `42362505851`）→ merge `1f9065d` →
+  tag `v0.6.0` → 同 sha（`git ls-remote --tags origin` CONFIRMED）→ Release workflow run
+  `42362674837` success → GitHub Release `https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.6.0`
+  published **2026-11-07T10:09:17Z**，asset `dsh-grok-workflow-0.6.0.tgz` **299,146 B**。
+  minor 理由：C1 向后兼容（hint 只重排未试路由，孤立 run 逐字节一致），按 RELEASING.md 走 minor。
+- **本地检查（CONFIRMED）：** `npm ci` / typecheck 0 errors / lint **4 warnings / 0 errors**
+  （3 既有 + 1 新增 `src/run.ts:29` 未使用 `RoleName`，本版未修）/ build（client 84123 B）/
+  `git diff --exit-code -- lib/` = 0 / vitest **35 files / 624 PASS** /
+  `npm pack --dry-run` 64 files / 299.1 kB（npm 缓存只读，改用 workspace-local cache 重跑）。
+- **隔离验证 Round 26（CONFIRMED）：** 新鲜 profile `v060r` + 隔离 `DSH_HOME=out/v060-verify/home`，
+  模型 v4-pro + agnes flash（v4.1-flash 当天 cooldown，如实记录）；单轮团队档双任务双路由
+  （各 cap 1）→ COMPLETED，2 verified，报告含本地 `Route overflows` 行 + 双 worker 路由；
+  工作区仅 sum.txt/prod.txt（611），无外写。跨 run hint 行本轮未产出（单 run），由单测覆盖。
+  证据：`docs/knowledge/evidence/v060-route-cap/`（README + report-full + session 52 事件）。
+- **诚实边界：** 未动 DSH core；未重启/未碰 live `:3090`（仍 `0.2.7`，D-013）；未动已发布 tag；
+  operator `DSH_HOME` 未写；`warn.emptyCap` 浏览器渲染 `NOT_RUN`（单测覆盖）。
+- **本轮归档（release 分支，不进 main）：** `docs/knowledge/evidence/v060-route-cap/`（4 文件，
+  已删冗余 excerpt 只留 report-full + session-events + README）+ STATE（`0.6.0` released）+
+  VALIDATION.md Round 26 + 本节；随本轮 commit push 到 `origin release/0.6.0`。
+- **Next action：** lead 确认后可关闭本轮；`:3090` 升级到 `v0.6.0` 待用户批准（D-013），不自行执行。
+
 ## 2026-11-07 — 路由 Cap B组+C1 收尾归档（route-cap-closer，`release/0.5.1` 工作分支）
 
 - **From:** route-cap-closer · **To:** lead · **Base:** `df34ac0`（本地 `release/0.5.1` HEAD，本轮 commit 前）

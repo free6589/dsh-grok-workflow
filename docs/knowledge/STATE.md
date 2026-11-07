@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-11-07 (local, release-closer)
+Last updated: 2026-11-07 (local, v0.6.0 released + isolated verification done)
 
 ## Repository
 
@@ -20,10 +20,19 @@ Last updated: 2026-11-07 (local, release-closer)
 
 ## Current phase
 
-Last updated 2026-11-07 route-cap B+C1（`release/0.5.1` 工作树内，已合入未发布，见 D-038 / VALIDATION Round 25）。
+Last updated 2026-11-07 v0.6.0 released（`origin/main` = `1f9065d`，PR #43；tag `v0.6.0` 同 sha；见 VALIDATION Round 26 隔离验证）。
 
-`0.5.1` **released**. Base of this state: **`origin/main` = `5cc66be`** (Merge PR #42,
-release `0.5.1`; local `release/0.5.1` HEAD `720eeb6` is the merged second-parent commit).
+`0.6.0` **released**. Base of this state: **`origin/main` = `1f9065d`** (Merge PR #43,
+release `0.6.0`; tag `v0.6.0` points at the same sha).
+
+`v0.6.0` **is released** (tag `v0.6.0` → `1f9065d`, `git ls-remote --tags origin` CONFIRMED;
+GitHub Release `https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.6.0`
+published **2026-11-07T10:09:17Z**, asset `dsh-grok-workflow-0.6.0.tgz` **299,146 B**,
+Release workflow run `42362674837` green). `package.json` + `package-lock.json` both
+read `0.6.0`; `CHANGELOG.md` carries bilingual `## [0.6.0] - 2026-11-07` (B-group empty-cap
+heads-up + single-run scope + C1 cross-run hint; C2 ruled out per A16). Minor rationale:
+C1 is backward-compatible (hint only reorders untried routes; solitary runs byte-identical),
+so minor per RELEASING.md.
 
 `v0.5.1` **is released** (tag `v0.5.1` → `5cc66be`, `git ls-remote --tags origin` CONFIRMED;
 far-end sha matches `origin/main`; GitHub Release `https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.5.1`
@@ -34,9 +43,10 @@ quick-worker receives bounded conversation/carry-over context).
 
 Authoritative numbers for this state (measured, not planned):
 
-- `npm run ci` on `release/0.5.1` HEAD `720eeb6` (merge second-parent commit): **PASS** —
-  typecheck 0 errors, lint **3 warnings / 0 errors** (pre-existing baseline), vitest
-  **35 files / 617 tests PASS**; `git diff --exit-code -- lib/` = exit 0 (no diff).
+- `npm run ci` on `release/0.6.0` HEAD `ca040e4` (release-prep commit): **PASS** —
+  typecheck 0 errors, lint **4 warnings / 0 errors** (3 pre-existing + 1 new unused `RoleName` import in `src/run.ts:29`, not fixed in this release), vitest
+  **35 files / 624 tests PASS**; `git diff --exit-code -- lib/` = exit 0; build client bundle 84123 B; `npm pack --dry-run` 64 files / 299.1 kB. CI on PR #43 (run `42362505851`) Node 22 + 24 both pass.
+- Round 26 (2026-11-07) is the **v0.6.0 isolated verification** (`CONFIRMED`): fresh profile `v060r`, models `wb/cn:deepseek-v4-pro` + `agnes-3.0-flash` (v4.1-flash was in per-model cooldown that day, stated not hidden); one gated team round with 2 tasks + 2-route worker chain (cap 1 each) → `Grok workflow: COMPLETED`, 2 verified, report carries `Route overflows (full lane yielded, not failures):` with `skipped full …` and both worker routes in `Model routes:`. Cross-run `(cross-run hint)` kind stays unit-covered (`test/route-concurrency.spec.ts`), no second concurrent live run staged. Evidence: `docs/knowledge/evidence/v060-route-cap/` (README + report-full + session-events 52 events).
 - `v0.5.1` live check (Round 23, `CONFIRMED`): isolated profile `v051f`, model
   `wb/cn:deepseek-v4.1-flash`; session A follow-up answered `391` from the bounded context
   block without restatement; session B team round PASS then resume BLOCKED by the
@@ -185,12 +195,11 @@ None.
 
 ## Next priority
 
-**`0.5.1` is released; nothing is blocked on review.** PR #41 was merged (`45d721a`) and the
-release went out as PR #42 (`5cc66be`) + tag `v0.5.1` (Round 23 live check PASS).
-This close-out commit archives VALIDATION.md Round 24 (read-only diagnosis) + the
-`v051-fast-context/` live evidence (13 files) + STATE/HANDOFF refresh. The one open action is outside
-this repo: the live DSH service on `:3090` still runs `dsh-grok-workflow@0.2.7` and any
-profile reload/upgrade (to `v0.5.1`) — **that reload awaits explicit user approval (D-013); it is not done**.
+**`0.6.0` is released; nothing is blocked on review.** PR #43 was merged (`1f9065d`) and the
+release went out as tag `v0.6.0` + GitHub Release (Round 26 isolated verification PASS).
+The one open action is outside this repo: the live DSH service on `:3090` still runs
+`dsh-grok-workflow@0.2.7` and any profile reload/upgrade (to `v0.6.0`) — **that reload
+awaits explicit user approval (D-013); it is not done**.
 
 B组+C1 已合入工作树、未发布（2026-11-07，route-cap-closer 收尾）：设置页 `warn.emptyCap`
 黄字提醒不拦 Save + `validateRoutes` notes + 单 run 作用域（ARCHITECTURE），C1 `busyRoutes`

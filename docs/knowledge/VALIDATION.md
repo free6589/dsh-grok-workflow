@@ -2061,3 +2061,38 @@ DSH 的自动压缩（`@deepseek-ai/dsh-compaction-basic@0.2.1-rc.2`）经 `agen
   `src/{script,run,report,settings}.ts`、`src/client/index.js`、`docs/ARCHITECTURE.md`、
   `docs/knowledge/RESEARCH.md`（A16 已由 C2-spike 任务写入）、`CHANGELOG.md`（条目已由实现任务写入）、
   `test/{route-concurrency,client}.spec.ts`、`lib/` 编译产物。
+
+## Round 26 (2026-11-07) — v0.6.0 isolated verification: dual-route worker overflow (release-runner)
+
+**性质**：隔离 profile 真机验证（`v0.6.0` 发布后验证，不碰 live `:3090`，不改 DSH core）。
+完整证据：`docs/knowledge/evidence/v060-route-cap/`（README + report-full.txt + session-events.jsonl 52 事件）。
+
+### 命令与结果（CONFIRMED，均在 `/home/fish/projects_mine/dsh-grok-workflow` 执行）
+
+| 命令 | 结果 |
+|---|---|
+| `npm ci` | PASS |
+| `npm run typecheck` | PASS（0 errors） |
+| `npm run lint` | **4 warnings / 0 errors**（3 既有 + 1 新增：`src/run.ts:29` 未使用的 `RoleName` import，本版未修） |
+| `npm run build` | PASS（`client bundle: 84123 bytes → lib/client.js`） |
+| `git diff --exit-code -- lib/` | exit 0 |
+| `npm test` | **35 files / 624 tests PASS**（24.34s） |
+| `npm pack --dry-run` | 64 files / 299.1 kB `dsh-grok-workflow-0.6.0.tgz`（npm 缓存只读，用 workspace-local cache 重跑） |
+| PR #43 CI (run `42362505851`) | Node 22 pass / Node 24 pass |
+| Release workflow (run `42362674837`) | success；GitHub Release `v0.6.0` published **2026-11-07T10:09:17Z**，asset `dsh-grok-workflow-0.6.0.tgz` **299,146 B** |
+
+### 隔离验证（CONFIRMED）
+
+新鲜 profile `v060r`（`--from-default-profile headless`，隔离 `DSH_HOME=out/v060-verify/home`），
+模型 `wb/cn:deepseek-v4-pro` + `agnes-3.0-flash`（`wb/cn:deepseek-v4.1-flash` 当天 per-model cooldown 400，如实记录并换路）。
+Turn 1 gate-off 问候 exit 0；turn 2 团队档（`mode: full`，worker 双路由各 `maxInFlight: 1`，2 任务）→
+`Grok workflow: COMPLETED`，2 verified，报告含 `Route overflows (full lane yielded, not failures):` +
+`skipped full bifrost-completions/wb/cn:deepseek-v4-pro` ×2，双 worker 路由均在 `Model routes:`。
+工作区 `out/v060-verify/work/` 仅 `sum.txt`（`TOTAL: 611`，11 B）+ `prod.txt`（`PRODUCT: 611`，13 B），无外写。
+跨 run `(cross-run hint)` 行本轮未产出（未起第二个并发 live run），由 `test/route-concurrency.spec.ts` 13 例确定性覆盖。
+
+### 边界
+
+- `warn.emptyCap` 黄字提醒的浏览器渲染本轮 `NOT_RUN`（`test/client.spec.ts` 34/34 单元覆盖）。
+- 报告中另有一条真实 `Route switches:`（agnes 路由一次 `format-error`，按 `maxRetries: 0` 记录为 switch，运行仍 COMPLETED）——如实记录，非本版缺陷。
+- live `:3090` 未动（仍 `0.2.7`，D-013）；operator `DSH_HOME` 未写；无 DSH core 改动；已发布 tag 未移动。
