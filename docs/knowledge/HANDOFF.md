@@ -1,5 +1,29 @@
 # Agent Handoff
 
+## 2026-11-07 — v0.5.0/v0.5.1 收尾 + Round 24 诊断交接（release-closer，`release/0.5.1` 工作分支）
+
+- **From:** release-closer · **To:** lead / next agent · **Base:** local `release/0.5.1` HEAD `720eeb6`
+  (merge second-parent); `origin/main` = `5cc66be` (Merge PR #42); tag `v0.5.1` → `5cc66be`
+  (far-end sha matches `origin/main`, `git ls-remote --tags origin` CONFIRMED); GitHub Release
+  `https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.5.1` published
+  **2026-11-07T02:08:32Z**, asset `dsh-grok-workflow-0.5.1.tgz` **294,363 B**.
+- **现状（CONFIRMED）：** `package.json` + `package-lock.json` = `0.5.1`；`CHANGELOG.md` 有双语
+  `## [0.5.1] - 2026-11-07`（PR #41 / `45d721a`）；`npm run ci` PASS（typecheck 0 errors /
+  lint 3 warnings 0 errors / vitest **35 files / 617 tests**；`git diff --exit-code -- lib/` 无 diff）。
+- **本轮归档（CONFIRMED）：** `docs/knowledge/VALIDATION.md` +39 行 Round 24 只读诊断；
+  `docs/knowledge/evidence/diag-ctx-compaction-2026-11-07.md`（已 chmod 644）+
+  `docs/knowledge/evidence/diag-ctx-compaction-verify-metric.mjs`（已 chmod 644）入库；
+  `docs/knowledge/evidence/v051-fast-context/`（13 文件）入库；`.gitignore` 追加
+  `.v050-home/` `.v051-home/` `.v051-verify/` `out/`（本地隔离目录不入库）。
+- **Round 24 结论（CONFIRMED，只读诊断，未改代码）：** session-3361cd6e 团队档即时回执
+  （seq 2339，step 之外的 `assistant/message`）使 `tokenMeter.measure()` 每次在同处抛错，
+  turn 4 之后自动压缩永久停摆，GUI 百分比照常 92–95%；`/compact` 实测 NOT_RUN（会写会话），
+  Web GUI API 取数 BLOCKED（401，不读凭据）。修复方案留给用户决策，未执行。
+- **诚实边界：** 未动 `main`、未打 tag、未重启 `:3090`（D-013；`:3090` 仍跑 `0.2.7`，
+  reload/upgrade 待用户批准）；未删本地目录。CHANGELOG/package.json 版本号本轮未改。
+- **Next action：** lead 确认本 commit 内容后由 release-closer `git push origin release/0.5.1`；
+  用户决策 Round 24 修复方案（receipt 写时点 / token-meter 容忍孤儿 / 新会话 `instantReceipt: false`）。
+
 ## 2026-11-06 — 先回捞后提问（`history_first_no_reask`，v0.5 未发布，工作树内）
 
 - **From:** workflow execution agent · **To:** next agent / verifier · **Base commit:** `ac28a41`

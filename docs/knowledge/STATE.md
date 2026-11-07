@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-11-06 (local)
+Last updated: 2026-11-07 (local, release-closer)
 
 ## Repository
 
@@ -20,13 +20,44 @@ Last updated: 2026-11-06 (local)
 
 ## Current phase
 
-`0.4.0` **released**. Base of this state: **`origin/main` = `708c315`** (release commit; PR #38
-merge).
+`0.5.1` **released**. Base of this state: **`origin/main` = `5cc66be`** (Merge PR #42,
+release `0.5.1`; local `release/0.5.1` HEAD `720eeb6` is the merged second-parent commit).
 
-`v0.4.0` **is released** (tag `v0.4.0` on `708c315`, Release workflow run
+`v0.5.1` **is released** (tag `v0.5.1` → `5cc66be`, `git ls-remote --tags origin` CONFIRMED;
+far-end sha matches `origin/main`; GitHub Release `https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.5.1`
+published **2026-11-07T02:08:32Z**, asset `dsh-grok-workflow-0.5.1.tgz` **294,363 B**).
+`v0.5.0` **is released** (tag `v0.5.0` → `af82a34`). `package.json` + `package-lock.json` both
+read `0.5.1`; `CHANGELOG.md` carries bilingual `## [0.5.1] - 2026-11-07` (PR #41 / `45d721a`:
+quick-worker receives bounded conversation/carry-over context).
+
+Authoritative numbers for this state (measured, not planned):
+
+- `npm run ci` on `release/0.5.1` HEAD `720eeb6` (merge second-parent commit): **PASS** —
+  typecheck 0 errors, lint **3 warnings / 0 errors** (pre-existing baseline), vitest
+  **35 files / 617 tests PASS**; `git diff --exit-code -- lib/` = exit 0 (no diff).
+- `v0.5.1` live check (Round 23, `CONFIRMED`): isolated profile `v051f`, model
+  `wb/cn:deepseek-v4.1-flash`; session A follow-up answered `391` from the bounded context
+  block without restatement; session B team round PASS then resume BLOCKED by the
+  orphan-receipt defect (F3, same orphan class as Round 24). Evidence:
+  `docs/knowledge/evidence/v051-fast-context/` (13 files).
+- Round 24 (2026-11-07) is a **read-only diagnosis, no code change** (`CONFIRMED`):
+  instant receipt written outside any step breaks `tokenMeter.measure()` from seq 2339 on,
+  so auto-compaction never fires again after turn 4 while the GUI percentage keeps climbing
+  92–95%. Full report `docs/knowledge/evidence/diag-ctx-compaction-2026-11-07.md` +
+  replay script `docs/knowledge/evidence/diag-ctx-compaction-verify-metric.mjs`;
+  `/compact` live test `NOT_RUN` (would mutate the session); Web GUI API fetch `BLOCKED`
+  (endpoint 401, no credential read per policy). Fix left to user decision.
+- Operator `web` profile on `:3090` still runs `dsh-grok-workflow@0.2.7` (`CONFIRMED`,
+  unchanged); any reload/upgrade awaits explicit user approval (D-013), not done.
+
+Prior releases (unchanged): `v0.4.0` → `708c315` (PR #38, Round 20: 32 files / 545 tests);
+`v0.3.0` → `3f5ad0a`; `v0.2.7` → `16a11b7`. `0.4.0`-era detail below is history, not the
+current baseline.
+
+History (unchanged detail, kept for reference): `v0.4.0` was released (tag `v0.4.0` on `708c315`, Release workflow run
 [42075318386](https://github.com/free6589/dsh-grok-workflow/actions/runs/42075318386) green,
 GitHub Release `https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.4.0`, asset
-`dsh-grok-workflow-0.4.0.tgz` 250,693 B, sha256 `e10802ca…`). `package.json` reads `0.4.0` and `CHANGELOG.md` carries
+`dsh-grok-workflow-0.4.0.tgz` 250,693 B, sha256 `e10802ca…`). At that time `package.json` read `0.4.0` and `CHANGELOG.md` carried
 `## [0.4.0] - 2026-11-06` (Round 20). Prior: `v0.3.0` **is released** (tag `v0.3.0` on `3f5ad0a`, Release green
 [41665410667](https://github.com/free6589/dsh-grok-workflow/actions/runs/41665410667), asset
 `dsh-grok-workflow-0.3.0.tgz` 246,493 B). Earlier: `v0.2.7` **is released** (tag `v0.2.7` on `16a11b7`,
@@ -152,12 +183,12 @@ None.
 
 ## Next priority
 
-**`0.4.0` is released; nothing is blocked on review.** PR #37 was merged (`9438b3d`) and the
-release went out as PR #38 (`708c315`) + tag `v0.4.0` (Round 20). The one open action is outside
-this repo: the live DSH service on `:3090` still runs `dsh-grok-workflow@0.2.7` and the
-`web/cordis.patch.yml` change (owner's `synthesis: model` line) needs a profile reload to take
-effect — **that reload awaits explicit user approval (D-013); it is not done**. Upgrading the `web`
-profile to `v0.4.0` is likewise pending approval.
+**`0.5.1` is released; nothing is blocked on review.** PR #41 was merged (`45d721a`) and the
+release went out as PR #42 (`5cc66be`) + tag `v0.5.1` (Round 23 live check PASS).
+This close-out commit archives VALIDATION.md Round 24 (read-only diagnosis) + the
+`v051-fast-context/` live evidence (13 files) + STATE/HANDOFF refresh. The one open action is outside
+this repo: the live DSH service on `:3090` still runs `dsh-grok-workflow@0.2.7` and any
+profile reload/upgrade (to `v0.5.1`) — **that reload awaits explicit user approval (D-013); it is not done**.
 
 Older candidates — none decided, all `HYPOTHESIS` until the captain picks:
 `relay`/`append` delivery in a long-lived GUI session (NR-1's remaining half), item 8's

@@ -1,0 +1,142 @@
+=== env ===
+date: 2026-11-07T09:48:02+08:00
+node: v26.8.1
+npm: 11.19.0
+dsh: 0.2.1-rc.2
+commit: 720eeb63bd012e2940d4e619223c82329cfb56e9
+branch: release/0.5.1
+
+=== npm run ci ===
+
+> dsh-grok-workflow@0.5.1 ci
+> npm run typecheck && npm run lint && npm test
+
+
+> dsh-grok-workflow@0.5.1 typecheck
+> tsc -p tsconfig.json --noEmit
+
+
+> dsh-grok-workflow@0.5.1 lint
+> oxlint src test
+
+
+  ! eslint(no-useless-escape): Unnecessary escape character '['
+     ,-[src/redact.ts:155:348]
+ 154 |     name: 'key-value',
+ 155 |     pattern: /(?<![A-Za-z0-9])((?:[A-Za-z0-9]+[_-]){0,8}(?:api[_-]?key|access[_-]?key(?:[_-]?id)?|private[_-]?key|secret[_-]?access[_-]?key|secret[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|session[_-]?id|client[_-]?secret|token|secret|passphrase|password|passwd|pass|pwd|session|credentials?))(["']?)(\s*[:=]\s*)(?!["'\[{]|required\b|optional\b|enabled\b|disabled\b|true\b|false\b|null\b|none\b)([^\s,;}\]]{6,})/gi,
+     :                                                                                                                                                                                                                                                                                                                                                            ^^
+ 156 |     replacement: '$1$2$3[REDACTED]',
+     `----
+  help: Replace `\[` with `[`.
+
+  ! eslint(no-unused-vars): Variable 'GROUPS_WITH_FIELDS' is declared but never used. Unused variables should start with a '_'.
+    ,-[src/client/index.js:87:11]
+ 86 |     const GROUPS = ['gate', 'limits', 'roles', 'output', 'structural']
+ 87 |     const GROUPS_WITH_FIELDS = ['gate', 'limits', 'output']
+    :           ^^^^^^^^^|^^^^^^^^
+    :                    `-- 'GROUPS_WITH_FIELDS' is declared here
+ 88 | 
+    `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'field' is declared but never used. Unused variables should start with a '_'.
+      ,-[src/client/index.js:1160:15]
+ 1159 |       const booleanRow = (key) => {
+ 1160 |         const field = fieldByKey(key)
+      :               ^^|^^
+      :                 `-- 'field' is declared here
+ 1161 |         return h(FieldRow, {
+      `----
+  help: Consider removing this declaration.
+
+Found 3 warnings and 0 errors.
+Finished in 289ms on 66 files with 96 rules using 6 threads.
+
+> dsh-grok-workflow@0.5.1 test
+> npm run build && vitest run
+
+
+> dsh-grok-workflow@0.5.1 build
+> tsc -p tsconfig.build.json && node scripts/build-client.mjs
+
+client bundle: 81835 bytes → lib/client.js
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+ ✓ test/plugin-lifecycle.spec.ts (15 tests) 3272ms
+     ✓ returns timeout when startup resolves after the deadline  1102ms
+     ✓ returns timeout when startup rejects after the deadline  1101ms
+     ✓ returns a failed report when the deadline cancels the run  1002ms
+(node:164) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGTERM listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:164) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGINT listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:164) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGHUP listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+ ✓ test/gate.spec.ts (50 tests) 3143ms
+     ✓ turns its own deadline into a failure report instead of waiting forever  2007ms
+(node:171) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/memory-archive.spec.ts (21 tests) 2694ms
+     ✓ archives a round that hit the deadline, with its cause, so a later session still learns it happened  2503ms
+(node:202) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGTERM listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:202) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGINT listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:202) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGHUP listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+ ✓ test/reliability.spec.ts (24 tests) 2185ms
+     ✓ turns a deadline into an infrastructure report instead of an exception  1004ms
+     ✓ reports the deadline on time even when the engine ignores the cancel  1003ms
+(node:209) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGTERM listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:209) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGINT listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:209) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGHUP listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+ ✓ test/phase1-dialogue.spec.ts (27 tests) 1472ms
+     ✓ turns a deadline into its own terminal state (regression)  1003ms
+ ✓ test/lifecycle-disposal.spec.ts (15 tests) 1053ms
+     ✓ reports the deadline it actually used  1002ms
+(node:223) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGTERM listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:223) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGINT listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:223) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGHUP listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+ ✓ test/triage.spec.ts (34 tests) 753ms
+ ✓ test/triage-recall.spec.ts (28 tests) 445ms
+ ✓ test/issue-watch.spec.ts (2 tests) 273ms
+ ✓ test/orchestrator.spec.ts (26 tests) 156ms
+(node:432) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/panel.spec.ts (11 tests) 151ms
+(node:444) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/progress.spec.ts (12 tests) 142ms
+ ✓ test/fallback-shards.spec.ts (16 tests) 136ms
+ ✓ test/paths.spec.ts (18 tests) 133ms
+ ✓ test/command.spec.ts (11 tests) 132ms
+ ✓ test/objective-limit.spec.ts (16 tests) 146ms
+ ✓ test/route-concurrency.spec.ts (7 tests) 98ms
+(node:490) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/engine-contract.spec.ts (15 tests) 90ms
+ ✓ test/composition.spec.ts (9 tests) 68ms
+(node:515) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/failure-paths.spec.ts (11 tests) 58ms
+ ✓ test/routing.spec.ts (25 tests) 59ms
+ ✓ test/loader.spec.ts (2 tests) 55ms
+ ✓ test/redact.spec.ts (24 tests) 46ms
+ ✓ test/config.spec.ts (27 tests) 38ms
+ ✓ test/naming.spec.ts (15 tests) 33ms
+ ✓ test/carryover.spec.ts (21 tests) 33ms
+ ✓ test/client.spec.ts (33 tests) 31ms
+ ✓ test/settings-projection.spec.ts (4 tests) 21ms
+ ✓ test/report.spec.ts (41 tests) 20ms
+ ✓ test/config-synthesis-fallback.spec.ts (8 tests) 13ms
+ ✓ test/history.spec.ts (11 tests) 12ms
+ ✓ test/input.spec.ts (13 tests) 11ms
+ ✓ test/mode.spec.ts (15 tests) 11ms
+ ✓ test/triage-followup.spec.ts (5 tests) 10ms
+ ✓ test/criterion.spec.ts (5 tests) 8ms
+
+ Test Files  35 passed (35)
+      Tests  617 passed (617)
+   Start at  09:48:10
+   Duration  23.88s (transform 1.53s, setup 0ms, import 2.99s, tests 17.00s, environment 4ms)
+
+CI_EXIT=0

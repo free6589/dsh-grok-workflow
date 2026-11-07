@@ -24,3 +24,9 @@ sessions/
 
 # Local AgentTeams session state
 .agent-teams/
+
+# Local isolated DSH homes / verify fixtures / generated output (never commit)
+.v050-home/
+.v051-home/
+.v051-verify/
+out/

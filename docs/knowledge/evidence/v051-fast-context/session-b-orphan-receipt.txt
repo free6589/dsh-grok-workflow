@@ -1,0 +1,25 @@
+Session B (team round) — event shape of the stored log, decompressed from
+DSH_HOME=.v051-verify/home/sessions/--home-fish-projects_mine-dsh-grok-workflow-.v051-verify-work--/
+session-1f1024ae-2504-44cd-85c0-59476a381885/session.v4.jsonl.zstd (44 lines).
+Line 26 is an `assistant/message` (seq 25) written after `turn/start` (seq 22) and before the
+turn's first `step/start` (seq 37): the team-tier instant receipt. DSH then refuses to load the
+log (see the reproduction commands in README.md).
+==============================================================================
+
+5    seq=4    turn/start         open_step=False
+7    seq=6    step/start         open_step=True
+9    seq=8    user/message       open_step=True
+10   seq=9    user/message       open_step=True
+11   seq=10   user/message       open_step=True
+12   seq=11   user/message       open_step=True
+18   seq=17   assistant/message  open_step=True
+19   seq=18   step/end           open_step=False
+20   seq=19   turn/end           open_step=False
+23   seq=22   turn/start         open_step=False
+25   seq=24   user/message       open_step=False
+26   seq=25   assistant/message  open_step=False
+38   seq=37   step/start         open_step=True
+39   seq=38   user/message       open_step=True
+41   seq=40   assistant/message  open_step=True
+42   seq=41   step/end           open_step=False
+43   seq=42   turn/end           open_step=False
