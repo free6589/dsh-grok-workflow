@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-07
+
 ### Added / 新增
 
 - **Empty-cap heads-up and single-run scope docs for route caps / 空 Cap 提醒与单 run 作用域说明** —
