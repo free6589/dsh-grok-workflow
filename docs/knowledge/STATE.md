@@ -419,3 +419,31 @@ turn at a time; Round 16's isolation proof is in `.workflow-artifacts/matrix-024
   本轮消息读成"历史"→ 自命中；`collectRecallSources(…, exclude)` 修复。
 - **决策**：D-037。**证据**：`docs/knowledge/evidence/history-first/`。
 - **未做**：真机在线模型两轮回放、`:3090` 热加载（D-013）、版本号与发布。
+
+## 2026-11-07 — 子代理顶栏显示名：诊断完成，判定 **BLOCKED**（无插件侧扩展点）
+
+- **状态**：只读源码取证诊断，**无插件源码改动、无 DSH core 改动、未起隔离 profile、未碰 live `:3090`**。
+  用户目标（顶栏每个子代理显示具体任务名、不出现 `任务团队 child N` / 提示词原文）在当前约束下不可达。
+- **根因（`CONFIRMED`，行号即证据）**：插件已经传了标签
+  （`src/script.ts:1188/1213/1324/1438` → `规划助手`/`执行`/`检查`/`汇总助手`），DSH 自己的工具文档也把
+  `label` 写作 "(display)"（`dsh-tool-workflow/lib/index.js:143`）；但引擎运行时
+  `packages/workflow/workflow-ptc/src/runtime.ts:183-188` 不把 `label` 转给 `startAgent`，
+  宿主 `host.ts:200-205` 直接写死 `` `${this.meta.name} child ${callId}` ``，
+  该值落成子会话首个 `subagent/descriptor`（`dsh-subagent/lib/index.js:1404,1800`）并被
+  `foldSubagentDescriptor` 锁成不可改写（同文件 `:686-698`），GUI 顶栏主标签直接取它
+  （`dsh-client-ui-subagent/lib/client.js:201`）。
+- **否决的绕行**：追加描述符 / 自定义 `SubagentProvider` / 改 `meta.name` / 插件自建 `startActivation` / 改 core，
+  逐条理由见 `DECISIONS.md` D-039 与 `VALIDATION.md` Round 27。
+- **上游 ask（`NOT_RUN`）**：`runtime.ts` 转发 `opts.label` + `host.ts` 的 `childRequest()/startChild()`
+  接 `label`（约 3 行），改完插件零改动即生效。
+- **未做**：`CHANGELOG.md` 不加条目（无用户可见变更）；live `:3090` 版本查询 `NOT_RUN`
+  （`GET /` → `401`，本会话无凭据）；真机 GUI 复验 `NOT_RUN`。
+- **并发注意**：开工时工作树已有**另一任务**的改动（`src/client/index.js`、`lib/client.js`、
+  `test/client.spec.ts`、未跟踪 `test/panel-links.spec.ts`），本轮未触碰、未提交。
+- **第二次尝试补充（2026-11-07 晚，Round 28，`CONFIRMED`）**：结论**维持 BLOCKED**。上一轮的两项 `NOT_RUN`
+  升级——①源码链逐条**独立重验**（本轮自己读的行号见 `VALIDATION.md` Round 28 表）；
+  ②**隔离 profile 真机复现成功**：`out/childname-verify/`（profile `cnamer`，headless，模型
+  v4-pro + agnes-3.0-flash，密钥仅布尔存在检查）跑一轮团队档 COMPLETED（2 任务 verified，6 个子代理），
+  父会话 `tool-workflow/agent-start` 证明插件标签（`规划助手`/`执行`/`检查`）确实在传，
+  而 6 个子会话首个 `subagent/descriptor` **全部**是 `"label":"任务团队 child N"`（N=1..6）——
+  与用户截图逐字一致。证据：`docs/knowledge/evidence/childname-blocked/`。上游 ask 内容不变。

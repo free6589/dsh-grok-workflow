@@ -2096,3 +2096,94 @@ Turn 1 gate-off 问候 exit 0；turn 2 团队档（`mode: full`，worker 双路�
 - `warn.emptyCap` 黄字提醒的浏览器渲染本轮 `NOT_RUN`（`test/client.spec.ts` 34/34 单元覆盖）。
 - 报告中另有一条真实 `Route switches:`（agnes 路由一次 `format-error`，按 `maxRetries: 0` 记录为 switch，运行仍 COMPLETED）——如实记录，非本版缺陷。
 - live `:3090` 未动（仍 `0.2.7`，D-013）；operator `DSH_HOME` 未写；无 DSH core 改动；已发布 tag 未移动。
+
+## Round 27 (2026-11-07) — 子代理显示名诊断：标签由 DSH core 写死，插件侧无扩展点（**BLOCKED**）
+
+**性质**：只读源码取证诊断。**未改插件代码、未改 DSH core、未起隔离 profile、未碰 live `:3090`。**
+任务目标（让顶栏每个子代理显示具体任务名、不出现 `任务团队 child N` 或提示词原文）在当前约束下**不可达**，
+原因与证据如下（全部 `CONFIRMED`，逐行读过源码）。
+
+### 根因链（CONFIRMED）
+
+| 环节 | 位置 | 事实 |
+|---|---|---|
+| ① 插件确实传了标签 | `src/script.ts:1186-1191`（worker）、`1211-1216`（verifier）、`1322-1327`（planner）、`1436-1441`（synthesizer） | 每次 `agent(prompt, { label: memberLabel(...) })` 都带标签（`规划助手` / `执行` / `检查` / `汇总助手`，见 `src/naming.ts:258-265`） |
+| ② 引擎文档把 label 定义为显示名 | `…/dsh-tool-workflow/lib/index.js:143` | 原文：`Other opts: \`label\` (display)` |
+| ③ 引擎运行时只把它当进度标签 | `packages/workflow/workflow-ptc/src/runtime.ts:176` 与 `:183-188` | `const label = opts.label ?? defaultLabel(rawPrompt)` 只进 `WorkflowAgentInfo`；`children.startAgent({ prompt, schema, provider, model })` **不转发 label** |
+| ④ 宿主写死子代理激活 label | `packages/workflow/workflow-ptc/src/host.ts:200-205`（`childRequest()` 在 `:45`） | `` label: `${this.meta.name} child ${callId}` ``；`childRequest()` 只取 prompt/provider/model/schema，任何 label 字段被丢弃 |
+| ⑤ 该 label 成为持久描述符 | `dsh-subagent/lib/index.js:1404`（`snapshotSubagentDescriptor`）、`:1800`（`child.session.append("subagent/descriptor", …)`） | 子会话首个 `subagent/descriptor` 事件带的就是 `任务团队 child N` |
+| ⑥ 描述符**不可改写** | `dsh-subagent/lib/index.js:686-698`（`foldSubagentDescriptor`） | 注释原文：`The first subagent/descriptor event is authoritative … a later same-type event cannot rewrite the declared composition`；实现用 `events.find(...)` 取第一条 |
+| ⑦ GUI 顶栏主标签就取它 | `dsh-client-ui-subagent/lib/client.js:201` | `const label = entry.label ?? entry.id;`，次级行拼 `summary?.title`（子会话自动标题，故出现 `You are the planning agent`） |
+| ⑧ `任务团队` 从哪来 | `src/script.ts:1659-1664`（`name: runTitle(...)`）+ `src/naming.ts:312`（`workflow: '任务团队'`） | 它是 **run 级** meta.name，一个 run 只有一个值，无法按子代理区分 |
+
+结论：`任务团队 child N` 由 DSH core 在**创建子代理那一刻**写死，且被描述符契约锁成不可改写；
+插件侧（含 workflow 脚本的 `agent()` 选项、`WorkflowMeta`、`WorkflowStartRequest.subagentProvider`、
+自定义 `SubagentProvider`、客户端 slot）**没有任何文档化扩展点**能改它。
+`WorkflowMeta` 只接受 `name/description/whenToUse/phases`（`…/dsh-workflow-ptc/lib/index.js:483-537` 的
+`validateMetaShape`，未知字段直接 `META_INVALID`）；`WorkflowStartRequest` 只有
+`script/meta/args/subagentProvider/maxTotalAgents/parent/signal`（`…/dsh-workflow/lib/types/runtime-types.d.ts:14-33`）。
+
+### 已否决的绕行方案
+
+| 方案 | 否决理由 |
+|---|---|
+| 追加第二个 `subagent/descriptor` 事件改 label | `foldSubagentDescriptor` 取**第一条**（`dsh-subagent/lib/index.js:686-698`），契约明写不可改写；且属未文档化的内部日志改写 |
+| 自定义 `SubagentProvider`（`subagentProvider` 选项） | provider 拿到的 label 仍是 manager 传入的 `spec.label`（`dsh-subagent/lib/index.js:1407/1501`）；`ContinuableCreateSpec` 只有 `seed`，没有 label/descriptor 覆盖位 |
+| 把 `meta.name` 改成描述性名字 | 仍是 run 级单值，只会得到 `任务团队 · N 个任务 child 1`，`child N` 还在 |
+| 插件自己调 `ctx.subagents.startActivation({ label })` 建子代理 | 等于绕开 `ctx.workflowEngine` 的 `agent()` 钩子，违反本仓架构不变量（AGENTS.md「primary execution path is a workflow script executed by ctx.workflowEngine」），且验收条款要求"经 agent() 钩子创建的子代理" |
+| 改 DSH core | 明令禁止（AGENTS.md + 本任务 constraints） |
+
+### 需要的上游改动（**NOT_RUN**，未执行）
+
+DSH core 两处、约 3 行：`runtime.ts` 的 `agent()` 把 `label` 放进 `startAgent(...)`；
+`host.ts` 的 `childRequest()` 接收 `label`，`startChild()` 用
+`` label: request.label ?? `${this.meta.name} child ${callId}` ``。改完后插件**现有代码即生效**（标签已经在传），
+无需再改插件。
+
+### 命令与结果（CONFIRMED）
+
+| 命令 | 结果 |
+|---|---|
+| `git status --short --branch`（开工时） | `## release/0.6.0...origin/release/0.6.0`；工作树有**并发任务**改动（`src/client/index.js`、`lib/client.js`、`test/client.spec.ts` 已改，`test/panel-links.spec.ts` 未跟踪），非本任务产物，未触碰 |
+| 源码取证 | 上表 8 处逐一 `sed`/`grep` 读过，行号即证据 |
+| 已装 DSH 版本 | 7 个 mise node 安装下 `@deepseek-ai/dsh` 全为 `0.2.1-rc.2`（`node -e require(package.json).version` 逐一确认） |
+| live `:3090` 版本与浏览器渲染 | `NOT_RUN`（`GET http://100.111.111.88:3090/` → `401 Unauthorized`，本会话无凭据；且根因已在源码层定死，渲染层无待验变量） |
+| 隔离 profile 真机 | `NOT_RUN`（无修复可验；本轮为诊断） |
+| 插件代码改动 | 无（`git diff` 中无本任务产生的源码改动） |
+| DSH core 改动 | 无 |
+
+## Round 28 (2026-11-07) — fix_child_names 复核：Round 27 结论独立重验 + 隔离 profile 真机复现（**BLOCKED 维持**）
+
+**性质**：fix_child_names 第二次尝试。本轮把 Round 27 的源码结论**逐条独立重验**（不依赖上一轮记录），
+并把 `隔离 profile 真机` 从 `NOT_RUN` 升级为 **PASS（复现成功）**——在真机 installed DSH 上观察到了
+`任务团队 child N` 写进每个子会话首个 `subagent/descriptor`。结论不变：**BLOCKED**。
+证据目录：`docs/knowledge/evidence/childname-blocked/`（README + 3 个摘录文件）。
+
+### 独立重验的源码链（本轮自己读，非转抄 Round 27）
+
+| 环节 | 本轮实际读到的位置与内容 |
+|---|---|
+| 引擎写死子代理 label | `…/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-workflow-ptc/lib/index.js:332`（打包后 host `startChild`）：`` label: `${this.meta.name} child ${callId}` `` |
+| guest 不转发 label | 同文件内嵌 `WORKFLOW_GUEST_SOURCE`：`children.startAgent({ prompt, schema?, provider?, model? })`——`SUPPORTED_AGENT_OPTIONS` 里的 `label/phase` 只进 observer `agentStart(info)` |
+| 描述符锁死 | `…/@deepseek-ai/dsh-subagent/lib/index.js`（`foldSubagentDescriptor` 用 `events.find(...)` 取第一条；`SubagentActivationSpec.label` 为 `readonly`，descriptor 由 manager `startLocal` 在 provider 钩子之前 `snapshotSubagentDescriptor({…label: spec.label…})` 快照） |
+| GUI 直接渲染 | `…/@deepseek-ai/dsh-client-ui-subagent/lib/client.js:201`：`const label = entry.label ?? entry.id;`，次级行为 `[summary?.title, mode, activity].join(" · ")` |
+| 半程缓解点存在 | `…/@deepseek-ai/dsh-session-title/lib/index.js:295`：`SessionTitleService.rename(session, title)` 确为文档化服务（改的是**次级行**，主标签不动） |
+
+### 真机复现（隔离 profile，CONFIRMED）
+
+| 命令 | 结果 |
+|---|---|
+| `DSH_HOME=out/childname-verify/home dsh --profile cnamer --from-default-profile headless --dump-config` | exit 0（隔离 home + headless profile 建立） |
+| turn 1（gate off，复用 `out/v060-verify/model-pro.patch.yml` + `plugin-off.patch.yml`） | exit 0，`session-765de8f7-15ae-490b-8c16-ce39018edac9` |
+| turn 2（gate on，`plugin-on.patch.yml`：`mode: full`、`maxTasks: 2`、`maxRetries: 0`、worker 双路由） | exit 0，团队档 COMPLETED，2 任务 verified（一条真实 agnes `format-error` route switch，同 Round 26 形态）；共 **6 个子代理**（planner 1 + worker 2/3/5 + verifier 4/6） |
+| 父会话 `tool-workflow/run-start` | `"name":"任务团队"`（计划先行，开局无任务数后缀） |
+| 父会话 `tool-workflow/agent-start` ×6 | **插件标签确实在传**：`{"label":"规划助手","phase":"规划",…}`、`{"label":"执行","phase":"任务 1 · Create and verify sum.tx…",…}`、`{"label":"检查",…}`（`parent-agent-start-excerpts.txt`） |
+| 6 个子会话首个 `subagent/descriptor`（`zstdcat` + `grep`） | **全部为 `"label":"任务团队 child N"`（N=1..6），`seq 0`，`provider:"spawn"`**（`child-descriptor-events.txt`）——插件传的描述性 label 未到达持久描述符，与用户截图逐字一致 |
+
+### 边界
+
+- live `:3090` 未动（D-013，仍 `0.2.7`）；operator `DSH_HOME` 未写；DSH core 未改（`git -C ~/projects_mine/deepseek-harness status` 干净）。
+- 浏览器渲染本轮 `NOT_RUN`（同 Round 24/27：GUI 401 无凭据；描述符标签已是渲染输入的唯一主标签来源，源码已定）。
+- 插件源码零改动；`npm run ci` 本轮未跑（无本任务源码改动，且工作树含并发任务进行中的 client 改动，跑 CI 只会测到别人的中间态；基线仍是 Round 26 的 35 文件 / 624 测试 PASS）。
+- `out/childname-verify/` 内两个中间摘录文件曾在相邻两次调用之间消失（`child1-events.jsonl`、`descriptor-excerpts.txt`；原因未查明，疑似与并发任务的 out/ 操作相撞）。已用「同一命令内生成+校验」的方式把三份摘录直接落盘到 `docs/knowledge/evidence/childname-blocked/`，落盘后跨调用复核仍在，证据不受影响。
+- 模型密钥：`BIFROST_VIRTUAL_KEY` 仅做存在性布尔检查（`[ -n … ]`），全程未读、未写、未回显。

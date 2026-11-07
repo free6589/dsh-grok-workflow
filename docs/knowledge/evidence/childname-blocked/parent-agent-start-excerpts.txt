@@ -1,0 +1,6 @@
+"type":"tool-workflow/agent-start","seq":26,"time":1794065939901,"data":{"runId":"e653dcbf-32fd-4770-a871-9dc679b5bc0d","seq":1,"label":"规划助手","phase":"规划","childId":"de461a52-bc6e-488d-b453-cdc91421fa9d"}
+"type":"tool-workflow/agent-start","seq":29,"time":1794066007077,"data":{"runId":"e653dcbf-32fd-4770-a871-9dc679b5bc0d","seq":3,"label":"执行","phase":"任务 2 · Create and verify prod.t…","childId":"e54edff5-135c-4c5f-b9f9-3f6e413c8056"}
+"type":"tool-workflow/agent-start","seq":31,"time":1794066007111,"data":{"runId":"e653dcbf-32fd-4770-a871-9dc679b5bc0d","seq":2,"label":"执行","phase":"任务 1 · Create and verify sum.tx…","childId":"eaad1243-bc1f-47ab-bf5d-498e1647781c"}
+"type":"tool-workflow/agent-start","seq":34,"time":1794066142642,"data":{"runId":"e653dcbf-32fd-4770-a871-9dc679b5bc0d","seq":4,"label":"检查","phase":"任务 1 · Create and verify sum.tx…","childId":"48cb82f8-be8a-495f-891b-c680d7ba1b4e"}
+"type":"tool-workflow/agent-start","seq":37,"time":1794066172960,"data":{"runId":"e653dcbf-32fd-4770-a871-9dc679b5bc0d","seq":5,"label":"执行","phase":"任务 2 · Create and verify prod.t…","childId":"cf207c46-7f24-4f90-af64-bd39bb8fb681"}
+"type":"tool-workflow/agent-start","seq":41,"time":1794066222524,"data":{"runId":"e653dcbf-32fd-4770-a871-9dc679b5bc0d","seq":6,"label":"检查","phase":"任务 2 · Create and verify prod.t…","childId":"efcb296d-4ba5-47bc-8970-880435e26d02"}

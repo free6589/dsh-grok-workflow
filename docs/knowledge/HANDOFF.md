@@ -1,5 +1,65 @@
 # Agent Handoff
 
+## 2026-11-07 — 子代理顶栏显示名：第二次尝试复核 + 真机复现，**BLOCKED 维持**（fix_child_names，`release/0.6.0` 工作树）
+
+- **From:** 执行子代理（fix_child_names，attempt 2）· **To:** lead / 用户 · **Base:** `524097f`（本地 `release/0.6.0` HEAD，未变）
+- **本轮做了什么（attempt 2）：** ①把 attempt 1（Round 27 / D-039）的源码结论**逐条独立重验**——全部自己重新读源码，
+  关键行号见 `VALIDATION.md` Round 28 表（引擎 `dsh-workflow-ptc/lib/index.js:332` 写死
+  `` `${meta.name} child ${callId}` ``、guest 不转发 `label`、描述符 `foldSubagentDescriptor` 取第一条锁死、
+  GUI `dsh-client-ui-subagent/lib/client.js:201` 直接渲染、`dsh-session-title` `SessionTitleService.rename`
+  存在且只作用于次级行）。②把 attempt 1 的「隔离 profile 真机 `NOT_RUN`」升级为**真机复现 PASS**：
+  `out/childname-verify/`（隔离 home + profile `cnamer`，headless，模型 v4-pro + agnes-3.0-flash，
+  复用 `out/v060-verify/*.patch.yml`，密钥仅布尔存在检查）跑一轮团队档 COMPLETED（2 任务 verified，
+  6 子代理），父会话 `tool-workflow/agent-start` 证明插件标签（`规划助手`/`执行`/`检查`）确实在传，
+  而 6 个子会话首个 `subagent/descriptor` **全部**是 `"label":"任务团队 child N"`（N=1..6）——
+  与用户截图逐字一致。证据：`docs/knowledge/evidence/childname-blocked/`（README + 3 摘录文件）。
+- **结论：BLOCKED 维持。** 主标签由 DSH core 写死并被描述符契约锁成不可改写，插件侧无文档化扩展点；
+  按任务约束（"If no extension point exists … report BLOCKED with the specific limitation instead of
+  modifying DSH core"）不做绕行改动。验收条款逐条状态：条款 1/3/4/6 的"修复已实现"部分不可达
+  （无修复可交付）；条款 2（DSH core 未改）满足；条款 5（CHANGELOG 条目）不适用（无用户可见变更，D-039 既定）。
+- **本轮改动：** 仅记忆与证据文件——`VALIDATION.md`（Round 28）、`DECISIONS.md`（D-039 Addendum）、
+  `STATE.md`（2026-11-07 段补充）、本节、`docs/knowledge/evidence/childname-blocked/`（4 文件）。
+  **无源码改动、无 `CHANGELOG.md` 条目。**
+- **未做 / `NOT_RUN`：** DSH core 未改（约束禁止）；live `:3090` 未碰（D-013，仍 `0.2.7`，本会话无凭据 401）；
+  浏览器渲染 `NOT_RUN`（描述符标签已是渲染输入的唯一主标签来源）；`npm run ci` 未跑
+  （零源码改动；工作树含并发任务进行中的 client 改动，跑 CI 只会测到别人的中间态；基线 Round 26
+  35 文件 / 624 测试 PASS）；半程缓解（`sessionTitle.rename`）未实施（D-039：待用户批准）。
+- **现场异常（已绕过，如实记录）：** `out/childname-verify/` 内两个中间摘录文件曾在相邻两次调用之间
+  消失（疑似与并发任务的 out/ 操作相撞）；改用「同一命令内生成+校验」把摘录直接落盘到证据目录后
+  跨调用复核仍在，证据完整性不受影响。
+- **并发注意：** 工作树仍有**另一任务**的改动（`src/client/index.js`、`lib/client.js`、
+  `test/client.spec.ts`、未跟踪 `test/panel-links.spec.ts`，另有 `.gitignore`/`package.json`/`.v070-home/`
+  等进行中痕迹）。本轮**未触碰、未提交**，因此**未做 git commit**（避免把别人的工作树改动扫进提交）。
+- **Next action（需要用户/lead 决策，二选一，同 attempt 1）：**
+  ①**上游修复（推荐，能彻底解决）**：DSH `packages/workflow/workflow-ptc/src/` 改约 3 行——
+  `runtime.ts` 把 `opts.label` 放进 `startAgent(...)`，`host.ts` 的 `childRequest()` 接收 `label`、
+  `startChild()` 用 `` label: request.label ?? `${this.meta.name} child ${callId}` ``；改完插件零改动即生效。
+  ②**半程缓解（不满足本任务验收条款 1）**：插件在 `workflow/agent-start`（事件带 `childId`）后调
+  `ctx.sessionTitle.rename(session, <任务名>)`，把顶栏**次级行**的提示词原文换成任务名；主标签 `任务团队 child N` 仍在。
+
+## 2026-11-07 — 子代理顶栏显示名：诊断完成，判定 **BLOCKED**（fix_child_names 任务，`release/0.6.0` 工作树，attempt 1）
+
+- **From:** 执行子代理（fix_child_names）· **To:** lead / 用户 · **Base:** `524097f`（本地 `release/0.6.0` HEAD）
+- **结论（`CONFIRMED`，源码逐行取证）：** 顶栏主标签 `任务团队 child N` 由 **DSH core** 在创建子代理时写死，
+  插件侧无任何文档化扩展点可改。证据链（8 处行号）见 `VALIDATION.md` Round 27，决策见 `DECISIONS.md` D-039。
+  一句话：插件已经在传 `label`（`src/script.ts:1188/1213/1324/1438`），丢标签发生在引擎内部
+  （`workflow-ptc/src/runtime.ts:183-188` 不转发 → `host.ts:205` 写死 → 描述符被锁成不可改写
+  → `dsh-client-ui-subagent/lib/client.js:201` 直接渲染）。
+- **本轮改动：** 仅记忆文件——`docs/knowledge/VALIDATION.md`（Round 27）、`DECISIONS.md`（D-039）、
+  `STATE.md`（2026-11-07 段）、本节。**无源码改动、无 `CHANGELOG.md` 条目**（没有用户可见变更可记）。
+- **未做 / `NOT_RUN`：** DSH core 未改（约束禁止）；隔离 profile 真机 `NOT_RUN`（无修复可验）；
+  live `:3090` 版本与浏览器渲染 `NOT_RUN`（`GET /` → `401`，本会话无凭据）；`npm run ci` 本轮未跑
+  （零源码改动；基线仍是 Round 26 的 35 文件 / 624 测试 PASS）。
+- **并发注意：** 开工时工作树已有**另一任务**的改动（`src/client/index.js`、`lib/client.js`、
+  `test/client.spec.ts` 已改，`test/panel-links.spec.ts` 未跟踪）。本轮**未触碰、未提交**，
+  因此**未做 git commit**（避免把别人的工作树改动扫进提交）。
+- **Next action（需要用户/lead 决策，二选一）：**
+  ①**上游修复（推荐，能彻底解决）**：DSH `packages/workflow/workflow-ptc/src/` 改约 3 行——
+  `runtime.ts` 把 `opts.label` 放进 `startAgent(...)`，`host.ts` 的 `childRequest()` 接收 `label`、
+  `startChild()` 用 `` label: request.label ?? `${this.meta.name} child ${callId}` ``；改完插件零改动即生效。
+  ②**半程缓解（不满足本任务验收条款 1）**：插件在 `workflow/agent-start`（事件带 `childId`）后调
+  `ctx.sessionTitle.rename(session, <任务名>)`，把顶栏**次级行**的提示词原文换成任务名；主标签 `任务团队 child N` 仍在。
+
 ## 2026-11-07 — v0.6.0 发布 + 隔离验证收尾（release-runner，`release/0.6.0` 分支）
 
 - **From:** release-runner · **To:** lead · **Base:** `ca040e4`（`release/0.6.0` release-prep；`main` 已合入为 `1f9065d`，PR #43）

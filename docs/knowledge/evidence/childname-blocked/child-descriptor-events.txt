@@ -1,0 +1,6 @@
+{"type":"subagent/descriptor","seq":0,"time":1794065939734,"data":{"version":3,"mode":"continuable","provider":"spawn","label":"任务团队 child 1","agentProvider":"bifrost-completions","agentModel":"wb/cn:deepseek-v4-pro"}}
+{"type":"subagent/descriptor","seq":0,"time":1794066007005,"data":{"version":3,"mode":"continuable","provider":"spawn","label":"任务团队 child 2","agentProvider":"bifrost-completions","agentModel":"wb/cn:deepseek-v4-pro"}}
+{"type":"subagent/descriptor","seq":0,"time":1794066007007,"data":{"version":3,"mode":"continuable","provider":"spawn","label":"任务团队 child 3","agentProvider":"bifrost-completions","agentModel":"agnes-3.0-flash"}}
+{"type":"subagent/descriptor","seq":0,"time":1794066142340,"data":{"version":3,"mode":"continuable","provider":"spawn","label":"任务团队 child 4","agentProvider":"bifrost-completions","agentModel":"wb/cn:deepseek-v4-pro"}}
+{"type":"subagent/descriptor","seq":0,"time":1794066171684,"data":{"version":3,"mode":"continuable","provider":"spawn","label":"任务团队 child 5","agentProvider":"bifrost-completions","agentModel":"wb/cn:deepseek-v4-pro"}}
+{"type":"subagent/descriptor","seq":0,"time":1794066222375,"data":{"version":3,"mode":"continuable","provider":"spawn","label":"任务团队 child 6","agentProvider":"bifrost-completions","agentModel":"wb/cn:deepseek-v4-pro"}}

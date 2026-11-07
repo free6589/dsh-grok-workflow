@@ -583,3 +583,39 @@ Each entry records the decision, evidence, alternatives, and status.
 - **Alternatives rejected:** C2 精确全局信号量（spike 按 A16 证伪：须改 harness + 脚本注入面，
   本次不做）；打满当失败（拒：溢出不是失败，不耗重试、不动 `switchOn`，D-030 既定语义）；
   排队等同一条（拒：有空闲路由时等是浪费，全满才排队等腾位 `queuedMs`）。
+
+## D-039 — 子代理顶栏显示名不改 DSH core：判定为 BLOCKED，只记证据与上游改动清单
+
+- **Status:** BLOCKED（源码级 `CONFIRMED`：见 VALIDATION.md Round 27 的 8 处行号；插件侧无文档化扩展点）
+- **Date:** 2026-11-07
+- **Decision:** 用户要求"顶栏每个子代理显示具体任务名，不出现 `任务团队 child N` 或提示词原文"。
+  经逐行取证，主标签由 DSH core 在创建子代理时写死
+  （`packages/workflow/workflow-ptc/src/host.ts:205` 的 `` `${this.meta.name} child ${callId}` ``），
+  并作为子会话首个 `subagent/descriptor` 事件持久化、被 `foldSubagentDescriptor` 锁成**不可改写**
+  （`dsh-subagent/lib/index.js:686-698`）；GUI 顶栏主标签直接取它（`dsh-client-ui-subagent/lib/client.js:201`）。
+  **本轮不做任何绕行改动**：不改 DSH core，也不做未文档化的描述符/日志改写，只把证据与上游改动清单落到记忆里。
+- **Reason:** 插件已经做对了它这一层——每次 `agent()` 都传 `label`（`src/script.ts:1188/1213/1324/1438`），
+  DSH 自己的工具文档也把 `label` 写成 "(display)"（`dsh-tool-workflow/lib/index.js:143`），
+  丢标签发生在引擎内部（`runtime.ts:183-188` 不转发、`host.ts:205` 写死）。
+  在这种情况下，插件侧任何"修复"都只能是绕过契约的脏补，风险大于收益，且违反 AGENTS.md 的
+  "never modify the DSH core repository … use documented extension points only"。
+- **Consequences:** 无源码改动；`CHANGELOG.md` 不加条目（没有用户可见变更可记）。
+  记录：`VALIDATION.md` Round 27、本节、`STATE.md`、`HANDOFF.md`。
+- **Alternatives rejected:** 见 VALIDATION.md Round 27 的「已否决的绕行方案」表（追加描述符、自定义
+  SubagentProvider、改 `meta.name`、插件自建 `startActivation`、改 core）。
+- **可选的半程缓解（未实施，待用户批准）：** 顶栏**次级行**是子会话自动标题，来源是提示词首行
+  （`You are the planning agent…`）。插件可在 `workflow/agent-start`（事件里带 `childId`）后调用文档化服务
+  `ctx.sessionTitle.rename(session, <任务名>)`（`@deepseek-ai/dsh-session-title` 的 `SessionTitleService.rename`）
+  把次级行改成任务名。**但这只去掉提示词原文，`任务团队 child N` 主标签仍在**，因此不满足本任务验收条款 1，
+  本轮不做；若用户接受"主标签保留、次级行变任务名"，可作为独立小任务实施。
+- **Upstream ask（NOT_RUN）：** `runtime.ts` 把 `opts.label` 放进 `startAgent`；`host.ts` 的 `childRequest()`
+  接收 `label` 且 `startChild()` 用 `label: request.label ?? \`${meta.name} child ${callId}\``。约 3 行，改完插件零改动即生效。
+- **Addendum（2026-11-07 晚，第二次尝试，Round 28）：** 状态维持 **BLOCKED**。Round 27 的判定由第二次尝试
+  **独立重验**（源码链逐条重读）并用**隔离 profile 真机复现**坐实：复用 `out/v060-verify/*.patch.yml`，
+  在 `out/childname-verify/`（profile `cnamer`）跑一轮团队档（COMPLETED，2 任务 verified，6 子代理），
+  6 个子会话首个 `subagent/descriptor` 全部为 `"label":"任务团队 child N"`（N=1..6），而父会话
+  `tool-workflow/agent-start` 证明插件标签（`规划助手`/`执行`/`检查`）确实随每次 `agent()` 传入——
+  与用户截图逐字一致，且 live `:3090`、operator `DSH_HOME`、DSH core 均未触碰。
+  证据：`docs/knowledge/evidence/childname-blocked/`（README + `child-descriptor-events.txt` +
+  `parent-agent-start-excerpts.txt` + `parent-run-start-excerpt.txt`）；命令与边界见 `VALIDATION.md` Round 28。
+  半程缓解与上游 ask 维持原判：前者仍待用户批准（改次级行，不满足验收条款 1），后者仍 `NOT_RUN`（约束禁止改 core）。
