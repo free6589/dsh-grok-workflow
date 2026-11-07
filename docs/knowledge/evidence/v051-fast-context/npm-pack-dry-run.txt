@@ -1,0 +1,80 @@
+=== npm pack --dry-run (npm_config_cache=<workspace>/out/v051-ci/npm-cache; ~/.npm is read-only under the file sandbox) ===
+npm notice
+npm notice 📦  dsh-grok-workflow@0.5.1
+npm notice Tarball Contents
+npm notice 78.3kB CHANGELOG.md
+npm notice 1.1kB LICENSE
+npm notice 25.1kB README.md
+npm notice 23.5kB README.zh-CN.md
+npm notice 278B cordis.patch.yml
+npm notice 5.9kB docs/ACCEPTANCE.md
+npm notice 21.5kB docs/ARCHITECTURE.md
+npm notice 1.9kB docs/COORDINATION.md
+npm notice 4.8kB docs/images/workflow-overview.svg
+npm notice 4.6kB docs/images/workflow-overview.zh-CN.svg
+npm notice 7.1kB docs/ISSUE-WATCHER.md
+npm notice 12.1kB docs/LOCAL-TESTING.md
+npm notice 12.2kB docs/RELEASING.md
+npm notice 15.7kB docs/task-progress-panel.md
+npm notice 2.6kB lib/answer.d.ts
+npm notice 5.4kB lib/answer.js
+npm notice 7.1kB lib/carryover.d.ts
+npm notice 14.9kB lib/carryover.js
+npm notice 81.8kB lib/client.js
+npm notice 3.2kB lib/command.d.ts
+npm notice 3.6kB lib/command.js
+npm notice 18.8kB lib/config.d.ts
+npm notice 28.0kB lib/config.js
+npm notice 8.2kB lib/gate.d.ts
+npm notice 56.3kB lib/gate.js
+npm notice 1.9kB lib/history.d.ts
+npm notice 5.3kB lib/history.js
+npm notice 920B lib/index.d.ts
+npm notice 12.0kB lib/index.js
+npm notice 1.8kB lib/input.d.ts
+npm notice 7.1kB lib/input.js
+npm notice 9.5kB lib/memory/archive.d.ts
+npm notice 14.2kB lib/memory/archive.js
+npm notice 1.4kB lib/memory/cli.d.ts
+npm notice 4.7kB lib/memory/cli.js
+npm notice 9.3kB lib/memory/recorder.d.ts
+npm notice 22.1kB lib/memory/recorder.js
+npm notice 3.0kB lib/mode.d.ts
+npm notice 2.9kB lib/mode.js
+npm notice 12.1kB lib/naming.d.ts
+npm notice 14.8kB lib/naming.js
+npm notice 5.7kB lib/panel.d.ts
+npm notice 7.9kB lib/panel.js
+npm notice 3.8kB lib/paths.d.ts
+npm notice 5.9kB lib/paths.js
+npm notice 17.7kB lib/records.d.ts
+npm notice 25.0kB lib/records.js
+npm notice 1.5kB lib/redact.d.ts
+npm notice 9.6kB lib/redact.js
+npm notice 952B lib/report.d.ts
+npm notice 44.7kB lib/report.js
+npm notice 9.1kB lib/run.d.ts
+npm notice 43.7kB lib/run.js
+npm notice 2.8kB lib/script.d.ts
+npm notice 68.7kB lib/script.js
+npm notice 7.0kB lib/settings.d.ts
+npm notice 11.0kB lib/settings.js
+npm notice 2.6kB lib/shards.d.ts
+npm notice 4.8kB lib/shards.js
+npm notice 18.4kB lib/triage.d.ts
+npm notice 47.6kB lib/triage.js
+npm notice 16.9kB lib/types.d.ts
+npm notice 44B lib/types.js
+npm notice 3.5kB package.json
+npm notice Tarball Details
+npm notice name: dsh-grok-workflow
+npm notice version: 0.5.1
+npm notice filename: dsh-grok-workflow-0.5.1.tgz
+npm notice package size: 294.4 kB
+npm notice unpacked size: 926.0 kB
+npm notice shasum: 950e32873b92b375b05bf2e2aa9c570a4888926a
+npm notice integrity: sha512-evZ/nOk5XPspa[...]oAR6O0ovvD/LA==
+npm notice total files: 64
+npm notice
+dsh-grok-workflow-0.5.1.tgz
+PACK_EXIT=0

@@ -26,6 +26,12 @@ export interface ActiveRunInfo {
     /** Session object, so a disposal can write the interrupted run's notice. */
     session?: Session;
     startedAtMs: number;
+    /**
+     * Route labels this run configured (C1 cross-run hint snapshot source).
+     * Run-level estimate only: which chains exist, not live sub-call counts
+     * (A16 — exact in-flight counts are invisible host-side).
+     */
+    routes?: string[];
 }
 /** Lifetime-scoped state shared by the tool and the gate. */
 export interface ActiveState {
@@ -54,6 +60,15 @@ export declare function createActiveState(): ActiveState;
 export declare function formatElapsed(ms: number): string;
 /** How many runs (started + starting) one session holds against its cap. */
 export declare function activeCountOfSession(state: ActiveState, sessionId: string): number;
+/** Route labels one config puts into play, flattened across roles (C1 hint source). */
+export declare function configRouteLabels(config: ResolvedConfig): string[];
+/**
+ * Approximate global busy snapshot (C1): route labels other live runs
+ * configured, oldest run first. Run-level only — exact in-flight sub-call
+ * counts are invisible host-side (A16), so this never claims semaphore
+ * precision; the script only deprioritizes, never removes, flagged routes.
+ */
+export declare function snapshotBusyRoutes(state: ActiveState): string[];
 /** Short label used in thrown messages and rendered failures. */
 export declare function workflowLabel(config: ResolvedConfig): string;
 /** Inputs the plugin disposer can offer about how it was reached. */

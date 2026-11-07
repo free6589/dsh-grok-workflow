@@ -39,6 +39,12 @@ export interface WorkflowRequestPayload {
          * redacted by `src/carryover.ts`. Absent on a first round.
          */
         carryover?: string;
+        /**
+         * Cross-run hint (C1, approximate): route labels other live runs
+         * configured, snapshotted host-side at admission. Absent/empty on a
+         * first or solitary run, which keeps the payload identical to before.
+         */
+        busyRoutes?: string[];
     };
     maxTotalAgents: number;
 }
@@ -63,5 +69,5 @@ export declare function routeBudgetFor(config: ResolvedConfig): RouteBudget;
  * with AGENT_CAP as soon as a fallback route is used.
  */
 export declare function maxTotalAgentsFor(tasks: number, retries: number, budget?: RouteBudget): number;
-export declare function buildWorkflowRequest(objective: string, tasks: NormalizedTask[] | undefined, config: ResolvedConfig, namingLanguage?: NamingLanguage, carryover?: string): WorkflowRequestPayload;
+export declare function buildWorkflowRequest(objective: string, tasks: NormalizedTask[] | undefined, config: ResolvedConfig, namingLanguage?: NamingLanguage, carryover?: string, busyRoutes?: string[]): WorkflowRequestPayload;
 //# sourceMappingURL=script.d.ts.map

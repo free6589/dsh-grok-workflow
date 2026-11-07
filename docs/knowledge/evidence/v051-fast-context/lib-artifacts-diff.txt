@@ -1,0 +1,16 @@
+=== git diff --exit-code -- lib/ (after npm run ci's build) ===
+LIB_DIFF_EXIT=0
+
+=== git status --porcelain --untracked-files=all -- lib/ ===
+(empty above = no untracked build artifacts)
+
+=== npm pack --dry-run ===
+npm error code EROFS
+npm error syscall open
+npm error path /home/fish/.npm/_cacache/tmp/***
+npm error errno -30
+npm error rofs EROFS: read-only file system, open '/home/fish/.npm/_cacache/tmp/***'
+npm error rofs Often virtualized file systems, or other file systems that don't support symlinks, give this error.
+npm error Log files were not written due to an error writing to the directory: /home/fish/.npm/_logs
+npm error You can rerun the command with `--loglevel=verbose` to see the logs in your terminal
+PACK_EXIT=226

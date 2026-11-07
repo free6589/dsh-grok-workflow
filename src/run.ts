@@ -26,7 +26,7 @@ import {
 import type { DisposeRecord, DisposeRunInfo } from './records.js'
 import { archiveRoundNow, createMemoryArchiver, memberFromEnd, memberFromStart, roundArchiveEvidence, roundArchiveSummary } from './memory/recorder.js'
 import { redactDeep, redactError, redactSecrets } from './redact.js'
-import type { FailureCategory, FinalStatus, IncompleteItem, NormalizedTask, ResolvedConfig, WorkflowReport } from './types.js'
+import type { FailureCategory, FinalStatus, IncompleteItem, NormalizedTask, ResolvedConfig, RoleName, WorkflowReport } from './types.js'
 
 /** Minimal logger surface used by the runtime modules. */
 export interface WorkflowLogger {
@@ -43,6 +43,12 @@ export interface ActiveRunInfo {
   /** Session object, so a disposal can write the interrupted run's notice. */
   session?: Session
   startedAtMs: number
+  /**
+   * Route labels this run configured (C1 cross-run hint snapshot source).
+   * Run-level estimate only: which chains exist, not live sub-call counts
+   * (A16 — exact in-flight counts are invisible host-side).
+   */
+  routes?: string[]
 }
 
 /** Lifetime-scoped state shared by the tool and the gate. */
@@ -116,6 +122,48 @@ function runsOfSession(state: ActiveState, sessionId: string): ActiveRunInfo[] {
 /** How many runs (started + starting) one session holds against its cap. */
 export function activeCountOfSession(state: ActiveState, sessionId: string): number {
   return (state.starting.get(sessionId) ?? 0) + runsOfSession(state, sessionId).length
+}
+
+/** Route labels one config puts into play, flattened across roles (C1 hint source). */
+export function configRouteLabels(config: ResolvedConfig): string[] {
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const role of ['planner', 'worker', 'verifier', 'synthesizer'] as const) {
+    for (const route of config.roles[role] ?? []) {
+      const model = typeof route.model === 'string' ? route.model.trim() : ''
+      if (model === '') continue
+      const provider = typeof route.provider === 'string' ? route.provider.trim() : ''
+      const label = provider === '' ? model : `${provider}/${model}`
+      if (seen.has(label)) continue
+      seen.add(label)
+      out.push(label.slice(0, 120))
+      if (out.length >= 64) return out
+    }
+  }
+  return out
+}
+
+/**
+ * Approximate global busy snapshot (C1): route labels other live runs
+ * configured, oldest run first. Run-level only — exact in-flight sub-call
+ * counts are invisible host-side (A16), so this never claims semaphore
+ * precision; the script only deprioritizes, never removes, flagged routes.
+ */
+export function snapshotBusyRoutes(state: ActiveState): string[] {
+  const infos = [...state.active.values()].sort((left, right) => left.startedAtMs - right.startedAtMs)
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const info of infos) {
+    for (const label of info.routes ?? []) {
+      if (typeof label !== 'string') continue
+      const trimmed = label.trim().slice(0, 120)
+      if (trimmed === '' || seen.has(trimmed)) continue
+      seen.add(trimmed)
+      out.push(trimmed)
+      if (out.length >= 64) return out
+    }
+  }
+  return out
 }
 
 /** `run <id> (running 14m38s)` — the detail a refusal has to carry to be actionable. */
@@ -498,7 +546,12 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
   const { ctx, config, state, logger, agent, objective } = options
   if (state.disposed) throw new Error(`${workflowLabel(config)} is unavailable: plugin has been unloaded`)
   const callerTasks = options.callerTasks
-  const request = buildWorkflowRequest(objective, callerTasks, config, progressNamingLanguage(ctx), options.carryover)
+  // C1 cross-run hint: snapshot which route labels other live runs configured
+  // (approximate, run-level only — see snapshotBusyRoutes/A16). Taken before
+  // admission so the snapshot never includes this run itself; omitted from the
+  // payload when empty so a solitary run stays byte-identical to before.
+  const busyHint = snapshotBusyRoutes(state)
+  const request = buildWorkflowRequest(objective, callerTasks, config, progressNamingLanguage(ctx), options.carryover, busyHint)
   // Two independent caps (t41, P1-3): the per-session one is what a user can
   // reason about ("this conversation already runs two workflows"), and the
   // process-wide one only exists so a fleet of sessions cannot unbounded the
@@ -689,6 +742,9 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
         sessionId,
         ...owner === undefined ? {} : { session: owner },
         startedAtMs: Date.now(),
+        // C1 hint source: what this run configured, so a later admission can
+        // deprioritize the same labels. Run-level only, never live counts.
+        routes: configRouteLabels(config),
       })
       // Belt and braces for in-turn delivery: `start({signal})` documents that an
       // aborted signal cancels the run, but an in-turn wait lives inside the open
