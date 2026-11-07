@@ -238,12 +238,12 @@ export async function disposeActiveState(
 
   // One record and at most one notice per affected session, written *before* the
   // abort: afterwards every session is racing its own turn teardown.
-  const bySession = new Map<string, { session?: Session; interrupted: number }>()
+  const bySession = new Map<string, { session?: Session }>()
   for (const info of infos) {
-    const entry = bySession.get(info.sessionId)
-      ?? { ...info.session === undefined ? {} : { session: info.session }, interrupted: 0 }
-    entry.interrupted += 1
-    bySession.set(info.sessionId, entry)
+    if (bySession.has(info.sessionId)) continue
+    bySession.set(info.sessionId, {
+      ...info.session === undefined ? {} : { session: info.session },
+    })
   }
   if (bySession.size === 0) {
     // Idle unload: nothing was damaged, so nothing is written into any session.
