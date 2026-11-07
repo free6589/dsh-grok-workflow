@@ -33,8 +33,9 @@ class FakeRun {
   readonly dispose = vi.fn(async () => {})
   readonly result: Promise<EngineResult>
   private settle!: (value: EngineResult) => void
+  cancelValue: unknown
   readonly cancel = vi.fn((_reason?: string) => {
-    this.settleCancelled(undefined)
+    this.settleCancelled(this.cancelValue)
   })
 
   constructor(request: WorkflowStartRequest) {
@@ -62,12 +63,14 @@ class FakeEngine {
   /** Run the script immediately with scripted children, so no model is involved. */
   autoRun = false
   startError: Error | undefined
+  startGate: Promise<void> | undefined
   /** When true the run never settles on its own (for deadline/unload/cancel cases). */
   hang = false
 
   async start(request: WorkflowStartRequest): Promise<FakeRun> {
     this.startCalls.push(request)
     if (this.startError !== undefined) throw this.startError
+    if (this.startGate !== undefined) await this.startGate
     const run = new FakeRun(request)
     this.runs.push(run)
     request.signal?.addEventListener('abort', () => run.cancel('signal aborted'), { once: true })
@@ -708,7 +711,7 @@ describe('P0-4: cancellation reaches a terminal state', () => {
       // The engine's own value: one task verified, one not started.
       status: 'partial',
       objective,
-      plan: { source: 'caller', tasks: plan },
+      plan: { source: 'planner', tasks: plan },
       tasks: [
         {
           id: 'a',
@@ -858,6 +861,86 @@ describe('P0-4: a cancelled turn keeps the message and states the terminal', () 
     expect(live.ownEvents().filter(event => event.type === 'user/message')).toHaveLength(1)
   })
 
+  it('writes verified partial work into the cancelled transcript', async () => {
+    const ctx = new FakeContext()
+    const config = { mode: 'full' as const, grokDefault: 'on' as const, maxConcurrency: 2, maxRetries: 0, maxTasks: 2 }
+    const limitsConfig = resolveConfig(config)
+    apply(ctx as never, config)
+    const live = session('sess-p1-cancel-partial-report')
+    const agent = new FakeAgent(live)
+    const request = '完成两个任务'
+    const objective = 'Current request:\n' + request
+    const claimed = [userMessage(request)]
+    const controller = new AbortController()
+    const plan = [task('a'), task('b')]
+    const partial = {
+      schemaVersion: 'grok-workflow/v1',
+      status: 'partial',
+      objective,
+      plan: { source: 'caller', tasks: plan },
+      tasks: [
+        {
+          id: 'a',
+          title: 'Task a',
+          objective: 'Do a',
+          expectedOutput: 'Output a',
+          acceptanceCriteria: ['a works'],
+          context: '',
+          constraints: [],
+          writesPaths: null,
+          status: 'verified',
+          attempts: [{ attempt: 1, status: 'verified', execution: execution('work done'), verification: verification(plan[0]!), passed: true }],
+          evidence: verification(plan[0]!).criteria,
+        },
+        {
+          id: 'b',
+          title: 'Task b',
+          objective: 'Do b',
+          expectedOutput: 'Output b',
+          acceptanceCriteria: ['b works'],
+          context: '',
+          constraints: [],
+          writesPaths: null,
+          status: 'failed',
+          attempts: [],
+          error: '',
+        },
+      ],
+      confirmed: [{ taskId: 'a', criterion: 'a works', evidence: verification(plan[0]!).criteria[0]!.evidence }],
+      incomplete: [],
+      errors: [],
+      uncertainties: [],
+      routes: [],
+      routing: { planner: [], worker: [], verifier: [], synthesizer: [] },
+      synthesis: { mode: 'deterministic' },
+      limits: {
+        maxConcurrency: limitsConfig.maxConcurrency,
+        maxRetries: limitsConfig.maxRetries,
+        maxTasks: limitsConfig.maxTasks,
+        maxTotalAgents: maxTotalAgentsFor(plan.length, limitsConfig.maxRetries, routeBudgetFor(limitsConfig)),
+        timeoutMs: limitsConfig.timeoutMs,
+      },
+    }
+
+    const pending = ctx.preStep()(payload(agent, claimed, controller.signal), nextWith(claimed)) as Promise<Decision>
+    await waitFor(() => ctx.engine.runs.length === 1)
+    ctx.engine.runs[0]!.cancelValue = partial
+    controller.abort()
+    const decision = await pending
+
+    expect(decision.kind).toBe('reject')
+    const transcript = texts(live)
+    const all = transcript.join('\n')
+    expect(transcript.filter(text => text === request)).toHaveLength(1)
+    expect(all).toContain('PARTIAL')
+    expect(all).toContain('Task a')
+    expect(all).toContain(verification(plan[0]!).criteria[0]!.evidence)
+    expect(all).toContain('Task b')
+    expect(all).toContain('not started')
+    expect(all).toContain('cancelled')
+    expect(all).not.toContain('COMPLETED')
+  })
+
   it('keeps the message and states the terminal when the signal was already aborted', async () => {
     const ctx = new FakeContext()
     apply(ctx as never, { mode: 'full', grokDefault: 'on' })
@@ -877,5 +960,52 @@ describe('P0-4: a cancelled turn keeps the message and states the terminal', () 
     expect(last).toContain('取消')
     expect(last).toContain('没有启动任何工人')
     expect(last).not.toContain('COMPLETED')
+  })
+})
+
+
+describe('P1: front-desk calls share the plugin lifecycle', () => {
+  it('cancels and disposes a running quick-worker call when the plugin unloads', async () => {
+    const ctx = new FakeContext()
+    ctx.engine.hang = true
+    apply(ctx as never, { mode: 'triage', grokDefault: 'on' })
+    const live = session('sess-p1-quick-unload')
+    const agent = new FakeAgent(live)
+    const claimed = [userMessage('run npm test')]
+    const pending = ctx.preStep()(payload(agent, claimed), nextWith(claimed)) as Promise<Decision>
+
+    await waitFor(() => ctx.engine.runs.length === 1)
+    const run = ctx.engine.runs[0]!
+    await ctx.dispose()
+    const decision = await pending
+
+    expect(decision.kind).toBe('enter')
+    expect(run.cancel).toHaveBeenCalled()
+    expect(run.dispose).toHaveBeenCalled()
+    expect(texts(live).join('\n')).toContain('unloaded')
+    expect(texts(live)).toContain('run npm test')
+  })
+
+  it('returns from quick-worker startup on unload and disposes a run that arrives late', async () => {
+    const ctx = new FakeContext()
+    let release!: () => void
+    ctx.engine.startGate = new Promise(resolve => { release = resolve })
+    apply(ctx as never, { mode: 'triage', grokDefault: 'on' })
+    const live = session('sess-p1-quick-start-unload')
+    const agent = new FakeAgent(live)
+    const claimed = [userMessage('run npm test')]
+    const pending = ctx.preStep()(payload(agent, claimed), nextWith(claimed)) as Promise<Decision>
+
+    await waitFor(() => ctx.engine.startCalls.length === 1)
+    await ctx.dispose()
+    const decision = await pending
+    expect(decision.kind).toBe('enter')
+
+    release()
+    await waitFor(() => ctx.engine.runs.length === 1)
+    const lateRun = ctx.engine.runs[0]!
+    await waitFor(() => lateRun.dispose.mock.calls.length === 1)
+    expect(lateRun.cancel).toHaveBeenCalled()
+    expect(answerOf(decision)).toContain('unloaded')
   })
 })

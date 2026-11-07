@@ -188,7 +188,7 @@ describe('plugin lifecycle and tool boundary', () => {
     await vi.waitFor(() => expect(ctx.engine.startCalls).toHaveLength(1))
     await ctx.dispose()
     release()
-    await expect(pending).rejects.toThrow(/plugin unloaded|cancelled/)
+    await expect(pending).rejects.toThrow(/unloaded|cancelled/)
     const run = ctx.engine.runs[0]!
     expect(run.cancel).toHaveBeenCalled()
     expect(run.dispose).toHaveBeenCalled()
@@ -266,6 +266,57 @@ describe('plugin lifecycle and tool boundary', () => {
     await ctx.dispose()
   })
 
+  it('returns the deadline while workflow startup is still pending, then disposes a late run', async () => {
+    const ctx = new FakeContext()
+    apply(ctx as never, { timeoutMs: 1000 })
+    let release!: () => void
+    ctx.engine.startGate = new Promise(resolve => { release = resolve })
+    const pending = ctx.tool!.execute({ objective: 'startup never resolves before the deadline' }, exec())
+    await vi.waitFor(() => expect(ctx.engine.startCalls).toHaveLength(1))
+
+    const raced = await Promise.race([
+      pending.then(report => ({ kind: 'settled' as const, report: report as { status: string; errors: { phase: string }[] } })),
+      new Promise<{ kind: 'stuck' }>(resolve => setTimeout(() => resolve({ kind: 'stuck' }), 1800)),
+    ])
+    // Always release the fake engine so a regression fails cleanly instead of
+    // leaving a pending promise behind for the rest of the suite.
+    release()
+    const report = raced.kind === 'settled' ? raced.report : await pending as { status: string; errors: { phase: string }[] }
+
+    expect(raced.kind).toBe('settled')
+    expect(report.status).toBe('failed')
+    expect(report.errors[0]!.phase).toBe('Timeout')
+    await vi.waitFor(() => expect(ctx.engine.runs).toHaveLength(1))
+    const lateRun = ctx.engine.runs[0]!
+    await vi.waitFor(() => expect(lateRun.cancel).toHaveBeenCalled())
+    await vi.waitFor(() => expect(lateRun.dispose).toHaveBeenCalled())
+    await ctx.dispose()
+  })
+
+  it('returns promptly when the caller cancels while workflow startup is pending', async () => {
+    const ctx = new FakeContext()
+    apply(ctx as never, { timeoutMs: 60_000 })
+    let release!: () => void
+    ctx.engine.startGate = new Promise(resolve => { release = resolve })
+    const controller = new AbortController()
+    const pending = ctx.tool!.execute({ objective: 'caller cancels during startup' }, exec(controller.signal))
+      .then(() => 'resolved', () => 'rejected')
+    await vi.waitFor(() => expect(ctx.engine.startCalls).toHaveLength(1))
+
+    controller.abort()
+    const raced = await Promise.race([
+      pending,
+      new Promise<string>(resolve => setTimeout(() => resolve('stuck'), 800)),
+    ])
+    release()
+    expect(raced).toBe('rejected')
+    await vi.waitFor(() => expect(ctx.engine.runs).toHaveLength(1))
+    const lateRun = ctx.engine.runs[0]!
+    expect(lateRun.cancel).toHaveBeenCalled()
+    expect(lateRun.dispose).toHaveBeenCalled()
+    await ctx.dispose()
+  })
+
   it('returns timeout when startup resolves after the deadline', async () => {
     const ctx = new FakeContext()
     apply(ctx as never, { timeoutMs: 1000 })
@@ -278,8 +329,8 @@ describe('plugin lifecycle and tool boundary', () => {
     const report = await pending as { status: string; errors: { phase: string }[] }
     expect(report.status).toBe('failed')
     expect(report.errors[0]!.phase).toBe('Timeout')
-    expect(ctx.engine.runs[0]!.cancel).toHaveBeenCalled()
-    expect(ctx.engine.runs[0]!.dispose).toHaveBeenCalled()
+    await vi.waitFor(() => expect(ctx.engine.runs[0]!.cancel).toHaveBeenCalled())
+    await vi.waitFor(() => expect(ctx.engine.runs[0]!.dispose).toHaveBeenCalled())
     await ctx.dispose()
   })
 
