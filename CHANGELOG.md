@@ -5,6 +5,32 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-07
+
+### Fixed / 修复
+
+- **The quick worker now gets the context it was already being classified against /
+  快手档拿到它本来就在被据以分类的上文** —
+  a follow-up such as "用人话告诉我刚才那份研究的结论" was correctly recognised as a follow-up
+  from the conversation, but the single worker that answered it received **only the bare
+  request**: it was triaged with the conversation in hand and then dispatched blind, so it
+  replied "I am a single turn, I cannot see the research above" and asked the user to restate
+  what the session already held. The quick-tier prompt now carries a bounded, redacted
+  `Context (do not ask for what is already here):` block — the recalled material when the
+  recall pass hit (excerpt plus the file/URL locators it came from), otherwise the bounded
+  conversation turns plus the cross-round digest, capped at 4 000 characters — and is told not
+  to claim it cannot see earlier turns and not to ask for anything already present. A first
+  message carries no context at all, so its prompt stays byte-identical to `0.5.0`; nothing is
+  invented, no extra model call is made, and no new configuration key is added (PR #41,
+  commit `45d721a`).
+  像"用人话告诉我刚才那份研究的结论"这样的追问，本来就已经被判定为"有上文的追问"，但真正作答的
+  那个快手档工人只收到 **bare request**：分诊时手里有会话、派活时却把上文丢了，于是它回一句
+  "我这轮是单次进来的，看不到上面的研究结果"，要求用户把会话里已有的内容再说一遍。快手档提示词
+  现在会带上一个有界、脱敏的 `Context (do not ask for what is already here):` 块——回捞命中时是
+  回捞到的材料（摘录 + 它的文件/URL 定位符），否则是有界的会话轮次加跨轮 digest，合计上限
+  4000 字符——并明确要求"不得声称看不到前文、不得索要已经在这里的内容"。首条消息完全不带上下文，
+  提示词与 `0.5.0` 逐字节一致；全程不编造、不增加模型调用、不新增配置键（PR #41，提交 `45d721a`）。
+
 ## [0.5.0] - 2026-11-06
 
 ### Added / 新增
