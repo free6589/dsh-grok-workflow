@@ -12,7 +12,6 @@ import type { Session } from '@deepseek-ai/dsh-session'
 import type { WorkflowAgentOutcome, WorkflowStopReason } from '@deepseek-ai/dsh-workflow'
 import { appendPluginRecord, pluginRecordOf } from '@deepseek-ai/dsh-session'
 import { redactError, redactSecrets } from './redact.js'
-import { createAssistantMessage } from '@deepseek-ai/dsh-llm'
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import type { WorkflowLogger } from './run.js'
 import type { FinalStatus, RouteTrailEntry, RoleName, SynthesisMode } from './types.js'
@@ -667,94 +666,3 @@ export function recordDispose(
   }
 }
 
-/** Append an instant team-tier receipt so the run never looks blank while in flight. */
-export function appendInstantReceipt(
-  session: Session | undefined,
-  text: string,
-  logger: WorkflowLogger,
-): boolean {
-  if (session === undefined || typeof session.append !== 'function') return false
-  const { turn, step } = lastTurnOf(session)
-  try {
-    session.append('assistant/message', {
-      turn,
-      step,
-      message: createAssistantMessage({
-        content: [{ type: 'text', text }],
-        source: { provider: 'grok-workflow', model: 'workflow-receipt' },
-      }),
-      stream: [],
-    }, { surfaceOp: 'append' })
-    return true
-  } catch (error) {
-    logger.warn(`instant receipt not written: ${redactError(error)}`)
-    return false
-  }
-}
-
-/** The last turn/step the session recorded, for placing a notice in the transcript. */
-function lastTurnOf(session: Session): { turn: number, step: number } {
-  try {
-    const events = (session as unknown as { ownEvents?: () => unknown[] }).ownEvents?.() ?? []
-    let turn = 0
-    let step = 0
-    for (const event of events) {
-      const data = (event as { data?: { turn?: unknown, step?: unknown } }).data
-      if (typeof data?.turn !== 'number') continue
-      if (data.turn > turn) {
-        turn = data.turn
-        step = 0
-      }
-      if (data.turn === turn && typeof data.step === 'number' && data.step > step) step = data.step
-    }
-    return { turn, step }
-  } catch {
-    return { turn: 0, step: 0 }
-  }
-}
-
-/**
- * Write the one-shot interruption notice into the session whose run was cut.
- *
- * Two shapes were considered and one was measured (t45):
- *
- * - `user/message` with this plugin's own source kind is the durable, honest
- *   shape, and it is what the gate uses for a relayed report — but the stock Web
- *   conversation **does not render** a user row whose source is not `user`
- *   (measured: the event is in the log at seq 13 with `surfaceOp: 'append'`, and
- *   the transcript shows nothing between the last turn and DSH's own "Task
- *   stopped" block).
- * - `assistant/message` is the shape this plugin already uses to deliver a
- *   composed answer outside a live turn (`deliverAppend`), and the transcript
- *   renders it as an ordinary assistant row.
- *
- * So the notice is written as an assistant row attributed to the plugin
- * (`provider: 'grok-workflow'`, `model: 'workflow-notice'`) and carries a
- * `[grok-workflow]` prefix, so a reader can tell it apart from anything the model
- * generated. It also enters the surface, which is deliberate: the next turn then
- * knows the mandatory workflow is off instead of silently assuming it ran.
- */
-export function appendUnloadNotice(
-  session: Session | undefined,
-  text: string,
-  logger: WorkflowLogger,
-): boolean {
-  if (session === undefined || typeof session.append !== 'function') return false
-  const { turn, step } = lastTurnOf(session)
-  try {
-    session.append('assistant/message', {
-      turn,
-      step,
-      message: createAssistantMessage({
-        content: [{ type: 'text', text }],
-        source: { provider: 'grok-workflow', model: 'workflow-notice' },
-      }),
-      stream: [],
-    }, { surfaceOp: 'append' })
-    return true
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error)
-    logger.warn(`unload notice not written: ${detail}`)
-    return false
-  }
-}
