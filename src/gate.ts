@@ -34,8 +34,9 @@
  * - `relay`: return `reject`, run in the background, deliver in a new turn.
  *   Needs a long-lived app to keep the tree alive; not measurable in headless
  *   one-shot mode (NR-1).
- * - `append`: like `relay`, but writes into the closed turn (`surfaceOp:'append'`);
- *   degraded, no stream and no usage accounting (NR-3).
+ * - `append`: legacy alias for safe follow-up delivery. It no longer writes a
+ *   synthetic assistant message into a closed turn, which violates TokenMeter's
+ *   step-boundary contract.
  *
  * Only `relay`/`append` use the per-agent queue, because only they can have several
  * runs in flight for one agent. `in-turn` is already serialized by the loop (one step
@@ -45,7 +46,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
 import type { Session } from '@deepseek-ai/dsh-session'
-import { createAssistantMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { Message, UserMessage } from '@deepseek-ai/dsh-llm'
 import { readdirSync, readFileSync } from 'node:fs'
 import { delimiter, join } from 'node:path'
@@ -54,7 +55,7 @@ import { carryoverBounds, carryoverForSession } from './carryover.js'
 import { collectHistory, composeObjective, renderHistory } from './history.js'
 import { TASK_LIMITS } from './input.js'
 import { isModeEnabled, readModeRecord } from './mode.js'
-import { alreadyRouted, appendInstantReceipt, deliveryKey, recordDelivery } from './records.js'
+import { alreadyRouted, deliveryKey, recordDelivery } from './records.js'
 import type { DeliveryPhase } from './records.js'
 import { redactError, redactSecrets } from './redact.js'
 import type { ActiveState, RunOutcome, WorkflowLogger } from './run.js'
@@ -439,53 +440,6 @@ async function deliverRelay(agent: Agent, text: string): Promise<boolean> {
   }
 }
 
-/**
- * Deliver the answer by writing it into the closed turn (strategy `append`).
- *
- * Degraded and experimental: no stream, no usage accounting, and the turn still
- * ends `blocked`, so a one-shot app reports a non-zero exit. The write happens
- * only after the turn closed, because a write during the turn races the loop's
- * own step messages and loses. The turn-order case is not measured yet (NR-3).
- */
-async function deliverAppend(
-  agent: Agent,
-  text: string,
-  turn: number,
-  step: number,
-): Promise<boolean> {
-  try {
-    await agent.whenIdle()
-  } catch {
-    // See deliverRelay: a disposed agent cannot accept delivery.
-  }
-  const session = sessionOf(agent)
-  if (session === undefined) return false
-  try {
-    // The user message is committed by this plugin: a rejected batch never
-    // becomes a user/message event, so the report would otherwise be orphaned.
-    session.append('user/message', createUserMessage({
-      content: [{ type: 'text', text }],
-      source: { kind: RELAY_SOURCE_KIND },
-    }), { surfaceOp: 'append' })
-    const options = agent.options ?? {}
-    session.append('assistant/message', {
-      turn,
-      step,
-      message: createAssistantMessage({
-        content: [{ type: 'text', text }],
-        source: {
-          provider: options.provider ?? 'grok-workflow',
-          model: options.model ?? 'workflow-report',
-        },
-      }),
-      stream: [],
-    }, { surfaceOp: 'append' })
-    return true
-  } catch {
-    return false
-  }
-}
-
 /** Install the gate; returns false when the runtime cannot host `agent/pre-step`. */
 export function installGate(deps: GateDeps): boolean {
   const { ctx, config, state, logger } = deps
@@ -790,16 +744,9 @@ export function installGate(deps: GateDeps): boolean {
           outcome: recalled === undefined ? 'triaged-fast' : 'triaged-recalled',
         }
       }
-      // Team tier: instant receipt first so the run never looks blank while in
-      // flight (pure addition; a failed append only costs the receipt, never the run).
-      if (limits.instantReceipt) {
-        const receipt = [...lead, triageLine(tier), tier.greeting ? greetingLine(tier.lang) : '', tier.lang === 'zh' ? '正在执行，进度节点在旁。' : 'Running now; the live progress board sits beside this message.'].filter(line => line !== '').join('\n')
-        try {
-          appendInstantReceipt(sessionOf(agent), receipt, logger)
-        } catch {
-          // Receipt is best-effort by design.
-        }
-      }
+      // The live workflow progress panel is the in-flight receipt. Do not append
+      // assistant/message here: pre-step runs before step/start, so that would
+      // poison TokenMeter's replay cursor for this session.
       const answer = await runTeam(agent, target, signal, history)
       // Human-readable summary: deterministic plain-language lead-in in front
       // of the machine report (opt-out via humanSummary:false). Deterministic
@@ -902,9 +849,9 @@ export function installGate(deps: GateDeps): boolean {
     answer: Answer,
   ): Promise<void> => {
     const text = answerText(answer, false)
-    const delivered = safe().answerStrategy === 'append'
-      ? await deliverAppend(agent, text, entry.turn, entry.step ?? 0)
-      : await deliverRelay(agent, text)
+    // Both long-lived delivery strategies use a real DSH follow-up turn.
+    // Never append assistant/message after the original turn has closed.
+    const delivered = await deliverRelay(agent, text)
     // A `report` and a front-desk answer both settle the batch: the user has the
     // answer. Only a notice leaves it routable, because nothing was produced.
     if ((answer.kind === 'report' || answer.kind === 'direct') && delivered) {
@@ -973,25 +920,17 @@ export function installGate(deps: GateDeps): boolean {
     text: string,
     alreadySurfaced = false,
   ): boolean => {
+    // A rejected/aborted pre-step never reaches AgentLoop.step(), so the plugin
+    // is the only writer for the claimed user messages. Keep those original
+    // messages once, then queue the terminal as a normal plugin-owned follow-up.
     const kept = alreadySurfaced ? true : commitClaimed(agent, payload.messages)
-    const session = sessionOf(agent)
-    if (session === undefined) return kept
     try {
-      const options = agent.options ?? {}
-      session.append('assistant/message', {
-        turn: payload.turn,
-        step: payload.step,
-        message: createAssistantMessage({
-          content: [{ type: 'text', text }],
-          source: {
-            provider: options.provider ?? 'grok-workflow',
-            model: options.model ?? 'workflow-report',
-          },
-        }),
-        stream: [],
-      }, { surfaceOp: 'append' })
+      agent.followup(createUserMessage({
+        content: [{ type: 'text', text }],
+        source: { kind: RELAY_SOURCE_KIND },
+      }))
     } catch (error) {
-      logger.warn(`gate could not state the cancelled terminal: ${redactError(error)}`)
+      logger.warn(`gate could not queue the cancelled terminal: ${redactError(error)}`)
     }
     return kept
   }
