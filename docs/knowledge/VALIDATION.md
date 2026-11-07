@@ -1993,3 +1993,42 @@ follow-up: 刚才那个端口的事你再说一下
 - **记忆文件只读 `*.md` 且只看默认根目录**：`docs/knowledge/` 之外（例如 `~/.dsh/memory` 的
   `archive.jsonl`）本轮不读——那是 D-036 的另一条路径，避免两处语义打架。
 - 未提交、未 push、未 bump 版本、未发布 npm；工作树里同时还存在 D-035 / D-036 两个任务的未提交改动。
+
+## Round 24 (2026-11-07) — 诊断：即时回执打断 token 计量 → 自动压缩永久静默停摆（session-3361cd6e）
+
+**性质**：只读诊断，不改代码、不改配置、不改会话数据。完整报告：
+`docs/knowledge/evidence/diag-ctx-compaction-2026-11-07.md`。
+
+### 结论（CONFIRMED）
+
+DSH 的自动压缩（`@deepseek-ai/dsh-compaction-basic@0.2.1-rc.2`）经 `agent/pre-step` → `compactIfNeeded()` →
+`ctx.tokenMeter.measure()` 取数，阈值 `floor(min(contextWindow*0.8, window−maxTokens−headroom))`；
+本路由（`contextWindow 1000000` / `maxTokens 32000` / `headroom 65536`）= **800,000**。
+
+`session-3361cd6e` 的日志在 **seq 2339** 有一条 step 之外的 `assistant/message`
+（`source: {provider:"grok-workflow", model:"workflow-receipt"}`，即本插件 `src/records.ts` `appendInstantReceipt()`
+在 `turn/start` 之后、`step/start` 之前写入的团队档即时回执）。`dsh-token-meter` 的 `_foldEvent` 要求
+`assistant/message` 必须落在 `step/start … step/end` 内（`lib/index.js:846-848`），否则抛
+`token meter: assistant/message at seq 2339 has no matching step/start event`；抛错后 fold 游标不前进，
+**此后每次测量都在同一处抛错**。压缩侧只在 `logger.warn(... continuing the turn)` 里吞掉（`compaction-basic/lib/index.js:839-850`），
+于是会话从第 5 轮起再没有自动压缩，而 GUI 的占用百分比走独立投影（`contextPressure`）照常显示 92–95%。
+
+### 取证
+
+| 检查 | 结果 | 证据 |
+|---|---|---|
+| 会话占用 | CONFIRMED | `~dsh-layerfs/storages/session_projcache/sessions/session-3361cd6e-….json`：`pressureTokens` 921,147（seq 6361）→ 953,777（seq 6557）/ `contextWindow` 1,000,000 = 92.1% → 95.4% |
+| 断点前后行为 | CONFIRMED | 全日志仅 1 次 `compaction/start`（seq 2148, turn 4），其压缩前最大 prompt 399,817（≈0.8×500,000 刚过线）；seq 2151 之后再无 `compaction/*`，而 turn 16/17 的 prompt 长期 800k–953k |
+| 复现 | CONFIRMED | `node docs/knowledge/evidence/diag-ctx-compaction-verify-metric.mjs`（原在未跟踪的 `out/diag/`，已随证据入库）：STEP 1 raw `measure()` 抛上述错误；STEP 2 唯一孤儿 = seq 2339；STEP 3 修好回放后 `totalTokens=954,926`；STEP 4 阈值 800,000 |
+| 跨会话 | CONFIRMED | 同工作区 5 个会话扫描：本会话与 `session-eb3f5542` 各 1 条回执孤儿，其余 0 |
+| `/compact` 实测 | NOT_RUN | 会在活动会话上产生压缩，违反只读约束（源码上 `compactNow()` 同为 `measure()`，预计被包成 `busy`） |
+| Web GUI API 取数 | BLOCKED | `curl http://100.111.111.88:3090/` → 401；按约束不读凭据，改用同源投影缓存 |
+
+### 修复建议（未执行，留给用户决策）
+
+1. 根因：`appendInstantReceipt()`/`appendUnloadNotice()`/`gate.ts` 两处 append 只在“存在与之匹配的 open step”时写，
+   否则延后到该轮第一个 `step/start` 之后；配套单测 + `TokenMeter.measure()` 回放回归测试。
+2. 立即规避（只对新会话）：`profiles/web/cordis.patch.yml` 的 `grok-workflow.config` 加 `instantReceipt: false`，重启 `dsh-layerfs-web.service`。
+3. 上游：`dsh-token-meter` 容忍孤儿 `assistant/message`（或 `session.append` 前置校验、压缩失败升级为可见告警），
+   否则已存在的会话无法原地恢复（重启 DSH 也不行，日志里的孤儿事件仍在）。
+4. 未提交、未 push、未 bump 版本；工作树另有既有未跟踪目录 `.v050-home/`、`out/`。

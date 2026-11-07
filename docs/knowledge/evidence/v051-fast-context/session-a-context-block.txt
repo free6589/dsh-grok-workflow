@@ -1,0 +1,76 @@
+Follow-up (round 2) quick-worker prompt — the bounded context block, verbatim.
+Source: child session b967ee28-ec3b-4da6-b764-f8c94ac71c64, event `user/message` seq 8, in
+DSH_HOME=.v051-verify/home of this run. The complete prompt is in
+session-a-round2-child-prompt.txt; this file is only the context slice.
+==============================================================================
+
+Context (do not ask for what is already here):
+Conversation so far (context only):
+User: 你好，用一句话打个招呼。
+User: <system-reminder>
+The following workspace instructions may be relevant to your work. Use them as guidance when applicable. More specific instructions take precedence over broader ones. They do not override system, developer, or direct user instructions.
+
+Instructions from: AGENTS.md
+
+# AGENTS.md — dsh-grok-workflow
+
+This repository is the shared, durable memory and source of truth for the
+`dsh-grok-workflow` plugin. Local and cloud agents MUST read this file before
+changing code and MUST update the memory files before ending a work session.
+
+## Start every task in this order
+
+1. Read `AGENTS.md`.
+2. Read `docs/knowledge/STATE.md`, `DECISIONS.md`, `HANDOFF.md`, `VALIDATION.md`.
+3. Read `docs/ARCHITECTURE.md`, `docs/ACCEPTANCE.md`, `docs/knowledge/RESEARCH.md` when the task touches design, behavior, or verification.
+4. Run `git status --short --branch`, inspect the latest commits, and check GitHub Issues/PRs relevant to the task.
+5. Compare the memory with the actual code and test logs. Memory never overrides observed reality.
+
+## Status vocabulary
+
+Use these labels in memory files and reports:
+
+- `CONFIRMED` — directly observed in source, a real command, or a real test.
+- `HYPOTHESIS` — plausible but not yet verified.
+- `NOT_RUN` — intentionally not executed yet.
+- `BLOCKED` — cannot proceed without an external capability or decision.
+
+Never write a claim as confirmed when only reasoning or a plan supports it.
+
+## Truth rules for tests
+
+- Every reported test result must name…
+User: Current runtime context. This snapshot supersedes earlier runtime-context snapshots.
+
+Current working directory: "/home/fish/projects_mine/dsh-grok-workflow/.v051-verify/work".
+
+Current DSH file policy: workspace-write. Any available operation enforced by the DSH file sandbox may modify files under the session workspace: "/home/fish/projects_mine/dsh-grok-workflow/.v051-verify/work". Some platform temporary areas may also be writable.
+
+Approval policy: ask. Operations that require approval may ask through the configured answerers; without an available answerer, the request fails closed.
+User: <system-reminder>
+A skill is a reusable set of task-specific instructions. The following skills are available in this session:
+
+[REDACTED]
+- `apk-reverse`: Reverse engineer, debloat, de-ad, patch, or re-sign Android APKs, and analyze their runtime and server-side behaviour. Use for an .apk/.aab/.dex/.so sample, smali or dex patching, Frida hooking, repacking, ad or SDK removal, API probing, or deciding whether a client-side patch can work. Covers recon, anti-tamper, membership limits, surgical dex patching, repack pitfalls, device setup, and a failure catalogue.
+- `browser-use`: Direct browser control via CDP for web interaction: automation, scraping, testing, screenshots, and site/app work.
+- `craft-your-textbook`: 当用户要把教材/考纲/讲义/某领域知识加工成 AI 苏格拉底老师能拿去上课的教学蓝本（pure-blueprint）或一本给人读的流畅教材（human-readable，AI 也能直接教）时使用。适用任何学科，有教师用书可针对应试。触发词："造一本教学蓝本/做一本 XX 教材/按这套方法写一本书/复刻这个 skill 的写法"。
+- `create-ai-presenter-video`: Turn a topic or finished script plus an authorized adult presenter image into a complete, publish-ready AI presenter video. Use for new presenter videos and for continuing, revising, captioning, lip-sync repairing, or re-exporting an existing presenter-video job. Keep model and provider selection capability-based and record the actual choices per job.
+- `diagnose-crash`: Diagnose why a program crashed on this machine, from a systemd-coredump core dump. Use when a process has segfaulted, aborted, or otherwise dumped core, when asked why an application crashed or…
+Assistant: 你好！很高兴见到你，有什么我可以帮你的吗？
+User: 任务：在当前工作目录创建一个文件 note.txt，内容只有一行：SESSION-FACT: 391。创建后读回来确认内容无误，再告诉我文件里最终写的数字是多少。
+Assistant: <<<GROK-WORKFLOW-REPORT>>>
+档位：快手档 — 因为：这是一个问题，需要查证后才能回答，至少派一个工人去做。
+
+已在当前工作目录创建 `note.txt`，内容为一行并已读回确认无误：
+
+```
+SESSION-FACT: 391
+```
+
+文件中最终写的数字是 **391**。
+
+（这条只派了一个工人，没有开完整团队。）
+<<<END-GROK-WORKFLOW-REPORT>>>
+
+Request:
+用人话告诉我：刚才那个 SESSION-FACT 里的数字是多少？只要一句结论，顺带说清这个数字是从哪儿来的。
