@@ -15,7 +15,6 @@ import type { NamingLanguage } from './naming.js'
 import { buildWorkflowRequest } from './script.js'
 import { assertWorkflowReport, failureReport } from './report.js'
 import {
-  appendUnloadNotice,
   callSiteFrames,
   classifyDisposeTrigger,
   createWorkflowProgressRecorder,
@@ -183,24 +182,6 @@ export interface DisposalContext {
   callSite?: string
 }
 
-/** Notice text for a session whose run was cut by an unload. */
-function unloadNoticeText(record: DisposeRecord, interrupted: number): string {
-  const runs = interrupted === 1 ? '1 workflow run' : `${interrupted} workflow runs`
-  // Two facts, both observed rather than guessed: how many runs are being cut, and
-  // whether the process received a shutdown signal (empty for an in-process
-  // unload, where the host does not disclose who asked for it).
-  const cause = record.signals.length > 0
-    ? `Cause: the process is shutting down (${record.signals.join(', ')}), so this is not a deadline, not a manual stop and not a plugin setting.`
-    : 'Cause: the plugin was unloaded inside a running process (a settings toggle, a reload or an upgrade);'
-      + ' the host does not disclose which, and the disposal call path is recorded in this session for whoever asks.'
-  return [
-    `[grok-workflow] The plugin was unloaded while this session had ${runs} in flight, so that work was cancelled.`,
-    cause,
-    'This notice is written once, at unload time. Messages sent until the plugin is enabled again are answered',
-    'directly and are no longer forced through the mandatory workflow.',
-  ].join(' ')
-}
-
 /**
  * Cancel every live run; called from the plugin disposer.
  *
@@ -211,15 +192,13 @@ function unloadNoticeText(record: DisposeRecord, interrupted: number): string {
  *    shutdown signals, trigger class, redacted call site, run count and per-run
  *    elapsed) and one diagnostics line, so "who unloaded the plugin" is answerable
  *    from the log.
- * 2. **Say what it broke, once.** A session whose run is interrupted gets one
- *    user-visible notice; an *idle* unload — what a user does on purpose when
- *    disabling the plugin from the settings surface — stays silent, because a
- *    direct answer is the expected behaviour there and a per-message banner
- *    would be noise.
+ * 2. **Keep the session log valid.** A disposer has no open model step. It must
+ *    never synthesize an assistant/message to announce cancellation: TokenMeter
+ *    requires every assistant settlement to match a real step/start. The durable
+ *    dispose record is written before abort; DSH owns the visible stopped state.
  *
  * Every write is contained: this runs inside a disposer, where the session
- * service may already be gone, and a refused record must never stop the
- * cancellation that follows it.
+ * service may already be gone, and a refused record must never stop cancellation.
  */
 export async function disposeActiveState(
   state: ActiveState,
@@ -277,7 +256,7 @@ export async function disposeActiveState(
     logger.warn(
       `dsh-grok-workflow: disposing with ${record.activeRuns} active and ${record.pending} starting run(s) ` +
       `(trigger=${record.trigger}, uptime=${formatElapsed(record.uptimeMs)}, sessions=${bySession.size}); ` +
-      'the runs are cancelled and each affected session receives one interruption notice',
+      'the runs are cancelled and each affected session receives one durable disposal record; the Host owns the stopped presentation',
     )
     let notices = 0
     for (const [sessionId, entry] of bySession) {
@@ -286,9 +265,9 @@ export async function disposeActiveState(
         runs: record.runs.filter(run => run.sessionId === sessionId),
         notices: 0,
       }
-      const wrote = appendUnloadNotice(entry.session, unloadNoticeText(scoped, entry.interrupted), logger)
-      if (wrote) notices += 1
-      recordDispose(entry.session, { ...scoped, notices: wrote ? 1 : 0 }, logger)
+      // No assistant/message is written here: the disposer has no open Step.
+      // The session gets only the log-only plugin record; DSH owns cancellation UI.
+      recordDispose(entry.session, { ...scoped, notices: 0 }, logger)
     }
     record.notices = notices
   }
