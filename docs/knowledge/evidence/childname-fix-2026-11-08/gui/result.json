@@ -1,0 +1,157 @@
+{
+  "ok": true,
+  "bootErrors": [
+    "Failed to load resource: the server responded with a status of 404 (Not Found)"
+  ],
+  "log": [
+    "[2026-11-07T19:38:52.737Z] dismissed preview notice",
+    "[2026-11-07T19:38:55.288Z] prompt submitted",
+    "[2026-11-07T19:38:59.293Z] mid-run: grokRows=[{\"status\":\"running\",\"label\":\"规划助手\",\"inGrokPanel\":true}] ariaLabels=[{\"aria\":\"New session\"},{\"aria\":\"Collapse sidebar\"},{\"aria\":\"Global panels\"},{\"aria\":\"Plugins\"},{\"aria\":\"Automation tasks\"},{\"aria\":\"Search sessions\"},{\"aria\":\"View options\"},{\"aria\":\"Add workspace\"},{\"aria\":\"Sessions\"},{\"aria\":\"Workspace actions for Default workspace\"},{\"aria\":\"New session in Default workspace\"},{\"aria\":\"Session actions for 用团队档完成两个独立的计算\"}]"
+  ],
+  "final": {
+    "hasTeamChildPattern": false,
+    "hasGuiHua": true,
+    "hasHuiZong": false,
+    "hasCheckDot": false,
+    "hasCompleted": true,
+    "panelStatus": "completed",
+    "grokRows": [
+      {
+        "status": "completed",
+        "label": "规划助手",
+        "inGrokPanel": true
+      },
+      {
+        "status": "completed",
+        "label": "执行",
+        "inGrokPanel": true
+      },
+      {
+        "status": "completed",
+        "label": "检查",
+        "inGrokPanel": true
+      },
+      {
+        "status": "failed",
+        "label": "执行",
+        "inGrokPanel": true
+      },
+      {
+        "status": "completed",
+        "label": "执行",
+        "inGrokPanel": true
+      },
+      {
+        "status": "completed",
+        "label": "检查",
+        "inGrokPanel": true
+      }
+    ],
+    "stockRows": [],
+    "ariaLabels": [
+      {
+        "aria": "New session"
+      },
+      {
+        "aria": "Collapse sidebar"
+      },
+      {
+        "aria": "Global panels"
+      },
+      {
+        "aria": "Plugins"
+      },
+      {
+        "aria": "Automation tasks"
+      },
+      {
+        "aria": "Search sessions"
+      },
+      {
+        "aria": "View options"
+      },
+      {
+        "aria": "Add workspace"
+      },
+      {
+        "aria": "Sessions"
+      },
+      {
+        "aria": "Workspace actions for Default workspace"
+      },
+      {
+        "aria": "New session in Default workspace"
+      },
+      {
+        "aria": "Session actions for 用团队档完成两个独立的计算"
+      },
+      {
+        "aria": "Archive session"
+      },
+      {
+        "aria": "Pin session"
+      },
+      {
+        "aria": "Account menu"
+      },
+      {
+        "aria": "Session hierarchy"
+      },
+      {
+        "aria": "6 subagents"
+      },
+      {
+        "aria": "Open in Files"
+      },
+      {
+        "aria": "More ways to open"
+      },
+      {
+        "aria": "More actions"
+      },
+      {
+        "aria": "Open right sidebar"
+      },
+      {
+        "aria": "Copy"
+      },
+      {
+        "aria": "Open 规划助手"
+      },
+      {
+        "aria": "Open 执行"
+      },
+      {
+        "aria": "Open 检查"
+      },
+      {
+        "aria": "Message or run a task, / commands, @ files or sessions"
+      },
+      {
+        "aria": "Add files or run commands"
+      },
+      {
+        "aria": "Access mode, current: Workspace Write"
+      },
+      {
+        "aria": "Select model, current DeepSeek V4 Pro (cn)"
+      },
+      {
+        "aria": "Stop generating"
+      },
+      {
+        "aria": "New tab"
+      },
+      {
+        "aria": "Split"
+      },
+      {
+        "aria": "Fullscreen"
+      },
+      {
+        "aria": "Collapse right sidebar"
+      }
+    ]
+  },
+  "bodyTextLength": 589
+}

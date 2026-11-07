@@ -392,3 +392,12 @@ out-of-scope → mode-off → already-routed; reason labels are asserted only vi
 无 `session-` 前缀；父会话才有）；`/tmp` 在部分执行通道间不保证留存，证据要当场拷进
 `docs/knowledge/evidence/`。插件 headless 输出里 cordis logger.warn 不可见，
 需要诊断落点时用工具结果/会话日志，别指望 stderr。
+
+**GUI 渲染链实证补充（Round 32，真 Chromium，`CONFIRMED`）**：顶栏触发器 aria-label 为计数
+（运行中 `1 subagent running`，完成态 `6 subagents`）；展开后的菜单行主标签 = `entry.label ?? entry.id`
+（client.js:201），次级行 = `summary?.title · mode · activity`——子会话 title 由 DSH 从子代理
+提示词派生，修复后提示词首行即描述性标题，故次级行同样以任务名开头（不再是裸人设行开头）。
+团队档子会话的 descriptor label 与面板渲染逐字一致（真机交叉核对）。隔离 Web 实例的 boot
+stdout 形如 `dsh web: http://127.0.0.1:3199/?token=…`——token 只走环境变量进驱动，不落盘；
+首次 boot 前必须 `--from-default-profile`（REPLACE 语义），插件用 `dsh plugin add file://<checkout>`
+dev 安装（pnpm store 可落仓库内 `.pnpm-store/`）。

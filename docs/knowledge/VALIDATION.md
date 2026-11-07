@@ -2337,3 +2337,53 @@ key 走 `apiKeyEnv: BIFROST_VIRTUAL_KEY` 仅布尔存在性检查）。
 - live `:3090` 仍是 0.2.7 旧插件（401，D-013），浏览器点开验证 NOT_RUN；GUI 主名判定由
   `client.js:201` 源码链 + 描述符事件钉死（次级行 = 提示词首行，与本修复一致）。
 - 无凭据读取；无密钥接触；无 tag/发布动作；`package.json` 未动。
+
+## Round 32 (2026-11-08) — fix_child_names GUI 浏览器验证：隔离 Web 实例 + 真 Chromium PASS（**CONFIRMED**）
+
+**性质**：Round 31 修复的浏览器观察轮。**零源码改动**；live `:3090` 全程未碰（D-013）；
+operator `DSH_HOME` 未写。验证全部在隔离 home `out/gui-verify/home/`（gitignored）完成：
+profile `guiweb`（`--from-default-profile web`），插件 dev 安装（`dsh plugin add file:///…/dsh-grok-workflow`，
+安装后 `lib/team-engine.js` md5 == 工作树构建），`workflow-ptc` 由 patch 启用（`provider: spawn`），
+模型 `wb/cn:deepseek-v4-pro` + `agnes-3.0-flash`（`apiKeyEnv: BIFROST_VIRTUAL_KEY` 仅布尔存在检查）。
+实例 `127.0.0.1:3199`（起前确认空闲；一次性 URL token 只从 boot stdout 取用、只经 `GUI_URL`
+环境变量进驱动、不落任何文件；用后即杀，live `:3090` 的 PID/端口全程未触碰）。
+浏览器：headless Chromium（playwright-core 取自 `@playwright/cli` 自带依赖，
+`chromium_headless_shell-1248`），1440×900。DSH CLI 实证来自
+`/home/fish/.local/share/mise/installs/node/26.8.1/lib/node_modules/@deepseek-ai/dsh`（`0.2.1-rc.2`）。
+
+### 命令（全部实际执行）
+
+1. `DSH_HOME=$PWD/out/gui-verify/home dsh --profile guiweb --from-default-profile web`
+2. `DSH_HOME=$PWD/out/gui-verify/home dsh plugin --profile guiweb add file:///home/fish/projects_mine/dsh-grok-workflow`
+3. `DSH_HOME=$PWD/out/gui-verify/home dsh --profile guiweb --patch out/gui-verify/model.patch.yml --patch out/gui-verify/guiweb-patch.yml --host 127.0.0.1 --port 3199 --no-open` → boot 输出唯一行 `dsh web: http://127.0.0.1:3199/?token=…`（token 未入库）
+4. `GUI_URL=<token URL> node out/gui-verify/driver.mjs`（第一遍：真实 composer 键入团队档双计算任务并回车，跑完全程并断言）→ exit 0
+5. `GUI_URL=<token URL> node out/gui-verify/driver2.mjs`（第二遍：点开库存 `Session hierarchy` 面板，读取每个条目主标签并断言）→ exit 0
+6. 基线：`npm run ci`（round 开始时于 `ad66118` 工作树）→ **37 文件 / 650 测试 PASS**（本轮零源码改动，未重跑）
+
+### 结果
+
+- **boot 干净**：无 pending / did-not-activate；两遍全程唯一异常是一条装饰性 404
+  （`/open-in-app/icon/filemanager` 图标资源）。
+- **真 GUI 驱动的团队档跑通**：composer 键入「919+27 / 919×3 双计算任务」→ 面板
+  `data-run-status="completed"`；父会话 `session-0a8eb864…` 日志含 `Grok workflow: COMPLETED`；
+  一条真实 agnes `format-error` route-switch 重试 → 共 6 个子代理（规划 1 + 执行 3——含一次
+  failed 尝试与重试 + 检查 2）。
+- **运行中**：顶栏 `Session hierarchy` 触发器 aria = `1 subagent running`（03-running.png）。
+- **顶栏（用户投诉的库存子代理面板）**：展开后 6 个条目主标签全部为描述性任务名——
+  `规划助手` / `计算并验算 919 + 27` / `计算并验算 919 × 3` / `检查 · 计算并验算 919 + 27` /
+  `计算并验算 919 × 3` / `检查 · 计算并验算 919 × 3`；**0 处 `任务团队 child N`**、
+  0 处以提示词原文作主标签（驱动断言 `bad=[]`、`ok=true`，见 `hierarchy-result.json`）。
+  次级行 = 子会话标题（DSH 从子代理提示词派生；修复后提示词首行即描述性标题，故次级行以任务名开头）。
+- **持久数据交叉核对**：6 个子会话首个 `subagent/descriptor` 的 label 与 GUI 面板逐字一致
+  （`gui/child-descriptor-events-gui-run.txt`）。
+- 截图与 DOM 证据：`docs/knowledge/evidence/childname-fix-2026-11-08/gui/`
+  （README、03/04/11/12 四张截图、`hierarchy-result.json`、`result.json`、`mid-run.json`、描述符摘录）。
+
+### live `:3090` 事实核查（只读）与边界
+
+- **更正记忆**：live web profile（`/home/fish/dsh-layerfs/profiles/web`）的插件实为
+  **released `0.6.0`**（2026-11-07 21:54 安装），非 0.2.7（STATE/HANDOFF 旧记录已过时）；
+  其 `lib/team-engine.js` **不存在** → 是**不含本修复**的构建。把 `ad66118` 构建部署到 `:3090`
+  属 D-013 步骤 5（需用户明确授权），本轮 `NOT_RUN`。
+- 浏览器为 headless（本机无 X11 显示，同 Round 15/30）；无凭据读取；无 tag/发布动作；
+  `package.json` 未动。

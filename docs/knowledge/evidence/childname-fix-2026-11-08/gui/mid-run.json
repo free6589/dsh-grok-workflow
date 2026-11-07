@@ -1,0 +1,114 @@
+{
+  "hasTeamChildPattern": false,
+  "hasGuiHua": true,
+  "hasHuiZong": false,
+  "hasCheckDot": false,
+  "hasCompleted": false,
+  "panelStatus": "running",
+  "grokRows": [
+    {
+      "status": "running",
+      "label": "规划助手",
+      "inGrokPanel": true
+    }
+  ],
+  "stockRows": [],
+  "ariaLabels": [
+    {
+      "aria": "New session"
+    },
+    {
+      "aria": "Collapse sidebar"
+    },
+    {
+      "aria": "Global panels"
+    },
+    {
+      "aria": "Plugins"
+    },
+    {
+      "aria": "Automation tasks"
+    },
+    {
+      "aria": "Search sessions"
+    },
+    {
+      "aria": "View options"
+    },
+    {
+      "aria": "Add workspace"
+    },
+    {
+      "aria": "Sessions"
+    },
+    {
+      "aria": "Workspace actions for Default workspace"
+    },
+    {
+      "aria": "New session in Default workspace"
+    },
+    {
+      "aria": "Session actions for 用团队档完成两个独立的计算"
+    },
+    {
+      "aria": "Archive session"
+    },
+    {
+      "aria": "Pin session"
+    },
+    {
+      "aria": "Account menu"
+    },
+    {
+      "aria": "Session hierarchy"
+    },
+    {
+      "aria": "1 subagent running"
+    },
+    {
+      "aria": "Open in Files"
+    },
+    {
+      "aria": "More ways to open"
+    },
+    {
+      "aria": "More actions"
+    },
+    {
+      "aria": "Open right sidebar"
+    },
+    {
+      "aria": "Copy"
+    },
+    {
+      "aria": "Open 规划助手"
+    },
+    {
+      "aria": "Message or run a task, / commands, @ files or sessions"
+    },
+    {
+      "aria": "Add files or run commands"
+    },
+    {
+      "aria": "Access mode, current: Workspace Write"
+    },
+    {
+      "aria": "Select model, current DeepSeek V4 Pro (cn)"
+    },
+    {
+      "aria": "Stop generating"
+    },
+    {
+      "aria": "New tab"
+    },
+    {
+      "aria": "Split"
+    },
+    {
+      "aria": "Fullscreen"
+    },
+    {
+      "aria": "Collapse right sidebar"
+    }
+  ]
+}

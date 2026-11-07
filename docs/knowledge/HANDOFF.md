@@ -1,5 +1,36 @@
 # Agent Handoff
 
+## 2026-11-08 — 子代理顶栏显示名：GUI 浏览器验证 PASS（fix_child_names 验证轮，零源码改动，`CONFIRMED`，`release/0.6.0` @ `ad66118`）
+
+- **From:** 执行子代理（fix_child_names，orchestrator attempt 4 · GUI 验证轮）· **To:** lead / 用户 ·
+  **Base:** `ad66118`（本地 `release/0.6.0` HEAD，与 origin 同步，未变）
+- **本轮只做验证，不改代码。** Round 31 的修复（twin 引擎 + 提示词首行）此前已过 `npm run ci`
+  （37 文件 / 650 测试 PASS）与 headless 真机验证，但「GUI 顶栏实际渲染」未观察——本轮补上：
+  隔离 Web 实例（home `out/gui-verify/home/`，profile `guiweb` 从 web 模板创建，插件 dev 安装
+  `file:` 链接工作树构建、安装后 `lib/team-engine.js` md5 一致，`workflow-ptc` patch 启用，
+  v4-pro + agnes flash，实例 `127.0.0.1:3199`，一次性 token 只走环境变量、不落任何文件、用后即杀）
+  + headless Chromium（playwright-core + `chromium_headless_shell-1248`，1440×900）。
+  ①真实 composer 键入团队档双计算任务 → `Grok workflow: COMPLETED`（6 子代理，含真实 agnes
+  format-error 路由切换重试）；②展开库存 `Session hierarchy` 顶栏面板 → **6 个子代理主标签全部
+  描述性**（`规划助手` / 任务标题 / `检查 · 任务标题`），**0 处 `任务团队 child N`**、0 处提示词
+  原文作主标签；持久 `subagent/descriptor` 与面板逐字一致。证据：
+  `evidence/childname-fix-2026-11-08/gui/`（README + 4 截图 + 3 JSON + 描述符摘录）；
+  记录：`VALIDATION.md` Round 32、`DECISIONS.md` D-041 Addendum、`RESEARCH.md` A18 补充、STATE。
+- **记忆更正（只读核实）**：live `:3090` web profile 的插件 = **released 0.6.0**（2026-11-07
+  21:54 安装；`lib/team-engine.js` 不存在 → 不含本修复）。旧记"仍 0.2.7"过时，STATE/VALIDATION
+  已更正。live 实例全程未碰（D-013）。
+- **验收条款状态（本轮后）**：条款 1/2/3/5/6 满足；条款 4 的「插件加载于 mise DSH installation +
+  ≥3 子代理工作流 + Web GUI 顶栏显示描述性名」三项在本机 `CONFIRMED`（本隔离实例与 live 用同一
+  `dsh` 二进制 0.2.1-rc.2）；唯一未达项 = 特指 `http://100.111.111.88:3090` 实例本身——其上仍跑
+  不含修复的 released 0.6.0，按 D-013 步骤 5 部署+重启需用户明确授权，且本会话沙箱只可写工作树。
+- **未做 / `NOT_RUN`：** live `:3090` 的修复部署与浏览器复验；`[COORDINATION]` Issue 状态块
+  （仓库 Issue 列表无该 Issue，历史轮次同样记 `NOT_RUN`）；上游 3 行 ask（可选简化，未执行）。
+- **Next action（用户/lead，一次外部动作即收口）：** 把 `release/0.6.0` HEAD（`ad66118`；npm 未
+  发布、无新 tag）装入 live `web` profile（备份 patch → `dsh plugin add` 新路径 tarball → 核对
+  `dsh.profile.bundles` 三项齐全 → `workflow-ptc` enabled 确认），再按 D-013 步骤 5 重启 `:3090`
+  （`DSH_HOME=/home/fish/dsh-layerfs dsh web --host 100.111.111.88 --port 3090 --no-open`），
+  即可在 live GUI 顶栏看到同样的描述性子代理名。
+
 ## 2026-11-08 — 子代理顶栏显示名：插件侧 twin 引擎落地，真机 PASS（fix_child_names 第四次执行，`CONFIRMED`，`release/0.6.0` 工作树）
 
 - **From:** 执行子代理（fix_child_names，attempt 4）· **To:** lead / 用户 · **Base:** `60cde95`（本地 `release/0.6.0` HEAD；含并发任务 fix_completed_links 的已提交修复）

@@ -1,0 +1,47 @@
+{
+  "triggerAria": "6 subagents",
+  "rows": [
+    {
+      "aria": "规划助手 规划助手 You are the planning · continuable · completed 34.4K tok · 13s",
+      "label": "规划助手",
+      "summary": "规划助手 You are the planning · continuable · completed"
+    },
+    {
+      "aria": "计算并验算 919 + 27 计算并验算 919 + 27 You · continuable · completed 67.6K tok · 13s",
+      "label": "计算并验算 919 + 27",
+      "summary": "计算并验算 919 + 27 You · continuable · completed"
+    },
+    {
+      "aria": "计算并验算 919 × 3 计算并验算 919 × 3 You · continuable · not running 0 tok · 42s",
+      "label": "计算并验算 919 × 3",
+      "summary": "计算并验算 919 × 3 You · continuable · not running"
+    },
+    {
+      "aria": "检查 · 计算并验算 919 + 27 检查 · 计算并验算 919 + · continuable · completed 68.6K tok · 15s",
+      "label": "检查 · 计算并验算 919 + 27",
+      "summary": "检查 · 计算并验算 919 + · continuable · completed"
+    },
+    {
+      "aria": "计算并验算 919 × 3 计算并验算 919 × 3 You · continuable · completed 67.6K tok · 12s",
+      "label": "计算并验算 919 × 3",
+      "summary": "计算并验算 919 × 3 You · continuable · completed"
+    },
+    {
+      "aria": "检查 · 计算并验算 919 × 3 检查 · 计算并验算 919 × · continuable · completed 69K tok · 15s",
+      "label": "检查 · 计算并验算 919 × 3",
+      "summary": "检查 · 计算并验算 919 × · continuable · completed"
+    }
+  ],
+  "bodyHasTeamChildPattern": false,
+  "bodyHasCheckDot": true,
+  "bootErrors": [
+    "404 http://127.0.0.1:3199/open-in-app/icon/filemanager",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)"
+  ],
+  "log": [
+    "[2026-11-07T19:43:39.661Z] landed; body head: \"New Session\\nPlugins\\nAutomation tasks\\nWorkspaces\\nDefault workspace\\nNew Session\\n会话标题：**计算任务：919+27 与 919×3 的运算及验算**\\n4min\\nMore\\nInto the Unknown\\nPreview\\nDefault workspace\\nStandard mode\\nDescribe what you want to build, / commands, @ files or sessions\\nWorkspace Write\\nDeepSeek V4 Pro (cn)\"",
+    "[2026-11-07T19:43:42.828Z] opened via \"计算任务：919\"",
+    "[2026-11-07T19:43:42.831Z] trigger aria-label: \"6 subagents\"",
+    "[2026-11-07T19:43:44.944Z] hierarchy rows: [\n {\n  \"aria\": \"规划助手 规划助手 You are the planning · continuable · completed 34.4K tok · 13s\",\n  \"label\": \"规划助手\",\n  \"summary\": \"规划助手 You are the planning · continuable · completed\"\n },\n {\n  \"aria\": \"计算并验算 919 + 27 计算并验算 919 + 27 You · continuable · completed 67.6K tok · 13s\",\n  \"label\": \"计算并验算 919 + 27\",\n  \"summary\": \"计算并验算 919 + 27 You · continuable · completed\"\n },\n {\n  \"aria\": \"计算并验算 919 × 3 计算并验算 919 × 3 You · continuable · not running 0 tok · 42s\",\n  \"label\": \"计算并验算 919 × 3\",\n  \"summary\": \"计算并验算 919 × 3 You · continuable · not running\"\n },\n {\n  \"aria\": \"检查 · 计算并验算 919 + 27 检查 · 计算并验算 919 + · continuable · completed 68.6K tok · 15s\",\n  \"label\": \"检查 · 计算并验算 919 + 27\",\n  \"summary\": \"检查 · 计算并验算 919 + · continuable · completed\"\n },\n {\n  \"aria\": \"计算并验算 919 × 3 计算并验算 919 × 3 You · continuable · completed 67.6K tok · 12s\",\n  \"label\": \"计算并验算 919 × 3\",\n  \"summary\": \"计算并验算 919 × 3 You · continuable · completed\"\n },\n {\n  \"aria\": \"检查 · 计算并验算 919 × 3 检查 · 计算并验算 919 × · continuable · completed 69K tok · 15s\",\n  \"label\": \"检查 · 计算并验算 919 × 3\",\n  \"summary\": \"检查 · 计算并验算 919 × · continuable · completed\"\n }\n]"
+  ]
+}

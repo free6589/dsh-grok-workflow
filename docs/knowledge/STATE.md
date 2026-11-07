@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-11-07 (local, v0.6.0 released + isolated verification done)
+Last updated: 2026-11-08 (fix_child_names: twin-engine fix at `ad66118` on `release/0.6.0` + GUI browser verification PASS, Round 32)
 
 ## Repository
 
@@ -59,8 +59,10 @@ Authoritative numbers for this state (measured, not planned):
   replay script `docs/knowledge/evidence/diag-ctx-compaction-verify-metric.mjs`;
   `/compact` live test `NOT_RUN` (would mutate the session); Web GUI API fetch `BLOCKED`
   (endpoint 401, no credential read per policy). Fix left to user decision.
-- Operator `web` profile on `:3090` still runs `dsh-grok-workflow@0.2.7` (`CONFIRMED`,
-  unchanged); any reload/upgrade awaits explicit user approval (D-013), not done.
+- Operator `web` profile on `:3090` runs released `dsh-grok-workflow@0.6.0` (read-only check
+  2026-11-08: installed 2026-11-07 21:54, `lib/team-engine.js` absent → **without** the
+  fix_child_names build; corrects the earlier `0.2.7` note). Any deployment of the fix build
+  plus profile reload awaits explicit user approval (D-013), not done.
 
 Prior releases (unchanged): `v0.4.0` → `708c315` (PR #38, Round 20: 32 files / 545 tests);
 `v0.3.0` → `3f5ad0a`; `v0.2.7` → `16a11b7`. `0.4.0`-era detail below is history, not the
@@ -197,8 +199,9 @@ None.
 
 **`0.6.0` is released; nothing is blocked on review.** PR #43 was merged (`1f9065d`) and the
 release went out as tag `v0.6.0` + GitHub Release (Round 26 isolated verification PASS).
-The one open action is outside this repo: the live DSH service on `:3090` still runs
-`dsh-grok-workflow@0.2.7` and any profile reload/upgrade (to `v0.6.0`) — **that reload
+The one open action is outside this repo: the live DSH service on `:3090` runs released
+`dsh-grok-workflow@0.6.0` (2026-11-08 read-only check), which predates the fix_child_names build
+(`ad66118` on `release/0.6.0`, unpublished); deploying that build — **that reload
 awaits explicit user approval (D-013); it is not done**.
 
 B组+C1 已合入工作树、未发布（2026-11-07，route-cap-closer 收尾）：设置页 `warn.emptyCap`
@@ -486,6 +489,25 @@ turn at a time; Round 16's isolation proof is in `.workflow-artifacts/matrix-024
   their work / 任务团队子代理按其工作命名"。
 - **并发注意**：本节与 Round 30 的 fix_completed_links（D-040，已入库 `60cde95`）不冲突；
   本轮触碰的文件与其零交集（除 `CHANGELOG.md`/记忆文件的追加）。
+
+## 2026-11-08 — 子代理顶栏显示名：GUI 浏览器验证 PASS（fix_child_names 验证轮，零源码改动，`CONFIRMED`）
+
+- **状态**：Round 31 修复的浏览器观察轮完成（Round 32）。工作树基点 `ad66118`（`release/0.6.0`，
+  与 origin 同步）；基线 `npm run ci` **37 文件 / 650 测试 PASS**；本轮零源码改动。
+- **做了什么**：隔离 home `out/gui-verify/home/`（web 模板 profile `guiweb`，插件 dev 安装自
+  工作树构建）起 Web 实例 `127.0.0.1:3199`（一次性 token 只走环境变量、不落盘、用后即杀），
+  headless Chromium 两遍驱动：①真实 composer 键入团队档双计算任务 → `Grok workflow: COMPLETED`
+  （6 子代理，含真实 agnes format-error 路由切换重试）；②展开库存 `Session hierarchy` 顶栏面板 →
+  **6 个子代理主标签全部描述性**（`规划助手`/`计算并验算 919 + 27`/`检查 · 计算并验算 919 × 3` 等），
+  **0 处 `任务团队 child N`**、0 处提示词原文作主标签；持久 `subagent/descriptor` 与面板逐字一致。
+  证据：`evidence/childname-fix-2026-11-08/gui/`（README + 4 截图 + 3 JSON + 描述符摘录）。
+- **记忆更正（只读核实）**：live web profile 的插件 = **released 0.6.0**（2026-11-07 21:54 安装，
+  `lib/team-engine.js` 不存在 → 不含本修复；旧记"仍 0.2.7"过时，本文件与 VALIDATION 已更正）。
+- **验收条款状态**：条款 1/2/3/5/6 满足；条款 4 的「DSH installation 加载 + ≥3 子代理工作流 +
+  GUI 顶栏显示描述性名」三项在本机 `CONFIRMED`，唯一未达项 = 特指 live `:3090` 实例本身
+  （仍跑不含修复的 released 0.6.0；部署需用户授权，D-013 步骤 5，本会话沙箱只可写工作树）。
+- **未做**：live `:3090` 的修复部署与浏览器复验（用户授权动作）；上游 3 行 ask（可选，未执行）；
+  无 CHANGELOG 变更（无新用户可见变更）。
 
 ## 2026-11-08 — 已完成子任务保持可点击：客户端重注册 workflow-run 节点（v0.6.0 工作树，未发布）
 

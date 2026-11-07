@@ -690,3 +690,11 @@ Each entry records the decision, evidence, alternatives, and status.
   ⑥改 DSH core——明令禁止。
 - **边界：** live `:3090` 未触碰（D-013，仍跑 0.2.7）；DSH core 检出全程 clean（`687f282e`）；
   GUI 渲染判定由 `client.js:201` 源码链 + 描述符事件钉死，浏览器点开验证 NOT_RUN。
+- **Addendum（Round 32，2026-11-08）：GUI 浏览器验证 PASS（`CONFIRMED`）。** 在隔离 Web 实例
+  （`127.0.0.1:3199`，web 模板 profile + headless Chromium）上由 GUI composer 驱动团队档跑完
+  （6 子代理，含真实 agnes format-error 路由切换重试）：顶栏 `Session hierarchy` 面板 6 个子代理
+  主标签全部为描述性任务名（`规划助手`/任务标题/`检查 · 任务标题`），**0 处 `任务团队 child N`**；
+  持久 `subagent/descriptor` 与面板逐字一致。详见 VALIDATION.md Round 32 与
+  `evidence/childname-fix-2026-11-08/gui/`。live `:3090` 只读核实为 **released 0.6.0**
+  （2026-11-07 21:54 安装，`lib/team-engine.js` 不存在 → 不含本修复；更正上行的旧记 0.2.7），
+  部署修复构建待用户授权（D-013 步骤 5）。
