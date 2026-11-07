@@ -420,7 +420,7 @@ turn at a time; Round 16's isolation proof is in `.workflow-artifacts/matrix-024
 - **决策**：D-037。**证据**：`docs/knowledge/evidence/history-first/`。
 - **未做**：真机在线模型两轮回放、`:3090` 热加载（D-013）、版本号与发布。
 
-## 2026-11-07 — 子代理顶栏显示名：诊断完成，判定 **BLOCKED**（无插件侧扩展点）
+## 2026-11-07 — 子代理顶栏显示名：诊断完成（当时判定 BLOCKED；**2026-11-08 已被第四次执行推翻并落地**，见下一节）
 
 - **状态**：只读源码取证诊断，**无插件源码改动、无 DSH core 改动、未起隔离 profile、未碰 live `:3090`**。
   用户目标（顶栏每个子代理显示具体任务名、不出现 `任务团队 child N` / 提示词原文）在当前约束下不可达。
@@ -454,6 +454,38 @@ turn at a time; Round 16's isolation proof is in `.workflow-artifacts/matrix-024
   `PtcWorkflowEngine` 一个引擎实现）。core 检出 HEAD `687f282e` 与 installed 同为 `0.2.1-rc.2`，上游 ask
   仍必要。插件源码零改动。证据：`docs/knowledge/evidence/childname-blocked/extension-points-closure.md`；
   详见 `VALIDATION.md` Round 29 与 `DECISIONS.md` D-039 Addendum 2。
+
+## 2026-11-08 — 子代理顶栏显示名：插件侧 twin 引擎落地，真机 PASS（fix_child_names 第四次执行，`CONFIRMED`）
+
+- **状态**：实现 + 确定性测试 + 真机验证完成。`npm run ci` **37 文件 / 650 测试 PASS**
+  （typecheck 0 错；lint 4 warning / 0 error，与 HEAD 基线一致）；隔离 profile `cfix`
+  真机 PASS（Round 31）。**未提交（随本轮 commit）、未 bump 版本、未打 tag、未发布、
+  live `:3090` 未动（仍 `0.2.7`，D-013）；DSH core 检出全程 clean（`687f282e`）**。
+- **做了什么**：①`src/team-engine.ts`（新增）——用注入引擎**自己的构造函数**建私有 twin
+  （static-inject 判别、WeakMap 按 ctx 缓存、`reflect.provide` 置空、引擎 config 镜像），
+  twin 的 subagents 视图在 `startActivation` 处把 `spec.label` 重写为提示词首行
+  （48 码点截断）；构造失败/非 PTC 引擎原样回退并 `logger.warn` 一次性。
+  ②`src/script.ts`/`src/triage.ts`/`src/gate.ts`——每个子代理提示词**首行**改为描述性标题
+  （`规划助手`/`<任务标题>`/`检查 · <任务标题>`/`汇总助手`/`快速应答`/`前台直答`/`前台任务`/`任务分类`），
+  人设行保持第二行。③`src/run.ts`——两处 `ctx.workflowEngine.start` 改走
+  `teamWorkflowEngine(ctx, logger)`。测试 `test/team-engine.spec.ts` 12 例 +
+  `test/engine-harness.ts` 一处 additive 捕获。
+- **关键机制（RESEARCH.md A18 / DECISIONS.md D-041）**：`PtcWorkflowEngine.start()` 在 start
+  时读 `runCtx.subagents`，故插件可在交 run 前替换 subagents 视图——`startActivation` 的
+  调用方变成插件，label 归调用方的契约站在插件这边。真机两次失败定位了 cordis 硬事实：
+  代理 cordis ctx 会破坏 receiver 键控的服务解析；服务属性访问受 isolate guard，
+  显式 `ctx.get(name)` 不受——twin 的服务从引擎自身 ctx 经 `ctx.get` 解析。
+- **真机验证（Round 31）**：终验团队档 COMPLETED，6 个子会话首个 `subagent/descriptor`
+  全部为描述性标签（规划助手 / 任务标题 / 检查 · 任务标题，含一条真实 agnes route-switch 重试），
+  **0 处 `任务团队 child N`**；修复前同 patch 对照 3/3 为旧标签。GUI 主名判定 =
+  `client.js:201` 源码链 + 描述符事件；浏览器点开 live `:3090` 验证 NOT_RUN（401，D-013）。
+  证据：`docs/knowledge/evidence/childname-fix-2026-11-08/`。
+- **未做**：live `:3090` 的浏览器复验（实例仍是旧插件 0.2.7，需重新部署后人工确认）；
+  上游 3 行 ask 从"必要"降级为"可选简化"，未执行。
+- **CHANGELOG**：`[Unreleased]` Fixed 增加英中双语条目"Task-team children are named after
+  their work / 任务团队子代理按其工作命名"。
+- **并发注意**：本节与 Round 30 的 fix_completed_links（D-040，已入库 `60cde95`）不冲突；
+  本轮触碰的文件与其零交集（除 `CHANGELOG.md`/记忆文件的追加）。
 
 ## 2026-11-08 — 已完成子任务保持可点击：客户端重注册 workflow-run 节点（v0.6.0 工作树，未发布）
 

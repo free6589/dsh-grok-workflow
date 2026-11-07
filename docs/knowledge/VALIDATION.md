@@ -2283,3 +2283,57 @@ lint 4 warning / 0 error 基线），`git diff` 幂等重建 `lib/` md5 一致�
 - 深色主题/移动端宽度下样式未逐项核对（面板用内联样式 + `var(--dsw-alias-link)`，视觉差异
   可能存在，`NOT_RUN`）。
 - 无凭据读取；无密钥接触；DSH core 未改；无 tag/发布动作。
+
+## Round 31 (2026-11-08) — fix_child_names 第四次执行：twin 引擎 seam 真机 PASS（**CONFIRMED**）
+
+**性质**：插件侧修复（新增 `src/team-engine.ts` + 提示词首行改造）+ 真实 headless DSH 验证。
+DSH core 零改动（检出全程 clean，`687f282e`）；live `:3090` 未碰（D-013）；
+operator `DSH_HOME` 未写；验证全部在隔离 home `out/childname-fix-verify/`（profile `cfix`，从
+headless 模板创建）完成；插件从工作树构建 `file:///…/dsh-grok-workflow/lib/index.js` 加载
+（`mode: full`、`maxTasks: 2`、`maxRetries: 0`、gate on、模型 `wb/cn:deepseek-v4-pro` + agnes flash，
+key 走 `apiKeyEnv: BIFROST_VIRTUAL_KEY` 仅布尔存在性检查）。
+
+### 根因与 seam（CONFIRMED，行号即证据；链路全图见 RESEARCH.md A18）
+
+- Guest `agent()` 的 label 只进观察者事件，`startAgent` 转发体不带 label（`runtime.js:183-188`）；
+  host `startChild` 写死 `` `${this.meta.name} child ${callId}` ``（`workflow-ptc/src/host.ts:205`），
+  成为子会话**首个** `subagent/descriptor` 事件（first-wins），GUI 主名直取它
+  （`dsh-client-ui-subagent/lib/client.js:201`）。
+- `PtcWorkflowEngine.start()` 在 start 时读 `runCtx.subagents`（`workflow-ptc/src/index.ts:157`）→
+  插件用注入引擎**自己的构造函数**建私有 twin（static-inject 判别、WeakMap 按 ctx 缓存、
+  `reflect.provide` 置空），twin 的 subagents 视图在 `startActivation` 处重写
+  `spec.label` = 提示词首行；非 PTC 引擎原样返回并 warn（`src/team-engine.ts`）。
+- `src/script.ts`：planner/worker/verifier/synthesizer 提示词首行改为
+  `规划助手`/`<任务标题>`/`检查 · <任务标题>`/`汇总助手`（人设第二行）；`src/triage.ts`、`src/gate.ts`
+  的非团队路径首行 `快速应答`/`前台直答`/`前台任务`/`任务分类`。
+
+### 两次真机失败（诊断价值，均 CONFIRMED）
+
+1. twin ctx 用**代理视图**包插件 ctx → `cannot get property "ptcRuntime" without inject`：
+   cordis get handler 以 receiver 为键做 shadow/fiber walk，`Reflect.get(target, prop, target)` 破坏解析。
+2. 改为正确 receiver 转发后，从插件 ctx / 引擎 ctx **属性读**服务仍抛
+   `cannot get property "subagents" without inject`（isolate guard；真机探针：同一 ctx 上
+   `readSubagents` 抛错、`ctx.get('subagents')`/`ctx.reflect.get('subagents', false)` 返回 object）。
+   **修复**：从引擎自身 ctx 经 `ctx.get(name)` 显式解析服务装入最小 holder（A18 三条硬事实）。
+   探针轮（run 8，随后移除探针）：`twin built ok`、`twin=true`、`startActivation intercepted` ×6
+   （引擎仍报 `任务团队 child 1..6`，重写发生在 descriptor 落盘前）。
+
+### 真机验证（shipping 构建，无调试代码）
+
+- 终验命令：团队档创建并读回 `final-sum.txt`/`final-prod.txt` → exit 0、
+  `Grok workflow: COMPLETED`、6 个子会话首个 `subagent/descriptor` 全部为
+  `规划助手` / `<任务标题>` / `检查 · <任务标题>`（含一条真实 agnes format-error route-switch 重试），
+  **0 处 `任务团队 child N`**；前缀对照（同 patch、修复前构建）3/3 为旧标签。
+- 确定性单测：`npx vitest run test/team-engine.spec.ts` → 12 passed（首行推导/重写/非 PTC 回退/
+  fake 构造函数不被重调/twin seam 契约/WORKFLOW_SCRIPT 首行契约中英双语）；
+  `npm run ci` → **37 文件 / 650 测试 PASS**（typecheck 0 错；lint 4 warning / 0 error，
+  与 HEAD 基线一致）。lint 基线：`src/redact.ts:155`、`src/client/index.js:87+1188`、`src/run.ts:30`。
+- 证据：`docs/knowledge/evidence/childname-fix-2026-11-08/`（README、
+  `child-descriptor-events-final-run.txt`、`child-descriptor-events-prefix-run.txt`、
+  `child-descriptor-events.txt`（run 8）、`session-dirs-newest-first.txt`）。
+
+### 边界
+
+- live `:3090` 仍是 0.2.7 旧插件（401，D-013），浏览器点开验证 NOT_RUN；GUI 主名判定由
+  `client.js:201` 源码链 + 描述符事件钉死（次级行 = 提示词首行，与本修复一致）。
+- 无凭据读取；无密钥接触；无 tag/发布动作；`package.json` 未动。

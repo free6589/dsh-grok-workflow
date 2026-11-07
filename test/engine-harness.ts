@@ -152,10 +152,15 @@ export function createEngineHarness(answer: (call: ChildCall) => ChildAnswer | P
       return name === provider.name ? provider : undefined
     },
     async startActivation(request: {
+      label?: string
       request: { prompt: { text: string }[]; outputSchema?: unknown; agentOptions?: { provider?: string; model?: string } }
     }) {
       const call: ChildCall = {
         prompt: request.request.prompt.map(block => block.text).join(''),
+        // The durable descriptor label the engine's startChild chose — what the
+        // Web GUI team panel shows (`entry.label ?? entry.id`). A raw (untwinned)
+        // engine records `<run name> child N` here.
+        ...request.label === undefined ? {} : { label: request.label },
         ...request.request.outputSchema === undefined ? {} : { outputSchema: request.request.outputSchema },
         ...request.request.agentOptions?.provider === undefined ? {} : { provider: request.request.agentOptions.provider },
         ...request.request.agentOptions?.model === undefined ? {} : { model: request.request.agentOptions.model },

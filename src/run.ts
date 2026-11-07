@@ -13,6 +13,7 @@ import type { WorkflowRun, WorkflowStartRequest, WorkflowStopReason } from '@dee
 import { namingLanguageFromSettings } from './naming.js'
 import type { NamingLanguage } from './naming.js'
 import { buildWorkflowRequest } from './script.js'
+import { teamWorkflowEngine } from './team-engine.js'
 import { assertWorkflowReport, failureReport } from './report.js'
 import {
   appendUnloadNotice,
@@ -719,7 +720,10 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
         ...config.subagentProvider === undefined ? {} : { subagentProvider: config.subagentProvider },
       }
       try {
-        run = await ctx.workflowEngine.start(start)
+        // The team engine is the runtime's own PTC engine over a view that
+        // gives every child its descriptive durable label (src/team-engine.ts);
+        // on non-PTC engines (unit fakes) it is the injected engine unchanged.
+        run = await teamWorkflowEngine(ctx, logger).start(start)
       } catch (error) {
         if (timedOut) return timeout(`workflow exceeded the ${config.timeoutMs} ms deadline during startup`)
         throw error
@@ -1010,7 +1014,7 @@ export async function runSingleCall(options: SingleCallOptions): Promise<SingleC
       }
       let timedOut = false
       try {
-        run = await ctx.workflowEngine.start(start)
+        run = await teamWorkflowEngine(ctx, logger).start(start)
       } catch (error) {
         return { ok: false, reason: redactError(error) }
       }

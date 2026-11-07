@@ -353,3 +353,42 @@ out-of-scope → mode-off → already-routed; reason labels are asserted only vi
   （`dsh-subagent/lib/index.js`）；`values.subagent.mode` 与 `sessions.byId[childId]` 在结束后
   依然可解析，库存渲染器只是用 `member.status === "running"` 把它挡住了
   （`dsh-client-ui-workflow-run/lib/client.js:176-179`）。
+
+## A18 — 子代理显示名链路与 cordis 服务解析的硬事实（fix_child_names 第四次执行，2026-11-08，`CONFIRMED`）
+
+**显示名链路（逐行重验，行号为 installed `0.2.1-rc.2`）**：
+
+1. Guest 的 `agent()` 会为**观察者事件**算 `label = opts.label ?? defaultLabel(prompt)`
+   （`dsh-workflow/lib/runtime.js:183-188`），但 `startAgent` 转发体只有
+   `prompt/schema/provider/model`（`runtime.js` 构造 `children.startAgent` 处）——label 到不了 host。
+2. Host `startChild` 写死 `` label: `${this.meta.name} child ${callId}` ``（`workflow-ptc/src/host.ts:205`），
+   经 `startActivation(spec)` → `startLocal`（`dsh-subagent/lib/index.js:1391-1411`）快照
+   `snapshotSubagentDescriptor({label: spec.label})`，写入子会话**首个** `subagent/descriptor`
+   事件并被 `foldSubagentDescriptor`（:697）锁成 first-wins；`establishCatalogChild`（:816）把 label
+   带进目录；GUI 主名 `entry.label ?? entry.id`（`dsh-client-ui-subagent/lib/client.js:201`），
+   次级行 `summary?.title · mode · activity`（:205-209）。**改主名的唯一插件侧控制点 =
+   `startActivation` 收到的 spec.label**（契约明说 label 归调用方，types.d.ts:122-124）。
+3. `PtcWorkflowEngine.start()` 在 **start() 时**读 `runCtx.subagents`（`workflow-ptc/src/index.ts:157`），
+   所以插件可以在把 run 交给引擎前，用**同一个引擎构造函数**建一个私有 twin，
+   换上装饰过的 subagents 视图（`src/team-engine.ts`）。
+
+**cordis 解析硬事实（三次真机失败换来，都是 `CONFIRMED`）**：
+
+- 插件 fiber 只能看到自己 `inject` 的服务名 + 非隔离祖先；对插件 ctx 直接读
+  `ctx.subagents`/`ctx.ptcRuntime` 抛 `cannot get property "X" without inject`。
+- 在**任何** cordis ctx 上，服务的**属性访问**走 isolate-guarded 的祖先 fiber walk；
+  `ctx.get(name)` 与 `ctx.reflect.get(name, false)` 能解析同一服务（真机探针实证：
+  同一 ctx 上 `readSubagents` 抛错而 `getSubagents`/`reflectGet` 返回 'object'）。
+- **不要代理 cordis ctx**：其 get handler 以 receiver 为键做 shadow/fiber walk，
+  `Reflect.get(target, prop, target)` 直接破坏解析（第一次真机失败的根因）。
+- cordis `Service` 基类构造时经 `this.ctx.reflect.provide(name, self)` 注册；
+  私有实例必须把它换成 `provide: () => {}`（否则污染运行时服务面）。
+- cordis 每次属性访问可能返回派生视图 → 以 ctx 为键缓存 twin（WeakMap），
+  不能以注入的引擎实例为键。
+- TS 6：对没有调用签名的对象类型写 `typeof x !== 'function'` 会把 else 分支收窄成
+  `never`——判别构造函数的 static inject 要先经 `unknown` 转型再取 `.inject`。
+
+**运维事实**：隔离 home 的子会话目录是**裸 uuid**（`sessions/<workspace-key>/<childId>/`，
+无 `session-` 前缀；父会话才有）；`/tmp` 在部分执行通道间不保证留存，证据要当场拷进
+`docs/knowledge/evidence/`。插件 headless 输出里 cordis logger.warn 不可见，
+需要诊断落点时用工具结果/会话日志，别指望 stderr。

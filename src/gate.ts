@@ -644,6 +644,8 @@ export function installGate(deps: GateDeps): boolean {
         && (tier0.reason === 'ambiguous' || tier0.reason === 'ambiguous-escalate'
           || (tier0.tier === 'chat' && historyNonEmpty))) {
         const hybridPrompt = [
+          // First line = the child's durable display label (src/team-engine.ts).
+          tier0.lang === 'zh' ? '任务分类' : 'Triage classifier',
           'You are the front-desk classifier of a coding assistant.',
           'Decide one tier for the current message: chat (small talk only), fast (one worker), team (multi-step).',
           'Reply only JSON: {"tier":"chat|fast|team"}.',

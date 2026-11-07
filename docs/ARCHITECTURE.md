@@ -13,7 +13,7 @@ adapter, sandbox, or subagent runtime.
 
 | Capability | DSH package/service | How this plugin uses it |
 |---|---|---|
-| Workflow execution | `ctx.workflowEngine` (`@deepseek-ai/dsh-workflow`) | Starts a generated plain-JavaScript orchestration script; awaits `run.result`; always disposes. |
+| Workflow execution | `ctx.workflowEngine` (`@deepseek-ai/dsh-workflow`) via `src/team-engine.ts` | Starts a generated plain-JavaScript orchestration script; awaits `run.result`; always disposes. For task-team runs the engine is a private twin of the runtime's own PTC engine whose `subagents` view derives each child's durable display label from its prompt's first line; on any non-PTC engine the injected engine is used unchanged. |
 | Script sandbox and child fan-out | `@deepseek-ai/dsh-workflow-ptc` | Executes the script in DSH's PTC runtime; `agent()` delegates to subagents. |
 | Subagent lifecycle | `ctx.subagents` (`@deepseek-ai/dsh-subagent`) | Provides child admission, cancellation, structured output, and teardown through the engine. |
 | Tool registration | `ctx.tools` (`@deepseek-ai/dsh-tools`) | Registers `grok_workflow` with typed parameters and a JSON canonical result. |

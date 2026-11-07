@@ -37,6 +37,31 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
   `dsh-client-ui-workflow-run` 客户端报 "1 entry did not activate" 启动失败）。库存渲染器保留为
   被遮蔽的活条目，插件卸载时自动恢复。
 
+- **Task-team children are named after their work / 任务团队子代理按其工作命名** —
+  in the Web GUI's subagent panel every workflow child showed up as `任务团队 child N`
+  (front-desk calls: `Front desk child 1`) with the child's prompt opener (`You are the
+  planning agent`) as the session title. The workflow guest computes the script's label
+  but drops it before the host starts the child, and the PTC host hardcodes
+  `<run name> child N` as the child's durable descriptor label — exactly the field the
+  panel renders (`dsh-client-ui-subagent` shows `entry.label ?? entry.id`). This plugin
+  now runs its workflows on a twin of the runtime's own PTC engine whose `subagents`
+  view derives each child's durable label from the prompt's first line, and every prompt
+  builder opens with that title: the planner is `规划助手`, a worker its task title, the
+  verifier `检查 · <task title>`, the synthesizer `汇总助手`, and the front-desk calls
+  their tier names (`快速应答` / `前台直答` / `快速执行` / `任务分类`). DSH core is not
+  modified: the twin is built from the injected engine's own constructor, `subagents` is
+  the only decorated service, and any non-PTC engine is used unchanged.
+  在 Web GUI 的子代理面板里，任务团队的每个子代理都显示为 `任务团队 child N`（前台单调用为
+  `Front desk child 1`），副标题是子代理提示词的开头（`You are the planning agent`）：
+  workflow guest 算出了脚本给的 label，却在宿主启动子代理前把它丢掉，PTC 宿主写死了
+  `<run 名> child N` 作为子代理的持久 descriptor 标签——这正是面板渲染的字段
+  （`dsh-client-ui-subagent` 显示 `entry.label ?? entry.id`）。本插件现在把工作流跑在
+  运行时自己的 PTC 引擎的一个孪生实例上，其 `subagents` 视图从提示词首行推导每个子代理的
+  持久标签，且所有提示词构造器都以该标题开头：规划者为 `规划助手`，工人为任务标题，
+  检查者为 `检查 · <任务标题>`，汇总者为 `汇总助手`，前台各调用为其档位名
+  （`快速应答` / `前台直答` / `快速执行` / `任务分类`）。不修改 DSH core：孪生实例用注入
+  引擎自己的构造器构建，`subagents` 是唯一被装饰的服务，非 PTC 引擎原样使用。
+
 ## [0.6.0] - 2026-11-07
 
 ### Added / 新增

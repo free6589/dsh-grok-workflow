@@ -1,6 +1,37 @@
 # Agent Handoff
 
-## 2026-11-08 — 子代理顶栏显示名：第三次执行复核 + 末两个扩展点候选用类型级证据关闭，**BLOCKED 维持**（fix_child_names，`release/0.6.0` 工作树）
+## 2026-11-08 — 子代理顶栏显示名：插件侧 twin 引擎落地，真机 PASS（fix_child_names 第四次执行，`CONFIRMED`，`release/0.6.0` 工作树）
+
+- **From:** 执行子代理（fix_child_names，attempt 4）· **To:** lead / 用户 · **Base:** `60cde95`（本地 `release/0.6.0` HEAD；含并发任务 fix_completed_links 的已提交修复）
+- **结论：D-039 的 BLOCKED 判定被推翻。** 插件侧存在可用扩展点——插件持有 `ctx.workflowEngine`
+  （自己的 inject），而 `PtcWorkflowEngine.start()` 在 start 时才读 `runCtx.subagents`
+  （`workflow-ptc/src/index.ts:157`）；插件用**注入引擎自己的构造函数**建私有 twin，
+  把 `subagents` 换成在 `startActivation` 处重写 `spec.label`（= 提示词首行）的视图，
+  `reflect.provide` 置空保持私有，非 PTC 引擎原样回退并 warn。不改 core、不改引擎、
+  不碰共享服务实例。上游 3 行 ask 从"必要"降级为"可选简化"。
+- **本轮改动（全在本仓库，未提交，随本轮 commit）：**
+  `src/team-engine.ts`（新）、`src/run.ts`（两处调用点）、`src/script.ts`/`src/triage.ts`/`src/gate.ts`
+  （子代理提示词**首行**改描述性标题，人设第二行）、`test/team-engine.spec.ts`（新，12 例）、
+  `test/engine-harness.ts`（additive 捕获一处）、`CHANGELOG.md`（[Unreleased] Fixed 英中条目）、
+  `docs/ARCHITECTURE.md`（执行路径行）、记忆文件（RESEARCH A18 / DECISIONS D-039 addendum + D-041 /
+  VALIDATION Round 31 / STATE / 本节）、证据 `docs/knowledge/evidence/childname-fix-2026-11-08/`。
+- **真机验证（Round 31）：** 隔离 home `out/childname-fix-verify/`（profile `cfix`）、
+  shipping 构建（无调试代码）团队档 COMPLETED；6 个子会话首个 `subagent/descriptor` 全部为
+  `规划助手`/`<任务标题>`/`检查 · <任务标题>`（含一条真实 agnes route-switch 重试），
+  **0 处 `任务团队 child N`**；修复前同 patch 对照 3/3 旧标签。`npm run ci` → **37 文件 / 650 测试 PASS**。
+- **诊断教训（RESEARCH.md A18，三次真机失败换来）：** 不要代理 cordis ctx（receiver 键控的
+  fiber walk 会被破坏）；服务**属性访问**受 isolate guard（`cannot get property "X" without inject`），
+  显式 `ctx.get(name)`/`ctx.reflect.get(name, false)` 不受——twin 的服务从**引擎自身 ctx** 经
+  `ctx.get` 解析进最小 holder。headless 下 cordis logger.warn 不可见，诊断要用工具结果/探针。
+- **未做 / NOT_RUN：** live `:3090` 的浏览器复验（实例仍是旧插件 0.2.7，401/D-013，无凭据读取）——
+  部署新构建后人工点开团队档即可看到；上游 3 行 ask 未执行（现在可选）。
+- **Next action：** commit + push 本轮文件（按文件名逐一 add）；如需在 live `:3090` 生效，
+  需用户/lead 重新部署插件（非本会话能力）。
+- **标注更正（2026-11-08）：** 上文 Round 31 与 STATE/VALIDATION 里的 synthesizer 首行实为
+  `汇总助手`（`src/naming.ts:102` 的 role copy，`memberLabel('synthesizer', 1)`），
+  初稿误写 `综合助手`，已在本轮更正。
+
+## 2026-11-08 — 子代理顶栏显示名：第三次执行复核 + 末两个扩展点候选用类型级证据关闭，**BLOCKED 维持（已被上一节推翻）**（fix_child_names，`release/0.6.0` 工作树）
 
 - **From:** 执行子代理（fix_child_names，编排器重试轮）· **To:** lead / 用户 · **Base:** `5d9fcbe`（本地 `release/0.6.0` HEAD，未变）
 - **本轮做了什么：** ①把 Round 27/28 的源码链**第三次独立重验**（全部自己重读 installed DSH `0.2.1-rc.2` 与

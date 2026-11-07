@@ -586,7 +586,7 @@ Each entry records the decision, evidence, alternatives, and status.
 
 ## D-039 — 子代理顶栏显示名不改 DSH core：判定为 BLOCKED，只记证据与上游改动清单
 
-- **Status:** BLOCKED（源码级 `CONFIRMED`：见 VALIDATION.md Round 27 的 8 处行号；插件侧无文档化扩展点）
+- **Status:** BLOCKED（历史判定，2026-11-08 已被 D-041 推翻并落地；原判定依据：源码级 `CONFIRMED`，见 VALIDATION.md Round 27 的 8 处行号，当时结论"插件侧无文档化扩展点"）
 - **Date:** 2026-11-07
 - **Decision:** 用户要求"顶栏每个子代理显示具体任务名，不出现 `任务团队 child N` 或提示词原文"。
   经逐行取证，主标签由 DSH core 在创建子代理时写死
@@ -659,3 +659,34 @@ Each entry records the decision, evidence, alternatives, and status.
 - **Alternatives rejected:** ①改 DSH core 放宽 `navigableMembers` 条件——明令禁止；
   ②只改插件让 `tool-workflow/*` 事件带额外数据——渲染器根本不读它，无扩展点；
   ③注册不设 priority 靠加载顺序——实测会让库存客户端 boot 失败，不可接受。
+
+## D-041 — 任务团队子代理显示名：插件侧 twin 引擎在 `startActivation` 写入描述性 label（fix_child_names 第四次执行）
+
+- **Status:** CONFIRMED（真机 PASS，Round 31；12 例单测钉死；`npm run ci` 37 文件 / 650 测试 PASS）
+- **Date:** 2026-11-08
+- **Decision:** 顶栏主名改为描述性任务名，落点有三处，全部在本仓库：
+  ①`src/team-engine.ts`——用注入引擎**自己的构造函数**建私有 twin（static-inject 判别 +
+  WeakMap 按 ctx 缓存），twin 的 subagents 视图在 `startActivation` 处把 `spec.label` 重写为
+  提示词首行（`childLabelFromPrompt`，48 码点截断），`reflect.provide` 置空保持私有，
+  非 PTC 引擎原样返回并 warn；②`src/script.ts` + `src/triage.ts` + `src/gate.ts`——
+  每个子代理提示词的首行改为描述性标题（规划助手/任务标题/检查 · 任务标题/快速应答/前台直答等），
+  人设行保持第二行；③`src/run.ts` 两处 `ctx.workflowEngine.start` 改走 `teamWorkflowEngine(ctx, logger)`。
+- **Reason:** D-039 的三次执行把"逐调用扩展点"逐个排除了，但漏掉一个服务级扩展点：
+  插件本来就持有 `ctx.workflowEngine`（自己的 inject），而 `PtcWorkflowEngine.start()`
+  在 start 时才读 `runCtx.subagents`（`workflow-ptc/src/index.ts:157`）——把 run 起在
+  "同一引擎 + 装饰过的 subagents"上，`startActivation` 的调用方就变成了插件，
+  label 归调用方的契约（types.d.ts:122-124）站在插件这边。不改 core、不改引擎、
+  不碰共享服务实例；上游 3 行 ask（D-039）从"必要"降级为"可选的简化"。
+- **Consequences:** 子代理描述符（GUI 主名）= 提示词首行；twin 构造失败/非 PTC 引擎时
+  原样回退并 `logger.warn` 一次性（可观测的静默降级）；cordis 解析的硬事实沉淀为 A18。
+  真机证据：`docs/knowledge/evidence/childname-fix-2026-11-08/`（终版 6/6 描述性、
+  0 个 `任务团队 child N`；前缀对照 3/3 旧标签）。
+- **Alternatives rejected:** ①代理 cordis ctx（插件 ctx 或引擎 ctx）——两次真机失败：
+  receiver 键控的 fiber walk 被破坏 + 属性访问受 isolate guard（A18）；
+  ②从引擎 ctx 属性读服务——同一 isolate guard 失败，最终用 `ctx.get(name)` 显式解析；
+  ③自定义 SubagentProvider / 直接调 `startActivation`——D-039 Addendum 2 的类型级证据仍成立；
+  ④改 `meta.name` 模板——仍是 `<name> child N` 模式，不满足验收条款 1；
+  ⑤`sessionTitle.rename` 半程缓解（D-039）——只改次级行，主名不变，不再需要；
+  ⑥改 DSH core——明令禁止。
+- **边界：** live `:3090` 未触碰（D-013，仍跑 0.2.7）；DSH core 检出全程 clean（`687f282e`）；
+  GUI 渲染判定由 `client.js:201` 源码链 + 描述符事件钉死，浏览器点开验证 NOT_RUN。

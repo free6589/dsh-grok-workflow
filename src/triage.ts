@@ -820,6 +820,8 @@ function locatorLabel(locator: string, lang: TriageLang): string {
 export function recallPrompt(verdict: TriageVerdict, request: string, hit: RecallHit): string {
   const material = hit.excerpt === '' ? '' : hit.excerpt
   return [
+    // First line = the child's durable display label (src/team-engine.ts).
+    verdict.lang === 'zh' ? '快速应答' : 'Quick answer',
     'You are the single worker of a coding assistant, answering a follow-up from material the session already holds.',
     'The material below was retrieved BEFORE anything was asked back: it is the conversation so far and the memory files on disk.',
     'Answer from this material and quote the lines that carry the answer.',
@@ -951,6 +953,8 @@ export function singleCallPrompt(verdict: TriageVerdict, request: string, wantJs
     : ['Context (do not ask for what is already here):', context.trim(), ''];
   if (verdict.tier === 'chat') {
     return [
+      // First line = the child's durable display label (src/team-engine.ts).
+      verdict.lang === 'zh' ? '前台直答' : 'Front-desk answer',
       'You are the front desk of a coding assistant. Answer this message in one or two short sentences.',
       // Not "do not call tools": the structured result is returned through a tool,
       // so forbidding tools makes the child answer in prose and the guest collapses
@@ -967,6 +971,8 @@ export function singleCallPrompt(verdict: TriageVerdict, request: string, wantJs
     ].join('\n')
   }
   return [
+    // First line = the child's durable display label (src/team-engine.ts).
+    verdict.lang === 'zh' ? '快速执行' : 'Front-desk task',
     'You are the single worker of a coding assistant, answering one simple request in one pass.',
     'Do the request and give the result directly: state what you did or what the answer is, briefly.',
     'Do not plan, do not delegate, do not write a report.',

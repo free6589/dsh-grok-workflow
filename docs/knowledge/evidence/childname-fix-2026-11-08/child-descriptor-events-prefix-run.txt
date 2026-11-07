@@ -1,0 +1,6 @@
+=== 1d3ddcb3-8e4b-4af1-aa43-358cea271142 (pre-fix run 1) ===
+{"type":"subagent/descriptor","seq":0,"time":1794075077095,"data":{"version":3,"mode":"continuable","provider":"spawn","label":"任务团队 child 1","agentProvider":"bifrost-completions","agentModel":"wb/cn:deepseek-v4-pro"}}
+=== f3e65332-df70-49b8-aa14-23d1c4ca21e5 (pre-fix run 1) ===
+{"type":"subagent/descriptor","seq":0,"time":1794075100268,"data":{"version":3,"mode":"continuable","provider":"spawn","label":"任务团队 child 2","agentProvider":"bifrost-completions","agentModel":"wb/cn:deepseek-v4-pro"}}
+=== 747b5ef5-6214-4dcc-83c2-850f917a6cda (pre-fix run 1) ===
+{"type":"subagent/descriptor","seq":0,"time":1794075130276,"data":{"version":3,"mode":"continuable","provider":"spawn","label":"任务团队 child 3","agentProvider":"bifrost-completions","agentModel":"wb/cn:deepseek-v4-pro"}}
