@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-11-08 (fix_child_names: fix at `ad66118` on `release/0.6.0` + GUI browser verification PASS (Round 32); Round 33 adds live `:3090` durable panel data — the current run's children still render `任务团队 child N` there)
+Last updated: 2026-11-08 (fix_child_names attempt 6/6 final: all facts re-verified unchanged — CI 650 PASS at `b2bf3a8`; live `:3090` newest children incl. this round's own still render `任务团队 child 25–32`; fix `ad66118` still only on `release/0.6.0`, `origin/main` advanced to `3b1d9a8` (PR #44) without it; deploy+restart = user-reserved D-013 step 5)
 
 ## Repository
 
@@ -67,7 +67,11 @@ Authoritative numbers for this state (measured, not planned):
   (`find /home/fish/dsh-layerfs -name team-engine.js` → 0), the live GUI is 401-guarded on
   loopback too (no loopback bypass), and the durable panel data of the current orchestrator
   run shows generic `任务团队 child 15–28` labels for all 14 newest children — including
-  attempt 5's own executor child (28).
+  attempt 5's own executor child (28). Round 34 (attempt 6/6 final, 2026-11-08) re-extracted
+  the 8 newest children: labels `任务团队 child 25–32`, zero descriptive; attempt 6's own
+  children (identified via the task marker in their logs) are among them. `origin/main` has
+  since advanced to `3b1d9a8` (Merge PR #44, a different task's P1 fix) and still does not
+  contain `ad66118`, so `pnpm update` on the live profile still will not fetch the fix.
 
 Prior releases (unchanged): `v0.4.0` → `708c315` (PR #38, Round 20: 32 files / 545 tests);
 `v0.3.0` → `3f5ad0a`; `v0.2.7` → `16a11b7`. `0.4.0`-era detail below is history, not the

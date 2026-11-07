@@ -1,0 +1,31 @@
+live :3090 — Round 34 (attempt 6/6 final) re-extraction of durable subagent/descriptor
+labels (fix_child_names orchestrator attempt 6; zero source changes; read-only)
+
+Collected: 2026-11-08 04:24–04:32 (+08:00). Method identical to Round 33
+(live-descriptor-labels-2026-11-08.txt):
+
+  cd /home/fish/dsh-layerfs/sessions/--home-fish-projects_mine-dsh-grok-workflow--
+  for d in $(ls -t | head -8); do f="$d/session.v4.jsonl.zstd"; [ -f "$f" ] || continue; \
+    echo "== $d | mtime=$(stat -c %y "$f" | cut -c1-19) | $(zstdcat "$f" 2>/dev/null \
+      | grep -m1 '"type":"subagent/descriptor"' | grep -o '"label":"[^"]\{0,90\}"')"; done
+
+Output — 8 newest workflow-child sessions (orchestrator workspace):
+
+  560f8508-de25-422e-bd19-74ea6dcb5140 | 2026-11-08 04:30:29 | "label":"任务团队 child 32"
+  837b6b0d-ba6a-4576-9cae-cdf2ca95adc7 | 2026-11-08 04:24:39 | "label":"任务团队 child 31"
+  263e0b3a-45cc-4e07-91e0-9990327978bc | 2026-11-08 04:24:38 | "label":"任务团队 child 30"
+  125cf9d2-8c1f-46d4-a647-4e50bb5f202b | 2026-11-08 04:24:33 | "label":"任务团队 child 29"
+  88e59d33-5856-4284-846f-66bb4b1828c1 | 2026-11-08 04:21:24 | "label":"任务团队 child 28"
+  8fd84295-ea13-414b-bbe1-27b78c52ad7d | 2026-11-08 04:00:53 | "label":"任务团队 child 27"
+  fac5c95a-9654-42bf-baa5-835891b2f7ec | 2026-11-08 04:00:51 | "label":"任务团队 child 26"
+  a887612f-dab8-402f-b6db-e408722a7b94 | 2026-11-08 04:00:47 | "label":"任务团队 child 25"
+
+Attempt-6 self-identification: grepping the same 4 newest logs for the marker
+"ATTEMPT: 6 of 6" (the orchestrator's prompt text for this attempt's own children)
+matches children 30, 31 and 32 — i.e. attempt 6's own verifier/executor children are
+on the live panel as "任务团队 child 30/31/32" at report time. Zero descriptive labels
+in the whole set. Per the Round 32-verified panel mapping (entry.label ?? entry.id),
+this is exactly what http://100.111.111.88:3090 renders for these children now.
+
+File contains only labels, UUIDs, mtimes and one marker count; no user session
+content, no credentials.

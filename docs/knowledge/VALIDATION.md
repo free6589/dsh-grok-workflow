@@ -2424,3 +2424,41 @@ profile `guiweb`（`--from-default-profile web`），插件 dev 安装（`dsh pl
   用户保留，`NOT_RUN`。
 - 边界：全程只读（live 实例未碰）；无凭据读取；证据文件只含标签/uuid/mtime，无用户
   会话内容；无 tag/发布动作。
+
+## Round 34 (2026-11-08, attempt 6/6 最终轮): 全量复验——结果与 Round 33 零变化；唯一未达合取仍是 live `:3090` 的部署状态（用户保留动作） — `CONFIRMED`（零源码改动）
+
+- **目的**：attempt 6（最终轮）不重做已验证的修复，只独立复验全部在案事实并收口记忆。
+  工作树自 `b2bf3a8`（`release/0.6.0`，与 origin 同步）零源码改动。
+- **命令与结果（全部本机实跑，2026-11-08 04:24–04:32 +08:00）**：
+  1. `npm run ci`（`b2bf3a8`；链条 `typecheck && lint && test`）→ 前置步干净，vitest
+     **37 文件 / 650 测试 PASS**（23.30s，04:30:35 起），含 `test/team-engine.spec.ts`
+     12 例。与 Round 33 基线一致。
+  2. 认证边界：`curl http://127.0.0.1:3090/`、`http://localhost:3090/`、
+     `http://100.111.111.88:3090/` → **三者均 HTTP 401**（`ss -tlnp`：监听在
+     `100.111.111.88:3090` 与 `127.0.0.1:3090`）。按 AGENTS.md 不读凭据 → 浏览器级
+     live 观察对代理会话不可行。
+  3. `find /home/fish/dsh-layerfs -maxdepth 8 -name team-engine.js` → **0 命中**；
+     live web profile 仍为 released `dsh-grok-workflow@0.6.0`（spec
+     `github:free6589/dsh-grok-workflow`）→ 修复构建在 live home 全域缺席。
+  4. live 持久面板数据复抽（同 Round 33 方法，最新 8 个子会话）：首个
+     `subagent/descriptor` label 全部为 `任务团队 child 25` … `任务团队 child 32`
+     （mtime 04:00:47–04:30:29），**0 个描述性**。attempt 6 自证：对最新 4 个日志
+     grep 任务标记 `ATTEMPT: 6 of 6` → 命中 child 30/31/32，即**本轮自己的
+     验证/执行子会话在 live 顶栏此刻显示为泛化名**。摘录：
+     `evidence/childname-fix-2026-11-08/live-descriptor-labels-2026-11-08-r34.txt`。
+  5. 远端拓扑更新（本轮新事实）：`git fetch` 后 `origin/main` = `3b1d9a8`（Merge
+     PR #44 = 并发任务的 P1 lifecycle 修复 `4e8d1c3`），已从 `1f9065d` 前进；
+     `git merge-base --is-ancestor ad66118 origin/main` → **NO** —— 修复仍不在 main，
+     live profile 的 `pnpm update` 仍取不到修复，HANDOFF「显式安装 ad66118 构建」
+     指引不变。双侧分叉 `CONFIRMED`（PR #44 大改 `src/run.ts`；`ad66118` 对
+     `src/run.ts` 两处小改）→ 日后合并分支时该文件可能需手工调和（推断，未实测）。
+  6. DSH core mise 安装 `lib/` mtime 仍为 2026-10-22 21:59（原始安装值）→ core 零改动。
+  7. 载用证据复核：`evidence/childname-fix-2026-11-08/gui/hierarchy-result.json`
+     （Round 32 真浏览器）6/6 描述性主标签、`bodyHasTeamChildPattern=false`；
+     `CHANGELOG.md` 行 40 双语 `[Unreleased]` 条目在位。
+- **结论**：六轮尝试收口。条款 2/3/5/6 满足且本轮独立复验；条款 1/4 的代码与单测侧
+  满足（Round 31/32 同一二进制真机 + 真 GUI），唯一未达 = live `:3090` 实例的
+  部署+重启（D-013 步骤 5，用户保留动作）：本会话沙箱 workspace-write 不能写
+  `/home/fish/dsh-layerfs`，GUI 401 且禁读凭据，live 进程承载本工作流自身。
+- 边界：全程只读（live 未碰）；无凭据读取；证据文件只含标签/uuid/mtime/标记计数；
+  无 tag/发布动作；未改 main。

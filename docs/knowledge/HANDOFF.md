@@ -28,6 +28,13 @@
   （`NOT_RUN`）——重启是保证生效的重载方式。
 - **本轮其他**：`npm run ci` @ `91cad68` → 37 文件 / 650 测试 PASS；[COORDINATION] 状态块
   按协议发布到 Issue #1（更正上一节「Issue 无该状态块」的过时记录：attempt 4 的块已存在）。
+- **最终轮复验（attempt 6/6，2026-11-08 04:24–04:32，零源码改动）：结果零变化。** `npm run ci`
+  @ `b2bf3a8` → 37 文件 / 650 测试 PASS；live 最新 8 个子会话 label 仍为
+  `任务团队 child 25–32`（attempt 6 自己的子会话 30/31/32 经任务标记确证在列，0 描述性）；
+  `origin/main` 已前进至 `3b1d9a8`（并发任务 PR #44）但仍不含 `ad66118` → 上面的显式安装
+  指引与「不要 pnpm update」告警依旧有效；日后把 `release/0.6.0` 合回 `main` 时，
+  `src/run.ts` 与 PR #44 双侧都改过，可能需手工调和。记录：VALIDATION Round 34、证据
+  `evidence/childname-fix-2026-11-08/live-descriptor-labels-2026-11-08-r34.txt`。
 
 ## 2026-11-08 — 子代理顶栏显示名：GUI 浏览器验证 PASS（fix_child_names 验证轮，零源码改动，`CONFIRMED`，`release/0.6.0` @ `ad66118`）
 
