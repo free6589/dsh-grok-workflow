@@ -1,0 +1,62 @@
+live :3090 — durable subagent/descriptor labels of the current orchestrator run
+(fix_child_names, orchestrator attempt 5)
+
+Collected: 2026-11-08 04:13–04:15 (+08:00), read-only, no credentials read or written.
+
+Why this proves what the live top panel renders: the stock "Session hierarchy" panel's
+per-child primary label is `entry.label ?? entry.id` from the durable subagent/descriptor
+events. That mapping was verified verbatim against a real GUI in VALIDATION.md Round 32
+(docs/knowledge/evidence/childname-fix-2026-11-08/gui/hierarchy-result.json matches the
+child session logs exactly). Reading the live harness's own session logs therefore shows
+exactly what the live panel at http://100.111.111.88:3090 renders for these children.
+
+Method (live harness home is DSH_HOME=/home/fish/dsh-layerfs; orchestrator workspace
+/home/fish/projects_mine/dsh-grok-workflow):
+
+  cd /home/fish/dsh-layerfs/sessions/--home-fish-projects_mine-dsh-grok-workflow--
+  for d in $(ls -t | head -14); do f="$d/session.v4.jsonl.zstd"; [ -f "$f" ] || continue; \
+    echo "== $d | mtime=$(stat -c %y "$f" | cut -c1-19) | $(zstdcat "$f" 2>/dev/null \
+      | grep -m1 '"type":"subagent/descriptor"' | grep -o '"label":"[^"]\{0,90\}"')"; done
+
+Output — 14 newest workflow-child sessions (orchestrator workspace; the child counter
+15..28 spans the fix_child_names orchestrator attempts in one parent session):
+
+  88e59d33-5856-4284-846f-66bb4b1828c1 | 2026-11-08 04:13:07 | "label":"任务团队 child 28"   <- attempt 5 executor child (this very round)
+  8fd84295-ea13-414b-bbe1-27b78c52ad7d | 2026-11-08 04:00:53 | "label":"任务团队 child 27"
+  fac5c95a-9654-42bf-baa5-835891b2f7ec | 2026-11-08 04:00:51 | "label":"任务团队 child 26"
+  a887612f-dab8-402f-b6db-e408722a7b94 | 2026-11-08 04:00:47 | "label":"任务团队 child 25"
+  93339b6c-c31a-408d-8c6f-68b60d521da0 | 2026-11-08 03:55:00 | "label":"任务团队 child 24"
+  ad3cdeed-162a-4dba-a822-391d670a1999 | 2026-11-08 03:17:17 | "label":"任务团队 child 23"
+  60afe2a6-3734-4af3-8836-039b666e1ea3 | 2026-11-08 03:17:15 | "label":"任务团队 child 22"
+  a2697731-b45d-47b1-ac2f-5997dd99a84b | 2026-11-08 03:17:13 | "label":"任务团队 child 21"
+  e53081ad-b791-4c73-a53c-72a2a5a6d955 | 2026-11-08 01:31:41 | "label":"任务团队 child 20"
+  f25e4e84-a4f7-494e-a9bc-49ca953bdec0 | 2026-11-08 01:24:25 | "label":"任务团队 child 19"
+  86d1819d-d802-4745-98b4-dad1b7a33af9 | 2026-11-08 01:20:29 | "label":"任务团队 child 18"
+  6a5506ec-6d4b-4433-b1d2-b11cbe13632c | 2026-11-08 01:20:26 | "label":"任务团队 child 17"
+  a79c66ff-9c3c-475b-a996-c4c68d7553cb | 2026-11-08 01:20:22 | "label":"任务团队 child 16"
+  90070478-5579-428d-8339-dd72bd746340 | 2026-11-08 03:04:30 | "label":"任务团队 child 15"
+
+Additional counts: `grep -c '任务团队 child'` over the same 14 logs returned 3–67
+occurrences each (the larger counts are verifier children quoting the defect text
+itself); the generic first-descriptor label is uniform. Zero descriptive labels.
+
+Corroborating facts (same round, all commands run on this machine):
+
+- `find /home/fish/dsh-layerfs -name team-engine.js` -> 0 matches: the fix build
+  (lib/team-engine.js) exists NOWHERE in the live harness home.
+- Live web profile plugin = released dsh-grok-workflow@0.6.0 (installed 2026-11-07
+  21:54), dependency spec "github:free6589/dsh-grok-workflow"
+  (/home/fish/dsh-layerfs/profiles/web/package.json line 10). Repo default branch =
+  main @ 1f9065d (v0.6.0 merge) and `git log main..release/0.6.0` contains ad66118 +
+  91cad68 -> `pnpm update` of that github: dependency would NOT fetch the fix.
+- Auth boundary re-test: curl http://127.0.0.1:3090/ , http://localhost:3090/ ,
+  http://100.111.111.88:3090/ -> HTTP 401 on all three (no loopback bypass;
+  `ss -tlnp` shows listeners on 100.111.111.88:3090 and 127.0.0.1:3090).
+
+Interpretation: the live :3090 top panel is rendering "任务团队 child N" for the
+CURRENT workflow run's children — including this attempt's own executor child
+(任务团队 child 28) — because the loaded plugin build predates the fix. Until the
+ad66118 build is installed into the live web profile and the harness is restarted
+(user-reserved per D-013 step 5), every new orchestrator attempt reproduces the
+defect on :3090. This file contains only labels, session UUIDs and mtimes; no user
+session content, no credentials.

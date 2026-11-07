@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-11-08 (fix_child_names: twin-engine fix at `ad66118` on `release/0.6.0` + GUI browser verification PASS, Round 32)
+Last updated: 2026-11-08 (fix_child_names: fix at `ad66118` on `release/0.6.0` + GUI browser verification PASS (Round 32); Round 33 adds live `:3090` durable panel data — the current run's children still render `任务团队 child N` there)
 
 ## Repository
 
@@ -63,6 +63,11 @@ Authoritative numbers for this state (measured, not planned):
   2026-11-08: installed 2026-11-07 21:54, `lib/team-engine.js` absent → **without** the
   fix_child_names build; corrects the earlier `0.2.7` note). Any deployment of the fix build
   plus profile reload awaits explicit user approval (D-013), not done.
+  Round 33 (2026-11-08) sharpens this: the fix build is absent from the whole live home
+  (`find /home/fish/dsh-layerfs -name team-engine.js` → 0), the live GUI is 401-guarded on
+  loopback too (no loopback bypass), and the durable panel data of the current orchestrator
+  run shows generic `任务团队 child 15–28` labels for all 14 newest children — including
+  attempt 5's own executor child (28).
 
 Prior releases (unchanged): `v0.4.0` → `708c315` (PR #38, Round 20: 32 files / 545 tests);
 `v0.3.0` → `3f5ad0a`; `v0.2.7` → `16a11b7`. `0.4.0`-era detail below is history, not the
@@ -201,8 +206,12 @@ None.
 release went out as tag `v0.6.0` + GitHub Release (Round 26 isolated verification PASS).
 The one open action is outside this repo: the live DSH service on `:3090` runs released
 `dsh-grok-workflow@0.6.0` (2026-11-08 read-only check), which predates the fix_child_names build
-(`ad66118` on `release/0.6.0`, unpublished); deploying that build — **that reload
-awaits explicit user approval (D-013); it is not done**.
+(`ad66118` on `release/0.6.0`, unpublished); deploying that build awaits explicit user
+approval (D-013); it is not done. Round 33 adds two deploy notes: the repo default branch is
+`main` @ `1f9065d`, which lacks `ad66118`, so `pnpm update` of the live profile's
+`github:` dependency will NOT fetch the fix — install the `ad66118` build explicitly
+(HANDOFF); until then the live top panel keeps rendering generic `任务团队 child N` labels
+for every new orchestrator run (durable descriptor data, Round 33).
 
 B组+C1 已合入工作树、未发布（2026-11-07，route-cap-closer 收尾）：设置页 `warn.emptyCap`
 黄字提醒不拦 Save + `validateRoutes` notes + 单 run 作用域（ARCHITECTURE），C1 `busyRoutes`

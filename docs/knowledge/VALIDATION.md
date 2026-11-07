@@ -2387,3 +2387,40 @@ profile `guiweb`（`--from-default-profile web`），插件 dev 安装（`dsh pl
   属 D-013 步骤 5（需用户明确授权），本轮 `NOT_RUN`。
 - 浏览器为 headless（本机无 X11 显示，同 Round 15/30）；无凭据读取；无 tag/发布动作；
   `package.json` 未动。
+
+## Round 33 (2026-11-08, attempt 5): live `:3090` 持久面板数据实锤——当前轮子代理在 live 上仍显示「任务团队 child N」；认证边界复测；修复构建在 live home 全域缺席 — `CONFIRMED`（零源码改动）
+
+- **目的**：attempt 5 重开唯一未达合取（验收条款 4 特指 `http://100.111.111.88:3090`），
+  并为该条款收集 live 实例自身的证据。工作树自 `91cad68`（`release/0.6.0`，与 origin 同步）
+  零源码改动。
+- **命令与结果（全部本机实跑）**：
+  1. `npm run ci`（`91cad68`）→ **37 文件 / 650 测试 PASS**（23.37s；本轮自己的基线，
+     不沿用上轮转录）。
+  2. 认证边界复测：`curl http://127.0.0.1:3090/`、`http://localhost:3090/`、
+     `http://100.111.111.88:3090/` → **三者均 HTTP 401**（无 loopback 豁免；`ss -tlnp`
+     显示监听在 `100.111.111.88:3090` 与 `127.0.0.1:3090`）。按 AGENTS.md 不读取凭据 →
+     浏览器级 live 观察对任何代理会话都不可行。
+  3. `find /home/fish/dsh-layerfs -name team-engine.js` → **0 命中**：修复构建在 live
+     harness 的整个 `DSH_HOME` 里不存在（比上轮「web profile node_modules 缺文件」更强）。
+  4. **新证据（决定性）**：只读抽取 live 持久会话日志
+     `/home/fish/dsh-layerfs/sessions/--home-fish-projects_mine-dsh-grok-workflow--/`
+     （orchestrator 工作区）最新 14 个子会话的首个 `subagent/descriptor` label：**全部为
+     `任务团队 child 15` … `任务团队 child 28`**（mtime 2026-11-08 01:20:22–04:13:07），
+     **0 个描述性标签**。其中 `任务团队 child 28`（`88e59d33…`，04:13:07）就是 attempt 5
+     自己的执行子代理——live 顶栏此刻正把本轮子代理显示成泛化名。面板→descriptor 映射
+     已在 Round 32 用真 GUI 逐字验证（`entry.label ?? entry.id`），故该抽取即 live 面板
+     实际渲染内容。摘录：
+     `docs/knowledge/evidence/childname-fix-2026-11-08/live-descriptor-labels-2026-11-08.txt`。
+  5. 上轮不确定项 #2（live 进程是否已载入 0.6.0）就此关闭：live 运行中代码**可观察地**
+     不含 label 重写（描述符行为即证据），与启动时刻无关。
+  6. 分支告警（`CONFIRMED`）：仓库默认分支 = `main` @ `1f9065d`（v0.6.0 合并）；
+     `git log main..release/0.6.0` 含 `ad66118`+`91cad68` → live profile 的
+     `github:free6589/dsh-grok-workflow` 依赖 + `pnpm update` **不会**取到修复；部署必须
+     显式安装 `ad66118` 构建（HANDOFF 步骤为准）。
+- **结论**：条款 4 特指 URL 合取仍未达，且**未达原因是 live 实例的部署状态，不是验证
+  缺口**——今天即便有凭据做浏览器观察，`:3090` 上看到的也是缺陷本身（子代理显示
+  `任务团队 child N`，如本轮自己的 child 28）。本机 GUI 验证已在 Round 31/32 用同一
+  `dsh` 二进制（mise 安装，0.2.1-rc.2）真浏览器完成。live 部署+重启 = D-013 步骤 5，
+  用户保留，`NOT_RUN`。
+- 边界：全程只读（live 实例未碰）；无凭据读取；证据文件只含标签/uuid/mtime，无用户
+  会话内容；无 tag/发布动作。

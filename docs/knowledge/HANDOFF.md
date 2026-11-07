@@ -1,5 +1,34 @@
 # Agent Handoff
 
+## 2026-11-08 — 子代理顶栏显示名：live `:3090` 持久面板数据实锤——本轮自己的子代理在 live 上显示为「任务团队 child 28」；用户一步部署即收口（fix_child_names 第 5 轮，零源码改动，`CONFIRMED`）
+
+- **From:** 执行子代理（fix_child_names，orchestrator attempt 5）· **To:** lead / 用户 ·
+  **Base:** `91cad68`（本地 `release/0.6.0` HEAD，与 origin 同步，未变）
+- **本轮新实锤（全部只读；摘录
+  `evidence/childname-fix-2026-11-08/live-descriptor-labels-2026-11-08.txt`，记录
+  `VALIDATION.md` Round 33）：**
+  - live 顶栏此刻正把**当前 orchestrator run 的子代理**显示成泛化名：最新 14 个子会话
+    首 `subagent/descriptor` label 全部为 `任务团队 child 15`…`任务团队 child 28`
+    （含 attempt 5 自己的执行子代理 `88e59d33…` = child 28，04:13），0 个描述性标签；
+    面板→descriptor 映射已在 Round 32 真 GUI 逐字验证，即 live 面板实际渲染内容。
+  - 修复构建在 live home **全域缺席**：`find /home/fish/dsh-layerfs -name team-engine.js`
+    → 0。
+  - 认证边界复测：`127.0.0.1:3090` / `localhost:3090` / `100.111.111.88:3090` 均 HTTP 401
+    （无 loopback 豁免）→ 浏览器级 live 观察对任何代理会话不可行（AGENTS.md 禁读凭据）。
+  - 分支告警：默认分支 `main` @ `1f9065d` 不含 `ad66118` → live profile 的 `github:`
+    依赖 + `pnpm update` **取不到修复**；必须显式安装 `ad66118` 构建。
+- **结论**：验收条款 4 特指 `http://100.111.111.88:3090` 合取的未达 = live 部署状态问题，
+  不是验证缺口；本机 GUI 验证 PASS（Round 31/32，同一 `dsh` 二进制 0.2.1-rc.2，真浏览器 +
+  6 子代理团队档，顶栏 6/6 描述性、0 泛化）。
+- **Next action（用户/lead，一步收口）**：把 `ad66118` 构建装入 live `web` profile（上一节
+  步骤：备份 patch → `dsh plugin add` 新路径 tarball → 核对 `dsh.profile.bundles` 三项 →
+  `workflow-ptc` enabled），**不要**用 `pnpm update`（main 上没有修复），然后按 D-013 步骤 5
+  重启 `:3090`（`DSH_HOME=/home/fish/dsh-layerfs dsh web --host 100.111.111.88 --port 3090
+  --no-open`）。之后任意团队档工作流的顶栏即显示描述性子代理名。插件 toggle 重载语义未验证
+  （`NOT_RUN`）——重启是保证生效的重载方式。
+- **本轮其他**：`npm run ci` @ `91cad68` → 37 文件 / 650 测试 PASS；[COORDINATION] 状态块
+  按协议发布到 Issue #1（更正上一节「Issue 无该状态块」的过时记录：attempt 4 的块已存在）。
+
 ## 2026-11-08 — 子代理顶栏显示名：GUI 浏览器验证 PASS（fix_child_names 验证轮，零源码改动，`CONFIRMED`，`release/0.6.0` @ `ad66118`）
 
 - **From:** 执行子代理（fix_child_names，orchestrator attempt 4 · GUI 验证轮）· **To:** lead / 用户 ·
