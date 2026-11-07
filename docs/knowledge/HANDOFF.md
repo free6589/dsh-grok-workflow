@@ -1,5 +1,24 @@
 # Agent Handoff
 
+## 2026-11-07 — 路由 Cap B组+C1 收尾归档（route-cap-closer，`release/0.5.1` 工作分支）
+
+- **From:** route-cap-closer · **To:** lead · **Base:** `df34ac0`（本地 `release/0.5.1` HEAD，本轮 commit 前）
+- **变更文件（`git add -A` 入库，未 bump 版本、未打 tag、未发布 npm）：**
+  实现（既有工作树改动，本轮只重建 `lib/` 确认同步）：`src/settings.ts`（`validateRoutes` 空 Cap notes）、
+  `src/client/index.js`（`warn.emptyCap` 中英 + 黄字横幅，不拦 Save）、`docs/ARCHITECTURE.md`（单 run 作用域）、
+  `src/script.ts`（`busyRoutes` 快照 + 重排未试顺序 + `'(cross-run hint)'` 标记）、`src/run.ts`（run 级路由标签快照）、
+  `src/report.ts` + `src/records.ts`（`Route overflows (cross-run hint)` 分开渲染 + 透传）、
+  `docs/knowledge/RESEARCH.md`（A16，C2-spike 已写入）、`CHANGELOG.md`（条目已由实现任务写入）、
+  `test/route-concurrency.spec.ts` + `test/client.spec.ts`、`lib/` 编译产物（`build-client` 84123 B，二次重建 md5 幂等）；
+  归档（本轮新增）：`docs/knowledge/DECISIONS.md` D-038、`docs/knowledge/VALIDATION.md` Round 25、
+  `docs/knowledge/STATE.md`（Last updated 行 + Next priority 段）、本节。
+- **ci 结果（CONFIRMED）：** `npm run build` PASS；`npx vitest run test/route-concurrency.spec.ts test/client.spec.ts`
+  **47/47 PASS**（route-concurrency 13/13，client 34/34）；`npm run ci` **624/624 PASS**（35 文件，typecheck 0 errors，
+  lint 3 warnings / 0 errors 既有基线）；DSH core 未改；live `:3090` 未重启（D-013）；真机 live `NOT_RUN`。
+- **诚实边界：** B组+C1 已合入工作树、随本轮 commit 进 `origin release/0.5.1`；未发布、未打 tag；
+  `task-3` 只读确认 completed（未 claim）。push 结果见本轮回复。
+- **Next action：** lead 复核 D-038 / Round 25 后决定是否合入 `main`、走发布流程、升级 `:3090`（需用户批准）。
+
 ## 2026-11-07 — v0.5.0/v0.5.1 收尾 + Round 24 诊断交接（release-closer，`release/0.5.1` 工作分支）
 
 - **From:** release-closer · **To:** lead / next agent · **Base:** local `release/0.5.1` HEAD `720eeb6`

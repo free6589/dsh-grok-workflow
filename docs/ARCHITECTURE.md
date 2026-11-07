@@ -104,10 +104,13 @@ only from a pool worker, so at most that many child agents are in flight.
 ### Per-route concurrency: overflow, not fallback
 
 Each route in a role's chain may carry an optional `maxInFlight` (1–64, blank =
-unlimited). The counter is per route, not per run: while a capped route is full,
+unlimited). The counter is per route **inside one workflow run**: while a capped route is full,
 a new call overflows to the next untried route in chain order instead of waiting
 on the full one. Only when every untried route is full does the call wait for a
-drain, and the wait is recorded as `queuedMs`.
+drain, and the wait is recorded as `queuedMs`. Counters live in the generated
+script's per-run state and are never shared across runs, so a `Route overflows …`
+entry can only ever describe yielding inside the run that produced it. Blank =
+unlimited = never yields: a chain whose routes are all blank can never overflow.
 
 A full lane is never a failure: it advances no fallback, costs no retry attempt,
 and leaves the failure policy (`switchOn`) untouched. The distinction is visible

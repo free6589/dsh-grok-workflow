@@ -42,6 +42,8 @@ interface Bundle {
     translate(locale: string, key: string, params?: Record<string, unknown>): string
     translator(locale: string): Translator
     activeLocale(locale: unknown): string
+    comboWarn(draft: Draft): boolean
+    emptyCapWarn(draft: Draft): boolean
   }
 }
 
@@ -75,7 +77,7 @@ function loadBundle(): Bundle {
 }
 
 const bundle = loadBundle()
-const { draftOf, validate, formatError, opsFor, resolveNamespace, translate, translator } = bundle.GROK_WORKFLOW_INTERNALS
+const { draftOf, validate, formatError, opsFor, resolveNamespace, translate, translator, comboWarn, emptyCapWarn } = bundle.GROK_WORKFLOW_INTERNALS
 const en = translator('en')
 const zh = translator('zh')
 
@@ -511,5 +513,45 @@ describe('client settings page: draft, validation and path ops', () => {
     expect(resolveNamespace(undefined, 'grok-workflow')).toEqual({ ns: 'grok-workflow', how: 'default' })
     // Half the signature is not this plugin: `roles` alone must not capture a page.
     expect(resolveNamespace({ namespaces: [{ ns: 'x', value: { roles: {} } }] }, 'grok-workflow')).toEqual({ ns: 'grok-workflow', how: 'missing' })
+  })
+
+  it('warns (not blocks) when a chain has 2+ routes but every cap is blank', () => {
+    // Bilingual copy exists and actually differs.
+    expect(translate('en', 'warn.emptyCap.title')).not.toBe('warn.emptyCap.title')
+    expect(translate('zh', 'warn.emptyCap.title')).not.toBe('warn.emptyCap.title')
+    expect(translate('en', 'warn.emptyCap.title')).not.toBe(translate('zh', 'warn.emptyCap.title'))
+    expect(translate('en', 'warn.emptyCap.detail')).not.toBe(translate('zh', 'warn.emptyCap.detail'))
+    // Single-locale rule: no raw key leakage, both dicts carry the pair.
+    for (const locale of ['zh', 'en']) {
+      const dict = bundle.GROK_WORKFLOW_DICT[locale]!
+      expect(dict['warn.emptyCap.title']!.length).toBeGreaterThan(3)
+      expect(dict['warn.emptyCap.detail']!.length).toBeGreaterThan(3)
+    }
+    //capHint/placeholder carry the blank=unlimited=never-yield rule in both languages.
+    expect(translate('en', 'roles.capHint')).toContain('Blank = unlimited = never yields')
+    expect(translate('zh', 'roles.capHint')).toContain('留空=不限=不让路')
+    expect(translate('en', 'roles.capHint')).toContain('never shared across runs')
+    expect(translate('zh', 'roles.capHint')).toContain('跨run不共享计数')
+
+    const twoBlank = draftOf(undefined)
+    twoBlank.roles.worker = [{ provider: 'p', model: 'm1' }, { provider: 'p', model: 'm2' }]
+    expect(emptyCapWarn(twoBlank)).toBe(true)
+    // Not a validation error: Save stays enabled.
+    expect(validate(twoBlank)).toEqual([])
+
+    const oneCapped = draftOf(undefined)
+    oneCapped.roles.worker = [{ provider: 'p', model: 'm1' }, { provider: 'p', model: 'm2', maxInFlight: 1 }]
+    expect(emptyCapWarn(oneCapped)).toBe(false)
+
+    const single = draftOf(undefined)
+    single.roles.worker = [{ provider: 'p', model: 'm1' }]
+    expect(emptyCapWarn(single)).toBe(false)
+
+    const unfinished = draftOf(undefined)
+    unfinished.roles.worker = [{ provider: 'p', model: 'm1' }, { provider: 'p', model: '' }]
+    expect(emptyCapWarn(unfinished)).toBe(false)
+
+    // comboWarn is untouched by this change.
+    expect(comboWarn(draftOf(undefined))).toBe(false)
   })
 })
