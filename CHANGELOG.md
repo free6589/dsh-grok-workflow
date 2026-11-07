@@ -5,6 +5,40 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Added / 新增
+
+- **Empty-cap heads-up and single-run scope docs for route caps / 空 Cap 提醒与单 run 作用域说明** —
+  a role chain with 2+ routes but every `maxInFlight` blank now shows a yellow heads-up on the
+  settings page (`warn.emptyCap`, both languages) instead of silently never overflowing: blank =
+  unlimited = never yields, and only a capped route yields when full. The cap hint/placeholder
+  copy and the load-time `validateRoutes` notes say the same rule in both languages. `docs/ARCHITECTURE.md`
+  now states the scope explicitly: the per-route in-flight counters live inside one workflow run
+  and `Route overflows …` can only ever describe yielding inside the run that produced it. No routing
+  behavior changed; the warning never blocks Save and the notes never fail the load.
+  当一条角色链有 2 条以上路由、但 `maxInFlight` 全空时，设置页会显示黄色提醒（`warn.emptyCap`，
+  中英双语），不再静默地"永远不溢出"：留空=不限=不让路，只有填了上限的路由才会在打满时让路。
+  上限的 hint/placeholder 文案与加载时 `validateRoutes` 的 notes 用中英双语写明同一规则；
+  `docs/ARCHITECTURE.md` 明确作用域：每条路由的在飞计数只活在单次 workflow run 内，
+  `Route overflows …` 只可能描述产生它的那一次 run 内部的让路。不改任何选路行为；提醒不拦保存，
+  notes 不会导致加载失败。
+
+- **Cross-run route hint with local-vs-hint overflow rendering / 跨 run 路由 hint 与本地/跨 run 让路分开渲染** —
+  at admission the plugin snapshots an approximate global busy hint (route labels other live
+  runs configured, run-level only, never exact sub-call counts) and passes it as `args.busyRoutes`;
+  the script only reorders untried routes (busy lanes yield to non-busy ones, never removed) and
+  records a deprioritized lane as `<label> (cross-run hint)` in the existing `skippedBusy` evidence,
+  reusing the overflow fields. No failure semantics change: `switchOn`/retries/counts are untouched,
+  the child-agent budget ignores the hint, and a solitary run omits the key so its report is
+  byte-identical to before. `Route overflows (cross-run hint):` renders separately from the local
+  `Route overflows (full lane yielded, not failures):` line, and the routing ledger carries the same
+  evidence through `recordRouting`.
+  准入时插件对近似全局忙闲做一次快照（其它 live run 配置过的路由标签，仅 run 级估计，不含精确子调用
+  计数），经 `args.busyRoutes` 下发；脚本只重排未试路由顺序（忙 lane 给非忙让路，不删除），被 hint
+  挤到后面的记为 `<label> (cross-run hint)`，复用现有 `skippedBusy` 证据字段。不改失败语义：
+  `switchOn`/重试/计数不动，子代理预算忽略 hint；孤立 run 不带该键，报告与之前逐字节一致。
+  `Route overflows (cross-run hint):` 与本地 `Route overflows (full lane yielded, not failures):`
+  分开渲染，路由台账经 `recordRouting` 同步透传同一证据。
+
 ## [0.5.1] - 2026-11-07
 
 ### Fixed / 修复

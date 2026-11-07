@@ -254,8 +254,8 @@ window.__ModuleLoader__.load({
       'roles.providerLabel': 'Channel',
       'roles.modelLabel': 'Model',
       'roles.capLabel': 'Cap',
-      'roles.capPlaceholder': '1-64, blank = unlimited',
-      'roles.capHint': 'Max calls at once on this route. A full route overflows to the next one; it never fails, it just yields.',
+      'roles.capPlaceholder': '1-64, blank = unlimited (never yields)',
+      'roles.capHint': 'Max calls at once on this route. A full route overflows to the next one; it never fails, it just yields. Blank = unlimited = never yields; a capped route yields only when full inside one workflow run, and counts are never shared across runs.',
       'roles.providerPlaceholder': 'Pick a channel…',
       'roles.modelPlaceholder': 'Pick a model… (blank = easiest)',
       'roles.manualProvider': 'or type a channel…',
@@ -266,6 +266,8 @@ window.__ModuleLoader__.load({
 
       'warn.combo.title': 'Long chains plus many retries can run very long.',
       'warn.combo.detail': 'This is a heads-up, not a block: saving still works.',
+      'warn.emptyCap.title': 'All caps are blank: nothing will ever yield.',
+      'warn.emptyCap.detail': 'This chain has 2+ routes but every cap is blank = unlimited = never yields; only a capped route yields when full inside one workflow run, and counts are never shared across runs. This is a heads-up, not a block: saving still works.',
 
       'action.save': 'Save',
       'action.saveCount': 'Save ({count})',
@@ -442,8 +444,8 @@ window.__ModuleLoader__.load({
       'roles.providerLabel': '哪家',
       'roles.modelLabel': '用哪个',
       'roles.capLabel': '并发上限',
-      'roles.capPlaceholder': '1-64，空=不限',
-      'roles.capHint': '这条路由同时在飞的调用上限。打满就用下一条，不算失败，只是让路。',
+      'roles.capPlaceholder': '1-64，空=不限=不让路',
+      'roles.capHint': '这条路由同时在飞的调用上限。打满就用下一条，不算失败，只是让路。留空=不限=不让路；单run内打满才让路；跨run不共享计数。',
       'roles.providerPlaceholder': '选哪家…',
       'roles.modelPlaceholder': '选用哪个…（留空最省事）',
       'roles.manualProvider': '或手填通道…',
@@ -454,6 +456,8 @@ window.__ModuleLoader__.load({
 
       'warn.combo.title': '备用链很长、重试又高，跑起来会很久。',
       'warn.combo.detail': '只是提醒，不拦保存。',
+      'warn.emptyCap.title': '上限全空：永远不会让路。',
+      'warn.emptyCap.detail': '这条链有 2 条以上路由但上限全空=不限=不让路；只有填了上限的路由才会在单次 run 内打满时让路，计数跨 run 不共享。只是提醒，不拦保存。',
 
       'action.save': '保存',
       'action.saveCount': '保存 ({count})',
@@ -617,6 +621,29 @@ window.__ModuleLoader__.load({
     function comboWarn(draft) {
       const longest = Math.max(1, ...ROLES.map((role) => (draft.roles[role] || []).length))
       return longest >= 5 && Number(draft.maxRetries) >= 5
+    }
+
+    /**
+     * Heads-up (not a block) when a chain has 2+ finished routes but every cap
+     * is blank: blank = unlimited = never yields, so no overflow can ever
+     * happen on that chain. Only finished rows (non-blank model) count — two
+     * blank unfinished rows are already `error.missingModel`, not this warning.
+     * A capped route yields only when full inside one workflow run; counts are
+     * never shared across runs. Rendered above the save button like `comboWarn`;
+     * saving still works.
+     * @param draft - the editable draft.
+     * @returns true when the warning should show.
+     */
+    function emptyCapWarn(draft) {
+      return ROLES.some((role) => {
+        const finished = (draft.roles[role] || [])
+          .filter((route) => String((route && route.model) || '').trim() !== '')
+        if (finished.length < 2) return false
+        return finished.every((route) => {
+          const capRaw = route === undefined || route === null ? undefined : route.maxInFlight
+          return capRaw === undefined || capRaw === null || String(capRaw).trim() === ''
+        })
+      })
     }
 
     /**
@@ -1090,6 +1117,7 @@ window.__ModuleLoader__.load({
       const errors = useMemo(() => validate(draft), [draft])
       const ops = useMemo(() => opsFor(draft, value), [draft, value])
       const warnCombo = useMemo(() => comboWarn(draft), [draft])
+      const warnEmptyCap = useMemo(() => emptyCapWarn(draft), [draft])
       const disabled = saving || namespace.status !== 'ready' || entry === undefined || entry.writable === false
       const onChange = (key, next) => setDraft((current) => ({ ...current, [key]: next }))
       const setChain = (role, next) => setDraft((current) => ({ ...current, roles: { ...current.roles, [role]: next } }))
@@ -1269,6 +1297,11 @@ window.__ModuleLoader__.load({
             h('strong', null, t('warn.combo.title')),
             h('div', null, t('warn.combo.detail')))
           : null,
+        warnEmptyCap
+          ? h('div', { style: styles.warn },
+            h('strong', null, t('warn.emptyCap.title')),
+            h('div', null, t('warn.emptyCap.detail')))
+          : null,
         errors.length > 0
           ? h('div', { style: styles.errorBox },
             h('ul', { style: { ...styles.error, margin: 0, paddingLeft: '18px' } },
@@ -1445,6 +1478,7 @@ window.__ModuleLoader__.load({
     /** Internals pinned by test/client.spec.ts (no runtime caller). */
     exports.GROK_WORKFLOW_INTERNALS = {
       validate, formatError, opsFor, draftOf, resolveNamespace, translate, translator, activeLocale,
+      comboWarn, emptyCapWarn,
     }
     return module.exports
   },

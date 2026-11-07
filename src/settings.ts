@@ -169,6 +169,23 @@ export function validateRoutes(ctx: Context, config: ResolvedConfig): RouteValid
     for (const route of config.roles[role]) configured.push({ role, route })
   }
   if (configured.length === 0) return { errors, notes }
+  // Empty-cap heads-up (never a failure): a chain with 2+ routes where every
+  // maxInFlight is blank can never overflow — blank = unlimited = never yields.
+  // Only a capped route yields when full inside one workflow run, and the
+  // in-flight counters live inside that run (never shared across runs).
+  // This needs no runtime service, so it is computed before the llm-gated
+  // checks below (which return early when the runtime cannot judge routes).
+  for (const role of ROLE_ORDER) {
+    const chain = config.roles[role] ?? []
+    if (chain.length < 2) continue
+    const allBlank = chain.every(route => route.maxInFlight === undefined)
+    if (!allBlank) continue
+    notes.push(
+      `roles.${role} has ${chain.length} routes but every maxInFlight is blank (= unlimited = never yields); ` +
+      `only a capped route yields when full inside one workflow run, and counts are never shared across runs ` +
+      `(上限全空=不限=不让路；只有填了上限的路由才会在单次 run 内打满时让路，计数跨 run 不共享)`,
+    )
+  }
   if (llm === undefined || typeof llm.listProviders !== 'function') {
     notes.push('model routes were not validated: this runtime exposes no llm service')
     return { errors, notes }

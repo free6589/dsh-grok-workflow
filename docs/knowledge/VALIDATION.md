@@ -2032,3 +2032,32 @@ DSH 的自动压缩（`@deepseek-ai/dsh-compaction-basic@0.2.1-rc.2`）经 `agen
 3. 上游：`dsh-token-meter` 容忍孤儿 `assistant/message`（或 `session.append` 前置校验、压缩失败升级为可见告警），
    否则已存在的会话无法原地恢复（重启 DSH 也不行，日志里的孤儿事件仍在）。
 4. 未提交、未 push、未 bump 版本；工作树另有既有未跟踪目录 `.v050-home/`、`out/`。
+
+## Round 25 (2026-11-07) — 路由 Cap 空陷阱提示 + 单 run 作用域 + 跨 run hint（B组+C1 收尾归档）
+
+**性质**：收尾归档 + 提交。本轮不改 `src`/`test`/`lib` 行为（B组+C1 实现为既有工作树改动），只新增
+`DECISIONS.md` D-038、本 Round 25、`STATE.md`/`HANDOFF.md` 刷新，然后 `git commit` + push 到
+`origin release/0.5.1`。`CHANGELOG.md` 不动（B组+C1 条目已由实现任务写入）。
+
+### 命令与结果（CONFIRMED，均在 `/home/fish/projects_mine/dsh-grok-workflow` 执行）
+
+| 命令 | 结果 |
+|---|---|
+| `npm run build` | PASS（exit 0；`client bundle: 84123 bytes → lib/client.js`） |
+| `npx vitest run test/route-concurrency.spec.ts test/client.spec.ts` | **47/47 PASS**（route-concurrency 13/13，client 34/34） |
+| `npm run ci` | **PASS**（exit 0；typecheck 0 errors；lint 3 warnings / 0 errors 既有基线；vitest **35 files / 624 tests PASS**） |
+| `lib` 同步 | `npm run build` 后二次重建 md5 幂等一致（`IDEMPOTENT_SYNCED`）；`lib/` 变更即 B组+C1 实现的编译产物，随本轮 commit 入库 |
+| `git diff --exit-code -- lib/` | 以入库为准（上条确认后随 commit 同步；约束原文"若不是0则重跑"已满足——重跑后幂等无变化） |
+| DSH core 改动 | 无（`CONFIRMED`：`git status` 仅本仓库文件，无 core 路径） |
+| live `:3090` 重启 | 未做（D-013；live 实例仍跑 `0.2.7`，reload/upgrade 待用户批准） |
+| 真机 live | `NOT_RUN`（本轮纯收尾归档，未起隔离 profile） |
+
+### 归档内容
+
+- `DECISIONS.md` D-038：B组（`warn.emptyCap` 黄字不拦 Save + `validateRoutes` notes + 单 run 作用域）+
+  C1（`busyRoutes` run 级估计重排未试顺序、无 hint 逐字节不变、`skippedBusy` 复用 `'(cross-run hint)'` 标记、
+  报告分开渲染）+ C2 不可行（A16，沙箱封闭）。
+- 变更文件（随本轮 commit 入库，未 bump 版本、未打 tag、未发布 npm）：
+  `src/{script,run,report,settings}.ts`、`src/client/index.js`、`docs/ARCHITECTURE.md`、
+  `docs/knowledge/RESEARCH.md`（A16 已由 C2-spike 任务写入）、`CHANGELOG.md`（条目已由实现任务写入）、
+  `test/{route-concurrency,client}.spec.ts`、`lib/` 编译产物。

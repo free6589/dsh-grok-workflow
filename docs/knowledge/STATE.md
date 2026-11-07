@@ -20,6 +20,8 @@ Last updated: 2026-11-07 (local, release-closer)
 
 ## Current phase
 
+Last updated 2026-11-07 route-cap B+C1（`release/0.5.1` 工作树内，已合入未发布，见 D-038 / VALIDATION Round 25）。
+
 `0.5.1` **released**. Base of this state: **`origin/main` = `5cc66be`** (Merge PR #42,
 release `0.5.1`; local `release/0.5.1` HEAD `720eeb6` is the merged second-parent commit).
 
@@ -189,6 +191,12 @@ This close-out commit archives VALIDATION.md Round 24 (read-only diagnosis) + th
 `v051-fast-context/` live evidence (13 files) + STATE/HANDOFF refresh. The one open action is outside
 this repo: the live DSH service on `:3090` still runs `dsh-grok-workflow@0.2.7` and any
 profile reload/upgrade (to `v0.5.1`) — **that reload awaits explicit user approval (D-013); it is not done**.
+
+B组+C1 已合入工作树、未发布（2026-11-07，route-cap-closer 收尾）：设置页 `warn.emptyCap`
+黄字提醒不拦 Save + `validateRoutes` notes + 单 run 作用域（ARCHITECTURE），C1 `busyRoutes`
+run 级估计重排未试顺序 + `skippedBusy '(cross-run hint)'` 标记 + 报告分开渲染，C2 按 A16 不做；
+`npm run ci` 35 文件 / 624 测试 PASS（Round 25）；随本轮 commit 进 `origin release/0.5.1`，
+未 bump 版本、未打 tag、未发布 npm、未重启 live。D-038 / VALIDATION.md Round 25 为准。
 
 Older candidates — none decided, all `HYPOTHESIS` until the captain picks:
 `relay`/`append` delivery in a long-lived GUI session (NR-1's remaining half), item 8's

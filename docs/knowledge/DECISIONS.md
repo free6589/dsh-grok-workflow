@@ -558,3 +558,28 @@ Each entry records the decision, evidence, alternatives, and status.
 - **已知缺陷（本轮发现并已修，`CONFIRMED`）：** 首版把本轮消息当历史（`relay` 先 `commitClaimed()`
   再 `produceAnswer()`），任何追问都会命中自己；`collectRecallSources(…, exclude=request)` 剔除后修复，
   `test/triage-recall.spec.ts` 的 `before the fix` 用例守着。
+
+## D-038 — 路由 Cap 空陷阱提示 + 单 run 作用域 + 跨 run hint（C1），C2 精确锁证伪
+
+- **Status:** CONFIRMED（`npm run ci` 35 文件 / 624 测试 PASS；
+  `test/route-concurrency.spec.ts` 13 例、`test/client.spec.ts` 34 例；见 VALIDATION.md Round 25）
+- **Date:** 2026-11-07
+- **Decision:** ①B组：设置页 `warn.emptyCap`（≥2 路由全空 Cap 黄字提醒、**不拦 Save**）+
+  `validateRoutes` notes（`src/settings.ts` load-time note，非 error）+ ARCHITECTURE 写明单 run 作用域
+  （只有填了上限的路由才会在单次 run 内打满时让路，计数跨 run 不共享）；②C1：run 准入快照
+  `busyRoutes`（run 级估计，来源 `ActiveState` 的 run 级占用、经 `routeBudgetFor` 估算，非精确子调用级）
+  重排**未试**顺序（已试/失败语义 `switchOn`/重试不动）、无 hint 时逐字节不变；`skippedBusy`
+  复用 `'(cross-run hint)'` 标记（`src/script.ts:400-421`），报告分开渲染
+  （`Route overflows (cross-run hint)`，`src/records.ts`/`src/report.ts` 透传）；③C2 不做——
+  精确全局信号量不可行（A16：`ctx.workflowEngine.start` 不接受 host 回调注入、`bindings()` 写死 6 键、
+  脚本全局表只注入 `agent/parallel/pipeline/phase/log/args`，沙箱封闭）。
+- **Reason:** 用户可见失败是"配了多条路由却永远只走第一条"——根因是全空 Cap = 不限 = 永不让路，
+  且计数只活在单次 run 内。B组把空陷阱摆到台面上（提醒不拦），C1 用廉价 run 级 hint 做近似分流，
+  精确锁（C2）经 spike 证伪后不再追。
+- **Consequences:** `src/settings.ts`（`validateRoutes` notes）、`src/client/index.js`
+  （`warn.emptyCap` 中英 + `emptyCapWarn` + 黄字横幅）、`docs/ARCHITECTURE.md`（单 run 作用域）、
+  `src/script.ts`（`busyRoutes` 快照 + 重排 + `(cross-run hint)` 标记）、`src/run.ts`
+  （run 级路由标签快照）、`src/report.ts`/`src/records.ts`（分开渲染 + 透传）。
+- **Alternatives rejected:** C2 精确全局信号量（spike 按 A16 证伪：须改 harness + 脚本注入面，
+  本次不做）；打满当失败（拒：溢出不是失败，不耗重试、不动 `switchOn`，D-030 既定语义）；
+  排队等同一条（拒：有空闲路由时等是浪费，全满才排队等腾位 `queuedMs`）。

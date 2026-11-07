@@ -323,3 +323,12 @@ out-of-scope → mode-off → already-routed; reason labels are asserted only vi
 4. **闸门默认关**：`grokDefault` 默认 `off`，全新 profile 里用户消息根本不进分诊，
    `runWorkflow` 从未运行——此时归档文件不会出现。排查"归档是空的"要先确认这一点
    （真机 patch 里写 `grokDefault: "on"`）。
+
+## A16 — PTC 全局信号量不可行：沙箱注入面封闭（C2-spike，2026-11-07，`CONFIRMED`）
+- **结论：不可行（不改行为前提下）**：`ctx.workflowEngine.start` 不接受 agent 钩子之外的 host 回调/共享原语注入；脚本内 `callRole` 调不到 host 侧全局计数。想做必须改 harness + 本仓库脚本（= 改行为），本次 spike 不做。
+- **请求面封闭**：`WorkflowStartRequest` 只有 `script/meta/args/subagentProvider/maxTotalAgents/parent/signal`（`packages/workflow/workflow/src/runtime-types.ts:19-34`）；`PtcWorkflowEngine.start` 只组装 `WorkerInit{meta,body,args,limits}`（`packages/workflow/workflow-ptc/src/index.ts:149-154`），无额外绑定参数（`index.ts:134-189`）。
+- **绑定面封闭**：`PtcWorkflowRun.bindings()` 写死 6 键 `begin/startChild/childResult/disposeChild/progress`（`packages/workflow/workflow-ptc/src/host.ts:178-189`），`drive()` 只暴露一个 namespace `workflowHost`（`host.ts:290-297`，程序模板 `host.ts:27`）。Guest 类型 `WorkflowGuestHost` 仅 5 方法（`src/guest-types.ts:27-59`），`runWorkflowGuest` 的 `ChildPort` 仅 `startAgent`（`src/guest.ts:49-66`）。
+- **脚本全局表封闭**：`WorkflowExecution` 只注入 `agent/parallel/pipeline/phase/log/args`（`packages/workflow/workflow-ptc/src/runtime.ts:85-93`）；`agent()` opts 白名单 `label/phase/schema/provider/model`（`runtime.ts:32-33,237-258`），未知 key 抛 `UNSUPPORTED_OPTION`；跨 realm 值须过 `materializeFromRealm`，函数不可过（`src/realm.ts:85-86`）。PTC 层 `PtcBindingFunction` 本是 `(args) => Promise<PtcJsonValue>`、支持多 namespace（`packages/ptc-runtime/ptc-runtime/src/types.ts:20,88-89`），但 workflow-ptc 只用了一个。
+- **本仓库侧无计数通道**：`buildWorkflowRequest` 的 `args` 只有 objective/tasks/并发重试上限/roles/switchOn/carryover 等（`src/script.ts:1543-1604`）；`callRole` 唯一出口是 `agent(prompt, call)`（`src/script.ts:390`），`routeInFlight`（`src/script.ts:297-313`）是单 run 内存计数，跨 run 不共享。
+- **最小注入点（HYPOTHESIS，未做）**：`guest-types.ts` 加 `semAcquire/semRelease` → `host.ts bindings()` 实现进程级 `Map<key,{permits,waiters}>` → `guest.ts` 透传 `SemaphorePort` → `runtime.ts globals` 注册冻结函数 → `index.ts WorkerInit` + 本仓库 `args` 下发 key（纯 JSON）。安全要求：状态只活 host 侧、acquire 与 `controller.signal` 联动可取消（仿 `host.ts:231-247`）、key 命名空间化、unload 时清等待队列（仿 `host.ts:307-317`）、返回仅纯 JSON。
+- **替代方向**：不碰沙箱，在 host 侧（`src/run.ts` 的 `activeCountOfSession`/cap 检查，`run.ts:116-119,509-535`）做 run 级准入排队；粒度是 run 不是 task/role，且已有 per-session/total 两层上限。Task 级写冲突已有脚本内串行化（`mapLimitIsolated`，`src/script.ts:1037-1105`），与全局信号量无关。
