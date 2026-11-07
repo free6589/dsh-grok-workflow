@@ -2187,3 +2187,38 @@ DSH core 两处、约 3 行：`runtime.ts` 的 `agent()` 把 `label` 放进 `sta
 - 插件源码零改动；`npm run ci` 本轮未跑（无本任务源码改动，且工作树含并发任务进行中的 client 改动，跑 CI 只会测到别人的中间态；基线仍是 Round 26 的 35 文件 / 624 测试 PASS）。
 - `out/childname-verify/` 内两个中间摘录文件曾在相邻两次调用之间消失（`child1-events.jsonl`、`descriptor-excerpts.txt`；原因未查明，疑似与并发任务的 out/ 操作相撞）。已用「同一命令内生成+校验」的方式把三份摘录直接落盘到 `docs/knowledge/evidence/childname-blocked/`，落盘后跨调用复核仍在，证据不受影响。
 - 模型密钥：`BIFROST_VIRTUAL_KEY` 仅做存在性布尔检查（`[ -n … ]`），全程未读、未写、未回显。
+
+## Round 29 (2026-11-08) — fix_child_names 第三轮执行：链路再次独立重验 + 末两个扩展点候选用类型级证据关闭（**BLOCKED 维持**）
+
+**性质**：fix_child_names 再次执行（编排器重试）。本轮不转抄前两轮记录，全部自己重读源码；Round 27/28
+结论逐条复现一致，并新增**类型级证据**关闭此前仅以「理由否决」记录的末两个扩展点候选
+（每 run `subagentProvider` 覆盖 + `ctx.subagents.registerProvider`）。插件源码零改动，结论不变：**BLOCKED**。
+
+### 本轮自己重读并复核一致的源码链（installed DSH `0.2.1-rc.2`）
+
+| 环节 | 本轮实际读到的位置与内容 |
+|---|---|
+| 引擎写死子代理 label | `dsh-workflow-ptc/lib/index.js:332`：`` label: `${this.meta.name} child ${callId}` ``，无条件分支 |
+| guest 不转发 label | 同文件内嵌 `WORKFLOW_GUEST_SOURCE`（本轮全文读）：`SUPPORTED_AGENT_OPTIONS` 含 `label/phase`，但 `agent()` 只把 `prompt/schema/provider/model` 传给 `children.startAgent(...)`；`label/phase` 仅进 observer `agentStart(info)` |
+| 描述符锁死 | `dsh-subagent/lib/index.js:697-698` `foldSubagentDescriptor` 取第一条 `subagent/descriptor`；`:1404` descriptor 由 `startLocal` 从 `spec.label` 快照；`:1800` 写入子会话；types.d.ts:29 `SubagentActivationSpec.label` readonly |
+| 目录标签来源 | `dsh-subagent/lib/index.js:2575`：catalog entry 的 label = `foldSubagentDescriptor(子会话事件)?.label` → `dsh-client-ui-subagent/lib/client.js:201` `entry.label ?? entry.id` 直接渲染 |
+| 插件侧已尽责 | `src/script.ts:1188/1213/1324/1438` 每次 `agent()` 都传 `label`（`memberLabel`）；`src/` 全文无 `sessionTitle` 调用（用户截图里任务 2/5 的描述性次级行来自子会话标题的提示词首行推导，非插件 rename） |
+| core 检出无上游修复 | `~/projects_mine/deepseek-harness` HEAD `687f282e`（= release-dsh-0.2.1-rc.2 合入），`host.ts:205` 与 `runtime.ts:183-188` 与 installed 逐字一致——上游 ask 仍属必要 |
+
+### 新增：末两个扩展点候选的类型级关闭（本轮新证据）
+
+| 候选 | 关闭证据 |
+|---|---|
+| `WorkflowStartRequest` 是否有 label 字段 | `dsh-workflow/lib/types/runtime-types.d.ts:15-28` 全接口只有 `script/meta/args/subagentProvider/maxTotalAgents/parent/signal`——无 label；`meta.name` 可控但模板恒拼 ` child ${callId}` |
+| 每 run `subagentProvider` + 自定义 `SubagentProvider` | 注册与选择 API 真实存在（`dsh-subagent/lib/types/index.d.ts:288` `registerProvider`；`workflow-ptc/src/index.ts:70-79` `resolveSubagentProvider`），但 continuable 子代理的 provider 参与**只有** `prepareContinuable → ContinuableCreateSpec { seed? }`（`dsh-subagent/lib/types/types.d.ts:187-213`，单字段、无 label，manager 拥有其余一切生命周期）；descriptor 由 `startLocal` 从 `spec.label` 快照，而 `startActivation` 的契约明说 label 由调用方拥有（types.d.ts:122-124，`request` 里 `Omit<…,'label'>`）——调用方是写死的 workflow host |
+| 无 `prepareContinuable` 的 provider（external 一次性子代理） | `SubagentRunInfo` 只有 `runId/provider/id/local`（types.d.ts:88-102），无 label 无会话目录条目 → GUI 会渲染裸子会话 id，比 `任务团队 child N` 更差，且摧毁 continuable 任务团队模型（子会话、目录面板、插件经 `workflow/agent-end` 的归档全依赖 continuable） |
+| 引擎配置 / 备选引擎 | `workflow-ptc/src/index.ts:105-111` Config 只有 provider/并发/上限/超时——无 label 模板；全 core checkout `extends WorkflowEngine` 仅 `PtcWorkflowEngine` 一处 |
+| 插件直调 `startActivation` | `ctx.subagents` 服务面只有 `registerProvider/getProvider/list/interruptByParent/…`（index.d.ts:270-300）；`startActivation` 在 `SubagentRuntime` 类上（index.d.ts:135,145），host 侧直调将绕过引擎 `agent()` 钩子——违反本仓架构不变量与任务措辞 |
+
+完整定位与推理：`docs/knowledge/evidence/childname-blocked/extension-points-closure.md`（本轮新增）。
+
+### 边界
+
+- 纯源码取证轮：未起隔离 profile（Round 28 的真机复现继续有效，其证据文件本轮复读完整）、未碰 live `:3090`（D-013）、operator `DSH_HOME` 未写、DSH core 未改。
+- 插件源码零改动；`npm run ci` 未跑（无本任务源码改动；工作树仍含并发任务的 client 改动；基线 Round 26：35 文件 / 624 测试 PASS）。
+- 无凭据读取；无密钥接触。

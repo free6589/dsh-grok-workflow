@@ -1,5 +1,37 @@
 # Agent Handoff
 
+## 2026-11-08 — 子代理顶栏显示名：第三次执行复核 + 末两个扩展点候选用类型级证据关闭，**BLOCKED 维持**（fix_child_names，`release/0.6.0` 工作树）
+
+- **From:** 执行子代理（fix_child_names，编排器重试轮）· **To:** lead / 用户 · **Base:** `5d9fcbe`（本地 `release/0.6.0` HEAD，未变）
+- **本轮做了什么：** ①把 Round 27/28 的源码链**第三次独立重验**（全部自己重读 installed DSH `0.2.1-rc.2` 与
+  core 检出源码，行号见 `VALIDATION.md` Round 29 表）——逐条一致；②新增**类型级证据**，把前两轮仅以
+  「理由否决」记录的末两个扩展点候选关闭：`WorkflowStartRequest` 全接口无 label 字段
+  （`dsh-workflow/lib/types/runtime-types.d.ts:15-28`）；每 run `subagentProvider` + `registerProvider` 虽是
+  真实文档化 API，但 continuable 子代理的 provider 参与只有 `ContinuableCreateSpec { seed? }`
+  （`dsh-subagent/lib/types/types.d.ts:187-213`，单字段无 label），descriptor 由 `startLocal` 从
+  `spec.label` 快照、label 归 `startActivation` 调用方（types.d.ts:122-124）——调用方即写死的 workflow host；
+  无 `prepareContinuable` 的 provider 会把子代理降级为 external 一次性 run（GUI 渲染裸子会话 id，更差且摧毁
+  continuable 模型）；引擎 Config 无 label 模板；全 core checkout 仅 `PtcWorkflowEngine` 一个引擎实现；
+  `ctx.subagents` 服务面不暴露 `startActivation`。另核：core 检出 HEAD `687f282e` 与 installed 同为
+  `0.2.1-rc.2`（无上游修复落地）。
+- **结论：BLOCKED 维持（第三次独立确认）。** 主标签只能由 DSH core 的 ~3 行上游改动解锁
+  （`runtime.ts` 转发 `opts.label` + `host.ts` 的 `childRequest()/startChild()` 接 `label`）；
+  半程缓解（`ctx.sessionTitle.rename`，只改次级行）仍待用户批准且不满足验收条款 1。本轮零源码改动。
+- **本轮改动：** 仅记忆与证据文件——`VALIDATION.md`（Round 29）、`DECISIONS.md`（D-039 Addendum 2）、
+  `STATE.md`（第三次执行补充段）、本节、
+  `docs/knowledge/evidence/childname-blocked/extension-points-closure.md`（新）。**无源码改动、无 `CHANGELOG.md` 条目。**
+- **未做 / `NOT_RUN`：** DSH core 未改（约束禁止）；live `:3090` 未碰（D-013，仍 `0.2.7`，本会话无凭据 401）；
+  隔离 profile 未再起（Round 28 的真机复现继续有效，本轮复读其证据文件完整）；`npm run ci` 未跑
+  （零源码改动；工作树含并发任务进行中的 client 改动；基线 Round 26：35 文件 / 624 测试 PASS）。
+- **并发注意：** 工作树仍有**另一任务**的改动（`.gitignore`、`lib/client.js`、`package.json`、
+  `src/client/index.js`、`test/client.spec.ts`、未跟踪 `test/panel-links.spec.ts`）。本轮**未触碰**，
+  提交时按文件名逐一 `git add`，只含本任务 5 个记忆/证据文件。
+- **Next action（需要用户/lead 决策，同前两轮，二选一）：**
+  ①**上游修复（推荐，能彻底解决）**：DSH `packages/workflow/workflow-ptc/src/` 约 3 行 label 转发；
+  改完插件零改动即生效。
+  ②**半程缓解（不满足本任务验收条款 1）**：插件在 `workflow/agent-start` 后调
+  `ctx.sessionTitle.rename(childId, <任务名>)`，次级行提示词原文换成任务名；主标签 `任务团队 child N` 仍在。
+
 ## 2026-11-07 — 子代理顶栏显示名：第二次尝试复核 + 真机复现，**BLOCKED 维持**（fix_child_names，`release/0.6.0` 工作树）
 
 - **From:** 执行子代理（fix_child_names，attempt 2）· **To:** lead / 用户 · **Base:** `524097f`（本地 `release/0.6.0` HEAD，未变）

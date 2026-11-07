@@ -619,3 +619,18 @@ Each entry records the decision, evidence, alternatives, and status.
   证据：`docs/knowledge/evidence/childname-blocked/`（README + `child-descriptor-events.txt` +
   `parent-agent-start-excerpts.txt` + `parent-run-start-excerpt.txt`）；命令与边界见 `VALIDATION.md` Round 28。
   半程缓解与上游 ask 维持原判：前者仍待用户批准（改次级行，不满足验收条款 1），后者仍 `NOT_RUN`（约束禁止改 core）。
+- **Addendum 2（2026-11-08，第三次执行，Round 29）：** 状态维持 **BLOCKED**。Round 27「Alternatives rejected」里
+  仅以理由否决的**自定义 `SubagentProvider`** 与**插件自建 `startActivation`** 两条，本轮补上**类型级证据**关闭：
+  ①`WorkflowStartRequest` 全接口（`dsh-workflow/lib/types/runtime-types.d.ts:15-28`）无 label 字段；
+  ②每 run `subagentProvider` 覆盖与 `ctx.subagents.registerProvider()`（`dsh-subagent/lib/types/index.d.ts:288`）
+  虽为真实文档化 API，但 continuable 子代理的 provider 参与**只有**
+  `prepareContinuable → ContinuableCreateSpec { seed? }`（`dsh-subagent/lib/types/types.d.ts:187-213`，单字段无
+  label），descriptor 由 `startLocal` 从 `spec.label` 快照、而 `startActivation` 契约明说 label 归调用方
+  （types.d.ts:122-124）——调用方即写死的 workflow host；③无 `prepareContinuable` 的 provider 会把子代理
+  降级为 external 一次性 run（`SubagentRunInfo` 无 label、无会话目录条目，GUI 渲染裸子会话 id），摧毁
+  continuable 任务团队模型；④引擎 Config 无 label 模板，全 core checkout 仅 `PtcWorkflowEngine` 一个
+  `WorkflowEngine` 实现；⑤`ctx.subagents` 服务面不暴露 `startActivation`（在 `SubagentRuntime` 类上，
+  index.d.ts:135,145），host 侧直调将绕过引擎 `agent()` 钩子，违反架构不变量。另核：core 检出 HEAD
+  `687f282e` 与 installed 同为 `0.2.1-rc.2`，`host.ts:205`/`runtime.ts:183-188` 逐字一致——上游 ask 仍必要。
+  完整定位：`docs/knowledge/evidence/childname-blocked/extension-points-closure.md`；命令与边界见
+  `VALIDATION.md` Round 29。

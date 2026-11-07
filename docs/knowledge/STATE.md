@@ -447,3 +447,10 @@ turn at a time; Round 16's isolation proof is in `.workflow-artifacts/matrix-024
   父会话 `tool-workflow/agent-start` 证明插件标签（`规划助手`/`执行`/`检查`）确实在传，
   而 6 个子会话首个 `subagent/descriptor` **全部**是 `"label":"任务团队 child N"`（N=1..6）——
   与用户截图逐字一致。证据：`docs/knowledge/evidence/childname-blocked/`。上游 ask 内容不变。
+- **第三次执行补充（2026-11-08，Round 29，`CONFIRMED`）**：结论**维持 BLOCKED**。Round 27/28 链路第三次独立
+  重验逐条一致；并新增**类型级证据**关闭末两个扩展点候选（每 run `subagentProvider` 覆盖 +
+  `ctx.subagents.registerProvider`：continuable 子代理的 provider 参与只有 `ContinuableCreateSpec { seed? }`、
+  无 label 字段；`WorkflowStartRequest` 全接口无 label；引擎 Config 无 label 模板；仅
+  `PtcWorkflowEngine` 一个引擎实现）。core 检出 HEAD `687f282e` 与 installed 同为 `0.2.1-rc.2`，上游 ask
+  仍必要。插件源码零改动。证据：`docs/knowledge/evidence/childname-blocked/extension-points-closure.md`；
+  详见 `VALIDATION.md` Round 29 与 `DECISIONS.md` D-039 Addendum 2。
