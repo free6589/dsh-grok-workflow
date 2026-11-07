@@ -2222,3 +2222,64 @@ DSH core 两处、约 3 行：`runtime.ts` 的 `agent()` 把 `label` 放进 `sta
 - 纯源码取证轮：未起隔离 profile（Round 28 的真机复现继续有效，其证据文件本轮复读完整）、未碰 live `:3090`（D-013）、operator `DSH_HOME` 未写、DSH core 未改。
 - 插件源码零改动；`npm run ci` 未跑（无本任务源码改动；工作树仍含并发任务的 client 改动；基线 Round 26：35 文件 / 624 测试 PASS）。
 - 无凭据读取；无密钥接触。
+
+## Round 30 (2026-11-08) — fix_completed_links：已完成子任务在聊天任务列表保持可点击（**CONFIRMED，真机 PASS**）
+
+**性质**：插件客户端修复（`src/client/index.js` 新增 `workflow-run` 聊天节点渲染器）+ 真实 Web GUI 验证。
+**DSH core 零改动**（唯一涉及的 DSH 侧事实全部走文档化扩展点）；live `:3090` 未碰（D-013）；
+operator `DSH_HOME` 未写；验证全部在隔离 home `.v070-home/`（web 模板 profile `panelcheck`，端口 3177/3179）完成。
+
+### 根因（CONFIRMED，行号即证据）
+
+- 库存任务列表是 `@deepseek-ai/dsh-client-ui-workflow-run` 的键控聊天节点渲染器（installed
+  `dsh-client-ui-workflow-run/lib/client.js:176-179`）：`navigableMembers()` 要求
+  `member.status === "running"` 且子会话属于本 run、投影出 `subagent` 身份——**已结束的行因此全部失去链接**。
+- 子会话能否打开与状态无关：workflow 子代理由 `startLocal` 以 `mode: "continuable"` 创建
+  （`dsh-subagent/lib/index.js` `snapshotSubagentDescriptor({ mode: "continuable", … })`），
+  完成后子会话与 `values.subagent.mode` 都还在——**可开性在结束后依然成立**，被库存渲染器的
+  running 条件错误掩盖。
+- 键控槽位的替换机制是**优先级遮蔽**（`dsh-web-frontend/dist/assets/index-*.js` 内 `SlotCore.register`）：
+  同键**同优先级**直接抛错（"already has an entry for key … register at a different priority to
+  shadow it (lowest renders)"），`entriesOfSlot` 按优先级升序去重、最低者渲染。首轮实现（无
+  `priority`，双方都落默认 0）实测：库存 `dsh-client-ui-workflow-run` 整个客户端 boot 失败
+  （"web boot: 1 entry did not activate"），页面只剩错误屏；A/B 对照（`disabled: true` 同 profile）
+  干净启动，冲突源锁定为本插件注册。加 `priority: -1` 后双注册并存、库存条目被遮蔽（插件卸载即恢复）。
+
+### 修复（插件侧，全在文档化扩展点内）
+
+`src/client/index.js`（= `lib/client.js`，md5 同步）新增 `mountPanel`：经
+`ctx.slots.inject('conversation.chat.node', …)` 以 `key: 'workflow-run'`、`priority: -1`
+重注册键控渲染器；行可开性由 `panelMemberMode()`（子会话存在 + `parentId` 匹配本 run +
+`mode` 为 `continuable`/`one-shot`）决定，**不读成员状态**。`uiWorkspace` 为可选注入
+（缺席时面板不注册、库存渲染器保留、设置页不受影响）。测试：`test/panel-links.spec.ts`
+14 例（运行态链接/完成态保持链接/失败·取消·中断保持链接/running→completed→failed 引用
+不变式/点击回调载荷/不可开行回退/双语词典/槽位注册含 `priority: -1` 钉死）+
+`test/client.spec.ts` 2 处断言更新；`npm run ci` **36 文件 / 638 测试 PASS**（typecheck 0 错，
+lint 4 warning / 0 error 基线），`git diff` 幂等重建 `lib/` md5 一致。
+
+### 真机验证（隔离 profile `panelcheck`，DSH CLI `0.2.1-rc.2`，模型 v4-pro + agnes flash）
+
+1. 插件 dev 安装进 web 模板 profile，`workflow-ptc` 启用 + 模型 patch（同 Round 26 叠加），
+   实例起在 `127.0.0.1:3179`；headless Chromium（Playwright）打开 GUI：
+   **boot 干净**（无 "Failed to load plugins"、无激活失败、console 0 错误）。
+2. 团队档真跑（gate on + `mode: full`，计算类双任务）：**run `runStatus: completed`**
+   （面板 `data-run-status="completed"`，共 6 子代理：规划 1 + 任务1 执行/检查 + 任务2 执行/检查，
+   其中一条真实 agnes `format-error` route switch 的 `执行 failed` 行——同 Round 26 形态）。
+3. **运行中**：`规划助手` running 行 = `<button data-member-openable="true">`（截图 04/05）。
+4. **完成后**：6 行全部 `tag=button`、`data-member-openable="true"`、**0 行 inert**——
+   `规划助手 已完成`（用户报告的缺陷行）与 `执行 failed` 都是链接（截图 06：全行下划线蓝链）。
+5. **点击已完成的规划助手行**：主面板切到子会话视图（面包屑 `… / 任务团队 child 1`，
+   含规划提示词全文与 "Completed in 34s"，截图 07）——与运行中行打开的是同一子任务视图。
+6. 附带验证（首轮 run，写文件任务在 ro 挂载的 `/home` 下按预期失败）：**failed 行同样可点击**，
+   run 终态 FAILED 时 6 行也全部为按钮——failed 分支的验收同轮覆盖。
+
+证据：`docs/knowledge/evidence/panel-links-2026-11-08/`（README、result.json、截图 04–07）。
+隔离实例用后即弃（job 已杀），实例访问 URL 含一次性 token 未入库（evidence 截图不含 URL/token）。
+
+### 边界
+
+- `relay`/`append` 投递形态下的任务列表渲染未单独验证（本轮验证的是默认 `in-turn`；渲染器
+  消费的是同一批 `tool-workflow/*` 事件，与投递策略无关，`HYPOTHESIS` 级外推）。
+- 深色主题/移动端宽度下样式未逐项核对（面板用内联样式 + `var(--dsw-alias-link)`，视觉差异
+  可能存在，`NOT_RUN`）。
+- 无凭据读取；无密钥接触；DSH core 未改；无 tag/发布动作。

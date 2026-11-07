@@ -1,0 +1,96 @@
+{
+  "ok": true,
+  "bootErrors": [
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)"
+  ],
+  "log": [
+    "[2026-11-07T16:49:19.971Z] prompt submitted",
+    "[2026-11-07T16:49:23.167Z] panel appeared: {\"panel\":{\"runStatus\":\"running\",\"runOpen\":\"true\"},\"rows\":[{\"status\":\"running\",\"tag\":\"button\",\"openable\":\"true\",\"label\":\"规划助手\",\"ariaLabel\":\"Open 规划助手\",\"inGrokPanel\":true}],\"url\":\"http://127.0.0.1:3179/\",\"stockRows\":[]}",
+    "[2026-11-07T16:49:27.323Z] running sample: {\"panel\":{\"runStatus\":\"running\",\"runOpen\":\"true\"},\"rows\":[{\"status\":\"running\",\"tag\":\"button\",\"openable\":\"true\",\"label\":\"规划助手\",\"ariaLabel\":\"Open 规划助手\",\"inGrokPanel\":true}],\"url\":\"http://127.0.0.1:3179/\",\"stockRows\":[]}",
+    "[2026-11-07T16:52:38.182Z] final rows: {\"panel\":{\"runStatus\":\"completed\",\"runOpen\":\"true\"},\"rows\":[{\"status\":\"completed\",\"tag\":\"button\",\"openable\":\"true\",\"label\":\"规划助手\",\"ariaLabel\":\"Open 规划助手\",\"inGrokPanel\":true},{\"status\":\"failed\",\"tag\":\"button\",\"openable\":\"true\",\"label\":\"执行\",\"ariaLabel\":\"Open 执行\",\"inGrokPanel\":true},{\"status\":\"completed\",\"tag\":\"button\",\"openable\":\"true\",\"label\":\"执行\",\"ariaLabel\":\"Open 执行\",\"inGrokPanel\":true},{\"status\":\"completed\",\"tag\":\"button\",\"openable\":\"true\",\"label\":\"检查\",\"ariaLabel\":\"Open 检查\",\"inGrokPanel\":true},{\"status\":\"completed\",\"tag\":\"button\",\"openable\":\"true\",\"label\":\"执行\",\"ariaLabel\":\"Open 执行\",\"inGrokPanel\":true},{\"status\":\"completed\",\"tag\":\"button\",\"openable\":\"true\",\"label\":\"检查\",\"ariaLabel\":\"Open 检查\",\"inGrokPanel\":true}],\"url\":\"http://127.0.0.1:3179/\",\"stockRows\":[]}",
+    "[2026-11-07T16:52:38.397Z] grok rows: 6, clickable: 6, inert: 0",
+    "[2026-11-07T16:52:38.397Z] grok rows detail: [{\"status\":\"completed\",\"tag\":\"button\",\"openable\":\"true\",\"label\":\"规划助手\",\"ariaLabel\":\"Open 规划助手\",\"inGrokPanel\":true},{\"status\":\"failed\",\"tag\":\"button\",\"openable\":\"true\",\"label\":\"执行\",\"ariaLabel\":\"Open 执行\",\"inGrokPanel\":true},{\"status\":\"completed\",\"tag\":\"button\",\"openable\":\"true\",\"label\":\"执行\",\"ariaLabel\":\"Open 执行\",\"inGrokPanel\":true},{\"status\":\"completed\",\"tag\":\"button\",\"openable\":\"true\",\"label\":\"检查\",\"ariaLabel\":\"Open 检查\",\"inGrokPanel\":true},{\"status\":\"completed\",\"tag\":\"button\",\"openable\":\"true\",\"label\":\"执行\",\"ariaLabel\":\"Open 执行\",\"inGrokPanel\":true},{\"status\":\"completed\",\"tag\":\"button\",\"openable\":\"true\",\"label\":\"检查\",\"ariaLabel\":\"Open 检查\",\"inGrokPanel\":true}]",
+    "[2026-11-07T16:52:41.093Z] planner click result: {\"clicked\":true,\"urlChanged\":false,\"afterUrl\":\"http://127.0.0.1:3179/\"}"
+  ],
+  "rows": [
+    {
+      "status": "completed",
+      "tag": "button",
+      "openable": "true",
+      "label": "规划助手",
+      "ariaLabel": "Open 规划助手",
+      "inGrokPanel": true
+    },
+    {
+      "status": "failed",
+      "tag": "button",
+      "openable": "true",
+      "label": "执行",
+      "ariaLabel": "Open 执行",
+      "inGrokPanel": true
+    },
+    {
+      "status": "completed",
+      "tag": "button",
+      "openable": "true",
+      "label": "执行",
+      "ariaLabel": "Open 执行",
+      "inGrokPanel": true
+    },
+    {
+      "status": "completed",
+      "tag": "button",
+      "openable": "true",
+      "label": "检查",
+      "ariaLabel": "Open 检查",
+      "inGrokPanel": true
+    },
+    {
+      "status": "completed",
+      "tag": "button",
+      "openable": "true",
+      "label": "执行",
+      "ariaLabel": "Open 执行",
+      "inGrokPanel": true
+    },
+    {
+      "status": "completed",
+      "tag": "button",
+      "openable": "true",
+      "label": "检查",
+      "ariaLabel": "Open 检查",
+      "inGrokPanel": true
+    }
+  ],
+  "stockRows": [],
+  "panel": {
+    "runStatus": "completed",
+    "runOpen": "true"
+  },
+  "runningSample": {
+    "panel": {
+      "runStatus": "running",
+      "runOpen": "true"
+    },
+    "rows": [
+      {
+        "status": "running",
+        "tag": "button",
+        "openable": "true",
+        "label": "规划助手",
+        "ariaLabel": "Open 规划助手",
+        "inGrokPanel": true
+      }
+    ],
+    "url": "http://127.0.0.1:3179/",
+    "stockRows": []
+  },
+  "clickResult": {
+    "clicked": true,
+    "urlChanged": false,
+    "beforeUrl": "http://127.0.0.1:3179/",
+    "afterUrl": "http://127.0.0.1:3179/",
+    "bodyAfterSnippet": "New Session\nPlugins\nAutomation tasks\nWorkspaces\nDefault workspace\nRunning\n用团队档完成两个独立的计算\n3min\nSession title: **创建 sum.txt 与 prod.txt 文件并确认内容（数字 611\n14min\nMore\n用团队档完成两个独立的计算\n/\n任务团队 child 1\nStandard mode\nChat\nTrajectory\nYou are the planning agent inside a verified workflow.\nDo not execute the work. Decompose the objective into at most 2 independent tasks.\nEvery task must have: id (unique, short, letters/numbers/_-), title, objective, expectedOutput, acceptanceCriteria (non-empty testable checks), context, constraints.\nRespect these limits exactly: workflow objective <= 32000 chars; each task title <= 160 chars; task objective/expectedOutput/context <= 4000 chars each; 1-20 acceptanceCriteria each <= 1000 chars; 0-20 constraints each <= 1000 chars; combined serialized tasks <= 48000 chars. Output outside these limits is rejected.\nThe constraints array is for execution constraints on the worker (scope, safety, non-goals). Never put planning-phase instructions such as \"do not execute work\" in it; every task will be executed by a worker after planning.\nTasks must be independent: do not create dependencies, ordering, or overlapping scope.\nAcceptance criteria must describe the END STATE the objective requires, never a weaker substitute. Never restate the objective as \"attempt X and report what happened\", \"try to do X\", or \"(expected failure)\". If the requested end state cannot be reached, the run must fail honestly: a criterion about having reported the attempt does not satisfy the ob"
+  }
+}

@@ -697,3 +697,29 @@
   4. 真机验证前先确认闸门开着（`grokDefault: "on"`），否则跑一整轮也不会有任何归档。
 - **下一步**：提交 + 开 PR（`base:main`）；`:3090` 升级仍需用户批准（D-013）；
   两进程并发追加压测、换引擎的子代理形状复测仍是 `NOT_RUN`。
+
+## 2026-11-08 — fix_completed_links 完成：已完成子任务保持可点击（真机 PASS，待复核/发布决定）
+
+- **From:** 执行子代理（fix_completed_links）· **To:** lead / 用户 · **Base:** `524097f`（本地 `release/0.6.0` HEAD）
+- **结论（`CONFIRMED`）**：已完成（及失败/取消/中断）子任务行在聊天任务列表恢复可点击并
+  可打开子会话视图；真机验证见 `VALIDATION.md` Round 30，决策 `DECISIONS.md` D-040，
+  机制 `RESEARCH.md` A17。改动全在插件客户端（`src/client/index.js` = `lib/client.js`），
+  DSH core 零改动。
+- **本轮改动**：`src/client/index.js` + `lib/client.js`（`mountPanel`，`priority: -1` 遮蔽）、
+  `test/panel-links.spec.ts`（新，14 例）、`test/client.spec.ts`（+2 断言）、
+  `package.json`（`test:unit` 收入新 spec）、`.gitignore`（`.v070-home/`）、
+  `CHANGELOG.md` `[Unreleased]` 中英条目、`docs/knowledge/{VALIDATION,RESEARCH,DECISIONS,STATE,HANDOFF}.md`、
+  `docs/knowledge/evidence/panel-links-2026-11-08/`。
+- **测试（`CONFIRMED`）**：`npm run ci` exit 0，**36 文件 / 638 测试 PASS**（typecheck 0 错，
+  lint 4 warning / 0 error 基线）；`lib/` 重建幂等（md5 `3ae940ff…`，src/lib 逐字节一致）。
+- **真机（`CONFIRMED`）**：隔离 `DSH_HOME=.v070-home/`，profile `panelcheck`（web 模板），
+  插件 dev 安装 + `workflow-ptc` 启用 + v4-pro/agnes 模型 patch，实例 `127.0.0.1:3179`，
+  headless Chromium；团队档跑到 `completed`，6/6 行可点击（含 `规划助手 已完成` 与
+  `执行 failed`），点击规划助手打开 `任务团队 child 1` 子会话视图。运行中行同为按钮（对齐库存行为）。
+- **诚实边界**：首轮真机 run（写文件任务）因 `/home` ro 挂载按预期 FAILED——恰好覆盖
+  failed 行渲染与可点击（6/6 按钮）；`relay`/`append` 形态未单独验证（HYPOTHESIS 外推）；
+  深色主题/移动端 NOT_RUN；live `:3090` 未动（D-013）。
+- **并发注意**：工作树含 fix_child_names 任务的记忆条目（D-039/Round 27–29），随本轮 commit
+  一并入库；`src/` 其余文件未触碰。
+- **Next action**：①lead 复核 D-040/Round 30 后决定合入/发布节奏（未 bump 版本、未 tag）；
+  ②`:3090` 升级仍待用户批准（D-013）——修复要在线上生效需升级 + 重载。

@@ -33,6 +33,7 @@ interface Bundle {
   GROK_WORKFLOW_ROUTE_INFLIGHT_MIN: number
   GROK_WORKFLOW_ROUTE_INFLIGHT_MAX: number
   GROK_WORKFLOW_DICT: Record<string, Record<string, string>>
+  GROK_WORKFLOW_PANEL: PanelBundle
   GROK_WORKFLOW_INTERNALS: {
     draftOf(value?: Record<string, unknown>): Draft
     validate(draft: Draft): Finding[]
@@ -45,6 +46,22 @@ interface Bundle {
     comboWarn(draft: Draft): boolean
     emptyCapWarn(draft: Draft): boolean
   }
+}
+
+/** The task-panel half of the bundle (pinned by test/panel-links.spec.ts as well). */
+interface PanelBundle {
+  NS: string
+  DICT: Record<string, Record<string, string>>
+  component: (props: Record<string, unknown>) => unknown
+  mount: (ctx: unknown, workspace: unknown, i18n: unknown) => (() => void) | undefined
+  translate: Translator
+  translator(locale: string): Translator
+  memberMode: (child: unknown, identity: unknown, parentSessionId: unknown) => string | undefined
+  openableKey: (sessions: unknown, phases: unknown, parentSessionId: unknown) => string
+  openableMap: (key: string) => Map<string, string>
+  runMode: (data: unknown) => string
+  phaseSummary: (members: unknown, t: Translator) => string
+  statusKey: Record<string, string>
 }
 
 type Route = { provider?: string, model?: string, maxInFlight?: number }
@@ -226,6 +243,8 @@ describe('client settings page: wiring to the DSH locale service (t42)', () => {
     getSnapshot(): { active: string, revision: number }
   }
 
+  type FakeWorkspace = { openSession(target: unknown): void }
+
   function fakeLocale(locale: string): FakeLocale & { bound: string[], registered: Array<{ ns: string, dicts: Record<string, Record<string, string>> }> } {
     const bound: string[] = []
     const registered: Array<{ ns: string, dicts: Record<string, Record<string, string>> }> = []
@@ -239,7 +258,7 @@ describe('client settings page: wiring to the DSH locale service (t42)', () => {
   }
 
   /** The minimum context `apply()` touches, recording what the bundle registers. */
-  function fakeContext(locale?: FakeLocale) {
+  function fakeContext(locale?: FakeLocale, workspace: FakeWorkspace | undefined = { openSession: () => {} }) {
     const slots: Array<{ options: Record<string, unknown>, component: (props: never) => unknown, disposed: boolean }> = []
     const effectLabels: string[] = []
     const face = {
@@ -255,9 +274,14 @@ describe('client settings page: wiring to the DSH locale service (t42)', () => {
       },
       // Cordis' nested-injection seam: the callback runs only when the requested services
       // are present, which is exactly the "optional service" path the bundle relies on.
-      inject: (deps: string[], callback: (scope: { locale?: FakeLocale }) => unknown) => {
+      inject: (deps: string[], callback: (scope: Record<string, unknown>) => unknown) => {
         effectLabels.push(`inject:${deps.join(',')}`)
-        return locale === undefined ? {} : callback({ locale })
+        const scope: Record<string, unknown> = {}
+        for (const dep of deps) {
+          if (dep === 'locale' && locale !== undefined) scope['locale'] = locale
+          if (dep === 'uiWorkspace' && workspace !== undefined) scope['uiWorkspace'] = workspace
+        }
+        return deps.every(dep => scope[dep] !== undefined) ? callback(scope) : {}
       },
       configForms: {
         describe: () => face,
@@ -285,11 +309,15 @@ describe('client settings page: wiring to the DSH locale service (t42)', () => {
     const locale = fakeLocale('zh')
     const { ctx } = fakeContext(locale)
     bundle.apply(ctx)
-    expect(locale.registered).toHaveLength(1)
+    // Two namespaces: the settings page, and the chat task panel that replaces the stock
+    // `workflow-run` renderer (see test/panel-links.spec.ts).
+    expect(locale.registered).toHaveLength(2)
     expect(locale.registered[0]!.ns).toBe('grok-workflow')
     expect(Object.keys(locale.registered[0]!.dicts).sort()).toEqual(['en', 'zh'])
     // The dictionary handed to the Host is the one the page renders from.
     expect(locale.registered[0]!.dicts).toEqual(bundle.GROK_WORKFLOW_DICT)
+    expect(locale.registered[1]!.ns).toBe(bundle.GROK_WORKFLOW_PANEL.NS)
+    expect(locale.registered[1]!.dicts).toEqual(bundle.GROK_WORKFLOW_PANEL.DICT)
   })
 
   it('declares the locale namespace on the slot so the framework seats a live `t`', () => {
@@ -298,7 +326,8 @@ describe('client settings page: wiring to the DSH locale service (t42)', () => {
     bundle.apply(ctx)
     // The page is mounted once before the locale service arrives and once after: only the
     // second registration survives, and it is the one carrying the namespace.
-    expect(live()).toHaveLength(1)
+    // Two live registrations: the settings page and the task panel renderer.
+    expect(live()).toHaveLength(2)
     expect(live()[0]!.options['name']).toBe('plugins.item')
     expect(live()[0]!.options['locale']).toBe('grok-workflow')
     expect(typeof live()[0]!.options['label']).toBe('function')
@@ -334,8 +363,13 @@ describe('client settings page: wiring to the DSH locale service (t42)', () => {
     expect(() => bundle.apply(ctx)).not.toThrow()
     // No locale face ⇒ no `locale` option: the renderer throws a SlotAssemblyError for an
     // entry that names a namespace while no face is installed.
-    expect(live()).toHaveLength(1)
+    expect(live()).toHaveLength(2)
     expect(live()[0]!.options['locale']).toBeUndefined()
+    expect(live()[1]!.options['locale']).toBeUndefined()
+    // The task panel shadows the stock `workflow-run` renderer by priority (lowest renders);
+    // same key at the same priority would fail the stock plugin's whole boot fiber.
+    expect(live()[1]!.options['key']).toBe('workflow-run')
+    expect(live()[1]!.options['priority']).toBe(-1)
     const component = live()[0]!.component as (props: Record<string, unknown>) => string
     expect(component({ view: 'summary' })).toBe(bundle.GROK_WORKFLOW_DICT['en']!['card.summary'])
     // The fallback translator still answers every key, so no page copy degrades to a key id.

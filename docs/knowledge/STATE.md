@@ -454,3 +454,27 @@ turn at a time; Round 16's isolation proof is in `.workflow-artifacts/matrix-024
   `PtcWorkflowEngine` 一个引擎实现）。core 检出 HEAD `687f282e` 与 installed 同为 `0.2.1-rc.2`，上游 ask
   仍必要。插件源码零改动。证据：`docs/knowledge/evidence/childname-blocked/extension-points-closure.md`；
   详见 `VALIDATION.md` Round 29 与 `DECISIONS.md` D-039 Addendum 2。
+
+## 2026-11-08 — 已完成子任务保持可点击：客户端重注册 workflow-run 节点（v0.6.0 工作树，未发布）
+
+- **状态**：实现 + 确定性测试 + 真机验证完成（`npm run ci` **36 文件 / 638 测试 PASS**；
+  隔离 profile `panelcheck` 真机 PASS，Round 30）。**未提交（随本轮 commit）、未 bump 版本、
+  未打 tag、未发布、live `:3090` 未动（仍 `0.2.7`，D-013）**。
+- **做了什么**：`src/client/index.js`（= `lib/client.js`）新增 `mountPanel`——经
+  `conversation.chat.node` 键控槽位以 `key: 'workflow-run'`、`priority: -1` 重注册聊天任务
+  列表渲染器；成员行可开性只看"子会话能否打开"（`panelMemberMode`），不看状态——运行中、
+  已完成、失败、取消、中断全部是链接，点击即开子会话（`uiWorkspace.openSession`，可选注入）。
+  测试 `test/panel-links.spec.ts` 14 例 + `test/client.spec.ts` 断言更新；
+  `package.json` `test:unit` 收入新 spec。
+- **硬约束（新发现，A17/D-040）**：键控槽位同键**同优先级**会让另一个注册者整条 boot fiber
+  失败（首轮实测库存 `dsh-client-ui-workflow-run` "1 entry did not activate"、整页错误屏）；
+  静态客户端路径无自动优先级分配，跨插件复用键控键**必须**显式 `priority: -1`。
+- **真机验证（Round 30）**：隔离 home `.v070-home/`、web 模板 profile、headless Chromium；
+  boot 干净后团队档真跑到 `completed`（6 子代理，含一条真实 agnes route-switch 的 failed 行），
+  **6 行全部 `<button data-member-openable="true">`、0 行 inert**；点击已完成的 `规划助手` 行
+  打开子会话视图（面包屑 `… / 任务团队 child 1`）。证据
+  `docs/knowledge/evidence/panel-links-2026-11-08/`。
+- **未做**：`relay`/`append` 形态的任务列表渲染（HYPOTHESIS 外推）、深色主题/移动端视觉
+  （NOT_RUN）、CHANGELOG 之外的 README/ARCHITECTURE 更新（本轮认为无必要）。
+- **并发注意**：工作树同时含 fix_child_names 任务的记忆条目（D-039/Round 27–29），本轮
+  commit 一并入库（均为已完成的记录）；`src/` 其余文件本轮未触碰。

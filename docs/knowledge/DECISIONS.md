@@ -634,3 +634,28 @@ Each entry records the decision, evidence, alternatives, and status.
   `687f282e` 与 installed 同为 `0.2.1-rc.2`，`host.ts:205`/`runtime.ts:183-188` 逐字一致——上游 ask 仍必要。
   完整定位：`docs/knowledge/evidence/childname-blocked/extension-points-closure.md`；命令与边界见
   `VALIDATION.md` Round 29。
+
+## D-040 — 已完成子任务保持可点击：客户端重注册键控 `workflow-run` 节点 + `priority: -1` 遮蔽
+
+- **Status:** CONFIRMED（真机 PASS，Round 30；单测钉死）
+- **Date:** 2026-11-08
+- **Decision:** 用户报告聊天任务列表里运行中的子任务行是链接、已完成行（`规划助手已完成` 等）
+  是死文字。修复选择**插件客户端重注册**：经 `conversation.chat.node` 键控槽位（契约原文
+  "reusing a key replaces that node renderer"）以 `key: 'workflow-run'`、`priority: -1` 注册
+  自绘渲染器；行可开性 = 子会话存在 + `parentId` 匹配本 run + `subagent.mode` 为
+  `continuable`/`one-shot`，**不读成员状态**（运行中/已完成/失败/取消/中断一视同仁）。
+- **Reason:** ①库存渲染器把链接钉在 `member.status === 'running'`（可开性其实与状态无关，
+  子会话与投影在结束后依然在）；②渲染器层是唯一同时满足"不改 DSH core"与"恢复链接"的
+  文档化扩展点（`dsh-client-ui-workflow-run` 无任何配置可放宽该条件）。
+- **优先级遮蔽（本轮实测学到的硬约束）**：键控槽位同键同优先级会让**另一个注册者**整条
+  boot fiber 失败（首轮实测：库存 `dsh-client-ui-workflow-run` 报 "1 entry did not activate"，
+  整页错误屏；A/B 对照锁定冲突源）。静态客户端路径没有自动优先级分配，必须显式
+  `priority: -1`（低于库存默认 0，lowest renders）；库存条目保持 live 被遮蔽，插件卸载即恢复。
+  详见 RESEARCH.md A17。
+- **Consequences:** 插件此后负责所有 `workflow-run` 节点的外观（含非本插件工作流的 run；
+  投影与文案与库存一致，差异只在可开性判据与简化版 disclosure）；`uiWorkspace` 缺席的
+  组合不注册面板、库存渲染器继续工作（设置页不受影响）；单测
+  `test/panel-links.spec.ts`（14 例）+ `test/client.spec.ts` 断言钉死注册形态。
+- **Alternatives rejected:** ①改 DSH core 放宽 `navigableMembers` 条件——明令禁止；
+  ②只改插件让 `tool-workflow/*` 事件带额外数据——渲染器根本不读它，无扩展点；
+  ③注册不设 priority 靠加载顺序——实测会让库存客户端 boot 失败，不可接受。

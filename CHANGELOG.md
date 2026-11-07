@@ -5,6 +5,38 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Fixed / 修复
+
+- **Finished subtasks in the chat task list stay clickable / 聊天任务列表中已完成子任务保持可点击** —
+  in the chat sidebar task list a *running* subtask row (for example `任务 1 · …`) was a link, but
+  every finished row rendered as inert text: the planner row `规划助手已完成`, a task's `执行` /
+  `检查` rows — none of them could be opened, so the output of a completed subtask was unreachable.
+  The stock task-list renderer gates the row link on the member still running
+  (`navigableMembers()` in `@deepseek-ai/dsh-client-ui-workflow-run` requires
+  `member.status === 'running'`), which is exactly backwards for a reader who wants to inspect
+  what a finished subtask did. This plugin now re-registers the keyed `workflow-run` chat node
+  (`conversation.chat.node`, the slot contract's own "reusing a key replaces that node renderer"
+  extension point) with the same projection and wording and one deliberate difference: a member
+  row is a link whenever its child session can be opened — running, completed, failed, cancelled
+  or interrupted — and clicking it opens the child session exactly like a running row does. A row
+  whose child session cannot be resolved stays inert text rather than opening the wrong session.
+  The registration sits at `priority: -1`, below the stock renderer's default, because the runtime
+  shadows a keyed entry by priority and the same key at the same priority fails the *other*
+  registrant's whole boot fiber (measured: without the priority the stock
+  `dsh-client-ui-workflow-run` client failed web boot with "1 entry did not activate"). The stock
+  renderer stays live-but-shadowed and resumes when the plugin unloads.
+  在聊天侧栏任务列表里，运行中的子任务行（例如 `任务 1 · …`）是链接，但所有已结束的行都渲染成
+  不可点的文字：规划助手行「规划助手已完成」、各任务的「执行」「检查」行都打不开，已完成子任务
+  的输出根本看不到。库存任务列表渲染器把行链接限制在"成员仍在运行"（`navigableMembers()` 要求
+  `member.status === 'running'`），这对想查看已完成子任务做了什么的读者恰恰相反。本插件现在重新
+  注册键控 `workflow-run` 聊天节点（`conversation.chat.node`，槽位契约自带的"复用同键即替换该节点
+  渲染器"扩展点），投影与文案保持一致，只有一处刻意差异：只要成员的子会话能打开——运行中、已完成、
+  失败、已取消或已中断——该行就是链接，点击后与运行中的行一样打开子会话；子会话无法解析的行仍保持
+  不可点文字，而不是打开错误的会话。注册带 `priority: -1`（低于库存渲染器的默认值）：运行时按键控
+  优先级做遮蔽，同键同优先级会让**另一个**注册者的整条启动 fiber 失败（实测：不加优先级时库存
+  `dsh-client-ui-workflow-run` 客户端报 "1 entry did not activate" 启动失败）。库存渲染器保留为
+  被遮蔽的活条目，插件卸载时自动恢复。
+
 ## [0.6.0] - 2026-11-07
 
 ### Added / 新增

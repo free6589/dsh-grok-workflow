@@ -332,3 +332,24 @@ out-of-scope → mode-off → already-routed; reason labels are asserted only vi
 - **本仓库侧无计数通道**：`buildWorkflowRequest` 的 `args` 只有 objective/tasks/并发重试上限/roles/switchOn/carryover 等（`src/script.ts:1543-1604`）；`callRole` 唯一出口是 `agent(prompt, call)`（`src/script.ts:390`），`routeInFlight`（`src/script.ts:297-313`）是单 run 内存计数，跨 run 不共享。
 - **最小注入点（HYPOTHESIS，未做）**：`guest-types.ts` 加 `semAcquire/semRelease` → `host.ts bindings()` 实现进程级 `Map<key,{permits,waiters}>` → `guest.ts` 透传 `SemaphorePort` → `runtime.ts globals` 注册冻结函数 → `index.ts WorkerInit` + 本仓库 `args` 下发 key（纯 JSON）。安全要求：状态只活 host 侧、acquire 与 `controller.signal` 联动可取消（仿 `host.ts:231-247`）、key 命名空间化、unload 时清等待队列（仿 `host.ts:307-317`）、返回仅纯 JSON。
 - **替代方向**：不碰沙箱，在 host 侧（`src/run.ts` 的 `activeCountOfSession`/cap 检查，`run.ts:116-119,509-535`）做 run 级准入排队；粒度是 run 不是 task/role，且已有 per-session/total 两层上限。Task 级写冲突已有脚本内串行化（`mapLimitIsolated`，`src/script.ts:1037-1105`），与全局信号量无关。
+
+## A17 — 键控槽位的替换机制是优先级遮蔽，不是去重替换（2026-11-08，`CONFIRMED`）
+
+- **契约**：`conversation.chat.node` 的声明注释写"Reusing a key replaces that node renderer"
+  （`dsh-client-ui-chat/lib/types/client/contract/slots.d.ts:326-336`）。
+- **运行时实现**（`dsh-web-frontend/dist/assets/index-*.js` 内 `SlotCore.register`，静态客户端
+  路径无优先级分配器、`options.priority` 原样透传）：同键**同优先级**（默认 `?? 0`）注册直接抛
+  `keyed slot "…" already has an entry for key "…" — register at a different priority to shadow it
+  (lowest renders)`；渲染时 `entriesOfSlot` 按优先级升序对键控条目去重、**最低优先级者渲染**，
+  其余条目保持 live 但被遮蔽（`isLive` 仍真，插件卸载后自然恢复）。
+- **实测后果**：两个客户端插件都注册 `workflow-run`（都无 priority → 都 0）时，**后注册者整条
+  plugin fiber 失败**——web boot 报 "N entries did not activate"、整页只剩错误屏，失败方是库存
+  `dsh-client-ui-workflow-run`。动态包路径（`dsh-cordis-client-runner` 的 guarded
+  `allocatePriority: () => --this.nextPriority`）会自动递减，不撞此坑；**静态客户端路径会撞**。
+- **正确姿势**：跨插件复用键控键必须显式 `priority: -1`（或任何 < 库存默认的值）。本仓
+  `src/client/index.js` `mountPanel` 已按此实现并有单测钉死（`test/panel-links.spec.ts`
+  `expect(options['priority']).toBe(-1)`）。
+- **可开性与状态解耦**：workflow 子代理由 `startLocal` 以 `mode: "continuable"` 落描述符
+  （`dsh-subagent/lib/index.js`）；`values.subagent.mode` 与 `sessions.byId[childId]` 在结束后
+  依然可解析，库存渲染器只是用 `member.status === "running"` 把它挡住了
+  （`dsh-client-ui-workflow-run/lib/client.js:176-179`）。
