@@ -197,7 +197,8 @@ describe('route validation against the runtime', () => {
     expect(projected).toContain('maxActiveRunsTotal')
     expect(projected).toContain('triageClassifier')
     expect(projected).toContain('humanSummary')
-    expect(projected).toHaveLength(27)
+    expect(projected).toContain('showDiagnostics')
+    expect(projected).toHaveLength(28)
     const ctx = ctxWith({
       settings: { configure: () => () => {}, describe: () => [descriptor] },
     })

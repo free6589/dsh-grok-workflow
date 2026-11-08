@@ -22,8 +22,9 @@ export const REPORT_END = '<<<END-GROK-WORKFLOW-REPORT>>>'
 /** Instruction preamble for a successful or partial report. */
 const SUCCESS_PREAMBLE = [
   'The mandatory workflow gate finished and the workflow produced the report below.',
-  'Reply with the text between the markers exactly as given: keep every line, order and character,',
-  'add no commentary before or after it, and do not summarise it. Do not call any tool.',
+  'You may first state the outcome in at most 3 plain sentences in the user\'s language,',
+  'then reply with the text between the markers exactly as given: keep every line, order and character,',
+  'add nothing else before, between, or after those parts, and do not call any tool.',
 ].join(' ')
 
 /** Instruction preamble for a failure report. */
@@ -39,12 +40,14 @@ const FAILURE_PREAMBLE = [
  * @param report - a validated report, or an explicit failure report.
  * @returns the relay message text, already bounded by {@link renderReport}.
  */
-export function relayText(report: WorkflowReport, header?: string): string {
+export function relayText(report: WorkflowReport, header?: string, opts?: { showDiagnostics?: boolean }): string {
   const preamble = report.status === 'failed' ? FAILURE_PREAMBLE : SUCCESS_PREAMBLE
   // The header rides *inside* the markers (t52): the front desk's tier line and
   // work-start greeting are user-visible content, and a line before the opening
   // marker would be counted as commentary the model is told not to add.
-  const body = header === undefined || header === '' ? renderReport(report) : `${header}\n\n${renderReport(report)}`
+  // B plan: diagnostics follow the showDiagnostics toggle (default hidden).
+  const rendered = renderReport(report, opts)
+  const body = header === undefined || header === '' ? rendered : `${header}\n\n${rendered}`
   return [preamble, '', REPORT_BEGIN, body, REPORT_END].join('\n')
 }
 

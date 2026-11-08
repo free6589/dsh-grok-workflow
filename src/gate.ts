@@ -60,7 +60,7 @@ import { redactError, redactSecrets } from './redact.js'
 import type { ActiveState, RunOutcome, WorkflowLogger } from './run.js'
 import { runSingleCall, runWorkflow } from './run.js'
 import {
-  askLine, chatReply, classifyTriage, expiredAskNote, greetingLine, missingNote, recallFromPrior,
+  askLine, chatReply, classifyTriage, detectLanguage, expiredAskNote, greetingLine, missingNote, recallFromPrior,
   recallPrompt, recalledNote, resolvePending, resumedRequest, singleCallPrompt, tierNote, triageLine,
   unusedAskNote, RECALL_LIMITS,
 } from './triage.js'
@@ -870,10 +870,28 @@ export function installGate(deps: GateDeps): boolean {
       logger.warn(`gate could not start the workflow: ${reason}`)
       return { kind: 'notice', reason, outcome: 'start-failed' }
     }
+    // B plan: `full` mode gets the same deterministic plain-language header the
+    // front desk already writes. Before this, `/grok on` produced the machine
+    // ledger and nothing else — the user's own words for it were "全是机器语言".
+    // Only completed/partial qualify: a failed run must never open with a
+    // success-styled sentence. The report body itself is untouched.
+    let fullHeader: string | undefined
+    if (limits.humanSummary
+      && (outcome.report.status === 'completed' || outcome.report.status === 'partial')) {
+      const verifiedCount = outcome.report.tasks.filter(task => task.status === 'verified').length
+      const totalCount = outcome.report.tasks.length
+      const firstLines = (outcome.report.synthesis.summary ?? '')
+        .split('\n').map(s => s.trim()).filter(s => s !== '').slice(0, 2).join(' / ').slice(0, 400)
+      const lang = detectLanguage(request)
+      fullHeader = lang === 'zh'
+        ? `【人话结论】任务 ${verifiedCount}/${totalCount} 项已核验通过。${firstLines !== '' ? firstLines : '详见下方原文报告。'}\n\n（原文报告附后）`
+        : `【Plain summary】${verifiedCount}/${totalCount} tasks verified. ${firstLines !== '' ? firstLines : 'See the full report below.'}\n\n(Full machine report follows)`
+    }
     return {
       kind: 'report',
       report: outcome.report,
       outcome: outcome.ok ? outcome.report.status : (outcome.cause ?? 'failed'),
+      ...fullHeader === undefined ? {} : { header: fullHeader },
     }
   }
 

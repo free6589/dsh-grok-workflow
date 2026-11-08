@@ -52,7 +52,7 @@ export declare const CONFIG_VERSION = 1;
  * a typo that is silently ignored looks exactly like a setting that "does not
  * work", which is the failure mode the settings surface must not have.
  */
-export declare const CONFIG_KEYS: readonly ["toolName", "enforceGate", "gateRequired", "gateScope", "gatePreset", "answerStrategy", "mode", "grokDefault", "triageAsk", "triageModel", "triageClassifier", "triageFollowupAsFast", "instantReceipt", "humanSummary", "historyTurns", "historyChars", "maxQueuedMessages", "maxConcurrency", "maxRetries", "maxTasks", "timeoutMs", "maxActiveRuns", "maxActiveRunsTotal", "subagentProvider", "roles", "synthesis", "switchOn", "recordRuns", "recordLimit", "showProgress", "configVersion"];
+export declare const CONFIG_KEYS: readonly ["toolName", "enforceGate", "gateRequired", "gateScope", "gatePreset", "answerStrategy", "mode", "grokDefault", "triageAsk", "triageModel", "triageClassifier", "triageFollowupAsFast", "instantReceipt", "humanSummary", "showDiagnostics", "historyTurns", "historyChars", "maxQueuedMessages", "maxConcurrency", "maxRetries", "maxTasks", "timeoutMs", "maxActiveRuns", "maxActiveRunsTotal", "subagentProvider", "roles", "synthesis", "switchOn", "recordRuns", "recordLimit", "showProgress", "configVersion"];
 /**
  * DSH profile configuration schema.
  *
@@ -79,6 +79,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     triageFollowupAsFast: z<boolean, boolean, "volatile-defined">;
     instantReceipt: z<boolean, boolean, "volatile-defined">;
     humanSummary: z<boolean, boolean, "volatile-defined">;
+    showDiagnostics: z<boolean, boolean, "volatile-defined">;
     historyTurns: z<number, number, "volatile-defined">;
     historyChars: z<number, number, "volatile-defined">;
     maxQueuedMessages: z<number, number, "volatile-defined">;
@@ -185,6 +186,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     triageFollowupAsFast: z<boolean, boolean, "volatile-defined">;
     instantReceipt: z<boolean, boolean, "volatile-defined">;
     humanSummary: z<boolean, boolean, "volatile-defined">;
+    showDiagnostics: z<boolean, boolean, "volatile-defined">;
     historyTurns: z<number, number, "volatile-defined">;
     historyChars: z<number, number, "volatile-defined">;
     maxQueuedMessages: z<number, number, "volatile-defined">;

@@ -636,8 +636,21 @@ describe('workflow report semantic contract', () => {
  * process (`timeoutMs` was not in the report at all). Both are contract now.
  */
 describe('t47: the report states its routes and its deadline', () => {
+  // B plan: these ledger lines are opt-in (`showDiagnostics`), so every assertion
+  // about them asks for the ledger explicitly; the default view is pinned below.
+  const diag = { showDiagnostics: true }
+
+  it('keeps the ledger out of the default view (B plan)', () => {
+    const text = renderReport(assertWorkflowReport(report({ timeoutMs: config.timeoutMs }), OBJECTIVE, config))
+    expect(text).not.toContain('Model routes:')
+    expect(text).not.toContain('Deadline:')
+    // The reader-facing parts stay: they are the report, not the ledger.
+    expect(text).toContain('Grok workflow:')
+    expect(text).toContain('Objective:')
+  })
+
   it('prints Model routes with "inherit" when no chain was configured', () => {
-    const text = renderReport(assertWorkflowReport(report(), OBJECTIVE, config))
+    const text = renderReport(assertWorkflowReport(report(), OBJECTIVE, config), diag)
     expect(text).toContain('Model routes: planner=inherit; worker=inherit; verifier=inherit; synthesizer=inherit')
   })
 
@@ -649,7 +662,7 @@ describe('t47: the report states its routes and its deadline', () => {
         verifier: [],
         synthesizer: [],
       },
-    }), OBJECTIVE, config))
+    }), OBJECTIVE, config), diag)
     expect(text).toContain('planner=bifrost-completions/wb/cn:no-such-model-probe → bifrost-completions/wb/cn:deepseek-v4.1-flash')
     expect(text).toContain('worker=bifrost-completions/wb/cn:deepseek-v4.1-flash')
     expect(text).toContain('verifier=inherit')
@@ -658,7 +671,7 @@ describe('t47: the report states its routes and its deadline', () => {
   it('carries the deadline the run actually ran under', () => {
     const accepted = assertWorkflowReport(report({ timeoutMs: config.timeoutMs }), OBJECTIVE, config)
     expect(accepted.limits.timeoutMs).toBe(config.timeoutMs)
-    expect(renderReport(accepted)).toContain(`Deadline: ${config.timeoutMs} ms per run`)
+    expect(renderReport(accepted, diag)).toContain(`Deadline: ${config.timeoutMs} ms per run`)
   })
 
   it('rejects a result that ran under a different deadline than the plugin enforces', () => {
@@ -668,7 +681,7 @@ describe('t47: the report states its routes and its deadline', () => {
 
   it('names the configured chains in a failure report too, instead of all-empty', () => {
     const configured = resolveConfig({ roles: { worker: [{ provider: 'bifrost-completions', model: 'wb/cn:deepseek-v4.1-flash' }] } })
-    const text = renderReport(failureReport(OBJECTIVE, configured, 'Timeout', 'the deadline fired'))
+    const text = renderReport(failureReport(OBJECTIVE, configured, 'Timeout', 'the deadline fired'), diag)
     // A timeout report is still a report about this configuration: printing the
     // all-empty default made "no chain" and "chain unknown here" look the same (t46).
     expect(text).toContain('worker=bifrost-completions/wb/cn:deepseek-v4.1-flash')
@@ -684,6 +697,8 @@ describe('t47: the report states its routes and its deadline', () => {
 })
 
 describe('t47: a route switch is visible in the report', () => {
+  // B plan: switch/overflow lines belong to the opt-in ledger, so ask for it.
+  const diag = { showDiagnostics: true }
   // t46 wrote a deliberately broken first worker route and saw no `Route switches:`
   // line. The reason is not the renderer: a model the provider does not enumerate
   // is rejected at load (`validateRoutes`), so that configuration never ran. The
@@ -725,7 +740,7 @@ describe('t47: a route switch is visible in the report', () => {
         attempt: 1,
         outcome: 'ok',
       }],
-    }), OBJECTIVE, twoRoutes))
+    }), OBJECTIVE, twoRoutes), diag)
     expect(text).toContain('Route switches:')
     expect(text).toContain('- worker attempt 1 via bifrost-completions/wb/cn:deepseek-v4.1-flash: rate-limit — 429 Too Many Requests')
   })
@@ -739,7 +754,7 @@ describe('t47: a route switch is visible in the report', () => {
         attempt: 1,
         outcome: 'ok',
       }],
-    }), OBJECTIVE, config))
+    }), OBJECTIVE, config), diag)
     expect(text).not.toContain('Route switches:')
   })
 })

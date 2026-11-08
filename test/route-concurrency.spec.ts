@@ -123,7 +123,7 @@ describe('per-route concurrency caps with overflow to the next route', () => {
       agent,
     )
     expect(run.report.status).toBe('completed')
-    const text = renderReport(run.report)
+    const text = renderReport(run.report, { showDiagnostics: true })
     expect(text).toContain('Route overflows (full lane yielded, not failures):')
     expect(text).toContain('skipped full w1')
     expect(text).not.toContain('Route switches:')
@@ -213,7 +213,7 @@ describe('per-route concurrency caps with overflow to the next route', () => {
     expect(models).toEqual(['w2'])
     const overflow = run.report.routes.find(entry => entry.role === 'worker')
     expect(overflow).toMatchObject({ route: 'w2', outcome: 'ok', skippedBusy: ['w1 (cross-run hint)'] })
-    const text = renderReport(run.report)
+    const text = renderReport(run.report, { showDiagnostics: true })
     expect(text).toContain('Route overflows (cross-run hint):')
     expect(text).toContain('w1 (cross-run hint)')
     expect(text).not.toContain('Route overflows (full lane yielded, not failures):')

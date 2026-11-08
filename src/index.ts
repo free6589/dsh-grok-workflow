@@ -181,10 +181,21 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
     parameters,
     output: {
       schema: { type: 'json' as const },
-      render: (_args, value) => [{
-        type: 'text' as const,
-        text: renderReport(value as unknown as WorkflowReport),
-      }],
+      render: (_args, value) => {
+        // Diagnostics visibility follows the live setting (B plan). Read at render
+        // time; a broken edit degrades to hidden rather than throwing, because a
+        // render failure would swallow a report that was already produced.
+        let showDiagnostics = false
+        try {
+          showDiagnostics = readConfig().showDiagnostics
+        } catch {
+          showDiagnostics = false
+        }
+        return [{
+          type: 'text' as const,
+          text: renderReport(value as unknown as WorkflowReport, { showDiagnostics }),
+        }]
+      },
     },
     timeoutMs: Math.min(config.timeoutMs + 60_000, HARD_LIMITS.timeoutMs),
     isConcurrencySafe: () => false,

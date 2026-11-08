@@ -19,7 +19,9 @@ export declare const REPORT_END = "<<<END-GROK-WORKFLOW-REPORT>>>";
  * @param report - a validated report, or an explicit failure report.
  * @returns the relay message text, already bounded by {@link renderReport}.
  */
-export declare function relayText(report: WorkflowReport, header?: string): string;
+export declare function relayText(report: WorkflowReport, header?: string, opts?: {
+    showDiagnostics?: boolean;
+}): string;
 /**
  * Build the message text for a front-desk answer (chat/fast/ask tiers).
  * @param body - the answer or question the front desk produced.

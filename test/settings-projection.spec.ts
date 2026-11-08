@@ -16,14 +16,14 @@ describe('the settings fixture matches the runtime projection', () => {
   it('projects exactly the volatile fields, dropping structural ones', () => {
     const descriptor = realSettingsDescriptor()
     const projected = Object.keys(descriptor.value).sort()
-    // 31 keys exist in the config surface, but the runtime's form only carries the
-    // 27 volatile ones; `toolName`, `enforceGate`, `gateRequired` and
+    // 32 keys exist in the config surface, but the runtime's form only carries the
+    // 28 volatile ones; `toolName`, `enforceGate`, `gateRequired` and
     // `configVersion` are plain and therefore invisible to the form.
-    expect(projected).toHaveLength(27)
+    expect(projected).toHaveLength(28)
     expect(projected).toEqual([
       'answerStrategy', 'gatePreset', 'gateScope', 'grokDefault', 'historyChars', 'historyTurns',
       'humanSummary', 'instantReceipt', 'maxActiveRuns', 'maxActiveRunsTotal', 'maxConcurrency', 'maxQueuedMessages', 'maxRetries',
-      'maxTasks', 'mode', 'recordLimit', 'recordRuns', 'roles', 'showProgress',
+      'maxTasks', 'mode', 'recordLimit', 'recordRuns', 'roles', 'showDiagnostics', 'showProgress',
       'subagentProvider', 'switchOn', 'synthesis', 'timeoutMs', 'triageAsk', 'triageClassifier', 'triageFollowupAsFast', 'triageModel',
     ])
     for (const structural of ['toolName', 'enforceGate', 'gateRequired', 'configVersion']) {

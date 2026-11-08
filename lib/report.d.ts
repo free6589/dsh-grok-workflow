@@ -12,6 +12,14 @@ export declare function failureSummary(report: WorkflowReport): {
     category: FailureCategory;
     count: number;
 }[];
-/** Render a concise model-facing view; the canonical JSON remains available to PTC. */
-export declare function renderReport(report: WorkflowReport): string;
+/** Render a concise model-facing view; the canonical JSON remains available to PTC.
+ *
+ * B plan: machine diagnostics (Model routes / Deadline / Route switches /
+ * overflows / Uncertainties / Errors) render only when `opts.showDiagnostics`
+ * is true (default false). Final answer / Confirmed evidence / task rows /
+ * Incomplete always render.
+ */
+export declare function renderReport(report: WorkflowReport, opts?: {
+    showDiagnostics?: boolean;
+}): string;
 //# sourceMappingURL=report.d.ts.map

@@ -772,8 +772,14 @@ export function failureSummary(report: WorkflowReport): { category: FailureCateg
   return order.filter(category => counts.has(category)).map(category => ({ category, count: counts.get(category) ?? 0 }))
 }
 
-/** Render a concise model-facing view; the canonical JSON remains available to PTC. */
-export function renderReport(report: WorkflowReport): string {
+/** Render a concise model-facing view; the canonical JSON remains available to PTC.
+ *
+ * B plan: machine diagnostics (Model routes / Deadline / Route switches /
+ * overflows / Uncertainties / Errors) render only when `opts.showDiagnostics`
+ * is true (default false). Final answer / Confirmed evidence / task rows /
+ * Incomplete always render.
+ */
+export function renderReport(report: WorkflowReport, opts?: { showDiagnostics?: boolean }): string {
   const verified = report.tasks.filter(task => task.status === 'verified').length
   const lines: string[] = [
     `Grok workflow: ${report.status.toUpperCase()}`,
@@ -814,22 +820,25 @@ export function renderReport(report: WorkflowReport): string {
   if (report.synthesis.error !== undefined) {
     lines.push(`Synthesis: model narrative unavailable (${oneLine(report.synthesis.error, 300)}); the report above is complete`)
   }
-  // t47: always printed. The t46 round saw the line appear only after a settings
-  // save and could not tell "no chain configured" from "the line was skipped", so
-  // an unset role now says `inherit` instead of silently vanishing.
-  const configured = (['planner', 'worker', 'verifier', 'synthesizer'] as const)
-    .map(role => [role, report.routing[role]] as const)
-  lines.push(`Model routes: ${configured.map(([role, chain]) => `${role}=${chain.length === 0 ? 'inherit' : chain.join(' → ')}`).join('; ')}`)
-  if (report.limits.timeoutMs !== undefined) {
-    lines.push(`Deadline: ${report.limits.timeoutMs} ms per run (enforced by the plugin)`)
-  }
-  const routeFailures = report.routes.filter(entry => entry.outcome === 'failed')
-  if (routeFailures.length > 0) {
-    lines.push('Route switches:')
-    for (const entry of routeFailures.slice(0, 12)) {
-      lines.push(`- ${entry.role} attempt ${entry.attempt} via ${entry.route}: ${entry.failureClass ?? 'unknown'} — ${oneLine(entry.reason ?? '', 200)}`)
+  // B plan + t47: diagnostics are opt-in via showDiagnostics. t46 saw the
+  // Model-routes line appear only after a settings save and could not tell
+  // "no chain configured" from "the line was skipped", so when enabled an
+  // unset role says `inherit` instead of silently vanishing. Default (off):
+  // none of the ledger lines below render.
+  if (opts?.showDiagnostics === true) {
+    const configured = (['planner', 'worker', 'verifier', 'synthesizer'] as const)
+      .map(role => [role, report.routing[role]] as const)
+    lines.push(`Model routes: ${configured.map(([role, chain]) => `${role}=${chain.length === 0 ? 'inherit' : chain.join(' → ')}`).join('; ')}`)
+    if (report.limits.timeoutMs !== undefined) {
+      lines.push(`Deadline: ${report.limits.timeoutMs} ms per run (enforced by the plugin)`)
     }
-  }
+    const routeFailures = report.routes.filter(entry => entry.outcome === 'failed')
+    if (routeFailures.length > 0) {
+      lines.push('Route switches:')
+      for (const entry of routeFailures.slice(0, 12)) {
+        lines.push(`- ${entry.role} attempt ${entry.attempt} via ${entry.route}: ${entry.failureClass ?? 'unknown'} — ${oneLine(entry.reason ?? '', 200)}`)
+      }
+    }
   // Overflow is not failure and never appears above: a full lane yields to the
   // next route instead of failing. Record which calls yielded so the reader can
   // tell "used route B because route A was full" apart from "route A failed".
@@ -838,35 +847,41 @@ export function renderReport(report: WorkflowReport): string {
   // yielding and cross-run hints render under separate headings so the reader
   // can tell "this run's own cap was full" apart from "another live run
   // configured the same label (approximate, run-level only)".
-  const overflows = report.routes.filter(entry => entry.skippedBusy !== undefined && entry.skippedBusy.length > 0)
-  const hintOverflows = overflows.filter(entry => entry.skippedBusy!.some(label => label.includes('(cross-run hint)')))
-  const localOverflows = overflows.filter(entry => !entry.skippedBusy!.some(label => label.includes('(cross-run hint)')))
-  if (localOverflows.length > 0) {
-    lines.push('Route overflows (full lane yielded, not failures):')
-    for (const entry of localOverflows.slice(0, 12)) {
-      const skipped = entry.skippedBusy!.join(', ')
-      const waited = entry.queuedMs !== undefined && entry.queuedMs > 0 ? ` (waited ${entry.queuedMs} ms)` : ''
-      lines.push(`- ${entry.role} attempt ${entry.attempt} via ${entry.route}: skipped full ${skipped}${waited}`)
+    const overflows = report.routes.filter(entry => entry.skippedBusy !== undefined && entry.skippedBusy.length > 0)
+    const hintOverflows = overflows.filter(entry => entry.skippedBusy!.some(label => label.includes('(cross-run hint)')))
+    const localOverflows = overflows.filter(entry => !entry.skippedBusy!.some(label => label.includes('(cross-run hint)')))
+    if (localOverflows.length > 0) {
+      lines.push('Route overflows (full lane yielded, not failures):')
+      for (const entry of localOverflows.slice(0, 12)) {
+        const skipped = entry.skippedBusy!.join(', ')
+        const waited = entry.queuedMs !== undefined && entry.queuedMs > 0 ? ` (waited ${entry.queuedMs} ms)` : ''
+        lines.push(`- ${entry.role} attempt ${entry.attempt} via ${entry.route}: skipped full ${skipped}${waited}`)
+      }
+    }
+    if (hintOverflows.length > 0) {
+      lines.push('Route overflows (cross-run hint):')
+      for (const entry of hintOverflows.slice(0, 12)) {
+        const skipped = entry.skippedBusy!.join(', ')
+        const waited = entry.queuedMs !== undefined && entry.queuedMs > 0 ? ` (waited ${entry.queuedMs} ms)` : ''
+        lines.push(`- ${entry.role} attempt ${entry.attempt} via ${entry.route}: skipped busy ${skipped}${waited}`)
+      }
+    }
+    if (report.errors.length > 0) {
+      lines.push('Errors:')
+      for (const item of report.errors.slice(0, 12)) {
+        lines.push(`- ${item.phase}: ${oneLine(item.message, 500)}`)
+      }
     }
   }
-  if (hintOverflows.length > 0) {
-    lines.push('Route overflows (cross-run hint):')
-    for (const entry of hintOverflows.slice(0, 12)) {
-      const skipped = entry.skippedBusy!.join(', ')
-      const waited = entry.queuedMs !== undefined && entry.queuedMs > 0 ? ` (waited ${entry.queuedMs} ms)` : ''
-      lines.push(`- ${entry.role} attempt ${entry.attempt} via ${entry.route}: skipped busy ${skipped}${waited}`)
-    }
-  }
+  // Uncertainties stay OUTSIDE the diagnostics gate on purpose (B plan):
+  //  1. they are truthful caveats a reader needs, not a routing ledger, and
+  //  2. carry-over parses `Uncertainties:` back out of an earlier round's
+  //     rendered report, so hiding them would silently drop that context from
+  //     every follow-up round (`src/carryover.ts`).
   if (report.uncertainties.length > 0) {
     lines.push('Uncertainties:')
     for (const item of report.uncertainties.slice(0, 12)) {
       lines.push(`- ${item.taskId}: ${oneLine(item.text, 400)}`)
-    }
-  }
-  if (report.errors.length > 0) {
-    lines.push('Errors:')
-    for (const item of report.errors.slice(0, 12)) {
-      lines.push(`- ${item.phase}: ${oneLine(item.message, 500)}`)
     }
   }
   const text = lines.join('\n')

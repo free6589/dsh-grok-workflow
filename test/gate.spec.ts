@@ -489,6 +489,49 @@ describe('mandatory entry gate', () => {
     expect(agent.whenIdle).toHaveBeenCalled()
   })
 
+  // ---------------------------------------------------------------- B plan --
+  // `/grok on` selects `full`, which used to bypass the front desk's plain-language
+  // header entirely: the only output a user got was the machine ledger. The header
+  // is now composed in `runTeam` too, so a full-mode run opens with a sentence a
+  // reader can act on. These three cases pin the contract.
+  it('prepends a plain-language summary in full mode (B plan)', async () => {
+    const ctx = new FakeContext()
+    ctx.engine.autoRun = true
+    applyWith(ctx)
+    const agent = new FakeAgent()
+    await ctx.preStep()(payload(agent, [userMessage('查一下新加坡天气')]), passingNext([]))
+    await waitFor(() => agent.followups.length === 1)
+    const text = textOf(agent.followups[0]!)
+    expect(text).toContain('【人话结论】')
+    expect(text).toContain('项已核验通过')
+    // The header rides inside the markers so the main model reproduces it verbatim.
+    expect(text.indexOf('【人话结论】')).toBeGreaterThan(text.indexOf(REPORT_BEGIN))
+    expect(text.indexOf('【人话结论】')).toBeLessThan(text.indexOf(REPORT_END))
+  })
+
+  it('never dresses a failed run in the success header (B plan)', async () => {
+    const ctx = new FakeContext()
+    applyWith(ctx)
+    const agent = new FakeAgent()
+    await ctx.preStep()(payload(agent, [userMessage('doomed')]), passingNext([]))
+    await waitFor(() => ctx.engine.runs.length === 1)
+    ctx.engine.runs[0]!.fail('error', 'boom')
+    await waitFor(() => agent.followups.length === 1)
+    const text = textOf(agent.followups[0]!)
+    expect(text).toContain('FAILED')
+    expect(text).not.toContain('【人话结论】')
+  })
+
+  it('honours humanSummary:false in full mode (B plan)', async () => {
+    const ctx = new FakeContext()
+    ctx.engine.autoRun = true
+    applyWith(ctx, { humanSummary: false })
+    const agent = new FakeAgent()
+    await ctx.preStep()(payload(agent, [userMessage('查一下新加坡天气')]), passingNext([]))
+    await waitFor(() => agent.followups.length === 1)
+    expect(textOf(agent.followups[0]!)).not.toContain('【人话结论】')
+  })
+
   it('delivers an explicit failure answer when the engine reports an error', async () => {
     const ctx = new FakeContext()
     applyWith(ctx)
