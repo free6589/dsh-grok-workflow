@@ -5,6 +5,27 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Added / 新增
+
+- **`/grok on` speaks plainly, and the ledger is opt-in / `/grok on` 也说人话，机器台账改为按需显示** —
+  `full` mode bypassed the front desk, so a team run answered with the machine ledger only
+  (`Grok workflow: … / Model routes: … / Deadline: … / Route switches: …`) and nothing a reader
+  could act on. A full-mode run now opens with the same deterministic 【人话结论】 header the triage
+  path already wrote (`任务 N/M 项已核验通过` + the first lines of the synthesis), and a failed run
+  still opens as a failure — the header is only composed for `completed`/`partial`. New
+  `showDiagnostics` setting (default **off**): the ledger lines (`Model routes`, `Deadline`,
+  `Route switches`, route overflows, `Errors`) now render only when it is on. `Uncertainties` stay
+  visible in both cases: they are truthful caveats, and carry-over parses them back out of an
+  earlier round, so hiding them would silently drop follow-up context. The success preamble also
+  stopped forbidding all commentary: up to three plain sentences may precede the verbatim report.
+  / `full` 模式绕开了前台，团队档只回一串机器台账（`Grok workflow: … / Model routes: … /
+  Deadline: … / Route switches: …`），没有一句能直接用的结论。现在 `full` 也会在报告前加同样的
+  【人话结论】（`任务 N/M 项已核验通过` ＋ 汇总首句），失败仍是失败样式——只有 `completed`/`partial`
+  才拼这段。新增 `showDiagnostics` 开关（默认**关**）：`模型路由`/`时限`/`路由切换`/`溢出`/`错误`
+  这些台账行只在打开时输出；`不确定项` 两种情况下都保留——它是诚实的限定语，且跨轮承接要靠它从
+  上一轮报告里解析回来，藏掉会静默丢失追问上下文。成功报告的说明文字也不再一律禁止评论：
+  允许先给三句以内人话，再原样贴原文。
+
 ### Fixed / 修复
 
 - **Saved role/model settings now actually reach the run / 保存的模型设置现在真正生效** —

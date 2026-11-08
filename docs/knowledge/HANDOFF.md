@@ -1,5 +1,30 @@
 # Agent Handoff
 
+## 2026-11-08 — B 方案：`/grok on` 也说人话、机器台账可按需打开（`61c3ac9`，`CONFIRMED`）
+
+- **From:** lead · **To:** 用户 / 后续代理 · **Base:** `61c3ac9`（本仓库 `release/0.6.0`）
+- **用户诉求**：`session-00fca25f…` 明明是 `COMPLETED`，但回复通篇是
+  `Grok workflow:` / `Confirmed evidence:` / `Model routes:` / `Deadline:` / `Route switches:`，
+  用户原话「在我眼里不像人话」。用户明确选择方案 **B（改代码）**，否决了「别开团队」这类用法建议。
+- **本轮交付：**
+  - `src/gate.ts` `runTeam` → `completed`/`partial` 拼 `【人话结论】任务 N/M 项已核验通过。…`
+    ＋汇总首句（`detectLanguage(request)` 定中英）；`failed` 不拼，失败不套成功口吻。
+  - `src/answer.ts` → `SUCCESS_PREAMBLE` 允许「先 ≤3 句人话，再原样贴 markers 内全文」；
+    `FAILURE_PREAMBLE` 与 markers 结构不变。
+  - `src/report.ts` → `renderReport(report, { showDiagnostics })`；新配置 `showDiagnostics`
+    默认 **off**，控制 `Model routes` / `Deadline` / `Route switches` / `Route overflows` / `Errors`。
+    **`Uncertainties` 有意留在开关外**（carry-over 要从上一轮文本解析它，藏掉会丢追问上下文）。
+  - `src/index.ts` 工具 `render` 渲染时读实时开关；`src/client/index.js` 设置页新增中英双语
+    「机器台账 / Machine diagnostics」开关。
+  - 测试：`test/gate.spec.ts` +3、`test/report.spec.ts` +1 默认视图钉住；volatile 字段数 27→28。
+    `npx vitest run` → **37 文件 / 655 测试 PASS**；`tsc --noEmit` 0 错误；lint 4 warnings/0 errors。
+- **过程事实（不掩盖）**：执行子代理 `impl-b` 中途失联，改动先落 stash `temp-gate-fix`；
+  其自身提交 `ef29e9b` 把 humanSummary 段当「无关 hunk」删掉，本轮在 `61c3ac9` 重新加回并钉测。
+- **Next action（用户，一步收口，`NOT_RUN`）**：重启 `:3090` 才加载新模块（D-013 步骤 5，
+  `DSH_HOME=/home/fish/dsh-layerfs dsh web --host 100.111.111.88 --port 3090 --no-open`）。
+  重启后：设置页应出现「机器台账」开关（默认关）；`/grok on` 跑一次应看到 `【人话结论】` 开头，
+  且不再出现 `Model routes:` 等台账行（除非手动打开）。
+
 ## 2026-11-08 — 设置保存不生效：已定位并修复（网关把开机快照传给 run）；live 需重启才加载新模块
 
 - **From:** lead · **To:** 用户 / 后续代理 · **Base:** `5b0e3df`（本仓库 `release/0.6.0`）

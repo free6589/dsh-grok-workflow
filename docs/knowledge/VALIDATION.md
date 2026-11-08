@@ -2491,3 +2491,39 @@ profile `guiweb`（`--from-default-profile web`），插件 dev 安装（`dsh pl
   （原文件已备份为 `gate.js.bak-before-livefix-<ts>`）。但 loader 用普通动态 `import()`
   （`cordis-plugin-loader/lib/index.js:214`，无 cache-bust），运行中的 `:3090` 仍持有旧模块，
   需重启该实例才会加载新代码。本轮未重启（用户明令禁止）。
+
+## Round 36 (2026-11-08): B 方案 —— `full` 模式也说人话，机器台账按需显示（`CONFIRMED`，`61c3ac9`）
+
+- **触发**：用户对 `session-00fca25f…`（`COMPLETED`）的判词是「你说这个是人话，但在我眼里不像人话」。
+  核对源码确认这不是读错了报告，而是设计使然：`full` 模式（`/grok on`）在 `produceAnswer`
+  里直接 `return runTeam(...)`，绕开了 triage 分支里唯一拼 `humanSummary` 的那段；同时
+  `src/answer.ts` 的 `SUCCESS_PREAMBLE` 明令主模型「add no commentary … do not summarise it」，
+  于是用户拿到的只能是 `Grok workflow:` / `Model routes:` / `Deadline:` / `Route switches:`
+  这一串台账。
+- **改动（用户明确选择「B」）：**
+  1. `src/gate.ts` `runTeam`：`completed`/`partial` 时拼与 triage 同款的
+     `【人话结论】任务 N/M 项已核验通过。…`，语言由 `detectLanguage(request)` 决定；
+     `failed` 绝不拼（失败不得套成功口吻）。报告正文不变，只多一个 `header`。
+  2. `src/answer.ts`：`SUCCESS_PREAMBLE` 改为「可先给最多 3 句人话，再原样贴 markers 内全文」；
+     `FAILURE_PREAMBLE` 保持如实、禁止谎报成功；markers 结构不变。
+  3. `src/report.ts`：`renderReport(report, { showDiagnostics })`，新配置
+     `showDiagnostics`（默认 `false`）控制 `Model routes` / `Deadline` / `Route switches` /
+     `Route overflows` / `Errors`。**`Uncertainties` 刻意留在开关之外**：它是给读者的诚实限定语，
+     且 `src/carryover.ts` 的 `parseReportRound` 要从上一轮渲染文本里解析 `Uncertainties:`，
+     一起藏掉会静默丢掉追问上下文——这一条由 `test/carryover.spec.ts` 的既有用例反向钉住
+     （藏进去就 FAIL，`expected '' to contain 'only measured on one host'`）。
+  4. `src/index.ts`：工具 `render` 在渲染时读 `readConfig().showDiagnostics`（读失败降级为隐藏，
+     不让渲染异常吞掉已产出的报告）。
+  5. `src/client/index.js`：设置页新增「机器台账 / Machine diagnostics」开关 + 中英文案，
+     文案写明「不确定项始终保留」。
+- **测试**：`tsc -p tsconfig.json --noEmit` → 0 错误；`npx vitest run` → **37 文件 / 655 测试 PASS**
+  （= Round 35 的 651 + 本轮新增 4：`test/gate.spec.ts` 三条〔full 有 header / failed 无 header /
+  `humanSummary:false` 抑制〕+ `test/report.spec.ts` 一条〔默认视图不含台账〕）。
+  既有台账断言改为显式索取 `{ showDiagnostics: true }`；`test/settings-projection.spec.ts` 与
+  `test/config.spec.ts` 的 volatile 字段数 27 → 28。`npm run lint` → 4 warnings / 0 errors
+  （均为既有，含 `src/run.ts` 未使用的 `RoleName`）。
+- **过程事实（不掩盖）**：执行子代理 `impl-b` 中途失联（background subagent failed），
+  其改动先落在 stash `temp-gate-fix`；随后它自身的提交 `ef29e9b` 把 humanSummary 段当作
+  「误入的无关 hunk」删除。本轮在 `61c3ac9` 里按用户决定重新加回并以测试钉死，
+  故 `ef29e9b` 的删除已被覆盖。
+- **部署（用户保留动作，`NOT_RUN`）**：`:3090` 未重启、live profile 未由本轮改动。

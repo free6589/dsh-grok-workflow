@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-11-08 (Round 35: 设置保存不生效已修复 —— 根因是 `src/gate.ts` 把开机快照传给 `runWorkflow`/`runSingleCall`，实时编辑只作用于准入；三处改 `config: limits`，回归用例+负向对照钉死，提交 `5b0e3df`，37 文件 / 651 测试 PASS。修复构建已装入 live web profile 安装副本（原文件已备份），但运行中的 `:3090` 仍持有旧模块，需重启该实例才生效 —— 用户保留，`NOT_RUN`)
+Last updated: 2026-11-08 (Round 36: B 方案落地 —— `full` 模式（`/grok on`）现在也拼 `【人话结论】` 头（completed/partial only，failed 不拼），`src/answer.ts` 允许先给 ≤3 句人话，`src/report.ts` 新增 `showDiagnostics`（默认 off）控制 Model routes/Deadline/Route switches/overflows/Errors，`Uncertainties` 故意留在开关外（carry-over 解析依赖 + 诚实限定语）；提交 `61c3ac9`，37 文件 / 655 测试 PASS，typecheck 0 错误，lint 4 warnings/0 errors。前一轮 `5b0e3df` 修「设置保存不生效」（三处 `config: limits`）。两轮都需**重启 `:3090`** 才加载新模块 —— 用户保留，`NOT_RUN`)
 
 ## Repository
 

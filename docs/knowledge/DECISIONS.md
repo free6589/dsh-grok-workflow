@@ -698,3 +698,29 @@ Each entry records the decision, evidence, alternatives, and status.
   `evidence/childname-fix-2026-11-08/gui/`。live `:3090` 只读核实为 **released 0.6.0**
   （2026-11-07 21:54 安装，`lib/team-engine.js` 不存在 → 不含本修复；更正上行的旧记 0.2.7），
   部署修复构建待用户授权（D-013 步骤 5）。
+
+## D-042 — `full` 模式补人话头；机器台账改为按需显示（用户选择方案 B，2026-11-08）
+
+- **Status:** CONFIRMED（`61c3ac9`）
+- **Date:** 2026-11-08
+- **Decision:** 三项：
+  1. `src/gate.ts` 的 `runTeam` 在 `completed`/`partial` 时拼与 triage 同款的
+     `【人话结论】任务 N/M 项已核验通过。…` 头；`failed` 不拼。
+  2. `src/answer.ts` 的 `SUCCESS_PREAMBLE` 允许「先 ≤3 句人话，再原样贴 markers 内全文」，
+     不再一律禁止评论；`FAILURE_PREAMBLE`（如实失败、不得谎报成功）不变。
+  3. 新增配置 `showDiagnostics`（默认 `false`），只控制 `Model routes` / `Deadline` /
+     `Route switches` / `Route overflows` / `Errors`。**`Uncertainties` 不进这个开关。**
+- **Reason（用户现象）:** `session-00fca25f…` 是 `COMPLETED`，但用户看到的只有台账并评价「不像人话」。
+  源码层面 `full` 在 `produceAnswer` 里直接 `return runTeam(...)`，绕开了 triage 分支里唯一拼
+  `humanSummary` 的那段；再叠加 `SUCCESS_PREAMBLE` 的「不许总结」，主模型连润色都不被允许。
+- **Reason（为何 Uncertainties 不藏）:** 两条独立理由：①它是给读者的诚实限定语（"这项只在一台机器测过"），
+  不是路由台账；②`src/carryover.ts` 的 `parseReportRound` 从上一轮**渲染文本**里解析
+  `Uncertainties:`，藏掉会让每一轮追问都静默丢失该上下文。`test/carryover.spec.ts` 的既有用例
+  在误藏时会 FAIL（`expected '' to contain 'only measured on one host'`），构成回归保护。
+- **Reason（为何默认关而不是默认开）:** 用户的原话是这些行「不像人话」；默认开的台账等于把问题留在默认路径上。
+  需要排障的人打开开关即可，报告的结构化 JSON 始终完整（渲染只是视图）。
+- **Alternatives rejected:** 只改文档教用户「别开团队」（用户明确否决：他是专门拿小活做测试）；
+  把台账整段删除（排障能力归零，且 t47 的契约「报告自证路由与时限」会被破坏）；
+  让主模型自由改写报告（会失去「已验证内容逐字交付」这一 fail-closed 保证）。
+- **Consequences:** 新增 1 个配置键（总数 27→28 volatile）；`renderReport` 多一个可选参数，
+  既有调用点默认隐藏台账，老测试需显式索取 `{ showDiagnostics: true }`。
