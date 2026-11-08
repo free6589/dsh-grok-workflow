@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-08
+
 ### Added / 新增
 
 - **`/grok on` speaks plainly, and the ledger is opt-in / `/grok on` 也说人话，机器台账改为按需显示** —
