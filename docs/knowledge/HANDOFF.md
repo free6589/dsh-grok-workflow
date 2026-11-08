@@ -1,5 +1,25 @@
 # Agent Handoff
 
+## 2026-11-08 — v0.7.0 已发布（tag → `main` `146dce7`）；live `:3090` 一步重启即收口（`CONFIRMED`）
+
+- **From:** lead · **To:** 用户 / 后续代理
+- **已发布（`CONFIRMED`）**：`v0.7.0` → `146dce7`（`main`）；GitHub Release
+  https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.7.0 ，
+  asset `dsh-grok-workflow-0.7.0.tgz` **317,470 B**；Release workflow `42474831253` 绿，
+  main 的 CI `42474712526` 绿。tag 不得移动。
+- **合并事实**：`origin/main` 的 PR #44 与本分支在 `src/run.ts` 启动段冲突；口径为「保留 main 的
+  startup deadline race + 两条入口都走 `teamWorkflowEngine`」。`lib/` 由 `npm run build` 重新生成，
+  无手改。合并后 37 文件 / 660 测试 PASS。
+- **Next action（用户，一步，`NOT_RUN`）**：重启 `:3090` 才加载新代码。装法二选一：
+  ①`dsh plugin --profile web add https://github.com/free6589/dsh-grok-workflow/releases/download/v0.7.0/dsh-grok-workflow-0.7.0.tgz`
+  ②本机已打好 `out/dsh-grok-workflow-0.7.0.tgz`（由 `146dce7` 打包，与本 tag 同内容）；
+  然后 `DSH_HOME=/home/fish/dsh-layerfs dsh web --host 100.111.111.88 --port 3090 --no-open`。
+  重启后应看到：设置页出现「机器台账」开关（默认关）；`/grok on` 跑一次以 `【人话结论】` 开头且无
+  `Model routes:` 行；`Model routes`（打开开关后看）里出现 `wb/cn:deepseek-v4.1-flash` 即证明
+  Round 35 的「保存即生效」也一起修好了。
+- **未做（`NOT_RUN`）**：live 安装副本与本机 `:3090` 均未由代理改动（沙箱对
+  `/home/fish/dsh-layerfs` 只读，见 Round 36 尾注）。
+
 ## 2026-11-08 — B 方案：`/grok on` 也说人话、机器台账可按需打开（`61c3ac9`，`CONFIRMED`）
 
 - **From:** lead · **To:** 用户 / 后续代理 · **Base:** `61c3ac9`（本仓库 `release/0.6.0`）

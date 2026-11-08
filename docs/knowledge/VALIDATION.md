@@ -2527,3 +2527,28 @@ profile `guiweb`（`--from-default-profile web`），插件 dev 安装（`dsh pl
   「误入的无关 hunk」删除。本轮在 `61c3ac9` 里按用户决定重新加回并以测试钉死，
   故 `ef29e9b` 的删除已被覆盖。
 - **部署（用户保留动作，`NOT_RUN`）**：`:3090` 未重启、live profile 未由本轮改动。
+
+## Round 37 (2026-11-08): v0.7.0 发布 —— 合 main、打 tag、Release 全绿（`CONFIRMED`）
+
+- **发布对象**：`v0.7.0` → commit `146dce7`（`main` 上）；annotated tag 对象 `3b96b16`
+  （`git ls-remote --tags origin v0.7.0`）。
+- **前置合并（有冲突，已解）**：`origin/main` 已前进到 `3b1d9a8`（PR #44，lifecycle/cancellation/
+  startup-deadline 修复），与本分支在 `src/run.ts` 的启动段冲突（`git merge-tree --write-tree`
+  预览确认，随后 `git merge origin/main` 实测两人冲突块）。解决口径：**保留 main 的启动 deadline race**
+  （`start()` 不 settle 也不再挂死调用方；迟到的 run 会被 cancel+dispose），同时把两条入口的
+  `ctx.workflowEngine.start(start)` 换成 `teamWorkflowEngine(ctx, logger).start(start)`，保住子代理
+  的描述性显示名（`ad66118`）。`lib/` 不手改，删冲突产物后用 `npm run build` 重新生成。
+- **合并后实测**：`tsc -p tsconfig.json --noEmit` → 0 错误；`npx vitest run` → **37 文件 / 660 测试
+  PASS**（比 Round 36 的 655 多 5 个，来自 main 侧新增用例）。
+- **发布准备**：`package.json` + `package-lock.json` 同步升到 `0.7.0`（脚本改写，diff 仅 3 行，
+  无格式化噪声）；`CHANGELOG.md` 的 `[Unreleased]` 提升为 `## [0.7.0] - 2026-11-08`（98 行，
+  远超发布工作流要求的 4 行），并在其上保留新的空 `[Unreleased]`。
+- **发布前本机 CI**：`npm run ci` → typecheck 0 错误、lint 4 warnings/0 错误、37 文件 / 660 测试
+  PASS、`git diff --exit-code -- lib/` 干净（构建可复现）。`main` 上再跑一次 `npm run ci` 同样 PASS。
+- **推送与发布**：`release/0.6.0` → `146dce7`（`f222238..146dce7`）；`main` → `146dce7`
+  （`3b1d9a8..146dce7`，release 分支已吸收 main，故为快进）；`git push origin v0.7.0` 新建 tag。
+  GitHub Actions：CI `42474712526` **success**；Release `42474831253` **success**（43 s）。
+- **产物（`gh release view` 实测）**：`Grok Workflow for DSH v0.7.0`，`publishedAt`
+  `2026-11-08T11:14:41Z`，asset `dsh-grok-workflow-0.7.0.tgz` **317,470 B**，
+  sha256 `de443167858b7df25d81576288c2c9521da1256e8ad8004c6a9575eaecf4a3ec`。
+- **未做（`NOT_RUN`）**：live `:3090` 未重启、live 安装副本未由本轮改动（沙箱只读，见 Round 36 尾注）。

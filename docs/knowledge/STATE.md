@@ -1,6 +1,14 @@
 # Project State
 
-Last updated: 2026-11-08 (Round 36: B 方案落地 —— `full` 模式（`/grok on`）现在也拼 `【人话结论】` 头（completed/partial only，failed 不拼），`src/answer.ts` 允许先给 ≤3 句人话，`src/report.ts` 新增 `showDiagnostics`（默认 off）控制 Model routes/Deadline/Route switches/overflows/Errors，`Uncertainties` 故意留在开关外（carry-over 解析依赖 + 诚实限定语）；提交 `61c3ac9`，37 文件 / 655 测试 PASS，typecheck 0 错误，lint 4 warnings/0 errors。前一轮 `5b0e3df` 修「设置保存不生效」（三处 `config: limits`）。两轮都需**重启 `:3090`** 才加载新模块 —— 用户保留，`NOT_RUN`)
+Last updated: 2026-11-08 (**v0.7.0 released** — tag `v0.7.0` → `146dce7` on `main`; Release
+`42474831253` green, asset `dsh-grok-workflow-0.7.0.tgz` 317,470 B. Round 37: merged `origin/main`
+(PR #44) resolving the `src/run.ts` startup conflict by keeping main's deadline race **and** routing
+both entry points through `teamWorkflowEngine`; 37 files / 660 tests PASS; `[Unreleased]` promoted to
+`## [0.7.0] - 2026-11-08`; `package.json`+`package-lock.json` = `0.7.0`. Content of the release:
+Round 36's B plan — `full` mode now opens with `【人话结论】` (completed/partial only), `showDiagnostics`
+(default off) gates Model routes/Deadline/Route switches/overflows/Errors, `Uncertainties` stays
+visible; and Round 35's fix — a saved role/model setting now actually reaches the run. Live `:3090`
+still needs a restart to load any of it — user-reserved, `NOT_RUN`)
 
 ## Repository
 

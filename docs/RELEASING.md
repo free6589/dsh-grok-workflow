@@ -193,3 +193,26 @@ dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.
 Replace `v0.1.0` with a tag that is present on GitHub. The `v0.1.0` tag is published; the unpinned README command follows `main` and does not pin a release. Restart the profile after changing the installed version.
 
 请把示例中的 `v0.1.0` 替换成 GitHub 上实际存在的标签。`v0.1.0` 已发布；README 中未固定版本的命令跟随 `main`，不会固定到发布版本。切换版本后请重启对应 DSH profile。
+
+## 0.7.0 — released 2026-11-08 / 0.7.0 — 已于 2026-11-08 发布
+
+| | |
+|---|---|
+| Tag | `v0.7.0` on commit `146dce7` (on `main`) |
+| GitHub Release | 2026-11-08T11:14:41Z — https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.7.0 |
+| Artifact | `dsh-grok-workflow-0.7.0.tgz`, **317,470 B**, sha256 `de443167…` |
+| Release workflow | run `42474831253` green; CI on `main` run `42474712526` green |
+
+**Minor rationale:** the release adds a user-visible setting (`showDiagnostics`) and changes the
+default rendering of a `full`-mode report (a plain-language header, and the machine ledger hidden
+by default). The report *schema* is unchanged, no config key was removed or renamed, and the ledger
+is one setting away — so this is backward-compatible per the version rule above, not a major bump.
+`Uncertainties` deliberately stays outside the new switch: carry-over parses it back out of an
+earlier round's rendered report.
+
+**版本类型说明：** 本次新增了用户可见的 `showDiagnostics` 配置项，并改变了 `full` 模式报告的默认呈现
+（增加人话结论头、机器台账默认隐藏）。报告**数据结构**不变，没有删除或重命名任何配置键，台账一个开关即可
+恢复——因此按上面的版本规则属于向后兼容，不升主版本。`不确定项` 有意不纳入这个开关：跨轮承接需要从上一轮
+渲染文本里把它解析回来。
+
+This tag must not be moved. / 该标签不得移动。
