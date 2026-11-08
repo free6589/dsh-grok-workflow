@@ -652,6 +652,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
   state.starting.set(sessionId, (state.starting.get(sessionId) ?? 0) + 1)
   let run: WorkflowRun | undefined
   let cancelOnAbort: (() => void) | undefined
+  let removeStartupAbort: (() => void) | undefined
   // The stop reason the engine settled on; `run-end` reports it, and a run that
   // never settles (an engine throw) is reported as an error rather than silently
   // left open in the GUI.
@@ -719,15 +720,70 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
         maxTotalAgents: request.maxTotalAgents,
         ...config.subagentProvider === undefined ? {} : { subagentProvider: config.subagentProvider },
       }
-      try {
-        // The team engine is the runtime's own PTC engine over a view that
-        // gives every child its descriptive durable label (src/team-engine.ts);
-        // on non-PTC engines (unit fakes) it is the injected engine unchanged.
-        run = await teamWorkflowEngine(ctx, logger).start(start)
-      } catch (error) {
-        if (timedOut) return timeout(`workflow exceeded the ${config.timeoutMs} ms deadline during startup`)
-        throw error
+      // Startup is part of the run's deadline. Racing only `run.result` left
+      // the caller blocked forever when workflowEngine.start() itself never settled.
+      const startingPromise = Promise.resolve().then(() => teamWorkflowEngine(ctx, logger).start(start))
+      const startupCancelled = new Promise<'cancelled'>(resolve => {
+        const onAbort = (): void => {
+          // The deadline aborts the same combined signal. Let the deadline
+          // branch win so timeout is not misreported as a caller cancellation.
+          if (!timedOut) resolve('cancelled')
+        }
+        if (signal.aborted) onAbort()
+        else {
+          signal.addEventListener('abort', onAbort, { once: true })
+          removeStartupAbort = () => signal.removeEventListener('abort', onAbort)
+        }
+      })
+      const startup = await Promise.race([
+        startingPromise.then(
+          value => ({ kind: 'started' as const, run: value }),
+          error => ({ kind: 'error' as const, error }),
+        ),
+        deadline.then(() => ({ kind: 'deadline' as const })),
+        startupCancelled.then(() => ({ kind: 'cancelled' as const })),
+      ])
+      if (startup.kind === 'deadline' || (startup.kind === 'cancelled' && timedOut)) {
+        const reason = 'workflow deadline exceeded after ' + config.timeoutMs + ' ms during startup'
+        // The caller can return now, but the engine may still hand back a run later.
+        // Observe the pending promise and dispose that late resource immediately.
+        void startingPromise.then(async lateRun => {
+          try { await lateRun.cancel(reason) } catch (error) {
+            logger.warn('late workflow startup cancellation failed: ' + redactError(error))
+          }
+          try { await lateRun.dispose() } catch (error) {
+            logger.warn('late workflow startup dispose failed: ' + redactError(error))
+          }
+        }, () => {})
+        return timeout('workflow exceeded the ' + config.timeoutMs + ' ms deadline during startup')
       }
+      if (startup.kind === 'cancelled') {
+        const reason = state.disposed
+          ? workflowLabel(config) + ' was unloaded during workflow startup'
+          : workflowLabel(config) + ' was cancelled by its caller during workflow startup'
+        settledStop = 'cancelled'
+        void startingPromise.then(async lateRun => {
+          try { await lateRun.cancel(reason) } catch (error) {
+            logger.warn('late cancelled workflow startup cancellation failed: ' + redactError(error))
+          }
+          try { await lateRun.dispose() } catch (error) {
+            logger.warn('late cancelled workflow startup dispose failed: ' + redactError(error))
+          }
+        }, () => {})
+        return failure(state.disposed ? 'Unloaded' : 'Cancelled', reason, state.disposed ? 'unloaded' : 'cancelled')
+      }
+      if (startup.kind === 'error') {
+        if (timedOut) return timeout('workflow exceeded the ' + config.timeoutMs + ' ms deadline during startup')
+        if (signal.aborted) {
+          const reason = state.disposed
+            ? workflowLabel(config) + ' was unloaded during workflow startup'
+            : workflowLabel(config) + ' was cancelled by its caller during workflow startup'
+          settledStop = 'cancelled'
+          return failure(state.disposed ? 'Unloaded' : 'Cancelled', reason, state.disposed ? 'unloaded' : 'cancelled')
+        }
+        throw startup.error
+      }
+      run = startup.run
       // The node is announced before the script can produce anything, which is
       // what turns "several minutes of empty window" into a live row (t43).
       progress?.runStart(run)
@@ -871,6 +927,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
     }
     archiver.dispose()
     for (const off of stopProgressListeners ?? []) off()
+    removeStartupAbort?.()
     combined.dispose()
     if (run !== undefined) {
       state.runs.delete(run)
@@ -969,7 +1026,7 @@ return { reply: null }
  */
 export async function runSingleCall(options: SingleCallOptions): Promise<SingleCallOutcome> {
   const { ctx, config, state, logger, agent, prompt, label } = options
-  if (state.disposed) return { ok: false, reason: `${workflowLabel(config)} is unavailable: plugin has been unloaded` }
+  if (state.disposed) return { ok: false, reason: workflowLabel(config) + ' is unavailable: plugin has been unloaded' }
   const route = config.triageModel === undefined
     ? {}
     : config.triageModel.provider === undefined
@@ -977,26 +1034,71 @@ export async function runSingleCall(options: SingleCallOptions): Promise<SingleC
       : { provider: config.triageModel.provider, model: config.triageModel.model }
   const deadlineMs = config.timeoutMs
   const signals = options.signals ?? []
-  if (state.disposed) return { ok: false, reason: `${workflowLabel(config)} is unavailable: plugin has been unloaded` }
+  let stopped = false
 
   /**
    * One attempt of the front-desk call.
    *
-   * `structured` selects the schema-shaped variant; the plain variant asks for a
-   * natural answer, which the child returns as text. Measured on :3100: a
-   * schema-constrained child sometimes answers in prose, and the guest collapses
-   * that to `{"reply":null}` — the plain call is the primary, the schema call the
-   * retry, and the outcome says how many attempts it took.
+   * The deadline and cancellation signal cover startup as well as execution.
+   * Registering the returned run in the shared lifetime state makes quick calls
+   * visible to plugin unload, the same way a full workflow run is.
    */
   const attempt = async (structured: boolean): Promise<SingleCallOutcome> => {
+    if (state.disposed) {
+      stopped = true
+      return { ok: false, reason: workflowLabel(config) + ' is unavailable: plugin has been unloaded' }
+    }
+
     state.pending += 1
+    const sessionId = sessionIdOf(agent)
+    state.starting.set(sessionId, (state.starting.get(sessionId) ?? 0) + 1)
+    let starting = true
+    const finishStarting = (): void => {
+      if (!starting) return
+      starting = false
+      state.pending = Math.max(0, state.pending - 1)
+      const count = state.starting.get(sessionId) ?? 0
+      if (count <= 1) state.starting.delete(sessionId)
+      else state.starting.set(sessionId, count - 1)
+    }
+
+    const deadlineController = new AbortController()
+    const combined = anySignal([state.controller.signal, ...signals, deadlineController.signal])
     let run: WorkflowRun | undefined
     let timer: ReturnType<typeof setTimeout> | undefined
-    let detach: (() => void) | undefined
+    let timedOut = false
+    let resolveStopped: ((value: { kind: 'stopped', reason: string }) => void) | undefined
+    const stoppedPromise = new Promise<{ kind: 'stopped', reason: string }>(resolve => {
+      resolveStopped = resolve
+    })
+    const stopReason = (): string => timedOut
+      ? 'the front-desk call exceeded the ' + deadlineMs + ' ms deadline'
+      : state.disposed
+        ? workflowLabel(config) + ' was unloaded while the front-desk call was running'
+        : 'the front-desk call was cancelled by its caller'
+    const stop = (): void => {
+      const reason = stopReason()
+      // During plugin disposal the shared disposer owns cancellation and dispose.
+      // For a caller stop or deadline, this listener owns the live run's cancel.
+      if (run !== undefined && !state.disposed) {
+        try { void run.cancel(reason) } catch (error) {
+          logger.warn('front-desk run cancellation failed: ' + redactError(error))
+        }
+      }
+      resolveStopped?.({ kind: 'stopped', reason })
+    }
+    combined.signal.addEventListener('abort', stop, { once: true })
+    if (combined.signal.aborted) stop()
+    timer = setTimeout(() => {
+      timedOut = true
+      deadlineController.abort()
+    }, deadlineMs)
+    timer.unref?.()
+
     try {
       const start: WorkflowStartRequest = {
         script: singleCallScript(
-          structured ? `${prompt}\n\nReturn only a JSON object with one field: {"reply": "<your answer>"}.` : prompt,
+          structured ? prompt + '\n\nReturn only a JSON object with one field: {"reply": "<your answer>"}.' : prompt,
           label,
           route,
           structured,
@@ -1008,61 +1110,119 @@ export async function runSingleCall(options: SingleCallOptions): Promise<SingleC
         },
         args: {},
         parent: agent,
+        signal: combined.signal,
         // One child: the tier's whole promise is "one model call".
         maxTotalAgents: 1,
         ...config.subagentProvider === undefined ? {} : { subagentProvider: config.subagentProvider },
       }
-      let timedOut = false
-      try {
-        run = await teamWorkflowEngine(ctx, logger).start(start)
-      } catch (error) {
-        return { ok: false, reason: redactError(error) }
+
+      if (combined.signal.aborted) {
+        stopped = true
+        return { ok: false, reason: stopReason() }
       }
-      const live = run
-      detach = () => {
-        live.cancel(state.disposed ? 'grok-workflow plugin unloaded' : 'front-desk call cancelled by its caller')
-      }
-      for (const signal of signals) {
-        if (signal.aborted === true) detach()
-        else signal.addEventListener('abort', detach, { once: true })
-      }
-      const result = await Promise.race([
-        live.result,
-        new Promise<undefined>(resolve => {
-          timer = setTimeout(() => {
-            timedOut = true
-            live.cancel(`front-desk call exceeded the ${deadlineMs} ms deadline`)
-            resolve(undefined)
-          }, deadlineMs)
-        }),
+
+      // Attach both handlers immediately. If the deadline/caller wins while
+      // startup is pending, a late run is still cancelled and disposed when the
+      // engine finally hands it back; a late rejection is already observed.
+      const startingPromise = Promise.resolve().then(() => teamWorkflowEngine(ctx, logger).start(start))
+      const startOutcome = await Promise.race([
+        startingPromise.then(
+          value => ({ kind: 'started' as const, run: value }),
+          error => ({ kind: 'error' as const, error }),
+        ),
+        stoppedPromise,
       ])
-      if (timedOut) return { ok: false, reason: `the front-desk call exceeded the ${deadlineMs} ms deadline` }
-      if (result === undefined) return { ok: false, reason: 'the front-desk call settled without a result' }
-      if (result.stopReason !== 'completed') {
+
+      if (startOutcome.kind === 'stopped') {
+        stopped = true
+        void startingPromise.then(async lateRun => {
+          try { await lateRun.cancel(startOutcome.reason) } catch (error) {
+            logger.warn('late front-desk run cancellation failed: ' + redactError(error))
+          }
+          try { await lateRun.dispose() } catch (error) {
+            logger.warn('late front-desk run dispose failed: ' + redactError(error))
+          }
+        }, () => {})
+        return { ok: false, reason: startOutcome.reason }
+      }
+      if (startOutcome.kind === 'error') {
+        if (combined.signal.aborted) {
+          stopped = true
+          return { ok: false, reason: stopReason() }
+        }
+        return { ok: false, reason: redactError(startOutcome.error) }
+      }
+
+      run = startOutcome.run
+      finishStarting()
+      if (state.disposed) {
+        stopped = true
+        try { await run.cancel(workflowLabel(config) + ' plugin unloaded during front-desk startup') } catch (error) {
+          logger.warn('front-desk run cancellation after unload failed: ' + redactError(error))
+        }
+        try { await run.dispose() } catch (error) {
+          logger.warn('front-desk run dispose after unload failed: ' + redactError(error))
+        }
+        run = undefined
+        return { ok: false, reason: stopReason() }
+      }
+
+      state.runs.add(run)
+      const owner = sessionOfAgent(agent)
+      state.active.set(run, {
+        runId: String(run.id),
+        sessionId,
+        ...(owner === undefined ? {} : { session: owner }),
+        startedAtMs: Date.now(),
+        routes: [],
+      })
+      if (combined.signal.aborted) {
+        stop()
+        stopped = true
+        return { ok: false, reason: stopReason() }
+      }
+
+      const outcome = await Promise.race([
+        run.result.then(
+          value => ({ kind: 'result' as const, value }),
+          error => ({ kind: 'error' as const, error }),
+        ),
+        stoppedPromise,
+      ])
+      if (outcome.kind === 'stopped') {
+        stopped = true
+        return { ok: false, reason: outcome.reason }
+      }
+      if (outcome.kind === 'error') {
+        return { ok: false, reason: redactError(outcome.error) }
+      }
+      if (combined.signal.aborted) {
+        stopped = true
+        return { ok: false, reason: stopReason() }
+      }
+      if (outcome.value.stopReason !== 'completed') {
+        if (outcome.value.stopReason === 'cancelled' || state.disposed || signals.some(signal => signal.aborted)) stopped = true
         return {
           ok: false,
-          reason: `the front-desk call stopped: ${result.stopReason}${result.error === undefined ? '' : ` (${result.error})`}`,
+          reason: 'the front-desk call stopped: ' + outcome.value.stopReason +
+            (outcome.value.error === undefined ? '' : ' (' + outcome.value.error + ')'),
         }
       }
-      const value = result.value as { reply?: unknown } | string | null
+
+      const value = outcome.value.value as { reply?: unknown } | string | null
       const text = typeof value === 'string'
         ? value.trim()
         : value !== null && typeof value === 'object' && typeof value.reply === 'string'
           ? value.reply.trim()
           : ''
       if (text === '') {
-        // The guest collapses "the child failed" and "the child returned no
-        // structured value" into null, so the reason carries what the engine did
-        // report: `agentsStarted` 0 means the call was never accepted.
-        logger.warn(`front-desk call produced no reply (agentsStarted=${result.agentsStarted} value=${JSON.stringify(result.value)?.slice(0, 120) ?? 'undefined'})`)
-        return { ok: false, reason: `the front-desk worker returned no text (agentsStarted=${result.agentsStarted})` }
+        logger.warn('front-desk call produced no reply (agentsStarted=' + outcome.value.agentsStarted +
+          ' value=' + (JSON.stringify(outcome.value.value)?.slice(0, 120) ?? 'undefined') + ')')
+        return { ok: false, reason: 'the front-desk worker returned no text (agentsStarted=' + outcome.value.agentsStarted + ')' }
       }
-      // The front-desk tier is a round as well: one child answered, and a later
-      // session must be able to find that answer. Archived here — before this call
-      // returns to the turn — for the same reason the full path archives at settle:
-      // a result nobody can look up afterwards is a result the next round redoes.
+
       archiveRoundNow({
-        runId: String(live.id),
+        runId: String(run.id),
         runName: TRIAGE_RUN_LABEL,
         sessionId: sessionIdOf(agent),
         objective: prompt,
@@ -1071,21 +1231,27 @@ export async function runSingleCall(options: SingleCallOptions): Promise<SingleC
       }, { logger })
       return { ok: true, text }
     } catch (error) {
-      logger.warn(`front-desk call failed: ${redactError(error)}`)
+      logger.warn('front-desk call failed: ' + redactError(error))
       return { ok: false, reason: redactError(error) }
     } finally {
       if (timer !== undefined) clearTimeout(timer)
-      if (detach !== undefined) for (const signal of signals) signal.removeEventListener('abort', detach)
-      state.pending -= 1
-      run?.dispose().catch(() => {})
+      combined.signal.removeEventListener('abort', stop)
+      combined.dispose()
+      finishStarting()
+      if (run !== undefined) {
+        state.runs.delete(run)
+        state.active.delete(run)
+        // disposeActiveState owns the run after it marks the plugin disposed.
+        if (!state.disposed) run.dispose().catch(() => {})
+      }
     }
   }
 
   const plain = await attempt(false)
-  if (plain.ok) return plain
+  if (plain.ok || stopped) return plain
   // One retry, schema-shaped: a cheap answer may cost two calls when the child
-  // returns nothing, and the answer text says so (`attempts`).
+  // returns nothing. A stop/deadline is terminal and must never launch a retry.
   const retry = await attempt(true)
   if (retry.ok) return { ok: true, text: retry.text, retried: true }
-  return { ok: false, reason: `${plain.reason}; retry with a structured answer also failed: ${retry.reason}` }
+  return { ok: false, reason: plain.reason + '; retry with a structured answer also failed: ' + retry.reason }
 }

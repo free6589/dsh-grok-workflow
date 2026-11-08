@@ -397,13 +397,21 @@ export function classifyPreStep(
  *
  * @param reason - Optional measured reason; empty when there is none to state.
  */
-export function cancelledText(reason: string): string {
-  const lines = [
-    '运行已取消（cancelled）：这条消息没有完成，也没有可交付的结果。',
-    '已完成的部分保留，未完成的部分不再继续；要接着做，请把任务重新发一次。',
-  ]
+export function cancelledText(reason: string, report?: WorkflowReport): string {
+  const verified = report?.tasks.filter(task => task.status === 'verified').length ?? 0
+  const total = report?.tasks.length ?? 0
+  const lines = report === undefined
+    ? [
+      '运行已取消（cancelled）：这条消息没有完成，也没有可交付的结果。',
+      '没有可保留的核验报告；未完成的部分不再继续，要接着做请把任务重新发一次。',
+    ]
+    : [
+      '运行已取消（cancelled）：工作流在全部任务完成前停止。',
+      '取消前已有 ' + verified + '/' + total + ' 项任务核验通过；下方保留核验结果、未完成项和证据。总体状态仍为取消，不代表全部完成。',
+    ]
   const trimmed = reason.trim()
-  if (trimmed !== '') lines.push(`原因：${trimmed}`)
+  if (trimmed !== '') lines.push('原因：' + trimmed)
+  if (report !== undefined) lines.push('', '取消前保留的工作流报告：', relayText(report))
   return lines.join('\n')
 }
 
@@ -1165,7 +1173,9 @@ export function installGate(deps: GateDeps): boolean {
       // entered step, and the run already stopped on the same signal — so the
       // transcript gets the batch and the cancelled terminal instead (P0-1 + P0-4).
       record(agent, entry, 'failed', 'aborted')
-      commitCancelled(agent, payload, cancelledText(answer.kind === 'notice' ? answer.reason : ''), surfaced)
+      const reason = answer.kind === 'notice' ? answer.reason : ''
+      const partialReport = answer.kind === 'report' ? answer.report : undefined
+      commitCancelled(agent, payload, cancelledText(reason, partialReport), surfaced)
       return { kind: 'reject' }
     }
     record(agent, entry, answer.kind === 'notice' ? 'failed' : 'delivered', answer.outcome)

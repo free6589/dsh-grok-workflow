@@ -47,7 +47,7 @@ import type { Session } from '@deepseek-ai/dsh-session';
 import type { UserMessage } from '@deepseek-ai/dsh-llm';
 import type { ActiveState, WorkflowLogger } from './run.js';
 import type { RecallSource } from './triage.js';
-import type { ResolvedConfig } from './types.js';
+import type { ResolvedConfig, WorkflowReport } from './types.js';
 /** Payload shape of one `agent/pre-step` dispatch. */
 export interface PreStepPayload {
     agent: Agent;
@@ -167,7 +167,7 @@ export declare function classifyPreStep(deps: Pick<GateDeps, 'config' | 'readCon
  *
  * @param reason - Optional measured reason; empty when there is none to state.
  */
-export declare function cancelledText(reason: string): string;
+export declare function cancelledText(reason: string, report?: WorkflowReport): string;
 /** Install the gate; returns false when the runtime cannot host `agent/pre-step`. */
 export declare function installGate(deps: GateDeps): boolean;
 export {};
