@@ -868,3 +868,10 @@
   一并入库；`src/` 其余文件未触碰。
 - **Next action**：①lead 复核 D-040/Round 30 后决定合入/发布节奏（未 bump 版本、未 tag）；
   ②`:3090` 升级仍待用户批准（D-013）——修复要在线上生效需升级 + 重载。
+
+- **部署边界（本轮实测，`CONFIRMED`）**：本会话的 DSH 文件策略是 `workspace-write`，
+  `cp -a lib/. /home/fish/dsh-layerfs/profiles/web/node_modules/dsh-grok-workflow/lib/`
+  被沙箱拒绝（`Read-only file system`，含备份目录创建）。因此 live 安装副本**本轮未由我改动**；
+  安装包已打到 `out/dsh-grok-workflow-0.6.0.tgz`（66 文件 / 309K，`npm pack --cache /tmp/...`，
+  默认 `~/.npm` 只读）。用户执行安装 + 重启即可收口。Round 35 记录的「已装入 live 副本」
+  只覆盖当时的 `lib/gate.js`，不含本轮 B 方案。
