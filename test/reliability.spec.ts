@@ -560,6 +560,30 @@ describe('reliability: wiring the live configuration and the category vocabulary
     expect(report.tasks).toHaveLength(2)
   })
 
+  it('uses the live roles chain for a gated run, not the load-time snapshot', async () => {
+    // Regression for the user report "saved the worker chain, but the team run
+    // still used the old models": the gate read `safe()` for admission yet handed
+    // the load-time `config` to runWorkflow, so a saved roles edit reached
+    // admission and never reached the children.
+    let workerModel = 'old-model'
+    const ctx = new FakeContext()
+    apply(ctx as never, {
+      answerStrategy: 'relay',
+      mode: 'full',
+      grokDefault: 'on',
+      maxConcurrency: 1,
+      roles: { get: () => ({ worker: [{ model: workerModel }] }) },
+    } as never)
+    // The settings save lands after load, before the next message: same holder,
+    // new value — exactly what a successful hot reload produces.
+    workerModel = 'wb/cn:deepseek-v4.1-flash'
+    const target = session('sess-live-roles')
+    await ctx.preStep(stepPayload(agentOf(target), [userMessage('do the thing')]), passThrough([]))
+    await vi.waitFor(() => { if (ctx.engine.startCalls.length === 0) throw new Error('run did not start') })
+    const args = ctx.engine.startCalls[0]!.args as { roles: { worker: { model: string }[] } }
+    expect(args.roles.worker[0]!.model).toBe('wb/cn:deepseek-v4.1-flash')
+  })
+
   it('falls back to the last good snapshot, not the load-time config (F1)', async () => {
     // Sequence that kills the M3 mutation: a valid edit takes effect, then an
     // invalid edit arrives. Delivery must keep the last *valid* value, because

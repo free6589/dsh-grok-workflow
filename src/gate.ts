@@ -655,7 +655,7 @@ export function installGate(deps: GateDeps): boolean {
         ].join('\n')
         try {
           const call = await runSingleCall({
-            ctx, config, state, logger, agent,
+            ctx, config: limits, state, logger, agent,
             prompt: hybridPrompt,
             label: 'triage-classifier',
             ...signal === undefined ? {} : { signals: [signal] },
@@ -760,7 +760,7 @@ export function installGate(deps: GateDeps): boolean {
           : [histForTriage, carryoverForSession(sessionOf(agent), { rounds: limits.historyTurns, chars: limits.historyChars }).digest]
             .map(part => part.trim()).filter(part => part !== '').join('\n\n').slice(0, 4000)
         const call = await runSingleCall({
-          ctx, config, state, logger, agent,
+          ctx, config: limits, state, logger, agent,
           prompt: recalled === undefined ? singleCallPrompt(tier, target, false, fastContext) : recallPrompt(tier, target, recalled),
           label: 'quick-worker',
           ...signal === undefined ? {} : { signals: [signal] },
@@ -860,7 +860,7 @@ export function installGate(deps: GateDeps): boolean {
       // The gate owns the user-visible answer, so failures become reports here;
       // only conditions that prevent starting at all reach the catch below.
       outcome = await runWorkflow({
-        ctx, config, state, logger, agent, objective, failureMode: 'report',
+        ctx, config: limits, state, logger, agent, objective, failureMode: 'report',
         ...carryover.digest === '' ? {} : { carryover: carryover.digest },
         ...signal === undefined ? {} : { signals: [signal] },
       })
