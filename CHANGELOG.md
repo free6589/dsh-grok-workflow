@@ -7,6 +7,24 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ### Fixed / 修复
 
+- **Saved role/model settings now actually reach the run / 保存的模型设置现在真正生效** —
+  a settings save wrote the profile patch, bumped the revision and reported no error, yet every
+  child of the next workflow still used the previous chain (`roles.worker` first entry ignored;
+  the models observed were the ones from the process's start-up snapshot). Cause: the gate read
+  `safe()` (the live holders) for classification, history bounds and queue limits, then handed the
+  closure's **load-time** `ResolvedConfig` to `runWorkflow` and to both `runSingleCall` sites
+  (triage classifier, quick worker) — so an edit reached admission and never reached a child. The
+  three call sites now receive the live snapshot, which is what "an edit applies to the next
+  message" was always documented to mean. Regression:
+  `test/reliability.spec.ts` → "uses the live roles chain for a gated run, not the load-time
+  snapshot" (negative control without the fix fails with
+  `expected 'old-model' to be 'wb/cn:deepseek-v4.1-flash'`).
+  / 设置页保存后，补丁文件、revision 都对、也没有报错，但下一轮工作流的每个子代理仍在用旧链路
+  （`roles.worker` 第一名被忽略，实际用的是进程启动那一刻的快照）。原因：网关用 `safe()`（实时持有值）
+  做分类、历史与排队上限，却把闭包里的**开机快照** `ResolvedConfig` 传给了 `runWorkflow` 和两处
+  `runSingleCall`（前台分类、快速应答）——于是编辑只作用于准入，永远到不了子代理。三处改为传实时快照，
+  这才是"编辑对下一条消息生效"本来的含义。回归测试见上，去掉修复即失败，正是用户看到的现象。
+
 - **Finished subtasks in the chat task list stay clickable / 聊天任务列表中已完成子任务保持可点击** —
   in the chat sidebar task list a *running* subtask row (for example `任务 1 · …`) was a link, but
   every finished row rendered as inert text: the planner row `规划助手已完成`, a task's `执行` /

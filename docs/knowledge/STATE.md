@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-11-08 (fix_child_names attempt 6/6 final: all facts re-verified unchanged — CI 650 PASS at `b2bf3a8`; live `:3090` newest children incl. this round's own still render `任务团队 child 25–32`; fix `ad66118` still only on `release/0.6.0`, `origin/main` advanced to `3b1d9a8` (PR #44) without it; deploy+restart = user-reserved D-013 step 5)
+Last updated: 2026-11-08 (Round 35: 设置保存不生效已修复 —— 根因是 `src/gate.ts` 把开机快照传给 `runWorkflow`/`runSingleCall`，实时编辑只作用于准入；三处改 `config: limits`，回归用例+负向对照钉死，提交 `5b0e3df`，37 文件 / 651 测试 PASS。修复构建已装入 live web profile 安装副本（原文件已备份），但运行中的 `:3090` 仍持有旧模块，需重启该实例才生效 —— 用户保留，`NOT_RUN`)
 
 ## Repository
 

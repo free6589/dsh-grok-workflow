@@ -561,10 +561,10 @@ describe('reliability: wiring the live configuration and the category vocabulary
   })
 
   it('uses the live roles chain for a gated run, not the load-time snapshot', async () => {
-    // Regression for the user report "saved the worker chain, but the team run
-    // still used the old models": the gate read `safe()` for admission yet handed
-    // the load-time `config` to runWorkflow, so a saved roles edit reached
-    // admission and never reached the children.
+    // Regression for the user report "settings saved but worker still uses the
+    // old chain": the gate read limits live for admission but handed the
+    // load-time snapshot to runWorkflow, so a saved worker edit never reached
+    // the next team run. The run must carry the edited chain.
     let workerModel = 'old-model'
     const ctx = new FakeContext()
     apply(ctx as never, {
@@ -574,8 +574,7 @@ describe('reliability: wiring the live configuration and the category vocabulary
       maxConcurrency: 1,
       roles: { get: () => ({ worker: [{ model: workerModel }] }) },
     } as never)
-    // The settings save lands after load, before the next message: same holder,
-    // new value — exactly what a successful hot reload produces.
+    // Settings save lands between load and the next message: same holder, new value.
     workerModel = 'wb/cn:deepseek-v4.1-flash'
     const target = session('sess-live-roles')
     await ctx.preStep(stepPayload(agentOf(target), [userMessage('do the thing')]), passThrough([]))

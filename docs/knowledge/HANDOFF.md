@@ -1,5 +1,27 @@
 # Agent Handoff
 
+## 2026-11-08 — 设置保存不生效：已定位并修复（网关把开机快照传给 run）；live 需重启才加载新模块
+
+- **From:** lead · **To:** 用户 / 后续代理 · **Base:** `5b0e3df`（本仓库 `release/0.6.0`）
+- **用户现象**：设置页把 `roles.worker` 第一名存成 `wb/cn:deepseek-v4.1-flash`（revision 21、
+  无红字、补丁文件该行正确），新会话的子代理却仍点 `global` → `global-sg` → `autoclaw`，
+  规划子代理用 `mimo`（补丁里是 muse-spark）。
+- **根因（`CONFIRMED`，源码级）**：`src/gate.ts` `installGate()` 解构的是**开机**`deps.config`；
+  `safe()` 只喂分类/历史/排队，而 `runTeam()` 的 `runWorkflow` 与两处 `runSingleCall`
+  传的都是开机快照 → 保存只影响准入，永远到不了子代理。工具入口传的是 `config: live`，
+  两个入口行为不一致。
+- **修复**：三处改 `config: limits`；回归用例 + 负向对照（无修复时
+  `expected 'old-model' to be 'wb/cn:deepseek-v4.1-flash'`）；`npx vitest run` 37 文件 / 651 PASS。
+- **部署状态（关键）**：修复构建已写入 live web profile 安装副本
+  `…/profiles/web/node_modules/dsh-grok-workflow/lib/gate.js`（原文件已备份）。
+  **但 loader 用无 cache-bust 的动态 `import()`（`cordis-plugin-loader/lib/index.js:214`），
+  运行中的 `:3090` 仍持有旧模块** → 必须重启该实例（或任何能重新 import 该模块的等价操作）
+  才会加载新代码。**禁止**在没有用户授权时重启 live（D-013 步骤 5）。
+- **Next action（用户）**：授权重启 `:3090`（`DSH_HOME=/home/fish/dsh-layerfs dsh web
+  --host 100.111.111.88 --port 3090 --no-open`）后，设置页保存的 `cn` 链路即对下一条消息生效。
+
+# Agent Handoff
+
 ## 2026-11-08 — 子代理顶栏显示名：live `:3090` 持久面板数据实锤——本轮自己的子代理在 live 上显示为「任务团队 child 28」；用户一步部署即收口（fix_child_names 第 5 轮，零源码改动，`CONFIRMED`）
 
 - **From:** 执行子代理（fix_child_names，orchestrator attempt 5）· **To:** lead / 用户 ·

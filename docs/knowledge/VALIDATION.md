@@ -2462,3 +2462,32 @@ profile `guiweb`（`--from-default-profile web`），插件 dev 安装（`dsh pl
   `/home/fish/dsh-layerfs`，GUI 401 且禁读凭据，live 进程承载本工作流自身。
 - 边界：全程只读（live 未碰）；无凭据读取；证据文件只含标签/uuid/mtime/标记计数；
   无 tag/发布动作；未改 main。
+
+## Round 35 (2026-11-08): 设置保存后子代理仍用旧模型 —— 网关把开机快照传给 run（已修复，`CONFIRMED`）
+
+- **触发**：用户报告设置页把 `roles.worker` 第一名保存为 `wb/cn:deepseek-v4.1-flash`
+  （revision 21、无红字、补丁文件该行确实正确），但新会话（`session-3884b55e…`、
+  `session-00fca25f…`）的每个执行子代理仍在点 `wb/global:deepseek-v4.1-flash` →
+  `wb/global:deepseek-v4.1-flash-sg` → `agent2api/autoclaw/glm-5.3-flash`，
+  规划子代理用的是 `wb/cn:mimo-v2.6-pro`（补丁里 planner 是 muse-spark）。
+- **根因（源码级 `CONFIRMED`）**：`src/gate.ts` 的 `installGate()` 解构出**开机时**的
+  `deps.config`；`safe()`（实时）只用于分类、历史/排队上限，而 `runTeam()` 里的
+  `runWorkflow({ ctx, config, … })` 与两处 `runSingleCall({ ctx, config, … })`
+  （triage-classifier、quick-worker）传的都是那个开机快照。于是「设置保存 → 持有值更新」
+  只影响准入判定，永远到不了子代理 —— 与用户现象完全一致。工具入口 `src/index.ts` 传的是
+  `config: live`，两个入口因此行为不一致。
+- **修复**：三处改为 `config: limits`（= `safe()` 的实时快照）。
+- **确定性复现（负向对照，`CONFIRMED`）**：
+  1. 隔离副本 `out/livefix`（`git archive HEAD` 干净导出 + node_modules 软链）。
+  2. `test/reliability.spec.ts` 新增「uses the live roles chain for a gated run, not the
+     load-time snapshot」：`roles` 以持有值注入，装载后把 worker 改成
+     `wb/cn:deepseek-v4.1-flash` 再发消息，断言引擎收到的 `args.roles.worker[0].model`。
+  3. 去掉修复跑该用例 → **FAIL**：`expected 'old-model' to be 'wb/cn:deepseek-v4.1-flash'`。
+     装上修复 → **PASS**。
+  4. 全量：`npx vitest run` → **37 文件 / 651 测试 PASS**；`tsc --noEmit` 干净。
+- **提交**：`5b0e3df`（`src/gate.ts` 3 行 + 回归用例 + `lib/gate.js`/`.map` 重建）。
+- **部署（用户保留动作，`NOT_RUN`）**：修复构建已写入
+  `/home/fish/dsh-layerfs/profiles/web/node_modules/dsh-grok-workflow/lib/gate.js`
+  （原文件已备份为 `gate.js.bak-before-livefix-<ts>`）。但 loader 用普通动态 `import()`
+  （`cordis-plugin-loader/lib/index.js:214`，无 cache-bust），运行中的 `:3090` 仍持有旧模块，
+  需重启该实例才会加载新代码。本轮未重启（用户明令禁止）。
