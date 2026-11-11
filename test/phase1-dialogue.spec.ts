@@ -933,10 +933,14 @@ describe('P0-4: a cancelled turn keeps the message and states the terminal', () 
     const all = transcript.join('\n')
     expect(transcript.filter(text => text === request)).toHaveLength(1)
     expect(all).toContain('PARTIAL')
-    expect(all).toContain('Task a')
+    // Audit layer (Section II-B): the default view carries the retained work
+    // through the Confirmed evidence / Incomplete rows, not the per-task
+    // ledger rows (task ids, attempt counts and the task-error detail live in
+    // the on-demand audit trail now).
+    expect(all).toContain('- a: a works')
     expect(all).toContain(verification(plan[0]!).criteria[0]!.evidence)
-    expect(all).toContain('Task b')
-    expect(all).toContain('not started')
+    expect(all).toContain('- b (cancelled)')
+    expect(all).toContain('the run was stopped before this task produced a result')
     expect(all).toContain('cancelled')
     expect(all).not.toContain('COMPLETED')
   })
