@@ -5,6 +5,34 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Changed / 变更
+
+- **The default answer is a delivery, not a ledger / 默认回复改为「交付文案」而非机器台账** —
+  the gate used to hand the main model the machine report
+  (`Grok workflow: … / Plan: … / task ids / Model routes: …`) and have it replay the whole ledger
+  verbatim after a three-sentence preamble, so what a user read was a machine dump with a banner.
+  A user-delivery layer now renders the user-facing answer itself: result-first, in the user's
+  language (zh/en), with wording that follows the scenario — code fix (what changed, how it was
+  verified), research (findings then basis), pure Q&A (the answer itself), partial (what verified
+  and what is left), failed (no success styling), and the cancelled split (nothing started vs. what
+  had verified before the cancel). Task ids, status enums, route/attempt counters, deadlines and
+  limits never reach the delivery text; titles, changed files, verification commands, evidence
+  pointers, incomplete reasons and uncertainties are quoted only from the validated report — nothing
+  is invented and no status is upgraded. The machine record still rides in the durable message
+  after the closing marker (carry-over compiles earlier rounds from it), and the model is told to
+  reproduce only the delivery text. `humanSummary: false` restores the previous machine-ledger
+  contract between the markers. Before/after samples for all six scenarios:
+  `docs/knowledge/evidence/user-delivery/samples.md`.
+  / 网关过去把机器报告（`Grok workflow: … / Plan: … / 任务 id / Model routes: …`）交给主模型，
+  让它先说三句人话、再把整份台账逐字复述——用户读到的仍是一段机器输出。现在由用户交付层直接渲染
+  最终答案：结果先行、跟随用户语言（中/英），并按场景措辞——代码修复（改了什么、怎么验证的）、
+  调研（结论＋依据）、纯问答（答案本身）、部分完成（已核验与未完成）、失败（绝无成功口吻）、
+  取消二分（尚未派工 vs. 取消前已核验的内容）。任务 id、状态枚举、路由/尝试计数、时限与限额
+  不会出现在交付文案里；标题、改动文件、验证命令、证据指针、未完成原因与不确定性全部只引自
+  已核验的报告，不编造、不改状态。机器台账仍随消息落盘（位于收尾标记之后，供跨轮 carry-over
+  解析），但主模型只被要求复述交付文案。`humanSummary: false` 可恢复旧的「标记内机器台账」行为。
+  六个场景的前后对照样例见 `docs/knowledge/evidence/user-delivery/samples.md`。
+
 ## [0.7.0] - 2026-11-08
 
 ### Added / 新增

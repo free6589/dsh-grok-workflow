@@ -489,12 +489,14 @@ describe('mandatory entry gate', () => {
     expect(agent.whenIdle).toHaveBeenCalled()
   })
 
-  // ---------------------------------------------------------------- B plan --
-  // `/grok on` selects `full`, which used to bypass the front desk's plain-language
-  // header entirely: the only output a user got was the machine ledger. The header
-  // is now composed in `runTeam` too, so a full-mode run opens with a sentence a
-  // reader can act on. These three cases pin the contract.
-  it('prepends a plain-language summary in full mode (B plan)', async () => {
+  // -------------------------------------------------------- delivery layer --
+  // `/grok on` selects `full`, which used to deliver the machine ledger and
+  // nothing else; the B-plan round bolted a two-line 【人话结论】 excerpt onto it.
+  // Both are superseded by the user-delivery layer (src/delivery.ts): the text
+  // between the markers is now the result-first delivery message, and the
+  // machine ledger rides after the closing marker as the internal record that
+  // carry-over compiles. These three cases pin the contract.
+  it('delivers a full-mode answer result-first inside the markers', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
     applyWith(ctx)
@@ -502,34 +504,47 @@ describe('mandatory entry gate', () => {
     await ctx.preStep()(payload(agent, [userMessage('查一下新加坡天气')]), passingNext([]))
     await waitFor(() => agent.followups.length === 1)
     const text = textOf(agent.followups[0]!)
-    expect(text).toContain('【人话结论】')
-    expect(text).toContain('项已核验通过')
-    // The header rides inside the markers so the main model reproduces it verbatim.
-    expect(text.indexOf('【人话结论】')).toBeGreaterThan(text.indexOf(REPORT_BEGIN))
-    expect(text.indexOf('【人话结论】')).toBeLessThan(text.indexOf(REPORT_END))
+    const begin = text.indexOf(REPORT_BEGIN)
+    const end = text.indexOf(REPORT_END)
+    const inner = text.slice(begin, end)
+    // Result first, in the request's language, and no status enum inside.
+    expect(inner).toContain('已完成')
+    expect(inner).not.toContain('COMPLETED')
+    expect(begin).toBeGreaterThan(-1)
+    expect(end).toBeGreaterThan(begin)
+    // The machine record rides after the closing marker for the next round.
+    expect(text.slice(end)).toContain('Grok workflow: COMPLETED')
   })
 
-  it('never dresses a failed run in the success header (B plan)', async () => {
+  it('never dresses a failed run in success wording (delivery)', async () => {
     const ctx = new FakeContext()
     applyWith(ctx)
     const agent = new FakeAgent()
-    await ctx.preStep()(payload(agent, [userMessage('doomed')]), passingNext([]))
+    await ctx.preStep()(payload(agent, [userMessage('注定失败')]), passingNext([]))
     await waitFor(() => ctx.engine.runs.length === 1)
     ctx.engine.runs[0]!.fail('error', 'boom')
     await waitFor(() => agent.followups.length === 1)
     const text = textOf(agent.followups[0]!)
-    expect(text).toContain('FAILED')
+    const inner = text.slice(text.indexOf(REPORT_BEGIN), text.indexOf(REPORT_END))
+    expect(inner).toContain('未能完成')
+    expect(inner).not.toContain('已完成')
     expect(text).not.toContain('【人话结论】')
+    // The measured reason and the honest machine label both survive.
+    expect(text).toContain('boom')
+    expect(text).toContain('Grok workflow: FAILED')
   })
 
-  it('honours humanSummary:false in full mode (B plan)', async () => {
+  it('keeps the machine ledger between the markers when humanSummary is false', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
     applyWith(ctx, { humanSummary: false })
     const agent = new FakeAgent()
     await ctx.preStep()(payload(agent, [userMessage('查一下新加坡天气')]), passingNext([]))
     await waitFor(() => agent.followups.length === 1)
-    expect(textOf(agent.followups[0]!)).not.toContain('【人话结论】')
+    const text = textOf(agent.followups[0]!)
+    const inner = text.slice(text.indexOf(REPORT_BEGIN), text.indexOf(REPORT_END))
+    expect(inner).toContain('Grok workflow: COMPLETED')
+    expect(inner).not.toContain('已完成')
   })
 
   it('delivers an explicit failure answer when the engine reports an error', async () => {

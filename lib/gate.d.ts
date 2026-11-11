@@ -45,6 +45,7 @@ import type { Context } from '@deepseek-ai/cordis';
 import type { Agent } from '@deepseek-ai/dsh-agent';
 import type { Session } from '@deepseek-ai/dsh-session';
 import type { UserMessage } from '@deepseek-ai/dsh-llm';
+import type { DeliveryLang } from './delivery.js';
 import type { ActiveState, WorkflowLogger } from './run.js';
 import type { RecallSource } from './triage.js';
 import type { ResolvedConfig, WorkflowReport } from './types.js';
@@ -162,12 +163,18 @@ export declare function classifyPreStep(deps: Pick<GateDeps, 'config' | 'readCon
  * User-visible terminal for a cancelled turn (P0-4).
  *
  * A cancellation that ends silently is indistinguishable from a hang, and the two
- * used to be exactly that. The text names the state, keeps the completed/partial
- * split honest, and never reads as success.
+ * used to be exactly that. The terminal names the state in the user's language
+ * and keeps the split honest: what had verified before the cancel is preserved
+ * with its evidence, the run still counts as cancelled, and a run cancelled
+ * before it produced anything never reads as if something was delivered.
  *
  * @param reason - Optional measured reason; empty when there is none to state.
+ * @param report - The report of the interrupted run, when one exists; a run
+ *   cancelled before it produced anything passes `undefined`.
+ * @param lang - The user's language, detected from the request (D-022);
+ *   defaults to the language of the historical text.
  */
-export declare function cancelledText(reason: string, report?: WorkflowReport): string;
+export declare function cancelledText(reason: string, report?: WorkflowReport, lang?: DeliveryLang): string;
 /** Install the gate; returns false when the runtime cannot host `agent/pre-step`. */
 export declare function installGate(deps: GateDeps): boolean;
 export {};
