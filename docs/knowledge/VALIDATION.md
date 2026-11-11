@@ -2552,3 +2552,42 @@ profile `guiweb`（`--from-default-profile web`），插件 dev 安装（`dsh pl
   `2026-11-08T11:14:41Z`，asset `dsh-grok-workflow-0.7.0.tgz` **317,470 B**，
   sha256 `de443167858b7df25d81576288c2c9521da1256e8ad8004c6a9575eaecf4a3ec`。
 - **未做（`NOT_RUN`）**：live `:3090` 未重启、live 安装副本未由本轮改动（沙箱只读，见 Round 36 尾注）。
+
+## Round 38 (2026-11-11): 用户交付层 —— 默认回复改为场景化自然交付（`CONFIRMED`，`feat/user-delivery` @ `d7de24d`）
+
+- **任务**：实现默认用户交付层（II-A/III/IV 用户侧）——语言感知、结果先行的自然输出，
+  覆盖代码修复/调研/部分完成/失败/取消二分/纯问答六个场景，不泄漏内部字段。
+  约束：只动 `src/gate.ts`、`src/answer.ts` 与新增 `src/delivery.ts`；不碰 report/script/
+  config/carryover/recorder；在 `origin/main`（`84e6894`）的隔离工作树
+  `.worktrees/user-delivery`（分支 `feat/user-delivery`）上进行；main 树上并发任务的
+  WIP（`src/config.ts`、`src/script.ts`、`test/synthesis-guardrails.spec.ts`、
+  `docs/knowledge/RENDERING-STUDY.md`、`.audit-scratch/`）全程未触碰。
+- **改动**：新增 `src/delivery.ts`（`deliveryForReport`/`deliveryScenario`/`preservedFacts`/
+  `DELIVERY_LIMITS`：只从已核验报告字段取材，任务 id/状态枚举/路由与尝试计数/时限一律不进
+  交付文案，不确定性全场景保留，整体 2,800 字符代理安全截断）；`src/answer.ts` 重构 relay
+  契约——标记内默认放交付文案（交付前言禁止复述标记外内容），机器台账整体移到收尾标记之后
+  作内部记录（**carry-over 依赖这份持久文本**，`src/carryover.ts` 未改、由新测试反向钉住），
+  `delivery:false`（即 `humanSummary:false`）恢复旧「标记内机器台账」行为；`src/gate.ts`
+  删除两处 `【人话结论】` 头块（B 方案的「前两行摘要」缺陷被交付正文取代），`Answer` 增加
+  `lang`（triage 档取 `tier.lang`，full 档取 `detectLanguage(request)`），`cancelledText`
+  改为中英双语并把「取消前已核验 N/M + 保留证据 + 不确定性 + 审计报告」写全。
+- **测试**：新增 `test/delivery.spec.ts` 25 例（六场景 zh/en 逐字钉测、场景判定不混淆状态、
+  内部字段零泄漏、事实保真与不确定性保留、relay 接线/`humanSummary:false`/t52 头行位置、
+  `parseReportRound` 能从交付后的持久消息解析回 status/confirmed/uncertainties/summary、
+  截断不劈代理对）；`test/gate.spec.ts` 三条 B 方案钉测改钉交付契约。
+  命令与结果（均在隔离工作树、`node_modules` 软链主仓依赖）：
+  `npm run typecheck` → 0 错误；`npm run lint` → **4 warnings / 0 errors**（既有基线）；
+  `TMPDIR=$PWD/out/tmp npx vitest run` → **38 文件 / 685 测试 PASS**（改动前同命令基线
+  37 文件 / 660 测试 PASS）；`npm run build` → 干净，重建 `lib/` 随提交入库。
+- **样例**：六场景前后对照由真实构建产物生成（`node out/gen-delivery-samples.mjs`，
+  fixture 与 spec 一致），入库于
+  `docs/knowledge/evidence/user-delivery/samples.md`；英文镜像形态由 spec 逐字钉测覆盖。
+- **环境异常（`CONFIRMED`，持久事实）**：本机 `/tmp` 对该用户配额耗尽——
+  `dd if=/dev/zero of=/tmp/x bs=1M count=5` → `Disk quota exceeded`（0 字节文件可创建，
+  任何数据写入失败），而 `/home` 写入正常。后果：①DSH 会话的 bash 执行器全部失败
+  （`UNKNOWN: unknown error, write`）；②默认 `npx vitest run` 全体 37 文件
+  `Unknown system error -122, write` 启动失败。绕行：测试与命令一律加
+  `TMPDIR=<工作区内目录>`（本轮用 `.worktrees/user-delivery/out/tmp`）。运维建议：清理
+  `/tmp` 或调大该用户 tmpfs 配额后 bash 才能恢复。
+- **未做（`NOT_RUN`）**：live `:3090` 加载与真机 GUI 复验（需发布/部署，用户保留动作）；
+  在线真模型回放（本轮为确定性单测验证）；并发任务 WIP 的内容与本轮无关、未验证。

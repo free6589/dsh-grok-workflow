@@ -1,6 +1,15 @@
 # Project State
 
-Last updated: 2026-11-08 (**v0.7.0 released** — tag `v0.7.0` → `146dce7` on `main`; Release
+Last updated: 2026-11-11 (**user-delivery layer implemented on `feat/user-delivery` @ `d7de24d`**,
+base `origin/main` `84e6894`, isolated worktree `.worktrees/user-delivery`, unmerged/unreleased —
+default answers are now rendered by `src/delivery.ts`: result-first, zh/en, six-scenario wording
+(code fix / research / pure Q&A / partial / failed / cancelled split), no internal ids, enums,
+routes or counters; the machine ledger moved after the closing markers as the carry-over record;
+38 files / 685 tests PASS, typecheck clean, lint 4 warnings / 0 errors; before-after samples in
+`docs/knowledge/evidence/user-delivery/samples.md`; `humanSummary:false` restores the old machine
+body. Environment: `/tmp` per-user quota exhausted (EDQUOT) breaks the harness bash executor and
+default vitest runs — use `TMPDIR=<workspace dir>` until the operator clears it. Prior entry:
+**v0.7.0 released** — tag `v0.7.0` → `146dce7` on `main`; Release
 `42474831253` green, asset `dsh-grok-workflow-0.7.0.tgz` 317,470 B. Round 37: merged `origin/main`
 (PR #44) resolving the `src/run.ts` startup conflict by keeping main's deadline race **and** routing
 both entry points through `teamWorkflowEngine`; 37 files / 660 tests PASS; `[Unreleased]` promoted to

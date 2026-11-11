@@ -1,5 +1,33 @@
 # Agent Handoff
 
+## 2026-11-11 — 用户交付层落地：默认回复改为结果先行的场景化自然文案（`feat/user-delivery` @ `d7de24d`，base `84e6894`；未合并、未发布）
+
+- **From:** 执行子代理（user_delivery）· **To:** lead / 后续代理 · **Base:** `origin/main` `84e6894`
+- **做了什么（`CONFIRMED`）**：新增 `src/delivery.ts`（用户交付层：`deliveryForReport` 按
+  code fix / research / 纯问答 / partial / failed / 取消六场景渲染结果先行的中英文案，
+  只引用已核验 `WorkflowReport` 字段，无任务 id / 状态枚举 / 路由与尝试计数 / 时限限额，
+  不确定性全场景保留）；`src/answer.ts` 的 relay 契约改为「标记内 = 交付文案，收尾标记之后
+  = 机器台账（carry-over 的持久解析源，未改 carryover）」，`humanSummary:false` 恢复旧机器
+  正文；`src/gate.ts` 删除两处 `【人话结论】` 头块、`Answer` 带 `lang`、`cancelledText`
+  中英双语化（取消二分：未派工 vs. 取消前已核验 N/M＋证据＋审计报告）。
+- **测试（`CONFIRMED`）**：`test/delivery.spec.ts` 新增 25 例（zh/en 六场景逐字钉测、零泄漏、
+  保真、relay 接线、carry-over 反向兼容钉测）；`test/gate.spec.ts` 三条 B 方案钉测改钉交付
+  契约。隔离工作树 `.worktrees/user-delivery` 实测：typecheck 0 错误；lint 4 warnings /
+  0 errors（既有）；`TMPDIR=$PWD/out/tmp npx vitest run` → **38 文件 / 685 测试 PASS**
+  （基线 37/660）；`npm run build` 干净、`lib/` 随提交入库。六场景前后对照样例（真实构建
+  产物生成）：`docs/knowledge/evidence/user-delivery/samples.md`。
+- **环境注意（`CONFIRMED`）**：本机 `/tmp` 用户配额耗尽（EDQUOT）→ DSH bash 执行器与默认
+  vitest 全挂（`Unknown system error -122, write`）；跑测试加 `TMPDIR=<工作区目录>` 即可，
+  彻底解决需清理 `/tmp`/调大配额（用户动作）。
+- **并发注意**：main 工作树含另一任务的进行中改动（`src/config.ts`、`src/script.ts`、
+  `test/synthesis-guardrails.spec.ts`、`docs/knowledge/RENDERING-STUDY.md`）；本轮全程在
+  隔离工作树工作，零接触、未提交。合并本分支前注意这两处 `src/` 改动的冲突面
+  （本轮未改这两个文件，理论无冲突）。
+- **未做 / `NOT_RUN`**：未推送、未开 PR、未合并（lead 决定）；live `:3090` 复验（需发布部署）；
+  在线真模型回放（本轮为确定性验证）。
+- **Next action：** lead 复核 Round 38 与样例后推送 `feat/user-delivery` 并开 PR
+  （`base:main`，标题建议 `feat(gate): user-delivery layer — result-first scenario wording`）。
+
 ## 2026-11-08 — v0.7.0 已发布（tag → `main` `146dce7`）；live `:3090` 一步重启即收口（`CONFIRMED`）
 
 - **From:** lead · **To:** 用户 / 后续代理
