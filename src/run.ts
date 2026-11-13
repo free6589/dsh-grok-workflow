@@ -14,6 +14,9 @@ import { namingLanguageFromSettings } from './naming.js'
 import type { NamingLanguage } from './naming.js'
 import { buildWorkflowRequest } from './script.js'
 import { teamWorkflowEngine } from './team-engine.js'
+import { createCheckpointRecorder, unloadCheckpointRecorders } from './checkpoint/wiring.js'
+import { deliverReport } from './delivery/index.js'
+import type { DeliveryView } from './delivery/index.js'
 import { assertWorkflowReport, failureReport } from './report.js'
 import {
   appendUnloadNotice,
@@ -294,6 +297,20 @@ export async function disposeActiveState(
     record.notices = notices
   }
 
+  // One terminal checkpoint per live run, written *before* the abort for the same
+  // reason the notice is: after the abort the run is gone and the file would have
+  // nothing true left to describe. The recorder bounds this itself (one small
+  // atomic file per run, a fixed timeout), and a refusal is a warning line — an
+  // unwritable disk must never be able to stop an unload.
+  try {
+    const described = await unloadCheckpointRecorders(state, 'the plugin was unloaded while the run was in flight', logger)
+    if (described > 0) {
+      logger.info?.(`dsh-grok-workflow: wrote ${described} unload checkpoint(s) before cancelling ${runs.length} run(s)`)
+    }
+  } catch (error) {
+    logger.warn(`checkpoint unload hook failed: ${redactError(error)}`)
+  }
+
   state.controller.abort('grok-workflow plugin unloaded')
   state.runs.clear()
   state.active.clear()
@@ -379,6 +396,19 @@ export interface RunOutcome {
   ok: boolean
   /** Failure cause for logs and record keeping, when `ok` is false. */
   cause?: string
+  /**
+   * The relay-ready delivery view for whatever this outcome carries: the human
+   * conclusion first, the machine ledger only when the live `showDiagnostics`
+   * switch asks for it.
+   *
+   * Composed here rather than in each caller because *every* exit of
+   * {@link runWorkflow} — a validated report, a kept cancellation, a deadline or
+   * an engine error — hands the same thing to a relay turn, and a caller that
+   * forgot to compose it would deliver the raw report with no plain-language
+   * conclusion. The caller still decides *whether* to send it; this only makes
+   * the human-first text exist on every path.
+   */
+  delivery?: DeliveryView
 }
 
 /**
@@ -622,11 +652,23 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
   // the round entry is written exactly once, from the authoritative verdict.
   let lastReport: WorkflowReport | undefined
   let lastCause: string | undefined
+  /**
+   * Relay handoff for one report (phase 1 of the output rework).
+   *
+   * Every exit below hands its report to a relay turn through this one composer,
+   * so no path can deliver a bare machine report: the human conclusion is always
+   * first, and the ledger follows only when the live `showDiagnostics` switch is
+   * on (default off — a reader who never asked for routing bookkeeping never
+   * sees it). Composition is pure text over an already-validated report, so it
+   * costs no engine call and cannot change what the run did.
+   */
+  const deliver = (report: WorkflowReport): DeliveryView =>
+    deliverReport(report, { diagnostics: config.showDiagnostics })
   const asReport = (phase: string, message: string, cause: string): RunOutcome => {
     const report = redactDeep(failureReport(objective, config, phase, message, categoryFor(cause)))
     lastReport = report
     lastCause = cause
-    return { report, ok: false, cause }
+    return { report, ok: false, cause, delivery: deliver(report) }
   }
   // A deadline always yields a report: the caller asked for work and must learn
   // that it stopped, not receive an exception the transport may swallow.
@@ -684,6 +726,31 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
     ctx,
     logger,
     ...sessionId === undefined ? {} : { sessionId },
+  })
+  /**
+   * The run's checkpoint recorder: host-side durability, again not a switch.
+   *
+   * Created *before* the engine starts so its `workflow/*` subscription cannot
+   * miss the first phase, and adopted with the run the engine hands back — until
+   * then it arms no timer and writes nothing. It observes only: it never calls
+   * `agent()`, so it costs zero model calls and introduces no fifth role, and its
+   * writes are contained like the archiver's. On unload the recorder is reached
+   * through the plugin instance's registry (`unloadCheckpointRecorders`), which is
+   * what turns a disposal into one terminal `cancelled` checkpoint per live run.
+   */
+  const checkpoints = createCheckpointRecorder({
+    eventSource: ctx,
+    logger,
+    state,
+    objective,
+    ...sessionId === undefined ? {} : { sessionId },
+    limits: {
+      maxConcurrency: config.maxConcurrency,
+      maxRetries: config.maxRetries,
+      maxTasks: config.maxTasks,
+      timeoutMs: config.timeoutMs,
+    },
+    ...options.carryover === undefined || options.carryover.trim() === '' ? {} : { minContextDigest: options.carryover },
   })
   /**
    * Subscribe one engine event and keep its disposer.
@@ -790,6 +857,9 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
       // Adopt before the script can settle anything: `agent-start`/`agent-end` are
       // process-wide, and only a run this archiver owns may write entries.
       archiver.adopt(String(run.id), String(run.meta.name))
+      // Same window, same reason: from here the recorder arms its periodic timer
+      // and joins the unload registry, so a disposal can describe this run.
+      checkpoints.adopt(run)
       if (state.disposed) {
         run.cancel('grok-workflow plugin unloaded')
         settledStop = 'cancelled'
@@ -872,7 +942,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
         }
         lastReport = report
         lastCause = undefined
-        return { report, ok: true }
+        return { report, ok: true, delivery: deliver(report) }
       } catch (error) {
         const detail = redactError(error)
         logger.warn(`report validation failed: ${detail}`)
@@ -897,7 +967,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
       if (kept !== undefined) {
         lastReport = kept
         lastCause = cause
-        return { report: kept, ok: false, cause }
+        return { report: kept, ok: false, cause, delivery: deliver(kept) }
       }
       return failure(phase, message, cause)
     }
@@ -926,6 +996,22 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
       })
     }
     archiver.dispose()
+    // The terminal checkpoint is written here, with everything the run now knows:
+    // the report's tasks/agents/evidence, the engine's stop reason, and — through
+    // the recorder's own registry entry — whether an unload cut the run. It is
+    // contained for the same reason the archive is: a refused disk costs a
+    // warning line, never the report this function is about to return.
+    try {
+      await checkpoints.finish({
+        ...lastReport === undefined ? {} : { report: lastReport },
+        ...settledStop === undefined ? {} : { stopReason: settledStop },
+        ...lastCause === undefined ? {} : { cause: lastCause },
+        ...state.unloadedAt === undefined ? {} : { unloaded: true },
+      })
+    } catch (error) {
+      logger.warn(`checkpoint finalisation failed: ${redactError(error)}`)
+      checkpoints.dispose()
+    }
     for (const off of stopProgressListeners ?? []) off()
     removeStartupAbort?.()
     combined.dispose()

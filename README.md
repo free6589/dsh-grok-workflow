@@ -171,7 +171,7 @@ Give each role its own ordered chain. A route is `{ provider, model }`, and a ba
         - { provider: my-provider, model: backup-worker }
       verifier: [{ provider: my-provider, model: strict-verifier }]
       synthesizer: []          # empty = inherit the parent route
-    synthesis: deterministic   # or: model (requires a synthesizer route)
+    synthesis: deterministic   # or: model (requires a synthesizer route), or layered (verified report stays the source of fact)
     switchOn: [rate-limit, timeout, server-error]   # empty = built-in policy
 ```
 
@@ -228,7 +228,7 @@ Configuration belongs to the profile's `cordis.patch.yml` (or a `--patch` overla
 | `maxActiveRuns` | `2` | `4` | Concurrent `grok_workflow` runs per plugin instance |
 | `subagentProvider` | engine default | string | Optional subagent provider override |
 | `roles` | empty chains | ≤50 routes each | `{ planner, worker, verifier, synthesizer }` ordered chains |
-| `synthesis` | `deterministic` | `deterministic` \| `model` | Deterministic aggregation, or a model-written summary |
+| `synthesis` | `deterministic` | `deterministic` \| `model` \| `layered` | Policy: deterministic aggregation, one model-written summary, or the layered policy (verified report stays the only source of fact; report `synthesis.mode` stays `deterministic`/`model`) |
 | `switchOn` | `[]` (built-in) | whitelist | Failure classes that advance a role's chain |
 | `recordRuns` | `true` | boolean | Write the routing/delivery ledger into the session |
 | `recordLimit` | `64` | `256` | Maximum ledger entries per run (0 = none) |

@@ -14,6 +14,10 @@ export default defineConfig({
       // A scratch directory keeps the test suite deterministic and side-effect free
       // outside the workspace; a test that needs its own location sets the variable.
       GROK_WORKFLOW_MEMORY_DIR: process.env.GROK_WORKFLOW_MEMORY_DIR ?? join(tmpdir(), 'dsh-grok-workflow-test-memory'),
+      // Same rule for checkpoints (`src/checkpoint/wiring.ts`): every run now
+      // writes one, so an unset location would put test checkpoints in the
+      // operator's real `$DSH_HOME/checkpoints/grok-workflow`.
+      GROK_WORKFLOW_CHECKPOINT_DIR: process.env.GROK_WORKFLOW_CHECKPOINT_DIR ?? join(tmpdir(), 'dsh-grok-workflow-test-checkpoints'),
     },
   },
 })

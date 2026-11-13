@@ -165,7 +165,7 @@ DSH 启动后，直接提问即可：
         - { provider: my-provider, model: backup-worker }
       verifier: [{ provider: my-provider, model: strict-verifier }]
       synthesizer: []          # 空 = 继承父级路由
-    synthesis: deterministic   # 或 model（需要 synthesizer 路由）
+    synthesis: deterministic   # 或 model（需要 synthesizer 路由），或 layered（核验报告仍是事实来源）
     switchOn: [rate-limit, timeout, server-error]   # 空 = 内置策略
 ```
 
@@ -222,7 +222,7 @@ DSH 启动后，直接提问即可：
 | `triageModel` | 空 | 路由字符串 | 快手档那次调用花哪个模型；空则用本次运行自己的路由 |
 | `subagentProvider` | 引擎默认 | 字符串 | 可选的子代理 provider 覆盖 |
 | `roles` | 空链 | 每个角色 ≤50 条 | `{ planner, worker, verifier, synthesizer }` 有序链 |
-| `synthesis` | `deterministic` | `deterministic` \| `model` | 确定性聚合，或由模型撰写总结 |
+| `synthesis` | `deterministic` | `deterministic` \| `model` \| `layered` | 策略：确定性聚合、一次模型总结，或分层策略（核验报告仍是唯一事实来源；报告 `synthesis.mode` 仍只记 `deterministic`/`model`） |
 | `switchOn` | `[]`（内置） | 白名单 | 允许推进备用链的失败类别 |
 | `recordRuns` | `true` | 布尔 | 是否把路由/交付台账写进会话 |
 | `recordLimit` | `64` | `256` | 每次运行的台账条数上限（0 = 不写） |

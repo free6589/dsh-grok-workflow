@@ -383,9 +383,188 @@ and no `Grok workflow:` status line and no task lines may appear — the user se
 ran instead of a silent no-op (V-2). The positive run is also the check that the real Loader
 hands `.volatile()` configuration over as holders and the plugin unwraps them (DESIGN E-40).
 
+## Checkpoint and resume (record + re-drive policy)
+
+Status (**0.8.0**): `src/checkpoint/` (schema, atomic writer,
+engine wiring) and `src/resume/` (validator, restore policy) ship in this release and are
+exercised by `test/checkpoint-schema.spec.ts`, `test/checkpoint-wiring.spec.ts` and
+`test/resume-validator.spec.ts`. The wiring *is* called: `src/run.ts` creates one recorder per
+run, adopts it with the engine's run object and finalises it on the terminal path,
+while `disposeActiveState` writes one `cancelled`
+checkpoint per live run before it aborts. No user-visible surface changed — a run gains a JSON file on disk and, on
+failure, a warning line. This section is the contract the code implements.
+
+Boundary (D-013, DSH 0.2.1-rc.2): `resume` never means engine-level resume — the shipped
+engine journals nothing and states it as a limitation. `resumeDecision` answers a host
+question ("should a new run re-drive the unfinished tasks from this file?") and has no
+production caller in this release; `src/resume/` is imported only by tests. This release
+never terminates a run: recording is best-effort and unload-bounded, and a refused disk
+costs a warning line, never the report. There is no Command Watchdog and no Host Evidence
+Collector in this release (NOT_DONE, no implementation in the tree) — those names must not
+appear as shipped features in release notes.
+
+### Location / 位置
+
+- The writer never chooses a directory: `writeCheckpoint(filePath, input)` takes the final
+  path from the caller and creates the parent directories (`src/checkpoint/writer.ts:71`).
+- Filename policy is `checkpointFileName(runId)`: `checkpoint-<runId>.json`, every character
+  outside `[A-Za-z0-9._-]` replaced by `_`, truncated to `CHECKPOINT_LIMITS.idChars` (120),
+  and the degenerate `''` / `.` / `..` cases folded to `checkpoint-run.json`
+  (`src/checkpoint/writer.ts:59`). Filename derivation is total: any run id yields exactly
+  one safe name.
+- Default directory (wiring): `checkpointDir()` resolves an explicit `options.dir`, then
+  `GROK_WORKFLOW_CHECKPOINT_DIR`, then `$DSH_HOME` (else `~/.dsh`) +
+  `checkpoints/grok-workflow` (`src/checkpoint/wiring.ts:125`), and `checkpointFile(runId)`
+  joins that with `checkpointFileName(runId)` (`:135`). The three-step shape is deliberately
+  the one the incremental memory archive already uses (`src/memory/archive.ts:141`). There is
+  **no setting** for it: the path is host state, not a display preference, so no configuration
+  key selects a policy — an integration that wants a different directory passes `dir` (or the
+  environment variable) at the call site.
+
+### Version policy / 版本策略
+
+Two independent versions, each refused rather than migrated:
+
+- run document: `CHECKPOINT_VERSION = 'grok-workflow.checkpoint/v1'`
+  (`src/checkpoint/schema.ts:46`);
+- restore document: `RESUME_CHECKPOINT_VERSION = 1` with envelope kind
+  `grok-workflow.resume-checkpoint` (`src/resume/validator.ts:28`).
+
+The validator accepts exactly the version it was built with; anything else is
+`version-mismatch` and restore is denied (`src/resume/validator.ts:208`). There is no
+migration path and no "best effort" read: a checkpoint written by a newer build is refused
+by an older one, by design. Bumping either number is a new document kind, not an in-place
+edit.
+
+### Limits / 上限
+
+Bounded at write time and re-checked at read time (`src/checkpoint/schema.ts:53`):
+
+| Bound | Value |
+|---|---|
+| whole file (writer **and** reader) | 1,048,576 B |
+| plan / task rows | 128 |
+| agent rows | 512 |
+| stage rows | 16 |
+| evidence rows | 1,024 |
+| recorded attempts per task | 0–16 |
+| objective / min-context objective | 4,000 chars |
+| task title, acceptance criterion | 600 chars |
+| error / failure reason, evidence claim | 1,000 chars |
+| evidence locator | 400 chars |
+| min-context digest | 12,000 chars (64 rows per section) |
+| run id, session id | 120 chars |
+| route label, branch name | 200 chars |
+| declared write paths per task | 16 items × 300 chars |
+| structural numbers (counts, timeouts) | 1,000,000 |
+
+Overflow is handled three ways and they must not be confused: free **text** is truncated
+with an explicit ellipsis marker (so the file is always writable), a **count** above a
+ceiling is a hard `invalid` refusal, and a **whole file** above 1 MiB is `too-large` in both
+directions — the writer refuses before touching the disk and the reader `stat`s first, so a
+hostile or torn file is never parsed (`src/checkpoint/writer.ts:75`, `:132`).
+
+Limits *observed in a run* are recorded, not policed: the schema stores whatever `limits`
+the run actually used, and `limitContractViolations` only reports `maxConcurrency > 6` /
+`maxRetries > 3` against the AGENTS.md envelope (`src/checkpoint/schema.ts:105`, `:845`).
+Note the standing divergence: the code's own defaults are `maxConcurrency: 4` and
+`maxRetries: 2` with hard caps `1_000_000` / `10` (`src/config.ts:157`), so a truthful
+checkpoint of a default run already reports a contract violation. That divergence is
+recorded as data on purpose and is not reconciled by the schema.
+
+Two ceilings, deliberately different: `countCeiling` (1,000,000) bounds structural counts,
+while `msCeiling` (604,800,000 = 7 days) bounds durations and timeouts so that any
+`HARD_LIMITS.timeoutMs` the plugin accepts stays recordable (`src/checkpoint/schema.ts:95`,
+`:101`; `src/config.ts:14`). The wiring adds a second rule on top of that: a deadline above the
+recording ceiling is **omitted, never clamped** — `deadlineMs: 1000000` for a week-long run
+would be a number describing no real bound — and the same value gates `time.deadlineAtMs` and
+the derived `watchdog.deadlineHit` (`src/checkpoint/wiring.ts:455`).
+
+Wiring's own bounds are about *rate* and *retention*, never content
+(`src/checkpoint/wiring.ts:76`): a periodic rewrite every 1–300 s (default 30 s, timer
+`unref()`ed so a checkpoint never keeps the process alive), at most 3 consecutive failed
+writes before that run's recorder stops retrying, at most 4 remembered run ids per recorder,
+and a 3 s bound on the unload write (an abandoned write is dropped, never retried).
+
+Cleanup may never mask the coded refusal: both `catch` blocks in `writeCheckpoint` swallow a
+failing `rm` (`src/checkpoint/writer.ts:91`, `:97`), so a caller that hits a bad path receives
+`CheckpointError('io')` rather than a raw filesystem error. That property regressed once during
+this round (a bare `rm` replaced the coded error on the `ENOTDIR` path) and is now pinned by
+`test/checkpoint-schema.spec.ts` — see `docs/knowledge/VALIDATION.md` Round 38.
+
+### Refusals / 拒绝语义
+
+Run-document side — `CheckpointError.reason` is exactly one of
+`invalid | too-large | integrity | io` (`src/checkpoint/schema.ts:296`):
+
+- `invalid` — the object does not satisfy the schema (missing section, wrong type,
+  `plan.taskCount` ≠ `plan.tasks.length`, count above a ceiling).
+- `too-large` — the canonical payload or the file on disk exceeds 1 MiB.
+- `integrity` — the recomputed sha-256 over the canonical payload (or its byte count) does
+  not match the stored `integrity` record: the bytes were modified or torn after sealing.
+- `io` — stat/read/write/rename failed, or the path is not a regular file.
+
+Restore-document side — `RefusalReason` is exactly one of
+`version-mismatch | corruption | conflict` (`src/resume/validator.ts:50`):
+
+- `corruption` — unparsable JSON, wrong `kind`, missing or invalid digest, malformed record,
+  bad field type, or a digest that no longer matches the body.
+- `version-mismatch` — sealed with a format version this build does not restore.
+- `conflict` — structurally intact and correctly sealed, yet its claims contradict the
+  restore contract: unknown task status, duplicate task id, duplicate seq, or a `runId`
+  other than the one the caller pinned.
+
+Both sides fail closed: `evaluateResumeCheckpoint` refuses with the validator's reason and
+never returns a plan (`src/resume/policy.ts:168`), so corruption, a foreign version, or a
+wrong run can never trigger an automatic restore.
+
+Recording never fails a run. Every write goes through `writeCheckpoint`, and a refusal
+(`invalid` / `too-large` / `integrity` / `io`) is counted and logged as a warning, never
+propagated into the work being recorded; after 3 consecutive failures the recorder stops
+retrying that run, so a read-only or full disk costs one warning rather than one per tick
+(`src/checkpoint/wiring.ts:47`, `:754`). The unload path bounds itself to 3 s and logs
+`checkpoint unload hook failed: …` instead of blocking disposal (`src/run.ts:309`).
+
+Retention is the other half of that policy: exactly five journaled states are retained —
+`completed`, `interrupted`, `failed`, `gated`, `evidence-incomplete` — with their outputs,
+files and evidence carried over verbatim, while a bare `success` mark is **never** retained
+because a self-report is not verification; that task goes back to the planner
+(`src/resume/policy.ts:35`, `:95`). Restore therefore never re-runs completed work and never
+discards what an interrupted attempt already produced.
+
+### What the user sees / 用户可见面
+
+In this release: a run writes `checkpoint-<runId>.json` under
+`~/.dsh/checkpoints/grok-workflow` (or `$DSH_HOME` / `GROK_WORKFLOW_CHECKPOINT_DIR`) — one file
+rewritten every 30 s, a terminal one at the end, and one `cancelled` shape on plugin unload.
+There is **no restore UI, no resume button, no setting** and no line in a normal report: the
+only trace a user could notice is a `logger.warn` line when a write fails. `resumeDecision`
+answers a *host* question — "should a new run start from this file, and with which unfinished
+tasks?" — in a reason string, and never claims engine-level resume: the shipped engine
+journals nothing (stated limitation), so `resume` here means starting a new run that
+re-drives the unfinished tasks from the recorded context. Two consequences belong in the same breath, because they are what a reader
+will actually meet: **nothing prunes the directory** (one file per run id, rewritten in place
+while the run lives, never deleted — the cost of retention is the user's disk), and **nothing
+consumes the files** (`resumeDecision` has no production caller; `src/resume/` is imported only
+by tests). The UX commitments an integration inherits:
+
+1. A refused restore is spoken out loud with its reason and detail — the same rule the gate
+   already follows for refused messages (see `## Mandatory entry (the gate)`). Silence is not
+   an acceptable outcome for "we found a checkpoint but would not use it".
+2. Restore is never silent or automatic: a *plan* is the only thing the policy produces, and
+   it names each task's action (`retain` / `redrive` / `reverify` / `replan`), so a reader can
+   see what would be kept and what would run again.
+3. The `detail` strings are written to be shown to a human verbatim (they name the offending
+   field and value), so the failure path needs no separate copy.
+4. Checkpoints hold no secrets: every free-text field is redacted at build time through
+   `src/redact.ts` (`src/checkpoint/schema.ts:33`), which is also what makes a checkpoint
+   safe to attach to an Issue.
+
 ## Known architecture limits (MVP)
 
-- No pause/resume, journaling, or cross-process resume.
+- No pause/resume, journaling, or cross-process resume. Checkpoints are written (see above),
+  but the engine journals nothing: `resumeDecision` is a host-side decision over a file, not an
+  engine restart, and no code path re-enters a run from one.
 - No background job mode; the tool runs in the foreground and uses `exec.signal`.
 - Model routing is **script-level (L1) only**: each call passes
   `{ provider, model }` from the role's chain, but the plugin does not register

@@ -46,7 +46,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent';
 import type { Session } from '@deepseek-ai/dsh-session';
 import type { UserMessage } from '@deepseek-ai/dsh-llm';
 import type { ActiveState, WorkflowLogger } from './run.js';
-import type { RecallSource } from './triage.js';
+import type { RecallSource, TriageLang } from './triage.js';
 import type { ResolvedConfig, WorkflowReport } from './types.js';
 /** Payload shape of one `agent/pre-step` dispatch. */
 export interface PreStepPayload {
@@ -165,9 +165,41 @@ export declare function classifyPreStep(deps: Pick<GateDeps, 'config' | 'readCon
  * used to be exactly that. The text names the state, keeps the completed/partial
  * split honest, and never reads as success.
  *
+ * The kept report is relayed with the same plain-language head every other path
+ * uses, so a cancelled PARTIAL does not open with the raw ledger either.
+ *
  * @param reason - Optional measured reason; empty when there is none to state.
+ * @param report - Report the run produced before it was stopped, when there is one.
+ * @param opts - `showDiagnostics` / `humanSummary` switches and the user's language.
  */
-export declare function cancelledText(reason: string, report?: WorkflowReport): string;
+export declare function cancelledText(reason: string, report?: WorkflowReport, opts?: {
+    showDiagnostics?: boolean;
+    humanSummary?: boolean;
+    lang?: TriageLang;
+}): string;
+/**
+ * Deterministic plain-language head for a finished run (B plan, widened here).
+ *
+ * One composer for all three final statuses. The head used to be built twice (the
+ * front desk's team branch and `runTeam`), so any path that composed its own
+ * answer — a cancelled turn, a PARTIAL arriving through the front desk — could
+ * hand the user the raw ledger and nothing else. That is exactly what
+ * session-4c562307 saw: a PARTIAL answer that began at `Grok workflow: PARTIAL`.
+ *
+ * Deterministic on purpose: no model call, so engine call counts and the one-shot
+ * budget are unchanged. Bounded to two summary lines and short next steps.
+ *
+ * - `completed`: the 0.7.0 wording, byte for byte (no regression).
+ * - `partial`: same marker, plus what did not get done and what to do next.
+ * - `failed`: its own marker (`【人话结论·未完成】` / `【Plain summary · not completed】`)
+ *   and never the success sentence: a failed run must not read as success.
+ *
+ * @param report - validated report.
+ * @param lang - language of the user's request.
+ * @param enabled - the `humanSummary` switch; off means no head at all.
+ * @returns the head block, or undefined when the switch is off.
+ */
+export declare function humanHead(report: WorkflowReport, lang: TriageLang, enabled: boolean): string | undefined;
 /** Install the gate; returns false when the runtime cannot host `agent/pre-step`. */
 export declare function installGate(deps: GateDeps): boolean;
 export {};

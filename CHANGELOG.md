@@ -5,6 +5,183 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Added / 新增
+
+## [0.8.0] - 2026-11-13
+
+### Added / 新增
+
+- **The human conclusion now has its own delivery layer — the reader contract is unchanged
+  / 人话结论有了独立的交付层 —— 读者契约不变** —
+  new `src/delivery/` (`humanConclusion` + `machineLedger` + `deliverReport`) composes the
+  relay-ready text for every `RunOutcome` in `src/run.ts`: the human block first, the machine
+  ledger only when the live `showDiagnostics` switch asks for it (default off). `report.ts`
+  stays the canonical machine renderer for the tool surface; the delivery layer is the relay
+  handoff for `runWorkflow` exits (validated report, kept cancellation, deadline, engine error).
+  It never dresses a failure as success, never drops `uncertainties`, and never lets an internal
+  id reach a human. The user-visible contract is unchanged: the same head, the same ledger
+  rules, the same switches — only the composer moved, so no path can deliver a bare machine
+  report again.
+  / 新增 `src/delivery/`（`humanConclusion` ＋ `machineLedger` ＋ `deliverReport`），为 `src/run.ts`
+  的每个 `RunOutcome` 拼出可直接转发的文本：人话块在前，机器台账只在 `showDiagnostics` 打开时才跟
+  在后面（默认关）。`report.ts` 仍是工具面的机器渲染器；交付层是 `runWorkflow` 各退出的转发装配
+  （核验报告、保留的取消、超时、引擎错误）。它永不把失败打扮成成功、永不丢 `uncertainties`、永不
+  让内部 id 进人话。读者契约不变：同样的头、同样的台账规则、同样的开关——只是装配点收拢了，所以
+  任何路径都不再能交出裸机器报告。
+
+- **Each run now writes one bounded, checksummed checkpoint file — what you see does not change
+  / 每轮运行写一份有界、带校验的检查点文件 —— 你看到的内容不变** —
+  new `src/checkpoint/` (versioned schema + atomic writer + engine wiring) and `src/resume/`
+  (validator + restore policy) record how a workflow run can be captured and later re-driven.
+  The installed plugin changes in no user-visible way: no report line, no setting, no button. What a run gains is a JSON
+  file — `checkpoint-<runId>.json` under `$DSH_HOME` or `GROK_WORKFLOW_CHECKPOINT_DIR` plus
+  `checkpoints/grok-workflow`, else `~/.dsh/checkpoints/grok-workflow` — rewritten every 30 s
+  (bounded to 1 s–300 s, timer `unref()`ed so it never keeps the process alive), plus a terminal
+  one at the end and a `cancelled` one when the plugin unloads mid-run. Recording can never break
+  the run it records: a failed write is a warning and a counter, and after 3 consecutive failures
+  that run stops being retried.
+  A checkpoint is one JSON file per run. The writer writes a hidden `*.tmp` in the target
+  directory, fsyncs it, then renames it into place (atomic on POSIX and Windows), and removes
+  the temporary file on any failure — a reader never sees a half-written checkpoint and a
+  failed write leaves the previous one intact. The file carries a sha-256 over its canonical
+  payload (sorted keys, no `undefined` fields), and `readCheckpoint` refuses a file whose
+  bytes no longer match. Hard bounds: 1 MiB per file (the writer refuses before touching the
+  disk, the reader `stat`s before parsing), 128 plan/task rows, 512 agent rows, 16 stages,
+  1,024 evidence rows, a 4,000-character objective, 600-character titles and acceptance
+  criteria, 1,000-character errors and claims, 400-character locators, and a
+  12,000-character min-context digest. Oversized free text is truncated with an explicit
+  ellipsis; a count above its ceiling and a file above 1 MiB are refused. Every free-text
+  field is redacted at build time, so a checkpoint carries no secrets and is safe to attach
+  to an Issue.
+  Refusals are a closed vocabulary. Writing or reading a run document fails as exactly
+  `invalid`, `too-large`, `integrity` or `io`; restoring fails as exactly
+  `version-mismatch`, `corruption` or `conflict` — the restore format is version 1 with
+  envelope `grok-workflow.resume-checkpoint`, and any other version is refused rather than
+  migrated. Restore fails closed: `evaluateResumeCheckpoint` returns a refusal instead of a
+  plan whenever validation refuses, so a corrupt, foreign-version or wrong-run checkpoint can
+  never trigger an automatic restart. `resume` here never means engine-level resume (the shipped engine journals nothing, stated as a limitation): it means starting a new run that re-drives the unfinished tasks from the recorded context, because the verified rows say which work is already done. Retention keeps exactly five journaled states
+  (completed, interrupted, failed, gated, evidence-incomplete) together with their outputs,
+  files and evidence, and never retains a bare `success` mark — a self-report is not
+  verification, so that task goes back to the planner instead.
+  / 新增 `src/checkpoint/`（版本化 schema ＋ 原子写入器 ＋ 引擎接线）与 `src/resume/`（校验器 ＋
+  恢复策略），把「一轮工作流怎么记录、怎么重跑未完成部分」落成有界文档。本版装好后没有任何用户可见
+  变化：不增加报告行、不增加设置项、不增加按钮。一轮运行
+  多的只是一个 JSON 文件——`$DSH_HOME` 或 `GROK_WORKFLOW_CHECKPOINT_DIR` 下的
+  `checkpoints/grok-workflow`（否则 `~/.dsh/checkpoints/grok-workflow`）里的
+  `checkpoint-<runId>.json`，每 30 秒重写一次（限制在 1 秒–300 秒，定时器 `unref()`，不会吊住
+  进程），结束时写一份终态，插件中途卸载则写一份 `cancelled`。记录永远不会破坏被记录的工作：
+  写失败只产生一条警告和一个计数器，连续失败 3 次后该轮停止重试。
+  一个运行 = 一个 JSON 文件。写入器先在同目录写隐藏 `*.tmp`、fsync，再 rename 到位（POSIX 与
+  Windows 都原子），任何失败都会删掉临时文件——读者永远不会看到写了一半的检查点，写失败也不会
+  毁掉上一份。文件带 sha-256（覆盖规范化 JSON：键排序、无 `undefined` 字段），`readCheckpoint`
+  会让字节对不上的文件直接失败。硬上限：单文件 1 MiB（写入前拒绝、读取先 stat 再解析）、
+  128 条计划/任务行、512 条 agent 行、16 个阶段、1,024 条证据、目标 4,000 字符、标题与验收条款
+  600 字符、错误与结论 1,000 字符、定位符 400 字符、最小上下文摘要 12,000 字符。自由文本超长按
+  显式省略号截断；计数越界与文件超 1 MiB 直接拒绝。所有自由文本在构建期过脱敏，因此检查点不含密钥，
+  可以直接贴进 Issue。
+  拒绝原因是一套封闭词表：读写运行文档只可能是 `invalid` / `too-large` / `integrity` / `io`；
+  恢复只可能是 `version-mismatch` / `corruption` / `conflict`——恢复文档格式版本固定为 1、信封
+  `grok-workflow.resume-checkpoint`，其他版本一律拒绝、不做迁移。恢复是失败关闭的：只要校验拒绝，
+  `evaluateResumeCheckpoint` 就返回拒绝而不产出计划，所以损坏、版本不符或不属于本轮的检查点永远
+  无法触发自动重跑。这里的 `resume` 从不是引擎级恢复（随附引擎无日志、无恢复，已声明为限制）：
+  它指带着已记录上下文起一个新轮次，把未完成任务重跑一遍，因为已核验行说明了哪些活已经干完。
+  保留策略只保留五种已记账状态（completed / interrupted / failed / gated /
+  evidence-incomplete）及其产出、文件、证据，裸 `success` **永不**保留——自我声明不是验证，
+  这类任务回到规划器重排。
+
+- **A third value for `synthesis`: `layered` — the answer is in plain language even when no model
+  answers / `synthesis` 多了第三个取值 `layered`——模型答不出来，结论照样是人话** —
+  `deterministic` (the default, behaviour unchanged) aggregates by rule and ships the report;
+  `model` spends one synthesizer call on the narrative. `layered` keeps the verified report as the
+  only source of fact and adds a natural-language summary built in the script itself, which *is*
+  the answer whenever the model path is unavailable — no synthesizer chain configured, every route
+  dead, an empty or invalid summary, or a text the guardrail refuses. One constrained polish call
+  is made only when `roles.synthesizer` is non-empty, and it may rewrite nothing but
+  `synthesis.summary`. Its text is checked deterministically before use: it cannot claim full
+  success while the run is not `completed`, cannot claim passing tests when no checker verified a
+  pass, cannot deny the incomplete items or open questions the report lists, and cannot cite a
+  backticked path or command the report does not contain. A polished answer also gets the report's
+  own notes appended (unfinished items, open questions, and test counts split into
+  checker-verified vs executor-reported), so a fluent summary cannot quietly drop them. With
+  `humanSummary: false` a `layered` run composes no narrative at all and spends no synthesizer
+  call — the machine report is the whole answer, exactly as `deterministic` behaves. With
+  `showDiagnostics` on, the narrative carries one provenance line saying whether it is the
+  polished text, the model narrative, or the deterministic fallback and why, paid out of the same
+  character budget below. Bounds:
+  2,000 characters for the summary and 6,000 for the digest the polish may read, mirrored as
+  `HARD_LIMITS.synthesisSummaryChars` / `HARD_LIMITS.synthesisDigestChars` and pinned equal on both
+  sides of the script boundary by `test/synthesis-guardrails.spec.ts`. The report's
+  `synthesis.mode` still carries only `deterministic`/`model` — it says whether a polish call was
+  in play, never the policy. A value outside the three is refused at load with a named error
+  instead of falling through silently. The `README.md` value table now lists all three values.
+  / `deterministic`（默认，行为不变）按规则聚合并给出报告；`model` 花一次合成调用写叙述；
+  `layered` 以核验过的报告为唯一事实来源，另在脚本内建一段自然语言结论——只要模型这条路不可用
+  （没配 synthesizer 链、所有路由都挂、摘要为空或非法、被事实护栏拒），这段就是最终结论。只有
+  `roles.synthesizer` 非空时才额外做一次受约束的润色调用，且只允许改写 `synthesis.summary`。
+  润色文本在使用前过一道确定性护栏：运行状态不是 `completed` 时不得声称全部通过；没有检查者核验过的
+  通过时不得声称测试通过；不得否认报告里列出的未完成项与待确认项；反引号里引用的路径或命令必须在报告
+  里真实存在。润色稿还会附上报告自己的附注（未完成项、待确认项，以及把「检查者核验」与「执行者自报」
+  分开统计的测试计数），流利的总结没法把它们悄悄省掉。`humanSummary: false` 时 `layered` 一轮完全
+  不写叙述、也不花合成调用——机器报告就是全部答复，与 `deterministic` 完全一致。打开
+  `showDiagnostics` 时，叙述尾部会多一行来源说明（润色稿 / 模型直写 / 确定性回退及原因），并从下面
+  同一个字符预算里支出。上限：结论 2,000 字符、润色可读的摘要
+  6,000 字符，两侧常量分别落在 `HARD_LIMITS.synthesisSummaryChars` /
+  `HARD_LIMITS.synthesisDigestChars`，由 `test/synthesis-guardrails.spec.ts` 钉住。报告的
+  `synthesis.mode` 仍只有 `deterministic`/`model`——它说明这一轮有没有发生润色调用，不表示策略。
+  三个取值之外的值在载入时直接报出具体错误，不会静默落空。这些是**未提交、不在已安装插件里**的工作树
+  代码；`README.md` 的设置取值表当时仍写两值。
+
+### Changed / 变更
+
+- **Every final answer now opens in plain language — including the ones that failed — while the
+  machine ledger stays hidden until you ask for it / 每种最终结果现在都用一句人话开场，失败的也一样
+  ——机器台账仍默认隐藏** —
+  the plain-language head used to be composed in two places (the front desk's team branch and
+  `/grok on`), so any other path could hand back the raw ledger: a PARTIAL that arrived through the
+  front desk opened at `Grok workflow: PARTIAL`, and a failed run got no head at all. One composer,
+  `humanHead()`, now serves every path that can deliver a report — the front-desk answer, `/grok on`,
+  and the report kept from a cancelled run — and every status. `completed` keeps the `0.7.0` wording
+  unchanged. `partial` keeps the same marker, names up to three unfinished items and says what to do
+  next. `failed` gets its own marker (`【人话结论·未完成】` / `【Plain summary · not completed】`) that
+  never reuses the success sentence, one bounded reason line, and advice matched to the measured
+  failure category (infrastructure, configuration, quality, cancelled, unknown). It is deterministic
+  on purpose: no model call, so engine call counts and the one-shot budget are untouched. It is
+  bounded: two summary lines (400 characters), three named unfinished items, a 200-character reason.
+  `humanSummary: false` still means no head at all. Diagnostics stay opt-in: `showDiagnostics` is
+  still default **off**, and the switch now actually reaches two paths that used to ignore it — the
+  report text delivered to the reader (it had only been wired into the PTC `render` tool, so turning
+  it on in the settings changed nothing about the answer received) and the report kept in a
+  cancelled answer. `Uncertainties` stay visible with the switch off, in all of these paths.
+  / 人话结论以前只在两处拼（前台团队分支与 `/grok on`），其它路径就只能把机器台账原样交出去：经前台
+  到达的 PARTIAL 会以 `Grok workflow: PARTIAL` 开头，失败的运行连一句开场都没有。现在由同一个
+  `humanHead()` 服务所有可能交付报告的路径——前台答复、`/grok on`、以及被取消时保留的报告——并且覆盖
+  每一种状态。`completed` 与 `0.7.0` 的措辞完全一致。`partial` 保留同一标记，点名最多三项没做成的
+  事，并给出下一步。`failed` 用自己独占的标记（`【人话结论·未完成】` / `【Plain summary · not
+  completed】`），永不复用成功句式，附一行有界的失败原因，并按实测的失败类别
+  （infrastructure / configuration / quality / cancelled / unknown）给出可执行的下一步。它刻意是
+  确定性的：不调模型，所以引擎调用数与前台上限一分不动。它是有界的：摘要两行（400 字符）、最多点名
+  三项未完成、原因 200 字符。`humanSummary: false` 仍然表示完全不加这段。诊断仍是按需：
+  `showDiagnostics` 仍默认**关**，而这个开关现在真正到达了两处本来无视它的路径——交付给读者的报告正文
+  （过去只接进了 PTC 的 `render` 工具，在设置里打开对实际收到的答复毫无影响），以及被取消答复里保留的
+  那份报告。开关关着的时候，`不确定项` 在这些路径上照旧可见。
+
+### Known limitations / 已知限制
+
+- **Checkpoints accumulate and resume means re-driving, not continuing / 检查点会持续累积；恢复指重跑未完成部分，不是继续原轮** —
+  this round ships recording plus the re-drive policy. One file per run id is rewritten in place
+  while the run lives, a terminal copy is left behind, and **nothing prunes the directory**, so the
+  files are the price of retention in disk space. `src/resume/` (validator + retention policy) is
+  imported only by tests, and `resumeDecision` — the host-side "should a new run re-drive from
+  this file?" helper — has no production caller. `resume` never claims engine-level resume (the
+  shipped engine journals nothing, stated as a limitation) and the release never terminates a run:
+  recording is best-effort and unload-bounded, and a refused disk costs a warning line, never the
+  report. Both halves are deliberate, not bugs.
+  / 本轮交付记录＋重跑策略：每个 run id 一个文件，运行期间原地重写，结束留一份终态，**没有任何
+  清理逻辑**，所以累积的磁盘占用就是保留期的代价。`src/resume/`（校验器 ＋ 保留策略）只被测试引用，
+  `resumeDecision`（host 侧「要不要从这个文件起新的一轮重跑未完成任务」）没有生产调用方。这里的
+  `resume` 从不是引擎级恢复（随附引擎无日志、无恢复，已声明为限制），本版也不终止任何运行：记录是
+  尽力而为、卸载有界，磁盘写失败只记一条警告，永不吞掉报告。这两点都是有意为之，不是缺陷。
+
 ## [0.7.0] - 2026-11-08
 
 ### Added / 新增

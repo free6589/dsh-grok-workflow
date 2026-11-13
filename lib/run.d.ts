@@ -10,6 +10,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent';
 import type { Session } from '@deepseek-ai/dsh-session';
 import type { WorkflowRun } from '@deepseek-ai/dsh-workflow';
 import type { NamingLanguage } from './naming.js';
+import type { DeliveryView } from './delivery/index.js';
 import type { DisposeRecord } from './records.js';
 import type { NormalizedTask, ResolvedConfig, WorkflowReport } from './types.js';
 /** Minimal logger surface used by the runtime modules. */
@@ -145,6 +146,19 @@ export interface RunOutcome {
     ok: boolean;
     /** Failure cause for logs and record keeping, when `ok` is false. */
     cause?: string;
+    /**
+     * The relay-ready delivery view for whatever this outcome carries: the human
+     * conclusion first, the machine ledger only when the live `showDiagnostics`
+     * switch asks for it.
+     *
+     * Composed here rather than in each caller because *every* exit of
+     * {@link runWorkflow} — a validated report, a kept cancellation, a deadline or
+     * an engine error — hands the same thing to a relay turn, and a caller that
+     * forgot to compose it would deliver the raw report with no plain-language
+     * conclusion. The caller still decides *whether* to send it; this only makes
+     * the human-first text exist on every path.
+     */
+    delivery?: DeliveryView;
 }
 /**
  * Copy language for every user-visible progress string (Issue #22, P1-3).

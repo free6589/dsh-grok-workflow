@@ -96,11 +96,18 @@ export type RoleRouting = Partial<Record<RoleName, ModelRoute[]>>;
 /**
  * Who writes the final answer narrative (U-3).
  *
- * `deterministic` keeps the current behaviour: the host renders the aggregated
- * report. `model` adds one bounded synthesizer call that writes a narrative
- * summary on top of the same aggregations; it falls back to the deterministic
- * text when the call fails, so it can never lose verified content.
+ * Policy values (`GrokWorkflowConfig.synthesis`): `deterministic` keeps the
+ * current behaviour (the host renders the aggregated report); `model` adds one
+ * bounded synthesizer call that writes a narrative summary on top of the same
+ * aggregations; `layered` keeps the verified report as the only source of fact
+ * and answers from a deterministic natural-language summary built in the
+ * script, with one constrained polish call only when a synthesizer chain is
+ * configured. Report values (`WorkflowReport.synthesis.mode`): `deterministic`
+ * or `model` only — they say whether a polish call was in play, never the
+ * policy. A layered run that polishes reports `model`, otherwise
+ * `deterministic`.
  */
+export type SynthesisPolicy = 'deterministic' | 'model' | 'layered';
 export type SynthesisMode = 'deterministic' | 'model';
 /** Plugin configuration (also the DSH Schemastery schema shape). */
 export interface GrokWorkflowConfig {
@@ -134,7 +141,7 @@ export interface GrokWorkflowConfig {
     /** Per-role ordered model chains (planner/worker/verifier/synthesizer). */
     roles?: RoleRouting;
     /** Final-answer strategy (U-3): deterministic aggregation, or one model call. */
-    synthesis?: SynthesisMode;
+    synthesis?: SynthesisPolicy;
     /**
      * Answer production strategy (U-1). `in-turn` is the default because it is
      * the only one that survives a one-shot app (G-18/F9); `relay` and `append`
@@ -214,7 +221,7 @@ export interface ResolvedConfig {
     showDiagnostics: boolean;
     /** Effective per-role chains; an empty array means "inherit the run's route". */
     roles: Record<RoleName, ModelRoute[]>;
-    synthesis: SynthesisMode;
+    synthesis: SynthesisPolicy;
     /**
      * True when the load-time repair (`repairSynthesisInconsistency`) rewrote
      * `synthesis` so a recoverable synthesis/synthesizer mismatch could still

@@ -1,10 +1,11 @@
 import { TASK_LIMITS } from './input.js'
+import { DEFAULT_HUMAN_SUMMARY, DEFAULT_SHOW_DIAGNOSTICS } from './config.js'
 import { CARRYOVER_LIMITS } from './carryover.js'
 import { shardCountFor, shardsSource } from './shards.js'
 import { namingSource, phaseLabel, runTitle } from './naming.js'
 import type { NamingLanguage } from './naming.js'
 import { REDACTION_RULES } from './redact.js'
-import type { FailureClass, ModelRoute, NormalizedTask, ResolvedConfig, RoleName, SynthesisMode } from './types.js'
+import type { FailureClass, ModelRoute, NormalizedTask, ResolvedConfig, RoleName, SynthesisPolicy } from './types.js'
 
 /**
  * Render the shared redaction rules (src/redact.ts) as script-realm JS source.
@@ -217,7 +218,36 @@ function hintBusyLabel(label) {
   return hintBusyRoutes[label] === true;
 }
 
-const synthesisMode = args && args.synthesis === 'model' && roleRoutes.synthesizer.length > 0 ? 'model' : 'deterministic';
+// Layered synthesis policy (Section IV). The verified report is always the base.
+// "model" adds one constrained polish call exactly as before. "layered" adds a
+// deterministic natural-language base narrative, runs the same constrained polish
+// when a synthesizer chain is configured, and falls back to the base narrative
+// whenever the model path is unavailable — so the final answer never depends on a
+// model being willing or able to answer. The report's synthesis.mode keeps its
+// two host-validated values ("deterministic"/"model"): it names whether a polish
+// call was in play, never the policy.
+const synthesisPolicy = args && typeof args.synthesis === 'string' ? args.synthesis : 'deterministic';
+// Output switches. Both are read here with the human-first defaults
+// (src/config.ts DEFAULT_HUMAN_SUMMARY / DEFAULT_SHOW_DIAGNOSTICS), so a payload
+// that carries neither key — every caller written before the switches existed —
+// behaves exactly as it did:
+//
+//   humanSummary    default true. "false" means machine-only output: no
+//                   narrative is built, no synthesizer call is spent, and the
+//                   report ships as the whole answer.
+//   showDiagnostics default false. "true" appends one bounded provenance line to
+//                   the narrative, naming the layer that produced it and why a
+//                   polish was dropped. Off, the answer stays human.
+const humanSummary = !(args && args.humanSummary === false);
+const showDiagnostics = Boolean(args && args.showDiagnostics === true);
+const polishAttempted = humanSummary && (synthesisPolicy === 'model' || synthesisPolicy === 'layered') && roleRoutes.synthesizer.length > 0;
+const synthesisMode = polishAttempted ? 'model' : 'deterministic';
+
+// Layered-synthesis guardrail bounds. They mirror HARD_LIMITS.synthesisDigestChars
+// and HARD_LIMITS.synthesisSummaryChars in src/config.ts (pinned equal by
+// test/synthesis-guardrails.spec.ts) — do not edit one side without the other.
+const SYNTHESIS_DIGEST_CHARS = 6000;
+const SYNTHESIS_SUMMARY_CHARS = 2000;
 
 const ROUTE_FAILURE_CLASSES = {
   'rate-limit': 1,
@@ -1096,6 +1126,401 @@ function normalizeSummary(raw) {
   return { summary: summary };
 }
 
+// ------------------------------------------------------------ layered mode --
+// Section IV: the synthesizer may produce natural language, but the default is
+// deterministic and there is no guaranteed model answer. The layered policy is
+// the shape that makes that honest end to end:
+//
+//   layer 1  verified report — the aggregation above is the only source of fact;
+//   layer 2  constrained polish — one synthesizer call rewrites the narrative,
+//            but its text is checked against the report before use and it can
+//            never touch anything except the synthesis.summary field;
+//   layer 3  deterministic fallback — the narrative built here from the same
+//            data is the answer whenever the model path is unavailable, fails
+//            the guardrail, or is not configured at all.
+//
+// Truthfulness invariants: executor claims, verifier judgments and confirmed
+// evidence are labeled apart in both the digest and the fallback text, so the
+// final answer never reads a self-report as a verified fact, and an unrun test
+// is rendered as unrun — never as passed.
+
+/** Bound a string to a maximum length without cutting a surrogate pair in half. */
+function clip(value, max) {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (raw.length <= max) return raw;
+  let cut = max - 1;
+  const code = raw.charCodeAt(cut - 1);
+  if (code >= 0xd800 && code <= 0xdbff) cut -= 1;
+  return raw.slice(0, cut) + '…';
+}
+
+function synthesisStatusWord(status) {
+  if (NAMING_LANGUAGE === 'en') {
+    return status === 'completed' ? 'completed' : status === 'partial' ? 'partially complete' : 'not passed';
+  }
+  return status === 'completed' ? '已完成' : status === 'partial' ? '部分完成' : '未通过';
+}
+
+/**
+ * Per-task material for the layered digest, walkable once.
+ *
+ * The last attempt is the one the report itself would publish, so the digest
+ * cannot disagree with the report about what the last attempt produced.
+ */
+function layeredDigestData(results) {
+  const judgments = [];
+  const claims = [];
+  const checkedTests = [];
+  const claimedTests = [];
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i];
+    const last = result.attempts.length > 0 ? result.attempts[result.attempts.length - 1] : null;
+    const tag = 'task ' + result.task.id;
+    if (last && last.verification) {
+      const unmet = [];
+      for (let c = 0; c < last.verification.criteria.length; c++) {
+        if (!last.verification.criteria[c].met) unmet.push(clip(last.verification.criteria[c].criterion, 160));
+      }
+      judgments.push(
+        '- [' + tag + (result.status === 'verified' ? '' : ' (task ' + result.status + ')') + '] verifier verdict ' +
+        last.verification.verdict + ', confidence ' + last.verification.confidence +
+        (unmet.length > 0 ? '; unmet: ' + unmet.join('; ') : '')
+      );
+      for (let c = 0; c < last.verification.commandsRun.length; c++) {
+        checkedTests.push('- [' + tag + '] ' + clip(last.verification.commandsRun[c].command, 140) + ' -> ' + last.verification.commandsRun[c].status);
+      }
+    } else {
+      judgments.push('- [' + tag + (result.status === 'verified' ? '' : ' (task ' + result.status + ')') + '] no verification record');
+    }
+    if (last && last.execution) {
+      claims.push('- [' + tag + '] ' + clip(last.execution.summary, 360));
+      for (let c = 0; c < last.execution.testsRun.length; c++) {
+        claimedTests.push('- [' + tag + '] ' + clip(last.execution.testsRun[c].command, 140) + ' -> ' + last.execution.testsRun[c].status);
+      }
+    }
+  }
+  return { judgments: judgments, claims: claims, checkedTests: checkedTests, claimedTests: claimedTests };
+}
+
+function pushBounded(list, target, maxItems) {
+  for (let i = 0; i < list.length && target.length < maxItems; i++) target.push(list[i]);
+}
+
+/**
+ * Build the polish digest from the verified aggregation only.
+ *
+ * Section labels are stable English tokens (the polish prompt decides the answer
+ * language), and every section says what its entries are worth: confirmed
+ * evidence was checked by verifiers, verifier judgments are this run's checks,
+ * executor claims are self-reports. Nothing else exists as fact.
+ */
+function layeredDigest(status, verifiedCount, total, confirmed, incomplete, uncertainties, results, planErrorText) {
+  const data = layeredDigestData(results);
+  const lines = [];
+  lines.push('Run status: ' + status + ' (' + synthesisStatusWord(status) + '). Verified tasks: ' + verifiedCount + '/' + total + '.');
+  if (confirmed.length > 0) {
+    lines.push('CONFIRMED EVIDENCE (checked by independent verifiers):');
+    for (let i = 0; i < confirmed.length && i < 16; i++) {
+      lines.push('- [task ' + confirmed[i].taskId + '] ' + clip(confirmed[i].criterion, 200) + ' -> ' + clip(confirmed[i].evidence, 260));
+    }
+  }
+  if (data.judgments.length > 0) {
+    lines.push('VERIFIER JUDGMENTS (this run\'s independent checks):');
+    pushBounded(data.judgments, lines, 16);
+  }
+  if (data.claims.length > 0) {
+    lines.push('EXECUTOR CLAIMS (self-reported, not independently verified):');
+    pushBounded(data.claims, lines, 16);
+  }
+  if (data.checkedTests.length > 0 || data.claimedTests.length > 0) {
+    lines.push('TESTS AND COMMANDS (status verbatim from the report; an entry marked not_run never passed):');
+    pushBounded(data.checkedTests, lines, 16);
+    pushBounded(data.claimedTests, lines, 16);
+  }
+  if (incomplete.length > 0) {
+    lines.push('INCOMPLETE (not verified; must stay in the answer):');
+    for (let i = 0; i < incomplete.length && i < 16; i++) {
+      lines.push('- [task ' + incomplete[i].taskId + '] ' + clip(incomplete[i].reason, 280) + ' (' + incomplete[i].category + ')');
+    }
+  }
+  if (uncertainties.length > 0) {
+    lines.push('UNCERTAINTIES (must stay visible in the answer):');
+    for (let i = 0; i < uncertainties.length && i < 16; i++) {
+      lines.push('- [task ' + uncertainties[i].taskId + '] ' + clip(uncertainties[i].text, 240));
+    }
+  }
+  if (planErrorText) lines.push('PLANNING NOTE (the plan degraded, so the run cannot be fully clean): ' + clip(planErrorText, 240));
+  return clip(lines.join('\n'), SYNTHESIS_DIGEST_CHARS);
+}
+
+/**
+ * Citable-fact corpus for the guardrail: the digest plus every locator-shaped
+ * string the report itself carries, lowercased. A polished text may cite any of
+ * these verbatim and nothing else, so an invented path or command cannot slip
+ * through as prose.
+ */
+function layeredCitationCorpus(digest, results) {
+  const parts = [digest];
+  for (let i = 0; i < results.length; i++) {
+    const last = results[i].attempts.length > 0 ? results[i].attempts[results[i].attempts.length - 1] : null;
+    if (last && last.execution) {
+      for (let c = 0; c < last.execution.deliverables.length; c++) parts.push(last.execution.deliverables[c].locator);
+      for (let c = 0; c < last.execution.evidence.length; c++) parts.push(last.execution.evidence[c].source);
+      for (let c = 0; c < last.execution.filesChanged.length; c++) parts.push(last.execution.filesChanged[c]);
+    }
+    if (last && last.verification) {
+      for (let c = 0; c < last.verification.checkedEvidence.length; c++) parts.push(last.verification.checkedEvidence[c].locator);
+    }
+  }
+  return parts.join('\n').toLowerCase();
+}
+
+/** Command/test counts split by who ran them, so status words stay verbatim. */
+function layeredTestCounts(results) {
+  const counts = { checked: { passed: 0, failed: 0, not_run: 0 }, claimed: { passed: 0, failed: 0, not_run: 0 } };
+  for (let i = 0; i < results.length; i++) {
+    const last = results[i].attempts.length > 0 ? results[i].attempts[results[i].attempts.length - 1] : null;
+    if (last && last.verification) {
+      for (let c = 0; c < last.verification.commandsRun.length; c++) {
+        const status = last.verification.commandsRun[c].status;
+        if (status === 'passed' || status === 'failed' || status === 'not_run') counts.checked[status] += 1;
+      }
+    }
+    if (last && last.execution) {
+      for (let c = 0; c < last.execution.testsRun.length; c++) {
+        const status = last.execution.testsRun[c].status;
+        if (status === 'passed' || status === 'failed' || status === 'not_run') counts.claimed[status] += 1;
+      }
+    }
+  }
+  return counts;
+}
+
+function layeredTestsLine(counts) {
+  if (NAMING_LANGUAGE === 'en') {
+    return 'Commands and tests — verified by checkers: ' + counts.checked.passed + ' passed, ' + counts.checked.failed +
+      ' failed, ' + counts.checked.not_run + ' not run; executor-reported: ' + counts.claimed.passed + ' passed, ' +
+      counts.claimed.failed + ' failed, ' + counts.claimed.not_run + ' not run.';
+  }
+  return '命令与测试——检查者核验：通过 ' + counts.checked.passed + '、失败 ' + counts.checked.failed +
+    '、未运行 ' + counts.checked.not_run + '；执行者自报：通过 ' + counts.claimed.passed +
+    '、失败 ' + counts.claimed.failed + '、未运行 ' + counts.claimed.not_run + '。';
+}
+
+/**
+ * The deterministic natural-language summary (layer 3).
+ *
+ * Pure function of the verified aggregation: the same report always yields the
+ * same text, a failed run says it is not passed, and a test that did not run is
+ * counted as not run — never as passed.
+ */
+function layeredFallbackSummary(data) {
+  const en = NAMING_LANGUAGE === 'en';
+  const lines = [];
+  const verifiedPhrase = en
+    ? (data.verified > 0
+      ? data.verified + '/' + data.total + ' task(s) verified by independent checkers'
+      : 'no task has been verified by an independent checker')
+    : (data.verified > 0
+      ? data.verified + '/' + data.total + ' 项任务已由独立检查核验'
+      : '尚无任务通过独立核验');
+  lines.push((en ? 'Overall status: ' + synthesisStatusWord(data.status) + '; ' : '总体状态：' + synthesisStatusWord(data.status) + '；') + verifiedPhrase + (en ? '.' : '。'));
+  if (data.confirmed.length > 0) {
+    lines.push(en ? 'Confirmed (independent verification):' : '已确认（独立核验）：');
+    for (let i = 0; i < data.confirmed.length && i < 12; i++) {
+      lines.push(en
+        ? '- task ' + data.confirmed[i].taskId + ': ' + clip(data.confirmed[i].criterion, 180) + ' (evidence: ' + clip(data.confirmed[i].evidence, 220) + ')'
+        : '- 任务 ' + data.confirmed[i].taskId + '：' + clip(data.confirmed[i].criterion, 180) + '（证据：' + clip(data.confirmed[i].evidence, 220) + '）');
+    }
+  }
+  if (data.incomplete.length > 0) {
+    lines.push(en ? 'Incomplete (not verified):' : '未完成（未通过核验）：');
+    for (let i = 0; i < data.incomplete.length && i < 12; i++) {
+      lines.push(en
+        ? '- task ' + data.incomplete[i].taskId + ': ' + clip(data.incomplete[i].reason, 240)
+        : '- 任务 ' + data.incomplete[i].taskId + '：' + clip(data.incomplete[i].reason, 240));
+    }
+  }
+  if (data.counts.checked.passed + data.counts.checked.failed + data.counts.checked.not_run +
+    data.counts.claimed.passed + data.counts.claimed.failed + data.counts.claimed.not_run > 0) {
+    lines.push(layeredTestsLine(data.counts));
+  }
+  if (data.uncertainties.length > 0) {
+    lines.push(en ? 'Open questions:' : '待确认：');
+    for (let i = 0; i < data.uncertainties.length && i < 8; i++) {
+      lines.push(en
+        ? '- task ' + data.uncertainties[i].taskId + ': ' + clip(data.uncertainties[i].text, 200)
+        : '- 任务 ' + data.uncertainties[i].taskId + '：' + clip(data.uncertainties[i].text, 200));
+    }
+  }
+  if (data.planError) lines.push((en ? 'Planning note: ' : '规划说明：') + clip(data.planError, 200));
+  return clip(lines.join('\n'), SYNTHESIS_SUMMARY_CHARS);
+}
+
+/**
+ * The report-notes appendix that rides on a polished answer (layer 2 guard).
+ *
+ * A polish that stays inside the guardrails can still be quiet about what the
+ * report treats as open; these lines are appended from the report data, so the
+ * final answer cannot hide an incomplete item, an uncertainty or a test count.
+ */
+function layeredNotesBlock(data) {
+  const en = NAMING_LANGUAGE === 'en';
+  const lines = [];
+  if (data.incomplete.length > 0) {
+    lines.push(en ? 'Still incomplete (from the report):' : '仍未完成（来自报告）：');
+    for (let i = 0; i < data.incomplete.length && i < 8; i++) {
+      lines.push(en
+        ? '- task ' + data.incomplete[i].taskId + ': ' + clip(data.incomplete[i].reason, 160)
+        : '- 任务 ' + data.incomplete[i].taskId + '：' + clip(data.incomplete[i].reason, 160));
+    }
+  }
+  if (data.uncertainties.length > 0) {
+    lines.push(en ? 'Open questions (from the report):' : '待确认（来自报告）：');
+    for (let i = 0; i < data.uncertainties.length && i < 8; i++) {
+      lines.push(en
+        ? '- task ' + data.uncertainties[i].taskId + ': ' + clip(data.uncertainties[i].text, 160)
+        : '- 任务 ' + data.uncertainties[i].taskId + '：' + clip(data.uncertainties[i].text, 160));
+    }
+  }
+  if (data.counts.checked.passed + data.counts.checked.failed + data.counts.checked.not_run +
+    data.counts.claimed.passed + data.counts.claimed.failed + data.counts.claimed.not_run > 0) {
+    lines.push(layeredTestsLine(data.counts));
+  }
+  if (lines.length === 0) return '';
+  return (en ? 'Report notes (facts from the report, not rewritten):' : '报告附注（以下为报告事实，摘要不改写）：') + '\n' + lines.join('\n');
+}
+
+/** Compose a polished narrative with the non-negotiable notes, within the bound. */
+function withReportNotes(polish, data) {
+  const notes = layeredNotesBlock(data);
+  if (notes === '') return clip(polish, SYNTHESIS_SUMMARY_CHARS);
+  const budget = Math.max(0, SYNTHESIS_SUMMARY_CHARS - notes.length - 2);
+  return clip(clip(polish, budget) + '\n\n' + notes, SYNTHESIS_SUMMARY_CHARS);
+}
+
+/**
+ * Append one provenance line to a finished narrative (opt-in diagnostics).
+ *
+ * showDiagnostics true is the caller asking for the machine view, and the one
+ * machine fact the prose cannot carry is where the prose came from: the
+ * synthesizer's polish or the deterministic fallback, and why a polish was
+ * dropped. The line is paid for out of the narrative's own budget, so turning
+ * diagnostics on can never push the answer past the clamp every other path obeys.
+ */
+function withProvenance(summary, note) {
+  const budget = Math.max(0, SYNTHESIS_SUMMARY_CHARS - note.length - 1);
+  return clip(clip(summary, budget) + '\n' + note, SYNTHESIS_SUMMARY_CHARS);
+}
+
+/**
+ * The provenance line for one finished narrative (zh/en follow the run's naming).
+ *
+ * @param source - "polish" when the synthesizer's text survived the guardrail.
+ * @param error - the recorded reason the polish was not used, when there is one.
+ */
+function provenanceLine(source, error) {
+  const en = NAMING_LANGUAGE === 'en';
+  if (source === 'polish') {
+    return en
+      ? 'Diagnostics: this narrative is the synthesizer polish, accepted by the factual guardrail.'
+      : '诊断：本段结语来自润色稿，已通过事实校验。';
+  }
+  if (source === 'model') {
+    return en
+      ? 'Diagnostics: this narrative was written directly by the synthesizer (synthesis "model").'
+      : '诊断：本段结语由 synthesizer 直接生成（synthesis 为 model）。';
+  }
+  const why = error === ''
+    ? (en ? 'no synthesizer chain is configured.' : '未配置 synthesizer 链路。')
+    : clip(error, 240);
+  return en
+    ? 'Diagnostics: this narrative is the deterministic fallback (' + why + ')'
+    : '诊断：本段结语来自确定性回退（' + why + '）';
+}
+
+/**
+ * The factual guardrail for the polished text (layer 2 gate).
+ *
+ * Deterministic and bounded: every check is a regex or a substring lookup over
+ * data derived from the verified report. A failure never falls back to the model
+ * text — it falls back to the deterministic narrative, so the worst outcome of a
+ * false rejection is a plainer answer, never a less truthful one.
+ */
+function polishGuardrail(text, facts, corpus) {
+  const value = typeof text === 'string' ? text.trim() : '';
+  if (value === '') return { ok: false, reason: 'the polish is empty' };
+  if (value.length > SYNTHESIS_SUMMARY_CHARS * 2) {
+    return { ok: false, reason: 'the polish is over ' + (SYNTHESIS_SUMMARY_CHARS * 2) + ' characters' };
+  }
+  // 1. The verdict is the report's, not the polish's: a run that is not completed
+  //    must never be narrated as all-passed.
+  if (facts.status !== 'completed') {
+    const claimsAll =
+      /\b(all|every)\b[^.\n]{0,40}\b(passed|verified|completed|succeeded|done|met|satisfied)\b/i.test(value) ||
+      /\bCOMPLETED\b/.test(value) ||
+      /全部(任务|项目|检查|验收标准)?(均|都)?(已)?(通过|核验通过|完成|满足|达成)/.test(value) ||
+      /所有(任务|项目|检查)(都|均)?(已)?(通过|完成|满足|达成)/.test(value);
+    if (claimsAll) return { ok: false, reason: 'claims full success while the run status is ' + facts.status };
+  }
+  // 2. Passing tests exist only if a checker ran one: without a verified pass,
+  //    any pass claim is invention, whatever the executor reported.
+  if (facts.verifiedPasses === 0) {
+    const claimsPass =
+      /\b(tests?|checks?|suites?|builds?)\s+(all\s+)?(pass|passed|passing|green)\b/i.test(value) ||
+      /(?:测试|用例|检查|构建)(?:全部|均|都)?(?:已)?通过/.test(value) ||
+      /全绿/.test(value);
+    if (claimsPass) return { ok: false, reason: 'claims passing tests while no checker-verified passing test exists' };
+  }
+  // 3. Open items cannot be narrated away; the notes appendix re-prints them, and
+  //    an explicit denial marks the text as unfaithful.
+  if (facts.openItems > 0) {
+    const denies =
+      /no\s+(open\s+|unresolved\s+|outstanding\s+|remaining\s+)?(uncertainties?|open\s+questions?|risks?|issues?|caveats?)/i.test(value) ||
+      /没有(任何)?(未决|不确定|遗留|待确认)/.test(value) ||
+      /无(未决|遗留)问题/.test(value);
+    if (denies) return { ok: false, reason: 'denies open items the report lists' };
+  }
+  // 4. Cited paths and commands must come from the report: a backtick span that
+  //    carries a path or command shape and is absent from the corpus is invention.
+  const tick = String.fromCharCode(96);
+  const spans = value.split(tick);
+  for (let i = 1; i + 1 < spans.length; i += 2) {
+    const inner = spans[i];
+    if (inner.length < 1 || inner.length > 200 || inner.indexOf('\n') !== -1) continue;
+    if (!/[\/.\s]/.test(inner)) continue;
+    if (corpus.indexOf(inner.toLowerCase()) === -1) {
+      return { ok: false, reason: 'cites "' + inner + '", which the verified report does not contain' };
+    }
+  }
+  return { ok: true, reason: '' };
+}
+
+/** The constrained polish prompt (layer 2): language follows the run's naming. */
+function layeredPolishPrompt(digest) {
+  const zh = NAMING_LANGUAGE !== 'en';
+  return [
+    memberLabel('synthesizer', 1),
+    zh
+      ? '你为一次已完成核验的工作流运行撰写最终结语的润色稿。DATA 是唯一事实来源。'
+      : 'You write the polished final narrative for a verified workflow run. DATA below is the only source of fact.',
+    zh
+      ? '不得改变结论：运行状态与核验数量以 DATA 为准；DATA 没有列出的文件、命令或结果一律不得提及；DATA 未标 passed 的测试不得写成通过；不确定与未完成事项必须原样保留。'
+      : 'You may not change the verdict: run status and verified counts follow DATA; never mention a file, command or result that DATA does not list; never write a test as passed when DATA does not mark it passed; keep uncertainties and incomplete items as they are.',
+    zh
+      ? '未完成与待确认事项必须出现在回答里，不得省略或否认。'
+      : 'Incomplete items and uncertainties must appear in the answer; never drop or deny them.',
+    zh
+      ? '用不超过 200 字的平实散文，不用标题与列表；需要引用文件或命令时，必须照抄 DATA 原文并放在反引号里。'
+      : 'Write at most 200 words of plain prose, no headings and no bullet lists; cite any file or command exactly as it appears in DATA, inside backticks.',
+    'When prior rounds are listed, the answer may say what this run adds to them; never present an earlier round\'s result as this run\'s work.'
+  ].concat(carryoverSection(), [
+    '',
+    'DATA:',
+    safePromptJson(digest)
+  ]).join('\n');
+}
+
 async function mapLimit(items, limit, fn) {
   const results = new Array(items.length);
   let next = 0;
@@ -1454,7 +1879,72 @@ else if (verifiedCount > 0) status = 'partial';
 
 let synthesisError = '';
 let synthesisSummary = '';
-if (synthesisMode === 'model') {
+// Which layer produced the narrative: 'polish' (guardrail-clean synthesizer
+// text), 'model' (the plain synthesis policy) or 'fallback' (the deterministic
+// narrative). Only read when the caller asked for diagnostics; empty when no
+// narrative was built at all.
+let synthesisSource = '';
+// A layered run with humanSummary false builds nothing: machine-only output means
+// the report is the answer, so no narrative is composed and no synthesizer call
+// is spent. synthesis.mode stays "deterministic" because no polish was in play —
+// the same value a deterministic run reports, which is exactly what this run is.
+if (synthesisPolicy === 'layered' && humanSummary) {
+  // Layered policy: the deterministic narrative is built first and unconditionally,
+  // then the polish is attempted and only a guardrail-clean result may replace it.
+  const digest = layeredDigest(status, verifiedCount, results.length, confirmed, incomplete, uncertainties, results, plan.error || '');
+  const counts = layeredTestCounts(results);
+  const layeredData = {
+    status: status,
+    verified: verifiedCount,
+    total: results.length,
+    confirmed: confirmed,
+    incomplete: incomplete,
+    uncertainties: uncertainties,
+    counts: counts,
+    planError: plan.error || ''
+  };
+  const fallback = layeredFallbackSummary(layeredData);
+  if (polishAttempted) {
+    try {
+      const polished = await callRole('synthesizer', layeredPolishPrompt(digest), {
+        schema: SUMMARY_SCHEMA,
+        label: memberLabel('synthesizer', 1),
+        phase: phaseLabel('synthesize'),
+        attempt: 0
+      });
+      if (polished.ok) {
+        const normalized = normalizeSummary(polished.value);
+        if (!normalized) {
+          synthesisError = 'synthesizer returned no valid summary; the deterministic summary is used';
+        } else {
+          const facts = {
+            status: status,
+            verifiedPasses: counts.checked.passed,
+            openItems: incomplete.length + uncertainties.length
+          };
+          const verdict = polishGuardrail(normalized.summary, facts, layeredCitationCorpus(digest, results));
+          if (verdict.ok) {
+            synthesisSummary = withReportNotes(normalized.summary, layeredData);
+            synthesisSource = 'polish';
+          } else synthesisError = 'polish rejected by the factual guardrail (' + verdict.reason + '); the deterministic summary is used';
+        }
+      } else {
+        synthesisError = 'synthesizer failed on every route: [' + polished.failure.class + '] ' + polished.failure.reason + '; the deterministic summary is used';
+      }
+    } catch (error) {
+      // The deterministic aggregation and narrative are already complete, so the
+      // polish is optional: a synthesizer fault is reported, never propagated (G-4).
+      synthesisError = 'synthesizer could not run: [' + classifyCallFailure('synthesizer', error).class + '] ' + safeError(error) + '; the deterministic summary is used';
+    }
+  }
+  // Layer 3: whenever the model path produced nothing usable — no chain, dead
+  // routes, no valid summary, guardrail rejection — the deterministic narrative
+  // is the answer.
+  if (synthesisSummary === '') {
+    synthesisSummary = fallback;
+    synthesisSource = 'fallback';
+  }
+} else if (synthesisMode === 'model') {
   try {
     const summarized = await callRole('synthesizer', synthesizerPrompt(status, verifiedCount, results.length, confirmed, incomplete, uncertainties), {
       schema: SUMMARY_SCHEMA,
@@ -1464,7 +1954,10 @@ if (synthesisMode === 'model') {
     });
     if (summarized.ok) {
       const normalized = normalizeSummary(summarized.value);
-      if (normalized) synthesisSummary = normalized.summary;
+      if (normalized) {
+        synthesisSummary = normalized.summary;
+        synthesisSource = 'model';
+      }
       else synthesisError = 'synthesizer returned no valid summary';
     } else {
       synthesisError = 'synthesizer failed on every route: [' + summarized.failure.class + '] ' + summarized.failure.reason;
@@ -1474,6 +1967,17 @@ if (synthesisMode === 'model') {
     // optional: a synthesizer fault is reported, never propagated (G-4).
     synthesisError = 'synthesizer could not run: [' + classifyCallFailure('synthesizer', error).class + '] ' + safeError(error);
   }
+}
+
+// Output diagnostics, opt-in (showDiagnostics, default false). The answer a
+// reader gets by default stays human; a caller who asks for the machine view
+// gets the one machine fact the prose cannot carry — which layer wrote this
+// narrative and why a polish was dropped. The full ledger (routes, deadline,
+// overflows, errors) is rendered host-side from the same report, so nothing is
+// duplicated here. With humanSummary false there is no narrative to annotate,
+// and the report alone is the machine view.
+if (showDiagnostics && synthesisSummary !== '' && synthesisSource !== '') {
+  synthesisSummary = withProvenance(synthesisSummary, provenanceLine(synthesisSource, synthesisError));
 }
 
 const synthesisReport = { mode: synthesisMode };
@@ -1549,7 +2053,12 @@ export interface WorkflowRequestPayload {
     /** The deadline the plugin enforces for this run (0 = unknown/legacy). */
     timeoutMs: number
     roles: Record<RoleName, ModelRoute[]>
-    synthesis: SynthesisMode
+    /**
+     * Final-answer policy: `deterministic`, `model`, or `layered` (the Section IV
+     * layered policy, which travels as the third runtime value). The script maps
+     * the policy onto the report's host-validated `synthesis.mode`.
+     */
+    synthesis: SynthesisPolicy
     /** Failure classes that advance a role's chain; empty = built-in policy. */
     switchOn: FailureClass[]
     /** Copy language for every user-visible progress string (Issue #22 P1-3). */
@@ -1565,6 +2074,24 @@ export interface WorkflowRequestPayload {
      * first or solitary run, which keeps the payload identical to before.
      */
     busyRoutes?: string[]
+    /**
+     * Output switch 1/2: build the plain-language narrative (default `true`).
+     *
+     * Omitted means the default, exactly like `src/config.ts`
+     * `DEFAULT_HUMAN_SUMMARY`, so a caller that predates the switch keeps the
+     * narrative it always got. `false` ships the machine report alone: no
+     * polish call, no fallback narrative, `synthesis.mode = "deterministic"`.
+     */
+    humanSummary?: boolean
+    /**
+     * Output switch 2/2: append the narrative's provenance (default `false`).
+     *
+     * Omitted means the default, exactly like `src/config.ts`
+     * `DEFAULT_SHOW_DIAGNOSTICS`. `true` adds one bounded line naming the layer
+     * that wrote the narrative and why a polish was dropped; the complete
+     * machine ledger is rendered host-side from the same report.
+     */
+    showDiagnostics?: boolean
   }
   maxTotalAgents: number
 }
@@ -1581,13 +2108,26 @@ export interface RouteBudget {
   synthesizer: number
 }
 
-/** Derive the per-run call budget from the configured chains. */
+/**
+ * Derive the per-run call budget from the configured chains.
+ *
+ * The synthesizer budget follows the configured policy, not the two-value
+ * `SynthesisMode` type union: the layered policy travels as the runtime value
+ * `"layered"` and spends one synthesizer call per run — but only when a chain is
+ * configured, because a layered run without a chain answers from the
+ * deterministic narrative and spends nothing.
+ */
 export function routeBudgetFor(config: ResolvedConfig): RouteBudget {
+  const chain = config.roles.synthesizer.length
+  const policy = String(config.synthesis)
+  const synthesizer = policy === 'model'
+    ? Math.max(1, chain)
+    : policy === 'layered' && chain > 0 ? Math.max(1, chain) : 0
   return {
     planner: Math.max(1, config.roles.planner.length),
     worker: Math.max(1, config.roles.worker.length),
     verifier: Math.max(1, config.roles.verifier.length),
-    synthesizer: config.synthesis === 'model' ? Math.max(1, config.roles.synthesizer.length) : 0,
+    synthesizer,
   }
 }
 
@@ -1706,6 +2246,8 @@ export function buildWorkflowRequest(
       // t47: the deadline the plugin will enforce, so the run report can name it.
       timeoutMs: config.timeoutMs,
       roles: config.roles,
+      // The policy travels verbatim: "layered" is the third runtime value of the
+      // layered policy, and the script maps it onto synthesis.mode itself.
       synthesis: config.synthesis,
       switchOn: config.switchOn,
       naming: { language: namingLanguage },
@@ -1719,6 +2261,12 @@ export function buildWorkflowRequest(
       // empty, so a solitary run stays byte-identical to before (the budget
       // ignores it: a hint never adds a call).
       ...busyValue.length === 0 ? {} : { busyRoutes: busyValue },
+      // Output switches (human-first defaults). Carried only when the resolved
+      // config deviates from `DEFAULT_HUMAN_SUMMARY` / `DEFAULT_SHOW_DIAGNOSTICS`,
+      // so an unset configuration produces the byte-identical payload every
+      // pre-switch caller sent, and the script's own defaults apply.
+      ...config.humanSummary === DEFAULT_HUMAN_SUMMARY ? {} : { humanSummary: config.humanSummary },
+      ...config.showDiagnostics === DEFAULT_SHOW_DIAGNOSTICS ? {} : { showDiagnostics: config.showDiagnostics },
     },
     maxTotalAgents,
   }
