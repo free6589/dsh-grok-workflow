@@ -553,3 +553,26 @@ turn at a time; Round 16's isolation proof is in `.workflow-artifacts/matrix-024
   （NOT_RUN）、CHANGELOG 之外的 README/ARCHITECTURE 更新（本轮认为无必要）。
 - **并发注意**：工作树同时含 fix_child_names 任务的记忆条目（D-039/Round 27–29），本轮
   commit 一并入库（均为已完成的记录）；`src/` 其余文件本轮未触碰。
+
+## 2026-11-13 — v0.8.0 已发布（PR #45 → 9c590f2；Tag v0.8.0 → 同 sha；Release 已建）
+
+- **状态（`CONFIRMED`，lead 独立核验）**：`main = origin/main = 9c590f2`（ahead/behind 0/0）；
+  `package.json` = `0.8.0`；Tag `v0.8.0` peel 到 `9c590f2`（本地与远端 `ls-remote` 一致）；
+  PR #45 MERGED 2026-11-13T01:26:25Z（CI Node22+24 双绿）；Release published 2026-11-13T01:27:54Z
+ （`dsh-grok-workflow-0.8.0.tgz`，Release workflow 绿）。Aggressive `git fsck` 悬空对象仅为历史
+  dangling，无 WIP 丢失。
+- **内容**：人话交付层（`src/delivery/` + `humanHead` 统一三态 + `showDiagnostics` 默认关）＋
+  `synthesis: layered`（`SynthesisPolicy` 三值，报告 `mode` 仍两值，digest/guardrail/fallback 有界）＋
+  checkpoint/resume（`src/checkpoint/` 原子写入校验 + `src/resume/` 校验恢复策略 + `src/run.ts` 接线，
+  无用户可见面）。Watchdog 与 Evidence Collector 明确 `NOT_DONE`（工作树无实现，未伪装）。
+- **安装验证**：隔离 profile `v080verify` 从 Tag 安装成功（`package.json` 0.8.0；headless 真跑
+  `BLOCKED`——需模型调用，100s 无输出，不算通过）；`~/.dsh/profiles/web` 从 Tag 装到 0.8.0
+ （`lib/delivery|checkpoint|resume` 齐，`config.js` 含 layered×10）。**`dsh-layerfs` 的 live
+  `:3090`（pid 4003162，自 11-12 运行）未装、未重启**——`layerfs/profiles/web/node_modules/`
+  下无此包、`pnpm-lock` 无记录；release-080 澄清其“live”仅指 `~/.dsh`，`layerfs` 生效记
+  `UNVERIFIED`。重启仍是用户动作（D-013）。
+- **测试诚实边界**：本版相关 12 spec / 198 PASS；全量 778 passed / 3 failed——`gate.spec` 2 失败在
+  baseline `84e6894` 同样复现（预存/环境性），`human-output-contract` 全量时 1 flaky、单跑 9/9 过。
+- **遗留**：工作树未跟踪（`.audit-scratch/`、`.tmp-largefiles/`、`RENDERING-STUDY.md`、
+  `evidence/checkpoint-*`、`survey`）未入库；STATE/HANDOFF/VALIDATION 本轮未更新（写范围外）；
+  `release/0.8.0` 分支未删；已发布 Tag 未动。

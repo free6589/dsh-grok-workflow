@@ -895,3 +895,16 @@
   安装包已打到 `out/dsh-grok-workflow-0.6.0.tgz`（66 文件 / 309K，`npm pack --cache /tmp/...`，
   默认 `~/.npm` 只读）。用户执行安装 + 重启即可收口。Round 35 记录的「已装入 live 副本」
   只覆盖当时的 `lib/gate.js`，不含本轮 B 方案。
+
+## 2026-11-13 — v0.8.0 发布后交接（给用户 / 后续代理）
+
+- **已发布（`CONFIRMED`）**：PR #45 → `9c590f2`；Tag `v0.8.0` → 同 sha；Release
+  https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.8.0 。`package.json` = `0.8.0`。
+- **这次包含**：人话交付层、layered synthesis、checkpoint/resume（无用户可见面）。**不含**：
+  Command Watchdog、Host Evidence Collector（记 `NOT_DONE`，没做就是没做）。
+- **装到哪里了**：`~/.dsh/profiles/web` 已是 0.8.0；隔离 `v080verify` 也是 0.8.0（均从 Tag 装，未重启
+  任何服务）。**没装到哪里**：`dsh-layerfs` 的 live `:3090` 还是旧版——`layerfs/.../node_modules/`
+  下无此包。它要生效需两步（都由用户拍板，D-013）：①把 Tag 装入 layerfs 的 web profile；
+  ②重启 `:3090`。只做其中一步不会变新人话。
+- **Next action（用户）**：确认 layerfs 升级＋重启时机；`session-4c562307` 那类 PARTIAL 输出届时首行即
+  人话结论（做成 N/M、没做成点名＋下一步），台账默认收起，`uncertainties` 保留。
