@@ -646,7 +646,8 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
     ? { planner: [], worker: [], verifier: [], synthesizer: [] }
     : routeLabels(root.routing, 'routing')
   const synthesisRoot = root.synthesis === undefined ? {} : record(root.synthesis, 'synthesis')
-  const synthesisMode = string(synthesisRoot.mode ?? config.synthesis, 'synthesis.mode')
+  const fallbackMode = config.synthesis === 'model' ? 'model' : 'deterministic'
+  const synthesisMode = string(synthesisRoot.mode ?? fallbackMode, 'synthesis.mode')
   if (synthesisMode !== 'deterministic' && synthesisMode !== 'model') {
     throw new Error(`workflow result synthesis.mode must be "deterministic" or "model", got "${synthesisMode}"`)
   }
@@ -716,7 +717,7 @@ export function failureReport(
       verifier: chainLabelsFor(config.roles.verifier),
       synthesizer: chainLabelsFor(config.roles.synthesizer),
     },
-    synthesis: { mode: config.synthesis },
+    synthesis: { mode: config.synthesis === 'model' ? 'model' : 'deterministic' },
     limits: {
       maxConcurrency: config.maxConcurrency,
       maxRetries: config.maxRetries,

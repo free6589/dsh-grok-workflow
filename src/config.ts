@@ -1,5 +1,5 @@
 import z from '@deepseek-ai/schemastery'
-import type { FailureClass, GrokWorkflowConfig, ModelRoute, ResolvedConfig, RoleName } from './types.js'
+import type { FailureClass, GrokWorkflowConfig, ModelRoute, ResolvedConfig, RoleName, SynthesisPolicy } from './types.js'
 
 /** Hard limits; user configuration can only tighten these. */
 export const HARD_LIMITS = {
@@ -22,6 +22,18 @@ export const HARD_LIMITS = {
   maxAttemptsPerTask: 1100,
   /** Hard ceiling on routing ledger entries kept per run. */
   recordEntries: 256,
+  /**
+   * Layered-synthesis guardrail bounds (Section IV). The final narrative a
+   * layered run ships in `synthesis.summary` is clamped to the same per-section
+   * budget the report renderer applies (`renderReport` clamps the summary at the
+   * same 2 000 characters), and the digest the constrained polish may read is
+   * bounded so the polish stays a cheap, bounded call. The generated script
+   * mirrors both constants because it cannot import host code; the parity is
+   * pinned by test/synthesis-guardrails.spec.ts — do not edit one side without
+   * the other.
+   */
+  synthesisSummaryChars: 2_000,
+  synthesisDigestChars: 6_000,
 } as const
 
 /**
@@ -45,6 +57,32 @@ export const DEFAULT_MAX_ACTIVE_RUNS = 2
  * number of child agents in one process bounded.
  */
 export const DEFAULT_MAX_ACTIVE_RUNS_TOTAL = 8
+
+/**
+ * Default of the `humanSummary` output switch: **on** (human-first).
+ *
+ * A run that is asked for nothing in particular gets the plain-language answer
+ * first and the machine report after it. Declared once and read by both the
+ * schema default and `resolveConfig`, so the settings form, a hand-written
+ * profile patch and a programmatic call cannot disagree about what "unset"
+ * means. The workflow script applies the same default to a payload that omits
+ * the key (`src/script.ts`, `humanSummary`), so a caller that passes nothing —
+ * the pre-switch calling convention — keeps the behavior it had.
+ */
+export const DEFAULT_HUMAN_SUMMARY = true
+
+/**
+ * Default of the `showDiagnostics` output switch: **off** (diagnostics opt-in).
+ *
+ * Off means the rendered report omits the routing ledger (Model routes /
+ * Deadline / Route switches / overflows / Errors). Turning it on is the
+ * supported way to retrieve the complete machine report: the same validated
+ * report renders every one of those lines
+ * (`renderReport(report, { showDiagnostics: true })`), and the PTC `render`
+ * tool reads the live setting, so no remount and no second report format are
+ * involved. Declared once, read by the schema default and by `resolveConfig`.
+ */
+export const DEFAULT_SHOW_DIAGNOSTICS = false
 
 /** Version of the configuration surface this build understands. */
 export const CONFIG_VERSION = 1
@@ -136,9 +174,27 @@ export const Config = z.object({
   // Team tier: append an instant receipt after claiming so the user sees the tier
   // while the run is in flight (default on, pure addition).
   instantReceipt: z.boolean().default(true).volatile(),
-  // Team tier: append a 3-5 sentence Chinese summary after the run (default on).
-  humanSummary: z.boolean().default(true).volatile(),
-  showDiagnostics: z.boolean().default(false).volatile(),
+  // Output switch 1/2 — `humanSummary`, default **on** (human-first output).
+  //
+  // On: the answer opens with the deterministic plain-language head/summary and
+  // the machine report follows it (this is what a caller who passes nothing
+  // gets, exactly as before the switch existed — old calls stay compatible).
+  // Off: no human narrative anywhere — the front desk writes no head, and the
+  // workflow script builds no narrative at all (no polish call, no fallback
+  // text), so the run ships the machine report alone.
+  humanSummary: z.boolean().default(DEFAULT_HUMAN_SUMMARY).volatile(),
+  // Output switch 2/2 — `showDiagnostics`, default **off** (diagnostics opt-in).
+  //
+  // Off: `renderReport` omits the routing ledger (Model routes / Deadline /
+  // Route switches / overflows / Errors); the human-facing parts of the report
+  // are untouched. On: the same validated report renders every ledger line —
+  // this switch is the supported way to retrieve the complete machine report,
+  // for a human at the settings form and for a programmatic caller alike
+  // (`renderReport(report, { showDiagnostics: true })`, `resolveConfig({ showDiagnostics: true })`).
+  // When the workflow script is told `showDiagnostics: true` it additionally
+  // appends one bounded provenance line to the narrative, naming which layer
+  // produced it (polish vs deterministic fallback) and why a polish was dropped.
+  showDiagnostics: z.boolean().default(DEFAULT_SHOW_DIAGNOSTICS).volatile(),
   historyTurns: z.natural().min(0).max(HARD_LIMITS.historyTurns).default(12).volatile(),
   historyChars: z.natural().min(0).max(HARD_LIMITS.historyChars).default(20_000).volatile(),
   maxQueuedMessages: z.natural().min(0).max(HARD_LIMITS.maxQueuedMessages).default(4).volatile(),
@@ -163,7 +219,19 @@ export const Config = z.object({
     verifier: z.array(z.object({ provider: z.string().default(''), model: z.string(), maxInFlight: z.natural().min(HARD_LIMITS.routeInFlight.min).max(HARD_LIMITS.routeInFlight.max) })).default([]),
     synthesizer: z.array(z.object({ provider: z.string().default(''), model: z.string(), maxInFlight: z.natural().min(HARD_LIMITS.routeInFlight.min).max(HARD_LIMITS.routeInFlight.max) })).default([]),
   }).default({ planner: [], worker: [], verifier: [], synthesizer: [] }).volatile(),
-  synthesis: z.union([z.const('deterministic'), z.const('model')]).default('deterministic').volatile(),
+  // Final-answer policy. `deterministic` (default) aggregates by rule and ships
+  // no narrative. `model` adds one synthesizer polish call (U-3) that may fail
+  // without losing verified work. `layered` is the Section IV layered policy: the
+  // verified report is always the base, one constrained polish call runs when a
+  // synthesizer chain is configured, and a deterministic natural-language summary
+  // built in the script is the answer whenever the model path is unavailable —
+  // so the final answer never depends on a model being willing or able to answer.
+  // `synthesis` decides *who writes* the narrative; `humanSummary` decides
+  // whether any narrative is shipped at all. With `humanSummary: false` a
+  // `model` or `layered` run spends no synthesizer call and reports
+  // `synthesis.mode = "deterministic"` with no summary — the machine report is
+  // then the whole answer (retrieve its full ledger with `showDiagnostics: true`).
+  synthesis: z.union([z.const('deterministic'), z.const('model'), z.const('layered')]).default('deterministic').volatile(),
   // Switching policy (阶段5): which failure classes advance the fallback chain.
   // Empty means "use the built-in policy" (every transport/model class switches;
   // content failures never do), which is what phases 3-4 shipped.
@@ -426,9 +494,28 @@ export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
   }
   const triageFollowupAsFast = config.triageFollowupAsFast ?? true
   const instantReceipt = config.instantReceipt ?? true
-  const humanSummary = config.humanSummary ?? true
-  const showDiagnostics = config.showDiagnostics ?? false
-  const synthesis = config.synthesis ?? 'deterministic'
+  // Output switches. The fallbacks read the exported defaults rather than a
+  // literal, so a caller that omits both keys (the pre-switch calling
+  // convention) resolves to exactly the schema default: human summary on,
+  // machine diagnostics off. Nothing about an unset key changed when the
+  // switches were added — only a caller who says `false`/`true` sees a
+  // difference, and the machine report is always retrievable by asking for it.
+  const humanSummary = config.humanSummary ?? DEFAULT_HUMAN_SUMMARY
+  const showDiagnostics = config.showDiagnostics ?? DEFAULT_SHOW_DIAGNOSTICS
+  // The final-answer policy. `layered` is the Section IV layered policy: it is
+  // read off the raw config as a plain string because the public `SynthesisMode`
+  // union keeps its two *report-side* values (`deterministic`/`model`, the only
+  // ones report validation accepts); a layered run maps the policy onto
+  // `synthesis.mode` in the script, and `routeBudgetFor`/`buildWorkflowRequest`
+  // treat the runtime value "layered" as the third policy. A non-string value
+  // would otherwise fall through silently, so it is refused like a typo.
+  const synthesisRaw: unknown = (config as { synthesis?: unknown }).synthesis
+  if (synthesisRaw !== undefined && synthesisRaw !== 'deterministic' && synthesisRaw !== 'model' && synthesisRaw !== 'layered') {
+    throw new Error(`synthesis must be "deterministic", "model" or "layered", got "${String(synthesisRaw)}"`)
+  }
+  // A layered run is legal with or without a synthesizer chain: without one it
+  // answers from the deterministic narrative alone and spends no child call.
+  const synthesis = (synthesisRaw === undefined ? 'deterministic' : synthesisRaw) as SynthesisPolicy
   if (synthesis === 'model' && roles.synthesizer.length === 0) {
     throw new Error('synthesis "model" requires a non-empty roles.synthesizer chain')
   }

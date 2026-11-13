@@ -24,6 +24,18 @@ export declare const HARD_LIMITS: {
     readonly maxAttemptsPerTask: 1100;
     /** Hard ceiling on routing ledger entries kept per run. */
     readonly recordEntries: 256;
+    /**
+     * Layered-synthesis guardrail bounds (Section IV). The final narrative a
+     * layered run ships in `synthesis.summary` is clamped to the same per-section
+     * budget the report renderer applies (`renderReport` clamps the summary at the
+     * same 2 000 characters), and the digest the constrained polish may read is
+     * bounded so the polish stays a cheap, bounded call. The generated script
+     * mirrors both constants because it cannot import host code; the parity is
+     * pinned by test/synthesis-guardrails.spec.ts — do not edit one side without
+     * the other.
+     */
+    readonly synthesisSummaryChars: 2000;
+    readonly synthesisDigestChars: 6000;
 };
 /**
  * Default deadline for one workflow run: 60 minutes (t45, P1-4).
@@ -44,6 +56,30 @@ export declare const DEFAULT_MAX_ACTIVE_RUNS = 2;
  * number of child agents in one process bounded.
  */
 export declare const DEFAULT_MAX_ACTIVE_RUNS_TOTAL = 8;
+/**
+ * Default of the `humanSummary` output switch: **on** (human-first).
+ *
+ * A run that is asked for nothing in particular gets the plain-language answer
+ * first and the machine report after it. Declared once and read by both the
+ * schema default and `resolveConfig`, so the settings form, a hand-written
+ * profile patch and a programmatic call cannot disagree about what "unset"
+ * means. The workflow script applies the same default to a payload that omits
+ * the key (`src/script.ts`, `humanSummary`), so a caller that passes nothing —
+ * the pre-switch calling convention — keeps the behavior it had.
+ */
+export declare const DEFAULT_HUMAN_SUMMARY = true;
+/**
+ * Default of the `showDiagnostics` output switch: **off** (diagnostics opt-in).
+ *
+ * Off means the rendered report omits the routing ledger (Model routes /
+ * Deadline / Route switches / overflows / Errors). Turning it on is the
+ * supported way to retrieve the complete machine report: the same validated
+ * report renders every one of those lines
+ * (`renderReport(report, { showDiagnostics: true })`), and the PTC `render`
+ * tool reads the live setting, so no remount and no second report format are
+ * involved. Declared once, read by the schema default and by `resolveConfig`.
+ */
+export declare const DEFAULT_SHOW_DIAGNOSTICS = false;
 /** Version of the configuration surface this build understands. */
 export declare const CONFIG_VERSION = 1;
 /**
@@ -165,7 +201,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
             maxInFlight: z<number, number, "plain">;
         }>>[], "defined">;
     }>>>, "volatile-defined">;
-    synthesis: z<"deterministic" | "model", "deterministic" | "model", "volatile-defined">;
+    synthesis: z<"deterministic" | "model" | "layered", "deterministic" | "model" | "layered", "volatile-defined">;
     switchOn: z<NoInfer<string[]>, NoInfer<string[]>, "volatile-defined">;
     recordRuns: z<boolean, boolean, "volatile-defined">;
     recordLimit: z<number, number, "volatile-defined">;
@@ -272,7 +308,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
             maxInFlight: z<number, number, "plain">;
         }>>[], "defined">;
     }>>>, "volatile-defined">;
-    synthesis: z<"deterministic" | "model", "deterministic" | "model", "volatile-defined">;
+    synthesis: z<"deterministic" | "model" | "layered", "deterministic" | "model" | "layered", "volatile-defined">;
     switchOn: z<NoInfer<string[]>, NoInfer<string[]>, "volatile-defined">;
     recordRuns: z<boolean, boolean, "volatile-defined">;
     recordLimit: z<number, number, "volatile-defined">;
