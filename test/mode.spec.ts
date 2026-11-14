@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Session, appendPluginRecord, pluginRecordOf } from '@deepseek-ai/dsh-session'
 import { MODE_RECORD, isModeEnabled, isModeRecord, readModeRecord, setMode } from '../src/mode.js'
-import type { ModeRecord } from '../src/mode.js'
+import type { ModeRecord, SetModeResult } from '../src/mode.js'
 
 function modeRecord(enabled: boolean, turn = 1, setBy = 'command:/grok'): ModeRecord {
   return { v: 1, enabled, turn, setBy }
@@ -136,7 +136,16 @@ describe('setMode', () => {
     expect(isModeRecord(committed[0])).toBe(true)
   })
 
+  it('reports ok only for a write the readers can see', () => {
+    const session = Session.create('sess-mode-ok' as never)
+    const result = setMode(session, { v: 1, enabled: true, turn: 1, setBy: 'command:/grok', workflowMode: 'full' })
+    expect(result).toEqual({ ok: true })
+    expect(readModeRecord(session)?.enabled).toBe(true)
+  })
+
   it('warns and continues when the session refuses the record', () => {
+    // A log that cannot take the record at all: the append throws instead of
+    // committing, so the caller must be told rather than handed a silent no-op.
     const broken = {
       ownEvents: () => [],
       append() {
@@ -144,9 +153,37 @@ describe('setMode', () => {
       },
     } as unknown as Session
     const { messages, logger } = warningLogger()
-    expect(() => setMode(broken, modeRecord(true, 1, 'command:/grok'), logger)).not.toThrow()
+    let result: SetModeResult | undefined
+    expect(() => { result = setMode(broken, modeRecord(true, 1, 'command:/grok'), logger) }).not.toThrow()
     expect(messages.some(message => message.includes('mode record not persisted'))).toBe(true)
     expect(messages.some(message => message.includes('command:/grok'))).toBe(true)
+    // A refused write is not a no-op: the caller has to be able to tell.
+    expect(result?.ok).toBe(false)
+    expect(result?.reason).toContain('instance of class Session')
+  })
+
+  it('reports failure when the append is accepted but the record is not readable back', () => {
+    // A session can take the append and still not commit it; "the call returned"
+    // must never be reported as "the toggle changed".
+    const session = Session.create('sess-mode-unreadable' as never)
+    Object.defineProperty(session, 'ownEvents', { value: () => [], configurable: true })
+    const { messages, logger } = warningLogger()
+    const result = setMode(session, { v: 1, enabled: true, turn: 1, setBy: 'command:/grok' }, logger)
+    expect(result).toEqual({ ok: false, reason: 'the record was not readable back' })
+    expect(messages.some(message => message.includes('the record was not readable back'))).toBe(true)
+  })
+
+  it('reports failure when the readers still show the previous record', () => {
+    // The read-back must match the write, not merely exist: a session whose
+    // readers keep the older record has not applied this one.
+    const session = Session.create('sess-mode-stale' as never)
+    setMode(session, modeRecord(false, 1, 'command:/grok off'))
+    const staleLog = session.ownEvents()
+    Object.defineProperty(session, 'ownEvents', { value: () => staleLog, configurable: true })
+    const result = setMode(session, modeRecord(true, 2, 'command:/grok'))
+    expect(result.ok).toBe(false)
+    expect(result.reason).toBe('the session still reads a different record')
+    expect(readModeRecord(session)?.enabled).toBe(false)
   })
 
   it('never throws when the logger itself is absent or minimal', () => {
@@ -162,9 +199,15 @@ describe('setMode', () => {
 
   it('returns silently when the session is unavailable or cannot append', () => {
     const warn = vi.fn()
-    expect(() => setMode(undefined, modeRecord(true), { warn })).not.toThrow()
+    expect(setMode(undefined, modeRecord(true), { warn })).toEqual({
+      ok: false,
+      reason: 'the session cannot persist plugin records',
+    })
     const bare = { ownEvents: () => [] } as unknown as Session
-    expect(() => setMode(bare, modeRecord(true), { warn })).not.toThrow()
+    expect(setMode(bare, modeRecord(true), { warn })).toEqual({
+      ok: false,
+      reason: 'the session cannot persist plugin records',
+    })
     expect(warn).not.toHaveBeenCalled()
   })
 })

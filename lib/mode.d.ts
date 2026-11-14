@@ -51,14 +51,23 @@ export declare function isModeRecord(value: unknown): value is ModeRecord;
 export declare function readModeRecord(session: Session | undefined): ModeRecord | undefined;
 /** Whether grok mode is on, falling back when no record was written yet. */
 export declare function isModeEnabled(session: Session | undefined, fallback?: boolean): boolean;
+/** Outcome of one toggle write; `ok` is only ever reported for a readable record. */
+export interface SetModeResult {
+    /** True when {@link readModeRecord} shows exactly the record that was asked for. */
+    ok: boolean;
+    /** Why the write did not take effect; present only when `ok` is false. */
+    reason?: string;
+}
 /**
  * Append one mode record.
  *
- * A record is durable plugin state, not a correctness dependency for the
- * current turn: when the session refuses the write we warn and continue, and
- * the caller never sees a throw (exactly like `recordDelivery`).
+ * Never throws, but never claims success either: `ok` means the record was
+ * committed AND read back, because "the call returned" is not the same fact as
+ * "the toggle changed" (a session can accept an append without committing it).
+ * A failed write is durable-state loss, so the caller must be able to say so
+ * instead of answering the user with a state that was never written.
  */
 export declare function setMode(session: Session | undefined, record: ModeRecord, logger?: {
     warn?(message: string): void;
-}): void;
+}): SetModeResult;
 //# sourceMappingURL=mode.d.ts.map

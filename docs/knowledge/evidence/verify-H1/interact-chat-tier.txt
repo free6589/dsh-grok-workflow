@@ -1,0 +1,10 @@
+# front-desk triage (chat tier) — real instance, isolated DSH_HOME
+CMD: DSH_HOME=.verify-gw/home GWVERIFY_MOCK_KEY=<dummy> dsh --profile gwverify-hl --patch .verify-gw/mock.patch.yml "你好"
+EXIT=0
+--- stdout ---
+档位：直答档 — 因为：这是问候/寒暄，没有要做的事，前台直接回答。
+
+你好！我在。要做事就直接说：简单的我派一个工人，复杂的我开团队，拿不准我会先问你一句。
+
+（这条没有动用团队，前台直答。）
+

@@ -1,7 +1,7 @@
 # Grok Workflow for DSH
 
 <p align="center">
-  <strong>每条消息都走完整工作流：规划、并行执行、独立验证、如实汇报。</strong>
+  <strong>每条消息都先过前台；该上工作流的那些，才跑规划、并行执行、独立验证、如实汇报。</strong>
   <br />
   <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a>
 </p>
@@ -9,13 +9,15 @@
 <p align="center">
   <a href="https://github.com/free6589/dsh-grok-workflow/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/free6589/dsh-grok-workflow/actions/workflows/ci.yml/badge.svg?branch=main"></a>
   <img alt="Node.js 22+" src="https://img.shields.io/badge/Node.js-22%2B-339933?logo=node.js&logoColor=white">
-  <img alt="DSH 0.2.1-rc.2" src="https://img.shields.io/badge/DSH-0.2.1--rc.2-536DFE">
+  <img alt="DSH 0.2.x" src="https://img.shields.io/badge/DSH-0.2.x-536DFE">
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/License-MIT-blue.svg"></a>
 </p>
 
-**Grok Workflow for DSH** 是 [DeepSeek Harness (DSH)](https://github.com/deepseek-ai/deepseek-harness) 的外部插件。它为 DSH 提供用户消息的强制工作流（自 `0.2.0` 起默认开启），同时注册模型可直接调用的 `grok_workflow` 工具。
+**Grok Workflow for DSH** 是 [DeepSeek Harness (DSH)](https://github.com/deepseek-ai/deepseek-harness) 的外部插件。它给 DSH 的用户消息加了一道强制入口：闸门拦截每条用户消息并交给前台，由前台选定档位、并写明选的是哪一档。它也注册模型可直接调用的 `grok_workflow` 工具。
 
-你不需要写工作流脚本。安装插件、重启 profile、直接提问即可：闸门会认领这条消息，做规划、执行任务、逐条对照验收标准验证，并在同一轮内给出答案。
+会话内的开关本身**默认是关的**（`grokDefault: off`）：在某一轮里发过 `/grok` 之前，这个会话的消息按普通聊天放行。开关打开后，前台逐条判定——寒暄用模板回、小问题派一个工人、只有确实需要团队的目标才跑完整工作流。
+
+你不需要写工作流脚本。安装插件、重启 profile、直接提问即可：被前台派到**团队档**的消息会做规划、执行任务、逐条对照验收标准验证，并在同一轮内给出答案。
 
 ![规划、执行、验证、重试与汇报工作流](docs/images/workflow-overview.svg)
 
@@ -23,15 +25,16 @@
 
 | 需求 | 本插件的做法 |
 |---|---|
-| **每条消息都走完整工作流** | `agent/pre-step` 闸门认领每条用户消息，并用校验通过的
-工作流报告作答——不会静默退回到普通直接回答。 |
+| **每条消息前面都有一张前台** | `agent/pre-step` 闸门认领每条用户消息，前台选一档——`直答档`、`快手档`、`团队档` 或 `确认档`——并在答案第一行写明档位与理由。完整「规划→执行→验证」工作流只在**团队档**运行；不会静默退回普通直接回答。 |
+| **按会话开启，且如实相告** | `grokDefault: off` 意味着一个会话在 `/grok` 开启之前就是普通聊天；`/grok off` 再关掉。写不进去的开关会被报成失败，而不是被当成已生效。 |
 | **按角色选模型** | `roles.planner`、`roles.worker`、`roles.verifier`、`roles.synthesizer` 各带自己的模型。 |
 | **每角色有序备用链** | 每个角色最多三条路由；路由级失败会推进该角色的链，实际用到的路由会写进报告。 |
 | **可操作的设置** | 导出的 `Config` **就是** DSH 设置页：字段是活值、未知键被拒绝并给出建议、链会对照运行时真实拥有的 provider 校验。 |
+| **工作流形状可选** | `mode: 'triage'`（默认）保留前台分流；`mode: 'full'` 恢复旧规则：每条被认领的消息都跑团队。 |
 
 ## 一条命令安装
 
-**开始之前：**需要 DSH **`0.2.1-rc.2`** 与 Node.js **22 或更高版本**。你的 profile 必须包含工作流与子代理服务（标准 base/headless 套件已提供）。
+**开始之前：**需要 DSH **`>=0.2.1-rc.2 <0.3.0`** 与 Node.js **22 或更高版本**。这就是包在 `engines.dsh` 里声明的区间，也是 DSH loader 唯一评估的要求；`0.2.x` 的预发布版本包含在内。你的 profile 必须包含工作流与子代理服务（标准 base/headless 套件已提供）。
 
 如果还没有 profile，请在安装插件**之前**先用 headless 模板创建：
 
@@ -42,12 +45,10 @@ dsh --profile grok-workflow-dev --from-default-profile headless --dump-config
 然后安装插件：
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.2.2
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.8.0
 ```
 
-> （`#v0.2.2` 于本 tag 发布后可用；发布前请用 `#v0.2.1`。）
-
-请固定你真正想要的标签；省略 `#v0.2.2` 会跟随 `main`，那不是发布版本。不要在 `plugin add` 之后再运行 `--from-default-profile`：它会重建 profile 并移除你刚装好的插件。
+> `#v0.8.0` 是当前发布版本。请固定你真正想要的标签；省略标签会跟随 `main`，那不是发布版本。不要在 `plugin add` 之后再运行 `--from-default-profile`：它会重建 profile 并移除你刚装好的插件。
 
 最后重启 profile，让 DSH 加载新插件：
 
@@ -86,7 +87,7 @@ DSH 启动后，直接提问即可：
 
 > 检查这个仓库，找出两个互相独立的问题，逐条对照当前文件验证每个发现，并总结还有哪些不确定的地方。不要修改文件。
 
-自 `0.2.0` 起，无论模型是否会调用工具，闸门都会认领这条消息。默认 `mode: 'triage'` 下先过前台：上面的长目标会走**团队档**并附一行状态（`Grok workflow: COMPLETED`、`PARTIAL` 或 `FAILED`）与已验证的任务、失败项、不确定项；而一句“今天几号”会走**快手档**、一句“你好”走**直答档**，答案第一行都写明档位与理由。想要旧行为（每条都跑团队），把 `mode` 设成 `full`。
+在会话开关打开后（发 `/grok`；`grokDefault` 默认是 `off`），无论模型是否会调用工具，闸门都会认领这条消息。默认 `mode: 'triage'` 下先过前台：上面的长目标会走**团队档**并附一行状态（`Grok workflow: COMPLETED`、`PARTIAL` 或 `FAILED`）与已验证的任务、失败项、不确定项；而一句“今天几号”会走**快手档**、一句“你好”走**直答档**，答案第一行都写明档位与理由。想要旧行为（每条都跑团队），把 `mode` 设成 `full`。
 
 ## 工作方式
 
@@ -108,7 +109,7 @@ DSH 启动后，直接提问即可：
 
 ## 强制入口：对你意味着什么
 
-- 闸门**默认开启**（`enforceGate: true`），每一条**用户**消息都会被认领。其它来源的消息——用户问题回复、团队消息、webhook、定时任务、子代理提示词——**故意不认领**；空批直接放行。
+- 闸门**默认已安装**（`enforceGate: true`），会拦截每一条**用户**消息。但“是否真的动手做”是第二个开关：会话级开关的配置默认值 `grokDefault` 是 `off` —— 在那个会话里发过 `/grok` 之前，被拦截的消息按普通聊天交给模型（`reason: mode-off`）。其它来源的消息——用户问题回复、团队消息、webhook、定时任务、子代理提示词——从不认领；空批直接放行。
 - 答案在**同一轮内**到达（`answerStrategy: in-turn`）。这是唯一能在一次性进程中存活的策略；`relay`、`append` 保留给长驻界面。
 - 插件不会执行的消息会**明确拒绝**并给出原因（消息为空，或目标超过 32,000 字符）。不会执行任何工作，也不会自动重试。
 - 交付按消息记录：同一批消息被派发两次不会启动第二次运行；每个 agent 的等待队列由 `maxQueuedMessages` 封顶。
@@ -196,8 +197,8 @@ DSH 启动后，直接提问即可：
 ```yaml
 - id: grok-workflow
   config:
-    maxConcurrency: 4
-    maxRetries: 2
+    maxConcurrency: 3
+    maxRetries: 1
     maxTasks: 12
 ```
 
@@ -212,8 +213,8 @@ DSH 启动后，直接提问即可：
 | `historyTurns` | `12` | `1000000` | 作为上下文带上的对话轮数 |
 | `historyChars` | `20000` | `1000000` | 该上下文的字符预算 |
 | `maxQueuedMessages` | `4` | `8` | 每个 agent 的等待消息上限，超过即拒绝 |
-| `maxConcurrency` | `4` | `1000000` | 每次运行的并行子代理数 |
-| `maxRetries` | `2` | `10` | 每个任务首次尝试后的重试次数 |
+| `maxConcurrency` | `3` | `6` | 每次运行的并行子代理数 |
+| `maxRetries` | `1` | `3` | 每个任务首次尝试后的重试次数 |
 | `maxTasks` | `12` | `100` | 调用方或规划器任务上限 |
 | `timeoutMs` | `3600000` | `604800000`（7 天） | 整体运行时限 |
 | `maxActiveRuns` | `2` | `4` | 每个插件实例并发的 `grok_workflow` 运行数 |
@@ -279,24 +280,22 @@ dsh plugin --profile grok-workflow-dev remove dsh-grok-workflow
 ## 出问题时
 
 - **工具没出现：** 重启 profile，并确认它包含工作流引擎与子代理 provider。
-- **现在每个回答都像工作流：** 这是 `enforceGate: true` 的效果；设为 `false` 即恢复 `0.1.0` 行为。
+- **现在每个回答都像工作流：** 这是 `enforceGate: true` 叠加会话开关打开的效果；设 `enforceGate: false` 可只保留 `grok_workflow` 工具，发 `/grok off` 只关掉那个会话的开关，或者让 `grokDefault` 保持 `off`（要求显式开启）。
 - **消息被拒绝而不是被回答：** 原因会被打印（消息为空，或目标超过 32,000 字符）。没有执行任何工作，也不会自动重试。
 - **某个键在载入时被拒绝：** 错误信息会给出最接近的合法键。静默忽略是有意不提供的。
-- **DSH 版本不同：** 本版本只在 DSH `0.2.1-rc.2` 上验证过。
+- **DSH 版本不同：** 包声明的是 `engines.dsh: ">=0.2.1-rc.2 <0.3.0"`，bundle 是否载入由这个区间决定。DSH 评估该区间时**包含预发布版本**（正因如此 `0.2.2-rc.3` 才装得上）：`0.2.x` 的预发布版被接受，`0.3.0` 及以后被拒绝——但 `0.3.0` 的**预发布**版仍满足 `<0.3.0`，因此仍会载入。行为在 `0.2.1-rc.2` 上验证；该 bundle 在 `0.2.2-rc.3` 上可安装并进入组合图。
 - **想了解设计：** 见[架构说明](docs/ARCHITECTURE.md)、[设计知识库](docs/knowledge/WORKFLOW-DESIGN.md)与[验收清单](docs/ACCEPTANCE.md)。
 - **发现 Bug：** [提交 Issue](https://github.com/free6589/dsh-grok-workflow/issues)。
 
 ## 版本与发布说明
 
-本仓库声明的包版本是 `0.2.2`。需要安装或回退到某个已发布版本时，在地址后加标签：
+本仓库声明的包版本是 `0.8.0`。需要安装或回退到某个已发布版本时，在地址后加标签：
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.2.2
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.8.0
 ```
 
-> （`#v0.2.2` 于本 tag 发布后可用；发布前请用 `#v0.2.1`。）
-
-只使用 GitHub 上确实存在的标签。已发布：`v0.1.0`、`v0.2.0`、`v0.2.1`；`v0.2.2` 是本仓库当前的版本，由发布本次提交的流程打标签。未固定版本的命令跟随 `main`，不会固定到发布版本。版本规则与回退流程见[更新日志](CHANGELOG.md)与[发布指南](docs/RELEASING.md)。
+只使用 GitHub 上确实存在的标签。已发布：`v0.1.0`、`v0.2.0`、`v0.2.1`、`v0.2.2`、`v0.2.3`、`v0.2.4`、`v0.2.5`、`v0.2.6`、`v0.2.7`、`v0.3.0`、`v0.4.0`、`v0.5.0`、`v0.5.1`、`v0.6.0`、`v0.7.0`、`v0.8.0`。未固定版本的命令跟随 `main`，不会固定到发布版本。版本规则与回退流程见[更新日志](CHANGELOG.md)与[发布指南](docs/RELEASING.md)。
 
 ## 测试与开发
 
@@ -309,7 +308,7 @@ npm run ci
 
 ## 安全与兼容性
 
-- 只在 DSH **`0.2.1-rc.2`** 与 Node.js **22 及以上**验证过；包声明了精确的 DSH peer 版本（`@deepseek-ai/cordis` 使用兼容的 `~4.0.5` 区间）。这是 DSH 外部 bundle，不修改 DSH 核心。
+- 在 DSH **`0.2.1-rc.2`** 与 Node.js **22 及以上**上验证过。包把自己的 DSH 要求声明为区间 **`engines.dsh: ">=0.2.1-rc.2 <0.3.0"`** —— 自带的 `engines.dsh` 单独决定兼容性，所以是这一区间（而不是 peer 区间）决定运行时能否载入，也让更高的版本在载入期就被拒绝，而不是拖到运行期出错。构建所针对的 peer 包仍精确固定（`@deepseek-ai/cordis` 使用兼容的 `~4.0.5` 区间）。这是 DSH 外部 bundle，不修改 DSH 核心。
 - 不绕过 DSH 的审批、沙箱策略或工具策略。子代理不能递归调用 `grok_workflow`；它们的其它工具仍受 DSH 自身策略约束。
 - 子代理继承父会话可用的工具与权限。没有只读能力模式；验证者提示词要求它不要修改文件，但那不是硬性沙箱保证。
 - 脱敏是尽力而为：不要把凭据写进目标、任务文本或日志。报告不保证子代理从未接触过密钥。

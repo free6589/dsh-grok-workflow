@@ -1,0 +1,9 @@
+{"event":"start","run":"run-recovery-kill","attempt":"1","pid":11281,"task":"task-a","seq":1}
+{"event":"end","run":"run-recovery-kill","attempt":"1","pid":11281,"task":"task-a","seq":1}
+{"event":"start","run":"run-recovery-kill","attempt":"1","pid":11281,"task":"task-b","seq":2}
+{"event":"retained","run":"run-recovery-kill","attempt":"2","pid":11288,"task":"task-a","seq":1}
+{"event":"start","run":"run-recovery-kill","attempt":"2","pid":11288,"task":"task-b","seq":2}
+{"event":"end","run":"run-recovery-kill","attempt":"2","pid":11288,"task":"task-b","seq":2}
+{"event":"start","run":"run-recovery-kill","attempt":"2","pid":11288,"task":"task-c","seq":3}
+{"event":"end","run":"run-recovery-kill","attempt":"2","pid":11288,"task":"task-c","seq":3}
+{"event":"worker-exit","run":"run-recovery-kill","attempt":"2","pid":11288}

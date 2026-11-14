@@ -1,0 +1,23 @@
+{
+  "gwverify": {
+    "dependencies": {
+      "dsh-grok-workflow": "link:/home/fish/projects_mine/dsh-grok-workflow"
+    },
+    "bundles": [
+      "@deepseek-ai/dsh-base",
+      "@deepseek-ai/dsh-web-app",
+      "dsh-grok-workflow"
+    ]
+  },
+  "gwverify_hl": {
+    "dependencies": {
+      "dsh-grok-workflow": "link:/home/fish/projects_mine/dsh-grok-workflow",
+      "gw-verify-probe": "link:/home/fish/projects_mine/dsh-grok-workflow/.verify-gw/probe"
+    },
+    "bundles": [
+      "@deepseek-ai/dsh-base",
+      "@deepseek-ai/dsh-headless",
+      "dsh-grok-workflow"
+    ]
+  }
+}

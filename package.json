@@ -1,6 +1,6 @@
 {
   "name": "dsh-grok-workflow",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Bounded plan-execute-verify-retry-synthesize workflows for DeepSeek Harness",
   "license": "MIT",
   "type": "module",
@@ -36,23 +36,13 @@
     "verification"
   ],
   "engines": {
-    "dsh": "0.2.1-rc.2",
+    "dsh": ">=0.2.1-rc.2 <0.3.0",
     "node": ">=22"
   },
   "dsh": {
     "pluginType": "feature",
     "bundle": {
       "patch": "./cordis.patch.yml"
-    },
-    "compatibility": {
-      "dsh": ">=0.2.1-rc.2",
-      "profiles": [
-        "web",
-        "desktop"
-      ],
-      "dshReleases": {
-        "0.2.1-rc.2": "compatible"
-      }
     },
     "client": {
       "platform": "web",

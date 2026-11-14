@@ -3,9 +3,160 @@
 Notable user-facing changes are recorded here in English and Simplified Chinese.
 用户可见的功能和修复会在这里以英文和简体中文记录。
 
-## [Unreleased]
+## [0.9.0] - 2026-11-15
 
 ### Added / 新增
+
+- **A third tab shows what the workflow is doing, folded from the events it records
+  / 第三个 Tab 展示工作流正在做什么 —— 全部由它自己记录的事件折叠而来** —
+  the session now has three tabs, `Chat / Trajectory / Progress` (对话 / 轨迹 / 进度). The progress
+  tab is not selected by default and adds no setting, no button and no new registration elsewhere.
+  The track is folded from the four `tool-workflow/*` events this plugin already records
+  (`run-start`, `agent-start`, `agent-end`, `run-end`): a stage the engine never reported stays
+  `pending` with `Not reported in the events` instead of borrowing a neighbour's state, and the
+  percentage is `settled/declared` — absent when no row is declared, never a guess. The states are
+  `pending`, `doing`, `done`, `cancelled` (the engine's own word), plus two the view derives and
+  explains on the node itself: `failed` (wins over an unfinished row) and `blocked` (a run that ended
+  over a row it never settled, with the reason). Clicking a node opens a three-part detail popover:
+  the header, `Engine facts` (seq / label / phase / child session / outcome / duration, verbatim from
+  the events) and `Stage report` (seven fields, each with its own source badge; `—` plus
+  `Source: not reported` when nothing was recorded, and `Copy coordination block` disabled rather than
+  claiming there is something to copy). `Open child session` really opens the child. At ≤480 px the
+  detail becomes a bottom drawer with single-column fields; every ring and dot colour comes from a
+  `var(--dsw-alias-…)` design token with the old hex as fallback, so dark mode follows the theme
+  without a separate stylesheet.
+  / 会话有三个 Tab：`对话 / 轨迹 / 进度`。进度 Tab 不默认选中，也不新增设置项、按钮或别处的注册。
+  轨道只从插件已经记录的四个 `tool-workflow/*` 事件折叠：引擎没报的阶段保持 `pending` 并标注
+  「事件里没有报告」，不借邻居状态；百分比是「已结算 / 已声明」，没有声明行时整段缺席，不做猜测。
+  状态为 `pending`、`doing`、`done`、`cancelled`（引擎原话），另加两个由视图派生并在节点上说明理由的：
+  `failed`（压过未完成行）与 `blocked`（运行结束却留下未结算行，并给出原因）。点节点开三段浮层：头部、
+  `Engine facts`（seq / 标签 / 阶段 / 子会话 / 结果 / 时长，逐字取自事件）、`Stage report`（七个字段各带
+  来源徽标；没有记录就是 `—` 加「事件里没有报告」，`Copy coordination block` 在无协调块时置灰，而不是
+  谎报可复制）。`Open child session` 真的能打开子会话。≤480 px 详情变底部抽屉、字段单列；环与点的颜色
+  全部来自 `var(--dsw-alias-…)` 设计 token（旧 hex 兜底），深色主题无需另写样式表即可跟随。
+
+### Fixed / 修复
+
+- **The plugin declares a real DSH version range, and declares it in one place
+  / 插件声明真实的 DSH 版本区间，且只声明一处 (B01)** —
+  `engines.dsh` is now `>=0.2.1-rc.2 <0.3.0` instead of the single fixed version `0.2.1-rc.2`, and the
+  hand-written `dsh.compatibility` block (`dsh` / `profiles` / `dshReleases`) is gone: one source of
+  truth for "which runtime can install this". Measured on the real runtime `0.2.2-rc.3` the check
+  reports no unmet requirement, while a control range (`<0.2.0`) is still refused — so the check is
+  not vacuous. The boundary is recorded honestly: DSH evaluates a range with `includePrerelease`, so
+  `<0.3.0` also admits `0.3.0-rc.*`.
+  / `engines.dsh` 由固定版本 `0.2.1-rc.2` 改为区间 `>=0.2.1-rc.2 <0.3.0`，并删除手写的
+  `dsh.compatibility`（`dsh` / `profiles` / `dshReleases`）整块——「哪个运行时能装」只有一处真源。
+  在真实运行时 `0.2.2-rc.3` 上判定为无未满足要求，而对照区间 `<0.2.0` 仍被拒绝，说明检查不是空转。
+  边界如实记录：DSH 用 `includePrerelease` 判区间，故 `<0.3.0` 也会放行 `0.3.0-rc.*`。
+
+- **The front desk stops misfiling the messages it reads / 前台不再误读它读到的消息 (B02, B09)** —
+  two fixes in `src/triage.ts`: the signal scan is bounded (`TRIAGE_LIMITS.signalChars`), so a 32k
+  paste no longer costs seconds inside one message's scan; and a three-part list written with 顿号 or
+  full-width commas counts as three things instead of one, so it is no longer answered by a single
+  quick worker. The front desk's own reply is also read as one answer rather than thrown away.
+  / `src/triage.ts` 两处修复：信号扫描有界（`TRIAGE_LIMITS.signalChars`），32k 粘贴不再让单条消息的
+  扫描按秒计；用顿号或全角逗号写的三件事算三件事，不再被压成单个 quick worker。前台自己的回复也按
+  「一个答复」解析，不再被整段丢弃。
+
+- **A message that answers the pending question and carries new work is one job, not two half-jobs
+  / 「先回答、再派新活」是一条工作，不是两个半截 (B05)** —
+  the worker receives the answered request and the new work in the same message, and the answer is
+  described as what it is instead of being dressed up as the task objective.
+  / 工人在同一条消息里拿到被回答的请求和新工作；答复按其本来面目描述，不再被包装成任务目标。
+
+- **The gate keeps what it must remember, and names its own reason
+  / 门禁记住该记的，理由出自它自己 (B04, B06, B08, B18)** —
+  a second question no longer erases the still-unanswered first one (B04); the resumed request is cut
+  to the objective budget instead of refusing the whole run (B08); when this plugin is itself the
+  writer of a claimed batch (`relay` / `append`), the history read that follows leaves those ids out,
+  so the message the user just typed is not replayed as context (B06); and the opt-in hybrid
+  classifier's verdict carries its own sentence instead of borrowing the rules sentence (B18).
+  / 第二个问题不再抹掉仍未作答的第一个（B04）；复述的请求裁剪到 objective 预算内，而不是拒绝整轮
+  （B08）；当本插件自己就是被 claim 批次的写者（`relay` / `append`）时，随后的历史读排除这些 id，
+  用户刚打的字不会被当上下文回放（B06）；可选的混合分类器给出的档位带它自己的理由句，不借用规则句
+  （B18）。
+
+- **`/grok` only says "on" about a toggle the session can show
+  / `/grok` 只在会话真能出示记录时才说「已开启」 (B03)** —
+  the command reads the record back after writing. A session that refuses the append, or accepts it
+  without committing it, settles as an error that states the state the session really has
+  (`the toggle is still off`), never the success wording; an agent without a session settles as an
+  error too.
+  / 命令写入后读回记录：会话拒绝写入、或接受了却没落地，都以失败结算并说出真实状态（「开关仍是关闭」），
+  绝不使用成功文案；没有会话的 agent 同样按失败结算。
+
+- **A failure reason that merely contains a ledger word is no longer deleted
+  / 只是包含台账词的失败原因不再被删掉 (B10)** —
+  the guard that keeps machine ledger labels out of the human block was a raw substring scan, so a real
+  reason such as `task aborted before any attempt: [infrastructure/timeout] …` was dropped line by line
+  and the reader saw a bare title with no reason at all. The guard is anchored / whole-word now, and the
+  two fields carrying the run's own failure text (`incomplete[].reason`, `task.error`) are no longer
+  scrubbed field-by-field. A line that really is a ledger label is still dropped.
+  / 把人话块里台账标签挡掉的守卫原来是裸子串扫描，于是 `task aborted before any attempt:
+  [infrastructure/timeout] …` 这种真实原因被逐行丢掉，读者只看到标题、没有原因。现在守卫改成锚定 /
+  整词，且承载运行自身失败文本的两个字段（`incomplete[].reason`、`task.error`）不再逐字段清洗；
+  真正是台账标签的行仍然被挡掉。
+
+- **Concurrency and retries are back inside the documented envelope, and the per-task call backstop is
+  the worst legal case / 并发与重试回到文档契约内，单任务调用上界取最坏合法值 (B07)** —
+  hard caps `maxConcurrency` 1,000,000 → 6 and `maxRetries` 10 → 3, defaults 4 / 2 → 3 / 1, declared
+  once as `DEFAULT_MAX_CONCURRENCY` / `DEFAULT_MAX_RETRIES`; the generated script's numbers stay in
+  parity by test. `maxAttemptsPerTask` 1100 → 400, derived as `(50 + 50) × (3 + 1)` — the worker plus
+  verifier chain ceilings at the retry cap — with the guard still `>`, so the worst legal combination
+  loads and only "widened a limit and forgot this" trips it. A default run's checkpoint therefore no
+  longer reports a contract violation; older files still load, because the read side stays lenient and
+  reports an out-of-envelope row instead of migrating it.
+  / 硬上限 `maxConcurrency` 1,000,000 → 6、`maxRetries` 10 → 3，默认 4 / 2 → 3 / 1，单一声明
+  `DEFAULT_MAX_CONCURRENCY` / `DEFAULT_MAX_RETRIES`；生成脚本里的数字由测试保持同步。
+  `maxAttemptsPerTask` 1100 → 400，取值 = `(50 + 50) × (3 + 1)`（worker 与 verifier 的链上限 × 重试
+  上限），守卫仍是 `>`，所以最坏合法组合能通过，只有「放宽了某个上限却忘了这里」才会撞到。默认运行的
+  checkpoint 因此不再记录越界；旧文件仍能读——读侧保持宽松，只报告越界而不迁移。
+
+- **The checkpoint records the run's real identity, and stops visibly instead of silently
+  / 检查点记录运行的真实身份，停止时可见而不是静默 (B12–B15)** —
+  the durable task identity comes from the engine's `meta.name` (redacted and bounded) and
+  `stages` / `agents` are always present instead of `undefined` (B12); staleness is judged on its own
+  1 s–24 h range rather than the write interval, and a stamp in the future is "possibly live", never
+  stale (B13); at most one write per run file is in flight, and two ids that sanitize to the same name
+  stay separate (B14); an absent `limits` block is recorded as the contract defaults, and the loop that
+  gives up says so exactly once, visibly (B15).
+  / 持久任务身份取自引擎 `meta.name`（脱敏且有界），`stages` / `agents` 恒存在而非 `undefined`
+  （B12）；陈旧判定用自有 1 s–24 h 区间而不是写间隔，未来时间戳算「可能仍活」、绝不算陈旧（B13）；
+  同一 run 文件同时只有一个写在飞，两个清洗后同名的 id 仍分开（B14）；缺省 `limits` 按契约默认值
+  记录，放弃写入时只说一次且可见（B15）。
+
+- **The browser bundle stops leaking key ids and stops overflowing narrow windows
+  / 浏览器端不再泄露 key、不再在窄窗溢出** —
+  status dots come from the design tokens (`var(--dsw-alias-…)`, old hex as fallback) so they follow
+  the theme; a translation the framework cannot resolve never renders the key id (this bundle's own
+  table answers first, then `—`); an engine status the panel does not word renders `状态未知` /
+  `Unknown` and still counts in its phase summary; the settings page keeps `loading`, `error` (the
+  reason, plus one retry) and `unavailable` (a good answer that does not serve this namespace) apart
+  instead of showing "读取中…" forever after a failed read, and advertises the Host's real ranges
+  (`maxConcurrency` 1–6, `maxRetries` 0–3, defaults 3 and 1); a field row collapses to one column at
+  ≤560 px so the card no longer overflows; and a task row stops printing the engine's own child label
+  (`` `${name} child ${callId}` ``) — it shows neutral `Subagent` / `子代理` plus the call state, and
+  shows any other label exactly as recorded without guessing a role.
+  / 状态点改用设计 token（`var(--dsw-alias-…)`，旧 hex 兜底），跟随主题；框架解析不出的翻译不再把 key
+  显示出来（先查本包自己的词表，再退到 `—`）；面板不认识的引擎状态显示「状态未知」并仍计入阶段汇总；
+  设置页把「加载中 / 失败（带原因 + 一次重试）/ 不可用（答复正常但不含本命名空间）」三态分开，
+  读取失败不再永远显示「读取中…」，且只提供 Host 真实接受的范围（`maxConcurrency` 1–6、
+  `maxRetries` 0–3，默认 3 / 1）；字段行在 ≤560 px 收成单列，卡片不再横向溢出；任务行不再直接印
+  引擎自己的子标签（`` `${name} child ${callId}` ``），改用中性的「子代理 / Subagent」加调用状态，
+  其它标签按记录原样显示、不猜角色。
+
+- **Docs match the code again / 文档与代码重新对齐** —
+  `README` / `README.zh-CN` describe the front desk (the tier on the answer's first line) and the
+  opt-in per-session toggle instead of "every message runs the full workflow", and the DSH badge reads
+  `0.2.x`; `docs/ARCHITECTURE.md` states the real envelope (default 3 / max 6, default 1 / max 3) and
+  explains why the checkpoint read side stays lenient; `docs/LOCAL-TESTING.md` corrects the defaults
+  (`maxTasks` 12, `timeoutMs` 3600000); `docs/task-progress-panel.md` gains the client-surface
+  hardening section and the rule about engine child labels.
+  / `README` / `README.zh-CN` 改讲前台（档位写在回答首行）与按会话开启的开关，不再说「每条消息都走
+  全流程」，DSH 徽章改为 `0.2.x`；`docs/ARCHITECTURE.md` 写清真实包络（默认 3 / 上限 6、默认 1 /
+  上限 3）并解释 checkpoint 读侧为何保持宽松；`docs/LOCAL-TESTING.md` 修正默认值（`maxTasks` 12、
+  `timeoutMs` 3600000）；`docs/task-progress-panel.md` 增加客户端加固一节与「不印引擎子标签」的规则。
 
 ## [0.8.0] - 2026-11-13
 

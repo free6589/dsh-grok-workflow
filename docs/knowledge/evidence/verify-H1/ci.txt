@@ -1,0 +1,30 @@
+CMD: npm run ci
+NODE: v26.8.1  NPM: 11.19.0  DSH: 0.2.2-rc.3
+CWD: /home/fish/projects_mine/dsh-grok-workflow
+GIT: ee5e013 (dirty tree, wave1+wave2 uncommitted)
+START: 2026-11-15T02:43:42+08:00
+EXIT=0
+END: 2026-11-15T02:44:22+08:00
+--- resolved scripts ---
+{
+  "ci": "npm run typecheck && npm run lint && npm test",
+  "typecheck": "tsc -p tsconfig.json --noEmit",
+  "lint": "oxlint src test",
+  "test": "npm run build && vitest run",
+  "build": "tsc -p tsconfig.build.json && node scripts/build-client.mjs"
+}
+--- summary lines from the full log ---
+2:> dsh-grok-workflow@0.8.0 ci
+3:> npm run typecheck && npm run lint && npm test
+6:> dsh-grok-workflow@0.8.0 typecheck
+7:> tsc -p tsconfig.json --noEmit
+10:> dsh-grok-workflow@0.8.0 lint
+11:> oxlint src test
+53:Found 4 warnings and 0 errors.
+56:> dsh-grok-workflow@0.8.0 test
+57:> npm run build && vitest run
+60:> dsh-grok-workflow@0.8.0 build
+61:> tsc -p tsconfig.build.json && node scripts/build-client.mjs
+63:client bundle: 186091 bytes → lib/client.js
+168: Test Files  48 passed (48)
+169:      Tests  897 passed (897)

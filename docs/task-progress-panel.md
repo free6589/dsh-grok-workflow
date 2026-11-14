@@ -34,6 +34,14 @@ Rules that make the grouping usable:
 - **No machine identifiers are visible.** No `grok-` prefix, no `-a<n>` attempt suffix, no
   `-r<n>` fallback suffix, no internal task id, no child run id. They all still exist where they
   belong: `report.tasks[].id`, `report.tasks[].attempts[]`, `report.routes[].chainIndex`.
+- **A row never prints the engine's own child label.** For any call this plugin did not start,
+  `agent-start` carries the label DSH wrote itself — `` `${meta.name} child ${callId}` ``
+  (`PtcWorkflowEngine.startChild`, the `host.ts:205` call site D-039 measured; D-041 only fixed
+  the labels for calls *this* plugin schedules). `src/panel.ts` recognizes that form and renders
+  neutral copy (`子代理` / `Subagent`) plus the call state instead of the engine's string: the
+  call id is a machine identifier, and the name part is the run title the node header already
+  shows. Any *other* label is shown as recorded and no role is guessed for it — a guessed `执行`
+  on a foreign run's row would be a claim about work this plugin did not schedule.
 - **The attempt count is the only difference between two attempts of one task.** `执行` and
   `执行（尝试 2）` are the same task; a reader can see the retry without being told a route index.
 
@@ -196,6 +204,45 @@ BLOCKED on the engine, and the proposal above is the smallest change that would 
 | Out-of-order events | A settlement that arrives before its start still settles its row in the projection (and is shown to be dropped by the stock fold, which is why the recorder preserves arrival order); a settlement for a sequence that never started creates no row. |
 | Cancellation | The node closes as `cancelled` and the fold reads `已取消` (also covered by `test/progress.spec.ts`). |
 
+## Client-surface hardening (this wave)
+
+Four defects the browser bundle shipped with, fixed where they live (`src/client/index.js`).
+None of them adds a tab, a setting or a registration: every one is a change to how an existing
+surface renders.
+
+1. **Status colours come from the design tokens.** A status dot was a frozen hex value, so it did
+   not follow the theme. Each of the five reader-facing states now renders
+   `var(--dsw-alias-…, <the old hex>)`: `doing` → `state-business-primary` (a running call),
+   `done` → `state-success-primary` (a completed call), `failed` → `state-error-primary`,
+   `blocked` → `state-warn-primary` (cancelled or interrupted), `pending` →
+   `state-idle-primary` (not started). The panel's `StateDot` equivalent is the same palette the
+   stock component reaches through the primitives, and the fallback keeps a composition without
+   design tokens rendering exactly as before.
+2. **A key id never reaches the screen.** The framework's `t` answers with the key itself when its
+   dictionary is not registered — which is what a page or panel is handed when the `locale`
+   scope that registered the dictionary is gone. `guardedTranslator(seat, own)` resolves through
+   the seat, then through this bundle's own table, and only then falls back to `—`; the key id is
+   never returned. In practice the middle step always answers, because every derived key is in both
+   shipped dictionaries (asserted by `test/client.spec.ts`).
+3. **A status the panel does not word says so.** An engine status outside the five the panel
+   words used to be printed verbatim in a member row (`queued` in the middle of a Chinese
+   sentence) with a hard-coded grey dot. Both now map to `状态未知` / `Unknown`
+   (`status.unknown`, on the idle token), and an unwording status still counts in its phase
+   summary instead of disappearing from it.
+4. **The settings page has three states, not one.** A failed `describe()` left the mirror at
+   `status: 'idle'` **with** an `error`, which the page reported as `读取中…` forever. The page now
+   keeps `loading`, `error` (the reason, plus one retry) and `unavailable` (a good answer that does
+   not serve this namespace — the plugin is off, so no retry is offered) apart. The retry calls
+   `mirror.load()`, the only documented way to re-read, and is only rendered when the face exposes
+   it. The two numeric limits the page advertises were also synced to the Host's accepted range
+   (`maxConcurrency` 1–6, `maxRetries` 0–3, defaults 3 and 1), so the form can no longer offer a
+   value the Host refuses.
+5. **Narrow windows stack instead of overflowing.** A field row is a two-column grid with a 200px
+   label minimum, which pushed the card wider than the panel below ~430px; the injected stylesheet
+   now collapses `.gw-row` to one column at ≤560px (`!important`, because the row's layout is an
+   inline style), the footer wraps, and the panel's indentation and its two fixed status columns
+   use `min(<stock value>, <viewport share>)` so they shrink only on a narrow window.
+
 ## Verification
 
 - `test/naming.spec.ts` (15 tests) pins: group header format and uniqueness, identical titles not
@@ -204,8 +251,18 @@ BLOCKED on the engine, and the proposal above is the smallest change that would 
   `agent-end: completed` ≠ task-verified boundary with its call-vs-verdict wording, the `zh`/`en`
   tables with no Chinese in `en`, `locale.preference` handling, Host/guest copy parity, and
   grouping under the real child pool.
-- `test/panel.spec.ts` (11 tests) is the scenario matrix above plus the `progressStopReason` rule
-  and the panel-vs-report agreement.
+- `test/panel.spec.ts` (13 tests) is the scenario matrix above plus the `progressStopReason` rule,
+  the panel-vs-report agreement, and the row-label rule (the engine's `<name> child <callId>` form
+  becomes `子代理` / `Subagent`, any other label is shown as recorded, and a plugin-authored label
+  is untouched).
+- `test/panel-links.spec.ts` (16 tests) renders the shipped bundle with a recording React stub:
+  the finished-row link, the wording table (including the sixth `unknown` entry), phase summaries,
+  and that every status dot is a `--dsw-alias-*` token rather than a frozen hex.
+- `test/client.spec.ts` (42 tests) loads `src/client/index.js` and pins the settings page: the
+  field table against `HARD_LIMITS` (both bounds *and* the advertised range), the two dictionaries,
+  the locale wiring, the three reading states with their retry, the `t` guard, the status tokens,
+  and the lifecycle rule that unbinding the `locale` scope drops every registration without
+  mounting anything from inside a disposer.
 - `npm run typecheck`, `npm run lint`, `npm test`, `npm run ci`, `npm run build` (with `lib/`
   committed and byte-identical on rebuild; `lib/client.js` stays byte-identical to
   `src/client/index.js`).

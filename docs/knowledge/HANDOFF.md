@@ -908,3 +908,57 @@
   ②重启 `:3090`。只做其中一步不会变新人话。
 - **Next action（用户）**：确认 layerfs 升级＋重启时机；`session-4c562307` 那类 PARTIAL 输出届时首行即
   人话结论（做成 N/M、没做成点名＋下一步），台账默认收起，`uncertainties` 保留。
+
+## 2026-11-15 — wave1+wave2 收尾交接（未提交；版本与提交交 V 组）
+
+- **From:** 收尾组 M · **To:** V 组 / lead / 后续代理 · **Base:** `HEAD = ee5e013`，`main...origin/main` 干净，
+  工作树 **81 文件 / +7014 / −534** 全部未提交。
+- **这条分支现在是什么**：v0.8.0 加上 wave1+wave2 —— 前台分诊（triage 四档）与 B01-B18 修复、
+  人话交付层加固、checkpoint 契约对齐、以及**新增的进度 Tab**（`src/progress-tab.ts` +
+  `src/client/index.js` 第三个 Tab）。`package.json` 工作树已是 `0.9.0`（V 组 bump）。
+- **测过什么（`CONFIRMED`）**：`npm run ci` → `tsc` 0 错、`oxlint` 0 error / 4 warning、
+  client bundle 186091 B、**48 文件 / 897 测试 PASS**，exit 0，40 s（`evidence/verify-H1/ci.txt`）。
+  `npm pack --dry-run` 82 条，`lib/client.js` 与 `cordis.patch.yml` 在内，`docs/knowledge/**` 不外发。
+- **真机测过什么（`CONFIRMED`）**：
+  ①安装/加载/前台 —— 隔离 home + `gwverify`/`gwverify-hl` 双 profile，安装 PASS（3 bundles）、
+  加载 PASS（含「关掉 `workflow-ptc` 就 pending」的对照）、`settings/describe` 23 命名空间含本插件、
+  client bundle 逐字节投递、工具表含 `grok_workflow`；前台 chat 档真跑 PASS。
+  ②进度 Tab —— 隔离 `dsh web` `:3210` + 真模型 + headless Chromium，**14 张截图**，
+  `pending/doing/done/cancelled` 四态真机 `CONFIRMED`。
+- **没测到什么（`BLOCKED` / `NOT_RUN`，别当已过）**：
+  - 真模型**团队档端到端 = `BLOCKED`**：`models.fyrali.com` → `100.111.111.99`（bifrost）；
+    tailnet 显示 active 但 `rx 0`、ping 100% 丢包、80/443/3000/3065/8000/8080/8888/9000/11434/4000 全关；
+    DSH 原文 `Connect Timeout Error (attempted address: models.fyrali.com:443, timeout: 10000ms)`。
+    备选 `127.0.0.1:3065/v1` 要网关 key（取 key = 读用户凭据，禁止）。团队档本轮用 mock 模型跑出
+    `FAILED / format-error`，那是 mock 的性质，不是产品结论。
+  - 进度 Tab 的 `blocked` / `failed` 两态**真机 `NOT_RUN`**（没构造失败子调用，不伪造），
+    由 `test/progress-tab.spec.ts` + `test/client.spec.ts` 的 **93 个测试**覆盖。
+  - live `:3080` / `:3086` / `:3090` 未部署、未重启（D-013，用户保留动作）。
+- **复现命令（exact，可直接抄）**：
+
+  ```bash
+  cd /home/fish/projects_mine/dsh-grok-workflow
+  npm run ci                       # 期望：48 files / 897 tests passed
+  # 安装+加载（H1）
+  npm run build
+  export DSH_HOME=$PWD/.verify-gw/home
+  dsh --profile gwverify --from-default-profile web --dump-config
+  dsh plugin --profile gwverify add "$PWD"
+  dsh --profile gwverify-hl --patch mock.patch.yml "你好"    # 前台 chat 档，无模型也能过
+  # 进度 Tab（H2，需要本机模型网关）
+  npm pack --cache .dsh-home/npm-cache --pack-destination .dsh-home/h2-pack
+  dsh gwprog --from-default-profile web
+  dsh plugin --profile gwprog add file:$PWD/.dsh-home/h2-pack/dsh-grok-workflow-0.8.0.tgz
+  dsh gwprog --patch docs/knowledge/evidence/progress-tab-2026-11-15/gwprog.patch.yml \
+      --port 3210 --host 127.0.0.1 --no-open
+  cd docs/knowledge/evidence/progress-tab-2026-11-15 && node stage-a.mjs   # 然后 b/c/d/e
+  ```
+
+- **给 V 组的三条硬约束**：①节头已由你提升为 `## [0.9.0] - 2026-11-15`，M 组的 11 条条目原文躺在
+  下面（1 Added + 10 Fixed，中英双语），提交时**别改文字**；②`engines.dsh` 是 `>=0.2.1-rc.2 <0.3.0`，
+  与 `engines-dsh-B01.txt` 一致，别改窄也别放宽；③发布前 `npm run ci` 必须仍是 897 测试全绿——
+  本轮没有为文档改动动过 `src`/`test`。
+- **给用户的一句话**：本机 `:3080`/`:3090` 仍是旧版，进度 Tab 只有装新包并重启才看得见；
+  `/grok` 开关在真机验证时请用**打包产物**装，别用 `link:`（会报
+  `Receiver must be an instance of class Session.`，归因见 RESEARCH A20）。
+- **Next action**：V 组 bump 已完成 → 填/确认 `[0.9.0]` 节头 → 提交（不 push 未授权前） → lead 决定合入与发布节奏。

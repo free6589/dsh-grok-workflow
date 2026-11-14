@@ -3,6 +3,8 @@ import {
   CONFIG_KEYS,
   CONFIG_VERSION,
   Config,
+  DEFAULT_MAX_CONCURRENCY,
+  DEFAULT_MAX_RETRIES,
   HARD_LIMITS,
   describeResolvedConfig,
   resolveConfig,
@@ -100,8 +102,8 @@ describe('configuration surface', () => {
     expect(defaults).toMatchObject({
       enforceGate: true,
       answerStrategy: 'in-turn',
-      maxConcurrency: 4,
-      maxRetries: 2,
+      maxConcurrency: DEFAULT_MAX_CONCURRENCY,
+      maxRetries: DEFAULT_MAX_RETRIES,
       maxTasks: 12,
       maxActiveRuns: 2,
       switchOn: [],
@@ -238,12 +240,58 @@ describe('route validation against the runtime', () => {
 
   it('keeps the generated script clamps identical to HARD_LIMITS (single source)', () => {
     // script.ts cannot import host code, so its defensive clamps mirror HARD_LIMITS
-    // by value. This assertion fails the suite when one side is edited alone.
-    expect(WORKFLOW_SCRIPT).toContain(`Math.min(${HARD_LIMITS.maxConcurrency},`)
-    expect(WORKFLOW_SCRIPT).toContain(`Math.min(${HARD_LIMITS.maxRetries},`)
-    expect(WORKFLOW_SCRIPT).toContain(`Math.min(${HARD_LIMITS.maxTasks},`)
+    // and its documented defaults by value. The whole clamp expression is quoted
+    // (bound *and* fallback), not just the bound: matching `Math.min(6,` alone
+    // passes for a script that still defaults to 4, which is how the two sides
+    // drifted apart before.
+    expect(WORKFLOW_SCRIPT).toContain(
+      `Math.min(${HARD_LIMITS.maxConcurrency}, argNumber(args ? args.maxConcurrency : undefined, ${DEFAULT_MAX_CONCURRENCY}))`,
+    )
+    expect(WORKFLOW_SCRIPT).toContain(
+      `Math.min(${HARD_LIMITS.maxRetries}, argNumber(args ? args.maxRetries : undefined, ${DEFAULT_MAX_RETRIES}))`,
+    )
+    expect(WORKFLOW_SCRIPT).toContain(`Math.min(${HARD_LIMITS.maxTasks}, argNumber(args ? args.maxTasks : undefined, 12))`)
     expect(WORKFLOW_SCRIPT).toContain(`chainLength: ${HARD_LIMITS.chainLength},`)
     expect(WORKFLOW_SCRIPT).toContain(`routeInFlightMax: ${HARD_LIMITS.routeInFlight.max}`)
+  })
+
+  it('pins the documented run limits: default 3/1, hard maximum 6/3', () => {
+    // The engine-hook contract (AGENTS.md, D-003) has one source. The config
+    // schema, the checkpoint contract (ENGINE_HOOK_LIMITS in
+    // src/checkpoint/schema.ts, which imports these constants) and the script
+    // clamps all read it from here.
+    expect(HARD_LIMITS.maxConcurrency).toBe(6)
+    expect(HARD_LIMITS.maxRetries).toBe(3)
+    expect(DEFAULT_MAX_CONCURRENCY).toBe(3)
+    expect(DEFAULT_MAX_RETRIES).toBe(1)
+    expect(resolveConfig({} as never)).toMatchObject({ maxConcurrency: 3, maxRetries: 1 })
+    expect(() => resolveConfig({ maxConcurrency: HARD_LIMITS.maxConcurrency + 1 } as never)).toThrow(/maxConcurrency/)
+    expect(() => resolveConfig({ maxRetries: HARD_LIMITS.maxRetries + 1 } as never)).toThrow(/maxRetries/)
+    expect(resolveConfig({ maxConcurrency: 6, maxRetries: 3 } as never)).toMatchObject({ maxConcurrency: 6, maxRetries: 3 })
+  })
+
+  it('applies the documented defaults inside the script, without swallowing an explicit 0', async () => {
+    // The script is the last place a missing number can be defaulted, so it has to
+    // default to the same 3/1 the host does — while an explicitly configured
+    // `maxRetries: 0` stays 0 (a task that must not be retried), which the old
+    // `Number(x) || 0` idiom happened to get right and a naive `|| 1` would not.
+    const agent: ScriptAgent = async (_prompt, options) => {
+      if (roleOf(options.label) === 'worker') return execution('did it')
+      return verification(task('a'))
+    }
+    const { args } = buildWorkflowRequest(
+      'Ship the verified result',
+      [task('a')],
+      resolveConfig({ maxConcurrency: 1, maxRetries: 0, maxTasks: 4 }),
+    )
+    const withoutLimits = { ...args } as Record<string, unknown>
+    delete withoutLimits['maxConcurrency']
+    delete withoutLimits['maxRetries']
+    const defaulted = await runWorkflowScript(WORKFLOW_SCRIPT, withoutLimits, agent)
+    expect(defaulted.report.limits).toMatchObject({ maxConcurrency: 3, maxRetries: 1 })
+
+    const explicitZero = await runWorkflowScript(WORKFLOW_SCRIPT, { ...args }, agent)
+    expect(explicitZero.report.limits).toMatchObject({ maxConcurrency: 1, maxRetries: 0 })
   })
 
   it('degrades quietly on a runtime without a settings service', () => {

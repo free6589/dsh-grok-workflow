@@ -147,8 +147,8 @@ describe('configuration limits', () => {
   it('applies safe defaults', () => {
     expect(resolveConfig()).toMatchObject({
       toolName: 'grok_workflow',
-      maxConcurrency: 4,
-      maxRetries: 2,
+      maxConcurrency: 3,
+      maxRetries: 1,
       maxTasks: 12,
       // 60 minutes since t45 (P1-4): the 30-minute default killed two real
       // four-task runs at 30m00s / 30m01s.

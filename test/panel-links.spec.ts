@@ -135,6 +135,18 @@ function walk(node: unknown, out: Element[] = []): Element[] {
 }
 
 /**
+ * Every inline style object of a rendered tree, in document order.
+ *
+ * The panel's colours live in inline styles (the stock CSS module is not reachable from
+ * this bundle), so this is how a test reads what a dot is actually painted with.
+ */
+function styleObjects(tree: unknown): Array<Record<string, unknown>> {
+  return walk(tree)
+    .map(node => node.props['style'])
+    .filter((style): style is Record<string, unknown> => typeof style === 'object' && style !== null && !Array.isArray(style))
+}
+
+/**
  * Render the panel the way the framework would, then expand it if it starts collapsed.
  *
  * A finished run starts collapsed (the stock panel does the same), so a test that wants to
@@ -279,15 +291,61 @@ describe('chat task list: wording and disclosure', () => {
       failed: 'status.failed',
       cancelled: 'status.cancelled',
       interrupted: 'status.interrupted',
+      // The sixth entry is not a status the stock fold emits: it is what a row says when
+      // the engine reports one this bundle does not word, so the reader gets a sentence
+      // instead of the engine's own token.
+      unknown: 'status.unknown',
     })
     expect(zh('status.completed')).toBe('已完成')
     expect(en('status.completed')).toBe('Completed')
+    expect(zh('status.unknown')).toBe('状态未知')
+    expect(en('status.unknown')).toBe('Unknown')
     expect(zh('member.open', { name: '规划助手' })).toBe('打开 规划助手')
     expect(en('member.open', { name: 'Planner' })).toBe('Open Planner')
     // No Chinese leaks into the English dictionary.
     for (const [key, value] of Object.entries(panel.DICT['en']!)) {
       expect(/[\u4e00-\u9fff]/.test(value), key).toBe(false)
     }
+  })
+
+  it('colours every status through a --dsw-alias token, never a frozen hex', () => {
+    // A status dot is a design-system state, so its colour has to follow the theme. Each
+    // value is `var(--dsw-alias-…, <fallback>)`: the token is what renders, and the
+    // fallback keeps a composition without design tokens rendering at all.
+    const expected: Record<string, string> = {
+      running: '--dsw-alias-state-business-primary',
+      completed: '--dsw-alias-state-success-primary',
+      failed: '--dsw-alias-state-error-primary',
+      cancelled: '--dsw-alias-state-warn-primary',
+      interrupted: '--dsw-alias-state-warn-primary',
+    }
+    const dotOf = (status: string): string => {
+      const { element } = render(runData(status, status))
+      const dots = styleObjects(element)
+        .map(style => style['background'])
+        .filter((value): value is string => typeof value === 'string' && value !== 'currentColor')
+      expect(dots.length, status).toBeGreaterThan(0)
+      return dots[dots.length - 1]!
+    }
+    // The run tail's dot is the last one drawn.
+    for (const [status, token] of Object.entries(expected)) {
+      const background = dotOf(status)
+      expect(background, status).toContain(`var(${token}`)
+      expect(background, status).toMatch(/,\s*#[0-9a-f]{6}\)$/)
+    }
+  })
+
+  it('renders a status it does not know as neutral copy on the idle token', () => {
+    const { element } = render(runData('queued', 'queued'))
+    const texts = walk(element).flatMap(node => node.children.filter(child => typeof child === 'string'))
+    expect(texts).toContain('状态未知')
+    // The engine's own token is a machine word and must not reach the reader.
+    expect(texts).not.toContain('queued')
+    const backgrounds = styleObjects(element)
+      .map(style => style['background'])
+      .filter((value): value is string => typeof value === 'string')
+    expect(backgrounds.some(value => value.includes('--dsw-alias-state-idle-primary'))).toBe(true)
+    expect(backgrounds).not.toContain('#8a8a8a')
   })
 
   it('summarises a phase the way the stock panel does', () => {

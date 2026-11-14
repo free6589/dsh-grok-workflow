@@ -84,6 +84,12 @@ const MAX_LEDGER_CHARS = 8_000
  * apart in wording), and the human block is *scrubbed against* it — a model's
  * own summary is free text and could echo a field name back at the reader, so
  * the guard is applied to every line that reaches the human block.
+ *
+ * How each entry is matched matters (B10, see {@link tainted}): a field label is
+ * a label only where a field label can be — at the start of a line. A raw
+ * substring scan dropped *real* content: the reason `src/script.ts` records for a
+ * task whose child never started reads `task aborted before any attempt: [ … ]`,
+ * and the `attempt:` inside it erased the reader's only explanation.
  */
 const LEDGER_LABELS = [
   'Grok workflow:',
@@ -107,10 +113,35 @@ const LEDGER_LABELS = [
 ] as const
 
 /**
+ * Labels the ledger also writes in the middle of a line, matched as whole words.
+ *
+ * These are phrases no ordinary sentence contains by accident, so the boundary
+ * check is enough to keep them out of a summary without risking real prose.
+ */
+const MIDLINE_LABELS = [
+  'Route overflows',
+  'skipped full',
+  'skipped busy',
+  'cross-run hint',
+  'per run (enforced by the plugin)',
+] as const
+
+/**
  * Identifier tokens that must never reach the human block, whatever field they
  * came from. The ledger keeps them: they are how a maintainer finds the run.
+ *
+ * Matched as whole words: `childId 3 failed` is caught, while `childIdle` or an
+ * ordinary word containing the same letters is not. `attempt:` is deliberately
+ * not here but in {@link ANCHORED_LABEL}: it never starts a rendered ledger line
+ * (`report.ts` writes `(2 attempts)`, `attempt 1 via …`), and as a mid-line token
+ * it erased the run's own explanation of a failed task (B10). The one field the
+ * guard does not apply to is the failure reason itself — see
+ * {@link humanConclusion}.
  */
-const ID_TOKENS = ['runId', 'taskId', 'childId', 'attempt:', 'chainIndex'] as const
+const ID_TOKENS = ['runId', 'taskId', 'childId', 'chainIndex'] as const
+
+/** A ledger-shaped key that only ever starts a line, never a sentence. */
+const ANCHORED_KEYS = ['attempt:'] as const
 
 /** Read a switch that may be a resolved boolean or a live holder. */
 export function diagnosticsEnabled(value?: DiagnosticsSwitch): boolean {
@@ -131,9 +162,31 @@ function oneLine(text: string, max: number): string {
   return flat.length <= max ? flat : `${flat.slice(0, Math.max(0, max - 1))}…`
 }
 
-/** True when a line carries a ledger label or an identifier token. */
+/** Escape a literal for a regular expression. */
+function literal(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** A field label or ledger key, anchored to the start of a line (leading space allowed). */
+const ANCHORED_LABEL = new RegExp(`^\\s*(?:${[...LEDGER_LABELS, ...ANCHORED_KEYS].map(literal).join('|')})`)
+
+/** A ledger phrase that also appears mid-line, bounded to a whole word. */
+const MIDLINE_TERM = new RegExp(`(?:^|[^\\w])(?:${MIDLINE_LABELS.map(literal).join('|')})(?![\\w])`)
+
+/** An identifier key, bounded to a whole word. */
+const ID_TERM = new RegExp(`(?:^|[^\\w])(?:${ID_TOKENS.map(literal).join('|')})(?![\\w])`)
+
+/**
+ * True when a line carries a ledger label or an identifier token.
+ *
+ * Anchored/whole-word, not a substring scan (B10): a line is tainted because it
+ * *is* a ledger line — a field label at its start — or because it contains a
+ * phrase no human sentence contains by accident. An identifier key inside a
+ * sentence is still caught, and a failure reason that merely mentions one is not
+ * thrown away with it.
+ */
 function tainted(line: string): boolean {
-  return LEDGER_LABELS.some(label => line.includes(label)) || ID_TOKENS.some(token => line.includes(token))
+  return ANCHORED_LABEL.test(line) || MIDLINE_TERM.test(line) || ID_TERM.test(line)
 }
 
 /** Drop any line that carries a ledger label or an identifier token. */
@@ -143,6 +196,36 @@ function scrub(text: string): string {
     const line = raw.trimEnd()
     if (tainted(line)) continue
     kept.push(line)
+  }
+  return kept.join('\n').replace(/\n{3,}/g, '\n\n').trim()
+}
+
+/**
+ * One line of the human block, and whether the guard applies to it.
+ *
+ * Everything the run assembled for its own reader is guarded (no ledger label, no
+ * identifier key). The failure reasons are not: they are the run's explanation of
+ * what went wrong, and a reason the reader cannot see is worse than a reason that
+ * mentions a token (B10) — see {@link humanConclusion}.
+ */
+interface BlockLine {
+  text: string
+  guard: boolean
+}
+
+/** Compose the block in order, applying the guard line by line to guarded entries. */
+function composeBlock(lines: readonly BlockLine[]): string {
+  const kept: string[] = []
+  for (const item of lines) {
+    if (!item.guard) {
+      kept.push(item.text)
+      continue
+    }
+    for (const raw of item.text.split('\n')) {
+      const line = raw.trimEnd()
+      if (tainted(line)) continue
+      kept.push(line)
+    }
   }
   return kept.join('\n').replace(/\n{3,}/g, '\n\n').trim()
 }
@@ -247,10 +330,14 @@ export function humanConclusion(report: WorkflowReport, opts: { lang?: DeliveryL
   const verifiedTasks = report.tasks.filter(task => task.status === 'verified')
   const verified = verifiedTasks.length
   const total = report.tasks.length
-  const lines: string[] = [headline(report, verified, total, lang)]
+  const lines: BlockLine[] = []
+  // Every line this function assembles is guarded, except the failure reasons,
+  // which are the run's own explanation and must reach the reader (B10).
+  const push = (text: string, guard = true): void => { lines.push({ text, guard }) }
+  push(headline(report, verified, total, lang))
 
   const conclusion = conclusionOf(report)
-  if (conclusion !== '') lines.push(zh ? `结果：${conclusion}` : `Result: ${conclusion}`)
+  if (conclusion !== '') push(zh ? `结果：${conclusion}` : `Result: ${conclusion}`)
 
   // What was achieved, named the way a reader knows it (title, never id).
   const doneTitles = verifiedTasks
@@ -262,36 +349,38 @@ export function humanConclusion(report: WorkflowReport, opts: { lang?: DeliveryL
     .filter(title => title !== '')
   if (report.status !== 'completed' && doneTitles.length > 0) {
     const rest = verifiedTasks.length > doneTitles.length ? (zh ? ' 等' : ' and more') : ''
-    lines.push(zh ? `做成的：${doneTitles.join('、')}${rest}。` : `Achieved: ${doneTitles.join(', ')}${rest}.`)
+    push(zh ? `做成的：${doneTitles.join('、')}${rest}。` : `Achieved: ${doneTitles.join(', ')}${rest}.`)
   }
 
   // What did not get done, with the reason the run actually recorded.
   const undone = report.tasks.filter(task => task.status !== 'verified')
   if (undone.length > 0) {
-    lines.push(zh ? '没做成的：' : 'Not done:')
+    push(zh ? '没做成的：' : 'Not done:')
     undone.slice(0, 5).forEach((task) => {
       const item = report.incomplete.find(entry => entry.taskId === task.id)
-      const reason = oneLine(scrub(item?.reason ?? task.error ?? ''), 240)
+      // Not scrubbed: `incomplete[].reason` and `task.error` are the run's own
+      // account of what went wrong, and this is the only place a reader sees it (B10).
+      const reason = oneLine(item?.reason ?? task.error ?? '', 240)
       const name = titleOf(report, task.id, report.tasks.indexOf(task))
-      lines.push(reason === '' ? `- ${name}` : `- ${name}：${reason}`)
+      push(reason === '' ? `- ${name}` : `- ${name}：${reason}`, false)
     })
-    if (undone.length > 5) lines.push(zh ? `- 另有 ${undone.length - 5} 项没做成` : `- ${undone.length - 5} more did not finish`)
+    if (undone.length > 5) push(zh ? `- 另有 ${undone.length - 5} 项没做成` : `- ${undone.length - 5} more did not finish`)
   }
 
   // A failure with no task rows (deadline, engine error) still needs its reason.
   // When task rows exist the reason is already above, so it is not repeated here.
   if (report.status === 'failed' && undone.length === 0 && report.errors.length > 0) {
     const reason = oneLine(scrub(report.errors[0]!.message), 300)
-    if (reason !== '') lines.push(zh ? `原因：${reason}` : `Reason: ${reason}`)
+    if (reason !== '') push(zh ? `原因：${reason}` : `Reason: ${reason}`)
   }
 
   // Key evidence, so a "done" claim is checkable without opening the ledger.
   if (report.status === 'completed' && report.confirmed.length > 0) {
-    lines.push(zh ? '关键证据：' : 'Key evidence:')
+    push(zh ? '关键证据：' : 'Key evidence:')
     for (const item of report.confirmed.slice(0, 3)) {
       const criterion = oneLine(scrub(item.criterion), 120)
       const evidence = oneLine(scrub(item.evidence), 160)
-      lines.push(evidence === '' ? `- ${criterion}` : `- ${criterion}（${evidence}）`)
+      push(evidence === '' ? `- ${criterion}` : `- ${criterion}（${evidence}）`)
     }
   }
 
@@ -300,18 +389,18 @@ export function humanConclusion(report: WorkflowReport, opts: { lang?: DeliveryL
   const advice = report.status === 'completed'
     ? (zh ? '结果可以直接用；哪一项对不上，就把那一项单独再发一次，我会重跑。' : 'The result is usable as it stands; if one item does not match what you expected, send that item again and I will rerun it.')
     : nextStep(report, lang)
-  lines.push((zh ? '下一步：' : 'Next: ') + advice)
+  push((zh ? '下一步：' : 'Next: ') + advice)
 
   // Caveats stay visible at every status: they are content, not diagnostics.
   const caveats = report.uncertainties.slice(0, 4)
   if (caveats.length > 0) {
-    lines.push(zh ? '需要你知道的：' : 'Worth knowing:')
+    push(zh ? '需要你知道的：' : 'Worth knowing:')
     for (const item of caveats) {
-      lines.push(`- ${oneLine(scrub(item.text), 240)}`)
+      push(`- ${oneLine(scrub(item.text), 240)}`)
     }
   }
 
-  const block = stripIds(scrub(lines.join('\n')), report)
+  const block = stripIds(composeBlock(lines), report)
   return block.length <= MAX_HUMAN_CHARS ? block : `${block.slice(0, MAX_HUMAN_CHARS - 1)}…`
 }
 

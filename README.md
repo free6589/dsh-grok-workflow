@@ -1,7 +1,7 @@
 # Grok Workflow for DSH
 
 <p align="center">
-  <strong>Every message runs the whole workflow: plan, parallel work, independent checks, honest result.</strong>
+  <strong>Every message meets the front desk; the work that needs it runs plan, parallel execution, independent checks, honest result.</strong>
   <br />
   <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a>
 </p>
@@ -9,13 +9,15 @@
 <p align="center">
   <a href="https://github.com/free6589/dsh-grok-workflow/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/free6589/dsh-grok-workflow/actions/workflows/ci.yml/badge.svg?branch=main"></a>
   <img alt="Node.js 22+" src="https://img.shields.io/badge/Node.js-22%2B-339933?logo=node.js&logoColor=white">
-  <img alt="DSH 0.2.1-rc.2" src="https://img.shields.io/badge/DSH-0.2.1--rc.2-536DFE">
+  <img alt="DSH 0.2.x" src="https://img.shields.io/badge/DSH-0.2.x-536DFE">
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/License-MIT-blue.svg"></a>
 </p>
 
-**Grok Workflow for DSH** is an external plugin for [DeepSeek Harness (DSH)](https://github.com/deepseek-ai/deepseek-harness). It gives DSH a mandatory workflow for user messages (from `0.2.0` on, by default), and it also registers the `grok_workflow` tool that the model can call directly.
+**Grok Workflow for DSH** is an external plugin for [DeepSeek Harness (DSH)](https://github.com/deepseek-ai/deepseek-harness). It gives DSH a mandatory entry for user messages: a gate intercepts every user message and hands it to the front desk, which picks a tier and says which one. It also registers the `grok_workflow` tool that the model can call directly.
 
-You do not write a workflow script. Install the plugin, restart your profile, and ask a question: the gate claims the message, plans it, runs the tasks, verifies each one against its acceptance criteria, and answers in the same turn.
+The per-session toggle itself is **off by default** (`grokDefault: off`): until you send `/grok` in a session, its messages pass through as ordinary chat. With the toggle on, the front desk decides per message — a greeting is answered from a template, a small question by one worker, and only an objective that needs the team runs the full workflow.
+
+You do not write a workflow script. Install the plugin, restart your profile, and ask a question: a message the front desk sends to the **team** tier is planned, run, verified task by task against its acceptance criteria, and answered in the same turn.
 
 ![Plan, execute, verify, retry, and report workflow](docs/images/workflow-overview.svg)
 
@@ -23,14 +25,16 @@ You do not write a workflow script. Install the plugin, restart your profile, an
 
 | Requirement | What this plugin does |
 |---|---|
-| **Every message runs the full workflow** | An `agent/pre-step` gate claims each user message and answers it from a validated workflow report — no silent fallback to ordinary direct answering. |
+| **A front desk in front of every message** | An `agent/pre-step` gate claims each user message and the front desk picks a tier — `direct`, `quick`, `team` or `ask` — stating the tier and its reason on the answer's first line. The full plan→execute→verify workflow runs on the `team` tier; nothing falls back silently to ordinary direct answering. |
+| **Opt-in per session, honest about it** | `grokDefault: off` means a session chats normally until `/grok` turns the workflow on for it; `/grok off` turns it back. A toggle that cannot be persisted is reported as a failure instead of being claimed. |
 | **Per-role model choice** | `roles.planner`, `roles.worker`, `roles.verifier`, `roles.synthesizer` each carry their own model. |
 | **Ordered fallback chains per role** | Up to three routes per role; a route-level failure advances that role's chain and the routes actually used are recorded in the report. |
 | **Operable settings** | The exported `Config` *is* the DSH settings page: live values, unknown keys rejected with a suggestion, chains validated against the providers the runtime really has. |
+| **Pluggable workflow shape** | `mode: 'triage'` (default) keeps the front desk; `mode: 'full'` restores the older rule where every claimed message runs the team. |
 
 ## Install in one command
 
-**Before you start:** DSH **`0.2.1-rc.2`** and Node.js **22 or newer** are required. Your DSH profile must include the workflow and subagent services (the standard base/headless bundles provide them).
+**Before you start:** DSH **`>=0.2.1-rc.2 <0.3.0`** and Node.js **22 or newer** are required. That is the range the package declares in `engines.dsh`, and it is the only requirement DSH's loader evaluates; prereleases of `0.2.x` are included. Your DSH profile must include the workflow and subagent services (the standard base/headless bundles provide them).
 
 If you do not have a profile yet, create it from the headless template **before** installing the plugin:
 
@@ -41,12 +45,10 @@ dsh --profile grok-workflow-dev --from-default-profile headless --dump-config
 Then install the plugin:
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.2.2
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.8.0
 ```
 
-> `#v0.2.2` is installable from the moment the `v0.2.2` tag is published; before that, use `#v0.2.1`.
-
-Pin the tag you actually want. Omitting `#v0.2.2` follows `main`, which is not a release. Do not run `--from-default-profile` after `plugin add`: it replaces the profile and removes the plugin you just installed.
+> `#v0.8.0` is the current release. Pin the tag you actually want; omitting it follows `main`, which is not a release. Do not run `--from-default-profile` after `plugin add`: it replaces the profile and removes the plugin you just installed.
 
 Then restart the profile so DSH loads the new plugin:
 
@@ -85,7 +87,7 @@ After DSH starts, just ask something:
 
 > Inspect this repository, find two independent issues, verify each finding against the current files, and summarize what remains uncertain. Do not modify files.
 
-From `0.2.0` the gate claims that message whether or not the model would have called the tool. With the
+Once the session's toggle is on (`/grok`; `grokDefault` is `off`), the gate claims that message whether or not the model would have called the tool. With the
 default `mode: 'triage'` the front desk decides first: a long objective like the one above runs the
 **team** tier and ends with a short status line (`Grok workflow: COMPLETED`, `PARTIAL` or `FAILED`)
 plus the verified tasks, failures and uncertainties, while "what is today's date" takes the **quick**
@@ -112,7 +114,7 @@ The workflow exists to avoid treating an agent's “done” message as proof tha
 
 ## Mandatory entry: what changes for you
 
-- The gate is **on by default** (`enforceGate: true`). Every *user* message is claimed. Messages from other sources — user-question replies, team messages, webhooks, schedules, subagent prompts — are deliberately **not** claimed, and an empty batch passes through.
+- The gate is **installed by default** (`enforceGate: true`) and intercepts every *user* message. Whether a message is *worked on* is a second switch: the per-session toggle, whose config default `grokDefault` is `off` — until `/grok` turns it on for that session, a claimed message passes through to the model as ordinary chat (`reason: mode-off`). Messages from other sources — user-question replies, team messages, webhooks, schedules, subagent prompts — are never claimed, and an empty batch passes through.
 - The answer arrives **inside the same turn** (`answerStrategy: in-turn`). That is the only strategy that survives a one-shot process; `relay` and `append` remain available for long-lived surfaces.
 - A message the plugin will not run is **refused out loud** with the reason (empty message, or an objective over 32,000 characters). Nothing is executed and nothing is retried automatically.
 - Delivery is recorded per message: the same batch dispatched twice does not start a second run, and each agent's waiting queue is bounded by `maxQueuedMessages`.
@@ -202,8 +204,8 @@ Configuration belongs to the profile's `cordis.patch.yml` (or a `--patch` overla
 ```yaml
 - id: grok-workflow
   config:
-    maxConcurrency: 4
-    maxRetries: 2
+    maxConcurrency: 3
+    maxRetries: 1
     maxTasks: 12
 ```
 
@@ -221,8 +223,8 @@ Configuration belongs to the profile's `cordis.patch.yml` (or a `--patch` overla
 | `historyTurns` | `12` | `1000000` | Conversation turns included as context |
 | `historyChars` | `20000` | `1000000` | Character budget for that context |
 | `maxQueuedMessages` | `4` | `8` | Waiting messages per agent before refusals start |
-| `maxConcurrency` | `4` | `1000000` | Child agents in flight per run |
-| `maxRetries` | `2` | `10` | Retries per task after the initial attempt |
+| `maxConcurrency` | `3` | `6` | Child agents in flight per run |
+| `maxRetries` | `1` | `3` | Retries per task after the initial attempt |
 | `maxTasks` | `12` | `100` | Maximum caller or planner tasks |
 | `timeoutMs` | `3600000` | `604800000` (7 days) | Overall run deadline |
 | `maxActiveRuns` | `2` | `4` | Concurrent `grok_workflow` runs per plugin instance |
@@ -291,24 +293,22 @@ The plugin reuses DSH's workflow engine and subagents. It does not replace DSH's
 ## If something does not work
 
 - **The tool does not appear:** restart the profile and confirm it contains the workflow engine and a subagent provider.
-- **Every answer looks like a workflow now:** that is `enforceGate: true`. Set it to `false` to get the `0.1.0` behaviour.
+- **Every answer looks like a workflow now:** that is `enforceGate: true` plus the session toggle on. Set `enforceGate: false` to keep only the `grok_workflow` tool, send `/grok off` to turn the toggle off for one session, or leave `grokDefault` at `off` to require an opt-in.
 - **A message is refused instead of answered:** the reason is printed (empty message or an objective over 32,000 characters). Nothing was executed and nothing will be retried automatically.
 - **A key is rejected at load:** the message names the closest accepted key. Silent ignoring is not offered on purpose.
-- **Your DSH version differs:** this release is verified only with DSH `0.2.1-rc.2`.
+- **Your DSH version differs:** the package declares `engines.dsh: ">=0.2.1-rc.2 <0.3.0"`, and that range decides whether the bundle loads. DSH evaluates it with prereleases included (that is what lets `0.2.2-rc.3` load at all), so a `0.2.x` prerelease is admitted and `0.3.0` and above are refused — a `0.3.0` *prerelease* still satisfies `<0.3.0` and therefore loads. Behavior is verified on `0.2.1-rc.2`; the bundle installs and composes on `0.2.2-rc.3`.
 - **You want to understand the design:** see [Architecture](docs/ARCHITECTURE.md), the [design knowledge base](docs/knowledge/WORKFLOW-DESIGN.md) and the [acceptance checklist](docs/ACCEPTANCE.md).
 - **You found a bug:** [Open an issue](https://github.com/free6589/dsh-grok-workflow/issues).
 
 ## Versions and release notes
 
-The package version in this repository is `0.2.2`. Install or roll back to an exact release with a tag suffix:
+The package version in this repository is `0.8.0`. Install or roll back to an exact release with a tag suffix:
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.2.2
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.8.0
 ```
 
-> `#v0.2.2` is installable from the moment the `v0.2.2` tag is published; before that, use `#v0.2.1`.
-
-Use only a tag that exists on GitHub. Published: `v0.1.0`, `v0.2.0` and `v0.2.1`; `v0.2.2` is the version in this tree, tagged by the release process that publishes this commit. The unpinned command follows `main` and does not pin a release. See the [changelog](CHANGELOG.md) and the [release guide](docs/RELEASING.md) for the versioning and rollback rules.
+Use only a tag that exists on GitHub. Published: `v0.1.0`, `v0.2.0`, `v0.2.1`, `v0.2.2`, `v0.2.3`, `v0.2.4`, `v0.2.5`, `v0.2.6`, `v0.2.7`, `v0.3.0`, `v0.4.0`, `v0.5.0`, `v0.5.1`, `v0.6.0`, `v0.7.0` and `v0.8.0`. The unpinned command follows `main` and does not pin a release. See the [changelog](CHANGELOG.md) and the [release guide](docs/RELEASING.md) for the versioning and rollback rules.
 
 ## Testing and development
 
@@ -321,7 +321,7 @@ npm run ci
 
 ## Security and compatibility
 
-- Verified only with DSH **`0.2.1-rc.2`** and Node.js **22 or newer**; the package declares the exact DSH peer versions (`@deepseek-ai/cordis` uses a compatible `~4.0.5` range). This is an external DSH bundle and does not modify DSH core.
+- Verified with DSH **`0.2.1-rc.2`** and Node.js **22 or newer**. The package declares its DSH requirement as the range **`engines.dsh: ">=0.2.1-rc.2 <0.3.0"`** — an own `engines.dsh` decides alone, so this range (not the peer ranges) is what admits a runtime and what makes a later release refuse to load instead of failing at run time. The peer packages the build is tested against stay pinned exactly (`@deepseek-ai/cordis` uses a compatible `~4.0.5` range). This is an external DSH bundle and does not modify DSH core.
 - It does not bypass DSH approvals, sandbox policy or tool policy. Child agents cannot recursively invoke `grok_workflow`; their other tools remain subject to DSH's own policy.
 - Child agents inherit the parent session's available tools and permissions. There is no read-only capability mode; the verifier prompt asks it not to modify files, but that is not a hard sandbox guarantee.
 - Redaction is best-effort: do not put credentials in objectives, task text or logs. Reports are not a guarantee that a child agent never touched a secret.

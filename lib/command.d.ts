@@ -15,6 +15,11 @@
  * the next message (`classifyPreStep`'s `mode-off` pass branch). The `turn`
  * field is informational metadata only — the gate reads only `enabled`.
  *
+ * The settle text reports what the session's own log shows, not what the write
+ * call did: an enable that did not land settles as `kind: 'error'` and never
+ * uses the success wording, so "the toggle is on" is only ever said about a
+ * record a reader can see.
+ *
  * The registration surface is structural (not imported from
  * `@deepseek-ai/dsh-commands`): that package is a UI-side service, not a
  * dependency of this bundle, and the contract used here is exactly the
@@ -49,7 +54,7 @@ export interface GrokCommandDefinition {
     };
     handler: (invocation: GrokCommandInvocation) => GrokCommandResult;
 }
-/** Warnings only: `setMode` is warn-and-continue and tolerates its absence. */
+/** Warnings from the write path; the settle text, not the logger, reports failure. */
 export interface CommandLogger {
     warn?(message: string): void;
 }

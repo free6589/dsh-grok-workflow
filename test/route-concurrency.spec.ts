@@ -99,6 +99,30 @@ describe('per-route concurrency caps with overflow to the next route', () => {
     expect(WORKFLOW_SCRIPT).toContain(`routeInFlightMax: ${HARD_LIMITS.routeInFlight.max}`)
   })
 
+  it('caps an over-limit concurrency the script is handed, instead of trusting the caller (B07)', async () => {
+    // The host validates args first, so this cannot arrive through the plugin's own
+    // path; the point of the clamp is that a caller passing a raw payload gets the
+    // documented maximum, not an unbounded pool.
+    let peak = 0
+    let inFlight = 0
+    const agent = directAgent(async () => {
+      inFlight += 1
+      peak = Math.max(peak, inFlight)
+      await delay(10)
+      inFlight -= 1
+      return execution('done')
+    })
+    const many = [task('a'), task('b'), task('c'), task('d'), task('e'), task('f'), task('g'), task('h')]
+    const run = await runWorkflowScript(
+      WORKFLOW_SCRIPT,
+      args({ maxConcurrency: 1_000_000, maxRetries: 99, maxTasks: 8, tasks: many }),
+      agent,
+    )
+    expect(run.report.limits).toMatchObject({ maxConcurrency: HARD_LIMITS.maxConcurrency, maxRetries: HARD_LIMITS.maxRetries })
+    expect(peak).toBeLessThanOrEqual(HARD_LIMITS.maxConcurrency)
+    expect(peak).toBeGreaterThan(1)
+  })
+
   it('budgets the same child-agent total because a cap never adds a call', () => {
     const uncapped = resolveConfig({ maxRetries: 1, maxTasks: 1, roles: { worker: [{ model: 'w1' }] } })
     const capped = resolveConfig({ maxRetries: 1, maxTasks: 1, roles: { worker: [{ model: 'w1', maxInFlight: 1 }] } })

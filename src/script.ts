@@ -40,12 +40,20 @@ ${namingSource()};
 const rawObjective = String(args && args.objective ? args.objective : '');
 const objective = rawObjective.trim() === '' ? '' : rawObjective;
 // Defensive clamps only: the host validates args against HARD_LIMITS first, so a
-// value arriving here is already in range. The numbers below mirror
-// HARD_LIMITS (maxConcurrency, maxRetries, maxTasks) and are pinned equal by
+// value arriving here is already in range. The bounds and the fallbacks below
+// mirror HARD_LIMITS (maxConcurrency 6, maxRetries 3, maxTasks 100) and the
+// documented defaults (3 / 1 / 12) in src/config.ts, and are pinned equal by
 // test/config.spec.ts — do not edit one side without the other.
-const maxConcurrency = Math.max(1, Math.min(1000000, Number(args && args.maxConcurrency) || 4));
-const maxRetries = Math.max(0, Math.min(10, Number(args && args.maxRetries) || 0));
-const maxTasks = Math.max(1, Math.min(100, Number(args && args.maxTasks) || 12));
+// isFinite (not the || idiom): an explicitly configured 0 retries must stay 0,
+// where an absent key is what falls back to the documented default.
+const argNumber = function (value, fallback) {
+  if (value === undefined || value === null || value === '') return fallback;
+  const parsed = Number(value);
+  return isFinite(parsed) ? parsed : fallback;
+};
+const maxConcurrency = Math.max(1, Math.min(6, argNumber(args ? args.maxConcurrency : undefined, 3)));
+const maxRetries = Math.max(0, Math.min(3, argNumber(args ? args.maxRetries : undefined, 1)));
+const maxTasks = Math.max(1, Math.min(100, argNumber(args ? args.maxTasks : undefined, 12)));
 const suppliedTasks = args && Array.isArray(args.tasks) ? args.tasks : null;
 // Switching policy (阶段5): an empty list means the built-in rule — every
 // transport/model class advances the chain, content failures never do.

@@ -1,0 +1,12 @@
+[grok-workflow] no settings namespace projects this plugin's fields: the row is disabled, renamed with an unreadable projection, or did not activate (see docs/LOCAL-TESTING.md#enable). The Grok workflow page cannot appear until it does.
+
+(node:45) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/client.spec.ts (71 tests) 83ms
+ ✓ test/progress-tab.spec.ts (22 tests) 14ms
+
+ Test Files  2 passed (2)
+      Tests  93 passed (93)
+   Start at  03:03:28
+   Duration  508ms (transform 141ms, setup 0ms, import 187ms, tests 96ms, environment 0ms)
+

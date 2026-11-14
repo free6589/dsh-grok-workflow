@@ -512,3 +512,43 @@ describe('duplicated and out-of-order events are handled without inventing state
     expect(projectPanel(orphan)?.groups).toEqual([])
   })
 })
+
+// ---------------------------------------------------------------------------
+// F. A label this plugin did not author: no engine identifier reaches the row
+// ---------------------------------------------------------------------------
+
+describe('a row never shows the engine\'s own child label', () => {
+  const engineRun = (label: string, outcome = 'completed'): PanelEvent[] => [
+    { type: PROGRESS_RUN_START, data: { runId: 'r', name: '任务团队 · 2 个任务' } },
+    { type: PROGRESS_AGENT_START, data: { runId: 'r', seq: 1, label, phase: '执行', childId: 'c1' } },
+    { type: PROGRESS_AGENT_END, data: { runId: 'r', seq: 1, outcome } },
+    { type: PROGRESS_RUN_END, data: { runId: 'r', stopReason: 'completed' } },
+  ]
+
+  it('maps the engine\'s `<run name> child <callId>` label to neutral copy', () => {
+    // DSH writes this label itself (`${meta.name} child ${callId}`), so it is on the wire
+    // for any run this plugin did not start — and the call id is a machine identifier the
+    // panel's own rule keeps off the screen.
+    const panel = projectPanel(engineRun('任务团队 child 3'))
+    expect(panel?.groups[0]?.rows[0]?.label).toBe('子代理')
+    expect(panel?.groups[0]?.rows[0]?.text).toBe('子代理已结束')
+    const rendered = JSON.stringify(panel)
+    expect(rendered).not.toContain('child')
+    // The row still words a *call*; nothing here promotes it to a task verdict.
+    expect(rendered).not.toContain('任务通过')
+    expect(projectPanel(engineRun('任务团队 child 3'), { language: 'en' })?.groups[0]?.rows[0])
+      .toMatchObject({ label: 'Subagent', text: 'Subagent ended' })
+  })
+
+  it('shows any other label as recorded and guesses no role for it', () => {
+    const panel = projectPanel(engineRun('Review the diff', 'failed'))
+    expect(panel?.groups[0]?.rows[0]?.label).toBe('Review the diff')
+    expect(panel?.groups[0]?.rows[0]?.text).toBe('Review the diff失败')
+    // A label that merely ends in the word is not the engine's form.
+    expect(projectPanel(engineRun('Summarize this child'))?.groups[0]?.rows[0]?.label)
+      .toBe('Summarize this child')
+    // …and the plugin's own labels are untouched by the rule.
+    expect(projectPanel(engineRun('执行（尝试 2）'))?.groups[0]?.rows[0])
+      .toMatchObject({ label: '执行（尝试 2）', text: '执行代理已结束' })
+  })
+})

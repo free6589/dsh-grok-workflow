@@ -69,18 +69,18 @@ describe('per-role routing configuration', () => {
   })
 
   it('keeps an extreme call backstop that the worst legal combination exactly meets', () => {
-    // Worst legal case: 50 worker + 50 verifier routes with maxRetries 10 =
-    // 100 calls/attempt x 11 attempts = 1100 = HARD_LIMITS.maxAttemptsPerTask.
+    // Worst legal case: 50 worker + 50 verifier routes with maxRetries 3 =
+    // 100 calls/attempt x 4 attempts = 400 = HARD_LIMITS.maxAttemptsPerTask.
     // Equality passes (the guard is `>`), so every legal combination loads;
     // the backstop only fires if a future limit widens without revisiting it.
     const long = Array.from({ length: 50 }, (_unused, index) => ({ model: `m${index}` }))
-    expect(resolveConfig({ roles: { worker: long, verifier: long }, maxRetries: 10 }).maxRetries).toBe(10)
+    expect(resolveConfig({ roles: { worker: long, verifier: long }, maxRetries: 3 }).maxRetries).toBe(3)
     expect(HARD_LIMITS.maxAttemptsPerTask).toBe(
       (HARD_LIMITS.chainLength + HARD_LIMITS.chainLength) * (HARD_LIMITS.maxRetries + 1),
     )
-    // Ordinary combinations always pass: 3+3 chains with the default 2 retries.
+    // Ordinary combinations always pass: 3+3 chains with the default 1 retry.
     const chain = [{ model: 'a' }, { model: 'b' }, { model: 'c' }]
-    expect(resolveConfig({ roles: { worker: chain, verifier: chain } }).maxRetries).toBe(2)
+    expect(resolveConfig({ roles: { worker: chain, verifier: chain } }).maxRetries).toBe(1)
   })
 
   it('requires a synthesizer chain for model synthesis, and forbids an unused one', () => {

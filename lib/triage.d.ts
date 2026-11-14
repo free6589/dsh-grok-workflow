@@ -93,12 +93,61 @@ export interface TriageVerdict {
     /** The batch must run the whole workflow and gets the greeting. */
     greeting: boolean;
 }
+/**
+ * Filler a choice word may carry and still be *only* an answer ("简单", "简单的吧").
+ *
+ * The front desk asks "简单 / 团队", so the honest reading of the reply is the
+ * choice plus a filler character or two — never a choice prefix in front of a
+ * new task. Messages such as "好的，帮我看下 log" open with "好" but carry work;
+ * treating the whole message as the answer threw that work away (B05).
+ */
+export declare const PENDING_FILLER_MAX = 2;
+/** One reply read as the answer to the front-desk question. */
+export interface PendingAnswer {
+    /** The choice word the reply opens with, as written ("简单", "quick", "好"). */
+    choice: string;
+    /** The tier that word selects. */
+    tier: 'fast' | 'team';
+    /**
+     * What the reply says beyond the choice, with its leading punctuation removed.
+     * Empty for a bare answer; a *new task* when {@link PendingAnswer.bare} is false.
+     */
+    task: string;
+    /**
+     * True when the reply is the choice alone, plus at most
+     * {@link PENDING_FILLER_MAX} filler characters — the one shape that means
+     * "answer the question I was asked and nothing else".
+     */
+    bare: boolean;
+}
+/**
+ * Read one reply as the answer to the front-desk question (B05).
+ *
+ * The choice word decides the tier ({@link PENDING_FAST} before
+ * {@link PENDING_TEAM}: "不用团队" names the team and still selects the quick
+ * tier). Everything after it is returned as `task`, so a caller can tell "简单"
+ * from "简单，另外把 X 改成 Y" and keep the new work instead of discarding it.
+ *
+ * @param text - the user's reply.
+ * @returns the answer, or `undefined` when the reply is not an answer at all.
+ */
+export declare function pendingAnswer(text: string): PendingAnswer | undefined;
 /** Limits that separate "one shot" from "a plan". */
 export declare const TRIAGE_LIMITS: {
     /** A message longer than this is treated as multi-part work. */
     readonly teamChars: 200;
     /** A chat message is short: a greeting plus padding, never a request. */
     readonly chatChars: 40;
+    /**
+     * Characters of one message the signal scan reads (B02).
+     *
+     * Every pattern in {@link triageSignals} is a single pass over its input, but a
+     * pasted wall of text makes each pass long — and the pre-B02 `CONCRETE` made
+     * one of them quadratic. The head of a message carries the anchors a front desk
+     * can act on, so the scan stops there. `long` is still judged on the whole
+     * message, which is why a huge paste keeps its tier.
+     */
+    readonly signalChars: 4096;
 };
 /**
  * Language of one message: CJK present means Chinese, else English.
@@ -339,7 +388,13 @@ export interface PendingAsk {
  *
  * The selection is stated as a *decision about the original request*, not as a new
  * request: a worker that received only "简单" would either do nothing or invent a
- * task, and the phrase below is the one the acceptance for P0-2 pins.
+ * task. Two shapes are possible:
+ *
+ * 1. **The answer alone** ("简单", "简单的吧") — the choice, and nothing else to do.
+ * 2. **An answer that also carries work** ("简单，另外帮我看下 log") — the choice
+ *    *and* a new task in one message. Both are named: dropping the new task as
+ *    "not a task objective" is how real work got lost (B05).
+ *
  * @param verdict - the tier the answer selected.
  * @param originalRequest - the request the front-desk question was about.
  * @param answer - the user's confirmation message, verbatim.

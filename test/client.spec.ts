@@ -34,6 +34,7 @@ interface Bundle {
   GROK_WORKFLOW_ROUTE_INFLIGHT_MAX: number
   GROK_WORKFLOW_DICT: Record<string, Record<string, string>>
   GROK_WORKFLOW_PANEL: PanelBundle
+  GROK_WORKFLOW_PROGRESS: ProgressBundle
   GROK_WORKFLOW_INTERNALS: {
     draftOf(value?: Record<string, unknown>): Draft
     validate(draft: Draft): Finding[]
@@ -64,10 +65,134 @@ interface PanelBundle {
   statusKey: Record<string, string>
 }
 
+/**
+ * The progress-tab half of the bundle (pinned against `src/progress-tab.ts` as well).
+ *
+ * The browser bundle is hand-written JavaScript, so the only way its fold, its state
+ * precedence, its percentage and its provenance ladder can be trusted is to compare them
+ * with the typed implementation the unit tests cover — and to render its component.
+ */
+interface ProgressBundle {
+  target: string
+  kind: string
+  viewId: string
+  viewOrder: number
+  zoomKey: string
+  zoom: { min: number, max: number, step: number }
+  eventTypes: string[]
+  stages: Array<{ key: string, tokens: string[], edge: boolean }>
+  detailFields: string[]
+  stateColor: Record<string, string>
+  stateKey: Record<string, string>
+  css: string
+  component: (props: Record<string, unknown>) => unknown
+  eventDefinition: Record<string, unknown>
+  viewDefinition: Record<string, unknown>
+  Builder: new () => {
+    empty: unknown
+    replace(input: { nodes: Array<Record<string, unknown>> }): Record<string, unknown>
+    apply(input: { upserts: Array<Record<string, unknown>> }): Record<string, unknown>
+  }
+  mount: (
+    ctx: unknown,
+    services: Record<string, unknown>,
+    i18n: Record<string, unknown>,
+    status: { set(state: string, message?: string): void },
+    workspaceOf: () => unknown,
+  ) => (() => void) | undefined
+  fold(records: Array<Record<string, unknown>>): ProgressRun[]
+  selectActiveRun(runs: ProgressRun[]): ProgressRun | undefined
+  nodeState(members: ProgressMember[], ended: boolean): string
+  percent(members: ProgressMember[]): { settled: number, declared: number, value: number } | undefined
+  deriveTrack(run: ProgressRun | undefined, labelFor: (key: string) => string): ProgressTrack | undefined
+  detailFor(sources?: Record<string, unknown>): {
+    fields: Array<{ key: string, value?: string, source: string }>
+    coordinationRaw?: string
+  }
+  parseCoordination(text: string | undefined): { fields: Record<string, string>, raw: string } | undefined
+  duration(ms: number | undefined): string | undefined
+  readZoom(): number
+  writeZoom(value: number): void
+  createStatus(): { getSnapshot(): string, getMessage(): string | undefined, subscribe(fn: () => void): () => void, set(state: string, message?: string): void }
+}
+
+type ProgressMember = {
+  seq: number
+  label: string
+  phase?: string
+  childId: string
+  order: number
+  startedAt?: number
+  endedAt?: number
+  outcome?: string
+}
+
+type ProgressRun = {
+  runId: string
+  name: string
+  anchorSeq: number
+  members: ProgressMember[]
+  startedAt?: number
+  endedAt?: number
+  stopReason?: string
+}
+
+type ProgressNode = {
+  key: string
+  kind: string
+  label: string
+  state: string
+  members: ProgressMember[]
+  phases: string[]
+  derived: boolean
+  reason?: string
+}
+
+type ProgressTrack = {
+  runId: string
+  name: string
+  ended: boolean
+  stopReason?: string
+  nodes: ProgressNode[]
+  percent?: { settled: number, declared: number, value: number }
+}
+
 type Route = { provider?: string, model?: string, maxInFlight?: number }
 type Draft = Record<string, unknown> & { roles: Record<string, Route[]> }
 
-/** Load the bundle the way the host does: register, then run the factory with a stub React. */
+/** One rendered element of the stub tree. */
+type Element = { type: unknown, props: Record<string, unknown>, children: unknown[] }
+
+/**
+ * The hook cells of the render in progress.
+ *
+ * `GrokWorkflowPage` is a function of its props *and* its hooks (`useState`,
+ * `useSyncExternalStore`, `useMemo`), so a test that wants the detail page — and not only
+ * the one-line card summary, which returns before any hook runs — needs the same ordered
+ * cells React keeps. Re-rendering replays them, exactly like a real re-render.
+ */
+type Hooks = { index: number, cells: unknown[], useState(initial: unknown): unknown[] }
+
+let rendering: Hooks | undefined
+
+/** The hook runtime of the render in progress, or an inert one outside a render. */
+function hooks(): Hooks {
+  if (rendering !== undefined) return rendering
+  return {
+    index: 0,
+    cells: [],
+    useState: (initial: unknown) => [typeof initial === 'function' ? (initial as () => unknown)() : initial, () => {}],
+  }
+}
+
+/**
+ * Load the bundle the way the host does: register, then run the factory with a stub React.
+ *
+ * The stub records elements and delegates the hooks to {@link renderPage}, so a test can
+ * render the settings page the way the framework does — including a second pass after a
+ * click. `useSyncExternalStore` simply asks the face for its current snapshot: the face is
+ * a plain object here, and re-reading it is what makes a state change observable.
+ */
 function loadBundle(): Bundle {
   const source = readFileSync(new URL('../src/client/index.js', import.meta.url), 'utf8')
   let registration: { id: string, factory: (require: (id: string) => unknown) => Bundle } | undefined
@@ -81,11 +206,16 @@ function loadBundle(): Bundle {
   }
   expect(registration?.id).toBe('dsh-grok-workflow')
   const stubReact = {
-    createElement: () => null,
-    useState: () => [],
+    createElement: (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]): unknown => {
+      const element: Element = { type, props: props ?? {}, children: children.flat(Infinity) as unknown[] }
+      // React calls a function component to get its element, so the stub must too —
+      // otherwise a test would only ever see `h(FieldRow, …)`, never the row it renders.
+      return typeof type === 'function' ? (type as (props: Record<string, unknown>) => unknown)(element.props) : element
+    },
+    useState: (initial: unknown) => hooks().useState(initial),
     useEffect: () => {},
-    useMemo: () => [],
-    useSyncExternalStore: () => undefined,
+    useMemo: (factory: () => unknown) => factory(),
+    useSyncExternalStore: (_subscribe: unknown, getSnapshot: () => unknown) => getSnapshot(),
   }
   return registration!.factory((id) => {
     if (id === 'react') return stubReact
@@ -258,13 +388,20 @@ describe('client settings page: wiring to the DSH locale service (t42)', () => {
   }
 
   /** The minimum context `apply()` touches, recording what the bundle registers. */
-  function fakeContext(locale?: FakeLocale, workspace: FakeWorkspace | undefined = { openSession: () => {} }) {
+  function fakeContext(
+    locale?: FakeLocale,
+    workspace: FakeWorkspace | undefined = { openSession: () => {} },
+    faceOverrides: Record<string, unknown> = {},
+  ) {
     const slots: Array<{ options: Record<string, unknown>, component: (props: never) => unknown, disposed: boolean }> = []
     const effectLabels: string[] = []
+    /** Disposers the bundle handed to `ctx.inject`, in injection order (locale, workspace). */
+    const disposers: Array<() => void> = []
     const face = {
       subscribe: () => () => {},
       getSnapshot: () => ({ status: 'ready', view: { namespaces: [{ ns: 'grok-workflow', value: { roles: {}, switchOn: [] } }] } }),
       ensure: async () => undefined,
+      ...faceOverrides,
     }
     const ctx = {
       effect: (fn: () => unknown, label: string) => {
@@ -281,7 +418,10 @@ describe('client settings page: wiring to the DSH locale service (t42)', () => {
           if (dep === 'locale' && locale !== undefined) scope['locale'] = locale
           if (dep === 'uiWorkspace' && workspace !== undefined) scope['uiWorkspace'] = workspace
         }
-        return deps.every(dep => scope[dep] !== undefined) ? callback(scope) : {}
+        if (!deps.every(dep => scope[dep] !== undefined)) return {}
+        const dispose = callback(scope)
+        if (typeof dispose === 'function') disposers.push(() => { dispose() })
+        return dispose === undefined ? {} : dispose
       },
       configForms: {
         describe: () => face,
@@ -302,7 +442,7 @@ describe('client settings page: wiring to the DSH locale service (t42)', () => {
     }
     /** Registrations still mounted (a locale switch remounts the slot). */
     const live = () => slots.filter(entry => !entry.disposed)
-    return { ctx, slots, live, effectLabels, face }
+    return { ctx, slots, live, effectLabels, face, disposers }
   }
 
   it('registers both dictionaries on the locale service under the plugin namespace', () => {
@@ -374,6 +514,292 @@ describe('client settings page: wiring to the DSH locale service (t42)', () => {
     expect(component({ view: 'summary' })).toBe(bundle.GROK_WORKFLOW_DICT['en']!['card.summary'])
     // The fallback translator still answers every key, so no page copy degrades to a key id.
     expect(component({ view: 'summary', translateOwn: translator('en') })).toBe(bundle.GROK_WORKFLOW_DICT['en']!['card.summary'])
+  })
+
+  it('never prints a key id when the seated `t` cannot resolve one', () => {
+    const { ctx, live } = fakeContext(fakeLocale('zh'))
+    bundle.apply(ctx)
+    const component = live()[0]!.component as (props: Record<string, unknown>) => string
+    // A seat whose dictionary is missing answers with the key itself — the failure the
+    // guard exists for. The page must answer with copy either way.
+    const seatless = (key: string, params?: Record<string, unknown>) => (params === undefined ? key : key)
+    expect(component({ view: 'summary', t: seatless })).toBe(bundle.GROK_WORKFLOW_DICT['en']!['card.summary'])
+    expect(component({ view: 'summary', t: () => '' })).toBe(bundle.GROK_WORKFLOW_DICT['en']!['card.summary'])
+  })
+
+  it('drops every registration on unbind instead of rebuilding them in a dead scope', () => {
+    const locale = fakeLocale('zh')
+    const { ctx, live, slots, disposers } = fakeContext(locale)
+    bundle.apply(ctx)
+    // The settings page and the task-panel renderer are both mounted, and the `locale`
+    // fiber handed back exactly one disposer.
+    expect(live()).toHaveLength(2)
+    expect(disposers).toHaveLength(2)
+    const mounted = slots.length
+    const unbind = disposers[0]!
+
+    unbind()
+    // Everything is gone …
+    expect(live()).toHaveLength(0)
+    expect(slots.length).toBe(mounted)
+    // … and the disposer mounted nothing: the previous version called `startPages` again
+    // from inside it, registering a page and an `ctx.effect` against a fiber the framework
+    // had already disposed. That rebuild is the whole bug, so the count may not move.
+    expect(slots.every(entry => entry.disposed)).toBe(true)
+
+    // Idempotent: a second unbind (unload after the locale scope left, or two racing
+    // disposers) must not throw, re-register or leave anything behind.
+    expect(() => unbind()).not.toThrow()
+    expect(slots.length).toBe(mounted)
+    expect(live()).toHaveLength(0)
+  })
+
+  it('lets the plugin disposer win when it runs first, and stays idempotent after that', () => {
+    const { ctx, live, slots, disposers } = fakeContext(fakeLocale('zh'))
+    const dispose = bundle.apply(ctx) as unknown as () => void
+    const mounted = slots.length
+    expect(live()).toHaveLength(2)
+    dispose()
+    expect(live()).toHaveLength(0)
+    expect(slots.length).toBe(mounted)
+    // The locale scope's own disposer runs later on unload; it is the same routine, so it
+    // changes nothing (and must not resurrect the panel through `startPanel`).
+    expect(() => disposers[0]!()).not.toThrow()
+    expect(slots.length).toBe(mounted)
+    expect(live()).toHaveLength(0)
+  })
+})
+
+/** Every element of a stub tree, depth first. */
+function walk(node: unknown, out: Element[] = []): Element[] {
+  if (node === null || node === undefined || typeof node !== 'object') return out
+  if (Array.isArray(node)) {
+    for (const child of node) walk(child, out)
+    return out
+  }
+  const element = node as Element
+  if ('type' in element && 'props' in element) {
+    out.push(element)
+    walk(element.children, out)
+  }
+  return out
+}
+
+/** Every string of a stub tree, in document order. */
+function texts(node: unknown, out: string[] = []): string[] {
+  if (typeof node === 'string') {
+    out.push(node)
+    return out
+  }
+  if (node === null || node === undefined || typeof node !== 'object') return out
+  if (Array.isArray(node)) {
+    for (const child of node) texts(child, out)
+    return out
+  }
+  const element = node as Element
+  if ('children' in element) texts(element.children, out)
+  return out
+}
+
+/** Every inline style object of a stub tree, in document order. */
+function stylesOf(node: unknown, out: Array<Record<string, unknown>> = []): Array<Record<string, unknown>> {
+  for (const element of walk(node)) {
+    const style = element.props['style']
+    if (typeof style === 'object' && style !== null) out.push(style as Record<string, unknown>)
+  }
+  return out
+}
+
+describe('client settings page: reading, failure and retry', () => {
+  /** The seat the framework installs for namespace `grok-workflow`, in Chinese. */
+  const seatZh = (key: string, params?: Record<string, unknown>) => translate('zh', key, params)
+  const zhDict = bundle.GROK_WORKFLOW_DICT['zh']!
+
+  /** A face with one fixed snapshot, plus whatever the case under test needs. */
+  function faceFor(snapshot: Record<string, unknown>, extra: Record<string, unknown> = {}) {
+    return {
+      subscribe: () => () => {},
+      getSnapshot: () => snapshot,
+      ensure: async () => undefined,
+      ...extra,
+    }
+  }
+
+  /**
+   * The minimum context `apply()` touches, with a face the test controls.
+   *
+   * No locale and no workspace are injected: this block is about the settings page alone,
+   * and it hands the page its `t` seat directly.
+   */
+  function fakePageContext(face: Record<string, unknown>) {
+    const slots: Array<{ options: Record<string, unknown>, component: (props: Record<string, unknown>) => unknown, disposed: boolean }> = []
+    const ctx = {
+      effect: (fn: () => unknown) => {
+        const dispose = fn()
+        return typeof dispose === 'function' ? dispose : () => {}
+      },
+      inject: () => ({}),
+      configForms: {
+        describe: () => face,
+        whileServed: (_ns: string[], fn: () => unknown) => {
+          const dispose = fn()
+          return typeof dispose === 'function' ? dispose : () => {}
+        },
+        get: () => ({ mutate: async () => true }),
+      },
+      slots: {
+        inject: (_name: string, fn: () => unknown) => fn(),
+        register: (options: Record<string, unknown>, component: (props: Record<string, unknown>) => unknown) => {
+          const entry = { options, component, disposed: false }
+          slots.push(entry)
+          return () => { entry.disposed = true }
+        },
+      },
+    }
+    return { ctx, slots, live: () => slots.filter(entry => !entry.disposed) }
+  }
+
+  /** Register the page and take the component plus the props the plugin manager injects. */
+  function mounted(face: Record<string, unknown>) {
+    const { ctx, live } = fakePageContext(face)
+    bundle.apply(ctx)
+    const options = live()[0]!.options
+    const injected = (options['inject'] as () => Record<string, unknown>)()
+    return {
+      component: live()[0]!.component,
+      props: { ...injected, t: seatZh } as Record<string, unknown>,
+    }
+  }
+
+  /**
+   * Render the page, keeping its hook cells so a second pass sees what a click changed.
+   * @param component - the registered page.
+   * @param props - the props to render with.
+   * @returns `run()` for a render pass, `click(element)` for a button press.
+   */
+  function renderPage(component: (props: Record<string, unknown>) => unknown, props: Record<string, unknown>) {
+    const cells: unknown[] = []
+    const local: Hooks = {
+      index: 0,
+      cells,
+      useState(initial: unknown) {
+        const at = this.index++
+        if (at >= this.cells.length) this.cells[at] = typeof initial === 'function' ? (initial as () => unknown)() : initial
+        const set = (next: unknown) => {
+          this.cells[at] = typeof next === 'function' ? (next as (value: unknown) => unknown)(this.cells[at]) : next
+        }
+        return [this.cells[at], set]
+      },
+    }
+    const run = (): unknown => {
+      const before = rendering
+      rendering = local
+      local.index = 0
+      try {
+        return component(props)
+      } finally {
+        rendering = before
+      }
+    }
+    return {
+      run,
+      async click(button: Element) {
+        ;(button.props['onClick'] as () => void)()
+        // The retry handler resolves the mirror read before it clears its own flag.
+        await new Promise(resolve => setTimeout(resolve, 0))
+      },
+    }
+  }
+
+  const READY = {
+    status: 'ready',
+    view: {
+      writable: true,
+      namespaces: [{ ns: 'grok-workflow', revision: 1, value: { roles: {}, switchOn: [] } }],
+    },
+    error: null,
+  }
+
+  it('keeps still reading, read failed and not served as three different pages', () => {
+    const cases: Array<[string, Record<string, unknown>, string, boolean]> = [
+      // A mirror that has not answered yet: no failure to report and nothing to retry.
+      ['loading', { status: 'loading', view: undefined, error: null }, zhDict['status.loading']!, false],
+      // The regression this state exists for: a *failed* describe() used to be reported as
+      // `status: 'loading'`, so the page said "读取中…" forever with no way to try again.
+      ['error', { status: 'idle', view: undefined, error: 'socket closed' }, 'socket closed', true],
+      // A good answer that simply does not carry this namespace: the plugin is off, so a
+      // retry cannot help and is not offered.
+      ['unavailable', { status: 'ready', view: { namespaces: [], writable: true }, error: null }, zhDict['status.unavailable']!, false],
+    ]
+    for (const [state, snapshot, expected, retry] of cases) {
+      const { component, props } = mounted(faceFor(snapshot, { load: async () => undefined }))
+      const view = renderPage(component, props)
+      const tree = view.run()
+      const block = walk(tree).find(element => element.props['data-settings-state'] === state)
+      expect(block, state).toBeDefined()
+      expect(texts(tree).join('\n'), state).toContain(expected)
+      const buttons = walk(tree).filter(element => element.props['data-action'] === 'retry')
+      expect(buttons, state).toHaveLength(retry ? 1 : 0)
+      if (retry) {
+        expect(texts(buttons[0]!).join('')).toBe(zhDict['action.retry'])
+        // The reason is part of the message, not a console-only detail.
+        expect(texts(tree).join('\n')).toContain(zhDict['status.loadError']!.replace('{message}', 'socket closed'))
+      }
+      // A failed read never renders the form: there is nothing to edit.
+      expect(walk(tree).some(element => element.props['data-field'] === 'maxConcurrency')).toBe(false)
+    }
+  })
+
+  it('retries the mirror read through the face and shows the form once it answers', async () => {
+    let snapshot: Record<string, unknown> = { status: 'idle', view: undefined, error: 'socket closed' }
+    let loads = 0
+    const { component, props } = mounted(faceFor(snapshot, {
+      load: async () => { loads += 1; snapshot = READY },
+      getSnapshot: () => snapshot,
+    }))
+    const view = renderPage(component, props)
+    const broken = walk(view.run())
+    expect(broken.find(element => element.props['data-settings-state'] === 'error')).toBeDefined()
+
+    await view.click(broken.find(element => element.props['data-action'] === 'retry')!)
+    const recovered = walk(view.run())
+    expect(loads).toBe(1)
+    // The failure is gone and the real page is there — fields, range lines and all.
+    expect(recovered.some(element => element.props['data-settings-state'] !== undefined)).toBe(false)
+    expect(recovered.some(element => element.props['data-field'] === 'maxConcurrency')).toBe(true)
+    expect(texts(view.run()).join('\n')).toContain(zhDict['field.maxConcurrency']!)
+  })
+
+  it('offers no retry when the composition has no way to re-read', () => {
+    const { component, props } = mounted(faceFor({ status: 'idle', view: undefined, error: 'socket closed' }))
+    const tree = renderPage(component, props).run()
+    expect(walk(tree).find(element => element.props['data-settings-state'] === 'error')).toBeDefined()
+    expect(walk(tree).filter(element => element.props['data-action'] === 'retry')).toHaveLength(0)
+  })
+
+  it('renders no key id even when the seat answers every key with the key', () => {
+    const { component, props } = mounted(faceFor(READY))
+    const tree = renderPage(component, { ...props, t: (key: string) => key }).run()
+    const rendered = texts(tree).join('\n')
+    // The seat above is the worst case: it answers every key with the key. No dictionary
+    // key may survive to the screen — not one of them, in either shipped language.
+    for (const key of [...Object.keys(zhDict), ...Object.keys(bundle.GROK_WORKFLOW_DICT['en']!)]) {
+      expect(rendered, key).not.toContain(key)
+    }
+    // The page still says something: the guard falls back to this bundle's own table.
+    expect(rendered).toContain('Grok workflow')
+  })
+
+  it('colours the live status line through --dsw-alias tokens', () => {
+    const { component, props } = mounted(faceFor(READY))
+    const backgrounds = stylesOf(renderPage(component, props).run())
+      .map(style => style['background'])
+      .filter((value): value is string => typeof value === 'string')
+    expect(backgrounds.some(value => value.includes('var(--dsw-alias-state-'))).toBe(true)
+    // The five states the panel words all come from the token palette, not from a hex.
+    for (const token of ['business-primary', 'success-primary', 'error-primary', 'warn-primary', 'idle-primary']) {
+      expect(readFileSync(new URL('../src/client/index.js', import.meta.url), 'utf8')).toContain(`--dsw-alias-state-${token}`)
+    }
   })
 })
 
@@ -587,5 +1013,741 @@ describe('client settings page: draft, validation and path ops', () => {
 
     // comboWarn is untouched by this change.
     expect(comboWarn(draftOf(undefined))).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The "进度" conversation tab (group G)
+
+/** One declared row, in the shape `agent-start` produces. */
+function progressMember(seq: number, phase: string | undefined, outcome?: string): ProgressMember {
+  return {
+    seq,
+    label: `执行 ${seq}`,
+    childId: `child-${seq}`,
+    order: seq - 1,
+    ...phase === undefined ? {} : { phase },
+    ...outcome === undefined ? {} : { outcome },
+  }
+}
+
+// ---------------------------------------------------------------------------
+
+/**
+ * The progress tab, as the browser bundle implements it.
+ *
+ * Every rule the tab relies on is pinned twice: here against the hand-written JavaScript
+ * the host serves, and in `test/progress-tab.spec.ts` against the typed fold in
+ * `src/progress-tab.ts`. The bundle cannot import that module (the host serves it
+ * verbatim), so parity is a test property, not a build guarantee — which is exactly why
+ * the two suites are written against the same fixtures.
+ */
+describe('client progress tab: registration', () => {
+  const progress = bundle.GROK_WORKFLOW_PROGRESS
+
+  type FakeConversation = {
+    events: { register(definition: unknown): () => void }
+    views: { register(definition: unknown): () => void }
+    binding(sessionId: string): { target(name: string): { getSnapshot(): unknown, subscribe(listener: () => void): () => void } }
+  }
+
+  /** A conversation service recording what the tab registers, with one inert session. */
+  function fakeConversation(options: { failEvents?: boolean, failViews?: boolean } = {}) {
+    const events: unknown[] = []
+    const views: unknown[] = []
+    const targets: string[] = []
+    const conversation: FakeConversation = {
+      events: {
+        register: (definition) => {
+          if (options.failEvents === true) throw new Error('events registry refused')
+          events.push(definition)
+          return () => { events.length = 0 }
+        },
+      },
+      views: {
+        register: (definition) => {
+          if (options.failViews === true) throw new Error('views registry refused')
+          views.push(definition)
+          return () => { views.length = 0 }
+        },
+      },
+      binding: (sessionId) => ({
+        target: (name) => {
+          targets.push(`${sessionId}:${name}`)
+          const snapshot = { runs: [], activeRun: undefined }
+          return { getSnapshot: () => snapshot, subscribe: () => () => {} }
+        },
+      }),
+    }
+    return { conversation, events, views, targets }
+  }
+
+  function fakeSessions(addresses: Record<string, { parentSessionId: string, mode: string }> = {}) {
+    return {
+      binding: (sessionId: string) => ({ sessionId, key: sessionId }),
+      subagentAddress: (childId: string) => addresses[childId],
+    }
+  }
+
+  function mountProgressOn(
+    conversation: FakeConversation,
+    sessions: Record<string, unknown>,
+    extra: { workspace?: unknown, i18n?: Record<string, unknown> } = {},
+  ) {
+    const slots: Array<{ options: Record<string, unknown>, component: (props: Record<string, unknown>) => unknown, disposed: boolean }> = []
+    const ctx = {
+      slots: {
+        inject: (_name: string, fn: () => unknown) => fn(),
+        register: (options: Record<string, unknown>, component: (props: Record<string, unknown>) => unknown) => {
+          const entry = { options, component, disposed: false }
+          slots.push(entry)
+          return () => { entry.disposed = true }
+        },
+      },
+    }
+    const status = { states: [] as string[], set(state: string) { this.states.push(state) } }
+    const i18n = extra.i18n ?? { locale: undefined, t: translator('zh') }
+    const dispose = progress.mount(ctx, { uiConversation: conversation, sessions }, i18n, status, () => extra.workspace)
+    return {
+      slots,
+      status,
+      dispose,
+      live: () => slots.filter((entry) => !entry.disposed),
+    }
+  }
+
+  it('registers a namespaced view entry after chat and trajectory, without a priority', () => {
+    expect(progress.viewId).toBe('grok-progress')
+    expect(progress.target).toBe('grok-progress')
+    expect(progress.kind.startsWith('grok-progress')).toBe(true)
+    // The stock chat is order 0 and the trajectory view order 10, so 20 is "third".
+    expect(progress.viewOrder).toBe(20)
+    expect(progress.zoomKey).toBe('dsh.gw.progress.zoom')
+
+    const { conversation } = fakeConversation()
+    const mounted = mountProgressOn(conversation, fakeSessions())
+    const entry = mounted.live()[0]!
+    expect(entry.options['name']).toBe('conversation.view')
+    expect(entry.options['id']).toBe('grok-progress')
+    expect(entry.options['order']).toBe(20)
+    // A list slot orders by `order`; `priority` belongs to keyed replacement and must
+    // not appear here (it would say "shadow someone" where nothing is shadowed).
+    expect('priority' in entry.options).toBe(false)
+    expect(typeof entry.options['label']).toBe('function')
+    expect(mounted.status.states).toEqual(['mounted'])
+  })
+
+  it('defaults to the chat tab: it never selects or pins itself', () => {
+    const { conversation } = fakeConversation()
+    const mounted = mountProgressOn(conversation, fakeSessions())
+    // One registration, and the entry's own props carry no selection: the shell's stored
+    // preference (null → chat) decides, which is why no `view`/`selected` key exists.
+    expect(mounted.live()).toHaveLength(1)
+    for (const key of ['selected', 'default', 'view', 'active']) {
+      expect(key in mounted.live()[0]!.options).toBe(false)
+    }
+  })
+
+  it('keeps the copy on the plugin namespace and declares it only with a locale face', () => {
+    const { conversation } = fakeConversation()
+    const withoutLocale = mountProgressOn(conversation, fakeSessions())
+    expect(withoutLocale.live()[0]!.options['locale']).toBeUndefined()
+
+    const locale = { bind: (ns: string) => { expect(ns).toBe('grok-workflow'); return translator('zh') } }
+    const withLocale = mountProgressOn(fakeConversation().conversation, fakeSessions(), { i18n: { locale, t: translator('zh') } })
+    expect(withLocale.live()[0]!.options['locale']).toBe('grok-workflow')
+    expect((withLocale.live()[0]!.options['label'] as () => string)()).toBe(bundle.GROK_WORKFLOW_DICT['zh']!['view.progress'])
+  })
+
+  it('degrades to no tab (with a stated reason) when the registries refuse it', () => {
+    const warnings: string[] = []
+    const originalWarn = console.warn
+    console.warn = (...args: unknown[]) => { warnings.push(args.map(String).join(' ')) }
+    try {
+      const refused = mountProgressOn(fakeConversation({ failViews: true }).conversation, fakeSessions())
+      expect(refused.dispose).toBeUndefined()
+      expect(refused.live()).toHaveLength(0)
+      expect(refused.status.states).toEqual(['failed'])
+      expect(warnings.join('\n')).toContain('progress tab could not be registered')
+
+      const refusedEvents = mountProgressOn(fakeConversation({ failEvents: true }).conversation, fakeSessions())
+      expect(refusedEvents.live()).toHaveLength(0)
+      expect(refusedEvents.status.states).toEqual(['failed'])
+      // The tab is the only casualty: the mount fails, it does not throw at the caller.
+      expect(() => mountProgressOn(fakeConversation({ failEvents: true }).conversation, fakeSessions())).not.toThrow()
+    } finally {
+      console.warn = originalWarn
+    }
+  })
+
+  it('keeps the tab out entirely without a uiConversation service, and the page says so', () => {
+    // `apply()` only calls mount from inside `ctx.inject(['uiConversation','sessions'])`,
+    // so an absent service never reaches mount at all: the status stays `unmounted`.
+    const status = progress.createStatus()
+    expect(status.getSnapshot()).toBe('unmounted')
+    const seen: string[] = []
+    const off = status.subscribe(() => seen.push(status.getSnapshot()))
+    status.set('mounted')
+    status.set('failed', 'boom')
+    off()
+    status.set('unmounted')
+    expect(seen).toEqual(['mounted', 'failed'])
+    // …and the copy for that state exists in both languages.
+    for (const locale of ['zh', 'en']) {
+      expect(translate(locale, 'status.progressMissing')).not.toBe('status.progressMissing')
+      expect(translate(locale, 'status.progressFailed', { message: 'boom' })).toContain('boom')
+    }
+  })
+
+  it('remounts on a locale change from the disposer, never leaving two tabs', () => {
+    const first = mountProgressOn(fakeConversation().conversation, fakeSessions())
+    expect(first.live()).toHaveLength(1)
+    first.dispose!()
+    // The tab's own disposer takes the view registration away and reports the change, so
+    // the page can stop claiming a tab that is gone.
+    expect(first.slots.every((entry) => entry.disposed)).toBe(true)
+    expect(first.status.states).toEqual(['mounted', 'unmounted'])
+    expect(first.live()).toHaveLength(0)
+    // Idempotent: a second call (unload after the locale scope left) must not throw.
+    expect(() => first.dispose!()).not.toThrow()
+  })
+
+  it('resolves the target it registered and no other', () => {
+    const { conversation, targets } = fakeConversation()
+    mountProgressOn(conversation, fakeSessions())
+    const options = progress.viewDefinition as { target: string }
+    expect(options.target).toBe(progress.target)
+    // The injected props carry a snapshot reader bound to that exact target name.
+    expect(typeof (progress.eventDefinition as { target: string }).target).toBe('string')
+    expect((progress.eventDefinition as { target: string }).target).toBe(progress.target)
+    expect(targets).toEqual([])
+  })
+})
+
+describe('client progress tab: the fold and the five states', () => {
+  const progress = bundle.GROK_WORKFLOW_PROGRESS
+  const stateLabels = (key: string) => translate('zh', `progress.state.${key}`)
+
+  function rec(type: string, data: Record<string, unknown>, seq?: number, time?: number) {
+    return { type, data, seq, time }
+  }
+
+  function trackOf(members: ProgressMember[], stopReason?: string) {
+    const run: ProgressRun = {
+      runId: 'run-1',
+      name: '任务团队',
+      anchorSeq: 1,
+      members,
+      ...stopReason === undefined ? {} : { stopReason },
+    }
+    const track = progress.deriveTrack(run, (key) => translate('zh', `progress.stage.${key}`))
+    expect(track).toBeDefined()
+    return track!
+  }
+
+  const stage = (track: ProgressTrack, key: string) => {
+    const node = track.nodes.find((candidate) => candidate.key === `stage:${key}`)
+    expect(node, key).toBeDefined()
+    return node!
+  }
+
+  it('folds the four recorded events and ignores everything else', () => {
+    expect(progress.eventTypes).toEqual([
+      'tool-workflow/run-start',
+      'tool-workflow/agent-start',
+      'tool-workflow/agent-end',
+      'tool-workflow/run-end',
+    ])
+    const runs = progress.fold([
+      rec('tool-workflow/run-start', { runId: 'r1', name: '任务团队 · 2 个任务' }, 10, 1_000),
+      rec('tool-workflow/agent-start', { runId: 'r1', seq: 1, label: '执行', phase: '任务 1 · 修复', childId: 'c1' }, 11, 1_100),
+      rec('tool-workflow/agent-end', { runId: 'r1', seq: 1, outcome: 'completed' }, 12, 2_100),
+      rec('assistant/message', { runId: 'r1', text: 'noise' }, 13),
+      rec('tool-workflow/run-end', { runId: 'r1', stopReason: 'completed' }, 14, 2_200),
+    ])
+    expect(runs).toHaveLength(1)
+    expect(runs[0]!.runId).toBe('r1')
+    expect(runs[0]!.stopReason).toBe('completed')
+    expect(runs[0]!.members).toEqual([{
+      seq: 1,
+      label: '执行',
+      phase: '任务 1 · 修复',
+      childId: 'c1',
+      order: 0,
+      startedAt: 1_100,
+      endedAt: 2_100,
+      outcome: 'completed',
+    }])
+  })
+
+  it('settles out of order and idempotently, and drops what nobody declared', () => {
+    const runs = progress.fold([
+      rec('tool-workflow/agent-end', { runId: 'r1', seq: 2, outcome: 'failed' }, 12),
+      rec('tool-workflow/agent-start', { runId: 'r1', seq: 2, label: '检查', phase: '任务 1 · 修复', childId: 'c2' }, 11),
+      rec('tool-workflow/agent-start', { runId: 'r1', seq: 2, label: '检查', phase: '任务 1 · 修复', childId: 'c2' }, 11),
+      rec('tool-workflow/run-start', { runId: 'r1', name: '任务团队' }, 10),
+      rec('tool-workflow/agent-end', { runId: 'r1', seq: 7, outcome: 'completed' }, 13),
+      rec('tool-workflow/agent-end', { runId: 'ghost', seq: 1, outcome: 'completed' }, 14),
+    ])
+    expect(runs).toHaveLength(1)
+    expect(runs[0]!.members).toHaveLength(1)
+    expect(runs[0]!.members[0]!.outcome).toBe('failed')
+  })
+
+  it('picks the newest run, preferring the one still running', () => {
+    const older: ProgressRun = { runId: 'old', name: 'a', anchorSeq: 10, members: [], stopReason: 'completed' }
+    const newest: ProgressRun = { runId: 'new', name: 'b', anchorSeq: 30, members: [] }
+    expect(progress.selectActiveRun([older, newest])?.runId).toBe('new')
+    expect(progress.selectActiveRun([newest, older])?.runId).toBe('new')
+    expect(progress.selectActiveRun([])).toBeUndefined()
+  })
+
+  it('renders pending, doing, done, blocked and failed from the events alone', () => {
+    // pending: nothing declared for this stage.
+    const pending = trackOf([])
+    expect(stage(pending, 'fix').state).toBe('pending')
+    expect(pending.percent).toBeUndefined()
+    expect(stateLabels('pending')).toBe('待开始')
+
+    // doing: an open run with an unsettled row.
+    const doing = trackOf([progressMember(1, '任务 1 · 修复登录')])
+    expect(stage(doing, 'fix').state).toBe('doing')
+    expect(doing.ended).toBe(false)
+    expect(stateLabels('doing')).toBe('进行中')
+
+    // done: every row settled completed.
+    const done = trackOf([progressMember(1, '任务 1 · 修复登录', 'completed')], 'completed')
+    expect(stage(done, 'fix').state).toBe('done')
+    expect(stage(done, 'end').state).toBe('done')
+    expect(stateLabels('done')).toBe('已完成')
+
+    // blocked: derived from a run that ended over a row it never settled, and labelled.
+    const blocked = trackOf([progressMember(1, '任务 1 · 修复登录'), progressMember(2, '任务 1 · 修复登录', 'completed')], 'error')
+    expect(stage(blocked, 'fix').state).toBe('blocked')
+    expect(stage(blocked, 'fix').derived).toBe(true)
+    expect(stage(blocked, 'fix').reason).toBe('runEndedUnsettled')
+    expect(stateLabels('blocked')).toBe('阻塞')
+    // The explanation is real copy in both languages, not a bare key.
+    for (const locale of ['zh', 'en']) {
+      expect(translate(locale, 'progress.derived.runEndedUnsettled')).not.toBe('progress.derived.runEndedUnsettled')
+      expect(translate(locale, 'progress.derived.outcomeUnsettled')).not.toBe('progress.derived.outcomeUnsettled')
+    }
+
+    // failed: wins over an unfinished row, and the run's own end agrees.
+    const failed = trackOf([progressMember(1, '任务 1 · 修复登录', 'failed'), progressMember(2, '任务 1 · 修复登录')], 'error')
+    expect(stage(failed, 'fix').state).toBe('failed')
+    expect(stage(failed, 'end').state).toBe('failed')
+    expect(stateLabels('failed')).toBe('失败')
+
+    // cancelled: the engine's own word, kept rather than derived.
+    const cancelled = trackOf([progressMember(1, '任务 1 · 修复登录', 'cancelled')], 'cancelled')
+    expect(stage(cancelled, 'fix').state).toBe('cancelled')
+    expect(stage(cancelled, 'end').state).toBe('cancelled')
+    expect(stateLabels('cancelled')).toBe('已取消')
+  })
+
+  it('reports settled rows over declared rows, and nothing when nothing was declared', () => {
+    expect(progress.percent([])).toBeUndefined()
+    expect(progress.percent([progressMember(1, 'x', 'completed'), progressMember(2, 'x'), progressMember(3, 'x', 'completed'), progressMember(4, 'x', 'completed')]))
+      .toEqual({ settled: 3, declared: 4, value: 75 })
+    const track = trackOf([progressMember(1, '任务 1 · 修复', 'completed'), progressMember(2, '任务 1 · 修复', 'completed')], 'completed')
+    expect(track.percent).toEqual({ settled: 2, declared: 2, value: 100 })
+    // The copy states what the number is, so no reader mistakes it for a task verdict.
+    expect(translate('zh', 'progress.percent', { settled: 3, declared: 4, percent: 75 })).toContain('3/4')
+    expect(translate('zh', 'progress.percentHint', { settled: 3, declared: 4 })).toContain('不是任务通过数')
+    expect(translate('en', 'progress.percentHint', { settled: 3, declared: 4 })).toContain('not a task verdict')
+  })
+
+  it('appends an unmatched phase as a real node and keeps an unphased row visible', () => {
+    const track = trackOf([
+      progressMember(1, '任务 1 · 真机验证', 'completed'),
+      progressMember(2, '任务 2 · 写文档', 'completed'),
+      progressMember(3, undefined, 'completed'),
+    ], 'completed')
+    const keys = track.nodes.map((node) => node.key)
+    expect(keys).toContain('phase:任务 2 · 写文档')
+    expect(keys).toContain('phase:')
+    // Between the device stage and the cleanup stage: it is work, not a closing step.
+    expect(keys.indexOf('phase:任务 2 · 写文档')).toBeGreaterThan(keys.indexOf('stage:device'))
+    expect(keys.indexOf('phase:任务 2 · 写文档')).toBeLessThan(keys.indexOf('stage:cleanup'))
+    expect(track.nodes.find((node) => node.key === 'phase:任务 2 · 写文档')!.label).toBe('任务 2 · 写文档')
+    // Every declared row appears exactly once across the track.
+    const rendered = track.nodes.flatMap((node) => node.members.map((entry) => entry.seq)).sort((a, b) => a - b)
+    expect(rendered).toEqual([1, 2, 3])
+  })
+})
+
+describe('client progress tab: the detail ladder', () => {
+  const progress = bundle.GROK_WORKFLOW_PROGRESS
+  const block = ['```grok-coordination', JSON.stringify({
+    files: 'src/a.ts',
+    commands: ['npx vitest run test/a.spec.ts'],
+    result: 'tests pass',
+  }, null, 2), '```'].join('\n')
+
+  it('labels every field with its source, strongest first', () => {
+    const report = progress.detailFor({ stageDetail: { files: 'from-event' }, coordinationText: block })
+    const byKey = new Map(report.fields.map((field) => [field.key, field]))
+    expect(byKey.get('files')).toEqual({ key: 'files', value: 'from-event', source: 'stage-detail' })
+    expect(byKey.get('commands')).toEqual({ key: 'commands', value: 'npx vitest run test/a.spec.ts', source: 'coordination' })
+    expect(byKey.get('result')).toEqual({ key: 'result', value: 'tests pass', source: 'coordination' })
+    for (const key of ['evidence', 'risks', 'next', 'owner']) {
+      expect(byKey.get(key)).toEqual({ key, source: 'not-reported' })
+    }
+    expect(report.fields).toHaveLength(progress.detailFields.length)
+    expect(report.coordinationRaw).toContain('src/a.ts')
+  })
+
+  it('degrades to seven "not reported" rows, with the badge copy in both languages', () => {
+    const report = progress.detailFor()
+    expect(report.fields).toHaveLength(7)
+    expect(report.fields.every((field) => field.source === 'not-reported' && field.value === undefined)).toBe(true)
+    expect(report.coordinationRaw).toBeUndefined()
+    for (const locale of ['zh', 'en']) {
+      for (const key of ['progress.source.stageDetail', 'progress.source.coordination', 'progress.source.notReported']) {
+        expect(translate(locale, key), `${locale} ${key}`).not.toBe(key)
+      }
+      // A missing value renders an em dash, never a blank cell.
+      expect(translate(locale, 'progress.none')).toBe('—')
+    }
+  })
+
+  it('accepts only an explicit coordination block', () => {
+    expect(progress.parseCoordination(block)?.fields.files).toBe('src/a.ts')
+    const nested = ['```json', JSON.stringify({ coordination: { owner: 'G' } }), '```'].join('\n')
+    expect(progress.parseCoordination(nested)?.fields).toEqual({ owner: 'G' })
+    expect(progress.parseCoordination(['```json', JSON.stringify({ files: 'a', result: 'b' }), '```'].join('\n'))?.fields.files).toBe('a')
+    expect(progress.parseCoordination(['```json', JSON.stringify({ result: 'b' }), '```'].join('\n'))).toBeUndefined()
+    expect(progress.parseCoordination('files: a.ts; result: ok')).toBeUndefined()
+    expect(progress.parseCoordination(undefined)).toBeUndefined()
+  })
+
+  /**
+   * Render the tab with the real hook cells, so a click is a real second render.
+   * @param props - the props to render with.
+   * @returns `run()` for a render pass and `click(element)` for a button press.
+   */
+  function renderProgress(props: Record<string, unknown>) {
+    const cells: unknown[] = []
+    const local: Hooks = {
+      index: 0,
+      cells,
+      useState(initial: unknown) {
+        const at = this.index++
+        if (at >= this.cells.length) this.cells[at] = typeof initial === 'function' ? (initial as () => unknown)() : initial
+        const set = (next: unknown) => {
+          this.cells[at] = typeof next === 'function' ? (next as (value: unknown) => unknown)(this.cells[at]) : next
+        }
+        return [this.cells[at], set]
+      },
+    }
+    const run = (): unknown => {
+      const before = rendering
+      rendering = local
+      local.index = 0
+      try {
+        return progress.component(props)
+      } finally {
+        rendering = before
+      }
+    }
+    return { run }
+  }
+
+  /** The run every render-based case below shows: two rows, one phase each. */
+  const run: ProgressRun = {
+    runId: 'run-42',
+    name: '任务团队 · 2 个任务',
+    anchorSeq: 1,
+    members: [
+      progressMember(1, '任务 1 · 修复登录', 'completed'),
+      progressMember(2, '任务 2 · 修复登录', 'completed'),
+    ],
+    startedAt: 1_000,
+  }
+
+  it('opens a node into three sections: header, engine facts and the seven-field report', () => {
+    const t = translator('zh')
+    const view = renderProgress({
+      t,
+      progressT: t,
+      useGrokProgress: (select: (value: unknown) => unknown) => select({ runs: [run], activeRun: run }),
+      detailSources: () => ({ coordinationText: block }),
+    })
+    const before = walk(view.run())
+    expect(before.some((element) => element.props['data-progress-detail'] === true)).toBe(false)
+
+    const fix = before.find((element) => element.props['data-node-key'] === 'stage:fix')!
+    ;(fix.props['onClick'] as () => void)()
+    const detail = walk(view.run()).find((element) => element.props['data-progress-detail'] === true)!
+    expect(detail, 'detail popover').toBeDefined()
+
+    const detailText = texts(detail).join('\n')
+    // Section 1: which stage and which state.
+    expect(detailText).toContain('修复')
+    expect(detailText).toContain(bundle.GROK_WORKFLOW_DICT['zh']!['progress.state.done'])
+    // Section 2: the engine facts, verbatim.
+    expect(detailText).toContain('run-42')
+    expect(detailText).toContain('child-1')
+    expect(detailText).toContain('completed')
+    expect(detailText).toContain('任务 1 · 修复登录')
+    // Section 3: seven fields, each with the source it came from.
+    const fields = walk(detail).filter((element) => element.props['data-gw-progress-field'] !== undefined)
+    expect(fields).toHaveLength(progress.detailFields.length)
+    const sources = fields.map((field) => field.props['data-source'])
+    expect(sources.filter((source) => source === 'coordination')).toHaveLength(3)
+    expect(sources.filter((source) => source === 'not-reported')).toHaveLength(4)
+    // A field's value and its badge are both on screen; a missing one is an em dash.
+    const files = fields.find((field) => field.props['data-gw-progress-field'] === 'files')!
+    expect(texts(files).join(' ')).toContain('src/a.ts')
+    expect(texts(files).join(' ')).toContain(bundle.GROK_WORKFLOW_DICT['zh']!['progress.source.coordination'])
+    const risks = fields.find((field) => field.props['data-gw-progress-field'] === 'risks')!
+    expect(texts(risks).join(' ')).toContain('—')
+    expect(texts(risks).join(' ')).toContain(bundle.GROK_WORKFLOW_DICT['zh']!['progress.source.notReported'])
+  })
+
+  it('copies the coordination block through the clipboard and reports what happened', async () => {
+    const t = translator('zh')
+    const copied: string[] = []
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'navigator')
+    Object.defineProperty(globalThis, 'navigator', {
+      configurable: true,
+      writable: true,
+      value: { clipboard: { writeText: async (text: string) => { copied.push(text) } } },
+    })
+    try {
+      const view = renderProgress({
+        t,
+        progressT: t,
+        useGrokProgress: (select: (value: unknown) => unknown) => select({ runs: [run], activeRun: run }),
+        detailSources: () => ({ coordinationText: block }),
+      })
+      const fix = walk(view.run()).find((element) => element.props['data-node-key'] === 'stage:fix')!
+      ;(fix.props['onClick'] as () => void)()
+      const open = walk(view.run())
+      const copy = open.find((element) => element.props['data-gw-progress-copy'] === true)!
+      expect(copy.props['disabled']).toBe(false)
+      ;(copy.props['onClick'] as () => void)()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      expect(copied).toHaveLength(1)
+      expect(copied[0]).toContain('"files"')
+      const after = walk(view.run()).find((element) => element.props['data-gw-progress-copy'] === true)!
+      expect(texts(after).join('')).toBe(bundle.GROK_WORKFLOW_DICT['zh']!['progress.detail.copied'])
+    } finally {
+      if (descriptor === undefined) delete (globalThis as unknown as { navigator?: unknown }).navigator
+      else Object.defineProperty(globalThis, 'navigator', descriptor)
+    }
+  })
+
+  it('disables the copy action when no coordination block exists', () => {
+    const t = translator('zh')
+    const view = renderProgress({
+      t,
+      progressT: t,
+      useGrokProgress: (select: (value: unknown) => unknown) => select({ runs: [run], activeRun: run }),
+    })
+    const fix = walk(view.run()).find((element) => element.props['data-node-key'] === 'stage:fix')!
+    ;(fix.props['onClick'] as () => void)()
+    const copy = walk(view.run()).find((element) => element.props['data-gw-progress-copy'] === true)!
+    expect(copy.props['disabled']).toBe(true)
+    expect(copy.props['title']).toBe(bundle.GROK_WORKFLOW_DICT['zh']!['progress.detail.noBlock'])
+  })
+
+  it('offers "open child session" only for a row the panel rule would open', () => {
+    const t = translator('zh')
+    const opened: string[] = []
+    const view = renderProgress({
+      t,
+      progressT: t,
+      useGrokProgress: (select: (value: unknown) => unknown) => select({ runs: [run], activeRun: run }),
+      canOpen: (childId: string) => childId === 'child-1',
+      openChild: (childId: string) => { opened.push(childId) },
+    })
+    const fix = walk(view.run()).find((element) => element.props['data-node-key'] === 'stage:fix')!
+    ;(fix.props['onClick'] as () => void)()
+    const buttons = walk(view.run()).filter((element) => element.props['data-gw-progress-open'] === true)
+    // Two rows in this stage, one of them openable: exactly one button, and it opens it.
+    expect(buttons).toHaveLength(1)
+    ;(buttons[0]!.props['onClick'] as () => void)()
+    expect(opened).toEqual(['child-1'])
+  })
+})
+
+describe('client progress tab: styles, zoom and empty snapshots', () => {
+  const progress = bundle.GROK_WORKFLOW_PROGRESS
+
+  it('keeps every colour on a --dsw-alias token and the family on a --dsw-font token', () => {
+    for (const state of ['doing', 'done', 'failed', 'blocked', 'cancelled', 'pending']) {
+      expect(progress.stateColor[state]).toMatch(/^var\(--dsw-alias-/)
+    }
+    expect(progress.css).toContain('var(--dsw-font-family-sans')
+    expect(progress.css).toContain('var(--dsw-font-family-mono')
+    // No literal colour and no light-only surface anywhere in the scoped rules.
+    expect(progress.css).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
+    expect(progress.css).not.toMatch(/\brgba?\(/)
+    expect(progress.css).not.toMatch(/\bhsla?\(/)
+  })
+
+  it('scopes every rule to .gw-progress, with the 96px track, snap and both breakpoints', () => {
+    const rules = progress.css.split('\n').filter((line) => line.includes('{') && !line.trim().startsWith('@'))
+    for (const rule of rules) expect(rule.trim().startsWith('.gw-progress')).toBe(true)
+    expect(progress.css).toContain('height: 96px')
+    expect(progress.css).toContain('overflow-x: auto')
+    expect(progress.css).toContain('scroll-snap-type: x mandatory')
+    expect(progress.css).toContain('prefers-reduced-motion: reduce')
+    expect(progress.css).toContain('@media (max-width: 720px)')
+    expect(progress.css).toContain('@media (max-width: 480px)')
+    // The narrow layout is a bottom drawer, not a squeezed popover.
+    expect(progress.css).toMatch(/@media \(max-width: 480px\)[\s\S]*position: fixed/)
+    // 28px rings, sized from the zoom variable rather than a fixed px font.
+    expect(progress.css).toContain('width: 28px')
+    expect(progress.css).toContain('--gw-zoom')
+  })
+
+  it('zooms through font-size and remembers the factor, clamped to its range', () => {
+    expect(progress.zoom).toEqual({ min: 0.8, max: 1.6, step: 0.1 })
+    const memory = new Map<string, string>()
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      writable: true,
+      value: {
+        getItem: (key: string) => (memory.has(key) ? memory.get(key)! : null),
+        setItem: (key: string, value: string) => { memory.set(key, value) },
+      },
+    })
+    try {
+      expect(progress.readZoom()).toBe(1)
+      progress.writeZoom(1.3)
+      expect(memory.get('dsh.gw.progress.zoom')).toBe('1.3')
+      expect(progress.readZoom()).toBe(1.3)
+      progress.writeZoom(9)
+      expect(progress.readZoom()).toBe(1.6)
+      progress.writeZoom(0.1)
+      expect(progress.readZoom()).toBe(0.8)
+      progress.writeZoom(1)
+      expect(progress.readZoom()).toBe(1)
+    } finally {
+      if (descriptor === undefined) delete (globalThis as unknown as { localStorage?: unknown }).localStorage
+      else Object.defineProperty(globalThis, 'localStorage', descriptor)
+    }
+  })
+
+  it('returns the same snapshot object when nothing the track renders changed', () => {
+    const builder = new progress.Builder()
+    const node = { key: 'k', data: { runId: 'r1', name: 'a', anchorSeq: 1, members: [] } }
+    const first = builder.replace({ nodes: [node] })
+    // An `apply` with no upserts is the common case (an unrelated session event).
+    expect(builder.apply({ upserts: [] })).toBe(first)
+    // …and an upsert carrying identical data is not a change either.
+    expect(builder.apply({ upserts: [node] })).toBe(first)
+    // A real change does produce a new object.
+    const changed = builder.apply({ upserts: [{ key: 'k', data: { ...node.data, name: 'b' } }] })
+    expect(changed).not.toBe(first)
+  })
+
+  it('renders the empty state and the track from a snapshot, without inventing rows', () => {
+    const t = translator('zh')
+    const empty = progress.component({ t, progressT: t, useGrokProgress: (select: (value: unknown) => unknown) => select({ runs: [], activeRun: undefined }) })
+    const emptyTree = walk(empty)
+    expect(emptyTree.some((element) => element.props['data-progress-empty'] === true)).toBe(true)
+    expect(texts(empty).join('\n')).toContain(bundle.GROK_WORKFLOW_DICT['zh']!['progress.empty.title'])
+    expect(texts(empty).join('\n')).toContain(bundle.GROK_WORKFLOW_DICT['zh']!['progress.unsettled'])
+    // The stylesheet is part of the tab's own tree, so it leaves when the tab unmounts.
+    expect(emptyTree.some((element) => element.props['data-gw-progress-css'] === true)).toBe(true)
+    expect(emptyTree.filter((element) => element.props['data-gw-progress-node'] === true)).toHaveLength(0)
+
+    const run: ProgressRun = {
+      runId: 'r1',
+      name: '任务团队',
+      anchorSeq: 1,
+      members: [progressMember(1, '任务 1 · 修复登录', 'completed')],
+      stopReason: 'completed',
+    }
+    const filled = progress.component({ t, progressT: t, useGrokProgress: (select: (value: unknown) => unknown) => select({ runs: [run], activeRun: run }) })
+    const nodes = walk(filled).filter((element) => element.props['data-gw-progress-node'] === true)
+    expect(nodes).toHaveLength(progress.stages.length)
+    expect(nodes.map((node) => node.props['data-state'])).toContain('done')
+    expect(texts(filled).join('\n')).toContain('1/1 · 100%')
+    // Roving tabindex: exactly one node is in the tab order.
+    expect(nodes.filter((node) => node.props['tabIndex'] === 0)).toHaveLength(1)
+    // Aria: the track is a labelled group, every node has a name, and nothing is expanded
+    // until a reader opens it.
+    expect(walk(filled).some((element) => element.props['role'] === 'group' && element.props['aria-label'] !== undefined)).toBe(true)
+    expect(nodes.every((node) => typeof node.props['aria-label'] === 'string' && node.props['aria-label'].includes('·'))).toBe(true)
+    expect(nodes.every((node) => node.props['aria-expanded'] === false)).toBe(true)
+  })
+
+  it('survives a snapshot with a missing field instead of throwing', () => {
+    const t = translator('zh')
+    // The worst a damaged session can hand the tab: a run with no members, a member with
+    // no phase, and a snapshot whose activeRun is present but empty.
+    const broken = { runs: [{ runId: 'r', name: '', anchorSeq: 0, members: [{ seq: Number.NaN, label: '', childId: '', order: 0 }] }], activeRun: { runId: 'r', name: '', anchorSeq: 0, members: [] } }
+    const tree = progress.component({ t, progressT: t, useGrokProgress: (select: (value: unknown) => unknown) => select(broken) })
+    expect(walk(tree).some((element) => element.props['data-gw-progress-track'] === true)).toBe(true)
+    expect(texts(tree).join('\n')).toContain(bundle.GROK_WORKFLOW_DICT['zh']!['progress.title'])
+    // No number is invented for a run that declared nothing.
+    expect(texts(tree).join('\n')).toContain(bundle.GROK_WORKFLOW_DICT['zh']!['progress.unsettled'])
+  })
+})
+
+describe('client progress tab: derived states say where they came from', () => {
+  const progress = bundle.GROK_WORKFLOW_PROGRESS
+  const t = translator('zh')
+
+  /** Render one run and hand back its nodes. */
+  function nodesOf(run: ProgressRun) {
+    const tree = progress.component({
+      t,
+      progressT: t,
+      useGrokProgress: (select: (value: unknown) => unknown) => select({ runs: [run], activeRun: run }),
+    })
+    return walk(tree).filter((element) => element.props['data-gw-progress-node'] === true)
+  }
+
+  it('gives a blocked node the derived-state tooltip, not a guess', () => {
+    const blocked: ProgressRun = {
+      runId: 'r',
+      name: '任务团队',
+      anchorSeq: 1,
+      members: [progressMember(1, '任务 1 · 修复登录')],
+      stopReason: 'error',
+    }
+    const fix = nodesOf(blocked).find((node) => node.props['data-node-key'] === 'stage:fix')!
+    expect(fix.props['data-state']).toBe('blocked')
+    expect(fix.props['data-derived']).toBe('true')
+    expect(fix.props['title']).toBe(bundle.GROK_WORKFLOW_DICT['zh']!['progress.derived.runEndedUnsettled'])
+    // The label is the state word the reader sees, plus the stage name.
+    expect(String(fix.props['aria-label'])).toContain(bundle.GROK_WORKFLOW_DICT['zh']!['progress.state.blocked'])
+  })
+
+  it('keeps the engine’s own cancelled word on the node and the end mark', () => {
+    const cancelled: ProgressRun = {
+      runId: 'r',
+      name: '任务团队',
+      anchorSeq: 1,
+      members: [progressMember(1, '任务 1 · 修复登录', 'cancelled')],
+      stopReason: 'cancelled',
+    }
+    const nodes = nodesOf(cancelled)
+    const fix = nodes.find((node) => node.props['data-node-key'] === 'stage:fix')!
+    expect(fix.props['data-state']).toBe('cancelled')
+    // Not derived: the engine said so.
+    expect(fix.props['data-derived']).toBeUndefined()
+    expect(String(fix.props['aria-label'])).toContain(bundle.GROK_WORKFLOW_DICT['zh']!['progress.state.cancelled'])
+    expect(nodes.find((node) => node.props['data-node-key'] === 'stage:end')!.props['data-state']).toBe('cancelled')
+  })
+
+  it('marks a template stage the events never reported instead of borrowing a state', () => {
+    const run: ProgressRun = {
+      runId: 'r',
+      name: '任务团队',
+      anchorSeq: 1,
+      members: [progressMember(1, '任务 1 · 修复登录', 'completed')],
+      stopReason: 'completed',
+    }
+    const cleanup = nodesOf(run).find((node) => node.props['data-node-key'] === 'stage:cleanup')!
+    expect(cleanup.props['data-state']).toBe('pending')
+    expect(cleanup.props['title']).toBe(bundle.GROK_WORKFLOW_DICT['zh']!['progress.notReported'])
   })
 })

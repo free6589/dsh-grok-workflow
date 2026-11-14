@@ -58,6 +58,25 @@ describe('gate history forwarding', () => {
     expect(collectHistory({ deriveMessages: () => { throw new Error('nope') } } as never, { turns: 2, chars: 100 })).toBe('')
   })
 
+  // B06: the writer of a claimed batch is sometimes this plugin itself (`relay` /
+  // `append` reject the step), so the history read that follows the write must be
+  // able to leave those ids out — otherwise the message the user just typed is
+  // replayed as context and the objective carries it twice.
+  it('skips the message ids the caller already committed', () => {
+    const mine = user('the message just written')
+    const rendered = renderHistory([user('earlier turn'), mine], { turns: 2, chars: 1_000 }, [String(mine.id)])
+    expect(rendered).toContain('earlier turn')
+    expect(rendered).not.toContain('the message just written')
+  })
+
+  it('passes the excluded ids through collectHistory', () => {
+    const mine = user('the message just written')
+    const session = { deriveMessages: () => [user('earlier turn'), mine] }
+    const rendered = collectHistory(session as never, { turns: 2, chars: 1_000 }, [String(mine.id)])
+    expect(rendered).toContain('earlier turn')
+    expect(rendered).not.toContain('the message just written')
+  })
+
   it('composes history and request within the objective limit', () => {
     const composed = composeObjective('Conversation so far (context only):\nUser: earlier', 'now do it', 4_000)
     expect(composed).toContain('Conversation so far')

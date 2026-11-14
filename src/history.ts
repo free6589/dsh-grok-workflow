@@ -48,14 +48,26 @@ function isPluginMessage(message: Message): boolean {
  *
  * @param messages - durable conversation messages in order.
  * @param bounds - turn and character bounds.
+ * @param excludeIds - message ids to leave out. The gate's `relay`/`append`
+ *   strategies write the claimed batch themselves before the run starts (the step
+ *   is rejected, so nothing else would), and the history read that follows must
+ *   not hand the words the user just typed back to the run as "prior
+ *   conversation": the objective would carry the message twice — once as history,
+ *   once as the current request.
  * @returns the rendered block, or an empty string when there is nothing to forward.
  */
-export function renderHistory(messages: readonly Message[], bounds: HistoryBounds): string {
+export function renderHistory(
+  messages: readonly Message[],
+  bounds: HistoryBounds,
+  excludeIds: readonly string[] = [],
+): string {
   if (bounds.turns <= 0 || bounds.chars <= 0) return ''
+  const excluded = excludeIds.length === 0 ? undefined : new Set(excludeIds)
   const wanted = bounds.turns * 2
   const recent: { role: string; text: string }[] = []
   for (const message of messages) {
     if (message.role !== 'user' && message.role !== 'assistant') continue
+    if (excluded !== undefined && excluded.has(String(message.id))) continue
     if (isPluginMessage(message)) continue
     // Bound the input *before* running the redaction regexes: a very long message
     // must not pay unbounded regex time just to be truncated below.
@@ -88,10 +100,14 @@ export function renderHistory(messages: readonly Message[], bounds: HistoryBound
 }
 
 /** Render the durable history of one session, tolerating an unavailable session. */
-export function collectHistory(session: Session | undefined, bounds: HistoryBounds): string {
+export function collectHistory(
+  session: Session | undefined,
+  bounds: HistoryBounds,
+  excludeIds: readonly string[] = [],
+): string {
   if (session === undefined || typeof session.deriveMessages !== 'function') return ''
   try {
-    return renderHistory(session.deriveMessages(), bounds)
+    return renderHistory(session.deriveMessages(), bounds, excludeIds)
   } catch {
     return ''
   }

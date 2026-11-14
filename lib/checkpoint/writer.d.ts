@@ -39,7 +39,17 @@ export interface CheckpointWriteResult {
     /** sha-256 of the canonical payload (the stored integrity checksum). */
     checksum: string;
 }
-/** Sanitize a run id into a filename-safe segment. */
+/**
+ * Sanitize a run id into a filename-safe segment, plus a short hash of the raw id.
+ *
+ * Sanitizing alone is not injective: `run x/y` and `run x_y` both become
+ * `run_x_y`, and any two ids longer than {@link CHECKPOINT_LIMITS.idChars} that
+ * share a prefix collapse into one name — so two live runs could silently
+ * overwrite each other's checkpoint. The 8-hex-character digest of the *unmodified*
+ * id keeps the readable prefix for a human and makes the collision a thing that
+ * cannot happen silently, while staying far under the platform limit on a file
+ * name.
+ */
 export declare function checkpointFileName(runId: string): string;
 /**
  * Build, seal, and atomically write one checkpoint.

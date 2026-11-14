@@ -1,0 +1,19 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+(node:4177190) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+stdout | test/checkpoint-engine-wire.spec.ts > engine wiring writes real checkpoints > records a verified run: tasks, four-role agent rows, evidence, and no extra model calls
+[smoke] status=completed file=/home/fish/projects_mine/dsh-grok-workflow/docs/knowledge/evidence/checkpoint-engine-wire-2026-11-12/checkpoints/checkpoint-01d56234-501f-4a19-8826-09809bc2d11f.json resume=none reason=the run already completed, so re-driving it would redo verified work
+
+stdout | test/checkpoint-engine-wire.spec.ts > engine wiring writes real checkpoints > records a rejected run and answers the resume question with what to re-drive
+[smoke] status=failed file=/home/fish/projects_mine/dsh-grok-workflow/docs/knowledge/evidence/checkpoint-engine-wire-2026-11-12/checkpoints/checkpoint-1533330d-97d0-425f-9a03-d6ce49c84d01.json resume=resume unfinished=a
+
+ ✓ test/checkpoint-engine-wire.spec.ts (2 tests) 251ms
+ ✓ test/checkpoint-wiring.spec.ts (20 tests) 155ms
+
+ Test Files  2 passed (2)
+      Tests  22 passed (22)
+   Start at  03:23:26
+   Duration  2.11s (transform 638ms, setup 0ms, import 933ms, tests 406ms, environment 0ms)
+

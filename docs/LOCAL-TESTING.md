@@ -42,8 +42,8 @@ release.
 
 Configuration keys and their hard limits are listed in the
 [README configuration table](../README.md#configure-disable-and-uninstall).
-The plugin defaults are `maxConcurrency: 3`, `maxRetries: 1`, `maxTasks: 6`,
-`timeoutMs: 1800000`, and `maxActiveRuns: 2`; values are tightened by the
+The plugin defaults are `maxConcurrency: 3`, `maxRetries: 1`, `maxTasks: 12`,
+`timeoutMs: 3600000`, and `maxActiveRuns: 2`; values are tightened by the
 calling profile, not by editing this repository.
 
 ## Enable

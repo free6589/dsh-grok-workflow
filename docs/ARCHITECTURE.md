@@ -97,7 +97,7 @@ write each requirement once, with distinct wording.
 ### Execute
 
 Tasks run through a bounded worker pool implemented in the script. The pool size
-is `maxConcurrency` (default 4, schema maximum 1000000). The script calls `agent()`
+is `maxConcurrency` (default 3, hard maximum 6). The script calls `agent()`
 only from a pool worker, so at most that many child agents are in flight.
 `maxTotalAgents` is also passed to the engine as a second backstop.
 
@@ -134,8 +134,8 @@ converted to a failed verification and triggers a bounded retry.
 
 ### Retry
 
-Each task has at most `maxRetries` retries after the initial attempt (default 2,
-schema maximum 10). Retry attempts receive the prior result and verifier issues.
+Each task has at most `maxRetries` retries after the initial attempt (default 1,
+hard maximum 3). Retry attempts receive the prior result and verifier issues.
 Attempt counts are reported; failures are never collapsed into success.
 
 ### Synthesize
@@ -467,10 +467,11 @@ hostile or torn file is never parsed (`src/checkpoint/writer.ts:75`, `:132`).
 Limits *observed in a run* are recorded, not policed: the schema stores whatever `limits`
 the run actually used, and `limitContractViolations` only reports `maxConcurrency > 6` /
 `maxRetries > 3` against the AGENTS.md envelope (`src/checkpoint/schema.ts:105`, `:845`).
-Note the standing divergence: the code's own defaults are `maxConcurrency: 4` and
-`maxRetries: 2` with hard caps `1_000_000` / `10` (`src/config.ts:157`), so a truthful
-checkpoint of a default run already reports a contract violation. That divergence is
-recorded as data on purpose and is not reconciled by the schema.
+The configuration now matches that envelope exactly — defaults `maxConcurrency: 3` /
+`maxRetries: 1`, hard caps `6` / `3` (`src/config.ts:22`) — so a checkpoint of a default
+run records no violation. The former wider defaults (`4` / `2`, caps `1_000_000` / `10`)
+are why the read side stays lenient: a file written by an older build must still load,
+and `limitContractViolations` is how a caller reports one that is out of envelope.
 
 Two ceilings, deliberately different: `countCeiling` (1,000,000) bounds structural counts,
 while `msCeiling` (604,800,000 = 7 days) bounds durations and timeouts so that any

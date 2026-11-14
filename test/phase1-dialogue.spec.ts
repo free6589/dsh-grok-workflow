@@ -78,6 +78,8 @@ class FakeEngine {
       const result = await runWorkflowScript(request.script, request.args as Record<string, unknown>, async (_prompt, options) => {
         // The front-desk single call (t52) returns a string answer.
         if (options.label === 'quick-worker') return 'quick answer'
+        // The opt-in hybrid classifier answers with one JSON verdict (gate B18).
+        if (options.label === 'triage-classifier') return '{"tier":"team"}'
         // Roles are read back from the *user-visible* label (Issue #22 P1-1): the
         // script no longer emits machine names like `grok-worker-t1-a2`, so the
         // double must tell roles apart exactly the way the panel does.
@@ -503,6 +505,64 @@ describe('P0-2: a confirmation answer keeps the original request', () => {
       nextWith([]),
     ) as Decision
     expect(answerOf(decision)).toContain('作废')
+  })
+
+  it('keeps an earlier unanswered request when a second question arrives (B04)', async () => {
+    const ctx = new FakeContext()
+    ctx.engine.autoRun = true
+    apply(ctx as never, { mode: 'triage', grokDefault: 'on' })
+    const live = session('sess-b04-carry')
+    const agent = new FakeAgent(live)
+    await ctx.preStep()(payload(agent, [userMessage('改一下那个')]), nextWith([]))
+    // A second vague request while the first question is still open. The answer is
+    // the answer to *both* questions, so neither request may be thrown away.
+    const second = await ctx.preStep()(payload(agent, [userMessage('把那个也顺手弄一下')]), nextWith([])) as Decision
+    expect(answerOf(second)).toContain('简单 / 团队')
+
+    const answered = await ctx.preStep()(payload(agent, [userMessage('团队')]), nextWith([])) as Decision
+
+    await waitFor(() => ctx.engine.startCalls.length === 1)
+    const objective = String((ctx.engine.startCalls[0]!.args as { objective?: string }).objective ?? '')
+    // The forwarded conversation already names both messages, so the assertion has
+    // to look at the request the run was actually started with — the composed
+    // history is not evidence about what the front desk remembered.
+    const request = objective.slice(objective.indexOf('Current request:'))
+    expect(request).toContain('原始任务：')
+    expect(request).toContain('改一下那个')
+    expect(request).toContain('把那个也顺手弄一下')
+    expect(answerOf(answered)).toContain('COMPLETED')
+  })
+
+  it('cuts the resumed request to the objective budget instead of refusing the run (B08)', async () => {
+    const ctx = new FakeContext()
+    ctx.engine.autoRun = true
+    apply(ctx as never, { mode: 'triage', grokDefault: 'on' })
+    const live = session('sess-b08-budget')
+    const agent = new FakeAgent(live)
+    await ctx.preStep()(payload(agent, [userMessage('改一下那个')]), nextWith([]))
+    // A question whose request is one character under the workflow objective limit:
+    // the confirmation wording on top of it used to push the composed objective
+    // over the limit, and the run was refused *after* the pending entry was gone.
+    const head = '把那个也顺手弄一下 '
+    const padded = `${head}${'x'.repeat(32_000 - head.length)}`
+    const asked = await ctx.preStep()(payload(agent, [userMessage(padded)]), nextWith([])) as Decision
+    expect(answerOf(asked)).toContain('简单 / 团队')
+
+    const answered = await ctx.preStep()(payload(agent, [userMessage('团队')]), nextWith([])) as Decision
+
+    await waitFor(() => ctx.engine.startCalls.length === 1)
+    const objective = String((ctx.engine.startCalls[0]!.args as { objective?: string }).objective ?? '')
+    const request = objective.slice(objective.indexOf('原始任务：'))
+    expect(objective.length).toBeLessThanOrEqual(32_000)
+    // The confirmation and the newest request survive whole; the older request of
+    // the first question only does not, because the newest message alone already
+    // fills the budget (there is no room left to keep any of it).
+    expect(request).toContain('用户选择团队模式')
+    expect(request).toContain('把那个也顺手弄一下')
+    // The cut is marked where the budget ran out, so nothing looks truncated.
+    expect(request).toContain('…')
+    expect(answerOf(answered)).not.toContain('workflow objective limit')
+    expect(answerOf(answered)).toContain('COMPLETED')
   })
 })
 
@@ -1007,5 +1067,29 @@ describe('P1: front-desk calls share the plugin lifecycle', () => {
     await waitFor(() => lateRun.dispose.mock.calls.length === 1)
     expect(lateRun.cancel).toHaveBeenCalled()
     expect(answerOf(decision)).toContain('unloaded')
+  })
+})
+
+/* -------------------------------------------------------------------- B18 -- */
+
+describe('B18: the hybrid classifier states its own reason', () => {
+  it('names the model instead of reusing the rules sentence it overruled', async () => {
+    const ctx = new FakeContext()
+    ctx.engine.autoRun = true
+    apply(ctx as never, { mode: 'triage', grokDefault: 'on', triageClassifier: 'hybrid' })
+    const live = session('sess-b18-hybrid')
+    const agent = new FakeAgent(live)
+    const decision = await ctx.preStep()(payload(agent, [userMessage('改一下那个')]), nextWith([])) as Decision
+    const answer = answerOf(decision)
+
+    // The rules verdict for this message is the confirm tier, and its sentence says
+    // the signals conflict so the front desk does not guess. The classifier said
+    // team, so the tier line must say *that* — reusing the rules sentence would
+    // print "团队档 — 因为：信号互相矛盾或线索不足，前台不猜。".
+    expect(answer).toContain('团队档')
+    expect(answer).toContain('模型')
+    expect(answer).not.toContain('信号互相矛盾或线索不足')
+    // Two starts: the classifier call that overruled the rules, then the team run.
+    expect(ctx.engine.startCalls).toHaveLength(2)
   })
 })

@@ -6,7 +6,7 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { setMode } from '../src/mode.js'
 import { apply } from '../src/index.js'
 import {
-  askLine, chatBucket, chatReply, classifyTriage, detectLanguage, greetingLine, resolvePending,
+  askLine, chatBucket, chatReply, classifyTriage, detectLanguage, greetingLine, PENDING_FILLER_MAX, pendingAnswer, resolvePending,
   singleCallPrompt, tierNote, triageLine, triageSignals, TRIAGE_LIMITS, resumedRequest, expiredAskNote, unusedAskNote,
 } from '../src/triage.js'
 import { callerTask, execution, task, verification } from './fixtures.js'
@@ -79,6 +79,31 @@ describe('t52 front desk: the classifier is cheap, deterministic and explainable
     expect(verdict).toMatchObject({ tier: 'team', reason: 'mode-full', greeting: false })
     // No tier line and no greeting in full mode: the answer text is 0.2.1's text.
     expect(triageLine(verdict)).toContain('档位：团队档')
+  })
+
+  // B02: a 32k paste used to cost seconds inside `triageSignals`, because
+  // CONCRETE's `[\w./-]+\.` backtracked over the whole run for every start
+  // position (measured on the baseline: 2090 ms at 32k, 8519 ms at 64k, i.e.
+  // quadratic), and the front desk runs that scan on every message.
+  it('bounds the concrete scan so a 32k paste cannot stall the front desk', () => {
+    const paste = 'a'.repeat(32_768)
+    const started = performance.now()
+    const signals = triageSignals(paste)
+    const elapsed = performance.now() - started
+    expect(elapsed).toBeLessThan(200)
+    // The bound is on the scan, not on the verdict: `long` still reads the whole
+    // message, so the tier of a huge paste is unchanged.
+    expect(signals.long).toBe(true)
+    expect(triage(paste)).toMatchObject({ tier: 'team', reason: 'long-objective' })
+  })
+
+  it('scans at most the first 4096 characters for signals', () => {
+    // The head of a message carries the anchors a front desk can act on; beyond
+    // the bound nothing is read, which is what keeps the scan linear.
+    const anchor = ' src/triage.ts'
+    expect(triageSignals('src/triage.ts').concrete).toBe(true)
+    expect(triageSignals('a'.repeat(TRIAGE_LIMITS.signalChars) + anchor).concrete).toBe(false)
+    expect(triageSignals('a'.repeat(TRIAGE_LIMITS.signalChars - anchor.length) + anchor).concrete).toBe(true)
   })
 
   it('is pure: no clock, no I/O, same text in the same verdict out', () => {
@@ -200,6 +225,35 @@ describe('t52 front desk: wording is bilingual and states the tier', () => {
     expect(f1('并回滚到上一版').tier).toBe('team')
     // Two items are usually one action described twice: still the quick tier.
     expect(f1('读、写').tier).toBe('fast')
+  })
+
+  // B09: the same three-part list written with full-width commas counted as one
+  // clause, so "改配置，重启，验证" was answered by a single quick worker while
+  // "改配置、重启、验证" opened the team — the same plan, two tiers.
+  it('counts a full-width comma list as sequencing too', () => {
+    for (const text of ['改配置，重启，验证', '备份，升级，通知我', '设计接口，实现，补测试']) {
+      const verdict = f1(text)
+      expect(verdict.tier, text).toBe('team')
+      expect(verdict.reason, text).toBe('multi-step')
+    }
+    // ...and the 顿号 form it mirrors keeps its tier (D-025).
+    expect(f1('改配置、重启、验证').tier).toBe('team')
+  })
+
+  // B09: a 顿号 list inside a question is a choice, not a plan. "A、B、C哪个更快"
+  // names three things to compare and asks about them; the list itself is not
+  // sequencing, so the team rule must not fire before the question rule.
+  it('does not read a 顿号 list inside a question as sequencing', () => {
+    const signals = triageSignals('A、B、C哪个更快')
+    expect(signals.question).toBe(true)
+    expect(signals.multiStep).toBe(false)
+    for (const text of ['A、B、C哪个更快', 'A、B、C哪个更大', '读、写、跑哪个先做']) {
+      const verdict = f1(text)
+      expect(verdict.tier, text).toBe('fast')
+      expect(verdict.reason, text).toBe('question')
+    }
+    // A command list is still a plan when it is not a question.
+    expect(f1('改配置、重启、验证').tier).toBe('team')
   })
 
 
@@ -493,6 +547,24 @@ describe('t52 front desk: each tier behaves as promised', () => {
     expect(team).toContain('你刚才回答「团队」')
   })
 
+  it('hands the worker the answered request and the new work in the same message (B05)', async () => {
+    const ctx = new FakeContext()
+    const agent = new FakeAgent()
+    const asked = await route(ctx, agent, '把这个弄一下')
+    expect(asked).toContain('档位：确认档')
+    ctx.engine.reply = 'done'
+    const answered = await route(ctx, agent, '简单，另外帮我看下 log')
+    expect(answered).toContain('档位：快手档')
+    expect(ctx.engine.startCalls).toHaveLength(1)
+    // The prompt travels inside the guest script, so the script text is what the
+    // child receives: the request the question was about, and the new work.
+    const script = ctx.engine.startCalls[0]!.script
+    expect(script).toContain('把这个弄一下')
+    expect(script).toContain('另外帮我看下 log')
+    // The answer is not an objective on its own.
+    expect(script).not.toContain('Request:\n简单，')
+  })
+
   it('upgrades to the team when the message asks for it', async () => {
     const ctx = new FakeContext()
     const text = await route(ctx, new FakeAgent(), '用团队帮我改个 typo')
@@ -543,7 +615,10 @@ describe('P0-2: a confirmation answer is not a task', () => {
     const text = resumedRequest(fast, '改一下那个', '简单')
     expect(text).toContain('改一下那个')
     expect(text).toContain('用户选择简单模式')
-    expect(text).toContain('不是新的任务目标')
+    // B05: the answer is described as what it is; it is no longer dressed up as
+    // "it is not a new task objective", which was the sentence that threw away
+    // the new work a message like "简单，另外把 X 改成 Y" also carried.
+    expect(text).not.toContain('不是新的任务目标')
     // The choice word never stands alone as the request.
     expect(text.trim()).not.toBe('简单')
   })
@@ -564,5 +639,64 @@ describe('P0-2: a confirmation answer is not a task', () => {
     expect(expiredAskNote('zh')).toContain('重新描述')
     expect(unusedAskNote('zh')).toContain('作废')
     expect(expiredAskNote('en')).toContain('expired')
+  })
+})
+
+describe('B05: a message that answers the question and carries new work', () => {
+  const triage = (text: string, extra: Record<string, unknown> = {}) =>
+    classifyTriage({ text, mode: 'triage', ask: true, ...extra })
+
+  it('reads the whole message before calling it an answer', () => {
+    // The choice alone, plus at most two filler characters, is just the answer.
+    for (const text of ['简单', '简单的', '简单的吧', 'quick', 'quick!', '团队', '好']) {
+      expect(pendingAnswer(text)?.bare, text).toBe(true)
+    }
+    // ...and the boundary is the exported number, not a literal in this test.
+    expect(PENDING_FILLER_MAX).toBe(2)
+    expect(pendingAnswer(`简单${'的'.repeat(PENDING_FILLER_MAX)}`)?.bare).toBe(true)
+    expect(pendingAnswer(`简单${'的'.repeat(PENDING_FILLER_MAX + 1)}`)?.bare).toBe(false)
+    // A choice word with real work behind it is an answer AND a task.
+    for (const text of ['简单，另外帮我重构 run.ts 并补测试', '好的，帮我看下 log', '团队，把 X 改成 Y']) {
+      expect(pendingAnswer(text)?.bare, text).toBe(false)
+    }
+    expect(pendingAnswer('随便')).toBeUndefined()
+  })
+
+  it('keeps the choice, the original request and the new work in the worker text', () => {
+    const answer = '简单，另外帮我重构 run.ts 并补测试'
+    const verdict = triage(answer, { pending: true })
+    expect(verdict).toMatchObject({ tier: 'fast', reason: 'pending-fast' })
+    const text = resumedRequest(verdict, '改一下那个', answer)
+    expect(text).toContain('改一下那个')
+    expect(text).toContain('用户选择简单模式')
+    // The new work travels with the resumed request instead of being discarded.
+    // Only the choice word is quoted back; the task itself is stated below it.
+    expect(text).toContain('另外帮我重构 run.ts 并补测试')
+    expect(text).toContain('新任务')
+    expect(text).not.toContain('不是新的任务目标')
+  })
+
+  it('adds no new work section when the message is only the answer', () => {
+    const verdict = triage('简单的吧', { pending: true })
+    const text = resumedRequest(verdict, '改一下那个', '简单的吧')
+    expect(text).toContain('用户选择简单模式')
+    expect(text).toContain('改一下那个')
+    expect(text).not.toContain('新任务')
+  })
+
+  it('keeps the team choice and the new work together, in the message language', () => {
+    const verdict = triage('团队，把 X 改成 Y', { pending: true })
+    expect(verdict).toMatchObject({ tier: 'team', reason: 'pending-team' })
+    const zh = resumedRequest(verdict, '改一下那个', '团队，把 X 改成 Y')
+    expect(zh).toContain('用户选择团队模式')
+    expect(zh).toContain('把 X 改成 Y')
+
+    const en = resumedRequest(
+      classifyTriage({ text: 'team, and rename X', mode: 'triage', ask: true, pending: true }),
+      'change that thing',
+      'team, and rename X',
+    )
+    expect(en).toContain('the user chose the team mode')
+    expect(en).toContain('rename X')
   })
 })

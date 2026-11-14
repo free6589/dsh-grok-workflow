@@ -1,6 +1,11 @@
 # Project State
 
-Last updated: 2026-11-08 (**v0.7.0 released** — tag `v0.7.0` → `146dce7` on `main`; Release
+Last updated: 2026-11-15 (**wave1+wave2 已落盘、未提交** — 基线 `ee5e013`，工作树 dirty；
+`package.json` = `0.9.0`（V 组 bump，未提交）；本轮 = B01-B18 清点 + 进度 Tab + 真机验证 H1/H2。
+版本号与提交由 V 组做，M 组只写记忆与 CHANGELOG 的 `[Unreleased]`。详见文末
+「2026-11-15 — wave1+wave2 收尾」。下降级保留的上一条 11-08 记录仍有效，未被覆盖。)
+
+Previous update: 2026-11-08 (**v0.7.0 released** — tag `v0.7.0` → `146dce7` on `main`; Release
 `42474831253` green, asset `dsh-grok-workflow-0.7.0.tgz` 317,470 B. Round 37: merged `origin/main`
 (PR #44) resolving the `src/run.ts` startup conflict by keeping main's deadline race **and** routing
 both entry points through `teamWorkflowEngine`; 37 files / 660 tests PASS; `[Unreleased]` promoted to
@@ -576,3 +581,174 @@ turn at a time; Round 16's isolation proof is in `.workflow-artifacts/matrix-024
 - **遗留**：工作树未跟踪（`.audit-scratch/`、`.tmp-largefiles/`、`RENDERING-STUDY.md`、
   `evidence/checkpoint-*`、`survey`）未入库；STATE/HANDOFF/VALIDATION 本轮未更新（写范围外）；
   `release/0.8.0` 分支未删；已发布 Tag 未动。
+
+## 2026-11-15 — wave1+wave2 收尾（**未提交**）：B01-B18 清点 + 进度 Tab + 真机验证 H1/H2
+
+- **From:** 收尾组 M · **To:** V 组（版本提交）/ lead · **可写面:** 六个 `docs/knowledge/*.md` +
+  `CHANGELOG.md` 的 `[Unreleased]` 节 + `DESIGN-progress-tab.md` 追加收尾节；不碰
+  `src/` `lib/` `test/` `package*.json` `README*` `cordis.patch.yml`，不 commit、不打 tag、不 push。
+- **基线（`CONFIRMED`）**：`git status --short --branch` → `## main...origin/main`；`HEAD = ee5e013`
+  （v0.8.0 发布记录 `docs(memory): v0.8.0 release record`）。工作树 **81 文件 / +7014 / −534**
+  全部未提交：`src/` **13** 文件、`test/` **15** 文件、`lib/` **46** 个构建产物（+ 4 个新增
+  `progress-tab.*`）、`docs/` 3 文件 + `README`/`README.zh-CN` + `CHANGELOG`（`git diff --name-only`
+  逐区计数）。
+  未跟踪新增：`src/progress-tab.ts`、`lib/progress-tab.js`（+ `.d.ts`/`.map`）、
+  `test/progress-tab.spec.ts`、`test/delivery-human-block.spec.ts`、`docs/knowledge/DESIGN-progress-tab.md`、
+  `docs/knowledge/evidence/{verify-H1,progress-tab-2026-11-15,checkpoint-engine-wire-2026-11-12,recovery-kill-restart-2026-11-12}/`。
+- **版本（`CONFIRMED`）**：`package.json` 工作树已是 `0.9.0`（V 组的 bump，未提交）。本轮 M 组
+  **不 bump**，只往 `[Unreleased]` 写内容（1 条 Added + 10 条 Fixed，中英双语）；写完后 V 组把节头
+  提升为 `## [0.9.0] - 2026-11-15`，条目原文未动。`## [0.8.0] - 2026-11-13` 及以下未触碰。
+- **环境（`CONFIRMED`，见 `evidence/verify-H1/ci.txt`）**：host `omarchy`，`node v26.8.1`、
+  `npm 11.19.0`、`dsh 0.2.2-rc.3`。
+
+### B01-B18 状态清单
+
+状态词只用 `CONFIRMED` / `HYPOTHESIS` / `NOT_RUN` / `BLOCKED`。`CONFIRMED` 的行都有源码锚点
+（本轮 grep 复核过行号）或证据文件，**逐行核过源码注释**（`src` 内以 `B<n>` 标注的注释即是审计
+锚点）—— 例外是 B11/B16/B17：这三条在源码里没有编号锚点，映射是推断，见本节末「B11/B16/B17
+的边界」。
+
+| 编号 | 锚点（文件:行号） | 一句话 | 状态 |
+| --- | --- | --- | --- |
+| B01 | `package.json:39`（`engines.dsh: ">=0.2.1-rc.2 <0.3.0"`；同时删掉旧 `dsh.compatibility` 块） | 引擎兼容声明改成真 semver 区间，旧的手写兼容表撤除 | **CONFIRMED** — `evidence/verify-H1/engines-dsh-B01.txt`：真机 runtime `0.2.2-rc.3` → 判定 `null`（无未满足要求）；对照 `engines.dsh:"<0.2.0"` → REFUSED，证明检查非空转 |
+| B02 | `src/triage.ts:249,291-294,356` | 分诊信号扫描有界（`TRIAGE_LIMITS.signalChars`），32k 粘贴不再按秒计 | **CONFIRMED** — 锚点注释 + `test/triage.spec.ts:84` |
+| B03 | `src/command.ts:68-127`（`toggleFailureText` + 读回校验） | `/grok` 的写入没落地时只报失败、绝不用成功措辞 | **CONFIRMED** — `test/command.spec.ts:100-150`（拒绝写入 / 接受但读不回 / 无 session 三形态 + 健康路径） |
+| B04 | `src/gate.ts:745,945` | 前台第二个问题到来时，未作答的上一个请求不被丢掉 | **CONFIRMED** — `test/phase1-dialogue.spec.ts:510` |
+| B05 | `src/triage.ts:115,142,735,990` | 「先回答再派新活」的一条消息不再把答复当任务目标 | **CONFIRMED** — `test/triage.spec.ts:550,645` |
+| B06 | `src/gate.ts:1238`、`src/history.ts`（排除自写批次的 id）、`test/history.spec.ts:61` | `relay`/`append` 自己是写者时，紧随的历史读不能把刚写的消息重复喂回 | **CONFIRMED** — `test/gate.spec.ts:592`、`test/history.spec.ts:61-75` |
+| B07 | `src/config.ts:22,35`（`maxConcurrency` 6 / `maxRetries` 3 / `maxAttemptsPerTask` 400）、`test/routing.spec.ts:73`、`test/route-concurrency.spec.ts:102` | 并发/重试硬上限回到 AGENTS.md 的文档契约（3/6、1/3），脚本侧传入的超限被夹紧 | **CONFIRMED** — 见下「maxAttemptsPerTask = 400 的推导」 |
+| B08 | `src/gate.ts:769,935` | 确认后复述的请求裁到 objective 预算内，而不是拒绝整轮 | **CONFIRMED** — `test/phase1-dialogue.spec.ts:536` |
+| B09 | `src/triage.ts:233,237,277,363` | 顿号/全角逗号写的三件事不再被当成「一件事」压成单个 quick worker | **CONFIRMED** — `test/triage.spec.ts:230,243` |
+| B10 | `src/delivery/index.ts:88,137,182,209,335,362` | 人话块里的失败原因被台账关键词的裸子串扫描误删；改成锚定/整词，且 `incomplete[].reason`/`task.error` 不再逐字段洗 | **CONFIRMED** — `test/delivery-human-block.spec.ts:114,154`（含「守卫没被删掉」的反向断言） |
+| B11 | `src/client/index.js:714`（状态色改 design token `var(--dsw-alias-state-business-primary, …)`） | 状态点不再写死浅色 hex，跟随主题 | **HYPOTHESIS**（内容 CONFIRMED：`docs/task-progress-panel.md` §Client-surface hardening 第 1 条 + 锚点；**编号→条目映射**未获审计清单确认，见本节末「B11/B16/B17 的边界」） |
+| B12 | `src/checkpoint/wiring.ts:775,933` | 检查点的任务身份取自引擎 `meta.name` 且脱敏有界；`stages`/`agents` 永不为 `undefined` | **CONFIRMED** — `test/checkpoint-wiring.spec.ts:212,228,239` |
+| B13 | `src/checkpoint/wiring.ts:315` | 陈旧判定用自有区间 1 s–24 h，不借用写间隔 | **CONFIRMED** — `test/checkpoint-wiring.spec.ts:539,556` |
+| B14 | `src/checkpoint/wiring.ts:828` | 同一 run 文件单飞写入；两个清洗后同名的 id 分开存 | **CONFIRMED** — `test/checkpoint-wiring.spec.ts:255`、`test/checkpoint-schema.spec.ts:379` |
+| B15 | `src/checkpoint/wiring.ts:517,907` | 缺省 limits 按契约默认值记录；放弃写入时只说一次且可见 | **CONFIRMED** — `test/checkpoint-wiring.spec.ts:430,649`、`test/checkpoint-schema.spec.ts:339` |
+| B16 | `src/client/index.js:690`（`guardedTranslator`）、`:1665,1688,1714`（`status.unknown`） | 字典缺注册时 key id 不上屏；面板不认识的状态说「状态未知」而不是把引擎原词塞进中文句子 | **HYPOTHESIS**（内容 CONFIRMED：同上 §Client-surface hardening 第 2、3 条；编号映射未确认） |
+| B17 | `src/client/index.js:987,1005,1412`（设置页 `loading`/`error`/`unavailable` 三态）、`:945`（≤560px `.gw-row` 单列） | 失败不再永远显示「读取中…」；窄窗不再横向溢出 | **HYPOTHESIS**（内容 CONFIRMED：同上第 4、5 条；编号映射未确认） |
+| B18 | `src/gate.ts:186,870` | 可选混合分类器给出的档位带**它自己**的理由句，不冒充规则句 | **CONFIRMED** — `test/phase1-dialogue.spec.ts:1073-…` |
+
+**B11/B16/B17 的边界（`HYPOTHESIS`，不冒充）**：这三条在本仓库全树（`src/`、`test/`、`lib/`、
+`docs/`、`.dsh-home/`、`.agent-teams/`）**没有任何 `B11`/`B16`/`B17` 源码注释锚点**，
+审计清单也没有落盘文件。因此上表按「本轮客户端加固的实际改动」给出 `文件:行号` 与证据，
+但**编号与条目的对应关系是推断**。lead 若持有清单原文，补一行即可把状态改成 `CONFIRMED`；
+在此之前不得把它们当作「审计编号已核对」。
+
+### H1 — 安装 / 加载 / 交互（真机，`evidence/verify-H1/`）
+
+环境：隔离 `DSH_HOME=<repo>/.verify-gw/home`（跑完已删）、profile `gwverify`（自 `web` 模板）与
+`gwverify-hl`（自 `headless`）、运行时 `dsh 0.2.2-rc.3`。命令与输出原文见该目录 `README.md`。
+
+- **安装 PASS（`CONFIRMED`）**：
+  `npm run build` → exit 0，client bundle **186091 B** → `lib/client.js`；
+  `DSH_HOME=$PWD/.verify-gw/home dsh plugin --profile gwverify add "$PWD"` → pnpm 写入
+  `dsh-grok-workflow link:../../../..`，安装后 manifest 版本 `0.8.0`（工作树基线），
+  `dsh.profile.bundles` 变 **3 条**（`profile-bundles.json`）。同法在 `gwverify-hl` 重复，exit 0。
+- **加载 PASS（`CONFIRMED`，不是「没报错就算过」）**：启用时 boot 只有 URL 一行
+  （`boot-enabled.txt`），无 `pending` / `did not activate` / `skipping profile bundle`；
+  **对照**：`--patch` 关掉 `workflow-ptc` → `dsh: warning: 1 entry did not activate` +
+  `grok-workflow (dsh-grok-workflow): pending (waiting for service: workflowEngine)`
+  （`boot-control-workflow-ptc-disabled.txt`）。对照存在，说明干净那行不是静默假象。
+- **活实例三查（`CONFIRMED`）**：`POST /api/settings/describe` → 23 个命名空间，其中
+  `grok-workflow`（`autoGenerate: true`、`applies: live`、28 投影字段、无 secret 槽）；
+  首页把 `dsh-grok-workflow/client.js` 打进 `/plugins/??…` 批，取回字节 = `lib/client.js`
+  加一行 `sourceMappingURL`（`client-bundle-serving.txt`）；真实会话出站请求的工具表
+  **24 个含 `grok_workflow`**（`mock-boundary.txt`）。
+- **前台（chat 档）PASS（`CONFIRMED`）**：
+  `DSH_HOME=.verify-gw/home dsh --profile gwverify-hl --patch mock.patch.yml "你好"` → exit 0，
+  stdout 由插件自己产出：`档位：直答档 — 因为：这是问候/寒暄，没有要做的事，前台直接回答。`
+  且该裁决同时写进了会话日志（`session-dcf8b852…` 的 `user/message` seq 12，`front-desk-relay-message.txt`）。
+- **团队档 model-BLOCKED（`BLOCKED`，不报 PASS）**：同一命令换成
+  `"用团队跑一个小任务：…"` → exit 0，但 run `FAILED`：
+  `task-1: failed (2 attempts) — worker failed on every route: [format-error] child returned no valid structured result`
+  （`interact-team-tier.txt`）。档位行本身正确（`档位：团队档 — 因为：你的消息里点名了团队…`），
+  规划/工人子会话都真的起来了；失败点是**被 mock 的模型给不出结构化结果**。
+  真模型路径本轮**不可达**，原文如下（`model-boundary-BLOCKED.txt`）：
+
+  ```text
+  命令：DSH_HOME=.verify-gw/home dsh --profile gwverify-hl --patch .verify-gw/model.patch.yml "Reply with exactly: MODEL_OK"
+  EXIT=1
+  stderr: dsh: TIMEOUT: Request timed out.: Connect Timeout Error
+          (attempted address: models.fyrali.com:443, timeout: 10000ms) (UND_ERR_CONNECT_TIMEOUT)
+
+  getent hosts models.fyrali.com -> 100.111.111.99
+  tailscale status: 100.111.111.99 bifrost active; relay "sin", tx 10764 rx 0
+  ping 100.111.111.99: 2 packets transmitted, 0 received, 100% packet loss
+  TCP 80/443/3000/3065/8000/8080/8888/9000/11434/4000 on 100.111.111.99: all closed/timeout
+  备选本机网关 http://127.0.0.1:3065/v1 (agent2api) 列出模型，但
+  POST /v1/chat/completions -> HTTP 401 model_api_key_required（取网关 key 需读用户凭据库，AGENTS.md 禁止）
+  ```
+
+  即 **`100.111.111.99` 不可达 = BLOCKED 的成因**：tailnet 侧显示 active 但 `rx 0`、
+  100% 丢包、所有探测端口关闭；备选网关要凭据。**没有伪造任何 PASS**。
+- **engines 上界边界（`CONFIRMED`）**：`evaluatePluginCompatibility` 用
+  `semver.satisfies(runtime, range, { includePrerelease: true })`（`dsh-app-boot/lib/index.js`），
+  所以 `<0.3.0` 实际**放行 `0.3.0-rc.*`** —— 实测 `0.3.0-rc.1` → compatible。
+  即「上界 0.3.0」在当前实现里不构成对 rc 的围栏；安装从未因 `engines.dsh` 被拦。
+  这是记录，不是缺陷：要不要收窄留给下次改 `engines` 时决定（见 DECISIONS D-043）。
+
+### H2 — 进度 Tab 真机（14 帧，`evidence/progress-tab-2026-11-15/`）
+
+隔离 `dsh web` 实例 `127.0.0.1:3210`、`DSH_HOME=<repo>/.dsh-home`、profile `gwprog`（自 `web` 模板）、
+插件用**打包产物**装入、模型走 `127.0.0.1:18088` 真网关、headless Chromium 1440×900 / 480×900。
+收尾：杀进程 + 删 token 日志（`PORT_3210_CLOSED` / `TOKEN_LOG_REMOVED`），`:3080`/`:3086`/`:3065` 未触碰。
+
+| 状态 | 真机结论 | 证据 |
+| --- | --- | --- |
+| `pending` | **CONFIRMED** | `03`、`04`：7 个未命中的模板阶段保持 pending，`title="Not reported in the events"`，不借邻居状态 |
+| `doing` | **CONFIRMED** | `03`；`TIMELINE` T+0 / +4s / +21s 三帧 |
+| `done` | **CONFIRMED** | `03`（Start）、`04`（`3/3 · 100%`）、`06`（`规划 Done`） |
+| `cancelled` | **CONFIRMED** | `12`/`13`/`14`：跑到 doing 时点 composer 停止（真实动作），`FINAL_STATES=["done","pending","cancelled"]`，引擎原话，未由「没结算」派生 |
+| `blocked` | **NOT_RUN**（真机未触发） | 本轮没有真实触发条件（abort 给的是 `cancelled`）。单元覆盖：`test/progress-tab.spec.ts`、`test/client.spec.ts` |
+| `failed` | **NOT_RUN**（真机未触发） | 未构造失败子调用（不伪造真机）。单元覆盖同上 |
+
+- 三 Tab 共存且默认落对话：`A2_TABS=[Chat(selected), Trajectory, Progress]`、`A2_TAB_COUNT=3`（`01`）。
+- 空态：有标题与「No rows declared yet」，无轨道/节点/百分比（`02`）。
+- 详情三段：`DETAIL_HEADINGS=["Engine facts","Stage report"]`，7 字段全 `—` + `Source: not reported`
+  （L3 落点，符合设计 §7），`Copy coordination block` 在无协调块时 `disabled=true`（`06`、`stage-d.log.txt`）。
+- 窄屏 480 / 深色：详情变底部抽屉、字段单列；环色全来自 token（`07`、`08`）。
+- 零回归：对话含任务原文 + 报告 + `/grok on` 回执、无 `TypeError`/`Cannot read`；轨迹 6132 字符含
+  events / workflow；已完成行可点开真实子会话（`09`、`10`、`11`）。
+- **`blocked`/`failed` 的补充是单元快照，不冒充真机**：
+  `npx vitest run test/progress-tab.spec.ts test/client.spec.ts` → **2 文件 / 93 测试 PASS**
+  （`unit-supplement.log.txt`）。
+- **单 run 展示**：`selectActiveRun` 取 `anchorSeq` 最大的 run，故 `04` 之后只剩最新轨道（与设计 §3 一致）。
+
+### `maxAttemptsPerTask = 400` 的推导（`CONFIRMED`）
+
+`src/config.ts:35` 把上界从 `1100` 降到 `400`，`test/routing.spec.ts:73` 把它钉成等式：
+
+```text
+worker 链上限 50（HARD_LIMITS.chainLength）
++ verifier 链上限 50
+= 每次尝试 100 次子调用
+× 尝试次数（maxRetries 硬上限 3 → 3+1 = 4）
+= 400
+```
+
+守卫是 `>`，所以**最坏的合法组合恰好等于 400 且能通过**；只有「将来把某个上限放宽却忘了 revisit」
+才会撞到它。普通组合（3+3 链、默认 1 重试 = (3+3)×2 = 12）远在界内。
+性质变了：旧值 1100 只是「足够大」，新值 400 是「最坏合法值」，等式由测试固定。
+
+### link: 安装 / `grok on`（现象 `CONFIRMED`，归因 `HYPOTHESIS`）
+
+- **`CONFIRMED`**：`dsh plugin --profile gwprog add link:<repo>` 装的实例里 `/grok on` 回
+  `Failed / Grok workflow toggle not changed: Receiver must be an instance of class Session.`
+  （`probes/probe-after-grok-on.png`）；换成同目录**打包产物**安装，同一条命令成功
+  `Grok workflow ON — every message now runs the full plan→execute→verify workflow.`
+  （`probes/probe-grok-on-existing.png`、`stage-e.log.txt` 的 `GROK_ON=true`）。
+- **`HYPOTHESIS`（未插桩验证模块身份）**：`link:` 时插件解析到工作树自己的
+  `node_modules/@deepseek-ai/dsh-session` **0.2.1-rc.2**（devDependencies），运行时是
+  **0.2.2-rc.3**；`appendPluginRecord` 落在旧副本的私有方法上，跨副本 brand check 抛错。
+  打包安装的 profile 里只有 `cosmokit`/`schemastery`，没有第二份，故正常。
+- **影响面（`CONFIRMED` 的边界）**：只影响「把工作树 `link:` 进 profile 做真机验证」；
+  不影响打包/npm 安装形态。**验证 `/grok` 开关必须用打包产物。**
+- 附带 `CONFIRMED` 限制：会话首页（尚无 session）里发 `/grok on` 不执行，必须先有一条普通消息建会话。
+
+### 本轮 `NOT_RUN` / `BLOCKED` 汇总
+
+- `BLOCKED`：真模型团队档端到端（`100.111.111.99` 不可达，原文见上）；因此「团队档答案质量」本轮无结论。
+- `NOT_RUN`：live `:3080` / `:3086` / `:3090` 的部署与重启（用户保留动作，D-013）；
+  进度 Tab 的 `blocked`/`failed` 真机触发；`README`/`ARCHITECTURE` 之外的文档连带改动。
+- 未提交、未 push、未打 tag、未 bump（版本由 V 组做）。

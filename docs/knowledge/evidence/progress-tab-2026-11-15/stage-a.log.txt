@@ -1,0 +1,10 @@
+NOTICE=null
+REPLY_SEEN=true
+A2_TABS=[{"label":"Chat","selected":"true","cls":"wSkVaW_tab wSkVaW_tabActive"},{"label":"Trajectory","selected":"false","cls":"wSkVaW_tab"},{"label":"Progress","selected":"false","cls":"wSkVaW_tab"}]
+A2_TAB_COUNT=3
+A2_DEFAULT_SELECTED=["Chat"]
+A2_PROGRESS_TAB_EXISTS=true
+A3_SESSION_TITLE="打招呼"
+A4_PROGRESS_DOM={"present":true,"emptyText":"No workflow progress in this session yet\n\nThe track is folded from the four tool-workflow events this plugin records; it appears once a run starts.","title":"Task progress","percent":"No rows declared yet","nodeCount":0,"nodes":[],"states":[],"detailOpen":false,"detailText":null,"detailHeadings":[],"detailFields":[],"detailSources":[],"detailRunIds":[]}
+A4_EMPTY_STATE=true
+A5_TABS_AFTER=[{"label":"Chat","selected":"false","cls":"wSkVaW_tab"},{"label":"Trajectory","selected":"false","cls":"wSkVaW_tab"},{"label":"Progress","selected":"true","cls":"wSkVaW_tab wSkVaW_tabActive"}]

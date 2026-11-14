@@ -1,0 +1,4 @@
+# mock model boundary: what the real instance asked it for
+GET /v1/models -> model list (provider probe)
+requests=7
+tools=24 includes grok_workflow=True

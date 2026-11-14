@@ -1,0 +1,21 @@
+# team tier — real run, model boundary mocked
+CMD: DSH_HOME=.verify-gw/home GWVERIFY_MOCK_KEY=<dummy> dsh --profile gwverify-hl --patch .verify-gw/mock.patch.yml "用团队跑一个小任务：..."
+EXIT=0
+--- stdout ---
+档位：团队档 — 因为：你的消息里点名了团队，直接升级为团队档。
+收到！团队开工中，施工牌在旁边。
+【人话结论·未完成】这次没有做成，没有可交付的结果（其中 0/1 项已核验通过，但整体不算完成）。原因：task-1: worker failed on every route: [format-error] child returned no valid structured result。
+下一步：看起来是模型或网络一侧的问题：稍后把同样的请求再发一次；连续失败就去设置里检查模型链路。
+
+（原文报告附后）
+
+Grok workflow: FAILED
+Objective: Current request: 用团队跑一个小任务：在工作目录创建 verify-h1-team.txt，内容一行 TEAM_OK，然后核对文件确实存在且内容正确。
+Plan: fallback; 1 task(s); 0 verified
+Failures: 2 infrastructure
+Plan failure: format-error (infrastructure)
+- task-1: failed (2 attempts) — Complete the objective
+  incomplete (infrastructure): worker failed on every route: [format-error] child returned no valid structured result
+Incomplete:
+- task-1 (infrastructure): worker failed on every route: [format-error] child returned no valid structured result
+

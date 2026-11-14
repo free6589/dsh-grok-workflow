@@ -95,6 +95,61 @@ describe('grok command handler (arg parsing → toggle state)', () => {
   })
 })
 
+/* ------------------------------------------------- handler: failed writes -- */
+
+describe('grok command handler (a write that does not land)', () => {
+  it('settles error, never the success wording, when the session refuses the write', () => {
+    // A log that cannot take a plugin record at all (here: not a Session).
+    const refusing = { ownEvents: () => [], append() { throw new Error('read-only session') } } as unknown as Session
+    const result = invoke('on', new FakeAgent(refusing))
+    expect(result.kind).toBe('error')
+    expect(result.text).not.toContain('Grok workflow ON')
+    expect(result.text).not.toContain('Grok workflow OFF')
+    expect(result.text).toContain('toggle not changed')
+    expect(result.text).toContain('no toggle was recorded')
+  })
+
+  it('reports the state the session really has when the write does not land', () => {
+    const session = realSession('sess-cmd-stale')
+    const agent = new FakeAgent(session)
+    invoke('on', agent)
+    expect(isModeEnabled(session)).toBe(true)
+    // The log stops reflecting new writes: `/grok off` cannot land, so the
+    // handler must report the state the readers still see (on), not "OFF".
+    const staleLog = session.ownEvents()
+    Object.defineProperty(session, 'ownEvents', { value: () => staleLog, configurable: true })
+    const result = invoke('off', agent)
+    expect(result.kind).toBe('error')
+    expect(result.text).toContain('the session still reads a different record')
+    expect(result.text).toContain('the toggle is still on')
+    expect(result.text).not.toContain('Grok workflow OFF')
+    expect(result.text).not.toContain('normal chat')
+  })
+
+  it('settles error when the append is accepted but never readable back', () => {
+    const session = realSession('sess-cmd-unreadable')
+    Object.defineProperty(session, 'ownEvents', { value: () => [], configurable: true })
+    const result = invoke('on', new FakeAgent(session))
+    expect(result.kind).toBe('error')
+    expect(result.text).toContain('not readable back')
+    expect(result.text).toContain('no toggle was recorded')
+    expect(result.text).not.toContain('every message now runs the full plan')
+  })
+
+  it('settles error on an agent without a session instead of claiming success', () => {
+    const result = invoke('on', new FakeAgent(undefined as never))
+    expect(result.kind).toBe('error')
+    expect(result.text).toContain('toggle not changed')
+    expect(result.text).not.toContain('Grok workflow ON')
+  })
+
+  it('still settles success for a write the session really holds', () => {
+    const session = realSession('sess-cmd-lands')
+    expect(invoke('on', new FakeAgent(session))).toEqual({ kind: 'success', text: ON_TEXT })
+    expect(invoke('off', new FakeAgent(session))).toEqual({ kind: 'success', text: OFF_TEXT })
+  })
+})
+
 /* ------------------------------------------------------- handler: results -- */
 
 describe('grok command handler (settled kind and text)', () => {

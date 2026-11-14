@@ -31,7 +31,7 @@
  * module only performs schema-safe, atomic file IO and never calls the engine.
  */
 
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { mkdir, open, readFile, rename, rm, stat } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import {
@@ -55,10 +55,22 @@ export interface CheckpointWriteResult {
   checksum: string
 }
 
-/** Sanitize a run id into a filename-safe segment. */
+/**
+ * Sanitize a run id into a filename-safe segment, plus a short hash of the raw id.
+ *
+ * Sanitizing alone is not injective: `run x/y` and `run x_y` both become
+ * `run_x_y`, and any two ids longer than {@link CHECKPOINT_LIMITS.idChars} that
+ * share a prefix collapse into one name — so two live runs could silently
+ * overwrite each other's checkpoint. The 8-hex-character digest of the *unmodified*
+ * id keeps the readable prefix for a human and makes the collision a thing that
+ * cannot happen silently, while staying far under the platform limit on a file
+ * name.
+ */
 export function checkpointFileName(runId: string): string {
   const safe = runId.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, CHECKPOINT_LIMITS.idChars)
-  return `checkpoint-${safe === '' || safe === '.' || safe === '..' ? 'run' : safe}.json`
+  const prefix = safe === '' || safe === '.' || safe === '..' ? 'run' : safe
+  const digest = createHash('sha256').update(runId, 'utf8').digest('hex').slice(0, 8)
+  return `checkpoint-${prefix}-${digest}.json`
 }
 
 /**

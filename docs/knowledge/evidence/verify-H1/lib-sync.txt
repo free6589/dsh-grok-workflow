@@ -1,0 +1,6 @@
+# lib/ sync: a fresh build reproduces the checked-in lib byte for byte
+git status --short lib | md5sum  (before ci build): 2a4d283a890e807f44f80433f9e30c62  -
+git status --short lib | md5sum  (after ci build) : 2a4d283a890e807f44f80433f9e30c62  -
+npm run build (again) exit=0 -> git status --short lib | md5sum: 2a4d283a890e807f44f80433f9e30c62  -
+changed lib files vs HEAD: 50 (expected: wave1+wave2 are uncommitted)
+md5 src/client/index.js = md5 lib/client.js = 7c0592819f13d849d5328c7aec602261

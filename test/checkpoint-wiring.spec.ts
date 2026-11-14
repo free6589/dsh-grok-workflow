@@ -12,7 +12,7 @@
  * fake hanging engine, because the unload path is the one wiring point that lives
  * in `src/run.ts` rather than in the recorder.
  */
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -24,12 +24,13 @@ import {
   createCheckpointRecorder,
   isHostRole,
   phaseFromTitle,
+  RESUME_DECISION_WIRING,
   registeredCheckpointRecorders,
   resumeDecision,
 } from '../src/checkpoint/wiring.js'
 import type { CheckpointEventSource, RunCheckpointRecorder } from '../src/checkpoint/wiring.js'
 import { buildCheckpoint, sealCheckpoint } from '../src/checkpoint/schema.js'
-import { readCheckpoint } from '../src/checkpoint/writer.js'
+import { checkpointFileName, readCheckpoint } from '../src/checkpoint/writer.js'
 import { createActiveState, disposeActiveState, runWorkflow } from '../src/run.js'
 import type { ActiveState, WorkflowLogger } from '../src/run.js'
 import { resolveConfig } from '../src/config.js'
@@ -208,6 +209,69 @@ describe('periodic checkpoints', () => {
     recorder.dispose()
   })
 
+  it('latches the run\'s durable task identity at adopt (B12)', async () => {
+    const dir = join(scratch, 'identity')
+    const recorder = createCheckpointRecorder(options({ directory: dir }))
+    // The engine run handle carries both: `id` is engine-generated, `meta.name` is
+    // the durable task label `src/run.ts` also hands the memory archiver.
+    recorder.adopt({ id: 'run-identity', meta: { name: '  checkpoint wiring round  ' } })
+    expect(recorder.stats.runName).toBe('checkpoint wiring round')
+
+    const written = await recorder.tick()
+    expect(written?.ok).toBe(true)
+    const checkpoint = await readCheckpoint(checkpointFile('run-identity', { dir }))
+    expect(checkpoint.run.runId).toBe('run-identity')
+    expect(checkpoint.run.name).toBe('checkpoint wiring round')
+    recorder.dispose()
+  })
+
+  it('redacts a secret in the durable name before it reaches stats or disk (B12)', async () => {
+    const dir = join(scratch, 'identity-secret')
+    const secret = 'sk-proj-abcdefghijklmnopqrstuvwxyz0123456789'
+    const recorder = createCheckpointRecorder(options({ directory: dir }))
+    recorder.adopt({ id: 'run-identity-secret', meta: { name: `round for ${secret}` } })
+    expect(recorder.stats.runName).not.toContain(secret)
+    await recorder.tick()
+    expect(await readFile(checkpointFile('run-identity-secret', { dir }), 'utf8')).not.toContain(secret)
+    recorder.dispose()
+  })
+
+  it('always fills agents and stages in the snapshot, before any report exists (B12)', () => {
+    const events = new FakeEvents()
+    const dir = join(scratch, 'snapshot-shape')
+    const recorder = createCheckpointRecorder(options({ directory: dir, events }))
+    recorder.adopt({ id: 'run-snapshot' })
+    events.emit('workflow/phase', { id: 'run-snapshot' }, 'plan')
+
+    const input = recorder.snapshot()
+    // Not `undefined`: "no child call was observed yet" is a fact, and a consumer
+    // must not have to know whether a report exists to read these two rows.
+    expect(input?.agents).toEqual([])
+    expect(input?.stages?.map(stage => stage.phase)).toEqual(['plan'])
+    expect(input?.tasks).toBeUndefined()
+    recorder.dispose()
+  })
+
+  it('never lets two writes overlap on the same run file (B14)', async () => {
+    const dir = join(scratch, 'single-flight')
+    const recorder = createCheckpointRecorder(options({ directory: dir }))
+    recorder.adopt({ id: 'run-single-flight' })
+
+    // Two ticks issued in the same synchronous block: the second one coalesces onto
+    // the write already in flight instead of racing it on the same file.
+    const [first, second] = await Promise.all([recorder.tick(), recorder.tick()])
+    expect(first?.ok).toBe(true)
+    expect(second).toBe(first)
+    expect(recorder.stats.writes).toBe(1)
+
+    // A terminal write queues behind an in-flight one and is what lands last.
+    const terminal = await recorder.finish({ stopReason: 'completed' })
+    expect(terminal?.terminal).toBe(true)
+    expect(recorder.stats.writes).toBe(2)
+    const checkpoint = await readCheckpoint(checkpointFile('run-single-flight', { dir }))
+    expect(checkpoint.run.status).toBe('failed')
+  })
+
   it('maps only this plugin’s own phase labels', () => {
     expect(phaseFromTitle('plan')).toBe('plan')
     expect(phaseFromTitle('Execute')).toBe('execute')
@@ -308,6 +372,15 @@ describe('unload checkpoints', () => {
 /* ------------------------------------------------------------- 4. no roles -- */
 
 describe('four roles, host-side only', () => {
+  it('states plainly that the resume decision has no production caller (B12)', () => {
+    // The alternative to wiring it this round is saying so in a form a test can
+    // read: this marker is what keeps "exported and tested" from being mistaken
+    // for "reachable by a user".
+    expect(RESUME_DECISION_WIRING.wired).toBe(false)
+    expect(RESUME_DECISION_WIRING.entry).toBeUndefined()
+    expect(RESUME_DECISION_WIRING.note).toContain('no production caller')
+  })
+
   it('knows exactly the four roles the plugin runs', () => {
     expect([...HOST_ROLES]).toEqual(['planner', 'worker', 'verifier', 'synthesizer'])
     expect(isHostRole('planner')).toBe(true)
@@ -352,6 +425,54 @@ describe('inert when there is nothing to describe', () => {
     expect(registeredCheckpointRecorders(state)).toBe(1)
     recorder.dispose()
     expect(registeredCheckpointRecorders(state)).toBe(0)
+  })
+
+  it('records the contract defaults when a run supplies no limits at all (B15)', async () => {
+    const dir = join(scratch, 'no-limits')
+    // No `limits` at all: the schema fills the documented defaults. Coercing the
+    // missing numbers to 0 used to make every single write fail as `invalid`.
+    const recorder = createCheckpointRecorder({
+      logger: new Recorder().logger,
+      directory: dir,
+      objective: 'ship the thing',
+    })
+    recorder.adopt({ id: 'run-no-limits' })
+    const written = await recorder.tick()
+    expect(written?.ok).toBe(true)
+    const checkpoint = await readCheckpoint(checkpointFile('run-no-limits', { dir }))
+    expect(checkpoint.limits).toEqual({ maxConcurrency: 3, maxRetries: 1, maxTasks: 12 })
+    recorder.dispose()
+  })
+
+  it('surfaces a limits row outside the engine-hook contract once, visibly (B07)', async () => {
+    const dir = join(scratch, 'contract')
+    const recorder = new Recorder()
+    // A programmatic caller that bypasses the config schema is the only way these
+    // numbers can arrive: `resolveConfig` itself refuses anything above 6 / 3.
+    const violations = createCheckpointRecorder({
+      ...options({ directory: dir, recorder }),
+      limits: { maxConcurrency: 8, maxRetries: 5, maxTasks: 4 },
+    })
+    violations.adopt({ id: 'run-contract' })
+    const warned = recorder.warnings.filter(message => message.includes('engine-hook contract'))
+    expect(warned).toHaveLength(1)
+    expect(warned[0]).toContain('maxConcurrency 8 exceeds the documented maximum 6')
+    expect(warned[0]).toContain('maxRetries 5 exceeds the documented maximum 3')
+    // Idempotent: re-adopting the same run does not repeat the warning.
+    violations.adopt({ id: 'run-contract' })
+    expect(recorder.warnings.filter(message => message.includes('engine-hook contract'))).toHaveLength(1)
+    // And the run is not broken: the recorder refuses the *write*, not the run.
+    const refused = await violations.tick()
+    if (refused === undefined || refused.ok) throw new Error('expected the write to be refused')
+    expect(refused.reason).toBe('invalid')
+    violations.dispose()
+
+    // A compliant run says nothing at all.
+    const quiet = new Recorder()
+    const compliant = createCheckpointRecorder(options({ directory: join(scratch, 'contract-ok'), recorder: quiet }))
+    compliant.adopt({ id: 'run-contract-ok' })
+    expect(quiet.warnings).toEqual([])
+    compliant.dispose()
   })
 
   it('stops retrying after repeated write failures instead of warning forever', async () => {
@@ -402,7 +523,7 @@ describe('resume decision', () => {
     const decision = resumeDecision(checkpointOf('running', [
       { id: 'task-1', status: 'verified' },
       { id: 'task-2', status: 'running' },
-    ]), { now: 1_000_000 + CHECKPOINT_WIRING_LIMITS.resumeStaleAfterMs + 1 })
+    ]), { now: 1_000_000 + CHECKPOINT_WIRING_LIMITS.staleAfterMs.default + 1 })
     expect(decision.action).toBe('resume')
     expect(decision.unfinished).toEqual(['task-2'])
     expect(decision.seed).toBe('DIGEST')
@@ -413,6 +534,34 @@ describe('resume decision', () => {
     const empty = resumeDecision(checkpointOf('cancelled', []))
     expect(empty.action).toBe('none')
     expect(empty.reason).toContain('no task rows')
+  })
+
+  it('bounds staleness on its own range, 1 s to 24 h, not the write interval (B13)', () => {
+    const sixHours = 6 * 60 * 60 * 1000
+    const twelveHours = 12 * 60 * 60 * 1000
+    const running = checkpointOf('running', [{ id: 'task-1', status: 'running' }])
+    // Inside the staleness range but far outside the interval range (1 s .. 5 min):
+    // the shared clamp used to fold a 12-hour request into 5 minutes and resume a
+    // run that was still in flight.
+    expect(resumeDecision(running, { now: 1_000_000 + sixHours, staleAfterMs: twelveHours }).action).toBe('wait')
+    // Below the floor (500 ms) the bound is raised to 1 s, so a 500 ms old file waits.
+    expect(resumeDecision(running, { now: 1_000_000 + 500, staleAfterMs: 1 }).action).toBe('wait')
+    // Above the ceiling the bound stays 24 h: a week-long request cannot make a
+    // day-old checkpoint look live.
+    expect(resumeDecision(running, { now: 1_000_000 + 86_400_000 + 1, staleAfterMs: 7 * 86_400_000 }).action).toBe('resume')
+    // The default is still two minutes.
+    expect(CHECKPOINT_WIRING_LIMITS.staleAfterMs).toEqual({ min: 1_000, max: 86_400_000, default: 120_000 })
+  })
+
+  it('treats a stamp in the future as possibly live, never as stale (B13)', () => {
+    // A clock behind the writer (or a replayed file) must not read as "old": age is
+    // floored at 0, and the answer stays `wait`, which is the fail-safe direction
+    // because `resume` starts a second run over work another process may hold.
+    const ahead = checkpointOf('running', [{ id: 'task-1', status: 'running' }], 1_000_000 + 60_000)
+    const decision = resumeDecision(ahead, { now: 1_000_000 })
+    expect(decision.action).toBe('wait')
+    expect(decision.reason).toContain('in the future')
+    expect(decision.unfinished).toEqual(['task-1'])
   })
 
   it('never claims engine-level resume', () => {
@@ -474,9 +623,12 @@ describe('run lifecycle and disposal', () => {
       await disposeActiveState(state, { logger: recorder.logger })
       await pending
 
-      const checkpoint = await readCheckpoint(join(dir, 'checkpoint-run-wire-1.json'))
+      const checkpoint = await readCheckpoint(checkpointFile(run.id, { dir }))
       expect(checkpoint.run.status).toBe('cancelled')
       expect(checkpoint.watchdog.cancelled).toBe(true)
+      // End to end, through the real `runWorkflow`: the durable task label the
+      // engine hands back reaches the file, not only a synthetic `adopt` (B12).
+      expect(checkpoint.run.name).toBe(run.meta.name)
       // The default deadline (1 h) is above the schema's count ceiling, so the file
       // says nothing about it rather than recording a number it cannot express.
       expect(checkpoint.limits.timeoutMs).toBeUndefined()
@@ -494,13 +646,41 @@ describe('run lifecycle and disposal', () => {
     }
   })
 
+  it('says once, visibly, that it has stopped writing checkpoints (B15)', async () => {
+    const blocker = join(scratch, 'blocked-give-up')
+    await rm(blocker, { recursive: true, force: true })
+    const { writeFile } = await import('node:fs/promises')
+    await writeFile(blocker, 'not a directory', 'utf8')
+    const recorder = new Recorder()
+    const checkpointing = createCheckpointRecorder(options({ directory: blocker, recorder }))
+    checkpointing.adopt({ id: 'run-give-up' })
+    await checkpointing.tick()
+    await checkpointing.tick()
+    await checkpointing.tick()
+    expect(checkpointing.stats.writesStopped).toBe(false)
+
+    // The next tick is the one that gives up, and it is the only one that says so:
+    // without this line the run went quiet after three per-write warnings, which
+    // reads exactly like a run whose checkpoints are healthy.
+    expect(await checkpointing.tick()).toBeUndefined()
+    expect(checkpointing.stats.writesStopped).toBe(true)
+    const giveUp = recorder.warnings.filter(message => message.includes('stopped after 3 consecutive failures'))
+    expect(giveUp).toHaveLength(1)
+    expect(giveUp[0]).toContain('run-give-up')
+    await checkpointing.tick()
+    expect(recorder.warnings.filter(message => message.includes('stopped after 3 consecutive failures'))).toHaveLength(1)
+    checkpointing.dispose()
+  })
+
   it('resolves the default directory from the environment', async () => {
     const previous = process.env.GROK_WORKFLOW_CHECKPOINT_DIR
     process.env.GROK_WORKFLOW_CHECKPOINT_DIR = '/tmp/wiring-explicit'
     try {
       expect(checkpointDir()).toBe('/tmp/wiring-explicit')
       expect(checkpointDir({ dir: '/tmp/wiring-arg' })).toBe('/tmp/wiring-arg')
-      expect(checkpointFile('run x/y')).toBe('/tmp/wiring-explicit/checkpoint-run_x_y.json')
+      expect(checkpointFile('run x/y')).toBe(`/tmp/wiring-explicit/${checkpointFileName('run x/y')}`)
+      // Two ids a sanitizer alone would merge must not share a file.
+      expect(checkpointFile('run x/y')).not.toBe(checkpointFile('run x_y'))
     } finally {
       if (previous === undefined) delete process.env.GROK_WORKFLOW_CHECKPOINT_DIR
       else process.env.GROK_WORKFLOW_CHECKPOINT_DIR = previous

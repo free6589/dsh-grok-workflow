@@ -589,6 +589,35 @@ describe('mandatory entry gate', () => {
     expect(objective).toContain('now do the same for CHANGELOG')
   })
 
+  // B06: `relay`/`append` write the claimed batch themselves (the step is
+  // rejected), and the run then reads the conversation as late as possible. The
+  // message this plugin just committed must not come back as prior conversation:
+  // the objective would carry the user's words twice — once as history, once as
+  // the current request.
+  it.each(['relay', 'append'] as const)(
+    'does not read back the message it just committed (%s, B06)',
+    async (strategy) => {
+      const ctx = new FakeContext()
+      applyWith(ctx, { answerStrategy: strategy })
+      const live = realSession(`sess-b06-${strategy}`)
+      const agent = new FakeAgent({ session: live })
+      const request = '给导出接口加一个 CSV 选项'
+      await ctx.preStep()(payload(agent, [userMessage(request)]), passingNext([]))
+
+      await waitFor(() => ctx.engine.startCalls.length === 1)
+      const objective = String((ctx.engine.startCalls[0]!.args as { objective?: string }).objective ?? '')
+      expect(objective).toContain('Current request:')
+      expect(objective.split(request)).toHaveLength(2)
+      expect(objective).not.toContain('Conversation so far')
+      // P0-1 still holds: the batch is in the transcript, exactly once.
+      const words = live.deriveMessages()
+        .map(message => (message as unknown as UserMessage).content
+          .map(block => (block as { type?: string, text?: string }).type === 'text' ? (block as { text?: string }).text ?? '' : '')
+          .join('\n'))
+      expect(words.filter(text => text === request)).toHaveLength(1)
+    },
+  )
+
   it('refuses a 32001-character message with the 32000-character limit without running the workflow', async () => {
     const ctx = new FakeContext()
     applyWith(ctx)

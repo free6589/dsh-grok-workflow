@@ -15,6 +15,11 @@
  * the next message (`classifyPreStep`'s `mode-off` pass branch). The `turn`
  * field is informational metadata only — the gate reads only `enabled`.
  *
+ * The settle text reports what the session's own log shows, not what the write
+ * call did: an enable that did not land settles as `kind: 'error'` and never
+ * uses the success wording, so "the toggle is on" is only ever said about a
+ * record a reader can see.
+ *
  * The registration surface is structural (not imported from
  * `@deepseek-ai/dsh-commands`): that package is a UI-side service, not a
  * dependency of this bundle, and the contract used here is exactly the
@@ -24,7 +29,8 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { Session } from '@deepseek-ai/dsh-session'
-import { setMode } from './mode.js'
+import { readModeRecord, setMode } from './mode.js'
+import type { ModeRecord } from './mode.js'
 
 /** Agent surface the handler needs (the live agent carries more). */
 export interface GrokCommandAgent {
@@ -59,9 +65,26 @@ interface CommandsSurface {
   register(definition: GrokCommandDefinition): unknown
 }
 
-/** Warnings only: `setMode` is warn-and-continue and tolerates its absence. */
+/** Warnings from the write path; the settle text, not the logger, reports failure. */
 export interface CommandLogger {
   warn?(message: string): void
+}
+
+/** The state a session is left in when the toggle write did not take effect. */
+function currentStateText(record: ModeRecord | undefined): string {
+  if (record === undefined) return 'no toggle was recorded'
+  return `the toggle is still ${record.enabled ? 'on' : 'off'}`
+}
+
+/**
+ * The `kind: 'error'` settle text for a write that did not land.
+ *
+ * It must never carry the success wording: a refused write answered with
+ * "every message now runs the full workflow" is the user acting on a toggle
+ * that does not exist.
+ */
+function toggleFailureText(reason: string, current: ModeRecord | undefined): string {
+  return `Grok workflow toggle not changed: ${reason}. In this session ${currentStateText(current)}.`
 }
 
 /** The `/grok` command definition: arg grammar owned by the handler. */
@@ -77,7 +100,7 @@ export function grokCommand(logger?: CommandLogger): GrokCommandDefinition {
       const enable = arg === '' || arg === 'on'
       if (!enable && arg !== 'off') return { kind: 'error', text: 'Usage: /grok [on|off]' }
       const turn = typeof agent.turn === 'number' && Number.isFinite(agent.turn) ? agent.turn : 0
-      setMode(agent.session, {
+      const written = setMode(agent.session, {
         v: 1,
         enabled: enable,
         turn,
@@ -87,6 +110,23 @@ export function grokCommand(logger?: CommandLogger): GrokCommandDefinition {
         // carries no shape; the next `/grok` re-selects `full`.
         ...enable ? { workflowMode: 'full' as const } : {},
       }, logger)
+      // Read back instead of trusting the writer. "Grok workflow ON" is a claim
+      // about durable state, so it is only allowed to settle when the session's
+      // own log shows exactly that record — a session can accept an append
+      // without committing it, and the user would then act on a toggle that
+      // never existed.
+      const current = readModeRecord(agent.session)
+      const applied = written.ok
+        && current !== undefined
+        && current.enabled === enable
+        && current.turn === turn
+        && current.setBy === (enable ? 'command:/grok' : 'command:/grok off')
+      if (!applied) {
+        return {
+          kind: 'error',
+          text: toggleFailureText(written.reason ?? 'the session did not record it', current),
+        }
+      }
       return {
         kind: 'success',
         text: enable

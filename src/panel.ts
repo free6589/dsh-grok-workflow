@@ -31,7 +31,11 @@
  *   never had;
  * - a repeated `agent-start` for the same `seq` does not add a second row and a
  *   repeated `agent-end` does not change the outcome twice, so a duplicated event is
- *   idempotent. Our recorder emits neither, and this is the belt to that braces.
+ *   idempotent. Our recorder emits neither, and this is the belt to that braces;
+ * - a label the plugin did not author is *not* printed verbatim when it is the engine's
+ *   own child-call form (`<run name> child <callId>`): it becomes neutral copy, because
+ *   the call id is a machine identifier and the run name is already the node's title
+ *   ({@link neutralMemberLabel}). Any other label is shown as recorded.
  *
  * Everything here is pure: no clock, no counter, no estimate (Issue #22, P1-4).
  */
@@ -62,7 +66,10 @@ export interface PanelEvent {
 export interface PanelRow {
   /** Engine sequence number; internal, used to correlate start and settlement. */
   seq: number
-  /** User-visible label (`执行`, `检查（尝试 2）`): a role, never an identifier. */
+  /**
+   * User-visible label (`执行`, `检查（尝试 2）`): a role, never an identifier — or the
+   * neutral word for a call this plugin did not label (see {@link neutralMemberLabel}).
+   */
   label: string
   /** Lifecycle of the *call*, not of the task. */
   call: CallState
@@ -124,6 +131,46 @@ function runState(stopReason: unknown): RunState {
     case 'error': return 'failed'
     default: return 'interrupted'
   }
+}
+
+/**
+ * The trailing marker DSH itself writes into a workflow child's label.
+ *
+ * `PtcWorkflowEngine.startChild()` labels every child run
+ * `` `${this.meta.name} child ${callId}` `` (`dsh-workflow-ptc`, the call site
+ * `host.ts:205` in the checkout D-039 measured), and that label reaches a row whenever
+ * the call was not started by this plugin's own label table — a `workflow-run` node
+ * written by another bundle in the composition, or a session recorded before the
+ * descriptive labels of D-041. The call id is a machine identifier: it is exactly the
+ * kind of string the panel's "no internal id is visible" rule keeps off the screen
+ * (there is a test for `grok-`, `-a<n>` and `-r<n>` for the same reason).
+ */
+const ENGINE_CHILD_LABEL = /(?:^|\s)child\s+\d+\s*$/iu
+
+/**
+ * The word for a child call whose label this plugin did not author.
+ *
+ * It says what the row knows — this is a subagent call — and nothing more. The engine's
+ * name part is the *run* title, which the node header already carries, and the call id is
+ * not copy; repeating either would put a machine string in a sentence about a call. The
+ * word lives here rather than in `src/naming.ts` because it is not plugin copy: it is what
+ * the panel shows when *another* producer's label is on the wire, so it belongs with the
+ * rule that decides it.
+ */
+const UNKNOWN_MEMBER_LABEL: Record<NamingLanguage, string> = { zh: '子代理', en: 'Subagent' }
+
+/**
+ * The label a row shows, with the engine's own child-call form replaced by neutral copy.
+ *
+ * Anything else is shown as recorded: this projection does not paraphrase a label it
+ * cannot attribute, and it never guesses a role for one (a guessed `执行` on a foreign
+ * run's row would be a claim about work this plugin did not schedule).
+ * @param label - the label read off the `agent-start` event.
+ * @param language - copy language.
+ * @returns the label to render next to the call state.
+ */
+function neutralMemberLabel(label: string, language: NamingLanguage): string {
+  return ENGINE_CHILD_LABEL.test(label) ? UNKNOWN_MEMBER_LABEL[language] : label
 }
 
 /** The state word for a label the plugin did not produce (defensive, never guessed). */
@@ -192,12 +239,15 @@ export function projectPanel(events: readonly PanelEvent[], options: PanelOption
       groups.set(header, group)
     }
     const state = callState(settlements.get(seq))
+    // The row's label is user-visible (the stock renderer prints `agent-start`'s label
+    // verbatim), so the engine's own child-call form is replaced before it lands here.
+    const shown = neutralMemberLabel(label, language)
     const role = parseMemberLabel(label, language)?.role
     group.rows.push({
       seq,
-      label,
+      label: shown,
       call: state,
-      text: role === undefined ? fallbackRowText(label, state, language) : callStateText(role, state, language),
+      text: role === undefined ? fallbackRowText(shown, state, language) : callStateText(role, state, language),
     })
   }
   const projected = [...groups.values()]

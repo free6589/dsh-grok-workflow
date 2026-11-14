@@ -31,7 +31,11 @@
  *   never had;
  * - a repeated `agent-start` for the same `seq` does not add a second row and a
  *   repeated `agent-end` does not change the outcome twice, so a duplicated event is
- *   idempotent. Our recorder emits neither, and this is the belt to that braces.
+ *   idempotent. Our recorder emits neither, and this is the belt to that braces;
+ * - a label the plugin did not author is *not* printed verbatim when it is the engine's
+ *   own child-call form (`<run name> child <callId>`): it becomes neutral copy, because
+ *   the call id is a machine identifier and the run name is already the node's title
+ *   ({@link neutralMemberLabel}). Any other label is shown as recorded.
  *
  * Everything here is pure: no clock, no counter, no estimate (Issue #22, P1-4).
  */
@@ -50,7 +54,10 @@ export interface PanelEvent {
 export interface PanelRow {
     /** Engine sequence number; internal, used to correlate start and settlement. */
     seq: number;
-    /** User-visible label (`执行`, `检查（尝试 2）`): a role, never an identifier. */
+    /**
+     * User-visible label (`执行`, `检查（尝试 2）`): a role, never an identifier — or the
+     * neutral word for a call this plugin did not label (see {@link neutralMemberLabel}).
+     */
     label: string;
     /** Lifecycle of the *call*, not of the task. */
     call: CallState;

@@ -5,8 +5,21 @@ export declare const HARD_LIMITS: {
     readonly historyTurns: 1000000;
     readonly historyChars: 1000000;
     readonly maxQueuedMessages: 8;
-    readonly maxConcurrency: 1000000;
-    readonly maxRetries: 10;
+    /**
+     * Concurrency and retries are the plugin's *documented* engine-hook contract
+     * (AGENTS.md "Architecture invariants", D-003): default 3 / hard maximum 6, and
+     * default 1 / hard maximum 3. They are deliberately small, because each unit is
+     * one child agent charged against a real provider quota, and the generated
+     * script mirrors these two numbers by value (`src/script.ts`) — the parity is
+     * pinned by `test/config.spec.ts`, so neither side may be edited alone.
+     *
+     * The same envelope is pinned for checkpoints by `ENGINE_HOOK_LIMITS`
+     * (`src/checkpoint/schema.ts`), which derives from these two constants and makes
+     * `buildCheckpoint` refuse a row outside them; the run path warns once when a
+     * caller bypasses the config schema and hands a recorder a wider value.
+     */
+    readonly maxConcurrency: 6;
+    readonly maxRetries: 3;
     readonly maxTasks: 100;
     readonly maxActiveRuns: 4;
     readonly maxActiveRunsTotal: 16;
@@ -21,7 +34,7 @@ export declare const HARD_LIMITS: {
         readonly max: 64;
     };
     /** Extreme backstop on child calls charged against one task (worker + verifier). */
-    readonly maxAttemptsPerTask: 1100;
+    readonly maxAttemptsPerTask: 400;
     /** Hard ceiling on routing ledger entries kept per run. */
     readonly recordEntries: 256;
     /**
@@ -47,6 +60,19 @@ export declare const HARD_LIMITS: {
  * longer objective raises it in the profile patch (t45 D-017).
  */
 export declare const DEFAULT_TIMEOUT_MS = 3600000;
+/**
+ * Defaults of the two documented run limits (3 concurrent tasks, 1 retry).
+ *
+ * Declared once and read by the schema defaults, the checkpoint recorder and the
+ * tests, so a settings form, a hand-written profile patch and a programmatic call
+ * cannot disagree about what "unset" means — the same rule
+ * `DEFAULT_HUMAN_SUMMARY` follows. `src/checkpoint/schema.ts` imports them for
+ * `ENGINE_HOOK_LIMITS`, which is what keeps the recorded contract and the
+ * accepted configuration equal by construction instead of by comment.
+ */
+export declare const DEFAULT_MAX_CONCURRENCY = 3;
+/** @see DEFAULT_MAX_CONCURRENCY */
+export declare const DEFAULT_MAX_RETRIES = 1;
 /** Default concurrent workflow runs per session (t45, P1-3). */
 export declare const DEFAULT_MAX_ACTIVE_RUNS = 2;
 /**

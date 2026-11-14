@@ -1,0 +1,9 @@
+# client bundle served by the real instance (port 3411)
+index_HTTP=200; index references dsh-grok-workflow/client.js in a /plugins/?? batch
+served URL: plugins/??dsh-grok-workflow/client.js&rev=1e7814704e56
+served bytes=186165; lib/client.js bytes=186091
+first divergence at byte 181224 = appended sourceMappingURL comment only
+served payload startsWith lib/client.js: true
+
+md5 lib/client.js : 7c0592819f13d849d5328c7aec602261
+md5 src/client/index.js : 7c0592819f13d849d5328c7aec602261

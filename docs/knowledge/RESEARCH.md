@@ -401,3 +401,83 @@ out-of-scope → mode-off → already-routed; reason labels are asserted only vi
 stdout 形如 `dsh web: http://127.0.0.1:3199/?token=…`——token 只走环境变量进驱动，不落盘；
 首次 boot 前必须 `--from-default-profile`（REPLACE 语义），插件用 `dsh plugin add file://<checkout>`
 dev 安装（pnpm store 可落仓库内 `.pnpm-store/`）。
+
+## A19 — DSH 插件兼容判定的真实语义：`includePrerelease`，`<0.3.0` 会放行 `0.3.0-rc.*`（2026-11-15，`CONFIRMED`）
+
+证据：`evidence/verify-H1/engines-dsh-B01.txt`（直接调用 DSH 自己的 `evaluatePluginCompatibility`）。
+
+实测矩阵（插件 `engines.dsh: ">=0.2.1-rc.2 <0.3.0"`）：
+
+| runtime | 判定 |
+| --- | --- |
+| `0.2.1-rc.2` | compatible |
+| `0.2.2-rc.3`（本机真实运行时） | compatible → `null`，无需版本豁免 |
+| `0.2.2` | compatible |
+| `0.3.0-rc.1` | **compatible** |
+| 对照 `engines.dsh:"<0.2.0"` | **REFUSED**，附完整不兼容警告 + `allow-version` 提示 |
+
+原因是上游用 `semver.satisfies(runtime, range, { includePrerelease: true })`
+（`dsh-app-boot/lib/index.js`）：prerelease 的 `0.3.0-rc.1` 排序低于 `0.3.0`，因此在排除上界之外
+仍满足区间。两条推论值得记住：
+
+1. 「上界」在插件侧不能用来阻断 rc 线。要阻断必须写成 `<0.3.0-0` 这类形式——那是语义技巧，
+   不该为一个未发生的事故提前写进清单。
+2. 兼容表（旧 `dsh.compatibility.dshReleases`）与 `engines` 并存时，前者是纯文档、后者才参与判定；
+   两份真源必然漂移，已在 D-043 收成一份。
+
+`package.json` 现在只有 `engines`（`>=0.2.1-rc.2 <0.3.0` + `node >=22`），旧的
+`dsh.compatibility`（`dsh` / `profiles` / `dshReleases`）整块删除，`npm pack` 与安装均未因此报错。
+
+## A20 — `link:` 安装会带出第二份 `@deepseek-ai/dsh-session`：`/grok on` 的 brand check 失败（现象 `CONFIRMED`，归因 `HYPOTHESIS`）
+
+现象（隔离实例，headless Chromium，`probes/`）：
+
+```text
+link: 安装 → /grok on
+  Failed
+  grok
+  Grok workflow toggle not changed: Receiver must be an instance of class Session.
+  In this session no toggle was recorded.
+
+打包产物安装 → /grok on
+  Grok workflow ON — every message now runs the full plan→execute→verify workflow.
+```
+
+这是 B03 修复（`src/command.ts` 读回校验）**正确工作的样子**：写入没落地时它报失败、并说出当前
+真实状态，而不是继续印成功文案。失败本身来自安装形态，不是判定逻辑。
+
+归因（`HYPOTHESIS`，未插桩验证模块身份）：`link:` 让插件解析到工作树自己的
+`node_modules/@deepseek-ai/dsh-session`（devDependencies，`0.2.1-rc.2`），而运行时是 `0.2.2-rc.3`；
+`appendPluginRecord` 是宿主 session 实例上的方法，跨副本 `instanceof` brand check 直接抛
+`Receiver must be an instance of class Session`。打包安装的 profile 只有 `cosmokit` /
+`schemastery`，不存在第二份 session 包。
+
+运维结论（已进 D-046）：真机验 `/grok` 开关用打包产物；`link:` 只用于「加载是否 pending」这类诊断。
+若要证伪该归因，最小插桩是打印两份 `require.resolve('@deepseek-ai/dsh-session')` 与一次
+`instanceof` 实测——本轮没做，所以状态停在 `HYPOTHESIS`。
+
+附带 `CONFIRMED` 限制：**尚无会话的首页里发 `/grok on` 不会执行**（命令需要已存在的 session），
+必须先有一条普通消息把会话建出来。这不是缺陷，是命令面的事实，写进验证流程避免重复踩。
+
+## A21 — 进度 Tab 的数据源与视图能力边界（2026-11-15，`CONFIRMED`）
+
+四个 `tool-workflow/*` 事件是轨道的唯一来源：`run-start`（声明行数与模板阶段）、`agent-start`
+（子调用开始）、`agent-end`（结算）、`run-end`（终局与 stop reason）。由此得到的硬事实：
+
+- **未命中的行永远 `pending`。** 引擎没报的模板阶段（`Sync`/`Diagnose`/`Fix`/`UI`/`On device`/
+  `Clean up`/`Push, tag and release`）在真机上保持空环 + `title="Not reported in the events"`，
+  一帧里能同时看到 `pending/doing/done`（`03-progress-pending-doing-done.png`）。
+- **`cancelled` 是引擎原话，不是推导。** 跑到 doing 时点 composer 停止 → `FINAL_STATES`
+  含 `cancelled`，`End` 随后也 cancelled。反过来，`blocked` 必须是**派生**状态：运行结束仍留下
+  未结算行，视图才说「blocked」并给出理由（`progress.derived.runEndedUnsettled`）。
+- **`failed` 压过一切**，包括未完成行——这条由单测钉住，真机本轮没有构造（不伪造）。
+- **详情拿不到 L1/L2。** recorder 不写 `stage-detail`，视图侧也拿不到子会话正文，所以 7 个字段
+  （`Files/Commands/Result/Evidence/Risks/Next/Owner`）真实落点是 L3：全 `—` +
+  `Source: not reported`。阶梯已实现，将来有数据源不用改 UI。
+- **打开子会话依赖 `sessions.subagentAddress`**；`mode: 'unknown'` 时按 `panelMemberMode` 的既有
+  规则保持不可点。真机上点「Open child session」确实开出面板里那个子会话（`11-child-session-opened.png`，
+  子会话自带 Chat/Trajectory/Progress 三 Tab 与完整 planner 上下文）。
+- **单 run 展示**：`selectActiveRun` 取 `anchorSeq` 最大的 run，所以一次会话里只显示最新那次
+  运行的轨道（与设计 §3 一致）。
+- **主题化**：环/点颜色全部 `var(--dsw-alias-…)` + 旧 hex 兜底；深色下实测 done = `rgb(34,197,94)`、
+  pending = `rgb(84,85,87)`，无硬编码浅色块。

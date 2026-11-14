@@ -20,11 +20,17 @@ export interface HistoryBounds {
  *
  * @param messages - durable conversation messages in order.
  * @param bounds - turn and character bounds.
+ * @param excludeIds - message ids to leave out. The gate's `relay`/`append`
+ *   strategies write the claimed batch themselves before the run starts (the step
+ *   is rejected, so nothing else would), and the history read that follows must
+ *   not hand the words the user just typed back to the run as "prior
+ *   conversation": the objective would carry the message twice — once as history,
+ *   once as the current request.
  * @returns the rendered block, or an empty string when there is nothing to forward.
  */
-export declare function renderHistory(messages: readonly Message[], bounds: HistoryBounds): string;
+export declare function renderHistory(messages: readonly Message[], bounds: HistoryBounds, excludeIds?: readonly string[]): string;
 /** Render the durable history of one session, tolerating an unavailable session. */
-export declare function collectHistory(session: Session | undefined, bounds: HistoryBounds): string;
+export declare function collectHistory(session: Session | undefined, bounds: HistoryBounds, excludeIds?: readonly string[]): string;
 /**
  * Compose the gate objective from forwarded history and the current message.
  *

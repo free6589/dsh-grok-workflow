@@ -6,8 +6,21 @@ export const HARD_LIMITS = {
   historyTurns: 1_000_000,
   historyChars: 1_000_000,
   maxQueuedMessages: 8,
-  maxConcurrency: 1_000_000,
-  maxRetries: 10,
+  /**
+   * Concurrency and retries are the plugin's *documented* engine-hook contract
+   * (AGENTS.md "Architecture invariants", D-003): default 3 / hard maximum 6, and
+   * default 1 / hard maximum 3. They are deliberately small, because each unit is
+   * one child agent charged against a real provider quota, and the generated
+   * script mirrors these two numbers by value (`src/script.ts`) — the parity is
+   * pinned by `test/config.spec.ts`, so neither side may be edited alone.
+   *
+   * The same envelope is pinned for checkpoints by `ENGINE_HOOK_LIMITS`
+   * (`src/checkpoint/schema.ts`), which derives from these two constants and makes
+   * `buildCheckpoint` refuse a row outside them; the run path warns once when a
+   * caller bypasses the config schema and hands a recorder a wider value.
+   */
+  maxConcurrency: 6,
+  maxRetries: 3,
   maxTasks: 100,
   maxActiveRuns: 4,
   maxActiveRunsTotal: 16,
@@ -19,7 +32,7 @@ export const HARD_LIMITS = {
   /** Per-route in-flight ceiling (`maxInFlight`): 1 keeps a private lane, 64 is the widest share. */
   routeInFlight: { min: 1, max: 64 },
   /** Extreme backstop on child calls charged against one task (worker + verifier). */
-  maxAttemptsPerTask: 1100,
+  maxAttemptsPerTask: 400,
   /** Hard ceiling on routing ledger entries kept per run. */
   recordEntries: 256,
   /**
@@ -46,6 +59,21 @@ export const HARD_LIMITS = {
  * longer objective raises it in the profile patch (t45 D-017).
  */
 export const DEFAULT_TIMEOUT_MS = 3_600_000
+
+/**
+ * Defaults of the two documented run limits (3 concurrent tasks, 1 retry).
+ *
+ * Declared once and read by the schema defaults, the checkpoint recorder and the
+ * tests, so a settings form, a hand-written profile patch and a programmatic call
+ * cannot disagree about what "unset" means — the same rule
+ * `DEFAULT_HUMAN_SUMMARY` follows. `src/checkpoint/schema.ts` imports them for
+ * `ENGINE_HOOK_LIMITS`, which is what keeps the recorded contract and the
+ * accepted configuration equal by construction instead of by comment.
+ */
+export const DEFAULT_MAX_CONCURRENCY = 3
+
+/** @see DEFAULT_MAX_CONCURRENCY */
+export const DEFAULT_MAX_RETRIES = 1
 
 /** Default concurrent workflow runs per session (t45, P1-3). */
 export const DEFAULT_MAX_ACTIVE_RUNS = 2
@@ -198,8 +226,8 @@ export const Config = z.object({
   historyTurns: z.natural().min(0).max(HARD_LIMITS.historyTurns).default(12).volatile(),
   historyChars: z.natural().min(0).max(HARD_LIMITS.historyChars).default(20_000).volatile(),
   maxQueuedMessages: z.natural().min(0).max(HARD_LIMITS.maxQueuedMessages).default(4).volatile(),
-  maxConcurrency: z.natural().min(1).max(HARD_LIMITS.maxConcurrency).default(4).volatile(),
-  maxRetries: z.natural().min(0).max(HARD_LIMITS.maxRetries).default(2).volatile(),
+  maxConcurrency: z.natural().min(1).max(HARD_LIMITS.maxConcurrency).default(DEFAULT_MAX_CONCURRENCY).volatile(),
+  maxRetries: z.natural().min(0).max(HARD_LIMITS.maxRetries).default(DEFAULT_MAX_RETRIES).volatile(),
   maxTasks: z.natural().min(1).max(HARD_LIMITS.maxTasks).default(12).volatile(),
   // 60 minutes, not 30 (t45, P1-4): the two measured deadline kills were 30m00s
   // and 30m01s on four-task objectives, and a real four-task run took 878 s / 1148 s
@@ -471,12 +499,13 @@ export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
     verifier: resolveChain('verifier', config.roles?.verifier),
     synthesizer: resolveChain('synthesizer', config.roles?.synthesizer),
   }
-  const maxRetries = integer('maxRetries', config.maxRetries ?? 2, 0, HARD_LIMITS.maxRetries)
+  const maxRetries = integer('maxRetries', config.maxRetries ?? DEFAULT_MAX_RETRIES, 0, HARD_LIMITS.maxRetries)
   // Budget backstop (R-12): one task may charge at most
   // HARD_LIMITS.maxAttemptsPerTask child calls, and every attempt pays for one
-  // worker and one verifier call per chain entry. The cap is deliberately
-  // extreme (1100): ordinary short-chain combinations always pass it; only a
-  // pathological long-chain + high-retry combination is refused at load.
+  // worker and one verifier call per chain entry. The cap is the worst legal
+  // combination and nothing more — 50+50 chain entries at the 3-retry cap is
+  // (50 + 50) x 4 = 400 (`test/routing.spec.ts`) — so equality still loads and
+  // only a limit widened without revisiting it can trip the guard.
   const callsPerAttempt = Math.max(1, roles.worker.length) + Math.max(1, roles.verifier.length)
   const attemptsPerTask = maxRetries + 1
   if (callsPerAttempt * attemptsPerTask > HARD_LIMITS.maxAttemptsPerTask) {
@@ -543,7 +572,7 @@ export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
     historyTurns: integer('historyTurns', config.historyTurns ?? 12, 0, HARD_LIMITS.historyTurns),
     historyChars: integer('historyChars', config.historyChars ?? 20_000, 0, HARD_LIMITS.historyChars),
     maxQueuedMessages: integer('maxQueuedMessages', config.maxQueuedMessages ?? 4, 0, HARD_LIMITS.maxQueuedMessages),
-    maxConcurrency: integer('maxConcurrency', config.maxConcurrency ?? 4, 1, HARD_LIMITS.maxConcurrency),
+    maxConcurrency: integer('maxConcurrency', config.maxConcurrency ?? DEFAULT_MAX_CONCURRENCY, 1, HARD_LIMITS.maxConcurrency),
     maxRetries,
     maxTasks: integer('maxTasks', config.maxTasks ?? 12, 1, HARD_LIMITS.maxTasks),
     timeoutMs: integer('timeoutMs', config.timeoutMs ?? DEFAULT_TIMEOUT_MS, 1_000, HARD_LIMITS.timeoutMs),

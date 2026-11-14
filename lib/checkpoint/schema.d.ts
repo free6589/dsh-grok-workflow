@@ -20,15 +20,18 @@
  *   `agent()` hook; stage rows are meant to be recorded from those lifecycle
  *   events by a later integration task. This module never calls the engine.
  *
- * Limits policy: the checkpoint *records* whatever limits a run actually used
- * (structural sanity only), because the schema must stay writable for every
- * configuration the plugin accepts today. The documented engine-hook contract
- * — default concurrency 3, hard maximum 6; retries default 1, hard maximum 3
- * (AGENTS.md "Architecture invariants") — is pinned in
- * {@link ENGINE_HOOK_LIMITS} and checked by {@link limitContractViolations}.
- * Observed code currently defaults `maxConcurrency` to 4 and `maxRetries` to 2
- * (src/config.ts); that divergence is recorded here as data, not silently
- * reconciled by the schema.
+ * Limits policy: the checkpoint *records* whatever limits a run actually used —
+ * except that a row outside the documented engine-hook contract is **refused**,
+ * because a checkpoint is the artifact a later run is re-driven from and must not
+ * be able to describe a run the plugin would never start. The contract is
+ * default concurrency 3 / hard maximum 6 and retries default 1 / hard maximum 3
+ * (AGENTS.md "Architecture invariants", D-003); it is pinned once in
+ * {@link ENGINE_HOOK_LIMITS}, which derives from `HARD_LIMITS` in `src/config.ts`
+ * so the accepted configuration and the recorded contract cannot drift apart.
+ * The read side (`assertCheckpoint`) stays lenient on purpose: a file written by
+ * an older build, when the config cap was wider, must still be readable, and
+ * {@link limitContractViolations} names what is out of envelope for a caller that
+ * wants to report it.
  *
  * Secrets: every free-text field passes through `redactSecrets` at build time
  * (see `src/redact.ts`). Field-level wholesale redaction (`redactDeep`) is
@@ -96,10 +99,12 @@ export declare const CHECKPOINT_LIMITS: {
 };
 /**
  * The documented engine-hook contract for run limits (AGENTS.md architecture
- * invariants; the task brief repeats it verbatim). Recorded limits that stay
- * inside this envelope are flagged compliant by {@link limitContractViolations};
- * values outside it are still recorded, never rejected, so the checkpoint
- * always tells the truth about the run.
+ * invariants; the task brief repeats it verbatim), derived from the single
+ * declaration in `src/config.ts` so `HARD_LIMITS.maxConcurrency` /
+ * `HARD_LIMITS.maxRetries` and the numbers `buildCheckpoint` refuses are the same
+ * pair by construction. A value outside this envelope is refused by the writer
+ * (`buildCheckpoint`) and reported by `limitContractViolations`; the reader still
+ * accepts it, so a checkpoint written by an older, wider build stays readable.
  */
 export declare const ENGINE_HOOK_LIMITS: {
     readonly maxConcurrency: {
@@ -123,6 +128,14 @@ export type CheckpointPhase = (typeof PHASE_NAMES)[number];
 export interface CheckpointRun {
     runId: string;
     sessionId?: string;
+    /**
+     * The run's durable task identity — the engine run's `meta.name`, which is what
+     * `src/run.ts` also hands the memory archiver (`adopt(id, name)`), redacted and
+     * bounded here. `runId` is engine-generated and means nothing outside the
+     * process that produced it; this label is what lets a later reader tie the file
+     * back to the task that was asked for.
+     */
+    name?: string;
     objective: string;
     status: CheckpointStatus;
     cause?: string;
@@ -239,6 +252,8 @@ export interface CheckpointInput {
         objective: string;
         status: CheckpointStatus;
         sessionId?: string;
+        /** Durable task identity (`run.meta.name`), redacted and bounded at build time. */
+        name?: string;
         cause?: string;
     };
     plan: {
@@ -297,12 +312,12 @@ export interface CheckpointInput {
         objective?: string;
         digest: string;
     };
-    limits?: {
-        maxConcurrency: number;
-        maxRetries: number;
-        maxTasks: number;
-        timeoutMs?: number;
-    };
+    /**
+     * Limits the run used. Every field is optional: an omitted one is recorded as
+     * the documented contract default ({@link ENGINE_HOOK_LIMITS} / `maxTasks` 12)
+     * rather than as a zero the writer would then have to refuse.
+     */
+    limits?: Partial<CheckpointLimits>;
     watchdog?: {
         deadlineHit?: boolean;
         cancelled?: boolean;

@@ -106,6 +106,64 @@ const FORCE_TEAM = /(?:用|上|开|走|要|叫|让)(?:完整的?)?团队|团队(
 const PENDING_FAST = /^[\s\p{P}\p{S}]*(?:简单|快手|直接|快速|单干|自己|不用团队|别用团队|quick|simple|fast|solo|no team|skip)/iu
 const PENDING_TEAM = /^[\s\p{P}\p{S}]*(?:团队|完整|全流程|全部|用团队|team|full|yes|好)/iu
 
+/**
+ * Filler a choice word may carry and still be *only* an answer ("简单", "简单的吧").
+ *
+ * The front desk asks "简单 / 团队", so the honest reading of the reply is the
+ * choice plus a filler character or two — never a choice prefix in front of a
+ * new task. Messages such as "好的，帮我看下 log" open with "好" but carry work;
+ * treating the whole message as the answer threw that work away (B05).
+ */
+export const PENDING_FILLER_MAX = 2
+
+/** One reply read as the answer to the front-desk question. */
+export interface PendingAnswer {
+  /** The choice word the reply opens with, as written ("简单", "quick", "好"). */
+  choice: string
+  /** The tier that word selects. */
+  tier: 'fast' | 'team'
+  /**
+   * What the reply says beyond the choice, with its leading punctuation removed.
+   * Empty for a bare answer; a *new task* when {@link PendingAnswer.bare} is false.
+   */
+  task: string
+  /**
+   * True when the reply is the choice alone, plus at most
+   * {@link PENDING_FILLER_MAX} filler characters — the one shape that means
+   * "answer the question I was asked and nothing else".
+   */
+  bare: boolean
+}
+
+/** Padding a choice word may be wrapped in, and what is left once it is removed. */
+const LEADING_NOISE = /^[\s\p{P}\p{S}]+/u
+
+/**
+ * Read one reply as the answer to the front-desk question (B05).
+ *
+ * The choice word decides the tier ({@link PENDING_FAST} before
+ * {@link PENDING_TEAM}: "不用团队" names the team and still selects the quick
+ * tier). Everything after it is returned as `task`, so a caller can tell "简单"
+ * from "简单，另外把 X 改成 Y" and keep the new work instead of discarding it.
+ *
+ * @param text - the user's reply.
+ * @returns the answer, or `undefined` when the reply is not an answer at all.
+ */
+export function pendingAnswer(text: string): PendingAnswer | undefined {
+  for (const [pattern, tier] of [[PENDING_FAST, 'fast'], [PENDING_TEAM, 'team']] as const) {
+    const match = pattern.exec(text)
+    if (match === null) continue
+    const task = text.slice(match[0].length).replace(LEADING_NOISE, '').trim()
+    return {
+      choice: match[0].replace(LEADING_NOISE, '').trim(),
+      tier,
+      task,
+      bare: task.length <= PENDING_FILLER_MAX,
+    }
+  }
+  return undefined
+}
+
 /** Greetings, thanks and acknowledgements: no work to route at all. */
 const CHAT_EXACT = /^(?:hi|hello|hey|yo|hiya|你好|您好|嗨|哈喽|哈啰|在吗|在么|谢谢|多谢|感谢|谢了|thank you|thanks|thx|ty|ok|okay|好的|好|收到|了解到|明白了|明白|嗯+|哦+|再见|拜拜|晚安|早上好|上午好|中午好|下午好|晚上好)(?:[\s!！。,.，~～?？…、]*)$/i
 
@@ -165,18 +223,37 @@ const STATEMENT_CHOICE = /还是\s*(?:觉得|认|想|喜|倾|没|不|未|无|要
 const ENUMERATION = /(?:^|[\n。；;])\s*(?:\d{1,2}\s*[).、．]|[一二三四五六七八九十]{1,3}\s*[、.)]|[-*•]\s+\S)/u
 
 /**
- * A 顿号 list of three or more items ("改配置、重启、验证").
+ * A list of three or more items, separated by 顿号 or a full-width comma
+ * ("改配置、重启、验证" / "改配置，重启，验证").
  *
  * Three items in one breath is a plan with parts; two items ("读、写") is usually one
  * action described twice, which is why the count is three and not two. D-025 states
  * that 顿号 counts as sequencing, and this is the rule that makes the statement true.
+ * The full-width comma is the same list written the other way round, and reading it
+ * as one clause answered it with a single quick worker instead of the team (B09).
+ *
+ * A list inside a *question* is a choice, not a plan: "A、B、C哪个更快" names three
+ * things to compare and asks about them, and reading that as sequencing sent it to
+ * the team before the question rule could answer it (B09). The caller therefore
+ * applies this signal only when the message is not a question — see
+ * {@link triageSignals}.
  */
-const COMMA_LIST = /(?:[^\s、，。；;:：]{1,10}、){2,}/u
+const COMMA_LIST = /(?:[^\s、，。；;:：]{1,10}[、，]){2,}/u
 
-/** Concrete anchors: a path, a file name, an error code, a quoted snippet. */
-// Written with character classes for the slash and the backtick: both are regex
-// literals' own delimiters/quotes and a literal `\/` here ended the pattern early.
-const CONCRETE = /(?:[\w./-]+\.(?:ts|tsx|js|mjs|cjs|json|md|ya?ml|py|go|rs|sh|toml|ini|lock)\b|(?:^|[\s"'\u0060(])(?:src|lib|test|docs|packages|apps)[/]|\b[A-Z]{2,}-\d{2,}\b|\bE[A-Z]{3,}\b|\b0x[0-9a-f]{4,}\b|[\u0060][^\u0060]+[\u0060]|\b(?:error|traceback|stack trace)\b|报错[:：]|错误码)/iu
+/**
+ * Concrete anchors: a path, a file name, an error code, a quoted snippet.
+ *
+ * The quantifier on the first alternative is **bounded** ({1,120}) on purpose.
+ * An unbounded `[\w./-]+\.` backtracks over every character of a run for every
+ * start position, which is quadratic: measured 2,090 ms on a 32k paste of one
+ * letter and 8,519 ms at 64k, all inside the front desk's per-message scan (B02).
+ * The bound stops the backtracking at 120 characters; a file name longer than
+ * that is not a name this rule needs to recognise.
+ *
+ * Written with character classes for the slash and the backtick: both are regex
+ * literals' own delimiters/quotes and a literal `\/` here ended the pattern early.
+ */
+const CONCRETE = /(?:[\w./-]{1,120}\.(?:ts|tsx|js|mjs|cjs|json|md|ya?ml|py|go|rs|sh|toml|ini|lock)\b|(?:^|[\s"'\u0060(])(?:src|lib|test|docs|packages|apps)[/]|\b[A-Z]{2,}-\d{2,}\b|\bE[A-Z]{3,}\b|\b0x[0-9a-f]{4,}\b|[\u0060][^\u0060]+[\u0060]|\b(?:error|traceback|stack trace)\b|报错[:：]|错误码)/iu
 
 /** Sequencing or enumeration: a task with several parts. */
 const MULTI_STEP = /(?:先[^。；;!?！？]{0,20}(?:然后|再|接着|之后|最后)|并且|然后|接着|同时|以及|顺便|再把|再帮|之后|第一|首先|其次|最后|并(?:补|写|加|跑|执行|提交|验证|测试|实现|整理|更新|输出|记录|修复|创建|生成|通知|备份|复制|拷贝|升级|部署|删除|修改|发送|打印|回复|迁移|发布|回滚|回退|重启|验证|灰度)|\bstep\s*1\b|\bthen\b|\band\s+also\b|\bafter\s+that\b|\bfirst\b[^.!?\n]{0,40}\b(?:then|second|next)\b|\bafterwards\b|\bfinally\b)/iu
@@ -192,8 +269,17 @@ const ACTION = /(?:算|查|找|列|读|看|改|加|跑|执行|运行|打印|输�
 /** Words that make an objective vague on its own ("改一下那个"). */
 const VAGUE = /(?:那个|这个|那些|这些|它(?!们)|\bthat\b|\bthis\b|\bit\b)/i
 
-/** Sentence terminators, used as a crude clause count. */
-const CLAUSE_BREAK = /[。；;!！?？]+|\.\s/g
+/**
+ * Sentence terminators, used as a crude clause count.
+ *
+ * The full-width comma is here because it is how a Chinese command list is
+ * usually written: "改配置，重启，验证" is the same three steps as the 顿号 form,
+ * and counting it as one clause answered it with a single quick worker (B09).
+ * 顿号 is deliberately *not* a clause break — three 顿号 items are the
+ * {@link COMMA_LIST} signal, and counting them twice would make a question that
+ * lists choices look like a plan.
+ */
+const CLAUSE_BREAK = /[。；;，,!！?？]+|\.\s/g
 
 /** Limits that separate "one shot" from "a plan". */
 export const TRIAGE_LIMITS = {
@@ -201,6 +287,16 @@ export const TRIAGE_LIMITS = {
   teamChars: 200,
   /** A chat message is short: a greeting plus padding, never a request. */
   chatChars: 40,
+  /**
+   * Characters of one message the signal scan reads (B02).
+   *
+   * Every pattern in {@link triageSignals} is a single pass over its input, but a
+   * pasted wall of text makes each pass long — and the pre-B02 `CONCRETE` made
+   * one of them quadratic. The head of a message carries the anchors a front desk
+   * can act on, so the scan stops there. `long` is still judged on the whole
+   * message, which is why a huge paste keeps its tier.
+   */
+  signalChars: 4_096,
 } as const
 
 /** True when the text contains CJK characters. */
@@ -257,23 +353,33 @@ export interface TriageSignals {
  */
 export function triageSignals(text: string): TriageSignals {
   const body = text.trim()
+  // The scan is bounded (B02, {@link TRIAGE_LIMITS.signalChars}): `long` is the
+  // only signal that has to see the whole message, and it is a length check.
+  const head = body.slice(0, TRIAGE_LIMITS.signalChars)
   const hits = new Set<string>()
-  for (const match of body.matchAll(new RegExp(DELIVERABLE.source, 'giu'))) hits.add(match[0].toLowerCase())
+  for (const match of head.matchAll(new RegExp(DELIVERABLE.source, 'giu'))) hits.add(match[0].toLowerCase())
+  // A question is decided first, because it changes what a 顿号 list means: three
+  // items in a question are three things being compared ("A、B、C哪个更快"), not
+  // three steps to run (B09).
+  const question =
+    QUESTION.test(head) ||
+    A_NOT_A.test(head) ||
+    (CHOICE.test(head) && !STATEMENT_CHOICE.test(head)) ||
+    (WHO.test(head) && !WHO_REPORTED.test(head))
   return {
     deliverables: hits.size,
-    multiStep: MULTI_STEP.test(body) || ENUMERATION.test(body) || COMMA_LIST.test(body),
-    action: ACTION.test(body),
+    multiStep:
+      MULTI_STEP.test(head) ||
+      ENUMERATION.test(head) ||
+      (!question && COMMA_LIST.test(head)),
+    action: ACTION.test(head),
     long: body.length > TRIAGE_LIMITS.teamChars,
-    clauses: clauseCount(body),
+    clauses: clauseCount(head),
     // "这个报错" is not vague when the message also names a path, a code or a snippet:
     // there is something to look at, so the front desk answers instead of asking.
-    vague: VAGUE.test(body) && hits.size === 0 && !CONCRETE.test(body),
-    question:
-      QUESTION.test(body) ||
-      A_NOT_A.test(body) ||
-      (CHOICE.test(body) && !STATEMENT_CHOICE.test(body)) ||
-      (WHO.test(body) && !WHO_REPORTED.test(body)),
-    concrete: CONCRETE.test(body),
+    vague: VAGUE.test(head) && hits.size === 0 && !CONCRETE.test(head),
+    question,
+    concrete: CONCRETE.test(head),
   }
 }
 
@@ -625,8 +731,12 @@ export function classifyTriage(input: TriageInput): TriageVerdict {
     return input.ask ? verdict('ask', 'ambiguous') : verdict('team', 'ambiguous-escalate', true)
   }
   if (input.pending === true) {
-    if (PENDING_FAST.test(text)) return verdict('fast', 'pending-fast')
-    if (PENDING_TEAM.test(text)) return verdict('team', 'pending-team', true)
+    // The reply is read as the answer to the question, whether it is the choice
+    // alone or a choice followed by new work (B05) — {@link resumedRequest} is
+    // what tells those two apart when the worker text is composed.
+    const answer = pendingAnswer(text)
+    if (answer?.tier === 'fast') return verdict('fast', 'pending-fast')
+    if (answer?.tier === 'team') return verdict('team', 'pending-team', true)
   } else if (BARE_CHOICE.test(text)) {
     // A choice word with no question waiting for it: the pending answer expired, or
     // the plugin was reloaded. Never start a run the user did not pair with a task,
@@ -872,7 +982,13 @@ export interface PendingAsk {
  *
  * The selection is stated as a *decision about the original request*, not as a new
  * request: a worker that received only "简单" would either do nothing or invent a
- * task, and the phrase below is the one the acceptance for P0-2 pins.
+ * task. Two shapes are possible:
+ *
+ * 1. **The answer alone** ("简单", "简单的吧") — the choice, and nothing else to do.
+ * 2. **An answer that also carries work** ("简单，另外帮我看下 log") — the choice
+ *    *and* a new task in one message. Both are named: dropping the new task as
+ *    "not a task objective" is how real work got lost (B05).
+ *
  * @param verdict - the tier the answer selected.
  * @param originalRequest - the request the front-desk question was about.
  * @param answer - the user's confirmation message, verbatim.
@@ -880,22 +996,30 @@ export interface PendingAsk {
  */
 export function resumedRequest(verdict: TriageVerdict, originalRequest: string, answer: string): string {
   const trimmed = answer.trim()
+  const shape = pendingAnswer(trimmed)
+  const choice = shape === undefined || shape.choice === '' ? trimmed : shape.choice
+  const task = shape !== undefined && !shape.bare ? shape.task : ''
+  const team = verdict.tier === 'team'
   if (verdict.lang === 'zh') {
-    const choice = verdict.tier === 'team' ? '用户选择团队模式' : '用户选择简单模式'
-    return [
+    const lines = [
       '原始任务：',
       originalRequest,
       '',
-      `用户的确认：${choice}（「${trimmed}」只是对上一个确认档问题的回答，它不是新的任务目标）。`,
-    ].join('\n')
+      // Only the choice word is quoted: quoting the whole message would repeat the
+      // new task, which the section below states on its own.
+      `用户的确认：${team ? '用户选择团队模式' : '用户选择简单模式'}（「${choice}」是对上一个确认档问题的回答）。`,
+    ]
+    if (task !== '') lines.push('', '这条消息里还带了新任务，和上面的原始任务一起做：', task)
+    return lines.join('\n')
   }
-  const choice = verdict.tier === 'team' ? 'the user chose the team mode' : 'the user chose the simple mode'
-  return [
+  const lines = [
     'Original request:',
     originalRequest,
     '',
-    `User confirmation: ${choice} ("${trimmed}" answers the previous confirm question; it is not a new task objective).`,
-  ].join('\n')
+    `User confirmation: ${team ? 'the user chose the team mode' : 'the user chose the simple mode'} ("${choice}" answers the previous confirm question).`,
+  ]
+  if (task !== '') lines.push('', 'This message also carries new work; do it together with the original request:', task)
+  return lines.join('\n')
 }
 
 /**

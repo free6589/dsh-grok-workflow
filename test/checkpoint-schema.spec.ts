@@ -2,6 +2,7 @@ import { mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { DEFAULT_MAX_CONCURRENCY, DEFAULT_MAX_RETRIES, HARD_LIMITS } from '../src/config.js'
 import {
   assertCheckpoint,
   buildCheckpoint,
@@ -107,6 +108,25 @@ describe('schema coverage', () => {
     expect(checkpoint.minContext.digest).toContain('plan: 3 task(s), 1 finished')
     expect(checkpoint.minContext.digest).toContain('- task-1 verified Schema')
     expect(checkpoint.minContext.digest).toContain('- [task-1] schema covers every section :: all section keys present')
+  })
+
+  it('carries the run\'s durable task identity, redacted and bounded (B12)', () => {
+    // `runId` is engine-generated; `run.name` is the task label the run handle's
+    // `meta.name` carries, so a later reader can tie the file back to the work.
+    const named = buildCheckpoint({ ...fullInput(), run: { ...fullInput().run, name: '  checkpoint wiring  ' } }, NOW)
+    expect(named.run.name).toBe('checkpoint wiring')
+    expect(assertCheckpoint(JSON.parse(canonicalJson(sealCheckpoint(named)))).run.name).toBe('checkpoint wiring')
+
+    // Absent or blank means absent — never an empty string field.
+    expect(buildCheckpoint(fullInput(), NOW).run.name).toBeUndefined()
+    expect(buildCheckpoint({ ...fullInput(), run: { ...fullInput().run, name: '   ' } }, NOW).run.name).toBeUndefined()
+
+    // It is free text, so it is redacted and bounded like every other free text.
+    const secret = 'sk-proj-abcdefghijklmnopqrstuvwxyz0123456789'
+    const leaky = buildCheckpoint({ ...fullInput(), run: { ...fullInput().run, name: `run for ${secret}` } }, NOW)
+    expect(leaky.run.name).not.toContain(secret)
+    const long = buildCheckpoint({ ...fullInput(), run: { ...fullInput().run, name: 'n'.repeat(5_000) } }, NOW)
+    expect(long.run.name).toHaveLength(CHECKPOINT_LIMITS.titleChars)
   })
 
   it('keeps a caller-supplied digest verbatim and marks the source', () => {
@@ -286,22 +306,90 @@ describe('engine hook limit contract', () => {
     expect(ENGINE_HOOK_LIMITS).toEqual({ maxConcurrency: { default: 3, max: 6 }, maxRetries: { default: 1, max: 3 } })
   })
 
-  it('reports violations without blocking the checkpoint', () => {
+  it('reports what is outside the envelope, without blocking a read', () => {
     expect(limitContractViolations({ maxConcurrency: 3, maxRetries: 1 })).toEqual([])
     expect(limitContractViolations({ maxConcurrency: 8, maxRetries: 1 })).toEqual(['maxConcurrency 8 exceeds the documented maximum 6'])
     expect(limitContractViolations({ maxConcurrency: 4, maxRetries: 5 })).toEqual(['maxRetries 5 exceeds the documented maximum 3'])
-    // The observed config default (4) is inside the documented maximum 6, so a
-    // real run's checkpoint is never flagged for the concurrency default alone.
-    expect(limitContractViolations({ maxConcurrency: 4, maxRetries: 2 })).toEqual([])
+    expect(limitContractViolations({ maxConcurrency: 6, maxRetries: 3 })).toEqual([])
+  })
+
+  it('derives the envelope from the config constants, so it cannot drift', () => {
+    // One source: HARD_LIMITS in src/config.ts. If a later change widens the
+    // accepted configuration, this test fails with the recorder contract instead
+    // of letting the two disagree silently.
+    expect(ENGINE_HOOK_LIMITS).toEqual({
+      maxConcurrency: { default: DEFAULT_MAX_CONCURRENCY, max: HARD_LIMITS.maxConcurrency },
+      maxRetries: { default: DEFAULT_MAX_RETRIES, max: HARD_LIMITS.maxRetries },
+    })
+    expect(HARD_LIMITS.maxConcurrency).toBe(6)
+    expect(HARD_LIMITS.maxRetries).toBe(3)
+  })
+
+  it('refuses a checkpoint whose limits leave the contract (B07)', () => {
+    const overConcurrency = { ...fullInput(), limits: { ...fullInput().limits, maxConcurrency: 7 } }
+    expect(() => buildCheckpoint(overConcurrency, NOW)).toThrow(/engine-hook contract/)
+    expect(() => buildCheckpoint(overConcurrency, NOW)).toThrow(/maxConcurrency 7 exceeds the documented maximum 6/)
+    const overRetries = { ...fullInput(), limits: { ...fullInput().limits, maxRetries: 4 } }
+    expect(() => buildCheckpoint(overRetries, NOW)).toThrow(/maxRetries 4 exceeds the documented maximum 3/)
+    // The boundary itself is legal: 6 concurrency and 3 retries are the hard maxima.
+    expect(buildCheckpoint({ ...fullInput(), limits: { maxConcurrency: 6, maxRetries: 3, maxTasks: 1 } }, NOW).limits)
+      .toEqual({ maxConcurrency: 6, maxRetries: 3, maxTasks: 1 })
+  })
+
+  it('records the contract defaults when the caller supplies no limits at all (B15)', () => {
+    // An absent value is *omitted*, never coerced to 0: the old `?? 0` produced
+    // `maxConcurrency: 0`, which every write then refused, so a recorder created
+    // without limits failed silently on every tick.
+    const bare = buildCheckpoint({
+      run: { runId: 'r', objective: 'o', status: 'running' },
+      plan: { source: 'caller', tasks: [] },
+    }, NOW)
+    expect(bare.limits).toEqual({ maxConcurrency: 3, maxRetries: 1, maxTasks: 12 })
+    // And a partial row keeps the supplied half while defaulting the rest.
+    const partial = buildCheckpoint({
+      run: { runId: 'r2', objective: 'o', status: 'running' },
+      plan: { source: 'caller', tasks: [] },
+      limits: { maxRetries: 2 },
+    }, NOW)
+    expect(partial.limits).toEqual({ maxConcurrency: 3, maxRetries: 2, maxTasks: 12 })
+  })
+
+  it('reads a legacy row that the writer would now refuse, and refuses a bad one on write', () => {
+    // Read stays lenient on purpose: a file written when the config cap was wider
+    // must still be readable, and a reader that rewrote numbers would be lying
+    // about the run that produced them.
+    const legacy = JSON.parse(canonicalJson(sealCheckpoint(buildCheckpoint(fullInput(), NOW)))) as Record<string, unknown>
+    ;(legacy['limits'] as Record<string, unknown>)['maxConcurrency'] = 12
+    const resealed = sealCheckpoint(legacy as never)
+    expect(assertCheckpoint(JSON.parse(canonicalJson(resealed))).limits.maxConcurrency).toBe(12)
+    expect(limitContractViolations(assertCheckpoint(JSON.parse(canonicalJson(resealed))).limits)).toEqual([
+      'maxConcurrency 12 exceeds the documented maximum 6',
+    ])
   })
 })
 
 describe('checkpoint file names', () => {
   it('sanitizes run ids into safe file names', () => {
-    expect(checkpointFileName('run-42')).toBe('checkpoint-run-42.json')
-    expect(checkpointFileName('../etc/passwd')).toBe('checkpoint-.._etc_passwd.json')
-    expect(checkpointFileName('')).toBe('checkpoint-run.json')
-    expect(checkpointFileName('..')).toBe('checkpoint-run.json')
+    expect(checkpointFileName('run-42')).toBe('checkpoint-run-42-92234f8b.json')
+    expect(checkpointFileName('../etc/passwd')).toBe('checkpoint-.._etc_passwd-7fef78f5.json')
+    expect(checkpointFileName('')).toBe('checkpoint-run-e3b0c442.json')
+    expect(checkpointFileName('..')).toBe('checkpoint-run-5ec1f7e7.json')
+  })
+
+  it('separates two ids that sanitize to the same name (B14)', () => {
+    // Sanitizing alone is not injective: `/` and `_` both become `_`, so these two
+    // ids used to name one file and one live run could overwrite the other's
+    // checkpoint. The digest of the raw id is what makes that impossible.
+    expect(checkpointFileName('run x/y')).toBe('checkpoint-run_x_y-12ff6c83.json')
+    expect(checkpointFileName('run x_y')).toBe('checkpoint-run_x_y-3a2d945d.json')
+    expect(checkpointFileName('run x/y')).not.toBe(checkpointFileName('run x_y'))
+    // Same for two ids sharing a long prefix: the readable part is truncated, the
+    // digest still separates them.
+    const long = 'r'.repeat(CHECKPOINT_LIMITS.idChars)
+    expect(checkpointFileName(long + '-a')).not.toBe(checkpointFileName(long + '-b'))
+    // Deterministic, and safe as a file name on every platform.
+    expect(checkpointFileName('run-42')).toBe(checkpointFileName('run-42'))
+    expect(checkpointFileName('run-42')).toMatch(/^[A-Za-z0-9._-]+\.json$/)
   })
 })
 

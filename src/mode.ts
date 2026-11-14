@@ -81,23 +81,55 @@ export function isModeEnabled(session: Session | undefined, fallback = false): b
   return readModeRecord(session)?.enabled ?? fallback
 }
 
+/** Outcome of one toggle write; `ok` is only ever reported for a readable record. */
+export interface SetModeResult {
+  /** True when {@link readModeRecord} shows exactly the record that was asked for. */
+  ok: boolean
+  /** Why the write did not take effect; present only when `ok` is false. */
+  reason?: string
+}
+
+/** Whether a stored record carries exactly the values that were written. */
+function sameModeRecord(left: ModeRecord, right: ModeRecord): boolean {
+  return left.v === right.v
+    && left.enabled === right.enabled
+    && left.turn === right.turn
+    && left.setBy === right.setBy
+    // Absent and `undefined` are the same state: a JSON round-trip drops the key.
+    && (left.workflowMode ?? undefined) === (right.workflowMode ?? undefined)
+}
+
 /**
  * Append one mode record.
  *
- * A record is durable plugin state, not a correctness dependency for the
- * current turn: when the session refuses the write we warn and continue, and
- * the caller never sees a throw (exactly like `recordDelivery`).
+ * Never throws, but never claims success either: `ok` means the record was
+ * committed AND read back, because "the call returned" is not the same fact as
+ * "the toggle changed" (a session can accept an append without committing it).
+ * A failed write is durable-state loss, so the caller must be able to say so
+ * instead of answering the user with a state that was never written.
  */
 export function setMode(
   session: Session | undefined,
   record: ModeRecord,
   logger?: { warn?(message: string): void },
-): void {
-  if (session === undefined || typeof session.append !== 'function') return
+): SetModeResult {
+  if (session === undefined || typeof session.append !== 'function') {
+    return { ok: false, reason: 'the session cannot persist plugin records' }
+  }
   try {
     appendPluginRecord(session, MODE_RECORD, record)
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
     logger?.warn?.(`mode record not persisted (${record.setBy}): ${detail}`)
+    return { ok: false, reason: detail }
   }
+  const current = readModeRecord(session)
+  const detail = current === undefined
+    ? 'the record was not readable back'
+    : sameModeRecord(current, record) ? undefined : 'the session still reads a different record'
+  if (detail !== undefined) {
+    logger?.warn?.(`mode record not persisted (${record.setBy}): ${detail}`)
+    return { ok: false, reason: detail }
+  }
+  return { ok: true }
 }

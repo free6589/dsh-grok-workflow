@@ -1,0 +1,11 @@
+# model-boundary reachability from this machine (2026-11-15 02:3x +08:00)
+real route attempt: DSH_HOME=.verify-gw/home dsh --profile gwverify-hl --patch .verify-gw/model.patch.yml "Reply with exactly: MODEL_OK"
+EXIT=1
+stderr: dsh: TIMEOUT: Request timed out.: Connect Timeout Error (attempted address: models.fyrali.com:443, timeout: 10000ms) (UND_ERR_CONNECT_TIMEOUT)
+
+getent hosts models.fyrali.com -> 100.111.111.99
+tailscale status: 100.111.111.99 bifrost active; relay \"sin\", tx 10764 rx 0
+ping 100.111.111.99: 2 packets transmitted, 0 received, 100% packet loss
+TCP probe 80/443/3000/3065/8000/8080/8888/9000/11434/4000 on 100.111.111.99: all closed/timeout
+
+alternative local gateway http://127.0.0.1:3065/v1 (agent2api) lists models but POST /v1/chat/completions -> HTTP 401 model_api_key_required (a gateway key would have to be read from the user's credential store, which AGENTS.md forbids)

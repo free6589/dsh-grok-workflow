@@ -724,3 +724,98 @@ Each entry records the decision, evidence, alternatives, and status.
   让主模型自由改写报告（会失去「已验证内容逐字交付」这一 fail-closed 保证）。
 - **Consequences:** 新增 1 个配置键（总数 27→28 volatile）；`renderReport` 多一个可选参数，
   既有调用点默认隐藏台账，老测试需显式索取 `{ showDiagnostics: true }`。
+
+## D-043 — `engines.dsh` 用真 semver 区间替代手写兼容表；`0.3.0-rc.*` 的放行被接受并记录（2026-11-15）
+
+- **Status:** CONFIRMED（`package.json:39`，证据 `docs/knowledge/evidence/verify-H1/engines-dsh-B01.txt`）
+- **Date:** 2026-11-15
+- **Decision:** 两项：
+  1. `engines.dsh` 从固定字符串 `0.2.1-rc.2` 改成区间 `>=0.2.1-rc.2 <0.3.0`，并**删除**旧的手写
+     `dsh.compatibility`（`{dsh:"…", profiles:[…], dshReleases:{…}}`）整块 —— 兼容性只有一个来源。
+  2. 上界 `0.3.0` 保持现状，**不为 `0.3.0-rc.*` 加 `includePrerelease` 排除逻辑**；该行为写进
+     STATE/RESEARCH，等真的需要支持或阻断 0.3 线时再一起改。
+- **Reason（为何要 B01）:** 旧声明是一个等式字符串，只有那一个版本被判兼容，而真机运行的是
+  `0.2.2-rc.3`；同时手写兼容表与 `engines` 是两份可能互相矛盾的声明。区间化让「哪个运行时可以装」
+  由 semver 一处回答。
+- **Reason（为何不改上界）:** DSH 的判定是
+  `semver.satisfies(runtime, range, { includePrerelease: true })`（`dsh-app-boot/lib/index.js`），
+  实测 `0.3.0-rc.1` 判 compatible。这是上游的区间语义，不是本插件漏判；为了排除 rc 去写负向
+  前瞻正则（`<0.3.0-0`）会把「区间」变成「技巧」，且真到 0.3 线时仍要重新决策。**记录边界比假装
+  边界不存在更诚实。**
+- **Alternatives rejected:** 保留 `dsh.compatibility` 与新 `engines` 并存（两份真源，必然漂移）；
+  直接把上界写成 `<0.3.0-0`（提前替上游决定 rc 语义，且未经验证）；把上界放到 `<0.2.3`
+  （会把使用者锁死在补丁版本，与「插件只依赖文档化扩展点」的定位冲突）。
+- **Consequences:** 安装判定对 `0.2.1-rc.2`…`<0.3.0` 全区间为 `null`（无未满足要求），
+  对照 `engines.dsh:"<0.2.0"` 仍 REFUSED（证明检查非空转）。README 徽章随之从 `DSH 0.2.1-rc.2`
+  改为 `DSH 0.2.x`。**没有**版本豁免（exemption）参与任何一步。
+
+## D-044 — 并发/重试回到文档契约（3/6、1/3），`maxAttemptsPerTask` 取「最坏合法值」400（2026-11-15）
+
+- **Status:** CONFIRMED（`src/config.ts:22,35`、`test/routing.spec.ts:73`、`test/route-concurrency.spec.ts:102`）
+- **Date:** 2026-11-15
+- **Decision:** 三项一起改，任何一项单独改都是错的：
+  1. `HARD_LIMITS.maxConcurrency: 1_000_000 → 6`，`maxRetries: 10 → 3`，默认值 `4/2 → 3/1`，
+     并新增 `DEFAULT_MAX_CONCURRENCY` / `DEFAULT_MAX_RETRIES` 单一声明（schema 默认值、
+     checkpoint recorder、配置解析都读它）。
+  2. `HARD_LIMITS.maxAttemptsPerTask: 1100 → 400`，取值 = 最坏合法组合
+     `(chainLength 50 + 50) × (maxRetries 3 + 1)`；守卫仍是 `>`，所以等式成立时**能通过**。
+  3. checkpoint 侧的 `ENGINE_HOOK_LIMITS` 从这两个常量派生，`buildCheckpoint` 拒绝越界行；
+     run 路径对「绕过 schema 直接给 recorder 更宽值」只 warn 一次且可见。
+- **Reason（为何是 B07）:** 代码里 `maxConcurrency` 的硬上限是 `1_000_000`、`maxRetries` 是 `10`，
+  与 AGENTS.md 的「默认 3 / 硬上限 6，默认 1 / 硬上限 3」直接冲突；后果是 checkpoint 对**默认配置
+  的一次运行**都会记录成「超出引擎契约」，`limitContractViolations` 天天报假警。
+  上限不是防呆，是配额：每个单位都是一次真实 provider 调用。
+- **Reason（为何 400 而不是继续留 1100）:** `1100` 只是「足够大」，它不表达任何契约；一旦有人把
+  链长上限提到 500，1100 仍会静默放行。400 = 最坏合法值，让**上限与合法空间对齐**，只有「放宽某处
+  却忘了 revisit」才会撞到。等式由 `test/routing.spec.ts` 用常量表达式钉死，改任一侧都会红。
+- **Alternatives rejected:** 只改默认值不改硬上限（`1_000_000` 仍可被 profile 写进配置）；
+  把 `maxAttemptsPerTask` 留在 1100 并加注释（注释不参与判定）；把守卫改成 `>=`（等于最坏合法值时
+  会误拒合法配置）。
+- **Consequences:** 默认运行的 checkpoint 不再记录越界；旧文件仍能读（读侧保持宽松，靠
+  `limitContractViolations` 报告越界，不迁移、不改写历史）。ARCHITECTURE §Limits 的「standing
+  divergence」段落已改为「配置已对齐，读侧仍宽松」的原因说明。设置页两个数值范围同步为
+  `maxConcurrency` 1–6、`maxRetries` 0–3，默认 3 / 1，表单不再能提供 Host 会拒绝的值。
+
+## D-045 — 进度 Tab 是第三个 Tab，轨道由 `tool-workflow/*` 事件折叠；`blocked`/`failed` 只由单测覆盖（2026-11-15）
+
+- **Status:** CONFIRMED（`src/progress-tab.ts`、`src/client/index.js`、`evidence/progress-tab-2026-11-15/`）
+- **Date:** 2026-11-15
+- **Decision:** 四项：
+  1. Tab 集合 `Chat / Trajectory / Progress`，默认落 `Chat`；进度 Tab **不默认选中**、不加设置项、
+     不改既有 Tab 的注册。
+  2. 轨道**只从插件自己记录的四个 `tool-workflow/*` 事件折叠**，未命中的模板阶段保持 `pending`
+     并给 `title="Not reported in the events"`，不借邻居状态、不推断百分比分子的计划数。
+  3. 详情三段（头部 / Engine facts / Stage report）保留三级来源阶梯；本 recorder 不写
+     `stage-detail`，视图也拿不到子会话正文，所以**真实落点是 L3**（7 字段全 `—` +
+     `Source: not reported`），阶梯已实现并有单测，将来接入无需改 UI。
+  4. `blocked`/`failed` 两态**不构造真机**：`blocked` 由「运行结束仍留下未结算行」派生、
+     `failed` 优先于一切；两者由 `test/progress-tab.spec.ts` + `test/client.spec.ts`（93 例）覆盖，
+     报告里与真机截图分开列。
+- **Reason:** 进度必须是**可核对的观测**，不是「看起来像在跑」。折叠模型的代价是「引擎没报的行
+  永远 pending」，收益是任何一帧都能回溯到具体事件；把未触发状态伪装成真机截图会让后续读者
+  无法分辨「测过」与「没测过」。
+- **Alternatives rejected:** 按任务计划数算百分比（计划与事件不同源，会出现 >100% 或空跑 100%）；
+  为 `blocked`/`failed` 造一个假子调用（伪造证据）；把详情字段猜一个来源（`Source:` 徽标失去意义）。
+- **Consequences:** 真机 14 帧覆盖 `pending/doing/done/cancelled`（含「跑到一半点停止」→
+  `cancelled` 用引擎原话）；`blocked`/`failed` 的覆盖只有单测。设计文档 §12.5 的「真机截图
+  `NOT_RUN`」已由收尾节回填为「H2 组已做」，其余限制不变。
+
+## D-046 — `/grok` 开关的真机验收一律用打包产物安装；`link:` 形态只作诊断（2026-11-15）
+
+- **Status:** 现象 CONFIRMED / 归因 HYPOTHESIS（`evidence/progress-tab-2026-11-15/README.md` §2）
+- **Date:** 2026-11-15
+- **Decision:** 真机验证 `/grok on|off` 时，插件用 `dsh plugin add file:<repo>/…tgz`（打包产物）
+  安装，**不用** `dsh plugin add link:<repo>`；`link:` 下出现的
+  `Grok workflow toggle not changed: Receiver must be an instance of class Session.` 记录为
+  安装形态限制，不作为产品缺陷。
+- **Reason（现象 `CONFIRMED`）:** 同一台机、同一个 profile、同一条命令，`link:` 安装报上述失败，
+  打包安装成功（`Grok workflow ON — …`，`GROK_ON=true`）。差别只在安装形态。
+- **Reason（归因 `HYPOTHESIS`）:** 未插桩验证模块身份。最可能：`link:` 时插件解析到工作树自己的
+  `node_modules/@deepseek-ai/dsh-session` 0.2.1-rc.2（devDependencies），而运行时是 0.2.2-rc.3；
+  `appendPluginRecord` 落在旧副本的私有方法上，跨副本 brand check 抛错。打包 profile 里只有
+  `cosmokit`/`schemastery`，没有第二份。
+- **Alternatives rejected:** 把 `dsh-session` 从 devDependencies 去掉（会破坏本仓库的类型与测试）；
+  在插件里 duck-type 绕过 brand check（等于绕开上游不变量，且真因未证）。
+- **Consequences:** 验证流程多一步 `npm pack`；`link:` 仍可用于「看加载是否 pending」这类诊断，
+  但任何「开关是否生效」的结论必须在打包安装下取得。若将来要支持 `link:` 真机验证，先做
+  模块身份插桩（`require.resolve` 两份路径 + `instanceof` 实测），再改这条决定。

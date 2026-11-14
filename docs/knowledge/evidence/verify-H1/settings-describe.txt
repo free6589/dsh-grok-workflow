@@ -1,0 +1,7 @@
+writable=true
+hasDocument=true
+namespaceCount=23
+namespaces=session-log-deepseek,agent-default-model,llm-pi-ai,bash-sandbox,permission,subagent,web,web-search-deepseek,web-deepseek-api,agent-loop,llm-deepseek,llm-deepseek-account,subagent-model-selection-settings,ui-settings-account,mcp-manager,ui-theme,locale,ui-settings,ui-settings-general,ui-conversation,ui-chat,agent-preset-registry,grok-workflow
+
+grok-workflow: autoGenerate=true applies=live revision=0 projectedFields=28
+fields=answerStrategy,gatePreset,gateScope,grokDefault,historyChars,historyTurns,humanSummary,instantReceipt,maxActiveRuns,maxActiveRunsTotal,maxConcurrency,maxQueuedMessages,maxRetries,maxTasks,mode,recordLimit,recordRuns,roles,showDiagnostics,showProgress,subagentProvider,switchOn,synthesis,timeoutMs,triageAsk,triageClassifier,triageFollowupAsFast,triageModel

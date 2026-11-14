@@ -41,12 +41,21 @@
  *   when the caller supplies a provider; otherwise the schema default is recorded
  *   and must not be read as an observation.
  *
- * Durability and failure policy: every write goes through
- * `writeCheckpoint` (atomic rename + checksum). A failed write is a warning and a
- * counter, never a failed run — recording must not be able to break the work it
- * records. After {@link CHECKPOINT_WIRING_LIMITS.maxConsecutiveFailures}
- * consecutive failures the recorder stops retrying for that run, so a read-only
- * or full disk costs one warning per interval instead of one per tick forever.
+ * Durability and failure policy: every write goes through `writeCheckpoint`
+ * (atomic rename + checksum) and at most one write per run is in flight at a
+ * time, so a periodic tick and the terminal write can never race on the same
+ * file. A failed write is a warning and a counter, never a failed run — recording
+ * must not be able to break the work it records. After
+ * {@link CHECKPOINT_WIRING_LIMITS.maxConsecutiveFailures} consecutive failures the
+ * recorder stops retrying for that run **and says so once** (a read-only or full
+ * disk then costs one explicit give-up line instead of a silent stop), so the
+ * state is never mistakable for a healthy run.
+ *
+ * The limits a run records are held to the documented engine-hook envelope
+ * ({@link ENGINE_HOOK_LIMITS}, derived from `HARD_LIMITS` in `src/config.ts`): a
+ * caller that bypasses the config schema and hands the recorder a wider value gets
+ * one visible warning at `adopt`, and the write itself is refused by
+ * `buildCheckpoint`.
  */
 import type { RoleName, WorkflowReport } from '../types.js';
 import type { CheckpointGit, CheckpointInput, CheckpointLimits, CheckpointPhase, WorkflowCheckpoint } from './schema.js';
@@ -67,8 +76,20 @@ export declare const CHECKPOINT_WIRING_LIMITS: {
      * an abandoned write is dropped (it never retries and starts no timer).
      */
     readonly unloadWriteTimeoutMs: 3000;
-    /** A checkpoint younger than this is treated as possibly still live. */
-    readonly resumeStaleAfterMs: 120000;
+    /**
+     * How recent a `running` checkpoint must be to count as possibly live, on its
+     * own bounds: one second is the smallest age that says anything at all, and one
+     * day is the longest a run may plausibly still be alive. It is deliberately
+     * **not** the interval range: the interval bounds how often a file is rewritten
+     * (seconds to minutes), while staleness asks a different question, and reusing
+     * one clamp for both silently reinterpreted a caller's 10-minute staleness as
+     * 5 minutes.
+     */
+    readonly staleAfterMs: {
+        readonly min: 1000;
+        readonly max: 86400000;
+        readonly default: 120000;
+    };
 };
 /**
  * The only roles a checkpoint may name: the four the plugin already runs.
@@ -128,6 +149,22 @@ export interface ResumeOptions {
     staleAfterMs?: number;
 }
 /**
+ * Whether {@link resumeDecision} is reached from a production entry point.
+ *
+ * **NOT_RUN**: it is not, today. The function is exported, unit-covered and used
+ * by the checkpoint smoke spec, but no shipped path calls it — the visible entry
+ * would be a resume surface in `src/run.ts` or the `/grok` command, and neither
+ * asks this question. This marker is the machine-checkable form of that statement
+ * (`test/checkpoint-wiring.spec.ts` pins it), so the gap cannot be mistaken for a
+ * wired feature: flip `wired` and name the caller in `entry` in the same commit
+ * that connects it.
+ */
+export declare const RESUME_DECISION_WIRING: {
+    readonly wired: false;
+    readonly entry: string | undefined;
+    readonly note: "no production caller: resumeDecision is exported and tested, but nothing in the shipped plugin asks it whether to re-drive a checkpoint";
+};
+/**
  * Decide what a host should do with one checkpoint.
  *
  * The engine cannot resume a run (no journaling, no resume — see the module
@@ -141,6 +178,11 @@ export interface ResumeOptions {
  * restore policy in `src/resume/policy.ts`, which consumes a
  * `grok-workflow.resume-checkpoint` and decides task by task what may be retained
  * verbatim; the two answer different questions over different artifacts.
+ *
+ * Wiring state: **no production path calls this yet** — see
+ * {@link RESUME_DECISION_WIRING}, which is the single place that says so. It is
+ * deliberately not faked into a visible surface here; a checkpoint module cannot
+ * invent a resume entry without owning a run.
  * @param checkpoint - a verified checkpoint (as returned by `readCheckpoint`).
  * @param options - clock and staleness overrides.
  * @returns The decision, its reason, and the task ids a resume would re-drive.
@@ -229,6 +271,8 @@ export interface RunCheckpointRecorder {
 /** Observable recorder state. */
 export interface CheckpointRecorderStats {
     runId?: string;
+    /** Durable task identity latched at `adopt` (`run.meta.name`), redacted. */
+    runName?: string;
     disposed: boolean;
     unloaded: boolean;
     writes: number;
@@ -238,6 +282,12 @@ export interface CheckpointRecorderStats {
     timerArmed: boolean;
     /** Engine listeners currently held. */
     listeners: number;
+    /**
+     * `true` once the periodic loop gave up after
+     * {@link CHECKPOINT_WIRING_LIMITS.maxConsecutiveFailures} consecutive failures.
+     * Exposed so the give-up is a state a test can read, not only a log line.
+     */
+    writesStopped: boolean;
     agents: CheckpointObservedAgents;
 }
 export interface CheckpointRecorderOptions {

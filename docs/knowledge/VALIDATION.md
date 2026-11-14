@@ -2552,3 +2552,186 @@ profile `guiweb`（`--from-default-profile web`），插件 dev 安装（`dsh pl
   `2026-11-08T11:14:41Z`，asset `dsh-grok-workflow-0.7.0.tgz` **317,470 B**，
   sha256 `de443167858b7df25d81576288c2c9521da1256e8ad8004c6a9575eaecf4a3ec`。
 - **未做（`NOT_RUN`）**：live `:3090` 未重启、live 安装副本未由本轮改动（沙箱只读，见 Round 36 尾注）。
+
+## Round 38 (2026-11-15) — wave1+wave2 收尾验证：`ci` 48/897 PASS、H1 安装+加载+前台 PASS、团队档 `BLOCKED`、H2 进度 Tab 真机 14 帧（`CONFIRMED`）
+
+本轮只做验证与记忆落盘：**零 `src/`/`lib/`/`test/` 改动**，未 commit、未 bump、未 push。
+两条独立证据线（组 H1 / 组 H2）各自建目录、各自收尾清理：
+
+- `docs/knowledge/evidence/verify-H1/` —— 安装、加载、前台交互、模型边界
+- `docs/knowledge/evidence/progress-tab-2026-11-15/` —— 进度 Tab 真机 GUI（14 帧）
+
+### 环境（`CONFIRMED`）
+
+```text
+host omarchy · node v26.8.1 · npm 11.19.0 · dsh 0.2.2-rc.3
+CWD /home/fish/projects_mine/dsh-grok-workflow
+GIT ee5e013（工作树 dirty：81 文件 / +7014 / −534，wave1+wave2 未提交）
+```
+
+### 1. 回归快照
+
+```text
+$ npm run ci
+> tsc -p tsconfig.json --noEmit      → exit 0（无输出）
+> oxlint src test                    → Found 4 warnings and 0 errors
+> npm run build                      → client bundle: 186091 bytes → lib/client.js
+> vitest run                         → Test Files 48 passed (48) / Tests 897 passed (897)
+EXIT=0   START 2026-11-15T02:43:42+08:00   END 2026-11-15T02:44:22+08:00（40 s）
+```
+
+- `lib-sync.txt`：再跑一次 `npm run build`，`git status --short lib` 的 md5 不变；`src/client/index.js`
+  与 `lib/client.js` 同 md5。**50 个 `lib/` 条目相对 `HEAD` 是改动状态（46 修改 + 4 新增
+  `progress-tab.*`），这是 wave1+wave2 未提交的预期，不是漂移。**
+- `pack.txt`：`npm pack --dry-run --json` → `dsh-grok-workflow-0.8.0.tgz`（按工作树 `package.json`
+  的旧值打包时点）、82 条，含 `lib/client.js` 与 `cordis.patch.yml`，不含 `docs/knowledge/**`。
+
+### 2. H1 — 安装 / 加载（`CONFIRMED`）
+
+```text
+$ DSH_HOME=$PWD/.verify-gw/home dsh --profile gwverify --from-default-profile web --dump-config
+$ DSH_HOME=$PWD/.verify-gw/home dsh plugin --profile gwverify add "$PWD"
+→ exit 0；pnpm 写入 dsh-grok-workflow link:../../../..；node_modules/dsh-grok-workflow → 仓库
+→ dsh.profile.bundles = 3 条（profile-bundles.json）
+同一命令在 gwverify-hl（headless 模板）重复 → exit 0，3 条 bundle
+```
+
+```text
+启用态 boot stdout（boot-enabled.txt）：只有一行 dsh web: http://127.0.0.1:3413/?token=<redacted>
+对照 --patch 关掉 workflow-ptc（boot-control-workflow-ptc-disabled.txt）：
+  dsh: warning: 1 entry did not activate
+  grok-workflow (dsh-grok-workflow): pending (waiting for service: workflowEngine)
+```
+
+活实例（`http://127.0.0.1:3411`，隔离 home，真 `dsh`）：
+
+```text
+POST /api/settings/describe（RPC envelope {type:"client-request",rpcId,method,payload:{args:{}}}）
+→ 23 个命名空间，其中 grok-workflow：autoGenerate=true、applies=live、28 projected fields、无 secret 槽
+  （settings-describe.txt）
+首页引用 dsh-grok-workflow/client.js（在 /plugins/??… 批里），取回字节 = lib/client.js + sourceMappingURL
+  （client-bundle-serving.txt）
+真实会话出站请求的工具表：requests=7、tools=24、includes grok_workflow=True（mock-boundary.txt）
+```
+
+### 3. H1 — 交互（前台 `PASS`；团队档 `BLOCKED`）
+
+```text
+$ DSH_HOME=.verify-gw/home dsh --profile gwverify-hl --patch mock.patch.yml "你好"
+→ exit 0；stdout（插件自己产出）：
+  档位：直答档 — 因为：这是问候/寒暄，没有要做的事，前台直接回答。
+
+  你好！我在。要做事就直接说：简单的我派一个工人，复杂的我开团队，拿不准我会先问你一句。
+
+  （这条没有动用团队，前台直答。）
+→ 同一裁决写进会话日志：session-dcf8b852-b28b-4221-a921-fa953e40b9a5，event user/message seq 12
+  （front-desk-relay-message.txt）
+```
+
+```text
+$ DSH_HOME=.verify-gw/home dsh --profile gwverify-hl --patch mock.patch.yml "用团队跑一个小任务：…"
+→ exit 0，run FAILED：
+  Grok workflow: FAILED
+  task-1: failed (2 attempts) — worker failed on every route: [format-error]
+          child returned no valid structured result
+（interact-team-tier.txt；档位行 = 档位：团队档 — 因为：你的消息里点名了团队，直接升级为团队档。）
+```
+
+**该 FAILED 是 mock 模型的性质，不是产品结论**：本轮 mock 只替换了模型 HTTP 端点，Loader、
+服务注册表、插件生命周期、gate、workflow engine、子代理派生都是真的。真模型路径：
+
+```text
+$ DSH_HOME=.verify-gw/home dsh --profile gwverify-hl --patch .verify-gw/model.patch.yml \
+    "Reply with exactly: MODEL_OK"
+EXIT=1
+stderr: dsh: TIMEOUT: Request timed out.: Connect Timeout Error
+        (attempted address: models.fyrali.com:443, timeout: 10000ms) (UND_ERR_CONNECT_TIMEOUT)
+
+getent hosts models.fyrali.com -> 100.111.111.99
+tailscale status: 100.111.111.99 bifrost active; relay "sin", tx 10764 rx 0
+ping 100.111.111.99: 2 packets transmitted, 0 received, 100% packet loss
+TCP probe 80/443/3000/3065/8000/8080/8888/9000/11434/4000 on 100.111.111.99: all closed/timeout
+备选 http://127.0.0.1:3065/v1 (agent2api)：/v1/models 有列表，
+  POST /v1/chat/completions -> HTTP 401 model_api_key_required
+  （取网关 key 需读用户凭据库 → AGENTS.md 禁止，故不取）
+```
+
+→ **真模型团队档 = `BLOCKED`（成因 `100.111.111.99` 不可达）**。全 bundle 没有任何伪造 PASS。
+
+### 4. H1 — `engines.dsh`（B01）行为实测
+
+```text
+app-boot (== dsh runtime) version: 0.2.2-rc.3
+plugin engines.dsh: >=0.2.1-rc.2 <0.3.0     plugin version: 0.8.0
+verdict on the real runtime: null            ← 无未满足要求、无需版本豁免
+runtime 0.2.1-rc.2 → compatible
+runtime 0.2.2-rc.3 → compatible
+runtime 0.2.2     → compatible
+runtime 0.3.0-rc.1 → compatible             ← 上界不 fence rc
+control engines.dsh="<0.2.0" → REFUSED {"engines.dsh":"<0.2.0"}
+  + 完整不兼容警告原文（含 allow-version 提示）
+```
+
+原因（`CONFIRMED`，源码）：DSH 用 `semver.satisfies(runtime, range, { includePrerelease: true })`
+判区间（`dsh-app-boot/lib/index.js`），prerelease 的 `0.3.0-rc.*` 仍排在 `0.3.0` 之下，故放行。
+
+### 5. H2 — 进度 Tab 真机（14 帧，`CONFIRMED`）
+
+实例：`dsh web` `127.0.0.1:3210`，`DSH_HOME=<repo>/.dsh-home`，profile `gwprog`（自 `web` 模板），
+插件 = 本目录打包产物（`cmp` 校验：`lib/client.js` / `lib/progress-tab.js` 与工作树逐字节一致），
+模型 = `127.0.0.1:18088` 真网关 `wb/cn:deepseek-v4.1-flash`，浏览器 = `/usr/bin/chromium` +
+Playwright headless 1440×900 / 480×900。**无 mock**。收尾：`PORT_3210_CLOSED` / `TOKEN_LOG_REMOVED`。
+
+```text
+stage-a  A2_TABS=[{"Chat","selected":"true"},{"Trajectory"},{"Progress"}]  A2_TAB_COUNT=3
+         A4_PROGRESS_DOM={"emptyText":"No workflow progress in this session yet…","nodeCount":0,…}
+stage-b  TIMELINE  +0s 0/1·0%（Start:done, 规划:doing, End:doing, 5 模板阶段 pending）
+                   +4s 1/2·50%    +21s 2/3·67%    +55s 3/3·100%
+stage-c  DETAIL_HEADINGS=["Engine facts","Stage report"]  DETAIL_FIELD_COUNT=7
+         DETAIL_SOURCES=["Source: not reported" ×7]
+         NARROW_DETAIL_CSS={"position":"fixed","bottom":"0px",…,"fieldColumns":"450px","viewport":{"w":480,"h":900}}
+         DARK_PROBE={"dark":true,"bodyBg":"rgb(21, 21, 23)","ringColors":["rgb(34, 197, 94)","rgb(84, 85, 87)",…]}
+stage-d  CHAT_HAS_TASK=true CHAT_HAS_REPORT=true CHAT_HAS_TOGGLE_ON=true CHAT_HAS_CRASH_TEXT=false
+         TRAJ_LEN=6132 TRAJ_HAS_EVENTS=true TRAJ_HAS_WORKFLOW=true
+         DETAIL_BUTTONS=[Close(false), Open child session(false), Copy coordination block(true)]
+stage-e  FINAL_STATES=["done","pending","cancelled"]
+         FINAL_NODES=[Start:done, 6×pending, 规划:cancelled, …, End:cancelled]
+         FINAL_PERCENT="1/1 · 100%"    GROK_ON=true
+```
+
+状态覆盖：`pending` / `doing` / `done` / `cancelled` = 真机 `CONFIRMED`（截图 `01`-`14`）；
+`blocked` / `failed` = **真机 `NOT_RUN`**（无真实触发条件，不伪造），由单元补充：
+
+```text
+$ npx vitest run test/progress-tab.spec.ts test/client.spec.ts
+ ✓ test/client.spec.ts (71 tests)  ✓ test/progress-tab.spec.ts (22 tests)
+ Test Files 2 passed (2) / Tests 93 passed (93)   Duration 508ms
+```
+
+### 6. 真机发现的安装形态限制（现象 `CONFIRMED`，归因 `HYPOTHESIS`）
+
+```text
+link: 安装的实例里 /grok on →
+  Failed
+  grok
+  Grok workflow toggle not changed: Receiver must be an instance of class Session.
+  In this session no toggle was recorded.
+（probes/probe-after-grok-on.png / probe-trajectory.png）
+
+同一仓库改用它自己的打包产物安装 → 同一条命令：
+  Grok workflow ON — every message now runs the full plan→execute→verify workflow.
+（probes/probe-grok-on-existing.png；stage-e.log.txt GROK_ON=true）
+```
+
+归因未插桩：`HYPOTHESIS` = `link:` 时解析到工作树 `node_modules/@deepseek-ai/dsh-session`
+0.2.1-rc.2（devDependencies），运行时是 0.2.2-rc.3，跨副本 brand check 抛错；打包 profile 里
+没有第二份。**结论只用于流程**：真机验证 `/grok` 开关一律用打包产物，不用 `link:`。
+
+另记 `CONFIRMED`：尚无会话的首页里发 `/grok on` 不执行，需先有一条普通消息建会话。
+
+### 7. 本轮未做（`NOT_RUN` / `BLOCKED`）
+
+- `BLOCKED`：真模型团队档端到端（含答案质量对比）。
+- `NOT_RUN`：进度 Tab 的 `blocked`/`failed` 真机触发；live `:3080`/`:3086`/`:3090` 的部署与重启；
+  单元测试之外的压力/长跑。
+- 未提交、未打 tag、未 bump（版本由 V 组做）；写面仅限记忆文件 + `CHANGELOG` 的 `[Unreleased]`。
