@@ -982,3 +982,112 @@
   `/grok` 开关在真机验证时请用**打包产物**装，别用 `link:`（会报
   `Receiver must be an instance of class Session.`，归因见 RESEARCH A20）。
 - **Next action**：V 组 bump 已完成 → 填/确认 `[0.9.0]` 节头 → 提交（不 push 未授权前） → lead 决定合入与发布节奏。
+
+## 2026-11-15 — v0.9.2 准备中：发版 HOLD、记忆已写、两条 gate 失败确认为基线既有
+
+- **From:** 收尾组 agent-26 · **To:** lead / agent-27 / 后续代理 · **Base:** `main` = `4b92278`
+  （v0.9.1 发布记录；`HEAD` = `origin/main`）。本轮**零源码改动**，只读 + 跑命令 + 写记忆。
+- **现在工作树里有什么（`CONFIRMED`，`git status --porcelain`，本轮核数时）**：19 个修改文件——
+  `src/` 4（`config.ts`、`index.ts`、`progress-tab.ts`、`client/index.js`）、`test/` 3
+  （`client.spec.ts`、`config-limits-repair.spec.ts`、`progress-tab.spec.ts`）、`lib/` 12 个构建产物；
+  未跟踪 `test/progress-connector.spec.ts`、`docs/knowledge/evidence/progress-tab-2026-11-15/Round2/`、
+  `.tmp/`。内容 = **B01/B02/B04** + 进度 Tab **脊椎整词绑定 / 详情协调块 / 连线填充+状态字形**。
+  细节与行号锚点在 `STATE.md`「2026-11-15 — v0.9.2 准备中」与 `DECISIONS.md` D-047/D-048。
+- **发版动作全部 HOLD（用户 2026-11-15 指令，经 lead 下达）**：`CHANGELOG.md` 未改、
+  `package.json`/`package-lock.json` 仍 `0.9.1`、未 commit、未 push、未打 tag、未动 Issue #1。
+  成因：用户看到 Round2 `05` 截图里的报告太机器（`stat`/`od`/`sha256`/路径/marker 直接贴给读者）。
+- **写面划分（别撞车）**：人话报告改动归 **agent-27**——`src/answer.ts`、`src/report.ts`、
+  `src/delivery/*`、`src/gate.ts` 调用点及其测试。收尾组不碰这四处；其余记忆文件由收尾组写。
+- **测过什么（`CONFIRMED`，`TMPDIR=$PWD/.tmp`）**：`npm run ci` → typecheck 0 错；
+  `oxlint` 4 warning / 0 error（4 条既有）；`npm run build` 幂等（67 个 `lib` 产物 sha256 全等，
+  client bundle **204585 B**，`cmp lib/client.js src/client/index.js` 一致）；vitest
+  **50 文件 / 934 测试 → 932 PASS / 2 FAIL**。
+- **两条失败 = 基线既有（`CONFIRMED`，独立 worktree 对照）**：`git worktree add .dsh-home/baseline-wt
+  4b92278` → `npx vitest run test/gate.spec.ts` = **2 failed | 53 passed**，与本轮同形
+  （`refuses a message explicitly when the queue is full…` 稳定失败；
+  `writes the answer into the session when the append strategy is selected` 基线失败、
+  工作树单跑偶过）。**所以现在不能说"全绿"**：谁要在发布前说 PASS，必须先处置这两条。
+- **真机证据路径（别人的成果，我只核对了目录与结论行）**：
+  `docs/knowledge/evidence/progress-tab-2026-11-15/Round2/`（隔离 `:3221`、`DSH_HOME=.dsh-home/r2`、
+  profile `gwprog2`、装 `0.9.1` 打包产物、headless Chromium、13 PNG + 5 stage 日志 +
+  `MANIFEST.sha256`；真机 `pending/doing/done/failed` 四态）；安装/加载/前台仍是
+  `docs/knowledge/evidence/verify-H1/`。
+- **复现命令（exact）**：
+
+  ```bash
+  cd /home/fish/projects_mine/dsh-grok-workflow
+  export TMPDIR=$PWD/.tmp
+  npm run build                                  # client bundle 204585 B；构建幂等
+  npm run ci                                     # 50 files / 934 tests：932 pass / 2 fail
+  git worktree add .dsh-home/baseline-wt 4b92278 # 基线对照（gitignored）
+  ( cd .dsh-home/baseline-wt && TMPDIR=/home/fish/projects_mine/dsh-grok-workflow/.tmp \
+      npx vitest run test/gate.spec.ts )
+  npx vitest run test/progress-connector.spec.ts # 连线填充 + 状态字形 7 例
+  ```
+
+- **发版放行条件（checklist，逐条都要有证据）**：①`npm run ci` **全绿**——当前 2 条 `gate.spec`
+  基线失败未处置前不放行，也不许写成 PASS；②`lib/` 幂等（build 后产物 sha256 全等 +
+  `cmp lib/client.js src/client/index.js`）；③`CHANGELOG.md` 把 `[Unreleased]` 提成
+  `## [0.9.2] - 2026-11-15`（Release workflow 要求该节存在、非空、且与 tag/`package.json` 同版本），
+  `package.json` + `package-lock.json` 一起 bump；④真机证据：**human-only 默认形态**的截图
+  （机器证据收起、Progress 详情/诊断开关里可查）——这条是用户点名的问题，没有截图不放行；
+  ⑤tag 从 `main` 打，`git ls-remote --tags origin` 复核旧 tag（v0.9.1 `584dc22…` → `9103280`）未动；
+  ⑥Issue #1 状态评论走 `AGENTS.md` 的 FROM/TO/TASK/BASE/WORK/CHANGES/TESTS/RESULTS/LOCAL/BLOCKERS/NEXT。
+- **Next action**：①agent-27 把人话报告改完（默认只发 human 块 + 下一步，机器证据进 Progress 详情 /
+  诊断开关），并说明两条 `gate.spec` 失败是否连带处理；②lead 验货后才允许 bump 0.9.2 +
+  写 `[0.9.2]` 节头 + commit/push/tag + Issue 状态评论（模板见 `AGENTS.md`）；③live
+  `:3080`/`:3086`/`:3090` 仍是用户动作（D-013）。
+- **给用户的一句话**：这一版还没发——工作树里的东西能装能跑（真机截图在 Round2 目录），
+  但报告文案要先改成"人话在前、机器证据收起来"，改完再一起发版。
+
+## 2026-11-15 — v0.9.2 收尾发版：本地齐了（`5eb4942`），**push / tag / Issue 评论等人话真机截图**
+
+- **From:** 收尾发版组 agent-30 · **To:** lead / 截图组 / 后续代理 · **Base:** `main` = `4b92278`
+  （= `origin/main`，v0.9.1 发布记录）。**本地提交 `5eb4942`**（release-prep）+ 随后的 docs 提交
+  （本段所在的记忆记录）。**远端未变**：`origin/main` 仍是 `4b92278`，没有 `v0.9.2` tag，没有
+  GitHub Release，Issue #1 无新评论。
+- **本轮做完了什么（`CONFIRMED`）**：
+  1. `test/gate.spec.ts` 两条基线既有时序失败按 D-051 的最小改法修同步（**只改等待条件**，
+     产品代码零改动）：单跑 **55/55**、全量 **51 文件 / 948 测试全 PASS**。
+  2. `npm run ci`：typecheck 0 错、oxlint 5 warning / 0 error（4 既有 + 1 新）、build client bundle
+     204585 B、build 幂等（`lib/` 67 产物哈希全等）+ `cmp lib/client.js src/client/index.js` 一致。
+  3. `CHANGELOG.md`：`[Unreleased]` 提为 `## [0.9.2] - 2026-11-15`（94 行；Added 人话优先、
+     Fixed 存量钳制 + B02/B04 + B01 + 进度 Tab 三条、Tests 两条同步修复）；**不写 layerfs 条目**（D-049）。
+  4. `package.json` + `package-lock.json` 一起 bump 到 `0.9.2`（`npm version 0.9.2 --no-git-tag-version`）。
+  5. Round2 真机证据（13 PNG + 5 stage 日志 + `MANIFEST.sha256` + `r2.patch.yml` + `run-state.json`）
+     与新增 spec（`test/delivery.spec.ts`、`test/progress-connector.spec.ts`）一起入库；
+     入库前对证据目录扫过密钥形状（`sk-…` / `Bearer …` 命中 0），`r2.patch.yml` 只写
+     `apiKeyEnv: BIFROST_VIRTUAL_KEY` 名字、不含值。
+- **现在卡在哪（`NOT_RUN`，唯一堵点）**：**human-only 默认形态的真机复拍**。仓库里最新真机证据止于
+  11-15 12:09（`evidence/progress-tab-2026-11-15/Round2/`），全部早于 agent-27 的人话默认化改动；
+  `Round2/05-chat-with-run-report.png` 就是用户点名「太机器」的那张。**需补的 6 项**见
+  `VALIDATION.md` Round 40 §6（三 Tab 共存 / 默认消息只有人话块+下一步、无命令无路径无 sha 无 marker /
+  `showDiagnostics` 关开对照 / ≤480 px + 深色 / 三 Tab 回归含点开子会话 / 会话事件旁证）。
+- **复现命令（exact）**：
+
+  ```bash
+  cd /home/fish/projects_mine/dsh-grok-workflow
+  export TMPDIR=$PWD/.tmp
+  npm run ci                                        # 51 files / 948 tests PASS
+  npx vitest run test/gate.spec.ts                  # 55 passed（修同步前是 2 failed）
+  npm run build && git status --porcelain -- lib/   # 幂等、无未跟踪产物
+  git log --oneline -2                              # 5eb4942 release: prepare v0.9.2 …
+  ```
+
+- **放行后要做的三步（照做，别改顺序、别 force-push）**：
+  1. 截图组把 §6 的证据落盘（新建 `docs/knowledge/evidence/human-default-2026-11-15/`，与 Round2
+     同构：PNG + stage 日志 + `MANIFEST.sha256`），并把结论补进 VALIDATION 的新 Round（状态词照
+     `CONFIRMED` / `NOT_RUN` 用，别把单测结论写成真机结论）；
+  2. `git push origin main` → 等 CI（Node 22 + 24）绿；再核对本地 `HEAD` 就是要发的那一个提交；
+  3. `git tag -a v0.9.2 -m "v0.9.2: plain-language answer by default, one clamp table, progress tab spine/detail/connector"`
+     → `git push origin v0.9.2` → 等 Release workflow 绿（它会校验 tag ↔ `package.json` ↔
+     `CHANGELOG` 的 `[0.9.2]` 节、`lib/` 已提交且与构建一致、`npm test` 全绿）→ 复核
+     `git ls-remote --tags origin` 里**旧 tag 未动**（`v0.9.1` → `9103280` 及更早），
+     然后按 `AGENTS.md` 的 FROM/TO/TASK/BASE/WORK/CHANGES/TESTS/RESULTS/LOCAL/BLOCKERS/NEXT
+     模板给 Issue #1 发状态评论。
+- **写面提醒**：人话报告的源码（`src/answer.ts`、`src/delivery/index.ts`、`src/gate.ts` 调用点）本轮
+  已冻结在 `5eb4942` 里；要再改就得走新的提交，别在工作树里改完直接打 tag（Release workflow 会因
+  `lib/` 不同步而拦下，`git diff --exit-code -- lib/` 那一步会红）。
+- **别碰**：已发布 tag（`v0.9.1` 及更早）、DSH core、live `:3080` / `:3086` / `:3090`（D-013）、
+  npm 发布与仓库可见性。
+

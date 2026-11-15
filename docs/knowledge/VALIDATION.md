@@ -2735,3 +2735,256 @@ link: 安装的实例里 /grok on →
 - `NOT_RUN`：进度 Tab 的 `blocked`/`failed` 真机触发；live `:3080`/`:3086`/`:3090` 的部署与重启；
   单元测试之外的压力/长跑。
 - 未提交、未打 tag、未 bump（版本由 V 组做）；写面仅限记忆文件 + `CHANGELOG` 的 `[Unreleased]`。
+
+## Round 39 (2026-11-15) — v0.9.2 准备：B01/B02/B04 + 进度 Tab 脊椎/详情/连线；全量 934 中 2 条基线既有失败（`CONFIRMED`）
+
+**性质**：收尾组 agent-26 的验证轮，**零源码改动**（只读源码 + 跑命令 + 写记忆）。
+基线 `main` = `4b92278`（`HEAD` = `origin/main`）。工作树带上一轮未提交改动：
+`src/` 4 文件（`config.ts`、`index.ts`、`progress-tab.ts`、`client/index.js`）、`test/` 3 文件、
+`lib/` 12 个产物，未跟踪 `test/progress-connector.spec.ts` 与
+`docs/knowledge/evidence/progress-tab-2026-11-15/Round2/`。
+
+**发布状态**：CHANGELOG / 版本号 / commit / push / tag / Issue 全部 **HOLD**（用户 2026-11-15 指令，
+经 lead 下达；成因是 Round2 `05` 截图里的报告太机器）。本节因此**不是发布记录**。
+
+### 1. 环境与隔离
+
+| 项 | 值 |
+| --- | --- |
+| Host | local Linux workspace（omarchy） |
+| Node / npm | `v26.8.1` / `11.19.0` |
+| DSH CLI | `0.2.2-rc.3` |
+| `TMPDIR` | `<repo>/.tmp`（harness 的 `/tmp` 配额 `EDQUOT`，见 STATE） |
+| harness 限制 | bash/glob/grep 工具 UNKNOWN 失败 → 全部命令经 Serena MCP shell 执行 |
+| 基线对照 worktree | `.dsh-home/baseline-wt`（`git worktree add … 4b92278`，gitignored） |
+
+### 2. 构建幂等与产物身份（`CONFIRMED`）
+
+```text
+$ export TMPDIR=$PWD/.tmp && npm run build
+> tsc -p tsconfig.build.json && node scripts/build-client.mjs
+client bundle: 204585 bytes → lib/client.js
+BUILD_RC=0
+LIB_UNCHANGED_BY_BUILD          # 构建前后 67 个 lib/*.js|*.d.ts 的 sha256 全等
+CLIENT_MATCH                    # cmp lib/client.js src/client/index.js → 一致
+```
+
+### 3. 全量 `npm run ci`（`CONFIRMED`，命令原文与结果）
+
+```text
+$ TMPDIR=$PWD/.tmp npm run ci
+> npm run typecheck && npm run lint && npm test
+typecheck: tsc -p tsconfig.json --noEmit            → 0 errors
+lint:      oxlint src test                          → Found 4 warnings and 0 errors.
+           （4 条均为既有：src/run.ts RoleName 未用、src/redact.ts 多余转义、
+             src/client/index.js GROUPS_WITH_FIELDS 未用、src/client/index.js field 未用）
+build:     client bundle 204585 bytes → lib/client.js
+vitest:    Test Files  1 failed | 49 passed (50)
+           Tests       2 failed | 932 passed (934)
+           Duration    52.59s
+CI_RC=1
+```
+
+失败项全部在 `test/gate.spec.ts`（本轮未改 `src/gate.ts`）：
+
+```text
+× refuses a message explicitly when the queue is full and never retries it on its own
+× writes the answer into the session when the append strategy is selected
+```
+
+### 4. 基线对照（`CONFIRMED`）——两条失败在 `4b92278` 上同样失败
+
+```text
+$ git worktree add .dsh-home/baseline-wt 4b92278
+$ cd .dsh-home/baseline-wt && TMPDIR=<repo>/.tmp npx vitest run test/gate.spec.ts
+ × refuses a message explicitly when the queue is full and never retries it on its own 1070ms
+ × writes the answer into the session when the append strategy is selected 55ms
+ Test Files  1 failed (1)
+      Tests  2 failed | 53 passed (55)
+```
+
+同一条 spec 在**本轮工作树**上单跑：
+
+```text
+$ cd <repo> && TMPDIR=$PWD/.tmp npx vitest run test/gate.spec.ts
+ × refuses a message explicitly when the queue is full and never retries it on its own 1074ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 54 passed (55)
+```
+
+即：①`queue is full` 那条**稳定失败**（工作树与基线都失败）；②`append strategy` 那条
+**基线失败、工作树单跑偶过、全量跑失败**——形态上是既有失败 + 时序敏感，不是本轮引入。
+边界：本轮只证明"与基线同形"，**未定位根因、未修**。发版前是否连带处理由 agent-27 / 用户决定；
+在此之前 934 全绿**不成立**，写"PASS"会是假话。
+
+### 5. 真机 Round2（H2 进度 Tab + 安装/加载半边）— 引证，不是本轮自跑
+
+本轮**没有**重跑真机（真机由 L2 组完成，证据已落盘，我只核对了目录内容与 README 的结论行）：
+
+- 目录：`docs/knowledge/evidence/progress-tab-2026-11-15/Round2/`（13 PNG、5 份 stage 日志、
+  `MANIFEST.sha256`、`run-state.json`）。
+- 实例：`http://127.0.0.1:3221`，`DSH_HOME=<repo>/.dsh-home/r2`，profile `gwprog2`，
+  插件装打包产物 `dsh-grok-workflow-0.9.1.tgz`（sha256 `ac51b89a…`），模型 `127.0.0.1:18088`
+  的 `wb/cn:deepseek-v4.1-flash`，headless Chromium 1440×900 / 480×900。
+- 真机四态：`pending` / `doing` / `done` / `failed` = `CONFIRMED`（`failed` 是真实沙箱边界那一次，
+  `End:failed`，人话结论如实写"没做成"）；`blocked` / `cancelled` 本轮 `NOT_TRIGGERED`。
+- 产物身份半条：`npm run build` 前后 `lib/` 哈希全等 + `cmp` 三者一致（工作树 ↔ profile 安装副本），
+  与本节 §2 的本轮复跑结果一致。
+- 安装/加载/前台半边的 Round1 证据仍是 `docs/knowledge/evidence/verify-H1/`（含"关掉
+  `workflow-ptc` → `pending (waiting for service: workflowEngine)`"的对照），本轮未复跑，
+  **不冒充本轮结果**。
+
+### 6. 用户报告的"机器味"（`CONFIRMED`，截图 `Round2/05-chat-with-run-report.png`）
+
+用户看到的那条会话消息，逐字含（我读了截图核对，不是转述别人的话）：
+
+- 首行 `Grok workflow: COMPLETED Objective: Conversation so far (context only): User: 你好，只打个招呼，
+  不要做任何事。 User: <system-reminder> The following information describes your current session: …`
+  —— 把 objective 原文和注入的 `<system-reminder>` 一起端给读者；
+- 六条任务 bullet，每条都是 shell 输出原文：`文件 … 存在且为普通文件 - stat -c %F %s bytes %n
+  r2-todos.md output 'regular file 111 bytes r2-todos.md'`、`wc -l -> 3`、`python 校验`、
+  `od -c 显示每行以 '·'（横线加空格，八进制 055 040）之后的 UTF-8 中文字节）起始`、
+  `md5 a64a6f17a1c4c6b1fe39b8a1a8115982`、`find -mindepth 1 -maxdepth 1 -> 仅 'r2-todos.md'`；
+- 结尾 `<<<END-GROK-WORKFLOW-REPORT>>>` 机器 marker；整条消息计 **18.6K token**。
+
+**判定（`CONFIRMED`）**：这版 relay/in-turn 的出站默认是"证据全集"，人话结论即使存在也被机器块
+盖住；对非技术读者不可读。**要求（用户，经 lead 下达）**：默认只发 human 块 + 下一步，机器证据
+默认收进 Progress 详情 / 诊断开关（`showDiagnostics` 一类），不再 verbatim 全贴。该改动归 agent-27，
+本节只记录证据与判据，**未实现、未验证**（`NOT_RUN`）。
+
+### 7. 本轮未做（`NOT_RUN` / HOLD）
+
+- CHANGELOG 条目、`package.json`/`package-lock.json` bump、commit、push、tag、Issue 评论：**HOLD**
+  （用户指令，等人话报告改动回齐）。因此 `package.json` 仍是 `0.9.1`，`CHANGELOG.md` 工作树未改。
+- 两条 `gate.spec` 失败的根因定位与修复：`NOT_RUN`（不在收尾组写面，`src/gate.ts` 归 agent-27）。
+- `blocked` / `cancelled` 的真机补充：`NOT_RUN`。
+- live `:3080` / `:3086` / `:3090` 的部署与重启：`NOT_RUN`（D-013，用户保留动作）。
+
+## Round 40 (2026-11-15) — v0.9.2 收尾发版：两条基线既有失败按最小改法修同步、全量 948 全 PASS、本地提交 `5eb4942`（push/tag HOLD）
+
+**性质**：收尾发版组 agent-30 的发版准备轮。基线 `main` = `4b92278`（= `origin/main`）。
+**本地提交 `5eb4942`**（`release: prepare v0.9.2 …`）。**未 push、未打 tag、未发 Release、未动 Issue**
+（lead 2026-11-15 (B) 口径）。写面：`test/gate.spec.ts`（仅等待条件）、`CHANGELOG.md`、`package.json`
++ `package-lock.json`、四个记忆文件；不碰 `src/` 产品代码。
+
+### 1. 环境
+
+| 项 | 值 |
+| --- | --- |
+| Host / Node / npm | 本机 omarchy / `v26.8.1` / `11.19.0` |
+| vitest | `4.1.12`（`package-lock.json` 亦为 `4.1.12`） |
+| `TMPDIR` | `<repo>/.tmp`（harness 的 `/tmp` 配额 `EDQUOT`） |
+| harness | bash/glob/grep 工具不可用 → 全部命令经 Serena MCP shell |
+| 基线对照 worktree | `.dsh-home/baseline-wt`（`4b92278`，gitignored） |
+
+### 2. 两条失败：根因与改法（`CONFIRMED`，测试侧竞态，非产品缺陷）
+
+先用一次性 DBG 探针（临时 `test/zz-dbg.spec.ts`，跑完删）把时序摊开：在第一条消息受理、
+`complete(report())` 之后 **100 ms** 尺度上 `engine.startCalls` 确实到 2，而原用例的 5 ms 尺度上
+第二次派发又被判队列满——即失败来自**用例等错了条件**，不是 run 起不来。
+
+| 用例 | 原等待条件 | 为什么已经满足 | 改成 |
+| --- | --- | --- | --- |
+| `refuses a message explicitly when the queue is full and never retries it on its own` | `agent.followups.length >= 1` | 队列满**通知**投递后即满足（当时 followups=1），而首个 run 的答复还没到 → 5 ms 后重发时队列仍 `queued=1`，再次 `queue-full` | `>= 2`（通知 + 该 run 自己的答复） |
+| `writes the answer into the session when the append strategy is selected` | `session.appends.length >= 2` | `[user/message, tool-workflow/run-start]` 即满足 → 断言早于 `assistant/message` 落盘 | `session.appends.some(a => a.type === 'assistant/message')` |
+
+基线对照（`CONFIRMED`，独立 worktree）：
+
+```text
+$ cd .dsh-home/baseline-wt            # HEAD = 4b92278（v0.9.1 发布记录）
+$ TMPDIR=<repo>/.tmp npx vitest run test/gate.spec.ts
+ × refuses a message explicitly when the queue is full and never retries it on its own 1070ms
+ × writes the answer into the session when the append strategy is selected 54ms
+ Test Files  1 failed (1)
+      Tests  2 failed | 53 passed (55)
+```
+
+即两条在 `4b92278` 上同样红。**同一提交在 GitHub CI 的 Node 22/24 上是绿的**（main 上
+`43666296089` success，CI 跑 `npm test`），所以这是**本机时序敏感**，不是「CI 带红发版」——
+措辞按此写，不夸大。改完：
+
+```text
+$ TMPDIR=$PWD/.tmp npx vitest run test/gate.spec.ts
+ Test Files  1 passed (1)
+      Tests  55 passed (55)
+```
+
+### 3. 全量 `npm run ci`（`CONFIRMED`，命令与结果）
+
+```text
+$ TMPDIR=$PWD/.tmp npm run ci
+typecheck: tsc -p tsconfig.json --noEmit   → 0 errors
+lint:      oxlint src test                 → Found 5 warnings and 0 errors
+           （4 条既有：src/redact.ts 多余转义、src/client/index.js GROUPS_WITH_FIELDS、同文件 field、
+             src/run.ts RoleName；新增 1 条：src/delivery/index.ts:264 no-useless-escape）
+build:     client bundle 204585 bytes → lib/client.js
+vitest:    Test Files  51 passed (51)
+           Tests       948 passed (948)
+```
+
+### 4. 构建幂等与产物身份（`CONFIRMED`）
+
+```text
+$ before=$(find lib -type f \( -name '*.js' -o -name '*.d.ts' \) | sort | xargs sha256sum | sha256sum)
+$ npm run build          # client bundle: 204585 bytes → lib/client.js
+$ after =$(…同上…)
+BEFORE=db64c890de347250260a1fb56ba51221474179fa2809d1b4e7b1146217de9c80
+AFTER =db64c890de347250260a1fb56ba51221474179fa2809d1b4e7b1146217de9c80   → LIB_IDEMPOTENT=PASS
+$ cmp lib/client.js src/client/index.js                                   → CLIENT_MATCH=PASS
+```
+
+`lib/` 已随 `5eb4942` 一起提交（Release workflow 的 `git diff --exit-code -- lib/` 与
+「无未跟踪构建产物」两步的本地对应检查通过：暂存后 `git status --porcelain -- lib/` 为空）。
+
+### 5. 提交内容与版本（`CONFIRMED`）
+
+```text
+$ git log --oneline -3
+5eb4942 release: prepare v0.9.2 (human-first report, one clamp table, progress tab spine/detail/connector)
+4b92278 docs(memory): v0.9.1 release record (stored limit clamp, user enable fix)
+$ node -p "require('./package.json').version"        → 0.9.2
+$ node -e "…package-lock…"                           → lock.version=0.9.2, packages[""].version=0.9.2
+$ grep -n '^## ' CHANGELOG.md | head -3               → ## [0.9.2] - 2026-11-15 / ## [0.9.1] …
+```
+
+`CHANGELOG.md` 的 `[0.9.2]` 节 94 行：`### Added / 新增`（人话优先）+ `### Fixed / 修复`（存量钳制、
+B02/B04 一张钳制表与一条告警、B01 横幅读用户层、进度 Tab 三条）+ `### Tests / 测试`（两条同步修复）。
+Release workflow 要求「该节存在且 ≥4 行」这一条在本地按其脚本逻辑核对通过（节头精确匹配 `[0.9.2]`）。
+**`[0.9.2]` 不写 layerfs 条目**：见 §7。
+
+### 6. 放行的真实缺口：human-only 默认形态的真机复拍（`NOT_RUN`）
+
+我在全树核过证据 mtime：最新真机证据是 `evidence/progress-tab-2026-11-15/Round2/`（11-15 11:44–12:09），
+**早于** agent-27 的人话默认化改动，`05-chat-with-run-report.png` 正是用户点名「太机器」的那张。
+因此「改后的人话默认形态」在真机上**没有任何截图或日志**，本项 `NOT_RUN`。需补图/补证的清单（交给
+截图组，逐张都要能回指本轮提交 `5eb4942` 的构件）：
+
+1. 三 Tab 共存且默认落对话（改后构建）；
+2. 团队档一趟跑完后的**默认**入站消息：**只有人话块 + 下一步**，无 `stat -c` / `od` / `sha256` /
+   绝对路径 / `<<<END-GROK-WORKFLOW-REPORT>>>`（这一张是用户点名的那张的对照）；
+3. 同一会话里 `showDiagnostics` 关/开对照两张（关：台账不在标记内；开：台账回到标记内）；
+4. ≤480 px 窄屏 + 深色主题下的同一条消息（人话块不被截断、不被 composer 遮住）；
+5. 回归：对话 / 轨迹 / 进度三 Tab 各一张，含已完成行可点开子会话；
+6. 机器可核对的旁证：`run-state.json` 形态的会话事件摘录，证明第 2 张里那条消息的正文确实落在
+   结束标记之后（内部块）而不是人话块里。
+
+### 7. layerfs 借鉴评估（`CONFIRMED` = 只读评估；`NOT_RUN` = 移植/真机）
+
+agent-28（UI）与 agent-29（多 Agent）对 `/home/fish/projects_mine/layerfs` 做**只读评估**（本地检出
+`87bd986`；LayerFS 的 UI = `dsh/packages`，多 Agent 面 = `dsh/scenarios/*` + `core/crates/*`）。
+UI：8 条可借鉴 / 9 条不可搬；多 Agent：8 条可借鉴 / 7 条不可搬（逐条与理由见 D-049）。
+**本轮零用户可见落地**：进度 Tab 的 `var(--dsw-alias-*)` token 色、≤480 px 抽屉、百分比空态
+`data-progress-percent="none"` + `aria-live`、交付层人话块都是 **v0.9.0 既有实现**，无法证明是照
+layerfs 搬的，故不写进 `CHANGELOG`（lead 口径：不冒认）。移植本身 `NOT_RUN`：没有一行代码来自
+layerfs，也没有在 layerfs 侧做过任何改动（其检出仍是 `M core/crates/layerfs-store-service/src/install.rs`
+等既有本地改动，与本仓库无关）。
+
+### 8. 本轮 `NOT_RUN` / HOLD 汇总
+
+- `push origin main`、`tag v0.9.2`、GitHub Release、Issue #1 评论：**HOLD**（lead (B) 口径，等 §6 截图）。
+  因此远端 `origin/main` 仍是 `4b92278`，`git ls-remote --tags origin` 无需复核（本轮未产生新 tag），
+  旧 tag（`v0.9.1` → `9103280`）未被触碰。
+- §6 的真机复拍：`NOT_RUN`（新派截图组）。
+- live `:3080` / `:3086` / `:3090` 部署与重启：`NOT_RUN`（D-013，用户保留动作）。
+
+

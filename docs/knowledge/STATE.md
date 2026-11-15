@@ -1,6 +1,26 @@
 # Project State
 
-Last updated: 2026-11-15 (**v0.9.1 released** — tag `v0.9.1` → `9103280` on `main`; Release
+Last updated: 2026-11-15 (**v0.9.2 已本地提交 — 未 push / 未打 tag / 未发 GitHub Release**；
+基线 `main` = `4b92278`。本轮内容 = B01/B02/B04 + 进度 Tab 脊椎/详情/连线 + 人话报告默认化
+（agent-27）+ 两条基线既有 `test/gate.spec.ts` 失败的同步修复（只动测试等待条件）。工作树 30+ 文件；
+`package.json` + `package-lock.json` = **`0.9.2`**；`CHANGELOG.md` 有 `## [0.9.2] - 2026-11-15`（中英
+双语，含 `### Tests / 测试`）。本机 `npm run ci`：typecheck 0 错、oxlint **5 warning / 0 error**
+（4 条既有 + `src/delivery/index.ts:264` 1 条新）、build client bundle **204585 B**、vitest
+**51 文件 / 948 测试全 PASS**；build 幂等（`lib/` 67 产物 sha256 前后全等）+ `cmp lib/client.js
+src/client/index.js` 一致。**push 与 tag 依 lead 2026-11-15 (B) 指令 HOLD**：等「human-only 默认
+形态」真机复拍（`NOT_RUN`，需补图清单见 VALIDATION Round 40）；layerfs 借鉴结论为**只读评估、
+本轮零用户可见落地**（D-049），故 CHANGELOG 不写 layerfs 条目。详见文末
+「2026-11-15 — v0.9.2 收尾发版（本地已提交，push/tag HOLD）」。)
+
+Previous update: 2026-11-15 (**v0.9.2 准备中 — 未提交 / 未 bump / 未发布**; 基线 `main` = `4b92278`。
+工作树 19 文件（`src/` 4、`test/` 3、`lib/` 12）+ 未跟踪 `test/progress-connector.spec.ts` 与 Round2
+真机证据；内容 = B01/B02/B04 + 进度 Tab 脊椎/详情/连线；人话报告默认化由 agent-27 进行中，
+`src/answer.ts`/`report.ts`/delivery/`gate` 调用点不在收尾组写面。`package.json` 仍 `0.9.1`，
+`CHANGELOG.md` 未动（发版 HOLD，用户 2026-11-15 指令）。`npm run ci`：50 文件 / 934 测试，
+**932 PASS / 2 FAIL**，两条失败在 `test/gate.spec.ts` 且基线 `4b92278` 独立 worktree 同样失败（预存）。
+详见文末「2026-11-15 — v0.9.2 准备中」。)
+
+Previous update: 2026-11-15 (**v0.9.1 released** — tag `v0.9.1` → `9103280` on `main`; Release
 green, asset `dsh-grok-workflow-0.9.1.tgz`; CI `43665777667` + Release `43666035740` success.
 Fixes the user-reported WebUI enable failure: pre-v0.9.0 patch `maxConcurrency: 8 /
 maxRetries: 5` now clamps to `6 / 3` with bilingual warnings instead of failing the row.
@@ -8,7 +28,7 @@ maxRetries: 5` now clamps to `6 / 3` with bilingual warnings instead of failing 
 Evidence: `test/config-limits-repair.spec.ts` (17); isolated profile `gwverify851` with the 8/5
 patch activates; control `0` still refuses with user-identical frames.)
 
-Previous update: 2026-11-15 (**wave1+wave2 已落盘、未提交** — 基线 `ee5e013`，工作树 dirty；
+Earlier update: 2026-11-15 (**wave1+wave2 已落盘、未提交** — 基线 `ee5e013`，工作树 dirty；
 `package.json` = `0.9.0`（V 组 bump，未提交）；本轮 = B01-B18 清点 + 进度 Tab + 真机验证 H1/H2。
 版本号与提交由 V 组做，M 组只写记忆与 CHANGELOG 的 `[Unreleased]`。详见文末
 「2026-11-15 — wave1+wave2 收尾」。下降级保留的上一条 11-08 记录仍有效，未被覆盖。)
@@ -760,3 +780,115 @@ worker 链上限 50（HARD_LIMITS.chainLength）
 - `NOT_RUN`：live `:3080` / `:3086` / `:3090` 的部署与重启（用户保留动作，D-013）；
   进度 Tab 的 `blocked`/`failed` 真机触发；`README`/`ARCHITECTURE` 之外的文档连带改动。
 - 未提交、未 push、未打 tag、未 bump（版本由 V 组做）。
+
+## 2026-11-15 — v0.9.2 准备中：B01/B02/B04 + 进度 Tab 脊椎/详情/连线（未提交、未 bump、未发布）
+
+- **From:** 收尾组 agent-26 · **To:** lead / agent-27 / 后续代理 · **Base:** `main` = `4b92278`
+  （v0.9.1 发布记录；`HEAD` 与 `origin/main` 同 sha）。工作树 dirty（本轮核数时；agent-27 的人话
+  报告改动随后进入同一工作树，故这个数字会变）：**19 文件**
+  （`src/` 4：`config.ts`/`index.ts`/`progress-tab.ts`/`client/index.js`；`test/` 3；
+  `lib/` 12 个构建产物）+ 未跟踪 `test/progress-connector.spec.ts`、
+  `docs/knowledge/evidence/progress-tab-2026-11-15/Round2/`、`.tmp/`（测试用 TMPDIR）。
+- **发布动作全部 HOLD（`CONFIRMED`，用户 2026-11-15 指令，经 lead 下达）**：不写 `CHANGELOG.md`、
+  不 bump `package.json`/`package-lock.json`（仍 `0.9.1`）、不 commit、不 push、不打 tag、不动 Issue。
+  原因：用户反馈 Round2 的 `05` 截图里报告太机器（`stat`/`od`/`sha256`/路径/marker 全贴给用户，
+  非技术读者看不懂）——截图逐字内容与判定见 `VALIDATION.md` Round 39 §6。
+  人话报告改动归 **agent-27**（写面：`src/answer.ts`、`src/report.ts`、
+  `src/delivery/*`、`src/gate.ts` 调用点及其测试），收尾组不碰这四处；等 agent-27 回齐 + lead 验货
+  后统一发版。要求的默认形态：只发 human 块 + 下一步，机器证据收进 Progress 详情 / 诊断开关。
+- **B01（`CONFIRMED`）**：设置页超限横幅读**用户层**，不读钳制后的生效值。锚点
+  `src/client/index.js:862`（注释与取值）、`:1444`（`describe()` 投影里把 `user` 层带出来）。
+  理由：`describe()` 发布的是**生效值**，横幅若读它，用户存的 `8` 被钳成 `6` 后被显示成 `6`，
+  等于替用户改口。测试：`test/config-limits-repair.spec.ts`
+  `reads the stored user layer, not the clamped projected value (B01)`。
+- **B02（`CONFIRMED`）**：全部数值硬上限收敛到**一张表** `LIMIT_CAPS`（`src/config.ts:53` 起，
+  值一律读 `HARD_LIMITS`），schema 侧 `clampedLimit(field, min)` 与载入期 `repairLimitOverruns`
+  共用同一张表：新增上限只加一行，两侧不再各写一个界。表内 10 个字段：`maxConcurrency`、
+  `maxRetries`、`maxQueuedMessages`、`historyTurns`、`historyChars`、`maxTasks`、`timeoutMs`、
+  `maxActiveRuns`、`maxActiveRunsTotal`、`recordLimit`。**不在表内是刻意的**：每路由
+  `maxInFlight`（在链内判，界是 `HARD_LIMITS.routeInFlight`）与 `configVersion`（线上契约，
+  不匹配必须拒载而非改写）。低于下限、非数字、程序化 `resolveConfig` 越界仍硬拒（R-06 不变）。
+- **B04（`CONFIRMED`）**：钳制告警**每次载入一条**。两层钳制都只记账
+  （`recordOverrun()`：schema 没有 logger；repair 跑在一个仍可能因别的缺陷抛错的读里），
+  由 `src/index.ts` 的 `announceOverruns()` 用一个 set 按 `field:stored` 去重后统一 `logger.warn`；
+  `repairLimitOverruns` 自己的 `warnings` 仍决定"确实修过"。旧写法的问题：那条读路径**每条消息**
+  走一次，只要补丁还在超限就会每消息刷一条告警。
+- **进度 Tab 三处（`CONFIRMED`，`src/progress-tab.ts` 与 `src/client/index.js` 双侧同构）**：
+  - **脊椎整词绑定**：拉丁字母 token 只在**词边界**命中，CJK token 仍按子串（`规划` 在
+    `任务 1 · 规划` 里就是词）。松匹配的三个真实误报：`ui` 读进 `build`、`tag` 读进
+    `stage`/`target`、`sync` 读进 `async`——旧脊椎因此报出没人跑过的阶段。
+  - **详情协调块**：`parseCoordinationBlock` 只认三种形态（`json`/`grok-coordination` 围栏、
+    任意围栏里的 `LABEL: value` 七字段块、无围栏的同款标签块），糊散文一律不认；来源阶梯
+    `stage-detail` → 子会话协调块 → `not-reported`，块内值标 `Source: child coordination block`，
+    只有拿到原文才允许 `Copy coordination block`（否则保持 disabled）。
+  - **连线填充 + 状态字形**：连线只在**左侧节点自己 `done`** 时填充（`data-filled="true"`，
+    否则属性**缺席**而不是 `"false"`）；`failed`/`blocked` 故意留空——线是证据，不是装饰。
+    节点环里一个状态字形；节点聚合多行时用**行数**替换字形（可核对的数字优先于符号）。
+    钉住：新 spec `test/progress-connector.spec.ts`（7 例，直接渲染 `lib/client.js`，含
+    `blocked` 派生节点与"两行→计数、单行→字形"）。
+- **测试（`CONFIRMED`，`TMPDIR=$PWD/.tmp`）**：`npm run ci` → `tsc` **0 错**；`oxlint`
+  **4 warning / 0 error**（4 条均为既有：`src/run.ts` 未用 `RoleName`、`src/redact.ts` 多余转义、
+  `src/client/index.js` 的 `GROUPS_WITH_FIELDS` 与 `field`）；`npm run build` **幂等**——构建前后
+  67 个 `lib` 产物 sha256 全等，client bundle **204585 B**，`cmp lib/client.js src/client/index.js`
+  一致；全量 vitest **50 文件 / 934 测试 → 932 PASS / 2 FAIL**。
+- **两条失败是基线既有（`CONFIRMED`，独立 worktree 对照）**：`git worktree add .dsh-home/baseline-wt
+  4b92278` 后在同一 worktree 跑 `npx vitest run test/gate.spec.ts` → **2 failed | 53 passed**，与本轮
+  工作树失败项相同：`refuses a message explicitly when the queue is full and never retries it on its
+  own`（单跑也复现）与 `writes the answer into the session when the append strategy is selected`
+  （全量跑复现、单跑偶过）。本轮未改 `src/gate.ts`。**既不写成"已修"，也不写成"产品 PASS"**：
+  发版前由 agent-27 或用户决定是否连带处理。
+- **真机证据（Round2，`CONFIRMED`）**：`docs/knowledge/evidence/progress-tab-2026-11-15/Round2/`
+  ——隔离 `dsh web` `127.0.0.1:3221`、`DSH_HOME=<repo>/.dsh-home/r2`、profile `gwprog2`（自 web 模板）、
+  插件装**打包产物** `dsh-grok-workflow-0.9.1.tgz`（sha256 `ac51b89a…`）、模型走本机网关
+  `127.0.0.1:18088`（`wb/cn:deepseek-v4.1-flash`）、headless Chromium 1440×900 / 480×900；
+  **13 张 PNG** + 5 份 stage 日志 + `MANIFEST.sha256`；token 只经环境变量、收尾删日志与 envfile，
+  目录内 token 形状字符串扫描 = 0。真机 `pending`/`doing`/`done`/`failed` 四态 `CONFIRMED`
+  （`failed` 来自真实沙箱边界那一次运行，不是构造）；`blocked`/`cancelled` 本轮 `NOT_TRIGGERED`
+  （不伪造，单测覆盖在 Round 38 记的 93 例里）。安装/加载/前台半边的证据仍是
+  `docs/knowledge/evidence/verify-H1/`（`CONFIRMED`，含"关掉 `workflow-ptc` → pending"的对照）。
+- **诚实边界**：`blocked`/`cancelled` 的真机补充 `NOT_RUN`；live `:3080`/`:3086`/`:3090` 未部署
+  未重启（D-013）；版本号、节头、commit、push、tag、Issue 评论全部 HOLD，本段**不是发布记录**。
+
+## 2026-11-15 — v0.9.2 收尾发版（本地已提交 `5eb4942`；push / tag / Issue 评论 HOLD）
+
+- **From:** 收尾发版组 agent-30 · **To:** lead · **Base:** `main` = `4b92278`（`HEAD` = `origin/main`
+  = v0.9.1 发布记录）。**本地提交 `5eb4942`**（release-prep：`src` 7 / `test` 9 / `lib` 40+ /
+  `CHANGELOG.md` / `package.json` / `package-lock.json` / Round2 证据；72 文件 `+5135 −1021`）。
+  记忆文件随本段之后的一个 docs 提交入库。**未 push、未打 tag、未发 GitHub Release、未动 Issue**
+  （lead 2026-11-15 (B) 口径：等 human-only 真机复拍）。
+- **内容（`CONFIRMED`，每条都有源码锚点）**：
+  - **B01** — `src/client/index.js` 设置页超限横幅读**用户层**，不读钳制后的生效值（理由见 D-047）。
+  - **B02** — `src/config.ts` `LIMIT_CAPS` 是唯一钳制表（10 个字段，界一律读 `HARD_LIMITS`），schema
+    侧 `clampedLimit` 与载入期 `repairLimitOverruns` 共用同一张表。
+  - **B04** — 两层钳制只记账，唯一发声点是 `src/index.ts` 的 `announceOverruns()`，按 `field:stored`
+    去重，补丁仍超限时不再每条消息刷一条告警。
+  - **进度 Tab** — `src/progress-tab.ts` 与 `src/client/index.js` 同构：脊椎拉丁 token 只在词边界命中
+    （CJK 仍按子串）、详情七字段来源阶梯（`stage-detail` → 子会话协调块 → `not-reported`，只认三种
+    显式块形态）、连线只在左侧节点自己 `done` 时填充、节点环一个状态字形（聚合多行换行数）。见 D-048。
+  - **人话报告默认化**（agent-27；`src/answer.ts` + `src/delivery/index.ts`，调用点 `src/gate.ts`）——
+    标记之间是人话块（中英双语），机器台账折到结束标记**之后**并有一行 `LEDGER_GUARD` 明说
+    「这是内部上下文，不许引用」；`showDiagnostics` 打开时台账回到标记内；人话行剥掉机器细节
+    （`MACHINE_DETAIL` 12 类：shell 命令、摘要/hex、路径、裸文件名、代码、relay 标记），整行都是
+    机器细节的直接丢弃；失败原因保留措辞。台账仍随消息留存，供 Progress 详情与跨轮延续读回。
+- **测试与构建（`CONFIRMED`，本机；证据见 VALIDATION Round 40）**：`npm run ci` → typecheck **0 错**；
+  oxlint **5 warning / 0 error**（4 条既有 + `src/delivery/index.ts:264` 新增 1 条）；build client
+  bundle **204585 B**；vitest **51 文件 / 948 测试全 PASS**；build 幂等（`lib/` 67 个产物 sha256
+  前后全等）+ `cmp lib/client.js src/client/index.js` 一致。
+- **两条 `test/gate.spec.ts` 同步修复（`CONFIRMED`，只动测试的等待条件，产品行为未变）**：队列满那条
+  等的是「一条 relay follow-up」，而拒绝通知本身就满足它 → 在被受理的批次排空之前重发、又被同一个
+  满队列拒绝；append 那条等「两条 session append」，而 run 自己的进度事件就满足它 → 断言早于
+  `assistant/message` 落盘。两条在 `4b92278` 的独立 worktree 上同样失败（本机红、同一提交在 CI 的
+  Node 22/24 绿 → 时序敏感，不是 CI 带红发版）。改法：分别等「拒绝通知 + 该 run 自己的答复」与
+  `assistant/message`；单跑 **55/55**，全量 **948/948**。规则记入 D-051。
+- **layerfs 借鉴结论（`CONFIRMED` = 只读评估；`NOT_RUN` = 移植与真机）**：agent-28（UI）与 agent-29
+  （多 Agent）对 `/home/fish/projects_mine/layerfs`（本地检出 `87bd986`，UI = `dsh/packages`）做了
+  **只读评估**：UI 8 条可借鉴 / 9 条不可搬，多 Agent 8 条可借鉴 / 7 条不可搬，逐条理由见 D-049。
+  **本轮零用户可见落地**（进度 Tab 的 token 色 / 窄屏抽屉 / 百分比空态与交付层人话块都是 v0.9.0
+  既有实现，不是照 layerfs 搬的），故 `CHANGELOG.md` 的 `[0.9.2]` **不写 layerfs 条目**。
+- **放行的真实缺口（`NOT_RUN`）**：「human-only 默认形态」的**真机复拍**。仓库内最新真机证据止于
+  11-15 12:09 的 `evidence/progress-tab-2026-11-15/Round2/`，全部是**人话默认化之前**的形态
+  （`05-chat-with-run-report.png` 正是用户点名太机器的那张）。需补图清单见 VALIDATION Round 40 §6。
+- **边界**：`v0.9.2` 目前只是本地提交——远端 `origin/main` 仍是 `4b92278`，没有 tag，因此没有 GitHub
+  Release，Issue #1 无新评论；live `:3080`/`:3086`/`:3090` 未部署未重启（D-013）。
+
+

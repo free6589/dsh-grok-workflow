@@ -819,3 +819,114 @@ Each entry records the decision, evidence, alternatives, and status.
 - **Consequences:** 验证流程多一步 `npm pack`；`link:` 仍可用于「看加载是否 pending」这类诊断，
   但任何「开关是否生效」的结论必须在打包安装下取得。若将来要支持 `link:` 真机验证，先做
   模块身份插桩（`require.resolve` 两份路径 + `instanceof` 实测），再改这条决定。
+
+## D-047 — 数值硬上限只用一张钳制表；钳制告警每次载入一条（2026-11-15）
+
+- **Status:** CONFIRMED（源码 + 单测；`test/config-limits-repair.spec.ts` 的 `LIMIT_CAPS` 与 `B04` 两组）
+- **Date:** 2026-11-15
+- **Decision:** ① `src/config.ts` 的 `LIMIT_CAPS` 是**唯一**的"哪些数值键按硬上限钳制、界是多少"的
+  声明，值一律读 `HARD_LIMITS`；schema 侧 `clampedLimit(field, min)` 与载入期
+  `repairLimitOverruns()` 都从这张表取界，新增上限只加一行。② 两层钳制都**只记账**
+  （`recordOverrun()`），唯一发声点是 `src/index.ts` 的 `announceOverruns()`，按 `field:stored`
+  用 set 去重后 `logger.warn`。③ 设置页横幅读 `entry.user`（用户层），不读 `entry.value`（生效值）。
+- **Reason:** 旧实现把 `maxConcurrency`/`maxRetries` 的界写了两处（schema 与 repair），第二个界
+  永远落后一步；而报错路径那条读**每条消息**走一次，原来的逐条 `logger.warn` 会在补丁仍超限时
+  每消息刷一行，用户看到的是刷屏而不是"一次修复"。横幅读生效值则更糟：用户存 `8`、生效 `6`，
+  横幅若显示 `6` 等于替用户改口，用户无法知道自己的补丁被改了。
+- **Alternatives rejected:** 把界放进每个 schema 字段字面量（两处界会再次漂移）；在 repair 里直接
+  `logger.warn`（那条读可能因别的缺陷抛错，且没有去重锚点）；把 `configVersion` 也纳入钳制
+  （它是线上契约，不匹配必须拒载，改写会造出"版本对得上"的假象）；把每路由 `maxInFlight` 纳入
+  （它的界属于链内判定 `HARD_LIMITS.routeInFlight`，与顶层标量不是同一类）。
+- **Consequences:** 表内 10 个字段的越界都在载入时按上限生效、并只警告一次；低于下限、非数字、
+  程序化 `resolveConfig` 越界仍硬拒（R-06 不变）；因此"存量补丁不再让整行起不来"覆盖面从 2 个
+  键扩到 10 个键，但**上限本身一个都没放宽**。真机复核这半边 = Round2 §1 的产物身份，
+  行为面仍由单测覆盖（`test/config-limits-repair.spec.ts`）。
+
+## D-048 — 进度 Tab：脊椎按整词绑定、详情走来源阶梯、连线填充只陈述"已走过"（2026-11-15）
+
+- **Status:** CONFIRMED（`src/progress-tab.ts` + `src/client/index.js` 同构实现；
+  `test/progress-tab.spec.ts`、`test/progress-connector.spec.ts`）
+- **Date:** 2026-11-15
+- **Decision:** ① 阶段 token 里含拉丁字母的一律按**词边界**匹配，CJK token 才用子串；
+  ② 详情七字段的来源阶梯固定为 `stage-detail` 事件 → 子会话协调块 → `not-reported`，
+  块内值标 `Source: child coordination block`，只有解析到原文才允许复制；
+  ③ 连线只在**左侧节点自己 `done`** 时填充，`failed`/`blocked` 留空；节点环内一个状态字形，
+  聚合多行时用行数替换字形。
+- **Reason:** 松匹配在真实 phase 头上产生了三次误报（`ui`→`build`、`tag`→`stage`/`target`、
+  `sync`→`async`），把没人跑过的阶段画成"跑过了"——进度视图一旦会撒谎就没有观测价值。协调块
+  只认显式块（围栏 json/`grok-coordination`、围栏内 `LABEL: value`、无围栏的同款标签块），
+  是因为把散文猜成字段等于伪造证据；连线与字形的语义同理：填充=已走过，不是"看起来在跑"。
+- **Alternatives rejected:** 把连线做成"运行到这里就亮"（流里没有这个事实）；用模糊/编辑距离
+  匹配阶段名（误报只会更隐蔽）；把协调块从散文里正则抽字段（无法区分"报告了"与"提到了"）；
+  聚合多行时仍显示单个字形（行数是更可核对的事实）。
+- **Consequences:** 未命中的模板阶段永远 `pending` 并标"事件里没有报告"；一次真实运行若中途失败，
+  线上的填充状态停在最后一个 `done` 节点，与引擎结局一致。`blocked`/`cancelled` 的真机触发仍是
+  `NOT_RUN`（单测覆盖），不因为改了这一层就升级为真机结论。
+
+## D-049 — layerfs 借鉴：只读评估留下可搬/不可搬两张清单，本轮**零移植**（2026-11-15）
+
+- **Status:** 评估本身 **CONFIRMED**（只读）；每条 idea 在本仓库的适配性 **HYPOTHESIS**（未落地、
+  未测）；移植与真机 **NOT_RUN**。
+- **Date:** 2026-11-15
+- **Decision:** 继续把 layerfs 当作**可选借鉴源**而不是依赖：本轮只产出两张清单（UI、多 Agent 各
+  一组「可借鉴 / 不可搬」），**一行代码都不从 layerfs 搬**，也不改 layerfs 检出。可借鉴条目留给后续
+  轮次逐条立项，每条都要有自己的证据与验收；不可搬条目连同理由一并记录，避免下一轮重新讨论。
+- **评估对象（`CONFIRMED`）**：`/home/fish/projects_mine/layerfs`，本地检出
+  `87bd986`（`Merge pull request #409 …`，工作树带其自身既有改动，与本仓库无关）。LayerFS 的 UI
+  即它自己的 DSH 插件（`dsh/packages/{client,host,view,model,mock,dsh-layerfs,dsh-layerfs-demo}`），
+  多 Agent 面在 `dsh/scenarios/*` 与 `core/crates/*`。执行者：agent-28（UI）、agent-29（多 Agent）；
+  两份报告经 lead 汇总，故本条的结论口径来自 lead，不是逐条重跑的推理。
+- **UI 侧（8 条可借鉴）**：①空态三档拆分；②错误降级 `note`；③失败给下一步 + 复制重跑；
+  ④窄屏避让 composer；⑤深色零写死色并测试化；⑥百分比 `null` / indeterminate + `aria`；
+  ⑦人话摘要行；⑧间距 token 表、零视觉改动。
+- **UI 侧（不可搬，lead 计数 9 条 / 枚举 10 项——计数差异如实保留，不合并两条冒充 9）**：
+  ①女仆皮肤；②自研渲染引擎；③`data-theme` 反射；④按时钟推断停止；⑤加权分数；⑥Stop-Run 按钮；
+  ⑦portal 座位；⑧轮询；⑨字节格式化；⑩双 Tab。成组理由：**风格冲突**（①）、**渲染所有权**（②③⑦）、
+  **无主后台**（④⑧）、**断言强度**（⑤⑨）、**能力边界**（⑥⑩）。
+- **多 Agent 侧（8 条可借鉴）**：①关闭三段式；②未尝试不耗重试；③惰性获取、空闲释放；④容量拒绝带
+  `code` + `next`；⑤短锁；⑥零进展出口；⑦证据禁转抄；⑧后挡板预算命名——**第 ⑧ 条是 HYPOTHESIS**：
+  要先观测 twin 引擎的 `maxTotalAgents` 真实取值，才谈得上命名预算。
+- **多 Agent 侧（不可搬 7 条）**：①无拷贝分叉；②sealed 哈希容器；③无超时；④废弃队列数值；
+  ⑤verifier 格式错误全不重试；⑥`main` 发布权限；⑦任务分解算法削弱。理由与其自身产品边界有关，
+  挪到本插件会与「有界并发/有界重试/独立验证」三条硬契约冲突（AGENTS.md 架构不变量）。
+- **Alternatives rejected:** 直接把某条 idea 当本轮改动落进 `src/`（无法给出「照 layerfs 做的」
+  证据——进度 Tab 的 token 色、≤480 px 抽屉、百分比空态与交付层人话块都是 v0.9.0 既有实现）；
+  把评估结论写进 `CHANGELOG`（它不是用户可见变更，写进去等于冒认）；把 layerfs 列为依赖或镜像其
+  实现（它的 UI 是它自己产品的界面，渲染所有权不在本仓库）。
+- **Consequences:** 后续若立项移植，起点是上面两张清单 + 各自的验收证据；`CHANGELOG.md` 的
+  `[0.9.2]` 不含任何 layerfs 条目（lead 2026-11-15 口径：不冒认）；本轮记忆只记评估，不记「已借鉴」。
+
+## D-050 — v0.9.2 的 push/tag 卡在「human-only 默认形态」的真机证据上（2026-11-15）
+
+- **Status:** CONFIRMED（lead 2026-11-15 口径 (B)）
+- **Date:** 2026-11-15
+- **Decision:** 本地把发版准备做齐（改测试同步、写 `CHANGELOG` 的 `[0.9.2]` 节、`package.json` +
+  `package-lock.json` bump 到 `0.9.2`、全量绿、提交），但 **`push origin main`、`git tag v0.9.2`、
+  GitHub Release、Issue #1 状态评论全部停住**，等新派的截图组补出「人话默认形态」的真机截图再放行。
+- **Reason:** 用户对 v0.9.1 的不满**正是**报告形态（`evidence/progress-tab-2026-11-15/Round2/05`
+  那张：`stat -c` / `od` / `sha256` / 绝对路径 / relay marker 全贴给读者），而仓库里**所有**真机证据
+  都早于 agent-27 的人话默认化改动——即「改后到底长什么样」只有单测证据、没有真机证据。tag 一旦
+  发布就不能移动（AGENTS.md 发布纪律），所以这一步必须等证据，而不是先发再补。
+- **Alternatives rejected:** 直接 push+tag，把真机复拍记成事后补（用户点名的就是可见形态，凭单测
+  就说改好了等于让用户替我们验收）；只本地留着不提交（记忆与 `CHANGELOG` 会漂在工作树里，下一轮
+  容易把已完成的发版准备当成没做）。
+- **Consequences:** 远端 `origin/main` 在放行前仍是 `4b92278`，没有 `v0.9.2` tag，也没有 Release；
+  谁要接手，先读 `VALIDATION.md` Round 40 §6 的补图清单；旧 tag（`v0.9.1` → `9103280`）本轮未被触碰。
+
+## D-051 — 测试的等待条件必须等于它断言的那件事实（2026-11-15）
+
+- **Status:** CONFIRMED（`test/gate.spec.ts` 两条；见 VALIDATION Round 40 §2）
+- **Date:** 2026-11-15
+- **Decision:** `waitFor` 的条件写成**被断言的事实本身**（那一条答复落盘、那个 `assistant/message`
+  出现），不写「某个计数 ≥ n」——计数会被别的消息提前满足。
+- **Reason:** 两条 `test/gate.spec.ts` 失败都是这一条：队列满那条等「一条 relay follow-up」，而
+  队列满**通知**本身就满足它，于是在被受理的批次还在排空时重发、又被同一个满队列拒绝；append 那条
+  等「两条 session append」，而 run 自己的进度事件就满足它，于是断言早于 `assistant/message` 落盘。
+  两者在 `4b92278` 上同样红，而在 CI 的 Node 22/24 上绿——**同一个测试在两个环境里给出不同结论**，
+  这本身就是缺陷：一个只在快机器上过的用例，不能算证据。
+- **Alternatives rejected:** 把 5 ms 的 `setTimeout` 调大（把时钟依赖藏得更深，只是把概率挪小）；
+  加 `retry`/`testTimeout`（掩盖竞态）；给产品代码加同步点（产品不欠测试一个钩子）。
+- **Consequences:** 该文件单跑 **55/55**、全量 **948/948**；今后新增「等某条消息/某个事件」的用例，
+  条件写成那条消息/事件，不写成计数；重跑发现的时序敏感用例按本决定处理，不按「重跑一次就过」放过。
+
+
