@@ -156,10 +156,12 @@ function taintedReport(): WorkflowReport {
 describe('人话块：只有人能用的内容', () => {
   it('names what was done, what came of it and what is next, in both languages', () => {
     const human = deliverReport(completedReport(), { bilingual: true }).human
-    expect(human).toContain('做完了')
-    expect(human).toContain('Done:')
+    // Answer-first: the run's own conclusion opens, the count lives in the tail.
+    expect(human).toContain('答案：')
+    expect(human).toContain('Answer:')
     expect(human).toContain('下一步')
     expect(human).toContain('Next:')
+    expect(human).toContain('以上是结论；明细已记入台账。')
     // The run's own conclusion is carried, not a template only.
     expect(human).toContain('新加坡本周多雨，出行请带伞。')
   })
@@ -177,17 +179,17 @@ describe('人话块：只有人能用的内容', () => {
     const human = deliverReport(failureReport(OBJECTIVE, config, 'Plan', 'planner unavailable'), { bilingual: true }).human
     expect(human).toContain('这次没做成')
     expect(human).toContain('This run did not finish')
-    expect(human).not.toContain('做完了')
-    expect(human).not.toContain('Done:')
+    expect(human).toContain('答案：')
+    expect(human).not.toContain('以上是结论；明细已记入台账。')
     // The measured cause still reaches the reader.
     expect(human).toContain('planner unavailable')
   })
 
   it('leads with the language that was asked for, and mirrors the other one', () => {
     const zh = humanConclusion(completedReport(), { lang: 'zh', bilingual: true })
-    expect(zh.indexOf('做完了')).toBeLessThan(zh.indexOf('Done:'))
+    expect(zh.indexOf('答案：')).toBeLessThan(zh.indexOf('Answer:'))
     const en = humanConclusion(completedReport(), { lang: 'en', bilingual: true })
-    expect(en.indexOf('Done:')).toBeLessThan(en.indexOf('做完了'))
+    expect(en.indexOf('Answer:')).toBeLessThan(en.indexOf('答案：'))
   })
 })
 
@@ -220,7 +222,9 @@ describe('relay/in-turn 文本：可见块与人话块一致，台账折叠在�
     const visible = between(text)
     expect(visible).not.toBe('')
     for (const label of LEDGER_LABELS) expect(visible).not.toContain(label)
-    expect(visible).toContain('做完了')
+    // Answer-first: the conclusion opens, the tail closes, no count up front.
+    expect(visible).toContain('答案：')
+    expect(visible).toContain('以上是结论；明细已记入台账。')
     // Folded, not deleted: the durable copy carries the same report.
     expect(text).toContain(LEDGER_GUARD)
     expect(text.slice(text.indexOf(REPORT_END))).toContain('Grok workflow: COMPLETED')
@@ -238,7 +242,8 @@ describe('relay/in-turn 文本：可见块与人话块一致，台账折叠在�
     const text = relayText(partialReport())
     const visible = between(text)
     for (const label of LEDGER_LABELS) expect(visible).not.toContain(label)
-    expect(visible).toContain('做了一部分')
+    expect(visible).toContain('答案：')
+    expect(visible).toContain('项没做成')
 
     // The whole point of folding instead of deleting: the next round still finds
     // the previous round's results in its own transcript.

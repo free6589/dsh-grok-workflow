@@ -930,3 +930,55 @@ Each entry records the decision, evidence, alternatives, and status.
   条件写成那条消息/事件，不写成计数；重跑发现的时序敏感用例按本决定处理，不按「重跑一次就过」放过。
 
 
+
+## D-050 — 答案置顶 + 边聊边干（A/B/C 的取舍结论）
+
+- **Status:** CONFIRMED（代码+测试落地，未发布）
+- **Date:** 2026-11-15
+- **Decision:**
+  1. 答案渲染与执行管线解耦：`full` 的"逐字节复现旧行为"指 plan/execute/verify/report 管线，
+     不包括 delivery 渲染。A 对 `full`/`triage` 一视同仁；要旧机器原文开 `showDiagnostics` 或
+     关 `humanSummary`。
+  2. `SUCCESS_PREAMBLE` 逐字复述保留（实测只有逐字复述稳定），顺序问题在 delivery 层解，不在
+     preamble 解（否决"让模型先说答案再贴 markers"）。
+  3. 默认行为变更声明：`answerStrategy` 配置默认值不动（仍 `in-turn`）；改变的是 triage-team
+     在可交互运行时的走法（`receipt-then-relay`），不可交互（one-shot/headless）回落 `in-turn`。
+  4. 取消语义定为"整轮取消 + 窄化重起"，V1 不做子任务级定向取消（engine 无 per-task cancel）。
+  5. B10 vs scrub 边界：失败原因行豁免 `tainted` 整行丢弃，只过 `stripMachineDetail`
+     （保语义、去标识符）；`[infrastructure/timeout]` 类 `[a/b]`  bracket 永不进路由模式。
+- **Evidence:** `src/delivery/index.ts`（answerLead/statusTail/scrub）、`src/script.ts`
+  （synthesisHardRules/polishStyleVerdict）、`src/gate.ts`（canBackgroundDeliver/
+  answerTeamInteractive）、`test/*` 29 断言更新 + 948 全绿。
+- **Alternatives rejected:** 改 preamble 放行自由发挥（实测不稳定）；动 `answerStrategy`
+  默认值（会静默改变 headless 语义）；子任务级取消（engine 不支持，虚假承诺）。
+- **Consequences:** 旧 headline 断言全部重写；`instantReceipt` 固定句删除；真机验证待补。
+
+## D-051 — 首答信息结构固定、措辞每次现写（禁固定话术的执行口径）
+
+- **Status:** CONFIRMED
+- **Date:** 2026-11-15
+- **Decision:** 固定的是四要素信息结构（①听懂 ②已知/未知 ③后台查哪几方向 ④怎么打断），
+  每句话现场组织；首答走一次轻量 `runSingleCall`（复用 `triageModel` 快手链路，不为首答开团队），
+  失败降级为简短模板且明说"模板兜底"。`triageLine` 档位声明保留（可审计性），`greetingLine`
+  固定写法不再作首答。
+- **Evidence:** `src/triage.ts`（firstAnswerPrompt/sanitizeFirstAnswer/firstAnswerFallback）、
+  `src/gate.ts`（produceFirstAnswer/answerTeamInteractive）。
+- **Consequences:** 测试钉"两次同输入首答不逐字重复"方向待补（本轮未加）；模板句全文匹配即失败。
+
+## D-052 — 进度 Tab A+C：七段脊 + 单展开分支 + 窄屏竖排（只改渲染 + CSS）
+
+- **Status:** CONFIRMED（代码 + 单测 + 隔离真机）
+- **Date:** 2026-11-16
+- **Decision:** 采用 session-0ee2a233 的 10 路结论（方案A主推 + C窄屏形态，不做B泳道）：
+  ①脊 7 等分占满宽，自身永不横滚；②横管时间、竖管归属；③手风琴同时只开一段（默认首个失败→首个 doing→全收）；④展开段默认 3 卡 + 实数 `+N`（N=M-3），分支 ≤4 行；⑤失败只标一处（2px 左红条 + 列头红点 + badge），阻塞灰虚边，running 蓝流动虚线绝不用绿；⑥有失败才有"跳到首个失败"按钮；⑦<480px 转竖排（Ant 竖排语义）；⑧默认露出 3 个；⑨颜色只用 5 状态色全走 token，色盲靠图标 + 文字。
+- **Reason:** 宽度只花一次（窄面板永不横滚）；两根轴抢同一语义感知是反的（CHI/Timeline）；下游没 succeeded 就点亮绿线会骗人（Argo）。
+- **Alternatives rejected:** B 横向泳道（高度随成员数爆炸，无真实日期退化成空轴；成员常年 >10 再议）；多层缩进树（层级伪造）；新依赖/daisyUI 引入（抄思路不引包）。
+- **Consequences:** `test/client.spec.ts` 的 96px/snap/`aria-expanded` 全收断言、`progress-connector.spec.ts` 的 count-glyph 断言按新行为更新；`DESIGN-progress-tab.md §4` 的 9 段旧模板文字已漂移（待改文档，不在施工面）。
+- **Evidence:** `src/client/index.js`（diff）、`lib/client.js`（同字节）、隔离 `acgtest:3225` 截图 `03/04/05/10/11/12/13/21/22/23` + DOM 断言。
+
+## D-053 — live 免重启更新：新代码无已验证的免重启生效路径
+
+- **Status:** CONFIRMED（现象） / HYPOTHESIS（归因 loader 无 cache-bust import）
+- **Date:** 2026-11-16
+- **Decision:** 新构建进运行中 live 进程**无已验证的免重启路径**（`dsh plugin add` 只换文件，进程仍跑旧模块；设置页改值无需重启，但那是值不是代码）。验证一律新 profile + 新端口（`acgtest/:3225` 标准路径）。live 更新等用户指令：要么用户重启 DSH，要么用户接受"只换文件不生效"的现状。
+- **Evidence:** agent-11 只读侦察（HANDOFF 段）；`docs/LOCAL-TESTING.md §Activate` 步骤 5；HANDOFF 2026-11-08 loader 根因。

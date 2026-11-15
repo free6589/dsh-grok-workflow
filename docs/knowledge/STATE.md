@@ -928,3 +928,45 @@ worker 链上限 50（HARD_LIMITS.chainLength）
   三项缺口（`showDiagnostics` 开态台账在答案里不可拍、完成行点开子会话未在本实例重拍、
   人话块后几轮仍漏 `od -c`/命令片段——见 VALIDATION Round 41 §2）。
 
+
+## 2026-11-15 — 答案置顶 + 边聊边干（A/B/C 落地，未提交；`CONFIRMED` 代码 + 测试，`NOT_RUN` 真机）
+
+- **基线**：`main` = `129a92e`（v0.9.2 已发布）。本轮工作树：`src/delivery/index.ts`、`src/script.ts`、
+  `src/gate.ts`、`src/triage.ts` + 8 个测试文件 + `lib/` 构建产物 + `CHANGELOG.md[Unreleased]` +
+  `docs/ARCHITECTURE.md` 策略段。
+- **A（答案为本）**：`headline()`→`statusTail()`（计数只进尾巴），新增 `answerLead()`（summary
+  首完整句→转述回落→绝不回落 ledger），`composeHuman()` 重排（答案→下一步→做成/没做成→caveats→尾巴），
+  删除"关键证据："逐字块；`MACHINE_DETAIL` 新增站号/坐标/Model链/计数施工句 4 类；`answerLead` 回落
+  句自带 `核验通过` 被自家 MIDLINE 误杀→改"有一项已得出可用结论。"；`stripIds` 单字符 lookbehind
+  无捕获组导致 `Task a：`→`Task $1`→修替换串为空。
+- **S（synthesizer 硬约束）**：`synthesizerPrompt` + `layeredPolishPrompt` 追加 HARD RULES（中英各一）；
+  `polishVerbatimSources` + `polishStyleVerdict` 宿主校验（首句状态行/机器 token/逐字引用/反引号/
+  中英复读/标题列表/>200词），`polishGuardrail` 第 5 步；`layeredFallbackSummary` confirmed 段改转述；
+  `layeredPolishPrompt` 旧"照抄加反引号"指示改为"转述不抄"（否则 prompt 与 guardrail 自相矛盾）。
+- **B/C（边聊边干 + 首答现场写）**：`triage.ts` 新增 `firstAnswerPrompt`（四要素信息结构 + FORBIDDEN）/
+  `sanitizeFirstAnswer` / `firstAnswerFallback`（明说模板兜底）/`FIRST_ANSWER_LIMITS`；`gate.ts` 新增
+  `canBackgroundDeliver`（whenIdle+followup+session 三探针，失败回落）/`produceFirstAnswer`/
+  `answerTeamInteractive`（首答 enter + 后台 enqueue runTeam + `record admitted-team-background`）；
+  `instantReceipt` 固定句删除、函数作写入通道保留、语义改为"是否写首答行"（默认仍 true）。
+- **测试（`CONFIRMED`）**：`npm run ci` → typecheck 0 错、oxlint **4 warning / 0 error**（基线 5，
+  修掉 2 个自带 useless-escape，另 1 个基线 warning 被重写带走）、build 产物一致、
+  vitest **51 文件 / 948 测试全 PASS**。29 个旧断言按新行为更新（delivery 4 套件、gate、
+  gate-partial-head、triage、phase1-dialogue、synthesis-guardrails、human-output-contract）；
+  另修 2 个实现 bug（`$1` 注入、`核验通过` 自杀）。
+- **不变量（`CONFIRMED`）**：并发 3/6、重试 1/3、maxActiveRuns 2/4、Total 8/16、核验独立/证据链/
+  fail-closed/脱敏/unload 取消、`humanSummary` on、`showDiagnostics` off、`/grok` 开关、mode 语义、
+  `answerStrategy` 默认 `in-turn`、`full` 管线字节——全部保留，仅 delivery 渲染与 team 走法变更。
+- **未做（`NOT_RUN`）**：真机 Web 长驻验证（首答现场措辞、进度节点、中断重定向）、headless e2e
+  回归（`scripts/e2e-headless-in-turn.sh`）、commit/push（等用户指令）。
+
+## 2026-11-16 — 进度 Tab A+C 落地（`CONFIRMED` 代码 + 单测 + 隔离真机；未提交）
+
+- **From:** lead · **Base:** `129a92e`（v0.9.2）+ 未提交 A/B/C（33 文件）。
+- **做了什么**：只改 `src/client/index.js`（i18n +8 key 中英、`PROGRESS_CSS` 脊/段/分支/成员卡/jump/legend、link 规则补回、`ProgressNode`→段渲染、`ProgressMemberCard` 新增、`ProgressView` 手风琴状态机 + 跳转 + 分支渲染 + 键盘 Enter/Esc/↑↓）+ `test/client.spec.ts`（scope 断言改脊 + `aria-expanded` 默认开段）+ `test/progress-connector.spec.ts`（meta 计数断言 + 手风琴 3 例新测）。折叠/百分比/blocked/事件契约/5 状态色/详情阶梯/子会话打开——一律未动。
+- **实现期抓到的真 bug（`CONFIRMED`，真机复现）**：
+  1. 段头 meta 被 seg-line 穿过 → seg-head 加背景 + z-index，line 置后。
+  2. 运行中分支把其他段挤扁 → branch/members/li 加 max-width + overflow hidden，label 补回 min-width:0（补回时发现旧 label 规则被删，标题裸奔）。
+  3. 我的 python 行号替换把 link 规则弄丢 → link 宽 0，补回。
+  4. `label-inverse, #fff` 字面色被 lint 规则抓 → 改 `inherit` 回退（token 保留）。
+- **验证（`CONFIRMED`）**：`npm run ci` → typecheck 0 错、lint 4w/0e、**51 文件 / 951 测试 PASS**（948+3 新）；隔离 profile `acgtest`（`:3225`，打包安装，md5 校验）真机：脊 7 段 / 单展开 / +N / jump / scrollW==innerW（宽+窄）/ 深色 token / 详情三段 / Open child session 真开 / Chat 回归；窄屏竖排 + 详情抽屉 fixed 生效。
+- **未做（`NOT_RUN`）**：commit/push/tag/Release（等用户指令）；live 更新（禁重启，需用户定夺路径）。

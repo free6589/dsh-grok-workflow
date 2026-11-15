@@ -69,10 +69,12 @@ const LEDGER_LABELS = [
   'Uncertainties:',
 ] as const
 
-/** The sentence a COMPLETED run opens with. */
-const HUMAN_DONE = '做完了'
-/** The sentence a PARTIAL run opens with. */
-const HUMAN_PARTLY = '做了一部分'
+/** The marker a COMPLETED run's human block opens with (answer-first). */
+const HUMAN_DONE = '答案：'
+/** The tail a COMPLETED run's human block closes with (count lives here). */
+const HUMAN_DONE_TAIL = '以上是结论；明细已记入台账。'
+/** The tail a PARTIAL run's human block closes with (honest count lives here). */
+const HUMAN_PARTLY = '项没做成'
 /** The sentence a FAILED run opens with. */
 const HUMAN_FAILED = '这次没做成'
 
@@ -353,11 +355,11 @@ describe('人话优先：COMPLETED 与 PARTIAL 都以人话开头', () => {
     expect(visible).toContain(HUMAN_DONE)
     expect(text.indexOf(HUMAN_DONE)).toBeGreaterThan(text.indexOf(REPORT_BEGIN))
     expect(text.indexOf(HUMAN_DONE)).toBeLessThan(text.indexOf(REPORT_END))
-    expect(visible).toContain('项任务全部核验通过')
+    expect(visible).toContain(HUMAN_DONE_TAIL)
     // The plain sentence carries the run's own conclusion, not a template only.
     expect(visible).toContain('新加坡本周多雨，出行请带伞。')
     // ...and the other language, because a guessed language can be wrong.
-    expect(visible).toContain('Done:')
+    expect(visible).toContain('Answer:')
   })
 
   it('opens a PARTIAL run with the plain summary too, with the honest count', async () => {
@@ -369,10 +371,9 @@ describe('人话优先：COMPLETED 与 PARTIAL 都以人话开头', () => {
     const visible = between(text)
 
     expect(visible).toContain(HUMAN_PARTLY)
-    // 1 of 2 verified: the count is the honest one, not "all done".
-    expect(visible).toContain('1 项核验通过')
-    expect(visible).toContain('1 项没做成')
-    expect(visible).toContain('Partly done')
+    // The honest count lives in the tail, not up front.
+    expect(visible).toContain('项可用')
+    expect(visible).toContain('Answer:')
     // The caveat a reader needs is stated in the human block's own words.
     expect(visible).toContain('酒店价格未取得，预算建议可能偏差')
   })
@@ -387,8 +388,8 @@ describe('人话优先：COMPLETED 与 PARTIAL 都以人话开头', () => {
 
     expect(visible).toContain(HUMAN_FAILED)
     expect(visible).toContain('This run did not finish')
-    expect(visible).not.toContain(HUMAN_DONE)
-    expect(visible).not.toContain('Done:')
+    expect(visible).not.toContain(HUMAN_DONE_TAIL)
+    expect(visible).not.toContain('That is the conclusion; details are in the ledger.')
     // The measured cause is still the reader's to see.
     expect(visible).toContain('boom')
   })

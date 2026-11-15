@@ -23,9 +23,9 @@
  *   machine renderer for the tool surface; the ledger here mirrors its field
  *   names so an operator reading either one sees the same labels, not two
  *   dialects.
- * - **Never dress a failure as success.** A `failed` run opens with its own
- *   wording; it never borrows the "done" sentence, because a failure that reads
- *   like an answer is worse than no answer.
+ * - **Never dress a failure as success.** A `failed` run answers with its own
+ *   wording — `statusTail` owns the only verdict sentence a reader sees — because
+ *   a failure that reads like an answer is worse than no answer.
  * - **Honest about what is unknown.** `uncertainties` stay in the human block:
  *   they are a truthful caveat a reader needs, not routing bookkeeping. Hiding
  *   them behind a diagnostics switch would be the same class of bug as hiding
@@ -74,6 +74,12 @@ export interface DeliveryView {
 export declare const DEFAULT_DIAGNOSTICS = false;
 /** Read a switch that may be a resolved boolean or a live holder. */
 export declare function diagnosticsEnabled(value?: DiagnosticsSwitch): boolean;
+/** One closing sentence per final status — the count lives in the tail, never after the verdict. */
+export declare function statusTail(report: WorkflowReport, verified: number, total: number, lang: DeliveryLang): string;
+/** Remove near-duplicate bilingual halves: keep `lang`'s half when it carries the sentence. */
+export declare function dedupeBilingual(text: string, lang: DeliveryLang): string;
+/** The run's own answer, first: one plain half-sentence that stands on its own. */
+export declare function answerLead(report: WorkflowReport, lang: DeliveryLang): string;
 /**
  * Build the plain-language block for one settled run.
  *

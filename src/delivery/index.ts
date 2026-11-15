@@ -23,9 +23,9 @@
  *   machine renderer for the tool surface; the ledger here mirrors its field
  *   names so an operator reading either one sees the same labels, not two
  *   dialects.
- * - **Never dress a failure as success.** A `failed` run opens with its own
- *   wording; it never borrows the "done" sentence, because a failure that reads
- *   like an answer is worse than no answer.
+ * - **Never dress a failure as success.** A `failed` run answers with its own
+ *   wording — `statusTail` owns the only verdict sentence a reader sees — because
+ *   a failure that reads like an answer is worse than no answer.
  * - **Honest about what is unknown.** `uncertainties` stay in the human block:
  *   they are a truthful caveat a reader needs, not routing bookkeeping. Hiding
  *   them behind a diagnostics switch would be the same class of bug as hiding
@@ -119,6 +119,8 @@ const LEDGER_LABELS = [
   'Errors:',
   'Synthesis:',
   'Uncertainties:',
+  '核验通过',
+  '进度节点在旁',
 ] as const
 
 /**
@@ -133,6 +135,10 @@ const MIDLINE_LABELS = [
   'skipped busy',
   'cross-run hint',
   'per run (enforced by the plugin)',
+  '核验通过',
+  '进度节点在旁',
+  'Model routes',
+  'Deadline',
 ] as const
 
 /**
@@ -240,8 +246,32 @@ const MACHINE_DETAIL: readonly (readonly [RegExp, string])[] = [
   [/\b[\w.-]+\s+-{1,2}[A-Za-z][\w-]*(?:\s+\S+)*/g, ' '],
   // A bare command head: the tools these reports quote most often.
   [/\b(?:npm|pnpm|npx|yarn|vitest|jest|tsc|oxlint|eslint|curl|wget|docker|kubectl|python3?|pip3?|cargo|mvn|gradle|git|stat|sed|awk|grep|rg|xargs|xxd|hexdump|chmod|chown|base64|jq|systemctl|unzip)\s+[^，。；\n]{0,120}/gi, ' '],
+  // Station/serial codes a field report quotes (`站号A12`, `Station No. 5`).
+  [/(?:站号|站点|编号)\s*[:：#]?\s*[A-Za-z0-9][A-Za-z0-9-]*/g, ' '],
+  [/\bStation\s+(?:No\.?\s*#?|#)\s*[A-Za-z0-9][A-Za-z0-9-]*/gi, ' '],
+  // Coordinates: paired 3-decimal readings, lat/lon markers, UTM, labelled pairs.
+  [/\b-?\d{1,3}\.\d{3,}\s*[,，;；\s]\s*-?\d{1,3}\.\d{3,}/g, ' '],
+  [/\b(?:lat(?:itude)?|lon(?:gitude)?)\s*[:：=]?\s*-?\d+(?:\.\d+)?/gi, ' '],
+  [/(?:经度|纬度|经纬度)\s*[:：=]?\s*-?\d+(?:\.\d+)?/g, ' '],
+  [/\bUTM\b[^\n，。；;]{0,40}/gi, ' '],
+  [/(?:坐标|coordinates?)\s*[:：=]?\s*[^\n，。；;]{1,40}/gi, ' '],
+  // Model chains: arrow links, role assignments, provider/model/route markers.
+  [/[^，。；;\n]*→[^，。；;\n]*/g, ' '],
+  [/\b(?:planner|worker|verifier|synthesizer)\s*=\s*[^\s，。；;\n]+/gi, ' '],
+  [/\b(?:provider|model|route)\s*[:：=]\s*\S+/gi, ' '],
+  // A `provider/model` pair — but never the run's own `[category]` bracket
+  // (B10): `[infrastructure/timeout]` is a failure reason's own words, not a
+  // route, so a pair wrapped in `[…]` is left alone.
+  [/(?<![[])\b(?=[\w.-]*[A-Za-z])[\w.-]+\/[\w.:-]+(?![\]])/g, ' '],
+  // Tally phrasing: the run's own count sentences, never an answer.
+  [/\b\d[\d,]*\s*ms\s+per\s+run\b/gi, ' '],
+  [/\d+\s*项任务(?:全部)?核验通过/g, ' '],
+  [/全部\s*\d*\s*项任务核验通过/g, ' '],
+  [/任务全部核验通过/g, ' '],
+  [/\bverified\s+of\s+\d+\b/gi, ' '],
+  [/\b\d+\s+of\s+\d+\s+tasks?\s+(?:passed\s+verification|verified)\b/gi, ' '],
+  [/\ball\s+\d+\s+tasks?\s+(?:passed\s+verification|verified)\b/gi, ' '],
 ]
-
 /**
  * Strip machine detail from one line, then tidy the gap it left.
  *
@@ -261,7 +291,7 @@ function stripMachineDetail(line: string): string {
   }
   return out
     .replace(/（\s*）|\(\s*\)/g, '')
-    .replace(/([（(【\[])\s+/g, '$1')
+    .replace(/([（(【[])\s+/g, '$1')
     .replace(/\s+([）)】\]])/g, '$1')
     .replace(/\s+/g, ' ')
     .replace(/([，,、；;：:])\s*(?=[，,、；;：:。.])/g, '')
@@ -314,11 +344,26 @@ function composeBlock(lines: readonly BlockLine[]): string {
  * ordinary word is never rewritten.
  */
 function stripIds(text: string, report: WorkflowReport): string {
+  // Only real task ids of this report are touched — and a single-character id
+  // must not eat the inside of another word (`childId 3` is not `task d`).
+  // So one-letter ids match only as a standalone `d:` prefix or `(d)` token,
+  // never inside `\w`.
   const ids = [...report.tasks.map(task => task.id), 'workflow'].filter(id => id !== '')
   let out = text
   for (const id of ids) {
     const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    out = out.replace(new RegExp(`(^|[\\s\u3000：,，、（(\\[])(?:${escaped})[:：][\\s\u3000]*`, 'gu'), '$1')
+    // Single-character ids (t1-style fixtures use `a`/`b`/`c`) are the
+    // dangerous ones: `d` matches inside `childId`. They match only with a
+    // non-word left boundary; longer ids keep the historical separator class.
+    // `$1` keeps the separator when the long-id branch matched one; the
+    // single-character branch is a zero-width lookbehind with no group, so it
+    // replaces with the empty string (`$1` would leak literally into a title
+    // like `Task a：…` → `Task $1…`). Ids never contain `$`, so no
+    // replacement-pattern injection is possible either way.
+    // eslint-disable-next-line no-div-regex
+    const left = id.length === 1 ? String.raw`(?:^|(?<=[^\w\u4E00-\u9FFF]))` : String.raw`(^|[\s　：,，、（(\[])`
+    const keep = id.length === 1 ? '' : '$1'
+    out = out.replace(new RegExp(`${left}(?:${escaped})[:：][\\s　]*`, 'gu'), keep)
     out = out.replace(new RegExp(`[（(]${escaped}[)）]`, 'gu'), '')
   }
   return out.replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim()
@@ -331,18 +376,104 @@ function titleOf(report: WorkflowReport, taskId: string, index: number): string 
   return title !== '' ? oneLine(title, 60) : `第 ${index + 1} 项任务`
 }
 
-/** The first clean line(s) of the run's own answer, bounded for a human block. */
-function conclusionOf(report: WorkflowReport): string {
-  // Tainted lines are dropped *before* the slice, so a summary whose second line
-  // happens to quote a ledger label still yields its first line instead of an
-  // empty result.
-  const summary = (report.synthesis.summary ?? '')
+/** One closing sentence per final status — the count lives in the tail, never after the verdict. */
+export function statusTail(report: WorkflowReport, verified: number, total: number, lang: DeliveryLang): string {
+  const zh = lang === 'zh'
+  if (report.status === 'completed') {
+    return zh
+      ? '以上是结论；明细已记入台账。'
+      : 'That is the conclusion; details are in the ledger.'
+  }
+  if (report.status === 'partial') {
+    const unfinished = total - verified
+    return zh
+      ? `以上是结论（${total} 项里 ${verified} 项可用，${unfinished} 项没做成）；明细已记入台账。`
+      : `That is the conclusion (${verified} of ${total} usable, ${unfinished} not done); details are in the ledger.`
+  }
+  return zh
+    ? '这次没做成，没有可交付的结论；明细已记入台账。'
+    : 'This run did not finish, so there is no conclusion; details are in the ledger.'
+}
+
+/** True when a sentence half reads in `lang`. */
+function matchesLang(half: string, lang: DeliveryLang): boolean {
+  const cjk = /[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/
+  return lang === 'zh' ? cjk.test(half) : !cjk.test(half)
+}
+
+/** A sentence splitter that keeps the terminator on each piece. */
+function splitSentences(text: string): string[] {
+  const out: string[] = []
+  let current = ''
+  for (const ch of text) {
+    current += ch
+    if ('。！？.!?'.includes(ch)) {
+      if (current.trim() !== '') out.push(current.trim())
+      current = ''
+    }
+  }
+  if (current.trim() !== '') out.push(current.trim())
+  return out
+}
+
+/** Remove near-duplicate bilingual halves: keep `lang`'s half when it carries the sentence. */
+export function dedupeBilingual(text: string, lang: DeliveryLang): string {
+  const pieces = splitSentences(text)
+  const kept: string[] = []
+  let index = 0
+  while (index < pieces.length) {
+    const half = pieces[index]!
+    const next = pieces[index + 1]
+    if (next !== undefined && matchesLang(half, lang) !== matchesLang(next, lang)) {
+      const preferred = matchesLang(half, lang) ? half : next
+      if (!kept.includes(preferred)) kept.push(preferred)
+      index += 2
+      continue
+    }
+    if (!kept.includes(half)) kept.push(half)
+    index += 1
+  }
+  return kept.join(' ')
+}
+
+/** The run's own answer, first: one plain half-sentence that stands on its own. */
+export function answerLead(report: WorkflowReport, lang: DeliveryLang): string {
+  const summary = report.synthesis.summary ?? ''
+  const pieces = summary
     .split('\n')
     .map(line => line.trim())
     .filter(line => line !== '' && !tainted(line))
-    .slice(0, 2)
-    .join(' / ')
-  return oneLine(scrub(summary), 400)
+    .flatMap(line => splitSentences(line))
+  let tried = 0
+  for (const piece of pieces) {
+    if (tried >= 3) break
+    const stripped = stripMachineDetail(piece)
+    if (stripped === '') continue
+    const scrubbed = scrub(stripped)
+    if (scrubbed === '') continue
+    const clean = stripIds(scrubbed, report)
+    if (clean === '') continue
+    tried += 1
+    if (!tainted(clean)) return oneLine(dedupeBilingual(clean, lang), 400)
+  }
+  // Never fall back to the raw ledger: paraphrase the first confirmation instead
+  // (no criterion/evidence verbatim), and name the open questions when the run
+  // left any. The fallback sentence must not carry a ledger label itself
+  // (`核验通过` is a MIDLINE term): it would be dropped by its own guard.
+  const first = report.confirmed[0]
+  if (first !== undefined) {
+    const lead = lang === 'zh' ? '有一项已得出可用结论。' : 'One item passed verification.'
+    const open = report.uncertainties.length > 0
+      ? (lang === 'zh' ? '还有未确认的细节，见下文。' : 'Open details are listed below.')
+      : ''
+    return oneLine(`${lead}${open}`, 400)
+  }
+  if (report.uncertainties.length > 0) {
+    return lang === 'zh'
+      ? '答案里还有没确认的细节，见下文。'
+      : 'The answer still has unconfirmed details, listed below.'
+  }
+  return ''
 }
 
 /** Short, category-aware "what now" advice a reader can act on. */
@@ -368,30 +499,13 @@ function nextStep(report: WorkflowReport, lang: DeliveryLang): string {
   return (lang === 'zh' ? zh : en)[category] ?? (lang === 'zh' ? zh.unknown! : en.unknown!)
 }
 
-/** One opening sentence per final status — never the success wording for a stop. */
-function headline(report: WorkflowReport, verified: number, total: number, lang: DeliveryLang): string {
-  const unfinished = report.tasks.filter(task => task.status !== 'verified').length
-  if (report.status === 'completed') {
-    return lang === 'zh'
-      ? `做完了：${total} 项任务全部核验通过。`
-      : `Done: all ${total} tasks passed verification.`
-  }
-  if (report.status === 'partial') {
-    return lang === 'zh'
-      ? `做了一部分：${total} 项任务里 ${verified} 项核验通过，${unfinished} 项没做成。`
-      : `Partly done: ${verified} of ${total} tasks passed verification and ${unfinished} did not.`
-  }
-  return lang === 'zh'
-    ? '这次没做成，没有可交付的结果。'
-    : 'This run did not finish, so there is no deliverable.'
-}
-
 /**
  * Build the plain-language block for one settled run.
  *
- * Order is deliberate: verdict, then the run's own conclusion, then what was and
- * was not achieved, then what to do next, then the caveats. A reader who stops
- * after the first two lines already knows whether to trust the rest.
+ * Order is deliberate: the run's own answer first, then the advice/next step
+ * in the run's original wording, then what was and was not achieved, then the
+ * caveats, and finally the closing tail. A reader who stops after the first
+ * line already has the answer; the count lives only in the tail.
  *
  * @param report - validated report (or an explicit failure report).
  * @param lang - language this pass is written in.
@@ -405,11 +519,22 @@ function composeHuman(report: WorkflowReport, lang: DeliveryLang): string {
   const lines: BlockLine[] = []
   // Every line this function assembles is guarded, except the failure reasons,
   // which are the run's own explanation and must reach the reader (B10).
+  // Even there a shell command, a digest or a path is stripped by composeBlock —
+  // only the ledger labels stay out of the guard.
   const push = (text: string, guard = true): void => { lines.push({ text, guard }) }
-  push(headline(report, verified, total, lang))
+  const lead = answerLead(report, lang)
+  if (lead !== '') {
+    push(zh ? `答案：${lead}` : `Answer: ${lead}`)
+  } else if (report.status === 'failed') {
+    push(zh ? '答案：这次没能给出可用结论。' : 'Answer: no usable conclusion this time.')
+  }
 
-  const conclusion = conclusionOf(report)
-  if (conclusion !== '') push(zh ? `结果：${conclusion}` : `Result: ${conclusion}`)
+  // The run's own advice/next step, verbatim and moved up: it reads right after
+  // the answer and before the folded process detail.
+  const advice = report.status === 'completed'
+    ? (zh ? '结果可以直接用；哪一项对不上，就把那一项单独再发一次，我会重跑。' : 'The result is usable as it stands; if one item does not match what you expected, send that item again and I will rerun it.')
+    : nextStep(report, lang)
+  push((zh ? '下一步：' : 'Next: ') + advice)
 
   // What was achieved, named the way a reader knows it (title, never id).
   const doneTitles = verifiedTasks
@@ -430,9 +555,12 @@ function composeHuman(report: WorkflowReport, lang: DeliveryLang): string {
     push(zh ? '没做成的：' : 'Not done:')
     undone.slice(0, 5).forEach((task) => {
       const item = report.incomplete.find(entry => entry.taskId === task.id)
-      // Not scrubbed: `incomplete[].reason` and `task.error` are the run's own
-      // account of what went wrong, and this is the only place a reader sees it (B10).
-      const reason = oneLine(item?.reason ?? task.error ?? '', 240)
+      // Not scrubbed against ledger labels either: `incomplete[].reason` and
+      // `task.error` are the run's own account of what went wrong, and this is
+      // the only place a reader sees it (B10). Machine detail (commands, paths,
+      // digests, coordinates, routes) is still stripped, because a reader cannot
+      // use it — but the line itself is never dropped for mentioning a token.
+      const reason = oneLine(stripMachineDetail(item?.reason ?? task.error ?? ''), 240)
       const name = titleOf(report, task.id, report.tasks.indexOf(task))
       push(reason === '' ? `- ${name}` : `- ${name}：${reason}`, false)
     })
@@ -442,26 +570,9 @@ function composeHuman(report: WorkflowReport, lang: DeliveryLang): string {
   // A failure with no task rows (deadline, engine error) still needs its reason.
   // When task rows exist the reason is already above, so it is not repeated here.
   if (report.status === 'failed' && undone.length === 0 && report.errors.length > 0) {
-    const reason = oneLine(scrub(report.errors[0]!.message), 300)
-    if (reason !== '') push(zh ? `原因：${reason}` : `Reason: ${reason}`)
+    const reason = oneLine(stripMachineDetail(report.errors[0]!.message), 300)
+    if (reason !== '') push(zh ? `原因：${reason}` : `Reason: ${reason}`, false)
   }
-
-  // Key evidence, so a "done" claim is checkable without opening the ledger.
-  if (report.status === 'completed' && report.confirmed.length > 0) {
-    push(zh ? '关键证据：' : 'Key evidence:')
-    for (const item of report.confirmed.slice(0, 3)) {
-      const criterion = oneLine(scrub(item.criterion), 120)
-      const evidence = oneLine(scrub(item.evidence), 160)
-      push(evidence === '' ? `- ${criterion}` : `- ${criterion}（${evidence}）`)
-    }
-  }
-
-  // A finished run does not need "do the unfinished part again": its advice is
-  // about the result it just produced, not about work that never happened.
-  const advice = report.status === 'completed'
-    ? (zh ? '结果可以直接用；哪一项对不上，就把那一项单独再发一次，我会重跑。' : 'The result is usable as it stands; if one item does not match what you expected, send that item again and I will rerun it.')
-    : nextStep(report, lang)
-  push((zh ? '下一步：' : 'Next: ') + advice)
 
   // Caveats stay visible at every status: they are content, not diagnostics.
   const caveats = report.uncertainties.slice(0, 4)
@@ -471,6 +582,8 @@ function composeHuman(report: WorkflowReport, lang: DeliveryLang): string {
       push(`- ${oneLine(scrub(item.text), 240)}`)
     }
   }
+
+  push(statusTail(report, verified, total, lang))
 
   const block = stripIds(composeBlock(lines), report)
   return block.length <= MAX_HUMAN_CHARS ? block : `${block.slice(0, MAX_HUMAN_CHARS - 1)}…`

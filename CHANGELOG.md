@@ -3,6 +3,55 @@
 Notable user-facing changes are recorded here in English and Simplified Chinese.
 用户可见的功能和修复会在这里以英文和简体中文记录。
 
+## [Unreleased]
+
+### Added / 新增
+
+- **The Progress tab is now a seven-segment spine with one expanding branch
+  / 进度 Tab 改为七段脊 + 单展开分支** —
+  the track takes the full width once (seven equal segments, never sideways scroll);
+  members grow downward inside the expanded segment only (accordion, one open at a time;
+  failed first, else running, else collapsed to counts). An expanded branch shows three
+  member cards and folds the rest into a real `+N` line; a failed segment carries a 2px
+  red bar, a red dot and a count badge (never a whole red column); blocked is a dashed
+  grey edge; the running connector is a flowing blue dashed line, never green. A
+  "jump to first failure" button appears only when there is a failure. Under 480px the
+  spine turns into a vertical step list (no sideways scroll); colours stay on
+  `var(--dsw-alias-*)` tokens with icon + text fallbacks. Only rendering + CSS changed:
+  folding, percentage, blocked derivation and the event contract are untouched.
+  / 轨道只占一次满宽（七段等分，永不横滚）；成员只在当前展开段下方纵向生长（手风琴，
+  同时只开一段：优先失败段，其次运行段，否则全收成计数）。展开段默认露三个成员卡，
+  其余收成实数 `+N` 行；失败段只标一处（2px 左红条 + 列头红点 + 计数 badge，不整列描红）；
+  阻塞用灰虚边；运行中连线用蓝色流动虚线，绝不用绿。有失败才出现"跳到首个失败"按钮。
+  480px 以下轨道转竖排（无横滚）；颜色全走 `var(--dsw-alias-*)`，图标 + 文字兜底。只改了
+  渲染 + CSS：折叠、百分比、blocked 推导、事件契约一律未动。
+
+- **The answer comes first, the process is folded away; the main thread speaks first and works in the background
+  / 答案为本、过程折叠，主会话先说话、边聊边干** —
+  a Q&A run now opens with the direct answer (`答案：… / Answer: …`), followed by what to do next;
+  the process tally (`N 项任务核验通过 / verified of N`) lives only in the two-sentence tail, never at
+  the opening, and station IDs, coordinates, model routes, deadlines and shell output never reach the
+  visible block (they stay in the ledger for `showDiagnostics`). The synthesizer prompt carries hard
+  rules (no status-line opening, no machine tokens, paraphrase evidence instead of quoting it, one
+  language per clause), enforced by a host-side style guardrail that falls back to the deterministic
+  narrative. On an interactive surface the team no longer blocks the main thread: a live first answer
+  (written fresh per message by one light model call over the `triageModel` route — structure is fixed,
+  wording never is) enters the turn immediately while the workflow runs in the background with the
+  progress board; a failed first-answer call degrades to a plainly-labelled template fallback. Saying
+  "stop X / focus on Y" cancels the in-flight round and restarts narrowed (whole-round cancel +
+  narrow restart; no subtask-level redirect in V1). Headless one-shot keeps the old blocking behaviour
+  (`in-turn` fallback) so the final answer is never lost; `answerStrategy` default (`in-turn`), `full`
+  pipeline bytes, all caps, verification, redaction, unload-cancel, and every switch default are unchanged.
+  / 问答类任务现在首屏就是直接答案（`答案：… / Answer: …`），其次是下一步；过程计数（`N 项任务核验通过 /
+  verified of N`）只出现在末尾两句收束语里，站号、坐标、模型路由、时限、shell 输出一律不进可见块
+  （`showDiagnostics` 打开才在台账里看）。synthesizer prompt 加硬约束（禁状态行开头、禁机器 token、
+  证据只转述不贴原文、单句单语言），宿主侧风格 guardrail 兜底，不合规就回落确定性叙事。可交互会话里
+  团队不再挂死主会话：一次轻量模型调用（走 `triageModel` 快手链路）按固定信息结构现场写首答、当即
+  `enter`，工作流后台跑、进度节点照常；首答失败则明说降级为模板兜底。说"停掉 X / 重点查 Y"即取消整轮
+  并窄化重起（V1 无子任务级重定向）。headless 单发保持阻塞旧行为（`in-turn` 回落），最终答案不丢；
+  `answerStrategy` 默认值（`in-turn`）、`full` 管线字节、全部上限、核验、脱敏、unload 取消与各开关默认
+  全部不变。
+
 ## [0.9.2] - 2026-11-15
 
 ### Added / 新增

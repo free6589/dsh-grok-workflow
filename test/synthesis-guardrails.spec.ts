@@ -60,8 +60,10 @@ describe('layered synthesis: deterministic base narrative', () => {
     const summary = run.report.synthesis.summary ?? ''
     expect(summary).toContain('总体状态：已完成')
     expect(summary).toContain('1/1 项任务已由独立检查核验')
-    expect(summary).toContain('任务 a：a works')
-    expect(summary).toContain('verified a works in file:///tmp/report')
+    // A4: the fallback paraphrases instead of quoting criterion/evidence verbatim.
+    expect(summary).toContain('有一项计划结果已由独立检查确认。')
+    expect(summary).not.toContain('任务 a：a works')
+    expect(summary).not.toContain('verified a works in file:///tmp/report')
   })
 
   it('keeps a failed run failed in the narrative — never a success claim', async () => {

@@ -3041,3 +3041,68 @@ Issue #1 状态评论：`TEST_RESULTS: PASS`，
 
 - live `:3080` / `:3086` / `:3090` 的部署与重启：用户动作（D-013）。
 - 上面 §2 表里的三项缺口：`NOT_RUN`，它们需要新的真机复拍或交付层设计改动，不在本轮范围。
+
+## Round 42 — 2026-11-15 — 答案置顶 + 边聊边干（A/B/C），`npm run ci` 全绿
+
+Command:
+
+```sh
+npm run ci
+```
+
+Result: **PASS**
+
+- `npm run typecheck`: PASS, 0 错误。
+- `npm run lint`: PASS, **4 warnings / 0 errors**（基线 5；本轮修掉 2 个自带
+  `no-useless-escape`，另 1 个基线 warning 被 delivery 重写带走；`src/redact.ts:155`
+  的既有 escape 未动）。
+- `npm run build`: PASS（`tsc -p tsconfig.build.json` + 客户端打包；`lib/` 产物已更新）。
+- `vitest run`: **51 文件 / 948 测试全 PASS**（基线 948，数量一致：只改断言、未加文件）。
+
+Behavior-change notes (all intended, each pinned by an updated assertion):
+
+- `test/delivery*.spec.ts`、`test/human-output-contract.spec.ts`、
+  `test/gate-partial-head.spec.ts`、`test/gate.spec.ts`：`做完了/做了一部分/项任务全部核验通过`
+  开头断言 → `答案：/Answer:` 开头 + `以上是结论；明细已记入台账。` 尾巴。
+- `test/triage.spec.ts` team 两例：`startCalls` 1 → 2（首答 + 团队 run），固定 greeting
+  断言删除。
+- `test/phase1-dialogue.spec.ts` P0-2 五例 + B18：`startCalls[0]` → `startCalls[1]`
+  （团队 run），`answered` 改断首答（含档位行、不含固定 greeting），B18 2 → 3
+ （classifier + 首答 + 团队 run）；harness 认 `first-answer` label。
+- `test/synthesis-guardrails.spec.ts` fallback 原文断言 → 转述断言 + `not.toContain` 原文。
+
+Implementation bugs found and fixed in-round (both `CONFIRMED` by failing test):
+
+1. `$1` 注入：`stripIds` 单字符分支 lookbehind 无捕获组，`$1` 逐字写回
+   （`Task a：…` → `Task $1…`）。修：单字符分支替换串用空串。
+2. `核验通过` 自杀：`answerLead` 回落句"有一项已核验通过。"命中自家 MIDLINE，
+   被 `composeBlock` 整行丢弃。修：回落句改"有一项已得出可用结论。"。
+
+Boundaries: 真机 Web 长驻验证 `NOT_RUN`（首答现场措辞、进度节点、中断重定向均未真机看过）；
+headless e2e（`scripts/e2e-headless-in-turn.sh`）`NOT_RUN`；`full` 管线字节一致性由既有
+`test/triage.spec.ts` full 回归 + `gate-partial-head` full 同 head 用例覆盖（PASS）。
+
+## Round 43 — 2026-11-16 — 进度 Tab A+C：`npm run ci` 全绿 + 隔离真机复验
+
+Command:
+
+```sh
+npm run ci
+```
+
+Result: **PASS**
+
+- `npm run typecheck`: PASS, 0 错误。
+- `npm run lint`: PASS, **4 warnings / 0 errors**（基线 4，无新增）。
+- `npm run build`: PASS（client bundle 220535 B → `lib/client.js`，`cmp` 一致）。
+- `vitest run`: **51 文件 / 951 测试全 PASS**（948 + 手风琴 3 例新测）。
+
+Isolated real-machine verification (`CONFIRMED`, profile `acgtest`, `:3225`, 打包安装 md5 一致)：
+
+- 脊 7 段满宽（DOM `segs:7`，各段 ~161px 均分）、单展开互斥（`branches:1`，`aria-expanded=true` ≤1）、默认开段（失败优先→doing→全收）、`+N` 实数（`+1 more (show all 4)`）、无横滚（`scrollW==innerW`，宽 1440 / 窄 480 均成立）。
+- settled 态：7 段标题全显、计数行 `1/1` `2/2`、全绿线、`3/3 · 100%`、全收起。
+- 窄屏：竖排 + 左竖线 + 成员卡片 + 详情底部抽屉（`position:fixed/bottom:0/60vh/auto` 生效）；深色 token 生效。
+- 详情三段 + `Open child session` 真开子会话（三 Tab + planner 上下文）；Chat 回归正常。
+- 真机抓到的实现 bug 4 个（STATE 段）：line 压 meta、分支挤扁段、link 规则丢失、badge 字面色——全部修好并复验。
+
+Boundaries: live `:3080` 更新 `NOT_RUN`（禁重启，无已验证免重启路径，见 D-053）；commit/push/tag/Release 待用户指令。

@@ -163,8 +163,9 @@ describe('B10: the guard is anchored, not removed', () => {
     const report = completedReportWithEcho()
     const echoed = { ...report, synthesis: { ...report.synthesis, summary: 'Final answer: nothing to show' } }
     const text = humanConclusion(echoed, { lang: 'zh' })
-    // No conclusion line at all is honest; the header and the advice still are there.
-    expect(text).toContain('做完了')
+    // No conclusion line at all is honest; the advice and the tail still are there.
+    expect(text).toContain('下一步：')
+    expect(text).toContain('以上是结论；明细已记入台账。')
     expect(text).not.toContain('Final answer:')
   })
 
@@ -228,7 +229,8 @@ describe('B10: the delivery view is unchanged around the human block', () => {
 
   it('never dresses a partial run as a completed one', () => {
     const text = humanConclusion(partialReport(), { lang: 'zh' })
-    expect(text).toContain('做了一部分')
-    expect(text).not.toContain('做完了')
+    expect(text).toContain('项没做成')
+    expect(text).toContain('以上是结论')
+    expect(text).not.toContain('以上是结论；明细已记入台账。')
   })
 })

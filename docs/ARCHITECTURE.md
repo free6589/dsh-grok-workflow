@@ -261,6 +261,22 @@ user message ──► agent/pre-step ──► classify
   as the step's message, and the main model finalises it in the same turn. The
   alternatives (`relay`, `append`) deliver after the turn closes and therefore
   need a long-lived surface.
+- **A triage-team message on an interactive surface speaks first, then works in
+  the background (`receipt-then-relay`).** The pre-step writes one live first
+  answer into the turn (one light model call over the `triageModel` route; the
+  information structure is fixed, the wording is composed fresh every time, and
+  a failed call degrades to a plainly-labelled template fallback), then admits
+  the workflow into the per-agent queue; the result is delivered by `relay`
+  when it settles and the progress board stays live meanwhile. Anything that
+  cannot deliver in the background — headless one-shot (no `followup` turn),
+  `full` mode, a full queue, or any throw inside the interactive path — falls
+  back to the blocking `in-turn` run, so the final answer is never lost. The
+  `answerStrategy` configured value is unchanged (`in-turn` default); what
+  changed is the triage-team walk on a surface that can deliver later.
+  Cancelling is whole-round: a new message for the same session cancels the
+  in-flight run (`run.cancel` + `commitCancelled`) and restarts narrowed
+  (`carriedPendingRequest` / `resumedTarget`); V1 offers no subtask-level
+  redirect.
 - **The gate reads the live configuration** on every decision (holders, see the
   settings section), so an edit applies to the next message while an in-flight
   run keeps its snapshot; an invalid edit refuses that message with its reason

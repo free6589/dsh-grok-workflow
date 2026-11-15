@@ -1124,3 +1124,27 @@
   ③D路/记忆侧若已写过「v0.9.2 = HOLD」的段落，以本轮 STATE / VALIDATION Round 41 为最新事实。
 - **别碰**：已发布 tag（`v0.9.2` 及更早一律不动）、DSH core、live `:3080`/`:3086`/`:3090`、
   npm 发布与仓库可见性。
+
+## 2026-11-15 — A/B/C 落地待收口（未提交/未push/未发版，`CONFIRMED` 本地绿）
+
+- **From:** lead · **To:** 用户 / 后续代理 · **Base:** `main` = `129a92e`（v0.9.2 已发布，
+  本轮在其上工作，未动 tag）。
+- **做了什么**：答案置顶（delivery 首句答案、计数沉尾、4 类 scrub、关键证据块删除）、
+  synthesizer HARD RULES + 宿主风格 guardrail、主会话先说话边聊边干（`receipt-then-relay` +
+  首答现场写 + 模板兜底明说 + 整轮取消窄化重起）。`answerStrategy` 默认值、`full` 管线、
+  全部上限与开关默认未动。CHANGELOG `[Unreleased]` + ARCHITECTURE 策略段已写。
+- **验证**：`npm run ci` 全绿（typecheck 0 错 / lint 4w0e / 51 文件 948 测试 PASS），
+  详见 VALIDATION Round 42；实现期抓到并修好 `$1` 注入与 `核验通过` 自杀两个 bug。
+- **没做什么（`NOT_RUN`）**：commit / push / tag / Release（等用户指令）；真机 Web 长驻验证；
+  headless e2e 回归。**不要**以"测试全绿"为由直接发版。
+- **Next action（用户一步）**：先看行为是否对味（问一个天气类问题：首屏应是 `答案：…` 而不是
+  `做完了 N 项…`；team 档应先回一句现场写的人话再后台跑）。对味了说一声，我再走提交→push→
+  CI→发版流程；不对味直接说哪句别扭，我改。
+
+## 2026-11-16 — 进度 Tab A+C 待收口（未提交/未push/未发版，`CONFIRMED` 本地绿 + 隔离真机绿）
+
+- **From:** lead · **To:** 用户 / 后续代理 · **Base:** `main` = `129a92e`（v0.9.2 已发布）。
+- **做了什么**：A/B/C（答案置顶 + 边聊边干，未提交）+ 进度 Tab A+C（七段脊 + 单展开分支 + 窄屏竖排，只改 `src/client/index.js` 渲染 + CSS，`test/client` + `test/progress-connector` 同步，CHANGELOG `[Unreleased]` +1 条）。`npm run ci` 全绿（51/951），隔离 `acgtest:3225` 真机全过。
+- **验证证据**：`.dsh-home/acg/shots/`（`03/04/05/10/11/12/13/21/22/23` + DOM 日志）——注意该目录在 `.gitignore` 外？（`TMPDIR=$PWD/.tmp` 约定；`acg/` 是否入库由发版组定，默认不入库）。
+- **没做什么（`NOT_RUN`）**：commit / push / tag / Release（等用户指令）；live `:3080` 更新（禁重启，见 D-053——新代码无已验证免重启路径，要么用户重启 DSH，要么接受文件换了进程仍跑旧模块）。
+- **Next action（用户，两步）**：① 看一眼截图（`13-settled-wide`  settled 脊 / `11-spine-narrow` 窄屏竖排），对味了说"提交发版"；② live 更新方式二选一：等下次 DSH 重启自动生效，或用户亲手重启。

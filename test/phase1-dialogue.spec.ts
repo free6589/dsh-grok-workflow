@@ -78,6 +78,8 @@ class FakeEngine {
       const result = await runWorkflowScript(request.script, request.args as Record<string, unknown>, async (_prompt, options) => {
         // The front-desk single call (t52) returns a string answer.
         if (options.label === 'quick-worker') return 'quick answer'
+        // The live first answer (B/C: 边聊边干): composed fresh per message.
+        if (options.label === 'first-answer') return '听懂了，正在按你说的查，查完给你结论。'
         // The opt-in hybrid classifier answers with one JSON verdict (gate B18).
         if (options.label === 'triage-classifier') return '{"tier":"team"}'
         // Roles are read back from the *user-visible* label (Issue #22 P1-1): the
@@ -367,7 +369,7 @@ async function askThenAnswer(options: {
   live: Session
   ambiguous?: string
   answer: string
-}): Promise<{ asked: string, answered: string, decision: Decision }> {
+}): Promise<{ asked: string, answered: string, decision: Decision, agent: FakeAgent }> {
   const { ctx, live, answer } = options
   const ambiguous = options.ambiguous ?? '改一下那个'
   const agent = new FakeAgent(live)
@@ -375,7 +377,7 @@ async function askThenAnswer(options: {
   commit(live, first)
   const second = await ctx.preStep()(payload(agent, [userMessage(answer)]), nextWith([])) as Decision
   commit(live, second)
-  return { asked: answerOf(first), answered: answerOf(second), decision: second }
+  return { asked: answerOf(first), answered: answerOf(second), decision: second, agent }
 }
 
 describe('P0-2: a confirmation answer keeps the original request', () => {
@@ -415,13 +417,19 @@ describe('P0-2: a confirmation answer keeps the original request', () => {
     ctx.engine.autoRun = true
     apply(ctx as never, { mode: 'triage', grokDefault: 'on' })
     const live = session('sess-p02-team')
-    const { answered } = await askThenAnswer({ ctx, live, ambiguous: '改一下那个', answer: '团队' })
+    const { answered, agent } = await askThenAnswer({ ctx, live, ambiguous: '改一下那个', answer: '团队' })
 
-    await waitFor(() => ctx.engine.startCalls.length === 1)
-    const objective = String((ctx.engine.startCalls[0]!.args as { objective?: string }).objective ?? '')
+    // Two starts: the live first answer, then the background team run.
+    await waitFor(() => ctx.engine.startCalls.length === 2)
+    const objective = String((ctx.engine.startCalls[1]!.args as { objective?: string }).objective ?? '')
     expect(objective).toContain('改一下那个')
     expect(objective).toContain('用户选择团队模式')
-    expect(answered).toContain('COMPLETED')
+    // The in-turn reply is the live first answer (B/C), not the final report…
+    expect(answered).toContain('档位：团队档')
+    expect(answered).not.toContain('收到！团队开工中')
+    // …the report lands in the background turn.
+    await waitFor(() => agent.followups.length === 1)
+    expect(textOf(agent.followups[0]!)).toContain('COMPLETED')
   })
 
   it('states that the confirmation expired instead of guessing the task', async () => {
@@ -473,9 +481,9 @@ describe('P0-2: a confirmation answer keeps the original request', () => {
 
     // ...and session one can still answer its own question.
     const own = await ctx.preStep()(payload(new FakeAgent(one), [userMessage('团队')]), nextWith([])) as Decision
-    await waitFor(() => ctx.engine.startCalls.length === 1)
-    expect(String((ctx.engine.startCalls[0]!.args as { objective?: string }).objective)).toContain('改一下那个')
-    expect(answerOf(own)).toContain('COMPLETED')
+    await waitFor(() => ctx.engine.startCalls.length === 2)
+    expect(String((ctx.engine.startCalls[1]!.args as { objective?: string }).objective)).toContain('改一下那个')
+    expect(answerOf(own)).toContain('档位：团队档')
   })
 
   it('consumes a pending question once, so a repeated answer cannot start a second run', async () => {
@@ -486,11 +494,11 @@ describe('P0-2: a confirmation answer keeps the original request', () => {
     const agent = new FakeAgent(live)
     await ctx.preStep()(payload(agent, [userMessage('改一下那个')]), nextWith([]))
     await ctx.preStep()(payload(agent, [userMessage('团队')]), nextWith([]))
-    await waitFor(() => ctx.engine.startCalls.length === 1)
+    await waitFor(() => ctx.engine.startCalls.length === 2)
 
     const again = await ctx.preStep()(payload(agent, [userMessage('团队')]), nextWith([])) as Decision
     expect(answerOf(again)).toContain('没有待回答的分流问题')
-    expect(ctx.engine.startCalls).toHaveLength(1)
+    expect(ctx.engine.startCalls).toHaveLength(2)
   })
 
   it('says the question is void when the user answers something else', async () => {
@@ -521,8 +529,8 @@ describe('P0-2: a confirmation answer keeps the original request', () => {
 
     const answered = await ctx.preStep()(payload(agent, [userMessage('团队')]), nextWith([])) as Decision
 
-    await waitFor(() => ctx.engine.startCalls.length === 1)
-    const objective = String((ctx.engine.startCalls[0]!.args as { objective?: string }).objective ?? '')
+    await waitFor(() => ctx.engine.startCalls.length === 2)
+    const objective = String((ctx.engine.startCalls[1]!.args as { objective?: string }).objective ?? '')
     // The forwarded conversation already names both messages, so the assertion has
     // to look at the request the run was actually started with — the composed
     // history is not evidence about what the front desk remembered.
@@ -530,7 +538,7 @@ describe('P0-2: a confirmation answer keeps the original request', () => {
     expect(request).toContain('原始任务：')
     expect(request).toContain('改一下那个')
     expect(request).toContain('把那个也顺手弄一下')
-    expect(answerOf(answered)).toContain('COMPLETED')
+    expect(answerOf(answered)).toContain('档位：团队档')
   })
 
   it('cuts the resumed request to the objective budget instead of refusing the run (B08)', async () => {
@@ -550,8 +558,8 @@ describe('P0-2: a confirmation answer keeps the original request', () => {
 
     const answered = await ctx.preStep()(payload(agent, [userMessage('团队')]), nextWith([])) as Decision
 
-    await waitFor(() => ctx.engine.startCalls.length === 1)
-    const objective = String((ctx.engine.startCalls[0]!.args as { objective?: string }).objective ?? '')
+    await waitFor(() => ctx.engine.startCalls.length === 2)
+    const objective = String((ctx.engine.startCalls[1]!.args as { objective?: string }).objective ?? '')
     const request = objective.slice(objective.indexOf('原始任务：'))
     expect(objective.length).toBeLessThanOrEqual(32_000)
     // The confirmation and the newest request survive whole; the older request of
@@ -562,7 +570,7 @@ describe('P0-2: a confirmation answer keeps the original request', () => {
     // The cut is marked where the budget ran out, so nothing looks truncated.
     expect(request).toContain('…')
     expect(answerOf(answered)).not.toContain('workflow objective limit')
-    expect(answerOf(answered)).toContain('COMPLETED')
+    expect(answerOf(answered)).toContain('档位：团队档')
   })
 })
 
@@ -1090,6 +1098,7 @@ describe('B18: the hybrid classifier states its own reason', () => {
     expect(answer).toContain('模型')
     expect(answer).not.toContain('信号互相矛盾或线索不足')
     // Two starts: the classifier call that overruled the rules, then the team run.
-    expect(ctx.engine.startCalls).toHaveLength(2)
+    // Three, now: classifier, live first answer, team run (B/C 边聊边干).
+    expect(ctx.engine.startCalls).toHaveLength(3)
   })
 })

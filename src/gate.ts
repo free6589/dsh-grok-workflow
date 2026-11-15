@@ -61,8 +61,10 @@ import { redactError, redactSecrets } from './redact.js'
 import type { ActiveState, RunOutcome, WorkflowLogger } from './run.js'
 import { runSingleCall, runWorkflow } from './run.js'
 import {
-  askLine, chatReply, classifyTriage, detectLanguage, expiredAskNote, greetingLine, missingNote, recallFromPrior,
-  recallPrompt, recalledNote, resolvePending, resumedRequest, singleCallPrompt, tierNote, triageLine,
+  askLine, chatReply, classifyTriage, detectLanguage, expiredAskNote, firstAnswerFallback, firstAnswerPrompt,
+  missingNote, recallFromPrior,
+  recallPrompt, recalledNote, resolvePending, resumedRequest, sanitizeFirstAnswer, singleCallPrompt,
+  tierNote, triageLine,
   unusedAskNote, RECALL_LIMITS,
 } from './triage.js'
 import type { PendingAsk, RecallHit, RecallMiss, RecallSource, TriageLang, TriageVerdict } from './triage.js'
@@ -213,6 +215,109 @@ const HYBRID_DETAIL: Record<'chat' | 'fast' | 'team', { zh: string, en: string }
     zh: '混合分诊模型把它判成团队档：这一档是模型定的，不是规则档位。',
     en: 'the hybrid classifier (the model) chose the team tier; this is a model verdict, not a rule.',
   },
+}
+
+/**
+ * True when this run can answer live and deliver the team result later (B: 边聊边干).
+ *
+ * All-or-nothing: any failure here is a silent `false`, so the caller falls back
+ * to `answerInTurn` and always produces a final answer.
+ *
+ * A one-shot run has no followup turn to deliver into: probing
+ * `agent.whenIdle`/`followup` keeps this to genuinely interactive runs, so
+ * @param agent - the agent that would deliver in the background.
+ * @returns true only when `whenIdle` and `followup` are both functions and the
+ *   session is present. Anything else (one-shot, followup unavailable) is a
+ *   silent `false` and the caller falls back to `answerInTurn`.
+ */
+export function canBackgroundDeliver(agent: Agent): boolean {
+  try {
+    const candidate = agent as unknown as {
+      whenIdle?: unknown
+      followup?: unknown
+      session?: unknown
+    }
+    if (typeof candidate.whenIdle !== 'function') return false
+    if (typeof candidate.followup !== 'function') return false
+    return sessionOf(agent) !== undefined
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Bounded context snapshot the live first answer may read (history / carry-over /
+ * memory, 2 000 characters; possibly empty).
+ *
+ * Failure-tolerant: any read error yields a shorter context (or an empty one)
+ * rather than losing the first answer.
+ */
+function firstAnswerContext(
+  session: Session | undefined,
+  limits: ResolvedConfig,
+  history: string,
+): string {
+  try {
+    const carryover = carryoverForSession(session, {
+      rounds: limits.historyTurns,
+      chars: limits.historyChars,
+    }).digest
+    let memory = ''
+    try {
+      memory = readMemoryDocs(memoryDocRoots(), RECALL_LIMITS)
+        .map(doc => `${doc.path}: ${doc.text}`)
+        .join('\n')
+    } catch {
+      memory = ''
+    }
+    return [history, carryover, memory]
+      .map(part => part.trim())
+      .filter(part => part !== '')
+      .join('\n\n')
+      .slice(0, 2_000)
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * One live first answer for a team message.
+ *
+ * The call is intentionally decoupled from the background start: a slow or
+ * failed first answer never blocks the workflow run — the failure path still
+ * enters a plainly-labelled template fallback, so the first visible line always
+ * says what it is. The live text is scrubbed the way the delivery side scrubs
+ * its human block (drop ledger lines, strip machine detail).
+ *
+ * `call` is injected so the module stays testable without an engine; production
+ * wires it to one `runSingleCall` (`label: 'first-answer'`, `triageModel` route).
+ *
+ * @param agent - owning agent (kept for call-site symmetry; unused by the helper itself).
+ * @param request - the user original.
+ * @param history - bounded context snapshot, possibly empty.
+ * @param tier - the team verdict (language only; never the tier sentence itself).
+ * @param call - the one first-answer call; absent means "no live text".
+ * @returns the first-answer text (live or template fallback, never empty).
+ */
+export async function produceFirstAnswer(
+  agent: Agent,
+  request: string,
+  history: string | undefined,
+  tier: TriageVerdict,
+  call?: (prompt: string) => Promise<{ ok: true, text: string } | { ok: false, reason: string }>,
+): Promise<string> {
+  void agent
+  let raw = ''
+  try {
+    const outcome = call === undefined
+      ? undefined
+      : await call(firstAnswerPrompt(request, history ?? '', tier.lang))
+    if (outcome !== undefined && outcome.ok) raw = sanitizeFirstAnswer(outcome.text)
+  } catch {
+    raw = ''
+  }
+  if (raw.trim() !== '') return raw
+  return firstAnswerFallback(tier.lang, request)
 }
 
 /* ------------------------------------------------- look up, then ask ------ */
@@ -929,10 +1034,23 @@ export function installGate(deps: GateDeps): boolean {
           outcome: recalled === undefined ? 'triaged-fast' : 'triaged-recalled',
         }
       }
-      // Team tier: instant receipt first so the run never looks blank while in
-      // flight (pure addition; a failed append only costs the receipt, never the run).
+      // Team tier, in-turn fallback: live receipt first so the run never looks
+      // blank while in flight (pure addition; a failed append only costs the
+      // receipt, never the run). The receipt is the live first answer (C: 现场写),
+      // never the fixed template sentence.
       if (limits.instantReceipt) {
-        const receipt = [...lead, triageLine(tier), tier.greeting ? greetingLine(tier.lang) : '', tier.lang === 'zh' ? '正在执行，进度节点在旁。' : 'Running now; the live progress board sits beside this message.'].filter(line => line !== '').join('\n')
+        const context = firstAnswerContext(sessionOf(agent), limits, histForTriage)
+        const fallback = await produceFirstAnswer(
+          agent,
+          target,
+          context,
+          tier,
+          async prompt => runSingleCall({
+            ctx, config: limits, state, logger, agent,
+            prompt, label: 'first-answer',
+          }),
+        )
+        const receipt = [...lead, triageLine(tier), fallback].filter(line => line !== '').join('\n')
         try {
           appendInstantReceipt(sessionOf(agent), receipt, logger)
         } catch {
@@ -945,7 +1063,7 @@ export function installGate(deps: GateDeps): boolean {
       // lines (tier, greeting, notes). Two composers printed the same conclusion
       // twice, and a status the header got wrong could not be corrected by the
       // body it sat above.
-      const header = [...lead, triageLine(tier), tier.greeting ? greetingLine(tier.lang) : ''].filter(line => line !== '').join('\n')
+      const header = [...lead, triageLine(tier)].filter(line => line !== '').join('\n')
       return answer.kind === 'report' ? { ...answer, header, lang: tier.lang } : answer
     }
     return runTeam(agent, request, signal, history)
@@ -1201,6 +1319,127 @@ export function installGate(deps: GateDeps): boolean {
     })
   }
 
+  /**
+   * Team tier on an interactive run (B: 边聊边干).
+   *
+   * triage-team + effectiveMode `triage` + background-deliverable agent: one
+   * live first-answer call (label 'first-answer', `triageModel` route, history
+   * snapshot taken before the first answer so the receipt cannot echo back as
+   * history), entered into this turn (stepBase + withoutClaimed, P0-1/P0-5
+   * semantics); the workflow is admitted behind it by reusing admitInBackground
+   * (commitClaimed + enqueue + produceAnswer -> deliverAndRecord), whose
+   * pre-step returns immediately with the first answer instead of awaiting the
+   * workflow.
+   *
+   * Returns the `enter` decision with the first answer, or `undefined` when the
+   * caller must keep the blocking path (full mode, one-shot/followup
+   * unavailable, failed first answer with no downgrade, queue full): the
+   * caller then falls back to answerInTurn's awaited run, which always produces
+   * a final answer. Never throws: any internal failure is `undefined`
+   * (fallback), never a lost answer.
+   *
+   * Cancellation / redirect reuse the existing machinery, no new bus: a new
+   * message in the same session while a run is in flight cancels that run via
+   * ActiveState.active/starting + run.cancel(reason) + dispose, then
+   * commitCancelled + cancelledText lands the terminal; the narrowed rerun is
+   * composed with carriedPendingRequest / resumedTarget (whole-round cancel +
+   * narrow restart). V1 does no subtask-level directed cancel; alreadyRouted
+   * stays the double-run guard; the per-agent enqueue path is reused as-is
+   * (cancel/reject stays whole-queue: no task-level remove in V1).
+   */
+  const answerTeamInteractive = async (
+    agent: Agent,
+    admit: Extract<Classification, { kind: 'admit' }>,
+    payload: PreStepPayload,
+    base: readonly UserMessage[],
+    history: string,
+    opts: {
+      enterAfter: (base: readonly UserMessage[], text: string, surfaced?: boolean) => PreStepDecision
+      surfaced: boolean
+      signal?: AbortSignal
+    },
+  ): Promise<PreStepDecision | undefined> => {
+    try {
+      const limits = safe()
+      const sessionShape = readModeRecord(agent.session)?.workflowMode
+      if ((sessionShape ?? limits.mode) !== 'triage') return undefined
+      if (!canBackgroundDeliver(agent)) return undefined
+      // The tier must actually be team: classify here from the same history
+      // snapshot (cheap, deterministic); anything else is not this function's job.
+      // Pending answers count: a bare '团队' reply to the front-desk question is
+      // team only with pending:true (without it the same word is stale-choice
+      // chat). takePending is consumed here (once), so the queued background run
+      // below must NOT go through produceAnswer (which would take it again and
+      // miss); it calls runTeam directly with the already-resumed target.
+      const pending = takePending(admit.agentId)
+      const live = pending?.kind === 'live' ? pending.ask : undefined
+      const tier = classifyTriage({
+        text: admit.request,
+        mode: 'triage',
+        ask: limits.triageAsk,
+        pending: live !== undefined,
+        historyNonEmpty: history.trim() !== '',
+        followupAsFast: limits.triageFollowupAsFast,
+      })
+      if (tier.tier !== 'team') {
+        // Not ours: put the pending question back so the blocking path still
+        // answers it (takePending consumed it above).
+        if (pending !== undefined) pendingAsks.set(admit.agentId, pending.ask)
+        return undefined
+      }
+      const target = live === undefined || (tier.reason !== 'pending-fast' && tier.reason !== 'pending-team')
+        ? admit.request
+        : resumedTarget(tier, live.originalRequest, admit.request)
+      const context = firstAnswerContext(sessionOf(agent), limits, history)
+      let firstText = ''
+      try {
+        const call = await runSingleCall({
+          ctx, config: limits, state, logger, agent,
+          prompt: firstAnswerPrompt(target, context, tier.lang),
+          label: 'first-answer',
+        })
+        if (call.ok) firstText = sanitizeFirstAnswer(call.text)
+      } catch {
+        firstText = ''
+      }
+      const fellBack = firstText.trim() === ''
+      const firstLine = fellBack ? firstAnswerFallback(tier.lang, target) : firstText
+      const firstAnswer: Answer = {
+        kind: 'direct',
+        text: [triageLine(tier), '', firstLine].join('\n'),
+        outcome: fellBack ? 'triaged-team-first-fallback' : 'triaged-team-first',
+      }
+      // Batch lifecycle: claim for good (started/admitted-team-background), then
+      // the same background admission relay/append uses. enqueue is per-agent
+      // serialized, so a newer message cancels/redirects through the same queue.
+      const entry = entryOf(admit, payload)
+      // Redirect-on-new-message (existing machinery, no new bus): if a newer
+      // message for the same session arrives while this run is queued/running,
+      // it cancels the in-flight run via the shared ActiveState (active run's
+      // cancel + dispose, then commitCancelled + cancelledText lands the
+      // terminal), and the narrowed rerun is composed with
+      // carriedPendingRequest / resumedTarget (whole-round cancel + narrow
+      // restart; V1 does no subtask-level directed cancel). alreadyRouted
+      // stays the double-run guard. See handle()/answerInTurn abort paths and
+      // run.ts disposeActiveState for the cancel side.
+      record(agent, entry, 'started', 'admitted-team-background')
+      const accepted = enqueue(admit.agentId, async () => {
+        const late = safe()
+        const lateHistory = collectHistory(
+          sessionOf(agent),
+          { turns: late.historyTurns, chars: late.historyChars },
+          entry.messageIds,
+        )
+        await deliverAndRecord(agent, entry, await runTeam(agent, target, undefined, lateHistory, tier.lang))
+      })
+      if (!accepted) return undefined
+      return opts.enterAfter(base, answerText(firstAnswer, true), opts.surfaced)
+    } catch (error) {
+      logger.warn(`interactive team admission failed, falling back to in-turn: ${redactError(error)}`)
+      return undefined
+    }
+  }
+
   /** The step message that carries the report into the open turn. */
   const enterMessage = (text: string): UserMessage => createUserMessage({
     content: [{ type: 'text', text }],
@@ -1312,6 +1551,17 @@ export function installGate(deps: GateDeps): boolean {
     const limits = safe()
     const history = collectHistory(sessionOf(agent), { turns: limits.historyTurns, chars: limits.historyChars })
     const surfaced = commitClaimed(agent, payload.messages)
+    // B (边聊边干): triage-team on a background-deliverable agent answers the
+    // live first answer in this turn and admits the workflow behind it.
+    // answerStrategy is NOT consulted: the config default stays `in-turn`; this
+    // branch changes only what triage-team does when the run is interactive.
+    // Everything else (full mode, agent without followup/whenIdle, first answer
+    // with no downgrade available) keeps the blocking path, which always
+    // produces a final answer.
+    const interactive = await answerTeamInteractive(agent, verdict, payload, base, history, {
+      enterAfter, surfaced, signal,
+    })
+    if (interactive !== undefined) return interactive
     const answer = await produceAnswer(agent, verdict.request, signal, history)
     if (aborted()) {
       // The turn was cancelled while the run was in flight: nobody can read an

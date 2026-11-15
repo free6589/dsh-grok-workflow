@@ -515,11 +515,12 @@ describe('t52 front desk: each tier behaves as promised', () => {
   it('runs the whole workflow for a complex request and greets the user', async () => {
     const ctx = new FakeContext()
     const text = await route(ctx, new FakeAgent(), '帮我重构 run.ts 的超时逻辑，并补上回归测试')
-    expect(ctx.engine.startCalls).toHaveLength(1)
+    // Two starts: the live first answer (Front desk, label 首答) and the team run.
+    expect(ctx.engine.startCalls).toHaveLength(2)
     // The team tier uses the workflow script, not the one-call script.
-    expect(ctx.engine.startCalls[0]!.meta.name).toMatch(/^任务团队/)
+    expect(ctx.engine.startCalls[1]!.meta.name).toMatch(/^任务团队/)
     expect(text).toContain('档位：团队档')
-    expect(text).toContain('收到！团队开工中')
+    expect(text).not.toContain('收到！团队开工中')
     expect(text).toContain('Grok workflow:')
   })
 
@@ -568,7 +569,8 @@ describe('t52 front desk: each tier behaves as promised', () => {
   it('upgrades to the team when the message asks for it', async () => {
     const ctx = new FakeContext()
     const text = await route(ctx, new FakeAgent(), '用团队帮我改个 typo')
-    expect(ctx.engine.startCalls[0]!.meta.name).toMatch(/^任务团队/)
+    // First start is the live first answer; the team run follows it.
+    expect(ctx.engine.startCalls[1]!.meta.name).toMatch(/^任务团队/)
     expect(text).toContain('你的消息里点名了团队')
   })
 

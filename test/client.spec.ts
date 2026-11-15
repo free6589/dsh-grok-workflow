@@ -1606,17 +1606,21 @@ describe('client progress tab: styles, zoom and empty snapshots', () => {
     expect(progress.css).not.toMatch(/\bhsla?\(/)
   })
 
-  it('scopes every rule to .gw-progress, with the 96px track, snap and both breakpoints', () => {
+  it('scopes every rule to .gw-progress, with the full-width spine and the vertical narrow layout', () => {
     const rules = progress.css.split('\n').filter((line) => line.includes('{') && !line.trim().startsWith('@'))
     for (const rule of rules) expect(rule.trim().startsWith('.gw-progress')).toBe(true)
-    expect(progress.css).toContain('height: 96px')
-    expect(progress.css).toContain('overflow-x: auto')
-    expect(progress.css).toContain('scroll-snap-type: x mandatory')
+    // A+C: the spine takes the full width once (7 equal parts, no sideways scroll).
+    expect(progress.css).toContain('.gw-progress-track')
+    expect(progress.css).toContain('width: 100%')
+    expect(progress.css).not.toContain('overflow-x: auto')
+    expect(progress.css).not.toContain('scroll-snap-type')
     expect(progress.css).toContain('prefers-reduced-motion: reduce')
     expect(progress.css).toContain('@media (max-width: 720px)')
     expect(progress.css).toContain('@media (max-width: 480px)')
     // The narrow layout is a bottom drawer, not a squeezed popover.
     expect(progress.css).toMatch(/@media \(max-width: 480px\)[\s\S]*position: fixed/)
+    // …and the track itself turns vertical under 480px (no sideways scroll).
+    expect(progress.css).toMatch(/@media \(max-width: 480px\)[\s\S]*flex-direction: column/)
     // 28px rings, sized from the zoom variable rather than a fixed px font.
     expect(progress.css).toContain('width: 28px')
     expect(progress.css).toContain('--gw-zoom')
@@ -1689,11 +1693,12 @@ describe('client progress tab: styles, zoom and empty snapshots', () => {
     expect(texts(filled).join('\n')).toContain('1/1 · 100%')
     // Roving tabindex: exactly one node is in the tab order.
     expect(nodes.filter((node) => node.props['tabIndex'] === 0)).toHaveLength(1)
-    // Aria: the track is a labelled group, every node has a name, and nothing is expanded
-    // until a reader opens it.
+    // Aria: the track is a labelled group, every node has a name, and at most one
+    // segment is expanded (the accordion default follows the run: failed first,
+    // else doing, else nothing). A settled run opens nothing.
     expect(walk(filled).some((element) => element.props['role'] === 'group' && element.props['aria-label'] !== undefined)).toBe(true)
     expect(nodes.every((node) => typeof node.props['aria-label'] === 'string' && node.props['aria-label'].includes('·'))).toBe(true)
-    expect(nodes.every((node) => node.props['aria-expanded'] === false)).toBe(true)
+    expect(nodes.filter((node) => node.props['aria-expanded'] === true)).toHaveLength(0)
   })
 
   it('survives a snapshot with a missing field instead of throwing', () => {

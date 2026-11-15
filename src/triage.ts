@@ -829,7 +829,10 @@ export function triageLine(verdict: TriageVerdict): string {
 }
 
 /**
- * Opening line of a team answer.
+ * Opening line of a team answer (legacy template).
+ *
+ * Kept byte-identical: existing tests pin both languages, and the interactive
+ * first answer (firstAnswerPrompt) replaces its *use*, not its wording.
  * @param lang - language of the message.
  * @returns the greeting.
  */
@@ -1157,4 +1160,144 @@ export function chatReply(verdict: TriageVerdict, request: string): string {
     case 'about': return 'I am the front desk for this conversation: every message passes me first, and I pick the tier — direct for small talk, one worker for a simple task, the full team (plan, execute, verify, report) for a complex one, and a question when it is unclear. The team tier shows a live progress board, and saying "use the team" always escalates.'
     default: return 'Hello! I am here. Say what you need: one worker for something simple, the team for something complex, and I will ask which when it is unclear.'
   }
+}
+
+/* ------------------------------------------------- first answer (live) ---- */
+
+/**
+ * Bounds for the live first answer.
+ *
+ * The context the first-answer call may read is bounded once, here: history /
+ * carry-over / memory summary, at most 2 000 characters, possibly empty.
+ */
+export const FIRST_ANSWER_LIMITS = {
+  /** Characters of context the first-answer prompt carries. */
+  contextChars: 2_000,
+  /** Live zh answer budget (characters). */
+  zhChars: 120,
+  /** Live en answer budget (words). */
+  enWords: 80,
+  /** Sanitized first-answer ceiling (only bites when the model ignored the budget). */
+  sanitizedChars: 800,
+} as const
+
+/**
+ * Prompt for the one call a live first answer spends.
+ *
+ * First line is the child's durable display label (`首答`), exactly like the
+ * other front-desk prompts. The body forces a fresh, short, user-language answer
+ * with a fixed four-part shape and an explicit forbidden list, so each receipt
+ * is written live per message instead of pasted from a template.
+ *
+ * @param request - the user original.
+ * @param context - bounded history/carry-over/memory summary, possibly empty.
+ * @param lang - the message language; picks the answer language and budget.
+ * @returns the child prompt.
+ */
+export function firstAnswerPrompt(request: string, context: string, lang: TriageLang): string {
+  const bounded = (context ?? '').slice(0, FIRST_ANSWER_LIMITS.contextChars)
+  const languageLine = lang === 'zh'
+    ? 'Language: Chinese (中文). Write the answer in Chinese.'
+    : 'Language: English. Write the answer in English.'
+  const lengthLine = lang === 'zh'
+    ? `Length: at most ${FIRST_ANSWER_LIMITS.zhChars} Chinese characters. Hard limit.`
+    : `Length: at most ${FIRST_ANSWER_LIMITS.enWords} English words. Hard limit.`
+  return [
+    '首答',
+    'You are the front desk of a coding assistant. Give an instant first answer while the team works in the background.',
+    languageLine,
+    'Write fresh each time, no boilerplate, no fixed sentences.',
+    lengthLine,
+    'Cover four points in order, concisely:',
+    '① what you heard the user wants (one sentence);',
+    '② what can be said now, and what honestly needs verification (name what must be checked, never invent conclusions);',
+    '③ which 2-4 directions the background subtasks will check (directions only, no conclusions, no promises);',
+    '④ how to interrupt: the user can say ‘停掉X/重点查Y’ ("stop X / focus on Y") to redirect, and the live progress board beside this message shows the run (word this naturally).',
+    'FORBIDDEN in your answer: ledger labels (Grok workflow, Objective, Plan, Failures, Confirmed evidence, Incomplete, Model routes, Deadline, Route switches, Errors, Synthesis, Uncertainties, etc.), counts and tallies, station numbers, coordinates, file paths, shell commands, code, model or route names, the fixed sentence “正在执行，进度节点在旁” (and its English twin "Running now; the live progress board sits beside this message."), repeating the same content in Chinese and English.',
+    'Context (bounded, may be empty; history/carryover/memory summary — do not ask for what is already here):',
+    bounded === '' ? '(empty)' : bounded,
+    '',
+    'Request (the user original — answer this):',
+    request,
+  ].join('\n')
+}
+
+/** Ledger-shaped lines that must never reach a first answer. */
+const FIRST_ANSWER_TAINTED: readonly RegExp[] = [
+  /^\s*(?:Grok workflow:|Objective:|Plan:|Failures:|Plan failure:|Confirmed evidence:|Incomplete:|Final answer:|Model routes:|Deadline:|Route switches:|Route overflows|Errors:|Synthesis:|Uncertainties:)/i,
+  /runId|taskId|childId|chainIndex/i,
+  /\battempt:/i,
+]
+
+/** Machine detail stripped from a first answer (simplified delivery-side strip). */
+const FIRST_ANSWER_MACHINE: readonly RegExp[] = [
+  /```[\s\S]*?```/g,
+  /`[^`\n]*`/g,
+  /\bhttps?:\/\/\S+/g,
+  /\bfile:\/\/\S+/g,
+  /(?:^|[\s(（"'=])(?:~|\.{1,2})?\/[\w.@%+-]+(?:\/[\w.@%+-]+)+/g,
+  /\b[\w-]+(?:\.[\w-]+)*\.(?:ts|tsx|js|mjs|cjs|json|md|ya?ml|lock|sh|py|log|txt|csv|png|jpe?g|svg|zip|gz)\b/gi,
+  /\b[0-9a-f]{8,64}\b/gi,
+  /\b(?:npm|pnpm|npx|yarn|vitest|jest|tsc|git|curl|wget|docker|python3?|pip3?)\s+[^，。；\n]{0,120}/gi,
+]
+
+/**
+ * Scrub a live first answer the way the delivery side scrubs its human block.
+ *
+ * Simplified, dependency-free copy of the delivery idea (the delivery helpers are
+ * not exported): drop ledger-labelled lines, strip machine detail, collapse
+ * whitespace per line, and ceiling the result. Never throws; empty in means empty out.
+ *
+ * @param text - the model text.
+ * @returns the cleaned text, possibly empty when nothing survivable remains.
+ */
+export function sanitizeFirstAnswer(text: string): string {
+  const kept: string[] = []
+  for (const raw of String(text ?? '').split('\n')) {
+    const line = raw.trimEnd()
+    if (line.trim() === '') continue
+    if (FIRST_ANSWER_TAINTED.some(pattern => pattern.test(line))) continue
+    kept.push(line)
+  }
+  let out = kept.join('\n').replace(/\n{3,}/g, '\n\n').trim()
+  for (const pattern of FIRST_ANSWER_MACHINE) {
+    pattern.lastIndex = 0
+    out = out.replace(pattern, ' ')
+  }
+  const lines = out
+    .split('\n')
+    .map(line => line.replace(/[ \t]+/g, ' ').trim())
+    .filter(line => line !== '')
+  out = lines.join('\n')
+    .replace(/（\s*）|\(\s*\)/g, '')
+    .trim()
+  if (out.length > FIRST_ANSWER_LIMITS.sanitizedChars) {
+    out = `${out.slice(0, FIRST_ANSWER_LIMITS.sanitizedChars - 1)}…`
+  }
+  return out
+}
+
+/**
+ * Explicit template fallback entered when the lightweight first-answer call fails.
+ *
+ * It says so plainly (no silent template), names the background directions, the
+ * progress board, and the redirect wording. The zh text carries the exact phrase
+ * the contract pins; the en text carries its equivalent.
+ *
+ * @param lang - the message language.
+ * @param requestSnippet - user original, quoted truncated to show what was heard.
+ * @returns the fallback text.
+ */
+export function firstAnswerFallback(lang: TriageLang, requestSnippet = ''): string {
+  const snippet = requestSnippet.trim().slice(0, 24)
+  if (lang === 'en') {
+    const heard = snippet === '' ? 'your request' : `“${snippet}”`
+    return [
+      `First answer is a template fallback: the light model did not reply. I heard ${heard}.`,
+      'The background team will check along planning, execution and verification before concluding; the live progress board beside this message shows the run.',
+      `To redirect, say 'stop X / focus on Y'.`,
+    ].join(' ')
+  }
+  const heard = snippet === '' ? '你的这条消息' : `“${snippet}”`
+  return `首答是模板兜底：轻量模型没回。已听懂${heard}；后台将分拆解、执行、核验几路核验后再给结论，进度节点在旁可看；要调整就说‘停掉X/重点查Y’，我会重定向。`
 }

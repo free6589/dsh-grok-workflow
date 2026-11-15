@@ -316,7 +316,10 @@ export declare function resolvePending(reply: string): 'team' | 'fast' | undefin
  */
 export declare function triageLine(verdict: TriageVerdict): string;
 /**
- * Opening line of a team answer.
+ * Opening line of a team answer (legacy template).
+ *
+ * Kept byte-identical: existing tests pin both languages, and the interactive
+ * first answer (firstAnswerPrompt) replaces its *use*, not its wording.
  * @param lang - language of the message.
  * @returns the greeting.
  */
@@ -449,4 +452,57 @@ export declare function chatBucket(text: string): ChatBucket;
  * @returns the answer body.
  */
 export declare function chatReply(verdict: TriageVerdict, request: string): string;
+/**
+ * Bounds for the live first answer.
+ *
+ * The context the first-answer call may read is bounded once, here: history /
+ * carry-over / memory summary, at most 2 000 characters, possibly empty.
+ */
+export declare const FIRST_ANSWER_LIMITS: {
+    /** Characters of context the first-answer prompt carries. */
+    readonly contextChars: 2000;
+    /** Live zh answer budget (characters). */
+    readonly zhChars: 120;
+    /** Live en answer budget (words). */
+    readonly enWords: 80;
+    /** Sanitized first-answer ceiling (only bites when the model ignored the budget). */
+    readonly sanitizedChars: 800;
+};
+/**
+ * Prompt for the one call a live first answer spends.
+ *
+ * First line is the child's durable display label (`首答`), exactly like the
+ * other front-desk prompts. The body forces a fresh, short, user-language answer
+ * with a fixed four-part shape and an explicit forbidden list, so each receipt
+ * is written live per message instead of pasted from a template.
+ *
+ * @param request - the user original.
+ * @param context - bounded history/carry-over/memory summary, possibly empty.
+ * @param lang - the message language; picks the answer language and budget.
+ * @returns the child prompt.
+ */
+export declare function firstAnswerPrompt(request: string, context: string, lang: TriageLang): string;
+/**
+ * Scrub a live first answer the way the delivery side scrubs its human block.
+ *
+ * Simplified, dependency-free copy of the delivery idea (the delivery helpers are
+ * not exported): drop ledger-labelled lines, strip machine detail, collapse
+ * whitespace per line, and ceiling the result. Never throws; empty in means empty out.
+ *
+ * @param text - the model text.
+ * @returns the cleaned text, possibly empty when nothing survivable remains.
+ */
+export declare function sanitizeFirstAnswer(text: string): string;
+/**
+ * Explicit template fallback entered when the lightweight first-answer call fails.
+ *
+ * It says so plainly (no silent template), names the background directions, the
+ * progress board, and the redirect wording. The zh text carries the exact phrase
+ * the contract pins; the en text carries its equivalent.
+ *
+ * @param lang - the message language.
+ * @param requestSnippet - user original, quoted truncated to show what was heard.
+ * @returns the fallback text.
+ */
+export declare function firstAnswerFallback(lang: TriageLang, requestSnippet?: string): string;
 //# sourceMappingURL=triage.d.ts.map

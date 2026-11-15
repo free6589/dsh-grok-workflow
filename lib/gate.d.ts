@@ -46,7 +46,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent';
 import type { Session } from '@deepseek-ai/dsh-session';
 import type { UserMessage } from '@deepseek-ai/dsh-llm';
 import type { ActiveState, WorkflowLogger } from './run.js';
-import type { RecallSource, TriageLang } from './triage.js';
+import type { RecallSource, TriageLang, TriageVerdict } from './triage.js';
 import type { ResolvedConfig, WorkflowReport } from './types.js';
 /** Payload shape of one `agent/pre-step` dispatch. */
 export interface PreStepPayload {
@@ -95,6 +95,46 @@ type Classification = {
     request: string;
     turn: number;
 };
+/**
+ * True when this run can answer live and deliver the team result later (B: 边聊边干).
+ *
+ * All-or-nothing: any failure here is a silent `false`, so the caller falls back
+ * to `answerInTurn` and always produces a final answer.
+ *
+ * A one-shot run has no followup turn to deliver into: probing
+ * `agent.whenIdle`/`followup` keeps this to genuinely interactive runs, so
+ * @param agent - the agent that would deliver in the background.
+ * @returns true only when `whenIdle` and `followup` are both functions and the
+ *   session is present. Anything else (one-shot, followup unavailable) is a
+ *   silent `false` and the caller falls back to `answerInTurn`.
+ */
+export declare function canBackgroundDeliver(agent: Agent): boolean;
+/**
+ * One live first answer for a team message.
+ *
+ * The call is intentionally decoupled from the background start: a slow or
+ * failed first answer never blocks the workflow run — the failure path still
+ * enters a plainly-labelled template fallback, so the first visible line always
+ * says what it is. The live text is scrubbed the way the delivery side scrubs
+ * its human block (drop ledger lines, strip machine detail).
+ *
+ * `call` is injected so the module stays testable without an engine; production
+ * wires it to one `runSingleCall` (`label: 'first-answer'`, `triageModel` route).
+ *
+ * @param agent - owning agent (kept for call-site symmetry; unused by the helper itself).
+ * @param request - the user original.
+ * @param history - bounded context snapshot, possibly empty.
+ * @param tier - the team verdict (language only; never the tier sentence itself).
+ * @param call - the one first-answer call; absent means "no live text".
+ * @returns the first-answer text (live or template fallback, never empty).
+ */
+export declare function produceFirstAnswer(agent: Agent, request: string, history: string | undefined, tier: TriageVerdict, call?: (prompt: string) => Promise<{
+    ok: true;
+    text: string;
+} | {
+    ok: false;
+    reason: string;
+}>): Promise<string>;
 /**
  * Directories the look-up pass reads memory files from.
  *

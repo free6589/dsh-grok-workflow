@@ -254,15 +254,22 @@ describe('client progress tab: the state glyph', () => {
     expect(texts(planless!)).toEqual([''])
   })
 
-  it('shows the exact row count instead of a glyph when a node aggregates more than one row', () => {
-    const execute = glyphOf(run, 'stage:execute')!
-    // Two completed rows: a count is a fact a reader can check, and it wins over the glyph.
-    expect(execute.props['data-gw-progress-count']).toBe(2)
-    expect(execute.props['data-gw-progress-glyph']).toBeUndefined()
-    expect(texts(execute)).toEqual(['2'])
+  it('shows the settled/declared count on the segment meta line, not a count glyph', () => {
+    const tree = renderRun(run)
+    const executeSeg = walk(tree).find((element) => element.props['data-node-key'] === 'stage:execute')!
+    // A+C: every segment ring carries its own state glyph; the count lives on the
+    // meta line (a fact a reader can check, next to the state words).
+    const glyph = glyphOf(run, 'stage:execute')!
+    expect(glyph!.props['data-gw-progress-glyph']).toBe('done')
+    const meta = walk(executeSeg).find((element) => element.props['data-gw-progress-meta'] === true)!
+    expect(texts(meta).join('')).toContain('2/2')
+    // No count attribute replaces the glyph anywhere.
+    for (const element of walk(tree)) {
+      expect(element.props['data-gw-progress-count']).toBeUndefined()
+    }
     // One row keeps the glyph.
     const verify = glyphOf(run, 'stage:verify')!
-    expect(verify.props['data-gw-progress-count']).toBeUndefined()
+    expect(verify.props['data-gw-progress-glyph']).toBe('failed')
   })
 
   it('rings a derived blocked node with the blocked glyph the tooltip explains', () => {
@@ -279,5 +286,68 @@ describe('client progress tab: the state glyph', () => {
     const glyph = glyphOf(blocked, 'stage:execute')!
     expect(glyph.props['data-gw-progress-glyph']).toBe('blocked')
     expect(texts(glyph)).toEqual([progress.stateGlyph['blocked']])
+  })
+})
+
+describe('client progress tab: accordion spine (A+C)', () => {
+  it('opens the first failed segment by default, and only one segment at a time', () => {
+    const nodes = walk(renderRun(run)).filter((element) => element.props['data-gw-progress-node'] === true)
+    const open = nodes.filter((node) => node.props['aria-expanded'] === true)
+    expect(open).toHaveLength(1)
+    expect(open[0]!.props['data-node-key']).toBe('stage:verify')
+    // Only the open segment renders a branch.
+    const branches = walk(renderRun(run)).filter((element) => element.props['data-gw-progress-branch'] !== undefined)
+    expect(branches).toHaveLength(1)
+    expect(branches[0]!.props['data-gw-progress-branch']).toBe('stage:verify')
+    // The jump button exists exactly when there is a failure.
+    expect(walk(renderRun(run)).some((element) => element.props['data-gw-progress-jump'] === true)).toBe(true)
+  })
+
+  it('opens the doing segment when there is no failure, and nothing when settled', () => {
+    const running: ProgressRun = {
+      runId: 'run-doing',
+      name: '任务团队',
+      anchorSeq: 1,
+      members: [progressMember(1, '执行')],
+    }
+    const open = walk(renderRun(running))
+      .filter((element) => element.props['data-gw-progress-node'] === true && element.props['aria-expanded'] === true)
+    expect(open).toHaveLength(1)
+    expect(open[0]!.props['data-node-key']).toBe('stage:execute')
+    const settled: ProgressRun = {
+      runId: 'run-settled',
+      name: '任务团队',
+      anchorSeq: 1,
+      members: [progressMember(1, '执行', 'completed')],
+      stopReason: 'completed',
+    }
+    expect(walk(renderRun(settled))
+      .filter((element) => element.props['data-gw-progress-node'] === true && element.props['aria-expanded'] === true))
+      .toHaveLength(0)
+    expect(walk(renderRun(settled)).some((element) => element.props['data-gw-progress-jump'] === true)).toBe(false)
+  })
+
+  it('shows three member cards and a real +N line past three members', () => {
+    const many: ProgressRun = {
+      runId: 'run-many',
+      name: '任务团队',
+      anchorSeq: 1,
+      members: [
+        progressMember(1, '执行', 'completed'),
+        progressMember(2, '执行', 'completed'),
+        progressMember(3, '执行', 'completed'),
+        progressMember(4, '执行', 'completed'),
+        progressMember(5, '执行'),
+      ],
+    }
+    const tree = renderRun(many)
+    const cards = walk(tree).filter((element) => element.props['data-gw-progress-member'] !== undefined)
+    expect(cards).toHaveLength(3)
+    const more = walk(tree).find((element) => element.props['data-gw-progress-more'] !== undefined)!
+    expect(more.props['data-gw-progress-more']).toBe(2)
+    expect(texts(more).join('')).toContain('+2')
+    // The failed badge and the meta count line travel on the segment head.
+    const verify = walk(tree).find((element) => element.props['data-node-key'] === 'stage:execute')!
+    expect(String(texts(verify).join(''))).toContain('5')
   })
 })

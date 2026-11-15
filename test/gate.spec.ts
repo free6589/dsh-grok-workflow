@@ -506,11 +506,12 @@ describe('mandatory entry gate', () => {
     await ctx.preStep()(payload(agent, [userMessage('查一下新加坡天气')]), passingNext([]))
     await waitFor(() => agent.followups.length === 1)
     const text = textOf(agent.followups[0]!)
-    expect(text).toContain('做完了')
-    expect(text).toContain('项任务全部核验通过')
+    // Answer-first: the conclusion opens, the count lives in the tail.
+    expect(text).toContain('答案：')
+    expect(text).toContain('以上是结论；明细已记入台账。')
     // The human block rides inside the markers so the main model reproduces it verbatim.
-    expect(text.indexOf('做完了')).toBeGreaterThan(text.indexOf(REPORT_BEGIN))
-    expect(text.indexOf('做完了')).toBeLessThan(text.indexOf(REPORT_END))
+    expect(text.indexOf('答案：')).toBeGreaterThan(text.indexOf(REPORT_BEGIN))
+    expect(text.indexOf('答案：')).toBeLessThan(text.indexOf(REPORT_END))
   })
 
   it('never dresses a failed run in the success header (B plan)', async () => {
@@ -533,7 +534,7 @@ describe('mandatory entry gate', () => {
     const agent = new FakeAgent()
     await ctx.preStep()(payload(agent, [userMessage('查一下新加坡天气')]), passingNext([]))
     await waitFor(() => agent.followups.length === 1)
-    expect(textOf(agent.followups[0]!)).not.toContain('做完了')
+    expect(textOf(agent.followups[0]!)).not.toContain('答案：')
   })
 
   it('delivers an explicit failure answer when the engine reports an error', async () => {
