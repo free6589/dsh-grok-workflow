@@ -158,6 +158,80 @@ export const CONFIG_KEYS = [
 
 const TOOL_NAME = /^[a-z][a-z0-9_]{1,40}$/
 
+/** One stored limit the schema had to clamp, as the parse saw it. */
+export interface LimitOverrun {
+  field: 'maxConcurrency' | 'maxRetries'
+  /** The value that was stored, before clamping. */
+  stored: number
+  /** The hard maximum it takes effect as. */
+  cap: number
+}
+
+/**
+ * Overruns recorded by the schema clamp, waiting for the load path to announce them.
+ *
+ * This buffer is the one impure thing in this module, and it is deliberate: the
+ * clamp happens inside a `Config` resolver, which the host runs *before* `apply()`
+ * and which has no logger. A schema cannot warn, so it records and the plugin
+ * drains. Keyed by field + stored value because the resolver calls the transform
+ * callback twice (the value and the adapted input) and the host may parse the same
+ * document again; the reader still sees one entry per distinct stored overrun.
+ */
+const recordedOverruns = new Map<string, LimitOverrun>()
+
+/**
+ * Drain the overruns the schema clamp recorded since the last call.
+ *
+ * The caller announces them once: a config document parsed before `apply()` (the
+ * ordinary profile-patch path) leaves its notes here, and so does every later
+ * re-parse, so nothing is lost and nothing is announced twice by this module.
+ * @returns The distinct overruns recorded since the previous drain, in field order.
+ */
+export function takeLimitOverruns(): LimitOverrun[] {
+  const out = [...recordedOverruns.values()]
+  recordedOverruns.clear()
+  return out
+}
+
+/**
+ * The one sentence that names a clamped limit, in both shipped languages.
+ *
+ * Shared by the schema clamp and the load-path repair so a reader cannot tell which
+ * layer caught the overrun from the wording — the fact reported is the same one.
+ * @param overrun - the stored value and the cap it takes effect as.
+ * @returns the warning line the plugin logs.
+ */
+export function limitOverrunWarning({ field, stored, cap }: LimitOverrun): string {
+  return `${field} is ${stored}, over the hard maximum ${cap}: it now takes effect as ${cap} (repaired). `
+    + `已按 ${cap} 生效（原值 ${stored} 超过上限 ${cap}），请在设置页确认`
+}
+
+/**
+ * Build a schema field that clamps an over-limit number instead of refusing it.
+ *
+ * The host validates the profile patch against this schema *before* the plugin is
+ * called (`Fiber.resolveConfig` → `Config["~standard"].validate`), so a schema that
+ * rejects 8 kills the whole row — `did not activate` — and the plugin's own repair
+ * never runs. Clamping here is what makes the recovery reachable at all (B07).
+ *
+ * Only an overrun is recovered: the inner schema still refuses a non-number, a
+ * fraction, `NaN` and anything below `min`, so a genuinely invalid value keeps
+ * failing closed at load (R-06) and `resolveConfig` keeps throwing for the
+ * programmatic path. `extra('max')` keeps the UI bound in the projected form
+ * without putting the value back under validation.
+ * @param field - configuration key, used in the warning.
+ * @param min - inclusive minimum the value must respect.
+ * @param cap - hard maximum; an overrun takes effect as this number.
+ * @returns the schema field.
+ */
+function clampedLimit(field: LimitOverrun['field'], min: number, cap: number) {
+  return z.transform(z.natural().min(min), (value: number): number => {
+    if (!(value > cap)) return value
+    recordedOverruns.set(`${field}:${value}`, { field, stored: value, cap })
+    return cap
+  }).extra('max', cap)
+}
+
 /**
  * DSH profile configuration schema.
  *
@@ -226,8 +300,8 @@ export const Config = z.object({
   historyTurns: z.natural().min(0).max(HARD_LIMITS.historyTurns).default(12).volatile(),
   historyChars: z.natural().min(0).max(HARD_LIMITS.historyChars).default(20_000).volatile(),
   maxQueuedMessages: z.natural().min(0).max(HARD_LIMITS.maxQueuedMessages).default(4).volatile(),
-  maxConcurrency: z.natural().min(1).max(HARD_LIMITS.maxConcurrency).default(DEFAULT_MAX_CONCURRENCY).volatile(),
-  maxRetries: z.natural().min(0).max(HARD_LIMITS.maxRetries).default(DEFAULT_MAX_RETRIES).volatile(),
+  maxConcurrency: clampedLimit('maxConcurrency', 1, HARD_LIMITS.maxConcurrency).default(DEFAULT_MAX_CONCURRENCY).volatile(),
+  maxRetries: clampedLimit('maxRetries', 0, HARD_LIMITS.maxRetries).default(DEFAULT_MAX_RETRIES).volatile(),
   maxTasks: z.natural().min(1).max(HARD_LIMITS.maxTasks).default(12).volatile(),
   // 60 minutes, not 30 (t45, P1-4): the two measured deadline kills were 30m00s
   // and 30m01s on four-task objectives, and a real four-task run took 878 s / 1148 s
@@ -476,6 +550,43 @@ export function repairSynthesisInconsistency(raw: GrokWorkflowConfig): { repaire
     }
   }
   return { repaired: raw, warnings: [] }
+}
+
+/**
+ * Repair a stored limit that exceeds the hard maximum (B07, D-031).
+ *
+ * `maxConcurrency` / `maxRetries` are a quota envelope, not a preference: the Host
+ * refuses to run above 6 / 3 (`resolveConfig`), and that refusal is correct. A
+ * profile patch written before v0.9.0 restored the envelope can still hold the old
+ * wider numbers (8 / 5), and failing the whole row for them leaves the user with no
+ * settings page to fix it from — the same deadlock D-031 removed for the synthesis
+ * mismatch. So a stored overrun takes effect as the cap, announced once.
+ *
+ * Only an *overrun* is recoverable here: a number above the maximum. Everything
+ * else is left exactly as it is for `resolveConfig` to reject (R-06) — a value
+ * below the minimum, a non-number, an unknown key or a malformed chain is not a
+ * "the cap moved" problem, and silently rewriting it would hide a real error.
+ * The input is not mutated; a non-matching input returns unchanged with no
+ * warnings, so the caller can chain this with the other repair unconditionally.
+ * @param raw - raw user configuration (plain snapshot shape).
+ * @returns The clamped config plus human-readable warnings (empty when nothing matched).
+ */
+export function repairLimitOverruns(raw: GrokWorkflowConfig): { repaired: GrokWorkflowConfig; warnings: string[] } {
+  const caps: ReadonlyArray<{ field: LimitOverrun['field']; cap: number }> = [
+    { field: 'maxConcurrency', cap: HARD_LIMITS.maxConcurrency },
+    { field: 'maxRetries', cap: HARD_LIMITS.maxRetries },
+  ]
+  const out: GrokWorkflowConfig = { ...raw }
+  const warnings: string[] = []
+  for (const { field, cap } of caps) {
+    const stored = raw[field]
+    // A non-number and `NaN` are left alone: `NaN > cap` is false, and neither is a
+    // "the cap moved" case — `resolveConfig` rejects both with their own reason.
+    if (typeof stored !== 'number' || !(stored > cap)) continue
+    out[field] = cap
+    warnings.push(limitOverrunWarning({ field, stored, cap }))
+  }
+  return { repaired: warnings.length === 0 ? raw : out, warnings }
 }
 
 /** Resolve defaults and enforce the hard limits for direct construction paths. */

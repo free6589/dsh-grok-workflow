@@ -115,6 +115,32 @@ export declare const CONFIG_VERSION = 1;
  * work", which is the failure mode the settings surface must not have.
  */
 export declare const CONFIG_KEYS: readonly ["toolName", "enforceGate", "gateRequired", "gateScope", "gatePreset", "answerStrategy", "mode", "grokDefault", "triageAsk", "triageModel", "triageClassifier", "triageFollowupAsFast", "instantReceipt", "humanSummary", "showDiagnostics", "historyTurns", "historyChars", "maxQueuedMessages", "maxConcurrency", "maxRetries", "maxTasks", "timeoutMs", "maxActiveRuns", "maxActiveRunsTotal", "subagentProvider", "roles", "synthesis", "switchOn", "recordRuns", "recordLimit", "showProgress", "configVersion"];
+/** One stored limit the schema had to clamp, as the parse saw it. */
+export interface LimitOverrun {
+    field: 'maxConcurrency' | 'maxRetries';
+    /** The value that was stored, before clamping. */
+    stored: number;
+    /** The hard maximum it takes effect as. */
+    cap: number;
+}
+/**
+ * Drain the overruns the schema clamp recorded since the last call.
+ *
+ * The caller announces them once: a config document parsed before `apply()` (the
+ * ordinary profile-patch path) leaves its notes here, and so does every later
+ * re-parse, so nothing is lost and nothing is announced twice by this module.
+ * @returns The distinct overruns recorded since the previous drain, in field order.
+ */
+export declare function takeLimitOverruns(): LimitOverrun[];
+/**
+ * The one sentence that names a clamped limit, in both shipped languages.
+ *
+ * Shared by the schema clamp and the load-path repair so a reader cannot tell which
+ * layer caught the overrun from the wording — the fact reported is the same one.
+ * @param overrun - the stored value and the cap it takes effect as.
+ * @returns the warning line the plugin logs.
+ */
+export declare function limitOverrunWarning({ field, stored, cap }: LimitOverrun): string;
 /**
  * DSH profile configuration schema.
  *
@@ -379,6 +405,29 @@ export declare function assertKnownKeys(config: Record<string, unknown>): void;
  * @returns The repaired config plus human-readable warnings (empty when nothing matched).
  */
 export declare function repairSynthesisInconsistency(raw: GrokWorkflowConfig): {
+    repaired: GrokWorkflowConfig;
+    warnings: string[];
+};
+/**
+ * Repair a stored limit that exceeds the hard maximum (B07, D-031).
+ *
+ * `maxConcurrency` / `maxRetries` are a quota envelope, not a preference: the Host
+ * refuses to run above 6 / 3 (`resolveConfig`), and that refusal is correct. A
+ * profile patch written before v0.9.0 restored the envelope can still hold the old
+ * wider numbers (8 / 5), and failing the whole row for them leaves the user with no
+ * settings page to fix it from — the same deadlock D-031 removed for the synthesis
+ * mismatch. So a stored overrun takes effect as the cap, announced once.
+ *
+ * Only an *overrun* is recoverable here: a number above the maximum. Everything
+ * else is left exactly as it is for `resolveConfig` to reject (R-06) — a value
+ * below the minimum, a non-number, an unknown key or a malformed chain is not a
+ * "the cap moved" problem, and silently rewriting it would hide a real error.
+ * The input is not mutated; a non-matching input returns unchanged with no
+ * warnings, so the caller can chain this with the other repair unconditionally.
+ * @param raw - raw user configuration (plain snapshot shape).
+ * @returns The clamped config plus human-readable warnings (empty when nothing matched).
+ */
+export declare function repairLimitOverruns(raw: GrokWorkflowConfig): {
     repaired: GrokWorkflowConfig;
     warnings: string[];
 };

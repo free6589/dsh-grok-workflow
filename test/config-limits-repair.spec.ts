@@ -1,0 +1,465 @@
+import { readFileSync } from 'node:fs'
+import { Context } from '@deepseek-ai/cordis'
+import z from '@deepseek-ai/schemastery'
+import { beforeEach, describe, expect, it } from 'vitest'
+import {
+  Config,
+  HARD_LIMITS,
+  repairLimitOverruns,
+  resolveConfig,
+  snapshotConfig,
+  takeLimitOverruns,
+} from '../src/config.js'
+import { apply } from '../src/index.js'
+
+/**
+ * The schema records clamped overruns in a module-level buffer the plugin drains, so
+ * every case starts from a clean one: the assertions below are about its own input,
+ * not about whatever an earlier case happened to parse.
+ */
+beforeEach(() => { takeLimitOverruns() })
+
+/** Plain values out of a parsed (volatile) config document. */
+const parsed = (raw: Record<string, unknown>): Record<string, unknown> =>
+  snapshotConfig(Config(raw as never) as Record<string, unknown>) as Record<string, unknown>
+
+/**
+ * B07 recovery for a stored limit over the hard maximum.
+ *
+ * v0.9.0 restored the documented 6 / 3 envelope (`HARD_LIMITS`, D-003), so a live
+ * profile patch written before it can still hold the old wider numbers (8 / 5).
+ * `resolveConfig` is right to refuse them — the cap is a quota — but refusing the
+ * whole row leaves the user with no settings page to fix it from, which is the
+ * deadlock D-031 removed for the synthesis mismatch. The load path therefore
+ * clamps to the cap and warns once per field.
+ *
+ * Two layers carry the recovery, because the host validates the profile patch before
+ * the plugin exists: `Config` clamps at parse time (that is the layer the user hits —
+ * `Fiber.resolveConfig` → `Config["~standard"].validate`), and `readConfig` repairs a
+ * config that never met the schema (programmatic `apply()`). `resolveConfig` keeps
+ * refusing an overrun, because the cap is a quota and a direct caller must not get a
+ * silent wider value.
+ *
+ * Mutation meaning: deleting the `repairLimitOverruns` call from `readConfig`
+ * fails the `apply()` cases below (the row throws instead of activating); widening
+ * `repairLimitOverruns` to a below-minimum value fails the R-06 cases; removing
+ * the cap from `resolveConfig` fails the first assertion of the first case. The
+ * cap itself is never widened anywhere in this file.
+ */
+describe('config limit repair (B07)', () => {
+  it('clamps a stored 8 / 5 to 6 / 3 with one bilingual warning per field', () => {
+    const raw = { maxConcurrency: 8, maxRetries: 5 }
+    // R-06 pin: validation itself still refuses the stored numbers, untouched.
+    expect(() => resolveConfig({ maxConcurrency: 8 })).toThrow(/maxConcurrency must be an integer between 1 and 6/)
+    expect(() => resolveConfig({ maxRetries: 5 })).toThrow(/maxRetries must be an integer between 0 and 3/)
+
+    const { repaired, warnings } = repairLimitOverruns(raw)
+    expect(repaired.maxConcurrency).toBe(HARD_LIMITS.maxConcurrency)
+    expect(repaired.maxRetries).toBe(HARD_LIMITS.maxRetries)
+    expect(repaired.maxConcurrency).toBe(6)
+    expect(repaired.maxRetries).toBe(3)
+    // One warning each, concurrency first, and each one names both numbers in both
+    // languages so the log can be read without the patch open next to it.
+    expect(warnings).toHaveLength(2)
+    expect(warnings[0]).toContain('maxConcurrency is 8')
+    expect(warnings[0]).toContain('over the hard maximum 6')
+    expect(warnings[0]).toContain('已按 6 生效（原值 8 超过上限 6），请在设置页确认')
+    expect(warnings[1]).toContain('maxRetries is 5')
+    expect(warnings[1]).toContain('over the hard maximum 3')
+    expect(warnings[1]).toContain('已按 3 生效（原值 5 超过上限 3），请在设置页确认')
+
+    // The clamped shape resolves to the cap, not to the default and not above it.
+    const config = resolveConfig(repaired)
+    expect(config.maxConcurrency).toBe(6)
+    expect(config.maxRetries).toBe(3)
+    // Pure: the caller's object is not mutated, so a second read sees the stored value.
+    expect(raw).toEqual({ maxConcurrency: 8, maxRetries: 5 })
+  })
+
+  it('clamps in the schema the host validates before apply() — the layer that died', () => {
+    // This is the reported failure: Cordis validates the profile patch through
+    // `Config["~standard"].validate` *before* `apply()`, so a schema that refuses 8
+    // makes the whole row `did not activate` and no plugin repair can run.
+    const result = (Config as unknown as { '~standard': { validate(input: unknown): { issues?: unknown, value: unknown } } })['~standard']
+      .validate({ maxConcurrency: 8, maxRetries: 5 })
+    expect(result.issues).toBeUndefined()
+    expect(snapshotConfig(result.value as Record<string, unknown>)).toMatchObject({ maxConcurrency: 6, maxRetries: 3 })
+    // The callable form (what the settings path and the tests use) agrees.
+    expect(parsed({ maxConcurrency: 8, maxRetries: 5 })).toMatchObject({ maxConcurrency: 6, maxRetries: 3 })
+    // And the clamp is announced: the note the plugin drains at load.
+    expect(takeLimitOverruns()).toEqual([
+      { field: 'maxConcurrency', stored: 8, cap: 6 },
+      { field: 'maxRetries', stored: 5, cap: 3 },
+    ])
+    // Parsing the same document twice does not double the note.
+    parsed({ maxConcurrency: 8, maxRetries: 5 })
+    expect(takeLimitOverruns()).toHaveLength(2)
+  })
+
+  it('keeps the schema fail-closed for everything that is not an overrun (R-06)', () => {
+    expect(() => Config({ maxConcurrency: 0 } as never)).toThrow(/maxConcurrency expected number >= 1/)
+    expect(() => Config({ maxRetries: -1 } as never)).toThrow(/maxRetries expected number >= 0/)
+    expect(() => Config({ maxConcurrency: 2.5 } as never)).toThrow(/multiple of 1/)
+    expect(() => Config({ maxConcurrency: '8' } as never)).toThrow(/expected number/)
+    // An absent key still defaults, so the clamp did not swallow the default.
+    expect(parsed({})).toMatchObject({ maxConcurrency: 3, maxRetries: 1 })
+    expect(parsed({ maxConcurrency: 6, maxRetries: 3 })).toMatchObject({ maxConcurrency: 6, maxRetries: 3 })
+    expect(takeLimitOverruns()).toEqual([])
+  })
+
+  it('leaves a legal 6 / 3 untouched and says nothing', () => {
+    const raw = { maxConcurrency: 6, maxRetries: 3 }
+    const { repaired, warnings } = repairLimitOverruns(raw)
+    expect(warnings).toEqual([])
+    // Nothing matched: the input object comes back untouched, not a copy of it.
+    expect(repaired).toBe(raw)
+    expect(resolveConfig(repaired).maxConcurrency).toBe(6)
+  })
+
+  it('clamps only the field that overruns', () => {
+    const { repaired, warnings } = repairLimitOverruns({ maxConcurrency: 7, maxRetries: 2 })
+    expect(repaired).toEqual({ maxConcurrency: 6, maxRetries: 2 })
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0]).toContain('maxConcurrency')
+  })
+
+  it('leaves a below-minimum or non-numeric value to the validator (R-06)', () => {
+    // Not a "the cap moved" case: 0 was never legal, so clamping it would invent a
+    // value the user never wrote. It stays a hard fail.
+    const zero = { maxConcurrency: 0 }
+    expect(repairLimitOverruns(zero)).toEqual({ repaired: zero, warnings: [] })
+    expect(() => resolveConfig(zero)).toThrow(/maxConcurrency must be an integer between 1 and 6/)
+
+    const negative = { maxRetries: -1 }
+    expect(repairLimitOverruns(negative).warnings).toEqual([])
+    expect(() => resolveConfig(negative)).toThrow(/maxRetries must be an integer between 0 and 3/)
+
+    const text = { maxConcurrency: '8' } as never
+    expect(repairLimitOverruns(text).warnings).toEqual([])
+    expect(() => resolveConfig(text)).toThrow(/maxConcurrency must be an integer/)
+  })
+})
+
+/** The minimum context `apply()` touches, with the load-time warnings recorded. */
+class FakeCtx {
+  readonly warnings: string[] = []
+  readonly infos: string[] = []
+  tool: { name: string } | undefined
+  readonly tools = {
+    register: (tool: { name: string }) => { this.tool = tool; return () => { this.tool = undefined } },
+  }
+  readonly systemPrompt = {
+    section: () => () => {},
+    getSectionOrder: () => 2600,
+  }
+  logger = () => ({
+    warn: (message: string) => { this.warnings.push(message) },
+    info: (message: string) => { this.infos.push(message) },
+  })
+  effect = (installer: () => unknown) => installer()
+}
+
+/**
+ * `apply()` half: the row must activate on a stale pre-v0.9.0 patch, because the
+ * settings page it is fixed from only exists once the row is up.
+ */
+describe('apply() load-time limit repair (B07)', () => {
+  it('activates on a stored 8 / 5, warns once per field, and runs at 6 / 3', () => {
+    const ctx = new FakeCtx()
+    expect(() => apply(ctx as never, { maxConcurrency: 8, maxRetries: 5 } as never)).not.toThrow()
+    expect(ctx.tool?.name).toBe('grok_workflow')
+    expect(ctx.warnings.filter(w => w.includes('请在设置页确认'))).toHaveLength(2)
+    expect(ctx.warnings.some(w => w.includes('maxConcurrency is 8'))).toBe(true)
+    expect(ctx.warnings.some(w => w.includes('maxRetries is 5'))).toBe(true)
+    // The effective-configuration line the t47 log writes is the evidence that the
+    // run reads the cap and not the stored number.
+    expect(ctx.infos.some(info => info.includes('maxConcurrency=6') && info.includes('maxRetries=3'))).toBe(true)
+  })
+
+  it('announces the schema-clamped overrun the host parsed before apply()', () => {
+    // The real order: the host validates the patch, then loads the plugin with the
+    // clamped document. The clamp itself is silent, so the note it leaves is the only
+    // way the user learns their stored 8 is running as 6.
+    const hostConfig = Config({ maxConcurrency: 8, maxRetries: 5 } as never) as Record<string, unknown>
+    const ctx = new FakeCtx()
+    expect(() => apply(ctx as never, hostConfig as never)).not.toThrow()
+    expect(ctx.tool?.name).toBe('grok_workflow')
+    expect(ctx.warnings.filter(w => w.includes('请在设置页确认'))).toHaveLength(2)
+    expect(ctx.warnings.some(w => w.includes('maxConcurrency is 8, over the hard maximum 6'))).toBe(true)
+    expect(ctx.warnings.some(w => w.includes('maxRetries is 5, over the hard maximum 3'))).toBe(true)
+    expect(ctx.infos.some(info => info.includes('maxConcurrency=6') && info.includes('maxRetries=3'))).toBe(true)
+    // Nothing recorded, nothing to say on the next load of the same document.
+    takeLimitOverruns()
+    const quiet = new FakeCtx()
+    apply(quiet as never, Config({ maxConcurrency: 6, maxRetries: 3 } as never) as never)
+    expect(quiet.warnings.filter(w => w.includes('请在设置页确认'))).toEqual([])
+  })
+
+  it('contrast: the schema clamps while the programmatic resolver still throws (R-06)', () => {
+    // Same number, two entry points, two contracts: the loading path recovers, a
+    // direct caller is refused. Widening `resolveConfig` to clamp would fail this.
+    expect(parsed({ maxConcurrency: 8, maxRetries: 5 })).toMatchObject({ maxConcurrency: 6, maxRetries: 3 })
+    expect(() => resolveConfig({ maxConcurrency: 8 })).toThrow(/maxConcurrency must be an integer between 1 and 6/)
+    expect(() => resolveConfig({ maxRetries: 5 })).toThrow(/maxRetries must be an integer between 0 and 3/)
+    // What the reader actually resolves is the clamped shape, and that is legal.
+    expect(resolveConfig(parsed({ maxConcurrency: 8, maxRetries: 5 }))).toMatchObject({ maxConcurrency: 6, maxRetries: 3 })
+  })
+
+  it('repairs both defect kinds in one load instead of needing two restarts', () => {
+    const ctx = new FakeCtx()
+    expect(() => apply(ctx as never, { synthesis: 'model', maxConcurrency: 8 } as never)).not.toThrow()
+    expect(ctx.tool?.name).toBe('grok_workflow')
+    // Two repair warnings (the runtime also notes its own unavailable services).
+    expect(ctx.warnings.filter(w => w.includes('请在设置页确认'))).toHaveLength(2)
+    expect(ctx.warnings.some(w => w.includes('已按 deterministic 生效，请在设置页确认'))).toBe(true)
+    expect(ctx.warnings.some(w => w.includes('已按 6 生效（原值 8 超过上限 6）'))).toBe(true)
+    const line = ctx.infos.find(info => info.startsWith('configuration in effect:'))
+    expect(line).toContain('synthesis=deterministic (repaired)')
+    expect(line).toContain('maxConcurrency=6')
+  })
+
+  it('still throws at load when the repaired shape hides a defect it may not touch', () => {
+    const ctx = new FakeCtx()
+    // The overrun is repaired, then the unknown key is rejected: one repair must not
+    // launder a second, unrecoverable defect (R-06).
+    expect(() => apply(ctx as never, { maxConcurrency: 8, maxRetires: 2 } as never))
+      .toThrow(/unknown configuration key/)
+    expect(ctx.tool).toBeUndefined()
+    // A below-minimum value is not repaired either, so it still refuses the load.
+    expect(() => apply(new FakeCtx() as never, { maxConcurrency: 0 } as never))
+      .toThrow(/maxConcurrency must be an integer between 1 and 6/)
+  })
+})
+
+/**
+ * The frame the user actually died in.
+ *
+ * The host does not call the plugin to decide whether it loads: Cordis validates the
+ * profile patch against the exported `Config` *first* (`Fiber.resolveConfig` →
+ * `Config["~standard"].validate`) and a validation issue leaves the fiber `FAILED`
+ * before `apply()` exists. So the schema-level clamp is the fix that matters, and a
+ * real fiber is the only honest way to show it — hence a real `Context`, not a double.
+ * The second half is the control: the same fiber with the pre-B07 schema (`max(6)`)
+ * still fails, which is what makes the first half evidence instead of ritual.
+ */
+describe('B07 at the host layer: a real Cordis fiber', () => {
+  const FAILED = 3
+  const ACTIVE = 2
+
+  async function loadWith(schema: unknown) {
+    const ctx = new Context()
+    let registered: { name: string } | undefined
+    ctx.provide('tools', { register: (tool: { name: string }) => { registered = tool; return () => {} } })
+    ctx.provide('workflowEngine', { start: () => undefined })
+    ctx.provide('systemPrompt', { section: () => () => {}, getSectionOrder: () => 2600 })
+    let seen: Record<string, unknown> | undefined
+    const fiber = ctx.plugin({
+      name: 'dsh-grok-workflow',
+      inject: ['tools', 'workflowEngine', 'systemPrompt'],
+      Config: schema,
+      apply: (inner: never, config: never) => {
+        seen = snapshotConfig(config as Record<string, unknown>) as Record<string, unknown>
+        return apply(inner, config)
+      },
+    } as never, { maxConcurrency: 8, maxRetries: 5 } as never)
+    // One macrotask is enough for `_reload()` to settle into a stable state.
+    await new Promise(resolve => setTimeout(resolve, 50))
+    const state = (fiber as unknown as { state: number }).state
+    await (fiber as unknown as { dispose: () => Promise<void> }).dispose()
+    return { state, seen, registered }
+  }
+
+  it('activates on a stored 8 / 5 and hands the plugin 6 / 3', async () => {
+    const result = await loadWith(Config)
+    expect(result.state).toBe(ACTIVE)
+    expect(result.seen).toMatchObject({ maxConcurrency: 6, maxRetries: 3 })
+    expect(result.registered?.name).toBe('grok_workflow')
+  })
+
+  it('control: the pre-B07 schema still fails the fiber before apply()', async () => {
+    const refusing = z.object({ maxConcurrency: z.number().max(HARD_LIMITS.maxConcurrency).default(3) })
+    const result = await loadWith(refusing)
+    expect(result.state).toBe(FAILED)
+    expect(result.registered).toBeUndefined()
+    expect(result.seen).toBeUndefined()
+  })
+})
+
+// ─── Settings page half ────────────────────────────────────────────────────────
+//
+// The page is hand-written JavaScript, so these fixtures load the shipped bundle the
+// way the host does (`__ModuleLoader__` registration, then the factory) and drive the
+// component with a stub React. Only the render surface is stubbed — the bundle, its
+// dictionaries and the page component are the real ones.
+
+type Element = { type: unknown, props: Record<string, unknown>, children: unknown[] }
+type Translator = (key: string, params?: Record<string, unknown>) => string
+
+interface PageBundle {
+  apply(ctx: unknown): void
+  GROK_WORKFLOW_DICT: Record<string, Record<string, string>>
+  GROK_WORKFLOW_INTERNALS: {
+    limitOverrunWarn(value?: Record<string, unknown>): Array<{ key: string, live: number, cap: number }>
+    translate(locale: string, key: string, params?: Record<string, unknown>): string
+    translator(locale: string): Translator
+  }
+}
+
+let rendering: { index: number, cells: unknown[] } | undefined
+
+function loadBundle(): PageBundle {
+  const source = readFileSync(new URL('../src/client/index.js', import.meta.url), 'utf8')
+  let registration: { id: string, factory: (require: (id: string) => unknown) => PageBundle } | undefined
+  const globalRecord = globalThis as unknown as { window?: { __ModuleLoader__?: { load(spec: never): void } } | undefined }
+  const previous = globalRecord.window
+  globalRecord.window = { __ModuleLoader__: { load: (spec) => { registration = spec } } }
+  try {
+    new Function(source)()
+  } finally {
+    globalRecord.window = previous
+  }
+  expect(registration?.id).toBe('dsh-grok-workflow')
+  const stubReact = {
+    createElement: (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]): unknown => {
+      const element: Element = { type, props: props ?? {}, children: children.flat(Infinity) as unknown[] }
+      return typeof type === 'function' ? (type as (props: Record<string, unknown>) => unknown)(element.props) : element
+    },
+    useState: (initial: unknown) => {
+      const cells = rendering?.cells ?? []
+      const at = rendering === undefined ? 0 : rendering.index++
+      if (at >= cells.length) cells[at] = typeof initial === 'function' ? (initial as () => unknown)() : initial
+      return [cells[at], (next: unknown) => { cells[at] = typeof next === 'function' ? (next as (value: unknown) => unknown)(cells[at]) : next }]
+    },
+    useEffect: () => {},
+    useMemo: (factory: () => unknown) => factory(),
+    useSyncExternalStore: (_subscribe: unknown, getSnapshot: () => unknown) => getSnapshot(),
+  }
+  return registration!.factory((id) => {
+    if (id === 'react') return stubReact
+    throw new Error(`the bundle must not require ${id} at load time`)
+  })
+}
+
+const bundle = loadBundle()
+const { limitOverrunWarn, translate, translator } = bundle.GROK_WORKFLOW_INTERNALS
+
+/** Register the page against a face holding one fixed settings document. */
+function renderWith(value: Record<string, unknown>): unknown {
+  const snapshot = {
+    status: 'ready',
+    view: { writable: true, namespaces: [{ ns: 'grok-workflow', revision: 1, value }] },
+    error: null,
+  }
+  const face = {
+    subscribe: () => () => {},
+    getSnapshot: () => snapshot,
+    ensure: async () => undefined,
+  }
+  let page: { options: Record<string, unknown>, component: (props: Record<string, unknown>) => unknown } | undefined
+  bundle.apply({
+    effect: (fn: () => unknown) => {
+      const dispose = fn()
+      return typeof dispose === 'function' ? dispose : () => {}
+    },
+    inject: () => ({}),
+    configForms: {
+      describe: () => face,
+      whileServed: (_ns: string[], fn: () => unknown) => fn(),
+      get: () => ({ mutate: async () => true }),
+    },
+    slots: {
+      inject: (_name: string, fn: () => unknown) => fn(),
+      register: (options: Record<string, unknown>, component: (props: Record<string, unknown>) => unknown) => {
+        page = { options, component }
+        return () => { page = undefined }
+      },
+    },
+  })
+  const options = page!.options
+  const injected = (options['inject'] as () => Record<string, unknown>)()
+  const props = { ...injected, t: translator('zh') } as Record<string, unknown>
+  rendering = { index: 0, cells: [] }
+  try {
+    return page!.component(props)
+  } finally {
+    rendering = undefined
+  }
+}
+
+/** Every rendered element, depth first. */
+function walk(node: unknown, out: Element[] = []): Element[] {
+  if (node === null || node === undefined || typeof node === 'boolean') return out
+  if (Array.isArray(node)) {
+    for (const child of node) walk(child, out)
+    return out
+  }
+  if (typeof node === 'object') {
+    const element = node as Element
+    out.push(element)
+    for (const child of element.children) walk(child, out)
+    return out
+  }
+  return out
+}
+
+/** The text a rendered subtree carries, flattened. */
+function texts(node: unknown): string[] {
+  if (node === null || node === undefined || typeof node === 'boolean') return []
+  if (typeof node === 'string' || typeof node === 'number') return [String(node)]
+  if (Array.isArray(node)) return node.flatMap(child => texts(child))
+  const element = node as Element
+  return element.children.flatMap(child => texts(child))
+}
+
+describe('client settings page: over-limit banner (B07)', () => {
+  it('finds a live value above the hard maximum and ignores a legal one', () => {
+    expect(limitOverrunWarn({ maxConcurrency: 8, maxRetries: 5 })).toEqual([
+      { key: 'maxConcurrency', live: 8, cap: 6 },
+      { key: 'maxRetries', live: 5, cap: 3 },
+    ])
+    expect(limitOverrunWarn({ maxConcurrency: 6, maxRetries: 3 })).toEqual([])
+    expect(limitOverrunWarn(undefined)).toEqual([])
+    // A string or a below-minimum value is `error.number`'s business, not this banner's.
+    expect(limitOverrunWarn({ maxConcurrency: '8' })).toEqual([])
+    expect(limitOverrunWarn({ maxConcurrency: 0 })).toEqual([])
+    // Partial: only the field that overruns is reported.
+    expect(limitOverrunWarn({ maxConcurrency: 7, maxRetries: 1 })).toEqual([
+      { key: 'maxConcurrency', live: 7, cap: 6 },
+    ])
+  })
+
+  it('shows one yellow line per overrun, naming the saved value and the cap', () => {
+    const tree = renderWith({ maxConcurrency: 8, maxRetries: 5, roles: {}, switchOn: [] })
+    const banner = walk(tree).find(element => element.props['data-warn'] === 'limits')
+    expect(banner).toBeDefined()
+    const keys = walk(banner).map(element => element.props['data-warn-key']).filter(Boolean)
+    expect(keys).toEqual(['maxConcurrency', 'maxRetries'])
+    const copy = texts(banner).join('\n')
+    // The reader is told both numbers, in the page's own language, and that the
+    // run is clamped rather than refused.
+    expect(copy).toContain(bundle.GROK_WORKFLOW_DICT['zh']!['warn.limit.title'])
+    expect(copy).toContain('同时干几件 保存的是 8，超过硬上限 6')
+    expect(copy).toContain('失败重试几次 保存的是 5，超过硬上限 3')
+  })
+
+  it('drops the banner once the saved value is legal', () => {
+    const tree = renderWith({ maxConcurrency: 6, maxRetries: 3, roles: {}, switchOn: [] })
+    expect(walk(tree).some(element => element.props['data-warn'] === 'limits')).toBe(false)
+  })
+
+  it('carries the notice in both languages, not as a key', () => {
+    const zh = translator('zh')
+    const english = translate('en', 'warn.limit.detail', { field: 'Jobs at once', live: '8', cap: '6' })
+    const chinese = zh('warn.limit.detail', { field: '同时干几件', live: '8', cap: '6' })
+    expect(english).not.toBe('warn.limit.detail')
+    expect(english).not.toBe(chinese)
+    expect(english).toContain('8')
+    expect(english).toContain('6')
+    expect(chinese).toContain('同时干几件')
+    for (const locale of ['en', 'zh']) {
+      const dict = bundle.GROK_WORKFLOW_DICT[locale]!
+      expect(dict['warn.limit.title']!.length).toBeGreaterThan(3)
+      expect(dict['warn.limit.detail']!.length).toBeGreaterThan(3)
+    }
+  })
+})

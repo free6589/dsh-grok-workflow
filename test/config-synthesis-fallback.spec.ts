@@ -142,13 +142,17 @@ describe('apply() load-time synthesis fallback (P1)', () => {
   it('still throws at load on anything the repair must not touch (R-06)', () => {
     expect(() => apply(new FakeCtx() as never, { maxRetires: 2 } as never))
       .toThrow(/unknown configuration key/)
-    expect(() => apply(new FakeCtx() as never, { maxRetries: 99 } as never))
-      .toThrow(/maxRetries must be an integer/)
+    // B07 made a stored *overrun* (maxRetries 5, maxConcurrency 8) recoverable at load,
+    // so the hard-fail witness here is a value the limit repair must not touch: below
+    // the minimum was never legal, so it still refuses the load
+    // (`test/config-limits-repair.spec.ts` pins the other side).
+    expect(() => apply(new FakeCtx() as never, { maxConcurrency: 0 } as never))
+      .toThrow(/maxConcurrency must be an integer/)
     // A repairable shape hiding a second defect stays hard fail: the number
     // error must surface, not the repair warning.
     const ctx = new FakeCtx()
-    expect(() => apply(ctx as never, { synthesis: 'model', maxRetries: 99 } as never))
-      .toThrow(/maxRetries must be an integer/)
+    expect(() => apply(ctx as never, { synthesis: 'model', maxConcurrency: 0 } as never))
+      .toThrow(/maxConcurrency must be an integer/)
     expect(ctx.tool).toBeUndefined()
   })
 })

@@ -3,7 +3,21 @@
 Notable user-facing changes are recorded here in English and Simplified Chinese.
 用户可见的功能和修复会在这里以英文和简体中文记录。
 
-## [0.9.0] - 2026-11-15
+## [Unreleased]
+
+### Fixed / 修复
+
+- **Stored `maxConcurrency` / `maxRetries` over the hard maximum no longer disables the whole plugin
+  / 存量 `maxConcurrency` / `maxRetries` 超上限不再让整个插件起不来** —
+  a profile patch written before v0.9.0 (e.g. `maxConcurrency: 8`, `maxRetries: 5`) now activates
+  at the documented caps (`6` / `3`) with one bilingual warning per field instead of failing the
+  whole `grok-workflow` row with `ValidationError`. Values below the minimum, non-numbers, and
+  programmatic `resolveConfig` overruns still fail closed (R-06); the caps themselves are unchanged.
+  / v0.9.0 之前写的 profile 补丁（如 `maxConcurrency: 8`、`maxRetries: 5`）现在按文档上限
+  （`6` / `3`）钳制生效，每项一条中英告警，不再让整行 `grok-workflow` 报 `ValidationError`
+  起不来。低于下限、非数字、程序化 `resolveConfig` 越界仍硬拒绝（R-06），上限本身不变。
+
+## [0.9.1] - 2026-11-15
 
 ### Added / 新增
 
