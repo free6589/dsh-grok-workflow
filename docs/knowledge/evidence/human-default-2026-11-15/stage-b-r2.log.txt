@@ -1,0 +1,156 @@
+{
+  "step": "narrow",
+  "label": "narrow-480-light",
+  "reopened": false,
+  "scrolled": {
+    "ok": false
+  },
+  "viewport": {
+    "w": 480,
+    "h": 900
+  },
+  "prefersDark": false,
+  "bodyBg": "rgb(255, 255, 255)",
+  "bodyColor": "rgb(15, 17, 21)",
+  "tabColor": null,
+  "tabStripBox": {
+    "w": 480,
+    "h": 38
+  },
+  "reportBox": null,
+  "tabs": [],
+  "report_len": [],
+  "crash_hits": [],
+  "overflow_x": {
+    "scrollWidth": 480,
+    "innerWidth": 480,
+    "horizontal_scroll": false
+  }
+}
+{
+  "step": "dark",
+  "label": "dark-1440",
+  "reopened": true,
+  "scrolled": {
+    "ok": true,
+    "top": 146
+  },
+  "viewport": {
+    "w": 1440,
+    "h": 900
+  },
+  "prefersDark": true,
+  "bodyBg": "rgb(21, 21, 23)",
+  "bodyColor": "rgb(249, 250, 251)",
+  "tabColor": "rgb(122, 170, 255)",
+  "tabStripBox": {
+    "w": 201,
+    "h": 25
+  },
+  "reportBox": {
+    "w": 742,
+    "h": 574
+  },
+  "tabs": [
+    {
+      "label": "Chat",
+      "selected": "true"
+    },
+    {
+      "label": "Trajectory",
+      "selected": "false"
+    },
+    {
+      "label": "Progress",
+      "selected": "false"
+    }
+  ],
+  "report_len": [
+    1645
+  ],
+  "crash_hits": [],
+  "overflow_x": {
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "horizontal_scroll": false
+  }
+}
+{
+  "stage": "B-r2",
+  "narrow": {
+    "label": "narrow-480-light",
+    "reopened": false,
+    "scrolled": {
+      "ok": false
+    },
+    "viewport": {
+      "w": 480,
+      "h": 900
+    },
+    "prefersDark": false,
+    "bodyBg": "rgb(255, 255, 255)",
+    "bodyColor": "rgb(15, 17, 21)",
+    "tabColor": null,
+    "tabStripBox": {
+      "w": 480,
+      "h": 38
+    },
+    "reportBox": null,
+    "tabs": [],
+    "report_len": [],
+    "crash_hits": [],
+    "overflow_x": {
+      "scrollWidth": 480,
+      "innerWidth": 480,
+      "horizontal_scroll": false
+    }
+  },
+  "dark": {
+    "label": "dark-1440",
+    "reopened": true,
+    "scrolled": {
+      "ok": true,
+      "top": 146
+    },
+    "viewport": {
+      "w": 1440,
+      "h": 900
+    },
+    "prefersDark": true,
+    "bodyBg": "rgb(21, 21, 23)",
+    "bodyColor": "rgb(249, 250, 251)",
+    "tabColor": "rgb(122, 170, 255)",
+    "tabStripBox": {
+      "w": 201,
+      "h": 25
+    },
+    "reportBox": {
+      "w": 742,
+      "h": 574
+    },
+    "tabs": [
+      {
+        "label": "Chat",
+        "selected": "true"
+      },
+      {
+        "label": "Trajectory",
+        "selected": "false"
+      },
+      {
+        "label": "Progress",
+        "selected": "false"
+      }
+    ],
+    "report_len": [
+      1645
+    ],
+    "crash_hits": [],
+    "overflow_x": {
+      "scrollWidth": 1440,
+      "innerWidth": 1440,
+      "horizontal_scroll": false
+    }
+  }
+}
+exit=0

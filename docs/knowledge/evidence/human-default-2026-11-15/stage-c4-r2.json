@@ -1,0 +1,45 @@
+{
+  "stage": "C4-r2",
+  "switch_layer": "profile layer: .tmp/human-home-r2/profiles/ghuman/cordis.patch.yml -> grok-workflow.config.showDiagnostics: true; composed tree verified by `dsh ghuman --dump-config` before boot",
+  "task4": "小任务，请团队跑两步：第一步，在工作目录下建 .tmp/human-scratch-r2d.md，写两行待办，每行以 - 开头。第二步，用 stat -c '%s' 取回它的字节数，把这条命令的原始输出当成证据记下来。",
+  "reopened": false,
+  "settle_quiet": true,
+  "responses_before": 0,
+  "responses_total": 0,
+  "turn4_len": 0,
+  "turn4_text": "",
+  "turn4_ledger_labels": [],
+  "turn4_ledger_re": false,
+  "turn4_has_rule": false,
+  "turn4_human_landmarks": [],
+  "turn4_strip_violations": [],
+  "turn4_residue": [],
+  "turn4_machine": {
+    "statCommand": false,
+    "odCommand": false,
+    "shaTool": false,
+    "hexDigest": false,
+    "absPath": false,
+    "ledgerRule": false
+  },
+  "earlier_turns_ledger_absent": [],
+  "earlier_turn_lens": [],
+  "user_bubbles": 0,
+  "tabs": [
+    {
+      "label": "Chat",
+      "selected": "true"
+    },
+    {
+      "label": "Trajectory",
+      "selected": "false"
+    },
+    {
+      "label": "Progress",
+      "selected": "false"
+    }
+  ],
+  "crash_hits": [],
+  "scrolled": false,
+  "ledger_scrolled": false
+}

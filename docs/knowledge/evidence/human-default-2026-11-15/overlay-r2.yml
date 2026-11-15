@@ -1,0 +1,84 @@
+# Overlay for the human-report evidence instance, retry run (agent-32, 2026-11-15).
+#
+# Booted as:
+#   DSH_HOME=<repo>/.tmp/human-home-r2 dsh web --profile ghuman --patch <this file> \
+#     --port 3217 --host 127.0.0.1 --no-open
+#
+# Model credentials stay in the environment (BIFROST_VIRTUAL_KEY, read from
+# ~/.dsh/bifrost.env by the launching shell); nothing secret is written here. The
+# endpoint is the machine-local gateway on 127.0.0.1:18088/openai/v1 — the same
+# route the operator's own web profile uses. The model and the network are NOT
+# mocked: the team really runs and the model really answers.
+#
+# The two output switches under test are deliberately NOT pinned here:
+#   humanSummary    default on   -> the report is the human block      (shots 01/02/05/06)
+#   showDiagnostics default off  -> the machine ledger is folded away  (shots 02 vs 07/08)
+# Leaving them out is what makes the diagnostics shot a real contrast: the switch is
+# flipped in the profile layer (the layer the generated settings page writes), not by
+# this overlay.
+- id: llm-pi-ai
+  name: '@deepseek-ai/dsh-llm-pi-ai'
+  config:
+    providers:
+      bifrost-completions:
+        displayName: Completions
+        api: openai-completions
+        baseURL: http://127.0.0.1:18088/openai/v1
+        apiKeyEnv: BIFROST_VIRTUAL_KEY
+        reasoning: low
+        compat:
+          supportsDeveloperRole: false
+          supportsStore: false
+        models:
+          - id: wb/cn:deepseek-v4.1-flash
+            name: DeepSeek V4.1 Flash (cn)
+            contextWindow: 500000
+            maxTokens: 65536
+            input:
+              - text
+            reasoningEfforts:
+              off: null
+              low: low
+              medium: medium
+              high: high
+- id: agent-default-model
+  name: '@deepseek-ai/dsh-agent-default-model'
+  config:
+    provider: bifrost-completions
+    model: wb/cn:deepseek-v4.1-flash
+    reasoningEffort: low
+# The web layer disables workflow-ptc; dsh-grok-workflow injects the
+# workflowEngine service, so its provider has to be switched back on.
+- id: workflow-ptc
+  name: '@deepseek-ai/dsh-workflow-ptc'
+  config:
+    provider: spawn
+  disabled: false
+- id: grok-workflow
+  name: dsh-grok-workflow
+  config:
+    # `mode: full` = every message runs the whole team (D-021). The shipped default
+    # is `triage`; the subject here is the report a *team* run produces, so the team
+    # tier is forced on to keep the run deterministic. The report's own form is left
+    # at its defaults so the "human-only default" claim is about shipped defaults.
+    mode: full
+    grokDefault: on
+    triageAsk: false
+    timeoutMs: 900000
+    maxActiveRuns: 4
+    roles:
+      planner:
+        - provider: bifrost-completions
+          model: wb/cn:deepseek-v4.1-flash
+      worker:
+        - provider: bifrost-completions
+          model: wb/cn:deepseek-v4.1-flash
+      verifier:
+        - provider: bifrost-completions
+          model: wb/cn:deepseek-v4.1-flash
+      synthesizer: []
+  disabled: false
+- id: ui-settings-general
+  name: '@deepseek-ai/dsh-client-ui-settings-general'
+  config:
+    welcomeNoticeVersion: 2026-09-28.1

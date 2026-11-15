@@ -1,0 +1,122 @@
+{
+  "run": "human-report-2026-11-15 retry (agent-32)",
+  "date": "2026-11-15",
+  "evidence_dir": "docs/knowledge/evidence/human-report-2026-11-15/",
+  "shots": [
+    {
+      "file": "01-three-tabs-default-chat.png",
+      "state": "three Tab coexist, Chat default, conversation head with the user request",
+      "backed_by": "stage-a3-r2.json (tabs Chat=selected/Trajectory/Progress; user node top=92)"
+    },
+    {
+      "file": "02-human-default-report.png",
+      "state": "human-only default report (zh block + en mirror), no ledger",
+      "backed_by": "stage-a-r2.json / stage-a3-r2.json (1645 chars, human landmarks, strip clean, markers absent)"
+    },
+    {
+      "file": "03-narrow-480-report.png",
+      "state": "480 px narrow, sidebar opened first, no horizontal overflow",
+      "backed_by": "stage-b2-r2.json (viewport 480x900, scrollWidth 480, report box 409x814)"
+    },
+    {
+      "file": "04-dark-report.png",
+      "state": "prefers-color-scheme dark",
+      "backed_by": "stage-b-r2.json (bodyBg rgb(21,21,23), bodyColor rgb(249,250,251))"
+    },
+    {
+      "file": "05-chat-regression.png",
+      "state": "chat intact after a Chat→Trajectory→Chat round-trip",
+      "backed_by": "stage-a3-r2.json (same_report true, 1645 chars, no crash strings)"
+    },
+    {
+      "file": "06-trajectory-regression.png",
+      "state": "Trajectory renders the run (SYSTEM/USER/CONTEXT/ASSISTANT, 3 subagents)",
+      "backed_by": "stage-a2-r2.json + stage-a3-r2.json (role rows, Duration, workflow row)"
+    },
+    {
+      "file": "07-diagnostics-on-report-head.png",
+      "state": "switch showDiagnostics ON, reader-facing answer — still the human block alone",
+      "backed_by": "stage-c6-r2.json (composed config verified showDiagnostics:true; answer 1299 chars, ledger_re false)"
+    },
+    {
+      "file": "08-diagnostics-ledger-visible.png",
+      "state": "same turn, transcript detail panel: the ledger the switch added",
+      "backed_by": "stage-c8-r2.json (Model routes:/Deadline: in the panel; session log record 27 user/message)"
+    },
+    {
+      "file": "probes/progress-tab-probe.png",
+      "state": "supporting: Progress tab spine (8 nodes, 3/3 · 100%)",
+      "backed_by": "stage-a2-r2.json progress {present:true,nodeCount:8,states:[done,pending]}"
+    }
+  ],
+  "states_covered": [
+    "three-tab-coexistence (shot 01)",
+    "chat-default-selected (shot 01)",
+    "team-small-task-human-default-report (shot 02)",
+    "diagnostics-on-contrast (shots 07 + 08)",
+    "narrow-480 (shot 03)",
+    "dark-color-scheme (shot 04)",
+    "chat-zero-regression (shot 05)",
+    "conversation-trajectory-zero-regression (shot 06)",
+    "progress-tab-spine (probe shot)"
+  ],
+  "status": "captured_with_findings",
+  "status_detail": "8 required shots + 1 supporting shot written and measured on a freshly built and freshly installed worktree with a real model and no model/network mock. Shot 07 and 08 do NOT show a ledger inside the chat answer: with showDiagnostics on, the plugin puts the ledger into the transcript and the relayed answer drops it (README-r2.md F3), so the contrast is presented as reader side (07) vs transcript side (08). Additional findings: the settings-page switch never commits (F1), a launch-time --patch replaces the profile layer's config for the same entry id (F2), the human block still emits relative paths and clamp-truncated evidence and leaked middot-style leftovers in later turns (F4), the sidebar renders literal markdown (F5). One session archive became unloadable after an overlapping-instance + SIGKILL sequence (INCIDENT-session-corrupt-r2.md) — that is the failure mode the first pass hit, and it is an operational error of this run, not a plugin defect.",
+  "not_verified": [
+    "the live-apply path of the settings switch (where the click's intent is lost) - HYPOTHESIS",
+    "flipping showDiagnostics without a launch-time overlay - NOT_RUN",
+    "480px / dark re-taken on the switch-on session - NOT_RUN (03/04 are from the switch-off session)",
+    "repository test suite - NOT_RUN (this pass is picture-and-measurement only)"
+  ],
+  "isolation": {
+    "dsh_home": ".tmp/human-home-r2 (throwaway; DSH_HOME set per process)",
+    "profile": "ghuman (fresh copy of the shipped web template)",
+    "install": ".tmp/human-pack-r2/dsh-grok-workflow-0.9.2.tgz, built from this worktree (npm run build then npm pack)",
+    "ports": [
+      "3217 (default form)",
+      "3219 (switch-on attempt; session archive broke - see incident)",
+      "3221 (switch-on, contrast shots)"
+    ],
+    "all_instances_killed_after_use": true,
+    "token_handling": "one-time token read from the app's own stdout into DSH_URL during each Playwright process; no live token matches in the evidence directory"
+  },
+  "artifacts": {
+    "stage_logs": [
+      "stage-a-r2.log.txt",
+      "stage-a2-r2.log.txt",
+      "stage-a3-r2.log.txt",
+      "stage-b-r2.log.txt",
+      "stage-b2-r2.log.txt",
+      "stage-c2-r2.log.txt",
+      "stage-c3-r2.log.txt",
+      "stage-c4-r2.log.txt",
+      "stage-c5-r2.log.txt",
+      "stage-c6-r2.log.txt",
+      "stage-c7-r2.log.txt",
+      "stage-c8-r2.log.txt",
+      "stage-c9-r2.log.txt"
+    ],
+    "state": [
+      "run-state-r2.json",
+      "stage-a2-r2.json",
+      "stage-a3-r2.json",
+      "stage-b-r2.json",
+      "stage-b2-r2.json",
+      "stage-c2-r2.json",
+      "stage-c4-r2.json",
+      "stage-c5-r2.json",
+      "stage-c6-r2.json",
+      "stage-c7-r2.json",
+      "stage-c8-r2.json",
+      "stage-c9-r2.json"
+    ],
+    "docs": ["README-r2.md", "INCIDENT-session-corrupt-r2.md"],
+    "overlays": ["overlay-r2.yml", "overlay-r2-diag.yml"],
+    "no_json_stage": "stage-c3-r2 (the settings-page retest) exists as stage-c3-r2.log.txt only: the browser page died mid-settle after the Save click, so the stage never wrote its JSON; its measurements are in the log and in probes/settings-switch-flip-r2.png"
+  },
+  "repo": {
+    "commits_made": 0,
+    "pushes_made": 0,
+    "git_status": "only the untracked .tmp/ and docs/knowledge/evidence/human-report-2026-11-15/ entries; lib/ rebuilt identically (git clean after npm run build)"
+  }
+}

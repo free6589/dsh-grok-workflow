@@ -1,0 +1,88 @@
+# Overlay for the human-report evidence instance, diagnostics contrast
+# (agent-32 retry, 2026-11-15).
+#
+# Booted as:
+#   DSH_HOME=<repo>/.tmp/human-home-r2 dsh ghuman --patch <this file> \
+#     --port 3221 --host 127.0.0.1 --no-open
+#
+# Model credentials stay in the environment (BIFROST_VIRTUAL_KEY, read from
+# ~/.dsh/bifrost.env by the launching shell); nothing secret is written here. The
+# endpoint is the machine-local gateway on 127.0.0.1:18088/openai/v1. No mock: the
+# team really runs and the model really answers.
+#
+# Output switch 1/2 is left at its default:
+#   humanSummary    default on   -> the report is the human block   (shots 01/02/05/06)
+# Output switch 2/2 is pinned here:
+#   showDiagnostics true         -> the machine ledger is delivered (shots 07/08)
+#
+# Why here and not in the profile layer: the launch-time patch is applied *after* the
+# profile layer, and for the same entry id the later `config` block replaces the earlier
+# one. Setting the switch in <DSH_HOME>/profiles/ghuman/cordis.patch.yml is therefore
+# silently discarded while this overlay is in play — verified with
+# `dsh ghuman --patch <this file> --dump-config`, which printed this overlay's config and
+# no showDiagnostics at all (see .tmp/r2-dump-booted.yml and README section 3).
+- id: llm-pi-ai
+  name: '@deepseek-ai/dsh-llm-pi-ai'
+  config:
+    providers:
+      bifrost-completions:
+        displayName: Completions
+        api: openai-completions
+        baseURL: http://127.0.0.1:18088/openai/v1
+        apiKeyEnv: BIFROST_VIRTUAL_KEY
+        reasoning: low
+        compat:
+          supportsDeveloperRole: false
+          supportsStore: false
+        models:
+          - id: wb/cn:deepseek-v4.1-flash
+            name: DeepSeek V4.1 Flash (cn)
+            contextWindow: 500000
+            maxTokens: 65536
+            input:
+              - text
+            reasoningEfforts:
+              off: null
+              low: low
+              medium: medium
+              high: high
+- id: agent-default-model
+  name: '@deepseek-ai/dsh-agent-default-model'
+  config:
+    provider: bifrost-completions
+    model: wb/cn:deepseek-v4.1-flash
+    reasoningEffort: low
+# The web layer disables workflow-ptc; dsh-grok-workflow injects the
+# workflowEngine service, so its provider has to be switched back on.
+- id: workflow-ptc
+  name: '@deepseek-ai/dsh-workflow-ptc'
+  config:
+    provider: spawn
+  disabled: false
+- id: grok-workflow
+  name: dsh-grok-workflow
+  config:
+    # `mode: full` = every message runs the whole team (D-021), the tier whose report is
+    # the subject of this evidence set.
+    mode: full
+    showDiagnostics: true
+    grokDefault: on
+    triageAsk: false
+    timeoutMs: 900000
+    maxActiveRuns: 4
+    roles:
+      planner:
+        - provider: bifrost-completions
+          model: wb/cn:deepseek-v4.1-flash
+      worker:
+        - provider: bifrost-completions
+          model: wb/cn:deepseek-v4.1-flash
+      verifier:
+        - provider: bifrost-completions
+          model: wb/cn:deepseek-v4.1-flash
+      synthesizer: []
+  disabled: false
+- id: ui-settings-general
+  name: '@deepseek-ai/dsh-client-ui-settings-general'
+  config:
+    welcomeNoticeVersion: 2026-09-28.1

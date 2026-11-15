@@ -1,0 +1,87 @@
+{
+  "step": "flip",
+  "before": {
+    "checked": false,
+    "label": "Machine diagnostics Off: hide model routes, deadline, switches, overflows and errors. Uncertainties always stay."
+  },
+  "afterTick": {
+    "checked": true,
+    "label": "Machine diagnostics Off: hide model routes, deadline, switches, overflows and errors. Uncertainties always stay."
+  },
+  "afterSave": {
+    "checked": true,
+    "label": "Machine diagnostics Off: hide model routes, deadline, switches, overflows and errors. Uncertainties always stay."
+  },
+  "save_visible": true,
+  "committed": false,
+  "buttons_before": [
+    "New Session",
+    "Plugins",
+    "Automation tasks",
+    "More",
+    "More",
+    "Plugins",
+    "+ Add a backup (up to 50)",
+    "Remove",
+    "+ Add a backup (up to 50)",
+    "Remove",
+    "+ Add a backup (up to 50)",
+    "Remove",
+    "+ Add a backup (up to 50)",
+    "Save",
+    "Discard"
+  ],
+  "buttons_dirty": [
+    "New Session",
+    "Plugins",
+    "Automation tasks",
+    "More",
+    "More",
+    "Plugins",
+    "+ Add a backup (up to 50)",
+    "Remove",
+    "+ Add a backup (up to 50)",
+    "Remove",
+    "+ Add a backup (up to 50)",
+    "Remove",
+    "+ Add a backup (up to 50)",
+    "Save (1)",
+    "Discard"
+  ],
+  "buttons_after": [
+    "New Session",
+    "Plugins",
+    "Automation tasks",
+    "More",
+    "More",
+    "Plugins",
+    "+ Add a backup (up to 50)",
+    "Remove",
+    "+ Add a backup (up to 50)",
+    "Remove",
+    "+ Add a backup (up to 50)",
+    "Remove",
+    "+ Add a backup (up to 50)",
+    "Save (1)",
+    "Discard"
+  ],
+  "profile_layer_written": false,
+  "profile_layer": "# Your patch layer for this dsh profile, applied after every bundle layer:\n# a top-level YAML array of loader patch entries (id-targeted config\n# overrides, disables, and insert lists; `!!js` expressions allowed).\n[]\n"
+}
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+locator.innerText: Timeout 30000ms exceeded.
+Call log:
+  - waiting for locator('body')
+
+    at body (/home/fish/projects_mine/dsh-grok-workflow/docs/knowledge/evidence/human-report-2026-11-15/lib.mjs:92:46)
+    at settle (/home/fish/projects_mine/dsh-grok-workflow/docs/knowledge/evidence/human-report-2026-11-15/lib.mjs:109:23)
+    at async file:///home/fish/projects_mine/dsh-grok-workflow/docs/knowledge/evidence/human-report-2026-11-15/stage-c3-r2.mjs:69:15 {
+  log: [ "  - waiting for locator('body')" ],
+  name: 'TimeoutError'
+}
+
+Node.js v26.8.1
+exit=1

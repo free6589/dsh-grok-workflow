@@ -1,0 +1,73 @@
+{
+  "step": "shot01",
+  "top01": {
+    "ok": true,
+    "top": 92,
+    "bottom": 234,
+    "scroller": true,
+    "scrollTop": 0
+  },
+  "tabs": [
+    {
+      "label": "Chat",
+      "selected": "true"
+    },
+    {
+      "label": "Trajectory",
+      "selected": "false"
+    },
+    {
+      "label": "Progress",
+      "selected": "false"
+    }
+  ]
+}
+{
+  "stage": "A3-r2",
+  "reopened": true,
+  "shot01": {
+    "ok": true,
+    "top": 92,
+    "bottom": 234,
+    "scroller": true,
+    "scrollTop": 0
+  },
+  "shot02": {
+    "ok": true,
+    "top": 146,
+    "bottom": 720,
+    "scroller": true,
+    "scrollTop": 149
+  },
+  "shot05": {
+    "ok": true,
+    "top": 724,
+    "bottom": 756,
+    "scroller": true,
+    "scrollTop": 157
+  },
+  "tabs01": [
+    {
+      "label": "Chat",
+      "selected": "true"
+    },
+    {
+      "label": "Trajectory",
+      "selected": "false"
+    },
+    {
+      "label": "Progress",
+      "selected": "false"
+    }
+  ],
+  "report_len": [
+    1645
+  ],
+  "report_len_after": [
+    1645
+  ],
+  "same_report": true,
+  "user_bubbles": 1,
+  "crash_hits": []
+}
+exit=0

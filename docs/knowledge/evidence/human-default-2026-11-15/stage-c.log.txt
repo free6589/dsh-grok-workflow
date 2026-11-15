@@ -1,0 +1,43 @@
+{
+  "stage": "C",
+  "tabs": [
+    {
+      "label": "Chat",
+      "selected": "true"
+    },
+    {
+      "label": "Trajectory",
+      "selected": "false"
+    },
+    {
+      "label": "Progress",
+      "selected": "false"
+    }
+  ],
+  "chat": {
+    "has_user_task": true,
+    "has_report": true,
+    "has_human_labels": true,
+    "has_en_mirror": true,
+    "crash_hits": []
+  },
+  "trajectory": {
+    "len": 3000,
+    "has_role_rows": true,
+    "has_timing": true,
+    "has_workflow_row": true,
+    "crash_hits": [],
+    "excerpt": "New Session Plugins Automation tasks More Workspaces Default workspace **会话标题：** `scratch.md 写三行待办并采集 stat/sha256 原始输 23min More **会话标题：** `scratch.md 写三行待办并采集 stat/sha256 原始输 Standard mode 3 subagents Chat Trajectory Progress Duration ⊟ Turns ⊟ Calls ⊟ Subcalls Input Model Tools SYSTEM Initial System Prompt Turn 1 #1 USER 小任务，请团队跑完这两步：第一步，在仓库的 .tmp/human-home/human-scratch.md 里写三行待办，每行以 - 开头。第二步，"
+  },
+  "progress": {
+    "present": true,
+    "nodeCount": 8,
+    "states": [
+      "done",
+      "pending"
+    ],
+    "percent": "3/3 · 100%",
+    "textLen": 500
+  },
+  "chat_crash_hits": []
+}

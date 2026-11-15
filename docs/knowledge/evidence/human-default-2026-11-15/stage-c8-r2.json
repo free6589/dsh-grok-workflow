@@ -1,0 +1,53 @@
+{
+  "stage": "C8-r2",
+  "opened": true,
+  "scrolled": {
+    "ok": true,
+    "inViewport": true,
+    "top": 582,
+    "text": "scratch-file-and-stat: Todo line contents were unspecified by the task; two short plausible items were chosen.\nSynthesis: deterministic\nModel routes: planner=bifrost-completions/wb/cn:deepseek-v4.1-flash; worker=bifrost-"
+  },
+  "panel_headings": [
+    "Preview"
+  ],
+  "ledger_labels_on_screen": [
+    "Grok workflow:",
+    "Objective:",
+    "Model routes:",
+    "Deadline:",
+    "Confirmed evidence:"
+  ],
+  "markers_present_in_panel": true,
+  "transcript_has_ledger": true,
+  "tabs": [
+    {
+      "label": "Chat",
+      "selected": "false"
+    },
+    {
+      "label": "Trajectory",
+      "selected": "true"
+    },
+    {
+      "label": "Progress",
+      "selected": "false"
+    },
+    {
+      "label": "Summary",
+      "selected": "true"
+    },
+    {
+      "label": "Preview",
+      "selected": "false"
+    },
+    {
+      "label": "Raw",
+      "selected": "false"
+    },
+    {
+      "label": "Source",
+      "selected": "false"
+    }
+  ],
+  "crash_hits": []
+}

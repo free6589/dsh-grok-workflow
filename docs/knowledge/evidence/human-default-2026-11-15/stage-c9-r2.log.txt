@@ -1,0 +1,11 @@
+{
+  "stage": "C9-r2",
+  "opened": true,
+  "responses": 1,
+  "answer_len": [
+    1299
+  ],
+  "answer_has_ledger": false,
+  "note": "retake of 07 with the pointer parked away from the sidebar, so no hover card covers the answer"
+}
+exit=0

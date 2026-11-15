@@ -1,0 +1,49 @@
+{
+  "step": "before_switch",
+  "responses": 0
+}
+{
+  "step": "sent_second_run",
+  "sawReport": false
+}
+{
+  "step": "settled",
+  "quiet": true
+}
+{
+  "stage": "D",
+  "switch_layer": "profile patch: <DSH_HOME>/profiles/ghuman/cordis.patch.yml -> config.showDiagnostics: true",
+  "opened": false,
+  "responses_before": 0,
+  "responses_after": 0,
+  "new_turn_texts": 0,
+  "ledger_labels_present": [],
+  "ledger_label_count": 0,
+  "ledger_label_re": false,
+  "machine_in_turn": {
+    "statCommand": false,
+    "shaTool": false,
+    "hexDigest": false,
+    "absPath": false,
+    "ledgerRule": false,
+    "taskId": false
+  },
+  "turn_text": "",
+  "scrolled": false,
+  "ledger_scrolled": false,
+  "tabs": [
+    {
+      "label": "Chat",
+      "selected": "true"
+    },
+    {
+      "label": "Trajectory",
+      "selected": "false"
+    },
+    {
+      "label": "Progress",
+      "selected": "false"
+    }
+  ],
+  "flow": []
+}

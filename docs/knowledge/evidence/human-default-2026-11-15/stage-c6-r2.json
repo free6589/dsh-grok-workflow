@@ -1,0 +1,53 @@
+{
+  "stage": "C6-r2",
+  "switch_layer": "launch-time overlay docs/knowledge/evidence/human-report-2026-11-15/overlay-r2-diag.yml -> grok-workflow.config.showDiagnostics: true (profile layer restored to pristine; composed tree verified with `dsh ghuman --patch overlay-r2-diag.yml --dump-config`)",
+  "note": "shot 07/08 come from a NEW session of the same instance; the control session of shots 01/02/05/06 became unloadable after the restart — see INCIDENT-session-corrupt-r2.md",
+  "task6": "小任务，请团队跑两步：第一步，在工作目录下建 .tmp/human-scratch-r2f.md，写两行待办，每行以 - 开头。第二步，用 stat -c '%s' 取回它的字节数，把这条命令的原始输出当成证据记下来。",
+  "settle_quiet": true,
+  "responses_total": 1,
+  "turn_len": 1299,
+  "turn_text": "做完了：1 项任务全部核验通过。 关键证据：\n\nThe path exists as a regular file aft…（Verifier ran / on the absolute path; = \"regular file\"; `test -…）\nThe file contains exactly two non-empty lines and every one of those lines starts with the '-' character.（shows exactly: and (two lines, only a single trailing newline, no extr…）\nThe command was actually executed against that path (not against a copy, symli…（Verifier independently ran from cwd against the same inode; pa…） 下一步：结果可以直接用；哪一项对不上，就把那一项单独再发一次，我会重跑。 需要你知道的：\nTodo line contents were unspecified by the task; two short plausible items were chosen.\n\nDone: all 1 tasks passed verification. Key evidence:\n\nThe path exists as a regular file aft…（Verifier ran / on the absolute path; = \"regular file\"; `test -…）\nThe file contains exactly two non-empty lines and every one of those lines starts with the '-' character.（shows exactly: and (two lines, only a single trailing newline, no extr…）\nThe command was actually executed against that path (not against a copy, symli…（Verifier independently ran from cwd against the same inode; pa…） Next: The result is usable as it stands; if one item does not match what you expected, send that item again and I will rerun it. Worth knowing:\nTodo line contents were unspecified by the task; two short plausible items were chosen.",
+  "ledger_labels": [],
+  "ledger_re": false,
+  "has_rule": false,
+  "human_landmarks": [
+    "zhHeadline",
+    "zhEvidenceLabel",
+    "zhNextLabel",
+    "zhWorthKnowing",
+    "enMirror"
+  ],
+  "strip_violations": [],
+  "residue": [
+    {
+      "probe": "bareSlashSeparator",
+      "sample": " / "
+    }
+  ],
+  "machine": {
+    "statCommand": false,
+    "odCommand": false,
+    "shaTool": false,
+    "hexDigest": false,
+    "absPath": false,
+    "ledgerRule": false
+  },
+  "user_bubbles": 1,
+  "tabs": [
+    {
+      "label": "Chat",
+      "selected": "true"
+    },
+    {
+      "label": "Trajectory",
+      "selected": "false"
+    },
+    {
+      "label": "Progress",
+      "selected": "false"
+    }
+  ],
+  "crash_hits": [],
+  "scrolled": true,
+  "ledger_scrolled": false
+}

@@ -1,0 +1,53 @@
+{
+  "stage": "C7-r2",
+  "what_07_shows": "the reader-facing answer of the run whose composed config has showDiagnostics: true (human block only)",
+  "what_08_shows": "the transcript row that carries the gate payload, i.e. where the ledger for that run actually lives",
+  "revealed_by": "click (the row expanded by itself)",
+  "opened": true,
+  "sidebar_rows_matched": 1,
+  "opened_by": "human-scratch-r2f",
+  "answer_len": 1299,
+  "answer_has_ledger": false,
+  "answer_tail": "against the same inode; pa…） Next: The result is usable as it stands; if one item does not match what you expected, send that item again and I will rerun it. Worth knowing:\nTodo line contents were unspecified by the task; two short plausible items were chosen.",
+  "transcript_row": {
+    "found": true,
+    "ledgerInDom": false,
+    "textLen": 512,
+    "isClipped": false,
+    "tag": "SPAN",
+    "cls": ""
+  },
+  "transcript_has_ledger": true,
+  "tabs": [
+    {
+      "label": "Chat",
+      "selected": "false"
+    },
+    {
+      "label": "Trajectory",
+      "selected": "true"
+    },
+    {
+      "label": "Progress",
+      "selected": "false"
+    },
+    {
+      "label": "Summary",
+      "selected": "true"
+    },
+    {
+      "label": "Preview",
+      "selected": "false"
+    },
+    {
+      "label": "Raw",
+      "selected": "false"
+    },
+    {
+      "label": "Source",
+      "selected": "false"
+    }
+  ],
+  "user_bubbles": 0,
+  "crash_hits": []
+}
