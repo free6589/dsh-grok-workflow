@@ -1,5 +1,25 @@
 # Agent Handoff
 
+## 2026-11-15 — v0.9.1 已发布（存量越界钳制；用户 WebUI 启用失败的修复，`CONFIRMED`）
+
+- **From:** lead · **To:** 用户 / 后续代理
+- **现象（`CONFIRMED`，用户截图）**：WebUI 添加 `github:free6589/dsh-grok-workflow` 成功，启用时
+  `1 entry did not activate / ValidationError: $.maxConcurrency expected number <= 6 but got 8`。
+  用户存量 `cordis.patch.yml` 写 `maxConcurrency: 8 / maxRetries: 5`（v0.9.0 之前合法），v0.9.0 的 B07
+  恢复硬上限 6/3 后整行起不来，且没有设置页可修（D-031 死锁）。
+- **修复（`CONFIRMED`）**：宿主 `Config` schema 对越界存量钳制到上限 + 每项一条中英告警
+  （`repairLimitOverruns` + `clampedLimit`；`apply()` 串在 `repairSynthesisInconsistency` 之后）；
+  低于下限/非数字/程序化 `resolveConfig` 越界仍硬拒绝（R-06）；上限 6/3 未放宽。
+  证据：`test/config-limits-repair.spec.ts`（17 例）；隔离 profile `gwverify851` 用 8/5 patch 真激活
+  （仅停在 `MISSING_CREDENTIAL`）；对照 `0` 仍以用户截图同帧拒绝。
+- **发布（`CONFIRMED`）**：`9103280`（`release: prepare v0.9.1`）→ `git push origin main` →
+  CI `43665777667` success → tag `v0.9.1`（`584dc22` → peel `9103280`，已 push；旧 tag 未动）→
+  Release `43666035740` success，Release `v0.9.1` + asset `dsh-grok-workflow-0.9.1.tgz`。
+  协调状态已发 `Issue #1 comment 6887721733`。
+- **Next action（用户，一步）**：WebUI 插件页把 `dsh-grok-workflow` 更新到 `v0.9.1`（或重装
+  `github:free6589/dsh-grok-workflow`），再点启用：行应激活，日志里有两条钳制告警；之后去设置页把
+  `8/5` 改成 `6/3` 以内，告警即消失。不用改 patch 里的其它值。
+
 ## 2026-11-08 — v0.7.0 已发布（tag → `main` `146dce7`）；live `:3090` 一步重启即收口（`CONFIRMED`）
 
 - **From:** lead · **To:** 用户 / 后续代理

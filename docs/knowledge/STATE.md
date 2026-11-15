@@ -1,6 +1,14 @@
 # Project State
 
-Last updated: 2026-11-15 (**wave1+wave2 已落盘、未提交** — 基线 `ee5e013`，工作树 dirty；
+Last updated: 2026-11-15 (**v0.9.1 released** — tag `v0.9.1` → `9103280` on `main`; Release
+green, asset `dsh-grok-workflow-0.9.1.tgz`; CI `43665777667` + Release `43666035740` success.
+Fixes the user-reported WebUI enable failure: pre-v0.9.0 patch `maxConcurrency: 8 /
+maxRetries: 5` now clamps to `6 / 3` with bilingual warnings instead of failing the row.
+`package.json`+`package-lock.json` = `0.9.0`; `CHANGELOG.md` carries bilingual `## [0.9.1] - 2026-11-15`.
+Evidence: `test/config-limits-repair.spec.ts` (17); isolated profile `gwverify851` with the 8/5
+patch activates; control `0` still refuses with user-identical frames.)
+
+Previous update: 2026-11-15 (**wave1+wave2 已落盘、未提交** — 基线 `ee5e013`，工作树 dirty；
 `package.json` = `0.9.0`（V 组 bump，未提交）；本轮 = B01-B18 清点 + 进度 Tab + 真机验证 H1/H2。
 版本号与提交由 V 组做，M 组只写记忆与 CHANGELOG 的 `[Unreleased]`。详见文末
 「2026-11-15 — wave1+wave2 收尾」。下降级保留的上一条 11-08 记录仍有效，未被覆盖。)
