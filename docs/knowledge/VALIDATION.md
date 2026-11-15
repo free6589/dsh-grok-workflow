@@ -3106,3 +3106,40 @@ Isolated real-machine verification (`CONFIRMED`, profile `acgtest`, `:3225`, 打
 - 真机抓到的实现 bug 4 个（STATE 段）：line 压 meta、分支挤扁段、link 规则丢失、badge 字面色——全部修好并复验。
 
 Boundaries: live `:3080` 更新 `NOT_RUN`（禁重启，无已验证免重启路径，见 D-053）；commit/push/tag/Release 待用户指令。
+
+## Round 44 — 2026-11-16 — v0.9.3 发布闭环：push / CI / tag / Release / 可用性 / live 换文件（`CONFIRMED`）
+
+Base `7a31218` → release-prep `593f89e`（bump 0.9.3 + CHANGELOG 节头；`lib/` 无变化，`git diff --exit-code -- lib/` 通过）。
+
+### 1. 五步结果（`CONFIRMED`）
+
+```text
+$ git push origin main
+   7a31218..593f89e  main -> main            → exit 0（fast-forward，未 force）
+$ gh run view 43738470054 --json …
+   {"conclusion":"success","headSha":"593f89e…","jobs":[Node 24 success, Node 22 success]}
+$ git tag -a v0.9.3 593f89e -m "v0.9.3: answer-first background delivery, progress spine accordion"
+$ git push origin v0.9.3
+ * [new tag]         v0.9.3 -> v0.9.3        → exit 0
+$ gh release view v0.9.3 --json …
+   {"tagName":"v0.9.3","assets":[{"name":"dsh-grok-workflow-0.9.3.tgz","size":483122}]}
+```
+
+**旧 tag 未动（`CONFIRMED`）**：`v0.9.1` → `584dc22`/peel `9103280`、`v0.9.2` → `38ef237`/peel `5eb4942`
+与发版前同 sha；`v0.9.3` → `f63bb7c`/peel `593f89e`。`merge-base --is-ancestor` 通过。
+
+### 2. tag 可用性（`CONFIRMED`）
+
+`gh release download v0.9.3` → 483122 B，与本地 `npm pack` 同字节；解包 `version=0.9.3`，
+`lib/client.js` 含 `gw-progress-seg` 31 处，md5 与仓库 `lib/client.js` 一致。
+
+### 3. live 安装（`CONFIRMED` 文件，生效 `NOT_RUN` 待重启）
+
+`dsh plugin --profile web add file:…0.9.3.tgz` → Done；live 包 `0.9.2 → 0.9.3`，
+`lib/client.js` md5 一致。运行中 `:3080` 进程未重启（D-013），新渲染下次重启生效。
+沙箱 EROFS 导致首次安装失败，经 danger-full-access 审批后重执行成功；未触碰凭据。
+
+### 4. 本轮 `NOT_RUN`
+
+- 运行中 live 的重载验证（需用户重启 DSH）。
+- `#22` Phase 范围工作（本轮不算 #22 范围，未动其 PR/分支）。

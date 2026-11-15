@@ -1148,3 +1148,15 @@
 - **验证证据**：`.dsh-home/acg/shots/`（`03/04/05/10/11/12/13/21/22/23` + DOM 日志）——注意该目录在 `.gitignore` 外？（`TMPDIR=$PWD/.tmp` 约定；`acg/` 是否入库由发版组定，默认不入库）。
 - **没做什么（`NOT_RUN`）**：commit / push / tag / Release（等用户指令）；live `:3080` 更新（禁重启，见 D-053——新代码无已验证免重启路径，要么用户重启 DSH，要么接受文件换了进程仍跑旧模块）。
 - **Next action（用户，两步）**：① 看一眼截图（`13-settled-wide`  settled 脊 / `11-spine-narrow` 窄屏竖排），对味了说"提交发版"；② live 更新方式二选一：等下次 DSH 重启自动生效，或用户亲手重启。
+
+## 2026-11-16 — v0.9.3 已发布 + live 文件已换（待用户重启生效）
+
+- **From:** lead · **To:** 用户 / 后续代理。**远端已变**：`origin/main` = `593f89e`，
+  `tag v0.9.3` → `593f89e`，GitHub Release published（asset `dsh-grok-workflow-0.9.3.tgz`
+  483122 B）。CI `43738470054`（Node 22 + 24）与 Release 均 success；旧 tag 全部未动。
+- **内容**：CHANGELOG `## [0.9.3]` 两条 Added（答案置顶 + 边聊边干 / 进度脊手风琴），
+  package 0.9.3。A/B/C + 进度 Tab A+C 全量（含测试 951、隔离真机复验 Round 43）。
+- **live**：本机 `web` profile 包已换成 0.9.3（md5 与仓库一致），**但 `:3080` 进程没重启**，
+  新 UI 在用户下次重启 DSH 后才生效 —— 这是唯一剩下的用户动作。
+- **别碰**：已发布 tag（v0.9.3 及更早一律不动）、DSH core、live 进程的 kill/重启（用户亲手做）、
+  npm 发布与仓库可见性。

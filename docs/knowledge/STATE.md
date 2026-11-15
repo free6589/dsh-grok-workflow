@@ -970,3 +970,17 @@ worker 链上限 50（HARD_LIMITS.chainLength）
   4. `label-inverse, #fff` 字面色被 lint 规则抓 → 改 `inherit` 回退（token 保留）。
 - **验证（`CONFIRMED`）**：`npm run ci` → typecheck 0 错、lint 4w/0e、**51 文件 / 951 测试 PASS**（948+3 新）；隔离 profile `acgtest`（`:3225`，打包安装，md5 校验）真机：脊 7 段 / 单展开 / +N / jump / scrollW==innerW（宽+窄）/ 深色 token / 详情三段 / Open child session 真开 / Chat 回归；窄屏竖排 + 详情抽屉 fixed 生效。
 - **未做（`NOT_RUN`）**：commit/push/tag/Release（等用户指令）；live 更新（禁重启，需用户定夺路径）。
+
+## 2026-11-16 — v0.9.3 已发布：push / CI / tag / Release / Issue #1 闭环 + live 文件已换（未重启）
+
+- **From:** lead · **Base:** `origin/main` = `593f89e`（release-prep）→ 本轮推送后 `origin/main` = `593f89e`（已是最新，无新提交）。
+- **结果（`CONFIRMED`，逐条可复核）**：
+  - **push**：`git push origin main` → `7a31218..593f89e`（fast-forward，未 force，exit 0）。两个提交：`7a31218`（A+C 实现 + A/B/C + 测试 + 记忆）与 `593f89e`（bump 0.9.3 + CHANGELOG 节头；`lib/` 构建幂等无变化）。
+  - **CI**：run `43738470054`（commit `593f89e`），Node 22 + Node 24 **both success**（`gh run view`）。
+  - **tag**：`git tag -a v0.9.3 593f89e` → `git push origin v0.9.3`（`* [new tag]`，exit 0）；`git merge-base --is-ancestor 593f89e origin/main` 通过。
+  - **Release**：`v0.9.3` run success；GitHub Release published，asset `dsh-grok-workflow-0.9.3.tgz` **483122 B**（与本地 `npm pack` 同字节一致）。
+  - **旧 tag 复核**：`git ls-remote --tags origin` 推前后对照 —— `v0.9.1` → `584dc22`（peel `9103280`）、`v0.9.2` → `38ef237`（peel `5eb4942`）**全部未动**；新 `v0.9.3` → `f63bb7c`（peel `593f89e`）。
+- **tag 可用性（`CONFIRMED`）**：`gh release download v0.9.3` 得 tgz（483122 B），解包 `package.json` = `0.9.3`，`lib/client.js` 含脊规则 31 处，md5 `6a797b90…` 与仓库 `lib/client.js` **逐字节一致**。
+- **live 安装（`CONFIRMED` 文件已换，生效待重启）**：`dsh plugin --profile web add file:…0.9.3.tgz`（danger-full-access 审批后执行，exit 0），live `web` profile 内包版本 `0.9.2 → 0.9.3`，`lib/client.js` md5 `6a797b90…` 与仓库一致。**进程未重启**（D-013 用户保留动作）：运行中实例仍跑旧模块，新脊/首答渲染在用户下次重启 DSH 后生效。`~/.dsh/profiles/web` 在本会话沙箱下只读，安装经审批提权执行，未读未写任何凭据。
+- **杂散清理**：删 `?? .tmp-weather/`（12 项天气抓取产物，与任务无关，不在 `.gitignore` 内）。
+- **隔离实例**：`acgtest/:3225`（四轮 bundle 复验用）在收尾时仍在听；验证结束即 kill + 删 `dsh-url.env`，保留 `.dsh-home/acg/shots/` 与驱动脚本作复现证据（`.dsh-home/` 已 gitignore，不入库）。
