@@ -3,11 +3,12 @@
  *
  * The tab renders the four `tool-workflow/*` session events this plugin's own recorder
  * writes (`src/records.ts`, `createWorkflowProgressRecorder`) as one horizontal track of
- * stage nodes. This module is the fold, the state precedence, the percentage and the
- * detail provenance, with no React, no DOM, no clock and no estimate, so every rule the
- * browser half applies can be tested here; `src/client/index.js` carries the same rules
- * as hand-written JavaScript (the host serves that bundle verbatim, so it cannot import
- * this file) and `test/client.spec.ts` pins the two apart from drifting.
+ * stage nodes, plus the optional `tool-workflow/stage-detail` payload when a stream carries
+ * one. This module is the fold, the state precedence, the percentage and the detail
+ * provenance, with no React, no DOM, no clock and no estimate, so every rule the browser
+ * half applies can be tested here; `src/client/index.js` carries the same rules as
+ * hand-written JavaScript (the host serves that bundle verbatim, so it cannot import this
+ * file) and `test/client.spec.ts` pins the two apart from drifting.
  *
  * What the data can and cannot say (measured against DSH 0.2.1-rc.2, see
  * `docs/knowledge/DESIGN-progress-tab.md`):
@@ -31,6 +32,17 @@ export const PROGRESS_EVENT_TYPES = [
   'tool-workflow/run-end',
 ] as const
 
+/**
+ * The optional detail payload, kept apart from {@link PROGRESS_EVENT_TYPES} on purpose.
+ *
+ * The state of the track comes from the four events above and from nothing else. This
+ * one only ever *adds* field values to a node, so a stream without it renders exactly
+ * what it rendered before. `createWorkflowProgressRecorder` does not write it today; the
+ * tab reads it so that a recorder (or another bundle) that does write it is used instead
+ * of being ignored — the detail ladder's level 1 is a real read path, not a placeholder.
+ */
+export const PROGRESS_DETAIL_EVENT_TYPE = 'tool-workflow/stage-detail'
+
 /** Registered conversation target of the progress view (namespaced so a collision throws). */
 export const PROGRESS_VIEW_TARGET = 'grok-progress'
 
@@ -46,11 +58,49 @@ export type ProgressState = 'pending' | 'doing' | 'done' | 'blocked' | 'cancelle
 /** Where one detail field's value came from. */
 export type DetailSource = 'stage-detail' | 'coordination' | 'not-reported'
 
-/** The seven fields a settled stage reports, in render order. */
-export const DETAIL_FIELDS = ['files', 'commands', 'result', 'evidence', 'risks', 'next', 'owner'] as const
+/** The seven fields an AGENTS.md coordination block reports, in render order. */
+export const DETAIL_FIELDS = [
+  'workCommit',
+  'changes',
+  'testsRun',
+  'results',
+  'localRuntimeVerified',
+  'blockers',
+  'nextAction',
+] as const
 
 /** One of {@link DETAIL_FIELDS}. */
 export type DetailFieldKey = (typeof DETAIL_FIELDS)[number]
+
+/**
+ * The spellings one field is written as, folded to its canonical key.
+ *
+ * A coordination block is a shared format, not this tab's private schema: the labels
+ * `AGENTS.md` prescribes are `WORK_COMMIT` / `CHANGES` / `TESTS_RUN` / `TEST_RESULTS` /
+ * `LOCAL_RUNTIME_VERIFIED` / `BLOCKERS` / `NEXT_ACTION`, while a JSON block writes them
+ * in camelCase. Both spell the same seven facts, so both resolve to one key and a reader
+ * sees one row per fact.
+ */
+const DETAIL_FIELD_BY_TOKEN: Readonly<Record<string, DetailFieldKey>> = {
+  workcommit: 'workCommit',
+  changes: 'changes',
+  change: 'changes',
+  testsrun: 'testsRun',
+  tests: 'testsRun',
+  results: 'results',
+  result: 'results',
+  testresults: 'results',
+  localruntimeverified: 'localRuntimeVerified',
+  blockers: 'blockers',
+  blocker: 'blockers',
+  nextaction: 'nextAction',
+  next: 'nextAction',
+}
+
+/** Fold one written field name (`WORK_COMMIT`, `workCommit`, `next_action`) to its key. */
+function canonicalDetailField(name: string): DetailFieldKey | undefined {
+  return DETAIL_FIELD_BY_TOKEN[name.toLowerCase().replace(/[^a-z0-9]/g, '')]
+}
 
 /** One recorded `tool-workflow/*` event, in the shape a session reader gets it back. */
 export interface ProgressEventRecord {
@@ -96,42 +146,61 @@ export interface ProgressRunFacts {
   /** Engine stop reason from `run-end`; absent while the run is open. */
   stopReason?: string
   members: ProgressMemberFact[]
+  /** Level-1 detail payloads the stream carried for this run, in arrival order. */
+  details: ProgressStageDetailFact[]
 }
 
 /** One spine stage of the track, in render order. */
 export interface ProgressStageDefinition {
   /** Copy key suffix; also the stage identity in the model. */
   key: string
-  /** Case-insensitive substrings that bind a recorded phase to this stage. */
+  /**
+   * Words that bind a recorded phase to this stage.
+   *
+   * A CJK token matches anywhere (`规划` is a word on its own). A token with Latin
+   * letters matches **whole words only**, because a substring test reads `ui` inside
+   * `build`, `tag` inside `stage`/`target` and `sync` inside `async` — the three false
+   * hits measured on real phase headers.
+   */
   tokens: readonly string[]
   /** The two ends of the track: process marks, never work. */
   edge: boolean
 }
 
 /**
- * The track's fixed spine.
+ * The track's fixed spine: this engine's own phases, in the order it runs them.
  *
- * It is the process template of a staged delivery job, not a claim about a run: a stage
- * whose token no recorded phase carries stays `pending` and its tooltip says it was not
- * reported. Recorded phases that match no token become real nodes of their own
- * ({@link ProgressNodeModel.kind} `extra`), so a run that does not follow the template
- * still shows every phase it declared.
+ * The five work stages are the phase headers `src/naming.ts` actually emits for a staged
+ * delivery job — `规划` / `执行` / `检查` / `汇总` / `回答` (`phaseLabel`: plan, execute,
+ * verify, synthesize, answer) — plus one slot for the plan tasks themselves, which the
+ * engine announces as `任务 n · 标题` (`taskGroupTitle`) and which land between `执行`
+ * and `检查` because that is where the workers run. A stage whose token no recorded
+ * phase carries stays `pending` and says it was not reported; a phase that names no
+ * stage becomes a node of its own, so the spine never hides a declared phase.
  */
 export const PROGRESS_STAGES: readonly ProgressStageDefinition[] = [
   { key: 'start', tokens: [], edge: true },
-  { key: 'sync', tokens: ['同步', 'sync'], edge: false },
-  { key: 'triage', tokens: ['排查', '诊断', 'triage'], edge: false },
-  { key: 'fix', tokens: ['修复', 'fix'], edge: false },
-  { key: 'ui', tokens: ['ui', '界面'], edge: false },
-  { key: 'device', tokens: ['真机', '实机', 'device'], edge: false },
-  { key: 'cleanup', tokens: ['清理', 'cleanup'], edge: false },
-  { key: 'push', tokens: ['push', 'tag', '推送', '发布'], edge: false },
+  { key: 'plan', tokens: ['规划', 'plan'], edge: false },
+  { key: 'execute', tokens: ['执行', 'execute'], edge: false },
+  { key: 'verify', tokens: ['检查', '核验', 'verify'], edge: false },
+  { key: 'synthesize', tokens: ['汇总', 'synthesize'], edge: false },
+  { key: 'answer', tokens: ['回答', 'answer'], edge: false },
   { key: 'end', tokens: [], edge: true },
 ]
 
+/** One `tool-workflow/stage-detail` payload, as the stream carried it. */
+export interface ProgressStageDetailFact {
+  /** Phase header the payload names, when it names one. */
+  phase?: string
+  /** The fields it carries, already folded to canonical keys. */
+  fields: Partial<Record<DetailFieldKey, string>>
+  /** Exact coordination text it carried (a fenced or labelled block), when it carried one. */
+  coordinationText?: string
+}
+
 /** One rendered node of the track. */
 export interface ProgressNodeModel {
-  /** Stable render key (`stage:fix`, `phase:任务 2 · …`). */
+  /** Stable render key (`stage:plan`, `phase:任务 2 · …`). */
   key: string
   kind: 'edge' | 'stage' | 'extra'
   /** Copy key suffix for spine nodes; the recorded phase header for extra nodes. */
@@ -145,6 +214,8 @@ export interface ProgressNodeModel {
   derived: boolean
   /** Tooltip copy key suffix explaining a derived state (only for `blocked`). */
   reason?: 'runEndedUnsettled' | 'outcomeUnsettled'
+  /** Level-1 detail payload for this node, when the stream carried one for its phase. */
+  stageDetail?: ProgressStageDetailFact
 }
 
 /** Rows settled over rows declared; the tab's only percentage. */
@@ -164,6 +235,8 @@ export interface ProgressTrackModel {
   stopReason?: string
   nodes: ProgressNodeModel[]
   percent?: ProgressPercent
+  /** Level-1 payload that named no phase: the run-level fallback for any node. */
+  stageDetail?: ProgressStageDetailFact
 }
 
 /** Options for {@link deriveTrack}. */
@@ -226,11 +299,21 @@ function fieldText(value: unknown): string | undefined {
   return undefined
 }
 
-/** Read the known detail fields out of one record. */
+/**
+ * Read the known detail fields out of one record.
+ *
+ * Names are canonicalized first, so `WORK_COMMIT`, `workCommit` and `next_action` all
+ * land on the field that owns them, and the first written spelling of a fact wins over a
+ * later alias.
+ * @param source - a `stage-detail` payload or a parsed coordination object.
+ * @returns the fields it carried, keyed canonically.
+ */
 function pickDetailFields(source: Readonly<Record<string, unknown>>): Partial<Record<DetailFieldKey, string>> {
   const fields: Partial<Record<DetailFieldKey, string>> = {}
-  for (const key of DETAIL_FIELDS) {
-    const text = fieldText(source[key])
+  for (const [name, raw] of Object.entries(source)) {
+    const key = canonicalDetailField(name)
+    if (key === undefined || fields[key] !== undefined) continue
+    const text = fieldText(raw)
     if (text !== undefined) fields[key] = text
   }
   return fields
@@ -259,6 +342,7 @@ export function foldProgressRuns(records: readonly ProgressEventRecord[]): Progr
     members: Map<number, ProgressMemberFact>
     order: number[]
     settlements: Map<number, string>
+    details: ProgressStageDetailFact[]
   }
   const drafts = new Map<string, Draft>()
   let index = 0
@@ -278,6 +362,7 @@ export function foldProgressRuns(records: readonly ProgressEventRecord[]): Progr
       members: new Map(),
       order: [],
       settlements: new Map(),
+      details: [],
       ...record.time === undefined ? {} : { startedAt: record.time },
     })
   }
@@ -287,11 +372,27 @@ export function foldProgressRuns(records: readonly ProgressEventRecord[]): Progr
     index += 1
     const data = asRecord(record.data) ?? {}
     const runId = typeof data['runId'] === 'string' ? data['runId'] : undefined
-    if (runId === undefined || !(PROGRESS_EVENT_TYPES as readonly string[]).includes(record.type)) continue
+    const isDetail = record.type === PROGRESS_DETAIL_EVENT_TYPE
+    if (!isDetail && !(PROGRESS_EVENT_TYPES as readonly string[]).includes(record.type)) continue
+    if (runId === undefined) continue
     if (record.type === 'tool-workflow/run-start') continue
     const draft = drafts.get(runId)
     if (draft === undefined) continue
     if (seq < draft.anchorSeq) draft.anchorSeq = seq
+    if (isDetail) {
+      const fields = pickDetailFields(data)
+      const coordinationText = typeof data['coordination'] === 'string' ? data['coordination'] : undefined
+      // An empty payload is not a report: it would add a row of dashes that claims the
+      // stage was measured and found blank.
+      if (Object.keys(fields).length === 0 && coordinationText === undefined) continue
+      const phase = typeof data['phase'] === 'string' ? data['phase'] : undefined
+      draft.details.push({
+        fields,
+        ...phase === undefined ? {} : { phase },
+        ...coordinationText === undefined ? {} : { coordinationText },
+      })
+      continue
+    }
     if (record.type === 'tool-workflow/agent-start') {
       const memberSeq = Number(data['seq'])
       if (!Number.isFinite(memberSeq)) continue
@@ -336,6 +437,7 @@ export function foldProgressRuns(records: readonly ProgressEventRecord[]): Progr
       name: draft.name,
       anchorSeq: draft.anchorSeq,
       members,
+      details: draft.details,
       ...draft.startedAt === undefined ? {} : { startedAt: draft.startedAt },
       ...draft.endedAt === undefined ? {} : { endedAt: draft.endedAt },
       ...draft.stopReason === undefined ? {} : { stopReason: draft.stopReason },
@@ -405,12 +507,44 @@ export function percentOf(members: readonly ProgressMemberFact[]): ProgressPerce
   return { settled, declared, value: Math.round((settled / declared) * 100) }
 }
 
-/** The first spine stage whose token appears in the phase header. */
+/** Whether one character can continue a Latin word (so a token boundary is not here). */
+function isWordChar(character: string): boolean {
+  return character !== '' && /[a-z0-9_]/i.test(character)
+}
+
+/**
+ * Whether one phase header carries one stage token.
+ *
+ * A token made only of non-Latin characters is matched as a substring, which is what a
+ * word means in a script without spaces (`规划` in `任务 1 · 规划`). A token with Latin
+ * letters must sit on word boundaries: matched loosely, `ui` hits `build`, `tag` hits
+ * `stage` and `target`, and `sync` hits `async`, which is how the old spine reported
+ * stages that never ran. Both tests are done on the lowercased header.
+ * @param haystack - the lowercased phase header.
+ * @param token - one stage token.
+ * @returns true when the header names the token.
+ */
+function phaseCarriesToken(haystack: string, token: string): boolean {
+  const needle = token.toLowerCase()
+  if (needle === '') return false
+  if (!/[a-z0-9]/i.test(needle)) return haystack.includes(needle)
+  let from = 0
+  for (;;) {
+    const at = haystack.indexOf(needle, from)
+    if (at === -1) return false
+    const before = at === 0 ? '' : haystack.slice(at - 1, at)
+    const after = haystack.slice(at + needle.length, at + needle.length + 1)
+    if (!isWordChar(before) && !isWordChar(after)) return true
+    from = at + 1
+  }
+}
+
+/** The first spine stage whose token the phase header carries. */
 function stageForPhase(phase: string): ProgressStageDefinition | undefined {
   const haystack = phase.toLowerCase()
   for (const stage of PROGRESS_STAGES) {
     if (stage.edge) continue
-    if (stage.tokens.some((token) => haystack.includes(token.toLowerCase()))) return stage
+    if (stage.tokens.some((token) => phaseCarriesToken(haystack, token))) return stage
   }
   return undefined
 }
@@ -463,9 +597,28 @@ export function deriveTrack(run: ProgressRunFacts, options: DeriveOptions = {}):
     if (run.stopReason === 'completed') return 'done'
     return 'failed'
   }
+  /** Level-1 payloads by the phase they name; a phase-less one is the run's fallback. */
+  const detailByPhase = new Map<string, ProgressStageDetailFact>()
+  let runDetail: ProgressStageDetailFact | undefined
+  for (const detail of Array.isArray(run.details) ? run.details : []) {
+    if (detail === undefined) continue
+    if (detail.phase === undefined) {
+      runDetail = detail
+      continue
+    }
+    if (!detailByPhase.has(detail.phase)) detailByPhase.set(detail.phase, detail)
+  }
+  const detailOf = (phases: readonly string[]): ProgressStageDetailFact | undefined => {
+    for (const phase of phases) {
+      const detail = detailByPhase.get(phase)
+      if (detail !== undefined) return detail
+    }
+    return undefined
+  }
   const node = (definition: ProgressStageDefinition | undefined, key: string, kind: ProgressNodeModel['kind'], members: ProgressMemberFact[], phases: string[], label?: string): ProgressNodeModel => {
     const state = definition !== undefined && definition.edge ? edgeState(definition.key) : nodeState(members, ended)
     const reason = state === 'blocked' ? blockedReason(members, ended) : undefined
+    const detail = detailOf(phases)
     return {
       key,
       kind,
@@ -475,16 +628,18 @@ export function deriveTrack(run: ProgressRunFacts, options: DeriveOptions = {}):
       phases,
       derived: state === 'blocked',
       ...reason === undefined ? {} : { reason },
+      ...detail === undefined ? {} : { stageDetail: detail },
     }
   }
   const nodes: ProgressNodeModel[] = []
   for (const stage of PROGRESS_STAGES) {
     nodes.push(node(stage, `stage:${stage.key}`, stage.edge ? 'edge' : 'stage', byStage.get(stage.key) ?? [], byStagePhases.get(stage.key) ?? []))
-    // Extra phases are real plan tasks: they belong next to the work stages, before the
-    // closing stages of the template, and in the order the run started them. A row that
-    // declared no phase at all still gets a node (empty label = "unphased" copy), so the
-    // percentage and the track never count different rows.
-    if (stage.key === 'device') {
+    // Extra phases are real plan tasks (`任务 n · 标题`): the engine announces them while
+    // it executes the plan, so they belong between `执行` and `检查` — the template's
+    // work slot — in the order the run started them. A row that declared no phase at all
+    // still gets a node (empty label = "unphased" copy), so the percentage and the track
+    // never count different rows.
+    if (stage.key === 'execute') {
       for (const extra of extras) nodes.push(node(undefined, `phase:${extra.phase}`, 'extra', extra.members, [extra.phase], extra.phase))
       if (unphased.length > 0) nodes.push(node(undefined, 'phase:', 'extra', unphased, [], ''))
     }
@@ -497,17 +652,67 @@ export function deriveTrack(run: ProgressRunFacts, options: DeriveOptions = {}):
     nodes,
     ...percent === undefined ? {} : { percent },
     ...run.stopReason === undefined ? {} : { stopReason: run.stopReason },
+    ...runDetail === undefined ? {} : { stageDetail: runDetail },
   }
 }
 
+/** One `LABEL: value` line of a coordination block (`WORK_COMMIT: abc1234`). */
+const COORDINATION_LABEL_LINE = /^[ \t>*_`-]*([A-Za-z][A-Za-z_ -]*?)[ \t]*[:：][ \t]*(.*?)[ \t]*$/
+
+/** Read the labelled form of a block (`WORK_COMMIT: abc1234`), one fact per line. */
+function labelledFieldValues(body: string): Partial<Record<DetailFieldKey, string>> {
+  const fields: Partial<Record<DetailFieldKey, string>> = {}
+  for (const line of body.split(/\r?\n/)) {
+    const match = COORDINATION_LABEL_LINE.exec(line)
+    if (match === null) continue
+    const key = canonicalDetailField(match[1] ?? '')
+    if (key === undefined || fields[key] !== undefined) continue
+    // A value wrapped in backticks is still that value; the block is copied verbatim so
+    // the fences a writer adds for readability must not leak into the cell.
+    const value = (match[2] ?? '').replace(/^`+|`+$/g, '').trim()
+    if (value !== '') fields[key] = value
+  }
+  return fields
+}
+
+/** Read the JSON form of a fenced block, when that fence is one. */
+function jsonFieldValues(language: string, body: string): Partial<Record<DetailFieldKey, string>> | undefined {
+  if (language !== 'grok-coordination' && language !== 'json') return undefined
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(body)
+  } catch {
+    return undefined
+  }
+  const record = asRecord(parsed)
+  if (record === undefined) return undefined
+  const nested = asRecord(record['coordination'])
+  const fields = pickDetailFields(nested ?? record)
+  const known = Object.keys(fields).length
+  if (known === 0) return undefined
+  // A `json` fence is not a coordination report unless it carries the coordination object
+  // or enough of the seven fields to be unmistakable; prose in a generic JSON block must
+  // not be promoted into evidence.
+  if (nested === undefined && language !== 'grok-coordination' && known < 2) return undefined
+  return fields
+}
+
 /**
- * Parse a coordination block out of a child session's text.
+ * Parse a coordination block out of a stage's text.
  *
- * Only an explicit block is accepted: a fenced ` ```grok-coordination ` block, or a
- * fenced `json` block whose object carries a `coordination` object or at least two of the
- * seven known fields. Anything else is not a report, and the caller falls through to
- * "not reported" — the tab never treats prose as structured data.
- * @param text - child-session text that may contain a block.
+ * Three shapes are accepted, and nothing else:
+ *
+ * 1. a fenced `json` / `grok-coordination` block carrying the canonical fields (or a
+ *    `coordination` object) — at least two fields, unless the language says it is one;
+ * 2. any fenced block whose body is a labelled block — the `LABEL: value` form `AGENTS.md`
+ *    prescribes (`WORK_COMMIT: …`, `CHANGES: …`, `BLOCKERS: …`) — with at least two
+ *    known labels;
+ * 3. an unfenced labelled block, because the coordination protocol is posted as the
+ *    message body itself and not always inside a fence.
+ *
+ * Prose that merely mentions a field is not a report: the caller falls through to "not
+ * reported" and the tab never treats text as structured data.
+ * @param text - child-session or stage text that may contain a block.
  * @returns the parsed block, or undefined when no well-formed block exists.
  */
 export function parseCoordinationBlock(text: string | undefined): CoordinationBlock | undefined {
@@ -517,26 +722,13 @@ export function parseCoordinationBlock(text: string | undefined): CoordinationBl
   while ((match = fenced.exec(text)) !== null) {
     const language = (match[1] ?? '').toLowerCase()
     const body = match[2] ?? ''
-    if (language !== 'grok-coordination' && language !== 'json') continue
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(body)
-    } catch {
-      continue
-    }
-    const record = asRecord(parsed)
-    if (record === undefined) continue
-    const nested = asRecord(record['coordination'])
-    const source = nested ?? record
-    const fields = pickDetailFields(source)
-    const known = Object.keys(fields).length
-    if (known === 0) continue
-    // A `json` fence is not a coordination report unless it carries the coordination
-    // object or enough of the seven fields to be unmistakable; prose in a generic JSON
-    // block must not be promoted into evidence.
-    if (nested === undefined && language !== 'grok-coordination' && known < 2) continue
-    return { fields, raw: body.trim() }
+    const fromJson = jsonFieldValues(language, body)
+    if (fromJson !== undefined) return { fields: fromJson, raw: body.trim() }
+    const fromLabels = labelledFieldValues(body)
+    if (Object.keys(fromLabels).length >= 2) return { fields: fromLabels, raw: body.trim() }
   }
+  const unfenced = labelledFieldValues(text)
+  if (Object.keys(unfenced).length >= 2) return { fields: unfenced, raw: text.trim() }
   return undefined
 }
 
@@ -571,6 +763,33 @@ export function detailFor(sources: DetailSources = {}): DetailReport {
   return {
     fields,
     ...coordination === undefined ? {} : { coordinationRaw: coordination.raw },
+  }
+}
+
+/**
+ * Where one node's detail values actually come from.
+ *
+ * A view cannot read a child session's text, so the ladder is fed from the only channel
+ * that exists in the stream: the run's own `stage-detail` payloads, matched to the node by
+ * the phase they name, with a phase-less payload standing in for the whole run. A caller
+ * that *can* read a child session passes its own source in `injected`, which wins over the
+ * payload for the level it supplies — so wiring a stronger source later needs no UI change.
+ * @param track - the derived track (its phase-less payload is the fallback).
+ * @param node - the selected node.
+ * @param injected - a caller-supplied source, strongest where it speaks.
+ * @returns the sources the ladder resolves.
+ */
+export function detailSourcesOf(
+  track: ProgressTrackModel,
+  node: ProgressNodeModel,
+  injected: DetailSources = {},
+): DetailSources {
+  const payload = node.stageDetail ?? track.stageDetail
+  const stageDetail = injected.stageDetail ?? payload?.fields
+  const coordinationText = injected.coordinationText ?? payload?.coordinationText
+  return {
+    ...stageDetail === undefined ? {} : { stageDetail },
+    ...coordinationText === undefined ? {} : { coordinationText },
   }
 }
 

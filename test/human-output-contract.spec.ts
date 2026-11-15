@@ -1,27 +1,30 @@
 /**
  * 人话交付契约 / the human-language delivery contract, pinned offline.
  *
- * What a reader is promised after a run (v0.7.0 "B plan"):
+ * What a reader is promised after a run:
  *
- * 1. A COMPLETED and a PARTIAL run open with one plain-language sentence
- *    (`【人话结论】… 项已核验通过`), then the report. A FAILED run never opens with
- *    that success-styled sentence, because a failure must not look like an answer.
- * 2. The machine ledger — `Model routes:`, `Deadline:`, `Route switches:`,
- *    `Route overflows`, `Errors:` — is not part of the default view. It is
- *    retrievable on request through the `showDiagnostics` switch (default `false`).
- *    `Uncertainties:` stays visible either way: it is a truthful caveat a reader
- *    needs, not a routing ledger, and carry-over parses it back out of the report.
+ * 1. The delivered message opens with one plain-language block — what was done,
+ *    what came of it, what is next — in both languages (`src/delivery/index.ts`).
+ * 2. The machine ledger is *not* part of that block. It is folded below the
+ *    closing relay marker, where the preamble forbids quoting it, and it is the
+ *    durable copy cross-round carry-over parses back out. `showDiagnostics` moves
+ *    it inside the markers, which is the only way a reader sees it. `Uncertainties`
+ *    rides in the ledger like every other field: the human block states the
+ *    caveats it knows in its own words.
+ * 3. A FAILED run never opens with the completed wording, because a failure must
+ *    not look like an answer.
  *
  * Boundaries (read before trusting a green run):
  * - The only fakes are the workflow *engine* (a stub that hands back a fixed
  *   report) and the agent/session surface DSH would provide. `apply()`, the real
  *   cordis `agent/pre-step` waterfall, the real `ToolRuntime` registry, the real
- *   report validator (`assertWorkflowReport`) and the real renderer all run.
+ *   report validator (`assertWorkflowReport`) and the real composers all run.
  * - Deterministic and offline: no model call, no network, no clock. Every
  *   assertion is about text this plugin composed.
- * - This file pins the *delivery contract* only. It does not certify that the
- *   implementation behind it is correct, and it does not replace a real-DSH
- *   interaction run (that lives in `test/loader.spec.ts` and the e2e script).
+ * - This file pins the *delivery contract* through the mounted plugin. It does
+ *   not certify that the implementation behind it is correct, and it does not
+ *   replace a real-DSH interaction run (that lives in `test/loader.spec.ts` and
+ *   the e2e script).
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
@@ -30,7 +33,7 @@ import { ToolRuntime } from '@deepseek-ai/dsh-tools'
 import type { WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import { apply } from '../src/index.js'
-import { REPORT_BEGIN, REPORT_END, relayText } from '../src/answer.js'
+import { LEDGER_GUARD, REPORT_BEGIN, REPORT_END, relayText } from '../src/answer.js'
 import { resolveConfig } from '../src/config.js'
 import { assertWorkflowReport, failureReport, renderReport } from '../src/report.js'
 import { maxTotalAgentsFor } from '../src/script.js'
@@ -40,10 +43,7 @@ import { execution, failingVerification, task, verification } from './fixtures.j
 /**
  * The internal-term glossary this contract is about.
  *
- * Every entry is a string that only the machine ledger produces. A term that the
- * report itself legitimately shows (`Objective:`, `Confirmed evidence:`,
- * `Uncertainties:`, task rows) is deliberately NOT here — hiding those would be a
- * different, wrong contract.
+ * Every entry is a string that only the machine ledger produces.
  */
 const INTERNAL_TERMS = [
   'Model routes:',
@@ -57,12 +57,36 @@ const INTERNAL_TERMS = [
   'Errors:',
 ] as const
 
-/** The Chinese sentence the gate composes for a completed/partial run. */
-const HUMAN_HEADER = '【人话结论】'
+/** The machine-only section labels the visible block must not carry either. */
+const LEDGER_LABELS = [
+  'Grok workflow:',
+  'Objective:',
+  'Plan:',
+  'Failures:',
+  'Confirmed evidence:',
+  'Incomplete:',
+  'Final answer:',
+  'Uncertainties:',
+] as const
+
+/** The sentence a COMPLETED run opens with. */
+const HUMAN_DONE = '做完了'
+/** The sentence a PARTIAL run opens with. */
+const HUMAN_PARTLY = '做了一部分'
+/** The sentence a FAILED run opens with. */
+const HUMAN_FAILED = '这次没做成'
 
 const LIMITS = { maxConcurrency: 2, maxRetries: 1, maxTasks: 4 } as const
 const config = resolveConfig(LIMITS)
 const OBJECTIVE = '查一下新加坡这周的天气并给出出行建议'
+
+/** The slice of a relay message a reader actually sees. */
+function between(text: string): string {
+  const start = text.indexOf(REPORT_BEGIN)
+  const end = text.indexOf(REPORT_END)
+  if (start < 0 || end < start) return ''
+  return text.slice(start + REPORT_BEGIN.length, end)
+}
 
 /* ----------------------------------------------------------------- fixtures -- */
 
@@ -94,8 +118,8 @@ function completedReport(objective = OBJECTIVE): WorkflowReport {
  * A legal PARTIAL report: one verified task, one failed task.
  *
  * It carries every ledger-shaped field on purpose (a route that switched, a lane
- * that yielded, a cross-run hint, a deadline, an error) so the "hidden by default,
- * retrievable on request" assertion below has something real to hide.
+ * that yielded, a cross-run hint, a deadline, an error) so the "folded by default,
+ * retrievable on request" assertion below has something real to fold.
  */
 function partialReport(objective = OBJECTIVE): WorkflowReport {
   const ok = task('a', ['天气已核验'])
@@ -226,9 +250,12 @@ function textOf(message: UserMessage): string {
 }
 
 async function waitFor(predicate: () => boolean): Promise<void> {
+  // 5 s, not the 1 s default: the suite mounts a real cordis context per test and
+  // runs beside other spec files, and a loaded machine must not turn a correct
+  // gate into a red test.
   await vi.waitFor(() => {
     if (!predicate()) throw new Error('condition not met')
-  })
+  }, { timeout: 5_000 })
 }
 
 /* ------------------------------------------------------------------ harness -- */
@@ -319,37 +346,35 @@ describe('人话优先：COMPLETED 与 PARTIAL 都以人话开头', () => {
     mounted.engine.runs[0]!.complete(completedReport(objectiveOf(mounted)))
     await waitFor(() => agent.followups.length === 1)
     const text = textOf(agent.followups[0]!)
+    const visible = between(text)
 
     // The sentence a reader can act on comes first, and the main model is told to
     // reproduce it verbatim — so it must sit inside the markers, not before them.
-    expect(text).toContain(HUMAN_HEADER)
-    expect(text.indexOf(HUMAN_HEADER)).toBeGreaterThan(text.indexOf(REPORT_BEGIN))
-    expect(text.indexOf(HUMAN_HEADER)).toBeLessThan(text.indexOf(REPORT_END))
-    expect(text).toContain('任务 1/1 项已核验通过')
+    expect(visible).toContain(HUMAN_DONE)
+    expect(text.indexOf(HUMAN_DONE)).toBeGreaterThan(text.indexOf(REPORT_BEGIN))
+    expect(text.indexOf(HUMAN_DONE)).toBeLessThan(text.indexOf(REPORT_END))
+    expect(visible).toContain('项任务全部核验通过')
     // The plain sentence carries the run's own conclusion, not a template only.
-    expect(text).toContain('新加坡本周多雨，出行请带伞。')
-    // The report is still there, under the sentence.
-    expect(text).toContain('Grok workflow: COMPLETED')
-    expect(text).toContain('Final answer:')
-    for (const term of INTERNAL_TERMS) expect(text).not.toContain(term)
+    expect(visible).toContain('新加坡本周多雨，出行请带伞。')
+    // ...and the other language, because a guessed language can be wrong.
+    expect(visible).toContain('Done:')
   })
 
-  it('opens a PARTIAL run with the plain summary too, and keeps the caveat visible', async () => {
+  it('opens a PARTIAL run with the plain summary too, with the honest count', async () => {
     const mounted = await mount()
     const agent = await deliver(mounted)
     mounted.engine.runs[0]!.complete(partialReport(objectiveOf(mounted)))
     await waitFor(() => agent.followups.length === 1)
     const text = textOf(agent.followups[0]!)
+    const visible = between(text)
 
-    expect(text).toContain(HUMAN_HEADER)
+    expect(visible).toContain(HUMAN_PARTLY)
     // 1 of 2 verified: the count is the honest one, not "all done".
-    expect(text).toContain('任务 1/2 项已核验通过')
-    expect(text).toContain('Grok workflow: PARTIAL')
-    expect(text).toContain('Incomplete:')
-    // `Uncertainties:` is outside the ledger gate on purpose: a reader needs it.
-    expect(text).toContain('Uncertainties:')
-    expect(text).toContain('酒店价格未取得，预算建议可能偏差')
-    for (const term of INTERNAL_TERMS) expect(text).not.toContain(term)
+    expect(visible).toContain('1 项核验通过')
+    expect(visible).toContain('1 项没做成')
+    expect(visible).toContain('Partly done')
+    // The caveat a reader needs is stated in the human block's own words.
+    expect(visible).toContain('酒店价格未取得，预算建议可能偏差')
   })
 
   it('never dresses a FAILED run in the success sentence', async () => {
@@ -358,22 +383,45 @@ describe('人话优先：COMPLETED 与 PARTIAL 都以人话开头', () => {
     mounted.engine.runs[0]!.fail('error', 'boom')
     await waitFor(() => agent.followups.length === 1)
     const text = textOf(agent.followups[0]!)
+    const visible = between(text)
 
-    expect(text).toContain('Grok workflow: FAILED')
-    expect(text).toContain('boom')
-    expect(text).not.toContain(HUMAN_HEADER)
-    for (const term of INTERNAL_TERMS) expect(text).not.toContain(term)
+    expect(visible).toContain(HUMAN_FAILED)
+    expect(visible).toContain('This run did not finish')
+    expect(visible).not.toContain(HUMAN_DONE)
+    expect(visible).not.toContain('Done:')
+    // The measured cause is still the reader's to see.
+    expect(visible).toContain('boom')
   })
 
-  it('keeps the human sentence out of the report when humanSummary is switched off', async () => {
+  it('keeps the human sentence out of the delivery when humanSummary is switched off', async () => {
     const mounted = await mount({ humanSummary: false })
     const agent = await deliver(mounted)
     mounted.engine.runs[0]!.complete(completedReport(objectiveOf(mounted)))
     await waitFor(() => agent.followups.length === 1)
     const text = textOf(agent.followups[0]!)
 
-    expect(text).not.toContain(HUMAN_HEADER)
-    expect(text).toContain('Grok workflow: COMPLETED')
+    expect(text).not.toContain(HUMAN_DONE)
+    // The explicit opt-out still gets the report itself, not an empty answer.
+    expect(between(text)).toContain('Grok workflow: COMPLETED')
+  })
+})
+
+describe('机器台账：默认折叠在标记之后，不进可见块', () => {
+  it('folds the ledger below the closing marker, where it stays parseable', async () => {
+    const mounted = await mount()
+    const agent = await deliver(mounted)
+    mounted.engine.runs[0]!.complete(partialReport(objectiveOf(mounted)))
+    await waitFor(() => agent.followups.length === 1)
+    const text = textOf(agent.followups[0]!)
+    const visible = between(text)
+
+    for (const label of LEDGER_LABELS) expect(visible).not.toContain(label)
+    for (const term of INTERNAL_TERMS) expect(visible).not.toContain(term)
+    expect(text).toContain(LEDGER_GUARD)
+    const folded = text.slice(text.indexOf(REPORT_END))
+    expect(folded).toContain('Grok workflow: PARTIAL')
+    expect(folded).toContain('Confirmed evidence:')
+    expect(folded).toContain('Uncertainties:')
   })
 })
 
@@ -386,7 +434,7 @@ describe('诊断开关：默认隐藏，opt-in 才取回', () => {
   it('hides every internal term in the default view of a partial report', () => {
     const text = renderReport(partialReport())
     for (const term of INTERNAL_TERMS) expect(text).not.toContain(term)
-    // The reader-facing parts of the same report are untouched.
+    // The machine renderer is the detail view: it keeps the reader-facing parts.
     expect(text).toContain('Grok workflow: PARTIAL')
     expect(text).toContain('Confirmed evidence:')
   })
@@ -413,24 +461,37 @@ describe('诊断开关：默认隐藏，opt-in 才取回', () => {
     // Same report, same registration: only the switch moved.
     expect(on).toContain('Grok workflow: PARTIAL')
   })
+
+  it('puts the ledger inside the markers when the live switch is on', async () => {
+    const mounted = await mount({ showDiagnostics: true })
+    const agent = await deliver(mounted)
+    mounted.engine.runs[0]!.complete(partialReport(objectiveOf(mounted)))
+    await waitFor(() => agent.followups.length === 1)
+    const text = textOf(agent.followups[0]!)
+    const visible = between(text)
+
+    expect(visible).toContain('Grok workflow: PARTIAL')
+    expect(visible).toContain('Confirmed evidence:')
+    // Nothing is left folded when the reader asked to see it.
+    expect(text).not.toContain(LEDGER_GUARD)
+  })
 })
 
-describe('内部术语表：默认输出与 opt-in 输出互为补集', () => {
-  it('never leaks a ledger term into the relay text, whatever the run status', () => {
-    const completed = completedReport()
-    const partial = partialReport()
+describe('内部术语表：可见块与台账互为补集', () => {
+  it('never leaks a ledger term into the visible block, whatever the run status', () => {
     const failed = failureReport(OBJECTIVE, config, 'Plan', 'planner unavailable')
-    const header = `${HUMAN_HEADER}任务 1/1 项已核验通过。\n\n（原文报告附后）`
     const surfaces = [
-      relayText(completed, header),
-      relayText(partial, header),
+      relayText(completedReport()),
+      relayText(partialReport()),
       relayText(failed),
     ]
     for (const text of surfaces) {
-      for (const term of INTERNAL_TERMS) expect(text).not.toContain(term)
+      const visible = between(text)
+      for (const term of INTERNAL_TERMS) expect(visible).not.toContain(term)
+      for (const label of LEDGER_LABELS) expect(visible).not.toContain(label)
     }
     // ...and each term is still reachable on request, from the same report.
-    const opted = renderReport(partial, { showDiagnostics: true })
+    const opted = renderReport(partialReport(), { showDiagnostics: true })
     for (const term of INTERNAL_TERMS) expect(opted).toContain(term)
   })
 })

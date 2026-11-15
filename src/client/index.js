@@ -306,13 +306,11 @@ window.__ModuleLoader__.load({
       'progress.percentHint': '{settled} of {declared} declared rows settled; this is not a task verdict',
       'progress.unsettled': 'No rows declared yet',
       'progress.stage.start': 'Start',
-      'progress.stage.sync': 'Sync',
-      'progress.stage.triage': 'Diagnose',
-      'progress.stage.fix': 'Fix',
-      'progress.stage.ui': 'UI',
-      'progress.stage.device': 'On device',
-      'progress.stage.cleanup': 'Clean up',
-      'progress.stage.push': 'Push/tag',
+      'progress.stage.plan': 'Plan',
+      'progress.stage.execute': 'Execute',
+      'progress.stage.verify': 'Verify',
+      'progress.stage.synthesize': 'Synthesize',
+      'progress.stage.answer': 'Answer',
       'progress.stage.end': 'End',
       'progress.unphased': 'Unphased',
       'progress.extraHint': 'Plan task, appended from its phase',
@@ -347,13 +345,13 @@ window.__ModuleLoader__.load({
       'progress.source.stageDetail': 'Source: stage-detail event',
       'progress.source.coordination': 'Source: child coordination block',
       'progress.source.notReported': 'Source: not reported',
-      'progress.field.files': 'Files',
-      'progress.field.commands': 'Commands',
-      'progress.field.result': 'Result',
-      'progress.field.evidence': 'Evidence',
-      'progress.field.risks': 'Risks',
-      'progress.field.next': 'Next',
-      'progress.field.owner': 'Owner',
+      'progress.field.workCommit': 'Work commit',
+      'progress.field.changes': 'Changes',
+      'progress.field.testsRun': 'Tests run',
+      'progress.field.results': 'Test results',
+      'progress.field.localRuntimeVerified': 'Local runtime verified',
+      'progress.field.blockers': 'Blockers',
+      'progress.field.nextAction': 'Next action',
       'progress.none': '—',
       'status.progressMissing': 'The Progress tab is not mounted: this composition has no uiConversation service, so the track cannot appear.',
       'status.progressFailed': 'The Progress tab could not be registered: {message}. Everything else keeps working.',
@@ -567,13 +565,11 @@ window.__ModuleLoader__.load({
       'progress.percentHint': '已声明 {declared} 行，已结算 {settled} 行；这不是任务通过数',
       'progress.unsettled': '尚未声明任何行',
       'progress.stage.start': '起点',
-      'progress.stage.sync': '同步对比',
-      'progress.stage.triage': '排查',
-      'progress.stage.fix': '修复',
-      'progress.stage.ui': 'UI 改',
-      'progress.stage.device': '真机验证',
-      'progress.stage.cleanup': '清理',
-      'progress.stage.push': 'push/tag',
+      'progress.stage.plan': '规划',
+      'progress.stage.execute': '执行',
+      'progress.stage.verify': '检查',
+      'progress.stage.synthesize': '汇总',
+      'progress.stage.answer': '回答',
       'progress.stage.end': '终点',
       'progress.unphased': '未分阶段',
       'progress.extraHint': '计划任务，按 phase 追加',
@@ -608,13 +604,13 @@ window.__ModuleLoader__.load({
       'progress.source.stageDetail': '来源：stage-detail 事件',
       'progress.source.coordination': '来源：子会话协调块',
       'progress.source.notReported': '来源：未报告',
-      'progress.field.files': '变更文件',
-      'progress.field.commands': '运行命令',
-      'progress.field.result': '结论',
-      'progress.field.evidence': '证据',
-      'progress.field.risks': '风险',
-      'progress.field.next': '下一步',
-      'progress.field.owner': '负责人',
+      'progress.field.workCommit': '工作提交',
+      'progress.field.changes': '改动内容',
+      'progress.field.testsRun': '跑了哪些测试',
+      'progress.field.results': '测试结果',
+      'progress.field.localRuntimeVerified': '本机真机验证',
+      'progress.field.blockers': '卡点',
+      'progress.field.nextAction': '下一步',
       'progress.none': '—',
       'status.progressMissing': '进度 Tab 未挂载：当前组合没有 uiConversation 服务，轨道不会出现。',
       'status.progressFailed': '进度 Tab 注册失败：{message}。其余功能不受影响。',
@@ -852,38 +848,70 @@ window.__ModuleLoader__.load({
 
     /**
      * Heads-up (not a block) for a live document that already stores a number above
-     * its hard maximum (B07): `maxConcurrency` 8 or `maxRetries` 5 from a profile
-     * patch written before v0.9.0 restored the 6 / 3 envelope.
+     * its hard maximum (B07, B02): `maxConcurrency` 8 or `maxRetries` 5 from a profile
+     * patch written before v0.9.0 restored the 6 / 3 envelope, or any other limit in
+     * the Host's clamp list.
      *
      * The Host repairs that at load — it clamps to the cap, warns once and activates
      * the row instead of refusing it — so the tool is usable but the stored number
      * still disagrees with what runs. This banner is the page half of that pair: it
-     * names the stored value and the cap, and it reads the *live* document rather
+     * names the stored value and the cap, and it reads the *stored* document rather
      * than the draft, because the draft is already what the reader is editing. Saving
      * a legal number re-publishes the document and the notice disappears on its own.
      *
+     * It must read `entry.user`, not `entry.value` (B01). `describe()` publishes the
+     * *effective* value — already through the schema clamp — so a banner that compared
+     * `value` against the cap could never fire: it was dead code that made the whole
+     * pair look like a page feature nobody could ever see. `user` is the document as
+     * stored, which is exactly the number that disagrees. A namespace with no user
+     * layer, and a bare document (a test fixture, a caller passing a value), fall back
+     * to `value`, so the banner degrades to reporting the effective document instead of
+     * disappearing.
+     *
      * Only a numeric value above the maximum counts: a string, or a value below the
      * minimum, is a different defect and is already `error.number` (red, blocks Save).
-     * @param value - the live settings document as the Host projects it.
+     * @param entry - the namespace entry as the mirror publishes it (`{ value, user }`),
+     *   or a plain settings document.
      * @returns one `{ key, live, cap }` finding per overrun, in field order.
      */
-    function limitOverrunWarn(value) {
+    function limitOverrunWarn(entry) {
       const findings = []
-      if (value === undefined || value === null) return findings
+      if (entry === undefined || entry === null) return findings
+      const projected = entry.value === undefined || entry.value === null ? entry : entry.value
+      const stored = entry.user === undefined || entry.user === null ? projected : entry.user
+      if (stored === undefined || stored === null) return findings
       for (const field of FIELDS) {
         if (field.kind !== 'number' || field.max === undefined) continue
-        const live = value[field.key]
+        const live = stored[field.key]
         if (typeof live !== 'number' || !Number.isFinite(live) || live <= field.max) continue
         findings.push({ key: field.key, live, cap: field.max })
       }
       return findings
     }
 
+    /** Settings keys that have a row label, so a finding may name them in words. */
+    const FIELD_KEYS = new Set(FIELDS.map((field) => field.key))
+
+    /**
+     * The name of one settings field, translated when it is a real field.
+     *
+     * A finding carries the field *key* (`historyTurns`), which is an identifier, not
+     * copy: rendered raw it put an English camel-case key inside a Chinese sentence. The
+     * label the row itself shows is the same fact in words, so it is reused here.
+     * @param t - translator bound to this plugin's namespace.
+     * @param key - the field key from a finding.
+     * @returns the row label, or the key when it is not this page's field.
+     */
+    function fieldLabel(t, key) {
+      return FIELD_KEYS.has(key) ? t(`field.${key}`) : key
+    }
+
     /**
      * Render one validation finding in the active language.
      *
      * `role` params carry role ids, not prose: the role name is looked up here so a single
-     * dictionary entry serves all four chains in both languages.
+     * dictionary entry serves all four chains in both languages. `key` params carry a
+     * settings key and go through {@link fieldLabel} for the same reason.
      * @param error - a finding from `validate`.
      * @param t - translator bound to this plugin's namespace.
      * @returns the message the user sees.
@@ -892,6 +920,7 @@ window.__ModuleLoader__.load({
       const source = error === undefined || error.params === undefined ? {} : error.params
       const params = { ...source }
       if (typeof params.role === 'string') params.role = t(`role.${params.role}`)
+      if (typeof params.key === 'string') params.key = fieldLabel(t, params.key)
       return t(error.key, params)
     }
 
@@ -933,15 +962,24 @@ window.__ModuleLoader__.load({
       statusOn: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', rowGap: '4px', border: `1px solid ${STATUS_COLOR.done}`, background: 'var(--dsw-alias-state-success-tertiary, rgba(26,157,90,0.10))', borderRadius: '10px', padding: '10px 14px', fontSize: '13px' },
       statusOff: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', rowGap: '4px', border: `1px solid var(--dsw-alias-border-l2, rgba(128,128,128,0.28))`, background: 'var(--dsw-alias-fill-l2, rgba(128,128,128,0.08))', borderRadius: '10px', padding: '10px 14px', fontSize: '13px' },
       statusDot: { display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', marginRight: '8px', flex: 'none' },
-      warn: { border: '1px solid #f5c542', background: '#fff7e6', borderRadius: '10px', padding: '9px 13px', fontSize: '12px', lineHeight: 1.6 },
-      danger: { display: 'flex', flexDirection: 'column', gap: '0', border: '1px solid #f5c542', background: '#fff7e6', borderRadius: '12px', padding: '16px 20px 8px' },
+      /**
+       * A heads-up box. Both colours are tokens: the previous pair was a literal
+       * `#f5c542` on `#fff7e6`, which reads as a bright light-mode block in a dark
+       * composition and ignores a contrast pass. The `currentColor`/translucent fallbacks
+       * keep the box visible on a theme that does not define the warn tokens.
+       */
+      warn: { border: '1px solid var(--dsw-alias-state-warn-primary, currentColor)', background: 'var(--dsw-alias-state-warn-tertiary, rgba(183,121,31,0.12))', borderRadius: '10px', padding: '9px 13px', fontSize: '12px', lineHeight: 1.6 },
+      /** The same box when it wraps a whole section (a refused write): same tokens, roomier. */
+      danger: { display: 'flex', flexDirection: 'column', gap: '0', border: '1px solid var(--dsw-alias-state-warn-primary, currentColor)', background: 'var(--dsw-alias-state-warn-tertiary, rgba(183,121,31,0.12))', borderRadius: '12px', padding: '16px 20px 8px' },
       chain: { display: 'flex', flexDirection: 'column', gap: '8px', borderLeft: '2px solid rgba(128,128,128,0.25)', paddingLeft: '12px', maxHeight: '340px', overflowY: 'auto', paddingRight: '4px', paddingTop: '2px', paddingBottom: '2px' },
       roleCard: { display: 'flex', flexDirection: 'column', gap: '10px', background: 'rgba(128,128,128,0.05)', border: '1px solid rgba(128,128,128,0.16)', borderRadius: '10px', padding: '12px 14px' },
       roleHead: { display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' },
       roleIndex: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '22px', height: '22px', borderRadius: '50%', background: 'rgba(59,110,246,0.12)', color: '#3b6ef6', fontSize: '12px', fontWeight: 700, flex: 'none' },
       route: { display: 'flex', gap: '8px', alignItems: 'center' },
-      switch: { position: 'relative', width: '38px', height: '21px', borderRadius: '999px', border: 0, cursor: 'pointer', flex: 'none', background: '#d1d5db' },
-      switchOn: { position: 'relative', width: '38px', height: '21px', borderRadius: '999px', border: 0, cursor: 'pointer', flex: 'none', background: '#2f9e44' },
+      switch: { position: 'relative', width: '38px', height: '21px', borderRadius: '999px', border: 0, cursor: 'pointer', flex: 'none', background: '#d1d5db', display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-start', padding: '2px' },
+      switchOn: { position: 'relative', width: '38px', height: '21px', borderRadius: '999px', border: 0, cursor: 'pointer', flex: 'none', background: '#2f9e44', display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', padding: '2px' },
+      /** The moving part. Without it the pill reads as a flat block, not a switch. */
+      switchThumb: { width: '17px', height: '17px', borderRadius: '50%', background: 'var(--dsw-alias-label-inverse, #fff)', boxShadow: '0 1px 2px rgba(0,0,0,0.3)', transition: 'transform 120ms ease' },
       checkbox: { width: '16px', height: '16px', accentColor: '#3b6ef6', flex: 'none' },
       button: { minHeight: '32px', padding: '5px 12px', borderRadius: '8px', border: '1px solid rgba(128,128,128,0.45)', background: 'transparent', color: 'inherit', cursor: 'pointer', font: 'inherit' },
       primary: { minHeight: '32px', padding: '5px 18px', borderRadius: '8px', border: '1px solid transparent', background: '#3b6ef6', color: '#fff', cursor: 'pointer', font: 'inherit', fontWeight: 600 },
@@ -1112,7 +1150,9 @@ window.__ModuleLoader__.load({
           type: 'button', role: 'switch', 'aria-checked': on === true,
           style: on === true ? styles.switchOn : styles.switch, disabled,
           onClick: () => onFlip(!on),
-        }),
+        },
+        // The thumb is what makes the state visible at a glance; the pill alone is a block.
+        h('span', { 'data-switch-thumb': true, 'aria-hidden': 'true', style: styles.switchThumb })),
         h('span', null, label))
     }
 
@@ -1400,8 +1440,9 @@ window.__ModuleLoader__.load({
       const warnEmptyCap = useMemo(() => emptyCapWarn(draft), [draft])
       // Keyed on the live document, not the draft: an overrun is a fact about what is
       // stored, and it stops being one when the save lands (the revision bumps and the
-      // draft is re-seeded from the new value).
-      const warnLimits = useMemo(() => limitOverrunWarn(value), [value, stamp])
+      // draft is re-seeded from the new value). The entry is passed whole so the banner
+      // can read the stored `user` layer instead of the clamped `value` (B01).
+      const warnLimits = useMemo(() => limitOverrunWarn(entry), [entry, value, stamp])
       const disabled = saving || namespace.status !== 'ready' || entry === undefined || entry.writable === false
       const onChange = (key, next) => setDraft((current) => ({ ...current, [key]: next }))
       const setChain = (role, next) => setDraft((current) => ({ ...current, roles: { ...current.roles, [role]: next } }))
@@ -1629,14 +1670,19 @@ window.__ModuleLoader__.load({
             warnLimits.map((item) => h('div', { key: item.key, 'data-warn-key': item.key },
               t('warn.limit.detail', { field: t(`field.${item.key}`), live: String(item.live), cap: String(item.cap) }))))
           : null,
-        errors.length > 0
-          ? h('div', { style: styles.errorBox },
-            h('ul', { style: { ...styles.error, margin: 0, paddingLeft: '18px' } },
-              errors.map((error) => h('li', { key: errorId(error) }, formatError(error, t)))))
-          : null,
-        message !== undefined
-          ? h('p', { style: { ...(message.kind === 'error' ? styles.error : styles.ok), margin: 0 } }, t(message.key, message.params))
-          : null,
+        // One live region for both outcomes: a save that failed and a save that went
+        // through are the two things a reader who is not looking at the footer must
+        // hear. It is always mounted (empty when there is nothing to say) so that
+        // *inserting* text is what announces, not a region appearing with text in it.
+        h('div', { role: 'status', 'aria-live': 'polite', 'aria-atomic': 'true', 'data-gw-live': true },
+          errors.length > 0
+            ? h('div', { style: styles.errorBox },
+              h('ul', { style: { ...styles.error, margin: 0, paddingLeft: '18px' } },
+                errors.map((error) => h('li', { key: errorId(error) }, formatError(error, t)))))
+            : null,
+          message !== undefined
+            ? h('p', { style: { ...(message.kind === 'error' ? styles.error : styles.ok), margin: 0 } }, t(message.key, message.params))
+            : null),
         h('div', { style: styles.footer },
           h('button', {
             type: 'button', style: styles.primary, disabled: disabled || errors.length > 0 || ops.length === 0,
@@ -2182,20 +2228,85 @@ window.__ModuleLoader__.load({
      * It is a template, not a claim: a stage whose token no recorded phase carries stays
      * `pending` and its tooltip says the events did not report it.
      */
+    /**
+     * The track's spine: this engine's own phases, in the order it runs them.
+     *
+     * The five work stages are the phase headers `src/naming.ts` emits — `规划` / `执行` /
+     * `检查` / `汇总` / `回答` (`phaseLabel`: plan, execute, verify, synthesize, answer) —
+     * plus the plan tasks the engine announces as `任务 n · 标题` (`taskGroupTitle`), which
+     * are appended between `执行` and `检查` because that is where the workers run.
+     *
+     * A CJK token matches anywhere; a token with Latin letters must sit on word
+     * boundaries, or `ui` reads inside `build`, `tag` inside `stage` and `sync` inside
+     * `async` — the false hits that made the old spine report stages nobody ran.
+     */
     const PROGRESS_STAGES = [
       { key: 'start', tokens: [], edge: true },
-      { key: 'sync', tokens: ['同步', 'sync'], edge: false },
-      { key: 'triage', tokens: ['排查', '诊断', 'triage'], edge: false },
-      { key: 'fix', tokens: ['修复', 'fix'], edge: false },
-      { key: 'ui', tokens: ['ui', '界面'], edge: false },
-      { key: 'device', tokens: ['真机', '实机', 'device'], edge: false },
-      { key: 'cleanup', tokens: ['清理', 'cleanup'], edge: false },
-      { key: 'push', tokens: ['push', 'tag', '推送', '发布'], edge: false },
+      { key: 'plan', tokens: ['规划', 'plan'], edge: false },
+      { key: 'execute', tokens: ['执行', 'execute'], edge: false },
+      { key: 'verify', tokens: ['检查', '核验', 'verify'], edge: false },
+      { key: 'synthesize', tokens: ['汇总', 'synthesize'], edge: false },
+      { key: 'answer', tokens: ['回答', 'answer'], edge: false },
       { key: 'end', tokens: [], edge: true },
     ]
 
-    /** The seven fields a settled stage reports, in render order. */
-    const PROGRESS_DETAIL_FIELDS = ['files', 'commands', 'result', 'evidence', 'risks', 'next', 'owner']
+    /**
+     * The optional detail payload, kept apart from `PROGRESS_EVENT_TYPES`.
+     *
+     * It never decides a state; it only adds field values to a node. The recorder does
+     * not write it today, so a stream without it renders exactly what it rendered before
+     * — but when a stream carries one, the values are used instead of being ignored.
+     */
+    const PROGRESS_DETAIL_EVENT_TYPE = 'tool-workflow/stage-detail'
+
+    /** The seven fields an AGENTS.md coordination block reports, in render order. */
+    const PROGRESS_DETAIL_FIELDS = ['workCommit', 'changes', 'testsRun', 'results', 'localRuntimeVerified', 'blockers', 'nextAction']
+
+    /**
+     * Every spelling of one field, folded to its canonical key.
+     *
+     * `AGENTS.md` labels the facts `WORK_COMMIT` / `CHANGES` / `TESTS_RUN` /
+     * `TEST_RESULTS` / `LOCAL_RUNTIME_VERIFIED` / `BLOCKERS` / `NEXT_ACTION`; a JSON
+     * block writes them in camelCase. Both spell the same seven facts, so a reader sees
+     * one row per fact.
+     */
+    const PROGRESS_DETAIL_ALIASES = {
+      workcommit: 'workCommit',
+      changes: 'changes',
+      change: 'changes',
+      testsrun: 'testsRun',
+      tests: 'testsRun',
+      results: 'results',
+      result: 'results',
+      testresults: 'results',
+      localruntimeverified: 'localRuntimeVerified',
+      blockers: 'blockers',
+      blocker: 'blockers',
+      nextaction: 'nextAction',
+      next: 'nextAction',
+    }
+
+    /** Fold one written field name (`WORK_COMMIT`, `workCommit`, `next_action`) to its key. */
+    function progressDetailField(name) {
+      if (typeof name !== 'string') return undefined
+      return PROGRESS_DETAIL_ALIASES[name.toLowerCase().replace(/[^a-z0-9]/g, '')]
+    }
+
+    /**
+     * Ring glyph per state.
+     *
+     * The ring is 28px and the state word already exists, so the glyph is redundant on
+     * purpose: a reader can tell the stages apart without relying on colour, and the
+     * `aria-label` still carries the words.
+     */
+    const PROGRESS_STATE_GLYPH = {
+      pending: '',
+      doing: '▸',
+      done: '✓',
+      blocked: '!',
+      cancelled: '×',
+      failed: '✕',
+    }
 
     /**
      * Ring colour per state, all through DSH design tokens.
@@ -2247,11 +2358,13 @@ window.__ModuleLoader__.load({
       return undefined
     }
 
-    /** Read the known detail fields out of one record. */
+    /** Read the known detail fields out of one record, canonicalizing the names first. */
     function progressPickFields(source) {
       const fields = {}
-      for (const key of PROGRESS_DETAIL_FIELDS) {
-        const text = progressFieldText(source[key])
+      for (const name of Object.keys(source)) {
+        const key = progressDetailField(name)
+        if (key === undefined || fields[key] !== undefined) continue
+        const text = progressFieldText(source[name])
         if (text !== undefined) fields[key] = text
       }
       return fields
@@ -2282,6 +2395,7 @@ window.__ModuleLoader__.load({
           anchorSeq: seq,
           members: [],
           settlements: new Map(),
+          details: [],
           startedAt: record.time,
         })
       }
@@ -2291,10 +2405,24 @@ window.__ModuleLoader__.load({
         index += 1
         const data = progressRecord(record.data) || {}
         const runId = typeof data.runId === 'string' ? data.runId : undefined
-        if (runId === undefined || PROGRESS_EVENT_TYPES.indexOf(record.type) === -1) continue
+        const isDetail = record.type === PROGRESS_DETAIL_EVENT_TYPE
+        if (runId === undefined || (!isDetail && PROGRESS_EVENT_TYPES.indexOf(record.type) === -1)) continue
         const draft = drafts.get(runId)
         if (draft === undefined) continue
         if (seq < draft.anchorSeq) draft.anchorSeq = seq
+        if (isDetail) {
+          const fields = progressPickFields(data)
+          const coordinationText = typeof data.coordination === 'string' ? data.coordination : undefined
+          // An empty payload is not a report: it would claim the stage was measured and
+          // found blank.
+          if (Object.keys(fields).length === 0 && coordinationText === undefined) continue
+          draft.details.push({
+            phase: typeof data.phase === 'string' ? data.phase : undefined,
+            fields,
+            coordinationText,
+          })
+          continue
+        }
         if (record.type === 'tool-workflow/agent-start') {
           const memberSeq = Number(data.seq)
           if (!Number.isFinite(memberSeq)) continue
@@ -2334,6 +2462,7 @@ window.__ModuleLoader__.load({
           name: draft.name,
           anchorSeq: draft.anchorSeq,
           members: draft.members,
+          details: draft.details,
           startedAt: draft.startedAt,
           endedAt: draft.endedAt,
           stopReason: draft.stopReason,
@@ -2391,13 +2520,40 @@ window.__ModuleLoader__.load({
       return { settled, declared, value: Math.round((settled / declared) * 100) }
     }
 
-    /** The first spine stage whose token appears in a phase header. */
+    /** Whether one character can continue a Latin word (so a token boundary is not here). */
+    function progressWordChar(character) {
+      return character !== '' && /[a-z0-9_]/i.test(character)
+    }
+
+    /**
+     * Whether one phase header carries one stage token.
+     *
+     * A CJK-only token matches anywhere (`规划` in `任务 1 · 规划`); a token with Latin
+     * letters must sit on word boundaries, because a loose test reads `ui` inside
+     * `build`, `tag` inside `stage`/`target` and `sync` inside `async`.
+     */
+    function progressPhaseCarriesToken(haystack, token) {
+      const needle = token.toLowerCase()
+      if (needle === '') return false
+      if (!/[a-z0-9]/i.test(needle)) return haystack.indexOf(needle) !== -1
+      let from = 0
+      for (;;) {
+        const at = haystack.indexOf(needle, from)
+        if (at === -1) return false
+        const before = at === 0 ? '' : haystack.slice(at - 1, at)
+        const after = haystack.slice(at + needle.length, at + needle.length + 1)
+        if (!progressWordChar(before) && !progressWordChar(after)) return true
+        from = at + 1
+      }
+    }
+
+    /** The first spine stage whose token the phase header carries. */
     function progressStageForPhase(phase) {
       const haystack = phase.toLowerCase()
       for (const stage of PROGRESS_STAGES) {
         if (stage.edge) continue
         for (const token of stage.tokens) {
-          if (haystack.indexOf(token.toLowerCase()) !== -1) return stage
+          if (progressPhaseCarriesToken(haystack, token)) return stage
         }
       }
       return undefined
@@ -2444,6 +2600,21 @@ window.__ModuleLoader__.load({
         if (run.stopReason === 'completed') return 'done'
         return 'failed'
       }
+      /** Level-1 payloads by the phase they name; a phase-less one is the run's fallback. */
+      const detailByPhase = new Map()
+      let runDetail
+      for (const detail of Array.isArray(run.details) ? run.details : []) {
+        if (detail === undefined || detail === null) continue
+        if (detail.phase === undefined) { runDetail = detail; continue }
+        if (!detailByPhase.has(detail.phase)) detailByPhase.set(detail.phase, detail)
+      }
+      const detailOf = (phases) => {
+        for (const phase of phases) {
+          const detail = detailByPhase.get(phase)
+          if (detail !== undefined) return detail
+        }
+        return undefined
+      }
       const node = (stage, key, kind, members, phases, label) => {
         const state = stage !== undefined && stage.edge ? edgeState(stage.key) : progressNodeState(members, ended)
         const reason = state === 'blocked' ? progressBlockedReason(members, ended) : undefined
@@ -2456,16 +2627,17 @@ window.__ModuleLoader__.load({
           phases,
           derived: state === 'blocked',
           reason,
+          stageDetail: detailOf(phases),
         }
       }
       const nodes = []
       for (const stage of PROGRESS_STAGES) {
         nodes.push(node(stage, `stage:${stage.key}`, stage.edge ? 'edge' : 'stage', byStage.get(stage.key) || [], byStagePhases.get(stage.key) || []))
-        // Extra phases are real plan tasks: they sit with the work stages, before the
-        // template's closing stages, in the order the run started them. A row that
-        // declared no phase still gets a node, so the track and the percentage never
-        // count different rows.
-        if (stage.key === 'device') {
+        // Extra phases are real plan tasks (`任务 n · 标题`) announced while the engine
+        // executes the plan, so they sit between `执行` and `检查` — the template's work
+        // slot — in the order the run started them. A row that declared no phase still
+        // gets a node, so the track and the percentage never count different rows.
+        if (stage.key === 'execute') {
           for (const extra of extras) nodes.push(node(undefined, `phase:${extra.phase}`, 'extra', extra.members, [extra.phase], extra.phase))
           if (unphased.length > 0) nodes.push(node(undefined, 'phase:', 'extra', unphased, [], ''))
         }
@@ -2477,6 +2649,7 @@ window.__ModuleLoader__.load({
         stopReason: run.stopReason,
         nodes,
         percent: progressPercent(run.members),
+        stageDetail: runDetail,
       }
     }
 
@@ -2487,34 +2660,74 @@ window.__ModuleLoader__.load({
      * `json` block carrying the coordination object or at least two of the seven fields.
      * Prose is not structured data, and this function never promotes it into evidence.
      */
+    /** One `LABEL: value` line of a coordination block (`WORK_COMMIT: abc1234`). */
+    const PROGRESS_COORDINATION_LABEL = /^[ \t>*_`-]*([A-Za-z][A-Za-z_ -]*?)[ \t]*[:：][ \t]*(.*?)[ \t]*$/
+
+    /** Read the labelled form of a block, one fact per line. */
+    function progressLabelledFields(body) {
+      const fields = {}
+      for (const line of body.split(/\r?\n/)) {
+        const match = PROGRESS_COORDINATION_LABEL.exec(line)
+        if (match === null) continue
+        const key = progressDetailField(match[1] || '')
+        if (key === undefined || fields[key] !== undefined) continue
+        const value = (match[2] || '').replace(/^`+|`+$/g, '').trim()
+        if (value !== '') fields[key] = value
+      }
+      return fields
+    }
+
+    /** Read the JSON form of a fenced block, when that fence is one. */
+    function progressJsonFields(language, body) {
+      if (language !== 'grok-coordination' && language !== 'json') return undefined
+      let parsed
+      try {
+        parsed = JSON.parse(body)
+      } catch {
+        return undefined
+      }
+      const record = progressRecord(parsed)
+      if (record === undefined) return undefined
+      const nested = progressRecord(record.coordination)
+      const fields = progressPickFields(nested === undefined ? record : nested)
+      const known = Object.keys(fields).length
+      if (known === 0) return undefined
+      // A generic `json` fence needs the coordination object or two unmistakable fields;
+      // prose in a JSON block is not evidence.
+      if (nested === undefined && language !== 'grok-coordination' && known < 2) return undefined
+      return fields
+    }
+
+    /**
+     * Parse a coordination block out of stage text.
+     *
+     * Three shapes are accepted and nothing else: a fenced `json`/`grok-coordination`
+     * block with the canonical fields (or a `coordination` object); any fenced block whose
+     * body is the `LABEL: value` form `AGENTS.md` prescribes, with at least two known
+     * labels; and that same labelled block unfenced, because the coordination protocol is
+     * posted as the message body itself. Prose that merely mentions a field is never
+     * promoted into evidence.
+     */
     function parseProgressCoordination(text) {
       if (typeof text !== 'string' || text === '') return undefined
       const fenced = /```([A-Za-z-]*)[^\n]*\n([\s\S]*?)```/g
       let match
       while ((match = fenced.exec(text)) !== null) {
         const language = (match[1] || '').toLowerCase()
-        if (language !== 'grok-coordination' && language !== 'json') continue
-        let parsed
-        try {
-          parsed = JSON.parse(match[2] || '')
-        } catch {
-          continue
-        }
-        const record = progressRecord(parsed)
-        if (record === undefined) continue
-        const nested = progressRecord(record.coordination)
-        const fields = progressPickFields(nested === undefined ? record : nested)
-        const known = Object.keys(fields).length
-        if (known === 0) continue
-        if (nested === undefined && language !== 'grok-coordination' && known < 2) continue
-        return { fields, raw: (match[2] || '').trim() }
+        const body = match[2] || ''
+        const fromJson = progressJsonFields(language, body)
+        if (fromJson !== undefined) return { fields: fromJson, raw: body.trim() }
+        const fromLabels = progressLabelledFields(body)
+        if (Object.keys(fromLabels).length >= 2) return { fields: fromLabels, raw: body.trim() }
       }
+      const unfenced = progressLabelledFields(text)
+      if (Object.keys(unfenced).length >= 2) return { fields: unfenced, raw: text.trim() }
       return undefined
     }
 
     /**
      * Resolve the seven detail fields, strongest source first
-     * (`stage-detail` event → child coordination block → not reported).
+     * (`stage-detail` event → coordination block → not reported).
      * @param sources - available sources.
      * @returns one row per field, plus the copyable block when there was one.
      */
@@ -2531,6 +2744,27 @@ window.__ModuleLoader__.load({
         fields.push({ key, source: 'not-reported' })
       }
       return { fields, coordinationRaw: block === undefined ? undefined : block.raw }
+    }
+
+    /**
+     * Where one node's detail values come from.
+     *
+     * A view cannot read a child session's text, so the ladder is fed from the only
+     * channel in the stream: the run's own `stage-detail` payloads, matched to the node by
+     * the phase they name, with a phase-less payload as the run-level fallback. A caller
+     * that *can* read a child session passes its source in `injected`, which wins for the
+     * level it supplies — wiring a stronger source later needs no UI change.
+     */
+    function progressDetailSources(track, node, injected) {
+      const supplied = injected === undefined || injected === null ? {} : injected
+      const own = node === undefined || node === null ? undefined : node.stageDetail
+      const source = own === undefined ? (track === undefined || track === null ? undefined : track.stageDetail) : own
+      const stageDetail = supplied.stageDetail !== undefined ? supplied.stageDetail : (source === undefined ? undefined : source.fields)
+      const coordinationText = supplied.coordinationText !== undefined ? supplied.coordinationText : (source === undefined ? undefined : source.coordinationText)
+      return {
+        ...stageDetail === undefined ? {} : { stageDetail },
+        ...coordinationText === undefined ? {} : { coordinationText },
+      }
     }
 
     /** Format one duration for the engine-facts section; `undefined` when it was not measured. */
@@ -2595,6 +2829,12 @@ window.__ModuleLoader__.load({
       '.gw-progress-node[data-state="blocked"] .gw-progress-ring,',
       '.gw-progress-node[data-state="cancelled"] .gw-progress-ring { border-color: var(--dsw-alias-state-warn-primary); color: var(--dsw-alias-state-warn-primary); }',
       '.gw-progress-node[data-selected="true"] .gw-progress-ring { box-shadow: 0 0 0 4px var(--dsw-alias-fill-l2, transparent); }',
+      '.gw-progress-glyph { line-height: 1; font-size: calc(12px * var(--gw-zoom, 1)); font-variant-numeric: tabular-nums; }',
+      // The connector between two nodes: a hairline that fills only where the track has
+      // actually passed, so the fill is evidence and not decoration.
+      '.gw-progress-link { flex: 0 0 auto; align-self: flex-start; margin-top: 13px; width: 18px; height: 2px;',
+      '  border-radius: 999px; background: var(--dsw-alias-border-l2, currentColor); }',
+      '.gw-progress-link[data-filled="true"] { background: var(--dsw-alias-state-success-primary, currentColor); }',
       '.gw-progress-label { max-width: 84px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }',
       '.gw-progress-detail { position: absolute; z-index: 30; top: 96px; left: 12px; right: 12px; max-width: 560px;',
       '  box-sizing: border-box; padding: 12px 14px; border: 1px solid var(--dsw-alias-border-l2, currentColor); border-radius: 12px;',
@@ -2654,8 +2894,12 @@ window.__ModuleLoader__.load({
         'aria-expanded': props.selected,
         onClick: () => props.onSelect(node.key),
       },
+      // One glyph for the state, or the exact row count when the node aggregates more than
+      // one row (a count is a fact a reader can check; a glyph would hide it).
       h('span', { className: 'gw-progress-ring', style: { borderColor: PROGRESS_STATE_COLOR[node.state] }, 'aria-hidden': 'true' },
-        node.members.length > 1 ? node.members.length : null),
+        node.members.length > 1
+          ? h('span', { className: 'gw-progress-glyph', 'data-gw-progress-count': node.members.length }, String(node.members.length))
+          : h('span', { className: 'gw-progress-glyph', 'data-gw-progress-glyph': node.state }, PROGRESS_STATE_GLYPH[node.state] || '')),
       h('span', { className: 'gw-progress-label', 'data-gw-progress-label': true, title: label }, label))
     }
 
@@ -2768,6 +3012,13 @@ window.__ModuleLoader__.load({
       const [focusedKey, setFocusedKey] = useState(undefined)
       const [copy, setCopy] = useState('idle')
       const nodes = track === undefined ? [] : track.nodes
+      // Nodes and the connectors between them, in render order. A connector belongs to the
+      // pair it sits in, so it is built here rather than inside `ProgressNode`.
+      const trackChildren = []
+      nodes.forEach((node, index) => {
+        if (index > 0) trackChildren.push({ kind: 'link', filled: nodes[index - 1].state === 'done' })
+        trackChildren.push({ kind: 'node', node })
+      })
       const selected = selectedKey === undefined ? undefined : nodes.find((node) => node.key === selectedKey)
       const rovingKey = focusedKey === undefined ? (nodes.length === 0 ? undefined : nodes[0].key) : focusedKey
       const applyZoom = (next) => {
@@ -2795,7 +3046,12 @@ window.__ModuleLoader__.load({
           if (target !== undefined && typeof target.focus === 'function') target.focus()
         }
       }
-      const detailSources = selected === undefined || typeof props.detailSources !== 'function' ? {} : (props.detailSources(selected) || {})
+      // The ladder's real port: the node's own `stage-detail` payload (matched by phase,
+      // with the run-level one as fallback), overridden by whatever a caller injects.
+      const injectedSources = selected === undefined || typeof props.detailSources !== 'function' ? {} : (props.detailSources(selected) || {})
+      const detailSources = selected === undefined || track === undefined
+        ? injectedSources
+        : progressDetailSources(track, selected, injectedSources)
       const report = selected === undefined ? undefined : progressDetailFor(detailSources)
       const copyBlock = async () => {
         const raw = report === undefined ? undefined : report.coordinationRaw
@@ -2810,11 +3066,15 @@ window.__ModuleLoader__.load({
       const canOpen = typeof props.canOpen === 'function' ? props.canOpen : () => false
       const header = h('div', { className: 'gw-progress-head' },
         h('h3', { className: 'gw-progress-title' }, t('progress.title')),
+        // A live region: the number changes while a run works, and a reader who is not
+        // watching the track should hear that it moved. `polite` so it never interrupts.
         track === undefined || track.percent === undefined
-          ? h('span', { className: 'gw-progress-percent', 'data-progress-percent': 'none' }, t('progress.unsettled'))
+          ? h('span', { className: 'gw-progress-percent', 'data-progress-percent': 'none', role: 'status', 'aria-live': 'polite' }, t('progress.unsettled'))
           : h('span', {
             className: 'gw-progress-percent',
             'data-progress-percent': track.percent.value,
+            role: 'status',
+            'aria-live': 'polite',
             title: t('progress.percentHint', { settled: track.percent.settled, declared: track.percent.declared }),
           }, t('progress.percent', { settled: track.percent.settled, declared: track.percent.declared, percent: track.percent.value })),
         h('span', { className: 'gw-progress-zoom' },
@@ -2841,12 +3101,23 @@ window.__ModuleLoader__.load({
           'aria-label': t('progress.aria'),
           'data-gw-progress-track': true,
           onKeyDown,
-        }, nodes.map((node) => ProgressNode(node, {
-          t,
-          selected: selected !== undefined && selected.key === node.key,
-          tabIndex: node.key === rovingKey ? 0 : -1,
-          onSelect: (key) => { setSelectedKey(key); setFocusedKey(key); setCopy('idle') },
-        }))),
+        }, trackChildren.map((entry, index) => (entry.kind === 'link'
+          // A connector fills only where the track has actually passed: the previous node
+          // is `done`. A `failed`/`blocked` node leaves the line empty on purpose — the
+          // line is evidence, not decoration.
+          ? h('span', {
+            key: `link:${index}`,
+            className: 'gw-progress-link',
+            'data-gw-progress-link': true,
+            'data-filled': entry.filled ? 'true' : undefined,
+            'aria-hidden': 'true',
+          })
+          : ProgressNode(entry.node, {
+            t,
+            selected: selected !== undefined && selected.key === entry.node.key,
+            tabIndex: entry.node.key === rovingKey ? 0 : -1,
+            onSelect: (key) => { setSelectedKey(key); setFocusedKey(key); setCopy('idle') },
+          })))),
       selected === undefined || report === undefined ? null : ProgressDetail({
         t,
         node: selected,
@@ -3096,9 +3367,10 @@ window.__ModuleLoader__.load({
               workspace.openSession({ parentSessionId: sessionId, childSessionId: childId, mode })
               return true
             },
-            // The two stronger detail sources are wired, not faked: today the recorder
-            // writes no `stage-detail` event and no child text is reachable from a view,
-            // so the ladder lands on "not reported" and says so.
+            // The tab resolves level 1 itself, from the node's own `stage-detail` payload.
+            // This injection point exists for a caller that can read a child session's
+            // text; a view cannot, so nothing is supplied here and the ladder falls to
+            // "not reported" — which it says, instead of showing an empty cell.
             detailSources: () => ({}),
           }
         },
@@ -3424,7 +3696,7 @@ window.__ModuleLoader__.load({
     exports.GROK_WORKFLOW_ROUTE_INFLIGHT_MAX = ROUTE_INFLIGHT_MAX
     /** Internals pinned by test/client.spec.ts (no runtime caller). */
     exports.GROK_WORKFLOW_INTERNALS = {
-      validate, formatError, opsFor, draftOf, resolveNamespace, translate, translator, activeLocale,
+      validate, formatError, fieldLabel, opsFor, draftOf, resolveNamespace, translate, translator, activeLocale,
       comboWarn, emptyCapWarn, limitOverrunWarn,
     }
     /** Task panel: the `workflow-run` node renderer this bundle registers in place of the stock one. */
@@ -3455,10 +3727,12 @@ window.__ModuleLoader__.load({
       zoomKey: PROGRESS_ZOOM_KEY,
       zoom: { min: PROGRESS_ZOOM_MIN, max: PROGRESS_ZOOM_MAX, step: PROGRESS_ZOOM_STEP },
       eventTypes: PROGRESS_EVENT_TYPES,
+      detailEventType: PROGRESS_DETAIL_EVENT_TYPE,
       stages: PROGRESS_STAGES,
       detailFields: PROGRESS_DETAIL_FIELDS,
       stateColor: PROGRESS_STATE_COLOR,
       stateKey: PROGRESS_STATE_KEY,
+      stateGlyph: PROGRESS_STATE_GLYPH,
       css: PROGRESS_CSS,
       component: ProgressView,
       eventDefinition: progressEventDefinition,
@@ -3471,6 +3745,8 @@ window.__ModuleLoader__.load({
       percent: progressPercent,
       deriveTrack: deriveProgressTrack,
       detailFor: progressDetailFor,
+      detailSources: progressDetailSources,
+      detailField: progressDetailField,
       parseCoordination: parseProgressCoordination,
       duration: progressDuration,
       readZoom: readProgressZoom,

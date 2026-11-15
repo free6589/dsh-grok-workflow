@@ -165,8 +165,8 @@ export declare function classifyPreStep(deps: Pick<GateDeps, 'config' | 'readCon
  * used to be exactly that. The text names the state, keeps the completed/partial
  * split honest, and never reads as success.
  *
- * The kept report is relayed with the same plain-language head every other path
- * uses, so a cancelled PARTIAL does not open with the raw ledger either.
+ * The kept report goes through the same `relayText` every other path uses, so a
+ * cancelled PARTIAL opens with the same human block instead of the raw ledger.
  *
  * @param reason - Optional measured reason; empty when there is none to state.
  * @param report - Report the run produced before it was stopped, when there is one.
@@ -178,24 +178,19 @@ export declare function cancelledText(reason: string, report?: WorkflowReport, o
     lang?: TriageLang;
 }): string;
 /**
- * Deterministic plain-language head for a finished run (B plan, widened here).
+ * Plain-language head for a finished run (B plan, widened here).
  *
- * One composer for all three final statuses. The head used to be built twice (the
- * front desk's team branch and `runTeam`), so any path that composed its own
- * answer — a cancelled turn, a PARTIAL arriving through the front desk — could
- * hand the user the raw ledger and nothing else. That is exactly what
- * session-4c562307 saw: a PARTIAL answer that began at `Grok workflow: PARTIAL`.
+ * Kept as a named export so existing callers keep working; the composition itself
+ * lives in `src/delivery/index.ts` (`humanConclusion`), which is the one module
+ * that decides what a reader is told. This wrapper exists so the gate never grows
+ * a second wording of its own — the drift that produced a PARTIAL answer opening
+ * at `Grok workflow: PARTIAL` (session-4c562307).
  *
  * Deterministic on purpose: no model call, so engine call counts and the one-shot
- * budget are unchanged. Bounded to two summary lines and short next steps.
- *
- * - `completed`: the 0.7.0 wording, byte for byte (no regression).
- * - `partial`: same marker, plus what did not get done and what to do next.
- * - `failed`: its own marker (`【人话结论·未完成】` / `【Plain summary · not completed】`)
- *   and never the success sentence: a failed run must not read as success.
+ * budget are unchanged.
  *
  * @param report - validated report.
- * @param lang - language of the user's request.
+ * @param lang - language of the user's request; picks which block leads.
  * @param enabled - the `humanSummary` switch; off means no head at all.
  * @returns the head block, or undefined when the switch is off.
  */

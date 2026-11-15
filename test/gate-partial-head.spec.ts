@@ -171,36 +171,39 @@ const FAILED: EngineShape = { plan: ['a'], failing: [], crash: 'provider explode
 describe('a PARTIAL answer leads with a human conclusion and a next step', () => {
   it('opens with the head, not with the ledger, on the front desk team path', async () => {
     const text = await deliver(PARTIAL, TEAM_ZH)
-    const head = text.indexOf('【人话结论】')
-    // The head is user-visible content: inside the markers, above the ledger.
+    const head = text.indexOf('做了一部分')
+    // The human block is user-visible content: inside the markers, above the ledger.
     expect(head).toBeGreaterThan(text.indexOf('<<<GROK-WORKFLOW-REPORT>>>'))
     expect(head).toBeLessThan(text.indexOf('Grok workflow: PARTIAL'))
     // What a reader needs: how much got done, what did not, and what to do next.
-    expect(text).toContain('任务 1/2 项已核验通过')
-    expect(text).toContain('1 项没做成（Task b）')
+    expect(text).toContain('做了一部分：2 项任务里 1 项核验通过，1 项没做成。')
+    expect(text).toContain('没做成的：')
+    // `stripIds` drops a `<id>:` prefix, so the row reads as a sentence:
+    // the reason is what matters, not the fixture's `Task b` title.
+    expect(text).toContain('verifier verdict was fail')
     expect(text).toContain('下一步：')
-    // The ledger stays retrievable behind it.
+    // The ledger stays retrievable behind it, folded rather than pasted in.
     expect(text).toContain('Grok workflow: PARTIAL')
     expect(text).toContain('Incomplete:')
   })
 
   it('says the same in English, in the same order', async () => {
     const text = await deliver(PARTIAL, TEAM_EN)
-    expect(text).toContain('【Plain summary】1/2 tasks verified; 1 did not get done (Task b)')
+    expect(text).toContain('Partly done: 1 of 2 tasks passed verification and 1 did not.')
     expect(text).toContain('Next:')
-    expect(text.indexOf('Next:')).toBeGreaterThan(text.indexOf('【Plain summary】'))
+    expect(text.indexOf('Next:')).toBeGreaterThan(text.indexOf('Partly done'))
   })
 
   it('gives the full-mode path the same head (no path composes its own)', async () => {
     const text = await deliver(PARTIAL, TEAM_ZH, { mode: 'full' })
-    expect(text).toContain('【人话结论】任务 1/2 项已核验通过')
+    expect(text).toContain('做了一部分：2 项任务里 1 项核验通过')
     expect(text).toContain('下一步：')
-    expect(text.indexOf('【人话结论】')).toBeLessThan(text.indexOf('Grok workflow: PARTIAL'))
+    expect(text.indexOf('做了一部分')).toBeLessThan(text.indexOf('Grok workflow: PARTIAL'))
   })
 
   it('keeps the head off when humanSummary is off', async () => {
     const text = await deliver(PARTIAL, TEAM_ZH, { humanSummary: false })
-    expect(text).not.toContain('【人话结论】')
+    expect(text).not.toContain('做了一部分')
     expect(text).toContain('Grok workflow: PARTIAL')
   })
 
@@ -224,7 +227,7 @@ describe('a PARTIAL answer leads with a human conclusion and a next step', () =>
     } as unknown as WorkflowReport
     const text = cancelledText('用户停止', report, { lang: 'zh' })
     expect(text).toContain('运行已取消')
-    expect(text).toContain('【人话结论】任务 1/2 项已核验通过，1 项没做成（Task b）')
+    expect(text).toContain('做了一部分：2 项任务里 1 项核验通过，1 项没做成。')
     expect(text).toContain('下一步：')
   })
 })
@@ -232,49 +235,56 @@ describe('a PARTIAL answer leads with a human conclusion and a next step', () =>
 describe('a FAILED answer leads with a human conclusion, never with a success claim', () => {
   it('states the failure and what to do about it', async () => {
     const text = await deliver(FAILED, TEAM_ZH)
-    expect(text).toContain('【人话结论·未完成】')
-    expect(text).toContain('这次没有做成，没有可交付的结果')
+    expect(text).toContain('这次没做成')
+    expect(text).toContain('没有可交付的结果')
     expect(text).toContain('原因：provider exploded')
     expect(text).toContain('下一步：')
     // The infrastructure advice, not the "your task was bad" advice.
-    expect(text).toContain('模型或网络一侧')
+    expect(text).toContain('这次卡在外部服务或时限上')
+    expect(text).toContain('This was an external service or deadline problem')
     // Never the success wording.
-    expect(text).not.toContain('【人话结论】')
+    expect(text).not.toContain('做完了')
     // The ledger is still there for anyone who wants it.
     expect(text).toContain('Grok workflow: FAILED')
   })
 
   it('keeps the failure marker out of the success path', async () => {
     const text = await deliver(COMPLETED, TEAM_ZH)
-    expect(text).toContain('【人话结论】')
-    expect(text).not.toContain('【人话结论·未完成】')
+    expect(text).toContain('做完了')
+    expect(text).not.toContain('这次没做成')
   })
 })
 
 describe('a COMPLETED answer is unchanged and its ledger stays retrievable', () => {
-  it('keeps the 0.7.0 head wording and the machine report behind it', async () => {
+  it('keeps the human block first and the machine report folded behind it', async () => {
     const text = await deliver(COMPLETED, TEAM_ZH)
-    expect(text).toContain('【人话结论】任务 1/1 项已核验通过。')
-    expect(text).toContain('（原文报告附后）')
+    expect(text).toContain('做完了：1 项任务全部核验通过。')
     expect(text).toContain('<<<GROK-WORKFLOW-REPORT>>>')
     expect(text).toContain('<<<END-GROK-WORKFLOW-REPORT>>>')
-    expect(text).toContain('Grok workflow: COMPLETED')
+    // The block sits between the markers; the ledger does not.
+    const visible = text.slice(text.indexOf('<<<GROK-WORKFLOW-REPORT>>>'), text.indexOf('<<<END-GROK-WORKFLOW-REPORT>>>'))
+    expect(visible).toContain('做完了')
+    expect(visible).not.toContain('Confirmed evidence:')
+    // ...and it stays retrievable below them.
+    expect(text.slice(text.indexOf('<<<END-GROK-WORKFLOW-REPORT>>>'))).toContain('Grok workflow: COMPLETED')
     expect(text).toContain('Confirmed evidence:')
   })
 })
 
 describe('machine diagnostics follow the switch on the delivered text', () => {
-  it('hides the routing ledger by default', async () => {
+  it('hides the routing ledger from the visible block by default', async () => {
     const text = await deliver(COMPLETED, TEAM_ZH)
-    expect(text).not.toContain('Model routes:')
-    expect(text).not.toContain('Deadline:')
+    const visible = text.slice(text.indexOf('<<<GROK-WORKFLOW-REPORT>>>'), text.indexOf('<<<END-GROK-WORKFLOW-REPORT>>>'))
+    expect(visible).not.toContain('Model routes:')
+    expect(visible).not.toContain('Deadline:')
+    expect(visible).not.toContain('Confirmed evidence:')
   })
 
   it('shows it when showDiagnostics is on, under the same head', async () => {
     const text = await deliver(COMPLETED, TEAM_ZH, { showDiagnostics: true })
     expect(text).toContain('Model routes:')
     expect(text).toContain('Deadline:')
-    expect(text.indexOf('【人话结论】')).toBeLessThan(text.indexOf('Model routes:'))
+    expect(text.indexOf('做完了')).toBeLessThan(text.indexOf('Model routes:'))
   })
 })
 
@@ -304,19 +314,16 @@ describe('humanHead is the single composer', () => {
   })
 
   it('bounds the unfinished-task list instead of pasting every title', () => {
+    const failed = ['b', 'c', 'd', 'e', 'f', 'g', 'h']
+      .map(id => ({ id, title: `Task ${id}`, status: 'failed', attempts: [] }))
     const report = {
       ...base,
       status: 'partial',
-      tasks: [
-        base.tasks[0],
-        { id: 'b', title: 'Task b', status: 'failed', attempts: [] },
-        { id: 'c', title: 'Task c', status: 'failed', attempts: [] },
-        { id: 'd', title: 'Task d', status: 'failed', attempts: [] },
-        { id: 'e', title: 'Task e', status: 'failed', attempts: [] },
-      ],
+      tasks: [base.tasks[0], ...failed],
     } as unknown as WorkflowReport
     const head = humanHead(report, 'zh', true) ?? ''
-    expect(head).toContain('等 4 项')
-    expect(head.length).toBeLessThan(600)
+    // Five rows are named; the rest is a count, not five more titles.
+    expect(head).toContain('另有 2 项没做成')
+    expect(head.length).toBeLessThan(1200)
   })
 })

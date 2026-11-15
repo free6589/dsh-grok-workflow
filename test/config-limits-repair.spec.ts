@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import {
   Config,
   HARD_LIMITS,
+  LIMIT_CAPS,
+  limitOverrunWarning,
   repairLimitOverruns,
   resolveConfig,
   snapshotConfig,
@@ -137,6 +139,88 @@ describe('config limit repair (B07)', () => {
     const text = { maxConcurrency: '8' } as never
     expect(repairLimitOverruns(text).warnings).toEqual([])
     expect(() => resolveConfig(text)).toThrow(/maxConcurrency must be an integer/)
+  })
+})
+
+/**
+ * B02: the clamp covers *every* numeric hard limit, from one table.
+ *
+ * B07 fixed two fields ad hoc. The defect that leaves is drift: a limit the schema
+ * refuses while the repair clamps it (or the reverse), and a new limit added to one
+ * side only. `LIMIT_CAPS` is the single table both layers read, so this case walks it
+ * instead of listing fields — a field added to the table is covered the moment it
+ * exists, and a field somebody clamps by hand outside the table is not.
+ *
+ * Mutation meaning: dropping a key from `LIMIT_CAPS` fails the schema half (the
+ * schema goes back to refusing); reverting `repairLimitOverruns` to a hand-written
+ * list fails the repair half for every field the list omits; widening a cap fails
+ * the documented-envelope assertions below.
+ */
+describe('LIMIT_CAPS: one clamp table for every numeric cap (B02)', () => {
+  it('clamps each listed limit in the schema, records one note, and repairs the same number', () => {
+    expect(Object.keys(LIMIT_CAPS).sort()).toEqual([
+      'historyChars', 'historyTurns', 'maxActiveRuns', 'maxActiveRunsTotal', 'maxConcurrency',
+      'maxQueuedMessages', 'maxRetries', 'maxTasks', 'recordLimit', 'timeoutMs',
+    ])
+    for (const [field, cap] of Object.entries(LIMIT_CAPS)) {
+      takeLimitOverruns()
+      const stored = cap + 1
+      // The host's layer: clamp and note, instead of killing the row.
+      expect({ field, parsed: parsed({ [field]: stored })[field] }).toEqual({ field, parsed: cap })
+      expect(takeLimitOverruns()).toEqual([{ field, stored, cap }])
+      // The plugin's layer: the same number, the same cap, the same wording.
+      const { repaired, warnings } = repairLimitOverruns({ [field]: stored } as never)
+      expect({ field, repaired: (repaired as Record<string, unknown>)[field] }).toEqual({ field, repaired: cap })
+      expect(warnings).toEqual([limitOverrunWarning({ field: field as keyof typeof LIMIT_CAPS, stored, cap })])
+      // R-06: a direct caller is still refused the same number, and the repaired one runs.
+      expect(() => resolveConfig({ [field]: stored } as never)).toThrow(new RegExp(field))
+      expect((resolveConfig(repaired) as unknown as Record<string, number>)[field]).toBe(cap)
+    }
+  })
+
+  it('keeps the documented envelope and reads every cap off HARD_LIMITS', () => {
+    // Not a new bound: the same numbers, now named once for the clamp.
+    expect(LIMIT_CAPS.maxConcurrency).toBe(HARD_LIMITS.maxConcurrency)
+    expect(LIMIT_CAPS.maxRetries).toBe(HARD_LIMITS.maxRetries)
+    expect(LIMIT_CAPS.maxActiveRuns).toBe(HARD_LIMITS.maxActiveRuns)
+    expect(LIMIT_CAPS.maxActiveRunsTotal).toBe(HARD_LIMITS.maxActiveRunsTotal)
+    expect(LIMIT_CAPS.recordLimit).toBe(HARD_LIMITS.recordEntries)
+    expect([LIMIT_CAPS.maxConcurrency, LIMIT_CAPS.maxRetries]).toEqual([6, 3])
+    // A limit that is judged inside a chain is deliberately not in the table.
+    expect(Object.keys(LIMIT_CAPS)).not.toContain('maxInFlight')
+    // Below the minimum is still a refusal, not a clamp (R-06).
+    expect(() => Config({ timeoutMs: 0 } as never)).toThrow(/timeoutMs expected number >= 1000/)
+    expect(() => Config({ maxTasks: '500' } as never)).toThrow(/maxTasks expected number/)
+    expect(takeLimitOverruns()).toEqual([])
+  })
+})
+
+/**
+ * B04: the load-time repair's announcement joins the schema path's dedupe.
+ *
+ * `readConfig()` repairs a config that never met the schema on *every* read, and a
+ * read happens per message — so a patch that keeps failing for another reason (the
+ * synthesis mismatch below) used to log its limit line once per message. The repair
+ * now leaves the schema's own note instead of logging, which is what lets the
+ * plugin's one-per-load set suppress it and what keeps the two wordings identical.
+ */
+describe('B04: repair announcements share the schema path', () => {
+  it('leaves the schema note and the schema sentence, so one set covers both layers', () => {
+    takeLimitOverruns()
+    const { warnings } = repairLimitOverruns({ maxRetries: 9 })
+    const notes = takeLimitOverruns()
+    expect(notes).toEqual([{ field: 'maxRetries', stored: 9, cap: 3 }])
+    expect(warnings).toEqual([limitOverrunWarning(notes[0]!)])
+    // A second read of the same patch leaves the same single key: the dedupe set sees
+    // one entry, not one per read.
+    repairLimitOverruns({ maxRetries: 9 })
+    expect(takeLimitOverruns()).toHaveLength(1)
+  })
+
+  it('does not record a note for a limit it only passes over', () => {
+    takeLimitOverruns()
+    expect(repairLimitOverruns({ maxRetries: 3, maxConcurrency: 0 }).warnings).toEqual([])
+    expect(takeLimitOverruns()).toEqual([])
   })
 })
 
@@ -425,6 +509,34 @@ describe('client settings page: over-limit banner (B07)', () => {
     // Partial: only the field that overruns is reported.
     expect(limitOverrunWarn({ maxConcurrency: 7, maxRetries: 1 })).toEqual([
       { key: 'maxConcurrency', live: 7, cap: 6 },
+    ])
+  })
+
+  it('reads the stored user layer, not the clamped projected value (B01)', () => {
+    // This is the defect the banner shipped with: `describe()` publishes the *effective*
+    // value, so the Host has already clamped a stored 8 to 6 before the page sees it and
+    // a comparison against `value` could never fire. `user` is the document as stored —
+    // the only number the notice is actually about.
+    expect(limitOverrunWarn({ value: { maxConcurrency: 6 }, user: { maxConcurrency: 8 } })).toEqual([
+      { key: 'maxConcurrency', live: 8, cap: 6 },
+    ])
+    // A namespace that publishes no user layer still reports the effective document.
+    expect(limitOverrunWarn({ value: { maxConcurrency: 8 } })).toEqual([
+      { key: 'maxConcurrency', live: 8, cap: 6 },
+    ])
+    expect(limitOverrunWarn({ user: { maxConcurrency: 7, maxRetries: 1 } })).toEqual([
+      { key: 'maxConcurrency', live: 7, cap: 6 },
+    ])
+    // A legal stored document says nothing, whatever the projection carries.
+    expect(limitOverrunWarn({ value: { maxConcurrency: 8 }, user: { maxConcurrency: 6 } })).toEqual([])
+  })
+
+  it('reports every clamped limit in the shared table, not just the two original ones (B02)', () => {
+    expect(limitOverrunWarn({ timeoutMs: 999_999_999, maxTasks: 500, historyTurns: 2_000_000, recordLimit: 999 })).toEqual([
+      { key: 'historyTurns', live: 2_000_000, cap: 1_000_000 },
+      { key: 'maxTasks', live: 500, cap: 100 },
+      { key: 'timeoutMs', live: 999_999_999, cap: 604_800_000 },
+      { key: 'recordLimit', live: 999, cap: 256 },
     ])
   })
 

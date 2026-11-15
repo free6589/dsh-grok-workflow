@@ -51,6 +51,33 @@ export declare const HARD_LIMITS: {
     readonly synthesisDigestChars: 6000;
 };
 /**
+ * The hard maximum of every numeric limit that takes effect as a clamp (B02).
+ *
+ * One source, three readers: the `Config` schema clamps a stored overrun to it, the
+ * load-time `repairLimitOverruns` clamps a config that never met the schema, and the
+ * settings page's over-limit banner compares the stored number against it. The values
+ * are read off `HARD_LIMITS`, so a published bound stays declared once.
+ *
+ * A numeric limit that is *not* listed here is left to validation alone. That is
+ * deliberate, not an omission: a per-route `maxInFlight` is judged inside a chain (its
+ * bound is `HARD_LIMITS.routeInFlight`), and `configVersion` is a wire contract whose
+ * mismatch must refuse the load rather than be rewritten.
+ */
+export declare const LIMIT_CAPS: {
+    readonly maxConcurrency: 6;
+    readonly maxRetries: 3;
+    readonly maxQueuedMessages: 8;
+    readonly historyTurns: 1000000;
+    readonly historyChars: 1000000;
+    readonly maxTasks: 100;
+    readonly timeoutMs: 604800000;
+    readonly maxActiveRuns: 4;
+    readonly maxActiveRunsTotal: 16;
+    readonly recordLimit: 256;
+};
+/** A configuration key whose stored number takes effect clamped to its hard maximum. */
+export type LimitField = keyof typeof LIMIT_CAPS;
+/**
  * Default deadline for one workflow run: 60 minutes (t45, P1-4).
  *
  * The old 30-minute default was measured to be wrong twice in one afternoon —
@@ -117,7 +144,7 @@ export declare const CONFIG_VERSION = 1;
 export declare const CONFIG_KEYS: readonly ["toolName", "enforceGate", "gateRequired", "gateScope", "gatePreset", "answerStrategy", "mode", "grokDefault", "triageAsk", "triageModel", "triageClassifier", "triageFollowupAsFast", "instantReceipt", "humanSummary", "showDiagnostics", "historyTurns", "historyChars", "maxQueuedMessages", "maxConcurrency", "maxRetries", "maxTasks", "timeoutMs", "maxActiveRuns", "maxActiveRunsTotal", "subagentProvider", "roles", "synthesis", "switchOn", "recordRuns", "recordLimit", "showProgress", "configVersion"];
 /** One stored limit the schema had to clamp, as the parse saw it. */
 export interface LimitOverrun {
-    field: 'maxConcurrency' | 'maxRetries';
+    field: LimitField;
     /** The value that was stored, before clamping. */
     stored: number;
     /** The hard maximum it takes effect as. */
@@ -409,14 +436,19 @@ export declare function repairSynthesisInconsistency(raw: GrokWorkflowConfig): {
     warnings: string[];
 };
 /**
- * Repair a stored limit that exceeds the hard maximum (B07, D-031).
+ * Repair a stored limit that exceeds the hard maximum (B07, B02, D-031).
  *
- * `maxConcurrency` / `maxRetries` are a quota envelope, not a preference: the Host
- * refuses to run above 6 / 3 (`resolveConfig`), and that refusal is correct. A
- * profile patch written before v0.9.0 restored the envelope can still hold the old
- * wider numbers (8 / 5), and failing the whole row for them leaves the user with no
- * settings page to fix it from — the same deadlock D-031 removed for the synthesis
- * mismatch. So a stored overrun takes effect as the cap, announced once.
+ * Every key in `LIMIT_CAPS` is a quota envelope, not a preference: the Host refuses to
+ * run above it (`resolveConfig`), and that refusal is correct. A profile patch written
+ * before a cap was restored can still hold the old wider number, and failing the whole
+ * row for it leaves the user with no settings page to fix it from — the same deadlock
+ * D-031 removed for the synthesis mismatch. So a stored overrun takes effect as the
+ * cap, announced once.
+ *
+ * Which keys are in scope is `LIMIT_CAPS`'s answer, not this function's: that is what
+ * keeps the schema clamp and this repair from disagreeing about a bound, and what let
+ * the two documented limits (B07) become every numeric hard limit (B02) without a
+ * second table to maintain.
  *
  * Only an *overrun* is recoverable here: a number above the maximum. Everything
  * else is left exactly as it is for `resolveConfig` to reject (R-06) — a value
@@ -424,6 +456,12 @@ export declare function repairSynthesisInconsistency(raw: GrokWorkflowConfig): {
  * "the cap moved" problem, and silently rewriting it would hide a real error.
  * The input is not mutated; a non-matching input returns unchanged with no
  * warnings, so the caller can chain this with the other repair unconditionally.
+ *
+ * Each clamped overrun is also *recorded* in the same buffer the schema clamp writes
+ * to (B04), so the caller announces it through one deduplicated path with one wording
+ * instead of logging here: this function runs inside a read that may still throw for
+ * an unrelated defect, and a read happens per message, so logging here would repeat
+ * the line on every message for as long as the patch keeps failing.
  * @param raw - raw user configuration (plain snapshot shape).
  * @returns The clamped config plus human-readable warnings (empty when nothing matched).
  */

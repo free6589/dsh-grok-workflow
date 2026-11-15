@@ -1,0 +1,12 @@
+APP_HOST=http://127.0.0.1:3221/?token=<redacted>
+NOTICE=null
+REPLY_SEEN=true
+A2_TABS=[{"label":"Chat","selected":"true","cls":"wSkVaW_tab wSkVaW_tabActive"},{"label":"Trajectory","selected":"false","cls":"wSkVaW_tab"},{"label":"Progress","selected":"false","cls":"wSkVaW_tab"}]
+A2_TAB_COUNT=3
+A2_DEFAULT_SELECTED=["Chat"]
+A2_PROGRESS_TAB_EXISTS=true
+A3_SESSION_TITLE="Running"
+A3_SESSION_URL=DIFFERENT
+A4_PROGRESS_DOM={"present":true,"emptyPresent":true,"emptyText":"No workflow progress in this session yet\n\nThe track is folded from the four tool-workflow events this plugin records; it appears once a run starts.","title":"Task progress","percent":"No rows declared yet","percentAttr":"none","trackPresent":false,"nodeCount":0,"classNodeCount":0,"agree":true,"nodes":[],"states":[],"classes":[],"detailOpen":false,"detailState":null,"detailTitle":null,"detailRunId":null,"detailText":null,"detailHeadings":[],"detailFields":[],"detailSources":[],"detailRows":[],"openButtons":0,"actionButtons":[]}
+A4_EMPTY_STATE=true
+A5_TABS_AFTER=[{"label":"Chat","selected":"false","cls":"wSkVaW_tab"},{"label":"Trajectory","selected":"false","cls":"wSkVaW_tab"},{"label":"Progress","selected":"true","cls":"wSkVaW_tab wSkVaW_tabActive"}]

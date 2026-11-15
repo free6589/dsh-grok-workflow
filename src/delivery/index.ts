@@ -6,8 +6,9 @@
  * 1. **人类的结论先说** — one plain-language block that stands on its own: what
  *    was done, what was not, what to do next, and the caveats worth knowing. It
  *    is written for a person, so it carries no run/child/task identifiers, no
- *    route bookkeeping and no machine field labels: those only mean something to
- *    whoever debugged the plugin.
+ *    route bookkeeping, no machine field labels, and none of the machine detail a
+ *    report field can quote (`stat -c`, a digest, an absolute path, a relay
+ *    marker): those only mean something to whoever debugged the plugin.
  * 2. **机器台账默认收起** — the full machine view (ids, per-task attempts, route
  *    chain, deadline, route switches/overflows, errors) is *not* part of the
  *    default text. It is one explicit switch away ({@link deliverReport} with
@@ -51,6 +52,14 @@ export interface DeliveryOptions {
   diagnostics?: DiagnosticsSwitch
   /** Language of the human block. Default `zh`. */
   lang?: DeliveryLang
+  /**
+   * Emit the block in both languages: `lang` first, the other one after it.
+   *
+   * A chat answer can reach a reader whose language the rules guessed wrong (a
+   * one-word follow-up carries no language signal), and a summary nobody can read
+   * is not a summary. Default `false` so every existing caller keeps one block.
+   */
+  bilingual?: boolean
 }
 
 /** One composed delivery: the human block, and the ledger only on request. */
@@ -201,6 +210,68 @@ function scrub(text: string): string {
 }
 
 /**
+ * Machine detail stripped from every line the human block keeps.
+ *
+ * {@link LEDGER_LABELS} only catch *field labels*. A child model happily writes
+ * `stat -c '%s' /home/u/x` or `sha256 9f2c…` straight into a criterion, and the
+ * criterion is quoted into the human block as key evidence — so a label-only
+ * guard still hands the reader a shell command. The defect this file exists to
+ * end is exactly that, so the strip list covers the classes a report actually
+ * quotes: shell commands (with and without flags), digests and hex dumps, file
+ * paths, code, and the relay markers.
+ */
+const MACHINE_DETAIL: readonly (readonly [RegExp, string])[] = [
+  // Code is machine material by definition: fenced blocks, then inline spans.
+  [/```[\s\S]*?```/g, ' '],
+  [/`[^`\n]*`/g, ' '],
+  // Relay delimiters, if a child echoed one into a report field.
+  [/<{2,}[^\n>]{0,120}>{2,}/g, ' '],
+  // Locators: file URIs, URLs, Windows and POSIX paths.
+  [/\bfile:\/\/\S+/g, ' '],
+  [/\bhttps?:\/\/\S+/g, ' '],
+  [/\b[A-Za-z]:\\[^\s"'`]+/g, ' '],
+  [/(?:^|[\s(（"'=])(?:~|\.{1,2})?\/[\w.@%+-]+(?:\/[\w.@%+-]+)+/g, ' '],
+  // Bare file names: a reader does not open `answer.ts` from a chat message.
+  [/\b[\w-]+(?:\.[\w-]+)*\.(?:ts|tsx|js|mjs|cjs|json|jsonl|md|ya?ml|lock|sh|py|log|txt|csv|png|jpe?g|svg|zip|gz)\b/gi, ' '],
+  // Digests and the hex dump of a file (`od`, `xxd`), abbreviated commits.
+  [/\b(?:sha-?(?:1|256|512)|md5|sha1sum|sha256sum|sha512sum|md5sum)\b/gi, ' '],
+  [/\b[0-9a-f]{8,64}\b/gi, ' '],
+  // A command with flags (`stat -c`, `od -c`, `npm run build --silent`).
+  [/\b[\w.-]+\s+-{1,2}[A-Za-z][\w-]*(?:\s+\S+)*/g, ' '],
+  // A bare command head: the tools these reports quote most often.
+  [/\b(?:npm|pnpm|npx|yarn|vitest|jest|tsc|oxlint|eslint|curl|wget|docker|kubectl|python3?|pip3?|cargo|mvn|gradle|git|stat|sed|awk|grep|rg|xargs|xxd|hexdump|chmod|chown|base64|jq|systemctl|unzip)\s+[^，。；\n]{0,120}/gi, ' '],
+]
+
+/**
+ * Strip machine detail from one line, then tidy the gap it left.
+ *
+ * Whitespace is collapsed and an emptied bracket or a doubled separator removed,
+ * so `实现 的人话块` reads as a sentence instead of punctuation soup. A line that
+ * was nothing but machine detail comes back empty and its caller drops it — a
+ * reader losing a bullet is better than a reader being handed a command.
+ *
+ * @param line - one already line-split piece of the block.
+ * @returns the stripped line, possibly empty.
+ */
+function stripMachineDetail(line: string): string {
+  let out = line
+  for (const [pattern, replacement] of MACHINE_DETAIL) {
+    pattern.lastIndex = 0
+    out = out.replace(pattern, replacement)
+  }
+  return out
+    .replace(/（\s*）|\(\s*\)/g, '')
+    .replace(/([（(【\[])\s+/g, '$1')
+    .replace(/\s+([）)】\]])/g, '$1')
+    .replace(/\s+/g, ' ')
+    .replace(/([，,、；;：:])\s*(?=[，,、；;：:。.])/g, '')
+    // A leading dash is a list bullet, so it is deliberately not trimmed here.
+    .replace(/^[\s，,、；;：:。.…]+/, '')
+    .replace(/[\s，,、；;…]+$/, '')
+    .trim()
+}
+
+/**
  * One line of the human block, and whether the guard applies to it.
  *
  * Everything the run assembled for its own reader is guarded (no ledger label, no
@@ -217,14 +288,16 @@ interface BlockLine {
 function composeBlock(lines: readonly BlockLine[]): string {
   const kept: string[] = []
   for (const item of lines) {
-    if (!item.guard) {
-      kept.push(item.text)
-      continue
-    }
     for (const raw of item.text.split('\n')) {
       const line = raw.trimEnd()
-      if (tainted(line)) continue
-      kept.push(line)
+      // A guarded line is assembled by this module or by the run, so it may not
+      // carry a ledger label or an identifier key. An unguarded line is the
+      // failure reason itself (B10) and keeps its wording — but even there a
+      // shell command, a digest or a path is not something a reader can use.
+      if (item.guard && tainted(line)) continue
+      const clean = stripMachineDetail(line)
+      if (clean === '' && line.trim() !== '') continue
+      kept.push(clean)
     }
   }
   return kept.join('\n').replace(/\n{3,}/g, '\n\n').trim()
@@ -321,11 +394,10 @@ function headline(report: WorkflowReport, verified: number, total: number, lang:
  * after the first two lines already knows whether to trust the rest.
  *
  * @param report - validated report (or an explicit failure report).
- * @param opts - `lang`; the human block is `zh` unless asked otherwise.
+ * @param lang - language this pass is written in.
  * @returns the human block, bounded by {@link MAX_HUMAN_CHARS}.
  */
-export function humanConclusion(report: WorkflowReport, opts: { lang?: DeliveryLang } = {}): string {
-  const lang = opts.lang ?? 'zh'
+function composeHuman(report: WorkflowReport, lang: DeliveryLang): string {
   const zh = lang === 'zh'
   const verifiedTasks = report.tasks.filter(task => task.status === 'verified')
   const verified = verifiedTasks.length
@@ -402,6 +474,31 @@ export function humanConclusion(report: WorkflowReport, opts: { lang?: DeliveryL
 
   const block = stripIds(composeBlock(lines), report)
   return block.length <= MAX_HUMAN_CHARS ? block : `${block.slice(0, MAX_HUMAN_CHARS - 1)}…`
+}
+
+/**
+ * Build the plain-language block for one settled run.
+ *
+ * One pass per language, in the order the reader is most likely to read: `lang`
+ * first. `bilingual` composes both, because a chat answer can reach a reader whose
+ * language the rules guessed wrong (a one-word follow-up carries no language
+ * signal) and a summary nobody can read is not a summary.
+ *
+ * @param report - validated report (or an explicit failure report).
+ * @param opts - `lang` (default `zh`) and the `bilingual` mirror switch.
+ * @returns the human block, bounded (twice the single-pass bound when bilingual).
+ */
+export function humanConclusion(
+  report: WorkflowReport,
+  opts: { lang?: DeliveryLang, bilingual?: boolean } = {},
+): string {
+  const lang: DeliveryLang = opts.lang ?? 'zh'
+  if (opts.bilingual !== true) return composeHuman(report, lang)
+  const first = composeHuman(report, lang)
+  const second = composeHuman(report, lang === 'zh' ? 'en' : 'zh')
+  const both = second === '' ? first : `${first}\n\n${second}`
+  const cap = MAX_HUMAN_CHARS * 2
+  return both.length <= cap ? both : `${both.slice(0, cap - 1)}…`
 }
 
 /** Count failures per category, so the ledger separates "provider down" from "work short". */

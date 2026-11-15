@@ -1,0 +1,25 @@
+NOTICE=null
+PROBE={
+ "treeitems": [
+  {
+   "text": "Default workspace",
+   "selected": null,
+   "cls": "YDXeBa_projectRow",
+   "tag": "DIV"
+  },
+  {
+   "text": "New Session",
+   "selected": "true",
+   "cls": "YDXeBa_sessionRow YDXeBa_selected",
+   "tag": "DIV"
+  },
+  {
+   "text": "简单问候\n3min",
+   "selected": "false",
+   "cls": "YDXeBa_sessionRow",
+   "tag": "DIV"
+  }
+ ],
+ "anchors": [],
+ "url": "http://127.0.0.1:3221/"
+}

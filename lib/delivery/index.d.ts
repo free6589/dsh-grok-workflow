@@ -6,8 +6,9 @@
  * 1. **人类的结论先说** — one plain-language block that stands on its own: what
  *    was done, what was not, what to do next, and the caveats worth knowing. It
  *    is written for a person, so it carries no run/child/task identifiers, no
- *    route bookkeeping and no machine field labels: those only mean something to
- *    whoever debugged the plugin.
+ *    route bookkeeping, no machine field labels, and none of the machine detail a
+ *    report field can quote (`stat -c`, a digest, an absolute path, a relay
+ *    marker): those only mean something to whoever debugged the plugin.
  * 2. **机器台账默认收起** — the full machine view (ids, per-task attempts, route
  *    chain, deadline, route switches/overflows, errors) is *not* part of the
  *    default text. It is one explicit switch away ({@link deliverReport} with
@@ -49,6 +50,14 @@ export interface DeliveryOptions {
     diagnostics?: DiagnosticsSwitch;
     /** Language of the human block. Default `zh`. */
     lang?: DeliveryLang;
+    /**
+     * Emit the block in both languages: `lang` first, the other one after it.
+     *
+     * A chat answer can reach a reader whose language the rules guessed wrong (a
+     * one-word follow-up carries no language signal), and a summary nobody can read
+     * is not a summary. Default `false` so every existing caller keeps one block.
+     */
+    bilingual?: boolean;
 }
 /** One composed delivery: the human block, and the ledger only on request. */
 export interface DeliveryView {
@@ -68,16 +77,18 @@ export declare function diagnosticsEnabled(value?: DiagnosticsSwitch): boolean;
 /**
  * Build the plain-language block for one settled run.
  *
- * Order is deliberate: verdict, then the run's own conclusion, then what was and
- * was not achieved, then what to do next, then the caveats. A reader who stops
- * after the first two lines already knows whether to trust the rest.
+ * One pass per language, in the order the reader is most likely to read: `lang`
+ * first. `bilingual` composes both, because a chat answer can reach a reader whose
+ * language the rules guessed wrong (a one-word follow-up carries no language
+ * signal) and a summary nobody can read is not a summary.
  *
  * @param report - validated report (or an explicit failure report).
- * @param opts - `lang`; the human block is `zh` unless asked otherwise.
- * @returns the human block, bounded by {@link MAX_HUMAN_CHARS}.
+ * @param opts - `lang` (default `zh`) and the `bilingual` mirror switch.
+ * @returns the human block, bounded (twice the single-pass bound when bilingual).
  */
 export declare function humanConclusion(report: WorkflowReport, opts?: {
     lang?: DeliveryLang;
+    bilingual?: boolean;
 }): string;
 /**
  * Build the full machine ledger.

@@ -100,7 +100,13 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
       // hard fail and no "repaired" line is ever logged for a config that cannot run.
       const fixed = resolveConfig(limits.repaired)
       if (synthesis.warnings.length > 0) fixed.synthesisRepaired = true
-      for (const warning of warnings) logger.warn(warning)
+      for (const warning of synthesis.warnings) logger.warn(warning)
+      // The limit half is announced through the same set as the schema clamp (B04):
+      // `repairLimitOverruns` only *records* what it clamped, so the wording is the
+      // schema path's own sentence and a read that keeps landing here — this branch
+      // runs once per message while another defect keeps failing — warns once, not
+      // once per message. `limits.warnings` still decides that a repair happened.
+      announceOverruns()
       const signature = describeResolvedConfig(fixed)
       if (signature !== configSignature) {
         configSignature = signature

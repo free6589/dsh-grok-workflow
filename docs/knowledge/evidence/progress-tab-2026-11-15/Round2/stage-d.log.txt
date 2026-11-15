@@ -1,0 +1,20 @@
+NOTICE=null
+ENTER=token-url+sessionRow(2)
+CHAT_HAS_TASK=true
+CHAT_HAS_REPORT=true
+CHAT_HAS_TOGGLE_ON=true
+CHAT_HAS_CRASH_TEXT=false
+CHAT_LEN=3854
+TRAJ_LEN=4398
+TRAJ_HAS_EVENTS=true
+TRAJ_HAS_WORKFLOW=true
+TRAJ_HAS_CRASH_TEXT=false
+DETAIL_INDEX=1
+DETAIL_NODE_STATE=done
+DETAIL_OPEN_BUTTONS=1
+DETAIL_ACTIONS=[{"text":"Copy coordination block","disabled":true,"title":"No coordination block to copy"}]
+OPEN_CHILD_BUTTONS=1
+AFTER_OPEN_HAS_BACK=false
+AFTER_OPEN_TABS=[{"label":"Chat","selected":"true","cls":"wSkVaW_tab wSkVaW_tabActive"},{"label":"Trajectory","selected":"false","cls":"wSkVaW_tab"},{"label":"Progress","selected":"false","cls":"wSkVaW_tab"}]
+AFTER_OPEN_HEAD="New Session\nPlugins\nAutomation tasks\nMore\nWorkspaces\nDefault workspace\n简单问候\n3min\nMore\n简单问候\n/\n任务团队 child 1\nStandard mode\nChat\nTrajectory\nProgress\n规划助手\nYou are the planning agent inside a verified workflow.\nDo not execute the work. Decompose the objective into at most 12 independent tasks.\nEvery task must have: id (unique, short, letters/numbers/_-), title, objective, expectedOutput, acceptanceCriteria (non-empty testable checks), context, constraints.\nRespect these limits exactly: workflow objective <= 32000 chars; each task title <= 160 chars; task objective/expectedOutput/context <= 4000 chars each; 1-20 acceptanceCriteria each <= 1000 chars; 0-20 constraints each <= 1000 chars; combined se"
+AFTER_OPEN_URL_DIFFERS=false

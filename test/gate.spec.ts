@@ -413,7 +413,11 @@ describe('mandatory entry gate', () => {
     await ctx.preStep()(payload(agent, refused, 2, 1), passingNext([]))
     expect(ctx.engine.startCalls).toHaveLength(1)
     ctx.engine.runs[0]!.complete(report())
-    await waitFor(() => agent.followups.length >= 1)
+    // Both messages, not one: the queue-full notice is delivered the moment the
+    // queue refuses, so waiting for a single follow-up returns while the admitted
+    // batch is still draining — and the re-dispatch below would be refused by the
+    // same full queue instead of starting the run this test is about.
+    await waitFor(() => agent.followups.length >= 2)
     await new Promise(resolve => setTimeout(resolve, 5))
     // The host claims the rejected batch and does not give it back (V-2), so
     // nothing retries on its own: the dispatch below is a client re-send of the
@@ -502,11 +506,11 @@ describe('mandatory entry gate', () => {
     await ctx.preStep()(payload(agent, [userMessage('查一下新加坡天气')]), passingNext([]))
     await waitFor(() => agent.followups.length === 1)
     const text = textOf(agent.followups[0]!)
-    expect(text).toContain('【人话结论】')
-    expect(text).toContain('项已核验通过')
-    // The header rides inside the markers so the main model reproduces it verbatim.
-    expect(text.indexOf('【人话结论】')).toBeGreaterThan(text.indexOf(REPORT_BEGIN))
-    expect(text.indexOf('【人话结论】')).toBeLessThan(text.indexOf(REPORT_END))
+    expect(text).toContain('做完了')
+    expect(text).toContain('项任务全部核验通过')
+    // The human block rides inside the markers so the main model reproduces it verbatim.
+    expect(text.indexOf('做完了')).toBeGreaterThan(text.indexOf(REPORT_BEGIN))
+    expect(text.indexOf('做完了')).toBeLessThan(text.indexOf(REPORT_END))
   })
 
   it('never dresses a failed run in the success header (B plan)', async () => {
@@ -529,7 +533,7 @@ describe('mandatory entry gate', () => {
     const agent = new FakeAgent()
     await ctx.preStep()(payload(agent, [userMessage('查一下新加坡天气')]), passingNext([]))
     await waitFor(() => agent.followups.length === 1)
-    expect(textOf(agent.followups[0]!)).not.toContain('【人话结论】')
+    expect(textOf(agent.followups[0]!)).not.toContain('做完了')
   })
 
   it('delivers an explicit failure answer when the engine reports an error', async () => {
@@ -736,7 +740,9 @@ describe('mandatory entry gate', () => {
     const session = new RecordingSession()
     const agent = new FakeAgent({ session })
     await ctx.preStep()(payload(agent, [userMessage('append please')]), passingNext([]))
-    await waitFor(() => session.appends.length >= 2)
+    // Wait for the answer itself, not for two appends: the run's progress events
+    // share the log, so a length check is satisfied before the answer is written.
+    await waitFor(() => session.appends.some(append => append.type === 'assistant/message'))
     const types = session.appends.map(append => append.type)
     // The run's progress events share the log with its messages (t44): the panel
     // needs them, and they are appended while the run is live, not after it.

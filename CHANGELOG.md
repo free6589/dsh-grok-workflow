@@ -3,7 +3,28 @@
 Notable user-facing changes are recorded here in English and Simplified Chinese.
 用户可见的功能和修复会在这里以英文和简体中文记录。
 
-## [Unreleased]
+## [0.9.2] - 2026-11-15
+
+### Added / 新增
+
+- **The answer you read opens with the plain-language block, and the machine ledger is no longer part of it
+  / 你读到的答复以人话块开头，机器台账不再算答复的一部分** —
+  the message this plugin delivers now carries the plain-language block between the relay markers — what
+  was done, what came of it, what to do next, in both languages — and the machine ledger is folded *below*
+  the closing marker under an explicit guard line that tells the main model never to quote, mention or
+  summarise it. The ledger still travels inside the message, because that is the durable copy the Progress
+  node detail and the cross-round carry-over read back out of the transcript, but it is no longer what the
+  reader sees. `showDiagnostics` puts the ledger back inside the markers for a reader who asks for it.
+  Machine detail that a task result can quote (shell commands with flags, digests and hex dumps, URLs and
+  file paths, bare file names, fenced and inline code, relay markers) is stripped from the human lines; a
+  line that was nothing but machine detail is dropped rather than handed to the reader, while a failure
+  reason keeps its own wording.
+  / 插件出站的消息现在把人话块放在标记之间——做了什么、结果怎样、下一步，两种语言各一段；机器台账折到
+  结束标记**之后**，由一行显式守卫说明「这是给你的内部上下文，不许引用、提及或概括」。台账仍随消息
+  留存，因为 Progress 节点详情与跨轮延续正是从 transcript 把它读回来，但它不再是读者看到的东西；
+  `showDiagnostics` 打开时台账回到标记内。任务结果里可能被引用的机器细节（带参数的 shell 命令、
+  摘要与十六进制转储、URL 与文件路径、裸文件名、围栏与行内代码、relay 标记）会从人话行里剥掉，
+  整行都是机器细节的直接丢弃而不是塞给读者；失败原因保留自己的措辞。
 
 ### Fixed / 修复
 
@@ -16,6 +37,65 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
   / v0.9.0 之前写的 profile 补丁（如 `maxConcurrency: 8`、`maxRetries: 5`）现在按文档上限
   （`6` / `3`）钳制生效，每项一条中英告警，不再让整行 `grok-workflow` 报 `ValidationError`
   起不来。低于下限、非数字、程序化 `resolveConfig` 越界仍硬拒绝（R-06），上限本身不变。
+
+- **Every numeric hard cap now lives in one clamp table, and a clamped value warns once per load
+  / 数值硬上限收敛到一张钳制表，钳制告警每次载入一条（B02、B04）** —
+  `LIMIT_CAPS` is the single declaration of which numeric keys clamp at a hard maximum and where that
+  maximum is (every bound reads `HARD_LIMITS`), and both the schema side (`clampedLimit`) and the
+  load-time repair (`repairLimitOverruns`) take their bound from it: a new cap is one line instead of two
+  bounds that drift apart. Both layers only keep books; `announceOverruns()` is the single voice and
+  de-duplicates by `field:stored`, so a patch that is still over the cap no longer prints one warning per
+  message. Ten fields clamp (concurrency, retries, queue length, history turns and chars, tasks, timeout,
+  active runs, record limit); per-route `maxInFlight` and `configVersion` are deliberately outside the
+  table.
+  / `LIMIT_CAPS` 是「哪些数值键按硬上限钳制、界在哪」的唯一声明（界一律读 `HARD_LIMITS`），schema 侧
+  （`clampedLimit`）与载入期修复（`repairLimitOverruns`）都从这张表取界：新增上限改一行，不再两处
+  各写一个界而漂移。两层钳制都只记账，`announceOverruns()` 是唯一发声点并按 `field:stored` 去重，
+  补丁仍超限时不再每条消息刷一条告警。表内 10 个字段（并发、重试、队列长度、历史轮数与字符、
+  任务数、超时、活跃 run、记录上限）；每路由 `maxInFlight` 与 `configVersion` 刻意不在表内。
+
+- **The settings banner names the value you stored, not the one that took effect
+  / 设置页横幅说的是你存下的值，不是生效后的值（B01）** —
+  a banner that read the projected (already clamped) value would show `6` for a patch that says `8` — it
+  would quietly change the user's words. It now reads the stored user layer and shows what was actually
+  written.
+  / 横幅若读投影（已被钳制的）值，补丁写 `8` 会显示成 `6`，等于替用户改口；现在读用户层，显示真正
+  写下的值。
+
+- **The progress tab stops drawing stages nothing ever ran
+  / 进度 Tab 不再画出没跑过的阶段** —
+  a stage token containing Latin letters must now sit on a word boundary (CJK tokens still match as
+  substrings), because loose matching read `ui` out of `build`, `tag` out of `stage`/`target` and `sync`
+  out of `async`, and drew three stages nobody ran. The node detail takes its seven fields down a fixed
+  source ladder — the `stage-detail` event, then the child session's explicit coordination block, then
+  `not reported` — and only parses the three explicit block shapes, so prose is never guessed into
+  fields; `Copy coordination block` enables only when the block was really parsed. A connector is filled
+  only when the node on its left is `done` (the attribute is absent rather than `"false"`), and
+  `failed`/`blocked` leave it empty on purpose: the line is evidence, not decoration. A node's ring
+  carries one state glyph, replaced by the row count when the node aggregates several rows.
+  / 阶段 token 含拉丁字母的现在必须落在词边界（CJK token 仍按子串匹配），因为松匹配从 `build` 里读出
+  `ui`、从 `stage`/`target` 里读出 `tag`、从 `async` 里读出 `sync`，凭空画出三个没人跑过的阶段。
+  节点详情七个字段走固定来源阶梯——`stage-detail` 事件、子会话显式协调块、`not reported`——只认三种
+  显式块形态，散文永不猜成字段；`Copy coordination block` 只在真的解析到块时才可点。连线只在左侧
+  节点自己 `done` 时填充（属性缺席而不是 `"false"`），`failed`/`blocked` 故意留空：线是证据，不是
+  装饰。节点环里一个状态字形，聚合多行时换成行数。
+
+### Tests / 测试
+
+- **Two gate tests waited on the wrong condition and are re-synchronized (`test/gate.spec.ts` only)
+  / 两条 gate 测试等错了条件，已重新同步（只改 `test/gate.spec.ts`）** —
+  no product behaviour changed. The queue-full test waited for one relay follow-up, which the refusal
+  notice already satisfies, so it re-dispatched while the admitted batch was still draining, was refused
+  by the same full queue, and never started the run it is about; it now waits for both messages. The
+  append test waited for two session appends, which the run's own progress events already satisfy, so it
+  asserted before the answer was written; it now waits for the `assistant/message`. Both were
+  timing-sensitive on this host (red locally, green in CI on Node 22/24 at the same commit); the new
+  conditions are ordering-based, not clock-based.
+  / 产品行为未变。队列满那条等的是「一条 relay follow-up」，而拒绝通知本身就满足它，于是在被受理的
+  批次还在排空时就重发、又被同一个满队列拒绝，它要验证的那次 run 根本没起来；现在等两条消息都到。
+  append 那条等「两条 session append」，而 run 自己的进度事件就满足它，于是断言早于答复落盘；现在
+  等 `assistant/message`。两条在本机是时序敏感的（同一个提交本机红、CI 的 Node 22/24 绿）；新条件
+  依据的是先后顺序，不是时钟。
 
 ## [0.9.1] - 2026-11-15
 

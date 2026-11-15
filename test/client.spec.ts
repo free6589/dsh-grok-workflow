@@ -354,8 +354,14 @@ describe('client settings page: bilingual copy (t42)', () => {
     const finding: Finding = { key: 'error.chainTooLong', params: { role: 'worker', limit: bundle.GROK_WORKFLOW_CHAIN_LIMIT } }
     expect(formatError(finding, zh)).toBe('执行 备用链最多 50 条，删掉多余的。')
     expect(formatError(finding, en)).toBe('Worker can keep at most 50 backup routes — remove the extras.')
-    expect(formatError({ key: 'error.number', params: { key: 'timeoutMs', min: 1000, max: 604800000 } }, en))
-      .toBe('timeoutMs must be a whole number between 1000 and 604800000 — fix the number and save again.')
+    // A numeric finding names its field in words, not with the settings key: `timeoutMs`
+    // is an identifier and reading it inside a Chinese sentence is a leak, not a label.
+    const number: Finding = { key: 'error.number', params: { key: 'timeoutMs', min: 1000, max: 604800000 } }
+    expect(formatError(number, en)).toBe('Max run time must be a whole number between 1000 and 604800000 — fix the number and save again.')
+    expect(formatError(number, zh)).toBe('最多跑多久 得是 1000 到 604800000 之间的整数，改对数字再保存。')
+    // A key that is not one of this page's fields is left exactly as it came.
+    expect(formatError({ key: 'error.number', params: { key: 'notAField', min: 0, max: 1 } }, en))
+      .toContain('notAField must be a whole number')
   })
 
   it('falls back to English for an unknown locale and to the key for an unknown entry', () => {
@@ -1305,27 +1311,27 @@ describe('client progress tab: the fold and the five states', () => {
   it('renders pending, doing, done, blocked and failed from the events alone', () => {
     // pending: nothing declared for this stage.
     const pending = trackOf([])
-    expect(stage(pending, 'fix').state).toBe('pending')
+    expect(stage(pending, 'verify').state).toBe('pending')
     expect(pending.percent).toBeUndefined()
     expect(stateLabels('pending')).toBe('待开始')
 
     // doing: an open run with an unsettled row.
-    const doing = trackOf([progressMember(1, '任务 1 · 修复登录')])
-    expect(stage(doing, 'fix').state).toBe('doing')
+    const doing = trackOf([progressMember(1, '执行')])
+    expect(stage(doing, 'execute').state).toBe('doing')
     expect(doing.ended).toBe(false)
     expect(stateLabels('doing')).toBe('进行中')
 
     // done: every row settled completed.
-    const done = trackOf([progressMember(1, '任务 1 · 修复登录', 'completed')], 'completed')
-    expect(stage(done, 'fix').state).toBe('done')
+    const done = trackOf([progressMember(1, '执行', 'completed')], 'completed')
+    expect(stage(done, 'execute').state).toBe('done')
     expect(stage(done, 'end').state).toBe('done')
     expect(stateLabels('done')).toBe('已完成')
 
     // blocked: derived from a run that ended over a row it never settled, and labelled.
-    const blocked = trackOf([progressMember(1, '任务 1 · 修复登录'), progressMember(2, '任务 1 · 修复登录', 'completed')], 'error')
-    expect(stage(blocked, 'fix').state).toBe('blocked')
-    expect(stage(blocked, 'fix').derived).toBe(true)
-    expect(stage(blocked, 'fix').reason).toBe('runEndedUnsettled')
+    const blocked = trackOf([progressMember(1, '执行'), progressMember(2, '执行', 'completed')], 'error')
+    expect(stage(blocked, 'execute').state).toBe('blocked')
+    expect(stage(blocked, 'execute').derived).toBe(true)
+    expect(stage(blocked, 'execute').reason).toBe('runEndedUnsettled')
     expect(stateLabels('blocked')).toBe('阻塞')
     // The explanation is real copy in both languages, not a bare key.
     for (const locale of ['zh', 'en']) {
@@ -1334,14 +1340,14 @@ describe('client progress tab: the fold and the five states', () => {
     }
 
     // failed: wins over an unfinished row, and the run's own end agrees.
-    const failed = trackOf([progressMember(1, '任务 1 · 修复登录', 'failed'), progressMember(2, '任务 1 · 修复登录')], 'error')
-    expect(stage(failed, 'fix').state).toBe('failed')
+    const failed = trackOf([progressMember(1, '执行', 'failed'), progressMember(2, '执行')], 'error')
+    expect(stage(failed, 'execute').state).toBe('failed')
     expect(stage(failed, 'end').state).toBe('failed')
     expect(stateLabels('failed')).toBe('失败')
 
     // cancelled: the engine's own word, kept rather than derived.
-    const cancelled = trackOf([progressMember(1, '任务 1 · 修复登录', 'cancelled')], 'cancelled')
-    expect(stage(cancelled, 'fix').state).toBe('cancelled')
+    const cancelled = trackOf([progressMember(1, '执行', 'cancelled')], 'cancelled')
+    expect(stage(cancelled, 'execute').state).toBe('cancelled')
     expect(stage(cancelled, 'end').state).toBe('cancelled')
     expect(stateLabels('cancelled')).toBe('已取消')
   })
@@ -1350,7 +1356,7 @@ describe('client progress tab: the fold and the five states', () => {
     expect(progress.percent([])).toBeUndefined()
     expect(progress.percent([progressMember(1, 'x', 'completed'), progressMember(2, 'x'), progressMember(3, 'x', 'completed'), progressMember(4, 'x', 'completed')]))
       .toEqual({ settled: 3, declared: 4, value: 75 })
-    const track = trackOf([progressMember(1, '任务 1 · 修复', 'completed'), progressMember(2, '任务 1 · 修复', 'completed')], 'completed')
+    const track = trackOf([progressMember(1, '执行', 'completed'), progressMember(2, '执行', 'completed')], 'completed')
     expect(track.percent).toEqual({ settled: 2, declared: 2, value: 100 })
     // The copy states what the number is, so no reader mistakes it for a task verdict.
     expect(translate('zh', 'progress.percent', { settled: 3, declared: 4, percent: 75 })).toContain('3/4')
@@ -1358,19 +1364,19 @@ describe('client progress tab: the fold and the five states', () => {
     expect(translate('en', 'progress.percentHint', { settled: 3, declared: 4 })).toContain('not a task verdict')
   })
 
-  it('appends an unmatched phase as a real node and keeps an unphased row visible', () => {
+  it('appends an unmatched phase as a real node between execute and verify, and keeps an unphased row', () => {
     const track = trackOf([
-      progressMember(1, '任务 1 · 真机验证', 'completed'),
-      progressMember(2, '任务 2 · 写文档', 'completed'),
+      progressMember(1, '任务 1 · 写文档', 'completed'),
+      progressMember(2, '任务 2 · 补测试', 'completed'),
       progressMember(3, undefined, 'completed'),
     ], 'completed')
     const keys = track.nodes.map((node) => node.key)
-    expect(keys).toContain('phase:任务 2 · 写文档')
+    expect(keys).toContain('phase:任务 1 · 写文档')
     expect(keys).toContain('phase:')
-    // Between the device stage and the cleanup stage: it is work, not a closing step.
-    expect(keys.indexOf('phase:任务 2 · 写文档')).toBeGreaterThan(keys.indexOf('stage:device'))
-    expect(keys.indexOf('phase:任务 2 · 写文档')).toBeLessThan(keys.indexOf('stage:cleanup'))
-    expect(track.nodes.find((node) => node.key === 'phase:任务 2 · 写文档')!.label).toBe('任务 2 · 写文档')
+    // Between `执行` (where the workers run) and `检查` (which reads their evidence).
+    expect(keys.indexOf('phase:任务 1 · 写文档')).toBeGreaterThan(keys.indexOf('stage:execute'))
+    expect(keys.indexOf('phase:任务 1 · 写文档')).toBeLessThan(keys.indexOf('stage:verify'))
+    expect(track.nodes.find((node) => node.key === 'phase:任务 1 · 写文档')!.label).toBe('任务 1 · 写文档')
     // Every declared row appears exactly once across the track.
     const rendered = track.nodes.flatMap((node) => node.members.map((entry) => entry.seq)).sort((a, b) => a - b)
     expect(rendered).toEqual([1, 2, 3])
@@ -1380,22 +1386,23 @@ describe('client progress tab: the fold and the five states', () => {
 describe('client progress tab: the detail ladder', () => {
   const progress = bundle.GROK_WORKFLOW_PROGRESS
   const block = ['```grok-coordination', JSON.stringify({
-    files: 'src/a.ts',
-    commands: ['npx vitest run test/a.spec.ts'],
-    result: 'tests pass',
+    workCommit: 'abc1234',
+    testsRun: ['npx vitest run test/client.spec.ts'],
+    results: 'tests pass',
   }, null, 2), '```'].join('\n')
 
   it('labels every field with its source, strongest first', () => {
-    const report = progress.detailFor({ stageDetail: { files: 'from-event' }, coordinationText: block })
+    const report = progress.detailFor({ stageDetail: { WORK_COMMIT: 'from-event' }, coordinationText: block })
     const byKey = new Map(report.fields.map((field) => [field.key, field]))
-    expect(byKey.get('files')).toEqual({ key: 'files', value: 'from-event', source: 'stage-detail' })
-    expect(byKey.get('commands')).toEqual({ key: 'commands', value: 'npx vitest run test/a.spec.ts', source: 'coordination' })
-    expect(byKey.get('result')).toEqual({ key: 'result', value: 'tests pass', source: 'coordination' })
-    for (const key of ['evidence', 'risks', 'next', 'owner']) {
+    expect(byKey.get('workCommit')).toEqual({ key: 'workCommit', value: 'from-event', source: 'stage-detail' })
+    expect(byKey.get('testsRun')).toEqual({ key: 'testsRun', value: 'npx vitest run test/client.spec.ts', source: 'coordination' })
+    expect(byKey.get('results')).toEqual({ key: 'results', value: 'tests pass', source: 'coordination' })
+    for (const key of ['changes', 'localRuntimeVerified', 'blockers', 'nextAction']) {
       expect(byKey.get(key)).toEqual({ key, source: 'not-reported' })
     }
     expect(report.fields).toHaveLength(progress.detailFields.length)
-    expect(report.coordinationRaw).toContain('src/a.ts')
+    expect(progress.detailFields).toEqual(['workCommit', 'changes', 'testsRun', 'results', 'localRuntimeVerified', 'blockers', 'nextAction'])
+    expect(report.coordinationRaw).toContain('abc1234')
   })
 
   it('degrades to seven "not reported" rows, with the badge copy in both languages', () => {
@@ -1407,18 +1414,29 @@ describe('client progress tab: the detail ladder', () => {
       for (const key of ['progress.source.stageDetail', 'progress.source.coordination', 'progress.source.notReported']) {
         expect(translate(locale, key), `${locale} ${key}`).not.toBe(key)
       }
+      // Every field has a real label in both languages, never a key.
+      for (const field of progress.detailFields) {
+        expect(translate(locale, `progress.field.${field}`), `${locale} ${field}`).not.toBe(`progress.field.${field}`)
+      }
       // A missing value renders an em dash, never a blank cell.
       expect(translate(locale, 'progress.none')).toBe('—')
     }
   })
 
   it('accepts only an explicit coordination block', () => {
-    expect(progress.parseCoordination(block)?.fields.files).toBe('src/a.ts')
-    const nested = ['```json', JSON.stringify({ coordination: { owner: 'G' } }), '```'].join('\n')
-    expect(progress.parseCoordination(nested)?.fields).toEqual({ owner: 'G' })
-    expect(progress.parseCoordination(['```json', JSON.stringify({ files: 'a', result: 'b' }), '```'].join('\n'))?.fields.files).toBe('a')
-    expect(progress.parseCoordination(['```json', JSON.stringify({ result: 'b' }), '```'].join('\n'))).toBeUndefined()
-    expect(progress.parseCoordination('files: a.ts; result: ok')).toBeUndefined()
+    expect(progress.parseCoordination(block)?.fields.workCommit).toBe('abc1234')
+    const nested = ['```json', JSON.stringify({ coordination: { blockers: 'none' } }), '```'].join('\n')
+    expect(progress.parseCoordination(nested)?.fields).toEqual({ blockers: 'none' })
+    expect(progress.parseCoordination(['```json', JSON.stringify({ workCommit: 'a', results: 'b' }), '```'].join('\n'))?.fields.workCommit).toBe('a')
+    expect(progress.parseCoordination(['```json', JSON.stringify({ results: 'b' }), '```'].join('\n'))).toBeUndefined()
+    // The AGENTS.md labelled form, bare or fenced.
+    const labelled = ['WORK_COMMIT: abc1234', 'CHANGES: spine', 'TESTS_RUN: npx vitest run', 'TEST_RESULTS: PASS', 'NEXT_ACTION: screenshot'].join('\n')
+    expect(progress.parseCoordination(labelled)?.fields).toEqual({
+      workCommit: 'abc1234', changes: 'spine', testsRun: 'npx vitest run', results: 'PASS', nextAction: 'screenshot',
+    })
+    expect(progress.parseCoordination(['```text', labelled, '```'].join('\n'))?.fields.nextAction).toBe('screenshot')
+    expect(progress.parseCoordination('NEXT_ACTION: 继续')).toBeUndefined()
+    expect(progress.parseCoordination('CHANGES: a.ts; result: ok')).toBeUndefined()
     expect(progress.parseCoordination(undefined)).toBeUndefined()
   })
 
@@ -1460,8 +1478,8 @@ describe('client progress tab: the detail ladder', () => {
     name: '任务团队 · 2 个任务',
     anchorSeq: 1,
     members: [
-      progressMember(1, '任务 1 · 修复登录', 'completed'),
-      progressMember(2, '任务 2 · 修复登录', 'completed'),
+      progressMember(1, '执行', 'completed'),
+      progressMember(2, '执行', 'completed'),
     ],
     startedAt: 1_000,
   }
@@ -1477,20 +1495,20 @@ describe('client progress tab: the detail ladder', () => {
     const before = walk(view.run())
     expect(before.some((element) => element.props['data-progress-detail'] === true)).toBe(false)
 
-    const fix = before.find((element) => element.props['data-node-key'] === 'stage:fix')!
-    ;(fix.props['onClick'] as () => void)()
+    const execute = before.find((element) => element.props['data-node-key'] === 'stage:execute')!
+    ;(execute.props['onClick'] as () => void)()
     const detail = walk(view.run()).find((element) => element.props['data-progress-detail'] === true)!
     expect(detail, 'detail popover').toBeDefined()
 
     const detailText = texts(detail).join('\n')
     // Section 1: which stage and which state.
-    expect(detailText).toContain('修复')
+    expect(detailText).toContain(bundle.GROK_WORKFLOW_DICT['zh']!['progress.stage.execute'])
     expect(detailText).toContain(bundle.GROK_WORKFLOW_DICT['zh']!['progress.state.done'])
     // Section 2: the engine facts, verbatim.
     expect(detailText).toContain('run-42')
     expect(detailText).toContain('child-1')
     expect(detailText).toContain('completed')
-    expect(detailText).toContain('任务 1 · 修复登录')
+    expect(detailText).toContain('执行')
     // Section 3: seven fields, each with the source it came from.
     const fields = walk(detail).filter((element) => element.props['data-gw-progress-field'] !== undefined)
     expect(fields).toHaveLength(progress.detailFields.length)
@@ -1498,12 +1516,12 @@ describe('client progress tab: the detail ladder', () => {
     expect(sources.filter((source) => source === 'coordination')).toHaveLength(3)
     expect(sources.filter((source) => source === 'not-reported')).toHaveLength(4)
     // A field's value and its badge are both on screen; a missing one is an em dash.
-    const files = fields.find((field) => field.props['data-gw-progress-field'] === 'files')!
-    expect(texts(files).join(' ')).toContain('src/a.ts')
-    expect(texts(files).join(' ')).toContain(bundle.GROK_WORKFLOW_DICT['zh']!['progress.source.coordination'])
-    const risks = fields.find((field) => field.props['data-gw-progress-field'] === 'risks')!
-    expect(texts(risks).join(' ')).toContain('—')
-    expect(texts(risks).join(' ')).toContain(bundle.GROK_WORKFLOW_DICT['zh']!['progress.source.notReported'])
+    const workCommit = fields.find((field) => field.props['data-gw-progress-field'] === 'workCommit')!
+    expect(texts(workCommit).join(' ')).toContain('abc1234')
+    expect(texts(workCommit).join(' ')).toContain(bundle.GROK_WORKFLOW_DICT['zh']!['progress.source.coordination'])
+    const nextAction = fields.find((field) => field.props['data-gw-progress-field'] === 'nextAction')!
+    expect(texts(nextAction).join(' ')).toContain('—')
+    expect(texts(nextAction).join(' ')).toContain(bundle.GROK_WORKFLOW_DICT['zh']!['progress.source.notReported'])
   })
 
   it('copies the coordination block through the clipboard and reports what happened', async () => {
@@ -1522,15 +1540,15 @@ describe('client progress tab: the detail ladder', () => {
         useGrokProgress: (select: (value: unknown) => unknown) => select({ runs: [run], activeRun: run }),
         detailSources: () => ({ coordinationText: block }),
       })
-      const fix = walk(view.run()).find((element) => element.props['data-node-key'] === 'stage:fix')!
-      ;(fix.props['onClick'] as () => void)()
+      const execute = walk(view.run()).find((element) => element.props['data-node-key'] === 'stage:execute')!
+      ;(execute.props['onClick'] as () => void)()
       const open = walk(view.run())
       const copy = open.find((element) => element.props['data-gw-progress-copy'] === true)!
       expect(copy.props['disabled']).toBe(false)
       ;(copy.props['onClick'] as () => void)()
       await new Promise((resolve) => setTimeout(resolve, 0))
       expect(copied).toHaveLength(1)
-      expect(copied[0]).toContain('"files"')
+      expect(copied[0]).toContain('"workCommit"')
       const after = walk(view.run()).find((element) => element.props['data-gw-progress-copy'] === true)!
       expect(texts(after).join('')).toBe(bundle.GROK_WORKFLOW_DICT['zh']!['progress.detail.copied'])
     } finally {
@@ -1546,8 +1564,8 @@ describe('client progress tab: the detail ladder', () => {
       progressT: t,
       useGrokProgress: (select: (value: unknown) => unknown) => select({ runs: [run], activeRun: run }),
     })
-    const fix = walk(view.run()).find((element) => element.props['data-node-key'] === 'stage:fix')!
-    ;(fix.props['onClick'] as () => void)()
+    const execute = walk(view.run()).find((element) => element.props['data-node-key'] === 'stage:execute')!
+    ;(execute.props['onClick'] as () => void)()
     const copy = walk(view.run()).find((element) => element.props['data-gw-progress-copy'] === true)!
     expect(copy.props['disabled']).toBe(true)
     expect(copy.props['title']).toBe(bundle.GROK_WORKFLOW_DICT['zh']!['progress.detail.noBlock'])
@@ -1563,8 +1581,8 @@ describe('client progress tab: the detail ladder', () => {
       canOpen: (childId: string) => childId === 'child-1',
       openChild: (childId: string) => { opened.push(childId) },
     })
-    const fix = walk(view.run()).find((element) => element.props['data-node-key'] === 'stage:fix')!
-    ;(fix.props['onClick'] as () => void)()
+    const execute = walk(view.run()).find((element) => element.props['data-node-key'] === 'stage:execute')!
+    ;(execute.props['onClick'] as () => void)()
     const buttons = walk(view.run()).filter((element) => element.props['data-gw-progress-open'] === true)
     // Two rows in this stage, one of them openable: exactly one button, and it opens it.
     expect(buttons).toHaveLength(1)
@@ -1661,7 +1679,7 @@ describe('client progress tab: styles, zoom and empty snapshots', () => {
       runId: 'r1',
       name: '任务团队',
       anchorSeq: 1,
-      members: [progressMember(1, '任务 1 · 修复登录', 'completed')],
+      members: [progressMember(1, '执行', 'completed')],
       stopReason: 'completed',
     }
     const filled = progress.component({ t, progressT: t, useGrokProgress: (select: (value: unknown) => unknown) => select({ runs: [run], activeRun: run }) })
@@ -1710,15 +1728,15 @@ describe('client progress tab: derived states say where they came from', () => {
       runId: 'r',
       name: '任务团队',
       anchorSeq: 1,
-      members: [progressMember(1, '任务 1 · 修复登录')],
+      members: [progressMember(1, '执行')],
       stopReason: 'error',
     }
-    const fix = nodesOf(blocked).find((node) => node.props['data-node-key'] === 'stage:fix')!
-    expect(fix.props['data-state']).toBe('blocked')
-    expect(fix.props['data-derived']).toBe('true')
-    expect(fix.props['title']).toBe(bundle.GROK_WORKFLOW_DICT['zh']!['progress.derived.runEndedUnsettled'])
+    const execute = nodesOf(blocked).find((node) => node.props['data-node-key'] === 'stage:execute')!
+    expect(execute.props['data-state']).toBe('blocked')
+    expect(execute.props['data-derived']).toBe('true')
+    expect(execute.props['title']).toBe(bundle.GROK_WORKFLOW_DICT['zh']!['progress.derived.runEndedUnsettled'])
     // The label is the state word the reader sees, plus the stage name.
-    expect(String(fix.props['aria-label'])).toContain(bundle.GROK_WORKFLOW_DICT['zh']!['progress.state.blocked'])
+    expect(String(execute.props['aria-label'])).toContain(bundle.GROK_WORKFLOW_DICT['zh']!['progress.state.blocked'])
   })
 
   it('keeps the engine’s own cancelled word on the node and the end mark', () => {
@@ -1726,15 +1744,15 @@ describe('client progress tab: derived states say where they came from', () => {
       runId: 'r',
       name: '任务团队',
       anchorSeq: 1,
-      members: [progressMember(1, '任务 1 · 修复登录', 'cancelled')],
+      members: [progressMember(1, '执行', 'cancelled')],
       stopReason: 'cancelled',
     }
     const nodes = nodesOf(cancelled)
-    const fix = nodes.find((node) => node.props['data-node-key'] === 'stage:fix')!
-    expect(fix.props['data-state']).toBe('cancelled')
+    const execute = nodes.find((node) => node.props['data-node-key'] === 'stage:execute')!
+    expect(execute.props['data-state']).toBe('cancelled')
     // Not derived: the engine said so.
-    expect(fix.props['data-derived']).toBeUndefined()
-    expect(String(fix.props['aria-label'])).toContain(bundle.GROK_WORKFLOW_DICT['zh']!['progress.state.cancelled'])
+    expect(execute.props['data-derived']).toBeUndefined()
+    expect(String(execute.props['aria-label'])).toContain(bundle.GROK_WORKFLOW_DICT['zh']!['progress.state.cancelled'])
     expect(nodes.find((node) => node.props['data-node-key'] === 'stage:end')!.props['data-state']).toBe('cancelled')
   })
 
@@ -1743,11 +1761,11 @@ describe('client progress tab: derived states say where they came from', () => {
       runId: 'r',
       name: '任务团队',
       anchorSeq: 1,
-      members: [progressMember(1, '任务 1 · 修复登录', 'completed')],
+      members: [progressMember(1, '执行', 'completed')],
       stopReason: 'completed',
     }
-    const cleanup = nodesOf(run).find((node) => node.props['data-node-key'] === 'stage:cleanup')!
-    expect(cleanup.props['data-state']).toBe('pending')
-    expect(cleanup.props['title']).toBe(bundle.GROK_WORKFLOW_DICT['zh']!['progress.notReported'])
+    const verify = nodesOf(run).find((node) => node.props['data-node-key'] === 'stage:verify')!
+    expect(verify.props['data-state']).toBe('pending')
+    expect(verify.props['title']).toBe(bundle.GROK_WORKFLOW_DICT['zh']!['progress.notReported'])
   })
 })
