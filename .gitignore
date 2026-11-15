@@ -25,6 +25,9 @@ sessions/
 # Local AgentTeams session state
 .agent-teams/
 
+# Per-run TMPDIR for the test suite and real-machine evidence runs (TMPDIR=$PWD/.tmp)
+.tmp/
+
 # Local isolated DSH homes / verify fixtures / generated output (never commit)
 .v050-home/
 .v051-home/
