@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-11-16
+
 ### Added / 新增
 
 - **The Progress tab is now a seven-segment spine with one expanding branch
