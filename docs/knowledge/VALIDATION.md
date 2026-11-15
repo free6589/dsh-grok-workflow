@@ -2988,3 +2988,56 @@ layerfs，也没有在 layerfs 侧做过任何改动（其检出仍是 `M core/c
 - live `:3080` / `:3086` / `:3090` 部署与重启：`NOT_RUN`（D-013，用户保留动作）。
 
 
+## Round 41 (2026-11-15) — v0.9.2 发布闭环：push / CI / tag / Release / Issue #1（`CONFIRMED`），证据集自陈三项缺口
+
+发版执行组 agent-38。Base `origin/main` = `4b92278`；本轮推送后 `origin/main` = `98f26a8`。
+本轮**没有改产品代码**：新增只有 `.gitignore`（收 `.tmp/`）与人话证据目录。
+
+### 1. 五步结果（`CONFIRMED`，命令与返回值原文）
+
+```text
+$ git push origin main
+   4b92278..98f26a8  main -> main            → exit 0（fast-forward，未 force）
+$ gh run view 43698707930 --json …
+   {"conclusion":"success","headSha":"98f26a8…","jobs":[Node 24 success, Node 22 success]}
+$ git tag -a v0.9.2 5eb4942 -m "v0.9.2: plain-language answer by default, one clamp table, progress tab spine/detail/connector"
+$ git push origin v0.9.2
+ * [new tag]         v0.9.2 -> v0.9.2        → exit 0
+$ gh run view 43698836519 --json …
+   {"conclusion":"success","headBranch":"v0.9.2","headSha":"5eb4942…"}
+$ gh release view v0.9.2 --json …
+   {"tagName":"v0.9.2","publishedAt":"2026-11-15T09:22:08Z","assets":[{"name":"dsh-grok-workflow-0.9.2.tgz","size":464763}]}
+```
+
+**旧 tag 未动（`CONFIRMED`，推前 / 推后各查一次 `git ls-remote --tags origin`）**：
+`v0.9.1` → `584dc22`（peel `9103280`）、`v0.9.0` → `936e625`（peel `2d2b347`）、`v0.8.0` → `9c590f2`、
+`v0.7.0` → `3b96b16`（peel `146dce7`）及更早全部同 sha；新增 `v0.9.2` → `38ef237`（peel `5eb4942`）。
+`git merge-base --is-ancestor 5eb4942 origin/main` 通过（Release workflow 的同一条检查在 CI 侧也绿）。
+
+Issue #1 状态评论：`TEST_RESULTS: PASS`，
+[issuecomment-6892286461](https://github.com/free6589/dsh-grok-workflow/issues/1#issuecomment-6892286461)
+（模板 11 字段齐全；`LOCAL_RUNTIME_VERIFIED` 字段内明写三项缺口，未把缺口写成通过）。
+
+### 2. 证据集自陈的缺口（不冒充通过）
+
+`docs/knowledge/evidence/human-default-2026-11-15/`（8 PNG + stage 脚本/日志 + probes +
+`MANIFEST.sha256` = 85 个文件 + `lib/client.js`、`lib/progress-tab.js`，`sha256sum -c` 全 OK）
+覆盖 VALIDATION Round 40 §6 的六项，但按证据自己的 `README-r2.md` §3/§5：
+
+| §6 项 | 状态 | 边界 |
+| --- | --- | --- |
+| 1 三 Tab 共存、默认落对话 | `CONFIRMED` | `01` |
+| 2 默认消息只有人话块 + 下一步，无 `stat`/`od`/`sha256`/绝对路径/marker | 首轮 `CONFIRMED`；**第 2、5 轮被反证** | 首轮 1 645 字符仍带相对路径 `.tmp/` 与半句截断标记（F4）；第 5 轮漏 `od -c` 输出、第 6 轮漏 `test -` 片段 |
+| 3 `showDiagnostics` 关/开对照 | 仅**转写侧** `CONFIRMED` | `07` 读者侧仍是人话块、`08` 标记内确有台账；`assistant/message` 无人话块外台账 → 「答案里看得见台账」`NOT_RUN`（F3） |
+| 4 ≤480 px + 深色 | `CONFIRMED` | `03`（`scrollWidth = 480`）、`04` |
+| 5 三 Tab 回归（含完成行点开子会话） | 对话/轨迹 `CONFIRMED`；点开子会话本实例 `NOT_RUN` | `05`、`06`、`probes/progress-tab-probe.png`；点子会话由 `evidence/progress-tab-2026-11-15/Round2/09–11` 与 `test/panel-links.spec.ts` 覆盖 |
+| 6 机器可核对旁证 | `CONFIRMED` | `run-state-r2.json`（19 797 B）、`final-answer.json`、`stage-c*-r2.json/.log.txt` |
+
+目录改名与 `.tmp` 清理的副作用见该目录 `LANDING.md`：结果 JSON 与堆栈里仍写原名
+`human-report-2026-11-15`（未改写证据），`README-r2.md` 引用的 `.tmp/r2-dump-booted.yml`
+与打包 tgz 已随 `.tmp` 清理删除（命令在文中，可重建）。
+
+### 3. 本轮 `NOT_RUN`
+
+- live `:3080` / `:3086` / `:3090` 的部署与重启：用户动作（D-013）。
+- 上面 §2 表里的三项缺口：`NOT_RUN`，它们需要新的真机复拍或交付层设计改动，不在本轮范围。

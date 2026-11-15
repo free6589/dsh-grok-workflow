@@ -1,6 +1,11 @@
 # Project State
 
-Last updated: 2026-11-15 (**v0.9.2 已本地提交 — 未 push / 未打 tag / 未发 GitHub Release**；
+Last updated: 2026-11-15 (**v0.9.2 已发布** — `tag v0.9.2` → `5eb4942`，`origin/main` = `98f26a8`，
+GitHub Release 已建（`dsh-grok-workflow-0.9.2.tgz` 464,763 B）。CI `43698707930`（Node 22+24）绿、
+Release `43698836519` 绿；旧 tag 复核未动。发文细节与边界见文末
+「2026-11-15 — v0.9.2 已发布：push / CI / tag / Release / Issue #1 闭环」。)
+
+Previous update: 2026-11-15 (**v0.9.2 已本地提交 — 未 push / 未打 tag / 未发 GitHub Release**；
 基线 `main` = `4b92278`。本轮内容 = B01/B02/B04 + 进度 Tab 脊椎/详情/连线 + 人话报告默认化
 （agent-27）+ 两条基线既有 `test/gate.spec.ts` 失败的同步修复（只动测试等待条件）。工作树 30+ 文件；
 `package.json` + `package-lock.json` = **`0.9.2`**；`CHANGELOG.md` 有 `## [0.9.2] - 2026-11-15`（中英
@@ -891,4 +896,35 @@ worker 链上限 50（HARD_LIMITS.chainLength）
 - **边界**：`v0.9.2` 目前只是本地提交——远端 `origin/main` 仍是 `4b92278`，没有 tag，因此没有 GitHub
   Release，Issue #1 无新评论；live `:3080`/`:3086`/`:3090` 未部署未重启（D-013）。
 
+
+## 2026-11-15 — v0.9.2 已发布：push / CI / tag / Release / Issue #1 闭环
+
+- **From:** 发版执行组 agent-38 · **To:** lead / 后续代理 · **Base:** `origin/main` = `4b92278`
+  （= 上一版发布记录）→ 本轮推送后 `origin/main` = `98f26a8`。
+- **结果（`CONFIRMED`，逐条可复核）**：
+  - **push**：`git push origin main` → `4b92278..98f26a8`（fast-forward，**未 force**，exit 0）。
+    两个提交：`4ab0cb3`（`.gitignore` 收 `.tmp/`）、`98f26a8`（人话默认形态真机证据落盘）。
+  - **CI**：run `43698707930`，commit `98f26a8`，Node 22 + Node 24 **both success**（`gh run view`）。
+  - **tag**：`git tag -a v0.9.2 5eb4942 -m "v0.9.2: plain-language answer by default, one clamp table,
+    progress tab spine/detail/connector"` → `git push origin v0.9.2`（`* [new tag]`，exit 0）；
+    `git merge-base --is-ancestor 5eb4942 origin/main` 通过。
+  - **Release**：run `43698836519` success（tag ↔ `package.json` ↔ `CHANGELOG [0.9.2]` 校验、
+    `lib/` 已提交且与构建一致、`npm test` 全绿）；GitHub Release published
+    **2026-11-15T09:22:08Z**，asset `dsh-grok-workflow-0.9.2.tgz` **464,763 B**。
+  - **旧 tag 复核**：`git ls-remote --tags origin` 前后对照 —— `v0.9.1` → `584dc22`（peel `9103280`）、
+    `v0.9.0` → `936e625`、`v0.8.0` → `9c590f2` 及更早**全部未动**；新 `v0.9.2` → `38ef237`（peel `5eb4942`）。
+  - **Issue #1**：状态评论
+    [issuecomment-6892286461](https://github.com/free6589/dsh-grok-workflow/issues/1#issuecomment-6892286461)，
+    `TEST_RESULTS: PASS`，模板 11 字段齐全。
+- **证据落盘（`CONFIRMED`）**：`docs/knowledge/evidence/human-default-2026-11-15/`（8 PNG + stage 脚本/日志 +
+  probes + `MANIFEST.sha256` 覆盖 85 个文件 + `lib/client.js`、`lib/progress-tab.js` 哈希；取自 agent-32
+  的补拍，原名 `human-report-2026-11-15`，落盘时只改仪器脚本路径，结果 JSON/堆栈原文未改写，见 `LANDING.md`）。
+- **`.tmp` 处置（`CONFIRMED`）**：按「可再生」判据整体清空（13 MB / 97 项：测试 checkpoints、隔离家
+  `human-home`/`human-home-r2`、`npm pack` 产物、chromium 临时 profile、编译/npm 缓存、probe 日志），
+  删前对两份 `.credentials.yaml`（各 161 B）做了布尔检查：只含 `client-connection/browser-session`
+  一条记录，**provider key 标记 0 处**；`.gitignore` 增 `.tmp/`。副作用如实记录：证据 README 引用的
+  `.tmp/r2-dump-booted.yml` 与打包 tgz 已随之删除（均可用文中命令重建）。
+- **未做（`NOT_RUN`）**：live `:3080`/`:3086`/`:3090` 的部署与重启（D-013，用户动作）；证据集自陈的
+  三项缺口（`showDiagnostics` 开态台账在答案里不可拍、完成行点开子会话未在本实例重拍、
+  人话块后几轮仍漏 `od -c`/命令片段——见 VALIDATION Round 41 §2）。
 

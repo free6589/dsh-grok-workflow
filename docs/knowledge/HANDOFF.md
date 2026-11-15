@@ -1091,3 +1091,36 @@
 - **别碰**：已发布 tag（`v0.9.1` 及更早）、DSH core、live `:3080` / `:3086` / `:3090`（D-013）、
   npm 发布与仓库可见性。
 
+## 2026-11-15 — v0.9.2 已发布（`5eb4942` / tag `v0.9.2`）；下一版从这里起
+
+- **From:** 发版执行组 agent-38 · **To:** lead / 下一个代理。**远端已变**：`origin/main` = `98f26a8`，
+  `tag v0.9.2` → `5eb4942`，GitHub Release published `2026-11-15T09:22:08Z`
+  （`dsh-grok-workflow-0.9.2.tgz` 464,763 B）。CI `43698707930`（Node 22+24）与
+  Release `43698836519` 均 success；旧 tag 全部未动（`v0.9.1` → `584dc22` / peel `9103280`）。
+- **`5eb4942` 与 `98f26a8` 的关系**：`5eb4942` 是 release-prep 提交（tag 打在它上面），
+  `a591817`、`4ab0cb3`、`98f26a8` 是它之后的三个人 docs 提交（记忆记录 / `.gitignore` / 人话证据）。
+  所以 **Release 的源码树不含证据目录**，证据在 `main` 历史里 —— 这是刻意的，理由：tag 与
+  `package.json`、`CHANGELOG [0.9.2]` 必须同版本，而证据是事后落盘的。
+- **证据**：`docs/knowledge/evidence/human-default-2026-11-15/`（原名 `human-report-2026-11-15`，
+  落盘改名，`LANDING.md` 逐项写明改了什么、没改什么）+ `MANIFEST.sha256`（85 文件 + 两个 `lib` 哈希，
+  `sha256sum -c` 全 OK）。覆盖面与**三项缺口**见 VALIDATION Round 41 §2：人话块首轮 `CONFIRMED`、
+  第 2/5 轮被反证；`showDiagnostics` 开态台账只在转写侧可拍；完成行点开子会话未在本实例重拍。
+- **`.tmp` 已清空并 gitignore**：`TMPDIR=$PWD/.tmp` 仍是本仓库约定的测试临时目录，用法不变；
+  清空时删掉的内容（13 MB / 97 项）与凭据布尔检查结果见 STATE 本轮段。下次要复现真机证据，
+  照 `human-default-2026-11-15/README-r2.md` 的命令重建打包产物与隔离家即可。
+- **复现命令（exact）**：
+
+  ```bash
+  cd /home/fish/projects_mine/dsh-grok-workflow
+  export TMPDIR=$PWD/.tmp && mkdir -p .tmp
+  gh run list --commit "$(git rev-parse HEAD)"        # CI 对当前提交
+  git ls-remote --tags origin                          # 旧 tag 未动 + v0.9.2 peel 到 5eb4942
+  ( cd docs/knowledge/evidence/human-default-2026-11-15 && \
+    grep -vE '  lib/(client|progress-tab)\.js$' MANIFEST.sha256 | sha256sum -c - )
+  ```
+
+- **下一步（不做也不算欠账，但别假装做过）**：①用户把 live 实例升到 `v0.9.2` 并重启（D-013，用户动作）；
+  ②若要关闭 §2 的三项缺口，需要新一次真机复拍 + 可能改交付层的 relay 文案（那是设计决定，先问用户）；
+  ③D路/记忆侧若已写过「v0.9.2 = HOLD」的段落，以本轮 STATE / VALIDATION Round 41 为最新事实。
+- **别碰**：已发布 tag（`v0.9.2` 及更早一律不动）、DSH core、live `:3080`/`:3086`/`:3090`、
+  npm 发布与仓库可见性。
