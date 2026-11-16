@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.9.4] - 2026-11-16
+
 ### Added / 新增
 
 - **A missing structured result gets one same-attempt resubmit before any retry
