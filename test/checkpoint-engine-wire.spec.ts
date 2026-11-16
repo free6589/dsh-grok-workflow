@@ -97,7 +97,7 @@ async function checkpointFor(dir: string, objective: string): Promise<{ file: st
 /* -------------------------------------------------------------------- tests -- */
 
 describe('engine wiring writes real checkpoints', () => {
-  it('records a verified run: tasks, four-role agent rows, evidence, and no extra model calls', async () => {
+  it('records a verified run: tasks, five-role agent rows, evidence, and no extra model calls', async () => {
     const engine = createEngineHarness(call => (call.prompt.includes('You are the execution agent')
       ? { structured: execution }
       : { structured: verification(true) }))
@@ -107,7 +107,7 @@ describe('engine wiring writes real checkpoints', () => {
 
     const outcome = await runWorkflow({
       ctx: engine.ctx as never,
-      config: resolveConfig({ maxConcurrency: 1, maxRetries: 0, maxTasks: 6, timeoutMs: 60_000 } as never),
+      config: resolveConfig({ maxConcurrency: 1, maxTasks: 6} as never),
       state: createActiveState(),
       logger: logger(),
       agent: { session: Session.create('sess-smoke-ok' as never) } as never,
@@ -132,7 +132,10 @@ describe('engine wiring writes real checkpoints', () => {
     // Stages come from the script's own phase labels, observed through the engine.
     expect(checkpoint.stages.map(stage => stage.phase)).toContain('plan')
     expect(checkpoint.plan.source).toBe('caller')
-    expect(checkpoint.watchdog).toEqual({ deadlineHit: false, cancelled: false, deadlineMs: 60_000 })
+    // T4: the fixed 60 min production deadline exceeds the checkpoint row's
+    // representable range (countCeiling), so no deadlineMs is recorded — the
+    // watchdog only carries what the row can represent.
+    expect(checkpoint.watchdog).toEqual({ deadlineHit: false, cancelled: false })
 
     const decision = resumeDecision(checkpoint)
     expect(decision.action).toBe('none')
@@ -150,7 +153,7 @@ describe('engine wiring writes real checkpoints', () => {
 
     const outcome = await runWorkflow({
       ctx: engine.ctx as never,
-      config: resolveConfig({ maxConcurrency: 1, maxRetries: 0, maxTasks: 6, timeoutMs: 60_000 } as never),
+      config: resolveConfig({ maxConcurrency: 1, maxTasks: 6} as never),
       state: createActiveState(),
       logger: logger(),
       agent: { session: Session.create('sess-smoke-fail' as never) } as never,

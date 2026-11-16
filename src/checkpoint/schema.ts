@@ -24,7 +24,7 @@
  * except that a row outside the documented engine-hook contract is **refused**,
  * because a checkpoint is the artifact a later run is re-driven from and must not
  * be able to describe a run the plugin would never start. The contract is
- * default concurrency 3 / hard maximum 6 and retries default 1 / hard maximum 3
+ * default concurrency 10 / hard maximum 100 and retries default 1 / hard maximum 3
  * (AGENTS.md "Architecture invariants", D-003); it is pinned once in
  * {@link ENGINE_HOOK_LIMITS}, which derives from `HARD_LIMITS` in `src/config.ts`
  * so the accepted configuration and the recorded contract cannot drift apart.
@@ -41,7 +41,7 @@
  */
 
 import { createHash } from 'node:crypto'
-import { DEFAULT_MAX_CONCURRENCY, DEFAULT_MAX_RETRIES, HARD_LIMITS } from '../config.js'
+import { DEFAULT_MAX_CONCURRENCY, DEFAULT_MAX_TASKS, FIXED_MAX_RETRIES, HARD_LIMITS } from '../config.js'
 import { normalizeWritesPaths } from '../paths.js'
 import { redactSecrets } from '../redact.js'
 import type { RoleName } from '../types.js'
@@ -93,7 +93,7 @@ export const CHECKPOINT_LIMITS = {
   maxStages: 16,
   /** Maximum evidence rows. */
   maxEvidence: 1_024,
-  /** Maximum recorded attempts per task (config ceiling is 10 retries + 1). */
+  /** Maximum recorded attempts per task (config ceiling is 3 retries + 1). */
   attemptsCeiling: 16,
   /** Structural ceiling for recorded limit numbers (matches config's 1e6 backstop). */
   countCeiling: 1_000_000,
@@ -116,7 +116,7 @@ export const CHECKPOINT_LIMITS = {
  */
 export const ENGINE_HOOK_LIMITS = {
   maxConcurrency: { default: DEFAULT_MAX_CONCURRENCY, max: HARD_LIMITS.maxConcurrency },
-  maxRetries: { default: DEFAULT_MAX_RETRIES, max: HARD_LIMITS.maxRetries },
+  maxRetries: { default: FIXED_MAX_RETRIES, max: HARD_LIMITS.maxRetries },
 } as const
 
 /** Run/stage status. `cancelled` covers caller cancel and plugin unload (t14). */
@@ -131,7 +131,7 @@ export type CheckpointPlanSource = 'caller' | 'planner' | 'fallback' | 'unavaila
 const RUN_STATUSES: readonly CheckpointStatus[] = ['running', 'completed', 'partial', 'failed', 'cancelled']
 const TASK_STATUSES: readonly CheckpointTaskStatus[] = ['pending', 'running', 'verified', 'failed', 'cancelled']
 const PLAN_SOURCES: readonly CheckpointPlanSource[] = ['caller', 'planner', 'fallback', 'unavailable']
-const ROLE_NAMES: readonly RoleName[] = ['planner', 'worker', 'verifier', 'synthesizer']
+const ROLE_NAMES = ['planner', 'worker', 'verifier', 'supervisor', 'synthesizer'] as const
 const PHASE_NAMES = ['plan', 'execute', 'verify', 'synthesize', 'answer'] as const
 export type CheckpointPhase = (typeof PHASE_NAMES)[number]
 const AGENT_OUTCOMES: readonly ('ok' | 'failed')[] = ['ok', 'failed']
@@ -306,7 +306,7 @@ export interface CheckpointInput {
   minContext?: { objective?: string; digest: string }
   /**
    * Limits the run used. Every field is optional: an omitted one is recorded as
-   * the documented contract default ({@link ENGINE_HOOK_LIMITS} / `maxTasks` 12)
+   * the documented contract default ({@link ENGINE_HOOK_LIMITS} / `maxTasks` 10)
    * rather than as a zero the writer would then have to refuse.
    */
   limits?: Partial<CheckpointLimits>
@@ -643,7 +643,7 @@ export function buildCheckpoint(input: CheckpointInput, now: number = Date.now()
   const rawLimits = {
     maxConcurrency: inRange(integer(input.limits?.maxConcurrency ?? ENGINE_HOOK_LIMITS.maxConcurrency.default, 'limits.maxConcurrency'), 1, CHECKPOINT_LIMITS.countCeiling, 'limits.maxConcurrency'),
     maxRetries: inRange(integer(input.limits?.maxRetries ?? ENGINE_HOOK_LIMITS.maxRetries.default, 'limits.maxRetries'), 0, CHECKPOINT_LIMITS.countCeiling, 'limits.maxRetries'),
-    maxTasks: inRange(integer(input.limits?.maxTasks ?? 12, 'limits.maxTasks'), 1, CHECKPOINT_LIMITS.countCeiling, 'limits.maxTasks'),
+    maxTasks: inRange(integer(input.limits?.maxTasks ?? DEFAULT_MAX_TASKS, 'limits.maxTasks'), 1, CHECKPOINT_LIMITS.countCeiling, 'limits.maxTasks'),
   }
   const limitViolations = limitContractViolations(rawLimits)
   if (limitViolations.length > 0) {

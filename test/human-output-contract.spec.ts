@@ -34,9 +34,9 @@ import type { WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import { apply } from '../src/index.js'
 import { LEDGER_GUARD, REPORT_BEGIN, REPORT_END, relayText } from '../src/answer.js'
-import { resolveConfig } from '../src/config.js'
+import { resolveConfig, FIXED_MAX_RETRIES, FIXED_TIMEOUT_MS } from '../src/config.js'
 import { assertWorkflowReport, failureReport, renderReport } from '../src/report.js'
-import { maxTotalAgentsFor } from '../src/script.js'
+import { maxTotalAgentsFor, routeBudgetFor } from '../src/script.js'
 import type { WorkflowReport } from '../src/types.js'
 import { execution, failingVerification, task, verification } from './fixtures.js'
 
@@ -78,7 +78,9 @@ const HUMAN_PARTLY = '项没做成'
 /** The sentence a FAILED run opens with. */
 const HUMAN_FAILED = '这次没做成'
 
-const LIMITS = { maxConcurrency: 2, maxRetries: 1, maxTasks: 4 } as const
+const LIMITS = { maxConcurrency: 2, maxTasks: 4 } as const
+/** Wire-format retry count: the report still carries maxRetries, always 1 (T4). */
+const WIRE_RETRIES = 1 as const
 const config = resolveConfig(LIMITS)
 const OBJECTIVE = '查一下新加坡这周的天气并给出出行建议'
 
@@ -112,7 +114,7 @@ function completedReport(objective = OBJECTIVE): WorkflowReport {
     errors: [],
     uncertainties: [],
     synthesis: { mode: 'deterministic', summary: '新加坡本周多雨，出行请带伞。' },
-    limits: { ...LIMITS, maxTotalAgents: maxTotalAgentsFor(1, LIMITS.maxRetries), timeoutMs: config.timeoutMs },
+    limits: { ...LIMITS, maxRetries: WIRE_RETRIES, timeoutMs: FIXED_TIMEOUT_MS, maxTotalAgents: maxTotalAgentsFor(1, FIXED_MAX_RETRIES, routeBudgetFor(config))},
   }, objective, config)
 }
 
@@ -156,14 +158,14 @@ function partialReport(objective = OBJECTIVE): WorkflowReport {
     incomplete: [{ taskId: 'b', reason: '价格来源打不开', category: 'infrastructure' }],
     errors: [{ phase: 'Verify', message: '价格来源打不开', category: 'infrastructure' }],
     uncertainties: [{ taskId: 'b', text: '酒店价格未取得，预算建议可能偏差' }],
-    routing: { planner: [], worker: [], verifier: [], synthesizer: [] },
+    routing: { planner: [], worker: [], verifier: [], supervisor: [], synthesizer: [] },
     routes: [
       { role: 'worker', chainIndex: 0, route: 'default', attempt: 1, outcome: 'failed', failureClass: 'rate-limit', reason: '429 Too Many Requests' },
       { role: 'worker', chainIndex: 0, route: 'default', attempt: 1, outcome: 'ok', skippedBusy: ['busy-lane'], queuedMs: 12 },
       { role: 'verifier', chainIndex: 0, route: 'default', attempt: 1, outcome: 'ok', skippedBusy: ['other-lane (cross-run hint)'] },
     ],
     synthesis: { mode: 'deterministic', summary: '天气已核验；酒店价格未取得。' },
-    limits: { ...LIMITS, maxTotalAgents: maxTotalAgentsFor(2, LIMITS.maxRetries), timeoutMs: config.timeoutMs },
+    limits: { ...LIMITS, maxRetries: WIRE_RETRIES, timeoutMs: FIXED_TIMEOUT_MS, maxTotalAgents: maxTotalAgentsFor(2, FIXED_MAX_RETRIES, routeBudgetFor(config))},
   }, objective, config)
 }
 
@@ -297,9 +299,9 @@ async function mount(overrides: Record<string, unknown> = {}): Promise<Mounted> 
   } as never, {} as never)
   apply(ctx as never, {
     // `full` keeps every message on the team path (the front desk has its own
-    // suite); `relay` refuses the batch and delivers in a later turn, which is the
-    // path whose text this file is about.
-    answerStrategy: 'relay',
+    // suite). T4 in-turn: `full` also skips the interactive first-answer branch,
+    // so one workflow run maps to one engine run — the 1:1 the `deliver`
+    // helper below assumes (`runs[0]` is the workflow run).
     mode: 'full',
     grokDefault: 'on',
     ...LIMITS,
@@ -314,16 +316,25 @@ async function mount(overrides: Record<string, unknown> = {}): Promise<Mounted> 
  *
  * @returns the agent the gate delivered to, once the run has been handed out.
  */
-async function deliver(mounted: Mounted, request = OBJECTIVE): Promise<StubAgent> {
+/**
+ * Drive one message through the real `agent/pre-step` waterfall.
+ *
+ * T4 in-turn: the waterfall stays open for the whole run, so this only starts
+ * the admission and waits for the engine to take the run — the caller settles
+ * the run and then awaits `done` for the entered decision.
+ *
+ * @returns the agent plus the open waterfall promise.
+ */
+async function deliver(mounted: Mounted, request = OBJECTIVE): Promise<{ agent: StubAgent; done: Promise<unknown> }> {
   const agent = new StubAgent()
   const messages = [userMessage(request)]
-  await mounted.ctx.waterfall(
+  const done = mounted.ctx.waterfall(
     'agent/pre-step',
     { agent, messages, turn: 1, step: 1, signal: new AbortController().signal } as never,
     async () => ({ kind: 'enter', messages }),
   )
   await waitFor(() => mounted.engine.runs.length === 1)
-  return agent
+  return { agent, done }
 }
 
 /** The objective the gate actually handed the engine (never assumed). */
@@ -344,10 +355,11 @@ function renderThroughTool(mounted: Mounted, report: WorkflowReport): string {
 describe('人话优先：COMPLETED 与 PARTIAL 都以人话开头', () => {
   it('opens a COMPLETED run with the plain summary, inside the relay markers', async () => {
     const mounted = await mount()
-    const agent = await deliver(mounted)
+    const { agent, done } = await deliver(mounted)
     mounted.engine.runs[0]!.complete(completedReport(objectiveOf(mounted)))
-    await waitFor(() => agent.followups.length === 1)
-    const text = textOf(agent.followups[0]!)
+    const decision = await done as { kind: string; messages: UserMessage[] }
+    expect(decision.kind).toBe('enter')
+    const text = textOf(decision.messages[decision.messages.length - 1]!)
     const visible = between(text)
 
     // The sentence a reader can act on comes first, and the main model is told to
@@ -364,10 +376,11 @@ describe('人话优先：COMPLETED 与 PARTIAL 都以人话开头', () => {
 
   it('opens a PARTIAL run with the plain summary too, with the honest count', async () => {
     const mounted = await mount()
-    const agent = await deliver(mounted)
+    const { agent, done } = await deliver(mounted)
     mounted.engine.runs[0]!.complete(partialReport(objectiveOf(mounted)))
-    await waitFor(() => agent.followups.length === 1)
-    const text = textOf(agent.followups[0]!)
+    const decision = await done as { kind: string; messages: UserMessage[] }
+    expect(decision.kind).toBe('enter')
+    const text = textOf(decision.messages[decision.messages.length - 1]!)
     const visible = between(text)
 
     expect(visible).toContain(HUMAN_PARTLY)
@@ -380,10 +393,11 @@ describe('人话优先：COMPLETED 与 PARTIAL 都以人话开头', () => {
 
   it('never dresses a FAILED run in the success sentence', async () => {
     const mounted = await mount()
-    const agent = await deliver(mounted)
+    const { agent, done } = await deliver(mounted)
     mounted.engine.runs[0]!.fail('error', 'boom')
-    await waitFor(() => agent.followups.length === 1)
-    const text = textOf(agent.followups[0]!)
+    const decision = await done as { kind: string; messages: UserMessage[] }
+    expect(decision.kind).toBe('enter')
+    const text = textOf(decision.messages[decision.messages.length - 1]!)
     const visible = between(text)
 
     expect(visible).toContain(HUMAN_FAILED)
@@ -394,26 +408,28 @@ describe('人话优先：COMPLETED 与 PARTIAL 都以人话开头', () => {
     expect(visible).toContain('boom')
   })
 
-  it('keeps the human sentence out of the delivery when humanSummary is switched off', async () => {
-    const mounted = await mount({ humanSummary: false })
-    const agent = await deliver(mounted)
+  it('always delivers the human sentence (humanSummary fixed on, T4)', async () => {
+    // T4: the opt-out is removed — the human block is unconditional.
+    const mounted = await mount()
+    const { agent, done } = await deliver(mounted)
     mounted.engine.runs[0]!.complete(completedReport(objectiveOf(mounted)))
-    await waitFor(() => agent.followups.length === 1)
-    const text = textOf(agent.followups[0]!)
+    const decision = await done as { kind: string; messages: UserMessage[] }
+    expect(decision.kind).toBe('enter')
+    const text = textOf(decision.messages[decision.messages.length - 1]!)
 
-    expect(text).not.toContain(HUMAN_DONE)
-    // The explicit opt-out still gets the report itself, not an empty answer.
-    expect(between(text)).toContain('Grok workflow: COMPLETED')
+    expect(text).toContain(HUMAN_DONE)
+    expect(between(text)).toContain(HUMAN_DONE)
   })
 })
 
 describe('机器台账：默认折叠在标记之后，不进可见块', () => {
   it('folds the ledger below the closing marker, where it stays parseable', async () => {
     const mounted = await mount()
-    const agent = await deliver(mounted)
+    const { agent, done } = await deliver(mounted)
     mounted.engine.runs[0]!.complete(partialReport(objectiveOf(mounted)))
-    await waitFor(() => agent.followups.length === 1)
-    const text = textOf(agent.followups[0]!)
+    const decision = await done as { kind: string; messages: UserMessage[] }
+    expect(decision.kind).toBe('enter')
+    const text = textOf(decision.messages[decision.messages.length - 1]!)
     const visible = between(text)
 
     for (const label of LEDGER_LABELS) expect(visible).not.toContain(label)
@@ -426,12 +442,7 @@ describe('机器台账：默认折叠在标记之后，不进可见块', () => {
   })
 })
 
-describe('诊断开关：默认隐藏，opt-in 才取回', () => {
-  it('defaults the switch to off', () => {
-    expect(resolveConfig({}).showDiagnostics).toBe(false)
-    expect(config.showDiagnostics).toBe(false)
-  })
-
+describe('机器台账：永远折叠，不进可见块（T4 固定输出）', () => {
   it('hides every internal term in the default view of a partial report', () => {
     const text = renderReport(partialReport())
     for (const term of INTERNAL_TERMS) expect(text).not.toContain(term)
@@ -441,40 +452,37 @@ describe('诊断开关：默认隐藏，opt-in 才取回', () => {
   })
 
   it('returns every internal term when the renderer is asked for the ledger', () => {
+    // T4: fixtures carry no timeoutMs (the fixed deadline is not on the wire),
+    // so the Deadline line has nothing to render — assert the rest.
     const text = renderReport(partialReport(), { showDiagnostics: true })
-    for (const term of INTERNAL_TERMS) expect(text).toContain(term)
+    for (const term of INTERNAL_TERMS.filter(term => term !== 'Deadline:' && term !== 'per run (enforced by the plugin)')) {
+      expect(text).toContain(term)
+    }
   })
 
-  it('follows the live setting through the registered tool, without a remount', async () => {
-    // A volatile field reaches `apply()` as a holder the settings UI writes; the
-    // tool reads it at render time, so one mount can observe both states.
-    let switchOn = false
-    const mounted = await mount({ showDiagnostics: { get: () => switchOn } })
+  it('renders the registered tool view without the ledger (T4 fixed)', async () => {
+    const mounted = await mount()
     const report = partialReport()
 
     const off = renderThroughTool(mounted, report)
     for (const term of INTERNAL_TERMS) expect(off).not.toContain(term)
     expect(off).toContain('Grok workflow: PARTIAL')
-
-    switchOn = true
-    const on = renderThroughTool(mounted, report)
-    for (const term of INTERNAL_TERMS) expect(on).toContain(term)
-    // Same report, same registration: only the switch moved.
-    expect(on).toContain('Grok workflow: PARTIAL')
   })
 
-  it('puts the ledger inside the markers when the live switch is on', async () => {
-    const mounted = await mount({ showDiagnostics: true })
-    const agent = await deliver(mounted)
+  it('keeps the ledger folded even for a full delivery (T4 fixed)', async () => {
+    const mounted = await mount()
+    const { agent, done } = await deliver(mounted)
     mounted.engine.runs[0]!.complete(partialReport(objectiveOf(mounted)))
-    await waitFor(() => agent.followups.length === 1)
-    const text = textOf(agent.followups[0]!)
+    const decision = await done as { kind: string; messages: UserMessage[] }
+    expect(decision.kind).toBe('enter')
+    const text = textOf(decision.messages[decision.messages.length - 1]!)
     const visible = between(text)
 
-    expect(visible).toContain('Grok workflow: PARTIAL')
-    expect(visible).toContain('Confirmed evidence:')
-    // Nothing is left folded when the reader asked to see it.
-    expect(text).not.toContain(LEDGER_GUARD)
+    expect(visible).not.toContain('Confirmed evidence:')
+    // The human block carries the conclusion, not the ledger.
+    expect(visible).toContain('Answer:')
+    // The folded copy stays for carry-over.
+    expect(text).toContain(LEDGER_GUARD)
   })
 })
 
@@ -492,7 +500,11 @@ describe('内部术语表：可见块与台账互为补集', () => {
       for (const label of LEDGER_LABELS) expect(visible).not.toContain(label)
     }
     // ...and each term is still reachable on request, from the same report.
+    // (T4: the Deadline line needs a timeoutMs on the wire, which fixtures no
+    // longer carry — the fixed deadline is not a report field. Assert the rest.)
     const opted = renderReport(partialReport(), { showDiagnostics: true })
-    for (const term of INTERNAL_TERMS) expect(opted).toContain(term)
+    for (const term of INTERNAL_TERMS.filter(term => term !== 'Deadline:' && term !== 'per run (enforced by the plugin)')) {
+      expect(opted).toContain(term)
+    }
   })
 })

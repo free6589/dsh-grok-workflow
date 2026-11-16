@@ -7,7 +7,7 @@ export declare const HARD_LIMITS: {
     readonly maxQueuedMessages: 8;
     /**
      * Concurrency and retries are the plugin's *documented* engine-hook contract
-     * (AGENTS.md "Architecture invariants", D-003): default 3 / hard maximum 6, and
+     * (AGENTS.md "Architecture invariants", D-003): default 10 / hard maximum 100, and
      * default 1 / hard maximum 3. They are deliberately small, because each unit is
      * one child agent charged against a real provider quota, and the generated
      * script mirrors these two numbers by value (`src/script.ts`) — the parity is
@@ -18,7 +18,7 @@ export declare const HARD_LIMITS: {
      * `buildCheckpoint` refuse a row outside them; the run path warns once when a
      * caller bypasses the config schema and hands a recorder a wider value.
      */
-    readonly maxConcurrency: 6;
+    readonly maxConcurrency: 100;
     readonly maxRetries: 3;
     readonly maxTasks: 100;
     readonly maxActiveRuns: 4;
@@ -33,8 +33,8 @@ export declare const HARD_LIMITS: {
         readonly min: 1;
         readonly max: 64;
     };
-    /** Extreme backstop on child calls charged against one task (worker + verifier). */
-    readonly maxAttemptsPerTask: 400;
+    /** Extreme backstop on child calls charged against one task (worker + verifier + supervisor). */
+    readonly maxAttemptsPerTask: 600;
     /** Hard ceiling on routing ledger entries kept per run. */
     readonly recordEntries: 256;
     /**
@@ -64,16 +64,8 @@ export declare const HARD_LIMITS: {
  * mismatch must refuse the load rather than be rewritten.
  */
 export declare const LIMIT_CAPS: {
-    readonly maxConcurrency: 6;
-    readonly maxRetries: 3;
-    readonly maxQueuedMessages: 8;
-    readonly historyTurns: 1000000;
-    readonly historyChars: 1000000;
+    readonly maxConcurrency: 100;
     readonly maxTasks: 100;
-    readonly timeoutMs: 604800000;
-    readonly maxActiveRuns: 4;
-    readonly maxActiveRunsTotal: 16;
-    readonly recordLimit: 256;
 };
 /** A configuration key whose stored number takes effect clamped to its hard maximum. */
 export type LimitField = keyof typeof LIMIT_CAPS;
@@ -88,19 +80,52 @@ export type LimitField = keyof typeof LIMIT_CAPS;
  */
 export declare const DEFAULT_TIMEOUT_MS = 3600000;
 /**
- * Defaults of the two documented run limits (3 concurrent tasks, 1 retry).
+ * Defaults of the two documented run limits (10 concurrent tasks, 1 retry).
  *
  * Declared once and read by the schema defaults, the checkpoint recorder and the
  * tests, so a settings form, a hand-written profile patch and a programmatic call
- * cannot disagree about what "unset" means — the same rule
- * `DEFAULT_HUMAN_SUMMARY` follows. `src/checkpoint/schema.ts` imports them for
+ * cannot disagree about what "unset" means.
+ * `src/checkpoint/schema.ts` imports them for
  * `ENGINE_HOOK_LIMITS`, which is what keeps the recorded contract and the
  * accepted configuration equal by construction instead of by comment.
  */
-export declare const DEFAULT_MAX_CONCURRENCY = 3;
-/** @see DEFAULT_MAX_CONCURRENCY */
-export declare const DEFAULT_MAX_RETRIES = 1;
-/** Default concurrent workflow runs per session (t45, P1-3). */
+export declare const DEFAULT_MAX_CONCURRENCY = 10;
+/** Maximum retries per task: fixed at 1, not user-configurable (T4 settings slim-down). */
+export declare const FIXED_MAX_RETRIES = 1;
+/** Default maximum tasks per run. */
+export declare const DEFAULT_MAX_TASKS = 10;
+/**
+ * Fixed run values (T4 settings slim-down): these are no longer user-configurable.
+ * A profile patch that still carries them is rejected as an unknown key (R-06).
+ */
+export declare const FIXED_TIMEOUT_MS = 3600000;
+/** Fixed per-session active-run cap. */
+export declare const FIXED_MAX_ACTIVE_RUNS = 2;
+/** Fixed process-wide active-run backstop. */
+export declare const FIXED_MAX_ACTIVE_RUNS_TOTAL = 8;
+/** Fixed carry-over/history budget (rounds, chars). */
+export declare const FIXED_HISTORY_TURNS = 20;
+export declare const FIXED_HISTORY_CHARS = 20000;
+/** Fixed per-agent queue bound. */
+export declare const FIXED_MAX_QUEUED_MESSAGES = 4;
+/** Fixed ledger row bound. */
+export declare const FIXED_RECORD_LIMIT = 256;
+/** Front desk is always `rules` + follow-up shortcut on; receipt always posted. */
+export declare const FIXED_TRIAGE_FOLLOWUP_AS_FAST = true;
+export declare const FIXED_INSTANT_RECEIPT = true;
+export declare const FIXED_HUMAN_SUMMARY = true;
+export declare const FIXED_SHOW_DIAGNOSTICS = false;
+/** Only `in-turn` survives: `relay`/`append` lose the answer on a one-shot app (D-050). */
+export declare const FIXED_ANSWER_STRATEGY: "in-turn";
+export declare const FIXED_TRIAGE_CLASSIFIER: "rules";
+export declare const FIXED_TRIAGE_ASK = true;
+export declare const FIXED_RECORD_RUNS = true;
+export declare const FIXED_SHOW_PROGRESS = true;
+/** Empty means the built-in switching policy. */
+export declare const FIXED_SWITCH_ON: Array<'rate-limit' | 'server-error' | 'connection' | 'timeout' | 'model-unavailable' | 'format-error' | 'agent-start-failed'>;
+/** Gate is always on; `gate.ts` no longer consults any preset/required switch. */
+export declare const FIXED_GATE_ON = true;
+/** Default concurrent workflow runs per session (t45, P1-3). Kept as a fixed internal value (T4). */
 export declare const DEFAULT_MAX_ACTIVE_RUNS = 2;
 /**
  * Default concurrent workflow runs across every session.
@@ -109,39 +134,20 @@ export declare const DEFAULT_MAX_ACTIVE_RUNS = 2;
  * number of child agents in one process bounded.
  */
 export declare const DEFAULT_MAX_ACTIVE_RUNS_TOTAL = 8;
-/**
- * Default of the `humanSummary` output switch: **on** (human-first).
- *
- * A run that is asked for nothing in particular gets the plain-language answer
- * first and the machine report after it. Declared once and read by both the
- * schema default and `resolveConfig`, so the settings form, a hand-written
- * profile patch and a programmatic call cannot disagree about what "unset"
- * means. The workflow script applies the same default to a payload that omits
- * the key (`src/script.ts`, `humanSummary`), so a caller that passes nothing —
- * the pre-switch calling convention — keeps the behavior it had.
- */
-export declare const DEFAULT_HUMAN_SUMMARY = true;
-/**
- * Default of the `showDiagnostics` output switch: **off** (diagnostics opt-in).
- *
- * Off means the rendered report omits the routing ledger (Model routes /
- * Deadline / Route switches / overflows / Errors). Turning it on is the
- * supported way to retrieve the complete machine report: the same validated
- * report renders every one of those lines
- * (`renderReport(report, { showDiagnostics: true })`), and the PTC `render`
- * tool reads the live setting, so no remount and no second report format are
- * involved. Declared once, read by the schema default and by `resolveConfig`.
- */
-export declare const DEFAULT_SHOW_DIAGNOSTICS = false;
 /** Version of the configuration surface this build understands. */
 export declare const CONFIG_VERSION = 1;
 /**
  * Every top-level key the configuration accepts, in schema order.
+ * T4 slim-down: the settings page exposes exactly 8 keys (toolName,
+ * configVersion, mode, grokDefault, roles, synthesis, maxConcurrency,
+ * maxTasks); the rest of the former surface is fixed internally.
  * Kept explicit so an unknown key can be rejected instead of silently dropped:
  * a typo that is silently ignored looks exactly like a setting that "does not
  * work", which is the failure mode the settings surface must not have.
  */
-export declare const CONFIG_KEYS: readonly ["toolName", "enforceGate", "gateRequired", "gateScope", "gatePreset", "answerStrategy", "mode", "grokDefault", "triageAsk", "triageModel", "triageClassifier", "triageFollowupAsFast", "instantReceipt", "humanSummary", "showDiagnostics", "historyTurns", "historyChars", "maxQueuedMessages", "maxConcurrency", "maxRetries", "maxTasks", "timeoutMs", "maxActiveRuns", "maxActiveRunsTotal", "subagentProvider", "roles", "synthesis", "switchOn", "recordRuns", "recordLimit", "showProgress", "configVersion"];
+export declare const CONFIG_KEYS: readonly ["toolName", "mode", "grokDefault", "roles", "synthesis", "maxConcurrency", "maxTasks", "configVersion"];
+/** Every key removed by the T4 slim-down; a patch that still carries one is rejected (R-06). */
+export declare const REMOVED_CONFIG_KEYS: readonly ["enforceGate", "gateRequired", "gateScope", "gatePreset", "answerStrategy", "triageAsk", "triageModel", "triageClassifier", "triageFollowupAsFast", "instantReceipt", "humanSummary", "showDiagnostics", "historyTurns", "historyChars", "maxQueuedMessages", "maxRetries", "timeoutMs", "maxActiveRuns", "maxActiveRunsTotal", "subagentProvider", "switchOn", "recordRuns", "recordLimit", "showProgress"];
 /** One stored limit the schema had to clamp, as the parse saw it. */
 export interface LimitOverrun {
     field: LimitField;
@@ -181,30 +187,10 @@ export declare function limitOverrunWarning({ field, stored, cap }: LimitOverrun
  */
 export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     toolName: z<string, string, "defined">;
-    enforceGate: z<boolean, boolean, "defined">;
-    gateRequired: z<boolean, boolean, "defined">;
-    gateScope: z<"process" | "preset", "process" | "preset", "volatile-defined">;
-    gatePreset: z<string, string, "volatile-defined">;
-    answerStrategy: z<"relay" | "append" | "in-turn", "relay" | "append" | "in-turn", "volatile-defined">;
     mode: z<"full" | "triage", "full" | "triage", "volatile-defined">;
     grokDefault: z<"on" | "off", "on" | "off", "volatile-defined">;
-    triageAsk: z<boolean, boolean, "volatile-defined">;
-    triageModel: z<string, string, "volatile-defined">;
-    triageClassifier: z<"rules" | "hybrid", "rules" | "hybrid", "volatile-defined">;
-    triageFollowupAsFast: z<boolean, boolean, "volatile-defined">;
-    instantReceipt: z<boolean, boolean, "volatile-defined">;
-    humanSummary: z<boolean, boolean, "volatile-defined">;
-    showDiagnostics: z<boolean, boolean, "volatile-defined">;
-    historyTurns: z<number, number, "volatile-defined">;
-    historyChars: z<number, number, "volatile-defined">;
-    maxQueuedMessages: z<number, number, "volatile-defined">;
     maxConcurrency: z<number, number, "volatile-defined">;
-    maxRetries: z<number, number, "volatile-defined">;
     maxTasks: z<number, number, "volatile-defined">;
-    timeoutMs: z<number, number, "volatile-defined">;
-    maxActiveRuns: z<number, number, "volatile-defined">;
-    maxActiveRunsTotal: z<number, number, "volatile-defined">;
-    subagentProvider: z<string, string, "volatile-defined">;
     roles: z<NoInfer<Schemastery.ObjectS<NoInfer<{
         planner: z<({
             provider?: string | null;
@@ -234,6 +220,15 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
             maxInFlight: z<number, number, "plain">;
         }>>[], "defined">;
         synthesizer: z<({
+            provider?: string | null;
+            model?: string | null;
+            maxInFlight?: number | null;
+        } & import("@deepseek-ai/cosmokit").Dict)[], Schemastery.ObjectT<NoInfer<{
+            provider: z<string, string, "defined">;
+            model: z<string, string, "plain">;
+            maxInFlight: z<number, number, "plain">;
+        }>>[], "defined">;
+        supervisor: z<({
             provider?: string | null;
             model?: string | null;
             maxInFlight?: number | null;
@@ -279,39 +274,24 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
             model: z<string, string, "plain">;
             maxInFlight: z<number, number, "plain">;
         }>>[], "defined">;
+        supervisor: z<({
+            provider?: string | null;
+            model?: string | null;
+            maxInFlight?: number | null;
+        } & import("@deepseek-ai/cosmokit").Dict)[], Schemastery.ObjectT<NoInfer<{
+            provider: z<string, string, "defined">;
+            model: z<string, string, "plain">;
+            maxInFlight: z<number, number, "plain">;
+        }>>[], "defined">;
     }>>>, "volatile-defined">;
-    synthesis: z<"deterministic" | "model" | "layered", "deterministic" | "model" | "layered", "volatile-defined">;
-    switchOn: z<NoInfer<string[]>, NoInfer<string[]>, "volatile-defined">;
-    recordRuns: z<boolean, boolean, "volatile-defined">;
-    recordLimit: z<number, number, "volatile-defined">;
-    showProgress: z<boolean, boolean, "volatile-defined">;
+    synthesis: z<"model" | "layered", "model" | "layered", "volatile-defined">;
     configVersion: z<number, number, "defined">;
 }>>, Schemastery.ObjectT<NoInfer<{
     toolName: z<string, string, "defined">;
-    enforceGate: z<boolean, boolean, "defined">;
-    gateRequired: z<boolean, boolean, "defined">;
-    gateScope: z<"process" | "preset", "process" | "preset", "volatile-defined">;
-    gatePreset: z<string, string, "volatile-defined">;
-    answerStrategy: z<"relay" | "append" | "in-turn", "relay" | "append" | "in-turn", "volatile-defined">;
     mode: z<"full" | "triage", "full" | "triage", "volatile-defined">;
     grokDefault: z<"on" | "off", "on" | "off", "volatile-defined">;
-    triageAsk: z<boolean, boolean, "volatile-defined">;
-    triageModel: z<string, string, "volatile-defined">;
-    triageClassifier: z<"rules" | "hybrid", "rules" | "hybrid", "volatile-defined">;
-    triageFollowupAsFast: z<boolean, boolean, "volatile-defined">;
-    instantReceipt: z<boolean, boolean, "volatile-defined">;
-    humanSummary: z<boolean, boolean, "volatile-defined">;
-    showDiagnostics: z<boolean, boolean, "volatile-defined">;
-    historyTurns: z<number, number, "volatile-defined">;
-    historyChars: z<number, number, "volatile-defined">;
-    maxQueuedMessages: z<number, number, "volatile-defined">;
     maxConcurrency: z<number, number, "volatile-defined">;
-    maxRetries: z<number, number, "volatile-defined">;
     maxTasks: z<number, number, "volatile-defined">;
-    timeoutMs: z<number, number, "volatile-defined">;
-    maxActiveRuns: z<number, number, "volatile-defined">;
-    maxActiveRunsTotal: z<number, number, "volatile-defined">;
-    subagentProvider: z<string, string, "volatile-defined">;
     roles: z<NoInfer<Schemastery.ObjectS<NoInfer<{
         planner: z<({
             provider?: string | null;
@@ -341,6 +321,15 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
             maxInFlight: z<number, number, "plain">;
         }>>[], "defined">;
         synthesizer: z<({
+            provider?: string | null;
+            model?: string | null;
+            maxInFlight?: number | null;
+        } & import("@deepseek-ai/cosmokit").Dict)[], Schemastery.ObjectT<NoInfer<{
+            provider: z<string, string, "defined">;
+            model: z<string, string, "plain">;
+            maxInFlight: z<number, number, "plain">;
+        }>>[], "defined">;
+        supervisor: z<({
             provider?: string | null;
             model?: string | null;
             maxInFlight?: number | null;
@@ -386,12 +375,17 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
             model: z<string, string, "plain">;
             maxInFlight: z<number, number, "plain">;
         }>>[], "defined">;
+        supervisor: z<({
+            provider?: string | null;
+            model?: string | null;
+            maxInFlight?: number | null;
+        } & import("@deepseek-ai/cosmokit").Dict)[], Schemastery.ObjectT<NoInfer<{
+            provider: z<string, string, "defined">;
+            model: z<string, string, "plain">;
+            maxInFlight: z<number, number, "plain">;
+        }>>[], "defined">;
     }>>>, "volatile-defined">;
-    synthesis: z<"deterministic" | "model" | "layered", "deterministic" | "model" | "layered", "volatile-defined">;
-    switchOn: z<NoInfer<string[]>, NoInfer<string[]>, "volatile-defined">;
-    recordRuns: z<boolean, boolean, "volatile-defined">;
-    recordLimit: z<number, number, "volatile-defined">;
-    showProgress: z<boolean, boolean, "volatile-defined">;
+    synthesis: z<"model" | "layered", "model" | "layered", "volatile-defined">;
     configVersion: z<number, number, "defined">;
 }>>, "plain">;
 /**
@@ -435,36 +429,6 @@ export declare function repairSynthesisInconsistency(raw: GrokWorkflowConfig): {
     repaired: GrokWorkflowConfig;
     warnings: string[];
 };
-/**
- * Repair a stored limit that exceeds the hard maximum (B07, B02, D-031).
- *
- * Every key in `LIMIT_CAPS` is a quota envelope, not a preference: the Host refuses to
- * run above it (`resolveConfig`), and that refusal is correct. A profile patch written
- * before a cap was restored can still hold the old wider number, and failing the whole
- * row for it leaves the user with no settings page to fix it from — the same deadlock
- * D-031 removed for the synthesis mismatch. So a stored overrun takes effect as the
- * cap, announced once.
- *
- * Which keys are in scope is `LIMIT_CAPS`'s answer, not this function's: that is what
- * keeps the schema clamp and this repair from disagreeing about a bound, and what let
- * the two documented limits (B07) become every numeric hard limit (B02) without a
- * second table to maintain.
- *
- * Only an *overrun* is recoverable here: a number above the maximum. Everything
- * else is left exactly as it is for `resolveConfig` to reject (R-06) — a value
- * below the minimum, a non-number, an unknown key or a malformed chain is not a
- * "the cap moved" problem, and silently rewriting it would hide a real error.
- * The input is not mutated; a non-matching input returns unchanged with no
- * warnings, so the caller can chain this with the other repair unconditionally.
- *
- * Each clamped overrun is also *recorded* in the same buffer the schema clamp writes
- * to (B04), so the caller announces it through one deduplicated path with one wording
- * instead of logging here: this function runs inside a read that may still throw for
- * an unrelated defect, and a read happens per message, so logging here would repeat
- * the line on every message for as long as the patch keeps failing.
- * @param raw - raw user configuration (plain snapshot shape).
- * @returns The clamped config plus human-readable warnings (empty when nothing matched).
- */
 export declare function repairLimitOverruns(raw: GrokWorkflowConfig): {
     repaired: GrokWorkflowConfig;
     warnings: string[];

@@ -997,3 +997,45 @@ Each entry records the decision, evidence, alternatives, and status.
   （违背用户"便宜"的原意；attempts 语义是"第几次尝试"，补交不是新尝试）。
 - **Evidence:** `src/script.ts`（`resubmitPrompt` + worker 循环）、`src/report.ts` 白名单、
   `src/types.ts`、`test/failure-paths.spec.ts`（same-attempt resubmit 3 例）。
+
+## D-055 — 设置页瘦身：8 键保留、24 键删除并固化行为（2026-11-17）
+
+- **Status:** CONFIRMED（代码+测试落地，未发布；`npx vitest run` 51 文件 / 951 测试 PASS，typecheck 0 错）
+- **Date:** 2026-11-17
+- **Decision:**
+  1. 配置表面只留 8 键：`toolName/mode/grokDefault/roles/synthesis/maxConcurrency/maxTasks/configVersion`；
+     24 键删除（`REMOVED_CONFIG_KEYS`），旧补丁携带按 unknown-key 拒载（R-06）。
+  2. 固定值：`maxRetries=1`（`FIXED_MAX_RETRIES`）、`timeoutMs=3600000`（`FIXED_TIMEOUT_MS`）、
+     `humanSummary=true`、`showDiagnostics=false`、`answerStrategy=in-turn` 恒定、
+     门控恒开（`enforceGate/gateRequired/gateScope/gatePreset` 删除）、triage 全固定
+     （inherit/rules/双 true）、history 20/20000、队列 4、双记录恒开、recordLimit 256、
+     `switchOn=[]` 内置策略、`subagentProvider` 空。
+  3. 设置页只渲染 4 标量 + 5 角色链（9 叶键），无 hint、无用途说明、无 Danger、无只读区；
+     `mode` 页上显示 `auto/full`（`auto`=triage 语义）；输出为模型直出的 markdown。
+- **Reason:** 用户原话"设置页好多选项，小白看不懂，不要介绍每个选项的用途，要简单明了"。
+  mock（`settings-simple-mock.html`）三轮定稿：总开关 / 执行模型（5 角色 × fallback + 监督）/ 高级（两数）。
+- **Evidence:** `src/config.ts`（CONFIG_KEYS/REMOVED/FIXED_*）、`src/client/index.js`
+  （4 卡片渲染）、`test/client.spec.ts`（72 例）、CHANGELOG `[Unreleased]` 双语迁移说明。
+- **Alternatives rejected:** 隐藏键保留 schema 可配（用户选了 schema 也删除，干净但破坏兼容，
+  以迁移说明 + R-06 拒载覆盖）；页上限 100 但硬上限保持 6（"填了不生效"的落差不可接受）。
+- **Consequences:** 旧补丁含 24 键任一即拒载，需手动删除；`relay/append` 投递删除（one-shot 下丢答案）；
+  1h deadline 单测不可真等，改静态断言（reliability/memory-archive）。
+
+## D-056 — 第五角色 supervisor：每 task 每 attempt 一次，只能判失败（2026-11-17）
+
+- **Status:** CONFIRMED（代码+测试落地，未发布；supervisor 预算计入，全量绿）
+- **Date:** 2026-11-17
+- **Decision:**
+  1. `RoleName` 加 `supervisor`，调用门在 verify 之后、synthesize 之前，每 task 每 attempt 一次，
+     仅当 supervisor 链已配置才跑；只能 fail 不能 pass（verifier 已 fail 则保持）。
+  2. 预算：`routeBudgetFor` 加 supervisor 项（空链=0，保持旧预算不变），
+     `maxTotalAgentsFor` 计入；`maxAttemptsPerTask` 400→600，公式
+     `(50+50+50)×4=600`（`test/routing.spec.ts` 钉死）。
+  3. 上限同步放宽：`maxConcurrency/maxTasks` 默认 10/10、上限 100/100
+     （用户定值；AGENTS.md 不变量同步更新）。
+- **Reason:** 用户要求"每个步骤可以选多个模型 fallback" + "监督可以监督每个环节"。
+- **Evidence:** `src/script.ts`（`supervisorPrompt`/调用门/预算）、`src/report.ts`/`records.ts`/
+  `naming.ts`（监督/监督调用/Supervisor）/`checkpoint` 五元组、`test/routing.spec.ts`
+  backstop 公式、`npm run ci` 级全量 951 绿。
+- **Alternatives rejected:** 监督映射到 verifier（用户选了独立第五角色，全链路贯通）；
+  per-run 60000 守卫（per-task 语义下永不触发，否决，见 T6 讨论）。

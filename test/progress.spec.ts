@@ -240,7 +240,7 @@ function progressEvents(session: SessionType): { type: string, data: Record<stri
 }
 
 describe('progress wiring: the real engine writes what the panel folds', () => {
-  const config = () => resolveConfig({ maxConcurrency: 1, maxRetries: 0, maxTasks: 6, timeoutMs: 60_000 })
+  const config = () => resolveConfig({ maxConcurrency: 1, maxTasks: 6})
 
   it('records run-start, one row per subagent, then run-end', async () => {
     const engine = harness(call => (call.prompt.includes('You are the execution agent')
@@ -346,14 +346,14 @@ describe('progress wiring: the real engine writes what the panel folds', () => {
     expect(warnings.some(warning => warning.includes('progress record dropped'))).toBe(true)
   })
 
-  it('writes nothing at all when showProgress is off, and still runs the workflow', async () => {
+  it('always writes progress (showProgress fixed on, T4), and still runs the workflow', async () => {
     const engine = harness(call => (call.prompt.includes('You are the execution agent')
       ? { structured: executionResult }
       : { structured: verificationResult(taskFromPrompt(call.prompt)) }))
     const session = Session.create('sess-progress-off' as never)
     const outcome = await runWorkflow({
       ctx: engine.ctx as never,
-      config: resolveConfig({ maxConcurrency: 1, maxRetries: 0, maxTasks: 6, timeoutMs: 60_000, showProgress: false }),
+      config: resolveConfig({ maxConcurrency: 1, maxTasks: 6}),
       state: createActiveState(),
       logger: loggerWith([]),
       agent: { session } as never,
@@ -362,8 +362,9 @@ describe('progress wiring: the real engine writes what the panel folds', () => {
       failureMode: 'report',
     })
     expect(outcome.ok).toBe(true)
-    expect(progressEvents(session)).toEqual([])
-    // The engine still did the work; only the recording stopped.
+    // T4: showProgress is fixed on — the run always records progress events.
+    expect(progressEvents(session).length).toBeGreaterThan(0)
+    // The engine still did the work.
     expect(engine.children.length).toBeGreaterThan(0)
   })
 })

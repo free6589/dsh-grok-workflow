@@ -24,7 +24,7 @@
  * except that a row outside the documented engine-hook contract is **refused**,
  * because a checkpoint is the artifact a later run is re-driven from and must not
  * be able to describe a run the plugin would never start. The contract is
- * default concurrency 3 / hard maximum 6 and retries default 1 / hard maximum 3
+ * default concurrency 10 / hard maximum 100 and retries default 1 / hard maximum 3
  * (AGENTS.md "Architecture invariants", D-003); it is pinned once in
  * {@link ENGINE_HOOK_LIMITS}, which derives from `HARD_LIMITS` in `src/config.ts`
  * so the accepted configuration and the recorded contract cannot drift apart.
@@ -86,7 +86,7 @@ export declare const CHECKPOINT_LIMITS: {
     readonly maxStages: 16;
     /** Maximum evidence rows. */
     readonly maxEvidence: 1024;
-    /** Maximum recorded attempts per task (config ceiling is 10 retries + 1). */
+    /** Maximum recorded attempts per task (config ceiling is 3 retries + 1). */
     readonly attemptsCeiling: 16;
     /** Structural ceiling for recorded limit numbers (matches config's 1e6 backstop). */
     readonly countCeiling: 1000000;
@@ -108,8 +108,8 @@ export declare const CHECKPOINT_LIMITS: {
  */
 export declare const ENGINE_HOOK_LIMITS: {
     readonly maxConcurrency: {
-        readonly default: 3;
-        readonly max: 6;
+        readonly default: 10;
+        readonly max: 100;
     };
     readonly maxRetries: {
         readonly default: 1;
@@ -314,7 +314,7 @@ export interface CheckpointInput {
     };
     /**
      * Limits the run used. Every field is optional: an omitted one is recorded as
-     * the documented contract default ({@link ENGINE_HOOK_LIMITS} / `maxTasks` 12)
+     * the documented contract default ({@link ENGINE_HOOK_LIMITS} / `maxTasks` 10)
      * rather than as a zero the writer would then have to refuse.
      */
     limits?: Partial<CheckpointLimits>;

@@ -67,8 +67,8 @@ export type AnswerStrategy = 'relay' | 'append' | 'in-turn';
  * smallest scope an external plugin can express (U-7).
  */
 export type GateScope = 'process' | 'preset';
-/** The four roles a workflow run assigns model routes to. */
-export type RoleName = 'planner' | 'worker' | 'verifier' | 'synthesizer';
+/** The five roles a workflow run assigns model routes to. */
+export type RoleName = 'planner' | 'worker' | 'verifier' | 'synthesizer' | 'supervisor';
 /**
  * One entry of an ordered fallback chain.
  *
@@ -109,95 +109,34 @@ export type RoleRouting = Partial<Record<RoleName, ModelRoute[]>>;
  */
 export type SynthesisPolicy = 'deterministic' | 'model' | 'layered';
 export type SynthesisMode = 'deterministic' | 'model';
-/** Plugin configuration (also the DSH Schemastery schema shape). */
+/**
+ * Plugin configuration (also the DSH Schemastery schema shape).
+ *
+ * T4 slim-down: the settings page exposes exactly 8 keys. Every other former
+ * key is rejected as an unknown key (R-06) and takes effect as a fixed
+ * internal value (see FIXED_* in `src/config.ts`).
+ */
 export interface GrokWorkflowConfig {
     /** Model-facing tool name. */
     toolName?: string;
-    /** Route every top-level user message through the workflow (mandatory entry). */
-    enforceGate?: boolean;
-    /**
-     * Fail loading instead of degrading when the runtime exposes no
-     * `agent/pre-step` hook. Default false: a missing hook only warns.
-     */
-    gateRequired?: boolean;
-    /** Front-desk routing mode (t52). */
+    /** Front-desk routing mode (t52). The page shows `auto` for `triage`. */
     mode?: TriageMode;
     /** Config-level default for the per-session grok-mode toggle (`off` = normal chat). */
     grokDefault?: 'on' | 'off';
-    /** Whether the front desk may ask instead of guessing an unclear tier. */
-    triageAsk?: boolean;
-    /** Route for the single call a chat or fast answer spends (`model` or `provider/model`). */
-    triageModel?: string;
-    /** Front-desk classifier: pure rules (default), or rules with one model fallback. */
-    triageClassifier?: TriageClassifier;
-    /** When true (default), a follow-up phrase with history routes fast. */
-    triageFollowupAsFast?: boolean;
-    /** Team tier: append an instant receipt after claiming (default true). */
-    instantReceipt?: boolean;
-    /** Team tier: append a 3-5 sentence Chinese summary after the run (default true). */
-    humanSummary?: boolean;
-    /** Hide machine diagnostics unless true (default false). */
-    showDiagnostics?: boolean;
-    /** Per-role ordered model chains (planner/worker/verifier/synthesizer). */
+    /** Per-role ordered model chains (planner/worker/verifier/synthesizer/supervisor). */
     roles?: RoleRouting;
-    /** Final-answer strategy (U-3): deterministic aggregation, or one model call. */
+    /** Final-answer policy: `layered` (markdown direct output, default) or one model call. */
     synthesis?: SynthesisPolicy;
-    /**
-     * Answer production strategy (U-1). `in-turn` is the default because it is
-     * the only one that survives a one-shot app (G-18/F9); `relay` and `append`
-     * remain selectable for long-lived surfaces.
-     */
-    answerStrategy?: AnswerStrategy;
-    /** Enforcement scope (U-7): whole process, or only one agent preset. */
-    gateScope?: GateScope;
-    /** Preset id that owns the gate when `gateScope` is `preset`. */
-    gatePreset?: string;
-    /** Prior conversation turns forwarded as context for follow-up messages. */
-    historyTurns?: number;
-    /** Character budget for the forwarded conversation history. */
-    historyChars?: number;
-    /** Maximum user messages in flight or waiting per agent; further ones are refused. */
-    maxQueuedMessages?: number;
-    /**
-     * Which failure classes advance a role's fallback chain. Empty (default) uses
-     * the built-in policy: every transport/model class switches, content failures
-     * never do. Setup faults (budget, schema, options) never switch regardless.
-     */
-    switchOn?: FailureClass[];
-    /** Write the routing/delivery ledger into the session (default true). */
-    recordRuns?: boolean;
-    /**
-     * Write the Web GUI's workflow-run progress events (one node, one member row
-     * per subagent). Presentation only: the run is identical either way.
-     */
-    showProgress?: boolean;
-    /** Maximum ledger entries kept per run (hard maximum 256). */
-    recordLimit?: number;
     /** Configuration surface version; unknown/newer versions are refused. */
     configVersion?: number;
-    /** Maximum concurrent child agents per workflow run. Hard maximum 6. */
+    /** Maximum concurrent child agents per workflow run. Hard maximum 100. */
     maxConcurrency?: number;
-    /** Maximum retries per task after the initial attempt. Hard maximum 3. */
-    maxRetries?: number;
-    /** Maximum tasks accepted from a caller or planner. Hard maximum 12. */
+    /** Maximum tasks accepted from a caller or planner. Hard maximum 100. */
     maxTasks?: number;
-    /** Overall workflow deadline in milliseconds. */
-    timeoutMs?: number;
-    /** Maximum concurrent workflow runs per session. Hard maximum 4. */
-    maxActiveRuns?: number;
-    /** Maximum concurrent workflow runs across every session in the process. Hard maximum 16. */
-    maxActiveRunsTotal?: number;
-    /** Optional DSH subagent provider override; defaults to the engine/provider default. */
-    subagentProvider?: string;
 }
-/** Fully resolved limits. */
+/** Fully resolved configuration. Everything not listed here is a fixed internal value. */
 export interface ResolvedConfig {
     toolName: string;
-    enforceGate: boolean;
-    gateRequired: boolean;
-    gateScope: GateScope;
-    gatePreset?: string;
-    answerStrategy: AnswerStrategy;
     /**
      * Front-desk mode (t52): `full` keeps the pre-t52 rule that every message runs
      * the team; `triage` routes each message to chat / fast / team / ask.
@@ -205,20 +144,6 @@ export interface ResolvedConfig {
     mode: TriageMode;
     /** Config-level default for the per-session grok-mode toggle (`off` = normal chat). */
     grokDefault: 'on' | 'off';
-    /** Whether the front desk may ask instead of guessing a tier. */
-    triageAsk: boolean;
-    /** Optional route for the single call a chat or fast answer spends. */
-    triageModel?: ModelRoute;
-    /** Front-desk classifier: pure rules (default), or rules with one model fallback. */
-    triageClassifier: TriageClassifier;
-    /** When false, the follow-up shortcut is disabled even with history. */
-    triageFollowupAsFast: boolean;
-    /** Team tier: instant receipt after claiming so the user sees progress (default true). */
-    instantReceipt: boolean;
-    /** Team tier: 3-5 sentence Chinese summary prepended to the report (default true). */
-    humanSummary: boolean;
-    /** When false (default), the rendered report hides machine diagnostics. */
-    showDiagnostics: boolean;
     /** Effective per-role chains; an empty array means "inherit the run's route". */
     roles: Record<RoleName, ModelRoute[]>;
     synthesis: SynthesisPolicy;
@@ -230,21 +155,9 @@ export interface ResolvedConfig {
      * `describeResolvedConfig` as `synthesis=<mode> (repaired)`.
      */
     synthesisRepaired?: boolean;
-    historyTurns: number;
-    historyChars: number;
-    maxQueuedMessages: number;
     maxConcurrency: number;
     maxRetries: number;
     maxTasks: number;
-    timeoutMs: number;
-    maxActiveRuns: number;
-    maxActiveRunsTotal: number;
-    subagentProvider?: string;
-    /** Effective switching policy; empty means the built-in policy. */
-    switchOn: FailureClass[];
-    recordRuns: boolean;
-    showProgress: boolean;
-    recordLimit: number;
     configVersion: number;
 }
 /** One evidence item confirmed by a verifier. */

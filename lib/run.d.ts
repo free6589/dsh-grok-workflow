@@ -186,8 +186,8 @@ export declare function runWorkflow(options: RunWorkflowOptions): Promise<RunOut
  * the child ceiling and reports `workflow/agent-start` to the progress panel: a
  * side channel would make those three facts untrue for the cheap tiers.
  *
- * The route is `config.triageModel` when set, else the run's own route (`agent()`'s
- * default), which is why an unconfigured front desk costs no extra model.
+ * The route is always the run's own route (`agent()`'s default): the front desk
+ * inherits instead of naming a model (T4: `triageModel` removed).
  */
 export interface SingleCallOptions {
     ctx: Context;

@@ -20,13 +20,15 @@
  */
 import { describe, expect, it } from 'vitest'
 import { deliverReport, humanConclusion, machineLedger } from '../src/delivery/index.js'
-import { resolveConfig } from '../src/config.js'
+import { resolveConfig, FIXED_MAX_RETRIES} from '../src/config.js'
 import { assertWorkflowReport } from '../src/report.js'
-import { maxTotalAgentsFor } from '../src/script.js'
+import { maxTotalAgentsFor, routeBudgetFor } from '../src/script.js'
 import type { WorkflowReport } from '../src/types.js'
 import { execution, failingVerification, task, verification } from './fixtures.js'
 
-const LIMITS = { maxConcurrency: 2, maxRetries: 1, maxTasks: 4 } as const
+const LIMITS = { maxConcurrency: 2, maxTasks: 4 } as const
+/** Wire-format retry count: the report still carries maxRetries, always 1 (T4). */
+const WIRE_RETRIES = 1 as const
 const config = resolveConfig(LIMITS)
 const OBJECTIVE = '查一下新加坡这周的天气并给出出行建议'
 
@@ -80,10 +82,10 @@ function partialReport(objective = OBJECTIVE): WorkflowReport {
     ],
     errors: [],
     uncertainties: [{ taskId: 'c', text: '机场巴士时刻未取得，行程建议可能偏差' }],
-    routing: { planner: [], worker: [], verifier: [], synthesizer: [] },
+    routing: { planner: [], worker: [], verifier: [], supervisor: [], synthesizer: [] },
     routes: [],
     synthesis: { mode: 'deterministic', summary: '天气已核验；酒店价格与机场巴士时刻未取得。' },
-    limits: { ...LIMITS, maxTotalAgents: maxTotalAgentsFor(3, LIMITS.maxRetries), timeoutMs: config.timeoutMs },
+    limits: { ...LIMITS, maxRetries: WIRE_RETRIES, maxTotalAgents: maxTotalAgentsFor(3, FIXED_MAX_RETRIES, routeBudgetFor(config))},
   }, objective, config)
 }
 
@@ -107,7 +109,7 @@ function completedReportWithEcho(): WorkflowReport {
     errors: [],
     uncertainties: [],
     synthesis: { mode: 'deterministic', summary: '新加坡本周多雨，出行请带伞。\nFinal answer: this line is a ledger echo and must not reach a reader' },
-    limits: { ...LIMITS, maxTotalAgents: maxTotalAgentsFor(1, LIMITS.maxRetries), timeoutMs: config.timeoutMs },
+    limits: { ...LIMITS, maxRetries: WIRE_RETRIES, maxTotalAgents: maxTotalAgentsFor(1, FIXED_MAX_RETRIES, routeBudgetFor(config))},
   }, OBJECTIVE, config)
 }
 

@@ -16,17 +16,14 @@ describe('the settings fixture matches the runtime projection', () => {
   it('projects exactly the volatile fields, dropping structural ones', () => {
     const descriptor = realSettingsDescriptor()
     const projected = Object.keys(descriptor.value).sort()
-    // 32 keys exist in the config surface, but the runtime's form only carries the
-    // 28 volatile ones; `toolName`, `enforceGate`, `gateRequired` and
-    // `configVersion` are plain and therefore invisible to the form.
-    expect(projected).toHaveLength(28)
+    // T4: 8 keys exist in the config surface; the runtime's form only carries the
+    // 6 volatile ones; `toolName` and `configVersion` are plain and therefore
+    // invisible to the form.
+    expect(projected).toHaveLength(6)
     expect(projected).toEqual([
-      'answerStrategy', 'gatePreset', 'gateScope', 'grokDefault', 'historyChars', 'historyTurns',
-      'humanSummary', 'instantReceipt', 'maxActiveRuns', 'maxActiveRunsTotal', 'maxConcurrency', 'maxQueuedMessages', 'maxRetries',
-      'maxTasks', 'mode', 'recordLimit', 'recordRuns', 'roles', 'showDiagnostics', 'showProgress',
-      'subagentProvider', 'switchOn', 'synthesis', 'timeoutMs', 'triageAsk', 'triageClassifier', 'triageFollowupAsFast', 'triageModel',
+      'grokDefault', 'maxConcurrency', 'maxTasks', 'mode', 'roles', 'synthesis',
     ])
-    for (const structural of ['toolName', 'enforceGate', 'gateRequired', 'configVersion']) {
+    for (const structural of ['toolName', 'configVersion']) {
       expect(projected).not.toContain(structural)
     }
   })
@@ -41,9 +38,8 @@ describe('the settings fixture matches the runtime projection', () => {
   })
 
   it('carries the configured values through the projection unchanged', () => {
-    const descriptor = realSettingsDescriptor({ maxConcurrency: 2, switchOn: ['timeout'] })
+    const descriptor = realSettingsDescriptor({ maxConcurrency: 2 })
     expect(descriptor.value.maxConcurrency).toBe(2)
-    expect(descriptor.value.switchOn).toEqual(['timeout'])
     expect(descriptor.value.roles).toBeDefined()
   })
 
@@ -72,7 +68,7 @@ describe('the settings fixture matches the runtime projection', () => {
     expect(shape(ours)).toEqual(shape(theirs))
     expect(Object.keys((ours as { dict: object }).dict).sort())
       .toEqual(Object.keys((theirs as { dict: object }).dict).sort())
-    const sample = { maxConcurrency: 2, roles: { worker: [{ provider: 'p', model: 'm' }] }, switchOn: ['timeout'] }
+    const sample = { maxConcurrency: 2, roles: { worker: [{ provider: 'p', model: 'm' }] } }
     const resolved = Config(sample as never)
     expect(JSON.stringify(plainConfig(resolved))).toBe(JSON.stringify(real.plainConfig!(resolved)))
     expect(JSON.stringify(projectForm(ours, plainConfig(resolved))))

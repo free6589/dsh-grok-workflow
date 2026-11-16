@@ -210,7 +210,7 @@ describe('P1-3: two languages, no per-run configuration', () => {
   it('ships Chinese copy for the names Issue #22 lists', () => {
     expect(NAMING_COPY.zh.workflow).toBe('任务团队')
     expect(NAMING_COPY.zh.roles).toEqual({
-      planner: '规划助手', worker: '执行', verifier: '检查', synthesizer: '汇总助手',
+      planner: '规划助手', worker: '执行', verifier: '检查', supervisor: '监督', synthesizer: '汇总助手',
     })
     expect(['plan', 'execute', 'verify', 'synthesize'].map(kind => phaseLabel(kind as never, 'zh')))
       .toEqual(['规划', '执行', '检查', '汇总'])

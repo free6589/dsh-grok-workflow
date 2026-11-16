@@ -61,6 +61,10 @@ import { redactError, redactSecrets } from './redact.js'
 import type { ActiveState, RunOutcome, WorkflowLogger } from './run.js'
 import { runSingleCall, runWorkflow } from './run.js'
 import {
+  FIXED_HISTORY_CHARS, FIXED_HISTORY_TURNS, FIXED_INSTANT_RECEIPT, FIXED_MAX_QUEUED_MESSAGES,
+  FIXED_TRIAGE_ASK, FIXED_TRIAGE_FOLLOWUP_AS_FAST,
+} from './config.js'
+import {
   askLine, chatReply, classifyTriage, detectLanguage, expiredAskNote, firstAnswerFallback, firstAnswerPrompt,
   missingNote, recallFromPrior,
   recallPrompt, recalledNote, resolvePending, resumedRequest, sanitizeFirstAnswer, singleCallPrompt,
@@ -193,29 +197,7 @@ function sessionOf(agent: Agent): Session | undefined {
   return agent.session
 }
 
-/**
- * The sentence a hybrid-classifier verdict carries as its reason (B18).
- *
- * The rules' own sentence (`TriageVerdict.detail`) explains the tier *they*
- * chose, so a model verdict on top of it made one answer state two incompatible
- * things: a team run opened with 档位：团队档 — 因为：信号互相矛盾或线索不足，前台不猜。
- * followed by 收到！团队开工中. Each sentence below names the classifier as the
- * source instead, so no rule claims a conclusion it never reached.
- */
-const HYBRID_DETAIL: Record<'chat' | 'fast' | 'team', { zh: string, en: string }> = {
-  chat: {
-    zh: '混合分诊模型把它判成直答档：这一档是模型定的，不是规则档位。',
-    en: 'the hybrid classifier (the model) chose the direct tier; this is a model verdict, not a rule.',
-  },
-  fast: {
-    zh: '混合分诊模型把它判成快手档：这一档是模型定的，不是规则档位。',
-    en: 'the hybrid classifier (the model) chose the quick tier; this is a model verdict, not a rule.',
-  },
-  team: {
-    zh: '混合分诊模型把它判成团队档：这一档是模型定的，不是规则档位。',
-    en: 'the hybrid classifier (the model) chose the team tier; this is a model verdict, not a rule.',
-  },
-}
+
 
 /**
  * True when this run can answer live and deliver the team result later (B: 边聊边干).
@@ -254,13 +236,12 @@ export function canBackgroundDeliver(agent: Agent): boolean {
  */
 function firstAnswerContext(
   session: Session | undefined,
-  limits: ResolvedConfig,
   history: string,
 ): string {
   try {
     const carryover = carryoverForSession(session, {
-      rounds: limits.historyTurns,
-      chars: limits.historyChars,
+      rounds: FIXED_HISTORY_TURNS,
+      chars: FIXED_HISTORY_CHARS,
     }).digest
     let memory = ''
     try {
@@ -499,23 +480,11 @@ export function classifyPreStep(
   const header = session?.header
   const depth = header?.delegationDepth ?? 0
   if (header?.origin === 'subagent' || depth > 0) return { kind: 'pass', reason: 'subagent' }
-  // U-7: an external plugin cannot register into a preset, so `preset` scope is
-  // expressed as an allow-list on the session header. Sessions outside the named
-  // preset keep their ordinary behaviour.
-  // Live scope check: an edit that widens or narrows the gate applies to the next
-  // claimed message. A broken edit degrades to the load-time snapshot instead of
-  // throwing here: classification runs outside the gate's error handling, and a
-  // throw would replace the workflow answer with an opaque rejection.
-  const scoped = readScope(deps)
-  if (scoped.gateScope === 'preset' && header?.agentPreset !== scoped.gatePreset) {
-    return { kind: 'pass', reason: 'out-of-scope' }
-  }
-  // Grok mode is a per-session, runtime toggle (default off). When it is not
-  // enabled this batch passes to the model untouched (normal chat); only
-  // toggle-admitted batches run the workflow. The config default comes from the
-  // same live scope the out-of-scope check reads, so a settings edit is honored;
-  // placed here so the more specific pass reasons above keep their labels.
-  if (!isModeEnabled(session, scoped.grokDefault === 'on')) {
+  // T4: the gate is always on for every session (gateScope/gatePreset removed).
+  // The config default comes from the same live scope an edit updates, so a
+  // settings edit is honored; placed here so the more specific pass reasons
+  // above keep their labels.
+  if (!isModeEnabled(session, readScope(deps).grokDefault === 'on')) {
     return { kind: 'pass', reason: 'mode-off' }
   }
   const agentId = agentIdOf(agent)
@@ -538,12 +507,12 @@ export function classifyPreStep(
  *
  * @param reason - Optional measured reason; empty when there is none to state.
  * @param report - Report the run produced before it was stopped, when there is one.
- * @param opts - `showDiagnostics` / `humanSummary` switches and the user's language.
+ * @param opts - the user's language (T4: human block always on, diagnostics always off).
  */
 export function cancelledText(
   reason: string,
   report?: WorkflowReport,
-  opts: { showDiagnostics?: boolean, humanSummary?: boolean, lang?: TriageLang } = {},
+  opts: { lang?: TriageLang } = {},
 ): string {
   const verified = report?.tasks.filter(task => task.status === 'verified').length ?? 0
   const total = report?.tasks.length ?? 0
@@ -562,8 +531,6 @@ export function cancelledText(
     // The human block is composed inside `relayText` now, so this path must not
     // pass one in: a head here plus a block there printed the same summary twice.
     lines.push('', '取消前保留的工作流报告：', relayText(report, undefined, {
-      showDiagnostics: opts.showDiagnostics === true,
-      humanSummary: opts.humanSummary !== false,
       ...opts.lang === undefined ? {} : { lang: opts.lang },
     }))
   }
@@ -582,13 +549,16 @@ export function cancelledText(
  * Deterministic on purpose: no model call, so engine call counts and the one-shot
  * budget are unchanged.
  *
+ * T4: the human block is always on — `enabled` stays as a parameter so existing
+ * callers keep compiling, but it is ignored.
+ *
  * @param report - validated report.
  * @param lang - language of the user's request; picks which block leads.
- * @param enabled - the `humanSummary` switch; off means no head at all.
- * @returns the head block, or undefined when the switch is off.
+ * @param enabled - ignored (always on).
+ * @returns the head block.
  */
 export function humanHead(report: WorkflowReport, lang: TriageLang, enabled: boolean): string | undefined {
-  if (!enabled) return undefined
+  void enabled
   return humanConclusion(report, { lang: lang === 'en' ? 'en' : 'zh' })
 }
 
@@ -616,52 +586,6 @@ async function deliverRelay(agent: Agent, text: string): Promise<boolean> {
   }
 }
 
-/**
- * Deliver the answer by writing it into the closed turn (strategy `append`).
- *
- * Degraded and experimental: no stream, no usage accounting, and the turn still
- * ends `blocked`, so a one-shot app reports a non-zero exit. The write happens
- * only after the turn closed, because a write during the turn races the loop's
- * own step messages and loses. The turn-order case is not measured yet (NR-3).
- */
-async function deliverAppend(
-  agent: Agent,
-  text: string,
-  turn: number,
-  step: number,
-): Promise<boolean> {
-  try {
-    await agent.whenIdle()
-  } catch {
-    // See deliverRelay: a disposed agent cannot accept delivery.
-  }
-  const session = sessionOf(agent)
-  if (session === undefined) return false
-  try {
-    // The user message is committed by this plugin: a rejected batch never
-    // becomes a user/message event, so the report would otherwise be orphaned.
-    session.append('user/message', createUserMessage({
-      content: [{ type: 'text', text }],
-      source: { kind: RELAY_SOURCE_KIND },
-    }), { surfaceOp: 'append' })
-    const options = agent.options ?? {}
-    session.append('assistant/message', {
-      turn,
-      step,
-      message: createAssistantMessage({
-        content: [{ type: 'text', text }],
-        source: {
-          provider: options.provider ?? 'grok-workflow',
-          model: options.model ?? 'workflow-report',
-        },
-      }),
-      stream: [],
-    }, { surfaceOp: 'append' })
-    return true
-  } catch {
-    return false
-  }
-}
 
 /** Install the gate; returns false when the runtime cannot host `agent/pre-step`. */
 export function installGate(deps: GateDeps): boolean {
@@ -689,13 +613,9 @@ export function installGate(deps: GateDeps): boolean {
   const host = ctx as unknown as { on?: (event: string, handler: unknown) => () => void }
   const on = host.on
   if (typeof on !== 'function') {
-    // Fail-open by default (a runtime without the hook cannot be policed), but a
-    // deployment that promises mandatory entry sets gateRequired to turn this
-    // silent degradation into a load-time error.
-    if (config.gateRequired === true) {
-      throw new Error('enforceGate requires the agent/pre-step hook, which this runtime does not expose (gateRequired is true)')
-    }
-    logger.warn('agent/pre-step is unavailable: mandatory entry is disabled in this runtime; set gateRequired to fail instead')
+    // T4: no gateRequired switch anymore — a runtime without the hook is always
+    // fail-open with a warning, never a load error.
+    logger.warn('agent/pre-step is unavailable: mandatory entry is disabled in this runtime')
     return false
   }
   const queues = new Map<string, AgentQueue>()
@@ -866,61 +786,18 @@ export function installGate(deps: GateDeps): boolean {
       const live = pending?.kind === 'live' ? pending.ask : undefined
       // History-aware follow-up: reuse the in-turn snapshot when present; only
       // the relay/append path (history === undefined) reads it here.
-      const histForTriage = history ?? collectHistory(sessionOf(agent), { turns: limits.historyTurns, chars: limits.historyChars })
+      const histForTriage = history ?? collectHistory(sessionOf(agent), { turns: FIXED_HISTORY_TURNS, chars: FIXED_HISTORY_CHARS })
       const historyNonEmpty = histForTriage.trim() !== ''
       const tier0 = classifyTriage({
         text: request,
         mode: effectiveMode,
-        ask: limits.triageAsk,
+        ask: FIXED_TRIAGE_ASK,
         pending: live !== undefined,
         historyNonEmpty,
-        followupAsFast: limits.triageFollowupAsFast,
+        followupAsFast: FIXED_TRIAGE_FOLLOWUP_AS_FAST,
       })
-      // Hybrid classifier (opt-in): one model call only for unclear cases.
-      // Rules stay the default path byte-for-byte; hybrid only re-decides
-      // ask/ambiguous-escalate, or chat when history exists to consult.
+      // T4: classifier is always `rules` (hybrid model-call fallback removed).
       let tier = tier0
-      if (limits.triageClassifier === 'hybrid'
-        && (tier0.reason === 'ambiguous' || tier0.reason === 'ambiguous-escalate'
-          || (tier0.tier === 'chat' && historyNonEmpty))) {
-        const hybridPrompt = [
-          // First line = the child's durable display label (src/team-engine.ts).
-          tier0.lang === 'zh' ? '任务分类' : 'Triage classifier',
-          'You are the front-desk classifier of a coding assistant.',
-          'Decide one tier for the current message: chat (small talk only), fast (one worker), team (multi-step).',
-          'Reply only JSON: {"tier":"chat|fast|team"}.',
-          '',
-          `History: ${histForTriage.slice(0, 2000)}`,
-          `Message: ${request.slice(0, 2000)}`,
-        ].join('\n')
-        try {
-          const call = await runSingleCall({
-            ctx, config: limits, state, logger, agent,
-            prompt: hybridPrompt,
-            label: 'triage-classifier',
-            ...signal === undefined ? {} : { signals: [signal] },
-          })
-          if (call.ok) {
-            const m = /"tier"\s*:\s*"(chat|fast|team)"/.exec(call.text)
-            const t = m?.[1]
-            if (t === 'chat' || t === 'fast' || t === 'team') {
-              // B18: the rules sentence explains *their* tier, so a model verdict on
-              // top of it contradicted itself ("团队档 — 因为：信号互相矛盾或线索不足，
-              // 前台不猜。"): the line named a tier the rules had just refused to
-              // pick. The override states who decided instead of reusing it.
-              tier = {
-                tier: t,
-                reason: `hybrid-${t}`,
-                detail: HYBRID_DETAIL[t][tier0.lang],
-                lang: tier0.lang,
-                greeting: t === 'team',
-              }
-            }
-          }
-        } catch {
-          // Fall through to the rules verdict on any hybrid failure.
-        }
-      }
       // Look it up before asking (v0.5, `history_first_no_reask`).
       //
       // The failing session asked the user to repeat research results the
@@ -942,10 +819,10 @@ export function installGate(deps: GateDeps): boolean {
           tier = classifyTriage({
             text: request,
             mode: effectiveMode,
-            ask: limits.triageAsk,
+            ask: FIXED_TRIAGE_ASK,
             pending: live !== undefined,
             historyNonEmpty,
-            followupAsFast: limits.triageFollowupAsFast,
+            followupAsFast: FIXED_TRIAGE_FOLLOWUP_AS_FAST,
             prior: lookup,
           })
         } else if (sources.some(source => source.kind === 'history')) {
@@ -1007,7 +884,7 @@ export function installGate(deps: GateDeps): boolean {
         // stays byte-identical), bounded and redacted otherwise.
         const fastContext = recalled !== undefined
           ? [recalled.excerpt, `(${recalled.locators.join(' | ')})`].filter(part => part !== '').join('\n')
-          : [histForTriage, carryoverForSession(sessionOf(agent), { rounds: limits.historyTurns, chars: limits.historyChars }).digest]
+          : [histForTriage, carryoverForSession(sessionOf(agent), { rounds: FIXED_HISTORY_TURNS, chars: FIXED_HISTORY_CHARS }).digest]
             .map(part => part.trim()).filter(part => part !== '').join('\n\n').slice(0, 4000)
         const call = await runSingleCall({
           ctx, config: limits, state, logger, agent,
@@ -1038,8 +915,8 @@ export function installGate(deps: GateDeps): boolean {
       // blank while in flight (pure addition; a failed append only costs the
       // receipt, never the run). The receipt is the live first answer (C: 现场写),
       // never the fixed template sentence.
-      if (limits.instantReceipt) {
-        const context = firstAnswerContext(sessionOf(agent), limits, histForTriage)
+      if (FIXED_INSTANT_RECEIPT) {
+        const context = firstAnswerContext(sessionOf(agent), histForTriage)
         const fallback = await produceFirstAnswer(
           agent,
           target,
@@ -1083,13 +960,12 @@ export function installGate(deps: GateDeps): boolean {
     history?: string,
     lang?: TriageLang,
   ): Promise<Answer> => {
-    const limits = safe()
     // P0-5: `in-turn` publishes the claimed message before the run, so the caller
     // snapshots the history first and passes it here — otherwise the message the
     // user just typed would also appear as "conversation so far" and the objective
     // would carry it twice.
     const objective = composeObjective(
-      history ?? collectHistory(sessionOf(agent), { turns: limits.historyTurns, chars: limits.historyChars }),
+      history ?? collectHistory(sessionOf(agent), { turns: FIXED_HISTORY_TURNS, chars: FIXED_HISTORY_CHARS }),
       request,
       TASK_LIMITS.objectiveChars,
     )
@@ -1107,7 +983,7 @@ export function installGate(deps: GateDeps): boolean {
     // instead of asking the user to repeat what they already said. The digest is
     // read from the durable transcript (the validated reports this plugin wrote),
     // shares the configured history budget, and is empty on a first round.
-    const carryover = carryoverForSession(sessionOf(agent), carryoverBounds(limits))
+    const carryover = carryoverForSession(sessionOf(agent), carryoverBounds({ historyTurns: FIXED_HISTORY_TURNS, historyChars: FIXED_HISTORY_CHARS }))
     if (carryover.digest !== '') {
       logger.info?.(`grok-workflow carry-over: ${carryover.rounds} earlier round(s), ${carryover.digest.length} chars`)
     }
@@ -1115,7 +991,7 @@ export function installGate(deps: GateDeps): boolean {
       // The gate owns the user-visible answer, so failures become reports here;
       // only conditions that prevent starting at all reach the catch below.
       outcome = await runWorkflow({
-        ctx, config: limits, state, logger, agent, objective, failureMode: 'report',
+        ctx, config: safe(), state, logger, agent, objective, failureMode: 'report',
         ...carryover.digest === '' ? {} : { carryover: carryover.digest },
         ...signal === undefined ? {} : { signals: [signal] },
       })
@@ -1149,10 +1025,7 @@ export function installGate(deps: GateDeps): boolean {
    */
   const answerText = (answer: Answer, inTurn: boolean): string => {
     if (answer.kind === 'report') {
-      const live = safe()
       return relayText(answer.report, answer.header, {
-        showDiagnostics: live.showDiagnostics,
-        humanSummary: live.humanSummary,
         ...answer.lang === undefined ? {} : { lang: answer.lang },
       })
     }
@@ -1172,9 +1045,9 @@ export function installGate(deps: GateDeps): boolean {
     answer: Answer,
   ): Promise<void> => {
     const text = answerText(answer, false)
-    const delivered = safe().answerStrategy === 'append'
-      ? await deliverAppend(agent, text, entry.turn, entry.step ?? 0)
-      : await deliverRelay(agent, text)
+    // T4: only `in-turn` survives (`relay`/`append` removed): the turn that
+    // admitted the batch also delivers it, via the plugin's own source message.
+    const delivered = await deliverRelay(agent, text)
     // A `report` and a front-desk answer both settle the batch: the user has the
     // answer. Only a notice leaves it routable, because nothing was produced.
     if ((answer.kind === 'report' || answer.kind === 'direct') && delivered) {
@@ -1267,59 +1140,6 @@ export function installGate(deps: GateDeps): boolean {
   }
 
   /**
-   * Admit one batch and answer it after the turn closes (`relay`/`append`).
-   *
-   * Kept separate so the listener itself stays total: this function may throw,
-   * the listener turns any throw into a refusal (never a silent pass).
-   */
-  const admitInBackground = (
-    verdict: Extract<Classification, { kind: 'admit' }>,
-    payload: PreStepPayload,
-  ): void => {
-    const { agent } = verdict
-    const entry = entryOf(verdict, payload)
-    // Every path below rejects the step, so nothing else will commit this batch.
-    commitClaimed(agent, payload.messages)
-    const refusal = refusalOf(verdict)
-    if (refusal !== undefined) {
-      record(agent, entry, 'failed', refusal.outcome)
-      void deliverAndRecord(agent, entry, { kind: 'notice', reason: refusal.reason, outcome: refusal.outcome })
-      return
-    }
-    const accepted = enqueue(verdict.agentId, async () => {
-      // B06: this path is the writer of the claimed batch (the step is rejected, so
-      // the loop commits nothing), and the run then reads the conversation as late
-      // as possible so a queued follow-up sees the answer the previous run just
-      // delivered. The words this plugin just wrote must not come back as "prior
-      // conversation" — the objective would carry the user's message twice: once as
-      // history, once as the current request. Excluding the committed ids keeps the
-      // late read and drops exactly that echo.
-      const limits = safe()
-      const history = collectHistory(
-        sessionOf(agent),
-        { turns: limits.historyTurns, chars: limits.historyChars },
-        entry.messageIds,
-      )
-      await deliverAndRecord(agent, entry, await produceAnswer(agent, verdict.request, undefined, history))
-    })
-    if (accepted) {
-      // Recorded only once the run is really queued: a refused batch must stay
-      // routable, while an accepted one is claimed for good.
-      record(agent, entry, 'started', 'admitted')
-      return
-    }
-    logger.warn(`gate queue is full for ${verdict.agentId}: refusing ${verdict.key}`)
-    record(agent, entry, 'failed', 'queue-full')
-    // Never await delivery here: this listener runs inside the step driver and
-    // `whenIdle()` cannot resolve until it returns.
-    void deliverAndRecord(agent, entry, {
-      kind: 'notice',
-      reason: `this agent already has ${safe().maxQueuedMessages} queued message(s) waiting for the workflow`,
-      outcome: 'queue-full',
-    })
-  }
-
-  /**
    * Team tier on an interactive run (B: 边聊边干).
    *
    * triage-team + effectiveMode `triage` + background-deliverable agent: one
@@ -1376,10 +1196,10 @@ export function installGate(deps: GateDeps): boolean {
       const tier = classifyTriage({
         text: admit.request,
         mode: 'triage',
-        ask: limits.triageAsk,
+        ask: FIXED_TRIAGE_ASK,
         pending: live !== undefined,
         historyNonEmpty: history.trim() !== '',
-        followupAsFast: limits.triageFollowupAsFast,
+        followupAsFast: FIXED_TRIAGE_FOLLOWUP_AS_FAST,
       })
       if (tier.tier !== 'team') {
         // Not ours: put the pending question back so the blocking path still
@@ -1390,11 +1210,11 @@ export function installGate(deps: GateDeps): boolean {
       const target = live === undefined || (tier.reason !== 'pending-fast' && tier.reason !== 'pending-team')
         ? admit.request
         : resumedTarget(tier, live.originalRequest, admit.request)
-      const context = firstAnswerContext(sessionOf(agent), limits, history)
+      const context = firstAnswerContext(sessionOf(agent), history)
       let firstText = ''
       try {
         const call = await runSingleCall({
-          ctx, config: limits, state, logger, agent,
+          ctx, config: safe(), state, logger, agent,
           prompt: firstAnswerPrompt(target, context, tier.lang),
           label: 'first-answer',
         })
@@ -1424,10 +1244,9 @@ export function installGate(deps: GateDeps): boolean {
       // run.ts disposeActiveState for the cancel side.
       record(agent, entry, 'started', 'admitted-team-background')
       const accepted = enqueue(admit.agentId, async () => {
-        const late = safe()
         const lateHistory = collectHistory(
           sessionOf(agent),
-          { turns: late.historyTurns, chars: late.historyChars },
+          { turns: FIXED_HISTORY_TURNS, chars: FIXED_HISTORY_CHARS },
           entry.messageIds,
         )
         await deliverAndRecord(agent, entry, await runTeam(agent, target, undefined, lateHistory, tier.lang))
@@ -1548,8 +1367,7 @@ export function installGate(deps: GateDeps): boolean {
     // nothing but the running status, and a reload lost the message completely.
     // The history snapshot is taken first, so the published message is not also
     // read back as prior conversation.
-    const limits = safe()
-    const history = collectHistory(sessionOf(agent), { turns: limits.historyTurns, chars: limits.historyChars })
+    const history = collectHistory(sessionOf(agent), { turns: FIXED_HISTORY_TURNS, chars: FIXED_HISTORY_CHARS })
     const surfaced = commitClaimed(agent, payload.messages)
     // B (边聊边干): triage-team on a background-deliverable agent answers the
     // live first answer in this turn and admits the workflow behind it.
@@ -1571,8 +1389,6 @@ export function installGate(deps: GateDeps): boolean {
       const reason = answer.kind === 'notice' ? answer.reason : ''
       const partialReport = answer.kind === 'report' ? answer.report : undefined
       commitCancelled(agent, payload, cancelledText(reason, partialReport, {
-        showDiagnostics: limits.showDiagnostics,
-        humanSummary: limits.humanSummary,
         lang: detectLanguage(verdict.request),
       }), surfaced)
       return { kind: 'reject' }
@@ -1624,7 +1440,7 @@ export function installGate(deps: GateDeps): boolean {
   /** Serialize one agent's batches and bound the queue. */
   const enqueue = (agentId: string, task: () => Promise<void>): boolean => {
     const current = queues.get(agentId)
-    if (current !== undefined && current.queued >= safe().maxQueuedMessages) return false
+    if (current !== undefined && current.queued >= FIXED_MAX_QUEUED_MESSAGES) return false
     const queue: AgentQueue = current ?? { tail: Promise.resolve(), queued: 0 }
     queue.queued += 1
     queues.set(agentId, queue)
@@ -1654,25 +1470,17 @@ export function installGate(deps: GateDeps): boolean {
     // Pass-through calls the next listener untouched: a foreign failure must
     // surface as that listener's failure, not as this gate's refusal.
     if (verdict.kind === 'pass') return next()
-    if (safe().answerStrategy === 'in-turn') {
-      try {
-        return await answerInTurn(verdict, payload, next)
-      } catch (error) {
-        // Totality with an answer: an internal failure is still stated, because a
-        // plain refusal would leave a one-shot app with no user-visible output.
-        // The claimed message is kept in front of the notice (P0-1).
-        const reason = redactError(error)
-        logger.warn(`gate could not answer in-turn: ${reason}`)
-        return enterRefusal(payload, noticeEnterText(reason))
-      }
-    }
+    // T4: only `in-turn` survives — the turn that admitted the batch answers it.
     try {
-      admitInBackground(verdict, payload)
+      return await answerInTurn(verdict, payload, next)
     } catch (error) {
-      // Totality: a throw here would end the turn with an error and no answer.
-      logger.warn(`gate could not admit the message: ${redactError(error)}`)
+      // Totality with an answer: an internal failure is still stated, because a
+      // plain refusal would leave a one-shot app with no user-visible output.
+      // The claimed message is kept in front of the notice (P0-1).
+      const reason = redactError(error)
+      logger.warn(`gate could not answer in-turn: ${reason}`)
+      return enterRefusal(payload, noticeEnterText(reason))
     }
-    return { kind: 'reject' }
   }
 
   // Call through the context: cordis event registration is receiver-bound.

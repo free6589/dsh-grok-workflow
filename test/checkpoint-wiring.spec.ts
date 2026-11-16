@@ -113,9 +113,9 @@ function reportOf(status: WorkflowReport['status'], tasks: TaskReport[]): Workfl
       { role: 'auditor' as unknown as RoleName, chainIndex: 0, route: 'p/m', attempt: 1, outcome: 'ok' },
       { role: 'synthesizer', chainIndex: 0, route: 'p/m', attempt: 0, outcome: 'ok' },
     ],
-    routing: { planner: [], worker: [], verifier: [], synthesizer: [] },
+    routing: { planner: [], worker: [], verifier: [], supervisor: [], synthesizer: [] },
     synthesis: { mode: 'deterministic' },
-    limits: { maxConcurrency: 3, maxRetries: 1, maxTasks: 12, maxTotalAgents: 48, timeoutMs: 60_000 },
+    limits: { maxConcurrency: 3, maxRetries: 1, maxTasks: 12, maxTotalAgents: 48 },
   }
 }
 
@@ -127,7 +127,7 @@ function options(overrides: { directory: string, events?: FakeEvents, recorder?:
     directory: overrides.directory,
     objective: 'ship the thing',
     sessionId: 'sess-wire',
-    limits: { maxConcurrency: 3, maxRetries: 1, maxTasks: 12, timeoutMs: 60_000 },
+    limits: { maxConcurrency: 10, maxRetries: 1, maxTasks: 12 },
     ...overrides.now === undefined ? {} : { now: overrides.now },
   }
 }
@@ -162,7 +162,13 @@ describe('periodic checkpoints', () => {
   it('writes a running checkpoint with the phases the script actually emitted', async () => {
     const events = new FakeEvents()
     const dir = witnessDir('witness-periodic')
-    const recorder = createCheckpointRecorder(options({ directory: dir, events }))
+    // Test-only deadline: the production 60 min deadline exceeds the checkpoint
+    // row's representable range (countCeiling), so the machinery is exercised
+    // with 60 s here; the semantics (passed deadline -> host fact) are identical.
+    const recorder = createCheckpointRecorder({
+      ...options({ directory: dir, events }),
+      limits: { maxConcurrency: 10, maxRetries: 1, maxTasks: 12, timeoutMs: 60_000 },
+    })
     recorder.adopt({ id: 'run-7' })
 
     // The engine's own payload shape: (info, title).
@@ -185,7 +191,7 @@ describe('periodic checkpoints', () => {
     // evidence that it ended.
     expect(checkpoint.stages[0]?.endedAtMs).toBeDefined()
     expect(checkpoint.stages[1]?.endedAtMs).toBeUndefined()
-    expect(checkpoint.limits).toEqual({ maxConcurrency: 3, maxRetries: 1, maxTasks: 12, timeoutMs: 60_000 })
+    expect(checkpoint.limits).toEqual({ maxConcurrency: 10, maxRetries: 1, maxTasks: 12, timeoutMs: 60_000 })
     expect(checkpoint.watchdog).toEqual({ deadlineHit: false, cancelled: false, deadlineMs: 60_000 })
     // Before a report exists the plan is unknown, not echoed back as if it were one.
     expect(checkpoint.plan).toEqual({ source: 'unavailable', taskCount: 0, tasks: [] })
@@ -358,9 +364,15 @@ describe('unload checkpoints', () => {
   it('records a deadline that passed as a host fact', async () => {
     const dir = join(scratch, 'deadline')
     let now = 1_000_000
-    const recorder = createCheckpointRecorder({ ...options({ directory: dir, now: () => now }), startedAtMs: now })
+    const recorder = createCheckpointRecorder({
+      ...options({ directory: dir, now: () => now }),
+      startedAtMs: now,
+      // Test-only deadline (see above): the production 60 min value exceeds the
+      // checkpoint row's representable range, so 60 s exercises the same path.
+      limits: { maxConcurrency: 10, maxRetries: 1, maxTasks: 12, timeoutMs: 60_000 },
+    })
     recorder.adopt({ id: 'run-12' })
-    now = 1_000_000 + 60_001 // past the 60 s deadline
+    now = 1_000_000 + 60_001 // past the 60 s test deadline
     await recorder.tick()
     const checkpoint = await readCheckpoint(checkpointFile('run-12', { dir }))
     expect(checkpoint.watchdog.deadlineHit).toBe(true)
@@ -381,8 +393,8 @@ describe('four roles, host-side only', () => {
     expect(RESUME_DECISION_WIRING.note).toContain('no production caller')
   })
 
-  it('knows exactly the four roles the plugin runs', () => {
-    expect([...HOST_ROLES]).toEqual(['planner', 'worker', 'verifier', 'synthesizer'])
+  it('knows exactly the five roles the plugin runs', () => {
+    expect([...HOST_ROLES]).toEqual(['planner', 'worker', 'verifier', 'supervisor', 'synthesizer'])
     expect(isHostRole('planner')).toBe(true)
     expect(isHostRole('auditor')).toBe(false)
     expect(isHostRole(undefined)).toBe(false)
@@ -440,7 +452,7 @@ describe('inert when there is nothing to describe', () => {
     const written = await recorder.tick()
     expect(written?.ok).toBe(true)
     const checkpoint = await readCheckpoint(checkpointFile('run-no-limits', { dir }))
-    expect(checkpoint.limits).toEqual({ maxConcurrency: 3, maxRetries: 1, maxTasks: 12 })
+    expect(checkpoint.limits).toEqual({ maxConcurrency: 10, maxRetries: 1, maxTasks: 10 })
     recorder.dispose()
   })
 
@@ -448,15 +460,15 @@ describe('inert when there is nothing to describe', () => {
     const dir = join(scratch, 'contract')
     const recorder = new Recorder()
     // A programmatic caller that bypasses the config schema is the only way these
-    // numbers can arrive: `resolveConfig` itself refuses anything above 6 / 3.
+    // numbers can arrive: `resolveConfig` itself refuses anything above 100 / 3.
     const violations = createCheckpointRecorder({
       ...options({ directory: dir, recorder }),
-      limits: { maxConcurrency: 8, maxRetries: 5, maxTasks: 4 },
+      limits: { maxConcurrency: 101, maxRetries: 5, maxTasks: 4 },
     })
     violations.adopt({ id: 'run-contract' })
     const warned = recorder.warnings.filter(message => message.includes('engine-hook contract'))
     expect(warned).toHaveLength(1)
-    expect(warned[0]).toContain('maxConcurrency 8 exceeds the documented maximum 6')
+    expect(warned[0]).toContain('maxConcurrency 101 exceeds the documented maximum 100')
     expect(warned[0]).toContain('maxRetries 5 exceeds the documented maximum 3')
     // Idempotent: re-adopting the same run does not repeat the warning.
     violations.adopt({ id: 'run-contract' })

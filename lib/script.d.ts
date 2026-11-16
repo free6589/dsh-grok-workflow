@@ -79,6 +79,8 @@ export interface RouteBudget {
     worker: number;
     /** Verifier calls per task attempt. */
     verifier: number;
+    /** Supervisor calls per task attempt (0 when no supervisor chain is configured). */
+    supervisor: number;
     /** Synthesizer calls per run (0 when synthesis is deterministic). */
     synthesizer: number;
 }

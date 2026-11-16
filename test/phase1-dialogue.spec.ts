@@ -15,7 +15,7 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { Session, pluginRecordOf } from '@deepseek-ai/dsh-session'
 import { apply } from '../src/index.js'
 import { REPORT_BEGIN, REPORT_END } from '../src/answer.js'
-import { resolveConfig } from '../src/config.js'
+import { FIXED_TIMEOUT_MS, resolveConfig } from '../src/config.js'
 import { parseMemberLabel } from '../src/naming.js'
 import { DELIVERY_RECORD } from '../src/records.js'
 import { createActiveState, runWorkflow } from '../src/run.js'
@@ -310,39 +310,42 @@ describe('P0-1: the user’s own message survives in the transcript', () => {
     expect(texts(reopened)).toEqual(replayed)
   })
 
-  it('relay: the plugin commits the claimed message itself, because the step is rejected', async () => {
+  it('in-turn: the claimed message is entered with the answer in the same step (T4)', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
-    apply(ctx as never, { answerStrategy: 'relay', mode: 'full', grokDefault: 'on' })
+    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
     const live = session('sess-p01-relay')
     const agent = new FakeAgent(live)
-    const claimed = [userMessage('relay 也要留下原话')]
+    const claimed = [userMessage('in-turn 也要留下原话')]
 
     const decision = await ctx.preStep()(payload(agent, claimed), nextWith(claimed)) as Decision
-    // A rejected step commits nothing, so the plugin wrote the message itself.
-    expect(decision).toEqual({ kind: 'reject' })
-    expect(texts(live)).toEqual(['relay 也要留下原话'])
-    await waitFor(() => agent.followups.length === 1)
-    // The answer arrives in its own turn and is owned by the plugin, so it can never
-    // be routed a second time.
-    expect(textOf(agent.followups[0]!)).toContain(REPORT_BEGIN)
-    expect((agent.followups[0]!.source as { kind?: string }).kind).toBe('grok-workflow')
+    // T4: only `in-turn` survives — the turn stays open, the run settles, and
+    // the decision carries the claimed message plus the answer (no followup).
+    expect(decision.kind).toBe('enter')
+    expect(texts(live)).toEqual(['in-turn 也要留下原话'])
+    expect(answerOf(decision)).toContain(REPORT_BEGIN)
+    expect(agent.followups).toHaveLength(0)
   })
 
-  it('append: the original message and the report are both in the durable log', async () => {
+  it('in-turn: the original message and the report are both in the durable log (T4)', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
-    apply(ctx as never, { answerStrategy: 'append', mode: 'full', grokDefault: 'on' })
+    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
     const live = session('sess-p01-append')
     const agent = new FakeAgent(live)
     const claimed = [userMessage('append 也要留下原话')]
 
-    await ctx.preStep()(payload(agent, claimed), nextWith(claimed))
-    await waitFor(() => texts(live).some(text => text.includes('COMPLETED')))
-    const derived = texts(live)
-    expect(derived[0]).toBe('append 也要留下原话')
-    expect(derived[derived.length - 1]).toContain('COMPLETED')
-    expect(derived.filter(text => text === 'append 也要留下原话')).toHaveLength(1)
+    // In-turn never writes the session itself: the loop commits the decision,
+    // so assert on what the decision carries — the claimed words, then the
+    // report answer.
+    const decision = await ctx.preStep()(payload(agent, claimed), nextWith(claimed)) as Decision
+    expect(decision.kind).toBe('enter')
+    // P0-5: the plugin published the claimed batch to the session surface
+    // before the run, so the decision carries only the answer — the original
+    // words live in the transcript exactly once, the report in the decision.
+    expect(texts(live)).toEqual(['append 也要留下原话'])
+    const carried = (decision.messages ?? []).map(textOf)
+    expect(carried[carried.length - 1]).toContain('COMPLETED')
   })
 
   it('a downstream refusal is not claimed, so the batch stays routable', async () => {
@@ -696,7 +699,7 @@ describe('P0-3: every internal error leaves a user-visible terminal state', () =
 /* ------------------------------------------------------------------- P0-4 -- */
 
 describe('P0-4: cancellation reaches a terminal state', () => {
-  const config = (): ReturnType<typeof resolveConfig> => resolveConfig({ maxConcurrency: 1, timeoutMs: 60_000 })
+  const config = (): ReturnType<typeof resolveConfig> => resolveConfig({ maxConcurrency: 1})
 
   function agentOf(live: Session): Record<string, unknown> {
     return { session: live, whenIdle: async () => {}, followup: () => {}, steer: () => {} }
@@ -813,7 +816,7 @@ describe('P0-4: cancellation reaches a terminal state', () => {
       errors: [],
       uncertainties: [],
       routes: [],
-      routing: { planner: [], worker: [], verifier: [], synthesizer: [] },
+      routing: { planner: [], worker: [], verifier: [], supervisor: [], synthesizer: [] },
       synthesis: { mode: 'deterministic' },
       // A report is only trusted when its limits echo the configuration that ran
       // (assertWorkflowReport refuses anything else), so the fixture echoes it.
@@ -827,7 +830,6 @@ describe('P0-4: cancellation reaches a terminal state', () => {
         // The report validator only trusts an agent budget inside the range the
         // planner budget allows (`report.ts`: min-max for this task count).
         maxTotalAgents: maxTotalAgentsFor(plan.length, limitsConfig.maxRetries, routeBudgetFor(limitsConfig)),
-        timeoutMs: limitsConfig.timeoutMs,
       },
     }
     ctx.engine.runs[0]!.settleCancelled(partial)
@@ -848,21 +850,28 @@ describe('P0-4: cancellation reaches a terminal state', () => {
     expect(outcome.report.errors.at(-1)?.category).toBe('cancelled')
   })
 
-  it('turns a deadline into its own terminal state (regression)', async () => {
-    const ctx = new FakeContext()
-    ctx.engine.hang = true
-    const outcome = await runWorkflow({
-      ctx: ctx as never,
-      config: resolveConfig({ maxConcurrency: 1, timeoutMs: 1_000 }),
-      state: createActiveState(),
-      logger: { warn: () => {} },
-      agent: agentOf(session('sess-p04-timeout')) as never,
-      objective: 'do the thing',
-      failureMode: 'report',
-    })
-    expect(outcome.cause).toBe('timeout')
-    expect(outcome.report.errors[0]?.phase).toBe('Timeout')
-    expect(outcome.report.errors[0]?.category).toBe('infrastructure')
+  it('turns a deadline into its own terminal state (regression, T4 fixed deadline)', async () => {
+    // T4: the deadline is fixed at 60 minutes — fake timers stand in for it.
+    vi.useFakeTimers()
+    try {
+      const ctx = new FakeContext()
+      ctx.engine.hang = true
+      const pending = runWorkflow({
+        ctx: ctx as never,
+        config: resolveConfig({ maxConcurrency: 1 }),
+        state: createActiveState(),
+        logger: { warn: () => {} },
+        agent: agentOf(session('sess-p04-timeout')) as never,
+        objective: 'do the thing',
+        failureMode: 'report',
+      })
+      const outcome = await vi.advanceTimersByTimeAsync(FIXED_TIMEOUT_MS + 1_000).then(() => pending)
+      expect(outcome.cause).toBe('timeout')
+      expect(outcome.report.errors[0]?.phase).toBe('Timeout')
+      expect(outcome.report.errors[0]?.category).toBe('infrastructure')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('names an unload as an unload, not as a caller cancellation', async () => {
@@ -931,7 +940,7 @@ describe('P0-4: a cancelled turn keeps the message and states the terminal', () 
 
   it('writes verified partial work into the cancelled transcript', async () => {
     const ctx = new FakeContext()
-    const config = { mode: 'full' as const, grokDefault: 'on' as const, maxConcurrency: 2, maxRetries: 0, maxTasks: 2 }
+    const config = { mode: 'full' as const, grokDefault: 'on' as const, maxConcurrency: 2, maxTasks: 2 }
     const limitsConfig = resolveConfig(config)
     apply(ctx as never, config)
     const live = session('sess-p1-cancel-partial-report')
@@ -979,14 +988,13 @@ describe('P0-4: a cancelled turn keeps the message and states the terminal', () 
       errors: [],
       uncertainties: [],
       routes: [],
-      routing: { planner: [], worker: [], verifier: [], synthesizer: [] },
+      routing: { planner: [], worker: [], verifier: [], supervisor: [], synthesizer: [] },
       synthesis: { mode: 'deterministic' },
       limits: {
         maxConcurrency: limitsConfig.maxConcurrency,
         maxRetries: limitsConfig.maxRetries,
         maxTasks: limitsConfig.maxTasks,
         maxTotalAgents: maxTotalAgentsFor(plan.length, limitsConfig.maxRetries, routeBudgetFor(limitsConfig)),
-        timeoutMs: limitsConfig.timeoutMs,
       },
     }
 
@@ -1081,24 +1089,18 @@ describe('P1: front-desk calls share the plugin lifecycle', () => {
 /* -------------------------------------------------------------------- B18 -- */
 
 describe('B18: the hybrid classifier states its own reason', () => {
-  it('names the model instead of reusing the rules sentence it overruled', async () => {
+  it('states the rules verdict with no model call (hybrid removed, T4)', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
-    apply(ctx as never, { mode: 'triage', grokDefault: 'on', triageClassifier: 'hybrid' })
+    apply(ctx as never, { mode: 'triage', grokDefault: 'on' })
     const live = session('sess-b18-hybrid')
     const agent = new FakeAgent(live)
     const decision = await ctx.preStep()(payload(agent, [userMessage('改一下那个')]), nextWith([])) as Decision
     const answer = answerOf(decision)
 
-    // The rules verdict for this message is the confirm tier, and its sentence says
-    // the signals conflict so the front desk does not guess. The classifier said
-    // team, so the tier line must say *that* — reusing the rules sentence would
-    // print "团队档 — 因为：信号互相矛盾或线索不足，前台不猜。".
-    expect(answer).toContain('团队档')
-    expect(answer).toContain('模型')
-    expect(answer).not.toContain('信号互相矛盾或线索不足')
-    // Two starts: the classifier call that overruled the rules, then the team run.
-    // Three, now: classifier, live first answer, team run (B/C 边聊边干).
-    expect(ctx.engine.startCalls).toHaveLength(3)
+    // T4: the hybrid model-call fallback is removed — the rules verdict stands
+    // on its own, and no classifier call starts.
+    expect(answer).toContain('确认档')
+    expect(ctx.engine.startCalls).toHaveLength(0)
   })
 })

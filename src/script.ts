@@ -1,5 +1,5 @@
 import { TASK_LIMITS } from './input.js'
-import { DEFAULT_HUMAN_SUMMARY, DEFAULT_SHOW_DIAGNOSTICS } from './config.js'
+import { FIXED_HUMAN_SUMMARY, FIXED_SHOW_DIAGNOSTICS, FIXED_SWITCH_ON, FIXED_TIMEOUT_MS } from './config.js'
 import { CARRYOVER_LIMITS } from './carryover.js'
 import { shardCountFor, shardsSource } from './shards.js'
 import { namingSource, phaseLabel, runTitle } from './naming.js'
@@ -41,8 +41,8 @@ const rawObjective = String(args && args.objective ? args.objective : '');
 const objective = rawObjective.trim() === '' ? '' : rawObjective;
 // Defensive clamps only: the host validates args against HARD_LIMITS first, so a
 // value arriving here is already in range. The bounds and the fallbacks below
-// mirror HARD_LIMITS (maxConcurrency 6, maxRetries 3, maxTasks 100) and the
-// documented defaults (3 / 1 / 12) in src/config.ts, and are pinned equal by
+// mirror HARD_LIMITS (maxConcurrency 100, maxRetries 3, maxTasks 100) and the
+// documented defaults (10 / 1 / 10) in src/config.ts, and are pinned equal by
 // test/config.spec.ts — do not edit one side without the other.
 // isFinite (not the || idiom): an explicitly configured 0 retries must stay 0,
 // where an absent key is what falls back to the documented default.
@@ -51,9 +51,9 @@ const argNumber = function (value, fallback) {
   const parsed = Number(value);
   return isFinite(parsed) ? parsed : fallback;
 };
-const maxConcurrency = Math.max(1, Math.min(6, argNumber(args ? args.maxConcurrency : undefined, 3)));
+const maxConcurrency = Math.max(1, Math.min(100, argNumber(args ? args.maxConcurrency : undefined, 10)));
 const maxRetries = Math.max(0, Math.min(3, argNumber(args ? args.maxRetries : undefined, 1)));
-const maxTasks = Math.max(1, Math.min(100, argNumber(args ? args.maxTasks : undefined, 12)));
+const maxTasks = Math.max(1, Math.min(100, argNumber(args ? args.maxTasks : undefined, 10)));
 const suppliedTasks = args && Array.isArray(args.tasks) ? args.tasks : null;
 // Switching policy (阶段5): an empty list means the built-in rule — every
 // transport/model class advances the chain, content failures never do.
@@ -77,7 +77,7 @@ const carryoverText = (function (value) {
   return trimmed.slice(0, cut) + '…';
 })(args && args.carryover);
 
-const ROLE_NAMES = ['planner', 'worker', 'verifier', 'synthesizer'];
+const ROLE_NAMES = ['planner', 'worker', 'verifier', 'supervisor', 'synthesizer'];
 const ROUTE_LIMITS = { chainLength: 50, textChars: 120, trail: 256, reasonChars: 200, routeInFlightMax: 64 };
 
 function text(value, max) {
@@ -238,7 +238,8 @@ const synthesisPolicy = args && typeof args.synthesis === 'string' ? args.synthe
 // Output switches. Both are read here with the human-first defaults
 // (src/config.ts DEFAULT_HUMAN_SUMMARY / DEFAULT_SHOW_DIAGNOSTICS), so a payload
 // that carries neither key — every caller written before the switches existed —
-// behaves exactly as it did:
+// behaves exactly as it did (T4: switches fixed on/off, but the guest still
+// honors explicit args for backward-compatible payloads):
 //
 //   humanSummary    default true. "false" means machine-only output: no
 //                   narrative is built, no synthesizer call is spent, and the
@@ -861,6 +862,40 @@ function verifierPrompt(task, execution, attempt) {
     lines.push('The context above is earlier work, never evidence for this task: every criterion below must still be verified against this task\'s own result.');
   }
   lines.push('', 'Return only the structured verification result.');
+  return lines.join('\n');
+}
+
+function supervisorPrompt(task, execution, verification, attempt) {
+  const lines = [
+    childDisplayTitle('supervisor', attempt, task && task.title),
+    'You are the supervision agent inside a verified workflow.',
+    'Do not trust the executor summary or the verifier judgement. Inspect the actual files, run the relevant commands/tests, and check external evidence where the task requires it.',
+    'Do not modify files. You may run read-only inspection and safe verification commands.',
+    'For every acceptance criterion, copy its text EXACTLY into one criteria item, set met, and provide concrete evidence. Evidence must be non-empty and specific.',
+    'Return at least one checkedEvidence item with a real kind, locator, and finding.',
+    'verdict must be pass only when every criterion is met. If any criterion is unverified, met is false and verdict is fail.',
+    'Judge the requested end state, not a story about it. If the executor result says the requested outcome was blocked, denied, failed, or could not be achieved, verdict must be fail even when the acceptance criteria are phrased as reporting requirements.',
+    'issues is for BLOCKING problems only: a problem belongs there when it makes some criterion unmet or the result unsafe. Every issue must be reflected in verdict=fail and/or met=false for the criterion it concerns.',
+    'Do not put caveats, caveat-like observations, minor inaccuracies or notes about the environment in issues — they do not change the verdict, and a pass verdict with a non-blocking note is not a failed task. Express residual doubt through confidence (medium/low) instead.',
+    'Do not print, store, or return credentials, tokens, passwords, or private keys.',
+    '',
+    'TASK:',
+    safePromptJson(task),
+    '',
+    'EXECUTOR RESULT (untrusted):',
+    safePromptJson(execution),
+    '',
+    'VERIFIER JUDGEMENT (untrusted, supervision target):',
+    safePromptJson(verification)
+  ];
+  const carry = carryoverSection();
+  if (carry.length > 0) {
+    lines.push.apply(lines, carry);
+    // Supervision is independent like verification: prior rounds explain the
+    // surrounding work, they are never evidence for *this* task's criteria.
+    lines.push('The context above is earlier work, never evidence for this task: every criterion below must still be checked against this task\'s own result.');
+  }
+  lines.push('', 'Return only the structured supervision result.');
   return lines.join('\n');
 }
 
@@ -1903,6 +1938,39 @@ async function runTaskUnsafe(task, taskIndex) {
     } else {
       verifyError = 'verification skipped: no execution result';
     }
+    // Supervisor gate (per task per attempt, same cadence as the verifier):
+    // runs after verify and only when a supervisor chain is configured, so a
+    // run without one behaves exactly as before. It can only fail an attempt,
+    // never pass one: a verifier failure stands even when supervision passes.
+    if (execution && roleRoutes.supervisor.length > 0) {
+      try {
+        const supervision = await callRole('supervisor', supervisorPrompt(task, execution, verification, attempt), {
+          schema: VERIFICATION_SCHEMA,
+          label: memberLabel('supervisor'),
+          phase: taskGroupTitle(taskPosition, task.title),
+          attempt: attempt
+        });
+        if (supervision.ok) {
+          const supervised = normalizeVerification(supervision.value);
+          if (!supervised) {
+            verifyError = 'supervisor returned no valid structured result';
+            attemptFailure = { role: 'supervisor', class: 'format-error', reason: verifyError, switchModel: false, setup: false, category: 'infrastructure' };
+          } else {
+            const check = checkVerification(task, execution, supervised);
+            if (!check.passed) {
+              verifyError = redactPromptText(check.reason);
+              attemptFailure = { role: 'supervisor', class: 'verification-failed', reason: verifyError, switchModel: false, setup: false, category: 'quality' };
+            }
+          }
+        } else {
+          attemptFailure = supervision.failure;
+          verifyError = 'supervisor failed on every route: [' + supervision.failure.class + '] ' + supervision.failure.reason;
+        }
+      } catch (error) {
+        verifyError = 'supervisor failed: ' + safeError(error);
+        attemptFailure = classifyCallFailure('supervisor', error);
+      }
+    }
     const passed = Boolean(verification) && verifyError === '';
     const attemptRecord = {
       attempt: attempt,
@@ -2238,6 +2306,7 @@ const report = {
     planner: roleChainLabels('planner'),
     worker: roleChainLabels('worker'),
     verifier: roleChainLabels('verifier'),
+    supervisor: roleChainLabels('supervisor'),
     synthesizer: roleChainLabels('synthesizer')
   },
   synthesis: synthesisReport,
@@ -2321,6 +2390,8 @@ export interface RouteBudget {
   worker: number
   /** Verifier calls per task attempt. */
   verifier: number
+  /** Supervisor calls per task attempt (0 when no supervisor chain is configured). */
+  supervisor: number
   /** Synthesizer calls per run (0 when synthesis is deterministic). */
   synthesizer: number
 }
@@ -2344,6 +2415,9 @@ export function routeBudgetFor(config: ResolvedConfig): RouteBudget {
     planner: Math.max(1, config.roles.planner.length),
     worker: Math.max(1, config.roles.worker.length),
     verifier: Math.max(1, config.roles.verifier.length),
+    // No inherit fallback: an empty supervisor chain means the gate never runs,
+    // so the budget is the raw length (0 when unconfigured).
+    supervisor: config.roles.supervisor.length,
     synthesizer,
   }
 }
@@ -2359,8 +2433,9 @@ export function maxTotalAgentsFor(tasks: number, retries: number, budget?: Route
   const planner = budget?.planner ?? 1
   const worker = budget?.worker ?? 1
   const verifier = budget?.verifier ?? 1
+  const supervisor = budget?.supervisor ?? 1
   const synthesizer = budget?.synthesizer ?? 0
-  return planner + synthesizer + tasks * (retries + 1) * (worker + verifier) + 2
+  return planner + synthesizer + tasks * (retries + 1) * (worker + verifier + supervisor) + 2
 }
 
 /** Stable base label of a run: the GUI card title and the log's run name. */
@@ -2461,12 +2536,12 @@ export function buildWorkflowRequest(
       maxTasks: config.maxTasks,
       maxTotalAgents,
       // t47: the deadline the plugin will enforce, so the run report can name it.
-      timeoutMs: config.timeoutMs,
+      timeoutMs: FIXED_TIMEOUT_MS,
       roles: config.roles,
       // The policy travels verbatim: "layered" is the third runtime value of the
       // layered policy, and the script maps it onto synthesis.mode itself.
       synthesis: config.synthesis,
-      switchOn: config.switchOn,
+      switchOn: [...FIXED_SWITCH_ON],
       naming: { language: namingLanguage },
       // Cross-round carry-over (v0.5): the earlier rounds of this session, already
       // compiled and bounded by src/carryover.ts. Omitted entirely when there is
@@ -2478,12 +2553,10 @@ export function buildWorkflowRequest(
       // empty, so a solitary run stays byte-identical to before (the budget
       // ignores it: a hint never adds a call).
       ...busyValue.length === 0 ? {} : { busyRoutes: busyValue },
-      // Output switches (human-first defaults). Carried only when the resolved
-      // config deviates from `DEFAULT_HUMAN_SUMMARY` / `DEFAULT_SHOW_DIAGNOSTICS`,
-      // so an unset configuration produces the byte-identical payload every
-      // pre-switch caller sent, and the script's own defaults apply.
-      ...config.humanSummary === DEFAULT_HUMAN_SUMMARY ? {} : { humanSummary: config.humanSummary },
-      ...config.showDiagnostics === DEFAULT_SHOW_DIAGNOSTICS ? {} : { showDiagnostics: config.showDiagnostics },
+      // Output switches are fixed (T4: humanSummary on, showDiagnostics off).
+      // Always carried so the script never depends on its own defaults.
+      humanSummary: FIXED_HUMAN_SUMMARY,
+      showDiagnostics: FIXED_SHOW_DIAGNOSTICS,
     },
     maxTotalAgents,
   }

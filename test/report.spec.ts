@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { resolveConfig } from '../src/config.js'
+import { FIXED_TIMEOUT_MS, resolveConfig } from '../src/config.js'
 import { assertWorkflowReport, failureReport, renderReport } from '../src/report.js'
 import { maxTotalAgentsFor, routeBudgetFor } from '../src/script.js'
 
-const config = resolveConfig({ maxConcurrency: 2, maxRetries: 1, maxTasks: 6 })
+const config = resolveConfig({ maxConcurrency: 2, maxTasks: 6 })
 const OBJECTIVE = 'Ship the verified result'
 
 interface ReportTask {
@@ -559,10 +559,10 @@ describe('workflow report semantic contract', () => {
       .toThrow(/outside the allowed range/)
     expect(() => assertWorkflowReport(report({ maxTotalAgents: 99 }), OBJECTIVE, config))
       .toThrow(/outside the allowed range/)
-    const atMinimum = report({ maxTotalAgents: maxTotalAgentsFor(1, 1) })
-    const atMaximum = report({ maxTotalAgents: maxTotalAgentsFor(6, 1) })
-    expect(assertWorkflowReport(atMinimum, OBJECTIVE, config).limits.maxTotalAgents).toBe(maxTotalAgentsFor(1, 1))
-    expect(assertWorkflowReport(atMaximum, OBJECTIVE, config).limits.maxTotalAgents).toBe(maxTotalAgentsFor(6, 1))
+    const atMinimum = report({ maxTotalAgents: maxTotalAgentsFor(1, 1, routeBudgetFor(config)) })
+    const atMaximum = report({ maxTotalAgents: maxTotalAgentsFor(6, 1, routeBudgetFor(config)) })
+    expect(assertWorkflowReport(atMinimum, OBJECTIVE, config).limits.maxTotalAgents).toBe(maxTotalAgentsFor(1, 1, routeBudgetFor(config)))
+    expect(assertWorkflowReport(atMaximum, OBJECTIVE, config).limits.maxTotalAgents).toBe(maxTotalAgentsFor(6, 1, routeBudgetFor(config)))
   })
 
   it('rejects a partial report that does not account for its failed task', () => {
@@ -641,7 +641,7 @@ describe('t47: the report states its routes and its deadline', () => {
   const diag = { showDiagnostics: true }
 
   it('keeps the ledger out of the default view (B plan)', () => {
-    const text = renderReport(assertWorkflowReport(report({ timeoutMs: config.timeoutMs }), OBJECTIVE, config))
+    const text = renderReport(assertWorkflowReport(report({ timeoutMs: FIXED_TIMEOUT_MS }), OBJECTIVE, config))
     expect(text).not.toContain('Model routes:')
     expect(text).not.toContain('Deadline:')
     // The reader-facing parts stay: they are the report, not the ledger.
@@ -651,7 +651,7 @@ describe('t47: the report states its routes and its deadline', () => {
 
   it('prints Model routes with "inherit" when no chain was configured', () => {
     const text = renderReport(assertWorkflowReport(report(), OBJECTIVE, config), diag)
-    expect(text).toContain('Model routes: planner=inherit; worker=inherit; verifier=inherit; synthesizer=inherit')
+    expect(text).toContain('Model routes: planner=inherit; worker=inherit; verifier=inherit; supervisor=inherit; synthesizer=inherit')
   })
 
   it('prints the configured chains, in chain order, when they exist', () => {
@@ -669,13 +669,13 @@ describe('t47: the report states its routes and its deadline', () => {
   })
 
   it('carries the deadline the run actually ran under', () => {
-    const accepted = assertWorkflowReport(report({ timeoutMs: config.timeoutMs }), OBJECTIVE, config)
-    expect(accepted.limits.timeoutMs).toBe(config.timeoutMs)
-    expect(renderReport(accepted, diag)).toContain(`Deadline: ${config.timeoutMs} ms per run`)
+    const accepted = assertWorkflowReport(report({ timeoutMs: FIXED_TIMEOUT_MS }), OBJECTIVE, config)
+    expect(accepted.limits.timeoutMs).toBe(FIXED_TIMEOUT_MS)
+    expect(renderReport(accepted, diag)).toContain(`Deadline: ${FIXED_TIMEOUT_MS} ms per run`)
   })
 
   it('rejects a result that ran under a different deadline than the plugin enforces', () => {
-    expect(() => assertWorkflowReport(report({ timeoutMs: config.timeoutMs + 1_000 }), OBJECTIVE, config))
+    expect(() => assertWorkflowReport(report({ timeoutMs: FIXED_TIMEOUT_MS + 1_000 }), OBJECTIVE, config))
       .toThrow(/deadline/)
   })
 
@@ -686,7 +686,7 @@ describe('t47: the report states its routes and its deadline', () => {
     // all-empty default made "no chain" and "chain unknown here" look the same (t46).
     expect(text).toContain('worker=bifrost-completions/wb/cn:deepseek-v4.1-flash')
     expect(text).toContain('planner=inherit')
-    expect(text).toContain(`Deadline: ${configured.timeoutMs} ms per run`)
+    expect(text).toContain(`Deadline: ${FIXED_TIMEOUT_MS} ms per run`)
   })
 
   it('accepts a legacy result that does not mention a deadline', () => {
@@ -708,7 +708,6 @@ describe('t47: a route switch is visible in the report', () => {
     // two-route worker chain — which is also what makes the switch reachable.
     const twoRoutes = resolveConfig({
       maxConcurrency: 2,
-      maxRetries: 1,
       maxTasks: 6,
       roles: {
         worker: [

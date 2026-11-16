@@ -65,9 +65,9 @@ function reportFixture(overrides: {
     errors: [],
     uncertainties: (overrides.uncertainties ?? []) as never,
     routes: [],
-    routing: { planner: [], worker: [], verifier: [], synthesizer: [] },
+    routing: { planner: [], worker: [], verifier: [], supervisor: [], synthesizer: [] },
     synthesis: overrides.summary === undefined ? { mode: 'deterministic' } : { mode: 'deterministic', summary: overrides.summary },
-    limits: { maxConcurrency: 2, maxRetries: 1, maxTasks: 6, maxTotalAgents: 10 },
+    limits: { maxConcurrency: 2, maxTasks: 6, maxTotalAgents: 10 },
   } as unknown as WorkflowReport
 }
 
@@ -372,7 +372,7 @@ describe('carry-over: the real prompt path', () => {
 })
 
 describe('carry-over: the request payload', () => {
-  const config = resolveConfig({ maxConcurrency: 2, maxRetries: 1, maxTasks: 3 })
+  const config = resolveConfig({ maxConcurrency: 2, maxTasks: 3 })
 
   it('ships the digest in args when there is one', () => {
     const request = buildWorkflowRequest('objective', undefined, config, 'en', 'PRIOR ROUNDS IN THIS SESSION: …')

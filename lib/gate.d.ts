@@ -210,11 +210,9 @@ export declare function classifyPreStep(deps: Pick<GateDeps, 'config' | 'readCon
  *
  * @param reason - Optional measured reason; empty when there is none to state.
  * @param report - Report the run produced before it was stopped, when there is one.
- * @param opts - `showDiagnostics` / `humanSummary` switches and the user's language.
+ * @param opts - the user's language (T4: human block always on, diagnostics always off).
  */
 export declare function cancelledText(reason: string, report?: WorkflowReport, opts?: {
-    showDiagnostics?: boolean;
-    humanSummary?: boolean;
     lang?: TriageLang;
 }): string;
 /**
@@ -229,10 +227,13 @@ export declare function cancelledText(reason: string, report?: WorkflowReport, o
  * Deterministic on purpose: no model call, so engine call counts and the one-shot
  * budget are unchanged.
  *
+ * T4: the human block is always on — `enabled` stays as a parameter so existing
+ * callers keep compiling, but it is ignored.
+ *
  * @param report - validated report.
  * @param lang - language of the user's request; picks which block leads.
- * @param enabled - the `humanSummary` switch; off means no head at all.
- * @returns the head block, or undefined when the switch is off.
+ * @param enabled - ignored (always on).
+ * @returns the head block.
  */
 export declare function humanHead(report: WorkflowReport, lang: TriageLang, enabled: boolean): string | undefined;
 /** Install the gate; returns false when the runtime cannot host `agent/pre-step`. */

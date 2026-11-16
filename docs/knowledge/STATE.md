@@ -1,6 +1,17 @@
 # Project State
 
-Last updated: 2026-11-15 (**v0.9.2 已发布** — `tag v0.9.2` → `5eb4942`，`origin/main` = `98f26a8`，
+Last updated: 2026-11-17 (**设置页瘦身 + supervisor 第五角色，未提交** —
+基线 `main` = `ae0c6d3`（v0.9.4）。工作树 50+ 文件；`npm run typecheck` 0 错、
+`npx vitest run` **51 文件 / 951 测试全 PASS**、`npm run build` 成功且
+`cmp src/client/index.js lib/client.js` 一致（191404 B）。
+内容 = T1/T2/T3/T6 supervisor 贯通（五角色、预算 600、上限 100/默认 10）+
+T4 删 24 键（CONFIG_KEYS 8 键、REMOVED 24 键、FIXED 写死、门控恒开、in-turn 恒定、
+humanSummary 恒 true、markdown 直出）+ T5 设置页重写（4 标量 + 5 角色链、
+无 hint/Danger/只读区、client 72 例绿）。CHANGELOG `[Unreleased]` 有 Added +
+Changed 双语条目。**未提交 / 未 push / 未打 tag / 未发版**，等用户验收真机后再定。
+`settings-simple-mock.html`（用户定稿 mock）未跟踪，不入库。
+
+Previous update: 2026-11-15 (**v0.9.2 已发布** — `tag v0.9.2` → `5eb4942`，`origin/main` = `98f26a8`，
 GitHub Release 已建（`dsh-grok-workflow-0.9.2.tgz` 464,763 B）。CI `43698707930`（Node 22+24）绿、
 Release `43698836519` 绿；旧 tag 复核未动。发文细节与边界见文末
 「2026-11-15 — v0.9.2 已发布：push / CI / tag / Release / Issue #1 闭环」。)
@@ -1006,3 +1017,23 @@ worker 链上限 50（HARD_LIMITS.chainLength）
   （951 + 补交 3 例：补交成功 verified 且 attempts=1/resubmitted 真；补交再缺记 format-error；
   传输失败不补交）。真机复验 `NOT_RUN`（逻辑纯单测覆盖 + 模板文本变更；发版前建议走一次 acgtest）。
 - **没做**：B（失败行分类显示）用户没点，`NOT_RUN`；push/tag/Release（等用户指令）。
+
+## 2026-11-17 — T4 测试迁移完成（未提交；全量 vitest 51/951 绿 + typecheck 干净）
+
+- **From:** agent-5 (lead T4) · **Base:** `ae0c6d3`（v0.9.4），worktree 延续 T1/T2/T6 未提交改动。
+- **做了什么（`CONFIRMED`）**：T4 schema 瘦身后的测试套件迁移。src 侧 T4 改动（8 键 schema、
+  24 键 unknown-key 拒载、FIXED_* 固定值、in-turn 唯一投递、hybrid/append/relay 删除）已由
+  同 worktree 协作完成；本轮修复测试侧 ~60 处语义漂移：
+  - 恢复被批量 strip 误删的 `carryoverBounds({historyTurns, historyChars})`、
+    `routeBudgetFor(config)` 预算窗（T6 修复）、report wire `maxRetries`、
+    `engine-harness` 超时透传；
+  - `checkpoint-schema/wiring` 按 T6 数值（并发默认 10/上限 100、重试 1/3）重写过期期望；
+  - `human-output/delivery/gate/phase1` 按固定输出重写（human 恒开、ledger 恒折叠、
+    in-turn enter 断言）；`plugin-lifecycle`/`phase1` deadline 测试改 fake timer
+   （`FIXED_TIMEOUT_MS` 60min 不可实等）；`triage.spec` route helper 按 in-turn 改写
+    （entered 首答 + background followup 拼接；首答 markers 非终局判据用 ledger 行区分）；
+  - `settings.ts` `distinctive` 键 `switchOn`→`synthesis`（删键后 value 匹配失效的根因）。
+- **验证**：`npx tsc -p tsconfig.json --noEmit` 0 错；`npx vitest run` **51 文件 / 951 测试全绿**
+  （20.4s，串行跑；并行跑曾因 CPU 争用出现 flake，单跑即绿）。
+  注意全量 951（vs 之前 954）是 sibling 改写增删用例后的净数，非回归。
+- **没做**：commit/push（等 lead 指令）；`lib/` 构建产物未重编；真机 live 验证 `NOT_RUN`。

@@ -99,7 +99,7 @@ function runInput(): CheckpointInput {
       { taskId: 'task-1', criterion: 'restore is fail closed', claim: 'refusal produces no plan', locator: 'src/resume/policy.ts' },
     ],
     time: { startedAtMs: NOW - 5_000, updatedAtMs: NOW },
-    limits: { maxConcurrency: 2, maxRetries: 1, maxTasks: 2, timeoutMs: 600_000 },
+    limits: { maxConcurrency: 2, maxTasks: 2},
     watchdog: { deadlineHit: false, cancelled: false, deadlineMs: 600_000 },
   }
 }

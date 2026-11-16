@@ -54,7 +54,7 @@ function harness(answer: (call: ChildCall) => ChildAnswer | Promise<ChildAnswer>
 }
 
 function config(overrides: Record<string, unknown> = {}) {
-  return resolveConfig({ maxConcurrency: 1, maxRetries: 0, maxTasks: 6, timeoutMs: 60_000, ...overrides })
+  return resolveConfig({ maxConcurrency: 1, maxTasks: 6, ...overrides })
 }
 
 function taskFixture(id: string): NormalizedTask {
@@ -161,9 +161,11 @@ describe('the panel is closed with the task-level result', () => {
     expect(outcome.report.tasks[0]!.status).toBe('failed')
 
     const events = progressEvents(session)
-    // Both calls ended (`agent-end: completed`) …
+    // T4: maxRetries is fixed at 1, so a verifier rejection retries once:
+    // 2 attempts x (worker + verifier) = 4 ended calls.
     expect(events.filter(event => event.type === PROGRESS_AGENT_END).map(event => event.data.outcome))
-      .toEqual(['completed', 'completed'])
+      .toEqual(['completed', 'completed', 'completed', 'completed'])
+    expect(outcome.report.tasks[0]!.attempts).toHaveLength(2)
     // … and the node is closed as a failure, not as a pass.
     expect(events.at(-1)).toMatchObject({ type: PROGRESS_RUN_END, data: { stopReason: 'error' } })
 
@@ -177,7 +179,8 @@ describe('the panel is closed with the task-level result', () => {
     expect(panel?.run).toBe('failed')
     expect(panel?.statusText).toBe(NAMING_COPY.zh.runStates.failed)
     // Every row words the call, and the task wording is the task's own.
-    expect(panel?.groups[0]?.rows.map(row => row.text)).toEqual(['执行代理已结束', '检查调用已结束'])
+    // T4 fixed retry (maxRetries=1): the failed first attempt plus its retry.
+    expect(panel?.groups[0]?.rows.map(row => row.text)).toEqual(['执行代理已结束', '检查调用已结束', '执行代理已结束', '检查调用已结束'])
     expect(panel?.groups[0]?.verdict).toEqual({ status: 'failed', text: '任务未通过' })
     const rendered = JSON.stringify(panel)
     for (const forbidden of ['任务已完成', '检查通过', '已完成', '任务通过']) {
@@ -341,7 +344,7 @@ describe('a verification failure retries into a second attempt', () => {
     const session = Session.create('sess-panel-retry' as never)
     const outcome = await runWorkflow({
       ctx: engine.ctx as never,
-      config: config({ maxRetries: 1 }),
+      config: config(),
       state: createActiveState(),
       logger,
       agent: { session } as never,

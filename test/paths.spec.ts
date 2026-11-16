@@ -101,7 +101,7 @@ describe('declaration parsing', () => {
 
 /* --------------------------------------------------------------- scheduling -- */
 
-const config = (overrides: Record<string, unknown> = {}) => resolveConfig({ maxConcurrency: 3, maxRetries: 0, maxTasks: 6, ...overrides })
+const config = (overrides: Record<string, unknown> = {}) => resolveConfig({ maxConcurrency: 3, maxTasks: 6, ...overrides })
 
 interface Span { id: string; start: number; end: number }
 

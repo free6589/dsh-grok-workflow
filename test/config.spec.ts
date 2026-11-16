@@ -4,8 +4,9 @@ import {
   CONFIG_VERSION,
   Config,
   DEFAULT_MAX_CONCURRENCY,
-  DEFAULT_MAX_RETRIES,
+  FIXED_MAX_RETRIES,
   HARD_LIMITS,
+  REMOVED_CONFIG_KEYS,
   describeResolvedConfig,
   resolveConfig,
   snapshotConfig,
@@ -47,8 +48,22 @@ function configWith(overrides: Record<string, unknown> = {}): ResolvedConfig {
 
 describe('configuration surface', () => {
   it('refuses an unknown key instead of silently dropping it', () => {
-    expect(() => resolveConfig({ maxRetires: 2 } as never)).toThrow(/unknown configuration key "maxRetires".*did you mean "maxRetries"/)
+    expect(() => resolveConfig({ maxRetires: 2 } as never)).toThrow(/unknown configuration key "maxRetires"/)
     for (const key of CONFIG_KEYS) expect(() => resolveConfig({ [key]: undefined } as never)).not.toThrow()
+  })
+
+  it('rejects every T4-removed key as unknown (R-06), with the migration named', () => {
+    // The T4 slim-down keeps exactly 8 keys; the other 24 are unknown now.
+    expect(CONFIG_KEYS).toEqual([
+      'toolName', 'mode', 'grokDefault', 'roles', 'synthesis',
+      'maxConcurrency', 'maxTasks', 'configVersion',
+    ])
+    expect(REMOVED_CONFIG_KEYS).toHaveLength(24)
+    for (const key of REMOVED_CONFIG_KEYS) {
+      expect(() => resolveConfig({ [key]: 1 } as never)).toThrow(/unknown configuration key/)
+    }
+    // Spot checks: the typo suggestion still works for surviving keys.
+    expect(() => resolveConfig({ maxConcurreny: 2 } as never)).toThrow(/did you mean "maxConcurrency"/)
   })
 
   it('refuses a configuration written for a newer version', () => {
@@ -65,7 +80,7 @@ describe('configuration surface', () => {
   it('treats an empty chain as inherit rather than an error', () => {
     const config = resolveConfig({ roles: { planner: [], worker: [], verifier: [], synthesizer: [] } } as never)
     expect(config.roles.worker).toEqual([])
-    expect(config.synthesis).toBe('deterministic')
+    expect(config.synthesis).toBe('layered')
   })
 
   it('refuses a model repeated inside one chain', () => {
@@ -81,18 +96,10 @@ describe('configuration surface', () => {
       .toThrow(/maximum chain length is 50/)
   })
 
-  it('refuses a switching policy naming a class that can never switch', () => {
-    expect(() => resolveConfig({ switchOn: ['verification-failed'] } as never))
-      .toThrow(/not a switchable failure class.*content and setup failures never switch/)
-    expect(resolveConfig({ switchOn: ['timeout', 'timeout'] } as never).switchOn).toEqual(['timeout'])
-    expect(resolveConfig({} as never).switchOn).toEqual([])
-  })
-
-  it('carries the run-record switches, bounded by the hard limit', () => {
-    expect(resolveConfig({} as never)).toMatchObject({ recordRuns: true, recordLimit: 64, configVersion: CONFIG_VERSION })
-    expect(resolveConfig({ recordRuns: false, recordLimit: 0 } as never)).toMatchObject({ recordRuns: false, recordLimit: 0 })
-    expect(() => resolveConfig({ recordLimit: HARD_LIMITS.recordEntries + 1 } as never))
-      .toThrow(/recordLimit must be an integer between 0 and 256/)
+  it('refuses a removed switching policy key as unknown (R-06)', () => {
+    // T4: `switchOn` is fixed to the built-in policy (empty); a stored value is unknown.
+    expect(() => resolveConfig({ switchOn: ['timeout'] } as never))
+      .toThrow(/unknown configuration key "switchOn"/)
   })
 
   it('fills every documented default through the schema', () => {
@@ -100,18 +107,21 @@ describe('configuration surface', () => {
     // that turns them back into plain values (that is what the plugin reads).
     const defaults = snapshotConfig(Config({}) as Record<string, unknown>) as Record<string, unknown>
     expect(defaults).toMatchObject({
-      enforceGate: true,
-      answerStrategy: 'in-turn',
       maxConcurrency: DEFAULT_MAX_CONCURRENCY,
-      maxRetries: DEFAULT_MAX_RETRIES,
-      maxTasks: 12,
-      maxActiveRuns: 2,
-      switchOn: [],
-      recordRuns: true,
-      recordLimit: 64,
+      maxTasks: 10,
+      synthesis: 'layered',
+      mode: 'triage',
       grokDefault: 'off',
       configVersion: CONFIG_VERSION,
     })
+  })
+
+  it('fixes the removed retry count at 1 and the synthesis default at layered', () => {
+    expect(resolveConfig({} as never).maxRetries).toBe(FIXED_MAX_RETRIES)
+    expect(FIXED_MAX_RETRIES).toBe(1)
+    expect(resolveConfig({} as never).synthesis).toBe('layered')
+    expect(() => resolveConfig({ synthesis: 'deterministic' } as never))
+      .toThrow(/synthesis must be "model" or "layered"/)
   })
 
   it('gates the workflow behind the per-session grok-mode default, off by default', () => {
@@ -194,13 +204,10 @@ describe('route validation against the runtime', () => {
     expect(Object.keys(descriptor.schema as Record<string, unknown>).sort()).toEqual(['refs', 'uid'])
     const projected = Object.keys(descriptor.value).sort()
     expect(projected).not.toContain('toolName')   // not volatile => not projected
-    expect(projected).toContain('roles')
-    expect(projected).toContain('switchOn')
-    expect(projected).toContain('maxActiveRunsTotal')
-    expect(projected).toContain('triageClassifier')
-    expect(projected).toContain('humanSummary')
-    expect(projected).toContain('showDiagnostics')
-    expect(projected).toHaveLength(28)
+    expect(projected).not.toContain('configVersion')   // not volatile => not projected
+    // T4: the page is the 6 volatile survivors (toolName/configVersion are structural).
+    expect(projected).toEqual(['grokDefault', 'maxConcurrency', 'maxTasks', 'mode', 'roles', 'synthesis'])
+    expect(projected).toHaveLength(6)
     const ctx = ctxWith({
       settings: { configure: () => () => {}, describe: () => [descriptor] },
     })
@@ -248,33 +255,31 @@ describe('route validation against the runtime', () => {
       `Math.min(${HARD_LIMITS.maxConcurrency}, argNumber(args ? args.maxConcurrency : undefined, ${DEFAULT_MAX_CONCURRENCY}))`,
     )
     expect(WORKFLOW_SCRIPT).toContain(
-      `Math.min(${HARD_LIMITS.maxRetries}, argNumber(args ? args.maxRetries : undefined, ${DEFAULT_MAX_RETRIES}))`,
+      `Math.min(${HARD_LIMITS.maxRetries}, argNumber(args ? args.maxRetries : undefined, ${FIXED_MAX_RETRIES}))`,
     )
-    expect(WORKFLOW_SCRIPT).toContain(`Math.min(${HARD_LIMITS.maxTasks}, argNumber(args ? args.maxTasks : undefined, 12))`)
+    expect(WORKFLOW_SCRIPT).toContain(`Math.min(${HARD_LIMITS.maxTasks}, argNumber(args ? args.maxTasks : undefined, 10))`)
     expect(WORKFLOW_SCRIPT).toContain(`chainLength: ${HARD_LIMITS.chainLength},`)
     expect(WORKFLOW_SCRIPT).toContain(`routeInFlightMax: ${HARD_LIMITS.routeInFlight.max}`)
   })
 
-  it('pins the documented run limits: default 3/1, hard maximum 6/3', () => {
+  it('pins the documented run limits: default 10/1, hard maximum 100/3', () => {
     // The engine-hook contract (AGENTS.md, D-003) has one source. The config
     // schema, the checkpoint contract (ENGINE_HOOK_LIMITS in
     // src/checkpoint/schema.ts, which imports these constants) and the script
     // clamps all read it from here.
-    expect(HARD_LIMITS.maxConcurrency).toBe(6)
-    expect(HARD_LIMITS.maxRetries).toBe(3)
-    expect(DEFAULT_MAX_CONCURRENCY).toBe(3)
-    expect(DEFAULT_MAX_RETRIES).toBe(1)
-    expect(resolveConfig({} as never)).toMatchObject({ maxConcurrency: 3, maxRetries: 1 })
+    expect(HARD_LIMITS.maxConcurrency).toBe(100)
+    expect(FIXED_MAX_RETRIES).toBe(1)
+    expect(DEFAULT_MAX_CONCURRENCY).toBe(10)
+    expect(resolveConfig({} as never)).toMatchObject({ maxConcurrency: 10, maxRetries: 1 })
     expect(() => resolveConfig({ maxConcurrency: HARD_LIMITS.maxConcurrency + 1 } as never)).toThrow(/maxConcurrency/)
-    expect(() => resolveConfig({ maxRetries: HARD_LIMITS.maxRetries + 1 } as never)).toThrow(/maxRetries/)
-    expect(resolveConfig({ maxConcurrency: 6, maxRetries: 3 } as never)).toMatchObject({ maxConcurrency: 6, maxRetries: 3 })
+    expect(resolveConfig({ maxConcurrency: 100 } as never)).toMatchObject({ maxConcurrency: 100, maxRetries: 1 })
   })
 
   it('applies the documented defaults inside the script, without swallowing an explicit 0', async () => {
     // The script is the last place a missing number can be defaulted, so it has to
-    // default to the same 3/1 the host does — while an explicitly configured
-    // `maxRetries: 0` stays 0 (a task that must not be retried), which the old
-    // `Number(x) || 0` idiom happened to get right and a naive `|| 1` would not.
+    // default to the same 10/1 the host does — while an explicitly provided
+    // `maxRetries: 0` stays 0, which the old `Number(x) || 0` idiom happened to
+    // get right and a naive `|| 1` would not.
     const agent: ScriptAgent = async (_prompt, options) => {
       if (roleOf(options.label) === 'worker') return execution('did it')
       return verification(task('a'))
@@ -282,16 +287,16 @@ describe('route validation against the runtime', () => {
     const { args } = buildWorkflowRequest(
       'Ship the verified result',
       [task('a')],
-      resolveConfig({ maxConcurrency: 1, maxRetries: 0, maxTasks: 4 }),
+      resolveConfig({ maxConcurrency: 1, maxTasks: 4 }),
     )
     const withoutLimits = { ...args } as Record<string, unknown>
     delete withoutLimits['maxConcurrency']
     delete withoutLimits['maxRetries']
     const defaulted = await runWorkflowScript(WORKFLOW_SCRIPT, withoutLimits, agent)
-    expect(defaulted.report.limits).toMatchObject({ maxConcurrency: 3, maxRetries: 1 })
+    expect(defaulted.report.limits).toMatchObject({ maxConcurrency: 10, maxRetries: 1 })
 
     const explicitZero = await runWorkflowScript(WORKFLOW_SCRIPT, { ...args }, agent)
-    expect(explicitZero.report.limits).toMatchObject({ maxConcurrency: 1, maxRetries: 0 })
+    expect(explicitZero.report.limits).toMatchObject({ maxConcurrency: 1, maxRetries: 1 })
   })
 
   it('degrades quietly on a runtime without a settings service', () => {
@@ -302,25 +307,24 @@ describe('route validation against the runtime', () => {
 })
 
 describe('configuration reaches the run', () => {
-  it('applies the configured switching policy to the fallback chain', async () => {
+  it('uses the built-in switching policy (T4: switchOn removed, always built-in)', async () => {
     const agent: ScriptAgent = async (_prompt, options) => {
       if (roleOf(options.label) === 'worker') throw Object.assign(new Error('429 Too Many Requests'), { code: 'AGENT_RESULT' })
       return verification(task('a'))
     }
-    const build = (switchOn: string[]) => {
+    const build = () => {
       const config = resolveConfig({
         maxConcurrency: 1,
-        maxRetries: 0,
         maxTasks: 4,
         roles: { worker: [{ model: 'w1' }, { model: 'w2' }] },
-        switchOn: switchOn as never,
       })
-      return { args: { ...buildWorkflowRequest('Ship the verified result', [task('a')], config).args }, config }
+      return { args: buildWorkflowRequest('Ship the verified result', [task('a')], config).args, config }
     }
-    // Built-in policy: a rate limit advances the chain (both routes tried).
-    const builtIn = build([])
+    // Built-in policy: a rate limit advances the chain (both routes tried per
+    // attempt; maxRetries 1 => 2 attempts => 4 worker calls).
+    const builtIn = build()
     const a = await runWorkflowScript(WORKFLOW_SCRIPT, builtIn.args, agent)
-    expect(a.calls.filter(call => roleOf(call.label) === 'worker')).toHaveLength(2)
+    expect(a.calls.filter(call => roleOf(call.label) === 'worker')).toHaveLength(4)
     expect(a.report.status).toBe('failed')
     // t47: the switch is only *visible* if the trail records which route failed.
     // t46 wrote a model the provider does not enumerate and saw no switch entry —
@@ -329,23 +333,19 @@ describe('configuration reaches the run', () => {
     // that has to reach the ledger.
     const failed = (a.report.routes as { role: string; route: string; outcome: string; failureClass?: string }[])
       .filter(entry => entry.outcome === 'failed')
-    // Both routes were tried (this agent fails every worker call), so the trail
-    // names both in chain order: that is what makes a switch auditable.
-    expect(failed.map(entry => entry.route)).toEqual(['w1', 'w2'])
+    // Both routes were tried (this agent fails every worker call), and the fixed
+    // single retry runs the chain a second time — so the trail names both routes
+    // in chain order, twice: that is what makes a switch auditable.
+    expect(failed.map(entry => entry.route)).toEqual(['w1', 'w2', 'w1', 'w2'])
     expect(failed.every(entry => entry.role === 'worker')).toBe(true)
     expect(failed[0]?.failureClass).toBe('rate-limit')
-    // Configured policy that omits rate-limit: the same failure does NOT advance.
-    const narrowed = build(['server-error'])
-    const b = await runWorkflowScript(WORKFLOW_SCRIPT, narrowed.args, agent)
-    expect(b.calls.filter(call => roleOf(call.label) === 'worker')).toHaveLength(1)
-    expect(b.report.tasks[0]?.attempts[0]?.failure?.class).toBe('rate-limit')
   })
 
   it('budgets an empty plan exactly like a missing one (t27/F3)', () => {
     // The script falls back to a planner and then runs at least one task, so a
     // budget computed for zero tasks produces a limit the validated report can
     // exceed — a rejection that would cost every task's evidence.
-    const config = resolveConfig({ maxTasks: 6, maxRetries: 0, roles: { worker: [{ model: 'w1' }, { model: 'w2' }] } } as never)
+    const config = resolveConfig({ maxTasks: 6, roles: { worker: [{ model: 'w1' }, { model: 'w2' }] } } as never)
     const withEmpty = buildWorkflowRequest('Ship the verified result', [], config)
     const withNone = buildWorkflowRequest('Ship the verified result', undefined, config)
     expect(withEmpty.maxTotalAgents).toBe(withNone.maxTotalAgents)
@@ -356,7 +356,7 @@ describe('configuration reaches the run', () => {
   it('bounds the run ledger by recordLimit and writes nothing at 0', () => {
     const entry = {
       objective: 'ship it',
-      routing: { planner: [], worker: ['p/first', 'p/second'], verifier: [], synthesizer: [] } as never,
+      routing: { planner: [], worker: ['p/first', 'p/second'], verifier: [], supervisor: [], synthesizer: [] } as never,
       synthesis: 'deterministic' as const,
       routes: [
         { role: 'worker' as const, chainIndex: 0, route: 'p/first', attempt: 1, outcome: 'failed' as const, failureClass: 'server-error' as const, reason: 'boom' },
@@ -388,7 +388,8 @@ describe('t47: the effective configuration is nameable', () => {
   it('names the deadline and every role chain, with "inherit" for an unset role', () => {
     const described = describeResolvedConfig(resolveConfig({}))
     expect(described).toContain(`timeoutMs=${3_600_000}`)
-    expect(described).toContain('roles=planner:inherit worker:inherit verifier:inherit synthesizer:inherit')
+    expect(described).toContain('gate=on')
+    expect(described).toContain('roles=planner:inherit worker:inherit verifier:inherit synthesizer:inherit supervisor:inherit')
   })
 
   it('shows the chains in order, so a fallback is visible without a run', () => {
@@ -405,9 +406,10 @@ describe('t47: the effective configuration is nameable', () => {
   })
 
   it('travels into the workflow request, so the report can state the deadline', () => {
-    const config = resolveConfig({ timeoutMs: 60_000, maxConcurrency: 1 })
+    const config = resolveConfig({ maxConcurrency: 1 })
     const request = buildWorkflowRequest('Ship the verified result', [task('a')], config)
-    expect((request.args as { timeoutMs: number }).timeoutMs).toBe(60_000)
+    // T4: the deadline is fixed, not configurable.
+    expect((request.args as { timeoutMs: number }).timeoutMs).toBe(3_600_000)
   })
 })
 
@@ -425,7 +427,7 @@ describe('t47: the effective configuration is nameable', () => {
  */
 describe('t49: a non-blocking verifier note does not fail a verified task', () => {
   it('keeps the task verified and carries the notes into the report', async () => {
-    const config = resolveConfig({ maxConcurrency: 1, maxRetries: 0, maxTasks: 4 })
+    const config = resolveConfig({ maxConcurrency: 1, maxTasks: 4 })
     const plan = [task('a')]
     const agent: ScriptAgent = async (_prompt, options) => {
       if (roleOf(options.label) === 'worker') return execution('did it')
@@ -453,7 +455,7 @@ describe('t49: a non-blocking verifier note does not fail a verified task', () =
   })
 
   it('still fails when the same verifier marks a criterion unmet', async () => {
-    const config = resolveConfig({ maxConcurrency: 1, maxRetries: 0, maxTasks: 4 })
+    const config = resolveConfig({ maxConcurrency: 1, maxTasks: 4 })
     const plan = [task('a', ['first holds', 'second holds'])]
     const agent: ScriptAgent = async (_prompt, options) => {
       if (roleOf(options.label) === 'worker') return execution('did it')
@@ -475,7 +477,7 @@ describe('t49: a non-blocking verifier note does not fail a verified task', () =
   })
 
   it('still fails when the verifier verdict is fail, notes or not', async () => {
-    const config = resolveConfig({ maxConcurrency: 1, maxRetries: 0, maxTasks: 4 })
+    const config = resolveConfig({ maxConcurrency: 1, maxTasks: 4 })
     const plan = [task('a')]
     const agent: ScriptAgent = async (_prompt, options) => {
       if (roleOf(options.label) === 'worker') return execution('did it')

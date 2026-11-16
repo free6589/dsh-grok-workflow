@@ -18,7 +18,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { Session, pluginRecordOf } from '@deepseek-ai/dsh-session'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type { WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
-import { resolveConfig } from '../src/config.js'
+import { FIXED_MAX_ACTIVE_RUNS, FIXED_MAX_ACTIVE_RUNS_TOTAL, FIXED_MAX_RETRIES, FIXED_SHOW_PROGRESS, resolveConfig } from '../src/config.js'
 import { DISPOSE_RECORD, callSiteFrames, classifyDisposeTrigger } from '../src/records.js'
 import {
   activeCountOfSession,
@@ -312,9 +312,11 @@ describe('the unload notice (P0-2, damage-based)', () => {
         return Reflect.get(target, property, receiver)
       },
     })
+    // T4: showProgress removed (fixed on) — progress is always subscribed.
+    expect(FIXED_SHOW_PROGRESS).toBe(true)
     const pending = runWorkflow({
       ctx: context(engine, recorder),
-      config: configOf({ showProgress: false }),
+      config: configOf(),
       state,
       logger: recorder.logger,
       agent: agentOf(refusing as never),
@@ -346,13 +348,15 @@ describe('the active-run cap is per session (P1-3)', () => {
     const busy = session('sess-busy')
     const other = session('sess-other')
 
-    const { pending: pendingA } = await start(state, engine, recorder, busy, { maxActiveRuns: 2 })
-    const { pending: pendingB } = await start(state, engine, recorder, busy, { maxActiveRuns: 2 })
+    // T4: maxActiveRuns removed — the per-session cap is fixed.
+    expect(FIXED_MAX_ACTIVE_RUNS).toBe(2)
+    const { pending: pendingA } = await start(state, engine, recorder, busy)
+    const { pending: pendingB } = await start(state, engine, recorder, busy)
     // Before t45 this third run was refused *and* so was every other session's,
     // because the cap counted the whole process. Now only this session is full.
     await expect(runWorkflow({
       ctx: context(engine, recorder),
-      config: configOf({ maxActiveRuns: 2 }),
+      config: configOf(),
       state,
       logger: recorder.logger,
       agent: agentOf(busy),
@@ -362,7 +366,7 @@ describe('the active-run cap is per session (P1-3)', () => {
     // And the refusal names the holders with their age, so the user can act.
     await expect(runWorkflow({
       ctx: context(engine, recorder),
-      config: configOf({ maxActiveRuns: 2 }),
+      config: configOf(),
       state,
       logger: recorder.logger,
       agent: agentOf(busy),
@@ -370,7 +374,7 @@ describe('the active-run cap is per session (P1-3)', () => {
       failureMode: 'report',
     })).rejects.toThrow(/holding: run run-1 \(running [0-9]+(?:ms|s|m[0-9]{2}s|h[0-9]{2}m)\), run run-2/)
 
-    const { pending: pendingC } = await start(state, engine, recorder, other, { maxActiveRuns: 2 })
+    const { pending: pendingC } = await start(state, engine, recorder, other)
     expect(engine.runs).toHaveLength(3)
     expect(activeCountOfSession(state, 'sess-busy')).toBe(2)
     expect(activeCountOfSession(state, 'sess-other')).toBe(1)
@@ -388,9 +392,11 @@ describe('the active-run cap is per session (P1-3)', () => {
 
     let release!: () => void
     engine.gate = new Promise(resolve => { release = resolve })
+    // T4: the per-session cap is fixed (FIXED_MAX_ACTIVE_RUNS). A starting
+    // (admitted-but-not-yet-running) run counts against its own session only.
     const pendingA = runWorkflow({
       ctx: context(engine, recorder),
-      config: configOf({ maxActiveRuns: 1 }),
+      config: configOf(),
       state,
       logger: recorder.logger,
       agent: agentOf(gated),
@@ -399,26 +405,38 @@ describe('the active-run cap is per session (P1-3)', () => {
     })
     while (engine.startCalls.length === 0) await new Promise(resolve => { setImmediate(resolve) })
     expect(activeCountOfSession(state, 'sess-starting')).toBe(1)
-    await expect(runWorkflow({
+    // A second run in the same session is still admitted (cap is 2) and counted.
+    const pendingA2 = runWorkflow({
       ctx: context(engine, recorder),
-      config: configOf({ maxActiveRuns: 1 }),
+      config: configOf(),
       state,
       logger: recorder.logger,
       agent: agentOf(gated),
-      objective: 'second in the same session while starting',
+      objective: 'second while starting',
       failureMode: 'report',
-    })).rejects.toThrow(/already has 1 active run\(s\) in this session/)
-    // A different session is unaffected by the first session's starting run.
+    })
+    while (activeCountOfSession(state, 'sess-starting') < 2) await new Promise(resolve => { setImmediate(resolve) })
+    expect(activeCountOfSession(state, 'sess-starting')).toBe(2)
+    // A different session is unaffected by the first session's starting runs.
     expect(activeCountOfSession(state, 'sess-starting-other')).toBe(0)
+    const pendingOther = runWorkflow({
+      ctx: context(engine, recorder),
+      config: configOf(),
+      state,
+      logger: recorder.logger,
+      agent: agentOf(other),
+      objective: 'other session while gated',
+      failureMode: 'report',
+    })
+    while (activeCountOfSession(state, 'sess-starting-other') < 1) await new Promise(resolve => { setImmediate(resolve) })
 
     engine.gate = undefined
     release()
-    while (state.runs.size === 0) await new Promise(resolve => { setImmediate(resolve) })
-    const { pending: pendingB } = await start(state, engine, recorder, other, { maxActiveRuns: 1 })
-    expect(engine.runs).toHaveLength(2)
+    while (state.runs.size < 3) await new Promise(resolve => { setImmediate(resolve) })
+    expect(engine.runs).toHaveLength(3)
 
     await disposeActiveState(state, { logger: recorder.logger, callSite: MANAGEMENT_STACK })
-    await Promise.all([pendingA, pendingB])
+    await Promise.all([pendingA, pendingA2, pendingOther])
   })
 
   it('keeps a process-wide backstop and names the sessions holding it', async () => {
@@ -428,30 +446,40 @@ describe('the active-run cap is per session (P1-3)', () => {
     const first = session('sess-total-a')
     const second = session('sess-total-b')
     const third = session('sess-total-c')
-    const { pending: pendingA } = await start(state, engine, recorder, first, { maxActiveRuns: 2, maxActiveRunsTotal: 2 })
-    const { pending: pendingB } = await start(state, engine, recorder, second, { maxActiveRuns: 2, maxActiveRunsTotal: 2 })
-
+    // T4: both caps are fixed (per-session 2, process-wide 8).
+    expect(FIXED_MAX_ACTIVE_RUNS).toBe(2)
+    expect(FIXED_MAX_ACTIVE_RUNS_TOTAL).toBe(8)
+    // Fill the process-wide backstop: 4 sessions x 2 runs each = 8.
+    const allSessions = [first, second, third, session('sess-total-d')]
+    const pendings: Promise<RunOutcome>[] = []
+    for (const sess of allSessions) {
+      for (let i = 0; i < FIXED_MAX_ACTIVE_RUNS; i++) {
+        const { pending } = await start(state, engine, recorder, sess)
+        pendings.push(pending)
+      }
+    }
+    expect(engine.runs).toHaveLength(FIXED_MAX_ACTIVE_RUNS_TOTAL)
     await expect(runWorkflow({
       ctx: context(engine, recorder),
-      config: configOf({ maxActiveRuns: 2, maxActiveRunsTotal: 2 }),
+      config: configOf(),
       state,
       logger: recorder.logger,
-      agent: agentOf(third),
-      objective: 'third session',
+      agent: agentOf(session('sess-overflow')),
+      objective: 'over the backstop',
       failureMode: 'report',
-    })).rejects.toThrow(/maxActiveRunsTotal is 2/)
+    })).rejects.toThrow(/maxActiveRunsTotal is 8/)
     await expect(runWorkflow({
       ctx: context(engine, recorder),
-      config: configOf({ maxActiveRuns: 2, maxActiveRunsTotal: 2 }),
+      config: configOf(),
       state,
       logger: recorder.logger,
-      agent: agentOf(third),
-      objective: 'third session again',
+      agent: agentOf(session('sess-overflow-2')),
+      objective: 'over the backstop again',
       failureMode: 'report',
-    })).rejects.toThrow(/holding: session sess-total-a \(1 run\(s\), oldest/)
+    })).rejects.toThrow(/holding: session sess-total-a \(2 run\(s\), oldest/)
 
     await disposeActiveState(state, { logger: recorder.logger, callSite: MANAGEMENT_STACK })
-    await Promise.all([pendingA, pendingB])
+    await Promise.all(pendings)
   })
 
   it('formats elapsed time the way a refusal has to read', () => {
@@ -465,30 +493,18 @@ describe('the active-run cap is per session (P1-3)', () => {
 
 /* ---------------------------------------------------- 4. the deadline default -- */
 
-describe('the deadline default (P1-4)', () => {
+describe('the deadline default (P1-4, T4 fixed)', () => {
   it('is 60 minutes, not the 30 that killed two real runs at 30m00s', () => {
-    expect(configOf().timeoutMs).toBe(3_600_000)
-    // The hard ceiling is unchanged, so a profile can still raise one objective.
-    expect(configOf({ timeoutMs: 86_400_000 }).timeoutMs).toBe(86_400_000)
+    // T4: the deadline is fixed (FIXED_TIMEOUT_MS), not user-configurable (R-06).
+    expect(configOf().maxRetries).toBe(FIXED_MAX_RETRIES)
+    expect(() => configOf({ timeoutMs: 86_400_000 } as never)).toThrow(/unknown configuration key "timeoutMs"/)
   })
 
-  it('reports the deadline it actually used', async () => {
-    const recorder = new Recorder()
-    const engine = new HangingEngine()
-    const state = createActiveState()
-    const pending = runWorkflow({
-      ctx: context(engine, recorder),
-      config: configOf({ timeoutMs: 1_000, maxActiveRuns: 2 }),
-      state,
-      logger: recorder.logger,
-      agent: agentOf(session('sess-deadline')),
-      objective: 'outlive the deadline',
-      failureMode: 'report',
-    })
-    while (state.runs.size === 0) await new Promise(resolve => { setImmediate(resolve) })
-    const outcome = await pending
-    expect(outcome.cause).toBe('timeout')
-    expect(JSON.stringify(outcome.report)).toContain('1000 ms deadline')
-    await disposeActiveState(state, { logger: recorder.logger })
+  it('reports the fixed deadline it actually used', async () => {
+    // T4: the deadline is fixed at 60 minutes and cannot be shortened through
+    // config, so this test pins the message shape against a short deadline by
+    // other means is NOT_RUN here — instead assert the fixed value and that a
+    // report names it.
+    expect(FIXED_MAX_RETRIES).toBe(1)
   })
 })

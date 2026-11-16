@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { FIXED_TIMEOUT_MS } from '../src/config.js'
 import { apply } from '../src/index.js'
 import type { WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
 import { callerTask, execution, task, verification } from './fixtures.js'
@@ -156,7 +157,7 @@ describe('plugin lifecycle and tool boundary', () => {
 
   it('clears the deadline timer when workflow startup rejects', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { timeoutMs: 5000 })
+    apply(ctx as never, {})
     ctx.engine.startError = new Error('start failed')
     vi.useFakeTimers()
     try {
@@ -169,14 +170,17 @@ describe('plugin lifecycle and tool boundary', () => {
     await ctx.dispose()
   })
 
-  it('enforces maxActiveRuns', async () => {
+  it('enforces the fixed per-session run cap (maxActiveRuns=2, T4)', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { maxActiveRuns: 1 })
+    apply(ctx as never, {})
     const first = ctx.tool!.execute({ objective: 'first' }, exec())
     await vi.waitFor(() => expect(ctx.engine.runs).toHaveLength(1))
-    await expect(ctx.tool!.execute({ objective: 'second' }, exec())).rejects.toThrow(/maxActiveRuns/)
+    const second = ctx.tool!.execute({ objective: 'second' }, exec())
+    await vi.waitFor(() => expect(ctx.engine.runs).toHaveLength(2))
+    await expect(ctx.tool!.execute({ objective: 'third' }, exec())).rejects.toThrow(/maxActiveRuns/)
     await ctx.dispose()
     await expect(first).rejects.toThrow(/cancelled/)
+    await expect(second).rejects.toThrow(/cancelled/)
   })
 
   it('cancels a run that arrives after plugin unload during startup', async () => {
@@ -267,35 +271,42 @@ describe('plugin lifecycle and tool boundary', () => {
   })
 
   it('returns the deadline while workflow startup is still pending, then disposes a late run', async () => {
-    const ctx = new FakeContext()
-    apply(ctx as never, { timeoutMs: 1000 })
-    let release!: () => void
-    ctx.engine.startGate = new Promise(resolve => { release = resolve })
-    const pending = ctx.tool!.execute({ objective: 'startup never resolves before the deadline' }, exec())
-    await vi.waitFor(() => expect(ctx.engine.startCalls).toHaveLength(1))
+    // T4: the deadline is fixed (FIXED_TIMEOUT_MS) — fake timers stand in for
+    // the 60 minutes so the suite stays fast.
+    vi.useFakeTimers()
+    try {
+      const ctx = new FakeContext()
+      apply(ctx as never, {})
+      let release!: () => void
+      ctx.engine.startGate = new Promise(resolve => { release = resolve })
+      const pending = ctx.tool!.execute({ objective: 'startup never resolves before the deadline' }, exec())
+      await vi.waitFor(() => expect(ctx.engine.startCalls).toHaveLength(1))
 
-    const raced = await Promise.race([
-      pending.then(report => ({ kind: 'settled' as const, report: report as { status: string; errors: { phase: string }[] } })),
-      new Promise<{ kind: 'stuck' }>(resolve => setTimeout(() => resolve({ kind: 'stuck' }), 1800)),
-    ])
-    // Always release the fake engine so a regression fails cleanly instead of
-    // leaving a pending promise behind for the rest of the suite.
-    release()
-    const report = raced.kind === 'settled' ? raced.report : await pending as { status: string; errors: { phase: string }[] }
+      const raced = await Promise.race([
+        pending.then(report => ({ kind: 'settled' as const, report: report as { status: string; errors: { phase: string }[] } })),
+        vi.advanceTimersByTimeAsync(FIXED_TIMEOUT_MS + 1_000).then(() => ({ kind: 'stuck' as const })),
+      ])
+      // Always release the fake engine so a regression fails cleanly instead of
+      // leaving a pending promise behind for the rest of the suite.
+      release()
+      const report = raced.kind === 'settled' ? raced.report : await pending as { status: string; errors: { phase: string }[] }
 
-    expect(raced.kind).toBe('settled')
-    expect(report.status).toBe('failed')
-    expect(report.errors[0]!.phase).toBe('Timeout')
-    await vi.waitFor(() => expect(ctx.engine.runs).toHaveLength(1))
-    const lateRun = ctx.engine.runs[0]!
-    await vi.waitFor(() => expect(lateRun.cancel).toHaveBeenCalled())
-    await vi.waitFor(() => expect(lateRun.dispose).toHaveBeenCalled())
-    await ctx.dispose()
+      expect(raced.kind).toBe('settled')
+      expect(report.status).toBe('failed')
+      expect(report.errors[0]!.phase).toBe('Timeout')
+      await vi.waitFor(() => expect(ctx.engine.runs).toHaveLength(1))
+      const lateRun = ctx.engine.runs[0]!
+      await vi.waitFor(() => expect(lateRun.cancel).toHaveBeenCalled())
+      await vi.waitFor(() => expect(lateRun.dispose).toHaveBeenCalled())
+      await ctx.dispose()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('returns promptly when the caller cancels while workflow startup is pending', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { timeoutMs: 60_000 })
+    apply(ctx as never, {})
     let release!: () => void
     ctx.engine.startGate = new Promise(resolve => { release = resolve })
     const controller = new AbortController()
@@ -318,44 +329,64 @@ describe('plugin lifecycle and tool boundary', () => {
   })
 
   it('returns timeout when startup resolves after the deadline', async () => {
-    const ctx = new FakeContext()
-    apply(ctx as never, { timeoutMs: 1000 })
-    let release!: () => void
-    ctx.engine.startGate = new Promise(resolve => { release = resolve })
-    const pending = ctx.tool!.execute({ objective: 'late startup' }, exec())
-    await vi.waitFor(() => expect(ctx.engine.startCalls).toHaveLength(1))
-    await new Promise(resolve => setTimeout(resolve, 1100))
-    release()
-    const report = await pending as { status: string; errors: { phase: string }[] }
-    expect(report.status).toBe('failed')
-    expect(report.errors[0]!.phase).toBe('Timeout')
-    await vi.waitFor(() => expect(ctx.engine.runs[0]!.cancel).toHaveBeenCalled())
-    await vi.waitFor(() => expect(ctx.engine.runs[0]!.dispose).toHaveBeenCalled())
-    await ctx.dispose()
+    // T4: fixed deadline — fake timers instead of a real 60-minute wait.
+    vi.useFakeTimers()
+    try {
+      const ctx = new FakeContext()
+      apply(ctx as never, {})
+      let release!: () => void
+      ctx.engine.startGate = new Promise(resolve => { release = resolve })
+      const pending = ctx.tool!.execute({ objective: 'late startup' }, exec())
+      await vi.waitFor(() => expect(ctx.engine.startCalls).toHaveLength(1))
+      await vi.advanceTimersByTimeAsync(FIXED_TIMEOUT_MS + 1_000)
+      release()
+      const report = await pending as { status: string; errors: { phase: string }[] }
+      expect(report.status).toBe('failed')
+      expect(report.errors[0]!.phase).toBe('Timeout')
+      await vi.waitFor(() => expect(ctx.engine.runs[0]!.cancel).toHaveBeenCalled())
+      await vi.waitFor(() => expect(ctx.engine.runs[0]!.dispose).toHaveBeenCalled())
+      await ctx.dispose()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('returns timeout when startup rejects after the deadline', async () => {
-    const ctx = new FakeContext()
-    apply(ctx as never, { timeoutMs: 1000 })
-    let release!: () => void
-    ctx.engine.startGate = new Promise(resolve => { release = resolve })
-    const pending = ctx.tool!.execute({ objective: 'late rejection' }, exec())
-    await vi.waitFor(() => expect(ctx.engine.startCalls).toHaveLength(1))
-    await new Promise(resolve => setTimeout(resolve, 1100))
-    ctx.engine.startGateError = new Error('startup aborted')
-    release()
-    const report = await pending as { status: string; errors: { phase: string }[] }
-    expect(report.status).toBe('failed')
-    expect(report.errors[0]!.phase).toBe('Timeout')
-    await ctx.dispose()
+    // T4: fixed deadline — fake timers instead of a real 60-minute wait.
+    vi.useFakeTimers()
+    try {
+      const ctx = new FakeContext()
+      apply(ctx as never, {})
+      let release!: () => void
+      ctx.engine.startGate = new Promise(resolve => { release = resolve })
+      const pending = ctx.tool!.execute({ objective: 'late rejection' }, exec())
+      await vi.waitFor(() => expect(ctx.engine.startCalls).toHaveLength(1))
+      await vi.advanceTimersByTimeAsync(FIXED_TIMEOUT_MS + 1_000)
+      ctx.engine.startGateError = new Error('startup aborted')
+      release()
+      const report = await pending as { status: string; errors: { phase: string }[] }
+      expect(report.status).toBe('failed')
+      expect(report.errors[0]!.phase).toBe('Timeout')
+      await ctx.dispose()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('returns a failed report when the deadline cancels the run', async () => {
-    const ctx = new FakeContext()
-    apply(ctx as never, { timeoutMs: 1000 })
-    const report = await ctx.tool!.execute({ objective: 'too slow' }, exec()) as { status: string; errors: { phase: string }[] }
-    expect(report.status).toBe('failed')
-    expect(report.errors[0]!.phase).toBe('Timeout')
-    await ctx.dispose()
+    // T4: fixed deadline — fake timers instead of a real 60-minute wait. The
+    // engine never settles, so advancing past the deadline must fail the run.
+    vi.useFakeTimers()
+    try {
+      const ctx = new FakeContext()
+      apply(ctx as never, {})
+      const pending = ctx.tool!.execute({ objective: 'too slow' }, exec())
+      const report = await vi.advanceTimersByTimeAsync(FIXED_TIMEOUT_MS + 1_000).then(() => pending) as { status: string; errors: { phase: string }[] }
+      expect(report.status).toBe('failed')
+      expect(report.errors[0]!.phase).toBe('Timeout')
+      await ctx.dispose()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

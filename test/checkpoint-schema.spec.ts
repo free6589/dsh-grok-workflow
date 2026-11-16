@@ -2,7 +2,7 @@ import { mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { DEFAULT_MAX_CONCURRENCY, DEFAULT_MAX_RETRIES, HARD_LIMITS } from '../src/config.js'
+import { DEFAULT_MAX_CONCURRENCY, FIXED_MAX_RETRIES, HARD_LIMITS } from '../src/config.js'
 import {
   assertCheckpoint,
   buildCheckpoint,
@@ -61,7 +61,7 @@ function fullInput(): CheckpointInput {
     ],
     git: { branch: 'main', head: '84e6894dfb10c64aa2e75e755fc3e202839c9de8', dirty: true, ahead: 0, behind: 0 },
     time: { startedAtMs: NOW - 5_000, updatedAtMs: NOW, deadlineAtMs: NOW + 3_600_000 },
-    limits: { maxConcurrency: 3, maxRetries: 1, maxTasks: 3, timeoutMs: 3_600_000 },
+    limits: { maxConcurrency: 10, maxRetries: 1, maxTasks: 3 },
     watchdog: { deadlineHit: false, cancelled: false, deadlineMs: 3_600_000 },
   }
 }
@@ -96,7 +96,7 @@ describe('schema coverage', () => {
     expect(checkpoint.plan.tasks[0]!.writesPaths).toEqual(['src/a.ts'])
     expect(checkpoint.tasks).toEqual([{ id: 't1', title: 'T', status: 'pending', attempts: 0 }])
     expect(checkpoint.git.dirty).toBe(false)
-    expect(checkpoint.limits).toEqual({ maxConcurrency: 3, maxRetries: 1, maxTasks: 12 })
+    expect(checkpoint.limits).toEqual({ maxConcurrency: 10, maxRetries: 1, maxTasks: 10 })
     expect(checkpoint.watchdog).toEqual({ deadlineHit: false, cancelled: false })
     expect(checkpoint.time).toEqual({ startedAtMs: NOW, updatedAtMs: NOW })
   })
@@ -303,14 +303,14 @@ describe('schema validation', () => {
 
 describe('engine hook limit contract', () => {
   it('pins the documented concurrency and retry bounds', () => {
-    expect(ENGINE_HOOK_LIMITS).toEqual({ maxConcurrency: { default: 3, max: 6 }, maxRetries: { default: 1, max: 3 } })
+    expect(ENGINE_HOOK_LIMITS).toEqual({ maxConcurrency: { default: 10, max: 100 }, maxRetries: { default: 1, max: 3 } })
   })
 
   it('reports what is outside the envelope, without blocking a read', () => {
     expect(limitContractViolations({ maxConcurrency: 3, maxRetries: 1 })).toEqual([])
-    expect(limitContractViolations({ maxConcurrency: 8, maxRetries: 1 })).toEqual(['maxConcurrency 8 exceeds the documented maximum 6'])
+    expect(limitContractViolations({ maxConcurrency: 101, maxRetries: 1 })).toEqual(['maxConcurrency 101 exceeds the documented maximum 100'])
     expect(limitContractViolations({ maxConcurrency: 4, maxRetries: 5 })).toEqual(['maxRetries 5 exceeds the documented maximum 3'])
-    expect(limitContractViolations({ maxConcurrency: 6, maxRetries: 3 })).toEqual([])
+    expect(limitContractViolations({ maxConcurrency: 100, maxRetries: 3 })).toEqual([])
   })
 
   it('derives the envelope from the config constants, so it cannot drift', () => {
@@ -319,21 +319,21 @@ describe('engine hook limit contract', () => {
     // of letting the two disagree silently.
     expect(ENGINE_HOOK_LIMITS).toEqual({
       maxConcurrency: { default: DEFAULT_MAX_CONCURRENCY, max: HARD_LIMITS.maxConcurrency },
-      maxRetries: { default: DEFAULT_MAX_RETRIES, max: HARD_LIMITS.maxRetries },
+      maxRetries: { default: FIXED_MAX_RETRIES, max: HARD_LIMITS.maxRetries },
     })
-    expect(HARD_LIMITS.maxConcurrency).toBe(6)
+    expect(HARD_LIMITS.maxConcurrency).toBe(100)
     expect(HARD_LIMITS.maxRetries).toBe(3)
   })
 
   it('refuses a checkpoint whose limits leave the contract (B07)', () => {
-    const overConcurrency = { ...fullInput(), limits: { ...fullInput().limits, maxConcurrency: 7 } }
+    const overConcurrency = { ...fullInput(), limits: { ...fullInput().limits, maxConcurrency: 101 } }
     expect(() => buildCheckpoint(overConcurrency, NOW)).toThrow(/engine-hook contract/)
-    expect(() => buildCheckpoint(overConcurrency, NOW)).toThrow(/maxConcurrency 7 exceeds the documented maximum 6/)
+    expect(() => buildCheckpoint(overConcurrency, NOW)).toThrow(/maxConcurrency 101 exceeds the documented maximum 100/)
     const overRetries = { ...fullInput(), limits: { ...fullInput().limits, maxRetries: 4 } }
     expect(() => buildCheckpoint(overRetries, NOW)).toThrow(/maxRetries 4 exceeds the documented maximum 3/)
-    // The boundary itself is legal: 6 concurrency and 3 retries are the hard maxima.
-    expect(buildCheckpoint({ ...fullInput(), limits: { maxConcurrency: 6, maxRetries: 3, maxTasks: 1 } }, NOW).limits)
-      .toEqual({ maxConcurrency: 6, maxRetries: 3, maxTasks: 1 })
+    // The boundary itself is legal: 100 concurrency and 3 retries are the hard maxima.
+    expect(buildCheckpoint({ ...fullInput(), limits: { maxConcurrency: 100, maxRetries: 3, maxTasks: 1 } }, NOW).limits)
+      .toEqual({ maxConcurrency: 100, maxRetries: 3, maxTasks: 1 })
   })
 
   it('records the contract defaults when the caller supplies no limits at all (B15)', () => {
@@ -344,14 +344,14 @@ describe('engine hook limit contract', () => {
       run: { runId: 'r', objective: 'o', status: 'running' },
       plan: { source: 'caller', tasks: [] },
     }, NOW)
-    expect(bare.limits).toEqual({ maxConcurrency: 3, maxRetries: 1, maxTasks: 12 })
+    expect(bare.limits).toEqual({ maxConcurrency: 10, maxRetries: 1, maxTasks: 10 })
     // And a partial row keeps the supplied half while defaulting the rest.
     const partial = buildCheckpoint({
       run: { runId: 'r2', objective: 'o', status: 'running' },
       plan: { source: 'caller', tasks: [] },
       limits: { maxRetries: 2 },
     }, NOW)
-    expect(partial.limits).toEqual({ maxConcurrency: 3, maxRetries: 2, maxTasks: 12 })
+    expect(partial.limits).toEqual({ maxConcurrency: 10, maxRetries: 2, maxTasks: 10 })
   })
 
   it('reads a legacy row that the writer would now refuse, and refuses a bad one on write', () => {
@@ -359,11 +359,11 @@ describe('engine hook limit contract', () => {
     // must still be readable, and a reader that rewrote numbers would be lying
     // about the run that produced them.
     const legacy = JSON.parse(canonicalJson(sealCheckpoint(buildCheckpoint(fullInput(), NOW)))) as Record<string, unknown>
-    ;(legacy['limits'] as Record<string, unknown>)['maxConcurrency'] = 12
+    ;(legacy['limits'] as Record<string, unknown>)['maxConcurrency'] = 120
     const resealed = sealCheckpoint(legacy as never)
-    expect(assertCheckpoint(JSON.parse(canonicalJson(resealed))).limits.maxConcurrency).toBe(12)
+    expect(assertCheckpoint(JSON.parse(canonicalJson(resealed))).limits.maxConcurrency).toBe(120)
     expect(limitContractViolations(assertCheckpoint(JSON.parse(canonicalJson(resealed))).limits)).toEqual([
-      'maxConcurrency 12 exceeds the documented maximum 6',
+      'maxConcurrency 120 exceeds the documented maximum 100',
     ])
   })
 })

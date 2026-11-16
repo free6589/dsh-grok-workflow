@@ -1172,3 +1172,27 @@
   B（失败行分类显示）；commit/push/tag/Release（等用户指令）。
 - **Next action（用户）**：说"提交发版"就走 commit→push→CI→tag→Release→live 换文件
  （live 仍需用户重启 DSH 生效，沿 D-013/D-053）。
+
+## 2026-11-17 — T4 测试迁移交接（agent-5 → lead）
+
+- **状态**：T4 测试迁移完成。`npx tsc` 干净，`npx vitest run` 51/951 全绿（串行）。
+- ** contract 提醒**：全量套件对并行负载敏感（deadline/fake-timer 用例在 CPU 争用下 flake）；
+  复验请串行跑 `npx vitest run`，不要与其它 vitest 并行。
+- **工作区状态**：70+ 文件未提交（含 T1/T2/T6 + T4 + sibling 的 in-turn 测试改写 + 本轮 STATE.md）。
+  `lib/` 产物是旧的，发版前需重编。`settings-simple-mock.html`（??）是杂散文件，与 T4 无关。
+- **Next action（lead）**：决定提交/发版节奏；T5（client 页面）仍可并行，不碰 src 契约。
+
+## 2026-11-17 — 设置页瘦身 + supervisor 未提交（待用户验收，`CONFIRMED` 本地绿）
+
+- **From:** lead · **To:** 用户 / 后续代理
+- **状态**：工作树未提交（基线 `ae0c6d3` v0.9.4），`npm run typecheck` 0 错、
+  `npx vitest run` **51 文件 / 951 测试全 PASS**、`npm run build` 成功、
+  `cmp src/client/index.js lib/client.js` 一致。CHANGELOG `[Unreleased]` 有
+  Added（supervisor）+ Changed（瘦身迁移）双语条目。
+- **内容**：①设置页 3 卡（总开关 auto/full、执行模型 5 角色 × fallback + 监督、
+  高级两数 1–100/def10），无 hint/Danger/只读区；②24 键删 + 固定值（见 D-055）；
+  ③supervisor 第五角色（见 D-056）；④上限 100/默认 10（AGENTS.md 已同步）。
+- **Next action（用户）**：看 `settings-simple-mock.html`（定稿 mock，可点）→
+  若认可，回复"提交"，lead 即 commit（不 push/tag，发版另听指令）。
+- **Next action（后续代理）**：先读本轮 STATE/DECISIONS D-055/D-056；
+  真机验证 `NOT_RUN`（acgtest 新 profile + 新端口，老规矩）；live `:3090` 未动。

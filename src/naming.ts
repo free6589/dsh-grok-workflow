@@ -99,7 +99,7 @@ interface NamingCopy {
 export const NAMING_COPY: Record<NamingLanguage, NamingCopy> = {
   zh: {
     workflow: '任务团队',
-    roles: { planner: '规划助手', worker: '执行', verifier: '检查', synthesizer: '汇总助手' },
+    roles: { planner: '规划助手', worker: '执行', verifier: '检查', supervisor: '监督', synthesizer: '汇总助手' },
     taskGroup: '任务 {index} · {title}',
     attempt: '{role}（尝试 {n}）',
     phases: { plan: '规划', execute: '执行', verify: '检查', synthesize: '汇总', answer: '回答' },
@@ -108,6 +108,7 @@ export const NAMING_COPY: Record<NamingLanguage, NamingCopy> = {
       planner: '规划助手调用',
       worker: '执行代理',
       verifier: '检查调用',
+      supervisor: '监督调用',
       synthesizer: '汇总调用',
     },
     callStates: {
@@ -129,7 +130,7 @@ export const NAMING_COPY: Record<NamingLanguage, NamingCopy> = {
   },
   en: {
     workflow: 'Task team',
-    roles: { planner: 'Planner', worker: 'Execute', verifier: 'Check', synthesizer: 'Summarizer' },
+    roles: { planner: 'Planner', worker: 'Execute', verifier: 'Check', supervisor: 'Supervisor', synthesizer: 'Summarizer' },
     taskGroup: 'Task {index} · {title}',
     attempt: '{role} (attempt {n})',
     phases: { plan: 'Plan', execute: 'Execute', verify: 'Verify', synthesize: 'Synthesize', answer: 'Answer' },
@@ -138,6 +139,7 @@ export const NAMING_COPY: Record<NamingLanguage, NamingCopy> = {
       planner: 'Planner call',
       worker: 'Execute agent',
       verifier: 'Check call',
+      supervisor: 'Supervisor call',
       synthesizer: 'Summarizer call',
     },
     callStates: {
@@ -281,7 +283,7 @@ export function parseMemberLabel(
 ): { role: RoleName, attempt: number } | undefined {
   if (typeof label !== 'string') return undefined
   const copy = NAMING_COPY[language]
-  const roles: RoleName[] = ['planner', 'worker', 'verifier', 'synthesizer']
+  const roles: RoleName[] = ['planner', 'worker', 'verifier', 'supervisor', 'synthesizer']
   for (const role of roles) {
     const base = copy.roles[role]
     if (label !== base && !label.startsWith(base)) continue

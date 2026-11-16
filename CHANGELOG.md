@@ -5,6 +5,63 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Added / 新增
+
+- **Fifth role `supervisor`: one supervision call per task attempt / 第五角色`监督`：每任务每尝试一次监督调用** —
+  a new `roles.supervisor` chain runs after verification and before synthesis;
+  it can only fail a task, never pass one, and the settings page shows it as
+  the fifth row （拆活/干活/检查/收尾/**监督**）. The per-task budget backstop
+  is now `(50+50+50)×4=600` child calls.
+  / 新增 `roles.supervisor` 链，在检查之后、收尾之前运行；只能判失败、不能判通过；
+  设置页显示为第五行（拆活/干活/检查/收尾/**监督**）。单任务预算上限更新为
+  `(50+50+50)×4=600` 次子调用。
+
+### Changed / 变更
+
+- **Settings slim-down: 8 keys stay, 24 removed with fixed behavior
+  / 设置页瘦身：保留 8 键，删除 24 键并固化行为** —
+  the configuration surface keeps exactly 8 keys (`toolName`, `mode`,
+  `grokDefault`, `roles`, `synthesis`, `maxConcurrency`, `maxTasks`,
+  `configVersion`). The other 24 keys are no longer accepted: a profile patch
+  that still carries one is rejected as an unknown key (R-06), and the plugin
+  runs on fixed internal values instead —
+  `maxRetries=1`, `timeoutMs=3600000` (60 min),
+  `humanSummary=true`, `showDiagnostics=false`, `answerStrategy=in-turn`,
+  `triageModel` unset (inherit the run's route), `triageClassifier=rules`,
+  `triageFollowupAsFast=true`, `instantReceipt=true`,
+  `historyTurns=20` / `historyChars=20000`, `maxQueuedMessages=4`,
+  `recordRuns=true`, `showProgress=true`, `recordLimit=256`,
+  `switchOn=[]` (built-in policy), `subagentProvider` unset,
+  gate always on (`enforceGate`/`gateRequired`/`gateScope`/`gatePreset`
+  removed).
+  The settings page shows `mode` as `auto`/`full` (`auto` = `triage`
+  semantics); the gate delivers `in-turn` only (`relay`/`append` removed —
+  they lose the answer on a one-shot app); output is markdown direct from the
+  model (`synthesis` keeps `layered` default / `model` optional, `humanSummary`
+  always on).
+  Migration: delete the 24 keys from your profile patch; if you relied on a
+  removed value (e.g. a longer `timeoutMs`, `showDiagnostics: true`, a
+  `triageModel` override), there is no replacement — the fixed value above
+  applies.
+  / 配置表面只保留 8 个键（`toolName`、`mode`、`grokDefault`、`roles`、
+  `synthesis`、`maxConcurrency`、`maxTasks`、`configVersion`）。
+  其余 24 个键不再接受：旧补丁里还带着会被当未知键拒载（R-06），插件按
+  固定内置值运行 —— `maxRetries=1`、`timeoutMs=3600000`（60 分钟）、
+  `humanSummary=true`、`showDiagnostics=false`、`answerStrategy=in-turn`、
+  `triageModel` 未设（继承本轮路由）、`triageClassifier=rules`、
+  `triageFollowupAsFast=true`、`instantReceipt=true`、
+  `historyTurns=20` / `historyChars=20000`、`maxQueuedMessages=4`、
+  `recordRuns=true`、`showProgress=true`、`recordLimit=256`、
+  `switchOn=[]`（内置策略）、`subagentProvider` 未设、门控恒开
+  （`enforceGate`/`gateRequired`/`gateScope`/`gatePreset` 删除）。
+  设置页 `mode` 显示为 `auto`/`full`（`auto` 即 `triage` 语义）；门控只走
+  `in-turn` 投递（`relay`/`append` 删除 —— one-shot 下答案会丢）；输出为
+  模型直出的 markdown（`synthesis` 保留 `layered` 默认 / `model` 可选，
+  `humanSummary` 恒开）。
+  迁移：从 profile 补丁里删掉这 24 个键；若以前依赖过被删的值（如更长的
+  `timeoutMs`、`showDiagnostics: true`、`triageModel` 覆盖），没有替代项 ——
+  一律按上面的固定值生效。
+
 ## [0.9.4] - 2026-11-16
 
 ### Added / 新增

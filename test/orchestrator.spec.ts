@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { resolveConfig } from '../src/config.js'
 import { redactDeep } from '../src/redact.js'
 import { assertWorkflowReport } from '../src/report.js'
-import { maxTotalAgentsFor, WORKFLOW_SCRIPT } from '../src/script.js'
+import { maxTotalAgentsFor, routeBudgetFor, WORKFLOW_SCRIPT } from '../src/script.js'
 import {delay, runWorkflowScript, type ScriptAgent, roleOf, idOfPhase, attemptOf, indexOfPhase} from './helpers.js'
 import { execution, failingVerification, task, verification } from './fixtures.js'
 
@@ -16,9 +16,12 @@ function args(tasks: unknown[] | null, overrides: Record<string, unknown> = {}):
     ...overrides,
   }
   // Mirror the request builder: the child cap is derived from the task count
-  // (exact for a caller plan, the configured maximum otherwise).
+  // (exact for a caller plan, the configured maximum otherwise), with the
+  // route budget the validator uses (T2: supervisor counts).
+  const config = resolveConfig({ maxConcurrency: 2, maxTasks: 6 })
+  const budget = routeBudgetFor(config)
   const taskCount = tasks === null ? (base.maxTasks as number) : tasks.length
-  return { ...base, maxTotalAgents: maxTotalAgentsFor(taskCount, base.maxRetries as number) }
+  return { ...base, maxTotalAgents: maxTotalAgentsFor(taskCount, base.maxRetries as number, budget) }
 }
 
 describe('generated workflow script', () => {
@@ -208,7 +211,7 @@ describe('generated workflow script', () => {
     expect(report.plan.source).toBe('fallback')
     expect(report.plan.error).toContain('planner failed')
 
-    const config = resolveConfig({ maxConcurrency: 2, maxRetries: 1, maxTasks: 6 })
+    const config = resolveConfig({ maxConcurrency: 2, maxTasks: 6 })
     const validated = assertWorkflowReport(report, 'Ship the verified result', config)
     expect(validated.status).toBe('partial')
     expect(validated.plan.source).toBe('fallback')
@@ -332,7 +335,7 @@ describe('generated workflow script', () => {
     const { report } = await runWorkflowScript(WORKFLOW_SCRIPT, args(null, { objective: answerObjective }), agent)
     expect(report.status).toBe('completed')
     expect(report.tasks[0]!.status).toBe('verified')
-    expect(() => assertWorkflowReport(report, answerObjective, resolveConfig({ maxConcurrency: 2, maxRetries: 1, maxTasks: 6 })))
+    expect(() => assertWorkflowReport(report, answerObjective, resolveConfig({ maxConcurrency: 2, maxTasks: 6 })))
       .not.toThrow()
   })
 
@@ -486,7 +489,7 @@ describe('generated workflow script', () => {
     // The report keeps the task's own criterion text, so host validation (which
     // compares confirmed evidence against the task criteria) still matches.
     expect(report.confirmed).toEqual([{ taskId: 'a', criterion: 'alpha works', evidence: 'file:///tmp/proof' }])
-    const config = resolveConfig({ maxConcurrency: 2, maxRetries: 1, maxTasks: 6 })
+    const config = resolveConfig({ maxConcurrency: 2, maxTasks: 6 })
     expect(assertWorkflowReport(report, 'Ship the verified result', config).status).toBe('completed')
   })
 

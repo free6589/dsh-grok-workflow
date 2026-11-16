@@ -154,25 +154,29 @@ class FakeAgent {
 function install(ctx: FakeContext, roots: readonly string[]): void {
   installGate({
     ctx: ctx as never,
-    config: resolveConfig({ answerStrategy: 'relay', mode: 'triage', grokDefault: 'on' }),
+    config: resolveConfig({ mode: 'triage', grokDefault: 'on' }),
     state: createActiveState(),
     logger: ctx.logger() as never,
     memoryDocRoots: roots,
   })
 }
 
-/** Deliver one message through the gate and return the text the plugin delivered. */
+/** Deliver one message through the gate and return the text the plugin delivered.
+ *
+ * T4 in-turn: the answer arrives as the entered step's message, not as a
+ * followup. Chat/fast/ask tiers resolve inside the open step, so the decision
+ * is `enter` and the answer is its last message.
+ */
 async function route(ctx: FakeContext, agent: FakeAgent, text: string): Promise<string> {
   const messages = [userMessage(text)]
-  const seen = agent.followups.length
-  await ctx.preStep()(
+  const decision = await ctx.preStep()(
     { agent, messages, turn: 1, step: 1, signal: new AbortController().signal },
     async () => ({ kind: 'enter', messages }),
-  )
-  await vi.waitFor(() => {
-    if (agent.followups.length <= seen) throw new Error('no answer delivered')
-  })
-  const content = agent.followups[agent.followups.length - 1]!.content as { type: string, text?: string }[]
+  ) as { kind: string; messages?: { content: { type: string, text?: string }[] }[] }
+  expect(decision.kind).toBe('enter')
+  const texts = decision.messages ?? []
+  expect(texts.length).toBeGreaterThan(0)
+  const content = texts[texts.length - 1]!.content
   return content.map(block => block.text ?? '').join('')
 }
 
@@ -487,7 +491,7 @@ describe('the installed plugin keeps its ordinary front desk', () => {
     // `apply()` is the production install path (index.ts): the default root is the
     // workspace's docs/knowledge, and a greeting must never reach the look-up pass.
     const ctx = new FakeContext()
-    apply(ctx as never, { answerStrategy: 'relay', mode: 'triage', grokDefault: 'on' })
+    apply(ctx as never, { mode: 'triage', grokDefault: 'on' })
     const agent = new FakeAgent(Session.create('sess-recall-apply' as never))
     const text = await route(ctx, agent, '你好')
     expect(text).toContain('档位：直答档')

@@ -20,9 +20,9 @@
  *    was given, the engine's `workflow/end` stop reason, and the caller's own
  *    statements (`noteDeadline`/`noteCancel`/`finish`). Nothing is inferred from
  *    a child's self-report.
- * 4. **Four roles, no new ones.** Everything recorded about children comes from
+ * 4. **Five roles, no new ones.** Everything recorded about children comes from
  *    host-observable data — the report's own route trail — and a row whose role
- *    is not one of {@link HOST_ROLES planner, worker, verifier, synthesizer} is
+ *    is not one of {@link HOST_ROLES planner, worker, verifier, supervisor, synthesizer} is
  *    dropped rather than given a label. Wiring never calls `agent()` and never
  *    starts a model turn: it costs zero model calls and adds zero roles.
  *
@@ -107,13 +107,13 @@ export const CHECKPOINT_WIRING_LIMITS = {
 } as const
 
 /**
- * The only roles a checkpoint may name: the four the plugin already runs.
+ * The only roles a checkpoint may name: the five the plugin already runs.
  *
  * Wiring records child calls from the report's route trail, so this list is a
  * guard, not a taxonomy: a route entry with any other role is dropped instead of
  * being recorded under an invented name (AGENTS.md: no new agent role).
  */
-export const HOST_ROLES = ['planner', 'worker', 'verifier', 'synthesizer'] as const
+export const HOST_ROLES = ['planner', 'worker', 'verifier', 'supervisor', 'synthesizer'] as const
 
 /** Whether a value is one of {@link HOST_ROLES}. */
 export function isHostRole(value: unknown): value is RoleName {
@@ -1130,7 +1130,7 @@ function tasksFromReport(report: WorkflowReport): NonNullable<CheckpointInput['t
  * calls that carries a real role.
  *
  * A row with a role outside {@link HOST_ROLES} is dropped: wiring must never
- * invent a fifth role, and a report is untrusted input like any other.
+ * invent a sixth role, and a report is untrusted input like any other.
  */
 function agentsFromReport(report: WorkflowReport): NonNullable<CheckpointInput['agents']> {
   const rows: NonNullable<CheckpointInput['agents']> = []

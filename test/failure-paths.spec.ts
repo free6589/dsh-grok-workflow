@@ -26,7 +26,7 @@ import {runWorkflowScript, type ScriptAgent, roleOf, idOfPhase} from './helpers.
  * @returns Resolved config used for both the request args and validation.
  */
 function config(overrides: Record<string, unknown> = {}): ReturnType<typeof resolveConfig> {
-  const base = { maxConcurrency: 1, maxRetries: 0, maxTasks: 4 }
+  const base = { maxConcurrency: 1, maxTasks: 4 }
   const rolesOverride = overrides.roles as Record<string, unknown> | undefined
   if (rolesOverride === undefined) return resolveConfig(base)
   const resolved = resolveConfig(base)
@@ -148,12 +148,14 @@ describe('infrastructure failures still produce a report (G-4)', () => {
     )
     const byTask = Object.fromEntries(report.incomplete.map(item => [item.taskId, item.category]))
     expect(byTask).toEqual({ flaky: 'infrastructure', weak: 'quality' })
+    // T4: maxRetries is fixed at 1, so each failed task retries once: 2
+    // attempts per task, 2 failures per category.
     expect(failureSummary(report)).toEqual(expect.arrayContaining([
-      { category: 'infrastructure', count: 1 },
-      { category: 'quality', count: 1 },
+      { category: 'infrastructure', count: 2 },
+      { category: 'quality', count: 2 },
     ]))
     const rendered = renderReport(report)
-    expect(rendered).toContain('Failures: 1 infrastructure, 1 quality')
+    expect(rendered).toContain('Failures: 2 infrastructure, 2 quality')
     expect(rendered).toContain('(infrastructure)')
     expect(rendered).toContain('(quality)')
   })
@@ -169,7 +171,8 @@ describe('infrastructure failures still produce a report (G-4)', () => {
     expect(report.status).toBe('failed')
     expect(report.incomplete).toHaveLength(1)
     expect(report.errors.length).toBeGreaterThan(0)
-    expect(report.routes.filter(entry => entry.role === 'worker')).toHaveLength(2)
+    // T4: maxRetries is fixed at 1, so 2 attempts x 2 routes = 4 trail rows.
+    expect(report.routes.filter(entry => entry.role === 'worker')).toHaveLength(4)
     const twoRoutes = config({ roles: roles([{ model: 'w1' }, { model: 'w2' }]) })
     expect(assertWorkflowReport(report, 'Ship the verified result', twoRoutes).status).toBe('failed')
   })
@@ -310,7 +313,9 @@ describe('same-attempt resubmit (A)', () => {
     }
     const { report } = await runWorkflowScript(WORKFLOW_SCRIPT, args({ roles: roles([{ model: 'w1' }]) }), agent)
     expect(report.status).toBe('failed')
-    expect(report.tasks[0]?.attempts).toHaveLength(1)
+    // T4: maxRetries is fixed at 1 — the empty resubmit fails, then the retry
+    // fails the same way: 2 attempts, neither marked resubmitted.
+    expect(report.tasks[0]?.attempts).toHaveLength(2)
     expect(report.tasks[0]?.attempts[0]?.resubmitted).toBeUndefined()
     expect(report.tasks[0]?.attempts[0]?.failure?.class).toBe('format-error')
     expect(() => assertWorkflowReport(report, 'Ship the verified result', config())).not.toThrow()
@@ -327,8 +332,10 @@ describe('same-attempt resubmit (A)', () => {
     }
     const { report } = await runWorkflowScript(WORKFLOW_SCRIPT, args({ roles: roles([{ model: 'w1' }]) }), agent)
     expect(report.status).toBe('failed')
-    // One call per route, no resubmit: a dead provider is not a missing form.
-    expect(workerCalls).toBe(1)
+    // One call per route per attempt, no resubmit: a dead provider is not a
+    // missing form. T4 fixed retry (maxRetries=1) retries the failed attempt
+    // once, so 2 worker calls total.
+    expect(workerCalls).toBe(2)
     expect(report.tasks[0]?.attempts[0]?.failure?.class).not.toBe('format-error')
   })
 })

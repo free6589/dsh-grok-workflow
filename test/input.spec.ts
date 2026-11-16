@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { HARD_LIMITS, resolveConfig } from '../src/config.js'
+import { HARD_LIMITS, resolveConfig, FIXED_MAX_RETRIES} from '../src/config.js'
 import { normalizeCallerTasks, TASK_LIMITS } from '../src/input.js'
 
 describe('caller task validation', () => {
@@ -147,20 +147,17 @@ describe('configuration limits', () => {
   it('applies safe defaults', () => {
     expect(resolveConfig()).toMatchObject({
       toolName: 'grok_workflow',
-      maxConcurrency: 3,
+      maxConcurrency: 10,
       maxRetries: 1,
-      maxTasks: 12,
-      // 60 minutes since t45 (P1-4): the 30-minute default killed two real
-      // four-task runs at 30m00s / 30m01s.
-      timeoutMs: 3_600_000,
-      maxActiveRuns: 2,
-      maxActiveRunsTotal: 8,
+      maxTasks: 10,
     })
   })
 
   it('rejects values above the hard cap', () => {
     expect(() => resolveConfig({ maxConcurrency: HARD_LIMITS.maxConcurrency + 1 })).toThrow(/maxConcurrency/)
-    expect(() => resolveConfig({ maxRetries: HARD_LIMITS.maxRetries + 1 })).toThrow(/maxRetries/)
+    // T4: maxRetries is fixed at 1 and not configurable; a stored value is unknown (R-06).
+    expect(() => resolveConfig({ maxRetries: 2 } as never)).toThrow(/unknown configuration key "maxRetries"/)
+    expect(resolveConfig({} as never).maxRetries).toBe(FIXED_MAX_RETRIES)
     expect(() => resolveConfig({ maxTasks: HARD_LIMITS.maxTasks + 1 })).toThrow(/maxTasks/)
     expect(() => resolveConfig({ toolName: 'Bad Name' })).toThrow(/toolName/)
   })

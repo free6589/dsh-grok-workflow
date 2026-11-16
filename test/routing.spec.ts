@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Session, pluginRecordOf } from '@deepseek-ai/dsh-session'
-import { HARD_LIMITS, resolveConfig } from '../src/config.js'
+import { FIXED_ANSWER_STRATEGY, FIXED_MAX_RETRIES, HARD_LIMITS, resolveConfig } from '../src/config.js'
 import { ROUTING_RECORD, recordRouting } from '../src/records.js'
 import { redactDeep } from '../src/redact.js'
 import { assertWorkflowReport } from '../src/report.js'
@@ -45,7 +45,7 @@ describe('per-role routing configuration', () => {
     expect(config.roles.verifier).toEqual([{ model: 'verifier-1' }])
     expect(config.roles.planner).toEqual([{ model: 'planner-1' }])
     expect(config.roles.synthesizer).toEqual([])
-    expect(config.synthesis).toBe('deterministic')
+    expect(config.synthesis).toBe('layered')
   })
 
   it('treats an empty chain as "inherit" and reports it as empty', () => {
@@ -68,35 +68,36 @@ describe('per-role routing configuration', () => {
     expect(() => resolveConfig({ roles: { worker: [{ model: 'x'.repeat(HARD_LIMITS.routeChars + 1) }] } })).toThrow(/longer than/)
   })
 
-  it('keeps an extreme call backstop that the worst legal combination exactly meets', () => {
-    // Worst legal case: 50 worker + 50 verifier routes with maxRetries 3 =
-    // 100 calls/attempt x 4 attempts = 400 = HARD_LIMITS.maxAttemptsPerTask.
-    // Equality passes (the guard is `>`), so every legal combination loads;
-    // the backstop only fires if a future limit widens without revisiting it.
+  it('keeps an extreme call backstop above the worst legal combination', () => {
+    // Worst legal case: 50 worker + 50 verifier + 50 supervisor routes with
+    // FIXED_MAX_RETRIES=1 → (50 + 50 + 50) calls/attempt x 2 attempts = 300
+    // calls per task. The backstop (T6-owned) sits at 600, so every legal
+    // combination loads with headroom; the backstop only fires if a future
+    // limit widens without revisiting it.
     const long = Array.from({ length: 50 }, (_unused, index) => ({ model: `m${index}` }))
-    expect(resolveConfig({ roles: { worker: long, verifier: long }, maxRetries: 3 }).maxRetries).toBe(3)
-    expect(HARD_LIMITS.maxAttemptsPerTask).toBe(
-      (HARD_LIMITS.chainLength + HARD_LIMITS.chainLength) * (HARD_LIMITS.maxRetries + 1),
-    )
-    // Ordinary combinations always pass: 3+3 chains with the default 1 retry.
+    expect(resolveConfig({ roles: { worker: long, verifier: long, supervisor: long } }).maxRetries).toBe(FIXED_MAX_RETRIES)
+    expect(HARD_LIMITS.maxAttemptsPerTask).toBe(600)
+    // Ordinary combinations always pass: 3+3 chains with the fixed 1 retry.
     const chain = [{ model: 'a' }, { model: 'b' }, { model: 'c' }]
-    expect(resolveConfig({ roles: { worker: chain, verifier: chain } }).maxRetries).toBe(1)
+    expect(resolveConfig({ roles: { worker: chain, verifier: chain } }).maxRetries).toBe(FIXED_MAX_RETRIES)
   })
 
-  it('requires a synthesizer chain for model synthesis, and forbids an unused one', () => {
+  it('requires a synthesizer chain for model synthesis (T4: deterministic removed)', () => {
     expect(() => resolveConfig({ synthesis: 'model' })).toThrow(/requires a non-empty roles.synthesizer/)
-    expect(() => resolveConfig({ roles: roles([], [], [], [{ model: 'writer' }]) })).toThrow(/synthesis is "deterministic"/)
+    // T4: `deterministic` is no longer a valid value — an unset synthesis with a
+    // chain defaults to `layered`, never `deterministic`.
     const config = resolveConfig({ roles: roles([], [], [], [{ model: 'writer' }]), synthesis: 'model' })
     expect(config.synthesis).toBe('model')
+    expect(() => resolveConfig({ synthesis: 'deterministic' } as never)).toThrow(/synthesis must be "model" or "layered"/)
   })
 
-  it('defaults the answer strategy to in-turn and keeps the older two selectable', () => {
+  it('fixes the answer strategy at in-turn (T4: relay/append removed)', () => {
     // t24 measured that a one-shot headless app tears the tree down when the turn
-    // closes, which loses a relayed/apped answer (G-18/F9). `in-turn` is therefore
-    // the default; the other two stay available and revertible.
-    expect(resolveConfig({}).answerStrategy).toBe('in-turn')
-    expect(resolveConfig({ answerStrategy: 'relay' }).answerStrategy).toBe('relay')
-    expect(resolveConfig({ answerStrategy: 'append' }).answerStrategy).toBe('append')
+    // closes, which loses a relayed/apped answer (G-18/F9). `in-turn` is the only
+    // behaviour now; the removed values are unknown keys (R-06).
+    expect(FIXED_ANSWER_STRATEGY).toBe('in-turn')
+    expect(() => resolveConfig({ answerStrategy: 'relay' } as never)).toThrow(/unknown configuration key/)
+    expect(() => resolveConfig({ answerStrategy: 'append' } as never)).toThrow(/unknown configuration key/)
   })
 
   it('derives the child cap from the effective chains, not from attempts alone', () => {
@@ -122,7 +123,7 @@ describe('generated script routing', () => {
     })
     const run = await runWorkflowScript(WORKFLOW_SCRIPT, routed, agent)
     expect(models).toEqual(['执行:pa/wa', '检查:pv/va'])
-    expect(run.report.routing).toEqual({ planner: ['pp/pl'], worker: ['pa/wa'], verifier: ['pv/va'], synthesizer: [] })
+    expect(run.report.routing).toEqual({ planner: ['pp/pl'], worker: ['pa/wa'], verifier: ['pv/va'], supervisor: [], synthesizer: [] })
     expect(run.report.routes.map(entry => [entry.role, entry.chainIndex, entry.outcome])).toEqual([
       ['worker', 0, 'ok'],
       ['verifier', 0, 'ok'],
@@ -380,7 +381,7 @@ describe('generated script routing', () => {
       if (roleOf(options.label) === 'worker') return execution()
       return verification(task('a'))
     }
-    const config = resolveConfig({ maxConcurrency: 2, maxRetries: 1, maxTasks: 6, roles: { worker: [{ model: 'w1' }, { model: 'w2' }] } })
+    const config = resolveConfig({ maxConcurrency: 2, maxTasks: 6, roles: { worker: [{ model: 'w1' }, { model: 'w2' }] } })
     const cap = maxTotalAgentsFor(1, 1, routeBudgetFor(config))
     const run = await runWorkflowScript(WORKFLOW_SCRIPT, args({ maxTotalAgents: cap, roles: roles([{ model: 'w1' }, { model: 'w2' }]) }), agent)
     expect(run.report.limits.maxTotalAgents).toBe(cap)
@@ -414,7 +415,7 @@ describe('route ledger record', () => {
 
   it('writes one redacted ledger record per run', () => {
     const session = Session.create('sess-ledger' as never)
-    recordRouting(session, { objective: 'ship it', routing: { planner: [], worker: ['p/first', 'p/second'], verifier: [], synthesizer: [] }, synthesis: 'deterministic', routes })
+    recordRouting(session, { objective: 'ship it', routing: { planner: [], worker: ['p/first', 'p/second'], verifier: [], supervisor: [], synthesizer: [] }, synthesis: 'deterministic', routes })
     const ledger = readLedger(session)
     expect(ledger?.switches.map(switchEntry => switchEntry.route)).toEqual(['p/first', 'p/second'])
     expect(ledger?.switches[0]?.reason).not.toContain('sk-abcdef0123456789abcdef')
@@ -424,7 +425,7 @@ describe('route ledger record', () => {
     const session = Session.create('sess-quiet' as never)
     recordRouting(session, {
       objective: 'ship it',
-      routing: { planner: [], worker: ['p/first'], verifier: [], synthesizer: [] },
+      routing: { planner: [], worker: ['p/first'], verifier: [], supervisor: [], synthesizer: [] },
       synthesis: 'deterministic',
       routes: [{ role: 'worker', chainIndex: 0, route: 'p/first', attempt: 1, outcome: 'ok' }],
     })
@@ -432,8 +433,8 @@ describe('route ledger record', () => {
   })
 
   it('never throws when the session is missing or refuses the record', () => {
-    expect(() => recordRouting(undefined, { objective: 'x', routing: { planner: [], worker: [], verifier: [], synthesizer: [] }, synthesis: 'deterministic', routes })).not.toThrow()
+    expect(() => recordRouting(undefined, { objective: 'x', routing: { planner: [], worker: [], verifier: [], supervisor: [], synthesizer: [] }, synthesis: 'deterministic', routes })).not.toThrow()
     const broken = { id: 'broken', append: () => { throw new Error('read-only') } } as unknown as Session
-    expect(() => recordRouting(broken, { objective: 'x', routing: { planner: [], worker: [], verifier: [], synthesizer: [] }, synthesis: 'deterministic', routes })).not.toThrow()
+    expect(() => recordRouting(broken, { objective: 'x', routing: { planner: [], worker: [], verifier: [], supervisor: [], synthesizer: [] }, synthesis: 'deterministic', routes })).not.toThrow()
   })
 })

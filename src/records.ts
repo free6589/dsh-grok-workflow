@@ -295,7 +295,7 @@ export function recordDelivery(
 }
 
 /** Roles in report order; also the closed set a ledger switch may name. */
-const ROLES: readonly RoleName[] = ['planner', 'worker', 'verifier', 'synthesizer']
+const ROLES: readonly RoleName[] = ['planner', 'worker', 'verifier', 'supervisor', 'synthesizer']
 
 /** Coerce a possibly-missing numeric field into a non-negative integer. */
 function counter(value: unknown, fallback: number): number {
@@ -358,7 +358,7 @@ export function recordRouting(
     .filter(route => route.outcome === 'failed' || route.chainIndex > 0 || (route.skippedBusy !== undefined && route.skippedBusy.length > 0) || route.queuedMs !== undefined)
     .slice(0, cap)
   if (switches.length === 0) return
-  const routing: Record<RoleName, string[]> = { planner: [], worker: [], verifier: [], synthesizer: [] }
+  const routing: Record<RoleName, string[]> = { planner: [], worker: [], verifier: [], supervisor: [], synthesizer: [] }
   for (const role of ROLES) {
     const chain = (entry.routing as Record<string, unknown> | undefined)?.[role]
     routing[role] = Array.isArray(chain) ? chain.filter(item => typeof item === 'string').map(item => item.slice(0, 160)) : []

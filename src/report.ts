@@ -2,6 +2,7 @@ import type {
   AttemptFailure,
   RouteTrailEntry, ExecutionResult, FailureCategory, FinalStatus, VerificationResult, WorkflowReport } from './types.js'
 import type { ModelRoute, ResolvedConfig, RoleName } from './types.js'
+import { FIXED_TIMEOUT_MS } from './config.js'
 import { criterionKey, TASK_LIMITS } from './input.js'
 import { maxTotalAgentsFor, routeBudgetFor } from './script.js'
 import { shardCountFor, splitObjective } from './shards.js'
@@ -170,7 +171,7 @@ function verificationResult(value: unknown, path: string): VerificationResult {
  * The script is trusted code, but a malformed engine result must not be
  * presented as a successful workflow.
  */
-const ROLE_NAMES = ['planner', 'worker', 'verifier', 'synthesizer'] as const
+const ROLE_NAMES = ['planner', 'worker', 'verifier', 'supervisor', 'synthesizer'] as const
 
 const FAILURE_CLASSES = [
   'rate-limit',
@@ -366,8 +367,8 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
   // t47: the deadline travels with the result. It used to live only in memory, so
   // "which deadline was in force?" was unanswerable from the session log.
   const timeoutMs = limits.timeoutMs === undefined ? undefined : number(limits.timeoutMs, 'limits.timeoutMs')
-  if (timeoutMs !== undefined && timeoutMs !== 0 && timeoutMs !== config.timeoutMs) {
-    throw new Error(`workflow result ran under a ${timeoutMs} ms deadline but the plugin enforces ${config.timeoutMs} ms`)
+  if (timeoutMs !== undefined && timeoutMs !== 0 && timeoutMs !== FIXED_TIMEOUT_MS) {
+    throw new Error(`workflow result ran under a ${timeoutMs} ms deadline but the plugin enforces ${FIXED_TIMEOUT_MS} ms`)
   }
   if (maxConcurrency !== config.maxConcurrency || maxRetries !== config.maxRetries || maxTasks !== config.maxTasks) {
     throw new Error('workflow result limits do not match the configured limits')
@@ -644,7 +645,7 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
     }
   }
   const routing = root.routing === undefined
-    ? { planner: [], worker: [], verifier: [], synthesizer: [] }
+    ? { planner: [], worker: [], verifier: [], supervisor: [], synthesizer: [] }
     : routeLabels(root.routing, 'routing')
   const synthesisRoot = root.synthesis === undefined ? {} : record(root.synthesis, 'synthesis')
   const fallbackMode = config.synthesis === 'model' ? 'model' : 'deterministic'
@@ -716,6 +717,7 @@ export function failureReport(
       planner: chainLabelsFor(config.roles.planner),
       worker: chainLabelsFor(config.roles.worker),
       verifier: chainLabelsFor(config.roles.verifier),
+      supervisor: chainLabelsFor(config.roles.supervisor),
       synthesizer: chainLabelsFor(config.roles.synthesizer),
     },
     synthesis: { mode: config.synthesis === 'model' ? 'model' : 'deterministic' },
@@ -724,7 +726,7 @@ export function failureReport(
       maxRetries: config.maxRetries,
       maxTasks: config.maxTasks,
       maxTotalAgents: 0,
-      timeoutMs: config.timeoutMs,
+      timeoutMs: FIXED_TIMEOUT_MS,
     },
   }
 }
@@ -828,7 +830,7 @@ export function renderReport(report: WorkflowReport, opts?: { showDiagnostics?: 
   // unset role says `inherit` instead of silently vanishing. Default (off):
   // none of the ledger lines below render.
   if (opts?.showDiagnostics === true) {
-    const configured = (['planner', 'worker', 'verifier', 'synthesizer'] as const)
+    const configured = (['planner', 'worker', 'verifier', 'supervisor', 'synthesizer'] as const)
       .map(role => [role, report.routing[role]] as const)
     lines.push(`Model routes: ${configured.map(([role, chain]) => `${role}=${chain.length === 0 ? 'inherit' : chain.join(' → ')}`).join('; ')}`)
     if (report.limits.timeoutMs !== undefined) {

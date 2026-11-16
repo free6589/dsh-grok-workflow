@@ -44,7 +44,6 @@ describe('real DSH Loader composition', () => {
       `  name: ${plugin}`,
       '  config:',
       '    maxConcurrency: 2',
-      '    maxRetries: 1',
       '',
     ].join('\n'))
 

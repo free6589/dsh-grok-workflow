@@ -12,6 +12,10 @@ import type { Session } from '@deepseek-ai/dsh-session'
 import type { WorkflowRun, WorkflowStartRequest, WorkflowStopReason } from '@deepseek-ai/dsh-workflow'
 import { namingLanguageFromSettings } from './naming.js'
 import type { NamingLanguage } from './naming.js'
+import {
+  FIXED_MAX_ACTIVE_RUNS, FIXED_MAX_ACTIVE_RUNS_TOTAL, FIXED_RECORD_LIMIT, FIXED_RECORD_RUNS,
+  FIXED_SHOW_DIAGNOSTICS, FIXED_SHOW_PROGRESS, FIXED_TIMEOUT_MS,
+} from './config.js'
 import { buildWorkflowRequest } from './script.js'
 import { teamWorkflowEngine } from './team-engine.js'
 import { createCheckpointRecorder, unloadCheckpointRecorders } from './checkpoint/wiring.js'
@@ -591,17 +595,17 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
   // three different sessions, all with "already has 2 active run(s)".
   const sessionId = sessionIdOf(agent)
   const sessionActive = activeCountOfSession(state, sessionId)
-  if (sessionActive >= config.maxActiveRuns) {
+  if (sessionActive >= FIXED_MAX_ACTIVE_RUNS) {
     const now = Date.now()
     const holders = runsOfSession(state, sessionId).map(info => describeHolder(info, now))
     throw new Error(
       `${workflowLabel(config)} already has ${sessionActive} active run(s) in this session; ` +
-      `maxActiveRuns is ${config.maxActiveRuns} per session` +
+      `maxActiveRuns is ${FIXED_MAX_ACTIVE_RUNS} per session` +
       (holders.length === 0 ? '' : ` (holding: ${holders.slice(0, 3).join(', ')})`),
     )
   }
   const totalActive = state.runs.size + state.pending
-  if (totalActive >= config.maxActiveRunsTotal) {
+  if (totalActive >= FIXED_MAX_ACTIVE_RUNS_TOTAL) {
     const now = Date.now()
     const holders: string[] = []
     const seen = new Set<string>()
@@ -613,7 +617,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
     }
     throw new Error(
       `${workflowLabel(config)} already has ${totalActive} active run(s) across ${seen.size || 'several'} session(s); ` +
-      `maxActiveRunsTotal is ${config.maxActiveRunsTotal}` +
+      `maxActiveRunsTotal is ${FIXED_MAX_ACTIVE_RUNS_TOTAL}` +
       (holders.length === 0 ? '' : ` (holding: ${holders.slice(0, 3).join(', ')})`),
     )
   }
@@ -633,7 +637,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
     timedOut = true
     timeoutController.abort()
     hitDeadline?.()
-  }, config.timeoutMs)
+  }, FIXED_TIMEOUT_MS)
   timer.unref?.()
   const combined = anySignal([state.controller.signal, timeoutController.signal, ...options.signals ?? []])
   const signal = combined.signal
@@ -663,7 +667,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
    * costs no engine call and cannot change what the run did.
    */
   const deliver = (report: WorkflowReport): DeliveryView =>
-    deliverReport(report, { diagnostics: config.showDiagnostics })
+    deliverReport(report, { diagnostics: FIXED_SHOW_DIAGNOSTICS })
   const asReport = (phase: string, message: string, cause: string): RunOutcome => {
     const report = redactDeep(failureReport(objective, config, phase, message, categoryFor(cause)))
     lastReport = report
@@ -707,7 +711,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
   // Progress recording is a presentation switch: one GUI node with a member row
   // per subagent. It is subscribed *before* the run exists so the first
   // `agent-start` cannot be missed, and it never affects the run itself.
-  const progress = config.showProgress
+  const progress = FIXED_SHOW_PROGRESS
     ? createWorkflowProgressRecorder(sessionOfAgent(agent), logger)
     : undefined
   const stopProgressListeners: (() => void)[] = []
@@ -748,7 +752,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
       maxConcurrency: config.maxConcurrency,
       maxRetries: config.maxRetries,
       maxTasks: config.maxTasks,
-      timeoutMs: config.timeoutMs,
+      timeoutMs: FIXED_TIMEOUT_MS,
     },
     ...options.carryover === undefined || options.carryover.trim() === '' ? {} : { minContextDigest: options.carryover },
   })
@@ -785,7 +789,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
         parent: agent,
         signal,
         maxTotalAgents: request.maxTotalAgents,
-        ...config.subagentProvider === undefined ? {} : { subagentProvider: config.subagentProvider },
+        
       }
       // Startup is part of the run's deadline. Racing only `run.result` left
       // the caller blocked forever when workflowEngine.start() itself never settled.
@@ -811,7 +815,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
         startupCancelled.then(() => ({ kind: 'cancelled' as const })),
       ])
       if (startup.kind === 'deadline' || (startup.kind === 'cancelled' && timedOut)) {
-        const reason = 'workflow deadline exceeded after ' + config.timeoutMs + ' ms during startup'
+        const reason = 'workflow deadline exceeded after ' + FIXED_TIMEOUT_MS + ' ms during startup'
         // The caller can return now, but the engine may still hand back a run later.
         // Observe the pending promise and dispose that late resource immediately.
         void startingPromise.then(async lateRun => {
@@ -822,7 +826,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
             logger.warn('late workflow startup dispose failed: ' + redactError(error))
           }
         }, () => {})
-        return timeout('workflow exceeded the ' + config.timeoutMs + ' ms deadline during startup')
+        return timeout('workflow exceeded the ' + FIXED_TIMEOUT_MS + ' ms deadline during startup')
       }
       if (startup.kind === 'cancelled') {
         const reason = state.disposed
@@ -840,7 +844,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
         return failure(state.disposed ? 'Unloaded' : 'Cancelled', reason, state.disposed ? 'unloaded' : 'cancelled')
       }
       if (startup.kind === 'error') {
-        if (timedOut) return timeout('workflow exceeded the ' + config.timeoutMs + ' ms deadline during startup')
+        if (timedOut) return timeout('workflow exceeded the ' + FIXED_TIMEOUT_MS + ' ms deadline during startup')
         if (signal.aborted) {
           const reason = state.disposed
             ? workflowLabel(config) + ' was unloaded during workflow startup'
@@ -890,7 +894,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
         const reason = state.disposed
           ? 'grok-workflow plugin unloaded'
           : timedOut
-            ? `workflow deadline exceeded after ${config.timeoutMs} ms`
+            ? `workflow deadline exceeded after ${FIXED_TIMEOUT_MS} ms`
             : 'workflow cancelled by its caller'
         void active.cancel(reason)
       }
@@ -899,7 +903,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
       if (timedOut) {
         run.cancel('workflow deadline exceeded during startup')
         settledStop = 'cancelled'
-        return timeout(`workflow exceeded the ${config.timeoutMs} ms deadline and was cancelled`)
+        return timeout(`workflow exceeded the ${FIXED_TIMEOUT_MS} ms deadline and was cancelled`)
       }
     } finally {
       state.pending -= 1
@@ -914,14 +918,14 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
     // engine that ignores `cancel`.
     const raced = await Promise.race([activeRun.result, deadline])
     if (raced === 'deadline') {
-      void activeRun.cancel(`workflow deadline exceeded after ${config.timeoutMs} ms`)
+      void activeRun.cancel(`workflow deadline exceeded after ${FIXED_TIMEOUT_MS} ms`)
       settledStop = 'cancelled'
-      return timeout(`workflow exceeded the ${config.timeoutMs} ms deadline and was cancelled; the engine had not settled, so this report is the authoritative result`)
+      return timeout(`workflow exceeded the ${FIXED_TIMEOUT_MS} ms deadline and was cancelled; the engine had not settled, so this report is the authoritative result`)
     }
     const result = raced
     settledStop = result.stopReason
     if (timedOut) {
-      return timeout(`workflow exceeded the ${config.timeoutMs} ms deadline and was cancelled`)
+      return timeout(`workflow exceeded the ${FIXED_TIMEOUT_MS} ms deadline and was cancelled`)
     }
     if (result.stopReason === 'completed') {
       try {
@@ -932,13 +936,13 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
         // Run records are a configuration switch: a user who does not want the
         // plugin appending ledger entries to the session can turn them off, and
         // `recordLimit` bounds what is written.
-        if (config.recordRuns) {
+        if (FIXED_RECORD_RUNS) {
           recordRouting(sessionOfAgent(agent), {
             objective,
             routing: report.routing,
             synthesis: report.synthesis.mode,
             routes: report.routes,
-          }, logger, config.recordLimit)
+          }, logger, FIXED_RECORD_LIMIT)
         }
         lastReport = report
         lastCause = undefined
@@ -1038,8 +1042,8 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
  * the child ceiling and reports `workflow/agent-start` to the progress panel: a
  * side channel would make those three facts untrue for the cheap tiers.
  *
- * The route is `config.triageModel` when set, else the run's own route (`agent()`'s
- * default), which is why an unconfigured front desk costs no extra model.
+ * The route is always the run's own route (`agent()`'s default): the front desk
+ * inherits instead of naming a model (T4: `triageModel` removed).
  */
 export interface SingleCallOptions {
   ctx: Context
@@ -1113,12 +1117,9 @@ return { reply: null }
 export async function runSingleCall(options: SingleCallOptions): Promise<SingleCallOutcome> {
   const { ctx, config, state, logger, agent, prompt, label } = options
   if (state.disposed) return { ok: false, reason: workflowLabel(config) + ' is unavailable: plugin has been unloaded' }
-  const route = config.triageModel === undefined
-    ? {}
-    : config.triageModel.provider === undefined
-      ? { model: config.triageModel.model }
-      : { provider: config.triageModel.provider, model: config.triageModel.model }
-  const deadlineMs = config.timeoutMs
+  // T4: triageModel removed — the single call always inherits the run's route.
+  const route = {}
+  const deadlineMs = FIXED_TIMEOUT_MS
   const signals = options.signals ?? []
   let stopped = false
 
@@ -1199,7 +1200,7 @@ export async function runSingleCall(options: SingleCallOptions): Promise<SingleC
         signal: combined.signal,
         // One child: the tier's whole promise is "one model call".
         maxTotalAgents: 1,
-        ...config.subagentProvider === undefined ? {} : { subagentProvider: config.subagentProvider },
+        
       }
 
       if (combined.signal.aborted) {

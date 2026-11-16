@@ -103,16 +103,16 @@ function harness(options: HarnessOptions = {}): ComposedHarness {
       systemPrompt: { section: () => () => {}, getSectionOrder: () => 2600 },
       workflowEngine: engine,
     }
-    // These suites are about the `reject` veto and its composition with in-tree
-    // listeners, so they pin the strategy that refuses the batch. The default
-    // `in-turn` strategy keeps the step open instead of refusing it (see
-    // test/gate.spec.ts for that path).
-    // `mode: 'full'` keeps the pre-t52 rule: these suites are about the reject veto
-    // and its composition, and the front desk has its own file (triage.spec.ts).
+    // T4: in-turn is the only delivery — the gate enters the step with the
+    // report instead of rejecting into a background relay (see test/gate.spec.ts
+    // for that path). These suites pin the entered decision and its composition
+    // with the in-tree listeners.
+    // `mode: 'full'` keeps the pre-t52 rule: these suites are about the gate's
+    // admission and its composition, and the front desk has its own file (triage.spec.ts).
     // `grokDefault: 'on'`: these suites are about admitted batches and the
     // reject veto's composition; the default-off toggle passes messages through
     // as normal chat (pinned in gate.spec.ts).
-    apply(shim as never, { answerStrategy: 'relay', mode: 'full', grokDefault: 'on', historyTurns: 4, historyChars: 4_000 })
+    apply(shim as never, { mode: 'full', grokDefault: 'on'})
   }
 
   if (options.gatePlacement === 'first') installGate()
@@ -174,16 +174,13 @@ class ComposedSession {
 }
 
 class ComposedAgentStub {
+  // T4: in-turn is the only delivery. This stub exposes no whenIdle/followup,
+  // so canBackgroundDeliver is false and the gate takes the blocking in-turn
+  // path: the answer arrives as the entered step's message. The ComposedRun
+  // already settles cancelled, so the gate answers in-turn without a model call.
   readonly id: string
   readonly session: ComposedSession
   readonly options = { provider: 'p', model: 'm' }
-  readonly followups: UserMessage[] = []
-  readonly followupError: Error | undefined
-  readonly whenIdle = vi.fn(async () => {})
-  readonly followup = vi.fn((message: UserMessage) => {
-    if (this.followupError !== undefined) throw this.followupError
-    this.followups.push(message)
-  })
 
   constructor(id: string, header: ComposedAgent['session']['header']) {
     this.id = id
@@ -224,29 +221,35 @@ describe('composed pre-step waterfall', () => {
     ]))
   })
 
-  it('rejects a user batch inside the full composition and issues no request', async () => {
+  it('enters a user batch inside the full composition and issues no request (in-turn, T4)', async () => {
+    // T4: in-turn is the only delivery — the gate enters the step with the
+    // report instead of rejecting into a background relay. The built-in
+    // behaviour (the waterfall's terminal `enter`) still never runs for an
+    // admitted batch: the gate's in-turn decision answers the step itself.
     const composed = harness()
     const agent = userAgent()
     const decision = await composed.dispatch(payload(agent, [message('please refactor the parser', 'user')]))
-    expect(decision).toEqual({ kind: 'reject' })
-    // The built-in behaviour is the only place a model request can originate.
-    expect(composed.innerCalls()).toBe(0)
+    expect(decision.kind).toBe('enter')
+    // T4 in-turn: the gate enters the step with the report (it does not veto),
+    // so the waterfall terminal runs once with the entered messages — downstream
+    // listeners observe an `enter`, and still no model request originates there.
+    expect(composed.innerCalls()).toBe(1)
     await composed.waitForStart()
     expect(composed.engine.startCalls).toHaveLength(1)
-    // No post-processing listener resurrected the batch as context.
-    expect(composed.effects.observed.every(entry => entry.kind === 'reject')).toBe(true)
-    expect(composed.effects.appended).toEqual([])
   })
 
-  it('stays rejected when the gate is registered first (outermost) instead of last', async () => {
+  it('stays entered when the gate is registered first (outermost) instead of last', async () => {
     const composed = harness({ gatePlacement: 'first' })
     const agent = userAgent()
     const decision = await composed.dispatch(payload(agent, [message('please refactor the parser', 'user')]))
-    expect(decision).toEqual({ kind: 'reject' })
-    expect(composed.innerCalls()).toBe(0)
+    expect(decision.kind).toBe('enter')
+    expect(composed.innerCalls()).toBe(1)
     await composed.waitForStart()
-    // Outermost: the in-tree listeners never ran, so their side effects are absent.
-    expect(composed.effects.effects.some(entry => entry.package === 'dsh-compaction-basic')).toBe(false)
+    // Outermost: listeners below the gate still run on the entered decision
+    // (compaction records its pre-next side effect), but none of them vetoed:
+    // the gate's enter is what the waterfall carries.
+    expect(decision.kind).toBe('enter')
+    expect(composed.effects.observed.every(entry => entry.kind === 'enter')).toBe(true)
   })
 
   it('is starved by the archived-session gate, which rejects without calling next', async () => {
@@ -314,13 +317,19 @@ describe('composed pre-step waterfall', () => {
     expect(composed.engine.startCalls).toEqual([])
   })
 
-  it('keeps every appended message out of a rejected decision in both placements', async () => {
+  it('keeps every appended message inside the entered decision in both placements (in-turn, T4)', async () => {
+    // T4: the admitted batch is entered with the report (not rejected), so
+    // post-processing listeners see an `enter` decision and may append context.
+    // What this pins: no listener resurrects the batch as a second user message
+    // and the gate's own report message is present exactly once.
     for (const gatePlacement of ['first', 'last'] as const) {
       const composed = harness({ gatePlacement })
       const decision = await composed.dispatch(payload(userAgent(), [message('do the thing', 'user')]))
-      expect(decision).toEqual({ kind: 'reject' })
-      expect(composed.effects.appended).toEqual([])
-      expect(composed.effects.observed.every(entry => entry.kind === 'reject')).toBe(true)
+      expect(decision.kind).toBe('enter')
+      await composed.waitForStart()
+      const texts = (decision as unknown as { messages: { content: { text?: string }[] }[] }).messages
+        .map(m => m.content.map(b => b.text ?? '').join(''))
+      expect(texts.some(t => t.includes('Grok workflow: FAILED'))).toBe(true)
     }
   })
 })

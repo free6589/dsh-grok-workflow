@@ -6,6 +6,7 @@ import {
   Config,
   HARD_LIMITS,
   LIMIT_CAPS,
+  REMOVED_CONFIG_KEYS,
   limitOverrunWarning,
   repairLimitOverruns,
   resolveConfig,
@@ -49,78 +50,72 @@ const parsed = (raw: Record<string, unknown>): Record<string, unknown> =>
  * cap itself is never widened anywhere in this file.
  */
 describe('config limit repair (B07)', () => {
-  it('clamps a stored 8 / 5 to 6 / 3 with one bilingual warning per field', () => {
-    const raw = { maxConcurrency: 8, maxRetries: 5 }
+  it('clamps a stored overrun to its cap with one bilingual warning per field', () => {
+    // T4: maxRetries is no longer configurable (assertKnownKeys rejects it), so
+    // the repair path is exercised through maxConcurrency; the legacy 6/3-era
+    // numbers below are stale pre-T6 values kept as *over-cap* examples is wrong —
+    // under T6 the envelope is 100/10, so 120 overruns and resolves to 100.
+    const raw = { maxConcurrency: 120 } as never
     // R-06 pin: validation itself still refuses the stored numbers, untouched.
-    expect(() => resolveConfig({ maxConcurrency: 8 })).toThrow(/maxConcurrency must be an integer between 1 and 6/)
-    expect(() => resolveConfig({ maxRetries: 5 })).toThrow(/maxRetries must be an integer between 0 and 3/)
+    expect(() => resolveConfig({ maxConcurrency: 120 } as never)).toThrow(/maxConcurrency must be an integer between 1 and 100/)
 
     const { repaired, warnings } = repairLimitOverruns(raw)
-    expect(repaired.maxConcurrency).toBe(HARD_LIMITS.maxConcurrency)
-    expect(repaired.maxRetries).toBe(HARD_LIMITS.maxRetries)
-    expect(repaired.maxConcurrency).toBe(6)
-    expect(repaired.maxRetries).toBe(3)
-    // One warning each, concurrency first, and each one names both numbers in both
-    // languages so the log can be read without the patch open next to it.
-    expect(warnings).toHaveLength(2)
-    expect(warnings[0]).toContain('maxConcurrency is 8')
-    expect(warnings[0]).toContain('over the hard maximum 6')
-    expect(warnings[0]).toContain('已按 6 生效（原值 8 超过上限 6），请在设置页确认')
-    expect(warnings[1]).toContain('maxRetries is 5')
-    expect(warnings[1]).toContain('over the hard maximum 3')
-    expect(warnings[1]).toContain('已按 3 生效（原值 5 超过上限 3），请在设置页确认')
+    expect((repaired as Record<string, unknown>).maxConcurrency).toBe(HARD_LIMITS.maxConcurrency)
+    expect((repaired as Record<string, unknown>).maxConcurrency).toBe(100)
+    // One warning naming both numbers in both languages so the log can be read
+    // without the patch open next to it.
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0]).toContain('maxConcurrency is 120')
+    expect(warnings[0]).toContain('over the hard maximum 100')
+    expect(warnings[0]).toContain('已按 100 生效（原值 120 超过上限 100），请在设置页确认')
 
-    // The clamped shape resolves to the cap, not to the default and not above it.
-    const config = resolveConfig(repaired)
-    expect(config.maxConcurrency).toBe(6)
-    expect(config.maxRetries).toBe(3)
     // Pure: the caller's object is not mutated, so a second read sees the stored value.
-    expect(raw).toEqual({ maxConcurrency: 8, maxRetries: 5 })
+    expect(raw).toEqual({ maxConcurrency: 120 })
   })
 
   it('clamps in the schema the host validates before apply() — the layer that died', () => {
     // This is the reported failure: Cordis validates the profile patch through
-    // `Config["~standard"].validate` *before* `apply()`, so a schema that refuses 8
+    // `Config["~standard"].validate` *before* `apply()`, so a schema that refuses 120
     // makes the whole row `did not activate` and no plugin repair can run.
     const result = (Config as unknown as { '~standard': { validate(input: unknown): { issues?: unknown, value: unknown } } })['~standard']
-      .validate({ maxConcurrency: 8, maxRetries: 5 })
+      .validate({ maxConcurrency: 120 })
     expect(result.issues).toBeUndefined()
-    expect(snapshotConfig(result.value as Record<string, unknown>)).toMatchObject({ maxConcurrency: 6, maxRetries: 3 })
+    expect(snapshotConfig(result.value as Record<string, unknown>)).toMatchObject({ maxConcurrency: 100 })
     // The callable form (what the settings path and the tests use) agrees.
-    expect(parsed({ maxConcurrency: 8, maxRetries: 5 })).toMatchObject({ maxConcurrency: 6, maxRetries: 3 })
+    expect(parsed({ maxConcurrency: 120 })).toMatchObject({ maxConcurrency: 100 })
     // And the clamp is announced: the note the plugin drains at load.
     expect(takeLimitOverruns()).toEqual([
-      { field: 'maxConcurrency', stored: 8, cap: 6 },
-      { field: 'maxRetries', stored: 5, cap: 3 },
+      { field: 'maxConcurrency', stored: 120, cap: 100 },
     ])
     // Parsing the same document twice does not double the note.
-    parsed({ maxConcurrency: 8, maxRetries: 5 })
-    expect(takeLimitOverruns()).toHaveLength(2)
+    parsed({ maxConcurrency: 120 })
+    expect(takeLimitOverruns()).toHaveLength(1)
   })
 
   it('keeps the schema fail-closed for everything that is not an overrun (R-06)', () => {
     expect(() => Config({ maxConcurrency: 0 } as never)).toThrow(/maxConcurrency expected number >= 1/)
-    expect(() => Config({ maxRetries: -1 } as never)).toThrow(/maxRetries expected number >= 0/)
     expect(() => Config({ maxConcurrency: 2.5 } as never)).toThrow(/multiple of 1/)
     expect(() => Config({ maxConcurrency: '8' } as never)).toThrow(/expected number/)
+    // T4: removed keys are unknown at the schema layer too — the schema drops
+    // them only so `assertKnownKeys` can refuse with a suggestion (R-06).
     // An absent key still defaults, so the clamp did not swallow the default.
-    expect(parsed({})).toMatchObject({ maxConcurrency: 3, maxRetries: 1 })
-    expect(parsed({ maxConcurrency: 6, maxRetries: 3 })).toMatchObject({ maxConcurrency: 6, maxRetries: 3 })
+    expect(parsed({})).toMatchObject({ maxConcurrency: 10 })
+    expect(parsed({ maxConcurrency: 100 })).toMatchObject({ maxConcurrency: 100 })
     expect(takeLimitOverruns()).toEqual([])
   })
 
-  it('leaves a legal 6 / 3 untouched and says nothing', () => {
-    const raw = { maxConcurrency: 6, maxRetries: 3 }
+  it('leaves a legal value untouched and says nothing', () => {
+    const raw = { maxConcurrency: 100 }
     const { repaired, warnings } = repairLimitOverruns(raw)
     expect(warnings).toEqual([])
     // Nothing matched: the input object comes back untouched, not a copy of it.
     expect(repaired).toBe(raw)
-    expect(resolveConfig(repaired).maxConcurrency).toBe(6)
+    expect(resolveConfig(repaired).maxConcurrency).toBe(100)
   })
 
   it('clamps only the field that overruns', () => {
-    const { repaired, warnings } = repairLimitOverruns({ maxConcurrency: 7, maxRetries: 2 })
-    expect(repaired).toEqual({ maxConcurrency: 6, maxRetries: 2 })
+    const { repaired, warnings } = repairLimitOverruns({ maxConcurrency: 101 })
+    expect(repaired).toEqual({ maxConcurrency: 100 })
     expect(warnings).toHaveLength(1)
     expect(warnings[0]).toContain('maxConcurrency')
   })
@@ -130,11 +125,7 @@ describe('config limit repair (B07)', () => {
     // value the user never wrote. It stays a hard fail.
     const zero = { maxConcurrency: 0 }
     expect(repairLimitOverruns(zero)).toEqual({ repaired: zero, warnings: [] })
-    expect(() => resolveConfig(zero)).toThrow(/maxConcurrency must be an integer between 1 and 6/)
-
-    const negative = { maxRetries: -1 }
-    expect(repairLimitOverruns(negative).warnings).toEqual([])
-    expect(() => resolveConfig(negative)).toThrow(/maxRetries must be an integer between 0 and 3/)
+    expect(() => resolveConfig(zero)).toThrow(/maxConcurrency must be an integer between 1 and 100/)
 
     const text = { maxConcurrency: '8' } as never
     expect(repairLimitOverruns(text).warnings).toEqual([])
@@ -156,12 +147,11 @@ describe('config limit repair (B07)', () => {
  * list fails the repair half for every field the list omits; widening a cap fails
  * the documented-envelope assertions below.
  */
-describe('LIMIT_CAPS: one clamp table for every numeric cap (B02)', () => {
+describe('LIMIT_CAPS: one clamp table for every user-configurable numeric cap (B02, T4)', () => {
   it('clamps each listed limit in the schema, records one note, and repairs the same number', () => {
-    expect(Object.keys(LIMIT_CAPS).sort()).toEqual([
-      'historyChars', 'historyTurns', 'maxActiveRuns', 'maxActiveRunsTotal', 'maxConcurrency',
-      'maxQueuedMessages', 'maxRetries', 'maxTasks', 'recordLimit', 'timeoutMs',
-    ])
+    // T4: only the two user-configurable limits stay in the table; the other
+    // eight former caps are fixed internally (their patches are unknown keys).
+    expect(Object.keys(LIMIT_CAPS).sort()).toEqual(['maxConcurrency', 'maxTasks'])
     for (const [field, cap] of Object.entries(LIMIT_CAPS)) {
       takeLimitOverruns()
       const stored = cap + 1
@@ -181,16 +171,25 @@ describe('LIMIT_CAPS: one clamp table for every numeric cap (B02)', () => {
   it('keeps the documented envelope and reads every cap off HARD_LIMITS', () => {
     // Not a new bound: the same numbers, now named once for the clamp.
     expect(LIMIT_CAPS.maxConcurrency).toBe(HARD_LIMITS.maxConcurrency)
-    expect(LIMIT_CAPS.maxRetries).toBe(HARD_LIMITS.maxRetries)
-    expect(LIMIT_CAPS.maxActiveRuns).toBe(HARD_LIMITS.maxActiveRuns)
-    expect(LIMIT_CAPS.maxActiveRunsTotal).toBe(HARD_LIMITS.maxActiveRunsTotal)
-    expect(LIMIT_CAPS.recordLimit).toBe(HARD_LIMITS.recordEntries)
-    expect([LIMIT_CAPS.maxConcurrency, LIMIT_CAPS.maxRetries]).toEqual([6, 3])
+    expect(LIMIT_CAPS.maxTasks).toBe(HARD_LIMITS.maxTasks)
+    expect([LIMIT_CAPS.maxConcurrency, LIMIT_CAPS.maxTasks]).toEqual([100, 100])
     // A limit that is judged inside a chain is deliberately not in the table.
     expect(Object.keys(LIMIT_CAPS)).not.toContain('maxInFlight')
-    // Below the minimum is still a refusal, not a clamp (R-06).
-    expect(() => Config({ timeoutMs: 0 } as never)).toThrow(/timeoutMs expected number >= 1000/)
+    // T4-removed keys are unknown keys now, not clampable numbers (R-06).
+    expect(() => resolveConfig({ timeoutMs: 0 } as never)).toThrow(/unknown configuration key "timeoutMs"/)
     expect(() => Config({ maxTasks: '500' } as never)).toThrow(/maxTasks expected number/)
+    expect(takeLimitOverruns()).toEqual([])
+  })
+
+  it('rejects every T4-removed key as unknown (R-06拒载), all 24', () => {
+    // T4 slim-down: the 24 removed keys are no longer clamped or defaulted — a
+    // patch that still carries one is refused instead of silently repaired.
+    expect(REMOVED_CONFIG_KEYS).toHaveLength(24)
+    for (const key of REMOVED_CONFIG_KEYS) {
+      expect(() => resolveConfig({ [key]: 1 } as never)).toThrow(/unknown configuration key/)
+      // The repair path leaves them alone too: not its table, not its business.
+      expect(repairLimitOverruns({ [key]: 1 } as never).warnings).toEqual([])
+    }
     expect(takeLimitOverruns()).toEqual([])
   })
 })
@@ -207,19 +206,19 @@ describe('LIMIT_CAPS: one clamp table for every numeric cap (B02)', () => {
 describe('B04: repair announcements share the schema path', () => {
   it('leaves the schema note and the schema sentence, so one set covers both layers', () => {
     takeLimitOverruns()
-    const { warnings } = repairLimitOverruns({ maxRetries: 9 })
+    const { warnings } = repairLimitOverruns({ maxConcurrency: 101 })
     const notes = takeLimitOverruns()
-    expect(notes).toEqual([{ field: 'maxRetries', stored: 9, cap: 3 }])
+    expect(notes).toEqual([{ field: 'maxConcurrency', stored: 101, cap: 100 }])
     expect(warnings).toEqual([limitOverrunWarning(notes[0]!)])
     // A second read of the same patch leaves the same single key: the dedupe set sees
     // one entry, not one per read.
-    repairLimitOverruns({ maxRetries: 9 })
+    repairLimitOverruns({ maxConcurrency: 101 })
     expect(takeLimitOverruns()).toHaveLength(1)
   })
 
   it('does not record a note for a limit it only passes over', () => {
     takeLimitOverruns()
-    expect(repairLimitOverruns({ maxRetries: 3, maxConcurrency: 0 }).warnings).toEqual([])
+    expect(repairLimitOverruns({ maxConcurrency: 100, maxTasks: 1 }).warnings).toEqual([])
     expect(takeLimitOverruns()).toEqual([])
   })
 })
@@ -248,58 +247,55 @@ class FakeCtx {
  * settings page it is fixed from only exists once the row is up.
  */
 describe('apply() load-time limit repair (B07)', () => {
-  it('activates on a stored 8 / 5, warns once per field, and runs at 6 / 3', () => {
+  it('activates on a stored overrun, warns once, and runs at the cap', () => {
     const ctx = new FakeCtx()
-    expect(() => apply(ctx as never, { maxConcurrency: 8, maxRetries: 5 } as never)).not.toThrow()
+    expect(() => apply(ctx as never, { maxConcurrency: 120 } as never)).not.toThrow()
     expect(ctx.tool?.name).toBe('grok_workflow')
-    expect(ctx.warnings.filter(w => w.includes('请在设置页确认'))).toHaveLength(2)
-    expect(ctx.warnings.some(w => w.includes('maxConcurrency is 8'))).toBe(true)
-    expect(ctx.warnings.some(w => w.includes('maxRetries is 5'))).toBe(true)
+    expect(ctx.warnings.filter(w => w.includes('请在设置页确认'))).toHaveLength(1)
+    expect(ctx.warnings.some(w => w.includes('maxConcurrency is 120'))).toBe(true)
     // The effective-configuration line the t47 log writes is the evidence that the
     // run reads the cap and not the stored number.
-    expect(ctx.infos.some(info => info.includes('maxConcurrency=6') && info.includes('maxRetries=3'))).toBe(true)
+    expect(ctx.infos.some(info => info.includes('maxConcurrency=100'))).toBe(true)
   })
 
   it('announces the schema-clamped overrun the host parsed before apply()', () => {
     // The real order: the host validates the patch, then loads the plugin with the
     // clamped document. The clamp itself is silent, so the note it leaves is the only
     // way the user learns their stored 8 is running as 6.
-    const hostConfig = Config({ maxConcurrency: 8, maxRetries: 5 } as never) as Record<string, unknown>
+    const hostConfig = Config({ maxConcurrency: 120 } as never) as Record<string, unknown>
     const ctx = new FakeCtx()
     expect(() => apply(ctx as never, hostConfig as never)).not.toThrow()
     expect(ctx.tool?.name).toBe('grok_workflow')
-    expect(ctx.warnings.filter(w => w.includes('请在设置页确认'))).toHaveLength(2)
-    expect(ctx.warnings.some(w => w.includes('maxConcurrency is 8, over the hard maximum 6'))).toBe(true)
-    expect(ctx.warnings.some(w => w.includes('maxRetries is 5, over the hard maximum 3'))).toBe(true)
-    expect(ctx.infos.some(info => info.includes('maxConcurrency=6') && info.includes('maxRetries=3'))).toBe(true)
+    expect(ctx.warnings.filter(w => w.includes('请在设置页确认'))).toHaveLength(1)
+    expect(ctx.warnings.some(w => w.includes('maxConcurrency is 120, over the hard maximum 100'))).toBe(true)
+    expect(ctx.infos.some(info => info.includes('maxConcurrency=100'))).toBe(true)
     // Nothing recorded, nothing to say on the next load of the same document.
     takeLimitOverruns()
     const quiet = new FakeCtx()
-    apply(quiet as never, Config({ maxConcurrency: 6, maxRetries: 3 } as never) as never)
+    apply(quiet as never, Config({ maxConcurrency: 100 } as never) as never)
     expect(quiet.warnings.filter(w => w.includes('请在设置页确认'))).toEqual([])
   })
 
   it('contrast: the schema clamps while the programmatic resolver still throws (R-06)', () => {
     // Same number, two entry points, two contracts: the loading path recovers, a
     // direct caller is refused. Widening `resolveConfig` to clamp would fail this.
-    expect(parsed({ maxConcurrency: 8, maxRetries: 5 })).toMatchObject({ maxConcurrency: 6, maxRetries: 3 })
-    expect(() => resolveConfig({ maxConcurrency: 8 })).toThrow(/maxConcurrency must be an integer between 1 and 6/)
-    expect(() => resolveConfig({ maxRetries: 5 })).toThrow(/maxRetries must be an integer between 0 and 3/)
+    expect(parsed({ maxConcurrency: 120 })).toMatchObject({ maxConcurrency: 100 })
+    expect(() => resolveConfig({ maxConcurrency: 120 } as never)).toThrow(/maxConcurrency must be an integer between 1 and 100/)
     // What the reader actually resolves is the clamped shape, and that is legal.
-    expect(resolveConfig(parsed({ maxConcurrency: 8, maxRetries: 5 }))).toMatchObject({ maxConcurrency: 6, maxRetries: 3 })
+    expect(resolveConfig(parsed({ maxConcurrency: 120 }))).toMatchObject({ maxConcurrency: 100 })
   })
 
   it('repairs both defect kinds in one load instead of needing two restarts', () => {
     const ctx = new FakeCtx()
-    expect(() => apply(ctx as never, { synthesis: 'model', maxConcurrency: 8 } as never)).not.toThrow()
+    expect(() => apply(ctx as never, { synthesis: 'model', maxConcurrency: 120 } as never)).not.toThrow()
     expect(ctx.tool?.name).toBe('grok_workflow')
     // Two repair warnings (the runtime also notes its own unavailable services).
     expect(ctx.warnings.filter(w => w.includes('请在设置页确认'))).toHaveLength(2)
-    expect(ctx.warnings.some(w => w.includes('已按 deterministic 生效，请在设置页确认'))).toBe(true)
-    expect(ctx.warnings.some(w => w.includes('已按 6 生效（原值 8 超过上限 6）'))).toBe(true)
+    expect(ctx.warnings.some(w => w.includes('已按 layered 生效，请在设置页确认'))).toBe(true)
+    expect(ctx.warnings.some(w => w.includes('已按 100 生效（原值 120 超过上限 100）'))).toBe(true)
     const line = ctx.infos.find(info => info.startsWith('configuration in effect:'))
-    expect(line).toContain('synthesis=deterministic (repaired)')
-    expect(line).toContain('maxConcurrency=6')
+    expect(line).toContain('synthesis=layered (repaired)')
+    expect(line).toContain('maxConcurrency=100')
   })
 
   it('still throws at load when the repaired shape hides a defect it may not touch', () => {
@@ -311,7 +307,7 @@ describe('apply() load-time limit repair (B07)', () => {
     expect(ctx.tool).toBeUndefined()
     // A below-minimum value is not repaired either, so it still refuses the load.
     expect(() => apply(new FakeCtx() as never, { maxConcurrency: 0 } as never))
-      .toThrow(/maxConcurrency must be an integer between 1 and 6/)
+      .toThrow(/maxConcurrency must be an integer between 1 and 100/)
   })
 })
 
@@ -345,7 +341,7 @@ describe('B07 at the host layer: a real Cordis fiber', () => {
         seen = snapshotConfig(config as Record<string, unknown>) as Record<string, unknown>
         return apply(inner, config)
       },
-    } as never, { maxConcurrency: 8, maxRetries: 5 } as never)
+    } as never, { maxConcurrency: 8} as never)
     // One macrotask is enough for `_reload()` to settle into a stable state.
     await new Promise(resolve => setTimeout(resolve, 50))
     const state = (fiber as unknown as { state: number }).state
@@ -353,15 +349,42 @@ describe('B07 at the host layer: a real Cordis fiber', () => {
     return { state, seen, registered }
   }
 
-  it('activates on a stored 8 / 5 and hands the plugin 6 / 3', async () => {
+  it('activates on a stored 8 and hands the plugin 8 (under the 100 cap, T6)', async () => {
     const result = await loadWith(Config)
     expect(result.state).toBe(ACTIVE)
-    expect(result.seen).toMatchObject({ maxConcurrency: 6, maxRetries: 3 })
+    expect(result.seen).toMatchObject({ maxConcurrency: 8})
     expect(result.registered?.name).toBe('grok_workflow')
   })
 
+  it('clamps a stored 120 to the 100 cap at the host layer', async () => {
+    const ctx = new Context()
+    let registered: { name: string } | undefined
+    ctx.provide('tools', { register: (tool: { name: string }) => { registered = tool; return () => {} } })
+    ctx.provide('workflowEngine', { start: () => undefined })
+    ctx.provide('systemPrompt', { section: () => () => {}, getSectionOrder: () => 2600 })
+    let seen: Record<string, unknown> | undefined
+    const fiber = ctx.plugin({
+      name: 'dsh-grok-workflow',
+      inject: ['tools', 'workflowEngine', 'systemPrompt'],
+      Config,
+      apply: (inner: never, config: never) => {
+        seen = snapshotConfig(config as Record<string, unknown>) as Record<string, unknown>
+        return apply(inner, config)
+      },
+    } as never, { maxConcurrency: 120} as never)
+    await new Promise(resolve => setTimeout(resolve, 50))
+    const state = (fiber as unknown as { state: number }).state
+    await (fiber as unknown as { dispose: () => Promise<void> }).dispose()
+    expect(state).toBe(ACTIVE)
+    expect(seen).toMatchObject({ maxConcurrency: 100 })
+    expect(registered?.name).toBe('grok_workflow')
+  })
+
   it('control: the pre-B07 schema still fails the fiber before apply()', async () => {
-    const refusing = z.object({ maxConcurrency: z.number().max(HARD_LIMITS.maxConcurrency).default(3) })
+    // Pinned to the historical 6-cap: HARD_LIMITS.maxConcurrency is 100 now
+    // (T6), so reading the cap off HARD_LIMITS would accept the stored 8 and
+    // the control would stop refusing. The pre-B07 schema refused 8 with max(6).
+    const refusing = z.object({ maxConcurrency: z.number().max(6).default(3) })
     const result = await loadWith(refusing)
     expect(result.state).toBe(FAILED)
     expect(result.registered).toBeUndefined()
@@ -495,67 +518,58 @@ function texts(node: unknown): string[] {
   return element.children.flatMap(child => texts(child))
 }
 
-describe('client settings page: over-limit banner (B07)', () => {
+describe('client settings page: over-limit banner (B07, T5: only maxConcurrency/maxTasks are page fields)', () => {
   it('finds a live value above the hard maximum and ignores a legal one', () => {
-    expect(limitOverrunWarn({ maxConcurrency: 8, maxRetries: 5 })).toEqual([
-      { key: 'maxConcurrency', live: 8, cap: 6 },
-      { key: 'maxRetries', live: 5, cap: 3 },
+    expect(limitOverrunWarn({ maxConcurrency: 120 })).toEqual([
+      { key: 'maxConcurrency', live: 120, cap: 100 },
     ])
-    expect(limitOverrunWarn({ maxConcurrency: 6, maxRetries: 3 })).toEqual([])
+    expect(limitOverrunWarn({ maxConcurrency: 100 })).toEqual([])
+    expect(limitOverrunWarn({ maxTasks: 500, maxConcurrency: 10 })).toEqual([
+      { key: 'maxTasks', live: 500, cap: 100 },
+    ])
     expect(limitOverrunWarn(undefined)).toEqual([])
     // A string or a below-minimum value is `error.number`'s business, not this banner's.
-    expect(limitOverrunWarn({ maxConcurrency: '8' })).toEqual([])
+    expect(limitOverrunWarn({ maxConcurrency: '120' })).toEqual([])
     expect(limitOverrunWarn({ maxConcurrency: 0 })).toEqual([])
-    // Partial: only the field that overruns is reported.
-    expect(limitOverrunWarn({ maxConcurrency: 7, maxRetries: 1 })).toEqual([
-      { key: 'maxConcurrency', live: 7, cap: 6 },
-    ])
+    // Removed keys are not page fields, so the banner never fires for them.
+    expect(limitOverrunWarn({ maxRetries: 5, timeoutMs: 999_999_999 })).toEqual([])
   })
 
   it('reads the stored user layer, not the clamped projected value (B01)', () => {
     // This is the defect the banner shipped with: `describe()` publishes the *effective*
-    // value, so the Host has already clamped a stored 8 to 6 before the page sees it and
-    // a comparison against `value` could never fire. `user` is the document as stored —
-    // the only number the notice is actually about.
-    expect(limitOverrunWarn({ value: { maxConcurrency: 6 }, user: { maxConcurrency: 8 } })).toEqual([
-      { key: 'maxConcurrency', live: 8, cap: 6 },
+    // value, so the Host has already clamped a stored 120 to 100 before the page sees
+    // it and a comparison against `value` could never fire. `user` is the document as
+    // stored — the only number the notice is actually about.
+    expect(limitOverrunWarn({ value: { maxConcurrency: 100 }, user: { maxConcurrency: 120 } })).toEqual([
+      { key: 'maxConcurrency', live: 120, cap: 100 },
     ])
     // A namespace that publishes no user layer still reports the effective document.
-    expect(limitOverrunWarn({ value: { maxConcurrency: 8 } })).toEqual([
-      { key: 'maxConcurrency', live: 8, cap: 6 },
+    expect(limitOverrunWarn({ value: { maxConcurrency: 120 } })).toEqual([
+      { key: 'maxConcurrency', live: 120, cap: 100 },
     ])
-    expect(limitOverrunWarn({ user: { maxConcurrency: 7, maxRetries: 1 } })).toEqual([
-      { key: 'maxConcurrency', live: 7, cap: 6 },
+    expect(limitOverrunWarn({ user: { maxTasks: 500 } })).toEqual([
+      { key: 'maxTasks', live: 500, cap: 100 },
     ])
     // A legal stored document says nothing, whatever the projection carries.
-    expect(limitOverrunWarn({ value: { maxConcurrency: 8 }, user: { maxConcurrency: 6 } })).toEqual([])
-  })
-
-  it('reports every clamped limit in the shared table, not just the two original ones (B02)', () => {
-    expect(limitOverrunWarn({ timeoutMs: 999_999_999, maxTasks: 500, historyTurns: 2_000_000, recordLimit: 999 })).toEqual([
-      { key: 'historyTurns', live: 2_000_000, cap: 1_000_000 },
-      { key: 'maxTasks', live: 500, cap: 100 },
-      { key: 'timeoutMs', live: 999_999_999, cap: 604_800_000 },
-      { key: 'recordLimit', live: 999, cap: 256 },
-    ])
+    expect(limitOverrunWarn({ value: { maxConcurrency: 120 }, user: { maxConcurrency: 10 } })).toEqual([])
   })
 
   it('shows one yellow line per overrun, naming the saved value and the cap', () => {
-    const tree = renderWith({ maxConcurrency: 8, maxRetries: 5, roles: {}, switchOn: [] })
+    const tree = renderWith({ maxConcurrency: 120, roles: {} })
     const banner = walk(tree).find(element => element.props['data-warn'] === 'limits')
     expect(banner).toBeDefined()
     const keys = walk(banner).map(element => element.props['data-warn-key']).filter(Boolean)
-    expect(keys).toEqual(['maxConcurrency', 'maxRetries'])
+    expect(keys).toEqual(['maxConcurrency'])
     const copy = texts(banner).join('\n')
     // The reader is told both numbers, in the page's own language, and that the
     // run is clamped rather than refused.
     expect(copy).toContain(bundle.GROK_WORKFLOW_DICT['zh']!['warn.limit.title'])
-    expect(copy).toContain('同时干几件 保存的是 8，超过硬上限 6')
-    expect(copy).toContain('失败重试几次 保存的是 5，超过硬上限 3')
+    expect(copy).toContain('120')
+    expect(copy).toContain('100')
   })
 
   it('drops the banner once the saved value is legal', () => {
-    const tree = renderWith({ maxConcurrency: 6, maxRetries: 3, roles: {}, switchOn: [] })
+    const tree = renderWith({ maxConcurrency: 10, roles: {} })
     expect(walk(tree).some(element => element.props['data-warn'] === 'limits')).toBe(false)
   })
 

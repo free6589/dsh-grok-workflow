@@ -250,7 +250,7 @@ describe('generated workflow script on the real engine', () => {
     const args = { ...runArgs([callerTask]), maxTotalAgents: 7 }
     const result = await engine.run(WORKFLOW_SCRIPT, { args })
     expect(result.stopReason).toBe('completed')
-    const validated = assertWorkflowReport(result.value, 'Ship the verified result', resolveConfig({ maxConcurrency: 2, maxRetries: 1, maxTasks: 6 }))
+    const validated = assertWorkflowReport(result.value, 'Ship the verified result', resolveConfig({ maxConcurrency: 2, maxTasks: 6 }))
     expect(validated.status).toBe('completed')
     expect(validated.tasks[0]!.status).toBe('verified')
     expect(validated.confirmed).toEqual([{ taskId: 'a', criterion: 'a works', evidence: 'checked a works' }])
@@ -267,7 +267,7 @@ describe('generated workflow script on the real engine', () => {
     const args = { ...runArgs([callerTask]), maxTotalAgents: 7 }
     const result = await engine.run(WORKFLOW_SCRIPT, { args })
     expect(result.stopReason).toBe('completed')
-    const validated = assertWorkflowReport(result.value, 'Ship the verified result', resolveConfig({ maxConcurrency: 2, maxRetries: 1, maxTasks: 6 }))
+    const validated = assertWorkflowReport(result.value, 'Ship the verified result', resolveConfig({ maxConcurrency: 2, maxTasks: 6 }))
     expect(validated.status).toBe('failed')
     expect(validated.tasks[0]!.attempts).toHaveLength(2)
     expect(validated.incomplete).toEqual([{

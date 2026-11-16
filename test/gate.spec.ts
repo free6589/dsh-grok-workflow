@@ -16,10 +16,8 @@ import {runWorkflowScript, roleOf} from './helpers.js'
 import { ROUTING_RECORD } from '../src/records.js'
 
 /**
- * Install the gate with the `relay` strategy.
- *
- * `in-turn` is the default since t25 (it is the only strategy a one-shot app
- * survives), so every test below names the strategy it is actually about.
+ * Install the gate (T4: `in-turn` is the only delivery; every test below is
+ * about the gate and the run, not about the front desk).
  */
 function applyWith(ctx: unknown, overrides: Record<string, unknown> = {}): void {
   // `mode: 'full'` on purpose: every test in this file is about the gate and the
@@ -28,7 +26,7 @@ function applyWith(ctx: unknown, overrides: Record<string, unknown> = {}): void 
   // `grokDefault: 'on'` on purpose as well: these tests are about *admitted*
   // batches, and the default-off toggle passes everything through as normal chat
   // (pinned in `grok mode toggle (classifyPreStep)` below).
-  apply(ctx as never, { answerStrategy: 'relay', mode: 'full', grokDefault: 'on', ...overrides })
+  apply(ctx as never, { mode: 'full', grokDefault: 'on', ...overrides })
 }
 
 /* ------------------------------------------------------------------ engine -- */
@@ -308,12 +306,14 @@ describe('mandatory entry gate', () => {
   it('rejects an admitted user message and starts exactly one run', async () => {
     const ctx = new FakeContext()
     applyWith(ctx)
+    ctx.engine.autoRun = true
     const agent = new FakeAgent()
     const messages = [userMessage('summarize the repo')]
     const next = passingNext(messages)
-    const decision = await ctx.preStep()(payload(agent, messages), next)
-    expect(decision).toEqual({ kind: 'reject' })
-    expect(next).not.toHaveBeenCalled()
+    const decision = await ctx.preStep()(payload(agent, messages), next) as { kind: string }
+    // T4 in-turn: the turn stays open for the whole run and the report is
+    // entered (not rejected into a background relay + followup).
+    expect(decision.kind).toBe('enter')
     await waitFor(() => ctx.engine.startCalls.length === 1)
     expect(ctx.engine.startCalls[0]!.args).toMatchObject({ objective: expect.stringContaining('summarize the repo') })
   })
@@ -321,11 +321,12 @@ describe('mandatory entry gate', () => {
   it('routes one user message only once even when pre-step fires again', async () => {
     const ctx = new FakeContext()
     applyWith(ctx)
+    ctx.engine.autoRun = true
     const session = Session.create('sess-dedupe' as never)
     const agent = new FakeAgent({ session })
     const messages = [userMessage('same message')]
-    const first = await ctx.preStep()(payload(agent, messages), passingNext(messages))
-    expect(first).toEqual({ kind: 'reject' })
+    const first = await ctx.preStep()(payload(agent, messages), passingNext(messages)) as { kind: string }
+    expect(first.kind).toBe('enter')
     await waitFor(() => ctx.engine.startCalls.length === 1)
     const replay = passingNext(messages)
     const second = await ctx.preStep()(payload(agent, messages, 2, 1), replay)
@@ -337,64 +338,82 @@ describe('mandatory entry gate', () => {
   it('serializes a second message instead of running it concurrently', async () => {
     const ctx = new FakeContext()
     applyWith(ctx)
+    ctx.engine.autoRun = true
     const agent = new FakeAgent()
-    await ctx.preStep()(payload(agent, [userMessage('first')]), passingNext([]))
+    // In-turn holds the turn for the whole run: hold the promise so the run
+    // can settle, then await. autoRun completes the run on start.
+    const firstP = ctx.preStep()(payload(agent, [userMessage('first')]), passingNext([]))
+    const first = await firstP as { kind: string }
+    expect(first.kind).toBe('enter')
     await waitFor(() => ctx.engine.startCalls.length === 1)
-    await ctx.preStep()(payload(agent, [userMessage('second')], 2, 1), passingNext([]))
-    await new Promise(resolve => setTimeout(resolve, 5))
-    expect(ctx.engine.startCalls).toHaveLength(1)
-    ctx.engine.runs[0]!.complete(report())
+    const secondP = ctx.preStep()(payload(agent, [userMessage('second')], 2, 1), passingNext([]))
+    const second = await secondP as { kind: string }
+    expect(second.kind).toBe('enter')
     await waitFor(() => ctx.engine.startCalls.length === 2)
     expect(ctx.engine.startCalls[1]!.args).toMatchObject({ objective: expect.stringContaining('second') })
   })
 
-  it('refuses a message when the per-agent queue is full, without bypassing', async () => {
+  it('admits a second message while the first run is still open (in-turn serializes, T4)', async () => {
+    // T4: only `in-turn` survives and it blocks the turn for the whole run —
+    // there is no per-agent queue on this path anymore (the
+    // FIXED_MAX_QUEUED_MESSAGES bound only guards the interactive background
+    // admission). A second message is admitted right away as its own run;
+    // serialization happens inside the engine, not as a gate refusal. What this
+    // pins: no bypass (both runs start exactly once, in order) and no silent
+    // drop (both decisions settle).
     const ctx = new FakeContext()
-    applyWith(ctx, { maxQueuedMessages: 1 })
+    applyWith(ctx)
     const agent = new FakeAgent()
-    await ctx.preStep()(payload(agent, [userMessage('first')]), passingNext([]))
+    const first = ctx.preStep()(payload(agent, [userMessage('first')]), passingNext([]))
     await waitFor(() => ctx.engine.startCalls.length === 1)
-    const next = passingNext([])
-    const decision = await ctx.preStep()(payload(agent, [userMessage('second')], 2, 1), next)
-    expect(decision).toEqual({ kind: 'reject' })
-    expect(next).not.toHaveBeenCalled()
-    expect(ctx.engine.startCalls).toHaveLength(1)
-    await waitFor(() => agent.followups.length === 1)
-    expect(textOf(agent.followups[0]!)).toContain('queued message')
+    const second = ctx.preStep()(payload(agent, [userMessage('second')], 2, 1), passingNext([]))
+    ctx.engine.runs[0]!.complete(report({ objective: 'first' }))
+    const firstDecision = await first as { kind: string }
+    expect(firstDecision.kind).toBe('enter')
+    await waitFor(() => ctx.engine.startCalls.length === 2)
+    expect(ctx.engine.startCalls[1]!.args).toMatchObject({ objective: expect.stringContaining('second') })
+    ctx.engine.runs[1]!.complete(report({ objective: 'second' }))
+    const secondDecision = await second as { kind: string }
+    expect(secondDecision.kind).toBe('enter')
   })
 
-  it('returns from the listener without waiting for the agent to become idle', async () => {
+  it('admits while a run is open without waiting for idle (in-turn, T4)', async () => {
+    // T4: `in-turn` holds the turn open for the whole workflow — the listener
+    // never returns before the run settles, so there is no fast path that could
+    // skip ordering. What this pins: a second message is admitted immediately
+    // (its own run starts at once), not queued behind the first run's delivery.
     const ctx = new FakeContext()
-    applyWith(ctx, { maxQueuedMessages: 1 })
+    applyWith(ctx)
+    ctx.engine.autoRun = true
     const agent = new FakeAgent()
-    let releaseIdle: (() => void) | undefined
-    agent.whenIdle.mockImplementation(() => new Promise<void>(resolve => { releaseIdle = resolve }))
-    await ctx.preStep()(payload(agent, [userMessage('first')]), passingNext([]))
+    const first = ctx.preStep()(payload(agent, [userMessage('first')]), passingNext([]))
     await waitFor(() => ctx.engine.startCalls.length === 1)
-    const blocked = ctx.preStep()(payload(agent, [userMessage('second')], 2, 1), passingNext([]))
-    const decision = await Promise.race([
-      blocked,
-      new Promise<'timeout'>(resolve => setTimeout(() => resolve('timeout'), 50)),
-    ])
-    expect(decision).toEqual({ kind: 'reject' })
-    expect(releaseIdle).toBeDefined()
-    releaseIdle?.()
-    await waitFor(() => agent.followups.length === 1)
-    expect(textOf(agent.followups[0]!)).toContain('queued message')
+    const second = ctx.preStep()(payload(agent, [userMessage('second')], 2, 1), passingNext([]))
+    // Admitted at once: the second run starts even though the first is unsettled.
+    await waitFor(() => ctx.engine.startCalls.length === 2)
+    ctx.engine.runs[0]!.complete(report({ objective: 'first' }))
+    ctx.engine.runs[1]!.complete(report({ objective: 'second' }))
+    expect((await first) as { kind: string }).toMatchObject({ kind: 'enter' })
+    expect((await second) as { kind: string }).toMatchObject({ kind: 'enter' })
   })
 
   it('reads history when the run starts so a queued follow-up sees the previous answer', async () => {
     const ctx = new FakeContext()
     applyWith(ctx)
+    ctx.engine.autoRun = true
     const session = new FakeSession({ header: {} })
     const agent = new FakeAgent({ session })
-    await ctx.preStep()(payload(agent, [userMessage('first request')]), passingNext([]))
+    // Hold both admissions (in-turn blocks the turn), then settle in order.
+    const firstP = ctx.preStep()(payload(agent, [userMessage('first request')]), passingNext([]))
     await waitFor(() => ctx.engine.startCalls.length === 1)
     // A second message is admitted while the first run is still open.
-    await ctx.preStep()(payload(agent, [userMessage('second request')], 2, 1), passingNext([]))
+    const secondP = ctx.preStep()(payload(agent, [userMessage('second request')], 2, 1), passingNext([]))
     // The first answer becomes durable conversation before the second run starts.
     session.messages.push(userMessage('first request'), assistantMessage('FIRST ANSWER BODY'))
-    ctx.engine.runs[0]!.complete(report({ objective: 'first request' }))
+    expect((await firstP) as { kind: string }).toMatchObject({ kind: 'enter' })
+    // The second admission composed its objective while the first run was in
+    // flight, so it also settles now that the first run's answer is durable.
+    expect((await secondP) as { kind: string }).toMatchObject({ kind: 'enter' })
     await waitFor(() => ctx.engine.startCalls.length === 2)
     const objective = String((ctx.engine.startCalls[1]!.args as { objective: string }).objective)
     expect(objective).toContain('Conversation so far')
@@ -403,50 +422,54 @@ describe('mandatory entry gate', () => {
     expect(objective).toContain('second request')
   })
 
-  it('refuses a message explicitly when the queue is full and never retries it on its own', async () => {
+  it('never retries a refused batch on its own (host re-send is the only path)', async () => {
+    // T4: with only `in-turn` left, a fresh message is admitted as its own run.
+    // The host-side rule this pins: the plugin starts at most one run per
+    // admitted batch; a re-dispatch is a new admission, never an auto-retry.
     const ctx = new FakeContext()
-    applyWith(ctx, { maxQueuedMessages: 1 })
+    applyWith(ctx)
+    ctx.engine.autoRun = true
     const agent = new FakeAgent({ session: Session.create('sess-refusal' as never) })
-    await ctx.preStep()(payload(agent, [userMessage('first')]), passingNext([]))
+    // In-turn holds the turn open for the whole run: hold the promise, settle
+    // the run, then await — awaiting first would hang here forever.
+    const first = ctx.preStep()(payload(agent, [userMessage('first')]), passingNext([]))
     await waitFor(() => ctx.engine.startCalls.length === 1)
-    const refused = [userMessage('second')]
-    await ctx.preStep()(payload(agent, refused, 2, 1), passingNext([]))
     expect(ctx.engine.startCalls).toHaveLength(1)
     ctx.engine.runs[0]!.complete(report())
-    // Both messages, not one: the queue-full notice is delivered the moment the
-    // queue refuses, so waiting for a single follow-up returns while the admitted
-    // batch is still draining — and the re-dispatch below would be refused by the
-    // same full queue instead of starting the run this test is about.
-    await waitFor(() => agent.followups.length >= 2)
-    await new Promise(resolve => setTimeout(resolve, 5))
-    // The host claims the rejected batch and does not give it back (V-2), so
-    // nothing retries on its own: the dispatch below is a client re-send of the
-    // same message, which is the only path that can start the run.
-    const retried = passingNext(refused)
-    const decision = await ctx.preStep()(payload(agent, refused, 2, 1), retried)
-    expect(decision).toEqual({ kind: 'reject' })
-    expect(retried).not.toHaveBeenCalled()
+    expect((await first) as { kind: string }).toMatchObject({ kind: 'enter' })
+    // A client send of a new message starts exactly one more run — no
+    // automatic retry happened in between.
+    const retried = passingNext([userMessage('second')])
+    const second = ctx.preStep()(payload(agent, [userMessage('second')], 2, 1), retried)
     await waitFor(() => ctx.engine.startCalls.length === 2)
+    ctx.engine.runs[1]!.complete(report({ objective: 'second' }))
+    expect((await second) as { kind: string }).toMatchObject({ kind: 'enter' })
   })
 
   it('refuses a message with no text instead of burning a workflow run', async () => {
     const ctx = new FakeContext()
     applyWith(ctx)
     const agent = new FakeAgent({ session: Session.create('sess-empty' as never) })
-    const decision = await ctx.preStep()(payload(agent, [userMessage('   ')]), passingNext([]))
-    expect(decision).toEqual({ kind: 'reject' })
-    await waitFor(() => agent.followups.length === 1)
-    expect(textOf(agent.followups[0]!)).toContain('no text to route')
+    const decision = await ctx.preStep()(payload(agent, [userMessage('   ')]), passingNext([])) as {
+      kind: string
+      messages: UserMessage[]
+    }
+    // T4 in-turn: an empty batch is an entered notice (refusalOf), not a
+    // reject + followup. No run starts either way.
+    expect(decision.kind).toBe('enter')
+    expect(answerOf(decision)).toContain('no text to route')
     expect(ctx.engine.startCalls).toHaveLength(0)
   })
 
-  it('fails loading when the hook is missing and the gate is required', () => {
+  it('fails open with a warning when the hook is missing (gate always on, T4)', () => {
     const ctx = new FakeContext()
     // A runtime that exposes everything except the pre-step registration hook.
     const withoutHook = new Proxy(ctx, {
       get: (target, property, receiver) => property === 'on' ? undefined : Reflect.get(target, property, receiver),
     })
-    expect(() => apply(withoutHook as never, { gateRequired: true })).toThrow(/agent\/pre-step/)
+    // T4: no gateRequired switch — a missing hook never fails the load.
+    expect(() => apply(withoutHook as never, {})).not.toThrow()
+    expect(ctx.warnings.some(w => w.includes('agent/pre-step is unavailable'))).toBe(true)
   })
 
   it('writes a redacted routing ledger when a route switched during the run', async () => {
@@ -454,7 +477,10 @@ describe('mandatory entry gate', () => {
     applyWith(ctx, { roles: { worker: [{ model: 'good' }, { model: 'backup' }] } })
     const session = Session.create('sess-routing' as never)
     const agent = new FakeAgent({ session })
-    await ctx.preStep()(payload(agent, [userMessage('route me')]), passingNext([]))
+    // Manual run: the test drives the engine with a scripted switch, so the
+    // preStep promise is held, the scripted report completes the run, then the
+    // in-turn decision (with the ledger assertion) is awaited.
+    const routeP = ctx.preStep()(payload(agent, [userMessage('route me')]), passingNext([]))
     await waitFor(() => ctx.engine.startCalls.length === 1)
     const request = ctx.engine.startCalls[0]!
     const result = await runWorkflowScript(request.script, request.args as Record<string, unknown>, async (_prompt, options) => {
@@ -467,7 +493,8 @@ describe('mandatory entry gate', () => {
       return verification(task('a'))
     })
     ctx.engine.runs[0]!.complete(result.report)
-    await waitFor(() => agent.followups.length === 1)
+    const routeDecision = await routeP as { kind: string }
+    expect(routeDecision.kind).toBe('enter')
     const ledger = session.ownEvents()
       .map(event => pluginRecordOf(event))
       .filter(record => record !== undefined && record.type === ROUTING_RECORD)
@@ -477,20 +504,22 @@ describe('mandatory entry gate', () => {
     expect(ledger?.switches[0]?.failureClass).toBe('rate-limit')
   })
 
-  it('delivers the validated report as a relay message owned by the plugin', async () => {
+  // T4 in-turn: the turn stays open and the validated report is entered, not
+  // relayed into a later turn — so assert on the entered step message.
+  it('delivers the validated report in the open turn (in-turn, T4)', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
     applyWith(ctx)
-    const agent = new FakeAgent()
-    await ctx.preStep()(payload(agent, [userMessage('do the thing')]), passingNext([]))
-    await waitFor(() => agent.followups.length === 1)
-    const relay = agent.followups[0]!
-    expect((relay.source as { kind: string }).kind).toBe('grok-workflow')
-    const text = textOf(relay)
+    const agent = new FakeAgent({ session: realSession('sess-deliver-report') })
+    const decision = await ctx.preStep()(payload(agent, [userMessage('do the thing')]), passingNext([])) as {
+      kind: string
+      messages: UserMessage[]
+    }
+    expect(decision.kind).toBe('enter')
+    const text = answerOf(decision)
     expect(text).toContain(REPORT_BEGIN)
     expect(text).toContain(REPORT_END)
     expect(text).toContain('COMPLETED')
-    expect(agent.whenIdle).toHaveBeenCalled()
   })
 
   // ---------------------------------------------------------------- B plan --
@@ -502,10 +531,13 @@ describe('mandatory entry gate', () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
     applyWith(ctx)
-    const agent = new FakeAgent()
-    await ctx.preStep()(payload(agent, [userMessage('查一下新加坡天气')]), passingNext([]))
-    await waitFor(() => agent.followups.length === 1)
-    const text = textOf(agent.followups[0]!)
+    const agent = new FakeAgent({ session: realSession('sess-bplan-summary') })
+    const decision = await ctx.preStep()(payload(agent, [userMessage('查一下新加坡天气')]), passingNext([])) as {
+      kind: string
+      messages: UserMessage[]
+    }
+    expect(decision.kind).toBe('enter')
+    const text = answerOf(decision)
     // Answer-first: the conclusion opens, the count lives in the tail.
     expect(text).toContain('答案：')
     expect(text).toContain('以上是结论；明细已记入台账。')
@@ -517,35 +549,45 @@ describe('mandatory entry gate', () => {
   it('never dresses a failed run in the success header (B plan)', async () => {
     const ctx = new FakeContext()
     applyWith(ctx)
-    const agent = new FakeAgent()
-    await ctx.preStep()(payload(agent, [userMessage('doomed')]), passingNext([]))
+    // manual run control: autoRun stays off so fail()/complete() below owns the outcome
+    const agent = new FakeAgent({ session: realSession('sess-no-dress') })
+    const doomedP = ctx.preStep()(payload(agent, [userMessage('doomed')]), passingNext([]))
     await waitFor(() => ctx.engine.runs.length === 1)
     ctx.engine.runs[0]!.fail('error', 'boom')
-    await waitFor(() => agent.followups.length === 1)
-    const text = textOf(agent.followups[0]!)
+    const doomed = await doomedP as { kind: string; messages: UserMessage[] }
+    expect(doomed.kind).toBe('enter')
+    const text = answerOf(doomed)
     expect(text).toContain('FAILED')
     expect(text).not.toContain('【人话结论】')
   })
 
-  it('honours humanSummary:false in full mode (B plan)', async () => {
+  // T4: humanSummary removed (always on) — the human block is unconditional.
+  // In-turn delivers by entering the step, not via followups (followups only
+  // happen on the interactive background path), so assert on the decision.
+  it('always answers with the human block in full mode (B plan, T4)', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
-    applyWith(ctx, { humanSummary: false })
-    const agent = new FakeAgent()
-    await ctx.preStep()(payload(agent, [userMessage('查一下新加坡天气')]), passingNext([]))
-    await waitFor(() => agent.followups.length === 1)
-    expect(textOf(agent.followups[0]!)).not.toContain('答案：')
+    applyWith(ctx)
+    const agent = new FakeAgent({ session: realSession('sess-always-human') })
+    const decision = await ctx.preStep()(payload(agent, [userMessage('查一下新加坡天气')]), passingNext([])) as {
+      kind: string
+      messages: UserMessage[]
+    }
+    expect(decision.kind).toBe('enter')
+    expect(answerOf(decision)).toContain('答案：')
   })
 
   it('delivers an explicit failure answer when the engine reports an error', async () => {
     const ctx = new FakeContext()
     applyWith(ctx)
-    const agent = new FakeAgent()
-    await ctx.preStep()(payload(agent, [userMessage('doomed')]), passingNext([]))
+    // manual run control: autoRun stays off so fail()/complete() below owns the outcome
+    const agent = new FakeAgent({ session: realSession('sess-fail-answer') })
+    const failedP = ctx.preStep()(payload(agent, [userMessage('doomed')]), passingNext([]))
     await waitFor(() => ctx.engine.runs.length === 1)
     ctx.engine.runs[0]!.fail('error', 'boom')
-    await waitFor(() => agent.followups.length === 1)
-    const text = textOf(agent.followups[0]!)
+    const failed = await failedP as { kind: string; messages: UserMessage[] }
+    expect(failed.kind).toBe('enter')
+    const text = answerOf(failed)
     expect(text).toContain('FAILED')
     expect(text).toContain('boom')
     expect(text).not.toContain('COMPLETED')
@@ -554,12 +596,14 @@ describe('mandatory entry gate', () => {
   it('delivers a failure answer when report validation rejects the engine value', async () => {
     const ctx = new FakeContext()
     applyWith(ctx)
-    const agent = new FakeAgent()
-    await ctx.preStep()(payload(agent, [userMessage('bad report')]), passingNext([]))
+    // manual run control: autoRun stays off so fail()/complete() below owns the outcome
+    const agent = new FakeAgent({ session: realSession('sess-bad-report') })
+    const badP = ctx.preStep()(payload(agent, [userMessage('bad report')]), passingNext([]))
     await waitFor(() => ctx.engine.runs.length === 1)
     ctx.engine.runs[0]!.complete({ schemaVersion: 1, status: 'completed', objective: 'bad report', plan: { source: 'caller', tasks: [] }, tasks: [] })
-    await waitFor(() => agent.followups.length === 1)
-    expect(textOf(agent.followups[0]!)).toContain('FAILED')
+    const bad = await badP as { kind: string; messages: UserMessage[] }
+    expect(bad.kind).toBe('enter')
+    expect(answerOf(bad)).toContain('FAILED')
     expect(ctx.warnings.some(warning => warning.includes('report validation failed'))).toBe(true)
   })
 
@@ -567,11 +611,14 @@ describe('mandatory entry gate', () => {
     const ctx = new FakeContext()
     ctx.engine.startError = new Error('engine unavailable')
     applyWith(ctx)
-    const agent = new FakeAgent()
-    const decision = await ctx.preStep()(payload(agent, [userMessage('anything')]), passingNext([]))
-    expect(decision).toEqual({ kind: 'reject' })
-    await waitFor(() => agent.followups.length === 1)
-    const text = textOf(agent.followups[0]!)
+    const agent = new FakeAgent({ session: realSession('sess-engine-down') })
+    const decision = await ctx.preStep()(payload(agent, [userMessage('anything')]), passingNext([])) as {
+      kind: string
+      messages: UserMessage[]
+    }
+    // T4 in-turn: a start failure is an entered notice, not a reject + followup.
+    expect(decision.kind).toBe('enter')
+    const text = answerOf(decision)
     expect(text).toContain('engine unavailable')
     expect(text).toContain('no workflow result exists')
   })
@@ -579,12 +626,15 @@ describe('mandatory entry gate', () => {
   it('forwards bounded conversation history for a follow-up message', async () => {
     const ctx = new FakeContext()
     applyWith(ctx)
+    ctx.engine.autoRun = true
     const history = [
       createUserMessage({ content: [{ type: 'text', text: 'summarize README' }], source: { kind: 'user' } }),
       createAssistantMessage({ content: [{ type: 'text', text: 'README summary' }], source: { kind: 'model', provider: 'p', model: 'm' } as never }),
     ]
     const agent = new FakeAgent({ session: new FakeSession({ header: {}, messages: history }) })
-    await ctx.preStep()(payload(agent, [userMessage('now do the same for CHANGELOG')]), passingNext([]))
+    const histP = ctx.preStep()(payload(agent, [userMessage('now do the same for CHANGELOG')]), passingNext([]))
+    const histDecision = await histP as { kind: string }
+    expect(histDecision.kind).toBe('enter')
     await waitFor(() => ctx.engine.startCalls.length === 1)
     const objective = String((ctx.engine.startCalls[0]!.args as { objective: string }).objective)
     expect(objective).toContain('Conversation so far')
@@ -599,21 +649,26 @@ describe('mandatory entry gate', () => {
   // message this plugin just committed must not come back as prior conversation:
   // the objective would carry the user's words twice — once as history, once as
   // the current request.
-  it.each(['relay', 'append'] as const)(
-    'does not read back the message it just committed (%s, B06)',
-    async (strategy) => {
+  // B06 (T4: only `in-turn` survives): the claimed batch is published before the
+  // run, so the run must not read it back as prior conversation.
+  it(
+    'does not read back the message it just committed (in-turn, B06)',
+    async () => {
       const ctx = new FakeContext()
-      applyWith(ctx, { answerStrategy: strategy })
-      const live = realSession(`sess-b06-${strategy}`)
+      applyWith(ctx)
+      const live = realSession(`sess-b06-in-turn`)
       const agent = new FakeAgent({ session: live })
       const request = '给导出接口加一个 CSV 选项'
-      await ctx.preStep()(payload(agent, [userMessage(request)]), passingNext([]))
-
+      const b06P = ctx.preStep()(payload(agent, [userMessage(request)]), passingNext([]))
       await waitFor(() => ctx.engine.startCalls.length === 1)
       const objective = String((ctx.engine.startCalls[0]!.args as { objective?: string }).objective ?? '')
       expect(objective).toContain('Current request:')
       expect(objective.split(request)).toHaveLength(2)
       expect(objective).not.toContain('Conversation so far')
+      // Settle the held run so the in-turn decision can land.
+      ctx.engine.runs[0]!.complete(report({ objective: request }))
+      const b06 = await b06P as { kind: string }
+      expect(b06.kind).toBe('enter')
       // P0-1 still holds: the batch is in the transcript, exactly once.
       const words = live.deriveMessages()
         .map(message => (message as unknown as UserMessage).content
@@ -626,12 +681,16 @@ describe('mandatory entry gate', () => {
   it('refuses a 32001-character message with the 32000-character limit without running the workflow', async () => {
     const ctx = new FakeContext()
     applyWith(ctx)
-    const agent = new FakeAgent()
-    const decision = await ctx.preStep()(payload(agent, [userMessage('x'.repeat(32_001))]), passingNext([]))
-    expect(decision).toEqual({ kind: 'reject' })
+    const agent = new FakeAgent({ session: realSession('sess-too-long') })
+    const decision = await ctx.preStep()(payload(agent, [userMessage('x'.repeat(32_001))]), passingNext([])) as {
+      kind: string
+      messages: UserMessage[]
+    }
+    // T4 in-turn: an over-long message is an entered notice (refusalOf), not a
+    // reject + followup. No run starts either way.
+    expect(decision.kind).toBe('enter')
     expect(ctx.engine.startCalls).toHaveLength(0)
-    await waitFor(() => agent.followups.length === 1)
-    expect(textOf(agent.followups[0]!)).toContain('32000-character workflow objective limit')
+    expect(answerOf(decision)).toContain('32000-character workflow objective limit')
   })
 
   it.each([4_000, 4_001, 10_000, 32_000])(
@@ -663,8 +722,10 @@ describe('mandatory entry gate', () => {
     applyWith(ctx)
     const session = Session.create('sess-records' as never)
     const agent = new FakeAgent({ session })
-    await ctx.preStep()(payload(agent, [userMessage('recorded')]), passingNext([]))
-    await waitFor(() => agent.followups.length === 1)
+    // In-turn enters the step on settle: hold the promise, autoRun settles it.
+    const recordedP = ctx.preStep()(payload(agent, [userMessage('recorded')]), passingNext([]))
+    const recorded = await recordedP as { kind: string }
+    expect(recorded.kind).toBe('enter')
     const records = session.ownEvents()
       .map(event => pluginRecordOf(event))
       .filter(record => record !== undefined)
@@ -679,11 +740,15 @@ describe('mandatory entry gate', () => {
     ctx.engine.autoRun = true
     applyWith(ctx)
     const broken = new FakeSession({ header: {} })
+    broken.appendError = new Error('read-only session')
     const agent = new FakeAgent({ session: broken })
-    await ctx.preStep()(payload(agent, [userMessage('no records')]), passingNext([]))
-    await waitFor(() => agent.followups.length === 1)
-    expect(textOf(agent.followups[0]!)).toContain('COMPLETED')
-    expect(ctx.warnings.some(warning => warning.includes('delivery record not persisted'))).toBe(true)
+    // Commit of the claimed batch fails (warns), but the in-turn answer still
+    // enters — session keeps the report even when the record write fails.
+    const keptP = ctx.preStep()(payload(agent, [userMessage('no records')]), passingNext([]))
+    const kept = await keptP as { kind: string; messages: UserMessage[] }
+    expect(kept.kind).toBe('enter')
+    expect(answerOf(kept)).toContain('COMPLETED')
+    expect(ctx.warnings.some(warning => warning.includes('delivery record not persisted') || warning.includes('could not keep'))).toBe(true)
   })
 
   it('never throws out of the listener when classification itself fails', async () => {
@@ -715,100 +780,44 @@ describe('mandatory entry gate', () => {
     expect(ctx.warnings.some(warning => warning.includes('gate classification failed'))).toBe(true)
   })
 
-  it('does not register the gate when mandatory entry is disabled', async () => {
+  // T4: enforceGate removed — the gate is always on and always registers.
+  it('always registers the gate (mandatory entry cannot be disabled, T4)', async () => {
     const ctx = new FakeContext()
-    applyWith(ctx, { enforceGate: false })
-    expect(ctx.handlers.has('agent/pre-step')).toBe(false)
+    applyWith(ctx)
+    expect(ctx.handlers.has('agent/pre-step')).toBe(true)
     expect(ctx.registeredTools).toHaveLength(1)
   })
 
   it('fails closed after the plugin was unloaded', async () => {
     const ctx = new FakeContext()
     applyWith(ctx)
-    const agent = new FakeAgent()
+    const agent = new FakeAgent({ session: realSession('sess-unloaded') })
     await ctx.dispose()
-    const decision = await ctx.preStep()(payload(agent, [userMessage('late message')]), passingNext([]))
-    expect(decision).toEqual({ kind: 'reject' })
-    await waitFor(() => agent.followups.length === 1)
-    expect(textOf(agent.followups[0]!)).toContain('no workflow result exists')
+    const decision = await ctx.preStep()(payload(agent, [userMessage('late message')]), passingNext([])) as {
+      kind: string
+      messages: UserMessage[]
+    }
+    // T4 in-turn: the unload terminal is an entered notice, not a reject +
+    // followup. No run starts either way.
+    expect(decision.kind).toBe('enter')
+    expect(answerOf(decision)).toContain('no workflow result exists')
     expect(ctx.engine.startCalls).toHaveLength(0)
   })
 
-  it('writes the answer into the session when the append strategy is selected', async () => {
+  // T4: the gate is always on for every session (gateScope/gatePreset removed).
+  it('admits every session regardless of preset (gate always on, T4)', async () => {
     const ctx = new FakeContext()
+    applyWith(ctx)
     ctx.engine.autoRun = true
-    applyWith(ctx, { answerStrategy: 'append' })
-    const session = new RecordingSession()
-    const agent = new FakeAgent({ session })
-    await ctx.preStep()(payload(agent, [userMessage('append please')]), passingNext([]))
-    // Wait for the answer itself, not for two appends: the run's progress events
-    // share the log, so a length check is satisfied before the answer is written.
-    await waitFor(() => session.appends.some(append => append.type === 'assistant/message'))
-    const types = session.appends.map(append => append.type)
-    // The run's progress events share the log with its messages (t44): the panel
-    // needs them, and they are appended while the run is live, not after it.
-    // P0-1: the claimed message is committed by the plugin for `append`, so the log
-    // holds the user's own words, then the report, then the plugin's answer.
-    expect(types.filter(type => !type.startsWith('tool-workflow/'))).toEqual(['user/message', 'user/message', 'assistant/message'])
-    // A `user/message` event carries the message itself (the same shape the loop
-    // writes), so the first one is the user's request, verbatim.
-    const original = session.appends.find(append => append.type === 'user/message')!.data as { content: { text?: string }[] }
-    expect(original.content[0]?.text).toBe('append please')
-    expect(types).toContain('tool-workflow/run-start')
-    expect(types).toContain('tool-workflow/run-end')
-    expect(agent.followups).toHaveLength(0)
-    // Find the message by type: the run's own progress events interleave with it.
-    const answer = session.appends.find(append => append.type === 'assistant/message')!
-      .data as { message: { content: { text?: string }[] }; stream: unknown[] }
-    expect(answer.stream).toEqual([])
-    expect(answer.message.content[0]?.text ?? '').toContain('COMPLETED')
-  })
-
-  it('commits both messages of the append strategy to a real session log', async () => {
-    const ctx = new FakeContext()
-    ctx.engine.autoRun = true
-    applyWith(ctx, { answerStrategy: 'append' })
-    const session = Session.create('sess-append' as never)
-    const agent = new FakeAgent({ session })
-    await ctx.preStep()(payload(agent, [userMessage('append durably')]), passingNext([]))
-    await waitFor(() => session.deriveMessages().some(message => message.role === 'assistant'))
-    const derived = session.deriveMessages()
-    // P0-1: original request, then the report as a user message and its answer.
-    expect(derived.map(message => message.role)).toEqual(['user', 'user', 'assistant'])
-    expect(JSON.stringify(derived[0]!.content)).toContain('append durably')
-    expect(JSON.stringify(derived[1]!.content)).toContain('COMPLETED')
-    expect(agent.followups).toHaveLength(0)
-  })
-
-  it('appends nothing when the session refuses the write', async () => {
-    const ctx = new FakeContext()
-    ctx.engine.autoRun = true
-    applyWith(ctx, { answerStrategy: 'append' })
-    const session = new RecordingSession()
-    session.appendError = new Error('read-only session')
-    const agent = new FakeAgent({ session })
-    await ctx.preStep()(payload(agent, [userMessage('append fails')]), passingNext([]))
-    await waitFor(() => ctx.warnings.some(warning => warning.includes('could not deliver')))
-    expect(agent.followups).toHaveLength(0)
-  })
-
-  it('polices only sessions composed from the configured preset', async () => {
-    const ctx = new FakeContext()
-    applyWith(ctx, { gateScope: 'preset', gatePreset: 'strict-workflow' })
-    const outside = new FakeAgent({ session: new FakeSession({ header: { agentPreset: 'other-preset' } }) })
-    const outsideNext = passingNext([])
-    await ctx.preStep()(payload(outside, [userMessage('outside')]), outsideNext)
-    expect(outsideNext).toHaveBeenCalledTimes(1)
-    expect(ctx.engine.startCalls).toHaveLength(0)
-    const inside = new FakeAgent({ session: new FakeSession({ header: { agentPreset: 'strict-workflow' } }) })
-    const decision = await ctx.preStep()(payload(inside, [userMessage('inside')]), passingNext([]))
-    expect(decision).toEqual({ kind: 'reject' })
-    await waitFor(() => ctx.engine.startCalls.length === 1)
-  })
-
-  it('requires a preset id when the scope is preset', () => {
-    const ctx = new FakeContext()
-    expect(() => applyWith(ctx, { gateScope: 'preset' })).toThrow(/gatePreset/)
+    for (const preset of ['other-preset', 'strict-workflow']) {
+      const agent = new FakeAgent({ session: new FakeSession({ header: { agentPreset: preset } }) })
+      const decision = await ctx.preStep()(payload(agent, [userMessage('inside')]), passingNext([])) as {
+        kind: string
+        messages: UserMessage[]
+      }
+      expect(decision.kind).toBe('enter')
+    }
+    await waitFor(() => ctx.engine.startCalls.length === 2)
   })
 })
 
@@ -867,9 +876,11 @@ describe('grok mode toggle (classifyPreStep)', () => {
       .toEqual({ kind: 'pass', reason: 'empty-batch' })
     const subagent = new FakeAgent({ header: { origin: 'subagent', delegationDepth: 1 } })
     expect(classifyPreStep({ config }, batch(subagent))).toEqual({ kind: 'pass', reason: 'subagent' })
+    // T4: gateScope/gatePreset removed — the gate is always on, so a session in
+    // another preset is admitted, not passed as out-of-scope.
     const outside = new FakeAgent({ session: new FakeSession({ header: { agentPreset: 'other-preset' } }) })
-    const scoped = resolveConfig({ grokDefault: 'off', gateScope: 'preset', gatePreset: 'strict-workflow' })
-    expect(classifyPreStep({ config: scoped }, batch(outside))).toEqual({ kind: 'pass', reason: 'out-of-scope' })
+    const scoped = resolveConfig({ grokDefault: 'on' })
+    expect(classifyPreStep({ config: scoped }, batch(outside))).toMatchObject({ kind: 'admit' })
   })
 })
 
@@ -1047,17 +1058,19 @@ describe('in-turn delivery (default strategy)', () => {
   })
 
   it('turns its own deadline into a failure report instead of waiting forever', async () => {
-    const ctx = new FakeContext()
-    apply(ctx as never, { timeoutMs: 1_000, grokDefault: 'on' })
-    const agent = new FakeAgent({ session: realSession('sess-in-turn-timeout') })
-    const decision = await ctx.preStep()(payload(agent, [userMessage('run the workflow')]), passingNext([])) as {
-      kind: string
-      messages: UserMessage[]
-    }
-    expect(decision.kind).toBe('enter')
-    const text = answerOf(decision)
-    expect(text).toContain('deadline')
-    expect(ctx.engine.runs[0]!.cancel).toHaveBeenCalled()
+    // T4: the deadline is FIXED_TIMEOUT_MS (1h) and cannot be awaited in a unit
+    // test. Pinned here: the report the deadline race builds — a failed
+    // infrastructure Timeout naming the fixed deadline (run.ts), and that a
+    // hanging run's cancel reason names the deadline, not the caller.
+    // The race wiring itself is pinned in reliability.spec.ts; the hang path
+    // cannot be awaited here either.
+    const { failureReport } = await import('../src/report.js')
+    const { FIXED_TIMEOUT_MS } = await import('../src/config.js')
+    expect(FIXED_TIMEOUT_MS).toBe(3_600_000)
+    const report = failureReport('run the workflow', resolveConfig({ grokDefault: 'on' }), 'Timeout', `workflow exceeded the ${FIXED_TIMEOUT_MS} ms deadline and was cancelled`)
+    expect(report.status).toBe('failed')
+    expect(report.errors[0]?.phase).toBe('Timeout')
+    expect(report.errors[0]?.category).toBe('infrastructure')
   })
 
   it('answers when the plugin is unloaded mid-run', async () => {
@@ -1121,9 +1134,9 @@ function reportText(): string {
     errors: [],
     uncertainties: [],
     routes: [],
-    routing: { planner: [], worker: [], verifier: [], synthesizer: [] },
+    routing: { planner: [], worker: [], verifier: [], supervisor: [], synthesizer: [] },
     synthesis: { mode: 'deterministic' },
-    limits: { maxConcurrency: 2, maxRetries: 1, maxTasks: 6, maxTotalAgents: 20 },
+    limits: { maxConcurrency: 2, maxTasks: 6, maxTotalAgents: 20 },
   } as unknown as WorkflowReport
   return renderReport(value)
 }
@@ -1132,6 +1145,7 @@ describe('cross-round carry-over', () => {
   it('hands the second round a digest of the first round instead of a blank slate', async () => {
     const ctx = new FakeContext()
     applyWith(ctx)
+    ctx.engine.autoRun = true
     const session = Session.create('sess-carryover' as never)
     // Round 1 already happened: the transcript holds the user's words and the
     // plugin's own validated report (its durable, model-independent copy).
@@ -1139,21 +1153,27 @@ describe('cross-round carry-over', () => {
     session.append('user/message', userMessage(reportText(), 'grok-workflow'), { surfaceOp: 'append' })
     const agent = new FakeAgent({ session })
     const followUp = 'now summarise it for my manager'
-    await ctx.preStep()(payload(agent, [userMessage(followUp)], 2, 1), passingNext([]))
+    // In-turn holds the turn for the whole run: hold the promise so the run
+    // can start, assert on the started request, then settle and await.
+    const carryP = ctx.preStep()(payload(agent, [userMessage(followUp)], 2, 1), passingNext([]))
     await waitFor(() => ctx.engine.startCalls.length === 1)
     const args = ctx.engine.startCalls[0]!.args as Record<string, unknown>
     // The research result travels; the user's follow-up carries none of it.
     expect(String(args.carryover)).toContain('PYTEST-EVIDENCE-9f3c')
     expect(String(args.objective)).not.toContain('PYTEST-EVIDENCE-9f3c')
     expect(String(args.objective)).toContain(followUp)
+    // Settle the held in-turn run so the listener can land.
+    expect((await carryP) as { kind: string }).toMatchObject({ kind: 'enter' })
   })
 
   it('sends no carry-over on a first round', async () => {
     const ctx = new FakeContext()
     applyWith(ctx)
+    ctx.engine.autoRun = true
     const agent = new FakeAgent({ session: Session.create('sess-carryover-first' as never) })
-    await ctx.preStep()(payload(agent, [userMessage('measure the retry loop')]), passingNext([]))
+    const firstP = ctx.preStep()(payload(agent, [userMessage('measure the retry loop')]), passingNext([]))
     await waitFor(() => ctx.engine.startCalls.length === 1)
     expect('carryover' in (ctx.engine.startCalls[0]!.args as Record<string, unknown>)).toBe(false)
+    expect((await firstP) as { kind: string }).toMatchObject({ kind: 'enter' })
   })
 })

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { CONFIG_KEYS, HARD_LIMITS, SWITCHABLE_CLASSES } from '../src/config.js'
+import { CONFIG_KEYS, DEFAULT_MAX_CONCURRENCY, DEFAULT_MAX_TASKS, HARD_LIMITS, SWITCHABLE_CLASSES } from '../src/config.js'
 
 /**
  * The browser settings page is hand-written JavaScript (the host serves it verbatim in
@@ -238,34 +238,39 @@ describe('client settings page bundle', () => {
     expect(typeof bundle.apply).toBe('function')
   })
 
-  it('renders every config key exactly once, editable or read-only', () => {
-    const rendered = [
-      ...bundle.GROK_WORKFLOW_FIELDS.map(field => field.key),
-      'roles',
-      ...bundle.GROK_WORKFLOW_READ_ONLY,
-    ]
-    expect([...rendered].sort()).toEqual([...CONFIG_KEYS].sort())
-    expect(new Set(rendered).size).toBe(rendered.length)
+  // T5 slim page: 4 visible FIELDS (grokDefault/mode/maxConcurrency/maxTasks)
+  // plus the 5 role chains equal the 9-leaf-key CONFIG_KEYS surface
+  // (toolName/roles/synthesis/configVersion are structural, rendered nowhere).
+  // Number bounds mirror HARD_LIMITS (100) and the defaults (10); the suite
+  // pins all three so a quiet drift fails here instead of in the GUI.
+  it('renders the T5 visible keys: 4 fields plus the 5 role chains', () => {
+    expect(bundle.GROK_WORKFLOW_FIELDS.map(field => field.key).sort()).toEqual(
+      ['grokDefault', 'maxConcurrency', 'maxTasks', 'mode'].sort())
+    expect(bundle.GROK_WORKFLOW_READ_ONLY).toEqual([])
+    expect([...bundle.GROK_WORKFLOW_FIELDS.map(field => field.key), 'roles'].sort()).toEqual(
+      ['grokDefault', 'mode', 'maxConcurrency', 'maxTasks', 'roles'].sort())
   })
 
   it('keeps the numeric bounds identical to HARD_LIMITS', () => {
     const numeric = new Map(bundle.GROK_WORKFLOW_FIELDS.filter(field => field.kind === 'number').map(field => [field.key, field]))
     const expected: Record<string, [number, number]> = {
-      historyTurns: [0, HARD_LIMITS.historyTurns],
-      historyChars: [0, HARD_LIMITS.historyChars],
-      maxQueuedMessages: [0, HARD_LIMITS.maxQueuedMessages],
       maxConcurrency: [1, HARD_LIMITS.maxConcurrency],
-      maxRetries: [0, HARD_LIMITS.maxRetries],
       maxTasks: [1, HARD_LIMITS.maxTasks],
-      timeoutMs: [1_000, HARD_LIMITS.timeoutMs],
-      maxActiveRuns: [1, HARD_LIMITS.maxActiveRuns],
-      maxActiveRunsTotal: [1, HARD_LIMITS.maxActiveRunsTotal],
-      recordLimit: [0, HARD_LIMITS.recordEntries],
     }
     for (const [key, [min, max]] of Object.entries(expected)) {
       expect({ key, min: numeric.get(key)?.min, max: numeric.get(key)?.max }).toEqual({ key, min, max })
     }
     expect([...numeric.keys()].sort()).toEqual(Object.keys(expected).sort())
+    expect(HARD_LIMITS.maxConcurrency).toBe(100)
+    expect(HARD_LIMITS.maxTasks).toBe(100)
+  })
+
+  it('keeps the numeric defaults identical to src/config.ts', () => {
+    const defs = new Map(bundle.GROK_WORKFLOW_FIELDS.map(field => [field.key, field]))
+    expect(defs.get('maxConcurrency')?.def).toBe(DEFAULT_MAX_CONCURRENCY)
+    expect(defs.get('maxTasks')?.def).toBe(DEFAULT_MAX_TASKS)
+    expect(DEFAULT_MAX_CONCURRENCY).toBe(10)
+    expect(DEFAULT_MAX_TASKS).toBe(10)
   })
 
   it('keeps the per-route cap bounds identical to HARD_LIMITS', () => {
@@ -273,12 +278,13 @@ describe('client settings page bundle', () => {
     expect(bundle.GROK_WORKFLOW_ROUTE_INFLIGHT_MAX).toBe(HARD_LIMITS.routeInFlight.max)
   })
 
-  it('offers exactly the failure classes the Host accepts in switchOn', () => {
-    expect(bundle.GROK_WORKFLOW_SWITCHABLE_CLASSES).toEqual([...SWITCHABLE_CLASSES])
+  it('keeps the switchable-class export empty: switchOn is fixed since T4', () => {
+    expect(bundle.GROK_WORKFLOW_SWITCHABLE_CLASSES).toEqual([])
+    expect([...SWITCHABLE_CLASSES].length).toBeGreaterThan(0)
   })
 
-  it('covers the four documented roles', () => {
-    expect(bundle.GROK_WORKFLOW_ROLES).toEqual(['planner', 'worker', 'verifier', 'synthesizer'])
+  it('covers the five T5 roles (supervisor added to the four documented ones)', () => {
+    expect(bundle.GROK_WORKFLOW_ROLES).toEqual(['planner', 'worker', 'verifier', 'synthesizer', 'supervisor'])
   })
 
   it('ships lib/client.js byte-identical to the source (no stale bundle)', () => {
@@ -309,14 +315,13 @@ describe('client settings page: bilingual copy (t42)', () => {
     expect(zhKeys).toEqual(enKeys)
   })
 
-  it('translates every key the page derives from data (fields, read-only rows, roles, groups)', () => {
+  it('translates every key the page derives from data (fields, roles, groups)', () => {
     const derived = [
       ...bundle.GROK_WORKFLOW_FIELDS.map(field => `field.${field.key}`),
-      ...bundle.GROK_WORKFLOW_READ_ONLY.flatMap(key => [`readonly.${key}`, `readonlyValue.${key}`]),
       ...bundle.GROK_WORKFLOW_ROLES.map(role => `role.${role}`),
       ...bundle.GROK_WORKFLOW_GROUPS.map(group => `group.${group}`),
     ]
-    expect(derived.length).toBe(bundle.GROK_WORKFLOW_FIELDS.length + 8 + 4 + 5)
+    expect(derived.length).toBe(bundle.GROK_WORKFLOW_FIELDS.length + 5 + 3)
     for (const key of derived) {
       for (const locale of bundle.GROK_WORKFLOW_LOCALES) {
         // `translate` returns the key itself when nothing carries it: a missing entry is
@@ -326,18 +331,16 @@ describe('client settings page: bilingual copy (t42)', () => {
     }
   })
 
+  // T5: only five error keys survive (number/chain/missing/tooLong/duplicate/badCap);
+  // preset/switchOn/synthesis cross-checks died with the removed keys.
   it('translates every validation finding in both languages, including the error keys in the code', () => {
     const findings: Finding[] = [
-      { key: 'error.number', params: { key: 'maxConcurrency', min: 1, max: 6 } },
-      { key: 'error.presetNeeded' },
+      { key: 'error.number', params: { key: 'maxConcurrency', min: 1, max: 100 } },
       { key: 'error.chainTooLong', params: { role: 'worker', limit: 50 } },
       { key: 'error.missingModel', params: { role: 'planner', index: 2 } },
       { key: 'error.tooLong', params: { role: 'verifier', index: 1, limit: 120 } },
       { key: 'error.duplicate', params: { role: 'synthesizer', index: 3 } },
       { key: 'error.badCap', params: { role: 'worker', index: 1, min: 1, max: 64 } },
-      { key: 'error.unknownClass', params: { entry: 'not-a-class' } },
-      { key: 'error.synthesisChainUnused' },
-      { key: 'error.synthesisChainMissing' },
     ]
     for (const finding of findings) {
       for (const locale of bundle.GROK_WORKFLOW_LOCALES) {
@@ -351,14 +354,14 @@ describe('client settings page: bilingual copy (t42)', () => {
   })
 
   it('renders role ids as localized names and interpolates every parameter', () => {
-    const finding: Finding = { key: 'error.chainTooLong', params: { role: 'worker', limit: bundle.GROK_WORKFLOW_CHAIN_LIMIT } }
-    expect(formatError(finding, zh)).toBe('执行 备用链最多 50 条，删掉多余的。')
-    expect(formatError(finding, en)).toBe('Worker can keep at most 50 backup routes — remove the extras.')
-    // A numeric finding names its field in words, not with the settings key: `timeoutMs`
+    const finding: Finding = { key: 'error.chainTooLong', params: { role: 'supervisor', limit: bundle.GROK_WORKFLOW_CHAIN_LIMIT } }
+    expect(formatError(finding, zh)).toBe('监督 备用链最多 50 条，删掉多余的。')
+    expect(formatError(finding, en)).toBe('Supervisor can keep at most 50 backup routes — remove the extras.')
+    // A numeric finding names its field in words, not with the settings key: `maxTasks`
     // is an identifier and reading it inside a Chinese sentence is a leak, not a label.
-    const number: Finding = { key: 'error.number', params: { key: 'timeoutMs', min: 1000, max: 604800000 } }
-    expect(formatError(number, en)).toBe('Max run time must be a whole number between 1000 and 604800000 — fix the number and save again.')
-    expect(formatError(number, zh)).toBe('最多跑多久 得是 1000 到 604800000 之间的整数，改对数字再保存。')
+    const number: Finding = { key: 'error.number', params: { key: 'maxTasks', min: 1, max: 100 } }
+    expect(formatError(number, en)).toBe('Tasks per job must be a whole number between 1 and 100 — fix the number and save again.')
+    expect(formatError(number, zh)).toBe('一次拆几个任务 得是 1 到 100 之间的整数，改对数字再保存。')
     // A key that is not one of this page's fields is left exactly as it came.
     expect(formatError({ key: 'error.number', params: { key: 'notAField', min: 0, max: 1 } }, en))
       .toContain('notAField must be a whole number')
@@ -367,8 +370,6 @@ describe('client settings page: bilingual copy (t42)', () => {
   it('falls back to English for an unknown locale and to the key for an unknown entry', () => {
     expect(translate('ja', 'action.save')).toBe('Save')
     expect(translate('en', 'no.such.key')).toBe('no.such.key')
-    // An unknown placeholder stays literal, exactly like the locale plugin's own translate.
-    expect(translate('en', 'error.unknownClass', { other: 'x' })).toBe('This switch does not accept {entry}.')
   })
 })
 
@@ -405,7 +406,7 @@ describe('client settings page: wiring to the DSH locale service (t42)', () => {
     const disposers: Array<() => void> = []
     const face = {
       subscribe: () => () => {},
-      getSnapshot: () => ({ status: 'ready', view: { namespaces: [{ ns: 'grok-workflow', value: { roles: {}, switchOn: [] } }] } }),
+      getSnapshot: () => ({ status: 'ready', view: { namespaces: [{ ns: 'grok-workflow', value: { roles: {}} }] } }),
       ensure: async () => undefined,
       ...faceOverrides,
     }
@@ -721,7 +722,7 @@ describe('client settings page: reading, failure and retry', () => {
     status: 'ready',
     view: {
       writable: true,
-      namespaces: [{ ns: 'grok-workflow', revision: 1, value: { roles: {}, switchOn: [] } }],
+      namespaces: [{ ns: 'grok-workflow', revision: 1, value: { roles: {}} }],
     },
     error: null,
   }
@@ -840,10 +841,9 @@ describe('client settings page: draft, validation and path ops', () => {
     }
   })
 
-  it('requires a preset name when the gate scope is preset', () => {
-    const findings = validate({ ...draftOf(undefined), gateScope: 'preset', gatePreset: '   ' })
-    expect(findings.map(finding => finding.key)).toContain('error.presetNeeded')
-    expect(validate({ ...draftOf(undefined), gateScope: 'preset', gatePreset: 'standard' })).toEqual([])
+  // T5: the gate preset no longer exists; every default draft validates clean.
+  it('has no preset gate: a fresh draft always validates clean', () => {
+    expect(validate({ ...draftOf(undefined) })).toEqual([])
   })
 
   it('bounds a chain at fifty routes and names the offending entry', () => {
@@ -901,33 +901,19 @@ describe('client settings page: draft, validation and path ops', () => {
     expect(validate(blank)).toEqual([])
   })
 
-  it('refuses a switchOn class the Host does not accept', () => {
-    const findings = validate({ ...draftOf(undefined), switchOn: ['rate-limit', 'not-a-class'] })
-    expect(findings).toEqual([{ key: 'error.unknownClass', params: { entry: 'not-a-class' } }])
+  // T5: `switchOn` is a fixed internal policy since T4 — the page never reads
+  // it, so any draft carrying a legacy value still validates (save drops it).
+  it('ignores a legacy switchOn value: it is fixed policy, not a page field', () => {
+    expect(validate({ ...draftOf(undefined), switchOn: ['rate-limit', 'not-a-class'] })).toEqual([])
     expect(validate({ ...draftOf(undefined), switchOn: ['rate-limit'] })).toEqual([])
   })
 
-  it('blocks Save when synthesis disagrees with the summarizer chain (P2 cross-field)', () => {
-    // (a) chain non-empty + deterministic: red, blocks Save, same meaning as the host warning.
-    const unused = draftOf(undefined)
-    unused.roles.synthesizer = [{ provider: 'p', model: 'm' }]
-    const unusedFindings = validate(unused)
-    expect(unusedFindings).toEqual([{ key: 'error.synthesisChainUnused' }])
-    expect(messagesIn(unusedFindings, en)[0]).toContain('Assemble by rule')
-    expect(messagesIn(unusedFindings, zh)[0]).toContain('按规则拼')
-
-    // (b) model + empty chain: red, blocks Save.
-    const missing = validate({ ...draftOf(undefined), synthesis: 'model' })
-    expect(missing).toEqual([{ key: 'error.synthesisChainMissing' }])
-    expect(messagesIn(missing, en)[0]).toContain('Rewrite with model')
-    expect(messagesIn(missing, zh)[0]).toContain('模型重写')
-
-    // Legal combinations pass: deterministic + empty, model + finished route.
-    expect(validate(draftOf(undefined))).toEqual([])
-    const legal = draftOf(undefined)
-    legal.synthesis = 'model'
-    legal.roles.synthesizer = [{ provider: 'p', model: 'm' }]
-    expect(validate(legal)).toEqual([])
+  // T5: `synthesis` is fixed (`layered`) since T4 — the page has no union row,
+  // so a summarizer chain is always legal on its own.
+  it('accepts a summarizer chain without any synthesis cross-check', () => {
+    const filled = draftOf(undefined)
+    filled.roles.synthesizer = [{ provider: 'p', model: 'm' }]
+    expect(validate(filled)).toEqual([])
 
     // Blank unfinished rows do not count as a chain: they stay a missing-model
     // problem, not a cross-field one.
@@ -960,15 +946,22 @@ describe('client settings page: draft, validation and path ops', () => {
   })
 
   it('binds to the shipped namespace id when the Host publishes it', () => {
-    const view = { namespaces: [{ ns: 'grok-workflow', value: { roles: {}, switchOn: [] } }] }
+    const view = { namespaces: [{ ns: 'grok-workflow', value: { roles: {}} }] }
     expect(resolveNamespace(view, 'grok-workflow')).toEqual({ ns: 'grok-workflow', how: 'id' })
   })
 
   it('follows a renamed Loader row instead of silently losing the page (t34 residual)', () => {
+    const fullValue = () => ({
+      grokDefault: 'off',
+      mode: 'triage',
+      maxConcurrency: 10,
+      maxTasks: 10,
+      roles: { planner: [], worker: [], verifier: [], synthesizer: [], supervisor: [] },
+    })
     const view = {
       namespaces: [
         { ns: 'agent-default-model', value: { provider: 'p' } },
-        { ns: 'renamed-row', value: { roles: { planner: [] }, switchOn: ['rate-limit'] } },
+        { ns: 'renamed-row', value: fullValue() },
       ],
     }
     expect(resolveNamespace(view, 'grok-workflow')).toEqual({ ns: 'renamed-row', how: 'value' })
@@ -977,7 +970,8 @@ describe('client settings page: draft, validation and path ops', () => {
   it('reports a missing namespace so the page can say why it is absent', () => {
     expect(resolveNamespace({ namespaces: [{ ns: 'other', value: {} }] }, 'grok-workflow')).toEqual({ ns: 'grok-workflow', how: 'missing' })
     expect(resolveNamespace(undefined, 'grok-workflow')).toEqual({ ns: 'grok-workflow', how: 'default' })
-    // Half the signature is not this plugin: `roles` alone must not capture a page.
+    // A bare `roles` value without the five T5 chains and the visible scalars
+    // must not capture a page.
     expect(resolveNamespace({ namespaces: [{ ns: 'x', value: { roles: {} } }] }, 'grok-workflow')).toEqual({ ns: 'grok-workflow', how: 'missing' })
   })
 
@@ -993,11 +987,6 @@ describe('client settings page: draft, validation and path ops', () => {
       expect(dict['warn.emptyCap.title']!.length).toBeGreaterThan(3)
       expect(dict['warn.emptyCap.detail']!.length).toBeGreaterThan(3)
     }
-    //capHint/placeholder carry the blank=unlimited=never-yield rule in both languages.
-    expect(translate('en', 'roles.capHint')).toContain('Blank = unlimited = never yields')
-    expect(translate('zh', 'roles.capHint')).toContain('留空=不限=不让路')
-    expect(translate('en', 'roles.capHint')).toContain('never shared across runs')
-    expect(translate('zh', 'roles.capHint')).toContain('跨run不共享计数')
 
     const twoBlank = draftOf(undefined)
     twoBlank.roles.worker = [{ provider: 'p', model: 'm1' }, { provider: 'p', model: 'm2' }]
@@ -1017,7 +1006,7 @@ describe('client settings page: draft, validation and path ops', () => {
     unfinished.roles.worker = [{ provider: 'p', model: 'm1' }, { provider: 'p', model: '' }]
     expect(emptyCapWarn(unfinished)).toBe(false)
 
-    // comboWarn is untouched by this change.
+    // T5 removed the long-chain-plus-retries heads-up with `maxRetries`: always false.
     expect(comboWarn(draftOf(undefined))).toBe(false)
   })
 })

@@ -362,7 +362,6 @@ describe('objective limit — planner-failure fallback path', () => {
       }      // Host validation accepts a fallback report at this length.
       const config = resolveConfig({
         maxConcurrency: report.limits.maxConcurrency,
-        maxRetries: report.limits.maxRetries,
         maxTasks: report.limits.maxTasks,
       })
       expect(() => assertWorkflowReport(report, objective, config)).not.toThrow()

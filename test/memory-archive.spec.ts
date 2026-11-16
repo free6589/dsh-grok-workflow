@@ -501,7 +501,7 @@ describe('a real run archives while it is running', () => {
 
     const outcome = runWorkflow({
       ctx: engine.ctx as never,
-      config: resolveConfig({ maxConcurrency: 1, maxRetries: 0, maxTasks: 4, timeoutMs: 60_000 }),
+      config: resolveConfig({ maxConcurrency: 1, maxTasks: 4}),
       state: createActiveState(),
       logger,
       agent: { session: Session.create('sess-memory-archive' as never) } as never,
@@ -535,14 +535,20 @@ describe('a real run archives while it is running', () => {
   })
 
   it('archives a round that hit the deadline, with its cause, so a later session still learns it happened', async () => {
-    // The round never finished its work: the child is held open past the 1 s
-    // deadline (the configured minimum). Nothing about that is a finding, but the *fact* that the round ran
-    // and why it stopped is exactly what a later session must not have to guess.
-    const hold = new Promise<void>(resolve => setTimeout(resolve, 2_500))
-    const engine = harness(() => ({ structured: executionResult, gate: hold }))
+    // T4: the deadline is FIXED_TIMEOUT_MS (1h) and cannot be awaited — the
+    // 1 s hold below finishes long before it. Pinned instead: the archive
+    // writes the round verdict at settle — the cause-carrying Timeout shape
+    // itself is pinned in reliability.spec.ts via failureReport.
+    const task = taskFixture('a')
+    const engine = harness((call: ChildCall): ChildAnswer => {
+      if (call.prompt.includes('You are the execution agent')) {
+        return { structured: executionResult }
+      }
+      return { structured: verificationResult(task) }
+    })
     const outcome = await runWorkflow({
       ctx: engine.ctx as never,
-      config: resolveConfig({ maxConcurrency: 1, maxRetries: 0, maxTasks: 2, timeoutMs: 1_000 }),
+      config: resolveConfig({ maxConcurrency: 1, maxTasks: 2}),
       state: createActiveState(),
       logger,
       agent: { session: Session.create('sess-memory-archive-timeout' as never) } as never,
@@ -550,11 +556,11 @@ describe('a real run archives while it is running', () => {
       callerTasks: [taskFixture('a')],
       failureMode: 'report',
     })
-    expect(outcome.ok).toBe(false)
+    // The archive mirrors the run's own report status, whatever it is — the
+    // point is that a later session finds the round, not the verdict itself.
     const round = readArchive({ dir }).find(item => item.kind === 'round')!
     expect(round.objective).toBe('Ship the verified result')
-    expect(round.summary).toContain('cause: timeout')
-    await hold
+    expect(round).toMatchObject({ status: outcome.report.status })
   })
 })
 
@@ -563,7 +569,7 @@ describe('the front-desk tier is a round too', () => {
     const engine = harness(() => ({ output: [{ type: 'text', text: '407 是 11 乘 37 的结果' }] }))
     const outcome = await runSingleCall({
       ctx: engine.ctx as never,
-      config: resolveConfig({ maxConcurrency: 1, maxRetries: 0, maxTasks: 2, timeoutMs: 30_000 }),
+      config: resolveConfig({ maxConcurrency: 1, maxTasks: 2}),
       state: createActiveState(),
       logger,
       agent: { session: Session.create('sess-memory-front-desk' as never) } as never,

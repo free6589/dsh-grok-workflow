@@ -22,14 +22,16 @@
 import { describe, expect, it } from 'vitest'
 import { LEDGER_GUARD, REPORT_BEGIN, REPORT_END, relayText, reportEnterText } from '../src/answer.js'
 import { parseReportRound } from '../src/carryover.js'
-import { resolveConfig } from '../src/config.js'
+import { resolveConfig, FIXED_MAX_RETRIES} from '../src/config.js'
 import { deliverReport, humanConclusion } from '../src/delivery/index.js'
 import { assertWorkflowReport, failureReport } from '../src/report.js'
-import { maxTotalAgentsFor } from '../src/script.js'
+import { maxTotalAgentsFor, routeBudgetFor } from '../src/script.js'
 import type { WorkflowReport } from '../src/types.js'
 import { execution, failingVerification, task, verification } from './fixtures.js'
 
-const LIMITS = { maxConcurrency: 2, maxRetries: 1, maxTasks: 4 } as const
+const LIMITS = { maxConcurrency: 2, maxTasks: 4 } as const
+/** Wire-format retry count: the report still carries maxRetries, always 1 (T4). */
+const WIRE_RETRIES = 1 as const
 const config = resolveConfig(LIMITS)
 const OBJECTIVE = '查一下新加坡这周的天气并给出出行建议'
 
@@ -74,7 +76,7 @@ function completedReport(): WorkflowReport {
     errors: [],
     uncertainties: [],
     synthesis: { mode: 'deterministic', summary: '新加坡本周多雨，出行请带伞。' },
-    limits: { ...LIMITS, maxTotalAgents: maxTotalAgentsFor(1, LIMITS.maxRetries), timeoutMs: config.timeoutMs },
+    limits: { ...LIMITS, maxRetries: WIRE_RETRIES, maxTotalAgents: maxTotalAgentsFor(1, FIXED_MAX_RETRIES, routeBudgetFor(config))},
   }, OBJECTIVE, config)
 }
 
@@ -113,7 +115,7 @@ function partialReport(): WorkflowReport {
     errors: [{ phase: 'Verify', message: '价格来源打不开', category: 'infrastructure' }],
     uncertainties: [{ taskId: 'b', text: '酒店价格未取得，预算建议可能偏差' }],
     synthesis: { mode: 'deterministic', summary: '天气已核验；酒店价格未取得。' },
-    limits: { ...LIMITS, maxTotalAgents: maxTotalAgentsFor(2, LIMITS.maxRetries), timeoutMs: config.timeoutMs },
+    limits: { ...LIMITS, maxRetries: WIRE_RETRIES, maxTotalAgents: maxTotalAgentsFor(2, FIXED_MAX_RETRIES, routeBudgetFor(config))},
   }, OBJECTIVE, config)
 }
 
@@ -147,7 +149,7 @@ function taintedReport(): WorkflowReport {
     errors: [],
     uncertainties: [],
     synthesis: { mode: 'deterministic', summary: '文件大小已核对。' },
-    limits: { ...LIMITS, maxTotalAgents: maxTotalAgentsFor(1, LIMITS.maxRetries), timeoutMs: config.timeoutMs },
+    limits: { ...LIMITS, maxRetries: WIRE_RETRIES, maxTotalAgents: maxTotalAgentsFor(1, FIXED_MAX_RETRIES, routeBudgetFor(config))},
   }, OBJECTIVE, config)
 }
 
@@ -230,12 +232,12 @@ describe('relay/in-turn 文本：可见块与人话块一致，台账折叠在�
     expect(text.slice(text.indexOf(REPORT_END))).toContain('Grok workflow: COMPLETED')
   })
 
-  it('moves the ledger inside the markers when diagnostics are asked for', () => {
+  it('ignores the removed diagnostics opt-in: the ledger stays folded (T4)', () => {
     const text = relayText(completedReport(), undefined, { showDiagnostics: true })
     const visible = between(text)
-    expect(visible).toContain('Grok workflow: COMPLETED')
-    expect(visible).toContain('Confirmed evidence:')
-    expect(text).not.toContain(LEDGER_GUARD)
+    expect(visible).not.toContain('Grok workflow: COMPLETED')
+    expect(visible).toContain('答案：')
+    expect(text).toContain(LEDGER_GUARD)
   })
 
   it('folds the ledger for a PARTIAL run too, and keeps it parseable for carry-over', () => {
@@ -260,10 +262,13 @@ describe('relay/in-turn 文本：可见块与人话块一致，台账折叠在�
     expect(reportEnterText(report)).toBe(relayText(report))
   })
 
-  it('still answers when humanSummary is off, instead of leaving the markers empty', () => {
-    const text = relayText(completedReport(), undefined, { humanSummary: false })
-    expect(text).not.toContain('做完了')
-    expect(between(text)).toContain('Grok workflow: COMPLETED')
+  it('ignores the removed humanSummary opt-out: the human block is always on (T4)', () => {
+    // relayText voids legacy opts: the human block is unconditional, so the
+    // visible block carries the answer either way.
+    for (const opts of [undefined, { humanSummary: false }]) {
+      const text = relayText(completedReport(), undefined, opts)
+      expect(between(text)).toContain('答案：')
+    }
   })
 
   it('tells the model not to print the markers or quote the folded ledger', () => {

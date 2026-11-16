@@ -17,6 +17,7 @@ import type { WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { apply } from '../src/index.js'
+import { FIXED_HUMAN_SUMMARY, FIXED_SHOW_DIAGNOSTICS } from '../src/config.js'
 import { cancelledText, humanHead } from '../src/gate.js'
 import type { WorkflowReport } from '../src/types.js'
 import { callerTask, execution, failingVerification, verification } from './fixtures.js'
@@ -98,11 +99,11 @@ class FakeSession {
 }
 
 class FakeAgent {
-  readonly followups: UserMessage[] = []
+  // T4: in-turn is the only delivery. This stub exposes no whenIdle/followup,
+  // so canBackgroundDeliver is false and the gate takes the blocking in-turn
+  // path: the answer arrives as the entered step's message (see deliver()).
   readonly session = new FakeSession()
   readonly options = {}
-  readonly followup = vi.fn((message: UserMessage) => { this.followups.push(message) })
-  readonly whenIdle = vi.fn(async () => {})
 }
 
 class FakeContext {
@@ -139,6 +140,11 @@ function textOf(message: UserMessage): string {
  *
  * `mode` defaults to the deployment default (`triage`), so the front desk's team
  * branch is the path under test unless a case asks for `full`.
+ *
+ * T4: in-turn is the only delivery — the answer arrives as the entered step's
+ * message, not as a followup. Followups only happen when the background path
+ * cannot run (the engine shape here always completes, so the decision path is
+ * what this helper reads).
  */
 async function deliver(
   shape: EngineShape,
@@ -148,16 +154,16 @@ async function deliver(
   const ctx = new FakeContext()
   ctx.engine.shape = shape
   const agent = new FakeAgent()
-  apply(ctx as never, { answerStrategy: 'relay', grokDefault: 'on', ...overrides })
+  apply(ctx as never, { grokDefault: 'on', ...overrides })
   const messages = [userMessage(request)]
-  await ctx.preStep()(
+  const decision = await ctx.preStep()(
     { agent, messages, turn: 1, step: 1, signal: new AbortController().signal },
     async () => ({ kind: 'enter', messages }),
-  )
-  await vi.waitFor(() => {
-    if (agent.followups.length === 0) throw new Error('no answer delivered')
-  })
-  return textOf(agent.followups[0]!)
+  ) as { kind: string; messages?: UserMessage[] }
+  expect(decision.kind).toBe('enter')
+  const texts = (decision.messages ?? []).map(textOf)
+  expect(texts.length).toBeGreaterThan(0)
+  return texts[texts.length - 1]!
 }
 
 const TEAM_ZH = '帮我重构 run.ts 的超时逻辑，并补上回归测试'
@@ -201,9 +207,12 @@ describe('a PARTIAL answer leads with a human conclusion and a next step', () =>
     expect(text.indexOf('答案：')).toBeLessThan(text.indexOf('Grok workflow: PARTIAL'))
   })
 
-  it('keeps the head off when humanSummary is off', async () => {
-    const text = await deliver(PARTIAL, TEAM_ZH, { humanSummary: false })
-    expect(text).not.toContain('答案：')
+  it('always shows the head (humanSummary fixed on, T4)', async () => {
+    // T4: humanSummary removed — the human block is unconditional (R-06
+    // rejects the key, so pin the FIXED value and the fixed behaviour).
+    expect(FIXED_HUMAN_SUMMARY).toBe(true)
+    const text = await deliver(PARTIAL, TEAM_ZH)
+    expect(text).toContain('答案：')
     expect(text).toContain('Grok workflow: PARTIAL')
   })
 
@@ -221,9 +230,9 @@ describe('a PARTIAL answer leads with a human conclusion and a next step', () =>
       errors: [],
       uncertainties: [],
       routes: [],
-      routing: { planner: [], worker: [], verifier: [], synthesizer: [] },
+      routing: { planner: [], worker: [], verifier: [], supervisor: [], synthesizer: [] },
       synthesis: { mode: 'deterministic' },
-      limits: { maxConcurrency: 3, maxRetries: 1, maxTasks: 12, maxTotalAgents: 48 },
+      limits: { maxConcurrency: 3, maxTasks: 12, maxTotalAgents: 48 },
     } as unknown as WorkflowReport
     const text = cancelledText('用户停止', report, { lang: 'zh' })
     expect(text).toContain('运行已取消')
@@ -280,11 +289,17 @@ describe('machine diagnostics follow the switch on the delivered text', () => {
     expect(visible).not.toContain('Confirmed evidence:')
   })
 
-  it('shows it when showDiagnostics is on, under the same head', async () => {
-    const text = await deliver(COMPLETED, TEAM_ZH, { showDiagnostics: true })
-    expect(text).toContain('Model routes:')
-    expect(text).toContain('Deadline:')
-    expect(text.indexOf('答案：')).toBeLessThan(text.indexOf('Model routes:'))
+  it('keeps diagnostics off (showDiagnostics fixed false, T4)', async () => {
+    // T4: showDiagnostics removed — the visible head never carries the
+    // routing ledger (R-06 rejects the key, so pin the FIXED value and the
+    // fixed behaviour). The ledger itself stays retrievable behind the
+    // markers (pinned by the COMPLETED case above).
+    expect(FIXED_SHOW_DIAGNOSTICS).toBe(false)
+    const text = await deliver(COMPLETED, TEAM_ZH)
+    const visible = text.slice(text.indexOf('<<<GROK-WORKFLOW-REPORT>>>'), text.indexOf('<<<END-GROK-WORKFLOW-REPORT>>>'))
+    expect(visible).not.toContain('Model routes:')
+    expect(visible).not.toContain('Deadline:')
+    expect(visible).toContain('答案：')
   })
 })
 
@@ -301,15 +316,19 @@ describe('humanHead is the single composer', () => {
     errors: [],
     uncertainties: [],
     routes: [],
-    routing: { planner: [], worker: [], verifier: [], synthesizer: [] },
+    routing: { planner: [], worker: [], verifier: [], supervisor: [], synthesizer: [] },
     synthesis: { mode: 'deterministic' },
-    limits: { maxConcurrency: 3, maxRetries: 1, maxTasks: 12, maxTotalAgents: 48 },
+    limits: { maxConcurrency: 3, maxTasks: 12, maxTotalAgents: 48 },
   }
 
-  it('returns nothing when the switch is off, for every status', () => {
+  it('always returns the head (switch fixed on, T4)', () => {
+    // T4: humanSummary removed — the third arg is ignored, the head is
+    // unconditional. Pin both spellings of "off".
+    expect(FIXED_HUMAN_SUMMARY).toBe(true)
     for (const status of ['completed', 'partial', 'failed'] as const) {
       const report = { ...base, status } as unknown as WorkflowReport
-      expect(humanHead(report, 'zh', false)).toBeUndefined()
+      expect(humanHead(report, 'zh', false)).toContain('下一步：')
+      expect(humanHead(report, 'zh', true)).toContain('下一步：')
     }
   })
 

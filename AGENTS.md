@@ -45,7 +45,7 @@ Never write a claim as confirmed when only reasoning or a plan supports it.
 
 - This plugin is an external DSH bundle. It must not fork or reimplement the DSH agent loop.
 - The primary execution path is a workflow script executed by `ctx.workflowEngine`; child work is created through the engine's `agent()` hook, which uses DSH's subagent capability.
-- Concurrency is bounded per workflow run: default 3, hard maximum 6. Retries are bounded: default 1, hard maximum 3. No unbounded loops.
+- Concurrency is bounded per workflow run: default 10, hard maximum 100. Retries are bounded: default 1, hard maximum 3. No unbounded loops.
 - Verification is independent from execution and must validate evidence per acceptance criterion.
 - Plugin unload must cancel/dispose active workflow runs and release all registrations. No ownerless background work.
 - Keep the plugin inert when its bundle row is not mounted.

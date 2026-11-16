@@ -450,15 +450,38 @@ async function route(
   // `grokDefault: 'on'`: these tests are about admitted batches and the front
   // desk; the default-off toggle passes messages through as normal chat (pinned
   // in gate.spec.ts).
-  if (ctx.handlers.size === 0) apply(ctx as never, { answerStrategy: 'relay', grokDefault: 'on', ...overrides })
+  if (ctx.handlers.size === 0) apply(ctx as never, { grokDefault: 'on', ...overrides })
   const messages = [userMessage(text)]
-  const seen = agent.followups.length
-  await ctx.preStep()(
+  // T4: only `in-turn` survives — the gate enters the answer in the same step
+  // instead of delivering it as a followup, so read the entered step message.
+  // The interactive background path (team tier on an interactive agent) still
+  // uses a followup for the first answer; fall back to it when the decision
+  // carries no entered answer.
+  const decision = await ctx.preStep()(
     { agent, messages, turn: 1, step: 1, signal: new AbortController().signal },
     async () => ({ kind: 'enter', messages }),
-  )
-  // Wait for *this* call's answer: a second message on the same agent already has
-  // the previous answer in the list.
+  ) as { kind: string; messages: { content: { type: string; text?: string }[] }[] }
+  const entered = (decision.messages ?? [])
+    .flatMap(message => message.content ?? [])
+    .map(block => block.text ?? '')
+    .join('')
+  const seen = agent.followups.length
+  // The interactive team path (B 边聊边干) admits a background run behind the
+  // entered first answer, so the entered step carries the tier line but no
+  // report — the final report lands as a followup once the run settles. The
+  // blocking path (full mode, or a team run on a one-shot agent) enters the
+  // final report itself, so entered text that already holds a report is final.
+  const enteredHasReport = entered.includes('Grok workflow:')
+  if (!enteredHasReport && ctx.engine.startCalls.some(call => call.meta.name !== 'Front desk')) {
+    await vi.waitFor(() => {
+      if (agent.followups.length <= seen) throw new Error('background report not delivered yet')
+    })
+    const content = agent.followups[agent.followups.length - 1]!.content as { type: string, text?: string }[]
+    // Both halves: the entered first answer carries the tier line, the
+    // background followup carries the final report.
+    return [entered, content.map(block => block.text ?? '').join('')].filter(part => part.trim() !== '').join('\n')
+  }
+  if (decision.kind === 'enter' && entered.trim() !== '') return entered
   await vi.waitFor(() => {
     if (agent.followups.length <= seen) throw new Error('no answer delivered')
   })

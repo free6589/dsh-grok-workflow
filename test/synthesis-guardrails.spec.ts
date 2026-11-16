@@ -366,7 +366,6 @@ describe('layered synthesis: configuration surface', () => {
     // limits are exactly what the host sends and validates.
     const config = resolveConfig({
       maxConcurrency: 2,
-      maxRetries: 1,
       maxTasks: 6,
       synthesis: 'layered',
     } as never)

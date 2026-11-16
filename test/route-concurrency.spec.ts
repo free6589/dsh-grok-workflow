@@ -115,17 +115,17 @@ describe('per-route concurrency caps with overflow to the next route', () => {
     const many = [task('a'), task('b'), task('c'), task('d'), task('e'), task('f'), task('g'), task('h')]
     const run = await runWorkflowScript(
       WORKFLOW_SCRIPT,
-      args({ maxConcurrency: 1_000_000, maxRetries: 99, maxTasks: 8, tasks: many }),
+      args({ maxConcurrency: 1_000_000, maxTasks: 8, tasks: many }),
       agent,
     )
-    expect(run.report.limits).toMatchObject({ maxConcurrency: HARD_LIMITS.maxConcurrency, maxRetries: HARD_LIMITS.maxRetries })
+    expect(run.report.limits).toMatchObject({ maxConcurrency: HARD_LIMITS.maxConcurrency})
     expect(peak).toBeLessThanOrEqual(HARD_LIMITS.maxConcurrency)
     expect(peak).toBeGreaterThan(1)
   })
 
   it('budgets the same child-agent total because a cap never adds a call', () => {
-    const uncapped = resolveConfig({ maxRetries: 1, maxTasks: 1, roles: { worker: [{ model: 'w1' }] } })
-    const capped = resolveConfig({ maxRetries: 1, maxTasks: 1, roles: { worker: [{ model: 'w1', maxInFlight: 1 }] } })
+    const uncapped = resolveConfig({ maxTasks: 1, roles: { worker: [{ model: 'w1' }] } })
+    const capped = resolveConfig({ maxTasks: 1, roles: { worker: [{ model: 'w1', maxInFlight: 1 }] } })
     expect(routeBudgetFor(capped)).toEqual(routeBudgetFor(uncapped))
     expect(maxTotalAgentsFor(1, 1, routeBudgetFor(capped))).toBe(maxTotalAgentsFor(1, 1, routeBudgetFor(uncapped)))
   })
@@ -180,7 +180,7 @@ describe('per-route concurrency caps with overflow to the next route', () => {
     const session = Session.create('sess-overflow' as never)
     recordRouting(session, {
       objective: 'ship it',
-      routing: { planner: [], worker: ['w1', 'w2'], verifier: [], synthesizer: [] },
+      routing: { planner: [], worker: ['w1', 'w2'], verifier: [], supervisor: [], synthesizer: [] },
       synthesis: 'deterministic',
       routes: [{
         role: 'worker', chainIndex: 1, route: 'w2', attempt: 1, outcome: 'ok',
@@ -257,12 +257,12 @@ describe('per-route concurrency caps with overflow to the next route', () => {
   })
 
   it('never lets the cross-run hint change the child-agent budget', () => {
-    const config = resolveConfig({ maxRetries: 1, maxTasks: 1, roles: { worker: [{ model: 'w1' }, { model: 'w2' }] } })
+    const config = resolveConfig({ maxTasks: 1, roles: { worker: [{ model: 'w1' }, { model: 'w2' }] } })
     const hinted = buildWorkflowRequest('Ship the verified result', [task('a')], config, 'en', undefined, ['w1'])
     const plain = buildWorkflowRequest('Ship the verified result', [task('a')], config, 'en')
     expect(hinted.args.busyRoutes).toEqual(['w1'])
     expect('busyRoutes' in plain.args).toBe(false)
-    expect(routeBudgetFor(config)).toEqual({ planner: 1, worker: 2, verifier: 1, synthesizer: 0 })
+    expect(routeBudgetFor(config)).toEqual({ planner: 1, worker: 2, verifier: 1, supervisor: 0, synthesizer: 0 })
     expect(hinted.maxTotalAgents).toBe(plain.maxTotalAgents)
     expect(hinted.maxTotalAgents).toBe(maxTotalAgentsFor(1, 1, routeBudgetFor(config)))
   })
