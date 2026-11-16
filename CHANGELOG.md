@@ -5,6 +5,27 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Added / 新增
+
+- **A missing structured result gets one same-attempt resubmit before any retry
+  / 交卷缺失先补交一次，不花重试次数** —
+  when a worker call produces no structured result (the child fetched its data
+  but never called the submit tool, returned nothing, or crashed the schema
+  call), the same attempt now asks once more with a prompt that forbids redoing
+  completed work: fetch only what is still missing, then submit immediately.
+  The resubmit spends no retry budget (`attempts` stays one entry, marked
+  `resubmitted: true`) and only format gaps qualify — transport/model failures,
+  setup faults, and explicit non-format failures keep their original path, and a
+  second miss records the attempt as failed under the normal retry policy.
+  Verification strictness is unchanged: prose without a structured result still
+  verifies nothing.
+  / 当某次 worker 调用没有返回结构化结果（子会话取到了数据但没调交卷工具、
+  返回空、无结构化值），同一次 attempt 先补问一次：prompt 禁止重做已完成的工作，
+  只取还缺的、然后立刻交卷。补交不花重试额度（`attempts` 仍是一条，标
+  `resubmitted: true`）；只有格式缺失才补交，传输/模型失败、setup 故障、
+  明确的非格式失败走原路径；补交再缺才记 attempt 失败、进正常重试。
+  核验严格性不变：没有结构化结果的 prose 依然核验不了任何东西。
+
 ## [0.9.3] - 2026-11-16
 
 ### Added / 新增

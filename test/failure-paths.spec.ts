@@ -272,3 +272,63 @@ describe('task-level safety nets', () => {
     expect(run.report.tasks[0]?.attempts[0]?.failure?.class).toBe('rate-limit')
   })
 })
+
+describe('same-attempt resubmit (A)', () => {
+  const t = task('a')
+
+  it('recovers a missing structured result without spending a retry', async () => {
+    let workerCalls = 0
+    const agent: ScriptAgent = async (prompt, options) => {
+      if (roleOf(options.label) === 'worker') {
+        workerCalls += 1
+        // First call prose-answers: no structured value, like the child that
+        // fetched everything but never called the submit tool.
+        if (workerCalls === 1) return null
+        // The resubmit must say why it exists and forbid redoing work.
+        expect(prompt).toContain('produced no structured result')
+        expect(prompt).toContain('Do NOT redo work')
+        return execution('resubmitted')
+      }
+      return verification(t)
+    }
+    // maxRetries 0: without the resubmit this task could never recover.
+    const { report } = await runWorkflowScript(WORKFLOW_SCRIPT, args({ roles: roles([{ model: 'w1' }]) }), agent)
+    expect(report.status).toBe('completed')
+    expect(report.tasks[0]?.status).toBe('verified')
+    expect(report.tasks[0]?.attempts).toHaveLength(1)
+    expect(report.tasks[0]?.attempts[0]?.passed).toBe(true)
+    expect(report.tasks[0]?.attempts[0]?.resubmitted).toBe(true)
+    expect(report.tasks[0]?.attempts[0]?.failure).toBeUndefined()
+    expect(workerCalls).toBe(2)
+    expect(() => assertWorkflowReport(report, 'Ship the verified result', cfg())).not.toThrow()
+  })
+
+  it('records the attempt as failed when the resubmit also yields nothing', async () => {
+    const agent: ScriptAgent = async (_prompt, options) => {
+      if (roleOf(options.label) === 'worker') return null
+      return verification(t)
+    }
+    const { report } = await runWorkflowScript(WORKFLOW_SCRIPT, args({ roles: roles([{ model: 'w1' }]) }), agent)
+    expect(report.status).toBe('failed')
+    expect(report.tasks[0]?.attempts).toHaveLength(1)
+    expect(report.tasks[0]?.attempts[0]?.resubmitted).toBeUndefined()
+    expect(report.tasks[0]?.attempts[0]?.failure?.class).toBe('format-error')
+    expect(() => assertWorkflowReport(report, 'Ship the verified result', config())).not.toThrow()
+  })
+
+  it('does not resubmit transport failures or setup faults', async () => {
+    let workerCalls = 0
+    const agent: ScriptAgent = async (_prompt, options) => {
+      if (roleOf(options.label) === 'worker') {
+        workerCalls += 1
+        throw agentResultError('503 Service Unavailable')
+      }
+      return verification(t)
+    }
+    const { report } = await runWorkflowScript(WORKFLOW_SCRIPT, args({ roles: roles([{ model: 'w1' }]) }), agent)
+    expect(report.status).toBe('failed')
+    // One call per route, no resubmit: a dead provider is not a missing form.
+    expect(workerCalls).toBe(1)
+    expect(report.tasks[0]?.attempts[0]?.failure?.class).not.toBe('format-error')
+  })
+})

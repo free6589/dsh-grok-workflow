@@ -803,6 +803,36 @@ function workerPrompt(task, attempt, previous) {
   return lines.join('\n');
 }
 
+// Resubmit prompt: the previous worker call in this attempt produced no
+// structured result (the child prose-answered, crashed the schema call, or
+// returned nothing), so nothing was recorded. This is NOT a new attempt and
+// spends no retry budget: the same attempt continues. The child is new (the
+// engine cannot resume a child session), so the instruction forbids repeating
+// completed work — fetch only what is still missing, then submit immediately.
+function resubmitPrompt(task, attempt, previous) {
+  const lines = [
+    childTitleLine(task && task.title) || memberLabel('worker', attempt),
+    'You are the execution agent inside a verified workflow.',
+    'Your previous response for this attempt produced no structured result, so nothing was recorded. Do NOT redo work that is already done: reuse any data already fetched, fetch only what is still missing, and do NOT run exploratory searches first.',
+    'Call the structured result tool exactly once with your complete answer now. Use the tools available to you, inspect before claiming, and run the relevant checks yourself.',
+    'Report honestly. A self-reported status is not a verification result. If work is incomplete, say partial or failed and explain why.',
+    'For every evidence item, cite a real file path, command, URL, or other locator. Never invent evidence.',
+    'Do not print, store, or return credentials, tokens, passwords, or private keys.',
+    '',
+    'TASK:',
+    safePromptJson(task),
+    '',
+    'ATTEMPT: ' + attempt + ' of ' + (maxRetries + 1) + ' (resubmission: same attempt, no retry spent)'
+  ];
+  if (previous) {
+    lines.push('', 'PREVIOUS ATTEMPT RESULT (use it, do not trust it):', safePromptJson(previous));
+  }
+  const carry = carryoverSection();
+  if (carry.length > 0) lines.push.apply(lines, carry);
+  lines.push('', 'Return only the structured execution result.');
+  return lines.join('\n');
+}
+
 function verifierPrompt(task, execution, attempt) {
   const lines = [
     childDisplayTitle('verifier', attempt, task && task.title),
@@ -1804,6 +1834,41 @@ async function runTaskUnsafe(task, taskIndex) {
       executionError = 'worker failed: ' + safeError(error);
       attemptFailure = classifyCallFailure('worker', error);
     }
+    // Resubmission (A): the worker call produced no structured result, so this
+    // attempt has nothing to verify yet. Before spending a retry, ask once more
+    // in the SAME attempt: the prompt forbids redoing completed work, so a
+    // child that already fetched its data only pays one short submit call
+    // instead of a full retry. Only format gaps qualify — a transport/model
+    // failure, a setup fault, or an explicit non-format failure keeps its
+    // original path. One resubmit per attempt at most; a second miss records
+    // the attempt as failed and the normal retry policy applies.
+    let resubmitted = false;
+    if (!execution && attemptFailure && attemptFailure.class === 'format-error' && !attemptFailure.setup) {
+      try {
+        const resubmit = await callRole('worker', resubmitPrompt(task, attempt, previous), {
+          schema: EXECUTION_SCHEMA,
+          label: memberLabel('worker', attempt),
+          phase: taskGroupTitle(taskPosition, task.title),
+          attempt: attempt
+        });
+        if (resubmit.ok) {
+          const resubmittedExecution = normalizeExecution(resubmit.value);
+          if (resubmittedExecution) {
+            execution = resubmittedExecution;
+            resubmitted = true;
+            if (attemptRoute === '') attemptRoute = resubmit.label;
+            attemptFailure = null;
+            executionError = '';
+            log('task ' + task.id + ' attempt ' + attempt + ' resubmitted structured result');
+          }
+        }
+        // A failed or still-empty resubmit keeps the original failure: the
+        // attempt below records it and the retry policy is untouched.
+      } catch (error) {
+        // The resubmit itself must never create a new failure mode; the
+        // original format failure stands and the attempt fails normally.
+      }
+    }
     if (execution) {
       try {
         const verifier = await callRole('verifier', verifierPrompt(task, execution, attempt), {
@@ -1846,6 +1911,7 @@ async function runTaskUnsafe(task, taskIndex) {
       passed: passed
     };
     if (attemptRoute !== '') attemptRecord.route = attemptRoute;
+    if (resubmitted) attemptRecord.resubmitted = true;
     if (attemptFailure) {
       attemptRecord.failure = { class: attemptFailure.class, reason: routeReason(attemptFailure.reason), category: attemptFailure.category };
       // Carried to the task row below: the report keeps one category per failed

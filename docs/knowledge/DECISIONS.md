@@ -982,3 +982,18 @@ Each entry records the decision, evidence, alternatives, and status.
 - **Date:** 2026-11-16
 - **Decision:** 新构建进运行中 live 进程**无已验证的免重启路径**（`dsh plugin add` 只换文件，进程仍跑旧模块；设置页改值无需重启，但那是值不是代码）。验证一律新 profile + 新端口（`acgtest/:3225` 标准路径）。live 更新等用户指令：要么用户重启 DSH，要么用户接受"只换文件不生效"的现状。
 - **Evidence:** agent-11 只读侦察（HANDOFF 段）；`docs/LOCAL-TESTING.md §Activate` 步骤 5；HANDOFF 2026-11-08 loader 根因。
+
+## D-054 — 补交步 A：格式缺失同 attempt 补一次，不花重试额度
+
+- **Status:** CONFIRMED（代码 + 单测 3 例；真机 NOT_RUN）
+- **Date:** 2026-11-16
+- **Decision:** worker 调用无 structured 结果且失败分类是 format-error（非 setup）时，
+  同 attempt 内追加一次 resubmit 调用（`resubmitPrompt`：禁重做、只取还缺的、立刻交卷），
+  成功则正常进 verifier，attempts 仍一条并标 `resubmitted: true`；再缺则按原路径失败进重试。
+- **Reason:** seq=5 式浪费（数据全对、只缺交卷格式，却烧一整轮重试）是真实落盘案例；
+  补交是最短路径重试，不动核验严格性，不给 prose 开口子。
+- **Alternatives rejected:** 启发式从 prose 提取字段（拆 verification 地基，t59 口子重开）；
+  engine 续原 child 会话（`agent()` 契约无此通道，CONFIRMED 不支持）；补交计入 maxAttempts
+  （违背用户"便宜"的原意；attempts 语义是"第几次尝试"，补交不是新尝试）。
+- **Evidence:** `src/script.ts`（`resubmitPrompt` + worker 循环）、`src/report.ts` 白名单、
+  `src/types.ts`、`test/failure-paths.spec.ts`（same-attempt resubmit 3 例）。

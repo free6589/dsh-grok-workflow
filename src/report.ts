@@ -328,6 +328,7 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
           verification: entry.verification === null ? null : verificationResult(entry.verification, `tasks[${index}].attempts[${a}].verification`),
           passed: entry.passed === true,
           ...entry.route === undefined ? {} : { route: string(entry.route, `tasks[${index}].attempts[${a}].route`) },
+          ...entry.resubmitted === true ? { resubmitted: true } : {},
           ...entry.failure === undefined || entry.failure === null
             ? {}
             : { failure: attemptFailure(entry.failure, `tasks[${index}].attempts[${a}].failure`) },

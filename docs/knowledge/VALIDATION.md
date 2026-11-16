@@ -3143,3 +3143,27 @@ $ gh release view v0.9.3 --json …
 
 - 运行中 live 的重载验证（需用户重启 DSH）。
 - `#22` Phase 范围工作（本轮不算 #22 范围，未动其 PR/分支）。
+
+## Round 45 — 2026-11-16 — 补交步 A：`npm run ci` 全绿（51/954），真机 NOT_RUN
+
+Command:
+
+```sh
+npm run ci
+```
+
+Result: **PASS**
+
+- `npx tsc --noEmit`: 0 错误。
+- `oxlint`: **4 warnings / 0 errors**（无新增）。
+- `npm run build`: client bundle 正常（本轮只改 script/report/types，lib 同步构建）。
+- `vitest run`: **51 文件 / 954 测试全 PASS**（951 + `failure-paths.spec.ts` 新增 same-attempt resubmit 3 例）。
+
+New tests (`CONFIRMED` PASS):
+
+- 补交成功 → task `verified`、`attempts` 长 1、`resubmitted: true`、无 failure（maxRetries=0 下可恢复，证不花重试额度）；
+- 补交再缺 → attempt 失败、`failure.class = format-error`、report 仍合法；
+- 传输失败（503）→ 不补交（worker 只调 1 次），失败分类不变。
+
+Boundaries: 隔离真机复验 `NOT_RUN`（建议发版前走一次 acgtest 跑个三城天气看 `resubmitted` 落盘）；
+push/tag/Release 待用户指令；B（失败行分类显示）用户没点，`NOT_RUN`。

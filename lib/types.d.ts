@@ -371,6 +371,8 @@ export interface AttemptReport {
     passed: boolean;
     /** Route that produced the attempt, when routing is configured. */
     route?: string;
+    /** True when this attempt's execution arrived via the same-attempt resubmit (A), not a fresh retry. */
+    resubmitted?: boolean;
     /** Classified failure of this attempt, when it failed. */
     failure?: AttemptFailure;
     error?: string;

@@ -1160,3 +1160,15 @@
   新 UI 在用户下次重启 DSH 后才生效 —— 这是唯一剩下的用户动作。
 - **别碰**：已发布 tag（v0.9.3 及更早一律不动）、DSH core、live 进程的 kill/重启（用户亲手做）、
   npm 发布与仓库可见性。
+
+## 2026-11-16 — 补交步 A 已实现未发布（`npm run ci` 绿，真机 NOT_RUN）
+
+- **From:** lead · **To:** 用户 / 后续代理。**远端未变**：`origin/main` = `01f86de`，
+  本轮 5 文件未提交（`src/script|report|types` + `test/failure-paths` + CHANGELOG `[Unreleased]`）。
+- **做了什么**：失败 session `3c296b9a`/seq=5 落盘确证"数据全对、只缺交卷"后，
+  按用户拍板 A 实现同 attempt 补交（D-054）：格式缺失补一次、不花重试额度，
+  再缺才进正常重试；核验严格性零动。单测 3 例全绿。
+- **没做什么（`NOT_RUN`）**：隔离真机复验（建议发版前 acgtest 跑一次三城天气）；
+  B（失败行分类显示）；commit/push/tag/Release（等用户指令）。
+- **Next action（用户）**：说"提交发版"就走 commit→push→CI→tag→Release→live 换文件
+ （live 仍需用户重启 DSH 生效，沿 D-013/D-053）。
