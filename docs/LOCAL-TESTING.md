@@ -41,10 +41,13 @@ release.
 ## Configuration
 
 Configuration keys and their hard limits are listed in the
-[README configuration table](../README.md#configure-disable-and-uninstall).
-The plugin defaults are `maxConcurrency: 3`, `maxRetries: 1`, `maxTasks: 12`,
-`timeoutMs: 3600000`, and `maxActiveRuns: 2`; values are tightened by the
-calling profile, not by editing this repository.
+[README configuration table](../README.md#configuration-reference).
+`0.10.0` accepts exactly eight keys (`toolName`, `mode`, `grokDefault`, `roles`,
+`synthesis`, `maxConcurrency`, `maxTasks`, `configVersion`); everything else is
+fixed inside the plugin (`maxRetries=1`, `timeoutMs=3600000`,
+`maxActiveRuns=2` per session / `8` per process) and a patch that still carries
+a removed key is rejected at load. Values are tightened by the calling profile,
+not by editing this repository.
 
 ## Enable
 

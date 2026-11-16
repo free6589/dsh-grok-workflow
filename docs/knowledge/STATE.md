@@ -1,6 +1,19 @@
 # Project State
 
-Last updated: 2026-11-17 (**设置页瘦身 + supervisor 第五角色，未提交** —
+Last updated: 2026-11-17 (**v0.10.0 发布准备完成 + 真机验收通过** —
+基线 `main` = `ae0c6d3`（v0.9.4 已发布），工作提交在前一条 `3d9275a` 之上。
+本轮 = 真机验收（**新 profile `acgtest95` / 新端口 `:3231`**，打包安装 `0.9.4` tgz、
+md5 与仓库一致，Plugins 页出现 Grok workflow、8 键设置页、两次真实工作流运行：
+7 段进度脊 + 首答 7s + 后台收尾 1/1 verified）→ `npm run ci` 全绿（typecheck 0 错、
+lint 4w/0e、**51 文件 / 951 测试 PASS**、`lib/` 构建幂等且 `lib/client.js` 与
+`src/client/index.js` 逐字节相同）→ 版本 `0.9.4` → **`0.10.0`**（`package.json` +
+`package-lock.json` 联动）→ `CHANGELOG` 插入 `## [0.10.0] - 2026-11-17` →
+README 中英配置参考按 8 键重写、`docs/LOCAL-TESTING.md` 同步 → push / tag / Release。
+**已知缺口（未修）**：Progress 页 `Execute`/`Verify` 段报
+`Not reported in the events`（成员事实没进该会话进度流），台账证明任务确实执行并核验
+（见 VALIDATION Round 47）。
+
+Previous update: 2026-11-17 (**设置页瘦身 + supervisor 第五角色，未提交** —
 基线 `main` = `ae0c6d3`（v0.9.4）。工作树 50+ 文件；`npm run typecheck` 0 错、
 `npx vitest run` **51 文件 / 951 测试全 PASS**、`npm run build` 成功且
 `cmp src/client/index.js lib/client.js` 一致（191404 B）。
@@ -1037,3 +1050,31 @@ worker 链上限 50（HARD_LIMITS.chainLength）
   （20.4s，串行跑；并行跑曾因 CPU 争用出现 flake，单跑即绿）。
   注意全量 951（vs 之前 954）是 sibling 改写增删用例后的净数，非回归。
 - **没做**：commit/push（等 lead 指令）；`lib/` 构建产物未重编；真机 live 验证 `NOT_RUN`。
+
+## 2026-11-17 — v0.10.0：真机验收（acgtest95 / :3231）→ push / tag / Release
+
+- **From:** agent-25（verify_push_release）· **Base:** `3d9275a`（T1–T6 实现提交，本地未 push）
+  → 发布准备提交 → push。
+- **真机验收（`CONFIRMED`，细节见 VALIDATION Round 47）**：`DSH_HOME=<repo>/.dsh-home/acgv095`、
+  新 profile `acgtest95`、新端口 `:3231`、宿主 `dsh 0.2.2-rc.3`、本地网关模型路由。
+  `npm pack` → `dsh-grok-workflow-0.9.4.tgz`（472,958 B）安装成功，已装 `lib/client.js`
+  md5 `d1e2df8c…` 与仓库一致；`--dump-config` 显示 grok-workflow 8 键 + `workflow-ptc`
+  由 overlay 重新启用；`curl http://127.0.0.1:3231/` → 401（围栏）。
+  浏览器真实加载：`dsh-grok-workflow/client.js` 被请求、无失败无 console error；Plugins 页
+  出现 Grok workflow 行；设置页 = 开关/模式/五角色链（含 Supervisor）/两数字 + Save，
+  `scrollW == innerW`。两次真实对话：三城介绍（4 subagents，7 段脊，3/3 100%）、
+  三城天气（04:00 首答 7s、04:02 后台收尾「1/1 项任务已由独立检查核验」，
+  台账 `archive.jsonl` = `run:eef1f4b7-…` completed / verified 1/1 / confirmed 6）。
+- **已知缺口（`CONFIRMED` 现象，归因 `HYPOTHESIS`）**：两次运行的 Execute/Verify 段都渲染为
+  `Not reported in the events`（`members=0`、`branches=0`），与台账/答案中的"已执行并核验"
+  矛盾；`deriveTrack` 成员来自 `run.members.phase`，即成员事实未进该会话进度流。
+  是否为 supervisor 插入或 in-turn 后台投递引入，**未定位**，未写进 Release notes。
+- **验证（`CONFIRMED`）**：`npm run ci` → typecheck 0 错、oxlint 4w/0e、build 成功、
+  vitest 51 文件 / 951 测试 PASS；`git status --porcelain lib/` 为空（提交产物 = 全新构建）。
+- **发版动作（`CONFIRMED`）**：`package.json` + `package-lock.json` = `0.10.0`；
+  `CHANGELOG` 插入 `## [0.10.0] - 2026-11-17`（`[Unreleased]` 保留为空节）；
+  README（英/中）配置参考与闸门说明按 8 键与恒开门控重写，`docs/LOCAL-TESTING.md` 同步；
+  push（fast-forward，无 force）→ tag `v0.10.0` → Release（工作流校验 tag ↔ package.json ↔
+  CHANGELOG ↔ `lib/` 后建）。远端 SHA / CI / Release 结论见 HANDOFF 与 VALIDATION。
+- **未做（`NOT_RUN`）**：live `web` profile（`:3080`）换装与重启（D-013 用户动作）；
+  进度 Execute/Verify 成员渲染缺口的定位与修复。

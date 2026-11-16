@@ -114,11 +114,11 @@ The workflow exists to avoid treating an agent's “done” message as proof tha
 
 ## Mandatory entry: what changes for you
 
-- The gate is **installed by default** (`enforceGate: true`) and intercepts every *user* message. Whether a message is *worked on* is a second switch: the per-session toggle, whose config default `grokDefault` is `off` — until `/grok` turns it on for that session, a claimed message passes through to the model as ordinary chat (`reason: mode-off`). Messages from other sources — user-question replies, team messages, webhooks, schedules, subagent prompts — are never claimed, and an empty batch passes through.
-- The answer arrives **inside the same turn** (`answerStrategy: in-turn`). That is the only strategy that survives a one-shot process; `relay` and `append` remain available for long-lived surfaces.
+- The gate is **always installed** in `0.10.0` (the former `enforceGate` switch was removed) and inspects every *user* message. Whether a message is *worked on* is a second switch: the per-session toggle, whose config default `grokDefault` is `off` — until `/grok` turns it on for that session, a message passes through to the model as ordinary chat (`reason: mode-off`). Messages from other sources — user-question replies, team messages, webhooks, schedules, subagent prompts — are never claimed, and an empty batch passes through.
+- The answer arrives **inside the same turn**. `in-turn` is the only delivery strategy in `0.10.0` — it is the one that survives a one-shot process, and the former `relay`/`append` options were removed.
 - A message the plugin will not run is **refused out loud** with the reason (empty message, or an objective over 32,000 characters). Nothing is executed and nothing is retried automatically.
 - Delivery is recorded per message: the same batch dispatched twice does not start a second run, and each agent's waiting queue is bounded by `maxQueuedMessages`.
-- Set `enforceGate: false` to keep only the `grok_workflow` tool and skip interception. A deployment that must never degrade silently should also set `gateRequired: true`, which turns “this runtime exposes no `agent/pre-step` hook” into a load error instead of a warning.
+- To keep only the `grok_workflow` tool and skip interception entirely, leave `grokDefault` at `off` and never run `/grok on`. A deployment that must never degrade silently gets a warning (not a silent pass) when this runtime exposes no `agent/pre-step` hook; `0.10.0` has no `gateRequired` key left to promote that to a load error.
 
 ### Objective length limit
 
@@ -130,7 +130,7 @@ The workflow objective limit is **32,000 characters**, measured on the user mess
 | 4,001–32,000 characters | Accepted; the entire message is kept as the objective. At exactly 32,000 characters the `Current request:` label is dropped instead of trimming the message, and no conversation history is attached. |
 | 32,001 characters or more | Refused out loud with `the message is longer than the 32000-character workflow objective limit`; no run starts. |
 
-Other limits are unchanged: each task field (`objective`, `expectedOutput`, `context`) is still capped at `4000` characters (`taskTextChars`), and the aggregate serialized task budget stays at `48,000` characters. History and run bounds were relaxed for long jobs in `0.2.5`: `historyChars` defaults to `20000` (hard maximum `1000000`), `historyTurns` defaults to `12` (hard maximum `1000000`), `timeoutMs` may run up to 7 days, and each role chain holds up to `50` backup routes. A larger objective therefore has to be decomposed into several tasks rather than widening one task field.
+Other limits are unchanged: each task field (`objective`, `expectedOutput`, `context`) is still capped at `4000` characters, and the aggregate serialized task budget stays at `48,000` characters. History and the run deadline are fixed in `0.10.0`: `historyTurns=20` / `historyChars=20000`, `timeoutMs=3600000` (60 minutes), and each role chain holds up to `50` backup routes. A larger objective therefore has to be decomposed into several tasks rather than widening one task field or one deadline.
 
 If planning fails, the fallback plan splits the whole objective into contiguous segments that each fit the 4,000-character task-text budget. Concatenating the segments reproduces the objective verbatim, so the fallback is **not** rejected a second time and no character is lost. The run reports `partial` with `planning.source: "fallback"` and the planner error.
 
@@ -199,52 +199,43 @@ The rendered answer adds a `Failures: 1 infrastructure, 1 quality` line, so a pr
 
 ## Configuration reference
 
-Configuration belongs to the profile's `cordis.patch.yml` (or a `--patch` overlay), under the bundle row:
+Configuration belongs to the profile's `cordis.patch.yml` (or a `--patch` overlay), under the bundle row. Since `0.10.0` the surface is exactly eight keys; anything else is rejected at load, so a stale patch fails loudly instead of looking like a setting that does nothing:
 
 ```yaml
 - id: grok-workflow
   config:
-    maxConcurrency: 3
-    maxRetries: 1
-    maxTasks: 12
+    toolName: grok
+    mode: triage
+    grokDefault: 'on'
+    synthesis: layered
+    maxConcurrency: 10
+    maxTasks: 10
+    roles:
+      planner:
+        - provider: deepseek-official
+          model: deepseek-flash
 ```
 
 | Key | Default | Hard limit | Meaning |
 |---|---:|---:|---|
 | `toolName` | `grok_workflow` | pattern `^[a-z][a-z0-9_]{1,40}$` | Model-facing tool name (fixed at registration) |
-| `enforceGate` | `true` | boolean | Claim every user message through the gate |
-| `mode` | `triage` | `triage` \| `full` | `triage`: the front desk picks a tier and says so. `full`: every message runs the team (pre-t52 behaviour) |
-| `triageAsk` | `true` | boolean | When the tier signals conflict, ask instead of escalating to the team |
-| `triageModel` | *(empty)* | route string | The model the quick tier's call spends; empty uses the run's own route |
-| `gateRequired` | `false` | boolean | Fail to load when the runtime cannot host the gate |
-| `gateScope` | `process` | `process` \| `preset` | Which agents the gate claims |
-| `gatePreset` | `''` | string | Agent preset that owns the gate when `gateScope: preset` |
-| `answerStrategy` | `in-turn` | `in-turn` \| `relay` \| `append` | How the answer reaches the user |
-| `historyTurns` | `12` | `1000000` | Conversation turns included as context |
-| `historyChars` | `20000` | `1000000` | Character budget for that context |
-| `maxQueuedMessages` | `4` | `8` | Waiting messages per agent before refusals start |
-| `maxConcurrency` | `3` | `6` | Child agents in flight per run |
-| `maxRetries` | `1` | `3` | Retries per task after the initial attempt |
-| `maxTasks` | `12` | `100` | Maximum caller or planner tasks |
-| `timeoutMs` | `3600000` | `604800000` (7 days) | Overall run deadline |
-| `maxActiveRuns` | `2` | `4` | Concurrent `grok_workflow` runs per plugin instance |
-| `subagentProvider` | engine default | string | Optional subagent provider override |
-| `roles` | empty chains | ≤50 routes each | `{ planner, worker, verifier, synthesizer }` ordered chains |
-| `synthesis` | `deterministic` | `deterministic` \| `model` \| `layered` | Policy: deterministic aggregation, one model-written summary, or the layered policy (verified report stays the only source of fact; report `synthesis.mode` stays `deterministic`/`model`) |
-| `switchOn` | `[]` (built-in) | whitelist | Failure classes that advance a role's chain |
-| `recordRuns` | `true` | boolean | Write the routing/delivery ledger into the session |
-| `recordLimit` | `64` | `256` | Maximum ledger entries per run (0 = none) |
+| `mode` | `triage` | `triage` \| `full` | `triage`: the front desk picks a tier and says so (the settings page shows it as `auto`). `full`: every message runs the team |
+| `grokDefault` | `off` | `on` \| `off` | Session default when no `/grok` record exists. `off` leaves ordinary chat alone; `on` claims every user message |
+| `roles` | empty chains | ≤50 routes each | `{ planner, worker, verifier, synthesizer, supervisor }` ordered chains. The supervisor runs after verification and can only fail a task, never pass one |
+| `synthesis` | `layered` | `layered` \| `model` | `layered` keeps the verified report the only source of fact; `model` adds one model-written summary |
+| `maxConcurrency` | `10` | `100` | Child agents in flight per run |
+| `maxTasks` | `10` | `100` | Maximum caller or planner tasks |
 | `configVersion` | `1` | `1` | Configuration surface version |
 
-Unknown keys are **rejected** at load with the closest accepted key (`maxRetires` → “did you mean `maxRetries`?”), because a silently ignored key is indistinguishable from a setting that does not work.
+Everything else is fixed inside the plugin and no longer accepted: `maxRetries=1`, `timeoutMs=3600000` (60 minutes), `maxActiveRuns=2` per session and `8` per process, `historyTurns=20` / `historyChars=20000`, `maxQueuedMessages=4`, `recordLimit=256`, `answerStrategy=in-turn`, `triageClassifier=rules`, `triageAsk`, `triageFollowupAsFast`, `instantReceipt`, `humanSummary`, `showDiagnostics=false`, `recordRuns`, `showProgress`, `switchOn=[]` (built-in policy), `subagentProvider` unset, and the gate (`enforceGate`/`gateRequired`/`gateScope`/`gatePreset`) is always on.
+
+**Migration from ≤0.9.4:** delete those keys from your patch. A patch that still carries one is rejected as an unknown key, and there is no replacement for a removed value — the fixed value above applies.
 
 ### The settings page
 
-Because the plugin exports its `Config`, DSH projects it into the standard settings surface automatically: the fields on that page are the fields this plugin reads — there is no second, decorative source of truth. Edits are live: an edit reaches the next message, and an invalid edit is refused with its reason while delivery keeps the last valid snapshot. Chains are validated against the providers the runtime actually has, so a model that does not exist is caught at load with the declared ids listed.
+Because the plugin exports its `Config`, DSH projects it into the standard settings surface automatically: the fields on that page are the fields this plugin reads — there is no second, decorative source of truth. Edits are live: an edit reaches the next message, and an invalid edit is refused with its reason while delivery keeps the last valid snapshot.
 
-What you will *not* find yet is a chain editor with model dropdowns; that needs a client-side module (tracked as U-6 / Phase 9). Until then the profile patch and the plain form are the two ways to edit the same values.
-
-Since `0.2.5` the page is novice-oriented and strictly single-locale: it renders only the language DSH is set to (no raw field keys, no mixed bilingual lines), shows a live one-line status under the intro, and groups the controls into "Mode", "Who does it", "Limits", a collapsed "More" and an "Advanced — leave alone" section. Role chains and the triage model use provider→model dropdowns fed by the runtime's declared models, falling back to free text when the runtime exposes no catalog.
+The page shows four things and nothing else: the on/off switch, the mode (`auto`/`full`), the five role chains as "channel → model" dropdowns fed by the runtime's declared models, and the two numbers. No per-field explanations, no read-only area, no diagnostics panel.
 
 ### Disable and uninstall
 
@@ -293,7 +284,7 @@ The plugin reuses DSH's workflow engine and subagents. It does not replace DSH's
 ## If something does not work
 
 - **The tool does not appear:** restart the profile and confirm it contains the workflow engine and a subagent provider.
-- **Every answer looks like a workflow now:** that is `enforceGate: true` plus the session toggle on. Set `enforceGate: false` to keep only the `grok_workflow` tool, send `/grok off` to turn the toggle off for one session, or leave `grokDefault` at `off` to require an opt-in.
+- **Every answer looks like a workflow now:** that is the always-on gate plus `grokDefault: on`. Send `/grok off` to turn the toggle off for one session, or leave `grokDefault` at `off` to require an opt-in.
 - **A message is refused instead of answered:** the reason is printed (empty message or an objective over 32,000 characters). Nothing was executed and nothing will be retried automatically.
 - **A key is rejected at load:** the message names the closest accepted key. Silent ignoring is not offered on purpose.
 - **Your DSH version differs:** the package declares `engines.dsh: ">=0.2.1-rc.2 <0.3.0"`, and that range decides whether the bundle loads. DSH evaluates it with prereleases included (that is what lets `0.2.2-rc.3` load at all), so a `0.2.x` prerelease is admitted and `0.3.0` and above are refused — a `0.3.0` *prerelease* still satisfies `<0.3.0` and therefore loads. Behavior is verified on `0.2.1-rc.2`; the bundle installs and composes on `0.2.2-rc.3`.

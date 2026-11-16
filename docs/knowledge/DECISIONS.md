@@ -1039,3 +1039,20 @@ Each entry records the decision, evidence, alternatives, and status.
   backstop 公式、`npm run ci` 级全量 951 绿。
 - **Alternatives rejected:** 监督映射到 verifier（用户选了独立第五角色，全链路贯通）；
   per-run 60000 守卫（per-task 语义下永不触发，否决，见 T6 讨论）。
+
+## D-057 — v0.10.0 用 minor 而非 patch：删键属于 0.x 破坏性变更（2026-11-17）
+
+- **Status:** CONFIRMED（本轮发版执行）
+- **Date:** 2026-11-17
+- **Decision:** T4 瘦身把配置面从 32 键砍到 8 键、24 键按 unknown-key 拒载，版本按
+  `0.9.4 → 0.10.0`（minor）发布，不用 `0.9.5`（patch）。
+- **Reason:** 对 0.x 用户而言，旧 profile 补丁带着被删键会在载入时被拒 —— 不是缺陷修复，
+  是行为契约变更；semver 的 0.x 惯例把破坏性变更放在 minor 位。patch 位只留给
+  不改变配置契约的修复（如 v0.9.4 的补交步）。
+- **Evidence:** `src/config.ts`（`CONFIG_KEYS` 8 / `REMOVED_CONFIG_KEYS` 24）、
+  `package.json`+`package-lock.json` = `0.10.0`、`CHANGELOG` `## [0.10.0] - 2026-11-17`
+  迁移段、`.github/workflows/release.yml`（tag ↔ package.json 校验）。
+- **Alternatives rejected:** `0.9.5`（把破坏性变更放进 patch 位，用户按 patch 语义升级会踩坑）；
+  `1.0.0`（配置面之外的 API 还在动，太早）。
+- **Consequences:** 用户升级前必须清理补丁；README 配置表与 `docs/LOCAL-TESTING.md`
+  已按 8 键重写，CHANGELOG 给出迁移清单。

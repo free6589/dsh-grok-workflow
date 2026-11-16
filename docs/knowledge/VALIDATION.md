@@ -3179,3 +3179,68 @@ $ gh run view <latest> --json …
 
 工作树干净（`git status` 仅剩跟踪文件无修改）。tag/Release 待用户指令（建议攒到 B 或下次发版一起，
 本轮 CHANGELOG 已在 `[Unreleased]`）。
+
+## Round 47 — 2026-11-17 — v0.10.0 真机验收（新 profile `acgtest95` / 新端口 `:3231`）
+
+**环境（`CONFIRMED`）**：`DSH_HOME=<repo>/.dsh-home/acgv095`（`.dsh-home/` 已 gitignore，不入库）、
+profile `acgtest95`（新建，非复用 `acgtest`）、端口 `:3231`（此前在听的是 3065/3080/3086/3211）。
+宿主 `dsh --version` = `0.2.2-rc.3`（比 `package.json` peer `0.2.1-rc.2` 新，落在
+`engines.dsh >=0.2.1-rc.2 <0.3.0` 区间内）；模型路由为机器本地网关 `127.0.0.1:18088`
+（`apiKeyEnv: BIFROST_VIRTUAL_KEY`，键值只在环境里，未读未写未打印）。
+
+**安装（`CONFIRMED`）**：
+
+```text
+$ npm pack --pack-destination .tmp/v095            → dsh-grok-workflow-0.9.4.tgz（472,958 B，82 files）
+$ DSH_HOME=…/acgv095 dsh plugin --profile acgtest95 add file:…/dsh-grok-workflow-0.9.4.tgz
+  dsh: initialized profile acgtest95 … / + dsh-grok-workflow file:…  → exit 0
+$ node -p 已装包 version → 0.9.4
+$ md5sum 已装 lib/client.js vs 仓库 lib/client.js → d1e2df8c… 两侧一致（cmp 通过）
+```
+
+注：`dsh plugin … add` 首建 profile 只写 `@deepseek-ai/dsh-base` bundle，需手工把
+`@deepseek-ai/dsh-web-app` 补进 `dsh.profile.bundles`（本机 profile 文件，不入库）。
+
+**加载（`CONFIRMED`）**：
+
+```text
+$ DSH_HOME=… dsh --profile acgtest95 --patch …/patch.yml --dump-config
+  → - id: grok-workflow（8 键：toolName/mode/grokDefault/synthesis/maxConcurrency=4/maxTasks=8/roles 3 链）
+  → - id: workflow-ptc  disabled: false（web 层默认 disabled: true，overlay 按文档扩回）
+$ DSH_HOME=… dsh --profile acgtest95 --patch … --host 127.0.0.1 --port 3231 --no-open
+  → "dsh web: http://127.0.0.1:3231/?token=…"（token 不落报告）
+$ curl -o /dev/null -w '%{http_code}' http://127.0.0.1:3231/  → 401（访问围栏生效）
+```
+
+浏览器侧（chromium + playwright，1440×900）：`/plugins/??…,dsh-grok-workflow/client.js,…`
+被真实请求，无 requestfailed、无 console error；侧栏 Plugins 页出现
+**"Grok workflow — A task-splitting tool: the entry gate, per-role model chains,
+concurrency limits and run records."**，点进去是本版新设置页：
+
+```text
+page[data-page="grok-workflow"] present=true；input[data-field] = maxConcurrency=4, maxTasks=8；
+switch=1（Work hard by default → On）；角色行 = Planner/Worker/Checker/Summarizer/Supervisor（1/50、1/50、1/50、0/50、0/50）；
+Save/Discard 在位；scrollW=1440 = innerW（无横向溢出）
+```
+
+**交互（`CONFIRMED`，两次真实运行）**：
+
+1. `用一句话介绍北京、上海、广州三座城市，然后汇总成一句话结论` → 会话标题「北京、上海、广州三城介绍与总结」，
+   "4 subagents"，Progress 页 7 段：Start ✓ / Plan ✓ 1/1 / Execute / Verify / Synthesize ✓ 2/2 / Answer / End ✓，
+   `3/3 · 100%`，`scrollW=innerW=1440`。
+2. `分别查一下北京、上海、广州今天的天气，然后汇总成一句话结论` → 04:00 首答 7s 内落地
+   （"档位：团队档 …… 后台会分别查三地天气 ……"），04:02 后台运行收尾给出
+   "总体状态：已完成；1/1 项任务已由独立检查核验。"，台账
+   `.dsh-home/acgv095/memory/grok-workflow/archive.jsonl` 记录
+   `run:eef1f4b7-… status=completed · verified 1/1 · confirmed 6 criteria`，
+   task `weather-3cities-summary` 带 2 条 uncertain（工作目录只读挂载、两源措辞差异）。
+
+**观察到的缺口（`CONFIRMED` 现象 / `HYPOTHESIS` 归因，未定性为回归）**：两次运行的 Progress 页里
+`Execute` / `Verify` 段显示 `Not reported in the events`（`members=0`、`branches=0`），而台账与答案
+都写明该任务是执行过并由独立检查核验通过的（1/1 verified）。`deriveTrack()` 的成员来自
+`run.members` 的 `phase`，故现象是成员事实没进到该会话的进度流。是否为本轮 T1–T6 引入
+（supervisor 调用插在 verify 后）或 in-turn 后台投递路径的既有行为，本轮**未**定位——记此待查，
+不写进 Release notes 当作已修。
+
+**边界（`NOT_RUN`）**：live `web` profile（`:3080`）的安装与重启（D-013 用户动作）；窄屏 480px 复拍；
+`Open child session` 点开子会话（本次运行未走到 running 成员卡）；headless e2e 脚本。

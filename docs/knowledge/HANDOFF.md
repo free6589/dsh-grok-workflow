@@ -1196,3 +1196,29 @@
   若认可，回复"提交"，lead 即 commit（不 push/tag，发版另听指令）。
 - **Next action（后续代理）**：先读本轮 STATE/DECISIONS D-055/D-056；
   真机验证 `NOT_RUN`（acgtest 新 profile + 新端口，老规矩）；live `:3090` 未动。
+
+## 2026-11-17 — v0.10.0 发布（真机 acgtest95 / :3231 → push / tag / Release）
+
+- **From:** agent-25（verify_push_release，lead 委派）· **Base:** `3d9275a`（T1–T6）·
+  **发布准备提交：** 见本轮 `release: prepare v0.10.0 …`。
+- **做了什么**：
+  1. 真机验收（新 profile + 新端口，老规矩）：`DSH_HOME=.dsh-home/acgv095`、profile `acgtest95`、
+     `:3231`、宿主 `dsh 0.2.2-rc.3`、本地网关 `127.0.0.1:18088`（键只在环境，不落盘）；
+     `npm pack`（472,958 B）→ `dsh plugin add file:…` → 已装 `lib/client.js` md5 与仓库一致；
+     `--dump-config` = 8 键 + `workflow-ptc disabled:false`；浏览器：client bundle 被请求、
+     Plugins 页出现 Grok workflow、设置页 8 键 + 五角色链、两次真实工作流（7 段脊 / 首答 7s /
+     后台 1/1 verified，台账 `archive.jsonl`）。完整命令与结果见 VALIDATION Round 47。
+  2. `npm run ci` 全绿（typecheck 0 错、lint 4w/0e、51 文件 / 951 测试、build 幂等、
+     `lib/` 无未提交差异）。
+  3. 发版准备：`0.9.4 → 0.10.0`（`package.json` + `package-lock.json` 联动）、
+     `CHANGELOG` 插入 `## [0.10.0] - 2026-11-17`、README 英/中配置参考按 8 键重写、
+     `docs/LOCAL-TESTING.md` 配置段同步；`settings-simple-mock.html` 仍未跟踪、不入库。
+  4. push（fast-forward，未 force）→ `v0.10.0` tag → Release 工作流（tag ↔ package.json ↔
+     CHANGELOG ↔ `lib/` 四项校验后建 Release）。
+- **版本选择的理由（D-057）**：24 个配置键被删除且旧补丁会被拒载 = 对 0.x 用户是破坏性变更，
+  按 semver 走 minor（`0.10.0`），不用 patch。
+- **没做（`NOT_RUN`）**：live `web` 运行实例（`:3080`）换装/重启 —— 用户保留动作（D-013）；
+  Progress 页 Execute/Verify 段成员不渲染的定位（现象与台账矛盾，见 STATE/VALIDATION，
+  下一个接手者优先查这个）。
+- **接手提示**：本机隔离实例默认仍在 `127.0.0.1:3231` 上跑（`DSH_HOME=.dsh-home/acgv095`）；
+  收尾已 kill 并删 `url.txt` 里的 token 文本；`.dsh-home/`、`.tmp/` 均 gitignore，不入库。

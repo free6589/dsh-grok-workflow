@@ -109,11 +109,11 @@ DSH 启动后，直接提问即可：
 
 ## 强制入口：对你意味着什么
 
-- 闸门**默认已安装**（`enforceGate: true`），会拦截每一条**用户**消息。但“是否真的动手做”是第二个开关：会话级开关的配置默认值 `grokDefault` 是 `off` —— 在那个会话里发过 `/grok` 之前，被拦截的消息按普通聊天交给模型（`reason: mode-off`）。其它来源的消息——用户问题回复、团队消息、webhook、定时任务、子代理提示词——从不认领；空批直接放行。
-- 答案在**同一轮内**到达（`answerStrategy: in-turn`）。这是唯一能在一次性进程中存活的策略；`relay`、`append` 保留给长驻界面。
+- `0.10.0` 起闸门**恒开**（原先的 `enforceGate` 开关已删除），会检查每一条**用户**消息。但“是否真的动手做”是第二个开关：会话级开关的配置默认值 `grokDefault` 是 `off` —— 在那个会话里发过 `/grok` 之前，消息按普通聊天交给模型（`reason: mode-off`）。其它来源的消息——用户问题回复、团队消息、webhook、定时任务、子代理提示词——从不认领；空批直接放行。
+- 答案在**同一轮内**到达。`0.10.0` 只剩 `in-turn` 一种投递方式——它是唯一能在一次性进程中存活的策略，原来的 `relay`、`append` 已删除。
 - 插件不会执行的消息会**明确拒绝**并给出原因（消息为空，或目标超过 32,000 字符）。不会执行任何工作，也不会自动重试。
 - 交付按消息记录：同一批消息被派发两次不会启动第二次运行；每个 agent 的等待队列由 `maxQueuedMessages` 封顶。
-- 设 `enforceGate: false` 可只保留 `grok_workflow` 工具、跳过拦截。要求“绝不静默降级”的部署还应设 `gateRequired: true`：把“运行时没有 `agent/pre-step` 钩子”从警告变成载入错误。
+- 想只保留 `grok_workflow` 工具、完全不拦截，就让 `grokDefault` 保持 `off` 且不要发 `/grok on`。要求“绝不静默降级”的部署会看到“运行时没有 `agent/pre-step` 钩子”的警告（不是静默放行）；`0.10.0` 已没有 `gateRequired` 键可以把它升成载入错误。
 
 ### 目标长度上限
 
@@ -125,7 +125,7 @@ DSH 启动后，直接提问即可：
 | 4,001–32,000 字符 | 接受；整条消息原样成为目标。恰好 32,000 字符时会丢弃 `Current request:` 标签而不是裁剪消息，也不再附带历史。 |
 | 32,001 字符及以上 | 明确拒绝，提示 `the message is longer than the 32000-character workflow objective limit`；不会启动任何运行。 |
 
-其它限制保持不变：每个任务字段（`objective`、`expectedOutput`、`context`）仍各限 `4000` 字符（`taskTextChars`），任务 JSON 合计仍限 `48,000` 字符。`0.2.5` 为长任务放宽了历史与运行上限：`historyChars` 默认 `20000`（硬上限 `1000000`），`historyTurns` 默认 `12`（硬上限 `1000000`），`timeoutMs` 最长可到 7 天，每条角色链最多 `50` 条备用路由。因此更大的目标必须拆成多个任务，而不是放宽单个任务字段。
+其它限制保持不变：每个任务字段（`objective`、`expectedOutput`、`context`）仍各限 `4000` 字符，任务 JSON 合计仍限 `48,000` 字符。`0.10.0` 起历史与时限固化：`historyTurns=20` / `historyChars=20000`、`timeoutMs=3600000`（60 分钟），每条角色链最多 `50` 条备用路由。因此更大的目标必须拆成多个任务，而不是放宽单个任务字段或时限。
 
 规划失败时，fallback 计划会把整个目标切成若干连续分段，每段都不超过 4,000 字符的任务文本上限；分段按序拼接后与原始目标逐字一致，因此**不会**被二次拒绝，也不会丢失任何字符。运行以 `partial` 结束，并记录 `planning.source: "fallback"` 与规划错误。
 
@@ -192,50 +192,44 @@ DSH 启动后，直接提问即可：
 
 ## 配置参考
 
-配置写在 profile 的 `cordis.patch.yml`（或 `--patch` 覆盖层）里，位于 bundle 行下：
+配置写在 profile 的 `cordis.patch.yml`（或 `--patch` 覆盖层）里，位于 bundle 行下。`0.10.0` 起配置面只有八个键；其它键在载入时直接被拒绝——旧补丁会明确报错，而不是变成"设了也不生效"：
 
 ```yaml
 - id: grok-workflow
   config:
-    maxConcurrency: 3
-    maxRetries: 1
-    maxTasks: 12
+    toolName: grok
+    mode: triage
+    grokDefault: 'on'
+    synthesis: layered
+    maxConcurrency: 10
+    maxTasks: 10
+    roles:
+      planner:
+        - provider: deepseek-official
+          model: deepseek-flash
 ```
 
 | 键 | 默认值 | 硬上限 | 含义 |
 |---|---:|---:|---|
 | `toolName` | `grok_workflow` | 正则 `^[a-z][a-z0-9_]{1,40}$` | 面向模型的工具名（注册时固定） |
-| `enforceGate` | `true` | 布尔 | 是否通过闸门认领每条用户消息 |
-| `gateRequired` | `false` | 布尔 | 运行时无法承载闸门时是否载入失败 |
-| `gateScope` | `process` | `process` \| `preset` | 闸门认领哪些 agent |
-| `gatePreset` | `''` | 字符串 | `gateScope: preset` 时拥有闸门的 agent preset |
-| `answerStrategy` | `in-turn` | `in-turn` \| `relay` \| `append` | 答案如何到达用户 |
-| `historyTurns` | `12` | `1000000` | 作为上下文带上的对话轮数 |
-| `historyChars` | `20000` | `1000000` | 该上下文的字符预算 |
-| `maxQueuedMessages` | `4` | `8` | 每个 agent 的等待消息上限，超过即拒绝 |
-| `maxConcurrency` | `3` | `6` | 每次运行的并行子代理数 |
-| `maxRetries` | `1` | `3` | 每个任务首次尝试后的重试次数 |
-| `maxTasks` | `12` | `100` | 调用方或规划器任务上限 |
-| `timeoutMs` | `3600000` | `604800000`（7 天） | 整体运行时限 |
-| `maxActiveRuns` | `2` | `4` | 每个插件实例并发的 `grok_workflow` 运行数 |
-| `mode` | `triage` | `triage` \| `full` | `triage`：前台选一档并写明；`full`：每条消息都跑团队（t52 之前的行为） |
-| `triageAsk` | `true` | 布尔 | 信号冲突时反问一句，而不是直接升级团队 |
-| `triageModel` | 空 | 路由字符串 | 快手档那次调用花哪个模型；空则用本次运行自己的路由 |
-| `subagentProvider` | 引擎默认 | 字符串 | 可选的子代理 provider 覆盖 |
-| `roles` | 空链 | 每个角色 ≤50 条 | `{ planner, worker, verifier, synthesizer }` 有序链 |
-| `synthesis` | `deterministic` | `deterministic` \| `model` \| `layered` | 策略：确定性聚合、一次模型总结，或分层策略（核验报告仍是唯一事实来源；报告 `synthesis.mode` 仍只记 `deterministic`/`model`） |
-| `switchOn` | `[]`（内置） | 白名单 | 允许推进备用链的失败类别 |
-| `recordRuns` | `true` | 布尔 | 是否把路由/交付台账写进会话 |
-| `recordLimit` | `64` | `256` | 每次运行的台账条数上限（0 = 不写） |
+| `mode` | `triage` | `triage` \| `full` | `triage`：前台选一档并写明（设置页显示为 `auto`）。`full`：每条消息都跑团队 |
+| `grokDefault` | `off` | `on` \| `off` | 会话没有 `/grok` 记录时的默认：`off` 不碰普通对话，`on` 认领每条用户消息 |
+| `roles` | 空链 | 每个角色 ≤50 条 | `{ planner, worker, verifier, synthesizer, supervisor }` 有序链；监督在检查之后运行，只能判失败、不能判通过 |
+| `synthesis` | `layered` | `layered` \| `model` | `layered` 让核验报告保持唯一事实来源；`model` 追加一次模型总结 |
+| `maxConcurrency` | `10` | `100` | 每次运行的并行子代理数 |
+| `maxTasks` | `10` | `100` | 调用方或规划器任务上限 |
 | `configVersion` | `1` | `1` | 配置面版本 |
 
-未知键会在载入时被**拒绝**并给出最接近的合法键（`maxRetires` → “did you mean `maxRetries`?”），因为被静默忽略的键与“设置不生效”无法区分。
+其余一律固化在插件内部、不再接受：`maxRetries=1`、`timeoutMs=3600000`（60 分钟）、`maxActiveRuns` 每会话 `2` / 每进程 `8`、`historyTurns=20` / `historyChars=20000`、`maxQueuedMessages=4`、`recordLimit=256`、`answerStrategy=in-turn`、`triageClassifier=rules`、`triageAsk`、`triageFollowupAsFast`、`instantReceipt`、`humanSummary`、`showDiagnostics=false`、`recordRuns`、`showProgress`、`switchOn=[]`（内置策略）、`subagentProvider` 未设，闸门（`enforceGate`/`gateRequired`/`gateScope`/`gatePreset`）恒开。
+
+**从 ≤0.9.4 迁移：** 把这些键从补丁里删掉。还带着它们会被当未知键拒绝，而被删的值没有替代项——按上面的固定值生效。
 
 ### 设置页
 
-由于插件导出了自己的 `Config`，DSH 会把它投影到标准设置面上：页面上的字段就是插件读取的字段——不存在第二份装饰性的真相来源。编辑是活值：编辑对下一条消息生效，非法编辑会带原因被拒绝，而投递继续使用上一次合法快照。链会对照运行时实际拥有的 provider 校验，因此不存在的模型会在载入时被发现，并列出已声明的 id。
+由于插件导出了自己的 `Config`，DSH 会把它投影到标准设置面：页面上的字段就是插件读取的字段——不存在第二份装饰性的真相来源。编辑是活值：编辑对下一条消息生效，非法编辑会带原因被拒绝，而投递继续使用上一次合法快照。
 
-设置页里能看到并直接改的分组成员包括前台三项：`mode`（分流 / 全团队）、`triageAsk`（信号冲突时反问还是直接升级）、`triageModel`（快手档那次调用花哪个模型；留空表示用本次运行自己的路由）。`0.2.5` 起设置页是新手向、严格单语的：只渲染 DSH 语言设置的那一种文字（不显示 raw 字段键，不中英混排），页头有一句跟随当前草稿的实时状态，控件按"模式 / 谁来干 / 上限 / 其他（默认折叠）/ 高级（别碰）"分组。角色链与分诊模型用"通道→模型"双下拉，目录读运行时已声明的模型；读不到就回退手写框。
+页面只显示四样东西：总开关、模式（`auto`/`full`）、五条角色链（"通道 → 模型"双下拉，目录读运行时已声明的模型）、以及两个数字。没有逐项用途说明，没有只读区，没有诊断面板。
+
 
 ### 停用与卸载
 
@@ -280,7 +274,7 @@ dsh plugin --profile grok-workflow-dev remove dsh-grok-workflow
 ## 出问题时
 
 - **工具没出现：** 重启 profile，并确认它包含工作流引擎与子代理 provider。
-- **现在每个回答都像工作流：** 这是 `enforceGate: true` 叠加会话开关打开的效果；设 `enforceGate: false` 可只保留 `grok_workflow` 工具，发 `/grok off` 只关掉那个会话的开关，或者让 `grokDefault` 保持 `off`（要求显式开启）。
+- **现在每个回答都像工作流：** 这是恒开闸门叠加 `grokDefault: on` 的效果；发 `/grok off` 只关掉那个会话的开关，或者让 `grokDefault` 保持 `off`（要求显式开启）。
 - **消息被拒绝而不是被回答：** 原因会被打印（消息为空，或目标超过 32,000 字符）。没有执行任何工作，也不会自动重试。
 - **某个键在载入时被拒绝：** 错误信息会给出最接近的合法键。静默忽略是有意不提供的。
 - **DSH 版本不同：** 包声明的是 `engines.dsh: ">=0.2.1-rc.2 <0.3.0"`，bundle 是否载入由这个区间决定。DSH 评估该区间时**包含预发布版本**（正因如此 `0.2.2-rc.3` 才装得上）：`0.2.x` 的预发布版被接受，`0.3.0` 及以后被拒绝——但 `0.3.0` 的**预发布**版仍满足 `<0.3.0`，因此仍会载入。行为在 `0.2.1-rc.2` 上验证；该 bundle 在 `0.2.2-rc.3` 上可安装并进入组合图。

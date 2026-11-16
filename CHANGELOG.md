@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-17
+
 ### Added / 新增
 
 - **Fifth role `supervisor`: one supervision call per task attempt / 第五角色`监督`：每任务每尝试一次监督调用** —
