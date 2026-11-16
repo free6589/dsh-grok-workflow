@@ -1078,3 +1078,26 @@ worker 链上限 50（HARD_LIMITS.chainLength）
   CHANGELOG ↔ `lib/` 后建）。远端 SHA / CI / Release 结论见 HANDOFF 与 VALIDATION。
 - **未做（`NOT_RUN`）**：live `web` profile（`:3080`）换装与重启（D-013 用户动作）；
   进度 Execute/Verify 成员渲染缺口的定位与修复。
+
+### 2026-11-17 — v0.10.0 发布结果（`CONFIRMED`，逐条可复核）
+
+- **push**：`git fetch origin` → `origin/main` = `ae0c6d3`（= 本地 base，`merge-base --is-ancestor`
+  通过）→ `git push origin main` → `ae0c6d3..b2c4515  main -> main`（fast-forward，未 force，exit 0）。
+- **CI**：run `43946211999`（`headSha` = `b2c4515`）→ `conclusion: success`，`Node 22` +
+  `Node 24` 两个 job 均 success（`gh run view --json jobs`）。
+- **tag**：`git tag -a v0.10.0 b2c4515` → `git push origin v0.10.0`（`* [new tag]`，exit 0）；
+  `git merge-base --is-ancestor b2c4515 origin/main` 通过；远端 `v0.10.0` object
+  `63c04aa` / peel `b2c4515`。
+- **old tags**：推前快照 `.tmp/v095/tags-before.txt` 与推后 `git ls-remote --tags origin`
+  对照（剔除 `v0.10.0`）**逐行相同** → `v0.9.4`（`8ca2c1a`/peel `ae0c6d3`）、`v0.9.3`、`v0.9.2`、
+  `v0.9.1` 及更早全部未动。
+- **Release**：run `43946446721` success（tag ↔ `package.json` ↔ `CHANGELOG [0.10.0]` ↔ 已提交
+  `lib/` 四项校验 + `npm test` + `npm pack`）；GitHub Release `Grok Workflow for DSH v0.10.0`
+  published **2026-11-16T20:08:07Z**，非 draft 非 prerelease，asset
+  `dsh-grok-workflow-0.10.0.tgz` **472,274 B**。
+- **asset 可核**：`gh release download v0.10.0` → 包内 `package.json` = `0.10.0`，
+  包内 `lib/client.js` md5 `d1e2df8c…` 与仓库 `lib/client.js` **一致**。
+- **Issue #1**：状态评论 [issuecomment-6927842856](https://github.com/free6589/dsh-grok-workflow/issues/1#issuecomment-6927842856)，
+  `TEST_RESULTS: PASS`、`LOCAL_RUNTIME_VERIFIED: yes`，模板 11 字段齐全。
+- **凭证边界**：全程未读写任何 key/token（`BIFROST_VIRTUAL_KEY` 只在环境里，仅做过布尔/长度检查）；
+  隔离实例的访问 token 只留在 `.tmp/v095/url.txt`（`.tmp/` gitignore），收尾删除。

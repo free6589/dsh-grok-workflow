@@ -1222,3 +1222,11 @@
   下一个接手者优先查这个）。
 - **接手提示**：本机隔离实例默认仍在 `127.0.0.1:3231` 上跑（`DSH_HOME=.dsh-home/acgv095`）；
   收尾已 kill 并删 `url.txt` 里的 token 文本；`.dsh-home/`、`.tmp/` 均 gitignore，不入库。
+
+### 发布结果（同日，`CONFIRMED`）
+
+`origin/main` = `b2c4515`（push `ae0c6d3..b2c4515`，fast-forward）；CI `43946211999` 双绿；
+tag `v0.10.0` → `b2c4515`（object `63c04aa`），新 tag，旧 tag 快照对照未动；
+Release `43946446721` 绿，published 2026-11-16T20:08:07Z，asset `dsh-grok-workflow-0.10.0.tgz`
+472,274 B（包内 `package.json` = 0.10.0，`lib/client.js` md5 `d1e2df8c…` 与仓库一致）；
+Issue #1 状态评论 issuecomment-6927842856。
