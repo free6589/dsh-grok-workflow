@@ -1,0 +1,75 @@
+# Overlay for the isolated v0.9.5 real-machine acceptance instance.
+#
+# Booted as:
+#   DSH_HOME=<repo>/.dsh-home/acgv095 dsh acgtest95 --patch <this file> \
+#     --port 3231 --host 127.0.0.1 --no-open
+#
+# Model credentials stay in the environment (BIFROST_VIRTUAL_KEY); nothing secret is
+# written here. The endpoint is the machine-local gateway on 127.0.0.1:18088 — the same
+# route the operator's own web profile uses, so no model or network boundary is mocked.
+- id: llm-pi-ai
+  name: '@deepseek-ai/dsh-llm-pi-ai'
+  config:
+    providers:
+      bifrost-completions:
+        displayName: Completions
+        api: openai-completions
+        baseURL: http://127.0.0.1:18088/openai/v1
+        apiKeyEnv: BIFROST_VIRTUAL_KEY
+        reasoning: low
+        compat:
+          supportsDeveloperRole: false
+          supportsStore: false
+        models:
+          - id: wb/cn:deepseek-v4.1-flash
+            name: DeepSeek V4.1 Flash (cn)
+            contextWindow: 500000
+            maxTokens: 65536
+            input:
+              - text
+            reasoningEfforts:
+              off: null
+              low: low
+              medium: medium
+              high: high
+- id: agent-default-model
+  name: '@deepseek-ai/dsh-agent-default-model'
+  config:
+    provider: bifrost-completions
+    model: wb/cn:deepseek-v4.1-flash
+    reasoningEffort: low
+# The web layer disables workflow-ptc; dsh-grok-workflow injects the workflowEngine
+# service, so its provider has to be switched back on.
+- id: workflow-ptc
+  name: '@deepseek-ai/dsh-workflow-ptc'
+  config:
+    provider: spawn
+  disabled: false
+# T4 slim-down surface: only the 8 documented keys. Any removed key here would be
+# rejected as an unknown key (R-06), so the overlay carries the minimum.
+- id: grok-workflow
+  name: dsh-grok-workflow
+  config:
+    toolName: grok
+    mode: triage
+    grokDefault: 'on'
+    synthesis: layered
+    maxConcurrency: 4
+    maxTasks: 8
+    roles:
+      planner:
+        - provider: bifrost-completions
+          model: wb/cn:deepseek-v4.1-flash
+      worker:
+        - provider: bifrost-completions
+          model: wb/cn:deepseek-v4.1-flash
+      verifier:
+        - provider: bifrost-completions
+          model: wb/cn:deepseek-v4.1-flash
+      supervisor: []
+      synthesizer: []
+  disabled: false
+- id: ui-settings-general
+  name: '@deepseek-ai/dsh-client-ui-settings-general'
+  config:
+    welcomeNoticeVersion: 2026-09-28.1
