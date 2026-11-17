@@ -5,6 +5,29 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-11-18
+
+### Fixed / 修复
+
+- **The READMEs no longer advertise a release from three versions ago /
+  README 不再推荐三个版本之前的发布** — both languages still said "the package
+  version in this repository is `0.8.0`", pinned `#v0.8.0` in every install
+  example, and stopped the published-tag list at `v0.8.0`, while the package was
+  at `0.11.0` and nine more tags had been pushed. The declared version, the
+  install examples, the tag-naming sentence and the published list now come from
+  the real tags and are checked by `test/docs-version.spec.ts`, which fails the
+  build when the prose and `package.json` disagree. / 中英两份 README 都还写着"本
+  仓库声明的包版本是 `0.8.0`"、安装示例固定 `#v0.8.0`、已发布列表停在 `v0.8.0`，而
+  包已经是 `0.11.0`、另有九个标签已推送。声明的版本、安装示例、正文里点名的标签、已发布
+  列表现在都来自真实标签，并由 `test/docs-version.spec.ts` 钉住：说明文字与
+  `package.json` 不一致时构建失败。
+
+### Tests / 测试
+
+- `test/docs-version.spec.ts` (6): declared version in both languages, every
+  `plugin add` pin, bare `#vX.Y.Z` prose, published list ordering + last entry,
+  and the newest changelog heading all agree with `package.json`.
+
 ## [0.11.0] - 2026-11-18
 
 ### Added / 新增

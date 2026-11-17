@@ -1,0 +1,87 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+ ❯ test/docs-version.spec.ts (5 tests | 4 failed) 13ms
+     × states the current package version in English 7ms
+     × states the current package version in Simplified Chinese 1ms
+     × pins every install example to the current release tag 3ms
+     × lists published tags in ascending order ending at the current release 1ms
+     ✓ opens the changelog with the version the package declares 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/docs-version.spec.ts > README version claims match package.json > states the current package version in English
+AssertionError: expected '0.8.0' to be '0.11.0' // Object.is equality
+
+Expected: "0.11.0"
+Received: "0.8.0"
+
+ ❯ test/docs-version.spec.ts:55:94
+     53| describe('README version claims match package.json', () => {
+     54|   it('states the current package version in English', () => {
+     55|     expect(declaredVersion(readmeEn, /The package version in this repo…
+       |                                                                                              ^
+     56|   })
+     57|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  test/docs-version.spec.ts > README version claims match package.json > states the current package version in Simplified Chinese
+AssertionError: expected '0.8.0' to be '0.11.0' // Object.is equality
+
+Expected: "0.11.0"
+Received: "0.8.0"
+
+ ❯ test/docs-version.spec.ts:59:63
+     57|
+     58|   it('states the current package version in Simplified Chinese', () =>…
+     59|     expect(declaredVersion(readmeZh, /本仓库声明的包版本是 `([^`]+)`/)).toBe(ver…
+       |                                                               ^
+     60|   })
+     61|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  test/docs-version.spec.ts > README version claims match package.json > pins every install example to the current release tag
+AssertionError: expected Set{ 'v0.8.0' } to deeply equal Set{ 'v0.11.0' }
+
+- Expected
++ Received
+
+  Set {
+-   "v0.11.0",
++   "v0.8.0",
+  }
+
+ ❯ test/docs-version.spec.ts:66:29
+     64|       const pins = [...readme.matchAll(/dsh-grok-workflow#(v\d+\.\d+\.…
+     65|       expect(pins.length).toBeGreaterThanOrEqual(2)
+     66|       expect(new Set(pins)).toEqual(new Set([tag]))
+       |                             ^
+     67|     }
+     68|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  test/docs-version.spec.ts > README version claims match package.json > lists published tags in ascending order ending at the current release
+AssertionError: expected 'v0.8.0' to be 'v0.11.0' // Object.is equality
+
+Expected: "v0.11.0"
+Received: "v0.8.0"
+
+ ❯ test/docs-version.spec.ts:79:27
+     77|       const ascending = [...tags].sort(compareVersions)
+     78|       expect(tags).toEqual(ascending)
+     79|       expect(tags.at(-1)).toBe(tag)
+       |                           ^
+     80|     }
+     81|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 1 passed (5)
+   Start at  01:20:18
+   Duration  177ms (transform 19ms, setup 0ms, import 31ms, tests 13ms, environment 0ms)
+

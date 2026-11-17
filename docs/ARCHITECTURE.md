@@ -401,7 +401,7 @@ hands `.volatile()` configuration over as holders and the plugin unwraps them (D
 
 ## Checkpoint and resume (record + re-drive policy)
 
-Status (**0.8.0**): `src/checkpoint/` (schema, atomic writer,
+Status (since **0.8.0**): `src/checkpoint/` (schema, atomic writer,
 engine wiring) and `src/resume/` (validator, restore policy) ship in this release and are
 exercised by `test/checkpoint-schema.spec.ts`, `test/checkpoint-wiring.spec.ts` and
 `test/resume-validator.spec.ts`. The wiring *is* called: `src/run.ts` creates one recorder per

@@ -1,0 +1,5 @@
+round 0 carry-in
+tree at commit: 85541ad
+ci: 51 files / 959 tests PASS (npm run ci, 2026-11-18T01:17+08:00)
+build: idempotent, git diff -- lib/ empty after npm run build
+tag: v0.11.0 (annotated, pushed)

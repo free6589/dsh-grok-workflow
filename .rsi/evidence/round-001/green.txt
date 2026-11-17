@@ -1,0 +1,35 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+ ❯ test/docs-version.spec.ts (6 tests | 1 failed) 13ms
+     ✓ states the current package version in English 2ms
+     ✓ states the current package version in Simplified Chinese 0ms
+     ✓ pins every install example to the current release tag 1ms
+     ✓ names only the current release when a tag is spelled out in prose 0ms
+     ✓ lists published tags in ascending order ending at the current release 1ms
+     × opens the changelog with the version the package declares 6ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/docs-version.spec.ts > README version claims match package.json > opens the changelog with the version the package declares
+AssertionError: expected '0.11.0' to be '0.11.1' // Object.is equality
+
+Expected: "0.11.1"
+Received: "0.11.0"
+
+ ❯ test/docs-version.spec.ts:94:45
+     92|     const newest = changelog.match(/^## \[(\d+\.\d+\.\d+)\]/m)
+     93|     expect(newest).not.toBeNull()
+     94|     expect((newest as RegExpMatchArray)[1]).toBe(version)
+       |                                             ^
+     95|   })
+     96| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 5 passed (6)
+   Start at  01:20:49
+   Duration  192ms (transform 24ms, setup 0ms, import 37ms, tests 13ms, environment 0ms)
+
