@@ -162,9 +162,11 @@ describe('periodic checkpoints', () => {
   it('writes a running checkpoint with the phases the script actually emitted', async () => {
     const events = new FakeEvents()
     const dir = witnessDir('witness-periodic')
-    // Test-only deadline: the production 60 min deadline exceeds the checkpoint
-    // row's representable range (countCeiling), so the machinery is exercised
-    // with 60 s here; the semantics (passed deadline -> host fact) are identical.
+    // Test-only deadline: 60 s only keeps the clock arithmetic below small. The
+    // production 60 min deadline *is* representable — `limits.timeoutMs` and
+    // `watchdog.deadlineMs` are bounded by `msCeiling`, not by the count ceiling —
+    // so nothing would be dropped there; the semantics (passed deadline -> host
+    // fact) are identical either way.
     const recorder = createCheckpointRecorder({
       ...options({ directory: dir, events }),
       limits: { maxConcurrency: 10, maxRetries: 1, maxTasks: 12, timeoutMs: 60_000 },
@@ -278,6 +280,31 @@ describe('periodic checkpoints', () => {
     expect(checkpoint.run.status).toBe('failed')
   })
 
+  it('records a duration far past the 16-minute mark instead of dropping it', async () => {
+    const dir = join(scratch, 'long-duration')
+    // 30 min: longer than every run `src/config.ts` documents (878 s / 1148 s /
+    // 1801 s) and, at 1,800,000 ms, above the 1,000,000 count ceiling — the bound
+    // that used to swallow the field. `durationMs` is a millisecond value, so the
+    // schema bounds it by `msCeiling` (MAX_SAFE_INTEGER), and the recorder must not
+    // invent a tighter one of its own.
+    const start = 1_000_000
+    let now = start
+    const recorder = createCheckpointRecorder({
+      ...options({ directory: dir, now: () => now }),
+      startedAtMs: start,
+    })
+    recorder.adopt({ id: 'run-long' })
+
+    now = start + 1_800_000
+    const written = await recorder.tick()
+    expect(written?.ok).toBe(true)
+    const checkpoint = await readCheckpoint(checkpointFile('run-long', { dir }))
+    expect(checkpoint.time.startedAtMs).toBe(start)
+    expect(checkpoint.time.updatedAtMs).toBe(start + 1_800_000)
+    expect(checkpoint.time.durationMs).toBe(1_800_000)
+    recorder.dispose()
+  })
+
   it('maps only this plugin’s own phase labels', () => {
     expect(phaseFromTitle('plan')).toBe('plan')
     expect(phaseFromTitle('Execute')).toBe('execute')
@@ -367,8 +394,9 @@ describe('unload checkpoints', () => {
     const recorder = createCheckpointRecorder({
       ...options({ directory: dir, now: () => now }),
       startedAtMs: now,
-      // Test-only deadline (see above): the production 60 min value exceeds the
-      // checkpoint row's representable range, so 60 s exercises the same path.
+      // Test-only deadline (see above): 60 s keeps the clock arithmetic small and
+      // nothing more — the production 60 min value is representable, because the
+      // checkpoint bounds timeoutMs and deadlineMs by `msCeiling`. Same code path.
       limits: { maxConcurrency: 10, maxRetries: 1, maxTasks: 12, timeoutMs: 60_000 },
     })
     recorder.adopt({ id: 'run-12' })
