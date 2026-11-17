@@ -319,6 +319,21 @@ describe('configuration surface', () => {
     expect(() => resolveConfig({ grokDefault: 'sometimes' } as never)).toThrow(/grokDefault must be "on" or "off"/)
   })
 
+  it('refuses an unknown grok-mode default on the direct-construction path', () => {
+    // The schema is not the only way in: `apply()` and a stale `lib/` hand
+    // `resolveConfig` a plain object, so the enum has to hold here as well.
+    // Without this check `sometimes` resolves, the gate reads it as `off`, and
+    // the effective-configuration signature prints the unknown value verbatim.
+    expect(() => resolveConfig({ grokDefault: 'sometimes' } as never))
+      .toThrow('grokDefault must be "on" or "off", got "sometimes"')
+    expect(() => resolveConfig({ grokDefault: true } as never))
+      .toThrow(/grokDefault must be "on" or "off"/)
+    // The two accepted values still resolve, and the signature still names them.
+    expect(resolveConfig({ grokDefault: 'on' } as never).grokDefault).toBe('on')
+    expect(resolveConfig({ grokDefault: 'off' } as never).grokDefault).toBe('off')
+    expect(describeResolvedConfig(resolveConfig({ grokDefault: 'on' } as never))).toContain('grokDefault=on')
+  })
+
   it('names grokDefault in the one-line effective-configuration signature', () => {
     expect(describeResolvedConfig(resolveConfig({}))).toContain('grokDefault=off')
     expect(describeResolvedConfig(resolveConfig({ grokDefault: 'on' } as never))).toContain('grokDefault=on')
