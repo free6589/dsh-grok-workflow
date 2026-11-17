@@ -3272,3 +3272,23 @@ Save/Discard 在位；scrollW=1440 = innerW（无横向溢出）
 
 **验证（`CONFIRMED`）**：`npm run build`（198003 B）→ `cmp` 一致；
 `test/client.spec.ts` 74/74；全量 51 文件 / 953 测试 PASS；typecheck 0 错；lint 22w/0e（无新增）。
+
+## Round 49 — 2026-11-17 — v0.10.1 发版（`CONFIRMED`，逐条可复核）
+
+**内容**：`e49acd1`（序号/回退/去计数）+ `1757164`（专业重写 + 保存锁死修复）+
+`ed61750`（升 0.10.1 + changelog）。`v0.10.0` tag 未动（peel `b2c4515` 不变）。
+
+**发版动作（`CONFIRMED`）**：`package.json` + `package-lock.json` = `0.10.1`；
+`CHANGELOG` 插入 `## [0.10.1] - 2026-11-17`（`[Unreleased]` 保留为空节）；
+push（fast-forward `7300a6e..ed61750`，无 force）→ tag `v0.10.1`（peel `ed61750`）→
+CI `44109698911` success → Release `44109723594` success，
+Release `v0.10.1` + asset `dsh-grok-workflow-0.10.1.tgz` 已发布。
+
+**新 profile 真机（`CONFIRMED`，`acgtest101x` / 未用端口，web 沙箱起不来故 CLI 侧）**：
+`dsh plugin add file:…0.10.1…`（按同包重演，exit 0）→ 已装 `lib/client.js` md5 与
+工作区修复版一致（`modeCards`/`data-route-cap`/`4 · 监督` 在列）→
+`--dump-config` grok 行 8 键全 → 写 7/9 落盘、supervisor 链写入落盘。
+浏览器点检 NOT_RUN（沙箱回收 web 后台进程）；用户 `:3080` 重启后所见以其浏览器为准。
+
+**未做（`NOT_RUN`）**：live `:3080` 换装 v0.10.1 与重启（D-013 用户动作）；
+进度 Execute/Verify 成员渲染缺口的定位与修复。
