@@ -134,7 +134,6 @@ window.__ModuleLoader__.load({
       'warn.limit.detail': '{field} is saved as {live}, over the hard maximum {cap}. The plugin runs it clamped to {cap} and said so in its log, so the tool stays usable — save {cap} or lower here and this notice goes away.',
 
       'action.save': 'Save',
-      'action.saveCount': 'Save ({count})',
       'action.saving': 'Saving…',
       'action.discard': 'Discard',
       // One retry of the mirror read: the only recovery a failed `describe()` has.
@@ -279,7 +278,6 @@ window.__ModuleLoader__.load({
       'warn.limit.detail': '{field} 保存的是 {live}，超过硬上限 {cap}。插件按 {cap} 钳制运行并在日志里说明过，所以工具照常可用——在这里保存 {cap} 或更小，这条提示就会消失。',
 
       'action.save': '保存',
-      'action.saveCount': '保存 ({count})',
       'action.saving': '保存中…',
       'action.discard': '放弃修改',
       // Same key as `en`: re-reading is the only recovery a failed `describe()` has.
@@ -895,11 +893,17 @@ window.__ModuleLoader__.load({
     function EnumField(props) {
       const { field, value, disabled, onChange, t } = props
       const optionKey = (option) => `option.${field.key}.${option}`
+      const known = new Set(field.options.map((option) => String(option)))
+      const current = String(value)
+      // An out-of-range stored value (a legacy patch, a hand edit) must stay
+      // selectable: a bare <select> would render blank and drop the value on
+      // the next save. Show it as its own first row so nothing is lost.
+      const rows = known.has(current) ? field.options : [current, ...field.options]
       return h('select', {
-        style: { ...styles.input, ...styles.narrow, width: 'auto' }, value: String(value), disabled,
+        style: { ...styles.input, ...styles.narrow, width: 'auto' }, value: current, disabled,
         onChange: (event) => onChange(field.key, event.target.value),
         'data-field': field.key,
-      }, field.options.map((option) => {
+      }, rows.map((option) => {
         const label = translate(undefined, optionKey(option)) === optionKey(option)
           ? option
           : t(optionKey(option))
@@ -998,7 +1002,7 @@ window.__ModuleLoader__.load({
         }, t('roles.remove')))
     }
 
-    const ROLE_ORDER = { planner: 1, worker: 2, verifier: 3, synthesizer: 4, supervisor: 5 }
+    const ROLE_ORDER = { planner: 1, worker: 2, verifier: 3, supervisor: 4, synthesizer: 5 }
 
     function RoleChain(props) {
       const { role, chain, disabled, onChange, catalog, t } = props
@@ -1251,7 +1255,7 @@ window.__ModuleLoader__.load({
           h('button', {
             type: 'button', style: styles.primary, disabled: disabled || errors.length > 0 || ops.length === 0,
             onClick: save, 'data-action': 'save',
-          }, saving ? t('action.saving') : (ops.length > 0 ? t('action.saveCount', { count: ops.length }) : t('action.save'))),
+          }, saving ? t('action.saving') : t('action.save')),
           h('button', {
             type: 'button', style: styles.button, disabled: disabled || ops.length === 0,
             onClick: () => { setDraft(draftOf(value)); setMessage(undefined) }, 'data-action': 'discard',
@@ -3491,7 +3495,7 @@ window.__ModuleLoader__.load({
     /** Internals pinned by test/client.spec.ts (no runtime caller). */
     exports.GROK_WORKFLOW_INTERNALS = {
       validate, formatError, fieldLabel, opsFor, draftOf, resolveNamespace, translate, translator, activeLocale,
-      comboWarn, emptyCapWarn, limitOverrunWarn,
+      comboWarn, emptyCapWarn, limitOverrunWarn, EnumField, ROLE_ORDER,
     }
     /** Task panel: the `workflow-run` node renderer this bundle registers in place of the stock one. */
     exports.GROK_WORKFLOW_PANEL = {

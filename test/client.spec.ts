@@ -46,6 +46,7 @@ interface Bundle {
     activeLocale(locale: unknown): string
     comboWarn(draft: Draft): boolean
     emptyCapWarn(draft: Draft): boolean
+    ROLE_ORDER: Record<string, number>
   }
 }
 
@@ -224,7 +225,7 @@ function loadBundle(): Bundle {
 }
 
 const bundle = loadBundle()
-const { draftOf, validate, formatError, opsFor, resolveNamespace, translate, translator, comboWarn, emptyCapWarn } = bundle.GROK_WORKFLOW_INTERNALS
+const { draftOf, validate, formatError, opsFor, resolveNamespace, translate, translator, comboWarn, emptyCapWarn, ROLE_ORDER } = bundle.GROK_WORKFLOW_INTERNALS
 const en = translator('en')
 const zh = translator('zh')
 
@@ -285,6 +286,12 @@ describe('client settings page bundle', () => {
 
   it('covers the five T5 roles (supervisor added to the four documented ones)', () => {
     expect(bundle.GROK_WORKFLOW_ROLES).toEqual(['planner', 'worker', 'verifier', 'synthesizer', 'supervisor'])
+  })
+
+  it('numbers the role cards in execution order (supervise before summarize)', () => {
+    // The script runs supervisor after verify and before synthesis, so the
+    // card numbers must read 1-2-3-4-5 in that same order.
+    expect(ROLE_ORDER).toEqual({ planner: 1, worker: 2, verifier: 3, supervisor: 4, synthesizer: 5 })
   })
 
   it('ships lib/client.js byte-identical to the source (no stale bundle)', () => {
