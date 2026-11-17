@@ -1,0 +1,69 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.worktrees/rsi-r8
+
+ ❯ test/delivery.spec.ts (14 tests | 2 failed) 38ms
+     ✓ names what was done, what came of it and what is next, in both languages 11ms
+     ✓ drops the shell command, the digest and the absolute path a report quoted 1ms
+     ✓ never words a failure as success 1ms
+     ✓ leads with the language that was asked for, and mirrors the other one 1ms
+     ✓ is absent from the delivery until the switch is on 2ms
+     ✓ reads a live settings holder, and degrades to hidden when it throws 1ms
+     × names a configured supervisor chain, in the documented execution order 7ms
+     × labels the synthesis mode once, under a label the failure note does not own 2ms
+     ✓ keeps every ledger label out of the visible block and folds the ledger below the marker 2ms
+     ✓ ignores the removed diagnostics opt-in: the ledger stays folded (T4) 1ms
+     ✓ folds the ledger for a PARTIAL run too, and keeps it parseable for carry-over 5ms
+     ✓ delivers one wording for in-turn and relay 1ms
+     ✓ ignores the removed humanSummary opt-out: the human block is always on (T4) 1ms
+     ✓ tells the model not to print the markers or quote the folded ledger 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/delivery.spec.ts > 机器台账：每一行说清一件已经发生的事 > names a configured supervisor chain, in the documented execution order
+AssertionError: expected 'Model routes: planner=inherit; worker…' to contain 'supervisor=bifrost-completions/wb/cn:…'
+
+Expected: "supervisor=bifrost-completions/wb/cn:deepseek-v4.1-pro"
+Received: "Model routes: planner=inherit; worker=inherit; verifier=inherit; synthesizer=inherit"
+
+ ❯ test/delivery.spec.ts:239:18
+    237|     const line = routeLine(ledger)
+    238|     expect(line, 'the ledger states the routes for every run').toBeDef…
+    239|     expect(line).toContain('supervisor=bifrost-completions/wb/cn:deeps…
+       |                  ^
+    240|     // Execution order: planner → worker → verifier → supervisor → syn…
+    241|     expect(line!.indexOf('supervisor=')).toBeLessThan(line!.indexOf('s…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/delivery.spec.ts > 机器台账：每一行说清一件已经发生的事 > labels the synthesis mode once, under a label the failure note does not own
+AssertionError: expected 'Grok workflow: COMPLETED\nObjective: …' not to contain 'Synthesis: deterministic'
+
+- Expected
++ Received
+
++ Grok workflow: COMPLETED
++ Objective: 查一下新加坡这周的天气并给出出行建议
++ Plan: caller; 1 task(s); 1 verified
++ - a: verified (1 attempt) — Task a
++ Confirmed evidence:
++ - a: 天气已核验 → verified 天气已核验 in file:///tmp/report
++ Synthesis: model narrative unavailable (model polish timed out); the report above is complete
+  Synthesis: deterministic
++ Model routes: planner=inherit; worker=inherit; verifier=inherit; synthesizer=inherit
+
+ ❯ test/delivery.spec.ts:253:24
+    251|     // Two lines under one label meant two different facts; the mode n…
+    252|     // fact it is, so a reader (or a parser) never has to guess.
+    253|     expect(ledger).not.toContain('Synthesis: deterministic')
+       |                        ^
+    254|     expect(lines.filter(line => line.startsWith('Synthesis mode:'))).t…
+    255|     expect(lines.filter(line => line.startsWith('Synthesis:'))).toHave…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 12 passed (14)
+   Start at  01:42:46
+   Duration  744ms (transform 538ms, setup 0ms, import 579ms, tests 38ms, environment 0ms)
+

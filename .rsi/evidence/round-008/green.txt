@@ -1,0 +1,10 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.worktrees/rsi-r8
+
+ ✓ test/delivery.spec.ts (14 tests) 39ms
+
+ Test Files  1 passed (1)
+      Tests  14 passed (14)
+   Start at  01:43:35
+   Duration  822ms (transform 586ms, setup 0ms, import 640ms, tests 39ms, environment 0ms)
+

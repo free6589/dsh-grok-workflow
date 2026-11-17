@@ -118,6 +118,7 @@ const LEDGER_LABELS = [
   'cross-run hint',
   'Errors:',
   'Synthesis:',
+  'Synthesis mode:',
   'Uncertainties:',
   '核验通过',
   '进度节点在旁',
@@ -949,7 +950,10 @@ export function machineLedger(report: WorkflowReport): string {
   if (report.synthesis.error !== undefined) {
     lines.push(`Synthesis: model narrative unavailable (${oneLine(report.synthesis.error, 300)}); the report above is complete`)
   }
-  lines.push(`Synthesis: ${report.synthesis.mode}`)
+  // R8: the mode line owns its own label. It used to be a second `Synthesis:`
+  // line, so one label carried two facts (the failure note and the mode) and a
+  // reader or parser had to guess which it was looking at.
+  lines.push(`Synthesis mode: ${report.synthesis.mode}`)
   // Five routed roles, in report order (`src/report.ts` `ROLE_NAMES`): a run
   // configured with a supervisor chain must name it the same way `renderReport`
   // does, or the ledger reads "no supervision" for a supervised run (R8-ledger).

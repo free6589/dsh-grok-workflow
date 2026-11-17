@@ -295,6 +295,50 @@ describe('机器台账：默认折叠，opt-in 才出现', () => {
   })
 })
 
+describe('机器台账：每一行说清一件已经发生的事', () => {
+  /** The ledger's route line, which every run carries whatever its outcome. */
+  function routeLine(text: string): string | undefined {
+    return text.split('\n').find(line => line.startsWith('Model routes:'))
+  }
+
+  it('names a configured supervisor chain, in the documented execution order', () => {
+    // The fifth role was reachable from config and rendered by `src/report.ts`, but
+    // the ledger listed only four: a configured supervisor chain existed and the
+    // durable copy said nothing about it.
+    const supervisorConfig = resolveConfig({
+      ...LIMITS,
+      roles: { supervisor: [{ provider: 'bifrost-completions', model: 'wb/cn:deepseek-v4.1-pro' }] },
+    })
+    const report = failureReport(OBJECTIVE, supervisorConfig, 'Verify', 'supervisor chain unreachable')
+    const ledger = machineLedger(report)
+    const line = routeLine(ledger)
+    expect(line, 'the ledger states the routes for every run').toBeDefined()
+    expect(line).toContain('supervisor=bifrost-completions/wb/cn:deepseek-v4.1-pro')
+    // Execution order: planner → worker → verifier → supervisor → synthesizer.
+    expect(line!.indexOf('supervisor=')).toBeLessThan(line!.indexOf('synthesizer='))
+    // One report, one dialect: the canonical renderer prints the same route line.
+    expect(line).toBe(routeLine(renderReport(report, { showDiagnostics: true })))
+  })
+
+  it('labels the synthesis mode once, under a label the failure note does not own', () => {
+    const base = completedReport()
+    const degraded = { ...base, synthesis: { mode: 'deterministic' as const, error: 'model polish timed out' } }
+    const ledger = machineLedger(degraded)
+    const lines = ledger.split('\n')
+    // Two lines under one label meant two different facts; the mode now says whose
+    // fact it is, so a reader (or a parser) never has to guess.
+    expect(ledger).not.toContain('Synthesis: deterministic')
+    expect(lines.filter(line => line.startsWith('Synthesis mode:'))).toEqual(['Synthesis mode: deterministic'])
+    expect(lines.filter(line => line.startsWith('Synthesis:'))).toHaveLength(1)
+    // The note itself still carries the measured cause.
+    expect(ledger).toContain('Synthesis: model narrative unavailable (model polish timed out)')
+
+    // A run whose narrative was fine still states the mode, once.
+    expect(machineLedger(base).split('\n').filter(line => line.startsWith('Synthesis')))
+      .toEqual(['Synthesis mode: deterministic'])
+  })
+})
+
 describe('relay/in-turn 文本：可见块与人话块一致，台账折叠在标记之后', () => {
   it('keeps every ledger label out of the visible block and folds the ledger below the marker', () => {
     const text = relayText(completedReport())
