@@ -2,7 +2,6 @@ import type {
   AttemptFailure,
   RouteTrailEntry, ExecutionResult, FailureCategory, FinalStatus, VerificationResult, WorkflowReport } from './types.js'
 import type { ModelRoute, ResolvedConfig, RoleName } from './types.js'
-import { FIXED_TIMEOUT_MS } from './config.js'
 import { criterionKey, TASK_LIMITS } from './input.js'
 import { maxTotalAgentsFor, routeBudgetFor } from './script.js'
 import { shardCountFor, splitObjective } from './shards.js'
@@ -366,9 +365,12 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
   const maxTotalAgents = number(limits.maxTotalAgents, 'limits.maxTotalAgents')
   // t47: the deadline travels with the result. It used to live only in memory, so
   // "which deadline was in force?" was unanswerable from the session log.
+  // The deadline is user-configurable (default 0 = unlimited): the report must
+  // carry exactly the configured value — any other non-negative integer is a
+  // report from a different configuration, not from this one.
   const timeoutMs = limits.timeoutMs === undefined ? undefined : number(limits.timeoutMs, 'limits.timeoutMs')
-  if (timeoutMs !== undefined && timeoutMs !== 0 && timeoutMs !== FIXED_TIMEOUT_MS) {
-    throw new Error(`workflow result ran under a ${timeoutMs} ms deadline but the plugin enforces ${FIXED_TIMEOUT_MS} ms`)
+  if (timeoutMs !== undefined && timeoutMs !== 0 && timeoutMs !== config.timeoutMs) {
+    throw new Error(`workflow result ran under a ${timeoutMs} ms deadline but the plugin enforces ${config.timeoutMs} ms`)
   }
   if (maxConcurrency !== config.maxConcurrency || maxRetries !== config.maxRetries || maxTasks !== config.maxTasks) {
     throw new Error('workflow result limits do not match the configured limits')
@@ -726,7 +728,7 @@ export function failureReport(
       maxRetries: config.maxRetries,
       maxTasks: config.maxTasks,
       maxTotalAgents: 0,
-      timeoutMs: FIXED_TIMEOUT_MS,
+      ...config.timeoutMs === 0 ? {} : { timeoutMs: config.timeoutMs },
     },
   }
 }

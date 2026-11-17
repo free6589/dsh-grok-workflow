@@ -91,11 +91,12 @@ export declare const CHECKPOINT_LIMITS: {
     /** Structural ceiling for recorded limit numbers (matches config's 1e6 backstop). */
     readonly countCeiling: 1000000;
     /**
-     * Structural ceiling for millisecond durations and timeouts. Mirrors
-     * HARD_LIMITS.timeoutMs (604,800,000 = 7 days) in src/config.ts, so a
-     * checkpoint can record any timeout the plugin itself accepts.
+     * Structural ceiling for millisecond durations and timeouts. Accepts 0
+     * (unlimited) and any configured timeoutMs up to MAX_SAFE_INTEGER, so a
+     * checkpoint records the configured deadline honestly instead of refusing
+     * or clamping it.
      */
-    readonly msCeiling: 604800000;
+    readonly msCeiling: number;
 };
 /**
  * The documented engine-hook contract for run limits (AGENTS.md architecture

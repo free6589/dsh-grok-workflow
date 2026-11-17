@@ -14,7 +14,7 @@ import { namingLanguageFromSettings } from './naming.js'
 import type { NamingLanguage } from './naming.js'
 import {
   FIXED_MAX_ACTIVE_RUNS, FIXED_MAX_ACTIVE_RUNS_TOTAL, FIXED_RECORD_LIMIT, FIXED_RECORD_RUNS,
-  FIXED_SHOW_DIAGNOSTICS, FIXED_SHOW_PROGRESS, FIXED_TIMEOUT_MS,
+  FIXED_SHOW_DIAGNOSTICS, FIXED_SHOW_PROGRESS, MAX_TIMER_DELAY_MS,
 } from './config.js'
 import { buildWorkflowRequest } from './script.js'
 import { teamWorkflowEngine } from './team-engine.js'
@@ -625,20 +625,29 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
   const mode = options.failureMode ?? 'throw'
   const timeoutController = new AbortController()
   let timedOut = false
-  // t47: the deadline is a plugin-owned hard bound, not a hint to the engine. The
+  // t47: the deadline is a plugin-owned bound, not a hint to the engine. The
   // t46 acceptance round measured a run that was still working five minutes after a
   // 60 s deadline: the timer aborted the signal and asked the engine to cancel, and
   // the turn then waited for the engine to settle. This promise lets the caller stop
   // waiting, so a deadline always produces a report on time whether or not the
   // engine honours the abort.
+  //
+  // The deadline is user-configurable (0 = unlimited). With 0 — or with a value
+  // above MAX_TIMER_DELAY_MS, which Node would fire immediately instead of after
+  // the delay — no timer is armed at all: `deadline` never resolves and the
+  // startup race omits the deadline branch below.
+  const deadlineMs = config.timeoutMs
+  const deadlineArmed = deadlineMs > 0 && deadlineMs <= MAX_TIMER_DELAY_MS
   let hitDeadline: (() => void) | undefined
   const deadline = new Promise<'deadline'>(resolve => { hitDeadline = () => resolve('deadline') })
-  const timer = setTimeout(() => {
-    timedOut = true
-    timeoutController.abort()
-    hitDeadline?.()
-  }, FIXED_TIMEOUT_MS)
-  timer.unref?.()
+  const timer = deadlineArmed
+    ? setTimeout(() => {
+      timedOut = true
+      timeoutController.abort()
+      hitDeadline?.()
+    }, deadlineMs)
+    : undefined
+  timer?.unref?.()
   const combined = anySignal([state.controller.signal, timeoutController.signal, ...options.signals ?? []])
   const signal = combined.signal
   // The category tells a reader who failed: a deadline or a broken engine is
@@ -752,7 +761,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
       maxConcurrency: config.maxConcurrency,
       maxRetries: config.maxRetries,
       maxTasks: config.maxTasks,
-      timeoutMs: FIXED_TIMEOUT_MS,
+      timeoutMs: deadlineMs,
     },
     ...options.carryover === undefined || options.carryover.trim() === '' ? {} : { minContextDigest: options.carryover },
   })
@@ -806,16 +815,24 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
           removeStartupAbort = () => signal.removeEventListener('abort', onAbort)
         }
       })
-      const startup = await Promise.race([
-        startingPromise.then(
-          value => ({ kind: 'started' as const, run: value }),
-          error => ({ kind: 'error' as const, error }),
-        ),
-        deadline.then(() => ({ kind: 'deadline' as const })),
-        startupCancelled.then(() => ({ kind: 'cancelled' as const })),
-      ])
+      const startup = deadlineArmed
+        ? await Promise.race([
+          startingPromise.then(
+            value => ({ kind: 'started' as const, run: value }),
+            error => ({ kind: 'error' as const, error }),
+          ),
+          deadline.then(() => ({ kind: 'deadline' as const })),
+          startupCancelled.then(() => ({ kind: 'cancelled' as const })),
+        ])
+        : await Promise.race([
+          startingPromise.then(
+            value => ({ kind: 'started' as const, run: value }),
+            error => ({ kind: 'error' as const, error }),
+          ),
+          startupCancelled.then(() => ({ kind: 'cancelled' as const })),
+        ])
       if (startup.kind === 'deadline' || (startup.kind === 'cancelled' && timedOut)) {
-        const reason = 'workflow deadline exceeded after ' + FIXED_TIMEOUT_MS + ' ms during startup'
+        const reason = 'workflow deadline exceeded after ' + deadlineMs + ' ms during startup'
         // The caller can return now, but the engine may still hand back a run later.
         // Observe the pending promise and dispose that late resource immediately.
         void startingPromise.then(async lateRun => {
@@ -826,7 +843,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
             logger.warn('late workflow startup dispose failed: ' + redactError(error))
           }
         }, () => {})
-        return timeout('workflow exceeded the ' + FIXED_TIMEOUT_MS + ' ms deadline during startup')
+        return timeout('workflow exceeded the ' + deadlineMs + ' ms deadline during startup')
       }
       if (startup.kind === 'cancelled') {
         const reason = state.disposed
@@ -844,7 +861,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
         return failure(state.disposed ? 'Unloaded' : 'Cancelled', reason, state.disposed ? 'unloaded' : 'cancelled')
       }
       if (startup.kind === 'error') {
-        if (timedOut) return timeout('workflow exceeded the ' + FIXED_TIMEOUT_MS + ' ms deadline during startup')
+        if (timedOut) return timeout('workflow exceeded the ' + deadlineMs + ' ms deadline during startup')
         if (signal.aborted) {
           const reason = state.disposed
             ? workflowLabel(config) + ' was unloaded during workflow startup'
@@ -894,7 +911,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
         const reason = state.disposed
           ? 'grok-workflow plugin unloaded'
           : timedOut
-            ? `workflow deadline exceeded after ${FIXED_TIMEOUT_MS} ms`
+            ? `workflow deadline exceeded after ${deadlineMs} ms`
             : 'workflow cancelled by its caller'
         void active.cancel(reason)
       }
@@ -903,7 +920,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
       if (timedOut) {
         run.cancel('workflow deadline exceeded during startup')
         settledStop = 'cancelled'
-        return timeout(`workflow exceeded the ${FIXED_TIMEOUT_MS} ms deadline and was cancelled`)
+        return timeout(`workflow exceeded the ${deadlineMs} ms deadline and was cancelled`)
       }
     } finally {
       state.pending -= 1
@@ -915,17 +932,17 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
     const activeRun = run
     // The deadline wins the race even when the engine keeps working: the caller asked
     // for bounded work and must be told the bound was hit, not left waiting for an
-    // engine that ignores `cancel`.
-    const raced = await Promise.race([activeRun.result, deadline])
+    // engine that ignores `cancel`. With no deadline armed the run simply settles.
+    const raced = deadlineArmed ? await Promise.race([activeRun.result, deadline]) : await activeRun.result
     if (raced === 'deadline') {
-      void activeRun.cancel(`workflow deadline exceeded after ${FIXED_TIMEOUT_MS} ms`)
+      void activeRun.cancel(`workflow deadline exceeded after ${deadlineMs} ms`)
       settledStop = 'cancelled'
-      return timeout(`workflow exceeded the ${FIXED_TIMEOUT_MS} ms deadline and was cancelled; the engine had not settled, so this report is the authoritative result`)
+      return timeout(`workflow exceeded the ${deadlineMs} ms deadline and was cancelled; the engine had not settled, so this report is the authoritative result`)
     }
     const result = raced
     settledStop = result.stopReason
     if (timedOut) {
-      return timeout(`workflow exceeded the ${FIXED_TIMEOUT_MS} ms deadline and was cancelled`)
+      return timeout(`workflow exceeded the ${deadlineMs} ms deadline and was cancelled`)
     }
     if (result.stopReason === 'completed') {
       try {
@@ -978,7 +995,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
     const detail = redactSecrets(String(result.error ?? 'unknown workflow failure'))
     return failure('Engine error', detail, 'engine-error')
   } finally {
-    clearTimeout(timer)
+    if (timer !== undefined) clearTimeout(timer)
     if (cancelOnAbort !== undefined) signal.removeEventListener('abort', cancelOnAbort)
     // Close the node even when this function throws: an abandoned node would read
     // as "still running" in the panel until the turn ends.
@@ -1119,7 +1136,11 @@ export async function runSingleCall(options: SingleCallOptions): Promise<SingleC
   if (state.disposed) return { ok: false, reason: workflowLabel(config) + ' is unavailable: plugin has been unloaded' }
   // T4: triageModel removed — the single call always inherits the run's route.
   const route = {}
-  const deadlineMs = FIXED_TIMEOUT_MS
+  const deadlineMs = config.timeoutMs
+  // Same unlimited semantics as the full run: 0 (or an overflow past the
+  // setTimeout ceiling, which Node would fire immediately) arms no timer;
+  // the caller/unload can still stop the call through `signals`/disposal.
+  const deadlineArmed = deadlineMs > 0 && deadlineMs <= MAX_TIMER_DELAY_MS
   const signals = options.signals ?? []
   let stopped = false
 
@@ -1160,9 +1181,13 @@ export async function runSingleCall(options: SingleCallOptions): Promise<SingleC
     })
     const stopReason = (): string => timedOut
       ? 'the front-desk call exceeded the ' + deadlineMs + ' ms deadline'
-      : state.disposed
-        ? workflowLabel(config) + ' was unloaded while the front-desk call was running'
-        : 'the front-desk call was cancelled by its caller'
+      : deadlineArmed
+        ? state.disposed
+          ? workflowLabel(config) + ' was unloaded while the front-desk call was running'
+          : 'the front-desk call was cancelled by its caller'
+        : state.disposed
+          ? workflowLabel(config) + ' was unloaded while the front-desk call was running (no deadline)'
+          : 'the front-desk call was cancelled by its caller (no deadline)'
     const stop = (): void => {
       const reason = stopReason()
       // During plugin disposal the shared disposer owns cancellation and dispose.
@@ -1176,11 +1201,13 @@ export async function runSingleCall(options: SingleCallOptions): Promise<SingleC
     }
     combined.signal.addEventListener('abort', stop, { once: true })
     if (combined.signal.aborted) stop()
-    timer = setTimeout(() => {
-      timedOut = true
-      deadlineController.abort()
-    }, deadlineMs)
-    timer.unref?.()
+    if (deadlineArmed) {
+      timer = setTimeout(() => {
+        timedOut = true
+        deadlineController.abort()
+      }, deadlineMs)
+      timer.unref?.()
+    }
 
     try {
       const start: WorkflowStartRequest = {

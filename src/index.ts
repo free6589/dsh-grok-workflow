@@ -1,7 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
-import { FIXED_HISTORY_CHARS, FIXED_HISTORY_TURNS, FIXED_TIMEOUT_MS, HARD_LIMITS, createConfigReader, describeResolvedConfig, limitOverrunWarning, repairLimitOverruns, repairSynthesisInconsistency, resolveConfig, snapshotConfig, takeLimitOverruns } from './config.js'
+import { FIXED_HISTORY_CHARS, FIXED_HISTORY_TURNS, MAX_TIMER_DELAY_MS, createConfigReader, describeResolvedConfig, limitOverrunWarning, repairLimitOverruns, repairSynthesisInconsistency, resolveConfig, snapshotConfig, takeLimitOverruns } from './config.js'
 import { describeSurface, validateRoutes } from './settings.js'
 import { carryoverBounds, carryoverForSession } from './carryover.js'
 import { registerGrokCommand } from './command.js'
@@ -224,7 +224,13 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
         }]
       },
     },
-    timeoutMs: Math.min(FIXED_TIMEOUT_MS + 60_000, HARD_LIMITS.timeoutMs),
+    // DSH `defineTool({timeoutMs})` requires a positive finite number and throws
+    // otherwise, so an unlimited (0) or overflow (> MAX_TIMER_DELAY_MS) deadline
+    // omits the field entirely (no DSH-side deadline); otherwise the tool gets
+    // the run deadline plus 60 s of headroom, never past the setTimeout ceiling.
+    ...config.timeoutMs <= 0 || config.timeoutMs > MAX_TIMER_DELAY_MS
+      ? {}
+      : { timeoutMs: Math.min(config.timeoutMs + 60_000, MAX_TIMER_DELAY_MS) },
     isConcurrencySafe: () => false,
     async execute(args, exec: ToolRunContext) {
       // Read at execution time, not at registration: a settings edit applies to

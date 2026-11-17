@@ -1056,3 +1056,30 @@ Each entry records the decision, evidence, alternatives, and status.
   `1.0.0`（配置面之外的 API 还在动，太早）。
 - **Consequences:** 用户升级前必须清理补丁；README 配置表与 `docs/LOCAL-TESTING.md`
   已按 8 键重写，CHANGELOG 给出迁移清单。
+
+## D-058 — 运行死线改为可配置，默认仍是 60 分钟，`0` = 不限时（2026-11-18）
+
+- **Status:** CONFIRMED（本地 `npm run ci` 全绿 + 全量 959 测试）
+- **Date:** 2026-11-18
+- **Decision:** `timeoutMs` 回到配置面（第 9 键）：默认 `3600000`（60 分钟），
+  接受 `0 … MAX_SAFE_INTEGER`，`0` = 不设 timer；非法值 fail closed（R-06），
+  不做钳制。超过 `setTimeout` 上限（`MAX_TIMER_DELAY_MS = 2^31-1`）的值内部按不限时
+  处理，但报告与 checkpoint 记录配置值本身。checkpoint 的 `msCeiling` 随之从
+  "镜像 `HARD_LIMITS.timeoutMs`" 改成 `MAX_SAFE_INTEGER`，不再因为"记录不了"而丢掉
+  真实死线。
+- **Reason:** t45 实测过一次"改死线要改代码"的成本：30 分钟默认在同一个下午杀掉两次
+  真实四任务运行（30m00s / 30m01s），而真实运行耗时为 878 s / 1148 s / 1801 s ——
+  默认值必须是可调参数而不是常量，才能在不重新发版的情况下适配更长的任务。
+  但默认值仍是 60 分钟而不是不限时：AGENTS.md 的不变量是"有界"，
+  不限时必须由调用方显式选择（`0`），不能成为默认。
+- **Evidence:** `src/config.ts`（`DEFAULT_TIMEOUT_MS`/`MAX_TIMER_DELAY_MS`/
+  `timeoutInteger`/`CONFIG_KEYS` 9 键）、`src/run.ts`（`deadlineArmed` 两处入口）、
+  `src/index.ts`（`defineTool` 只在有界时传 `timeoutMs`）、`src/checkpoint/wiring.ts`
+  （`recordableTimeoutMs`）、`test/config.spec.ts` 新增 4 例、
+  `test/checkpoint-engine-wire.spec.ts`/`test/checkpoint-wiring.spec.ts` 记录真实死线、
+  README 中英配置表、`docs/LOCAL-TESTING.md`。
+- **Alternatives rejected:** 默认 `0`（不限时）：与"有界工作流"的项目不变量冲突，
+  一次卡住的运行会一直挂着；把上限钉在 `HARD_LIMITS.timeoutMs`（原 604,800,000）：
+  用户明确要"没有实际上限"，且报告/checkpoint 现在都按配置值记录。
+- **Consequences:** 设置页从两个数字变成三个数字；`REMOVED_CONFIG_KEYS` 从 24 变 23；
+  旧补丁里写 `timeoutMs` 不再被拒载，而是生效。

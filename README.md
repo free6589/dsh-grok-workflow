@@ -130,7 +130,7 @@ The workflow objective limit is **32,000 characters**, measured on the user mess
 | 4,001–32,000 characters | Accepted; the entire message is kept as the objective. At exactly 32,000 characters the `Current request:` label is dropped instead of trimming the message, and no conversation history is attached. |
 | 32,001 characters or more | Refused out loud with `the message is longer than the 32000-character workflow objective limit`; no run starts. |
 
-Other limits are unchanged: each task field (`objective`, `expectedOutput`, `context`) is still capped at `4000` characters, and the aggregate serialized task budget stays at `48,000` characters. History and the run deadline are fixed in `0.10.0`: `historyTurns=20` / `historyChars=20000`, `timeoutMs=3600000` (60 minutes), and each role chain holds up to `50` backup routes. A larger objective therefore has to be decomposed into several tasks rather than widening one task field or one deadline.
+Other limits are unchanged: each task field (`objective`, `expectedOutput`, `context`) is still capped at `4000` characters, and the aggregate serialized task budget stays at `48,000` characters. History is fixed in `0.10.0` (`historyTurns=20` / `historyChars=20000`), the run deadline defaults to 60 minutes and is configurable (`timeoutMs`, `0` = unlimited), and each role chain holds up to `50` backup routes. A larger objective therefore has to be decomposed into several tasks rather than widening one task field or one deadline.
 
 If planning fails, the fallback plan splits the whole objective into contiguous segments that each fit the 4,000-character task-text budget. Concatenating the segments reproduces the objective verbatim, so the fallback is **not** rejected a second time and no character is lost. The run reports `partial` with `planning.source: "fallback"` and the planner error.
 
@@ -225,9 +225,10 @@ Configuration belongs to the profile's `cordis.patch.yml` (or a `--patch` overla
 | `synthesis` | `layered` | `layered` \| `model` | `layered` keeps the verified report the only source of fact; `model` adds one model-written summary |
 | `maxConcurrency` | `10` | `100` | Child agents in flight per run |
 | `maxTasks` | `10` | `100` | Maximum caller or planner tasks |
+| `timeoutMs` | `3600000` (60 min) | any non-negative integer (`0` = unlimited) | Run deadline in milliseconds. `0` arms no timer; a value above `2147483647` (the largest `setTimeout` delay) is treated as unlimited internally while the report records the configured number |
 | `configVersion` | `1` | `1` | Configuration surface version |
 
-Everything else is fixed inside the plugin and no longer accepted: `maxRetries=1`, `timeoutMs=3600000` (60 minutes), `maxActiveRuns=2` per session and `8` per process, `historyTurns=20` / `historyChars=20000`, `maxQueuedMessages=4`, `recordLimit=256`, `answerStrategy=in-turn`, `triageClassifier=rules`, `triageAsk`, `triageFollowupAsFast`, `instantReceipt`, `humanSummary`, `showDiagnostics=false`, `recordRuns`, `showProgress`, `switchOn=[]` (built-in policy), `subagentProvider` unset, and the gate (`enforceGate`/`gateRequired`/`gateScope`/`gatePreset`) is always on.
+Everything else is fixed inside the plugin and no longer accepted: `maxRetries=1`, `maxActiveRuns=2` per session and `8` per process, `historyTurns=20` / `historyChars=20000`, `maxQueuedMessages=4`, `recordLimit=256`, `answerStrategy=in-turn`, `triageClassifier=rules`, `triageAsk`, `triageFollowupAsFast`, `instantReceipt`, `humanSummary`, `showDiagnostics=false`, `recordRuns`, `showProgress`, `switchOn=[]` (built-in policy), `subagentProvider` unset, and the gate (`enforceGate`/`gateRequired`/`gateScope`/`gatePreset`) is always on.
 
 **Migration from ≤0.9.4:** delete those keys from your patch. A patch that still carries one is rejected as an unknown key, and there is no replacement for a removed value — the fixed value above applies.
 
@@ -235,7 +236,7 @@ Everything else is fixed inside the plugin and no longer accepted: `maxRetries=1
 
 Because the plugin exports its `Config`, DSH projects it into the standard settings surface automatically: the fields on that page are the fields this plugin reads — there is no second, decorative source of truth. Edits are live: an edit reaches the next message, and an invalid edit is refused with its reason while delivery keeps the last valid snapshot.
 
-The page shows four things and nothing else: the on/off switch, the mode (`auto`/`full`), the five role chains as "channel → model" dropdowns fed by the runtime's declared models, and the two numbers. No per-field explanations, no read-only area, no diagnostics panel.
+The page shows four things and nothing else: the on/off switch, the mode (`auto`/`full`), the five role chains as "channel → model" dropdowns fed by the runtime's declared models, and the three numbers (jobs at once, splits per job, run deadline). No per-field explanations, no read-only area, no diagnostics panel.
 
 ### Disable and uninstall
 

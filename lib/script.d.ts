@@ -24,7 +24,7 @@ export interface WorkflowRequestPayload {
         maxRetries: number;
         maxTasks: number;
         maxTotalAgents: number;
-        /** The deadline the plugin enforces for this run (0 = unknown/legacy). */
+        /** The deadline the plugin enforces for this run (0 = unlimited, no host timer; the guest never arms its own timer). */
         timeoutMs: number;
         roles: Record<RoleName, ModelRoute[]>;
         /**

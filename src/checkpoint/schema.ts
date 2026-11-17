@@ -98,11 +98,12 @@ export const CHECKPOINT_LIMITS = {
   /** Structural ceiling for recorded limit numbers (matches config's 1e6 backstop). */
   countCeiling: 1_000_000,
   /**
-   * Structural ceiling for millisecond durations and timeouts. Mirrors
-   * HARD_LIMITS.timeoutMs (604,800,000 = 7 days) in src/config.ts, so a
-   * checkpoint can record any timeout the plugin itself accepts.
+   * Structural ceiling for millisecond durations and timeouts. Accepts 0
+   * (unlimited) and any configured timeoutMs up to MAX_SAFE_INTEGER, so a
+   * checkpoint records the configured deadline honestly instead of refusing
+   * or clamping it.
    */
-  msCeiling: 604_800_000,
+  msCeiling: Number.MAX_SAFE_INTEGER,
 } as const
 
 /**
@@ -654,7 +655,7 @@ export function buildCheckpoint(input: CheckpointInput, now: number = Date.now()
   }
   const limits: CheckpointLimits = {
     ...rawLimits,
-    ...(input.limits?.timeoutMs === undefined ? {} : { timeoutMs: inRange(integer(input.limits.timeoutMs, 'limits.timeoutMs'), 1, CHECKPOINT_LIMITS.msCeiling, 'limits.timeoutMs') }),
+    ...(input.limits?.timeoutMs === undefined ? {} : { timeoutMs: inRange(integer(input.limits.timeoutMs, 'limits.timeoutMs'), 0, CHECKPOINT_LIMITS.msCeiling, 'limits.timeoutMs') }),
   }
 
   const watchdog: CheckpointWatchdog = {
@@ -833,7 +834,7 @@ export function assertCheckpoint(value: unknown): WorkflowCheckpoint {
     maxConcurrency: inRange(integer(limitsRaw['maxConcurrency'], 'limits.maxConcurrency'), 1, CHECKPOINT_LIMITS.countCeiling, 'limits.maxConcurrency'),
     maxRetries: inRange(integer(limitsRaw['maxRetries'], 'limits.maxRetries'), 0, CHECKPOINT_LIMITS.countCeiling, 'limits.maxRetries'),
     maxTasks: inRange(integer(limitsRaw['maxTasks'], 'limits.maxTasks'), 1, CHECKPOINT_LIMITS.countCeiling, 'limits.maxTasks'),
-    ...(limitsRaw['timeoutMs'] === undefined ? {} : { timeoutMs: inRange(integer(limitsRaw['timeoutMs'], 'limits.timeoutMs'), 1, CHECKPOINT_LIMITS.msCeiling, 'limits.timeoutMs') }),
+    ...(limitsRaw['timeoutMs'] === undefined ? {} : { timeoutMs: inRange(integer(limitsRaw['timeoutMs'], 'limits.timeoutMs'), 0, CHECKPOINT_LIMITS.msCeiling, 'limits.timeoutMs') }),
   }
 
   const watchdogRaw = record(root['watchdog'], 'watchdog')

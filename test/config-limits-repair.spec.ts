@@ -175,16 +175,20 @@ describe('LIMIT_CAPS: one clamp table for every user-configurable numeric cap (B
     expect([LIMIT_CAPS.maxConcurrency, LIMIT_CAPS.maxTasks]).toEqual([100, 100])
     // A limit that is judged inside a chain is deliberately not in the table.
     expect(Object.keys(LIMIT_CAPS)).not.toContain('maxInFlight')
-    // T4-removed keys are unknown keys now, not clampable numbers (R-06).
-    expect(() => resolveConfig({ timeoutMs: 0 } as never)).toThrow(/unknown configuration key "timeoutMs"/)
+    // timeoutMs is a real key, but it has no clamp: 0 means unlimited and any
+    // non-negative integer is accepted as written, so it stays out of the table.
+    expect(Object.keys(LIMIT_CAPS)).not.toContain('timeoutMs')
+    expect(resolveConfig({ timeoutMs: 0 } as never).timeoutMs).toBe(0)
+    expect(resolveConfig({ timeoutMs: 7_200_000 } as never).timeoutMs).toBe(7_200_000)
     expect(() => Config({ maxTasks: '500' } as never)).toThrow(/maxTasks expected number/)
     expect(takeLimitOverruns()).toEqual([])
   })
 
-  it('rejects every T4-removed key as unknown (R-06拒载), all 24', () => {
-    // T4 slim-down: the 24 removed keys are no longer clamped or defaulted — a
+  it('rejects every T4-removed key as unknown (R-06拒载), all 23', () => {
+    // T4 slim-down: the 23 removed keys are no longer clamped or defaulted — a
     // patch that still carries one is refused instead of silently repaired.
-    expect(REMOVED_CONFIG_KEYS).toHaveLength(24)
+    // (`timeoutMs` left this list when it became configurable again.)
+    expect(REMOVED_CONFIG_KEYS).toHaveLength(23)
     for (const key of REMOVED_CONFIG_KEYS) {
       expect(() => resolveConfig({ [key]: 1 } as never)).toThrow(/unknown configuration key/)
       // The repair path leaves them alone too: not its table, not its business.

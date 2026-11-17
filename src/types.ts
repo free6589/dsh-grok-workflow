@@ -124,7 +124,7 @@ export type SynthesisMode = 'deterministic' | 'model'
 /**
  * Plugin configuration (also the DSH Schemastery schema shape).
  *
- * T4 slim-down: the settings page exposes exactly 8 keys. Every other former
+ * The settings page exposes 9 keys. Every other former
  * key is rejected as an unknown key (R-06) and takes effect as a fixed
  * internal value (see FIXED_* in `src/config.ts`).
  */
@@ -145,6 +145,11 @@ export interface GrokWorkflowConfig {
   maxConcurrency?: number
   /** Maximum tasks accepted from a caller or planner. Hard maximum 100. */
   maxTasks?: number
+  /**
+   * Run deadline in milliseconds. 0 = unlimited (no timer is armed).
+   * No hard upper limit: any non-negative safe integer is accepted.
+   */
+  timeoutMs?: number
 }
 
 /** Fully resolved configuration. Everything not listed here is a fixed internal value. */
@@ -171,6 +176,8 @@ export interface ResolvedConfig {
   maxConcurrency: number
   maxRetries: number
   maxTasks: number
+  /** Run deadline in milliseconds. 0 = unlimited (no timer is armed). */
+  timeoutMs: number
   configVersion: number
 }
 

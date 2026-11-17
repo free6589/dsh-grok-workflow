@@ -24,7 +24,6 @@ export const HARD_LIMITS = {
   maxTasks: 100,
   maxActiveRuns: 4,
   maxActiveRunsTotal: 16,
-  timeoutMs: 604_800_000,
   /** Maximum routes in one role's fallback chain. */
   chainLength: 50,
   /** Maximum characters in one provider or model id. */
@@ -71,27 +70,35 @@ export const LIMIT_CAPS = {
 export type LimitField = keyof typeof LIMIT_CAPS
 
 /**
- * Default deadline for one workflow run: 60 minutes (t45, P1-4).
+ * Default run deadline in milliseconds: 60 minutes (t45, P1-4).
  *
- * The old 30-minute default was measured to be wrong twice in one afternoon —
- * two four-task runs were killed at exactly 30m00s and 30m01s — while real
- * four-task runs finish in 878 s / 1148 s / 1801 s. 60 minutes keeps a hung run
- * bounded and gives the observed worst case roughly 2x headroom; a caller with a
- * longer objective raises it in the profile patch (t45 D-017).
+ * The 30-minute default was measured wrong twice in one afternoon — two
+ * four-task runs were killed at exactly 30m00s and 30m01s — while real
+ * four-task runs finish in 878 s / 1148 s / 1801 s. 60 minutes keeps a hung
+ * run bounded and gives the observed worst case roughly 2x headroom (D-017).
+ *
+ * `timeoutMs` is user-configurable since 0.11.0: a caller raises or lowers it
+ * in the profile patch or on the settings page. `0` means unlimited — no timer
+ * is armed — and is an explicit opt-in, never the default, because an
+ * unbounded run is exactly what this plugin exists to avoid.
  */
 export const DEFAULT_TIMEOUT_MS = 3_600_000
 
 /**
- * Defaults of the two documented run limits (10 concurrent tasks, 1 retry).
- *
- * Declared once and read by the schema defaults, the checkpoint recorder and the
- * tests, so a settings form, a hand-written profile patch and a programmatic call
- * cannot disagree about what "unset" means.
- * `src/checkpoint/schema.ts` imports them for
- * `ENGINE_HOOK_LIMITS`, which is what keeps the recorded contract and the
- * accepted configuration equal by construction instead of by comment.
+ * Historical name for the same binding, kept because tests and older imports
+ * read it. It is no longer a *fixed* value: `timeoutMs` is configurable, and
+ * this constant names its default.
  */
-export const DEFAULT_MAX_CONCURRENCY = 10
+export const FIXED_TIMEOUT_MS = DEFAULT_TIMEOUT_MS
+
+/**
+ * Largest delay `setTimeout` accepts without overflowing (2^31 - 1).
+ *
+ * A larger configured deadline must NOT be passed to setTimeout (Node clamps
+ * it to 1 ms and the timer fires immediately); the run treats it as unlimited
+ * internally while the report records the configured value honestly.
+ */
+export const MAX_TIMER_DELAY_MS = 2_147_483_647
 
 /** Maximum retries per task: fixed at 1, not user-configurable (T4 settings slim-down). */
 export const FIXED_MAX_RETRIES = 1
@@ -100,10 +107,17 @@ export const FIXED_MAX_RETRIES = 1
 export const DEFAULT_MAX_TASKS = 10
 
 /**
- * Fixed run values (T4 settings slim-down): these are no longer user-configurable.
- * A profile patch that still carries them is rejected as an unknown key (R-06).
+ * Defaults of the two documented run limits (10 concurrent tasks, 1 retry).
+ *
+ * Declared once and read by the schema defaults, the checkpoint recorder and the
+ * tests, so a settings form, a hand-written profile patch and a programmatic call
+ * cannot disagree about what "unset" means.
+ * `src/checkpoint/schema.ts` imports them for `ENGINE_HOOK_LIMITS`, which is what
+ * keeps the recorded contract and the accepted configuration equal by construction
+ * instead of by comment.
  */
-export const FIXED_TIMEOUT_MS = DEFAULT_TIMEOUT_MS
+export const DEFAULT_MAX_CONCURRENCY = 10
+
 /** Fixed per-session active-run cap. */
 export const FIXED_MAX_ACTIVE_RUNS = 2
 /** Fixed process-wide active-run backstop. */
@@ -147,9 +161,9 @@ export const CONFIG_VERSION = 1
 
 /**
  * Every top-level key the configuration accepts, in schema order.
- * T4 slim-down: the settings page exposes exactly 8 keys (toolName,
- * configVersion, mode, grokDefault, roles, synthesis, maxConcurrency,
- * maxTasks); the rest of the former surface is fixed internally.
+ * The settings page exposes 9 keys (toolName, configVersion, mode,
+ * grokDefault, roles, synthesis, maxConcurrency, maxTasks, timeoutMs);
+ * the rest of the former surface is fixed internally.
  * Kept explicit so an unknown key can be rejected instead of silently dropped:
  * a typo that is silently ignored looks exactly like a setting that "does not
  * work", which is the failure mode the settings surface must not have.
@@ -162,6 +176,7 @@ export const CONFIG_KEYS = [
   'synthesis',
   'maxConcurrency',
   'maxTasks',
+  'timeoutMs',
   'configVersion',
 ] as const
 
@@ -183,7 +198,6 @@ export const REMOVED_CONFIG_KEYS = [
   'historyChars',
   'maxQueuedMessages',
   'maxRetries',
-  'timeoutMs',
   'maxActiveRuns',
   'maxActiveRunsTotal',
   'subagentProvider',
@@ -309,12 +323,17 @@ export const Config = z.object({
   // `off` means a batch passes through to the model as normal chat until the
   // session turns grok mode on (the runtime toggle overrides this default).
   grokDefault: z.union([z.const('on'), z.const('off')]).default('off').volatile(),
-  // Only two limits stay user-configurable (T4): concurrency (default 10, hard
-  // maximum 100) and task cap (default 10, hard maximum 100). Every other
-  // former numeric limit is a fixed internal constant (see FIXED_* above); a
-  // patch that still carries one is rejected as an unknown key (R-06).
+  // concurrency (default 10, hard maximum 100), task cap (default 10, hard
+  // maximum 100) and run deadline (default 60 min, no hard upper limit).
+  // Every other former numeric limit is a fixed internal constant (see
+  // FIXED_* above); a patch that still carries one is rejected as an unknown
+  // key (R-06).
+  // timeoutMs is user-configurable with no hard upper limit: any non-negative
+  // integer up to MAX_SAFE_INTEGER is accepted, 0 = unlimited (no timer);
+  // negatives, fractions, NaN and non-numbers fail closed (R-06).
   maxConcurrency: clampedLimit('maxConcurrency', 1).default(DEFAULT_MAX_CONCURRENCY).volatile(),
   maxTasks: clampedLimit('maxTasks', 1).default(DEFAULT_MAX_TASKS).volatile(),
+  timeoutMs: z.natural().min(0).max(Number.MAX_SAFE_INTEGER).default(DEFAULT_TIMEOUT_MS).volatile(),
   roles: z.object({
     planner: z.array(z.object({ provider: z.string().default(''), model: z.string(), maxInFlight: z.natural().min(HARD_LIMITS.routeInFlight.min).max(HARD_LIMITS.routeInFlight.max) })).default([]),
     worker: z.array(z.object({ provider: z.string().default(''), model: z.string(), maxInFlight: z.natural().min(HARD_LIMITS.routeInFlight.min).max(HARD_LIMITS.routeInFlight.max) })).default([]),
@@ -495,6 +514,21 @@ function integer(name: string, value: number, min: number, max: number): number 
 }
 
 /**
+ * Validate the user-configurable run deadline (R-06, fail closed).
+ *
+ * Accepts 0 (unlimited — no timer is ever armed) through MAX_SAFE_INTEGER;
+ * rejects negatives, fractions, NaN and non-numbers with their own reason.
+ * There is no clamp: an invalid value fails the load instead of being
+ * silently rewritten.
+ */
+function timeoutInteger(name: string, value: unknown): number {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value > Number.MAX_SAFE_INTEGER) {
+    throw new Error(`${name} must be a non-negative integer between 0 and ${Number.MAX_SAFE_INTEGER} (0 = unlimited)`)
+  }
+  return value
+}
+
+/**
  * Repair a recoverable synthesis/synthesizer mismatch without touching anything else.
  *
  * Only two shapes are recoverable (P1):
@@ -582,7 +616,6 @@ const LEGACY_LIMIT_CAPS = {
   historyTurns: HARD_LIMITS.historyTurns,
   historyChars: HARD_LIMITS.historyChars,
   maxTasks: HARD_LIMITS.maxTasks,
-  timeoutMs: HARD_LIMITS.timeoutMs,
   maxActiveRuns: HARD_LIMITS.maxActiveRuns,
   maxActiveRunsTotal: HARD_LIMITS.maxActiveRunsTotal,
   recordLimit: HARD_LIMITS.recordEntries,
@@ -668,6 +701,7 @@ export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
     maxConcurrency: integer('maxConcurrency', config.maxConcurrency ?? DEFAULT_MAX_CONCURRENCY, 1, HARD_LIMITS.maxConcurrency),
     maxRetries,
     maxTasks: integer('maxTasks', config.maxTasks ?? DEFAULT_MAX_TASKS, 1, HARD_LIMITS.maxTasks),
+    timeoutMs: timeoutInteger('timeoutMs', config.timeoutMs ?? DEFAULT_TIMEOUT_MS),
     configVersion,
   }
 }
@@ -759,7 +793,7 @@ export function describeResolvedConfig(config: ResolvedConfig): string {
     return chain.length === 0 ? 'inherit' : chain.map(routeLabel).join('→')
   }
   return [
-    `timeoutMs=${FIXED_TIMEOUT_MS}`,
+    `timeoutMs=${config.timeoutMs}`,
     `maxTasks=${config.maxTasks}`,
     `maxConcurrency=${config.maxConcurrency}`,
     `maxRetries=${FIXED_MAX_RETRIES}`,

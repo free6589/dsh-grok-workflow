@@ -529,18 +529,18 @@ export function createCheckpointRecorder(options: CheckpointRecorderOptions): Ru
   /**
    * The run's deadline, but only when the record can express it.
    *
-   * `CHECKPOINT_LIMITS.countCeiling` bounds every recorded count to 1,000,000 —
-   * about 16m40s of milliseconds — while the plugin accepts deadlines up to a
-   * week (`HARD_LIMITS.timeoutMs` in src/config.ts). A deadline above the ceiling
-   * is *omitted*, never clamped: writing `deadlineMs: 1000000` for a week-long
-   * run would be a number that describes no real bound. The same value gates
-   * `time.deadlineAtMs` and the derived `watchdog.deadlineHit`, so an
+   * 0 (unlimited) is *omitted*, never recorded: absent and 0 both name "no
+   * deadline". A positive deadline is recorded as-is up to
+   * `CHECKPOINT_LIMITS.msCeiling`, which accepts every timeoutMs the config
+   * accepts; a value above it is *omitted*, never clamped, because writing a
+   * smaller number would describe a bound the run never had. The same value
+   * gates `time.deadlineAtMs` and the derived `watchdog.deadlineHit`, so an
    * unrepresentable deadline simply leaves those fields absent rather than
    * pretending the run has no deadline.
    */
   const recordableTimeoutMs = limits.timeoutMs !== undefined
     && limits.timeoutMs >= 1
-    && limits.timeoutMs <= CHECKPOINT_LIMITS.countCeiling
+    && limits.timeoutMs <= CHECKPOINT_LIMITS.msCeiling
     ? limits.timeoutMs
     : undefined
   const recordedLimits: Partial<CheckpointLimits> = {

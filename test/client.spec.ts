@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { CONFIG_KEYS, DEFAULT_MAX_CONCURRENCY, DEFAULT_MAX_TASKS, HARD_LIMITS, SWITCHABLE_CLASSES } from '../src/config.js'
+import { DEFAULT_MAX_CONCURRENCY, DEFAULT_MAX_TASKS, DEFAULT_TIMEOUT_MS, HARD_LIMITS, SWITCHABLE_CLASSES } from '../src/config.js'
 
 /**
  * The browser settings page is hand-written JavaScript (the host serves it verbatim in
@@ -240,16 +240,16 @@ describe('client settings page bundle', () => {
   })
 
   // T5 slim page: 4 visible FIELDS (grokDefault/mode/maxConcurrency/maxTasks)
-  // plus the 5 role chains equal the 9-leaf-key CONFIG_KEYS surface
+  // plus the 5 role chains equal the 9-leaf-key configuration surface
   // (toolName/roles/synthesis/configVersion are structural, rendered nowhere).
   // Number bounds mirror HARD_LIMITS (100) and the defaults (10); the suite
   // pins all three so a quiet drift fails here instead of in the GUI.
-  it('renders the T5 visible keys: 4 fields plus the 5 role chains', () => {
+  it('renders the T5 visible keys: 5 fields plus the 5 role chains', () => {
     expect(bundle.GROK_WORKFLOW_FIELDS.map(field => field.key).sort()).toEqual(
-      ['grokDefault', 'maxConcurrency', 'maxTasks', 'mode'].sort())
+      ['grokDefault', 'maxConcurrency', 'maxTasks', 'mode', 'timeoutMs'].sort())
     expect(bundle.GROK_WORKFLOW_READ_ONLY).toEqual([])
     expect([...bundle.GROK_WORKFLOW_FIELDS.map(field => field.key), 'roles'].sort()).toEqual(
-      ['grokDefault', 'mode', 'maxConcurrency', 'maxTasks', 'roles'].sort())
+      ['grokDefault', 'mode', 'maxConcurrency', 'maxTasks', 'timeoutMs', 'roles'].sort())
   })
 
   it('keeps the numeric bounds identical to HARD_LIMITS', () => {
@@ -257,6 +257,10 @@ describe('client settings page bundle', () => {
     const expected: Record<string, [number, number]> = {
       maxConcurrency: [1, HARD_LIMITS.maxConcurrency],
       maxTasks: [1, HARD_LIMITS.maxTasks],
+      // The deadline has no practical cap: 0 = unlimited, and the schema accepts
+      // any non-negative safe integer, so the page mirrors that instead of
+      // inventing a ceiling the plugin would not enforce.
+      timeoutMs: [0, Number.MAX_SAFE_INTEGER],
     }
     for (const [key, [min, max]] of Object.entries(expected)) {
       expect({ key, min: numeric.get(key)?.min, max: numeric.get(key)?.max }).toEqual({ key, min, max })
@@ -270,6 +274,7 @@ describe('client settings page bundle', () => {
     const defs = new Map(bundle.GROK_WORKFLOW_FIELDS.map(field => [field.key, field]))
     expect(defs.get('maxConcurrency')?.def).toBe(DEFAULT_MAX_CONCURRENCY)
     expect(defs.get('maxTasks')?.def).toBe(DEFAULT_MAX_TASKS)
+    expect(defs.get('timeoutMs')?.def).toBe(DEFAULT_TIMEOUT_MS)
     expect(DEFAULT_MAX_CONCURRENCY).toBe(10)
     expect(DEFAULT_MAX_TASKS).toBe(10)
   })
@@ -1005,6 +1010,7 @@ describe('client settings page: draft, validation and path ops', () => {
       mode: 'triage',
       maxConcurrency: 10,
       maxTasks: 10,
+      timeoutMs: 3_600_000,
       roles: { planner: [], worker: [], verifier: [], synthesizer: [], supervisor: [] },
     })
     const view = {

@@ -42,11 +42,12 @@ release.
 
 Configuration keys and their hard limits are listed in the
 [README configuration table](../README.md#configuration-reference).
-`0.10.0` accepts exactly eight keys (`toolName`, `mode`, `grokDefault`, `roles`,
-`synthesis`, `maxConcurrency`, `maxTasks`, `configVersion`); everything else is
-fixed inside the plugin (`maxRetries=1`, `timeoutMs=3600000`,
+`0.11.0` accepts exactly nine keys (`toolName`, `mode`, `grokDefault`, `roles`,
+`synthesis`, `maxConcurrency`, `maxTasks`, `timeoutMs`, `configVersion`);
+everything else is fixed inside the plugin (`maxRetries=1`,
 `maxActiveRuns=2` per session / `8` per process) and a patch that still carries
-a removed key is rejected at load. Values are tightened by the calling profile,
+a removed key is rejected at load. `timeoutMs` defaults to `3600000` (60 min);
+`0` means unlimited. Values are tightened by the calling profile,
 not by editing this repository.
 
 ## Enable

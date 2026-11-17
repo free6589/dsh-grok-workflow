@@ -493,11 +493,13 @@ describe('the active-run cap is per session (P1-3)', () => {
 
 /* ---------------------------------------------------- 4. the deadline default -- */
 
-describe('the deadline default (P1-4, T4 fixed)', () => {
+describe('the deadline default (P1-4; configurable since 0.11.0)', () => {
   it('is 60 minutes, not the 30 that killed two real runs at 30m00s', () => {
-    // T4: the deadline is fixed (FIXED_TIMEOUT_MS), not user-configurable (R-06).
+    // The default is the measured one; a caller may raise, lower or disable it.
     expect(configOf().maxRetries).toBe(FIXED_MAX_RETRIES)
-    expect(() => configOf({ timeoutMs: 86_400_000 } as never)).toThrow(/unknown configuration key "timeoutMs"/)
+    expect(configOf().timeoutMs).toBe(3_600_000)
+    expect(configOf({ timeoutMs: 86_400_000 }).timeoutMs).toBe(86_400_000)
+    expect(configOf({ timeoutMs: 0 }).timeoutMs).toBe(0)
   })
 
   it('reports the fixed deadline it actually used', async () => {

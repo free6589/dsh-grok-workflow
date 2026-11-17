@@ -5,6 +5,28 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-18
+
+### Added / 新增
+
+- **The run deadline is a setting now: `timeoutMs` / 运行死线变成配置项：`timeoutMs`** —
+  the deadline was a fixed internal 60 minutes: raising it for a long job meant
+  editing the plugin, and "which deadline was in force?" was only answerable from
+  a report. It is now the ninth configuration key (settings page: **Run deadline
+  (ms)**, `field.timeoutMs`), defaulting to `3600000` (60 min, the value t45
+  measured), `0` = unlimited (no timer is armed). Any non-negative integer up to
+  `Number.MAX_SAFE_INTEGER` is accepted; a negative, fractional, `NaN` or
+  non-numeric value fails the load with its own reason instead of being
+  rewritten. A value above `2147483647` (the largest `setTimeout` delay, which
+  Node would fire immediately) is treated as unlimited internally while the
+  report and the checkpoint record the configured number honestly. /
+  死线以前是写死的 60 分钟：长活想放宽只能改插件，"实际生效的是哪个死线"也只能从报告里
+  找。现在它是第九个配置键（设置页 **运行死线（毫秒）**，`field.timeoutMs`），默认
+  `3600000`（60 分钟，t45 实测的值），`0` = 不限时（不设 timer）。接受
+  `0 … Number.MAX_SAFE_INTEGER` 的任意整数；负数、小数、`NaN`、非数字一律载入失败并给出
+  原因，不会被悄悄改写。大于 `2147483647`（`setTimeout` 上限，Node 会立刻触发）的值内部
+  按不限时处理，报告与 checkpoint 仍如实记录配置的数字。
+
 ## [0.10.2] - 2026-11-17
 
 ### Fixed / 修复

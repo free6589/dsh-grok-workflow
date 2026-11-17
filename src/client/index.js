@@ -50,6 +50,10 @@ window.__ModuleLoader__.load({
       // pins both against `src/config.ts`.
       { key: 'maxConcurrency', group: 'limits', kind: 'number', min: 1, max: 100, def: 10 },
       { key: 'maxTasks', group: 'limits', kind: 'number', min: 1, max: 100, def: 10 },
+      // Run deadline in milliseconds: 0 = unlimited (no timer is armed).
+      // max is Number.MAX_SAFE_INTEGER (no practical cap); the number widget
+      // below steps within [min, max] and the schema rejects out-of-range input.
+      { key: 'timeoutMs', group: 'limits', kind: 'number', min: 0, max: Number.MAX_SAFE_INTEGER, def: 3600000 },
     ]
 
     // T5: the switchable-class picker is gone with `switchOn` (fixed internal
@@ -82,7 +86,7 @@ window.__ModuleLoader__.load({
 
     const EN = {
       'card.title': 'Grok workflow',
-      'card.summary': 'Decide how hard Grok works: a master switch, five role chains, and two limits.',
+      'card.summary': 'Decide how hard Grok works: a master switch, five role chains, and three limits.',
 
       'page.intro': 'How Grok works for you.',
 
@@ -103,6 +107,8 @@ window.__ModuleLoader__.load({
       'field.grokDefault': 'Work hard by default',
       'field.maxConcurrency': 'Jobs at once',
       'field.maxTasks': 'Splits per job',
+      'field.timeoutMs': 'Run deadline (ms)',
+      'field.timeoutMs.hint': '0 = unlimited (no timer).',
 
       // Page shows auto/full; stored values stay `triage`/`full` (T4/T5).
       'option.mode.triage': 'auto',
@@ -145,6 +151,7 @@ window.__ModuleLoader__.load({
       'action.discard': 'Discard',
       'unit.jobs': 'jobs',
       'unit.tasks': 'tasks',
+      'unit.ms': 'ms · 0 = unlimited',
       // One retry of the mirror read: the only recovery a failed `describe()` has.
       'action.retry': 'Try again',
 
@@ -238,7 +245,7 @@ window.__ModuleLoader__.load({
 
     const ZH = {
       'card.title': 'Grok workflow',
-      'card.summary': '定 Grok 下多大的力气：一个总开关，五条角色链，两个上限。',
+      'card.summary': '定 Grok 下多大的力气：一个总开关，五条角色链，三个上限。',
 
       'page.intro': 'Grok 怎么帮你干活，在这里定。',
 
@@ -258,6 +265,8 @@ window.__ModuleLoader__.load({
       'field.grokDefault': '默认下大力气',
       'field.maxConcurrency': '同时干几件',
       'field.maxTasks': '一次拆几件',
+      'field.timeoutMs': '运行死线（毫秒）',
+      'field.timeoutMs.hint': '0 = 不限时（不设 timer）。',
 
       // Page shows auto/full; stored values stay `triage`/`full` (T4/T5).
       'option.mode.triage': 'auto',
@@ -299,6 +308,7 @@ window.__ModuleLoader__.load({
       'action.discard': '放弃修改',
       'unit.jobs': '件',
       'unit.tasks': '件',
+      'unit.ms': '毫秒 · 0 = 不限时',
       // Same key as `en`: re-reading is the only recovery a failed `describe()` has.
       'action.retry': '重试',
 
@@ -1254,6 +1264,7 @@ window.__ModuleLoader__.load({
       const NUMBER_UNITS = {
         maxConcurrency: 'unit.jobs',
         maxTasks: 'unit.tasks',
+        timeoutMs: 'unit.ms',
       }
       const numberRow = (key) => {
         const field = fieldByKey(key)
@@ -1341,11 +1352,12 @@ window.__ModuleLoader__.load({
               key: role, role, chain: draft.roles[role] || [], disabled, catalog, t, badRows,
               onChange: (next) => setChain(role, next),
             })))),
-        // --- 3 · 下多大力气 (two numbers) ---
+        // --- 3 · 下多大力气 (three numbers) ---
         h('div', { style: styles.card },
           h('h3', { style: styles.groupTitle }, t('group.limits')),
           numberRow('maxConcurrency'),
-          numberRow('maxTasks')),
+          numberRow('maxTasks'),
+          numberRow('timeoutMs')),
         warnEmptyCap
           ? h('div', { style: styles.warn },
             h('strong', null, t('warn.emptyCap.title')),

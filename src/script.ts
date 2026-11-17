@@ -1,5 +1,5 @@
 import { TASK_LIMITS } from './input.js'
-import { FIXED_HUMAN_SUMMARY, FIXED_SHOW_DIAGNOSTICS, FIXED_SWITCH_ON, FIXED_TIMEOUT_MS } from './config.js'
+import { FIXED_HUMAN_SUMMARY, FIXED_SHOW_DIAGNOSTICS, FIXED_SWITCH_ON } from './config.js'
 import { CARRYOVER_LIMITS } from './carryover.js'
 import { shardCountFor, shardsSource } from './shards.js'
 import { namingSource, phaseLabel, runTitle } from './naming.js'
@@ -2336,7 +2336,7 @@ export interface WorkflowRequestPayload {
     maxRetries: number
     maxTasks: number
     maxTotalAgents: number
-    /** The deadline the plugin enforces for this run (0 = unknown/legacy). */
+    /** The deadline the plugin enforces for this run (0 = unlimited, no host timer; the guest never arms its own timer). */
     timeoutMs: number
     roles: Record<RoleName, ModelRoute[]>
     /**
@@ -2536,7 +2536,8 @@ export function buildWorkflowRequest(
       maxTasks: config.maxTasks,
       maxTotalAgents,
       // t47: the deadline the plugin will enforce, so the run report can name it.
-      timeoutMs: FIXED_TIMEOUT_MS,
+      // 0 = unlimited (no timer): written as-is, the guest treats 0 as no bound.
+      timeoutMs: config.timeoutMs,
       roles: config.roles,
       // The policy travels verbatim: "layered" is the third runtime value of the
       // layered policy, and the script maps it onto synthesis.mode itself.

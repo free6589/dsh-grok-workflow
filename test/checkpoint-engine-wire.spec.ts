@@ -13,7 +13,7 @@
  * with `GROK_WORKFLOW_CHECKPOINT_DIR` pointed at the evidence directory and the
  * checkpoint files quoted there are produced by it.
  */
-import { mkdtemp, readdir, rm } from 'node:fs/promises'
+import { mkdtemp, readdir, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -83,15 +83,27 @@ async function checkpointRoot(): Promise<string> {
   return created
 }
 
-/** Find the one checkpoint whose objective is this run's (ids are engine-generated). */
+/**
+ * Find the checkpoint this run just wrote (ids are engine-generated and the
+ * objective is not unique across days).
+ *
+ * The suite shares one checkpoint directory by default, so a previous run of the
+ * same objective is still on disk. Matching by objective alone therefore read a
+ * stale file and reported another day's numbers as this run's; the newest file
+ * with this objective is the one this test produced.
+ */
 async function checkpointFor(dir: string, objective: string): Promise<{ file: string, checkpoint: WorkflowCheckpoint }> {
   const names = (await readdir(dir)).filter(name => name.startsWith('checkpoint-') && name.endsWith('.json'))
+  let best: { file: string, checkpoint: WorkflowCheckpoint, mtimeMs: number } | undefined
   for (const name of names) {
     const file = join(dir, name)
     const checkpoint = await readCheckpoint(file)
-    if (checkpoint.run.objective === objective) return { file, checkpoint }
+    if (checkpoint.run.objective !== objective) continue
+    const { mtimeMs } = await stat(file)
+    if (best === undefined || mtimeMs > best.mtimeMs) best = { file, checkpoint, mtimeMs }
   }
-  throw new Error(`no checkpoint for ${objective} in ${dir} (saw ${names.join(', ')})`)
+  if (best === undefined) throw new Error(`no checkpoint for ${objective} in ${dir} (saw ${names.join(', ')})`)
+  return { file: best.file, checkpoint: best.checkpoint }
 }
 
 /* -------------------------------------------------------------------- tests -- */
@@ -132,10 +144,10 @@ describe('engine wiring writes real checkpoints', () => {
     // Stages come from the script's own phase labels, observed through the engine.
     expect(checkpoint.stages.map(stage => stage.phase)).toContain('plan')
     expect(checkpoint.plan.source).toBe('caller')
-    // T4: the fixed 60 min production deadline exceeds the checkpoint row's
-    // representable range (countCeiling), so no deadlineMs is recorded — the
-    // watchdog only carries what the row can represent.
-    expect(checkpoint.watchdog).toEqual({ deadlineHit: false, cancelled: false })
+    // The 60 min default is a representable deadline (the checkpoint's own
+    // msCeiling accepts every timeoutMs the config accepts), so the row records
+    // the bound the run actually had instead of dropping it.
+    expect(checkpoint.watchdog).toEqual({ deadlineHit: false, cancelled: false, deadlineMs: 3_600_000 })
 
     const decision = resumeDecision(checkpoint)
     expect(decision.action).toBe('none')

@@ -641,10 +641,10 @@ describe('run lifecycle and disposal', () => {
       // End to end, through the real `runWorkflow`: the durable task label the
       // engine hands back reaches the file, not only a synthetic `adopt` (B12).
       expect(checkpoint.run.name).toBe(run.meta.name)
-      // The default deadline (1 h) is above the schema's count ceiling, so the file
-      // says nothing about it rather than recording a number it cannot express.
-      expect(checkpoint.limits.timeoutMs).toBeUndefined()
-      expect(checkpoint.time.deadlineAtMs).toBeUndefined()
+      // The default deadline (60 min) is a representable bound for this schema, so
+      // the file records the deadline the run actually had instead of dropping it.
+      expect(checkpoint.limits.timeoutMs).toBe(3_600_000)
+      expect(checkpoint.time.deadlineAtMs).toBeGreaterThan(0)
       expect(checkpoint.stages.map(stage => stage.phase)).toEqual(['plan'])
       const decision = resumeDecision(checkpoint)
       expect(decision.action).toBe('none')

@@ -4,6 +4,7 @@ import {
   CONFIG_VERSION,
   Config,
   DEFAULT_MAX_CONCURRENCY,
+  DEFAULT_TIMEOUT_MS,
   FIXED_MAX_RETRIES,
   HARD_LIMITS,
   REMOVED_CONFIG_KEYS,
@@ -52,13 +53,13 @@ describe('configuration surface', () => {
     for (const key of CONFIG_KEYS) expect(() => resolveConfig({ [key]: undefined } as never)).not.toThrow()
   })
 
-  it('rejects every T4-removed key as unknown (R-06), with the migration named', () => {
-    // The T4 slim-down keeps exactly 8 keys; the other 24 are unknown now.
+  it('rejects every removed key as unknown (R-06), with the migration named', () => {
+    // The slim-down keeps exactly 9 keys; the other 23 are unknown now.
     expect(CONFIG_KEYS).toEqual([
       'toolName', 'mode', 'grokDefault', 'roles', 'synthesis',
-      'maxConcurrency', 'maxTasks', 'configVersion',
+      'maxConcurrency', 'maxTasks', 'timeoutMs', 'configVersion',
     ])
-    expect(REMOVED_CONFIG_KEYS).toHaveLength(24)
+    expect(REMOVED_CONFIG_KEYS).toHaveLength(23)
     for (const key of REMOVED_CONFIG_KEYS) {
       expect(() => resolveConfig({ [key]: 1 } as never)).toThrow(/unknown configuration key/)
     }
@@ -205,9 +206,9 @@ describe('route validation against the runtime', () => {
     const projected = Object.keys(descriptor.value).sort()
     expect(projected).not.toContain('toolName')   // not volatile => not projected
     expect(projected).not.toContain('configVersion')   // not volatile => not projected
-    // T4: the page is the 6 volatile survivors (toolName/configVersion are structural).
-    expect(projected).toEqual(['grokDefault', 'maxConcurrency', 'maxTasks', 'mode', 'roles', 'synthesis'])
-    expect(projected).toHaveLength(6)
+    // The page is the 7 volatile keys (toolName/configVersion are structural).
+    expect(projected).toEqual(['grokDefault', 'maxConcurrency', 'maxTasks', 'mode', 'roles', 'synthesis', 'timeoutMs'])
+    expect(projected).toHaveLength(7)
     const ctx = ctxWith({
       settings: { configure: () => () => {}, describe: () => [descriptor] },
     })
@@ -488,5 +489,45 @@ describe('t49: a non-blocking verifier note does not fail a verified task', () =
     const out = await runWorkflowScript(WORKFLOW_SCRIPT, { ...args }, agent)
     expect(out.report.status).toBe('failed')
     expect(JSON.stringify(out.report.incomplete)).toContain('verifier verdict was fail')
+  })
+})
+
+/* --------------------------------------------------- timeoutMs (0 = unlimited) -- */
+/**
+ * The deadline used to be a fixed internal constant, which made "the run was
+ * killed at 60 minutes" unanswerable from the outside and impossible to change
+ * without editing the plugin. It is now a user-configurable key with three
+ * pinned properties: the 60-minute default survives (t45 measured it), any
+ * non-negative integer is accepted, and an invalid value fails the load instead
+ * of being silently rewritten.
+ */
+describe('the run deadline is user-configurable (0 = unlimited)', () => {
+  it('defaults to 60 minutes and carries that value into the request and the log line', () => {
+    const config = resolveConfig({})
+    expect(config.timeoutMs).toBe(3_600_000)
+    expect(DEFAULT_TIMEOUT_MS).toBe(config.timeoutMs)
+    const request = buildWorkflowRequest('Ship the verified result', [task('a')], config)
+    expect((request.args as { timeoutMs: number }).timeoutMs).toBe(3_600_000)
+    expect(describeResolvedConfig(config)).toContain('timeoutMs=3600000')
+  })
+
+  it('accepts any non-negative integer, including 0 for unlimited', () => {
+    expect(resolveConfig({ timeoutMs: 0 }).timeoutMs).toBe(0)
+    expect(resolveConfig({ timeoutMs: 1 }).timeoutMs).toBe(1)
+    expect(resolveConfig({ timeoutMs: 86_400_000 }).timeoutMs).toBe(86_400_000)
+    expect(resolveConfig({ timeoutMs: Number.MAX_SAFE_INTEGER }).timeoutMs).toBe(Number.MAX_SAFE_INTEGER)
+    expect(describeResolvedConfig(resolveConfig({ timeoutMs: 0 }))).toContain('timeoutMs=0')
+  })
+
+  it('fails closed on a negative, fractional or non-numeric deadline (R-06)', () => {
+    for (const bad of [-1, 1.5, Number.NaN, '60000']) {
+      expect(() => resolveConfig({ timeoutMs: bad } as never))
+        .toThrow(/timeoutMs must be a non-negative integer/)
+    }
+  })
+
+  it('refuses the same values in the schema, so a profile patch cannot store one', () => {
+    expect(() => Config({ timeoutMs: -5 } as never)).toThrow()
+    expect(() => Config({ timeoutMs: 1.5 } as never)).toThrow()
   })
 })

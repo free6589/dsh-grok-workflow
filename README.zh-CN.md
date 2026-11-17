@@ -125,7 +125,7 @@ DSH 启动后，直接提问即可：
 | 4,001–32,000 字符 | 接受；整条消息原样成为目标。恰好 32,000 字符时会丢弃 `Current request:` 标签而不是裁剪消息，也不再附带历史。 |
 | 32,001 字符及以上 | 明确拒绝，提示 `the message is longer than the 32000-character workflow objective limit`；不会启动任何运行。 |
 
-其它限制保持不变：每个任务字段（`objective`、`expectedOutput`、`context`）仍各限 `4000` 字符，任务 JSON 合计仍限 `48,000` 字符。`0.10.0` 起历史与时限固化：`historyTurns=20` / `historyChars=20000`、`timeoutMs=3600000`（60 分钟），每条角色链最多 `50` 条备用路由。因此更大的目标必须拆成多个任务，而不是放宽单个任务字段或时限。
+其它限制保持不变：每个任务字段（`objective`、`expectedOutput`、`context`）仍各限 `4000` 字符，任务 JSON 合计仍限 `48,000` 字符。`0.10.0` 起历史固化（`historyTurns=20` / `historyChars=20000`）；运行时限默认 60 分钟且可配置（`timeoutMs`，`0` = 不限时）；每条角色链最多 `50` 条备用路由。因此更大的目标必须拆成多个任务，而不是放宽单个任务字段或时限。
 
 规划失败时，fallback 计划会把整个目标切成若干连续分段，每段都不超过 4,000 字符的任务文本上限；分段按序拼接后与原始目标逐字一致，因此**不会**被二次拒绝，也不会丢失任何字符。运行以 `partial` 结束，并记录 `planning.source: "fallback"` 与规划错误。
 
@@ -192,7 +192,7 @@ DSH 启动后，直接提问即可：
 
 ## 配置参考
 
-配置写在 profile 的 `cordis.patch.yml`（或 `--patch` 覆盖层）里，位于 bundle 行下。`0.10.0` 起配置面只有八个键；其它键在载入时直接被拒绝——旧补丁会明确报错，而不是变成"设了也不生效"：
+配置写在 profile 的 `cordis.patch.yml`（或 `--patch` 覆盖层）里，位于 bundle 行下。`0.10.0` 起配置面只有八个键，`0.11.0` 起为九个（新增 `timeoutMs`）；其它键在载入时直接被拒绝——旧补丁会明确报错，而不是变成"设了也不生效"：
 
 ```yaml
 - id: grok-workflow
@@ -218,9 +218,10 @@ DSH 启动后，直接提问即可：
 | `synthesis` | `layered` | `layered` \| `model` | `layered` 让核验报告保持唯一事实来源；`model` 追加一次模型总结 |
 | `maxConcurrency` | `10` | `100` | 每次运行的并行子代理数 |
 | `maxTasks` | `10` | `100` | 调用方或规划器任务上限 |
+| `timeoutMs` | `3600000`（60 分钟） | 任意非负整数（`0` = 不限时） | 运行时限（毫秒）。`0` 不设 timer；大于 `2147483647`（`setTimeout` 上限）的值在内部按不限时处理，报告里仍如实记录配置的数字 |
 | `configVersion` | `1` | `1` | 配置面版本 |
 
-其余一律固化在插件内部、不再接受：`maxRetries=1`、`timeoutMs=3600000`（60 分钟）、`maxActiveRuns` 每会话 `2` / 每进程 `8`、`historyTurns=20` / `historyChars=20000`、`maxQueuedMessages=4`、`recordLimit=256`、`answerStrategy=in-turn`、`triageClassifier=rules`、`triageAsk`、`triageFollowupAsFast`、`instantReceipt`、`humanSummary`、`showDiagnostics=false`、`recordRuns`、`showProgress`、`switchOn=[]`（内置策略）、`subagentProvider` 未设，闸门（`enforceGate`/`gateRequired`/`gateScope`/`gatePreset`）恒开。
+其余一律固化在插件内部、不再接受：`maxRetries=1`、`maxActiveRuns` 每会话 `2` / 每进程 `8`、`historyTurns=20` / `historyChars=20000`、`maxQueuedMessages=4`、`recordLimit=256`、`answerStrategy=in-turn`、`triageClassifier=rules`、`triageAsk`、`triageFollowupAsFast`、`instantReceipt`、`humanSummary`、`showDiagnostics=false`、`recordRuns`、`showProgress`、`switchOn=[]`（内置策略）、`subagentProvider` 未设，闸门（`enforceGate`/`gateRequired`/`gateScope`/`gatePreset`）恒开。
 
 **从 ≤0.9.4 迁移：** 把这些键从补丁里删掉。还带着它们会被当未知键拒绝，而被删的值没有替代项——按上面的固定值生效。
 
@@ -228,7 +229,7 @@ DSH 启动后，直接提问即可：
 
 由于插件导出了自己的 `Config`，DSH 会把它投影到标准设置面：页面上的字段就是插件读取的字段——不存在第二份装饰性的真相来源。编辑是活值：编辑对下一条消息生效，非法编辑会带原因被拒绝，而投递继续使用上一次合法快照。
 
-页面只显示四样东西：总开关、模式（`auto`/`full`）、五条角色链（"通道 → 模型"双下拉，目录读运行时已声明的模型）、以及两个数字。没有逐项用途说明，没有只读区，没有诊断面板。
+页面只显示四样东西：总开关、模式（`auto`/`full`）、五条角色链（"通道 → 模型"双下拉，目录读运行时已声明的模型）、以及三个数字（同时干几件、一次拆几件、运行死线）。没有逐项用途说明，没有只读区，没有诊断面板。
 
 
 ### 停用与卸载

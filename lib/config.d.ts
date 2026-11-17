@@ -23,7 +23,6 @@ export declare const HARD_LIMITS: {
     readonly maxTasks: 100;
     readonly maxActiveRuns: 4;
     readonly maxActiveRunsTotal: 16;
-    readonly timeoutMs: 604800000;
     /** Maximum routes in one role's fallback chain. */
     readonly chainLength: 50;
     /** Maximum characters in one provider or model id. */
@@ -70,35 +69,48 @@ export declare const LIMIT_CAPS: {
 /** A configuration key whose stored number takes effect clamped to its hard maximum. */
 export type LimitField = keyof typeof LIMIT_CAPS;
 /**
- * Default deadline for one workflow run: 60 minutes (t45, P1-4).
+ * Default run deadline in milliseconds: 60 minutes (t45, P1-4).
  *
- * The old 30-minute default was measured to be wrong twice in one afternoon —
- * two four-task runs were killed at exactly 30m00s and 30m01s — while real
- * four-task runs finish in 878 s / 1148 s / 1801 s. 60 minutes keeps a hung run
- * bounded and gives the observed worst case roughly 2x headroom; a caller with a
- * longer objective raises it in the profile patch (t45 D-017).
+ * The 30-minute default was measured wrong twice in one afternoon — two
+ * four-task runs were killed at exactly 30m00s and 30m01s — while real
+ * four-task runs finish in 878 s / 1148 s / 1801 s. 60 minutes keeps a hung
+ * run bounded and gives the observed worst case roughly 2x headroom (D-017).
+ *
+ * `timeoutMs` is user-configurable since 0.11.0: a caller raises or lowers it
+ * in the profile patch or on the settings page. `0` means unlimited — no timer
+ * is armed — and is an explicit opt-in, never the default, because an
+ * unbounded run is exactly what this plugin exists to avoid.
  */
 export declare const DEFAULT_TIMEOUT_MS = 3600000;
+/**
+ * Historical name for the same binding, kept because tests and older imports
+ * read it. It is no longer a *fixed* value: `timeoutMs` is configurable, and
+ * this constant names its default.
+ */
+export declare const FIXED_TIMEOUT_MS = 3600000;
+/**
+ * Largest delay `setTimeout` accepts without overflowing (2^31 - 1).
+ *
+ * A larger configured deadline must NOT be passed to setTimeout (Node clamps
+ * it to 1 ms and the timer fires immediately); the run treats it as unlimited
+ * internally while the report records the configured value honestly.
+ */
+export declare const MAX_TIMER_DELAY_MS = 2147483647;
+/** Maximum retries per task: fixed at 1, not user-configurable (T4 settings slim-down). */
+export declare const FIXED_MAX_RETRIES = 1;
+/** Default maximum tasks per run. */
+export declare const DEFAULT_MAX_TASKS = 10;
 /**
  * Defaults of the two documented run limits (10 concurrent tasks, 1 retry).
  *
  * Declared once and read by the schema defaults, the checkpoint recorder and the
  * tests, so a settings form, a hand-written profile patch and a programmatic call
  * cannot disagree about what "unset" means.
- * `src/checkpoint/schema.ts` imports them for
- * `ENGINE_HOOK_LIMITS`, which is what keeps the recorded contract and the
- * accepted configuration equal by construction instead of by comment.
+ * `src/checkpoint/schema.ts` imports them for `ENGINE_HOOK_LIMITS`, which is what
+ * keeps the recorded contract and the accepted configuration equal by construction
+ * instead of by comment.
  */
 export declare const DEFAULT_MAX_CONCURRENCY = 10;
-/** Maximum retries per task: fixed at 1, not user-configurable (T4 settings slim-down). */
-export declare const FIXED_MAX_RETRIES = 1;
-/** Default maximum tasks per run. */
-export declare const DEFAULT_MAX_TASKS = 10;
-/**
- * Fixed run values (T4 settings slim-down): these are no longer user-configurable.
- * A profile patch that still carries them is rejected as an unknown key (R-06).
- */
-export declare const FIXED_TIMEOUT_MS = 3600000;
 /** Fixed per-session active-run cap. */
 export declare const FIXED_MAX_ACTIVE_RUNS = 2;
 /** Fixed process-wide active-run backstop. */
@@ -138,16 +150,16 @@ export declare const DEFAULT_MAX_ACTIVE_RUNS_TOTAL = 8;
 export declare const CONFIG_VERSION = 1;
 /**
  * Every top-level key the configuration accepts, in schema order.
- * T4 slim-down: the settings page exposes exactly 8 keys (toolName,
- * configVersion, mode, grokDefault, roles, synthesis, maxConcurrency,
- * maxTasks); the rest of the former surface is fixed internally.
+ * The settings page exposes 9 keys (toolName, configVersion, mode,
+ * grokDefault, roles, synthesis, maxConcurrency, maxTasks, timeoutMs);
+ * the rest of the former surface is fixed internally.
  * Kept explicit so an unknown key can be rejected instead of silently dropped:
  * a typo that is silently ignored looks exactly like a setting that "does not
  * work", which is the failure mode the settings surface must not have.
  */
-export declare const CONFIG_KEYS: readonly ["toolName", "mode", "grokDefault", "roles", "synthesis", "maxConcurrency", "maxTasks", "configVersion"];
+export declare const CONFIG_KEYS: readonly ["toolName", "mode", "grokDefault", "roles", "synthesis", "maxConcurrency", "maxTasks", "timeoutMs", "configVersion"];
 /** Every key removed by the T4 slim-down; a patch that still carries one is rejected (R-06). */
-export declare const REMOVED_CONFIG_KEYS: readonly ["enforceGate", "gateRequired", "gateScope", "gatePreset", "answerStrategy", "triageAsk", "triageModel", "triageClassifier", "triageFollowupAsFast", "instantReceipt", "humanSummary", "showDiagnostics", "historyTurns", "historyChars", "maxQueuedMessages", "maxRetries", "timeoutMs", "maxActiveRuns", "maxActiveRunsTotal", "subagentProvider", "switchOn", "recordRuns", "recordLimit", "showProgress"];
+export declare const REMOVED_CONFIG_KEYS: readonly ["enforceGate", "gateRequired", "gateScope", "gatePreset", "answerStrategy", "triageAsk", "triageModel", "triageClassifier", "triageFollowupAsFast", "instantReceipt", "humanSummary", "showDiagnostics", "historyTurns", "historyChars", "maxQueuedMessages", "maxRetries", "maxActiveRuns", "maxActiveRunsTotal", "subagentProvider", "switchOn", "recordRuns", "recordLimit", "showProgress"];
 /** One stored limit the schema had to clamp, as the parse saw it. */
 export interface LimitOverrun {
     field: LimitField;
@@ -191,6 +203,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     grokDefault: z<"on" | "off", "on" | "off", "volatile-defined">;
     maxConcurrency: z<number, number, "volatile-defined">;
     maxTasks: z<number, number, "volatile-defined">;
+    timeoutMs: z<number, number, "volatile-defined">;
     roles: z<NoInfer<Schemastery.ObjectS<NoInfer<{
         planner: z<({
             provider?: string | null;
@@ -292,6 +305,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     grokDefault: z<"on" | "off", "on" | "off", "volatile-defined">;
     maxConcurrency: z<number, number, "volatile-defined">;
     maxTasks: z<number, number, "volatile-defined">;
+    timeoutMs: z<number, number, "volatile-defined">;
     roles: z<NoInfer<Schemastery.ObjectS<NoInfer<{
         planner: z<({
             provider?: string | null;
