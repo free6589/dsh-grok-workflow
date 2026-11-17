@@ -1,0 +1,32 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+ ❯ test/docs-version.spec.ts (7 tests | 1 failed) 15ms
+     ✓ states the current package version in English 2ms
+     ✓ states the current package version in Simplified Chinese 0ms
+     ✓ pins every install example to the current release tag 1ms
+     ✓ names only the current release when a tag is spelled out in prose 1ms
+     ✓ lists published tags in ascending order ending at the current release 1ms
+     × gives every published tag its own changelog section, newest first 7ms
+     ✓ opens the changelog with the version the package declares 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/docs-version.spec.ts > README version claims match package.json > gives every published tag its own changelog section, newest first
+AssertionError: no changelog section for v0.9.0: expected [ '0.11.1', '0.11.0', '0.10.2', …(22) ] to include '0.9.0'
+ ❯ test/docs-version.spec.ts:97:87
+     95|     const published = publishedTags(readmeEn, 'Published:', 'The unpin…
+     96|     expect(published.length).toBeGreaterThan(10)
+     97|     for (const tag of published) expect(sections, `no changelog sectio…
+       |                                                                                       ^
+     98|     expect(sections).toEqual([...sections].sort((a, b) => compareVersi…
+     99|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 6 passed (7)
+   Start at  01:24:22
+   Duration  237ms (transform 27ms, setup 0ms, import 40ms, tests 15ms, environment 0ms)
+

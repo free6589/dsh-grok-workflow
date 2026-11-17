@@ -1,0 +1,10 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+ ✓ test/docs-version.spec.ts (7 tests) 10ms
+
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+   Start at  01:24:34
+   Duration  188ms (transform 23ms, setup 0ms, import 37ms, tests 10ms, environment 0ms)
+

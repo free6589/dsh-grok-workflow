@@ -5,6 +5,31 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.11.2] - 2026-11-18
+
+### Fixed / 修复
+
+- **The v0.9.0 release notes were filed under v0.9.1, so v0.9.0 had no changelog entry
+  at all / v0.9.0 的发布说明被挪到 v0.9.1 名下，v0.9.0 从此没有更新日志** —
+  the `v0.9.1` release commit renamed the `## [0.9.0]` heading in place instead of adding a
+  section, so the eleven bilingual entries that shipped the Progress tab are now labelled
+  `0.9.1`, and the actual `0.9.1` note (stored caps clamp at load) was later promoted into
+  `0.9.2`. The `0.9.0` section is restored verbatim from the commit that released it
+  (`2d2b347:CHANGELOG.md`, byte-identical body), the clamp note is back under `0.9.1`, and
+  `test/docs-version.spec.ts` now fails when a published tag has no section of its own or
+  when the sections are not newest-first. / `v0.9.1` 的发版提交没有新增小节，而是把
+  `## [0.9.0]` 的标题就地改名为 `0.9.1`：随进度 Tab 一起发出去的十一条中英条目现在挂在
+  `0.9.1` 名下，真正的 `0.9.1` 说明（存量上限载入即钳制）后来又被并入 `0.9.2`。现在
+  `0.9.0` 小节从发布它的那次提交逐字恢复（`2d2b347:CHANGELOG.md`，正文逐字节相同），
+  钳制说明回到 `0.9.1`；`test/docs-version.spec.ts` 在「已发布标签没有自己的小节」或
+  「小节不是由新到旧」时失败。
+
+### Tests / 测试
+
+- `test/docs-version.spec.ts` (7): every published tag must own a `## [x.y.z]` section and
+  the sections must be ordered newest-first; red before this round with
+  `no changelog section for v0.9.0`.
+
 ## [0.11.1] - 2026-11-18
 
 ### Fixed / 修复
@@ -245,16 +270,6 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ### Fixed / 修复
 
-- **Stored `maxConcurrency` / `maxRetries` over the hard maximum no longer disables the whole plugin
-  / 存量 `maxConcurrency` / `maxRetries` 超上限不再让整个插件起不来** —
-  a profile patch written before v0.9.0 (e.g. `maxConcurrency: 8`, `maxRetries: 5`) now activates
-  at the documented caps (`6` / `3`) with one bilingual warning per field instead of failing the
-  whole `grok-workflow` row with `ValidationError`. Values below the minimum, non-numbers, and
-  programmatic `resolveConfig` overruns still fail closed (R-06); the caps themselves are unchanged.
-  / v0.9.0 之前写的 profile 补丁（如 `maxConcurrency: 8`、`maxRetries: 5`）现在按文档上限
-  （`6` / `3`）钳制生效，每项一条中英告警，不再让整行 `grok-workflow` 报 `ValidationError`
-  起不来。低于下限、非数字、程序化 `resolveConfig` 越界仍硬拒绝（R-06），上限本身不变。
-
 - **Every numeric hard cap now lives in one clamp table, and a clamped value warns once per load
   / 数值硬上限收敛到一张钳制表，钳制告警每次载入一条（B02、B04）** —
   `LIMIT_CAPS` is the single declaration of which numeric keys clamp at a hard maximum and where that
@@ -315,6 +330,20 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
   依据的是先后顺序，不是时钟。
 
 ## [0.9.1] - 2026-11-15
+
+### Fixed / 修复
+
+- **Stored `maxConcurrency` / `maxRetries` over the hard maximum no longer disables the whole plugin
+  / 存量 `maxConcurrency` / `maxRetries` 超上限不再让整个插件起不来** —
+  a profile patch written before v0.9.0 (e.g. `maxConcurrency: 8`, `maxRetries: 5`) now activates
+  at the documented caps (`6` / `3`) with one bilingual warning per field instead of failing the
+  whole `grok-workflow` row with `ValidationError`. Values below the minimum, non-numbers, and
+  programmatic `resolveConfig` overruns still fail closed (R-06); the caps themselves are unchanged.
+  / v0.9.0 之前写的 profile 补丁（如 `maxConcurrency: 8`、`maxRetries: 5`）现在按文档上限
+  （`6` / `3`）钳制生效，每项一条中英告警，不再让整行 `grok-workflow` 报 `ValidationError`
+  起不来。低于下限、非数字、程序化 `resolveConfig` 越界仍硬拒绝（R-06），上限本身不变。
+
+## [0.9.0] - 2026-11-15
 
 ### Added / 新增
 

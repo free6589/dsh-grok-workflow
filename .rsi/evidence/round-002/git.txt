@@ -1,0 +1,11 @@
+round 2 · tag v0.11.2
+npm run ci exit 0 · 52 test files passed · 966 tests passed
+
+diffstat before commit:
+CHANGELOG.md              | 49 +++++++++++++++++++++++++++++++++++++----------
+ README.md                 | 10 +++++-----
+ README.zh-CN.md           | 10 +++++-----
+ package-lock.json         |  4 ++--
+ package.json              |  2 +-
+ test/docs-version.spec.ts | 14 ++++++++++++--
+ 6 files changed, 64 insertions(+), 25 deletions(-)

@@ -53,3 +53,25 @@ no history is rewritten, and no round is force-pushed.
   change touches no runtime path (`NOT_RUN`, stated rather than implied).
 - **Suggested version:** patch → `0.11.1`.
 - **status:** OK
+
+## Round 2 — a published release lost its changelog section
+
+- **Theme (P0, false statement in shipped docs):** `v0.9.0` is a published tag but
+  `CHANGELOG.md` had no `## [0.9.0]` section. Root cause found in git history: the `v0.9.1`
+  release commit `9103280` renamed `## [0.9.0] - 2026-11-15` to `## [0.9.1] - 2026-11-15`
+  in place, so the eleven bilingual 0.9.0 entries (the Progress tab release) became 0.9.1's,
+  and the real 0.9.1 note (stored caps clamp at load) was later folded into `0.9.2`.
+- **Change:** `0.9.0` restored verbatim from `2d2b347:CHANGELOG.md` (body compared
+  byte-for-byte, equal); the clamp note moved back under a new `0.9.1` section; `0.9.2`
+  keeps only its own entries. `test/docs-version.spec.ts` gained the invariant that would
+  have caught this: every published tag owns a section, and sections are newest-first.
+- **Files:** `CHANGELOG.md`, `test/docs-version.spec.ts`, `package.json`,
+  `package-lock.json`, `README.md`, `README.zh-CN.md` (published list now ends at this
+  round's tag), `.rsi/` records.
+- **Evidence:** `.rsi/evidence/round-002/red.txt` (fails: `no changelog section for
+  v0.9.0`), `.rsi/evidence/round-002/green.txt` (7/7 pass), `.rsi/evidence/round-002/ci.txt`
+  (npm run ci exit 0 · 52 test files passed · 966 tests passed), `.rsi/evidence/round-002/git.txt`.
+- **Unverified:** the GitHub Release page for `v0.9.0` was not re-inspected; the fix is to
+  the repository changelog, not to the released artifact body (`NOT_RUN`).
+- **Suggested version:** patch → `0.11.2`.
+- **status:** OK

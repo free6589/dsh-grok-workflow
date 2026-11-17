@@ -41,9 +41,11 @@ function publishedTags(readme: string, from: string, to: string): string[] {
   return [...readme.slice(start, end).matchAll(/`(v\d+\.\d+\.\d+)`/g)].map((m) => m[1] as string)
 }
 
+const numeric = (version: string) => version.replace(/^v/, '')
+
 const compareVersions = (a: string, b: string): number => {
-  const left = a.slice(1).split('.').map(Number)
-  const right = b.slice(1).split('.').map(Number)
+  const left = numeric(a).split('.').map(Number)
+  const right = numeric(b).split('.').map(Number)
   for (let index = 0; index < 3; index += 1) {
     if (left[index] !== right[index]) return (left[index] as number) - (right[index] as number)
   }
@@ -86,6 +88,14 @@ describe('README version claims match package.json', () => {
       expect(tags).toEqual(ascending)
       expect(tags.at(-1)).toBe(tag)
     }
+  })
+
+  it('gives every published tag its own changelog section, newest first', () => {
+    const sections = [...changelog.matchAll(/^## \[(\d+\.\d+\.\d+)\]/gm)].map((m) => m[1] as string)
+    const published = publishedTags(readmeEn, 'Published:', 'The unpinned command').map(numeric)
+    expect(published.length).toBeGreaterThan(10)
+    for (const tag of published) expect(sections, `no changelog section for v${tag}`).toContain(tag)
+    expect(sections).toEqual([...sections].sort((a, b) => compareVersions(b, a)))
   })
 
   it('opens the changelog with the version the package declares', () => {
