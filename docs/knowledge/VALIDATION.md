@@ -3340,3 +3340,19 @@ Release `v0.10.1` + asset `dsh-grok-workflow-0.10.1.tgz` 已发布。
 **验证（`CONFIRMED`）**：`npm run build` → `cmp` 一致；`test/client.spec.ts` 76/76；
 全量 51 文件 / 955 测试 PASS；typecheck 干净；lint 22w/0e（回基线）。
 新增测试：坏 draft 下 validate/emptyCapWarn/opsFor 不抛且无 roles 幻影 op。
+
+## Round 52 — 2026-11-17 — v0.10.2 发版（`CONFIRMED`，逐条可复核）
+
+**内容**：`27fad89`（roles 非对象防御 + badEnum）+ `8b1d543`（A5 空值防御）+
+`4eabee8`（升 0.10.2 + changelog）。旧 tag 未动（v0.10.0 peel `b2c4515`，
+v0.10.1 peel `ed61750`）。
+
+**发版动作（`CONFIRMED`）**：`package.json` + `package-lock.json` = `0.10.2`；
+`CHANGELOG` 插入 `## [0.10.2] - 2026-11-17`（`[Unreleased]` 保留为空节）；
+push（fast-forward `a8f60e6..4eabee8`，无 force）→ tag `v0.10.2`（peel `4eabee8`）→
+CI `44116957934` success → Release `44116985460` success，
+Release `v0.10.2` + asset `dsh-grok-workflow-0.10.2.tgz` 已发布。
+
+**未做（`NOT_RUN`）**：live `:3080` 换装 v0.10.2 与重启（D-013 用户动作）；
+A4 三处 Host 契约错位（writable 层级/revision fence/set 代 unset）的单独发版修复；
+进度 Execute/Verify 成员渲染缺口的定位。
