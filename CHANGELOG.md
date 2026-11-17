@@ -5,6 +5,30 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-11-17
+
+### Fixed / 修复
+
+- **Settings page: save-blocking bugs fixed, professional rewrite / 设置页：修好存不上，又重画了一遍** —
+  execution order is now 1 break-down / 2 do / 3 check / **4 supervise** / 5 wrap-up,
+  and the render order matches the numbers; role names carry their numbers
+  (`4 · 监督`) in both languages. Mode is two radio cards (Auto / Full) instead
+  of a dropdown that hid the difference; the two numbers are steppers (− / ＋,
+  clamped 1–100) and the missing `unit.jobs` / `unit.tasks` keys are filled so the
+  suffix no longer renders as `—`. Every route row now has a per-run cap input
+  (empty = unlimited): a dirty stored cap finally has somewhere to be fixed —
+  before, it failed validation with no editor and locked Save forever. Rows that
+  block the save are outlined red inline (`missingModel` from one tap on
+  `+ Add a backup`, `badCap`, duplicates). Empty chains say plainly that empty
+  means "follows this chat, no backup set". Save / refuse / failure copy is in
+  plain words. / 执行顺序现为拆活 1 / 干活 2 / 检查 3 / **监督 4** / 收尾 5，
+  渲染顺序与序号一致；角色名自带序号（`4 · 监督`），中英双语。模式改双卡片二选一
+  （自动挡 / 全员上），不再是藏起差异的下拉；两数字改步进器（− / ＋，钳制 1–100），
+  补上缺的 `unit.jobs` / `unit.tasks` 键，后缀不再显示 `—`。每行加单次上限输入框
+  （空 = 不限）：存量脏 cap 终于有地方改 —— 以前它校验不过又没编辑框，保存永远锁死。
+  卡住保存的行行内红框标出（点一下 `＋ 加备选` 出空行没填完、`badCap`、重复）。
+  空链明说空 = "跟这次对话用同一个，没加备选"。保存 / 拒绝 / 失败文案全换白话。
+
 ## [0.10.0] - 2026-11-17
 
 ### Added / 新增
