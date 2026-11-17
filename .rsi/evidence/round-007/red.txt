@@ -1,0 +1,51 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.worktrees/rsi-r7
+
+ ❯ test/delivery-human-block.spec.ts (11 tests | 1 failed) 36ms
+     ✓ keeps a reason that contains an identifier token ("attempt:") 12ms
+     ✓ keeps a reason that merely quotes a ledger label mid-sentence 1ms
+     ✓ drops no failed task from the block 2ms
+     ✓ keeps the same reason in the English block 1ms
+     × separates a failure row the way the block's language does 9ms
+     ✓ still drops a line that is a ledger label 1ms
+     ✓ still keeps the answer when the echo is the only line 0ms
+     ✓ still keeps every ledger label out of the human block, and in the ledger 4ms
+     ✓ drops a line that carries an identifier key, and keeps a reason that mentions one 1ms
+     ✓ hides the ledger by default and shows it on request 1ms
+     ✓ never dresses a partial run as a completed one 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/delivery-human-block.spec.ts > B10: the human block keeps the failure reason the run recorded > separates a failure row the way the block's language does
+AssertionError: expected 'Answer: 天气已核验；酒店价格与机场巴士时刻未取得。\nNext: …' to contain '- 酒店价格: task aborted before any attem…'
+
+- Expected
++ Received
+
+- - 酒店价格: task aborted before any attempt: [infrastructure/timeout] provider exploded
++ Answer: 天气已核验；酒店价格与机场巴士时刻未取得。
++ Next: This was an external service or deadline problem, not your request; sending the same work again later usually goes through.
++ Achieved: Task a.
++ Not done:
++ - 酒店价格：task aborted before any attempt: [infrastructure/timeout] provider exploded
++ - 机场巴士时刻：verify step rejected: Plan: step 2 was skipped by the runner
++ Worth knowing:
++ - 机场巴士时刻未取得，行程建议可能偏差
++ That is the conclusion (1 of 3 usable, 2 not done); details are in the ledger.
+
+ ❯ test/delivery-human-block.spec.ts:160:16
+    158|     // punctuation systems in one sentence.
+    159|     const en = humanConclusion(partialReport(), { lang: 'en' })
+    160|     expect(en).toContain(`- 酒店价格: ${ABORTED_REASON}`)
+       |                ^
+    161|     expect(en).not.toContain('：')
+    162|     // …and the Chinese block is untouched by that change.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 10 passed (11)
+   Start at  01:37:41
+   Duration  402ms (transform 160ms, setup 0ms, import 207ms, tests 36ms, environment 0ms)
+

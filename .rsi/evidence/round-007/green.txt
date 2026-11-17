@@ -1,0 +1,10 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.worktrees/rsi-r7
+
+ ✓ test/delivery-human-block.spec.ts (11 tests) 53ms
+
+ Test Files  1 passed (1)
+      Tests  11 passed (11)
+   Start at  01:37:59
+   Duration  475ms (transform 191ms, setup 0ms, import 245ms, tests 53ms, environment 0ms)
+

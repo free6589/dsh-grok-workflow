@@ -677,7 +677,9 @@ function composeHumanParts(report: WorkflowReport, lang: DeliveryLang): { block:
       // use it — but the line itself is never dropped for mentioning a token.
       const reason = sentenceLine(stripMachineDetail(item?.reason ?? task.error ?? ''), 240)
       const name = titleOf(report, task.id, report.tasks.indexOf(task))
-      push(reason === '' ? `- ${name}` : `- ${name}：${reason}`, false)
+      // The separator follows the block's language, like every other row above:
+      // a full-width colon inside an English sentence reads as a typo.
+      push(reason === '' ? `- ${name}` : `- ${name}${zh ? '：' : ': '}${reason}`, false)
     })
     if (undone.length > 5) push(zh ? `- 另有 ${undone.length - 5} 项没做成` : `- ${undone.length - 5} more did not finish`)
   }

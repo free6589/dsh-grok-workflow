@@ -151,6 +151,19 @@ describe('B10: the human block keeps the failure reason the run recorded', () =>
     expect(text).toContain(ABORTED_REASON)
     expect(text).toContain(MID_LINE_REASON)
   })
+
+  it('separates a failure row the way the block\'s language does', () => {
+    // A row read in English must not carry the full-width colon the Chinese
+    // passes use: `Not done:\n- Hotel price：the source refused` mixes two
+    // punctuation systems in one sentence.
+    const en = humanConclusion(partialReport(), { lang: 'en' })
+    expect(en).toContain(`- 酒店价格: ${ABORTED_REASON}`)
+    expect(en).not.toContain('：')
+    // …and the Chinese block is untouched by that change.
+    const zh = humanConclusion(partialReport(), { lang: 'zh' })
+    expect(zh).toContain(`- 酒店价格：${ABORTED_REASON}`)
+    expect(zh).not.toContain(`- 酒店价格: ${ABORTED_REASON}`)
+  })
 })
 
 describe('B10: the guard is anchored, not removed', () => {
