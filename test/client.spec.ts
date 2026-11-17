@@ -348,6 +348,7 @@ describe('client settings page: bilingual copy (t42)', () => {
       { key: 'error.tooLong', params: { role: 'verifier', index: 1, limit: 120 } },
       { key: 'error.duplicate', params: { role: 'synthesizer', index: 3 } },
       { key: 'error.badCap', params: { role: 'worker', index: 1, min: 1, max: 64 } },
+      { key: 'error.badEnum', params: { key: 'mode' } },
     ]
     for (const finding of findings) {
       for (const locale of bundle.GROK_WORKFLOW_LOCALES) {
@@ -822,6 +823,24 @@ describe('client settings page: draft, validation and path ops', () => {
     const draft = draftOf(undefined)
     for (const field of bundle.GROK_WORKFLOW_FIELDS) expect(draft[field.key], field.key).toEqual(field.def)
     for (const role of bundle.GROK_WORKFLOW_ROLES) expect(draft.roles[role]).toEqual([])
+  })
+
+  it('survives a non-object roles section instead of crashing the page', () => {
+    for (const roles of [null, 'fast', 42, ['planner']]) {
+      const draft = draftOf({ roles } as unknown as Record<string, unknown>)
+      for (const role of bundle.GROK_WORKFLOW_ROLES) expect(draft.roles[role]).toEqual([])
+    }
+    expect(validate(draftOf({ roles: null } as unknown as Record<string, unknown>))).toEqual([])
+  })
+
+  it('rejects a stored enum value outside the offered options', () => {
+    const bad = { ...draftOf(undefined), mode: 'auto' }
+    const findings = validate(bad)
+    expect(findings.some(finding => finding.key === 'error.badEnum')).toBe(true)
+    expect(messagesIn(findings, en).some(text => text.includes('options'))).toBe(true)
+    expect(messagesIn(findings, zh).some(text => text.includes('选项'))).toBe(true)
+    // A legal value still validates clean.
+    expect(validate(draftOf(undefined))).toEqual([])
   })
 
   it('keeps a chain the Host published and fills the roles the document omits', () => {

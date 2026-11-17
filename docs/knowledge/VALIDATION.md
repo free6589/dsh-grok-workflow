@@ -3292,3 +3292,32 @@ Release `v0.10.1` + asset `dsh-grok-workflow-0.10.1.tgz` 已发布。
 
 **未做（`NOT_RUN`）**：live `:3080` 换装 v0.10.1 与重启（D-013 用户动作）；
 进度 Execute/Verify 成员渲染缺口的定位与修复。
+
+## Round 50 — 2026-11-17 — 设置页 error 根因修复（A1–A7 审计 + lead 合入，未发布）
+
+**用户现象（`CONFIRMED`）**：v0.10.1 装上重启后，打开设置即 error，无法保存。
+
+**审计（`CONFIRMED`，7 子代理只读，lead 合入）**：
+- A2/A3 实锤整页 error 主因：存量 `roles` 非对象（null/字符串）→ `draftOf` 第 502 行
+  `clone(value.roles)` 后取属性抛 TypeError → React 整页崩（A2 P3/A3-B,C）。
+  另：`mode:"auto"` 等非法枚举值页面 0 错绿灯通过，存下去后 Host `resolveConfig`
+  throw 整行拒载（A3-F，页面与 Host 双重标准）。
+- A4 契约错位（记录，不修）：`entry.writable` 层级不对（per-ns entry 无此字段）、
+  `revision` 应取 form 快照 fence 而非 mirror、`set` 不能代 `unset` 去覆盖。
+  三处各一行 diff，已记待办，本轮不改（改动 Host 交互面，需单独发版验证）。
+- A1 T1/T2（改名行放宽匹配、error 残值优先）不采纳：放宽误认别家 namespace，
+  error 页有重试按钮是正道。T3（clone 防抛）采纳。
+- A6：文案零遗漏零错字，无改动。A7：node 矩阵 + chromium 实渲染截图
+  `.tmp/a7-render.png`（harness `.tmp/a7-harness.html`，脚本 `.tmp/a7-matrix.mjs`），
+  脏输入矩阵全记录；M17（无效 mode 显示 OK）正是本轮 badEnum 要堵的口。
+
+**修复（`CONFIRMED`，未 push）**：
+1. `draftOf`：roles 非对象（null/字符串/数组）不再 clone，直接沿用空链（整页 error 根除）。
+2. `validate` 新增 `error.badEnum`：enum 存量非法即红错锁保存（中英双语文案 + 测试钉住翻译全覆盖）。
+3. `clone` 加 try/catch：BigInt/circular 等脏 mirror 值回退为空，不整页崩。
+4. 顺手：EN `error.badEnum` 重复键删一处（lint 23→22 回基线）。
+
+**验证（`CONFIRMED`）**：`npm run build` → `cmp` 一致；`test/client.spec.ts` 76/76；
+全量 51 文件 / 955 测试 PASS；typecheck 干净；lint 22w/0e（回基线）。
+新 profile `acgtest102x`：0.10.1 修复包重装（md5 `dd47bd15` 两侧一致）→ dump grok 行
+8 键全 → 读写落盘通。新增测试：roles 非对象不抛、badEnum 中英红错。

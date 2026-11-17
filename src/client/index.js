@@ -228,6 +228,7 @@ window.__ModuleLoader__.load({
 
 
       'error.number': '{key} must be a whole number between {min} and {max} — fix the number and save again.',
+      'error.badEnum': '{key} has a value the current options do not offer — pick one of the offered options and save again.',
       'error.chainTooLong': '{role} can keep at most {limit} backup routes — remove the extras.',
       'error.missingModel': '{role} entry {index} has no model — pick one or remove the row.',
       'error.tooLong': '{role} entry {index}: the channel/model text is over {limit} characters.',
@@ -381,6 +382,7 @@ window.__ModuleLoader__.load({
 
 
       'error.number': '{key} 得是 {min} 到 {max} 之间的整数，改对数字再保存。',
+      'error.badEnum': '{key} 有个现在选项里没有的值，选一个再保存。',
       'error.chainTooLong': '{role} 备用链最多 {limit} 条，删掉多余的。',
       'error.missingModel': '{role} 第 {index} 条没有模型，选一个或删掉这一行。',
       'error.tooLong': '{role} 第 {index} 条的通道/模型文字超过 {limit} 字。',
@@ -492,14 +494,23 @@ window.__ModuleLoader__.load({
     }
 
     const emptyRoles = () => ({ planner: [], worker: [], verifier: [], synthesizer: [], supervisor: [] })
-    const clone = (value) => JSON.parse(JSON.stringify(value === undefined ? null : value))
+    const clone = (value) => {
+      // A stored document is JSON-shaped, but a hostile or corrupted mirror
+      // value (BigInt, circular, function) would throw out of useState and
+      // take the whole page down. Fall back to empty so the page stays up.
+      try {
+        return JSON.parse(JSON.stringify(value === undefined ? null : value))
+      } catch {
+        return value === undefined ? null : undefined
+      }
+    }
     const draftOf = (value) => {
       const out = { roles: emptyRoles() }
       for (const field of FIELDS) {
         const current = value === undefined ? undefined : value[field.key]
         out[field.key] = current === undefined ? clone(field.def) : clone(current)
       }
-      if (value !== undefined && value.roles !== undefined) out.roles = clone(value.roles)
+      if (value !== undefined && value.roles !== undefined && value.roles !== null && typeof value.roles === 'object' && !Array.isArray(value.roles)) out.roles = clone(value.roles)
       for (const role of ROLES) if (!Array.isArray(out.roles[role])) out.roles[role] = []
       return out
     }
@@ -516,10 +527,19 @@ window.__ModuleLoader__.load({
     const validate = (draft) => {
       const errors = []
       for (const field of FIELDS) {
-        if (field.kind !== 'number') continue
-        const raw = draft[field.key]
-        if (!Number.isSafeInteger(raw) || raw < field.min || raw > field.max) {
-          errors.push({ key: 'error.number', params: { key: field.key, min: field.min, max: field.max } })
+        if (field.kind === 'number') {
+          const raw = draft[field.key]
+          if (!Number.isSafeInteger(raw) || raw < field.min || raw > field.max) {
+            errors.push({ key: 'error.number', params: { key: field.key, min: field.min, max: field.max } })
+          }
+        } else if (field.kind === 'enum') {
+          // A stored value outside the options (a legacy patch, a hand edit)
+          // renders as its own first row so nothing is lost — but it must not
+          // save: the Host schema rejects it and refuses the whole document.
+          const known = field.options.map((option) => String(option))
+          if (!known.includes(String(draft[field.key]))) {
+            errors.push({ key: 'error.badEnum', params: { key: field.key } })
+          }
         }
       }
       // T5: the gate preset no longer exists (fixed internal behavior).
