@@ -831,6 +831,19 @@ describe('client settings page: draft, validation and path ops', () => {
       for (const role of bundle.GROK_WORKFLOW_ROLES) expect(draft.roles[role]).toEqual([])
     }
     expect(validate(draftOf({ roles: null } as unknown as Record<string, unknown>))).toEqual([])
+    // validate/emptyCapWarn/opsFor must survive a draft whose roles section
+    // was destroyed after seeding (no throw, no phantom ops).
+    const broken = { ...draftOf(undefined), roles: null } as unknown as Parameters<typeof validate>[0]
+    expect(validate(broken)).toEqual([])
+    expect(emptyCapWarn(broken)).toBe(false)
+    // No throw and no phantom ops: a destroyed roles section reads as empty.
+    expect(opsFor(broken, undefined)).toEqual(
+      expect.arrayContaining([
+        { op: 'set', path: ['grokDefault'], value: 'off' },
+        { op: 'set', path: ['mode'], value: 'triage' },
+      ])
+    )
+    expect(opsFor(broken, undefined).filter(op => op.path[0] === 'roles')).toEqual([])
   })
 
   it('rejects a stored enum value outside the offered options', () => {

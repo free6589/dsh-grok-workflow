@@ -3321,3 +3321,22 @@ Release `v0.10.1` + asset `dsh-grok-workflow-0.10.1.tgz` 已发布。
 全量 51 文件 / 955 测试 PASS；typecheck 干净；lint 22w/0e（回基线）。
 新 profile `acgtest102x`：0.10.1 修复包重装（md5 `dd47bd15` 两侧一致）→ dump grok 行
 8 键全 → 读写落盘通。新增测试：roles 非对象不抛、badEnum 中英红错。
+
+## Round 51 — 2026-11-17 — A5 补修（validate/ops/catalog/translate 空值防御，未发布）
+
+**来源（`CONFIRMED`）**：A5（agent-42）姗姗来迟的 render 崩溃审计，补了 3 条 lead
+已合入之外的 throw 路径，逐条验中后修。
+
+**修复（`CONFIRMED`，`27fad89` 之上未提交）**：
+1. `validate`/`emptyCapWarn`：`draft.roles` 非对象时用空对象兜底（`draft.roles[role]`
+   读属性抛 TypeError 整页崩；`emptyCapWarn` 同族）。
+2. `opsFor`：`value.roles` 非对象不再取属性；`draft.roles[role]` 非数组回退 `[]`
+  （坏 draft 不抛、不产幻影 op）。
+3. `RouteRow`：`catalog` 为 null 时按无目录降级（`Object.keys(null)` 抛）。
+4. `translate`/`panelTranslate`：`params` 非对象时按 `{}` 处理（`in` 运算抛）。
+5. A1-T1（改名行放宽匹配）、T2（error 残值优先）不采纳：前者误认别家 namespace，
+   后者改状态机风险大，error 页重试按钮是正道。A4 三处契约错位记待办，不在本轮。
+
+**验证（`CONFIRMED`）**：`npm run build` → `cmp` 一致；`test/client.spec.ts` 76/76；
+全量 51 文件 / 955 测试 PASS；typecheck 干净；lint 22w/0e（回基线）。
+新增测试：坏 draft 下 validate/emptyCapWarn/opsFor 不抛且无 roles 幻影 op。
