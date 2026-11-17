@@ -5,6 +5,21 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.10.2] - 2026-11-17
+
+### Fixed / 修复
+
+- **Settings page no longer crashes on dirty stored data / 设置页不再被脏存量整页崩掉** —
+  a non-object `roles` section (null, string, array from a legacy patch or hand edit)
+  no longer throws the whole page; the page shows empty chains instead. A stored enum
+  value outside the offered options (e.g. a legacy `mode`) is now a red validation
+  error that blocks save instead of a green light that the Host then refuses.
+  `validate` / `emptyCapWarn` / `opsFor` / `catalog` / `translate` all tolerate null
+  inputs without throwing. / 存量 `roles` 非对象（旧补丁或手改留下的 null、字符串、
+  数组）不再整页崩，显示空链即可。存量枚举值不在选项里（如旧 `mode`）现在红错锁保存，
+  不再绿灯放行再被 Host 拒载。`validate` / `emptyCapWarn` / `opsFor` / `catalog` /
+  `translate` 全加空值防御，不再抛错。
+
 ## [0.10.1] - 2026-11-17
 
 ### Fixed / 修复
