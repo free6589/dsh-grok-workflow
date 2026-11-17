@@ -632,7 +632,13 @@ export function cancelledText(
     ]
     : [
       '运行已取消（cancelled）：工作流在全部任务完成前停止。',
-      '取消前已有 ' + verified + '/' + total + ' 项任务核验通过；下方保留人话结论，技术细节在进度节点里。总体状态仍为取消，不代表全部完成。',
+      // R11: no task row means the run stopped before planning produced work
+      // (a plan or deadline failure), so the honest count is "nothing started",
+      // not `0/0` — a reader cannot parse that, and it reads as "nothing was
+      // verified" rather than "nothing was ever started".
+      total === 0
+        ? '取消前还没有任何一项任务开工，所以没有核验结果；下方保留当时的结论，技术细节在进度节点里。总体状态仍为取消，不代表完成了什么。'
+        : '取消前已有 ' + verified + '/' + total + ' 项任务核验通过；下方保留人话结论，技术细节在进度节点里。总体状态仍为取消，不代表全部完成。',
     ]
   const trimmed = reason.trim()
   if (trimmed !== '') lines.push('原因：' + trimmed)

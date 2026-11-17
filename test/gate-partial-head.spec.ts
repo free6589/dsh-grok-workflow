@@ -17,6 +17,7 @@ import type { WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { apply } from '../src/index.js'
+import { LEDGER_GUARD, REPORT_BEGIN, REPORT_END } from '../src/answer.js'
 import { FIXED_HUMAN_SUMMARY, FIXED_SHOW_DIAGNOSTICS } from '../src/config.js'
 import { cancelledText, humanHead } from '../src/gate.js'
 import type { WorkflowReport } from '../src/types.js'
@@ -244,6 +245,67 @@ describe('a PARTIAL answer leads with a human conclusion and a next step', () =>
     expect(text).not.toContain('<<<GROK-WORKFLOW-REPORT>>>')
     expect(text).not.toContain('Confirmed evidence:')
     expect(text).not.toContain('Model routes:')
+  })
+
+  it('keeps the model-facing relay wrapper out of the cancelled transcript message', () => {
+    // The cancelled message is appended straight into the transcript
+    // (`session.append('assistant/message', …)`), so a reader reads it as the
+    // assistant's own words. The relay preamble ("Reply with those lines exactly
+    // as given… do not call any tool") and the `<<<GROK-WORKFLOW-REPORT>>>`
+    // markers are instructions for the main model, and the ledger under them is
+    // ids and routes — exactly the technical detail this text promises lives in
+    // the progress nodes instead.
+    const report = {
+      status: 'partial',
+      objective: 'do the thing',
+      plan: { source: 'caller', tasks: [] },
+      tasks: [
+        { id: 'a', title: 'Task a', status: 'verified', attempts: [], expectedOutput: 'Output a' },
+        { id: 'b', title: 'Task b', status: 'failed', attempts: [], expectedOutput: 'Output b', error: 'verifier verdict was fail' },
+      ],
+      confirmed: [],
+      incomplete: [{ taskId: 'b', reason: 'verifier verdict was fail', category: 'quality' }],
+      errors: [],
+      uncertainties: [],
+      routes: [],
+      routing: { planner: [], worker: [], verifier: [], supervisor: [], synthesizer: [] },
+      synthesis: { mode: 'deterministic' },
+      limits: { maxConcurrency: 3, maxTasks: 12, maxTotalAgents: 48 },
+    } as unknown as WorkflowReport
+    const text = cancelledText('用户停止', report, { lang: 'zh' })
+    expect(text).toContain('运行已取消')
+    expect(text).toContain('技术细节在进度节点里')
+    expect(text).not.toContain('Reply with those lines exactly as given')
+    expect(text).not.toContain(REPORT_BEGIN)
+    expect(text).not.toContain(REPORT_END)
+    expect(text).not.toContain(LEDGER_GUARD)
+    expect(text).not.toContain('Grok workflow: PARTIAL')
+    expect(text).not.toContain('Model routes:')
+  })
+
+  it('says nothing had started instead of printing 0/0 when no task row exists', () => {
+    // A plan/deadline failure keeps a report with `tasks: []`. The fraction then
+    // read `0/0`, which a reader cannot parse and which reads as "nothing was
+    // verified" rather than "nothing was ever started".
+    const report = {
+      status: 'failed',
+      objective: 'do the thing',
+      plan: { source: 'caller', tasks: [] },
+      tasks: [],
+      confirmed: [],
+      incomplete: [],
+      errors: [{ phase: 'plan', message: 'deadline exceeded' }],
+      uncertainties: [],
+      routes: [],
+      routing: { planner: [], worker: [], verifier: [], supervisor: [], synthesizer: [] },
+      synthesis: { mode: 'deterministic' },
+      limits: { maxConcurrency: 3, maxTasks: 12, maxTotalAgents: 48 },
+    } as unknown as WorkflowReport
+    const text = cancelledText('时间到了', report, { lang: 'zh' })
+    expect(text).toContain('运行已取消')
+    expect(text).not.toContain('0/0')
+    expect(text).toContain('还没有任何一项任务开工')
+    expect(text).toContain('原因：deadline exceeded')
   })
 })
 
