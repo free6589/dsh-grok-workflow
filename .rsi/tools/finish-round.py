@@ -51,6 +51,7 @@ def main() -> int:
     parser.add_argument("--round", type=int, required=True)
     parser.add_argument("--version", required=True)
     parser.add_argument("--spec", required=True)
+    parser.add_argument("--resume", action="store_true", help="tree already bumped+changelog'd; redo CI and finish")
     args = parser.parse_args()
 
     spec = json.loads(pathlib.Path(args.spec).read_text())
@@ -69,21 +70,27 @@ def main() -> int:
         return fail("package.json unreadable")
 
     # 1. Version claims (package.json, package-lock.json, both READMEs, published list).
-    bumped = run([sys.executable, ".rsi/tools/bump-version.py", args.version], capture_output=True)
+    if args.resume:
+        bumped = subprocess.CompletedProcess([], 0, "resumed: bump and changelog already applied\n", "")
+    else:
+        bumped = run([sys.executable, ".rsi/tools/bump-version.py", args.version], capture_output=True)
     print(bumped.stdout.strip())
     if bumped.returncode != 0:
         return fail(f"bump-version failed: {bumped.stderr.strip()}")
 
     # 2. Changelog section, inserted directly above the newest existing section.
     changelog_path = ROOT / "CHANGELOG.md"
+    if args.resume:
+        print("resumed: changelog section already in place")
     changelog = changelog_path.read_text()
     heading = f"## [{args.version}] - {datetime.date.today().isoformat()}\n\n"
-    first_section = re.search(r"^## \[\d+\.\d+\.\d+\]", changelog, re.M)
-    if not first_section:
-        return fail("no versioned changelog section to insert above")
-    body = spec["changelog"].strip("\n") + "\n\n"
-    changelog = changelog[: first_section.start()] + heading + body + changelog[first_section.start():]
-    changelog_path.write_text(changelog)
+    if not args.resume:
+        first_section = re.search(r"^## \[\d+\.\d+\.\d+\]", changelog, re.M)
+        if not first_section:
+            return fail("no versioned changelog section to insert above")
+        body = spec["changelog"].strip("\n") + "\n\n"
+        changelog = changelog[: first_section.start()] + heading + body + changelog[first_section.start():]
+        changelog_path.write_text(changelog)
 
     # 3. CI. Red means the round does not ship; the tree stays dirty for the operator.
     ci_log = round_dir / "ci.txt"

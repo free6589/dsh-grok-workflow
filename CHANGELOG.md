@@ -5,6 +5,30 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.11.3] - 2026-11-18
+
+### Fixed / 修复
+
+- **Two configuration keys the loader rejects were missing from the READMEs' list of
+  removed keys / 载入时会拒绝的两个配置键，从未出现在 README 的"已删除键"清单里** —
+  `triageModel` and `maxActiveRunsTotal` are both in `REMOVED_CONFIG_KEYS`, so a patch that
+  still carries either fails to load with `unknown configuration key`; neither name appeared
+  in `README.md` or `README.zh-CN.md`, so the person holding that patch had nothing to read.
+  Both are now named (the per-process cap was described only as "`8` per process"), and
+  `test/docs-config-keys.spec.ts` makes the code's two lists the contract for what the
+  READMEs must document. / `triageModel` 与 `maxActiveRunsTotal` 都在
+  `REMOVED_CONFIG_KEYS` 里，补丁还带着它们就会 `unknown configuration key` 载入失败，而两份
+  README 都没提这两个名字——拿着旧补丁的人查不到任何说明。现在两个键都点名了（每进程上限
+  原来只写作「每进程 `8`」），并由 `test/docs-config-keys.spec.ts` 把代码里的两张清单变成
+  README 必须满足的约定。
+
+### Tests / 测试
+
+- `test/docs-config-keys.spec.ts` (3): every accepted key must be tabulated and every removed
+  key must be named in both READMEs, and the two lists must stay disjoint
+  (`REJECT`-worthy key drift is now a red test); red before this round with
+  `README.md never mentions the removed key triageModel`.
+
 ## [0.11.2] - 2026-11-18
 
 ### Fixed / 修复

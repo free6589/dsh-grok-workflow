@@ -1,0 +1,11 @@
+round 3 · tag v0.11.3
+npm run ci exit 0 · 54 test files passed · 981 tests passed
+
+diffstat before commit:
+.rsi/tools/finish-round.py | 21 ++++++++++++++-------
+ CHANGELOG.md               | 24 ++++++++++++++++++++++++
+ README.md                  | 12 ++++++------
+ README.zh-CN.md            | 12 ++++++------
+ package-lock.json          |  4 ++--
+ package.json               |  2 +-
+ 6 files changed, 53 insertions(+), 22 deletions(-)

@@ -1,0 +1,35 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+ ❯ test/docs-config-keys.spec.ts (3 tests | 1 failed) 17ms
+     ✓ tabulates every accepted key 5ms
+     × names every removed key 9ms
+     ✓ keeps the two lists disjoint 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/docs-config-keys.spec.ts > README documents exactly the configuration surface the code accepts > names every removed key
+AssertionError: README.md never mentions the removed key triageModel: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/docs-config-keys.spec.ts:39:11
+     37|           new RegExp(`\`${key}(?![A-Za-z0-9_])`).test(text),
+     38|           `${name} never mentions the removed key ${key}`,
+     39|         ).toBe(true)
+       |           ^
+     40|       }
+     41|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 passed (3)
+   Start at  01:29:59
+   Duration  261ms (transform 62ms, setup 0ms, import 85ms, tests 17ms, environment 0ms)
+

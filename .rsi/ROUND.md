@@ -75,3 +75,23 @@ no history is rewritten, and no round is force-pushed.
   the repository changelog, not to the released artifact body (`NOT_RUN`).
 - **Suggested version:** patch → `0.11.2`.
 - **status:** OK
+
+## Round 3 — two rejected config keys were undocumented
+
+- **Theme (P0, false statement in shipped docs):** `REMOVED_CONFIG_KEYS` contains
+  `triageModel` and `maxActiveRunsTotal`; a patch carrying either is refused at load with
+  `unknown configuration key`, yet neither name appeared in `README.md` or `README.zh-CN.md`
+  (the per-process cap was only described as "`8` per process"). The lists the READMEs call
+  exhaustive were one short.
+- **Change:** both names documented in both languages; new `test/docs-config-keys.spec.ts`
+  binds the READMEs to `CONFIG_KEYS` and `REMOVED_CONFIG_KEYS` (tabulated accepted keys,
+  named removed keys, disjoint lists).
+- **Files:** `test/docs-config-keys.spec.ts` (new), `README.md`, `README.zh-CN.md`,
+  `CHANGELOG.md`, `package.json`, `package-lock.json`, `.rsi/` records.
+- **Evidence:** `.rsi/evidence/round-003/red.txt` (`README.md never mentions the removed key
+  triageModel`), `.rsi/evidence/round-003/green.txt` (3/3), `.rsi/evidence/round-003/ci.txt`
+  (npm run ci exit 0 · 54 test files passed · 981 tests passed), `.rsi/evidence/round-003/git.txt`.
+- **Unverified:** none of the removed keys was re-tested against a live profile this round
+  (`NOT_RUN` — the load-time rejection itself is covered by `test/config.spec.ts`).
+- **Suggested version:** patch → `0.11.3`.
+- **status:** OK
