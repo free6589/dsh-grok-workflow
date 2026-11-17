@@ -618,6 +618,44 @@ describe('JSON, header and placeholder redaction', () => {
     expect(redactSecrets('password: required')).toBe('password: required')
   })
 
+  it('redacts Authorization headers with non-Bearer schemes', () => {
+    const token = fake('9f8e7d6c', '5b4a3f2e', '1d0c')
+    const apiKey = fake('3a7f9c2e', '5b8d1f4a', '6c9e')
+    const digest = fake('abc123def', '456')
+    const oauth = fake('0f9e8d7c', '6b5a')
+    const input = [
+      `Authorization: Token ${token}`,
+      `Authorization: ApiKey ${apiKey}`,
+      `Proxy-Authorization: Digest ${digest}`,
+      `Authorization: OAuth ${oauth}`,
+      `Authorization: ${token}`,
+      `{"authorization":"Token ${token}"}`,
+    ].join('\n')
+    const output = redactSecrets(input)
+    for (const secret of [token, apiKey, digest, oauth]) expect(output).not.toContain(secret)
+    expect(output.match(/\[REDACTED\]/g)).toHaveLength(6)
+    // The header names survive so the redacted line still says what leaked.
+    expect(output).toContain('Authorization: [REDACTED]')
+    expect(output).toContain('Proxy-Authorization: [REDACTED]')
+    expect(output).toContain('{"authorization":"[REDACTED]"}')
+    // Bearer/Basic keep their specific rule's output instead of being re-wrapped.
+    const handled = [
+      `Authorization: Bearer ${fake('abcdefghijklmnopqrstuvwxyz', '.1234567890')}`,
+      `Authorization: Basic ${fake('dXNlcj', 'pwRkZXI=', 'ZmFrZQ==')}`,
+    ].join('\n')
+    expect(redactSecrets(handled)).toBe(
+      'Authorization: Bearer [REDACTED]\nAuthorization: Basic [REDACTED]',
+    )
+    // Prose and placeholder values must survive untouched.
+    const benign = [
+      'Authorization: none',
+      'Authorization: required',
+      'Authorization: [REDACTED]',
+      'The Authorization header is optional for public endpoints.',
+    ].join('\n')
+    expect(redactSecrets(benign)).toBe(benign)
+  })
+
   it('redacts passphrase/pwd keys and values', () => {
     expect(redactSecrets('passphrase=hunter2')).toBe('passphrase=[REDACTED]')
     expect(redactSecrets('pwd=s3cret-value')).toBe('pwd=[REDACTED]')
@@ -656,6 +694,7 @@ describe('prompt redaction parity', () => {
     `slack ${fake('xoxb-', '123456789012-', 'abcdefghijkl')}`,
     `aws ${fake('AKIA', 'ABCDEFGH', 'IJKLMNOP')}`,
     `google ${fake('AIza', 'abcdefghijklmnopqrstuvwxyz', '0123456789')}`,
+    `Authorization: Token ${fake('9f8e7d6c', '5b4a3f2e', '1d0c')}`,
     `Authorization: Bearer ${fake('abcdefghijklmnopqrstuvwxyz', '.1234567890')}`,
     `Authorization: Basic ${fake('dXNlcj', 'pwRkZXI=', 'ZmFrZQ==')}`,
     `{"authorization":"Basic ${fake('dXNlcj', 'pwRkZXI=', 'ZmFrZQ==')}"}`,

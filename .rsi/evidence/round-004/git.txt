@@ -1,0 +1,14 @@
+round 4 · branch rsi/round-4 · base 17e3a12 (origin/main)
+npx vitest run test/redact.spec.ts — red: 1 failed / 24 passed (25); green: 25 passed (25)
+npx tsc -p tsconfig.json --noEmit — exit 0
+npm run test:unit — 18 test files passed, 427 tests passed
+npm run ci — NOT_RUN in this round (it runs npm run build, which rewrites lib/, and this round may not touch lib/);
+finish-round.py writes the real ci.txt and fills {{CI}} in the report.
+
+diffstat before commit:
+ .rsi/evidence/round-004/green.txt | 10 +++++++
+ .rsi/evidence/round-004/red.txt   | 62 +++++++++++++++++++++++++++++++++++++++
+ .rsi/incoming/round-004.json      | 11 +++++++
+ src/redact.ts                     | 13 ++++++++
+ test/redact.spec.ts               | 39 ++++++++++++++++++++++++
+ 5 files changed, 135 insertions(+)

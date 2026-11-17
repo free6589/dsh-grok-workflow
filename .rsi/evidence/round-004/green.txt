@@ -1,0 +1,10 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.worktrees/rsi-r4
+
+ ✓ test/redact.spec.ts (25 tests) 79ms
+
+ Test Files  1 passed (1)
+      Tests  25 passed (25)
+   Start at  01:46:36
+   Duration  563ms (transform 267ms, setup 0ms, import 321ms, tests 79ms, environment 0ms)
+
