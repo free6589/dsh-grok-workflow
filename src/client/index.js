@@ -57,7 +57,7 @@ window.__ModuleLoader__.load({
     // T5: five visible role chains (mock “执行模型”: 拆活/干活/检查/收尾/监督).
     // Every other role surface is unchanged: CHAIN_LIMIT / ROUTE_FIELD_LIMIT /
     // per-route cap bounds still mirror src/config.ts and are pinned by tests.
-    const ROLES = ['planner', 'worker', 'verifier', 'synthesizer', 'supervisor']
+    const ROLES = ['planner', 'worker', 'verifier', 'supervisor', 'synthesizer']
 
     const CHAIN_LIMIT = 50
     const ROUTE_FIELD_LIMIT = 120
@@ -82,27 +82,27 @@ window.__ModuleLoader__.load({
 
     const EN = {
       'card.title': 'Grok workflow',
-      'card.summary': 'A task-splitting tool: the entry gate, per-role model chains, concurrency limits and run records.',
+      'card.summary': 'Decide how hard Grok works: a master switch, five role chains, and two limits.',
 
-      'page.intro': 'A tool that breaks tasks down.',
+      'page.intro': 'How Grok works for you.',
 
       // Live one-line status under the intro, derived from the current draft.
-      'status.off': 'OFF — plain chat',
-      'status.off.detail': 'Answered directly. Send /grok for one serious run.',
-      'status.triage': 'ON — smart triage',
-      'status.triage.detail': 'Easy messages answered directly, hard ones get the team.',
-      'status.full': 'ON — full team',
-      'status.full.detail': 'The whole team runs every message: thorough, but slow.',
+      'status.off': 'Off — just chatting',
+      'status.off.detail': 'Grok answers directly, no helpers. Send /grok for one serious run.',
+      'status.triage': 'On — auto pilot',
+      'status.triage.detail': 'Easy ones answered directly, hard ones get the team.',
+      'status.full': 'On — full crew',
+      'status.full.detail': 'The whole team on every message: best quality, slowest.',
 
-      'group.mode': 'Mode',
-      'group.limits': 'Limits',
-      'group.roles': 'Who does it',
+      'group.mode': 'Master switch & mode',
+      'group.limits': 'How much effort',
+      'group.roles': 'Who does what',
 
       // T5 visible-field labels only (no hints, no Danger, no read-only).
       'field.mode': 'Mode',
       'field.grokDefault': 'Work hard by default',
       'field.maxConcurrency': 'Jobs at once',
-      'field.maxTasks': 'Tasks per job',
+      'field.maxTasks': 'Splits per job',
 
       // Page shows auto/full; stored values stay `triage`/`full` (T4/T5).
       'option.mode.triage': 'auto',
@@ -110,17 +110,24 @@ window.__ModuleLoader__.load({
       'option.grokDefault.off': 'Off',
       'option.grokDefault.on': 'On',
 
-      'role.planner': 'Planner',
-      'role.worker': 'Worker',
-      'role.verifier': 'Checker',
-      'role.synthesizer': 'Summarizer',
-      'role.supervisor': 'Supervisor',
+      'mode.auto.title': 'Auto pilot',
+      'mode.auto.detail': 'Judge first, then call the team only when needed.',
+      'mode.full.title': 'Full crew',
+      'mode.full.detail': 'The whole team on every message.',
 
-      'roles.count': '{count}/{limit} routes',
+      'role.planner': '1 · Break it down',
+      'role.worker': '2 · Do the work',
+      'role.verifier': '3 · Check it',
+      'role.supervisor': '4 · Supervise',
+      'role.synthesizer': '5 · Wrap it up',
+
+      'roles.count': '{count}/{limit} backups',
       'roles.add': '+ Add a backup',
       'roles.remove': 'Remove',
+      'roles.capPlaceholder': 'Cap…',
+      'roles.capLabel': 'per-run cap',
       // Empty chain = inherit: use the model you are talking to.
-      'roles.empty': 'Same as now',
+      'roles.empty': 'Empty = follows this chat, no backup set',
       'roles.providerPlaceholder': 'Pick a channel…',
       'roles.modelPlaceholder': 'Pick a model…',
       'roles.manualProvider': 'or type a channel…',
@@ -136,12 +143,14 @@ window.__ModuleLoader__.load({
       'action.save': 'Save',
       'action.saving': 'Saving…',
       'action.discard': 'Discard',
+      'unit.jobs': 'jobs',
+      'unit.tasks': 'tasks',
       // One retry of the mirror read: the only recovery a failed `describe()` has.
       'action.retry': 'Try again',
 
-      'status.saved': 'Saved; applies to the next message.',
-      'status.refused': 'The Host refused this write (a value is invalid or the key is read-only).',
-      'status.writeFailed': 'Write failed: {message}',
+      'status.saved': 'Saved — takes effect on the next message.',
+      'status.refused': 'Not saved: fix the highlighted rows, then save again.',
+      'status.writeFailed': 'Not saved — tap save once more ({message})',
       'status.loading': 'Loading…',
       'status.loadError': 'Could not read the settings from the Host: {message}',
       'status.unavailable': 'The Host does not serve the grok-workflow settings namespace (is the plugin active?)',
@@ -228,26 +237,26 @@ window.__ModuleLoader__.load({
 
     const ZH = {
       'card.title': 'Grok workflow',
-      'card.summary': '将任务拆分的工具：入口门禁、按角色模型链、并发上限与运行记录。',
+      'card.summary': '定 Grok 下多大的力气：一个总开关，五条角色链，两个上限。',
 
-      'page.intro': '将任务拆分的工具',
+      'page.intro': 'Grok 怎么帮你干活，在这里定。',
 
-      'status.off': '关着：普通聊天',
-      'status.off.detail': '发什么直接回什么。发 /grok 认真干一次。',
-      'status.triage': '开着：智能分诊',
-      'status.triage.detail': '简单的直接答，复杂的才开团队。',
-      'status.full': '开着：全员出动',
-      'status.full.detail': '每条都走完整团队，又全又慢。',
+      'status.off': '关着：只聊天',
+      'status.off.detail': '问什么答什么，不派帮手。发 /grok 认真干一次。',
+      'status.triage': '开着：自动挡',
+      'status.triage.detail': '简单的直接答，难的才开团队。',
+      'status.full': '开着：全员上',
+      'status.full.detail': '每条消息都走完整团队：质量最高，也最慢。',
 
-      'group.mode': '模式',
-      'group.limits': '上限',
+      'group.mode': '总开关和模式',
+      'group.limits': '下多大力气',
       'group.roles': '谁来干',
 
       // T5 visible-field labels only (no hints, no Danger, no read-only).
       'field.mode': '模式',
-      'field.grokDefault': '默认认真干活',
+      'field.grokDefault': '默认下大力气',
       'field.maxConcurrency': '同时干几件',
-      'field.maxTasks': '一次拆几个任务',
+      'field.maxTasks': '一次拆几件',
 
       // Page shows auto/full; stored values stay `triage`/`full` (T4/T5).
       'option.mode.triage': 'auto',
@@ -255,17 +264,24 @@ window.__ModuleLoader__.load({
       'option.grokDefault.off': '关',
       'option.grokDefault.on': '开',
 
-      'role.planner': '规划',
-      'role.worker': '执行',
-      'role.verifier': '检查',
-      'role.synthesizer': '总结',
-      'role.supervisor': '监督',
+      'mode.auto.title': '自动挡',
+      'mode.auto.detail': '先看难易，难的才开团队。',
+      'mode.full.title': '全员上',
+      'mode.full.detail': '每条消息都走完整团队。',
+
+      'role.planner': '1 · 拆活',
+      'role.worker': '2 · 干活',
+      'role.verifier': '3 · 检查',
+      'role.supervisor': '4 · 监督',
+      'role.synthesizer': '5 · 收尾',
 
       'roles.count': '{count}/{limit} 条备用',
       'roles.add': '＋ 加备选',
       'roles.remove': '删',
-      // 空链 = inherit：用跟你对话的模型（mock “跟现在一样” 下拉）。
-      'roles.empty': '跟现在一样',
+      'roles.capPlaceholder': '上限…',
+      'roles.capLabel': '单次上限',
+      // 空链 = 继承：用跟你对话的模型，没加备选就是没配。
+      'roles.empty': '空着 = 跟这次对话用同一个，没加备选',
       'roles.providerPlaceholder': '选哪家…',
       'roles.modelPlaceholder': '选用哪个…',
       'roles.manualProvider': '或手填通道…',
@@ -278,14 +294,16 @@ window.__ModuleLoader__.load({
       'warn.limit.detail': '{field} 保存的是 {live}，超过硬上限 {cap}。插件按 {cap} 钳制运行并在日志里说明过，所以工具照常可用——在这里保存 {cap} 或更小，这条提示就会消失。',
 
       'action.save': '保存',
-      'action.saving': '保存中…',
+      'action.saving': '正在保存…',
       'action.discard': '放弃修改',
+      'unit.jobs': '件',
+      'unit.tasks': '件',
       // Same key as `en`: re-reading is the only recovery a failed `describe()` has.
       'action.retry': '重试',
 
       'status.saved': '已保存，下一条消息生效。',
-      'status.refused': 'Host 拒绝了这次写入（值不合法或键不可写）。',
-      'status.writeFailed': '写入失败：{message}',
+      'status.refused': '没存上：有标红的地方，改完再点保存。',
+      'status.writeFailed': '没存上，再点一次保存（{message}）',
       'status.loading': '读取中…',
       'status.loadError': '读不到 Host 的设置：{message}',
       'status.unavailable': 'Host 未提供 grok-workflow 设置命名空间（插件未激活？）',
@@ -473,7 +491,7 @@ window.__ModuleLoader__.load({
       return snapshot === undefined || snapshot.active === undefined ? FALLBACK_LOCALE : snapshot.active
     }
 
-    const emptyRoles = () => ({ planner: [], worker: [], verifier: [], synthesizer: [] })
+    const emptyRoles = () => ({ planner: [], worker: [], verifier: [], synthesizer: [], supervisor: [] })
     const clone = (value) => JSON.parse(JSON.stringify(value === undefined ? null : value))
     const draftOf = (value) => {
       const out = { roles: emptyRoles() }
@@ -710,6 +728,14 @@ window.__ModuleLoader__.load({
       button: { minHeight: '32px', padding: '5px 12px', borderRadius: '8px', border: '1px solid rgba(128,128,128,0.45)', background: 'transparent', color: 'inherit', cursor: 'pointer', font: 'inherit' },
       primary: { minHeight: '32px', padding: '5px 18px', borderRadius: '8px', border: '1px solid transparent', background: '#3b6ef6', color: '#fff', cursor: 'pointer', font: 'inherit', fontWeight: 600 },
       footer: { display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', position: 'sticky', bottom: 0, padding: '12px 0', marginTop: '4px', borderTop: `1px solid ${HAIRLINE}`, background: 'var(--dsh-settings-footer-bg, rgba(128,128,128,0.12))', backdropFilter: 'blur(8px)' },
+      step: { minWidth: '32px', minHeight: '32px', padding: '0 8px', borderRadius: '8px', border: '1px solid rgba(128,128,128,0.45)', background: 'transparent', color: 'inherit', cursor: 'pointer', font: 'inherit', fontSize: '15px', lineHeight: 1 },
+      cards: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' },
+      card2: { display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start', textAlign: 'left', border: '1px solid rgba(128,128,128,0.35)', borderRadius: '10px', padding: '12px 14px', background: 'transparent', color: 'inherit', cursor: 'pointer', font: 'inherit' },
+      card2On: { borderColor: '#3b6ef6', background: 'rgba(59,110,246,0.08)' },
+      card2Top: { display: 'flex', gap: '8px', alignItems: 'center' },
+      card2Check: { color: '#3b6ef6', fontWeight: 700 },
+      card2Tag: { fontSize: '12px', opacity: 0.6 },
+      groupTitle: { fontSize: '15px', fontWeight: 650, margin: '0 0 4px', letterSpacing: '-0.01em' },
       error: { color: STATUS_COLOR.failed },
       errorBox: { background: 'rgba(229,72,77,0.07)', border: '1px solid rgba(229,72,77,0.35)', borderRadius: '10px', padding: '10px 14px' },
       empty: { display: 'block', border: '1px dashed rgba(128,128,128,0.4)', borderRadius: '8px', padding: '10px 12px', background: 'transparent' },
@@ -956,7 +982,7 @@ window.__ModuleLoader__.load({
      * degrade to text inputs so the page never depends on a hard-coded list.
      */
     function RouteRow(props) {
-      const { role, index, route, disabled, onUpdate, onRemove, catalog, t } = props
+      const { role, index, route, disabled, onUpdate, onRemove, catalog, t, invalid } = props
       const provider = String((route && route.provider) || '')
       const model = String((route && route.model) || '')
       const capRaw = route === undefined || route === null ? undefined : route.maxInFlight
@@ -965,14 +991,19 @@ window.__ModuleLoader__.load({
       const models = provider !== '' && catalog !== undefined && catalog[provider] !== undefined ? catalog[provider] : []
       const knownProvider = provider === '' || providers.includes(provider)
       const knownModel = model === '' || models.includes(model)
+      const missingModel = model.trim() === ''
+      const badCap = capRaw !== undefined && capRaw !== null && String(capRaw).trim() !== '' &&
+        (!Number.isSafeInteger(Number(capRaw)) || Number(capRaw) < ROUTE_INFLIGHT_MIN || Number(capRaw) > ROUTE_INFLIGHT_MAX)
+      const rowInvalid = invalid === true || missingModel || badCap
+      const badStyle = rowInvalid ? { borderColor: STATUS_COLOR.failed } : null
       const providerControl = providers.length === 0 || !knownProvider
         ? h('input', {
           type: 'text', placeholder: t('roles.manualProvider'), value: provider, disabled,
-          style: styles.input, 'data-route-provider': `${role}-${index}`,
+          style: badStyle === null ? styles.input : { ...styles.input, ...badStyle }, 'data-route-provider': `${role}-${index}`,
           onChange: (event) => onUpdate({ provider: event.target.value }),
         })
         : h('select', {
-          style: styles.input, value: provider, disabled,
+          style: badStyle === null ? styles.input : { ...styles.input, ...badStyle }, value: provider, disabled,
           'data-route-provider': `${role}-${index}`,
           onChange: (event) => onUpdate({ provider: event.target.value, model: '' }),
         },
@@ -981,11 +1012,11 @@ window.__ModuleLoader__.load({
       const modelControl = models.length === 0 || !knownModel
         ? h('input', {
           type: 'text', placeholder: t('roles.modelPlaceholder'), value: model, disabled,
-          style: styles.input, 'data-route-model': `${role}-${index}`,
+          style: badStyle === null ? styles.input : { ...styles.input, ...badStyle }, 'data-route-model': `${role}-${index}`,
           onChange: (event) => onUpdate({ model: event.target.value }),
         })
         : h('select', {
-          style: styles.input, value: model, disabled,
+          style: badStyle === null ? styles.input : { ...styles.input, ...badStyle }, value: model, disabled,
           'data-route-model': `${role}-${index}`,
           onChange: (event) => onUpdate({ model: event.target.value }),
         },
@@ -995,6 +1026,14 @@ window.__ModuleLoader__.load({
         h('span', { style: { ...styles.hint, minWidth: '18px', textAlign: 'center' } }, `${index + 1}`),
         h('span', { style: { flex: '1 1 0', minWidth: 0 } }, providerControl),
         h('span', { style: { flex: '1 1 0', minWidth: 0 } }, modelControl),
+        h('span', { style: { flex: '0 0 64px', minWidth: 0 }, title: t('roles.capLabel') },
+          h('input', {
+            type: 'number', placeholder: t('roles.capPlaceholder'), value: capText, disabled,
+            style: badCap ? { ...styles.input, textAlign: 'center', borderColor: STATUS_COLOR.failed } : { ...styles.input, textAlign: 'center' }, min: ROUTE_INFLIGHT_MIN, max: ROUTE_INFLIGHT_MAX, step: 1,
+            'data-route-cap': `${role}-${index}`,
+            'aria-label': t('roles.capLabel'),
+            onChange: (event) => onUpdate({ maxInFlight: event.target.value === '' ? undefined : Number(event.target.value) }),
+          })),
         h('button', {
           type: 'button', style: { ...styles.button, flex: 'none' }, disabled,
           onClick: onRemove,
@@ -1005,7 +1044,7 @@ window.__ModuleLoader__.load({
     const ROLE_ORDER = { planner: 1, worker: 2, verifier: 3, supervisor: 4, synthesizer: 5 }
 
     function RoleChain(props) {
-      const { role, chain, disabled, onChange, catalog, t } = props
+      const { role, chain, disabled, onChange, catalog, t, badRows } = props
       const update = (index, patch) => {
         const next = chain.map((route, position) => (position === index ? { ...route, ...patch } : route))
         onChange(next)
@@ -1026,6 +1065,7 @@ window.__ModuleLoader__.load({
             ? h('span', { style: { ...styles.hint, ...styles.empty } }, t('roles.empty'))
             : chain.map((route, index) => h(RouteRow, {
               key: `${role}-${index}`, role, index, route, disabled, catalog, t,
+              invalid: badRows !== undefined && badRows.has(`${role}-${index}`),
               onUpdate: (patch) => update(index, patch),
               onRemove: () => onChange(chain.filter((_route, position) => position !== index)),
             }))))
@@ -1094,6 +1134,19 @@ window.__ModuleLoader__.load({
       const stamp = `${String(revision)}:${namespace.status}`
       useEffect(() => { setDraft(draftOf(value)) }, [stamp])
       const errors = useMemo(() => validate(draft), [draft])
+      // Row-level error marks: `missingModel`/`tooLong`/`duplicate`/`badCap`
+      // carry `{ role, index }` (1-based) — the chain marks exactly those rows
+      // red so the reader sees which row blocks the save.
+      const badRows = useMemo(() => {
+        const marks = new Set()
+        for (const error of errors) {
+          const params = error === undefined || error.params === undefined ? {} : error.params
+          if (typeof params.role === 'string' && Number.isSafeInteger(params.index)) {
+            marks.add(`${params.role}-${Number(params.index) - 1}`)
+          }
+        }
+        return marks
+      }, [errors])
       const ops = useMemo(() => opsFor(draft, value), [draft, value])
       const warnEmptyCap = useMemo(() => emptyCapWarn(draft), [draft])
       // Keyed on the live document, not the draft: an overrun is a fact about what is
@@ -1181,18 +1234,59 @@ window.__ModuleLoader__.load({
       const numberRow = (key) => {
         const field = fieldByKey(key)
         const unitKey = NUMBER_UNITS[key]
+        const raw = draft[key]
+        const shown = raw === '' || raw === undefined ? '' : String(raw)
+        const step = (delta) => {
+          const base = raw === '' || raw === undefined || !Number.isSafeInteger(Number(raw)) ? field.def : Number(raw)
+          const next = base + delta
+          onChange(key, Math.min(field.max, Math.max(field.min, next)))
+        }
         return h(FieldRow, {
           key, fieldKey: key, title: t(`field.${key}`),
           control: h('span', null,
             h('span', { style: { display: 'inline-flex', gap: '8px', alignItems: 'center' } },
+              h('button', {
+                type: 'button', style: styles.step, disabled: disabled || raw === '' || Number(raw) <= field.min,
+                onClick: () => step(-1), 'aria-label': '−', 'data-step': `${key}-down`,
+              }, '−'),
               h('input', {
-                type: 'number', style: { ...styles.input, ...styles.narrow }, value: String(draft[key]), disabled,
+                type: 'number', style: { ...styles.input, ...styles.narrow, textAlign: 'center' }, value: shown, disabled,
                 min: field.min, max: field.max, step: 1,
                 onChange: (event) => onChange(key, event.target.value === '' ? '' : Number(event.target.value)),
                 'data-field': key,
               }),
+              h('button', {
+                type: 'button', style: styles.step, disabled: disabled || raw === '' || Number(raw) >= field.max,
+                onClick: () => step(1), 'aria-label': '＋', 'data-step': `${key}-up`,
+              }, '＋'),
               unitKey === undefined ? null : h('span', { style: styles.hint }, t(unitKey)))),
         })
+      }
+
+      // Mode as two radio cards (not a dropdown): the difference between the
+      // two is the point of the control, hiding it in a select is why readers
+      // could not tell them apart. Stored values stay `triage`/`full`.
+      const modeCards = () => {
+        const options = [
+          { stored: 'triage', titleKey: 'mode.auto.title', detailKey: 'mode.auto.detail', labelKey: 'option.mode.triage' },
+          { stored: 'full', titleKey: 'mode.full.title', detailKey: 'mode.full.detail', labelKey: 'option.mode.full' },
+        ]
+        return h('div', { style: styles.cards, 'data-field': 'mode' },
+          options.map((option) => {
+            const selected = draft.mode === option.stored
+            return h('button', {
+              key: option.stored, type: 'button',
+              style: selected ? { ...styles.card2, ...styles.card2On } : styles.card2,
+              disabled, 'aria-pressed': selected,
+              onClick: () => onChange('mode', option.stored),
+              'data-mode': option.stored,
+            },
+            h('span', { style: styles.card2Top },
+              h('strong', null, t(option.titleKey)),
+              selected ? h('span', { style: styles.card2Check }, '✓') : null),
+            h('span', { style: styles.hint }, t(option.detailKey)),
+            h('span', { style: styles.card2Tag }, t(option.labelKey)))
+          }))
       }
 
       return h('div', { style: styles.page, 'data-page': 'grok-workflow' },
@@ -1202,8 +1296,9 @@ window.__ModuleLoader__.load({
           h('p', { style: { ...styles.hint, margin: '0 0 12px', fontSize: '13px' } }, t('page.intro')),
           h(StatusLine, { draft, t }),
           progressNote),
-        // --- 1 · 总开关 ---
+        // --- 1 · 总开关 + 模式 ---
         h('div', { style: styles.card },
+          h('h3', { style: styles.groupTitle }, t('group.mode')),
           h(FieldRow, {
             key: 'grokDefault', fieldKey: 'grokDefault',
             title: t('field.grokDefault'),
@@ -1212,19 +1307,19 @@ window.__ModuleLoader__.load({
               onFlip: (next) => onChange('grokDefault', next ? 'on' : 'off'),
               label: t(draft.grokDefault === 'on' ? 'option.grokDefault.on' : 'option.grokDefault.off'),
             }),
-          })),
-        // --- 2 · 模式 (auto/full; stored as triage/full) ---
+          }),
+          modeCards()),
+        // --- 2 · 谁来干 (five role chains, execution order) ---
         h('div', { style: styles.card },
-          enumRow('mode')),
-        // --- 3 · 执行模型 (five role chains) ---
-        h('div', { style: styles.card },
+          h('h3', { style: styles.groupTitle }, t('group.roles')),
           h('div', { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
             ROLES.map((role) => h(RoleChain, {
-              key: role, role, chain: draft.roles[role] || [], disabled, catalog, t,
+              key: role, role, chain: draft.roles[role] || [], disabled, catalog, t, badRows,
               onChange: (next) => setChain(role, next),
             })))),
-        // --- 4 · 高级 (two numbers) ---
+        // --- 3 · 下多大力气 (two numbers) ---
         h('div', { style: styles.card },
+          h('h3', { style: styles.groupTitle }, t('group.limits')),
           numberRow('maxConcurrency'),
           numberRow('maxTasks')),
         warnEmptyCap

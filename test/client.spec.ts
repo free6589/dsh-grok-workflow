@@ -285,7 +285,7 @@ describe('client settings page bundle', () => {
   })
 
   it('covers the five T5 roles (supervisor added to the four documented ones)', () => {
-    expect(bundle.GROK_WORKFLOW_ROLES).toEqual(['planner', 'worker', 'verifier', 'synthesizer', 'supervisor'])
+    expect(bundle.GROK_WORKFLOW_ROLES).toEqual(['planner', 'worker', 'verifier', 'supervisor', 'synthesizer'])
   })
 
   it('numbers the role cards in execution order (supervise before summarize)', () => {
@@ -362,13 +362,13 @@ describe('client settings page: bilingual copy (t42)', () => {
 
   it('renders role ids as localized names and interpolates every parameter', () => {
     const finding: Finding = { key: 'error.chainTooLong', params: { role: 'supervisor', limit: bundle.GROK_WORKFLOW_CHAIN_LIMIT } }
-    expect(formatError(finding, zh)).toBe('监督 备用链最多 50 条，删掉多余的。')
-    expect(formatError(finding, en)).toBe('Supervisor can keep at most 50 backup routes — remove the extras.')
+    expect(formatError(finding, zh)).toBe('4 · 监督 备用链最多 50 条，删掉多余的。')
+    expect(formatError(finding, en)).toBe('4 · Supervise can keep at most 50 backup routes — remove the extras.')
     // A numeric finding names its field in words, not with the settings key: `maxTasks`
     // is an identifier and reading it inside a Chinese sentence is a leak, not a label.
     const number: Finding = { key: 'error.number', params: { key: 'maxTasks', min: 1, max: 100 } }
-    expect(formatError(number, en)).toBe('Tasks per job must be a whole number between 1 and 100 — fix the number and save again.')
-    expect(formatError(number, zh)).toBe('一次拆几个任务 得是 1 到 100 之间的整数，改对数字再保存。')
+    expect(formatError(number, en)).toBe('Splits per job must be a whole number between 1 and 100 — fix the number and save again.')
+    expect(formatError(number, zh)).toBe('一次拆几件 得是 1 到 100 之间的整数，改对数字再保存。')
     // A key that is not one of this page's fields is left exactly as it came.
     expect(formatError({ key: 'error.number', params: { key: 'notAField', min: 0, max: 1 } }, en))
       .toContain('notAField must be a whole number')
@@ -858,13 +858,13 @@ describe('client settings page: draft, validation and path ops', () => {
     draft.roles.worker = Array.from({ length: 51 }, (_unused, index) => ({ provider: 'p', model: `m${index}` }))
     const tooLong = validate(draft)
     expect(tooLong.some(finding => finding.key === 'error.chainTooLong' && finding.params?.['role'] === 'worker')).toBe(true)
-    expect(messagesIn(tooLong, en).some(text => /worker/i.test(text) && text.includes('50'))).toBe(true)
+    expect(messagesIn(tooLong, en).some(text => /do the work/i.test(text) && text.includes('50'))).toBe(true)
 
     const missing = draftOf(undefined)
     missing.roles.verifier = [{ provider: 'p', model: 'm' }, { provider: 'p', model: '  ' }]
     const findings = validate(missing)
     expect(findings).toEqual([{ key: 'error.missingModel', params: { role: 'verifier', index: 2 } }])
-    expect(formatError(findings[0]!, zh)).toBe('检查 第 2 条没有模型，选一个或删掉这一行。')
+    expect(formatError(findings[0]!, zh)).toBe('3 · 检查 第 2 条没有模型，选一个或删掉这一行。')
   })
 
   it('treats two blank routes as unfinished rows, not duplicates (t32 regression)', () => {
@@ -906,6 +906,16 @@ describe('client settings page: draft, validation and path ops', () => {
     const blank = draftOf(undefined)
     blank.roles.worker = [{ provider: 'p', model: 'm' }, { provider: 'p', model: 'n', maxInFlight: 2 }]
     expect(validate(blank)).toEqual([])
+  })
+
+  it('ships the per-route cap and mode-card copy in both languages', () => {
+    for (const locale of bundle.GROK_WORKFLOW_LOCALES) {
+      for (const key of ['roles.capPlaceholder', 'roles.capLabel', 'mode.auto.title', 'mode.auto.detail', 'mode.full.title', 'mode.full.detail', 'unit.jobs', 'unit.tasks']) {
+        expect(translate(locale!, key), `${locale} ${key}`).not.toBe(key)
+      }
+    }
+    expect(translate('zh', 'roles.capPlaceholder')).not.toBe(translate('en', 'roles.capPlaceholder'))
+    expect(translate('zh', 'mode.auto.title')).not.toBe(translate('en', 'mode.auto.title'))
   })
 
   // T5: `switchOn` is a fixed internal policy since T4 — the page never reads

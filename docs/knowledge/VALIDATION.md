@@ -3244,3 +3244,31 @@ Save/Discard 在位；scrollW=1440 = innerW（无横向溢出）
 
 **边界（`NOT_RUN`）**：live `web` profile（`:3080`）的安装与重启（D-013 用户动作）；窄屏 480px 复拍；
 `Open child session` 点开子会话（本次运行未走到 running 成员卡）；headless e2e 脚本。
+
+## Round 48 — 2026-11-17 — 设置页 UI bug 修复（10 子代理审计 + lead 合入）
+
+**起因（`CONFIRMED`，用户报告）**：设置内容保存不了；设置 UI 与 mock 长得不一样；
+角色顺序应为拆活1/干活2/检查3/监督4/收尾5，但页上看不到监督的模型设置。
+
+**审计（`CONFIRMED`，10 子代理只读审计，lead 合入）**：
+- 保存链无死路：`form.mutate(ops, revision)` 认深 path（Host `SettingsPathOp.path: readonly string[]`）；
+  按钮状态机（disabled/validate/ops/save）走查无恒灰死路（agent-36）。
+- 监督行非缺失而是被淹没：ROLES 5 键全渲染，5 空链文案一字相同（"跟现在一样"），
+  监督在旧 bundle 排第 5（首屏下易被截断），用户浏览器跑的还是没重启的旧 bundle（agent-29/agent-35）。
+- 保存失败真凶（agent-28）：① `+加备选` 产空行 → `missingModel` 红错锁保存，静默 return；
+  ② `maxInFlight` 有校验无输入框，存量 cap 脏了永远红、永远灰，无处可改；
+  ③ 数字行 `unit.jobs`/`unit.tasks` 字典缺键，后缀恒显示 `—`。
+
+**修复（`CONFIRMED`，`e49acd1` 之后未 push）**：
+1. ROLES 渲染顺序 → planner/worker/verifier/supervisor/synthesizer（序号 1-5 与执行序一致）。
+2. 角色名带序号（`1 · 拆活` … `5 · 收尾`，中英双语）。
+3. 空链文案 → "空着 = 跟这次对话用同一个，没加备选"（EN 同义）。
+4. 数字行步进器（− / ＋，夹取 1-100）+ 补 `unit.jobs`/`unit.tasks`（件/jobs/tasks）。
+5. 模式改双卡片二选一（自动挡/全员上，存 triage/full 不变）+ 新增 mode.* 文案键。
+6. 每行加并发上限 cap 输入框（`data-route-cap`，空=不限）——存量脏 cap 终于有地方改。
+7. 出错行行内红框（`badRows` 从 errors 反查 `{role,index}`），保存按钮不再无声灰着。
+8. 保存/失败/拒绝文案换白话；`saveCount` 死键已删（Round 47 末）。
+9. 卡片分区加标题（总开关和模式 / 谁来干 / 下多大力气）+ 状态行/页首文案重写。
+
+**验证（`CONFIRMED`）**：`npm run build`（198003 B）→ `cmp` 一致；
+`test/client.spec.ts` 74/74；全量 51 文件 / 953 测试 PASS；typecheck 0 错；lint 22w/0e（无新增）。
