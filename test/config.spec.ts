@@ -336,6 +336,17 @@ describe('route validation against the runtime', () => {
     expect(missing.errors[0]).toContain('known providers: p1')
   })
 
+  it('fails on a provider the runtime does not have for the supervisor chain', () => {
+    // The supervisor role is real work (`script.ts` runs it when the chain is
+    // non-empty), so an unusable supervisor chain must fail the load exactly
+    // like a worker chain instead of failing one attempt at run time.
+    const ctx = ctxWith({ llm: { listProviders: () => [knownProvider] } })
+    expect(validateRoutes(ctx, configWith()).errors).toEqual([])
+    const missing = validateRoutes(ctx, resolveConfig({ roles: { supervisor: [{ provider: 'nope', model: 'm1' }] } } as never))
+    expect(missing.errors[0]).toContain('roles.supervisor names provider "nope"')
+    expect(missing.errors[0]).toContain('known providers: p1')
+  })
+
   it('fails on a model the provider enumerates but does not declare', () => {
     const ctx = ctxWith({
       llm: {
@@ -404,6 +415,26 @@ describe('route validation against the runtime', () => {
     const empty = validateRoutes(ctxWith({ llm: { listProviders: () => [] } }), configWith())
     expect(empty.errors).toEqual([])
     expect(empty.notes.join(' ')).toContain('registry was empty at load')
+  })
+
+  it('notes an all-blank supervisor chain, never fails it', () => {
+    // Same heads-up as every other role: a 2+ route chain with no cap can never
+    // overflow, so it is a note on the path named `roles.supervisor`.
+    const ctx = ctxWith({ llm: { listProviders: () => [knownProvider] } })
+    const blank = validateRoutes(ctx, resolveConfig({ roles: { supervisor: [
+      { provider: 'p1', model: 'm1' },
+      { provider: 'p1', model: 'm2' },
+    ] } } as never))
+    expect(blank.errors).toEqual([])
+    expect(blank.notes.join(' ')).toContain('roles.supervisor has 2 routes but every maxInFlight is blank')
+
+    // Filling the cap silences it, which proves the note is role-driven and not
+    // emitted for the supervisor chain unconditionally.
+    const capped = validateRoutes(ctx, resolveConfig({ roles: { supervisor: [
+      { provider: 'p1', model: 'm1', maxInFlight: 2 },
+      { provider: 'p1', model: 'm2' },
+    ] } } as never))
+    expect(capped.notes.join(' ')).not.toContain('roles.supervisor has 2 routes')
   })
 
   it('reports the generated settings page for this plugin', () => {
