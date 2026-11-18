@@ -1,0 +1,31 @@
+Round-14 gate — the shared WORKING TREE (all agents' in-flight work), not the commit
+Recorded: 2026-11-19T01:30+08:00, device agent-25
+Command: npm run ci   (typecheck && lint && verify:lib && test)
+HEAD at the time: 09d5daa
+
+Result: EXIT=0 — 61 test files, 1131 tests passed, 22 lint warnings / 0 errors,
+verify:lib byte-identical at 141 files.
+
+> dsh-grok-workflow@0.11.14 ci
+> npm run typecheck && npm run lint && npm run verify:lib && npm test
+> dsh-grok-workflow@0.11.14 typecheck
+> tsc -p tsconfig.json --noEmit
+> dsh-grok-workflow@0.11.14 lint
+> oxlint src test
+Found 22 warnings and 0 errors.
+> dsh-grok-workflow@0.11.14 verify:lib
+> node scripts/verify-lib.mjs
+lib/ at 09d5daa is the build of src/ at 09d5daa (141 files, byte-identical)
+> dsh-grok-workflow@0.11.14 test
+> npm run build && vitest run
+> dsh-grok-workflow@0.11.14 build
+> tsc -p tsconfig.build.json && node scripts/build-client.mjs
+ Test Files  61 passed (61)
+      Tests  1131 passed (1131)
+
+Context: the same tree was RED six minutes earlier (01:23) at
+  test/config.spec.ts > carries bilingual metadata on the four repeat-run keys
+because another agent was mid-edit; that author fixed it and the run above is the settled state.
+At this point the tree carried uncommitted work from three other agents: the loopRrule anchor
+fix, the 413/409 route cases, the bilingual schema descriptions and the loop-brake feature.
+Nothing in that work was written by this agent; it is measured here, not owned.
