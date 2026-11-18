@@ -3549,9 +3549,12 @@ lint 22w 0e / exit 0，`npm run typecheck` exit 0。基线 v0.11.4 = 54/985。
 
 **门禁（`CONFIRMED`）**：
 - `npm run typecheck` → exit 0，无输出。
-- `npm run ci` → exit 0，`Test Files 60 passed (60)`、`Tests 1080 passed (1080)`、
-  `Found 22 warnings and 0 errors`（oxlint），日志 `.rsi/evidence/round-014/pre-release-ci.txt`。
-  上一轮基线 57 文件 / 1022 测试（`v0.11.13`）→ 本轮 +3 文件 / +58 测试；无删除、无 skip。
+- `npm run ci` → exit 0，`Test Files 60 passed (60)`、`Tests 1081 passed (1081)`、
+  `Found 22 warnings and 0 errors`（oxlint），日志 `.rsi/evidence/round-014/ci.txt`（发布脚本那次）。
+  文档侧先跑的一次是 `Test Files 60 passed` / `Tests 1080 passed`
+  （`.rsi/evidence/round-014/pre-release-ci.txt`）：两次之间 `test/loop-surface.spec.ts` 多了 1 条
+  路由用例，所以差 1，两个数字各带自己的日志，不合并成一句。
+  上一轮基线 57 文件 / 1022 测试（`v0.11.13`）→ 本轮 +3 文件 / +59 测试；无删除、无 skip。
 - 目标用例单独跑：`npx vitest run test/loop.spec.ts test/loop-surface.spec.ts test/heartbeat-guard.spec.ts`
   → `3 passed (3)` / `54 passed (54)`（27 + 13 + 14）。
 
@@ -3573,3 +3576,18 @@ lint 22w 0e / exit 0，`npm run typecheck` exit 0。基线 v0.11.4 = 54/985。
 `.rsi/tools/finish-round.py` 走 R6 流程：一次 CI → ROUND.md/LOG.md/ledger → 单次提交 →
 annotated tag `v0.11.14` → push main + push tag。**未移动任何旧标签、未 force-push、未发布 npm。**
 commit 与推送结果见 `.rsi/ROUND.md` Round 14、`.rsi/evidence/round-014/git.txt`。
+
+**发布结果（`CONFIRMED`，命令与输出）**：
+- `git log --oneline -1` → `20eafea feat(loop): Host-scheduled repeat-run surface + bilingual docs (RSI round 14)`。
+- `git rev-parse v0.11.14` → `2a7b0748576f3b4b6b8ccfc655f8e53b4ad72b80`；
+  `git rev-parse 'v0.11.14^{commit}'` → `20eafea150d34d18dc99bae7523db62c1d8fcb38`。
+- `git ls-remote origin main 'v0.11.14'` → `refs/heads/main` = `20eafea…`、`refs/tags/v0.11.14` =
+  `2a7b074…`；`git merge-base --is-ancestor 20eafea origin/main` → 通过。
+- `git ls-remote origin 'refs/tags/v0.11.13*'` → object `bac26e3f…` / peel `7a79efb…`，与 round 13 记录一致
+  → **旧标签未被移动或覆盖**。`git ls-remote --tags origin` 的标签集合与本地 `git tag -l 'v*'`
+  对比（`comm -3`）无差异（40 个标签）。
+- 未强推（`git push origin main` 为 fast-forward，脚本在 tag 已存在或 CI 红时会 `REFUSED` 而不是重试），
+  未发布 npm。
+- **发布后树状态**：另一个进程在本提交之后继续修改了 `src/loop.ts`、`src/loop-surface.ts`、
+  `test/loop-surface.spec.ts`（路由 `413`/`409` 用例）。这些改动不在 `20eafea` 中，本轮未提交它们，
+  因此**当前工作树不是干净的**——这是如实记录，不是本轮引入的缺陷。

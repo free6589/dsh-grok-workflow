@@ -516,3 +516,15 @@ no history is rewritten, and no round is force-pushed.
   deleted — D-066 makes the first heartbeat an operator action); a live-GUI click on a control that
   POSTs the loop route (the client has no such control yet, D-069「现状」).
 - **status:** OK
+
+- **Landed as:** commit `20eafea` (`20eafea150d34d18dc99bae7523db62c1d8fcb38`), annotated tag
+  `v0.11.14` (object `2a7b074`, peel = `20eafea`), `git push origin main` then
+  `git push origin v0.11.14`; `origin/main` = `20eafea` (`merge-base --is-ancestor` passes),
+  `git ls-remote --tags origin` compared with `git tag -l 'v*'`: same tag set (40 tags), every old
+  tag untouched (`v0.11.13` object `bac26e3`, peel `7a79efb` — unchanged), no force-push, nothing
+  published to npm. Count reconciliation: the doc-side run measured 60/1080, the release run
+  60/1081 (one extra route case in `test/loop-surface.spec.ts`); `.rsi/evidence/round-014/ci.txt`
+  is the number the tag carries. Tree note: after this commit another process in the same working
+  tree continued editing `src/loop.ts`/`src/loop-surface.ts`/`test/loop-surface.spec.ts` (route
+  `413`/`409` cases) — those edits are **not** part of this commit and were left uncommitted rather
+  than folded into a release unverified.

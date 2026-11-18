@@ -1,6 +1,7 @@
 # RSI State (overwritten every round; keep under 100 lines)
 
-Updated: 2026-11-18T00:10+08:00 · round 14 complete · version `0.11.14` (tag `v0.11.14`) ·
+Updated: 2026-11-18T00:10+08:00 · round 14 complete · version `0.11.14` (tag `v0.11.14`,
+commit `20eafea`, both pushed) ·
 repeat-run (loop) surface shipped + bilingual docs + D-068/D-069; P3-01/P3-02 still OPEN
 
 ## Facts
@@ -11,7 +12,8 @@ repeat-run (loop) surface shipped + bilingual docs + D-068/D-069; P3-01/P3-02 st
   `v0.11.7` 1760d50 · `v0.11.8` a045154 · `v0.11.9` 596239a · `v0.11.10` 000a56e ·
   `v0.11.11` 6ff6373 · `v0.11.12` be64d56 · `v0.11.13` 7a79efb. Test-count line:
   54/985 → 54/999 → 55/1009 → 56/1015 → 57/1022, no test removed or skipped at any point.
-- Round 14: repeat-run (loop) surface. One loop = **one** durable `rrule` task in the Host
+- Round 14: repeat-run (loop) surface (`20eafea`, tag `v0.11.14`; `origin/main` = `20eafea`,
+  tag object `2a7b074`, peel = `20eafea`, old tags untouched). One loop = **one** durable `rrule` task in the Host
   Schedule service (title `Loop heartbeat`, prompt prefix `[grok-workflow loop]`, target =
   same session); the plugin arms no timer and only calls `create`/`catalog`/`edit`.
   `open` is user-only (`loop/user-only` for any defined actor, so the route can open and
@@ -25,7 +27,7 @@ repeat-run (loop) surface shipped + bilingual docs + D-068/D-069; P3-01/P3-02 st
   `loopIntervalMin`), hard limits 100/20/10080, defaults false/10/3/0, `LIMIT_CAPS` feeds
   both the stored-value clamp and the load-time repair (`repairLimitOverruns` now iterates
   `LIMIT_CAPS`, not only the legacy table).
-- Tests added this round: `test/loop.spec.ts` (27), `test/loop-surface.spec.ts` (13),
+- Tests added this round: `test/loop.spec.ts` (27), `test/loop-surface.spec.ts` (14),
   `test/heartbeat-guard.spec.ts` (14); plus client/config/settings case updates.
 - Dev tooling already on the tree and landed by this round: `.rsi/HEARTBEAT.md` (heartbeat
   prompt template + guard contract), `.rsi/tools/heartbeat-guard.sh` (RESUME/SKIP/STOP).
@@ -85,10 +87,12 @@ POSTs `/grok-workflow/loop`. It is a `src/` change, needs its own tests and its 
 
 ## Final verification (latest landed tree: round 14)
 
-- `npm run typecheck` exit 0 · `npm run ci` exit 0 — **60 files / 1080 tests PASS**,
-  lint `Found 22 warnings and 0 errors`.
-- Evidence: `.rsi/evidence/round-014/pre-release-ci.txt` (doc-side run) and
-  `.rsi/evidence/round-014/ci.txt` (release-script run), `mutation.txt`, `git.txt`.
+- `npm run typecheck` exit 0 · `npm run ci` exit 0 — **60 files / 1081 tests PASS**,
+  lint `Found 22 warnings and 0 errors` (`.rsi/evidence/round-014/ci.txt`, the release-script run).
+  The doc-side run before the release measured 60 / 1080 (`pre-release-ci.txt`): one extra route
+  case landed in `test/loop-surface.spec.ts` between that run and the release run. Both numbers are
+  quoted with their run; the release number is the one the tag carries.
+- Evidence: `.rsi/evidence/round-014/` (`pre-release-ci.txt`, `ci.txt`, `mutation.txt`, `git.txt`).
 - Baseline for comparison: `v0.11.4` = 54 files / 985 tests; `v0.11.13` = 57 / 1022.
 
 ## Loop status (this session)

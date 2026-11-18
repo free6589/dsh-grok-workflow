@@ -7,7 +7,7 @@
   `src/loop.ts`（服务：策略、规则、行选择、清理）、`src/loop-surface.ts`（`grok_loop` 工具 +
   `POST /grok-workflow/loop` 路由 + 卸载/归档清理）、`src/config.ts`（四个键进 `CONFIG_KEYS`、
   `HARD_LIMITS`/`LIMIT_CAPS`、载入期 repair）、`src/client/index.js`（设置页「续跑」一组四字段）；
-  测试 `test/loop.spec.ts` 27、`test/loop-surface.spec.ts` 13、`test/heartbeat-guard.spec.ts` 14。
+  测试 `test/loop.spec.ts` 27、`test/loop-surface.spec.ts` 14、`test/heartbeat-guard.spec.ts` 14。
 - **语义（写给下一位，别凭直觉改）**：一条循环 = Schedule 里一条 `rrule` 任务，插件不持 timer；
   `open` 只能由不带 actor 的浏览器请求发起（工具 `open` 抛 `loop/user-only`）；轮数上限写进 `COUNT`
   是硬止损；连败轮数只是文案（回执只证明收件箱写入）；关闭/卸载/停止/归档一律**删行**不暂停。
@@ -19,16 +19,20 @@
   调那条路由**（`grep -rn "grok-workflow/loop" src/` 只有 `src/loop.ts:56` 一处常量），已改成可核对的
   说法；`CHANGELOG.md` `## [0.11.14] - 2026-11-18` 双语。
 - **通过的门（`CONFIRMED`）**：`npm run typecheck` exit 0；`npm run ci` exit 0 =
-  lint `Found 22 warnings and 0 errors`、**60 文件 / 1080 测试 PASS**
-  （`.rsi/evidence/round-014/pre-release-ci.txt`，发布脚本自己的那次见 `ci.txt`）。
-  上一轮 57/1022 → 本轮 +3 文件 / +58 测试，无删除、无 skip。
+  lint `Found 22 warnings and 0 errors`、**60 文件 / 1081 测试 PASS**
+  （`.rsi/evidence/round-014/ci.txt`，发布脚本那次；文档侧先跑的 `pre-release-ci.txt` 是 60/1080，
+  两者差 1 条路由用例）。上一轮 57/1022 → 本轮 +3 文件 / +59 测试，无删除、无 skip。
 - **未做（`NOT_RUN`）**：真机心跳投递（没有创建/修改/删除任何定时任务，D-066 规定第一条心跳是操作者
   动作）；在活的 Web GUI 里点一个真正会 POST 那条路由的控件——**客户端还没有这个控件**，今天的用户
   可达路径就是那条 HTTP 请求。
-- **发版**：`0.11.14`（patch）——`package.json`/`package-lock.json`/两份 README 的版本句、安装 pin、
-  已发布列表/`docs/LOCAL-TESTING.md` 压缩包名同步；一个提交 + annotated tag `v0.11.14`；未移动或覆盖
-  任何已发布标签，未 force-push，未发布 npm。commit SHA 由 `.rsi/ROUND.md` Round 14 与
-  `.rsi/evidence/round-014/git.txt` 记录。
+- **发版（`CONFIRMED`）**：`0.11.14`（patch）——`package.json`/`package-lock.json`/两份 README 的版本句、
+  安装 pin、已发布列表/`docs/LOCAL-TESTING.md` 压缩包名同步；commit `20eafea` + annotated tag
+  `v0.11.14`（object `2a7b074`，peel `20eafea`），`origin/main` = `20eafea`，`git ls-remote --tags
+  origin` 与本地同集合（40 个标签），旧标签逐个未动，无 force-push，未发布 npm。
+- **树状态提醒（`CONFIRMED`，不是本轮产物）**：本提交之后，同一棵工作树里另一个进程继续改了
+  `src/loop.ts`、`src/loop-surface.ts`、`test/loop-surface.spec.ts`（路由 `413`「body 过大」与
+  `409`「Schedule 拒绝」两个用例）。这些改动**不在** `20eafea` 里，本轮特意**没有**把它们塞进发布
+  提交（未验证的他人半成品不配 tag）；接手者应先跑全量 `npm run ci` 再决定它们属于哪一轮。
 - **Next action（下一轮）**：按 `PROTOCOL` §2 的默认顺序取 P3-01（设置页逐路由上限与死线字段的文案）
   或 P3-02（进度页「没有报告事实的成员」详情行）；另一条独立候选是「给客户端加一个真正会 POST
   `/grok-workflow/loop` 的控件」——那是 `src/` 改动，需要自己的测试与单独一轮主题（D-069）。

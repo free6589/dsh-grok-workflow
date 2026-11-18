@@ -11,7 +11,9 @@ Last updated: 2026-11-18 (**RSI 连续循环 round 14 完成 · `0.11.14`** — 
 「Repeat runs」一节 + 已知限制一条 + 表格行改为可核对的说法；CHANGELOG `## [0.11.14]` 双语；
 DECISIONS **D-068**（操作者授权先落 P4 续跑面、P3-01/P3-02 保持 OPEN）与 **D-069**（续跑面归谁、
 谁能开、靠什么停、关闭是什么）。`npm run ci` exit 0：typecheck 0 错、lint 22w/0e、
-**60 文件 / 1080 测试 PASS**（上一轮 57/1022，+3 文件/+58 测试，无删除无 skip）；tag `v0.11.14`。
+**60 文件 / 1081 测试 PASS**（发布脚本那次；文档侧先跑的一次是 60/1080，其间多了 1 条路由用例；
+上一轮 57/1022，+3 文件/+59 测试，无删除无 skip）；commit `20eafea`、annotated tag `v0.11.14`，
+`origin/main` = `20eafea`，旧标签未动。
 证据 `.rsi/evidence/round-014/`、`VALIDATION.md` Round 60。
 **剩余待办**：P3-01、P3-02（按 D-068 仍是 OPEN，顺序由下一位接手者按 PROTOCOL §2 决定）。
 
@@ -1209,12 +1211,15 @@ worker 链上限 50（HARD_LIMITS.chainLength）
   并写清授权只覆盖顺序、不放宽任何质量门；**D-069** 记录续跑面的四项归属选择与「客户端暂无开关控件」
   这一现状。
 - **验证（`CONFIRMED`）**：`npm run typecheck` exit 0；`npm run ci` exit 0 = lint 22 warnings / 0 errors、
-  **60 文件 / 1080 测试 PASS**（`.rsi/evidence/round-014/pre-release-ci.txt`；发布脚本另跑一次，
-  见 `.rsi/evidence/round-014/ci.txt`）。新增测试：`test/loop.spec.ts` 27、`test/loop-surface.spec.ts` 13、
+  **60 文件 / 1081 测试 PASS**（`.rsi/evidence/round-014/ci.txt`，发布脚本那次；文档侧先跑的
+  `pre-release-ci.txt` 是 60/1080，两者差 1 条路由用例）。新增测试：`test/loop.spec.ts` 27、`test/loop-surface.spec.ts` 14、
   `test/heartbeat-guard.spec.ts` 14；`test/client.spec.ts` 与 config/settings 相关用例扩展。
-  上一轮基线 57/1022，本轮 +3 文件 / +58 测试，无删除、无 skip。
+  上一轮基线 57/1022，本轮 +3 文件 / +59 测试，无删除、无 skip。
 - **未验证（`NOT_RUN`）**：真机心跳投递（需要 Host 常驻与真实额度，本轮没有创建任何定时任务——
   与 D-066 一致）；真实 Web GUI 里点一个会 POST 那条路由的控件（客户端还没有这个控件）。
-- **发版（`CONFIRMED`）**：`package.json` + `package-lock.json` + 两份 README 的版本句/安装 pin/已发布
+- **发版（`CONFIRMED`）**：commit `20eafea`、annotated tag `v0.11.14`（object `2a7b074`，peel =
+  `20eafea`），`origin/main` = `20eafea`（`merge-base --is-ancestor` 通过），`git ls-remote --tags
+  origin` 与本地 `git tag -l 'v*'` 同集合（40 个），旧标签逐个未动（`v0.11.13` object `bac26e3` /
+  peel `7a79efb`），未 force-push。`package.json` + `package-lock.json` + 两份 README 的版本句/安装 pin/已发布
   列表 + `docs/LOCAL-TESTING.md` 压缩包名 = `0.11.14`；`CHANGELOG` 有 `## [0.11.14] - 2026-11-18`；
   一个提交 + annotated tag `v0.11.14`，未移动任何旧标签、未 force-push、未发布 npm。
