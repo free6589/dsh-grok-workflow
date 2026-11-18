@@ -1,0 +1,33 @@
+=== git status --short --branch ===
+## main...origin/main
+ M CHANGELOG.md
+ M lib/history.d.ts.map
+ M lib/history.js
+ M lib/history.js.map
+ M lib/records.d.ts.map
+ M lib/records.js
+ M lib/records.js.map
+ M src/history.ts
+ M src/records.ts
+ M test/history.spec.ts
+?? .rsi/evidence/round-012/
+?? settings-simple-mock.html
+?? test/records-redaction.spec.ts
+
+=== git diff --stat ===
+ CHANGELOG.md         | 28 ++++++++++++++++++++++++++++
+ lib/history.d.ts.map |  2 +-
+ lib/history.js       | 46 +++++++++++++++++++++++++++++++++++++++-------
+ lib/history.js.map   |  2 +-
+ lib/records.d.ts.map |  2 +-
+ lib/records.js       |  9 +++------
+ lib/records.js.map   |  2 +-
+ src/history.ts       | 47 ++++++++++++++++++++++++++++++++++++++++-------
+ src/records.ts       |  9 +++------
+ test/history.spec.ts | 27 +++++++++++++++++++++++++++
+ 10 files changed, 144 insertions(+), 30 deletions(-)
+--- untracked (git status only, not in diff) ---
+?? .rsi/evidence/round-012/
+?? settings-simple-mock.html
+?? test/records-redaction.spec.ts
+NO COMMIT PERFORMED (read-only evidence)

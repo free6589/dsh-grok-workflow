@@ -289,8 +289,7 @@ export function recordDelivery(
   try {
     appendPluginRecord(session, DELIVERY_RECORD, record)
   } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error)
-    logger.warn(`delivery record not persisted (${record.key}): ${detail}`)
+    logger.warn(`delivery record not persisted (${record.key}): ${redactError(error)}`)
   }
 }
 
@@ -661,8 +660,7 @@ export function recordDispose(
     appendPluginRecord(session, DISPOSE_RECORD, record)
     return true
   } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error)
-    logger.warn(`dispose record not persisted: ${detail}`)
+    logger.warn(`dispose record not persisted: ${redactError(error)}`)
     return false
   }
 }
@@ -753,8 +751,7 @@ export function appendUnloadNotice(
     }, { surfaceOp: 'append' })
     return true
   } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error)
-    logger.warn(`unload notice not written: ${detail}`)
+    logger.warn(`unload notice not written: ${redactError(error)}`)
     return false
   }
 }

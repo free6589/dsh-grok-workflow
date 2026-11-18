@@ -53,6 +53,33 @@ describe('gate history forwarding', () => {
     expect(rendered).not.toContain('sk-abcdef0123456789abcdef')
   })
 
+  it('redacts a long spaceless secret that straddles the per-message cap', () => {
+    // No spaces: the old word-boundary cut sliced this into a fragment the
+    // rules could not match, and it reached the model prompt. The windowed
+    // redact-first path must match it whole.
+    const token = `sk-${'a'.repeat(60)}`
+    const raw = `${'x'.repeat(1_490)} ${token} ${'y'.repeat(9_000)}`
+    const rendered = renderHistory([user(raw)], { turns: 1, chars: 8_000 })
+    expect(rendered).not.toContain(token)
+  })
+
+  it('fail-closes a PEM block cut off by the redaction window', () => {
+    // BEGIN inside the cap, END past the window: no rule can match, so the
+    // tail must be dropped fail-closed instead of leaking key material.
+    const raw = `${'x'.repeat(1_400)} -----BEGIN PRIVATE KEY----- ${'M'.repeat(9_000)}`
+    const rendered = renderHistory([user(raw)], { turns: 1, chars: 8_000 })
+    expect(rendered).not.toContain('M'.repeat(100))
+    expect(rendered).toContain('[REDACTED')
+  })
+
+  it('leaves benign long text byte-identical apart from truncation', () => {
+    const raw = 'y'.repeat(5_000)
+    const rendered = renderHistory([user(raw)], { turns: 1, chars: 8_000 })
+    const line = rendered.split('\n').find(entry => entry.startsWith('User: '))!
+    expect(line.slice('User: '.length, 'User: '.length + 1_500)).toBe(raw.slice(0, 1_500))
+    expect(line.endsWith('…')).toBe(true)
+  })
+
   it('survives a session without a derivation API', () => {
     expect(collectHistory(undefined, { turns: 2, chars: 100 })).toBe('')
     expect(collectHistory({ deriveMessages: () => { throw new Error('nope') } } as never, { turns: 2, chars: 100 })).toBe('')

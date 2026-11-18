@@ -1,0 +1,172 @@
+## main...origin/main
+ M CHANGELOG.md
+ M lib/history.d.ts.map
+ M lib/history.js
+ M lib/history.js.map
+ M lib/records.d.ts.map
+ M lib/records.js
+ M lib/records.js.map
+ M src/history.ts
+ M src/records.ts
+ M test/history.spec.ts
+?? .rsi/evidence/round-012/
+?? settings-simple-mock.html
+?? test/records-redaction.spec.ts
+--- BEFORE-STASH-STATUS (above) ---
+Saved working directory and index state WIP on main: 9813c12 chore(rsi): land loop-stop record and final verification evidence (typecheck 0, ci 56/1015)
+=== AFTER STASH: git status ===
+## main...origin/main
+ M CHANGELOG.md
+ M lib/history.d.ts.map
+ M lib/history.js
+ M lib/history.js.map
+ M lib/records.d.ts.map
+ M lib/records.js
+ M lib/records.js.map
+ M test/history.spec.ts
+?? .rsi/evidence/round-012/
+?? settings-simple-mock.html
+?? test/records-redaction.spec.ts
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+ ❯ test/history.spec.ts (16 tests | 1 failed) 20ms
+     ✓ returns nothing when the bounds are zero 5ms
+     ✓ renders the most recent exchange with role labels 3ms
+     ✓ keeps the newest messages when the budget is tight 0ms
+     ✓ skips the plugin relay message so the previous report is not replayed twice 0ms
+     ✓ skips messages without text content 0ms
+     ✓ redacts secrets found in forwarded history 0ms
+     ✓ redacts a long spaceless secret that straddles the per-message cap 0ms
+     × fail-closes a PEM block cut off by the redaction window 7ms
+     ✓ leaves benign long text byte-identical apart from truncation 0ms
+     ✓ survives a session without a derivation API 0ms
+     ✓ skips the message ids the caller already committed 0ms
+     ✓ passes the excluded ids through collectHistory 0ms
+     ✓ composes history and request within the objective limit 0ms
+     ✓ drops history when the remaining room is useless 0ms
+     ✓ reports an unbuildable request instead of truncating it silently 0ms
+     ✓ truncates history to the remaining budget 0ms
+ ❯ test/records-redaction.spec.ts (4 tests | 3 failed) 15ms
+     × recordDelivery redacts a secret carried by the append error 8ms
+     × recordDispose redacts a secret carried by the append error 1ms
+     × appendUnloadNotice redacts a secret carried by the append error 4ms
+     ✓ keeps benign error text readable (no over-redaction) 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/history.spec.ts > gate history forwarding > fail-closes a PEM block cut off by the redaction window
+AssertionError: expected 'Conversation so far (context only):\n…' to contain '[REDACTED'
+
+- Expected
++ Received
+
+- [REDACTED
++ Conversation so far (context only):
++ User: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx -----BEGIN PRIVATE KEY-----…
+
+ ❯ test/history.spec.ts:72:22
+     70|     const rendered = renderHistory([user(raw)], { turns: 1, chars: 8_0…
+     71|     expect(rendered).not.toContain('M'.repeat(100))
+     72|     expect(rendered).toContain('[REDACTED')
+       |                      ^
+     73|   })
+     74|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  test/records-redaction.spec.ts > records warn paths redact thrown secrets > recordDelivery redacts a secret carried by the append error
+AssertionError: expected 'delivery record not persisted (k): ap…' not to contain 'sk-abcdef0123456789abcdef'
+
+Expected: "sk-abcdef0123456789abcdef"
+Received: "delivery record not persisted (k): append refused: sk-abcdef0123456789abcdef"
+
+ ❯ test/records-redaction.spec.ts:41:22
+     39|     expect(log.warn).toHaveBeenCalledTimes(1)
+     40|     const line = log.messages()[0]!
+     41|     expect(line).not.toContain(SECRET)
+       |                      ^
+     42|     expect(line).toContain('delivery record not persisted')
+     43|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  test/records-redaction.spec.ts > records warn paths redact thrown secrets > recordDispose redacts a secret carried by the append error
+AssertionError: expected 'dispose record not persisted: store d…' not to contain 'sk-abcdef0123456789abcdef'
+
+Expected: "sk-abcdef0123456789abcdef"
+Received: "dispose record not persisted: store down: sk-abcdef0123456789abcdef"
+
+ ❯ test/records-redaction.spec.ts:55:22
+     53|     expect(log.warn).toHaveBeenCalledTimes(1)
+     54|     const line = log.messages()[0]!
+     55|     expect(line).not.toContain(SECRET)
+       |                      ^
+     56|     expect(line).toContain('dispose record not persisted')
+     57|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  test/records-redaction.spec.ts > records warn paths redact thrown secrets > appendUnloadNotice redacts a secret carried by the append error
+AssertionError: expected 'unload notice not written: unload wri…' not to contain 'sk-abcdef0123456789abcdef'
+
+Expected: "sk-abcdef0123456789abcdef"
+Received: "unload notice not written: unload write failed: sk-abcdef0123456789abcdef"
+
+ ❯ test/records-redaction.spec.ts:69:22
+     67|     expect(log.warn).toHaveBeenCalledTimes(1)
+     68|     const line = log.messages()[0]!
+     69|     expect(line).not.toContain(SECRET)
+       |                      ^
+     70|     expect(line).toContain('unload notice not written')
+     71|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  4 failed | 16 passed (20)
+   Start at  15:24:01
+   Duration  396ms (transform 72ms, setup 0ms, import 119ms, tests 35ms, environment 0ms)
+
+MUTATION-EXIT:0
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   CHANGELOG.md
+	modified:   lib/history.d.ts.map
+	modified:   lib/history.js
+	modified:   lib/history.js.map
+	modified:   lib/records.d.ts.map
+	modified:   lib/records.js
+	modified:   lib/records.js.map
+	modified:   src/history.ts
+	modified:   src/records.ts
+	modified:   test/history.spec.ts
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	.rsi/evidence/round-012/
+	settings-simple-mock.html
+	test/records-redaction.spec.ts
+
+no changes added to commit (use "git add" and/or "git commit -a")
+Dropped refs/stash@{0} (5947f42cf3c8df1dcbc362b7b1d8e65196c9409b)
+=== AFTER POP: git status ===
+## main...origin/main
+ M CHANGELOG.md
+ M lib/history.d.ts.map
+ M lib/history.js
+ M lib/history.js.map
+ M lib/records.d.ts.map
+ M lib/records.js
+ M lib/records.js.map
+ M src/history.ts
+ M src/records.ts
+ M test/history.spec.ts
+?? .rsi/evidence/round-012/
+?? settings-simple-mock.html
+?? test/records-redaction.spec.ts

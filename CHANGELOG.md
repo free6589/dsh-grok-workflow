@@ -5,6 +5,36 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.11.12] - 2026-11-18
+
+### Fixed / 修复
+
+- **Warn-path logs and forwarded history no longer risk leaking credentials
+  / 告警日志与转发的历史不再有凭据泄漏风险** —
+  the three `records.ts` warn paths (`delivery` / `dispose` / `unload notice`)
+  logged the raw `error.message`, and `history.ts` redacted *after* truncating to
+  1500 chars, so a spaceless secret (long token, JWT) straddling the cap or a PEM
+  block cut off without its `END` line slipped through into logs or the next
+  model's prompt. The warn paths now log `redactError(error)` like their sibling
+  sites, and history redacts first on a bounded `1500 + 8192` window, then
+  truncates; a key block with no matching `END` is dropped fail-closed. Benign
+  text passes through byte-identical. / `records.ts` 三条 warn 路径
+  （`delivery` / `dispose` / `unload notice`）原来直接记 `error.message` 原文，
+  `history.ts` 先截断到 1500 字符再脱敏：跨截断点的无空格长密钥（长 token、JWT）
+  与缺 `END` 行的 PEM 块会漏网，进日志或下一个模型的提示词。现在 warn 路径改记
+  `redactError(error)`（与同文件另三处拉平），历史改为在 `1500 + 8192` 有界窗口
+  上先脱敏后截断；无配对 `END` 的密钥块直接 fail-closed 丢弃。良性文本逐字节不变。
+
+### Tests / 测试
+
+- `test/records-redaction.spec.ts` (4): each of the three warn paths throws a fake
+  `sk-` secret through its catch and asserts the log line drops it, plus a benign-error
+  readability guard. `test/history.spec.ts` (+3): spaceless secret straddling the cap,
+  PEM-without-END fail-close, benign long-text byte-identity. Mutation replay: 4 fail
+  without the fix, 20/20 pass with it. / 三条 warn 路径各用假 `sk-` 走 catch 并断言
+  日志不含密钥，另有良性错误可读性守卫；历史新增跨 cap 无空格密钥、无 END PEM
+  fail-closed、良性长文本逐字节一致。变异回放：无修复时 4 个失败，有修复时 20/20 通过。
+
 ## [0.11.11] - 2026-11-18
 
 ### Tests / 测试
