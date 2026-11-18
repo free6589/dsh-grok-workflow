@@ -1,0 +1,16 @@
+# Gates run in the repository working tree (2026-11-19T07:38:54+08:00)
+# Branch: main · HEAD: 37cb0fc · node v26.8.1
+
+## npx tsc -p tsconfig.json --noEmit
+TSC_EXIT=0
+
+## npx oxlint src test
+
+Found 22 warnings and 0 errors.
+Finished in 32ms on 107 files with 96 rules using 6 threads.
+LINT_EXIT=0
+
+## npm run verify:lib  (HEAD lib/ vs HEAD src/ only — NOT the uncommitted slice)
+client bundle: 206901 bytes → lib/client.js
+lib/ at 37cb0fc is the build of src/ at 37cb0fc (141 files, byte-identical)
+VERIFY_LIB_EXIT=0

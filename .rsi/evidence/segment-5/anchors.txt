@@ -1,0 +1,15 @@
+HEAD: 37cb0fc01b068699a7ceaa611f95463c703fbcab
+origin/main: 37cb0fc01b068699a7ceaa611f95463c703fbcab
+branch: main
+status lines: 46
+
+HEAD contains the switch?
+  git show HEAD:src/client/index.js | grep -c composer.dock = 0
+  git cat-file -e HEAD:src/loop-brakes.ts -> fatal: path 'src/loop-brakes.ts' exists on disk, but not in 'HEAD'
+exit=128
+
+working-tree anchors:
+3732:        name: 'conversation.composer.dock',
+3527:    const LOOP_ROUTE_PATH = '/grok-workflow/loop'
+
+line counts: 619 loop.ts, 362 loop-surface.ts, 442 loop-brakes.ts, 4132 client/index.js

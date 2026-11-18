@@ -5,6 +5,53 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Added / 新增
+
+- **The switch that opens a loop now exists, in the composer dock
+  / 打开循环的开关有了，就在输入框下面那条 dock 里** — the repeat-run surface shipped in
+  `0.11.14` could only be opened by hand-posting `POST /grok-workflow/loop`, because no
+  shipped control called it. The composer dock (slot `conversation.composer.dock`, id
+  `grok-workflow-loop`) now carries an `Auto-continue` switch for the current session. It
+  reads the loop once on mount with `status` and never polls, stays disabled while that
+  read is in flight, and a click sends `open` or `close` with no numbers of its own: the
+  rule is built from the stored `loopIntervalMin`, `loopMaxRounds` and `loopFailStreak`.
+  A refused click does not flip the switch — the last known state stays on the page and
+  the line states why (only the operator may open, no scheduler in this composition, a
+  non-JSON answer). The switch is a caller of the existing route, not a second
+  implementation: same durable row, same `LoopService` methods, and the model-facing tool
+  still cannot open a loop.
+  / `0.11.14` 落地的续跑面当时只能靠手打 `POST /grok-workflow/loop` 打开，因为没有任何已发布的控件
+  去调它。现在输入框下面那条 dock（槽位 `conversation.composer.dock`，id
+  `grok-workflow-loop`）带着当前会话的 `自动接着跑` 开关：挂载时用 `status` 读一次、之后不轮询，
+  读取期间点不动；点击只为当前会话发 `open` 或 `close`，自己不另带数字——规则按存下来的
+  `loopIntervalMin`、`loopMaxRounds`、`loopFailStreak` 生成。被拒绝的点击不会翻面：上一次知道的
+  状态留在页面上，并写明原因（只有操作者能打开、这套组合里没有调度服务、回答不是 JSON）。
+  这个开关是既有路由的调用方，不是第二套实现：同一条持久行、同一批 `LoopService` 方法，
+  面向模型的工具仍然打不开循环。
+
+- **A heartbeat can now be stopped without waiting for the round cap
+  / 心跳现在能被提前停住，不必等轮数跑满** — a delivery used to reach `agent/pre-step` as
+  `source.kind: 'schedule'` and pass straight through, so the loop ran for as long as the
+  Schedule row existed. `src/loop-brakes.ts` now answers one question per heartbeat —
+  continue or stop — from facts that already exist: an operator stop file (`.rsi/STOP`,
+  movable with `GROK_WORKFLOW_STOP_FILE`), the plugin having been disposed, consecutive
+  rounds that wrote no assistant message, rounds already admitted today (cap 24), a token
+  budget charged at a fixed 200 000 tokens per admitted round up to 2 000 000, and elapsed
+  time since the day's first round. A stop rejects the step with zero model calls **and**
+  deletes the Schedule row, so the loop cannot return on the next occurrence. No timer and
+  no queue: every fact is read back from the session's own records, so a restarted Host
+  still accounts for what the loop already spent. The token figure is a budget, not a
+  meter, and a round counts as failed only when it wrote no assistant message — both
+  limits are stated in the module rather than implied.
+  / 以前投递会以 `source.kind: 'schedule'` 进 `agent/pre-step` 直接放行，所以只要 Schedule 那行还在，
+  循环就一直跑。现在 `src/loop-brakes.ts` 每次心跳只回答一个问题——继续还是停——依据是本来就存在的
+  事实：操作者的停止文件（`.rsi/STOP`，可用 `GROK_WORKFLOW_STOP_FILE` 改位置）、插件已被卸载、
+  连续多少轮没有写出任何助手消息、当天已经放行过多少轮（上限 24）、按每轮固定 200 000 token
+  预留到 2 000 000 的预算、以及当天第一轮以来的耗时。停 = 拒绝这一步（零次模型调用）**并且**删掉
+  Schedule 那行，所以下一次到点不会再回来。没有 timer 也没有队列：每一项都从会话自己的记录里读回，
+  Host 重启后仍然算得清已经花掉多少。token 那个数是预算而不是计量，一轮只有在没写出助手消息时才
+  算失败——两条限制都写在模块里，不靠读者猜。
+
 ## [0.11.15] - 2026-11-19
 
 ### Fixed / 修复

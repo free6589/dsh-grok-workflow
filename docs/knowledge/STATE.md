@@ -1,6 +1,19 @@
 # Project State
 
-Last updated: 2026-11-19 (**RSI 连续循环 round 15 完成 · `0.11.15`** — 主题：收口 `v0.11.14` 的发布事故。
+Last updated: 2026-11-19 (**RSI 连续循环 round 16 完成 · 未发版** — 主题：续跑的开关 + 提前停。
+composer dock 里新增 `Auto-continue` 开关（槽位 `conversation.composer.dock`，id `grok-workflow-loop`，
+order 90，追加注册；挂载时 `status` 读一次、之后不轮询，点击发 `open`/`close`，点击被拒绝不翻面），
+以及 `src/loop-brakes.ts` 的六道刹车（操作者停止文件 `.rsi/STOP`、插件卸载、连败轮、当天上限 24 轮、
+每轮预留 200 000 token 封顶 2 000 000、当天第一轮以来的耗时），每项都从会话自己的记录读回；
+gate 在 `agent/pre-step` 上先分类，`loop-stop` 时先删行再 `reject`（零次模型调用）。
+本机门禁：`npm run typecheck` exit 0、`npx oxlint src test` 22 warnings / 0 errors、
+`npm run build` 后 `lib/` 145 个文件的 md5 清单与构建前逐条相同（幂等）、
+`npx vitest run` **62 文件 / 1139 测试 PASS**；提交后的 `npm run verify:lib` 见 `.rsi/ROUND.md` Round 16。
+**未验证（`NOT_RUN`）**：真实 Web GUI 里点那个开关、真机心跳投递（D-066，操作者动作）。
+**剩余待办**：P3-01、P3-02 仍 OPEN（D-068 只改了顺序）；「客户端还没有会 POST 那条路由的控件」
+这一条已随本轮落地而作废（`D-072`）。)
+
+Previous update: 2026-11-19 (**RSI 连续循环 round 15 完成 · `0.11.15`** — 主题：收口 `v0.11.14` 的发布事故。
 round 14 的标签提交 `20eafea` 的 `lib/` 落后于它的 `src/`（`lib/loop.js` 里没有 `callSchedule`），远端 CI 红、
 Release 工作流停在 `Verify committed build artifacts`，所以那个标签**没有 GitHub Release**，也从未产出压缩包；
 `main` 上的 `8c8e367` 只重建了产物。本轮按 D-070 从 `main` 打 **`0.11.15`**（patch）：只含构建产物重建 +
@@ -1270,3 +1283,29 @@ worker 链上限 50（HARD_LIMITS.chainLength）
   首次 push 因远端在运行期间前进（`3c24f92` / `09d5daa`）被拒；发布提交 rebase 为 `50c0321`，
   从未推送过的本地标签删除后在 rebase 提交上重建，再推。旧标签逐个未动。
 
+
+## 2026-11-19 — RSI round 16：续跑开关 + 心跳刹车落地（未发版，`CONFIRMED`）
+
+- **前提（`CONFIRMED`）**：`HEAD` = `37cb0fc` = `origin/main`；开工时树上 46 条 dirty 条目
+  （round 14 之后另一位写入者的客户端开关、`src/loop-brakes.ts`、`scripts/verify-lib.mjs` 等），
+  全部其它代理已 `inactive`、`src/` 最后修改停在 07:35:02，本轮在**静止的树**上工作。开工指纹
+  （sha256 前 16 位）`src/loop.ts 55483a52622f0f46`、`src/loop-surface.ts 6543545e5e3f6310`、
+  `src/loop-brakes.ts 34f56e7095abf6cd`、`src/client/index.js d290765594d62a3b`、
+  `src/gate.ts 332d23134642460c`、`src/config.ts c4d053572df36194`，收工前重算未变。
+- **做了什么（`CONFIRMED`）**：把「有开关、能提前停」这两件事从**未提交的实现**变成**落地的提交**：
+  ① `CHANGELOG.md` 的 `[Unreleased]` 补两条 Added（dock 开关、心跳刹车，双语）；
+  ② `DECISIONS.md` 新增 **D-072**（开关放哪儿、不带数字、停=拒绝+删行、六道刹车的输入是既有事实、
+  token 是预算不是计量、失败轮=没写出助手消息），并把 D-069「现状」段与 D-071 的过时一句指向 D-072；
+  ③ `README`（中英）与 `docs/LOCAL-TESTING.md` 的 dock 开关说明此前已由并发写入者写好，本轮只核对与
+  代码一致；④ 本文件、`VALIDATION.md`、`HANDOFF.md`、`.rsi/ROUND.md`、`.rsi/STATE.md` 记本轮。
+- **代码归属（不是本轮新写，是本轮核对并落地）**：`src/client/index.js` 的 `startLoopSwitch`
+  （`:3730-3743`，id `grok-workflow-loop`、order 90、`slots.inject` + `slots.register` 追加注册）、
+  `LoopSwitch` 组件（`:3665-3718`）、文案键（`:260-262` 等）、路径常量 `:3527`；
+  `src/loop-brakes.ts` 六道刹车与 `plugin:grok-workflow/loop-round` 记录（`:210`）；
+  `src/gate.ts:1535-1575` 的挂载与 `loop-stop` 处理；`src/config.ts:388-399` 四键边界与 `:792-795` clamp。
+- **门禁（`CONFIRMED`，命令与结果见 `VALIDATION.md` Round 62）**：`npm run typecheck` exit 0；
+  `npx oxlint src test` = 22 warnings / 0 errors（107 文件）；`npm run build` = `client bundle: 224412 bytes`，
+  构建前后 `lib/` 145 个文件 md5 清单完全相同（幂等，diff 为空）；`npx vitest run` =
+  **62 文件 / 1139 测试 PASS**（24.21s）。与 `v0.11.15` 的 60/1081 相比 +2 文件 / +58 测试，无删除、无 skip。
+- **未验证（`NOT_RUN`）**：真实 Web GUI 里点一次那个开关、真实心跳投递一次（需要常驻 Host 与真实
+  profile，且 D-066 把第一跳定为操作者动作）；本轮没有创建、修改或删除任何 Schedule 任务。

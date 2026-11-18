@@ -247,7 +247,11 @@ The page shows five things and nothing else: the on/off switch, the mode (`auto`
 
 A loop is one durable task in the Host's Schedule service, not a timer inside the plugin. The stored row is an `rrule` heartbeat whose delivery target is the same session, and each delivery is one ordinary turn. The plugin arms no timer of its own and starts no second execution path: what a round does is decided by that turn, exactly as a message you type is.
 
-**The switch.** The settings page's *Repeat runs* group holds the four `loop*` keys (table above). They are stored, validated and projected like every other key, but `loopEnabled` is a deployment default no automatic driver reads yet, so a saved `on` does not by itself start rounds. Opening a loop is one explicit browser request:
+**The switch.** The settings page's *Repeat runs* group holds the four `loop*` keys (table above). They are stored, validated and projected like every other key, but `loopEnabled` is a deployment default no automatic driver reads yet, so a saved `on` does not by itself start rounds.
+
+**The dock switch.** The round cap and the interval come from those stored keys, and the switch that spends them sits in the composer dock — the ambient strip under the message box, slot `conversation.composer.dock`, id `grok-workflow-loop`. It reads the loop with `status` once on mount and never on a timer, stays disabled while that read is in flight, and a click sends `open` or `close` for the current session with no numbers of its own: the rule is built from `loopIntervalMin`, `loopMaxRounds` and `loopFailStreak` as stored. A refused click does not flip the switch — it leaves the last known state on the page and states why the click did nothing. The switch is a caller of the route below, not a second implementation: the same durable row, the same service methods.
+
+Opening a loop is one explicit browser request:
 
 ```json
 POST /grok-workflow/loop

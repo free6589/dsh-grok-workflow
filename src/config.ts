@@ -378,10 +378,25 @@ export const Config = z.object({
   // capped and bounded (see DEFAULT_LOOP_*). Every capped number is clamped through
   // `LIMIT_CAPS`, so a stored overrun is announced as clamped instead of killing the
   // settings row.
-  loopEnabled: z.boolean().default(DEFAULT_LOOP_ENABLED).volatile(),
-  loopMaxRounds: clampedLimit('loopMaxRounds', 1).default(DEFAULT_LOOP_MAX_ROUNDS).volatile(),
-  loopFailStreak: clampedLimit('loopFailStreak', 1).default(DEFAULT_LOOP_FAIL_STREAK).volatile(),
-  loopIntervalMin: clampedLimit('loopIntervalMin', 0).default(DEFAULT_LOOP_INTERVAL_MIN).volatile(),
+  //
+  // Each field carries a bilingual `description()`: the label a form shows is the
+  // client's own i18n key, but the *meaning* — the unit, the range and what `0`
+  // asks for — travels with the schema, so a host that renders the schema without
+  // this plugin's client still states the same contract. Both languages are in one
+  // string (English first, then Chinese), the same shape `limitOverrunWarning()`
+  // uses; a test pins that neither half can be dropped.
+  loopEnabled: z.boolean().default(DEFAULT_LOOP_ENABLED)
+    .description('Off by default: a run repeats only while this is on. 默认关闭：打开后才会按同一目标续跑')
+    .volatile(),
+  loopMaxRounds: clampedLimit('loopMaxRounds', 1).default(DEFAULT_LOOP_MAX_ROUNDS)
+    .description('Rounds at most, 1-100 (above 100 takes effect as 100). 最多跑几轮，1-100（超过 100 按 100 生效）')
+    .volatile(),
+  loopFailStreak: clampedLimit('loopFailStreak', 1).default(DEFAULT_LOOP_FAIL_STREAK)
+    .description('Stop the loop after this many consecutive failed rounds, 1-20. 连续失败几轮就停，1-20')
+    .volatile(),
+  loopIntervalMin: clampedLimit('loopIntervalMin', 0).default(DEFAULT_LOOP_INTERVAL_MIN)
+    .description('Minutes between rounds, 0-10080; 0 asks for the loop floor (at least 60), not "start now". 两轮之间隔几分钟，0-10080；0 表示用下限（至少 60 分钟），不是立刻开始')
+    .volatile(),
   roles: z.object({
     planner: z.array(z.object({ provider: z.string().default(''), model: z.string(), maxInFlight: z.natural().min(HARD_LIMITS.routeInFlight.min).max(HARD_LIMITS.routeInFlight.max) })).default([]),
     worker: z.array(z.object({ provider: z.string().default(''), model: z.string(), maxInFlight: z.natural().min(HARD_LIMITS.routeInFlight.min).max(HARD_LIMITS.routeInFlight.max) })).default([]),

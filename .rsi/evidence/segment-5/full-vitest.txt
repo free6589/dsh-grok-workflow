@@ -1,0 +1,110 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.tmp/seg5-snapshot
+
+(node:43) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGTERM listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:43) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGINT listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:43) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGHUP listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+ ✓ test/phase1-dialogue.spec.ts (33 tests) 1273ms
+(node:54) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGTERM listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:54) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGINT listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:54) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGHUP listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+ ✓ test/gate.spec.ts (50 tests) 1241ms
+ ✓ test/plugin-lifecycle.spec.ts (17 tests) 838ms
+ ✓ test/heartbeat-guard.spec.ts (14 tests) 626ms
+(node:564) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGTERM listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:564) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGINT listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:564) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGHUP listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+ ✓ test/triage.spec.ts (43 tests) 462ms
+ ✓ test/issue-watch.spec.ts (2 tests) 299ms
+ ✓ test/human-output-contract.spec.ts (10 tests) 400ms
+ ✓ test/gate-partial-head.spec.ts (12 tests) 344ms
+ ✓ test/checkpoint-schema.spec.ts (36 tests) 309ms
+ ✓ test/reliability.spec.ts (25 tests) 305ms
+ ✓ test/timeout-config.spec.ts (12 tests) 284ms
+(node:810) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/memory-archive.spec.ts (21 tests) 245ms
+(node:845) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/panel.spec.ts (13 tests) 202ms
+ ✓ test/objective-limit.spec.ts (16 tests) 205ms
+ ✓ test/config-limits-repair.spec.ts (24 tests) 199ms
+ ✓ test/recovery-kill-restart.spec.ts (3 tests) 167ms
+(node:911) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/progress.spec.ts (12 tests) 171ms
+ ✓ test/loop-runtime-wiring.spec.ts (5 tests) 170ms
+ ✓ test/orchestrator.spec.ts (26 tests) 164ms
+ ✓ test/lifecycle-disposal.spec.ts (15 tests) 159ms
+ ✓ test/route-concurrency.spec.ts (14 tests) 155ms
+ ✓ test/fallback-shards.spec.ts (16 tests) 156ms
+(node:969) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+stdout | test/checkpoint-engine-wire.spec.ts > engine wiring writes real checkpoints > records a verified run: tasks, five-role agent rows, evidence, and no extra model calls
+[smoke] status=completed file=/tmp/dsh-grok-workflow-test-checkpoints/checkpoint-8a312377-1536-4a67-a334-074058770423-4b0a2c8c.json resume=none reason=the run already completed, so re-driving it would redo verified work
+
+stdout | test/checkpoint-engine-wire.spec.ts > engine wiring writes real checkpoints > records a rejected run and answers the resume question with what to re-drive
+[smoke] status=failed file=/tmp/dsh-grok-workflow-test-checkpoints/checkpoint-1c9e40e3-6619-4f44-a87d-d3e4eb88808e-7b28443a.json resume=resume unfinished=a
+
+ ✓ test/checkpoint-engine-wire.spec.ts (2 tests) 138ms
+stderr | test/client.spec.ts > client settings page: reading, failure and retry > keeps still reading, read failed and not served as three different pages
+[grok-workflow] no settings namespace projects this plugin's fields: the row is disabled, renamed with an unreadable projection, or did not activate (see docs/LOCAL-TESTING.md#enable). The Grok workflow page cannot appear until it does.
+
+(node:982) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/client.spec.ts (92 tests) 146ms
+ ✓ test/paths.spec.ts (18 tests) 137ms
+ ✓ test/command.spec.ts (16 tests) 135ms
+ ✓ test/composition.spec.ts (9 tests) 95ms
+(node:1014) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/engine-contract.spec.ts (15 tests) 104ms
+ ✓ test/loader.spec.ts (3 tests) 96ms
+(node:1043) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/failure-paths.spec.ts (14 tests) 84ms
+ ✓ test/checkpoint-wiring.spec.ts (30 tests) 69ms
+ ✓ test/routing.spec.ts (25 tests) 66ms
+ ✓ test/triage-recall.spec.ts (28 tests) 65ms
+ ✓ test/synthesis-guardrails.spec.ts (17 tests) 56ms
+ ✓ test/loop-surface.spec.ts (16 tests) 57ms
+ ✓ test/redact.spec.ts (32 tests) 52ms
+ ✓ test/config.spec.ts (36 tests) 56ms
+(node:1104) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/team-engine.spec.ts (12 tests) 40ms
+ ✓ test/carryover.spec.ts (21 tests) 36ms
+ ✓ test/naming.spec.ts (15 tests) 38ms
+ ✓ test/delivery-human-block.spec.ts (10 tests) 24ms
+ ✓ test/recovery-artifacts.spec.ts (9 tests) 34ms
+ ✓ test/delivery.spec.ts (12 tests) 28ms
+ ✓ test/report.spec.ts (42 tests) 22ms
+ ✓ test/loop.spec.ts (30 tests) 28ms
+ ✓ test/loop-brakes.spec.ts (35 tests) 27ms
+ ✓ test/progress-tab.spec.ts (34 tests) 21ms
+ ✓ test/settings-projection.spec.ts (4 tests) 21ms
+(node:1189) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/progress-connector.spec.ts (10 tests) 15ms
+ ✓ test/history.spec.ts (16 tests) 15ms
+ ✓ test/resume-validator.spec.ts (19 tests) 16ms
+ ✓ test/panel-links.spec.ts (16 tests) 15ms
+ ✓ test/docs-config-keys.spec.ts (12 tests) 16ms
+ ✓ test/config-synthesis-fallback.spec.ts (8 tests) 15ms
+ ✓ test/records-redaction.spec.ts (4 tests) 15ms
+ ✓ test/mode.spec.ts (18 tests) 14ms
+ ✓ test/input.spec.ts (13 tests) 14ms
+ ✓ test/triage-followup.spec.ts (5 tests) 13ms
+ ✓ test/docs-version.spec.ts (8 tests) 10ms
+ ✓ test/criterion.spec.ts (5 tests) 8ms
+ ✓ test/i18n-parity.spec.ts (6 tests) 10ms
+ ✓ test/docs-architecture-version.spec.ts (3 tests) 6ms
+
+ Test Files  62 passed (62)
+      Tests  1139 passed (1139)
+   Start at  07:40:26
+   Duration  22.71s (transform 1.71s, setup 0ms, import 4.94s, tests 10.23s, environment 7ms)
+

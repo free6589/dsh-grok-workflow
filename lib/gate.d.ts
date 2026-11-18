@@ -46,6 +46,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent';
 import type { Session } from '@deepseek-ai/dsh-session';
 import type { UserMessage } from '@deepseek-ai/dsh-llm';
 import type { ActiveState, WorkflowLogger } from './run.js';
+import type { LoopBrakeCode, LoopBrakePort } from './loop-brakes.js';
 import type { RecallSource, TriageLang, TriageVerdict } from './triage.js';
 import type { ResolvedConfig, WorkflowReport } from './types.js';
 /** Payload shape of one `agent/pre-step` dispatch. */
@@ -78,6 +79,15 @@ export interface GateDeps {
      * the pass is deterministic and never depends on the repository's own docs.
      */
     memoryDocRoots?: readonly string[];
+    /**
+     * Loop brakes for a Host heartbeat delivery.
+     *
+     * Omitted means "no driver is wired": a heartbeat still passes as
+     * `loop-continuation`, but nothing is counted and no brake can trip. The composition
+     * builds the real port in {@link installGate}; tests pass a stub to pin one brake
+     * without a Schedule service.
+     */
+    loop?: LoopBrakePort;
     ctx: Context;
     config: ResolvedConfig;
     state: ActiveState;
@@ -94,6 +104,17 @@ type Classification = {
     key: string;
     request: string;
     turn: number;
+}
+/**
+ * A heartbeat whose brakes tripped: the loop is stopped and the step is refused.
+ * Its own verdict rather than a `pass` reason, because the caller has to delete the
+ * stored Schedule row — a label would leave that work undone.
+ */
+ | {
+    kind: 'loop-stop';
+    agentId: string;
+    code: LoopBrakeCode;
+    detail: string;
 };
 /**
  * True when this run can answer live and deliver the team result later (B: 边聊边干).
@@ -197,7 +218,7 @@ export declare function collectRecallSources(session: Session | undefined, roots
  * Classification reads `payload.messages` only: `decision.messages` is appended
  * to by other listeners, so it cannot identify a new user message.
  */
-export declare function classifyPreStep(deps: Pick<GateDeps, 'config' | 'readConfig'>, payload: PreStepPayload): Classification;
+export declare function classifyPreStep(deps: Pick<GateDeps, 'config' | 'readConfig' | 'loop'>, payload: PreStepPayload): Classification;
 /**
  * User-visible terminal for a cancelled turn (P0-4).
  *

@@ -1,0 +1,335 @@
+# Git baseline: read-only branch / sync / tag inventory
+
+Task: git_baseline — "Complete read-only remote tag and sync baseline"
+Working directory (confirmed by `pwd`): /home/fish/projects_mine/dsh-grok-workflow
+Observation window: 2026-11-19T00:38:54+08:00 .. 2026-11-19T00:42:17+08:00 (Asia/Singapore)
+Mutating git commands executed: NONE. No fetch, no push, no commit, no tag, no ref update.
+
+================================================================
+1. BRANCH
+================================================================
+Command: git rev-parse --abbrev-ref HEAD
+  exit 0
+Output:
+main
+
+Command: git rev-parse --abbrev-ref --symbolic-full-name '@{u}'
+  exit 0
+Output:
+origin/main
+
+================================================================
+2. git status --short --branch
+================================================================
+Command: git status --short --branch
+  exit 0
+Output (observed at 2026-11-19T00:42:17+08:00):
+## main...origin/main [behind 1]
+ M docs/knowledge/DECISIONS.md
+ M docs/knowledge/RESEARCH.md
+ M docs/knowledge/VALIDATION.md
+ M lib/loop-surface.d.ts.map
+ M lib/loop-surface.js
+ M lib/loop-surface.js.map
+ M lib/loop.d.ts
+ M lib/loop.d.ts.map
+ M lib/loop.js
+ M lib/loop.js.map
+ M package.json
+ M src/config.ts
+ M src/loop-surface.ts
+ M src/loop.ts
+ M test/config.spec.ts
+ M test/loop-surface.spec.ts
+ M test/loop.spec.ts
+?? .rsi/evidence/round-014/lib-stale.txt
+?? .verify-tmp/
+?? scripts/verify-lib.mjs
+?? settings-simple-mock.html
+
+Earlier in the same window (00:38:54, before concurrent writers landed):
+## main...origin/main
+ M docs/knowledge/DECISIONS.md
+ M docs/knowledge/RESEARCH.md
+ M lib/loop-surface.d.ts.map
+ M lib/loop-surface.js
+ M lib/loop-surface.js.map
+ M lib/loop.d.ts
+ M lib/loop.d.ts.map
+ M lib/loop.js
+ M lib/loop.js.map
+ M src/loop-surface.ts
+ M src/loop.ts
+ M test/loop-surface.spec.ts
+ M test/loop.spec.ts
+?? .rsi/evidence/round-014/lib-stale.txt
+?? .verify-tmp/
+?? settings-simple-mock.html
+
+Delta between the two snapshots is NOT this task's work: docs/knowledge/VALIDATION.md,
+package.json, src/config.ts, test/config.spec.ts and scripts/verify-lib.mjs appeared while
+parallel agents worked in the same tree. This task wrote exactly one new file
+(.rsi/evidence/git-baseline/git-baseline.txt) and modified no src/, test/, lib/, docs/ file.
+
+================================================================
+3. .rsi/STOP existence
+================================================================
+Command: test -e .rsi/STOP && echo EXISTS || echo ABSENT
+  exit 0
+Output: ABSENT /home/fish/projects_mine/dsh-grok-workflow/.rsi/STOP
+
+Command: find .rsi -maxdepth 1 -name 'STOP*' -print
+  exit 0
+Output: (no lines — no STOP or STOP* entry at .rsi/ level)
+
+Conclusion: no STOP file exists; exact checked path is
+/home/fish/projects_mine/dsh-grok-workflow/.rsi/STOP
+
+================================================================
+4. STATE / LOG / HANDOFF presence and line counts
+================================================================
+Command: for f in .rsi/STATE.md .rsi/LOG.md .rsi/HANDOFF.md; do wc -l "$f"; done (with existence guard)
+  exit 0
+Output:
+.rsi/STATE.md: 116 lines    (present, 2026-11-19 00:26)
+.rsi/LOG.md: 60 lines       (present, 2026-11-19 00:17)
+.rsi/HANDOFF.md: ABSENT     (no .rsi/HANDOFF.md in .rsi/)
+
+Contrast with the prior round's verified baseline (STATE.md 65, LOG.md 8): both files grew
+under concurrent round writes. The values above are the current observed ones; the earlier
+numbers are stale, not wrong at the time they were taken.
+
+Command: ls -la .rsi/
+  exit 0
+Output (directory entries):
+.rsi/  contains: evidence/ HEARTBEAT.md incoming/ ledger.jsonl LOG.md POOL.md
+                  PROTOCOL.md ROUND.md STATE.md tools/
+Note: .rsi/HANDOFF.md is not among them; .rsi/evidence/ is present with 21 entries
+(final-build.txt, final-ci.txt, final-lib-idempotent.txt, final-typecheck.txt,
+heartbeat-guard, round-000 .. round-014).
+
+================================================================
+5. REMOTE main vs HEAD — full output, both observations
+================================================================
+--- Observation A, 2026-11-19T00:38:5x (start of window) ---
+Command: git ls-remote origin refs/heads/main
+  exit 0
+Output:
+81a76ecfdc2afb07ed866ae396b8f3900d159243	refs/heads/main
+
+Command: git rev-parse HEAD
+  exit 0
+Output:
+81a76ecfdc2afb07ed866ae396b8f3900d159243
+
+Comparison A: remote main SHA == HEAD SHA (identical). HEAD commit:
+  81a76ecfdc2afb07ed866ae396b8f3900d159243 2026-11-19T00:28:25+08:00
+  chore(rsi): record round-14 tag/SHA and reconcile the measured test count
+
+--- Observation B, 2026-11-19T00:42:00+08:00 (end of window) ---
+Command: git rev-parse HEAD
+  exit 0 -> 81a76ecfdc2afb07ed866ae396b8f3900d159243
+
+Command: git rev-parse refs/remotes/origin/main
+  exit 0 -> 8c8e36700bdba32c301fa09186e8a2ab2b0e8c73
+
+Command: git ls-remote origin refs/heads/main
+  exit 0 -> 8c8e36700bdba32c301fa09186e8a2ab2b0e8c73	refs/heads/main
+
+Command: git rev-list --left-right --count HEAD...refs/remotes/origin/main
+  exit 0 -> 0	1
+
+Command: git log -1 --format='%H %ad %s' --date=iso-strict refs/remotes/origin/main
+  exit 0 ->
+8c8e36700bdba32c301fa09186e8a2ab2b0e8c73 2026-11-19T00:39:10+08:00 fix(build): rebuild lib/loop.js so the committed artifacts match the released source
+
+Comparison B: HEAD (81a76ecf) != remote main (8c8e3670). HEAD is BEHIND by exactly 1 commit;
+HEAD has 0 commits the remote lacks. The remote advanced at 00:39:10, i.e. inside this
+observation window, from a concurrent writer that committed and pushed.
+
+Recency finding (this is the fact the prior round left open): refs/remotes/origin/main is NOT
+stale — it equals the live remote (8c8e3670) as returned by git ls-remote at the same moment.
+The staleness question is resolved by agreement, not by fetch: local remote-tracking ref
+== live remote SHA. What changed is HEAD, which is now one commit behind that ref.
+
+Consequence: "HEAD == remote main" was true at 00:38:5x and false at 00:42:00. Any sync claim
+must carry its timestamp; the tree is being written and pushed to concurrently.
+
+Remotes configured (git remote -v, exit 0):
+origin	https://github.com/free6589/dsh-grok-workflow.git (fetch)
+origin	https://github.com/free6589/dsh-grok-workflow.git (push)
+
+================================================================
+6. FULL TAG INVENTORY — remote, untruncated
+================================================================
+Command: git ls-remote --tags origin
+  exit 0
+Raw line count: 74  (40 tag refs + 34 peeled ^{} lines)
+Tag-name count excluding ^{}: 40
+
+FULL RAW OUTPUT (all 74 lines, no tail truncation):
+
+f175ada8a7533a5f61c06a75e5a457e32b37579b	refs/tags/v0.1.0
+a7d5a6267c471a6ed73e44ac02092f59942c508a	refs/tags/v0.1.0^{}
+63c04aa544372161cf8f4d1c307920f7c0531a94	refs/tags/v0.10.0
+b2c451500973ab2d38d7671b03f5f448d24e9feb	refs/tags/v0.10.0^{}
+84fccce84377a0aee8f347dcc93ea3d7ca061617	refs/tags/v0.10.1
+ed61750a49deebc01954ab48f2f1aa048445f0d3	refs/tags/v0.10.1^{}
+003cb68395764b26e8ccdf95119946de31658eb4	refs/tags/v0.10.2
+4eabee8c6a5ead2045d48128d00c9a742f8ed53a	refs/tags/v0.10.2^{}
+08c5fd0ddaf76efd8715f3c2cdd3f6016be05265	refs/tags/v0.11.0
+85541adefd005a2340d531da8c8eace2ae7c3c09	refs/tags/v0.11.0^{}
+9b327f1e6874b0025f196fcfdc1876419ec6d9e5	refs/tags/v0.11.1
+a5929c47534220b72d4e27873b576897a624c291	refs/tags/v0.11.1^{}
+f70d30749238d419b56896735b3d677141e9ea8c	refs/tags/v0.11.10
+000a56e9a816d1a7fbe7054072bf15309fe53f9e	refs/tags/v0.11.10^{}
+bfa0d80751ae2011a3c79400d889822f29885ce3	refs/tags/v0.11.11
+6ff6373b133c207b7dd8b7e328797a560ee98e98	refs/tags/v0.11.11^{}
+10d82d281aa8db8eae20fa0daa0d39743b4cba02	refs/tags/v0.11.12
+be64d566fedfbe4da1829e546312d70edb0a4043	refs/tags/v0.11.12^{}
+bac26e3f31a4400609b8095cf8033235f2b60946	refs/tags/v0.11.13
+7a79efb75bbad37930cab4c3c76a8bcb3822d1db	refs/tags/v0.11.13^{}
+2a7b0748576f3b4b6b8ccfc655f8e53b4ad72b80	refs/tags/v0.11.14
+20eafea150d34d18dc99bae7523db62c1d8fcb38	refs/tags/v0.11.14^{}
+629f0c40f91f1ab2de6d8fa6d14149aac4a30505	refs/tags/v0.11.2
+2d5e95679f07675d37e119ae400ee749171f8793	refs/tags/v0.11.2^{}
+eadf8f42b1a8d2c335c37b1e6df0f144faea565d	refs/tags/v0.11.3
+17e3a12c74ec2546c6a782eba1444590cfe8cb87	refs/tags/v0.11.3^{}
+437eddb020679fbf1e74a3e36fcfa9d645c901cd	refs/tags/v0.11.4
+bcb601d95f9043b21dc4c5070154241837660ee2	refs/tags/v0.11.4^{}
+0f97e19f30c78f6c8fba56b4f6b3419da5b80deb	refs/tags/v0.11.5
+bf0dc911c53402ac2c12fa965794949d6c536d6b	refs/tags/v0.11.5^{}
+c4d07a2ee269b540bc8f453ac4b64702972eb9b0	refs/tags/v0.11.6
+88d133b67d1da1bf19518a17a349e447dc2ae14d	refs/tags/v0.11.6^{}
+9796f9d843735a743d2fecf935deee28873899d3	refs/tags/v0.11.7
+1760d50fcf6af8cc80d78dc941ac23a441249123	refs/tags/v0.11.7^{}
+1fd0682b786710aaa1eb23dbbcbc421673020bd5	refs/tags/v0.11.8
+a04515435e2abb6d2927458fe5801e128ba31367	refs/tags/v0.11.8^{}
+bb124de12083a0443ab9a6e10cff1621cceed8e0	refs/tags/v0.11.9
+596239ab6759ec84c8ced33f75f04d89cfb108ca	refs/tags/v0.11.9^{}
+abb48bf67a06a52e9fe27762e1def3e2cd1fd194	refs/tags/v0.2.0
+f7a244c6dff75f27608328327f69968474e8bfe1	refs/tags/v0.2.0^{}
+8d4a9168d64a3807f6da8ac0aa6a7dab0ce5060c	refs/tags/v0.2.0-rc.1
+32a7f4a822fa9a2e13c5da0cdab0ea93943e331d	refs/tags/v0.2.0-rc.1^{}
+7cdd969e00c3d0f37ad859adfc908908123cdb63	refs/tags/v0.2.1
+cecc0651217761f0a6608bb7f2a6a2311b887cc9	refs/tags/v0.2.1^{}
+88f4343ba8aeaa2ba6b7684419b3fa7568dd3ea8	refs/tags/v0.2.2
+5ecd96bf9288fb67c07b412fce0b55bbe51db897	refs/tags/v0.2.2^{}
+1f63ec29fd3b9e54bbbf7526a972954ab7923669	refs/tags/v0.2.3
+538d1ab4a9d8b90106e8b04970459388c0b30ae1	refs/tags/v0.2.3^{}
+c6b614de112c0ab7ca5db4a72c018a1452d9cc41	refs/tags/v0.2.4
+7357e5efec4995da036d3656f74c546852e61931	refs/tags/v0.2.4^{}
+1e83b4abe0d38d8b32b35b7146748b66cef66cad	refs/tags/v0.2.5
+bf853ac084d7626f74ba3b23f4d1d8a8668988d2	refs/tags/v0.2.5^{}
+8e81dc561da7a5ce55b830f27b522319ec9d340b	refs/tags/v0.2.6
+f6ec5f1f84babfc727b7847e8edc44bbfff72247	refs/tags/v0.2.6^{}
+26f8044214d7be41d95fdb2efdd0aaf4c4e6493e	refs/tags/v0.2.7
+16a11b72fb527bd05affe7cb49e304c033580b88	refs/tags/v0.2.7^{}
+3f5ad0a1921e42d0a8c2d755cbb9ab94b5f4d73c	refs/tags/v0.3.0
+708c31557c17056a6a2629ff271f420fed3c9d98	refs/tags/v0.4.0
+af82a34becab2a1bc622c1aea7b34f56b2089428	refs/tags/v0.5.0
+5cc66beb428b01076aae6d9fa1209899c1f2b8a4	refs/tags/v0.5.1
+1f9065deb2d7bc5089df5bb458a1fb3ae5b3dc45	refs/tags/v0.6.0
+3b96b16a774e0ac6d8068dcb0cf0726d47e99efb	refs/tags/v0.7.0
+146dce72aa53ed7383f212032206c94b4cb8046d	refs/tags/v0.7.0^{}
+9c590f263b9144329a558a13c81596afc1933835	refs/tags/v0.8.0
+936e6258e438e1d3cdad0f49736bf8ceaac533a4	refs/tags/v0.9.0
+2d2b34744c8a619e595cd650754fd60858dec740	refs/tags/v0.9.0^{}
+584dc22040aee925666b064196af701e71aafb6a	refs/tags/v0.9.1
+9103280f325781b7d071eb3013aac192b7d435d7	refs/tags/v0.9.1^{}
+38ef23710e52a83115a54a14264a500836235704	refs/tags/v0.9.2
+5eb4942af5f0ccbbcee8b1c59e04074d7c172103	refs/tags/v0.9.2^{}
+f63bb7cf846056a01b048c304592f74cecbd1a41	refs/tags/v0.9.3
+593f89e95a7c6cc674d34d82ed3c0ae4d7ced78e	refs/tags/v0.9.3^{}
+8ca2c1abf07724678bd794b57ee4a62cc1a75569	refs/tags/v0.9.4
+ae0c6d328626d4f73ee0cab0ef61cf7f1b1d6582	refs/tags/v0.9.4^{}
+
+--- Local tags, sorted (git tag --list --sort=v:refname, exit 0) — 40 entries, 1..40 ---
+ 1 v0.1.0      11 v0.3.0      21 v0.9.3      31 v0.11.5
+ 2 v0.2.0      12 v0.4.0      22 v0.9.4      32 v0.11.6
+ 3 v0.2.0-rc.1 13 v0.5.0      23 v0.10.0     33 v0.11.7
+ 4 v0.2.1      14 v0.5.1      24 v0.10.1     34 v0.11.8
+ 5 v0.2.2      15 v0.6.0      25 v0.10.2     35 v0.11.9
+ 6 v0.2.3      16 v0.7.0      26 v0.11.0     36 v0.11.10
+ 7 v0.2.4      17 v0.8.0      27 v0.11.1     37 v0.11.11
+ 8 v0.2.5      18 v0.9.0      28 v0.11.2     38 v0.11.12
+ 9 v0.2.6      19 v0.9.1      29 v0.11.3     39 v0.11.13
+10 v0.2.7      20 v0.9.2      30 v0.11.4     40 v0.11.14
+
+Local tag count: 40. Remote tag-name count (^{} excluded): 40. Local == remote as sets.
+
+================================================================
+7. TAG INVENTORY vs README PUBLISHED LIST
+================================================================
+README.md:332 publishes the list. README.zh-CN.md:321 publishes the same list in Chinese.
+
+Command: sed -n '332p' README.md | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+(-[a-z0-9.]+)?' | sort -u
+  exit 0 -> 40 tokens
+Command: sed -n '321p' README.zh-CN.md | grep -oE ... | sort -u
+  exit 0 -> 40 tokens
+Command: comm -23 live_tags readme332_tags   (live but unlisted)
+  exit 0 -> (no output)
+Command: comm -13 live_tags readme332_tags   (listed but not live)
+  exit 0 -> (no output)
+Command: diff readme_en_tags readme_zh_tags
+  exit 0 -> IDENTICAL SETS
+
+Conclusion: exact set equality. All 40 live tags are listed in README.md:332; the README lists
+nothing that is absent from the remote; the zh-CN list at README.zh-CN.md:321 is the same set
+as the English list. The prior round's open item — a truncated inventory covering only
+v0.2.7..v0.9.4, unverified against the README — is now closed by full enumeration.
+
+README.md:332 also states explicitly, and this is consistent with the remote refs observed:
+`v0.2.0-rc.1` exists but is not a release (it predates the release workflow and its
+package.json still declares 0.1.0). That is why 40 tags exist while the "Published:" prose
+enumerates 39 releases plus the separate rc.1 sentence.
+
+================================================================
+8. VERSION REFERENCES (file:line literals)
+================================================================
+package.json:3
+  "version": "0.11.14",
+  command: grep -n '"version"' package.json ; exit 0
+
+package-lock.json:3
+  "version": "0.11.14",
+package-lock.json:9
+      "version": "0.11.14",
+  command: sed -n '1,12p' package-lock.json | grep -n '"version"' ; exit 0
+  (line 3 = lockfileVersion root "version"; line 9 = packages."" entry version; both 0.11.14,
+   so manifest and lock agree.)
+
+README.md:326
+  The package version in this repository is `0.11.14`. Install or roll back to an exact release with a tag suffix:
+README.md:48 and README.md:329
+  dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.11.14
+README.md:51
+  > `#v0.11.14` is the current release. Pin the tag you actually want; omitting it follows `main`, which is not a release. ...
+README.md:332
+  Use only a tag that exists on GitHub. Published: `v0.1.0`, ... and `v0.11.14`. ...
+
+README.zh-CN.md:315
+  本仓库声明的包版本是 `0.11.14`。需要安装或回退到某个已发布版本时，在地址后加标签：
+README.zh-CN.md:48 and README.zh-CN.md:318
+  dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.11.14
+README.zh-CN.md:51
+  > `#v0.11.14` 是当前发布版本。请固定你真正想要的标签；省略标签会跟随 `main`，那不是发布版本。...
+README.zh-CN.md:321
+  只使用 GitHub 上确实存在的标签。已发布：`v0.1.0`、...、`v0.11.14`。...
+
+CHANGELOG.md:6
+  ## [Unreleased]
+CHANGELOG.md:8
+  ## [0.11.14] - 2026-11-18
+  command: sed -n '1,12p' CHANGELOG.md | grep -n '^## ' ; exit 0
+
+Consistency: package.json:3 == package-lock.json:3 == package-lock.json:9 == README.md:326 ==
+README.zh-CN.md:315 == CHANGELOG.md:8 == newest tag v0.11.14. No mismatch found.
+
+================================================================
+9. WRITE SCOPE STATEMENT
+================================================================
+This task created exactly one file: .rsi/evidence/git-baseline/git-baseline.txt
+No src/, test/, lib/, docs/ file was modified by this task; no version was bumped; no ref,
+branch, tag or remote was mutated. Pre-existing and concurrently-appearing modifications
+listed in section 2 belong to other work in this shared tree.

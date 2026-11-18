@@ -33,10 +33,13 @@ class FakeSchedule implements LoopScheduleLike {
   readonly tasks = new Map<string, LoopScheduleTask>()
   readonly createCalls: { request: LoopScheduleCreate; actorSessionId?: string }[] = []
   readonly editCalls: LoopScheduleEdit[] = []
+  /** Set to make `create` refuse, so the route's refusal mapping is reachable. */
+  failCreate?: Error
   private seq = 0
 
   async create(request: LoopScheduleCreate, actorSessionId?: string): Promise<LoopScheduleTask> {
     this.createCalls.push({ request, ...actorSessionId === undefined ? {} : { actorSessionId } })
+    if (this.failCreate !== undefined) throw this.failCreate
     const id = `task-${++this.seq}`
     const task: LoopScheduleTask = {
       id,
@@ -366,6 +369,28 @@ describe('the switch route', () => {
     expect(res.statusCode).toBe(401)
     expect(res.body).toBe('')
     expect(schedule.createCalls).toHaveLength(0)
+  })
+
+  it('answers 413 for a body past the route limit', async () => {
+    const schedule = new FakeSchedule()
+    const route = wiring(schedule).routes[0]!
+    const huge = { action: 'open', sessionId: SESSION, prompt: 'x'.repeat(70 * 1024) }
+    const res = fakeResponse()
+    await route.handler(fakeRequest('POST', huge), res)
+    expect(res.statusCode).toBe(413)
+    expect(JSON.parse(res.body).code).toBe('loop/body')
+    expect(schedule.createCalls).toHaveLength(0)
+  })
+
+  it('reports a Host Schedule refusal as 409 instead of an internal error', async () => {
+    const schedule = new FakeSchedule()
+    schedule.failCreate = new Error('target session is archived')
+    const route = wiring(schedule).routes[0]!
+    const res = fakeResponse()
+    await route.handler(fakeRequest('POST', { action: 'open', sessionId: SESSION }), res)
+    expect(res.statusCode).toBe(409)
+    expect(JSON.parse(res.body)).toMatchObject({ ok: false, code: 'loop/schedule-refused' })
+    expect(JSON.parse(res.body).error).toContain('target session is archived')
   })
 
   it('reports an unavailable Schedule as 503 instead of a generic failure', async () => {

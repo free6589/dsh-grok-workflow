@@ -1,0 +1,12 @@
+# The working tree's lib/ is the build of the working tree's src/  (2026-11-19T07:38:16+08:00)
+# Why: scripts/verify-lib.mjs exports HEAD only (see its header), so the uncommitted
+#      slice a commit would carry is not covered by `npm run verify:lib`.
+# Step 1: isolated copy — src test scripts tsconfig.json tsconfig.build.json package.json
+#         into .tmp/wt-lib-check, node_modules symlinked to the repository's.
+# Step 2: node node_modules/typescript/bin/tsc -p tsconfig.build.json && node scripts/build-client.mjs
+# Step 3: cmp every emitted file against the repository's lib/
+emitted files: 145
+repo lib files: 145
+differing files: 0
+
+Result: 0 differing files, 145 emitted and 145 in lib/ — the artifacts match their source.

@@ -38,6 +38,17 @@ import type { WorkflowLogger } from './run.js';
 export declare const LOOP_TASK_TITLE = "Loop heartbeat";
 /** First line of every heartbeat prompt; the ownership marker cleanup matches on. */
 export declare const LOOP_PROMPT_PREFIX = "[grok-workflow loop]";
+/**
+ * True when this text is a heartbeat this plugin wrote.
+ *
+ * The marker is the only identity a `pre-step` listener has: the delivered message
+ * carries the prompt text and `source.kind`, not the Schedule row that produced it.
+ * A replacement prompt that drops the marker therefore also drops continuation
+ * routing — the marker is the ownership marker, not a decoration.
+ * @param text - message text as the step sees it.
+ * @returns true when the text leads with {@link LOOP_PROMPT_PREFIX}.
+ */
+export declare function isLoopHeartbeat(text: string): boolean;
 /** Default minutes between heartbeats. Also the hard floor: see {@link loopPolicyFromConfig}. */
 export declare const DEFAULT_LOOP_INTERVAL_MINUTES = 60;
 /** Hard ceiling on the interval, so a typo cannot park a loop for a year. */
@@ -227,11 +238,23 @@ export declare function isLoopTask(task: LoopScheduleTask, sessionId?: string): 
  */
 export declare function loopPolicyFromConfig(timeoutMs: number, intervalMinutes: number, rounds: number, failStreak: number): LoopPolicy;
 /**
- * Build the two-line rule Schedule stores. `DTSTART` is a whole UTC second so the
- * parser sees a real UTC date-time; the first actual occurrence is one interval after
- * acceptance, because Schedule chooses the first occurrence strictly after creation.
+ * Build the two-line rule Schedule stores.
+ *
+ * The anchor matters twice. Schedule commits `scheduledAt = next(now)` — the first
+ * occurrence strictly after creation — so the anchor itself is the first beat whenever
+ * it is at or behind the clock, while an anchor one interval ahead puts that beat a full
+ * interval out. And `COUNT` counts occurrences from the anchor, so an anchor at or
+ * behind the clock is already past: it spends one of the `rounds` and silently delivers
+ * `rounds - 1` beats. Anchoring one interval ahead of the next whole second satisfies
+ * both — every stored occurrence is still to come, and the first beat is never early.
+ *
+ * The anchor is rounded up rather than down because the wait must never be shorter than
+ * the interval: rounding down would put the first beat up to a second early. A whole
+ * second is required because the parser rejects a fractional `DTSTART`, so the grid
+ * cannot line up with a sub-second clock reading and the first beat may land up to one
+ * second late instead of exactly one interval out.
  * @param intervalMinutes - minutes between occurrences.
- * @param rounds - `COUNT` bound; exhaustion leaves the task stored as `ended`.
+ * @param rounds - `COUNT` boundary; every occurrence is delivered, then the task ends.
  * @param now - clock reading in epoch milliseconds.
  * @returns the normalized `DTSTART` + `RRULE` text.
  */
@@ -258,4 +281,18 @@ export declare function createLoopService(deps: LoopServiceDeps): LoopService;
 export declare function scheduleServiceOf(ctx: {
     readonly get?: (name: string) => unknown;
 }): LoopScheduleLike | undefined;
+/**
+ * Delete every heartbeat this plugin owns for one session, in one place.
+ *
+ * Both callers that must leave nothing behind share this body: the archive/stop
+ * cleanup on the service, and a brake that stops a loop after the fact. The count is
+ * what is actually gone, not what was attempted — a refused delete leaves a live row,
+ * and reporting "deleted" over a surviving heartbeat is the one lie this cleanup
+ * exists to prevent.
+ * @param service - the Host Schedule surface rows live in.
+ * @param sessionId - session whose heartbeats go.
+ * @param logger - warn sink for a refused delete.
+ * @returns how many rows are no longer stored.
+ */
+export declare function deleteSessionHeartbeats(service: LoopScheduleLike, sessionId: string, logger: WorkflowLogger): Promise<number>;
 //# sourceMappingURL=loop.d.ts.map

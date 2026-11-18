@@ -584,3 +584,33 @@ no history is rewritten, and no round is force-pushed.
   never-pushed** tag was deleted and re-created on the rebased commit before pushing. The tree
   was clean at the tag commit, `git diff --exit-code -- lib/` empty.
 
+
+## Round 16 — 2026-11-19 — 续跑开关进 composer dock + 心跳刹车（未发版）
+
+- **主题**：round 14 落地的续跑面只有一条 `POST /grok-workflow/loop`，D-069 当时把「客户端没有控件」
+  写成**现状**；round 15 之后主工作树里攒着一份未提交的实现（composer dock 开关、`src/loop-brakes.ts`、
+  两者各自的测试）。本轮就是**收口**：核对、记录、落地。
+- **改动（本轮新增的文件内容）**：`CHANGELOG.md` `[Unreleased]` 两条 Added（dock 开关 / 心跳可提前停，
+  双语）；`DECISIONS.md` **D-072**（开关放 dock 不放设置页、开关不带数字、停=拒绝+删行、六道刹车的输入
+  全是既有事实、token 是预算不是计量、失败轮=没写出助手消息），并把 D-069「现状」段与 D-071 的过时一句
+  指回 D-072；`docs/knowledge/STATE.md`、`VALIDATION.md`、`HANDOFF.md`、`.rsi/STATE.md` 记本轮。
+  `src/`、`test/` 的代码内容**没有**在本轮改动（开工/收工 sha256 指纹一致）。
+- **代码归属**：`src/client/index.js`（`:3527` 路径常量、`:3529` order、`:3665-3718` `LoopSwitch`、
+  `:3730-3743` 注册、`:3935` 挂载、`:4115-4120` 导出面）、`src/loop-brakes.ts`（六道刹车与
+  `plugin:grok-workflow/loop-round` 记录）、`src/gate.ts:1535-1575`（gate 里唯一入口与 `loop-stop`）、
+  `src/config.ts:388-399` + `:792-795`（四键与 clamp）、`test/loop-brakes.spec.ts`（35）、
+  `test/loop-runtime-wiring.spec.ts`（5）、`test/client.spec.ts` 的 dock 用例（92 条中的一部分）。
+- **门禁（`CONFIRMED`）**：`npm run typecheck` exit 0；`npx oxlint src test` = 22 warnings / 0 errors；
+  `npm run build` = `client bundle: 224412 bytes`，构建前后 `lib/` 145 文件 md5 清单 diff 为空（幂等）；
+  `npx vitest run` = **62 文件 / 1139 测试 PASS**（24.21s，比 `v0.11.15` 的 60/1081 多 2 文件 / 58 测试）。
+- **证据**：`.rsi/evidence/segment-5/`（`pre-head.txt`、`pre-status.txt`、`pre-fingerprints.txt`、
+  `build-seg5-attempt2.txt`、`lib-before.md5`、`lib-after-build.md5`、`lib-build-idempotence.txt`、
+  `typecheck-attempt2.txt`、`lint-attempt2.txt`、`full-vitest-attempt2.txt`、`verify-lib-precommit.txt`、
+  以及 attempt 1 的日志与 `NOTES.md`）。
+- **未验证（`NOT_RUN`）**：真实 Web GUI 点击开关；真实心跳投递（D-066，操作者动作）；插件 reload 时
+  Schedule 子 fiber 的重启语义（A27 §5 仍是 `HYPOTHESIS`）。
+- **发版**：本轮**不发版**（未 bump、未打标签、未建 Release、未 npm 发布）；`[Unreleased]` 留着，
+  下一次 patch 发版时搬进版本段。开关是用户可见的新增，版本纪律上属于 patch。
+- **status:** OK
+
+- **Landed as:** 见本轮 push 后的 `git log -1 --format=%H`（附录在下方，由记录提交补上）。

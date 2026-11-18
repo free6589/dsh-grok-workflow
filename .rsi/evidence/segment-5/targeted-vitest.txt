@@ -1,0 +1,24 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.tmp/seg5-snapshot
+
+ ✓ test/loop-runtime-wiring.spec.ts (5 tests) 171ms
+ ✓ test/config-limits-repair.spec.ts (24 tests) 200ms
+stderr | test/client.spec.ts > client settings page: reading, failure and retry > keeps still reading, read failed and not served as three different pages
+[grok-workflow] no settings namespace projects this plugin's fields: the row is disabled, renamed with an unreadable projection, or did not activate (see docs/LOCAL-TESTING.md#enable). The Grok workflow page cannot appear until it does.
+
+(node:62) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/client.spec.ts (92 tests) 138ms
+ ✓ test/loop-surface.spec.ts (16 tests) 57ms
+ ✓ test/config.spec.ts (36 tests) 53ms
+ ✓ test/loop.spec.ts (30 tests) 28ms
+ ✓ test/settings-projection.spec.ts (4 tests) 23ms
+ ✓ test/loop-brakes.spec.ts (35 tests) 29ms
+ ✓ test/docs-config-keys.spec.ts (12 tests) 16ms
+ ✓ test/docs-version.spec.ts (8 tests) 10ms
+
+ Test Files  10 passed (10)
+      Tests  262 passed (262)
+   Start at  07:39:18
+   Duration  3.03s (transform 647ms, setup 0ms, import 1.09s, tests 725ms, environment 1ms)
+

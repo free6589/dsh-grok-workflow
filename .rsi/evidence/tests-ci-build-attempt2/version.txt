@@ -1,0 +1,22 @@
+# version linkage at evidence time: 2026-11-19T02:03:54+08:00
+
+## bump chain (package.json version at each tag commit)
+7a79efb:   "version": "0.11.13",
+20eafea:   "version": "0.11.14",
+50c0321:   "version": "0.11.15",
+37cb0fc:   "version": "0.11.15",
+
+## package-lock.json version fields (worktree)
+3:  "version": "0.11.15",
+9:      "version": "0.11.15",
+
+## README pins
+README.md:3
+README.zh-CN.md:3
+v0.11.14` and `v0.11.15
+
+## CHANGELOG newest section
+8:## [0.11.15] - 2026-11-19
+50:## [0.11.14] - 2026-11-18
+105:## [0.11.13] - 2026-11-18
+126:## [0.11.12] - 2026-11-18

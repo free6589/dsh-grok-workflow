@@ -209,6 +209,33 @@ Ask the model to call `grok_workflow` with an objective, or supply a plan:
 
 Without `tasks`, the plugin asks a planner child to produce the plan.
 
+## Repeat runs (the composer switch)
+
+The strip under the message box (`conversation.composer.dock`) carries an
+`Auto-continue` / `自动接着跑` switch for the current session. It is the only
+shipped control that opens a loop; the `grok_loop` tool can read and close one but
+is refused with `loop/user-only` when it tries to open one. To check it by hand:
+
+1. open a session and look under the composer — the line reads `Checking…` (and the
+   switch is disabled) until the first read answers, then `Off` or
+   `On · every 60 min · 10 rounds left`;
+2. click once — the line names the interval and the rounds left, and
+   `POST /grok-workflow/loop {"action":"status","sessionId":"<id>"}` answers
+   `open: true` for that session;
+3. click again — the row is deleted and the same request answers `open: false`.
+
+What the switch sends is what the settings page stores: `loopIntervalMin`,
+`loopMaxRounds` and `loopFailStreak` are read when the loop opens, and the interval
+is floored at `max(60 min, one worst-case round)`, so `loopIntervalMin: 0` means the
+floor rather than "start now". `loopEnabled` is not read by the switch or by any
+driver yet — it is a stored default (see the README key table).
+
+Status: the request, refusal and status-line paths are covered by
+`test/client.spec.ts` against a scripted `fetch`; the click on a live instance is
+`NOT_RUN` as of this write-up — no DSH instance was started for it. A composition
+with no Schedule service answers `loop/unavailable`, and the line says the Host has
+no scheduler instead of failing silently.
+
 ## Disable or uninstall
 
 ```sh

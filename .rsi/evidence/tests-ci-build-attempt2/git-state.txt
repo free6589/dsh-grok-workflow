@@ -1,0 +1,66 @@
+# git state at evidence time: 2026-11-19T02:03:53+08:00
+
+## HEAD / remote
+37cb0fc01b068699a7ceaa611f95463c703fbcab
+37cb0fc01b068699a7ceaa611f95463c703fbcab
+
+## last 8 commits
+37cb0fc chore(rsi): record the worktree drift behind v0.11.15 and the sync applied
+b4299bc chore(rsi): record the v0.11.15 release results (tag, run ids, asset)
+fd56fd9 chore(rsi): record the working-tree gate (61 files / 1131 tests, verify:lib green)
+50c0321 chore(release): v0.11.15 — rebuild the published artifacts from their own source (RSI round 15)
+09d5daa chore(rsi): record the landed-tree gate and the idempotence proof (round 14 repair)
+3c24f92 fix(ci): fail the local gate when committed lib/ is not the build of src/
+b0d6d10 docs(rsi): record the v0.11.14 release incident and its repair on main
+8c8e367 fix(build): rebuild lib/loop.js so the committed artifacts match the released source
+
+## remote tags v0.11.13-v0.11.15 (objects and peels)
+bac26e3f31a4400609b8095cf8033235f2b60946	refs/tags/v0.11.13
+7a79efb75bbad37930cab4c3c76a8bcb3822d1db	refs/tags/v0.11.13^{}
+2a7b0748576f3b4b6b8ccfc655f8e53b4ad72b80	refs/tags/v0.11.14
+20eafea150d34d18dc99bae7523db62c1d8fcb38	refs/tags/v0.11.14^{}
+e52a8f4c415a7619891be4fbad04c247439baba9	refs/tags/v0.11.15
+50c0321e371db076908d5fb6cec94bb8be25f37b	refs/tags/v0.11.15^{}
+
+## build-input diff 50c0321(v0.11.15)..HEAD (empty = identical)
+(end)
+
+## worktree status (in-flight loop-brakes work by another writer; not landed)
+ M .rsi/ROUND.md
+ M .rsi/STATE.md
+ M docs/knowledge/DECISIONS.md
+ M docs/knowledge/HANDOFF.md
+ M docs/knowledge/RESEARCH.md
+ M docs/knowledge/STATE.md
+ M docs/knowledge/VALIDATION.md
+ M docs/knowledge/WORKFLOW-DESIGN.md
+ M lib/client.js
+ M lib/config.d.ts.map
+ M lib/config.js
+ M lib/config.js.map
+ M lib/gate.d.ts
+ M lib/gate.d.ts.map
+ M lib/gate.js
+ M lib/gate.js.map
+ M lib/loop-surface.d.ts.map
+ M lib/loop-surface.js
+ M lib/loop-surface.js.map
+ M lib/loop.d.ts
+ M lib/loop.d.ts.map
+ M lib/loop.js
+ M lib/loop.js.map
+ M src/client/index.js
+ M src/config.ts
+ M src/gate.ts
+ M src/loop-surface.ts
+ M src/loop.ts
+ M test/client.spec.ts
+ M test/config-limits-repair.spec.ts
+ M test/config.spec.ts
+ M test/loop-surface.spec.ts
+ M test/loop.spec.ts
+?? .rsi/evidence/git-baseline/
+?? .rsi/evidence/tests-ci-build-attempt2/
+?? settings-simple-mock.html
+?? src/loop-brakes.ts
+?? test/loop-brakes.spec.ts

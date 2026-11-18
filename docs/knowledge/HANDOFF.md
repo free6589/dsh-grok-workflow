@@ -1,5 +1,53 @@
 # Agent Handoff
 
+## 2026-11-19 — RSI round 16：续跑开关与心跳刹车落地（未发版）
+
+- **From:** 执行代理 agent-56（任务段 `segment 5/5`，收口轮）· **To:** 用户 / 下一轮接手者
+- **做了什么（`CONFIRMED`）**：把工作树里那份未提交的实现（composer dock 开关 + `src/loop-brakes.ts`）
+  核对、记录并**落地成一个提交**：`CHANGELOG.md` `[Unreleased]` 补两条 Added（双语）、
+  `DECISIONS.md` 新增 **D-072** 并把 D-069「现状」段 / D-071 的过时一句指回它、`STATE.md` /
+  `VALIDATION.md` / 本文件 / `.rsi/ROUND.md` / `.rsi/STATE.md` 记本轮；`src/`、`test/` 的代码内容
+  没有在本轮改动（开工与收工指纹一致）。
+- **门禁（`CONFIRMED`）**：`npm run typecheck` exit 0 · `npx oxlint src test` 22 warnings / 0 errors ·
+  `npm run build` 后 `lib/` 145 文件 md5 清单与构建前完全相同（幂等）· `npx vitest run`
+  **62 文件 / 1139 测试 PASS** · 提交后 `npm run verify:lib` 见 `.rsi/ROUND.md` Round 16 的 Landed as 段。
+  日志在 `.rsi/evidence/segment-5/`。
+- **未验证（`NOT_RUN`）**：真实 Web GUI 里点一次那个开关；真实心跳投递（D-066，操作者动作）。
+  本轮没有启动 DSH 实例，也没有创建、修改或删除任何 Schedule 任务。
+- **发版（`NOT_RUN`，需要操作者授权）**：本轮只提交到 `main`，**没有** bump 版本、没有打标签、
+  没有建 Release、没有 npm 发布。开关是用户可见的新增，下一次发版应走 patch（`0.11.16`）并把
+  `[Unreleased]` 两条搬进新版本段；`finish-round.py` 的流程对这份提交可直接快进使用。
+- **接手注意**：`settings-simple-mock.html` 仍是未跟踪的草稿，**不入库**（round 15 的结论未变）；
+  P3-01 / P3-02 仍 OPEN，是本轮之后仅剩的池内条目；`src/index.ts:292` 那句
+  「an open loop survives a plugin reload and an unload deletes it」两半仍对不上（A27 §5 的
+  `HYPOTHESIS`），改它要连 `lib/` 一起重建，留给下一次动 `src/index.ts` 的人。
+
+## 2026-11-19 — 文档记忆回接：round 15 的记录被并发写入者按旧副本覆盖，`D-070` 撞号
+
+- **From:** 执行代理 agent-41（任务段 `segment 1/5`）· **To:** 用户 / 下一轮接手者
+- **现象（`CONFIRMED`）**：工作树里另一位写入者在 00:26–01:39 之间把 `STATE.md` / `HANDOFF.md` /
+  `VALIDATION.md` / `.rsi/ROUND.md` / `.rsi/STATE.md` 按 round 14 的旧副本落回，等于删掉 round 15
+  （`v0.11.15` 发布）的全部记录；`DECISIONS.md` 里新写的「预设缺口在续跑面之后怎么落」又占用了
+  `D-070`，与 round 15 的发布事故条同号。当时的 `git diff --numstat`：`0/17`（`.rsi/ROUND.md`）、
+  `1/48`（`STATE.md`）、`0/11`（`HANDOFF.md`）、`0/17`（`VALIDATION.md`）、`85/60`（`.rsi/STATE.md`）
+  —— 四个纯删除加一个整篇回退，所以「复原」不会丢掉任何属于他人的新增内容。
+- **处理（`CONFIRMED`）**：`git checkout HEAD -- docs/knowledge/STATE.md docs/knowledge/HANDOFF.md
+  docs/knowledge/VALIDATION.md .rsi/ROUND.md .rsi/STATE.md` 把 round 15 记录放回原处；`DECISIONS.md`
+  里恢复发布事故条为 `D-070`、把预设缺口条改为 **`D-071`**，并同步 `RESEARCH.md` A26 的那一处引用。
+- **新增（`CONFIRMED`）**：`RESEARCH.md` 新增 **A27**，回答上一轮留空的 `host_loop_service` 判据
+  （LoopService 不是服务注册；Schedule 靠 `ctx.get` 查、查不到走 503；工具与路由各自 `effect` 撤回；
+  卸载 `await stopAll` 删光自己的行、会话停/归档删一行、删除数按 `catalog` 复核）；并在 A24 §5b
+  加了一句时态更正——「客户端没有控件」只对已落地的 `v0.11.15` 成立，工作树里有一份未提交的实现。
+- **验证（`CONFIRMED`）**：`npx vitest run test/docs-version.spec.ts test/docs-config-keys.spec.ts
+  test/docs-architecture-version.spec.ts` → **3 files / 23 tests passed**（本轮未改 `src/`、`test/`、`lib/`）。
+- **树状态（`CONFIRMED`，重要）**：并入时另一位写入者仍在跑（`lib/loop-brakes.js` 生成于 07:35）。
+  **不要** `git add -A`：`src/loop-brakes.ts`、`test/loop-brakes.spec.ts`、`src/client/index.js` 的
+  composer 开关、`settings-simple-mock.html` 都还没有人审阅。文档若再次被「按旧副本重建」，先跑
+  `git diff --numstat -- docs .rsi` 看是不是纯删除，再决定复原还是接受。
+- **Next action**：与 round 15 的交接一致（P3-01 / P3-02，或客户端开关那一轮）；文档侧没有新待办。
+  `src/index.ts:292` 那句「an open loop survives a plugin reload and an unload deletes it」两半对不上，
+  读者先看 A27 §5 —— 它是注释措辞缺陷，改它得连 `lib/` 一起重建，留给拥有 `src/` 的那一轮。
+
 ## 2026-11-19 — RSI round 15：`v0.11.14` 发布事故收口，`0.11.15` 是第一个真正带续跑面的发布
 
 - **From:** 执行代理 agent-29（任务 `docs_release_memory`，attempt 2）· **To:** 用户 / 下一轮接手者

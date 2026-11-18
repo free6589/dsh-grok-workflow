@@ -29,6 +29,14 @@ import type { WorkflowLogger } from './run.js'
 /** Largest browser body this route accepts; the switch sends three short fields. */
 const MAX_BODY_BYTES = 64 * 1024
 
+/** A body past {@link MAX_BODY_BYTES}; its own answer is 413, not an internal fault. */
+class BodyTooLarge extends Error {
+  constructor() {
+    super(`request body exceeds ${MAX_BODY_BYTES} bytes`)
+    this.name = 'BodyTooLarge'
+  }
+}
+
 /** The route carrier slice this module registers on. */
 export interface LoopWebServer {
   register(route: {
@@ -258,6 +266,10 @@ async function handleLoopRoute(
     const snapshot = await dispatchLoopAction(loop, action, sessionId, body)
     sendJson(res, 200, { ok: true, action, loop: snapshot })
   } catch (error) {
+    if (error instanceof BodyTooLarge) {
+      sendJson(res, 413, { ok: false, code: 'loop/body', error: error.message })
+      return
+    }
     if (error instanceof LoopError) {
       sendJson(res, statusForLoopCode(error.code), { ok: false, code: error.code, error: error.message })
       return
@@ -315,7 +327,7 @@ async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknow
     req.on('data', (chunk: Buffer) => {
       size += chunk.length
       if (size > MAX_BODY_BYTES) {
-        reject(new Error('body too large'))
+        reject(new BodyTooLarge())
         req.destroy()
         return
       }

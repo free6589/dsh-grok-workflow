@@ -1375,13 +1375,12 @@ timer、准入、投递、补投与归档策略。`src/loop.ts` 因此只有 `cr
 `stopAll`、会话停止/归档时 `forgetSession` 都会删掉自己拥有的行，删除被宿主拒绝时只记 warn，
 不把它报成干净的关闭。备选「关闭 = `active: false`」被排除，理由同上。
 
-**一条必须写明的现状（不是选择，是事实）**：本仓库的客户端 bundle 只渲染设置页的四个字段，
-**没有任何已发布的 UI 代码去调那条路由**（`grep -rn "grok-workflow/loop" src/` 只有一处命中：
-`src/loop.ts:56` 的常量；路由注册在 `src/loop-surface.ts:125` 引用该常量，`src/client/index.js`
-没有任何 `fetch`/路由调用点）。所以今天的用户可达路径就是那条 POST；
-输入框旁的开关是**未实现的后续工作**，README 与 CHANGELOG 因此都不写「已有开关」，只写设置页的
-分组与那条路由。把它写进产品（在设置页或输入框旁加一个真正会 POST 的控件）需要自己的测试与
-单独一轮主题，不在本轮范围。
+**一条必须写明的现状（不是选择，是事实；已被 `D-072` / round 16 supersede）**：本轮（round 14）落地时，
+本仓库的客户端 bundle 只渲染设置页的四个字段，**没有任何已发布的 UI 代码去调那条路由**
+（当时 `grep -rn "grok-workflow/loop" src/` 只有一处命中：`src/loop.ts:56` 的常量；路由注册在
+`src/loop-surface.ts:125` 引用该常量，`src/client/index.js` 没有任何 `fetch`/路由调用点）。所以当时
+的用户可达路径就是那条 POST；输入框旁的开关是**未实现的后续工作**，README 与 CHANGELOG 因此都不写
+「已有开关」。**这一段在 round 16 失效**：composer dock 里的开关已经落地并被测试钉住，见 `D-072`。
 
 **代价（明确接受）**：① 用户要打开循环得走一条 API 请求，直到那个控件出现；② 连败停在宿主侧不可
 强制，只能靠文案，模型不遵守就不会停——轮数上限是唯一的硬止损，所以它必须存在；③ 删行意味着
@@ -1434,3 +1433,147 @@ GitHub Release。**不包含** npm 发布、不包含移动/删除任何标签�
 `44349708692` success、`b0d6d10` CI `44351065108` success）；`gh release view v0.11.14` → release not
 found；`.rsi/evidence/round-014/lib-stale.txt`；本轮发版结果 `.rsi/ROUND.md` Round 15、
 `.rsi/evidence/round-015/`。
+
+## D-071 — 预设缺口在续跑面之后怎么落：仍选「用户拥有第一跳」，方案②（提示切预设）被排除（2026-11-19 · preset gap · round 14 之后）
+
+- **Status:** CONFIRMED（代码与 DSH `0.2.2-rc.3` 安装内的预设文件、工具源码、用户指南逐条实测；
+  真实 Web GUI 与真机心跳投递 `NOT_RUN`——本轮没有创建、修改或删除任何定时任务）
+
+**背景**：D-066 面对的问题是「跑循环的会话往往是最省的 `minimal`，它没有 `schedule_*`，谁来建第一条
+心跳」，当时给了两个方案并选了 ①（操作者在有能力的环境里手动建第一条心跳），排除 ②（打开循环开关时
+先提示切到带 `schedule_*` 的预设）。round 14（`20eafea`）把续跑面落了地，① 的执行面因此变了：
+用户在浏览器 POST 一条路由，插件的 LoopService 用 **Host 的 Schedule 服务**建那行任务，**不经过任何
+会话的 `schedule_*` 工具**。于是同一个问题要在现树上重答一次——目标会话是 `minimal` 时，第一跳归谁、
+由谁执行、缺工具时说什么。本条只回答这三问，不改 D-066 的选择本身（它的失效条件未被触发）。
+
+**选择：方案①——第一跳归用户，循环会话永远不是创建者。** ① 现在有两种执行形态，都属 ①：
+
+1. 在 Automation tasks 页「Create manually」手动建；新建会话「uses the default preset」
+   （`docs/user/guide/schedule.md:30`），天然是有能力的那一档。
+2. 用户（或其浏览器里的一个请求）POST `POST /grok-workflow/loop`（`src/loop.ts:56` 的
+   `LOOP_ROUTE_PATH`）；插件在**自己的挂载作用域**里 `ctx.get('schedule')`（`src/loop.ts:495-500`）
+   拿到 Host 服务后 `service.create(...)`（`src/loop.ts:401-406`）。
+
+两者的共同点不是「在哪儿点」，而是**动手的是用户**：`open` 对任何已定义 actor 抛 `loop/user-only`
+（`src/loop.ts:354-359`），所以模型、子代理、以及被投递出来的那一轮都不能给自己续命。
+D-066 里的「手动建」应读作「用户动作」，不是「必须去 Automation tasks 页面」——那是 ① 在
+round 14 之前的唯一形态，不是它的定义。
+
+**方案②「打开循环开关时先提示切到带 `schedule_*` 的预设」被排除**，四条理由：
+
+1. **它解决的不是真正的问题。** 建行的是 Host 的 Schedule 服务，不是 `schedule_*` 工具；工具只在
+   挂载作用域里注册（`dsh-tool-schedule/src/index.ts:4`：「a preset decides which agents receive
+   them」），而插件是通过服务查找建行的。切预设换来的能力，插件用不上——② 让用户先做一次迁移，
+   去做一件插件已经能做的事。
+2. **插件改不了预设。** 预设决定哪个作用域被注册（同上），本仓库只能通过 bundle patch 挂载自身，
+   AGENTS.md 也禁止改 DSH core。所以 ② 的「提示」永远只是提示，最终动手的仍是人——比 ① 多一道拒绝，
+   没少一次人工。
+3. **② 的失败态是 ownerless。** 开关显示 ON，而没有任何人能建、能读、能停那条心跳，与 AGENTS.md 的
+   「No ownerless background work」直接冲突；① 的失败态是「没建」，那是一眼能看见的。
+4. **① 可审计。** Automation tasks 页跨会话列出全部任务，可创建、编辑、运行、暂停、恢复、删除；
+   ② 把「能不能调度」变成会话的一个属性，在事件流里查不到。
+
+**循环会话不得被假设能建定时任务**（`schedule_*` 缺失时，任一条成立即不得假设）：
+
+- (a) `minimal` 预设既无 `tool-schedule` 也无 `time-context`：DSH `0.2.2-rc.3` 的
+  `dsh-web-app/presets/minimal.patch.yml`（78 行）只有 persona / tool-fs / compaction / persistent-shell
+  四组，`grep -cE "schedule|time-context"` = **0**；`presets/standard.patch.yml` 的 `time-context` 在
+  :19、`tool-schedule` 在 :38，`cordis`/`ptc` 同档（`docs/user/guide/schedule.md:22`）。
+- (b) 委派子代理即使预设暴露了这四个工具也会被拒（`dsh-tool-schedule/src/index.ts:292` 的注释与
+  :307 的 `subagent_session` 拒绝）。
+- (c) 没有 `time-context` 就没有当前时间与浏览器时区，模型连「下一次什么时候」都不该猜。
+
+正确行为是**报缺口并停**：有 `grok_loop` 时报「缺心跳 / 心跳到期」，没有时报「我建不了，请用
+Automation tasks 或那条路由」，然后停下——不换说法假装建好了，也不把「开关 ON」说成「循环在跑」。
+
+**UX 影响**：
+
+- 目标会话是 `minimal` 时，用户用那条 POST 打开循环**看不到任何预设相关的提示**——没有「请切换预设」
+  对话框，也没有「已开启」的假确认。成功就是那行任务真的出现在 Automation tasks 里；失败是明确的码：
+  无 Schedule 服务 → `loop/unavailable`（HTTP 503，`src/loop.ts:331`、`src/loop-surface.ts:315`），
+  宿主拒绝 → `loop/schedule-refused`（`src/loop.ts:345` 的 `callSchedule` 包装）。
+- 会话缺工具不影响第一跳，但影响**会话自己读/停**那行任务：`grok_loop` 只有 `status`/`close`，
+  且只在插件被挂载、Host 组合了 Schedule 时注册（`src/loop-surface.ts:123`）；本条不断言它在
+  `minimal` 会话里一定可见，只断言它**不能 open**。
+- 客户端的开关控件在 round 14 时还没有（D-069「现状」段）：当时的用户可达路径就是那条 POST。
+  round 16 已把它补上（composer dock，`conversation.composer.dock`，id `grok-workflow-loop`），
+  见 `D-072`；它发的仍然是同一条 POST，所以本条「打开只走浏览器请求」的判断保持不变。
+
+**实现影响**：
+
+- 插件不注册 `schedule_*` 工具、不注入、不 patch 任何预设；只做服务查找（`scheduleServiceOf`，
+  `src/loop.ts:494-500`），查不到就 `loop/unavailable`，插件其余功能照常加载。
+- 建行必须带 `target: { kind: 'session', sessionId }`（`src/loop.ts:401-406`），目标就是收到心跳的
+  那个会话；因此目标会话的预设与「能不能建」无关。
+- 将来若真的加一个 UI 控件，它也只能发那条 POST，**不得**给模型补 `open`——否则 ① 的所有权当场失效
+  （与 D-069「选择二」同一条理由）。
+
+**代价（明确接受）**：① 让无人值守的启动多一步人工动作，表面上与「无人值守」相反；但那一步恰好是
+唯一能被看见、能被撤销的一步。② 的「顺滑」是错觉——省下的那次点击，会在第一次心跳缺失时以
+「循环静默停摆」的形式还回来，而停摆时没有日志、没有报错，只有一份写着 ON 的开关。
+
+**失效条件**：若 DSH 将来给 `minimal` 加上 `tool-schedule` 与 `time-context`，(a) 失效；若 DSH 允许
+第三方 bundle 修改他人预设，② 的第 2 条理由失效。两种情况都应新开一条 supersede 本条（以及 D-066），
+不就地改。
+
+**证据索引**：`src/loop.ts`（`LOOP_TASK_TITLE`、`LOOP_ROUTE_PATH`、`open` 的 user-only、
+`service.create`、`scheduleServiceOf`、`loop/unavailable`、`loop/schedule-refused`）、
+`src/loop-surface.ts`（工具与路由注册、503 映射）、`src/gate.ts:472-477`（心跳不是用户消息，
+`non-user-source` 直通）、`README.md:246-268`（Repeat runs）、DSH `0.2.2-rc.3`：
+`presets/minimal.patch.yml`、`presets/standard.patch.yml:19,38`、`dsh-tool-schedule/src/index.ts:4,292,307`、
+`docs/user/guide/schedule.md:22,30,62`；前一条 D-066（方案二选一的出处）、D-069（续跑面归谁）。
+
+## D-072 — 续跑的开关放进 composer dock，停 = 拒绝并删行；预算与「失败轮」的定义写进模块而不是留给读者猜（2026-11-19 · round 16）
+
+- **Status:** CONFIRMED（代码、测试与本机门禁实测；真实 Web GUI 点击与真机心跳投递 `NOT_RUN`——
+  本轮没有起 DSH 实例，也没有创建、修改或删除任何定时任务，与 D-066 一致）
+
+**背景**：round 14 落地的续跑面只有一条 `POST /grok-workflow/loop`（`D-069`），round 15 把它作为
+`0.11.15` 发布出去；当时 D-069 明确写了「客户端没有控件」是**现状**而不是选择。round 16 把那个控件
+和「提前停」两件事一起做掉，本条记录三处归属选择：开关放哪儿、停是什么、以及两个会被人误读的量。
+
+**选择一：开关进 `conversation.composer.dock`，不进设置页。** 设置页的四个 `loop*` 键是**部署**配置
+（存下、校验、投影），而开关是**这个会话这一次**的动作；把两者放进同一个面板，会让「存了一个默认值」
+和「现在开了一个循环」看起来像同一件事。dock 是会话作用域的，平台自己声明的槽位是
+`{ kind: 'list', scope: 'session' }`，`sessionId` 由会话插件按 `SessionStandardProps` 注入
+（`src/client/index.js:3730-3743`，id `grok-workflow-loop`、order 90、注册是**追加**的，替换任何既有
+控件都不做）。备选「设置页加一个按钮」被排除：设置页是 profile 级、跨会话，按错了会替别的会话开循环。
+
+**选择二：开关不带数字。** 点击只发 `open` / `close` / `status`，规则永远按**存下来的**
+`loopIntervalMin`、`loopMaxRounds`、`loopFailStreak` 生成（`src/client/index.js:3527` 的路径常量，
+与 `src/loop.ts` 的 `LOOP_ROUTE_PATH` 同源，`test/client.spec.ts` 把两边钉住）。备选「开关自己收一组
+数字」被排除：那等于在 UI 里再实现一次策略，两套数字迟早不一致。拒绝的点击**不翻面**：403
+（`loop/user-only`）、503（`loop/unavailable`）、非 JSON 回答分别显示原因，状态停在最后一次已知值。
+
+**选择三：停 = 拒绝这一步 + 删掉那行，不是暂停。** 沿用 D-069 选择四的理由：暂停的行仍是一条
+存着的心跳，仍需要一个主人。`src/gate.ts:1541-1575` 在 `agent/pre-step` 上先分类：`loop-stop` 时
+`await loop.stop(...)` 删行**再** `{ kind: 'reject' }`，所以那一轮零次模型调用，且下一次到点不会再回来。
+
+**选择四（本条的实质）：刹车的输入全部是已存在的事实，不新增 timer / 队列 / 计数器。**
+`src/loop-brakes.ts` 每次心跳只回答「继续还是停」，依据是：操作者停止文件（`.rsi/STOP`，可用
+`GROK_WORKFLOW_STOP_FILE` 改位置，`:52`/`:55`）、插件已被卸载（`ActiveState.disposed`）、连续多少轮
+没写出助手消息、当天已放行轮数（上限 24，`:58`）、token 预算（每轮预留 200 000，上限 2 000 000，
+`:67`/`:70`）、当天第一轮以来的耗时。这些数从会话自己的记录里读回（`plugin:grok-workflow/loop-round`，
+`:210`），所以 Host 重启后仍然算得清。备选「进程内计数器」被排除：它随进程一起消失，重启即失忆。
+
+**两个量必须写清定义，不许读者猜**（写在模块头部，不是只写在文档里）：
+① token 是**预算不是计量**——没有任何用量记录能在 `pre-step` 拿到，所以按固定预留扣，它约束「最多能花
+多少」，不声称等于账单；
+② 一轮「失败」的定义是**没有写出任何助手消息**——写出错误报告的一轮不算失败，这个刹车是给静默停摆
+用的，不是给「产出内容不合我意」用的。
+
+**代价（明确接受）**：① 开关只能在浏览器里点，无人值守仍然需要一次人工动作，这正是 D-066/D-071 的
+选择；② token 预算偏保守（预留 20 万/轮），长期循环会先撞预算而不是先撞账单；③ 失败轮靠「有没有写出
+助手消息」判断，一轮写了半句然后卡住仍算成功，这个误差被显式接受而不是被掩盖。
+
+**失效条件**：若 DSH 的 `pre-step` 或会话记录将来能提供每轮真实用量与结局，选择四的 ①② 两条应被新条
+supersede（改成计量与真实结局），而不是就地把注释改一改；若平台把 `conversation.composer.dock` 改成
+`single` 槽位或取消 `sessionId` 注入，选择一的挂载方式必须重做。
+
+**证据索引**：`src/client/index.js`（`:260-262` 文案键、`:3527-3530` 路径/id/order、`:3665-3718` 组件、
+`:3730-3743` 注册、`:3935` 挂载、`:4115-4120` 导出面）、`src/loop-brakes.ts`（整篇，含 `:52`/`:55`/
+`:58`/`:67`/`:70`/`:210`）、`src/gate.ts:1535-1575`（刹车在 gate 里的唯一入口与 `loop-stop` 的处理）、
+`src/loop.ts:303`（`COUNT` 写进规则）、`test/client.spec.ts`（92 条，含「只挂 dock、追加、不碰
+model selector」）、`test/loop-brakes.spec.ts`（35 条）、`test/loop-runtime-wiring.spec.ts`（5 条，
+真 Loader + 记录型 Schedule）、README「Repeat runs」的 *The dock switch* 段、`docs/LOCAL-TESTING.md`
+「Repeat runs (the composer switch)」节、CHANGELOG `[Unreleased]`。

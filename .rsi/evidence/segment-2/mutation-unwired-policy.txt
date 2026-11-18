@@ -1,0 +1,83 @@
+# Mutation replay — the wiring spec fails when the bundle stops reading the config
+# Copy: .tmp/loop-wiring-mutation = git archive HEAD + test/loop-runtime-wiring.spec.ts
+# Mutation in lib/index.js (one line, the only place the policy is built):
+#   - return loopPolicyFromConfig(live.timeoutMs, live.loopIntervalMin, live.loopMaxRounds, live.loopFailStreak);
+#   + return loopPolicyFromConfig(0, 0, 10, 3);
+# Command: npx vitest run test/loop-runtime-wiring.spec.ts   (cwd = the copy)
+# Expectation: the two config-reading cases fail; the fence, cleanup and mounting cases
+#              do not read the policy and stay green.
+
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.tmp/loop-wiring-mutation
+
+ ❯ test/loop-runtime-wiring.spec.ts (5 tests | 2 failed) 187ms
+     × opens a heartbeat whose rule is the operator's own round cap and interval 77ms
+     × keeps the configured interval as a floor, and refreshes instead of minting a second row 19ms
+     ✓ refuses through the composition's connection fence before Schedule is touched 12ms
+     ✓ deletes every heartbeat it owns when the plugin is disposed 16ms
+     ✓ mounts no route where the composition has no web surface, while the tool and workflow still load 60ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/loop-runtime-wiring.spec.ts > the loop keys reach the running plugin, not only the settings page > opens a heartbeat whose rule is the operator's own round cap and interval
+AssertionError: expected { ok: true, action: 'open', …(1) } to match object { ok: true, action: 'open', …(1) }
+(3 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "action": "open",
+    "loop": {
+-     "intervalMinutes": 180,
++     "intervalMinutes": 60,
+      "open": true,
+-     "rounds": 7,
++     "rounds": 10,
+      "sessionId": "2d7bd1e7-1111-2222-3333-444455556666",
+    },
+    "ok": true,
+  }
+
+ ❯ test/loop-runtime-wiring.spec.ts:268:25
+    266|     const answer = await post(capture.route!.handler, { action: 'open'…
+    267|     expect(answer.status).toBe(200)
+    268|     expect(answer.body).toMatchObject({
+       |                         ^
+    269|       ok: true,
+    270|       action: 'open',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/loop-runtime-wiring.spec.ts > the loop keys reach the running plugin, not only the settings page > keeps the configured interval as a floor, and refreshes instead of minting a second row
+AssertionError: expected { ok: true, action: 'open', …(1) } to match object { Object (loop) }
+(7 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "loop": {
+-     "intervalMinutes": 180,
+-     "rounds": 7,
++     "intervalMinutes": 90,
++     "rounds": 10,
+    },
+  }
+
+ ❯ test/loop-runtime-wiring.spec.ts:299:24
+    297|     // 90 is below the configured 180, so the floor wins: a request ma…
+    298|     // the wait the operator set.
+    299|     expect(first.body).toMatchObject({ loop: { intervalMinutes: 180, r…
+       |                        ^
+    300|
+    301|     const second = await post(capture.route!.handler, { action: 'open'…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 3 passed (5)
+   Start at  07:38:39
+   Duration  524ms (transform 40ms, setup 0ms, import 82ms, tests 187ms, environment 0ms)
+

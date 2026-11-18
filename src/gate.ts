@@ -60,6 +60,9 @@ import type { DeliveryPhase } from './records.js'
 import { redactError, redactSecrets } from './redact.js'
 import type { ActiveState, RunOutcome, WorkflowLogger } from './run.js'
 import { runSingleCall, runWorkflow } from './run.js'
+import { isLoopHeartbeat, scheduleServiceOf } from './loop.js'
+import { createLoopBrakes } from './loop-brakes.js'
+import type { LoopBrakeCode, LoopBrakePort } from './loop-brakes.js'
 import {
   FIXED_HISTORY_CHARS, FIXED_HISTORY_TURNS, FIXED_INSTANT_RECEIPT, FIXED_MAX_QUEUED_MESSAGES,
   FIXED_TRIAGE_ASK, FIXED_TRIAGE_FOLLOWUP_AS_FAST,
@@ -105,6 +108,15 @@ export interface GateDeps {
    * the pass is deterministic and never depends on the repository's own docs.
    */
   memoryDocRoots?: readonly string[]
+  /**
+   * Loop brakes for a Host heartbeat delivery.
+   *
+   * Omitted means "no driver is wired": a heartbeat still passes as
+   * `loop-continuation`, but nothing is counted and no brake can trip. The composition
+   * builds the real port in {@link installGate}; tests pass a stub to pin one brake
+   * without a Schedule service.
+   */
+  loop?: LoopBrakePort
   ctx: Context
   config: ResolvedConfig
   state: ActiveState
@@ -133,6 +145,12 @@ interface AgentQueue {
 type Classification =
   | { kind: 'pass'; reason: string }
   | { kind: 'admit'; agent: Agent; agentId: string; key: string; request: string; turn: number }
+  /**
+   * A heartbeat whose brakes tripped: the loop is stopped and the step is refused.
+   * Its own verdict rather than a `pass` reason, because the caller has to delete the
+   * stored Schedule row — a label would leave that work undone.
+   */
+  | { kind: 'loop-stop'; agentId: string; code: LoopBrakeCode; detail: string }
 
 /**
  * Workflow answer for one admitted batch, before a transport is chosen.
@@ -463,12 +481,19 @@ function readScope(deps: Pick<GateDeps, 'config' | 'readConfig'>): ResolvedConfi
  * to by other listeners, so it cannot identify a new user message.
  */
 export function classifyPreStep(
-  deps: Pick<GateDeps, 'config' | 'readConfig'>,
+  deps: Pick<GateDeps, 'config' | 'readConfig' | 'loop'>,
   payload: PreStepPayload,
 ): Classification {
   const messages = Array.isArray(payload.messages) ? payload.messages : []
   // Tool continuation or wake: nothing was claimed, so no run may start.
   if (messages.length === 0) return { kind: 'pass', reason: 'empty-batch' }
+  // A Host heartbeat is the one non-user message this gate knows how to route: it
+  // continues the session's own work and must never be read as a request, and it is
+  // the only place the loop's brakes can run — the delivery is the driver's whole
+  // clock. Placed before the source filter, which would otherwise swallow it as
+  // `non-user-source` and let the turn run with no stop condition at all.
+  const heartbeat = messages.find(message => isHeartbeatMessage(message))
+  if (heartbeat !== undefined) return classifyHeartbeat(deps, payload)
   const userMessages = messages.filter(message => {
     const source = message.source as { kind?: unknown } | undefined
     return source?.kind === 'user'
@@ -493,6 +518,56 @@ export function classifyPreStep(
   if (alreadyRouted(session, key)) return { kind: 'pass', reason: 'already-routed' }
   const request = userMessages.map(textOf).filter(text => text !== '').join('\n\n')
   return { kind: 'admit', agent, agentId, key, request, turn: payload.turn }
+}
+
+/**
+ * True when this message is a loop heartbeat delivered by the Host.
+ *
+ * Two facts have to agree: the delivery source (`schedule`) and the ownership marker
+ * this plugin writes into every prompt it creates. Either alone is spoofable — a user
+ * can paste the marker, and a scheduled reminder can carry arbitrary text — so the pair
+ * is what identifies the heartbeat.
+ */
+function isHeartbeatMessage(message: UserMessage): boolean {
+  const source = message.source as { kind?: unknown } | undefined
+  if (source?.kind !== 'schedule') return false
+  return isLoopHeartbeat(textOf(message))
+}
+
+/**
+ * Route one heartbeat: continuation, or a stop that spends nothing.
+ *
+ * The continuation branch starts **no** run — the heartbeat turn is the session's own
+ * ordinary turn — so `maxConcurrency` and `maxRetries` are untouched by construction;
+ * this path can never add a second in-flight workflow. A tripped brake is answered with
+ * `reject`, the one decision that produces zero model calls, and the stored Schedule row
+ * is deleted by the caller so the heartbeat cannot arrive again.
+ */
+function classifyHeartbeat(
+  deps: Pick<GateDeps, 'config' | 'readConfig' | 'loop'>,
+  payload: PreStepPayload,
+): Classification {
+  const session = sessionOf(payload.agent)
+  // A delegated child never owns a loop: Schedule targets the session the user opened,
+  // so a heartbeat here is a mis-targeted delivery, and charging it would put the
+  // parent's accounting into the child's log.
+  const header = session?.header
+  if (header?.origin === 'subagent' || (header?.delegationDepth ?? 0) > 0) return { kind: 'pass', reason: 'subagent' }
+  const agentId = agentIdOf(payload.agent)
+  if (deps.loop === undefined) return { kind: 'pass', reason: 'loop-continuation' }
+  const input = {
+    sessionId: agentId,
+    session,
+    config: readScope(deps),
+  }
+  const verdict = deps.loop.review(input)
+  if (verdict.kind === 'stop') {
+    return { kind: 'loop-stop', agentId, code: verdict.code, detail: verdict.detail }
+  }
+  // Charged before the turn runs: an admitted round consumes a slot and may already
+  // have spent quota even if the turn then crashes.
+  deps.loop.admit(input)
+  return { kind: 'pass', reason: 'loop-continuation' }
 }
 
 /**
@@ -1456,16 +1531,43 @@ export function installGate(deps: GateDeps): boolean {
     return true
   }
 
+  /**
+   * The loop driver's brakes.
+   *
+   * Built here rather than injected by the composition: a profile that composes
+   * Schedule gets them without a second wiring point, and a profile without it gets a
+   * port that can still stop on the operator marker and the session's own records but
+   * has no row to delete. The Schedule lookup is lazy because the gate may be installed
+   * before that service is mounted.
+   */
+  const loop: LoopBrakePort = deps.loop ?? createLoopBrakes({
+    schedule: () => scheduleServiceOf(ctx as unknown as { get?: (name: string) => unknown }),
+    logger,
+    disposed: () => state.disposed,
+  })
+  const classifyDeps = {
+    config,
+    loop,
+    ...deps.readConfig === undefined ? {} : { readConfig: deps.readConfig },
+  }
+
   const handle = async (payload: PreStepPayload, next: () => Promise<PreStepDecision>): Promise<PreStepDecision> => {
     let verdict: Classification
     try {
-      verdict = classifyPreStep(deps, payload)
+      verdict = classifyPreStep(classifyDeps, payload)
     } catch (error) {
       // Fail closed (never a direct model answer) *and* visible (P0-3): the user
       // learns that the gate failed, instead of watching an empty turn.
       const reason = redactError(error)
       logger.warn(`gate classification failed: ${reason}`)
       return classificationFailure(payload, reason)
+    }
+    // A tripped brake is the one refusal that also has to remove the driver: the
+    // heartbeat is refused (zero model calls) and its Schedule row is deleted, so the
+    // loop cannot come back on the next occurrence.
+    if (verdict.kind === 'loop-stop') {
+      await loop.stop({ sessionId: verdict.agentId, code: verdict.code, detail: verdict.detail })
+      return { kind: 'reject' }
     }
     // Pass-through calls the next listener untouched: a foreign failure must
     // surface as that listener's failure, not as this gate's refusal.

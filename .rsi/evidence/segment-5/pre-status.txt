@@ -1,0 +1,47 @@
+ M README.md
+ M README.zh-CN.md
+ M docs/LOCAL-TESTING.md
+ M docs/knowledge/DECISIONS.md
+ M docs/knowledge/HANDOFF.md
+ M docs/knowledge/RESEARCH.md
+ M docs/knowledge/VALIDATION.md
+ M docs/knowledge/WORKFLOW-DESIGN.md
+ M lib/client.js
+ M lib/config.d.ts.map
+ M lib/config.js
+ M lib/config.js.map
+ M lib/gate.d.ts
+ M lib/gate.d.ts.map
+ M lib/gate.js
+ M lib/gate.js.map
+ M lib/loop-surface.d.ts.map
+ M lib/loop-surface.js
+ M lib/loop-surface.js.map
+ M lib/loop.d.ts
+ M lib/loop.d.ts.map
+ M lib/loop.js
+ M lib/loop.js.map
+ M src/client/index.js
+ M src/config.ts
+ M src/gate.ts
+ M src/loop-surface.ts
+ M src/loop.ts
+ M test/client.spec.ts
+ M test/config-limits-repair.spec.ts
+ M test/config.spec.ts
+ M test/loop-surface.spec.ts
+ M test/loop.spec.ts
+ M test/settings-fixture.ts
+?? .rsi/evidence/git-baseline/
+?? .rsi/evidence/round-014/docs-fold-verify.txt
+?? .rsi/evidence/segment-2/
+?? .rsi/evidence/segment-5/
+?? .rsi/evidence/tests-ci-build-attempt2/
+?? lib/loop-brakes.d.ts
+?? lib/loop-brakes.d.ts.map
+?? lib/loop-brakes.js
+?? lib/loop-brakes.js.map
+?? settings-simple-mock.html
+?? src/loop-brakes.ts
+?? test/loop-brakes.spec.ts
+?? test/loop-runtime-wiring.spec.ts

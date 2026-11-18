@@ -195,12 +195,91 @@ describe('repeat-run policy: the counts a loop may not exceed', () => {
 })
 
 describe('the stored rule is the bound Schedule enforces', () => {
+  /**
+   * The occurrences Schedule would deliver: `DTSTART` + k intervals, counting the
+   * anchor, with the first one strictly after `now` — DSH's `scheduledAt = next(now)`
+   * contract followed by `COUNT` occurrences. Recomputed here from the rule text so
+   * the assertion does not borrow the service's own arithmetic.
+   */
+  function occurrencesAfter(rrule: string, now: number): number[] {
+    const stamp = /DTSTART:(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/.exec(rrule)
+    if (stamp === null) throw new Error(`no DTSTART in ${rrule}`)
+    const start = Date.parse(`${stamp[1]}-${stamp[2]}-${stamp[3]}T${stamp[4]}:${stamp[5]}:${stamp[6]}Z`)
+    const interval = (intervalMinutesOf(rrule) ?? 0) * 60_000
+    const bound = roundsOf(rrule) ?? 0
+    const occurrences: number[] = []
+    let cursor = now
+    for (let index = 0; index < bound; index += 1) {
+      // Occurrences are `start + k intervals` for k >= 0, so an anchor still ahead of
+      // the clock starts the count at k = 0 rather than at a negative index.
+      const steps = Math.max(0, Math.floor((cursor - start) / interval) + 1)
+      occurrences.push(start + steps * interval)
+      cursor = start + steps * interval
+    }
+    return occurrences
+  }
+
   it('writes a two-line UTC rule whose COUNT is the round cap', () => {
-    expect(loopRrule(90, 7, NOW)).toBe('DTSTART:20231114T221320Z\nRRULE:FREQ=MINUTELY;INTERVAL=90;COUNT=7')
-    // A whole second is required by the parser; a millisecond anchor rounds up, so
-    // the stored first occurrence is never in the past.
-    expect(loopRrule(60, 3, NOW + 999)).toContain('DTSTART:20231114T221321Z')
+    // The anchor sits one interval ahead of the next whole second, so the first beat is
+    // a full interval out and every stored occurrence is still to come.
+    expect(loopRrule(90, 7, NOW)).toBe('DTSTART:20231114T234320Z\nRRULE:FREQ=MINUTELY;INTERVAL=90;COUNT=7')
+    expect(loopRrule(60, 3, NOW + 999)).toContain('DTSTART:20231114T231321Z')
     expect(loopRrule(60, 3, NOW)).toContain('FREQ=MINUTELY;INTERVAL=60;COUNT=3')
+  })
+
+  it('waits a whole interval before the first beat, whatever the clock phase', () => {
+    // Regression: an anchor at or just ahead of the clock is itself the first
+    // occurrence, because Schedule takes the first occurrence strictly after creation.
+    // A loop opened at 22:13:20.4 fired at 22:13:21 — a round starting while the
+    // session was still settling, and rounds that could stack.
+    for (const offset of [0, 1, 250, 999]) {
+      const opened = NOW + offset
+      const rrule = loopRrule(60, 10, opened)
+      const [first] = occurrencesAfter(rrule, opened)
+      const wait = (first ?? 0) - opened
+      // Never early: the wait is the interval plus at most the sub-second rounding the
+      // whole-second anchor forces.
+      expect(wait).toBeGreaterThanOrEqual(60 * 60_000)
+      expect(wait).toBeLessThanOrEqual(60 * 60_000 + 1_000)
+    }
+    // An open at a whole second needs no rounding: exactly one interval out.
+    expect((occurrencesAfter(loopRrule(60, 10, NOW), NOW)[0] ?? 0) - NOW).toBe(60 * 60_000)
+  })
+
+  it('spends no stored occurrence before the clock, so COUNT rounds are delivered', () => {
+    // `COUNT` counts occurrences from the anchor. An anchor at or behind the clock is
+    // already past, so it consumes one count and the loop delivers `rounds - 1` beats
+    // — a quiet off-by-one against the configured cap. Every occurrence must be ahead
+    // of the clock for the round cap to be the number of rounds the user gets.
+    for (const offset of [0, 413, 999]) {
+      const opened = NOW + offset
+      const occurrences = occurrencesAfter(loopRrule(60, 4, opened), opened)
+      expect(occurrences).toHaveLength(4)
+      for (const at of occurrences) expect(at).toBeGreaterThan(opened)
+      // Spacing is the interval, so rounds cannot stack on each other.
+      for (let index = 1; index < occurrences.length; index += 1) {
+        expect((occurrences[index] ?? 0) - (occurrences[index - 1] ?? 0)).toBe(60 * 60_000)
+      }
+    }
+  })
+
+  it('opens a loop without arming an immediate heartbeat', async () => {
+    // The same guarantee through the public operation, with an unaligned clock: the
+    // row the service creates is the row Schedule will fire an hour out, four times.
+    const schedule = new FakeSchedule()
+    const opened = NOW + 413
+    const service = createLoopService({
+      schedule: () => schedule,
+      logger: { warn: vi.fn() },
+      now: () => opened,
+      policy: () => ({ intervalMinutes: 60, rounds: 4, failStreak: 3 }),
+    })
+    await service.open({ sessionId: 'session-a' })
+    const stored = schedule.rows[0]?.rrule ?? ''
+    const occurrences = occurrencesAfter(stored, opened)
+    expect(occurrences).toHaveLength(4)
+    expect((occurrences[0] ?? 0) - opened).toBeGreaterThanOrEqual(60 * 60_000)
+    expect((occurrences[0] ?? 0) - opened).toBeLessThanOrEqual(60 * 60_000 + 1_000)
   })
 
   it('reads the interval and the bound back off a stored rule', () => {

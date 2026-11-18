@@ -1,0 +1,10 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+ ✓ test/loop-runtime-wiring.spec.ts (5 tests) 180ms
+
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+   Start at  07:37:43
+   Duration  385ms (transform 35ms, setup 0ms, import 75ms, tests 180ms, environment 0ms)
+

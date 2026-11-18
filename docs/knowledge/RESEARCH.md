@@ -516,6 +516,10 @@ Source: 本节是研究任务，只读代码与文档，**未改 `src/`、`test/
 `node_modules/@deepseek-ai/dsh-web-app/presets/*.patch.yml`；本仓 `src/gate.ts`、`src/carryover.ts`、
 `src/run.ts`、`src/script.ts`、`test/gate.spec.ts`。
 
+修订 2026-11-19（工作提交 `20eafea`，round 14）：§1–§4 结论不变；§5 的答案被 round 14 的续跑面扩展（新增
+§5b），§3 与 §6 里两处 `grep` 计数按现树改写。§5b 的依据是 `src/loop.ts`、`src/loop-surface.ts`、
+`test/loop-surface.spec.ts`、`dsh-web-app/cordis.patch.yml:131-136` 与 `HANDOFF.md` 的 round 14 记录。
+
 ### 1. 「心跳」在 DSH 里没有独立类型（`CONFIRMED`）
 
 它只是 Host 上的一条普通 Schedule 任务，用递归 timing 反复投递同一段 prompt。七种 timing 里可当心跳的
@@ -562,8 +566,10 @@ if (userMessages.length === 0) return { kind: 'pass', reason: 'non-user-source' 
 心跳消息的 `source.kind` 是 `'schedule'`，落进 `non-user-source` 分支 —— **心跳那一轮不进入本插件的
 工作流**，由主模型直接处理该 prompt。也就是说本插件「每条用户消息都必须走完整工作流」的强制入口只
 覆盖真人消息，不覆盖定时投递。这一条只看代码即可确定，但覆盖有缺口：`test/gate.spec.ts:274-292` 用
-`runtime-context` 与 `grok-workflow` 两种 kind 钉住了 pass 路径，`grep -rn "'schedule'" test/` 无命中，
-所以 `'schedule'` 这一 kind 本身是 `NOT_VERIFIED`（过滤器按字符串比较，行为可推导，但没有测试证据）。
+`runtime-context` 与 `grok-workflow` 两种 kind 钉住了 pass 路径；round 14 之后 `grep -rn "'schedule'"`
+在 `test/` 里有 3 处命中，但都是 loop 规格里的 Cordis 服务名（`test/loop.spec.ts:507`、
+`test/loop-surface.spec.ts:272`、`:420`），没有一处钉消息的 `source.kind`。所以 `'schedule'` 这一 kind
+本身仍是 `NOT_VERIFIED`（过滤器按字符串比较，行为可推导，但没有测试证据）。
 
 ### 4. 「连续主题」不是被检测出来的，是按会话重建的（`CONFIRMED`，修正前提）
 
@@ -595,12 +601,62 @@ preset」）。从 `minimal` 会话建的 `new_once` 心跳，之后每一轮都
 循环要么由人/带工具的会话反复 arm，要么一开始就在带工具的 preset 下创建。这一条解释了「谁负责建任务」
 为什么必须是一个有工具的会话或人，而不是被投递出来的那一轮自己。
 
+### 5b. round 14 之后：插件成了建任务方，但只替**用户**建（`CONFIRMED`，`20eafea`）
+
+`src/loop.ts` 把「谁建心跳」从「一个挂了 `schedule_*` 的会话」改成「插件的 LoopService 替用户建」。
+
+建任务那段是 `src/loop.ts:394-398`：
+
+```ts
+const created = await callSchedule('the task creation', () => service.create({
+  title: LOOP_TASK_TITLE,
+  prompt,
+  timing: { kind: 'rrule', rrule },
+  target: { kind: 'session', sessionId },
+}))
+```
+
+目标是**本会话**（`this_session`），不是 `new`/`new_once`，所以 §5 里「新会话捕获创建者 preset 与 cwd」
+的陷阱对这条路径不成立 —— 心跳永远回到同一个会话，不需要新会话重新拿到工具。
+
+但 `open` 一开始就拒绝任何带 actor 的调用（`src/loop.ts:347-352`，错误码 `loop/user-only`）。插件这条
+路径上唯一的建任务入口是浏览器路由 `POST /grok-workflow/loop`：常量在 `src/loop.ts:56`，注册在
+`src/loop-surface.ts:126-141`，处理函数 `handleLoopRoute`（`:242`）第一件事就是
+`connection?.requestRejection(req)`（`:249-254`），即 DSH 自己的 Host/Origin 校验加浏览器认证；建任务时
+`loop.open({…})` 不传 actor（`:300-307`，注释原话「a browser request is a user action」）。面向模型的
+`grok_loop` 工具只有 `status`/`close`；schema 里保留 `open` 是为了让拒绝可读而不是“无此动作”
+（`src/loop-surface.ts:154-213`，测试 `test/loop-surface.spec.ts:100-104` 断言 `loop/user-only`）。
+
+Schedule 服务本身是 Host 级，与 preset 无关：`dsh-web-app/cordis.patch.yml:131-136` 在应用组合里挂
+`@deepseek-ai/dsh-schedule`，注释原话是「The clock reading and the four reminder tools belong to the
+`standard`, `cordis`, and `ptc` presets, which declare them in their own scope.」插件挂 `grok_loop` 的条件
+也只是 `schedule` 与 `tools` 两个服务存在（`src/loop-surface.ts:119-124`），不读 preset 的工具清单。于是
+答案分三层：
+
+- preset 决定**模型**能否直接调 `schedule_create`（standard/ptc/cordis 有，minimal 没有）。
+- 它不决定 Host 能否存定时任务：`schedule` 服务在 web 应用组合里就有。
+- 所以在没有 `schedule_*` 的 preset 下，建心跳的仍然是**人**——经插件路由/开关调 `LoopService.open`，
+  既不是会话自己，也不是被投递出来的那一轮。这与 D-066（第一条心跳是操作者手动动作）和 D-069
+  （续跑面归谁）同向。
+
+一个诚实的缺口：客户端目前**没有**调那条路由的控件（`HANDOFF.md` 2026-11-18 round 14 节写明
+「用户可达路径就是那条 HTTP 请求」；`grep -rn "grok-workflow/loop" src/` 只有常量一处），所以“人怎么点”
+仍是 `NOT_RUN`，不是 `CONFIRMED`。
+
+> 2026-11-19 复核（只改这一句的时态，不改结论）：上面那句对**已落地**的 `v0.11.15` 成立。当前工作树里
+> 另有一位写入者未提交、未审阅的 composer 开关（`src/client/index.js`，挂 `conversation.composer.dock`）
+> 与 `src/loop-brakes.ts`；`grep -rn "grok-workflow/loop" src/` 现在有 3 处命中：`src/loop.ts:70`
+> （常量，HEAD 时为 `:56`）与 `src/client/index.js:3522`（客户端同一路径），另有 `src/loop-brakes.ts:210`
+> 的 `plugin:grok-workflow/loop-round` 标记。行号随工作树移动，引 A24 前先按本节 §0 的口径重数。
+
 ### 6. 未验证项与本仓缺口（`NOT_VERIFIED` / `NOT_RUN`）
 
 - 真机心跳 `NOT_RUN`：需要 Host 常驻、≥60 秒下限与真实模型额度，本轮没有起实例，不标 pass。
-- 本仓 `src/` 没有任何代码识别 `source.kind === 'schedule'`：`grep -i schedule src/` 的命中全是
-  `setInterval` 调度（`src/checkpoint/wiring.ts:462-511`）与任务调度器/“是否可调度”措辞
-  （`src/paths.ts`、`src/panel.ts:167`、`src/report.ts:126`、`src/script.ts:1805`），与本主题无关。
+- 本仓 `src/` 没有任何代码识别**消息**的 `source.kind === 'schedule'`：`grep -i schedule src/` 的命中有
+  `setInterval` 调度（`src/checkpoint/wiring.ts:462-511`）、任务调度器/“是否可调度”措辞（`src/paths.ts`、
+  `src/panel.ts:167`、`src/report.ts:126`、`src/script.ts:1805`），以及 round 14 新增的 loop 面
+  （`src/loop.ts`、`src/loop-surface.ts`、`src/index.ts`）——后者用的是 `ctx.get('schedule')` 服务
+  （`src/loop.ts:487-488`）和 `create({… target:{kind:'session'}})`，同样不看消息来源。
 - ~~`.rsi/` 全目录无 "heartbeat" 字样~~（这是本节研究当时的实测，已被 **A25** 取代：此后新增
   `.rsi/HEARTBEAT.md` 与 `.rsi/tools/heartbeat-guard.sh`）。仓库的循环概念仍只有 `Round N` 与
   `.rsi/PROTOCOL.md` 的一轮一主题——心跳负责**触发**一轮，不是第二种循环。
@@ -662,3 +718,252 @@ DSH 安装内 `docs/user/guide/schedule.md:24` 写明每次投递至少比上一
 真的起一条定时任务并收一次投递：本机未创建、未修改、未删除任何定时任务（D-066 规定第一条心跳是
 操作者动作）。守卫在真仓上的判定是 `SKIP code=dirty-tracked next_round=14`（round 14 在飞），
 证据 `.rsi/evidence/heartbeat-guard/repo-now.txt`。
+
+## A26 — 心跳链路复核：投递怎么开下一轮、pre-step 认不认「续跑」、minimal 下第一条心跳归谁（2026-11-19，`CONFIRMED`；真机可达性 `NOT_RUN`）
+
+Source: 只读任务，**未改 `src/`、`test/`、`lib/`、`package.json`**。依据 = DSH 安装内
+`docs/subsystems/schedule.md`、`docs/subsystems/core.md`、`docs/subsystems/slots.md`、
+`node_modules/@deepseek-ai/dsh-schedule/src/runtime.ts`；本仓 `src/config.ts`、`src/gate.ts`、
+`src/settings.ts`、`src/client/index.js`、`src/loop.ts`、`src/loop-surface.ts`、`src/loop-brakes.ts`、
+`src/index.ts`、`src/carryover.ts`、`.rsi/HEARTBEAT.md`、`.rsi/PROTOCOL.md`。
+A24/A25 是这三问的第一版答案；本节补它们没引的四个面（`config.ts` / `settings.ts` / `client/index.js` /
+`slots.md`），并按 §0 的口径重钉行号。
+
+### 0. 行号怎么读（引用「对不上」先看这里）
+
+这个仓在 2026-11-19 凌晨有多个任务在同时改同一批文件，同一个文件在不同树里行号不同，所以每条引用
+都跟一个**锚点字符串**，行号只是指针：
+
+- **基线提交 `3c24f92`**（`main`）。**不带标注的行号 = 该提交里的行号**，复现方式
+  `git show 3c24f92:src/gate.ts | sed -n '1487p'`。仓库自己的文档也按这个树写：`.rsi/HEARTBEAT.md:13`
+  引的 `src/gate.ts:474` 与 `:471-477` 就是 HEAD 的数。
+- **工作树快照** = 2026-11-19T01:2x 实测：`gate.ts`、`loop.ts`、`loop-surface.ts`、`client/index.js`、
+  `config.ts` 都有未提交改动，另有新文件 `src/loop-brakes.ts`（这几个文件当时仍在被别的任务改，
+  所以不记增删行数）。凡两树不同，写成 `src/gate.ts:1487（HEAD；工作树 :1583）`。
+- 快照指纹（`sha256` 前 12 位，**测量时刻**）：`gate.ts 7dde71eb5512`、`loop.ts 55483a52622f`、
+  `loop-surface.ts 6543545e5e3f`、`config.ts c4d053572df3`、`settings.ts d3bb641c6e61`、
+  `loop-brakes.ts 85bc847c4c4f`。并发任务仍在写这些文件，重算不一致属正常——重锚用锚点字符串，
+  不要用数字。`src/client/index.js` 漂得最快（一个小时内 `:3524` → `:3522`），所以 §3 里它的四条
+  引用都写成「测量时刻行号 + 锚点」。
+
+### 1. 一条心跳如何开出下一轮（`CONFIRMED`）
+
+四跳，每跳一个出处：
+
+- **投递**：`dsh-schedule/src/runtime.ts:353` 造 `createUserMessage({ …, source: { kind: 'schedule' } })`，
+  `:356` 调 `agent.followup(message)`。`docs/subsystems/core.md:120-121` 定义 `followup` 为
+  「Queue an ordinary follow-up turn and wake the driver. The item becomes the **sole ordinary message
+  of its own turn**.」——心跳就是它那一轮里唯一的普通消息，不是后台线程。
+- **落回同一会话**：循环任务的 target 是 `session`（`src/loop.ts:394-398`，工作树 `:420-425`），
+  `docs/subsystems/schedule.md:80` 的 target 表：`session` = 「Deliver to one existing Session」。
+  每一轮回到建任务的那个会话，不需要新会话重新拿工具。
+- **节律与合并在 Host 侧**：`schedule.md:127` 只有一个 Host timer 驱动，复用会话的任务会
+  「hold their execution slot until the target Agent becomes idle; intervening occurrences coalesce」；
+  `:129` 是每任务 60 秒下限；`:131` 是「Session inbox persistence precedes the task receipt write」——
+  回执只证明入队，不证明那一轮做完了。
+- **轮数上限在规则里，不在插件里**：`src/loop.ts:274-277`（工作树 `:300-303`）的 `loopRrule` 把轮数
+  写成 `COUNT=${rounds}`；`schedule.md:69` 规定 `COUNT` 取 1–1000，`:71` 规定每次实际发生计一次，
+  `:24` 写明「Exhaustion leaves the task stored as `ended`」。插件没有计数器（D-069 选择三）。
+
+**「一轮」是什么**：心跳投递出来的那一轮 = `.rsi/PROTOCOL.md:7-17` 的六步（读输入 / 选**一个**主题 /
+实施 / 自测 / 写 `ROUND.md` / 不自行发布）。`.rsi/HEARTBEAT.md:70-75` 把这件事说清楚：那六步就是
+「what older notes call "R1–R6"; the label is not a round number」。所以 **R1–R6 是那一个 turn 内部的
+六步，不是六个 turn、也不是六次投递**；心跳负责**触发**一轮，不是第二种循环。轮号写在
+`{{NEXT_ROUND}}` 占位符里（`HEARTBEAT.md:24`），由守卫脚本填。
+
+**进没进工作流：没有强制。** 心跳消息的 `source.kind` 是 `schedule`，pre-step 不把它当请求（§2），
+这一轮由主模型自己处理；工作流要跑起来，得模型在那一轮里调 `grok_workflow`（工具名默认值在
+`src/config.ts:355`，注册在 `src/index.ts:211` 定义、`:289` `ctx.tools.register(tool)`）。
+`src/config.ts:36-40` 那句「Every round is one full workflow run charged against provider quota」
+讲的是**账**，不是**闸**：闸不拦它，模型不调工具就只是一次普通回答。
+
+### 2. pre-step 认不认「续跑」：认「心跳」，不认「主题」（`CONFIRMED`）
+
+挂载点：`src/gate.ts:1487`（工作树 `:1583`）`host.on?.('agent/pre-step', handle)`；`handle` 在
+工作树 `:1548` 起；判定函数 `classifyPreStep` 在 `:465`（工作树 `:483`）。基线 `3c24f92` 上没有
+「续跑」这回事，工作树上刚长出一个「心跳」分支——**两者都不做主题判断**，这就是本问的答案。
+
+1. **基线**：`classifyPreStep` 只按 `message.source.kind` 分类。`schedule` 来源不是 `user`，落到
+   `:477`（工作树 `:502`）的 `{ kind: 'pass', reason: 'non-user-source' }`；`pass` 就是不干预，
+   工作树 `:1568` 的 `if (verdict.kind === 'pass') return next()` 即此意。空批走 `:471`
+   （工作树 `:489`）的 `empty-batch`。没有主题、相似度、阈值或跨轮状态分支。
+2. **工作树（未提交）**：在来源过滤**之前**先认心跳——
+   `const heartbeat = messages.find(m => isHeartbeatMessage(m)); if (heartbeat !== undefined) return
+   classifyHeartbeat(deps, payload)`（`gate.ts:495-496`）。识别靠**一对事实**，不靠文本相似度：
+   `source.kind === 'schedule'` 且 prompt 以本插件的 `[grok-workflow loop]` 开头
+   （`isHeartbeatMessage` 在 `:531-535`；标记 `LOOP_PROMPT_PREFIX` 在 `src/loop.ts:44`，两树同；
+   判定函数 `isLoopHeartbeat` 在 `src/loop.ts:56-58`，这个函数本身也是工作树新增，`3c24f92` 里没有）。
+   理由写在 `gate.ts:526-529`：任一条单独都能被伪造——用户能粘贴标记，任何定时提醒都能带任意文本。
+   `classifyHeartbeat`（`:546-564`）只做二选一：刹车端口 `review()` 说停 → `{ kind: 'loop-stop' }`
+   （`handle` 在 `:1562-1565` 删掉 Schedule 行并 `{ kind: 'reject' }`，零模型调用；删除走
+   `LoopBrakePort.stop`（`src/loop-brakes.ts:257`）→ `deleteSessionHeartbeats`（`src/loop.ts:566-579`），
+   没有 Schedule 服务时只拒、不删）；否则 `admit()` 记一轮，然后
+   `{ kind: 'pass', reason: 'loop-continuation' }`。**续跑分支不启动任何 run**——注释原话
+   「The continuation branch starts **no** run — the heartbeat turn is the session's own ordinary
+   turn」（`:540-541`）。刹车项见 `src/loop-brakes.ts:14-22`（operator stop / unload / fail streak /
+   daily cap / token budget / time budget），全部从已有会话记录推导，驱动不持有 timer 或队列。
+3. **RSI 心跳不进这个分支**：`.rsi/HEARTBEAT.md` 的模板（`:24` 起）不以 `[grok-workflow loop]` 开头，
+   所以即使在工作树上也走 `non-user-source` 直通。插件刹车只管插件自己开的那种 loop。
+
+**那「主题连续性」靠什么？** 三个载体，一个都不是 pre-step 的检测：**会话本身**（同一 session，
+历史就在那里）；**prompt 字面**（RSI 把上一轮摘要填进模板，理由在 `.rsi/HEARTBEAT.md:10-17`：
+心跳轮拿不到 carryover，所以摘要必须进 prompt）；**`answerInTurn` 路径上的 carryover 摘要**
+（`src/carryover.ts:314` 的 `DIGEST_HEADER`，由 `src/gate.ts:986-995` 交给运行，工作树 `:1055-1064`）——
+心跳轮拿不到它，因为只有被判定为 `admit` 的真人消息才走那条路。D-067 因此规定摘要写进 prompt。
+
+### 3. minimal preset 下，第一条心跳谁建：**人**（`CONFIRMED`；真机可达性 `NOT_RUN`）
+
+先把「谁能开」钉在代码上：
+
+- `src/loop.ts:347-353`（工作树 `:373-380`）：`open` 对任何**已定义**的 actor 抛 `loop/user-only`，
+  文案原话「a loop heartbeat can be opened only by the user from the composer switch; an agent cannot
+  open one on the user's behalf」。子代理、被投递的那一轮、任何带 actor 的调用都开不了。模型侧工具
+  `grok_loop`（`name: LOOP_TOOL_NAME`，`src/loop-surface.ts:148`，工作树 `:156`）的 schema 里留着 `open`
+  （`:157` 的 `enum: ['status', 'close', 'open']`，工作树 `:165`），执行时在 `:185`（工作树 `:193-198`）抛同一
+  错误码——留着是为了让拒绝可读、可测；真正跑得下去的分支只有 `status` / `close`。
+- **唯一入队入口是浏览器那条 POST**：`src/loop-surface.ts:125`（工作树 `:133`）注册 `LOOP_ROUTE_PATH`
+  （`src/loop.ts:56`，工作树 `:70`；字面量 `/grok-workflow/loop`），`handleLoopRoute`（`:234`，工作树 `:242`）先过
+  `connection?.requestRejection(req)`（`:241`，工作树 `:249`：Host/Origin 校验加浏览器认证），再由
+  `dispatchLoopAction` 的 `open` 分支（`:279`，工作树 `:291-306`）调 `loop.open` 且**不传 actor**
+  （`:288`，工作树 `:300-301`，注释原话「a browser request is a user action, which is exactly what
+  `open` accepts」）；
+  落库在 `src/loop.ts:394-398`（工作树 `:420-425`）
+  `service.create({ …, target: { kind: 'session', sessionId } })`。
+- **「人」今天点的是什么**：基线 `3c24f92` 的 client 没有这个开关
+  （`git show 3c24f92:src/client/index.js | grep -c 'composer.dock'` = 0，也没有路由字面量），那时
+  「人」只能手工 `POST`。工作树上有未提交的实现：`conversation.composer.dock` 里的 `LoopSwitch`
+  （注册 `src/client/index.js:3727-3733` 的 `name: 'conversation.composer.dock'`，组件 `:3660` 的
+  `function LoopSwitch(`），`openLoop` 发 `{ action: 'open', sessionId }`（`:3614`），路由常量在
+  `:3522`（`LOOP_ROUTE_PATH = '/grok-workflow/loop'`）。以上四条都是测量时刻行号，见 §0。落点选 `composer.dock`（`docs/subsystems/slots.md:194` 声明的
+  list slot，在 composer 卡片下方）而不是 `input.activity`（`slots.md:9` 的「between the model
+  selector and Send」）；两者都是平台已声明的槽，插件贡献 UI 的通道都是 `ctx.slots.register()`
+  （`slots.md:5`）。
+- **运维侧同样算「人」**：`.rsi/HEARTBEAT.md:81-87`（Step 3）写明定时任务由操作者在 Automation tasks
+  里建、或由挂了 `schedule_*` 的预设会话建；`minimal` 不挂 `schedule_*`（A24 §5 的结论；本次实测
+  `dsh-web-app/presets/minimal.patch.yml` 的 `grep -c tool-schedule` = 0，该键只出现在同目录
+  `cordis.patch.yml` / `ptc.patch.yml` / `standard.patch.yml`），子代理也拿不到这些工具。所以没有 `schedule_*` 的
+  会话只能报告，不能自称下一轮已排期。
+- **设置页那四个字段不建任务**：`src/config.ts:215-218` 收 `loopEnabled` / `loopMaxRounds` /
+  `loopFailStreak` / `loopIntervalMin`，四个都是 `.volatile()`（HEAD `:381-384`；工作树 `:388-399`，
+  每个键多了中英文 `.description()`）；默认 `DEFAULT_LOOP_ENABLED = false`（`:134`）、
+  `DEFAULT_LOOP_INTERVAL_MIN = 0`（`:142`，0 = 用下限，不是立刻开始）、硬上限
+  `loopIntervalMin: 10_080`（`:44`，七天）。`src/index.ts:291-296` 把这件事写死：「this plugin owns
+  no timer… `loopEnabled` stays the deployment default for a **future automatic driver**」——今天没有
+  读者：`grep -rn loopEnabled src/` 只有 schema 与载入期 repair（`config.ts:777-795`）、两处类型声明
+  （`types.ts:157` / `:200`）、两处注释（`loop.ts:5`、`index.ts:295`）。
+- `src/settings.ts` 是设置面的**读侧**：`describeSelf`（`:258`）用
+  `settings.describe({ redactSecrets: true })`（`:262`）认领命名空间，`:273` 的注释记「21 volatile
+  fields once the four loop keys joined」。这四个键确实进了设置投影——只说明「可读可改」，不说明「可建」。
+
+三层答案，缺一层都不完整：
+
+1. **会话自己建不了**：`minimal` 不挂 `schedule_*`，且 `open` 对带 actor 的调用一律拒。
+2. **被投递的那一轮也建不了**：它同样是带 actor 的模型调用；D-066 因此规定「循环会话只负责报告」，
+   D-071 又排除了「提示用户切预设」这条路（该条原编号 D-070，与 round 15 的发布事故条撞号，
+   2026-11-19 复核时改为 D-071，发布事故条保留 D-070），回到「用户拥有第一跳」。
+3. **能建的只有人**：经 `POST /grok-workflow/loop`（`action: "open"`），或在工作树上点 composer 底部
+   那个开关（同一个 POST）。目标固定为**本会话**，所以后续每轮不再需要 `schedule_*`，A24 §5 里
+   「`new_once` 捕获创建者 preset 与 cwd」的陷阱对这条路径不成立。
+
+未做（`NOT_RUN`）：真机点一次 `open` 并收一次投递——本节没有创建、修改、删除任何定时任务
+（D-066 规定第一条心跳是操作者动作）。测试：`npx vitest run test/loop.spec.ts test/loop-surface.spec.ts
+test/loop-brakes.spec.ts` → `3 files / 78 tests passed`（跑的是工作树，含他人未提交改动）。
+
+### 4. 一句话
+
+心跳是 Host Schedule 的一条 `rrule`：投递即 `followup`，一轮一条普通消息，落回同一会话；pre-step 只按
+**来源**分类——基线放行定时消息，工作树额外用「`schedule` 来源 + 插件标记」这对事实认领心跳并先过刹车，
+两者都**不看主题**，续跑靠 prompt 字面与会话本身；minimal preset 下第一条心跳由**人**经那条 POST
+（或 composer 开关）建，模型与被投递的轮次都无权建。
+
+## A27 — Host 侧 LoopService 是谁的对象：怎么挂、靠什么活、谁在什么时候删行（2026-11-19，`CONFIRMED`；真机重载 `NOT_RUN`）
+
+Source: 本节回答上一轮留空的 `host_loop_service` 判据——「Host 侧那个 loop 服务到底是谁的、活多久、
+卸载/归档时谁负责删」。只读代码与测试，**未改 `src/`、`test/`、`lib/`**。依据 = `src/index.ts`、
+`src/loop.ts`、`src/loop-surface.ts`、`test/loop-surface.spec.ts`、`test/loop.spec.ts`，工作树
+（含另一位写入者未提交的改动，凡涉及它们处单独标注）。HEAD = `37cb0fc`。
+
+### 1. 它不是 Cordis 服务，是 apply 期造的一个普通对象（`CONFIRMED`）
+
+`src/index.ts:297` 在插件的 `apply` 里 `createLoopService({…})`，`:305` 立刻 `installLoop({ctx, loop, logger})`。
+没有任何 `ctx.set` 发布它：`grep -rn "ctx\.set" src/` 的 4 处命中全是 `ctx.settings` 的注释字（
+`src/naming.ts:196`、`src/settings.ts:11/31/37`），零次服务注册。
+
+后果有三条，都能落到代码上：别的 bundle/插件拿不到这个对象（没有名字可查）；它的唯一入口是
+`installLoop` 挂的两个面（工具 + 路由）；测试只能自己持有对象再喂给 `installLoop`
+（`test/loop-surface.spec.ts:263-293` 的 `serviceFor(schedule)` 与手工 `ctx.provide`）。
+
+策略是闭包而不是快照：`policy: () => loopPolicyFromConfig(readConfig()…)`（`src/index.ts:300-303`），
+所以设置页改四个 `loop*` 键之后，**下一次** `open` 就按新值算，不用重启进程（`src/index.ts:291-296`
+的注释原话：「the policy is read at open time」）。
+
+### 2. Schedule 是「查」出来的，不是「注入」的（`CONFIRMED`）
+
+`scheduleServiceOf`（`src/loop.ts:504-512`）做三件事：`ctx.get?.('schedule')`、非对象即 `undefined`、
+再按鸭子类型要求 `create`/`catalog`/`edit` 三个函数全在。服务没被组合时不注入失败、不塌插件——
+理由是 `src/loop.ts:493-502` 的注释：headless/minimal profile 没有 Schedule 也要能加载本插件的其余功能。
+
+缺服务时的行为是分档的，不是一律报错：
+
+- `available()` 返回 `false`；`open` 抛 `loop/unavailable`（`src/loop.ts:350`），路由映射成 **HTTP 503**
+  （`src/loop-surface.ts:312-316` 的 `statusForLoopCode`，503 在 `:315`）。
+- `stopAll` / `forgetSession` 直接返回 `0`（`src/loop.ts:461-462`、`:478-479`），不抛——清理在无服务时
+  本来就是已完成状态。
+
+### 3. 两个面各自 gate 在自己的依赖上（`CONFIRMED`）
+
+`installLoop`（`src/loop-surface.ts:92`）里的 `mount(['schedule','tools'], …)`（`:119-123`）注册
+`grok_loop` 工具，`mount(['webServer','connection'], …)`（`:126-141`）注册
+`{ kind: 'exact', path: LOOP_ROUTE_PATH }`。两个注册都交给 `child.effect`，所以撤回跟着挂载它的
+fiber 走（`ctx.effect` 是工具注册表给得起的唯一生命周期，注释写在同一处）。
+
+关键差别：**路由不依赖 `schedule`**。没有 Schedule 的组合里那条 `POST` 照样存在，并且回答一个带码的
+503，而不是 404 或 500。这与「点了开关没反应」是两种世界：一个是可见的失败码，一个是静默。`ctx.inject`
+不可用时两个面都不挂，但事件监听与卸载清理仍会注册（`:95-111`、`:113-118`）。
+
+### 4. 生命周期四处，各自删什么（`CONFIRMED`）
+
+- `workspace/session-stop` 与 `workspace/session-archived` → `forgetSession(sessionId)`（`:96-103`）。
+  两条都挂是因为「停」与「归档」的先后不定：谁先到谁删，后到的那次查不到行、返回 0。
+- 卸载 disposer → `await stopAll('plugin unload')`（`:105-111`）。`await` 是刻意的：不要在删完之前
+  报告完成，否则卸载成功而心跳还在。
+- 删除本身是 `edit({ id, action: 'delete' })`（`src/loop.ts:543-551`），不是 pause；被拒的删除只 warn，
+  不让「关闭成功」覆盖一行还活着的任务。
+- 计数按**实测**而不是按意图：`stopAll`（`:460-476`）与 `deleteSessionHeartbeats`（`:566-579`）都删完
+  再 `catalog` 复核一次，返回 `before - left`。所有权靠三要素认（`isLoopTask`，`:241-247`：
+  `kind === 'rrule'`、标题 `Loop heartbeat`、prompt 前缀 `[grok-workflow loop]`），所以别人的 rrule 任务
+  不会被牵连。
+
+测试钉住的三条：`test/loop-surface.spec.ts:228`（卸载后 0 行）、`:241`（停/归档各删一行、另一会话保留）、
+`:263-293`（真 cordis：`ctx.provide` + `installLoop` + `ctx.fiber.dispose()` → 0 行，不是 fake 的产物）；
+`test/loop.spec.ts:511-515`（`forgetSession` 只删本会话、`stopAll` 只删自己的行、再跑一次返回 0）。
+
+### 5. 持久性与「重载」：保住的是行，删掉的是所有权（部分 `CONFIRMED`，重载语义 `NOT_RUN`）
+
+行存在 Host Schedule 里，插件自己不设 timer（`src/index.ts:291-296`）。所以：
+
+- Schedule 服务自己的重载（子 fiber 重启）不删行——挂载点都在 `child.effect` 里，撤回的是工具/路由注册。
+- 插件被 unload 会删光——第 4 条 + `test/loop-surface.spec.ts:263` 的 `ctx.fiber.dispose()`。
+
+于是 `src/index.ts:292` 那句注释「an open loop survives a plugin reload and an unload deletes it」两半
+需要分开读：只有把「plugin reload」读成「Schedule 子 fiber 重启」时它才与代码一致；若读成「插件自身
+dispose 再装回来」，那行已经被 disposer 删掉了。这条注释是措辞缺陷，不是行为缺陷——但读注释的人很容易
+把「重载后循环还在」当成承诺。**真机上哪种重载会发生（改设置是否重装插件 fiber）本轮 `NOT_RUN`**：
+需要常驻 Host + 真实 profile，本机沙箱下 `dsh` 连 `~/.dsh` 都写不了（A23），未起实例。
+
+### 6. 与本轮判据相关的两个旁证（`CONFIRMED`，`grep` 可复算）
+
+- **`loopEnabled` 在 Host 侧没有读者**：`grep -rn loopEnabled src/` 的命中只有 schema 与载入期 repair
+  （`src/config.ts:388`、`:777-795`）、两处类型（`src/types.ts:157`、`:200`）、两处注释
+  （`src/loop.ts:5`、`src/index.ts:295`）、以及客户端设置页/工作树里的 composer 开关。`src/loop.ts`
+  内唯一一处 `loopEnabled` 就是文件头注释。也就是说：**把设置页的「默认自动续跑」打开，今天不会产生
+  任何一次 `open`**；真正驱动的是那条 POST（或工作树里未提交的 composer 开关）。
+- **工作树里的 composer 开关不属于本节证据**：`src/client/index.js:3522` 与 `src/loop-brakes.ts`
+  是另一位写入者未提交、未审阅的改动；本节只把它们的**存在**记为事实，不把它们的行为记成 `CONFIRMED`。
+
+### 7. 一句话
+
+LoopService 是 apply 期的一个普通对象而不是服务注册；Schedule 靠 `ctx.get` 查，查不到就 503 而不是塌掉；
+它的寿命等于插件的 fiber——工具与路由各自 `effect` 撤回，卸载 `await stopAll` 删光自己的行，会话停/归档
+删一行，删完还要 `catalog` 复核；「行还在但没人负责」这个状态因此被结构性地排除了，代价是**插件重载
+等于丢循环**，而这条恰好是 §5 唯一没在真机上验证过的一句。

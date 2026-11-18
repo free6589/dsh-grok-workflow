@@ -1,0 +1,80 @@
+Docs/changelog segment — independent re-verification of the round-14 fold
+Recorded: 2026-11-19T07:35+08:00, device agent-44
+HEAD at the time: 37cb0fc (main), fold introduced by 20eafea, carried to HEAD
+
+Requirement checked (objective segment 4/5): `CHANGELOG.md` carries
+`## [0.11.14] - 2026-11-18` with `[Unreleased]` left empty, plus one accuracy clause —
+`loopEnabled` stays a deployment default that no run path reads — consistent with both
+READMEs; evidence lives in `.rsi/evidence/round-014/`.
+
+1) The fold, at the commit that landed it and at HEAD
+   $ git show 20eafea:CHANGELOG.md | sed -n '1,10p'
+     ## [Unreleased]
+     (blank)
+     ## [0.11.14] - 2026-11-18
+   $ grep -n '^## ' CHANGELOG.md | head -3          # HEAD
+     6:## [Unreleased]
+     8:## [0.11.15] - 2026-11-19
+     50:## [0.11.14] - 2026-11-18
+   `[Unreleased]` is heading + blank line only at both revisions: no bullet sits under it.
+
+2) The accuracy clause
+   $ git log -S'no run path reads' --oneline -- CHANGELOG.md
+     20eafea feat(loop): Host-scheduled repeat-run surface + bilingual docs (RSI round 14)
+   $ grep -n -A2 'loopEnabled` itself stays' CHANGELOG.md
+     57:  `loopIntervalMin`) now have a driver. `loopEnabled` itself stays a deployment
+     58:  default that no run path reads yet; opening a loop is always the session's own
+     59:  explicit action.
+   $ grep -n 'loopEnabled' README.md | head -3
+     228  table row  — "no automatic driver reads it yet ... nothing is scheduled until a
+          browser request opens the loop"
+     234  prose      — "is the deployment default for an automatic driver and is not read yet"
+     250  "The switch" — "loopEnabled is a deployment default no automatic driver reads yet"
+   $ grep -n 'loopEnabled' README.zh-CN.md | head -3
+     221 / 227 / 243 — the same three claims in Chinese ("部署默认值 ... 目前还没有自动驱动读它").
+   English and Chinese README state the same fact as the changelog clause.
+
+3) The clause is true of the source (not only of the prose)
+   $ grep -rn '\.loopEnabled' src/ | grep -v 'src/client/' | grep -v 'src/config.ts' | grep -v 'src/types.ts'
+     (no matches; exit 1)
+   The only readers are the settings schema/validator/projection (src/config.ts), the type
+   declarations (src/types.ts) and the settings-page renderer (src/client/index.js). The one
+   policy read is
+   $ grep -n 'loopPolicyFromConfig(' -A2 src/index.ts
+     302: return loopPolicyFromConfig(live.timeoutMs, live.loopIntervalMin,
+                                    live.loopMaxRounds, live.loopFailStreak)
+   — the four arguments are timeoutMs / interval / rounds / fail streak; `loopEnabled` is
+   not one of them. The composer dock switch (src/client/index.js LoopSwitch, line 3660)
+   reads the stored loop's `open` state from the service, not `loopEnabled`.
+   So "no run path reads loopEnabled" holds at HEAD, including the uncommitted
+   `src/loop-brakes.ts` in the shared working tree.
+
+4) The docs guards pass on this tree
+   $ npx vitest run test/docs-version.spec.ts test/docs-config-keys.spec.ts
+     ✓ test/docs-config-keys.spec.ts (12 tests) 19ms
+     ✓ test/docs-version.spec.ts (8 tests) 11ms
+     Test Files  2 passed (2)
+          Tests  20 passed (20)
+   docs-version pins package.json against both READMEs' declared version, every
+   `plugin add …#vX.Y.Z` pin, the published-tag list and the newest changelog heading;
+   docs-config-keys pins the documented configuration surface (thirteen keys).
+
+5) Evidence location
+   $ git ls-files .rsi/evidence/round-014/ | wc -l
+     17
+   All 17 records in `.rsi/evidence/round-014/` are tracked; `version.txt` records the
+   same linkage (`## [0.11.14] - 2026-11-18`, 0.11.14 in package.json/lock/READMEs/
+   LOCAL-TESTING) and `NOTES.md` describes the fold and the added clause.
+
+Scope notes, so this record is not read as more than it is:
+- The READMEs quote `1081` tests across `60` files, matching the committed-tree CI run
+  recorded in `.rsi/evidence/round-015/ci-committed.txt` (`Tests 1081 passed (1081)`).
+  The shared working tree is currently 61 files / 1131 tests from other agents' in-flight
+  work (`.rsi/evidence/round-014/ci-tree-1131.txt`); those counts describe a tree that is
+  not the release commit, so the README claim is not stale for `v0.11.15`.
+- `[Unreleased]` is empty at HEAD, but the uncommitted working tree carries user-visible
+  work (loop brakes, route 413/409 mapping) that AGENTS.md says to record under
+  `[Unreleased]` before it is committed. That fold belongs to whoever lands that work, not
+  to this record.
+- No file outside this evidence record was changed by this verification; no commit, tag or
+  push was made.

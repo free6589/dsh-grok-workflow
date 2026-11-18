@@ -3678,3 +3678,83 @@ commit 与推送结果见 `.rsi/ROUND.md` Round 14、`.rsi/evidence/round-014/gi
 - **并发记录**：首次 `push origin main` 被拒（远端在运行期间前进到 `09d5daa`）；rebase 后重推，
   本地未推送过的 `v0.11.15` 标签删除并在 rebase 提交上重建。未 force-push。
 
+
+## 2026-11-19 — `host_loop_service` 判据（A27）与文档记忆回接（`CONFIRMED`）
+
+**范围**：只改文档（`docs/knowledge/RESEARCH.md`、`docs/knowledge/DECISIONS.md`、`docs/knowledge/HANDOFF.md`、
+本文件）；`git status --short -- src test lib` 在本轮开工与收工时都只含他人未提交的改动，本轮**没有**写
+`src/`、`test/`、`lib/`，也没有创建、修改或删除任何 Schedule 任务。
+
+**做了什么（`CONFIRMED`）**：
+
+- `RESEARCH.md` 新增 **A27**：「Host 侧 LoopService 是谁的对象：怎么挂、靠什么活、谁在什么时候删行」。
+  依据 `src/index.ts:297/305`（apply 期建对象 + 装面）、`src/index.ts:290-296`（策略在 open 时读）、
+  `src/loop.ts:504-512`（`scheduleServiceOf` 的 `ctx.get('schedule')` + 鸭子类型三方法）、
+  `src/loop.ts:350`（`loop/unavailable`）、`src/loop-surface.ts:312-316`（503 映射）、
+  `src/loop-surface.ts:96-141`（两个事件监听、卸载 disposer、两个 `mount`）、
+  `src/loop.ts:460-476 / 477-479 / 543-551 / 566-579`（删光、删一行、删除即 `edit({action:'delete'})`、
+  按 `catalog` 复核计数）、`test/loop-surface.spec.ts:228 / 241 / 263-293`、`test/loop.spec.ts:511-515`。
+- `RESEARCH.md` A24 §5b 加一句时态更正：客户端控件只在**已落地**的 `v0.11.15` 缺席；工作树里
+  `src/client/index.js:3522` 与 `src/loop-brakes.ts` 是另一位写入者未提交、未审阅的改动，
+  `grep -rn "grok-workflow/loop" src/` 现在是 3 处（`src/loop.ts:70`、`src/client/index.js:3522`、
+  `src/loop-brakes.ts:210`）。
+- `DECISIONS.md` 撞号收口：被覆盖的既有决定重新落位——round 15 的发布事故条恢复为
+  **`D-070`**，预设缺口条改为 **`D-071`**；`RESEARCH.md` A26 的引用同步改写。
+- `STATE.md` / `HANDOFF.md` / `VALIDATION.md` / `.rsi/ROUND.md` / `.rsi/STATE.md` 的 round 15 记录
+  被旧副本覆盖（`git diff --numstat` 分别为 `1/48`、`0/11`、`0/17`、`0/17`、`85/60`，四个纯删除、
+  一个整篇回退），用 `git checkout HEAD -- <这五个文件>` 复原，复原不会丢掉他人的新增内容。
+
+**命令与结果（`CONFIRMED`）**：
+
+- `npx vitest run test/docs-version.spec.ts test/docs-config-keys.spec.ts test/docs-architecture-version.spec.ts`
+  → `Test Files 3 passed (3)` / `Tests 23 passed (23)`，exit 0（07:36:58）。
+- `grep -rn "ctx\.set" src/` → 4 处，全部是 `ctx.settings` 的注释字（`src/naming.ts:196`、
+  `src/settings.ts:11/31/37`），零次服务注册——A27 §1 的依据。
+- `grep -rn loopEnabled src/` → 命中只有 `src/config.ts`（schema/默认/repair）、`src/types.ts:157/200`、
+  两处注释（`src/loop.ts:5`、`src/index.ts:295`）、以及客户端设置页/工作树里的 composer 开关；
+  `src/loop.ts` 内唯一一处 `loopEnabled` 是文件头注释——「打开设置页的开关不会产生任何 `open`」的依据。
+
+**未验证（`NOT_RUN`）**：真机上的「重载」语义（改设置是否重装插件 fiber、从而跑一次卸载 disposer）；
+真机心跳投递与 `POST /grok-workflow/loop` 端到端。两者都要常驻 Host + 真实 profile，本机沙箱下未起实例。
+
+**不是本轮结论的（`HYPOTHESIS`）**：`src/index.ts:292` 注释「an open loop survives a plugin reload and
+an unload deletes it」的两半只有在「reload = Schedule 子 fiber 重启」时才同时成立；若「reload」包含插件
+自身 dispose，行会被删掉。改注释要连 `lib/` 一起重建，留给拥有 `src/` 的那一轮。
+
+## 2026-11-19 — RSI round 16：续跑开关 + 心跳刹车的门禁与本机核对（`CONFIRMED`）
+
+**范围**：本轮把「composer dock 开关 + `src/loop-brakes.ts`」这份**未提交的实现**核对并落地：只补
+`CHANGELOG.md` `[Unreleased]`、`DECISIONS.md` D-072（+ 两处过时句指回）、本文件 / `STATE.md` /
+`HANDOFF.md` / `.rsi/ROUND.md` / `.rsi/STATE.md` 的本轮记录；`src/`、`test/` 的代码内容未在本轮改动
+（开工指纹与收工复算一致：`src/loop.ts 55483a52…`、`src/loop-brakes.ts 34f56e70…`、
+`src/client/index.js d2907655…`、`src/gate.ts 332d2313…`、`src/config.ts c4d05357…`）。本轮没有启动
+DSH 实例，也没有创建、修改或删除任何 Schedule 任务。
+
+**命令与结果（`CONFIRMED`，全部在静止的主工作树上跑，07:52-08:0x）**：
+
+| 命令 | 结果 | 日志 |
+| --- | --- | --- |
+| `git rev-parse HEAD` / `git status --porcelain \| wc -l` | `37cb0fc` / 46 条 dirty | `.rsi/evidence/segment-5/pre-head.txt`、`pre-status.txt` |
+| `npm run build` | exit 0，`client bundle: 224412 bytes → lib/client.js` | `.rsi/evidence/segment-5/build-seg5-attempt2.txt` |
+| 构建前后 `lib/`（145 文件）md5 清单比对 | **diff 为空**（幂等：树里的 `lib/` 就是这份 `src/` 的构建） | `lib-before.md5` / `lib-after-build.md5` / `lib-build-idempotence.txt` |
+| `npx tsc -p tsconfig.json --noEmit` | exit 0，无输出 | `typecheck-attempt2.txt` |
+| `npx oxlint src test` | exit 0，`Found 22 warnings and 0 errors`（107 文件） | `lint-attempt2.txt` |
+| `npx vitest run` | exit 0，**62 文件 / 1139 测试 PASS**（24.21s） | `full-vitest-attempt2.txt` |
+| `npm run verify:lib`（提交前，检验的是 `37cb0fc`） | exit 0，`lib/ at 37cb0fc is the build of src/ at 37cb0fc (141 files, byte-identical)` | `verify-lib-precommit.txt` |
+
+**逐文件计数（同一次全量运行）**：`test/client.spec.ts` 92 · `test/loop.spec.ts` 30 ·
+`test/loop-brakes.spec.ts` 35 · `test/loop-surface.spec.ts` 16 · `test/loop-runtime-wiring.spec.ts` 5 ·
+`test/config.spec.ts` 36 · `test/config-limits-repair.spec.ts` 24 · `test/settings-projection.spec.ts` 4 ·
+`test/docs-config-keys.spec.ts` 12 · `test/docs-version.spec.ts` 8。
+
+**为什么 `verify:lib` 要在提交后再跑一次**：这个脚本导出的是 `HEAD`，比对的是 `HEAD` 的 `lib/` 与
+`HEAD` 源码的构建。提交前它只能证明 `37cb0fc` 那一对是自洽的（141 文件；`HEAD` 里没有
+`src/loop-brakes.ts`，客户端 bundle 是 206901 B，比工作树这份 224412 B 小 17511 B —— 差额就是 dock 开关
+那段）。提交后的那一次才是对本轮提交的证明，结果与命令写进 `.rsi/ROUND.md` Round 16。
+
+**未验证（`NOT_RUN`）**：真实 Web GUI 里点一次开关（需要常驻实例 + 浏览器会话）；真实心跳投递
+（D-066 把第一跳定为操作者动作）；插件 reload 时 `Schedule` 子 fiber 的重启语义（A27 §5 的
+`HYPOTHESIS`，本轮没有改动 `src/index.ts` 的注释）。
+
+**证据索引**：`.rsi/evidence/segment-5/`（本轮全部日志与指纹）、`D-072`、`docs/knowledge/STATE.md`
+Round 16 段、`.rsi/ROUND.md` Round 16。

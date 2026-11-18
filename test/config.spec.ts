@@ -145,6 +145,68 @@ describe('configuration surface', () => {
     expect(() => resolveConfig({ loopIntervalMin: 10081 } as never)).toThrow(/loopIntervalMin must be an integer between 0 and 10080/)
   })
 
+  it('carries bilingual metadata on the four repeat-run keys, agreeing with the envelope', () => {
+    // The label a form shows is the client's own i18n key; the *meaning* — the unit,
+    // the range, and what `0` asks for — rides on the schema, so a host that renders
+    // the schema without this plugin's client cannot state a different contract. Both
+    // halves are asserted: dropping one language is a silent half-translation, which
+    // no type check and no render test would catch.
+    interface SchemaNode {
+      meta: Record<string, unknown>
+      inner?: { meta: Record<string, unknown> }
+    }
+    const dict = (Config as unknown as { dict: Record<string, SchemaNode> }).dict
+    const LOOP_KEYS = ['loopEnabled', 'loopMaxRounds', 'loopFailStreak', 'loopIntervalMin'] as const
+    const node = (key: typeof LOOP_KEYS[number]): SchemaNode => {
+      const found = dict[key]
+      if (found === undefined) throw new Error(`Config schema has no ${key}`)
+      return found
+    }
+    const description = (key: typeof LOOP_KEYS[number]): string => {
+      const text = node(key).meta.description
+      expect(typeof text, `${key} carries no schema description`).toBe('string')
+      return text as string
+    }
+    for (const key of LOOP_KEYS) {
+      const text = description(key)
+      expect(text, `${key} description has no Chinese half`).toMatch(/[\u4e00-\u9fff]/)
+      expect(text, `${key} description has no English half`).toMatch(/[A-Za-z]{3,}/)
+    }
+    // The range a description promises is the one the schema enforces, read from the
+    // same constant the cap is built from: a widened bound with stale wording (or the
+    // reverse) fails here instead of shipping a form that lies about its own limit.
+    expect(description('loopMaxRounds')).toContain(`1-${HARD_LIMITS.loopMaxRounds}`)
+    expect(description('loopFailStreak')).toContain(`1-${HARD_LIMITS.loopFailStreak}`)
+    expect(description('loopIntervalMin')).toContain(`0-${HARD_LIMITS.loopIntervalMin}`)
+    expect(node('loopMaxRounds').meta.max).toBe(HARD_LIMITS.loopMaxRounds)
+    expect(node('loopFailStreak').meta.max).toBe(HARD_LIMITS.loopFailStreak)
+    expect(node('loopIntervalMin').meta.max).toBe(HARD_LIMITS.loopIntervalMin)
+    expect(node('loopMaxRounds').inner?.meta.min).toBe(1)
+    expect(node('loopFailStreak').inner?.meta.min).toBe(1)
+    // `loopIntervalMin` is a non-negative count, and 0 is not "start immediately": it
+    // asks for the loop's own floor (max(60, one worst-case round)). The description
+    // says so, so a reader of the schema alone cannot read 0 as "no wait".
+    expect(node('loopIntervalMin').inner?.meta.min).toBe(0)
+    expect(description('loopIntervalMin')).toContain('not "start now"')
+    // Zero caps and a negative interval are refused by the schema itself, before the
+    // run path is reached (R-06 fail-closed, not a clamp: only an overrun is repaired).
+    expect(() => Config({ loopMaxRounds: 0 } as never)).toThrow(/loopMaxRounds/)
+    expect(() => Config({ loopFailStreak: 0 } as never)).toThrow(/loopFailStreak/)
+    expect(() => Config({ loopIntervalMin: -1 } as never)).toThrow(/loopIntervalMin/)
+    // The metadata has to survive into the serialized schema, because that is the form
+    // a host reads (`Config.toJSON()` -> `{ uid, refs }`): a description kept only in
+    // the in-memory dict would be invisible to every consumer of the settings page.
+    // Read the `refs` map instead of the string, so a description containing quotes is
+    // compared by value rather than by its JSON-escaped spelling.
+    const refs = (Config.toJSON() as { refs?: Record<string, { meta?: { description?: unknown } }> }).refs ?? {}
+    const onWire = new Set(Object.values(refs)
+      .map(ref => ref.meta?.description)
+      .filter((text): text is string => typeof text === 'string'))
+    for (const key of LOOP_KEYS) {
+      expect(onWire, `${key} description is missing from Config.toJSON().refs`).toContain(description(key))
+    }
+  })
+
   it('fixes the removed retry count at 1 and the synthesis default at layered', () => {
     expect(resolveConfig({} as never).maxRetries).toBe(FIXED_MAX_RETRIES)
     expect(FIXED_MAX_RETRIES).toBe(1)

@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_LOOP_FAIL_STREAK, DEFAULT_LOOP_INTERVAL_MIN, DEFAULT_LOOP_MAX_ROUNDS, DEFAULT_MAX_CONCURRENCY, DEFAULT_MAX_TASKS, DEFAULT_TIMEOUT_MS, HARD_LIMITS, SWITCHABLE_CLASSES } from '../src/config.js'
+import { LOOP_ROUTE_PATH, LOOP_TOOL_NAME } from '../src/loop.js'
+import { createLoopTool } from '../src/loop-surface.js'
 
 /**
  * The browser settings page is hand-written JavaScript (the host serves it verbatim in
@@ -35,6 +37,7 @@ interface Bundle {
   GROK_WORKFLOW_DICT: Record<string, Record<string, string>>
   GROK_WORKFLOW_PANEL: PanelBundle
   GROK_WORKFLOW_PROGRESS: ProgressBundle
+  GROK_WORKFLOW_LOOP: LoopSwitchBundle
   GROK_WORKFLOW_INTERNALS: {
     draftOf(value?: Record<string, unknown>): Draft
     validate(draft: Draft): Finding[]
@@ -115,6 +118,45 @@ interface ProgressBundle {
   readZoom(): number
   writeZoom(value: number): void
   createStatus(): { getSnapshot(): string, getMessage(): string | undefined, subscribe(fn: () => void): () => void, set(state: string, message?: string): void }
+}
+
+/** One answer from the loop route, in the switch's own vocabulary. */
+type LoopAnswer =
+  | { ok: true, loop: LoopSnapshotLike }
+  | { ok: false, code: string, error: string }
+
+/** The fields of a `LoopSnapshot` (`src/loop.ts`) the switch actually reads. */
+type LoopSnapshotLike = {
+  open?: boolean
+  sessionId?: string
+  taskId?: string
+  intervalMinutes?: number
+  rounds?: number
+  nextAt?: string
+}
+
+/**
+ * The composer-dock switch (`GROK_WORKFLOW_LOOP`).
+ *
+ * Pinned against the Host here rather than trusted: this half of the bundle is hand-written
+ * JavaScript, so the only thing that keeps its route, its actions and its authorization
+ * honest is a test that compares them with `src/loop.ts` and with the real `grok_loop` tool.
+ */
+interface LoopSwitchBundle {
+  routePath: string
+  switchId: string
+  switchOrder: number
+  actions: string[]
+  component: (props: Record<string, unknown>) => unknown
+  mount: (ctx: unknown, i18n: { locale?: unknown }) => unknown
+  send: (body: Record<string, unknown>, fetchImpl?: unknown) => Promise<LoopAnswer>
+  read: (sessionId: string, fetchImpl?: unknown) => Promise<LoopAnswer>
+  open: (sessionId: string, fetchImpl?: unknown) => Promise<LoopAnswer>
+  close: (sessionId: string, fetchImpl?: unknown) => Promise<LoopAnswer>
+  parsePayload: (payload: unknown, status: number) => LoopAnswer
+  text: (t: Translator, state: Record<string, unknown>) => string
+  failureText: (t: Translator, code?: string, error?: string) => string
+  url: () => string
 }
 
 type ProgressMember = {
@@ -508,8 +550,9 @@ describe('client settings page: wiring to the DSH locale service (t42)', () => {
     bundle.apply(ctx)
     // The page is mounted once before the locale service arrives and once after: only the
     // second registration survives, and it is the one carrying the namespace.
-    // Two live registrations: the settings page and the task panel renderer.
-    expect(live()).toHaveLength(2)
+    // Three live registrations: the settings page, the task panel renderer and the
+    // composer-dock loop switch (which is additive and registered last).
+    expect(live()).toHaveLength(3)
     expect(live()[0]!.options['name']).toBe('plugins.item')
     expect(live()[0]!.options['locale']).toBe('grok-workflow')
     expect(typeof live()[0]!.options['label']).toBe('function')
@@ -545,7 +588,7 @@ describe('client settings page: wiring to the DSH locale service (t42)', () => {
     expect(() => bundle.apply(ctx)).not.toThrow()
     // No locale face ⇒ no `locale` option: the renderer throws a SlotAssemblyError for an
     // entry that names a namespace while no face is installed.
-    expect(live()).toHaveLength(2)
+    expect(live()).toHaveLength(3)
     expect(live()[0]!.options['locale']).toBeUndefined()
     expect(live()[1]!.options['locale']).toBeUndefined()
     // The task panel shadows the stock `workflow-run` renderer by priority (lowest renders);
@@ -573,9 +616,9 @@ describe('client settings page: wiring to the DSH locale service (t42)', () => {
     const locale = fakeLocale('zh')
     const { ctx, live, slots, disposers } = fakeContext(locale)
     bundle.apply(ctx)
-    // The settings page and the task-panel renderer are both mounted, and the `locale`
-    // fiber handed back exactly one disposer.
-    expect(live()).toHaveLength(2)
+    // The settings page, the task-panel renderer and the loop switch are all mounted, and
+    // the `locale` fiber handed back exactly one disposer per injected scope it entered.
+    expect(live()).toHaveLength(3)
     expect(disposers).toHaveLength(2)
     const mounted = slots.length
     const unbind = disposers[0]!
@@ -600,7 +643,7 @@ describe('client settings page: wiring to the DSH locale service (t42)', () => {
     const { ctx, live, slots, disposers } = fakeContext(fakeLocale('zh'))
     const dispose = bundle.apply(ctx) as unknown as () => void
     const mounted = slots.length
-    expect(live()).toHaveLength(2)
+    expect(live()).toHaveLength(3)
     dispose()
     expect(live()).toHaveLength(0)
     expect(slots.length).toBe(mounted)
@@ -827,6 +870,33 @@ describe('client settings page: reading, failure and retry', () => {
       const text = texts(tree).join('\n')
       for (const key of ['group.loop', ...loopKeys.map(field => `field.${field}`)]) {
         expect(text, `${locale} ${key}`).toContain(dict[key]!)
+      }
+    }
+  })
+
+  it('says what 0 means on the rows whose minimum is 0, in both languages', () => {
+    // `timeoutMs` and `loopIntervalMin` both default to 0, and 0 is not "off" on either
+    // one. The page carries no hint row (T5), so the unit suffix is the only place the
+    // meaning can live: `0` means "unlimited" for the deadline and "the loop's own
+    // floor" for the interval — never "start immediately". README's key table uses the
+    // same words, and `test/docs-config-keys.spec.ts` keeps that table honest.
+    const rows: Array<{ field: string, unit: string }> = [
+      { field: 'timeoutMs', unit: 'unit.ms' },
+      { field: 'loopIntervalMin', unit: 'unit.minutes' },
+    ]
+    const floorWording = { zh: /下限/, en: /floor/ } as const
+    for (const [locale, dict] of [['zh', zhDict], ['en', bundle.GROK_WORKFLOW_DICT['en']!]] as const) {
+      expect(dict['unit.minutes']!, `${locale} unit.minutes`).toMatch(floorWording[locale])
+      expect(dict['unit.ms']!, `${locale} unit.ms`).toMatch(/0/)
+      const { component, props } = mounted(faceFor(READY))
+      const tree = renderPage(component, {
+        ...props,
+        t: (key: string, params?: Record<string, unknown>) => translate(locale, key, params),
+      }).run()
+      for (const { field, unit } of rows) {
+        const row = walk(tree).find(element => element.props['data-field'] === field)
+        expect(row, `${locale} ${field}`).toBeDefined()
+        expect(texts(row!).join('\n'), `${locale} ${field} unit`).toContain(dict[unit]!)
       }
     }
   })
@@ -1927,5 +1997,336 @@ describe('client progress tab: derived states say where they came from', () => {
     })
     const enExecute = walk(enTree).find((element) => element.props['data-node-key'] === 'stage:execute')!
     expect(texts(enExecute).join(' ')).toContain('2 rows ran inside the plan tasks below')
+  })
+})
+
+/* ------------------------------------------------------------------ loop switch -- */
+
+/**
+ * The composer-dock loop switch: the *user's* half of the repeat-run feature.
+ *
+ * Three things are pinned here, and none of them is cosmetic:
+ * 1. **One operation, two callers.** The switch posts to the route `src/loop.ts` names,
+ *    with the actions the `grok_loop` tool's own schema declares. If either drifts, the
+ *    UI and the tool stop talking about the same loop and this suite says so.
+ * 2. **User-only.** The tool refuses `open`; the browser path is the only one that opens.
+ *    That asymmetry is the authorization, so it is asserted in the same test as the shared
+ *    action list rather than trusted to a comment.
+ * 3. **The composer dock, and nothing else.** The switch is additive in
+ *    `conversation.composer.dock`; the model selector in the composer's tool row is not
+ *    read, moved or referenced.
+ */
+describe('client composer dock: the loop switch (one Host operation, two callers)', () => {
+  const SESSION = '2d7bd1e7-1111-2222-3333-444455556666'
+  const zhDict = bundle.GROK_WORKFLOW_DICT['zh']!
+  const enDict = bundle.GROK_WORKFLOW_DICT['en']!
+  const loop = bundle.GROK_WORKFLOW_LOOP
+
+  /** The switch section of the bundle source, for the "touches nothing else" checks. */
+  const switchSource = (() => {
+    const source = readFileSync(new URL('../src/client/index.js', import.meta.url), 'utf8')
+    const start = source.indexOf('// ─── Composer dock: the loop switch')
+    const end = source.indexOf('/** Required services for the page')
+    expect(start, 'the loop switch section is in the bundle').toBeGreaterThan(0)
+    expect(end, 'the section ends where the page registration begins').toBeGreaterThan(start)
+    return source.slice(start, end)
+  })()
+
+  /** A fetch stand-in: records the POST body and answers from a script, one per call. */
+  function scriptedFetch(script: Array<{ status?: number, body?: unknown, throws?: boolean }>) {
+    const posted: Array<Record<string, unknown>> = []
+    const urls: string[] = []
+    const fetchImpl = async (url: string, init: Record<string, unknown>) => {
+      urls.push(url)
+      posted.push(JSON.parse(String(init['body'])) as Record<string, unknown>)
+      const answer = script.shift()
+      if (answer === undefined) throw new Error('unscripted loop call')
+      if (answer.throws === true) throw new Error('socket closed')
+      return { status: answer.status ?? 200, json: async () => answer.body }
+    }
+    return { posted, urls, fetchImpl }
+  }
+
+  it('pins the route and the action list to the Host, and the tool still refuses to open', async () => {
+    // The path is the Host's own constant, not a second spelling of it.
+    expect(loop.routePath).toBe(LOOP_ROUTE_PATH)
+
+    const tool = createLoopTool({
+      open: async () => ({ open: false, sessionId: SESSION }),
+      close: async () => ({ open: false, sessionId: SESSION }),
+      status: async () => ({ open: false, sessionId: SESSION }),
+      stopAll: async () => 0,
+      forgetSession: async () => 0,
+    } as never)
+    expect(tool.name).toBe(LOOP_TOOL_NAME)
+    // The tool's schema is the Host's declaration of what a loop request may say; the
+    // switch sends from the same set, so a new action cannot exist on one side only.
+    const parameters = tool.parameters as unknown as { properties: { action: { enum: string[] } } }
+    expect([...loop.actions].sort()).toEqual([...parameters.properties.action.enum].sort())
+
+    // User-only, structurally: the agent path is refused before it reaches Schedule …
+    await expect(tool.execute({ action: 'open' } as never, { agent: { session: { id: SESSION } } } as never))
+      .rejects.toMatchObject({ code: 'loop/user-only' })
+    // … and the browser path is the one that carries no acting Agent. A click is the
+    // user's grant; there is no other caller that can reach it.
+    const { posted, fetchImpl } = scriptedFetch([{ body: { ok: true, loop: { open: true, sessionId: SESSION } } }])
+    const answer = await loop.open(SESSION, fetchImpl)
+    expect(answer.ok).toBe(true)
+    expect(posted).toEqual([{ action: 'open', sessionId: SESSION }])
+  })
+
+  it('posts to the Host route with the browser credential and reads the answer back', async () => {
+    const { posted, urls, fetchImpl } = scriptedFetch([
+      { body: { ok: true, loop: { open: true, sessionId: SESSION, intervalMinutes: 60, rounds: 10 } } },
+    ])
+    const calls: Array<Record<string, unknown>> = []
+    const recording = async (url: string, init: Record<string, unknown>) => {
+      calls.push({ url, ...init })
+      return fetchImpl(url, init)
+    }
+    const answer = await loop.read(SESSION, recording)
+    expect(answer).toEqual({ ok: true, loop: { open: true, sessionId: SESSION, intervalMinutes: 60, rounds: 10 } })
+    expect(urls).toEqual([LOOP_ROUTE_PATH])
+    expect(calls[0]!['method']).toBe('POST')
+    // Same-origin cookie, no bespoke credential: the composition's own fence authenticates it.
+    expect(calls[0]!['credentials']).toBe('include')
+    expect((calls[0]!['headers'] as Record<string, string>)['content-type']).toBe('application/json')
+    expect(posted).toEqual([{ action: 'status', sessionId: SESSION }])
+  })
+
+  it('reports a refusal as a refusal instead of a state change', async () => {
+    // A stated refusal keeps its code so the switch can say something actionable.
+    expect(loop.parsePayload({ ok: false, code: 'loop/user-only', error: 'user only' }, 403))
+      .toEqual({ ok: false, code: 'loop/user-only', error: 'user only' })
+    // An answer the route never sends (a proxy page, an empty 500) is not a snapshot.
+    expect(loop.parsePayload('<html>', 502)).toMatchObject({ ok: false, code: 'loop/response' })
+    expect(loop.parsePayload(undefined, 500)).toMatchObject({ ok: false, code: 'loop/response' })
+    // A 403 with an unreadable body is still the user-only refusal: the status says so.
+    expect(loop.parsePayload(undefined, 403)).toMatchObject({ ok: false, code: 'loop/user-only' })
+
+    const offline = scriptedFetch([{ throws: true }])
+    expect(await loop.read(SESSION, offline.fetchImpl)).toMatchObject({ ok: false, code: 'loop/transport' })
+    // Without a fetch at all (a non-page evaluator) the switch says so instead of throwing.
+    expect(await loop.read(SESSION, null)).toMatchObject({ ok: false, code: 'loop/transport' })
+  })
+
+  it('mounts in the composer dock only, additive, and with the namespace when one exists', () => {
+    const registered: Array<{ options: Record<string, unknown>, component: unknown }> = []
+    const ctx = (refuse = false) => ({
+      slots: {
+        inject: (_name: string, factory: () => unknown) => factory(),
+        register: (options: Record<string, unknown>, component: unknown) => {
+          if (refuse) throw new Error('slot refused')
+          registered.push({ options, component })
+          return () => {}
+        },
+      },
+    })
+    const warn = console.warn
+    console.warn = () => {}
+    try {
+      loop.mount(ctx(), { locale: { bind: () => translator('zh') } })
+      expect(registered).toHaveLength(1)
+      expect(registered[0]!.options['name']).toBe('conversation.composer.dock')
+      expect(registered[0]!.options['id']).toBe(loop.switchId)
+      expect(registered[0]!.options['order']).toBe(loop.switchOrder)
+      // A fresh id in a `list` slot: this adds a row, it does not replace a shipped one.
+      expect(registered[0]!.options['locale']).toBe('grok-workflow')
+      expect(registered[0]!.component).toBe(loop.component)
+
+      // No locale face ⇒ no namespace on the entry, exactly like the settings page.
+      loop.mount(ctx(), {})
+      expect(registered[1]!.options['locale']).toBeUndefined()
+
+      // A refusing registry costs the switch and nothing else: no throw out of `apply`.
+      expect(loop.mount(ctx(true), {})).toBeUndefined()
+    } finally {
+      console.warn = warn
+    }
+  })
+
+  it('never reaches for the model selector or any DOM outside its own row', () => {
+    const source = readFileSync(new URL('../src/client/index.js', import.meta.url), 'utf8')
+    expect(source).not.toMatch(/conversation\.input\.model/)
+    // The switch renders through React and posts through fetch; it never queries the page.
+    expect(switchSource).not.toMatch(/querySelector/)
+    expect(switchSource).not.toMatch(/getElementById/)
+  })
+
+  it('carries its copy in both languages, and neither falls back to a key id', () => {
+    const keys = Object.keys(enDict).filter((key) => key.startsWith('loop.switch.'))
+    expect(keys.length).toBeGreaterThanOrEqual(8)
+    for (const key of keys) {
+      expect(zhDict[key], key).toBeTypeOf('string')
+      expect(zhDict[key], key).not.toBe(enDict[key])
+    }
+    // The one line the switch renders resolves through the seated translator in each language.
+    const closed = { phase: 'ready', loop: { open: false } }
+    expect(loop.text(translator('zh'), closed)).toBe(zhDict['loop.switch.off'])
+    expect(loop.text(translator('en'), closed)).toBe(enDict['loop.switch.off'])
+  })
+
+  /* ------------------------------------------------------------ the component -- */
+
+  type SwitchRender = { cells: unknown[], index: number, effects: Array<() => unknown> }
+  let switchRender: SwitchRender | undefined
+
+  /**
+   * React stand-in whose `useEffect` actually runs.
+   *
+   * The shared stub in this file deliberately does not run effects (the settings page
+   * writes its draft from one, and replaying that after a click would undo the click).
+   * The switch *reads on mount*, so its half of the file needs the opposite: effects are
+   * collected during a render and executed once, the way React does after the commit.
+   */
+  const switchReact = {
+    createElement: (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]): unknown => {
+      const element: Element = { type, props: props ?? {}, children: children.flat(Infinity) as unknown[] }
+      return typeof type === 'function' ? (type as (props: Record<string, unknown>) => unknown)(element.props) : element
+    },
+    useState: (initial: unknown) => {
+      const render = switchRender!
+      const at = render.index++
+      if (at >= render.cells.length) render.cells[at] = typeof initial === 'function' ? (initial as () => unknown)() : initial
+      return [render.cells[at], (next: unknown) => {
+        render.cells[at] = typeof next === 'function' ? (next as (value: unknown) => unknown)(render.cells[at]) : next
+      }]
+    },
+    useEffect: (fn: () => unknown) => { switchRender!.effects.push(fn) },
+    useMemo: (factory: () => unknown) => factory(),
+    useSyncExternalStore: (_subscribe: unknown, getSnapshot: () => unknown) => getSnapshot(),
+  }
+
+  /** The bundle again, loaded with {@link switchReact}. */
+  function loadSwitchBundle(): LoopSwitchBundle {
+    const source = readFileSync(new URL('../src/client/index.js', import.meta.url), 'utf8')
+    let registration: { id: string, factory: (require: (id: string) => unknown) => Record<string, unknown> } | undefined
+    const record = globalThis as unknown as { window?: { __ModuleLoader__?: { load(spec: never): void } } | undefined }
+    const previous = record.window
+    record.window = { __ModuleLoader__: { load: (spec) => { registration = spec } } }
+    try {
+      new Function(source)()
+    } finally {
+      record.window = previous
+    }
+    expect(registration?.id).toBe('dsh-grok-workflow')
+    const loaded = registration!.factory((id) => {
+      if (id === 'react') return switchReact
+      throw new Error(`the bundle must not require ${id} at load time`)
+    })
+    return loaded['GROK_WORKFLOW_LOOP'] as LoopSwitchBundle
+  }
+
+  /** Render the switch, run its mount effect once, and re-render what React would show. */
+  function mountSwitch(component: (props: Record<string, unknown>) => unknown, props: Record<string, unknown>) {
+    const render: SwitchRender = { cells: [], index: 0, effects: [] }
+    const run = (): unknown => {
+      render.index = 0
+      render.effects = []
+      const before = switchRender
+      switchRender = render
+      try {
+        return component(props)
+      } finally {
+        switchRender = before
+      }
+    }
+    // Resolved promises plus the effect's own chain: a macrotask flush is enough and, unlike
+    // a fixed number of microtasks, does not depend on how many `then`s the code adds.
+    const settle = async () => {
+      for (let turn = 0; turn < 4; turn += 1) await new Promise((resolve) => setTimeout(resolve, 0))
+    }
+    return {
+      async mount() {
+        const first = run()
+        const effects = render.effects.slice()
+        render.effects = []
+        for (const effect of effects) await effect()
+        await settle()
+        return { first, tree: run() }
+      },
+      async click(tree: unknown) {
+        const button = walk(tree).find((element) => element.props['data-loop-toggle'] === true)
+        expect(button, 'the switch renders a toggle').toBeDefined()
+        ;(button!.props['onClick'] as () => void)()
+        await settle()
+        return run()
+      },
+    }
+  }
+
+  const toggleOf = (tree: unknown) => walk(tree).find((element) => element.props['data-loop-toggle'] === true)!
+
+  it('reads the loop on mount, and stays inert until it knows the state', async () => {
+    const loaded = loadSwitchBundle()
+    const { posted, fetchImpl } = scriptedFetch([{ body: { ok: true, loop: { open: false, sessionId: SESSION } } }])
+    const view = mountSwitch(loaded.component, { sessionId: SESSION, t: translator('zh'), loopSend: fetchImpl })
+    const { first, tree } = await view.mount()
+
+    // Before the answer arrives a click would guess; the switch refuses to guess.
+    expect(toggleOf(first).props['disabled']).toBe(true)
+    expect(texts(first).join(' ')).toContain(zhDict['loop.switch.reading'])
+
+    expect(posted).toEqual([{ action: 'status', sessionId: SESSION }])
+    expect(toggleOf(tree).props['aria-checked']).toBe(false)
+    expect(toggleOf(tree).props['disabled']).toBe(false)
+    expect(texts(tree).join(' ')).toContain(zhDict['loop.switch.off'])
+  })
+
+  it('opens on a click and closes on the next one, through the shared Host operation', async () => {
+    const loaded = loadSwitchBundle()
+    const { posted, fetchImpl } = scriptedFetch([
+      { body: { ok: true, loop: { open: false, sessionId: SESSION } } },
+      { body: { ok: true, loop: { open: true, sessionId: SESSION, intervalMinutes: 10, rounds: 3 } } },
+      { body: { ok: true, loop: { open: false, sessionId: SESSION } } },
+    ])
+    const view = mountSwitch(loaded.component, { sessionId: SESSION, t: translator('zh'), loopSend: fetchImpl })
+    const { tree } = await view.mount()
+
+    const opened = await view.click(tree)
+    expect(posted[1]).toEqual({ action: 'open', sessionId: SESSION })
+    expect(toggleOf(opened).props['aria-checked']).toBe(true)
+    expect(texts(opened).join(' ')).toContain(translate('zh', 'loop.switch.on', { minutes: '10', rounds: '3' }))
+
+    const closed = await view.click(opened)
+    expect(posted[2]).toEqual({ action: 'close', sessionId: SESSION })
+    expect(toggleOf(closed).props['aria-checked']).toBe(false)
+    expect(texts(closed).join(' ')).toContain(zhDict['loop.switch.off'])
+  })
+
+  it('says why a refused open did nothing, and does not flip anyway', async () => {
+    const loaded = loadSwitchBundle()
+    const { fetchImpl } = scriptedFetch([
+      { body: { ok: true, loop: { open: false, sessionId: SESSION } } },
+      { status: 403, body: { ok: false, code: 'loop/user-only', error: 'user only' } },
+    ])
+    const view = mountSwitch(loaded.component, { sessionId: SESSION, t: translator('en'), loopSend: fetchImpl })
+    const { tree } = await view.mount()
+    const refused = await view.click(tree)
+    expect(toggleOf(refused).props['aria-checked']).toBe(false)
+    expect(walk(refused).find((element) => element.props['data-loop-state'] === 'failed')).toBeDefined()
+    expect(texts(refused).join(' ')).toContain(enDict['loop.switch.userOnly'])
+  })
+
+  it('reports a Host without a scheduler in its own words, and stays off', async () => {
+    const loaded = loadSwitchBundle()
+    const { fetchImpl } = scriptedFetch([
+      { status: 503, body: { ok: false, code: 'loop/unavailable', error: 'no schedule service' } },
+    ])
+    const view = mountSwitch(loaded.component, { sessionId: SESSION, t: translator('zh'), loopSend: fetchImpl })
+    const { tree } = await view.mount()
+    expect(toggleOf(tree).props['aria-checked']).toBe(false)
+    expect(texts(tree).join(' ')).toContain(zhDict['loop.switch.unavailable'])
+  })
+
+  it('renders inert copy instead of a switch when there is no session', async () => {
+    const loaded = loadSwitchBundle()
+    const { posted, fetchImpl } = scriptedFetch([])
+    const view = mountSwitch(loaded.component, { t: translator('zh'), loopSend: fetchImpl })
+    const { tree } = await view.mount()
+    expect(toggleOf(tree).props['disabled']).toBe(true)
+    expect(texts(tree).join(' ')).toContain(zhDict['loop.switch.noSession'])
+    // Nothing was asked of the Host: there is no session to ask about.
+    expect(posted).toEqual([])
   })
 })
