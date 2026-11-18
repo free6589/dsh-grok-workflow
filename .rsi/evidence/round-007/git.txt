@@ -1,0 +1,16 @@
+RSI round 7 — commit, tag, push (2026-11-18T14:04+08:00)
+
+$ git rev-parse HEAD
+1760d50fcf6af8cc80d78dc941ac23a441249123
+
+$ git log --oneline -3
+1760d50 docs(release): audit the whole tag inventory; name the one tag that is not a release (RSI round 7)
+88d133b fix(docs): LOCAL-TESTING named tarballs, a rejection and a notation it did not have (RSI round 6)
+bf0dc91 fix(redact): quoted cookies, presigned signatures, PGP armor, env value bounds (RSI round 5)
+
+$ git ls-remote origin refs/heads/main refs/tags/v0.11.7
+1760d50fcf6af8cc80d78dc941ac23a441249123	refs/heads/main
+9796f9d843735a743d2fecf935deee28873899d3	refs/tags/v0.11.7
+
+$ git rev-parse v0.11.7^{commit}
+1760d50fcf6af8cc80d78dc941ac23a441249123

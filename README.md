@@ -45,10 +45,10 @@ dsh --profile grok-workflow-dev --from-default-profile headless --dump-config
 Then install the plugin:
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.11.7
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.11.8
 ```
 
-> `#v0.11.7` is the current release. Pin the tag you actually want; omitting it follows `main`, which is not a release. Do not run `--from-default-profile` after `plugin add`: it replaces the profile and removes the plugin you just installed.
+> `#v0.11.8` is the current release. Pin the tag you actually want; omitting it follows `main`, which is not a release. Do not run `--from-default-profile` after `plugin add`: it replaces the profile and removes the plugin you just installed.
 
 Then restart the profile so DSH loads the new plugin:
 
@@ -287,19 +287,19 @@ The plugin reuses DSH's workflow engine and subagents. It does not replace DSH's
 - **Every answer looks like a workflow now:** that is the always-on gate plus `grokDefault: on`. Send `/grok off` to turn the toggle off for one session, or leave `grokDefault` at `off` to require an opt-in.
 - **A message is refused instead of answered:** the reason is printed (empty message or an objective over 32,000 characters). Nothing was executed and nothing will be retried automatically.
 - **A key is rejected at load:** the message names the closest accepted key. Silent ignoring is not offered on purpose.
-- **Your DSH version differs:** the package declares `engines.dsh: ">=0.2.1-rc.2 <0.3.0"`, and that range decides whether the bundle loads. DSH evaluates it with prereleases included (that is what lets `0.2.2-rc.3` load at all), so a `0.2.x` prerelease is admitted and `0.3.0` and above are refused — a `0.3.0` *prerelease* still satisfies `<0.3.0` and therefore loads. Behavior is verified on `0.2.1-rc.2`; the bundle installs and composes on `0.2.2-rc.3`.
+- **Your DSH version differs:** the package declares `engines.dsh: ">=0.2.1-rc.2 <0.3.0"`, and that range decides whether the bundle loads. DSH evaluates it with prereleases included (that is what lets `0.2.2-rc.3` load at all), so a `0.2.x` prerelease is admitted and `0.3.0` and above are refused — a `0.3.0` *prerelease* still satisfies `<0.3.0` and therefore loads. Behavior is verified on `0.2.1-rc.2`; on `0.2.2-rc.3` the bundle installs, activates (its row is no longer `pending`) and serves its settings namespace.
 - **You want to understand the design:** see [Architecture](docs/ARCHITECTURE.md), the [design knowledge base](docs/knowledge/WORKFLOW-DESIGN.md) and the [acceptance checklist](docs/ACCEPTANCE.md).
 - **You found a bug:** [Open an issue](https://github.com/free6589/dsh-grok-workflow/issues).
 
 ## Versions and release notes
 
-The package version in this repository is `0.11.7`. Install or roll back to an exact release with a tag suffix:
+The package version in this repository is `0.11.8`. Install or roll back to an exact release with a tag suffix:
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.11.7
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.11.8
 ```
 
-Use only a tag that exists on GitHub. Published: `v0.1.0`, `v0.2.0`, `v0.2.1`, `v0.2.2`, `v0.2.3`, `v0.2.4`, `v0.2.5`, `v0.2.6`, `v0.2.7`, `v0.3.0`, `v0.4.0`, `v0.5.0`, `v0.5.1`, `v0.6.0`, `v0.7.0`, `v0.8.0`, `v0.9.0`, `v0.9.1`, `v0.9.2`, `v0.9.3`, `v0.9.4`, `v0.10.0`, `v0.10.1`, `v0.10.2`, `v0.11.0`, `v0.11.1`, `v0.11.2`, `v0.11.3`, `v0.11.4`, `v0.11.5`, `v0.11.6` and `v0.11.7`. The unpinned command follows `main` and does not pin a release. `v0.2.0-rc.1` also exists on GitHub but is not a release: it predates the release workflow and its `package.json` still declares `0.1.0`. See the [changelog](CHANGELOG.md) and the [release guide](docs/RELEASING.md) for the versioning and rollback rules.
+Use only a tag that exists on GitHub. Published: `v0.1.0`, `v0.2.0`, `v0.2.1`, `v0.2.2`, `v0.2.3`, `v0.2.4`, `v0.2.5`, `v0.2.6`, `v0.2.7`, `v0.3.0`, `v0.4.0`, `v0.5.0`, `v0.5.1`, `v0.6.0`, `v0.7.0`, `v0.8.0`, `v0.9.0`, `v0.9.1`, `v0.9.2`, `v0.9.3`, `v0.9.4`, `v0.10.0`, `v0.10.1`, `v0.10.2`, `v0.11.0`, `v0.11.1`, `v0.11.2`, `v0.11.3`, `v0.11.4`, `v0.11.5`, `v0.11.6`, `v0.11.7` and `v0.11.8`. The unpinned command follows `main` and does not pin a release. `v0.2.0-rc.1` also exists on GitHub but is not a release: it predates the release workflow and its `package.json` still declares `0.1.0`. See the [changelog](CHANGELOG.md) and the [release guide](docs/RELEASING.md) for the versioning and rollback rules.
 
 ## Testing and development
 
@@ -312,7 +312,7 @@ npm run ci
 
 ## Security and compatibility
 
-- Verified with DSH **`0.2.1-rc.2`** and Node.js **22 or newer**. The package declares its DSH requirement as the range **`engines.dsh: ">=0.2.1-rc.2 <0.3.0"`** — an own `engines.dsh` decides alone, so this range (not the peer ranges) is what admits a runtime and what makes a later release refuse to load instead of failing at run time. The peer packages the build is tested against stay pinned exactly (`@deepseek-ai/cordis` uses a compatible `~4.0.5` range). This is an external DSH bundle and does not modify DSH core.
+- Verified with DSH **`0.2.1-rc.2`** (full runs) and **`0.2.2-rc.3`** (install, activation, settings projection) and Node.js **22 or newer**. The package declares its DSH requirement as the range **`engines.dsh: ">=0.2.1-rc.2 <0.3.0"`** — an own `engines.dsh` decides alone, so this range (not the peer ranges) is what admits a runtime and what makes a later release refuse to load instead of failing at run time. The peer packages the build is tested against stay pinned exactly (`@deepseek-ai/cordis` uses a compatible `~4.0.5` range). This is an external DSH bundle and does not modify DSH core.
 - It does not bypass DSH approvals, sandbox policy or tool policy. Child agents cannot recursively invoke `grok_workflow`; their other tools remain subject to DSH's own policy.
 - Child agents inherit the parent session's available tools and permissions. There is no read-only capability mode; the verifier prompt asks it not to modify files, but that is not a hard sandbox guarantee.
 - Redaction is best-effort and lives in one place (`src/redact.ts`; the generated workflow script mirrors the same rule table for prompts). It covers PEM and PGP `PRIVATE KEY` blocks, JWT, `sk-`/`ghp_`/`github_pat_`/`glpat-`/`npm_`/`xox*`/`AKIA`/`ASIA`/`AIza`/`ya29.`/Telegram bot tokens, `Bearer` and `Basic` authorization, `Cookie`/`Set-Cookie` headers (also when written inside a quoted shell argument), URL userinfo, signed-URL query parameters (`sig`, `X-Amz-Signature`, `X-Goog-Signature`, `auth`, `token`), and secret-named assignments in env, JSON and header form. No shape list is complete: do not put credentials in objectives, task text or logs, and treat a report as no proof that a child agent never touched a secret.

@@ -1,6 +1,6 @@
 # RSI State (overwritten every round; keep under 100 lines)
 
-Updated: 2026-11-18T14:02+08:00 · round 7 complete · version `0.11.7` (tag `v0.11.7`)
+Updated: 2026-11-18T14:16+08:00 · round 8 complete · version `0.11.8` (tag `v0.11.8`) · ordering exhausted
 
 ## Facts
 
@@ -10,8 +10,15 @@ Updated: 2026-11-18T14:02+08:00 · round 7 complete · version `0.11.7` (tag `v0
   uncommitted by that round; landed by `2f999eb` (chore, no version bump).
 - Round 5: `bf0dc91` (tag `v0.11.5`), 54 files / 993 tests PASS.
 - Round 6: `88d133b` (tag `v0.11.6`), 54 files / 998 tests PASS.
-- Round 7 commit: this round's commit (tag `v0.11.7` → same sha). `npm run ci`:
+- Round 7: `1760d50` (tag `v0.11.7`), 54 files / 999 tests PASS.
+- Round 8 commit: this round's commit (tag `v0.11.8` → same sha). `npm run ci`:
   54 files / 999 tests PASS, 0 type errors, lint 22 warnings / 0 errors (baseline).
+- Live runtime (round 8, `CONFIRMED` on DSH 0.2.2-rc.3): `dsh plugin add` of this checkout into
+  an isolated `DSH_HOME`, `workflow-ptc` re-enabled, boot produced only the URL line (no
+  `pending`, no `did not activate`) and `POST /api/settings/describe` projected 23 namespaces,
+  `grok-workflow` among them with `autoGenerate: true`. A model-backed `grok_workflow` message
+  is **BLOCKED**: `MISSING_CREDENTIAL … "deepseek-official"` in the isolated profile, and
+  copying the operator's key is forbidden.
 - Tag inventory (round 7, `CONFIRMED`): 32 remote tags, 32 local, identical objects, all
   peeled commits ancestors of `main`; 31 tags match `package.json`, `v0.2.0-rc.1` does
   not (predates the release workflow) and is documented instead of moved.
@@ -68,7 +75,19 @@ on a guess.
   assertion was tightened to the exact placeholder and the second run was green.
 - Round 6: no failed ci run (red evidence was a deliberate replay of the new spec
   against the pre-fix document, 2 failed / 9 passed).
+- Round 8: no failed round; the model-backed runtime check is recorded BLOCKED, not failed.
 - Consecutive failed rounds: 0. Consecutive valueless rounds: 0.
+
+## Loop status (this session)
+
+- The ordered theme list handed to this loop is exhausted: P2-02 (round 5), P1-03 (round 6),
+  tag-sync verification (round 7), live-runtime disposition (round 8). `.rsi/STOP` was absent
+  at every round start. The loop therefore stopped by scope, not by STOP.
+- Remaining backlog, in pool priority order: P0-02 (Progress page Execute/Verify rows),
+  P1-02 (ARCHITECTURE "current version" statuses), P2-01 (settings client i18n keys),
+  P3-01/P3-02 (settings wording, progress detail rows), plus the P-labelled call-site items in
+  `.rsi/POOL.md` (records.ts raw `error.message`, history.ts truncate-before-redact,
+  base64-PEM rule).
 
 ## Open decisions
 

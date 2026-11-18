@@ -3431,3 +3431,27 @@ README 写明「它不是发布版本」，并由 `test/docs-version.spec.ts` �
 
 **未验证（`NOT_RUN`）**：旧标签的 GitHub Release **附件**未重新下载核对（本轮审 refs，不审
 Release 正文）；Release 工作流对预发布标签的处理未测（未改工作流）。
+
+## Round 56 — 2026-11-18 — 真机 disposition：DSH 0.2.2-rc.3 上安装/激活/设置面 PASS，真模型消息 BLOCKED（`CONFIRMED`）
+
+**做了什么（`CONFIRMED`，命令见 `.rsi/evidence/round-008/activation.txt`）**：`DSH_HOME=$PWD/.dsh-home/rsi-r8`
+（仓库内、gitignore；沙箱下 `dsh` 无法写 `~/.dsh`，实测 `EROFS … /home/fish/.dsh/profiles/headless/cordis.yml`）→
+`--from-default-profile web` → `dsh plugin --profile grok-workflow-dev add $PWD`（以 `link:` 安装）→
+把 `workflow-ptc` 改回 `disabled: false` → 在 `127.0.0.1:3199` 启动。
+
+**PASS（`CONFIRMED`）**：bundles = `["@deepseek-ai/dsh-base","@deepseek-ai/dsh-web-app","dsh-grok-workflow"]`；
+`--dump-config` 里 `workflow-ptc` `disabled: false`、`grok-workflow` 行在；启动输出只有一行 URL
+（无 `pending`、无 `did not activate`）；用启动 token 换 cookie 后 `POST /api/settings/describe`
+返回 200 / 43 056 B / **23 个命名空间，其中 `grok-workflow` 且 `autoGenerate: true`**。
+
+**BLOCKED（不是 pass）**：`dsh --profile grok-workflow-dev headless "Use the grok_workflow tool …"`
+退出码 1，`MISSING_CREDENTIAL: llm-deepseek: no API key for provider route "deepseek-official"`。
+从别的 profile 拷密钥被任务禁止，故记 blocked；真实 Loader 路径仍由 `test/loader.spec.ts`（2 例）覆盖。
+
+**顺手发现两处坑（已写入 `docs/LOCAL-TESTING.md`）**：`web` 模板的 profile 没有 `headless` 命令
+（`too many arguments. Expected 0 arguments but got 2: headless, …`，`--host` 亦属未知选项）；
+`--from-default-profile web` 会**启动** web app，若操作者实例已占 `:3080` 就会 EADDRINUSE（profile 仍会写入）。
+
+**收尾（`CONFIRMED`）**：本轮启动的实例全部停止，`ss -ltn` 在 3199/3201/3203/3205/3207/3209/3211/3213
+均无监听；带 token 的启动日志已就地脱敏，证据目录里 `token=` / `API_KEY=` 检索为空。
+`npm run ci` exit 0，typecheck 0 错，lint 22w/0e，**54 文件 / 999 测试 PASS**。

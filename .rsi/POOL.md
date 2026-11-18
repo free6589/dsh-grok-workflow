@@ -106,6 +106,13 @@ here and are marked DONE when their commit lands.
 - P · `docs/knowledge/DESIGN-progress-tab.md` §4 documents the old delivery-template spine and
   §12 never records the Execute/Verify gap. S / low.
 
+## Runtime (round 8)
+
+- R8 DONE · plugin installs into a real DSH profile, the row activates (no `pending`), and the
+  settings projection serves `grok-workflow` (`autoGenerate: true`) on DSH 0.2.2-rc.3.
+  BLOCKED: a model-backed `grok_workflow` message (`MISSING_CREDENTIAL … "deepseek-official"` in
+  the isolated profile; copying a key is forbidden). Evidence `.rsi/evidence/round-008/`.
+
 ## Open questions
 
 - `src/panel.ts` has no production importer (only `test/panel.spec.ts`, `test/gui-fold.ts`); its

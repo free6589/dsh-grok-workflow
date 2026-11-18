@@ -248,3 +248,47 @@ no history is rewritten, and no round is force-pushed.
   would reject a prerelease tag is not tested (`NOT_RUN`, no workflow change made).
 - **Suggested version:** patch → `0.11.7`.
 - **status:** OK
+
+## Round 8 — the plugin really activates on DSH 0.2.2-rc.3; the model-backed run is blocked
+
+- **Theme (live runtime disposition):** the backend carried "live `grok-workflow-dev` message
+  test NOT_RUN" and the docs claimed the bundle "installs and composes" on `0.2.2-rc.3`
+  while behaviour was verified only on `0.2.1-rc.2`.
+- **What ran (exact commands in `.rsi/evidence/round-008/activation.txt`):** an isolated
+  `DSH_HOME=$PWD/.dsh-home/rsi-r8` (gitignored, inside the workspace — `dsh` cannot write
+  `~/.dsh` under this sandbox: `EROFS … /home/fish/.dsh/profiles/headless/cordis.yml`),
+  `dsh --profile grok-workflow-dev --from-default-profile web`,
+  `dsh plugin --profile grok-workflow-dev add $PWD` (installed as `link:`), the `workflow-ptc`
+  row re-enabled, then a boot on `127.0.0.1:3199`.
+- **Result — PASS for installation, composition and activation:**
+  - bundles after `plugin add`: `["@deepseek-ai/dsh-base","@deepseek-ai/dsh-web-app","dsh-grok-workflow"]`;
+  - `--dump-config` shows `workflow-ptc` `disabled: false` (provider `spawn`) and the
+    `grok-workflow` row;
+  - boot output was one line — `dsh web: http://127.0.0.1:3199/?token=…` — with no `pending`
+    row and no `did not activate` warning (acceptance check 1);
+  - `POST /api/settings/describe` (after minting the launch cookie with `GET /?token=…`)
+    returned **200 / 43 056 bytes, 23 namespaces, `grok-workflow` present with
+    `autoGenerate: true`** (acceptance check 2).
+- **Result — BLOCKED for a real model-backed message (acceptance check 4):** the isolated
+  profile has no credential; `dsh --profile grok-workflow-dev headless "Use the grok_workflow
+  tool …"` exits 1 with
+  `dsh: MISSING_CREDENTIAL: llm-deepseek: no API key for provider route "deepseek-official"; …`.
+  Copying the operator's key out of another profile is forbidden by this task, so the run is
+  recorded as blocked, **not** as a pass. The real Loader path is still covered by
+  `test/loader.spec.ts` (2 tests) inside `npm run ci`.
+- **Two real traps found while doing it** (both now in `docs/LOCAL-TESTING.md`): a
+  `web`-template profile rejects `dsh --profile <name> headless "task"` with `too many
+  arguments` and treats `--host` as unknown; and `--from-default-profile web` *boots* the web
+  app, so it fails when the operator's instance already owns `:3080` (the profile is still
+  written, which is all that step needs).
+- **Cleanup:** every instance started this round was stopped; `ss -ltn` shows no listener on
+  3199/3201/3203/3205/3207/3209/3211/3213. The boot log that carried the launch token was
+  redacted in place, and the evidence files contain no credential (`grep` for `token=` and
+  `API_KEY=` over `.rsi/evidence/round-008/` is empty).
+- **Evidence:** `.rsi/evidence/round-008/` — `activation.txt` (disposition + commands),
+  `settings-describe.txt` (namespace list and the `grok-workflow` entry), `headless-run.txt`
+  (`MISSING_CREDENTIAL`), `profile-create*.txt`, `plugin-add.txt`, `boot-raw.txt` (redacted),
+  `ci.txt` (exit 0, 54 files / 999 tests).
+- **Suggested version:** patch → `0.11.8` (docs now state a verified runtime that was not
+  claimed before).
+- **status:** OK

@@ -1,5 +1,21 @@
 # Agent Handoff
 
+## 2026-11-18 — RSI 连续循环：round 8 = 真机 disposition（激活 PASS / 真模型 BLOCKED）
+
+- **From:** RSI 执行代理（agent-34）· **To:** 用户 / 后续接手代理
+- **已证（`CONFIRMED`）**：DSH `0.2.2-rc.3` 上，本检出装入真实 `grok-workflow-dev`（`link:` 依赖），
+  `workflow-ptc` 启用后实例启动干净（无 `pending`/`did not activate`），设置投影含
+  `grok-workflow`（`autoGenerate: true`）。命令与输出见 `.rsi/evidence/round-008/activation.txt`
+  与 `settings-describe.txt`。
+- **未证（`BLOCKED`）**：经 `grok_workflow` 的真模型消息——孤立 profile 无凭据，
+  `MISSING_CREDENTIAL: … "deepseek-official"`。要补这一条，需操作者在自己可用的 profile 里跑
+  `docs/LOCAL-TESTING.md` 的 Real-model smoke，并把结果写进 VALIDATION；**不要**把别的 profile 的
+  密钥拷进本仓库或证据目录。
+- **清理**：本轮启动的实例都已停止（3199/3201/3203/3205/3207/3209/3211/3213 无监听），带 token 的
+  启动日志已就地脱敏；`.dsh-home/` 与 `.tmp/` 均 gitignore。
+- **循环状态**：本次会话交办的四个主题（P2-02 → P1-03 → tag 审计 → 真机）已全部完成并各自
+  提交/打 tag/push；下一轮应从 `.rsi/POOL.md` 的 P0-02（Progress 页 Execute/Verify 行）开始。
+
 ## 2026-11-18 — RSI 连续循环：round 7 = 远端标签清单对账（`CONFIRMED`）
 
 - **From:** RSI 执行代理（agent-34）· **To:** 用户 / 后续接手代理

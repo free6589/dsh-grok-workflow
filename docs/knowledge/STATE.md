@@ -1,6 +1,16 @@
 # Project State
 
-Last updated: 2026-11-18 (**RSI 连续循环 round 7 完成 · `0.11.7`** — 主题：远端标签清单对账。
+Last updated: 2026-11-18 (**RSI 连续循环 round 8 完成 · `0.11.8`** — 主题：真机 disposition。
+在 DSH `0.2.2-rc.3` 上用仓库内 `DSH_HOME`（沙箱下 `dsh` 写不了 `~/.dsh`，实测 EROFS）把本检出
+`dsh plugin add` 进 `grok-workflow-dev`，`workflow-ptc` 改回启用后在 `127.0.0.1:3199` 起真实实例：
+启动只有一行 URL（无 `pending`、无 `did not activate`），`POST /api/settings/describe` 投出 23 个
+命名空间且 `grok-workflow` `autoGenerate: true`。**真模型消息 BLOCKED**：
+`MISSING_CREDENTIAL … "deepseek-official"`，未把未跑过的运行标成 pass。顺手记下两处坑（`web` 模板
+profile 无 `headless` 命令；`--from-default-profile web` 会启动并可能 EADDRINUSE）。`npm run ci`
+exit 0：typecheck 0 错、lint 22w/0e、**54 文件 / 999 测试 PASS**；tag `v0.11.8`。
+证据 `.rsi/evidence/round-008/`、`VALIDATION.md` Round 56、`D-062`。
+
+Previous update: 2026-11-18 (**RSI 连续循环 round 7 完成 · `0.11.7`** — 主题：远端标签清单对账。
 `git ls-remote --tags` 全量 32 个标签逐条对 README 中英列表与各标签所在提交的 `package.json`：
 32/32 本地与远端对象相同（没有被移动过的标签）、每个 peeled 提交都是 `main` 祖先、两份列表
 升序无重复无缺失且末项 = 当前发布、`HEAD == origin/main`。31 个标签版本一致；唯一例外

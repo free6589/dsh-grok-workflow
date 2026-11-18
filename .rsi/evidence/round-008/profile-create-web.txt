@@ -1,0 +1,20 @@
+dsh: startup failed: 2 required plugins did not activate
+
+Failed plugins (1):
+  webserver (required)
+    Package: @deepseek-ai/dsh-host-webserver
+    Error: listen EADDRINUSE: address already in use 127.0.0.1:3080
+        at Server.setupListenHandle [as _listen2] (node:net:2328:16)
+        at listenInCluster (node:net:2437:12)
+        at node:net:2666:7
+        at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+
+Plugins waiting for services (5):
+  Plugin                  Missing services
+  web-runtime (required)  webServer
+  open-in-app             webServer
+  directory-picker        webServer
+  harness-dev-context     webApp
+  client-hmr              webServer
+
+Full diagnostics: /home/fish/projects_mine/dsh-grok-workflow/.dsh-home/rsi-r8/logs/startup-2026-11-18T05-59-44.301Z-952540d7-8eed-4b8e-b2f6-5b539af6a948.log

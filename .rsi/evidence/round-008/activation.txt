@@ -1,0 +1,43 @@
+RSI round 8 — live DSH runtime disposition (2026-11-18T14:12+08:00)
+
+$ dsh --version
+0.2.2-rc.3
+
+$ export DSH_HOME=$PWD/.dsh-home/rsi-r8   # isolated, gitignored, inside the workspace
+$ dsh --profile grok-workflow-dev --from-default-profile web   # first boot attempt
+=> profile created; boot itself failed with EADDRINUSE 127.0.0.1:3080 (the operator live
+   instance owns that port). The profile content was written, which is what this step needs.
+
+$ node -p "JSON.stringify(require(\"$DSH_HOME/profiles/grok-workflow-dev/package.json\").dsh.profile.bundles)"
+["@deepseek-ai/dsh-base","@deepseek-ai/dsh-web-app","dsh-grok-workflow"]
+
+$ dsh plugin --profile grok-workflow-dev add $PWD
+"Already up to date" / "+ dsh-grok-workflow link:../../../.." / "Done in 226ms using pnpm v12.4.2"
+
+$ dsh --profile grok-workflow-dev --dump-config | grep -A6 grok-workflow
+- id: workflow-ptc
+  name: '@deepseek-ai/dsh-workflow-ptc'
+  config:
+    provider: spawn
+  disabled: false
+- id: grok-workflow
+  name: dsh-grok-workflow
+
+$ dsh --profile grok-workflow-dev --host 127.0.0.1 --port 3199 --no-open
+dsh web: http://127.0.0.1:3199/?token=[REDACTED]   # single line, no "pending" and no
+                                                    # "did not activate" warning
+
+Acceptance check 2 (settings projection), on 0.2.2-rc.3:
+  GET  /?token=<launch token> -> 303 (cookie minted)
+  POST /api/settings/describe -> 200, 23 namespaces, one of them grok-workflow with
+  autoGenerate: true. See settings-describe.txt (the 43 KB body is not stored verbatim).
+
+Acceptance check 4 (real model-backed message through grok_workflow): NOT_RUN.
+  $ dsh --profile grok-workflow-dev headless "Use the grok_workflow tool ..."
+  exit 1: dsh: MISSING_CREDENTIAL: llm-deepseek: no API key for provider route
+  "deepseek-official"; store DEEPSEEK_API_KEY through the credentials service ...
+  The isolated DSH_HOME has no credential, and copying the operator key out of another
+  profile is forbidden by this task, so the run is recorded as blocked, not as a pass.
+
+$ ss -ltn | grep -E ":(3199|3201|3203|3205|3207|3209|3211|3213)"
+(no output: every instance this round started was stopped before the round ended)

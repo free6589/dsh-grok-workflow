@@ -1,0 +1,9 @@
+RSI round 8 — real DSH instance, settings projection probe
+
+GET  /?token=<launch token>            -> 303 (cookie minted)
+POST /api/settings/describe            -> 200, 43056 bytes
+namespaces projected by the instance   : 23
+namespace names                        : agent-default-model, agent-loop, agent-preset-registry, bash-sandbox, grok-workflow, llm-deepseek, llm-deepseek-account, llm-pi-ai, locale, mcp-manager, permission, session-log-deepseek, subagent, subagent-model-selection-settings, ui-chat, ui-conversation, ui-settings, ui-settings-account, ui-settings-general, ui-theme, web, web-deepseek-api, web-search-deepseek
+'grok-workflow' namespace present      : True
+  autoGenerate                         : True
+  projected schema fields (0)        : 

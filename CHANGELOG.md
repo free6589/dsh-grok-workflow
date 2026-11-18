@@ -5,6 +5,41 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.11.8] - 2026-11-18
+
+### Changed / 变更
+
+- **DSH `0.2.2-rc.3` is now verified for install, activation and settings projection / DSH `0.2.2-rc.3` 的安装、激活与设置面已有实测** —
+  the docs said the bundle "installs and composes" on `0.2.2-rc.3` while behaviour was only
+  verified on `0.2.1-rc.2`. A real isolated profile (`web` template, `dsh plugin add` of this
+  checkout as a `link:` dependency, `workflow-ptc` re-enabled) was booted on `0.2.2-rc.3`: the
+  only boot output was the URL line (no `pending` row, no `did not activate` warning) and
+  `POST /api/settings/describe` projected 23 namespaces, one of them `grok-workflow` with
+  `autoGenerate: true`. Both READMEs and `docs/LOCAL-TESTING.md` now say exactly that. The
+  model-backed message through `grok_workflow` remains **unverified**: the isolated profile has
+  no credential and the run stops with
+  `MISSING_CREDENTIAL: llm-deepseek: no API key for provider route "deepseek-official"`, which
+  is recorded as blocked rather than reported as a pass. / 文档原先只说该 bundle 在
+  `0.2.2-rc.3` 上「可安装并进入组合图」，行为却只在 `0.2.1-rc.2` 上验证过。本轮用真实孤立 profile
+  （`web` 模板、以 `link:` 依赖方式 `dsh plugin add` 本检出、重新启用 `workflow-ptc`）在
+  `0.2.2-rc.3` 上启动：启动输出只有一行 URL（没有 `pending` 行、没有 `did not activate` 警告），
+  `POST /api/settings/describe` 投出 23 个命名空间，其中包括 `autoGenerate: true` 的
+  `grok-workflow`。两份 README 与 `docs/LOCAL-TESTING.md` 现在如实写清这一点。经
+  `grok_workflow` 的真模型消息仍未验证：孤立 profile 没有凭据，运行以
+  `MISSING_CREDENTIAL: llm-deepseek: no API key for provider route "deepseek-official"`
+  停下，记为 blocked 而不是 pass。
+
+### Docs / 文档
+
+- `docs/LOCAL-TESTING.md`: a new trap (a `web`-template profile has no `headless` command —
+  `dsh --profile <name> headless "task"` is rejected with `too many arguments` and `--host` is
+  an unknown option there) and the `MISSING_CREDENTIAL` line a fresh isolated profile produces,
+  with the rule that a key is never copied out of another profile to make the smoke test pass. /
+  `docs/LOCAL-TESTING.md` 新增一条坑：`web` 模板创建出的 profile 没有 `headless` 命令
+  （`dsh --profile <name> headless "task"` 会被 `too many arguments` 拒绝，`--host` 也属未知选项），
+  以及全新孤立 profile 会输出的 `MISSING_CREDENTIAL` 行，并写明不得为了糊弄冒烟测试而从别的
+  profile 拷密钥。
+
 ## [0.11.7] - 2026-11-18
 
 ### Docs / 文档

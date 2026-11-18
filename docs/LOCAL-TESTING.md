@@ -4,7 +4,8 @@
 
 - Node.js 22+ (verified locally with Node 26.8.1)
 - npm or pnpm
-- DSH CLI `0.2.1-rc.2` (verified)
+- DSH CLI `0.2.1-rc.2` (full runs) or `0.2.2-rc.3` (activation and settings projection, RSI
+  round 8)
 - A DSH profile with `@deepseek-ai/dsh-base` / `dsh-web-app` or
   `dsh-headless`; those bundles provide `workflow-ptc`, `subagent`, and the
   `spawn` provider.
@@ -69,7 +70,7 @@ Verified activation, step by step (anyone can repeat it):
 dsh --profile grok-workflow-dev --from-default-profile web
 
 # 2. install the packed plugin (adds the dependency AND the bundle row)
-dsh plugin --profile grok-workflow-dev add ./dsh-grok-workflow-0.11.7.tgz
+dsh plugin --profile grok-workflow-dev add ./dsh-grok-workflow-0.11.8.tgz
 
 # 3. re-enable a workflow provider in the profile patch
 #    <profile>/cordis.patch.yml:
@@ -90,6 +91,13 @@ Acceptance for "it is really active" (all four, in this order):
 | Plugins page (web GUI) | a card `Grok workflow`; opening it shows the settings page |
 | a real session's `request/header.tools` | contains `grok_workflow` |
 
+Verified again on `0.2.2-rc.3` (RSI round 8, 2026-11-18): a fresh profile created from the
+`web` template, `dsh plugin add` of this checkout (installed as a `link:` dependency), the
+`workflow-ptc` row re-enabled, then a boot on `127.0.0.1:3199` whose only output was the URL
+line — no `pending` row and no `did not activate` warning — and a settings projection with 23
+namespaces, one of them `grok-workflow` with `autoGenerate: true`. The model-backed message
+was not run: see "Real-model smoke" for the `MISSING_CREDENTIAL` line.
+
 Three traps that cost real time in t32 (all reproduced):
 
 - **A stale install.** `dsh plugin add` with the *same* `file:` tarball path is a
@@ -101,6 +109,11 @@ Three traps that cost real time in t32 (all reproduced):
   profile's `dsh.profile.bundles` contained only that package — the earlier
   third-party bundle had been dropped. Re-add every bundle or edit
   `dsh.profile.bundles` by hand and re-check `--dump-config`.
+- **The profile template decides which app you get.** A profile created with
+  `--from-default-profile web` has no `headless` command: `dsh --profile <name> headless "task"`
+  fails with `error: too many arguments. Expected 0 arguments but got 2: headless, task`
+  (and `--host` is an unknown option in a `headless` profile). Recreate the profile from the
+  template whose app you want before using that form. Reproduced on `0.2.2-rc.3` (round 8).
 - **`subagentProvider` is a DSH subagent provider, not an LLM provider.** It must
   be `spawn` or `fork` (the names the profile registers through
   `@deepseek-ai/dsh-subagent-spawn-in-process` / `-fork-in-process`). Setting it to
@@ -126,8 +139,8 @@ cp "$DSH_HOME/profiles/<name>/cordis.patch.yml" \
 # 2. install the packed plugin. A *new path* every time: `dsh plugin add` with the same
 #    `file:` spec is a pnpm no-op, so an unchanged path can silently keep the old contents.
 DEST="/tmp/install-$(date +%s%N)"      # a spec this profile has never been given
-mkdir -p "$DEST" && cp dsh-grok-workflow-0.11.7.tgz "$DEST/"
-dsh plugin --profile <name> add "$DEST/dsh-grok-workflow-0.11.7.tgz"
+mkdir -p "$DEST" && cp dsh-grok-workflow-0.11.8.tgz "$DEST/"
+dsh plugin --profile <name> add "$DEST/dsh-grok-workflow-0.11.8.tgz"
 
 # 3. verify the installed bytes, not the pack
 node -p "require('$DSH_HOME/profiles/<name>/node_modules/dsh-grok-workflow/package.json').version"
@@ -248,6 +261,12 @@ credentials. Example shape:
 set -a; . ~/.dsh/bifrost.env; set +a
 dsh --profile grok-workflow-dev headless 'Use grok_workflow ...'
 ```
+
+A freshly created isolated profile has no credential, and the run says so instead of
+pretending: `dsh: MISSING_CREDENTIAL: llm-deepseek: no API key for provider route
+"deepseek-official"; store DEEPSEEK_API_KEY through the credentials service …`. Never copy a
+key out of another profile to make the smoke test pass — record the run as `BLOCKED` with that
+line (that is what RSI round 8 did; `.rsi/evidence/round-008/`).
 
 Record the exact model, profile, command, and result in
 `docs/knowledge/VALIDATION.md`; do not record the key.
