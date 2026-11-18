@@ -1394,3 +1394,43 @@ supersede，而不是就地改成计数器；客户端出现真正的开关控�
 **证据索引**：`src/loop.ts`（策略、规则、行选择、清理）、`src/loop-surface.ts`（工具 + 路由 +
 生命周期）、`test/loop.spec.ts`（27 条）、`test/loop-surface.spec.ts`（13 条）、
 `test/heartbeat-guard.spec.ts`（14 条，守卫侧）、README「Repeat runs」、CHANGELOG `[Unreleased]`。
+
+## D-070 — `v0.11.14` 的发布事故用 `0.11.15` 这个 patch 版本收口，不移动标签、不手工补 Release（2026-11-19 · round 15）
+
+- **Status:** CONFIRMED（远端标签/Release/CI 状态为 `git ls-remote` 与 `gh` 实测；新标签的 Release
+  由既有 release 工作流产生，结果见 `.rsi/ROUND.md` Round 15 与 `VALIDATION.md` Round 61）
+
+**背景**：round 14 推出 `v0.11.14` 后，标签提交 `20eafea` 的 `lib/` 落后于它的 `src/`
+（`git show 20eafea:src/loop.ts | grep -c callSchedule` = 12，`…:lib/loop.js` = 0），远端 CI 红
+（run `44345615218`），Release 工作流在 `Verify committed build artifacts` 失败（run `44345622700`），
+因此该标签**没有 GitHub Release**，也没有产出任何压缩包。标签已在远端公开。`main` 上的 `8c8e367`
+只重建了构建产物并把远端 CI 转绿（run `44349708692`），那修好的是 `main`，不是那个已发布的标签。
+
+**四个备选**：
+
+1. **移动/重打 `v0.11.14`**（`git tag -f` 加强推）——被 AGENTS.md「Never move or overwrite a published
+   tag」与 PROTOCOL 红线直接禁止；已被他人 fetch 的标签会分叉，且无法证明本地历史就是别人看到的那个。
+2. **`workflow_dispatch` 重跑 Release**——它 checkout 同一个不可变提交，会在同一步（构建产物检查）
+   再失败，不产生任何修复。
+3. **`gh release create v0.11.14` 手工补一个 Release**——会发布一个**不是它源码构建**的产物，等于绕过
+   发布门禁，并让 README/CHANGELOG 里「这个版本带续跑面」的说法变成假的。
+4. **从 `main` 打一个 patch 版本（本次选择）**——新标签、重跑全部门禁、Release 由既有工作流创建；
+   `v0.11.14` 保持原样，并在两份 README 与 CHANGELOG 里写明它不是发布版本、安装请固定 `v0.11.15`。
+
+**授权**：本任务（`docs_release_memory`，attempt 2）的目标与约束要求「commit push and tag via R6 flow
+without forcing or moving old tags」「patch/minor tag only per rules」，并把上一轮遗留的发布失败收口；
+据此把**一次 patch 发布**视为本任务范围内的授权。范围：一个 patch 标签 + 由既有 release 工作流创建的
+GitHub Release。**不包含** npm 发布、不包含移动/删除任何标签、不包含修改 `.github/` 的发布门禁或
+放宽 CI；若门禁再次红，本轮只记录失败，不改门禁。
+
+**代价（明确接受）**：发布线多一个 patch 版本；`v0.11.14` 这个标签会长期存在但没有 Release，而 README
+的「已发布」列表由 `git tag` 生成、无法把它摘掉，所以两份 README 都在那一句后面补了「它不是发布版本、
+请用 `v0.11.15`」的说明，并让 `docs-version` 守卫继续覆盖这个列表。
+
+**失效条件**：若操作者要求「不要为构建产物单独发版」，本条应被 supersede，改为在下一轮功能版本里
+带上修复（`v0.11.14` 依然没有 Release，README 的说明继续有效）。
+
+**证据索引**：`gh run list`（CI `44345615218` failure、Release `44345622700` failure、`8c8e367` CI
+`44349708692` success、`b0d6d10` CI `44351065108` success）；`gh release view v0.11.14` → release not
+found；`.rsi/evidence/round-014/lib-stale.txt`；本轮发版结果 `.rsi/ROUND.md` Round 15、
+`.rsi/evidence/round-015/`。

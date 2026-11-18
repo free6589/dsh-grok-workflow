@@ -1,5 +1,28 @@
 # Agent Handoff
 
+## 2026-11-19 — RSI round 15：`v0.11.14` 发布事故收口，`0.11.15` 是第一个真正带续跑面的发布
+
+- **From:** 执行代理 agent-29（任务 `docs_release_memory`，attempt 2）· **To:** 用户 / 下一轮接手者
+- **为什么有这一轮（`CONFIRMED`）**：round 14 的 `v0.11.14` 只推了标签；Release 工作流在
+  `Verify committed build artifacts` 失败（run `44345622700`），标签提交 `20eafea` 的 `lib/loop.js`
+  是更早的 `src/loop.ts` 构建的（`grep -c callSchedule`：src 12 / lib 0），所以**该标签没有 GitHub
+  Release**，也没有任何压缩包发布。`8c8e367` 修好了 `main`，但修不了已发布的标签。
+- **本轮做法（`CONFIRMED`）**：在独立克隆 `.worktrees/release-015`（基线 `b0d6d10`）里按 R6 走
+  `finish-round.py` 打 `0.11.15`（patch）。**没有移动/删除/重打任何旧标签，没有 force-push，没有 npm
+  发布**；`v0.11.14` 原地保留，并在两份 README 与 CHANGELOG 里写明它不是发布版本、安装请固定 `v0.11.15`。
+- **内容（`CONFIRMED`）**：构建产物重建（`src/`、`test/` 零改动，`lib/` 与源码一致性由发布工作流自己的
+  `git diff --exit-code -- lib/` 验证）+ README 测试数更正（`1022 / 57` → `1081 / 60`）+ 安装区一句
+  「不要固定 `v0.11.14`」+ `D-070`（四个备选与授权范围）+ 本轮记录。
+- **门禁（`CONFIRMED`）**：`npm run ci` exit 0 = 60 文件 / 1081 测试 PASS、lint `22 warnings / 0 errors`
+  （`.rsi/evidence/round-015/pre-release-ci.txt`；发布脚本那次是 `ci.txt`），ROUND.md Round 15。
+- **树状态（`CONFIRMED`，重要）**：主工作树在 round 15 期间仍有另一位写入者的未提交工作
+  （`src/client/index.js` 的设置页开关、`src/loop-brakes.ts`、`scripts/verify-lib.mjs`、`src/config.ts`、
+  `src/gate.ts`、`test/*.spec.ts` 等，21 tracked + 6 untracked）。**这些没有进 `0.11.15`**，也未经本轮
+  审阅；接手者先跑 `npm run ci` 再决定它们属于哪一轮（其中 `verify:lib` 把 `npm run ci` 改成先导出
+  `HEAD` 再重建比较，是一个独立主题）。
+- **Next action**：P3-01（设置页逐路由上限与死线字段的文案）或 P3-02（进度页「没有报告事实的成员」详情行）；
+  另一条候选是 D-069「现状」里的客户端开关——那正是上面仍未提交的那份工作。
+
 ## 2026-11-18 — RSI round 14 落地并发布 `0.11.14`：续跑（loop）面 + 双语文档 + D-068/D-069
 
 - **From:** 执行代理 agent-8（任务 `docs_release_memory`）· **To:** 用户 / 下一轮接手者

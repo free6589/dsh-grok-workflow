@@ -543,3 +543,27 @@ no history is rewritten, and no round is force-pushed.
   `loop/schedule-refused` mapping without its 413/409 route tests (grep = 0 in that commit); those
   tests are still uncommitted in the working tree and belong to the next round.
 
+## Round 15 — 2026-11-19 — 发布事故收口：`0.11.15`（patch），`v0.11.14` 标签原地保留
+
+- **主题**：round 14 的 `v0.11.14` 只推了标签；其提交 `20eafea` 的 `lib/` 是更早的 `src/loop.ts`
+  构建的（`callSchedule`：src 12 / lib 0），Release 工作流停在 `Verify committed build artifacts`
+  （run `44345622700`），该标签既没有 GitHub Release，也没有压缩包发布。本轮按 D-070 从 `main`
+  打 `0.11.15` 收口。
+- **为什么在独立克隆里做**：主工作树有另一位写入者的 21 tracked + 6 untracked 未提交工作
+  （客户端开关、`src/loop-brakes.ts`、`scripts/verify-lib.mjs` 等）；直接跑 R6 的
+  `git add -A -- src test lib …` 会把未经审阅的半成品塞进发布提交。克隆
+  `.worktrees/release-015`，基线 `b0d6d10`，`origin` 指回 GitHub。
+- **改动**：`src/`、`test/` 零改动；`npm run build` 后 `git diff --stat -- lib/` 为空，所以本版本是
+  「同一份源码、正确的产物」；README 中英测试数 `1022/57` → `1081/60`，并在安装区写明
+  `v0.11.14` 不是发布版本、请固定 `v0.11.15`；`CHANGELOG.md` 双语 `## [0.11.15]`；
+  `DECISIONS.md` `D-070`；`STATE.md` / `HANDOFF.md` / `VALIDATION.md` 本轮记录；
+  `bump-version.py` 同步 `package.json` / `package-lock.json` / 两份 README / `docs/LOCAL-TESTING.md`。
+- **门禁**：npm run ci exit 0 · 60 test files passed · 1081 tests passed（`.rsi/evidence/round-015/ci.txt`；文档侧先跑的一次在 `pre-release-ci.txt`）。
+  CI 重建后 `git diff --exit-code -- lib/` 仍为空；文档守卫（docs-version 8、docs-config-keys 12、
+  docs-architecture-version 3）通过；基线 `v0.11.13` = 57 / 1022，本轮 +3 文件 / +59 测试，
+  无删除、无 skip。
+- **证据**：`.rsi/evidence/round-015/`（`pre-release-ci.txt`、`ci.txt`、`git.txt`）；事故复述与 run id
+  见 `VALIDATION.md` Round 61、`DECISIONS.md` D-070。
+- **未验证（`NOT_RUN`）**：npm 发布（未授权）；真机心跳投递（D-066，操作者动作）；主工作树里另一位
+  写入者的客户端开关与 `verify:lib`（不属于本轮，未提交、未审阅）。
+- **status:** OK

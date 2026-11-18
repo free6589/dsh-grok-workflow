@@ -5,7 +5,24 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.11.15] - 2026-11-19
+
 ### Fixed / 修复
+
+- **`v0.11.14` was tagged but never released; `0.11.15` is the release that actually
+  carries the repeat-run surface / `v0.11.14` 只打了标签、没有发布；`0.11.15` 才是真正
+  带上续跑面的发布** — the commit under the `v0.11.14` tag carried a `lib/` built from an
+  earlier `src/loop.ts`. The Release workflow stopped at its `Verify committed build
+  artifacts` step before creating the GitHub Release, so that tag has no Release and no
+  tarball ever shipped. This patch publishes the same source with that `lib/` rebuilt; pin
+  `dsh-grok-workflow#v0.11.15`. The tag itself is left in place: published tags are
+  immutable, and a hand-made release for it would ship an artifact that is not the build
+  of its own source.
+  / `v0.11.14` 标签下的提交带着一份用更早的 `src/loop.ts` 构建的 `lib/`。Release 工作流
+  在 `Verify committed build artifacts` 一步就停了，没有创建 GitHub Release，所以那个标签
+  既没有 Release，也从未产出过压缩包。这个 patch 版本用同一份源码、把那份 `lib/` 重新构建
+  后发布；请固定 `dsh-grok-workflow#v0.11.15`。旧标签保持不动：已发布的标签不可变，而手工
+  为它建 Release 会发布一个不是它源码构建的产物。
 
 - **The bundle is now provably the build of the source it ships beside
   / 发布产物现在可以证明就是它旁边那份源码的构建** —
@@ -23,6 +40,12 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
   在临时目录里重新构建，只要 `lib/` 与该构建不是逐字节相同就报错。本机门禁此前从原理上就
   看不到这个问题——`npm test` 会先重建 `lib/`，再测试重建后的文件——只有远端的
   `git diff --exit-code -- lib/` 能发现它，而那时标签已经推上去了。
+
+- **README test counts corrected / README 的测试数说法已更正** — both READMEs said
+  `1022` tests across `57` files, a number from `v0.11.13`; the suite is `1081` tests
+  across `60` files. The claim now matches the CI run this release was cut from.
+  / 两份 README 此前写「57 个文件 / 1022 个测试」（`v0.11.13` 的数字），而实际是
+  **60 个文件 / 1081 个测试**；现在的说法与本版本的发版 CI 一致。
 
 ## [0.11.14] - 2026-11-18
 

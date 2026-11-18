@@ -1,6 +1,17 @@
 # Project State
 
-Last updated: 2026-11-18 (**RSI 连续循环 round 14 完成 · `0.11.14`** — 主题：续跑（repeat-run / loop）
+Last updated: 2026-11-19 (**RSI 连续循环 round 15 完成 · `0.11.15`** — 主题：收口 `v0.11.14` 的发布事故。
+round 14 的标签提交 `20eafea` 的 `lib/` 落后于它的 `src/`（`lib/loop.js` 里没有 `callSchedule`），远端 CI 红、
+Release 工作流停在 `Verify committed build artifacts`，所以那个标签**没有 GitHub Release**，也从未产出压缩包；
+`main` 上的 `8c8e367` 只重建了产物。本轮按 D-070 从 `main` 打 **`0.11.15`**（patch）：只含构建产物重建 +
+文档更正（两份 README 的测试数 1022/57 → 1081/60、新增「`v0.11.14` 不是发布版本、请固定 `v0.11.15`」一句）+
+本轮记录，`v0.11.14` 标签原地不动、未 force-push、未发布 npm。`npm run ci` exit 0 =
+**60 文件 / 1081 测试 PASS**、lint 22 warnings / 0 errors（`.rsi/evidence/round-015/pre-release-ci.txt`）；
+新标签的 Release 由既有工作流创建，commit 与 run id 见 `.rsi/ROUND.md` Round 15 与 `VALIDATION.md` Round 61。
+**剩余待办**：P3-01、P3-02 仍 OPEN（D-068 只改了顺序）；「客户端还没有真正会 POST `/grok-workflow/loop` 的
+控件」仍是候选主题（D-069「现状」）。)
+
+Previous update: 2026-11-18 (**RSI 连续循环 round 14 完成 · `0.11.14`** — 主题：续跑（repeat-run / loop）
 面落地并发版。四个 `loop*` 键从「存着没人读」变成有驱动：一个循环 = Host Schedule 里一条 `rrule`
 持久任务（标题 `Loop heartbeat`、文案前缀 `[grok-workflow loop]`、目标=本会话），插件自己不设 timer；
 打开只走 `POST /grok-workflow/loop`（用户侧，路由在组合的 Host/Origin + 浏览器认证闸门后），
@@ -1223,3 +1234,31 @@ worker 链上限 50（HARD_LIMITS.chainLength）
   peel `7a79efb`），未 force-push。`package.json` + `package-lock.json` + 两份 README 的版本句/安装 pin/已发布
   列表 + `docs/LOCAL-TESTING.md` 压缩包名 = `0.11.14`；`CHANGELOG` 有 `## [0.11.14] - 2026-11-18`；
   一个提交 + annotated tag `v0.11.14`，未移动任何旧标签、未 force-push、未发布 npm。
+
+## 2026-11-19 — RSI round 15：`v0.11.14` 发布事故收口 + `0.11.15`（`CONFIRMED`）
+
+- **前提（`CONFIRMED`）**：主工作树 `git status --short --branch` = `## main...origin/main`、HEAD = `b0d6d10`，
+  但树上有 21 个 tracked 改动 + 6 个未跟踪条目（另一个写入者正在做客户端开关与 `verify:lib`）。本轮**不碰**
+  这些文件：发版在独立克隆 `.worktrees/release-015`（从本地仓 `--no-hardlinks` 克隆、`origin` 改回 GitHub）
+  里做，基线 = `b0d6d10`；`npm ci` 后 `npm run build`，`git diff --stat -- lib/` 为空——即 `main` 的产物与
+  它自己的源码一致，事故只在那个已发布的标签里。
+- **事故复述（`CONFIRMED`）**：`v0.11.14` 标签提交 `20eafea` 的 `src/loop.ts` 有 12 处 `callSchedule`，
+  提交里的 `lib/loop.js` 为 0；远端 CI run `44345615218` = failure，Release run `44345622700` 在
+  `Verify committed build artifacts` 失败，其后步骤（含 `Create GitHub Release`）全部 skipped；
+  `gh release view v0.11.14` = release not found（最新发布仍是 `v0.11.13`）。
+- **决定**：`DECISIONS.md` **D-070** —— 四个备选（移动标签 / `workflow_dispatch` 重跑 / 手工
+  `gh release create` / 从 `main` 打 patch）逐一写明并选第四个；授权范围 = 一次 patch 标签 + 既有工作流
+  创建的 Release，不含 npm 发布、不含移动标签、不含修改发布门禁。
+- **改动（`CONFIRMED`）**：`src/`、`test/` 零改动（`git diff --stat -- src/ test/` 为空），本版本是「同一份
+  源码、正确的构建产物」；README 中英把测试数 `1022 / 57` 改成 `1081 / 60`，并在「已发布」一句后写明
+  `v0.11.14` 不是发布版本、安装请固定 `v0.11.15`；`CHANGELOG.md` `## [0.11.15]` 双语；
+  `package.json` / `package-lock.json` / 两份 README 的版本句与 pin / `docs/LOCAL-TESTING.md` 压缩包名
+  随 `bump-version.py` 同步。
+- **门禁（`CONFIRMED`）**：`npm run typecheck` exit 0；`npm run ci` exit 0 = **60 文件 / 1081 测试 PASS**、
+  lint `Found 22 warnings and 0 errors`（`.rsi/evidence/round-015/pre-release-ci.txt`；发布脚本那次的
+  `ci.txt` 由 ROUND 引用）。与 `v0.11.13` 基线 57 / 1022 相比 +3 文件 / +59 测试，无删除、无 skip。
+- **发版**：`finish-round.py --round 15 --version 0.11.15 --resume` → 单次提交 → annotated tag `v0.11.15` →
+  `push origin main` → `push origin v0.11.15`；未移动任何旧标签、未 force-push、未发布 npm。
+- **未验证（`NOT_RUN`）**：npm 发布（未授权）；真机心跳投递（D-066，操作者动作）；主工作树里另一位写入者的
+  客户端开关改动（不属于本轮，未提交、未审阅）。
+

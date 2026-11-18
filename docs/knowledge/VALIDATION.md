@@ -3620,3 +3620,44 @@ commit 与推送结果见 `.rsi/ROUND.md` Round 14、`.rsi/evidence/round-014/gi
   工作树里的 413/409 两条路由用例**没有**进这次提交（`git show 20eafea:test/loop-surface.spec.ts |
   grep -cE "413|409|schedule-refused"` = 0）。这两条用例与更多 `src/` 改动在本轮结束时仍在工作树里，
   未提交，留给下一轮连同验证一起落地。
+
+## Round 61 — 2026-11-19 — RSI round 15：`v0.11.14` 发布事故收口（`0.11.15`，patch）（`CONFIRMED`）
+
+**前提（`CONFIRMED`）**：主工作树 HEAD = `b0d6d10`、与 `origin/main` 平齐，但有另一位写入者的
+21 个 tracked 改动 + 6 个未跟踪条目（客户端开关、`src/loop-brakes.ts`、`scripts/verify-lib.mjs` 等）。
+本轮不碰它们：发版在独立克隆 `.worktrees/release-015` 里做（`git clone --no-hardlinks` 自本地仓，
+`origin` 改回 `https://github.com/free6589/dsh-grok-workflow.git`），基线 `b0d6d10`。
+`npm ci`（缓存指向工作区 `.tmp/`，因为默认 npm 缓存只读）后 `npm run build`，
+`git diff --stat -- lib/` 为空——`main` 的已提交产物与它自己的源码一致；事故只存在于已发布的标签里。
+
+**事故复述（`CONFIRMED`，命令）**：
+- `git show 20eafea:src/loop.ts | grep -c callSchedule` = 12；`git show 20eafea:lib/loop.js | grep -c callSchedule` = 0。
+- `gh run list --workflow release.yml` → headSha `20eafea` = failure（run `44345622700`）；逐步骤
+  （`gh api …/runs/44345622700/jobs`）失败在 `Verify committed build artifacts`，其后包括
+  `Create GitHub Release` 的步骤全部 `skipped`。
+- `gh release view v0.11.14` → `release not found`；`gh release list` 最新仍是 `v0.11.13`。
+
+**门禁（`CONFIRMED`）**：
+- `npm run typecheck` → exit 0，无输出。
+- `npm run ci` → exit 0，`Test Files 60 passed (60)`、`Tests 1081 passed (1081)`、
+  `Found 22 warnings and 0 errors`（oxlint）。日志 `.rsi/evidence/round-015/pre-release-ci.txt`；
+  发布脚本那次 `.rsi/evidence/round-015/ci.txt`。基线 `v0.11.13` = 57 / 1022，本轮 +3 文件 / +59 测试，
+  无删除、无 skip；CI 重建后 `git diff --stat -- lib/` 仍为空。
+- 文档守卫（`test/docs-version.spec.ts` 8、`test/docs-config-keys.spec.ts` 12、
+  `test/docs-architecture-version.spec.ts` 3）全部在 `npm run ci` 内通过：README 版本句/pin/已发布列表
+  与 `package.json` 一致，`[Unreleased]` 之后第一节 = `[0.11.15]`，每个已发布标签都有 CHANGELOG 节。
+
+**改动（`CONFIRMED`）**：`src/`、`test/` 零改动（`git diff --stat -- src/ test/` 为空）；`package.json` /
+`package-lock.json` / 两份 README 的版本句、安装 pin、已发布列表与 `docs/LOCAL-TESTING.md` 压缩包名由
+`bump-version.py 0.11.15` 同步；README 中英的测试数改为 1081 / 60，并在「已发布」一句后写明
+`v0.11.14` 不是发布版本、请固定 `v0.11.15`（避免 README 把用户送到一个没有 Release 的标签上）；
+`CHANGELOG.md` 新增双语 `## [0.11.15] - 2026-11-19`；`DECISIONS.md` 新增 `D-070`。
+
+**发版（`CONFIRMED`）**：`python3 .rsi/tools/finish-round.py --round 15 --version 0.11.15 --spec
+.tmp/rsi-round-15.json --resume` → 单次提交 → annotated tag `v0.11.15` → `push origin main` →
+`push origin v0.11.15`。未移动/删除/重打任何旧标签（`v0.11.13` object `bac26e3`、peel `7a79efb` 前后一致），
+未 force-push，未发布 npm。commit、tag object/peel 与远端 CI/Release run id 见 `.rsi/ROUND.md` Round 15。
+
+**未验证（`NOT_RUN`）**：npm 发布（未授权）；真机心跳投递（D-066 规定第一条心跳是操作者动作）；
+主工作树里另一位写入者的客户端开关与 `verify:lib`（不属于本轮，未提交、未审阅、未运行其测试）。
+
