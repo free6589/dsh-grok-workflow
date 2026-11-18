@@ -5,6 +5,52 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.11.5] - 2026-11-18
+
+### Fixed / 修复
+
+- **Redaction missed four credential shapes and rewrote non-secret code / 脱敏漏掉四类凭据形状，还会改写非敏感代码** —
+  `src/redact.ts` now covers (1) a `Cookie`/`Set-Cookie` header written inside a quoted shell
+  argument (`curl -H 'Cookie: PHPSESSID=…'`), where the old pattern only matched at line start,
+  (2) presigned-URL signatures `X-Amz-Signature`, `X-Goog-Signature` and the generic `auth`
+  query parameter, (3) PGP armored `BEGIN PGP PRIVATE KEY BLOCK` blocks, whose banner the PEM
+  rule could not match, and (4) short values of `SECRET_KEY` / `PRIVATE_TOKEN`, which the env
+  rule's key alternation lacked. Two false positives are gone: `key-value-env` no longer ends a
+  value inside a call, a comparison or a code keyword (`const token = await refreshToken()`,
+  `if (password == null)` are left untouched), and its value now terminates at a token boundary
+  so `db_pass=hunter2;user=app` keeps `;user=app` instead of swallowing it. An already-redacted
+  placeholder (`X-Amz-Credential=[REDACTED AWS ACCESS KEY]`) is no longer re-redacted into
+  `[REDACTED] AWS ACCESS KEY]`. / `src/redact.ts` 现在覆盖：（1）写在
+  shell 引号参数里的 `Cookie`/`Set-Cookie` 头（`curl -H 'Cookie: PHPSESSID=…'`），旧规则只在行首匹配；
+  （2）签名链接参数 `X-Amz-Signature`、`X-Goog-Signature` 与通用 `auth`；（3）PGP armor 的
+  `BEGIN PGP PRIVATE KEY BLOCK` 块（PEM 规则匹配不到它的横幅）；（4）`SECRET_KEY` / `PRIVATE_TOKEN`
+  的短值（env 规则的键名分支原本没有它们）。同时修掉两个误伤：`key-value-env` 不再把值截断在调用、
+  比较或代码关键字中间（`const token = await refreshToken()`、`if (password == null)` 原样保留），
+  值现在在 token 边界结束，`db_pass=hunter2;user=app` 会保留 `;user=app` 而不再整段吞掉；
+  已脱敏的占位符（`X-Amz-Credential=[REDACTED AWS ACCESS KEY]`）不会再被打成
+  `[REDACTED] AWS ACCESS KEY]`。
+
+### Docs / 文档
+
+- Both READMEs and `docs/ARCHITECTURE.md` now name the covered credential families, the
+  two deliberate asymmetries (over-redaction preferred to rewriting code; a value ends at a
+  token boundary) and the known base64-PEM gap; a docs test fails if a family disappears from
+  any of the three documents. / 两份 README 与 `docs/ARCHITECTURE.md` 现在列出覆盖的凭据族、
+  两处有意取舍（宁可多脱敏，也不改写代码；值在 token 边界结束）以及已知的 base64-PEM 缺口；
+  任一份文档丢掉某个族都会让文档测试失败。
+
+### Tests / 测试
+
+- `test/redact.spec.ts` 24 → 32 `it`s: quoted-header cookies, three signed-URL families, PGP
+  armor, env value termination, placeholder stability, the code non-rewrite cases, deep-copy
+  header keys (`x-api-key`/`secretKey`), and a documentation guard over
+  `README.md`/`README.zh-CN.md`/`docs/ARCHITECTURE.md`; the prompt-parity corpus grew from 22
+  to 29 samples so the generated script mirror is checked on the new shapes too. / 
+  `test/redact.spec.ts` 从 24 个 `it` 增至 32 个：引号内 Cookie 头、三类签名链接、PGP armor、
+  env 值边界、占位符稳定、代码不改写、深拷贝头部键（`x-api-key`/`secretKey`），以及对
+  `README.md`/`README.zh-CN.md`/`docs/ARCHITECTURE.md` 的文档守卫；提示词一致性用例的语料
+  从 22 条增至 29 条，新形状在生成脚本里同样被核对。
+
 ## [0.11.4] - 2026-11-18
 
 ### Fixed / 修复

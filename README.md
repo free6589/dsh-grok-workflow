@@ -45,10 +45,10 @@ dsh --profile grok-workflow-dev --from-default-profile headless --dump-config
 Then install the plugin:
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.11.4
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.11.5
 ```
 
-> `#v0.11.4` is the current release. Pin the tag you actually want; omitting it follows `main`, which is not a release. Do not run `--from-default-profile` after `plugin add`: it replaces the profile and removes the plugin you just installed.
+> `#v0.11.5` is the current release. Pin the tag you actually want; omitting it follows `main`, which is not a release. Do not run `--from-default-profile` after `plugin add`: it replaces the profile and removes the plugin you just installed.
 
 Then restart the profile so DSH loads the new plugin:
 
@@ -293,13 +293,13 @@ The plugin reuses DSH's workflow engine and subagents. It does not replace DSH's
 
 ## Versions and release notes
 
-The package version in this repository is `0.11.4`. Install or roll back to an exact release with a tag suffix:
+The package version in this repository is `0.11.5`. Install or roll back to an exact release with a tag suffix:
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.11.4
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.11.5
 ```
 
-Use only a tag that exists on GitHub. Published: `v0.1.0`, `v0.2.0`, `v0.2.1`, `v0.2.2`, `v0.2.3`, `v0.2.4`, `v0.2.5`, `v0.2.6`, `v0.2.7`, `v0.3.0`, `v0.4.0`, `v0.5.0`, `v0.5.1`, `v0.6.0`, `v0.7.0`, `v0.8.0`, `v0.9.0`, `v0.9.1`, `v0.9.2`, `v0.9.3`, `v0.9.4`, `v0.10.0`, `v0.10.1`, `v0.10.2`, `v0.11.0`, `v0.11.1`, `v0.11.2`, `v0.11.3` and `v0.11.4`. The unpinned command follows `main` and does not pin a release. See the [changelog](CHANGELOG.md) and the [release guide](docs/RELEASING.md) for the versioning and rollback rules.
+Use only a tag that exists on GitHub. Published: `v0.1.0`, `v0.2.0`, `v0.2.1`, `v0.2.2`, `v0.2.3`, `v0.2.4`, `v0.2.5`, `v0.2.6`, `v0.2.7`, `v0.3.0`, `v0.4.0`, `v0.5.0`, `v0.5.1`, `v0.6.0`, `v0.7.0`, `v0.8.0`, `v0.9.0`, `v0.9.1`, `v0.9.2`, `v0.9.3`, `v0.9.4`, `v0.10.0`, `v0.10.1`, `v0.10.2`, `v0.11.0`, `v0.11.1`, `v0.11.2`, `v0.11.3`, `v0.11.4` and `v0.11.5`. The unpinned command follows `main` and does not pin a release. See the [changelog](CHANGELOG.md) and the [release guide](docs/RELEASING.md) for the versioning and rollback rules.
 
 ## Testing and development
 
@@ -315,7 +315,7 @@ npm run ci
 - Verified with DSH **`0.2.1-rc.2`** and Node.js **22 or newer**. The package declares its DSH requirement as the range **`engines.dsh: ">=0.2.1-rc.2 <0.3.0"`** — an own `engines.dsh` decides alone, so this range (not the peer ranges) is what admits a runtime and what makes a later release refuse to load instead of failing at run time. The peer packages the build is tested against stay pinned exactly (`@deepseek-ai/cordis` uses a compatible `~4.0.5` range). This is an external DSH bundle and does not modify DSH core.
 - It does not bypass DSH approvals, sandbox policy or tool policy. Child agents cannot recursively invoke `grok_workflow`; their other tools remain subject to DSH's own policy.
 - Child agents inherit the parent session's available tools and permissions. There is no read-only capability mode; the verifier prompt asks it not to modify files, but that is not a hard sandbox guarantee.
-- Redaction is best-effort: do not put credentials in objectives, task text or logs. Reports are not a guarantee that a child agent never touched a secret.
+- Redaction is best-effort and lives in one place (`src/redact.ts`; the generated workflow script mirrors the same rule table for prompts). It covers PEM and PGP `PRIVATE KEY` blocks, JWT, `sk-`/`ghp_`/`github_pat_`/`glpat-`/`npm_`/`xox*`/`AKIA`/`ASIA`/`AIza`/`ya29.`/Telegram bot tokens, `Bearer` and `Basic` authorization, `Cookie`/`Set-Cookie` headers (also when written inside a quoted shell argument), URL userinfo, signed-URL query parameters (`sig`, `X-Amz-Signature`, `X-Goog-Signature`, `auth`, `token`), and secret-named assignments in env, JSON and header form. No shape list is complete: do not put credentials in objectives, task text or logs, and treat a report as no proof that a child agent never touched a secret.
 - Parallel tasks share the session working directory; declare `writesPaths` or use `maxConcurrency: 1` for write-heavy work.
 - No npm package is published; install from this GitHub repository.
 

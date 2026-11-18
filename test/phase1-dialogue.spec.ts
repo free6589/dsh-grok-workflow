@@ -652,7 +652,10 @@ describe('P0-3: every internal error leaves a user-visible terminal state', () =
     const decision = await ctx.preStep()(payload(agent, [userMessage('跑一下工作流')]), nextWith([])) as Decision
     const text = textOf(decision.messages![decision.messages!.length - 1]!)
     expect(text).not.toContain('sk-live-9f8e7d6c5b4a3210')
-    expect(text).toContain('[REDACTED]')
+    // The provider-token rule fires before the assignment rule, so the value keeps the
+    // rule-specific placeholder; the assignment rule must not re-redact it into a broken
+    // `[REDACTED] API KEY]`.
+    expect(text).toContain('api_key=[REDACTED API KEY]')
     for (const warning of ctx.warnings) expect(warning).not.toContain('sk-live-9f8e7d6c5b4a3210')
   })
 

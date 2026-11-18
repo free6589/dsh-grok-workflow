@@ -3356,3 +3356,31 @@ Release `v0.10.2` + asset `dsh-grok-workflow-0.10.2.tgz` 已发布。
 **未做（`NOT_RUN`）**：live `:3080` 换装 v0.10.2 与重启（D-013 用户动作）；
 A4 三处 Host 契约错位（writable 层级/revision fence/set 代 unset）的单独发版修复；
 进度 Execute/Verify 成员渲染缺口的定位。
+
+## Round 53 — 2026-11-18 — P2-02 脱敏形状：引号内 Cookie、签名链接、PGP armor、env 值边界（`CONFIRMED`）
+
+**现象（`CONFIRMED`，先探针后改）**：对已构建的 `lib/redact.js` 直接探针，八条形状里五条是漏或损坏：
+`curl -H 'Cookie: PHPSESSID=…'` 不变（规则锚在 `^|\n`）；`?X-Amz-Signature=` / `?X-Goog-Signature=` /
+`?auth=` 不变（只有 Azure `sig`）；PGP armor 不变（只认 PEM 横幅）；`SECRET_KEY=x` / `PRIVATE_TOKEN=y`
+不变（键名分支没有这两个）；`const token = await refreshToken()` 被改写成
+`const token = [REDACTED] refreshToken()`；`if (password == null)` 被改写成
+`if (password =[REDACTED] null)`；`db_pass=hunter2;user=app` 丢掉 `;user=app`；
+`X-Amz-Credential=[REDACTED AWS ACCESS KEY]` 被二次脱敏成 `[REDACTED] AWS ACCESS KEY]`。
+
+**修复（`CONFIRMED`）**：`cookie-header` 增加引号前缀并止于收尾引号；`azure-sas-signature` 更名
+`url-signature-query` 并加 `X-Amz-Signature`/`X-Goog-Signature`/`auth`；新增 `pgp-private-key`；
+`key-value-env` 加 `secret[_-]?key`/`private[_-]?token`、拒绝 `==`/`===` 与代码关键字、要求值止于
+token 边界（空白、行尾、`,;}&|<>})]`）、拒绝已脱敏占位符；`isSensitiveKey` 用连字符归一化后比同一张
+复合表（`x-api-key` 命中）。
+
+**验证（`CONFIRMED`）**：`.rsi/evidence/round-005/red.txt`（改前 6 failed / 24 passed）、
+`green.txt`（`test/redact.spec.ts` 32/32）、`ci.txt`（`npm run ci` exit 0，typecheck 0 错，
+lint 22 warning / 0 error，**54 文件 / 993 测试 PASS**，基线 54/985）。
+
+**一处既有断言调整**：`test/phase1-dialogue.spec.ts:655` 原先要求裸 `[REDACTED]`；provider-token
+规则先命中，正确标记是 `[REDACTED API KEY]`，断言改为钉住该确切占位符（更严），原文密钥仍断言不存在。
+未删、未跳过、未放宽任何断言。
+
+**未验证（`NOT_RUN`）**：base64 包裹的 PEM（无规则，已写入 `docs/ARCHITECTURE.md` 已知缺口）；
+`grok-workflow-dev` 真机消息路径（改动只在 `redact.ts`，`test/loader.spec.ts` 2 例真实 Loader 激活
+仍由 `npm run ci` 覆盖）。

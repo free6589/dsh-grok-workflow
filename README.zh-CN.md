@@ -45,10 +45,10 @@ dsh --profile grok-workflow-dev --from-default-profile headless --dump-config
 然后安装插件：
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.11.4
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.11.5
 ```
 
-> `#v0.11.4` 是当前发布版本。请固定你真正想要的标签；省略标签会跟随 `main`，那不是发布版本。不要在 `plugin add` 之后再运行 `--from-default-profile`：它会重建 profile 并移除你刚装好的插件。
+> `#v0.11.5` 是当前发布版本。请固定你真正想要的标签；省略标签会跟随 `main`，那不是发布版本。不要在 `plugin add` 之后再运行 `--from-default-profile`：它会重建 profile 并移除你刚装好的插件。
 
 最后重启 profile，让 DSH 加载新插件：
 
@@ -283,13 +283,13 @@ dsh plugin --profile grok-workflow-dev remove dsh-grok-workflow
 
 ## 版本与发布说明
 
-本仓库声明的包版本是 `0.11.4`。需要安装或回退到某个已发布版本时，在地址后加标签：
+本仓库声明的包版本是 `0.11.5`。需要安装或回退到某个已发布版本时，在地址后加标签：
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.11.4
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.11.5
 ```
 
-只使用 GitHub 上确实存在的标签。已发布：`v0.1.0`、`v0.2.0`、`v0.2.1`、`v0.2.2`、`v0.2.3`、`v0.2.4`、`v0.2.5`、`v0.2.6`、`v0.2.7`、`v0.3.0`、`v0.4.0`、`v0.5.0`、`v0.5.1`、`v0.6.0`、`v0.7.0`、`v0.8.0`、`v0.9.0`、`v0.9.1`、`v0.9.2`、`v0.9.3`、`v0.9.4`、`v0.10.0`、`v0.10.1`、`v0.10.2`、`v0.11.0`、`v0.11.1`、`v0.11.2`、`v0.11.3`、`v0.11.4`。未固定版本的命令跟随 `main`，不会固定到发布版本。版本规则与回退流程见[更新日志](CHANGELOG.md)与[发布指南](docs/RELEASING.md)。
+只使用 GitHub 上确实存在的标签。已发布：`v0.1.0`、`v0.2.0`、`v0.2.1`、`v0.2.2`、`v0.2.3`、`v0.2.4`、`v0.2.5`、`v0.2.6`、`v0.2.7`、`v0.3.0`、`v0.4.0`、`v0.5.0`、`v0.5.1`、`v0.6.0`、`v0.7.0`、`v0.8.0`、`v0.9.0`、`v0.9.1`、`v0.9.2`、`v0.9.3`、`v0.9.4`、`v0.10.0`、`v0.10.1`、`v0.10.2`、`v0.11.0`、`v0.11.1`、`v0.11.2`、`v0.11.3`、`v0.11.4`、`v0.11.5`。未固定版本的命令跟随 `main`，不会固定到发布版本。版本规则与回退流程见[更新日志](CHANGELOG.md)与[发布指南](docs/RELEASING.md)。
 
 ## 测试与开发
 
@@ -305,7 +305,7 @@ npm run ci
 - 在 DSH **`0.2.1-rc.2`** 与 Node.js **22 及以上**上验证过。包把自己的 DSH 要求声明为区间 **`engines.dsh: ">=0.2.1-rc.2 <0.3.0"`** —— 自带的 `engines.dsh` 单独决定兼容性，所以是这一区间（而不是 peer 区间）决定运行时能否载入，也让更高的版本在载入期就被拒绝，而不是拖到运行期出错。构建所针对的 peer 包仍精确固定（`@deepseek-ai/cordis` 使用兼容的 `~4.0.5` 区间）。这是 DSH 外部 bundle，不修改 DSH 核心。
 - 不绕过 DSH 的审批、沙箱策略或工具策略。子代理不能递归调用 `grok_workflow`；它们的其它工具仍受 DSH 自身策略约束。
 - 子代理继承父会话可用的工具与权限。没有只读能力模式；验证者提示词要求它不要修改文件，但那不是硬性沙箱保证。
-- 脱敏是尽力而为：不要把凭据写进目标、任务文本或日志。报告不保证子代理从未接触过密钥。
+- 脱敏是尽力而为，且只有一个实现（`src/redact.ts`；生成的工作流脚本镜像同一张规则表，用于提示词）。覆盖 PEM 与 PGP 的 `PRIVATE KEY` 块、JWT、`sk-`/`ghp_`/`github_pat_`/`glpat-`/`npm_`/`xox*`/`AKIA`/`ASIA`/`AIza`/`ya29.`/Telegram 机器人令牌、`Bearer` 与 `Basic` 认证、`Cookie`/`Set-Cookie` 头（含写在 shell 引号参数里的形式）、URL userinfo、签名链接的查询参数（`sig`、`X-Amz-Signature`、`X-Goog-Signature`、`auth`、`token`），以及 env/JSON/头部形式的敏感名赋值。任何形状清单都不完整：不要把凭据写进目标、任务文本或日志，报告也不保证子代理从未接触过密钥。
 - 并行任务共享会话工作目录；写入密集的工作请声明 `writesPaths` 或设 `maxConcurrency: 1`。
 - 不发布到 npm；请从本 GitHub 仓库安装。
 

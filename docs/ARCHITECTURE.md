@@ -577,6 +577,42 @@ by tests). The UX commitments an integration inherits:
    `src/redact.ts` (`src/checkpoint/schema.ts:33`), which is also what makes a checkpoint
    safe to attach to an Issue.
 
+## Credential redaction (`src/redact.ts`)
+
+One ordered rule table, applied to every model-facing report, diagnostic, checkpoint field,
+and prompt-side worker output. `src/script.ts` renders the same table into the workflow
+script (`redactionRulesSource`), so a rule added here protects both boundaries; the parity
+test compares the two implementations over one corpus.
+
+Covered shapes, in table order:
+
+1. `PRIVATE KEY` blocks — PEM and PGP armor (`BEGIN PGP PRIVATE KEY BLOCK`) — replaced whole.
+2. Provider tokens by prefix: JWT, `sk-`/`rk-`/`pk-`, `ghp_`/`github_pat_`, `glpat-`, `npm_`,
+   `xox*`, `AKIA`/`ASIA`, `AIza`, `ya29.`, Telegram bot tokens, Slack webhooks.
+3. `Cookie` / `Set-Cookie` header values — including the form written inside a quoted shell
+   argument (`curl -H 'Cookie: …'`), where the header is not at the start of a line. The value
+   stops at the closing quote so the rest of the command survives.
+4. `Bearer` and `Basic` authorization, header or JSON form.
+5. URL-borne credentials: `userinfo` in any scheme, and signature query parameters — `sig`,
+   `signature`, `sharedaccesssignature`, `X-Amz-Signature`, `X-Goog-Signature`, `auth` — plus
+   the `token`/`key`/`secret` query family. The signature alone grants access, so a presigned
+   URL is a bearer credential.
+6. Secret-named assignments (`token`, `password`, `SECRET_KEY`, `client_secret`, …) in JSON,
+   env and quoted form. By name in `redactDeep`, whose key normalisation treats `x-api-key`
+   and `accessToken` alike.
+
+Two deliberate asymmetries:
+
+- **Under-redaction is a leak, over-redaction is noise.** A value that continues into a call
+  (`refreshToken()`), a comparison (`password == null`) or a code keyword (`await`) is not
+  redacted at all: rewriting source costs more than the missed shape, because the rewrite is
+  itself reported as fact.
+- **A value ends at a token boundary** — whitespace, end of line, or one of `,;}&|<>})]`. An
+  unterminated value used to swallow `;user=app` and `Path=/` from the same line.
+
+Known gaps: base64-wrapped PEM has no rule, and no list of shapes is complete. Redaction is a
+safety net, not a guarantee (see the README security section).
+
 ## Known architecture limits (MVP)
 
 - No pause/resume, journaling, or cross-process resume. Checkpoints are written (see above),

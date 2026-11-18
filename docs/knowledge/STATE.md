@@ -1,6 +1,16 @@
 # Project State
 
-Last updated: 2026-11-17 (**v0.10.0 发布准备完成 + 真机验收通过** —
+Last updated: 2026-11-18 (**RSI 连续循环 round 5 完成 · `0.11.5`** — 主题 P2-02：
+`src/redact.ts` 的形状缺口与两处误伤。改前八条探针里五条是漏或损坏（引号内 `Cookie:`、
+`X-Amz-Signature`/`X-Goog-Signature`/`?auth=`、PGP armor、`SECRET_KEY`/`PRIVATE_TOKEN`、
+`const token = await refreshToken()` 被改写、`db_pass=hunter2;user=app` 丢尾部、占位符被二次脱敏）。
+修复 = 引号感知的 cookie 规则 + 签名链接查询参数 + PGP 规则 + env 值 token 边界/比较符/关键字守卫 +
+占位符守卫 + `isSensitiveKey` 连字符归一化。`npm run ci` exit 0：typecheck 0 错、lint 22w/0e（基线）、
+**54 文件 / 993 测试 PASS**（基线 54/985）；tag `v0.11.5`。细节见 `.rsi/ROUND.md` round 5、
+`docs/knowledge/VALIDATION.md` Round 53、`D-059`。**已知缺口（未修）**：仍无形状清单能穷尽；
+base64 包裹的 PEM 无规则；Progress 页 Execute/Verify 段 `Not reported in the events`（P0-02，未修）。
+
+Previous update: 2026-11-17 (**v0.10.0 发布准备完成 + 真机验收通过** —
 基线 `main` = `ae0c6d3`（v0.9.4 已发布），工作提交在前一条 `3d9275a` 之上。
 本轮 = 真机验收（**新 profile `acgtest95` / 新端口 `:3231`**，打包安装 `0.9.4` tgz、
 md5 与仓库一致，Plugins 页出现 Grok workflow、8 键设置页、两次真实工作流运行：

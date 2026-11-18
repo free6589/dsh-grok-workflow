@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import vm from 'node:vm'
 import { describe, expect, it } from 'vitest'
 import { redactDeep, redactError, redactSecrets, REDACTION_RULES } from '../src/redact.js'
@@ -174,6 +175,84 @@ describe('credential redaction', () => {
 })
 
 /**
+ * P2-02 (round 5): shapes the earlier rules missed, plus two false positives
+ * that rewrote non-secret code and already-redacted placeholders.
+ */
+describe('redaction shapes the earlier rules missed', () => {
+  it('redacts a Cookie header inside a quoted shell argument', () => {
+    const output = redactSecrets([
+      `curl -H 'Cookie: PHPSESSID=abc123def456' https://example.test`,
+      `curl --header 'Cookie: sid=abc123def456; theme=dark' https://example.test`,
+      `curl -H "Cookie: PHPSESSID=abc123def456" https://example.test`,
+    ].join('\n'))
+    expect(output).not.toContain('abc123def456')
+    expect(output).toContain("curl -H 'Cookie: [REDACTED]' https://example.test")
+    expect(output).toContain('curl --header \'Cookie: [REDACTED]\' https://example.test')
+    expect(output).toContain('curl -H "Cookie: [REDACTED]" https://example.test')
+  })
+
+  it('redacts presigned URL signatures from S3, GCS and generic gateways', () => {
+    const signature = fake('FAKE', 'SIGNATURE', 'VALUE')
+    const output = redactSecrets([
+      `https://bucket.s3.amazonaws.com/o?X-Amz-Signature=${signature}&X-Amz-Expires=900`,
+      `https://storage.googleapis.com/o?X-Goog-Signature=${signature}&X-Goog-Expires=900`,
+      `https://api.example.test/v1/object?auth=${signature}`,
+    ].join('\n'))
+    expect(output).not.toContain(signature)
+    expect(output).toContain('X-Amz-Expires=900')
+    expect(output).toContain('X-Goog-Expires=900')
+    expect(output.match(/\[REDACTED\]/g)).toHaveLength(3)
+  })
+
+  it('redacts PGP armored private keys', () => {
+    const body = fake('lQOYBF', 'fakeArmoredBody')
+    const armored = [
+      '-----BEGIN PGP PRIVATE KEY BLOCK-----',
+      'Version: GnuPG v2',
+      '',
+      body,
+      '-----END PGP PRIVATE KEY BLOCK-----',
+    ].join('\n')
+    const output = redactSecrets(`before\n${armored}\nafter`)
+    expect(output).toContain('[REDACTED PRIVATE KEY]')
+    expect(output).not.toContain(body)
+    expect(output).toContain('after')
+  })
+
+  it('keeps the rest of the line and an already-redacted placeholder intact', () => {
+    // `;user=app` used to be swallowed by an unterminated env value.
+    expect(redactSecrets('db_pass=hunter2;user=app')).toBe('db_pass=[REDACTED];user=app')
+    expect(redactSecrets('db_pass=hunter2&user=app')).toBe('db_pass=[REDACTED]&user=app')
+    // Re-redacting a placeholder used to produce `[REDACTED] AWS ACCESS KEY]`.
+    expect(redactSecrets('X-Amz-Credential=[REDACTED AWS ACCESS KEY]&x=1'))
+      .toBe('X-Amz-Credential=[REDACTED AWS ACCESS KEY]&x=1')
+  })
+
+  it('does not rewrite non-secret code that mentions a secret-like name', () => {
+    const code = [
+      'const token = await refreshToken()',
+      'if (password == null) return',
+      'const same = config.password === expected',
+      'const value = getSecret()',
+    ]
+    for (const line of code) expect(redactSecrets(line)).toBe(line)
+  })
+
+  it('redacts short values for the secret-key spellings the env rule lacked', () => {
+    expect(redactSecrets('SECRET_KEY=x')).toBe('SECRET_KEY=[REDACTED]')
+    expect(redactSecrets('PRIVATE_TOKEN=y')).toBe('PRIVATE_TOKEN=[REDACTED]')
+  })
+
+  it('redacts header-style credential keys by name in deep copies', () => {
+    expect(redactDeep({ 'x-api-key': 'opaque', secretKey: 'opaque', tokenCount: 7 })).toEqual({
+      'x-api-key': '[REDACTED]',
+      secretKey: '[REDACTED]',
+      tokenCount: 7,
+    })
+  })
+})
+
+/**
  * Pull the workflow script's own prompt redactor out of the generated source so
  * the host list (src/redact.ts) and the in-sandbox copy are compared directly.
  * The script cannot import host code, so this parity test is what keeps the
@@ -335,6 +414,13 @@ describe('prompt redaction parity', () => {
     'https://user:password@example.test/path',
     `jwt ${fake('eyJhbGciOiJIUzI1NiJ9', '.eyJzdWIiOiIxMjM0NTY3ODkwIn0', '.signature12345')}`,
     '-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBg\n-----END PRIVATE KEY-----',
+    '-----BEGIN PGP PRIVATE KEY BLOCK-----\nlQOYBFfakeArmoredBody\n-----END PGP PRIVATE KEY BLOCK-----',
+    `curl -H 'Cookie: PHPSESSID=abc123def456' https://example.test`,
+    'https://bucket.s3.amazonaws.com/o?X-Amz-Signature=FAKESIGNATUREVALUE&X-Amz-Expires=900',
+    'https://storage.googleapis.com/o?X-Goog-Signature=FAKESIGNATUREVALUE',
+    'https://api.example.test/v1/object?auth=FAKESIGNATUREVALUE',
+    'db_pass=hunter2;user=app',
+    'const token = await refreshToken()',
     'plain prose about a workflow with 42 tasks and no secrets',
     'the token count is 3 and the key insight is spacing',
   ]
@@ -354,6 +440,38 @@ describe('prompt redaction parity', () => {
       if (sample === undefined) continue
       rule.pattern.lastIndex = 0
       expect(inScript(sample)).not.toBe(sample)
+    }
+  })
+})
+
+/**
+ * The README security bullet and `docs/ARCHITECTURE.md` name the credential families this
+ * module covers. That list is prose, so it can rot silently when a rule is removed or a
+ * family is renamed — the failure mode rounds 3 and 4 fixed for the configuration surface.
+ * This test binds the two documents to the families a reader is promised; it does not
+ * prove the rules still fire (the cases above do that).
+ */
+describe('documentation names the covered credential families', () => {
+  const families = [
+    'PRIVATE KEY',
+    'PGP',
+    'JWT',
+    'Bearer',
+    'Basic',
+    'Cookie',
+    'Set-Cookie',
+    'X-Amz-Signature',
+    'X-Goog-Signature',
+    'userinfo',
+  ]
+  const docs = ['README.md', 'README.zh-CN.md', 'docs/ARCHITECTURE.md']
+
+  it('keeps every family named in both READMEs and the architecture doc', () => {
+    for (const doc of docs) {
+      const text = readFileSync(new URL(`../${doc}`, import.meta.url), 'utf8')
+      for (const family of families) {
+        expect(text, `${doc} no longer names the redacted family ${family}`).toContain(family)
+      }
     }
   })
 })

@@ -1083,3 +1083,17 @@ Each entry records the decision, evidence, alternatives, and status.
   用户明确要"没有实际上限"，且报告/checkpoint 现在都按配置值记录。
 - **Consequences:** 设置页从两个数字变成三个数字；`REMOVED_CONFIG_KEYS` 从 24 变 23；
   旧补丁里写 `timeoutMs` 不再被拒载，而是生效。
+
+## D-059 — 脱敏宁可多遮，也不改写代码；值必须在 token 边界结束（2026-11-18 · RSI round 5）
+
+- **背景**：`key-value-env` 无值终止符，`db_pass=hunter2;user=app` 会连 `;user=app` 一起吞；
+  同一规则把 `const token = await refreshToken()` 改写成 `const token = [REDACTED] refreshToken()`，
+  把 `if (password == null)` 改写成 `if (password =[REDACTED] null)`；对已脱敏的
+  `[REDACTED AWS ACCESS KEY]` 还会二次脱敏成 `[REDACTED] AWS ACCESS KEY]`。
+- **选择**：值必须止于 token 边界（空白、行尾、`,;}&|<>})]`）；比较运算符（`==`/`===`）与代码关键字
+  （`await`/`new`/`process`/…）一律不匹配；`[`、引号、`{` 开头的值不匹配。
+- **替代方案**：a) 保持贪婪（会继续吞掉同一行其余内容并改写代码）；b) 引入 AST/语言感知
+  （成本远超一个正则安全网）。选 a 的反面：**漏掉一个形状是漏，改写代码是把猜测写成事实**。
+- **代价（明确接受）**：`token=getSecret()` 这类「值延续成调用」的赋值不会被脱敏；已记录在
+  `docs/ARCHITECTURE.md` 的两条有意失衡里，并由 `test/redact.spec.ts` 钉住。
+- **连带影响**：`test/phase1-dialogue.spec.ts` 的 `[REDACTED]` 断言改为 `[REDACTED API KEY]`（更严）。

@@ -7,29 +7,17 @@ here and are marked DONE when their commit lands.
 
 ## Redaction (`src/redact.ts`, call sites)
 
-- R4 DONE-ISH · `Authorization:` leaks for every scheme except Bearer/Basic and for a bare
-  opaque value (`Agent` in round 4 fixed this). `authorization` exists only in
-  `isSensitiveKey` (line ~217), never in the text rules.
-- P · `Cookie:`/`Set-Cookie:` are matched only at line start (`^` without `m`, line ~82), so
-  `curl -H 'Cookie: PHPSESSID=…'` passes through; `PHPSESSID`/`JSESSIONID`/`sid` are in no
-  alternation. S / low.
-- P · URL allowlist misses `X-Amz-Signature`, `X-Goog-Signature`, `?sig=`, `?auth=` (line ~109).
-  A presigned S3 URL is a bearer credential. S / low.
-- P · PGP armored keys (`BEGIN PGP PRIVATE KEY BLOCK`) are not matched (line ~28); a
-  base64-wrapped PEM has no rule at all. S / low (M with the base64 leg).
-- P · The assignment rule (line ~155) rewrites code: `const token = await refreshToken()` →
-  `const token = [REDACTED] refreshToken()`, `password == null` → `password =[REDACTED] null`.
-  S / medium.
-- P · `key-value-env` (line ~136) has no value terminator, so `db_pass=hunter2;user=app`
-  loses `;user=app` and a `Set-Cookie` line loses `Path=/`. S / low.
-- P · Placeholder re-redaction: `X-Amz-Credential=[REDACTED AWS ACCESS KEY]` becomes
-  `[REDACTED] AWS ACCESS KEY]` (line ~136 lacks the `\[` guard line ~155 has). S / low.
-- P · `isSensitiveKey` (lines ~214-218) misses `x-api-key`/`private-token`; text rules miss
-  `authorization`/`cookie`. S / low.
-- P · `src/records.ts` lines ~292, ~664, ~756 log `error.message` raw where sibling sites use
-  `redactError` (lines ~555, ~690). S / low.
-- P · `src/history.ts` ~78-80 truncates before redacting, so a credential straddling the cap
-  survives as a sub-threshold fragment. S / low.
+- R5 DONE · quoted `Cookie:` headers (`curl -H 'Cookie: …'`), `X-Amz-Signature` /
+  `X-Goog-Signature` / `?auth=`, PGP armor, short `SECRET_KEY`/`PRIVATE_TOKEN`,
+  env value termination, placeholder stability, `x-api-key` deep keys (round 5).
+- R4 DONE · `Authorization:` leaks for every scheme except Bearer/Basic and for a
+  bare opaque value.
+- P · `src/records.ts` lines ~292, ~664, ~756 log `error.message` raw where sibling
+  sites use `redactError` (lines ~555, ~690). S / low.
+- P · `src/history.ts` ~78-80 truncates before redacting, so a credential straddling
+  the cap survives as a sub-threshold fragment. S / low.
+- P · Base64-wrapped PEM has no rule (a `BEGIN PRIVATE KEY` body that is itself
+  base64 of a PEM block). Recorded in `docs/ARCHITECTURE.md` as a known gap. S / low.
 
 ## Configuration (`src/config.ts`, `src/settings.ts`, `src/index.ts`)
 

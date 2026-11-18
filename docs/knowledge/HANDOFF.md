@@ -1,5 +1,21 @@
 # Agent Handoff
 
+## 2026-11-18 — RSI 连续循环：round 5 = P2-02 脱敏形状（`CONFIRMED`）
+
+- **From:** RSI 执行代理（agent-34）· **To:** 用户 / 后续接手代理
+- **已完成（`CONFIRMED`）**：`src/redact.ts` 补齐引号内 `Cookie:` 头、`X-Amz-Signature` /
+  `X-Goog-Signature` / `?auth=` 签名参数、PGP armor、`SECRET_KEY`/`PRIVATE_TOKEN` 短值；修掉
+  `const token = await refreshToken()` / `if (password == null)` 被改写与占位符二次脱敏；
+  env 值改为止于 token 边界。证据 `.rsi/evidence/round-005/`（red 6 failed → green 32/32 → ci 54 文件 / 993 测试）。
+- **版本（`CONFIRMED`）**：`0.11.5`（`package.json` + `package-lock.json` 联动），`CHANGELOG`
+  插入 `## [0.11.5]` 双语节，README 中英安全段的脱敏清单与 `docs/ARCHITECTURE.md` 新增
+  「Credential redaction」一节。
+- **接手提示**：池里紧邻的两项是 P1-02（`docs/ARCHITECTURE.md` 里以版本号当「当前」的段状态）
+  与 P0-02（Progress 页 Execute/Verify 成员不渲染）。P0-02 风险中/工作量中，动手前先用
+  `.rsi/POOL.md` 的 anchors 复核。
+- **未做（`NOT_RUN`）**：base64 包裹 PEM 的规则；live `grok-workflow-dev` 消息实测（本轮改动不触运行路径）。
+- **可信边界**：`.rsi/STATE.md` 是本轮的权威状态；本文件只记对外可复核的结论。
+
 ## 2026-11-15 — v0.9.1 已发布（存量越界钳制；用户 WebUI 启用失败的修复，`CONFIRMED`）
 
 - **From:** lead · **To:** 用户 / 后续代理

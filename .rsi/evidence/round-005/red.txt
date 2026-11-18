@@ -1,0 +1,60 @@
+
+Expected: "db_pass=[REDACTED];user=app"
+Received: "db_pass=[REDACTED]"
+
+ ❯ test/redact.spec.ts:223:55
+    221|   it('keeps the rest of the line and an already-redacted placeholder i…
+    222|     // `;user=app` used to be swallowed by an unterminated env value.
+    223|     expect(redactSecrets('db_pass=hunter2;user=app')).toBe('db_pass=[R…
+       |                                                       ^
+    224|     expect(redactSecrets('db_pass=hunter2&user=app')).toBe('db_pass=[R…
+    225|     // Re-redacting a placeholder used to produce `[REDACTED] AWS ACCE…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
+
+ FAIL  test/redact.spec.ts > redaction shapes the earlier rules missed > does not rewrite non-secret code that mentions a secret-like name
+AssertionError: expected 'const token = [REDACTED] refreshToken…' to be 'const token = await refreshToken()' // Object.is equality
+
+Expected: "const token = await refreshToken()"
+Received: "const token = [REDACTED] refreshToken()"
+
+ ❯ test/redact.spec.ts:237:58
+    235|       'const value = getSecret()',
+    236|     ]
+    237|     for (const line of code) expect(redactSecrets(line)).toBe(line)
+       |                                                          ^
+    238|   })
+    239|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯
+
+ FAIL  test/redact.spec.ts > redaction shapes the earlier rules missed > redacts header-style credential keys by name in deep copies
+AssertionError: expected { 'x-api-key': 'opaque', …(2) } to deeply equal { 'x-api-key': '[REDACTED]', …(2) }
+
+- Expected
++ Received
+
+  {
+-   "secretKey": "[REDACTED]",
++   "secretKey": "opaque",
+    "tokenCount": 7,
+-   "x-api-key": "[REDACTED]",
++   "x-api-key": "opaque",
+  }
+
+ ❯ test/redact.spec.ts:241:87
+    239|
+    240|   it('redacts header-style credential keys by name in deep copies', ()…
+    241|     expect(redactDeep({ 'x-api-key': 'opaque', secretKey: 'opaque', to…
+       |                                                                                       ^
+    242|       'x-api-key': '[REDACTED]',
+    243|       secretKey: '[REDACTED]',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  6 failed | 24 passed (30)
+   Start at  13:45:18
+   Duration  845ms (transform 611ms, setup 0ms, import 644ms, tests 60ms, environment 0ms)
+

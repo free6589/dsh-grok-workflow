@@ -125,3 +125,58 @@ no history is rewritten, and no round is force-pushed.
   `loader.spec.ts` (2 tests PASS).
 - **Suggested version:** patch → `0.11.4`.
 - **status:** OK
+
+## Round 5 — redaction missed four shapes and rewrote non-secret code
+
+- **Theme (P2-02, `src/redact.ts`):** the pool's redaction section, probed on the
+  built `lib/redact.js` before touching anything. Seven behaviours, five of them
+  leaks or corruptions:
+  | probe | before |
+  | --- | --- |
+  | `curl -H 'Cookie: PHPSESSID=abc123def' …` | unchanged (rule anchored at `^\|\n`) |
+  | `?X-Amz-Signature=…`, `?X-Goog-Signature=…`, `?auth=…` | unchanged (only Azure `sig`) |
+  | `-----BEGIN PGP PRIVATE KEY BLOCK-----` | unchanged (PEM banner only) |
+  | `SECRET_KEY=x`, `PRIVATE_TOKEN=y` | unchanged (key alternation lacked both) |
+  | `const token = await refreshToken()` | `const token = [REDACTED] refreshToken()` |
+  | `if (password == null)` | `if (password =[REDACTED] null)` |
+  | `db_pass=hunter2;user=app` | `db_pass=[REDACTED]` (loses `;user=app`) |
+  | `X-Amz-Credential=[REDACTED AWS ACCESS KEY]` | `[REDACTED] AWS ACCESS KEY]` |
+- **Change:**
+  1. `cookie-header` also matches inside a quoted shell argument / JSON string and
+     stops at the closing quote, so the rest of the command survives.
+  2. `url-signature-query` (renamed from `azure-sas-signature`) adds
+     `X-Amz-Signature`, `X-Goog-Signature` and `auth` to the existing
+     `sig`/`signature`/`sharedaccesssignature`.
+  3. New `pgp-private-key` rule for `BEGIN PGP PRIVATE KEY BLOCK` /
+     `SECRET KEY BLOCK` armor.
+  4. `key-value-env` gains `secret[_-]?key` / `private[_-]?token`, no longer matches
+     a comparison (`==`/`===`) or a code keyword (`await`, `new`, `process`, …), and
+     requires the value to end at a token boundary (whitespace, EOL, `,;}&|<>})]`),
+     so a call expression is left alone and `;user=app` survives.
+  5. The env rule also refuses a value that is already a `[REDACTED …]` placeholder
+     or a quote/brace, which is what corrupted placeholders.
+  6. `isSensitiveKey` compares hyphenated header names (`x-api-key`) against the
+     same composite list as their snake_case spellings.
+- **Docs:** both READMEs' redaction bullet and a new `docs/ARCHITECTURE.md`
+  "Credential redaction" section name the covered families, the two deliberate
+  asymmetries (over-redaction preferred to rewriting code; a value ends at a token
+  boundary) and the known base64-PEM gap.
+- **Evidence:** `.rsi/evidence/round-005/red.txt` — 6 failed / 24 passed before the
+  fix. `green.txt` — `test/redact.spec.ts` 32/32. `ci.txt` — `npm run ci` exit 0,
+  typecheck 0 errors, lint 22 warnings / 0 errors (baseline), **54 files / 993 tests
+  PASS** (was 54/985).
+- **One existing assertion changed** (`test/phase1-dialogue.spec.ts:655`): it required
+  a bare `[REDACTED]` after `api_key=sk-live-…`. The provider-token rule fires before
+  the assignment rule, so the honest marker is `[REDACTED API KEY]`; the assertion now
+  pins that exact string (stronger) and still asserts the raw secret is absent. No
+  assertion was deleted, skipped or loosened.
+- **New tests:** `test/redact.spec.ts` 24 → 32 `it`s (six behaviour cases, one
+  docs guard over README + README.zh-CN + ARCHITECTURE, one deep-copy key case); the
+  prompt-parity corpus 22 → 29 samples so the generated script mirror is checked on
+  the new shapes.
+- **Unverified:** base64-wrapped PEM still has no rule (`NOT_RUN` by design, recorded
+  in ARCHITECTURE); the live `grok-workflow-dev` message path was not exercised this
+  round (`NOT_RUN` — the change is inside `redact.ts`, and `test/loader.spec.ts` (2
+  tests) in `npm run ci` covers the real Loader activation path).
+- **Suggested version:** patch → `0.11.5`.
+- **status:** OK

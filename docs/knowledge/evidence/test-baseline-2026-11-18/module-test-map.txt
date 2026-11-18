@@ -1,0 +1,36 @@
+# Module -> test-file coverage map (import-graph based, no instrumented coverage)
+# generated 2026-11-18T07:34:22+08:00 at 17e3a12
+SRC MODULE                                 TESTS THAT IMPORT IT (or none)
+src/answer.ts                              delivery.spec.ts,gate.spec.ts,human-output-contract.spec.ts,phase1-dialogue.spec.ts,triage-recall.spec.ts
+src/carryover.ts                           carryover.spec.ts,delivery.spec.ts
+src/checkpoint/schema.ts                   checkpoint-engine-wire.spec.ts,checkpoint-schema.spec.ts,checkpoint-wiring.spec.ts,recovery-artifacts.spec.ts
+src/checkpoint/wiring.ts                   checkpoint-engine-wire.spec.ts,checkpoint-wiring.spec.ts
+src/checkpoint/writer.ts                   checkpoint-engine-wire.spec.ts,checkpoint-schema.spec.ts,checkpoint-wiring.spec.ts,recovery-artifacts.spec.ts
+src/command.ts                             command.spec.ts
+src/config.ts                              carryover.spec.ts,checkpoint-engine-wire.spec.ts,checkpoint-schema.spec.ts,checkpoint-wiring.spec.ts,client.spec.ts,config-limits-repair.spec.ts,config.spec.ts,config-synthesis-fallback.spec.ts,delivery-human-block.spec.ts,delivery.spec.ts,docs-config-keys.spec.ts,engine-contract.spec.ts,failure-paths.spec.ts,fallback-shards.spec.ts,gate-partial-head.spec.ts,gate.spec.ts,human-output-contract.spec.ts,input.spec.ts,lifecycle-disposal.spec.ts,memory-archive.spec.ts,objective-limit.spec.ts,orchestrator.spec.ts,panel.spec.ts,paths.spec.ts,phase1-dialogue.spec.ts,plugin-lifecycle.spec.ts,progress.spec.ts,reliability.spec.ts,report.spec.ts,route-concurrency.spec.ts,routing.spec.ts,settings-fixture.ts,settings-projection.spec.ts,synthesis-guardrails.spec.ts,timeout-config.spec.ts,triage-recall.spec.ts
+src/delivery/index.ts                      delivery-human-block.spec.ts,delivery.spec.ts
+src/gate.ts                                gate-partial-head.spec.ts,gate.spec.ts,triage-recall.spec.ts
+src/history.ts                             history.spec.ts,reliability.spec.ts
+src/index.ts                               command.spec.ts,composition.spec.ts,config-limits-repair.spec.ts,config-synthesis-fallback.spec.ts,gate-partial-head.spec.ts,gate.spec.ts,human-output-contract.spec.ts,objective-limit.spec.ts,phase1-dialogue.spec.ts,plugin-lifecycle.spec.ts,reliability.spec.ts,timeout-config.spec.ts,triage-recall.spec.ts,triage.spec.ts
+src/input.ts                               criterion.spec.ts,fallback-shards.spec.ts,input.spec.ts
+src/memory/archive.ts                      memory-archive.spec.ts
+src/memory/cli.ts                          memory-archive.spec.ts
+src/memory/recorder.ts                     memory-archive.spec.ts
+src/mode.ts                                command.spec.ts,gate.spec.ts,mode.spec.ts,triage.spec.ts
+src/naming.ts                              helpers.ts,naming.spec.ts,objective-limit.spec.ts,panel.spec.ts,phase1-dialogue.spec.ts,progress.spec.ts
+src/panel.ts                               gui-fold.ts,panel.spec.ts
+src/paths.ts                               paths.spec.ts
+src/progress-tab.ts                        progress-tab.spec.ts
+src/records.ts                             config.spec.ts,gate.spec.ts,lifecycle-disposal.spec.ts,panel.spec.ts,phase1-dialogue.spec.ts,progress.spec.ts,reliability.spec.ts,route-concurrency.spec.ts,routing.spec.ts
+src/redact.ts                              orchestrator.spec.ts,redact.spec.ts,routing.spec.ts
+src/report.ts                              carryover.spec.ts,delivery-human-block.spec.ts,delivery.spec.ts,engine-contract.spec.ts,failure-paths.spec.ts,fallback-shards.spec.ts,gate.spec.ts,human-output-contract.spec.ts,objective-limit.spec.ts,orchestrator.spec.ts,reliability.spec.ts,report.spec.ts,route-concurrency.spec.ts,routing.spec.ts,synthesis-guardrails.spec.ts,timeout-config.spec.ts
+src/resume/index.ts                        recovery-artifacts.spec.ts,recovery-kill-restart.spec.ts,resume-validator.spec.ts
+src/resume/policy.ts                       NONE
+src/resume/validator.ts                    resume-validator.spec.ts
+src/run.ts                                 checkpoint-engine-wire.spec.ts,checkpoint-wiring.spec.ts,lifecycle-disposal.spec.ts,memory-archive.spec.ts,panel.spec.ts,phase1-dialogue.spec.ts,progress.spec.ts,reliability.spec.ts,route-concurrency.spec.ts,triage-recall.spec.ts
+src/script.ts                              carryover.spec.ts,config.spec.ts,criterion.spec.ts,delivery-human-block.spec.ts,delivery.spec.ts,engine-contract.spec.ts,failure-paths.spec.ts,fallback-shards.spec.ts,human-output-contract.spec.ts,naming.spec.ts,objective-limit.spec.ts,orchestrator.spec.ts,paths.spec.ts,phase1-dialogue.spec.ts,redact.spec.ts,reliability.spec.ts,report.spec.ts,route-concurrency.spec.ts,routing.spec.ts,synthesis-guardrails.spec.ts,team-engine.spec.ts,timeout-config.spec.ts
+src/settings.ts                            config.spec.ts,reliability.spec.ts,route-concurrency.spec.ts
+src/shards.ts                              fallback-shards.spec.ts
+src/team-engine.ts                         team-engine.spec.ts
+src/triage.ts                              triage-followup.spec.ts,triage-recall.spec.ts,triage.spec.ts
+src/types.ts                               carryover.spec.ts,checkpoint-engine-wire.spec.ts,checkpoint-wiring.spec.ts,config.spec.ts,delivery-human-block.spec.ts,delivery.spec.ts,engine-contract.spec.ts,failure-paths.spec.ts,fallback-shards.spec.ts,fixtures.ts,gate-partial-head.spec.ts,gate.spec.ts,helpers.ts,human-output-contract.spec.ts,memory-archive.spec.ts,objective-limit.spec.ts,panel.spec.ts,progress.spec.ts,route-concurrency.spec.ts,timeout-config.spec.ts
