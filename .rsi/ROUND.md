@@ -567,3 +567,20 @@ no history is rewritten, and no round is force-pushed.
 - **未验证（`NOT_RUN`）**：npm 发布（未授权）；真机心跳投递（D-066，操作者动作）；主工作树里另一位
   写入者的客户端开关与 `verify:lib`（不属于本轮，未提交、未审阅）。
 - **status:** OK
+
+- **Landed as:** commit `50c0321e371db076908d5fb6cec94bb8be25f37b`, annotated tag `v0.11.15`
+  (object `e52a8f4c415a7619891be4fbad04c247439baba9`, peel = `50c0321`), `git push origin main`
+  then `git push origin v0.11.15`; `origin/main` = `50c0321` before the record commit and the tag
+  is an ancestor of it. Remote CI run `44359410024` = success; Release run `44359422843` =
+  success with all 16 steps green, including `Verify committed build artifacts` and
+  `Create GitHub Release` → https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.11.15
+  with asset `dsh-grok-workflow-0.11.15.tgz` (523743 B), marked Latest.
+  `npm run verify:lib` at `50c0321`: `141 files, byte-identical`
+  (`.rsi/evidence/round-015/ci-committed.txt`). Old tags untouched (`v0.11.14` object `2a7b074`,
+  peel `20eafea`; `v0.11.13` object `bac26e3`, peel `7a79efb`). No force-push, no npm publish.
+- **Concurrency note:** the first `push origin main` was rejected (non-fast-forward) because
+  another agent landed `3c24f92` (`verify:lib` gate) and `09d5daa` (evidence) while this round
+  ran. The release commit was rebased `e46a302` → `50c0321` onto `09d5daa`, and the **local,
+  never-pushed** tag was deleted and re-created on the rebased commit before pushing. The tree
+  was clean at the tag commit, `git diff --exit-code -- lib/` empty.
+

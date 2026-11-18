@@ -1261,4 +1261,12 @@ worker 链上限 50（HARD_LIMITS.chainLength）
   `push origin main` → `push origin v0.11.15`；未移动任何旧标签、未 force-push、未发布 npm。
 - **未验证（`NOT_RUN`）**：npm 发布（未授权）；真机心跳投递（D-066，操作者动作）；主工作树里另一位写入者的
   客户端开关改动（不属于本轮，未提交、未审阅）。
+- **落地（`CONFIRMED`）**：commit `50c0321`、annotated tag `v0.11.15`（object `e52a8f4`，peel
+  `50c0321`），`origin/main` = 该提交；远端 CI run `44359410024` = success，Release run
+  `44359422843` = success（16 步全绿，含 `Verify committed build artifacts` 与
+  `Create GitHub Release`）；https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.11.15
+  带资产 `dsh-grok-workflow-0.11.15.tgz`（523743 B）并标为 Latest。`npm run verify:lib` 在
+  `50c0321` 上报 `141 files, byte-identical`（`.rsi/evidence/round-015/ci-committed.txt`）。
+  首次 push 因远端在运行期间前进（`3c24f92` / `09d5daa`）被拒；发布提交 rebase 为 `50c0321`，
+  从未推送过的本地标签删除后在 rebase 提交上重建，再推。旧标签逐个未动。
 

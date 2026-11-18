@@ -3661,3 +3661,20 @@ commit 与推送结果见 `.rsi/ROUND.md` Round 14、`.rsi/evidence/round-014/gi
 **未验证（`NOT_RUN`）**：npm 发布（未授权）；真机心跳投递（D-066 规定第一条心跳是操作者动作）；
 主工作树里另一位写入者的客户端开关与 `verify:lib`（不属于本轮，未提交、未审阅、未运行其测试）。
 
+**落地后验证（`CONFIRMED`，命令与输出）**：
+- `git rev-parse 'v0.11.15^{commit}'` → `50c0321e371db076908d5fb6cec94bb8be25f37b`；
+  `git rev-parse v0.11.15` → `e52a8f4c415a7619891be4fbad04c247439baba9`（annotated tag object）。
+- `git ls-remote origin main 'refs/tags/v0.11.1*'` → `refs/heads/main` = `50c0321…`；
+  `refs/tags/v0.11.15` = `e52a8f4…`（peel `50c0321…`）；`v0.11.14` = `2a7b074…` / peel `20eafea…`、
+  `v0.11.13` = `bac26e3…` / peel `7a79efb…`，与前次记录逐字节一致。
+- `gh run list` → headSha `50c0321`：CI = success（run `44359410024`）、Release = success
+  （run `44359422843`）。`gh api …/runs/44359422843/jobs` 显示 16 个步骤全部 `success`，
+  包括 `Verify committed build artifacts`、`Test`、`Create GitHub Release`。
+- `gh release view v0.11.15` → 非 draft、非 prerelease，资产 `dsh-grok-workflow-0.11.15.tgz`
+  （523743 B），`gh release list` 中为 Latest。
+- `npm run ci` 在发布提交 `50c0321` 的干净树上 exit 0（60 文件 / 1081 测试）且
+  `npm run verify:lib` 报 `lib/ at 50c0321 is the build of src/ at 50c0321 (141 files,
+  byte-identical)`，`git diff --exit-code -- lib/` 为空（`.rsi/evidence/round-015/ci-committed.txt`）。
+- **并发记录**：首次 `push origin main` 被拒（远端在运行期间前进到 `09d5daa`）；rebase 后重推，
+  本地未推送过的 `v0.11.15` 标签删除并在 rebase 提交上重建。未 force-push。
+

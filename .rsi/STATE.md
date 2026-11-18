@@ -1,8 +1,8 @@
 # RSI State (overwritten every round; keep under 100 lines)
 
-Updated: 2026-11-19T01:12+08:00 · round 15 complete · version `0.11.15` (tag `v0.11.15`;
-commit and remote run ids in `ROUND.md` Round 15) · release repair of `v0.11.14` (tagged,
-never released) + bilingual docs corrections
+Updated: 2026-11-19T01:35+08:00 · round 15 complete · version `0.11.15` (tag `v0.11.15`,
+commit `50c0321`, both pushed; CI run `44359410024` success, Release run `44359422843` success) ·
+release repair of `v0.11.14` (tagged, never released) + bilingual docs corrections
 
 ## Facts
 

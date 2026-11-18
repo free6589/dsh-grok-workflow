@@ -22,6 +22,17 @@
   `HEAD` 再重建比较，是一个独立主题）。
 - **Next action**：P3-01（设置页逐路由上限与死线字段的文案）或 P3-02（进度页「没有报告事实的成员」详情行）；
   另一条候选是 D-069「现状」里的客户端开关——那正是上面仍未提交的那份工作。
+- **落地（`CONFIRMED`）**：commit `50c0321`、annotated tag `v0.11.15`（object `e52a8f4`，peel
+  `50c0321`）、`origin/main` = `50c0321`；远端 CI run `44359410024` = success，Release run
+  `44359422843` = success（16 步全绿），Release
+  https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.11.15 带
+  `dsh-grok-workflow-0.11.15.tgz`（523743 B）并标为 Latest；`verify:lib` 在 `50c0321` 上报
+  `141 files, byte-identical`。旧标签未动（`v0.11.14` object `2a7b074` / peel `20eafea`）。
+- **一次并发代价（`CONFIRMED`）**：本轮运行期间另一位 agent 把 `3c24f92`（`verify:lib` 门禁）与
+  `09d5daa`（证据）推上 `main`，所以第一次 `push origin main` 被拒（非快进）。发布提交 rebase
+  （`e46a302` → `50c0321`），**从未推送过**的本地标签删除后在 rebase 提交上重建，再推。
+  同一时刻主工作树的本地 `main` 上还有一个未推送的记录提交 `65bbd87`（工作树门禁 61/1131）；
+  接手者先 `git pull --rebase` 再提交。本轮只动文档与记录，冲突面在 `DECISIONS.md` / `CHANGELOG.md`。
 
 ## 2026-11-18 — RSI round 14 落地并发布 `0.11.14`：续跑（loop）面 + 双语文档 + D-068/D-069
 
