@@ -5,6 +5,25 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Fixed / 修复
+
+- **The bundle is now provably the build of the source it ships beside
+  / 发布产物现在可以证明就是它旁边那份源码的构建** —
+  `lib/loop.js` committed at the v0.11.14 tag was built from an earlier `src/loop.ts`:
+  it contained no `callSchedule`, so a Host Schedule refusal could not surface as
+  `loop/schedule-refused`. The artifact is rebuilt and committed together with its
+  source, and the new `npm run verify:lib` (part of `npm run ci`) exports `HEAD`,
+  rebuilds it in a temporary directory and fails when `lib/` is not byte-identical to
+  that build. The local gate could not see this before by construction — `npm test`
+  rebuilds `lib/` and then tests the rebuilt files — so only the remote
+  `git diff --exit-code -- lib/` step caught it, after the tag had been pushed.
+  / v0.11.14 标签里的 `lib/loop.js` 是更早的 `src/loop.ts` 构建的：里面没有
+  `callSchedule`，Host Schedule 的拒绝因此无法变成 `loop/schedule-refused`。现在产物与源码
+  一起重新构建并提交，并新增 `npm run verify:lib`（已并入 `npm run ci`）：它导出 `HEAD`，
+  在临时目录里重新构建，只要 `lib/` 与该构建不是逐字节相同就报错。本机门禁此前从原理上就
+  看不到这个问题——`npm test` 会先重建 `lib/`，再测试重建后的文件——只有远端的
+  `git diff --exit-code -- lib/` 能发现它，而那时标签已经推上去了。
+
 ## [0.11.14] - 2026-11-18
 
 ### Added / 新增

@@ -1,0 +1,65 @@
+Round-14 evidence — the guard that makes a stale artifact impossible to commit
+Recorded: 2026-11-19T00:57+08:00, device agent-25
+Files: scripts/verify-lib.mjs (new), package.json (`verify:lib`, wired into `ci`)
+
+## Why a new check and not just a rebuilt file
+
+`npm run ci` on the tree that produced v0.11.14 was green and the artifact it committed was
+not the build of its own source. That is not a flake: `npm test` = `npm run build && vitest run`,
+so the local gate regenerates `lib/` and then tests the regenerated files. It can never observe
+a `lib/` that disagrees with the committed `src/`. The remote workflow has always had the
+check (`git diff --exit-code -- lib/`, `.github/workflows/ci.yml:30`, `release.yml:57`) and it
+fired — after the tag was already pushed (runs 44345615218 / 44345622700 / 44347643600).
+
+`scripts/verify-lib.mjs` moves that check to where the mistake is made:
+
+1. `git archive HEAD` → a scratch directory (the committed tree, not the working tree);
+2. `tsc -p tsconfig.build.json` + `scripts/build-client.mjs` in that scratch copy;
+3. byte-compare the emitted `lib/` with `git archive HEAD lib`; report every file that
+   differs, is missing, or was emitted but not committed.
+
+It reads only `HEAD`, so it is stable while the working tree is dirty, and it never writes to
+the repository.
+
+## RED: the guard reproduces the verifier's finding on 81a76ec
+
+    $ node scripts/verify-lib.mjs
+    lib/ at 81a76ec is not the build of src/ at 81a76ec:
+      differs from its own build: loop.d.ts.map
+      differs from its own build: loop.js
+      differs from its own build: loop.js.map
+
+    Run `npm run build` and commit lib/ together with the src/ change it came from.
+    EXIT=1
+
+Three files, exactly the three the round-2 verifier named (`lib/loop.js`, `lib/loop.js.map`,
+`lib/loop.d.ts.map`), and exactly the three `8c8e367` later rebuilt.
+
+## GREEN: after the repair commit, on a tree with uncommitted work in progress
+
+    $ node scripts/verify-lib.mjs
+    client bundle: 206901 bytes → lib/client.js
+    lib/ at b0d6d10 is the build of src/ at b0d6d10 (141 files, byte-identical)
+    EXIT=0
+
+This run happened while `src/loop.ts`, `src/config.ts`, `src/gate.ts` and several specs were
+dirty in the working tree — the point of the check is that it judges the commit, not the desk.
+
+## Wiring
+
+    "verify:lib": "node scripts/verify-lib.mjs",
+    "ci": "npm run typecheck && npm run lint && npm run verify:lib && npm test"
+
+Placed before `npm test` so a stale commit is named before the build hides it. `.github/` was
+not touched (RSI red line: CI/release protection logic is not this round's to edit), and the
+remote workflows keep their own equivalent step.
+
+## What it does not cover
+
+- It proves `lib/` is the build of `src/`; it does not prove the build is *correct*. That is
+  what the 1087 tests are for.
+- It needs `git`, `tar` and an installed `node_modules`; it is not part of the published
+  package (`scripts/` is not in `files`).
+- It cannot repair the tag that is already pushed. `v0.11.14` still carries the stale
+  `lib/loop.js`; per the lead's decision recorded in `.rsi/ROUND.md` the tag is not moved and
+  the corrected bundle ships in the next patch release.

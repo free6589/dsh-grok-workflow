@@ -1,0 +1,80 @@
+Round-14 post-verification audit — the committed bundle did not match its own source
+Recorded: 2026-11-19T00:40+08:00, device agent-25, working tree /home/fish/projects_mine/dsh-grok-workflow
+Why this file exists: the round-14 idempotence proof (build-twice.txt, 00:05) was taken on the
+working tree before the last source edits; it did not prove that the *committed* lib/ is the
+build of the *committed* src/. It was not. This file is the measurement that shows it.
+
+## 1. The defect, measured at HEAD 81a76ec (the commit after tag v0.11.14)
+
+    $ git rev-parse HEAD
+    81a76ecfdc2afb07ed866ae396b8f3900d159243
+
+    $ git show HEAD:src/loop.ts | grep -c callSchedule
+    12
+    $ git show HEAD:lib/loop.js | grep -c callSchedule
+    0
+
+`callSchedule` is the wrapper that maps a Host Schedule refusal to the `loop/schedule-refused`
+error code. The committed JavaScript contains no trace of it, so the published bundle cannot
+produce that error — it is a build of an older src/loop.ts, not of the source it ships beside.
+
+## 2. Rebuild of that same commit, in a pristine archive
+
+    $ rm -rf .verify-tmp/audit && mkdir -p .verify-tmp/audit
+    $ git archive HEAD | tar -x -C .verify-tmp/audit
+    $ cp -al node_modules .verify-tmp/audit/node_modules
+    $ cd .verify-tmp/audit && npm run build
+    BUILD_EXIT=0
+    rebuilt lib/loop.js callSchedule: 12
+
+    $ md5sum committed (git archive HEAD lib) vs rebuilt
+    DIFF  lib/loop.js
+    DIFF  lib/loop.js.map
+    SAME  lib/loop.d.ts
+    DIFF  lib/loop.d.ts.map
+
+So `npm run build` on the landed tree is *not* a no-op: three of the four loop artifacts change.
+The working-tree idempotence proof (two builds byte-identical) was true and is still true; it
+just never covered this property, because the working tree had been rebuilt while HEAD had not.
+
+## 3. Why the remote gates did not stop it — they did, and they were ignored
+
+    $ gh run list --limit 4
+    completed  failure  chore(rsi): record round-14 tag/SHA …   CI       main      push  44347643600
+    completed  failure  feat(loop): Host-scheduled repeat-run …  Release  v0.11.14  push  44345622700
+    completed  failure  feat(loop): Host-scheduled repeat-run …  CI       main      push  44345615218
+    completed  success  docs(release): land round-13 gate …      Release  v0.11.13  push  44315911133
+
+    $ gh run view 44347643600 --log-failed | tail
+    Node 24  Run git diff --exit-code -- lib/  …  -  const tasks = (await service.catalog())…
+                                                 …  +  const tasks = (await callSchedule('the task catalog', …))…
+    Node 24  Run git diff --exit-code -- lib/  ##[error]Process completed with exit code 1.
+
+Both `.github/workflows/ci.yml:30` and `.github/workflows/release.yml:57` already run
+`git diff --exit-code -- lib/` after the build. They caught it: main's CI is red at 20eafea and
+81a76ec, and the v0.11.14 Release run failed. The round nevertheless recorded "npm run ci EXIT=0"
+as its gate, because the *local* `npm run ci` (typecheck && lint && test) contains no such check —
+`test` = `npm run build && vitest run`, which regenerates lib/ and then tests the regenerated
+files. A local gate cannot see a stale artifact by construction.
+
+## 4. Consequences
+
+- `refs/tags/v0.11.14` peels to 20eafea, whose lib/loop.js is the stale build. Tags are never
+  moved (AGENTS.md, release discipline), so the corrected bundle cannot be released as v0.11.14.
+  The next patch tag (v0.11.15) is the release that carries it.
+- The npm registry has no `dsh-grok-workflow` package at all (`npm view dsh-grok-workflow version`
+  → 404), so nothing was published from the broken tag; the exposure is the pushed tag and the
+  Release run, not a shipped tarball.
+- The fix is the rebuilt lib/ itself, committed in the same commit as the src/ it was built from,
+  plus a local pre-commit check that makes the property visible before a commit exists (see
+  `scripts/verify-lib.mjs` and the `verify:lib` script recorded in `build-twice-settled.txt`).
+
+## 5. Baseline for the non-decreasing test count, measured not quoted
+
+    $ (in the same pristine archive) npx vitest run
+    Test Files  60 passed (60)
+    Tests       1081 passed (1081)
+    VITEST_EXIT=0
+
+HEAD 81a76ec = 60 files / 1081 tests. The settled tree after the round's fixes = 60 files / 1085
+tests (see `ci-settled.txt`). Non-decreasing, nothing skipped or loosened.
