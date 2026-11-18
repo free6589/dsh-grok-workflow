@@ -481,3 +481,29 @@ link: 安装 → /grok on
   运行的轨道（与设计 §3 一致）。
 - **主题化**：环/点颜色全部 `var(--dsw-alias-…)` + 旧 hex 兜底；深色下实测 done = `rgb(34,197,94)`、
   pending = `rgb(84,85,87)`，无硬编码浅色块。
+
+## A22 — 发布标签的硬事实：32 个远端标签、31 个发布标签、1 个预发布例外（2026-11-18，`CONFIRMED`）
+
+Source: RSI round 7，`git ls-remote --tags origin` 全量输出与逐标签 `git show <tag>:package.json`
+（证据 `.rsi/evidence/round-007/remote-tags.txt`、`audit.txt`、`local-vs-remote-objects.txt`）。
+
+- 远端共 **32** 个 `refs/tags/v*`：31 个 `vX.Y.Z` 发布标签 + `v0.2.0-rc.1`。
+- 32 个标签的**对象**本地与远端完全相同（`git rev-parse <tag>` == `ls-remote` 对象），即没有被移动过；
+  其中 26 个是 annotated（`^{}` peel 行存在），6 个是 lightweight。
+- 每个标签 peel 出的提交都是 `origin/main` 的祖先；31 个发布标签的 `package.json` 与标签名一致。
+- **例外**：`v0.2.0-rc.1` 的提交里 `package.json` 仍是 `0.1.0`（早于发布流程）。已发布标签不移动，
+  因此在两份 README 写明它不是发布版本（`D-061`）。
+- `HEAD` 与 `origin/main` 逐轮核对一致（每轮 `.rsi/evidence/round-NNN/git.txt`）。
+
+## A23 — 本机沙箱下 `dsh` 无法写 `~/.dsh`，真机验证必须用 `DSH_HOME`（2026-11-18，`CONFIRMED`）
+
+Source: RSI round 8（证据 `.rsi/evidence/round-008/activation.txt`、`profile-headless.txt`）。
+
+- 直接运行 `dsh headless --help` 会尝试写 `~/.dsh/profiles/headless/cordis.yml`，在本机返回
+  `EROFS: read-only file system`；把 `DSH_HOME` 指到仓库内（`.dsh-home/`，gitignore）后一切正常。
+- 该 `DSH_HOME` 下 `--from-default-profile web` + `dsh plugin add <checkout>` 的组合会得到
+  `["@deepseek-ai/dsh-base","@deepseek-ai/dsh-web-app","dsh-grok-workflow"]`，插件以 `link:` 装入。
+- 真实激活可由 `POST /api/settings/describe`（先用 `GET /?token=…` 换 cookie）证明：
+  返回的 23 个命名空间里有 `grok-workflow` 且 `autoGenerate: true`。
+- 真模型消息在该孤立 profile 中不可跑：`MISSING_CREDENTIAL: llm-deepseek: no API key for provider
+  route "deepseek-official"`（`BLOCKED`，非 pass）。
