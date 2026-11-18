@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { load } from 'js-yaml'
 import { describe, expect, it } from 'vitest'
-import { CONFIG_KEYS, REMOVED_CONFIG_KEYS, resolveConfig } from '../src/config.js'
+import { CONFIG_KEYS, DEFAULT_TIMEOUT_MS, FIXED_HISTORY_CHARS, FIXED_HISTORY_TURNS, FIXED_MAX_ACTIVE_RUNS, FIXED_MAX_ACTIVE_RUNS_TOTAL, FIXED_MAX_QUEUED_MESSAGES, FIXED_MAX_RETRIES, FIXED_RECORD_LIMIT, REMOVED_CONFIG_KEYS, resolveConfig } from '../src/config.js'
 
 /**
  * Configuration-surface docs guard (RSI round 3).
@@ -91,5 +91,75 @@ describe('README documents exactly the configuration surface the code accepts', 
   it('keeps the two lists disjoint', () => {
     const accepted = new Set<string>(CONFIG_KEYS)
     for (const key of REMOVED_CONFIG_KEYS) expect(accepted.has(key)).toBe(false)
+  })
+})
+
+/**
+ * `docs/LOCAL-TESTING.md` is the document an operator follows to install and run this
+ * plugin, so every number in it is a promise the code has to keep. RSI round 6 audited
+ * the paragraph against `src/config.ts`: the key count and the fixed caps were right,
+ * while four install examples still named a `0.2.0`/`0.2.1` tarball that this release
+ * never produced, and one troubleshooting example described a *repaired* value as a
+ * load-time rejection.
+ */
+describe('docs/LOCAL-TESTING.md agrees with the code', () => {
+  const local = readFileSync(new URL('../docs/LOCAL-TESTING.md', import.meta.url), 'utf8')
+
+  it('names every accepted key and states the count the code enforces', () => {
+    const words: Record<number, string> = { 9: 'nine' }
+    const spelled = words[CONFIG_KEYS.length]
+    expect(spelled, 'add the spelled-out form for the new key count').toBeDefined()
+    expect(local).toContain(`exactly ${spelled} keys`)
+    for (const key of CONFIG_KEYS) {
+      expect(local, `LOCAL-TESTING.md never names the accepted key ${key}`).toContain(`\`${key}\``)
+    }
+  })
+
+  it('quotes the fixed caps and the deadline default from the constants', () => {
+    expect(local).toContain(`maxRetries=${FIXED_MAX_RETRIES}`)
+    expect(local).toContain(`maxActiveRuns=${FIXED_MAX_ACTIVE_RUNS}`)
+    expect(local).toContain(`\`${FIXED_MAX_ACTIVE_RUNS_TOTAL}\` per process`)
+    expect(local).toContain(`defaults to \`${DEFAULT_TIMEOUT_MS}\``)
+  })
+
+  it('pins every packed-artifact name to the package version', () => {
+    const version = (JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string }).version
+    const named = [...local.matchAll(/dsh-grok-workflow-(\d+\.\d+\.\d+)\.tgz/g)].map((match) => match[1] as string)
+    expect(named.length, 'LOCAL-TESTING.md no longer names the packed artifact').toBeGreaterThan(0)
+    for (const found of named) {
+      expect(found, 'LOCAL-TESTING.md names a tarball this release never produced').toBe(version)
+    }
+  })
+
+  it('quotes only load-time messages the code can produce', () => {
+    const source = readFileSync(new URL('../src/config.ts', import.meta.url), 'utf8')
+    for (const quoted of ['unknown configuration key', 'accepted keys:', 'synthesis must be "model" or "layered", got']) {
+      expect(source, `config.ts no longer produces "${quoted}"`).toContain(quoted)
+      expect(local, `LOCAL-TESTING.md no longer shows the real message "${quoted}"`).toContain(quoted)
+    }
+  })
+})
+
+describe('both READMEs quote the fixed caps from the constants', () => {
+  const readmes = {
+    'README.md': readFileSync(new URL('../README.md', import.meta.url), 'utf8'),
+    'README.zh-CN.md': readFileSync(new URL('../README.zh-CN.md', import.meta.url), 'utf8'),
+  }
+
+  it('keeps every fixed cap in step with src/config.ts', () => {
+    const facts = [
+      `maxRetries=${FIXED_MAX_RETRIES}`,
+      `maxActiveRuns=${FIXED_MAX_ACTIVE_RUNS}`,
+      `maxActiveRunsTotal=${FIXED_MAX_ACTIVE_RUNS_TOTAL}`,
+      `historyTurns=${FIXED_HISTORY_TURNS}`,
+      `historyChars=${FIXED_HISTORY_CHARS}`,
+      `maxQueuedMessages=${FIXED_MAX_QUEUED_MESSAGES}`,
+      `recordLimit=${FIXED_RECORD_LIMIT}`,
+    ]
+    for (const fact of facts) {
+      for (const [name, text] of Object.entries(readmes)) {
+        expect(text, `${name} no longer states ${fact.split('=')[0]} as ${fact.split('=')[1]}`).toContain(fact)
+      }
+    }
   })
 })

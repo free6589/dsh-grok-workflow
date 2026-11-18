@@ -12,6 +12,7 @@ import json
 import re
 import subprocess
 import sys
+from pathlib import Path
 
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
 
@@ -100,10 +101,24 @@ def main() -> int:
     with open("README.zh-CN.md", "w", encoding="utf-8") as handle:
         handle.write(zh)
 
+    # docs/LOCAL-TESTING.md names the packed artifact in its install examples. A stale
+    # name sends the reader to a file this release never produced, which is exactly what
+    # round 6 found (0.2.0/0.2.1 in a 0.11.x line). test/docs-config-keys.spec.ts pins it.
+    lt_tgz = 0
+    local_testing = Path("docs/LOCAL-TESTING.md")
+    if local_testing.exists():
+        text = local_testing.read_text(encoding="utf-8")
+        text, lt_tgz = re.subn(
+            r"dsh-grok-workflow-\d+\.\d+\.\d+\.tgz",
+            f"dsh-grok-workflow-{version}.tgz",
+            text,
+        )
+        local_testing.write_text(text, encoding="utf-8")
+
     print(
         f"version={version} declared(en={en_hits},zh={zh_hits}) "
         f"pins(en={en_pins},zh={zh_pins}) lists(en={en_list_hits},zh={zh_list_hits}) "
-        f"bare(en={en_bare},zh={zh_bare}) published={len(tags)}"
+        f"bare(en={en_bare},zh={zh_bare}) local-testing.tgz={lt_tgz} published={len(tags)}"
     )
     missing = [name for name, hits in (("declared", en_hits), ("pins", en_pins), ("list", en_list_hits)) if hits == 0]
     if missing:

@@ -69,7 +69,7 @@ Verified activation, step by step (anyone can repeat it):
 dsh --profile grok-workflow-dev --from-default-profile web
 
 # 2. install the packed plugin (adds the dependency AND the bundle row)
-dsh plugin --profile grok-workflow-dev add ./dsh-grok-workflow-0.2.0.tgz
+dsh plugin --profile grok-workflow-dev add ./dsh-grok-workflow-0.11.6.tgz
 
 # 3. re-enable a workflow provider in the profile patch
 #    <profile>/cordis.patch.yml:
@@ -95,7 +95,7 @@ Three traps that cost real time in t32 (all reproduced):
 - **A stale install.** `dsh plugin add` with the *same* `file:` tarball path is a
   pnpm no-op: the profile keeps the previously installed contents (the manifest
   said `dsh` without `client`, and the new `lib/client.js` was missing). Add a
-  freshly named copy (`cp …-0.2.0.tgz /tmp/g$(date +%s%N).tgz`) or change the
+  freshly named copy (`cp …-0.11.5.tgz /tmp/g$(date +%s%N).tgz`) or change the
   version, then confirm the installed `node_modules/<pkg>/package.json`.
 - **`plugin add` rewrites the bundle list.** After adding a second package the
   profile's `dsh.profile.bundles` contained only that package — the earlier
@@ -126,8 +126,8 @@ cp "$DSH_HOME/profiles/<name>/cordis.patch.yml" \
 # 2. install the packed plugin. A *new path* every time: `dsh plugin add` with the same
 #    `file:` spec is a pnpm no-op, so an unchanged path can silently keep the old contents.
 DEST="/tmp/install-$(date +%s%N)"      # a spec this profile has never been given
-mkdir -p "$DEST" && cp dsh-grok-workflow-0.2.1.tgz "$DEST/"
-dsh plugin --profile <name> add "$DEST/dsh-grok-workflow-0.2.1.tgz"
+mkdir -p "$DEST" && cp dsh-grok-workflow-0.11.6.tgz "$DEST/"
+dsh plugin --profile <name> add "$DEST/dsh-grok-workflow-0.11.6.tgz"
 
 # 3. verify the installed bytes, not the pack
 node -p "require('$DSH_HOME/profiles/<name>/node_modules/dsh-grok-workflow/package.json').version"
@@ -218,9 +218,14 @@ The `remove` command removes the bundle and its layer.
   engine. Enable it in the profile patch (see [Enable](#enable)). `--dump-config`
   shows the plugin row *and* the disabled provider side by side — composition is
   not activation.
-- `… did not activate`: the plugin's own `resolveConfig` rejected the config; the
-  line names the key (for example `roles.synthesizer is set but synthesis is
-  "deterministic"`).
+- `… did not activate`: the plugin's own `resolveConfig` rejected the config and the
+  line quotes the reason, for example
+  `unknown configuration key "triageModel"; accepted keys: toolName, mode, grokDefault,
+  roles, synthesis, maxConcurrency, maxTasks, timeoutMs, configVersion`, or
+  `synthesis must be "model" or "layered", got "deterministic"`. Two stored values are
+  *repaired* on the same line instead of being refused: `synthesis: "deterministic"`
+  takes effect as `layered`, and `synthesis: "model"` with an empty `roles.synthesizer`
+  chain also takes effect as `layered`.
 - The `Grok workflow` card is missing and the browser console says
   `[grok-workflow] no settings namespace projects this plugin's fields`: the row did not activate
   (see the two lines above) or the settings service refused it. The page binds to the row that

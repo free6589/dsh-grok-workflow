@@ -1,6 +1,16 @@
 # Project State
 
-Last updated: 2026-11-18 (**RSI 连续循环 round 5 完成 · `0.11.5`** — 主题 P2-02：
+Last updated: 2026-11-18 (**RSI 连续循环 round 6 完成 · `0.11.6`** — 主题 P1-03：
+`docs/LOCAL-TESTING.md` 与 `src/config.ts` 对账。九个键、`maxRetries=1`、`maxActiveRuns=2` /
+每进程 `8`、`timeoutMs` 默认 `3600000` 全部与代码一致；三处不符已修——四处安装示例指向
+`0.2.0`/`0.2.1` 压缩包（发布线 0.11.x）、排障条目把「被修复的 `synthesis: deterministic`」写成
+载入期拒绝、中文 README 的固化上限换了写法。`bump-version.py` 现在同步改写压缩包名；
+`test/docs-config-keys.spec.ts` 7 → 12 个 `it`；`npm run ci` exit 0：typecheck 0 错、
+lint 22w/0e、**54 文件 / 998 测试 PASS**（上一轮 54/993）；tag `v0.11.6`。
+细节见 `.rsi/ROUND.md` round 6、`VALIDATION.md` Round 54、`D-060`。
+**已知缺口（未修）**：Progress 页 Execute/Verify 段 `Not reported in the events`（P0-02）。
+
+Previous update: 2026-11-18 (**RSI 连续循环 round 5 完成 · `0.11.5`** — 主题 P2-02：
 `src/redact.ts` 的形状缺口与两处误伤。改前八条探针里五条是漏或损坏（引号内 `Cookie:`、
 `X-Amz-Signature`/`X-Goog-Signature`/`?auth=`、PGP armor、`SECRET_KEY`/`PRIVATE_TOKEN`、
 `const token = await refreshToken()` 被改写、`db_pass=hunter2;user=app` 丢尾部、占位符被二次脱敏）。

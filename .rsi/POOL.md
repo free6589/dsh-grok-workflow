@@ -94,8 +94,10 @@ here and are marked DONE when their commit lands.
 
 ## Docs
 
-- P · README says "Since `0.10.0` the surface is exactly eight keys" (line ~202) while the table
-  has nine rows and the Chinese text says nine. S / low.
+- R6 DONE · `docs/LOCAL-TESTING.md` install examples named `0.2.0`/`0.2.1` tarballs, the
+  troubleshooting entry quoted a message the build never emits and described a repaired
+  value as a rejection, and the zh README used a different notation for the fixed caps
+  (round 6; guard 7 → 12 its, bump-version.py now rewrites the tarball name).
 - P · Both README "Models per role" examples are patches the loader refuses:
   `synthesis: deterministic` and the removed `switchOn` key (EN ~176-177, zh ~169-170). S / low.
 - P · README validation bullet still says "more than three routes" and "an unknown `switchOn`

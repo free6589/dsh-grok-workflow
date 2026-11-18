@@ -180,3 +180,43 @@ no history is rewritten, and no round is force-pushed.
   tests) in `npm run ci` covers the real Loader activation path).
 - **Suggested version:** patch → `0.11.5`.
 - **status:** OK
+
+## Round 6 — LOCAL-TESTING promised a tarball, a rejection and a notation it did not have
+
+- **Theme (P1-03, `docs/LOCAL-TESTING.md` vs `src/config.ts`):** the guide an operator
+  follows to install and run the plugin. Audited every numeric claim against the code
+  before changing a word.
+  | claim | code | verdict |
+  | --- | --- | --- |
+  | "exactly nine keys" + all nine names | `CONFIG_KEYS` (9) | correct |
+  | `maxRetries=1` | `FIXED_MAX_RETRIES` | correct |
+  | `maxActiveRuns=2` per session, `8` per process | `FIXED_MAX_ACTIVE_RUNS` / `_TOTAL` | correct |
+  | `timeoutMs` defaults to `3600000`, `0` unlimited | `DEFAULT_TIMEOUT_MS` | correct |
+  | install examples `dsh-grok-workflow-0.2.0.tgz` / `-0.2.1.tgz` | `package.json` 0.11.5 | **stale, 4 occurrences** |
+  | troubleshooting `roles.synthesizer is set but synthesis is "deterministic"` | `apply()` repairs `deterministic` → `layered` (src/index.ts:94-101, config.ts:556-568); no such message exists | **wrong** |
+  | zh README `maxActiveRuns` 每会话 `2` / `maxActiveRunsTotal` 每进程 `8` | same facts, different notation from the English `key=value` | **inconsistent** |
+- **Change:**
+  1. All four tarball names follow `package.json`; `.rsi/tools/bump-version.py` now
+     rewrites `dsh-grok-workflow-X.Y.Z.tgz` in `docs/LOCAL-TESTING.md` on every bump
+     (printed as `local-testing.tgz=3`), so the guide cannot go stale again.
+  2. The troubleshooting entry quotes the two messages the build really produces
+     (`unknown configuration key "triageModel"; accepted keys: …`,
+     `synthesis must be "model" or "layered", got "…"`) and names the two stored values
+     that are *repaired* rather than refused.
+  3. `README.zh-CN.md` fixed-cap sentence uses the English `key=value` notation; no
+     number changed.
+- **Guard:** `test/docs-config-keys.spec.ts` 7 → 12 `its` — LOCAL-TESTING must name
+  every `CONFIG_KEYS` entry and the spelled-out count, quote
+  `FIXED_MAX_RETRIES`/`FIXED_MAX_ACTIVE_RUNS`/`FIXED_MAX_ACTIVE_RUNS_TOTAL`/
+  `DEFAULT_TIMEOUT_MS`, name only tarballs equal to the package version, and quote only
+  messages present in `src/config.ts`; both READMEs must state all seven fixed caps read
+  from the constants.
+- **Evidence:** `.rsi/evidence/round-006/red.txt` — the new spec against the pre-fix
+  document: **2 failed / 9 passed** (`pins every packed-artifact name…`,
+  `quotes only load-time messages…`). `green.txt` — 12/12. `ci.txt` — exit 0, typecheck
+  0 errors, lint 22 warnings / 0 errors, **54 files / 998 tests PASS** (was 54/993).
+- **Unverified:** the GitHub-rendered guide was not re-read in a browser (`NOT_RUN`); the
+  live `grok-workflow-dev` install was not repeated this round (`NOT_RUN` — round 8 owns
+  the runtime disposition).
+- **Suggested version:** patch → `0.11.6`.
+- **status:** OK

@@ -1,0 +1,54 @@
+RSI round 5 — commit, tag, push (2026-11-18T13:53+08:00)
+
+$ git rev-parse HEAD
+bf0dc911c53402ac2c12fa965794949d6c536d6b
+
+$ git log --oneline -1
+bf0dc91 fix(redact): quoted cookies, presigned signatures, PGP armor, env value bounds (RSI round 5)
+
+$ git diff --stat HEAD~1 HEAD
+ .rsi/LOG.md                                        |   1 +
+ .rsi/POOL.md                                       |  34 +-
+ .rsi/ROUND.md                                      |  55 ++++
+ .rsi/STATE.md                                      |  32 +-
+ .rsi/evidence/round-005/ci.txt                     | 344 +++++++++++++++++++++
+ .rsi/evidence/round-005/green.txt                  |  10 +
+ .rsi/evidence/round-005/red.txt                    |  60 ++++
+ .rsi/ledger.jsonl                                  |   1 +
+ CHANGELOG.md                                       |  46 +++
+ README.md                                          |  12 +-
+ README.zh-CN.md                                    |  12 +-
+ docs/ARCHITECTURE.md                               |  36 +++
+ docs/knowledge/DECISIONS.md                        |  14 +
+ docs/knowledge/HANDOFF.md                          |  16 +
+ docs/knowledge/STATE.md                            |  12 +-
+ docs/knowledge/VALIDATION.md                       |  28 ++
+ .../evidence/test-baseline-2026-11-18/REPORT.md    | 123 ++++++++
+ .../behavior-to-test-map.md                        |  13 +
+ .../evidence/test-baseline-2026-11-18/ci-exit.txt  |   1 +
+ .../test-baseline-2026-11-18/module-test-map.txt   |  36 +++
+ .../test-baseline-2026-11-18/vitest-report.json    |   1 +
+ lib/redact.d.ts.map                                |   2 +-
+ lib/redact.js                                      |  40 ++-
+ lib/redact.js.map                                  |   2 +-
+ package-lock.json                                  |   4 +-
+ package.json                                       |   2 +-
+ src/redact.ts                                      |  40 ++-
+ test/phase1-dialogue.spec.ts                       |   5 +-
+ test/redact.spec.ts                                | 118 +++++++
+ 29 files changed, 1031 insertions(+), 69 deletions(-)
+
+$ git ls-remote origin refs/heads/main refs/tags/v0.11.5
+bf0dc911c53402ac2c12fa965794949d6c536d6b	refs/heads/main
+0f97e19f30c78f6c8fba56b4f6b3419da5b80deb	refs/tags/v0.11.5
+
+$ git rev-parse v0.11.5^{commit}
+bf0dc911c53402ac2c12fa965794949d6c536d6b
+
+$ git tag -l "v0.11*" --sort=v:refname
+v0.11.0
+v0.11.1
+v0.11.2
+v0.11.3
+v0.11.4
+v0.11.5

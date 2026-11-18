@@ -3384,3 +3384,27 @@ lint 22 warning / 0 error，**54 文件 / 993 测试 PASS**，基线 54/985）�
 **未验证（`NOT_RUN`）**：base64 包裹的 PEM（无规则，已写入 `docs/ARCHITECTURE.md` 已知缺口）；
 `grok-workflow-dev` 真机消息路径（改动只在 `redact.ts`，`test/loader.spec.ts` 2 例真实 Loader 激活
 仍由 `npm run ci` 覆盖）。
+
+## Round 54 — 2026-11-18 — P1-03 `docs/LOCAL-TESTING.md` 与代码对账（`CONFIRMED`）
+
+**对账结果（`CONFIRMED`，逐条）**：九个键与全部键名 = `CONFIG_KEYS`（9）✓；`maxRetries=1` =
+`FIXED_MAX_RETRIES` ✓；`maxActiveRuns=2` 每会话 / `8` 每进程 = `FIXED_MAX_ACTIVE_RUNS` /
+`FIXED_MAX_ACTIVE_RUNS_TOTAL` ✓；`timeoutMs` 默认 `3600000`、`0` 不限时 = `DEFAULT_TIMEOUT_MS` ✓。
+三处不符：①四处安装示例写 `dsh-grok-workflow-0.2.0.tgz` / `-0.2.1.tgz`（发布线 0.11.x）；
+②排障条目引用 `roles.synthesizer is set but synthesis is "deterministic"`——本构建从不输出该消息，
+`apply()` 在 `resolveConfig` 之前就把 `deterministic` 修复成 `layered`（`src/index.ts:94-101`、
+`src/config.ts:556-568`）；③中文 README 用 `maxActiveRuns` 每会话 `2` 的写法，与英文 `key=value`
+不同构（数值相同）。
+
+**修复（`CONFIRMED`）**：四处示例名改为当前产物名；`.rsi/tools/bump-version.py` 每次升版本同步改写
+`docs/LOCAL-TESTING.md` 的 `dsh-grok-workflow-X.Y.Z.tgz`（本次输出 `local-testing.tgz=3`）；
+排障条目改为引用代码真会输出的两条消息并说明哪两个取值是「修复而非拒绝」；中文 README 改成
+`maxActiveRuns=2`（每会话） / `maxActiveRunsTotal=8`（每进程）。
+
+**验证（`CONFIRMED`）**：`.rsi/evidence/round-006/red.txt`（新用例对改前文档：2 failed / 9 passed）、
+`green.txt`（12/12）、`ci.txt`（`npm run ci` exit 0，typecheck 0 错，lint 22w/0e，
+**54 文件 / 998 测试 PASS**，上一轮 54/993）。`test/docs-config-keys.spec.ts` 7 → 12 个 `it`，
+无跳过、无放宽。
+
+**未验证（`NOT_RUN`）**：GitHub 渲染后的排版未在浏览器里复核；本轮未重复 `grok-workflow-dev`
+真机安装（真机结论归 round 8）。

@@ -1,5 +1,20 @@
 # Agent Handoff
 
+## 2026-11-18 — RSI 连续循环：round 6 = P1-03 LOCAL-TESTING 对账（`CONFIRMED`）
+
+- **From:** RSI 执行代理（agent-34）· **To:** 用户 / 后续接手代理
+- **对账结论（`CONFIRMED`）**：九个键与全部固化上限、默认死线都与 `src/config.ts` 一致；
+  不符的是四处安装示例的压缩包名（`0.2.0`/`0.2.1`）、一条引用代码从不输出的排障消息、
+  以及中文 README 的固化上限写法。三处已修，中文写法与英文统一为 `key=value`。
+- **机制（`CONFIRMED`）**：`.rsi/tools/bump-version.py` 升版本时同步改写
+  `docs/LOCAL-TESTING.md` 的压缩包名；`test/docs-config-keys.spec.ts` 7 → 12 个 `it`
+  从常量读数，不抄数字。证据 `.rsi/evidence/round-006/`（red 2 failed → green 12/12 →
+  ci 54 文件 / 998 测试）。
+- **版本（`CONFIRMED`）**：`0.11.6`（`package.json` + `package-lock.json` 联动），
+  `CHANGELOG` 插入 `## [0.11.6]` 双语节。
+- **接手提示**：下一主题是远端 tag 清单审计（README 已发布列表 vs `git ls-remote --tags`
+  vs 每个 tag 的 `package.json` 版本），再之后是 `grok-workflow-dev` 真机 disposition。
+
 ## 2026-11-18 — RSI 连续循环：round 5 = P2-02 脱敏形状（`CONFIRMED`）
 
 - **From:** RSI 执行代理（agent-34）· **To:** 用户 / 后续接手代理

@@ -5,6 +5,53 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.11.6] - 2026-11-18
+
+### Fixed / 修复
+
+- **The local-testing guide named tarballs this release never produced / 本地测试指南指向本版本从未产出的压缩包** —
+  four install examples in `docs/LOCAL-TESTING.md` said `dsh-grok-workflow-0.2.0.tgz` /
+  `-0.2.1.tgz` while the release line is `0.11.x`, so a reader following the guide hits a
+  missing file. All four now name the current artifact, and `.rsi/tools/bump-version.py`
+  rewrites the name on every bump, with `test/docs-config-keys.spec.ts` failing if either
+  side drifts. / `docs/LOCAL-TESTING.md` 的四处安装示例写着
+  `dsh-grok-workflow-0.2.0.tgz` / `-0.2.1.tgz`，而发布线早已是 `0.11.x`，照文档操作会找不到文件。
+  四处已改为当前产物名；`.rsi/tools/bump-version.py` 在每次升版本时同步改写该名字，
+  `test/docs-config-keys.spec.ts` 任一侧漂移都会失败。
+- **A repaired configuration value was documented as a load-time rejection / 一个被修复的配置值写成了载入期拒绝** —
+  the troubleshooting entry quoted `roles.synthesizer is set but synthesis is "deterministic"`,
+  a message this build never emits. `apply()` repairs a stored `synthesis: "deterministic"` to
+  `layered` (and `synthesis: "model"` with an empty synthesizer chain likewise) *before*
+  `resolveConfig` runs, so the guide now quotes the two messages the code actually produces —
+  `unknown configuration key "triageModel"; accepted keys: …` and
+  `synthesis must be "model" or "layered", got "…"` — and states which values are repaired
+  instead of refused. / 排障条目引用了本构建从不输出的
+  `roles.synthesizer is set but synthesis is "deterministic"`。`apply()` 会在 `resolveConfig`
+  之前把存量 `synthesis: "deterministic"` 修复为 `layered`（`synthesis: "model"` 配空的
+  synthesizer 链同理），因此文档现改为引用代码真正会输出的两条消息——
+  `unknown configuration key "triageModel"; accepted keys: …` 与
+  `synthesis must be "model" or "layered", got "…"`——并说明哪两个取值是被修复而非拒绝。
+- **The Chinese README used a different notation for the fixed caps / 中文 README 对固化上限用了不同写法** —
+  `maxActiveRuns` 每会话 `2` / `maxActiveRunsTotal` 每进程 `8` now reads
+  `maxActiveRuns=2`（每会话） / `maxActiveRunsTotal=8`（每进程）, matching the English
+  `key=value` form so one guard binds both READMEs to the constants. No number changed. /
+  中文改与英文相同的 `key=value` 写法，一份守卫即可把两份 README 钉到同一批常量；数值未变。
+
+### Tests / 测试
+
+- `test/docs-config-keys.spec.ts` 7 → 12 `it`s: `docs/LOCAL-TESTING.md` must name every
+  `CONFIG_KEYS` entry and state the count the code enforces, must quote
+  `FIXED_MAX_RETRIES` / `FIXED_MAX_ACTIVE_RUNS` / `FIXED_MAX_ACTIVE_RUNS_TOTAL` /
+  `DEFAULT_TIMEOUT_MS`, must name only tarballs equal to `package.json`'s version, and must
+  quote only messages `src/config.ts` can produce; both READMEs must state all seven fixed
+  caps read from the constants. No skip, no loosened assertion. / 
+  `test/docs-config-keys.spec.ts` 从 7 个 `it` 增至 12 个：`docs/LOCAL-TESTING.md` 必须点全
+  `CONFIG_KEYS` 每一项并写出与代码一致的键数，必须引用
+  `FIXED_MAX_RETRIES` / `FIXED_MAX_ACTIVE_RUNS` / `FIXED_MAX_ACTIVE_RUNS_TOTAL` /
+  `DEFAULT_TIMEOUT_MS`，只能写与 `package.json` 版本相同的压缩包名，只能引用
+  `src/config.ts` 真会输出的消息；两份 README 必须写出从常量读出的七条固化上限。
+  无跳过、无放宽断言。
+
 ## [0.11.5] - 2026-11-18
 
 ### Fixed / 修复

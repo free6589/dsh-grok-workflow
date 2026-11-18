@@ -1,6 +1,6 @@
 # RSI State (overwritten every round; keep under 100 lines)
 
-Updated: 2026-11-18T13:51+08:00 · round 5 complete · version `0.11.5` (tag `v0.11.5`)
+Updated: 2026-11-18T13:56+08:00 · round 6 complete · version `0.11.6` (tag `v0.11.6`)
 
 ## Facts
 
@@ -8,8 +8,9 @@ Updated: 2026-11-18T13:51+08:00 · round 5 complete · version `0.11.5` (tag `v0
   = https://github.com/free6589/dsh-grok-workflow.git (pushed, tag pushed).
 - Round 4 commit: `bcb601d` (tag `v0.11.4`). Its bookkeeping + evidence were left
   uncommitted by that round; landed by `2f999eb` (chore, no version bump).
-- Round 5 commit: this round's commit (tag `v0.11.5` → same sha). `npm run ci`:
-  54 files / 993 tests PASS, 0 type errors, lint 22 warnings / 0 errors (baseline).
+- Round 5: `bf0dc91` (tag `v0.11.5`), 54 files / 993 tests PASS.
+- Round 6 commit: this round's commit (tag `v0.11.6` → same sha). `npm run ci`:
+  54 files / 998 tests PASS, 0 type errors, lint 22 warnings / 0 errors (baseline).
 - Ledger: `.rsi/ledger.jsonl` (one JSON line per round). Resume from the highest
   `round` whose `status` is `OK`; do not redo rounds already logged.
 - Evidence: `.rsi/evidence/round-NNN/` (`red.txt` before, `green.txt` after,
@@ -32,11 +33,10 @@ P1 — docs and version truth
 - P1-01 done (round 1: version claims checked against `package.json`).
 - P1-02 `docs/ARCHITECTURE.md` section statuses naming a version as "current"
   rather than "since". (low / low / S)
-- P1-03 `docs/LOCAL-TESTING.md` key count and defaults vs `src/config.ts`. (medium / low / S)
-  Recon for round 6: the nine keys and the fixed `1` / `2` / `8` / `3600000`
-  claims are correct; the stale `0.2.0.tgz`/`0.2.1.tgz` install examples and the
-  `synthesis is "deterministic"` rejection example are not (`deterministic` is
-  repaired at load, not rejected).
+- P1-03 done (round 6: the nine keys and the fixed `1` / `2` / `8` / `3600000` claims
+  already matched `src/config.ts`; four tarball names, one "rejection" example and the
+  zh fixed-cap notation did not. Guard 7 → 12 its; `bump-version.py` rewrites the
+  tarball name on every bump).
 
 P2 — tests and reliability
 
@@ -62,6 +62,8 @@ on a guess.
 - Round 5: the first full `npm run ci` after the fix failed one existing test
   (`test/phase1-dialogue.spec.ts`, `[REDACTED]` vs `[REDACTED API KEY]`); the
   assertion was tightened to the exact placeholder and the second run was green.
+- Round 6: no failed ci run (red evidence was a deliberate replay of the new spec
+  against the pre-fix document, 2 failed / 9 passed).
 - Consecutive failed rounds: 0. Consecutive valueless rounds: 0.
 
 ## Open decisions

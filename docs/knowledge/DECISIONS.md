@@ -1097,3 +1097,16 @@ Each entry records the decision, evidence, alternatives, and status.
 - **代价（明确接受）**：`token=getSecret()` 这类「值延续成调用」的赋值不会被脱敏；已记录在
   `docs/ARCHITECTURE.md` 的两条有意失衡里，并由 `test/redact.spec.ts` 钉住。
 - **连带影响**：`test/phase1-dialogue.spec.ts` 的 `[REDACTED]` 断言改为 `[REDACTED API KEY]`（更严）。
+
+## D-060 — 文档守卫绑定的是常量，不是文档里抄下来的数字（2026-11-18 · RSI round 6）
+
+- **背景**：`docs/LOCAL-TESTING.md` 的键数、固化上限、默认死线当时都是对的，但同一份文档里
+  四处安装示例指向 `0.2.x` 压缩包，排障条目引用一条代码从不输出的消息，中文 README 又把固化
+  上限换了写法——数字对、事实错，正好是「没有守卫的文档」的典型腐烂方式。
+- **选择**：守卫从 `src/config.ts` 读数（`CONFIG_KEYS`、`FIXED_*`、`DEFAULT_TIMEOUT_MS`），
+  而不是把文档里的数字再抄一遍；压缩包名与 `package.json` 版本绑定，并由
+  `.rsi/tools/bump-version.py` 在升版本时同步改写，所以「满足守卫」和「升版本」是同一次动作。
+- **替代方案**：a) 只改文档不加守卫（下一版又会漂）；b) 守卫里写死 0.11.6（升版本即红）。
+  取 a/b 的反面：数字由常量派生，改名由工具派生。
+- **代价（明确接受）**：中文 README 的表述被拉平为 `key=value` 形式，可读性略降，但两份 README
+  现在可以共用一条断言。
