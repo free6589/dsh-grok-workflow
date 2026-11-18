@@ -5,6 +5,42 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.11.11] - 2026-11-18
+
+### Tests / 测试
+
+- **A parity guard for the two dictionaries in the browser bundle / 浏览器 bundle 里两本词典的键齐全性守卫** —
+  the bundle keeps two tables: the plugin's own `DICT` (settings page, progress tab) and
+  `PANEL_DICT` (registered under its own namespace for the re-registered stock run renderer).
+  Nothing compared them with the keys the code asks for, so a key typed into the wrong table —
+  or added to one language only — would render as a raw key with no test failing. The audit
+  found no defect today (137 keys in each plugin locale, 19 in each panel locale, both
+  symmetric; every literal, concatenated and dynamically built key resolves), so the round's
+  change is the guard: `test/i18n-parity.spec.ts` (6 its) checks locale symmetry in both
+  tables, rejects empty copy, resolves every literal `t('…')` in the source, resolves the keys
+  the code builds by concatenation (`unit.*`, `mode.*.title`/`.detail`, `option.mode.*`) and
+  every dynamic expansion the bundle can produce (`progress.stage.*`, `progress.field.*`,
+  `role.*`, `progress.derived.*`, `progress.source.*` from the plugin table; `status.*` and
+  `statusCount.*` from the panel table). A key that is missing from the plugin table must be
+  one of the six panel-scope keys, so a key that moves between tables fails loudly instead of
+  being excused by a blanket "exists somewhere". / bundle 里有两本词典：插件自己的 `DICT`
+  （设置页、进度页）与 `PANEL_DICT`（以独立命名空间注册，供重新注册的 stock run 渲染器使用）。
+  此前没有任何检查把这两本词典与代码实际请求的键对起来，所以把键写进错误的表、或只加到一个语言，
+  都会渲染成原始键而测试照旧全绿。本轮审计没有发现现成缺陷（插件每个语言 137 个键、面板每个语言
+  19 个键，两边都对称；字面、拼接与动态生成的键全部可解析），因此本轮的改动就是这个守卫：
+  `test/i18n-parity.spec.ts`（6 条）检查两本词典的语言对称性、拒绝空文案、解析源码里每一个字面
+  `t('…')`、解析拼接出来的键（`unit.*`、`mode.*.title`/`.detail`、`option.mode.*`）以及 bundle
+  能产生的每一种动态展开。插件表里缺失的键必须正好是那六个面板作用域的键，所以「键换到另一张表」
+  会直接把测试搞红，而不是被「某处存在」这种宽松断言放过。
+
+- The assertion can fail: removing one `zh` key (`unit.ms`) from the bundle makes two of the six
+  its red (`2 failed | 4 passed`), recorded as a deliberate mutation replay in
+  `.rsi/evidence/round-011/red.txt`; the file was restored immediately and the green run is
+  `6 passed` (`green.txt`). Suite: 56 files / 1015 tests. / 该断言确实会失败：从 bundle 里删掉
+  一个 `zh` 键（`unit.ms`）会让 6 条中的 2 条变红（`2 failed | 4 passed`），以**故意变异重放**
+  的形式记录在 `.rsi/evidence/round-011/red.txt`；文件随即还原，绿跑为 `6 passed`（`green.txt`）。
+  套件：56 文件 / 1015 测试。
+
 ## [0.11.10] - 2026-11-18
 
 ### Docs / 文档

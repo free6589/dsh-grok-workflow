@@ -1,0 +1,16 @@
+round 11 git evidence
+
+$ git log --oneline -1
+aae5847 test(i18n): guard both bundle dictionaries against the keys the code asks for (RSI round 11)
+
+$ git show --stat --oneline HEAD | tail -5
+ docs/knowledge/VALIDATION.md          |  24 +++
+ package-lock.json                     |   4 +-
+ package.json                          |   2 +-
+ test/i18n-parity.spec.ts              | 161 ++++++++++++++++
+ 21 files changed, 774 insertions(+), 30 deletions(-)
+
+$ git status --short --branch
+## main...origin/main [ahead 1]
+?? .rsi/evidence/round-011/git.txt
+?? settings-simple-mock.html

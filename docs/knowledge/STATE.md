@@ -1,6 +1,15 @@
 # Project State
 
-Last updated: 2026-11-18 (**RSI 连续循环 round 10 完成 · `0.11.10`** — 主题 P1-02：
+Last updated: 2026-11-18 (**RSI 连续循环 round 11 完成 · `0.11.11`** — 主题 P2-01：客户端 i18n 键
+齐全性。bundle 有两本词典（插件 `DICT` 与面板 `PANEL_DICT`），此前没有任何检查把它们与代码实际请求的
+键对起来。审计结论是**当前无缺陷**（插件每语言 137 键、面板 19 键，两表语言对称；字面/拼接/动态键全部
+在消费它的那张表里可解析），因此本轮交付的是守卫：`test/i18n-parity.spec.ts` 6 条，按作用域断言，
+并用一次变异重放证明它确实会红（删掉一个 `zh` 键 → `2 failed | 4 passed`，随即还原）。
+`npm run ci` exit 0：typecheck 0 错、lint 22w/0e、**56 文件 / 1015 测试 PASS**；tag `v0.11.11`。
+证据 `.rsi/evidence/round-011/`、`VALIDATION.md` Round 59、`D-065`。
+**P1/P2 待办已清零**；剩余 P3-01/P3-02 与 POOL 里带 `P ·` 的调用点条目。
+
+Previous update: 2026-11-18 (**RSI 连续循环 round 10 完成 · `0.11.10`** — 主题 P1-02：
 `docs/ARCHITECTURE.md` 的版本状态。审计发现 POOL 的字面措辞（「current version」）已不存在，但同类
 缺陷仍在：四处 `in this release` 无法落到版本，「resume 边界」只写了 DSH `0.2.1-rc.2` 而 round 8 已在
 `0.2.2-rc.3` 上复查过。现改为 `since **0.8.0**` / `as of **0.11.9**`，并把「实测版本」与「只做复查的

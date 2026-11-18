@@ -353,3 +353,44 @@ no history is rewritten, and no round is force-pushed.
 - **Evidence:** `.rsi/evidence/round-010/` — `stop-probes.txt` (shared), `red.txt`, `green.txt`,
   `typecheck.txt`, `ci.txt`, `git.txt`.
 - **status:** OK
+
+## Round 11 — P2-01 client i18n key parity (2026-11-18)
+
+- **STOP probe (round start):** `.rsi/tools/stop-probe.sh 11` → `round=11 … -> STOP ABSENT`.
+- **Read-first recon:** the bundle carries two dictionaries — the plugin's `DICT`
+  (`src/client/index.js:409`, exported as `GROK_WORKFLOW_DICT`) and `PANEL_DICT` (`:1445`,
+  registered as `grok-workflow-panel` at `:3624`). Panel call sites (`:1664` `statusCount.*`,
+  `:1726` `member.empty`, `:1790` `phase.*`, `:1835` `run.empty`) receive a translator bound to
+  `PANEL_DICT` (`:1556 panelTranslate`), so their keys are correct there and deliberately absent
+  from `DICT`.
+- **Audit result (no defect):** 137 keys per plugin locale, 19 per panel locale, both tables
+  symmetric (`leftOnly`/`rightOnly` empty), no empty copy; every literal `t('…')` key resolves,
+  every concatenated key (`unit.jobs|tasks|ms`, `mode.auto|full.title|.detail`,
+  `option.mode.triage|full`) resolves, and every dynamic expansion resolves in the table that
+  consumes it (`progress.stage.*` 7, `progress.field.*` 7, `role.*` 5, `progress.derived.*` 2,
+  `progress.source.*` 3 in `DICT`; `status.*` / `statusCount.*` 6+6 in `PANEL_DICT`).
+- **Change:** `test/i18n-parity.spec.ts` (6 its). A key missing from the plugin table must be one
+  of the six panel-scope keys, so a key that moves between tables fails instead of being excused
+  by "exists somewhere"; the panel dict is asserted symmetric on its own.
+- **Red → green:** `.rsi/evidence/round-011/red.txt` is a **deliberate mutation replay** — one
+  `zh` key (`unit.ms`) removed from the bundle → `2 failed | 4 passed`; the file was restored
+  immediately (`git diff --stat src/client/index.js` empty) and `green.txt` = `6 passed`.
+  The spec's own first run also failed on two of my shape assumptions (`progress.detailFields`
+  is a string array; the self-test passed dicts to a function expecting one) — test bugs, fixed
+  before the replay, and no product code was changed by them.
+- **Gates:** `npm run typecheck` exit 0 (`.rsi/evidence/round-011/typecheck.txt`); `npm run ci`
+  = `Test Files 56 passed` / `Tests 1015 passed` / lint 22 warnings 0 errors / exit 0
+  (`.rsi/evidence/round-011/ci.txt`).
+- **Version:** patch → `0.11.11` (`package.json` + `package-lock.json` together);
+  README published list rewritten (`published=36`).
+- **Evidence:** `.rsi/evidence/round-011/` — `red.txt`, `green.txt`, `typecheck.txt`, `ci.txt`,
+  `git.txt`, plus the shared `stop-probes.txt`.
+- **status:** OK
+
+## Backlog state after round 11
+
+- Pool P1 and P2 are now **empty**: P1-01/P1-02/P1-03 done, P2-01/P2-02 done.
+- Remaining pool items are P3-01 (settings page wording for the per-route cap and the deadline
+  field), P3-02 (progress detail rows for members with no reported facts), and the `P ·`-prefixed
+  call-site items (records.ts raw `error.message`, history.ts truncate-before-redact,
+  base64-PEM rule, and the six configuration fail-closed branches without tests).

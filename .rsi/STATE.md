@@ -1,7 +1,7 @@
 # RSI State (overwritten every round; keep under 100 lines)
 
-Updated: 2026-11-18T14:29+08:00 · round 10 complete · version `0.11.10` (tag `v0.11.10`) ·
-loop continues into the remaining pool
+Updated: 2026-11-18T14:34+08:00 · round 11 complete · version `0.11.11` (tag `v0.11.11`) ·
+P1/P2 pool empty, P3 and the `P ·` call-site items remain
 
 ## Facts
 
@@ -14,7 +14,8 @@ loop continues into the remaining pool
 - Round 7: `1760d50` (tag `v0.11.7`), 54 files / 999 tests PASS.
 - Round 8: `a045154` (tag `v0.11.8`), 54 files / 999 tests PASS.
 - Round 9: `596239a` (tag `v0.11.9`), P0-02 fixed — 54 files / 1006 tests PASS.
-- Round 10: P1-02 fixed (round 10 commit, tag `v0.11.10`) — **55 files / 1009 tests PASS**,
+- Round 10: `000a56e` (tag `v0.11.10`), P1-02 fixed — 55 files / 1009 tests PASS.
+- Round 11: P2-01 guarded (round 11 commit, tag `v0.11.11`) — **56 files / 1015 tests PASS**,
   0 type errors, lint 22 warnings / 0 errors.
 - P0-02 (`CONFIRMED`): the script records the plan-task group title (`任务 n · 标题`) as a
   worker/verifier `phase`, and the tab bound rows by `phase` alone, so `执行`/`检查` — the two
@@ -60,8 +61,9 @@ P1 — docs and version truth
 
 P2 — tests and reliability
 
-- P2-01 OPEN Settings client i18n: every key referenced by `src/client/index.js` exists in
-  both locales; a missing key renders as `—` and no guard notices. (medium / low / S) — next.
+- P2-01 done (round 11: audit found no defect — 137 plugin keys and 19 panel keys per locale,
+  both symmetric, every literal/concatenated/dynamic key resolves — so the round added the
+  guard `test/i18n-parity.spec.ts`, 6 its, proven to fail by a mutation replay).
 - P2-02 done (round 5: quoted Cookie headers, presigned signatures, PGP armor,
   `SECRET_KEY`/`PRIVATE_TOKEN`, env value termination, placeholder stability, `x-api-key`
   deep keys; docs + docs guard; 985 → 993 tests).
@@ -92,9 +94,9 @@ on a guess.
   was removed, skipped or loosened.
 - Consecutive failed rounds: 0. Consecutive valueless rounds: 0.
 
-## Final verification (round 10 tree)
+## Final verification (round 11 tree)
 
-- `npm run typecheck` exit 0 · `npm run ci` exit 0 — **55 files / 1009 tests PASS**, lint 22
+- `npm run typecheck` exit 0 · `npm run ci` exit 0 — **56 files / 1015 tests PASS**, lint 22
   warnings / 0 errors.
 - Evidence: `.rsi/evidence/round-009/typecheck.txt`, `ci.txt`, `red-ts.txt`, `green.txt`,
   `stop-probes.txt`.
@@ -103,16 +105,16 @@ on a guess.
 
 ## Loop status (this session)
 
-- Rounds 5–10 landed: P2-02 (5), P1-03 (6), tag inventory (7), live runtime (8), P0-02 (9),
-  P1-02 (10).
+- Rounds 5–11 landed: P2-02 (5), P1-03 (6), tag inventory (7), live runtime (8), P0-02 (9),
+  P1-02 (10), P2-01 (11).
   `.rsi/STOP` was absent at every round start, and from round 9 on that verdict is written to
   `.rsi/evidence/stop-probes.txt` and `.rsi/LOG.md` instead of being a prose claim.
 - The loop has **not** reached a permitted stop: no STOP file, no round limit, and the P1/P2
   backlog is not empty.
-- Remaining backlog, in pool priority order: P2-01 (settings client i18n key parity),
-  P3-01/P3-02 (settings wording, progress detail rows), plus the P-labelled call-site items in
-  `.rsi/POOL.md` (`records.ts` raw `error.message`, `history.ts` truncate-before-redact,
-  base64-PEM rule).
+- Pool P1 and P2 are **empty**. Remaining, in pool priority order: P3-01/P3-02 (settings
+  wording, progress detail rows), plus the `P ·` call-site items in `.rsi/POOL.md`
+  (`records.ts` raw `error.message`, `history.ts` truncate-before-redact, base64-PEM rule, the
+  six untested config fail-closed branches).
 
 ## Open decisions
 

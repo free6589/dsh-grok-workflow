@@ -55,6 +55,17 @@ here and are marked DONE when their commit lands.
 - P · `dedupeBilingual` deletes a deliberately repeated sentence from an answer (`:429`).
   H on intent. S / low.
 
+## Client i18n (`src/client/index.js`)
+
+- R11 DONE · the bundle's two tables (`DICT`, `PANEL_DICT`) were never compared with the keys the
+  code asks for, and the panel's copy is only reachable through its own translator. Audit at
+  `0.11.11`: 137 keys per plugin locale, 19 per panel locale, both symmetric, every literal /
+  concatenated / dynamic key resolves — no copy defect existed. Guard added:
+  `test/i18n-parity.spec.ts` (6 its, with a mutation replay proving it fails).
+  Evidence `.rsi/evidence/round-011/`.
+- P · `progress.notReported` is still the right answer for a stage with no rows and no evidence;
+  a future "declared but not started" distinction needs `meta.phases` (see the P0 item below).
+
 ## Progress panel (`src/progress-tab.ts`, `src/client/index.js`, `src/records.ts`)
 
 - P0 DONE · Execute/Verify printed `Not reported in the events` because rows were matched by

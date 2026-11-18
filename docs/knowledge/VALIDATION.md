@@ -3512,3 +3512,27 @@ round 8 已在 `0.2.2-rc.3` 上验证安装/激活/设置面。
 `npm run typecheck` exit 0。基线 v0.11.4 = 54/985。
 
 **STOP 探针（`CONFIRMED`）**：`.rsi/tools/stop-probe.sh 10` → `round=10 … -> STOP ABSENT`。
+
+## Round 59 — 2026-11-18 — P2-01 客户端 i18n 键齐全性（审计无缺陷，补守卫）（`CONFIRMED`）
+
+**结构（`CONFIRMED`）**：bundle 里有两本词典——插件的 `DICT`（`src/client/index.js:409`，导出为
+`GROK_WORKFLOW_DICT`）与 `PANEL_DICT`（`:1445`，在 `:3624` 以 `grok-workflow-panel` 命名空间注册）。
+面板调用点（`:1664` `statusCount.*`、`:1726` `member.empty`、`:1790` `phase.*`、`:1835` `run.empty`）
+拿到的是绑定 `PANEL_DICT` 的 translator（`:1556 panelTranslate`），因此它们的键**应当**只在面板表里。
+
+**审计（`CONFIRMED`，无缺陷）**：插件每语言 137 键、面板每语言 19 键，两表各自语言对称
+（`leftOnly`/`rightOnly` 皆空），无空文案；每个字面 `t('…')` 键可解析；每个拼接键
+（`unit.jobs|tasks|ms`、`mode.auto|full.title|.detail`、`option.mode.triage|full`）可解析；
+每种动态展开在**消费它的那张表**里可解析（`DICT`：`progress.stage.*` 7、`progress.field.*` 7、
+`role.*` 5、`progress.derived.*` 2、`progress.source.*` 3；`PANEL_DICT`：`status.*` / `statusCount.*`
+各 6）。
+
+**新增守卫（`CONFIRMED`）**：`test/i18n-parity.spec.ts`（6 条）。关键设计：插件表里缺失的键必须
+正好是那六个面板作用域键，所以「键换表」会把测试搞红，而不会被「某处存在」放过。
+
+**先红后绿（`CONFIRMED`）**：`.rsi/evidence/round-011/red.txt` 是**故意变异重放**——从 bundle 删掉一个
+`zh` 键（`unit.ms`）→ `2 failed | 4 passed`；随即还原（`git diff --stat src/client/index.js` 为空），
+`green.txt` = `6 passed`。全量 `npm run ci` = `Test Files 56 passed` / `Tests 1015 passed` /
+lint 22w 0e / exit 0，`npm run typecheck` exit 0。基线 v0.11.4 = 54/985。
+
+**STOP 探针（`CONFIRMED`）**：`.rsi/tools/stop-probe.sh 11` → `round=11 … -> STOP ABSENT`。

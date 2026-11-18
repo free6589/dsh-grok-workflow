@@ -1168,3 +1168,16 @@ Each entry records the decision, evidence, alternatives, and status.
 
 **代价**：每次发布若要更新 `as of` 就要改文档；`test/docs-architecture-version.spec.ts` 只钉住结构
 （有无相对措辞、有无 `since` 及其不超前于包版本），不钉具体日期，所以不会在版本 bump 时误红。
+
+## D-065 — i18n 守卫按「作用域」断言，不用「某处存在」放行（2026-11-18 · RSI round 11）
+
+**背景**：bundle 有两本词典（插件 `DICT` 与面板 `PANEL_DICT`），面板调用点拿到的是绑定
+`PANEL_DICT` 的 translator。若守卫只断言「键在任一表存在」，那么把一个键从插件表挪进面板表也能通过，
+而它实际会被错误的 translator 解析成原始键。
+
+**选择**：①两表各自语言对称；②插件表缺失的键必须**正好**等于六个面板作用域键（
+`member.empty`/`member.open`/`phase.empty`/`phase.unassigned`/`run.empty`/`statusCount.completed` 一类），
+多一个少一个都红；③拼接键与动态展开在**消费它的表**里断言；④加一条自检，证明比较函数在不对称输入
+下会返回差异（否则「两边都空」也能过）。
+
+**代价**：新增面板作用域键时需要同步更新白名单常量——这是有意的：那种改动必须被看见。

@@ -1,5 +1,20 @@
 # Agent Handoff
 
+## 2026-11-18 — RSI 连续循环：round 11 = P2-01 客户端 i18n 键齐全性（审计无缺陷，补守卫）
+
+- **From:** RSI 执行代理（agent-37）· **To:** 用户 / 后续接手代理
+- **审计（`CONFIRMED`）**：bundle 有两本词典——插件 `DICT`（`src/client/index.js:409`）与
+  `PANEL_DICT`（`:1445`，`:3624` 以独立命名空间注册）；面板调用点拿到的是绑定 `PANEL_DICT` 的
+  translator（`:1556`），所以它们的键只在面板表里是**正确**的。插件每语言 137 键、面板 19 键，
+  两表各自语言对称，字面/拼接/动态键全部在消费它的表里可解析——**没有现成缺陷**。
+- **交付（`CONFIRMED`）**：`test/i18n-parity.spec.ts`（6 条），按作用域断言；插件表缺失的键必须
+  正好是那六个面板作用域键，所以「键换表」会红而不是被放行。用变异重放证明它会失败：删掉一个
+  `zh` 键 → `2 failed | 4 passed`（`.rsi/evidence/round-011/red.txt`），随即还原，
+  `npm run ci` = **56 文件 / 1015 测试**。
+- **循环状态**：P1、P2 待办已清零；`.rsi/STOP` 不存在。下一轮从 P3-01（设置页每路由上限与
+  deadline 字段文案）或 POOL 里的 `P ·` 调用点条目里挑一个（`records.ts` 裸 `error.message`、
+  `history.ts` 先截断后脱敏、base64-PEM 规则）。
+
 ## 2026-11-18 — RSI 连续循环：round 10 = P1-02 ARCHITECTURE 版本状态锚定（已修）
 
 - **From:** RSI 执行代理（agent-37）· **To:** 用户 / 后续接手代理
