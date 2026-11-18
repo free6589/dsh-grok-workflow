@@ -1,0 +1,47 @@
+Round-14/15 — the shared working tree had drifted BEHIND the release commit
+Recorded: 2026-11-19T01:40+08:00, device agent-25
+
+HEAD was fd56fd9 (v0.11.15 released at 50c0321). The main working tree, not a clone,
+was missing content that HEAD already contained:
+
+  D .rsi/evidence/round-015/{ci.txt,git.txt,pre-release-ci.txt}   (whole directory absent)
+  M package.json          worktree said 0.11.14, HEAD says 0.11.15
+  M CHANGELOG.md          worktree lacked the [0.11.15] section
+  M .rsi/ROUND.md         worktree lacked the Round 15 section
+  M .rsi/STATE.md .rsi/LOG.md .rsi/ledger.jsonl
+  M README.md README.zh-CN.md docs/LOCAL-TESTING.md
+  M docs/knowledge/{HANDOFF,VALIDATION}.md
+
+Cause: round 15 (the v0.11.15 release) was prepared in an independent clone, precisely because
+this worktree had other writers' uncommitted work (its own ROUND.md entry says so). The clone was
+pushed; this worktree never received those files.
+
+Hazard if left alone: the next `git add -A && git commit` from this worktree would DELETE the
+round-015 evidence and revert the release metadata to 0.11.14 — silently undoing the very
+release that fixed the artifact.
+
+Classification (adds/dels of the worktree against HEAD, per file):
+
+  strictly behind (0 additions) — restored: .rsi/ROUND.md, .rsi/LOG.md, .rsi/ledger.jsonl,
+  CHANGELOG.md, docs/knowledge/HANDOFF.md, docs/knowledge/VALIDATION.md
+  pure version swaps — restored: package.json (0.11.14->0.11.15), package-lock.json,
+  README.md, README.zh-CN.md, docs/LOCAL-TESTING.md
+  recovered from HEAD: .rsi/evidence/round-015/ (3 files)
+
+  LEFT ALONE (they carry uncommitted additions from other agents, so restoring would destroy
+  work): .rsi/STATE.md (+84), docs/knowledge/STATE.md (+1/-29), DECISIONS.md (+70),
+  RESEARCH.md (+179), WORKFLOW-DESIGN.md (+2/-2). Their committer must merge these with HEAD,
+  not overwrite them.
+
+After the sync the tree is still green, at the released version:
+
+> dsh-grok-workflow@0.11.15 ci
+> dsh-grok-workflow@0.11.15 typecheck
+> dsh-grok-workflow@0.11.15 lint
+Found 22 warnings and 0 errors.
+> dsh-grok-workflow@0.11.15 verify:lib
+lib/ at fd56fd9 is the build of src/ at fd56fd9 (141 files, byte-identical)
+> dsh-grok-workflow@0.11.15 test
+> dsh-grok-workflow@0.11.15 build
+ Test Files  61 passed (61)
+      Tests  1133 passed (1133)
