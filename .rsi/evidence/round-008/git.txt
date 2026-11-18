@@ -1,0 +1,22 @@
+RSI round 8 — commit, tag, push (2026-11-18T14:19+08:00)
+
+$ git rev-parse HEAD
+a04515435e2abb6d2927458fe5801e128ba31367
+
+$ git log --oneline -4
+a045154 docs(runtime): verify activation on DSH 0.2.2-rc.3; record the model-backed run as blocked (RSI round 8)
+1760d50 docs(release): audit the whole tag inventory; name the one tag that is not a release (RSI round 7)
+88d133b fix(docs): LOCAL-TESTING named tarballs, a rejection and a notation it did not have (RSI round 6)
+bf0dc91 fix(redact): quoted cookies, presigned signatures, PGP armor, env value bounds (RSI round 5)
+
+$ git ls-remote origin refs/heads/main refs/tags/v0.11.8
+a04515435e2abb6d2927458fe5801e128ba31367	refs/heads/main
+1fd0682b786710aaa1eb23dbbcbc421673020bd5	refs/tags/v0.11.8
+
+$ git rev-parse v0.11.8^{commit}
+a04515435e2abb6d2927458fe5801e128ba31367
+
+$ git status --short --branch
+## main...origin/main
+?? .rsi/evidence/round-008/git.txt
+?? settings-simple-mock.html
