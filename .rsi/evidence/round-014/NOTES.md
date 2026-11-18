@@ -123,3 +123,54 @@ at 23:56 after the first CI run). The final `ci.txt` and `build-twice.txt` were 
 00:07 and 00:05 on the settled tree, and `test/loop.spec.ts` was re-run against the changed
 `src/loop.ts` (27/27) before the final gate. The mutation replays ran on a copy, never on the
 product source.
+
+---
+
+# Correction appended after the round-2 verification (agent-25, 2026-11-19T01:10+08:00)
+
+The verifier's FAIL is correct and this file's idempotence claim was too narrow.
+
+**What was wrong.** `build-twice.txt` proved that two consecutive `npm run build` runs on the
+*working tree* produce identical `lib/`. It did not prove that the *committed* `lib/` is the
+build of the *committed* `src/`, and it was not: at the tag commit `20eafea` and again at
+`81a76ec`, `lib/loop.js` contained 0 occurrences of `callSchedule` while `src/loop.ts`
+defined and called it 12 times. The v0.11.14 bundle therefore shipped without the
+`loop/schedule-refused` mapping. The round's `npm run ci` was green because `npm test` =
+`npm run build && vitest run` — it regenerates `lib/` and then tests the regenerated files, so
+it cannot see a stale artifact. Remote CI had always checked it (`git diff --exit-code --
+lib/`) and did fire: runs 44345615218 (CI), 44345622700 (Release v0.11.14), 44347643600 (CI).
+
+**Repairs, in order.**
+
+| commit | what it does |
+| --- | --- |
+| `8c8e367` (lead) | rebuilds `lib/loop.js`, `lib/loop.js.map`, `lib/loop.d.ts.map` so the committed artifacts match the released source — build output only, no source change |
+| `b0d6d10` (lead) | records the incident in `.rsi/ROUND.md`, `.rsi/STATE.md`, `docs/knowledge/{HANDOFF,VALIDATION}.md` |
+| `3c24f92` (this agent) | adds `scripts/verify-lib.mjs` + `npm run verify:lib`, wired into `npm run ci`: exports `HEAD`, rebuilds it in a scratch directory, byte-compares with `HEAD`'s `lib/`. Red on `81a76ec` (the same three files), green on `b0d6d10` and `3c24f92` (141 files). Plus the `[Unreleased]` changelog note and this evidence |
+
+**Measured state of the landed tree** (`CONFIRMED`, see `ci-landed.txt` / `build-twice-landed.txt`):
+clean clone of `3c24f92`, `npm run ci` exit 0 — typecheck clean, oxlint 22 warnings / 0 errors,
+`lib/ at 3c24f92 is the build of src/ at 3c24f92 (141 files, byte-identical)`, **60 files /
+1081 tests passed**. Two builds of that clone are byte-identical (141 files) and leave no
+tracked file changed. Remote CI on `main` for `3c24f92` is **success** (run 44354906962);
+the two preceding commits are green as well, so `main` is no longer red.
+
+**Test count, honestly.** The baseline I measured myself — pristine archive of `81a76ec`,
+`npx vitest run` — is 60 files / 1081 tests. The landed tree is 60 / 1081. Equal, not
+increased: the +4 tests written after that commit (2 route cases for the 413/409 answers,
+3 anchor regressions minus 1, `test/loop.spec.ts` 27 → 30) are **still uncommitted** in the
+working tree, owned by other agents of this round. No test was deleted, skipped or loosened
+(`grep -rnE "\b(it|test|describe)\.(skip|only|todo)\(" test/` → 0).
+
+**Still uncommitted when this note was written** (not mine to land; each needs its author's
+"done", and each must be committed together with a rebuilt `lib/`): the `loopRrule` anchor fix
+in `src/loop.ts` (ceil + one interval, with 3 regression tests), the 413/409 route cases in
+`test/loop-surface.spec.ts` + `src/loop-surface.ts`, the bilingual schema descriptions in
+`src/config.ts` / `test/config.spec.ts`, and the in-flight `src/loop-brakes.ts` / `src/gate.ts`
+brake feature. `verify:lib` will fail on the next commit that lands source without its build —
+that is the guard working, not a false alarm.
+
+**NOT_RUN, unchanged.** A real heartbeat delivery, the HTTP switch / `grok_loop` tool end to
+end, a live unload deleting rows, and the release workflow's tag validation. `v0.11.14` has no
+GitHub Release and its tag still carries the stale bundle; per the lead's recorded decision the
+tag is not moved, and the corrected artifact ships in the next patch release.
