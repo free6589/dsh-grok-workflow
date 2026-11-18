@@ -5,6 +5,36 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.11.4] - 2026-11-18
+
+### Fixed / 修复
+
+- **Settings-page scalar count said seven, the code enforces eight / 设置页标量数写成七个，代码实际是八个** —
+  `CONFIG_KEYS` carries nine keys with only `roles` non-scalar, so the scalar settings are
+  `toolName`, `mode`, `grokDefault`, `synthesis`, `maxConcurrency`, `maxTasks`, `timeoutMs`,
+  `configVersion` (8); both READMEs said seven and now say eight. `test/types/js-yaml.d.ts`
+  adds a local `declare module 'js-yaml'` shim (minimal `load` signature) so
+  `npm run typecheck` passes without a new dependency, without moving `js-yaml` to
+  `dependencies`, and without `ts-ignore` (TS7016). / `CONFIG_KEYS`
+  九项中只有 `roles` 是非标量，标量应为 `toolName`、`mode`、`grokDefault`、`synthesis`、
+  `maxConcurrency`、`maxTasks`、`timeoutMs`、`configVersion` 共 8 个；两份 README 都写成七个，
+  现已改为八个。`test/types/js-yaml.d.ts` 以本地 `declare module 'js-yaml'`
+  垫片（含最小 `load` 签名）修通 `npm run typecheck`（TS7016），未新增依赖、
+  未把 `js-yaml` 移入 `dependencies`、未使用 `ts-ignore`。
+
+### Tests / 测试
+
+- `test/docs-config-keys.spec.ts` (+4): the configuration-surface size both READMEs state
+  must equal `CONFIG_KEYS.length`, every YAML config example must load via `resolveConfig`,
+  and the chain limit / role count must quote the enforced `50 routes` with none of the stale
+  `three routes` / `four role chains` wording (plus a hard-limit-table row pinning the
+  `50`); the 4 new `it` blocks are untouched by the
+  typecheck fix. / 两份 README 声明的配置面大小必须等于 `CONFIG_KEYS.length`、
+  每个 YAML 配置示例必须经 `resolveConfig` 载入通过、链上限与角色数必须引用实际执行的
+  `50 routes` 且不得残留 `three routes` / `four role chains` 旧表述（另加硬上限表行级钉住
+  `50`）；修 typecheck 时
+  未改动新增的 4 个 `it` 断言。
+
 ## [0.11.3] - 2026-11-18
 
 ### Fixed / 修复

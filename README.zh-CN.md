@@ -28,7 +28,7 @@
 | **每条消息前面都有一张前台** | `agent/pre-step` 闸门认领每条用户消息，前台选一档——`直答档`、`快手档`、`团队档` 或 `确认档`——并在答案第一行写明档位与理由。完整「规划→执行→验证」工作流只在**团队档**运行；不会静默退回普通直接回答。 |
 | **按会话开启，且如实相告** | `grokDefault: off` 意味着一个会话在 `/grok` 开启之前就是普通聊天；`/grok off` 再关掉。写不进去的开关会被报成失败，而不是被当成已生效。 |
 | **按角色选模型** | `roles.planner`、`roles.worker`、`roles.verifier`、`roles.synthesizer` 各带自己的模型。 |
-| **每角色有序备用链** | 每个角色最多三条路由；路由级失败会推进该角色的链，实际用到的路由会写进报告。 |
+| **每角色有序备用链** | 每个角色最多 50 条路由；路由级失败会推进该角色的链，实际用到的路由会写进报告。 |
 | **可操作的设置** | 导出的 `Config` **就是** DSH 设置页：字段是活值、未知键被拒绝并给出建议、链会对照运行时真实拥有的 provider 校验。 |
 | **工作流形状可选** | `mode: 'triage'`（默认）保留前台分流；`mode: 'full'` 恢复旧规则：每条被认领的消息都跑团队。 |
 
@@ -45,10 +45,10 @@ dsh --profile grok-workflow-dev --from-default-profile headless --dump-config
 然后安装插件：
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.11.3
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.11.4
 ```
 
-> `#v0.11.3` 是当前发布版本。请固定你真正想要的标签；省略标签会跟随 `main`，那不是发布版本。不要在 `plugin add` 之后再运行 `--from-default-profile`：它会重建 profile 并移除你刚装好的插件。
+> `#v0.11.4` 是当前发布版本。请固定你真正想要的标签；省略标签会跟随 `main`，那不是发布版本。不要在 `plugin add` 之后再运行 `--from-default-profile`：它会重建 profile 并移除你刚装好的插件。
 
 最后重启 profile，让 DSH 加载新插件：
 
@@ -64,7 +64,7 @@ bundle 行由 `dsh plugin add` 写入。重启后确认它确实被组合进去�
 dsh --profile grok-workflow-dev --dump-config | grep -A4 'grok-workflow'
 ```
 
-健康的行包含 `id: grok-workflow` 与 `name: dsh-grok-workflow`。启动时插件还会打印一行设置面诊断，例如 `settings surface: page auto-generated for "grok-workflow" (17 field(s), …)`。
+健康的行包含 `id: grok-workflow` 与 `name: dsh-grok-workflow`。启动时插件还会打印一行设置面诊断，例如 `settings surface: page auto-generated for "grok-workflow" (9 field(s), …)`。
 
 **进了组合图 ≠ 被激活。** 插件注入 `workflowEngine`，而 Web 应用层默认禁用了工作流 provider，所以在 `dsh web` 上上面那行必要但不充分：
 
@@ -78,7 +78,7 @@ dsh --profile grok-workflow-dev --dump-config | grep -A4 'grok-workflow'
 
 四条校验才能证明它真的激活了：启动日志没有 `pending (waiting for service: workflowEngine)`、`POST /api/settings/describe` 里出现 `grok-workflow` 命名空间、插件页出现 **Grok workflow** 卡片、真实会话的工具列表里有 `grok_workflow`。完整流程（包括如何把"在跑的实例"迁到新构建、哪一步需要你授权）见 [`docs/LOCAL-TESTING.md`](docs/LOCAL-TESTING.md#activate-in-an-existing-live-profile--needs-the-operators-authorisation)。
 
-**Grok workflow** 卡片就是设置页：17 个可编辑字段、四条角色链（每角色最多 3 条）、4 个只读结构性字段并给出原因；非法输入在到达 Host 之前就被拦下，保存后对下一条消息生效。
+**Grok workflow** 卡片就是设置页：八个标量设置、五条角色链（每角色最多 50 条）、以及显示为只读并给出原因的结构性字段；非法输入在到达 Host 之前就被拦下，保存后对下一条消息生效。
 
 
 ## 试一试
@@ -166,14 +166,13 @@ DSH 启动后，直接提问即可：
         - { provider: my-provider, model: backup-worker }
       verifier: [{ provider: my-provider, model: strict-verifier }]
       synthesizer: []          # 空 = 继承父级路由
-    synthesis: deterministic   # 或 model（需要 synthesizer 路由），或 layered（核验报告仍是事实来源）
-    switchOn: [rate-limit, timeout, server-error]   # 空 = 内置策略
+    synthesis: layered        # 或 model（需要 synthesizer 路由）；layered 时核验报告仍是唯一事实来源
 ```
 
 - **路由级失败推进备用链**：`rate-limit`、`server-error`、`connection`、`timeout`、`model-unavailable`、`format-error`、`agent-start-failed`。
 - **内容类失败永不推进**：`task-failed` 与 `verification-failed` 会在同一路由上重试，因为换个模型看到的还是同样的证据。
 - 链耗尽时该任务报 `worker failed on every route: [class] reason`，绝不会被静默报成成功。
-- 配置在载入时即校验：一个角色超过三条路由、同一链内重复路由、模型为空或过长、`switchOn` 写了未知类别、`synthesis: model` 却没有 synthesizer 路由——都会带原因被拒绝。
+- 配置在载入时即校验：同一链内超过 50 条路由、同一链内重复路由、模型为空或过长、`synthesis: model` 却没有 synthesizer 路由——都会带原因被拒绝。
 - 实际用到的路由写在报告（`routing`）与答案里，因此“配了但没生效”不会看起来像“已经可用”。
 
 ## 失败告诉你什么
@@ -267,7 +266,7 @@ dsh plugin --profile grok-workflow-dev remove dsh-grok-workflow
 | 每任务重试 | 1 | 3 |
 | 每次运行任务 | 6 | 12 |
 | 并发工作流运行 | 2 | 4 |
-| 每角色链路由数 | 0（继承） | 3 |
+| 每角色链路由数 | 0（继承） | 50 |
 | 每次运行台账条数 | 64 | 256 |
 
 插件复用 DSH 的工作流引擎与子代理，不替换 DSH 的 agent 循环，也不绕过其审批与工具策略。
@@ -284,13 +283,13 @@ dsh plugin --profile grok-workflow-dev remove dsh-grok-workflow
 
 ## 版本与发布说明
 
-本仓库声明的包版本是 `0.11.3`。需要安装或回退到某个已发布版本时，在地址后加标签：
+本仓库声明的包版本是 `0.11.4`。需要安装或回退到某个已发布版本时，在地址后加标签：
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.11.3
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.11.4
 ```
 
-只使用 GitHub 上确实存在的标签。已发布：`v0.1.0`、`v0.2.0`、`v0.2.1`、`v0.2.2`、`v0.2.3`、`v0.2.4`、`v0.2.5`、`v0.2.6`、`v0.2.7`、`v0.3.0`、`v0.4.0`、`v0.5.0`、`v0.5.1`、`v0.6.0`、`v0.7.0`、`v0.8.0`、`v0.9.0`、`v0.9.1`、`v0.9.2`、`v0.9.3`、`v0.9.4`、`v0.10.0`、`v0.10.1`、`v0.10.2`、`v0.11.0`、`v0.11.1`、`v0.11.2`、`v0.11.3`。未固定版本的命令跟随 `main`，不会固定到发布版本。版本规则与回退流程见[更新日志](CHANGELOG.md)与[发布指南](docs/RELEASING.md)。
+只使用 GitHub 上确实存在的标签。已发布：`v0.1.0`、`v0.2.0`、`v0.2.1`、`v0.2.2`、`v0.2.3`、`v0.2.4`、`v0.2.5`、`v0.2.6`、`v0.2.7`、`v0.3.0`、`v0.4.0`、`v0.5.0`、`v0.5.1`、`v0.6.0`、`v0.7.0`、`v0.8.0`、`v0.9.0`、`v0.9.1`、`v0.9.2`、`v0.9.3`、`v0.9.4`、`v0.10.0`、`v0.10.1`、`v0.10.2`、`v0.11.0`、`v0.11.1`、`v0.11.2`、`v0.11.3`、`v0.11.4`。未固定版本的命令跟随 `main`，不会固定到发布版本。版本规则与回退流程见[更新日志](CHANGELOG.md)与[发布指南](docs/RELEASING.md)。
 
 ## 测试与开发
 

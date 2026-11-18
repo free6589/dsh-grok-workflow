@@ -28,7 +28,7 @@ You do not write a workflow script. Install the plugin, restart your profile, an
 | **A front desk in front of every message** | An `agent/pre-step` gate claims each user message and the front desk picks a tier — `direct`, `quick`, `team` or `ask` — stating the tier and its reason on the answer's first line. The full plan→execute→verify workflow runs on the `team` tier; nothing falls back silently to ordinary direct answering. |
 | **Opt-in per session, honest about it** | `grokDefault: off` means a session chats normally until `/grok` turns the workflow on for it; `/grok off` turns it back. A toggle that cannot be persisted is reported as a failure instead of being claimed. |
 | **Per-role model choice** | `roles.planner`, `roles.worker`, `roles.verifier`, `roles.synthesizer` each carry their own model. |
-| **Ordered fallback chains per role** | Up to three routes per role; a route-level failure advances that role's chain and the routes actually used are recorded in the report. |
+| **Ordered fallback chains per role** | Up to 50 routes per role; a route-level failure advances that role's chain and the routes actually used are recorded in the report. |
 | **Operable settings** | The exported `Config` *is* the DSH settings page: live values, unknown keys rejected with a suggestion, chains validated against the providers the runtime really has. |
 | **Pluggable workflow shape** | `mode: 'triage'` (default) keeps the front desk; `mode: 'full'` restores the older rule where every claimed message runs the team. |
 
@@ -45,10 +45,10 @@ dsh --profile grok-workflow-dev --from-default-profile headless --dump-config
 Then install the plugin:
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.11.3
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.11.4
 ```
 
-> `#v0.11.3` is the current release. Pin the tag you actually want; omitting it follows `main`, which is not a release. Do not run `--from-default-profile` after `plugin add`: it replaces the profile and removes the plugin you just installed.
+> `#v0.11.4` is the current release. Pin the tag you actually want; omitting it follows `main`, which is not a release. Do not run `--from-default-profile` after `plugin add`: it replaces the profile and removes the plugin you just installed.
 
 Then restart the profile so DSH loads the new plugin:
 
@@ -64,7 +64,7 @@ The bundle row is added by `dsh plugin add`. After restarting, confirm it is com
 dsh --profile grok-workflow-dev --dump-config | grep -A4 'grok-workflow'
 ```
 
-A healthy row includes `id: grok-workflow` and `name: dsh-grok-workflow`. At startup the plugin also logs one diagnostics line about its settings surface — for example `settings surface: page auto-generated for "grok-workflow" (17 field(s), applies live, …)`.
+A healthy row includes `id: grok-workflow` and `name: dsh-grok-workflow`. At startup the plugin also logs one diagnostics line about its settings surface — for example `settings surface: page auto-generated for "grok-workflow" (9 field(s), applies live, …)`.
 
 **Composed is not activated.** The plugin injects `workflowEngine`, and the Web app ships its workflow provider disabled, so on `dsh web` the row above is necessary but not sufficient:
 
@@ -78,7 +78,7 @@ A healthy row includes `id: grok-workflow` and `name: dsh-grok-workflow`. At sta
 
 Four checks prove it is really active: the startup log has no `pending (waiting for service: workflowEngine)` line, `POST /api/settings/describe` lists the `grok-workflow` namespace, the Plugins page shows a **Grok workflow** card, and a real session's tool list contains `grok_workflow`. The full procedure — including how to move a running instance onto a new build, and which step needs your authorisation — is in [`docs/LOCAL-TESTING.md`](docs/LOCAL-TESTING.md#activate-in-an-existing-live-profile--needs-the-operators-authorisation).
 
-The **Grok workflow** card opens the settings page: 17 live fields, the four role chains (up to three routes each), and four structural keys shown read-only with the reason. Invalid input is refused before it reaches the Host, and a save applies to the next message.
+The **Grok workflow** card opens the settings page: eight scalar settings, the five role chains (up to 50 routes each), and the structural keys shown read-only with the reason. Invalid input is refused before it reaches the Host, and a save applies to the next message.
 
 
 ## Try it
@@ -173,14 +173,13 @@ Give each role its own ordered chain. A route is `{ provider, model }`, and a ba
         - { provider: my-provider, model: backup-worker }
       verifier: [{ provider: my-provider, model: strict-verifier }]
       synthesizer: []          # empty = inherit the parent route
-    synthesis: deterministic   # or: model (requires a synthesizer route), or layered (verified report stays the source of fact)
-    switchOn: [rate-limit, timeout, server-error]   # empty = built-in policy
+    synthesis: layered        # or: model (requires a synthesizer route); layered keeps the verified report the only source of fact
 ```
 
 - **Route failures advance the chain**: `rate-limit`, `server-error`, `connection`, `timeout`, `model-unavailable`, `format-error`, `agent-start-failed`.
 - **Content failures never do**: `task-failed` and `verification-failed` are retried on the same route, because another model would be looking at the same evidence.
 - A chain that runs out reports `worker failed on every route: [class] reason` on that task; it is never silently reported as success.
-- Configuration is validated at load: more than three routes, duplicate routes in one chain, an empty or over-long model id, an unknown `switchOn` class, or `synthesis: model` without a synthesizer route are all refused with a reason.
+- Configuration is validated at load: more than 50 routes in one chain, duplicate routes in one chain, an empty or over-long model id, or `synthesis: model` without a synthesizer route are all refused with a reason.
 - The routes actually used are in the report (`routing`) and in the answer, so “configured but not in effect” cannot look like “working”.
 
 ## What a failure tells you
@@ -199,7 +198,7 @@ The rendered answer adds a `Failures: 1 infrastructure, 1 quality` line, so a pr
 
 ## Configuration reference
 
-Configuration belongs to the profile's `cordis.patch.yml` (or a `--patch` overlay), under the bundle row. Since `0.10.0` the surface is exactly eight keys; anything else is rejected at load, so a stale patch fails loudly instead of looking like a setting that does nothing:
+Configuration belongs to the profile's `cordis.patch.yml` (or a `--patch` overlay), under the bundle row. The surface is exactly nine keys (`timeoutMs` joined in `0.11.0`); anything else is rejected at load, so a stale patch fails loudly instead of looking like a setting that does nothing:
 
 ```yaml
 - id: grok-workflow
@@ -277,7 +276,7 @@ automatic only for plans whose tasks declare paths.
 | Retries per task | 1 | 3 |
 | Tasks per run | 6 | 12 |
 | Active workflow runs | 2 | 4 |
-| Routes per role chain | 0 (inherit) | 3 |
+| Routes per role chain | 0 (inherit) | 50 |
 | Ledger entries per run | 64 | 256 |
 
 The plugin reuses DSH's workflow engine and subagents. It does not replace DSH's agent loop or bypass its approval and tool policies.
@@ -294,13 +293,13 @@ The plugin reuses DSH's workflow engine and subagents. It does not replace DSH's
 
 ## Versions and release notes
 
-The package version in this repository is `0.11.3`. Install or roll back to an exact release with a tag suffix:
+The package version in this repository is `0.11.4`. Install or roll back to an exact release with a tag suffix:
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.11.3
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.11.4
 ```
 
-Use only a tag that exists on GitHub. Published: `v0.1.0`, `v0.2.0`, `v0.2.1`, `v0.2.2`, `v0.2.3`, `v0.2.4`, `v0.2.5`, `v0.2.6`, `v0.2.7`, `v0.3.0`, `v0.4.0`, `v0.5.0`, `v0.5.1`, `v0.6.0`, `v0.7.0`, `v0.8.0`, `v0.9.0`, `v0.9.1`, `v0.9.2`, `v0.9.3`, `v0.9.4`, `v0.10.0`, `v0.10.1`, `v0.10.2`, `v0.11.0`, `v0.11.1`, `v0.11.2` and `v0.11.3`. The unpinned command follows `main` and does not pin a release. See the [changelog](CHANGELOG.md) and the [release guide](docs/RELEASING.md) for the versioning and rollback rules.
+Use only a tag that exists on GitHub. Published: `v0.1.0`, `v0.2.0`, `v0.2.1`, `v0.2.2`, `v0.2.3`, `v0.2.4`, `v0.2.5`, `v0.2.6`, `v0.2.7`, `v0.3.0`, `v0.4.0`, `v0.5.0`, `v0.5.1`, `v0.6.0`, `v0.7.0`, `v0.8.0`, `v0.9.0`, `v0.9.1`, `v0.9.2`, `v0.9.3`, `v0.9.4`, `v0.10.0`, `v0.10.1`, `v0.10.2`, `v0.11.0`, `v0.11.1`, `v0.11.2`, `v0.11.3` and `v0.11.4`. The unpinned command follows `main` and does not pin a release. See the [changelog](CHANGELOG.md) and the [release guide](docs/RELEASING.md) for the versioning and rollback rules.
 
 ## Testing and development
 
