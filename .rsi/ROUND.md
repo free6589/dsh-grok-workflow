@@ -394,3 +394,15 @@ no history is rewritten, and no round is force-pushed.
   field), P3-02 (progress detail rows for members with no reported facts), and the `P ·`-prefixed
   call-site items (records.ts raw `error.message`, history.ts truncate-before-redact,
   base64-PEM rule, and the six configuration fail-closed branches without tests).
+
+## Loop stop (2026-11-18)
+
+- **Reason:** P1/P2 backlog empty — a permitted stop. `.rsi/STOP` absent at every round start;
+  no round limit reached.
+- **Final verification:** `npm run typecheck` exit 0 (`.rsi/evidence/final-typecheck.txt`);
+  `npm run ci` exit 0 with `Test Files 56 passed` / `Tests 1015 passed` / lint 22 warnings
+  0 errors (`.rsi/evidence/final-ci.txt`); `npm run build` exit 0 with an empty
+  `git diff -- lib/` (`.rsi/evidence/final-build.txt`, `final-lib-idempotent.txt`);
+  37/37 tag objects identical to the remote, 0 non-ancestors, HEAD == `origin/main`.
+- **Baseline:** v0.11.4 = 54 files / 985 tests; the loop added 2 files and 30 tests and removed
+  none (`grep -rnE "\.(skip|todo|only)\(" test/ src/` is empty).

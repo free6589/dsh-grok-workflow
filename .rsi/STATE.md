@@ -107,14 +107,14 @@ on a guess.
 
 - Rounds 5–11 landed: P2-02 (5), P1-03 (6), tag inventory (7), live runtime (8), P0-02 (9),
   P1-02 (10), P2-01 (11).
-  `.rsi/STOP` was absent at every round start, and from round 9 on that verdict is written to
-  `.rsi/evidence/stop-probes.txt` and `.rsi/LOG.md` instead of being a prose claim.
-- The loop has **not** reached a permitted stop: no STOP file, no round limit, and the P1/P2
-  backlog is not empty.
-- Pool P1 and P2 are **empty**. Remaining, in pool priority order: P3-01/P3-02 (settings
-  wording, progress detail rows), plus the `P ·` call-site items in `.rsi/POOL.md`
-  (`records.ts` raw `error.message`, `history.ts` truncate-before-redact, base64-PEM rule, the
-  six untested config fail-closed branches).
+- **Stopped on a permitted condition: the P1/P2 backlog is empty.** Every P1 and P2 item in
+  `.rsi/POOL.md` is DONE. `.rsi/STOP` was absent at every round start (recorded per round in
+  `.rsi/evidence/stop-probes.txt` and the STOP section of `.rsi/LOG.md`), and the bounded list
+  was exhausted rather than a round limit being hit.
+- Remaining, outside P1/P2: P3-01 (settings page wording for the per-route cap and the deadline
+  field), P3-02 (progress detail rows for members with no reported facts), and the `P ·`
+  call-site items (`records.ts` raw `error.message`, `history.ts` truncate-before-redact,
+  base64-PEM rule, six untested config fail-closed branches).
 
 ## Open decisions
 

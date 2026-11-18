@@ -31,3 +31,16 @@ the probe file is the evidence.
 Rounds 0–8 ran the same test but only wrote the verdict as prose in `.rsi/STATE.md`; that is
 the recording gap a review named on 2026-11-18. History is not rewritten here: from round 9 on
 the probe leaves the two artifacts above, and `.rsi/tools/stop-probe.sh` is the only writer.
+
+## Loop stop (2026-11-18, after round 11)
+
+The loop stops here, and the reason is one of the three the task allows: **the P1/P2 backlog is
+empty**. `.rsi/STOP` is absent (`.rsi/evidence/stop-probes.txt`, rounds 9–11), no round limit was
+reached (11 rounds against a bounded list), and every P1 and P2 item in `.rsi/POOL.md` is DONE —
+P1-01 (round 1), P1-03 (round 6), P1-02 (round 10), P2-02 (round 5), P2-01 (round 11). What
+remains is P3 (UX wording, progress detail rows) and the `P ·`-prefixed call-site items, which
+are neither P1 nor P2.
+
+Final state: HEAD `6ff6373`, tag `v0.11.11`, `npm run typecheck` exit 0, `npm run ci` exit 0
+with **56 files / 1015 tests**, build idempotent (empty `git diff -- lib/`), 37/37 tag objects
+identical to the remote, every peel an ancestor of `main`.
