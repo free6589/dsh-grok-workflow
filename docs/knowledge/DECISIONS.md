@@ -1181,3 +1181,216 @@ Each entry records the decision, evidence, alternatives, and status.
 下会返回差异（否则「两边都空」也能过）。
 
 **代价**：新增面板作用域键时需要同步更新白名单常量——这是有意的：那种改动必须被看见。
+
+## D-066 — 预设缺口：第一条心跳由操作者手动建，循环会话不得假设自己能建定时任务（2026-11-18 · preset gap）
+
+- **Status:** CONFIRMED（证据为本地实测；本条记录的是选择本身，本机未创建任何定时任务，
+  见「操作者授权」）
+
+**背景**：无人值守循环要靠一条定时任务（心跳）把下一轮推起来，而「跑循环的那个会话」往往是最省的
+`minimal` 预设，它既不声明 `dsh-tool-schedule`，也不声明 `time-context`。缺口有两条候选解法：
+①操作者在有能力的环境里手动建第一条心跳（Automation tasks 页「Create manually」，或
+`standard`/`cordis`/`ptc` 会话）；②打开循环开关时先提示切到带 `schedule_*` 的预设，再由本会话自己建。
+（同轮另有一份实现在给配置面加 `loopEnabled`/`loopMaxRounds`——见 `src/config.ts` 的 `CONFIG_KEYS`；
+本条约束的正是那个开关在会话缺 `schedule_*` 时该怎么做。）
+
+**选择**：选 ①。循环会话只负责**报告**——有工具时报缺心跳/心跳到期，没工具时明说自己建不了，然后停下。
+建第一条心跳是操作者的动作，不是循环的动作。
+
+**理由**：
+
+1. **插件改不了预设。** 工具注册在挂载作用域上，预设决定哪个作用域被注册
+   （`dsh-tool-schedule/src/index.ts:4`："a preset decides which…"）。本仓库只能通过 bundle patch 挂载
+   自身，不能替别的预设加工具，AGENTS.md 也禁止改 DSH core。所以 ② 的「提示」永远只是提示，最终动手的
+   仍是人——它比 ① 多一道拒绝，没少一次人工。
+2. **② 会把「没人拥有」留在开着的状态。** 开关显示 ON，而没有任何人能建、能读、能停那条心跳，
+   与 AGENTS.md 的「No ownerless background work」直接冲突。
+3. **预设是继承的，第一跳决定整条链。** 模型创建的会话沿用创建者的 cwd 与预设
+   （`dsh-tool-schedule/src/index.ts:244` 的工具描述、`docs/tool-catalog.md:1688`、
+   `docs/user/guide/schedule.md`）。跳错一次就是
+   永久错：`minimal` 连 `schedule_list` 都没有，链条没有自愈通道。① 的第一跳落在**默认预设**上
+   （同文档：手动创建的会话「uses the default preset」），天然是有能力的那一档。
+4. **① 是唯一可审计的。** Automation tasks 页跨会话列出全部任务，可创建、编辑、运行、暂停、恢复、
+   删除；② 把「能不能调度」变成会话的一个属性，在事件流里查不到。
+
+**循环会话本身不得被假设能建定时任务**（这一条是给未来实现的约束，任一条成立即不得假设）：
+
+- (a) `minimal` 预设既无 `tool-schedule` 也无 `time-context`。实测 DSH `0.2.2-rc.3` 的
+  `node_modules/@deepseek-ai/dsh-web-app/presets/minimal.patch.yml`（78 行）只有
+  persona / fs / compaction / persistent-shell 四组，`schedule` 与 `clock` 均无命中；
+  `presets/standard.patch.yml:19,38` 才有 `time-context` 与 `tool-schedule`。
+- (b) 委派子代理即使预设暴露了这四个工具，每个工具都会拒绝它
+  （`dsh-tool-schedule/src/index.ts:292`："A delegated subagent cannot use scheduled tasks…"）。
+- (c) 没有 `time-context` 就没有当前时间与浏览器时区，模型连「下一次什么时候」都不该猜。
+
+正确行为是**报缺口并停**，不是换个说法假装建好了。
+
+**一条必须写明的边界**：心跳送达的消息不是用户消息——它带 `source: { kind: 'schedule' }`
+（`dsh-schedule/src/index.ts:723`、`dsh-schedule/src/runtime.ts:353`），而本插件的 gate 只认
+`source.kind === 'user'`（`src/gate.ts:474`；`docs/ARCHITECTURE.md` 的分类白名单同样把 schedules 列为
+pass through）。所以心跳本身不会启动一次 workflow，它只给会话一个回合，跑不跑由该回合的模型调用决定。
+**「开关 ON」永远不等于「循环在跑」**——这正是 ① 必须由人显式拥有、而不是由插件猜的原因。
+
+**操作者授权**：本条只记录「二选一 + 理由」，由本轮任务文本授权；**手动创建第一条心跳属于操作者动作，
+本轮不代为执行**（`NOT_RUN`，与 `.rsi/PROTOCOL.md`「需要操作者授权的步骤一律跳过并记录」一致）——
+本机本轮没有创建、修改或删除任何定时任务。若将来把 ① 写进产品（循环开关在缺工具时直接给出
+「去 Automation tasks 建一条」的指引），那段文案是 `src/` 改动，需要自己的测试与单独一轮主题，
+不在本条范围内。
+
+**备选与不选的理由**：②「提示切预设」被排除，理由见上 1–4。第三条备选「插件自带一个调度器」违反
+AGENTS.md（不得 fork 或重实现 DSH 的循环与生命周期），并会在宿主之外多出一个没人拥有的定时器——
+ownerless 的反面不是「插件拥有一切」。第四条备选「用 `new` 目标每跳新建会话」只改投递语义、不改预设
+继承：每一跳照样继承创建者的预设，还让每轮换工作目录与会话，审计面更大。
+
+**代价（明确接受）**：① 让无人值守的启动多一步人工动作，表面上与「无人值守」相反；但那一步恰好是唯一
+能被看见、能被撤销的一步。② 的「顺滑」是错觉——省下的那次点击，会在第一次心跳缺失时以「循环静默停摆」
+的形式还回来，而停摆时没有日志、没有报错，只有一份写着 ON 的开关。
+
+**失效条件**：若 DSH 将来给 `minimal` 加上 `tool-schedule` 与 `time-context`，(a) 失效，应新开一条
+supersede 本条，而不是就地改这条——理由与证据必须留在同一条记录里。
+
+**证据索引**：本节的事实细节与同轮的研究记录 `docs/knowledge/RESEARCH.md` **A24**（心跳式迭代）逐条
+一致；其中 preset 清单、`source.kind`、目标继承三处，本轮用各自的 `grep`/`sed` 在 DSH `0.2.2-rc.3`
+安装内自测过（不是转抄）。A24 另外记了两条本条没有依赖、但同样成立的结论：心跳最快 60 秒一次；
+定时轮次不经过 `carryover`，所以拿不到跨轮摘要。
+
+## D-067 — 心跳轮次：摘要写进 prompt、上一轮未闭合就跳过、BLOCKED 达阈值就带摘要停（2026-11-18 · heartbeat）
+
+- **Status:** CONFIRMED（判定逻辑与 14 条测试为本地实测；真机投递 `NOT_RUN`，见「边界」）
+
+**背景**：RSI 循环要无人值守地继续，而「谁来推下一轮」有现成答案——一条定时任务（心跳）。A24 已经把
+投递事实测清了：定时消息带 `source.kind = "schedule"`，本插件 gate 让它直通，`carryover` 不覆盖它，
+所以心跳轮次既不会自动跑 workflow，也拿不到跨轮摘要。剩下四个必须做的选择是本文的范围。
+
+**选择一：上一轮的摘要由 prompt 自己携带，不改 carryover。** 心跳模板里 `{{LAST_ROUND_SUMMARY}}`
+由守卫从 `.rsi/STATE.md` 头、`.rsi/ledger.jsonl` 末行、`HANDOFF.md` 最新标题、`.rsi/ROUND.md` 尾段
+拼出。备选是把 `schedule` 轮次也纳入 `carryover`——被排除：那摘要的语义是「本会话此前的轮次」，而循环
+的连续性按**仓库记录**算，会话归档既可能被 compaction 截断，也会把心跳自己写进去形成自指。
+
+**选择二：上一轮未闭合就 `SKIP`，不开新一轮。** 「未闭合」= 尾部 `## Round N` 段没有
+`- **status:**`，或报告/台账互不对应，或有 tracked 改动。备选是「接着把上一轮做完」——被排除：
+PROTOCOL 的一轮一主题不允许两个主题共用一份报告，而且「把别人的半成品改完」正是 Git 里最容易
+把未验证改动当已验证提交的动作。跳过只花一次心跳，不花一轮。
+
+**选择三：连续 3 轮 `BLOCKED`（或同一未闭合信号被跳过 3 次）就带摘要停。** 阈值来自
+`DEFAULT_LOOP_FAIL_STREAK = 3`；`--max-rounds` 默认 **0（不设上限）**，因为插件的
+`DEFAULT_LOOP_MAX_ROUNDS = 10` 属于它的 repeat-run 面，拿来卡本循环会在第 11 轮把它停掉——那是
+一个安静的错误。备选「不限次数地跳过」被排除：60 分钟一次的心跳在无人处理时正是最贵的形态，
+停必须是一次能被看见的事件，所以停的时候要打印摘要（轮次、主题、code、人的下一个动作）。
+
+**选择四：默认 60 分钟。** DSH 的投递下限是一分钟（`docs/user/guide/schedule.md:24`），排队中/运行中
+的投递会被拒绝或合并（`:53`），重启后只补最近一次（`:80`）。60 分钟既不触发合并，也让一轮
+（自测 + 写记录）有时间落地。
+
+**边界（本轮不做的事）**：不实现循环——没有新的 `setInterval`、没有嵌套 workflow、没有改 `src/`；
+不创建定时任务（D-066 ①）；不在日志里写文件内容（守卫只写 verdict/code/计数）。`finish-round.py`
+只会记 `OK`，所以 BLOCKED 轮次的两处手写（ROUND.md 的 `- **status:** BLOCKED` 与 ledger 的
+`"status": "BLOCKED"`、`tag` 为空）写进了模板，缺一处守卫就判未闭合。
+
+**代价（明确接受）**：① 跳过意味着「上一轮没闭合」会以一次心跳的空转形式暴露，而不是被自动修掉——
+这正是想要的可见性；② 阈值停会让循环在真正卡住时彻底停下、需要人来重启，比「一直重试」少烧额度；
+③ 摘要限行（18 行 + 末行台账 + 标题）意味着极长的轮次只能被部分引用，但 prompt 要求本轮先去
+读 STATE/LOG/HANDOFF 原文，摘要不是唯一信息源。
+
+**失效条件**：若将来 `carryover` 明确覆盖 `schedule` 轮次，选择一应被新条 supersede；若
+`finish-round.py` 学会记 `BLOCKED` 并打标签，选择三里的「两处手写」段落应删去而不是留着。
+
+**证据索引**：`docs/knowledge/RESEARCH.md` A25（判定优先级、tracked-only 判据、`status: OK` 写死、
+`--prompt` 纯读、60 分钟三条文档依据）；实现 `.rsi/HEARTBEAT.md`、
+`.rsi/tools/heartbeat-guard.sh`、`test/heartbeat-guard.spec.ts`（14 条）。
+
+
+## D-068 — 操作者授权：先落 P4 的续跑面，再回头做 P3 的两条 UX（2026-11-18 · 顺序授权）
+
+- **Status:** CONFIRMED（授权来源是本轮任务文本；被授权的工作已在本轮落地并可复核。本条只记录
+  **顺序**，不记录任何质量门的放宽）
+- **决策类型:** 顺序 / 授权边界
+
+**背景**：本轮开始时在册的待办只有两类——P3 的两条 UX（P3-01 设置页逐路由上限与死线字段的文案、
+P3-02 进度页「没有报告事实的成员」详情行），以及续跑（repeat-run）面。续跑在
+`.rsi/incoming/github-demand-audit-2026-11-18.md:92` 的分级里属 **P4**（原话：
+「**P4** deferred by explicit decision or blocked on an external surface」）：它要 Host 的 Schedule
+服务才能存在，而本插件不拥有、也不能替宿主实现那条能力（AGENTS.md 禁止 fork DSH 的循环与生命周期）。
+按 `.rsi/PROTOCOL.md` 第 2 条的优先级（P0 > 文档/版本 > 测试 > UX > **新功能** > 删减/重构），
+P3-01/P3-02 本应先做，续跑这一条本应排在它们之后。
+
+**选择**：本轮**先做 P4 的续跑面，P3-01/P3-02 保持 OPEN**，并在 `.rsi/STATE.md` 的待办池里保留原编号
+与状态，不因本轮落地而改写它们的优先级。
+
+**授权**：顺序由操作者通过本轮任务文本显式授权（任务标题「Docs changelog memory update and release」、
+目标「Write bilingual README and CHANGELOG, record P4-before-P3 operator authorization in DECISIONS,
+refresh STATE/HANDOFF/VALIDATION, then commit push and tag」）。授权的**范围只有顺序**：
+
+- 它没有放宽任何质量门：`npm run ci` 全绿、逐条证据、双语 CHANGELOG、README 中英同步、
+  不移动/不覆盖已发布 tag、不发布 npm——全部照旧（本轮执行结果见 `.rsi/ROUND.md` Round 14）。
+- 它没有把 P3 判为不需要，也没有授权跳过 P3：两条仍在池里，编号不变。
+- 它没有授权「以后都按这个顺序」。下一轮若没有新的顺序授权，`PROTOCOL` §2 的默认优先级重新生效。
+
+**为什么不选另一条路（先做 P3-01/P3-02）**：本轮任务已经点名要落续跑面，而续跑面的代码、测试与
+研究记录（`src/loop.ts`、`src/loop-surface.ts`、`test/loop.spec.ts` 27 条、`test/loop-surface.spec.ts`
+13 条、`docs/knowledge/RESEARCH.md` A24/A25、DECISIONS D-066/D-067）已经在本轮之前的同一棵工作树里
+写完且未提交。把它们晾着、转去做两条 P3 文案，会让「已验证但未提交」的改动继续压在树上——那正是
+`.rsi/tools/heartbeat-guard.sh` 判 `dirty-tracked` 的原因，也是 AGENTS.md「结束时留下 working state」
+要避免的形态。第三条备选「拆成两轮、先提交代码再补文档」被排除：发布纪律要求用户可见变更与它的
+CHANGELOG/版本在同一次发布里（AGENTS.md「Release and version discipline」）。
+
+**代价（明确接受）**：P3 的两条 UX 缺陷多存在一个发布周期；续跑面先落地意味着它的文档必须先写好
+（本轮 README 两语种新增「Repeat runs」一节，就是为了不让「代码有了、说法没有」成为新的 P1 文档缺陷）。
+
+**失效条件**：操作者若改为「P3 优先」，本条应被新条 supersede；本条不构成对之后任何轮次顺序的约束。
+
+**证据索引**：分级定义 `.rsi/incoming/github-demand-audit-2026-11-18.md:92`；协议优先级
+`.rsi/PROTOCOL.md` §2；P3 两条的原编号 `.rsi/STATE.md`「Pool」；本轮落地与门禁
+`.rsi/ROUND.md` Round 14、`.rsi/evidence/round-014/`。
+
+## D-069 — 续跑面归谁：一行 Schedule、用户才能开、上限靠 `COUNT`、关闭靠删除（2026-11-18 · round 14）
+
+- **Status:** CONFIRMED（服务语义、路由与工具的 40 条测试为本地实测；真机投递 `NOT_RUN`，
+  没有创建任何定时任务）
+
+**背景**：四个 `loop*` 键自设置面落地起就「存着但没人读」。把它们接上一个驱动时，有四个
+DSH 不会替我们决定的问题：**归谁**（定时器由谁持有）、**谁能开**、**什么数量算停**、**关闭是什么**。
+本轮把它们一次定死，以免下一个人按自己的直觉补出第二套语义。
+
+**选择一：归 Host 的 Schedule，本插件不持有 timer。** 一条循环 = 一条 `rrule` 任务（标题
+`Loop heartbeat`、文案前缀 `[grok-workflow loop]`、目标 `session` = 本会话）。理由：AGENTS.md 的
+「No ownerless background work」与「不得重实现 DSH 生命周期」；DSH 的 Schedule 已拥有持久记录、
+timer、准入、投递、补投与归档策略。`src/loop.ts` 因此只有 `create`/`catalog`/`edit` 三个调用，
+不开任何 interval。备选「插件自带一个 setInterval 驱动」被排除：它会在宿主之外多出一个没人拥有、
+也无法被 Automation tasks 页看见的定时器。
+
+**选择二：只有用户能开。** 判定不是权限字符串，而是 DSH 自己的调用形态：浏览器请求不带
+`actorSessionId`，工具的 `execute` 一定带。于是 `open(request)` 对任何**已定义**的 actor 抛
+`loop/user-only`，路由（`POST /grok-workflow/loop`）不带 actor 所以能开，`grok_loop` 工具的
+`open` 在设计上被拒绝，只留 `status`/`close`。备选「让模型也能开」被排除：那等于让被投递出来的
+那一轮给自己续命，循环将没有外部主人（与 D-066 同一条理由的另一种形态）。
+
+**选择三：停靠三样东西，只有一样是宿主强制的。** ① 轮数上限写进 RRULE 的 `COUNT`——调度自己结束，
+行留 `ended`，下次 open 替换；② 连败轮数是文案里的指令，因为投递回执只证明收件箱写入、不证明这一轮
+做成了，所以不假装有计数器；③ 间隔取 `max(60, ceil(timeoutMs/60000), loopIntervalMin)` 并封顶七天，
+`loopIntervalMin` 只能抬高下限（`0` = 用下限，不是「立刻」）。备选「插件自己记账失败轮数」被排除：
+它必须从投递回执推断成败，那是猜测而不是事实。
+
+**选择四：关闭 = 删行，不是暂停。** 暂停的行仍是一条存着的心跳，仍需要一个主人；卸载时
+`stopAll`、会话停止/归档时 `forgetSession` 都会删掉自己拥有的行，删除被宿主拒绝时只记 warn，
+不把它报成干净的关闭。备选「关闭 = `active: false`」被排除，理由同上。
+
+**一条必须写明的现状（不是选择，是事实）**：本仓库的客户端 bundle 只渲染设置页的四个字段，
+**没有任何已发布的 UI 代码去调那条路由**（`grep -rn "grok-workflow/loop" src/` 只有一处命中：
+`src/loop.ts:56` 的常量；路由注册在 `src/loop-surface.ts:125` 引用该常量，`src/client/index.js`
+没有任何 `fetch`/路由调用点）。所以今天的用户可达路径就是那条 POST；
+输入框旁的开关是**未实现的后续工作**，README 与 CHANGELOG 因此都不写「已有开关」，只写设置页的
+分组与那条路由。把它写进产品（在设置页或输入框旁加一个真正会 POST 的控件）需要自己的测试与
+单独一轮主题，不在本轮范围。
+
+**代价（明确接受）**：① 用户要打开循环得走一条 API 请求，直到那个控件出现；② 连败停在宿主侧不可
+强制，只能靠文案，模型不遵守就不会停——轮数上限是唯一的硬止损，所以它必须存在；③ 删行意味着
+「暂停一下」不提供，重开就是重新算锚点。
+
+**失效条件**：DSH 若给 Schedule 增加「失败轮数」或「投递结果」的持久字段，选择三的 ② 应被新条
+supersede，而不是就地改成计数器；客户端出现真正的开关控件时，本条「现状」一段应删去并指向那条
+控件所在的轮次。
+
+**证据索引**：`src/loop.ts`（策略、规则、行选择、清理）、`src/loop-surface.ts`（工具 + 路由 +
+生命周期）、`test/loop.spec.ts`（27 条）、`test/loop-surface.spec.ts`（13 条）、
+`test/heartbeat-guard.spec.ts`（14 条，守卫侧）、README「Repeat runs」、CHANGELOG `[Unreleased]`。

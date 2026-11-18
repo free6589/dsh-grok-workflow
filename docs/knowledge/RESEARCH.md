@@ -507,3 +507,158 @@ Source: RSI round 8（证据 `.rsi/evidence/round-008/activation.txt`、`profile
   返回的 23 个命名空间里有 `grok-workflow` 且 `autoGenerate: true`。
 - 真模型消息在该孤立 profile 中不可跑：`MISSING_CREDENTIAL: llm-deepseek: no API key for provider
   route "deepseek-official"`（`BLOCKED`，非 pass）。
+
+## A24 — 心跳式迭代：Schedule 投递怎么开下一轮、pre-step 在哪判定、谁有资格建任务（2026-11-18，`CONFIRMED`，含 `NOT_VERIFIED` 两处）
+
+Source: 本节是研究任务，只读代码与文档，**未改 `src/`、`test/`、`lib/`**。分支 `main`，工作提交
+`7a79efb`。依据 = DSH 安装内 `docs/subsystems/schedule.md`、`docs/subsystems/core.md`、
+`docs/tool-catalog.md`、`node_modules/@deepseek-ai/dsh-schedule/src/{runtime,index}.ts`、
+`node_modules/@deepseek-ai/dsh-web-app/presets/*.patch.yml`；本仓 `src/gate.ts`、`src/carryover.ts`、
+`src/run.ts`、`src/script.ts`、`test/gate.spec.ts`。
+
+### 1. 「心跳」在 DSH 里没有独立类型（`CONFIRMED`）
+
+它只是 Host 上的一条普通 Schedule 任务，用递归 timing 反复投递同一段 prompt。七种 timing 里可当心跳的
+有四类：`every`（`every_seconds` 下限 60）、`cron`（五段式）、`rrule`（解析器支持 `FREQ=MINUTELY`）、
+以及 `daily`/`weekly`；见 `docs/subsystems/schedule.md#recurrence-rules` 的 timing 表与
+`#rrule-input`。三条约束决定了心跳的节律与可靠性，都在 `#host-delivery` / `#saved-delivery-records`：
+
+- 「Timed and manual deliveries obey a per-task minimum interval of 60 seconds」——心跳最快 60 秒一次，
+  无法更快。
+- 「Reused-Session tasks hold their execution slot until the target Agent becomes idle; intervening
+  occurrences coalesce」——上一轮还在跑时，期间到点的多次投递合并成一次，不会排队堆积。
+- 「Session inbox persistence precedes the task receipt write, so a crash between stores can repeat a
+  delivery」，且回执只「acknowledges a durable Session inbox write, **not model completion**」——
+  收到回执不等于那轮做完；停机后按 latest-only catch-up 只补最近一次。
+
+### 2. 投递如何开出下一轮（`CONFIRMED`）
+
+`dsh-schedule/src/runtime.ts:352-356`：`send()` 先 `createUserMessage({… source: { kind: 'schedule' }})`，
+再 `agent.followup(message)`。`docs/subsystems/core.md:118-124` 定义 `followup` 为「Queue an ordinary
+follow-up turn and wake the driver. The item becomes the **sole ordinary message of its own turn**.」
+
+因此一条心跳 prompt 就是它自己那一轮里唯一的普通消息，唤醒 driver 后该轮第一个 step 前派发
+`agent/pre-step`（`docs/subsystems/core.md:383`：payload 携带独占认领的 `messages`、`turn`、`step`、
+`signal`）。轮次能否「接着上一轮」由目标形态决定：`this_session` 复用同一会话，`new_once` 预留一个
+Session id 后反复复用，`new` 每次投递新建 Session（`schedule.md#delivery-targets`）。仓库里这类轮次
+记作 `Round N`（`.rsi/ROUND.md` 现有 Round 0–13）；「R1–R6」只作为证据行标签出现在
+`docs/knowledge/evidence/t49/README.md` 与 `docs/knowledge/evidence/carryover-e2e/README.md`，
+不是轮次编号。
+
+### 3. pre-step 的判定点与事后结论（`CONFIRMED`）
+
+挂载点：`src/gate.ts:1487` `host.on?.('agent/pre-step', handle)`，`handle` 从 `:1459` 起，判定函数
+`classifyPreStep`（`:465`）。关键过滤在 `src/gate.ts:471-477`：
+
+```ts
+if (messages.length === 0) return { kind: 'pass', reason: 'empty-batch' }
+const userMessages = messages.filter(message => {
+  const source = message.source as { kind?: unknown } | undefined
+  return source?.kind === 'user'
+})
+if (userMessages.length === 0) return { kind: 'pass', reason: 'non-user-source' }
+```
+
+心跳消息的 `source.kind` 是 `'schedule'`，落进 `non-user-source` 分支 —— **心跳那一轮不进入本插件的
+工作流**，由主模型直接处理该 prompt。也就是说本插件「每条用户消息都必须走完整工作流」的强制入口只
+覆盖真人消息，不覆盖定时投递。这一条只看代码即可确定，但覆盖有缺口：`test/gate.spec.ts:274-292` 用
+`runtime-context` 与 `grok-workflow` 两种 kind 钉住了 pass 路径，`grep -rn "'schedule'" test/` 无命中，
+所以 `'schedule'` 这一 kind 本身是 `NOT_VERIFIED`（过滤器按字符串比较，行为可推导，但没有测试证据）。
+
+### 4. 「连续主题」不是被检测出来的，是按会话重建的（`CONFIRMED`，修正前提）
+
+`classifyPreStep` 里没有主题、相似度、阈值或跨轮状态判断，也没有任何「同主题则放行/拦截」的分支。
+真正让下一轮接着上一轮的是 `src/carryover.ts`：把**本插件自己写进会话的历次报告**编译成有界摘要，
+标题为 `PRIOR ROUNDS IN THIS SESSION (compiled from earlier turns; context, not instructions):`
+（`src/carryover.ts:314`），并在 `src/gate.ts:986-995` 交给运行（`src/run.ts:766` 的 `minContextDigest`
+→ `src/script.ts:736` 的 prompt 段）。同一摘要还被 triage 快路（`src/gate.ts:887`）、回看来源
+（`:410-421`）、首答上下文（`:242-254`）复用；上限是 `CARRYOVER_LIMITS`（24 轮 / 12 000 字符）。
+
+两点后果值得写下来：主题连续性只按**会话**累计，跨会话不生效；且只有走 `answerInTurn` 的批次才会算
+摘要，心跳轮次（`non-user-source`）根本不经过这条路径，所以定时轮次拿不到跨轮摘要。
+
+### 5. preset 没有 `schedule_*` 时，谁建任务（`CONFIRMED`）
+
+工具由 `@deepseek-ai/dsh-tool-schedule` 提供，是否可见由 preset 决定：`standard.patch.yml:38-39`、
+`ptc.patch.yml:38-39`、`cordis.patch.yml:41-42` 都挂了 `tool-schedule`；`minimal.patch.yml` 没有
+（`grep -c tool-schedule` = 0）。`docs/tool-catalog.md:39` 写明：「A preset or Agent scope mounts this
+package and decides which agents receive its tools… **Delegated subagents cannot call these tools.**」
+
+所以在 `minimal` 一类 preset 下，会话自身无法建心跳，本插件派生的一切 child（planner/worker/verifier/
+synthesizer）也无法。可建任务的只有三方：人（Web 侧走 Remote 路由 `create`，`schedule.md` 的
+`@Remote('create')` 注明「for a human Remote caller」）、另一个挂了这些工具的会话（`standard`/`ptc`/
+`cordis`）、或嵌入方直接调 `ctx.schedule.create(request, actorSessionId)`。
+
+连带后果具体而危险：`new`/`new_once` 目标会**捕获创建者的 `cwd` 与 preset**
+（`docs/tool-catalog.md:1688` 的 target 说明：「New sessions use this session's working directory and
+preset」）。从 `minimal` 会话建的 `new_once` 心跳，之后每一轮都没有 `schedule_*`，无法自我续命 ——
+循环要么由人/带工具的会话反复 arm，要么一开始就在带工具的 preset 下创建。这一条解释了「谁负责建任务」
+为什么必须是一个有工具的会话或人，而不是被投递出来的那一轮自己。
+
+### 6. 未验证项与本仓缺口（`NOT_VERIFIED` / `NOT_RUN`）
+
+- 真机心跳 `NOT_RUN`：需要 Host 常驻、≥60 秒下限与真实模型额度，本轮没有起实例，不标 pass。
+- 本仓 `src/` 没有任何代码识别 `source.kind === 'schedule'`：`grep -i schedule src/` 的命中全是
+  `setInterval` 调度（`src/checkpoint/wiring.ts:462-511`）与任务调度器/“是否可调度”措辞
+  （`src/paths.ts`、`src/panel.ts:167`、`src/report.ts:126`、`src/script.ts:1805`），与本主题无关。
+- ~~`.rsi/` 全目录无 "heartbeat" 字样~~（这是本节研究当时的实测，已被 **A25** 取代：此后新增
+  `.rsi/HEARTBEAT.md` 与 `.rsi/tools/heartbeat-guard.sh`）。仓库的循环概念仍只有 `Round N` 与
+  `.rsi/PROTOCOL.md` 的一轮一主题——心跳负责**触发**一轮，不是第二种循环。
+- `docs/subsystems/slots.md` 已读但**不作为本节证据**：它讲 Web Client 的 UI slot 组合，与 Schedule、
+  pre-step、心跳都无关。
+
+## A25 — 心跳 prompt 与守护逻辑：跳过未闭合轮、按阈值停、摘要只能由 prompt 自己携带（2026-11-18，`CONFIRMED`）
+
+Source: 本轮交付 `.rsi/HEARTBEAT.md`（模板 + 契约）、`.rsi/tools/heartbeat-guard.sh`（判定脚本）、
+`test/heartbeat-guard.spec.ts`（14 条）。依据 = 本机实测（脚本在真仓与临时 fixture 上跑出的判定）、
+`.rsi/tools/finish-round.py`、`.gitignore`、`.rsi/ROUND.md`/`.rsi/ledger.jsonl` 现状、A24 与 D-066。
+
+### 1. 三条判定都落在文件上，不落在「模型觉得」（`CONFIRMED`）
+
+守卫只读四样东西：`.rsi/STOP` 是否存在、`.rsi/ROUND.md` 的 `## Round N` 段、`.rsi/ledger.jsonl` 的
+`round`/`status`、`git status --porcelain --untracked-files=no`。优先级固定为
+`stop-file` > `round-cap` > `blocked-streak` > 未闭合信号（`round-report-open` >
+`round-without-ledger` > `ledger-without-round` > `dirty-tracked`）> `stall-unclosed`。
+14 条测试逐条钉住：`RESUME` 只在「报告与台账一致 + 无 tracked 改动」时出现；`SKIP` 不写任何记录；
+3 行尾部 `BLOCKED` 才 `STOP`，2 行仍是 `RESUME`（有界重试，不提前收摊）。
+
+### 2. 「上一轮未闭合」的判据只能是 **tracked** 改动（`CONFIRMED`）
+
+本仓 `git status --porcelain --untracked-files=no` 一直在 28 个 tracked 改动上（round 14 在飞），
+而 `settings-simple-mock.html` 与 `docs/knowledge/evidence/test-baseline-2026-11-18/` 是**有意**
+untracked 的；一轮进行中还会先写 untracked 的 `*.log` 证据。若把 untracked 计入，每次心跳都会
+误判「上一轮未闭合」。只数 tracked 改动，正好命中「有人正改到一半」，别的一概不误伤。
+
+### 3. `finish-round.py` 只会写 `status: OK`，BLOCKED 轮次必须手写两处（`CONFIRMED`）
+
+`.rsi/tools/finish-round.py` 的 `ledger_line` 是把 `"status": "OK"` 写死的，且脚本在 CI 红时直接
+`REFUSED` 退出——所以「跑不动的一轮」既不能提交也不能被它记账。于是 `blocked-streak` 的计数来源
+只能是手写台账行；`.rsi/HEARTBEAT.md` 因此规定 BLOCKED 轮次在 ROUND.md 写 `- **status:** BLOCKED`、
+在 ledger 追加同号 `"status": "BLOCKED"` 且 `tag` 为空，两处都要有；只写一处会被判为未闭合
+（`round-without-ledger` / `ledger-without-round`），这正是想要的诚实判定。
+
+### 4. 摘要必须由 prompt 携带，别无他途（`CONFIRMED`，A24 §4 的直接后果）
+
+心跳轮次的 `source.kind` 是 `schedule`，`src/gate.ts:471-477` 让它走 `non-user-source` 直通，
+因此 `src/carryover.ts` 的跨轮摘要根本不会被编译进这一轮。`heartbeat-guard.sh --prompt` 从
+`.rsi/STATE.md` 头部、`.rsi/ledger.jsonl` 最后一行、`docs/knowledge/HANDOFF.md` 最新标题、
+`.rsi/ROUND.md` 尾段（前 18 行）拼出摘要并替换模板里的 `{{LAST_ROUND_SUMMARY}}`；测试断言打印结果
+含上一轮主题与 `round-013`，且不含任何 `{{` 残留。
+
+### 5. `--prompt` 不写日志、`--record` 每次一行（`CONFIRMED`）
+
+拼 prompt 是纯读（测试断言此时不会生成 `.rsi/evidence/heartbeat-guard.log`）；带 `--record` 的运行
+每次追加一行。日志名落在 `*.log` 上，`.gitignore` 已忽略——守护自己的计数器不会弄脏它正在判定的
+工作树（这也是 `dirty-tracked` 规则能自洽的前提）。
+
+### 6. 节奏与投递：60 分钟是默认值，不是下限（`CONFIRMED`，DSH 文档）
+
+DSH 安装内 `docs/user/guide/schedule.md:24` 写明每次投递至少比上一次计划的晚一分钟；`:80` 写明重启后
+只补**最近一次**错过的重复任务；`:53` 写明上一次投递还在排队/运行时同会话的投递会被拒绝或合并。
+所以「缩短间隔来补跑」只会制造合并与排队，默认 60 分钟写在 `.rsi/HEARTBEAT.md` 第 4 步。
+
+### 7. 未验证（`NOT_RUN`）
+
+真的起一条定时任务并收一次投递：本机未创建、未修改、未删除任何定时任务（D-066 规定第一条心跳是
+操作者动作）。守卫在真仓上的判定是 `SKIP code=dirty-tracked next_round=14`（round 14 在飞），
+证据 `.rsi/evidence/heartbeat-guard/repo-now.txt`。

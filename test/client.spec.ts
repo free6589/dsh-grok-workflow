@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_MAX_CONCURRENCY, DEFAULT_MAX_TASKS, DEFAULT_TIMEOUT_MS, HARD_LIMITS, SWITCHABLE_CLASSES } from '../src/config.js'
+import { DEFAULT_LOOP_FAIL_STREAK, DEFAULT_LOOP_INTERVAL_MIN, DEFAULT_LOOP_MAX_ROUNDS, DEFAULT_MAX_CONCURRENCY, DEFAULT_MAX_TASKS, DEFAULT_TIMEOUT_MS, HARD_LIMITS, SWITCHABLE_CLASSES } from '../src/config.js'
 
 /**
  * The browser settings page is hand-written JavaScript (the host serves it verbatim in
@@ -241,17 +241,19 @@ describe('client settings page bundle', () => {
     expect(typeof bundle.apply).toBe('function')
   })
 
-  // T5 slim page: 4 visible FIELDS (grokDefault/mode/maxConcurrency/maxTasks)
-  // plus the 5 role chains equal the 9-leaf-key configuration surface
+  // T5 slim page plus the four repeat-run keys: 9 visible FIELDS
+  // (grokDefault/mode/maxConcurrency/maxTasks/timeoutMs and the four loop keys)
+  // plus the 5 role chains equal the 13-leaf-key configuration surface
   // (toolName/roles/synthesis/configVersion are structural, rendered nowhere).
-  // Number bounds mirror HARD_LIMITS (100) and the defaults (10); the suite
-  // pins all three so a quiet drift fails here instead of in the GUI.
-  it('renders the T5 visible keys: 5 fields plus the 5 role chains', () => {
-    expect(bundle.GROK_WORKFLOW_FIELDS.map(field => field.key).sort()).toEqual(
-      ['grokDefault', 'maxConcurrency', 'maxTasks', 'mode', 'timeoutMs'].sort())
+  // Number bounds mirror HARD_LIMITS (100 / 20) and the defaults (10 / 3 / 0); the
+  // suite pins all three so a quiet drift fails here instead of in the GUI.
+  it('renders the visible keys: 9 fields plus the 5 role chains', () => {
+    const visible = ['grokDefault', 'maxConcurrency', 'maxTasks', 'mode', 'timeoutMs',
+      'loopEnabled', 'loopMaxRounds', 'loopFailStreak', 'loopIntervalMin']
+    expect(bundle.GROK_WORKFLOW_FIELDS.map(field => field.key).sort()).toEqual(visible.slice().sort())
     expect(bundle.GROK_WORKFLOW_READ_ONLY).toEqual([])
     expect([...bundle.GROK_WORKFLOW_FIELDS.map(field => field.key), 'roles'].sort()).toEqual(
-      ['grokDefault', 'mode', 'maxConcurrency', 'maxTasks', 'timeoutMs', 'roles'].sort())
+      [...visible, 'roles'].sort())
   })
 
   it('keeps the numeric bounds identical to HARD_LIMITS', () => {
@@ -263,6 +265,12 @@ describe('client settings page bundle', () => {
       // any non-negative safe integer, so the page mirrors that instead of
       // inventing a ceiling the plugin would not enforce.
       timeoutMs: [0, Number.MAX_SAFE_INTEGER],
+      // Repeat-run caps are quota envelopes (each round is a full run), so the page
+      // shows the same bounds the schema clamps to. An interval spends no quota and
+      // therefore has no practical ceiling either; 0 starts the next round at once.
+      loopMaxRounds: [1, HARD_LIMITS.loopMaxRounds],
+      loopFailStreak: [1, HARD_LIMITS.loopFailStreak],
+      loopIntervalMin: [0, HARD_LIMITS.loopIntervalMin],
     }
     for (const [key, [min, max]] of Object.entries(expected)) {
       expect({ key, min: numeric.get(key)?.min, max: numeric.get(key)?.max }).toEqual({ key, min, max })
@@ -270,6 +278,9 @@ describe('client settings page bundle', () => {
     expect([...numeric.keys()].sort()).toEqual(Object.keys(expected).sort())
     expect(HARD_LIMITS.maxConcurrency).toBe(100)
     expect(HARD_LIMITS.maxTasks).toBe(100)
+    expect(HARD_LIMITS.loopMaxRounds).toBe(100)
+    expect(HARD_LIMITS.loopFailStreak).toBe(20)
+    expect(HARD_LIMITS.loopIntervalMin).toBe(10_080)
   })
 
   it('keeps the numeric defaults identical to src/config.ts', () => {
@@ -277,8 +288,16 @@ describe('client settings page bundle', () => {
     expect(defs.get('maxConcurrency')?.def).toBe(DEFAULT_MAX_CONCURRENCY)
     expect(defs.get('maxTasks')?.def).toBe(DEFAULT_MAX_TASKS)
     expect(defs.get('timeoutMs')?.def).toBe(DEFAULT_TIMEOUT_MS)
+    expect(defs.get('loopMaxRounds')?.def).toBe(DEFAULT_LOOP_MAX_ROUNDS)
+    expect(defs.get('loopFailStreak')?.def).toBe(DEFAULT_LOOP_FAIL_STREAK)
+    expect(defs.get('loopIntervalMin')?.def).toBe(DEFAULT_LOOP_INTERVAL_MIN)
+    // A loop is opt-in: the page's switch starts off, like the schema default.
+    expect(defs.get('loopEnabled')?.def).toBe(false)
     expect(DEFAULT_MAX_CONCURRENCY).toBe(10)
     expect(DEFAULT_MAX_TASKS).toBe(10)
+    expect(DEFAULT_LOOP_MAX_ROUNDS).toBe(10)
+    expect(DEFAULT_LOOP_FAIL_STREAK).toBe(3)
+    expect(DEFAULT_LOOP_INTERVAL_MIN).toBe(0)
   })
 
   it('keeps the per-route cap bounds identical to HARD_LIMITS', () => {
@@ -335,7 +354,7 @@ describe('client settings page: bilingual copy (t42)', () => {
       ...bundle.GROK_WORKFLOW_ROLES.map(role => `role.${role}`),
       ...bundle.GROK_WORKFLOW_GROUPS.map(group => `group.${group}`),
     ]
-    expect(derived.length).toBe(bundle.GROK_WORKFLOW_FIELDS.length + 5 + 3)
+    expect(derived.length).toBe(bundle.GROK_WORKFLOW_FIELDS.length + 5 + 4)
     for (const key of derived) {
       for (const locale of bundle.GROK_WORKFLOW_LOCALES) {
         // `translate` returns the key itself when nothing carries it: a missing entry is
@@ -356,6 +375,7 @@ describe('client settings page: bilingual copy (t42)', () => {
       { key: 'error.duplicate', params: { role: 'synthesizer', index: 3 } },
       { key: 'error.badCap', params: { role: 'worker', index: 1, min: 1, max: 64 } },
       { key: 'error.badEnum', params: { key: 'mode' } },
+      { key: 'error.badBoolean', params: { key: 'loopEnabled' } },
     ]
     for (const finding of findings) {
       for (const locale of bundle.GROK_WORKFLOW_LOCALES) {
@@ -792,6 +812,25 @@ describe('client settings page: reading, failure and retry', () => {
     expect(texts(view.run()).join('\n')).toContain(zhDict['field.maxConcurrency']!)
   })
 
+  it('renders the repeat-run rows with their labels in both languages', () => {
+    const loopKeys = ['loopEnabled', 'loopMaxRounds', 'loopFailStreak', 'loopIntervalMin']
+    for (const [locale, dict] of [['zh', zhDict], ['en', bundle.GROK_WORKFLOW_DICT['en']!]] as const) {
+      const { component, props } = mounted(faceFor(READY))
+      const tree = renderPage(component, {
+        ...props,
+        t: (key: string, params?: Record<string, unknown>) => translate(locale, key, params),
+      }).run()
+      const rows = walk(tree).filter(element => element.props['data-field'] !== undefined)
+      for (const key of loopKeys) {
+        expect(rows.some(row => row.props['data-field'] === key), `${locale} ${key}`).toBe(true)
+      }
+      const text = texts(tree).join('\n')
+      for (const key of ['group.loop', ...loopKeys.map(field => `field.${field}`)]) {
+        expect(text, `${locale} ${key}`).toContain(dict[key]!)
+      }
+    }
+  })
+
   it('offers no retry when the composition has no way to re-read', () => {
     const { component, props } = mounted(faceFor({ status: 'idle', view: undefined, error: 'socket closed' }))
     const tree = renderPage(component, props).run()
@@ -861,6 +900,18 @@ describe('client settings page: draft, validation and path ops', () => {
     expect(messagesIn(findings, zh).some(text => text.includes('选项'))).toBe(true)
     // A legal value still validates clean.
     expect(validate(draftOf(undefined))).toEqual([])
+  })
+
+  it('rejects a repeat-run switch that is not a real boolean', () => {
+    const bad = { ...draftOf(undefined), loopEnabled: 'on' }
+    const findings = validate(bad)
+    expect(findings).toEqual([{ key: 'error.badBoolean', params: { key: 'loopEnabled' } }])
+    expect(messagesIn(findings, en).some(text => text.includes('on or off'))).toBe(true)
+    expect(messagesIn(findings, zh).some(text => text.includes('开和关'))).toBe(true)
+    // Both real booleans validate clean, so the switch itself is never blocked.
+    for (const flag of [true, false]) {
+      expect(validate({ ...draftOf(undefined), loopEnabled: flag })).toEqual([])
+    }
   })
 
   it('keeps a chain the Host published and fills the roles the document omits', () => {
@@ -1013,6 +1064,10 @@ describe('client settings page: draft, validation and path ops', () => {
       maxConcurrency: 10,
       maxTasks: 10,
       timeoutMs: 3_600_000,
+      loopEnabled: false,
+      loopMaxRounds: 10,
+      loopFailStreak: 3,
+      loopIntervalMin: 0,
       roles: { planner: [], worker: [], verifier: [], synthesizer: [], supervisor: [] },
     })
     const view = {

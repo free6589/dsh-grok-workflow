@@ -32,7 +32,11 @@ Rounds 0–8 ran the same test but only wrote the verdict as prose in `.rsi/STAT
 the recording gap a review named on 2026-11-18. History is not rewritten here: from round 9 on
 the probe leaves the two artifacts above, and `.rsi/tools/stop-probe.sh` is the only writer.
 
-## Loop stop (2026-11-18, after round 11)
+## Loop stop (2026-11-18, after round 11) — VOID, see correction below
+
+(The original text is preserved for history. It claimed the P1/P2 backlog being empty
+was a permitted stop. The authorizing task text §§6–7 says backlog shape alone never
+stops the loop, and rounds 12–13 have since landed on `P ·`/docs themes, disproving it.)
 
 The loop stops here, and the reason is one of the three the task allows: **the P1/P2 backlog is
 empty**. `.rsi/STOP` is absent (`.rsi/evidence/stop-probes.txt`, rounds 9–11), no round limit was
@@ -44,3 +48,13 @@ are neither P1 nor P2.
 Final state: HEAD `6ff6373`, tag `v0.11.11`, `npm run typecheck` exit 0, `npm run ci` exit 0
 with **56 files / 1015 tests**, build idempotent (empty `git diff -- lib/`), 37/37 tag objects
 identical to the remote, every peel an ancestor of `main`.
+| 12 | 2026-11-18T15:40+08:00 | redaction call-site hardening (records 3×RAW + history truncate-before-redact); B12 fix unreported-timeout recovered, B13 no-delivery taken over | OK — `be64d56`, tag `v0.11.12`, pushed; 57 files / 1022 tests PASS; review d12 PASS | `.rsi/evidence/round-012/` | README test-count drift (366/22 vs 56/1015) as P1 docs round next |
+| 13 | 2026-11-18T21:45+08:00 | round-13 gate landing: README counts 366/22->1022/57 + NR-4/OQ-018 reconciliation note + tag/sync baseline + lib idempotence + live probe | OK — `7a79efb`, tag `v0.11.13`, pushed; gate 5/5 verified; ci 57/1022 PASS; review d13 PASS | `.rsi/evidence/round-013/` | P3-01/P3-02 or remaining P· items next |
+
+## Correction (2026-11-18): the "Loop stop (after round 11)" section above is VOID
+
+It is superseded by rounds 12–13 and contradicts the authorizing task text (§§6–7):
+backlog shape alone never stops the loop. A loop stop is valid ONLY when `.rsi/STOP`
+exists or one of PROTOCOL §7 items 2–7 holds. Rounds 12–13 prove continuation on
+`P ·`/docs themes; future rounds must read this correction before citing the old stop.
+| 14 | 2026-11-19T00:17+0800 | round 14: repeat-run (loop) surface + bilingual docs + release 0.11.14 (P4 before P3, D-068/D-069) | OK — {{TAG}}, {{CI}}; docs guard green; no runtime code touched by this task | `.rsi/evidence/round-014/` | P3-01/P3-02 are still open; the loop route has no shipped UI control (D-069) — that is its own src round |

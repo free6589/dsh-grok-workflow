@@ -1,7 +1,7 @@
 // Browser half of dsh-grok-workflow: the Settings → Plugins → "Grok workflow" page.
 //
 // Why this file exists at all (measured, t32): the Host serves this plugin's
-// namespace (`settings/describe` → ns "grok-workflow", autoGenerate: true, 17 volatile
+// namespace (`settings/describe` → ns "grok-workflow", autoGenerate: true, 21 volatile
 // fields) but the stock web client renders *no* page for a namespace on its own. Every
 // feature ships a client bundle that registers a `plugins.item` tab and is kept alive by
 // `configForms.whileServed([ns])`, so without one the plugin is invisible in the GUI
@@ -54,6 +54,15 @@ window.__ModuleLoader__.load({
       // max is Number.MAX_SAFE_INTEGER (no practical cap); the number widget
       // below steps within [min, max] and the schema rejects out-of-range input.
       { key: 'timeoutMs', group: 'limits', kind: 'number', min: 0, max: Number.MAX_SAFE_INTEGER, def: 3600000 },
+      // Repeat runs (the loop keys): one full run per round, so the round cap and
+      // the fail streak are the quota envelope. Bounds mirror HARD_LIMITS
+      // (loopMaxRounds 100, loopFailStreak 20, loopIntervalMin 10080 = seven days)
+      // and the defaults 10 / 3 / 0; 0 minutes asks for the loop's floor, not
+      // "start immediately". test/client.spec.ts pins all three against `src/config.ts`.
+      { key: 'loopEnabled', group: 'loop', kind: 'boolean', def: false },
+      { key: 'loopMaxRounds', group: 'loop', kind: 'number', min: 1, max: 100, def: 10 },
+      { key: 'loopFailStreak', group: 'loop', kind: 'number', min: 1, max: 20, def: 3 },
+      { key: 'loopIntervalMin', group: 'loop', kind: 'number', min: 0, max: 10080, def: 0 },
     ]
 
     // T5: the switchable-class picker is gone with `switchOn` (fixed internal
@@ -70,7 +79,7 @@ window.__ModuleLoader__.load({
     const ROUTE_INFLIGHT_MIN = 1
     const ROUTE_INFLIGHT_MAX = 64
 
-    const GROUPS = ['mode', 'roles', 'limits']
+    const GROUPS = ['mode', 'roles', 'limits', 'loop']
 
     // ---------------------------------------------------------------------------
     // Dictionaries. Keys are the contract between this table and every render site;
@@ -86,7 +95,7 @@ window.__ModuleLoader__.load({
 
     const EN = {
       'card.title': 'Grok workflow',
-      'card.summary': 'Decide how hard Grok works: a master switch, five role chains, and three limits.',
+      'card.summary': 'Decide how hard Grok works: a master switch, five role chains, the limits, and whether it repeats.',
 
       'page.intro': 'How Grok works for you.',
 
@@ -101,6 +110,7 @@ window.__ModuleLoader__.load({
       'group.mode': 'Master switch & mode',
       'group.limits': 'How much effort',
       'group.roles': 'Who does what',
+      'group.loop': 'Repeat runs',
 
       // T5 visible-field labels only (no hints, no Danger, no read-only).
       'field.mode': 'Mode',
@@ -109,12 +119,18 @@ window.__ModuleLoader__.load({
       'field.maxTasks': 'Splits per job',
       'field.timeoutMs': 'Run deadline (ms)',
       'field.timeoutMs.hint': '0 = unlimited (no timer).',
+      'field.loopEnabled': 'Repeat by default',
+      'field.loopMaxRounds': 'Rounds at most',
+      'field.loopFailStreak': 'Stop after failed rounds',
+      'field.loopIntervalMin': 'Minutes between rounds',
 
       // Page shows auto/full; stored values stay `triage`/`full` (T4/T5).
       'option.mode.triage': 'auto',
       'option.mode.full': 'full',
       'option.grokDefault.off': 'Off',
       'option.grokDefault.on': 'On',
+      'option.loopEnabled.off': 'Off',
+      'option.loopEnabled.on': 'On',
 
       'mode.auto.title': 'Auto pilot',
       'mode.auto.detail': 'Judge first, then call the team only when needed.',
@@ -152,6 +168,9 @@ window.__ModuleLoader__.load({
       'unit.jobs': 'jobs',
       'unit.tasks': 'tasks',
       'unit.ms': 'ms · 0 = unlimited',
+      'unit.rounds': 'rounds',
+      'unit.failures': 'in a row',
+      'unit.minutes': 'min',
       // One retry of the mirror read: the only recovery a failed `describe()` has.
       'action.retry': 'Try again',
 
@@ -238,6 +257,7 @@ window.__ModuleLoader__.load({
 
       'error.number': '{key} must be a whole number between {min} and {max} — fix the number and save again.',
       'error.badEnum': '{key} has a value the current options do not offer — pick one of the offered options and save again.',
+      'error.badBoolean': '{key} is either on or off — flip it and save again.',
       'error.chainTooLong': '{role} can keep at most {limit} backup routes — remove the extras.',
       'error.missingModel': '{role} entry {index} has no model — pick one or remove the row.',
       'error.tooLong': '{role} entry {index}: the channel/model text is over {limit} characters.',
@@ -247,7 +267,7 @@ window.__ModuleLoader__.load({
 
     const ZH = {
       'card.title': 'Grok workflow',
-      'card.summary': '定 Grok 下多大的力气：一个总开关，五条角色链，三个上限。',
+      'card.summary': '定 Grok 下多大的力气：一个总开关，五条角色链，几个上限，还有要不要自动接着跑。',
 
       'page.intro': 'Grok 怎么帮你干活，在这里定。',
 
@@ -261,6 +281,7 @@ window.__ModuleLoader__.load({
       'group.mode': '总开关和模式',
       'group.limits': '下多大力气',
       'group.roles': '谁来干',
+      'group.loop': '自动接着干',
 
       // T5 visible-field labels only (no hints, no Danger, no read-only).
       'field.mode': '模式',
@@ -269,12 +290,18 @@ window.__ModuleLoader__.load({
       'field.maxTasks': '一次拆几件',
       'field.timeoutMs': '运行死线（毫秒）',
       'field.timeoutMs.hint': '0 = 不限时（不设 timer）。',
+      'field.loopEnabled': '默认自动续跑',
+      'field.loopMaxRounds': '最多跑几轮',
+      'field.loopFailStreak': '连败几轮就停',
+      'field.loopIntervalMin': '两轮之间隔几分钟',
 
       // Page shows auto/full; stored values stay `triage`/`full` (T4/T5).
       'option.mode.triage': 'auto',
       'option.mode.full': 'full',
       'option.grokDefault.off': '关',
       'option.grokDefault.on': '开',
+      'option.loopEnabled.off': '关',
+      'option.loopEnabled.on': '开',
 
       'mode.auto.title': '自动挡',
       'mode.auto.detail': '先看难易，难的才开团队。',
@@ -311,6 +338,9 @@ window.__ModuleLoader__.load({
       'unit.jobs': '件',
       'unit.tasks': '件',
       'unit.ms': '毫秒 · 0 = 不限时',
+      'unit.rounds': '轮',
+      'unit.failures': '轮',
+      'unit.minutes': '分钟',
       // Same key as `en`: re-reading is the only recovery a failed `describe()` has.
       'action.retry': '重试',
 
@@ -397,6 +427,7 @@ window.__ModuleLoader__.load({
 
       'error.number': '{key} 得是 {min} 到 {max} 之间的整数，改对数字再保存。',
       'error.badEnum': '{key} 有个现在选项里没有的值，选一个再保存。',
+      'error.badBoolean': '{key} 只有开和关两种状态，切换一下再保存。',
       'error.chainTooLong': '{role} 备用链最多 {limit} 条，删掉多余的。',
       'error.missingModel': '{role} 第 {index} 条没有模型，选一个或删掉这一行。',
       'error.tooLong': '{role} 第 {index} 条的通道/模型文字超过 {limit} 字。',
@@ -546,6 +577,13 @@ window.__ModuleLoader__.load({
           const raw = draft[field.key]
           if (!Number.isSafeInteger(raw) || raw < field.min || raw > field.max) {
             errors.push({ key: 'error.number', params: { key: field.key, min: field.min, max: field.max } })
+          }
+        } else if (field.kind === 'boolean') {
+          // A boolean row is a switch: anything else (a `'on'` string from an old
+          // hand edit, a missing value) would be refused by the Host schema, so it
+          // is refused here first with a row-level reason.
+          if (typeof draft[field.key] !== 'boolean') {
+            errors.push({ key: 'error.badBoolean', params: { key: field.key } })
           }
         } else if (field.kind === 'enum') {
           // A stored value outside the options (a legacy patch, a hand edit)
@@ -1269,6 +1307,9 @@ window.__ModuleLoader__.load({
         maxConcurrency: 'unit.jobs',
         maxTasks: 'unit.tasks',
         timeoutMs: 'unit.ms',
+        loopMaxRounds: 'unit.rounds',
+        loopFailStreak: 'unit.failures',
+        loopIntervalMin: 'unit.minutes',
       }
       const numberRow = (key) => {
         const field = fieldByKey(key)
@@ -1362,6 +1403,21 @@ window.__ModuleLoader__.load({
           numberRow('maxConcurrency'),
           numberRow('maxTasks'),
           numberRow('timeoutMs')),
+        // --- 4 · 自动接着干 (the repeat-run switch and its three bounds) ---
+        h('div', { style: styles.card },
+          h('h3', { style: styles.groupTitle }, t('group.loop')),
+          h(FieldRow, {
+            key: 'loopEnabled', fieldKey: 'loopEnabled',
+            title: t('field.loopEnabled'),
+            control: h(Toggle, {
+              on: draft.loopEnabled === true, disabled,
+              onFlip: (next) => onChange('loopEnabled', next),
+              label: t(draft.loopEnabled === true ? 'option.loopEnabled.on' : 'option.loopEnabled.off'),
+            }),
+          }),
+          numberRow('loopMaxRounds'),
+          numberRow('loopFailStreak'),
+          numberRow('loopIntervalMin')),
         warnEmptyCap
           ? h('div', { style: styles.warn },
             h('strong', null, t('warn.emptyCap.title')),

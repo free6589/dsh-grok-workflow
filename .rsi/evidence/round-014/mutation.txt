@@ -1,0 +1,239 @@
+### mutation: user-only guard disabled: open accepts an acting agent
+--- diff ---
+--- /home/fish/projects_mine/dsh-grok-workflow/out/loop-mutation/loop.orig.ts	2026-11-18 23:35:27.370270373 +0800
++++ src/loop.ts	2026-11-18 23:35:27.613542893 +0800
+@@ -327,7 +327,7 @@
+   }
+ 
+   const open = async (request: LoopOpenRequest, actorSessionId?: string): Promise<LoopSnapshot> => {
+-    if (actorSessionId !== undefined) {
++    if (false) {
+       throw new LoopError(
+         'loop/user-only',
+         "a loop heartbeat can be opened only by the user from the composer switch; an agent cannot open one on the user's behalf",
+--- vitest run (test/loop.spec.ts) ---
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/out/loop-mutation
+
+ ❯ test/loop.spec.ts (27 tests | 1 failed) 34ms
+     ✓ charges one worst-case round as the interval floor, so rounds cannot stack 2ms
+     ✓ keeps the round cap and the failure streak inside their hard counts 2ms
+     ✓ carries the failure streak into the heartbeat text, and says it is guidance 0ms
+     ✓ writes a two-line UTC rule whose COUNT is the round cap 1ms
+     ✓ reads the interval and the bound back off a stored rule 1ms
+     ✓ owns only rows matching title, marker and shape 0ms
+     ✓ opens exactly one heartbeat for a session that has none 2ms
+     ✓ refreshes an unchanged loop without writing or moving its anchor 1ms
+     ✓ rebuilds the rule when the round bound changes, keeping the same row 1ms
+     ✓ resumes a paused row instead of minting a second one 1ms
+     ✓ replaces an ended row, because an exhausted rule cannot resume 1ms
+     ✓ closes by deleting every owned row and leaving everything else alone 1ms
+     ✓ serializes concurrent opens so one session cannot end up with two rows 0ms
+     ✓ warns but still closes when Schedule refuses one delete 3ms
+     ✓ reports the stored facts of a loop, including the last acknowledged delivery 0ms
+     ✓ cleans up by reason across sessions, counting only its own rows 1ms
+     × lets only the user open a loop; an acting agent is refused before any write 8ms
+     ✓ still lets an agent or the user close a loop it did not open 1ms
+     ✓ says the composition has no Schedule instead of pretending a loop exists 1ms
+     ✓ refuses a session id that is not a usable target 1ms
+     ✓ refuses an interval outside its bounds, and never lowers the floor 1ms
+     ✓ refuses an empty or over-long replacement prompt 0ms
+     ✓ returns the service only when all three methods exist 0ms
+     ✓ resolves the four keys and defaults them to off / ten / three / immediate 2ms
+     ✓ accepts the four keys at their documented bounds 0ms
+     ✓ refuses a switch that is not a real boolean 1ms
+     ✓ refuses each loop number outside its range, naming the key and both bounds 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/loop.spec.ts > the switch refuses what it cannot honestly do > lets only the user open a loop; an acting agent is refused before any write
+AssertionError: promise resolved "{ open: true, …(7) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "createdAt": "2026-11-18T00:00:00.000Z",
++   "intervalMinutes": 60,
++   "nextAt": "2026-11-18T01:00:00.000Z",
++   "open": true,
++   "rounds": 10,
++   "sessionId": "session-a",
++   "taskId": "task-1",
++   "taskStatus": "active",
+  }
+
+ ❯ test/loop.spec.ts:439:26
+    437|     expect(service.available()).toBe(true)
+    438|     const refusal = service.open({ sessionId: 'session-a' }, 'session-…
+    439|     await expect(refusal).rejects.toBeInstanceOf(LoopError)
+       |                          ^
+    440|     await expect(refusal).rejects.toMatchObject({ code: 'loop/user-onl…
+    441|     // Refused means no Schedule call at all — not "created and then r…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 26 passed (27)
+   Start at  23:35:28
+   Duration  569ms (transform 380ms, setup 0ms, import 404ms, tests 34ms, environment 0ms)
+
+exit=1
+
+### mutation: failure-streak clamp removed: configured streak passes through unclamped
+--- diff ---
+--- /home/fish/projects_mine/dsh-grok-workflow/out/loop-mutation/loop.orig.ts	2026-11-18 23:35:27.370270373 +0800
++++ src/loop.ts	2026-11-18 23:35:29.680293711 +0800
+@@ -258,7 +258,7 @@
+   return {
+     intervalMinutes: Math.min(effective, MAX_LOOP_INTERVAL_MINUTES),
+     rounds: clampInteger(rounds, 1, 1000, 10),
+-    failStreak: clampInteger(failStreak, 1, 1000, 3),
++    failStreak,
+   }
+ }
+ 
+--- vitest run (test/loop.spec.ts) ---
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/out/loop-mutation
+
+ ❯ test/loop.spec.ts (27 tests | 1 failed) 36ms
+     ✓ charges one worst-case round as the interval floor, so rounds cannot stack 2ms
+     × keeps the round cap and the failure streak inside their hard counts 9ms
+     ✓ carries the failure streak into the heartbeat text, and says it is guidance 0ms
+     ✓ writes a two-line UTC rule whose COUNT is the round cap 1ms
+     ✓ reads the interval and the bound back off a stored rule 1ms
+     ✓ owns only rows matching title, marker and shape 0ms
+     ✓ opens exactly one heartbeat for a session that has none 2ms
+     ✓ refreshes an unchanged loop without writing or moving its anchor 1ms
+     ✓ rebuilds the rule when the round bound changes, keeping the same row 1ms
+     ✓ resumes a paused row instead of minting a second one 1ms
+     ✓ replaces an ended row, because an exhausted rule cannot resume 1ms
+     ✓ closes by deleting every owned row and leaving everything else alone 1ms
+     ✓ serializes concurrent opens so one session cannot end up with two rows 0ms
+     ✓ warns but still closes when Schedule refuses one delete 3ms
+     ✓ reports the stored facts of a loop, including the last acknowledged delivery 0ms
+     ✓ cleans up by reason across sessions, counting only its own rows 1ms
+     ✓ lets only the user open a loop; an acting agent is refused before any write 1ms
+     ✓ still lets an agent or the user close a loop it did not open 1ms
+     ✓ says the composition has no Schedule instead of pretending a loop exists 1ms
+     ✓ refuses a session id that is not a usable target 1ms
+     ✓ refuses an interval outside its bounds, and never lowers the floor 1ms
+     ✓ refuses an empty or over-long replacement prompt 0ms
+     ✓ returns the service only when all three methods exist 0ms
+     ✓ resolves the four keys and defaults them to off / ten / three / immediate 3ms
+     ✓ accepts the four keys at their documented bounds 0ms
+     ✓ refuses a switch that is not a real boolean 1ms
+     ✓ refuses each loop number outside its range, naming the key and both bounds 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/loop.spec.ts > repeat-run policy: the counts a loop may not exceed > keeps the round cap and the failure streak inside their hard counts
+AssertionError: expected { Object (intervalMinutes, rounds, ...) } to match object { rounds: 1, failStreak: 1 }
+(1 matching property omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "failStreak": 1,
++   "failStreak": 0,
+    "rounds": 1,
+  }
+
+ ❯ test/loop.spec.ts:174:46
+    172|   it('keeps the round cap and the failure streak inside their hard cou…
+    173|     // The two numbers are quota envelopes: each round is a full workf…
+    174|     expect(loopPolicyFromConfig(0, 0, 0, 0)).toMatchObject({ rounds: 1…
+       |                                              ^
+    175|     expect(loopPolicyFromConfig(0, 0, 250, 7)).toMatchObject({ rounds:…
+    176|     expect(loopPolicyFromConfig(0, 0, 5_000, 5_000)).toMatchObject({ r…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 26 passed (27)
+   Start at  23:35:30
+   Duration  391ms (transform 188ms, setup 0ms, import 213ms, tests 36ms, environment 0ms)
+
+exit=1
+
+### mutation: mutation queue removed: concurrent opens are no longer serialized
+--- diff ---
+--- /home/fish/projects_mine/dsh-grok-workflow/out/loop-mutation/loop.orig.ts	2026-11-18 23:35:27.370270373 +0800
++++ src/loop.ts	2026-11-18 23:35:31.590690861 +0800
+@@ -313,7 +313,7 @@
+   let tail: Promise<unknown> = Promise.resolve()
+ 
+   const serialized = <T>(work: () => Promise<T>): Promise<T> => {
+-    const next = tail.then(() => work(), () => work())
++    const next = work()
+     tail = next.then(() => undefined, () => undefined)
+     return next
+   }
+--- vitest run (test/loop.spec.ts) ---
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/out/loop-mutation
+
+ ❯ test/loop.spec.ts (27 tests | 1 failed) 34ms
+     ✓ charges one worst-case round as the interval floor, so rounds cannot stack 2ms
+     ✓ keeps the round cap and the failure streak inside their hard counts 2ms
+     ✓ carries the failure streak into the heartbeat text, and says it is guidance 0ms
+     ✓ writes a two-line UTC rule whose COUNT is the round cap 1ms
+     ✓ reads the interval and the bound back off a stored rule 1ms
+     ✓ owns only rows matching title, marker and shape 0ms
+     ✓ opens exactly one heartbeat for a session that has none 2ms
+     ✓ refreshes an unchanged loop without writing or moving its anchor 1ms
+     ✓ rebuilds the rule when the round bound changes, keeping the same row 1ms
+     ✓ resumes a paused row instead of minting a second one 1ms
+     ✓ replaces an ended row, because an exhausted rule cannot resume 1ms
+     ✓ closes by deleting every owned row and leaving everything else alone 1ms
+     × serializes concurrent opens so one session cannot end up with two rows 7ms
+     ✓ warns but still closes when Schedule refuses one delete 3ms
+     ✓ reports the stored facts of a loop, including the last acknowledged delivery 0ms
+     ✓ cleans up by reason across sessions, counting only its own rows 1ms
+     ✓ lets only the user open a loop; an acting agent is refused before any write 1ms
+     ✓ still lets an agent or the user close a loop it did not open 1ms
+     ✓ says the composition has no Schedule instead of pretending a loop exists 1ms
+     ✓ refuses a session id that is not a usable target 1ms
+     ✓ refuses an interval outside its bounds, and never lowers the floor 1ms
+     ✓ refuses an empty or over-long replacement prompt 0ms
+     ✓ returns the service only when all three methods exist 0ms
+     ✓ resolves the four keys and defaults them to off / ten / three / immediate 3ms
+     ✓ accepts the four keys at their documented bounds 0ms
+     ✓ refuses a switch that is not a real boolean 1ms
+     ✓ refuses each loop number outside its range, naming the key and both bounds 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/loop.spec.ts > the switch state machine: open, refresh, resume, replace, close > serializes concurrent opens so one session cannot end up with two rows
+AssertionError: expected [ 'create', 'create' ] to have a length of 1 but got 2
+
+- Expected
++ Received
+
+- 1
++ 2
+
+ ❯ test/loop.spec.ts:367:62
+    365|       service.open({ sessionId: 'session-a' }),
+    366|     ])
+    367|     expect(schedule.calls.filter(call => call === 'create')).toHaveLen…
+       |                                                              ^
+    368|     expect(schedule.rows).toHaveLength(1)
+    369|     expect(second.taskId).toBe(first.taskId)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 26 passed (27)
+   Start at  23:35:33
+   Duration  266ms (transform 78ms, setup 0ms, import 102ms, tests 34ms, environment 0ms)
+
+exit=1
+

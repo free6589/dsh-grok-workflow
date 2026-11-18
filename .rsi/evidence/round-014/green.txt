@@ -1,0 +1,14 @@
+# test/loop.spec.ts (repeat-run state machine, breaker counts, config schema)
+# command: npx vitest run test/loop.spec.ts
+# 2026-11-18T23:53:49+08:00  tree: 7a79efb + uncommitted round-014 work
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+ ✓ test/loop.spec.ts (27 tests) 26ms
+
+ Test Files  1 passed (1)
+      Tests  27 passed (27)
+   Start at  23:53:50
+   Duration  255ms (transform 78ms, setup 0ms, import 103ms, tests 26ms, environment 0ms)
+
+EXIT=0

@@ -34,6 +34,16 @@ export declare const HARD_LIMITS: {
     };
     /** Extreme backstop on child calls charged against one task (worker + verifier + supervisor). */
     readonly maxAttemptsPerTask: 600;
+    /**
+     * Repeat-run envelope (`loopMaxRounds` / `loopFailStreak`). Every round is one
+     * full workflow run charged against provider quota, so these two numbers are the
+     * reason a repeat run cannot become an unbounded worker; both take effect clamped
+     * (`LIMIT_CAPS`) rather than being silently exceeded.
+     */
+    readonly loopMaxRounds: 100;
+    readonly loopFailStreak: 20;
+    /** Seven days: the loop service's own hard ceiling on a heartbeat interval. */
+    readonly loopIntervalMin: 10080;
     /** Hard ceiling on routing ledger entries kept per run. */
     readonly recordEntries: 256;
     /**
@@ -65,6 +75,9 @@ export declare const HARD_LIMITS: {
 export declare const LIMIT_CAPS: {
     readonly maxConcurrency: 100;
     readonly maxTasks: 100;
+    readonly loopMaxRounds: 100;
+    readonly loopFailStreak: 20;
+    readonly loopIntervalMin: 10080;
 };
 /** A configuration key whose stored number takes effect clamped to its hard maximum. */
 export type LimitField = keyof typeof LIMIT_CAPS;
@@ -100,6 +113,25 @@ export declare const MAX_TIMER_DELAY_MS = 2147483647;
 export declare const FIXED_MAX_RETRIES = 1;
 /** Default maximum tasks per run. */
 export declare const DEFAULT_MAX_TASKS = 10;
+/**
+ * Defaults of the repeat-run surface (`loopEnabled` / `loopMaxRounds` /
+ * `loopFailStreak` / `loopIntervalMin`).
+ *
+ * A repeat run is an opt-in, never the default: an enabled-by-default loop would
+ * turn one message into an unbounded series of full workflow runs. Ten rounds,
+ * three consecutive failed rounds and no wait between rounds are the values the
+ * schema, the settings page and the docs quote — one constant each, so the three
+ * cannot disagree about what "unset" means.
+ */
+export declare const DEFAULT_LOOP_ENABLED = false;
+export declare const DEFAULT_LOOP_MAX_ROUNDS = 10;
+export declare const DEFAULT_LOOP_FAIL_STREAK = 3;
+/**
+ * Minutes to wait between rounds. `0` asks for the loop's own floor — never under one
+ * worst-case round, never under 60 minutes — so it is not "start immediately". Mind
+ * the units: this value is minutes, while `timeoutMs` is milliseconds.
+ */
+export declare const DEFAULT_LOOP_INTERVAL_MIN = 0;
 /**
  * Defaults of the two documented run limits (10 concurrent tasks, 1 retry).
  *
@@ -150,14 +182,14 @@ export declare const DEFAULT_MAX_ACTIVE_RUNS_TOTAL = 8;
 export declare const CONFIG_VERSION = 1;
 /**
  * Every top-level key the configuration accepts, in schema order.
- * The settings page exposes 9 keys (toolName, configVersion, mode,
- * grokDefault, roles, synthesis, maxConcurrency, maxTasks, timeoutMs);
- * the rest of the former surface is fixed internally.
+ * The settings page exposes 13 keys (toolName, configVersion, mode,
+ * grokDefault, roles, synthesis, maxConcurrency, maxTasks, timeoutMs and the four
+ * loop keys); the rest of the former surface is fixed internally.
  * Kept explicit so an unknown key can be rejected instead of silently dropped:
  * a typo that is silently ignored looks exactly like a setting that "does not
  * work", which is the failure mode the settings surface must not have.
  */
-export declare const CONFIG_KEYS: readonly ["toolName", "mode", "grokDefault", "roles", "synthesis", "maxConcurrency", "maxTasks", "timeoutMs", "configVersion"];
+export declare const CONFIG_KEYS: readonly ["toolName", "mode", "grokDefault", "roles", "synthesis", "maxConcurrency", "maxTasks", "timeoutMs", "loopEnabled", "loopMaxRounds", "loopFailStreak", "loopIntervalMin", "configVersion"];
 /** Every key removed by the T4 slim-down; a patch that still carries one is rejected (R-06). */
 export declare const REMOVED_CONFIG_KEYS: readonly ["enforceGate", "gateRequired", "gateScope", "gatePreset", "answerStrategy", "triageAsk", "triageModel", "triageClassifier", "triageFollowupAsFast", "instantReceipt", "humanSummary", "showDiagnostics", "historyTurns", "historyChars", "maxQueuedMessages", "maxRetries", "maxActiveRuns", "maxActiveRunsTotal", "subagentProvider", "switchOn", "recordRuns", "recordLimit", "showProgress"];
 /** One stored limit the schema had to clamp, as the parse saw it. */
@@ -204,6 +236,10 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     maxConcurrency: z<number, number, "volatile-defined">;
     maxTasks: z<number, number, "volatile-defined">;
     timeoutMs: z<number, number, "volatile-defined">;
+    loopEnabled: z<boolean, boolean, "volatile-defined">;
+    loopMaxRounds: z<number, number, "volatile-defined">;
+    loopFailStreak: z<number, number, "volatile-defined">;
+    loopIntervalMin: z<number, number, "volatile-defined">;
     roles: z<NoInfer<Schemastery.ObjectS<NoInfer<{
         planner: z<({
             provider?: string | null;
@@ -306,6 +342,10 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     maxConcurrency: z<number, number, "volatile-defined">;
     maxTasks: z<number, number, "volatile-defined">;
     timeoutMs: z<number, number, "volatile-defined">;
+    loopEnabled: z<boolean, boolean, "volatile-defined">;
+    loopMaxRounds: z<number, number, "volatile-defined">;
+    loopFailStreak: z<number, number, "volatile-defined">;
+    loopIntervalMin: z<number, number, "volatile-defined">;
     roles: z<NoInfer<Schemastery.ObjectS<NoInfer<{
         planner: z<({
             provider?: string | null;

@@ -1,0 +1,45 @@
+round 14 · tag v0.11.14
+npm run ci exit 0 · 60 test files passed · 1081 tests passed
+
+diffstat before commit:
+.rsi/LOG.md                       |  15 ++-
+ .rsi/PROTOCOL.md                  |   3 +
+ .rsi/ROUND.md                     |  62 ++++++++++-
+ .rsi/STATE.md                     | 166 ++++++++++++++---------------
+ .rsi/ledger.jsonl                 |   2 +
+ CHANGELOG.md                      |  55 ++++++++++
+ README.md                         |  45 ++++++--
+ README.zh-CN.md                   |  44 ++++++--
+ docs/LOCAL-TESTING.md             |  11 +-
+ docs/knowledge/DECISIONS.md       | 213 ++++++++++++++++++++++++++++++++++++++
+ docs/knowledge/HANDOFF.md         |  55 ++++++++++
+ docs/knowledge/RESEARCH.md        | 155 +++++++++++++++++++++++++++
+ docs/knowledge/STATE.md           |  50 ++++++++-
+ docs/knowledge/VALIDATION.md      |  35 +++++++
+ lib/client.js                     |  64 +++++++++++-
+ lib/config.d.ts                   |  48 ++++++++-
+ lib/config.d.ts.map               |   2 +-
+ lib/config.js                     |  87 +++++++++++++++-
+ lib/config.js.map                 |   2 +-
+ lib/index.d.ts.map                |   2 +-
+ lib/index.js                      |  17 +++
+ lib/index.js.map                  |   2 +-
+ lib/settings.js                   |   4 +-
+ lib/settings.js.map               |   2 +-
+ lib/types.d.ts                    |  25 ++++-
+ lib/types.d.ts.map                |   2 +-
+ package-lock.json                 |   4 +-
+ package.json                      |   4 +-
+ src/client/index.js               |  64 +++++++++++-
+ src/config.ts                     |  86 ++++++++++++++-
+ src/index.ts                      |  19 ++++
+ src/settings.ts                   |   4 +-
+ src/types.ts                      |  25 ++++-
+ test/client.spec.ts               |  75 ++++++++++++--
+ test/config-limits-repair.spec.ts |  13 ++-
+ test/config.spec.ts               |  41 +++++++-
+ test/docs-config-keys.spec.ts     |   4 +-
+ test/loader.spec.ts               |  61 +++++++++++
+ test/settings-fixture.ts          |   2 +-
+ test/settings-projection.spec.ts  |   9 +-
+ 40 files changed, 1401 insertions(+), 178 deletions(-)

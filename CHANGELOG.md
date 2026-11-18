@@ -5,6 +5,61 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.11.14] - 2026-11-18
+
+### Added / 新增
+
+- **Repeat runs: a loop heartbeat the Host schedules, not a timer in the plugin
+  / 自动接着跑：由 Host 调度的循环心跳，不是插件里的定时器** —
+  the four repeat-run keys (`loopEnabled` / `loopMaxRounds` / `loopFailStreak` /
+  `loopIntervalMin`) now have a driver. `loopEnabled` itself stays a deployment
+  default that no run path reads yet; opening a loop is always the session's own
+  explicit action. Opening a loop stores one durable `rrule`
+  task in the Host's Schedule service, whose delivery target is the same session,
+  so each heartbeat is one ordinary turn and the plugin arms no timer of its own.
+  Opening is user-only: it happens through `POST /grok-workflow/loop` (behind the
+  composition's Host/Origin plus browser-authentication fence), and the
+  model-facing `grok_loop` tool can only read (`status`) or delete (`close`) —
+  its `open` is refused with `loop/user-only`. The stored prompt carries the
+  ownership marker `[grok-workflow loop]` and asks the round to continue
+  unfinished work, not redo completed steps, and to stop and report after the
+  configured number of consecutive failures.
+  Breaker semantics: the round cap is written into the rule as `COUNT`, so the
+  schedule ends itself and the row stays `ended` (a later open replaces it); the
+  failure streak is guidance in the heartbeat text, because a delivery receipt
+  proves an inbox write and not that the round succeeded; the effective interval
+  is the largest of 60 minutes, one worst-case round (`timeoutMs`) and
+  `loopIntervalMin`, capped at seven days, so `loopIntervalMin` can only raise the
+  floor; and close, unload, session stop and archive all **delete** rows instead of
+  pausing them, so no heartbeat outlives its owner. A composition without a
+  Schedule service answers `loop/unavailable` (503) and the plugin's other
+  features keep working.
+  / 四个续跑键（`loopEnabled` / `loopMaxRounds` / `loopFailStreak` /
+  `loopIntervalMin`）现在有了驱动。`loopEnabled` 本身仍是部署默认值、当前没有运行路径
+  读它；打开循环始终是会话自己的显式动作。打开一个循环会在 Host 的 Schedule 服务里存下一条
+  持久 `rrule` 任务，投递目标就是同一个会话，所以每次心跳都是一轮普通回合，插件自己不设
+  任何 timer。打开是用户专属动作：走 `POST /grok-workflow/loop`（在宿主 Host/Origin 校验
+  与浏览器认证闸门之后），面向模型的 `grok_loop` 工具只能读（`status`）或删（`close`），
+  它的 `open` 以 `loop/user-only` 被拒绝。存下的文案带归属标记 `[grok-workflow loop]`，
+  要求这一轮接着做没做完的事、不重做已完成步骤、连败到配置轮数就停下报告。停的语义：
+  轮数上限写进规则的 `COUNT`，跑满后调度自己结束、行留在 `ended`（下次 open 会替换它）；
+  连败轮数只是心跳文案里的提示，因为投递回执只证明收件箱写入、不证明这一轮做成了；
+  实际间隔取 60 分钟、一轮最坏耗时（`timeoutMs`）、`loopIntervalMin` 三者最大，封顶七天，
+  所以 `loopIntervalMin` 只能抬高下限；关闭、卸载、会话停止与归档一律**删行**而不是暂停，
+  没有心跳会活得比主人久。没有 Schedule 服务的组合返回 `loop/unavailable`（503），
+  插件其余功能照常工作。
+
+### Changed / 变更
+
+- **Settings page: a fifth group for repeat runs / 设置页：续跑成为第五组** —
+  the page now renders the four `loop*` fields as their own group (`Repeat by
+  default`, rounds at most, stop after failed rounds, minutes between rounds),
+  with the hard bounds of the loader (`100` / `20` / `10080`) and the defaults
+  `false` / `10` / `3` / `0`. The configuration surface is thirteen keys.
+  / 页面把四个 `loop*` 字段渲染成独立一组（默认自动续跑、最多跑几轮、连败几轮就停、
+  两轮之间隔几分钟），边界与载入器一致（`100` / `20` / `10080`），默认值
+  `false` / `10` / `3` / `0`。配置面共十三个键。
+
 ## [0.11.13] - 2026-11-18
 
 ### Fixed / 修复

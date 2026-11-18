@@ -1,0 +1,11 @@
+# heartbeat guard on the live repository
+# 2026-11-18T23:35:21+08:00 · branch main · HEAD 7a79efb
+# cmd: .rsi/tools/heartbeat-guard.sh
+SKIP code=dirty-tracked next_round=14 threshold=3 max_rounds=0 blocked_streak=0 round_max=13 ledger_max=13 dirty_tracked=34 report_open=0 unclosed_skips=0
+first uncommitted: .rsi/LOG.md
+# exit=10
+
+# cmd: .rsi/tools/heartbeat-guard.sh --max-rounds 13
+STOP code=round-cap next_round=14 threshold=3 max_rounds=13 blocked_streak=0 round_max=13 ledger_max=13 dirty_tracked=34 report_open=0 unclosed_skips=0
+first uncommitted: .rsi/LOG.md
+# exit=20

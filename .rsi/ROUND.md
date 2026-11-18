@@ -395,10 +395,12 @@ no history is rewritten, and no round is force-pushed.
   call-site items (records.ts raw `error.message`, history.ts truncate-before-redact,
   base64-PEM rule, and the six configuration fail-closed branches without tests).
 
-## Loop stop (2026-11-18)
+## Loop stop (2026-11-18) — VOID (correction 2026-11-18, superseded by rounds 12–13)
 
-- **Reason:** P1/P2 backlog empty — a permitted stop. `.rsi/STOP` absent at every round start;
-  no round limit reached.
+- ~~**Reason:** P1/P2 backlog empty — a permitted stop.~~ **No longer valid:** the
+  authorizing task text (§§6–7) forbids stopping on backlog shape; `P ·`, P3 and
+  fresh-audit findings are valid continuation themes. `.rsi/STOP` absent at every
+  round start; no round limit reached. Kept for history, not authority.
 - **Final verification:** `npm run typecheck` exit 0 (`.rsi/evidence/final-typecheck.txt`);
   `npm run ci` exit 0 with `Test Files 56 passed` / `Tests 1015 passed` / lint 22 warnings
   0 errors (`.rsi/evidence/final-ci.txt`); `npm run build` exit 0 with an empty
@@ -406,3 +408,111 @@ no history is rewritten, and no round is force-pushed.
   37/37 tag objects identical to the remote, 0 non-ancestors, HEAD == `origin/main`.
 - **Baseline:** v0.11.4 = 54 files / 985 tests; the loop added 2 files and 30 tests and removed
   none (`grep -rnE "\.(skip|todo|only)\(" test/ src/` is empty).
+
+## Round 12 — redaction call-site hardening (P0 data safety)
+
+- **Theme:** POOL `P ·` items still valid in HEAD: `src/records.ts` three warn
+  paths logged raw `error.message` (`:292/:664/:756` vs `redactError` at
+  `:555/:690/:376`); `src/history.ts` redacted *after* truncating to 1500 chars,
+  so spaceless secrets straddling the cap and PEM blocks cut without `END`
+  leaked into logs / the next prompt. (A12 audit; POOL Docs P items verified STALE.)
+- **Change:** records 3× `redactError(error)`; history windowed redact-first
+  (`MESSAGE_CAP 1500 + REDACT_SPAN 8192`) + `dropDanglingKeyBlock` fail-closed;
+  benign text byte-identical. Tests: new `test/records-redaction.spec.ts` (4),
+  `test/history.spec.ts` (+3); CHANGELOG `## [0.11.12]` bilingual;
+  `package.json` + `package-lock.json` + READMEs + LOCAL-TESTING tarball → `0.11.12`.
+- **Files:** `src/records.ts`, `src/history.ts`, `test/history.spec.ts`,
+  `test/records-redaction.spec.ts` (new), `CHANGELOG.md`, version files, `lib/`
+  rebuilt (history.js +46 / records.js +9, idempotent rebuild confirmed), evidence.
+- **Evidence:** `.rsi/evidence/round-012/` (`ci.txt` 57/1022, `typecheck.txt` 0 error,
+  `vitest-redaction.txt` 52/52 incl. redact.spec, `mutation.txt` 4-fail-without-fix,
+  `git.txt`). DSH live message test NOT_RUN (no config/event/threshold change;
+  Loader coverage via CI `loader.spec.ts`).
+- **Process notes:** B12 finished the src fix but timed out without reporting (work
+  recovered from the tree, confirmed via blame + stash); B13 timed out with zero
+  delivery and was stood down; lead took over single-writer for tests + CHANGELOG
+  (2 test bugs of mine fixed: commit-spy typing, PEM BEGIN placement, Session
+  append vs commit interception). C12 verify green (incl. mutation replay);
+  D12 independent review PASS.
+- **Commit/tag/push:** `be64d56`, tag `v0.11.12`, both pushed (`ls-remote`
+  confirms `main` and `v0.11.12`).
+- **status:** OK
+
+## Round 13 — gate landing: counts, NR reconciliation, baselines, probe (P1 docs)
+
+- **Theme:** land one round of uncommitted gate work (5/5 verified per gate report):
+  readme-counts (366/22 → 1022/57 both languages), nr-reconcile (NR-7/8 consistent,
+  NR-4/OQ-018 stale → measured record prevails), git-baseline (HEAD == origin/main,
+  full tag inventory), lib-idempotence (build twice identical), live-probe (real DSH
+  load + stub-model interaction).
+- **Change:** `README.md:311`, `README.zh-CN.md:301` count sentences; VALIDATION.md
+  Round-15 reconciliation note (NR-4/OQ-018 pre-t32 wording superseded by t32 + Round 15
+  measurements, bilingual); `CHANGELOG.md` `## [0.11.13]` bilingual (counts + note);
+  version files `0.11.13`. Zero `src/`/`test/`/`lib/` changes (`diff --stat` empty).
+- **Files:** READMEs, CHANGELOG, package.json/lock, LOCAL-TESTING tarball names,
+  VALIDATION.md note, `.rsi/evidence/round-013/` (6 groups, 25 files; `*.log` members
+  gitignored per repo rule, summaries committed).
+- **Evidence:** gate `readme-counts/` (ci 57/1022 raw+after-fix), `nr-reconcile/report.md`,
+  `git-baseline/` (sync.txt/tags.txt), `lib-idempotence/build-twice.log`,
+  `live-probe/` (13 files), `release-verify/` (C13: ci.txt 57/1022, typecheck 0 error).
+  C13 verify green; D13 independent review PASS (counts match, history logs untouched,
+  versions consistent, bilingual, no secret, no overreach).
+- **Commit/tag/push:** `7a79efb`, tag `v0.11.13`, both pushed (`ls-remote` confirms).
+- **Unverified:** live model-backed `grok_workflow` message still BLOCKED
+  (MISSING_CREDENTIAL; copying the operator key forbidden) — probe covered load +
+  stub interaction only.
+- **status:** OK
+
+## Round 14 — repeat-run (loop) surface + bilingual docs + release (P4 before P3, D-068)
+
+- **Theme:** the four `loop*` keys were stored, validated and projected, and nothing read them —
+  "repeat runs" existed only as configuration. This round ships the driver and makes the claim
+  checkable in both languages. Order is authorized: the repeat-run item is P4 (deferred / blocked on
+  the Host Schedule surface) by the demand audit's own definition
+  (`.rsi/incoming/github-demand-audit-2026-11-18.md:92`), while PROTOCOL §2 would have put the two
+  open P3 UX items first — the operator authorized P4 first, recorded as `D-068`, scope = order only.
+- **Change (runtime, landed by this commit):** `src/loop.ts` (service: policy, RRULE building, row
+  selection, serialized mutations, cleanup), `src/loop-surface.ts` (`grok_loop` tool + `POST
+  /grok-workflow/loop` route + unload/stop/archive cleanups), `src/config.ts` (four keys into
+  `CONFIG_KEYS`, `HARD_LIMITS` 100/20/10080, `LIMIT_CAPS` driving both clamp and load-time repair),
+  `src/index.ts` (service wired to the live config at open time), `src/client/index.js` (settings
+  group `loop` with four fields), `src/settings.ts` + `src/types.ts` surface updates. Semantics:
+  user-only open (`loop/user-only` for any defined actor, so the route opens and the tool cannot),
+  interval floor `max(60, ceil(timeoutMs/60000), loopIntervalMin)` capped at 10080, round cap stored
+  as RRULE `COUNT` (hard stop), fail streak carried as text only (a receipt proves an inbox write,
+  not a successful round), close/unload/archive delete rows instead of pausing.
+- **Change (docs, this task):** `README.md` + `README.zh-CN.md` gain a section each — switch,
+  parameters, heartbeat behaviour, breaker semantics — plus one known-limitation line; the
+  `loopEnabled` table row and the paragraph after the table no longer claim a composer switch that
+  does not exist (`grep -rn "grok-workflow/loop" src/` = one hit, the constant at `src/loop.ts:56`;
+  no client caller). `CHANGELOG.md` `## [0.11.14] - 2026-11-18` bilingual. `DECISIONS.md` `D-068`
+  (P4-before-P3 authorization, scope stated) and `D-069` (loop ownership, who may open, what stops
+  it, what closing means, and the "no shipped control yet" fact). `STATE.md`/`HANDOFF.md`/
+  `VALIDATION.md` refreshed for this round.
+- **Files:** `src/loop.ts`, `src/loop-surface.ts`, `src/config.ts`, `src/index.ts`, `src/settings.ts`,
+  `src/types.ts`, `src/client/index.js`, `test/loop.spec.ts`, `test/loop-surface.spec.ts`,
+  `test/heartbeat-guard.spec.ts`, `test/client.spec.ts`, `test/config.spec.ts`,
+  `test/config-limits-repair.spec.ts`, `test/settings-fixture.ts`, `test/settings-projection.spec.ts`,
+  `test/docs-config-keys.spec.ts`, `lib/` (rebuilt), READMEs, CHANGELOG, package.json/lock,
+  `docs/LOCAL-TESTING.md`, `docs/knowledge/{DECISIONS,STATE,HANDOFF,VALIDATION,RESEARCH}.md`,
+  `.rsi/{STATE,HEARTBEAT}.md`, `.rsi/tools/heartbeat-guard.sh`, `.rsi/PROTOCOL.md`,
+  `.rsi/evidence/round-014/`, `.rsi/evidence/heartbeat-guard/`.
+- **Gates:** `npm run typecheck` exit 0. `npm run ci` = npm run ci exit 0 · 60 test files passed · 1081 tests passed (`.rsi/evidence/round-014/ci.txt`;
+  the doc-side run before it is `pre-release-ci.txt`, same counts). Baseline `v0.11.13` = 57 files /
+  1022 tests → +3 files / +58 tests, none removed, none skipped.
+- **Version:** patch → `0.11.14`, applied in-tree during this task by a parallel process in the same
+  working tree (package.json/lock + README version sentences/pins/published list + LOCAL-TESTING
+  tarball names, 23:46–23:50). This round did not invent a second number: it re-ran the full gate
+  after that bump and released `0.11.14`. The same tree also received the `[0.11.14]` changelog
+  heading from that process at 00:02; the release ran after notifying the lead and taking
+  single-writer ownership of the memory files and of this script.
+- **Evidence:** `.rsi/evidence/round-014/` — `pre-release-ci.txt` (doc-side full CI), `ci.txt`
+  (this script's run), `mutation.txt` (user-only guard mutation replay: 1 failed without the guard),
+  `ci-baseline.txt`, `git.txt`; `.rsi/evidence/heartbeat-guard/` (guard verdict in the real repo +
+  the spec run).
+- **Commit/tag/push:** `v0.11.14` — one commit, annotated tag, `push origin main` then `push origin
+  v0.11.14`; no old tag moved or overwritten, no force-push, nothing published to npm.
+- **Unverified (NOT_RUN):** a real heartbeat delivery (no scheduled task was created, modified or
+  deleted — D-066 makes the first heartbeat an operator action); a live-GUI click on a control that
+  POSTs the loop route (the client has no such control yet, D-069「现状」).
+- **status:** OK

@@ -1,0 +1,23 @@
+# version linkage: patch bump 0.11.13 -> 0.11.14
+# 2026-11-18T23:57:55+08:00
+--- package.json / package-lock.json / lock root entry ---
+0.11.14 0.11.14 0.11.14
+--- README declared version (en) ---
+The package version in this repository is `0.11.14`
+--- README declared version (zh) ---
+本仓库声明的包版本是 `0.11.14`
+--- README install pins (unique) ---
+v0.11.14
+--- newest changelog section ---
+## [0.11.14] - 2026-11-18
+--- LOCAL-TESTING artifact names ---
+dsh-grok-workflow-0.11.14.tgz
+--- docs guards ---
+ ✓ test/docs-config-keys.spec.ts (12 tests) 19ms
+ ✓ test/docs-version.spec.ts (8 tests) 13ms
+
+ Test Files  2 passed (2)
+      Tests  20 passed (20)
+   Start at  23:57:57
+   Duration  462ms (transform 64ms, setup 0ms, import 105ms, tests 32ms, environment 0ms)
+

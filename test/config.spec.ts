@@ -54,10 +54,13 @@ describe('configuration surface', () => {
   })
 
   it('rejects every removed key as unknown (R-06), with the migration named', () => {
-    // The slim-down keeps exactly 9 keys; the other 23 are unknown now.
+    // The slim-down keeps exactly 13 keys (nine plus the four repeat-run keys);
+    // the other 23 are unknown now.
     expect(CONFIG_KEYS).toEqual([
       'toolName', 'mode', 'grokDefault', 'roles', 'synthesis',
-      'maxConcurrency', 'maxTasks', 'timeoutMs', 'configVersion',
+      'maxConcurrency', 'maxTasks', 'timeoutMs',
+      'loopEnabled', 'loopMaxRounds', 'loopFailStreak', 'loopIntervalMin',
+      'configVersion',
     ])
     expect(REMOVED_CONFIG_KEYS).toHaveLength(23)
     for (const key of REMOVED_CONFIG_KEYS) {
@@ -113,8 +116,33 @@ describe('configuration surface', () => {
       synthesis: 'layered',
       mode: 'triage',
       grokDefault: 'off',
+      loopEnabled: false,
+      loopMaxRounds: 10,
+      loopFailStreak: 3,
+      loopIntervalMin: 0,
       configVersion: CONFIG_VERSION,
     })
+  })
+
+  it('validates the four repeat-run keys and defaults a loop off and bounded', () => {
+    // Defaults: off, 10 rounds, 3 consecutive failures, interval 0 (= the loop floor).
+    expect(resolveConfig({} as never)).toMatchObject({
+      loopEnabled: false, loopMaxRounds: 10, loopFailStreak: 3, loopIntervalMin: 0,
+    })
+    // A stored setting travels through the schema and resolveConfig unchanged.
+    const parsed = snapshotConfig(Config({ loopEnabled: true, loopMaxRounds: 4, loopFailStreak: 2, loopIntervalMin: 90 }))
+    expect(parsed).toMatchObject({ loopEnabled: true, loopMaxRounds: 4, loopFailStreak: 2, loopIntervalMin: 90 })
+    expect(resolveConfig(parsed as never)).toMatchObject({
+      loopEnabled: true, loopMaxRounds: 4, loopFailStreak: 2, loopIntervalMin: 90,
+    })
+    // Fail closed (R-06): the switch is a real boolean, and each number is inside
+    // the envelope the schema and the loop service share.
+    expect(() => Config({ loopEnabled: 'on' } as never)).toThrow(/loopEnabled expected boolean/)
+    expect(() => resolveConfig({ loopEnabled: 'on' } as never)).toThrow(/loopEnabled must be true or false/)
+    expect(() => resolveConfig({ loopMaxRounds: 0 } as never)).toThrow(/loopMaxRounds must be an integer between 1 and 100/)
+    expect(() => resolveConfig({ loopFailStreak: 21 } as never)).toThrow(/loopFailStreak must be an integer between 1 and 20/)
+    expect(() => resolveConfig({ loopIntervalMin: -1 } as never)).toThrow(/loopIntervalMin must be an integer between 0 and 10080/)
+    expect(() => resolveConfig({ loopIntervalMin: 10081 } as never)).toThrow(/loopIntervalMin must be an integer between 0 and 10080/)
   })
 
   it('fixes the removed retry count at 1 and the synthesis default at layered', () => {
@@ -206,9 +234,12 @@ describe('route validation against the runtime', () => {
     const projected = Object.keys(descriptor.value).sort()
     expect(projected).not.toContain('toolName')   // not volatile => not projected
     expect(projected).not.toContain('configVersion')   // not volatile => not projected
-    // The page is the 7 volatile keys (toolName/configVersion are structural).
-    expect(projected).toEqual(['grokDefault', 'maxConcurrency', 'maxTasks', 'mode', 'roles', 'synthesis', 'timeoutMs'])
-    expect(projected).toHaveLength(7)
+    // The page is the 11 volatile keys (toolName/configVersion are structural).
+    expect(projected).toEqual([
+      'grokDefault', 'loopEnabled', 'loopFailStreak', 'loopIntervalMin', 'loopMaxRounds',
+      'maxConcurrency', 'maxTasks', 'mode', 'roles', 'synthesis', 'timeoutMs',
+    ])
+    expect(projected).toHaveLength(11)
     const ctx = ctxWith({
       settings: { configure: () => () => {}, describe: () => [descriptor] },
     })

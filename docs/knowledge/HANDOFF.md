@@ -1,5 +1,60 @@
 # Agent Handoff
 
+## 2026-11-18 — RSI round 14 落地并发布 `0.11.14`：续跑（loop）面 + 双语文档 + D-068/D-069
+
+- **From:** 执行代理 agent-8（任务 `docs_release_memory`）· **To:** 用户 / 下一轮接手者
+- **交付（`CONFIRMED`）**：round 14 把「四个 `loop*` 键存着没人读」这件事收口——
+  `src/loop.ts`（服务：策略、规则、行选择、清理）、`src/loop-surface.ts`（`grok_loop` 工具 +
+  `POST /grok-workflow/loop` 路由 + 卸载/归档清理）、`src/config.ts`（四个键进 `CONFIG_KEYS`、
+  `HARD_LIMITS`/`LIMIT_CAPS`、载入期 repair）、`src/client/index.js`（设置页「续跑」一组四字段）；
+  测试 `test/loop.spec.ts` 27、`test/loop-surface.spec.ts` 13、`test/heartbeat-guard.spec.ts` 14。
+- **语义（写给下一位，别凭直觉改）**：一条循环 = Schedule 里一条 `rrule` 任务，插件不持 timer；
+  `open` 只能由不带 actor 的浏览器请求发起（工具 `open` 抛 `loop/user-only`）；轮数上限写进 `COUNT`
+  是硬止损；连败轮数只是文案（回执只证明收件箱写入）；关闭/卸载/停止/归档一律**删行**不暂停。
+  细节与备选见 `DECISIONS.md` D-069。
+- **顺序授权**：本轮按操作者授权先落 P4 续跑面，**P3-01/P3-02 仍 OPEN 且编号不变**（`D-068`）。
+  授权只覆盖顺序；CI/证据/双语 CHANGELOG/不移动标签这些门一条没放宽。
+- **文档**：README 中英各一节「Repeat runs / 自动接着跑」（开关、参数、心跳行为、停的语义）+
+  已知限制一条；表里 `loopEnabled` 一行原来说「由输入框旁的开关打开和关闭」，而客户端**没有任何代码
+  调那条路由**（`grep -rn "grok-workflow/loop" src/` 只有 `src/loop.ts:56` 一处常量），已改成可核对的
+  说法；`CHANGELOG.md` `## [0.11.14] - 2026-11-18` 双语。
+- **通过的门（`CONFIRMED`）**：`npm run typecheck` exit 0；`npm run ci` exit 0 =
+  lint `Found 22 warnings and 0 errors`、**60 文件 / 1080 测试 PASS**
+  （`.rsi/evidence/round-014/pre-release-ci.txt`，发布脚本自己的那次见 `ci.txt`）。
+  上一轮 57/1022 → 本轮 +3 文件 / +58 测试，无删除、无 skip。
+- **未做（`NOT_RUN`）**：真机心跳投递（没有创建/修改/删除任何定时任务，D-066 规定第一条心跳是操作者
+  动作）；在活的 Web GUI 里点一个真正会 POST 那条路由的控件——**客户端还没有这个控件**，今天的用户
+  可达路径就是那条 HTTP 请求。
+- **发版**：`0.11.14`（patch）——`package.json`/`package-lock.json`/两份 README 的版本句、安装 pin、
+  已发布列表/`docs/LOCAL-TESTING.md` 压缩包名同步；一个提交 + annotated tag `v0.11.14`；未移动或覆盖
+  任何已发布标签，未 force-push，未发布 npm。commit SHA 由 `.rsi/ROUND.md` Round 14 与
+  `.rsi/evidence/round-014/git.txt` 记录。
+- **Next action（下一轮）**：按 `PROTOCOL` §2 的默认顺序取 P3-01（设置页逐路由上限与死线字段的文案）
+  或 P3-02（进度页「没有报告事实的成员」详情行）；另一条独立候选是「给客户端加一个真正会 POST
+  `/grok-workflow/loop` 的控件」——那是 `src/` 改动，需要自己的测试与单独一轮主题（D-069）。
+
+## 2026-11-18 — 心跳 prompt 与守护逻辑落地（未开新一轮，未建定时任务）
+
+- **From:** 执行代理 agent-6（工作流子任务）· **To:** 用户 / round 14 的接手者
+- **交付（`CONFIRMED`）**：`.rsi/HEARTBEAT.md`（定时任务投递的那条 prompt 模板 + 守护契约）、
+  `.rsi/tools/heartbeat-guard.sh`（`RESUME`/`SKIP`/`STOP` 三判定）、
+  `test/heartbeat-guard.spec.ts`（14 条，临时 fixture 内起真 git 仓，逐条钉住优先级）。
+  `npx vitest run test/heartbeat-guard.spec.ts` = 14 passed（`.rsi/evidence/heartbeat-guard/spec.txt`）；
+  `npx oxlint test/heartbeat-guard.spec.ts` = 0 warnings / 0 errors。
+- **判定实测（`CONFIRMED`）**：在本仓跑 `.rsi/tools/heartbeat-guard.sh` →
+  `SKIP code=dirty-tracked next_round=14`（round 14 在飞，33 个 tracked 改动）；
+  `--max-rounds 13` → `STOP code=round-cap`。证据 `.rsi/evidence/heartbeat-guard/repo-now.txt`。
+- **为什么摘要写在 prompt 里**：心跳消息 `source.kind = "schedule"`，`src/gate.ts:471-477` 直通，
+  `carryover` 不覆盖该轮（A24 §4），所以 `--prompt` 自己从 STATE/ledger/HANDOFF/ROUND 拼摘要并注入
+  模板占位符；拼 prompt 是纯读，只有带 `--record` 的运行才写一行日志（`*.log` 已 gitignore）。
+- **未做（`NOT_RUN`）**：没有创建/修改/删除任何定时任务（D-066：第一条心跳是操作者动作）；真机投递
+  未跑；没有改 `src/`、没有开新一轮、没有动 `lib/`。
+- **当前树状态提醒（`CONFIRMED`，非本任务产物）**：`test/loop.spec.ts`（untracked，23:26 由并行
+  round-14 工作创建）让 `npm run typecheck` 红在 `test/loop.spec.ts(519,13): TS2304 "snapshotConfig"`。
+  该文件不由本任务写入；round 14 收尾时必须先修它，否则 `finish-round.py` 的 CI 会 REFUSED。
+- **Next action（round 14 的接手者）**：先修 `test/loop.spec.ts` 的 `snapshotConfig` 引用，跑
+  `npm run ci`；闭合后心跳守卫会自动从 `SKIP` 回到 `RESUME`（判据只看 tracked 改动与记录一致性）。
+
 ## 2026-11-18 — RSI 连续循环：round 11 = P2-01 客户端 i18n 键齐全性（审计无缺陷，补守卫）
 
 - **From:** RSI 执行代理（agent-37）· **To:** 用户 / 后续接手代理

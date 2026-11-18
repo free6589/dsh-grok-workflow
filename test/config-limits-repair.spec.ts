@@ -149,9 +149,10 @@ describe('config limit repair (B07)', () => {
  */
 describe('LIMIT_CAPS: one clamp table for every user-configurable numeric cap (B02, T4)', () => {
   it('clamps each listed limit in the schema, records one note, and repairs the same number', () => {
-    // T4: only the two user-configurable limits stay in the table; the other
-    // eight former caps are fixed internally (their patches are unknown keys).
-    expect(Object.keys(LIMIT_CAPS).sort()).toEqual(['maxConcurrency', 'maxTasks'])
+    // T4 kept the two run limits in the table; the repeat-run caps joined them with
+    // the loop keys. The other former caps are fixed internally (their patches are
+    // unknown keys).
+    expect(Object.keys(LIMIT_CAPS).sort()).toEqual(['loopFailStreak', 'loopIntervalMin', 'loopMaxRounds', 'maxConcurrency', 'maxTasks'])
     for (const [field, cap] of Object.entries(LIMIT_CAPS)) {
       takeLimitOverruns()
       const stored = cap + 1
@@ -173,6 +174,12 @@ describe('LIMIT_CAPS: one clamp table for every user-configurable numeric cap (B
     expect(LIMIT_CAPS.maxConcurrency).toBe(HARD_LIMITS.maxConcurrency)
     expect(LIMIT_CAPS.maxTasks).toBe(HARD_LIMITS.maxTasks)
     expect([LIMIT_CAPS.maxConcurrency, LIMIT_CAPS.maxTasks]).toEqual([100, 100])
+    // Each loop round is a full run, so the round cap and the fail streak are the
+    // same kind of quota envelope and clamp through the same table.
+    expect(LIMIT_CAPS.loopMaxRounds).toBe(HARD_LIMITS.loopMaxRounds)
+    expect(LIMIT_CAPS.loopFailStreak).toBe(HARD_LIMITS.loopFailStreak)
+    expect(LIMIT_CAPS.loopIntervalMin).toBe(HARD_LIMITS.loopIntervalMin)
+    expect([LIMIT_CAPS.loopMaxRounds, LIMIT_CAPS.loopFailStreak, LIMIT_CAPS.loopIntervalMin]).toEqual([100, 20, 10_080])
     // A limit that is judged inside a chain is deliberately not in the table.
     expect(Object.keys(LIMIT_CAPS)).not.toContain('maxInFlight')
     // timeoutMs is a real key, but it has no clamp: 0 means unlimited and any

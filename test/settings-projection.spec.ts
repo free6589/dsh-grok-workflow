@@ -16,12 +16,13 @@ describe('the settings fixture matches the runtime projection', () => {
   it('projects exactly the volatile fields, dropping structural ones', () => {
     const descriptor = realSettingsDescriptor()
     const projected = Object.keys(descriptor.value).sort()
-    // 9 keys exist in the config surface; the runtime's form only carries the
-    // 7 volatile ones; `toolName` and `configVersion` are plain and therefore
+    // 13 keys exist in the config surface; the runtime's form only carries the
+    // 11 volatile ones; `toolName` and `configVersion` are plain and therefore
     // invisible to the form.
-    expect(projected).toHaveLength(7)
+    expect(projected).toHaveLength(11)
     expect(projected).toEqual([
-      'grokDefault', 'maxConcurrency', 'maxTasks', 'mode', 'roles', 'synthesis', 'timeoutMs',
+      'grokDefault', 'loopEnabled', 'loopFailStreak', 'loopIntervalMin', 'loopMaxRounds',
+      'maxConcurrency', 'maxTasks', 'mode', 'roles', 'synthesis', 'timeoutMs',
     ])
     for (const structural of ['toolName', 'configVersion']) {
       expect(projected).not.toContain(structural)

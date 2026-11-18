@@ -3538,3 +3538,38 @@ round 8 已在 `0.2.2-rc.3` 上验证安装/激活/设置面。
 lint 22w 0e / exit 0，`npm run typecheck` exit 0。基线 v0.11.4 = 54/985。
 
 **STOP 探针（`CONFIRMED`）**：`.rsi/tools/stop-probe.sh 11` → `round=11 … -> STOP ABSENT`。
+
+## Round 60 — 2026-11-18 — RSI round 14：续跑（loop）面落地 + `0.11.14` 发版（`CONFIRMED`）
+
+**前提（`CONFIRMED`）**：本轮开场 `git status --short --branch` = `## main...origin/main`，HEAD =
+`7a79efb`（tag `v0.11.13`），工作树有 28 个 tracked 改动 + 未跟踪的 `src/loop.ts`、
+`src/loop-surface.ts`、`test/loop.spec.ts`、`test/loop-surface.spec.ts`、`test/heartbeat-guard.spec.ts`、
+`.rsi/HEARTBEAT.md`、`.rsi/tools/heartbeat-guard.sh`——即 round 14 的代码已经写完但未提交。本轮只改文档、
+记录与版本，**未改任何运行时源码**（`src/`、`test/` 的改动都是本轮的既有工作，由发布提交一次落库）。
+
+**门禁（`CONFIRMED`）**：
+- `npm run typecheck` → exit 0，无输出。
+- `npm run ci` → exit 0，`Test Files 60 passed (60)`、`Tests 1080 passed (1080)`、
+  `Found 22 warnings and 0 errors`（oxlint），日志 `.rsi/evidence/round-014/pre-release-ci.txt`。
+  上一轮基线 57 文件 / 1022 测试（`v0.11.13`）→ 本轮 +3 文件 / +58 测试；无删除、无 skip。
+- 目标用例单独跑：`npx vitest run test/loop.spec.ts test/loop-surface.spec.ts test/heartbeat-guard.spec.ts`
+  → `3 passed (3)` / `54 passed (54)`（27 + 13 + 14）。
+
+**文档事实核对（`CONFIRMED`，逐条命令）**：
+- `grep -rn "grok-workflow/loop" src/` → 仅 `src/loop.ts:56`（常量）。`src/client/index.js` 无任何
+  该路由的调用点，所以「输入框旁的开关」**不存在**；README 两语种与 CHANGELOG 据此改写/写明。
+- `grep -n "loopEnabled\|loopMaxRounds\|loopFailStreak\|loopIntervalMin" src/config.ts` → 四个键进
+  `CONFIG_KEYS`、schema（`.volatile()`）、`resolveConfig`（`loopEnabled` 布尔校验 + 三个整数范围）。
+- README 双语的表格四行 + 各自一节「Repeat runs / 自动接着跑」+ 已知限制一条互相一致；
+  `test/docs-config-keys.spec.ts`（键表/键数/示例可载入）与 `test/docs-version.spec.ts`
+  （版本句、安装 pin、已发布列表、CHANGELOG 首节 = 包版本）在 `npm run ci` 中全绿。
+
+**未验证（`NOT_RUN`）**：真机心跳投递（`NOT_RUN`——没有创建/修改/删除任何定时任务，D-066 规定第一条
+心跳是操作者动作）；在活的 Web GUI 中点击一个会 POST 该路由的控件（控件尚未实现，见 D-069「现状」）。
+
+**发版动作（`CONFIRMED`）**：`0.11.14`（patch）。`package.json` + `package-lock.json` 联动；
+两份 README 的版本句/安装 pin/已发布列表与 `docs/LOCAL-TESTING.md` 压缩包名同步；
+`CHANGELOG.md` 插入 `## [0.11.14] - 2026-11-18` 双语并把 `[Unreleased]` 留空；
+`.rsi/tools/finish-round.py` 走 R6 流程：一次 CI → ROUND.md/LOG.md/ledger → 单次提交 →
+annotated tag `v0.11.14` → push main + push tag。**未移动任何旧标签、未 force-push、未发布 npm。**
+commit 与推送结果见 `.rsi/ROUND.md` Round 14、`.rsi/evidence/round-014/git.txt`。

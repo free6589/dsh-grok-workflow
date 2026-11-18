@@ -1,0 +1,10 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+ ✓ test/heartbeat-guard.spec.ts (14 tests) 823ms
+
+ Test Files  1 passed (1)
+      Tests  14 passed (14)
+   Start at  23:35:20
+   Duration  989ms (transform 29ms, setup 0ms, import 43ms, tests 823ms, environment 0ms)
+

@@ -112,7 +112,7 @@ export type SynthesisMode = 'deterministic' | 'model';
 /**
  * Plugin configuration (also the DSH Schemastery schema shape).
  *
- * The settings page exposes 9 keys. Every other former
+ * The settings page exposes 13 keys. Every other former
  * key is rejected as an unknown key (R-06) and takes effect as a fixed
  * internal value (see FIXED_* in `src/config.ts`).
  */
@@ -138,6 +138,20 @@ export interface GrokWorkflowConfig {
      * No hard upper limit: any non-negative safe integer is accepted.
      */
     timeoutMs?: number;
+    /**
+     * Repeat-run switch. `false` (default) means one run per message; `true` lets a
+     * repeat-run driver start another round when the previous one ended unfinished.
+     */
+    loopEnabled?: boolean;
+    /** Round cap for a repeat run. Hard maximum 100. */
+    loopMaxRounds?: number;
+    /** Consecutive failed rounds that stop a repeat run. Hard maximum 20. */
+    loopFailStreak?: number;
+    /**
+     * Minutes to wait between rounds. `0` asks for the loop's floor: never under one
+     * worst-case round, never under 60 minutes. Hard maximum 10080 (seven days).
+     */
+    loopIntervalMin?: number;
 }
 /** Fully resolved configuration. Everything not listed here is a fixed internal value. */
 export interface ResolvedConfig {
@@ -165,6 +179,15 @@ export interface ResolvedConfig {
     maxTasks: number;
     /** Run deadline in milliseconds. 0 = unlimited (no timer is armed). */
     timeoutMs: number;
+    /**
+     * Repeat-run surface, resolved and validated. These are carried here so a
+     * repeat-run driver reads them from exactly one shape; `resolveConfig` does not
+     * start, schedule or stop any round itself.
+     */
+    loopEnabled: boolean;
+    loopMaxRounds: number;
+    loopFailStreak: number;
+    loopIntervalMin: number;
     configVersion: number;
 }
 /** One evidence item confirmed by a verifier. */

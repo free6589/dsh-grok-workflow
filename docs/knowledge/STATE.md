@@ -1,6 +1,21 @@
 # Project State
 
-Last updated: 2026-11-18 (**RSI 连续循环 round 11 完成 · `0.11.11`** — 主题 P2-01：客户端 i18n 键
+Last updated: 2026-11-18 (**RSI 连续循环 round 14 完成 · `0.11.14`** — 主题：续跑（repeat-run / loop）
+面落地并发版。四个 `loop*` 键从「存着没人读」变成有驱动：一个循环 = Host Schedule 里一条 `rrule`
+持久任务（标题 `Loop heartbeat`、文案前缀 `[grok-workflow loop]`、目标=本会话），插件自己不设 timer；
+打开只走 `POST /grok-workflow/loop`（用户侧，路由在组合的 Host/Origin + 浏览器认证闸门后），
+面向模型的 `grok_loop` 只有 `status`/`close`，`open` 以 `loop/user-only` 拒绝。停的语义：轮数上限写进
+规则 `COUNT`（跑满行留 `ended`，下次 open 替换）、连败轮数只是文案提示（回执只证明收件箱写入）、
+间隔取 `max(60, ceil(timeoutMs/60000), loopIntervalMin)` 封顶七天、关闭/卸载/停止/归档一律**删行**。
+设置页多一组「续跑」（四字段，边界 100/20/10080，默认 false/10/3/0）。**文档**：README 中英各新增
+「Repeat runs」一节 + 已知限制一条 + 表格行改为可核对的说法；CHANGELOG `## [0.11.14]` 双语；
+DECISIONS **D-068**（操作者授权先落 P4 续跑面、P3-01/P3-02 保持 OPEN）与 **D-069**（续跑面归谁、
+谁能开、靠什么停、关闭是什么）。`npm run ci` exit 0：typecheck 0 错、lint 22w/0e、
+**60 文件 / 1080 测试 PASS**（上一轮 57/1022，+3 文件/+58 测试，无删除无 skip）；tag `v0.11.14`。
+证据 `.rsi/evidence/round-014/`、`VALIDATION.md` Round 60。
+**剩余待办**：P3-01、P3-02（按 D-068 仍是 OPEN，顺序由下一位接手者按 PROTOCOL §2 决定）。
+
+Previous update: 2026-11-18 (**RSI 连续循环 round 11 完成 · `0.11.11`** — 主题 P2-01：客户端 i18n 键
 齐全性。bundle 有两本词典（插件 `DICT` 与面板 `PANEL_DICT`），此前没有任何检查把它们与代码实际请求的
 键对起来。审计结论是**当前无缺陷**（插件每语言 137 键、面板 19 键，两表语言对称；字面/拼接/动态键全部
 在消费它的那张表里可解析），因此本轮交付的是守卫：`test/i18n-parity.spec.ts` 6 条，按作用域断言，
@@ -1170,3 +1185,36 @@ worker 链上限 50（HARD_LIMITS.chainLength）
   `TEST_RESULTS: PASS`、`LOCAL_RUNTIME_VERIFIED: yes`，模板 11 字段齐全。
 - **凭证边界**：全程未读写任何 key/token（`BIFROST_VIRTUAL_KEY` 只在环境里，仅做过布尔/长度检查）；
   隔离实例的访问 token 只留在 `.tmp/v095/url.txt`（`.tmp/` gitignore），收尾删除。
+
+## 2026-11-18 — RSI round 14：续跑（repeat-run / loop）面落地 + `0.11.14` 发版（`CONFIRMED`）
+
+- **主题**：四个 `loop*` 键自设置面落地起只被存储、没有被任何驱动读取。本轮把驱动写出来（`src/loop.ts`
+  536 行、`src/loop-surface.ts` 350 行），并把它按发布纪律写进文档、版本与 CHANGELOG。
+- **代码（`CONFIRMED`）**：一条循环 = Host Schedule 里**一条** `rrule` 持久任务（标题 `Loop heartbeat`、
+  文案前缀 `[grok-workflow loop]`、目标 `session` = 本会话）。插件不自持 timer，只调
+  `create`/`catalog`/`edit`。`open` 对任何已定义 actor 抛 `loop/user-only`（浏览器请求天然不带 actor，
+  所以路由能开、工具不能）；`grok_loop` 只有 `status`/`close`；路由 `POST /grok-workflow/loop` 在组合
+  自己的 `connection.requestRejection` 闸门之后；无 Schedule 服务 → `loop/unavailable`（503）。
+  规则 = `DTSTART` + `FREQ=MINUTELY;INTERVAL=<分钟>;COUNT=<轮数>`；间隔下限
+  `max(60, ceil(timeoutMs/60000), loopIntervalMin)`、封顶 10080；`close`/`stopAll`/`forgetSession`
+  一律删行；一个会话重复 open 只刷新同一行（串行化，避免两行）。
+- **配置面**：`CONFIG_KEYS` 9 → 13（`loopEnabled`/`loopMaxRounds`/`loopFailStreak`/`loopIntervalMin`），
+  `HARD_LIMITS` 100/20/10080，默认 false/10/3/0，`LIMIT_CAPS` 参与存值 clamp 与载入期 repair。
+- **文档**：README（中英）新增「Repeat runs (the loop heartbeat) / 自动接着跑（循环心跳）」一节——
+  开关、参数、心跳行为、停的语义四块；表格里 `loopEnabled` 一行与表后段落改成可核对的说法
+  （原句写「由输入框旁的开关打开和关闭」，而本仓库客户端**没有任何代码去调那条路由**，
+  `grep -rn "grok-workflow/loop" src/` 只有 `src/loop.ts:56` 一处常量），并在「已知限制」加一条；
+  `CHANGELOG.md` `## [0.11.14]` 双语；`docs/LOCAL-TESTING.md` 键数与压缩包名随 bump 同步。
+- **决定**：`DECISIONS.md` **D-068** 记录操作者授权「先落 P4 续跑面、P3-01/P3-02 保持 OPEN」，
+  并写清授权只覆盖顺序、不放宽任何质量门；**D-069** 记录续跑面的四项归属选择与「客户端暂无开关控件」
+  这一现状。
+- **验证（`CONFIRMED`）**：`npm run typecheck` exit 0；`npm run ci` exit 0 = lint 22 warnings / 0 errors、
+  **60 文件 / 1080 测试 PASS**（`.rsi/evidence/round-014/pre-release-ci.txt`；发布脚本另跑一次，
+  见 `.rsi/evidence/round-014/ci.txt`）。新增测试：`test/loop.spec.ts` 27、`test/loop-surface.spec.ts` 13、
+  `test/heartbeat-guard.spec.ts` 14；`test/client.spec.ts` 与 config/settings 相关用例扩展。
+  上一轮基线 57/1022，本轮 +3 文件 / +58 测试，无删除、无 skip。
+- **未验证（`NOT_RUN`）**：真机心跳投递（需要 Host 常驻与真实额度，本轮没有创建任何定时任务——
+  与 D-066 一致）；真实 Web GUI 里点一个会 POST 那条路由的控件（客户端还没有这个控件）。
+- **发版（`CONFIRMED`）**：`package.json` + `package-lock.json` + 两份 README 的版本句/安装 pin/已发布
+  列表 + `docs/LOCAL-TESTING.md` 压缩包名 = `0.11.14`；`CHANGELOG` 有 `## [0.11.14] - 2026-11-18`；
+  一个提交 + annotated tag `v0.11.14`，未移动任何旧标签、未 force-push、未发布 npm。

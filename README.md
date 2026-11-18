@@ -45,10 +45,10 @@ dsh --profile grok-workflow-dev --from-default-profile headless --dump-config
 Then install the plugin:
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.11.13
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.11.14
 ```
 
-> `#v0.11.13` is the current release. Pin the tag you actually want; omitting it follows `main`, which is not a release. Do not run `--from-default-profile` after `plugin add`: it replaces the profile and removes the plugin you just installed.
+> `#v0.11.14` is the current release. Pin the tag you actually want; omitting it follows `main`, which is not a release. Do not run `--from-default-profile` after `plugin add`: it replaces the profile and removes the plugin you just installed.
 
 Then restart the profile so DSH loads the new plugin:
 
@@ -198,7 +198,7 @@ The rendered answer adds a `Failures: 1 infrastructure, 1 quality` line, so a pr
 
 ## Configuration reference
 
-Configuration belongs to the profile's `cordis.patch.yml` (or a `--patch` overlay), under the bundle row. The surface is exactly nine keys (`timeoutMs` joined in `0.11.0`); anything else is rejected at load, so a stale patch fails loudly instead of looking like a setting that does nothing:
+Configuration belongs to the profile's `cordis.patch.yml` (or a `--patch` overlay), under the bundle row. The surface is exactly thirteen keys (`timeoutMs` joined in `0.11.0`, the four `loop*` keys with the repeat-run settings); anything else is rejected at load, so a stale patch fails loudly instead of looking like a setting that does nothing:
 
 ```yaml
 - id: grok-workflow
@@ -225,7 +225,13 @@ Configuration belongs to the profile's `cordis.patch.yml` (or a `--patch` overla
 | `maxConcurrency` | `10` | `100` | Child agents in flight per run |
 | `maxTasks` | `10` | `100` | Maximum caller or planner tasks |
 | `timeoutMs` | `3600000` (60 min) | any non-negative integer (`0` = unlimited) | Run deadline in milliseconds. `0` arms no timer; a value above `2147483647` (the largest `setTimeout` delay) is treated as unlimited internally while the report records the configured number |
+| `loopEnabled` | `false` | `true` \| `false` | Deployment default for repeat runs. It is stored, validated and projected to the settings page, but no automatic driver reads it yet: nothing is scheduled until a browser request opens the loop ([Repeat runs](#repeat-runs-the-loop-heartbeat)). A saved `on` alone does not start a round |
+| `loopMaxRounds` | `10` | `100` | Round bound stored in the loop's schedule rule (`COUNT`), so the schedule ends itself after that many rounds. Each round is a full workflow run, so this is a quota envelope, not a preference |
+| `loopFailStreak` | `3` | `20` | Consecutive failed rounds the heartbeat text asks the round to stop after. The Host records delivery, not round success, so this is guidance carried into the round, not a host-enforced counter |
+| `loopIntervalMin` | `0` (`0` = the loop's floor) | `10080` (seven days) | Minutes between rounds. The effective wait is never below one worst-case round or 60 minutes, so `0` means "as soon as a round can finish", not "immediately" |
 | `configVersion` | `1` | `1` | Configuration surface version |
+
+The four `loop*` keys configure the repeat-run surface. When a session's loop is opened, the loop service reads `loopMaxRounds`, `loopFailStreak` and `loopIntervalMin` at open time and stores them in a durable Schedule rule; without a composed Schedule service the keys are stored and every message still runs once. `loopEnabled` is the deployment default for an automatic driver and is not read yet — opening a loop stays an explicit user action ([Repeat runs](#repeat-runs-the-loop-heartbeat)). `loopIntervalMin` is a wait, not a budget: it can only raise the loop's floor, and `loopFailStreak` travels into the heartbeat text as guidance because the Host records delivery, not round success.
 
 Everything else is fixed inside the plugin and no longer accepted: `maxRetries=1`, `maxActiveRuns=2` per session and `maxActiveRunsTotal=8` per process, `historyTurns=20` / `historyChars=20000`, `maxQueuedMessages=4`, `recordLimit=256`, `answerStrategy=in-turn`, `triageClassifier=rules`, `triageAsk`, `triageModel` unset, `triageFollowupAsFast`, `instantReceipt`, `humanSummary`, `showDiagnostics=false`, `recordRuns`, `showProgress`, `switchOn=[]` (built-in policy), `subagentProvider` unset, and the gate (`enforceGate`/`gateRequired`/`gateScope`/`gatePreset`) is always on.
 
@@ -235,7 +241,31 @@ Everything else is fixed inside the plugin and no longer accepted: `maxRetries=1
 
 Because the plugin exports its `Config`, DSH projects it into the standard settings surface automatically: the fields on that page are the fields this plugin reads — there is no second, decorative source of truth. Edits are live: an edit reaches the next message, and an invalid edit is refused with its reason while delivery keeps the last valid snapshot.
 
-The page shows four things and nothing else: the on/off switch, the mode (`auto`/`full`), the five role chains as "channel → model" dropdowns fed by the runtime's declared models, and the three numbers (jobs at once, splits per job, run deadline). No per-field explanations, no read-only area, no diagnostics panel.
+The page shows five things and nothing else: the on/off switch, the mode (`auto`/`full`), the five role chains as "channel → model" dropdowns fed by the runtime's declared models, the three run limits (jobs at once, splits per job, run deadline), and the repeat-run group (its switch plus the three bounds: rounds, consecutive failures, minutes between rounds). No per-field explanations, no read-only area, no diagnostics panel.
+
+### Repeat runs (the loop heartbeat)
+
+A loop is one durable task in the Host's Schedule service, not a timer inside the plugin. The stored row is an `rrule` heartbeat whose delivery target is the same session, and each delivery is one ordinary turn. The plugin arms no timer of its own and starts no second execution path: what a round does is decided by that turn, exactly as a message you type is.
+
+**The switch.** The settings page's *Repeat runs* group holds the four `loop*` keys (table above). They are stored, validated and projected like every other key, but `loopEnabled` is a deployment default no automatic driver reads yet, so a saved `on` does not by itself start rounds. Opening a loop is one explicit browser request:
+
+```json
+POST /grok-workflow/loop
+{ "action": "open" | "close" | "status", "sessionId": "<session id>", "intervalMinutes": 60, "prompt": "optional replacement text" }
+```
+
+Only that path may open a loop. The model-facing `grok_loop` tool exposes the other two actions: `status` reads the stored loop, `close` deletes it, and `open` is refused with `loop/user-only`, so an agent can report or stop a loop but never start one on your behalf. The route also sits behind the composition's own connection fence (Host/Origin check plus browser authentication), so a cross-site or unauthenticated request is rejected before it reaches the service. A composition without the Schedule service answers `loop/unavailable` (HTTP 503) and everything else keeps working.
+
+**What a heartbeat is.** The stored prompt begins with `[grok-workflow loop]` — the marker cleanup matches on together with the title `Loop heartbeat` — and asks the round to continue this session's unfinished work from where it stopped, not redo completed steps, report and stop when the work is done, and stop and report instead of retrying after the configured number of consecutive failures. A delivery arrives with `source.kind = "schedule"`, so the workflow gate's user-message entry does not claim it: the round is a normal session turn handled by the main model, and it gets no cross-round digest from `carryover` — continuity is whatever the repository and the session already hold.
+
+**Breaker semantics.** Four things bound a loop, and only one of them is a host-enforced stop:
+
+1. **Round cap (`loopMaxRounds`) — enforced.** The bound is written into the rule as `COUNT`, so the schedule stops delivering after that many rounds and the row is left as `ended`. An ended row cannot be resumed; the next open replaces it with a fresh one.
+2. **Failure streak (`loopFailStreak`) — guidance, not a counter.** A delivery receipt records that the Session inbox accepted a message, not whether the round succeeded, so the Host has no honest failure count to compare. The number travels into the heartbeat text as an instruction, and the plugin states that limitation instead of implying an enforcement it cannot make.
+3. **Interval floor (`loopIntervalMin`) — a wait, not a budget.** The effective interval is the largest of: 60 minutes, one worst-case round (your `timeoutMs` rounded up to whole minutes), and `loopIntervalMin`. It is then capped at seven days. `0` therefore means "as soon as a round can finish", not "immediately"; a heartbeat that could arrive while the previous round still runs would stack rounds.
+4. **Close, unload, archive — delete, never pause.** Closing deletes the row: a paused row is still a stored heartbeat. Plugin unload deletes every row this plugin owns, and stopping or archiving a session deletes that session's row, so no heartbeat outlives its owner. A delete the Host refuses is logged rather than reported as a clean close.
+
+Opening a loop that already exists refreshes it instead of minting a second row — the rule is recomputed only when the interval or the round cap changed — a paused row is resumed, an ended row is replaced, and concurrent opens are serialized so one session cannot end up with two rows.
 
 ### Disable and uninstall
 
@@ -293,13 +323,13 @@ The plugin reuses DSH's workflow engine and subagents. It does not replace DSH's
 
 ## Versions and release notes
 
-The package version in this repository is `0.11.13`. Install or roll back to an exact release with a tag suffix:
+The package version in this repository is `0.11.14`. Install or roll back to an exact release with a tag suffix:
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.11.13
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.11.14
 ```
 
-Use only a tag that exists on GitHub. Published: `v0.1.0`, `v0.2.0`, `v0.2.1`, `v0.2.2`, `v0.2.3`, `v0.2.4`, `v0.2.5`, `v0.2.6`, `v0.2.7`, `v0.3.0`, `v0.4.0`, `v0.5.0`, `v0.5.1`, `v0.6.0`, `v0.7.0`, `v0.8.0`, `v0.9.0`, `v0.9.1`, `v0.9.2`, `v0.9.3`, `v0.9.4`, `v0.10.0`, `v0.10.1`, `v0.10.2`, `v0.11.0`, `v0.11.1`, `v0.11.2`, `v0.11.3`, `v0.11.4`, `v0.11.5`, `v0.11.6`, `v0.11.7`, `v0.11.8`, `v0.11.9`, `v0.11.10`, `v0.11.11`, `v0.11.12` and `v0.11.13`. The unpinned command follows `main` and does not pin a release. `v0.2.0-rc.1` also exists on GitHub but is not a release: it predates the release workflow and its `package.json` still declares `0.1.0`. See the [changelog](CHANGELOG.md) and the [release guide](docs/RELEASING.md) for the versioning and rollback rules.
+Use only a tag that exists on GitHub. Published: `v0.1.0`, `v0.2.0`, `v0.2.1`, `v0.2.2`, `v0.2.3`, `v0.2.4`, `v0.2.5`, `v0.2.6`, `v0.2.7`, `v0.3.0`, `v0.4.0`, `v0.5.0`, `v0.5.1`, `v0.6.0`, `v0.7.0`, `v0.8.0`, `v0.9.0`, `v0.9.1`, `v0.9.2`, `v0.9.3`, `v0.9.4`, `v0.10.0`, `v0.10.1`, `v0.10.2`, `v0.11.0`, `v0.11.1`, `v0.11.2`, `v0.11.3`, `v0.11.4`, `v0.11.5`, `v0.11.6`, `v0.11.7`, `v0.11.8`, `v0.11.9`, `v0.11.10`, `v0.11.11`, `v0.11.12`, `v0.11.13` and `v0.11.14`. The unpinned command follows `main` and does not pin a release. `v0.2.0-rc.1` also exists on GitHub but is not a release: it predates the release workflow and its `package.json` still declares `0.1.0`. See the [changelog](CHANGELOG.md) and the [release guide](docs/RELEASING.md) for the versioning and rollback rules.
 
 ## Testing and development
 
@@ -333,6 +363,7 @@ npm run ci
 - **Real-provider failure texts are not exhaustively measured** (NR-5/NR-6): classification is a whitelist, and anything unmatched is reported as `unknown` rather than guessed.
 - No pause/resume, journaling or cross-process resume; cancellation is cooperative.
 - No background job mode; calls run in the foreground.
+- **The repeat-run loop is a schedule row, not a background job:** it must be opened from the browser path (the model can only read or close it), the Host owns delivery (a delivery arriving while the previous round runs is coalesced, and after downtime only the latest missed occurrence is delivered), and a round that fails is not counted as a failure by the Host — see [Repeat runs](#repeat-runs-the-loop-heartbeat).
 - No task dependency graph; tasks are independent by design, and only write-path overlap is serialized.
 - No custom Web UI; results use DSH's generic tool card and a chain editor is Phase 9 work.
 - See [known architecture limits](docs/ARCHITECTURE.md#known-architecture-limits-mvp) for the full list.
