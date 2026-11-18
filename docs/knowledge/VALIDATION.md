@@ -1361,6 +1361,8 @@ per-role model chains, concurrency and run records"），安装的 bundle 名为
 | 真 Web GUI 里的 `/grok`（当时只到 WebSocket/Typert Remote 协议边界） | **CONFIRMED**：§1 (a)(b)(c) 三步在真 GUI 上通过，命令事件、模式事件、报告文本三处独立可查 |
 | 设置页卡片在浏览器中的渲染 | **CONFIRMED**：§2 卡片渲染、编辑、保存（revision 0→1）、刷新后保持、新会话生效 |
 
+> 对账澄清（2026-11-18，nr_reconcile）：WORKFLOW-DESIGN.md 的 NR-4（"…; no write was performed"）与 OQ-018（"settings write-to-disk … NOT_RUN — nested path writes are source-confirmed only"）是 t32 之前的过时措辞，已被本节 §2/§3 与 Round 3（t32）的实测取代——真 GUI 保存经 POST /api/settings/mutate 落盘 cordis.patch.yml（含 t32 嵌套 roles.planner 路由写入），revision 0→1、刷新/重启后仍在、对新会话生效，以实测为准。Reconciliation note (2026-11-18, nr_reconcile): WORKFLOW-DESIGN.md NR-4 ("…; no write was performed") and OQ-018 ("settings write-to-disk … NOT_RUN — nested path writes are source-confirmed only") carry stale pre-t32 wording, superseded by the measurements in §2/§3 here and Round 3 (t32) — a real-GUI save persisted to cordis.patch.yml via POST /api/settings/mutate (including t32's nested roles.planner route write), revision 0→1, survives reload/restart, applies to a new session; the measured record prevails.
+
 ### 4. 五处环境偏离（必须如实标注，勿当成"标准环境"证据）
 
 1. **`DSH_HOME` 不在 `/tmp`**，在 `.workflow-artifacts/gui-verify/dsh-home`。原因：本沙箱 `/tmp` 是

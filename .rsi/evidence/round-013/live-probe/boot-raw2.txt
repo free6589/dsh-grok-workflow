@@ -1,0 +1,14 @@
+file:///home/fish/.local/share/mise/installs/node/26.8.1/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1855
+		if (template === void 0) throw new Error(`${binName}: profile ${JSON.stringify(name)} does not exist; create it with 'dsh plugin --profile ${name} add <package>'`);
+		                               ^
+
+Error: dsh: profile "grok-workflow-dev" does not exist; create it with 'dsh plugin --profile grok-workflow-dev add <package>'
+    at loadProfile (file:///home/fish/.local/share/mise/installs/node/26.8.1/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1855:34)
+    at prepareProfile (file:///home/fish/.local/share/mise/installs/node/26.8.1/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-QhDEDXsF.js:219:18)
+    at composeProfile (file:///home/fish/.local/share/mise/installs/node/26.8.1/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-QhDEDXsF.js:238:46)
+    at runProfile (file:///home/fish/.local/share/mise/installs/node/26.8.1/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-QhDEDXsF.js:283:26)
+    at async Module.runCli (file:///home/fish/.local/share/mise/installs/node/26.8.1/lib/node_modules/@deepseek-ai/dsh/lib/bin-CwxESKe-.js:214:5)
+    at async runCli (file:///home/fish/.local/share/mise/installs/node/26.8.1/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:21:2)
+    at async file:///home/fish/.local/share/mise/installs/node/26.8.1/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:25:33
+
+Node.js v26.8.1

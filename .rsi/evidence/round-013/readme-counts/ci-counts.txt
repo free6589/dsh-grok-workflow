@@ -1,0 +1,77 @@
+README 测试数 / 文件数漂移修正 — 本机实测证据
+==============================================
+
+任务: readme_counts_fix (修正 README 测试数与文件数漂移)
+状态词汇: CONFIRMED = 本机真实命令直接观察；NOT_RUN = 未执行
+采集时间: 2026-11-18T21:09:22+08:00 (Asia/Singapore, 修复前) / 2026-11-18T21:10:18+08:00 (修复后)
+工作目录: /home/fish/projects_mine/dsh-grok-workflow
+主机: 仓库根即 CWD，`pwd` 与 `git rev-parse --show-toplevel` 均指向该目录；分支 main，基线 v0.11.12。
+
+1. 修复前的漂移（CONFIRMED）
+--------------------------------
+命令:  grep -nE "[0-9]+ (deterministic )?tests|tests across|[0-9]+ 个文件" README.md README.zh-CN.md
+结果（命中且仅命中两行）:
+  README.md:311:`npm run ci` runs typecheck, lint, build and **366 deterministic tests across 22 files**; ...
+  README.zh-CN.md:301:`npm run ci` 依次运行 typecheck、lint、build 与**22 个文件 / 366 个确定性测试**，...
+结论: 英文与中文 README 各存在一处版本化计数声明，数值为 366 tests / 22 files，与实测不符。
+
+2. 实测命令与结果（CONFIRMED）
+--------------------------------
+命令:     npm run ci
+工作目录: /home/fish/projects_mine/dsh-grok-workflow
+退出码:   0
+原始输出: .rsi/evidence/round-013/readme-counts/ci-raw.log （347 行，未删改）
+执行时刻: Start at 21:09:22
+关键输出（原文摘录，ci-raw.log:342-345）:
+
+ Test Files  57 passed (57)
+      Tests  1022 passed (1022)
+   Start at  21:09:22
+   Duration  19.88s (transform 1.40s, setup 0ms, import 4.23s, tests 8.97s, environment 6ms)
+
+EXIT=0
+
+3. 独立复核文件数（CONFIRMED）
+--------------------------------
+命令: ls test/*.spec.ts | wc -l
+结果: 57
+命令: grep -c "^ ✓" /home/fish/projects_mine/dsh-grok-workflow/.rsi/evidence/round-013/readme-counts/ci-raw.log
+结果: 57   （与 vitest 报告的 57 个通过文件一一对应，无 skip/失败行）
+
+4. 修复后的声明（CONFIRMED）
+--------------------------------
+修改点仅两行（git diff --stat: README.md | 2 +-, README.zh-CN.md | 2 +-）:
+  README.md:311       **366 deterministic tests across 22 files**  ->  **1022 deterministic tests across 57 files**
+  README.zh-CN.md:301 **22 个文件 / 366 个确定性测试**            ->  **57 个文件 / 1022 个确定性测试**
+
+残留检查命令: grep -rn "366\|22 files\|22 个文件" README.md README.zh-CN.md
+结果: 无命中（grep 退出码 1 = 无匹配）
+
+5. 修复后回归（CONFIRMED）
+--------------------------------
+命令:     npm run ci
+工作目录: /home/fish/projects_mine/dsh-grok-workflow
+退出码:   0
+原始输出: .rsi/evidence/round-013/readme-counts/ci-after-fix.log （347 行，未删改）
+关键输出（原文摘录，ci-after-fix.log:342-345）:
+
+ Test Files  57 passed (57)
+      Tests  1022 passed (1022)
+   Start at  21:10:18
+   Duration  19.87s (transform 1.17s, setup 0ms, import 4.14s, tests 8.89s, environment 6ms)
+
+EXIT=0
+
+结论: 修改 README 计数声明后 typecheck + lint + build + 全量测试仍然全绿，57 文件 / 1022 例不变；
+      README 声明与本机实测一致，无回归。
+
+6. 范围与未做的事（NOT_RUN）
+--------------------------------
+NOT_RUN  未修改 src/、lib/、test/、版本号、CHANGELOG.md（本任务只做 README 计数行）。
+NOT_RUN  未执行 git commit / push / tag / 版本推进 / npm publish。
+NOT_RUN  README 之外的 docs/knowledge/VALIDATION.md、DECISIONS.md、docs/releases/RELEASE-NOTES-0.2.3.md
+         仍保留历史 366 / 22 文件记录：这些是带时间戳的历史验证日志与旧版本发布说明，
+         写的是当时的事实，不属于"当前计数声明"，本轮按约束未改动。
+本文件不含任何密钥、token 或凭据。
+
+设备=agent-92，时间 2026-11-18

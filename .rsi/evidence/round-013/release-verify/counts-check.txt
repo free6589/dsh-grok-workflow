@@ -1,0 +1,42 @@
+===== counts-check (round-13 release-verify) =====
+date(UTC): 2026-11-18T13:37:57Z
+
+--- README.md:311 ---
+`npm run ci` runs typecheck, lint, build and **1022 deterministic tests across 57 files**; no online model is needed. The suite covers the generated workflow, the real PTC engine contract, the gate and delivery paths, routing and fallback chains, failure classification, the configuration surface, write-path isolation and a reliability set (cancellation, deadlines, concurrency, duplicates, recursion, context bounds, redaction, unload/reload). Model-backed end-to-end checks are separate scripts and are recorded in [the validation log](docs/knowledge/VALIDATION.md); the headless one-shot delivery check is `scripts/e2e-headless-in-turn.sh`.
+
+--- README.zh-CN.md:301 ---
+`npm run ci` 依次运行 typecheck、lint、build 与**57 个文件 / 1022 个确定性测试**，不需要在线模型。测试覆盖生成的脚本、真实 PTC 引擎契约、闸门与交付路径、路由与备用链、失败归类、配置面、写入路径隔离，以及一组可靠性用例（取消、超时、并发、重复启动、递归、上下文边界、脱敏、卸载/重载）。带模型的端到端检查是独立脚本，记录在[验证日志](docs/knowledge/VALIDATION.md)；headless 单轮交付检查是 `scripts/e2e-headless-in-turn.sh`。
+
+--- CHANGELOG first ## sections ---
+6:## [Unreleased]
+8:## [0.11.13] - 2026-11-18
+29:## [0.11.12] - 2026-11-18
+
+--- package.json version ---
+  "version": "0.11.13",
+
+--- package-lock.json version (top) ---
+  "version": "0.11.13",
+      "version": "0.11.13",
+
+--- git diff --stat -- src/ test/ (expect empty) ---
+[end-of-diff-stat]
+
+--- git diff --name-only (working tree) ---
+.rsi/LOG.md
+.rsi/ROUND.md
+.rsi/STATE.md
+.rsi/ledger.jsonl
+CHANGELOG.md
+README.md
+README.zh-CN.md
+docs/LOCAL-TESTING.md
+docs/knowledge/VALIDATION.md
+package-lock.json
+package.json
+
+--- ci summary lines (from ci.txt) ---
+Found 22 warnings and 0 errors.
+ Test Files  57 passed (57)
+      Tests  1022 passed (1022)
+EXIT_CODE recorded separately; see execution log (ci EXIT_CODE=0).

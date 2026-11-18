@@ -1,0 +1,55 @@
+=== COMMAND: git rev-parse HEAD ===
+be64d566fedfbe4da1829e546312d70edb0a4043
+
+=== COMMAND: git rev-parse --abbrev-ref HEAD ===
+main
+
+=== COMMAND: git status --short --branch ===
+## main...origin/main
+ M .rsi/LOG.md
+ M .rsi/ROUND.md
+ M .rsi/STATE.md
+ M .rsi/ledger.jsonl
+?? .rsi/evidence/round-013/
+?? settings-simple-mock.html
+
+=== COMMAND: git ls-remote origin main ===
+be64d566fedfbe4da1829e546312d70edb0a4043	refs/heads/main
+
+=== COMMAND: git rev-parse refs/remotes/origin/main (local tracking ref, may be stale) ===
+be64d566fedfbe4da1829e546312d70edb0a4043
+
+=== COMMAND: git log -1 --format='%H %ci %s' HEAD ===
+be64d566fedfbe4da1829e546312d70edb0a4043 2026-11-18 15:39:41 +0800 fix(redact): harden warn paths and history forwarding against credential leaks (RSI round 12)
+
+=== sampled_at: 2026-11-18T21:07:57+08:00 ===
+
+=== 同步结论（逐条标注证据等级） ===
+1. [CONFIRMED] git rev-parse HEAD = be64d566fedfbe4da1829e546312d70edb0a4043
+   证据：上方 "COMMAND: git rev-parse HEAD" 完整输出。
+2. [CONFIRMED] 分支为 main，本地 HEAD 与远端 main 完全一致。
+   证据：git ls-remote origin main 输出 be64d566...\trefs/heads/main，与 HEAD 逐字节相同。
+   该方法直接查询远端，不依赖本地任何缓存 ref，因此不受 stale 影响。
+3. [CONFIRMED] 本地跟踪 ref refs/remotes/origin/main 亦为 be64d566...，与远端实测值一致。
+   结论：不存在 stale 跟踪 ref 的情形——"origin/main 是否 stale"此前未定论，现可判定为 NOT STALE。
+   注：本地 ref 与远端实测值相同并不能单独证明不 stale（两者可能同时落后），
+   但 ls-remote 直接连远端返回同一 SHA，故 stale 假设被排除。
+4. [CONFIRMED] 工作树不干净：4 个受控文件被修改，2 项未跟踪。
+   ` M .rsi/LOG.md` / ` M .rsi/ROUND.md` / ` M .rsi/STATE.md` / ` M .rsi/ledger.jsonl`
+   `?? .rsi/evidence/round-013/`（本任务证据目录） / `?? settings-simple-mock.html`
+   说明：HEAD 与 origin/main 在提交层面一致，但工作树存在未提交改动；两者是不同的判断，不可混为一谈。
+5. [CONFIRMED] HEAD 提交 = v0.11.12 所指向的提交（be64d566...），时间 2026-11-18 15:39:41 +0800。
+   证据：见 tags.txt "v0.11.12^{commit} vs HEAD" 段与 git log -1 输出。
+6. [NOT_RUN] git fetch / git pull 未执行（任务约束禁止改写 ref）。因此本基线不覆盖
+   "远端是否存在本地未知的新分支/新提交"以外的情形；main 分支本身已由 ls-remote 直接核对。
+7. 截断声明：本文件所有命令输出均为完整输出，未截断。tags.txt 中 tag 清单为全量 38 个，非尾部片段。
+
+=== 运行期并发观察（本任务只读，非本任务改动） ===
+采样开始时的 git status 集合： M .rsi/LOG.md / ROUND.md / STATE.md / ledger.jsonl ; ?? settings-simple-mock.html
+采样结束时新增： M README.md / M README.zh-CN.md
+mtime: README.md 2026-11-18 21:09:59.542601939 +0800 ; README.zh-CN.md 2026-11-18 21:09:59.887602399 +0800
+diff 摘要：README 中测试计数 366 tests/22 files -> 1022 tests/57 files
+[CONFIRMED] 该改动由同一工作区内的并发任务产生（readme-counts-fix），非本任务所为；
+  本任务全部写入仅限 .rsi/evidence/round-013/git-baseline/ 下两个文件。
+HEAD 复核（运行结束时）：be64d566fedfbe4da1829e546312d70edb0a4043
+远端 main 复核（运行结束时）：be64d566fedfbe4da1829e546312d70edb0a4043

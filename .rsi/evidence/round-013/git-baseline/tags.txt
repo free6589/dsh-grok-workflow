@@ -1,0 +1,288 @@
+# Remote tag inventory baseline (read-only, no fetch)
+# repo: /home/fish/projects_mine/dsh-grok-workflow
+# sampled_at: 2026-11-18T21:09:03+08:00
+# NOTE: output below is COMPLETE, not truncated. Full ref count = 70 lines (tags + peeled ^{} entries).
+
+=== COMMAND: git ls-remote --tags origin (COMPLETE RAW OUTPUT) ===
+f175ada8a7533a5f61c06a75e5a457e32b37579b	refs/tags/v0.1.0
+a7d5a6267c471a6ed73e44ac02092f59942c508a	refs/tags/v0.1.0^{}
+63c04aa544372161cf8f4d1c307920f7c0531a94	refs/tags/v0.10.0
+b2c451500973ab2d38d7671b03f5f448d24e9feb	refs/tags/v0.10.0^{}
+84fccce84377a0aee8f347dcc93ea3d7ca061617	refs/tags/v0.10.1
+ed61750a49deebc01954ab48f2f1aa048445f0d3	refs/tags/v0.10.1^{}
+003cb68395764b26e8ccdf95119946de31658eb4	refs/tags/v0.10.2
+4eabee8c6a5ead2045d48128d00c9a742f8ed53a	refs/tags/v0.10.2^{}
+08c5fd0ddaf76efd8715f3c2cdd3f6016be05265	refs/tags/v0.11.0
+85541adefd005a2340d531da8c8eace2ae7c3c09	refs/tags/v0.11.0^{}
+9b327f1e6874b0025f196fcfdc1876419ec6d9e5	refs/tags/v0.11.1
+a5929c47534220b72d4e27873b576897a624c291	refs/tags/v0.11.1^{}
+f70d30749238d419b56896735b3d677141e9ea8c	refs/tags/v0.11.10
+000a56e9a816d1a7fbe7054072bf15309fe53f9e	refs/tags/v0.11.10^{}
+bfa0d80751ae2011a3c79400d889822f29885ce3	refs/tags/v0.11.11
+6ff6373b133c207b7dd8b7e328797a560ee98e98	refs/tags/v0.11.11^{}
+10d82d281aa8db8eae20fa0daa0d39743b4cba02	refs/tags/v0.11.12
+be64d566fedfbe4da1829e546312d70edb0a4043	refs/tags/v0.11.12^{}
+629f0c40f91f1ab2de6d8fa6d14149aac4a30505	refs/tags/v0.11.2
+2d5e95679f07675d37e119ae400ee749171f8793	refs/tags/v0.11.2^{}
+eadf8f42b1a8d2c335c37b1e6df0f144faea565d	refs/tags/v0.11.3
+17e3a12c74ec2546c6a782eba1444590cfe8cb87	refs/tags/v0.11.3^{}
+437eddb020679fbf1e74a3e36fcfa9d645c901cd	refs/tags/v0.11.4
+bcb601d95f9043b21dc4c5070154241837660ee2	refs/tags/v0.11.4^{}
+0f97e19f30c78f6c8fba56b4f6b3419da5b80deb	refs/tags/v0.11.5
+bf0dc911c53402ac2c12fa965794949d6c536d6b	refs/tags/v0.11.5^{}
+c4d07a2ee269b540bc8f453ac4b64702972eb9b0	refs/tags/v0.11.6
+88d133b67d1da1bf19518a17a349e447dc2ae14d	refs/tags/v0.11.6^{}
+9796f9d843735a743d2fecf935deee28873899d3	refs/tags/v0.11.7
+1760d50fcf6af8cc80d78dc941ac23a441249123	refs/tags/v0.11.7^{}
+1fd0682b786710aaa1eb23dbbcbc421673020bd5	refs/tags/v0.11.8
+a04515435e2abb6d2927458fe5801e128ba31367	refs/tags/v0.11.8^{}
+bb124de12083a0443ab9a6e10cff1621cceed8e0	refs/tags/v0.11.9
+596239ab6759ec84c8ced33f75f04d89cfb108ca	refs/tags/v0.11.9^{}
+abb48bf67a06a52e9fe27762e1def3e2cd1fd194	refs/tags/v0.2.0
+f7a244c6dff75f27608328327f69968474e8bfe1	refs/tags/v0.2.0^{}
+8d4a9168d64a3807f6da8ac0aa6a7dab0ce5060c	refs/tags/v0.2.0-rc.1
+32a7f4a822fa9a2e13c5da0cdab0ea93943e331d	refs/tags/v0.2.0-rc.1^{}
+7cdd969e00c3d0f37ad859adfc908908123cdb63	refs/tags/v0.2.1
+cecc0651217761f0a6608bb7f2a6a2311b887cc9	refs/tags/v0.2.1^{}
+88f4343ba8aeaa2ba6b7684419b3fa7568dd3ea8	refs/tags/v0.2.2
+5ecd96bf9288fb67c07b412fce0b55bbe51db897	refs/tags/v0.2.2^{}
+1f63ec29fd3b9e54bbbf7526a972954ab7923669	refs/tags/v0.2.3
+538d1ab4a9d8b90106e8b04970459388c0b30ae1	refs/tags/v0.2.3^{}
+c6b614de112c0ab7ca5db4a72c018a1452d9cc41	refs/tags/v0.2.4
+7357e5efec4995da036d3656f74c546852e61931	refs/tags/v0.2.4^{}
+1e83b4abe0d38d8b32b35b7146748b66cef66cad	refs/tags/v0.2.5
+bf853ac084d7626f74ba3b23f4d1d8a8668988d2	refs/tags/v0.2.5^{}
+8e81dc561da7a5ce55b830f27b522319ec9d340b	refs/tags/v0.2.6
+f6ec5f1f84babfc727b7847e8edc44bbfff72247	refs/tags/v0.2.6^{}
+26f8044214d7be41d95fdb2efdd0aaf4c4e6493e	refs/tags/v0.2.7
+16a11b72fb527bd05affe7cb49e304c033580b88	refs/tags/v0.2.7^{}
+3f5ad0a1921e42d0a8c2d755cbb9ab94b5f4d73c	refs/tags/v0.3.0
+708c31557c17056a6a2629ff271f420fed3c9d98	refs/tags/v0.4.0
+af82a34becab2a1bc622c1aea7b34f56b2089428	refs/tags/v0.5.0
+5cc66beb428b01076aae6d9fa1209899c1f2b8a4	refs/tags/v0.5.1
+1f9065deb2d7bc5089df5bb458a1fb3ae5b3dc45	refs/tags/v0.6.0
+3b96b16a774e0ac6d8068dcb0cf0726d47e99efb	refs/tags/v0.7.0
+146dce72aa53ed7383f212032206c94b4cb8046d	refs/tags/v0.7.0^{}
+9c590f263b9144329a558a13c81596afc1933835	refs/tags/v0.8.0
+936e6258e438e1d3cdad0f49736bf8ceaac533a4	refs/tags/v0.9.0
+2d2b34744c8a619e595cd650754fd60858dec740	refs/tags/v0.9.0^{}
+584dc22040aee925666b064196af701e71aafb6a	refs/tags/v0.9.1
+9103280f325781b7d071eb3013aac192b7d435d7	refs/tags/v0.9.1^{}
+38ef23710e52a83115a54a14264a500836235704	refs/tags/v0.9.2
+5eb4942af5f0ccbbcee8b1c59e04074d7c172103	refs/tags/v0.9.2^{}
+f63bb7cf846056a01b048c304592f74cecbd1a41	refs/tags/v0.9.3
+593f89e95a7c6cc674d34d82ed3c0ae4d7ced78e	refs/tags/v0.9.3^{}
+8ca2c1abf07724678bd794b57ee4a62cc1a75569	refs/tags/v0.9.4
+ae0c6d328626d4f73ee0cab0ef61cf7f1b1d6582	refs/tags/v0.9.4^{}
+
+=== END raw output. total lines = 70 ===
+
+=== COMMAND: git ls-remote --tags origin | tag names, version-sorted (peeled entries removed) ===
+v0.1.0
+v0.2.0
+v0.2.0-rc.1
+v0.2.1
+v0.2.2
+v0.2.3
+v0.2.4
+v0.2.5
+v0.2.6
+v0.2.7
+v0.3.0
+v0.4.0
+v0.5.0
+v0.5.1
+v0.6.0
+v0.7.0
+v0.8.0
+v0.9.0
+v0.9.1
+v0.9.2
+v0.9.3
+v0.9.4
+v0.10.0
+v0.10.1
+v0.10.2
+v0.11.0
+v0.11.1
+v0.11.2
+v0.11.3
+v0.11.4
+v0.11.5
+v0.11.6
+v0.11.7
+v0.11.8
+v0.11.9
+v0.11.10
+v0.11.11
+v0.11.12
+
+=== unique tag count (remote) = 38 ===
+
+=== COMMAND: git tag -l | sort -V   (LOCAL tags) ===
+v0.1.0
+v0.2.0
+v0.2.0-rc.1
+v0.2.1
+v0.2.2
+v0.2.3
+v0.2.4
+v0.2.5
+v0.2.6
+v0.2.7
+v0.3.0
+v0.4.0
+v0.5.0
+v0.5.1
+v0.6.0
+v0.7.0
+v0.8.0
+v0.9.0
+v0.9.1
+v0.9.2
+v0.9.3
+v0.9.4
+v0.10.0
+v0.10.1
+v0.10.2
+v0.11.0
+v0.11.1
+v0.11.2
+v0.11.3
+v0.11.4
+v0.11.5
+v0.11.6
+v0.11.7
+v0.11.8
+v0.11.9
+v0.11.10
+v0.11.11
+v0.11.12
+
+=== unique tag count (local) = 38 ===
+
+=== COMMAND: diff of remote vs local tag name sets ===
+IDENTICAL: remote and local tag name sets match exactly
+
+=== COMMAND: per-tag resolved commit (annotated tags peeled) ===
+v0.1.0 -> a7d5a6267c471a6ed73e44ac02092f59942c508a
+v0.2.0 -> f7a244c6dff75f27608328327f69968474e8bfe1
+v0.2.0-rc.1 -> 32a7f4a822fa9a2e13c5da0cdab0ea93943e331d
+v0.2.1 -> cecc0651217761f0a6608bb7f2a6a2311b887cc9
+v0.2.2 -> 5ecd96bf9288fb67c07b412fce0b55bbe51db897
+v0.2.3 -> 538d1ab4a9d8b90106e8b04970459388c0b30ae1
+v0.2.4 -> 7357e5efec4995da036d3656f74c546852e61931
+v0.2.5 -> bf853ac084d7626f74ba3b23f4d1d8a8668988d2
+v0.2.6 -> f6ec5f1f84babfc727b7847e8edc44bbfff72247
+v0.2.7 -> 16a11b72fb527bd05affe7cb49e304c033580b88
+v0.3.0 -> 3f5ad0a1921e42d0a8c2d755cbb9ab94b5f4d73c
+v0.4.0 -> 708c31557c17056a6a2629ff271f420fed3c9d98
+v0.5.0 -> af82a34becab2a1bc622c1aea7b34f56b2089428
+v0.5.1 -> 5cc66beb428b01076aae6d9fa1209899c1f2b8a4
+v0.6.0 -> 1f9065deb2d7bc5089df5bb458a1fb3ae5b3dc45
+v0.7.0 -> 146dce72aa53ed7383f212032206c94b4cb8046d
+v0.8.0 -> 9c590f263b9144329a558a13c81596afc1933835
+v0.9.0 -> 2d2b34744c8a619e595cd650754fd60858dec740
+v0.9.1 -> 9103280f325781b7d071eb3013aac192b7d435d7
+v0.9.2 -> 5eb4942af5f0ccbbcee8b1c59e04074d7c172103
+v0.9.3 -> 593f89e95a7c6cc674d34d82ed3c0ae4d7ced78e
+v0.9.4 -> ae0c6d328626d4f73ee0cab0ef61cf7f1b1d6582
+v0.10.0 -> b2c451500973ab2d38d7671b03f5f448d24e9feb
+v0.10.1 -> ed61750a49deebc01954ab48f2f1aa048445f0d3
+v0.10.2 -> 4eabee8c6a5ead2045d48128d00c9a742f8ed53a
+v0.11.0 -> 85541adefd005a2340d531da8c8eace2ae7c3c09
+v0.11.1 -> a5929c47534220b72d4e27873b576897a624c291
+v0.11.2 -> 2d5e95679f07675d37e119ae400ee749171f8793
+v0.11.3 -> 17e3a12c74ec2546c6a782eba1444590cfe8cb87
+v0.11.4 -> bcb601d95f9043b21dc4c5070154241837660ee2
+v0.11.5 -> bf0dc911c53402ac2c12fa965794949d6c536d6b
+v0.11.6 -> 88d133b67d1da1bf19518a17a349e447dc2ae14d
+v0.11.7 -> 1760d50fcf6af8cc80d78dc941ac23a441249123
+v0.11.8 -> a04515435e2abb6d2927458fe5801e128ba31367
+v0.11.9 -> 596239ab6759ec84c8ced33f75f04d89cfb108ca
+v0.11.10 -> 000a56e9a816d1a7fbe7054072bf15309fe53f9e
+v0.11.11 -> 6ff6373b133c207b7dd8b7e328797a560ee98e98
+v0.11.12 -> be64d566fedfbe4da1829e546312d70edb0a4043
+
+=== v0.11.12 及前序版本存在性核对（逐条 grep 远端原始输出） ===
+PRESENT  v0.11.12
+PRESENT  v0.11.11
+PRESENT  v0.11.10
+PRESENT  v0.11.9
+PRESENT  v0.11.8
+PRESENT  v0.11.7
+PRESENT  v0.11.6
+PRESENT  v0.11.5
+PRESENT  v0.11.4
+PRESENT  v0.11.3
+PRESENT  v0.11.2
+PRESENT  v0.11.1
+PRESENT  v0.11.0
+PRESENT  v0.10.2
+PRESENT  v0.10.1
+PRESENT  v0.10.0
+PRESENT  v0.9.4
+
+=== COMMAND: git rev-parse refs/tags/v0.11.12^{commit} vs HEAD ===
+v0.11.12^{commit} = be64d566fedfbe4da1829e546312d70edb0a4043
+HEAD              = be64d566fedfbe4da1829e546312d70edb0a4043
+MATCH: HEAD is the commit tagged v0.11.12
+
+=== COMMAND: remote tag object SHA vs local tag object SHA (full 38-tag comparison) ===
+v0.1.0         local=f175ada8a7533a5f61c06a75e5a457e32b37579b remote=f175ada8a7533a5f61c06a75e5a457e32b37579b same
+v0.2.0         local=abb48bf67a06a52e9fe27762e1def3e2cd1fd194 remote=abb48bf67a06a52e9fe27762e1def3e2cd1fd194 same
+v0.2.0-rc.1    local=8d4a9168d64a3807f6da8ac0aa6a7dab0ce5060c remote=8d4a9168d64a3807f6da8ac0aa6a7dab0ce5060c same
+v0.2.1         local=7cdd969e00c3d0f37ad859adfc908908123cdb63 remote=7cdd969e00c3d0f37ad859adfc908908123cdb63 same
+v0.2.2         local=88f4343ba8aeaa2ba6b7684419b3fa7568dd3ea8 remote=88f4343ba8aeaa2ba6b7684419b3fa7568dd3ea8 same
+v0.2.3         local=1f63ec29fd3b9e54bbbf7526a972954ab7923669 remote=1f63ec29fd3b9e54bbbf7526a972954ab7923669 same
+v0.2.4         local=c6b614de112c0ab7ca5db4a72c018a1452d9cc41 remote=c6b614de112c0ab7ca5db4a72c018a1452d9cc41 same
+v0.2.5         local=1e83b4abe0d38d8b32b35b7146748b66cef66cad remote=1e83b4abe0d38d8b32b35b7146748b66cef66cad same
+v0.2.6         local=8e81dc561da7a5ce55b830f27b522319ec9d340b remote=8e81dc561da7a5ce55b830f27b522319ec9d340b same
+v0.2.7         local=26f8044214d7be41d95fdb2efdd0aaf4c4e6493e remote=26f8044214d7be41d95fdb2efdd0aaf4c4e6493e same
+v0.3.0         local=3f5ad0a1921e42d0a8c2d755cbb9ab94b5f4d73c remote=3f5ad0a1921e42d0a8c2d755cbb9ab94b5f4d73c same
+v0.4.0         local=708c31557c17056a6a2629ff271f420fed3c9d98 remote=708c31557c17056a6a2629ff271f420fed3c9d98 same
+v0.5.0         local=af82a34becab2a1bc622c1aea7b34f56b2089428 remote=af82a34becab2a1bc622c1aea7b34f56b2089428 same
+v0.5.1         local=5cc66beb428b01076aae6d9fa1209899c1f2b8a4 remote=5cc66beb428b01076aae6d9fa1209899c1f2b8a4 same
+v0.6.0         local=1f9065deb2d7bc5089df5bb458a1fb3ae5b3dc45 remote=1f9065deb2d7bc5089df5bb458a1fb3ae5b3dc45 same
+v0.7.0         local=3b96b16a774e0ac6d8068dcb0cf0726d47e99efb remote=3b96b16a774e0ac6d8068dcb0cf0726d47e99efb same
+v0.8.0         local=9c590f263b9144329a558a13c81596afc1933835 remote=9c590f263b9144329a558a13c81596afc1933835 same
+v0.9.0         local=936e6258e438e1d3cdad0f49736bf8ceaac533a4 remote=936e6258e438e1d3cdad0f49736bf8ceaac533a4 same
+v0.9.1         local=584dc22040aee925666b064196af701e71aafb6a remote=584dc22040aee925666b064196af701e71aafb6a same
+v0.9.2         local=38ef23710e52a83115a54a14264a500836235704 remote=38ef23710e52a83115a54a14264a500836235704 same
+v0.9.3         local=f63bb7cf846056a01b048c304592f74cecbd1a41 remote=f63bb7cf846056a01b048c304592f74cecbd1a41 same
+v0.9.4         local=8ca2c1abf07724678bd794b57ee4a62cc1a75569 remote=8ca2c1abf07724678bd794b57ee4a62cc1a75569 same
+v0.10.0        local=63c04aa544372161cf8f4d1c307920f7c0531a94 remote=63c04aa544372161cf8f4d1c307920f7c0531a94 same
+v0.10.1        local=84fccce84377a0aee8f347dcc93ea3d7ca061617 remote=84fccce84377a0aee8f347dcc93ea3d7ca061617 same
+v0.10.2        local=003cb68395764b26e8ccdf95119946de31658eb4 remote=003cb68395764b26e8ccdf95119946de31658eb4 same
+v0.11.0        local=08c5fd0ddaf76efd8715f3c2cdd3f6016be05265 remote=08c5fd0ddaf76efd8715f3c2cdd3f6016be05265 same
+v0.11.1        local=9b327f1e6874b0025f196fcfdc1876419ec6d9e5 remote=9b327f1e6874b0025f196fcfdc1876419ec6d9e5 same
+v0.11.2        local=629f0c40f91f1ab2de6d8fa6d14149aac4a30505 remote=629f0c40f91f1ab2de6d8fa6d14149aac4a30505 same
+v0.11.3        local=eadf8f42b1a8d2c335c37b1e6df0f144faea565d remote=eadf8f42b1a8d2c335c37b1e6df0f144faea565d same
+v0.11.4        local=437eddb020679fbf1e74a3e36fcfa9d645c901cd remote=437eddb020679fbf1e74a3e36fcfa9d645c901cd same
+v0.11.5        local=0f97e19f30c78f6c8fba56b4f6b3419da5b80deb remote=0f97e19f30c78f6c8fba56b4f6b3419da5b80deb same
+v0.11.6        local=c4d07a2ee269b540bc8f453ac4b64702972eb9b0 remote=c4d07a2ee269b540bc8f453ac4b64702972eb9b0 same
+v0.11.7        local=9796f9d843735a743d2fecf935deee28873899d3 remote=9796f9d843735a743d2fecf935deee28873899d3 same
+v0.11.8        local=1fd0682b786710aaa1eb23dbbcbc421673020bd5 remote=1fd0682b786710aaa1eb23dbbcbc421673020bd5 same
+v0.11.9        local=bb124de12083a0443ab9a6e10cff1621cceed8e0 remote=bb124de12083a0443ab9a6e10cff1621cceed8e0 same
+v0.11.10       local=f70d30749238d419b56896735b3d677141e9ea8c remote=f70d30749238d419b56896735b3d677141e9ea8c same
+v0.11.11       local=bfa0d80751ae2011a3c79400d889822f29885ce3 remote=bfa0d80751ae2011a3c79400d889822f29885ce3 same
+v0.11.12       local=10d82d281aa8db8eae20fa0daa0d39743b4cba02 remote=10d82d281aa8db8eae20fa0daa0d39743b4cba02 same
+mismatch_count=0
+
+=== TAG 结论（逐条标注证据等级） ===
+1. [CONFIRMED] 远端 tag 全量为 38 个唯一 tag（原始 70 行 ref 含 32 条 peeled ^{} 条目）。
+   证据：文件开头完整原始输出，未截断；末尾标注 total lines。
+2. [CONFIRMED] v0.11.12 在远端存在。
+   证据：git ls-remote --tags origin refs/tags/v0.11.12 命中；原始输出含
+   10d82d281aa8db8eae20fa0daa0d39743b4cba02	refs/tags/v0.11.12
+   be64d566fedfbe4da1829e546312d70edb0a4043	refs/tags/v0.11.12^{}
+3. [CONFIRMED] v0.11.12 的全部前序版本均存在：v0.10.0-v0.10.2、v0.11.0-v0.11.11、以及 v0.9.4 及更早。
+   证据：上方逐条 PRESENT 核对段，全部 PRESENT，无 ABSENT。
+4. [CONFIRMED] 本地 tag 集合与远端 tag 集合完全相同：38 = 38，名称集合 diff 为空。
+5. [CONFIRMED] 本地与远端 38 个 tag 的对象 SHA 逐一相同，mismatch_count=0。
+   结论：不存在本地 tag 与远端 tag 漂移或"发布后篡改 tag"的情况（此判断限于 SHA 相等，
+   不构成对 tag 内容合规性的判定）。
+6. [CONFIRMED] 命名规范：除 v0.2.0-rc.1 这一预发布 tag 外，其余 37 个均为 vMAJOR.MINOR.PATCH 形式。
+7. [PARTIAL] 此前基线只观察到 v0.2.7-v0.9.4 尾部 28 个 tag 未全验的缺口已由本文件消除：
+   现为全量清单。但 tag 的 GPG 签名状态、指向提交是否在 main 历史主干上，本任务未核对（超出范围）。
+8. 截断声明：无截断。全部 70 行原始 ref 输出逐字保留在本文件顶部。

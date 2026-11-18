@@ -5,6 +5,27 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.11.13] - 2026-11-18
+
+### Fixed / 修复
+
+- **READMEs no longer quote a stale test count / README 不再引用过时的测试数** —
+  both READMEs said `366 deterministic tests across 22 files` while the suite was at
+  57 files / 1022 tests; the two count sentences now quote the measured numbers.
+  / 两份 README 都写着 `366 个确定性测试 / 22 个文件`，而实际已是 57 文件 / 1022 测试；
+  两处计数句现已按实测改写。
+- **Settings-write history note reconciled with the measured record
+  / 设置写入历史注记已按实测对账** —
+  a clarification line under the Round 15 GUI table states that the pre-t32 NR-4 /
+  OQ-018 wording ("no write was performed" / "NOT_RUN — nested path writes are
+  source-confirmed only") is superseded by the t32 + Round 15 measurements (real-GUI
+  save persisted to `cordis.patch.yml` via `POST /api/settings/mutate`, revision
+  0→1, survives reload, applies to a new session); the measured record prevails.
+  / 在 Round 15 真机表下方加一行对账澄清：t32 之前的 NR-4 / OQ-018 旧措辞
+  （"no write was performed" / "NOT_RUN —— 嵌套写入仅源码确认"）已被 t32 与
+  Round 15 的实测取代（真 GUI 保存经 `POST /api/settings/mutate` 落盘
+  `cordis.patch.yml`，revision 0→1、重启后仍在、对新会话生效），以实测为准。
+
 ## [0.11.12] - 2026-11-18
 
 ### Fixed / 修复

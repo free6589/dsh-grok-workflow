@@ -70,7 +70,7 @@ Verified activation, step by step (anyone can repeat it):
 dsh --profile grok-workflow-dev --from-default-profile web
 
 # 2. install the packed plugin (adds the dependency AND the bundle row)
-dsh plugin --profile grok-workflow-dev add ./dsh-grok-workflow-0.11.12.tgz
+dsh plugin --profile grok-workflow-dev add ./dsh-grok-workflow-0.11.13.tgz
 
 # 3. re-enable a workflow provider in the profile patch
 #    <profile>/cordis.patch.yml:
@@ -139,8 +139,8 @@ cp "$DSH_HOME/profiles/<name>/cordis.patch.yml" \
 # 2. install the packed plugin. A *new path* every time: `dsh plugin add` with the same
 #    `file:` spec is a pnpm no-op, so an unchanged path can silently keep the old contents.
 DEST="/tmp/install-$(date +%s%N)"      # a spec this profile has never been given
-mkdir -p "$DEST" && cp dsh-grok-workflow-0.11.12.tgz "$DEST/"
-dsh plugin --profile <name> add "$DEST/dsh-grok-workflow-0.11.12.tgz"
+mkdir -p "$DEST" && cp dsh-grok-workflow-0.11.13.tgz "$DEST/"
+dsh plugin --profile <name> add "$DEST/dsh-grok-workflow-0.11.13.tgz"
 
 # 3. verify the installed bytes, not the pack
 node -p "require('$DSH_HOME/profiles/<name>/node_modules/dsh-grok-workflow/package.json').version"
