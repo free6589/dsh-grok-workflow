@@ -1,0 +1,10 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+ ✓ test/docs-config-keys.spec.ts (6 tests) 60ms
+
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+   Start at  01:41:46
+   Duration  867ms (transform 110ms, setup 0ms, import 604ms, tests 60ms, environment 0ms)
+

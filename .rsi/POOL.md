@@ -1,0 +1,123 @@
+# RSI Pool — findings with file:line anchors
+
+Built from eight read-only audits on 2026-11-18 (config/validation, redaction, report/delivery,
+client settings, progress panel, checkpoint/resume, script/scheduling, docs). A finding is
+pooled only with an anchor; `H` marks an unverified hypothesis. Rounds 4–11 are taken from
+here and are marked DONE when their commit lands.
+
+## Redaction (`src/redact.ts`, call sites)
+
+- R4 DONE-ISH · `Authorization:` leaks for every scheme except Bearer/Basic and for a bare
+  opaque value (`Agent` in round 4 fixed this). `authorization` exists only in
+  `isSensitiveKey` (line ~217), never in the text rules.
+- P · `Cookie:`/`Set-Cookie:` are matched only at line start (`^` without `m`, line ~82), so
+  `curl -H 'Cookie: PHPSESSID=…'` passes through; `PHPSESSID`/`JSESSIONID`/`sid` are in no
+  alternation. S / low.
+- P · URL allowlist misses `X-Amz-Signature`, `X-Goog-Signature`, `?sig=`, `?auth=` (line ~109).
+  A presigned S3 URL is a bearer credential. S / low.
+- P · PGP armored keys (`BEGIN PGP PRIVATE KEY BLOCK`) are not matched (line ~28); a
+  base64-wrapped PEM has no rule at all. S / low (M with the base64 leg).
+- P · The assignment rule (line ~155) rewrites code: `const token = await refreshToken()` →
+  `const token = [REDACTED] refreshToken()`, `password == null` → `password =[REDACTED] null`.
+  S / medium.
+- P · `key-value-env` (line ~136) has no value terminator, so `db_pass=hunter2;user=app`
+  loses `;user=app` and a `Set-Cookie` line loses `Path=/`. S / low.
+- P · Placeholder re-redaction: `X-Amz-Credential=[REDACTED AWS ACCESS KEY]` becomes
+  `[REDACTED] AWS ACCESS KEY]` (line ~136 lacks the `\[` guard line ~155 has). S / low.
+- P · `isSensitiveKey` (lines ~214-218) misses `x-api-key`/`private-token`; text rules miss
+  `authorization`/`cookie`. S / low.
+- P · `src/records.ts` lines ~292, ~664, ~756 log `error.message` raw where sibling sites use
+  `redactError` (lines ~555, ~690). S / low.
+- P · `src/history.ts` ~78-80 truncates before redacting, so a credential straddling the cap
+  survives as a sub-threshold fragment. S / low.
+
+## Configuration (`src/config.ts`, `src/settings.ts`, `src/index.ts`)
+
+- R5 PENDING · `roles.supervisor` is outside `ROLE_ORDER` (`src/settings.ts:94`), so a bad
+  supervisor route fails at run time instead of load. S / low.
+- R6 PENDING · `resolveConfig` never validates `grokDefault` (`config.ts:700`) though the type
+  is `'on' | 'off'` and the gate tests `=== 'on'`. S / low.
+- P · Unknown keys are rejected at the top level but silently dropped one level down:
+  `roles.reviewer` and a route's `maxInflight` are discarded (`config.ts:337`, `:439`, `:385`)
+  while the stored document keeps them. S / medium (stricter load needs a migration note).
+- P · A non-string `model`/`provider` throws a bare `TypeError` naming neither key nor shape
+  (`config.ts:456`, `:461`). S / low.
+- P · `repairLimitOverruns` still clamps seven removed keys through `LEGACY_LIMIT_CAPS`
+  (`config.ts:612-636`) and announces a cap that is not the fixed value (`maxActiveRuns` says 4,
+  the fixed value is 2). Dead path, misleading warning. S / low.
+- P · Six fail-closed branches have no test: `config.ts:654`, `:444`, `:462`, `:438`, `:680`,
+  `:826`. Coverage only (mutation run needed to show they bite). S / low.
+
+## Report and delivery (`src/report.ts`, `src/delivery/index.ts`, `src/answer.ts`)
+
+- P · The delivered answer is only the FIRST sentence of the synthesis, with no ellipsis
+  (`delivery/index.ts:457`), while `answer.ts:51-53` forbids the model to add anything. S / medium.
+- P · The 2400-char clamp drops the verdict line and, in bilingual delivery, the whole second
+  language (`delivery/index.ts:588`, `:613`). S / low.
+- R11 PENDING · The cancelled terminal embeds the relay preamble, markers and ledger
+  (`gate.ts:533`) although it is a real `assistant/message`. S / low.
+- P · The "bilingual" mirror repeats the same sentence under English labels
+  (`answer.ts:111-114`, `delivery/index.ts:611`). S / low.
+- R9 PENDING · A COMPLETED run prints `Failures: 1 infrastructure` for an attempt that was
+  retried and verified (`report.ts:769`, `delivery/index.ts:630`). S / low.
+- R8 PENDING · The ledger's model-route line omits `supervisor` (`delivery/index.ts:695`) and
+  pushes a duplicate `Synthesis: <mode>` label. S / low.
+- P · A fallback partial that verified everything says `0 项没做成` and never mentions the
+  degraded plan (`delivery/index.ts:387-392`, `script.ts:2160`). S / low.
+- P · `dedupeBilingual` deletes a deliberately repeated sentence from an answer (`:429`).
+  H on intent. S / low.
+
+## Progress panel (`src/progress-tab.ts`, `src/client/index.js`, `src/records.ts`)
+
+- P0 · Execute/Verify print `Not reported in the events` because rows are matched by
+  `agent-start.data.phase`, which the script fills with the plan-task group title, never
+  `执行`/`检查` (`progress-tab.ts:543-580`, tokens `:184-185`, producer `script.ts:1849-1852`).
+  Fix: bind a row to a stage by its role label when the phase is a task header, and add a
+  second view (`evidence`) so the one-node-per-row invariant (`test/progress-tab.spec.ts:268`)
+  survives. M / medium.
+- P · Edge nodes (Start/End) print the same `Not reported in the events` copy although
+  `run-start`/`run-end` did arrive (`client/index.js:2669`, `:2673`). S / low.
+- P · `meta.phases` (which does declare `检查`) is dropped at `run-start` (`records.ts:597`), so
+  "declared, no rows yet" is indistinguishable from "never planned". S / medium (typed session
+  event; needs a DSH-upgrade check first). H that the extra key is safe.
+- P · Fixtures feed the panel a stream shape the recorder cannot produce (`phase: '执行'`), which
+  is why 951 green tests coexist with an empty panel (`test/progress-tab.spec.ts:247`, `:54`). S / low.
+
+## Checkpoint and resume (`src/checkpoint/*`, `src/resume/*`)
+
+- P · `integrity.bytes` is bounded by `countCeiling` (1,000,000) on read but `maxBytes`
+  (1,048,576) on write (`schema.ts:59`, `:859`), so a legal payload in between writes fine and
+  reads back `invalid`. S / low.
+- R10 PENDING · `durationMs` is gated on `countCeiling` (16 min 40 s) instead of the field's own
+  `msCeiling` (`wiring.ts:786`, `schema.ts:624`), so every longer run records no duration. S / low.
+- P · `recordableTimeoutMs`'s upper guard is vacuous (`msCeiling === MAX_SAFE_INTEGER`), so a
+  config-legal `timeoutMs` near `MAX_SAFE_INTEGER` makes every checkpoint write `invalid`
+  (`wiring.ts:541-593`). S / low.
+- P · A caller-supplied `git` provider returning `head: ''` makes every write fail
+  (`wiring.ts:757`, `schema.ts:686`); the provider is untested. S / low.
+- P · Restore decisions drop `title`, `attempt`, `updatedAt` while claiming `retain` keeps the
+  task as-is (`resume/policy.ts:137-145`). S / medium.
+- P · Integrity is verified over the validator's normalized rebuild, so changing `git.head`'s
+  case after sealing still verifies (`writer.ts:160`, `schema.ts:812`, `:685`). S / low.
+- P · Five validator refusal branches are untested (`resume/validator.ts:231`, `:274`, `:290`,
+  `:296`, `:308`). Coverage only. S / low.
+- P · `completed` is retained with no evidence, while a bare `success` is refused as a
+  self-report (`resume/policy.ts:96-99` vs `:116-119`). H on intent; M / medium.
+
+## Docs
+
+- P · README says "Since `0.10.0` the surface is exactly eight keys" (line ~202) while the table
+  has nine rows and the Chinese text says nine. S / low.
+- P · Both README "Models per role" examples are patches the loader refuses:
+  `synthesis: deterministic` and the removed `switchOn` key (EN ~176-177, zh ~169-170). S / low.
+- P · README validation bullet still says "more than three routes" and "an unknown `switchOn`
+  class" (EN ~183, zh ~176); the real limit is `HARD_LIMITS.chainLength` = 50 and `switchOn` is
+  a removed key. S / low.
+- P · `docs/knowledge/DESIGN-progress-tab.md` §4 documents the old delivery-template spine and
+  §12 never records the Execute/Verify gap. S / low.
+
+## Open questions
+
+- `src/panel.ts` has no production importer (only `test/panel.spec.ts`, `test/gui-fold.ts`); its
+  "only a task-level result can produce a pass word" guarantee may never run. H — verify against
+  the shipped bundle before deciding to delete or wire it. M / medium.

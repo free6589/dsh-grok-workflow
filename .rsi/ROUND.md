@@ -95,3 +95,33 @@ no history is rewritten, and no round is force-pushed.
   (`NOT_RUN` — the load-time rejection itself is covered by `test/config.spec.ts`).
 - **Suggested version:** patch → `0.11.3`.
 - **status:** OK
+
+## Round 4 — README config-surface drift + docs guard extension (incl. TS7016)
+
+- **Theme (P0/P1, shipped docs false statements):** README prose still claimed
+  "three routes", "17 fields", "seven scalars", limits-table `| 3 |` and a
+  `synthesis: deterministic` + `switchOn` example the loader refuses — while
+  `src/config.ts` enforces `chainLength: 50`, `CONFIG_KEYS` 9, `synthesis:
+  layered|model`, 5 roles. `test/docs-config-keys.spec.ts` grew a `js-yaml`
+  import with no type shim, so `npm run typecheck` failed (TS7016).
+- **Change:** both READMEs aligned to code (50 routes, 9 field(s), eight
+  scalars, five roles, `layered` example, limits-table `| 50 |`);
+  `test/docs-config-keys.spec.ts` 3→7 its (size, loadable examples, chain
+  wording, hard-limit row pin); `test/types/js-yaml.d.ts` local shim (no new
+  dependency); `CHANGELOG.md` `## [0.11.4]` bilingual; `package.json` +
+  `package-lock.json` → `0.11.4`.
+- **Files:** `README.md`, `README.zh-CN.md`, `test/docs-config-keys.spec.ts`
+  (new its), `test/types/js-yaml.d.ts` (new), `CHANGELOG.md`,
+  `package.json`, `package-lock.json`.
+- **Evidence:** `.rsi/evidence/round-004/ci.txt` (npm run ci exit 0 · 54 files /
+  985 tests), `typecheck.txt` (0 error), `vitest-docs-config-keys.txt` (7/7).
+- **Review:** first review FAIL (rsi-agent-d: limits `| 3 |`, `17 field(s)`,
+  untracked shim); rework by rsi-agent-b2 closed all three; re-verify
+  rsi-agent-c2 green (985 tests); second review PASS (rsi-agent-d2).
+- **Commit/tag/push:** `bcb601d`, tag `v0.11.4`, both pushed (`ls-remote`
+  confirms `main` and `v0.11.4` at `bcb601d`).
+- **Unverified:** live `grok-workflow-dev` profile message test `NOT_RUN` —
+  zero `src/` change, zero runtime path; Loader coverage via CI
+  `loader.spec.ts` (2 tests PASS).
+- **Suggested version:** patch → `0.11.4`.
+- **status:** OK
