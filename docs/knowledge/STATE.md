@@ -1,6 +1,15 @@
 # Project State
 
-Last updated: 2026-11-18 (**RSI 连续循环 round 9 完成 · `0.11.9`** — 主题 P0-02：Progress 页
+Last updated: 2026-11-18 (**RSI 连续循环 round 10 完成 · `0.11.10`** — 主题 P1-02：
+`docs/ARCHITECTURE.md` 的版本状态。审计发现 POOL 的字面措辞（「current version」）已不存在，但同类
+缺陷仍在：四处 `in this release` 无法落到版本，「resume 边界」只写了 DSH `0.2.1-rc.2` 而 round 8 已在
+`0.2.2-rc.3` 上复查过。现改为 `since **0.8.0**` / `as of **0.11.9**`，并把「实测版本」与「只做复查的
+版本」分开写、明写没有重测那条 journaling 边界。新增 `test/docs-architecture-version.spec.ts`（3 条）
+钉住结构。`npm run ci` exit 0：typecheck 0 错、lint 22w/0e、**55 文件 / 1009 测试 PASS**；
+tag `v0.11.10`。证据 `.rsi/evidence/round-010/`、`VALIDATION.md` Round 58、`D-064`。
+**剩余待办**：P2-01（设置页 i18n 键齐全性守卫）、P3-01/P3-02、POOL 里的 P 级条目。
+
+Previous update: 2026-11-18 (**RSI 连续循环 round 9 完成 · `0.11.9`** — 主题 P0-02：Progress 页
 `执行`/`检查` 恒显示「事件中没有报告」。根因：脚本把 worker/verifier 的 `phase` 写成计划任务组
 标题（`任务 n · 标题`），而面板只按 `phase` 匹配阶段，于是每次运行都必然发生的两个阶段永远空着。
 修法：phase 命中不了阶段时再按**角色 label**（`执行`/`检查`、`Execute`/`Check`）判归属，并交叉

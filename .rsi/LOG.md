@@ -12,6 +12,7 @@
 | 7 | 2026-11-18T14:02+08:00 | remote tag inventory audited tag-by-tag vs README lists and per-tag package.json | OK — 32/32 identical objects, HEAD==origin/main, 54 files / 999 tests; tag `v0.11.7` | `.rsi/evidence/round-007/` | live runtime disposition next |
 | 8 | 2026-11-18T14:16+08:00 | live runtime disposition: isolated profile on DSH 0.2.2-rc.3 | OK — install/activation/settings projection PASS; model-backed run BLOCKED (MISSING_CREDENTIAL); 54 files / 999 tests; tag `v0.11.8` | `.rsi/evidence/round-008/` | ordered theme list exhausted; remaining backlog P0-02/P1-02/P2-01/P3-* | | P0-02 next: bind plan-task rows to a stage by role label |
 | 9 | 2026-11-18T14:19+08:00 | P0-02: Progress 页 `执行`/`检查` 恒为「事件中没有报告」 | OK — role-label evidence channel (TS + browser mirror); 54 files / 1006 tests; tag `v0.11.9` | `.rsi/evidence/round-009/` | P1-02 next: ARCHITECTURE "current version" statuses |
+| 10 | 2026-11-18T14:26+08:00 | P1-02: ARCHITECTURE 的版本状态写「in this release」而非 `since X.Y.Z` | OK — 4 处锚定到版本 + DSH 边界区分「实测」与「复查」；新守卫 3 条；55 files / 1009 tests；tag `v0.11.10` | `.rsi/evidence/round-010/` | P2-01 next: settings client i18n key parity |
 
 ## Round-start STOP probes
 

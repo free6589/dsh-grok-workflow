@@ -5,6 +5,34 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.11.10] - 2026-11-18
+
+### Docs / 文档
+
+- **`docs/ARCHITECTURE.md` states version statuses as `since X.Y.Z` instead of "in this release" / `docs/ARCHITECTURE.md` 的版本状态改为 `since X.Y.Z`，不再写「in this release」** —
+  a reader could not tell which release "in this release" meant, so the checkpoint section now
+  says the code ships since **0.8.0**, the visibility section is headed `Since **0.8.0**`, and
+  the two claims about what has no production caller are dated `as of **0.11.9**`. The
+  `resume` boundary line names the DSH version it was measured on (**0.2.1-rc.2**) and now also
+  says that round 8's install/activation/settings re-check happened on **0.2.2-rc.3** and did
+  **not** re-measure that journaling boundary, instead of letting the newer version look like a
+  newer measurement. / 读者无法判断「in this release」指哪个版本，因此 checkpoint 一节改为写明
+  代码「since **0.8.0**」，用户可见面一节标题改为 `Since **0.8.0**`，两处「没有生产调用方」的
+  断言改为「as of **0.11.9**」。`resume` 边界那一行写明它是在 DSH **0.2.1-rc.2** 上测的，并补充
+  round 8 在 **0.2.2-rc.3** 上做的是安装/激活/设置面复查、**没有**重新测那条 journaling 边界，
+  免得更新的版本看起来像更新的测量。
+
+### Tests / 测试
+
+- New `test/docs-architecture-version.spec.ts` (3 its): no release-relative phrase may appear,
+  every `Status (` claim must carry a `since **X.Y.Z**` that does not lead the package version,
+  and the resume boundary paragraph must keep naming both the measured version and the one that
+  was only re-checked. Replayed red against the previous document (2 failed / 1 passed); the
+  suite is 55 files / 1009 tests. / 新增 `test/docs-architecture-version.spec.ts`（3 条）：不得出现
+  发布相对措辞；每条 `Status (` 断言必须带一个不超前于包版本的 `since **X.Y.Z**`；`resume` 边界
+  段落必须同时写出「实测版本」与「只做复查的版本」。用上一版文档重放为红（2 failed / 1 passed）；
+  套件为 55 文件 / 1009 测试。
+
 ## [0.11.9] - 2026-11-18
 
 ### Fixed / 修复

@@ -1,5 +1,19 @@
 # Agent Handoff
 
+## 2026-11-18 — RSI 连续循环：round 10 = P1-02 ARCHITECTURE 版本状态锚定（已修）
+
+- **From:** RSI 执行代理（agent-37）· **To:** 用户 / 后续接手代理
+- **审计结论（`CONFIRMED`）**：POOL 里 P1-02 的字面措辞（「current version」）在
+  `docs/ARCHITECTURE.md` 里已不存在，但同类缺陷仍在——四处 `in this release` 无法落到具体版本，
+  且 `resume` 边界只写 DSH `0.2.1-rc.2`，而 round 8 已在 `0.2.2-rc.3` 上复查过安装/激活/设置面。
+- **修复（`CONFIRMED`）**：`since **0.8.0**` / `as of **0.11.9**` 锚定，两处「无生产调用方」已核实
+  （`grep -rn "resume/" src` 只有注释，`src/run.ts:21` import 的是 checkpoint）；边界行把「实测版本」
+  与「只做复查的版本」分开写，并明写没有重测 journaling 边界。
+- **守卫（`CONFIRMED`）**：`test/docs-architecture-version.spec.ts` 3 条；用上一版文档重放为红
+  （2 failed / 1 passed，`.rsi/evidence/round-010/red.txt`），`npm run ci` = **55 文件 / 1009 测试**。
+- **循环状态**：rounds 9–10 连做；`.rsi/STOP` 不存在，P1/P2 待办未清零。下一轮 P2-01
+  （设置页 i18n 键齐全性守卫），然后 P3-01/P3-02 与 POOL 的 P 级条目。
+
 ## 2026-11-18 — RSI 连续循环：round 9 = P0-02 进度页「事件中没有报告」（已修）
 
 - **From:** RSI 执行代理（agent-37）· **To:** 用户 / 后续接手代理

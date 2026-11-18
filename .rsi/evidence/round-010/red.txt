@@ -1,0 +1,59 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+ ❯ test/docs-architecture-version.spec.ts (3 tests | 2 failed) 12ms
+     × uses no release-relative phrase that cannot be resolved to a version 9ms
+     ✓ gives every `Status (` claim a `since **X.Y.Z**` version that is not in the future 1ms
+     × names the DSH version the resume boundary was measured on, and what was only re-checked elsewhere 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/docs-architecture-version.spec.ts > docs/ARCHITECTURE.md: version statuses name a version > uses no release-relative phrase that cannot be resolved to a version
+AssertionError: expected [ …(4) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "405: engine wiring) and `src/resume/` (validator, restore policy) ship in this release and are",
++   "416: production caller in this release; `src/resume/` is imported only by tests. This release",
++   "419: Collector in this release (NOT_DONE, no implementation in the tree) — those names must not",
++   "554: In this release: a run writes `checkpoint-<runId>.json` under",
++ ]
+
+ ❯ test/docs-architecture-version.spec.ts:37:18
+     35|       }
+     36|     }
+     37|     expect(hits).toEqual([])
+       |                  ^
+     38|   })
+     39|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/docs-architecture-version.spec.ts > docs/ARCHITECTURE.md: version statuses name a version > names the DSH version the resume boundary was measured on, and what was only re-checked elsewhere
+AssertionError: expected 'Boundary (D-013, DSH 0.2.1-rc.2): `re…' to match /DSH \*\*0\.2\.\d+(?:-rc\.\d+)?\*\*/
+
+- Expected:
+/DSH \*\*0\.2\.\d+(?:-rc\.\d+)?\*\*/
+
++ Received:
+"Boundary (D-013, DSH 0.2.1-rc.2): `resume` never means engine-level resume — the shipped engine journals nothing and states it as a limitation. `resumeDecision` answers a host question (\"should a new run re-drive the unfinished tasks from this file?\") and has no production caller in this release; `src/resume/` is imported only by tests. This release never terminates a run: recording is best-effort and unload-bounded, and a refused disk costs a warning line, never the report. There is no Command Watchdog and no Host Evidence Collector in this release (NOT_DONE, no implementation in the tree) — those names must not appear as shipped features in release notes."
+
+ ❯ test/docs-architecture-version.spec.ts:71:22
+     69|     }
+     70|     const boundary = paragraph.join(' ')
+     71|     expect(boundary).toMatch(/DSH \*\*0\.2\.\d+(?:-rc\.\d+)?\*\*/)
+       |                      ^
+     72|     // The activation re-check is a different measurement than the jou…
+     73|     // the sentence has to keep saying so instead of quietly upgrading…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 1 passed (3)
+   Start at  14:28:14
+   Duration  170ms (transform 20ms, setup 0ms, import 31ms, tests 12ms, environment 0ms)
+

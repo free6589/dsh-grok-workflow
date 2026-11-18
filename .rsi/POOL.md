@@ -99,6 +99,11 @@ here and are marked DONE when their commit lands.
   troubleshooting entry quoted a message the build never emits and described a repaired
   value as a rejection, and the zh README used a different notation for the fixed caps
   (round 6; guard 7 → 12 its, bump-version.py now rewrites the tarball name).
+- R10 DONE · `docs/ARCHITECTURE.md` said "in this release" four times and dated the `resume`
+  boundary to DSH 0.2.1-rc.2 only. Now every status names `since **X.Y.Z**`, the no-caller
+  claims are dated `as of **0.11.9**`, and the boundary line separates the measured version
+  from round 8's activation re-check on 0.2.2-rc.3. Guard: `test/docs-architecture-version.spec.ts`
+  (3 its). Evidence `.rsi/evidence/round-010/`.
 - P · Both README "Models per role" examples are patches the loader refuses:
   `synthesis: deterministic` and the removed `switchOn` key (EN ~176-177, zh ~169-170). S / low.
 - P · README validation bullet still says "more than three routes" and "an unknown `switchOn`

@@ -323,3 +323,33 @@ no history is rewritten, and no round is force-pushed.
 - **Evidence:** `.rsi/evidence/round-009/` — `stop-probes.txt`, `red-ts.txt`, `green.txt`,
   `typecheck.txt`, `ci.txt`, `git.txt`.
 - **status:** OK
+
+## Round 10 — P1-02 `docs/ARCHITECTURE.md` version statuses (2026-11-18)
+
+- **STOP probe (round start):** `.rsi/tools/stop-probe.sh 10` → `round=10 … -> STOP ABSENT`
+  (`.rsi/evidence/stop-probes.txt`).
+- **Read-first recon:** `grep -nE "in this release|current version|0\.1[01]\.[0-9]+" docs/ARCHITECTURE.md`
+  found no `current version` phrase and no stale package version, so the pool's literal wording
+  was not reproducible. What *was* there: four release-relative claims (`:405`, `:416`, `:419`,
+  `:554`) and a DSH boundary dated only to `0.2.1-rc.2` (`:413`), while round 8 verified
+  install/activation/settings on `0.2.2-rc.3`. The relative phrasing is the same defect the pool
+  named — a status nobody can resolve to a version.
+- **Fix:** §Checkpoint status → `ship since **0.8.0**`; §What the user sees → `Since **0.8.0**:`;
+  the two "no production caller / not in the tree" claims → `as of **0.11.9**` (verified:
+  `grep -rn "resume/" src` shows only a comment in `src/checkpoint/wiring.ts`, and
+  `src/run.ts:21` imports the checkpoint recorder); the boundary line now separates the measured
+  version (`0.2.1-rc.2`) from round 8's re-check (`0.2.2-rc.3`, which `did *not* re-measure`
+  that journaling boundary).
+- **Guard:** `test/docs-architecture-version.spec.ts` (3 its) — no release-relative phrase, every
+  `Status (` claim carries a `since **X.Y.Z**` that does not lead the package version, and the
+  boundary paragraph keeps both versions and the "not re-measured" clause.
+- **Red → green:** `.rsi/evidence/round-010/red.txt` is a deliberate replay of the new spec
+  against the previous document (`2 failed | 1 passed`); `green.txt` = `3 passed`.
+- **Gates:** `npm run typecheck` exit 0 (`.rsi/evidence/round-010/typecheck.txt`); `npm run ci`
+  = `Test Files 55 passed` / `Tests 1009 passed` / lint 22 warnings 0 errors / exit 0
+  (`.rsi/evidence/round-010/ci.txt`). Baseline v0.11.4 = 54/985.
+- **Version:** patch → `0.11.10` (`package.json` + `package-lock.json` together); README
+  published list rewritten by `bump-version.py` (`published=35`).
+- **Evidence:** `.rsi/evidence/round-010/` — `stop-probes.txt` (shared), `red.txt`, `green.txt`,
+  `typecheck.txt`, `ci.txt`, `git.txt`.
+- **status:** OK

@@ -1153,3 +1153,18 @@ Each entry records the decision, evidence, alternatives, and status.
 
 **代价**：节点模型多一个 `evidence` 字段（TS 与浏览器镜像各一份，`test/client.spec.ts` 对齐）；
 一个阶段可能同时有自有行和 evidence，此时只由自有行决定状态（已在测试里钉住）。
+
+## D-064 — 文档状态只写「since X.Y.Z」与「as of X.Y.Z」，不写「in this release」（2026-11-18 · RSI round 10）
+
+**背景**：`docs/ARCHITECTURE.md` 用 `in this release` 描述已交付能力。读者（以及下一个代理）无法
+判断它指装到的那个版本还是仓库当前 HEAD；DSH 边界一行也只写了一个版本，而复查发生在更新的版本上。
+
+**选择**：①能力上线写 `since **X.Y.Z**`（首次交付版本）；②「现在仍然如此」的断言写
+`as of **X.Y.Z**`（本轮核实的版本）；③如果之后在不同 DSH 版本上做过**别的**测量，把两种测量分开写，
+并明写哪条**没有**重测。
+
+**备选与不选的理由**：*只写最新版本号*——会把旧测量伪装成新测量（这正是要避免的）；*完全不写版本*——
+状态无法被复核，等于散文。
+
+**代价**：每次发布若要更新 `as of` 就要改文档；`test/docs-architecture-version.spec.ts` 只钉住结构
+（有无相对措辞、有无 `since` 及其不超前于包版本），不钉具体日期，所以不会在版本 bump 时误红。

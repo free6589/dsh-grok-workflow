@@ -402,7 +402,7 @@ hands `.volatile()` configuration over as holders and the plugin unwraps them (D
 ## Checkpoint and resume (record + re-drive policy)
 
 Status (since **0.8.0**): `src/checkpoint/` (schema, atomic writer,
-engine wiring) and `src/resume/` (validator, restore policy) ship in this release and are
+engine wiring) and `src/resume/` (validator, restore policy) ship since **0.8.0** and are
 exercised by `test/checkpoint-schema.spec.ts`, `test/checkpoint-wiring.spec.ts` and
 `test/resume-validator.spec.ts`. The wiring *is* called: `src/run.ts` creates one recorder per
 run, adopts it with the engine's run object and finalises it on the terminal path,
@@ -410,13 +410,15 @@ while `disposeActiveState` writes one `cancelled`
 checkpoint per live run before it aborts. No user-visible surface changed — a run gains a JSON file on disk and, on
 failure, a warning line. This section is the contract the code implements.
 
-Boundary (D-013, DSH 0.2.1-rc.2): `resume` never means engine-level resume — the shipped
+Boundary (D-013, measured on DSH **0.2.1-rc.2**; the install, activation and settings
+projection of this bundle were re-verified on **0.2.2-rc.3** in RSI round 8, which did *not*
+re-measure this journaling boundary): `resume` never means engine-level resume — the shipped
 engine journals nothing and states it as a limitation. `resumeDecision` answers a host
-question ("should a new run re-drive the unfinished tasks from this file?") and has no
-production caller in this release; `src/resume/` is imported only by tests. This release
-never terminates a run: recording is best-effort and unload-bounded, and a refused disk
-costs a warning line, never the report. There is no Command Watchdog and no Host Evidence
-Collector in this release (NOT_DONE, no implementation in the tree) — those names must not
+question ("should a new run re-drive the unfinished tasks from this file?") and has had no
+production caller since **0.8.0** (as of **0.11.9** `src/resume/` is imported only by tests).
+Recording never terminates a run: recording is best-effort and unload-bounded, and a refused
+disk costs a warning line, never the report. There is no Command Watchdog and no Host Evidence
+Collector as of **0.11.9** (NOT_DONE, no implementation in the tree) — those names must not
 appear as shipped features in release notes.
 
 ### Location / 位置
@@ -551,7 +553,7 @@ discards what an interrupted attempt already produced.
 
 ### What the user sees / 用户可见面
 
-In this release: a run writes `checkpoint-<runId>.json` under
+Since **0.8.0**: a run writes `checkpoint-<runId>.json` under
 `~/.dsh/checkpoints/grok-workflow` (or `$DSH_HOME` / `GROK_WORKFLOW_CHECKPOINT_DIR`) — one file
 rewritten every 30 s, a terminal one at the end, and one `cancelled` shape on plugin unload.
 There is **no restore UI, no resume button, no setting** and no line in a normal report: the

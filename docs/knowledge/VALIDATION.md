@@ -3486,3 +3486,29 @@ fixture 的默认 label 正是 `执行 N` 而转为失败——它们测的是 p
 （`round=9 … -> STOP ABSENT`），并在 `.rsi/LOG.md` 的 STOP 小节留一行。
 Rounds 5–8 当时只把该判定写成 `.rsi/STATE.md` 的一句散文，没有证据文件——这是上一轮被复核指出的
 记录缺口，本轮以工具 + 证据 + LOG 小节三处补上，历史轮次不追改。
+
+## Round 58 — 2026-11-18 — P1-02 `docs/ARCHITECTURE.md` 版本状态锚定（`CONFIRMED`）
+
+**审计（`CONFIRMED`）**：`grep -nE "in this release|current version|0\.1[01]\.[0-9]+" docs/ARCHITECTURE.md`
+在修复前命中四处 `in this release`（`:405`、`:416`、`:419`、`:554`），没有 `current version` 字样，
+也没有过期的包版本号——所以 POOL 里 P1-02 的字面措辞（「current version」）复现不出来，但同一类缺陷
+（状态无法落到某个版本）确实存在。另有一处：`resume` 边界只写了 DSH `0.2.1-rc.2`（`:413`），而
+round 8 已在 `0.2.2-rc.3` 上验证安装/激活/设置面。
+
+**修复（`CONFIRMED`）**：checkpoint 一节改为 `ship since **0.8.0**`；用户可见面一节标题改为
+`Since **0.8.0**:`；两处「没有生产调用方 / 树里没有实现」改为 `as of **0.11.9**`（依据实测：
+`grep -rn "resume/" src` 只在 `src/checkpoint/wiring.ts` 里有一句注释，
+`src/run.ts:21` 才 import checkpoint recorder）；边界行拆成「实测版本」与「round 8 复查版本」，
+并明写 `did *not* re-measure` 那条 journaling 边界。
+
+**守卫（`CONFIRMED`）**：新增 `test/docs-architecture-version.spec.ts`（3 条）——禁止发布相对措辞、
+每条 `Status (` 必须带不超前于包版本的 `since **X.Y.Z**`、边界段落必须同时写出两个版本与
+「没有重测」这一限定。写法上按**段落**取那条边界陈述（第一次按首行取，断言在截断句上通过了，
+属测试自身的 bug，已改为读到空行为止）。
+
+**先红后绿（`CONFIRMED`）**：`.rsi/evidence/round-010/red.txt` 是用**上一版文档**重放新 spec 的
+结果（`2 failed | 1 passed`），`green.txt` = `3 passed`。全量 `npm run ci` = `Test Files 55 passed`
+/ `Tests 1009 passed` / lint 22w 0e / exit 0（`.rsi/evidence/round-010/ci.txt`），
+`npm run typecheck` exit 0。基线 v0.11.4 = 54/985。
+
+**STOP 探针（`CONFIRMED`）**：`.rsi/tools/stop-probe.sh 10` → `round=10 … -> STOP ABSENT`。
