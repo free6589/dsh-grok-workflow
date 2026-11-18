@@ -528,3 +528,18 @@ no history is rewritten, and no round is force-pushed.
   tree continued editing `src/loop.ts`/`src/loop-surface.ts`/`test/loop-surface.spec.ts` (route
   `413`/`409` cases) — those edits are **not** part of this commit and were left uncommitted rather
   than folded into a release unverified.
+
+- **Post-release incident (CONFIRMED, appended after the records commit):** the tag commit `20eafea`
+  is red on the remote CI (run `44345615218`) and the Release workflow failed at `Verify committed
+  build artifacts` (run `44345622700`), so **`v0.11.14` has no GitHub Release**. Cause: a concurrent
+  writer changed `src/loop.ts` between this round's `npm test` and `git add`, so the committed `lib/`
+  was one build behind the committed `src/` (`git show 20eafea:src/loop.ts | grep -c callSchedule` =
+  12; `…:lib/loop.js` = 0; reproduced by `npm run build` in a clean worktree at the tag, ±41/−16 in
+  `lib/loop.js`). Local `npm run ci` was green because it measures the working tree, not the commit.
+  Repaired on main by `8c8e367` (build output only, no source change, pushed fast-forward; remote CI
+  run `44349708692` = success). The tag was **not** moved or deleted: published tags are immutable
+  and `workflow_dispatch` re-checks the same commit, so the remedy is a patch release from `main`,
+  which needs explicit authorization and was not taken here. Also: `20eafea` shipped the
+  `loop/schedule-refused` mapping without its 413/409 route tests (grep = 0 in that commit); those
+  tests are still uncommitted in the working tree and belong to the next round.
+

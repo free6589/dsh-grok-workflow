@@ -93,6 +93,15 @@ POSTs `/grok-workflow/loop`. It is a `src/` change, needs its own tests and its 
   case landed in `test/loop-surface.spec.ts` between that run and the release run. Both numbers are
   quoted with their run; the release number is the one the tag carries.
 - Evidence: `.rsi/evidence/round-014/` (`pre-release-ci.txt`, `ci.txt`, `mutation.txt`, `git.txt`).
+- **Release incident (CONFIRMED, must be read before the next round):** tag commit `20eafea` is red on
+  the remote CI (run `44345615218`) and the Release workflow failed at `Verify committed build
+  artifacts` (run `44345622700`) — the committed `lib/` was one build behind the committed `src/`
+  because a concurrent writer touched `src/loop.ts` between `npm test` and `git add`. Therefore
+  **`v0.11.14` has no GitHub Release**. Repaired on main by `8c8e367` (build output only; remote CI
+  run `44349708692` = success). The tag was not moved or deleted (published tags are immutable), so
+  the remedy is a patch release from main — a new Release needs explicit authorization.
+  Consequence for the next round: `20eafea` carries `loop/schedule-refused` without its 413/409 route
+  tests; those tests plus more `src/` edits are still uncommitted in the working tree.
 - Baseline for comparison: `v0.11.4` = 54 files / 985 tests; `v0.11.13` = 57 / 1022.
 
 ## Loop status (this session)

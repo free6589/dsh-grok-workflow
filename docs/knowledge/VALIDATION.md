@@ -3591,3 +3591,32 @@ commit 与推送结果见 `.rsi/ROUND.md` Round 14、`.rsi/evidence/round-014/gi
 - **发布后树状态**：另一个进程在本提交之后继续修改了 `src/loop.ts`、`src/loop-surface.ts`、
   `test/loop-surface.spec.ts`（路由 `413`/`409` 用例）。这些改动不在 `20eafea` 中，本轮未提交它们，
   因此**当前工作树不是干净的**——这是如实记录，不是本轮引入的缺陷。
+
+**发布后事故与修复（`CONFIRMED`，逐条命令与 run id）**：
+- **远端 CI 红在发布提交上**：`gh run list --workflow ci.yml` → headSha `20eafea` = `failure`
+  （run `44345615218`）、headSha `81a76ec` = `failure`（run `44347643600`）、headSha `8c8e367` =
+  `success`（run `44349708692`）。本地 `npm run ci` 之所以全绿，是因为它跑的是**工作树**；远端跑的是
+  **提交内容**。
+- **Release 工作流失败**：`gh run list --workflow release.yml` → headSha `20eafea` = `failure`
+  （run `44345622700`）；逐步骤看（`gh api …/runs/44345622700/jobs`）失败点在
+  **`Verify committed build artifacts`**，其后的 `Test`/`Create GitHub Release` 全部 `skipped`。
+  `gh release view v0.11.14` → **release not found**。
+- **根因（`CONFIRMED`，在标签提交的干净 worktree 里复现）**：`git worktree add .worktrees/verify-2014
+  20eafea` → `npm run build` → `git diff --stat -- lib/` = `lib/loop.js` ±41/−16、
+  `lib/loop.js.map`、`lib/loop.d.ts.map`。即**提交里的 `lib/` 与提交里的 `src/` 不是同一次构建**：
+  `git show 20eafea:src/loop.ts | grep -c callSchedule` = 12，而
+  `git show 20eafea:lib/loop.js | grep -c callSchedule` = 0。`git status --porcelain -- src/` 在该
+  worktree 里为空，所以不是 worktree 本身的问题。原因是同一棵工作树里另一个进程在 `npm test` 与
+  `git add` 之间改了 `src/loop.ts`。
+- **修复（`CONFIRMED`）**：`8c8e367 fix(build): rebuild lib/loop.js so the committed artifacts match
+  the released source` —— 只含构建产物（`lib/loop.js` / `.js.map` / `.d.ts.map`），零源码改动；
+  在独立 worktree 里对 `main` 的 `src/`（与标签提交的 `src/` 逐字节相同：`git diff --stat 20eafea
+  main -- src/ test/` 为空）重新构建后提交，`git push origin lib-repair:main` 为 fast-forward
+  （`81a76ec..8c8e367`）。远端 CI `success`（run `44349708692`）。
+- **未做（按规则不做）**：**没有移动、删除或重打 `v0.11.14`**（已发布标签不可变），因此该标签
+  **没有 GitHub Release**；`workflow_dispatch` 会 checkout 同一个不可变提交，重跑只会在同一步再失败。
+  干净做法是从 `main` 打下一个 patch 版本；那是新建 Release，需操作者/lead 明确授权，本轮不自作主张。
+- **连带事实（`CONFIRMED`）**：`20eafea` 的 `src/loop.ts` 带着 `loop/schedule-refused` 映射，但当时
+  工作树里的 413/409 两条路由用例**没有**进这次提交（`git show 20eafea:test/loop-surface.spec.ts |
+  grep -cE "413|409|schedule-refused"` = 0）。这两条用例与更多 `src/` 改动在本轮结束时仍在工作树里，
+  未提交，留给下一轮连同验证一起落地。

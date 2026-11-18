@@ -33,6 +33,18 @@
   `src/loop.ts`、`src/loop-surface.ts`、`test/loop-surface.spec.ts`（路由 `413`「body 过大」与
   `409`「Schedule 拒绝」两个用例）。这些改动**不在** `20eafea` 里，本轮特意**没有**把它们塞进发布
   提交（未验证的他人半成品不配 tag）；接手者应先跑全量 `npm run ci` 再决定它们属于哪一轮。
+- **发布事故（`CONFIRMED`，必须读）**：`v0.11.14` 的标签提交 `20eafea` 远端 CI **红**
+  （run `44345615218`），Release 工作流在 `Verify committed build artifacts` 一步**失败**
+  （run `44345622700`），所以**该标签没有 GitHub Release**（`gh release view v0.11.14` →
+  release not found）。根因：同一棵树里另一个进程在 `npm test` 与 `git add` 之间改了 `src/loop.ts`，
+  提交里的 `lib/` 是上一次构建（`git show 20eafea:src/loop.ts | grep -c callSchedule` = 12，
+  `…:lib/loop.js` = 0）。**已修复在 main**：`8c8e367 fix(build): rebuild lib/loop.js …`（纯构建产物，
+  独立 worktree 里重建，fast-forward 推送），远端 CI 转绿（run `44349708692`）。
+  **没有**移动/删除/重打标签——已发布标签不可变；`workflow_dispatch` 会 checkout 同一个不可变提交，
+  重跑只会在同一步再失败。补救方式是从 `main` 打下一个 patch 版本（新建 Release 需明确授权）。
+- **一处待补的验证（`CONFIRMED`）**：`20eafea` 的 `src/loop.ts` 已含 `loop/schedule-refused` 映射，
+  但 413/409 两条路由用例没进那次提交（`git show 20eafea:test/loop-surface.spec.ts | grep -cE
+  "413|409|schedule-refused"` = 0）。它们与另外几处 `src/` 改动在本轮结束时仍在工作树里，未提交。
 - **Next action（下一轮）**：按 `PROTOCOL` §2 的默认顺序取 P3-01（设置页逐路由上限与死线字段的文案）
   或 P3-02（进度页「没有报告事实的成员」详情行）；另一条独立候选是「给客户端加一个真正会 POST
   `/grok-workflow/loop` 的控件」——那是 `src/` 改动，需要自己的测试与单独一轮主题（D-069）。
