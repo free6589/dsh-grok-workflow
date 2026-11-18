@@ -3455,3 +3455,34 @@ Release 正文）；Release 工作流对预发布标签的处理未测（未改�
 **收尾（`CONFIRMED`）**：本轮启动的实例全部停止，`ss -ltn` 在 3199/3201/3203/3205/3207/3209/3211/3213
 均无监听；带 token 的启动日志已就地脱敏，证据目录里 `token=` / `API_KEY=` 检索为空。
 `npm run ci` exit 0，typecheck 0 错，lint 22w/0e，**54 文件 / 999 测试 PASS**。
+
+## Round 57 — 2026-11-18 — P0-02 Progress 页 `执行`/`检查` 恒为「事件中没有报告」（`CONFIRMED`）
+
+**缺陷（`CONFIRMED`，代码位置）**：`src/script.ts:1852/1886/1912/1950` 把 worker 与 verifier 调用的
+`phase` 写成 `taskGroupTitle(...)` = `任务 n · 标题`；`src/progress-tab.ts` 的阶段绑定只按 `phase`
+命中 `PROGRESS_STAGES` 的 token。因此每次运行都必然发生的 `执行`/`检查` 两个阶段永远分不到行，
+渲染成空白并显示 `progress.notReported`（`src/client/index.js` 的 meta 分支），而真正跑过的行就在
+其下的计划任务节点里。
+
+**修复（`CONFIRMED`）**：新增第二条绑定通道——phase 未命中任何阶段的行，按其 **label**
+（`memberLabel()` 生成的 `执行`/`检查`、`Execute`/`Check`）归属，并交叉引用到该阶段新增的
+`evidence` 列表。`members` 仍是每行唯一的归属（`test/progress-tab.spec.ts` 的 `rendered` 断言保持
+通过），状态优先取自有行、无自有行才取 evidence；role token 只匹配 label，不匹配 phase，所以标题
+含 `check` 的任务不会变成 `检查`。浏览器镜像 `src/client/index.js` 逐条同步，渲染 meta 行改为
+`{count} 行在下方任务节点中执行` / `{count} rows ran inside the plan tasks below`（两语言均已加键）。
+
+**先红后绿（`CONFIRMED`）**：`.rsi/evidence/round-009/red-ts.txt` = `Tests 5 failed | 29 passed (34)`
+（`evidence` 未定义 / `expected 'done' to be 'pending'` 的真失败）；同轮另有 2 条既有诱饵测试因
+fixture 的默认 label 正是 `执行 N` 而转为失败——它们测的是 phase 通道，故把 fixture 的 label 改为
+不含阶段名的 `Member` 并**加强**断言（同时断言 `members` 与 `evidence` 都为空），不是放宽。
+`.rsi/evidence/round-009/green.txt` = `Tests 112 passed (112)`（progress-tab 34 + client 78）。
+
+**全量门（`CONFIRMED`）**：`npm run typecheck` exit 0（`.rsi/evidence/round-009/typecheck.txt`）；
+`npm run ci` = `Test Files 54 passed` / `Tests 1006 passed` / lint 22 warnings 0 errors / exit 0
+（`.rsi/evidence/round-009/ci.txt`）。基线 v0.11.4 为 54/985，本轮较上一轮 54/999 增 7，无删除、无 skip。
+
+**STOP 探针（`CONFIRMED`，本轮起强制留痕）**：`.rsi/tools/stop-probe.sh 9` 把
+`test -e .rsi/STOP` 的判定追加到 `.rsi/evidence/stop-probes.txt`
+（`round=9 … -> STOP ABSENT`），并在 `.rsi/LOG.md` 的 STOP 小节留一行。
+Rounds 5–8 当时只把该判定写成 `.rsi/STATE.md` 的一句散文，没有证据文件——这是上一轮被复核指出的
+记录缺口，本轮以工具 + 证据 + LOG 小节三处补上，历史轮次不追改。

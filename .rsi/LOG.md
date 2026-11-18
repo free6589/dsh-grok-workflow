@@ -10,4 +10,21 @@
 | 5 | 2026-11-18T13:51+08:00 | P2-02: redaction missed quoted cookies, presigned signatures, PGP armor, short `SECRET_KEY`; rewrote code and corrupted placeholders | OK — 54 files / 993 tests; tag `v0.11.5` | `.rsi/evidence/round-005/` | P1-03 LOCAL-TESTING key/default audit next |
 | 6 | 2026-11-18T13:56+08:00 | P1-03: LOCAL-TESTING promised tarballs, a rejection and a notation it did not have | OK — 54 files / 998 tests; tag `v0.11.6` | `.rsi/evidence/round-006/` | tag inventory audit next |
 | 7 | 2026-11-18T14:02+08:00 | remote tag inventory audited tag-by-tag vs README lists and per-tag package.json | OK — 32/32 identical objects, HEAD==origin/main, 54 files / 999 tests; tag `v0.11.7` | `.rsi/evidence/round-007/` | live runtime disposition next |
-| 8 | 2026-11-18T14:16+08:00 | live runtime disposition: isolated profile on DSH 0.2.2-rc.3 | OK — install/activation/settings projection PASS; model-backed run BLOCKED (MISSING_CREDENTIAL); 54 files / 999 tests; tag `v0.11.8` | `.rsi/evidence/round-008/` | ordered theme list exhausted; remaining backlog P0-02/P1-02/P2-01/P3-* |
+| 8 | 2026-11-18T14:16+08:00 | live runtime disposition: isolated profile on DSH 0.2.2-rc.3 | OK — install/activation/settings projection PASS; model-backed run BLOCKED (MISSING_CREDENTIAL); 54 files / 999 tests; tag `v0.11.8` | `.rsi/evidence/round-008/` | ordered theme list exhausted; remaining backlog P0-02/P1-02/P2-01/P3-* | | P0-02 next: bind plan-task rows to a stage by role label |
+| 9 | 2026-11-18T14:19+08:00 | P0-02: Progress 页 `执行`/`检查` 恒为「事件中没有报告」 | OK — role-label evidence channel (TS + browser mirror); 54 files / 1006 tests; tag `v0.11.9` | `.rsi/evidence/round-009/` | P1-02 next: ARCHITECTURE "current version" statuses |
+
+## Round-start STOP probes
+
+Every round starts by testing `.rsi/STOP`; the verdict is written to
+`.rsi/evidence/stop-probes.txt` by `.rsi/tools/stop-probe.sh <round>` (timestamp, round, cwd,
+exact command, verdict). `STOP ABSENT` is not recorded here — the log row above is the round,
+the probe file is the evidence.
+
+| round | probe command | result | recorded in |
+|---|---|---|---|
+| 9 | `test -e .rsi/STOP` (cwd `/home/fish/projects_mine/dsh-grok-workflow`) | `STOP ABSENT` | `.rsi/evidence/stop-probes.txt` line `round=9` |
+| 10 | `test -e .rsi/STOP` | `STOP ABSENT` | `.rsi/evidence/stop-probes.txt` line `round=10` |
+
+Rounds 0–8 ran the same test but only wrote the verdict as prose in `.rsi/STATE.md`; that is
+the recording gap a review named on 2026-11-18. History is not rewritten here: from round 9 on
+the probe leaves the two artifacts above, and `.rsi/tools/stop-probe.sh` is the only writer.

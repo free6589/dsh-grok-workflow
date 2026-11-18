@@ -1,0 +1,40 @@
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  test/progress-tab.spec.ts > progress tab: the track > invents no evidence for a label that names no stage
+AssertionError: expected undefined to deeply equal []
+
+- Expected:
+[]
+
++ Received:
+undefined
+
+ ❯ test/progress-tab.spec.ts:391:50
+    389|   it('invents no evidence for a label that names no stage', () => {
+    390|     const track = trackOf([member(1, '任务 1 · 修复登录', 'completed', { lab…
+    391|     expect(stageNode(track, 'execute').evidence).toEqual([])
+       |                                                  ^
+    392|     expect(stageNode(track, 'verify').evidence).toEqual([])
+    393|     // Still the truth: no row ran as either stage, so both stay unrep…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  test/progress-tab.spec.ts > progress tab: the track > binds the English role labels too, where the verifier is called Check
+TypeError: Cannot read properties of undefined (reading 'map')
+ ❯ test/progress-tab.spec.ts:403:40
+    401|       member(3, 'Task 1 · fix login', 'completed', { label: 'Execute (…
+    402|     ], 'completed')
+    403|     expect(stageNode(track, 'execute').evidence.map((entry) => entry.s…
+       |                                        ^
+    404|     expect(stageNode(track, 'verify').evidence.map((entry) => entry.se…
+    405|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 29 passed (34)
+   Start at  14:20:27
+   Duration  236ms (transform 60ms, setup 0ms, import 76ms, tests 26ms, environment 0ms)
+

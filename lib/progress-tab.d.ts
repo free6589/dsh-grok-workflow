@@ -141,6 +141,16 @@ export interface ProgressNodeModel {
     state: ProgressState;
     /** Rows behind this node, in plan order. */
     members: ProgressMemberFact[];
+    /**
+     * Rows that ran under this stage and are rendered as their own plan-task nodes.
+     *
+     * A cross-reference, never a second home: `members` stays the one place a row is
+     * counted, so the track and the percentage cannot disagree. It exists because the
+     * engine records the plan-task group title (`任务 1 · 标题`) as a worker's `phase`, so
+     * matching rows by phase alone left `执行` and `检查` — the two stages every run
+     * performs — empty and "not reported".
+     */
+    evidence: ProgressMemberFact[];
     /** Exact phase headers aggregated here (empty for an unmatched spine stage). */
     phases: string[];
     /** Whether the state was derived from the run's end rather than from a settlement. */

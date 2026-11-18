@@ -1,5 +1,24 @@
 # Agent Handoff
 
+## 2026-11-18 — RSI 连续循环：round 9 = P0-02 进度页「事件中没有报告」（已修）
+
+- **From:** RSI 执行代理（agent-37）· **To:** 用户 / 后续接手代理
+- **缺陷（`CONFIRMED`）**：`src/script.ts:1852+` 把 worker/verifier 的 `phase` 写成
+  `任务 n · 标题`，面板只按 `phase` 匹配阶段 → `执行`/`检查` 永远分不到行，渲染成
+  `progress.notReported`。这正是此前 `docs/knowledge/STATE.md` 记录的已知缺口（P0-02）。
+- **修复（`CONFIRMED`）**：第二条绑定通道（role label → 阶段 `evidence` 交叉引用），
+  `members` 仍是每行唯一的家，状态自有行优先；TS 与浏览器镜像同步，两语言 meta 行更新。
+  先红后绿：`.rsi/evidence/round-009/red-ts.txt`（5 failed / 29 passed）→ `green.txt`
+  （112 passed）；全量 `npm run ci` exit 0，**54 文件 / 1006 测试**。
+- **STOP 记录缺口已补（`CONFIRMED`）**：新增 `.rsi/tools/stop-probe.sh`，每轮把
+  `test -e .rsi/STOP` 的判定写进 `.rsi/evidence/stop-probes.txt` 并在 `.rsi/LOG.md` 的 STOP
+  小节留行。rounds 5–8 只有散文没有证据，历史不追改。
+- **循环状态**：round 9 是继续推进的第一轮（上一轮把四个交办主题做完就停了，待办并未清零）。
+  剩余待办按 POOL 优先级：P1-02（`docs/ARCHITECTURE.md` 把版本写成「current」而非「since」）、
+  P2-01（设置页 i18n 键齐全性守卫）、P3-01/P3-02，以及 POOL 里带 `P ·` 前缀的条目
+  （`records.ts` 裸 `error.message`、`history.ts` 先截断后脱敏、base64-PEM 规则）。
+- **接手注意**：`.rsi/STOP` 当前不存在；若操作者要暂停循环，创建该文件即可，下一轮开始就会看到。
+
 ## 2026-11-18 — RSI 连续循环：round 8 = 真机 disposition（激活 PASS / 真模型 BLOCKED）
 
 - **From:** RSI 执行代理（agent-34）· **To:** 用户 / 后续接手代理

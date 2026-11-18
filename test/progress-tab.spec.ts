@@ -271,15 +271,20 @@ describe('progress tab: the track', () => {
   })
 
   it('binds a Latin token only on word boundaries, so a substring is not a stage', () => {
+    // The labels name no stage either, so this isolates the phase channel: the decoy is
+    // the header, not the role.
+    const neutral = { label: 'Member' }
     const track = trackOf([
-      member(1, '任务 1 · explain the build', 'completed'),
-      member(2, '任务 2 · reexecuted twice', 'completed'),
-      member(3, '任务 3 · answerless draft', 'completed'),
+      member(1, '任务 1 · explain the build', 'completed', neutral),
+      member(2, '任务 2 · reexecuted twice', 'completed', neutral),
+      member(3, '任务 3 · answerless draft', 'completed', neutral),
     ], 'completed')
     // `explain` carries `plan`, `reexecuted` carries `execute` and `answerless` carries
-    // `answer` — substrings, not words. None of them names a stage, so every work stage
-    // stays pending and the three rows become extras.
+    // `answer` — substrings, not words. None of them names a stage, so no stage claims a
+    // row on the phase channel and the three rows become extras.
     for (const key of ['plan', 'execute', 'verify', 'synthesize', 'answer']) {
+      expect(stageNode(track, key).members, key).toEqual([])
+      expect(stageNode(track, key).evidence, key).toEqual([])
       expect(stageNode(track, key).state, key).toBe('pending')
     }
     expect(track.nodes.filter((node) => node.kind === 'extra')).toHaveLength(3)
@@ -297,11 +302,14 @@ describe('progress tab: the track', () => {
     for (const gone of ['ui', 'tag', 'sync']) expect(tokens, gone).not.toContain(gone)
     // … and a header that contains them as substrings names no stage, so both rows become
     // plan-task nodes of their own instead of borrowing a stage they never ran.
+    const neutral = { label: 'Member' }
     const decoys = trackOf([
-      member(1, '任务 1 · UI build of the stage target', 'completed'),
-      member(2, '任务 2 · async sync of the tag list', 'completed'),
+      member(1, '任务 1 · UI build of the stage target', 'completed', neutral),
+      member(2, '任务 2 · async sync of the tag list', 'completed', neutral),
     ], 'completed')
     for (const key of ['plan', 'execute', 'verify', 'synthesize', 'answer']) {
+      expect(stageNode(decoys, key).members, key).toEqual([])
+      expect(stageNode(decoys, key).evidence, key).toEqual([])
       expect(stageNode(decoys, key).state, key).toBe('pending')
     }
     expect(decoys.nodes.filter((node) => node.kind === 'extra')).toHaveLength(2)
@@ -336,6 +344,72 @@ describe('progress tab: the track', () => {
     expect(unphased!.label).toBe('')
     expect(unphased!.state).toBe('done')
     expect(unphased!.members.map((entry) => entry.seq)).toEqual([1])
+  })
+
+  it('binds plan-task rows to the stage their role label names, so execute and verify are not "not reported"', () => {
+    const track = trackOf([
+      member(1, '任务 1 · 修复登录', 'completed', { label: '执行' }),
+      member(2, '任务 1 · 修复登录', 'completed', { label: '检查' }),
+      member(3, '任务 2 · 补文档', 'completed', { label: '执行' }),
+    ], 'completed')
+    // The rows keep their own plan-task nodes, one per group …
+    expect(track.nodes.filter((node) => node.kind === 'extra')).toHaveLength(2)
+    // … and they are also the evidence for the stage whose role ran them, so the two
+    // stages every run performs stop being `pending` with an empty row list.
+    const execute = stageNode(track, 'execute')
+    const verify = stageNode(track, 'verify')
+    expect(execute.evidence.map((entry) => entry.seq)).toEqual([1, 3])
+    expect(execute.state).toBe('done')
+    expect(verify.evidence.map((entry) => entry.seq)).toEqual([2])
+    expect(verify.state).toBe('done')
+    expect(execute.members).toEqual([])
+    // One home per row: the evidence list is a cross-reference, never a second node.
+    const rendered = track.nodes.flatMap((node) => node.members.map((entry) => entry.seq)).sort((a, b) => a - b)
+    expect(rendered).toEqual([1, 2, 3])
+    expect(track.percent).toEqual({ settled: 3, declared: 3, value: 100 })
+  })
+
+  it('derives the work stage from its evidence: failed when a task row failed, doing while one is open', () => {
+    const failed = trackOf([
+      member(1, '任务 1 · 修复登录', 'failed', { label: '执行' }),
+      member(2, '任务 1 · 修复登录', 'completed', { label: '检查' }),
+    ], 'error')
+    expect(stageNode(failed, 'execute').state).toBe('failed')
+    expect(stageNode(failed, 'verify').state).toBe('done')
+    const open = trackOf([member(1, '任务 1 · 修复登录', undefined, { label: '执行' })], undefined)
+    expect(stageNode(open, 'execute').state).toBe('doing')
+  })
+
+  it('keeps a stage’s own rows authoritative over its evidence', () => {
+    const track = trackOf([
+      member(1, '执行', 'completed'),
+      member(2, '任务 1 · 修复登录', undefined, { label: '执行' }),
+    ], undefined)
+    const execute = stageNode(track, 'execute')
+    expect(execute.members.map((entry) => entry.seq)).toEqual([1])
+    expect(execute.evidence.map((entry) => entry.seq)).toEqual([2])
+    // The stage's own row settled, so the stage is done even though a plan-task row is
+    // still open; the open row keeps its own node and its own state.
+    expect(execute.state).toBe('done')
+    expect(track.nodes.find((node) => node.key === 'phase:任务 1 · 修复登录')?.state).toBe('doing')
+  })
+
+  it('invents no evidence for a label that names no stage', () => {
+    const track = trackOf([member(1, '任务 1 · 修复登录', 'completed', { label: '整合者' })], 'completed')
+    expect(stageNode(track, 'execute').evidence).toEqual([])
+    expect(stageNode(track, 'verify').evidence).toEqual([])
+    // Still the truth: no row ran as either stage, so both stay unreported.
+    expect(stageNode(track, 'execute').state).toBe('pending')
+  })
+
+  it('binds the English role labels too, where the verifier is called Check', () => {
+    const track = trackOf([
+      member(1, 'Task 1 · fix login', 'completed', { label: 'Execute' }),
+      member(2, 'Task 1 · fix login', 'completed', { label: 'Check' }),
+      member(3, 'Task 1 · fix login', 'completed', { label: 'Execute (attempt 2)' }),
+    ], 'completed')
+    expect(stageNode(track, 'execute').evidence.map((entry) => entry.seq)).toEqual([1, 3])
+    expect(stageNode(track, 'verify').evidence.map((entry) => entry.seq)).toEqual([2])
   })
 
   it('reports rows settled over rows declared, not a task verdict', () => {

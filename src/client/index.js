@@ -230,6 +230,8 @@ window.__ModuleLoader__.load({
       'progress.branch.running': '{count} running',
       'progress.branch.failedCount': 'Failed {count}',
       'progress.branch.blockedCount': 'Blocked {count}',
+      'progress.branch.evidenceRows': '{count} rows ran inside the plan tasks below',
+      'progress.evidenceHint': 'ran inside the plan tasks listed below',
       'status.progressMissing': 'The Progress tab is not mounted: this composition has no uiConversation service, so the track cannot appear.',
       'status.progressFailed': 'The Progress tab could not be registered: {message}. Everything else keeps working.',
 
@@ -387,6 +389,8 @@ window.__ModuleLoader__.load({
       'progress.branch.running': '{count} 运行中',
       'progress.branch.failedCount': '失败 {count}',
       'progress.branch.blockedCount': '阻塞 {count}',
+      'progress.branch.evidenceRows': '{count} 行在下方任务节点中执行',
+      'progress.evidenceHint': '在下方任务节点中执行',
       'status.progressMissing': '进度 Tab 未挂载：当前组合没有 uiConversation 服务，轨道不会出现。',
       'status.progressFailed': '进度 Tab 注册失败：{message}。其余功能不受影响。',
 
@@ -2260,6 +2264,36 @@ window.__ModuleLoader__.load({
     }
 
     /**
+     * Role labels that name a work stage when the phase header does not.
+     *
+     * A recorded `agent-start` carries the plan-task group title (`任务 1 · 标题`) as the
+     * phase of the worker and verifier calls that run inside a task, so matching rows by
+     * phase alone left `执行` and `检查` empty and "not reported". These words are role
+     * names from `naming.ts`, matched only against a row's label: a task titled
+     * `check the build` must not become `检查` because of its own title.
+     */
+    const PROGRESS_STAGE_ROLE_LABELS = {
+      plan: ['规划助手', 'planner'],
+      execute: ['执行', 'execute', 'worker'],
+      verify: ['检查', '核验', 'verify', 'check', 'verifier'],
+      synthesize: ['汇总助手', 'summarize', 'synthesizer'],
+      answer: ['回答', 'answer'],
+    }
+
+    /** The first spine stage whose role label names it, if a label names one. */
+    function progressStageForRoleLabel(label) {
+      const haystack = label.toLowerCase()
+      for (const stage of PROGRESS_STAGES) {
+        const labels = PROGRESS_STAGE_ROLE_LABELS[stage.key]
+        if (labels === undefined) continue
+        for (const token of labels) {
+          if (progressPhaseCarriesToken(haystack, token)) return stage
+        }
+      }
+      return undefined
+    }
+
+    /**
      * Derive the track one run renders (mirror of `deriveTrack` in `src/progress-tab.ts`).
      * @param run - folded run facts, or `undefined`.
      * @param labelFor - copy resolver for the spine's stage labels.
@@ -2270,6 +2304,7 @@ window.__ModuleLoader__.load({
       const ended = run.stopReason !== undefined
       const byStage = new Map()
       const byStagePhases = new Map()
+      const evidenceByStage = new Map()
       const extras = []
       const unphased = []
       for (const member of run.members) {
@@ -2280,6 +2315,14 @@ window.__ModuleLoader__.load({
           const existing = extras.find((entry) => entry.phase === phase)
           if (existing === undefined) extras.push({ phase, members: [member] })
           else existing.members.push(member)
+          // The row keeps its plan-task node above; this only cross-references it onto
+          // the stage whose role ran it, so `执行`/`检查` report what happened.
+          const roleStage = progressStageForRoleLabel(member.label === undefined ? '' : member.label)
+          if (roleStage !== undefined) {
+            const evidence = evidenceByStage.get(roleStage.key)
+            if (evidence === undefined) evidenceByStage.set(roleStage.key, [member])
+            else evidence.push(member)
+          }
           continue
         }
         const list = byStage.get(stage.key)
@@ -2315,15 +2358,18 @@ window.__ModuleLoader__.load({
         }
         return undefined
       }
-      const node = (stage, key, kind, members, phases, label) => {
-        const state = stage !== undefined && stage.edge ? edgeState(stage.key) : progressNodeState(members, ended)
-        const reason = state === 'blocked' ? progressBlockedReason(members, ended) : undefined
+      const node = (stage, key, kind, members, phases, label, evidence) => {
+        // A stage's own rows are authoritative; its evidence speaks only when it has none.
+        const rows = members.length > 0 ? members : (evidence === undefined ? [] : evidence)
+        const state = stage !== undefined && stage.edge ? edgeState(stage.key) : progressNodeState(rows, ended)
+        const reason = state === 'blocked' ? progressBlockedReason(rows, ended) : undefined
         return {
           key,
           kind,
           label: label !== undefined ? label : (stage === undefined ? key : labelFor(stage.key)),
           state,
           members,
+          evidence: evidence === undefined ? [] : evidence,
           phases,
           derived: state === 'blocked',
           reason,
@@ -2332,7 +2378,7 @@ window.__ModuleLoader__.load({
       }
       const nodes = []
       for (const stage of PROGRESS_STAGES) {
-        nodes.push(node(stage, `stage:${stage.key}`, stage.edge ? 'edge' : 'stage', byStage.get(stage.key) || [], byStagePhases.get(stage.key) || []))
+        nodes.push(node(stage, `stage:${stage.key}`, stage.edge ? 'edge' : 'stage', byStage.get(stage.key) || [], byStagePhases.get(stage.key) || [], undefined, evidenceByStage.get(stage.key) || []))
         // Extra phases are real plan tasks (`任务 n · 标题`) announced while the engine
         // executes the plan, so they sit between `执行` and `检查` — the template's work
         // slot — in the order the run started them. A row that declared no phase still
@@ -2664,14 +2710,23 @@ window.__ModuleLoader__.load({
       const t = props.t
       const stateText = t(PROGRESS_STATE_KEY[node.state])
       const label = node.label === '' ? t('progress.unphased') : node.label
+      // Rows that ran under this stage but render as their own plan-task nodes. Read once:
+      // the tooltip and the meta line both report it instead of saying "not reported".
+      const evidence = Array.isArray(node.evidence) ? node.evidence : []
       const tip = node.state === 'blocked' && node.reason !== undefined
         ? t(`progress.derived.${node.reason}`)
-        : (node.phases.length > 0 ? node.phases.join(' · ') : (node.kind === 'extra' ? t('progress.extraHint') : t('progress.notReported')))
+        : (node.phases.length > 0
+          ? node.phases.join(' · ')
+          : (node.kind === 'extra'
+            ? t('progress.extraHint')
+            : (evidence.length > 0 ? t('progress.evidenceHint') : t('progress.notReported'))))
       const failedCount = node.members.filter((member) => member.outcome === 'failed').length
       const doingCount = node.members.filter((member) => member.outcome === undefined).length
       const settled = node.members.filter((member) => member.outcome !== undefined).length
+      // A stage whose rows render as their own plan-task nodes is not "not reported": it
+      // says how many rows ran under it, because an empty row list is not an absence.
       const meta = node.members.length === 0
-        ? t('progress.notReported')
+        ? (evidence.length > 0 ? t('progress.branch.evidenceRows', { count: evidence.length }) : t('progress.notReported'))
         : [
           t('progress.branch.settledOf', { settled, declared: node.members.length }),
           ...(doingCount > 0 ? [t('progress.branch.running', { count: doingCount })] : []),

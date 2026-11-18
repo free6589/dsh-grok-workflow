@@ -60,6 +60,27 @@
 
 `起点` / `终点` 报 run 自身的事实：起点在 run 存在时即 `done`；终点未结束为 `doing`，结束按 `stopReason`（`completed → done`、`cancelled → cancelled`、其它 → `failed`）。
 
+### 4.1 实现回填：两条绑定通道（2026-11-18，RSI round 9）
+
+上面 §4 描述的是早期模板脊椎；**实际发布**的脊椎是
+`起点 → 规划 → 执行 → 检查 → 汇总 → 回答 → 终点`（`PROGRESS_STAGES`，`src/progress-tab.ts`），
+计划任务节点插在 `执行` 与 `检查` 之间。逐条事实：
+
+- **通道一（phase）**：`agent-start` 的 `phase` 命中阶段 token 时，行聚合进该阶段节点。
+  CJK token 按子串匹配，拉丁 token 必须落在词边界上（`ui` 不命中 `build`）。
+- **通道二（role label）**：脚本把 worker/verifier 调用的 `phase` 写成计划任务组标题
+  （`任务 n · 标题`，`src/script.ts:1852` 起），这类行的 phase **永远**不含 `执行`/`检查`。
+  因此一条行若 phase 未命中任何阶段，就用它的 **label**（`memberLabel()` 产出的角色名：
+  `执行`/`检查`、`Execute`/`Check`）判一次它属于哪个工作阶段，并把该行**交叉引用**到该阶段的
+  `evidence` 列表。
+- **不变量不变**：`members` 仍是每条行唯一的归属（`evidence` 是引用，不是第二个家），
+  所以「轨道节点里的行」与百分比统计的仍是同一批行（`test/progress-tab.spec.ts` 的
+  `rendered` 断言）。阶段状态优先用自己的 `members`，只有它为空时才由 `evidence` 决定。
+- **标签只对 label 匹配**：`check the build` 这种任务标题不会因为含 `check` 变成 `检查`，
+  因为 role token 不参与 phase 匹配。
+- **文案**：阶段有 evidence 而无自有行时，tooltip 用 `progress.evidenceHint`、meta 行用
+  `progress.branch.evidenceRows`（`{count}` 行），不再落回「事件中没有报告」。
+
 ## 5. 状态与优先级
 
 优先级（固定顺序，先命中先返回）：`failed → doing → done → blocked → cancelled → pending`。
@@ -187,6 +208,10 @@ npx vitest run test/panel.spec.ts test/phase1-dialogue.spec.ts
 3. L1（stage-detail）与 L2（子会话协调块）在当前 recorder/视图 API 下都拿不到真实数据，详情实际落在 L3；阶梯已实现并有单测，未来接入无需改 UI。
 4. 子会话「打开」依赖 `sessions.subagentAddress`；`mode: 'unknown'` 时按 `panelMemberMode` 的既有规则保持不可点。
 5. 真机截图/浏览器视觉验收 **NOT_RUN**：本组不在本机启动真实 DSH Web 组合做视觉验证，截图留给验证组；本文件所有"已运行"结论仅覆盖上面的 vitest/tsc/oxlint 命令。
+6. 「`执行`/`检查` 显示『事件中没有报告』」这一缺陷已在 round 9 关闭（见 §4.1 通道二）：
+   真实流里 worker/verifier 的 phase 是计划任务组标题，旧实现只按 phase 匹配，因此两个必然发生的
+   阶段永远是空的。现在按 role label 交叉引用，状态与计数随之正确；没有 role label 可用时仍如实
+   报「没有报告」，不猜。
 
 ## 13. 收尾回填（2026-11-15，真机验证组 H2）
 

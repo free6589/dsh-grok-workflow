@@ -5,6 +5,45 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.11.9] - 2026-11-18
+
+### Fixed / 修复
+
+- **Progress tab: `执行` and `检查` are no longer reported as "not reported" / 进度页不再把「执行」「检查」显示成「事件中没有报告」** —
+  the script records the plan-task group title (`任务 1 · 标题`) as the `phase` of every worker
+  and verifier call, and the tab matched rows by `phase` alone. The two stages every run
+  performs therefore never claimed a row and rendered empty with
+  `Not reported in the events` (`进展`), while the rows sat in plan-task nodes right below
+  them. A row whose phase names no stage is now also matched by its **role label**
+  (`执行`/`检查`, `Execute`/`Check` from `memberLabel()`), and cross-referenced onto that
+  stage's new `evidence` list: state comes from the stage's own rows when it has any and from
+  its evidence when it has none. `members` stays the one home per row, so the track and the
+  percentage still count the same rows, and a task titled `check the build` does not become
+  `检查` because role tokens never match a phase. The stage meta line now reads
+  `{count} rows ran inside the plan tasks below` / `{count} 行在下方任务节点中执行` instead of
+  the not-reported copy, in both locales. / 脚本把每次 worker / verifier 调用的 `phase`
+  写成计划任务组标题（`任务 1 · 标题`），而本 Tab 只按 `phase` 匹配行。于是每次运行都必然发生的
+  「执行」「检查」两个阶段从来分不到行，渲染成空白并显示「事件中没有报告」，而真正跑过的行就
+  摆在它们下面的任务节点里。现在 phase 命中不了任何阶段的行还会按**角色 label**
+  （`执行`/`检查`、`Execute`/`Check`，由 `memberLabel()` 生成）判一次归属，并交叉引用到该阶段新增的
+  `evidence` 列表：阶段有自己的行就以自己的行为准，没有才看 evidence。`members` 仍是每行唯一的家，
+  所以轨道与百分比统计的仍是同一批行；标题里含 `check` 的任务不会因此变成「检查」（角色 token
+  不参与 phase 匹配）。阶段 meta 行在两个语言里都改为
+  `{count} 行在下方任务节点中执行` / `{count} rows ran inside the plan tasks below`。
+
+### Tests / 测试
+
+- `test/progress-tab.spec.ts` +6 and `test/client.spec.ts` +2 (54 files / 1006 tests, from 999):
+  role-label evidence for Chinese and English labels, the failed/doing derivation, a stage's own
+  rows winning over its evidence, no evidence invented for a label that names no stage, the
+  browser mirror agreeing with the typed rules, and the rendered meta line in both locales. The
+  two substring-decoy tests now use a label that names no stage, so they isolate the phase
+  channel instead of passing for the wrong reason. / `test/progress-tab.spec.ts` 新增 6 条、
+  `test/client.spec.ts` 新增 2 条（54 文件 / 1006 测试，原为 999）：中英文角色 label 的
+  evidence、failed/doing 推导、阶段自有行优先于 evidence、没有阶段可归时**不**编造 evidence、
+  浏览器镜像与类型规则一致、两个语言下的渲染 meta 行。两条子串诱饵测试改用不含阶段名的 label，
+  使它们只检验 phase 通道，而不是因为错误的原因通过。
+
 ## [0.11.8] - 2026-11-18
 
 ### Changed / 变更

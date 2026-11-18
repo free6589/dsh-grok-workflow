@@ -292,3 +292,34 @@ no history is rewritten, and no round is force-pushed.
 - **Suggested version:** patch → `0.11.8` (docs now state a verified runtime that was not
   claimed before).
 - **status:** OK
+
+## Round 9 — P0-02 Progress page `执行`/`检查` said "not reported" (2026-11-18)
+
+- **STOP probe (round start):** `.rsi/tools/stop-probe.sh 9` → `round=9 … 'test -e .rsi/STOP' ->
+  STOP ABSENT`, appended to `.rsi/evidence/stop-probes.txt`.
+- **Read-first recon:** `src/script.ts:1852/1886/1912/1950` puts `taskGroupTitle(...)`
+  (`任务 n · 标题`) in `phase`; `src/progress-tab.ts` bound rows by `phase` alone against
+  `PROGRESS_STAGES` tokens; `src/client/index.js` renders `progress.notReported` for a node with
+  no members. So the two stages every run performs were always empty. Pool anchor:
+  `.rsi/POOL.md` "Progress panel" P0.
+- **Fix (minimal):** second channel — a row whose phase names no stage is matched by its role
+  label (`STAGE_ROLE_LABELS`, words produced by `memberLabel()`) and cross-referenced onto that
+  stage's new `evidence` list. `members` stays the one home per row; state prefers own rows;
+  `blockedReason` follows the same rows. Mirrored in `src/client/index.js`; the stage meta line
+  and tooltip now read `{count} 行在下方任务节点中执行` / `{count} rows ran inside the plan
+  tasks below` instead of the not-reported copy (new keys in both locales).
+- **Red → green:** `.rsi/evidence/round-009/red-ts.txt` = `Tests 5 failed | 29 passed (34)` →
+  `.rsi/evidence/round-009/green.txt` = `Tests 112 passed (112)` (progress-tab 34 + client 78).
+  Two pre-existing decoy tests went red because their fixture used the default label `执行 N`
+  — i.e. the real worker label; they now use a neutral `Member` label and assert `members` **and**
+  `evidence` are empty, so they test the phase channel and nothing else.
+- **Gates:** `npm run typecheck` exit 0 (`.rsi/evidence/round-009/typecheck.txt`); `npm run ci`
+  = `Test Files 54 passed` / `Tests 1006 passed` / lint 22 warnings 0 errors / exit 0
+  (`.rsi/evidence/round-009/ci.txt`). Baseline v0.11.4 = 54/985; previous round 54/999.
+- **Docs:** `docs/knowledge/DESIGN-progress-tab.md` §4.1 (two binding channels, the invariant)
+  and §12 item 6 (the gap is closed, unknown labels still say "not reported"); CHANGELOG
+  [0.11.9] in English and Simplified Chinese.
+- **Version:** patch → `0.11.9` (`package.json` + `package-lock.json` together).
+- **Evidence:** `.rsi/evidence/round-009/` — `stop-probes.txt`, `red-ts.txt`, `green.txt`,
+  `typecheck.txt`, `ci.txt`, `git.txt`.
+- **status:** OK

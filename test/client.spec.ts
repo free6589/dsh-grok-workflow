@@ -144,6 +144,8 @@ type ProgressNode = {
   label: string
   state: string
   members: ProgressMember[]
+  /** Rows that ran under this stage but render as their own plan-task nodes. */
+  evidence: ProgressMember[]
   phases: string[]
   derived: boolean
   reason?: string
@@ -1070,7 +1072,7 @@ describe('client settings page: draft, validation and path ops', () => {
 // The "进度" conversation tab (group G)
 
 /** One declared row, in the shape `agent-start` produces. */
-function progressMember(seq: number, phase: string | undefined, outcome?: string): ProgressMember {
+function progressMember(seq: number, phase: string | undefined, outcome?: string, overrides: Partial<ProgressMember> = {}): ProgressMember {
   return {
     seq,
     label: `执行 ${seq}`,
@@ -1078,6 +1080,7 @@ function progressMember(seq: number, phase: string | undefined, outcome?: string
     order: seq - 1,
     ...phase === undefined ? {} : { phase },
     ...outcome === undefined ? {} : { outcome },
+    ...overrides,
   }
 }
 
@@ -1422,6 +1425,26 @@ describe('client progress tab: the fold and the five states', () => {
     expect(keys.indexOf('phase:任务 1 · 写文档')).toBeLessThan(keys.indexOf('stage:verify'))
     expect(track.nodes.find((node) => node.key === 'phase:任务 1 · 写文档')!.label).toBe('任务 1 · 写文档')
     // Every declared row appears exactly once across the track.
+    const rendered = track.nodes.flatMap((node) => node.members.map((entry) => entry.seq)).sort((a, b) => a - b)
+    expect(rendered).toEqual([1, 2, 3])
+  })
+
+  it('mirrors the role-label evidence, so execute and verify are not rendered as never reported', () => {
+    const track = trackOf([
+      progressMember(1, '任务 1 · 修复登录', 'completed', { label: '执行' }),
+      progressMember(2, '任务 1 · 修复登录', 'completed', { label: '检查' }),
+      progressMember(3, '任务 2 · 补文档', 'failed', { label: '执行' }),
+    ], 'error')
+    const execute = stage(track, 'execute')
+    const verify = stage(track, 'verify')
+    // Same derivation as the typed rules: rows stay in their plan-task nodes …
+    expect(execute.members).toEqual([])
+    expect(track.nodes.filter((node) => node.kind === 'extra')).toHaveLength(2)
+    // … and are cross-referenced onto the stage whose role ran them.
+    expect(execute.evidence.map((entry) => entry.seq)).toEqual([1, 3])
+    expect(execute.state).toBe('failed')
+    expect(verify.evidence.map((entry) => entry.seq)).toEqual([2])
+    expect(verify.state).toBe('done')
     const rendered = track.nodes.flatMap((node) => node.members.map((entry) => entry.seq)).sort((a, b) => a - b)
     expect(rendered).toEqual([1, 2, 3])
   })
@@ -1816,5 +1839,38 @@ describe('client progress tab: derived states say where they came from', () => {
     const verify = nodesOf(run).find((node) => node.props['data-node-key'] === 'stage:verify')!
     expect(verify.props['data-state']).toBe('pending')
     expect(verify.props['title']).toBe(bundle.GROK_WORKFLOW_DICT['zh']!['progress.notReported'])
+  })
+
+  it('reports the rows a stage ran inside plan tasks instead of saying it was never reported', () => {
+    const run: ProgressRun = {
+      runId: 'r',
+      name: '任务团队',
+      anchorSeq: 1,
+      members: [
+        progressMember(1, '任务 1 · 修复登录', 'completed', { label: '执行' }),
+        progressMember(2, '任务 1 · 修复登录', 'completed', { label: '检查' }),
+        progressMember(3, '任务 2 · 补文档', 'completed', { label: '执行' }),
+      ],
+      stopReason: 'completed',
+    }
+    const nodes = nodesOf(run)
+    const execute = nodes.find((node) => node.props['data-node-key'] === 'stage:execute')!
+    const verify = nodes.find((node) => node.props['data-node-key'] === 'stage:verify')!
+    // The two stages every run performs no longer read as never reported.
+    expect(execute.props['data-state']).toBe('done')
+    expect(verify.props['data-state']).toBe('done')
+    expect(execute.props['title']).toBe(bundle.GROK_WORKFLOW_DICT['zh']!['progress.evidenceHint'])
+    // The meta line names how many rows ran under the stage, in the reader's language.
+    const zhMeta = texts(execute).join(' ')
+    expect(zhMeta).toContain('2 行在下方任务节点中执行')
+    expect(zhMeta).not.toContain(bundle.GROK_WORKFLOW_DICT['zh']!['progress.notReported'])
+    const en = translator('en')
+    const enTree = progress.component({
+      t: en,
+      progressT: en,
+      useGrokProgress: (select: (value: unknown) => unknown) => select({ runs: [run], activeRun: run }),
+    })
+    const enExecute = walk(enTree).find((element) => element.props['data-node-key'] === 'stage:execute')!
+    expect(texts(enExecute).join(' ')).toContain('2 rows ran inside the plan tasks below')
   })
 })

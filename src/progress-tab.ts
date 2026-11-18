@@ -208,6 +208,16 @@ export interface ProgressNodeModel {
   state: ProgressState
   /** Rows behind this node, in plan order. */
   members: ProgressMemberFact[]
+  /**
+   * Rows that ran under this stage and are rendered as their own plan-task nodes.
+   *
+   * A cross-reference, never a second home: `members` stays the one place a row is
+   * counted, so the track and the percentage cannot disagree. It exists because the
+   * engine records the plan-task group title (`任务 1 · 标题`) as a worker's `phase`, so
+   * matching rows by phase alone left `执行` and `检查` — the two stages every run
+   * performs — empty and "not reported".
+   */
+  evidence: ProgressMemberFact[]
   /** Exact phase headers aggregated here (empty for an unmatched spine stage). */
   phases: string[]
   /** Whether the state was derived from the run's end rather than from a settlement. */
@@ -550,6 +560,39 @@ function stageForPhase(phase: string): ProgressStageDefinition | undefined {
 }
 
 /**
+ * Role labels that name a work stage when a row's phase header does not.
+ *
+ * A recorded `agent-start` carries two different kinds of `phase`: the phase a role call
+ * belongs to (`执行`, `检查`) for the fixed stages, and the plan-task group title
+ * (`任务 1 · 标题`) for the worker and verifier calls that run *inside* a task. Matched by
+ * phase alone, those rows name no stage — which is why the panel reported `执行` and
+ * `检查`, the two stages every run performs, as never reported.
+ *
+ * The words here are role names, not free-form headers, so they are matched only against
+ * a row's label and never against a phase: a task titled `检查登录` must keep binding by
+ * its phase, and a task titled `check the build` must not become `检查` because of a
+ * substring inside its own title.
+ */
+const STAGE_ROLE_LABELS: Readonly<Record<string, readonly string[]>> = {
+  plan: ['规划助手', 'planner'],
+  execute: ['执行', 'execute', 'worker'],
+  verify: ['检查', '核验', 'verify', 'check', 'verifier'],
+  synthesize: ['汇总助手', 'summarize', 'synthesizer'],
+  answer: ['回答', 'answer'],
+}
+
+/** The first spine stage whose role label names it, if a label names one. */
+function stageForRoleLabel(label: string): ProgressStageDefinition | undefined {
+  const haystack = label.toLowerCase()
+  for (const stage of PROGRESS_STAGES) {
+    const labels = STAGE_ROLE_LABELS[stage.key]
+    if (labels === undefined) continue
+    if (labels.some((token) => phaseCarriesToken(haystack, token))) return stage
+  }
+  return undefined
+}
+
+/**
  * Derive the track one run renders.
  *
  * Every recorded phase is either aggregated into the spine stage it names or appended as
@@ -564,6 +607,7 @@ export function deriveTrack(run: ProgressRunFacts, options: DeriveOptions = {}):
   const ended = run.stopReason !== undefined
   const byStage = new Map<string, ProgressMemberFact[]>()
   const byStagePhases = new Map<string, string[]>()
+  const evidenceByStage = new Map<string, ProgressMemberFact[]>()
   const extras: Array<{ phase: string, members: ProgressMemberFact[] }> = []
   const unphased: ProgressMemberFact[] = []
   for (const member of run.members) {
@@ -577,6 +621,14 @@ export function deriveTrack(run: ProgressRunFacts, options: DeriveOptions = {}):
       const existing = extras.find((entry) => entry.phase === phase)
       if (existing === undefined) extras.push({ phase, members: [member] })
       else existing.members.push(member)
+      // The row keeps its plan-task node above; this only cross-references it onto the
+      // stage whose role ran it, so `执行`/`检查` report what happened instead of nothing.
+      const roleStage = stageForRoleLabel(member.label)
+      if (roleStage !== undefined) {
+        const evidence = evidenceByStage.get(roleStage.key)
+        if (evidence === undefined) evidenceByStage.set(roleStage.key, [member])
+        else evidence.push(member)
+      }
       continue
     }
     const list = byStage.get(stage.key)
@@ -615,9 +667,11 @@ export function deriveTrack(run: ProgressRunFacts, options: DeriveOptions = {}):
     }
     return undefined
   }
-  const node = (definition: ProgressStageDefinition | undefined, key: string, kind: ProgressNodeModel['kind'], members: ProgressMemberFact[], phases: string[], label?: string): ProgressNodeModel => {
-    const state = definition !== undefined && definition.edge ? edgeState(definition.key) : nodeState(members, ended)
-    const reason = state === 'blocked' ? blockedReason(members, ended) : undefined
+  const node = (definition: ProgressStageDefinition | undefined, key: string, kind: ProgressNodeModel['kind'], members: ProgressMemberFact[], phases: string[], label?: string, evidence: ProgressMemberFact[] = []): ProgressNodeModel => {
+    // A stage's own rows are authoritative; its evidence speaks only when it has none.
+    const rows = members.length > 0 ? members : evidence
+    const state = definition !== undefined && definition.edge ? edgeState(definition.key) : nodeState(rows, ended)
+    const reason = state === 'blocked' ? blockedReason(rows, ended) : undefined
     const detail = detailOf(phases)
     return {
       key,
@@ -625,6 +679,7 @@ export function deriveTrack(run: ProgressRunFacts, options: DeriveOptions = {}):
       label: label ?? (definition === undefined ? key : labelFor(definition.key)),
       state,
       members,
+      evidence,
       phases,
       derived: state === 'blocked',
       ...reason === undefined ? {} : { reason },
@@ -633,7 +688,7 @@ export function deriveTrack(run: ProgressRunFacts, options: DeriveOptions = {}):
   }
   const nodes: ProgressNodeModel[] = []
   for (const stage of PROGRESS_STAGES) {
-    nodes.push(node(stage, `stage:${stage.key}`, stage.edge ? 'edge' : 'stage', byStage.get(stage.key) ?? [], byStagePhases.get(stage.key) ?? []))
+    nodes.push(node(stage, `stage:${stage.key}`, stage.edge ? 'edge' : 'stage', byStage.get(stage.key) ?? [], byStagePhases.get(stage.key) ?? [], undefined, evidenceByStage.get(stage.key) ?? []))
     // Extra phases are real plan tasks (`任务 n · 标题`): the engine announces them while
     // it executes the plan, so they belong between `执行` and `检查` — the template's
     // work slot — in the order the run started them. A row that declared no phase at all

@@ -57,12 +57,13 @@ here and are marked DONE when their commit lands.
 
 ## Progress panel (`src/progress-tab.ts`, `src/client/index.js`, `src/records.ts`)
 
-- P0 · Execute/Verify print `Not reported in the events` because rows are matched by
+- P0 DONE · Execute/Verify printed `Not reported in the events` because rows were matched by
   `agent-start.data.phase`, which the script fills with the plan-task group title, never
   `执行`/`检查` (`progress-tab.ts:543-580`, tokens `:184-185`, producer `script.ts:1849-1852`).
-  Fix: bind a row to a stage by its role label when the phase is a task header, and add a
-  second view (`evidence`) so the one-node-per-row invariant (`test/progress-tab.spec.ts:268`)
-  survives. M / medium.
+  Fixed in round 9 by the second channel the pool proposed: a row whose phase names no stage is
+  bound by its role label and cross-referenced onto the stage's `evidence` list, so the
+  one-node-per-row invariant (`test/progress-tab.spec.ts:269`) survives. Evidence
+  `.rsi/evidence/round-009/`.
 - P · Edge nodes (Start/End) print the same `Not reported in the events` copy although
   `run-start`/`run-end` did arrive (`client/index.js:2669`, `:2673`). S / low.
 - P · `meta.phases` (which does declare `检查`) is dropped at `run-start` (`records.ts:597`), so

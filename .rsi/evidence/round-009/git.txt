@@ -1,0 +1,17 @@
+round 9 git evidence
+
+$ git log --oneline -1
+a407f62 fix(progress): bind plan-task rows to the stage their role label names (RSI round 9)
+
+$ git show --stat --oneline HEAD | tail -6
+ package.json                          |   2 +-
+ src/client/index.js                   |  67 ++++++-
+ src/progress-tab.ts                   |  63 ++++++-
+ test/client.spec.ts                   |  58 +++++-
+ test/progress-tab.spec.ts             |  88 ++++++++-
+ 31 files changed, 1104 insertions(+), 110 deletions(-)
+
+$ git status --short --branch
+## main...origin/main [ahead 1]
+?? .rsi/evidence/round-009/git.txt
+?? settings-simple-mock.html

@@ -1,6 +1,18 @@
 # Project State
 
-Last updated: 2026-11-18 (**RSI 连续循环 round 8 完成 · `0.11.8`** — 主题：真机 disposition。
+Last updated: 2026-11-18 (**RSI 连续循环 round 9 完成 · `0.11.9`** — 主题 P0-02：Progress 页
+`执行`/`检查` 恒显示「事件中没有报告」。根因：脚本把 worker/verifier 的 `phase` 写成计划任务组
+标题（`任务 n · 标题`），而面板只按 `phase` 匹配阶段，于是每次运行都必然发生的两个阶段永远空着。
+修法：phase 命中不了阶段时再按**角色 label**（`执行`/`检查`、`Execute`/`Check`）判归属，并交叉
+引用到阶段新增的 `evidence` 列表；`members` 仍是每行唯一的家（轨道与百分比统计同一批行），状态
+自有行优先。role token 只匹配 label，标题含 `check` 的任务不会变成「检查」。两语言 meta 行改为
+「N 行在下方任务节点中执行」/「N rows ran inside the plan tasks below」。`npm run ci` exit 0：
+typecheck 0 错、lint 22w/0e、**54 文件 / 1006 测试 PASS**（上轮 54/999）；tag `v0.11.9`。
+证据 `.rsi/evidence/round-009/`、`VALIDATION.md` Round 57、`D-063`。
+**本轮起 STOP 判定强制留痕**：`.rsi/tools/stop-probe.sh` → `.rsi/evidence/stop-probes.txt`
++ `.rsi/LOG.md` 的 STOP 小节。**剩余待办**：P1-02、P2-01、P3-01/P3-02 与 POOL 里的 P 级条目。
+
+Previous update: 2026-11-18 (**RSI 连续循环 round 8 完成 · `0.11.8`** — 主题：真机 disposition。
 在 DSH `0.2.2-rc.3` 上用仓库内 `DSH_HOME`（沙箱下 `dsh` 写不了 `~/.dsh`，实测 EROFS）把本检出
 `dsh plugin add` 进 `grok-workflow-dev`，`workflow-ptc` 改回启用后在 `127.0.0.1:3199` 起真实实例：
 启动只有一行 URL（无 `pending`、无 `did not activate`），`POST /api/settings/describe` 投出 23 个

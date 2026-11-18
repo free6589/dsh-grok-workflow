@@ -1,0 +1,16 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+stderr | test/client.spec.ts > client settings page: reading, failure and retry > keeps still reading, read failed and not served as three different pages
+[grok-workflow] no settings namespace projects this plugin's fields: the row is disabled, renamed with an unreadable projection, or did not activate (see docs/LOCAL-TESTING.md#enable). The Grok workflow page cannot appear until it does.
+
+(node:43) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/client.spec.ts (78 tests) 65ms
+ ✓ test/progress-tab.spec.ts (34 tests) 20ms
+
+ Test Files  2 passed (2)
+      Tests  112 passed (112)
+   Start at  14:22:59
+   Duration  629ms (transform 270ms, setup 0ms, import 316ms, tests 84ms, environment 0ms)
+
