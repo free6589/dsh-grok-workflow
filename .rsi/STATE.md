@@ -78,6 +78,15 @@ on a guess.
 - Round 8: no failed round; the model-backed runtime check is recorded BLOCKED, not failed.
 - Consecutive failed rounds: 0. Consecutive valueless rounds: 0.
 
+## Final verification (on `06576f9`, the chore commit that landed round-8 git evidence)
+
+- `npm run typecheck` exit 0 · `npm run ci` exit 0 — **54 files / 999 tests PASS**, lint 22
+  warnings / 0 errors · `npm run build` exit 0 with an empty `git diff -- lib/` (idempotent).
+- Evidence: `.rsi/evidence/final-typecheck.txt`, `.rsi/evidence/final-ci.txt`,
+  `.rsi/evidence/final-build.txt`, `.rsi/evidence/final-lib-idempotent.txt`.
+- Baseline for comparison: `v0.11.4` = 54 files / 985 tests; every round since added tests and
+  none were removed or skipped.
+
 ## Loop status (this session)
 
 - The ordered theme list handed to this loop is exhausted: P2-02 (round 5), P1-03 (round 6),
