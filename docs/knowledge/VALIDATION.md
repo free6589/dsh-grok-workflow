@@ -3408,3 +3408,26 @@ lint 22 warning / 0 error，**54 文件 / 993 测试 PASS**，基线 54/985）�
 
 **未验证（`NOT_RUN`）**：GitHub 渲染后的排版未在浏览器里复核；本轮未重复 `grok-workflow-dev`
 真机安装（真机结论归 round 8）。
+
+## Round 55 — 2026-11-18 — 远端标签清单逐条对账（`CONFIRMED`，命令与输出见证据）
+
+**范围**：基线轮遗留的开放问题「远端标签只看到尾部 v0.2.7..v0.9.4，README 却列 28 个」。
+
+**方法（`CONFIRMED`）**：`git fetch origin --prune`；`git ls-remote --tags origin`（61 行 →
+32 个标签，其中 26 个 annotated）；逐标签 `git show <tag>:package.json` 与
+`git merge-base --is-ancestor <peeled> origin/main`；`git rev-parse HEAD` 对
+`git rev-parse origin/main`；从 README 中英两份抽 `Published:` / `已发布：` 列表；
+本地标签对象逐个对远端对象。
+
+**结论（`CONFIRMED`）**：32/32 标签本地与远端对象完全相同（**没有被动过的标签**）；每个 peeled
+提交都是 `main` 的祖先；两份 README 列表升序、无重复、无缺失无多余、末项 = 当前发布；
+`HEAD == origin/main`。31 个标签的 `package.json` 与标签名一致；唯一例外是 `v0.2.0-rc.1`，
+它早于发布流程，所在提交的 `package.json` 仍是 `0.1.0`。**已发布标签不移动**，因此改为在两份
+README 写明「它不是发布版本」，并由 `test/docs-version.spec.ts` 新增 1 个 `it` 钉住该说明（7 → 8）。
+
+**验证（`CONFIRMED`）**：`.rsi/evidence/round-007/remote-tags.txt`（原始 `ls-remote`）、
+`audit.txt`（逐标签表 + 列表比对 + main 同步）、`local-vs-remote-objects.txt`（32/32 对象相同）、
+`ci.txt`（`npm run ci` exit 0，typecheck 0 错，lint 22w/0e，**54 文件 / 999 测试 PASS**）。
+
+**未验证（`NOT_RUN`）**：旧标签的 GitHub Release **附件**未重新下载核对（本轮审 refs，不审
+Release 正文）；Release 工作流对预发布标签的处理未测（未改工作流）。

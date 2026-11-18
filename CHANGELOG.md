@@ -5,6 +5,31 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.11.7] - 2026-11-18
+
+### Docs / 文档
+
+- **The tag inventory is now audited, and the one non-release tag is named / 标签清单已对账，唯一的非发布标签已写明** —
+  all 32 remote tags were compared tag-by-tag with the README published list and with
+  `package.json` at each tag's commit: 31 release tags match their version, the lists in both
+  languages are ascending, duplicate-free, end at the current release and contain no extra or
+  missing entry, every tag object is identical locally and on `origin`, and `HEAD` equals
+  `origin/main`. The single exception is the prerelease `v0.2.0-rc.1`, which predates the
+  release workflow and sits on a commit whose `package.json` still says `0.1.0`; a published
+  tag is never moved, so both READMEs now state that it is not a release, and
+  `test/docs-version.spec.ts` fails if that note disappears. / 32 个远端标签逐个与 README
+  已发布列表、以及各标签所在提交的 `package.json` 对账：31 个发布标签与版本号一致，中英两份
+  列表升序、无重复、末项为当前发布、无多余也无缺失，每个标签对象本地与 `origin` 完全相同，
+  `HEAD` 与 `origin/main` 一致。唯一例外是预发布标签 `v0.2.0-rc.1`——它早于发布流程，所在提交的
+  `package.json` 仍写着 `0.1.0`；已发布标签永不移动，因此两份 README 都写明它不属于发布版本，
+  该说明若消失 `test/docs-version.spec.ts` 会失败。
+
+### Tests / 测试
+
+- `test/docs-version.spec.ts` 7 → 8 `it`s: the documented prerelease exception may not be
+  removed silently. No skip, no loosened assertion. / `test/docs-version.spec.ts` 从 7 个 `it`
+  增至 8 个：已写明的预发布例外不得被悄悄删掉。无跳过、无放宽断言。
+
 ## [0.11.6] - 2026-11-18
 
 ### Fixed / 修复

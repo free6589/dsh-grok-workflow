@@ -220,3 +220,31 @@ no history is rewritten, and no round is force-pushed.
   the runtime disposition).
 - **Suggested version:** patch → `0.11.6`.
 - **status:** OK
+
+## Round 7 — the tag inventory audited tag by tag; one tag is not a release
+
+- **Theme (verification, remote tag inventory):** the backend carried an open question
+  from the baseline round — "remote tags only tail-observed v0.2.7..v0.9.4 vs README 28
+  tags v0.1.0..v0.11.3". This round closed it with a full comparison instead of a tail.
+- **Method (exact commands, outputs in evidence):**
+  `git fetch origin --prune`; `git ls-remote --tags origin` (61 lines → 32 tags, 26
+  annotated); per tag `git show <tag>:package.json` + `git merge-base --is-ancestor
+  <peeled> origin/main`; `git rev-parse HEAD` vs `git rev-parse origin/main`; README
+  published lists extracted from both languages; local tag objects vs remote tag objects.
+- **Result:** 32/32 tags exist locally and remotely with **identical objects** (no moved
+  tag), every peeled commit is an ancestor of `main`, both README lists are ascending,
+  duplicate-free, complete (0 missing, 0 extra) and end at the current release, and
+  `HEAD == origin/main`. 31 of 32 tags have `package.json` equal to the tag; the
+  exception is `v0.2.0-rc.1`, which predates the release workflow and sits on a `0.1.0`
+  commit. It is a published tag, so it is **not moved**; both READMEs now say it is not a
+  release, and `test/docs-version.spec.ts` fails if that note disappears.
+- **Change:** README + README.zh-CN note about `v0.2.0-rc.1`; one new `it` in
+  `test/docs-version.spec.ts` pinning the note (7 → 8).
+- **Evidence:** `.rsi/evidence/round-007/` — `remote-tags.txt` (raw `ls-remote`),
+  `audit.txt` (tag-by-tag table, README-list comparison, main sync), 
+  `local-vs-remote-objects.txt` (32/32 identical objects), `ci.txt`.
+- **Unverified:** GitHub Release *assets* for the older tags were not re-downloaded
+  (`NOT_RUN` — this round audits refs, not release bodies); whether the Release workflow
+  would reject a prerelease tag is not tested (`NOT_RUN`, no workflow change made).
+- **Suggested version:** patch → `0.11.7`.
+- **status:** OK

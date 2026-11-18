@@ -1,0 +1,39 @@
+RSI round 6 — commit, tag, push (2026-11-18T13:58+08:00)
+
+$ git rev-parse HEAD
+88d133b67d1da1bf19518a17a349e447dc2ae14d
+
+$ git log --oneline -2
+88d133b fix(docs): LOCAL-TESTING named tarballs, a rejection and a notation it did not have (RSI round 6)
+bf0dc91 fix(redact): quoted cookies, presigned signatures, PGP armor, env value bounds (RSI round 5)
+
+$ git diff --stat HEAD~1 HEAD
+ .rsi/LOG.md                       |   1 +
+ .rsi/POOL.md                      |   6 +-
+ .rsi/ROUND.md                     |  40 +++++
+ .rsi/STATE.md                     |  18 +-
+ .rsi/evidence/round-005/git.txt   |  54 ++++++
+ .rsi/evidence/round-006/ci.txt    | 344 ++++++++++++++++++++++++++++++++++++++
+ .rsi/evidence/round-006/green.txt |  10 ++
+ .rsi/evidence/round-006/red.txt   | 326 ++++++++++++++++++++++++++++++++++++
+ .rsi/ledger.jsonl                 |   1 +
+ .rsi/tools/bump-version.py        |  17 +-
+ CHANGELOG.md                      |  47 ++++++
+ README.md                         |  10 +-
+ README.zh-CN.md                   |  12 +-
+ docs/LOCAL-TESTING.md             |  19 ++-
+ docs/knowledge/DECISIONS.md       |  13 ++
+ docs/knowledge/HANDOFF.md         |  15 ++
+ docs/knowledge/STATE.md           |  12 +-
+ docs/knowledge/VALIDATION.md      |  24 +++
+ package-lock.json                 |   4 +-
+ package.json                      |   2 +-
+ test/docs-config-keys.spec.ts     |  72 +++++++-
+ 21 files changed, 1013 insertions(+), 34 deletions(-)
+
+$ git ls-remote origin refs/heads/main refs/tags/v0.11.6
+88d133b67d1da1bf19518a17a349e447dc2ae14d	refs/heads/main
+c4d07a2ee269b540bc8f453ac4b64702972eb9b0	refs/tags/v0.11.6
+
+$ git rev-parse v0.11.6^{commit}
+88d133b67d1da1bf19518a17a349e447dc2ae14d

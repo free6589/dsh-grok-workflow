@@ -90,6 +90,15 @@ describe('README version claims match package.json', () => {
     }
   })
 
+  it('names the one prerelease tag that is not a release', () => {
+    // Round 7 compared all 32 remote tags against the release rules: 31 are release tags
+    // whose commit's package.json matches the tag, and v0.2.0-rc.1 predates the release
+    // workflow (tagged on a 0.1.0 commit). It cannot be moved, so it is documented
+    // instead — and the documentation is not allowed to disappear silently.
+    // Evidence: .rsi/evidence/round-007/audit.txt
+    for (const readme of [readmeEn, readmeZh]) expect(readme).toContain('v0.2.0-rc.1')
+  })
+
   it('gives every published tag its own changelog section, newest first', () => {
     const sections = [...changelog.matchAll(/^## \[(\d+\.\d+\.\d+)\]/gm)].map((m) => m[1] as string)
     const published = publishedTags(readmeEn, 'Published:', 'The unpinned command').map(numeric)

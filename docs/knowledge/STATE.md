@@ -1,6 +1,15 @@
 # Project State
 
-Last updated: 2026-11-18 (**RSI 连续循环 round 6 完成 · `0.11.6`** — 主题 P1-03：
+Last updated: 2026-11-18 (**RSI 连续循环 round 7 完成 · `0.11.7`** — 主题：远端标签清单对账。
+`git ls-remote --tags` 全量 32 个标签逐条对 README 中英列表与各标签所在提交的 `package.json`：
+32/32 本地与远端对象相同（没有被移动过的标签）、每个 peeled 提交都是 `main` 祖先、两份列表
+升序无重复无缺失且末项 = 当前发布、`HEAD == origin/main`。31 个标签版本一致；唯一例外
+`v0.2.0-rc.1` 早于发布流程（所在提交 `package.json` 仍为 `0.1.0`），已发布标签不移动，改为在两份
+README 写明并加 1 个守卫 `it`。`npm run ci` exit 0：typecheck 0 错、lint 22w/0e、
+**54 文件 / 999 测试 PASS**；tag `v0.11.7`。证据 `.rsi/evidence/round-007/`、
+`VALIDATION.md` Round 55、`D-061`。
+
+Previous update: 2026-11-18 (**RSI 连续循环 round 6 完成 · `0.11.6`** — 主题 P1-03：
 `docs/LOCAL-TESTING.md` 与 `src/config.ts` 对账。九个键、`maxRetries=1`、`maxActiveRuns=2` /
 每进程 `8`、`timeoutMs` 默认 `3600000` 全部与代码一致；三处不符已修——四处安装示例指向
 `0.2.0`/`0.2.1` 压缩包（发布线 0.11.x）、排障条目把「被修复的 `synthesis: deterministic`」写成

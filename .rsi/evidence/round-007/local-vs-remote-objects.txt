@@ -1,0 +1,45 @@
+# Round 7 — every remote tag object equals the local tag object (no moved tag)
+
+tag            local object                              remote object                             same
+-------------------------------------------------------------------------------------------------------
+v0.1.0         f175ada8a7533a5f61c06a75e5a457e32b37579b  f175ada8a7533a5f61c06a75e5a457e32b37579b  True
+v0.10.0        63c04aa544372161cf8f4d1c307920f7c0531a94  63c04aa544372161cf8f4d1c307920f7c0531a94  True
+v0.10.1        84fccce84377a0aee8f347dcc93ea3d7ca061617  84fccce84377a0aee8f347dcc93ea3d7ca061617  True
+v0.10.2        003cb68395764b26e8ccdf95119946de31658eb4  003cb68395764b26e8ccdf95119946de31658eb4  True
+v0.11.0        08c5fd0ddaf76efd8715f3c2cdd3f6016be05265  08c5fd0ddaf76efd8715f3c2cdd3f6016be05265  True
+v0.11.1        9b327f1e6874b0025f196fcfdc1876419ec6d9e5  9b327f1e6874b0025f196fcfdc1876419ec6d9e5  True
+v0.11.2        629f0c40f91f1ab2de6d8fa6d14149aac4a30505  629f0c40f91f1ab2de6d8fa6d14149aac4a30505  True
+v0.11.3        eadf8f42b1a8d2c335c37b1e6df0f144faea565d  eadf8f42b1a8d2c335c37b1e6df0f144faea565d  True
+v0.11.4        437eddb020679fbf1e74a3e36fcfa9d645c901cd  437eddb020679fbf1e74a3e36fcfa9d645c901cd  True
+v0.11.5        0f97e19f30c78f6c8fba56b4f6b3419da5b80deb  0f97e19f30c78f6c8fba56b4f6b3419da5b80deb  True
+v0.11.6        c4d07a2ee269b540bc8f453ac4b64702972eb9b0  c4d07a2ee269b540bc8f453ac4b64702972eb9b0  True
+v0.2.0         abb48bf67a06a52e9fe27762e1def3e2cd1fd194  abb48bf67a06a52e9fe27762e1def3e2cd1fd194  True
+v0.2.0-rc.1    8d4a9168d64a3807f6da8ac0aa6a7dab0ce5060c  8d4a9168d64a3807f6da8ac0aa6a7dab0ce5060c  True
+v0.2.1         7cdd969e00c3d0f37ad859adfc908908123cdb63  7cdd969e00c3d0f37ad859adfc908908123cdb63  True
+v0.2.2         88f4343ba8aeaa2ba6b7684419b3fa7568dd3ea8  88f4343ba8aeaa2ba6b7684419b3fa7568dd3ea8  True
+v0.2.3         1f63ec29fd3b9e54bbbf7526a972954ab7923669  1f63ec29fd3b9e54bbbf7526a972954ab7923669  True
+v0.2.4         c6b614de112c0ab7ca5db4a72c018a1452d9cc41  c6b614de112c0ab7ca5db4a72c018a1452d9cc41  True
+v0.2.5         1e83b4abe0d38d8b32b35b7146748b66cef66cad  1e83b4abe0d38d8b32b35b7146748b66cef66cad  True
+v0.2.6         8e81dc561da7a5ce55b830f27b522319ec9d340b  8e81dc561da7a5ce55b830f27b522319ec9d340b  True
+v0.2.7         26f8044214d7be41d95fdb2efdd0aaf4c4e6493e  26f8044214d7be41d95fdb2efdd0aaf4c4e6493e  True
+v0.3.0         3f5ad0a1921e42d0a8c2d755cbb9ab94b5f4d73c  3f5ad0a1921e42d0a8c2d755cbb9ab94b5f4d73c  True
+v0.4.0         708c31557c17056a6a2629ff271f420fed3c9d98  708c31557c17056a6a2629ff271f420fed3c9d98  True
+v0.5.0         af82a34becab2a1bc622c1aea7b34f56b2089428  af82a34becab2a1bc622c1aea7b34f56b2089428  True
+v0.5.1         5cc66beb428b01076aae6d9fa1209899c1f2b8a4  5cc66beb428b01076aae6d9fa1209899c1f2b8a4  True
+v0.6.0         1f9065deb2d7bc5089df5bb458a1fb3ae5b3dc45  1f9065deb2d7bc5089df5bb458a1fb3ae5b3dc45  True
+v0.7.0         3b96b16a774e0ac6d8068dcb0cf0726d47e99efb  3b96b16a774e0ac6d8068dcb0cf0726d47e99efb  True
+v0.8.0         9c590f263b9144329a558a13c81596afc1933835  9c590f263b9144329a558a13c81596afc1933835  True
+v0.9.0         936e6258e438e1d3cdad0f49736bf8ceaac533a4  936e6258e438e1d3cdad0f49736bf8ceaac533a4  True
+v0.9.1         584dc22040aee925666b064196af701e71aafb6a  584dc22040aee925666b064196af701e71aafb6a  True
+v0.9.2         38ef23710e52a83115a54a14264a500836235704  38ef23710e52a83115a54a14264a500836235704  True
+v0.9.3         f63bb7cf846056a01b048c304592f74cecbd1a41  f63bb7cf846056a01b048c304592f74cecbd1a41  True
+v0.9.4         8ca2c1abf07724678bd794b57ee4a62cc1a75569  8ca2c1abf07724678bd794b57ee4a62cc1a75569  True
+
+mismatched tag objects: none
+
+## Working tree / branch after the audit
+## main...origin/main
+?? .rsi/evidence/round-006/git.txt
+?? .rsi/evidence/round-007/
+?? settings-simple-mock.html
+

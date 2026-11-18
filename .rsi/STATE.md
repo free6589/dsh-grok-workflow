@@ -1,6 +1,6 @@
 # RSI State (overwritten every round; keep under 100 lines)
 
-Updated: 2026-11-18T13:56+08:00 · round 6 complete · version `0.11.6` (tag `v0.11.6`)
+Updated: 2026-11-18T14:02+08:00 · round 7 complete · version `0.11.7` (tag `v0.11.7`)
 
 ## Facts
 
@@ -9,8 +9,12 @@ Updated: 2026-11-18T13:56+08:00 · round 6 complete · version `0.11.6` (tag `v0
 - Round 4 commit: `bcb601d` (tag `v0.11.4`). Its bookkeeping + evidence were left
   uncommitted by that round; landed by `2f999eb` (chore, no version bump).
 - Round 5: `bf0dc91` (tag `v0.11.5`), 54 files / 993 tests PASS.
-- Round 6 commit: this round's commit (tag `v0.11.6` → same sha). `npm run ci`:
-  54 files / 998 tests PASS, 0 type errors, lint 22 warnings / 0 errors (baseline).
+- Round 6: `88d133b` (tag `v0.11.6`), 54 files / 998 tests PASS.
+- Round 7 commit: this round's commit (tag `v0.11.7` → same sha). `npm run ci`:
+  54 files / 999 tests PASS, 0 type errors, lint 22 warnings / 0 errors (baseline).
+- Tag inventory (round 7, `CONFIRMED`): 32 remote tags, 32 local, identical objects, all
+  peeled commits ancestors of `main`; 31 tags match `package.json`, `v0.2.0-rc.1` does
+  not (predates the release workflow) and is documented instead of moved.
 - Ledger: `.rsi/ledger.jsonl` (one JSON line per round). Resume from the highest
   `round` whose `status` is `OK`; do not redo rounds already logged.
 - Evidence: `.rsi/evidence/round-NNN/` (`red.txt` before, `green.txt` after,
