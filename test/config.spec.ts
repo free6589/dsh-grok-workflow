@@ -262,6 +262,34 @@ describe('route validation against the runtime', () => {
     expect(bad.errors[0]).toContain('declared: m1, m2')
   })
 
+  it('checks every routed role, the supervisor included', () => {
+    // The supervisor runs *after* the work is verified, so a route the runtime does
+    // not have must fail here — at load — instead of at the end of a run that has
+    // already paid for every child call. Every role in the report is routed through
+    // the same table, so every role is checked (RSI round 19).
+    const ctx = ctxWith({
+      llm: {
+        listProviders: () => [knownProvider],
+        listConfigurableProviders: () => [{ provider: 'p1', settingsNs: 'llm-p1', settingsPath: ['providers', 'p1'] }],
+      },
+      settings: {
+        describe: () => [{
+          ns: 'llm-p1',
+          value: { providers: { p1: { models: [{ id: 'm1' }] } } },
+          autoGenerate: true,
+        }],
+      },
+    })
+    for (const role of ['planner', 'worker', 'verifier', 'supervisor', 'synthesizer'] as const) {
+      const fine = validateRoutes(ctx, resolveConfig({ roles: { [role]: [{ provider: 'p1', model: 'm1' }] } } as never))
+      expect(fine.errors, role).toEqual([])
+      const noProvider = validateRoutes(ctx, resolveConfig({ roles: { [role]: [{ provider: 'nope', model: 'm1' }] } } as never))
+      expect(noProvider.errors.join(' '), role).toContain(`roles.${role} names provider "nope"`)
+      const noModel = validateRoutes(ctx, resolveConfig({ roles: { [role]: [{ provider: 'p1', model: 'm2' }] } } as never))
+      expect(noModel.errors.join(' '), role).toContain(`roles.${role} names model "m2"`)
+    }
+  })
+
   it('notes instead of failing when the runtime cannot judge the route', () => {
     const noModels = ctxWith({
       llm: {

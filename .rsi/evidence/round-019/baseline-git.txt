@@ -1,0 +1,14 @@
+## main...origin/main
+?? .rsi/evidence/round-019/
+?? settings-simple-mock.html
+6ee2e68 docs(rsi): record 0.11.17 release, tag-install verification and web-profile update
+5fc3e1d chore(release): v0.11.17 — resident parallel guardian (RSI round 18)
+4de7a7a feat(supervision): resident parallel guardian beside the serial supervisor
+6ee2e6845ed30d516a72f51e740a90272eecb32a
+6ee2e6845ed30d516a72f51e740a90272eecb32a
+--- tags tail ---
+v0.11.13
+v0.11.14
+v0.11.15
+v0.11.16
+v0.11.17

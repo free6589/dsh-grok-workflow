@@ -3858,3 +3858,43 @@ Round 16 段、`.rsi/ROUND.md` Round 16。
 
 **未验证（`NOT_RUN`，与上轮相同）**：rrule 定时到点的那次投递；真模型跑整轮；GUI 点击开关；
 unload/归档监听的 firing（操作体已 CONFIRMED）。`src/index.ts:292` 注释仍是 HYPOTHESIS，未动。
+
+## Round 64 — 2026-11-19 — RSI round 19：载入期路由校验漏掉 `supervisor`（`CONFIRMED`）
+
+**编号说明**：本文件里 `## Round 63` 出现了两次（`:5` 发版记录、`:31` 常驻监护落地），
+编号已经撞车。历史段不重写，本轮从 64 继续。
+
+**缺陷**：`src/settings.ts:94` 的 `ROLE_ORDER` 只有 planner/worker/verifier/synthesizer。
+`validateRoutes` 与「2+ 路由全空 `maxInFlight`」提示都从这张表取角色，所以
+`roles.supervisor` 完全不在载入期校验范围内：provider 不在注册表、模型不在 provider
+目录，都能装载成功，直到**那个任务**核验完、supervisor 环节真的被调用时才炸——那时
+该任务的 worker 与 verifier 孩子调用已经付过费（`src/script.ts:1945`）。README 与 `docs/ARCHITECTURE.md` 当时都写「每个配置
+的路由都校验」，实测只校验四个角色，按「记忆不覆盖实测」以实测为准。
+
+**改动**：`src/settings.ts`（`ROLE_ORDER` 补 `supervisor`，与 `src/report.ts` 的
+`ROLE_NAMES` 同序，并把「为什么必须有它」写进常量注释）、`test/config.spec.ts`
+（新用例「checks every routed role, the supervisor included」：五角色 × 好/坏 provider/
+坏模型的 3×5 断言）、`test/route-concurrency.spec.ts`（supervisor 两条空 cap 出提示、
+有一条 cap 不出提示）、`README.md` / `README.zh-CN.md`（载入校验清单补 provider 与模型
+存在性、写明含 `supervisor`）、`docs/ARCHITECTURE.md`（「all five routed roles,
+`supervisor` included」）、`DECISIONS.md` D-075。
+
+**命令与结果（`CONFIRMED`，本树实跑）**：
+
+| 命令 | 结果 | 证据 |
+| --- | --- | --- |
+| 基线 `npm run ci`（`6ee2e68`，改前） | exit 0，63 文件 / **1154** 测试 PASS | `.rsi/evidence/round-019/baseline-ci.txt` |
+| 修前探针（`node …/probe-supervisor-route.mjs`） | supervisor 两种错配置各 **0** 条 error，其余四角色各 1 条 | `probe-supervisor-route-RED.txt` |
+| 只 stash `src/settings.ts`，跑两条 spec | **2 failed / 49 passed**（断言原文：`expected '' to contain 'roles.supervisor names provider "nope"'`） | `red-spec-run.txt` |
+| 恢复修复后同两条 spec | **51 passed** | `green-spec-run.txt` |
+| 修后探针 | 五角色各 1 条 error（provider / 模型两个变体都是） | `probe-supervisor-route-GREEN.txt` |
+| 修复后 `npm run ci` | exit 0，`tsc --noEmit` 0 error，oxlint **22 warnings / 0 errors**，63 文件 / **1155** 测试 PASS（+1，与基线比无删除无 skip） | `ci-post-fix.txt` |
+| `npm run build` ×2 与 `diff -r` | 两次构建产物目录完全一致（幂等），`client bundle: 224525 bytes` | `lib-build-idempotence.txt` |
+
+**未验证（`NOT_RUN`）**：在真实 profile 里放一条指向注册表外 provider 的 supervisor 路由
+看装载是否被拒（需要改本机 profile 的 patch 文件，属操作者环境，本轮不碰）；真模型整轮。
+
+**迁移**：若某 profile 的 supervisor 链指向未注册 provider 或 provider 未宣告的模型，
+该行现在会装载失败。修法：改成已注册 provider / 已宣告模型，或只把该路由的 `provider`
+留空（`validateRoutes` 视为继承 run 的 provider，`src/settings.ts:211`）。**不要**删掉
+整条 supervisor 链——空链 = 监督门不跑（`src/script.ts:1945`、`:2418`），不是「行为不变」。

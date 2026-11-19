@@ -1,0 +1,23 @@
+round 19 · tag v0.11.18
+npm run ci exit 0 · 63 test files passed · 1155 tests passed
+
+diffstat before commit:
+.rsi/POOL.md                   |  7 +++++--
+ CHANGELOG.md                   | 24 ++++++++++++++++++++++++
+ README.md                      | 12 ++++++------
+ README.zh-CN.md                | 12 ++++++------
+ docs/ARCHITECTURE.md           |  6 ++++--
+ docs/LOCAL-TESTING.md          |  6 +++---
+ docs/knowledge/DECISIONS.md    | 41 +++++++++++++++++++++++++++++++++++++++++
+ docs/knowledge/HANDOFF.md      | 18 ++++++++++++++++++
+ docs/knowledge/STATE.md        | 19 +++++++++++++++++++
+ docs/knowledge/VALIDATION.md   | 40 ++++++++++++++++++++++++++++++++++++++++
+ lib/settings.d.ts.map          |  2 +-
+ lib/settings.js                | 13 +++++++++++--
+ lib/settings.js.map            |  2 +-
+ package-lock.json              |  4 ++--
+ package.json                   |  2 +-
+ src/settings.ts                | 13 +++++++++++--
+ test/config.spec.ts            | 28 ++++++++++++++++++++++++++++
+ test/route-concurrency.spec.ts |  7 +++++++
+ 18 files changed, 228 insertions(+), 28 deletions(-)

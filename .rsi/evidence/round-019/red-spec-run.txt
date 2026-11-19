@@ -1,0 +1,103 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+ ❯ test/route-concurrency.spec.ts (14 tests | 1 failed) 156ms
+     ✓ rejects a cap outside 1..64 and keeps the chain uncapped by default 3ms
+     ✓ uses the next route when the first is full, and records the overflow 36ms
+     ✓ queues instead of failing when every route is full 27ms
+     ✓ keeps the clamps comment pinned to the host limits 0ms
+     ✓ caps an over-limit concurrency the script is handed, instead of trusting the caller (B07) 15ms
+     ✓ budgets the same child-agent total because a cap never adds a call 0ms
+     ✓ renders overflows separately from failures and never as a switch 28ms
+     ✓ keeps two uncapped routes on route-1 with no overflow recorded (empty-cap baseline) 28ms
+     ✓ keeps an overflow-only call in the routing ledger with coerced evidence 3ms
+     × adds a load-time note (never an error) when a chain has 2+ routes but every cap is blank 7ms
+     ✓ prefers the non-busy route when the cross-run hint flags the first chain entry 2ms
+     ✓ keeps the no-hint pick byte-identical when busyRoutes is absent 3ms
+     ✓ never lets the cross-run hint change the child-agent budget 1ms
+     ✓ snapshots run-level route labels from live runs, oldest first 0ms
+ ❯ test/config.spec.ts (37 tests | 1 failed) 57ms
+     ✓ refuses an unknown key instead of silently dropping it 4ms
+     ✓ rejects every removed key as unknown (R-06), with the migration named 3ms
+     ✓ refuses a configuration written for a newer version 0ms
+     ✓ normalizes a bare model id shorthand into a route (migration) 0ms
+     ✓ treats an empty chain as inherit rather than an error 0ms
+     ✓ refuses a model repeated inside one chain 0ms
+     ✓ refuses an empty model, an over-long id and a too-long chain 1ms
+     ✓ refuses a removed switching policy key as unknown (R-06) 0ms
+     ✓ fills every documented default through the schema 2ms
+     ✓ validates the four repeat-run keys and defaults a loop off and bounded 2ms
+     ✓ carries bilingual metadata on the four repeat-run keys, agreeing with the envelope 3ms
+     ✓ fixes the removed retry count at 1 and the synthesis default at layered 0ms
+     ✓ gates the workflow behind the per-session grok-mode default, off by default 1ms
+     ✓ names grokDefault in the one-line effective-configuration signature 0ms
+     ✓ fails on a provider the runtime does not have 1ms
+     ✓ fails on a model the provider enumerates but does not declare 0ms
+     × checks every routed role, the supervisor included 6ms
+     ✓ notes instead of failing when the runtime cannot judge the route 0ms
+     ✓ reports the generated settings page for this plugin 3ms
+     ✓ matches the plain Config schema by uid when no volatile rebound happened 0ms
+     ✓ keeps the generated script clamps identical to HARD_LIMITS (single source) 0ms
+     ✓ pins the documented run limits: default 10/1, hard maximum 100/3 0ms
+     ✓ applies the documented defaults inside the script, without swallowing an explicit 0 11ms
+     ✓ degrades quietly on a runtime without a settings service 0ms
+     ✓ uses the built-in switching policy (T4: switchOn removed, always built-in) 3ms
+     ✓ budgets an empty plan exactly like a missing one (t27/F3) 0ms
+     ✓ bounds the run ledger by recordLimit and writes nothing at 0 2ms
+     ✓ names the deadline and every role chain, with "inherit" for an unset role 0ms
+     ✓ shows the chains in order, so a fallback is visible without a run 0ms
+     ✓ travels into the workflow request, so the report can state the deadline 0ms
+     ✓ keeps the task verified and carries the notes into the report 3ms
+     ✓ still fails when the same verifier marks a criterion unmet 2ms
+     ✓ still fails when the verifier verdict is fail, notes or not 2ms
+     ✓ defaults to 60 minutes and carries that value into the request and the log line 0ms
+     ✓ accepts any non-negative integer, including 0 for unlimited 0ms
+     ✓ fails closed on a negative, fractional or non-numeric deadline (R-06) 0ms
+     ✓ refuses the same values in the schema, so a profile patch cannot store one 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/config.spec.ts > route validation against the runtime > checks every routed role, the supervisor included
+AssertionError: supervisor: expected '' to contain 'roles.supervisor names provider "nope"'
+
+- Expected
++ Received
+
+- roles.supervisor names provider "nope"
+
+ ❯ test/config.spec.ts:287:49
+    285|       expect(fine.errors, role).toEqual([])
+    286|       const noProvider = validateRoutes(ctx, resolveConfig({ roles: { …
+    287|       expect(noProvider.errors.join(' '), role).toContain(`roles.${rol…
+       |                                                 ^
+    288|       const noModel = validateRoutes(ctx, resolveConfig({ roles: { [ro…
+    289|       expect(noModel.errors.join(' '), role).toContain(`roles.${role} …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/route-concurrency.spec.ts > per-route concurrency caps with overflow to the next route > adds a load-time note (never an error) when a chain has 2+ routes but every cap is blank
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/route-concurrency.spec.ts:218:130
+    216|     // the same heads-up (RSI round 19 — the note loop reads the same …
+    217|     const supervisor = resolveConfig({ roles: { supervisor: [{ provide…
+    218|     expect(validateRoutes(ctx, supervisor as ResolvedConfig).notes.som…
+       |                                                                                                                                  ^
+    219|     const cappedSupervisor = resolveConfig({ roles: { supervisor: [{ p…
+    220|     expect(validateRoutes(ctx, cappedSupervisor as ResolvedConfig).not…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  2 failed | 49 passed (51)
+   Start at  13:14:54
+   Duration  1.10s (transform 534ms, setup 0ms, import 653ms, tests 213ms, environment 0ms)
+
+EXIT=1

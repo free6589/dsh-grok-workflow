@@ -1,0 +1,357 @@
+diff --git i/.rsi/POOL.md w/.rsi/POOL.md
+index 123b8d6..95d676e 100644
+--- i/.rsi/POOL.md
++++ w/.rsi/POOL.md
+@@ -21,8 +21,11 @@ here and are marked DONE when their commit lands.
+ 
+ ## Configuration (`src/config.ts`, `src/settings.ts`, `src/index.ts`)
+ 
+-- R5 PENDING · `roles.supervisor` is outside `ROLE_ORDER` (`src/settings.ts:94`), so a bad
+-  supervisor route fails at run time instead of load. S / low.
++- R19 DONE · `roles.supervisor` was outside `ROLE_ORDER` (`src/settings.ts:94`), so a bad
++  supervisor route failed at run time instead of load — and the role was also exempt from the
++  empty-`maxInFlight` note. `ROLE_ORDER` now lists all five roles in report order
++  (`src/report.ts` `ROLE_NAMES`); `test/config.spec.ts` pins all five, `test/route-concurrency.spec.ts`
++  pins the note. Evidence `.rsi/evidence/round-019/`.
+ - R6 PENDING · `resolveConfig` never validates `grokDefault` (`config.ts:700`) though the type
+   is `'on' | 'off'` and the gate tests `=== 'on'`. S / low.
+ - P · Unknown keys are rejected at the top level but silently dropped one level down:
+diff --git i/CHANGELOG.md w/CHANGELOG.md
+index 6c0a4fd..acd59b1 100644
+--- i/CHANGELOG.md
++++ w/CHANGELOG.md
+@@ -5,6 +5,26 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
+ 
+ ## [Unreleased]
+ 
++### Fixed / 修复
++
++- **A broken supervisor route is refused at load, not at the end of a run
++  / supervisor 路由写错现在载入即拒，不再等到一轮末尾** — the load-time route
++  check named four roles, so `roles.supervisor` was never compared against
++  `llm.listProviders()` or the models a provider declares: a misspelled provider
++  or an undeclared model loaded cleanly and surfaced only at the last step of a
++  run, after planning, work and verification had already been paid for. All five
++  routed roles are checked now (the same table also drives the empty-`maxInFlight`
++  heads-up), and the README/architecture notes state that the supervisor is
++  included. If a profile's supervisor chain names a provider this runtime does not
++  have, that row now fails to load: point it at a registered provider, or clear
++  the chain to inherit the run's route as before.
++  / 载入期路由校验只点名四个角色，`roles.supervisor` 既没和 `llm.listProviders()`
++  比过，也没和 provider 宣告的模型目录比过：provider 拼错或模型未宣告都能装载成功，
++  直到一轮的最后一步才暴露——那时规划、执行、核验都已付过费。现在五个被路由的角色
++  都校验（空 `maxInFlight` 提示也读同一张表），README 与架构说明也写明包含
++  supervisor。若某 profile 的 supervisor 链写了本机没有的 provider，该行现在会装载
++  失败：改成已注册 provider，或清空该链以继承 run 路由（行为与以前一致）。
++
+ ## [0.11.17] - 2026-11-19
+ 
+ ### Added / 新增
+diff --git i/README.md w/README.md
+index 84594d6..7186ed7 100644
+--- i/README.md
++++ w/README.md
+@@ -179,7 +179,7 @@ Give each role its own ordered chain. A route is `{ provider, model }`, and a ba
+ - **Route failures advance the chain**: `rate-limit`, `server-error`, `connection`, `timeout`, `model-unavailable`, `format-error`, `agent-start-failed`.
+ - **Content failures never do**: `task-failed` and `verification-failed` are retried on the same route, because another model would be looking at the same evidence.
+ - A chain that runs out reports `worker failed on every route: [class] reason` on that task; it is never silently reported as success.
+-- Configuration is validated at load: more than 50 routes in one chain, duplicate routes in one chain, an empty or over-long model id, or `synthesis: model` without a synthesizer route are all refused with a reason.
++- Configuration is validated at load: a route naming a provider this runtime does not have, or a model the provider enumerates but does not declare, fails the load — as do more than 50 routes in one chain, duplicate routes in one chain, an empty or over-long model id, or `synthesis: model` without a synthesizer route. Every routed role is checked, `supervisor` included.
+ - The routes actually used are in the report (`routing`) and in the answer, so “configured but not in effect” cannot look like “working”.
+ 
+ ## What a failure tells you
+diff --git i/README.zh-CN.md w/README.zh-CN.md
+index 51342ed..9423c60 100644
+--- i/README.zh-CN.md
++++ w/README.zh-CN.md
+@@ -172,7 +172,7 @@ DSH 启动后，直接提问即可：
+ - **路由级失败推进备用链**：`rate-limit`、`server-error`、`connection`、`timeout`、`model-unavailable`、`format-error`、`agent-start-failed`。
+ - **内容类失败永不推进**：`task-failed` 与 `verification-failed` 会在同一路由上重试，因为换个模型看到的还是同样的证据。
+ - 链耗尽时该任务报 `worker failed on every route: [class] reason`，绝不会被静默报成成功。
+-- 配置在载入时即校验：同一链内超过 50 条路由、同一链内重复路由、模型为空或过长、`synthesis: model` 却没有 synthesizer 路由——都会带原因被拒绝。
++- 配置在载入时即校验：路由写的 provider 本机没有、或 provider 列了却没有宣告该模型，都会让载入失败；同一链内超过 50 条路由、同一链内重复路由、模型为空或过长、`synthesis: model` 却没有 synthesizer 路由——同样带原因被拒绝。每个被路由的角色都检查，含 `supervisor`。
+ - 实际用到的路由写在报告（`routing`）与答案里，因此“配了但没生效”不会看起来像“已经可用”。
+ 
+ ## 失败告诉你什么
+diff --git i/docs/ARCHITECTURE.md w/docs/ARCHITECTURE.md
+index 6bf7da1..a3a7a2f 100644
+--- i/docs/ARCHITECTURE.md
++++ w/docs/ARCHITECTURE.md
+@@ -242,8 +242,10 @@ revision check (`SETTINGS_CONFLICT`) into the profile patch file. The plugin
+ declares `ctx.settings.configure({ auto: true })` in `apply()` (soft failure on
+ runtimes without the hook) and validates its own configuration at load:
+ unknown keys are refused, `configVersion` is bounded, and every configured
+-route is checked against `llm.listProviders()` plus — where the provider
+-enumerates them — its declared model ids. Nothing here is decorative: the
++route — all five routed roles, `supervisor` included, because it is the only
++role that runs after the work is verified — is checked against
++`llm.listProviders()` plus, where the provider enumerates them, its declared
++model ids. Nothing here is decorative: the
+ generated fields are the fields `resolveConfig()` reads. A bespoke chain editor
+ with model dropdowns would be a client-half package (`dsh.client`), not a core
+ change (see ROADMAP §9.2).
+diff --git i/docs/knowledge/DECISIONS.md w/docs/knowledge/DECISIONS.md
+index 6b0f5d6..1753c7f 100644
+--- i/docs/knowledge/DECISIONS.md
++++ w/docs/knowledge/DECISIONS.md
+@@ -1649,3 +1649,38 @@ model selector」）、`test/loop-brakes.spec.ts`（35 条）、`test/loop-runti
+ - **Consequences:** 默认 60 分钟死线 → 每 child 600s 预算，恒早于死线 firing；
+   `timeoutMs: 0` 的运行 disarm（显式不限时不被 second-guess）；空 supervisor 链的
+   运行仍有并行监护（两者独立开关）。
++
++## D-075 — 载入期路由校验覆盖「每个被路由的角色」，`supervisor` 不再豁免（2026-11-19 · round 19）
++
++- **Status:** CONFIRMED（`src/settings.ts` 的 `ROLE_ORDER` 五角色；`test/config.spec.ts`
++  新增「checks every routed role, the supervisor included」；红→绿见
++  `.rsi/evidence/round-019/red-spec-run.txt` / `green-spec-run.txt`）
++- **Date:** 2026-11-19
++- **Decision:** `src/settings.ts` 的 `ROLE_ORDER` 由
++  `['planner','worker','verifier','synthesizer']` 改为
++  `['planner','worker','verifier','supervisor','synthesizer']`（与 `src/report.ts`
++  的 `ROLE_NAMES` 同序）。该常量有两个读者：`validateRoutes` 的逐路由目录校验，和
++  2+ 条路由却全空 `maxInFlight` 的提示。漏掉一个角色等于同时豁免这两件事。
++- **Reason:** `supervisor` 是唯一在**核验之后**才跑的环节（D-056）。它的路由写错
++  provider 或写了一个 provider 并未宣告的模型时，旧实现载入通过，跑到一轮的最后一
++  步才失败——此时这次 run 的规划、执行、核验孩子调用已经全部付过费，用户看到的是
++  「活干完了却没被判」。README 与 `docs/ARCHITECTURE.md` 当时都写「每个配置的路由
++  都校验」，代码只校验四个角色：说法与实测冲突，按「记忆不覆盖实测」以实测为准。
++- **Evidence:** 修前探针 `.rsi/evidence/round-019/probe-supervisor-route.mjs` 对五个角色
++  各给一次错误 provider / 错误模型：planner/worker/verifier/synthesizer 各 1 条 error，
++  supervisor 0 条（`probe-supervisor-route-RED.txt`）。修后同一探针五角色各 1 条
++  （`probe-supervisor-route-GREEN.txt`）。spec 级红→绿：只 stash `src/settings.ts`
++  时 `test/config.spec.ts` + `test/route-concurrency.spec.ts` = 2 failed / 49 passed，
++  恢复后 51 passed。
++- **Alternatives rejected:**
++  1. 只在校验错误里补一句 supervisor 特例（把豁免写进注释）——等于承认「文档说全查、
++     代码只查四个」，仍然让错配置跑到最后一步。
++  2. 在校验处额外维护第二份角色表——两份表必然漂移，`ROLE_NAMES` 与 `ROLE_ORDER`
++     同序才是唯一的稳定做法。
++  3. 只补 `supervisor` 的目录校验、不补空 cap 提示——同一常量同一循环，拆开改反而
++     制造新的不一致。
++- **Consequences:** 参数错误的 supervisor 链现在在载入期就被拒（fail-closed，与
++  `validateRoutes` 自己的判据一致——只有**确定性**答案才拦载入：provider 在注册表
++  里、模型在 provider 目录里，都属确定性答案）。真机上若某 profile 的 supervisor 链指向注册表外的 provider，
++  该行现在会装载失败而不是静默跑到末尾；迁移办法是把该路由改到已注册 provider 或
++  清空（空链 = 继承 run 路由，行为不变）。
+diff --git i/docs/knowledge/HANDOFF.md w/docs/knowledge/HANDOFF.md
+index e3fdb96..75c3d28 100644
+--- i/docs/knowledge/HANDOFF.md
++++ w/docs/knowledge/HANDOFF.md
+@@ -1600,3 +1600,21 @@ Issue #1 状态评论 issuecomment-6927842856。
+   残留已清（`.tmp/tagcheck-*` 全删）。真模型整轮 / GUI 点击 / rrule 定时到点仍 `NOT_RUN`。
+ - **Next action**：P3-01（设置页逐路由上限与死线字段文案）或 P3-02（进度页详情行）；
+   `src/index.ts:292` 注释仍 HYPOTHESIS，改它要连 `lib/` 重建，留给下次动 `src/` 的人。
++
++## 2026-11-19 — RSI round 19：载入校验的第五个角色（`CONFIRMED` 实现 + 验证，发版待 R6）
++
++- **From:** agent-2（执行代理）· **To:** 用户 / 下一轮接手者
++- **为什么做这个而不是 P3**：待办池里 P0/P1/P2 已清，P3-01/P3-02 是文案与面板详情行；
++  但 `roles.supervisor` 不在载入校验里属于「说法与实测冲突 + 错误配置延迟到一轮末尾爆」，
++  按 P0（错误行为 / 假陈述）优先于 P3。pool 里这条本来就是 `R5 PENDING`。
++- **落地（`CONFIRMED`）**：`src/settings.ts` `ROLE_ORDER` 五角色；`test/config.spec.ts`
++  五角色用例；`test/route-concurrency.spec.ts` 空 cap 提示覆盖 supervisor；README 中英、
++  `docs/ARCHITECTURE.md`、`DECISIONS.md` D-075、`VALIDATION.md` Round 64、本文件与本轮
++  STATE/CHANGELOG。`lib/` 只变 `settings.js`（+ `.map`）三个文件。
++- **门禁（`CONFIRMED`）**：`npm run ci` exit 0，63 文件 / 1155 测试（基线 1154）；
++  红→绿证据 `.rsi/evidence/round-019/`（`red-spec-run.txt` / `green-spec-run.txt` /
++  两个探针 / `lib-build-idempotence.txt`）。
++- **没动**：P3-01/P3-02 仍 OPEN；`src/index.ts:292` 注释仍是 HYPOTHESIS；没有碰任何 profile、
++  Schedule 行、`cordis.patch.yml`、`.github/`。
++- **Next action**：R6 发 patch `0.11.18`（`finish-round.py --round 19 --version 0.11.18`），
++  然后把 P3-01/P3-02 之一作为下一轮主题。
+diff --git i/docs/knowledge/STATE.md w/docs/knowledge/STATE.md
+index d63d6fe..c75dccd 100644
+--- i/docs/knowledge/STATE.md
++++ w/docs/knowledge/STATE.md
+@@ -1317,3 +1317,21 @@ worker 链上限 50（HARD_LIMITS.chainLength）
+   **62 文件 / 1139 测试 PASS**（24.21s）。与 `v0.11.15` 的 60/1081 相比 +2 文件 / +58 测试，无删除、无 skip。
+ - **未验证（`NOT_RUN`）**：真实 Web GUI 里点一次那个开关、真实心跳投递一次（需要常驻 Host 与真实
+   profile，且 D-066 把第一跳定为操作者动作）；本轮没有创建、修改或删除任何 Schedule 任务。
++
++## 2026-11-19 — RSI round 19：载入期路由校验补上 `supervisor`（`CONFIRMED`）
++
++- **缺陷（`CONFIRMED`，修前探针）**：`src/settings.ts` 的 `ROLE_ORDER` 只有四个角色，
++  `validateRoutes` 漏掉 `roles.supervisor`。错误 provider / 未宣告模型在 supervisor 上
++  载入通过，跑到一轮最后（核验之后）才失败；README/ARCHITECTURE 当时都写「每个配置的
++  路由都校验」。探针：四角色各 1 条 error，supervisor 0 条。
++- **改动**：`ROLE_ORDER` 补 `supervisor`（与 `src/report.ts` `ROLE_NAMES` 同序，注释写明
++  它同时供两个循环使用）；`test/config.spec.ts` 新用例（五角色 × 三种配置）；
++  `test/route-concurrency.spec.ts` 补 supervisor 的空 cap 提示 2 条；README 中英、`ARCHITECTURE`、
++  `DECISIONS` D-075、`VALIDATION` Round 64。
++- **门禁（`CONFIRMED`）**：修前 `npm run ci` 63/1154 → 只 stash 源码时 2 failed / 49 passed
++  → 恢复后 51 passed → 全量 `npm run ci` exit 0，**63 文件 / 1155 测试 PASS**，oxlint 22
++  warnings / 0 errors，`npm run build` 两次产物一致（`client bundle: 224525 bytes`）。
++- **未验证（`NOT_RUN`）**：在真实 profile 的 patch 里放错 supervisor 路由看装载被拒（操作者
++  环境，本轮不碰）；真模型整轮。
++- **迁移**：supervisor 链指向未注册 provider 的 profile 现在装载失败 → 改为已注册 provider
++  或清空该链（空链 = 继承 run 路由）。
+diff --git i/docs/knowledge/VALIDATION.md w/docs/knowledge/VALIDATION.md
+index f55be0d..24fdee8 100644
+--- i/docs/knowledge/VALIDATION.md
++++ w/docs/knowledge/VALIDATION.md
+@@ -3858,3 +3858,42 @@ Round 16 段、`.rsi/ROUND.md` Round 16。
+ 
+ **未验证（`NOT_RUN`，与上轮相同）**：rrule 定时到点的那次投递；真模型跑整轮；GUI 点击开关；
+ unload/归档监听的 firing（操作体已 CONFIRMED）。`src/index.ts:292` 注释仍是 HYPOTHESIS，未动。
++
++## Round 64 — 2026-11-19 — RSI round 19：载入期路由校验漏掉 `supervisor`（`CONFIRMED`）
++
++**编号说明**：本文件里 `## Round 63` 出现了两次（`:5` 发版记录、`:31` 常驻监护落地），
++编号已经撞车。历史段不重写，本轮从 64 继续。
++
++**缺陷**：`src/settings.ts:94` 的 `ROLE_ORDER` 只有 planner/worker/verifier/synthesizer。
++`validateRoutes` 与「2+ 路由全空 `maxInFlight`」提示都从这张表取角色，所以
++`roles.supervisor` 完全不在载入期校验范围内：provider 不在注册表、模型不在 provider
++目录，都能装载成功，直到一轮的**最后一步**（核验之后、综合之前）才炸——那时规划、
++执行、核验的孩子调用已经全部付费。README 与 `docs/ARCHITECTURE.md` 当时都写「每个配置
++的路由都校验」，实测只校验四个角色，按「记忆不覆盖实测」以实测为准。
++
++**改动**：`src/settings.ts`（`ROLE_ORDER` 补 `supervisor`，与 `src/report.ts` 的
++`ROLE_NAMES` 同序，并把「为什么必须有它」写进常量注释）、`test/config.spec.ts`
++（新用例「checks every routed role, the supervisor included」：五角色 × 好/坏 provider/
++坏模型的 3×5 断言）、`test/route-concurrency.spec.ts`（supervisor 两条空 cap 出提示、
++有一条 cap 不出提示）、`README.md` / `README.zh-CN.md`（载入校验清单补 provider 与模型
++存在性、写明含 `supervisor`）、`docs/ARCHITECTURE.md`（「all five routed roles,
++`supervisor` included」）、`DECISIONS.md` D-075。
++
++**命令与结果（`CONFIRMED`，本树实跑）**：
++
++| 命令 | 结果 | 证据 |
++| --- | --- | --- |
++| 基线 `npm run ci`（`6ee2e68`，改前） | exit 0，63 文件 / **1154** 测试 PASS | `.rsi/evidence/round-019/baseline-ci.txt` |
++| 修前探针（`node …/probe-supervisor-route.mjs`） | supervisor 两种错配置各 **0** 条 error，其余四角色各 1 条 | `probe-supervisor-route-RED.txt` |
++| 只 stash `src/settings.ts`，跑两条 spec | **2 failed / 49 passed**（断言原文：`expected '' to contain 'roles.supervisor names provider "nope"'`） | `red-spec-run.txt` |
++| 恢复修复后同两条 spec | **51 passed** | `green-spec-run.txt` |
++| 修后探针 | 五角色各 1 条 error（provider / 模型两个变体都是） | `probe-supervisor-route-GREEN.txt` |
++| 修复后 `npm run ci` | exit 0，`tsc --noEmit` 0 error，oxlint **22 warnings / 0 errors**，63 文件 / **1155** 测试 PASS（+1，与基线比无删除无 skip） | `ci-post-fix.txt` |
++| `npm run build` ×2 与 `diff -r` | 两次构建产物目录完全一致（幂等），`client bundle: 224525 bytes` | `lib-build-idempotence.txt` |
++
++**未验证（`NOT_RUN`）**：在真实 profile 里放一条指向注册表外 provider 的 supervisor 路由
++看装载是否被拒（需要改本机 profile 的 patch 文件，属操作者环境，本轮不碰）；真模型整轮。
++
++**迁移**：若某 profile 的 supervisor 链指向未注册 provider 或 provider 未宣告的模型，
++该行现在会装载失败。修法二选一：改成已注册 provider / 已宣告模型，或把 supervisor 链
++清空（空链 = 继承 run 路由，行为与以前一致）。
+diff --git i/lib/settings.d.ts.map w/lib/settings.d.ts.map
+index 68dfa98..9e4bcb5 100644
+--- i/lib/settings.d.ts.map
++++ w/lib/settings.d.ts.map
+@@ -1 +1 @@
+-{"version":3,"file":"settings.d.ts","sourceRoot":"","sources":["../src/settings.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,OAAO,EAAE,MAAM,qBAAqB,CAAA;AAElD,OAAO,KAAK,EAAc,cAAc,EAAY,MAAM,YAAY,CAAA;AAEtE;;;;;;;;;;;;;;;;;;;;;;;;GAwBG;AAEH,wDAAwD;AACxD,MAAM,WAAW,iBAAiB;IAChC,SAAS,CAAC,EAAE,CAAC,YAAY,EAAE;QAAE,IAAI,CAAC,EAAE,OAAO,CAAA;KAAE,KAAK,OAAO,CAAA;IACzD,QAAQ,CAAC,EAAE,CAAC,OAAO,CAAC,EAAE;QAAE,aAAa,CAAC,EAAE,OAAO,CAAA;KAAE,KAAK,sBAAsB,EAAE,CAAA;CAC/E;AAED,8DAA8D;AAC9D,MAAM,WAAW,sBAAsB;IACrC,EAAE,EAAE,MAAM,CAAA;IACV,KAAK,CAAC,EAAE,OAAO,CAAA;IACf,YAAY,CAAC,EAAE,OAAO,CAAA;IACtB,QAAQ,CAAC,EAAE,MAAM,CAAA;IACjB,wEAAwE;IACxE,OAAO,CAAC,EAAE,MAAM,CAAA;IAChB;;;;OAIG;IACH,MAAM,CAAC,EAAE,OAAO,CAAA;CACjB;AAED,mEAAmE;AACnE,MAAM,WAAW,wBAAwB;IACvC,QAAQ,EAAE,MAAM,CAAA;IAChB,UAAU,EAAE,MAAM,CAAA;IAClB,YAAY,CAAC,EAAE,SAAS,MAAM,EAAE,CAAA;CACjC;AAED,mDAAmD;AACnD,MAAM,WAAW,cAAc;IAC7B,aAAa,CAAC,EAAE,MAAM;QAAE,EAAE,EAAE,MAAM,CAAC;QAAC,IAAI,CAAC,EAAE,MAAM,CAAA;KAAE,EAAE,CAAA;IACrD,yBAAyB,CAAC,EAAE,MAAM,wBAAwB,EAAE,CAAA;CAC7D;AAED,8DAA8D;AAC9D,MAAM,WAAW,eAAe;IAC9B,0EAA0E;IAC1E,MAAM,EAAE,MAAM,EAAE,CAAA;IAChB,oEAAoE;IACpE,KAAK,EAAE,MAAM,EAAE,CAAA;CAChB;AAwBD;;;;;;;;;;GAUG;AACH,wBAAgB,sBAAsB,CAAC,GAAG,EAAE,OAAO,GAAG,UAAU,GAAG,QAAQ,GAAG,aAAa,CAU1F;AAkCD;;;;;;;;;;GAUG;AACH,wBAAgB,cAAc,CAAC,GAAG,EAAE,OAAO,EAAE,MAAM,EAAE,cAAc,GAAG,eAAe,CAgEpF;AAED,4EAA4E;AAC5E,MAAM,WAAW,gBAAgB;IAC/B,2EAA2E;IAC3E,EAAE,CAAC,EAAE,MAAM,CAAA;IACX,4EAA4E;IAC5E,YAAY,CAAC,EAAE,OAAO,CAAA;IACtB,mEAAmE;IACnE,OAAO,CAAC,EAAE,MAAM,CAAA;IAChB;;;;OAIG;IACH,MAAM,EAAE,MAAM,EAAE,CAAA;IAChB,2EAA2E;IAC3E,aAAa,EAAE,OAAO,CAAA;IACtB,iFAAiF;IACjF,SAAS,CAAC,EAAE,IAAI,GAAG,KAAK,GAAG,OAAO,CAAA;CACnC;AAED;;;;;;;;;GASG;AACH,wBAAgB,YAAY,CAAC,GAAG,EAAE,OAAO,EAAE,QAAQ,CAAC,EAAE,SAAS,MAAM,EAAE,GAAG,gBAAgB,GAAG,SAAS,CAmDrG;AAED,4DAA4D;AAC5D,MAAM,WAAW,aAAa;IAC5B,uCAAuC;IACvC,IAAI,EAAE,MAAM,CAAA;IACZ,0EAA0E;IAC1E,KAAK,EAAE,MAAM,GAAG,MAAM,CAAA;CACvB;AAED;;;;;;;;;;;GAWG;AACH,wBAAgB,eAAe,CAAC,GAAG,EAAE,OAAO,EAAE,QAAQ,CAAC,EAAE,SAAS,MAAM,EAAE,GAAG,aAAa,CAoCzF"}
+\ No newline at end of file
++{"version":3,"file":"settings.d.ts","sourceRoot":"","sources":["../src/settings.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,OAAO,EAAE,MAAM,qBAAqB,CAAA;AAElD,OAAO,KAAK,EAAc,cAAc,EAAY,MAAM,YAAY,CAAA;AAEtE;;;;;;;;;;;;;;;;;;;;;;;;GAwBG;AAEH,wDAAwD;AACxD,MAAM,WAAW,iBAAiB;IAChC,SAAS,CAAC,EAAE,CAAC,YAAY,EAAE;QAAE,IAAI,CAAC,EAAE,OAAO,CAAA;KAAE,KAAK,OAAO,CAAA;IACzD,QAAQ,CAAC,EAAE,CAAC,OAAO,CAAC,EAAE;QAAE,aAAa,CAAC,EAAE,OAAO,CAAA;KAAE,KAAK,sBAAsB,EAAE,CAAA;CAC/E;AAED,8DAA8D;AAC9D,MAAM,WAAW,sBAAsB;IACrC,EAAE,EAAE,MAAM,CAAA;IACV,KAAK,CAAC,EAAE,OAAO,CAAA;IACf,YAAY,CAAC,EAAE,OAAO,CAAA;IACtB,QAAQ,CAAC,EAAE,MAAM,CAAA;IACjB,wEAAwE;IACxE,OAAO,CAAC,EAAE,MAAM,CAAA;IAChB;;;;OAIG;IACH,MAAM,CAAC,EAAE,OAAO,CAAA;CACjB;AAED,mEAAmE;AACnE,MAAM,WAAW,wBAAwB;IACvC,QAAQ,EAAE,MAAM,CAAA;IAChB,UAAU,EAAE,MAAM,CAAA;IAClB,YAAY,CAAC,EAAE,SAAS,MAAM,EAAE,CAAA;CACjC;AAED,mDAAmD;AACnD,MAAM,WAAW,cAAc;IAC7B,aAAa,CAAC,EAAE,MAAM;QAAE,EAAE,EAAE,MAAM,CAAC;QAAC,IAAI,CAAC,EAAE,MAAM,CAAA;KAAE,EAAE,CAAA;IACrD,yBAAyB,CAAC,EAAE,MAAM,wBAAwB,EAAE,CAAA;CAC7D;AAED,8DAA8D;AAC9D,MAAM,WAAW,eAAe;IAC9B,0EAA0E;IAC1E,MAAM,EAAE,MAAM,EAAE,CAAA;IAChB,oEAAoE;IACpE,KAAK,EAAE,MAAM,EAAE,CAAA;CAChB;AAiCD;;;;;;;;;;GAUG;AACH,wBAAgB,sBAAsB,CAAC,GAAG,EAAE,OAAO,GAAG,UAAU,GAAG,QAAQ,GAAG,aAAa,CAU1F;AAkCD;;;;;;;;;;GAUG;AACH,wBAAgB,cAAc,CAAC,GAAG,EAAE,OAAO,EAAE,MAAM,EAAE,cAAc,GAAG,eAAe,CAgEpF;AAED,4EAA4E;AAC5E,MAAM,WAAW,gBAAgB;IAC/B,2EAA2E;IAC3E,EAAE,CAAC,EAAE,MAAM,CAAA;IACX,4EAA4E;IAC5E,YAAY,CAAC,EAAE,OAAO,CAAA;IACtB,mEAAmE;IACnE,OAAO,CAAC,EAAE,MAAM,CAAA;IAChB;;;;OAIG;IACH,MAAM,EAAE,MAAM,EAAE,CAAA;IAChB,2EAA2E;IAC3E,aAAa,EAAE,OAAO,CAAA;IACtB,iFAAiF;IACjF,SAAS,CAAC,EAAE,IAAI,GAAG,KAAK,GAAG,OAAO,CAAA;CACnC;AAED;;;;;;;;;GASG;AACH,wBAAgB,YAAY,CAAC,GAAG,EAAE,OAAO,EAAE,QAAQ,CAAC,EAAE,SAAS,MAAM,EAAE,GAAG,gBAAgB,GAAG,SAAS,CAmDrG;AAED,4DAA4D;AAC5D,MAAM,WAAW,aAAa;IAC5B,uCAAuC;IACvC,IAAI,EAAE,MAAM,CAAA;IACZ,0EAA0E;IAC1E,KAAK,EAAE,MAAM,GAAG,MAAM,CAAA;CACvB;AAED;;;;;;;;;;;GAWG;AACH,wBAAgB,eAAe,CAAC,GAAG,EAAE,OAAO,EAAE,QAAQ,CAAC,EAAE,SAAS,MAAM,EAAE,GAAG,aAAa,CAoCzF"}
+\ No newline at end of file
+diff --git i/lib/settings.js w/lib/settings.js
+index 009b361..66e0c8b 100644
+--- i/lib/settings.js
++++ w/lib/settings.js
+@@ -19,8 +19,17 @@ function serviceOf(ctx, name) {
+         return undefined;
+     }
+ }
+-/** Roles in report order, so messages are stable. */
+-const ROLE_ORDER = ['planner', 'worker', 'verifier', 'synthesizer'];
++/**
++ * Roles in report order (`src/report.ts` `ROLE_NAMES`), so messages are stable.
++ *
++ * Every routed role belongs here, `supervisor` included: the supervisor is the
++ * only role that runs *after* the work is verified, so a route the runtime does
++ * not have — a misspelled provider or a model the provider never declared — used
++ * to survive the load and surface at the end of a run, after every child call had
++ * been paid for. Both loops below read this list, so leaving a role out exempts
++ * it from `validateRoutes` *and* from the empty-`maxInFlight` note.
++ */
++const ROLE_ORDER = ['planner', 'worker', 'verifier', 'supervisor', 'synthesizer'];
+ /**
+  * Declare that this plugin wants the generated settings page.
+  *
+diff --git i/lib/settings.js.map w/lib/settings.js.map
+index ffa6e48..7d44df3 100644
+--- i/lib/settings.js.map
++++ w/lib/settings.js.map
+@@ -1 +1 @@
+-{"version":3,"file":"settings.js","sourceRoot":"","sources":["../src/settings.ts"],"names":[],"mappings":"AACA,OAAO,EAAE,WAAW,EAAE,MAAM,EAAE,MAAM,aAAa,CAAA;AAwEjD;;;;;;;;GAQG;AACH,SAAS,SAAS,CAAI,GAAY,EAAE,IAAY;IAC9C,IAAI,CAAC;QACH,MAAM,GAAG,GAAI,GAAoC,CAAC,GAAG,CAAA;QACrD,IAAI,OAAO,GAAG,KAAK,UAAU;YAAE,OAAO,SAAS,CAAA;QAC/C,OAAQ,GAAgC,CAAC,IAAI,CAAC,GAAG,EAAE,IAAI,CAAkB,CAAA;IAC3E,CAAC;IAAC,MAAM,CAAC;QACP,OAAO,SAAS,CAAA;IAClB,CAAC;AACH,CAAC;AAED,qDAAqD;AACrD,MAAM,UAAU,GAAe,CAAC,SAAS,EAAE,QAAQ,EAAE,UAAU,EAAE,aAAa,CAAC,CAAA;AAE/E;;;;;;;;;;GAUG;AACH,MAAM,UAAU,sBAAsB,CAAC,GAAY;IACjD,IAAI,CAAC;QACH,MAAM,QAAQ,GAAG,SAAS,CAAoB,GAAG,EAAE,UAAU,CAAC,CAAA;QAC9D,IAAI,QAAQ,KAAK,SAAS;YAAE,OAAO,QAAQ,CAAA;QAC3C,IAAI,OAAO,QAAQ,CAAC,SAAS,KAAK,UAAU;YAAE,OAAO,aAAa,CAAA;QAClE,QAAQ,CAAC,SAAS,CAAC,EAAE,IAAI,EAAE,IAAI,EAAE,CAAC,CAAA;QAClC,OAAO,UAAU,CAAA;IACnB,CAAC;IAAC,MAAM,CAAC;QACP,OAAO,aAAa,CAAA;IACtB,CAAC;AACH,CAAC;AAED;;;;;;GAMG;AACH,SAAS,cAAc,CAAC,QAAgB,EAAE,GAAmB,EAAE,QAA2B;IACxF,MAAM,GAAG,GAAG,GAAG,CAAC,yBAAyB,EAAE,EAAE,IAAI,EAAE,CAAA;IACnD,MAAM,KAAK,GAAG,GAAG,CAAC,IAAI,CAAC,IAAI,CAAC,EAAE,CAAC,IAAI,CAAC,QAAQ,KAAK,QAAQ,CAAC,CAAA;IAC1D,IAAI,KAAK,KAAK,SAAS,IAAI,OAAO,QAAQ,CAAC,QAAQ,KAAK,UAAU;QAAE,OAAO,SAAS,CAAA;IACpF,MAAM,UAAU,GAAG,QAAQ,CAAC,QAAQ,CAAC,EAAE,aAAa,EAAE,IAAI,EAAE,CAAC,CAAC,IAAI,CAAC,IAAI,CAAC,EAAE,CAAC,IAAI,CAAC,EAAE,KAAK,KAAK,CAAC,UAAU,CAAC,CAAA;IACxG,IAAI,UAAU,KAAK,SAAS;QAAE,OAAO,SAAS,CAAA;IAC9C,IAAI,IAAI,GAAY,UAAU,CAAC,KAAK,CAAA;IACpC,KAAK,MAAM,GAAG,IAAI,KAAK,CAAC,YAAY,IAAI,EAAE,EAAE,CAAC;QAC3C,IAAI,IAAI,KAAK,IAAI,IAAI,OAAO,IAAI,KAAK,QAAQ;YAAE,OAAO,SAAS,CAAA;QAC/D,IAAI,GAAI,IAAgC,CAAC,GAAG,CAAC,CAAA;IAC/C,CAAC;IACD,IAAI,IAAI,KAAK,IAAI,IAAI,OAAO,IAAI,KAAK,QAAQ;QAAE,OAAO,SAAS,CAAA;IAC/D,MAAM,MAAM,GAAI,IAAgC,CAAC,MAAM,CAAA;IACvD,IAAI,CAAC,KAAK,CAAC,OAAO,CAAC,MAAM,CAAC;QAAE,OAAO,SAAS,CAAA;IAC5C,MAAM,GAAG,GAAa,EAAE,CAAA;IACxB,KAAK,MAAM,KAAK,IAAI,MAAM,EAAE,CAAC;QAC3B,IAAI,OAAO,KAAK,KAAK,QAAQ;YAAE,GAAG,CAAC,IAAI,CAAC,KAAK,CAAC,CAAA;aACzC,IAAI,KAAK,KAAK,IAAI,IAAI,OAAO,KAAK,KAAK,QAAQ,EAAE,CAAC;YACrD,MAAM,EAAE,GAAI,KAAiC,CAAC,EAAE,CAAA;YAChD,IAAI,OAAO,EAAE,KAAK,QAAQ,IAAI,EAAE,KAAK,EAAE;gBAAE,GAAG,CAAC,IAAI,CAAC,EAAE,CAAC,CAAA;QACvD,CAAC;IACH,CAAC;IACD,OAAO,GAAG,CAAC,MAAM,KAAK,CAAC,CAAC,CAAC,CAAC,SAAS,CAAC,CAAC,CAAC,GAAG,CAAA;AAC3C,CAAC;AAED;;;;;;;;;;GAUG;AACH,MAAM,UAAU,cAAc,CAAC,GAAY,EAAE,MAAsB;IACjE,MAAM,MAAM,GAAa,EAAE,CAAA;IAC3B,MAAM,KAAK,GAAa,EAAE,CAAA;IAC1B,MAAM,GAAG,GAAG,SAAS,CAAiB,GAAG,EAAE,KAAK,CAAC,CAAA;IACjD,MAAM,QAAQ,GAAG,SAAS,CAAoB,GAAG,EAAE,UAAU,CAAC,CAAA;IAC9D,MAAM,UAAU,GAA4C,EAAE,CAAA;IAC9D,KAAK,MAAM,IAAI,IAAI,UAAU,EAAE,CAAC;QAC9B,KAAK,MAAM,KAAK,IAAI,MAAM,CAAC,KAAK,CAAC,IAAI,CAAC;YAAE,UAAU,CAAC,IAAI,CAAC,EAAE,IAAI,EAAE,KAAK,EAAE,CAAC,CAAA;IAC1E,CAAC;IACD,IAAI,UAAU,CAAC,MAAM,KAAK,CAAC;QAAE,OAAO,EAAE,MAAM,EAAE,KAAK,EAAE,CAAA;IACrD,2EAA2E;IAC3E,8EAA8E;IAC9E,wEAAwE;IACxE,sEAAsE;IACtE,wEAAwE;IACxE,0EAA0E;IAC1E,KAAK,MAAM,IAAI,IAAI,UAAU,EAAE,CAAC;QAC9B,MAAM,KAAK,GAAG,MAAM,CAAC,KAAK,CAAC,IAAI,CAAC,IAAI,EAAE,CAAA;QACtC,IAAI,KAAK,CAAC,MAAM,GAAG,CAAC;YAAE,SAAQ;QAC9B,MAAM,QAAQ,GAAG,KAAK,CAAC,KAAK,CAAC,KAAK,CAAC,EAAE,CAAC,KAAK,CAAC,WAAW,KAAK,SAAS,CAAC,CAAA;QACtE,IAAI,CAAC,QAAQ;YAAE,SAAQ;QACvB,KAAK,CAAC,IAAI,CACR,SAAS,IAAI,QAAQ,KAAK,CAAC,MAAM,uEAAuE;YACxG,wGAAwG;YACxG,qDAAqD,CACtD,CAAA;IACH,CAAC;IACD,IAAI,GAAG,KAAK,SAAS,IAAI,OAAO,GAAG,CAAC,aAAa,KAAK,UAAU,EAAE,CAAC;QACjE,KAAK,CAAC,IAAI,CAAC,sEAAsE,CAAC,CAAA;QAClF,OAAO,EAAE,MAAM,EAAE,KAAK,EAAE,CAAA;IAC1B,CAAC;IACD,MAAM,SAAS,GAAG,GAAG,CAAC,aAAa,EAAE,CAAA;IACrC,IAAI,SAAS,CAAC,MAAM,KAAK,CAAC,EAAE,CAAC;QAC3B,KAAK,CAAC,IAAI,CAAC,0EAA0E,CAAC,CAAA;QACtF,OAAO,EAAE,MAAM,EAAE,KAAK,EAAE,CAAA;IAC1B,CAAC;IACD,MAAM,KAAK,GAAG,SAAS,CAAC,GAAG,CAAC,IAAI,CAAC,EAAE,CAAC,IAAI,CAAC,EAAE,CAAC,CAAA;IAC5C,KAAK,MAAM,EAAE,IAAI,EAAE,KAAK,EAAE,IAAI,UAAU,EAAE,CAAC;QACzC,MAAM,QAAQ,GAAG,KAAK,CAAC,QAAQ,CAAA;QAC/B,IAAI,QAAQ,KAAK,SAAS,IAAI,QAAQ,KAAK,EAAE,EAAE,CAAC;YAC9C,KAAK,CAAC,IAAI,CAAC,SAAS,IAAI,UAAU,KAAK,CAAC,KAAK,0EAA0E,CAAC,CAAA;YACxH,SAAQ;QACV,CAAC;QACD,IAAI,CAAC,KAAK,CAAC,QAAQ,CAAC,QAAQ,CAAC,EAAE,CAAC;YAC9B,MAAM,CAAC,IAAI,CAAC,SAAS,IAAI,oBAAoB,QAAQ,yDAAyD,KAAK,CAAC,IAAI,CAAC,IAAI,CAAC,EAAE,CAAC,CAAA;YACjI,SAAQ;QACV,CAAC;QACD,IAAI,QAAQ,KAAK,SAAS,IAAI,OAAO,QAAQ,CAAC,QAAQ,KAAK,UAAU,EAAE,CAAC;YACtE,KAAK,CAAC,IAAI,CAAC,SAAS,IAAI,WAAW,KAAK,CAAC,KAAK,6DAA6D,CAAC,CAAA;YAC5G,SAAQ;QACV,CAAC;QACD,MAAM,MAAM,GAAG,cAAc,CAAC,QAAQ,EAAE,GAAG,EAAE,QAAQ,CAAC,CAAA;QACtD,IAAI,MAAM,KAAK,SAAS,EAAE,CAAC;YACzB,KAAK,CAAC,IAAI,CAAC,SAAS,IAAI,WAAW,KAAK,CAAC,KAAK,gCAAgC,QAAQ,wBAAwB,CAAC,CAAA;YAC/G,SAAQ;QACV,CAAC;QACD,IAAI,CAAC,MAAM,CAAC,QAAQ,CAAC,KAAK,CAAC,KAAK,CAAC,EAAE,CAAC;YAClC,MAAM,CAAC,IAAI,CACT,SAAS,IAAI,iBAAiB,KAAK,CAAC,KAAK,sBAAsB,QAAQ,wBAAwB;gBAC/F,aAAa,MAAM,CAAC,IAAI,CAAC,IAAI,CAAC,EAAE,CACjC,CAAA;QACH,CAAC;IACH,CAAC;IACD,OAAO,EAAE,MAAM,EAAE,KAAK,EAAE,CAAA;AAC1B,CAAC;AAsBD;;;;;;;;;GASG;AACH,MAAM,UAAU,YAAY,CAAC,GAAY,EAAE,QAA4B;IACrE,IAAI,CAAC;QACH,MAAM,QAAQ,GAAG,SAAS,CAAoB,GAAG,EAAE,UAAU,CAAC,CAAA;QAC9D,IAAI,QAAQ,KAAK,SAAS,IAAI,OAAO,QAAQ,CAAC,QAAQ,KAAK,UAAU;YAAE,OAAO,SAAS,CAAA;QACvF,MAAM,WAAW,GAAG,QAAQ,CAAC,QAAQ,CAAC,EAAE,aAAa,EAAE,IAAI,EAAE,CAAC,CAAA;QAC9D,MAAM,MAAM,GAAI,MAAM,CAAC,MAAM,EAAwB,CAAC,GAAG,CAAA;QACzD,MAAM,KAAK,GAAG,CAAC,IAA4B,EAAW,EAAE,CACrD,IAAI,CAAC,MAAwC,EAAE,GAAG,CAAA;QACrD,8EAA8E;QAC9E,qDAAqD;QACrD,yEAAyE;QACzE,gFAAgF;QAChF,4EAA4E;QAC5E,+EAA+E;QAC/E,8EAA8E;QAC9E,4EAA4E;QAC5E,oEAAoE;QACpE,+DAA+D;QAC/D,0EAA0E;QAC1E,qEAAqE;QACrE,MAAM,WAAW,GAAG,CAAC,OAAO,EAAE,WAAW,CAAC,CAAA;QAC1C,MAAM,WAAW,GAAG,CAAC,IAA4B,EAAW,EAAE;YAC5D,MAAM,KAAK,GAAG,CAAC,IAAI,CAAC,KAAK,IAAI,EAAE,CAA4B,CAAA;YAC3D,OAAO,WAAW,CAAC,KAAK,CAAC,GAAG,CAAC,EAAE,CAAC,GAAG,IAAI,KAAK,CAAC,CAAA;QAC/C,CAAC,CAAA;QACD,IAAI,KAAgF,CAAA;QACpF,IAAI,QAAQ,KAAK,SAAS,EAAE,CAAC;YAC3B,MAAM,IAAI,GAAG,WAAW,CAAC,IAAI,CAAC,IAAI,CAAC,EAAE,CAAC,QAAQ,CAAC,QAAQ,CAAC,IAAI,CAAC,EAAE,CAAC,CAAC,CAAA;YACjE,IAAI,IAAI,KAAK,SAAS;gBAAE,KAAK,GAAG,EAAE,IAAI,EAAE,IAAI,EAAE,GAAG,EAAE,IAAI,EAAE,CAAA;QAC3D,CAAC;QACD,IAAI,KAAK,KAAK,SAAS,IAAI,MAAM,KAAK,SAAS,EAAE,CAAC;YAChD,MAAM,KAAK,GAAG,WAAW,CAAC,IAAI,CAAC,IAAI,CAAC,EAAE,CAAC,KAAK,CAAC,IAAI,CAAC,KAAK,MAAM,CAAC,CAAA;YAC9D,IAAI,KAAK,KAAK,SAAS;gBAAE,KAAK,GAAG,EAAE,IAAI,EAAE,KAAK,EAAE,GAAG,EAAE,KAAK,EAAE,CAAA;QAC9D,CAAC;QACD,IAAI,KAAK,KAAK,SAAS,EAAE,CAAC;YACxB,MAAM,OAAO,GAAG,WAAW,CAAC,IAAI,CAAC,WAAW,CAAC,CAAA;YAC7C,IAAI,OAAO,KAAK,SAAS;gBAAE,KAAK,GAAG,EAAE,IAAI,EAAE,OAAO,EAAE,GAAG,EAAE,OAAO,EAAE,CAAA;QACpE,CAAC;QACD,IAAI,KAAK,KAAK,SAAS;YAAE,OAAO,SAAS,CAAA;QACzC,MAAM,IAAI,GAAG,KAAK,CAAC,IAAI,CAAA;QACvB,OAAO;YACL,EAAE,EAAE,IAAI,CAAC,EAAE;YACX,GAAG,IAAI,CAAC,YAAY,KAAK,SAAS,CAAC,CAAC,CAAC,EAAE,CAAC,CAAC,CAAC,EAAE,YAAY,EAAE,IAAI,CAAC,YAAY,EAAE;YAC7E,GAAG,IAAI,CAAC,OAAO,KAAK,SAAS,CAAC,CAAC,CAAC,EAAE,CAAC,CAAC,CAAC,EAAE,OAAO,EAAE,IAAI,CAAC,OAAO,EAAE;YAC9D,MAAM,EAAE,CAAC,GAAG,WAAW,CAAC;YACxB,aAAa,EAAE,MAAM,KAAK,SAAS,IAAI,KAAK,CAAC,IAAI,CAAC,KAAK,MAAM;YAC7D,SAAS,EAAE,KAAK,CAAC,GAAG;SACrB,CAAA;IACH,CAAC;IAAC,MAAM,CAAC;QACP,OAAO,SAAS,CAAA;IAClB,CAAC;AACH,CAAC;AAUD;;;;;;;;;;;GAWG;AACH,MAAM,UAAU,eAAe,CAAC,GAAY,EAAE,QAA4B;IACxE,MAAM,QAAQ,GAAG,sBAAsB,CAAC,GAAG,CAAC,CAAA;IAC5C,IAAI,QAAQ,KAAK,QAAQ,EAAE,CAAC;QAC1B,OAAO;YACL,IAAI,EAAE,mGAAmG;YACzG,KAAK,EAAE,MAAM;SACd,CAAA;IACH,CAAC;IACD,IAAI,QAAQ,KAAK,aAAa,EAAE,CAAC;QAC/B,OAAO;YACL,IAAI,EAAE,4HAA4H;YAClI,KAAK,EAAE,MAAM;SACd,CAAA;IACH,CAAC;IACD,MAAM,IAAI,GAAG,YAAY,CAAC,GAAG,EAAE,QAAQ,CAAC,CAAA;IACxC,IAAI,IAAI,KAAK,SAAS,EAAE,CAAC;QACvB,OAAO;YACL,IAAI,EAAE,sHAAsH;YAC5H,KAAK,EAAE,MAAM;SACd,CAAA;IACH,CAAC;IACD,MAAM,IAAI,GAAG,IAAI,CAAC,YAAY,KAAK,KAAK,CAAC,CAAC,CAAC,iBAAiB,CAAC,CAAC,CAAC,qBAAqB,CAAA;IACpF,MAAM,OAAO,GAAG,IAAI,CAAC,OAAO,KAAK,SAAS,CAAC,CAAC,CAAC,iBAAiB,CAAC,CAAC,CAAC,WAAW,IAAI,CAAC,OAAO,EAAE,CAAA;IAC1F,MAAM,QAAQ,GAAG,IAAI,CAAC,aAAa;QACjC,CAAC,CAAC,gBAAgB;QAClB,CAAC,CAAC,4CAA4C,IAAI,CAAC,SAAS,IAAI,SAAS,EAAE,CAAA;IAC7E,6EAA6E;IAC7E,8EAA8E;IAC9E,4DAA4D;IAC5D,6EAA6E;IAC7E,yCAAyC;IACzC,MAAM,SAAS,GAAG,IAAI,CAAC,MAAM,CAAC,MAAM,CAAC,GAAG,CAAC,EAAE,CAAC,GAAG,KAAK,UAAU,IAAI,GAAG,KAAK,eAAe,CAAC,CAAA;IAC1F,OAAO;QACL,IAAI,EAAE,qBAAqB,IAAI,SAAS,IAAI,CAAC,EAAE,MAAM,SAAS,CAAC,MAAM,OAAO,IAAI,CAAC,MAAM,CAAC,MAAM,0BAA0B,OAAO,KAAK,QAAQ,oCAAoC;QAChL,KAAK,EAAE,MAAM;KACd,CAAA;AACH,CAAC"}
+\ No newline at end of file
++{"version":3,"file":"settings.js","sourceRoot":"","sources":["../src/settings.ts"],"names":[],"mappings":"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"}
+\ No newline at end of file
+diff --git i/src/settings.ts w/src/settings.ts
+index cde4b01..b99935d 100644
+--- i/src/settings.ts
++++ w/src/settings.ts
+@@ -90,8 +90,17 @@ function serviceOf<T>(ctx: Context, name: string): T | undefined {
+   }
+ }
+ 
+-/** Roles in report order, so messages are stable. */
+-const ROLE_ORDER: RoleName[] = ['planner', 'worker', 'verifier', 'synthesizer']
++/**
++ * Roles in report order (`src/report.ts` `ROLE_NAMES`), so messages are stable.
++ *
++ * Every routed role belongs here, `supervisor` included: the supervisor is the
++ * only role that runs *after* the work is verified, so a route the runtime does
++ * not have — a misspelled provider or a model the provider never declared — used
++ * to survive the load and surface at the end of a run, after every child call had
++ * been paid for. Both loops below read this list, so leaving a role out exempts
++ * it from `validateRoutes` *and* from the empty-`maxInFlight` note.
++ */
++const ROLE_ORDER: RoleName[] = ['planner', 'worker', 'verifier', 'supervisor', 'synthesizer']
+ 
+ /**
+  * Declare that this plugin wants the generated settings page.
+diff --git i/test/config.spec.ts w/test/config.spec.ts
+index ca05ca4..339185a 100644
+--- i/test/config.spec.ts
++++ w/test/config.spec.ts
+@@ -262,6 +262,34 @@ describe('route validation against the runtime', () => {
+     expect(bad.errors[0]).toContain('declared: m1, m2')
+   })
+ 
++  it('checks every routed role, the supervisor included', () => {
++    // The supervisor runs *after* the work is verified, so a route the runtime does
++    // not have must fail here — at load — instead of at the end of a run that has
++    // already paid for every child call. Every role in the report is routed through
++    // the same table, so every role is checked (RSI round 19).
++    const ctx = ctxWith({
++      llm: {
++        listProviders: () => [knownProvider],
++        listConfigurableProviders: () => [{ provider: 'p1', settingsNs: 'llm-p1', settingsPath: ['providers', 'p1'] }],
++      },
++      settings: {
++        describe: () => [{
++          ns: 'llm-p1',
++          value: { providers: { p1: { models: [{ id: 'm1' }] } } },
++          autoGenerate: true,
++        }],
++      },
++    })
++    for (const role of ['planner', 'worker', 'verifier', 'supervisor', 'synthesizer'] as const) {
++      const fine = validateRoutes(ctx, resolveConfig({ roles: { [role]: [{ provider: 'p1', model: 'm1' }] } } as never))
++      expect(fine.errors, role).toEqual([])
++      const noProvider = validateRoutes(ctx, resolveConfig({ roles: { [role]: [{ provider: 'nope', model: 'm1' }] } } as never))
++      expect(noProvider.errors.join(' '), role).toContain(`roles.${role} names provider "nope"`)
++      const noModel = validateRoutes(ctx, resolveConfig({ roles: { [role]: [{ provider: 'p1', model: 'm2' }] } } as never))
++      expect(noModel.errors.join(' '), role).toContain(`roles.${role} names model "m2"`)
++    }
++  })
++
+   it('notes instead of failing when the runtime cannot judge the route', () => {
+     const noModels = ctxWith({
+       llm: {
+diff --git i/test/route-concurrency.spec.ts w/test/route-concurrency.spec.ts
+index f4e1ffd..6282efc 100644
+--- i/test/route-concurrency.spec.ts
++++ w/test/route-concurrency.spec.ts
+@@ -211,6 +211,13 @@ describe('per-route concurrency caps with overflow to the next route', () => {
+ 
+     const single = resolveConfig({ roles: { worker: [{ provider: 'p1', model: 'm1' }] } } as never)
+     expect(validateRoutes(ctx, single as ResolvedConfig).notes.some(note => note.includes('every maxInFlight is blank'))).toBe(false)
++
++    // The supervisor is a routed role too: an uncapped chain of 2+ routes on it gets
++    // the same heads-up (RSI round 19 — the note loop reads the same role list).
++    const supervisor = resolveConfig({ roles: { supervisor: [{ provider: 'p1', model: 'm1' }, { provider: 'p1', model: 'm2' }] } } as never)
++    expect(validateRoutes(ctx, supervisor as ResolvedConfig).notes.some(note => note.includes('roles.supervisor has 2 routes'))).toBe(true)
++    const cappedSupervisor = resolveConfig({ roles: { supervisor: [{ provider: 'p1', model: 'm1' }, { provider: 'p1', model: 'm2', maxInFlight: 1 }] } } as never)
++    expect(validateRoutes(ctx, cappedSupervisor as ResolvedConfig).notes.some(note => note.includes('roles.supervisor has 2 routes'))).toBe(false)
+   })
+ 
+   it('prefers the non-busy route when the cross-run hint flags the first chain entry', async () => {

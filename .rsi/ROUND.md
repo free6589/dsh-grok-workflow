@@ -629,3 +629,43 @@ no history is rewritten, and no round is force-pushed.
 - **发版**：patch `0.11.16`（用户可见修复：真机心跳刹车此前不生效；日志行说法修正）。`v0.11.14` 仍无 Release、原地不动。
 - **未验证（`NOT_RUN`）**：rrule 定时到点、真模型整轮、GUI 点击、unload/归档监听 firing。
 - **status:** OK
+
+## Round 19 — 2026-11-19 — 载入期路由校验漏掉 `supervisor`（P0，patch `0.11.18`）
+
+- **主题**：`src/settings.ts` 的 `ROLE_ORDER` 只列 planner/worker/verifier/synthesizer，
+  而 `validateRoutes` 与「2+ 路由全空 `maxInFlight`」提示都从这张表取角色。于是
+  `roles.supervisor` 完全不在载入期校验里：provider 不在注册表、模型不在 provider 目录，
+  都能装载成功，直到**那个任务**核验完、supervisor 环节真被调用时才炸——那时该任务的
+  worker 与 verifier 孩子调用已经付过费（`src/script.ts:1945`）。README 与 `docs/ARCHITECTURE.md` 当时都写「每个配置的路由
+  都校验」，实测只校验四个，按「记忆不覆盖实测」以实测为准。
+- **为什么不是 P3**：待办池里 P0/P1/P2 已清，P3-01/P3-02 是文案与面板详情行。这条属于
+  「错误行为 + 假陈述」，按 P0 优先于 P3；它在池里原本就标着 `R5 PENDING`。
+- **改动**：`src/settings.ts`（`ROLE_ORDER` 补 `supervisor`，与 `src/report.ts` 的
+  `ROLE_NAMES` 同序，常量注释写明两个循环共用它）；`test/config.spec.ts`（新用例
+  「checks every routed role, the supervisor included」，五角色 × 好/坏 provider/坏模型）；
+  `test/route-concurrency.spec.ts`（supervisor 的 2 条空 cap 出提示、有一条 cap 不出提示）；
+  `README.md` / `README.zh-CN.md`（载入校验清单补 provider 与模型存在性并写明含 supervisor）；
+  `docs/ARCHITECTURE.md`（all five routed roles, `supervisor` included）；
+  `DECISIONS.md` D-075；`VALIDATION.md` Round 64；`CHANGELOG.md` 双语节。`lib/` 只重生成
+  `settings.js`（+ 两个 map）。没有新增依赖、没有联网、没有碰任何 profile 或 `.github/`。
+- **红→绿（`CONFIRMED`）**：修前探针五角色里 supervisor 两种错配置各 0 条 error、其余各 1 条
+  （`probe-supervisor-route-RED.txt`）；只 stash `src/settings.ts` 跑两条 spec =
+  **2 failed / 49 passed**（`red-spec-run.txt`），恢复后 **51 passed**（`green-spec-run.txt`）；
+  修后探针五角色各 1 条（`probe-supervisor-route-GREEN.txt`）。
+- **门禁（`CONFIRMED`）**：npm run ci exit 0 · 63 test files passed · 1155 tests passed（基线 `6ee2e68` 是 63 文件 / 1154 测试，本轮 +1 测试，
+  无删除无 skip）；`tsc --noEmit` 0 error；oxlint 22 warnings / 0 errors；
+  `npm run build` 连跑两次产物目录 `diff -r` 一致（幂等，`client bundle: 224525 bytes`）。
+- **独立评审（R5）**：第一轮 fresh-context 子代理判 **FAIL**，四条全部是文档准确性问题
+  （①「唯一在核验之后跑的角色」不成立——综合也在核验之后；②迁移建议「清空 supervisor 链 =
+  继承 run 路由」是错的，空链 = 监督门不跑；③ README 的模型条件写成了不可能的形状，且漏掉
+  「运行时无法判断时降级为警告」；④「一轮的最后一步」高估了——supervisor 按任务按 attempt）。
+  逐条核对源码后已改：`src/settings.ts` 注释、`docs/ARCHITECTURE.md`、README 中英、
+  `DECISIONS.md` D-075、`VALIDATION.md` Round 64、`STATE.md`、`CHANGELOG` 双语，并重建 `lib/`。
+  第二轮评审结论见下方「Landed as」。
+- **证据**：`.rsi/evidence/round-019/`（`baseline-git.txt`、`baseline-ci.txt`、
+  `probe-supervisor-route*.txt`、`red-spec-run.txt`、`green-spec-run.txt`、`ci-post-fix.txt`、
+  `lib-build-idempotence.txt`、`review-diff.txt`）。
+- **未验证（`NOT_RUN`）**：在真实 profile 的 patch 里放一条错 supervisor 路由看装载被拒
+  （操作者环境，本轮不碰）；真模型整轮。
+- **发版**：patch `0.11.18`（用户可见修复：错配 supervisor 路由此前延迟到一轮末尾才失败）。
+- **status:** OK

@@ -90,8 +90,17 @@ function serviceOf<T>(ctx: Context, name: string): T | undefined {
   }
 }
 
-/** Roles in report order, so messages are stable. */
-const ROLE_ORDER: RoleName[] = ['planner', 'worker', 'verifier', 'synthesizer']
+/**
+ * Roles in report order (`src/report.ts` `ROLE_NAMES`), so messages are stable.
+ *
+ * Every routed role belongs here, `supervisor` included: the supervisor runs per
+ * task per attempt, after that task's verifier, and a route the runtime does not
+ * have — a misspelled provider, or a model the provider never declared — used to
+ * survive the load and surface only once that task's worker and verifier calls
+ * had been paid for. Both loops below read this list, so leaving a role out
+ * exempts it from `validateRoutes` *and* from the empty-`maxInFlight` note.
+ */
+const ROLE_ORDER: RoleName[] = ['planner', 'worker', 'verifier', 'supervisor', 'synthesizer']
 
 /**
  * Declare that this plugin wants the generated settings page.

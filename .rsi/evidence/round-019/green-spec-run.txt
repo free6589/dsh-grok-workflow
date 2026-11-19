@@ -1,0 +1,12 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+ ✓ test/route-concurrency.spec.ts (14 tests) 151ms
+ ✓ test/config.spec.ts (37 tests) 50ms
+
+ Test Files  2 passed (2)
+      Tests  51 passed (51)
+   Start at  13:15:00
+   Duration  1.06s (transform 516ms, setup 0ms, import 637ms, tests 201ms, environment 0ms)
+
+EXIT=0

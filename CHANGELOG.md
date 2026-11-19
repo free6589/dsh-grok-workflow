@@ -5,6 +5,30 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.11.18] - 2026-11-19
+
+### Fixed / 修复
+
+- **A broken supervisor route is refused at load, not after a task's work is paid for
+  / supervisor 路由写错现在载入即拒，不再等某个任务干完才暴露** — the load-time route
+  check named four roles, so `roles.supervisor` was never compared against
+  `llm.listProviders()` or the models a provider declares: a misspelled provider
+  or an undeclared model loaded cleanly and surfaced only once that task's worker
+  and verifier calls had already been paid for. All five routed roles are checked
+  now (the same table also drives the empty-`maxInFlight` heads-up), and the
+  README/architecture notes state that the supervisor is included. If a profile's
+  supervisor chain names a provider this runtime does not have, that row now fails
+  to load: point it at a registered provider, or blank that route's `provider` so
+  the route inherits the run's provider. Clearing the chain is not that — an empty
+  supervisor chain runs no supervision at all.
+  / 载入期路由校验只点名四个角色，`roles.supervisor` 既没和 `llm.listProviders()`
+  比过，也没和 provider 宣告的模型目录比过：provider 拼错或模型未宣告都能装载成功，
+  直到那个任务的 worker 与 verifier 都付过费之后才暴露。现在五个被路由的角色都校验
+  （空 `maxInFlight` 提示也读同一张表），README 与架构说明也写明包含 supervisor。
+  若某 profile 的 supervisor 链写了本机没有的 provider，该行现在会装载失败：改成已
+  注册 provider，或把该路由的 `provider` 留空以继承 run 的 provider。删掉整条链不是
+  同一件事——空的 supervisor 链等于完全不做监督。
+
 ## [0.11.17] - 2026-11-19
 
 ### Added / 新增

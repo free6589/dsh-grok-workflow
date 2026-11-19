@@ -45,10 +45,10 @@ dsh --profile grok-workflow-dev --from-default-profile headless --dump-config
 然后安装插件：
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.11.17
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.11.18
 ```
 
-> `#v0.11.17` 是当前发布版本。请固定你真正想要的标签；省略标签会跟随 `main`，那不是发布版本。不要在 `plugin add` 之后再运行 `--from-default-profile`：它会重建 profile 并移除你刚装好的插件。
+> `#v0.11.18` 是当前发布版本。请固定你真正想要的标签；省略标签会跟随 `main`，那不是发布版本。不要在 `plugin add` 之后再运行 `--from-default-profile`：它会重建 profile 并移除你刚装好的插件。
 
 最后重启 profile，让 DSH 加载新插件：
 
@@ -172,7 +172,7 @@ DSH 启动后，直接提问即可：
 - **路由级失败推进备用链**：`rate-limit`、`server-error`、`connection`、`timeout`、`model-unavailable`、`format-error`、`agent-start-failed`。
 - **内容类失败永不推进**：`task-failed` 与 `verification-failed` 会在同一路由上重试，因为换个模型看到的还是同样的证据。
 - 链耗尽时该任务报 `worker failed on every route: [class] reason`，绝不会被静默报成成功。
-- 配置在载入时即校验：同一链内超过 50 条路由、同一链内重复路由、模型为空或过长、`synthesis: model` 却没有 synthesizer 路由——都会带原因被拒绝。
+- 配置在载入时即校验：路由写的 provider 本机没有、或 provider 列出了模型目录而该模型不在其中，都会让载入失败；同一链内超过 50 条路由、同一链内重复路由、模型为空或过长、`synthesis: model` 却没有 synthesizer 路由——同样带原因被拒绝。每个被路由的角色都检查，含 `supervisor`。运行时无法判断某条路由时（没有 `llm` 服务、provider 注册表尚未就绪、没有设置服务、或该 provider 不列模型目录），校验降级为警告而不是拒绝。
 - 实际用到的路由写在报告（`routing`）与答案里，因此“配了但没生效”不会看起来像“已经可用”。
 
 ## 失败告诉你什么
@@ -322,13 +322,13 @@ dsh plugin --profile grok-workflow-dev remove dsh-grok-workflow
 
 ## 版本与发布说明
 
-本仓库声明的包版本是 `0.11.17`。需要安装或回退到某个已发布版本时，在地址后加标签：
+本仓库声明的包版本是 `0.11.18`。需要安装或回退到某个已发布版本时，在地址后加标签：
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.11.17
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.11.18
 ```
 
-只使用 GitHub 上确实存在的标签。已发布：`v0.1.0`、`v0.2.0`、`v0.2.1`、`v0.2.2`、`v0.2.3`、`v0.2.4`、`v0.2.5`、`v0.2.6`、`v0.2.7`、`v0.3.0`、`v0.4.0`、`v0.5.0`、`v0.5.1`、`v0.6.0`、`v0.7.0`、`v0.8.0`、`v0.9.0`、`v0.9.1`、`v0.9.2`、`v0.9.3`、`v0.9.4`、`v0.10.0`、`v0.10.1`、`v0.10.2`、`v0.11.0`、`v0.11.1`、`v0.11.2`、`v0.11.3`、`v0.11.4`、`v0.11.5`、`v0.11.6`、`v0.11.7`、`v0.11.8`、`v0.11.9`、`v0.11.10`、`v0.11.11`、`v0.11.12`、`v0.11.13`、`v0.11.14`、`v0.11.15`、`v0.11.16`、`v0.11.17`。未固定版本的命令跟随 `main`，不会固定到发布版本。GitHub 上还存在 `v0.2.0-rc.1`，但它不是发布版本：它早于发布流程，其 `package.json` 仍声明 `0.1.0`。`v0.11.14` 也不是发布版本：它提交里的 `lib/` 是用更早的 `src/` 构建的，发布工作流在产物检查一步就停了，从未发布过它。请使用上面固定的 `v0.11.15`；那个标签仍留在仓库里，只是因为已发布的标签不可变。版本规则与回退流程见[更新日志](CHANGELOG.md)与[发布指南](docs/RELEASING.md)。
+只使用 GitHub 上确实存在的标签。已发布：`v0.1.0`、`v0.2.0`、`v0.2.1`、`v0.2.2`、`v0.2.3`、`v0.2.4`、`v0.2.5`、`v0.2.6`、`v0.2.7`、`v0.3.0`、`v0.4.0`、`v0.5.0`、`v0.5.1`、`v0.6.0`、`v0.7.0`、`v0.8.0`、`v0.9.0`、`v0.9.1`、`v0.9.2`、`v0.9.3`、`v0.9.4`、`v0.10.0`、`v0.10.1`、`v0.10.2`、`v0.11.0`、`v0.11.1`、`v0.11.2`、`v0.11.3`、`v0.11.4`、`v0.11.5`、`v0.11.6`、`v0.11.7`、`v0.11.8`、`v0.11.9`、`v0.11.10`、`v0.11.11`、`v0.11.12`、`v0.11.13`、`v0.11.14`、`v0.11.15`、`v0.11.16`、`v0.11.17`、`v0.11.18`。未固定版本的命令跟随 `main`，不会固定到发布版本。GitHub 上还存在 `v0.2.0-rc.1`，但它不是发布版本：它早于发布流程，其 `package.json` 仍声明 `0.1.0`。`v0.11.14` 也不是发布版本：它提交里的 `lib/` 是用更早的 `src/` 构建的，发布工作流在产物检查一步就停了，从未发布过它。请使用上面固定的 `v0.11.15`；那个标签仍留在仓库里，只是因为已发布的标签不可变。版本规则与回退流程见[更新日志](CHANGELOG.md)与[发布指南](docs/RELEASING.md)。
 
 ## 测试与开发
 

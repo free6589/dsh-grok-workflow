@@ -1317,3 +1317,22 @@ worker 链上限 50（HARD_LIMITS.chainLength）
   **62 文件 / 1139 测试 PASS**（24.21s）。与 `v0.11.15` 的 60/1081 相比 +2 文件 / +58 测试，无删除、无 skip。
 - **未验证（`NOT_RUN`）**：真实 Web GUI 里点一次那个开关、真实心跳投递一次（需要常驻 Host 与真实
   profile，且 D-066 把第一跳定为操作者动作）；本轮没有创建、修改或删除任何 Schedule 任务。
+
+## 2026-11-19 — RSI round 19：载入期路由校验补上 `supervisor`（`CONFIRMED`）
+
+- **缺陷（`CONFIRMED`，修前探针）**：`src/settings.ts` 的 `ROLE_ORDER` 只有四个角色，
+  `validateRoutes` 漏掉 `roles.supervisor`。错误 provider / 未宣告模型在 supervisor 上
+  载入通过，跑到那个任务核验之后才失败；README/ARCHITECTURE 当时都写「每个配置的
+  路由都校验」。探针：四角色各 1 条 error，supervisor 0 条。
+- **改动**：`ROLE_ORDER` 补 `supervisor`（与 `src/report.ts` `ROLE_NAMES` 同序，注释写明
+  它同时供两个循环使用）；`test/config.spec.ts` 新用例（五角色 × 三种配置）；
+  `test/route-concurrency.spec.ts` 补 supervisor 的空 cap 提示 2 条；README 中英、`ARCHITECTURE`、
+  `DECISIONS` D-075、`VALIDATION` Round 64。
+- **门禁（`CONFIRMED`）**：修前 `npm run ci` 63/1154 → 只 stash 源码时 2 failed / 49 passed
+  → 恢复后 51 passed → 全量 `npm run ci` exit 0，**63 文件 / 1155 测试 PASS**，oxlint 22
+  warnings / 0 errors，`npm run build` 两次产物一致（`client bundle: 224525 bytes`）。
+- **未验证（`NOT_RUN`）**：在真实 profile 的 patch 里放错 supervisor 路由看装载被拒（操作者
+  环境，本轮不碰）；真模型整轮。
+- **迁移**：supervisor 链指向未注册 provider 的 profile 现在装载失败 → 改为已注册 provider /
+  已宣告模型，或只把该路由的 `provider` 留空（视为继承 run 的 provider）；**不要**删整条
+  链（空链 = 监督门不跑，`src/script.ts:1945`）。

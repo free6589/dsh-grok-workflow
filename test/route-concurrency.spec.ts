@@ -211,6 +211,13 @@ describe('per-route concurrency caps with overflow to the next route', () => {
 
     const single = resolveConfig({ roles: { worker: [{ provider: 'p1', model: 'm1' }] } } as never)
     expect(validateRoutes(ctx, single as ResolvedConfig).notes.some(note => note.includes('every maxInFlight is blank'))).toBe(false)
+
+    // The supervisor is a routed role too: an uncapped chain of 2+ routes on it gets
+    // the same heads-up (RSI round 19 — the note loop reads the same role list).
+    const supervisor = resolveConfig({ roles: { supervisor: [{ provider: 'p1', model: 'm1' }, { provider: 'p1', model: 'm2' }] } } as never)
+    expect(validateRoutes(ctx, supervisor as ResolvedConfig).notes.some(note => note.includes('roles.supervisor has 2 routes'))).toBe(true)
+    const cappedSupervisor = resolveConfig({ roles: { supervisor: [{ provider: 'p1', model: 'm1' }, { provider: 'p1', model: 'm2', maxInFlight: 1 }] } } as never)
+    expect(validateRoutes(ctx, cappedSupervisor as ResolvedConfig).notes.some(note => note.includes('roles.supervisor has 2 routes'))).toBe(false)
   })
 
   it('prefers the non-busy route when the cross-run hint flags the first chain entry', async () => {

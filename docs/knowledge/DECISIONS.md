@@ -1649,3 +1649,44 @@ model selector」）、`test/loop-brakes.spec.ts`（35 条）、`test/loop-runti
 - **Consequences:** 默认 60 分钟死线 → 每 child 600s 预算，恒早于死线 firing；
   `timeoutMs: 0` 的运行 disarm（显式不限时不被 second-guess）；空 supervisor 链的
   运行仍有并行监护（两者独立开关）。
+
+## D-075 — 载入期路由校验覆盖「每个被路由的角色」，`supervisor` 不再豁免（2026-11-19 · round 19）
+
+- **Status:** CONFIRMED（`src/settings.ts` 的 `ROLE_ORDER` 五角色；`test/config.spec.ts`
+  新增「checks every routed role, the supervisor included」；红→绿见
+  `.rsi/evidence/round-019/red-spec-run.txt` / `green-spec-run.txt`）
+- **Date:** 2026-11-19
+- **Decision:** `src/settings.ts` 的 `ROLE_ORDER` 由
+  `['planner','worker','verifier','synthesizer']` 改为
+  `['planner','worker','verifier','supervisor','synthesizer']`（与 `src/report.ts`
+  的 `ROLE_NAMES` 同序）。该常量有两个读者：`validateRoutes` 的逐路由目录校验，和
+  2+ 条路由却全空 `maxInFlight` 的提示。漏掉一个角色等于同时豁免这两件事。
+- **Reason:** `supervisor` 按任务、按 attempt 在**该任务的核验之后**跑
+  （`src/script.ts:1945`，D-056）；综合（synthesizer）也在核验之后，所以「唯一在核验
+  之后跑的环节」不是它的特征，「此前唯一没被载入校验覆盖的角色」才是。它的路由写错
+  provider、或写了 provider 目录里没有的模型时，旧实现载入通过，直到那个任务的执行
+  与核验孩子调用都付过费之后才失败——用户看到的是「活干完了却没被判」。README 与
+  `docs/ARCHITECTURE.md` 当时都写「每个配置的路由都校验」，代码只校验四个角色：说法
+  与实测冲突，按「记忆不覆盖实测」以实测为准。
+- **Evidence:** 修前探针 `.rsi/evidence/round-019/probe-supervisor-route.mjs` 对五个角色
+  各给一次错误 provider / 错误模型：planner/worker/verifier/synthesizer 各 1 条 error，
+  supervisor 0 条（`probe-supervisor-route-RED.txt`）。修后同一探针五角色各 1 条
+  （`probe-supervisor-route-GREEN.txt`）。spec 级红→绿：只 stash `src/settings.ts`
+  时 `test/config.spec.ts` + `test/route-concurrency.spec.ts` = 2 failed / 49 passed，
+  恢复后 51 passed。
+- **Alternatives rejected:**
+  1. 只在校验错误里补一句 supervisor 特例（把豁免写进注释）——等于承认「文档说全查、
+     代码只查四个」，仍然让错配置跑到最后一步。
+  2. 在校验处额外维护第二份角色表——两份表必然漂移，`ROLE_NAMES` 与 `ROLE_ORDER`
+     同序才是唯一的稳定做法。
+  3. 只补 `supervisor` 的目录校验、不补空 cap 提示——同一常量同一循环，拆开改反而
+     制造新的不一致。
+- **Consequences:** 参数错误的 supervisor 链现在在载入期就被拒（fail-closed，与
+  `validateRoutes` 自己的判据一致——只有**确定性**答案才拦载入：provider 在注册表
+  里、模型在 provider 目录里，都属确定性答案）。真机上若某 profile 的 supervisor 链指向注册表外的 provider，
+  该行现在会装载失败，而不是静默跑到那个任务核验之后才失败。
+  **迁移**：把该路由改成已注册的 provider、已宣告的模型；或只把该路由的 `provider`
+  留空——`validateRoutes` 把它当「继承 run 的 provider」，只校验模型 id
+  （`src/settings.ts:211`）。**不要**把整条 supervisor 链删掉：空链等于关掉监督门
+  （`src/script.ts:1945` 的 `length > 0`、`:2418` 的「No inherit fallback」），那与
+  「行为不变」是两件事。

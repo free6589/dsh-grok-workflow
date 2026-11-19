@@ -21,8 +21,11 @@ here and are marked DONE when their commit lands.
 
 ## Configuration (`src/config.ts`, `src/settings.ts`, `src/index.ts`)
 
-- R5 PENDING · `roles.supervisor` is outside `ROLE_ORDER` (`src/settings.ts:94`), so a bad
-  supervisor route fails at run time instead of load. S / low.
+- R19 DONE · `roles.supervisor` was outside `ROLE_ORDER` (`src/settings.ts:94`), so a bad
+  supervisor route failed at run time instead of load — and the role was also exempt from the
+  empty-`maxInFlight` note. `ROLE_ORDER` now lists all five roles in report order
+  (`src/report.ts` `ROLE_NAMES`); `test/config.spec.ts` pins all five, `test/route-concurrency.spec.ts`
+  pins the note. Evidence `.rsi/evidence/round-019/`.
 - R6 PENDING · `resolveConfig` never validates `grokDefault` (`config.ts:700`) though the type
   is `'on' | 'off'` and the gate tests `=== 'on'`. S / low.
 - P · Unknown keys are rejected at the top level but silently dropped one level down:

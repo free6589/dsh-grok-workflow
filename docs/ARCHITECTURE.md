@@ -242,8 +242,10 @@ revision check (`SETTINGS_CONFLICT`) into the profile patch file. The plugin
 declares `ctx.settings.configure({ auto: true })` in `apply()` (soft failure on
 runtimes without the hook) and validates its own configuration at load:
 unknown keys are refused, `configVersion` is bounded, and every configured
-route is checked against `llm.listProviders()` plus — where the provider
-enumerates them — its declared model ids. Nothing here is decorative: the
+route — all five routed roles, `supervisor` included, since its route is read
+from the same table and it runs per task after that task's verifier — is checked
+against `llm.listProviders()` plus, where the provider enumerates them, its
+declared model ids. Nothing here is decorative: the
 generated fields are the fields `resolveConfig()` reads. A bespoke chain editor
 with model dropdowns would be a client-half package (`dsh.client`), not a core
 change (see ROADMAP §9.2).

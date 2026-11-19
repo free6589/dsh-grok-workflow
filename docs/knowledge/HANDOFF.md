@@ -1600,3 +1600,21 @@ Issue #1 状态评论 issuecomment-6927842856。
   残留已清（`.tmp/tagcheck-*` 全删）。真模型整轮 / GUI 点击 / rrule 定时到点仍 `NOT_RUN`。
 - **Next action**：P3-01（设置页逐路由上限与死线字段文案）或 P3-02（进度页详情行）；
   `src/index.ts:292` 注释仍 HYPOTHESIS，改它要连 `lib/` 重建，留给下次动 `src/` 的人。
+
+## 2026-11-19 — RSI round 19：载入校验的第五个角色（`CONFIRMED` 实现 + 验证，发版待 R6）
+
+- **From:** agent-2（执行代理）· **To:** 用户 / 下一轮接手者
+- **为什么做这个而不是 P3**：待办池里 P0/P1/P2 已清，P3-01/P3-02 是文案与面板详情行；
+  但 `roles.supervisor` 不在载入校验里属于「说法与实测冲突 + 错误配置延迟到该任务干完才爆」，
+  按 P0（错误行为 / 假陈述）优先于 P3。pool 里这条本来就是 `R5 PENDING`。
+- **落地（`CONFIRMED`）**：`src/settings.ts` `ROLE_ORDER` 五角色；`test/config.spec.ts`
+  五角色用例；`test/route-concurrency.spec.ts` 空 cap 提示覆盖 supervisor；README 中英、
+  `docs/ARCHITECTURE.md`、`DECISIONS.md` D-075、`VALIDATION.md` Round 64、本文件与本轮
+  STATE/CHANGELOG。`lib/` 只变 `settings.js`（+ `.map`）三个文件。
+- **门禁（`CONFIRMED`）**：`npm run ci` exit 0，63 文件 / 1155 测试（基线 1154）；
+  红→绿证据 `.rsi/evidence/round-019/`（`red-spec-run.txt` / `green-spec-run.txt` /
+  两个探针 / `lib-build-idempotence.txt`）。
+- **没动**：P3-01/P3-02 仍 OPEN；`src/index.ts:292` 注释仍是 HYPOTHESIS；没有碰任何 profile、
+  Schedule 行、`cordis.patch.yml`、`.github/`。
+- **Next action**：R6 发 patch `0.11.18`（`finish-round.py --round 19 --version 0.11.18`），
+  然后把 P3-01/P3-02 之一作为下一轮主题。
