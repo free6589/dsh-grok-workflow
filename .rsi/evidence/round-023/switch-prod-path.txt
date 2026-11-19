@@ -1,0 +1,11 @@
+mount: disabled while reading — OK
+POST http://127.0.0.1:3451/grok-workflow/loop
+after read: state=ready note="关"
+read on mount via page fetch — OK (no HTTP undefined)
+POST http://127.0.0.1:3451/grok-workflow/loop
+after open click: "自动接着跑 开 · 每 60 分钟 · 还剩 10 轮"
+server confirms open (task schedule-4d042e8e-48b6-4365-8624-6f936d9fcde6) — OK
+POST http://127.0.0.1:3451/grok-workflow/loop
+after close click: "自动接着跑 关"
+server confirms closed — OK
+PASS: production-path switch reads, opens and closes through the page fetch

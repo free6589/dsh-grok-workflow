@@ -3661,12 +3661,15 @@ window.__ModuleLoader__.load({
      * disabled rather than guessing, because a click on an unknown state would open a loop
      * that may already exist (harmless) or report "off" over a live heartbeat (not).
      * @param props - slot runtime props: `sessionId`, the seated `t`, and an optional
-     *   `loopSend` (tests pass one; production uses the page's own fetch).
+     *   `loopSend` (tests pass a fake fetch-shaped stand-in; production uses the page's own fetch —
+     *   never `loopSend` itself, which already takes the loop body shape).
      */
     function LoopSwitch(props) {
       const t = guardedTranslator(props.t, translator(FALLBACK_LOCALE))
       const sessionId = typeof props.sessionId === 'string' && props.sessionId !== '' ? props.sessionId : undefined
-      const send = typeof props.loopSend === 'function' ? props.loopSend : loopSend
+      const send = typeof props.loopSend === 'function'
+        ? props.loopSend
+        : (typeof fetch === 'function' ? fetch.bind(undefined) : loopSend)
       const [state, setState] = useState(() => ({
         phase: sessionId === undefined ? 'no-session' : 'reading',
         loop: undefined,

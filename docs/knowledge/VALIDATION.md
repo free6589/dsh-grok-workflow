@@ -3992,3 +3992,40 @@ C1 跨 run 忙闲快照（`.rsi/POOL.md` R21）。修前探针：只加新用例
 
 **未验证（`NOT_RUN`）**：真实 16 分钟以上 run 的 checkpoint 回读（需要真跑一个长 run；
 写入语义由单测覆盖）；发版（本任务不授权）。
+
+## Round 68 — 2026-11-19 — 用户报障：续跑开关点不动 + `HTTP undefined`（`CONFIRMED`，未发版）
+
+**缺陷（`CONFIRMED`，本树实跑 + 复现）**：`src/client/index.js` `LoopSwitch` 的生产默认
+`const send = ... ? props.loopSend : loopSend` 把**请求体形**的 `loopSend(body, fetchImpl)`
+当成了 **fetch 形**的发送函数。真机浏览器不传 `loopSend` prop，于是每次 `readLoop` 都在
+`loopSend` 内部再包一层 `loopSend`：内层把外层的 `{action, sessionId}` 当 URL 去 `post()`，
+返回的 `{ok:false, code:'loop/transport'}` 对象没有 `.status`，外层 `parseLoopPayload`
+读到 `status === undefined`，开关永远 `phase: 'failed'` + 点不动，文案正是用户截图那句
+`续跑服务没有回应：the loop route answered HTTP undefined`。复现（node 直跑双层调用）：
+`PROD-PATH RESULT: {"ok":false,"code":"loop/response","error":"the loop route answered HTTP undefined"}`。
+
+**改动**：`src/client/index.js`（默认改走页面自己的 `fetch`，无 fetch 的非页面环境才回退
+`loopSend`；注释同步）、`test/client.spec.ts`（新增生产路径回归用例：不传 `loopSend`、
+注入页面 fetch，mount→读→点开→点关全通）、`CHANGELOG.md` `[Unreleased]` 双语 Fixed、
+`lib/` 重建。版本号未动。
+
+**命令与结果（`CONFIRMED`，本树实跑）**：
+
+| 命令 | 结果 | 证据 |
+| --- | --- | --- |
+| 修前双层调用复现 | `loop/response` + `HTTP undefined` | 本轮记录（上） |
+| 新增用例 `uses the page fetch on the production path` | PASS（含在 93 例内） | `ci.txt` |
+| `npm run ci`（改后） | exit 0，63 文件 / **1159** 测试 PASS，oxlint **22 warnings / 0 errors** | `.rsi/evidence/round-023/ci.txt` |
+| `npm run build` ×2 | `client bundle: 224700 bytes`，`src/client/index.js` 与 `lib/client.js` sha256 一致 | 工作树 `M lib/client.js` |
+| `npm run verify:lib` | 提交前的 HEAD 仍一致（新改动尚未提交，属预期内） | 本轮实跑输出 |
+
+**真机实测（`CONFIRMED`，复制 profile `loopfix-verify`，link 本工作树，端口 3451）**：
+实例启动干净（无 `pending`/`did not activate`）；`POST /grok-workflow/loop`
+`status→open→status→close→status` 全 200，关后 `schedule.json` 无残留行
+（`.rsi/evidence/round-023/loop-route.txt`）；真实 bundle 的生产路径脚本
+（不传 `loopSend`、cookie 走实例 jar）：mount 显示 `关`、点开变
+`开 · 每 60 分钟 · 还剩 10 轮`（服务端确认 task 落地）、再点变回 `关`
+（服务端确认关闭），`switch-prod-path.txt` PASS。实例已停，token/cookie 已清，
+证据目录无密钥残留（`token=`/`dsh-auth-` 零命中）。
+
+**未验证（`NOT_RUN`）**：用户自己浏览器里点一次（需用户在 GUI 操作）；发版（本任务不授权）。

@@ -5,6 +5,21 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Fixed / 修复
+
+- **The composer "auto-continue" switch is clickable again / 输入框旁的「自动接着跑」开关又能点了** —
+  the switch's production fallback passed `loopSend` (which already takes the loop body shape)
+  where a raw fetch belongs, so every read in a real browser answered `loop/response` with an
+  undefined status and the switch sat inert showing
+  `续跑服务没有回应：the loop route answered HTTP undefined`. The component now falls back to
+  the page's own fetch, and a regression test drives the mount-read-click path with no `loopSend`
+  prop at all.
+  / 开关在生产环境的默认发送函数误传了 `loopSend`（它要的是循环请求体），而该传浏览器原生的
+  fetch：真机上每次读取都只剩 `loop/response` + 缺失的状态码，开关卡死并显示
+  「续跑服务没有回应：the loop route answered HTTP undefined」。现在默认走页面自己的
+  fetch，并有一条回归测试专门覆盖「不传 `loopSend`」的生产路径。
+
+
 ## [0.11.20] - 2026-11-19
 
 ### Fixed / 修复

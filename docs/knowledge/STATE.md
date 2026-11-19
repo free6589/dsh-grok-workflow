@@ -1,5 +1,14 @@
 # Project State
 
+Last updated: 2026-11-19 (**用户报障修：续跑开关又能点了** — `LoopSwitch` 生产默认把
+请求体形的 `loopSend` 当 fetch 用，真机上每次读取都只剩 `HTTP undefined`。
+现默认走页面自己的 fetch + 新增生产路径回归用例；`npm run ci` exit 0 =
+**63 文件 / 1159 测试 PASS**；复制 profile `loopfix-verify`（link 本树，端口 3451）
+真机实测：路由 5×200 + 生产路径脚本 mount/开/关全通、服务端确认 task 落地与关闭、
+实例已停、证据无密钥。改动未提交：`M src/client/index.js`、`M test/client.spec.ts`、
+`M lib/client.js`、`M CHANGELOG.md`、`M docs/knowledge/VALIDATION.md`、
+`?? .rsi/evidence/round-023/`。**未发布，未打 tag**——等用户验收后再定发版。）
+
 Last updated: 2026-11-19 (**`0.11.17` 已发布并从 GitHub 更新到本机** — 常驻并行监护
 （guardian）走 patch 发版：`package.json`/`package-lock.json`/`README×2`/
 `docs/LOCAL-TESTING.md` 同步到 `0.11.17`，CHANGELOG `[Unreleased]` Added 搬进

@@ -2319,6 +2319,28 @@ describe('client composer dock: the loop switch (one Host operation, two callers
     expect(texts(tree).join(' ')).toContain(zhDict['loop.switch.unavailable'])
   })
 
+  it('uses the page fetch on the production path, not loopSend itself', async () => {
+    const loaded = loadSwitchBundle()
+    // Regression for the dead switch: the component's own default for `send` was
+    // `loopSend`, but that function already takes the loop body shape — passing it as
+    // the fetch made every read answer `loop/response` with an undefined status and
+    // left the switch inert with `续跑服务没有回应：the loop route answered HTTP undefined`.
+    const { posted, fetchImpl } = scriptedFetch([
+      { body: { ok: true, loop: { open: false, sessionId: SESSION } } },
+    ])
+    const realFetch = (globalThis as unknown as { fetch?: unknown }).fetch
+    ;(globalThis as unknown as { fetch?: unknown }).fetch = fetchImpl
+    try {
+      const view = mountSwitch(loaded.component, { sessionId: SESSION, t: translator('zh') })
+      const { tree } = await view.mount()
+      expect(posted).toEqual([{ action: 'status', sessionId: SESSION }])
+      expect(toggleOf(tree).props['disabled']).toBe(false)
+      expect(texts(tree).join(' ')).toContain(zhDict['loop.switch.off'])
+    } finally {
+      ;(globalThis as unknown as { fetch?: unknown }).fetch = realFetch
+    }
+  })
+
   it('renders inert copy instead of a switch when there is no session', async () => {
     const loaded = loadSwitchBundle()
     const { posted, fetchImpl } = scriptedFetch([])

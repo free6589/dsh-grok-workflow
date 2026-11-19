@@ -1,0 +1,10 @@
+{"ok":true,"action":"status","loop":{"open":false,"sessionId":"session-2bc2c2f1-3ef4-4832-8015-ba1016bfcd72"}}
+HTTP 200
+{"ok":true,"action":"open","loop":{"open":true,"sessionId":"session-2bc2c2f1-3ef4-4832-8015-ba1016bfcd72","taskId":"schedule-b731ed1d-c6b9-42a2-92a4-d45d19ae322e","taskStatus":"active","intervalMinutes":60,"rounds":10,"nextAt":"2026-11-19T14:58:35.000Z","createdAt":"2026-11-19T13:58:34.522Z"}}
+HTTP 200
+{"ok":true,"action":"status","loop":{"open":true,"sessionId":"session-2bc2c2f1-3ef4-4832-8015-ba1016bfcd72","taskId":"schedule-b731ed1d-c6b9-42a2-92a4-d45d19ae322e","taskStatus":"active","intervalMinutes":60,"rounds":10,"nextAt":"2026-11-19T14:58:35.000Z","createdAt":"2026-11-19T13:58:34.522Z"}}
+HTTP 200
+{"ok":true,"action":"close","loop":{"open":false,"sessionId":"session-2bc2c2f1-3ef4-4832-8015-ba1016bfcd72"}}
+HTTP 200
+{"ok":true,"action":"status","loop":{"open":false,"sessionId":"session-2bc2c2f1-3ef4-4832-8015-ba1016bfcd72"}}
+HTTP 200
