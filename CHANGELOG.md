@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.11.21] - 2026-11-19
+
 ### Fixed / 修复
 
 - **The composer "auto-continue" switch is clickable again / 输入框旁的「自动接着跑」开关又能点了** —
