@@ -3,7 +3,7 @@
 Updated: 2026-11-19T20:45+08:00 · round 22 landed as commit `6c8b0dc` on `main` (not pushed, no
 tag, no release — development commit) · `npm run ci` 63 files / 1158 tests PASS ·
 `verify:lib` = 149 files byte-identical ·
-last published release `v0.11.19` (commit `b38d23a`, CI `44469902581`, Release + tgz)
+last published release `v0.11.20` (commit `c911e6e`, CI `44530885058`, Release + `dsh-grok-workflow-0.11.20.tgz`)
 
 ## Facts
 
@@ -13,7 +13,7 @@ last published release `v0.11.19` (commit `b38d23a`, CI `44469902581`, Release +
   `v0.11.7` 1760d50 · `v0.11.8` a045154 · `v0.11.9` 596239a · `v0.11.10` 000a56e ·
   `v0.11.11` 6ff6373 · `v0.11.12` be64d56 · `v0.11.13` 7a79efb · `v0.11.14` 20eafea (no Release) ·
   `v0.11.15` 50c0321 · `v0.11.16` 63a4fbb · `v0.11.17` 5fc3e1d · `v0.11.18` 3b131c4 · `v0.11.19` b38d23a.
-  Test-count line: 54/985 → … → 63/1155 (0.11.18) → 63/1156 (0.11.19) → 63/1157 (round 21) → **63/1158** (round 22).
+  Test-count line: 54/985 → … → 63/1156 (0.11.19) → 63/1157 (round 21) → 63/1158 (round 22) → **`0.11.20`** c911e6e.
 - Round 22 (this round): `snapshot()` (`src/checkpoint/wiring.ts`) gated `time.durationMs` on
   `countCeiling` (rows, 1e6) while the reader takes `msCeiling`: runs past 16m40s recorded no
   duration. One-line ceiling swap + comment; +1 test (48h clock). Docs: D-077, VALIDATION Round 67,
