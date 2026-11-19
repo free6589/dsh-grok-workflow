@@ -1,0 +1,39 @@
+# Attempt 2 — the settings namespace and what it projects
+
+POST /api/settings/describe (Connection RPC envelope: {type:'client-request', rpcId, method:'settings/describe', payload:{args:{}}})
+HTTP body size: 44300 bytes; result.ok: true
+namespaces          : 23
+namespaces          : session-log-deepseek, agent-default-model, llm-pi-ai, bash-sandbox, permission, subagent, web, web-search-deepseek, web-deepseek-api, agent-loop, llm-deepseek, llm-deepseek-account, subagent-model-selection-settings, ui-settings-account, mcp-manager, ui-theme, locale, ui-settings, ui-settings-general, ui-conversation, ui-chat, agent-preset-registry, grok-workflow
+
+grok-workflow entry : autoGenerate=true applies=live secrets=[] revision=0
+projected value keys: 11
+projected keys      : mode, grokDefault, maxConcurrency, maxTasks, timeoutMs, loopEnabled, loopMaxRounds, loopFailStreak, loopIntervalMin, roles, synthesis
+projected value     : {"mode":"triage","grokDefault":"off","maxConcurrency":10,"maxTasks":10,"timeoutMs":3600000,"loopEnabled":false,"loopMaxRounds":10,"loopFailStreak":3,"loopIntervalMin":0,"roles":{"planner":[],"worker":[],"verifier":[],"synthesizer":[],"supervisor":[]},"synthesis":"layered"}
+base layer keys     : 11 (mode, grokDefault, maxConcurrency, maxTasks, timeoutMs, loopEnabled, loopMaxRounds, loopFailStreak, loopIntervalMin, roles, synthesis)
+user layer keys     : 0
+form schema         : top-level keys ["uid","refs"]
+form schema fields  : 11 mode, grokDefault, maxConcurrency, maxTasks, timeoutMs, loopEnabled, loopMaxRounds, loopFailStreak, loopIntervalMin, roles, synthesis
+
+--- what the INSTALLED plugin reports about its own page (lib/settings.js describeSurface,
+    fed the live descriptor captured above) ---
+{
+ "text": "settings surface: page auto-generated for \"grok-workflow\" (13 field(s), applies live, schema not matched by uid, identified by value); edits apply to the next message",
+ "level": "info"
+}
+
+--- the same claim in the source ---
+src/config.ts:199-200  :  * The settings page exposes 13 keys (toolName, configVersion, mode,  * grokDefault, roles, synthesis, maxConcurrency, maxTasks, timeoutMs and the four 
+src/client/index.js:4-5: // namespace (`settings/describe` → ns "grok-workflow", autoGenerate: true, 21 volatile // fields) but the stock web client renders *no* page for a namespace on its own. Every 
+
+--- the accepted configuration surface (installed package, lib/config.js) ---
+CONFIG_KEYS declared   : 13 toolName, mode, grokDefault, roles, synthesis, maxConcurrency, maxTasks, timeoutMs, loopEnabled, loopMaxRounds, loopFailStreak, loopIntervalMin, configVersion
+schema top-level keys  : 13
+volatile (projected)   : 11 mode, grokDefault, maxConcurrency, maxTasks, timeoutMs, loopEnabled, loopMaxRounds, loopFailStreak, loopIntervalMin, roles, synthesis
+plain (never projected): toolName, configVersion
+
+--- volatile nodes at any depth (installed package, walk of Config.toJSON().refs) ---
+volatile nodes: 11 (mode, grokDefault, maxConcurrency, maxTasks, timeoutMs, loopEnabled,
+loopMaxRounds, loopFailStreak, loopIntervalMin, roles, synthesis)
+measured: node -e 'import("./.tmp/r17b/home/profiles/acc-web/node_modules/dsh-grok-workflow/lib/config.js")'
+so the "21 volatile fields" figure in src/client/index.js:4-5 is stale, and the "13 field(s)"
+the plugin prints is the accepted surface, not the page.

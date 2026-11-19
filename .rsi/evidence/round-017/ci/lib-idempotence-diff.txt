@@ -1,0 +1,4 @@
+# diff of lib/ sha256 manifests: BEFORE vs AFTER `npm run ci` (header comment lines stripped)
+# files before: 145  files after: 145
+### diff lib-before.txt lib-after-ci.txt (content lines only)
+DIFF-EXIT=0

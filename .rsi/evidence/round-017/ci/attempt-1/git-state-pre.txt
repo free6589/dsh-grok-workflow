@@ -1,0 +1,7 @@
+# preflight git state 2026-11-19T08:38:53+08:00
+4db78f41f00416abe55baa1ec9403c4fa1a63379
+## main...origin/main
+?? .rsi/evidence/round-017/
+?? .rsi/evidence/segment-5/final-check-agent57.md
+?? .rsi/evidence/segment-5/final-check-agent57.txt
+?? settings-simple-mock.html

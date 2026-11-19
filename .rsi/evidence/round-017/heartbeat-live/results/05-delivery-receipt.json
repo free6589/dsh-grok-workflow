@@ -1,0 +1,22 @@
+{
+  "observedAt": "2026-11-19T01:14:01.199Z",
+  "instance": "profile live-verify, DSH_HOME=.rsi/evidence/round-017/heartbeat-live/instance/dsh-home, 127.0.0.1:3271",
+  "probeOp": "run",
+  "taskId": "schedule-d03411f5-b824-4475-bf19-4ffc57e1df7b",
+  "target": {
+    "kind": "session",
+    "sessionId": "session-48df3c0a-5c00-4f93-8baf-26678c473788"
+  },
+  "rrule": "DTSTART:20261119T020659Z\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=10",
+  "executionActive": true,
+  "deliveryFloorEndsAt": "2026-11-19T01:08:01.365Z",
+  "lastDelivery": {
+    "scheduledAt": "2026-11-19T01:07:01.365Z",
+    "deliveredAt": "2026-11-19T01:07:01.691Z",
+    "messageId": "8700badd-6e6a-4b6e-85c0-b2f9a0e4c1f7",
+    "targetSessionId": "session-48df3c0a-5c00-4f93-8baf-26678c473788"
+  },
+  "sessionEventDelivered": "11\tuser/message\tschedule\t[SCHEDULE REMINDER] This is a scheduled message from the user schedule_id_json: \"schedule-d03411f5-b824-4475-bf19-4ffc57",
+  "sessionEventAssistant": "18\tassistant/message\t\tSTUB_HEARTBEAT_ROUND_OK",
+  "storedDomain": "instance/dsh-home/storages/schedule.json"
+}

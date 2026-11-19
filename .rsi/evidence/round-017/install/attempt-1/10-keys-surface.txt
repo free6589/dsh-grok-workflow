@@ -1,0 +1,28 @@
+# The thirteen accepted configuration keys, proved on the live instance
+
+The profile patch in 03-dump-config.txt writes all thirteen keys under the grok-workflow
+row, including the two structural ones (toolName, configVersion). The instance booted
+cleanly and the projected value reflects every editable key:
+
+$ DSH_HOME=<isolated> dsh --profile r17-web --host 127.0.0.1 --port 3298 --no-open
+dsh web: http://127.0.0.1:3298/?token=[REDACTED]
+(boot line count: 1; no pending, no 'did not activate')
+
+$ POST /api/settings/describe  -> 200
+namespaces: 23  grok-workflow: true
+projected value: {"mode":"triage","grokDefault":"off","maxConcurrency":4,"maxTasks":5,"timeoutMs":1200000,"loopEnabled":true,"loopMaxRounds":3,"loopFailStreak":2,"loopIntervalMin":90,"roles":{"planner":[],"worker":[],"verifier":[],"synthesizer":[],"supervisor":[]},"synthesis":"layered"}
+projected keys : 11
+Every written value is projected: maxConcurrency 4, maxTasks 5, timeoutMs 1200000,
+loopEnabled true, loopMaxRounds 3, loopFailStreak 2, loopIntervalMin 90.
+
+The other direction: a removed key is rejected at load with the accepted list, so the
+surface really is thirteen and not 'anything goes':
+
+$ (append "    enforceGate: true" under the same row) dsh --profile r17-web ... --host 127.0.0.1 --port 3297
+dsh: warning: 1 entry did not activate
+grok-workflow (dsh-grok-workflow): Error: unknown configuration key "enforceGate"; accepted keys: toolName, mode, grokDefault, roles, synthesis, maxConcurrency, maxTasks, timeoutMs, loopEnabled, loopMaxRounds, loopFailStreak, loopIntervalMin, configVersion
+    at assertKnownKeys (file:///home/fish/projects_mine/dsh-grok-workflow/.tmp/rsi-r17/home/profiles/r17-web/node_modules/dsh-grok-workflow/lib/config.js:408:15)
+    at resolveConfig (file:///home/fish/projects_mine/dsh-grok-workflow/.tmp/rsi-r17/home/profiles/r17-web/node_modules/dsh-grok-workflow/lib/config.js:681:5)
+
+The plugin stays unapplied in that boot (DSH reports '1 entry did not activate'), which is
+the documented fail-loud behaviour for a stale patch; the profile patch was restored after.

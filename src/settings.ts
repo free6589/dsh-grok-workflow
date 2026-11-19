@@ -270,8 +270,9 @@ export function describeSelf(ctx: Context, entryIds?: readonly string[]): Settin
     //     gets a fresh uid, so uid equality alone reports "not ours" - t30/F2).
     // The signal for (3) must exist in the *projected* value: `describe()` reports
     // `projectForm(volatileForm(schema), config)`, which drops every non-volatile
-    // key, so `toolName` is never there (21 volatile fields once the four loop keys
-    // joined, measured against the real projection in `test/settings-fixture.ts`). `roles` and `synthesis`
+    // key, so `toolName` and `configVersion` are never there (13 accepted keys,
+    // 11 volatile on the page once the four loop keys joined, pinned in
+    // `test/settings-projection.spec.ts`). `roles` and `synthesis`
     // are volatile and together are specific enough: a config that happens to
     // share one key with us is not us (T4: `switchOn` no longer exists).
     const distinctive = ['roles', 'synthesis']
@@ -353,8 +354,14 @@ export function describeSurface(ctx: Context, entryIds?: readonly string[]): Sur
   const identity = view.schemaMatches
     ? 'schema matches'
     : `schema not matched by uid, identified by ${view.matchedBy ?? 'nothing'}`
+  // `fields` is the accepted surface (CONFIG_KEYS, 13), but the generated page
+  // only projects the volatile ones — `toolName` and `configVersion` are plain,
+  // so the runtime form drops them (11 on the page, pinned in
+  // `test/settings-projection.spec.ts`). Say both numbers so the log cannot be
+  // read as claiming 13 editable controls.
+  const projected = view.fields.filter(key => key !== 'toolName' && key !== 'configVersion')
   return {
-    text: `settings surface: ${auto} for "${view.ns}" (${view.fields.length} field(s), ${applies}, ${identity}); edits apply to the next message`,
+    text: `settings surface: ${auto} for "${view.ns}" (${projected.length} of ${view.fields.length} field(s) on the page, ${applies}, ${identity}); edits apply to the next message`,
     level: 'info',
   }
 }

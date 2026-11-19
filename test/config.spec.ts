@@ -321,7 +321,9 @@ describe('route validation against the runtime', () => {
     const surface = describeSurface(ctx)
     expect(surface.level).toBe('info')
     expect(surface.text).toContain('identified by value')
-    expect(surface.text).toContain(`${CONFIG_KEYS.length} field(s)`)
+    // The log states both numbers: 11 volatile keys reach the generated page,
+    // 13 are accepted (toolName/configVersion are plain, not volatile).
+    expect(surface.text).toContain(`11 of ${CONFIG_KEYS.length} field(s) on the page`)
     // A foreign schema is not ours, and no field list may be invented from it.
     const foreign = ctxWith({
       settings: {

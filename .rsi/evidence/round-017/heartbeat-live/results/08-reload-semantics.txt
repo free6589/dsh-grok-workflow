@@ -1,0 +1,33 @@
+# 2026-11-19T08:53:32+08:00 reload/unload semantics
+## boot 1
+{"status":303,"cookies":1}
+session=session-ca7cef6d-9f9e-41fa-bd7e-2d8f895c208d
+POST /grok-workflow/loop {"action":"open","sessionId":"session-ca7cef6d-9f9e-41fa-bd7e-2d8f895c208d"}
+-> HTTP 200 in 48 ms
+{"ok":true,"action":"open","loop":{"open":true,"sessionId":"session-ca7cef6d-9f9e-41fa-bd7e-2d8f895c208d","taskId":"schedule-81b3fabb-c9c3-42d2-b464-9598deddf866","taskStatus":"active","intervalMinutes":60,"rounds":10,"nextAt":"2026-11-19T01:51:25.000Z","createdAt":"2026-11-19T00:51:24.329Z"}}
+stored heartbeat rows: ["schedule-81b3fabb-c9c3-42d2-b464-9598deddf866"]
+## SIGTERM (graceful stop)
+stored heartbeat rows: ["schedule-81b3fabb-c9c3-42d2-b464-9598deddf866"]
+## boot 2 after SIGTERM
+{"status":303,"cookies":1}
+POST /grok-workflow/loop {"action":"status","sessionId":"session-ca7cef6d-9f9e-41fa-bd7e-2d8f895c208d"}
+-> HTTP 200 in 48 ms
+{"ok":true,"action":"status","loop":{"open":true,"sessionId":"session-ca7cef6d-9f9e-41fa-bd7e-2d8f895c208d","taskId":"schedule-81b3fabb-c9c3-42d2-b464-9598deddf866","taskStatus":"active","intervalMinutes":60,"rounds":10,"nextAt":"2026-11-19T01:51:25.000Z","createdAt":"2026-11-19T00:51:24.329Z"}}
+stored heartbeat rows: ["schedule-81b3fabb-c9c3-42d2-b464-9598deddf866"]
+## re-open then SIGKILL (hard stop)
+POST /grok-workflow/loop {"action":"open","sessionId":"session-ca7cef6d-9f9e-41fa-bd7e-2d8f895c208d"}
+-> HTTP 200 in 47 ms
+{"ok":true,"action":"open","loop":{"open":true,"sessionId":"session-ca7cef6d-9f9e-41fa-bd7e-2d8f895c208d","taskId":"schedule-81b3fabb-c9c3-42d2-b464-9598deddf866","taskStatus":"active","intervalMinutes":60,"rounds":10,"nextAt":"2026-11-19T01:51:25.000Z","createdAt":"2026-11-19T00:51:24.329Z"}}
+stored heartbeat rows: ["schedule-81b3fabb-c9c3-42d2-b464-9598deddf866"]
+## boot 3 after SIGKILL
+{"status":303,"cookies":1}
+POST /grok-workflow/loop {"action":"status","sessionId":"session-ca7cef6d-9f9e-41fa-bd7e-2d8f895c208d"}
+-> HTTP 200 in 48 ms
+{"ok":true,"action":"status","loop":{"open":true,"sessionId":"session-ca7cef6d-9f9e-41fa-bd7e-2d8f895c208d","taskId":"schedule-81b3fabb-c9c3-42d2-b464-9598deddf866","taskStatus":"active","intervalMinutes":60,"rounds":10,"nextAt":"2026-11-19T01:51:25.000Z","createdAt":"2026-11-19T00:51:24.329Z"}}
+stored heartbeat rows: ["schedule-81b3fabb-c9c3-42d2-b464-9598deddf866"]
+## cleanup: close the loop
+POST /grok-workflow/loop {"action":"close","sessionId":"session-ca7cef6d-9f9e-41fa-bd7e-2d8f895c208d"}
+-> HTTP 200 in 339 ms
+{"ok":true,"action":"close","loop":{"open":false,"sessionId":"session-ca7cef6d-9f9e-41fa-bd7e-2d8f895c208d"}}
+stored heartbeat rows: []
+# done

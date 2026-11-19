@@ -1,0 +1,9 @@
+{
+  "seq": 1,
+  "op": "session",
+  "ok": false,
+  "error": {
+    "code": null,
+    "message": "ctx.sessionController.createSession is not a function"
+  }
+}

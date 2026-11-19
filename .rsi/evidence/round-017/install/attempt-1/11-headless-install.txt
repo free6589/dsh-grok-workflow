@@ -1,0 +1,29 @@
+# Install into a second isolated profile — headless template (no Schedule)
+
+$ DSH_HOME=<isolated> dsh --profile r17-headless --from-default-profile headless --help
+$ dsh plugin --profile r17-headless add "$W/install-2/dsh-grok-workflow-0.11.15.tgz"
+[WARN] Issues with peer dependencies found. Run "pnpm peers check" to list them.
+
+dependencies:
++ dsh-grok-workflow file:/home/fish/projects_mine/dsh-grok-workflow/.tmp/rsi-r17/install-2/dsh-grok-workflow-0.11.15.tgz
+
+Done in 735ms using pnpm v12.4.2
+
+$ node -p "require(<profile>/package.json).dsh.profile.bundles"
+["@deepseek-ai/dsh-base","@deepseek-ai/dsh-headless","dsh-grok-workflow"]
+
+$ DSH_HOME=<isolated> dsh --profile r17-headless "Reply with the single word: ok"
+exit=1
+
+dsh: MISSING_CREDENTIAL: llm-deepseek: no API key for provider route "deepseek-official"; store DEEPSEEK_API_KEY through the credentials service (the web Models page writes it), or export DEEPSEEK_API_KEY in the launching environment
+
+The turn reached the model call and stopped on the missing credential (isolated home, no
+credential copied from any live profile). The request header it left behind shows the
+conditional mount of grok_loop:
+
+  session session-d3005b5b-4eb8-4110-b91c-49e6f516db06: tools=24 grok_workflow=true grok_loop=false
+  session session-d947b8b7-ddd9-4324-9e1c-ed6ce4ea20c9: tools=33 grok_workflow=true grok_loop=true
+
+Headless composes no Schedule row, so grok_loop is not mounted and neither is the HTTP
+route (no webServer/connection); grok_workflow is. The web profile (05-tools.txt) composes
+Schedule and gets both. That is the documented conditional mount.

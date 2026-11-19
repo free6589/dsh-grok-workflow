@@ -1,0 +1,12 @@
+# Attempt 2 — src/client/index.js vs lib/client.js
+
+src/client/index.js : d290765594d62a3bcdb6a740a53a6d37c73b5f57d3d341051cc54bdcd5957d2a
+lib/client.js       : d290765594d62a3bcdb6a740a53a6d37c73b5f57d3d341051cc54bdcd5957d2a
+tarball member      : d290765594d62a3bcdb6a740a53a6d37c73b5f57d3d341051cc54bdcd5957d2a
+installed copy      : d290765594d62a3bcdb6a740a53a6d37c73b5f57d3d341051cc54bdcd5957d2a
+cmp src vs lib      : identical
+cmp lib vs tarball  : identical
+
+--- packed lib/ count and never-built-in-checkout note ---
+lib files published: 37
+the checkout was never built: git status shows no modified tracked file (see 28-credentials.txt)

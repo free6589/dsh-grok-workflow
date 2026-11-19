@@ -1,0 +1,85 @@
+# 计数与版本断言 — 2026-11-19T08:47:41+08:00  HEAD=4db78f4  node v26.8.1/npm 11.19.0
+
+## 1. typecheck (tsc -p tsconfig.json --noEmit)
+error TS matches in ci.txt: 0
+tsc output between the tsc command and the lint banner: 2 lines, both empty (no diagnostics emitted)
+
+## 2. lint (oxlint src test)
+236:Found 22 warnings and 0 errors.
+237:Finished in 853ms on 107 files with 96 rules using 6 threads.
+error count = 0
+warning count = 22
+
+## 3. verify:lib (in ci chain)
+243:lib/ at 4db78f4 is the build of src/ at 4db78f4 (145 files, byte-identical)
+independent run:
+lib/ at 4db78f4 is the build of src/ at 4db78f4 (145 files, byte-identical)
+VERIFY-LIB-EXIT=0
+
+## 4. build
+.rsi/evidence/round-017/ci/ci.txt:242:client bundle: 224412 bytes → lib/client.js
+.rsi/evidence/round-017/ci/ci.txt:252:client bundle: 224412 bytes → lib/client.js
+.rsi/evidence/round-017/ci/build-second.txt:7:client bundle: 224412 bytes → lib/client.js
+
+## 5. vitest totals
+359: Test Files  62 passed (62)
+360:      Tests  1139 passed (1139)
+361:   Start at  08:46:41
+362:   Duration  24.35s (transform 1.84s, setup 0ms, import 5.33s, tests 10.91s, environment 8ms)
+
+## 6. lib/ file counts
+lib/ files (build output): 145
+src/ files (.ts): 36
+
+## 7. version consistency
+package.json version        = 0.11.15
+package-lock.json version   = 0.11.15
+lock packages[""].version   = 0.11.15
+all three equal             = true
+engines.dsh                 = {"dsh":">=0.2.1-rc.2 <0.3.0","node":">=22"}
+
+## 8. CHANGELOG [Unreleased] bullet count
+  bullet 1: - **The switch that opens a loop now exists, in the composer dock...
+  bullet 2: - **A heartbeat can now be stopped without waiting for the round cap...
+UNRELEASED-BULLETS=2
+sections present: 1
+
+## 9. test/ hygiene
+spec files in test/: 62
+.skip/.only/.todo matches: 0
+xit/xdescribe skipped suites: 0
+vitest.config include:
+7:    include: ['test/**/*.spec.ts'],
+
+## 10. README test-count standpoint
+--- README.md claim ---
+345:`npm run ci` runs typecheck, lint, build and **1081 deterministic tests across 60 files**; no online model is needed. The suite covers the generated workflow, the real PTC engine contract, the gate and delivery paths, routing and fallback chains, failure classification, the configuration surface, write-path isolation and a reliability set (cancellation, deadlines, concurrency, duplicates, recursion, context bounds, redaction, unload/reload). Model-backed end-to-end checks are separate scripts and are recorded in [the validation log](docs/knowledge/VALIDATION.md); the headless one-shot delivery check is `scripts/e2e-headless-in-turn.sh`.
+--- README.zh-CN.md claim ---
+334:`npm run ci` 依次运行 typecheck、lint、build 与**60 个文件 / 1081 个确定性测试**，不需要在线模型。测试覆盖生成的脚本、真实 PTC 引擎契约、闸门与交付路径、路由与备用链、失败归类、配置面、写入路径隔离，以及一组可靠性用例（取消、超时、并发、重复启动、递归、上下文边界、脱敏、卸载/重载）。带模型的端到端检查是独立脚本，记录在[验证日志](docs/knowledge/VALIDATION.md)；headless 单轮交付检查是 `scripts/e2e-headless-in-turn.sh`。
+--- actual from this run ---
+ Test Files  62 passed (62)
+      Tests  1139 passed (1139)
+--- verify:lib mentioned in README? ---
+README.md:0
+README.zh-CN.md:0
+--- docs/knowledge/STATE.md current record ---
+11:`npx vitest run` **62 文件 / 1139 测试 PASS**。**落地（`CONFIRMED`）**：commit `e11d100`、`push origin main` 快进 `37cb0fc..e11d100`、远端 CI run `44425357004` = success（Node 22 + 24 双绿）、提交后 `npm run verify:lib` = `145 files, byte-identical` at `e11d100`；未 bump 版本、未打标签、未建 Release、未 npm 发布。
+1309:  **62 文件 / 1139 测试 PASS**（24.21s）。与 `v0.11.15` 的 60/1081 相比 +2 文件 / +58 测试，无删除、无 skip。
+
+## 11. guard spec results in this run
+ ✓ test/docs-version.spec.ts (8 tests) 12ms
+ ✓ test/docs-config-keys.spec.ts (12 tests) 15ms
+ ✓ test/docs-architecture-version.spec.ts (3 tests) 6ms
+ ✓ test/i18n-parity.spec.ts (6 tests) 9ms
+ ✓ test/heartbeat-guard.spec.ts (14 tests) 573ms
+ ✓ test/loop.spec.ts (30 tests) 29ms
+ ✓ test/loop-brakes.spec.ts (35 tests) 56ms
+ ✓ test/loop-surface.spec.ts (16 tests) 57ms
+ ✓ test/loop-runtime-wiring.spec.ts (5 tests) 176ms
+bash: line 67: bc: command not found
+paste: write error: Broken pipe
+guard total tests: 129 (8+12+3+6+14 + 30+35+16+5)
+
+## 12. all spec files accounted for (62 reported vs files on disk)
+NO-DIFFERENCE
+cat: .rsi/evidence/round-017/ci/assertions.txt: input file is output file

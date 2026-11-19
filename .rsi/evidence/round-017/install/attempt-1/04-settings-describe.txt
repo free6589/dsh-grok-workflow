@@ -1,0 +1,24 @@
+# settings/describe on the live isolated instance
+
+GET  /?token=<launch token>            -> 303 (cookie minted)
+POST /api/settings/describe            -> 200 (44290 bytes, body kept in the evidence only as the excerpt below)
+
+namespaces projected by the instance : 23
+namespace names                      : session-log-deepseek, agent-default-model, llm-pi-ai, bash-sandbox, permission, subagent, web, web-search-deepseek, web-deepseek-api, agent-loop, llm-deepseek, llm-deepseek-account, subagent-model-selection-settings, ui-settings-account, mcp-manager, ui-theme, locale, ui-settings, ui-settings-general, ui-conversation, ui-chat, agent-preset-registry, grok-workflow
+grok-workflow present                : true
+  autoGenerate                       : true
+  applies                            : live
+  secrets                            : []
+  projected schema top-level fields  : 11
+  projected field names              : mode, grokDefault, maxConcurrency, maxTasks, timeoutMs, loopEnabled, loopMaxRounds, loopFailStreak, loopIntervalMin, roles, synthesis
+  projected value keys               : 11
+  projected value                    : {"mode":"triage","grokDefault":"off","maxConcurrency":10,"maxTasks":10,"timeoutMs":3600000,"loopEnabled":false,"loopMaxRounds":10,"loopFailStreak":3,"loopIntervalMin":0,"roles":{"planner":[],"worker":[],"verifier":[],"synthesizer":[],"supervisor":[]},"synthesis":"layered"}
+
+Reading of the two numbers:
+  * the accepted configuration surface is the thirteen keys listed in README.md#configuration
+    and pinned by src/config.ts CONFIG_KEYS (proved live in 10-keys-surface.txt);
+  * the settings projection carries only the eleven volatile fields. DSH projects
+    projectForm(volatileForm(schema), config), so the two structural keys toolName and
+    configVersion are deliberately absent (dsh-settings/lib/index.js:118-126; the plugin
+    records the same fact at src/settings.ts:270-273). The criterion wording 'projected 13
+    keys' does not match that runtime rule; see 00-conclusion.md (finding F1).

@@ -1,0 +1,10 @@
+{
+  "seq": 1795050436220,
+  "op": "classify",
+  "ok": true,
+  "result": {
+    "kind": "pass",
+    "reason": "non-user-source",
+    "code": null
+  }
+}

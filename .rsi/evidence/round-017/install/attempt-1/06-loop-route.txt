@@ -1,0 +1,79 @@
+# POST /grok-workflow/loop on the live isolated instance
+
+Cookie: GET /?token=<launch token> -> 303, Set-Cookie dsh-auth-... ; every request below
+carries that cookie, Content-Type: application/json and Origin: http://127.0.0.1:3299.
+
+Run 1 (default settings: loopIntervalMin 0, loopMaxRounds 10, loopFailStreak 3)
+
+  status (before)   {"action":"status","sessionId":"<sid>"}
+{"ok":true,"action":"status","loop":{"open":false,"sessionId":"session-d947b8b7-ddd9-4324-9e1c-ed6ce4ea20c9"}}
+  open              {"action":"open","sessionId":"<sid>"}
+{"ok":true,"action":"open","loop":{"open":true,"sessionId":"session-d947b8b7-ddd9-4324-9e1c-ed6ce4ea20c9","taskId":"schedule-8c23e779-1d96-44ac-8bc8-1a6cb9182982","taskStatus":"active","intervalMinutes":60,"rounds":10,"nextAt":"2026-11-19T01:46:44.000Z","createdAt":"2026-11-19T00:46:43.550Z"}}
+  status (open)     {"action":"status","sessionId":"<sid>"}
+{"ok":true,"action":"status","loop":{"open":true,"sessionId":"session-d947b8b7-ddd9-4324-9e1c-ed6ce4ea20c9","taskId":"schedule-8c23e779-1d96-44ac-8bc8-1a6cb9182982","taskStatus":"active","intervalMinutes":60,"rounds":10,"nextAt":"2026-11-19T01:46:44.000Z","createdAt":"2026-11-19T00:46:43.550Z"}}
+  close             {"action":"close","sessionId":"<sid>"}
+{"ok":true,"action":"close","loop":{"open":false,"sessionId":"session-d947b8b7-ddd9-4324-9e1c-ed6ce4ea20c9"}}
+  status (closed)   {"action":"status","sessionId":"<sid>"}
+{"ok":true,"action":"status","loop":{"open":false,"sessionId":"session-d947b8b7-ddd9-4324-9e1c-ed6ce4ea20c9"}}
+  unknown action    {"action":"nope",...}   -> HTTP 400
+{"ok":false,"code":"loop/action","error":"unknown action \"nope\"; expected open, close or status"}
+  no cookie                                  -> HTTP 401
+  GET (not POST)                             -> HTTP 405
+
+Run 2 (same profile, settings loopIntervalMin 90 / loopMaxRounds 3 / loopFailStreak 2):
+  open   -> {"ok":true,"action":"open","loop":{"open":true,"sessionId":"session-9bd3ca99-af2f-4586-b0d6-300032fe70a6","taskId":"schedule-c4161e01-21d2-4f90-a08a-83a9aa977319","taskStatus":"active","intervalMinutes":90,"rounds":3,"nextAt":"2026-11-19T02:21:09.000Z","createdAt":"2026-11-19T00:51:08.289Z"}}
+  close  -> {"ok":true,"action":"close","loop":{"open":false,"sessionId":"session-9bd3ca99-af2f-4586-b0d6-300032fe70a6"}}
+
+-- the durable Schedule row while the loop is open (storages/schedule.json) --
+{
+  "unit": {
+    "name": "schedule",
+    "version": 2
+  },
+  "global": null,
+  "tables": {
+    "tasks": {
+      "schedule-c4161e01-21d2-4f90-a08a-83a9aa977319": {
+        "record": {
+          "id": "schedule-c4161e01-21d2-4f90-a08a-83a9aa977319",
+          "kind": "rrule",
+          "title": "Loop heartbeat",
+          "prompt": "[grok-workflow loop] Loop heartbeat: the previous round has ended. Continue this session's unfinished work from where it stopped; do not redo completed steps. If the work is finished, report the final result and stop instead of starting anything new. If the last 2 rounds failed in a row, stop and report why rather than trying again.",
+          "rrule": "DTSTART:20261119T022109Z\nRRULE:FREQ=MINUTELY;INTERVAL=90;COUNT=3",
+          "scheduledAt": "2026-11-19T02:21:09.000Z"
+        },
+        "involvedSessionIds": [
+          "session-9bd3ca99-af2f-4586-b0d6-300032fe70a6"
+        ],
+        "status": "active",
+        "createdAt": "2026-11-19T00:51:08.289Z",
+        "updatedAt": "2026-11-19T00:51:08.289Z",
+        "target": {
+          "kind": "session",
+          "sessionId": "session-9bd3ca99-af2f-4586-b0d6-300032fe70a6"
+        },
+        "deliveryHistory": {
+          "records": [],
+          "earlierRecordsUnavailable": false,
+          "earlierRecordsPruned": false
+        }
+      }
+    }
+  }
+}
+
+-- the same file after close: the row is deleted, not paused --
+{
+  "unit": {
+    "name": "schedule",
+    "version": 2
+  },
+  "global": null,
+  "tables": {
+    "tasks": {}
+  }
+}
+
+Matches README 'Repeat runs': the rule is an rrule whose COUNT is loopMaxRounds, the
+interval is loopIntervalMin, the title is 'Loop heartbeat', the prompt starts with
+'[grok-workflow loop]', the target is the same session, and close deletes the row.

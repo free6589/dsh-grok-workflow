@@ -1,0 +1,12 @@
+# git state BEFORE gate — 2026-11-19T08:46:24+08:00
+HEAD 4db78f41f00416abe55baa1ec9403c4fa1a63379 (4db78f4)
+branch: main  ahead/behind origin/main: 0	0
+node v26.8.1  npm 11.19.0
+--- git status --short --branch ---
+## main...origin/main
+?? .rsi/evidence/round-017/
+?? .rsi/evidence/segment-5/final-check-agent57.md
+?? .rsi/evidence/segment-5/final-check-agent57.txt
+?? settings-simple-mock.html
+--- tracked porcelain lines ---
+0

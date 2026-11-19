@@ -1,0 +1,42 @@
+# Attempt 2 — POST /grok-workflow/loop on the installed build
+
+Cookie: GET /?token=<launch token> -> 303, Set-Cookie minted; requests carry that cookie,
+Content-Type: application/json and Origin: http://127.0.0.1:3441.
+Settings are the shipped defaults (loopIntervalMin 0 -> 60 minute floor, loopMaxRounds 10).
+
+{"ok":true,"action":"status","loop":{"open":false,"sessionId":"session-836bdbb9-9451-4318-a76d-6023b1cc3f0f"}}
+HTTP 200
+{"ok":true,"action":"open","loop":{"open":true,"sessionId":"session-836bdbb9-9451-4318-a76d-6023b1cc3f0f","taskId":"schedule-df373cec-d97d-44ea-94c2-f7cd1e39ea0a","taskStatus":"active","intervalMinutes":60,"rounds":10,"nextAt":"2026-11-19T02:31:18.000Z","createdAt":"2026-11-19T01:31:17.759Z"}}
+HTTP 200
+{"ok":true,"action":"status","loop":{"open":true,"sessionId":"session-836bdbb9-9451-4318-a76d-6023b1cc3f0f","taskId":"schedule-df373cec-d97d-44ea-94c2-f7cd1e39ea0a","taskStatus":"active","intervalMinutes":60,"rounds":10,"nextAt":"2026-11-19T02:31:18.000Z","createdAt":"2026-11-19T01:31:17.759Z"}}
+HTTP 200
+{"ok":true,"action":"close","loop":{"open":false,"sessionId":"session-836bdbb9-9451-4318-a76d-6023b1cc3f0f"}}
+HTTP 200
+{"ok":true,"action":"status","loop":{"open":false,"sessionId":"session-836bdbb9-9451-4318-a76d-6023b1cc3f0f"}}
+HTTP 200
+
+unknown action -> HTTP 400
+no cookie      -> HTTP 401
+GET            -> HTTP 405
+
+--- durable Schedule row while open (storages/schedule.json) ---
+{
+  "tasks": [
+    "schedule-df373cec-d97d-44ea-94c2-f7cd1e39ea0a"
+  ],
+  "row": {
+    "id": "schedule-df373cec-d97d-44ea-94c2-f7cd1e39ea0a",
+    "kind": "rrule",
+    "title": "Loop heartbeat",
+    "prompt": "[grok-workflow loop] Loop heartbeat: the previous round has ended. Continue this session's unfinished work from where it stopped; do not redo completed steps. If the work is finished, report the final result and stop instead of starting anything new. If the last 3 rounds failed in a row, stop and report why rather than trying again.",
+    "rrule": "DTSTART:20261119T023118Z\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=10",
+    "scheduledAt": "2026-11-19T02:31:18.000Z"
+  },
+  "target": {
+    "kind": "session",
+    "sessionId": "session-836bdbb9-9451-4318-a76d-6023b1cc3f0f"
+  }
+}
+
+--- the same file after close ---
+{}

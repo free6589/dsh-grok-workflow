@@ -1,0 +1,22 @@
+undefined	session		
+0	permission/preset		
+1	sandbox/mode		
+2	approval/policy		
+3	agent/inbox/spliced		
+4	agent/inbox/spliced		
+5	turn/start		
+6	agent/inbox/spliced		
+7	agent/inbox/spliced		
+8	step/start		
+9	system/message		You are an AI agent powered by DeepSeek Harness. You are a coding agent powered by the probe-stub model. Tokens prefixed
+10	user/message	schedule	[SCHEDULE CHANGE] A scheduled task involving this session was changed outside this session. This notice is not a deliver
+11	user/message	schedule	[SCHEDULE REMINDER] This is a scheduled message from the user schedule_id_json: "schedule-d03411f5-b824-4475-bf19-4ffc57
+12	user/message	agent-instructions	<system-reminder> The following workspace instructions may be relevant to your work. Use them as guidance when applicabl
+13	user/message	runtime-context	<system-reminder> The following information describes your current session: Current working directory: "/home/fish/proje
+14	user/message	skill-catalog	<system-reminder> A skill is a reusable set of task-specific instructions. The following skills are available in this se
+15	user/message	time-context	Time sampled while preparing turn 1, step 1: 2026-11-19T09:07:01+08:00[Asia/Singapore] Browser time zone for this reques
+16	request/header		
+17	request/context		
+18	assistant/message		STUB_HEARTBEAT_ROUND_OK
+19	step/end		
+20	turn/end		

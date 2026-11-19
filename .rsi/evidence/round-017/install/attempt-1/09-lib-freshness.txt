@@ -1,0 +1,18 @@
+# lib/ freshness: the packed lib/ is the build of the packed src/
+
+No build ran in the shared checkout. The scratch copy was built with the checkout's
+node_modules symlinked (the same trick scripts/verify-lib.mjs uses):
+
+  cd "$W/tree"
+  cp -a lib lib.committed2
+  node node_modules/typescript/bin/tsc -p tsconfig.build.json
+  node scripts/build-client.mjs
+  diff -r lib.committed2 lib
+
+$ node scripts/build-client.mjs
+client bundle: 224412 bytes -> lib/client.js
+
+$ diff -r lib.committed2 lib
+  (no differences: the shipped lib/ is the build of the shipped src/)
+
+Exit status of diff: 0

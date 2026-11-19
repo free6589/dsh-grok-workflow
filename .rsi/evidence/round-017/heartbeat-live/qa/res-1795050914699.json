@@ -1,0 +1,9 @@
+{
+  "seq": 1795050914699,
+  "op": "session",
+  "ok": true,
+  "result": {
+    "sessionId": "session-e7d7e1a6-35f3-4769-ba96-0e302be4c022",
+    "agentPreset": "standard"
+  }
+}

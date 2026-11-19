@@ -1,0 +1,185 @@
+# 2026-11-19T09:06:51+08:00 heartbeat live chain (isolated instance, profile live-verify)
+boot: dsh web: http://127.0.0.1:3271/?token=[REDACTED]
+{"status":303,"cookies":1}
+## 1. create a real Session in the host
+{
+  "seq": 1795050418117,
+  "op": "session",
+  "ok": true,
+  "result": {
+    "sessionId": "session-48df3c0a-5c00-4f93-8baf-26678c473788",
+    "agentPreset": "standard"
+  }
+}
+session=session-48df3c0a-5c00-4f93-8baf-26678c473788
+## 2. status before any open
+POST /grok-workflow/loop {"action":"status","sessionId":"session-48df3c0a-5c00-4f93-8baf-26678c473788"}
+-> HTTP 200 in 50 ms
+{"ok":true,"action":"status","loop":{"open":false,"sessionId":"session-48df3c0a-5c00-4f93-8baf-26678c473788"}}
+## 3. open through POST /grok-workflow/loop (the switch: a user action, no actor)
+POST /grok-workflow/loop {"action":"open","sessionId":"session-48df3c0a-5c00-4f93-8baf-26678c473788"}
+-> HTTP 200 in 162 ms
+{"ok":true,"action":"open","loop":{"open":true,"sessionId":"session-48df3c0a-5c00-4f93-8baf-26678c473788","taskId":"schedule-d03411f5-b824-4475-bf19-4ffc57e1df7b","taskStatus":"active","intervalMinutes":60,"rounds":10,"nextAt":"2026-11-19T02:06:59.000Z","createdAt":"2026-11-19T01:06:58.817Z"}}
+## 4. the row Schedule stored
+{
+  "seq": 1795050418948,
+  "op": "catalog",
+  "ok": true,
+  "result": [
+    {
+      "id": "schedule-d03411f5-b824-4475-bf19-4ffc57e1df7b",
+      "kind": "rrule",
+      "title": "Loop heartbeat",
+      "prompt": "[grok-workflow loop] Loop heartbeat: the previous round has ended. Continue this session's unfinished work from where it stopped; do not redo completed steps. If the work is finished, report the final result and stop instead of starting anything new. If the last 3 rounds failed in a row, stop and report why rather than trying again.",
+      "rrule": "DTSTART:20261119T020659Z\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=10",
+      "scheduledAt": "2026-11-19T02:06:59.000Z",
+      "target": {
+        "kind": "session",
+        "sessionId": "session-48df3c0a-5c00-4f93-8baf-26678c473788"
+      },
+      "involvedSessionIds": [
+        "session-48df3c0a-5c00-4f93-8baf-26678c473788"
+      ],
+      "status": "active",
+      "createdAt": "2026-11-19T01:06:58.817Z",
+      "updatedAt": "2026-11-19T01:06:58.817Z"
+    }
+  ]
+}
+task=schedule-d03411f5-b824-4475-bf19-4ffc57e1df7b
+## 5. the model-facing tool refuses open (loop/user-only)
+{
+  "seq": 1795050419488,
+  "op": "tool-open",
+  "ok": true,
+  "result": {
+    "outcome": "refused",
+    "code": "loop/user-only",
+    "message": "a loop heartbeat can be opened only by the user from the composer switch; an agent cannot open one on the user's behalf"
+  }
+}
+## 6. the service refuses an Agent-attributed open (loop/user-only)
+{
+  "seq": 1795050420024,
+  "op": "open-with-actor",
+  "ok": true,
+  "result": {
+    "outcome": "refused",
+    "code": "loop/user-only",
+    "message": "a loop heartbeat can be opened only by the user from the composer switch; an agent cannot open one on the user's behalf"
+  }
+}
+## 7. the refusals created no second row
+{
+  "seq": 1795050420563,
+  "op": "catalog",
+  "ok": true,
+  "result": [
+    {
+      "id": "schedule-d03411f5-b824-4475-bf19-4ffc57e1df7b",
+      "kind": "rrule",
+      "title": "Loop heartbeat",
+      "prompt": "[grok-workflow loop] Loop heartbeat: the previous round has ended. Continue this session's unfinished work from where it stopped; do not redo completed steps. If the work is finished, report the final result and stop instead of starting anything new. If the last 3 rounds failed in a row, stop and report why rather than trying again.",
+      "rrule": "DTSTART:20261119T020659Z\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=10",
+      "scheduledAt": "2026-11-19T02:06:59.000Z",
+      "target": {
+        "kind": "session",
+        "sessionId": "session-48df3c0a-5c00-4f93-8baf-26678c473788"
+      },
+      "involvedSessionIds": [
+        "session-48df3c0a-5c00-4f93-8baf-26678c473788"
+      ],
+      "status": "active",
+      "createdAt": "2026-11-19T01:06:58.817Z",
+      "updatedAt": "2026-11-19T01:06:58.817Z"
+    }
+  ]
+}
+## 8. real Schedule delivery (manual run) + receipt
+{
+  "seq": 1795050421102,
+  "op": "run",
+  "ok": true,
+  "result": {
+    "id": "schedule-d03411f5-b824-4475-bf19-4ffc57e1df7b",
+    "kind": "rrule",
+    "title": "Loop heartbeat",
+    "prompt": "[grok-workflow loop] Loop heartbeat: the previous round has ended. Continue this session's unfinished work from where it stopped; do not redo completed steps. If the work is finished, report the final result and stop instead of starting anything new. If the last 3 rounds failed in a row, stop and report why rather than trying again.",
+    "rrule": "DTSTART:20261119T020659Z\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=10",
+    "scheduledAt": "2026-11-19T02:06:59.000Z",
+    "target": {
+      "kind": "session",
+      "sessionId": "session-48df3c0a-5c00-4f93-8baf-26678c473788"
+    },
+    "involvedSessionIds": [
+      "session-48df3c0a-5c00-4f93-8baf-26678c473788"
+    ],
+    "status": "active",
+    "createdAt": "2026-11-19T01:06:58.817Z",
+    "updatedAt": "2026-11-19T01:07:01.691Z",
+    "executionActive": true,
+    "deliveryFloorEndsAt": "2026-11-19T01:08:01.365Z",
+    "lastDelivery": {
+      "scheduledAt": "2026-11-19T01:07:01.365Z",
+      "deliveredAt": "2026-11-19T01:07:01.691Z",
+      "messageId": "8700badd-6e6a-4b6e-85c0-b2f9a0e4c1f7",
+      "targetSessionId": "session-48df3c0a-5c00-4f93-8baf-26678c473788"
+    }
+  }
+}
+## 9. the delivered turn, from the Session log
+session trace: /home/fish/projects_mine/dsh-grok-workflow/.rsi/evidence/round-017/heartbeat-live/results/02-session-trace.txt (22 events)
+--- schedule-sourced and assistant events ---
+7:5	turn/start		
+12:10	user/message	schedule	[SCHEDULE CHANGE] A scheduled task involving this session was changed outside this session. This notice is not a deliver
+13:11	user/message	schedule	[SCHEDULE REMINDER] This is a scheduled message from the user schedule_id_json: "schedule-d03411f5-b824-4475-bf19-4ffc57
+20:18	assistant/message		STUB_HEARTBEAT_ROUND_OK
+22:20	turn/end		
+## 10. shipped classifyPreStep on the exact delivered message + isLoopHeartbeat
+{
+  "seq": 1795050436220,
+  "op": "classify",
+  "ok": true,
+  "result": {
+    "kind": "pass",
+    "reason": "non-user-source",
+    "code": null
+  }
+}
+{
+  "seq": 1795050436829,
+  "op": "heartbeat-probe",
+  "ok": true,
+  "result": {
+    "text": "[SCHEDULE REMINDER]\nThis is a scheduled message from the user\nschedule_id_json: \"schedule-d03411f5-b824-4475-bf19-4ffc57",
+    "isLoopHeartbeat": false
+  }
+}
+## 11. close through the route
+POST /grok-workflow/loop {"action":"close","sessionId":"session-48df3c0a-5c00-4f93-8baf-26678c473788"}
+-> HTTP 200 in 173 ms
+{"ok":true,"action":"close","loop":{"open":false,"sessionId":"session-48df3c0a-5c00-4f93-8baf-26678c473788"}}
+## 12. status after close
+POST /grok-workflow/loop {"action":"status","sessionId":"session-48df3c0a-5c00-4f93-8baf-26678c473788"}
+-> HTTP 200 in 47 ms
+{"ok":true,"action":"status","loop":{"open":false,"sessionId":"session-48df3c0a-5c00-4f93-8baf-26678c473788"}}
+## 13. catalog after close (no row => nothing can deliver)
+{
+  "seq": 1795050437656,
+  "op": "catalog",
+  "ok": true,
+  "result": []
+}
+## 14. a delivery attempt on the deleted row
+{
+  "seq": 1795050438191,
+  "op": "run",
+  "ok": true,
+  "result": {
+    "id": "schedule-d03411f5-b824-4475-bf19-4ffc57e1df7b",
+    "code": "schedule_not_found"
+  }
+}
+## 15. the durable Schedule domain on disk
+stored rows: []
+# done

@@ -1,0 +1,25 @@
+{
+  "seq": 21,
+  "op": "catalog",
+  "ok": true,
+  "result": [
+    {
+      "id": "schedule-81b3fabb-c9c3-42d2-b464-9598deddf866",
+      "kind": "rrule",
+      "title": "Loop heartbeat",
+      "prompt": "[grok-workflow loop] Loop heartbeat: the previous round has ended. Continue this session's unfinished work from where it stopped; do not redo completed steps. If the work is finished, report the final result and stop instead of starting anything new. If the last 3 rounds failed in a row, stop and report why rather than trying again.",
+      "rrule": "DTSTART:20261119T015125Z\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=10",
+      "scheduledAt": "2026-11-19T01:51:25.000Z",
+      "target": {
+        "kind": "session",
+        "sessionId": "session-ca7cef6d-9f9e-41fa-bd7e-2d8f895c208d"
+      },
+      "involvedSessionIds": [
+        "session-ca7cef6d-9f9e-41fa-bd7e-2d8f895c208d"
+      ],
+      "status": "active",
+      "createdAt": "2026-11-19T00:51:24.329Z",
+      "updatedAt": "2026-11-19T00:51:24.329Z"
+    }
+  ]
+}

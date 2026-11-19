@@ -1,0 +1,156 @@
+# Round 17 install acceptance — pack the working tree
+
+Date: 2026-11-19T08:49:45+08:00
+Repository: /home/fish/projects_mine/dsh-grok-workflow
+HEAD: 4db78f41f00416abe55baa1ec9403c4fa1a63379 (main)
+Uncommitted at pack time:
+  ?? .rsi/evidence/round-017/
+  ?? .rsi/evidence/segment-5/final-check-agent57.md
+  ?? .rsi/evidence/segment-5/final-check-agent57.txt
+  ?? settings-simple-mock.html
+
+The pack ran in a scratch copy, never in the shared checkout:
+  rsync -a --exclude node_modules --exclude .git --exclude .rsi ... "$R"/ "$W/tree"/
+  cd "$W/tree" && ln -s "$R/node_modules" node_modules && npm pack --loglevel=error
+
+$ npm pack --loglevel=error
+dsh-grok-workflow-0.11.15.tgz
+
+$ stat -c "%s bytes" dsh-grok-workflow-0.11.15.tgz
+543603 bytes
+$ sha256sum dsh-grok-workflow-0.11.15.tgz
+8d7ff2af0f308d90c26c612aeb33c6a774681b9649304c67cc79ce006cd9c993
+
+$ tar -tzf dsh-grok-workflow-0.11.15.tgz | wc -l
+88
+
+-- entry list --
+package/LICENSE
+package/lib/answer.js
+package/lib/memory/archive.js
+package/lib/carryover.js
+package/lib/memory/cli.js
+package/lib/client.js
+package/lib/command.js
+package/lib/config.js
+package/lib/gate.js
+package/lib/history.js
+package/lib/delivery/index.js
+package/lib/index.js
+package/lib/resume/index.js
+package/lib/input.js
+package/lib/loop-brakes.js
+package/lib/loop-surface.js
+package/lib/loop.js
+package/lib/mode.js
+package/lib/naming.js
+package/lib/panel.js
+package/lib/paths.js
+package/lib/resume/policy.js
+package/lib/progress-tab.js
+package/lib/memory/recorder.js
+package/lib/records.js
+package/lib/redact.js
+package/lib/report.js
+package/lib/run.js
+package/lib/checkpoint/schema.js
+package/lib/script.js
+package/lib/settings.js
+package/lib/shards.js
+package/lib/team-engine.js
+package/lib/triage.js
+package/lib/types.js
+package/lib/resume/validator.js
+package/lib/checkpoint/wiring.js
+package/lib/checkpoint/writer.js
+package/package.json
+package/docs/ACCEPTANCE.md
+package/docs/ARCHITECTURE.md
+package/CHANGELOG.md
+package/docs/COORDINATION.md
+package/docs/ISSUE-WATCHER.md
+package/docs/LOCAL-TESTING.md
+package/README.md
+package/README.zh-CN.md
+package/docs/RELEASING.md
+package/docs/task-progress-panel.md
+package/docs/images/workflow-overview.svg
+package/docs/images/workflow-overview.zh-CN.svg
+package/lib/answer.d.ts
+package/lib/memory/archive.d.ts
+package/lib/carryover.d.ts
+package/lib/memory/cli.d.ts
+package/lib/command.d.ts
+package/lib/config.d.ts
+package/lib/gate.d.ts
+package/lib/history.d.ts
+package/lib/delivery/index.d.ts
+package/lib/index.d.ts
+package/lib/resume/index.d.ts
+package/lib/input.d.ts
+package/lib/loop-brakes.d.ts
+package/lib/loop-surface.d.ts
+package/lib/loop.d.ts
+package/lib/mode.d.ts
+package/lib/naming.d.ts
+package/lib/panel.d.ts
+package/lib/paths.d.ts
+package/lib/resume/policy.d.ts
+package/lib/progress-tab.d.ts
+package/lib/memory/recorder.d.ts
+package/lib/records.d.ts
+package/lib/redact.d.ts
+package/lib/report.d.ts
+package/lib/run.d.ts
+package/lib/checkpoint/schema.d.ts
+package/lib/script.d.ts
+package/lib/settings.d.ts
+package/lib/shards.d.ts
+package/lib/team-engine.d.ts
+package/lib/triage.d.ts
+package/lib/types.d.ts
+package/lib/resume/validator.d.ts
+package/lib/checkpoint/wiring.d.ts
+package/lib/checkpoint/writer.d.ts
+package/cordis.patch.yml
+
+-- package/package.json inside the tarball --
+{
+ "name": "dsh-grok-workflow",
+ "version": "0.11.15",
+ "main": "lib/index.js",
+ "exports": {
+  ".": {
+   "types": "./lib/index.d.ts",
+   "default": "./lib/index.js"
+  },
+  "./client": {
+   "default": "./lib/client.js"
+  },
+  "./package.json": "./package.json"
+ },
+ "files": [
+  "lib/**/*.js",
+  "lib/**/*.d.ts",
+  "cordis.patch.yml",
+  "README.md",
+  "README.zh-CN.md",
+  "CHANGELOG.md",
+  "LICENSE",
+  "docs/images",
+  "docs/*.md"
+ ],
+ "dsh": {
+  "pluginType": "feature",
+  "bundle": {
+   "patch": "./cordis.patch.yml"
+  },
+  "client": {
+   "platform": "web",
+   "inject": [
+    "@deepseek-ai/dsh-client-ui-settings",
+    "@deepseek-ai/dsh-api-remotes"
+   ]
+  }
+ }
+}

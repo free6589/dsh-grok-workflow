@@ -1,0 +1,51 @@
+# 计数与版本断言 — 2026-11-19T08:40:17+08:00 — HEAD 4db78f41f00416abe55baa1ec9403c4fa1a63379
+
+## 1. vitest totals (from ci.txt)
+ Test Files  62 passed (62)
+      Tests  1139 passed (1139)
+   Start at  08:39:16
+   Duration  25.06s (transform 3.45s, setup 0ms, import 6.86s, tests 10.45s, environment 7ms)
+
+## 2. oxlint totals (from ci.txt)
+Found 22 warnings and 0 errors.
+Finished in 587ms on 107 files with 96 rules using 6 threads.
+
+## 3. verify:lib (from ci.txt and standalone rerun)
+.rsi/evidence/round-017/ci/ci.txt:lib/ at 4db78f4 is the build of src/ at 4db78f4 (145 files, byte-identical)
+.rsi/evidence/round-017/ci/verify-lib.txt:lib/ at 4db78f4 is the build of src/ at 4db78f4 (145 files, byte-identical)
+
+## 4. typecheck / build steps (no output = success; tsc emits nothing on success)
+7:> dsh-grok-workflow@0.11.15 typecheck
+11:> dsh-grok-workflow@0.11.15 lint
+235:> dsh-grok-workflow@0.11.15 verify:lib
+245:> dsh-grok-workflow@0.11.15 build
+
+## 5. package version
+package.json version = 0.11.15
+package-lock.json version = 0.11.15 | lock root packages[""].version = 0.11.15
+AGREE = true
+
+## 6. CHANGELOG [Unreleased] bullets
+bullet count = 2
+  4:- **The switch that opens a loop now exists, in the composer dock
+  26:- **A heartbeat can now be stopped without waiting for the round cap
+
+## 7. README test-count claims vs actual
+actual: Test Files = 62, Tests = 1139
+345:`npm run ci` runs typecheck, lint, build and **1081 deterministic tests across 60 files**; no online model is needed. The suite covers the generated workflow, the real PTC engine contract, the gate and delivery paths, routing and fallback chains, failure classification, the configuration surface, write-path isolation and a reliability set (cancellation, deadlines, concurrency, duplicates, recursion, context bounds, redaction, unload/reload). Model-backed end-to-end checks are separate scripts and are recorded in [the validation log](docs/knowledge/VALIDATION.md); the headless one-shot delivery check is `scripts/e2e-headless-in-turn.sh`.
+334:`npm run ci` 依次运行 typecheck、lint、build 与**60 个文件 / 1081 个确定性测试**，不需要在线模型。测试覆盖生成的脚本、真实 PTC 引擎契约、闸门与交付路径、路由与备用链、失败归类、配置面、写入路径隔离，以及一组可靠性用例（取消、超时、并发、重复启动、递归、上下文边界、脱敏、卸载/重载）。带模型的端到端检查是独立脚本，记录在[验证日志](docs/knowledge/VALIDATION.md)；headless 单轮交付检查是 `scripts/e2e-headless-in-turn.sh`。
+spec files in test/ = 62
+
+## 8. skip / only / todo scan in test/
+skip/only/todo match count = 0
+
+## 9. guard tests result lines (from ci.txt)
+ ✓ test/heartbeat-guard.spec.ts (14 tests) 744ms
+ ✓ test/loop-runtime-wiring.spec.ts (5 tests) 167ms
+ ✓ test/loop-surface.spec.ts (16 tests) 59ms
+ ✓ test/loop-brakes.spec.ts (35 tests) 27ms
+ ✓ test/loop.spec.ts (30 tests) 29ms
+ ✓ test/docs-config-keys.spec.ts (12 tests) 16ms
+ ✓ test/docs-version.spec.ts (8 tests) 11ms
+ ✓ test/i18n-parity.spec.ts (6 tests) 8ms
+ ✓ test/docs-architecture-version.spec.ts (3 tests) 5ms

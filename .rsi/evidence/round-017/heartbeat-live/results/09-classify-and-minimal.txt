@@ -1,0 +1,38 @@
+# 2026-11-19T08:55:07+08:00 classify + minimal-composition probes
+## A: shipped classifyPreStep on the real Schedule delivery
+{"status":303,"cookies":1}
+{
+  "seq": 30,
+  "op": "classify",
+  "ok": true,
+  "result": {
+    "kind": "pass",
+    "reason": "non-user-source",
+    "code": null
+  }
+}
+{
+  "seq": 31,
+  "op": "heartbeat-probe",
+  "ok": true,
+  "result": {
+    "text": "[SCHEDULE REMINDER]\nThis is a scheduled message from the user\nschedule_id_json: \"schedule-0d049159-fe18-4583-984e-3b0d51",
+    "isLoopHeartbeat": false
+  }
+}
+## A2: catalog is empty before shutdown (no heartbeat left behind)
+{
+  "seq": 32,
+  "op": "catalog",
+  "ok": true,
+  "result": []
+}
+## B: minimal composition (schedule disabled) — loop route must answer 503
+{"status":303,"cookies":1}
+POST /grok-workflow/loop {"action":"open","sessionId":"session-ca7cef6d-9f9e-41fa-bd7e-2d8f895c208d"}
+-> HTTP 503 in 51 ms
+{"ok":false,"code":"loop/unavailable","error":"the Host Schedule service is not composed; a loop heartbeat needs it"}
+POST /grok-workflow/loop {"action":"status","sessionId":"session-ca7cef6d-9f9e-41fa-bd7e-2d8f895c208d"}
+-> HTTP 503 in 51 ms
+{"ok":false,"code":"loop/unavailable","error":"the Host Schedule service is not composed; a loop heartbeat needs it"}
+# done

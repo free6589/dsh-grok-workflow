@@ -1,0 +1,8 @@
+{
+  "seq": 17,
+  "op": "forget",
+  "ok": true,
+  "result": {
+    "deleted": 1
+  }
+}

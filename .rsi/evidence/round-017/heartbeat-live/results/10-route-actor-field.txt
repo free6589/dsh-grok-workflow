@@ -1,0 +1,53 @@
+# 2026-11-19T09:15:07+08:00 route body carrying an actor
+{"status":303,"cookies":1}
+{
+  "seq": 1795050914699,
+  "op": "session",
+  "ok": true,
+  "result": {
+    "sessionId": "session-e7d7e1a6-35f3-4769-ba96-0e302be4c022",
+    "agentPreset": "standard"
+  }
+}
+session=session-e7d7e1a6-35f3-4769-ba96-0e302be4c022
+## POST open with an actor field in the body
+POST /grok-workflow/loop {"action":"open","sessionId":"session-e7d7e1a6-35f3-4769-ba96-0e302be4c022","actor":"session-actor-probe"}
+-> HTTP 200 in 105 ms
+{"ok":true,"action":"open","loop":{"open":true,"sessionId":"session-e7d7e1a6-35f3-4769-ba96-0e302be4c022","taskId":"schedule-3df76ed9-bec6-46d4-9533-f9064276dc79","taskStatus":"active","intervalMinutes":60,"rounds":10,"nextAt":"2026-11-19T02:15:16.000Z","createdAt":"2026-11-19T01:15:15.315Z"}}
+## catalog after that request
+{
+  "seq": 1795050915388,
+  "op": "catalog",
+  "ok": true,
+  "result": [
+    {
+      "id": "schedule-3df76ed9-bec6-46d4-9533-f9064276dc79",
+      "kind": "rrule",
+      "title": "Loop heartbeat",
+      "prompt": "[grok-workflow loop] Loop heartbeat: the previous round has ended. Continue this session's unfinished work from where it stopped; do not redo completed steps. If the work is finished, report the final result and stop instead of starting anything new. If the last 3 rounds failed in a row, stop and report why rather than trying again.",
+      "rrule": "DTSTART:20261119T021516Z\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=10",
+      "scheduledAt": "2026-11-19T02:15:16.000Z",
+      "target": {
+        "kind": "session",
+        "sessionId": "session-e7d7e1a6-35f3-4769-ba96-0e302be4c022"
+      },
+      "involvedSessionIds": [
+        "session-e7d7e1a6-35f3-4769-ba96-0e302be4c022"
+      ],
+      "status": "active",
+      "createdAt": "2026-11-19T01:15:15.315Z",
+      "updatedAt": "2026-11-19T01:15:15.315Z"
+    }
+  ]
+}
+## cleanup
+POST /grok-workflow/loop {"action":"close","sessionId":"session-e7d7e1a6-35f3-4769-ba96-0e302be4c022"}
+-> HTTP 200 in 95 ms
+{"ok":true,"action":"close","loop":{"open":false,"sessionId":"session-e7d7e1a6-35f3-4769-ba96-0e302be4c022"}}
+{
+  "seq": 1795050916061,
+  "op": "catalog",
+  "ok": true,
+  "result": []
+}
+# done

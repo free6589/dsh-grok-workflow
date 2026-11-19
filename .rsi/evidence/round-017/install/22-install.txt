@@ -1,0 +1,55 @@
+# Attempt 2 — install into a fresh, isolated profile
+
+DSH_HOME : /home/fish/projects_mine/dsh-grok-workflow/.tmp/r17b/home (created by this round; no live profile touched)
+profile  : acc-web, from the shipped web template
+
+cmd        : DSH_HOME=/home/fish/projects_mine/dsh-grok-workflow/.tmp/r17b/home dsh plugin --profile acc-web add /home/fish/projects_mine/dsh-grok-workflow/.tmp/r17b/tree/dsh-grok-workflow-0.11.15.tgz
+exit       : 0
+--- stdout ---
+Progress: resolved 0, reused 1, downloaded 0, added 0
+Packages are hard linked from the content-addressable store to the virtual store.
+  Content-addressable store is at: /home/fish/projects_mine/dsh-grok-workflow/.pnpm-store/v11
+  Virtual store is at:             node_modules/.pnpm
+Packages: +4
+++++
+Progress: resolved 4, reused 4, downloaded 0, added 4, done
+[WARN] Issues with peer dependencies found. Run "pnpm peers check" to list them.
+
+dependencies:
++ dsh-grok-workflow file:/home/fish/projects_mine/dsh-grok-workflow/.tmp/r17b/tree/dsh-grok-workflow-0.11.15.tgz
+
+Done in 572ms using pnpm v12.4.2
+--- stderr ---
+--- profile package.json (dsh + dependencies) ---
+{
+ "dsh": {
+  "profile": {
+   "bundles": [
+    "@deepseek-ai/dsh-base",
+    "@deepseek-ai/dsh-web-app",
+    "dsh-grok-workflow"
+   ]
+  }
+ },
+ "dependencies": {
+  "dsh-grok-workflow": "file:/home/fish/projects_mine/dsh-grok-workflow/.tmp/r17b/tree/dsh-grok-workflow-0.11.15.tgz"
+ }
+}
+--- installed package ---
+dsh-grok-workflow@0.11.15 dsh={"pluginType":"feature","bundle":{"patch":"./cordis.patch.yml"},"client":{"platform":"web","inject":["@deepseek-ai/dsh-client-ui-settings","@deepseek-ai/dsh-api-remotes"]}}
+
+--- dump-config: bundle rows that matter ---
+320:- id: workflow-ptc
+321-  name: '@deepseek-ai/dsh-workflow-ptc'
+322-  config:
+323-    provider: spawn
+324-  disabled: false
+--
+1290:# == dsh-grok-workflow
+1291-- id: grok-workflow
+1292-  name: dsh-grok-workflow
+
+--- boot log (launch token redacted) ---
+dsh web: http://127.0.0.1:3441/?token=[REDACTED]
+boot lines: 1
+lines matching 'pending' or 'did not activate': 0

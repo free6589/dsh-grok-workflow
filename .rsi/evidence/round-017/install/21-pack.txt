@@ -1,0 +1,56 @@
+# Attempt 2 — npm pack from a copy of this tree
+
+tree     : 4db78f41f00416abe55baa1ec9403c4fa1a63379 (branch main), package 0.11.15
+scratch  : .tmp/r17b/tree — an rsync copy of the checkout with node_modules symlinked
+           (.tmp/ is gitignored; nothing was built in the shared checkout)
+command  : (cd .tmp/r17b/tree && npm pack --loglevel=error)
+exit     : 0
+stdout   : dsh-grok-workflow-0.11.15.tgz
+stderr   : 
+artifact : dsh-grok-workflow-0.11.15.tgz
+size     : 543603 bytes
+sha256   : 8d7ff2af0f308d90c26c612aeb33c6a774681b9649304c67cc79ce006cd9c993
+entries  : 88
+.map     : 0
+
+--- packaged package.json (dsh + engines + peers) ---
+{
+ "name": "dsh-grok-workflow",
+ "version": "0.11.15",
+ "dsh": {
+  "pluginType": "feature",
+  "bundle": {
+   "patch": "./cordis.patch.yml"
+  },
+  "client": {
+   "platform": "web",
+   "inject": [
+    "@deepseek-ai/dsh-client-ui-settings",
+    "@deepseek-ai/dsh-api-remotes"
+   ]
+  }
+ },
+ "engines": {
+  "dsh": ">=0.2.1-rc.2 <0.3.0",
+  "node": ">=22"
+ },
+ "peerDependencies": {
+  "@deepseek-ai/cordis": "~4.0.5",
+  "@deepseek-ai/dsh-agent": "0.2.1-rc.2",
+  "@deepseek-ai/dsh-llm": "0.2.1-rc.2",
+  "@deepseek-ai/dsh-system-prompt": "0.2.1-rc.2",
+  "@deepseek-ai/dsh-tools": "0.2.1-rc.2",
+  "@deepseek-ai/dsh-workflow": "0.2.1-rc.2"
+ },
+ "files": [
+  "lib/**/*.js",
+  "lib/**/*.d.ts",
+  "cordis.patch.yml",
+  "README.md",
+  "README.zh-CN.md",
+  "CHANGELOG.md",
+  "LICENSE",
+  "docs/images",
+  "docs/*.md"
+ ]
+}

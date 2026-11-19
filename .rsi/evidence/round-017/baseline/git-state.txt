@@ -1,0 +1,120 @@
+# git state — round 17 baseline audit — 2026-11-19T08:40:56+08:00
+# cwd: /home/fish/projects_mine/dsh-grok-workflow
+
+== HEAD ==
+4db78f41f00416abe55baa1ec9403c4fa1a63379
+
+== origin/main (local remote-tracking ref) ==
+4db78f41f00416abe55baa1ec9403c4fa1a63379
+
+== git ls-remote origin refs/heads/main (network read) ==
+4db78f41f00416abe55baa1ec9403c4fa1a63379	refs/heads/main
+
+== branch tracking ==
+## main...origin/main
+
+== HEAD == origin/main ? ==
+IDENTICAL
+
+== tags v0.11.14 / v0.11.15: object, type, peel, subject ==
+v0.11.13
+  object : bac26e3f31a4400609b8095cf8033235f2b60946
+  type   : tag
+  peel   : 7a79efb75bbad37930cab4c3c76a8bcb3822d1db
+  subject: docs(release): land round-13 gate work + release v0.11.13 (RSI round 13)
+  date   : 2026-11-18 21:39:14 +0800
+v0.11.14
+  object : 2a7b0748576f3b4b6b8ccfc655f8e53b4ad72b80
+  type   : tag
+  peel   : 20eafea150d34d18dc99bae7523db62c1d8fcb38
+  subject: feat(loop): Host-scheduled repeat-run surface + bilingual docs (RSI round 14)
+  date   : 2026-11-19 00:17:58 +0800
+v0.11.15
+  object : e52a8f4c415a7619891be4fbad04c247439baba9
+  type   : tag
+  peel   : 50c0321e371db076908d5fb6cec94bb8be25f37b
+  subject: chore(release): v0.11.15 — rebuild the published artifacts from their own source (RSI round 15)
+  date   : 2026-11-19 01:27:17 +0800
+
+== is v0.11.15 an ancestor of HEAD? ==
+YES (HEAD is ahead)
+commits v0.11.15..HEAD: 6
+4db78f4 chore(rsi): record the round-16 record commit and its green CI run
+9567036 chore(rsi): record the round-16 landing (commit, push, CI run, verify:lib)
+e11d100 feat(loop): the composer-dock repeat-run switch and the brakes that stop a heartbeat (RSI round 16)
+37cb0fc chore(rsi): record the worktree drift behind v0.11.15 and the sync applied
+b4299bc chore(rsi): record the v0.11.15 release results (tag, run ids, asset)
+fd56fd9 chore(rsi): record the working-tree gate (61 files / 1131 tests, verify:lib green)
+
+== working tree: tracked modifications (status --untracked-files=no) ==
+TRACKED-PORCELAIN-LINES=0
+
+== working tree: full status (--untracked-files=all) ==
+ALL-PORCELAIN-LINES=20
+?? .rsi/evidence/round-017/baseline/git-state.txt
+?? .rsi/evidence/round-017/ci/assertions.txt
+?? .rsi/evidence/round-017/ci/build-second.txt
+?? .rsi/evidence/round-017/ci/ci.txt
+?? .rsi/evidence/round-017/ci/git-state-post.txt
+?? .rsi/evidence/round-017/ci/git-state-pre.txt
+?? .rsi/evidence/round-017/ci/lib-after-build2.txt
+?? .rsi/evidence/round-017/ci/lib-after-ci.txt
+?? .rsi/evidence/round-017/ci/lib-before.txt
+?? .rsi/evidence/round-017/ci/lib-idempotence-diff-build2.txt
+?? .rsi/evidence/round-017/ci/lib-idempotence-diff.txt
+?? .rsi/evidence/round-017/ci/verify-lib.txt
+?? .rsi/evidence/round-017/heartbeat-live/instance/dsh-home/profiles/live-verify/cordis.patch.yml
+?? .rsi/evidence/round-017/heartbeat-live/instance/dsh-home/profiles/live-verify/cordis.yml
+?? .rsi/evidence/round-017/heartbeat-live/instance/dsh-home/profiles/live-verify/package.json
+?? .rsi/evidence/round-017/heartbeat-live/instance/dsh-home/profiles/live-verify/pnpm-lock.yaml
+?? .rsi/evidence/round-017/heartbeat-live/instance/dsh-home/profiles/live-verify/pnpm-workspace.yaml
+?? .rsi/evidence/segment-5/final-check-agent57.md
+?? .rsi/evidence/segment-5/final-check-agent57.txt
+?? settings-simple-mock.html
+
+== git diff / diff --cached (tracked content) ==
+--- git diff --stat ---
+(end)
+--- git diff --cached --stat ---
+(end)
+
+== stash ==
+stash@{0}: On release/0.6.0: temp-gate-fix
+(end)
+
+== HEAD commit detail ==
+4db78f41f00416abe55baa1ec9403c4fa1a63379
+fish <free6589@users.noreply.github.com>
+2026-11-19 08:04:02 +0800
+chore(rsi): record the round-16 record commit and its green CI run
+
+== attempt 2 re-check ==
+AT=2026-11-19T08:51:34+08:00
+--- HEAD / origin/main / ls-remote ---
+4db78f41f00416abe55baa1ec9403c4fa1a63379
+4db78f41f00416abe55baa1ec9403c4fa1a63379
+4db78f41f00416abe55baa1ec9403c4fa1a63379	refs/heads/main
+--- tracked porcelain lines ---
+0
+--- git diff --stat HEAD ---
+(end)
+--- untracked (all) ---
+ALL-PORCELAIN-LINES=92
+  ?? .rsi/evidence/segment-5/final-check-agent57.md
+  ?? .rsi/evidence/segment-5/final-check-agent57.txt
+  ?? settings-simple-mock.html
+  (+ round-017 evidence entries: 89 — 其中 baseline/ 的 6 个是本片交付物，其余由 ci 与 heartbeat-live 两片写入；
+     这两个片在 08:46–08:52 仍在跑，所以未跟踪条目数会继续变化，本行只是 08:51:34 的快照)
+--- baseline dir entries ---
+BASELINE-ENTRIES=6
+--- lib blobs vs HEAD ---
+33f3cb3bdca160b30cf0e511c105b30cfbf12c22
+3adb6ccea4036b2ad624dc1343455930467688b8
+33f3cb3bdca160b30cf0e511c105b30cfbf12c22
+3adb6ccea4036b2ad624dc1343455930467688b8
+--- tag v0.11.15 ---
+v0.11.15 tag e52a8f4c415a7619891be4fbad04c247439baba9 50c0321e371db076908d5fb6cec94bb8be25f37b
+--- fingerprint stability ---
+src/loop-surface.ts: OK
+src/gate.ts: OK
+src/config.ts: OK

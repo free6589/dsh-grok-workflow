@@ -18,6 +18,7 @@ import {
   createLoopService,
   defaultLoopPrompt,
   intervalMinutesOf,
+  isLoopHeartbeat,
   isLoopTask,
   loopPolicyFromConfig,
   loopRrule,
@@ -191,6 +192,23 @@ describe('repeat-run policy: the counts a loop may not exceed', () => {
     // Stated limitation, pinned so it cannot be quietly reworded into a claim: the
     // host cannot enforce the streak, so the prompt asks for it instead.
     expect(defaultLoopPrompt(DEFAULT_LOOP_FAIL_STREAK)).toContain('If the last 3 rounds failed in a row')
+  })
+
+  it('recognises a heartbeat inside DSH delivery framing, not only at the start', () => {
+    // Round 17 live evidence: DSH 0.2.2 wraps the stored prompt as
+    // `[SCHEDULE REMINDER] … reminder_prompt_json: "<stored prompt>"`, so the
+    // marker is embedded, never leading. A real delivery must still be recognised.
+    const framed =
+      '[SCHEDULE REMINDER]\nThis is a scheduled message from the user\n' +
+      'schedule_id_json: "schedule-aaa"\noccurrence_at: 2026-11-19T01:07:01.365Z\n' +
+      `reminder_prompt_json: "${LOOP_PROMPT_PREFIX} Loop heartbeat: the round ended."`
+    expect(isLoopHeartbeat(framed)).toBe(true)
+    // The direct shape (stored prompt verbatim) keeps working.
+    expect(isLoopHeartbeat(`${LOOP_PROMPT_PREFIX} Loop heartbeat`)).toBe(true)
+    // A user pasting the marker into ordinary text is not a heartbeat by text
+    // alone: the gate additionally requires source.kind === 'schedule'.
+    expect(isLoopHeartbeat(`please ${LOOP_PROMPT_PREFIX} do not match`)).toBe(false)
+    expect(isLoopHeartbeat('ordinary text')).toBe(false)
   })
 })
 

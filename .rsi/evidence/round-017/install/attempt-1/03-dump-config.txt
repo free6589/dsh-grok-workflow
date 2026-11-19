@@ -1,0 +1,63 @@
+# Composed configuration of the isolated profile (--dump-config)
+
+$ DSH_HOME=... dsh --profile r17-web --dump-config > dump-config-after.txt
+lines: 1292
+
+-- workflow provider (enabled by the profile patch; the plugin needs workflowEngine) --
+320:- id: workflow-ptc
+321-  name: '@deepseek-ai/dsh-workflow-ptc'
+322-  config:
+323-    provider: spawn
+324-  disabled: false
+325-# == @deepseek-ai/dsh-base, patched by @deepseek-ai/dsh-web-app
+
+-- schedule row (what makes grok_loop mount) --
+475:- id: schedule
+476-  name: '@deepseek-ai/dsh-schedule'
+477-- id: ui-settings-account
+
+-- the plugin row inserted by the bundle patch --
+1291:- id: grok-workflow
+1292-  name: dsh-grok-workflow
+
+-- before the patch: workflow-ptc was disabled --
+320:- id: workflow-ptc
+321-  name: '@deepseek-ai/dsh-workflow-ptc'
+322-  config:
+323-    provider: spawn
+324-  disabled: true
+325-- id: tool-workflow
+
+-- the profile patch used for the thirteen-key boot, 10-keys-surface.txt (isolated profile only) --
+# Isolated acceptance profile (round 17): a workflow provider must be active, and every
+# one of the thirteen accepted configuration keys is written here to prove the surface.
+- id: workflow-ptc
+  disabled: false
+  config:
+    provider: spawn
+- id: grok-workflow
+  config:
+    toolName: grok_workflow
+    mode: triage
+    grokDefault: off
+    roles:
+      planner: []
+      worker: []
+      verifier: []
+      synthesizer: []
+      supervisor: []
+    synthesis: layered
+    maxConcurrency: 4
+    maxTasks: 5
+    timeoutMs: 1200000
+    loopEnabled: true
+    loopMaxRounds: 3
+    loopFailStreak: 2
+    loopIntervalMin: 90
+    configVersion: 1
+
+Note: the 1292-line dump was taken while the profile patch held only the workflow-ptc entry,
+which is why the before/after excerpt shows a single change (disabled true -> false). The patch
+printed above is the later version that also writes all thirteen configuration keys; it was used
+for the 13-key boot in 10-keys-surface.txt, and one removed key was appended to it for the reject
+probe. The scratch profile was deleted at the end of the round.

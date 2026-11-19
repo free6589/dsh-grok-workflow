@@ -1,0 +1,10 @@
+{
+  "seq": 7,
+  "op": "open-with-actor",
+  "ok": true,
+  "result": {
+    "outcome": "refused",
+    "code": "loop/user-only",
+    "message": "a loop heartbeat can be opened only by the user from the composer switch; an agent cannot open one on the user's behalf"
+  }
+}

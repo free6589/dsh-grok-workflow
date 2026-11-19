@@ -1,0 +1,37 @@
+# Client bundle byte identity (src/client/index.js == lib/client.js)
+
+The host serves lib/client.js verbatim to the browser (src/client is a __ModuleLoader__
+script, not compiler output), so the two files must be byte-identical: build-client.mjs
+is a copyFileSync and test/client.spec.ts asserts equality.
+
+$ sha256sum src/client/index.js lib/client.js
+d290765594d62a3bcdb6a740a53a6d37c73b5f57d3d341051cc54bdcd5957d2a  src/client/index.js
+d290765594d62a3bcdb6a740a53a6d37c73b5f57d3d341051cc54bdcd5957d2a  lib/client.js
+
+$ cmp src/client/index.js lib/client.js && echo identical
+identical
+
+-- inside the packed tarball --
+sha256 of package/lib/client.js:
+  d290765594d62a3bcdb6a740a53a6d37c73b5f57d3d341051cc54bdcd5957d2a
+sha256 of the source of truth src/client/index.js:
+  d290765594d62a3bcdb6a740a53a6d37c73b5f57d3d341051cc54bdcd5957d2a
+
+-- the installed bytes in the isolated profile --
+  d290765594d62a3bcdb6a740a53a6d37c73b5f57d3d341051cc54bdcd5957d2a
+$ cmp <tarball>/package/lib/client.js <installed>/lib/client.js
+identical
+
+-- every published lib/ file against the scratch rebuild of src/ --
+$ for f in $(cd package/lib && find . -type f); do cmp ...; done
+published lib files compared: 73, differing: 0
+
+The build tree also has lib/**/*.map files that the tarball does not carry, because
+package.json files[] publishes only 'lib/**/*.js' and 'lib/**/*.d.ts'. That is finding F2:
+the published .js files still end with '//# sourceMappingURL=<name>.js.map' (36 of the 37
+files; lib/client.js is the copied browser bundle and has no comment).
+$ grep -c sourceMappingURL package/lib/index.js
+1
+$ tail -1 package/lib/index.js
+ader.lastGood(),    });}//# sourceMappingURL=index.js.map
+map files in the tarball: 0

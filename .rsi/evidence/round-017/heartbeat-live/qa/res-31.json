@@ -1,0 +1,9 @@
+{
+  "seq": 31,
+  "op": "heartbeat-probe",
+  "ok": true,
+  "result": {
+    "text": "[SCHEDULE REMINDER]\nThis is a scheduled message from the user\nschedule_id_json: \"schedule-0d049159-fe18-4583-984e-3b0d51",
+    "isLoopHeartbeat": false
+  }
+}

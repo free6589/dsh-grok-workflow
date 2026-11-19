@@ -1,0 +1,8 @@
+{
+  "seq": 19,
+  "op": "stopall",
+  "ok": true,
+  "result": {
+    "deleted": 1
+  }
+}

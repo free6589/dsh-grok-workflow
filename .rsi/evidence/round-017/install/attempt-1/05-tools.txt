@@ -1,0 +1,138 @@
+# Activation and tool surface on the live isolated instance (web template)
+
+$ DSH_HOME=<isolated> dsh --profile r17-web --host 127.0.0.1 --port 3299 --no-open
+dsh web: http://127.0.0.1:3299/?token=[REDACTED]
+
+boot line count: 1
+lines matching 'pending' or 'did not activate': 0
+
+Tool list of a real session on that instance, read from the session log's request/header
+(the header is appended before the model call, so it exists even when the profile has no
+credential and the turn fails afterwards):
+  session log: /home/fish/projects_mine/dsh-grok-workflow/.tmp/rsi-r17/home/sessions/--home-fish-projects_mine-dsh-grok-workflow--/session-d947b8b7-ddd9-4324-9e1c-ed6ce4ea20c9/session.v4.jsonl.zstd
+
+tools in the header   : 33
+tool names            : ask_user_question, bash, create_goal, edit, get_goal, glob, grep, grok_loop, grok_workflow, job_kill, job_list, job_output, list_agents, list_subagent_models, plugin_manager, present, read, read_image, schedule_create, schedule_edit, schedule_list, schedule_view, send_message, skill, subagent, subagent_fork, todo_write, update_goal, wait_agent, web_fetch, workflow, working_directory, write
+
+--- grok_workflow parameters ---
+{
+ "type": "object",
+ "properties": {
+  "objective": {
+   "type": "string",
+   "description": "The complete objective to plan, execute, verify, and report. At most 32000 characters. Be specific about scope and desired deliverable."
+  },
+  "tasks": {
+   "type": "array",
+   "description": "Optional independent plan. When omitted, a planner child decomposes the objective. Caller tasks must not depend on each other.",
+   "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+     "id": {
+      "type": "string",
+      "description": "Stable id; generated as task-N when omitted. Unique within the plan."
+     },
+     "title": {
+      "type": "string",
+      "description": "Short task title."
+     },
+     "objective": {
+      "type": "string",
+      "description": "Outcome this task must achieve."
+     },
+     "expectedOutput": {
+      "type": "string",
+      "description": "Concrete expected output."
+     },
+     "acceptanceCriteria": {
+      "type": "array",
+      "description": "Non-empty testable acceptance checks; the verifier must cite evidence for each one.",
+      "items": {
+       "type": "string"
+      }
+     },
+     "context": {
+      "type": "string",
+      "description": "Optional context the worker needs."
+     },
+     "constraints": {
+      "type": "array",
+      "description": "Optional constraints and non-goals.",
+      "items": {
+       "type": "string"
+      }
+     },
+     "writesPaths": {
+      "type": "array",
+      "description": "File or directory paths this task writes. Overlapping tasks are serialized (they share one working directory); omit when unknown.",
+      "items": {
+       "type": "string"
+      }
+     }
+    },
+    "required": [
+     "title",
+     "objective",
+     "expectedOutput",
+     "acceptanceCriteria"
+    ]
+   }
+  }
+ },
+ "required": [
+  "objective"
+ ]
+}
+
+--- grok_loop parameters ---
+{
+ "type": "object",
+ "properties": {
+  "action": {
+   "type": "string",
+   "description": "status reads the loop, close deletes it, open is refused (user-only).",
+   "enum": [
+    "status",
+    "close",
+    "open"
+   ]
+  },
+  "sessionId": {
+   "type": "string",
+   "description": "Session whose loop is read. Defaults to the calling session; an agent may only address its own."
+  },
+  "intervalMinutes": {
+   "type": "number",
+   "description": "Only meaningful for `open`, which this tool refuses."
+  },
+  "prompt": {
+   "type": "string",
+   "description": "Only meaningful for `open`, which this tool refuses."
+  }
+ },
+ "required": [
+  "action"
+ ]
+}
+
+-- top-level event kinds in the session log --
+   7 user/message
+   5 agent/inbox/spliced
+   1 session
+   1 permission/preset
+   1 sandbox/mode
+   1 approval/policy
+   1 turn/start
+   1 step/start
+   1 system/message
+   1 request/header
+   1 request/context
+   1 session/title
+   1 session/title-llm-request
+   1 assistant/attempt
+   1 step/end
+   1 turn/end
+
+-- where the turn stopped (isolated home has no model credential) --
+llm-deepseek: no API key for provider route \

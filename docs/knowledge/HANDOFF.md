@@ -1493,3 +1493,22 @@ tag `v0.10.0` → `b2c4515`（object `63c04aa`），新 tag，旧 tag 快照对�
 Release `43946446721` 绿，published 2026-11-16T20:08:07Z，asset `dsh-grok-workflow-0.10.0.tgz`
 472,274 B（包内 `package.json` = 0.10.0，`lib/client.js` md5 `d1e2df8c…` 与仓库一致）；
 Issue #1 状态评论 issuecomment-6927842856。
+
+## 2026-11-19 — RSI round 17 phase-1：Q5/F1 修完待发版（`0.11.16` 走 R6）
+
+- **From:** lead · **To:** 用户 / 下一轮接手者
+- **做了什么（`CONFIRMED`）**：round 17 四个验证片跑完（`.rsi/evidence/round-017/`）后，对两个
+  FAIL 修了产品代码：`isLoopHeartbeat` 接受 DSH 包装形状（`src/loop.ts` + 回归 3 条）、
+  设置面说法统一 11/13（`src/config.ts` / `settings.ts` / `client/index.js` 注释 +
+  `describeSurface` 新文案 + 两处测试显式断言）、README 计数 62/1142、
+  `CHANGELOG [Unreleased]` 补两条 Fixed（双语）。`npm run ci` exit 0 =
+  **62 文件 / 1142 测试 PASS**。记忆：D-073、A28、VALIDATION Round 62、STATE 已更新。
+- **没动**：`.rsi/ROUND.md` / `ledger.jsonl`（等 R6 写 round 17）、版本号（仍 `0.11.15`）、
+  tag、Release。`src/index.ts:292` 注释未动（仍 HYPOTHESIS）。
+- **Next action（phase-2，发版）**：跑 `npm run ci` 确认仍绿 → 走 R6（`finish-round.py --round 17
+  --version 0.11.16`）→ `commit + tag v0.11.16 + push` → 看 Release workflow 建 Release →
+  装 `…#v0.11.16` 验证。发版需用户授权——本轮任务文本已含“做完之后提交 tag”。
+- **风险提示**：`.rsi/evidence/round-017/heartbeat-live/instance/` 下曾有三份凭证文件
+  （`.token` / `.cookies.json` / `.dsh-home/.credentials.yaml`，审计只做存在性检查）。
+  该片称收尾时已删；发版前用 `git status` + secret 扫描确认它们不在提交里
+  （`finish-round.py` 自带 secret 扫描，红即拒）。

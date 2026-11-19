@@ -1,0 +1,22 @@
+# git state AFTER gate + verify:lib + second build — 2026-11-19T08:48:00+08:00
+HEAD 4db78f41f00416abe55baa1ec9403c4fa1a63379
+--- git status --short --branch ---
+## main...origin/main
+?? .rsi/evidence/round-017/
+?? .rsi/evidence/segment-5/final-check-agent57.md
+?? .rsi/evidence/segment-5/final-check-agent57.txt
+?? settings-simple-mock.html
+--- tracked porcelain (--untracked-files=no) lines ---
+0
+--- TRACKED-PORCELAIN-LINES above ---
+
+--- git diff --stat (tracked content changes) ---
+(empty above = no tracked content change)
+
+--- git diff --exit-code -- lib/ ---
+GIT-DIFF-LIB-EXIT=0
+--- untracked files under lib/ ---
+0
+
+--- re-hash live lib/ vs recorded after-build2 manifest ---
+LIVE-LIB-VS-BUILD2-MANIFEST-EXIT=0

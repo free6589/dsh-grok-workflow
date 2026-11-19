@@ -1,0 +1,8 @@
+# npm run build (second, idempotence probe) — 2026-11-19T08:47:24+08:00
+### command: npm run build
+
+> dsh-grok-workflow@0.11.15 build
+> tsc -p tsconfig.build.json && node scripts/build-client.mjs
+
+client bundle: 224412 bytes → lib/client.js
+BUILD2-EXIT=0

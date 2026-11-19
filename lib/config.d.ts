@@ -182,9 +182,9 @@ export declare const DEFAULT_MAX_ACTIVE_RUNS_TOTAL = 8;
 export declare const CONFIG_VERSION = 1;
 /**
  * Every top-level key the configuration accepts, in schema order.
- * The settings page exposes 13 keys (toolName, configVersion, mode,
- * grokDefault, roles, synthesis, maxConcurrency, maxTasks, timeoutMs and the four
- * loop keys); the rest of the former surface is fixed internally.
+ * Thirteen keys in the accepted surface; eleven of them reach the settings
+ * page (`toolName` and `configVersion` are plain, not volatile, so the runtime
+ * projection drops them — pinned in `test/settings-projection.spec.ts`).
  * Kept explicit so an unknown key can be rejected instead of silently dropped:
  * a typo that is silently ignored looks exactly like a setting that "does not
  * work", which is the failure mode the settings surface must not have.

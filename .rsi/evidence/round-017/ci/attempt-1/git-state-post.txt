@@ -1,0 +1,9 @@
+# git state AFTER npm run ci 2026-11-19T08:39:52+08:00
+## tracked-file check (--untracked-files=no)
+TRACKED-PORCELAIN-LINES=0
+## full status
+## main...origin/main
+?? .rsi/evidence/round-017/
+?? .rsi/evidence/segment-5/final-check-agent57.md
+?? .rsi/evidence/segment-5/final-check-agent57.txt
+?? settings-simple-mock.html

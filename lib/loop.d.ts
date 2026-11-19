@@ -45,8 +45,15 @@ export declare const LOOP_PROMPT_PREFIX = "[grok-workflow loop]";
  * carries the prompt text and `source.kind`, not the Schedule row that produced it.
  * A replacement prompt that drops the marker therefore also drops continuation
  * routing — the marker is the ownership marker, not a decoration.
+ *
+ * DSH wraps a delivered prompt in its own framing (`[SCHEDULE REMINDER] …`
+ * `reminder_prompt_json: "<the stored prompt>"`, measured live in round 17), so
+ * the marker survives inside that quoted field rather than at the start of the
+ * delivered text. Both shapes are accepted; the caller still pairs this with
+ * `source.kind === 'schedule'` before treating a message as a heartbeat.
  * @param text - message text as the step sees it.
- * @returns true when the text leads with {@link LOOP_PROMPT_PREFIX}.
+ * @returns true when the text leads with {@link LOOP_PROMPT_PREFIX}, or embeds
+ * it as a quoted `reminder_prompt_json` value.
  */
 export declare function isLoopHeartbeat(text: string): boolean;
 /** Default minutes between heartbeats. Also the hard floor: see {@link loopPolicyFromConfig}. */

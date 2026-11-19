@@ -1,0 +1,121 @@
+# 2026-11-19T09:08:01+08:00 stop marker vs a real delivery
+boot: dsh web: http://127.0.0.1:3271/?token=[REDACTED]
+{"status":303,"cookies":1}
+{
+  "seq": 1795050488379,
+  "op": "session",
+  "ok": true,
+  "result": {
+    "sessionId": "session-76aa8adf-bd1b-4a1f-af33-dc98853ec54b",
+    "agentPreset": "standard"
+  }
+}
+session=session-76aa8adf-bd1b-4a1f-af33-dc98853ec54b
+POST /grok-workflow/loop {"action":"open","sessionId":"session-76aa8adf-bd1b-4a1f-af33-dc98853ec54b"}
+-> HTTP 200 in 104 ms
+{"ok":true,"action":"open","loop":{"open":true,"sessionId":"session-76aa8adf-bd1b-4a1f-af33-dc98853ec54b","taskId":"schedule-6c7eb04d-4df3-488f-bfd5-68d527a0f17f","taskStatus":"active","intervalMinutes":60,"rounds":10,"nextAt":"2026-11-19T02:08:09.000Z","createdAt":"2026-11-19T01:08:08.986Z"}}
+{
+  "seq": 1795050489058,
+  "op": "catalog",
+  "ok": true,
+  "result": [
+    {
+      "id": "schedule-6c7eb04d-4df3-488f-bfd5-68d527a0f17f",
+      "kind": "rrule",
+      "title": "Loop heartbeat",
+      "prompt": "[grok-workflow loop] Loop heartbeat: the previous round has ended. Continue this session's unfinished work from where it stopped; do not redo completed steps. If the work is finished, report the final result and stop instead of starting anything new. If the last 3 rounds failed in a row, stop and report why rather than trying again.",
+      "rrule": "DTSTART:20261119T020809Z\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=10",
+      "scheduledAt": "2026-11-19T02:08:09.000Z",
+      "target": {
+        "kind": "session",
+        "sessionId": "session-76aa8adf-bd1b-4a1f-af33-dc98853ec54b"
+      },
+      "involvedSessionIds": [
+        "session-76aa8adf-bd1b-4a1f-af33-dc98853ec54b"
+      ],
+      "status": "active",
+      "createdAt": "2026-11-19T01:08:08.986Z",
+      "updatedAt": "2026-11-19T01:08:08.986Z"
+    }
+  ]
+}
+task=schedule-6c7eb04d-4df3-488f-bfd5-68d527a0f17f
+## create the operator stop marker the brakes read (session cwd/.rsi/STOP)
+-rw-r--r-- 1 fish fish 5 Nov 19 09:08 /home/fish/projects_mine/dsh-grok-workflow/.rsi/evidence/round-017/heartbeat-live/workspace/.rsi/STOP
+## deliver while the marker exists
+{
+  "seq": 1795050489609,
+  "op": "run",
+  "ok": true,
+  "result": {
+    "id": "schedule-6c7eb04d-4df3-488f-bfd5-68d527a0f17f",
+    "kind": "rrule",
+    "title": "Loop heartbeat",
+    "prompt": "[grok-workflow loop] Loop heartbeat: the previous round has ended. Continue this session's unfinished work from where it stopped; do not redo completed steps. If the work is finished, report the final result and stop instead of starting anything new. If the last 3 rounds failed in a row, stop and report why rather than trying again.",
+    "rrule": "DTSTART:20261119T020809Z\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=10",
+    "scheduledAt": "2026-11-19T02:08:09.000Z",
+    "target": {
+      "kind": "session",
+      "sessionId": "session-76aa8adf-bd1b-4a1f-af33-dc98853ec54b"
+    },
+    "involvedSessionIds": [
+      "session-76aa8adf-bd1b-4a1f-af33-dc98853ec54b"
+    ],
+    "status": "active",
+    "createdAt": "2026-11-19T01:08:08.986Z",
+    "updatedAt": "2026-11-19T01:08:09.722Z",
+    "executionActive": true,
+    "deliveryFloorEndsAt": "2026-11-19T01:09:09.682Z",
+    "lastDelivery": {
+      "scheduledAt": "2026-11-19T01:08:09.682Z",
+      "deliveredAt": "2026-11-19T01:08:09.722Z",
+      "messageId": "975ba410-301c-4963-85ed-9720ef874ec3",
+      "targetSessionId": "session-76aa8adf-bd1b-4a1f-af33-dc98853ec54b"
+    }
+  }
+}
+## row state after the delivery (a tripped brake would have deleted it)
+{
+  "seq": 1795050504147,
+  "op": "catalog",
+  "ok": true,
+  "result": [
+    {
+      "id": "schedule-6c7eb04d-4df3-488f-bfd5-68d527a0f17f",
+      "kind": "rrule",
+      "title": "Loop heartbeat",
+      "prompt": "[grok-workflow loop] Loop heartbeat: the previous round has ended. Continue this session's unfinished work from where it stopped; do not redo completed steps. If the work is finished, report the final result and stop instead of starting anything new. If the last 3 rounds failed in a row, stop and report why rather than trying again.",
+      "rrule": "DTSTART:20261119T020809Z\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=10",
+      "scheduledAt": "2026-11-19T02:08:09.000Z",
+      "target": {
+        "kind": "session",
+        "sessionId": "session-76aa8adf-bd1b-4a1f-af33-dc98853ec54b"
+      },
+      "involvedSessionIds": [
+        "session-76aa8adf-bd1b-4a1f-af33-dc98853ec54b"
+      ],
+      "status": "active",
+      "createdAt": "2026-11-19T01:08:08.986Z",
+      "updatedAt": "2026-11-19T01:08:09.722Z",
+      "deliveryFloorEndsAt": "2026-11-19T01:09:09.682Z",
+      "lastDelivery": {
+        "scheduledAt": "2026-11-19T01:08:09.682Z",
+        "deliveredAt": "2026-11-19T01:08:09.722Z",
+        "messageId": "975ba410-301c-4963-85ed-9720ef874ec3",
+        "targetSessionId": "session-76aa8adf-bd1b-4a1f-af33-dc98853ec54b"
+      }
+    }
+  ]
+}
+stored rows: ["schedule-6c7eb04d-4df3-488f-bfd5-68d527a0f17f"]
+## cleanup: remove the marker and close the loop
+POST /grok-workflow/loop {"action":"close","sessionId":"session-76aa8adf-bd1b-4a1f-af33-dc98853ec54b"}
+-> HTTP 200 in 155 ms
+{"ok":true,"action":"close","loop":{"open":false,"sessionId":"session-76aa8adf-bd1b-4a1f-af33-dc98853ec54b"}}
+{
+  "seq": 1795050504908,
+  "op": "catalog",
+  "ok": true,
+  "result": []
+}
+# done

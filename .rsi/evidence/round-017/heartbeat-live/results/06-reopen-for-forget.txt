@@ -1,0 +1,19 @@
+# 2026-11-19T08:50:44+08:00 reopen for the archive-cleanup probe
+POST /grok-workflow/loop {"action":"open","sessionId":"session-ca7cef6d-9f9e-41fa-bd7e-2d8f895c208d"}
+-> HTTP 200 in 178 ms
+{"ok":true,"action":"open","loop":{"open":true,"sessionId":"session-ca7cef6d-9f9e-41fa-bd7e-2d8f895c208d","taskId":"schedule-2bc37113-35ab-4592-b425-37cb73681978","taskStatus":"active","intervalMinutes":60,"rounds":10,"nextAt":"2026-11-19T01:50:45.000Z","createdAt":"2026-11-19T00:50:44.639Z"}}
+rows: [('schedule-2bc37113-35ab-4592-b425-37cb73681978', 'active')]
+{
+  "seq": 17,
+  "op": "forget",
+  "ok": true,
+  "result": {
+    "deleted": 1
+  }
+}
+{
+  "seq": 18,
+  "op": "catalog",
+  "ok": true,
+  "result": []
+}

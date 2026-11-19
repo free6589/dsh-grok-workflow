@@ -1,17 +1,9 @@
 # Project State
 
-Last updated: 2026-11-19 (**RSI 连续循环 round 16 完成 · 未发版** — 主题：续跑的开关 + 提前停。
-composer dock 里新增 `Auto-continue` 开关（槽位 `conversation.composer.dock`，id `grok-workflow-loop`，
-order 90，追加注册；挂载时 `status` 读一次、之后不轮询，点击发 `open`/`close`，点击被拒绝不翻面），
-以及 `src/loop-brakes.ts` 的六道刹车（操作者停止文件 `.rsi/STOP`、插件卸载、连败轮、当天上限 24 轮、
-每轮预留 200 000 token 封顶 2 000 000、当天第一轮以来的耗时），每项都从会话自己的记录读回；
-gate 在 `agent/pre-step` 上先分类，`loop-stop` 时先删行再 `reject`（零次模型调用）。
-本机门禁：`npm run typecheck` exit 0、`npx oxlint src test` 22 warnings / 0 errors、
-`npm run build` 后 `lib/` 145 个文件的 md5 清单与构建前逐条相同（幂等）、
-`npx vitest run` **62 文件 / 1139 测试 PASS**。**落地（`CONFIRMED`）**：commit `e11d100`、`push origin main` 快进 `37cb0fc..e11d100`、远端 CI run `44425357004` = success（Node 22 + 24 双绿）、提交后 `npm run verify:lib` = `145 files, byte-identical` at `e11d100`；未 bump 版本、未打标签、未建 Release、未 npm 发布。
-**未验证（`NOT_RUN`）**：真实 Web GUI 里点那个开关、真机心跳投递（D-066，操作者动作）。
-**剩余待办**：P3-01、P3-02 仍 OPEN（D-068 只改了顺序）；「客户端还没有会 POST 那条路由的控件」
-这一条已随本轮落地而作废（`D-072`）。)
+Last updated: 2026-11-19 (**RSI 连续循环 round 17 phase-1 完成 · 未发版** — 主题：Q5 心跳识别 bug 修 + F1 设置面说法统一。
+round 17 四个验证片（`.rsi/evidence/round-017/`：baseline GO、ci GO 62/1139、heartbeat-live 机制 GO、install 除 F1 外全 PASS）交出两个 FAIL：真机投递被 DSH 包成 `[SCHEDULE REMINDER] … reminder_prompt_json`，旧 `isLoopHeartbeat` 只认开头 → 心跳分支与刹车不可达（Q5 CONTRADICTED）；13/11/“21 volatile”三处说法打架（F1）。修复：识别接受两种形状（source 配对不变）、诊断报 `11 of 13 field(s) on the page`、注释同步、README 计数 60/1081→62/1142、`CHANGELOG [Unreleased]` 补两条 Fixed。门禁：`npm run ci` exit 0、**62 文件 / 1142 测试 PASS**。未发版：等 phase-2 走 R6 打 `0.11.16`。
+**未验证（`NOT_RUN`）**：rrule 定时到点、真模型整轮、GUI 点击、unload/归档监听 firing（操作体已 CONFIRMED）。
+**剩余待办**：P3-01、P3-02 仍 OPEN；`src/index.ts:292` 注释仍 HYPOTHESIS 未动。)
 
 Previous update: 2026-11-19 (**RSI 连续循环 round 15 完成 · `0.11.15`** — 主题：收口 `v0.11.14` 的发布事故。
 round 14 的标签提交 `20eafea` 的 `lib/` 落后于它的 `src/`（`lib/loop.js` 里没有 `callSchedule`），远端 CI 红、

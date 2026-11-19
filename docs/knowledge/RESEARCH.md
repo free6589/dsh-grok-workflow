@@ -967,3 +967,38 @@ LoopService 是 apply 期的一个普通对象而不是服务注册；Schedule �
 它的寿命等于插件的 fiber——工具与路由各自 `effect` 撤回，卸载 `await stopAll` 删光自己的行，会话停/归档
 删一行，删完还要 `catalog` 复核；「行还在但没人负责」这个状态因此被结构性地排除了，代价是**插件重载
 等于丢循环**，而这条恰好是 §5 唯一没在真机上验证过的一句。
+
+## A28 — DSH 0.2.2 真实投递的文本形状：心跳标记在 `reminder_prompt_json` 里，不在开头（2026-11-19，`CONFIRMED`；rrule 定时到点 `NOT_RUN`）
+
+Round 17 `heartbeat-live` 片在隔离实例（DSH `0.2.2-rc.3`，profile `live-verify`）上实测。
+投递由 Schedule 自己的 `run` 手动触发（loop 间隔下限 60 分钟，验证不等一小时），模型是本地 stub，
+其余全是真件：真 Loader、真 Schedule 服务、本仓库 `4db78f4` 构建的 `lib/`。
+
+**投递原文**（`results/schedule-delivery-message.json`，逐字）：
+
+```text
+[SCHEDULE REMINDER]
+This is a scheduled message from the user
+schedule_id_json: "schedule-d03411f5-…"
+occurrence_at: 2026-11-19T01:07:01.365Z
+reminder_prompt_json: "[grok-workflow loop] Loop heartbeat: the previous round has ended. …"
+```
+
+即 `renderReminderFraming`（`@deepseek-ai/dsh-schedule` `src/domain.ts:1159-1169`，
+`src/runtime.ts:157` 调用）把存下来的 prompt 包成 `reminder_prompt_json` 字段。
+`source.kind` 为 `"schedule"`（会话 transcript 第 25–32 行可复核：`turn/start turn=2` →
+`user/message` source schedule → `request/header reason=resume` → `assistant/message` →
+`turn/end completed`）。这个形状下旧 `isLoopHeartbeat`（仅前缀判）返回 false，
+门禁走 `non-user-source` 直通，心跳分支与刹车 verdict 不可达——Q5 判 CONTRADICTED 的依据。
+
+**修复后的判定**（`src/loop.ts`）：开头即 marker，或含
+`reminder_prompt_json: "[grok-workflow loop]`。`source.kind === 'schedule'` 配对仍在
+`src/gate.ts:533`，用户粘贴 marker 不会被认（二因子约束见 A24 §3）。
+
+**同轮确认的归属**：建行的是 Host（HTTP `open` 后行立即出现，会话当时尚无事件；
+stub 只回 text、无任何工具调用；minimal 无 Schedule 时 `open` 答 503
+`loop/unavailable`）。与 D-066「循环会话不得被假设能建定时任务」一致。
+
+**仍未观测**：rrule 自己到点的那次投递（手动 `run` 触发，非定时器到点）；真模型跑整轮；
+GUI 点击开关；unload 钩子 firing（`stopAll` 操作体 CONFIRMED，钩子 HYPOTHESIS）；
+归档监听 firing（`forgetSession` 操作体 CONFIRMED，监听 NOT_RUN）。

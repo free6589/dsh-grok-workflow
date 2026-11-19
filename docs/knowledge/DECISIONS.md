@@ -1577,3 +1577,32 @@ supersede（改成计量与真实结局），而不是就地把注释改一改�
 model selector」）、`test/loop-brakes.spec.ts`（35 条）、`test/loop-runtime-wiring.spec.ts`（5 条，
 真 Loader + 记录型 Schedule）、README「Repeat runs」的 *The dock switch* 段、`docs/LOCAL-TESTING.md`
 「Repeat runs (the composer switch)」节、CHANGELOG `[Unreleased]`。
+
+## D-073 — 真机投递把心跳标记包进 `reminder_prompt_json`，识别按嵌入判；设置面说法统一为 11/13（2026-11-19 · round 17）
+
+- **Status:** CONFIRMED（round 17 真机证据 + 回归测试；改动已落地，未发版）
+- **背景**：round 17 的 `heartbeat-live` 片在隔离实例里跑通了 open→投递→turn→close 全链，
+  但 Q5 判了 CONTRADICTED：真实投递的文本是 DSH 的包装
+  `[SCHEDULE REMINDER] … reminder_prompt_json: "[grok-workflow loop] …"`，
+  而 `isLoopHeartbeat` 只认文本开头，导致真心跳掉进 `non-user-source` 直通，六道刹车一次没跑。
+  同一轮的 `install` 片另发现 F1：13 个 accepted 键 vs 11 个投影键，
+  但 `src/config.ts:199` 注释写“settings page exposes 13 keys”、
+  `describeSurface` 报 “13 field(s)”、`src/client/index.js:4` 写 “21 volatile fields”——三处各说各的。
+- **选择一：识别按“开头或嵌入”判，不动双因子。** `isLoopHeartbeat` 接受两种形状：
+  文本开头即 marker，或包含 `reminder_prompt_json: "[grok-workflow loop]`。
+  `source.kind === 'schedule'` 的配对要求不变（`src/gate.ts:533`），所以用户在聊天里粘贴
+  marker 仍不会被当成心跳。备选「gate 里拆 `reminder_prompt_json` 再判」被排除：
+  识别是 `src/loop.ts` 的职责，gate 只配对；拆 JSON 会引入解析失败面，而子串判定的误判
+  已被 source 配对封住。
+- **选择二：设置面说法统一为“13 接受、11 投影”。** `describeSurface` 报
+  `11 of 13 field(s) on the page`；三处注释同步；`test/config.spec.ts` 与
+  `test/reliability.spec.ts` 的计数断言改成显式新文案（原来恰好包含 “13 field(s)”
+  子串，是巧合通过，不是诚实钉住）。备选「把 `toolName`/`configVersion` 改成 volatile」
+  被排除：那是行为变更（多两个可编辑控件），且 `test/settings-projection.spec.ts`
+  已把 11 键投影钉死，改那边等于改契约。
+- **代价**：`isLoopHeartbeat` 现在依赖 DSH 的包装字段名（`reminder_prompt_json`）；
+  若将来 DSH 改包装，本函数需同步（回归测试用真实投递形状钉住，改包装会先红测试）。
+- **证据索引**：`.rsi/evidence/round-017/heartbeat-live/results/00-verdicts.md` Q5、
+  `results/schedule-delivery-message.json`（真实投递原文）、`test/loop.spec.ts`
+  （framing 用例）、`test/gate.spec.ts`（`heartbeat classification` 2 条）、CHANGELOG
+  `[Unreleased]` Fixed 两条。

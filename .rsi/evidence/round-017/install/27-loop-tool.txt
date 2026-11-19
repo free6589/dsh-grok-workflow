@@ -1,0 +1,14 @@
+# Attempt 2 — the installed grok_loop tool (lib/loop-surface.js) with a recording LoopService
+
+GROK_LOOP_SURFACE=.tmp/r17b/home/profiles/acc-web/node_modules/dsh-grok-workflow/lib/loop-surface.js \
+  node .rsi/evidence/round-017/install/07-loop-tool-harness.mjs
+exit: 0
+
+tool name: grok_loop
+status result: {"ok":true,"action":"status","loop":{"open":false,"sessionId":"session-abc"}}
+close result: {"ok":true,"action":"close","loop":{"open":false,"sessionId":"session-abc"}}
+open refusal: {"name":"LoopError","code":"loop/user-only","message":"a loop heartbeat can be opened only by the user from the composer switch; an agent cannot open one on the user's behalf"}
+open calls scheduled: 0
+foreign session: grok_loop may only address the calling session; "session-other" is not "session-abc"
+no agent: grok_loop requires a calling agent
+bad action: invalid arguments: "action" must be one of ["status","close","open"]

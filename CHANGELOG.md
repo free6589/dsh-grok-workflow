@@ -5,6 +5,37 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Fixed / 修复
+
+- **A delivered heartbeat is recognised inside DSH's own delivery framing
+  / 投递到的心跳在 DSH 自己的投递包装里也能被认出来** — DSH wraps every scheduled
+  prompt as `[SCHEDULE REMINDER] … reminder_prompt_json: "<the stored prompt>"`,
+  so the `[grok-workflow loop]` marker this plugin writes never leads the text
+  the gate sees. `isLoopHeartbeat` only matched a leading marker, which meant a
+  real delivery fell through to the generic `non-user-source` pass instead of the
+  heartbeat branch — and the loop brakes never ran. Both shapes are now accepted
+  (the gate still pairs the marker with `source.kind === 'schedule'`), with live
+  delivery evidence in `.rsi/evidence/round-017/heartbeat-live/` and regression
+  coverage in `test/loop.spec.ts` + `test/gate.spec.ts`.
+  / DSH 会把每条定时投递的提示词包成 `[SCHEDULE REMINDER] … reminder_prompt_json:
+  "存下来的提示词"`，所以本插件写进心跳的 `[grok-workflow loop]` 标记永远不在门禁
+  看到的文本开头。`isLoopHeartbeat` 以前只认开头的标记，于是真实投递掉进了通用的
+  `non-user-source` 直通分支，心跳分支和六道刹车一次都没跑到。现在两种形状都认
+  （门禁仍要求标记与 `source.kind === 'schedule'` 配对），真机投递证据在
+  `.rsi/evidence/round-017/heartbeat-live/`，回归覆盖在 `test/loop.spec.ts` 与
+  `test/gate.spec.ts`。
+
+- **The settings surface says how many keys it really projects
+  / 设置面现在说清它到底投影几个键** — the log line, the two code comments and the
+  test prose disagreed: 13 accepted keys, 11 volatile keys on the generated page
+  (`toolName` and `configVersion` are plain, so the runtime projection drops them).
+  `describeSurface` now reports `11 of 13 field(s) on the page`, and the comments
+  in `src/config.ts` / `src/settings.ts` / `src/client/index.js` say the same.
+  / 日志行、两处代码注释和测试文案各说各的：配置面接受 13 个键，生成的设置页上只有
+  11 个可投影键（`toolName` 与 `configVersion` 非 volatile，运行时投影会丢掉它们）。
+  `describeSurface` 现在报 `11 of 13 field(s) on the page`，`src/config.ts` /
+  `src/settings.ts` / `src/client/index.js` 的注释也统一成同一说法。
+
 ### Added / 新增
 
 - **The switch that opens a loop now exists, in the composer dock
@@ -51,6 +82,14 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
   Schedule 那行，所以下一次到点不会再回来。没有 timer 也没有队列：每一项都从会话自己的记录里读回，
   Host 重启后仍然算得清已经花掉多少。token 那个数是预算而不是计量，一轮只有在没写出助手消息时才
   算失败——两条限制都写在模块里，不靠读者猜。
+
+## [0.11.16] - 2026-11-19
+
+### Fixed / 修复
+
+- **A delivered heartbeat is recognised inside DSH's own delivery framing / 投递到的心跳在 DSH 自己的投递包装里也能被认出来** — DSH wraps every scheduled prompt as `[SCHEDULE REMINDER] … reminder_prompt_json: "<the stored prompt>"`, so the `[grok-workflow loop]` marker this plugin writes never leads the text the gate sees. `isLoopHeartbeat` only matched a leading marker, which meant a real delivery fell through to the generic `non-user-source` pass instead of the heartbeat branch — and the loop brakes never ran. Both shapes are now accepted (the gate still pairs the marker with `source.kind === 'schedule'`), with live delivery evidence in `.rsi/evidence/round-017/heartbeat-live/` and regression coverage in `test/loop.spec.ts` + `test/gate.spec.ts`. / DSH 会把每条定时投递的提示词包成 `[SCHEDULE REMINDER] … reminder_prompt_json: "存下来的提示词"`，所以本插件写进心跳的 `[grok-workflow loop]` 标记永远不在门禁看到的文本开头。`isLoopHeartbeat` 以前只认开头的标记，于是真实投递掉进了通用的 `non-user-source` 直通分支，心跳分支和六道刹车一次都没跑到。现在两种形状都认（门禁仍要求标记与 `source.kind === 'schedule'` 配对），真机投递证据在 `.rsi/evidence/round-017/heartbeat-live/`，回归覆盖在 `test/loop.spec.ts` 与 `test/gate.spec.ts`。
+
+- **The settings surface says how many keys it really projects / 设置面现在说清它到底投影几个键** — the log line, the two code comments and the test prose disagreed: 13 accepted keys, 11 volatile keys on the generated page (`toolName` and `configVersion` are plain, so the runtime projection drops them). `describeSurface` now reports `11 of 13 field(s) on the page`, and the comments in `src/config.ts` / `src/settings.ts` / `src/client/index.js` say the same. / 日志行、两处代码注释和测试文案各说各的：配置面接受 13 个键，生成的设置页上只有 11 个可投影键（`toolName` 与 `configVersion` 非 volatile，运行时投影会丢掉它们）。`describeSurface` 现在报 `11 of 13 field(s) on the page`，`src/config.ts` / `src/settings.ts` / `src/client/index.js` 的注释也统一成同一说法。
 
 ## [0.11.15] - 2026-11-19
 

@@ -620,3 +620,12 @@ no history is rewritten, and no round is force-pushed.
   141 文件）。**没有** bump 版本、没有打标签、没有 GitHub Release、没有 npm 发布——开关是用户可见的新增，
   下一次经授权的发版应为 patch（`0.11.16`），把 `[Unreleased]` 两条搬进版本段。
 - **Allowed untracked（未入库）：** `settings-simple-mock.html`（草稿 mock，round 15 的结论未变）。
+
+## Round 17 — 心跳识别修 + 设置面说法统一 + 发版 `0.11.16` (patch)
+
+- **主题**：round 17 四个验证片（`.rsi/evidence/round-017/`：baseline GO、ci GO、heartbeat-live 机制 GO、install 除 F1 外 PASS）交出两个 FAIL，逐项修完再发版。Q5：真机投递被 DSH 包成 `[SCHEDULE REMINDER] … reminder_prompt_json`，旧 `isLoopHeartbeat` 只认开头 → 心跳分支与六道刹车在真机上不可达（CONTRADICTED）；F1：13/11/“21 volatile”三处说法打架。另统一 README 测试数 60/1081→62/1142。
+- **改动**：`src/loop.ts`（识别接受两种形状，source 配对不变）、`src/config.ts` / `src/settings.ts` / `src/client/index.js`（注释 11/13）、`src/settings.ts`（`describeSurface` 新文案）、`test/loop.spec.ts`（framing 用例）、`test/gate.spec.ts`（heartbeat classification 2 条）、`test/config.spec.ts` / `test/reliability.spec.ts`（显式新文案断言）、`CHANGELOG [Unreleased]`（两条 Fixed，双语）、README 中英计数、记忆文件 D-073/A28/VALIDATION Round 62/STATE/HANDOFF。`src/index.ts:292` 注释未动（仍 HYPOTHESIS）；P3-01/P3-02 仍 OPEN。
+- **门禁（`CONFIRMED`）**：npm run ci exit 0 · 62 test files passed · 1142 tests passed；另有隔离真机证据（open→投递→turn→close→删行、user-only 双拒、minimal 503、stopAll/forgetSession 操作体、安装 10/11 PASS）。
+- **发版**：patch `0.11.16`（用户可见修复：真机心跳刹车此前不生效；日志行说法修正）。`v0.11.14` 仍无 Release、原地不动。
+- **未验证（`NOT_RUN`）**：rrule 定时到点、真模型整轮、GUI 点击、unload/归档监听 firing。
+- **status:** OK

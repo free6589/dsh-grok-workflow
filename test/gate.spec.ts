@@ -891,6 +891,47 @@ function textOf(message: UserMessage): string {
     .join('\n')
 }
 
+describe('heartbeat classification (classifyPreStep)', () => {
+  // Round 17 live evidence: DSH 0.2.2 wraps the stored loop prompt in its own
+  // framing — `[SCHEDULE REMINDER] … reminder_prompt_json: "<stored prompt>"` —
+  // so the marker is embedded, never leading. The gate must still route the
+  // delivery into the heartbeat branch instead of the generic pass-through.
+  const framedHeartbeat = (prompt: string): UserMessage =>
+    createUserMessage({
+      content: [{
+        type: 'text',
+        text: '[SCHEDULE REMINDER]\nThis is a scheduled message from the user\n' +
+          'schedule_id_json: "schedule-aaa"\noccurrence_at: 2026-11-19T01:07:01.365Z\n' +
+          `reminder_prompt_json: ${JSON.stringify(prompt)}`,
+      }],
+      source: { kind: 'schedule' } as never,
+    }) as unknown as UserMessage
+
+  it('routes a framed heartbeat into the heartbeat branch, not the pass-through', () => {
+    const config = resolveConfig({ grokDefault: 'on' })
+    const agent = new FakeAgent()
+    const message = framedHeartbeat('[grok-workflow loop] Loop heartbeat: the previous round has ended.')
+    const verdict = classifyPreStep(
+      { config },
+      payload(agent, [message]) as unknown as PreStepPayload,
+    )
+    // No loop service composed: the continuation reason still proves the
+    // heartbeat branch was entered (the pass-through would say non-user-source).
+    expect(verdict).toEqual({ kind: 'pass', reason: 'loop-continuation' })
+  })
+
+  it('still passes a schedule delivery without the marker as non-user-source', () => {
+    const config = resolveConfig({ grokDefault: 'on' })
+    const agent = new FakeAgent()
+    const message = framedHeartbeat('an ordinary scheduled reminder')
+    const verdict = classifyPreStep(
+      { config },
+      payload(agent, [message]) as unknown as PreStepPayload,
+    )
+    expect(verdict).toEqual({ kind: 'pass', reason: 'non-user-source' })
+  })
+})
+
 /* -------------------------------------------------------------- in-turn -- */
 
 /** Session that exposes its plugin records, for ledger/record assertions. */

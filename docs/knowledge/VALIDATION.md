@@ -3765,3 +3765,33 @@ bundle 是 206901 B，比工作树这份 224412 B 小 17511 B —— 差额就�
 
 **证据索引**：`.rsi/evidence/segment-5/`（本轮全部日志与指纹）、`D-072`、`docs/knowledge/STATE.md`
 Round 16 段、`.rsi/ROUND.md` Round 16。
+
+## Round 62 — 2026-11-19 — RSI round 17 phase-1：Q5 心跳识别 bug 修 + F1 设置面说法统一（`CONFIRMED`，未发版）
+
+**范围**：round 17 四个验证片（`baseline` / `ci` / `heartbeat-live` / `install`，证据
+`.rsi/evidence/round-017/`）之后，对它们交出的两个 FAIL 做产品代码修复。
+改动文件：`src/loop.ts`（`isLoopHeartbeat` 接受 DSH 包装形状）、`src/config.ts` /
+`src/settings.ts` / `src/client/index.js`（注释 13→11/13）、`src/settings.ts`
+（`describeSurface` 报 `11 of 13 field(s) on the page`）、`test/loop.spec.ts`（framing 用例）、
+`test/gate.spec.ts`（`heartbeat classification` 2 条）、`test/config.spec.ts` /
+`test/reliability.spec.ts`（计数断言改显式新文案）、`CHANGELOG.md`（`[Unreleased]` Fixed
+两条，双语）、`README.md` / `README.zh-CN.md`（测试数 60/1081→62/1142）、记忆文件
+（D-073、A28、本轮 STATE/HANDOFF/VALIDATION 段）。未动 `.rsi/ROUND.md` / `ledger.jsonl`
+（round 17 的轮次记录等发版时由 `finish-round.py` 写）。
+
+**命令与结果（`CONFIRMED`，共享树实跑）**：
+
+| 命令 | 结果 |
+| --- | --- |
+| `npx vitest run test/gate.spec.ts test/loop.spec.ts`（修后） | 2 文件 / 83 测试 PASS（gate 47→52，loop 30→31） |
+| `npx vitest run test/loop.spec.ts test/config.spec.ts test/reliability.spec.ts test/settings-projection.spec.ts` | 4 文件 / 96 测试 PASS |
+| `npm run ci`（修后全量） | exit 0，**62 文件 / 1142 测试 PASS**（24s 内），lint 22 warnings / 0 errors |
+| README 计数复核 | 与本次 `ci` 实测 62/1142 一致 |
+
+**为什么修**：Q5（`results/00-verdicts.md`）——真机投递文本被 DSH 包了一层，
+旧识别函数永远判 false，心跳分支与六道刹车在真机上不可达；F1（`install/00-conclusion.md`）——
+13/11/“21 volatile fields”三处说法互相打架，`settings/describe` 实测投影 11 键。
+两者都是“说法/识别”缺陷，不是安装失败：安装验收除 F1 外 10 项全 PASS。
+
+**未验证（`NOT_RUN`，与上轮相同）**：rrule 定时到点的那次投递；真模型跑整轮；GUI 点击开关；
+unload/归档监听的 firing（操作体已 CONFIRMED）。`src/index.ts:292` 注释仍是 HYPOTHESIS，未动。

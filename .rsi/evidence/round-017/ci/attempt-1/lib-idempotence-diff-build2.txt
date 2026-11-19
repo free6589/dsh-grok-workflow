@@ -1,0 +1,1 @@
+DIFF2-EXIT=0

@@ -1,0 +1,23 @@
+# grok_loop tool behaviour, executed from the installed artifact
+
+A live agent turn cannot call the tool in an isolated home (no credential), so the tool's
+own execute path is exercised against the installed lib/loop-surface.js with a recording
+LoopService. This is the shipped code, not a copy of it:
+  import { createLoopTool } from '<profile>/node_modules/dsh-grok-workflow/lib/loop-surface.js'
+
+$ GROK_LOOP_SURFACE="$DSH_HOME/profiles/r17-web/node_modules/dsh-grok-workflow/lib/loop-surface.js" \
+    node .rsi/evidence/round-017/install/07-loop-tool-harness.mjs
+tool name: grok_loop
+status result: {"ok":true,"action":"status","loop":{"open":false,"sessionId":"session-abc"}}
+close result: {"ok":true,"action":"close","loop":{"open":false,"sessionId":"session-abc"}}
+open refusal: {"name":"LoopError","code":"loop/user-only","message":"a loop heartbeat can be opened only by the user from the composer switch; an agent cannot open one on the user's behalf"}
+open calls scheduled: 0
+foreign session: grok_loop may only address the calling session; "session-other" is not "session-abc"
+no agent: grok_loop requires a calling agent
+bad action: invalid arguments: "action" must be one of ["status","close","open"]
+
+Documented contract (README 'Repeat runs', docs/LOCAL-TESTING.md 'Repeat runs'):
+  status reads the stored loop; close deletes it; open is refused with loop/user-only
+  before it reaches Schedule; an agent may only address its own session.
+The transcript above matches all four, and 'open calls scheduled: 0' shows the refusal
+happens before any service call.

@@ -1,0 +1,40 @@
+# agent-57 independent final verification 2026-11-19T08:12:31+08:00
+HEAD 4db78f41f00416abe55baa1ec9403c4fa1a63379
+origin/main 4db78f41f00416abe55baa1ec9403c4fa1a63379
+
+== npm run verify:lib (builds HEAD in temp dir, read-only) ==
+
+> dsh-grok-workflow@0.11.15 verify:lib
+> node scripts/verify-lib.mjs
+
+client bundle: 224412 bytes → lib/client.js
+lib/ at 4db78f4 is the build of src/ at 4db78f4 (145 files, byte-identical)
+verify:lib exit=0
+
+== npx tsc -p tsconfig.json --noEmit ==
+typecheck exit=0
+
+== npx oxlint src test (tail) ==
+
+Found 22 warnings and 0 errors.
+Finished in 401ms on 107 files with 96 rules using 6 threads.
+lint exit=0
+
+== npx vitest run (full suite, tail) ==
+ ✓ test/criterion.spec.ts (5 tests) 8ms
+ ✓ test/docs-architecture-version.spec.ts (3 tests) 5ms
+
+ Test Files  62 passed (62)
+      Tests  1139 passed (1139)
+   Start at  08:12:42
+   Duration  24.72s (transform 1.67s, setup 0ms, import 5.24s, tests 12.17s, environment 7ms)
+
+vitest exit=0
+
+== .skip/.only/.todo scan in test/ ==
+0
+
+== post-run git status ==
+?? .rsi/evidence/segment-5/final-check-agent57.txt
+?? settings-simple-mock.html
+status lines: 2

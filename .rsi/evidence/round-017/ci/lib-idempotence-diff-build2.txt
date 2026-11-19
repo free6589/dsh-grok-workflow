@@ -1,0 +1,7 @@
+# diff: AFTER-ci vs AFTER-second-build (header comment lines stripped)
+# files after-ci: 145  files after-build2: 145
+### diff <(grep -v '^#' lib-after-ci.txt) <(grep -v '^#' lib-after-build2.txt)
+DIFF2-EXIT=0
+
+# diff: BEFORE-ci vs AFTER-second-build (whole run idempotence)
+DIFF-BEFORE-VS-BUILD2-EXIT=0
