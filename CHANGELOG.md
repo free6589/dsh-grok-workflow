@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.11.17] - 2026-11-19
+
 ### Added / 新增
 
 - **Supervision is now resident and parallel, not just a serial stage
