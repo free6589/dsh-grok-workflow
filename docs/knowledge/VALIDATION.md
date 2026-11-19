@@ -2,6 +2,26 @@
 
 Real commands and results only. Do not add expected results here.
 
+## Self-iteration default template — 2026-11-20 — the document, the constant and the bundle agree, and the switch stores it (`CONFIRMED`)
+
+**Change:** `DEFAULT_ITERATE_TEMPLATE` was a twelve-line generic prompt; it is now the
+round prompt in `docs/iterate-template.md` (3 239 characters).
+
+| command | result |
+| --- | --- |
+| `npx vitest run test/iterate-template.spec.ts` | 7 passed — doc fence equals the constant byte for byte, length ≤ `MAX_LOOP_PROMPT_CHARS` (4000), POOL-before-TODO-before-GitHub-before-papers order, "at least one item per round", small/big split with `RESEARCH` + pool approval + "never cite a paper", `R1`/`R6`/`npm run ci`/`npm run verify:lib`/`copied profile`/`NOT_RUN`, exactly four numbered brakes, forbidden zones |
+| `npx vitest run test/client.spec.ts test/loop-surface.spec.ts test/iterate.spec.ts` | 134 passed — the bundle's `iterateTemplate.def` equals the constant (existing pin), the iterate route answers `status` without arming either row, open stores the template, close deletes only its own row |
+| `npm run ci` | exit 0 · **68 files / 1227 tests PASS** · typecheck 0 errors · oxlint 24 warnings / 0 errors |
+| `npm run verify:lib` (post-commit) | `lib/ at 23d3369 is the build of src/ at 23d3369` — 153 files byte-identical |
+| `.rsi/evidence/round-025/live-iterate.mjs` on the copied profile `loopfix-verify` `:3451` | PASS — real bundle switch over the real page fetch: open wrote one `RSI heartbeat` row of 3 239 chars byte-equal to the default, close deleted that row and nothing else, a second cycle was equally clean; `~/.dsh/storages/schedule.json` afterwards held only the operator's pre-existing row |
+
+**Redaction:** the boot log in the bundle has the printed `token=` value, `dsh-auth-…` names and
+`v1.eyJ…` cookie values replaced with `<redacted>`; the cookie jar lived under `/tmp/gwfx25/`,
+was never copied into the bundle and was deleted with the instance.
+
+**`NOT_RUN`:** a real scheduled delivery of the row (one interval of real time, operator's call),
+and a manual browser click-through with a screenshot.
+
 ## Intake audit — 2026-11-19 — a 2 041-character task prompt stalls a fresh session by its first line, not by size (`CONFIRMED`)
 
 **Report:** a stored team task prompt was pasted into a fresh session and the session did

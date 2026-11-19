@@ -1,5 +1,31 @@
 # Agent Handoff
 
+## 2026-11-20 — `0.12.1` 已发版（round-025：自迭代默认模板）
+
+- **From:** agent-50（self_iterate_full）· **To:** 用户 / 下一轮接手者
+- **发版（`CONFIRMED`）**：patch（默认内容变更，向后兼容：已存模板的档案不受影响）。
+  commit `23d3369`、annotated tag `v0.12.1` 已推；远端 CI `44595376323` success
+  （Node 22 + Node 24），Release `44595391505` success
+  （asset `dsh-grok-workflow-0.12.1.tgz`，594 810 bytes）。旧标签未动，无 force-push，
+  未发布 npm。
+- **内容**：`DEFAULT_ITERATE_TEMPLATE` 由 12 行通用提示词改为 `docs/iterate-template.md`
+  的轮次提示词；`src/client/index.js` 的设置页副本同步；新增 `test/iterate-template.spec.ts`
+  （文档↔常量逐字节、4000 字符上限、每个必需章节一条断言）；`test/loop-surface.spec.ts`
+  补自迭代路由 `status` 用例并把模板断言改为读常量。README 双语配置表指向新文档。
+- **门禁（`CONFIRMED`）**：`npm run ci` exit 0 = **68 文件 / 1227 测试 PASS**，typecheck 0 错、
+  oxlint 24 warnings / 0 errors；提交后 `npm run verify:lib` = `lib/ at 23d3369 is the build of
+  src/ at 23d3369`（153 files byte-identical）；测试文件数 63 基线 → 68（只增）。
+- **真机（`CONFIRMED`，复制档案 `loopfix-verify`，link 本树，`:3451`，实例已停）**：
+  `live-iterate.mjs` 用真实 bundle 的开关、真实 page fetch、真实路由/服务/设置写路径；
+  档案里模板已为空白（回退路径被真正走到）。开 → Schedule 行 `RSI heartbeat` 写入 3239 字符，
+  与 `DEFAULT_ITERATE_TEMPLATE` 逐字节相同；关 → 只删自己那行，会话无残留、未删他人行；
+  第二次开关同样干净。收尾 `~/.dsh/storages/schedule.json` 只剩操作者原有的一行。
+  证据 `.rsi/evidence/round-025/`（`boot.redacted.txt` 已脱敏；cookie jar 未入库并已删除）。
+- **未做（`NOT_RUN`）**：真实定时投递（D-066，操作者的事）；浏览器 GUI 手动点击拍照。
+- **接手注意**：默认模板是「会被投递的提示词」，改它等于改每个空白档案的行为；改动时同时改
+  `docs/iterate-template.md`、`src/config.ts`、`src/client/index.js` 三处，
+  `test/iterate-template.spec.ts` 与 `test/client.spec.ts` 会立刻指出漏改。
+
 ## 2026-11-20 — `0.12.0` 已发版（round-024 三线收口）
 
 - **From:** lead（本会话）· **To:** 用户 / 下一轮接手者

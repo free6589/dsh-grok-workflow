@@ -1138,3 +1138,26 @@ Source: 只读审计 + 本轮新增实现与单测。依据 = `src/guardian.ts`�
   这组测试真的能发现串线。页面开关的 `routePath` 与 Host 常量一致（`test/client.spec.ts`）。
 - **残留**：卸载只清循环行（`src/loop-surface.ts:115`），自迭代行按设计留存；归档清扫
   按实例各自正确（D-081）。真实定时投递与真机 GUI 观察仍 `NOT_RUN`。
+
+## A32 — The self-iteration default template, and the three copies that must agree
+
+- **Facts (`CONFIRMED`, 2026-11-20):** `DEFAULT_ITERATE_TEMPLATE` (`src/config.ts:166`) is the
+  schema default for `iterateTemplate` and the whitespace fallback `src/index.ts:319-320` hands
+  to the iterate service's `identity.defaultPrompt`; the service stores it verbatim as the
+  `RSI heartbeat` Schedule task's prompt (`src/loop.ts` `open`, `promptOf`). The hand-written
+  settings bundle keeps its own literal copy (`src/client/index.js:44`) because it has no host
+  import, and `test/client.spec.ts` pins it to the constant. `MAX_LOOP_PROMPT_CHARS = 4000`
+  (`src/loop.ts:112`) is enforced both by the schema (`src/config.ts:842`) and by the service
+  (`src/loop.ts:796`), and the textarea mirrors it (`max: 4000`).
+- **Why the document is a fourth copy, not a comment:** the template is what a round is judged
+  by, so the reasons for each section (POOL-first selection, the small/big split, R1–R6, the
+  triple review, four brakes, the forbidden zones) belong somewhere a reader can check.
+  `docs/iterate-template.md` holds the text between markers and
+  `test/iterate-template.spec.ts` asserts it equals the constant, so a change in either place
+  without the other fails the suite.
+- **Measured on the live path:** on the copied profile (`loopfix-verify`, `:3451`) the switch's
+  open wrote a 3 239-character prompt byte-equal to the default, and close left no Schedule row
+  (`.rsi/evidence/round-025/live-iterate.txt`). The profile's stored template was blank, so the
+  fallback itself was exercised, not a leftover test string.
+- **Boundary that remains:** a real scheduled delivery was not run (one interval of real time;
+  arming it is the operator's action, D-066).

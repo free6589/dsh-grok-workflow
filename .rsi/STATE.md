@@ -1,12 +1,25 @@
 # RSI State (overwritten every round; keep under 100 lines)
 
-Updated: 2026-11-19T20:45+08:00 · round 22 landed as commit `6c8b0dc` on `main` (not pushed, no
-tag, no release — development commit) · `npm run ci` 63 files / 1158 tests PASS ·
-`verify:lib` = 149 files byte-identical ·
-last published release `v0.11.20` (commit `c911e6e`, CI `44530885058`, Release + `dsh-grok-workflow-0.11.20.tgz`)
+Updated: 2026-11-20T03:20+08:00 · round 25 landed as commit `23d3369` on `main`, annotated tag
+`v0.12.1` pushed · `npm run ci` 68 files / 1227 tests PASS · `verify:lib` = 153 files
+byte-identical at `23d3369` · latest published release `v0.12.1` (CI `44595376323`, Release
+`44595391505` + `dsh-grok-workflow-0.12.1.tgz`); previous `v0.12.0` (`9839025`, CI
+`44587743089`, Release `44587748822`)
 
 ## Facts
 
+- Round 25 (this round): the self-iteration default template is now the round prompt in
+  `docs/iterate-template.md` (3 239 chars): POOL-first topic selection, at-least-one-per-round,
+  small/big split with RESEARCH + pool approval and no invented sources, R1–R6, triple review
+  (self + ci + verify:lib + copied-profile live run), four brakes, forbidden zones.
+  `test/iterate-template.spec.ts` pins doc ↔ constant; `test/client.spec.ts` pins the bundle copy;
+  `test/loop-surface.spec.ts` covers the iterate route's `status`. Live: open wrote the default
+  verbatim, close left no Schedule residue (`.rsi/evidence/round-025/`). D-082, A32.
+- Round 24 (release `0.12.0`): second composer switch for the self-iteration heartbeat
+  (`RSI heartbeat`, `/grok-workflow/iterate`, editable `iterateTemplate`, no marker, no tool),
+  `/grok on` background acceptance, `/grok`-prefixed prompt intake refusal. Commit `9839025`.
+- Round 23 (older): the switch's production path falls back to the page fetch, not `loopSend`
+  (`0.11.21`).
 - Repo: `/home/fish/projects_mine/dsh-grok-workflow`, branch `main`, remote `origin`
   = https://github.com/free6589/dsh-grok-workflow.git.
 - Release line (rounds 4–20): `v0.11.4` bcb601d · `v0.11.5` bf0dc91 · `v0.11.6` 88d133b ·

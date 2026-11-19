@@ -1,5 +1,20 @@
 # Project State
 
+Last updated: 2026-11-20 (**0.12.1 已发版：自迭代默认模板 = 仓库自己的轮次提示词** —
+`DEFAULT_ITERATE_TEMPLATE` 从 12 行通用提示词换成 `docs/iterate-template.md` 的轮次提示词
+（POOL 优先选题→TODO/失败行/GitHub/论文、每轮至少一项、小修不研究 vs 大改需 RESEARCH 且
+池内获批且不编造来源、R1–R6、三重评审含复制档案真机、四道刹车、禁区），`src/client/index.js`
+的 bundle 副本同步；`test/iterate-template.spec.ts` 钉住「文档 ↔ 常量」逐字节一致并逐项检查
+必需章节，`test/loop-surface.spec.ts` 补自迭代路由 `status` 用例。`npm run ci` exit 0 =
+**68 文件 / 1227 测试 PASS**，typecheck 0 错、lint 24w/0e；`verify:lib` = `lib/ at 23d3369 is
+the build of src/ at 23d3369`（153 files byte-identical）。真机（复制档案 `loopfix-verify`
+`:3451`，实例已停）：真实 bundle 的自迭代开关开→Schedule 行写入 3239 字符、与默认模板逐字节
+相同；关→只删自己那行，会话无 Schedule 残留、未误删他人行；二次开关同样干净。证据
+`.rsi/evidence/round-025/`（`boot.redacted.txt` 已脱敏，无 token/cookie）。**已发版
+`0.12.1`**：commit `23d3369`、annotated tag `v0.12.1` 已推；远端 CI `44595376323` success
+（Node 22/24），Release `44595391505` success（asset `dsh-grok-workflow-0.12.1.tgz`）。旧标签
+未动、无 force-push。NOT_RUN：真实定时投递、GUI 手动点击拍照。
+
 Last updated: 2026-11-20 (**round-024 收口：三线合一，真机复核过** —
 `/grok on` 后台受理（`answerFullBehind`，5 例）+ intake 提示词入口加固（14 例）
 + 双开关/模板（9+97 例）三条并发线合在同一工作树；`npm run ci` exit 0 =

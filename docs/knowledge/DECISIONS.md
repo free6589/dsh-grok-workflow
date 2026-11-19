@@ -1855,3 +1855,32 @@ model selector」）、`test/loop-brakes.spec.ts`（35 条）、`test/loop-runti
 - **Consequences:** 归档清扫按实例正确；卸载仍只清循环行（自迭代心跳按设计活过卸载，
   `src/loop-surface.ts:73`），因此自迭代行不会变成「无主后台工作」——它的投递只是普通
   定时消息，不进入任何插件处理器。回归测试与负对照见 `HEARTBEATS.md` F6 与 §5。
+
+## D-082 — The self-iteration default template is this repository's round prompt, documented as the source of truth
+
+- **Status:** CONFIRMED
+- **Date:** 2026-11-20
+- **Decision:** `DEFAULT_ITERATE_TEMPLATE` is the text in `docs/iterate-template.md`
+  (between its markers), byte for byte: POOL-first topic selection with TODO/failure rows,
+  GitHub issues and papers as the fallback order; at least one item per round; a small fix
+  without research and a big change with a `RESEARCH` entry plus pool approval and no invented
+  sources; R1–R6; the triple review (self-review, `npm run ci` + `npm run verify:lib`, a copied
+  profile live run); four brakes; the forbidden zones.
+- **Reason:** the previous default was a twelve-line generic prompt. A fresh profile armed a
+  heartbeat that did not know how a round here is chosen or judged, so the first delivery could
+  only improvise. The rules already existed in the operator's protocol; shipping them as the
+  default makes the switch useful without a hand-written template, and the settings textarea
+  still lets a profile override every word of it.
+- **Alternatives rejected:**
+  1. Keep the generic default and document the round prompt separately — a fresh profile would
+     still arm the wrong prompt, and the document would be advice rather than the default.
+  2. Point the default at a file read at runtime — the template is delivered as a Schedule
+     prompt and must not depend on the working directory the host happens to run in.
+  3. Only change the settings-page copy — the schema default and the fallback would then
+     disagree with the page, which is exactly the drift `test/client.spec.ts` exists to catch.
+- **Consequences:** three copies must move together (`docs/iterate-template.md`,
+  `src/config.ts`, `src/client/index.js`); `test/iterate-template.spec.ts` and
+  `test/client.spec.ts` fail if one is left behind. A profile that already stores a template is
+  untouched — only unset or whitespace-only templates see the new default, so no existing
+  heartbeat changes behaviour on upgrade. The 4000-character cap is unchanged and the shipped
+  default uses 3 239 of it.

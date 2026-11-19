@@ -810,3 +810,34 @@ no history is rewritten, and no round is force-pushed.
 
 - **Landed as:** commit `6c8b0dc` — pushed `origin/main` fast-forward, no tag, no
   Release, no npm publish. Evidence `.rsi/evidence/round-022/`.
+
+## Round 25 — 2026-11-20 — 自迭代默认模板改为仓库自己的轮次提示词（`CONFIRMED`，patch `0.12.1`）
+
+- **主题**：自迭代心跳的内置默认模板。`DEFAULT_ITERATE_TEMPLATE` 原本是 12 行通用提示词，
+  新档案武装出来的心跳不知道这个仓库怎么选题、怎么判一轮完成——等于把「该做什么」留给模型即兴。
+  任务要求默认模板覆盖：双源选题（POOL 优先，其次 TODO/失败行、GitHub issue、论文）、
+  每轮至少落地一项、小修不研究 / 大改必须 RESEARCH 且池内获批且不编造来源、R1–R6 执行、
+  三重评审（自审 + `npm run ci` + `npm run verify:lib` + 复制档案真机）、四道刹车与禁区。
+- **为什么不是「再加一份文档」**：文档只写建议，默认值才决定实际投递的提示词；所以文档成为
+  真源，`DEFAULT_ITERATE_TEMPLATE` 与它逐字节相同，`test/iterate-template.spec.ts` 钉死。
+  另一个可选方案是运行时读文件——投递的是 Schedule 提示词，不能依赖宿主工作目录，故拒绝。
+- **改动**：新增 `docs/iterate-template.md`（模板 + 每节为何存在 + 三个读者）；
+  `src/config.ts`（常量改为该文本，JSDoc 指向文档）；`src/client/index.js`（bundle 副本同步）；
+  新增 `test/iterate-template.spec.ts`（文档↔常量逐字节、4000 上限、每个必需章节一条断言）；
+  `test/loop-surface.spec.ts`（自迭代路由 `status` 用例；模板断言改读常量）；
+  README 双语配置表指向文档；`CHANGELOG.md` `[Unreleased]` → `[0.12.1]` 双语 Changed 一条；
+  `DECISIONS.md` D-082、`RESEARCH.md` A32、`VALIDATION.md` 新节；`lib/` 由 `npm run build` 重建。
+- **门禁（`CONFIRMED`）**：`npm run ci` exit 0 = **68 文件 / 1227 测试 PASS**
+  （基线 63 文件只增不减，新增 1 文件 7 例 + 路由 1 例），`tsc` 0 error，
+  oxlint 24 warnings / 0 errors；提交后 `npm run verify:lib` =
+  `lib/ at 23d3369 is the build of src/ at 23d3369`（153 files byte-identical）。
+- **真机（`CONFIRMED`）**：复制档案 `loopfix-verify`（link 本树，`:3451`，实例已停）。
+  `live-iterate.mjs` 用真实 bundle 的开关、真实 page fetch，档案模板为空白（回退路径真正走到）：
+  开 → `RSI heartbeat` 行 3239 字符、与默认模板逐字节相同；关 → 只删自己那行，
+  会话无 Schedule 残留、未误删他人行；二次开关同样干净。证据 `.rsi/evidence/round-025/`。
+- **未验证（`NOT_RUN`）**：真实定时投递（D-066）；GUI 手动点击拍照。
+- **status:** OK
+
+- **Landed as:** commit `23d3369`，annotated tag `v0.12.1` 已推；远端 CI `44595376323`
+  success（Node 22/24），Release `44595391505` success（`dsh-grok-workflow-0.12.1.tgz`）。
+  旧标签未动、无 force-push、未发布 npm。
