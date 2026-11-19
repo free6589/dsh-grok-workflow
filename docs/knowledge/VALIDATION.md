@@ -3963,3 +3963,32 @@ C1 跨 run 忙闲快照（`.rsi/POOL.md` R21）。修前探针：只加新用例
 `.bak/.orig/.tmp`（`.tmp/v100x-patch.bak` 在 `.gitignore` 的 `.tmp/` 内，属本地草稿区）。
 
 **未验证（`NOT_RUN`）**：两个真实并发 run 的避让效果；GUI 中观察提示；发版（本任务不授权）。
+
+## Round 67 — 2026-11-19 — RSI round 22：checkpoint `durationMs` 按行数上限丢时长（`CONFIRMED`，未发版）
+
+**缺陷（`CONFIRMED`，本树实跑）**：`src/checkpoint/wiring.ts:786` 的 `snapshot()`
+用 `CHECKPOINT_LIMITS.countCeiling`（1e6，行数上限）卡 `time.durationMs`，而读侧
+`src/checkpoint/schema.ts:624` 接受到 `msCeiling`。跑超 16 分 40 秒的 run（默认
+60 分钟死线的 run 全在此列）写成功但没有 `durationMs`——「跑了多久」这个唯一字段
+丢了。红探针：可控时钟 33m20s，`snapshot().time.durationMs` 为 `undefined`
+（`AssertionError: expected undefined to be 2000000`），见
+`.rsi/evidence/round-022/red-spec-run.txt`。`POOL.md` R10 把因果写反了（说读侧卡
+`countCeiling`），实测是写侧，以实测为准。
+
+**改动**：`src/checkpoint/wiring.ts`（上限 `countCeiling` 改 `msCeiling` + 注释说明
+为什么；「超限省略、永不截断」语义不变）、`test/checkpoint-wiring.spec.ts`
+（新增 48h 用例，断言 `durationMs === 2 * day`）、`CHANGELOG.md` `[Unreleased]`
+双语 Fixed、`DECISIONS.md` D-077、`lib/` 重建。版本号未动。
+
+**命令与结果（`CONFIRMED`，本树实跑）**：
+
+| 命令 | 结果 | 证据 |
+| --- | --- | --- |
+| 修前临时探针 | **1 failed**（`expected undefined to be 2000000`） | `red-spec-run.txt` |
+| 修后 `checkpoint-wiring` + `checkpoint-schema` + `checkpoint-engine-wire` | **3 files / 69 passed** | `green.txt` |
+| 修后 `npm run ci` | exit 0，63 文件 / **1158** 测试 PASS，oxlint **22 warnings / 0 errors** | `ci.txt` |
+| `npm run build` ×2 | 两次一致（幂等） | `build-twice.txt` |
+| `npm run verify:lib` | byte-identical | `verify-lib.txt` |
+
+**未验证（`NOT_RUN`）**：真实 16 分钟以上 run 的 checkpoint 回读（需要真跑一个长 run；
+写入语义由单测覆盖）；发版（本任务不授权）。

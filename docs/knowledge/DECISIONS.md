@@ -1725,3 +1725,27 @@ model selector」）、`test/loop-brakes.spec.ts`（35 条）、`test/loop-runti
   `supervisor=inherit`（与 `renderReport` 一致）。`run.ts:141`
   `configRouteLabels` 仍是四角色——那是 C1 跨 run 忙闲提示的输入，不是本轮主题，
   留给下一轮按单主题处理。
+
+## D-077 — checkpoint `durationMs` 按毫秒上限记，不按行数上限丢（2026-11-19 · round 22）
+
+- **Status:** CONFIRMED（`src/checkpoint/wiring.ts:786` `countCeiling` 改 `msCeiling`；
+  `test/checkpoint-wiring.spec.ts` 新增 48h 用例；红→绿见
+  `.rsi/evidence/round-022/red-spec-run.txt` / `green.txt`）
+- **Date:** 2026-11-19
+- **Decision:** `snapshot()` 里 `time.durationMs` 的上限由
+  `CHECKPOINT_LIMITS.countCeiling`（1e6，行数上限）改为
+  `CHECKPOINT_LIMITS.msCeiling`（读侧 `schema.ts:624` 接受的同一上限），与读侧对齐。
+  「超限则省略、永不截断」不变：写不下的时长仍然缺席，不写截断数。
+- **Reason:** 写侧用行数上限卡毫秒时长，读侧用毫秒上限收：16 分 40 秒以上的 run
+  （默认死线 60 分钟的 run 全在此列）写成功但没有 `durationMs`——恰恰是「跑了多久」
+  这个唯一字段丢了。`POOL.md` R10 原文把因果写反了（说读侧卡 `countCeiling`），实测是
+  写侧 `wiring.ts:786`，以实测为准。
+- **Alternatives rejected:**
+  1. 读侧也改 `countCeiling`（等于把 16m40s 以上的时长判非法，与 `msCeiling`
+     接受 `timeoutMs` 到 `MAX_SAFE_INTEGER` 的设计矛盾）。
+  2. 超限截断到上限（注释写明不截断的原因：截断数是 run 没跑过的时长，会撒谎）。
+  3. 顺手修 `integrity.bytes` 的读写上限差（`schema.ts:59/:859`）——同一文件不同
+     字段，超出单轮单主题，留给下一轮。
+- **Consequences:** 超过 16m40s 的 run 首次记下真实时长；旧 checkpoint 里缺
+  `durationMs` 的照常读（字段本来就是可选的）。`maxBytes`/`countCeiling` 的其它
+  用法不动。

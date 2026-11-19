@@ -7,6 +7,20 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ### Fixed / 修复
 
+- **A long run's checkpoint records its own duration instead of dropping it
+  / 跑得久的 run，checkpoint 会记下它到底跑了多久** — the checkpoint writer gated
+  `time.durationMs` on `countCeiling` (rows, 1e6) while the reader accepts durations
+  to `msCeiling`: any run past 16m40s recorded no duration at all — the one field
+  that says how long the run took. Both sides now read the same ceiling
+  (`msCeiling`), so a two-day run says two days. Omitted-not-clamped stays: an
+  unrepresentable duration is still absent, never a smaller number.
+  / checkpoint 写侧用 `countCeiling`（行数上限 1e6）卡 `time.durationMs`，读侧却接受到
+  `msCeiling` 的时长：超过 16 分 40 秒的 run 就记不住自己跑了多久——而那正是说明
+  「跑了多久」的唯一字段。现在两侧读同一个上限（`msCeiling`），跑两天的 run 就写
+  两天。「超限则省略、永不截断」不变：写不下的时长仍然缺席，不会写一个更小的数。
+
+### Fixed / 修复
+
 - **A busy supervisor lane is now flagged to the next run instead of going
   unseen / 打满的 supervisor 路由现在会提示给下一次 run，不再被漏掉** —
   `configRouteLabels()` (the cross-run route hint snapshot) flattened four roles

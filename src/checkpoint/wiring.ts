@@ -783,7 +783,10 @@ export function createCheckpointRecorder(options: CheckpointRecorderOptions): Ru
         updatedAtMs: at,
         // `durationMs` is omitted, never clamped, when it exceeds the schema's
         // ceiling: a clamped number would be a duration this run did not have.
-        ...at - wiring.startedAtMs >= 0 && at - wiring.startedAtMs <= CHECKPOINT_LIMITS.countCeiling
+        // The ceiling is `msCeiling` (every duration the reader accepts), not
+        // `countCeiling` (a row-count bound): a run past 16m40s still ran that
+        // long, and the checkpoint must say so.
+        ...at - wiring.startedAtMs >= 0 && at - wiring.startedAtMs <= CHECKPOINT_LIMITS.msCeiling
           ? { durationMs: at - wiring.startedAtMs }
           : {},
         ...deadline === undefined ? {} : { deadlineAtMs: deadline },

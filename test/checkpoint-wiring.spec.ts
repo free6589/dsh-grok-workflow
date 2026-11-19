@@ -710,4 +710,22 @@ describe('recorder surface', () => {
     }
     recorder.dispose()
   })
+
+  it('records durationMs up to msCeiling, not countCeiling (R10)', () => {
+    // The schema reader accepts durations to `msCeiling` (MAX_SAFE_INTEGER,
+    // `schema.ts:624`); the writer used to stop at `countCeiling` (1e6 ms =
+    // 16m40s), so any run past that recorded no duration at all. Both sides
+    // now read the same ceiling: a run that ran long says how long it ran.
+    const day = 86_400_000
+    let now = 1_000_000
+    const recorder = createCheckpointRecorder(options({
+      directory: join(scratch, 'long-run'),
+      now: () => now,
+    }))
+    recorder.adopt({ id: 'run-long' })
+    now = 1_000_000 + 2 * day // 48h elapsed, past countCeiling, within msCeiling
+    const snap = recorder.snapshot()
+    recorder.dispose()
+    expect((snap?.time as { durationMs?: number } | undefined)?.durationMs).toBe(2 * day)
+  })
 })

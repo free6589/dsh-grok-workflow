@@ -775,3 +775,38 @@ no history is rewritten, and no round is force-pushed.
   真实并发 run）；GUI 里看提示落地；发版（本轮是开发提交，不动 `package.json` 版本、
   不建 tag、不建 Release、不发布 npm）。
 - **status:** OK
+
+## Round 22 — 2026-11-19 — checkpoint `durationMs` 按行数上限丢时长（`CONFIRMED`，未发版）
+
+- **主题（P2，测试与可靠性缺口）**：`src/checkpoint/wiring.ts:786` 的 `snapshot()`
+  用 `countCeiling`（1e6，行数上限）卡 `time.durationMs`，而读侧
+  `schema.ts:624` 接受到 `msCeiling`。跑超 16 分 40 秒的 run（默认 60 分钟死线的
+  run 全在此列）写成功但没有 `durationMs`——「跑了多久」这个唯一字段丢了。
+- **为什么现在值得做**：P0 三处 supervisor 遗漏已在 rounds 19/20/21 收完，P1/P2
+  待办清零，剩下 P3-UX 两条和池子里的 `P ·` 项。候选排序：① 本轮 `durationMs`
+ （静默丢数据 + 读写不一致，有红探针实证）；② `Synthesis:` 双标签（改用户可见行
+  标签，需先评估 carry-over 回解析影响——`carryover.ts` 无 `Synthesis` 依赖，
+  `triage.ts:1227` 与 `delivery` 守卫认 `Synthesis:` 前缀，改标签要同步三处，
+  风险高于收益，留给独立成轮）；③ P3-01/P3-02（纯文案，无行为变化，价值更低）。
+  外部研究：无——一手来源（本仓 `wiring.ts:786` 与 `schema.ts:624`）已足够判定，
+  无需外部文档。
+- **改动**：`src/checkpoint/wiring.ts`（上限 `countCeiling` 改 `msCeiling` + 注释；
+  「超限省略、永不截断」语义不变）；`test/checkpoint-wiring.spec.ts`（新增 48h
+  用例）；`CHANGELOG.md` `[Unreleased]` 双语 Fixed；`DECISIONS.md` D-077；
+  `VALIDATION.md` Round 67；`lib/` 重建（checkpoint wiring 三文件）。版本号未动
+  （未发版，按 AGENTS.md 发版纪律：一次代码提交不等于公开发版）。
+- **红→绿（`CONFIRMED`）**：临时探针修前 `1 failed`
+  （`AssertionError: expected undefined to be 2000000`，
+  `.rsi/evidence/round-022/red-spec-run.txt`）；修后 3 文件 69 passed
+  （`green.txt`），探针已删，守卫留在 `checkpoint-wiring.spec.ts`。
+- **门禁（`CONFIRMED`）**：`npm run ci` exit 0 · **63 文件 / 1158 测试 PASS**
+  （基线 `2748e4a` 改前 63/1157，+1，无删除无 skip；`ci.txt`）；`tsc --noEmit`
+  0 error；oxlint 22 warnings / 0 errors；`npm run build` 连跑一致（幂等）；
+  `npm run verify:lib` 149 files byte-identical。
+- **独立审查（R5）**：fresh-context 子代理判 **PASS**（5 条：上限选对、守卫有效、
+  范围纪律、文档一致、无红旗）。零修回。
+- **未验证（`NOT_RUN`）**：真实 16 分钟以上 run 的 checkpoint 回读；发版。
+- **status:** OK
+
+- **Landed as:** commit `REPLACEME` — pushed `origin/main` fast-forward, no tag, no
+  Release, no npm publish. Evidence `.rsi/evidence/round-022/`.
