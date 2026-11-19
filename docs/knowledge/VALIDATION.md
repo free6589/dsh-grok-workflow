@@ -3930,3 +3930,36 @@ verifier=inherit; synthesizer=inherit' to contain 'supervisor=p1/m-sv'`），
 **未验证（`NOT_RUN`）**：真模型整轮（改动在渲染层，Loader 路径由 `loader.spec.ts` 覆盖）；
 GUI 点击；rrule 定时到点。`src/run.ts:141` 的 `configRouteLabels` 仍是四角色——那是
 C1 hint 输入，不是本轮主题，留给下一轮。
+
+## Round 66 — 2026-11-19 — RSI round 21：C1 跨 run 路由提示漏掉 `supervisor`（`CONFIRMED`，未发版）
+
+**缺陷**：`src/run.ts` `configRouteLabels()` 只摊平四个角色，`roles.supervisor` 链从不进入
+C1 跨 run 忙闲快照（`.rsi/POOL.md` R21）。修前探针：只加新用例、不改源码，
+`test/route-concurrency.spec.ts` **1 failed / 14 passed**，断言显示实收缺 `"sup/watcher"`
+（`AssertionError: expected [ 'plan-a', 'p1/m1', 'check-a', …(1) ] to deeply equal
+[ 'plan-a', 'p1/m1', 'check-a', …(2) ]`），见 `.rsi/evidence/round-021/red-spec-run.txt`。
+
+**改动**：`src/run.ts`（角色元组四改五，顺序 = `src/report.ts` `ROLE_NAMES` =
+`src/settings.ts` `ROLE_ORDER`）、`test/route-concurrency.spec.ts`（五角色完整标签列表用例）、
+`CHANGELOG.md` `[Unreleased]` 双语 Fixed、`lib/` 重建。版本号未动。
+
+**命令与结果（`CONFIRMED`，本树实跑）**：
+
+| 命令 | 结果 | 证据 |
+| --- | --- | --- |
+| 修前 `npx vitest run test/route-concurrency.spec.ts` | **1 failed / 14 passed** | `red-spec-run.txt` |
+| 修后同命令 | **15 passed** | `green-spec-run.txt` |
+| 收工复跑同命令 | **15 passed** | 本轮实跑 |
+| `npm run typecheck` | exit 0，0 error | `typecheck.txt`、`ci-cleanup.txt` |
+| `npm run ci`（改后） | exit 0，63 文件 / **1157** 测试 PASS，oxlint **22 warnings / 0 errors** | `ci.txt` |
+| `npm run ci`（清理收尾后复跑） | exit 0，63 文件 / **1157** 测试 PASS | `ci-cleanup.txt` |
+| `npm run build` ×2 + `diff -r` | 两次一致（幂等），`client bundle: 224525 bytes` | `build-second.txt`、`build-twice.diff`（空）、`build-idempotent.txt` |
+| `npm run verify:lib` | `lib/ at 3cd68eb is the build of src/ at 3cd68eb`（149 files byte-identical） | `verify-lib.txt` |
+
+**脏树与遗留文件**：`src/run.ts`、`test/route-concurrency.spec.ts`、`CHANGELOG.md`、
+`lib/run.*`、`.rsi/evidence/round-021/` 均保留并提交（`3cd68eb`）；
+`settings-simple-mock.html`（根目录遗留，`sha256 3fe1e657…`）存入
+`.rsi/archive/settings-simple-mock.html` 后可恢复，根副本已删；仓库内无其它
+`.bak/.orig/.tmp`（`.tmp/v100x-patch.bak` 在 `.gitignore` 的 `.tmp/` 内，属本地草稿区）。
+
+**未验证（`NOT_RUN`）**：两个真实并发 run 的避让效果；GUI 中观察提示；发版（本任务不授权）。

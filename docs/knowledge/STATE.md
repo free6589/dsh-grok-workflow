@@ -1336,3 +1336,34 @@ worker 链上限 50（HARD_LIMITS.chainLength）
 - **迁移**：supervisor 链指向未注册 provider 的 profile 现在装载失败 → 改为已注册 provider /
   已宣告模型，或只把该路由的 `provider` 留空（视为继承 run 的 provider）；**不要**删整条
   链（空链 = 监督门不跑，`src/script.ts:1945`）。
+
+## 2026-11-19 — RSI round 21：C1 跨 run 路由提示补上 `supervisor`；脏树清理与遗留文件归位（`CONFIRMED`）
+
+- **缺陷（`CONFIRMED`）**：`src/run.ts` 的 `configRouteLabels()` 只摊平
+  `planner/worker/verifier/synthesizer` 四个角色。有 `roles.supervisor` 链的 run，其
+  supervisor 路由从不进入 C1 跨 run 忙闲快照，于是另一个 run 打满的 supervisor 通道对下一次
+  run 不可见，不会先避让。这是 round 19（`settings.ts` `ROLE_ORDER`）、round 20（诊断台账）
+  同一遗漏类的第三处。
+- **改动**：`src/run.ts` 角色元组四改五（`planner, worker, verifier, supervisor,
+  synthesizer`，即 `src/report.ts` `ROLE_NAMES` / `src/settings.ts` `ROLE_ORDER` 的顺序）；
+  `test/route-concurrency.spec.ts` 新增五角色标签列表用例；`CHANGELOG.md` `[Unreleased]`
+  双语 Fixed 一条；`lib/` 由 `npm run build` 重建。版本号未动（开发提交，不发版）。
+- **红→绿（`CONFIRMED`）**：仅加用例时该文件 **1 failed / 14 passed**（实收缺
+  `"sup/watcher"`，`.rsi/evidence/round-021/red-spec-run.txt`）；补上角色后 **15 passed**
+  （`green-spec-run.txt`）。
+- **门禁（`CONFIRMED`）**：`npm run typecheck` exit 0；`npm run ci` exit 0，**63 文件 /
+  1157 测试 PASS**，oxlint 22 warnings / 0 errors；`npm run build` 连跑逐字节一致
+  （`client bundle: 224525 bytes`）；`npm run verify:lib` = `lib/ at 3cd68eb is the build of
+  src/ at 3cd68eb`（149 files byte-identical）。证据 `.rsi/evidence/round-021/`。
+- **来源**：改动与红/绿证据由并发写入者在 17:04:54–17:05:02 留下、未提交；本次清理任务核实
+  后落地为 `3cd68eb`（未 push、未打 tag、未建 Release）。
+- **脏树与遗留文件处置（`CONFIRMED`）**：`M src/run.ts`、`M test/route-concurrency.spec.ts`、
+  `M CHANGELOG.md`、`M lib/run.*`、`?? .rsi/evidence/round-021/` 全部有价值 → 已提交。
+  根目录遗留的 `settings-simple-mock.html`（179 行，sha256 `3fe1e657…`，D-055 的设计输入）
+  逐字节存到 `.rsi/archive/settings-simple-mock.html`，来源与还原命令见
+  `.rsi/archive/README.md`，根目录副本已删除；`.rsi/` 不在 `package.json` `files` 内，不会随包发布。
+  「允许未跟踪文件」白名单就此作废（原为 `settings-simple-mock.html`）。
+- **未验证（`NOT_RUN`）**：两个真实并发 run 的避让行为（提示只在脚本侧降权）；GUI 观感。
+- **受保护对象（`CONFIRMED`）**：`package.json`、`package-lock.json` 未改（sha256 与开工一致）；
+  `CHANGELOG.md` 只增 `[Unreleased]` 段；`lib/` 只经 `npm run build` 重建；`.git` 与
+  `v0.11.14`–`v0.11.19` 等已发布 tag 及其 peel 未动；无 force-push、无新 tag、不发布 npm。

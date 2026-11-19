@@ -742,3 +742,36 @@ no history is rewritten, and no round is force-pushed.
   https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.11.19
   with asset `dsh-grok-workflow-0.11.19.tgz`. Records follow-up commit `3019490`
   (STATE 99 lines / LOG row / ledger) pushed fast-forward.
+
+## Round 21 — 2026-11-19 — C1 跨 run 路由提示漏掉 `supervisor`（`CONFIRMED`，未发版）
+
+- **主题**：`src/run.ts` 的 `configRouteLabels()` 只摊平四个角色，而路由实际有五个。
+  `roles.supervisor` 链因此从不进入 C1 跨 run 忙闲快照：另一个活跃 run 打满的
+  supervisor 路由对下一次 run 不可见，它仍会往那条链里排 supervisor 调用，也不先避让
+  备选路由。与 round 19（`ROLE_ORDER`）、round 20（诊断台账）同一遗漏类的第三处，
+  round 20 的 LOG 已把它点名为「its own round」。
+- **来源与归属**：改动与红/绿证据是 2026-11-19 17:04:54–17:05:02 由一个并发写入者
+  留下的未提交工作（`M src/run.ts`、`M test/route-concurrency.spec.ts`、
+  `?? .rsi/evidence/round-021/`），它没走完收尾就停了。清理脏树的这次任务把这段工作
+  核实、重跑门禁后落地，没有重写它的证据，也没有替它编造结论。
+- **改动**：`src/run.ts`（角色元组四改五，按 `src/report.ts` `ROLE_NAMES` /
+  `src/settings.ts` `ROLE_ORDER` 的同一顺序 `planner, worker, verifier, supervisor,
+  synthesizer`，注释写明漏掉 supervisor 的后果）；`test/route-concurrency.spec.ts`
+  （新用例：五角色完整标签列表 `['plan-a', 'p1/m1', 'check-a', 'sup/watcher',
+  'synth-a']`，顺序即报告顺序）；`CHANGELOG.md` `[Unreleased]` 双语一条 Fixed；
+  `lib/` 用 `npm run build` 重建（`lib/run.js`、`run.js.map`、`run.d.ts`、
+  `run.d.ts.map` 四个文件，无手工改动）。
+- **红→绿（`CONFIRMED`）**：修前只加用例时 `test/route-concurrency.spec.ts`
+  **1 failed / 14 passed**，`AssertionError` 显示实收少了 `"sup/watcher"`
+  （`.rsi/evidence/round-021/red-spec-run.txt`）；修后同文件 **15 passed**
+  （`green-spec-run.txt`）。本轮收工前用当前树复跑同文件仍 15 passed。
+- **门禁（`CONFIRMED`，本树实跑）**：`npm run typecheck` exit 0（0 error）；
+  `npm run ci` exit 0 · **63 文件 / 1157 测试 PASS**（`ci.txt` 是并发写入者的改后门，
+  `ci-cleanup.txt` 是本次清理后的收尾门，两者数字一致）· oxlint 22 warnings / 0 errors；
+  `npm run build` 连跑产物逐字节一致（`sha256sum -c` 全 OK，`build-twice.diff` 空）；
+  `npm run verify:lib` = `lib/ at 3cd68eb is the build of src/ at 3cd68eb`
+  （149 files byte-identical，`verify-lib.txt`）。
+- **未验证（`NOT_RUN`）**：真模型整轮的跨 run 忙闲避让（提示只在脚本侧降权，需要两个
+  真实并发 run）；GUI 里看提示落地；发版（本轮是开发提交，不动 `package.json` 版本、
+  不建 tag、不建 Release、不发布 npm）。
+- **status:** OK

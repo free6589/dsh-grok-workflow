@@ -1,5 +1,33 @@
 # Agent Handoff
 
+## 2026-11-19 — round 21 落地（C1 提示补 `supervisor`）+ 脏树清理：遗留 mock 已归位归档
+
+- **From:** 清理任务（子代理）· **To:** 用户 / 下一轮接手者
+- **本轮改了什么（`CONFIRMED`）**：`src/run.ts` `configRouteLabels()` 补 `supervisor`
+  （五个角色、报告顺序），`test/route-concurrency.spec.ts` 钉住五角色标签列表；
+  `CHANGELOG.md` `[Unreleased]` 双语 Fixed；`lib/` 由 `npm run build` 重建。开发提交
+  `3cd68eb`，**未 push、未打 tag、未建 Release、未发 npm**。
+  这段改动与红/绿证据原本是并发写入者 17:04:54–17:05:02 留下的未提交工作，本次核实后落地。
+- **脏树处置（`CONFIRMED`）**：`M src/run.ts`、`M test/route-concurrency.spec.ts`、
+  `M CHANGELOG.md`、`M lib/run.d.ts|js|map`、`?? .rsi/evidence/round-021/` 全部有价值 →
+  提交；`git status --short --branch` 收工为干净（仅 `## main...origin/main [ahead 1]`）。
+- **遗留文件（`CONFIRMED`）**：根目录的 `settings-simple-mock.html`（179 行，sha256
+  `3fe1e657…`，D-055 设置面瘦身的设计输入）已逐字节存到
+  `.rsi/archive/settings-simple-mock.html`，来源/完整性/还原命令见
+  `.rsi/archive/README.md`，根副本删除。**旧结论「`settings-simple-mock.html` 允许未跟踪、
+  永不入库」就此作废**：仓库不再保留任何"故意未跟踪"的根文件，需要留存的草稿一律放
+  `.rsi/archive/`（不进 npm 包，`package.json` `files` 只含 `lib/**`、`docs/*.md`、
+  `docs/images` 等）。
+- **门禁（`CONFIRMED`）**：`npm run ci` exit 0 = **63 文件 / 1157 测试 PASS**，
+  `tsc --noEmit` 0 error，oxlint 22 warnings / 0 errors，`npm run build` 连跑逐字节一致，
+  `npm run verify:lib` = `lib/ at 3cd68eb is the build of src/ at 3cd68eb`（149 files
+  byte-identical）。证据 `.rsi/evidence/round-021/`。
+- **未验证（`NOT_RUN`）**：两个真实并发 run 的忙闲避让效果（提示只在脚本侧降权）；
+  GUI 观感；发版链路。
+- **接手注意**：本地比远端多一个提交（`origin/main` 仍是 `337b061` = `v0.11.19` 的树）。
+  下一轮若要发版，先 `git push origin main` 走 fast-forward，再按 `docs/RELEASING.md` 打
+  patch tag；不要 force-push，不要移动 `v0.11.14`–`v0.11.19`。
+
 ## 2026-11-19 — `0.11.17` 发版 + tag 安装验证 + 本机 GitHub 更新（已全部落地）
 
 - **From:** lead（本会话）· **To:** 用户 / 下一轮接手者

@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>干活设置</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background:#f5f5f7; color:#111; font-size:14px; line-height:1.6; }
+  .wrap { max-width:560px; margin:0 auto; padding:20px 16px 120px; }
+  h1 { font-size:20px; margin:4px 0 14px; }
+  .state { display:flex; align-items:center; gap:8px; background:#e9f6ee; border:1px solid #1a9d5a; border-radius:10px; padding:10px 14px; margin-bottom:14px; font-size:13px; }
+  .state.off { background:#f0f0f2; border-color:#c7c7cc; }
+  .dot { width:8px; height:8px; border-radius:50%; background:#1a9d5a; flex:none; }
+  .state.off .dot { background:#999; }
+  .card { background:#fff; border:1px solid rgba(0,0,0,.08); border-radius:14px; padding:16px 18px; margin-bottom:12px; }
+  .card h2 { font-size:15px; margin:0 0 6px; }
+  .row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 0; border-top:1px solid rgba(0,0,0,.06); }
+  .row:first-of-type { border-top:none; }
+  .label { font-weight:600; }
+  .switch { position:relative; width:46px; height:26px; border-radius:999px; border:0; background:#d1d5db; cursor:pointer; flex:none; padding:2px; display:inline-flex; align-items:center; justify-content:flex-start; }
+  .switch.on { background:#2f9e44; justify-content:flex-end; }
+  .thumb { width:22px; height:22px; border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.3); }
+  .pick2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:6px 0 10px; }
+  .pick { border:1px solid rgba(0,0,0,.15); border-radius:10px; background:#fff; padding:12px 10px; text-align:center; cursor:pointer; font-size:14px; font-weight:600; }
+  .pick.sel { border-color:#3b6ef6; background:rgba(59,110,246,.08); color:#2456d6; }
+  select { height:34px; border-radius:8px; border:1px solid rgba(0,0,0,.2); background:#fff; padding:0 8px; font-size:13px; width:100%; min-width:0; }
+  .role { padding:12px 0 4px; border-top:1px solid rgba(0,0,0,.06); }
+  .role:first-of-type { border-top:none; }
+  .roleHead { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  .roleName { font-weight:700; font-size:14px; }
+  .addBtn { border:1px solid rgba(0,0,0,.2); background:#fff; border-radius:8px; min-height:30px; padding:4px 12px; cursor:pointer; font-size:13px; }
+  .addBtn:disabled { opacity:.4; }
+  .routeRow { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+  .num { min-width:18px; text-align:center; color:#666; font-size:13px; }
+  .delBtn { flex:none; width:30px; height:30px; border-radius:8px; border:1px solid rgba(0,0,0,.2); background:#fff; cursor:pointer; font-size:14px; line-height:1; }
+  .step { display:inline-flex; align-items:center; gap:8px; }
+  .step button { width:30px; height:30px; border-radius:8px; border:1px solid rgba(0,0,0,.2); background:#fff; font-size:16px; cursor:pointer; line-height:1; }
+  .step b { min-width:40px; text-align:center; font-size:15px; }
+  .footer { position:fixed; left:0; right:0; bottom:0; background:rgba(245,245,247,.92); backdrop-filter:blur(8px); border-top:1px solid rgba(0,0,0,.08); padding:12px 16px; display:flex; gap:8px; justify-content:center; }
+  .footer button { min-height:38px; padding:6px 22px; border-radius:10px; font-size:14px; cursor:pointer; }
+  .save { background:#3b6ef6; color:#fff; border:1px solid transparent; font-weight:600; }
+  .save:disabled { opacity:.45; }
+  .giveup { background:transparent; border:1px solid rgba(0,0,0,.2); }
+  @media (max-width:480px){ .pick2{grid-template-columns:1fr;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>干活设置</h1>
+  <div class="state" id="stateBar"><span class="dot"></span><strong id="stateText">开 · auto</strong></div>
+
+  <div class="card">
+    <h2>1 · 总开关</h2>
+    <div class="row">
+      <span class="label" id="switchLabel">开</span>
+      <button class="switch on" id="mainSwitch" aria-label="总开关"><span class="thumb"></span></button>
+    </div>
+    <div class="row"><span class="label">模式</span></div>
+    <div class="pick2" id="modePick">
+      <button class="pick sel" data-v="auto">auto</button>
+      <button class="pick" data-v="full">full</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>2 · 执行模型</h2>
+    <div id="roles"></div>
+  </div>
+
+  <div class="card">
+    <h2>3 · 高级</h2>
+    <div class="row"><span class="label">同时干几件</span><span class="step"><button data-a="-" data-k="c">−</button><b id="v-c">10</b><button data-a="+" data-k="c">＋</button></span></div>
+    <div class="row"><span class="label">一次拆几件</span><span class="step"><button data-a="-" data-k="t">−</button><b id="v-t">10</b><button data-a="+" data-k="t">＋</button></span></div>
+  </div>
+</div>
+
+<div class="footer">
+  <button class="save" id="saveBtn" disabled>保存</button>
+  <button class="giveup" id="resetBtn">恢复原样</button>
+</div>
+
+<script>
+  const MODELS = ['跟现在一样', 'deepseek-v4', 'deepseek-v4.1-flash', 'agnes-flash'];
+  const ROLES = [
+    { id: 'chai', name: '拆活' },
+    { id: 'gan', name: '干活' },
+    { id: 'jian', name: '检查' },
+    { id: 'shou', name: '收尾' },
+    { id: 'du', name: '监督' },
+  ];
+  const MAX_BACKUP = 4;
+  const state = {};
+  ROLES.forEach(r => { state[r.id] = ['跟现在一样']; });
+
+  const rolesEl = document.getElementById('roles');
+  const save = document.getElementById('saveBtn');
+  function touch(){ save.disabled = false; save.textContent = '保存'; }
+
+  function renderRoles(){
+    rolesEl.innerHTML = '';
+    ROLES.forEach(r => {
+      const box = document.createElement('div');
+      box.className = 'role';
+      const head = document.createElement('div');
+      head.className = 'roleHead';
+      const nm = document.createElement('span');
+      nm.className = 'roleName';
+      nm.textContent = r.name;
+      const add = document.createElement('button');
+      add.className = 'addBtn';
+      add.textContent = '＋ 加备选';
+      add.disabled = state[r.id].length >= MAX_BACKUP;
+      add.onclick = () => { state[r.id].push('跟现在一样'); touch(); renderRoles(); };
+      head.appendChild(nm); head.appendChild(add);
+      box.appendChild(head);
+      state[r.id].forEach((m, i) => {
+        const row = document.createElement('div');
+        row.className = 'routeRow';
+        const num = document.createElement('span');
+        num.className = 'num';
+        num.textContent = (i + 1);
+        const sel = document.createElement('select');
+        MODELS.forEach(opt => {
+          const o = document.createElement('option');
+          o.value = opt; o.textContent = opt;
+          if (opt === m) o.selected = true;
+          sel.appendChild(o);
+        });
+        sel.onchange = () => { state[r.id][i] = sel.value; touch(); };
+        row.appendChild(num); row.appendChild(sel);
+        if (state[r.id].length > 1) {
+          const del = document.createElement('button');
+          del.className = 'delBtn';
+          del.textContent = '×';
+          del.onclick = () => { state[r.id].splice(i, 1); touch(); renderRoles(); };
+          row.appendChild(del);
+        }
+        box.appendChild(row);
+      });
+      rolesEl.appendChild(box);
+    });
+  }
+  renderRoles();
+
+  // 总开关
+  const sw = document.getElementById('mainSwitch');
+  const switchLabel = document.getElementById('switchLabel');
+  const stateBar = document.getElementById('stateBar');
+  const stateText = document.getElementById('stateText');
+  let mode = 'auto';
+  function refreshState(){
+    const on = sw.classList.contains('on');
+    switchLabel.textContent = on ? '开' : '关';
+    stateText.textContent = (on ? '开' : '关') + ' · ' + mode;
+    stateBar.classList.toggle('off', !on);
+  }
+  sw.onclick = () => { sw.classList.toggle('on'); touch(); refreshState(); };
+  document.querySelectorAll('#modePick .pick').forEach(b => b.onclick = () => {
+    document.querySelectorAll('#modePick .pick').forEach(x => x.classList.remove('sel'));
+    b.classList.add('sel'); mode = b.dataset.v; touch(); refreshState();
+  });
+
+  // 步进
+  const vals = { c:10, t:10 };
+  const lim = { c:[1,100], t:[1,100] };
+  document.querySelectorAll('.step button').forEach(btn => btn.onclick = () => {
+    const k = btn.dataset.k, d = btn.dataset.a === '+' ? 1 : -1;
+    let v = vals[k] + d;
+    v = Math.max(lim[k][0], Math.min(lim[k][1], v));
+    vals[k] = v; document.getElementById('v-'+k).textContent = v; touch();
+  });
+
+  save.onclick = () => { save.textContent = '已保存，下一条生效'; save.disabled = true; };
+  document.getElementById('resetBtn').onclick = () => location.reload();
+  refreshState();
+</script>
+</body>
+</html>

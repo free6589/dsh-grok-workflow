@@ -51,8 +51,13 @@ here and are marked DONE when their commit lands.
   (`answer.ts:111-114`, `delivery/index.ts:611`). S / low.
 - R9 PENDING · A COMPLETED run prints `Failures: 1 infrastructure` for an attempt that was
   retried and verified (`report.ts:769`, `delivery/index.ts:630`). S / low.
-- R8 PENDING · The ledger's model-route line omits `supervisor` (`delivery/index.ts:695`) and
-  pushes a duplicate `Synthesis: <mode>` label. S / low.
+- R8 DONE · The ledger's model-route line omitted `supervisor` (`delivery/index.ts:695`). The role
+  table now names all five in report order, with a parity assertion against the human route line
+  (`test/delivery.spec.ts`). Evidence `.rsi/evidence/round-020/`. The duplicate `Synthesis: <mode>`
+  label reported in the same audit line was outside that round and stays pooled. S / low.
+- R21 DONE · `configRouteLabels` (`src/run.ts:141`) flattened four roles, so a `roles.supervisor`
+  chain never reached the C1 cross-run busy hint. All five roles now, report order, pinned by
+  `test/route-concurrency.spec.ts`. Evidence `.rsi/evidence/round-021/`.
 - P · A fallback partial that verified everything says `0 项没做成` and never mentions the
   degraded plan (`delivery/index.ts:387-392`, `script.ts:2160`). S / low.
 - P · `dedupeBilingual` deletes a deliberately repeated sentence from an answer (`:429`).

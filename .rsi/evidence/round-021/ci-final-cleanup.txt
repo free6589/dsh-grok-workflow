@@ -1,0 +1,358 @@
+
+> dsh-grok-workflow@0.11.19 ci
+> npm run typecheck && npm run lint && npm run verify:lib && npm test
+
+
+> dsh-grok-workflow@0.11.19 typecheck
+> tsc -p tsconfig.json --noEmit
+
+
+> dsh-grok-workflow@0.11.19 lint
+> oxlint src test
+
+
+  ! eslint(no-unused-vars): Function 'resolveSwitchOn' is declared but never used.
+     ,-[src/config.ts:467:10]
+ 466 |  */
+ 467 | function resolveSwitchOn(list: FailureClass[] | undefined): FailureClass[] {
+     :          ^^^^^^^|^^^^^^^
+     :                 `-- 'resolveSwitchOn' is declared here
+ 468 |   if (list === undefined || list.length === 0) return []
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Function 'parseSingleRoute' is declared but never used.
+     ,-[src/config.ts:558:10]
+ 557 |  */
+ 558 | function parseSingleRoute(path: string, value: string | undefined): ModelRoute | undefined {
+     :          ^^^^^^^^|^^^^^^^
+     :                  `-- 'parseSingleRoute' is declared here
+ 559 |   const raw = (value ?? '').trim()
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Type alias 'OverrunField' is declared but never used.
+     ,-[src/config.ts:690:6]
+ 689 | /** @see {@link LimitField} */
+ 690 | type OverrunField = LegacyLimitField
+     :      ^^^^^^|^^^^^
+     :            `-- 'OverrunField' is declared here
+ 691 | 
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'agent' is declared but never used. Unused variables should start with a '_'.
+     ,-[test/human-output-contract.spec.ts:358:13]
+ 357 |     const mounted = await mount()
+ 358 |     const { agent, done } = await deliver(mounted)
+     :             ^^|^^
+     :               `-- 'agent' is declared here
+ 359 |     mounted.engine.runs[0]!.complete(completedReport(objectiveOf(mounted)))
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'agent' is declared but never used. Unused variables should start with a '_'.
+     ,-[test/human-output-contract.spec.ts:379:13]
+ 378 |     const mounted = await mount()
+ 379 |     const { agent, done } = await deliver(mounted)
+     :             ^^|^^
+     :               `-- 'agent' is declared here
+ 380 |     mounted.engine.runs[0]!.complete(partialReport(objectiveOf(mounted)))
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'agent' is declared but never used. Unused variables should start with a '_'.
+     ,-[test/human-output-contract.spec.ts:396:13]
+ 395 |     const mounted = await mount()
+ 396 |     const { agent, done } = await deliver(mounted)
+     :             ^^|^^
+     :               `-- 'agent' is declared here
+ 397 |     mounted.engine.runs[0]!.fail('error', 'boom')
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'agent' is declared but never used. Unused variables should start with a '_'.
+     ,-[test/human-output-contract.spec.ts:414:13]
+ 413 |     const mounted = await mount()
+ 414 |     const { agent, done } = await deliver(mounted)
+     :             ^^|^^
+     :               `-- 'agent' is declared here
+ 415 |     mounted.engine.runs[0]!.complete(completedReport(objectiveOf(mounted)))
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'agent' is declared but never used. Unused variables should start with a '_'.
+     ,-[test/human-output-contract.spec.ts:428:13]
+ 427 |     const mounted = await mount()
+ 428 |     const { agent, done } = await deliver(mounted)
+     :             ^^|^^
+     :               `-- 'agent' is declared here
+ 429 |     mounted.engine.runs[0]!.complete(partialReport(objectiveOf(mounted)))
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'agent' is declared but never used. Unused variables should start with a '_'.
+     ,-[test/human-output-contract.spec.ts:474:13]
+ 473 |     const mounted = await mount()
+ 474 |     const { agent, done } = await deliver(mounted)
+     :             ^^|^^
+     :               `-- 'agent' is declared here
+ 475 |     mounted.engine.runs[0]!.complete(partialReport(objectiveOf(mounted)))
+     `----
+  help: Consider removing this declaration.
+
+  ! unicorn(no-useless-spread): Using a spread operator here creates a new object unnecessarily.
+     ,-[src/gate.ts:609:7]
+ 608 |     lines.push('', '取消前保留的工作流报告：', relayText(report, undefined, {
+ 609 |       ...opts.lang === undefined ? {} : { lang: opts.lang },
+     :       ^^^
+ 610 |     }))
+     `----
+  help: `opts.lang === undefined ? {} : { lang: opts.lang }` returns a new object. Spreading it into an object expression to create a new object is redundant.
+
+  ! unicorn(no-useless-spread): Using a spread operator here creates a new object unnecessarily.
+      ,-[src/gate.ts:1104:9]
+ 1103 |       return relayText(answer.report, answer.header, {
+ 1104 |         ...answer.lang === undefined ? {} : { lang: answer.lang },
+      :         ^^^
+ 1105 |       })
+      `----
+  help: This expression returns a new object. Spreading it into an object expression to create a new object is redundant.
+
+  ! eslint(no-unused-vars): Interface 'TaskRow' is declared but never used.
+     ,-[test/timeout-config.spec.ts:245:13]
+ 244 | 
+ 245 |   interface TaskRow {
+     :             ^^^|^^^
+     :                `-- 'TaskRow' is declared here
+ 246 |     id: string
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Class 'RecordingSession' is declared but never used.
+     ,-[test/gate.spec.ts:184:7]
+ 183 | /** Session that records surface appends, used by the append-strategy tests. */
+ 184 | class RecordingSession {
+     :       ^^^^^^^^|^^^^^^^
+     :               `-- 'RecordingSession' is declared here
+ 185 |   readonly id = 'sess-recording'
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-useless-escape): Unnecessary escape character '['
+     ,-[src/redact.ts:174:348]
+ 173 |     name: 'key-value',
+ 174 |     pattern: /(?<![A-Za-z0-9])((?:[A-Za-z0-9]+[_-]){0,8}(?:api[_-]?key|access[_-]?key(?:[_-]?id)?|private[_-]?key|secret[_-]?access[_-]?key|secret[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|session[_-]?id|client[_-]?secret|token|secret|passphrase|password|passwd|pass|pwd|session|credentials?))(["']?)(\s*[:=]\s*)(?!["'\[{]|required\b|optional\b|enabled\b|disabled\b|true\b|false\b|null\b|none\b)([^\s,;}\]]{6,})/gi,
+     :                                                                                                                                                                                                                                                                                                                                                            ^^
+ 175 |     replacement: '$1$2$3[REDACTED]',
+     `----
+  help: Replace `\[` with `[`.
+
+  ! eslint(no-unused-vars): Type 'RoleName' is imported but never used.
+    ,-[src/run.ts:39:93]
+ 38 | import { redactDeep, redactError, redactSecrets } from './redact.js'
+ 39 | import type { FailureCategory, FinalStatus, IncompleteItem, NormalizedTask, ResolvedConfig, RoleName, WorkflowReport } from './types.js'
+    :                                                                                             ^^^^|^^^
+    :                                                                                                 `-- 'RoleName' is imported here
+ 40 | 
+    `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Parameter 'draft' is declared but never used. Unused parameters should start with a '_'.
+     ,-[src/client/index.js:670:24]
+ 669 |      */
+ 670 |     function comboWarn(draft) {
+     :                        ^^|^^
+     :                          `-- 'draft' is declared here
+ 671 |       return false
+     `----
+  help: Consider removing this parameter.
+
+  ! eslint(no-unused-vars): Function 'ScalarField' is declared but never used.
+      ,-[src/client/index.js:1053:14]
+ 1052 | 
+ 1053 |     function ScalarField(props) {
+      :              ^^^^^|^^^^^
+      :                   `-- 'ScalarField' is declared here
+ 1054 |       const { field, draft, disabled, onChange, t } = props
+      `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Function 'ClassPicker' is declared but never used.
+      ,-[src/client/index.js:1086:14]
+ 1085 |     // site is explicit instead of a silent deletion.
+ 1086 |     function ClassPicker(props) {
+      :              ^^^^^|^^^^^
+      :                   `-- 'ClassPicker' is declared here
+ 1087 |       return null
+      `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Parameter 'props' is declared but never used. Unused parameters should start with a '_'.
+      ,-[src/client/index.js:1086:26]
+ 1085 |     // site is explicit instead of a silent deletion.
+ 1086 |     function ClassPicker(props) {
+      :                          ^^|^^
+      :                            `-- 'props' is declared here
+ 1087 |       return null
+      `----
+  help: Consider removing this parameter.
+
+  ! eslint(no-unused-vars): Function 'TriageModelPicker' is declared but never used.
+      ,-[src/client/index.js:1190:14]
+ 1189 |     // page) so the removal site is explicit instead of a silent deletion.
+ 1190 |     function TriageModelPicker(props) {
+      :              ^^^^^^^^|^^^^^^^^
+      :                      `-- 'TriageModelPicker' is declared here
+ 1191 |       return null
+      `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Parameter 'props' is declared but never used. Unused parameters should start with a '_'.
+      ,-[src/client/index.js:1190:32]
+ 1189 |     // page) so the removal site is explicit instead of a silent deletion.
+ 1190 |     function TriageModelPicker(props) {
+      :                                ^^|^^
+      :                                  `-- 'props' is declared here
+ 1191 |       return null
+      `----
+  help: Consider removing this parameter.
+
+  ! eslint(no-unused-vars): Variable 'enumRow' is declared but never used. Unused variables should start with a '_'.
+      ,-[src/client/index.js:1334:13]
+ 1333 |       const fieldByKey = (key) => FIELDS.find((field) => field.key === key)
+ 1334 |       const enumRow = (key) => {
+      :             ^^^|^^^
+      :                `-- 'enumRow' is declared here
+ 1335 |         const field = fieldByKey(key)
+      `----
+  help: Consider removing this declaration.
+
+Found 22 warnings and 0 errors.
+Finished in 41ms on 109 files with 96 rules using 6 threads.
+
+> dsh-grok-workflow@0.11.19 verify:lib
+> node scripts/verify-lib.mjs
+
+client bundle: 224525 bytes → lib/client.js
+lib/ at 3cd68eb is the build of src/ at 3cd68eb (149 files, byte-identical)
+
+> dsh-grok-workflow@0.11.19 test
+> npm run build && vitest run
+
+
+> dsh-grok-workflow@0.11.19 build
+> tsc -p tsconfig.build.json && node scripts/build-client.mjs
+
+client bundle: 224525 bytes → lib/client.js
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+(node:170) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGTERM listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:170) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGINT listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:170) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGHUP listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+ ✓ test/phase1-dialogue.spec.ts (33 tests) 1306ms
+(node:181) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGTERM listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:181) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGINT listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:181) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGHUP listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+ ✓ test/gate.spec.ts (52 tests) 1188ms
+ ✓ test/plugin-lifecycle.spec.ts (17 tests) 862ms
+ ✓ test/heartbeat-guard.spec.ts (14 tests) 550ms
+ ✓ test/issue-watch.spec.ts (2 tests) 271ms
+(node:879) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGTERM listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:879) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGINT listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:879) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGHUP listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+ ✓ test/triage.spec.ts (43 tests) 437ms
+ ✓ test/human-output-contract.spec.ts (10 tests) 398ms
+ ✓ test/gate-partial-head.spec.ts (12 tests) 336ms
+ ✓ test/timeout-config.spec.ts (12 tests) 312ms
+ ✓ test/reliability.spec.ts (25 tests) 295ms
+ ✓ test/checkpoint-schema.spec.ts (36 tests) 272ms
+(node:937) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/memory-archive.spec.ts (21 tests) 399ms
+ ✓ test/config-limits-repair.spec.ts (24 tests) 200ms
+(node:979) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/panel.spec.ts (13 tests) 192ms
+ ✓ test/objective-limit.spec.ts (16 tests) 187ms
+(node:1006) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/progress.spec.ts (12 tests) 168ms
+ ✓ test/loop-runtime-wiring.spec.ts (5 tests) 214ms
+ ✓ test/orchestrator.spec.ts (26 tests) 162ms
+ ✓ test/recovery-kill-restart.spec.ts (3 tests) 161ms
+ ✓ test/lifecycle-disposal.spec.ts (15 tests) 139ms
+ ✓ test/route-concurrency.spec.ts (15 tests) 149ms
+ ✓ test/fallback-shards.spec.ts (16 tests) 138ms
+ ✓ test/paths.spec.ts (18 tests) 143ms
+ ✓ test/command.spec.ts (16 tests) 136ms
+stderr | test/client.spec.ts > client settings page: reading, failure and retry > keeps still reading, read failed and not served as three different pages
+[grok-workflow] no settings namespace projects this plugin's fields: the row is disabled, renamed with an unreadable projection, or did not activate (see docs/LOCAL-TESTING.md#enable). The Grok workflow page cannot appear until it does.
+
+(node:1110) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/client.spec.ts (92 tests) 134ms
+(node:1117) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+stdout | test/checkpoint-engine-wire.spec.ts > engine wiring writes real checkpoints > records a verified run: tasks, five-role agent rows, evidence, and no extra model calls
+[smoke] status=completed file=/tmp/dsh-grok-workflow-test-checkpoints/checkpoint-58136c60-e92f-49eb-8f99-547f8c5aa1f5-0544eac8.json resume=none reason=the run already completed, so re-driving it would redo verified work
+
+stdout | test/checkpoint-engine-wire.spec.ts > engine wiring writes real checkpoints > records a rejected run and answers the resume question with what to re-drive
+[smoke] status=failed file=/tmp/dsh-grok-workflow-test-checkpoints/checkpoint-1300d008-d6cb-4c7c-8f01-e38cc5aa9505-6736293a.json resume=resume unfinished=a
+
+ ✓ test/checkpoint-engine-wire.spec.ts (2 tests) 124ms
+ ✓ test/settings-projection.spec.ts (4 tests) 21ms
+(node:1138) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/engine-contract.spec.ts (15 tests) 100ms
+ ✓ test/composition.spec.ts (9 tests) 93ms
+ ✓ test/loader.spec.ts (3 tests) 178ms
+(node:1178) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/failure-paths.spec.ts (14 tests) 78ms
+ ✓ test/checkpoint-wiring.spec.ts (30 tests) 88ms
+ ✓ test/routing.spec.ts (25 tests) 75ms
+ ✓ test/triage-recall.spec.ts (28 tests) 121ms
+ ✓ test/redact.spec.ts (32 tests) 53ms
+ ✓ test/loop-surface.spec.ts (16 tests) 68ms
+ ✓ test/synthesis-guardrails.spec.ts (17 tests) 55ms
+ ✓ test/config.spec.ts (37 tests) 52ms
+ ✓ test/guardian.spec.ts (12 tests) 69ms
+(node:1250) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/team-engine.spec.ts (12 tests) 38ms
+ ✓ test/naming.spec.ts (15 tests) 35ms
+ ✓ test/carryover.spec.ts (21 tests) 35ms
+ ✓ test/recovery-artifacts.spec.ts (9 tests) 33ms
+ ✓ test/loop.spec.ts (31 tests) 30ms
+ ✓ test/delivery.spec.ts (13 tests) 28ms
+ ✓ test/loop-brakes.spec.ts (35 tests) 25ms
+ ✓ test/delivery-human-block.spec.ts (10 tests) 25ms
+ ✓ test/report.spec.ts (42 tests) 21ms
+ ✓ test/progress-tab.spec.ts (34 tests) 20ms
+(node:1327) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/progress-connector.spec.ts (10 tests) 14ms
+ ✓ test/docs-config-keys.spec.ts (12 tests) 16ms
+ ✓ test/history.spec.ts (16 tests) 14ms
+ ✓ test/resume-validator.spec.ts (19 tests) 14ms
+ ✓ test/panel-links.spec.ts (16 tests) 14ms
+ ✓ test/config-synthesis-fallback.spec.ts (8 tests) 13ms
+ ✓ test/records-redaction.spec.ts (4 tests) 12ms
+ ✓ test/mode.spec.ts (18 tests) 12ms
+ ✓ test/input.spec.ts (13 tests) 11ms
+ ✓ test/docs-version.spec.ts (8 tests) 10ms
+ ✓ test/triage-followup.spec.ts (5 tests) 10ms
+ ✓ test/criterion.spec.ts (5 tests) 8ms
+ ✓ test/i18n-parity.spec.ts (6 tests) 7ms
+ ✓ test/docs-architecture-version.spec.ts (3 tests) 5ms
+
+ Test Files  63 passed (63)
+      Tests  1157 passed (1157)
+   Start at  20:01:46
+   Duration  22.48s (transform 1.54s, setup 0ms, import 4.71s, tests 10.37s, environment 7ms)
+
