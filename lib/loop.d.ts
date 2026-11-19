@@ -32,11 +32,43 @@
  *   inbox accepted a message, not whether the model's round succeeded, so the host has
  *   no honest failure count to compare. The number is carried into the heartbeat text
  *   as an instruction instead, and this limitation is stated rather than implied.
+ *
+ * **Two heartbeats, one shape.** This repository also runs an *Iterate* heartbeat (the
+ * RSI self-iteration loop): a second instance of this service (`src/index.ts`), bound to
+ * its own slot (`{@link ITERATE_TASK_TITLE}`) and its own route, whose stored prompt is
+ * the operator-editable `iterateTemplate`. Both deliveries arrive as
+ * `source.kind === 'schedule'`, so identity is all that keeps them apart, and it is split
+ * deliberately into two predicates with two different jobs:
+ *
+ * - {@link isLoopHeartbeat} — the *routing* identity, read from prompt text by the gate.
+ *   It matches this plugin's marker and nothing else, which is why an Iterate delivery
+ *   takes the generic non-user pass and is never charged to a loop or stopped by a brake.
+ * - {@link isLoopSlot} — the *storage* identity, read from a Schedule row. It matches the
+ *   reserved task name, which is what close/archive/unload act on; a prompt is editable
+ *   text (DSH's own `schedule_edit` accepts `prompt`), so a row whose marker was edited
+ *   away is still this plugin's slot even though it no longer routes as a heartbeat.
+ *   Each instance binds it to its own title (`slotOf`), never to another heartbeat's.
+ *
+ * Neither identity may match the other heartbeat's task, in either direction.
+ * `test/heartbeat-identity.spec.ts` pins that against the real `.rsi/HEARTBEAT.md`
+ * template, and `docs/knowledge/HEARTBEATS.md` records the audit behind it.
  */
 import type { WorkflowLogger } from './run.js';
-/** Stored task name of every loop heartbeat. Matched exactly, together with the marker. */
+/**
+ * Stored task name of every loop heartbeat: this plugin's reserved Schedule slot.
+ *
+ * Matched exactly, and used for two different questions — is this row ours to delete
+ * ({@link isLoopSlot}), and does this row still route as a heartbeat ({@link isLoopTask}).
+ * The name is reserved: another Schedule task under the same name, in a session this
+ * plugin drives, is treated as this plugin's slot.
+ */
 export declare const LOOP_TASK_TITLE = "Loop heartbeat";
-/** First line of every heartbeat prompt; the ownership marker cleanup matches on. */
+/**
+ * First line of every loop heartbeat prompt: the *routing* marker the gate matches on.
+ *
+ * Cleanup does not use it — that is {@link isLoopSlot}'s job — because the prompt is
+ * editable text.
+ */
 export declare const LOOP_PROMPT_PREFIX = "[grok-workflow loop]";
 /**
  * True when this text is a heartbeat this plugin wrote.
@@ -64,6 +96,18 @@ export declare const MAX_LOOP_INTERVAL_MINUTES: number;
 export declare const MAX_LOOP_PROMPT_CHARS = 4000;
 /** Route the browser switch posts to. One exact path, one POST body. */
 export declare const LOOP_ROUTE_PATH = "/grok-workflow/loop";
+/**
+ * Stored task name of the self-iteration heartbeat (`/grok-workflow/iterate`).
+ *
+ * Deliberately different from {@link LOOP_TASK_TITLE}: the two switches must never
+ * adopt or delete each other's row, and the name is the storage identity. This is
+ * also the name `docs/knowledge/HEARTBEATS.md` §1 recommends for the operator's own
+ * Automation task, so a row the operator armed by hand and one the switch armed are
+ * the same slot, not two competing beats.
+ */
+export declare const ITERATE_TASK_TITLE = "RSI heartbeat";
+/** Route the self-iteration switch posts to. */
+export declare const ITERATE_ROUTE_PATH = "/grok-workflow/iterate";
 /** Model-facing tool name. Registered only when the Host composes Schedule. */
 export declare const LOOP_TOOL_NAME = "grok_loop";
 /** Failure kinds this service states. Stable strings, so a UI can branch on them. */
@@ -200,6 +244,30 @@ export interface LoopServiceDeps {
     readonly policy?: () => LoopPolicy;
     /** Clock seam for the RRULE anchor. */
     readonly now?: () => number;
+    /**
+     * Which Schedule slot this instance owns. Defaults to the auto-continue loop
+     * identity ({@link LOOP_TASK_TITLE} + {@link LOOP_PROMPT_PREFIX}); the
+     * self-iteration service passes its own title so the two switches can never
+     * adopt, charge or delete each other's row. A prompt prefix of `undefined`
+     * means the prompt is free text (the editable template) and is never
+     * marker-checked.
+     */
+    readonly identity?: LoopIdentity;
+}
+/**
+ * The Schedule slot one service instance owns.
+ *
+ * Storage identity is the reserved task {@link title}; the optional
+ * {@link promptPrefix} is the routing marker that keeps a delivery a continuation.
+ * The self-iteration heartbeat deliberately has none: its deliveries route as
+ * ordinary schedule messages (`docs/knowledge/HEARTBEATS.md` §2), so the gate's
+ * dispatcher is never touched by this service.
+ */
+export interface LoopIdentity {
+    readonly title: string;
+    readonly promptPrefix?: string;
+    /** Prompt used when a request carries none; defaults to the loop's own text. */
+    readonly defaultPrompt?: (policy: LoopPolicy) => string;
 }
 /** The one Host-surface object both callers use. */
 export interface LoopService {
@@ -226,7 +294,32 @@ export interface LoopService {
     /** Delete the loop heartbeat of one session; used by archive. */
     forgetSession(sessionId: string): Promise<number>;
 }
-/** True when the row is a heartbeat this plugin owns. */
+/**
+ * True when this row occupies the loop slot: the reserved name, a recurring rule, and
+ * (when asked) this session as the delivery target.
+ *
+ * This is the **storage** identity, and it is deliberately weaker than
+ * {@link isLoopTask}: a prompt is editable text, and DSH's own `schedule_edit` accepts a
+ * new one. A row whose marker an operator edited away is still the row this plugin
+ * opened, so closing, archiving and unloading must still be able to take it away —
+ * otherwise a live delivery would keep arriving after the switch said "off". Routing
+ * never uses this predicate; {@link isLoopHeartbeat} is the only routing identity.
+ * @param task - one Schedule catalog row.
+ * @param sessionId - when given, the row must target this session.
+ * @returns true when the row is this plugin's slot.
+ */
+export declare function isLoopSlot(task: LoopScheduleTask, sessionId?: string): boolean;
+/**
+ * True when the row is a loop heartbeat this plugin wrote: the slot, plus the marker
+ * that makes its deliveries route as continuations.
+ *
+ * Checked as a pair because neither half identifies a heartbeat on its own — a task that
+ * merely shares the reserved name does not route here, and a prompt that merely quotes
+ * the marker is not this plugin's row. Neither half may match the Iterate task.
+ * @param task - one Schedule catalog row.
+ * @param sessionId - when given, the row must target this session.
+ * @returns true when the row is both this plugin's slot and still marked.
+ */
 export declare function isLoopTask(task: LoopScheduleTask, sessionId?: string): boolean;
 /**
  * Effective heartbeat interval from the live configuration.
@@ -289,17 +382,28 @@ export declare function scheduleServiceOf(ctx: {
     readonly get?: (name: string) => unknown;
 }): LoopScheduleLike | undefined;
 /**
- * Delete every heartbeat this plugin owns for one session, in one place.
+ * Delete every heartbeat one identity owns for one session, in one place.
  *
- * Both callers that must leave nothing behind share this body: the archive/stop
- * cleanup on the service, and a brake that stops a loop after the fact. The count is
- * what is actually gone, not what was attempted — a refused delete leaves a live row,
- * and reporting "deleted" over a surviving heartbeat is the one lie this cleanup
- * exists to prevent.
+ * Ownership here is the slot (`slot`), not the marker: a row whose prompt was edited
+ * away must still be removable, or a brake that stops a loop would leave the very
+ * deliveries it exists to prevent.
+ *
+ * The slot predicate is a parameter because two services share this body with two
+ * different slots (`Loop heartbeat` and `RSI heartbeat`). A hard-coded predicate would
+ * make the iterate service's archive cleanup delete the *loop's* row and leave its own,
+ * which is the one cross-heartbeat write this separation exists to prevent. The default
+ * is the loop's own slot, so the brake — which owns only the loop — keeps its meaning
+ * without passing anything.
+ *
+ * Both callers that must leave nothing behind share this body: the archive cleanup on a
+ * service, and a brake that stops a loop after the fact. The count is what is actually
+ * gone, not what was attempted — a refused delete leaves a live row, and reporting
+ * "deleted" over a surviving heartbeat is the one lie this cleanup exists to prevent.
  * @param service - the Host Schedule surface rows live in.
  * @param sessionId - session whose heartbeats go.
  * @param logger - warn sink for a refused delete.
+ * @param slot - storage predicate of the identity whose rows go; defaults to the loop slot.
  * @returns how many rows are no longer stored.
  */
-export declare function deleteSessionHeartbeats(service: LoopScheduleLike, sessionId: string, logger: WorkflowLogger): Promise<number>;
+export declare function deleteSessionHeartbeats(service: LoopScheduleLike, sessionId: string, logger: WorkflowLogger, slot?: (task: LoopScheduleTask, sessionId?: string) => boolean): Promise<number>;
 //# sourceMappingURL=loop.d.ts.map

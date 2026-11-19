@@ -1,0 +1,32 @@
+# Exact commands and outcomes (all read-only)
+
+Run at 2026-11-20T00:57–01:01 +08:00 from `/home/fish/projects_mine/dsh-grok-workflow`.
+Writes performed by this task: only files under `/tmp/live-env-evidence-20261119T1623Z/`.
+No source edit, no `git` mutation, no schedule/profile/settings write, no credential read.
+
+| # | command | outcome |
+| --- | --- | --- |
+| 1 | `git status --short --branch` ; `git log --oneline -3` | `## main...origin/main` with `M CHANGELOG.md README* docs/knowledge/*.md lib/* src/*`; HEAD `22bbe17 docs(rsi): record 0.11.21 release` |
+| 2 | `cat ~/.dsh/profiles/web/package.json` | dependency `dsh-grok-workflow: github:free6589/dsh-grok-workflow`; bundle row mounted |
+| 3 | `grep -n -i grok ~/.dsh/profiles/web/node_modules/.modules.yaml` | `dsh-grok-workflow@https://codeload.github.com/free6589/dsh-grok-workflow/tar.gz/22bbe178ed…0fe6` |
+| 4 | `sed -n '32,40p;223,231p' ~/.dsh/profiles/web/pnpm-lock.yaml` | specifier + tarball URL + `version: 0.11.21` + sha512 integrity |
+| 5 | `cat ~/.dsh/profiles/web/node_modules/dsh-grok-workflow/package.json` | `"version": "0.11.21"` |
+| 6 | `readlink -f node_modules/git` | dangling symlink target absent (not the resolution path) |
+| 7 | `sed -n '550,600p' ~/.dsh/profiles/web/cordis.patch.yml` | `- id: grok-workflow`, `mode: full`, `grokDefault: on`, 5 roles, `timeoutMs: 0` |
+| 8 | `sha256sum` installed vs local `lib/{index,loop,client}.js`; `git show HEAD:lib/… \| sha256sum` | installed == HEAD for all three; local `lib/loop.js` differs (`0e6233d4…` vs `1a58d317…`) |
+| 9 | `grep -o "Usage: /grok \[on|off\][^\"']*" lib/command.js` (installed, local, HEAD) | installed/HEAD = short form; local = long form with "This text was not sent as a prompt" |
+| 10 | `comm -13 <(ls installed/lib) <(ls local/lib)` | local adds `intake.js`, `intake.d.ts`, `intake.d.ts.map`; installed has no `intake.*` |
+| 11 | `python3` parse of `~/.dsh/storages/schedule.json` | 1 task (`派发个人助理灵感箱`), 0 `Loop heartbeat` rows; 16047 B, mtime 00:06:39, sha256 `4be1a929…abc3f` |
+| 12 | `grok_loop(action="status")` (plugin tool) | `Loop heartbeat: closed for session 2357e7bd-1794-4b2b-94e5-0ff20c0d3fdb.` |
+| 13 | `schedule_list(limit=100)` (host tool) | BLOCKED — `{"code":"subagent_session","message":"A delegated subagent cannot use scheduled tasks."}` |
+| 14 | `curl -s -m 5 -o /tmp/lp.txt -w 'HTTP %{http_code}\n' -X POST http://127.0.0.1:3451/grok-workflow/loop -H 'content-type: application/json' -d '{"action":"status","sessionId":"session-2bc2c2f1-…"}'` | `HTTP 401` (auth required); not retried, no cookie hunted |
+| 15 | `find ~/.dsh -name 'schedule*.json' -not -path '*/node_modules/*'` ; `find ~/.dsh/profiles -maxdepth 3 -name 'schedule*.json'` | exactly one store: `~/.dsh/storages/schedule.json` (schedules are machine-global, not per-profile) |
+| 16 | `ps -eo pid,etime,args \| grep dsh` ; `ps -o pid,lstart,args -p 154637 -p 2439039` | web GUI PID 154637 since Nov 17 22:49:32; loopfix-verify PID 2439039 since Nov 20 00:14:47 (still running) |
+| 17 | `python3` census over `03-repro-logs/session-042dfe19-events.jsonl` | 14 events, `user/message` = 0, 3 × `command/run name:"grok"`, 2 × `error "Usage: /grok [on|off]"` |
+| 18 | `python3` census over `03-repro-logs/session-b7be2bd2-events.jsonl` | 19 events; `/grok on` success + mode `enabled:true`; paste → usage error ×2; `/grok off` success + `enabled:false` |
+| 19 | `ls -la ~/.dsh/sessions/--home-fish-projects_mine-dsh-grok-workflow--/session-042dfe19-…/` | `session.v4.jsonl.zstd` 6216 B, mtime 2026-11-20 00:12 — repro session is real in the live store |
+| 20 | `cat .rsi/evidence/round-023/{loop-route.txt,switch-prod-path.txt}` | the on/off route transcript and the production-path switch transcript quoted in `02-schedules/loop-heartbeat-states.txt` |
+
+Not run, on purpose: any `dsh` restart, any `--dump-config` (extra process), any schedule create/edit,
+any POST that writes a session message, any read of `~/.dsh/.credentials.yaml`, `bifrost.env`,
+`~/.dsh/*.key`.

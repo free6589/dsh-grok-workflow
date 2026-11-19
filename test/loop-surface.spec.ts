@@ -17,7 +17,8 @@ import { Readable } from 'node:stream'
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
 import {
-  createLoopService, DEFAULT_LOOP_INTERVAL_MINUTES, defaultLoopPrompt, LOOP_ROUTE_PATH, LOOP_TASK_TITLE,
+  createLoopService, DEFAULT_LOOP_INTERVAL_MINUTES, defaultLoopPrompt, ITERATE_ROUTE_PATH, ITERATE_TASK_TITLE,
+  LOOP_PROMPT_PREFIX, LOOP_ROUTE_PATH, LOOP_TASK_TITLE,
   LOOP_TOOL_NAME, loopRrule, scheduleServiceOf,
 } from '../src/loop.js'
 import type { LoopScheduleCreate, LoopScheduleEdit, LoopScheduleLike, LoopScheduleTask, LoopSnapshot } from '../src/loop.js'
@@ -223,6 +224,116 @@ function wiring(schedule: LoopScheduleLike | undefined, rejection?: number) {
   installLoop({ ctx, loop, logger: log })
   return { loop, routes, tools, listeners, effects }
 }
+
+/**
+ * Both switches mounted on one composition: two services, two routes, one Schedule.
+ *
+ * This is the isolation the operator depends on — the Loop switch must never close the
+ * RSI task, and the Self-iterate switch must never close the loop — proven at the layer
+ * that actually dispatches a browser click (the route handler), not only in the service.
+ */
+function wiringBoth(schedule: LoopScheduleLike) {
+  const { logger: log } = logger()
+  const loop = serviceFor(schedule)
+  const iterate = createLoopService({
+    schedule: () => schedule,
+    logger: log,
+    now: () => NOW,
+    identity: { title: ITERATE_TASK_TITLE, defaultPrompt: () => '# RSI heartbeat — self-iteration round' },
+    policy: () => ({ intervalMinutes: DEFAULT_LOOP_INTERVAL_MINUTES, rounds: 10, failStreak: 3 }),
+  })
+  const routes: FakeRoute[] = []
+  const tools: unknown[] = []
+  const effects: (() => unknown)[] = []
+  const webServer = {
+    register: (route: FakeRoute) => {
+      routes.push(route)
+      return () => {}
+    },
+  }
+  const connection = { requestRejection: () => undefined }
+  const child: LoopHostContext = {
+    webServer: webServer as unknown as NonNullable<LoopHostContext['webServer']>,
+    connection,
+    tools: { register: (tool: unknown) => { tools.push(tool); return () => {} } },
+    effect: ((installer: () => unknown) => {
+      const disposer = installer()
+      if (typeof disposer === 'function') effects.push(disposer as () => unknown)
+      return disposer
+    }) as unknown as NonNullable<LoopHostContext['effect']>,
+  }
+  const ctx: LoopHostContext = {
+    webServer: webServer as unknown as NonNullable<LoopHostContext['webServer']>,
+    connection,
+    inject: (_deps: readonly string[], callback: (child: LoopHostContext) => void) => { callback(child) },
+    on: () => () => {},
+    effect: ((installer: () => unknown) => {
+      const disposer = installer()
+      if (typeof disposer === 'function') effects.push(disposer as () => unknown)
+      return disposer
+    }) as unknown as NonNullable<LoopHostContext['effect']>,
+  }
+  installLoop({ ctx, loop, logger: log, iterate })
+  const routeAt = (path: string) => routes.find(route => route.path === path)!
+  return { loop, iterate, routes, tools, effects, routeAt }
+}
+
+describe('two switches, two routes: one heartbeat never drives the other', () => {
+  it('registers one exact route per heartbeat, with distinct paths', () => {
+    const wired = wiringBoth(new FakeSchedule())
+    expect(wired.routes.map(route => route.path)).toEqual([LOOP_ROUTE_PATH, ITERATE_ROUTE_PATH])
+    expect(LOOP_ROUTE_PATH).not.toBe(ITERATE_ROUTE_PATH)
+    // One tool, and it is the loop's: the self-iteration beat is armed by the switch,
+    // never by a model-facing tool.
+    expect(wired.tools).toHaveLength(1)
+    expect((wired.tools[0] as { name?: string }).name).toBe(LOOP_TOOL_NAME)
+  })
+
+  it('arms the RSI slot through its own route and leaves the loop row alone', async () => {
+    const schedule = new FakeSchedule()
+    const wired = wiringBoth(schedule)
+    const loopRoute = wired.routeAt(LOOP_ROUTE_PATH)
+    const iterateRoute = wired.routeAt(ITERATE_ROUTE_PATH)
+
+    await loopRoute.handler(fakeRequest('POST', { action: 'open', sessionId: SESSION }), fakeResponse())
+    const iterateOpened = fakeResponse()
+    await iterateRoute.handler(fakeRequest('POST', { action: 'open', sessionId: SESSION }), iterateOpened)
+    expect(JSON.parse(iterateOpened.body)).toMatchObject({ ok: true, loop: { open: true } })
+
+    const titles = [...schedule.tasks.values()].map(task => task.title)
+    expect(titles).toEqual([LOOP_TASK_TITLE, ITERATE_TASK_TITLE])
+    const iterateTask = [...schedule.tasks.values()].find(task => task.title === ITERATE_TASK_TITLE)!
+    // The template is the stored prompt, and it carries none of the loop's marker.
+    expect(iterateTask.prompt).toBe('# RSI heartbeat — self-iteration round')
+    expect(iterateTask.prompt.startsWith(LOOP_PROMPT_PREFIX)).toBe(false)
+  })
+
+  it('closes only its own row when each switch is flipped off', async () => {
+    const schedule = new FakeSchedule()
+    const wired = wiringBoth(schedule)
+    await wired.loop.open({ sessionId: SESSION })
+    await wired.iterate.open({ sessionId: SESSION })
+
+    const iterateClosed = fakeResponse()
+    await wired.routeAt(ITERATE_ROUTE_PATH).handler(fakeRequest('POST', { action: 'close', sessionId: SESSION }), iterateClosed)
+    expect(JSON.parse(iterateClosed.body)).toMatchObject({ ok: true, loop: { open: false } })
+    expect([...schedule.tasks.values()].map(task => task.title)).toEqual([LOOP_TASK_TITLE])
+
+    const loopClosed = fakeResponse()
+    await wired.routeAt(LOOP_ROUTE_PATH).handler(fakeRequest('POST', { action: 'close', sessionId: SESSION }), loopClosed)
+    expect(JSON.parse(loopClosed.body)).toMatchObject({ ok: true, loop: { open: false } })
+    expect(schedule.tasks.size).toBe(0)
+  })
+
+  it('unload takes the loop row and leaves the RSI row stored', async () => {
+    const schedule = new FakeSchedule()
+    const wired = wiringBoth(schedule)
+    await wired.loop.open({ sessionId: SESSION })
+    await wired.iterate.open({ sessionId: SESSION })
+    for (const dispose of wired.effects) await dispose()
+    expect([...schedule.tasks.values()].map(task => task.title)).toEqual([ITERATE_TASK_TITLE])
+  })
+})
 
 describe('lifecycle wiring', () => {
   it('mounts the tool and the switch route, and deletes every heartbeat on unload', async () => {

@@ -1,0 +1,40 @@
+# Excerpts of ~/.dsh/profiles/web/.plugin-manager/logs/operation-*/pnpm.log (token scan clean)
+== /home/fish/.dsh/profiles/web/.plugin-manager/logs/operation-g1yu8W/pnpm.log (mtime 2026-11-19 23:39:30) ==
+✓ Lockfile passes supply-chain policies (verified 1h ago)
+Lockfile is up to date, resolution step is skipped
+Packages: +1 -3
++---
+Progress: resolved 22, reused 21, downloaded 0, added 1, done
+
+dependencies:
+- dsh-grok-workflow github:free6589/dsh-grok-workflow#v0.11.21
+
+Done in 506ms using pnpm v12.4.2
+
+== /home/fish/.dsh/profiles/web/.plugin-manager/logs/operation-sjpPCh/pnpm.log (mtime 2026-11-19 23:39:48) ==
+✓ Lockfile passes supply-chain policies (verified 1d ago)
+Progress: resolved 0, reused 1, downloaded 0, added 0
+Packages: +4
+++++
+Progress: resolved 25, reused 24, downloaded 0, added 4, done
+[WARN] Issues with peer dependencies found. Run "pnpm peers check" to list them.
+
+dependencies:
++ dsh-grok-workflow github:free6589/dsh-grok-workflow
+
+Done in 12.3s using pnpm v12.4.2
+
+== /home/fish/.dsh/profiles/web/.plugin-manager/logs/operation-oZspIo/pnpm.log (mtime 2026-11-20 00:07:05) ==
+✓ Lockfile passes supply-chain policies (verified 27m ago)
+Added 1 entry to minimumReleaseAgeExclude in pnpm-workspace.yaml (set minimumReleaseAgeStrict to true to gate these updates with a prompt):
+  chat-in-dsh@1.0.0
+Packages: +2
+++
+Progress: resolved 26, reused 24, downloaded 1, added 2, done
+[WARN] Issues with peer dependencies found. Run "pnpm peers check" to list them.
+
+dependencies:
++ chat-in-dsh ^1.0.0
+
+Done in 2.4s using pnpm v12.4.2
+

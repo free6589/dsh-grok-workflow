@@ -1,0 +1,57 @@
+# Live install identity — CONFIRMED (read-only)
+
+Collected at 2026-11-20T01:00:37+08:00 by agent-14 (read-only task).
+
+## Profile / install source
+- Live profile: `web` — `~/.dsh/profiles/web/package.json`
+  - dependency line: `"dsh-grok-workflow": "github:free6589/dsh-grok-workflow"`
+  - bundle row present in `dsh.profile.bundles` (mounted)
+- Resolved install source (`~/.dsh/profiles/web/node_modules/.modules.yaml:72`):
+  `dsh-grok-workflow@https://codeload.github.com/free6589/dsh-grok-workflow/tar.gz/22bbe178ed375176b6b33674c85ae0ab47b10fe6`
+  → GitHub tarball at commit `22bbe17`, i.e. tag `v0.11.21`. NOT a link to the local checkout.
+- `~/.dsh/profiles/web/pnpm-lock.yaml:223-225`:
+  `resolution: {gitHosted: true, integrity: sha512-aehcy+oJvtatK1WN+/AdtnvsZVXD5mIckw3sThAh8p1XgDv/6+ADxFXhoUCNexjSVJj/cwhdENLMLywfFsRZ+g==, tarball: https://codeload.github.com/free6589/dsh-grok-workflow/tar.gz/22bbe178ed375176b6b33674c85ae0ab47b10fe6}`
+  `version: 0.11.21`
+- Installed `package.json` version: `0.11.21` (`~/.dsh/profiles/web/node_modules/dsh-grok-workflow/package.json`)
+- Stale symlink (dangling, not used for resolution): `node_modules/git -> ../github.com:free6589/dsh-grok-workflow.git` (target absent).
+
+## Composed config actually loaded
+- `~/.dsh/profiles/web/cordis.patch.yml:555-580`: `- id: grok-workflow`, `name: dsh-grok-workflow`,
+  `config.mode: full`, `config.grokDefault: on`, roles planner/worker/verifier/synthesizer/supervisor, `timeoutMs: 0`.
+- Full composed dump: `01-version-source/composed-grok-workflow-config.txt`.
+
+## Byte-level identity: installed == HEAD 22bbe17, local working tree != installed
+sha256 (installed `~/.dsh/profiles/web/node_modules/dsh-grok-workflow/lib/…`):
+- `index.js`  462cdd05a59791dff0aa883401f571a72cf9b8cc253bf5fd3a63f5bc73d6d827
+- `loop.js`   1a58d3179264f704777ddd27a5526439ea0306058ede3a30a0143e1c3fc6a8ca
+- `client.js` f85496889ef974aaf1df29199210f8f20110036388c3a451d93a2ca61410117b
+
+sha256 (local working tree `/home/fish/projects_mine/dsh-grok-workflow/lib/…`):
+- `index.js`  462cdd05a59791dff0aa883401f571a72cf9b8cc253bf5fd3a63f5bc73d6d827  (same)
+- `loop.js`   0e6233d4a5c058c32468b9db8fa528e2694692784a6c71742685a9437ba5fd56  (DIFFERS — uncommitted)
+- `client.js` f85496889ef974aaf1df29199210f8f20110036388c3a451d93a2ca61410117b  (same)
+
+sha256 of `git show HEAD:<path>` in the local checkout (HEAD = 22bbe17 "docs(rsi): record 0.11.21 release"):
+- `lib/index.js` 462cdd05…d827  == installed
+- `lib/loop.js`  1a58d317…a8ca  == installed
+- `lib/client.js` f8549688…117b == installed
+
+CONFIRMED: the live profile runs the published 0.11.21 bits verbatim. The local checkout carries
+uncommitted `src/`+`lib/` changes (git status: `M CHANGELOG.md README.md README.zh-CN.md
+docs/knowledge/*.md lib/* src/*`) that are NOT in the live profile.
+
+## Behavioural fork that proves the same thing
+- Live log message (see `03-repro-logs/session-042dfe19-events.jsonl`, `command/done`):
+  `"Usage: /grok [on|off]"` — short form.
+- Installed `lib/command.js` string: `Usage: /grok [on|off]` (short form) — matches live.
+- Local working tree `lib/command.js` string:
+  `Usage: /grok [on|off]. This text was not sent as a prompt, so nothing ran.` (long form).
+- `src/intake.ts:137` (local only) emits a further variant that names the discarded character count:
+  `Usage: /grok [on|off]. This text was not sent as a prompt: /grok takes only the arguments "on" or "off", so the ${chars} characters after it were discarded and nothing ran.`
+- Installed `lib/` has no `intake.js` at all (28 `.js` files installed, no `intake.*`); local `lib/`
+  adds `intake.js` / `intake.d.ts` / `intake.d.ts.map` (29 `.js`).
+
+## Environment vs code, stated once
+- The live fault surface is 0.11.21 as published (`22bbe17`), loaded by profile `web` on port 3080.
+- Local `src/` work (intake module, loop identity split, client switch fix) exists only in the
+  working tree; nothing in this evidence says it is loaded anywhere.

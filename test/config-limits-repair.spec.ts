@@ -152,7 +152,7 @@ describe('LIMIT_CAPS: one clamp table for every user-configurable numeric cap (B
     // T4 kept the two run limits in the table; the repeat-run caps joined them with
     // the loop keys. The other former caps are fixed internally (their patches are
     // unknown keys).
-    expect(Object.keys(LIMIT_CAPS).sort()).toEqual(['loopFailStreak', 'loopIntervalMin', 'loopMaxRounds', 'maxConcurrency', 'maxTasks'])
+    expect(Object.keys(LIMIT_CAPS).sort()).toEqual(['iterateIntervalMin', 'loopFailStreak', 'loopIntervalMin', 'loopMaxRounds', 'maxConcurrency', 'maxTasks'])
     for (const [field, cap] of Object.entries(LIMIT_CAPS)) {
       takeLimitOverruns()
       const stored = cap + 1

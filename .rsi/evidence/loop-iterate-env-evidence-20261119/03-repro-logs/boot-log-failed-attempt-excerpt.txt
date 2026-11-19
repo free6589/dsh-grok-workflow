@@ -1,0 +1,46 @@
+# Excerpt of ~/.dsh/logs/startup-2026-11-17T14-50-19.828Z-7fb31298-a1b8-4297-aa9e-d186787b9951.log
+# (FAILED boot attempt 2026-11-17 22:50:19 +08 — port already held by running instance pid 154637, boot 22:49:32)
+  error: StartupError: dsh: startup failed: 2 required plugins did not activate
+  
+  Failed plugins (1):
+    webserver (required)
+      Package: @deepseek-ai/dsh-host-webserver
+      Error: listen EADDRINUSE: address already in use 100.111.111.88:3080
+          at Server.setupListenHandle [as _listen2] (node:net:2328:16)
+          at listenInCluster (node:net:2437:12)
+          at node:net:2666:7
+          at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+  
+  Plugins waiting for services (7):
+    Plugin                  Missing services
+    web-runtime (required)  webServer
+    open-in-app             webServer
+    directory-picker        webServer
+    harness-dev-context     webApp
+    client-hmr              webServer
+    imagegen                webServer
+    cron-board              webServer
+      at auditStartupEntries (file:///home/fish/.local/share/mise/installs/node/26.8.1/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:5239:31)
+      ... 4 lines matching cause stack trace ...
+      at async file:///home/fish/.local/share/mise/installs/node/26.8.1/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:25:33 {
+    [stack]: [Getter/Setter],
+    [message]: 'dsh: startup failed: 2 required plugins did not activate\n' +
+      '\n' +
+      'Failed plugins (1):\n' +
+      '  webserver (required)\n' +
+      '    Package: @deepseek-ai/dsh-host-webserver\n' +
+      '    Error: listen EADDRINUSE: address already in use 100.111.111.88:3080\n' +
+      '        at Server.setupListenHandle [as _listen2] (node:net:2328:16)\n' +
+      '        at listenInCluster (node:net:2437:12)\n' +
+      '        at node:net:2666:7\n' +
+      '        at process.processTicksAndRejections (node:internal/process/task_queues:90:21)\n' +
+      '\n' +
+      'Plugins waiting for services (7):\n' +
+[...]
+        },
+        {
+          id: 'include:grok-workflow',
+          module: 'dsh-grok-workflow',
+          version: '0.10.0',
+          state: 'active',
+          source: 'file:///home/fish/.dsh/profiles/web/',

@@ -57,6 +57,14 @@ export interface InstallLoopOptions {
     readonly ctx: LoopHostContext;
     readonly loop: LoopService;
     readonly logger: WorkflowLogger;
+    /**
+     * The self-iteration service, when the composition arms one. Mounted as its own
+     * exact route and nothing else: no tool, no unload sweep, no archive cleanup —
+     * the self-iteration beat is the repository's own workflow and deliberately
+     * outlives the plugin (`docs/knowledge/HEARTBEATS.md` §1); it is disarmed by the
+     * same switch that armed it, or through DSH's own Automation tasks.
+     */
+    readonly iterate?: LoopService;
 }
 /**
  * Mount the optional surfaces and the lifecycle cleanups.
@@ -90,4 +98,34 @@ export interface LoopToolResult {
     readonly action?: string;
     readonly loop?: LoopSnapshot;
 }
+/**
+ * Answer one browser request.
+ *
+ * The body is one JSON object: `{ action, sessionId, intervalMinutes?, prompt? }`.
+ * `open` and `close` mutate; `status` only reads. Deliberately no GET form: a status
+ * read and a toggle share one body shape, so the switch has one code path.
+ *
+ * Exported as the production-path test seam: the page-level tests drive this exact
+ * handler behind a real HTTP server with the page's own `fetch`, so a hand-mocked
+ * success can never stand in for the transport (the v0.11.21 lesson).
+ * @param loop - the service this route acts on.
+ * @param connection - the trust fence, when the composition has one.
+ * @param req - the request.
+ * @param res - the response.
+ * @param dispatch - action dispatch; the iterate route passes one that ignores
+ *   `prompt`/`intervalMinutes`, so the stored template governs every open.
+ */
+export declare function handleLoopRoute(loop: LoopService, connection: LoopConnection | undefined, req: IncomingMessage, res: ServerResponse, dispatch?: typeof dispatchLoopAction): Promise<void>;
+/** Route one validated action to the shared service method. */
+declare function dispatchLoopAction(loop: LoopService, action: unknown, sessionId: unknown, body: Record<string, unknown>): Promise<LoopSnapshot>;
+/**
+ * Route one validated action to the self-iteration service.
+ *
+ * The body carries only `{ action, sessionId }`: no prompt, no interval override.
+ * The template persisted in the profile is the one source of the stored prompt, so
+ * a stray field in a request can never arm a heartbeat that disagrees with what the
+ * settings page shows.
+ */
+export declare function dispatchIterateAction(loop: LoopService, action: unknown, sessionId: unknown): Promise<LoopSnapshot>;
+export {};
 //# sourceMappingURL=loop-surface.d.ts.map

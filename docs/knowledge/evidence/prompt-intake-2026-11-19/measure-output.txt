@@ -1,0 +1,17 @@
+40 /grok invocations found
+ chars  bytes  settled  session / seq
+  2041   3697    error  session-042dfe19-f236-4cbf-8a96-d357455238da / 4
+  2032   3688    error  session-b7be2bd2-397a-49c8-a70d-f37e96ffcc98 / 2944
+  2032   3688    error  session-b7be2bd2-397a-49c8-a70d-f37e96ffcc98 / 2953
+     5      5  success  session-b279fa2c-b05c-410e-b44a-39ed79bd1c01 / 2241
+     4      4  success  session-0ee2a233-e978-42c9-80f3-b4a375586931 / 119
+     4      4  success  session-2b32c23b-d6b7-4360-94d4-7d5b255120e7 / 4
+     4      4  success  session-3a683cb6-1eaa-4b33-9eb9-57e1ef0b955b / 1068
+     4      4  success  session-3a683cb6-1eaa-4b33-9eb9-57e1ef0b955b / 1210
+     4      4  success  session-3a683cb6-1eaa-4b33-9eb9-57e1ef0b955b / 2928
+     4      4  success  session-4c562307-ea83-4019-81a2-53e176bfa0aa / 303
+
+3 invocation(s) carried more than 200 characters
+  2041 chars / 3697 bytes -> 'Usage: /grok [on|off]' (session has a user/message event: False)
+  2032 chars / 3688 bytes -> 'Usage: /grok [on|off]' (session has a user/message event: True)
+  2032 chars / 3688 bytes -> 'Usage: /grok [on|off]' (session has a user/message event: True)

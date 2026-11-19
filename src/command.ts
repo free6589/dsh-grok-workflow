@@ -10,6 +10,16 @@
  * plugin's static `inject` (plan-mode's `static inject` omits it too): it is
  * optional everywhere.
  *
+ * The commands parser reads the **first line** of a message as a command and
+ * hands everything after `/grok` to this handler as `rawInput`
+ * (`@deepseek-ai/dsh-commands` `parseCommand`). That makes this handler the
+ * intake boundary for every stored team task prompt, because those prompts are
+ * meant for a grok-enabled session and open with `/grok`. An argument that is
+ * not `on`/`off` therefore never goes quiet: a one-line argument gets an
+ * explicit grammar error, a prompt-shaped argument gets the measured, bilingual
+ * refusal from `src/intake.ts` (see `test/command.spec.ts`). The toggle
+ * semantics are unchanged — only the argument handling is.
+ *
  * The handler runs directly against the agent (no model message is created):
  * it writes the durable toggle in `src/mode.ts`, and `src/gate.ts` honors it on
  * the next message (`classifyPreStep`'s `mode-off` pass branch). The `turn`
@@ -31,6 +41,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Session } from '@deepseek-ai/dsh-session'
 import { readModeRecord, setMode } from './mode.js'
 import type { ModeRecord } from './mode.js'
+import { isPromptShapedArgument, refuseDiscardedCommandPrompt } from './intake.js'
 
 /** Agent surface the handler needs (the live agent carries more). */
 export interface GrokCommandAgent {
@@ -87,7 +98,17 @@ function toggleFailureText(reason: string, current: ModeRecord | undefined): str
   return `Grok workflow toggle not changed: ${reason}. In this session ${currentStateText(current)}.`
 }
 
-/** The `/grok` command definition: arg grammar owned by the handler. */
+/** The `kind: 'error'` settle text for an argument that is not a toggle word. */
+export const GROK_USAGE_TEXT = 'Usage: /grok [on|off]. This text was not sent as a prompt, so nothing ran.'
+
+/**
+ * The `/grok` command definition: arg grammar owned by the handler.
+ *
+ * The grammar is deliberately unchanged: empty or `on` enables, `off` disables.
+ * Only what happens to everything else changed, from a terse one-line usage
+ * error that looked like silence to an explicit refusal that says the text was
+ * discarded (and, for a prompt-shaped argument, measures it in both languages).
+ */
 export function grokCommand(logger?: CommandLogger): GrokCommandDefinition {
   return {
     name: 'grok',
@@ -95,10 +116,20 @@ export function grokCommand(logger?: CommandLogger): GrokCommandDefinition {
     input: { hint: '[on|off]' },
     handler: ({ agent, rawInput }) => {
       // Grammar: trim; empty or `on` enables, `off` disables, anything else is
-      // a usage error that must NOT change the toggle.
+      // refused and must NOT change the toggle.
       const arg = rawInput.trim()
       const enable = arg === '' || arg === 'on'
-      if (!enable && arg !== 'off') return { kind: 'error', text: 'Usage: /grok [on|off]' }
+      if (!enable && arg !== 'off') {
+        // A pasted prompt that opens with `/grok` reaches this line with the whole
+        // prompt as its argument. Answering that with the usage line alone is what
+        // made a 2 000-character request vanish; state the measured loss instead.
+        return {
+          kind: 'error',
+          text: isPromptShapedArgument(arg)
+            ? refuseDiscardedCommandPrompt(arg).text
+            : GROK_USAGE_TEXT,
+        }
+      }
       const turn = typeof agent.turn === 'number' && Number.isFinite(agent.turn) ? agent.turn : 0
       const written = setMode(agent.session, {
         v: 1,

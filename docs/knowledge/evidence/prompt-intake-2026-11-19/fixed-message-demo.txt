@@ -1,0 +1,7 @@
+session session-042dfe19-f236-4cbf-8a96-d357455238da: /grok argument 2041 characters / 3697 bytes
+before the fix it settled: Usage: /grok [on|off]
+after the fix it settles:
+Usage: /grok [on|off]. This text was not sent as a prompt: /grok takes only the arguments "on" or "off", so the 2040 characters after it were discarded and nothing ran.
+用法：/grok [on|off]。这段文字没有作为提示词发出：/grok 只接受 on 或 off，其后的 2040 个字符已被丢弃，没有任何步骤执行。
+remove the leading /grok and send the text again as its own message
+去掉开头的 /grok，把这段文字另作一条消息重新发送

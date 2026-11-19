@@ -66,6 +66,17 @@ export declare function relayText(report: WorkflowReport, header?: string, opts?
  */
 export declare function frontDeskText(body: string): string;
 /**
+ * Build the message text for an acceptance receipt (`full` mode, interactive run).
+ *
+ * `full` used to hold the open step for the whole run, which made every message
+ * typed meanwhile invisible until the run ended. The receipt is what the turn
+ * shows instead, so the debt is stated rather than hidden.
+ *
+ * @param body - the receipt line: what was accepted and what happens next.
+ * @returns the enter text, bounded by markers.
+ */
+export declare function acceptedEnterText(body: string): string;
+/**
  * Build the message text for in-turn delivery (strategy `in-turn`).
  *
  * Wording is deliberately identical to {@link relayText}: the contract with the

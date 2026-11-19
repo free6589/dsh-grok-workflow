@@ -155,6 +155,35 @@ export function frontDeskText(body: string): string {
 }
 
 /**
+ * Instruction preamble for an accepted message whose team run is in flight.
+ *
+ * It says the opposite of {@link FRONT_DESK_PREAMBLE}: a workflow *was* started
+ * and the real answer arrives later as its own message, so the main model hands
+ * over the receipt and must not answer the request from its own head in the
+ * meantime — that answer would land above the report and contradict it.
+ */
+const ACCEPTED_PREAMBLE = [
+  'The mandatory workflow gate accepted this message and started the team workflow in the background.',
+  'The report arrives later as its own message. Reply with the text between the markers exactly as given:',
+  'keep every line, print no marker line, add nothing before or after it,',
+  'do not answer the request yourself, and do not call any tool.',
+].join(' ')
+
+/**
+ * Build the message text for an acceptance receipt (`full` mode, interactive run).
+ *
+ * `full` used to hold the open step for the whole run, which made every message
+ * typed meanwhile invisible until the run ended. The receipt is what the turn
+ * shows instead, so the debt is stated rather than hidden.
+ *
+ * @param body - the receipt line: what was accepted and what happens next.
+ * @returns the enter text, bounded by markers.
+ */
+export function acceptedEnterText(body: string): string {
+  return [ACCEPTED_PREAMBLE, '', REPORT_BEGIN, body, REPORT_END].join('\n')
+}
+
+/**
  * Instruction preamble for an in-turn notice.
  *
  * The notice is entered into the *open* step, so the main model still produces

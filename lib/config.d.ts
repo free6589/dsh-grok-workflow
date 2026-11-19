@@ -44,6 +44,8 @@ export declare const HARD_LIMITS: {
     readonly loopFailStreak: 20;
     /** Seven days: the loop service's own hard ceiling on a heartbeat interval. */
     readonly loopIntervalMin: 10080;
+    /** Seven days: the same ceiling for the self-iteration heartbeat's interval. */
+    readonly iterateIntervalMin: 10080;
     /** Hard ceiling on routing ledger entries kept per run. */
     readonly recordEntries: 256;
     /**
@@ -78,6 +80,7 @@ export declare const LIMIT_CAPS: {
     readonly loopMaxRounds: 100;
     readonly loopFailStreak: 20;
     readonly loopIntervalMin: 10080;
+    readonly iterateIntervalMin: 10080;
 };
 /** A configuration key whose stored number takes effect clamped to its hard maximum. */
 export type LimitField = keyof typeof LIMIT_CAPS;
@@ -132,6 +135,24 @@ export declare const DEFAULT_LOOP_FAIL_STREAK = 3;
  * the units: this value is minutes, while `timeoutMs` is milliseconds.
  */
 export declare const DEFAULT_LOOP_INTERVAL_MIN = 0;
+/**
+ * Minutes to wait between self-iteration heartbeats. Same semantics and floor as
+ * {@link DEFAULT_LOOP_INTERVAL_MIN}: `0` asks for the heartbeat's own floor, never
+ * "start immediately".
+ */
+export declare const DEFAULT_ITERATE_INTERVAL_MIN = 0;
+/**
+ * Default prompt of the self-iteration heartbeat, as the settings page's template
+ * textarea and the schema default both ship it.
+ *
+ * The template is the whole stored prompt of the `RSI heartbeat` Schedule task, so
+ * it is written to be delivered, not documented: bounded (one round, one item),
+ * guard-first (an open round or a dirty tree means no new round), and explicit
+ * about stopping. It deliberately carries **no** routing marker: a self-iteration
+ * delivery routes as an ordinary schedule message (`docs/knowledge/HEARTBEATS.md`
+ * §2), so editing this text can never change how the gate routes it.
+ */
+export declare const DEFAULT_ITERATE_TEMPLATE: string;
 /**
  * Defaults of the two documented run limits (10 concurrent tasks, 1 retry).
  *
@@ -189,7 +210,7 @@ export declare const CONFIG_VERSION = 1;
  * a typo that is silently ignored looks exactly like a setting that "does not
  * work", which is the failure mode the settings surface must not have.
  */
-export declare const CONFIG_KEYS: readonly ["toolName", "mode", "grokDefault", "roles", "synthesis", "maxConcurrency", "maxTasks", "timeoutMs", "loopEnabled", "loopMaxRounds", "loopFailStreak", "loopIntervalMin", "configVersion"];
+export declare const CONFIG_KEYS: readonly ["toolName", "mode", "grokDefault", "roles", "synthesis", "maxConcurrency", "maxTasks", "timeoutMs", "loopEnabled", "loopMaxRounds", "loopFailStreak", "loopIntervalMin", "iterateIntervalMin", "iterateTemplate", "configVersion"];
 /** Every key removed by the T4 slim-down; a patch that still carries one is rejected (R-06). */
 export declare const REMOVED_CONFIG_KEYS: readonly ["enforceGate", "gateRequired", "gateScope", "gatePreset", "answerStrategy", "triageAsk", "triageModel", "triageClassifier", "triageFollowupAsFast", "instantReceipt", "humanSummary", "showDiagnostics", "historyTurns", "historyChars", "maxQueuedMessages", "maxRetries", "maxActiveRuns", "maxActiveRunsTotal", "subagentProvider", "switchOn", "recordRuns", "recordLimit", "showProgress"];
 /** One stored limit the schema had to clamp, as the parse saw it. */
@@ -240,6 +261,8 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     loopMaxRounds: z<number, number, "volatile-defined">;
     loopFailStreak: z<number, number, "volatile-defined">;
     loopIntervalMin: z<number, number, "volatile-defined">;
+    iterateIntervalMin: z<number, number, "volatile-defined">;
+    iterateTemplate: z<string, string, "volatile-defined">;
     roles: z<NoInfer<Schemastery.ObjectS<NoInfer<{
         planner: z<({
             provider?: string | null;
@@ -346,6 +369,8 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     loopMaxRounds: z<number, number, "volatile-defined">;
     loopFailStreak: z<number, number, "volatile-defined">;
     loopIntervalMin: z<number, number, "volatile-defined">;
+    iterateIntervalMin: z<number, number, "volatile-defined">;
+    iterateTemplate: z<string, string, "volatile-defined">;
     roles: z<NoInfer<Schemastery.ObjectS<NoInfer<{
         planner: z<({
             provider?: string | null;

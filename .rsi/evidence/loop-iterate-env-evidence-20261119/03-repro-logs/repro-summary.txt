@@ -1,0 +1,63 @@
+# Reproduction transcript — pasting a prompt into a session with `/grok on`
+
+Live GUI: `dsh web --host 100.111.111.88 --port 3080` (PID 154637), profile `web`,
+plugin `dsh-grok-workflow@0.11.21` from `github:free6589/dsh-grok-workflow` @ `22bbe17`.
+Source logs are the sessions' own event streams, exported by previous attempt (00:26 / 00:59) from
+`~/.dsh/sessions/--home-fish-projects_mine-dsh-grok-workflow--/<session>/session.v4.jsonl.zstd`.
+
+## Session A — `session-042dfe19-f236-4cbf-8a96-d357455238da` (NEW session, `isSeeded: false`)
+File: `03-repro-logs/session-042dfe19-events.jsonl` (14 events, 2026-11-19T23:42:48 → 00:12:10 +0800).
+Event-type census: `command/run`×3, `command/done`×3, `model/selection`×2, `session`,
+`permission/preset`, `sandbox/mode`, `approval/policy`, `subagent/model-selection-policy`,
+`plugin:grok-workflow/mode`×1. **`user/message` count = 0.**
+
+| seq | time (+08:00) | event | payload |
+| --- | --- | --- | --- |
+| 6 | 23:42:58 | `command/run` | `name:"grok"`, `args:" on /grok 团队任务：实现「自我迭代」…"` (2041 chars) |
+| 7 | 23:42:58 | `command/done` | `kind:"error"`, `text:"Usage: /grok [on|off]"` |
+| 8 | 00:12:00 | `command/run` | `name:"grok"`, `args:" on"`, `source.kind:"user"` |
+| 9 | 00:12:00 | `plugin:grok-workflow/mode` | `{enabled:true, turn:0, setBy:"command:/grok", workflowMode:"full"}` |
+| 10 | 00:12:00 | `command/done` | `kind:"success"`, `"Grok workflow ON — every message now runs the full plan→execute→verify workflow."` |
+| 13 | 00:12:10 | `command/run` | `name:"grok"`, `args:" 团队任务：实现「自我迭代」…"` (2032 chars) |
+| 14 | 00:12:10 | `command/done` | `kind:"error"`, `text:"Usage: /grok [on|off]"` |
+
+Outcome (CONFIRMED by the event stream, not by watching the screen): the pasted prompt never became a
+user message in this session — there is no `user/message` event and no model turn for it. It was parsed
+as a `/grok` command with a non-`on|off` argument and answered with the usage error. The mode write at
+seq 9 shows the mode itself did flip to `on`, so the failure is at message ingress, not at the switch.
+
+## Session B — `session-b7be2bd2-397a-49c8-a70d-f37e96ffcc98` (existing session, same workspace)
+File: `03-repro-logs/session-b7be2bd2-events.jsonl` (19 events, 23:33:33 → 23:38:54 +0800).
+
+| seq | time (+08:00) | event | payload |
+| --- | --- | --- | --- |
+| 3 | 23:33:37 | `command/run` | `name:"grok"`, `args:" on"` |
+| 4 | 23:33:37 | `plugin:grok-workflow/mode` | `{enabled:true, setBy:"command:/grok", workflowMode:"full"}` |
+| 5 | 23:33:37 | `command/done` | `success` — "Grok workflow ON …" |
+| 6 | 23:33:43 | `command/run` | `name:"grok"`, `args:" 团队任务：实现「自我迭代」…"` |
+| 7 | 23:33:43 | `command/done` | `error` — "Usage: /grok [on|off]" |
+| 11–12 | 23:34:10 → 23:35:38 | `command/done` (compaction) then `command/run` `args:" on"` | compaction succeeded; mode ON again |
+| 15–16 | 23:35:49 | `command/run` / `command/done` | same 2032-char paste → same usage error |
+| 17 | 23:38:54 | `command/run` | `name:"grok"`, `args:" off"` |
+| 18 | 23:38:54 | `plugin:grok-workflow/mode` | `{enabled:false, setBy:"command:/grok off"}` |
+| 19 | 23:38:54 | `command/done` | `success` — "Grok workflow OFF — normal chat." |
+
+So the `/grok off` half of the pair is CONFIRMED working in the live build (mode event + success reply),
+and the paste loss repeats identically in a pre-existing session — it is not specific to "new session".
+
+## Reading, marked honestly
+- CONFIRMED: in the live 0.11.21 build, a pasted block that begins with `/grok ` is consumed by the
+  command handler, answered with `Usage: /grok [on|off]`, and produces no user message and no turn.
+- CONFIRMED: `/grok on` and `/grok off` themselves succeed and write the mode event
+  (`setBy:"command:/grok"` / `"command:/grok off"`).
+- CONFIRMED: the live build's error text is the short form, matching installed `lib/command.js`, while
+  the local checkout already emits the long "This text was not sent as a prompt…" form via `src/intake.ts`.
+- HYPOTHESIS (not verified by this task): the composer/dispatch layer decides "this is a slash command"
+  from the leading `/grok` token before consulting the workflow gate, which is why the 2 kB of prompt
+  text is dropped rather than queued. The fix's own spec `test/grok-on-ingress.spec.ts` targets exactly
+  this class ("dispatches the next message while the team run is still in flight", "still runs the full
+  team for the message and delivers the report afterwards"), and its before/after logs are on disk at
+  `docs/knowledge/evidence/grok-on-ingress-2026-11-19/repro-before.log` (2 failed / 2 passed) and
+  `repro-after.log` (4 passed) — but both are vitest runs, not live GUI runs.
+- NOT_RUN: re-driving the paste in the live GUI by this task. Posting a user message is a session
+  mutation, and the task is read-only.

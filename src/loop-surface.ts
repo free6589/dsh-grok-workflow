@@ -21,7 +21,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
-import { LOOP_ROUTE_PATH, LOOP_TOOL_NAME, LoopError } from './loop.js'
+import { LOOP_ROUTE_PATH, LOOP_TOOL_NAME, ITERATE_ROUTE_PATH, LoopError } from './loop.js'
 import type { LoopService, LoopSnapshot } from './loop.js'
 import { redactError } from './redact.js'
 import type { WorkflowLogger } from './run.js'
@@ -73,6 +73,14 @@ export interface InstallLoopOptions {
   readonly ctx: LoopHostContext
   readonly loop: LoopService
   readonly logger: WorkflowLogger
+  /**
+   * The self-iteration service, when the composition arms one. Mounted as its own
+   * exact route and nothing else: no tool, no unload sweep, no archive cleanup —
+   * the self-iteration beat is the repository's own workflow and deliberately
+   * outlives the plugin (`docs/knowledge/HEARTBEATS.md` §1); it is disarmed by the
+   * same switch that armed it, or through DSH's own Automation tasks.
+   */
+  readonly iterate?: LoopService
 }
 
 /**
@@ -133,6 +141,20 @@ export function installLoop(options: InstallLoopOptions): void {
         path: LOOP_ROUTE_PATH,
         handler: (req, res) => handleLoopRoute(loop, connection, req, res),
       })
+      if (options.iterate !== undefined) {
+        const iterate = options.iterate
+        const iterateDispose = webServer.register({
+          kind: 'exact',
+          path: ITERATE_ROUTE_PATH,
+          handler: (req, res) => handleLoopRoute(iterate, connection, req, res, dispatchIterateAction),
+        })
+        return asDisposer(dispose) === undefined && asDisposer(iterateDispose) === undefined
+          ? undefined
+          : () => {
+            asDisposer(dispose)?.()
+            asDisposer(iterateDispose)?.()
+          }
+      }
       return asDisposer(dispose)
     }
     // `register` returns the route disposer; handing it to `effect` ties the route to
@@ -238,12 +260,23 @@ function renderLoopResult(result: LoopToolResult): string {
  * The body is one JSON object: `{ action, sessionId, intervalMinutes?, prompt? }`.
  * `open` and `close` mutate; `status` only reads. Deliberately no GET form: a status
  * read and a toggle share one body shape, so the switch has one code path.
+ *
+ * Exported as the production-path test seam: the page-level tests drive this exact
+ * handler behind a real HTTP server with the page's own `fetch`, so a hand-mocked
+ * success can never stand in for the transport (the v0.11.21 lesson).
+ * @param loop - the service this route acts on.
+ * @param connection - the trust fence, when the composition has one.
+ * @param req - the request.
+ * @param res - the response.
+ * @param dispatch - action dispatch; the iterate route passes one that ignores
+ *   `prompt`/`intervalMinutes`, so the stored template governs every open.
  */
-async function handleLoopRoute(
+export async function handleLoopRoute(
   loop: LoopService,
   connection: LoopConnection | undefined,
   req: IncomingMessage,
   res: ServerResponse,
+  dispatch: typeof dispatchLoopAction = dispatchLoopAction,
 ): Promise<void> {
   try {
     const rejection = connection?.requestRejection(req)
@@ -263,7 +296,7 @@ async function handleLoopRoute(
     }
     const sessionId = body.sessionId
     const action = body.action
-    const snapshot = await dispatchLoopAction(loop, action, sessionId, body)
+    const snapshot = await dispatch(loop, action, sessionId, body)
     sendJson(res, 200, { ok: true, action, loop: snapshot })
   } catch (error) {
     if (error instanceof BodyTooLarge) {
@@ -305,6 +338,26 @@ async function dispatchLoopAction(
       ...prompt === undefined ? {} : { prompt },
     })
   }
+  throw new LoopError('loop/action', `unknown action ${JSON.stringify(action)}; expected open, close or status`)
+}
+
+/**
+ * Route one validated action to the self-iteration service.
+ *
+ * The body carries only `{ action, sessionId }`: no prompt, no interval override.
+ * The template persisted in the profile is the one source of the stored prompt, so
+ * a stray field in a request can never arm a heartbeat that disagrees with what the
+ * settings page shows.
+ */
+export async function dispatchIterateAction(
+  loop: LoopService,
+  action: unknown,
+  sessionId: unknown,
+): Promise<LoopSnapshot> {
+  if (typeof sessionId !== 'string') throw new LoopError('loop/session', 'sessionId is required')
+  if (action === 'status') return loop.status({ sessionId })
+  if (action === 'close') return loop.close({ sessionId })
+  if (action === 'open') return loop.open({ sessionId })
   throw new LoopError('loop/action', `unknown action ${JSON.stringify(action)}; expected open, close or status`)
 }
 

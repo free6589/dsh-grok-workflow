@@ -5,6 +5,124 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-20
+
+### Added / 新增
+
+- **A second composer-dock switch arms the self-iteration heartbeat, and its prompt template
+  is editable on the settings page / 输入框旁新增「自迭代」开关，其心跳提示词模板可在设置页编辑** —
+  a second service instance over the same Host Schedule owns the reserved `RSI heartbeat` slot
+  (`/grok-workflow/iterate`), so the auto-continue and self-iterate switches can never create,
+  report or delete each other's row (`src/loop.ts` `identity`, `test/iterate.spec.ts`). The
+  settings page's *Self-iteration* group holds `iterateIntervalMin` and the `iterateTemplate`
+  textarea (whitespace-only falls back to the built-in default; at most 4000 characters); the
+  template is persisted per profile through the ordinary settings write path, and the switch's
+  open sends no prompt of its own — the stored template governs, so a stray request field can
+  never arm a heartbeat that disagrees with the page. An `RSI heartbeat` delivery routes as an
+  ordinary schedule message and the row deliberately outlives the plugin (it is the repository's
+  own beat); disarm it with the same switch or through DSH's own Automation tasks.
+  / 第二个服务实例复用同一个宿主 Schedule，拥有保留的 `RSI heartbeat` 槽位
+  （`/grok-workflow/iterate`），因此「自动接着跑」与「自迭代」两个开关永远不会创建、读取或删除
+  对方的行（`src/loop.ts` 的 `identity`，`test/iterate.spec.ts`）。设置页新增「自迭代」分组，
+  含 `iterateIntervalMin` 与 `iterateTemplate` 文本框（纯空白回退内置默认；最多 4000 字符）；
+  模板走普通设置写入路径随档案保存，开关的 `open` 自己不带提示词——存好的模板说了算，杂散的
+  请求字段不可能让心跳和页面不一致。`RSI heartbeat` 的投递按普通调度消息放行，且这一行刻意比
+  插件活得久（它是仓库自己的节拍）；用同一个开关关掉，或走 DSH 自己的「自动化任务」删除。
+
+### Fixed / 修复
+
+- **One session can no longer end up with two loop heartbeats, and a rewritten prompt no longer
+  orphans a live one / 一个会话不会再有两个循环心跳，提示词被改写也不会留下删不掉的活心跳** —
+  cycling the composer switch could leave a stale `Loop heartbeat` row beside the live one (an
+  `ended` row survived a refresh, and a refused delete was followed by a create anyway), so the
+  session received two rounds per interval. `open()` now keeps exactly one row: it deletes the
+  other rows of the session's slot on refresh and resume, and when a refused delete leaves a live
+  row behind it refreshes that row instead of minting a second one. The same pass fixed the other
+  half of the identity: a row whose prompt was edited in Automation tasks (DSH's own
+  `schedule_edit` accepts `prompt`) kept delivering but no longer carried the
+  `[grok-workflow loop]` marker, so its messages passed the gate as ordinary non-user mail and the
+  switch reported "off" over a live row it could not delete. Cleanup now matches the reserved task
+  name rather than the marker, and opening the switch rewrites the marker onto the row it reclaims
+  (`src/loop.ts`, `isLoopSlot`).
+  / 来回拨动输入框旁的开关可能留下一条旧的 `Loop heartbeat` 行（`ended` 行熬过了刷新，删除被拒
+  之后也照样新建），于是一个会话每个间隔收到两轮。现在 `open()` 只保留一行：刷新与恢复时删掉该
+  会话槽位里的其它行；删除被拒而留下活行时，改写那一行而不是再造一条。同一处还补上了身份的另一
+  半：在「自动化任务」里被改写提示词的行（DSH 自己的 `schedule_edit` 接受 `prompt`）仍在投递，
+  但不再带 `[grok-workflow loop]` 标记，于是它的消息按普通非用户消息穿过门禁，开关却在一条删不
+  掉的活行上显示「关闭」。清理现在按保留的任务名匹配而不是按标记，开关打开时会把标记写回它收回
+  的那一行（`src/loop.ts`，`isLoopSlot`）。
+
+- **The two heartbeats' identities are audited and pinned / 两个心跳的身份已审计并固定** —
+  `docs/knowledge/HEARTBEATS.md` records the Loop heartbeat (`Loop heartbeat`,
+  `[grok-workflow loop]`, `/grok-workflow/loop`, `grok_loop`) against the Iterate heartbeat
+  (`RSI heartbeat`, `/grok-workflow/iterate`, the editable `iterateTemplate` prompt, no tool),
+  the dispatcher branch each delivery takes, and the one shared switch that stops both
+  (`.rsi/STOP`, stop-only). `test/heartbeat-identity.spec.ts` pins it against the real
+  `.rsi/HEARTBEAT.md` template: an Iterate delivery is never charged to a loop, never trips a
+  brake, and never lets either service delete the other task's row.
+  / `docs/knowledge/HEARTBEATS.md` 记录了循环心跳（`Loop heartbeat`、`[grok-workflow loop]`、
+  `/grok-workflow/loop`、`grok_loop`）与自迭代心跳（`RSI heartbeat`、`/grok-workflow/iterate`、
+  可编辑的 `iterateTemplate` 提示词、无工具）的对照、各自消息走的分支，以及唯一同时停掉两者的
+  开关（`.rsi/STOP`，只能停）。`test/heartbeat-identity.spec.ts` 以真实的 `.rsi/HEARTBEAT.md`
+  模板为基准固定这些身份：自迭代投递不会被记到循环账上、不会触发刹车、也不会让任一服务删掉
+  另一个任务的行。
+
+- **The self-iterate switch no longer deletes the loop's task on archive / 自迭代开关归档时不会再删掉循环的任务** —
+  both switches are two instances of one service, and the archive sweep (`forgetSession`) used the
+  loop's hard-coded slot for every instance: archiving a session with the RSI heartbeat armed
+  deleted the `Loop heartbeat` row and left the `RSI heartbeat` row behind — one heartbeat deleting
+  the other's task, plus a stale row surviving the archive. The sweep now takes the calling
+  instance's own slot predicate (the brake keeps the loop's, by default), and each switch only ever
+  closes its own row. Route isolation is pinned as well: two exact routes, each bound to its own
+  service, and the client switch that posts to one never posts to the other.
+  / 两个开关是同一个服务的两个实例，而归档清扫（`forgetSession`）对每个实例都用循环那套写死的
+  槽位：在自迭代心跳武装的情况下归档会话，会删掉 `Loop heartbeat` 行、留下 `RSI heartbeat` 行
+  ——一个心跳删掉另一个的任务，还让一条旧行活过归档。现在清扫收调用方实例自己的槽位谓词
+  （刹车默认仍用循环的），每个开关只会关掉自己那一行。路由隔离也一并钉死：两条 exact 路由各自
+  绑定自己的服务，页面开关发一条路径就绝不会发到另一条。
+
+- **`/grok on` no longer holds the whole turn hostage / `/grok on` 之后消息不会再卡住** —
+  the toggle writes `workflowMode: 'full'`, and `full` was the one shape that skipped the
+  interactive admission and awaited the entire workflow inside `agent/pre-step`. The loop
+  dispatches the next batch only after the current step settles, so every message typed while
+  the team ran stayed invisible until the run ended (default deadline: 60 minutes) — the user's
+  report was "with `/grok on` I cannot send messages, with `/grok off` I can". A session that
+  carries the `/grok on` record now gets an acceptance receipt and the run continues behind it,
+  delivering the report as its own message; `full` as a deployment default keeps the documented
+  in-turn contract unchanged. The per-agent queue keeps its bound: past four messages already
+  waiting for a run, the next one takes the in-turn path (and waits for its own run) rather than
+  queueing without limit — no record claims a background run that was never queued.
+  / 开关写入 `workflowMode: 'full'`，而 `full` 正是唯一绕过交互式受理、在 `agent/pre-step`
+  里把整个工作流等完的那种形态。循环只在上一步结算后才会派发下一批消息，于是团队跑的整段
+  时间里（默认 60 分钟）用户打的每条消息都看不见——正是用户报的「`/grok on` 就打不出字，
+  `/grok off` 就行」。现在带 `/grok on` 记录的会话先回执、队伍在后台跑，结论单独发一条；
+  作为部署默认值的 `full` 仍保持原有的 in-turn 契约不变。每会话队列的既有上限不变：已有四条
+  消息在排队等跑时，下一条走 in-turn 等它自己那趟跑完，而不是无限排队——也不会有记录谎称
+  一次从未入队的后台开工。
+
+- **A stored task prompt that opens with `/grok` is no longer swallowed / 以 `/grok` 开头的存档任务提示词不会再被吞掉** —
+  the commands parser reads the first line of a message as a slash command and passes everything
+  after the name to the handler as its argument, so a team task prompt whose first line is
+  `/grok 团队任务：…` never became a message at all. Measured on this machine: the argument was
+  2 041 characters / 3 697 bytes in one fresh session and 2 032 / 3 688 in another, and each one
+  settled as `Usage: /grok [on|off]` with no `user/message`, no `agent/pre-step` and no workflow
+  run — the prompt was refused by size nowhere: 2 041 characters is 6.4 % of the 32000-character
+  objective budget, and nothing was truncated. The handler now answers a prompt-shaped argument
+  with an explicit bilingual refusal that states how many characters were discarded and how to
+  send them (`src/intake.ts`, `src/command.ts`); the gate's oversize and empty refusals use the
+  same pass, so both are bilingual and carry the measured count and the number of parts the
+  prompt would take. The documented default template lives in `docs/task-prompt-template.md` and
+  is assembled by the same rule (`test/intake.spec.ts`). Toggle semantics are unchanged.
+  / 命令解析器把消息**第一行**当命令，名字之后的一切原样交给 handler 当参数，于是第一行是
+  `/grok 团队任务：…` 的任务提示词根本没变成消息：本机实测参数为 2 041 字符 / 3 697 字节
+  （另一会话 2 032 / 3 688），每次都结算成 `Usage: /grok [on|off]`，既无 `user/message`
+  也无 `agent/pre-step`、无运行——按大小拦下的地方一处都没有：2 041 字符只占 32000 字符目标预算
+  的 6.4%，也没有任何截断。现在提示词形态的参数会得到中英双语、带丢弃字符数与下一步动作的明确
+  拒绝（`src/intake.ts`、`src/command.ts`）；门禁的超长与空消息拒绝走同一通道，同样双语，并写出
+  实测字符数与需要分成几段。默认模板落在 `docs/task-prompt-template.md`，由同一规则组装校验
+  （`test/intake.spec.ts`）。开关语义不变。
+
+
 ## [0.11.21] - 2026-11-19
 
 ### Fixed / 修复

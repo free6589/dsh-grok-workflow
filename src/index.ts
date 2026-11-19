@@ -1,12 +1,12 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
-import { FIXED_HISTORY_CHARS, FIXED_HISTORY_TURNS, MAX_TIMER_DELAY_MS, createConfigReader, describeResolvedConfig, limitOverrunWarning, repairLimitOverruns, repairSynthesisInconsistency, resolveConfig, snapshotConfig, takeLimitOverruns } from './config.js'
+import { DEFAULT_ITERATE_TEMPLATE, FIXED_HISTORY_CHARS, FIXED_HISTORY_TURNS, MAX_TIMER_DELAY_MS, createConfigReader, describeResolvedConfig, limitOverrunWarning, repairLimitOverruns, repairSynthesisInconsistency, resolveConfig, snapshotConfig, takeLimitOverruns } from './config.js'
 import { describeSurface, validateRoutes } from './settings.js'
 import { carryoverBounds, carryoverForSession } from './carryover.js'
 import { registerGrokCommand } from './command.js'
 import { installGate } from './gate.js'
-import { createLoopService, loopPolicyFromConfig, scheduleServiceOf } from './loop.js'
+import { ITERATE_TASK_TITLE, createLoopService, loopPolicyFromConfig, scheduleServiceOf } from './loop.js'
 import { installLoop } from './loop-surface.js'
 import type { LoopHostContext } from './loop-surface.js'
 import { installShutdownProbe } from './records.js'
@@ -302,7 +302,31 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
       return loopPolicyFromConfig(live.timeoutMs, live.loopIntervalMin, live.loopMaxRounds, live.loopFailStreak)
     },
   })
-  installLoop({ ctx: ctx as unknown as LoopHostContext, loop, logger })
+
+  // Self-iteration driver: a second service instance over the same Schedule, bound to
+  // the `RSI heartbeat` slot instead of the loop slot, so the two switches can never
+  // adopt, charge or delete each other's row. Its prompt is the editable template
+  // persisted in the profile (`iterateTemplate`), so a settings edit reaches the next
+  // open; a whitespace-only template falls back to the built-in default. No routing
+  // marker and no unload sweep: these deliveries route as ordinary schedule messages
+  // and the beat is the repository's own (docs/knowledge/HEARTBEATS.md §1).
+  const iterate = createLoopService({
+    schedule: () => scheduleServiceOf(ctx),
+    logger,
+    identity: {
+      title: ITERATE_TASK_TITLE,
+      defaultPrompt: () => {
+        const template = readConfig().iterateTemplate.trim()
+        return template === '' ? DEFAULT_ITERATE_TEMPLATE : template
+      },
+    },
+    policy: () => {
+      const live = readConfig()
+      return loopPolicyFromConfig(live.timeoutMs, live.iterateIntervalMin, live.loopMaxRounds, live.loopFailStreak)
+    },
+  })
+
+  installLoop({ ctx: ctx as unknown as LoopHostContext, loop, logger, iterate })
 
   // T4: the gate is always on (enforceGate removed) — every top-level user
   // message passes the front desk.

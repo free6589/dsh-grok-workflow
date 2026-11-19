@@ -45,10 +45,10 @@ dsh --profile grok-workflow-dev --from-default-profile headless --dump-config
 Then install the plugin:
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.11.21
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.12.0
 ```
 
-> `#v0.11.21` is the current release. Pin the tag you actually want; omitting it follows `main`, which is not a release. Do not run `--from-default-profile` after `plugin add`: it replaces the profile and removes the plugin you just installed.
+> `#v0.12.0` is the current release. Pin the tag you actually want; omitting it follows `main`, which is not a release. Do not run `--from-default-profile` after `plugin add`: it replaces the profile and removes the plugin you just installed.
 
 Then restart the profile so DSH loads the new plugin:
 
@@ -207,7 +207,7 @@ verification).
 
 ## Configuration reference
 
-Configuration belongs to the profile's `cordis.patch.yml` (or a `--patch` overlay), under the bundle row. The surface is exactly thirteen keys (`timeoutMs` joined in `0.11.0`, the four `loop*` keys with the repeat-run settings); anything else is rejected at load, so a stale patch fails loudly instead of looking like a setting that does nothing:
+Configuration belongs to the profile's `cordis.patch.yml` (or a `--patch` overlay), under the bundle row. The surface is exactly fifteen keys (`timeoutMs` joined in `0.11.0`, the four `loop*` keys with the repeat-run settings, and the two `iterate*` keys with the self-iteration heartbeat); anything else is rejected at load, so a stale patch fails loudly instead of looking like a setting that does nothing:
 
 ```yaml
 - id: grok-workflow
@@ -238,6 +238,8 @@ Configuration belongs to the profile's `cordis.patch.yml` (or a `--patch` overla
 | `loopMaxRounds` | `10` | `100` | Round bound stored in the loop's schedule rule (`COUNT`), so the schedule ends itself after that many rounds. Each round is a full workflow run, so this is a quota envelope, not a preference |
 | `loopFailStreak` | `3` | `20` | Consecutive failed rounds the heartbeat text asks the round to stop after. The Host records delivery, not round success, so this is guidance carried into the round, not a host-enforced counter |
 | `loopIntervalMin` | `0` (`0` = the loop's floor) | `10080` (seven days) | Minutes between rounds. The effective wait is never below one worst-case round or 60 minutes, so `0` means "as soon as a round can finish", not "immediately" |
+| `iterateIntervalMin` | `0` (`0` = the heartbeat's floor) | `10080` (seven days) | Minutes between self-iteration heartbeats. Same floor semantics as `loopIntervalMin`: never below one worst-case round or 60 minutes |
+| `iterateTemplate` | built-in default | at most 4000 characters | The whole prompt stored in the `RSI heartbeat` Schedule task when the Self-iterate switch arms one. Whitespace-only falls back to the built-in default. Edited in the settings page's *Self-iteration* group and persisted per profile; it carries no routing marker, so editing it never changes gate routing |
 | `configVersion` | `1` | `1` | Configuration surface version |
 
 The four `loop*` keys configure the repeat-run surface. When a session's loop is opened, the loop service reads `loopMaxRounds`, `loopFailStreak` and `loopIntervalMin` at open time and stores them in a durable Schedule rule; without a composed Schedule service the keys are stored and every message still runs once. `loopEnabled` is the deployment default for an automatic driver and is not read yet — opening a loop stays an explicit user action ([Repeat runs](#repeat-runs-the-loop-heartbeat)). `loopIntervalMin` is a wait, not a budget: it can only raise the loop's floor, and `loopFailStreak` travels into the heartbeat text as guidance because the Host records delivery, not round success.
@@ -259,6 +261,8 @@ A loop is one durable task in the Host's Schedule service, not a timer inside th
 **The switch.** The settings page's *Repeat runs* group holds the four `loop*` keys (table above). They are stored, validated and projected like every other key, but `loopEnabled` is a deployment default no automatic driver reads yet, so a saved `on` does not by itself start rounds.
 
 **The dock switch.** The round cap and the interval come from those stored keys, and the switch that spends them sits in the composer dock — the ambient strip under the message box, slot `conversation.composer.dock`, id `grok-workflow-loop`. It reads the loop with `status` once on mount and never on a timer, stays disabled while that read is in flight, and a click sends `open` or `close` for the current session with no numbers of its own: the rule is built from `loopIntervalMin`, `loopMaxRounds` and `loopFailStreak` as stored. A refused click does not flip the switch — it leaves the last known state on the page and states why the click did nothing. The switch is a caller of the route below, not a second implementation: the same durable row, the same service methods.
+
+**The self-iterate switch, beside it.** A second composer-dock switch, id `grok-workflow-iterate`, posts to `/grok-workflow/iterate` and drives a second service whose slot is the `RSI heartbeat` title — so the two switches can never create, report or delete each other's row. Its open sends no prompt and no interval: the stored prompt is the profile's `iterateTemplate` (edited in the settings page's *Self-iteration* group, textarea; empty falls back to the built-in default) and the interval floor is `iterateIntervalMin`. An `RSI heartbeat` delivery routes as an ordinary schedule message — the gate's loop routing never claims it — and the row deliberately outlives the plugin (it is the repository's own beat); disarm it with the same switch or through DSH's own Automation tasks.
 
 Opening a loop is one explicit browser request:
 
@@ -336,13 +340,13 @@ The plugin reuses DSH's workflow engine and subagents. It does not replace DSH's
 
 ## Versions and release notes
 
-The package version in this repository is `0.11.21`. Install or roll back to an exact release with a tag suffix:
+The package version in this repository is `0.12.0`. Install or roll back to an exact release with a tag suffix:
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.11.21
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.12.0
 ```
 
-Use only a tag that exists on GitHub. Published: `v0.1.0`, `v0.2.0`, `v0.2.1`, `v0.2.2`, `v0.2.3`, `v0.2.4`, `v0.2.5`, `v0.2.6`, `v0.2.7`, `v0.3.0`, `v0.4.0`, `v0.5.0`, `v0.5.1`, `v0.6.0`, `v0.7.0`, `v0.8.0`, `v0.9.0`, `v0.9.1`, `v0.9.2`, `v0.9.3`, `v0.9.4`, `v0.10.0`, `v0.10.1`, `v0.10.2`, `v0.11.0`, `v0.11.1`, `v0.11.2`, `v0.11.3`, `v0.11.4`, `v0.11.5`, `v0.11.6`, `v0.11.7`, `v0.11.8`, `v0.11.9`, `v0.11.10`, `v0.11.11`, `v0.11.12`, `v0.11.13`, `v0.11.14`, `v0.11.15`, `v0.11.16`, `v0.11.17`, `v0.11.18`, `v0.11.19`, `v0.11.20` and `v0.11.21`. The unpinned command follows `main` and does not pin a release. `v0.2.0-rc.1` also exists on GitHub but is not a release: it predates the release workflow and its `package.json` still declares `0.1.0`. The `v0.11.14` tag is not a release either: its committed `lib/` was built from an earlier `src/`, so the release workflow stopped at its artifact check and never published it. Install the `v0.11.15` pin above; that tag is left in place only because published tags are immutable. See the [changelog](CHANGELOG.md) and the [release guide](docs/RELEASING.md) for the versioning and rollback rules.
+Use only a tag that exists on GitHub. Published: `v0.1.0`, `v0.2.0`, `v0.2.1`, `v0.2.2`, `v0.2.3`, `v0.2.4`, `v0.2.5`, `v0.2.6`, `v0.2.7`, `v0.3.0`, `v0.4.0`, `v0.5.0`, `v0.5.1`, `v0.6.0`, `v0.7.0`, `v0.8.0`, `v0.9.0`, `v0.9.1`, `v0.9.2`, `v0.9.3`, `v0.9.4`, `v0.10.0`, `v0.10.1`, `v0.10.2`, `v0.11.0`, `v0.11.1`, `v0.11.2`, `v0.11.3`, `v0.11.4`, `v0.11.5`, `v0.11.6`, `v0.11.7`, `v0.11.8`, `v0.11.9`, `v0.11.10`, `v0.11.11`, `v0.11.12`, `v0.11.13`, `v0.11.14`, `v0.11.15`, `v0.11.16`, `v0.11.17`, `v0.11.18`, `v0.11.19`, `v0.11.20`, `v0.11.21` and `v0.12.0`. The unpinned command follows `main` and does not pin a release. `v0.2.0-rc.1` also exists on GitHub but is not a release: it predates the release workflow and its `package.json` still declares `0.1.0`. The `v0.11.14` tag is not a release either: its committed `lib/` was built from an earlier `src/`, so the release workflow stopped at its artifact check and never published it. Install the `v0.11.15` pin above; that tag is left in place only because published tags are immutable. See the [changelog](CHANGELOG.md) and the [release guide](docs/RELEASING.md) for the versioning and rollback rules.
 
 ## Testing and development
 
@@ -385,6 +389,7 @@ npm run ci
 
 - [Local installation and troubleshooting](docs/LOCAL-TESTING.md)
 - [Architecture](docs/ARCHITECTURE.md)
+- [Task prompt template](docs/task-prompt-template.md)
 - [Acceptance checklist](docs/ACCEPTANCE.md)
 - [Design knowledge base](docs/knowledge/WORKFLOW-DESIGN.md)
 - [Roadmap](docs/knowledge/WORKFLOW-ROADMAP.md)

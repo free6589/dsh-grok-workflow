@@ -1,8 +1,9 @@
+import { createServer } from 'node:http'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_LOOP_FAIL_STREAK, DEFAULT_LOOP_INTERVAL_MIN, DEFAULT_LOOP_MAX_ROUNDS, DEFAULT_MAX_CONCURRENCY, DEFAULT_MAX_TASKS, DEFAULT_TIMEOUT_MS, HARD_LIMITS, SWITCHABLE_CLASSES } from '../src/config.js'
-import { LOOP_ROUTE_PATH, LOOP_TOOL_NAME } from '../src/loop.js'
-import { createLoopTool } from '../src/loop-surface.js'
+import { DEFAULT_ITERATE_INTERVAL_MIN, DEFAULT_ITERATE_TEMPLATE, DEFAULT_LOOP_FAIL_STREAK, DEFAULT_LOOP_INTERVAL_MIN, DEFAULT_LOOP_MAX_ROUNDS, DEFAULT_MAX_CONCURRENCY, DEFAULT_MAX_TASKS, DEFAULT_TIMEOUT_MS, HARD_LIMITS, SWITCHABLE_CLASSES } from '../src/config.js'
+import { ITERATE_ROUTE_PATH, ITERATE_TASK_TITLE, LOOP_ROUTE_PATH, LOOP_TASK_TITLE, LOOP_TOOL_NAME, createLoopService, loopPolicyFromConfig } from '../src/loop.js'
+import { createLoopTool, dispatchIterateAction, handleLoopRoute } from '../src/loop-surface.js'
 
 /**
  * The browser settings page is hand-written JavaScript (the host serves it verbatim in
@@ -38,6 +39,7 @@ interface Bundle {
   GROK_WORKFLOW_PANEL: PanelBundle
   GROK_WORKFLOW_PROGRESS: ProgressBundle
   GROK_WORKFLOW_LOOP: LoopSwitchBundle
+  GROK_WORKFLOW_ITERATE: LoopSwitchBundle
   GROK_WORKFLOW_INTERNALS: {
     draftOf(value?: Record<string, unknown>): Draft
     validate(draft: Draft): Finding[]
@@ -283,15 +285,17 @@ describe('client settings page bundle', () => {
     expect(typeof bundle.apply).toBe('function')
   })
 
-  // T5 slim page plus the four repeat-run keys: 9 visible FIELDS
-  // (grokDefault/mode/maxConcurrency/maxTasks/timeoutMs and the four loop keys)
-  // plus the 5 role chains equal the 13-leaf-key configuration surface
-  // (toolName/roles/synthesis/configVersion are structural, rendered nowhere).
+  // T5 slim page plus the four repeat-run keys and the two self-iteration keys:
+  // 11 visible FIELDS (grokDefault/mode/maxConcurrency/maxTasks/timeoutMs, the four
+  // loop keys, iterateIntervalMin and the iterateTemplate textarea) plus the 5 role
+  // chains equal the 15-leaf-key configuration surface (toolName/roles/synthesis/
+  // configVersion are structural, rendered nowhere).
   // Number bounds mirror HARD_LIMITS (100 / 20) and the defaults (10 / 3 / 0); the
   // suite pins all three so a quiet drift fails here instead of in the GUI.
-  it('renders the visible keys: 9 fields plus the 5 role chains', () => {
+  it('renders the visible keys: 11 fields plus the 5 role chains', () => {
     const visible = ['grokDefault', 'maxConcurrency', 'maxTasks', 'mode', 'timeoutMs',
-      'loopEnabled', 'loopMaxRounds', 'loopFailStreak', 'loopIntervalMin']
+      'loopEnabled', 'loopMaxRounds', 'loopFailStreak', 'loopIntervalMin',
+      'iterateIntervalMin', 'iterateTemplate']
     expect(bundle.GROK_WORKFLOW_FIELDS.map(field => field.key).sort()).toEqual(visible.slice().sort())
     expect(bundle.GROK_WORKFLOW_READ_ONLY).toEqual([])
     expect([...bundle.GROK_WORKFLOW_FIELDS.map(field => field.key), 'roles'].sort()).toEqual(
@@ -313,6 +317,7 @@ describe('client settings page bundle', () => {
       loopMaxRounds: [1, HARD_LIMITS.loopMaxRounds],
       loopFailStreak: [1, HARD_LIMITS.loopFailStreak],
       loopIntervalMin: [0, HARD_LIMITS.loopIntervalMin],
+      iterateIntervalMin: [0, HARD_LIMITS.iterateIntervalMin],
     }
     for (const [key, [min, max]] of Object.entries(expected)) {
       expect({ key, min: numeric.get(key)?.min, max: numeric.get(key)?.max }).toEqual({ key, min, max })
@@ -333,6 +338,11 @@ describe('client settings page bundle', () => {
     expect(defs.get('loopMaxRounds')?.def).toBe(DEFAULT_LOOP_MAX_ROUNDS)
     expect(defs.get('loopFailStreak')?.def).toBe(DEFAULT_LOOP_FAIL_STREAK)
     expect(defs.get('loopIntervalMin')?.def).toBe(DEFAULT_LOOP_INTERVAL_MIN)
+    // Self-iteration: the interval mirrors the loop's, and the textarea's default is
+    // byte-identical to the schema's built-in template (one source, two copies of a
+    // hand-written bundle — the pin is what keeps them from drifting).
+    expect(defs.get('iterateIntervalMin')?.def).toBe(DEFAULT_ITERATE_INTERVAL_MIN)
+    expect(defs.get('iterateTemplate')?.def).toBe(DEFAULT_ITERATE_TEMPLATE)
     // A loop is opt-in: the page's switch starts off, like the schema default.
     expect(defs.get('loopEnabled')?.def).toBe(false)
     expect(DEFAULT_MAX_CONCURRENCY).toBe(10)
@@ -340,6 +350,7 @@ describe('client settings page bundle', () => {
     expect(DEFAULT_LOOP_MAX_ROUNDS).toBe(10)
     expect(DEFAULT_LOOP_FAIL_STREAK).toBe(3)
     expect(DEFAULT_LOOP_INTERVAL_MIN).toBe(0)
+    expect(DEFAULT_ITERATE_INTERVAL_MIN).toBe(0)
   })
 
   it('keeps the per-route cap bounds identical to HARD_LIMITS', () => {
@@ -396,7 +407,8 @@ describe('client settings page: bilingual copy (t42)', () => {
       ...bundle.GROK_WORKFLOW_ROLES.map(role => `role.${role}`),
       ...bundle.GROK_WORKFLOW_GROUPS.map(group => `group.${group}`),
     ]
-    expect(derived.length).toBe(bundle.GROK_WORKFLOW_FIELDS.length + 5 + 4)
+    expect(derived.length).toBe(
+      bundle.GROK_WORKFLOW_FIELDS.length + bundle.GROK_WORKFLOW_ROLES.length + bundle.GROK_WORKFLOW_GROUPS.length)
     for (const key of derived) {
       for (const locale of bundle.GROK_WORKFLOW_LOCALES) {
         // `translate` returns the key itself when nothing carries it: a missing entry is
@@ -550,9 +562,12 @@ describe('client settings page: wiring to the DSH locale service (t42)', () => {
     bundle.apply(ctx)
     // The page is mounted once before the locale service arrives and once after: only the
     // second registration survives, and it is the one carrying the namespace.
-    // Three live registrations: the settings page, the task panel renderer and the
-    // composer-dock loop switch (which is additive and registered last).
-    expect(live()).toHaveLength(3)
+    // Four live registrations: the settings page, the task panel renderer and the
+    // two composer-dock switches (additive, registered last: loop, then iterate).
+    expect(live()).toHaveLength(4)
+    const byId = (id: string) => live().find((entry: { options: Record<string, unknown> }) => entry.options['id'] === id)
+    expect(byId('grok-workflow-loop'), 'the loop switch is registered').toBeDefined()
+    expect(byId('grok-workflow-iterate'), 'the self-iterate switch is registered').toBeDefined()
     expect(live()[0]!.options['name']).toBe('plugins.item')
     expect(live()[0]!.options['locale']).toBe('grok-workflow')
     expect(typeof live()[0]!.options['label']).toBe('function')
@@ -588,7 +603,7 @@ describe('client settings page: wiring to the DSH locale service (t42)', () => {
     expect(() => bundle.apply(ctx)).not.toThrow()
     // No locale face ⇒ no `locale` option: the renderer throws a SlotAssemblyError for an
     // entry that names a namespace while no face is installed.
-    expect(live()).toHaveLength(3)
+    expect(live()).toHaveLength(4)
     expect(live()[0]!.options['locale']).toBeUndefined()
     expect(live()[1]!.options['locale']).toBeUndefined()
     // The task panel shadows the stock `workflow-run` renderer by priority (lowest renders);
@@ -616,9 +631,9 @@ describe('client settings page: wiring to the DSH locale service (t42)', () => {
     const locale = fakeLocale('zh')
     const { ctx, live, slots, disposers } = fakeContext(locale)
     bundle.apply(ctx)
-    // The settings page, the task-panel renderer and the loop switch are all mounted, and
+    // The settings page, the task-panel renderer and both switches are all mounted, and
     // the `locale` fiber handed back exactly one disposer per injected scope it entered.
-    expect(live()).toHaveLength(3)
+    expect(live()).toHaveLength(4)
     expect(disposers).toHaveLength(2)
     const mounted = slots.length
     const unbind = disposers[0]!
@@ -643,7 +658,7 @@ describe('client settings page: wiring to the DSH locale service (t42)', () => {
     const { ctx, live, slots, disposers } = fakeContext(fakeLocale('zh'))
     const dispose = bundle.apply(ctx) as unknown as () => void
     const mounted = slots.length
-    expect(live()).toHaveLength(3)
+    expect(live()).toHaveLength(4)
     dispose()
     expect(live()).toHaveLength(0)
     expect(slots.length).toBe(mounted)
@@ -941,6 +956,40 @@ describe('client settings page: draft, validation and path ops', () => {
     for (const role of bundle.GROK_WORKFLOW_ROLES) expect(draft.roles[role]).toEqual([])
   })
 
+  it('carries the template textarea through draft → ops → save, like every other key', () => {
+    // Seeding: an absent document seeds the built-in template, so a fresh profile
+    // renders a usable default instead of an empty box.
+    const draft = draftOf(undefined)
+    expect(draft.iterateTemplate).toBe(DEFAULT_ITERATE_TEMPLATE)
+    // An edit becomes one set op on the template's own path — the same shape the
+    // settings mirror persists into the profile patch, so the textarea needs no
+    // bespoke write path (and cannot bypass the Host's own schema on save).
+    const edited = { ...draft, iterateTemplate: `${DEFAULT_ITERATE_TEMPLATE}\n\n(edit)` }
+    expect(opsFor(edited, undefined)).toEqual(expect.arrayContaining([
+      { op: 'set', path: ['iterateTemplate'], value: edited.iterateTemplate },
+    ]))
+    // Nothing changed → no op, so an untouched template never dirties a save.
+    expect(opsFor(draft, JSON.parse(JSON.stringify(draft))).filter(op => op.path[0] === 'iterateTemplate')).toEqual([])
+    // A stored template survives the draft re-seed (a reload shows what is stored).
+    const stored = draftOf({ iterateTemplate: 'stored text' } as Record<string, unknown>)
+    expect(stored.iterateTemplate).toBe('stored text')
+    expect(opsFor(stored, undefined)).toEqual(expect.arrayContaining([
+      { op: 'set', path: ['iterateTemplate'], value: 'stored text' },
+    ]))
+  })
+
+  it('refuses a template over the prompt bound, in both languages', () => {
+    const over = { ...draftOf(undefined), iterateTemplate: 'x'.repeat(4001) }
+    const findings = validate(over)
+    expect(findings).toEqual([{ key: 'error.badTemplate', params: { key: 'iterateTemplate', limit: 4000 } }])
+    expect(formatError(findings[0]!, translator('en'))).toContain('4000')
+    expect(formatError(findings[0]!, translator('zh'))).toContain('4000')
+    // Exactly at the bound is fine.
+    expect(validate({ ...draftOf(undefined), iterateTemplate: 'x'.repeat(4000) })).toEqual([])
+    // Whitespace-only is legal: arming falls back to the built-in default.
+    expect(validate({ ...draftOf(undefined), iterateTemplate: '  \n ' })).toEqual([])
+  })
+
   it('survives a non-object roles section instead of crashing the page', () => {
     for (const roles of [null, 'fast', 42, ['planner']]) {
       const draft = draftOf({ roles } as unknown as Record<string, unknown>)
@@ -1138,6 +1187,8 @@ describe('client settings page: draft, validation and path ops', () => {
       loopMaxRounds: 10,
       loopFailStreak: 3,
       loopIntervalMin: 0,
+      iterateIntervalMin: 0,
+      iterateTemplate: '',
       roles: { planner: [], worker: [], verifier: [], synthesizer: [], supervisor: [] },
     })
     const view = {
@@ -2025,9 +2076,9 @@ describe('client composer dock: the loop switch (one Host operation, two callers
   /** The switch section of the bundle source, for the "touches nothing else" checks. */
   const switchSource = (() => {
     const source = readFileSync(new URL('../src/client/index.js', import.meta.url), 'utf8')
-    const start = source.indexOf('// ─── Composer dock: the loop switch')
+    const start = source.indexOf('// ─── Composer dock: the two heartbeat switches')
     const end = source.indexOf('/** Required services for the page')
-    expect(start, 'the loop switch section is in the bundle').toBeGreaterThan(0)
+    expect(start, 'the heartbeat switch section is in the bundle').toBeGreaterThan(0)
     expect(end, 'the section ends where the page registration begins').toBeGreaterThan(start)
     return source.slice(start, end)
   })()
@@ -2073,6 +2124,25 @@ describe('client composer dock: the loop switch (one Host operation, two callers
     const answer = await loop.open(SESSION, fetchImpl)
     expect(answer.ok).toBe(true)
     expect(posted).toEqual([{ action: 'open', sessionId: SESSION }])
+  })
+
+  it('keeps the self-iterate switch on its own route and its own slot', async () => {
+    // Two switches, two Host routes: a click on one must never reach the other's
+    // service, which is what keeps the loop and the RSI heartbeat independent.
+    const iterate = bundle.GROK_WORKFLOW_ITERATE
+    expect(iterate.routePath).toBe(ITERATE_ROUTE_PATH)
+    expect(iterate.routePath).not.toBe(loop.routePath)
+    expect(iterate.switchId).not.toBe(loop.switchId)
+
+    const iterateCall = scriptedFetch([{ body: { ok: true, loop: { open: true, sessionId: SESSION } } }])
+    await iterate.open(SESSION, iterateCall.fetchImpl)
+    expect(iterateCall.urls).toEqual([ITERATE_ROUTE_PATH])
+    // No prompt and no interval: the stored template is the one source of that text.
+    expect(iterateCall.posted).toEqual([{ action: 'open', sessionId: SESSION }])
+
+    const loopCall = scriptedFetch([{ body: { ok: true, loop: { open: true, sessionId: SESSION } } }])
+    await loop.open(SESSION, loopCall.fetchImpl)
+    expect(loopCall.urls).toEqual([LOOP_ROUTE_PATH])
   })
 
   it('posts to the Host route with the browser credential and reads the answer back', async () => {
@@ -2218,7 +2288,7 @@ describe('client composer dock: the loop switch (one Host operation, two callers
   }
 
   /** Render the switch, run its mount effect once, and re-render what React would show. */
-  function mountSwitch(component: (props: Record<string, unknown>) => unknown, props: Record<string, unknown>) {
+  function mountSwitch(component: (props: Record<string, unknown>) => unknown, props: Record<string, unknown>, dataAttr = 'loop') {
     const render: SwitchRender = { cells: [], index: 0, effects: [] }
     const run = (): unknown => {
       render.index = 0
@@ -2246,8 +2316,8 @@ describe('client composer dock: the loop switch (one Host operation, two callers
         return { first, tree: run() }
       },
       async click(tree: unknown) {
-        const button = walk(tree).find((element) => element.props['data-loop-toggle'] === true)
-        expect(button, 'the switch renders a toggle').toBeDefined()
+        const button = walk(tree).find((element) => element.props[`data-${dataAttr}-toggle`] === true)
+        expect(button, `the ${dataAttr} switch renders a toggle`).toBeDefined()
         ;(button!.props['onClick'] as () => void)()
         await settle()
         return run()
@@ -2350,5 +2420,126 @@ describe('client composer dock: the loop switch (one Host operation, two callers
     expect(texts(tree).join(' ')).toContain(zhDict['loop.switch.noSession'])
     // Nothing was asked of the Host: there is no session to ask about.
     expect(posted).toEqual([])
+  })
+
+  /* ------------- both switches on the production path: real fetch, real route, real service ------------- */
+
+  /**
+   * The v0.11.21 lesson, extended to both switches: no scripted success anywhere.
+   *
+   * These tests leave the page's own `fetch` untouched and point `document.baseURI`
+   * at a real `node:http` server whose handlers are the shipped `handleLoopRoute`
+   * driving the shipped `createLoopService` instances over an in-memory Schedule.
+   * Every answer the switches render was produced by the service actually storing or
+   * deleting a row, and every independence assertion is a fact about the stored rows.
+   * A hand-mocked transport cannot pass these; a broken default `send` cannot either.
+   */
+  it('drives both switches through the real page fetch into the real routes and services', async () => {
+    const rows: Array<{ id: string, title: string, prompt: string, kind: string, rrule?: string, scheduledAt: string, status: string, target: { kind: string, sessionId?: string } }> = []
+    let nextId = 1
+    const schedule = {
+      async create(request: { title: string, prompt: string, timing: { kind: 'rrule', rrule: string }, target: { kind: 'session', sessionId: string } }) {
+        const row = {
+          id: `task-${nextId++}`, title: request.title, prompt: request.prompt,
+          kind: request.timing.kind, rrule: request.timing.rrule,
+          scheduledAt: '2026-11-20T01:00:00.000Z', status: 'active',
+          target: { kind: request.target.kind, sessionId: request.target.sessionId },
+        }
+        rows.push(row)
+        return row
+      },
+      async catalog() { return rows.map(row => ({ ...row })) },
+      async edit(request: { id: string, action: string, patch?: { prompt?: string, active?: boolean, timing?: { kind: 'rrule', rrule: string } } }) {
+        const row = rows.find(candidate => candidate.id === request.id)
+        if (request.action === 'delete') {
+          if (row === undefined) throw new Error('no such task')
+          rows.splice(rows.indexOf(row), 1)
+          return undefined
+        }
+        if (row === undefined) throw new Error('no such task')
+        if (request.patch?.prompt !== undefined) row.prompt = request.patch.prompt
+        if (request.patch?.active !== undefined) row.status = request.patch.active ? 'active' : 'paused'
+        if (request.patch?.timing !== undefined) row.rrule = request.patch.timing.rrule
+        return row
+      },
+    }
+    const logger = { info: () => {}, warn: () => {}, error: () => {} } as never
+    const loopService = createLoopService({
+      schedule: () => schedule as never,
+      logger,
+      policy: () => loopPolicyFromConfig(0, 0, 10, 3),
+    })
+    const iterateService = createLoopService({
+      schedule: () => schedule as never,
+      logger,
+      identity: { title: ITERATE_TASK_TITLE, defaultPrompt: () => DEFAULT_ITERATE_TEMPLATE },
+      policy: () => loopPolicyFromConfig(0, 0, 10, 3),
+    })
+    const server = createServer((req, res) => {
+      const path = (req.url ?? '').split('?')[0]!
+      if (path === LOOP_ROUTE_PATH) return void handleLoopRoute(loopService, undefined, req, res)
+      if (path === ITERATE_ROUTE_PATH) return void handleLoopRoute(iterateService, undefined, req, res, dispatchIterateAction)
+      res.statusCode = 404
+      res.end()
+    })
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+    const address = server.address() as { port: number }
+    const baseURI = `http://127.0.0.1:${address.port}/`
+    const previousDocument = (globalThis as unknown as { document?: unknown }).document
+    ;(globalThis as unknown as { document?: unknown }).document = { baseURI }
+    try {
+      // Both bundles, loaded the way the host loads them (no transport override).
+      const source = readFileSync(new URL('../src/client/index.js', import.meta.url), 'utf8')
+      let registration: { factory: (require: (id: string) => unknown) => Record<string, unknown> } | undefined
+      const record = globalThis as unknown as { window?: { __ModuleLoader__?: { load(spec: never): void } } | undefined }
+      const previousWindow = record.window
+      record.window = { __ModuleLoader__: { load: (spec) => { registration = spec } } }
+      try { new Function(source)() } finally { record.window = previousWindow }
+      const loaded = registration!.factory((id) => {
+        if (id === 'react') return switchReact
+        throw new Error(`the bundle must not require ${id} at load time`)
+      })
+      const loopSwitch = loaded['GROK_WORKFLOW_LOOP'] as LoopSwitchBundle
+      const iterateSwitch = loaded['GROK_WORKFLOW_ITERATE'] as LoopSwitchBundle
+      expect(iterateSwitch.routePath).toBe(ITERATE_ROUTE_PATH)
+
+      // The loop switch: mount (status read over real HTTP), click open, click close.
+      expect(loopSwitch.url()).toContain('/grok-workflow/loop')
+      const loopView = mountSwitch(loopSwitch.component, { sessionId: SESSION, t: translator('zh') })
+      const { tree: loopTree } = await loopView.mount()
+      expect(texts(loopTree).join(' ')).toContain(zhDict['loop.switch.off'])
+      const loopOpened = await loopView.click(loopTree)
+      // The real service answered: the rule it stored (floor 60, 10 rounds) is what renders.
+      expect(texts(loopOpened).join(' ')).toContain(translate('zh', 'loop.switch.on', { minutes: '60', rounds: '10' }))
+      expect(rows.map(row => row.title)).toEqual([LOOP_TASK_TITLE])
+      const loopClosed = await loopView.click(loopOpened)
+      expect(texts(loopClosed).join(' ')).toContain(zhDict['loop.switch.off'])
+      expect(rows).toHaveLength(0)
+
+      // The iterate switch: same walk, and the stored prompt is the profile template.
+      const iterateView = mountSwitch(iterateSwitch.component, { sessionId: SESSION, t: translator('zh') }, 'iterate')
+      const { tree: iterateTree } = await iterateView.mount()
+      expect(texts(iterateTree).join(' ')).toContain(zhDict['iterate.switch.off'])
+      const iterateOpened = await iterateView.click(iterateTree)
+      expect(texts(iterateOpened).join(' ')).toContain(translate('zh', 'iterate.switch.on', { minutes: '60', rounds: '10' }))
+      expect(rows.map(row => row.title)).toEqual([ITERATE_TASK_TITLE])
+      expect(rows[0]!.prompt).toBe(DEFAULT_ITERATE_TEMPLATE)
+      // The loop slot is untouched by the iterate open: a fresh read of the loop
+      // route answers closed over real HTTP.
+      const loopRead = await loopSwitch.read(SESSION)
+      expect(loopRead).toMatchObject({ ok: true, loop: { open: false } })
+      // A body that tries to override the prompt is ignored: the template governs.
+      const smuggled = await iterateSwitch.send({ action: 'open', sessionId: SESSION, prompt: 'not the template', intervalMinutes: 3 })
+      expect(smuggled).toMatchObject({ ok: true, loop: { open: true } })
+      expect(rows).toHaveLength(1)
+      expect(rows[0]!.prompt).toBe(DEFAULT_ITERATE_TEMPLATE)
+      const iterateFinal = await iterateView.click(iterateOpened)
+      expect(texts(iterateFinal).join(' ')).toContain(zhDict['iterate.switch.off'])
+      expect(rows).toHaveLength(0)
+    } finally {
+      ;(globalThis as unknown as { document?: unknown }).document = previousDocument
+      server.closeAllConnections()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
   })
 })

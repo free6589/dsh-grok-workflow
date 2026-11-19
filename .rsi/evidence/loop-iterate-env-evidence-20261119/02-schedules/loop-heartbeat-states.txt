@@ -1,0 +1,72 @@
+# Loop heartbeat schedule states — OFF captured live, ON captured from prior live run
+
+Snapshot time: 2026-11-20T00:57–01:00 +08:00. Read-only: no schedule was created, edited, or deleted
+by this task.
+
+## Store
+- Host Schedule store (single, machine-global): `~/.dsh/storages/schedule.json`
+  - size 16047 bytes, mtime 2026-11-20 00:06:39 +0800,
+    sha256 `4be1a9297f83fb3d8f956af65c3253de38b4b448544c384a358861bbc8dabc3f`
+  - shape: `{"unit":"schedule","global":…,"tables":{"tasks":{…}}}`
+  - frozen copy: `02-schedules/schedule.json.snapshot` (taken 00:26, same 16047-byte content)
+- Per-profile stores: NONE. `find ~/.dsh/profiles -maxdepth 3 -name 'schedule*.json'` → empty;
+  `find ~/.dsh -name 'schedule*.json' -not -path '*/node_modules/*'` → only `~/.dsh/storages/schedule.json`.
+  CONFIRMED: a loop opened by any instance (web:3080 or the loopfix-verify copy on :3451) writes to
+  the same store the live GUI reads.
+
+## OFF state — CONFIRMED live, twice
+1. Direct store read (this task, 00:57):
+   `tables.tasks` contains exactly 1 row:
+   `schedule-12eadb13-49c0-4479-9ac2-0d0e8e7ff1d0` title `派发个人助理灵感箱`, status `active`,
+   target session `session-a52a4e1d-e601-494e-990d-7ad2cea40ed8`.
+   Loop-heartbeat rows (title `Loop heartbeat`): **0**.
+2. Plugin route via the model-facing tool, this session:
+   `grok_loop(action="status")` → `Loop heartbeat: closed for session 2357e7bd-1794-4b2b-94e5-0ff20c0d3fdb.`
+3. Earlier identical reading recorded in `~/.dsh/...` history: prior run's post-close artifact
+   `.rsi/evidence/round-023/schedule-closed.json` (Nov 19 21:58) also has exactly 1 row — the same
+   派发个人助理灵感箱 task, zero loop rows.
+
+## ON state — CONFIRMED from a real instance, artifact on disk (not reproduced now)
+Source: `.rsi/evidence/round-023/loop-route.txt` (written 2026-11-19 21:58 against
+`dsh --profile loopfix-verify --host 127.0.0.1 --port 3451`, which links the local checkout):
+
+```
+{"ok":true,"action":"status","loop":{"open":false,"sessionId":"session-2bc2c2f1-…"}}            HTTP 200
+{"ok":true,"action":"open","loop":{"open":true,"sessionId":"session-2bc2c2f1-…",
+  "taskId":"schedule-b731ed1d-c6b9-42a2-92a4-d45d19ae322e","taskStatus":"active",
+  "intervalMinutes":60,"rounds":10,"nextAt":"2026-11-19T14:58:35.000Z",
+  "createdAt":"2026-11-19T13:58:34.522Z"}}                                                       HTTP 200
+{"ok":true,"action":"status","loop":{… "taskStatus":"active" …}}                                 HTTP 200
+{"ok":true,"action":"close","loop":{"open":false,"sessionId":"session-2bc2c2f1-…"}}              HTTP 200
+{"ok":true,"action":"status","loop":{"open":false,…}}                                            HTTP 200
+```
+
+Second ON capture, production path through the page's own fetch (no injected `loopSend`),
+`.rsi/evidence/round-023/switch-prod-path.txt` (2026-11-19 22:01):
+```
+mount: disabled while reading — OK
+after read: state=ready note="关"
+read on mount via page fetch — OK (no HTTP undefined)
+after open click: "自动接着跑 开 · 每 60 分钟 · 还剩 10 轮"
+server confirms open (task schedule-4d042e8e-48b6-4365-8624-6f936d9fcde6) — OK
+after close click: "自动接着跑 关"
+server confirms closed — OK
+PASS: production-path switch reads, opens and closes through the page fetch
+```
+
+Both ON captures show the same invariant: one session-target `rrule` row titled `Loop heartbeat`,
+created by the open action, deleted (not paused) by close.
+
+## What is NOT captured (honest gaps)
+- ON state on the LIVE `web` profile (port 3080): **NOT_RUN**. The heartbeat can only be opened by the
+  user from the browser switch (`LoopService.open` refuses any agent actor, `src/loop.ts`); this task is
+  read-only and is a delegated subagent, so flipping the live switch was out of scope and out of reach.
+- Live HTTP re-probe on :3451: **BLOCKED** — `POST /grok-workflow/loop {"action":"status"}` returns
+  `HTTP 401` without the instance cookie jar. Deliberately not worked around (credentials are off-limits).
+- `schedule_list` tool: **BLOCKED** for this session — `{"code":"subagent_session","message":"A delegated
+  subagent cannot use scheduled tasks."}`. The store was read directly instead (same data, read-only).
+
+## Instances running at snapshot time (CONFIRMED, `ps`)
+- `PID 154637  Tue Nov 17 22:49:32 2026  dsh web --host 100.111.111.88 --port 3080 --no-open`  ← the live GUI
+- `PID 2439039 Fri Nov 20 00:14:47 2026  dsh --profile loopfix-verify --host 127.0.0.1 --port 3451 --no-open`
+  ← still running (memory `docs/knowledge/STATE.md` says this instance was stopped; observed reality wins)

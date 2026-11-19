@@ -13,14 +13,35 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { Session } from '@deepseek-ai/dsh-session'
-import { grokCommand, registerGrokCommand } from '../src/command.js'
+import { grokCommand, GROK_USAGE_TEXT, registerGrokCommand } from '../src/command.js'
 import type { GrokCommandAgent, GrokCommandDefinition, GrokCommandResult } from '../src/command.js'
 import { apply } from '../src/index.js'
 import { isModeEnabled, readModeRecord, setMode } from '../src/mode.js'
+import { isPromptShapedArgument } from '../src/intake.js'
 
 /** Documented settle texts (also asserted verbatim below). */
 const ON_TEXT = 'Grok workflow ON — every message now runs the full plan→execute→verify workflow.'
 const OFF_TEXT = 'Grok workflow OFF — normal chat.'
+
+/**
+ * The stored team task prompt that stalled intake (measured, two independent
+ * sessions: 2 032 and 2 041 characters, `docs/knowledge/VALIDATION.md`). Its
+ * first line opens with `/grok`, which is what the commands parser reads, so the
+ * whole body arrives as the command's argument.
+ */
+const PASTED_TEAM_PROMPT = [
+  '团队任务：实现「自我迭代」功能（与「自动接着跑」并列，第二开关 + 独立心跳 + 可改模板）',
+  '',
+  '【背景】',
+  '仓库 /home/fish/projects_mine/dsh-grok-workflow，分支 main，当前 v0.11.21。',
+  '「自动接着跑」= Schedule 里一条 rrule 任务，到点续一句让本会话接着干。',
+  '现在要加第二条独立心跳「自我迭代」：心跳唤醒后自己选题、自己改、自己测、自己记、自己发版。',
+  '',
+  '【要求】',
+  '1. 第二个开关，与「自动接着跑」并列，独立心跳。',
+  '2. 默认模板文件放在 docs 下，模板可改。',
+  '3. npm run ci 通过；每处改动有改前失败、改后通过的测试。',
+].join('\n')
 
 /* --------------------------------------------------------------- fixtures -- */
 
@@ -81,16 +102,16 @@ describe('grok command handler (arg parsing → toggle state)', () => {
     // Toggle currently ON: the bad arg must not flip it.
     const on = realSession('sess-cmd-bad-on')
     setMode(on, { v: 1, enabled: true, turn: 1, setBy: 'command:/grok' })
-    expect(invoke('maybe', new FakeAgent(on))).toEqual({ kind: 'error', text: 'Usage: /grok [on|off]' })
+    expect(invoke('maybe', new FakeAgent(on))).toEqual({ kind: 'error', text: GROK_USAGE_TEXT })
     expect(isModeEnabled(on)).toBe(true)
     // Toggle currently OFF: still untouched.
     const off = realSession('sess-cmd-bad-off')
     setMode(off, { v: 1, enabled: false, turn: 1, setBy: 'command:/grok off' })
-    expect(invoke('on please', new FakeAgent(off))).toEqual({ kind: 'error', text: 'Usage: /grok [on|off]' })
+    expect(invoke('on please', new FakeAgent(off))).toEqual({ kind: 'error', text: GROK_USAGE_TEXT })
     expect(isModeEnabled(off)).toBe(false)
     // Never written: a bad arg writes nothing at all.
     const fresh = realSession('sess-cmd-bad-fresh')
-    expect(invoke('off now', new FakeAgent(fresh))).toEqual({ kind: 'error', text: 'Usage: /grok [on|off]' })
+    expect(invoke('off now', new FakeAgent(fresh))).toEqual({ kind: 'error', text: GROK_USAGE_TEXT })
     expect(readModeRecord(fresh)).toBeUndefined()
   })
 })
@@ -161,10 +182,53 @@ describe('grok command handler (settled kind and text)', () => {
     expect(invoke('on', agent)).toEqual({ kind: 'success', text: ON_TEXT })
     const bad = invoke('banana', agent)
     expect(bad.kind).toBe('error')
-    expect(bad.text).toBe('Usage: /grok [on|off]')
+    expect(bad.text).toBe(GROK_USAGE_TEXT)
     // The grammar owns `on`/`off`/empty; anything else is usage — and the
     // toggle still reflects the last valid command (`on`).
     expect(isModeEnabled(session)).toBe(true)
+  })
+})
+
+/* -------------------------------------------------------- intake boundary -- */
+
+describe('grok command handler (prompt-shaped argument: the intake stall)', () => {
+  it('refuses a pasted team prompt with the measured, bilingual refusal', () => {
+    // The measured shape: `/grok` at the start of the line, the whole task body
+    // as the argument. Before this change the same call settled as a one-line
+    // usage error and the prompt never reached the gate.
+    const session = realSession('sess-cmd-prompt')
+    const result = invoke(` ${PASTED_TEAM_PROMPT}`, new FakeAgent(session))
+
+    expect(result.kind).toBe('error')
+    expect(result.text).toContain('Usage: /grok [on|off]')
+    expect(result.text).toContain(`the ${PASTED_TEAM_PROMPT.length} characters after it were discarded`)
+    expect(result.text).toContain('这段文字没有作为提示词发出')
+    expect(result.text).toContain('其后的')
+    expect(result.text).toContain(String(PASTED_TEAM_PROMPT.length))
+    // Nothing was written: a refused argument never touches the toggle.
+    expect(readModeRecord(session)).toBeUndefined()
+  })
+
+  it('also covers the "/grok on /grok …" shape the fresh session carried', () => {
+    const session = realSession('sess-cmd-prompt-on')
+    const result = invoke(` on /grok${PASTED_TEAM_PROMPT}`, new FakeAgent(session))
+
+    expect(result.kind).toBe('error')
+    expect(result.text).toContain('Usage: /grok [on|off]')
+    expect(result.text).toContain(String(` on /grok${PASTED_TEAM_PROMPT}`.trim().length))
+    expect(readModeRecord(session)).toBeUndefined()
+  })
+
+  it('keeps the terse grammar error for a one-line argument, never silence', () => {
+    expect(invoke('maybe', new FakeAgent(realSession('sess-cmd-one')))).toEqual({ kind: 'error', text: GROK_USAGE_TEXT })
+    expect(invoke('banana', new FakeAgent(realSession('sess-cmd-two')))).toEqual({ kind: 'error', text: GROK_USAGE_TEXT })
+
+    // The shape test: a one-line argument is a typo, a long or multi-line one is a
+    // prompt the command swallowed.
+    expect(isPromptShapedArgument('maybe')).toBe(false)
+    expect(isPromptShapedArgument('x'.repeat(199))).toBe(false)
+    expect(isPromptShapedArgument('x'.repeat(201))).toBe(true)
+    expect(isPromptShapedArgument(PASTED_TEAM_PROMPT)).toBe(true)
   })
 })
 

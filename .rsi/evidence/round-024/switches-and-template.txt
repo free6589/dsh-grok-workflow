@@ -1,0 +1,11 @@
+session session-9df3e1… created via the real RPC
+loop switch mounted via page fetch, reads 关 — OK
+loop open: server confirms task schedule-7a7ccd53-35d5-4aa1-9cfb-c9ffc79d3f8b (interval 60 min, 10 rounds) — OK
+iterate switch mounted via page fetch, reads 关 (loop row is not its slot) — OK
+iterate open: server confirms its own task, distinct from the loop task — OK
+settings mutate accepted (real write path, revision 0) — OK
+template read back from the profile verbatim (survives reload) — OK
+iterate row still live after the template edit (refresh semantics) — OK
+loop close deleted only the Loop heartbeat row — OK
+iterate close deleted its own row; nothing left — OK
+PASS: both switches + template persistence verified over the real page fetch, routes, services and settings write path

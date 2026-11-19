@@ -254,9 +254,16 @@ out-of-scope → mode-off → already-routed; reason labels are asserted only vi
   scope throw. `dsh-commands` is NOT a bundle dependency, so `src/command.ts` types the
   register/handler surface STRUCTURALLY (no import).
 - `/grok` grammar (pinned by tests): trim → `''`/`'on'` enable, `'off'` disable, anything else
-  `{kind:'error', text:'Usage: /grok [on|off]'}` with the toggle untouched. `setBy` =
+  is an error with the toggle untouched. That error is explicit in every case: a one-line
+  argument settles as `GROK_USAGE_TEXT` ("Usage: /grok [on|off]. This text was not sent as a
+  prompt, so nothing ran."), a prompt-shaped argument (multi-line, or over
+  `INTAKE_LIMITS.commandPromptChars` = 200 characters) settles as the measured bilingual refusal
+  from `src/intake.ts` (`refuseDiscardedCommandPrompt`). `setBy` =
   `command:/grok` / `command:/grok off`. `turn` is informational (finite agent turn else 0); the
-  gate reads only `enabled`.
+  gate reads only `enabled`. The boundary exists because `dsh-commands` `parseCommand`
+  (`/^\/([a-z][a-z0-9_-]*)(?=$|[\t\n\r ])/u`) turns the whole first line into a command and hands
+  the rest over as `rawInput`: a stored task prompt whose first line is `/grok 团队任务：…`
+  therefore arrives here as its own argument (`docs/task-prompt-template.md`).
 - Cordis test seam (CONFIRMED): `ctx.provide('commands', value)` works outside a fiber on
   `new Context()`; `ctx.inject(['commands'], cb)` fires cb async with `cb-ctx.commands === value`
   and PENDS (never fires) until the service appears. `registerGrokCommand` carries a
@@ -1081,3 +1088,53 @@ Source: 只读审计 + 本轮新增实现与单测。依据 = `src/guardian.ts`�
 - 一句话：**supervisor 回答「做得对不对」，guardian 回答「还活着没」**；
   前者在脚本里判质量，后者在主机侧看存活。两者正交，可独立开关
   （空 supervisor 链 = 串行门不开；`timeoutMs: 0` = 并行监护 disarm）。
+
+## A30 — 双心跳身份：路由看标记、存储看保留名，一个会话只留一行（2026-11-20，`CONFIRMED`；真实定时投递 `NOT_RUN`）
+
+- **事实**：本仓库同时存在两个同形状的心跳投递（`source.kind === 'schedule'`）——
+  Loop（`Loop heartbeat` / `[grok-workflow loop]` / `/grok-workflow/loop` / `grok_loop`，
+  `src/loop.ts:66/69/108/111`）与 Iterate（`RSI heartbeat` / `/grok-workflow/iterate` /
+  可编辑模板 `iterateTemplate`（`src/config.ts:166`），无标记、无工具；插件侧是同一个
+  服务类的第二个实例（`src/index.ts:313`，见 A31），仓库侧的提示词模板是
+  `.rsi/HEARTBEAT.md:24`）。
+  身份拆成两个谓词（D-079）：`isLoopHeartbeat`（`src/loop.ts:88`）是**路由**身份，被
+  `isHeartbeatMessage`（`src/gate.ts:532`，要求 `schedule` 源 + 标记）作为门禁唯一的心跳入口；
+  `isLoopSlot`（`src/loop.ts:292`）是**存储**身份（保留名 + `rrule` + 目标会话），
+  `close`/`status`/`stopAll`/`deleteSessionHeartbeats`/`dropDuplicates` 全部按它清理。
+- **为什么必须是两个谓词**：标记是消息文本里的东西，门禁只看得到文本与 `source.kind`，
+  看不到 Schedule 行；名字是行上的东西，清理按它才能收走被改掉标记的行（DSH 的
+  `schedule_edit` 接受 `prompt`）。合一边会各自坏：按标记清理 → 被改写的行删不掉，
+  投递按 `non-user-source` 直通、开关在活行上显示「关闭」；按名字路由 → 别人同名任务
+  的投递会被误收编。负对照：修前 `src/loop.ts` 上新测试 **7 failed / 38 passed**。
+- **门禁分支顺序**：`classifyPreStep`（`src/gate.ts:484`）先查心跳（`:496`）再过滤用户源
+  （`:503`）；Iterate 投递落到 `non-user-source` 直通，`loop.review/admit/stop` 全不调用
+  （`test/heartbeat-identity.spec.ts` 用「会说 stop 的刹车 spy」钉死）。
+- **生命周期不变量**：一个会话至多一条 Loop 行。`open()` refresh/resume/replace 三路
+  都跑 `dropDuplicates`（`src/loop.ts:535`）；删除被拒留下活行时改写幸存行（`:502`）；
+  `close` 与 `stopAll` 读回汇报真实剩余。`Loop heartbeat` 因此成为保留名（F5，规避见
+  `HEARTBEATS.md` §1）。
+- **残留共享面**：`.rsi/STOP` 同时停两个心跳（只会停、不会串路由，`GROK_WORKFLOW_STOP_FILE`
+  可分离，D-080）。真实定时投递、真机 GUI 改写提示词观察投递 `NOT_RUN`（武装任务是操作者
+  动作，D-066）。
+
+## A31 — 两个心跳是同一个服务类的两个实例，清理谓词随实例走（2026-11-20，`CONFIRMED`）
+
+- **事实**：`src/index.ts:299` 与 `:313` 各建一个 `createLoopService`：循环实例用默认身份
+  （`Loop heartbeat` / `[grok-workflow loop]`），自迭代实例用 `identity: { title:
+  'RSI heartbeat', defaultPrompt: () => iterateTemplate }`（`src/loop.ts:119`）。
+  `installLoop`（`src/loop-surface.ts:148`）为第二个实例注册 `/grok-workflow/iterate`
+  这条 exact 路由，dispatch 是 `dispatchIterateAction`（`:352`）：只接受
+  `{ action, sessionId }`，忽略 `prompt` / `intervalMinutes`，所以档案里的模板是提示词
+  的唯一来源。工具只有一个（`grok_loop`），自迭代心跳没有模型面入口。
+- **所有权**：每个实例的存储谓词是闭包 `slotOf`（`src/loop.ts:457`，按 `identity.title`
+  匹配 `rrule` + 目标会话）；`close`/`status`/`stopAll`/`forgetSession`/`dropDuplicates`
+  都用它。`deleteSessionHeartbeats`（`src/loop.ts:752`）把谓词做成参数（默认
+  `isLoopSlot`，刹车仍只清循环行），`forgetSession` 传自己的 `slotOf`。
+- **为什么**：写死谓词会让一个实例删掉另一个的行。实测修前 `iterate.forgetSession()`
+  在同时有两行的会话上删掉 `Loop heartbeat`、留下 `RSI heartbeat`（F6）。修后反方向
+  5 例测试通过；负对照（只把 `slotOf` 参数去掉）1 failed / 14 passed。
+- **路由隔离的另一半**：两条 exact 路由各自绑定自己的服务；把 iterate 路由改成绑循环
+  服务，`test/loop-surface.spec.ts` 的「two switches, two routes」块 2 例失败——说明
+  这组测试真的能发现串线。页面开关的 `routePath` 与 Host 常量一致（`test/client.spec.ts`）。
+- **残留**：卸载只清循环行（`src/loop-surface.ts:115`），自迭代行按设计留存；归档清扫
+  按实例各自正确（D-081）。真实定时投递与真机 GUI 观察仍 `NOT_RUN`。

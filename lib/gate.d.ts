@@ -220,6 +220,17 @@ export declare function collectRecallSources(session: Session | undefined, roots
  */
 export declare function classifyPreStep(deps: Pick<GateDeps, 'config' | 'readConfig' | 'loop'>, payload: PreStepPayload): Classification;
 /**
+ * The receipt a `full`-mode turn shows when the team runs behind it.
+ *
+ * It is the whole user-visible content of that turn, so it has to say three
+ * things without them: the message was accepted (not answered), the report comes
+ * as its own message, and sending more meanwhile is expected rather than lost.
+ *
+ * @param lang - the message's language.
+ * @returns one short paragraph, never empty.
+ */
+export declare function acceptedReceipt(lang: TriageLang): string;
+/**
  * User-visible terminal for a cancelled turn (P0-4).
  *
  * A cancellation that ends silently is indistinguishable from a hang, and the two

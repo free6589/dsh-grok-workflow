@@ -1749,3 +1749,109 @@ model selector」）、`test/loop-brakes.spec.ts`（35 条）、`test/loop-runti
 - **Consequences:** 超过 16m40s 的 run 首次记下真实时长；旧 checkpoint 里缺
   `durationMs` 的照常读（字段本来就是可选的）。`maxBytes`/`countCeiling` 的其它
   用法不动。
+
+## D-078 — 提示词进门的拒绝一律双语且带实测数字；`/grok` 的参数是提示词入口，不是只认拼写（2026-11-19 · 会话入口加固）
+
+- **Status:** CONFIRMED（`src/intake.ts` 新增；`src/command.ts` 非开关参数改走它；
+  `src/gate.ts` `refusalOf` + 迟到目标走它；`test/intake.spec.ts` 新增 14 条；
+  红→绿见 `docs/knowledge/evidence/prompt-intake-2026-11-19/red-full.log` 与
+  `ci.log`）
+- **Date:** 2026-11-19
+- **Decision:** 入口拒绝文本只在一个模块里生成（`src/intake.ts`），并且
+  ①英文一行 + 简体中文一行，永远两行都出；②写出实测字符数、上限、需要分成几段；
+  ③写出下一步动作（拆分重发 / 去掉开头 `/grok` 重发）。`/grok` 的非开关参数按
+  **形态**分档：单行短参数 = 拼写错误 → 一行 `GROK_USAGE_TEXT`（明确写出「这段文字
+  没有作为提示词发出」）；多行或超 200 字符 = 被命令吞掉的提示词 → 带字符数的双语
+  拒绝。开关语义（空/`on` 开、`off` 关、`setBy`、回读校验）逐字不动。
+- **Reason:** 用户把存档任务提示词贴进新会话，会话毫无反应。实测根因不是长度
+  （2 041 字符 / 3 697 字节，仅占 32 000 目标预算 6.4%，无截断），而是第一行以
+  `/grok` 开头：`dsh-commands` `parseCommand` 把整行当命令，正文成了参数，旧语法
+  只回一行 `Usage: /grok [on|off]` 就返回——没有 `user/message`、没有 `agent/pre-step`、
+  没有 run，用户看到的等于静默。同一个「静默」也存在于门禁：超长/空消息的拒绝
+  只有英文，读者既不知道上限也不知道收到多少。
+- **Alternatives rejected:**
+  1. 把 `/grok` 的未知参数直接当普通消息投递（命令 handler 拿不到「发送一条消息」
+     的写入口，只能伪造 `user/message`——与 P0-5 的单一写入者纪律冲突，且会绕过门禁）。
+  2. 只把门禁的拒绝翻成中文、不动命令（实测那三条真实失败根本没走到门禁，
+     修了等于没修）。
+  3. 无条件拒绝所有非开关参数（单行拼写错误会得到四行报告，噪音大于信息）。
+  4. 把上限从 32 000 调大（问题不是上限；调大只会让「谁在拦」更难看出）。
+- **Consequences:** 任何被入口拒绝的提示词都能在文本里核对「我发了多少、上限多少、
+  下一步做什么」；`INTAKE_LIMITS.promptChars` 直接取 `TASK_LIMITS.objectiveChars`，
+  一个数字只有一个含义（`test/intake.spec.ts` 钉住）。默认模板落到
+  `docs/task-prompt-template.md`，由 `assembleTaskPrompt` 组装并用测试证明模板自己
+  在预算内、且不以 `/` 开头。未覆盖：短于一行的提示词仍只得到一行明确拒绝（不测量，
+  因为无内容可测）。
+
+## D-079 — 心跳身份拆成两个谓词：路由看标记、存储看保留名；一个会话只留一行（2026-11-20 · 心跳隔离审计）
+
+- **Status:** CONFIRMED（`src/loop.ts:292` `isLoopSlot` 新增，`isLoopTask`
+  改为「槽位 + 标记」；`open()` 在刷新/恢复后调 `dropDuplicates`（`src/loop.ts:535`），
+  删除被拒留下活行时改写该行（`src/loop.ts:502`）；`close`/`status`/`stopAll`/
+  `deleteSessionHeartbeats` 改按槽位；`test/loop.spec.ts` 新增 4 条，红→绿见
+  `docs/knowledge/HEARTBEATS.md` §5）
+- **Date:** 2026-11-20
+- **Decision:** 心跳的身份分两半，两个谓词各管一半，互不替代：
+  `isLoopHeartbeat`（标记 `[grok-workflow loop]` + `source.kind==='schedule'`）是**路由**
+  身份，只有门禁用它；`isLoopSlot`（保留名 `Loop heartbeat` + `rrule` + 目标会话）是
+  **存储**身份，只有清理用它。清理不再要求标记，`open()` 会把标记写回它收回的那一行。
+- **Reason:** 标记不是所有权证明，提示词是可改文本（DSH 自己的 `schedule_edit` 收
+  `prompt`）。按标记清理时，一行被改掉标记就既刷不了也删不掉：它的投递按普通非用户消息
+  穿过门禁（不进刹车、不进账），开关却在一条活行上显示「关闭」——这正是「一个心跳压住
+  会话」的形态。反过来，按名字清理又必须保证别的心跳不被误删：RSI 自迭代任务的
+  `RSI heartbeat` 行、任何别的名字或 `kind` 的行，两个谓词都不匹配（`test/heartbeat-identity.spec.ts`）。
+- **Alternatives rejected:**
+  1. 继续只按标记清理（D-069 的原文），另加「标记丢失即视为陌生行」——那会把一条仍在
+     投递的行永久留在库里，且无人能停。
+  2. 把 RSI 任务名也写进插件常量做联合判断——插件不拥有那个任务，它的名字是操作者在
+     「自动化任务」里定的；写死等于伪造事实。
+  3. 给 `.rsi/STOP` 换成循环专用停止文件——见 D-080 的取舍。
+- **Consequences:** 一个会话最多一条循环行；被改写的行恢复路由且可关闭；`Loop heartbeat`
+  这个名字成为保留名（若操作者把自迭代任务也叫这个名字，会被当成循环槽位收回，已在
+  `HEARTBEATS.md` F5 写明）。
+
+## D-080 — `.rsi/STOP` 继续同时停掉两个心跳，不拆成两个开关（2026-11-20 · 心跳隔离审计）
+
+- **Status:** CONFIRMED（`src/loop-brakes.ts:52` `LOOP_STOP_MARKER = .rsi/STOP`；
+  `.rsi/PROTOCOL.md` 把同一文件定义为 RSI 的暂停开关；`loop/stop-file` 见
+  `src/loop-brakes.ts:122`）
+- **Date:** 2026-11-20
+- **Decision:** 保持共享，不拆。一个文件同时是循环刹车和自迭代暂停开关；要分开的部署用
+  `GROK_WORKFLOW_STOP_FILE` 指到别处。
+- **Reason:** 这是**只能停**的方向：写了它两个心跳都停，任何情况下都不会把一个心跳的
+  投递导到另一个的处理器。它还是本部署操作者已经记住的开关（`PROTOCOL.md` §7），改位置
+  等于把「我知道怎么停」这条隐性契约改掉。身份隔离要防的是「压住会话」和「互相触发」，
+  不是「一键全停」。
+- **Alternatives rejected:**
+  1. 循环专用 `.rsi/LOOP-STOP`：能分开，但操作者写 `.rsi/STOP` 时会以为全停而循环还在跑，
+     失败方向更坏。
+  2. 只靠 `GROK_WORKFLOW_STOP_FILE` 环境变量区分：默认值仍共享，等于没解决。
+- **Consequences:** 「停自迭代」会顺带停循环，这是有意为之，写进 `HEARTBEATS.md` F3；
+  要独立停循环就用 `grok_loop close`（删行，不写标记）。
+
+## D-081 — 两个心跳是两个服务实例；清理谓词随实例走，不写死（2026-11-20 · 心跳隔离审计第二轮）
+
+- **Status:** CONFIRMED（`src/index.ts:313` 第二个 `createLoopService`（`RSI heartbeat`），
+  `src/loop-surface.ts:148` 注册 `/grok-workflow/iterate`，`src/loop.ts:457` 每实例
+  `slotOf`；`deleteSessionHeartbeats`（`src/loop.ts:752`）新增 `slot` 参数，默认
+  `isLoopSlot`；回归测试 `test/heartbeat-identity.spec.ts` 反方向 4 例）
+- **Date:** 2026-11-20
+- **Decision:** 自迭代心跳不再只是「操作者的 Automation 任务」：插件用同一个
+  `createLoopService` 再实例化一次，身份是 `RSI heartbeat` + `/grok-workflow/iterate` +
+  可编辑模板 `iterateTemplate`（无标记、无工具、无卸载清扫）。**所有权与清理必须绑定到实例**：
+  任何「删这个会话的心跳」的入口都传自己实例的槽位谓词，绝不使用写死的
+  `isLoopSlot`（除刹车，它只拥有循环）。
+- **Reason:** 两个开关、两套路由、两个槽位共存后，一个写死的谓词就是跨心跳写：
+  实测 `iterate.forgetSession()` 在同时存在两行的会话上删掉了 `Loop heartbeat` 行、留下
+  `RSI heartbeat` 行——一个心跳删了另一个的任务，还让旧行活过归档。这属于「互相触发」，
+  不是命名偏好。可达性如实记：当前接线只把循环实例挂到归档事件，所以组合层今天走不到；
+  但 `forgetSession` 是归档清扫的接口、两个实例都暴露它，按「接口必须正确」处理。
+- **Alternatives rejected:**
+  1. 让自迭代服务复用 `isLoopSlot` 并按提示词标记区分——它故意没有标记（模板可编辑），
+     标记无法承担所有权。
+  2. 给 `deleteSessionHeartbeats` 加一个 `title` 字符串参数——调用方仍需知道别人的槽位规则；
+     传谓词才是「谁拥有谁清理」。
+  3. 归档时两个实例都清扫一次（先循环后自迭代）——会先删错行，方向不对；正确做法是各清各的。
+- **Consequences:** 归档清扫按实例正确；卸载仍只清循环行（自迭代心跳按设计活过卸载，
+  `src/loop-surface.ts:73`），因此自迭代行不会变成「无主后台工作」——它的投递只是普通
+  定时消息，不进入任何插件处理器。回归测试与负对照见 `HEARTBEATS.md` F6 与 §5。

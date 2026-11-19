@@ -1,0 +1,20 @@
+=== session: session-2fb9a98a-2185-4888-8773-bda9c03a195f ===
+--- loop status/open/status:
+{"ok":true,"action":"status","loop":{"open":false,"sessionId":"session-2fb9a98a-2185-4888-8773-bda9c03a195f"}}
+HTTP 200
+{"ok":true,"action":"open","loop":{"open":true,"sessionId":"session-2fb9a98a-2185-4888-8773-bda9c03a195f","taskId":"schedule-d13ff97c-20d8-4735-82f9-4fd820011ba5","taskStatus":"active","intervalMinutes":60,"rounds":10,"nextAt":"2026-11-19T19:21:25.000Z","createdAt":"2026-11-19T18:21:24.016Z"}}
+HTTP 200
+{"ok":true,"action":"status","loop":{"open":true,"sessionId":"session-2fb9a98a-2185-4888-8773-bda9c03a195f","taskId":"schedule-d13ff97c-20d8-4735-82f9-4fd820011ba5","taskStatus":"active","intervalMinutes":60,"rounds":10,"nextAt":"2026-11-19T19:21:25.000Z","createdAt":"2026-11-19T18:21:24.016Z"}}
+HTTP 200
+--- iterate status/open/status:
+{"ok":true,"action":"status","loop":{"open":false,"sessionId":"session-2fb9a98a-2185-4888-8773-bda9c03a195f"}}
+HTTP 200
+{"ok":true,"action":"open","loop":{"open":true,"sessionId":"session-2fb9a98a-2185-4888-8773-bda9c03a195f","taskId":"schedule-e0eafc48-0942-4149-90a9-c12410154bb4","taskStatus":"active","intervalMinutes":60,"rounds":10,"nextAt":"2026-11-19T19:21:25.000Z","createdAt":"2026-11-19T18:21:24.055Z"}}
+HTTP 200
+{"ok":true,"action":"status","loop":{"open":true,"sessionId":"session-2fb9a98a-2185-4888-8773-bda9c03a195f","taskId":"schedule-e0eafc48-0942-4149-90a9-c12410154bb4","taskStatus":"active","intervalMinutes":60,"rounds":10,"nextAt":"2026-11-19T19:21:25.000Z","createdAt":"2026-11-19T18:21:24.055Z"}}
+HTTP 200
+--- close both:
+{"ok":true,"action":"close","loop":{"open":false,"sessionId":"session-2fb9a98a-2185-4888-8773-bda9c03a195f"}}
+HTTP 200
+{"ok":true,"action":"close","loop":{"open":false,"sessionId":"session-2fb9a98a-2185-4888-8773-bda9c03a195f"}}
+HTTP 200

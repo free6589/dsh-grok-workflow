@@ -54,12 +54,13 @@ describe('configuration surface', () => {
   })
 
   it('rejects every removed key as unknown (R-06), with the migration named', () => {
-    // The slim-down keeps exactly 13 keys (nine plus the four repeat-run keys);
-    // the other 23 are unknown now.
+    // The slim-down keeps exactly 15 keys (nine plus the four repeat-run keys and
+    // the two self-iteration keys); the other 23 are unknown now.
     expect(CONFIG_KEYS).toEqual([
       'toolName', 'mode', 'grokDefault', 'roles', 'synthesis',
       'maxConcurrency', 'maxTasks', 'timeoutMs',
       'loopEnabled', 'loopMaxRounds', 'loopFailStreak', 'loopIntervalMin',
+      'iterateIntervalMin', 'iterateTemplate',
       'configVersion',
     ])
     expect(REMOVED_CONFIG_KEYS).toHaveLength(23)
@@ -324,12 +325,13 @@ describe('route validation against the runtime', () => {
     const projected = Object.keys(descriptor.value).sort()
     expect(projected).not.toContain('toolName')   // not volatile => not projected
     expect(projected).not.toContain('configVersion')   // not volatile => not projected
-    // The page is the 11 volatile keys (toolName/configVersion are structural).
+    // The page is the 13 volatile keys (toolName/configVersion are structural).
     expect(projected).toEqual([
-      'grokDefault', 'loopEnabled', 'loopFailStreak', 'loopIntervalMin', 'loopMaxRounds',
-      'maxConcurrency', 'maxTasks', 'mode', 'roles', 'synthesis', 'timeoutMs',
+      'grokDefault', 'iterateIntervalMin', 'iterateTemplate', 'loopEnabled', 'loopFailStreak',
+      'loopIntervalMin', 'loopMaxRounds', 'maxConcurrency', 'maxTasks', 'mode', 'roles',
+      'synthesis', 'timeoutMs',
     ])
-    expect(projected).toHaveLength(11)
+    expect(projected).toHaveLength(13)
     const ctx = ctxWith({
       settings: { configure: () => () => {}, describe: () => [descriptor] },
     })
@@ -349,9 +351,9 @@ describe('route validation against the runtime', () => {
     const surface = describeSurface(ctx)
     expect(surface.level).toBe('info')
     expect(surface.text).toContain('identified by value')
-    // The log states both numbers: 11 volatile keys reach the generated page,
-    // 13 are accepted (toolName/configVersion are plain, not volatile).
-    expect(surface.text).toContain(`11 of ${CONFIG_KEYS.length} field(s) on the page`)
+    // The log states both numbers: 13 volatile keys reach the generated page,
+    // 15 are accepted (toolName/configVersion are plain, not volatile).
+    expect(surface.text).toContain(`13 of ${CONFIG_KEYS.length} field(s) on the page`)
     // A foreign schema is not ours, and no field list may be invented from it.
     const foreign = ctxWith({
       settings: {

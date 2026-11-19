@@ -10,6 +10,16 @@
  * plugin's static `inject` (plan-mode's `static inject` omits it too): it is
  * optional everywhere.
  *
+ * The commands parser reads the **first line** of a message as a command and
+ * hands everything after `/grok` to this handler as `rawInput`
+ * (`@deepseek-ai/dsh-commands` `parseCommand`). That makes this handler the
+ * intake boundary for every stored team task prompt, because those prompts are
+ * meant for a grok-enabled session and open with `/grok`. An argument that is
+ * not `on`/`off` therefore never goes quiet: a one-line argument gets an
+ * explicit grammar error, a prompt-shaped argument gets the measured, bilingual
+ * refusal from `src/intake.ts` (see `test/command.spec.ts`). The toggle
+ * semantics are unchanged — only the argument handling is.
+ *
  * The handler runs directly against the agent (no model message is created):
  * it writes the durable toggle in `src/mode.ts`, and `src/gate.ts` honors it on
  * the next message (`classifyPreStep`'s `mode-off` pass branch). The `turn`
@@ -58,7 +68,16 @@ export interface GrokCommandDefinition {
 export interface CommandLogger {
     warn?(message: string): void;
 }
-/** The `/grok` command definition: arg grammar owned by the handler. */
+/** The `kind: 'error'` settle text for an argument that is not a toggle word. */
+export declare const GROK_USAGE_TEXT = "Usage: /grok [on|off]. This text was not sent as a prompt, so nothing ran.";
+/**
+ * The `/grok` command definition: arg grammar owned by the handler.
+ *
+ * The grammar is deliberately unchanged: empty or `on` enables, `off` disables.
+ * Only what happens to everything else changed, from a terse one-line usage
+ * error that looked like silence to an explicit refusal that says the text was
+ * discarded (and, for a prompt-shaped argument, measures it in both languages).
+ */
 export declare function grokCommand(logger?: CommandLogger): GrokCommandDefinition;
 /**
  * Lazy-mount the `/grok` command wherever a `commands` service is composed.

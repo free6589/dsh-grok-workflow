@@ -281,8 +281,28 @@ describe('objective limit — gate entry path', () => {
     const refusal = decision.messages.map(textOf).join('\n')
     expect(refusal).toContain('32000')
     expect(refusal).toContain('32000-character workflow objective limit')
+    // The refusal is bilingual and measured: the reader learns the received
+    // count and how many parts it would take, in both shipped languages.
+    expect(refusal).toContain('32001')
+    expect(refusal).toContain('parts')
+    expect(refusal).toContain('工作流目标上限')
     expect(ctx.engine.startCalls).toHaveLength(0)
     expect(agent.followups).toHaveLength(0)
+  })
+
+  it('refuses a message with no text to route with the same bilingual rule', async () => {
+    const ctx = newContext()
+    const agent = new FakeAgent()
+    const decision = await ctx.preStep()(
+      payload(agent, [userMessage('   \n ')]),
+      passingNext([]),
+    ) as { kind: string; messages: UserMessage[] }
+
+    expect(decision.kind).toBe('enter')
+    const refusal = decision.messages.map(textOf).join('\n')
+    expect(refusal).toContain('no text to route')
+    expect(refusal).toContain('没有可派工的文字')
+    expect(ctx.engine.startCalls).toHaveLength(0)
   })
 })
 
@@ -398,9 +418,16 @@ describe('built artifacts agree with the source constants', () => {
     expect(script).toContain('workflow objective <= 32000 chars')
   })
 
-  it('lib/input.js and lib/gate.js carry the same 32000 limit', () => {
+  it('lib/input.js, lib/intake.js and lib/gate.js carry the same 32000 limit', () => {
     expect(source('lib/input.js')).toContain('objectiveChars: 32_000')
-    expect(source('lib/gate.js')).toContain('verdict.request.length > TASK_LIMITS.objectiveChars')
+    // The gate no longer compares the length itself: admission refusal and the
+    // late objective path both ask the intake pass, and the intake pass takes its
+    // bound from `TASK_LIMITS.objectiveChars`. Asserting the seam instead of the
+    // literal expression keeps the parity check pointed at where the decision now
+    // lives, so the two files cannot drift apart silently.
+    expect(source('lib/gate.js')).toContain('inspectPrompt(verdict.request)')
+    expect(source('lib/gate.js')).toContain('refuseOversizePrompt(request.length)')
+    expect(source('lib/intake.js')).toContain('promptChars: TASK_LIMITS.objectiveChars')
   })
 
   it('the generated script and the host agree on the objective limit used at runtime', () => {

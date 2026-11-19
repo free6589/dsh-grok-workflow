@@ -78,6 +78,8 @@ class FakeSchedule implements LoopScheduleLike {
   calls: string[] = []
   /** Id whose delete must fail, so the "already gone is success / real error warns" path is reachable. */
   failDeleteOf?: string
+  /** Id whose delete must fail while the row itself goes active, so the "refresh the survivor" path is reachable. */
+  surviveDeleteOf?: string
   private next = 1
 
   async create(request: LoopScheduleCreate, actorSessionId?: string): Promise<LoopScheduleTask> {
@@ -111,6 +113,12 @@ class FakeSchedule implements LoopScheduleLike {
     this.calls.push(`edit:${request.action}:${request.id}`)
     const row = this.rows.find(candidate => candidate.id === request.id)
     if (request.action === 'delete') {
+      if (this.surviveDeleteOf === request.id) {
+        // An actor resumed this row between the catalog read and the delete: it is live
+        // again, the delete is refused, and the row stays where it is.
+        if (row !== undefined) row.status = 'active'
+        throw new Error('schedule refused the delete')
+      }
       if (this.failDeleteOf === request.id) throw new Error('schedule refused the delete')
       if (row === undefined) throw new Error(`no task ${request.id}`)
       this.rows = this.rows.filter(candidate => candidate.id !== request.id)
@@ -404,6 +412,116 @@ describe('the switch state machine: open, refresh, resume, replace, close', () =
     expect(schedule.rows[0]?.status).toBe('active')
     expect(schedule.rows[0]?.prompt).not.toContain('stale text')
     expect(schedule.calls.filter(call => call === 'create')).toHaveLength(0)
+  })
+
+  it('removes a stale duplicate beside the live row instead of keeping two beats', async () => {
+    // Cycling the switch on/off can leave an `ended` row beside a newer live one: a
+    // delete that was refused, or a row this session never removed. Two rows for one
+    // session deliver two rounds per interval, so the row the switch refreshes is the
+    // only one that stays.
+    const schedule = new FakeSchedule()
+    schedule.rows.push(
+      {
+        id: 'task-live',
+        title: LOOP_TASK_TITLE,
+        prompt: `${LOOP_PROMPT_PREFIX} heartbeat`,
+        kind: 'rrule',
+        rrule: 'RRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=10',
+        scheduledAt: '2026-11-18T01:00:00.000Z',
+        status: 'active',
+        target: { kind: 'session', sessionId: 'session-a' },
+      },
+      {
+        id: 'task-stale',
+        title: LOOP_TASK_TITLE,
+        prompt: `${LOOP_PROMPT_PREFIX} heartbeat`,
+        kind: 'rrule',
+        rrule: 'RRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=3',
+        scheduledAt: '2026-11-17T01:00:00.000Z',
+        status: 'ended',
+        target: { kind: 'session', sessionId: 'session-a' },
+      },
+    )
+    const { service } = harness({ schedule })
+    const snapshot = await service.open({ sessionId: 'session-a' })
+    expect(snapshot.taskId).toBe('task-live')
+    expect(schedule.rows.map(row => row.id)).toEqual(['task-live'])
+    expect(schedule.calls).toContain('edit:delete:task-stale')
+    // Nothing new is minted: the live row is refreshed in place.
+    expect(schedule.calls.filter(call => call === 'create')).toHaveLength(0)
+  })
+
+  it('keeps one live beat when the session somehow holds two', async () => {
+    const schedule = new FakeSchedule()
+    schedule.rows.push(
+      ...['task-live', 'task-duplicate'].map(id => ({
+        id,
+        title: LOOP_TASK_TITLE,
+        prompt: `${LOOP_PROMPT_PREFIX} heartbeat`,
+        kind: 'rrule',
+        rrule: 'RRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=10',
+        scheduledAt: '2026-11-18T01:00:00.000Z',
+        status: 'active' as const,
+        target: { kind: 'session' as const, sessionId: 'session-a' },
+      })),
+    )
+    const { service } = harness({ schedule })
+    const snapshot = await service.open({ sessionId: 'session-a' })
+    expect(snapshot.taskId).toBe('task-live')
+    expect(schedule.rows.map(row => row.id)).toEqual(['task-live'])
+    expect(schedule.calls).toContain('edit:delete:task-duplicate')
+    expect(schedule.calls.filter(call => call === 'create')).toHaveLength(0)
+  })
+
+  it('rewrites the marker on a live row whose prompt was edited away, so its deliveries keep routing', async () => {
+    // DSH's own `schedule_edit` takes `prompt`: a row left without the marker still
+    // delivers, but its message is no longer a continuation. Reclaiming it is what keeps
+    // the loop's deliveries routed and its row closable.
+    const schedule = new FakeSchedule()
+    schedule.rows.push({
+      id: 'task-edited',
+      title: LOOP_TASK_TITLE,
+      prompt: 'a prompt the operator rewrote',
+      kind: 'rrule',
+      rrule: 'RRULE:FREQ=MINUTELY;INTERVAL=120;COUNT=10',
+      scheduledAt: '2026-11-18T02:00:00.000Z',
+      status: 'active',
+      target: { kind: 'session', sessionId: 'session-a' },
+    })
+    const { service } = harness({ schedule })
+    const snapshot = await service.open({ sessionId: 'session-a' })
+    expect(snapshot.taskId).toBe('task-edited')
+    expect(schedule.rows[0]?.prompt).toBe(defaultLoopPrompt(DEFAULT_POLICY.failStreak))
+    // The rule the switch asked for replaces the one the edited row still carries.
+    expect(roundsOf(schedule.rows[0]?.rrule ?? '')).toBe(DEFAULT_POLICY.rounds)
+    expect(intervalMinutesOf(schedule.rows[0]?.rrule ?? '')).toBe(DEFAULT_POLICY.intervalMinutes)
+    expect(schedule.calls.filter(call => call === 'create')).toHaveLength(0)
+    // The reclaimed row is still closable: closing reads the slot, not the marker.
+    expect(await service.close({ sessionId: 'session-a' })).toEqual({ open: false, sessionId: 'session-a' })
+    expect(schedule.rows).toHaveLength(0)
+  })
+
+  it('refreshes a live row whose delete was refused instead of minting a second one', async () => {
+    const schedule = new FakeSchedule()
+    schedule.rows.push({
+      id: 'task-survivor',
+      title: LOOP_TASK_TITLE,
+      prompt: `${LOOP_PROMPT_PREFIX} old text`,
+      kind: 'rrule',
+      rrule: 'RRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=10',
+      scheduledAt: '2026-11-18T01:00:00.000Z',
+      status: 'ended',
+      target: { kind: 'session', sessionId: 'session-a' },
+    })
+    schedule.surviveDeleteOf = 'task-survivor'
+    const { service, logger } = harness({ schedule })
+    const snapshot = await service.open({ sessionId: 'session-a' })
+    expect(snapshot.taskId).toBe('task-survivor')
+    expect(schedule.rows).toHaveLength(1)
+    expect(schedule.rows[0]?.prompt).toBe(defaultLoopPrompt(DEFAULT_POLICY.failStreak))
+    expect(schedule.calls.filter(call => call === 'create')).toHaveLength(0)
+    // The refusal is stated, not swallowed: the row that survived the delete is named.
+    expect(String(logger.warn.mock.calls[0]?.[0])).toContain('could not delete loop heartbeat task-survivor')
   })
 
   it('replaces an ended row, because an exhausted rule cannot resume', async () => {

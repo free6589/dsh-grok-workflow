@@ -1,0 +1,26 @@
+32:      dsh-grok-workflow:
+33:        specifier: github:free6589/dsh-grok-workflow
+34:        version: https://codeload.github.com/free6589/dsh-grok-workflow/tar.gz/22bbe178ed375176b6b33674c85ae0ab47b10fe6
+35-      dsh-infinite-gen-5:
+36-        specifier: file:/home/fish/.dsh/plugins/dsh-infinite-gen-5
+37-        version: file:../../plugins/dsh-infinite-gen-5
+38-      dsh-llm-error-retry:
+39-        specifier: github:liaoyuqing/dsh-llm-error-retry
+40-        version: https://codeload.github.com/liaoyuqing/dsh-llm-error-retry/tar.gz/33ea19b81b82ca255b01fbba2563eb6a33ab8ae6
+--
+223:  dsh-grok-workflow@https://codeload.github.com/free6589/dsh-grok-workflow/tar.gz/22bbe178ed375176b6b33674c85ae0ab47b10fe6:
+224:    resolution: {gitHosted: true, integrity: sha512-aehcy+oJvtatK1WN+/AdtnvsZVXD5mIckw3sThAh8p1XgDv/6+ADxFXhoUCNexjSVJj/cwhdENLMLywfFsRZ+g==, tarball: https://codeload.github.com/free6589/dsh-grok-workflow/tar.gz/22bbe178ed375176b6b33674c85ae0ab47b10fe6}
+225-    version: 0.11.21
+226-    engines: {dsh: '>=0.2.1-rc.2 <0.3.0', node: '>=22'}
+227-    peerDependencies:
+228-      '@deepseek-ai/cordis': ~4.0.5
+229-      '@deepseek-ai/dsh-agent': 0.2.1-rc.2
+230-      '@deepseek-ai/dsh-llm': 0.2.1-rc.2
+--
+474:  dsh-grok-workflow@https://codeload.github.com/free6589/dsh-grok-workflow/tar.gz/22bbe178ed375176b6b33674c85ae0ab47b10fe6:
+475-    dependencies:
+476-      '@deepseek-ai/schemastery': 3.18.5
+477-
+478-  dsh-infinite-gen-5@file:../../plugins/dsh-infinite-gen-5: {}
+479-
+480-  dsh-llm-error-retry@https://codeload.github.com/liaoyuqing/dsh-llm-error-retry/tar.gz/33ea19b81b82ca255b01fbba2563eb6a33ab8ae6: {}

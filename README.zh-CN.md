@@ -45,10 +45,10 @@ dsh --profile grok-workflow-dev --from-default-profile headless --dump-config
 然后安装插件：
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.11.21
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.12.0
 ```
 
-> `#v0.11.21` 是当前发布版本。请固定你真正想要的标签；省略标签会跟随 `main`，那不是发布版本。不要在 `plugin add` 之后再运行 `--from-default-profile`：它会重建 profile 并移除你刚装好的插件。
+> `#v0.12.0` 是当前发布版本。请固定你真正想要的标签；省略标签会跟随 `main`，那不是发布版本。不要在 `plugin add` 之后再运行 `--from-default-profile`：它会重建 profile 并移除你刚装好的插件。
 
 最后重启 profile，让 DSH 加载新插件：
 
@@ -197,7 +197,7 @@ DSH 启动后，直接提问即可：
 
 ## 配置参考
 
-配置写在 profile 的 `cordis.patch.yml`（或 `--patch` 覆盖层）里，位于 bundle 行下。`0.11.0` 起配置面为九个（新增 `timeoutMs`），现在为十三个（新增四个 `loop*` 续跑键）；其它键在载入时直接被拒绝——旧补丁会明确报错，而不是变成"设了也不生效"：
+配置写在 profile 的 `cordis.patch.yml`（或 `--patch` 覆盖层）里，位于 bundle 行下。`0.11.0` 起配置面为九个（新增 `timeoutMs`），现在为十五个（新增四个 `loop*` 续跑键与两个 `iterate*` 自迭代键）；其它键在载入时直接被拒绝——旧补丁会明确报错，而不是变成"设了也不生效"：
 
 ```yaml
 - id: grok-workflow
@@ -228,6 +228,8 @@ DSH 启动后，直接提问即可：
 | `loopMaxRounds` | `10` | `100` | 存进循环调度规则（`COUNT`）的轮数上限，跑满后调度自己结束。每轮都是一次完整工作流运行，所以这是额度信封，不是偏好 |
 | `loopFailStreak` | `3` | `20` | 心跳文案里请这一轮「连败这么多轮就停」的数字。Host 只记录投递、不记录单轮成败，所以这是带进轮次的提示，不是 Host 强制的计数器 |
 | `loopIntervalMin` | `0`（`0` = 用循环自己的下限） | `10080`（七天） | 两轮之间的分钟数。实际等待不会低于一轮最坏耗时、也不低于 60 分钟，所以 `0` 是「上一轮跑完就接上」，不是「立刻开始」 |
+| `iterateIntervalMin` | `0`（`0` = 用心跳自己的下限） | `10080`（七天） | 自迭代心跳之间的分钟数，下限语义与 `loopIntervalMin` 相同：不低于一轮最坏耗时、也不低于 60 分钟 |
+| `iterateTemplate` | 内置默认 | 最多 4000 字符 | 「自迭代」开关武装心跳时，存进 `RSI heartbeat` 调度任务的整段提示词。纯空白回退到内置默认。在设置页「自迭代」分组的文本框里编辑、随档案保存；不带路由标记，编辑它不会改变门禁路由 |
 | `configVersion` | `1` | `1` | 配置面版本 |
 
 四个 `loop*` 键配置续跑面。会话的循环打开时，续跑服务读取 `loopMaxRounds`、`loopFailStreak`、`loopIntervalMin`，写进一条持久 Schedule 规则；Host 没有装配 Schedule 服务时，这些键只是存下来，一条消息仍然只跑一次。`loopEnabled` 是自动驱动的部署默认值，目前还没被读取——打开循环始终是用户自己的显式动作（见[自动接着跑](#自动接着跑循环心跳)）。`loopIntervalMin` 是等待，不是预算：它只能把循环的下限抬高；`loopFailStreak` 会写进心跳文案当提示，因为 Host 记录的是投递，不是单轮成败。
@@ -249,6 +251,8 @@ DSH 启动后，直接提问即可：
 **开关。** 设置页的「自动接着干」一组里有四个 `loop*` 键（见上表），它们和其它键一样被存下、校验并投影到页面；但 `loopEnabled` 是一个目前没有自动驱动读取的部署默认值，所以把它存成 `on` 本身不会开始任何一轮。
 
 **输入框下面那个开关。** 轮数上限和间隔来自上面这几个存下来的键，花掉它们的开关在输入框下面那条 dock 里——槽位 `conversation.composer.dock`，id `grok-workflow-loop`。它挂载时用 `status` 读一次、之后不轮询，读取期间点不动；点击会为当前会话发 `open` 或 `close`，自己不另带数字：规则按存下来的 `loopIntervalMin`、`loopMaxRounds`、`loopFailStreak` 生成。被拒绝的点击不会翻面——它把上一次知道的状态留在页面上，并说明这次点击为什么没生效。这个开关是下面那条路由的调用方，不是第二套实现：同一条持久行、同一批服务方法。
+
+**它旁边的「自迭代」开关。** 第二个 dock 开关，id `grok-workflow-iterate`，POST 到 `/grok-workflow/iterate`，驱动第二个服务实例——它的槽位是 `RSI heartbeat` 这个保留标题，所以两个开关永远不会创建、读取或删除对方的行。它的 `open` 不带 prompt 也不带间隔：存进去的提示词就是档案里的 `iterateTemplate`（在设置页「自迭代」分组的文本框编辑；纯空白回退内置默认），间隔下限是 `iterateIntervalMin`。`RSI heartbeat` 的投递按普通调度消息放行——门禁的循环路由从不认领它——而且这一行刻意比插件活得久（它是仓库自己的节拍）；用同一个开关关掉，或走 DSH 自己的「自动化任务」删除。
 
 打开一个循环是一次显式的浏览器请求：
 
@@ -322,13 +326,13 @@ dsh plugin --profile grok-workflow-dev remove dsh-grok-workflow
 
 ## 版本与发布说明
 
-本仓库声明的包版本是 `0.11.21`。需要安装或回退到某个已发布版本时，在地址后加标签：
+本仓库声明的包版本是 `0.12.0`。需要安装或回退到某个已发布版本时，在地址后加标签：
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.11.21
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.12.0
 ```
 
-只使用 GitHub 上确实存在的标签。已发布：`v0.1.0`、`v0.2.0`、`v0.2.1`、`v0.2.2`、`v0.2.3`、`v0.2.4`、`v0.2.5`、`v0.2.6`、`v0.2.7`、`v0.3.0`、`v0.4.0`、`v0.5.0`、`v0.5.1`、`v0.6.0`、`v0.7.0`、`v0.8.0`、`v0.9.0`、`v0.9.1`、`v0.9.2`、`v0.9.3`、`v0.9.4`、`v0.10.0`、`v0.10.1`、`v0.10.2`、`v0.11.0`、`v0.11.1`、`v0.11.2`、`v0.11.3`、`v0.11.4`、`v0.11.5`、`v0.11.6`、`v0.11.7`、`v0.11.8`、`v0.11.9`、`v0.11.10`、`v0.11.11`、`v0.11.12`、`v0.11.13`、`v0.11.14`、`v0.11.15`、`v0.11.16`、`v0.11.17`、`v0.11.18`、`v0.11.19`、`v0.11.20`、`v0.11.21`。未固定版本的命令跟随 `main`，不会固定到发布版本。GitHub 上还存在 `v0.2.0-rc.1`，但它不是发布版本：它早于发布流程，其 `package.json` 仍声明 `0.1.0`。`v0.11.14` 也不是发布版本：它提交里的 `lib/` 是用更早的 `src/` 构建的，发布工作流在产物检查一步就停了，从未发布过它。请使用上面固定的 `v0.11.15`；那个标签仍留在仓库里，只是因为已发布的标签不可变。版本规则与回退流程见[更新日志](CHANGELOG.md)与[发布指南](docs/RELEASING.md)。
+只使用 GitHub 上确实存在的标签。已发布：`v0.1.0`、`v0.2.0`、`v0.2.1`、`v0.2.2`、`v0.2.3`、`v0.2.4`、`v0.2.5`、`v0.2.6`、`v0.2.7`、`v0.3.0`、`v0.4.0`、`v0.5.0`、`v0.5.1`、`v0.6.0`、`v0.7.0`、`v0.8.0`、`v0.9.0`、`v0.9.1`、`v0.9.2`、`v0.9.3`、`v0.9.4`、`v0.10.0`、`v0.10.1`、`v0.10.2`、`v0.11.0`、`v0.11.1`、`v0.11.2`、`v0.11.3`、`v0.11.4`、`v0.11.5`、`v0.11.6`、`v0.11.7`、`v0.11.8`、`v0.11.9`、`v0.11.10`、`v0.11.11`、`v0.11.12`、`v0.11.13`、`v0.11.14`、`v0.11.15`、`v0.11.16`、`v0.11.17`、`v0.11.18`、`v0.11.19`、`v0.11.20`、`v0.11.21`、`v0.12.0`。未固定版本的命令跟随 `main`，不会固定到发布版本。GitHub 上还存在 `v0.2.0-rc.1`，但它不是发布版本：它早于发布流程，其 `package.json` 仍声明 `0.1.0`。`v0.11.14` 也不是发布版本：它提交里的 `lib/` 是用更早的 `src/` 构建的，发布工作流在产物检查一步就停了，从未发布过它。请使用上面固定的 `v0.11.15`；那个标签仍留在仓库里，只是因为已发布的标签不可变。版本规则与回退流程见[更新日志](CHANGELOG.md)与[发布指南](docs/RELEASING.md)。
 
 ## 测试与开发
 
@@ -368,6 +372,7 @@ npm run ci
 
 - [本地安装与排错](docs/LOCAL-TESTING.md)
 - [架构](docs/ARCHITECTURE.md)
+- [任务提示词模板](docs/task-prompt-template.md)
 - [验收清单](docs/ACCEPTANCE.md)
 - [设计知识库](docs/knowledge/WORKFLOW-DESIGN.md)
 - [路线图](docs/knowledge/WORKFLOW-ROADMAP.md)

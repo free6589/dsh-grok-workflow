@@ -1,0 +1,12 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+ ✓ test/objective-limit.spec.ts (17 tests) 1588ms
+ ✓ test/command.spec.ts (19 tests) 137ms
+ ✓ test/intake.spec.ts (14 tests) 8ms
+
+ Test Files  3 passed (3)
+      Tests  50 passed (50)
+   Start at  00:13:28
+   Duration  2.83s (transform 501ms, setup 0ms, import 727ms, tests 1.73s, environment 0ms)
+

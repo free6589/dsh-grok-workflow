@@ -1,0 +1,65 @@
+      - id: sdlc-task
+        name: '@ai-native-sdlc-plugin/dsh-sdlc/task'
+      - id: sdlc-artifact
+        name: '@ai-native-sdlc-plugin/dsh-sdlc/artifact'
+      - id: sdlc-status
+        name: '@ai-native-sdlc-plugin/dsh-sdlc/status'
+      - id: sdlc-verify
+        name: '@ai-native-sdlc-plugin/dsh-sdlc/verify'
+      - id: sdlc-workflow
+        name: '@ai-native-sdlc-plugin/dsh-sdlc/workflow'
+      - id: sdlc-rsi
+        name: '@ai-native-sdlc-plugin/dsh-sdlc/rsi'
+# == dsh-grok-workflow, patched by /home/fish/.dsh/profiles/web/cordis.patch.yml
+- id: grok-workflow
+  name: dsh-grok-workflow
+  config:
+    mode: full
+    grokDefault: 'on'
+    roles:
+      planner:
+        - provider: bifrost-responses
+          model: opencode-go/muse-spark-1.3-contributor
+      worker:
+        - provider: agent2api
+          model: deepseek-v4.1-flash
+        - provider: agent2api
+          model: glm-5.3-flash
+      verifier:
+        - provider: agent2api
+          model: deepseek-v4.1-flash
+      synthesizer:
+        - provider: bifrost-responses
+          model: opencode-go/muse-spark-1.3-contributor
+      supervisor:
+        - provider: agent2api
+          model: deepseek-v4.1-flash
+    timeoutMs: 0
+# == chat-in-dsh
+- id: chat-in-dsh
+  name: chat-in-dsh
+  config:
+    baseURL: ''
+# == /home/fish/.dsh/profiles/web/cordis.patch.yml
+- id: mcp-bifrost
+  name: '@deepseek-ai/dsh-mcp-client'
+  config:
+    serverName: bifrost
+    transport: streamable-http
+    url: https://models.fyrali.com/mcp
+    headers:
+      Authorization: !!js '`Bearer ${process.env.BIFROST_VIRTUAL_KEY}`'
+    failOnStartupError: false
+    toolCallTimeoutMs: 60000
+- id: mcp-lingshu-shared
+  name: '@deepseek-ai/dsh-mcp-client'
+  config:
+    serverName: lingshu
+    transport: stdio
+    command: /home/fish/.local/bin/lingshu-shared
+    args: []
+    env:
+      LINGSHU_ACTOR: local-dsh
+    failOnStartupError: false
+    toolCallTimeoutMs: 180000
+- id: mcp-mobile-phone

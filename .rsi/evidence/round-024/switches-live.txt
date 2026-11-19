@@ -1,0 +1,15 @@
+loop: disabled while reading — OK
+POST http://127.0.0.1:3451/grok-workflow/loop
+loop: read via page fetch — "自动接着跑 关"
+POST http://127.0.0.1:3451/grok-workflow/loop
+loop: opened — "自动接着跑 开 · 每 60 分钟 · 还剩 10 轮" (task schedule-7a1415c3-5979-4e53-bca6-cd634830f49d)
+POST http://127.0.0.1:3451/grok-workflow/loop
+loop: closed — "自动接着跑 关"
+iterate: disabled while reading — OK
+POST http://127.0.0.1:3451/grok-workflow/iterate
+iterate: read via page fetch — "自迭代 关"
+POST http://127.0.0.1:3451/grok-workflow/iterate
+iterate: opened — "自迭代 开 · 每 60 分钟 · 还剩 10 轮" (task schedule-c0d11ce2-9fff-4e0a-99b0-9095582edfc0)
+POST http://127.0.0.1:3451/grok-workflow/iterate
+iterate: closed — "自迭代 关"
+PASS: both switches drive their own rows through the production path

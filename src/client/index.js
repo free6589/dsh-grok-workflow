@@ -38,6 +38,26 @@ window.__ModuleLoader__.load({
     // profile patch / schema defaults and is left untouched by save.
     const READ_ONLY = []
 
+    // The default self-iteration template. Kept as a literal because this bundle is
+    // hand-written JavaScript with no host import; test/client.spec.ts pins it
+    // byte-identical against DEFAULT_ITERATE_TEMPLATE in src/config.ts.
+    const DEFAULT_ITERATE_TEMPLATE = [
+      '# RSI heartbeat — self-iteration round',
+      '',
+      'This message was delivered by an Automation task (source.kind = "schedule"), not by the',
+      'operator. Nobody will answer inside this turn: do not ask questions, decide and record.',
+      '',
+      "Continue this project's self-iteration: pick the next unfinished item from the project's",
+      'own state and planning notes, do one bounded round of work on it, verify the result, and',
+      'record the round (what changed, what was verified, what is left).',
+      '',
+      "If the previous round is still open or the working tree is dirty with someone else's",
+      'uncommitted work, do not start a new round: say what is unclosed in one or two sentences',
+      'and end the turn.',
+      '',
+      'If the work is done or a stop condition holds, stop instead of starting anything new.',
+    ].join('\n')
+
     const FIELDS = [
       // Total switch (mock “总开关”): `off` means normal chat until the session
       // turns grok mode on; the session toggle overrides this default.
@@ -64,6 +84,14 @@ window.__ModuleLoader__.load({
       { key: 'loopMaxRounds', group: 'loop', kind: 'number', min: 1, max: 100, def: 10 },
       { key: 'loopFailStreak', group: 'loop', kind: 'number', min: 1, max: 20, def: 3 },
       { key: 'loopIntervalMin', group: 'loop', kind: 'number', min: 0, max: 10080, def: 0 },
+      // Self-iteration heartbeat: the interval mirrors the loop's, and the template
+      // is the whole prompt stored in the `RSI heartbeat` Schedule task. The bound
+      // mirrors MAX_LOOP_PROMPT_CHARS in src/loop.ts (4000); the default is pinned
+      // against DEFAULT_ITERATE_TEMPLATE in src/config.ts by test/client.spec.ts.
+      // A whitespace-only template is legal and falls back to the built-in default
+      // when the switch arms a heartbeat.
+      { key: 'iterateIntervalMin', group: 'iterate', kind: 'number', min: 0, max: 10080, def: 0 },
+      { key: 'iterateTemplate', group: 'iterate', kind: 'textarea', max: 4000, def: DEFAULT_ITERATE_TEMPLATE },
     ]
 
     // T5: the switchable-class picker is gone with `switchOn` (fixed internal
@@ -80,7 +108,7 @@ window.__ModuleLoader__.load({
     const ROUTE_INFLIGHT_MIN = 1
     const ROUTE_INFLIGHT_MAX = 64
 
-    const GROUPS = ['mode', 'roles', 'limits', 'loop']
+    const GROUPS = ['mode', 'roles', 'limits', 'loop', 'iterate']
 
     // ---------------------------------------------------------------------------
     // Dictionaries. Keys are the contract between this table and every render site;
@@ -112,6 +140,7 @@ window.__ModuleLoader__.load({
       'group.limits': 'How much effort',
       'group.roles': 'Who does what',
       'group.loop': 'Repeat runs',
+      'group.iterate': 'Self-iteration',
 
       // T5 visible-field labels only (no hints, no Danger, no read-only).
       'field.mode': 'Mode',
@@ -124,6 +153,9 @@ window.__ModuleLoader__.load({
       'field.loopMaxRounds': 'Rounds at most',
       'field.loopFailStreak': 'Stop after failed rounds',
       'field.loopIntervalMin': 'Minutes between rounds',
+      'field.iterateIntervalMin': 'Minutes between rounds',
+      'field.iterateTemplate': 'Heartbeat prompt template',
+      'field.iterateTemplate.hint': 'Stored in the profile; the Self-iterate switch arms a heartbeat with this text. Empty falls back to the built-in default.',
 
       // Page shows auto/full; stored values stay `triage`/`full` (T4/T5).
       'option.mode.triage': 'auto',
@@ -271,9 +303,23 @@ window.__ModuleLoader__.load({
       'loop.switch.unavailable': 'This Host has no scheduler, so a loop cannot start here.',
       'loop.switch.failed': 'The loop service did not answer: {message}',
 
+      // --- The composer-dock self-iteration switch (a second slot, its own route) ---
+      'iterate.switch.label': 'Self-iterate',
+      'iterate.switch.aria': 'Self-iterate this session',
+      'iterate.switch.off': 'Off',
+      'iterate.switch.on': 'On · every {minutes} min · {rounds} rounds left',
+      'iterate.switch.onUnbounded': 'On · every {minutes} min',
+      'iterate.switch.reading': 'Checking…',
+      'iterate.switch.busy': 'Working…',
+      'iterate.switch.noSession': 'No session to iterate',
+      'iterate.switch.userOnly': 'Only you can turn this on — the assistant cannot start a self-iteration for you.',
+      'iterate.switch.unavailable': 'This Host has no scheduler, so a self-iteration heartbeat cannot start here.',
+      'iterate.switch.failed': 'The self-iteration service did not answer: {message}',
+
       'error.number': '{key} must be a whole number between {min} and {max} — fix the number and save again.',
       'error.badEnum': '{key} has a value the current options do not offer — pick one of the offered options and save again.',
       'error.badBoolean': '{key} is either on or off — flip it and save again.',
+      'error.badTemplate': '{key} is over the {limit}-character limit; shorten it and save again.',
       'error.chainTooLong': '{role} can keep at most {limit} backup routes — remove the extras.',
       'error.missingModel': '{role} entry {index} has no model — pick one or remove the row.',
       'error.tooLong': '{role} entry {index}: the channel/model text is over {limit} characters.',
@@ -298,6 +344,7 @@ window.__ModuleLoader__.load({
       'group.limits': '下多大力气',
       'group.roles': '谁来干',
       'group.loop': '自动接着干',
+      'group.iterate': '自迭代',
 
       // T5 visible-field labels only (no hints, no Danger, no read-only).
       'field.mode': '模式',
@@ -310,6 +357,9 @@ window.__ModuleLoader__.load({
       'field.loopMaxRounds': '最多跑几轮',
       'field.loopFailStreak': '连败几轮就停',
       'field.loopIntervalMin': '两轮之间隔几分钟',
+      'field.iterateIntervalMin': '两轮之间隔几分钟',
+      'field.iterateTemplate': '心跳提示词模板',
+      'field.iterateTemplate.hint': '随档案保存；「自迭代」开关用心跳投递这段文字。留空则回退到内置默认模板。',
 
       // Page shows auto/full; stored values stay `triage`/`full` (T4/T5).
       'option.mode.triage': 'auto',
@@ -455,9 +505,23 @@ window.__ModuleLoader__.load({
       'loop.switch.unavailable': '这台 Host 没有调度器，开不了续跑。',
       'loop.switch.failed': '续跑服务没有回应：{message}',
 
+      // --- The composer-dock self-iteration switch (a second slot, its own route) ---
+      'iterate.switch.label': '自迭代',
+      'iterate.switch.aria': '这个会话自动迭代',
+      'iterate.switch.off': '关',
+      'iterate.switch.on': '开 · 每 {minutes} 分钟 · 还剩 {rounds} 轮',
+      'iterate.switch.onUnbounded': '开 · 每 {minutes} 分钟',
+      'iterate.switch.reading': '查看中…',
+      'iterate.switch.busy': '处理中…',
+      'iterate.switch.noSession': '没有可迭代的会话',
+      'iterate.switch.userOnly': '只有你自己能打开——助手不能替你开始自迭代。',
+      'iterate.switch.unavailable': '这个宿主没有调度器，无法在这里开始自迭代心跳。',
+      'iterate.switch.failed': '自迭代服务没有回应：{message}',
+
       'error.number': '{key} 得是 {min} 到 {max} 之间的整数，改对数字再保存。',
       'error.badEnum': '{key} 有个现在选项里没有的值，选一个再保存。',
       'error.badBoolean': '{key} 只有开和关两种状态，切换一下再保存。',
+      'error.badTemplate': '{key} 超过了 {limit} 字的上限，缩短后再保存。',
       'error.chainTooLong': '{role} 备用链最多 {limit} 条，删掉多余的。',
       'error.missingModel': '{role} 第 {index} 条没有模型，选一个或删掉这一行。',
       'error.tooLong': '{role} 第 {index} 条的通道/模型文字超过 {limit} 字。',
@@ -622,6 +686,16 @@ window.__ModuleLoader__.load({
           const known = field.options.map((option) => String(option))
           if (!known.includes(String(draft[field.key]))) {
             errors.push({ key: 'error.badEnum', params: { key: field.key } })
+          }
+        } else if (field.kind === 'textarea') {
+          // The template is a free-text prompt, so only the length is checked
+          // here (the same bound the Host's own open refuses at). A
+          // whitespace-only template is legal: arming a heartbeat with one
+          // falls back to the built-in default instead of storing an empty
+          // prompt, so an unfinished edit can never break the switch.
+          const raw = typeof draft[field.key] === 'string' ? draft[field.key] : ''
+          if (raw.length > field.max) {
+            errors.push({ key: 'error.badTemplate', params: { key: field.key, limit: field.max } })
           }
         }
       }
@@ -1347,6 +1421,7 @@ window.__ModuleLoader__.load({
         loopMaxRounds: 'unit.rounds',
         loopFailStreak: 'unit.failures',
         loopIntervalMin: 'unit.minutes',
+        iterateIntervalMin: 'unit.minutes',
       }
       const numberRow = (key) => {
         const field = fieldByKey(key)
@@ -1455,6 +1530,22 @@ window.__ModuleLoader__.load({
           numberRow('loopMaxRounds'),
           numberRow('loopFailStreak'),
           numberRow('loopIntervalMin')),
+        // --- 5 · 自迭代 (the self-iteration heartbeat's interval and prompt template) ---
+        h('div', { style: styles.card },
+          h('h3', { style: styles.groupTitle }, t('group.iterate')),
+          numberRow('iterateIntervalMin'),
+          h(FieldRow, {
+            key: 'iterateTemplate', fieldKey: 'iterateTemplate',
+            title: t('field.iterateTemplate'),
+            control: h('textarea', {
+              style: { ...styles.input, width: '100%', minHeight: '160px', resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 },
+              value: String(draft.iterateTemplate === undefined || draft.iterateTemplate === null ? '' : draft.iterateTemplate),
+              disabled, rows: 8, spellCheck: false,
+              onChange: (event) => onChange('iterateTemplate', event.target.value),
+              'data-field': 'iterateTemplate',
+            }),
+          }),
+          h('p', { style: styles.hint, 'data-gw-template-hint': true }, t('field.iterateTemplate.hint'))),
         warnEmptyCap
           ? h('div', { style: styles.warn },
             h('strong', null, t('warn.emptyCap.title')),
@@ -3508,242 +3599,313 @@ window.__ModuleLoader__.load({
       subscribe: () => () => {},
     }
 
-    // ─── Composer dock: the loop switch ─────────────────────────────────────────
+    // ─── Composer dock: the two heartbeat switches ──────────────────────────────
     //
-    // The repeat-run heartbeat is the user's to start, and this switch is the user's half
-    // of that rule. It is not a second implementation: every request goes to the Host
-    // route named by `LOOP_ROUTE_PATH` in `src/loop.ts`, and that route dispatches to the
-    // same `LoopService` methods the `grok_loop` tool calls — `status`, `open`, `close`.
-    // What differs is the caller: a browser request carries no acting Agent, which is
-    // exactly the condition `LoopService.open` requires, while the tool always has one and
-    // is refused for it. The authorization is therefore structural, not a UI courtesy:
-    // there is no path from an Agent to this POST. `test/client.spec.ts` pins this file's
-    // path and action list against `src/loop.ts` and the tool's own schema, so the two
-    // callers cannot drift into "the switch opens one thing and the tool reads another".
+    // The repeat-run heartbeat is the user's to start, and these switches are the user's
+    // half of that rule. They are not a second implementation: every request goes to the
+    // Host route named by `LOOP_ROUTE_PATH` / `ITERATE_ROUTE_PATH` in `src/loop.ts`, and
+    // each route dispatches to the same `LoopService` methods the `grok_loop` tool calls —
+    // `status`, `open`, `close`. What differs is the caller: a browser request carries no
+    // acting Agent, which is exactly the condition `LoopService.open` requires, while the
+    // tool always has one and is refused for it. The authorization is therefore
+    // structural, not a UI courtesy: there is no path from an Agent to these POSTs.
+    // `test/client.spec.ts` pins each file's path and action list against `src/loop.ts`
+    // and the tool's own schema, so the switches cannot drift into "one switch opens one
+    // thing and the tool reads another".
     //
-    // It sits in `conversation.composer.dock` — the ambient strip under the composer card,
-    // a `list` slot the conversation shell declares. The model-selector control in the
-    // tool row belongs to model selection and stays untouched: this switch neither reads
-    // nor moves it, and no code here reaches for its DOM.
+    // Two switches, one factory, two slots: **Auto-continue** owns the loop route, whose
+    // service stores a `Loop heartbeat` task; **Self-iterate** owns the iterate route,
+    // whose service stores an `RSI heartbeat` task. Each service filters every read,
+    // write and delete by its own reserved title, so one switch can never create, report
+    // or delete the other's row. The iterate open sends no prompt and no interval: the
+    // template persisted in the profile (`iterateTemplate`) is the one source of the
+    // stored prompt, which is what keeps the settings page's textarea and the armed
+    // heartbeat from disagreeing.
+    //
+    // They sit in `conversation.composer.dock` — the ambient strip under the composer
+    // card, a `list` slot the conversation shell declares. The model-selector control in
+    // the tool row belongs to model selection and stays untouched: neither switch reads
+    // or moves it, and no code here reaches for its DOM.
     const LOOP_ROUTE_PATH = '/grok-workflow/loop'
-    const LOOP_SWITCH_ID = 'grok-workflow-loop'
+    const ITERATE_ROUTE_PATH = '/grok-workflow/iterate'
     const LOOP_SWITCH_ORDER = 90
-    /** The actions the route dispatches; pinned against the tool schema by the spec. */
+    const ITERATE_SWITCH_ORDER = 91
+    /** The actions both routes dispatch; pinned against the tool schema by the spec. */
     const LOOP_ACTIONS = ['status', 'close', 'open']
 
     /**
-     * Absolute URL of the loop route.
+     * Build one composer-dock heartbeat switch.
      *
-     * Relative to `document.baseURI`, so the switch keeps working behind a path prefix or
-     * a desktop carrier that serves the page from a subdirectory. Without a `document`
-     * (unit tests, a non-page evaluator) the bare path is returned and the caller decides.
-     * @returns the URL to POST to.
+     * The two switches differ in exactly four facts — the route path, the registration
+     * id, the dock order and the copy prefix — and nothing else: the same state machine,
+     * the same transport rules and the same DOM contract apply to both, so one factory
+     * keeps them from drifting apart.
+     * @param config - `routePath` (the exact Host route), `switchId` (the slot
+     *   registration id), `switchOrder`, `dataAttr` (the `data-<attr>-toggle` DOM key,
+     *   distinct per switch so a test can drive one without catching the other) and
+     *   `textPrefix` (the dictionary prefix, `loop.switch.*` or `iterate.switch.*`).
+     * @returns the bundle object the exports pin and the tests drive.
      */
-    function loopUrl() {
-      if (typeof document === 'undefined' || typeof document.baseURI !== 'string') return LOOP_ROUTE_PATH
-      try {
-        return new URL(LOOP_ROUTE_PATH, document.baseURI).href
-      } catch {
-        return LOOP_ROUTE_PATH
+    function makeHeartbeatSwitch(config) {
+      const { routePath, switchId, switchOrder, dataAttr, textPrefix } = config
+
+      /**
+       * Absolute URL of this switch's route.
+       *
+       * Relative to `document.baseURI`, so the switch keeps working behind a path prefix
+       * or a desktop carrier that serves the page from a subdirectory. Without a
+       * `document` (unit tests, a non-page evaluator) the bare path is returned and the
+       * caller decides.
+       * @returns the URL to POST to.
+       */
+      function switchUrl() {
+        if (typeof document === 'undefined' || typeof document.baseURI !== 'string') return routePath
+        try {
+          return new URL(routePath, document.baseURI).href
+        } catch {
+          return routePath
+        }
+      }
+
+      /**
+       * Read one route answer into the switch's own vocabulary.
+       *
+       * The route always answers JSON with `ok` plus either `loop` or `code`/`error`; a
+       * proxy or a refusal that answers something else must not be reported as a state
+       * change, so an unrecognized body becomes `loop/response` and the switch shows a
+       * failure instead of pretending the loop moved.
+       * @param payload - the parsed body, if any.
+       * @param status - HTTP status of the answer.
+       * @returns the loop snapshot, or the stated failure.
+       */
+      function parsePayload(payload, status) {
+        const isObject = payload !== null && typeof payload === 'object' && !Array.isArray(payload)
+        if (isObject && payload.ok === true && payload.loop !== undefined) {
+          return { ok: true, loop: payload.loop }
+        }
+        const answered = `the heartbeat route answered HTTP ${String(status)}`
+        // A 403 is the user-only refusal whichever body came with it: the status is the
+        // composition's own fence saying the request carried no accepted user credential.
+        const refused = status === 403 ? 'loop/user-only' : 'loop/response'
+        if (!isObject) return { ok: false, code: refused, error: answered }
+        const code = typeof payload.code === 'string' && payload.code !== '' ? payload.code : refused
+        const error = typeof payload.error === 'string' && payload.error !== '' ? payload.error : answered
+        return { ok: false, code, error }
+      }
+
+      /**
+       * POST one heartbeat request to the Host route.
+       *
+       * `credentials: 'include'` and a same-origin path are what make the composition's
+       * connection fence accept the call: the route is guarded by the Host's own
+       * Host/Origin + browser-authentication check, the same fence DSH's shipped routes
+       * use, so this switch needs no credential of its own and stores none.
+       * @param body - `{ action, sessionId }`, the one body shape the route accepts.
+       * @param fetchImpl - fetch to use; defaults to the page's own. Tests pass a fake.
+       * @returns the snapshot, or the stated failure — never a throw.
+       */
+      async function send(body, fetchImpl) {
+        const post = fetchImpl !== undefined ? fetchImpl : (typeof fetch === 'function' ? fetch : undefined)
+        if (typeof post !== 'function') {
+          return { ok: false, code: 'loop/transport', error: 'this page has no fetch to reach the Host with' }
+        }
+        let response
+        try {
+          response = await post(switchUrl(), {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(body),
+          })
+        } catch (error) {
+          return { ok: false, code: 'loop/transport', error: error && error.message ? error.message : String(error) }
+        }
+        let payload
+        try {
+          payload = await response.json()
+        } catch {
+          payload = undefined
+        }
+        return parsePayload(payload, response.status)
+      }
+
+      /** Read this session's heartbeat without writing: the same `status` the tool may call. */
+      function read(sessionId, fetchImpl) {
+        return send({ action: 'status', sessionId }, fetchImpl)
+      }
+
+      /** Open the heartbeat. Only reachable from a click: see the authorization note above. */
+      function open(sessionId, fetchImpl) {
+        return send({ action: 'open', sessionId }, fetchImpl)
+      }
+
+      /** Delete the heartbeat task; like the tool's `close`, this leaves nothing behind. */
+      function close(sessionId, fetchImpl) {
+        return send({ action: 'close', sessionId }, fetchImpl)
+      }
+
+      /** The one line under the switch, for one state, in one language. */
+      function switchText(t, state) {
+        const loop = state.loop
+        if (state.phase === 'reading') return t(`${textPrefix}.switch.reading`)
+        if (state.phase === 'busy') return t(`${textPrefix}.switch.busy`)
+        if (state.phase === 'no-session') return t(`${textPrefix}.switch.noSession`)
+        if (state.phase === 'failed') return failureText(t, state.code, state.error)
+        if (loop === undefined || loop.open !== true) return t(`${textPrefix}.switch.off`)
+        const minutes = typeof loop.intervalMinutes === 'number' ? String(loop.intervalMinutes) : '?'
+        return typeof loop.rounds === 'number'
+          ? t(`${textPrefix}.switch.on`, { minutes, rounds: String(loop.rounds) })
+          : t(`${textPrefix}.switch.onUnbounded`, { minutes })
+      }
+
+      /**
+       * One failure in the switch's words.
+       *
+       * The two codes a person can act on get their own sentence — "only you may open
+       * this" and "this Host has no scheduler" are not the same problem as "the request
+       * failed" — and everything else carries the Host's own message, which is already
+       * redacted there.
+       */
+      function failureText(t, code, error) {
+        if (code === 'loop/user-only') return t(`${textPrefix}.switch.userOnly`)
+        if (code === 'loop/unavailable') return t(`${textPrefix}.switch.unavailable`)
+        return t(`${textPrefix}.switch.failed`, { message: error === undefined ? '?' : String(error) })
+      }
+
+      /**
+       * The switch itself: one button, one status line, no hidden writes.
+       *
+       * It reads on mount and never on a timer: a heartbeat's state is a fact the Host
+       * owns, and polling it from the composer of every session would be work nobody
+       * asked for. A click flips the state it last read — while it is still reading, the
+       * switch is disabled rather than guessing, because a click on an unknown state
+       * would open a heartbeat that may already exist (harmless) or report "off" over a
+       * live task (not).
+       * @param props - slot runtime props: `sessionId`, the seated `t`, and an optional
+       *   transport override (`loopSend`, or `<dataAttr>Send`; tests pass a fake
+       *   fetch-shaped stand-in; production uses the page's own fetch — never `send`
+       *   itself, which already takes the request-body shape).
+       */
+      function Switch(props) {
+        const t = guardedTranslator(props.t, translator(FALLBACK_LOCALE))
+        const sessionId = typeof props.sessionId === 'string' && props.sessionId !== '' ? props.sessionId : undefined
+        const override = typeof props[`${dataAttr}Send`] === 'function'
+          ? props[`${dataAttr}Send`]
+          : (typeof props.loopSend === 'function' ? props.loopSend : undefined)
+        const send1 = override !== undefined
+          ? override
+          : (typeof fetch === 'function' ? fetch.bind(undefined) : send)
+        const [state, setState] = useState(() => ({
+          phase: sessionId === undefined ? 'no-session' : 'reading',
+          loop: undefined,
+          code: undefined,
+          error: undefined,
+        }))
+        useEffect(() => {
+          if (sessionId === undefined) return undefined
+          let live = true
+          read(sessionId, send1).then((result) => {
+            // The composer can be recycled onto another session while the read is in
+            // flight; a late answer about the old session must not repaint the new one.
+            if (!live) return
+            setState(result.ok === true
+              ? { phase: 'ready', loop: result.loop, code: undefined, error: undefined }
+              : { phase: 'failed', loop: undefined, code: result.code, error: result.error })
+          })
+          return () => { live = false }
+        }, [sessionId])
+        const flip = () => {
+          if (sessionId === undefined || state.phase === 'busy' || state.phase === 'reading') return
+          const closing = state.loop !== undefined && state.loop.open === true
+          setState((current) => ({ ...current, phase: 'busy' }))
+          const answered = closing ? close(sessionId, send1) : open(sessionId, send1)
+          void answered.then((result) => {
+            setState(result.ok === true
+              ? { phase: 'ready', loop: result.loop, code: undefined, error: undefined }
+              // A refused open leaves the previous state in place: the switch shows what it
+              // last knew plus why the click did nothing, instead of flipping anyway.
+              : { phase: 'failed', loop: state.loop, code: result.code, error: result.error })
+          })
+        }
+        const openNow = state.phase === 'ready' && state.loop !== undefined && state.loop.open === true
+        const disabled = state.phase === 'reading' || state.phase === 'busy' || state.phase === 'no-session'
+        return h('div', { style: styles.loopDock, [`data-${dataAttr}-switch`]: switchId, [`data-${dataAttr}-state`]: state.phase },
+          h('span', { style: styles.loopLabel }, t(`${textPrefix}.switch.label`)),
+          h('button', {
+            type: 'button', role: 'switch', 'aria-checked': openNow,
+            'aria-label': t(`${textPrefix}.switch.aria`), title: t(`${textPrefix}.switch.aria`),
+            [`data-${dataAttr}-toggle`]: true, disabled,
+            style: openNow ? styles.switchOn : styles.switch,
+            onClick: flip,
+          }, h('span', { 'data-switch-thumb': true, 'aria-hidden': 'true', style: styles.switchThumb })),
+          h('span', {
+            style: state.phase === 'failed' ? styles.error : styles.hint,
+            [`data-${dataAttr}-note`]: state.phase,
+          }, switchText(t, state)))
+      }
+
+      /**
+       * Register the switch in the composer dock.
+       *
+       * `locale: NS` is added only when the composition installs a locale face — the same
+       * rule the settings page follows, for the same reason: a registration that names a
+       * namespace the renderer cannot seat throws, and a switch in the wrong language
+       * beats no switch. The registration is additive (`list` slot, own id), so nothing
+       * the stock composer renders is replaced.
+       * @param ctx - the browser plugin context.
+       * @param i18n - live locale binding.
+       * @returns a disposer, or `undefined` when the registry refused the entry.
+       */
+      function start(ctx, i18n) {
+        const options = {
+          name: 'conversation.composer.dock',
+          id: switchId,
+          order: switchOrder,
+        }
+        if (i18n.locale !== undefined) options.locale = NS
+        try {
+          return ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register(options, Switch))
+        } catch (error) {
+          const message = error && error.message ? error.message : String(error)
+          console.warn(`[grok-workflow] the ${textPrefix} switch could not be registered (${message}); settings are unaffected.`)
+          return undefined
+        }
+      }
+
+      return {
+        routePath, switchId, switchOrder, dataAttr, actions: LOOP_ACTIONS.slice(),
+        component: Switch, mount: start, send, read, open, close,
+        parsePayload, text: switchText, failureText, url: switchUrl,
       }
     }
+
+    /** Auto-continue: the loop route, whose service owns the `Loop heartbeat` slot. */
+    const LOOP_SWITCH = makeHeartbeatSwitch({
+      routePath: LOOP_ROUTE_PATH, switchId: 'grok-workflow-loop', switchOrder: LOOP_SWITCH_ORDER,
+      dataAttr: 'loop', textPrefix: 'loop',
+    })
+    /** Self-iterate: the iterate route, whose service owns the `RSI heartbeat` slot. */
+    const ITERATE_SWITCH = makeHeartbeatSwitch({
+      routePath: ITERATE_ROUTE_PATH, switchId: 'grok-workflow-iterate', switchOrder: ITERATE_SWITCH_ORDER,
+      dataAttr: 'iterate', textPrefix: 'iterate',
+    })
 
     /**
-     * Read one route answer into the switch's own vocabulary.
+     * Mount both switches and return one disposer that takes both away.
      *
-     * The route always answers JSON with `ok` plus either `loop` or `code`/`error`; a
-     * proxy or a refusal that answers something else must not be reported as a state
-     * change, so an unrecognized body becomes `loop/response` and the switch shows a
-     * failure instead of pretending the loop moved.
-     * @param payload - the parsed body, if any.
-     * @param status - HTTP status of the answer.
-     * @returns the loop snapshot, or the stated failure.
-     */
-    function parseLoopPayload(payload, status) {
-      const isObject = payload !== null && typeof payload === 'object' && !Array.isArray(payload)
-      if (isObject && payload.ok === true && payload.loop !== undefined) {
-        return { ok: true, loop: payload.loop }
-      }
-      const answered = `the loop route answered HTTP ${String(status)}`
-      // A 403 is the user-only refusal whichever body came with it: the status is the
-      // composition's own fence saying the request carried no accepted user credential.
-      const refused = status === 403 ? 'loop/user-only' : 'loop/response'
-      if (!isObject) return { ok: false, code: refused, error: answered }
-      const code = typeof payload.code === 'string' && payload.code !== '' ? payload.code : refused
-      const error = typeof payload.error === 'string' && payload.error !== '' ? payload.error : answered
-      return { ok: false, code, error }
-    }
-
-    /**
-     * POST one loop request to the Host route.
-     *
-     * `credentials: 'include'` and a same-origin path are what make the composition's
-     * connection fence accept the call: the route is guarded by the Host's own
-     * Host/Origin + browser-authentication check, the same fence DSH's shipped routes use,
-     * so this switch needs no credential of its own and stores none.
-     * @param body - `{ action, sessionId }`, the one body shape the route accepts.
-     * @param fetchImpl - fetch to use; defaults to the page's own. Tests pass a fake.
-     * @returns the snapshot, or the stated failure — never a throw.
-     */
-    async function loopSend(body, fetchImpl) {
-      const post = fetchImpl !== undefined ? fetchImpl : (typeof fetch === 'function' ? fetch : undefined)
-      if (typeof post !== 'function') {
-        return { ok: false, code: 'loop/transport', error: 'this page has no fetch to reach the Host with' }
-      }
-      let response
-      try {
-        response = await post(loopUrl(), {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(body),
-        })
-      } catch (error) {
-        return { ok: false, code: 'loop/transport', error: error && error.message ? error.message : String(error) }
-      }
-      let payload
-      try {
-        payload = await response.json()
-      } catch {
-        payload = undefined
-      }
-      return parseLoopPayload(payload, response.status)
-    }
-
-    /** Read this session's loop without writing: the same `status` the tool may call. */
-    function readLoop(sessionId, fetchImpl) {
-      return loopSend({ action: 'status', sessionId }, fetchImpl)
-    }
-
-    /** Open the loop. Only reachable from a click: see the authorization note above. */
-    function openLoop(sessionId, fetchImpl) {
-      return loopSend({ action: 'open', sessionId }, fetchImpl)
-    }
-
-    /** Delete the loop heartbeat; like the tool's `close`, this leaves nothing behind. */
-    function closeLoop(sessionId, fetchImpl) {
-      return loopSend({ action: 'close', sessionId }, fetchImpl)
-    }
-
-    /** The one line under the switch, for one state, in one language. */
-    function loopSwitchText(t, state) {
-      const loop = state.loop
-      if (state.phase === 'reading') return t('loop.switch.reading')
-      if (state.phase === 'busy') return t('loop.switch.busy')
-      if (state.phase === 'no-session') return t('loop.switch.noSession')
-      if (state.phase === 'failed') return loopFailureText(t, state.code, state.error)
-      if (loop === undefined || loop.open !== true) return t('loop.switch.off')
-      const minutes = typeof loop.intervalMinutes === 'number' ? String(loop.intervalMinutes) : '?'
-      return typeof loop.rounds === 'number'
-        ? t('loop.switch.on', { minutes, rounds: String(loop.rounds) })
-        : t('loop.switch.onUnbounded', { minutes })
-    }
-
-    /**
-     * One failure in the switch's words.
-     *
-     * The two codes a person can act on get their own sentence — "only you may open this"
-     * and "this Host has no scheduler" are not the same problem as "the request failed" —
-     * and everything else carries the Host's own message, which is already redacted there.
-     */
-    function loopFailureText(t, code, error) {
-      if (code === 'loop/user-only') return t('loop.switch.userOnly')
-      if (code === 'loop/unavailable') return t('loop.switch.unavailable')
-      return t('loop.switch.failed', { message: error === undefined ? '?' : String(error) })
-    }
-
-    /**
-     * The switch itself: one button, one status line, no hidden writes.
-     *
-     * It reads on mount and never on a timer: a heartbeat's state is a fact the Host owns,
-     * and polling it from the composer of every session would be work nobody asked for.
-     * A click flips the state it last read — while it is still reading, the switch is
-     * disabled rather than guessing, because a click on an unknown state would open a loop
-     * that may already exist (harmless) or report "off" over a live heartbeat (not).
-     * @param props - slot runtime props: `sessionId`, the seated `t`, and an optional
-     *   `loopSend` (tests pass a fake fetch-shaped stand-in; production uses the page's own fetch —
-     *   never `loopSend` itself, which already takes the loop body shape).
-     */
-    function LoopSwitch(props) {
-      const t = guardedTranslator(props.t, translator(FALLBACK_LOCALE))
-      const sessionId = typeof props.sessionId === 'string' && props.sessionId !== '' ? props.sessionId : undefined
-      const send = typeof props.loopSend === 'function'
-        ? props.loopSend
-        : (typeof fetch === 'function' ? fetch.bind(undefined) : loopSend)
-      const [state, setState] = useState(() => ({
-        phase: sessionId === undefined ? 'no-session' : 'reading',
-        loop: undefined,
-        code: undefined,
-        error: undefined,
-      }))
-      useEffect(() => {
-        if (sessionId === undefined) return undefined
-        let live = true
-        readLoop(sessionId, send).then((result) => {
-          // The composer can be recycled onto another session while the read is in
-          // flight; a late answer about the old session must not repaint the new one.
-          if (!live) return
-          setState(result.ok === true
-            ? { phase: 'ready', loop: result.loop, code: undefined, error: undefined }
-            : { phase: 'failed', loop: undefined, code: result.code, error: result.error })
-        })
-        return () => { live = false }
-      }, [sessionId])
-      const flip = () => {
-        if (sessionId === undefined || state.phase === 'busy' || state.phase === 'reading') return
-        const closing = state.loop !== undefined && state.loop.open === true
-        setState((current) => ({ ...current, phase: 'busy' }))
-        const answered = closing ? closeLoop(sessionId, send) : openLoop(sessionId, send)
-        void answered.then((result) => {
-          setState(result.ok === true
-            ? { phase: 'ready', loop: result.loop, code: undefined, error: undefined }
-            // A refused open leaves the previous state in place: the switch shows what it
-            // last knew plus why the click did nothing, instead of flipping anyway.
-            : { phase: 'failed', loop: state.loop, code: result.code, error: result.error })
-        })
-      }
-      const open = state.phase === 'ready' && state.loop !== undefined && state.loop.open === true
-      const disabled = state.phase === 'reading' || state.phase === 'busy' || state.phase === 'no-session'
-      return h('div', { style: styles.loopDock, 'data-loop-switch': LOOP_SWITCH_ID, 'data-loop-state': state.phase },
-        h('span', { style: styles.loopLabel }, t('loop.switch.label')),
-        h('button', {
-          type: 'button', role: 'switch', 'aria-checked': open,
-          'aria-label': t('loop.switch.aria'), title: t('loop.switch.aria'),
-          'data-loop-toggle': true, disabled,
-          style: open ? styles.switchOn : styles.switch,
-          onClick: flip,
-        }, h('span', { 'data-switch-thumb': true, 'aria-hidden': 'true', style: styles.switchThumb })),
-        h('span', {
-          style: state.phase === 'failed' ? styles.error : styles.hint,
-          'data-loop-note': state.phase,
-        }, loopSwitchText(t, state)))
-    }
-
-    /**
-     * Register the switch in the composer dock.
-     *
-     * `locale: NS` is added only when the composition installs a locale face — the same
-     * rule the settings page follows, for the same reason: a registration that names a
-     * namespace the renderer cannot seat throws, and a switch in the wrong language beats
-     * no switch. The registration is additive (`list` slot, own id), so nothing the stock
-     * composer renders is replaced.
+     * Each mount is additive and fails soft on its own: a dock that refuses one
+     * registration costs that switch and still keeps the other, and a disposer that
+     * only owns the registrations that actually landed never takes down a neighbor's.
      * @param ctx - the browser plugin context.
      * @param i18n - live locale binding.
-     * @returns a disposer, or `undefined` when the registry refused the entry.
+     * @returns a combined disposer, or `undefined` when nothing was registered.
      */
-    function startLoopSwitch(ctx, i18n) {
-      const options = {
-        name: 'conversation.composer.dock',
-        id: LOOP_SWITCH_ID,
-        order: LOOP_SWITCH_ORDER,
-      }
-      if (i18n.locale !== undefined) options.locale = NS
-      try {
-        return ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register(options, LoopSwitch))
-      } catch (error) {
-        const message = error && error.message ? error.message : String(error)
-        console.warn(`[grok-workflow] the loop switch could not be registered (${message}); settings are unaffected.`)
-        return undefined
+    function startBothSwitches(ctx, i18n) {
+      const landed = [LOOP_SWITCH.mount(ctx, i18n), ITERATE_SWITCH.mount(ctx, i18n)]
+        .filter((disposer) => typeof disposer === 'function')
+      if (landed.length === 0) return undefined
+      return () => {
+        for (const dispose of landed) dispose()
       }
     }
 
@@ -3927,16 +4089,18 @@ window.__ModuleLoader__.load({
         startProgress()
       }
       /**
-       * Mount the composer-dock switch under the current locale binding.
+       * Mount the composer-dock switches under the current locale binding.
        *
-       * It is remounted (rather than mounted once) for the same reason the page is: the
-       * registration carries `locale: NS` only once a locale face exists, and that is what
-       * makes the framework seat a `t` that repaints on a language switch.
+       * Both are mounted (the auto-continue loop switch and, beside it, the
+       * self-iterate switch). Each is remounted (rather than mounted once) for the same
+       * reason the page is: the registration carries `locale: NS` only once a locale
+       * face exists, and that is what makes the framework seat a `t` that repaints on a
+       * language switch.
        */
       const startSwitch = () => {
         if (disposed) return
         switchMounted = true
-        stopSwitch = startLoopSwitch(ctx, i18n)
+        stopSwitch = startBothSwitches(ctx, i18n)
       }
       /** Drop the current switch registration and mount it again. */
       const restartSwitch = () => {
@@ -4111,26 +4275,17 @@ window.__ModuleLoader__.load({
       createStatus: createProgressStatus,
     }
     /**
-     * Composer-dock loop switch: the browser half of the loop surfaces. Pinned by
-     * `test/client.spec.ts` against `src/loop.ts` (route path, action list) and against
-     * the `grok_loop` tool schema, so the switch and the tool cannot drift apart.
+     * Exports.GROK_WORKFLOW_LOOP points into {@link LOOP_SWITCH}; the bundle object is
+     * the same shape the factory returns, so the tests drive exactly what mounts.
      */
-    exports.GROK_WORKFLOW_LOOP = {
-      routePath: LOOP_ROUTE_PATH,
-      switchId: LOOP_SWITCH_ID,
-      switchOrder: LOOP_SWITCH_ORDER,
-      actions: LOOP_ACTIONS,
-      component: LoopSwitch,
-      mount: startLoopSwitch,
-      send: loopSend,
-      read: readLoop,
-      open: openLoop,
-      close: closeLoop,
-      parsePayload: parseLoopPayload,
-      text: loopSwitchText,
-      failureText: loopFailureText,
-      url: loopUrl,
-    }
+    exports.GROK_WORKFLOW_LOOP = LOOP_SWITCH
+    /**
+     * Composer-dock self-iteration switch: the browser half of the iterate route.
+     * Pinned by `test/client.spec.ts` against `ITERATE_ROUTE_PATH` in `src/loop.ts`
+     * and against the identity separation in `test/iterate.spec.ts`, so the two
+     * switches cannot drift into sharing a slot.
+     */
+    exports.GROK_WORKFLOW_ITERATE = ITERATE_SWITCH
     return module.exports
   },
 })

@@ -164,6 +164,17 @@ export interface GrokWorkflowConfig {
    * worst-case round, never under 60 minutes. Hard maximum 10080 (seven days).
    */
   loopIntervalMin?: number
+  /**
+   * Minutes between self-iteration heartbeats. `0` asks for the same floor as
+   * `loopIntervalMin`. Hard maximum 10080 (seven days).
+   */
+  iterateIntervalMin?: number
+  /**
+   * Prompt template stored in the self-iteration heartbeat task. Whitespace-only
+   * falls back to the built-in default; hard maximum 4000 characters, the same
+   * bound the loop prompt has.
+   */
+  iterateTemplate?: string
 }
 
 /** Fully resolved configuration. Everything not listed here is a fixed internal value. */
@@ -201,6 +212,10 @@ export interface ResolvedConfig {
   loopMaxRounds: number
   loopFailStreak: number
   loopIntervalMin: number
+  /** Self-iteration heartbeat interval, resolved like `loopIntervalMin`. */
+  iterateIntervalMin: number
+  /** Self-iteration heartbeat prompt template, resolved to a bounded string. */
+  iterateTemplate: string
   configVersion: number
 }
 

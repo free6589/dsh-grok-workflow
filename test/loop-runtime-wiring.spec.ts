@@ -66,6 +66,8 @@ interface Capture {
   edits: { id: string; action: string; patch?: { prompt?: string; active?: boolean; timing?: { rrule: string } } }[]
   /** The route the bundle registered, with the handler it registered. */
   route?: { kind: string; path: string; handler: (req: never, res: never) => void | Promise<void> }
+  /** Every registered route by exact path: the loop route and the iterate route. */
+  routes: Record<string, { kind: string; path: string; handler: (req: never, res: never) => void | Promise<void> }>
   /** What the composition's connection fence answers; `undefined` = accept. */
   rejectWith?: number
 }
@@ -146,7 +148,7 @@ async function compose(
   config: Record<string, number | boolean>,
   options: { withWeb?: boolean } = {},
 ): Promise<Composition> {
-  const capture: Capture = { rows: [], creates: [], edits: [] }
+  const capture: Capture = { rows: [], creates: [], edits: [], routes: {} }
   scope.__loopWiring = capture
   const withWeb = options.withWeb ?? true
 
@@ -196,7 +198,8 @@ async function compose(
     '}',
     '',
   ])
-  // The web surface: one `register` that keeps the route, and the composition's own
+  // The web surface: one `register` that keeps every route by path (the loop route
+  // additionally as `route`, the historical handle), and the composition's own
   // connection fence, which the route must consult before doing anything.
   const web = module('fake-web', [
     "export const name = 'fake-web'",
@@ -204,8 +207,9 @@ async function compose(
     '  const state = globalThis.__loopWiring',
     '  ctx.provide(\'webServer\', {',
     '    register(route) {',
-    '      state.route = route',
-    '      return () => { state.route = undefined }',
+    '      state.routes[route.path] = route',
+    '      if (state.routes[\'/grok-workflow/loop\'] !== undefined) state.route = state.routes[\'/grok-workflow/loop\']',
+    '      return () => { delete state.routes[route.path] }',
     '    },',
     '  })',
     '  ctx.provide(\'connection\', {',
@@ -319,16 +323,32 @@ describe('the loop keys reach the running plugin, not only the settings page', (
     const { ctx, capture } = await compose({ timeoutMs: 0 })
     await until(() => capture.route !== undefined, 'the loop route registration')
     const sessionId = '2d7bd1e7-1111-2222-3333-444455556666'
+    // The Iterate heartbeat (the RSI loop) delivers to the same session from its own
+    // Schedule task. Unload is the sharpest test of identity the composition offers:
+    // it deletes every row this plugin owns, so a row it does not own surviving here is
+    // the proof that the two heartbeats are stored apart.
+    capture.rows.push({
+      id: 'task-iterate',
+      title: 'RSI heartbeat',
+      prompt: '# RSI heartbeat — round 23\n\nThis message was delivered by an Automation task',
+      kind: 'rrule',
+      rrule: 'DTSTART:20261119T230000Z\nRRULE:FREQ=MINUTELY;INTERVAL=60',
+      scheduledAt: '2026-11-19T23:00:00.000Z',
+      status: 'active',
+      target: { kind: 'session', sessionId },
+    })
     expect((await post(capture.route!.handler, { action: 'open', sessionId })).status).toBe(200)
-    expect(capture.rows).toHaveLength(1)
+    expect(capture.rows).toHaveLength(2)
 
     const entry = [...ctx.loader.entries()].find(item => item.options.id === 'grok-workflow')
     expect(entry?.fiber).toBeDefined()
     await entry!.fiber!.dispose()
     await ctx.loader.await()
     // No timer, no row, no obligation nobody owns: the unload cleanup is the only thing
-    // that can delete a heartbeat, so a surviving row here would be an orphan.
-    await until(() => capture.rows.length === 0, 'the unload cleanup')
+    // that can delete a heartbeat, so a surviving row here would be an orphan. The
+    // Iterate row is not an orphan — it is another owner's beat and must stay stored.
+    await until(() => !capture.rows.some(row => row.title === 'Loop heartbeat'), 'the unload cleanup')
+    expect(capture.rows.map(row => row.id)).toEqual(['task-iterate'])
     expect(capture.edits.some(edit => edit.action === 'delete')).toBe(true)
     expect(ctx.tools.schemas().map(tool => tool.name)).not.toContain('grok_loop')
   })

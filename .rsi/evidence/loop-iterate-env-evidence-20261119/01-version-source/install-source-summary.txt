@@ -1,0 +1,7 @@
+specifier line:
+33:        specifier: github:free6589/dsh-grok-workflow
+resolution:
+34:        version: https://codeload.github.com/free6589/dsh-grok-workflow/tar.gz/22bbe178ed375176b6b33674c85ae0ab47b10fe6
+223:  dsh-grok-workflow@https://codeload.github.com/free6589/dsh-grok-workflow/tar.gz/22bbe178ed375176b6b33674c85ae0ab47b10fe6:
+224:    resolution: {gitHosted: true, integrity: sha512-aehcy+oJvtatK1WN+/AdtnvsZVXD5mIckw3sThAh8p1XgDv/6+ADxFXhoUCNexjSVJj/cwhdENLMLywfFsRZ+g==, tarball: https://codeload.github.com/free6589/dsh-grok-workflow/tar.gz/22bbe178ed375176b6b33674c85ae0ab47b10fe6}
+474:  dsh-grok-workflow@https://codeload.github.com/free6589/dsh-grok-workflow/tar.gz/22bbe178ed375176b6b33674c85ae0ab47b10fe6:

@@ -1,5 +1,64 @@
 # Project State
 
+Last updated: 2026-11-20 (**round-024 收口：三线合一，真机复核过** —
+`/grok on` 后台受理（`answerFullBehind`，5 例）+ intake 提示词入口加固（14 例）
++ 双开关/模板（9+97 例）三条并发线合在同一工作树；`npm run ci` exit 0 =
+**67 文件 / 1219 测试 PASS**，typecheck 0 错、lint 24w/0e、`verify:lib` 通过。
+真机（`loopfix-verify` `:3451`）：loop/iterate 双路由各走各的全 200、taskId 不同；
+真实 bundle 双开关生产路径 mount/开/关全通、各建各删各；实例已停、证据无密钥。
+**未提交、未发版**——等收尾提交；NOT_RUN：真实定时投递、GUI 手动点击拍照。）
+
+
+Last updated: 2026-11-20 (**settings-toggle-ui 收口：双开关 + 模板 textarea 全链路真机过** —
+上一轮落地的自迭代实例/路由之上，本轮补齐了任务的全部验收面：设置页新增「自迭代」分组
+（`iterateIntervalMin` 数字 + `iterateTemplate` textarea，`error.badTemplate` 4000 上限校验，
+中英字典 +20 键），`iterateTemplate`/`iterateIntervalMin` 进 schema/CONFIG_KEYS（13→15 键），
+`src/index.ts` 的 iterate 实例 `defaultPrompt` 读 live 模板、空白回退内置默认；客户端开关
+重构为 `makeHeartbeatSwitch` 工厂，`GROK_WORKFLOW_ITERATE` 导出、`startBothSwitches` 双挂载。
+生产路径测试走真实 page fetch → 真 `node:http` → 真 `handleLoopRoute` → 真
+`createLoopService`（不传任何 send 覆盖，v0.11.21 教训不复现），并新增 textarea
+draft→ops→save 持久化用例。真机验证（隔离 profile `loopfix-verify` `:3451`，lib 重建后重启
+实例，结束后已停）：两开关独立开/关、互不碰对方的行；模板经**真实设置写路径**
+（describe→mutate 带 expectedRevision→重 describe 逐字节读回→cordis.patch.yml 落盘）持久
+且刷新后开关仍能刷新活行；循环 close 不带走自迭代行，收尾 schedule 存储无残留行、
+patch 里的测试模板已恢复。`npm run ci` exit 0 = **67 文件 / 1218 测试 PASS**、
+`verify:lib` 通过；证据 `.rsi/evidence/round-024/`（`ci-settings-run.log`、
+`switches-and-template.mjs/.txt`）。**未发版、未提交**：树里另有 intake/`/grok on`
+两个并发任务的未提交修复。**NOT_RUN**：真实定时投递（D-066）、浏览器 GUI 手动点击拍照。)
+
+Previous update: 2026-11-20 (**心跳隔离第二轮：自迭代心跳成为插件第二个实例后的真实串线已修** —
+`src/index.ts:313` 的第二个 `createLoopService`（`RSI heartbeat`）+ `src/loop-surface.ts:148`
+的 `/grok-workflow/iterate` 路由落地后，第一轮「自迭代心跳无插件路由」的记录过期，本轮按当前树
+重审并修正文档。真实缺陷：`forgetSession` 走写死的 `isLoopSlot`，**自迭代实例的归档清扫会删掉
+循环的行、留下自己的行**（先复现后修；当前接线只挂循环实例，故今天从组合层不可达，
+但它是归档清扫的接口、两实例都暴露）；`deleteSessionHeartbeats`（`src/loop.ts:752`）改为接受
+调用实例的 `slot` 谓词（默认 `isLoopSlot`，刹车语义不变），`forgetSession` 传 `slotOf`。
+新增测试：反方向所有权 5 例、门禁「用户粘贴标记仍 admit」1 例、路由层「两开关两路由」4 例、
+页面层路由隔离 1 例。负对照：去掉 `slotOf` 参数 → **1 failed / 14 passed**；iterate 路由绑到
+循环服务 → **2 failed / 18 passed**（两文件按 sha256 逐字节还原）。`npm run ci` **exit 0 =
+67 文件 / 1219 测试 PASS**（`lib/loop.js:552` 已带新参数，`verify:lib` 通过）。live
+`~/.dsh/storages/schedule.json` 只读 = 一条无关任务、两心跳未武装、本会话零写入。
+**未验证（`NOT_RUN`）**：真实定时投递（D-066）、真机 GUI 归档后任务列表。**残留**：
+F3 `.rsi/STOP` 双停（D-080）、F5 保留名、卸载只清循环行（自迭代行按设计留存）。
+改动未提交：`M src/loop.ts`、`M test/heartbeat-identity.spec.ts`、`M test/loop-surface.spec.ts`、
+`M test/client.spec.ts`、`M lib/*`、`docs/knowledge/HEARTBEATS.md`（重写）+ 记忆六件；
+工作树里 intake/command/answer 与 `test/iterate.spec.ts` 是并发任务的改动。)
+
+Previous update: 2026-11-20 (**心跳身份与路由隔离审计收口** — Loop（`Loop heartbeat` /
+`[grok-workflow loop]` / `/grok-workflow/loop` / `grok_loop`）与 Iterate（`RSI heartbeat` /
+`# RSI heartbeat — round N`，`.rsi/HEARTBEAT.md`）身份拆成两个谓词（D-079）：
+路由身份 `isLoopHeartbeat` 只认标记（`src/gate.ts:532` 门禁唯一入口），存储身份 `isLoopSlot`
+只认保留名 + `rrule` + 目标会话；`open()` 三路清重复行、删除被拒改写幸存行，
+Iterate 投递走 `non-user-source` 直通、`loop.review/admit/stop` 零调用（刹车 spy 钉死，
+`test/heartbeat-identity.spec.ts` 10 例）。负对照：修前 `src/loop.ts` 上同两文件
+**7 failed / 38 passed**（跑后 sha256 逐字节还原）；`npm run ci` exit 0 =
+**66 文件 / 1195 测试 PASS**；live `schedule.json` 只读核对 = 一条无关任务、零写入。
+改动未提交：`M src/loop.ts`、`M src/gate.ts`、`M test/loop*.spec.ts`、
+`?? test/heartbeat-identity.spec.ts`、`?? docs/knowledge/HEARTBEATS.md` + 并发任务的
+`src/intake.ts`/`src/command.ts`/`src/answer.ts`。**未验证（`NOT_RUN`）**：真实定时投递
+（D-066）、真机 GUI 改写提示词观察投递；**残留**：F3 `.rsi/STOP` 双停（D-080）、
+F5 保留名 `Loop heartbeat`（见 `HEARTBEATS.md` F5）。）
+
 Last updated: 2026-11-19 (**用户报障修：续跑开关又能点了** — `LoopSwitch` 生产默认把
 请求体形的 `loopSend` 当 fetch 用，真机上每次读取都只剩 `HTTP undefined`。
 现默认走页面自己的 fetch + 新增生产路径回归用例；`npm run ci` exit 0 =
@@ -198,6 +257,23 @@ Round 36's B plan — `full` mode now opens with `【人话结论】` (completed
 (default off) gates Model routes/Deadline/Route switches/overflows/Errors, `Uncertainties` stays
 visible; and Round 35's fix — a saved role/model setting now actually reaches the run. Live `:3090`
 still needs a restart to load any of it — user-reserved, `NOT_RUN`)
+
+## Prompt intake harden — 2026-11-19（agent-5，未提交）
+
+- **CONFIRMED**：用户贴进新会话的「自我迭代 /grok 团队任务」提示词**不是**因长度卡住。实测
+  2 041 字符 / 3 697 字节（`session-042dfe19` seq 4）与 2 032 / 3 688 两次
+  （`session-b7be2bd2` seq 2944/2953），占 32 000 目标预算 6.4%，无截断；三条都结算成
+  `Usage: /grok [on|off]`，且无 `user/message` / `agent/pre-step` / run。
+- **根因（CONFIRMED，源码级）**：`dsh-commands` `parseCommand` 把消息第一行当命令、其余作
+  `rawInput`；存档提示词第一行就是 `/grok 团队任务：…`，于是正文成了参数，旧语法只回一行用法
+  就返回 → 用户侧等于静默。
+- **改动**：`src/intake.ts`（新，入口上限与双语拒绝的唯一生成处）、`src/command.ts`（非开关参数
+  按形态分档，开关语义未动）、`src/gate.ts`（`refusalOf` + 迟到目标走 intake）、
+  `docs/task-prompt-template.md`（新，默认模板 + 规则）、`test/intake.spec.ts`（新，14 条）、
+  `test/command.spec.ts` +3、`test/objective-limit.spec.ts` +1。
+- **验证**：`npm run ci` exit 0 = **66 文件 / 1195 测试 PASS**；红证据 8 failed（
+  `docs/knowledge/evidence/prompt-intake-2026-11-19/red-full.log`）。
+- **NOT_RUN**：真机 GUI 粘贴同一条提示词（并发写入者在同一工作树）；commit/push。
 
 ## Repository
 
@@ -1376,3 +1452,24 @@ worker 链上限 50（HARD_LIMITS.chainLength）
 - **受保护对象（`CONFIRMED`）**：`package.json`、`package-lock.json` 未改（sha256 与开工一致）；
   `CHANGELOG.md` 只增 `[Unreleased]` 段；`lib/` 只经 `npm run build` 重建；`.git` 与
   `v0.11.14`–`v0.11.19` 等已发布 tag 及其 peel 未动；无 force-push、无新 tag、不发布 npm。
+
+## 2026-11-19 — `/grok on` 之后发不出消息：会话级 full 改走后台受理（`CONFIRMED`，未提交）
+
+- **缺陷**：`/grok on` 写 `workflowMode: 'full'`（`src/command.ts:142`），`full` 是唯一
+  绕过交互式受理的形态（`answerTeamInteractive` 只接 `triage`，`src/gate.ts:1281`），于是
+  落到 `await produceAnswer(...)`（修前 `src/gate.ts:1458`，现 `:1550`）：`in-turn` 把整步
+  开着等 workflow 跑完，而 `AgentLoop` 只在 step 结算后才 claim 下一批
+  （`dsh-agent-loop/lib/index.js:683` `inbox.claim`，`turn()` 的 `while` 在 `:752`、`step` 在 `:780`），
+  这段时间（默认 60 分钟，`src/config.ts:104`）用户发的消息全部只进队列、永不派发 ——
+  用户原话「`/grok on` 就无法发消息，`/grok off` 就可以」。
+- **修复**：`src/gate.ts` 新增 `answerFullBehind`（`:1386`，条件 `:1398` = 会话记录
+  `workflowMode === 'full'` + 可后台交付）：先回执 `acceptedEnterText`（`src/answer.ts:182`）
+  再后台 `runTeam` + `deliverAndRecord`；部署级默认 `mode:'full'` 保持 T4 `in-turn` 不变。
+- **证据**：`test/grok-on-ingress.spec.ts`（5 例，修前 3 failed → 修后 5 passed；修前的数
+  据由 `HEAD` worktree 独立复跑，见 `docs/knowledge/evidence/grok-on-ingress-2026-11-19/repro-before-head-worktree.log`）。
+  `npm run ci` 两处跑绿：共享工作树 exit 0 = **67 文件 / 1218 测试**
+  （24 warnings / 0 errors，`verify:lib` byte-identical，`shared-tree-ci-green.log`）；
+  「`HEAD` + 只本修复」隔离树 exit 0 = 64 文件 / 1164 测试（`ci-isolated-fix-only.log`）。
+  同日更早几次共享树是红的，红点全在并发写入者的半成品（设置页语法错、`test/client.spec.ts`
+  的 `TS2304`、配置面 5 文件），与本修复无关。
+- **未做**：真机 GUI 连发两条（`NOT_RUN`，本树有并发写入者，留给收尾组）；commit/push/发版未授权。

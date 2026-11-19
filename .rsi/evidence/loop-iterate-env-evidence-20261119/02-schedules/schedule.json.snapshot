@@ -1,0 +1,128 @@
+{
+  "unit": {
+    "name": "schedule",
+    "version": 2
+  },
+  "global": null,
+  "tables": {
+    "tasks": {
+      "schedule-12eadb13-49c0-4479-9ac2-0d0e8e7ff1d0": {
+        "record": {
+          "id": "schedule-12eadb13-49c0-4479-9ac2-0d0e8e7ff1d0",
+          "kind": "rrule",
+          "title": "派发个人助理灵感箱",
+          "prompt": "值守任务：清空 /home/fish/个人助理/dispatch/inbox。\n\n步骤：\n1. `cd /home/fish/个人助理/dispatch`，看 inbox 里除 `_template.md` 外还有没有 .md 文件。\n2. 有就 `python3 dispatch.py plan` 看归类，然后 `python3 dispatch.py run` 派发；没有就只回一行「灵感箱空」。\n3. 对上一轮已派发的跑 `python3 dispatch.py status`；状态变成 done/failed 的，用 `python3 dispatch.py collect` 把结果落到 out/，回复里列出这一轮新产出的 out 文件名。\n4. 失败条目：读 `logs/` 下对应的 `.err` 或 `.jsonl` 里的 error 事件，把原因摘要写进回复；原稿留在 inbox/done 不要删。可选的重试：`python3 dispatch.py run inbox/done/<文件> --keep`。\n\n回复控制在 10 行内：派发几条、去哪几个项目、状态、失败原因。",
+          "rrule": "DTSTART;TZID=Asia/Singapore:20261117T090000\nRRULE:FREQ=DAILY;BYHOUR=9,13,18,22;BYMINUTE=0",
+          "scheduledAt": "2026-11-20T01:00:00.000Z"
+        },
+        "involvedSessionIds": [
+          "session-03c7307d-fa30-454d-bf9d-269f55777cd4",
+          "session-a52a4e1d-e601-494e-990d-7ad2cea40ed8"
+        ],
+        "status": "active",
+        "createdAt": "2026-11-16T23:49:26.779Z",
+        "updatedAt": "2026-11-19T14:00:00.276Z",
+        "target": {
+          "kind": "session",
+          "sessionId": "session-a52a4e1d-e601-494e-990d-7ad2cea40ed8"
+        },
+        "lastDelivery": {
+          "scheduledAt": "2026-11-19T14:00:00.000Z",
+          "deliveredAt": "2026-11-19T14:00:00.276Z",
+          "messageId": "ab6c2e7d-6328-4b59-a569-db890ae3e1e4",
+          "targetSessionId": "session-a52a4e1d-e601-494e-990d-7ad2cea40ed8"
+        },
+        "deliveryHistory": {
+          "records": [
+            {
+              "scheduledAt": "2026-11-17T01:00:00.000Z",
+              "deliveredAt": "2026-11-17T01:00:01.428Z",
+              "messageId": "70b00d36-dcca-492e-b4ef-9baae7ce1db8",
+              "targetSessionId": "session-a52a4e1d-e601-494e-990d-7ad2cea40ed8",
+              "prompt": "值守任务：清空 /home/fish/个人助理/dispatch/inbox。\n\n步骤：\n1. `cd /home/fish/个人助理/dispatch`，看 inbox 里除 `_template.md` 外还有没有 .md 文件。\n2. 有就 `python3 dispatch.py plan` 看归类，然后 `python3 dispatch.py run` 派发；没有就只回一行「灵感箱空」。\n3. 对已派发且状态变成 idle/error 的，跑 `python3 dispatch.py collect` 把对话落到 out/，并在回复里列出这一轮新产出的 out 文件名。\n4. 如果某条派发失败（agent 状态 error），把 `paseo logs <agent_id>` 的报错摘要写进回复，原稿不要删，留在 inbox/done 里并注明失败。\n\n回复控制在 10 行内：派发了几条、去哪几个项目、状态、失败原因。"
+            },
+            {
+              "scheduledAt": "2026-11-17T05:00:00.000Z",
+              "deliveredAt": "2026-11-17T05:00:00.197Z",
+              "messageId": "bab02894-4ec2-4aa9-90cb-edfc44229868",
+              "targetSessionId": "session-a52a4e1d-e601-494e-990d-7ad2cea40ed8",
+              "prompt": "值守任务：清空 /home/fish/个人助理/dispatch/inbox。\n\n步骤：\n1. `cd /home/fish/个人助理/dispatch`，看 inbox 里除 `_template.md` 外还有没有 .md 文件。\n2. 有就 `python3 dispatch.py plan` 看归类，然后 `python3 dispatch.py run` 派发；没有就只回一行「灵感箱空」。\n3. 对上一轮已派发的跑 `python3 dispatch.py status`；状态变成 done/failed 的，用 `python3 dispatch.py collect` 把结果落到 out/，回复里列出这一轮新产出的 out 文件名。\n4. 失败条目：读 `logs/` 下对应的 `.err` 或 `.jsonl` 里的 error 事件，把原因摘要写进回复；原稿留在 inbox/done 不要删。可选的重试：`python3 dispatch.py run inbox/done/<文件> --keep`。\n\n回复控制在 10 行内：派发几条、去哪几个项目、状态、失败原因。"
+            },
+            {
+              "scheduledAt": "2026-11-17T10:00:00.000Z",
+              "deliveredAt": "2026-11-17T10:00:00.429Z",
+              "messageId": "97a2cc49-bfab-4d1e-a082-3c8b75e433b1",
+              "targetSessionId": "session-a52a4e1d-e601-494e-990d-7ad2cea40ed8",
+              "prompt": "值守任务：清空 /home/fish/个人助理/dispatch/inbox。\n\n步骤：\n1. `cd /home/fish/个人助理/dispatch`，看 inbox 里除 `_template.md` 外还有没有 .md 文件。\n2. 有就 `python3 dispatch.py plan` 看归类，然后 `python3 dispatch.py run` 派发；没有就只回一行「灵感箱空」。\n3. 对上一轮已派发的跑 `python3 dispatch.py status`；状态变成 done/failed 的，用 `python3 dispatch.py collect` 把结果落到 out/，回复里列出这一轮新产出的 out 文件名。\n4. 失败条目：读 `logs/` 下对应的 `.err` 或 `.jsonl` 里的 error 事件，把原因摘要写进回复；原稿留在 inbox/done 不要删。可选的重试：`python3 dispatch.py run inbox/done/<文件> --keep`。\n\n回复控制在 10 行内：派发几条、去哪几个项目、状态、失败原因。"
+            },
+            {
+              "scheduledAt": "2026-11-17T14:00:00.000Z",
+              "deliveredAt": "2026-11-17T14:00:00.443Z",
+              "messageId": "ce1f1406-1bf6-46da-bb5e-228ab53b0dda",
+              "targetSessionId": "session-a52a4e1d-e601-494e-990d-7ad2cea40ed8",
+              "prompt": "值守任务：清空 /home/fish/个人助理/dispatch/inbox。\n\n步骤：\n1. `cd /home/fish/个人助理/dispatch`，看 inbox 里除 `_template.md` 外还有没有 .md 文件。\n2. 有就 `python3 dispatch.py plan` 看归类，然后 `python3 dispatch.py run` 派发；没有就只回一行「灵感箱空」。\n3. 对上一轮已派发的跑 `python3 dispatch.py status`；状态变成 done/failed 的，用 `python3 dispatch.py collect` 把结果落到 out/，回复里列出这一轮新产出的 out 文件名。\n4. 失败条目：读 `logs/` 下对应的 `.err` 或 `.jsonl` 里的 error 事件，把原因摘要写进回复；原稿留在 inbox/done 不要删。可选的重试：`python3 dispatch.py run inbox/done/<文件> --keep`。\n\n回复控制在 10 行内：派发几条、去哪几个项目、状态、失败原因。"
+            },
+            {
+              "scheduledAt": "2026-11-18T01:00:00.000Z",
+              "deliveredAt": "2026-11-18T01:00:00.496Z",
+              "messageId": "6b312e04-d355-42e0-bc5f-fd8e38662b92",
+              "targetSessionId": "session-a52a4e1d-e601-494e-990d-7ad2cea40ed8",
+              "prompt": "值守任务：清空 /home/fish/个人助理/dispatch/inbox。\n\n步骤：\n1. `cd /home/fish/个人助理/dispatch`，看 inbox 里除 `_template.md` 外还有没有 .md 文件。\n2. 有就 `python3 dispatch.py plan` 看归类，然后 `python3 dispatch.py run` 派发；没有就只回一行「灵感箱空」。\n3. 对上一轮已派发的跑 `python3 dispatch.py status`；状态变成 done/failed 的，用 `python3 dispatch.py collect` 把结果落到 out/，回复里列出这一轮新产出的 out 文件名。\n4. 失败条目：读 `logs/` 下对应的 `.err` 或 `.jsonl` 里的 error 事件，把原因摘要写进回复；原稿留在 inbox/done 不要删。可选的重试：`python3 dispatch.py run inbox/done/<文件> --keep`。\n\n回复控制在 10 行内：派发几条、去哪几个项目、状态、失败原因。"
+            },
+            {
+              "scheduledAt": "2026-11-18T05:00:00.000Z",
+              "deliveredAt": "2026-11-18T05:00:00.090Z",
+              "messageId": "70cdd24e-ed68-417a-b31b-a4c23e71d9d5",
+              "targetSessionId": "session-a52a4e1d-e601-494e-990d-7ad2cea40ed8",
+              "prompt": "值守任务：清空 /home/fish/个人助理/dispatch/inbox。\n\n步骤：\n1. `cd /home/fish/个人助理/dispatch`，看 inbox 里除 `_template.md` 外还有没有 .md 文件。\n2. 有就 `python3 dispatch.py plan` 看归类，然后 `python3 dispatch.py run` 派发；没有就只回一行「灵感箱空」。\n3. 对上一轮已派发的跑 `python3 dispatch.py status`；状态变成 done/failed 的，用 `python3 dispatch.py collect` 把结果落到 out/，回复里列出这一轮新产出的 out 文件名。\n4. 失败条目：读 `logs/` 下对应的 `.err` 或 `.jsonl` 里的 error 事件，把原因摘要写进回复；原稿留在 inbox/done 不要删。可选的重试：`python3 dispatch.py run inbox/done/<文件> --keep`。\n\n回复控制在 10 行内：派发几条、去哪几个项目、状态、失败原因。"
+            },
+            {
+              "scheduledAt": "2026-11-18T10:00:00.000Z",
+              "deliveredAt": "2026-11-18T10:00:00.115Z",
+              "messageId": "737d2f14-83ac-4146-bf2a-35be3962d45c",
+              "targetSessionId": "session-a52a4e1d-e601-494e-990d-7ad2cea40ed8",
+              "prompt": "值守任务：清空 /home/fish/个人助理/dispatch/inbox。\n\n步骤：\n1. `cd /home/fish/个人助理/dispatch`，看 inbox 里除 `_template.md` 外还有没有 .md 文件。\n2. 有就 `python3 dispatch.py plan` 看归类，然后 `python3 dispatch.py run` 派发；没有就只回一行「灵感箱空」。\n3. 对上一轮已派发的跑 `python3 dispatch.py status`；状态变成 done/failed 的，用 `python3 dispatch.py collect` 把结果落到 out/，回复里列出这一轮新产出的 out 文件名。\n4. 失败条目：读 `logs/` 下对应的 `.err` 或 `.jsonl` 里的 error 事件，把原因摘要写进回复；原稿留在 inbox/done 不要删。可选的重试：`python3 dispatch.py run inbox/done/<文件> --keep`。\n\n回复控制在 10 行内：派发几条、去哪几个项目、状态、失败原因。"
+            },
+            {
+              "scheduledAt": "2026-11-18T14:00:00.000Z",
+              "deliveredAt": "2026-11-18T14:00:00.141Z",
+              "messageId": "b603528d-733a-4e11-a032-bf8972e53a19",
+              "targetSessionId": "session-a52a4e1d-e601-494e-990d-7ad2cea40ed8",
+              "prompt": "值守任务：清空 /home/fish/个人助理/dispatch/inbox。\n\n步骤：\n1. `cd /home/fish/个人助理/dispatch`，看 inbox 里除 `_template.md` 外还有没有 .md 文件。\n2. 有就 `python3 dispatch.py plan` 看归类，然后 `python3 dispatch.py run` 派发；没有就只回一行「灵感箱空」。\n3. 对上一轮已派发的跑 `python3 dispatch.py status`；状态变成 done/failed 的，用 `python3 dispatch.py collect` 把结果落到 out/，回复里列出这一轮新产出的 out 文件名。\n4. 失败条目：读 `logs/` 下对应的 `.err` 或 `.jsonl` 里的 error 事件，把原因摘要写进回复；原稿留在 inbox/done 不要删。可选的重试：`python3 dispatch.py run inbox/done/<文件> --keep`。\n\n回复控制在 10 行内：派发几条、去哪几个项目、状态、失败原因。"
+            },
+            {
+              "scheduledAt": "2026-11-19T01:00:00.000Z",
+              "deliveredAt": "2026-11-19T03:30:39.141Z",
+              "messageId": "c4e13eb1-7fad-4d15-b947-8f5e58b8a8dd",
+              "targetSessionId": "session-a52a4e1d-e601-494e-990d-7ad2cea40ed8",
+              "prompt": "值守任务：清空 /home/fish/个人助理/dispatch/inbox。\n\n步骤：\n1. `cd /home/fish/个人助理/dispatch`，看 inbox 里除 `_template.md` 外还有没有 .md 文件。\n2. 有就 `python3 dispatch.py plan` 看归类，然后 `python3 dispatch.py run` 派发；没有就只回一行「灵感箱空」。\n3. 对上一轮已派发的跑 `python3 dispatch.py status`；状态变成 done/failed 的，用 `python3 dispatch.py collect` 把结果落到 out/，回复里列出这一轮新产出的 out 文件名。\n4. 失败条目：读 `logs/` 下对应的 `.err` 或 `.jsonl` 里的 error 事件，把原因摘要写进回复；原稿留在 inbox/done 不要删。可选的重试：`python3 dispatch.py run inbox/done/<文件> --keep`。\n\n回复控制在 10 行内：派发几条、去哪几个项目、状态、失败原因。"
+            },
+            {
+              "scheduledAt": "2026-11-19T05:00:00.000Z",
+              "deliveredAt": "2026-11-19T05:00:00.319Z",
+              "messageId": "9c6d7179-c0e1-4932-9557-ebacf644fb86",
+              "targetSessionId": "session-a52a4e1d-e601-494e-990d-7ad2cea40ed8",
+              "prompt": "值守任务：清空 /home/fish/个人助理/dispatch/inbox。\n\n步骤：\n1. `cd /home/fish/个人助理/dispatch`，看 inbox 里除 `_template.md` 外还有没有 .md 文件。\n2. 有就 `python3 dispatch.py plan` 看归类，然后 `python3 dispatch.py run` 派发；没有就只回一行「灵感箱空」。\n3. 对上一轮已派发的跑 `python3 dispatch.py status`；状态变成 done/failed 的，用 `python3 dispatch.py collect` 把结果落到 out/，回复里列出这一轮新产出的 out 文件名。\n4. 失败条目：读 `logs/` 下对应的 `.err` 或 `.jsonl` 里的 error 事件，把原因摘要写进回复；原稿留在 inbox/done 不要删。可选的重试：`python3 dispatch.py run inbox/done/<文件> --keep`。\n\n回复控制在 10 行内：派发几条、去哪几个项目、状态、失败原因。"
+            },
+            {
+              "scheduledAt": "2026-11-19T10:00:00.000Z",
+              "deliveredAt": "2026-11-19T10:00:00.216Z",
+              "messageId": "cf2562fa-89a1-4d80-852b-9e5ffb5bdbf3",
+              "targetSessionId": "session-a52a4e1d-e601-494e-990d-7ad2cea40ed8",
+              "prompt": "值守任务：清空 /home/fish/个人助理/dispatch/inbox。\n\n步骤：\n1. `cd /home/fish/个人助理/dispatch`，看 inbox 里除 `_template.md` 外还有没有 .md 文件。\n2. 有就 `python3 dispatch.py plan` 看归类，然后 `python3 dispatch.py run` 派发；没有就只回一行「灵感箱空」。\n3. 对上一轮已派发的跑 `python3 dispatch.py status`；状态变成 done/failed 的，用 `python3 dispatch.py collect` 把结果落到 out/，回复里列出这一轮新产出的 out 文件名。\n4. 失败条目：读 `logs/` 下对应的 `.err` 或 `.jsonl` 里的 error 事件，把原因摘要写进回复；原稿留在 inbox/done 不要删。可选的重试：`python3 dispatch.py run inbox/done/<文件> --keep`。\n\n回复控制在 10 行内：派发几条、去哪几个项目、状态、失败原因。"
+            },
+            {
+              "scheduledAt": "2026-11-19T14:00:00.000Z",
+              "deliveredAt": "2026-11-19T14:00:00.276Z",
+              "messageId": "ab6c2e7d-6328-4b59-a569-db890ae3e1e4",
+              "targetSessionId": "session-a52a4e1d-e601-494e-990d-7ad2cea40ed8",
+              "prompt": "值守任务：清空 /home/fish/个人助理/dispatch/inbox。\n\n步骤：\n1. `cd /home/fish/个人助理/dispatch`，看 inbox 里除 `_template.md` 外还有没有 .md 文件。\n2. 有就 `python3 dispatch.py plan` 看归类，然后 `python3 dispatch.py run` 派发；没有就只回一行「灵感箱空」。\n3. 对上一轮已派发的跑 `python3 dispatch.py status`；状态变成 done/failed 的，用 `python3 dispatch.py collect` 把结果落到 out/，回复里列出这一轮新产出的 out 文件名。\n4. 失败条目：读 `logs/` 下对应的 `.err` 或 `.jsonl` 里的 error 事件，把原因摘要写进回复；原稿留在 inbox/done 不要删。可选的重试：`python3 dispatch.py run inbox/done/<文件> --keep`。\n\n回复控制在 10 行内：派发几条、去哪几个项目、状态、失败原因。"
+            }
+          ],
+          "earlierRecordsUnavailable": false,
+          "earlierRecordsPruned": false
+        }
+      }
+    }
+  }
+}

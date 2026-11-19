@@ -49,11 +49,12 @@ import { createAssistantMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { Message, UserMessage } from '@deepseek-ai/dsh-llm'
 import { readdirSync, readFileSync } from 'node:fs'
 import { delimiter, join } from 'node:path'
-import { frontDeskText, noticeEnterText, noticeText, relayText, RELAY_SOURCE_KIND } from './answer.js'
+import { acceptedEnterText, frontDeskText, noticeEnterText, noticeText, relayText, RELAY_SOURCE_KIND } from './answer.js'
 import { carryoverBounds, carryoverForSession } from './carryover.js'
 import { humanConclusion } from './delivery/index.js'
 import { collectHistory, composeObjective, renderHistory } from './history.js'
 import { TASK_LIMITS } from './input.js'
+import { inspectPrompt, refuseOversizePrompt } from './intake.js'
 import { isModeEnabled, readModeRecord } from './mode.js'
 import { alreadyRouted, appendInstantReceipt, deliveryKey, recordDelivery } from './records.js'
 import type { DeliveryPhase } from './records.js'
@@ -571,6 +572,29 @@ function classifyHeartbeat(
 }
 
 /**
+ * The receipt a `full`-mode turn shows when the team runs behind it.
+ *
+ * It is the whole user-visible content of that turn, so it has to say three
+ * things without them: the message was accepted (not answered), the report comes
+ * as its own message, and sending more meanwhile is expected rather than lost.
+ *
+ * @param lang - the message's language.
+ * @returns one short paragraph, never empty.
+ */
+export function acceptedReceipt(lang: TriageLang): string {
+  if (lang === 'en') {
+    return [
+      'Accepted. This message is running the full plan → execute → verify workflow now.',
+      'The report arrives as its own message when the run finishes; you can keep sending meanwhile, and a new message starts its own run behind this one.',
+    ].join(' ')
+  }
+  return [
+    '已接单：这条消息正在按整套流程（拆解 → 执行 → 核验）运行。',
+    '跑完会单独发一条结论给你；期间可以继续发消息，新消息会排在这次之后各自开工。',
+  ].join('')
+}
+
+/**
  * User-visible terminal for a cancelled turn (P0-4).
  *
  * A cancellation that ends silently is indistinguishable from a hang, and the two
@@ -725,19 +749,12 @@ export function installGate(deps: GateDeps): boolean {
   const refusalOf = (
     verdict: Extract<Classification, { kind: 'admit' }>,
   ): { reason: string; outcome: string } | undefined => {
-    if (verdict.request.trim() === '') {
-      // An attachment-only or empty message has nothing to route: refuse it
-      // explicitly instead of spending a full workflow run on an empty objective.
-      return { reason: 'the message contains no text to route', outcome: 'empty-request' }
-    }
-    if (verdict.request.length > TASK_LIMITS.objectiveChars) {
-      // Too large to route: refuse and say so instead of letting the model answer.
-      return {
-        reason: `the message is longer than the ${TASK_LIMITS.objectiveChars}-character workflow objective limit`,
-        outcome: 'objective-too-long',
-      }
-    }
-    return undefined
+    const refusal = inspectPrompt(verdict.request)
+    if (refusal === undefined) return undefined
+    // Empty and oversize are the two boundaries the intake pass owns: refuse
+    // explicitly, with the measured count and the action that fixes it, instead of
+    // letting the model answer a prompt the workflow was never given (P0-3).
+    return { reason: refusal.text, outcome: refusal.code === 'empty' ? 'empty-request' : 'objective-too-long' }
   }
 
   /**
@@ -1045,9 +1062,13 @@ export function installGate(deps: GateDeps): boolean {
       TASK_LIMITS.objectiveChars,
     )
     if (objective === undefined) {
+      // Reached only after a message passed admission (a queued follow-up re-reads
+      // the history late, which can push the composed objective over the budget).
+      // Same refusal as the admission path, so the reader gets one rule, one
+      // count and one next step in both languages.
       return {
         kind: 'notice',
-        reason: `the message is longer than the ${TASK_LIMITS.objectiveChars}-character workflow objective limit`,
+        reason: refuseOversizePrompt(request.length).text,
         outcome: 'objective-too-long',
       }
     }
@@ -1334,6 +1355,74 @@ export function installGate(deps: GateDeps): boolean {
     }
   }
 
+  /**
+   * `full` mode on an interactive run: accept the message now, work behind it.
+   *
+   * `/grok on` writes `workflowMode: 'full'` (src/command.ts), which is the one
+   * shape that skipped the interactive admission above and went straight to the
+   * awaited run. `in-turn` keeps the step open for the whole run, and the loop
+   * dispatches `agent/pre-step` for the next batch only after the current step
+   * settles — so for the entire run (default deadline 60 minutes) every message
+   * the user typed was accepted by the app and then never dispatched: the
+   * transcript stayed silent and the composer looked broken. `/grok off` passed
+   * messages through, which is exactly the reported contrast.
+   *
+   * This is the same admission the triage team path uses, minus the tier: `full`
+   * has no front desk, so there is no tier line and no cheap first answer — the
+   * receipt says what was accepted and that the report follows. The run keeps its
+   * own bounds (`maxConcurrency`, `maxActiveRuns`, `maxRetries`) because it is the
+   * same `runTeam`/`runWorkflow`; only the turn stops waiting for it.
+   *
+   * Only the *session* record (`/grok on`) takes this path. A deployment-level
+   * `mode: 'full'` keeps T4 `in-turn` byte for byte: that shape is the documented
+   * contract for a run that must finish inside its turn (and the 17 gate tests that
+   * pin it), and changing it is its own decision, not a side effect of this fix.
+   *
+   * @returns the `enter` decision carrying the receipt, or `undefined` when the
+   *   caller must keep the blocking path (config-level `full`, `triage` shape, a
+   *   one-shot agent with no `followup`/`whenIdle`, or a full per-agent queue).
+   *   Never throws.
+   */
+  const answerFullBehind = async (
+    agent: Agent,
+    admit: Extract<Classification, { kind: 'admit' }>,
+    payload: PreStepPayload,
+    base: readonly UserMessage[],
+    opts: { enterAfter: (base: readonly UserMessage[], text: string, surfaced?: boolean) => PreStepDecision; surfaced: boolean },
+  ): Promise<PreStepDecision | undefined> => {
+    try {
+      // The session record is the whole condition: `/grok on` writes
+      // `workflowMode: 'full'`, and that record only exists where a `commands`
+      // service is composed (an interactive UI). `limits.mode` — the deployment
+      // default — deliberately does not reach here.
+      if (readModeRecord(agent.session)?.workflowMode !== 'full') return undefined
+      // A one-shot run has no later turn to deliver into: keep the blocking path.
+      if (!canBackgroundDeliver(agent)) return undefined
+      const entry = entryOf(admit, payload)
+      const lang = detectLanguage(admit.request)
+      const accepted = enqueue(admit.agentId, async () => {
+        // Read history late and without this batch: a queued message must see the
+        // answer the previous run just delivered, and must not read itself back.
+        const lateHistory = collectHistory(
+          sessionOf(agent),
+          { turns: FIXED_HISTORY_TURNS, chars: FIXED_HISTORY_CHARS },
+          entry.messageIds,
+        )
+        await deliverAndRecord(agent, entry, await runTeam(agent, admit.request, undefined, lateHistory, lang))
+      })
+      // `started` only once the batch is actually queued: `enqueue` schedules the task
+      // on a later microtask, so this still lands before the run executes tool effects,
+      // and a full queue — which falls back to the blocking path below — leaves no
+      // record behind claiming a background run that never happened.
+      if (!accepted) return undefined
+      record(agent, entry, 'started', 'admitted-full-background')
+      return opts.enterAfter(base, acceptedEnterText(acceptedReceipt(lang)), opts.surfaced)
+    } catch (error) {
+      logger.warn(`full-mode admission failed, falling back to in-turn: ${redactError(error)}`)
+      return undefined
+    }
+  }
+
   /** The step message that carries the report into the open turn. */
   const enterMessage = (text: string): UserMessage => createUserMessage({
     content: [{ type: 'text', text }],
@@ -1448,13 +1537,18 @@ export function installGate(deps: GateDeps): boolean {
     // live first answer in this turn and admits the workflow behind it.
     // answerStrategy is NOT consulted: the config default stays `in-turn`; this
     // branch changes only what triage-team does when the run is interactive.
-    // Everything else (full mode, agent without followup/whenIdle, first answer
-    // with no downgrade available) keeps the blocking path, which always
-    // produces a final answer.
     const interactive = await answerTeamInteractive(agent, verdict, payload, base, history, {
       enterAfter, surfaced, signal,
     })
     if (interactive !== undefined) return interactive
+    // `full` (what `/grok on` selects) on the same kind of agent: accept the
+    // message, run the team behind it, deliver the report as its own message.
+    // Everything else (agent without followup/whenIdle — one-shot, headless)
+    // keeps the blocking path, which always produces a final answer.
+    const accepted = await answerFullBehind(agent, verdict, payload, base, {
+      enterAfter, surfaced,
+    })
+    if (accepted !== undefined) return accepted
     const answer = await produceAnswer(agent, verdict.request, signal, history)
     if (aborted()) {
       // The turn was cancelled while the run was in flight: nobody can read an
