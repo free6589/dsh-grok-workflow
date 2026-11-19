@@ -4406,3 +4406,18 @@ CI 全绿为共同基线）。
 **真机（沿用 round-025 结论，不过度重测）**：本轮零路由/开关/模板改动，真机面无变化；
 `ci-run.log`（68/1229）与 round-025 的 `live-iterate` 结论共同覆盖。NOT_RUN：真实定时投递、
 GUI 手动点击拍照。
+
+## Round 75 — 2026-11-20 — `0.12.2` 发版：R6 + R9（`CONFIRMED`）
+
+**版本判定**：patch。两条"报假/报错"类修复，无配置面变化、无新功能。
+
+**命令与结果（`CONFIRMED`）**：
+
+| 命令 | 结果 |
+| --- | --- |
+| `git commit c1be0c7`（R6+R9 改动+记忆+CHANGELOG+证据） | 31 files，`npm run ci` 68/1229 全绿为基 |
+| 发版 hygiene：round-024/025 的同类 harness 脚本均为跟踪态，本轮 `boot.sh` + `live-round26.mjs` 同样跟踪（`40228c5`，无密钥落盘：读 `/tmp` 私有 jar，只做布尔检查） | 与先例一致 |
+| `npm run verify:lib`（提交后） | `lib/ at 40228c5 is the build of src/ at 40228c5`（153 files byte-identical） |
+| `tag -a v0.12.2` + `push main` + `push tag` | 成功，无 force-push，旧标签未动 |
+| 远端 CI `44641153858` | success |
+| Release `44641158387` | success；Release `Grok Workflow for DSH v0.12.2` + asset `dsh-grok-workflow-0.12.2.tgz` |

@@ -4,8 +4,7 @@ Last updated: 2026-11-20 (**round-026 收口：R6 + R9，CI 全绿，未发版**
 `resolveConfig` 传错 `grokDefault` 现在直接拒绝（不再静默按 off 跑）；
 COMPLETED 轮次不再把重试救回来的失败印进 `Failures:`（两处渲染器同规则，
 PARTIAL 的行不受影响）。`npm run ci` exit 0 = **68 文件 / 1229 测试 PASS**，
-typecheck 0 错、lint 24w/0e；`lib/` 10 文件随 `src/` 重建。**未提交、未发版、
-未打 tag**——等收尾发版；NOT_RUN：真实定时投递、GUI 手动点击拍照。）
+typecheck 0 错、lint 24w/0e；`lib/` 10 文件随 `src/` 重建。**已发版 `0.12.2`**：commit `c1be0c7`（+hygiene `40228c5`）、annotated tag `v0.12.2` 已推，远端 CI `44641153858` success、Release `44641158387` success（asset `dsh-grok-workflow-0.12.2.tgz`）。NOT_RUN：真实定时投递、GUI 手动点击拍照。）
 
 
 Last updated: 2026-11-20 (**0.12.1 已发版：自迭代默认模板 = 仓库自己的轮次提示词** —
