@@ -1,5 +1,18 @@
 # Agent Handoff
 
+## 2026-11-20 — `0.12.2` 已发版（round-026：R6 + R9）
+
+- **From:** lead（本会话）· **To:** 用户 / 下一轮接手者
+- **发版（`CONFIRMED`）**：patch（两条报错/报假类修复）。commit `c1be0c7`（+hygiene
+  `40228c5`）、annotated tag `v0.12.2` 已推；远端 CI `44641153858` success、
+  Release `44641158387` success（asset `dsh-grok-workflow-0.12.2.tgz`）。
+  旧标签未动，无 force-push。
+- **内容**：R6 `resolveConfig` 拒收坏 `grokDefault`（fail-closed，不再静默关工作流）+
+  R9 COMPLETED 轮次不计已恢复失败（报告与台账同规则，PARTIAL 不受影响）。
+  `npm run ci` 68/1229 全绿；`verify:lib` 153 文件一致。
+- **NOT_RUN**：真实定时投递、GUI 手动点击拍照。本机 `web` profile 仍是旧版，
+  想用新版就从 `github:free6589/dsh-grok-workflow#v0.12.2` 更新。
+
 ## 2026-11-20 — `0.12.1` 已发版（round-025：自迭代默认模板）
 
 - **From:** agent-50（self_iterate_full）· **To:** 用户 / 下一轮接手者
