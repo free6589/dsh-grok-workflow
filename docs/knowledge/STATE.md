@@ -8,7 +8,7 @@ order 90，追加注册；挂载时 `status` 读一次、之后不轮询，点�
 gate 在 `agent/pre-step` 上先分类，`loop-stop` 时先删行再 `reject`（零次模型调用）。
 本机门禁：`npm run typecheck` exit 0、`npx oxlint src test` 22 warnings / 0 errors、
 `npm run build` 后 `lib/` 145 个文件的 md5 清单与构建前逐条相同（幂等）、
-`npx vitest run` **62 文件 / 1139 测试 PASS**；提交后的 `npm run verify:lib` 见 `.rsi/ROUND.md` Round 16。
+`npx vitest run` **62 文件 / 1139 测试 PASS**。**落地（`CONFIRMED`）**：commit `e11d100`、`push origin main` 快进 `37cb0fc..e11d100`、远端 CI run `44425357004` = success（Node 22 + 24 双绿）、提交后 `npm run verify:lib` = `145 files, byte-identical` at `e11d100`；未 bump 版本、未打标签、未建 Release、未 npm 发布。
 **未验证（`NOT_RUN`）**：真实 Web GUI 里点那个开关、真机心跳投递（D-066，操作者动作）。
 **剩余待办**：P3-01、P3-02 仍 OPEN（D-068 只改了顺序）；「客户端还没有会 POST 那条路由的控件」
 这一条已随本轮落地而作废（`D-072`）。)

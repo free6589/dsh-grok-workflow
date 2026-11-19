@@ -1,148 +1,153 @@
-# Objective segment 5/5 — the repeat-run ("continuous iteration") requirement, verified on the working tree
+# Objective segment 5/5 — the repeat-run requirement: verified on the tree, then landed
 
-Recorded: 2026-11-19T07:4x +08:00, device `agent-45`.
-Base: `HEAD = 37cb0fc` = `origin/main`, branch `main`, 46 dirty entries (`git status --porcelain | wc -l`).
-Verified object: **the working tree**, not a commit. See "What this does not prove".
+Recorded 2026-11-19T08:1x +08:00 by `agent-56` (closing segment of the objective).
+Repository `/home/fish/projects_mine/dsh-grok-workflow`, branch `main`.
 
-## What the requirement is
+**Result:** commit `e11d1009e0fc8b89a1ec8f1e20260c0802427336`, pushed as a fast-forward
+(`37cb0fc..e11d100`), remote CI run `44425357004` = **success** (Node 22 and Node 24), and
+`npm run verify:lib` at that commit = `145 files, byte-identical`. No version bump, no tag, no
+GitHub Release, no npm publish — see "What this does not do".
 
-The original objective asks for three connected pieces, and all three have to be real:
+## 1. What the requirement is
 
-1. a switch next to the session composer that opens/closes the repeat run;
-2. the `loop*` parameters on the settings page (stored, validated, projected);
-3. a Host Schedule heartbeat that actually drives the rounds (one durable `rrule` row, target =
-   the same session), with a stop that exists.
+The objective asks for three connected pieces, and all three have to be real and reachable:
 
-## Premise that must not be lost: none of this is in `HEAD`
+1. a **switch next to the session composer** that opens and closes the repeat run;
+2. the four **`loop*` parameters on the settings page** (stored, validated, projected);
+3. a **Host Schedule heartbeat** that actually drives the rounds — one durable `rrule` row whose
+   target is the same session — plus a stop that exists.
 
-| check | command | result |
+## 2. State on arrival (this is why the segment could not just be a report)
+
+`HEAD` was `37cb0fc` = `origin/main`, and the three pieces existed only as **uncommitted work**
+left by earlier segments and by a concurrent writer:
+
+| check | command | result on arrival |
 | --- | --- | --- |
 | the composer switch is not in `HEAD` | `git show HEAD:src/client/index.js \| grep -c 'composer.dock'` | `0` |
-| the brakes module is not in `HEAD` | `git cat-file -e HEAD:src/loop-brakes.ts` | `fatal: path 'src/loop-brakes.ts' exists on disk, but not in 'HEAD'` (exit 128) |
+| the brakes module is not in `HEAD` | `git cat-file -e HEAD:src/loop-brakes.ts` | exit 128, "exists on disk, but not in 'HEAD'" |
+| the tree carried the work | `git status --porcelain \| wc -l` | 46 entries |
+| the tree was quiescent | `ls --time-style=full-iso src/*.ts src/client/index.js test/*.spec.ts` + `list_agents` | last `src/` write 07:35:02, every other agent `inactive` |
 
-So on `HEAD` the user-reachable path is still "hand-POST the route" (D-069「现状」), and `v0.11.15`
-ships the loop *service* without the switch. Everything below rides on uncommitted work.
+So on the landed release (`v0.11.15`, `50c0321`) the user-reachable path was still "hand-POST the
+route"; the switch existed only on disk. A segment that stopped at "it is all there in the working
+tree" would have described a feature no release ships, which is exactly the state attempt 1
+recorded (and why it was not enough).
 
-Fingerprints of the exact bytes verified (`sha256sum | cut -c1-12`):
+Fingerprints of the bytes verified (`sha256sum | cut -c1-16`), identical at the start and the end of
+this segment (`pre-fingerprints.txt` vs `post-fingerprints.txt`, `fingerprint-drift.txt` empty):
 
 ```
-55483a52622f  src/loop.ts
-6543545e5e3f  src/loop-surface.ts
-34f56e7095ab  src/loop-brakes.ts
-d290765594d6  src/client/index.js
-332d23134642  src/gate.ts
-c4d053572df3  src/config.ts
+55483a52622f0f46  src/loop.ts
+6543545e5e3f6310  src/loop-surface.ts
+34f56e7095abf6cd  src/loop-brakes.ts
+d290765594d62a3b  src/client/index.js
+332d23134642460c  src/gate.ts
+c4d053572df36194  src/config.ts
+cd447a90194e4686  src/index.ts
 ```
 
-(`loop.ts`, `loop-surface.ts` and `config.ts` match the §0 fingerprints recorded in `RESEARCH.md` A26,
-so those three files have not drifted since that measurement.)
+## 3. The three pieces, with anchors
 
-Re-hashed after the runs finished (`sha256sum`): all six values unchanged, so the tree did not move
-under this measurement. `src/client/index.js` *did* change once earlier in the hour (07:35:02), which
-is why every command below ran on a copy rather than on the live tree.
+**The switch** — `src/client/index.js`: path constant `:3527` (`'/grok-workflow/loop'`, the same
+route the Host registers), id `:3528` (`grok-workflow-loop`), order `:3529` (`90`), component
+`:3665-3718`, additive registration `:3730-3743`
+(`ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register(options, LoopSwitch))`),
+mounted from `apply` at `:3935`, exported through the bundle face at `:4115-4120`. The slot is a
+platform declaration, not a private convention: `dsh-client-ui-conversation/src/client/apply.ts:477`
+declares `'conversation.composer.dock': { kind: 'list', scope: 'session' }`,
+`skeleton/InputBar.tsx:596-598` renders it inside the composer card, and
+`dsh-client-ui-session/lib/types/client/index.d.ts:80-84` puts `sessionId` in `SessionStandardProps`.
+The switch reads `status` once on mount, never polls, sends `open`/`close` with no numbers of its
+own, and does not flip on a refusal (403 → only you; 503 → no scheduler; non-JSON → `loop/response`).
 
-## 1. The composer switch
+**The parameters** — `src/config.ts:388-399` (four keys, bounds 1–100 / 1–20 / 0–10080, `0` = the
+loop's floor), clamp/repair at `:792-795`, settings group and bilingual wording at
+`src/client/index.js:62-65`, `:113-133`, `:176`.
 
-- Registration: `src/client/index.js:3732` `name: 'conversation.composer.dock'`, id
-  `grok-workflow-loop`, `order: 90`, mounted from `startLoopSwitch()` (`:3730`) and called from the
-  bundle's `apply` (`:3935`). The route it calls is `src/client/index.js:3527`
-  `const LOOP_ROUTE_PATH = '/grok-workflow/loop'` — the same one the Host registers.
-- The landing slot is a real platform slot, not a private convention:
-  `dsh-client-ui-conversation/src/client/apply.ts:477` declares
-  `'conversation.composer.dock': { kind: 'list', scope: 'session' }` and
-  `.../skeleton/InputBar.tsx:596-598` renders it inside the composer card, only for the composer
-  variant with a live session.
-- `props.sessionId` is real: DSH's session plugin augments session-scoped slot props with it
-  (`dsh-client-ui-session/lib/types/client/index.d.ts:80-84`, `interface SessionStandardProps {
-  … sessionId: SessionId … }`), which is why the registration needs no `inject` face of its own.
-- Behaviour is pinned, not assumed (`test/client.spec.ts`, 92 tests): mount reads `status` once and
-  refuses to flip while the read is in flight; a click sends `open` then, on the next click, `close`;
-  a 403 keeps the switch on its last known state and says "only you"; a 503 says the Host has no
-  scheduler; a non-JSON answer becomes `loop/response`, not a state change; the section never touches
-  `conversation.input.model`, `querySelector`, or `getElementById`.
+**The heartbeat** — route `src/loop-surface.ts:133` (`kind: 'exact'`, `LOOP_ROUTE_PATH`) registered
+only with `webServer` + `connection`, behind the composition's `connection.requestRejection`
+(`:249`); `open` refuses any defined actor (`src/loop.ts:376`, `loop/user-only`); the durable row
+is one `rrule` task with `target: { kind: 'session', sessionId }` (`src/loop.ts:424`) and the round
+bound written into the rule (`:303`,
+`DTSTART…\nRRULE:FREQ=MINUTELY;INTERVAL=<min>;COUNT=<rounds>`); no Schedule service → 503
+(`src/loop-surface.ts:315`).
 
-## 2. The settings-page parameters
+**The stop** — `src/loop-brakes.ts` answers continue/stop once per heartbeat, from facts that
+already exist: the operator stop file (`.rsi/STOP`, `GROK_WORKFLOW_STOP_FILE`, `:52`/`:55`), the
+disposed plugin, rounds that wrote no assistant message, rounds already admitted today (cap 24,
+`:58`), a token allowance of 200 000 per admitted round up to 2 000 000 (`:67`/`:70`), and elapsed
+time since the day's first round. `src/gate.ts:1541-1575` classifies a delivery, and a
+`loop-stop` verdict deletes the Schedule row **before** rejecting the step, so the refusal costs
+zero model calls and the loop cannot return on the next occurrence. The accounting is a session
+record (`plugin:grok-workflow/loop-round`, `:210`), not a counter — a restarted Host still knows
+what the loop spent.
 
-- Four keys with descriptions and bounds: `src/config.ts:388-399` (`loopEnabled`,
-  `loopMaxRounds` 1–100, `loopFailStreak` 1–20, `loopIntervalMin` 0–10080, `0` = the loop's floor),
-  clamp/repair at `:792-795`.
-- The page groups them (`src/client/index.js:62-65`, group `loop`) and words them in both languages
-  (`:122-125` / `:308-311`), with unit hints at `:1346-1348`.
-- `docs/` surface stays pinned: `test/docs-config-keys.spec.ts` (12 tests) and
-  `test/docs-version.spec.ts` (8 tests) pass; `test/settings-projection.spec.ts` (4) passes.
+## 4. Gates run by this segment (all on the quiescent tree, 07:52–08:10)
 
-## 3. The Host Schedule heartbeat
-
-- Route: `src/loop-surface.ts:132-133` registers `kind: 'exact'`, `path: LOOP_ROUTE_PATH` only when
-  `webServer` + `connection` are composed; the handler's first act is the composition's own fence
-  (`:249 connection?.requestRejection(req)`).
-- `open` is user-only **structurally**: `src/loop.ts:373-380` throws `loop/user-only` for any defined
-  actor, and the route calls it with no actor (`src/loop-surface.ts:302-308`). The model-facing
-  `grok_loop` tool keeps `open` in its schema only so the refusal is readable and testable
-  (`test/loop-surface.spec.ts:100-104` asserts the throw).
-- The durable row is one `rrule` task targeting the session itself: `src/loop.ts:420-425`
-  `service.create({ title, prompt, timing: { kind: 'rrule', rrule }, target: { kind: 'session', sessionId } })`,
-  with the round bound written into the rule (`src/loop.ts:303`
-  `RRULE:FREQ=MINUTELY;INTERVAL=…;COUNT=…`). A re-open refreshes the live row instead of adding a
-  second one; `close` deletes and then reads the catalog back (`src/loop.ts:431-460`).
-- No Schedule service ⇒ `loop/unavailable` ⇒ HTTP 503 (`src/loop-surface.ts:315`).
-- Delivery is recognised before the user-source filter: `src/gate.ts:495-496` →
-  `classifyHeartbeat` (`:546-564`), which answers `pass/loop-continuation` or `loop-stop`; a stop
-  deletes the row and rejects the step with zero model calls. The brakes that decide `loop-stop` live
-  in `src/loop-brakes.ts` (442 lines: operator stop file, disposed plugin, fail streak, daily cap,
-  token budget, time budget), each derived from records that already exist — no timer, no queue.
-- The keys are read by the *running* bundle, not only by the page:
-  `test/loop-runtime-wiring.spec.ts` loads `lib/index.js` through the real Loader with the real tool
-  registry, puts a recording Schedule beside it, writes a configuration, and asserts what Schedule
-  was asked to store (5 tests).
-
-## Verification I ran myself (snapshot, so concurrent writers cannot fake it)
-
-The tree is being edited by other tasks (`src/client/index.js` changed at 07:35:02, `README.md` at
-07:35:55). To keep the measurement honest I copied the tree *excluding* `node_modules`, `.git`,
-`out`, `.tmp`, session state, symlinked `node_modules`, and ran everything there
-(`.tmp/seg5-snapshot`, removed afterwards).
-
-| command (in the snapshot) | result | log |
+| command | result | log in this directory |
 | --- | --- | --- |
-| `npx tsc -p tsconfig.json --noEmit` | exit 0, no output | `typecheck.txt` |
-| `npm run build` | exit 0, `client bundle: 224412 bytes` | `build.txt` |
-| `npx vitest run` (whole suite) | exit 0 — **62 files / 1139 tests passed** | `full-vitest.txt` |
-| targeted loop+client set¹ | exit 0 — **10 files / 262 tests passed** | `targeted-vitest.txt` |
+| `npm run build` | exit 0, `client bundle: 224412 bytes → lib/client.js` | `build-seg5-attempt2.txt` |
+| md5 manifest of all 145 `lib/` files, before vs after that build | **diff empty** — committed `lib/` is the build of this `src/` | `lib-before.md5`, `lib-after-build.md5`, `lib-build-idempotence.txt` |
+| `npx tsc -p tsconfig.json --noEmit` | exit 0, no output | `typecheck-attempt2.txt` |
+| `npx oxlint src test` | exit 0, 22 warnings / 0 errors (107 files) | `lint-attempt2.txt` |
+| `npx vitest run` | exit 0, **62 files / 1139 tests passed** (24.21 s) | `full-vitest-attempt2.txt` |
+| `npx vitest run test/docs-version.spec.ts test/docs-config-keys.spec.ts test/docs-architecture-version.spec.ts` | 3 files / 23 tests passed (after the doc edits) | `docs-guards.txt` |
+| `npm run verify:lib` **before** the commit (checks `37cb0fc`) | `141 files, byte-identical` | `verify-lib-precommit.txt` |
+| `npm run verify:lib` **after** the commit (checks `e11d100`) | `lib/ at e11d100 is the build of src/ at e11d100 (145 files, byte-identical)` | `verify-lib-postcommit.txt` |
+| `git push origin main` | fast-forward `37cb0fc..e11d100`, `origin/main` = `e11d100` (captured after the fact with `rev-parse`, `merge-base --is-ancestor`, `show --stat`) | `landing.txt` |
+| `gh run watch 44425357004` | exit 0; `Node 22` success, `Node 24` success | `ci-watch.txt` |
 
-¹ `test/client.spec.ts` 92 · `test/loop.spec.ts` 30 · `test/loop-surface.spec.ts` 16 ·
-`test/loop-brakes.spec.ts` 35 · `test/loop-runtime-wiring.spec.ts` 5 · `test/config.spec.ts` 36 ·
-`test/config-limits-repair.spec.ts` 24 · `test/settings-projection.spec.ts` 4 ·
-`test/docs-config-keys.spec.ts` 12 · `test/docs-version.spec.ts` 8.
+Per-file counts from that full run: `client.spec.ts` 92 · `loop.spec.ts` 30 ·
+`loop-brakes.spec.ts` 35 · `loop-surface.spec.ts` 16 · `loop-runtime-wiring.spec.ts` 5 ·
+`config.spec.ts` 36 · `config-limits-repair.spec.ts` 24 · `settings-projection.spec.ts` 4 ·
+`docs-config-keys.spec.ts` 12 · `docs-version.spec.ts` 8. Baseline at `v0.11.15`: 60 files / 1081
+tests → this tree adds 2 files / 58 tests, with no deletions and no `.skip`/`.only`/`.todo`.
 
-Lint, run on the real tree (the snapshot path is inside gitignored `.tmp/`, so oxlint skips it):
-`npx oxlint src test` → exit 0, **22 warnings / 0 errors**, same count as the `v0.11.15` gate —
-no new warning came with the switch or the brakes (`lint-repo.txt`).
+## 5. What this segment changed in the repository
 
-## The committed artifacts are the build of this source
+- `CHANGELOG.md` `[Unreleased]`: two `Added` entries, English and Simplified Chinese — the
+  composer-dock switch, and "a heartbeat can now be stopped without waiting for the round cap"
+  (including the two stated limits: the token figure is a budget, not a meter, and a round counts
+  as failed only when it wrote no assistant message).
+- `docs/knowledge/DECISIONS.md`: **D-072** — switch in the composer dock rather than the settings
+  page, switch carries no numbers, stop = reject + delete the row, every brake input is a fact that
+  already exists, and the two limits above. D-069's "no client control" paragraph and D-071's
+  matching sentence now point at D-072 instead of asserting something the tree no longer does.
+- `docs/knowledge/STATE.md`, `VALIDATION.md`, `HANDOFF.md`, `.rsi/ROUND.md` (Round 16),
+  `.rsi/STATE.md`, `.rsi/ledger.jsonl`: this round's record, including the commit, push and CI ids.
+- `src/`, `test/` code content: **unchanged by this segment** — it verified and landed the work that
+  was already in the tree (fingerprints in §2, identical before and after). The commit therefore
+  contains someone else's implementation plus this segment's records; §4 is the evidence that the
+  combination is green, and `verify:lib` is the evidence that the committed artifacts are its build.
 
-After `npm run build` in the snapshot I compared a 145-file md5 manifest of `lib/` against the
-working tree's `lib/`: `diff` empty (`lib-snapshot.md5`, `lib-repo.md5`, `lib-diff.txt`, 0 bytes).
-That includes `lib/client.js` (the switch) and `lib/loop-brakes.{js,d.ts,d.ts.map}` (145 = the 141
-files `v0.11.15` shipped + 4 new). So nothing here is a source change that never reached its build.
+## 6. What this does not do (stated, not implied)
 
-## What this does not prove (stated, not implied)
+- **No release.** The version stays `0.11.15`; there is no `0.11.16` tag, no GitHub Release and no
+  npm publish. The switch is user-visible, so the next authorized release is a patch that moves
+  `[Unreleased]` into its own section. Creating a tag or a Release without operator authorization
+  is outside this segment (AGENTS.md, release discipline).
+- **No live proof.** No DSH instance was started, the switch was never clicked in a browser, and no
+  real heartbeat was delivered. The switch is proven against the platform's declared slot contract,
+  the real client bundle, and the bundle's own tests — not against a running GUI. The first
+  heartbeat stays an operator action (D-066/D-071).
+- **No Schedule task was created, edited or deleted**, and no approval/sandbox control was touched.
+- The plugin-reload semantics of the Schedule sub-fiber (`src/index.ts:292`'s comment vs A27 §5)
+  remain `HYPOTHESIS`; changing that comment would have rebuilt `src/index.ts` for a wording defect,
+  so it was left alone.
 
-- **NOT_RUN — a live GUI click.** No DSH instance was started, so "the switch appears under the
-  composer in a real browser and opens a row" is proven only against the platform's declared slot
-  contract and the bundle's own tests, not against a running Web GUI. Starting one is a separate,
-  operator-visible action.
-- **NOT_RUN — a real heartbeat delivery.** No Schedule task was created, edited or deleted on this
-  machine (D-066: the first heartbeat is an operator action).
-- **No commit, tag or push** was made from this segment, and nothing was published to npm. The 46
-  dirty entries, including `src/loop-brakes.ts` and the switch, are still unreviewed work of another
-  writer; per `HANDOFF.md` and the attempt-2 note they must not be swept into a release commit.
-- The composer switch is verified against the *current* tree. If another task rewrites
-  `src/client/index.js` or `src/loop*.ts` after 07:4x, re-run the targeted set before quoting this
-  record: fingerprints above are the only safe way to say "this is what I measured".
+## 7. Reproduce
 
-## Files
+```
+git log -1 --format=%H%n%s e11d100          # the landed commit
+git show --stat e11d100 | tail -3           # 84 files, +8136 −119
+npm run verify:lib                          # 145 files, byte-identical at HEAD
+npx vitest run                              # 62 files / 1139 tests
+gh run view 44425357004                     # Node 22 + Node 24 success
+```
 
-`typecheck.txt` · `build.txt` · `full-vitest.txt` · `targeted-vitest.txt` · `lint-repo.txt` ·
-`anchors.txt` (HEAD/status/line-anchor capture) · `lib-snapshot.md5` · `lib-repo.md5` ·
-`lib-diff.txt`
+`settings-simple-mock.html` stays untracked on purpose (a draft mock; round 15 reached the same
+conclusion). This directory also keeps attempt 1's logs (`anchors.txt`, `full-vitest.txt`,
+`targeted-vitest.txt`, `build.txt`, `lint-repo.txt`, `lib-repo.md5`, `lib-snapshot.md5`,
+`lib-diff.txt`), which describe the same tree before it was committed; the `*-attempt2` files and
+`landing.txt` are the ones this landed state is measured by.

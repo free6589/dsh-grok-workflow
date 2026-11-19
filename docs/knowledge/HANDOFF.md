@@ -11,7 +11,9 @@
 - **门禁（`CONFIRMED`）**：`npm run typecheck` exit 0 · `npx oxlint src test` 22 warnings / 0 errors ·
   `npm run build` 后 `lib/` 145 文件 md5 清单与构建前完全相同（幂等）· `npx vitest run`
   **62 文件 / 1139 测试 PASS** · 提交后 `npm run verify:lib` 见 `.rsi/ROUND.md` Round 16 的 Landed as 段。
-  日志在 `.rsi/evidence/segment-5/`。
+  日志在 `.rsi/evidence/segment-5/`。**落地（`CONFIRMED`）**：commit `e11d100`、`push origin main`
+  （`37cb0fc..e11d100` 快进）、远端 CI run `44425357004` success（Node 22 + 24）、提交后
+  `npm run verify:lib` = `145 files, byte-identical`。
 - **未验证（`NOT_RUN`）**：真实 Web GUI 里点一次那个开关；真实心跳投递（D-066，操作者动作）。
   本轮没有启动 DSH 实例，也没有创建、修改或删除任何 Schedule 任务。
 - **发版（`NOT_RUN`，需要操作者授权）**：本轮只提交到 `main`，**没有** bump 版本、没有打标签、

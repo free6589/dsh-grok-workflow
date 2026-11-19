@@ -1,9 +1,10 @@
 # RSI State (overwritten every round; keep under 100 lines)
 
-Updated: 2026-11-19T08:0x+08:00 · round 16 complete · **no new version** (the repeat-run switch and
-the heartbeat brakes landed on `main` with no bump, no tag, no Release — see "Open decisions") ·
-last release remains `0.11.15` (tag `v0.11.15`, commit `50c0321`, CI `44359410024`, Release
-`44359422843`)
+Updated: 2026-11-19T08:10+08:00 · round 16 complete · commit `e11d100` on `main`, pushed, remote CI
+`44425357004` success (Node 22 + Node 24), `verify:lib` 145 files byte-identical at that commit ·
+**no new version** (the repeat-run switch and the heartbeat brakes landed with no bump, no tag, no
+Release — see "Open decisions") · last release remains `0.11.15` (tag `v0.11.15`, commit `50c0321`,
+CI `44359410024`, Release `44359422843`)
 
 ## Facts
 

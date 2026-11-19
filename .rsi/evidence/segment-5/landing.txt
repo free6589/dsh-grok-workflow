@@ -1,0 +1,17 @@
+# landing evidence, captured 2026-11-19T08:02:01+08:00
+$ git rev-parse HEAD origin/main
+e11d1009e0fc8b89a1ec8f1e20260c0802427336
+e11d1009e0fc8b89a1ec8f1e20260c0802427336
+$ git log --oneline -3
+e11d100 feat(loop): the composer-dock repeat-run switch and the brakes that stop a heartbeat (RSI round 16)
+37cb0fc chore(rsi): record the worktree drift behind v0.11.15 and the sync applied
+b4299bc chore(rsi): record the v0.11.15 release results (tag, run ids, asset)
+$ git merge-base --is-ancestor 37cb0fc HEAD; echo $?
+0
+$ git show --stat --format=%s e11d100 | tail -4
+ test/loop-surface.spec.ts                          |  25 +
+ test/loop.spec.ts                                  |  87 +++-
+ test/settings-fixture.ts                           |   2 +-
+ 84 files changed, 8136 insertions(+), 119 deletions(-)
+$ gh run view 44425357004 --json status,conclusion,headSha,jobs --jq ...
+{"conclusion":"success","headSha":"e11d1009e0fc8b89a1ec8f1e20260c0802427336","jobs":[{"conclusion":"success","name":"Node 22"},{"conclusion":"success","name":"Node 24"}],"status":"completed"}

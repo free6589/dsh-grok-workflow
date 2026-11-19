@@ -3747,10 +3747,17 @@ DSH 实例，也没有创建、修改或删除任何 Schedule 任务。
 `test/config.spec.ts` 36 · `test/config-limits-repair.spec.ts` 24 · `test/settings-projection.spec.ts` 4 ·
 `test/docs-config-keys.spec.ts` 12 · `test/docs-version.spec.ts` 8。
 
-**为什么 `verify:lib` 要在提交后再跑一次**：这个脚本导出的是 `HEAD`，比对的是 `HEAD` 的 `lib/` 与
-`HEAD` 源码的构建。提交前它只能证明 `37cb0fc` 那一对是自洽的（141 文件；`HEAD` 里没有
-`src/loop-brakes.ts`，客户端 bundle 是 206901 B，比工作树这份 224412 B 小 17511 B —— 差额就是 dock 开关
-那段）。提交后的那一次才是对本轮提交的证明，结果与命令写进 `.rsi/ROUND.md` Round 16。
+**为什么 `verify:lib` 要跑两次**：这个脚本导出的是 `HEAD`，比对的是 `HEAD` 的 `lib/` 与 `HEAD` 源码的
+构建。提交前它只能证明 `37cb0fc` 那一对是自洽的（141 文件；`HEAD` 里没有 `src/loop-brakes.ts`，客户端
+bundle 是 206901 B，比工作树这份 224412 B 小 17511 B —— 差额就是 dock 开关那段）。提交后那一次才是对
+本轮提交的证明。
+
+**落地与提交后的核对（`CONFIRMED`）**：commit `e11d1009e0fc8b89a1ec8f1e20260c0802427336`（84 文件，
++8136 / −119）；`git push origin main` 快进 `37cb0fc..e11d100`，`origin/main` = `e11d100`；
+`npm run verify:lib` → `lib/ at e11d100 is the build of src/ at e11d100 (145 files, byte-identical)`；
+远端 CI run `44425357004` = **success**（`gh run view 44425357004`：`Node 22` success、`Node 24` success）；
+`git status --untracked-files=no` 提交后为空（唯一未跟踪项是 `settings-simple-mock.html`，按 round 15 的
+结论不入库）。没有 bump 版本、没有打标签、没有 GitHub Release、没有 npm 发布。
 
 **未验证（`NOT_RUN`）**：真实 Web GUI 里点一次开关（需要常驻实例 + 浏览器会话）；真实心跳投递
 （D-066 把第一跳定为操作者动作）；插件 reload 时 `Schedule` 子 fiber 的重启语义（A27 §5 的

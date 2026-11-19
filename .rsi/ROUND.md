@@ -613,4 +613,10 @@ no history is rewritten, and no round is force-pushed.
   下一次 patch 发版时搬进版本段。开关是用户可见的新增，版本纪律上属于 patch。
 - **status:** OK
 
-- **Landed as:** 见本轮 push 后的 `git log -1 --format=%H`（附录在下方，由记录提交补上）。
+- **Landed as:** commit `e11d1009e0fc8b89a1ec8f1e20260c0802427336`（84 文件 / +8136 / −119），
+  `git push origin main` 快进 `37cb0fc..e11d100`，`origin/main` = `e11d100`；远端 CI run `44425357004`
+  = **success**（`Node 22` 与 `Node 24` 两个 job 全绿）。提交后 `npm run verify:lib` =
+  `lib/ at e11d100 is the build of src/ at e11d100 (145 files, byte-identical)`（对比父提交那次是
+  141 文件）。**没有** bump 版本、没有打标签、没有 GitHub Release、没有 npm 发布——开关是用户可见的新增，
+  下一次经授权的发版应为 patch（`0.11.16`），把 `[Unreleased]` 两条搬进版本段。
+- **Allowed untracked（未入库）：** `settings-simple-mock.html`（草稿 mock，round 15 的结论未变）。
