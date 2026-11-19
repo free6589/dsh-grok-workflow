@@ -1,7 +1,9 @@
 # Project State
 
-Last updated: 2026-11-19 (**RSI 连续循环 round 17 phase-1 完成 · 未发版** — 主题：Q5 心跳识别 bug 修 + F1 设置面说法统一。
-round 17 四个验证片（`.rsi/evidence/round-017/`：baseline GO、ci GO 62/1139、heartbeat-live 机制 GO、install 除 F1 外全 PASS）交出两个 FAIL：真机投递被 DSH 包成 `[SCHEDULE REMINDER] … reminder_prompt_json`，旧 `isLoopHeartbeat` 只认开头 → 心跳分支与刹车不可达（Q5 CONTRADICTED）；13/11/“21 volatile”三处说法打架（F1）。修复：识别接受两种形状（source 配对不变）、诊断报 `11 of 13 field(s) on the page`、注释同步、README 计数 60/1081→62/1142、`CHANGELOG [Unreleased]` 补两条 Fixed。门禁：`npm run ci` exit 0、**62 文件 / 1142 测试 PASS**。未发版：等 phase-2 走 R6 打 `0.11.16`。
+Last updated: 2026-11-19 (**RSI round 17 完成 · `0.11.16` 已发布** — 主题：Q5 心跳识别修 + F1 设置面说法统一。
+R6 一次过：commit `63a4fbb`、tag `v0.11.16` 已推、远端 CI `44440179151` success、GitHub Release 已建（Latest，asset `dsh-grok-workflow-0.11.16.tgz`）。
+tag 安装验证 PASS：`…#v0.11.16` 装得上、行激活、投影 11 键与文档一致、假会话 open 被 admission 拒绝（行不落地）。
+`npm run ci` exit 0 = **62 文件 / 1142 测试 PASS**。
 **未验证（`NOT_RUN`）**：rrule 定时到点、真模型整轮、GUI 点击、unload/归档监听 firing（操作体已 CONFIRMED）。
 **剩余待办**：P3-01、P3-02 仍 OPEN；`src/index.ts:292` 注释仍 HYPOTHESIS 未动。)
 

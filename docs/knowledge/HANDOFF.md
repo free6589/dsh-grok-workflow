@@ -1512,3 +1512,22 @@ Issue #1 状态评论 issuecomment-6927842856。
   （`.token` / `.cookies.json` / `.dsh-home/.credentials.yaml`，审计只做存在性检查）。
   该片称收尾时已删；发版前用 `git status` + secret 扫描确认它们不在提交里
   （`finish-round.py` 自带 secret 扫描，红即拒）。
+
+## 2026-11-19 — RSI round 17 发版落地：`v0.11.16` 已发布 + tag 安装验证 PASS
+
+- **From:** lead · **To:** 用户 / 下一轮接手者
+- **落地（`CONFIRMED`）**：R6 `finish-round.py --round 17 --version 0.11.16` 一次过——
+  commit `63a4fbb`、`push origin main`、annotated tag `v0.11.16` 已推。
+  远端 CI run `44440179151` = **success**；GitHub Release 已建（Latest，
+  asset `dsh-grok-workflow-0.11.16.tgz`，`## [0.11.16]` 双语节全文展示）。
+  `v0.11.14` 仍无 Release、原地未动；无 force-push；无 npm 发布。
+- **tag 安装验证（`CONFIRMED`，本轮补做）**：`dsh plugin --profile tagcheck add
+  github:free6589/dsh-grok-workflow#v0.11.16` exit 0（仅 peer 警告 F3）；
+  bundle 行出现；实例干净启动（0 pending）；`settings/describe` 有 `grok-workflow`
+ （`autoGenerate: true`，投影 **11 键**，与文档“11/13”说法一致）；
+  假会话 id 的 `open` 被 Schedule admission 拒绝（`loop/schedule-refused`，
+  行不落地——熔断语义本身）；真会话 id 的端到端已在 round-017 heartbeat-live
+  片用本树构建验证过（`session-48df3c0a-…` open→投递→turn→close→删行）。
+  残留已清（`.tmp/tagcheck-*` 全删）。真模型整轮 / GUI 点击 / rrule 定时到点仍 `NOT_RUN`。
+- **Next action**：P3-01（设置页逐路由上限与死线字段文案）或 P3-02（进度页详情行）；
+  `src/index.ts:292` 注释仍 HYPOTHESIS，改它要连 `lib/` 重建，留给下次动 `src/` 的人。
