@@ -1,8 +1,8 @@
 # RSI State (overwritten every round; keep under 100 lines)
 
-Updated: 2026-11-19T19:55+08:00 · round 21 landed as commit `3cd68eb` on `main` (not pushed, no
-tag, no release — development commit) · `npm run ci` 63 files / 1157 tests PASS ·
-`verify:lib` = `lib/ at 3cd68eb is the build of src/ at 3cd68eb` (149 files byte-identical) ·
+Updated: 2026-11-19T20:45+08:00 · round 22 landed as commit `6c8b0dc` on `main` (not pushed, no
+tag, no release — development commit) · `npm run ci` 63 files / 1158 tests PASS ·
+`verify:lib` = 149 files byte-identical ·
 last published release `v0.11.19` (commit `b38d23a`, CI `44469902581`, Release + tgz)
 
 ## Facts
@@ -13,8 +13,12 @@ last published release `v0.11.19` (commit `b38d23a`, CI `44469902581`, Release +
   `v0.11.7` 1760d50 · `v0.11.8` a045154 · `v0.11.9` 596239a · `v0.11.10` 000a56e ·
   `v0.11.11` 6ff6373 · `v0.11.12` be64d56 · `v0.11.13` 7a79efb · `v0.11.14` 20eafea (no Release) ·
   `v0.11.15` 50c0321 · `v0.11.16` 63a4fbb · `v0.11.17` 5fc3e1d · `v0.11.18` 3b131c4 · `v0.11.19` b38d23a.
-  Test-count line: 54/985 → … → 63/1155 (0.11.18) → 63/1156 (0.11.19) → **63/1157** (round 21).
-- Round 21 (this round): `configRouteLabels()` (`src/run.ts`) flattened four roles while five are
+  Test-count line: 54/985 → … → 63/1155 (0.11.18) → 63/1156 (0.11.19) → 63/1157 (round 21) → **63/1158** (round 22).
+- Round 22 (this round): `snapshot()` (`src/checkpoint/wiring.ts`) gated `time.durationMs` on
+  `countCeiling` (rows, 1e6) while the reader takes `msCeiling`: runs past 16m40s recorded no
+  duration. One-line ceiling swap + comment; +1 test (48h clock). Docs: D-077, VALIDATION Round 67,
+  CHANGELOG `[Unreleased]` bilingual. Evidence `.rsi/evidence/round-022/`.
+- Round 21 (previous): `configRouteLabels()` (`src/run.ts`) flattened four roles while five are
   routed, so a `roles.supervisor` chain never entered the C1 cross-run busy hint. Five roles now,
   report order (`ROLE_NAMES` / `ROLE_ORDER`); `test/route-concurrency.spec.ts` pins the full label
   list. Third instance of the round-19/20 omission class; `POOL.md` R21 DONE. Evidence
@@ -23,19 +27,17 @@ last published release `v0.11.19` (commit `b38d23a`, CI `44469902581`, Release +
 - Round 20: `machineLedger()` rendered four roles while `renderReport()` renders five → role table
   four→five + parity assertion, `MACHINE_DETAIL` strips `supervisor=`. `0.11.19`. Evidence
   `.rsi/evidence/round-020/`. (`POOL.md` R8 now DONE.)
-- Round 19: `src/settings.ts` `ROLE_ORDER` gained `supervisor`, so `validateRoutes` and the empty-cap
+- Round 19 (older): `src/settings.ts` `ROLE_ORDER` gained `supervisor`, so `validateRoutes` and the empty-cap
   note cover every routed role. `0.11.18`. Evidence `.rsi/evidence/round-019/`.
-- Round 18: resident parallel `RunGuardian` beside the serial supervisor (`src/guardian.ts`), `0.11.17`.
-- Ledger: `.rsi/ledger.jsonl`. Resume from the highest `round` with `status: OK`.
-- Process tooling: `bump-version.py` + `finish-round.py` (R6; refuses red CI/existing tags, never forces).
-  `npm test` rebuilds `lib/` — committed artifacts need `verify:lib`, which CI runs.
+- Round 18 (older): resident parallel `RunGuardian` beside the serial supervisor (`src/guardian.ts`), `0.11.17`.
+- Ledger: `.rsi/ledger.jsonl`. Resume from the highest `status: OK` round.
+- Process tooling: `bump-version.py` + `finish-round.py` (R6; refuses red CI/existing tags).
 
 ## Pool (value / risk / size)
 
 P0 — wrong behaviour or false statements
 
-- No open P0. Rounds 19/20/21 closed the three supervisor-omission sites (load validation, ledger
-  rendering, C1 hint input).
+- No open P0. Rounds 19/20/21 closed the supervisor-omission sites; round 22 fixed a silent data drop.
 
 P1 — docs and version truth
 
@@ -79,14 +81,12 @@ P3 — UX (still OPEN, unchanged)
 - Consecutive failed rounds: 0. Consecutive valueless rounds: 0. Remote `main` = `337b061`
   (= `v0.11.19` tree) as of round 21; local is one round ahead and unpushed.
 
-## Final verification (round 21, commit `3cd68eb`)
+## Final verification (round 22, commit `6c8b0dc`)
 
-- `npm run ci` exit 0 · **63 files / 1157 tests PASS** · `tsc --noEmit` 0 errors ·
-  oxlint 22 warnings / 0 errors · `npm run build` twice → byte-identical (`client bundle:
-  224525 bytes`) · `npm run verify:lib` = 149 files byte-identical.
-- Red proof: the new case failed on the untouched source (missing `sup/watcher`) and passes after
-  the one-line role-tuple change; `test/route-concurrency.spec.ts` 15 tests PASS.
-- NOT_RUN: a real two-run busy-routing exercise; GUI check; tag/release (not authorised here).
+- `npm run ci` exit 0 · **63 files / 1158 tests PASS** · `tsc --noEmit` 0 errors ·
+  oxlint 22 warnings / 0 errors · build idempotent · `verify:lib` 149 files byte-identical.
+- Red proof: 33m20s clock run recorded `durationMs: undefined` pre-fix, exact value post-fix.
+- NOT_RUN: a real 16+ min run's checkpoint re-read; release.
 
 ## Open decisions
 

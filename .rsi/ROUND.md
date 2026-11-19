@@ -808,5 +808,5 @@ no history is rewritten, and no round is force-pushed.
 - **未验证（`NOT_RUN`）**：真实 16 分钟以上 run 的 checkpoint 回读；发版。
 - **status:** OK
 
-- **Landed as:** commit `REPLACEME` — pushed `origin/main` fast-forward, no tag, no
+- **Landed as:** commit `6c8b0dc` — pushed `origin/main` fast-forward, no tag, no
   Release, no npm publish. Evidence `.rsi/evidence/round-022/`.
