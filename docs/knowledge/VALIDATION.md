@@ -4029,3 +4029,17 @@ C1 跨 run 忙闲快照（`.rsi/POOL.md` R21）。修前探针：只加新用例
 证据目录无密钥残留（`token=`/`dsh-auth-` 零命中）。
 
 **未验证（`NOT_RUN`）**：用户自己浏览器里点一次（需用户在 GUI 操作）；发版（本任务不授权）。
+
+## Round 69 — 2026-11-19 — `0.11.21` 发版：续跑开关生产路径修复（`CONFIRMED`）
+
+**版本判定**：patch。开关从"点不动"恢复"能点"，配置面、报告 schema、5 角色语义都没变。
+
+**命令与结果（`CONFIRMED`，本机实跑）**：
+
+| 命令 | 结果 |
+| --- | --- |
+| `python3 .rsi/tools/bump-version.py 0.11.21` | `version=0.11.21`，5 处同步 |
+| `npm run ci`（发版前全量） | exit 0，**63 文件 / 1159 测试 PASS**（`.rsi/evidence/round-023/ci-release.txt`） |
+| `git commit 73cbd4b` + `git tag -a v0.11.21` + `git push origin main` + `git push origin v0.11.21` | push 成功，无 force-push，旧标签未动 |
+| 远端 CI `44543705967` | success |
+| Release `44543712011` | success；Release `Grok Workflow for DSH v0.11.21` 已建（asset `dsh-grok-workflow-0.11.21.tgz`） |

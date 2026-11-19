@@ -7,7 +7,7 @@ Last updated: 2026-11-19 (**用户报障修：续跑开关又能点了** — `Lo
 真机实测：路由 5×200 + 生产路径脚本 mount/开/关全通、服务端确认 task 落地与关闭、
 实例已停、证据无密钥。改动未提交：`M src/client/index.js`、`M test/client.spec.ts`、
 `M lib/client.js`、`M CHANGELOG.md`、`M docs/knowledge/VALIDATION.md`、
-`?? .rsi/evidence/round-023/`。**未发布，未打 tag**——等用户验收后再定发版。）
+`?? .rsi/evidence/round-023/`。**已发版 `0.11.21`**：commit `73cbd4b`、annotated tag `v0.11.21` 已推，远端 CI `44543705967` success、Release `44543712011` success（asset `dsh-grok-workflow-0.11.21.tgz`）。用户已授权自动打 tag/push/发版（今后同类发版不再逐次请示）。）
 
 Last updated: 2026-11-19 (**`0.11.17` 已发布并从 GitHub 更新到本机** — 常驻并行监护
 （guardian）走 patch 发版：`package.json`/`package-lock.json`/`README×2`/
