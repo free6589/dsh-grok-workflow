@@ -160,6 +160,34 @@ describe('infrastructure failures still produce a report (G-4)', () => {
     expect(rendered).toContain('(quality)')
   })
 
+  it('does not count an attempt that a later retry recovered as a failure', async () => {
+    // Round 26: a COMPLETED run used to print `Failures: 1 infrastructure` for an
+    // attempt that the retry replaced. The retry stays visible as the attempt
+    // count on the task row; the failure line names only what stayed broken.
+    const only = task('flaky')
+    let workerCalls = 0
+    const agent: ScriptAgent = async (_prompt, options) => {
+      if (roleOf(options.label) === 'worker' && idOfPhase(options.phase) === 'flaky') {
+        workerCalls += 1
+        if (workerCalls === 1) throw agentResultError('503 Service Unavailable')
+        return execution('flaky works')
+      }
+      return verification(only)
+    }
+    const { report } = await runWorkflowScript(
+      WORKFLOW_SCRIPT,
+      args({ tasks: [only], roles: roles([{ model: 'w1' }]) }),
+      agent,
+    )
+    expect(report.status).toBe('completed')
+    expect(report.tasks.map(item => [item.status, item.attempts.length])).toEqual([['verified', 2]])
+    expect(report.tasks[0]?.attempts[0]?.failure?.category).toBe('infrastructure')
+    expect(failureSummary(report)).toEqual([])
+    const rendered = renderReport(report)
+    expect(rendered).not.toContain('Failures:')
+    expect(rendered).toContain('- flaky: verified (2 attempts)')
+  })
+
   it('still yields a structured failure report when every route is exhausted', async () => {
     const agent: ScriptAgent = async (_prompt, options) => {
       if (roleOf(options.label) === 'worker') throw agentResultError('ECONNRESET socket hang up')

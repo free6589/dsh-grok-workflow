@@ -1,0 +1,43 @@
+diff --git i/src/delivery/index.ts w/src/delivery/index.ts
+index 564b535..fc7fc4b 100644
+--- i/src/delivery/index.ts
++++ w/src/delivery/index.ts
+@@ -627,6 +627,10 @@ function failureCounts(report: WorkflowReport): { category: string, count: numbe
+       add(report.incomplete.find(item => item.taskId === task.id)?.category)
+       continue
+     }
++    // Same rule as `failureSummary` in `src/report.ts`: a verified task's failed
++    // attempts were recovered, and the ledger's `Failures:` line has to say the
++    // same thing as the report's (round 26).
++    if (task.status === 'verified') continue
+     for (const attempt of classified) add(attempt.failure?.category)
+   }
+   if (counts.size === 0) for (const entry of report.errors) add(entry.category)
+diff --git i/src/report.ts w/src/report.ts
+index 5f45d9b..fa65c9e 100644
+--- i/src/report.ts
++++ w/src/report.ts
+@@ -749,6 +749,13 @@ function categoryOfTask(task: WorkflowReport['tasks'][number]): FailureCategory
+ /**
+  * Count failures per category across the report, so a reader can separate
+  * "the provider was down" from "the work was not good enough" at a glance.
++ *
++ * Only unrecovered failures count. A verified task carries retry history in its
++ * own `attempts` (the rendered row says `verified (2 attempts)`), but an attempt
++ * that a later attempt recovered says nothing about this run's outcome: counting
++ * it printed `COMPLETED` followed by `Failures: 1 infrastructure`, which reads as
++ * a failure on a run where every task passed. That line exists to tell a dead
++ * provider from work that fell short, and neither is true once the retry landed.
+  * @param report - validated report.
+  * @returns Category counts in report order.
+  */
+@@ -766,6 +773,9 @@ export function failureSummary(report: WorkflowReport): { category: FailureCateg
+       add(report.incomplete.find(item => item.taskId === task.id)?.category)
+       continue
+     }
++    // A verified task's failed attempts were all recovered by the attempt that
++    // verified it, so they are history, not failures.
++    if (task.status === 'verified') continue
+     for (const attempt of classified) add(attempt.failure?.category)
+   }
+   if (counts.size === 0) {

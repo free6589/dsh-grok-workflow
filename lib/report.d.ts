@@ -5,6 +5,13 @@ export declare function failureReport(objective: string, config: ResolvedConfig,
 /**
  * Count failures per category across the report, so a reader can separate
  * "the provider was down" from "the work was not good enough" at a glance.
+ *
+ * Only unrecovered failures count. A verified task carries retry history in its
+ * own `attempts` (the rendered row says `verified (2 attempts)`), but an attempt
+ * that a later attempt recovered says nothing about this run's outcome: counting
+ * it printed `COMPLETED` followed by `Failures: 1 infrastructure`, which reads as
+ * a failure on a run where every task passed. That line exists to tell a dead
+ * provider from work that fell short, and neither is true once the retry landed.
  * @param report - validated report.
  * @returns Category counts in report order.
  */

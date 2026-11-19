@@ -5,6 +5,32 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.12.2] - 2026-11-20
+
+### Fixed / 修复
+
+- **A direct `resolveConfig` call with a bad `grokDefault` is refused instead of silently disabling the workflow / 直接调 `resolveConfig` 传错 `grokDefault` 会被拒绝，不再静默关掉工作流** —
+  the `Config` schema already refused it, but the direct reader loaded any string as itself:
+  `grokDefault: 'onn'` printed `grokDefault=onn` in the one-line signature and then behaved
+  as off at the gate (`=== 'on'`), a typo that silently disables the workflow. The reader now
+  fails closed like `mode` (`grokDefault must be "on" or "off"`).
+  / `Config` 校验原本就拒收，但直接读配置的函数原样吞掉任何字符串：`grokDefault: 'onn'`
+  会印出 `grokDefault=onn` 然后在门禁按 off 跑——一个拼写错误静默关掉整个工作流。现在读侧
+  与 `mode` 一样 fail-closed（`grokDefault must be "on" or "off"`）。
+
+- **A COMPLETED run no longer prints a `Failures:` line for attempts its own retry recovered / 跑通的轮次不再把自己重试救回来的失败也印进 `Failures:`** —
+  a verified task carries retry history in its `attempts` (the row says `verified (2 attempts)`),
+  but an attempt a later attempt recovered says nothing about the run's outcome: counting it
+  printed `COMPLETED` followed by `Failures: 1 infrastructure`, which reads as a failure on a
+  run where every task passed. `failureSummary` (`src/report.ts`) and the ledger's `failureCounts`
+  (`src/delivery/index.ts`) now count only unrecovered failures; the retry stays visible as the
+  attempt count on the task row.
+  / 已验证的任务会在 `attempts` 里留着重试历史（行上写 `verified (2 attempts)`），但被后面
+  一次救回来的尝试与本轮成败无关：以前照计数，会印出 `COMPLETED` 紧跟 `Failures: 1
+  infrastructure`——全过的轮次看起来像失败了。现在报告（`src/report.ts`）与台账
+  （`src/delivery/index.ts`）只计没救回来的失败，重试仍以次数留在任务行上。
+
+
 ## [0.12.1] - 2026-11-20
 
 ### Changed / 变更

@@ -627,6 +627,10 @@ function failureCounts(report: WorkflowReport): { category: string, count: numbe
       add(report.incomplete.find(item => item.taskId === task.id)?.category)
       continue
     }
+    // Same rule as `failureSummary` in `src/report.ts`: a verified task's failed
+    // attempts were recovered, and the ledger's `Failures:` line has to say the
+    // same thing as the report's (round 26).
+    if (task.status === 'verified') continue
     for (const attempt of classified) add(attempt.failure?.category)
   }
   if (counts.size === 0) for (const entry of report.errors) add(entry.category)

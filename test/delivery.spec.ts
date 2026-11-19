@@ -23,7 +23,7 @@ import { describe, expect, it } from 'vitest'
 import { LEDGER_GUARD, REPORT_BEGIN, REPORT_END, relayText, reportEnterText } from '../src/answer.js'
 import { parseReportRound } from '../src/carryover.js'
 import { resolveConfig, FIXED_MAX_RETRIES} from '../src/config.js'
-import { deliverReport, humanConclusion } from '../src/delivery/index.js'
+import { deliverReport, humanConclusion, machineLedger } from '../src/delivery/index.js'
 import { assertWorkflowReport, failureReport, renderReport } from '../src/report.js'
 import { maxTotalAgentsFor, routeBudgetFor } from '../src/script.js'
 import type { WorkflowReport } from '../src/types.js'
@@ -249,6 +249,49 @@ describe('机器台账：默认折叠，opt-in 才出现', () => {
     const routeLine = (text: string): string | undefined =>
       text.split('\n').find(line => line.startsWith('Model routes:'))
     expect(routeLine(ledger)).toBe(routeLine(renderReport(supervised, { showDiagnostics: true })))
+  })
+
+  it('counts only unrecovered failures, exactly like the canonical report (round 26)', () => {
+    // A COMPLETED run whose single failed attempt was replaced by the retry used
+    // to read `Failures: 1 infrastructure` in both renderers — a failure line on a
+    // run where every task verified. One report, one dialect: the fix has to hold
+    // in both, and a run that really did fall short must still say so.
+    const planTask = task('a', ['天气已核验'])
+    const checked = verification(planTask)
+    const recovered = assertWorkflowReport({
+      schemaVersion: 'grok-workflow/v1',
+      status: 'completed',
+      objective: OBJECTIVE,
+      plan: { source: 'caller', tasks: [planTask], error: '' },
+      tasks: [{
+        ...planTask,
+        status: 'verified',
+        attempts: [
+          {
+            attempt: 1,
+            execution: null,
+            verification: null,
+            passed: false,
+            error: '503 Service Unavailable',
+            failure: { class: 'server-error', reason: '503 Service Unavailable', category: 'infrastructure' },
+          },
+          { attempt: 2, execution: execution('查到新加坡本周多雨'), verification: checked, passed: true, error: '' },
+        ],
+        error: '',
+      }],
+      confirmed: [{ taskId: 'a', criterion: '天气已核验', evidence: checked.criteria[0]!.evidence }],
+      incomplete: [],
+      errors: [],
+      uncertainties: [],
+      synthesis: { mode: 'deterministic', summary: '新加坡本周多雨，出行请带伞。' },
+      limits: { ...LIMITS, maxRetries: WIRE_RETRIES, maxTotalAgents: maxTotalAgentsFor(1, FIXED_MAX_RETRIES, routeBudgetFor(config)) },
+    }, OBJECTIVE, config)
+    expect(machineLedger(recovered)).not.toContain('Failures:')
+    expect(renderReport(recovered)).not.toContain('Failures:')
+    expect(renderReport(recovered)).toContain('- a: verified (2 attempts)')
+    // Control: the PARTIAL report keeps its line in both renderers.
+    expect(machineLedger(partialReport())).toContain('Failures: 1 infrastructure')
+    expect(renderReport(partialReport())).toContain('Failures: 1 infrastructure')
   })
 })
 

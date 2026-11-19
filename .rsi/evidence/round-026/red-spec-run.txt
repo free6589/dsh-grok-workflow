@@ -1,0 +1,45 @@
++ Final answer:
++ 新加坡本周多雨，出行请带伞。
++ Synthesis: deterministic
++ Model routes: planner=inherit; worker=inherit; verifier=inherit; supervisor=inherit; synthesizer=inherit
+
+ ❯ test/delivery.spec.ts:289:42
+    287|       limits: { ...LIMITS, maxRetries: WIRE_RETRIES, maxTotalAgents: m…
+    288|     }, OBJECTIVE, config)
+    289|     expect(machineLedger(recovered)).not.toContain('Failures:')
+       |                                          ^
+    290|     expect(renderReport(recovered)).not.toContain('Failures:')
+    291|     expect(renderReport(recovered)).toContain('- a: verified (2 attemp…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/failure-paths.spec.ts > infrastructure failures still produce a report (G-4) > does not count an attempt that a later retry recovered as a failure
+AssertionError: expected [ Array(1) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "category": "infrastructure",
++     "count": 1,
++   },
++ ]
+
+ ❯ test/failure-paths.spec.ts:185:36
+    183|     expect(report.tasks.map(item => [item.status, item.attempts.length…
+    184|     expect(report.tasks[0]?.attempts[0]?.failure?.category).toBe('infr…
+    185|     expect(failureSummary(report)).toEqual([])
+       |                                    ^
+    186|     const rendered = renderReport(report)
+    187|     expect(rendered).not.toContain('Failures:')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  2 failed | 27 passed (29)
+   Start at  07:33:47
+   Duration  1.13s (transform 550ms, setup 0ms, import 660ms, tests 127ms, environment 0ms)
+

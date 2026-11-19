@@ -4375,3 +4375,34 @@ CI 全绿为共同基线）。
 | `git commit 9839025` + `tag -a v0.12.0` + `push main` + `push tag` | 成功，无 force-push，旧标签未动 |
 | 远端 CI `44587743089` | success |
 | Release `44587748822` | success；Release `Grok Workflow for DSH v0.12.0` + asset `dsh-grok-workflow-0.12.0.tgz` |
+
+## Round 74 — 2026-11-20 — round-026 收口：R6 `grokDefault` 直读 fail-closed + R9 已恢复失败不计数（`CONFIRMED`，未发版）
+
+**主题**：POOL 里两条"报假/报错"类 PENDING——R6（`resolveConfig` 从不校验 `grokDefault`，
+拼写错误静默关工作流）+ R9（COMPLETED 轮次把重试救回来的失败也印进 `Failures:`）。
+
+**R6 根因（`CONFIRMED`，复现见 `.rsi/evidence/round-026/red-config-probe.txt`）**：
+`Config` schema 拒收坏值，但 `resolveConfig` 是第二条可达路径（手写配置对象、嵌入方、
+测试替身），那里 `config.grokDefault ?? 'off'` 原样吞掉任何字符串：
+修前 `grokDefault: 'onn'` → `"onn"`（无 throw），然后门禁 `=== 'on'` 判 false 按 off 跑。
+修法与 `mode` 对齐 fail-closed（`src/config.ts:877-881`），`config.spec.ts` +1 断言。
+
+**R9 根因（`CONFIRMED`，红测见 `red-spec-run.txt`）**：`failureSummary` 与台账 `failureCounts`
+把已验证任务的历史失败尝试也计数，COMPLETED 轮次印出 `Failures: 1 infrastructure`。
+修法两处各加 `if (task.status === 'verified') continue`（`src/report.ts`、`src/delivery/index.ts`），
+重试仍以 `verified (2 attempts)` 留在任务行；PARTIAL 的行不受影响（对照用例钉住两边渲染器）。
+
+**命令与结果（`CONFIRMED`，本树实跑）**：
+
+| 命令 | 结果 |
+| --- | --- |
+| 修前 `npx vitest run test/delivery.spec.ts test/failure-paths.spec.ts`（新用例已加、源码未改） | **2 failed / 27 passed** |
+| 修后同命令 | **29 passed**（`green-spec-run.txt`） |
+| `npx vitest run test/config.spec.ts`（R6 断言） | 37 passed（含新 `resolveConfig` 拒绝断言） |
+| `npm run ci` | exit 0，**68 文件 / 1229 测试 PASS**，typecheck 0 错，oxlint 24w/0e |
+| `npm run build` | `lib/` 10 文件随 `src/` 重建（`client bundle: 237735 bytes`，client 与 src 一致） |
+| `npm run verify:lib` | 提交前比的是 HEAD（`da7fb65` 一致，属预期内）；提交后复核见收尾 |
+
+**真机（沿用 round-025 结论，不过度重测）**：本轮零路由/开关/模板改动，真机面无变化；
+`ci-run.log`（68/1229）与 round-025 的 `live-iterate` 结论共同覆盖。NOT_RUN：真实定时投递、
+GUI 手动点击拍照。

@@ -224,6 +224,10 @@ describe('configuration surface', () => {
     // Like the other enum keys, a bad value is refused by the schema instead of
     // being silently dropped or defaulted.
     expect(() => Config({ grokDefault: 'sometimes' } as never)).toThrow()
+    // Round 26: the direct reader is the second layer and has to fail closed too.
+    // Before this, `grokDefault: 'onn'` loaded as itself, printed `grokDefault=onn`
+    // and behaved as off at the gate — a typo that silently disables the workflow.
+    expect(() => resolveConfig({ grokDefault: 'sometimes' } as never)).toThrow(/grokDefault must be "on" or "off"/)
   })
 
   it('names grokDefault in the one-line effective-configuration signature', () => {

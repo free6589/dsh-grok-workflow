@@ -1,0 +1,6 @@
+== BEFORE (lib/ built from pre-fix src) ==
+grokDefault: onn -> "onn" (no throw)
+== AFTER (lib/ rebuilt from fixed src) ==
+threw: grokDefault must be "on" or "off", got "onn"
+grokDefault: on -> "on"
+grokDefault: (unset) -> "off"

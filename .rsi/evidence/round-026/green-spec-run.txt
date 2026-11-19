@@ -1,0 +1,12 @@
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+(node:2768374) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/failure-paths.spec.ts (15 tests) 83ms
+ ✓ test/delivery.spec.ts (14 tests) 31ms
+
+ Test Files  2 passed (2)
+      Tests  29 passed (29)
+   Start at  07:33:53
+   Duration  647ms (transform 185ms, setup 0ms, import 294ms, tests 113ms, environment 0ms)
+

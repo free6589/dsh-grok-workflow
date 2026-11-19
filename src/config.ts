@@ -868,6 +868,17 @@ export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
   if (mode !== 'full' && mode !== 'triage') {
     throw new Error(`mode must be "full" or "triage", got "${String((config as { mode?: unknown }).mode)}"`)
   }
+  // Round 26: `grokDefault` was the one enum this reader never checked. The `Config`
+  // schema refuses a bad value, but `resolveConfig` is also reached directly (a
+  // hand-built config object, an embedder, a test double), and there a typo used to
+  // survive as itself: `grokDefault: 'onn'` loaded, printed `grokDefault=onn` in the
+  // one-line signature and then behaved as off at the gate (`=== 'on'`), which is the
+  // silent-off failure this reader exists to prevent. Fail closed, like `mode`.
+  const grokDefaultRaw: unknown = (config as { grokDefault?: unknown }).grokDefault
+  if (grokDefaultRaw !== undefined && grokDefaultRaw !== 'on' && grokDefaultRaw !== 'off') {
+    throw new Error(`grokDefault must be "on" or "off", got "${String(grokDefaultRaw)}"`)
+  }
+  const grokDefault = grokDefaultRaw === undefined ? 'off' : grokDefaultRaw
   // The final-answer policy (T4: `layered` default, markdown direct output). A
   // removed `deterministic` value in an old patch is an unknown value now (R-06).
   const synthesisRaw: unknown = (config as { synthesis?: unknown }).synthesis
@@ -906,7 +917,7 @@ export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
     roles,
     synthesis,
     mode,
-    grokDefault: config.grokDefault ?? 'off',
+    grokDefault,
     maxConcurrency: integer('maxConcurrency', config.maxConcurrency ?? DEFAULT_MAX_CONCURRENCY, 1, HARD_LIMITS.maxConcurrency),
     maxRetries,
     maxTasks: integer('maxTasks', config.maxTasks ?? DEFAULT_MAX_TASKS, 1, HARD_LIMITS.maxTasks),
