@@ -6,7 +6,7 @@ Last updated: 2026-11-20 (**round-024 收口：三线合一，真机复核过** 
 **67 文件 / 1219 测试 PASS**，typecheck 0 错、lint 24w/0e、`verify:lib` 通过。
 真机（`loopfix-verify` `:3451`）：loop/iterate 双路由各走各的全 200、taskId 不同；
 真实 bundle 双开关生产路径 mount/开/关全通、各建各删各；实例已停、证据无密钥。
-**未提交、未发版**——等收尾提交；NOT_RUN：真实定时投递、GUI 手动点击拍照。）
+**已发版 `0.12.0`**：commit `9839025`、annotated tag `v0.12.0` 已推，远端 CI `44587743089` success、Release `44587748822` success（asset `dsh-grok-workflow-0.12.0.tgz`）。NOT_RUN：真实定时投递、GUI 手动点击拍照。）
 
 
 Last updated: 2026-11-20 (**settings-toggle-ui 收口：双开关 + 模板 textarea 全链路真机过** —

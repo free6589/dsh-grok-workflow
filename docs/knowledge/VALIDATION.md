@@ -4341,3 +4341,17 @@ CI 全绿为共同基线）。
 
 **`NOT_RUN`**：真实定时投递（D-066）；浏览器 GUI 手动点击拍照；`/grok on` 后连发两条的
 真机 GUI 复核（本轮是路由/开关面，命令面仍是单测级）；commit/push/发版（等收尾提交）。
+
+## Round 73 — 2026-11-20 — `0.12.0` 发版：自迭代开关 + `/grok on` + 提示词入口（`CONFIRMED`）
+
+**版本判定**：minor。第二开关 + 可改模板是向后兼容的新功能（配置只增不改、旧开关行为不变），另含 5 条用户可见修复。
+
+**命令与结果（`CONFIRMED`）**：
+
+| 命令 | 结果 |
+| --- | --- |
+| `python3 .rsi/tools/bump-version.py 0.12.0` | `version=0.12.0`，5 处同步 |
+| `npm run ci`（发版前全量） | exit 0，**67 文件 / 1219 测试 PASS**（`.rsi/evidence/round-024/ci-release.txt`） |
+| `git commit 9839025` + `tag -a v0.12.0` + `push main` + `push tag` | 成功，无 force-push，旧标签未动 |
+| 远端 CI `44587743089` | success |
+| Release `44587748822` | success；Release `Grok Workflow for DSH v0.12.0` + asset `dsh-grok-workflow-0.12.0.tgz` |
