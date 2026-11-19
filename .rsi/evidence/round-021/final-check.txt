@@ -1,0 +1,45 @@
+# Final verification after cleanup — 2026-11-19T20:02+0800
+HEAD: 1fb146a7f7084a91b92cbe0103da1cf35593caeb
+
+## git status --short --branch
+## main...origin/main [ahead 2]
+?? .rsi/evidence/round-021/final-check.txt
+
+## git diff HEAD (uncommitted)
+(empty = none)
+
+## npm run typecheck
+
+> dsh-grok-workflow@0.11.19 typecheck
+> tsc -p tsconfig.json --noEmit
+
+exit=0
+
+## npm run verify:lib
+
+> dsh-grok-workflow@0.11.19 verify:lib
+> node scripts/verify-lib.mjs
+
+client bundle: 224525 bytes → lib/client.js
+lib/ at 1fb146a is the build of src/ at 1fb146a (149 files, byte-identical)
+exit=0
+
+## npm run lint
+Found 22 warnings and 0 errors.
+Finished in 40ms on 109 files with 96 rules using 6 threads.
+
+## untracked residue
+?? .rsi/evidence/round-021/final-check.txt
+(empty = none)
+
+## protected objects
+1cdd0adac3f268a38858c165f97eeb8b993d01b9c4db256d7dc3df8f28b43c1d  package.json
+0974c5f9e6dde7c56ed8527ad10ee7e64fdfdb7ee179f5abddfc93e7d825e381  package-lock.json
+20e15effce859508afac80d35673b017b6b4717af61d7ca644ef08f4d82b18fe  .gitignore
+version=0.11.19
+v0.11.19 b38d23ab4e28f628a92e7a7272293c93f218ab0f
+v0.11.18 3b131c418b9d89451a5a8567fcf9d9cb6addf18a
+v0.11.17 5fc3e1dd9e7bf194677a64d286fdc09c5b2b5268
+v0.11.16 63a4fbbd7dc3b6df36abc526d0dd9019578f46c5
+v0.11.15 50c0321e371db076908d5fb6cec94bb8be25f37b
+v0.11.14 20eafea150d34d18dc99bae7523db62c1d8fcb38
