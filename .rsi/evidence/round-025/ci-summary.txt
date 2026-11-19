@@ -1,0 +1,8 @@
+> npm run typecheck && npm run lint && npm run verify:lib && npm test
+Found 24 warnings and 0 errors.
+> dsh-grok-workflow@0.12.1 verify:lib
+client bundle: 234755 bytes → lib/client.js
+lib/ at 6331329 is the build of src/ at 6331329 (153 files, byte-identical)
+client bundle: 237735 bytes → lib/client.js
+ Test Files  68 passed (68)
+      Tests  1227 passed (1227)

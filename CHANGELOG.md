@@ -5,6 +5,35 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-11-20
+
+### Changed / 变更
+
+- **The self-iteration heartbeat ships the repository's own round prompt as its default
+  template / 自迭代心跳的内置默认模板改为仓库自己的轮次提示词** — the built-in default was a
+  twelve-line generic prompt, so a fresh profile armed a heartbeat that knew nothing about
+  how a round here is chosen or judged. The default is now the round prompt in
+  `docs/iterate-template.md`, delivered verbatim by `DEFAULT_ITERATE_TEMPLATE`
+  (`src/config.ts`): two topic sources with `POOL` first, then TODO/failure rows, GitHub
+  issues and papers; at least one item landed per round; a small fix needs no research
+  while a big change needs a `RESEARCH` entry and the item approved in the pool; `R1`–`R6`
+  execution; a triple review (self-review, `npm run ci` plus `npm run verify:lib`, and a
+  live check on a copied profile); four brakes and the forbidden zones. It still carries
+  no routing marker, whitespace still falls back to it, and the 4000-character cap is
+  unchanged. A profile that already stores a template is untouched — only an unset or
+  blank one sees the new default. `test/iterate-template.spec.ts` pins the document and
+  the constant byte-identical and checks each required section is present, and
+  `test/loop-surface.spec.ts` now also drives the iterate route's `status` action.
+  / 内置默认原本是一段十二行的通用提示词，新档案武装出来的心跳并不知道这个仓库怎么选题、怎么判
+  一轮是否完成。现在默认就是 `docs/iterate-template.md` 里的轮次提示词，由
+  `DEFAULT_ITERATE_TEMPLATE`（`src/config.ts`）原样投递：双源选题、`POOL` 优先，其次
+  TODO/失败行、GitHub issue 与论文；每轮至少落地一项；小修不做研究，大改必须有 `RESEARCH`
+  条目且该条目已在待办池获批；`R1`–`R6` 执行；三重评审（自审、`npm run ci` 加
+  `npm run verify:lib`、复制档案上的真机验证）；四道刹车与禁区。它依旧不带路由标记，纯空白
+  仍回退到它，4000 字符上限不变。已经存了模板的档案不受影响——只有未设置或纯空白的档案才会
+  看到新默认。`test/iterate-template.spec.ts` 把文档与常量钉成逐字节一致并逐项检查必需章节，
+  `test/loop-surface.spec.ts` 也补上了自迭代路由 `status` 动作的用例。
+
 ## [0.12.0] - 2026-11-20
 
 ### Added / 新增

@@ -16,6 +16,7 @@
 import { Readable } from 'node:stream'
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
+import { DEFAULT_ITERATE_TEMPLATE } from '../src/config.js'
 import {
   createLoopService, DEFAULT_LOOP_INTERVAL_MINUTES, defaultLoopPrompt, ITERATE_ROUTE_PATH, ITERATE_TASK_TITLE,
   LOOP_PROMPT_PREFIX, LOOP_ROUTE_PATH, LOOP_TASK_TITLE,
@@ -239,7 +240,7 @@ function wiringBoth(schedule: LoopScheduleLike) {
     schedule: () => schedule,
     logger: log,
     now: () => NOW,
-    identity: { title: ITERATE_TASK_TITLE, defaultPrompt: () => '# RSI heartbeat — self-iteration round' },
+    identity: { title: ITERATE_TASK_TITLE, defaultPrompt: () => DEFAULT_ITERATE_TEMPLATE },
     policy: () => ({ intervalMinutes: DEFAULT_LOOP_INTERVAL_MINUTES, rounds: 10, failStreak: 3 }),
   })
   const routes: FakeRoute[] = []
@@ -304,7 +305,7 @@ describe('two switches, two routes: one heartbeat never drives the other', () =>
     expect(titles).toEqual([LOOP_TASK_TITLE, ITERATE_TASK_TITLE])
     const iterateTask = [...schedule.tasks.values()].find(task => task.title === ITERATE_TASK_TITLE)!
     // The template is the stored prompt, and it carries none of the loop's marker.
-    expect(iterateTask.prompt).toBe('# RSI heartbeat — self-iteration round')
+    expect(iterateTask.prompt).toBe(DEFAULT_ITERATE_TEMPLATE)
     expect(iterateTask.prompt.startsWith(LOOP_PROMPT_PREFIX)).toBe(false)
   })
 
@@ -323,6 +324,32 @@ describe('two switches, two routes: one heartbeat never drives the other', () =>
     await wired.routeAt(LOOP_ROUTE_PATH).handler(fakeRequest('POST', { action: 'close', sessionId: SESSION }), loopClosed)
     expect(JSON.parse(loopClosed.body)).toMatchObject({ ok: true, loop: { open: false } })
     expect(schedule.tasks.size).toBe(0)
+  })
+
+  it('answers status on its own route without arming or touching either row', async () => {
+    const schedule = new FakeSchedule()
+    const wired = wiringBoth(schedule)
+    const iterateRoute = wired.routeAt(ITERATE_ROUTE_PATH)
+
+    const before = fakeResponse()
+    await iterateRoute.handler(fakeRequest('POST', { action: 'status', sessionId: SESSION }), before)
+    expect(JSON.parse(before.body)).toMatchObject({ ok: true, loop: { open: false } })
+    expect(schedule.tasks.size).toBe(0)
+
+    // A live loop row is not this route's row: status still reports the RSI slot.
+    await wired.loop.open({ sessionId: SESSION })
+    const afterLoop = fakeResponse()
+    await iterateRoute.handler(fakeRequest('POST', { action: 'status', sessionId: SESSION }), afterLoop)
+    expect(JSON.parse(afterLoop.body)).toMatchObject({ ok: true, loop: { open: false } })
+
+    await iterateRoute.handler(fakeRequest('POST', { action: 'open', sessionId: SESSION }), fakeResponse())
+    const opened = fakeResponse()
+    await iterateRoute.handler(fakeRequest('POST', { action: 'status', sessionId: SESSION }), opened)
+    const seen = JSON.parse(opened.body) as { ok: boolean, loop: { open: boolean, taskId?: string } }
+    expect(seen).toMatchObject({ ok: true, loop: { open: true } })
+    const iterateTask = [...schedule.tasks.values()].find(task => task.title === ITERATE_TASK_TITLE)!
+    expect(seen.loop.taskId).toBe(iterateTask.id)
+    expect(schedule.tasks.size).toBe(2)
   })
 
   it('unload takes the loop row and leaves the RSI row stored', async () => {

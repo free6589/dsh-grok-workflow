@@ -151,6 +151,11 @@ export declare const DEFAULT_ITERATE_INTERVAL_MIN = 0;
  * about stopping. It deliberately carries **no** routing marker: a self-iteration
  * delivery routes as an ordinary schedule message (`docs/knowledge/HEARTBEATS.md`
  * §2), so editing this text can never change how the gate routes it.
+ *
+ * `docs/iterate-template.md` is the reader-facing copy of this same text, and
+ * `test/iterate-template.spec.ts` asserts the two are byte-identical — the file
+ * explains why the template must cover POOL-first topic selection, the small/big
+ * split, R1–R6, the triple review, four brakes and the forbidden zones.
  */
 export declare const DEFAULT_ITERATE_TEMPLATE: string;
 /**

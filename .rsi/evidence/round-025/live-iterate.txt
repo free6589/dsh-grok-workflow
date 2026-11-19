@@ -1,0 +1,8 @@
+session session-33feca… created via the real RPC
+stored template was already blank in the real settings mirror (fallback exercised) — OK
+iterate switch mounted via page fetch, reads 关 — OK
+iterate open: server confirms its own task schedule-7b02038a-6447-431a-82ba-e70880c58e18 — OK
+Schedule row written: title "RSI heartbeat", 3239 chars, byte-equal to DEFAULT_ITERATE_TEMPLATE — OK
+iterate close deleted only its own row; session has no Schedule residue, no foreign row removed — OK
+second open/close cycle: one row created, one row deleted, no residue — OK
+PASS: the self-iteration switch arms the shipped default template over the real page fetch, route, service and Schedule storage, and leaves nothing behind

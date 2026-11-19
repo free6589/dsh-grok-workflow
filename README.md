@@ -45,10 +45,10 @@ dsh --profile grok-workflow-dev --from-default-profile headless --dump-config
 Then install the plugin:
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.12.0
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.12.1
 ```
 
-> `#v0.12.0` is the current release. Pin the tag you actually want; omitting it follows `main`, which is not a release. Do not run `--from-default-profile` after `plugin add`: it replaces the profile and removes the plugin you just installed.
+> `#v0.12.1` is the current release. Pin the tag you actually want; omitting it follows `main`, which is not a release. Do not run `--from-default-profile` after `plugin add`: it replaces the profile and removes the plugin you just installed.
 
 Then restart the profile so DSH loads the new plugin:
 
@@ -239,7 +239,7 @@ Configuration belongs to the profile's `cordis.patch.yml` (or a `--patch` overla
 | `loopFailStreak` | `3` | `20` | Consecutive failed rounds the heartbeat text asks the round to stop after. The Host records delivery, not round success, so this is guidance carried into the round, not a host-enforced counter |
 | `loopIntervalMin` | `0` (`0` = the loop's floor) | `10080` (seven days) | Minutes between rounds. The effective wait is never below one worst-case round or 60 minutes, so `0` means "as soon as a round can finish", not "immediately" |
 | `iterateIntervalMin` | `0` (`0` = the heartbeat's floor) | `10080` (seven days) | Minutes between self-iteration heartbeats. Same floor semantics as `loopIntervalMin`: never below one worst-case round or 60 minutes |
-| `iterateTemplate` | built-in default | at most 4000 characters | The whole prompt stored in the `RSI heartbeat` Schedule task when the Self-iterate switch arms one. Whitespace-only falls back to the built-in default. Edited in the settings page's *Self-iteration* group and persisted per profile; it carries no routing marker, so editing it never changes gate routing |
+| `iterateTemplate` | built-in default, `docs/iterate-template.md` | at most 4000 characters | The whole prompt stored in the `RSI heartbeat` Schedule task when the Self-iterate switch arms one. Whitespace-only falls back to the built-in default. The shipped default is the round prompt in `docs/iterate-template.md` (POOL-first topic selection, R1–R6, triple review, four brakes, forbidden zones), and `test/iterate-template.spec.ts` keeps the file and the constant byte-identical. Edited in the settings page's *Self-iteration* group and persisted per profile; it carries no routing marker, so editing it never changes gate routing |
 | `configVersion` | `1` | `1` | Configuration surface version |
 
 The four `loop*` keys configure the repeat-run surface. When a session's loop is opened, the loop service reads `loopMaxRounds`, `loopFailStreak` and `loopIntervalMin` at open time and stores them in a durable Schedule rule; without a composed Schedule service the keys are stored and every message still runs once. `loopEnabled` is the deployment default for an automatic driver and is not read yet — opening a loop stays an explicit user action ([Repeat runs](#repeat-runs-the-loop-heartbeat)). `loopIntervalMin` is a wait, not a budget: it can only raise the loop's floor, and `loopFailStreak` travels into the heartbeat text as guidance because the Host records delivery, not round success.
@@ -340,13 +340,13 @@ The plugin reuses DSH's workflow engine and subagents. It does not replace DSH's
 
 ## Versions and release notes
 
-The package version in this repository is `0.12.0`. Install or roll back to an exact release with a tag suffix:
+The package version in this repository is `0.12.1`. Install or roll back to an exact release with a tag suffix:
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.12.0
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.12.1
 ```
 
-Use only a tag that exists on GitHub. Published: `v0.1.0`, `v0.2.0`, `v0.2.1`, `v0.2.2`, `v0.2.3`, `v0.2.4`, `v0.2.5`, `v0.2.6`, `v0.2.7`, `v0.3.0`, `v0.4.0`, `v0.5.0`, `v0.5.1`, `v0.6.0`, `v0.7.0`, `v0.8.0`, `v0.9.0`, `v0.9.1`, `v0.9.2`, `v0.9.3`, `v0.9.4`, `v0.10.0`, `v0.10.1`, `v0.10.2`, `v0.11.0`, `v0.11.1`, `v0.11.2`, `v0.11.3`, `v0.11.4`, `v0.11.5`, `v0.11.6`, `v0.11.7`, `v0.11.8`, `v0.11.9`, `v0.11.10`, `v0.11.11`, `v0.11.12`, `v0.11.13`, `v0.11.14`, `v0.11.15`, `v0.11.16`, `v0.11.17`, `v0.11.18`, `v0.11.19`, `v0.11.20`, `v0.11.21` and `v0.12.0`. The unpinned command follows `main` and does not pin a release. `v0.2.0-rc.1` also exists on GitHub but is not a release: it predates the release workflow and its `package.json` still declares `0.1.0`. The `v0.11.14` tag is not a release either: its committed `lib/` was built from an earlier `src/`, so the release workflow stopped at its artifact check and never published it. Install the `v0.11.15` pin above; that tag is left in place only because published tags are immutable. See the [changelog](CHANGELOG.md) and the [release guide](docs/RELEASING.md) for the versioning and rollback rules.
+Use only a tag that exists on GitHub. Published: `v0.1.0`, `v0.2.0`, `v0.2.1`, `v0.2.2`, `v0.2.3`, `v0.2.4`, `v0.2.5`, `v0.2.6`, `v0.2.7`, `v0.3.0`, `v0.4.0`, `v0.5.0`, `v0.5.1`, `v0.6.0`, `v0.7.0`, `v0.8.0`, `v0.9.0`, `v0.9.1`, `v0.9.2`, `v0.9.3`, `v0.9.4`, `v0.10.0`, `v0.10.1`, `v0.10.2`, `v0.11.0`, `v0.11.1`, `v0.11.2`, `v0.11.3`, `v0.11.4`, `v0.11.5`, `v0.11.6`, `v0.11.7`, `v0.11.8`, `v0.11.9`, `v0.11.10`, `v0.11.11`, `v0.11.12`, `v0.11.13`, `v0.11.14`, `v0.11.15`, `v0.11.16`, `v0.11.17`, `v0.11.18`, `v0.11.19`, `v0.11.20`, `v0.11.21`, `v0.12.0` and `v0.12.1`. The unpinned command follows `main` and does not pin a release. `v0.2.0-rc.1` also exists on GitHub but is not a release: it predates the release workflow and its `package.json` still declares `0.1.0`. The `v0.11.14` tag is not a release either: its committed `lib/` was built from an earlier `src/`, so the release workflow stopped at its artifact check and never published it. Install the `v0.11.15` pin above; that tag is left in place only because published tags are immutable. See the [changelog](CHANGELOG.md) and the [release guide](docs/RELEASING.md) for the versioning and rollback rules.
 
 ## Testing and development
 

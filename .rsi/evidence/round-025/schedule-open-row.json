@@ -1,0 +1,12 @@
+{
+  "id": "schedule-7b02038a-6447-431a-82ba-e70880c58e18",
+  "title": "RSI heartbeat",
+  "kind": "rrule",
+  "rrule": "DTSTART:20261119T200756Z\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=10",
+  "target": {
+    "kind": "session",
+    "sessionId": "session-33feca04-8990-4479-980f-496be2a71ef6"
+  },
+  "promptChars": 3239,
+  "promptSha": "fd3ce637530763f8c0ecbaf0daa89232b9dd4812355959ce1ca7be09b76ad3ef"
+}
