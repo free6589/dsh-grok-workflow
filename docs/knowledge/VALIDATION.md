@@ -3898,3 +3898,35 @@ unload/归档监听的 firing（操作体已 CONFIRMED）。`src/index.ts:292` �
 该行现在会装载失败。修法：改成已注册 provider / 已宣告模型，或只把该路由的 `provider`
 留空（`validateRoutes` 视为继承 run 的 provider，`src/settings.ts:211`）。**不要**删掉
 整条 supervisor 链——空链 = 监督门不跑（`src/script.ts:1945`、`:2418`），不是「行为不变」。
+
+## Round 65 — 2026-11-19 — RSI round 20：诊断台账 `Model routes:` 行漏掉 `supervisor`（`CONFIRMED`）
+
+**缺陷（`CONFIRMED`，本树实跑）**：`src/delivery/index.ts:695` 的 `machineLedger()`
+只列四个角色（planner/worker/verifier/synthesizer），而 `src/report.ts:835` 的
+`renderReport()` 列五个（`ROLE_NAMES` 含 supervisor）。有 supervisor 链的 run 在
+ledger 里读成「无监督」（全 `inherit` 的那行里没有 supervisor 段）。红探针：
+临时 spec 断言 `ledger` 含 `supervisor=p1/m-sv`，结果 `1 failed`
+（`AssertionError: expected '…Model routes: planner=inherit; worker=inherit;
+verifier=inherit; synthesizer=inherit' to contain 'supervisor=p1/m-sv'`），
+见 `.rsi/evidence/round-020/red-spec-run.txt`。
+
+**改动**：`src/delivery/index.ts`（角色表四改五，与 `ROLE_NAMES` /
+`ROLE_ORDER` 同序；`MACHINE_DETAIL` 的 `role=` 剥离正则补 `supervisor`，让人话块
+同样不透出 supervisor 的路由赋值）、`test/delivery.spec.ts`（新用例：supervisor
+链具名 + 与 `renderReport` 同行逐行相等）、`test/report.spec.ts`（既有链用例补
+一条 supervisor 链断言）、`DECISIONS.md` D-076、`lib/` 重建。
+
+**命令与结果（`CONFIRMED`，本树实跑）**：
+
+| 命令 | 结果 | 证据 |
+| --- | --- | --- |
+| 基线 `npm run ci`（`762becc`，改前） | exit 0，63 文件 / **1155** 测试 PASS | 见轮内记录 |
+| 红探针（临时 spec，修前） | **1 failed** | `red-spec-run.txt` |
+| 修后 `test/delivery.spec.ts` + `delivery-human-block` + `report` + `human-output-contract` | **4 files / 75 passed** | `green.txt` |
+| 修后 `npm run ci` | exit 0，`tsc --noEmit` 0 error，oxlint **22 warnings / 0 errors**，63 文件 / **1156** 测试 PASS（+1，无删除无 skip） | `ci.txt` |
+| `npm run build` ×2 与 `diff -r` | 两次构建一致（幂等），`client bundle: 224525 bytes` | `build-twice-*.txt` |
+| `npm run verify:lib` | 149 files, byte-identical | `verify-lib.txt` |
+
+**未验证（`NOT_RUN`）**：真模型整轮（改动在渲染层，Loader 路径由 `loader.spec.ts` 覆盖）；
+GUI 点击；rrule 定时到点。`src/run.ts:141` 的 `configRouteLabels` 仍是四角色——那是
+C1 hint 输入，不是本轮主题，留给下一轮。

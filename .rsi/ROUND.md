@@ -690,3 +690,51 @@ no history is rewritten, and no round is force-pushed.
   `{{CI}}` / `{{TAG}}`，不碰 `log` 字段。本轮 LOG 行因此一度留下 `{{TAG}}` 字面量，已就地
   改成 `v0.11.18`；round 14 / round 17 的同类占位符属于历史记录，不重写。下一轮若动
   `.rsi/tools/`，顺手把 `log` 也走同一套替换。
+
+## Round 20 — 2026-11-19 — 诊断台账漏掉 `supervisor`（`CONFIRMED`，patch `0.11.19`）
+
+- **主题**：`src/delivery/index.ts` 的 `machineLedger()` 只列四个角色，而
+  `src/report.ts` 的 `renderReport()` 列五个（`ROLE_NAMES` 含 supervisor）——round 19
+  在载入期修好了同一类遗漏（D-075），交付层的 durable copy 还漏着。有 supervisor
+  链的 run 在台账里读成「无监督」。
+- **为什么现在值得做**：P0（错误行为 + 假陈述）优先于 P3。载入校验修好后，配了
+  supervisor 链的 run 能装载、能跑，但台账仍撒谎——修载入不修台账等于修了一半。
+  同一位置还发现：旧分支 `rsi/round-8` 的 `644897b` 当年修过同一处（red 2 failed
+  → green 14/14，含 `Synthesis:` 拆标签），但从未合入 `main`
+  （`git merge-base --is-ancestor 644897b HEAD` 为空）。本轮只收角色修复 + parity
+  守卫；`Synthesis:` 拆标签改的是用户可见行标签，独立成轮；`run.ts:141`
+  `configRouteLabels` 四角色是 C1 hint 输入，也留给下一轮。
+- **外部研究**：本轮无外部研究。候选是 DSH 上游的 route/delivery 约定，但一手来源
+  （本仓源码 `src/report.ts:835`、`src/settings.ts:103`）已足够判定这是内部不一致，
+  无需引用外部文档。`Synthesis:` 拆标签若独立成轮，需先查 carry-over 回解析
+  （`src/carryover.ts`）是否认新标签，再定。
+- **改动**：`src/delivery/index.ts`（角色表四改五，与 `ROLE_NAMES` / `ROLE_ORDER`
+  同序 + 注释；`MACHINE_DETAIL` 的 `role=` 剥离正则补 `supervisor`）；
+  `test/delivery.spec.ts`（新用例：supervisor 链具名 + 与 `renderReport` 同行逐行
+  相等，另补 `renderReport` 进口）；`test/report.spec.ts`（既有链用例补一条
+  supervisor 链断言）；`DECISIONS.md` D-076；`VALIDATION.md` Round 65；
+  `CHANGELOG.md` 双语 `## [0.11.19]`；`package.json` + `package-lock.json` +
+  两份 README + `docs/LOCAL-TESTING.md` → `0.11.19`；`lib/` 重建（delivery 三文件）。
+- **红→绿（`CONFIRMED`）**：临时探针修前 `1 failed`
+  （`AssertionError: expected '…Model routes: planner=inherit; worker=inherit;
+  verifier=inherit; synthesizer=inherit' to contain 'supervisor=p1/m-sv'`，
+  `.rsi/evidence/round-020/red-spec-run.txt`）；修后 4 文件 75 passed
+  （`.rsi/evidence/round-020/green.txt`），临时探针已删，守卫留在
+  `test/delivery.spec.ts`。
+- **门禁（`CONFIRMED`）**：`npm run ci` exit 0 · **63 文件 / 1156 测试 PASS**
+  （基线 `762becc` 改前 63/1155，+1，无删除无 skip；`.rsi/evidence/round-020/ci.txt`
+  是改后初验，`ci-release.txt` 是 bump + changelog 后的发版门）；
+  `tsc --noEmit` 0 error；oxlint 22 warnings / 0 errors；
+  `npm run build` 连跑产物一致（幂等，`client bundle: 224525 bytes`）；
+  `npm run verify:lib` = 149 files byte-identical（对 HEAD，工作树 lib 改动即本轮提交内容）。
+- **独立审查（R5）**：fresh-context 子代理判 **PASS**（6 条：缺陷定位准、正则安全、
+  无需新标签、parity 低误报、范围纪律、文档与代码一致）。零修回。
+- **版本**：patch → `0.11.19`（诊断台账补漏，用户可见但无配置面/报告 schema 变化；
+  不升 minor，更不碰 major / 1.0.0）。
+- **未验证（`NOT_RUN`）**：真模型整轮（渲染层改动，Loader 路径由 `loader.spec.ts`
+  覆盖）；GUI 点击；rrule 定时到点；tag 安装验证（本轮未做，下轮发版前若动安装面再补）。
+- **status:** OK
+
+- **Landed as:** commit `REPLACEME` + annotated tag `v0.11.19` — pushed `origin/main`
+  fast-forward, old tags untouched, no force-push, no npm publish. Evidence
+  `.rsi/evidence/round-020/`. Remote CI run id + Release URL recorded below after push.

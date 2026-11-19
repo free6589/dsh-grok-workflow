@@ -5,6 +5,26 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.11.19] - 2026-11-19
+
+### Fixed / 修复
+
+- **The machine ledger names the supervisor chain instead of silently dropping it
+  / 机器台账不再悄悄丢掉 supervisor 链** — `machineLedger()` listed four roles
+  while `renderReport()` lists five, so a run configured with a
+  `roles.supervisor` chain read as "unsupervised" in the durable copy: the
+  `Model routes:` line had no supervisor segment at all. All five routed roles
+  now render in report order, and a parity test pins the ledger's route line
+  equal to the canonical renderer's, so a future role cannot drift silently
+  again. The human block strips `supervisor=` assignments like every other
+  role, so the fix changes the ledger only, not the visible answer.
+  / `machineLedger()` 只列四个角色，而 `renderReport()` 列五个，于是配了
+  `roles.supervisor` 链的 run 在 durable copy 里读成「无监督」：`Model routes:`
+  那一行根本没有 supervisor 段。现在五个被路由的角色按报告顺序全部渲染，
+  parity 测试把台账的路由行与标准渲染器的同行钉成相等，以后加角色也不会再
+  悄悄漂移。人话块同样剥离 `supervisor=` 赋值（与其他角色一致），所以本修复
+  只改台账，不改可见答案。
+
 ## [0.11.18] - 2026-11-19
 
 ### Fixed / 修复

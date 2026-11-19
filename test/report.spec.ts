@@ -660,11 +660,13 @@ describe('t47: the report states its routes and its deadline', () => {
         planner: ['bifrost-completions/wb/cn:no-such-model-probe', 'bifrost-completions/wb/cn:deepseek-v4.1-flash'],
         worker: ['bifrost-completions/wb/cn:deepseek-v4.1-flash'],
         verifier: [],
+        supervisor: ['bifrost-completions/wb/cn:deepseek-v4.1-flash'],
         synthesizer: [],
       },
     }), OBJECTIVE, config), diag)
     expect(text).toContain('planner=bifrost-completions/wb/cn:no-such-model-probe → bifrost-completions/wb/cn:deepseek-v4.1-flash')
     expect(text).toContain('worker=bifrost-completions/wb/cn:deepseek-v4.1-flash')
+    expect(text).toContain('supervisor=bifrost-completions/wb/cn:deepseek-v4.1-flash')
     expect(text).toContain('verifier=inherit')
   })
 

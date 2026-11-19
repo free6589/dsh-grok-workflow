@@ -1,0 +1,42 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+ ❯ test/probe-round20-supervisor-ledger.spec.ts (1 test | 1 failed) 15ms
+     × ledger names the supervisor chain 13ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/probe-round20-supervisor-ledger.spec.ts > round-20 red probe (scratch) > ledger names the supervisor chain
+AssertionError: expected 'Grok workflow: COMPLETED\nObjective: …' to contain 'supervisor=p1/m-sv'
+
+- Expected
++ Received
+
+- supervisor=p1/m-sv
++ Grok workflow: COMPLETED
++ Objective: probe objective
++ Plan: caller; 1 task(s); 1 verified
++ - a: verified (1 attempt) — Task a
++ Confirmed evidence:
++ - a: done → verified done in file:///tmp/report
++ Final answer:
++ did it.
++ Synthesis: deterministic
++ Model routes: planner=inherit; worker=inherit; verifier=inherit; synthesizer=inherit
+
+ ❯ test/probe-round20-supervisor-ledger.spec.ts:56:20
+     54|   it('ledger names the supervisor chain', () => {
+     55|     const ledger = machineLedger(reportWithSupervisorChain())
+     56|     expect(ledger).toContain('supervisor=p1/m-sv')
+       |                    ^
+     57|   })
+     58| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  13:54:23
+   Duration  463ms (transform 263ms, setup 0ms, import 308ms, tests 15ms, environment 0ms)
+

@@ -1,0 +1,13 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+ ✓ test/human-output-contract.spec.ts (10 tests) 394ms
+ ✓ test/delivery.spec.ts (13 tests) 27ms
+ ✓ test/delivery-human-block.spec.ts (10 tests) 22ms
+ ✓ test/report.spec.ts (42 tests) 20ms
+
+ Test Files  4 passed (4)
+      Tests  75 passed (75)
+   Start at  14:01:11
+   Duration  1.63s (transform 512ms, setup 0ms, import 716ms, tests 464ms, environment 0ms)
+

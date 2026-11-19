@@ -24,7 +24,7 @@ import { LEDGER_GUARD, REPORT_BEGIN, REPORT_END, relayText, reportEnterText } fr
 import { parseReportRound } from '../src/carryover.js'
 import { resolveConfig, FIXED_MAX_RETRIES} from '../src/config.js'
 import { deliverReport, humanConclusion } from '../src/delivery/index.js'
-import { assertWorkflowReport, failureReport } from '../src/report.js'
+import { assertWorkflowReport, failureReport, renderReport } from '../src/report.js'
 import { maxTotalAgentsFor, routeBudgetFor } from '../src/script.js'
 import type { WorkflowReport } from '../src/types.js'
 import { execution, failingVerification, task, verification } from './fixtures.js'
@@ -215,6 +215,40 @@ describe('机器台账：默认折叠，opt-in 才出现', () => {
     const broken = deliverReport(completedReport(), { diagnostics: { get: () => { throw new Error('no settings') } } })
     expect(broken.diagnostics).toBe(false)
     expect(broken.ledger).toBeUndefined()
+  })
+
+  it('names the supervisor chain in the ledger, in report order (R8-ledger)', () => {
+    // Same omission class round 19 closed at load time: four roles rendered,
+    // the fifth silently dropped. A supervised run must read as supervised.
+    const planTask = task('a', ['天气已核验'])
+    const checked = verification(planTask)
+    const supervised = assertWorkflowReport({
+      schemaVersion: 'grok-workflow/v1',
+      status: 'completed',
+      objective: OBJECTIVE,
+      plan: { source: 'caller', tasks: [planTask], error: '' },
+      tasks: [{
+        ...planTask,
+        status: 'verified',
+        attempts: [{ attempt: 1, execution: execution('查到新加坡本周多雨'), verification: checked, passed: true, error: '' }],
+        error: '',
+      }],
+      confirmed: [{ taskId: 'a', criterion: '天气已核验', evidence: checked.criteria[0]!.evidence }],
+      incomplete: [],
+      errors: [],
+      uncertainties: [],
+      routing: { planner: [], worker: [], verifier: [], supervisor: ['p1/m-sv'], synthesizer: [] },
+      routes: [],
+      synthesis: { mode: 'deterministic', summary: '新加坡本周多雨，出行请带伞。' },
+      limits: { ...LIMITS, maxRetries: WIRE_RETRIES, maxTotalAgents: maxTotalAgentsFor(1, FIXED_MAX_RETRIES, routeBudgetFor(config)) },
+    }, OBJECTIVE, config)
+    const ledger = deliverReport(supervised, { diagnostics: true }).ledger ?? ''
+    expect(ledger).toContain('Model routes: planner=inherit; worker=inherit; verifier=inherit; supervisor=p1/m-sv; synthesizer=inherit')
+    // One report, one dialect: the ledger's route line is the canonical
+    // renderer's route line, so the two role lists cannot drift apart again.
+    const routeLine = (text: string): string | undefined =>
+      text.split('\n').find(line => line.startsWith('Model routes:'))
+    expect(routeLine(ledger)).toBe(routeLine(renderReport(supervised, { showDiagnostics: true })))
   })
 })
 

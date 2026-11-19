@@ -1690,3 +1690,38 @@ model selector」）、`test/loop-brakes.spec.ts`（35 条）、`test/loop-runti
   （`src/settings.ts:211`）。**不要**把整条 supervisor 链删掉：空链等于关掉监督门
   （`src/script.ts:1945` 的 `length > 0`、`:2418` 的「No inherit fallback」），那与
   「行为不变」是两件事。
+
+## D-076 — 诊断台账漏掉的 `supervisor`（2026-11-19 · round 20）
+
+- **Status:** CONFIRMED（`src/delivery/index.ts` 角色表四改五；`test/delivery.spec.ts`
+  新增 parity 守卫；红→绿见 `.rsi/evidence/round-020/red-spec-run.txt` / `green.txt`）
+- **Date:** 2026-11-19
+- **Decision:** `machineLedger()` 的 `Model routes:` 行由四角色
+  `['planner','worker','verifier','synthesizer']` 改为五角色
+  `['planner','worker','verifier','supervisor','synthesizer']`（与 `src/report.ts`
+  `ROLE_NAMES`、`src/settings.ts` `ROLE_ORDER` 同序），并与 `renderReport` 的
+  同行做逐行相等断言；同时 `MACHINE_DETAIL` 的角色赋值剥离正则补上
+  `supervisor`。只做这两处：`Synthesis:` 双行标签（`rsi/round-8` 分支
+  `644897b` 的第二改动）不在本轮范围内——它改的是用户可见的行标签，不是
+  「漏掉角色」同一类问题。
+- **Reason:** 与 round 19 同一类遗漏：载入校验修好了（D-075），但交付层的
+  machine ledger 仍只渲染四个角色。有 supervisor 链的 run 在台账里读成
+  「无监督」——`inherit` 在这里是「没配链」的意思，不是「省略显示」。这是一份
+  durable copy（carry-over 回解析、`reportEnterText` 的机器面），说法必须与
+  `renderReport` 同一种方言。
+- **Reason（为什么 parity 断言，而不是只断言 `toContain`）:** 旧分支 `rsi/round-8`
+  的 `644897b` 当年已经修过同一处（red 2 failed → green 14/14），但它从未合入
+  `main`——`git merge-base --is-ancestor 644897b HEAD` 为空，那条分支的守卫也
+  一起被遗弃了。这次不断言两行相等，下一次加第六个角色时还是同一出戏。
+- **Alternatives rejected:**
+  1. 只加 `supervisor=` 的 `toContain`（角色顺序漂移照样过，例如 supervisor
+     跑到 synthesizer 后面——旧分支当年断言过顺序，这次保留）。
+  2. 把 `Synthesis:` 也一起拆成两个标签（`644897b` 的第二改动；超出单轮单主题，
+     且改的是用户可见行标签，应独立成轮并单独评估 carry-over 解析影响）。
+  3. 把两个渲染点的角色表抽成共享常量（`delivery/index.ts` 头部设计约束：只做
+     类型导入，运行时导入会打破「人话层零依赖」的隔离；parity 测试是既定做法，
+     D-075 的 Alternatives (2) 也是同一结论）。
+- **Consequences:** 有 supervisor 链的 run 在 ledger 里如实具名；无链时仍是
+  `supervisor=inherit`（与 `renderReport` 一致）。`run.ts:141`
+  `configRouteLabels` 仍是四角色——那是 C1 跨 run 忙闲提示的输入，不是本轮主题，
+  留给下一轮按单主题处理。
