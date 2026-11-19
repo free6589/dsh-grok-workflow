@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.11.20] - 2026-11-19
+
 ### Fixed / 修复
 
 - **A long run's checkpoint records its own duration instead of dropping it
