@@ -287,4 +287,20 @@ describe('per-route concurrency caps with overflow to the next route', () => {
     state.active.set(runB, { runId: 'run-b', sessionId: 's2', startedAtMs: 1000, routes: ['w1', 'w3'] })
     expect(snapshotBusyRoutes(state)).toEqual(['w1', 'w3', 'w2'])
   })
+
+  it('labels all five routed roles, supervisor included, in report order', () => {
+    const config = resolveConfig({
+      roles: {
+        planner: [{ model: 'plan-a' }],
+        worker: [{ provider: 'p1', model: 'm1' }],
+        verifier: [{ model: 'check-a' }],
+        supervisor: [{ provider: 'sup', model: 'watcher' }],
+        synthesizer: [{ model: 'synth-a' }],
+      },
+    })
+    // The order is `src/report.ts` `ROLE_NAMES` / `src/settings.ts` `ROLE_ORDER`:
+    // a supervisor chain a run really has must be in the C1 hint snapshot, or a
+    // busy supervisor lane is never deprioritized.
+    expect(configRouteLabels(config)).toEqual(['plan-a', 'p1/m1', 'check-a', 'sup/watcher', 'synth-a'])
+  })
 })

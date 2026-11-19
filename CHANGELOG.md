@@ -5,6 +5,23 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Fixed / 修复
+
+- **A busy supervisor lane is now flagged to the next run instead of going
+  unseen / 打满的 supervisor 路由现在会提示给下一次 run，不再被漏掉** —
+  `configRouteLabels()` (the cross-run route hint snapshot) flattened four roles
+  while the router has five, so a `roles.supervisor` chain never reached the
+  snapshot: a supervisor lane another live run had saturated was invisible, and
+  the next run placed supervisor calls into it with no head start on the
+  alternative. All five routed roles are flattened now, in report order, and a
+  unit test pins the full five-role label list so a future role cannot drift out
+  of the snapshot again.
+  / `configRouteLabels()`（跨 run 路由提示快照）只摊平四个角色，而路由实际有五个，
+  于是 `roles.supervisor` 链从未进入快照：另一个活跃 run 已经打满的 supervisor 路由
+  不可见，下一次 run 仍会往里面排 supervisor 调用，也不会先避让到备选路由。现在五个
+  被路由的角色按报告顺序全部摊平，并有一条单元测试钉住五角色的完整标签列表，以后加
+  角色不会再从快照里漂走。
+
 ## [0.11.19] - 2026-11-19
 
 ### Fixed / 修复

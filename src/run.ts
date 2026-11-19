@@ -134,11 +134,18 @@ export function activeCountOfSession(state: ActiveState, sessionId: string): num
   return (state.starting.get(sessionId) ?? 0) + runsOfSession(state, sessionId).length
 }
 
-/** Route labels one config puts into play, flattened across roles (C1 hint source). */
+/**
+ * Route labels one config puts into play, flattened across roles (C1 hint source).
+ *
+ * Five routed roles, in report order (`src/report.ts` `ROLE_NAMES`, the same
+ * order `src/settings.ts` `ROLE_ORDER` uses): a run with a `roles.supervisor`
+ * chain must contribute those labels too, or a busy supervisor lane is never
+ * flagged to the next run (R8-hint).
+ */
 export function configRouteLabels(config: ResolvedConfig): string[] {
   const out: string[] = []
   const seen = new Set<string>()
-  for (const role of ['planner', 'worker', 'verifier', 'synthesizer'] as const) {
+  for (const role of ['planner', 'worker', 'verifier', 'supervisor', 'synthesizer'] as const) {
     for (const route of config.roles[role] ?? []) {
       const model = typeof route.model === 'string' ? route.model.trim() : ''
       if (model === '') continue

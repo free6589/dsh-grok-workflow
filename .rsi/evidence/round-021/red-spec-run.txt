@@ -1,0 +1,40 @@
+     ✓ keeps an overflow-only call in the routing ledger with coerced evidence 3ms
+     ✓ adds a load-time note (never an error) when a chain has 2+ routes but every cap is blank 1ms
+     ✓ prefers the non-busy route when the cross-run hint flags the first chain entry 2ms
+     ✓ keeps the no-hint pick byte-identical when busyRoutes is absent 3ms
+     ✓ never lets the cross-run hint change the child-agent budget 1ms
+     ✓ snapshots run-level route labels from live runs, oldest first 0ms
+     × labels all five routed roles, supervisor included, in report order 6ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/route-concurrency.spec.ts > per-route concurrency caps with overflow to the next route > labels all five routed roles, supervisor included, in report order
+AssertionError: expected [ 'plan-a', 'p1/m1', 'check-a', …(1) ] to deeply equal [ 'plan-a', 'p1/m1', 'check-a', …(2) ]
+
+- Expected
++ Received
+
+  [
+    "plan-a",
+    "p1/m1",
+    "check-a",
+-   "sup/watcher",
+    "synth-a",
+  ]
+
+ ❯ test/route-concurrency.spec.ts:304:39
+    302|     // a supervisor chain a run really has must be in the C1 hint snap…
+    303|     // busy supervisor lane is never deprioritized.
+    304|     expect(configRouteLabels(config)).toEqual(['plan-a', 'p1/m1', 'che…
+       |                                       ^
+    305|   })
+    306| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 14 passed (15)
+   Start at  17:05:01
+   Duration  740ms (transform 383ms, setup 0ms, import 459ms, tests 155ms, environment 0ms)
+
