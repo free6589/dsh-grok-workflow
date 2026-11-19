@@ -1618,3 +1618,22 @@ Issue #1 状态评论 issuecomment-6927842856。
   Schedule 行、`cordis.patch.yml`、`.github/`。
 - **Next action**：R6 发 patch `0.11.18`（`finish-round.py --round 19 --version 0.11.18`），
   然后把 P3-01/P3-02 之一作为下一轮主题。
+
+## 2026-11-19 — RSI round 19 发版落地：`v0.11.18` 已发布（`CONFIRMED`）
+
+- **From:** agent-2（执行代理）· **To:** 用户 / 下一轮接手者
+- **落地（`CONFIRMED`）**：R6 `finish-round.py --round 19 --version 0.11.18` 一次过——
+  commit `3b131c4`，`push origin main`（快进 `6ee2e68..3b131c4`），annotated tag `v0.11.18`
+  （object `40be048`，peel `3b131c4`）已推。远端 CI run `44465623532` = success；Release run
+  `44465627146` = success，Release 已建（非 draft/prerelease，asset
+  `dsh-grok-workflow-0.11.18.tgz`，560685 B）。提交后 `npm run verify:lib` = `lib/ at 3b131c4
+  is the build of src/ at 3b131c4 (149 files, byte-identical)`。老标签未动，无 force-push，
+  无 npm 发布。
+- **门禁（`CONFIRMED`）**：`npm run ci` exit 0 = 63 文件 / 1155 测试 PASS（基线 1154）；oxlint
+  22 warnings / 0 errors；`npm run build` 两次产物 `diff -r` 为空。
+- **评审**：R5 第 1 轮 FAIL（4 条文档准确性，全在“说法与实测”上：错误断言、会把 supervisor
+  门悄悄关掉的迁移建议、README 里不可能成立的模型条件、把 per-task 说成整轮末尾），修完后
+  第 2 轮 PASS。教训写进 `VALIDATION.md` Round 64：**迁移建议要对着运行时路径核一遍，不能
+  只对着载入期注释写**。
+- **Next action**：`src/delivery/index.ts:695` 与 `src/run.ts:141` 仍只列四个角色（同一类缺陷，
+  review 顺带确认），各开一轮；P3-01/P3-02 仍未动；`src/index.ts:292` 注释仍 HYPOTHESIS。

@@ -669,3 +669,20 @@ no history is rewritten, and no round is force-pushed.
   （操作者环境，本轮不碰）；真模型整轮。
 - **发版**：patch `0.11.18`（用户可见修复：错配 supervisor 路由此前延迟到一轮末尾才失败）。
 - **status:** OK
+
+- **Landed as:** commit `3b131c418b9d89451a5a8567fcf9d9cb6addf18a`（15 文件 / +210 / −12），
+  annotated tag `v0.11.18`（object `40be048ec0f5e7787f365ca9a4a5ee2ecd478f31`，peel
+  `3b131c4`）；`git push origin main` 快进 `6ee2e68..3b131c4`，随后 `git push origin v0.11.18`。
+  远端核对：`git ls-remote origin refs/heads/main refs/tags/v0.11.18` 与本地一致
+  （`refs/heads/main` = `3b131c4`，`refs/tags/v0.11.18^{}` = `3b131c4`）；提交后
+  `npm run verify:lib` = `lib/ at 3b131c4 is the build of src/ at 3b131c4 (149 files, byte-identical)`。
+  远端 CI run `44465623532` = **success**；Release run `44465627146` = **success**，Release
+  https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.11.18 已建（非 draft、非
+  prerelease，asset `dsh-grok-workflow-0.11.18.tgz`，560685 B）。老标签未动（`v0.11.17` =
+  `5fc3e1d`），无 force-push，无 npm 发布。
+- **Review 结论：** R5 第 1 轮 FAIL（4 条文档准确性）→ 逐条核对源码后修复（`src/settings.ts`
+  注释、README 中英、ARCHITECTURE、D-075、VALIDATION、STATE、CHANGELOG）→ 第 2 轮 **PASS**，
+  并顺手改掉它留下的两处行级 nit（HANDOFF 措辞、`:2419`→`:2418`）。两次评审都是 fresh-context
+  子代理，自行跑 `npx vitest run test/config.spec.ts test/route-concurrency.spec.ts`（51 passed）
+  与 `npx tsc -p tsconfig.json --noEmit`（exit 0），并逐字节比对 `src/settings.ts` 与
+  `lib/settings.js` 的注释块与数组。
