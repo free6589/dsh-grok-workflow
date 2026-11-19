@@ -735,6 +735,10 @@ no history is rewritten, and no round is force-pushed.
   覆盖）；GUI 点击；rrule 定时到点；tag 安装验证（本轮未做，下轮发版前若动安装面再补）。
 - **status:** OK
 
-- **Landed as:** commit `REPLACEME` + annotated tag `v0.11.19` — pushed `origin/main`
-  fast-forward, old tags untouched, no force-push, no npm publish. Evidence
-  `.rsi/evidence/round-020/`. Remote CI run id + Release URL recorded below after push.
+- **Landed as:** commit `b38d23a` + annotated tag `v0.11.19` (object `a1f36c9`, peel = `b38d23a`).
+  `git push origin main` fast-forward `762becc..b38d23a`; `git push origin v0.11.19` new tag;
+  old tags untouched, no force-push, no npm publish. Evidence `.rsi/evidence/round-020/`.
+  Remote CI run `44469902581` success; Release run `44469906522` success →
+  https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.11.19
+  with asset `dsh-grok-workflow-0.11.19.tgz`. Records follow-up commit `3019490`
+  (STATE 99 lines / LOG row / ledger) pushed fast-forward.
