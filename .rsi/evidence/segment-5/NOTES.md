@@ -136,6 +136,15 @@ tests → this tree adds 2 files / 58 tests, with no deletions and no `.skip`/`.
   remain `HYPOTHESIS`; changing that comment would have rebuilt `src/index.ts` for a wording defect,
   so it was left alone.
 
+## 6b. The record commit
+
+The commit above carries the code and the docs; the ids it could not contain (its own SHA, the
+push range, the CI run) were recorded in a follow-up record commit `9567036`
+(`chore(rsi): record the round-16 landing`), whose own CI run `44425756721` is also green
+(Node 22 + Node 24, `ci-watch-record.txt`). `npm run verify:lib` at that record commit still
+reports `145 files, byte-identical`, and `git status --untracked-files=no` is empty apart from
+`settings-simple-mock.html`, which stays untracked on purpose.
+
 ## 7. Reproduce
 
 ```
