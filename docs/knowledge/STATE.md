@@ -1,6 +1,17 @@
 # Project State
 
-Last updated: 2026-11-19 (**RSI round 17 完成 · `0.11.16` 已发布** — 主题：Q5 心跳识别修 + F1 设置面说法统一。
+Last updated: 2026-11-19 (**常驻并行监护落地，未发版** — 主题：监督从串行环节改为常驻并行监护。
+`src/guardian.ts` 新建（`createRunGuardian` + 实例级卸载注册）、`src/run.ts` 四处接线
+（创建/订阅/adopt/finish 折叠/unload）、`test/guardian.spec.ts` 12 条新测；
+`npm run ci` exit 0 = **63 文件 / 1154 测试 PASS**（+1 文件/+12 测试），lint 22 warnings / 0 errors，
+`lib/` 构建幂等（`git diff --exit-code -- lib/` 空）。
+串行 `supervisor`（D-056，只能 fail）零改动：`test/routing.spec.ts` 25 条 +
+`test/engine-contract.spec.ts` 15 条回归 PASS。
+**未验证（`NOT_RUN`）**：rrule 定时到点、真模型整轮、GUI 点击、unload/归档监听 firing
+（操作体已 CONFIRMED）；真机整轮（本轮只用隔离 profile 跑了 gate 路径，无模型调用）。
+**剩余待办**：P3-01、P3-02 仍 OPEN；`src/index.ts:292` 注释仍 HYPOTHESIS 未动。）
+
+Previous update: 2026-11-19 (**RSI round 17 完成 · `0.11.16` 已发布** — 主题：Q5 心跳识别修 + F1 设置面说法统一。
 R6 一次过：commit `63a4fbb`、tag `v0.11.16` 已推、远端 CI `44440179151` success、GitHub Release 已建（Latest，asset `dsh-grok-workflow-0.11.16.tgz`）。
 tag 安装验证 PASS：`…#v0.11.16` 装得上、行激活、投影 11 键与文档一致、假会话 open 被 admission 拒绝（行不落地）。
 `npm run ci` exit 0 = **62 文件 / 1142 测试 PASS**。

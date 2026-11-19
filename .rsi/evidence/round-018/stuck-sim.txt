@@ -1,0 +1,8 @@
+adopted: children=1 open=1 timerArmed=true
+t+5999 findings=0 cancelled=false
+t+6000 findings=1 signal=heartbeat-loss action=cancel-run
+cancelled once: true reason-head=workflow guardian: child "hanging worker" (seq 1) made no progress within 6000 m
+t+126000 findings=1
+settlement: cancelled=true findings=1
+registry before unload=1
+unloaded=1 after=0

@@ -189,6 +189,12 @@ DSH 启动后，直接提问即可：
 
 渲染的答案会增加 `Failures: 1 infrastructure, 1 quality` 这样的行，因此 provider 故障不会被读成“活干得不好”。
 
+卡住的子代理和主动停止走同一条上报：常驻并行监护从运行开始就盯着每个孩子
+（`workflow/agent-start` / `agent-end`），某一个在预算内毫无进展——取运行死线与
+10 分钟的较小值、显式不限时的运行则 disarm——它最多取消一次运行，并记一条点名
+那个孩子的 `Guardian` 错误，于是读者能分清“活卡住了”和“活被判了不合格”。它从不
+判质量：判质量仍是串行监督的事（检查之后、只能判失败）。
+
 ## 配置参考
 
 配置写在 profile 的 `cordis.patch.yml`（或 `--patch` 覆盖层）里，位于 bundle 行下。`0.11.0` 起配置面为九个（新增 `timeoutMs`），现在为十三个（新增四个 `loop*` 续跑键）；其它键在载入时直接被拒绝——旧补丁会明确报错，而不是变成"设了也不生效"：
@@ -213,7 +219,7 @@ DSH 启动后，直接提问即可：
 | `toolName` | `grok_workflow` | 正则 `^[a-z][a-z0-9_]{1,40}$` | 面向模型的工具名（注册时固定） |
 | `mode` | `triage` | `triage` \| `full` | `triage`：前台选一档并写明（设置页显示为 `auto`）。`full`：每条消息都跑团队 |
 | `grokDefault` | `off` | `on` \| `off` | 会话没有 `/grok` 记录时的默认：`off` 不碰普通对话，`on` 认领每条用户消息 |
-| `roles` | 空链 | 每个角色 ≤50 条 | `{ planner, worker, verifier, synthesizer, supervisor }` 有序链；监督在检查之后运行，只能判失败、不能判通过 |
+| `roles` | 空链 | 每个角色 ≤50 条 | `{ planner, worker, verifier, synthesizer, supervisor }` 有序链；串行监督在检查之后运行，只能判失败、不能判通过；同时常驻并行监护盯着每个子代理是否卡住（见下） |
 | `synthesis` | `layered` | `layered` \| `model` | `layered` 让核验报告保持唯一事实来源；`model` 追加一次模型总结 |
 | `maxConcurrency` | `10` | `100` | 每次运行的并行子代理数 |
 | `maxTasks` | `10` | `100` | 调用方或规划器任务上限 |

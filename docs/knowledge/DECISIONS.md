@@ -1606,3 +1606,45 @@ model selector」）、`test/loop-brakes.spec.ts`（35 条）、`test/loop-runti
   `results/schedule-delivery-message.json`（真实投递原文）、`test/loop.spec.ts`
   （framing 用例）、`test/gate.spec.ts`（`heartbeat classification` 2 条）、CHANGELOG
   `[Unreleased]` Fixed 两条。
+
+## D-074 — 常驻并行监护：run 侧 guardian 与串行 supervisor 正交（2026-11-19）
+
+- **Status:** CONFIRMED（代码+单测落地，未发版；`test/guardian.spec.ts` 12 条，
+  `npm run ci` 待本轮收口时复核）
+- **Date:** 2026-11-19
+- **Decision:**
+  1. 新增 `src/guardian.ts`（`createRunGuardian` + 实例级 `UnloadRegistry` 复刻
+     checkpoint 模式）：run 启动前创建、adopt 时绑定 live run id 并重放
+     pre-adoption 缓冲、单个 `unref()`ed `setInterval`（1s）只在
+     adopt→finish/dispose 之间存在；只订阅 `ctx.on('workflow/agent-start' /
+     'agent-end' / 'end')`，从不调用 `agent()` hook——零模型调用、零新角色。
+  2. 卡住判定走 `guardianChildBudgetMs(timeoutMs)`：`min(deadline, 600s)`，
+     低于 5s 或 `timeoutMs: 0` 则 disarm；超时（child 无 end）与心跳丢失
+     （整 run 静默）任一即 firing，每 run 最多一次 `run.cancel()`，后续只记账
+     （`maxFindings: 32`）。
+  3. 结算在 `run.ts finally` 最先：findings 以
+     `{ phase: 'Guardian', category: 'cancelled' }` 追加进 `lastReport.errors`，
+     不改 status；卸载经 `disposeActiveState` → `unloadRunGuardians(state)` 与
+     run 取消同一批 disposal，无残留 timer/listener/registry。
+  4. 串行 `supervisor` 语义不变（D-056）：verify 之后、synthesize 之前、只能 fail
+     不能 pass；`src/script.ts` 零改动。guardian 回答「活没活」，supervisor 回答
+     「对不对」——两者正交。
+- **Reason:** 用户要求监督是常驻并行监护者：run 一开始就在线、盯每个子代理的
+  存活、卡住能处理（取消/标记/汇总原因）。串行环节只能在 attempt 结束后判失败，
+  看不见 hang 住的 worker——并行 guardian 补的正是这个盲区。
+- **Evidence:** `src/guardian.ts`（模块头约束表）、`src/run.ts`（创建/订阅/adopt/
+  finish 折叠/unload 四处接线）、`test/guardian.spec.ts`（状态机 3、stall 处理 5、
+  卸载清理 4，含 run 级并行存在用例）、`docs/knowledge/RESEARCH.md` A29、
+  `docs/ARCHITECTURE.md` 执行设计节新增段。
+- **Alternatives rejected:**
+  1. 在 script 里加心跳 child（guest 看不见 hang，hang 占住 worker 池且无事件；
+     且每个心跳都是模型调用，违反零成本与 bounded 上限）。
+  2. 在 gate 里做监护（gate 只有 pre-step 决策位，无 run 内持续观察位；它的信号
+     是调用者取消，不是子代理沉寂）。
+  3. 杀单个 child 而非 cancel 整 run（`WorkflowRun` 无逐 child kill 句柄；进 engine
+     杀等于第二套调度，违反架构约束）。
+  4. guardian 改 status 或判 quality（与 D-056 串行语义冲突；status 仍由既有规则
+     计算，guardian 只解释为什么停）。
+- **Consequences:** 默认 60 分钟死线 → 每 child 600s 预算，恒早于死线 firing；
+  `timeoutMs: 0` 的运行 disarm（显式不限时不被 second-guess）；空 supervisor 链的
+  运行仍有并行监护（两者独立开关）。

@@ -5,6 +5,27 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Added / 新增
+
+- **Supervision is now resident and parallel, not just a serial stage
+  / 监督不再只是一个串行环节，而是常驻并行的监护** — every run now starts with a
+  `RunGuardian` beside it: it subscribes to `workflow/agent-start` / `agent-end`
+  before the engine's first child exists, watches every child for stalls, and when
+  one makes no progress within its budget (`min(run deadline, 10 minutes)`,
+  disarmed for an explicitly unlimited run) it cancels the run at most once and
+  records a bounded `Guardian` error naming the child — so a reader can tell "the
+  work stalled" apart from "the work was judged". It never judges quality: the
+  serial supervisor after verification (fail-only, D-056) is unchanged, `script`
+  is untouched, and it costs zero model calls. Plugin unload disposes every live
+  guardian with the runs it watches.
+  / 每次运行现在身边都跟着一个常驻监护：引擎第一个孩子出现之前它就已经订阅了
+  `workflow/agent-start` / `agent-end`，盯着每个孩子的存活；某一个在预算内毫无
+  进展（取运行死线与 10 分钟的较小值，显式不限时的运行则不启用），它最多取消一
+  次运行，并记一条点名那个孩子的 `Guardian` 错误——于是读者能分清“活卡住了”和
+  “活被判了不合格”。它从不判质量：检查之后的串行监督（只能判失败，D-056）原样
+  不动，`script` 零改动，零模型调用。插件卸载时，每个活着的监护随它看的运行一
+  起被清理。
+
 ### Fixed / 修复
 
 - **A delivered heartbeat is recognised inside DSH's own delivery framing

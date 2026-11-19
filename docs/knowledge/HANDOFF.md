@@ -1,5 +1,40 @@
 # Agent Handoff
 
+## 2026-11-19 — 常驻并行监护落地（未发版，未提交）
+
+- **From:** lead（本会话）· **To:** 用户 / 下一轮接手者
+- **做了什么（`CONFIRMED`）**：监督从串行环节改为常驻并行监护，与主流程并存。
+  新增 `src/guardian.ts`（`RunGuardian` 状态机：run 启动前创建、adopt 绑定 live run、
+  只读 `workflow/agent-start/agent-end/end`、超时/心跳丢失任一即 firing、每 run 最多
+  一次 `run.cancel()`、findings 以 `Guardian` 相追加进报告 errors 且不改 status、不调
+  `agent()` hook、零模型调用）；`src/run.ts` 四处接线（创建/订阅/adopt/`finally` 折叠/
+  `disposeActiveState` 经 `unloadRunGuardians` 清理）；`test/guardian.spec.ts` 12 条
+  （状态机 3、stall 处理 5、卸载清理 4，含 run 级并行存在用例）。
+  RESEARCH 写了 **A29**（实现位/状态源/判定/动作与上限），DECISIONS 新增 **D-074**，
+  ARCHITECTURE 执行设计图 + Supervise 节 + Lifecycle 三处更新，README 中英各加一段
+  + roles 表格行改说法，CHANGELOG `[Unreleased]` 加一条 Added（双语）。
+  串行 supervisor（`src/script.ts`）**零改动**。
+- **门禁（`CONFIRMED`）**：`npm run ci` exit 0 = **63 文件 / 1154 测试 PASS**
+  （基线 62/1142，+1 文件/+12 测试），lint 22 warnings / 0 errors（与基线一致），
+  `npm run verify:lib` 在提交前仍报“145 文件、与基线一致”（新 `lib/guardian.*`
+  尚未计入——提交后复核见 VALIDATION）。
+  证据：`.rsi/evidence/round-018/`（`baseline-ci.txt`、`full-ci.txt`、`stuck-sim.mjs/txt`）。
+- **验收对照**：①并行存在：run 级用例录下订阅快照（start/end 监听峰值 ≥3，progress/
+  archiver/guardian 各一）+ `adopted children=1 open=1 timerArmed=true`；
+  ②卡住模拟：`t+5999 findings=0` → `t+6000 findings=1 signal=heartbeat-loss
+  action=cancel-run` → 126s 后仍 1 条、cancel 恰一次；
+  ③卸载无残留：`finish` 释注册表、`unloadRunGuardians` 1→0、listeners 清空；
+  ④原 supervisor 回归：`routing` 25 条 + `engine-contract` 15 条 PASS，script 未动；
+  ⑤`npm run ci` exit 0（上）。
+- **未验证（`NOT_RUN`）**：rrule 定时到点、真模型整轮、GUI 点击、unload/归档监听
+  firing（操作体已 CONFIRMED）。真机只跑了隔离 profile 的 gate 路径，无模型调用。
+- **接手注意**：`settings-simple-mock.html` 仍是未跟踪草稿，**不入库**；
+  P3-01 / P3-02 仍 OPEN；`src/index.ts:292` 注释仍 HYPOTHESIS 未动。
+  **不要 `git add -A`**：`.rsi/evidence/round-018/` 与上述文件已按清单暂存，其余
+  未跟踪文件（尤其 `settings-simple-mock.html`）不属于本轮。
+- **Next action**：本轮提交 + push（命令见 VALIDATION 本轮段）；发版需操作者授权，
+  下一版应为 patch（用户可见新增），把 `[Unreleased]` 的 Added 搬进新版本段。
+
 ## 2026-11-19 — RSI round 16：续跑开关与心跳刹车落地（未发版）
 
 - **From:** 执行代理 agent-56（任务段 `segment 5/5`，收口轮）· **To:** 用户 / 下一轮接手者

@@ -2,6 +2,43 @@
 
 Real commands and results only. Do not add expected results here.
 
+## Round 63 — 2026-11-19 — 常驻并行监护落地（`CONFIRMED`，未发版）
+
+**范围**：监督从串行环节（`执行 → 检查 → 监督 → …`）改为常驻并行监护。
+新增 `src/guardian.ts`、`test/guardian.spec.ts`；`src/run.ts` 接线；
+`docs/knowledge/RESEARCH.md` A29、`DECISIONS.md` D-074、`docs/ARCHITECTURE.md`
+三处、`README.md` / `README.zh-CN.md`、`CHANGELOG.md [Unreleased]` Added 双语；
+`src/script.ts`（串行 supervisor）零改动。证据 `.rsi/evidence/round-018/`。
+
+**命令与结果（`CONFIRMED`，本机共享树实跑）**：
+
+| 命令 | 结果 |
+| --- | --- |
+| `npm run ci`（基线，改前） | exit 0，**62 文件 / 1142 测试 PASS**（`.rsi/evidence/round-018/baseline-ci.txt`） |
+| `npx vitest run test/guardian.spec.ts` | 12 / 12 PASS（状态机 3、stall 处理 5、卸载清理 4，含 run 级并行存在用例） |
+| `npx vitest run test/guardian.spec.ts test/routing.spec.ts test/engine-contract.spec.ts test/lifecycle-disposal.spec.ts test/plugin-lifecycle.spec.ts` | 5 文件 / 84 测试 PASS（supervisor 回归：routing 25 + engine-contract 15 全绿，script 未动） |
+| `node .rsi/evidence/round-018/stuck-sim.mjs` | `adopted children=1 open=1 timerArmed=true` → `t+5999 findings=0` → `t+6000 findings=1 signal=heartbeat-loss action=cancel-run`（cancel 恰一次）→ 126s 后仍 1 条 → `settlement cancelled=true findings=1` → `unloaded=1 after=0`（`.rsi/evidence/round-018/stuck-sim.txt`） |
+| `npm run ci`（改后全量） | exit 0，**63 文件 / 1154 测试 PASS**，lint 22 warnings / 0 errors（`.rsi/evidence/round-018/full-ci.txt`） |
+| `npm run build` 后 `git diff --exit-code -- lib/` | exit 0（幂等） |
+
+**验收逐条**：
+
+- 监督与主流程并行存在：run 级用例录下订阅快照（`agent-start`/`agent-end` 监听峰值
+  ≥3：progress、archiver、guardian 各一）+ guardian 在 run 前创建、adopt 绑定；
+  `src/run.ts` 订阅位与 `finally` 折叠位为证。有启动/结束证据，不是串行节点。
+- 卡住模拟：`stuck-sim` 显示 hung child 在预算内 0 firing、到点 1 firing、126s 后仍
+  1 条、cancel 恰一次——不无限等。处理动作为 `run.cancel()`（host 侧唯一拥有），
+  上限为结构性（`cancelOnce` + `maxFindings: 32`）。
+- 卸载/取消无残留：`finish` 释放注册表项、`unloadRunGuardians` 1→0、`dispose` 清
+  timer、run `finally` 清 listeners；`test/guardian.spec.ts` 卸载清理 4 条钉住。
+- 原 supervisor 语义回归：`src/script.ts` 零改动；`routing` backstop 公式与
+  `engine-contract` children 计数测试未动即 PASS（只能 fail 不能 pass 不变）。
+- `npm run ci` exit 0（上表）。
+
+**未验证（`NOT_RUN`，与上轮相同）**：rrule 定时到点；真模型跑整轮；GUI 点击；
+unload/归档监听的 firing（操作体 CONFIRMED）。真机只跑隔离 profile 的 gate 路径，
+无模型调用。
+
 **Before running any live matrix, read [TESTING.md](TESTING.md)** — the workspace-isolation rules are
 mandatory: no sample is sent to a test instance until its session workspace is a scratch directory
 under `/tmp`, and the proof of that (the `sessions/--tmp-…--` directory name plus the workspace name

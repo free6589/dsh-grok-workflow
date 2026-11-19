@@ -196,6 +196,15 @@ Every failure carries a `class` (what happened) and a `category` (who has to fix
 
 The rendered answer adds a `Failures: 1 infrastructure, 1 quality` line, so a provider outage is not read as poorly done work.
 
+A stalled child is reported the same way a stop is: the resident parallel
+guardian watches every child from run start (`workflow/agent-start` /
+`agent-end`), and when one makes no progress within its budget — `min(run
+deadline, 10 minutes)`, disarmed for an explicitly unlimited run — it cancels
+the run at most once and records a `Guardian` error naming the child, so a
+reader can tell "the work stalled" apart from "the work was judged". It never
+judges quality: the serial supervisor keeps that job (fail-only after
+verification).
+
 ## Configuration reference
 
 Configuration belongs to the profile's `cordis.patch.yml` (or a `--patch` overlay), under the bundle row. The surface is exactly thirteen keys (`timeoutMs` joined in `0.11.0`, the four `loop*` keys with the repeat-run settings); anything else is rejected at load, so a stale patch fails loudly instead of looking like a setting that does nothing:
@@ -220,7 +229,7 @@ Configuration belongs to the profile's `cordis.patch.yml` (or a `--patch` overla
 | `toolName` | `grok_workflow` | pattern `^[a-z][a-z0-9_]{1,40}$` | Model-facing tool name (fixed at registration) |
 | `mode` | `triage` | `triage` \| `full` | `triage`: the front desk picks a tier and says so (the settings page shows it as `auto`). `full`: every message runs the team |
 | `grokDefault` | `off` | `on` \| `off` | Session default when no `/grok` record exists. `off` leaves ordinary chat alone; `on` claims every user message |
-| `roles` | empty chains | ≤50 routes each | `{ planner, worker, verifier, synthesizer, supervisor }` ordered chains. The supervisor runs after verification and can only fail a task, never pass one |
+| `roles` | empty chains | ≤50 routes each | `{ planner, worker, verifier, synthesizer, supervisor }` ordered chains. The serial supervisor runs after verification and can only fail a task, never pass one; alongside it a resident parallel guardian watches every child for stalls (see below) |
 | `synthesis` | `layered` | `layered` \| `model` | `layered` keeps the verified report the only source of fact; `model` adds one model-written summary |
 | `maxConcurrency` | `10` | `100` | Child agents in flight per run |
 | `maxTasks` | `10` | `100` | Maximum caller or planner tasks |

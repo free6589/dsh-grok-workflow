@@ -58,7 +58,19 @@ ctx.workflowEngine.start({ script, meta, args, parent, signal })
         |       for each task:
         |         worker agent -> structured execution result
         |         verifier agent -> criterion evidence
+        |         supervisor agent (serial) -> can only fail the attempt, never pass it
         |         if failed and attempts remain: worker retry -> verifier
+        |
+        +--> Resident parallel supervision (host side, `src/guardian.ts`):
+        |       one `RunGuardian` per run, created before the engine starts and
+        |       adopted with the live run. It observes only
+        |       `workflow/agent-start` / `workflow/agent-end` / `workflow/end`,
+        |       judges liveness (never quality), and on a stall
+        |       (per-child timeout or run-wide heartbeat loss) cancels the run
+        |       at most once and records a bounded `Guardian` finding that the
+        |       terminal path folds into the report's errors. It never calls the
+        |       engine's `agent()` hook: zero model calls, no new agent role.
+        |       See `docs/knowledge/RESEARCH.md` A29 and `DECISIONS.md` D-074.
         |
         +--> Synthesize: deterministic host/script report
         |
@@ -132,6 +144,32 @@ task and the worker's structured result. The verifier must:
 The host validates these conditions. A malformed or evidence-free `pass` is
 converted to a failed verification and triggers a bounded retry.
 
+### Supervise (two layers, orthogonal)
+
+Supervision answers two different questions in two different places:
+
+- **Serial supervisor (quality):** after verification and before synthesis, one
+  `supervisor` agent call per task attempt — but only when a supervisor chain
+  is configured. It can only fail an attempt, never pass one: a verifier
+  failure stands even when supervision passes. This is the D-056 semantic and
+  it is unchanged.
+- **Resident parallel guardian (liveness):** one `RunGuardian` per run, alive
+  from before the engine starts until the run settles (`src/guardian.ts`). It
+  observes only `workflow/agent-start` / `workflow/agent-end` /
+  `workflow/end`, judges whether children are still alive (never what they
+  said), and on a stall — a per-child timeout or a run-wide heartbeat loss
+  against a budget derived from the run's own deadline (`min(deadline, 600s)`,
+  disarmed for `timeoutMs: 0`) — cancels the run at most once and records a
+  bounded `Guardian` finding that the terminal path folds into the report's
+  errors without changing its status. It never calls the engine's `agent()`
+  hook: zero model calls, no new agent role, no second scheduler. Plugin
+  unload disposes every live guardian with the runs it watches, so no timer,
+  listener, or registry entry outlives the unload. See `RESEARCH.md` A29 and
+  `DECISIONS.md` D-074.
+
+One sentence: the supervisor answers "is the work right", the guardian
+answers "is the work still alive".
+
 ### Retry
 
 Each task has at most `maxRetries` retries after the initial attempt (default 1,
@@ -171,7 +209,11 @@ Status rules:
   its controller and disposes every live run during unload, then returns after
   cleanup settles.
 - Tool and prompt registrations are Cordis effects, so unload removes them.
-- There are no plugin-owned timers, sockets, or listeners beyond the effect
+- The resident guardian owns one `unref()`ed 1-second interval per live run
+  plus its three engine-event listeners and its instance-registry entry; all
+  three are released on `finish()`/`dispose()`, and `disposeActiveState`
+  disposes every live guardian with the runs it watches.
+- There are no other plugin-owned timers, sockets, or listeners beyond the effect
   cleanup and the deadline timer, which is cleared on every path.
 
 ## Registration and composition

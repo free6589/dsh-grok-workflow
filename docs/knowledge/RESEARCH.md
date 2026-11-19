@@ -1002,3 +1002,82 @@ stub 只回 text、无任何工具调用；minimal 无 Schedule 时 `open` 答 5
 **仍未观测**：rrule 自己到点的那次投递（手动 `run` 触发，非定时器到点）；真模型跑整轮；
 GUI 点击开关；unload 钩子 firing（`stopAll` 操作体 CONFIRMED，钩子 HYPOTHESIS）；
 归档监听 firing（`forgetSession` 操作体 CONFIRMED，监听 NOT_RUN）。
+
+## A29 — 常驻并行监护：实现位、状态源、卡住判定、处理动作与上限（2026-11-19，`CONFIRMED`）
+
+Source: 只读审计 + 本轮新增实现与单测。依据 = `src/guardian.ts`（新）、`src/run.ts`
+（`guardian.adopt` / 订阅 / `finish` 折叠 / `unloadRunGuardians`）、`test/guardian.spec.ts`
+（12 条）、`docs/ARCHITECTURE.md` 执行设计节、D-056（第五角色语义）、D-002/D-003
+（engine-hook 与 bounded 上限）。
+
+### 1. 实现位：run，不在 gate，不在 script，复用已有三订阅位
+
+- **挂点**：`runWorkflow`（`src/run.ts`）。`createRunGuardian` 与 progress recorder、
+  checkpoint recorder 同一批创建（run 启动前），`guardian.adopt(run)` 与
+  `archiver.adopt` / `checkpoints.adopt` 同一个窗口（engine 交回 run 后），
+  订阅与 progress/archiver 同一批 `listen()`（`workflow/agent-start` /
+  `workflow/agent-end` / `workflow/end`），`finish` 在同一个 `finally` 里最先结算、
+  `disposeActiveState` 里与 run 取消同一批 disposal。
+- **为什么不是 gate**：gate 只有一个 `agent/pre-step` 决策位，它能拦下一条消息，
+  不能在一次运行内部持续观察 N 个子代理；它的信号是调用者的取消，不是子代理的
+  沉寂。监护要的是「运行内存活着、持续听事件」，这是 run 的寿命，不是 gate 的。
+- **为什么不是 script**：script 里已经有一个 `supervisor`（串行环节，见 §5），
+  但 guest 看不到自己的 `agent()` 调用是否 hang——hang 住的 worker 占着 worker 池，
+  脚本侧没有任何事件可读。能看到 `workflow/agent-start` / `agent-end` 的只有 host
+  侧（`ctx.on`），所以并行监护只能落在 host 侧的 run 里。script 侧零改动。
+- **不新增 agent loop**：`src/guardian.ts` 从不调用 `ctx.workflowEngine` 的
+  `agent()` hook（全文无 `agent(` 调用），不创建子代理、不跑模型、不产出结构化
+  结果——满足「不自建 loop、不复刻 DSH 调度」。
+
+### 2. 状态源：只读 engine 事件，不读 session，不读子输出
+
+- **事件**：`workflow/agent-start`（开一行：`seq` + `label` + `childId` + 到达时间）、
+  `workflow/agent-end`（按 `seq` 结算；先 end 后 start 记 settled 占位，幂等规则与
+  progress recorder 相同）、`workflow/end`（停表）。`info.id` 非本 run 的一律丢弃。
+- **竞态**：engine 可能在 `start()` 交回 run 之前就发出 `agent-start`（与 progress
+  的 pre-adoption buffer 同一窗口）。guardian 用 `pendingStarts` / `pendingEnds`
+ （各 ≤64）按 `info.id` 缓冲，`adopt(handle)` 时按 live run id 绑定并重放——
+  `runId: ''` 创建 + `adopt` 绑定是刻意设计，不是缺省。
+- **不碰**：session store（`ctx.sessions` / `ctx.get('sessions')` 一律不读）、子代理
+  输出、prompt 文本。监护只判「活没活」，不判「对不对」——质量判断仍是串行
+  supervisor 的事（§5）。
+
+### 3. 卡住判定：超时与心跳丢失是同一观测的两个名字
+
+- **预算**：`guardianChildBudgetMs(timeoutMs) = min(deadline, 600s)`，低于
+  `CHILD_TIMEOUT_FLOOR_MS`（5s）或 `timeoutMs <= 0`（不限时）则 disarm——显式不限时
+  的运行不被 second-guess（与 `run.ts` 的 `deadlineMs = 0 → 不设 timer` 同构）。
+  默认 60 分钟死线 → 预算 600s，监护恒早于死线 firing。
+- **超时（timeout）**：某 child 自 `agent-start` 起 `budgetMs` 内无 `agent-end`。
+- **心跳丢失（heartbeat-loss）**：同一预算内，本 run 无任何事件（无 end、无新的 start）。
+  host 侧子代理唯一的 liveness 信号就是它的 settlement 事件，所以「整 run 静默
+  ≥ budget」即 stall 的可观测形状。两者同时满足时记录 `heartbeat-loss`（run 级静默
+  更值得信任），否则记 `timeout`——判定测试各钉一条（`test/guardian.spec.ts`）。
+- **上限**：每 run 最多 `maxChildren`（256）行、`maxFindings`（32）条 finding；
+  定时检查是单个 `setInterval` 1s、`unref()`、只在 `adopt→finish/dispose` 之间存在
+  （与 checkpoint timer 同构）。无 unbounded loop。
+
+### 4. 处理动作：每 run 最多一次 cancel，其余只是记账
+
+- **动作**：`run.cancel(reason)`，reason 形如
+  `workflow guardian: child "…" (seq N) made no progress within M ms (signal)`。
+  这是 host 侧唯一拥有的动作：`WorkflowRun` 没有逐 child kill 句柄，到 engine 里
+  杀单个 child 等于第二套调度——被架构约束禁止。
+- **上界**：`cancelOnce`——首次 firing 取消，后续 firing 只追加 finding（仍 ≤32）。
+  guardian 自身不重试、不重排、不重驱动；script 侧既有的 bounded retry
+ （默认 1、上限 3）决定该 task 是否再试。cancel 抛错只记 `warn`，不污染 run。
+- **报告**：`run.ts` 的 `finally` 里 `guardian.finish()` 先于 checkpoint/archive 结算，
+  findings 以 `{ phase: 'Guardian', category: 'cancelled' }` 追加进 `lastReport.errors`
+ （按 `phase+message` 去重，≤32）。**不改 status**：status 仍由既有规则计算
+  （无 verified 即 failed），Guardian 只解释「为什么停」，不判「做没做成」。
+
+### 5. 与串行 supervisor 的关系：并行是 liveness，串行是 quality，语义不变
+
+- 串行 `supervisor`（D-056）保持原样：verify 之后、synthesize 之前，每 task 每
+  attempt 一次，只能 fail 不能 pass；`src/script.ts:1941-1973` 零改动。
+- 并行 guardian 不产出 `verdict`、不写 `checkedEvidence`、不进 `routes`/`routing`、
+  不占 `maxTotalAgents` 预算、不走任何 role chain——`test/routing.spec.ts`
+  的 backstop 公式与 `test/engine-contract.spec.ts` 的 children 计数在本轮未动即回归。
+- 一句话：**supervisor 回答「做得对不对」，guardian 回答「还活着没」**；
+  前者在脚本里判质量，后者在主机侧看存活。两者正交，可独立开关
+  （空 supervisor 链 = 串行门不开；`timeoutMs: 0` = 并行监护 disarm）。
