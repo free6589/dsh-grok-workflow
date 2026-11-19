@@ -1,5 +1,27 @@
 # Agent Handoff
 
+## 2026-11-19 — 用户报障修：续跑开关点不动 + `HTTP undefined`（已提交，未 push/未发版）
+
+- **From:** lead（本会话）· **To:** 用户 / 下一轮接手者
+- **根因（`CONFIRMED`）**：`LoopSwitch` 生产默认 `send = props.loopSend ?? loopSend`，
+  把请求体形的 `loopSend(body)` 当 fetch 传：真机上每次读取都被包两层，
+  内层返回的 `{ok:false}` 对象无 `.status`，外层报 `loop/response` + `HTTP undefined`，
+  开关 `failed` 卡死、点不动。测试全用 mock `loopSend`，生产路径零覆盖，故 CI 全绿也拦不住。
+- **改动（`CONFIRMED`）**：`src/client/index.js` 默认改走页面 `fetch`（5 行 + 注释）；
+  `test/client.spec.ts` 新增生产路径回归用例（不传 `loopSend`，挂载→读→点开→点关）；
+  `CHANGELOG.md` `[Unreleased]` 双语 Fixed；`lib/` 重建。提交 `1c28c6d`，
+  **未 push、未打 tag、未建 Release**。
+- **门禁（`CONFIRMED`）**：`npm run ci` exit 0 = **63 文件 / 1159 测试 PASS**；
+  `npm run verify:lib` = `lib/ at 1c28c6d is the build of src/ at 1c28c6d`
+ （149 files byte-identical）。证据 `.rsi/evidence/round-023/`。
+- **真机（`CONFIRMED`）**：复制 profile `loopfix-verify`（link 本树，`:3451`）——
+  路由 `status→open→status→close→status` 5×200、关后无残留行；真实 bundle 生产路径脚本
+  mount 显示 `关` → 点开 `开 · 每 60 分钟 · 还剩 10 轮`（服务端确认 task）→ 再点回 `关`
+  （服务端确认关闭）。实例已停，token/cookie 已清，证据无密钥。
+- **Next action**：用户在自己浏览器点一次开关确认 → 确认后 push + 按 `docs/RELEASING.md`
+  走 patch 发版（`[Unreleased]` 只有这一条 Fixed）。`loopfix-verify` profile
+  留在 `~/.dsh/profiles/`，复用或删除由用户定。
+
 ## 2026-11-19 — round 21 落地（C1 提示补 `supervisor`）+ 脏树清理：遗留 mock 已归位归档
 
 - **From:** 清理任务（子代理）· **To:** 用户 / 下一轮接手者
