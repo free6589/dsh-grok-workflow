@@ -686,3 +686,7 @@ no history is rewritten, and no round is force-pushed.
   子代理，自行跑 `npx vitest run test/config.spec.ts test/route-concurrency.spec.ts`（51 passed）
   与 `npx tsc -p tsconfig.json --noEmit`（exit 0），并逐字节比对 `src/settings.ts` 与
   `lib/settings.js` 的注释块与数组。
+- **工具缺陷（本轮发现，未修）**：`.rsi/tools/finish-round.py` 只在 `report` 正文里替换
+  `{{CI}}` / `{{TAG}}`，不碰 `log` 字段。本轮 LOG 行因此一度留下 `{{TAG}}` 字面量，已就地
+  改成 `v0.11.18`；round 14 / round 17 的同类占位符属于历史记录，不重写。下一轮若动
+  `.rsi/tools/`，顺手把 `log` 也走同一套替换。
