@@ -1,14 +1,17 @@
 # Project State
 
-Last updated: 2026-11-19 (**常驻并行监护落地，未发版** — 主题：监督从串行环节改为常驻并行监护。
-`src/guardian.ts` 新建（`createRunGuardian` + 实例级卸载注册）、`src/run.ts` 四处接线
-（创建/订阅/adopt/finish 折叠/unload）、`test/guardian.spec.ts` 12 条新测；
-`npm run ci` exit 0 = **63 文件 / 1154 测试 PASS**（+1 文件/+12 测试），lint 22 warnings / 0 errors，
-`lib/` 构建幂等（`git diff --exit-code -- lib/` 空）。
-串行 `supervisor`（D-056，只能 fail）零改动：`test/routing.spec.ts` 25 条 +
-`test/engine-contract.spec.ts` 15 条回归 PASS。
+Last updated: 2026-11-19 (**`0.11.17` 已发布并从 GitHub 更新到本机** — 常驻并行监护
+（guardian）走 patch 发版：`package.json`/`package-lock.json`/`README×2`/
+`docs/LOCAL-TESTING.md` 同步到 `0.11.17`，CHANGELOG `[Unreleased]` Added 搬进
+`## [0.11.17]`；commit `5fc3e1d`、annotated tag `v0.11.17` 已推，远端 CI
+`44459682983` success、Release 已建（asset `dsh-grok-workflow-0.11.17.tgz`）。
+tag 安装验证 PASS（隔离 profile 从 `github:…#v0.11.17` 装：行激活、投影 11 键、
+双工具、`loop` 路由开/关全通、`lib/guardian.js` 逐字节一致）。
+本机 `web` profile 已从 GitHub 更新到 `#v0.11.17`（`0.11.13` → `0.11.17`，
+guardian.js sha256 两侧一致，`--dump-config` 行正常）。
+`npm run ci` exit 0 = **63 文件 / 1154 测试 PASS**。
 **未验证（`NOT_RUN`）**：rrule 定时到点、真模型整轮、GUI 点击、unload/归档监听 firing
-（操作体已 CONFIRMED）；真机整轮（本轮只用隔离 profile 跑了 gate 路径，无模型调用）。
+（操作体已 CONFIRMED）。
 **剩余待办**：P3-01、P3-02 仍 OPEN；`src/index.ts:292` 注释仍 HYPOTHESIS 未动。）
 
 Previous update: 2026-11-19 (**RSI round 17 完成 · `0.11.16` 已发布** — 主题：Q5 心跳识别修 + F1 设置面说法统一。

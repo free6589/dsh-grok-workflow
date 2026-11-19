@@ -2,6 +2,32 @@
 
 Real commands and results only. Do not add expected results here.
 
+## Round 63 — 2026-11-19 — `0.11.17` 发版 + tag 安装验证 + 本机 GitHub 更新（`CONFIRMED`）
+
+**范围**：把常驻并行监护（guardian）走 patch 发版（`0.11.16` → `0.11.17`），验证
+tag 从 GitHub 可装可用，再把本机 `web` profile 的插件经 GitHub 更新到该 tag。
+证据 `.rsi/evidence/round-018/`（`release-ci.txt` + `install/`）。
+
+**版本判定**：patch。guardian 是用户可见的新增能力，但配置面、报告 schema、
+5 角色语义（D-056）都没变——按 `docs/RELEASING.md` 版本规则走 patch，不走 minor。
+
+**命令与结果（`CONFIRMED`，本机实跑）**：
+
+| 命令 | 结果 |
+| --- | --- |
+| `python3 .rsi/tools/bump-version.py 0.11.17` | `declared(en=1,zh=1) pins(en=2,zh=2) lists(en=1,zh=1) bare(en=1,zh=1) local-testing.tgz=3 published=42` |
+| `npm run ci`（发版前全量） | exit 0，**63 文件 / 1154 测试 PASS**，lint 22 warnings / 0 errors（`.rsi/evidence/round-018/release-ci.txt`） |
+| `git diff --exit-code -- lib/` | exit 0（幂等；`lib/guardian.*` 已随上轮提交入库） |
+| `git commit` + `git tag -a v0.11.17` + `git push origin main` + `git push origin v0.11.17` | `5fc3e1d` 推上 `main`（`4de7a7a..5fc3e1d` 快进）；tag `97df6ca` 新建，无 force-push，旧标签未动 |
+| 远端 CI（`gh run list --branch main`） | `44459682983` success（release commit）；Release 已建：`Grok Workflow for DSH v0.11.17` + asset `dsh-grok-workflow-0.11.17.tgz`（`gh release view v0.11.17` 可见） |
+| `PORT=3442 bash .rsi/evidence/round-018/install/20-run-install.sh` | `run complete`；安装命令是 `dsh plugin --profile acc-tag add github:free6589/dsh-grok-workflow#v0.11.17`（无本地路径），exit 0 |
+| tag 安装验收（隔离 profile，见 `install/00-conclusion.md`） | **PASS 10/10**：行激活、投影 11 键（`11 of 13 field(s)`）、双工具、`loop` open/status/close + 400/401/405、`lib/guardian.js` 逐字节一致、client 三处一致、无凭据落盘 |
+| `DSH_HOME=/home/fish/.dsh dsh plugin --profile web add github:free6589/dsh-grok-workflow#v0.11.17` | exit 0（7.7s）；`0.11.13` → `0.11.17`；guardian.js sha256 `072068d4…` 两侧一致；`--dump-config` 的 `grok-workflow` 行正常 |
+| `rm -rf .tmp/r18` | scratch 已删（含 launch token 与 cookie jar） |
+
+**未验证（`NOT_RUN`，与上轮相同）**：rrule 定时到点；真模型跑整轮；GUI 点击；
+unload/归档监听的 firing（操作体 CONFIRMED）。
+
 ## Round 63 — 2026-11-19 — 常驻并行监护落地（`CONFIRMED`，未发版）
 
 **范围**：监督从串行环节（`执行 → 检查 → 监督 → …`）改为常驻并行监护。

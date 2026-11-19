@@ -1,0 +1,38 @@
+cmd        : DSH_HOME=/home/fish/projects_mine/dsh-grok-workflow/.tmp/r18/home dsh plugin --profile acc-tag add github:free6589/dsh-grok-workflow#v0.11.17
+exit       : 0
+--- stdout ---
+Progress: resolved 0, reused 1, downloaded 0, added 0
+Packages are hard linked from the content-addressable store to the virtual store.
+  Content-addressable store is at: /home/fish/.local/share/pnpm/store/v11
+  Virtual store is at:             node_modules/.pnpm
+Packages: +4
+++++
+Progress: resolved 4, reused 4, downloaded 0, added 4, done
+[WARN] Issues with peer dependencies found. Run "pnpm peers check" to list them.
+
+dependencies:
++ dsh-grok-workflow github:free6589/dsh-grok-workflow#v0.11.17
+
+Done in 9.1s using pnpm v12.4.2
+--- stderr ---
+--- profile package.json (dsh + dependencies) ---
+{
+ "dsh": {
+  "profile": {
+   "bundles": [
+    "@deepseek-ai/dsh-base",
+    "@deepseek-ai/dsh-web-app",
+    "dsh-grok-workflow"
+   ]
+  }
+ },
+ "dependencies": {
+  "dsh-grok-workflow": "github:free6589/dsh-grok-workflow#v0.11.17"
+ }
+}
+--- installed package ---
+dsh-grok-workflow@0.11.17 dsh={"pluginType":"feature","bundle":{"patch":"./cordis.patch.yml"},"client":{"platform":"web","inject":["@deepseek-ai/dsh-client-ui-settings","@deepseek-ai/dsh-api-remotes"]}}
+--- installed lib entries (guardian must be present) ---
+/home/fish/projects_mine/dsh-grok-workflow/.tmp/r18/home/profiles/acc-tag/node_modules/dsh-grok-workflow/lib/guardian.d.ts
+/home/fish/projects_mine/dsh-grok-workflow/.tmp/r18/home/profiles/acc-tag/node_modules/dsh-grok-workflow/lib/guardian.js
+guardian exports: GUARDIAN_LIMITS,createRunGuardian,guardianChildBudgetMs,registerRunGuardian,registeredRunGuardians,unloadRunGuardians,unregisterRunGuardian

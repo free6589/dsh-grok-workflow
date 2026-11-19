@@ -1,5 +1,39 @@
 # Agent Handoff
 
+## 2026-11-19 — `0.11.17` 发版 + tag 安装验证 + 本机 GitHub 更新（已全部落地）
+
+- **From:** lead（本会话）· **To:** 用户 / 下一轮接手者
+- **做了什么（`CONFIRMED`）**：
+  1. 发版（patch，用户已授权）：`bump-version.py 0.11.17` 同步 5 处
+     （`package.json`+`package-lock.json`+两份 README+`LOCAL-TESTING.md` tgz 名）；
+     CHANGELOG `[Unreleased]` Added 搬进 `## [0.11.17] - 2026-11-19`；
+     README 测试数 62/1142 → 63/1154（双语）。commit `5fc3e1d`、annotated tag
+     `v0.11.17` 已推 `origin/main` 与 `origin/v0.11.17`；远端 CI `44459682983`
+     success；Release `Grok Workflow for DSH v0.11.17` 已建
+    （asset `dsh-grok-workflow-0.11.17.tgz`）。旧标签未动，无 force-push。
+  2. tag 安装验证 PASS（隔离 profile `acc-tag`，`DSH_HOME=.tmp/r18/home`，端口 3442，
+     从 `github:free6589/dsh-grok-workflow#v0.11.17` 装——无本地路径）：
+     行激活、投影 11 键、`grok_workflow`+`grok_loop` 双工具、`loop` 路由
+     status→open→close 全通（400/401/405 行为符合文档）、`lib/guardian.js`
+     逐字节一致、client 三处一致。证据 `.rsi/evidence/round-018/install/`。
+  3. 本机更新：`DSH_HOME=/home/fish/.dsh dsh plugin --profile web add
+     github:free6589/dsh-grok-workflow#v0.11.17` exit 0（`0.11.13` → `0.11.17`，
+     guardian.js sha256 `072068d4…` 两侧一致，`--dump-config` 行正常）。
+     依赖 pin 从 `github:free6589/dsh-grok-workflow` 变为带 tag 后缀
+     `github:free6589/dsh-grok-workflow#v0.11.17`——后续 `main` 更新不再自动跟进，
+     下次发版时再显式更新。
+- **门禁（`CONFIRMED`）**：`npm run ci` exit 0 = **63 文件 / 1154 测试 PASS**
+  （`.rsi/evidence/round-018/release-ci.txt`）；`lib/` 构建幂等；
+  D-074 状态已改为已发版。
+- **未验证（`NOT_RUN`）**：rrule 定时到点、真模型整轮、GUI 点击、unload/归档监听
+  firing（操作体已 CONFIRMED）。
+- **接手注意**：`settings-simple-mock.html` 仍是未跟踪草稿，**不入库**；
+  P3-01 / P3-02 仍 OPEN；`src/index.ts:292` 注释仍 HYPOTHESIS 未动。
+  `.tmp/r18` 已删；`.rsi/evidence/round-018/install/` 的 `20-run-install.sh` 是
+  GitHub-tag 版 harness（round-17 的是 tarball 版），下次复用认准文件名相同但
+  第一节不同。
+- **Next action**：本轮已收口（提交见下）；P3-01/P3-02 或新主题按 PROTOCOL §2 选。
+
 ## 2026-11-19 — 常驻并行监护落地（未发版，未提交）
 
 - **From:** lead（本会话）· **To:** 用户 / 下一轮接手者

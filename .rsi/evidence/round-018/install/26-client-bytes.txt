@@ -1,0 +1,9 @@
+src/client/index.js : abe486006d8a928fc8ffab72aec3c0b5ff42275a7d1fbb892b944562ed8537ec
+lib/client.js       : abe486006d8a928fc8ffab72aec3c0b5ff42275a7d1fbb892b944562ed8537ec
+installed copy      : abe486006d8a928fc8ffab72aec3c0b5ff42275a7d1fbb892b944562ed8537ec
+cmp src vs lib      : identical
+cmp lib vs installed  : identical
+--- guardian: repo lib vs installed ---
+072068d442dc080ea21ec3931228d98a1dea61cdf448066a2e4957f4d27ed159  /home/fish/projects_mine/dsh-grok-workflow/lib/guardian.js
+072068d442dc080ea21ec3931228d98a1dea61cdf448066a2e4957f4d27ed159  /home/fish/projects_mine/dsh-grok-workflow/.tmp/r18/home/profiles/acc-tag/node_modules/dsh-grok-workflow/lib/guardian.js
+cmp guardian.js       : identical

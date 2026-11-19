@@ -1,0 +1,19 @@
+{
+ "namespaces": 23,
+ "ns": "grok-workflow",
+ "autoGenerate": true,
+ "applies": "live",
+ "keys": [
+  "mode",
+  "grokDefault",
+  "maxConcurrency",
+  "maxTasks",
+  "timeoutMs",
+  "loopEnabled",
+  "loopMaxRounds",
+  "loopFailStreak",
+  "loopIntervalMin",
+  "roles",
+  "synthesis"
+ ]
+}

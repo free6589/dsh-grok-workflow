@@ -1609,8 +1609,9 @@ model selector」）、`test/loop-brakes.spec.ts`（35 条）、`test/loop-runti
 
 ## D-074 — 常驻并行监护：run 侧 guardian 与串行 supervisor 正交（2026-11-19）
 
-- **Status:** CONFIRMED（代码+单测落地，未发版；`test/guardian.spec.ts` 12 条，
-  `npm run ci` 待本轮收口时复核）
+- **Status:** CONFIRMED（已发版 `0.11.17`：`test/guardian.spec.ts` 12 条；
+  `npm run ci` 63 文件 / 1154 测试 PASS；tag `v0.11.17` 从 GitHub 装到隔离
+  profile 验证 PASS，见 VALIDATION Round 63 与 `.rsi/evidence/round-018/install/`）
 - **Date:** 2026-11-19
 - **Decision:**
   1. 新增 `src/guardian.ts`（`createRunGuardian` + 实例级 `UnloadRegistry` 复刻
