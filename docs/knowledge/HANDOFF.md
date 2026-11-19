@@ -1,5 +1,18 @@
 # Agent Handoff
 
+## 2026-11-20 — `0.12.0` 已发版（round-024 三线收口）
+
+- **From:** lead（本会话）· **To:** 用户 / 下一轮接手者
+- **发版（`CONFIRMED`）**：minor（新功能向后兼容）。commit `9839025`、annotated tag
+  `v0.12.0` 已推；远端 CI `44587743089` success、Release `44587748822` success
+  （asset `dsh-grok-workflow-0.12.0.tgz`）。旧标签未动，无 force-push。
+- **内容**：自迭代第二开关 + 可改模板（Added 1）+ 5 条 Fixed（双行清理、串线、心跳审计、
+  `/grok on` 卡消息、`/grok` 开头提示词被吞）。`npm run ci` 67/1219 全绿；
+  真机双路由 + 双开关生产路径全通（证据 `.rsi/evidence/round-024/`）。
+- **用户动作**：本机 `web` profile 仍是 `0.11.21`，想用新开关就从
+  `github:free6589/dsh-grok-workflow#v0.12.0` 更新。NOT_RUN 依旧：真实定时投递、
+  浏览器 GUI 手动点击拍照。
+
 ## 2026-11-20 — settings-toggle-ui 收口：双开关 + 模板 textarea（已改，未提交）
 
 - **From:** agent-8（settings-toggle-ui）· **To:** lead / 收尾组 · **Base:** `main` = `22bbe17`（v0.11.21）
