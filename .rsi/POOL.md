@@ -100,12 +100,11 @@ here and are marked DONE when their commit lands.
   are deleted; removed keys are left untouched so the refusal names the real defect. Live-table
   behaviour unchanged (`maxConcurrency:120→100` still clamps and loads). Pinned by a new
   round-40 case in `test/config-limits-repair.spec.ts`. Evidence `.rsi/evidence/round-040/`.
-- NEXT (round 41) · Shortlist ordered in `STATE.md` → "Next round shortlist (round 41)", four
-  candidates with disjoint file lists: S1 docs-only checkpoint bound
-  (`src/checkpoint/schema.ts` + new `test/checkpoint-bound.spec.ts`, already preserved), S2 the
-  fail-closed config branches below (`src/config.ts` + `test/config-limits-repair.spec.ts`), S3 the
-  validator branches below (`src/resume/validator.ts` + `test/resume-validator.spec.ts`), S4 README
-  model/validation bullets (`README.md`). One round takes one candidate.
+- NEXT (round 42) · Shortlist ordered in `STATE.md` → "Next round shortlist (round 42)", three
+  candidates with disjoint file lists: S2 the fail-closed config branches below
+  (`src/config.ts` + `test/config-limits-repair.spec.ts`), S3 the validator branches below
+  (`src/resume/validator.ts` + `test/resume-validator.spec.ts`), S4 README model/validation
+  bullets (`README.md`). One round takes one candidate. (S1 landed in round 41.)
 - P · Six fail-closed branches have no test: `config.ts:654`, `:444`, `:462`, `:438`, `:680`,
   `:826`. Coverage only (mutation run needed to show they bite). S / low. [S2]
 
@@ -207,18 +206,17 @@ here and are marked DONE when their commit lands.
   sealed file, writes at it and one byte over, then reads the source back and requires the comment
   to state it (`D-087`, `A36`). The behaviour was already right (round 27) — this round closed the
   prose and pinned it. Evidence `.rsi/evidence/round-031/`.
-- PRESERVED (round 39) · A parallel round-39/40 attempt in this checkout wrote a longer
-  `CHECKPOINT_LIMITS.maxBytes` docblock that separates the *file* bound from the legal payload
-  ceiling and derives both numbers, plus `test/checkpoint-bound.spec.ts` (156 lines) that locks the
-  comment instead of asserting the numbers merely appear. Round 39 needed a single-theme tree, so
-  the bytes were preserved rather than shipped:
-  `.rsi/evidence/round-039/preserved/checkpoint-docblock.patch` (applies cleanly with
-  `git apply --check`) and `.../checkpoint-bound.spec.ts.txt` (restore with
-  `cp ... test/checkpoint-bound.spec.ts`). Ready to land as its own docs round — no runtime line
-  changes, so no version bump per `docs/RELEASING.md`. Also preserved:
-  `.../config-chain-types.spec.ts.txt`, an 188-line spec for the round-38 `model`/`provider`
-  refusal; decide first whether it adds coverage over the committed `test/config.spec.ts` case or
-  only duplicates it, so the count does not grow without a second behaviour. S / low.
+- R41 DONE · The longer `CHECKPOINT_LIMITS.maxBytes` docblock + `test/checkpoint-bound.spec.ts`
+  landed byte-identical from the preserved bytes (round 39 set them aside for a single-theme
+  tree; round 41 took them as its S1). The comment names the file-vs-payload split, 122 fixed
+  bytes + digit count (129 at 7 digits), ceiling 1,048,447, the seal-vs-write division and the
+  pinning spec. Red 1 failed / 4 passed on the old comment → green 5 passed; overlap with
+  `test/checkpoint-schema.spec.ts` is honest: 4/5 behaviour-overlap, 2 genuine new pins
+  (seal-accepts-while-write-refuses + maxBytes-comment anchor). Evidence `.rsi/evidence/round-041/`.
+  Still preserved: `.../config-chain-types.spec.ts.txt`, an 188-line spec for the round-38
+  `model`/`provider` refusal; decide first whether it adds coverage over the committed
+  `test/config.spec.ts` case or only duplicates it, so the count does not grow without a second
+  behaviour. S / low.
 - R10 DONE · `durationMs` is gated on `msCeiling` (`wiring.ts:784-790`, `schema.ts:624`), fixed in
   round 22 and shipped in `0.11.20`.
 - P · `recordableTimeoutMs`'s upper guard is vacuous (`msCeiling === MAX_SAFE_INTEGER`), so a

@@ -1,0 +1,39 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+ ❯ test/checkpoint-bound.spec.ts (5 tests | 1 failed) 1703ms
+     ✓ measures the integrity record and derives the payload ceiling from it  749ms
+     ✓ writes at the payload ceiling and reads the file back intact  322ms
+     ✓ refuses one payload byte above the ceiling as too large  606ms
+     ✓ refuses a file above the bound before parsing it 2ms
+     × keeps the maxBytes comment stating the ceiling and the record it comes from 22ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/checkpoint-bound.spec.ts > checkpoint byte bound > keeps the maxBytes comment stating the ceiling and the record it comes from
+AssertionError: expected '/** Maximum whole-file size accepted …' to contain '1,048,447'
+
+- Expected
++ Received
+
+- 1,048,447
++ /** Maximum whole-file size accepted by writer and reader. */
++   
+
+ ❯ test/checkpoint-bound.spec.ts:148:21
+    146|     // The numbers a reader needs: the legal payload top, the fixed pa…
+    147|     // integrity record, and the record size at the ceiling.
+    148|     expect(comment).toContain(PAYLOAD_CEILING.toLocaleString('en-US'))
+       |                     ^
+    149|     expect(comment).toContain(String(RECORD_FIXED_BYTES))
+    150|     expect(comment).toContain(String(RECORD_BYTES_AT_CEILING))
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed (5)
+   Start at  07:42:51
+   Duration  2.24s (transform 365ms, setup 0ms, import 399ms, tests 1.70s, environment 0ms)
+
+exit:1

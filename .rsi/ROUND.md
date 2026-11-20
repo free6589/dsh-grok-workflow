@@ -1304,3 +1304,69 @@ no history is rewritten, and no round is force-pushed.
 - **建议版本**：patch（fail-closed 收紧 + 删误导警告，无 API/配置面变化；CHANGELOG 记 Fixed 双语，
   由发版轮搬运）。
 - **status:** OK
+
+## Round 41 — 2026-11-21 — 检查点字节上界注释落地（S1，`CONFIRMED`）
+
+- **门禁（R1）**：`.rsi/tools/heartbeat-guard.sh --round auto --max-rounds 1000` 首跑
+  `RESUME code=none next_round=41 round_max=40 ledger_max=40 dirty_tracked=0`（树干净、无 STOP），
+  再跑 `.rsi/tools/stop-probe.sh 41` → `STOP ABSENT`
+  （`2026-11-21T07:40:16+08:00`）。两行都以 `--record` 形式只记在 gitignored 的
+  `heartbeat-guard.log` / tracked 的 `stop-probes.txt`；开轮前把探针那一行
+  `git checkout --` 撤回，避免"跑探针把树弄脏"（round 40 先例）。
+- **选题（R2）**：`.rsi/STATE.md` 的 round-41 shortlist 第一项 S1 ——
+  PRESERVED 在 `.rsi/evidence/round-039/preserved/` 里的 checkpoint docblock + spec
+  （round 39 为保单主题树刻意保全，`POOL.md` PRESERVED 条 + `git apply --check` 已验）。
+  `iterate-plan.mjs --pool` 报 `top_next=line 103`（shortlist 头），`open=20`。
+  小修（注释 + 守卫用例，无运行时行变化），免研究。
+- **改动（R3，S1 文件集，无旁逸）**：
+  - `src/checkpoint/schema.ts`：`CHECKPOINT_LIMITS.maxBytes` 的单行注释换成 8 行 docblock——
+    *file* bound vs payload bound、122 固定字节 + 十进制位数（7 位数时 129）、
+    合法 payload 上限 1,048,447、`sealCheckpoint` 只封不拦（内存里到 `maxBytes` 照封）、
+    `writeCheckpoint` 按 file bound 拒绝、Pinned by `test/checkpoint-bound.spec.ts`。
+    与 preserved 的 `checkpoint-docblock.patch` 逐行比对**字节一致**。
+    值行 `maxBytes: 1_048_576` 不动，无运行时变化。
+  - `test/checkpoint-bound.spec.ts`（新建 156 行）：从 preserved 的 `.txt` 恢复，
+    `diff` **字节一致**。5 its：量 integrity 记录并推导 ceiling、ceiling 处写入并读回、
+    ceiling+1 拒绝（另断言 seal 照封——write 才拦的分工）、超 bound 文件读前拒绝、
+    读源码钉住 maxBytes 注释含 1,048,447/122/129 且无"payload tops out at 1,048,576"旧句。
+  - `lib/checkpoint/schema.{js,d.ts,js.map,d.ts.map}`：`npm run build` 重建（注释随 tsc 进产物），
+    无手改。`client bundle: 237735 bytes` 不变。
+  - `test/checkpoint-schema.spec.ts` 未动（`git diff` 空）；`package.json`/`CHANGELOG.md` 未动。
+- **红绿（R4，`CONFIRMED`，本树实跑）**：
+  - 红：`git stash push -- src/checkpoint/schema.ts` 后
+    `npx vitest run test/checkpoint-bound.spec.ts` → **1 failed / 4 passed (5)**
+    （`keeps the maxBytes comment…` 在 `spec.ts:148` 抛
+    `expected '/** Maximum whole-file size accepted …' to contain '1,048,447'`，
+    旧注释无数字，必红；另 4 项全过——行为本已正确，红的是 prose pin）。
+    证据 `.rsi/evidence/round-041/red-at-HEAD.txt`（尾含 `exit:1`）。
+  - 绿：`git stash pop` 后同文件 **5 passed**；双 spec 联跑
+    `checkpoint-schema + checkpoint-bound` = **43 passed**；`npm run typecheck` exit 0；
+    `npx oxlint src test` 23 warnings / 0 errors（与基线同）；
+    `npm run ci` exit 0 = **71 文件 / 1302 测试 PASS**
+    （基线 70/1297，+1 文件 +5 用例，无删除无 skip；证据 `ci.txt`）；
+    `npm run verify:lib` 在提交前按设计报 HEAD 一致（比较的是已提交树），发版/收口时重跑为准。
+- **三重评审（`CONFIRMED`）**：
+  1. 自查 diff：只 S1 文件 + `lib/` 重建 + evidence；无密钥（secret 模式 grep 空）；
+     无新运行时依赖（spec 只引 node 内置 + vitest + 本模块）；测试数只增。
+  2. 独立评审（fresh context 子代理 agent-33）：**PASS**，6 项全过——scope 仅 S1 文件、
+     注释每个数字与 `writer.ts:87-88/:145-146`（file bound）/`schema.ts:458-459`（seal bound）/
+     `checkpoint-schema.spec.ts:532`（122 实测）交叉对上；与旧 spec 的关系是"行为重叠 4/5、
+     新增 seal/write 分工 + maxBytes 注释锚点两处真 pin，不算为凑数"；
+     红绿诚实（红点唯一且必红）；无 credentials、无 `.skip/.only/.todo`。
+  3. 门禁：ci 全绿 + typecheck 0 + oxlint 0 error。真机 GUI 手点 / 真实定时投递仍 `NOT_RUN`
+     （operator 动作，D-066）。
+- **与旧 spec 的关系（诚实口径）**：`test/checkpoint-schema.spec.ts:524`
+  `bounds the payload by the file bound minus the integrity record` 早已量出 122、
+  推导 1,048,447、写 ceiling/拒 ceiling+1。本轮 5 its 里 4 项行为重叠（不同 sizer 复盖），
+  真正新增的是 seal 接受而 write 拒绝的那一行断言 + maxBytes 注释本身的钉住——
+  即"注释别再漂"，不是"行为别再坏"。不谎称 5 条全是行为钉子。
+- **POOL**：PRESERVED 条的 docblock + `checkpoint-bound.spec.ts` 两半落地，记 `R41 DONE`；
+  `config-chain-types.spec.ts` 那半仍 PRESERVED（待决是否相对 `config.spec.ts` 重复，见 STATE shortlist）。
+  池顶回到 shortlist 下一项：S2 六处 fail-closed 无测试分支
+  （`src/config.ts:654/:444/:462/:438/:680/:826` + `test/config-limits-repair.spec.ts`）。
+- **未验证（`NOT_RUN`）**：真机 GUI 手点；真实定时投递；发版（本轮不 bump、不打 tag、不建 Release，
+  见下）。
+- **建议版本**：**不发版**（纯注释 + 测试，无用户可见变化、无 API/配置面变化；
+  `docs/RELEASING.md` "A code commit does not automatically mean a new public version"）。
+  `package.json` 保持 `0.12.15`，`CHANGELOG.md` `[Unreleased]` 保持空。
+- **status:** OK

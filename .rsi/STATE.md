@@ -1,4 +1,4 @@
-Updated: 2026-11-21T07:35+08:00 · round 40 CLOSED (repairLimitOverruns drops the LEGACY dead path; removed keys refused, not clamped) · `npm run ci` 70 files / 1297 tests PASS · no version bump — `0.12.15` (`01272af`) stays the published release, the fix is unreleased and suggests patch · gate `RESUME next_round=41`
+Updated: 2026-11-21T07:55+08:00 · round 41 CLOSED (S1 docs-only: checkpoint byte-bound docblock + pinning spec land byte-identical from preserved) · `npm run ci` 71 files / 1302 tests PASS · no version bump — `0.12.15` (`01272af`) stays the published release · gate `RESUME next_round=42`
 
 Previous rounds: `0.12.14`/`c0eabef` (compact 回执，CI `44760621921`, Release `44760644587`) · `0.12.13`/`e80ed6d`（合并 `5fb5da0`） · `0.12.12`/`61c7cb8` (36, 协作轮) · `0.12.9`/`5d3bcea` (34) · `0.12.8`/`9f91684` (33, CI `44670766356`, Release `44670771402`) · `0.12.6`/`e7150ab` (30, CI `44659057507`, Release `44659061505`) · `0.12.5`/`5b7cae1` (29, CI `44656151053`, Release `44656153854`) — 每轮细节在 `.rsi/ROUND.md`、`.rsi/LOG.md`、`.rsi/ledger.jsonl`。
 ## Facts
@@ -66,27 +66,23 @@ Previous rounds: `0.12.14`/`c0eabef` (compact 回执，CI `44760621921`, Release
 
 - Closed by round 39: the 4800 pair cap losing the second verdict (R36 follow-on) and the ledger's
   route line coercing a non-label entry.
-- **PRESERVED, ready to land** (`POOL.md` → Checkpoint and resume, PRESERVED entry): the
-  checkpoint-bound docblock + spec at `.rsi/evidence/round-039/preserved/` — a docs-only round, no
-  version bump; and `test/config-chain-types.spec.ts`, whose coverage overlaps the committed
-  `test/config.spec.ts` case (decide before adding it, or the count grows without a second behaviour). S / low.
-## Next round shortlist (round 41) — 4 candidates, disjoint file lists
+- Closed by round 41 (S1): the preserved checkpoint-bound docblock + spec landed byte-identical
+  (file-vs-payload split, 122/129/1,048,447, seal-vs-write, comment pinned). Red 1 failed /
+  4 passed on the old comment → green 5 passed; 4/5 behaviour-overlap with
+  `test/checkpoint-schema.spec.ts` honestly stated, 2 genuine new pins.
+  Still PRESERVED: `test/config-chain-types.spec.ts` (decide vs `config.spec.ts` before adding).
+## Next round shortlist (round 42) — 3 candidates, disjoint file lists
 
 Take one whole round from this list; none of them shares a file with another, so a later round can
-pick the next without a merge question. Ordered by cost, cheapest first.
+pick the next without a merge question. Ordered by cost, cheapest first. (S1 landed in round 41.)
 
-1. **S1 · docs-only checkpoint bound** — land the preserved docblock + its spec. Files:
-   `src/checkpoint/schema.ts` (`CHECKPOINT_LIMITS.maxBytes` comment only) and a new
-   `test/checkpoint-bound.spec.ts` (restore with `cp .rsi/evidence/round-039/preserved/checkpoint-bound.spec.ts.txt test/checkpoint-bound.spec.ts`;
-   the patch half is `.rsi/evidence/round-039/preserved/checkpoint-docblock.patch`, `git apply --check` clean).
-   No runtime line changes ⇒ no version bump per `docs/RELEASING.md`. S.
-2. **S2 · config fail-closed coverage** — the six untested refusal branches. Files: `src/config.ts`
+1. **S2 · config fail-closed coverage** — the six untested refusal branches. Files: `src/config.ts`
    (`:654`, `:444`, `:462`, `:438`, `:680`, `:826`) plus `test/config-limits-repair.spec.ts`.
    Coverage only; a mutation run is needed to show each branch bites. S / low.
-3. **S3 · resume validator coverage** — the five untested refusal branches. Files:
+2. **S3 · resume validator coverage** — the five untested refusal branches. Files:
    `src/resume/validator.ts` (`:231`, `:274`, `:290`, `:296`, `:308`) plus `test/resume-validator.spec.ts`.
    Coverage only. S / low.
-4. **S4 · docs truth pass** — the README examples the loader refuses (`synthesis: deterministic`, the
+3. **S4 · docs truth pass** — the README examples the loader refuses (`synthesis: deterministic`, the
    removed `switchOn` key; EN ~176-183, zh ~169-176) and the stale "more than three routes" bullet
    (real limit `HARD_LIMITS.chainLength` = 50). File: `README.md` only. S / low.
 
