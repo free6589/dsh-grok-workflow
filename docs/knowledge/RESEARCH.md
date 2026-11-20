@@ -1161,3 +1161,28 @@ Source: 只读审计 + 本轮新增实现与单测。依据 = `src/guardian.ts`�
   fallback itself was exercised, not a leftover test string.
 - **Boundary that remains:** a real scheduled delivery was not run (one interval of real time;
   arming it is the operator's action, D-066).
+
+## A33 — POOL re-verification against the tree (2026-11-20, round 27), and the checkpoint byte window
+
+- **Why this entry exists:** `.rsi/POOL.md` was last rewritten for the 2026-11-18 audits and six of
+  its open entries describe code that has since been fixed. A round that trusts a stale entry
+  re-does finished work, which the protocol forbids, so the pool was re-checked line by line against
+  `HEAD fd241c8` before choosing this round's theme.
+- **Now stale, with anchors (`CONFIRMED`):**
+  - "`src/records.ts` lines ~292, ~664, ~756 log `error.message` raw" — every logger site in that
+    file redacts: `:292`, `:375`, `:554`, `:663`, `:688`, `:754` all call `redactError`.
+  - "`src/history.ts` ~78-80 truncates before redacting" — `renderHistory` now redacts a bounded
+    window first and truncates after (`src/history.ts:97-109`, comment states the reason and the call site follows it).
+  - "the delivered answer is only the FIRST sentence" — `answerLead` (`src/delivery/index.ts:440`)
+    walks up to three sentence pieces (`tried >= 3`) before falling back.
+  - R6, R9, R10 are shipped fixes (`c1be0c7` for R6/R9 in `0.12.2`; `durationMs` uses `msCeiling`
+    in `src/checkpoint/wiring.ts:784-790`), yet the pool still marks them PENDING.
+- **Still open after the same check:** R11 (the cancelled terminal still composes `relayText`,
+  which prepends `SUCCESS_PREAMBLE` and the `REPORT_BEGIN/END` markers, `src/gate.ts:611-644` +
+  `src/answer.ts:106-130`) and the `src/panel.ts` importer question (no `src/` module imports it;
+  only `test/panel.spec.ts`, `test/panel-links.spec.ts`, `test/gui-fold.ts`).
+- **Measured for this round's fix (`CONFIRMED`, this tree):** one maximum-width evidence row costs
+  **2,055 bytes** in the canonical payload. 481 rows → **1,001,015 bytes** (above `countCeiling`
+  1,000,000, below `maxBytes` 1,048,576); 503 rows still fit under the file bound with the integrity
+  record. So the write-then-unreadable band is ~22 rows wide, and the new test lands in the middle
+  of it rather than at an exact byte.

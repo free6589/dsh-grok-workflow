@@ -1,113 +1,53 @@
 # RSI State (overwritten every round; keep under 100 lines)
 
-Updated: 2026-11-20T03:20+08:00 · round 25 landed as commit `23d3369` on `main`, annotated tag
-`v0.12.1` pushed · `npm run ci` 68 files / 1227 tests PASS · `verify:lib` = 153 files
-byte-identical at `23d3369` · latest published release `v0.12.1` (CI `44595376323`, Release
-`44595391505` + `dsh-grok-workflow-0.12.1.tgz`); previous `v0.12.0` (`9839025`, CI
-`44587743089`, Release `44587748822`)
+Updated: 2026-11-20T08:55+08:00 · round 27 (checkpoint read-side byte bound) · release line
+`0.12.3` cut from this round · `npm run ci` 68 files / 1230 tests PASS · previous releases
+`v0.12.2` (`40228c5`, CI `44641153858`, Release `44641158387`) and `v0.12.1` (`23d3369`,
+CI `44595376323`, Release `44595391505`)
 
 ## Facts
 
-- Round 25 (this round): the self-iteration default template is now the round prompt in
-  `docs/iterate-template.md` (3 239 chars): POOL-first topic selection, at-least-one-per-round,
-  small/big split with RESEARCH + pool approval and no invented sources, R1–R6, triple review
-  (self + ci + verify:lib + copied-profile live run), four brakes, forbidden zones.
-  `test/iterate-template.spec.ts` pins doc ↔ constant; `test/client.spec.ts` pins the bundle copy;
-  `test/loop-surface.spec.ts` covers the iterate route's `status`. Live: open wrote the default
-  verbatim, close left no Schedule residue (`.rsi/evidence/round-025/`). D-082, A32.
-- Round 24 (release `0.12.0`): second composer switch for the self-iteration heartbeat
-  (`RSI heartbeat`, `/grok-workflow/iterate`, editable `iterateTemplate`, no marker, no tool),
-  `/grok on` background acceptance, `/grok`-prefixed prompt intake refusal. Commit `9839025`.
-- Round 23 (older): the switch's production path falls back to the page fetch, not `loopSend`
-  (`0.11.21`).
+- Round 27 (this round): `assertCheckpoint` bounded `integrity.bytes` with `countCeiling`
+  (1,000,000, a row-count backstop) while `sealCheckpoint` accepts payloads up to `maxBytes`
+  (1,048,576). A payload in between sealed, wrote, then read back `invalid` — an unrestorable
+  checkpoint. One-line bound swap + comment (`src/checkpoint/schema.ts`), +1 test that sizes a
+  payload across the boundary (481 max-width evidence rows = 1,001,015 bytes; 2,055 bytes/row).
+  Pool reconciled against the tree first: six entries were stale, R11 is still open. D-084,
+  A33, VALIDATION Round 76. Evidence `.rsi/evidence/round-027/`.
+- Round 26: `resolveConfig` refuses a bad `grokDefault`; a COMPLETED run no longer counts a
+  retried-and-recovered attempt as a failure. Shipped in `0.12.2`.
+- Round 25: the self-iteration default template is this repository's round prompt
+  (`docs/iterate-template.md`, 3 239 chars), pinned by `test/iterate-template.spec.ts` and the
+  bundle copy. Shipped in `0.12.1`.
+- Round 24: second composer switch for the self-iteration heartbeat (`RSI heartbeat`,
+  `/grok-workflow/iterate`, editable `iterateTemplate`), `/grok on` background acceptance,
+  `/grok`-prefixed prompt intake refusal. Shipped in `0.12.0`.
+- Round 22: checkpoint `durationMs` now gated on `msCeiling`, not the row-count ceiling.
 - Repo: `/home/fish/projects_mine/dsh-grok-workflow`, branch `main`, remote `origin`
   = https://github.com/free6589/dsh-grok-workflow.git.
 - Release line (rounds 4–20): `v0.11.4` bcb601d · `v0.11.5` bf0dc91 · `v0.11.6` 88d133b ·
   `v0.11.7` 1760d50 · `v0.11.8` a045154 · `v0.11.9` 596239a · `v0.11.10` 000a56e ·
   `v0.11.11` 6ff6373 · `v0.11.12` be64d56 · `v0.11.13` 7a79efb · `v0.11.14` 20eafea (no Release) ·
   `v0.11.15` 50c0321 · `v0.11.16` 63a4fbb · `v0.11.17` 5fc3e1d · `v0.11.18` 3b131c4 · `v0.11.19` b38d23a.
-  Test-count line: 54/985 → … → 63/1156 (0.11.19) → 63/1157 (round 21) → 63/1158 (round 22) → **`0.11.20`** c911e6e.
-- Round 22 (this round): `snapshot()` (`src/checkpoint/wiring.ts`) gated `time.durationMs` on
-  `countCeiling` (rows, 1e6) while the reader takes `msCeiling`: runs past 16m40s recorded no
-  duration. One-line ceiling swap + comment; +1 test (48h clock). Docs: D-077, VALIDATION Round 67,
-  CHANGELOG `[Unreleased]` bilingual. Evidence `.rsi/evidence/round-022/`.
-- Round 21 (previous): `configRouteLabels()` (`src/run.ts`) flattened four roles while five are
-  routed, so a `roles.supervisor` chain never entered the C1 cross-run busy hint. Five roles now,
-  report order (`ROLE_NAMES` / `ROLE_ORDER`); `test/route-concurrency.spec.ts` pins the full label
-  list. Third instance of the round-19/20 omission class; `POOL.md` R21 DONE. Evidence
-  `.rsi/evidence/round-021/`. The change and its red/green evidence were left uncommitted by a
-  concurrent writer at 17:05; the 2026-11-19 cleanup task verified and landed them.
-- Round 20: `machineLedger()` rendered four roles while `renderReport()` renders five → role table
-  four→five + parity assertion, `MACHINE_DETAIL` strips `supervisor=`. `0.11.19`. Evidence
-  `.rsi/evidence/round-020/`. (`POOL.md` R8 now DONE.)
-- Round 19 (older): `src/settings.ts` `ROLE_ORDER` gained `supervisor`, so `validateRoutes` and the empty-cap
-  note cover every routed role. `0.11.18`. Evidence `.rsi/evidence/round-019/`.
-- Round 18 (older): resident parallel `RunGuardian` beside the serial supervisor (`src/guardian.ts`), `0.11.17`.
-- Ledger: `.rsi/ledger.jsonl`. Resume from the highest `status: OK` round.
-- Process tooling: `bump-version.py` + `finish-round.py` (R6; refuses red CI/existing tags).
+  Test-count line: 54/985 → … → 63/1156 (0.11.19) → 68/1227 (0.12.1) → 68/1229 (0.12.2) → **68/1230**.
 
-## Pool (value / risk / size)
+## Installed profile (web)
 
-P0 — wrong behaviour or false statements
+- `~/.dsh/profiles/web` carries `dsh-grok-workflow` at the newest published tag; the shipped
+  `lib/` is byte-identical to the tag's (`diff -r --exclude='*.map'` = 0).
+- DSH host pid `154637` has run since 2026-11-17T22:49:32 without a restart through every
+  profile update (`lstart` and boot id `9d066162-…` unchanged). `docs/knowledge/HANDOFF.md`
+  records which version each update installed.
 
-- No open P0. Rounds 19/20/21 closed the supervisor-omission sites; round 22 fixed a silent data drop.
+## Pool (`.rsi/POOL.md`)
 
-P1 — docs and version truth
+- Re-checked against the tree this round: `records.ts` redaction, `history.ts` truncate order,
+  `answerLead` sentence count, R6, R9, R10 are all resolved (marked STALE/DONE with anchors).
+- Still open: R11 (the cancelled terminal still composes `relayText`, preamble + markers) and the
+  `src/panel.ts` importer question. Next round should start there.
 
-- Remaining: `docs/knowledge/WORKFLOW-DESIGN.md:1042/:999` docs-sync lines (later task).
+## Failures / counters
 
-P2 — tests and reliability
-
-- P2-01/P2-02 done.
-
-P3 — UX (still OPEN, unchanged)
-
-- P3-01 OPEN Settings page wording for the per-route cap and the deadline field.
-- P3-02 OPEN Progress tab detail rows for members with no reported facts.
-
-`P ·` items (see `POOL.md`) — each its own round:
-
-- Remaining highlights: redaction call sites (`records.ts`, `history.ts`), dropped keys one level
-  down in `config.ts`, `R6` `grokDefault` validation, `R9`/`R11` report wording, the duplicate
-  `Synthesis: <mode>` ledger label.
-
-## Working tree policy
-
-- No deliberately untracked file any more. `settings-simple-mock.html` (operator mock, design input
-  for D-055, formerly whitelisted as untracked) is archived byte-identically at
-  `.rsi/archive/settings-simple-mock.html` with provenance in `.rsi/archive/README.md`; restore by
-  copying it back to the repository root. `.rsi/` is not part of the published package.
-- Scratch area for one-off probes: `.tmp/` (gitignored). Nothing else may sit untracked at the
-  root — a stray root file makes every `git status` noisy and hides real work.
-
-## Failures
-
-- Round 4 first review FAIL (closed in rework). Round 5: one existing test failed, assertion
-  tightened. Rounds 8/9/12: BLOCKED or red-by-design, recorded.
-- Round 14: published from a tree a concurrent writer was editing → stale `lib/`, red CI, no
-  Release; repaired in round 15 (patch), not hidden.
-- Round 20 fresh-context review **PASS** (6 findings, zero rework). Round 19 first review **FAIL**
-  (four doc-accuracy defects, all fixed), second review **PASS**.
-- Rounds 20/21 concurrency: a second writer edited `src/run.ts` + `test/route-concurrency.spec.ts`
-  at 17:04:54–17:05:02 while a read-only verification round was running. The edits survived as
-  uncommitted work and were landed in round 21; nothing was lost and nothing was silently dropped.
-- Consecutive failed rounds: 0. Consecutive valueless rounds: 0. Remote `main` = `337b061`
-  (= `v0.11.19` tree) as of round 21; local is one round ahead and unpushed.
-
-## Final verification (round 22, commit `6c8b0dc`)
-
-- `npm run ci` exit 0 · **63 files / 1158 tests PASS** · `tsc --noEmit` 0 errors ·
-  oxlint 22 warnings / 0 errors · build idempotent · `verify:lib` 149 files byte-identical.
-- Red proof: 33m20s clock run recorded `durationMs: undefined` pre-fix, exact value post-fix.
-- NOT_RUN: a real 16+ min run's checkpoint re-read; release.
-
-## Open decisions
-
-- PROTOCOL says "do not commit, do not tag" while the task text requires a commit and a tag per
-  round. Resolution used since round 1: every round is committed; pushed only when the round
-  publishes, never forced, never moved.
-- D-068: operator authorized P4 (repeat-run) before P3-01/P3-02; order only, no gate relaxed.
-- D-075: every routed role is in `ROLE_ORDER`; `supervisor` included. Migration for a bad
-  supervisor route = fix the route or blank its `provider` (inherits the run's provider);
-  deleting the chain leaves the run unsupervised.
-- 2026-11-19 cleanup: the "allowed untracked" whitelist is retired — see Working tree policy.
+- Consecutive failed rounds: 0. Consecutive no-value rounds: 0.
+- Standing `NOT_RUN` (operator action, D-066): a real scheduled delivery of a heartbeat, and a
+  manual browser click-through with a screenshot.

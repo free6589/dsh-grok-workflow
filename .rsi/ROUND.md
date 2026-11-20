@@ -841,3 +841,29 @@ no history is rewritten, and no round is force-pushed.
 - **Landed as:** commit `23d3369`，annotated tag `v0.12.1` 已推；远端 CI `44595376323`
   success（Node 22/24），Release `44595391505` success（`dsh-grok-workflow-0.12.1.tgz`）。
   旧标签未动、无 force-push、未发布 npm。
+
+## Round 27 — 2026-11-20 — 检查点读侧把「载荷字节数」按行数上限卡死（`CONFIRMED`，patch `0.12.3`）
+
+- **选题（R2）**：先把 `POOL.md` 与 `HEAD fd241c8` 逐条对表。六条被判「stale」的项已有代码
+  证据（`records.ts` 全部 `redactError`、`history.ts` 先脱敏后截断、`answerLead` 走三段候选、
+  R6/R9 随 `0.12.2` 落地、R10 随 `0.11.20` 落地），`R11` 仍成立（`gate.ts:611-644` 仍组合
+  `relayText`）。仍能取的最高优先级「功能错误」类：检查点写入成功但读回 `invalid`。
+- **缺陷**：`sealCheckpoint`（`src/checkpoint/schema.ts:451`）接受规范化载荷到 `maxBytes`
+  （1,048,576），`writeCheckpoint`（`src/checkpoint/writer.ts:88`）对整文件再卡同一上限；
+  读侧 `assertCheckpoint` 却把 `integrity.bytes` 卡在 `countCeiling`（1,000,000，行数上限，
+  `schema.ts:859`）。载荷落在两者之间的检查点：封装、落盘都成功，读回即
+  `CheckpointError('invalid', '… integrity.bytes must be between 1 and 1000000')`——续跑永远起不来。
+- **改动**：`src/checkpoint/schema.ts` 一行上限（`countCeiling` → `maxBytes`）+ 说明注释；
+  `test/checkpoint-schema.spec.ts` 新用例「reads back a payload the writer accepted above the
+  row-count ceiling」（按最大宽度证据行把载荷顶过边界，再落盘、读回、验完整性），两个小助手
+  函数（`evidenceSizedInput`、`payloadBytesForRows`/`rowsAboveRowCeiling`）。
+- **实测边界**：一条最大宽度证据行 2,055 字节；481 行 → 1,001,015 字节（带内），503 行仍在
+  文件上限内 → 带内至少 22 行宽，用例落中间而非刀尖。
+- **门禁**：`npx vitest run test/checkpoint-schema.spec.ts -t "reads back a payload the writer
+  accepted"` 修前 **1 failed**（`red-test.txt`）；修后整文件 **37 passed**（原 36，`test-green.txt`）；
+  `npm run ci` exit 0 = **68 文件 / 1230 测试 PASS**、typecheck 0 错、oxlint 24w/0e（`ci.txt`）。
+- **证据**：`.rsi/evidence/round-027/`（`test-red.txt`、`test-green.txt`、`ci.txt`、
+  `verify-lib.txt`、`profile-check.txt`）。
+- **未验证（`NOT_RUN`）**：真实定时投递（D-066）、GUI 手动点击截图。
+- **建议版本**：patch → `0.12.3`（读侧拒绝语义修复，无新配置面、无 API 变化）。
+- **status:** OK

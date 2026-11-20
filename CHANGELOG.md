@@ -5,6 +5,21 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.12.3] - 2026-11-20
+
+### Fixed / 修复
+
+- **A checkpoint the writer accepted no longer reads back as `invalid` / 写得进去的检查点不再一读就报 `invalid`** —
+  `integrity.bytes` counts the canonical payload, and the writer accepts one up to `maxBytes`
+  (1,048,576). The read-side validator bounded the same field with `countCeiling` (1,000,000), a
+  *row-count* backstop, so a checkpoint whose payload landed between the two ceilings sealed,
+  wrote, and then failed validation on the way back in — a resume that could never happen. Both
+  sides now use the writer's bound.
+  / `integrity.bytes` 记录的是规范化载荷的字节数，写入侧的上限是 `maxBytes`（1,048,576）。读侧
+  却用 `countCeiling`（1,000,000，本来是行数上限）卡同一个字段：载荷落在这两个上限之间的检查点
+  能封装、能落盘，读回时却在校验阶段被判 `invalid`——续跑永远起不来。现在读写两侧同用写入侧的
+  上限。
+
 ## [0.12.2] - 2026-11-20
 
 ### Fixed / 修复

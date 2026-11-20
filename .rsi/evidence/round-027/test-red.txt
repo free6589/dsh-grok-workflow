@@ -1,0 +1,30 @@
+     ↓ keeps the file byte-identical for identical input
+     ↓ never writes a secret to disk
+     ↓ cleans up the temporary file when the rename fails
+     ↓ reports an io error when a path component is not a directory
+     ↓ refuses an oversized file before parsing it
+     ↓ refuses corrupt JSON and a file without an integrity record
+     ↓ refuses a missing file with an io error
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/checkpoint-schema.spec.ts > atomic writer > reads back a payload the writer accepted above the row-count ceiling
+CheckpointError: checkpoint integrity.bytes must be between 1 and 1000000
+ ❯ inRange src/checkpoint/schema.ts:370:11
+    368| function inRange(value: number, min: number, max: number, path: string…
+    369|   if (value < min || value > max) {
+    370|     throw new CheckpointError('invalid', `checkpoint ${path} must be b…
+       |           ^
+    371|   }
+    372|   return value
+ ❯ assertCheckpoint src/checkpoint/schema.ts:859:14
+ ❯ test/checkpoint-schema.spec.ts:487:12
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 36 skipped (37)
+   Start at  08:30:15
+   Duration  685ms (transform 339ms, setup 0ms, import 374ms, tests 187ms, environment 0ms)
+

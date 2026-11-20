@@ -66,6 +66,47 @@ function fullInput(): CheckpointInput {
   }
 }
 
+/**
+ * Byte length of a sealed payload carrying `rows` maximum-width evidence rows.
+ *
+ * Used to build a checkpoint that sits between the schema's *row-count* ceiling
+ * (1,000,000) and the writer's *byte* bound (1,048,576): `countCeiling` bounds
+ * how many rows a field may hold, so a payload can legally be larger than it
+ * while staying inside `maxBytes`. Build that payload small and the defect this
+ * measures is invisible; build it with three ordinary sections and any legal
+ * payload above a megabyte reads back as `invalid`.
+ */
+function evidenceSizedInput(rows: number): CheckpointInput {
+  return {
+    run: { runId: 'r', objective: 'o', status: 'running' },
+    plan: { source: 'caller', tasks: [{ id: 't1', title: 'T' }] },
+    tasks: [{ id: 't1', title: 'T', status: 'failed', attempts: 1 }],
+    evidence: Array.from({ length: rows }, () => ({
+      taskId: 't1',
+      criterion: 'c'.repeat(CHECKPOINT_LIMITS.criterionChars),
+      claim: 'x'.repeat(CHECKPOINT_LIMITS.claimChars),
+      locator: `file://${'l'.repeat(CHECKPOINT_LIMITS.locatorChars - 7)}`,
+    })),
+  }
+}
+
+function payloadBytesForRows(rows: number): number {
+  return Buffer.byteLength(canonicalJson(stripIntegrity(buildCheckpoint(evidenceSizedInput(rows), NOW))), 'utf8')
+}
+
+/**
+ * Row count whose payload crosses {@link CHECKPOINT_LIMITS.countCeiling}.
+ *
+ * The payload grows linearly in row count, so two samples fix the line and one
+ * correction lands on the crossing — no scan over a megabyte per candidate.
+ */
+function rowsAboveRowCeiling(target: number): number {
+  const sample = 100
+  const perRow = payloadBytesForRows(sample + 1) - payloadBytesForRows(sample)
+  const rows = sample + Math.ceil((target - payloadBytesForRows(sample)) / perRow)
+  return Math.min(CHECKPOINT_LIMITS.maxEvidence, Math.max(1, rows))
+}
+
 describe('schema coverage', () => {
   it('carries every documented section (run plan tasks agents stages evidence git time min-context)', () => {
     const checkpoint = buildCheckpoint(fullInput(), NOW)
@@ -424,6 +465,30 @@ describe('atomic writer', () => {
     const result = await writeCheckpoint(target(), fullInput())
     const read = await readCheckpoint(target())
     expect(stripIntegrity(read)).toEqual(built)
+    expect(read.integrity!.checksum).toBe(result.checksum)
+    expect(verifyCheckpointIntegrity(read)).toEqual({ ok: true })
+  })
+
+  it('reads back a payload the writer accepted above the row-count ceiling', async () => {
+    // `integrity.bytes` counts the payload the *writer* sealed, so the reader
+    // must accept every value the writer can produce. The writer's bound is
+    // `maxBytes`; a payload between `countCeiling` (a row-count backstop) and
+    // `maxBytes` used to seal and write fine and then read back as `invalid`,
+    // which is a resume that can never happen.
+    const rows = rowsAboveRowCeiling(CHECKPOINT_LIMITS.countCeiling + 1)
+    const input = evidenceSizedInput(rows)
+    const bytes = payloadBytesForRows(rows)
+    expect(bytes).toBeGreaterThan(CHECKPOINT_LIMITS.countCeiling)
+    // Leave room for the integrity record inside the same file bound.
+    expect(bytes).toBeLessThan(CHECKPOINT_LIMITS.maxBytes - 512)
+
+    const sealed = sealCheckpoint(buildCheckpoint(input, NOW))
+    expect(sealed.integrity!.bytes).toBe(bytes)
+    expect(assertCheckpoint(JSON.parse(canonicalJson(sealed)))).toEqual(sealed)
+
+    const result = await writeCheckpoint(target(), input)
+    const read = await readCheckpoint(target())
+    expect(read.integrity!.bytes).toBe(bytes)
     expect(read.integrity!.checksum).toBe(result.checksum)
     expect(verifyCheckpointIntegrity(read)).toEqual({ ok: true })
   })

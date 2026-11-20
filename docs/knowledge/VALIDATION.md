@@ -4470,3 +4470,28 @@ GUI 手动点击拍照。
 | `tag -a v0.12.2` + `push main` + `push tag` | 成功，无 force-push，旧标签未动 |
 | 远端 CI `44641153858` | success |
 | Release `44641158387` | success；Release `Grok Workflow for DSH v0.12.2` + asset `dsh-grok-workflow-0.12.2.tgz` |
+
+## Round 76 — 2026-11-20 — round-027：检查点读侧把「载荷字节数」按行数上限卡死（`CONFIRMED`，发版 `0.12.3`）
+
+**缺陷（`CONFIRMED`，代码路径 + 实测）**：`sealCheckpoint` 接受规范化载荷到 `maxBytes`
+（1,048,576），`writeCheckpoint` 对整文件再卡一次同一个数；读侧 `assertCheckpoint` 却把
+`integrity.bytes` 卡在 `countCeiling`（1,000,000，本来是行数上限）。于是载荷落在
+(1,000,000, ≤1,048,450] 的检查点：封装成功、落盘成功、读回时被判
+`CheckpointError('invalid', 'checkpoint integrity.bytes must be between 1 and 1000000')`——
+续跑永远起不来。实测一条最大宽度证据行占 2,055 字节，481 行 → 1,001,015 字节（落在带内），
+503 行仍在上限内，故带内至少 22 行宽，不是手工构造才够得着的角落。
+
+**命令与结果（`CONFIRMED`，本树实跑）**：
+
+| 命令 | 结果 |
+| --- | --- |
+| 修前 `npx vitest run test/checkpoint-schema.spec.ts -t "reads back a payload the writer accepted"` | **1 failed**（`checkpoint integrity.bytes must be between 1 and 1000000`，`red-test.txt`） |
+| 修后 `npx vitest run test/checkpoint-schema.spec.ts` | **37 passed**（原 36，+1；`test-green.txt`） |
+| `npm run ci` | exit 0，**68 文件 / 1230 测试 PASS**，typecheck 0 错，oxlint 24w/0e，`ci.txt` |
+| `npm run verify:lib`（提交前，比的是 HEAD `fd241c8`） | 153 files byte-identical（预期，改的是工作树） |
+| `npm run verify:lib`（提交后） | 见本文件 §0.12.3 发版段 |
+
+**没有放宽任何断言**：只新增一个用例（`git diff --stat` 显示 +65 行测试、零删除）、
+`src` 改一行上限加注释；既有 36 条用例全绿。
+
+**未验证（`NOT_RUN`）**：真实定时投递（D-066）、GUI 手动点击截图。

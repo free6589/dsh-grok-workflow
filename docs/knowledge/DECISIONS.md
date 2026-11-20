@@ -1913,3 +1913,36 @@ model selector」）、`test/loop-brakes.spec.ts`（35 条）、`test/loop-runti
   satisfied while the other constraints hold; the reachable end state is "`HEAD == origin/main`,
   tag is an ancestor, shipped code byte-identical". Future verification must read the check that
   way, or the operator must authorize a new release.
+
+## D-084 — A read-side bound mirrors the bound the writer enforces, never a neighbouring ceiling
+
+- **Status:** CONFIRMED
+- **Date:** 2026-11-20 (round 27)
+- **Decision:** when the validator bounds a field that records something the writer produced, its
+  ceiling is the writer's own ceiling. `integrity.bytes` records the byte length of a canonical
+  payload the writer accepted, so the read side now bounds it with `CHECKPOINT_LIMITS.maxBytes`
+  (1,048,576) — the same number `sealCheckpoint` and `writeCheckpoint` enforce — instead of
+  `countCeiling` (1,000,000).
+- **Why `countCeiling` was wrong here, and not merely tight:** `countCeiling` is the backstop for
+  *row counts* (tasks, agents, evidence rows). A byte count is not a row count, so the two ceilings
+  describe different things and picking the smaller one silently narrowed what the writer would
+  accept: a checkpoint whose payload landed between them sealed, wrote, and then failed
+  `assertCheckpoint` with `integrity.bytes must be between 1 and 1000000`, i.e. a resume that could
+  never happen. Measured: one maximum-width evidence row costs 2,055 bytes, so 481 rows produce a
+  1,001,015-byte payload and 503 rows still fit under the file bound — the broken window is about
+  22 rows wide, not a corner case reachable only by hand-made input.
+- **What the wider bound does not do:** it does not accept a corrupt file. `verifyCheckpointIntegrity`
+  recomputes both the byte length and the sha-256 of the canonical payload and refuses any mismatch,
+  and `readCheckpoint` `stat`s the file against `maxBytes` before parsing, so a value above the
+  writer's bound (1,048,577+) still dies; only the 1,000,001–1,048,576 band changes verdict, from
+  `invalid` to readable-and-verified.
+- **Alternatives rejected:**
+  1. Raise `maxBytes` to match the schema — separate decision, changes what the writer stores; the
+     defect is the disagreement, not the value.
+  2. Drop the `inRange` bound on `integrity.bytes` entirely — loses the early, readable refusal for
+     an absurd number before the checksum work runs.
+  3. Keep the read side and make the writer refuse payloads above 1,000,000 — shrinks a documented
+     public bound (1 MiB) to fix a read-side mistake, and would refuse files earlier builds wrote.
+- **Consequences:** a rule for future fields — *a validator bound on a writer-produced quantity is
+  read off the writer*, and a test that only builds a small payload cannot see this class of defect.
+  `test/checkpoint-schema.spec.ts` now sizes a payload across the boundary instead of shrinking it.

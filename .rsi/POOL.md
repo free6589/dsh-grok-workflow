@@ -12,10 +12,11 @@ here and are marked DONE when their commit lands.
   env value termination, placeholder stability, `x-api-key` deep keys (round 5).
 - R4 DONE · `Authorization:` leaks for every scheme except Bearer/Basic and for a
   bare opaque value.
-- P · `src/records.ts` lines ~292, ~664, ~756 log `error.message` raw where sibling
-  sites use `redactError` (lines ~555, ~690). S / low.
-- P · `src/history.ts` ~78-80 truncates before redacting, so a credential straddling
-  the cap survives as a sub-threshold fragment. S / low.
+- STALE (round 27) · `src/records.ts` logged `error.message` raw at three sites; every
+  logger in the file now calls `redactError` (`:292`, `:375`, `:554`, `:663`, `:688`, `:754`).
+  Re-checked against HEAD `fd241c8`; nothing left to do here.
+- STALE (round 27) · `renderHistory` now redacts a bounded window first and truncates
+  after (`src/history.ts:97-109`), which is the order the defect asked for.
 - P · Base64-wrapped PEM has no rule (a `BEGIN PRIVATE KEY` body that is itself
   base64 of a PEM block). Recorded in `docs/ARCHITECTURE.md` as a known gap. S / low.
 
@@ -26,8 +27,8 @@ here and are marked DONE when their commit lands.
   empty-`maxInFlight` note. `ROLE_ORDER` now lists all five roles in report order
   (`src/report.ts` `ROLE_NAMES`); `test/config.spec.ts` pins all five, `test/route-concurrency.spec.ts`
   pins the note. Evidence `.rsi/evidence/round-019/`.
-- R6 PENDING · `resolveConfig` never validates `grokDefault` (`config.ts:700`) though the type
-  is `'on' | 'off'` and the gate tests `=== 'on'`. S / low.
+- R6 DONE · `resolveConfig` validates `grokDefault` and fails closed (`config.ts:700`); shipped in
+  `0.12.2` (`c1be0c7`), pinned by `test/config.spec.ts`. (The pool entry said PENDING until round 27.)
 - P · Unknown keys are rejected at the top level but silently dropped one level down:
   `roles.reviewer` and a route's `maxInflight` are discarded (`config.ts:337`, `:439`, `:385`)
   while the stored document keeps them. S / medium (stricter load needs a migration note).
@@ -41,16 +42,17 @@ here and are marked DONE when their commit lands.
 
 ## Report and delivery (`src/report.ts`, `src/delivery/index.ts`, `src/answer.ts`)
 
-- P · The delivered answer is only the FIRST sentence of the synthesis, with no ellipsis
-  (`delivery/index.ts:457`), while `answer.ts:51-53` forbids the model to add anything. S / medium.
+- STALE (round 27) · `answerLead` walks up to three sentence pieces before falling back
+  (`src/delivery/index.ts:440-462`), so the lead is no longer one sentence.
 - P · The 2400-char clamp drops the verdict line and, in bilingual delivery, the whole second
   language (`delivery/index.ts:588`, `:613`). S / low.
 - R11 PENDING · The cancelled terminal embeds the relay preamble, markers and ledger
-  (`gate.ts:533`) although it is a real `assistant/message`. S / low.
+  (`gate.ts:611-644` still composes `relayText`, `answer.ts:106-130`) although it is a real
+  `assistant/message`. Re-checked round 27: still true, anchor moved with the code. S / low.
 - P · The "bilingual" mirror repeats the same sentence under English labels
   (`answer.ts:111-114`, `delivery/index.ts:611`). S / low.
-- R9 PENDING · A COMPLETED run prints `Failures: 1 infrastructure` for an attempt that was
-  retried and verified (`report.ts:769`, `delivery/index.ts:630`). S / low.
+- R9 DONE · a COMPLETED run no longer prints `Failures:` for an attempt a later attempt
+  recovered (`report.ts`, `delivery/index.ts`); shipped in `0.12.2` (`c1be0c7`).
 - R8 DONE · The ledger's model-route line omitted `supervisor` (`delivery/index.ts:695`). The role
   table now names all five in report order, with a parity assertion against the human route line
   (`test/delivery.spec.ts`). Evidence `.rsi/evidence/round-020/`. The duplicate `Synthesis: <mode>`
@@ -93,11 +95,18 @@ here and are marked DONE when their commit lands.
 
 ## Checkpoint and resume (`src/checkpoint/*`, `src/resume/*`)
 
+- R27 DONE · `integrity.bytes` was bounded by `countCeiling` (1,000,000, a row-count
+  backstop) on read while the writer accepts payloads up to `maxBytes` (1,048,576), so a
+  checkpoint whose payload landed between the two ceilings sealed, wrote, and read back as
+  `invalid` — a resume that could never happen (`schema.ts:859`, `:451`). Both sides now use
+  the writer's bound; `test/checkpoint-schema.spec.ts` sizes a payload across the boundary
+  (481 max-width evidence rows = 1,001,015 bytes). Evidence `.rsi/evidence/round-027/`.
+
 - P · `integrity.bytes` is bounded by `countCeiling` (1,000,000) on read but `maxBytes`
   (1,048,576) on write (`schema.ts:59`, `:859`), so a legal payload in between writes fine and
   reads back `invalid`. S / low.
-- R10 PENDING · `durationMs` is gated on `countCeiling` (16 min 40 s) instead of the field's own
-  `msCeiling` (`wiring.ts:786`, `schema.ts:624`), so every longer run records no duration. S / low.
+- R10 DONE · `durationMs` is gated on `msCeiling` (`wiring.ts:784-790`, `schema.ts:624`), fixed in
+  round 22 and shipped in `0.11.20`.
 - P · `recordableTimeoutMs`'s upper guard is vacuous (`msCeiling === MAX_SAFE_INTEGER`), so a
   config-legal `timeoutMs` near `MAX_SAFE_INTEGER` makes every checkpoint write `invalid`
   (`wiring.ts:541-593`). S / low.

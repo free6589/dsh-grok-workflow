@@ -538,7 +538,11 @@ and `limitContractViolations` is how a caller reports one that is out of envelop
 Two ceilings, deliberately different: `countCeiling` (1,000,000) bounds structural counts,
 while `msCeiling` (604,800,000 = 7 days) bounds durations and timeouts so that any
 `HARD_LIMITS.timeoutMs` the plugin accepts stays recordable (`src/checkpoint/schema.ts:95`,
-`:101`; `src/config.ts:14`). The wiring adds a second rule on top of that: a deadline above the
+`:101`; `src/config.ts:14`). A byte count is neither of those: `integrity.bytes` describes a
+payload the *writer* already accepted, so both sides bound it by `maxBytes`
+(`src/checkpoint/schema.ts:859`). The read side used `countCeiling` there until round 27, which
+refused every legal payload between 1,000,000 and 1,048,576 bytes — sealed and written fine,
+then read back as `invalid`. The wiring adds a second rule on top of that: a deadline above the
 recording ceiling is **omitted, never clamped** — `deadlineMs: 1000000` for a week-long run
 would be a number describing no real bound — and the same value gates `time.deadlineAtMs` and
 the derived `watchdog.deadlineHit` (`src/checkpoint/wiring.ts:455`).

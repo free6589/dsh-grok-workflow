@@ -1,0 +1,26 @@
+### round-027 profile check 2026-11-20T08:29:21+08:00
+## repo vs origin
+fd241c8f9f8dbf0f78f4cfd6eb1e3f69f23b84a7
+fd241c8f9f8dbf0f78f4cfd6eb1e3f69f23b84a7
+v0.12.2-5-gfd241c8
+## remote latest tag
+efed41d27b93b881cb095dac1ab1ee7e315fa8f2	refs/tags/v0.12.0
+983902520d2dbc590ea4feecb6af29760418b9f1	refs/tags/v0.12.0^{}
+db2b17deb95108df2ba005d4ff88f67897581f30	refs/tags/v0.12.1
+23d33697dac7bedcce0c2c532c532a1a084bfb27	refs/tags/v0.12.1^{}
+6853d60da59dc44eccd1a23c905f7d3a14837d9a	refs/tags/v0.12.2
+40228c551f115ee027a6a60a3d8bc27d7c8c4000	refs/tags/v0.12.2^{}
+## github latest release
+Grok Workflow for DSH v0.12.2	Latest	v0.12.2	2026-11-19T23:52:31Z
+## installed profile package
+dsh-grok-workflow 0.12.2
+## profile lock specifier
+grep: /home/fish/.dsh/profiles/web/package-lock.json: No such file or directory
+## lib parity with tag v0.12.2 (excluding maps)
+diff-exit=0
+## host process
+    PID                  STARTED ELAPSED CMD
+ 154637 Tue Nov 17 22:49:32 2026  207590 /home/fish/.local/share/mise/installs/node/26.8.1/bin/node /home/fish/.local/bin/dsh web --host 100.111.111.88 --port 3080 --no-open
+9d066162-58a9-4164-afa6-80202741eeb2
+## GUI
+401

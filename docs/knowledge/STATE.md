@@ -1,3 +1,16 @@
+Last updated: 2026-11-20 08:55 +08:00 (**round-027：读侧字节上限跟着写入侧走，载荷越界不再「写得进读不出」** —
+`assertCheckpoint` 把 `integrity.bytes` 卡在 `countCeiling`（1,000,000，行数上限），而
+`sealCheckpoint` 接受载荷到 `maxBytes`（1,048,576）：落在这两者之间的检查点封装、落盘都成功，
+读回即 `invalid`，续跑永远起不来。一行上限改为 `maxBytes` + 注释；新用例把载荷顶过边界再落盘读回
+（一条最大宽度证据行 2,055 字节，481 行 = 1,001,015 字节；503 行仍在上限内，故带内至少 22 行宽）。
+`npm run ci` exit 0 = **68 文件 / 1230 测试 PASS**（基线 1229，只增不减），typecheck 0 错、
+oxlint 24w/0e、`verify:lib` 提交后复核 153 files byte-identical。**选题前先把 `POOL.md` 与树对表**：
+六条已陈旧（`records.ts` 全 `redactError`、`history.ts` 先脱敏后截断、`answerLead` 三段候选、
+R6/R9 随 0.12.2、R10 随 0.11.20），R11 仍成立（`gate.ts:611-644` 仍组合 `relayText`）。
+文档：`DECISIONS.md` D-084、`RESEARCH.md` A33、`VALIDATION.md` Round 76、`ARCHITECTURE.md`
+的字节上限句。证据 `.rsi/evidence/round-027/`。NOT_RUN：真实定时投递（D-066）、GUI 手动点击拍照。
+发版见 `docs/RELEASING.md`，CI/Release 号记在 `.rsi/LOG.md` 第 27 行。）
+
 # Project State
 
 Last updated: 2026-11-20 08:20 +08:00 (**`web` profile 已到最新发布 `v0.12.2`，仓库无需变动，DSH 未重启** —

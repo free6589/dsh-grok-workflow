@@ -1,0 +1,10 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+ ✓ test/checkpoint-schema.spec.ts (37 tests) 510ms
+
+ Test Files  1 passed (1)
+      Tests  37 passed (37)
+   Start at  08:30:25
+   Duration  804ms (transform 119ms, setup 0ms, import 154ms, tests 510ms, environment 0ms)
+

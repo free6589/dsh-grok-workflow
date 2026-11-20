@@ -1,3 +1,20 @@
+## 2026-11-20 08:55 — round-027：检查点「写得进读不出」修掉，接下来只剩 R11 与 panel 问题
+
+- **From:** agent-65（round 27，update-then-self-iterate）· **To:** 下一轮 / 用户
+- **本轮（`CONFIRMED`）**：`integrity.bytes` 的读侧上限从 `countCeiling`（1,000,000，行数上限）
+  改为 `maxBytes`（1,048,576，写入侧同一个上限）。缺陷实测：带内载荷（481 条最大宽度证据行 =
+  1,001,015 字节）修前读回 `CheckpointError('invalid', … integrity.bytes …)`，修后落盘读回校验通过。
+  证据 `.rsi/evidence/round-027/`（`test-red.txt` / `test-green.txt` / `ci.txt`）。
+- **选题依据（`CONFIRMED`）**：`POOL.md` 与 `HEAD` 对表后六条已陈旧（redaction 调用点、history 顺序、
+  answerLead 句数、R6、R9、R10），已在池里标 STALE/DONE 并注明锚点。**下一轮从这里接**：R11
+  （取消终结消息仍在组合 `relayText` 的前导与标记，`gate.ts:611-644`）与 `src/panel.ts` 无生产
+  导入者（只有三个测试文件引用）这两条。
+- **发行**：本轮的改动是 patch 级（读侧拒绝语义修复，无新配置面）。`docs/RELEASING.md` 的
+  发布动作、CI/Release 号与标签记在 `.rsi/LOG.md` 第 27 行与 `VALIDATION.md` Round 76。
+- **仍 `NOT_RUN`（需操作者）**：真实定时投递一轮心跳（D-066，要占一个真实间隔）、GUI 手动点击截图。
+- **注意**：`~/.dsh/profiles/web` 已升到本轮 tag；宿主 pid 至今未重启，profile 更新只改磁盘上的
+  安装物，验收口径按 D-083 读（`HEAD == origin/main`、发布标签为祖先、发布代码与标签逐字节相同）。
+
 # Agent Handoff
 
 ## 2026-11-20 08:20 — 复查：`v0.12.2` 仍是最新，仓库和档案都停在它上面，卡点只剩验收口径
