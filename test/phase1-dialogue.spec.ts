@@ -1011,11 +1011,20 @@ describe('P0-4: a cancelled turn keeps the message and states the terminal', () 
     const transcript = texts(live)
     const all = transcript.join('\n')
     expect(transcript.filter(text => text === request)).toHaveLength(1)
-    expect(all).toContain('PARTIAL')
+    // Round 28: the cancelled terminal states the kept report as a human
+    // conclusion, never relayed — no success preamble, no markers, no `PARTIAL`
+    // status word from the machine ledger.
+    expect(all).not.toContain('PARTIAL')
+    expect(all).not.toContain('<<<GROK-WORKFLOW-REPORT>>>')
     expect(all).toContain('Task a')
-    expect(all).toContain(verification(plan[0]!).criteria[0]!.evidence)
-    expect(all).toContain('Task b')
-    expect(all).toContain('not started')
+    // Round 28: per-criterion evidence verbatim stays in the progress node,
+    // not in the cancelled terminal — the human conclusion names the task.
+    expect(all).not.toContain(verification(plan[0]!).criteria[0]!.evidence)
+    // Round 28: the unstarted task's title verbatim stays in the machine
+    // ledger, not in the cancelled terminal — the human conclusion describes
+    // it without naming it.
+    expect(all).not.toContain('Task b')
+    expect(all).not.toContain('not started')
     expect(all).toContain('cancelled')
     expect(all).not.toContain('COMPLETED')
   })

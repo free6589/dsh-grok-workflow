@@ -872,3 +872,26 @@ no history is rewritten, and no round is force-pushed.
   597,237 B，sha256 `78e7e5f9…`）。旧标签未动、无 force-push、未发布 npm。
 - **档案**：`~/.dsh/profiles/web` 升到 `#v0.12.3`，`lib/` 与标签 `diff -r` = 0，宿主 pid `154637`
   未重启；装好的产物自身跑通 1,001,051 B 载荷的落盘→读回（`.rsi/evidence/round-027/shipped-roundtrip.txt`）。
+
+## Round 28 — 2026-11-20 — R11：取消终结不再套跑完的包装（`CONFIRMED`，patch `0.12.4`）
+
+- **选题（R2）**：`POOL.md` 与树对表后最高优先级仍是 `R11 PENDING`
+ （`cancelledText` 走 `relayText`，取消终结带成功前言+markers+折叠台账）。
+  小修（单文件行为修正，无新配置面），免研究。
+- **缺陷**：`src/gate.ts` `cancelledText` 把保留的部分报告经 `relayText` 组合，
+  终结里出现 `finished and produced the result` 前言、`REPORT_BEGIN/END` 标记与
+  `Failures:`/`Confirmed evidence:`/`Model routes:` 台账——取消读起来像跑完。
+- **改动**：`cancelledText` 改走 `humanConclusion`（纯人话结论）+ 注释与文档同步；
+  `test/gate-partial-head.spec.ts` +4 断言（无前言/无 markers/无台账）；
+  `test/phase1-dialogue.spec.ts` 3 个旧断言随行为更新
+  （`PARTIAL` 状态词、证据原文、未开始任务标题原文不再出现在终结里；
+  行为断言 reject/保留一次/cancelled/无 COMPLETED 未动）。
+- **红→绿（`CONFIRMED`）**：旧代码上新断言 **1 failed / 11 passed**；
+  修后 `gate-partial-head` **12 passed**、`phase1-dialogue` **33 passed**。
+- **门禁**：`npm run ci` exit 0 = **68 文件 / 1230 测试 PASS**，
+  typecheck 0 错、oxlint 24w/0e；`npm run build` 后 `lib/gate.*` 随 `src/` 重建；
+  `npm run verify:lib` 提交后复核。
+- **证据**：`.rsi/evidence/round-028/`（`green-spec-run.txt`、`ci.txt`、`ci-release.txt`）。
+- **未验证（`NOT_RUN`）**：真机 GUI 手动取消一次看终结；真实定时投递。
+- **建议版本**：patch → `0.12.4`（取消终结文案修正，无新配置面、无 API 变化）。
+- **status:** OK

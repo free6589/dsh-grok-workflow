@@ -5,6 +5,23 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.12.4] - 2026-11-20
+
+### Fixed / 修复
+
+- **A cancelled turn no longer wears the packaging of a finished run / 被取消的轮次不再套着跑完的包装** —
+  the kept partial report went through `relayText`, so a cancelled terminal opened with the
+  success preamble, the `REPORT_BEGIN/END` markers and the folded machine ledger
+  (`Failures:`, `Confirmed evidence:`, `Model routes:`) — it read as if the workflow had
+  finished. It now states the kept report as a human conclusion (`humanConclusion`): what was
+  verified, what was not, and that stopping was the operator's act. The ledger stays in the
+  progress node, where it was already recorded.
+  / 保留的部分报告走的是 `relayText`，于是取消的终结带着成功前言、`REPORT_BEGIN/END` 标记和
+  折叠的机器台账（`Failures:`、`Confirmed evidence:`、`Model routes:`）——读起来像流程跑完了。
+  现在只说人话结论（`humanConclusion`）：核验过了什么、没做成什么、停下是主动操作。
+  台账本来就记在进度节点里，不丢。
+
+
 ## [0.12.3] - 2026-11-20
 
 ### Fixed / 修复

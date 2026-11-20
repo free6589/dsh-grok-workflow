@@ -1,3 +1,11 @@
+Last updated: 2026-11-20 09:10 +08:00 (**round-028 收口：R11，CI 全绿，未发版** —
+取消终结不再走 `relayText`（成功前言+markers+折叠台账），改说人话结论；
+`phase1-dialogue` 3 个旧断言随行为同步更新（行为断言未动）。
+`npm run ci` exit 0 = **68 文件 / 1230 测试 PASS**；`lib/` 随 `src/` 重建。
+**未提交、未发版、未打 tag**——等收尾发版。）
+
+# Project State
+
 Last updated: 2026-11-20 08:55 +08:00 (**round-027：读侧字节上限跟着写入侧走，载荷越界不再「写得进读不出」** —
 `assertCheckpoint` 把 `integrity.bytes` 卡在 `countCeiling`（1,000,000，行数上限），而
 `sealCheckpoint` 接受载荷到 `maxBytes`（1,048,576）：落在这两者之间的检查点封装、落盘都成功，
@@ -16,7 +24,6 @@ success（asset `dsh-grok-workflow-0.12.3.tgz`，597,237 B）。档案 `~/.dsh/p
 跑通 1,001,051 B 载荷落盘→读回。独立复查 `reviewer-027` = `ACCEPT`（worktree 里改回旧上限
 复现 1 failed / 36 passed）。NOT_RUN：运行中进程内存里的代码身份、复制档案实例的 GUI 交互。
 
-# Project State
 
 Last updated: 2026-11-20 08:20 +08:00 (**`web` profile 已到最新发布 `v0.12.2`，仓库无需变动，DSH 未重启** —
 远端最新 tag/Release 仍是 `v0.12.2`（`40228c5`），本地 `main` = `origin/main` = `5bd5bfe`

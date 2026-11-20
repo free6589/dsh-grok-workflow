@@ -46,9 +46,11 @@ here and are marked DONE when their commit lands.
   (`src/delivery/index.ts:440-462`), so the lead is no longer one sentence.
 - P · The 2400-char clamp drops the verdict line and, in bilingual delivery, the whole second
   language (`delivery/index.ts:588`, `:613`). S / low.
-- R11 PENDING · The cancelled terminal embeds the relay preamble, markers and ledger
-  (`gate.ts:611-644` still composes `relayText`, `answer.ts:106-130`) although it is a real
-  `assistant/message`. Re-checked round 27: still true, anchor moved with the code. S / low.
+- R11 DONE · the cancelled terminal stated the kept report via `relayText` (success preamble +
+  markers + folded ledger), reading as if the workflow had finished. Round 28 composes it
+  via `humanConclusion` instead (`src/gate.ts` `cancelledText`); the ledger stays in the
+  progress node. Pinned by `test/gate-partial-head.spec.ts` + `test/phase1-dialogue.spec.ts`.
+  Evidence `.rsi/evidence/round-028/`.
 - P · The "bilingual" mirror repeats the same sentence under English labels
   (`answer.ts:111-114`, `delivery/index.ts:611`). S / low.
 - R9 DONE · a COMPLETED run no longer prints `Failures:` for an attempt a later attempt

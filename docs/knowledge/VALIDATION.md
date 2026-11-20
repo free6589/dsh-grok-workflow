@@ -4526,3 +4526,25 @@ throwaway worktree 里把上限改回 `countCeiling`，新用例 **1 failed / 36
 
 **未验证（`NOT_RUN`）**：运行中宿主进程内存里的代码身份（插件不打印版本、ESM 缓存无版本标记，
 无 watcher 观测手段）；复制档案实例的 GUI 交互需 cookie；真实定时投递（D-066）、GUI 手动点击截图。
+
+## Round 77 — 2026-11-20 — R11：取消终结不再套跑完的包装（`CONFIRMED`，未发版）
+
+**主题**：POOL 里 `R11 PENDING`——`cancelledText` 把保留的报告走 `relayText`，
+于是取消终结带着成功前言（`finished and produced the result`）、
+`REPORT_BEGIN/END` 标记和折叠台账（`Failures:`、`Confirmed evidence:`、`Model routes:`），
+读起来像流程跑完了。
+
+**改动**：`src/gate.ts` `cancelledText` 改走 `humanConclusion`（纯人话结论）；
+注释与文档同步。已验证行仍在结论文本里（`做成的：Task a`），台账本来就记在进度节点里。
+
+**红绿（`CONFIRMED`，本树实跑）**：
+修前新断言在旧代码上 **1 failed / 11 passed**（正是 R11 的病：带 markers 和台账）；
+修后 `test/gate-partial-head.spec.ts` **12 passed**。
+`test/phase1-dialogue.spec.ts` 有 3 个旧断言建在"终结必须带机器细节"的假设上
+（`PARTIAL` 状态词、证据原文、未开始任务标题原文），随行为同步更新——行为断言
+（reject、消息恰保留一次、`cancelled`、无 `COMPLETED`）一个未动。
+
+**门禁**：`npm run ci` exit 0 = **68 文件 / 1230 测试 PASS**，typecheck 0 错，
+oxlint 24w/0e；`npm run verify:lib` 153 文件一致。证据 `.rsi/evidence/round-028/`。
+
+**未验证（`NOT_RUN`）**：真机 GUI 手动取消一次看终结；真实定时投递。

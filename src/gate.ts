@@ -601,8 +601,10 @@ export function acceptedReceipt(lang: TriageLang): string {
  * used to be exactly that. The text names the state, keeps the completed/partial
  * split honest, and never reads as success.
  *
- * The kept report goes through the same `relayText` every other path uses, so a
- * cancelled PARTIAL opens with the same human block instead of the raw ledger.
+ * The kept report is stated as a human conclusion (`humanConclusion`), never
+ * relayed: `relayText` would wrap it in the success preamble, the
+ * `REPORT_BEGIN/END` markers and the folded machine ledger, and a cancelled
+ * turn must never wear the packaging of a finished run.
  *
  * @param reason - Optional measured reason; empty when there is none to state.
  * @param report - Report the run produced before it was stopped, when there is one.
@@ -627,9 +629,13 @@ export function cancelledText(
   const trimmed = reason.trim()
   if (trimmed !== '') lines.push('原因：' + trimmed)
   if (report !== undefined) {
-    // The human block is composed inside `relayText` now, so this path must not
-    // pass one in: a head here plus a block there printed the same summary twice.
-    lines.push('', '取消前保留的工作流报告：', relayText(report, undefined, {
+    // Round 28: the kept report is stated as a human conclusion, not relayed.
+    // `relayText` wraps the human block in the success preamble, the
+    // `REPORT_BEGIN/END` markers and the folded machine ledger — that packaging
+    // says "the workflow finished", which a cancelled turn must never claim.
+    // The verified rows survive inside the conclusion text; the ledger stays in
+    // the progress node, where it was already recorded.
+    lines.push('', '取消前保留的工作流报告：', humanConclusion(report, {
       ...opts.lang === undefined ? {} : { lang: opts.lang },
     }))
   }

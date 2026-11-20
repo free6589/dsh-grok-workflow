@@ -1,0 +1,18 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+ ✓ test/gate-partial-head.spec.ts (12 tests) 3872ms
+     ✓ opens with the head, not with the ledger, on the front desk team path  520ms
+     ✓ says the same in English, in the same order  447ms
+     ✓ always shows the head (humanSummary fixed on, T4)  451ms
+     ✓ states the failure and what to do about it  443ms
+     ✓ keeps the failure marker out of the success path  448ms
+     ✓ keeps the human block first and the machine report folded behind it  445ms
+     ✓ hides the routing ledger from the visible block by default  448ms
+     ✓ keeps diagnostics off (showDiagnostics fixed false, T4)  445ms
+
+ Test Files  1 passed (1)
+      Tests  12 passed (12)
+   Start at  09:06:07
+   Duration  4.57s (transform 485ms, setup 0ms, import 583ms, tests 3.87s, environment 0ms)
+

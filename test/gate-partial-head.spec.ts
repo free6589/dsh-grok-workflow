@@ -238,6 +238,12 @@ describe('a PARTIAL answer leads with a human conclusion and a next step', () =>
     expect(text).toContain('运行已取消')
     expect(text).toContain('项没做成')
     expect(text).toContain('下一步：')
+    // Round 28: a cancelled turn never wears the packaging of a finished run —
+    // no success preamble, no REPORT_BEGIN/END markers, no folded ledger.
+    expect(text).not.toContain('finished and produced the result')
+    expect(text).not.toContain('<<<GROK-WORKFLOW-REPORT>>>')
+    expect(text).not.toContain('Confirmed evidence:')
+    expect(text).not.toContain('Model routes:')
   })
 })
 
