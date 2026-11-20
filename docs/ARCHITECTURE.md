@@ -669,12 +669,31 @@ Two deliberate asymmetries:
 - **A value ends at a token boundary** — whitespace, end of line, or one of `,;}&|<>})]`. An
   unterminated value used to swallow `;user=app` and `Path=/` from the same line.
 
-Known gaps: a wrapped base64 blob whose final line is shorter than 16 characters keeps that
-fragment — footer bytes, not key material, since the tail of the encoding is the end of the
-block — base64 `CERTIFICATE` and `PGP PUBLIC KEY BLOCK` blocks are deliberately left alone as
-public material, a blob wrapped **narrower than 24 columns** is not matched at all (the marker is a
-20-character contiguous literal plus the ≥16-character continuation rule; measured for both armors
-in round 30), and no list of shapes is complete. Redaction is a safety net, not a guarantee (see the README security section).
+Known gaps, and the rule behind each:
+
+- **Footer bytes.** A wrapped base64 block is consumed line by line while a line is at least
+  eight characters long, so a final line shorter than that — the end of the encoding, i.e. the
+  armor's footer — survives: at most seven characters, five decoded bytes, and nothing decodable
+  on its own, because the material it belongs to is gone. The threshold is the continuation
+  floor, not a separate constant: one character more is a continuation line and is consumed
+  with the block (`src/redact.ts` `BASE64_CONTINUATION`; pinned by `test/redact.spec.ts`
+  "keeps exactly one footer line", both sides of 7/8).
+- **Folds below that floor.** A blob folded to 1–7 columns has no line long enough to be a
+  continuation line, so it is consumed as a *run*: two or more consecutive lines that are only
+  base64 characters are read as one narrow fold. That is the shape a fold leaves, and it is
+  also the only reading under which such a block is covered at all — before this rule a
+  seven-column fold kept 244 of its 272 encoded characters, which decoded back to the banner and
+  the key body (`docs/knowledge/RESEARCH.md` A41).
+  The cost is stated rather than hidden: two consecutive one-word lines directly after a matched
+  encoded banner are consumed with it, where a single one is not. What can remain of a
+  sub-floor fold is at most its first line (≤4 characters, because the match starts where the
+  banner's own base64 alignment starts), never the block.
+- **Public material by design.** base64 `CERTIFICATE` blocks and base64 `PGP PUBLIC KEY BLOCK`
+  blocks are left alone: the encoded windows reach byte 17 of the banner, where `PRI`/`SEC`
+  separate from `PUB` (`D-086`), so a public blob cannot be caught by accident and a private one
+  is not missed for it.
+- No list of shapes is complete. Redaction is a safety net, not a guarantee (see the README
+  security section).
 
 ## Known architecture limits (MVP)
 

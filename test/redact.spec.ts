@@ -349,6 +349,78 @@ describe('redaction shapes the earlier rules missed', () => {
     expect(inScript(publicKey)).toBe(publicKey)
   })
 
+  it('redacts a blob folded below the continuation floor instead of leaving its tail', () => {
+    // Measured on the source before this round (`A41`): at a width under the eight-character
+    // continuation floor the *banner* still matched (the fold-tolerant window spans the
+    // breaks) but no continuation line was long enough to be consumed, so the rest of the
+    // encoding stayed — 244 of 272 encoded characters at width 7, which decoded back to the
+    // banner and the key body. A run of two or more sub-floor base64-only lines is now
+    // consumed as a narrow fold.
+    const pgp = `-----BEGIN PGP PRIVATE KEY BLOCK-----\n\n${'m'.repeat(120)}\n=abcd\n-----END PGP PRIVATE KEY BLOCK-----\n`
+    const blob = Buffer.from(pgp, 'utf8').toString('base64')
+    const inScript = scriptRedactPromptText()
+    // What is left of the encoding once the placeholder is taken out — the blob alone is
+    // redacted without prose, so every base64 character in the result came from the block.
+    const leftover = (output: string) => output.replace('[REDACTED PRIVATE KEY]', '').replace(/\n/g, '')
+    for (const width of [1, 2, 3, 4, 5, 6, 7]) {
+      const folded = (blob.match(new RegExp(`.{1,${width}}`, 'g')) ?? []).join('\n')
+      const output = redactSecrets(folded)
+      expect(output, `fold ${width}`).toContain('[REDACTED PRIVATE KEY]')
+      // The block itself is gone. What can survive is at most one fragment smaller than a
+      // continuation line: at widths 5–7 nothing does, and at 1–4 the fold's *first* line
+      // stays because the match starts where the banner's own base64 alignment starts (its
+      // third window sits three characters into the encoding) — measured 0 at widths 5/6/7
+      // and 4/4/3/4 at widths 1/2/3/4, i.e. under the footer bound of 8.
+      expect(leftover(output).length, `fold ${width} kept encoded material`).toBeLessThan(8)
+      expect(output, `fold ${width}`).not.toContain(blob.slice(8, 24))
+      // The prompt boundary mirrors the report boundary, from the same rule table.
+      expect(inScript(folded), `fold ${width} in the prompt realm`).toBe(output)
+
+      // The same blob inside prose keeps the prose on both sides and replaces the block.
+      const text = `Private key dump (fold ${width}):\n${folded}\nnext line stays`
+      expect(redactSecrets(text), `fold ${width} with prose`).toContain('next line stays')
+      expect(inScript(text), `fold ${width} with prose in the prompt realm`).toBe(redactSecrets(text))
+    }
+    // Two consecutive short one-word lines directly after a blob are read as a narrow fold
+    // too (that is the shape a fold leaves). This is the documented over-reach: it only
+    // fires after an encoded banner matched, and a single short line is not enough.
+    const wrapped = (blob.match(/.{1,64}/g) ?? []).join('\n')
+    const afterWords = redactSecrets(`dump:\n${wrapped}\nhello\nworld\nend of paragraph`)
+    expect(afterWords).toContain('[REDACTED PRIVATE KEY]')
+    expect(afterWords).toContain('end of paragraph')
+    expect(afterWords).not.toContain('hello')
+    const afterOneWord = redactSecrets(`dump:\n${wrapped}\nhello\nend of paragraph`)
+    expect(afterOneWord).toContain('hello')
+  })
+
+  it('keeps exactly one footer line of a wrapped blob and nothing more', () => {
+    // The documented trade-off (`A37`, `A41`): the final line of a wrapped block is consumed
+    // when it is at least a continuation line long, so a final line shorter than the
+    // eight-character floor survives as the armor's footer — at most seven characters, five
+    // decoded bytes, and nothing decodable on its own, because the material it belongs to is
+    // gone. This pins both sides of that boundary on both boundaries.
+    const pgp = `-----BEGIN PGP PRIVATE KEY BLOCK-----\n\n${'m'.repeat(120)}\n=abcd\n-----END PGP PRIVATE KEY BLOCK-----\n`
+    const blob = Buffer.from(pgp, 'utf8').toString('base64')
+    const inScript = scriptRedactPromptText()
+    const head = blob.slice(0, blob.length - 12)
+    for (const tailLength of [1, 3, 5, 7]) {
+      const tail = blob.slice(-12).slice(0, tailLength)
+      const text = `${head}\n${tail}`
+      const output = redactSecrets(text)
+      // The footer is the whole of what survives, on the same line it arrived on.
+      expect(output, `tail of ${tailLength}`).toBe(`[REDACTED PRIVATE KEY]\n${tail}`)
+      expect(inScript(text), `tail of ${tailLength} in the prompt realm`).toBe(output)
+    }
+    for (const tailLength of [8, 9, 12]) {
+      const tail = blob.slice(-12).slice(0, tailLength)
+      const text = `${head}\n${tail}`
+      const output = redactSecrets(text)
+      // One character longer is a continuation line, so it is consumed with the block.
+      expect(output, `tail of ${tailLength}`).toBe('[REDACTED PRIVATE KEY]')
+      expect(inScript(text), `tail of ${tailLength} in the prompt realm`).toBe(output)
+    }
+  })
+
   it('redacts a narrow-folded base64 key that sits in a JSON field', () => {
     // The same blob arrives as one long JSON string with `\n` escapes; the fold is real
     // text, so the document has to stay parseable after replacement.
