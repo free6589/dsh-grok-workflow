@@ -4589,3 +4589,23 @@ armor 规则（`:27` `private-key`、`:31` `pgp-private-key`），都匹配解�
 
 **未验证（`NOT_RUN`）**：真机 GUI 手动把一段 base64 私钥喂给运行的插件看报告；
 真实定时投递（D-066 属操作者动作，本会话是子代理，`schedule_*` 工具被拒）。
+
+## Round 80 — 2026-11-20 — `0.12.5` 发版：base64 包裹的私钥（`CONFIRMED`）
+
+**版本判定**：patch。安全/脱敏修复，无新配置面、无 API 变化、报告格式不变。
+
+**命令与结果（`CONFIRMED`）**：
+
+| 命令 | 结果 |
+| --- | --- |
+| `git commit 5b7cae1`（规则+测试+重建 lib+记忆+CHANGELOG+证据） | 21 files |
+| `npm run ci`（提交后，落 `.rsi/evidence/round-029/ci-post.txt`） | exit 0；68 文件 / 1233 测试 PASS；`lib/ at 5b7cae1 is the build of src/ at 5b7cae1`（153 files byte-identical） |
+| `git push origin main` | `ce856cb..5b7cae1`，fast-forward，无 force-push |
+| `tag -a v0.12.5` + `push origin v0.12.5` | 成功；tag 对象 `47fcb52`；旧标签未动 |
+| 远端 CI `44656151053`（head `5b7cae1`） | success |
+| Release `44656153854` | success；Release `Grok Workflow for DSH v0.12.5`，asset `dsh-grok-workflow-0.12.5.tgz`（599,562 B，uploaded），非 draft 非 prerelease |
+
+**版本串同步（`CONFIRMED`）**：`package.json` / `package-lock.json` 同步到 `0.12.5`；两份 README 的
+声明版本、安装示例标签、已发布标签清单，以及 `docs/LOCAL-TESTING.md` 的 tarball 名四处由守卫逼出
+（首轮 ci 因此 6 failed，改完复跑 exit 0）——这正是 `test/docs-version.spec.ts` 与
+`test/docs-config-keys.spec.ts` 存在的意义。

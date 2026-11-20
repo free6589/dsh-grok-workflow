@@ -7,6 +7,9 @@ base64 `CERTIFICATE` 与被 base64 包裹的 PGP armor 有意不动（后者仍�
 `verify:lib` 153 files byte-identical。红绿：旧码 worktree 里新用例 2 failed / 1 passed，失败输出
 就是整串 base64 私钥体。文档：`DECISIONS.md` D-085、`RESEARCH.md` A34、`VALIDATION.md` Round 79、
 `ARCHITECTURE.md` 覆盖清单与已知缺口、两份 README 安全条目。证据 `.rsi/evidence/round-029/`。
+**已发版 `0.12.5`**：commit `5b7cae1`、annotated tag `v0.12.5`（对象 `47fcb52`）已推，
+远端 CI `44656151053` success、Release `44656153854` success（asset
+`dsh-grok-workflow-0.12.5.tgz`，599,562 B）。
 NOT_RUN：真机 GUI 手点、真实定时投递（子代理被拒 `schedule_*`；现有心跳行 `COUNT=10` 只到
 2026-11-20T10:01:50Z，撑不到 12-01，需主会话续订）。）
 

@@ -1,0 +1,22 @@
+# remote CI + Release for v0.12.5 (captured with gh)
+
+## CI run 44656151053 (main)
+{
+ "conclusion": "success",
+ "headSha": "5b7cae181cfb1a33e04772c03f4198b088a98386",
+ "name": "CI",
+ "status": "completed",
+ "url": "https://github.com/free6589/dsh-grok-workflow/actions/runs/44656151053"
+}
+
+## Release run 44656153854 (tag v0.12.5)
+{
+ "conclusion": "success",
+ "headSha": "5b7cae181cfb1a33e04772c03f4198b088a98386",
+ "name": "Release",
+ "status": "completed",
+ "url": "https://github.com/free6589/dsh-grok-workflow/actions/runs/44656153854"
+}
+
+## release object
+{"assets":[{"apiUrl":"https://api.github.com/repos/free6589/dsh-grok-workflow/releases/assets/770030278","contentType":"application/x-gtar","createdAt":"2026-11-20T01:48:12Z","digest":"sha256:ec836c42d2a2558654e5bb17737101a8c1e2dfeaa765addfae26a78d4082eb52","downloadCount":0,"id":"RA_kwDOVWgu184t5brG","label":"","name":"dsh-grok-workflow-0.12.5.tgz","size":599562,"state":"uploaded","updatedAt":"2026-11-20T01:48:12Z","url":"https://github.com/free6589/dsh-grok-workflow/releases/download/v0.12.5/dsh-grok-workflow-0.12.5.tgz"}],"isDraft":false,"isPrerelease":false,"name":"Grok Workflow for DSH v0.12.5","publishedAt":"2026-11-20T01:48:13Z","tagName":"v0.12.5"}

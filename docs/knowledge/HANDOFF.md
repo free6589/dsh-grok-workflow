@@ -1,6 +1,10 @@
 # Agent Handoff
 
-## 2026-11-20 — round-029：base64 包裹的私钥不再原样进报告（`CONFIRMED`，发版 `0.12.5`）
+## 2026-11-20 — round-029：base64 包裹的私钥不再原样进报告（`CONFIRMED`，已发版 `0.12.5`）
+
+- **发版（`CONFIRMED`）**：patch。commit `5b7cae1`、annotated tag `v0.12.5`（对象 `47fcb52`）已推；
+  远端 CI `44656151053` success、Release `44656153854` success（asset
+  `dsh-grok-workflow-0.12.5.tgz`，599,562 B）。旧标签未动，无 force-push。
 
 - **From:** agent-70（RSI round 29 子代理）· **To:** 下一轮接手者 / 用户
 - **选题（`CONFIRMED`）**：`POOL.md` 红脱敏一节第一条非 DONE 项（`P · Base64-wrapped PEM has no

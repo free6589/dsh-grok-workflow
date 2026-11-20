@@ -1,4 +1,4 @@
-Updated: 2026-11-20T09:45+08:00 · round 29 (base64-wrapped private key) · `npm run ci` 68 files / 1233 tests PASS · release `0.12.5` in flight
+Updated: 2026-11-20T09:45+08:00 · round 29 (base64-wrapped private key) · `npm run ci` 68 files / 1233 tests PASS · released `0.12.5` (commit `5b7cae1`, tag `v0.12.5`, CI `44656151053`, Release `44656153854`)
 
 Updated: 2026-11-20T08:45+08:00 · round 27 (checkpoint read-side byte bound) · **released
 `0.12.3`**: commit `fd6a5ee`, tag `v0.12.3`, CI `44647313571`, Release `44647317251` ·
