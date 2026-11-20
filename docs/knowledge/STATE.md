@@ -1,3 +1,21 @@
+Last updated: 2026-11-20 10:13 +08:00 (**round-030：base64 包裹的 GnuPG 私钥不再原样进报告** —
+round 29 只堵了 PEM 这一半，`base64` 过的 GnuPG 钥匙串导出/JSON 字段里的密钥整块进报告、诊断和
+复查/重试提示词，因为编码形态里根本不存在解码后的横幅。`base64-private-key` 从 3 条标记扩到 9 条
+（`PRIVATE` 与遗留 `SECRET` × 三种分组对齐），窗口取到横幅第 17 字节——`PRI`/`SEC` 与 `PUB` 正是在
+那里分开，实测「共享前缀 `-----BEGIN PGP ` 的标记」会连 base64 公钥一起脱敏，故不采用。
+`npm run ci` exit 0 = **68 文件 / 1235 测试 PASS**（基线 1233，+2）；typecheck 0 错、oxlint 24w/0e；
+`verify:lib` 在提交后复核 `e7150ab` 153 files byte-identical。红绿：旧码 worktree 里
+`-t "GnuPG"` → 2 failed | 35 skipped，失败输出就是整串编码后的块；新码 37 passed。
+文档：`DECISIONS.md` D-086、`RESEARCH.md` A35、`VALIDATION.md` Round 81/82、`ARCHITECTURE.md`
+覆盖清单与已知缺口、`CHANGELOG.md` 双语条目。证据 `.rsi/evidence/round-030/`。
+**已发版 `0.12.6`**：commit `e7150ab`、annotated tag `v0.12.6`（对象 `167b475`）已推，
+远端 CI `44659057507` success、Release `44659061505` success（asset
+`dsh-grok-workflow-0.12.6.tgz`，600,316 B）；旧标签对象未动，无 force-push。
+顺带量出并**未修**的边界：**<24 列折行**的 base64 块会把 20 字符标记拆到两行，整块完全不匹配
+（8/12/16/19/20/21/22/23 列留 180–184/184 字符；24 列起才脱敏）——PEM 自 round 29 起既有，已入池。
+NOT_RUN：真机 GUI 手点；2026-11-20T10:01:50Z 之后的真实定时投递（子代理被拒 `schedule_*`，
+心跳行 `COUNT=10` 仍撑不到 12-01，需主会话续订）。）
+
 Last updated: 2026-11-20 09:45 +08:00 (**round-029：base64 包裹的私钥不再原样进报告** —
 每条 armor 规则匹配的都是解码后的横幅，所以 `base64 -w0` 的密钥文件、或藏在 JSON 字段/blob 里的
 base64 私钥整块进报告；旧代码只在前面恰好有敏感名标签（`PRIVATE_KEY=`）时才被 `key-value` 顺手

@@ -1,0 +1,18 @@
+== round 30 release evidence (recorded 2026-11-20T10:13:20+08:00) ==
+== CI run 44659057507 (push e7150ab) ==
+{"conclusion":"success","createdAt":"2026-11-20T02:11:57Z","databaseId":44659057507,"event":"push","headSha":"e7150ab98f36b3404d641a6214211d67b1f76f25","name":"CI","updatedAt":"2026-11-20T02:12:51Z"}
+
+== Release workflow run 44659061505 ==
+{"conclusion":"success","createdAt":"2026-11-20T02:11:59Z","databaseId":44659061505,"event":"push","headSha":"e7150ab98f36b3404d641a6214211d67b1f76f25","name":"Release","updatedAt":"2026-11-20T02:12:54Z"}
+
+== gh release view v0.12.6 ==
+{"assets":[{"name":"dsh-grok-workflow-0.12.6.tgz","size":600316,"state":"uploaded"}],"draft":false,"name":"Grok Workflow for DSH v0.12.6","pre":false,"tag":"v0.12.6"}
+
+== tag object ==
+object e7150ab98f36b3404d641a6214211d67b1f76f25
+type commit
+tag v0.12.6
+tagger fish <free6589@users.noreply.github.com> 1795140715 +0800
+
+Grok Workflow for DSH v0.12.6
+

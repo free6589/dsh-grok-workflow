@@ -1,0 +1,45 @@
+{
+ "mtime": "2026-11-20T02:01:50.085Z",
+ "taskCount": 2,
+ "rows": [
+  {
+   "id": "schedule-12eadb13-49c0-4479-9ac2-0d0e8e7ff1d0",
+   "title": "派发个人助理灵感箱",
+   "status": "active",
+   "owners": [
+    "session-03c7307d-fa30-454d-bf9d-269f55777cd4",
+    "session-a52a4e1d-e601-494e-990d-7ad2cea40ed8"
+   ],
+   "rrule": "DTSTART;TZID=Asia/Singapore:20261117T090000\nRRULE:FREQ=DAILY;BYHOUR=9,13,18,22;BYMINUTE=0",
+   "target": "session-a52a4e1d-e601-494e-990d-7ad2cea40ed8",
+   "lastDelivery": {
+    "scheduledAt": "2026-11-20T01:00:00.000Z",
+    "deliveredAt": "2026-11-20T01:00:00.185Z",
+    "messageId": "f655486f-f134-4f66-8152-a27b7d895eb3",
+    "targetSessionId": "session-a52a4e1d-e601-494e-990d-7ad2cea40ed8"
+   },
+   "updatedAt": "2026-11-20T01:00:00.185Z",
+   "createdAt": "2026-11-16T23:49:26.779Z",
+   "promptChars": 500
+  },
+  {
+   "id": "schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab",
+   "title": "RSI heartbeat",
+   "status": "active",
+   "owners": [
+    "session-3a683cb6-1eaa-4b33-9eb9-57e1ef0b955b"
+   ],
+   "rrule": "DTSTART:20261120T010150Z\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=10",
+   "target": "session-3a683cb6-1eaa-4b33-9eb9-57e1ef0b955b",
+   "lastDelivery": {
+    "scheduledAt": "2026-11-20T02:01:50.000Z",
+    "deliveredAt": "2026-11-20T02:01:50.081Z",
+    "messageId": "c5019813-fd87-42d5-94c7-ffa00c456ad6",
+    "targetSessionId": "session-3a683cb6-1eaa-4b33-9eb9-57e1ef0b955b"
+   },
+   "updatedAt": "2026-11-20T02:01:50.081Z",
+   "createdAt": "2026-11-20T00:01:49.999Z",
+   "promptChars": 3239
+  }
+ ]
+}

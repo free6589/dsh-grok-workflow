@@ -4640,3 +4640,28 @@ base64 公钥不误伤。`docs/ARCHITECTURE.md` 覆盖清单与「已知缺口�
 **未验证（`NOT_RUN`）**：真机 GUI 手动把一段 base64 的 GnuPG 私钥喂给运行的插件看报告；
 真实定时投递（D-066 属操作者动作，本会话是子代理，`schedule_*` 被宿主拒绝：
 `{"code":"subagent_session","message":"A delegated subagent cannot use scheduled tasks."}`）。
+
+## Round 82 — 2026-11-20 — `0.12.6` 发版：base64 包裹的 GnuPG 私钥（`CONFIRMED`）
+
+**版本判定**：patch。安全/脱敏修复，无新配置面、无 API 变化、报告格式不变。
+
+**命令与结果（`CONFIRMED`，证据 `.rsi/evidence/round-030/`）**：
+
+| 命令 | 结果 |
+| --- | --- |
+| `git commit e7150ab`（规则+测试+重建 lib+双语 CHANGELOG+记忆+证据，21 files） | 提交成功 |
+| `npm run ci`（提交后，`ci-post.txt`） | exit 0；**68 文件 / 1235 测试 PASS**；typecheck 0 错；oxlint 24w/0e |
+| `npm run verify:lib`（提交后，`verify-lib-post.txt`） | `lib/ at e7150ab is the build of src/ at e7150ab (153 files, byte-identical)` |
+| `git push origin main` | `df6cf4b..e7150ab`，fast-forward，无 force-push |
+| `tag -a v0.12.6` + `push origin v0.12.6` | 成功；tag 对象 `167b475`；旧标签对象未变（`v0.12.3` `0c66263`、`v0.12.4` `d5df98f`、`v0.12.5` `47fcb52`） |
+| 远端 CI `44659057507`（head `e7150ab`） | success（2026-11-20T02:11:57Z → 02:12:51Z） |
+| Release `44659061505` | success（02:11:59Z → 02:12:54Z） |
+| `gh release view v0.12.6` | 非 draft 非 prerelease；asset `dsh-grok-workflow-0.12.6.tgz` 600,316 B `uploaded` |
+
+**版本串同步（`CONFIRMED`）**：`package.json` / `package-lock.json` 同步到 `0.12.6`；两份 README 的
+声明版本、安装示例标签、已发布标签清单（`v0.12.4`、`v0.12.5`、`v0.12.6` 三项都在，sed 一次过手时
+差点丢掉 `v0.12.4`，逐行核对后补回），以及 `docs/LOCAL-TESTING.md` 的 tarball 名；`npm run ci`
+一次绿，无版本守卫失败。
+
+**未验证（`NOT_RUN`）**：GUI 手点；心跳行 `2026-11-20T10:01:50Z` 之后的真实定时投递（子代理被拒
+`schedule_*`，见 `.rsi/evidence/round-030/schedule-row.txt`）。

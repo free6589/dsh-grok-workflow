@@ -1,5 +1,42 @@
 # Agent Handoff
 
+## 2026-11-20 — round-030：base64 包裹的 GnuPG 私钥不再原样进报告（`CONFIRMED`，已发版 `0.12.6`）
+
+- **From:** agent-73（RSI round 30 子代理）· **To:** 下一轮接手者 / 主会话
+- **发版（`CONFIRMED`）**：patch。commit `e7150ab`、annotated tag `v0.12.6`（对象 `167b475`）已推；
+  远端 CI `44659057507` success、Release `44659061505` success（asset
+  `dsh-grok-workflow-0.12.6.tgz`，600,316 B）。旧标签对象未动（`v0.12.3` `0c66263`、
+  `v0.12.4` `d5df98f`、`v0.12.5` `47fcb52`），无 force-push。
+- **选题（`CONFIRMED`）**：`POOL.md` 红脱敏一节第一条非 DONE 项（round 29 留下的 `P · Base64-wrapped
+  *PGP armor*`）。选题前与 `HEAD df6cf4b` 对表：`grep -c QR1AgUF src/redact.ts` → 0，条目成立，未陈旧。
+- **本轮改动**：`base64-private-key` 从 3 条标记扩到 9 条（`PRIVATE`/`SECRET` × 三种分组对齐），窗口
+  取到横幅第 17 字节；`docs/ARCHITECTURE.md` 覆盖清单与已知缺口、`CHANGELOG.md` 双语条目、README
+  版本串、`lib/` 重建。细节见 `DECISIONS.md` D-086、`RESEARCH.md` A35、`VALIDATION.md` Round 81/82。
+- **红绿**：旧码 worktree（`git archive df6cf4b` + 新 spec）`-t "GnuPG"` → **2 failed | 35 skipped**，
+  收到的就是整串编码块；新码 **37 passed**（基线 35）。`npm run ci` **68 文件 / 1235 测试 PASS**；
+  提交后 `verify:lib` = `e7150ab` 153 files byte-identical。证据 `.rsi/evidence/round-030/`。
+- **本轮量出、未修（已入池）**：**<24 列折行**的 base64 块会把 20 字符标记拆到两行，整块完全不匹配
+  （8–23 列留 180–184/184 字符，24 列起才脱敏）；PEM 自 round 29 起既有。真 `base64` 默认 76 列、
+  `-w0` 不折行，风险是手工折行的粘贴。修它需要「标记允许自身断行」或解码通道，属独立决定。
+- **心跳行状态（`CONFIRMED`，只读核对 `~/.dsh/storages/schedule.json`）**：`RSI heartbeat` 行仍
+  `status: active`、只归属 `session-3a683cb6…`、prompt 3,239 字符；`lastDelivery` 现在是
+  2026-11-20T02:01:50Z（`messageId` 存在），加上前一次的 01:01:50Z，共**两次真实投递**。
+  **但 rrule 仍是 `FREQ=MINUTELY;INTERVAL=60;COUNT=10`，最后一次 2026-11-20T10:01:50Z——撑不到
+  2026-12-01。** 本会话是子代理，宿主拒绝 `schedule_*`
+  （`{"code":"subagent_session","message":"A delegated subagent cannot use scheduled tasks."}`），
+  未手工改宿主存储。**主会话/操作者需把该行 rrule 改成**
+  `DTSTART:20261120T100150Z\nRRULE:FREQ=HOURLY`（或每日 `FREQ=DAILY;COUNT=12` 之类）
+  **并把 `UNTIL=20261201T235959Z` 或 `COUNT` 覆盖到 12-01**；行 id `schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab`。
+  证据 `.rsi/evidence/round-030/schedule-row.txt`。
+- **未验证（`NOT_RUN`）**：真机 GUI 手点（把 base64 的 GnuPG 私钥喂给运行中的插件看报告）。
+
+### 下一位接手者的第一件事
+
+1. `POOL.md` 里 `src/checkpoint/schema.ts:59` 的注释偏差（说 1,048,576，实为 1,048,447，一行可修）——
+   round 27 当时「发版后动源码会让 `lib/` 与 `v0.12.3` 不一致」的理由已随每次发版失效。
+2. 其次是本轮新入池的 base64 折行宽度边界（M / low）。
+3. 心跳行续订见上；不续订则 2026-11-20T10:01:50Z 之后不再有自动轮次。
+
 ## 2026-11-20 — round-029：base64 包裹的私钥不再原样进报告（`CONFIRMED`，已发版 `0.12.5`）
 
 - **发版（`CONFIRMED`）**：patch。commit `5b7cae1`、annotated tag `v0.12.5`（对象 `47fcb52`）已推；

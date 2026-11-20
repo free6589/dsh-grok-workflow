@@ -1,3 +1,5 @@
+Updated: 2026-11-20T10:13+08:00 · round 30 (base64-wrapped GnuPG private key) · `npm run ci` 68 files / 1235 tests PASS · `verify:lib` byte-identical at `e7150ab` · released `0.12.6` (commit `e7150ab`, tag `v0.12.6` object `167b475`, CI `44659057507`, Release `44659061505`, asset 600,316 B)
+
 Updated: 2026-11-20T09:45+08:00 · round 29 (base64-wrapped private key) · `npm run ci` 68 files / 1233 tests PASS · released `0.12.5` (commit `5b7cae1`, tag `v0.12.5`, CI `44656151053`, Release `44656153854`)
 
 Updated: 2026-11-20T08:45+08:00 · round 27 (checkpoint read-side byte bound) · **released
@@ -8,6 +10,16 @@ and `v0.12.1` (`23d3369`, CI `44595376323`, Release `44595391505`)
 
 ## Facts
 
+- Round 30 (this round): a base64-wrapped *GnuPG* private key (`base64`d keyring export, key in a
+  JSON field) reached reports verbatim — round 29 closed only the PEM half. `base64-private-key` now
+  carries nine literals: the `PRIVATE` and legacy `SECRET` banner at all three group alignments; the
+  windows reach byte 17, where `PRI`/`SEC` separate from `PUB`, so base64 public keys stay untouched
+  (measured: a marker on the shared `-----BEGIN PGP ` prefix matches public blobs). Red/green: pre-fix
+  source fails 2 of 3 new cases with the whole block in the output; 37 passed after (+2 over 35).
+  Also measured and pooled, not fixed: a blob wrapped narrower than 24 columns splits the marker and
+  is not matched at all. D-086, A35, VALIDATION Round 81/82. Evidence `.rsi/evidence/round-030/`.
+  Heartbeat row unchanged: `status: active`, single owner, two real deliveries recorded
+  (01:01:50Z, 02:01:50Z), rrule still ends 2026-11-20T10:01:50Z — a subagent cannot edit `schedule_*`.
 - Round 29 (this round): a base64-wrapped PEM (`base64 -w0` key file, JSON field, blob inside a
   larger encoding) reached reports verbatim — every armor rule matched the decoded banner, and
   only a secret-named label (`PRIVATE_KEY=`) happened to catch it. New rule `base64-private-key`

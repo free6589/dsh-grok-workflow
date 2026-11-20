@@ -895,3 +895,47 @@ no history is rewritten, and no round is force-pushed.
 - **未验证（`NOT_RUN`）**：真机 GUI 手动取消一次看终结；真实定时投递。
 - **建议版本**：patch → `0.12.4`（取消终结文案修正，无新配置面、无 API 变化）。
 - **status:** OK
+
+## Round 30 — a base64-wrapped GnuPG private key reached reports verbatim
+
+- **Theme:** `.rsi/POOL.md` redaction section, first non-DONE entry (`P · Base64-wrapped *PGP
+  armor*`), the gap round 29 left behind when it closed the PEM half. Re-checked against
+  `HEAD df6cf4b` before choosing it: `grep -c QR1AgUF src/redact.ts` → 0, so the rule still knew
+  only the three PEM encodings. Not stale.
+- **Defect:** `-----BEGIN PGP PRIVATE KEY BLOCK-----` base64'd (a keyring export, a key in a JSON
+  field) contains no decoded banner, so every armor rule missed it and the whole block — with its
+  wrapped continuation lines — reached reports, diagnostics and verifier/retry prompts.
+- **Change:** `src/redact.ts` `base64-private-key` grows from three literals to nine: the `PRIVATE`
+  and legacy `SECRET` GnuPG banner at all three base64 group alignments. The windows reach byte 17
+  of the banner, where `PRI`/`SEC` separate from `PUB` — measured that a marker built from the
+  shared `-----BEGIN PGP ` prefix matches a base64 *public* key blob, i.e. would over-redact public
+  material. `docs/ARCHITECTURE.md` covered shapes + known gaps, `CHANGELOG.md` bilingual entry,
+  README version pins, `lib/` rebuilt (rule table is rendered into the script at module load, so
+  `lib/script.js` is byte-identical).
+- **Files changed:** `src/redact.ts`, `test/redact.spec.ts`, `lib/redact.js` (+ maps),
+  `package.json`, `package-lock.json`, `CHANGELOG.md`, `README.md`, `README.zh-CN.md`,
+  `docs/ARCHITECTURE.md`, `docs/LOCAL-TESTING.md`, `docs/knowledge/{DECISIONS,RESEARCH,VALIDATION}.md`,
+  `.rsi/POOL.md`.
+- **Red/green:** pre-fix tree (`git archive df6cf4b` into `/tmp/rsi-old-030`, new spec copied in,
+  `node_modules` symlinked): `npx vitest run test/redact.spec.ts -t "GnuPG"` → **2 failed | 35
+  skipped**, the received value being the entire encoded block. Fixed tree → **37 passed**
+  (baseline 35, +2). The negative case (base64 `CERTIFICATE`, base64 `PGP PUBLIC KEY BLOCK`, PNG)
+  passes on both sides — a guard, not a probe.
+- **Gates:** `npm run ci` exit 0 on the committed tree = **68 files / 1235 tests PASS**, typecheck
+  0 errors, oxlint 24w/0e; `npm run verify:lib` = `lib/ at e7150ab is the build of src/ at e7150ab
+  (153 files, byte-identical)`.
+- **Release:** patch, warranted (user-visible security fix). `e7150ab` → annotated tag `v0.12.6`
+  (object `167b475`); remote CI `44659057507` success, Release `44659061505` success with asset
+  `dsh-grok-workflow-0.12.6.tgz` (600,316 B, uploaded).
+- **Measured, not fixed:** a blob wrapped narrower than 24 columns splits the 20-character marker
+  across lines and is not redacted at all (wraps 8–23 leave 180–184 of 184 encoded characters;
+  24 is the first width that redacts). Pre-existing for PEM since round 29 — the marker width, not
+  the PGP literals, sets the floor. Recorded in `RESEARCH.md` A35, `docs/ARCHITECTURE.md` known
+  gaps and pooled as an M / low item with a suggested fix direction.
+- **Evidence:** `.rsi/evidence/round-030/` (`red-old.txt`, `red-new.txt`, `ci.txt`, `ci-post.txt`,
+  `verify-lib-post.txt`, `wrap-widths.txt`, `release.txt`, `schedule-row.txt`).
+- **Unverified (`NOT_RUN`):** GUI click-through (pasting a base64 GnuPG key into the running plugin
+  and reading the report) needs an authenticated browser session; real scheduled delivery of the
+  heartbeat beyond 2026-11-20T10:01:50Z, because this subagent is refused `schedule_*`
+  (`A delegated subagent cannot use scheduled tasks`) and the row's rrule ends there.
+- **status:** OK
