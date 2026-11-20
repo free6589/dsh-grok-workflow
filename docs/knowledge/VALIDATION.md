@@ -29,6 +29,27 @@ until the profile is rebooted, which this task forbade.
 **`NOT_RUN`:** DSH restart/reload, force-push, any tag move, npm publish
 (`registry.npmjs.org/dsh-grok-workflow` still 404), DSH core edits (that tree is not a git repo and
 had no file modified in the preceding 3 hours).
+### Re-verification pass, 2026-11-20T08:15–08:20 +08:00 (independent of the first pass)
+
+| command | result |
+| --- | --- |
+| `git rev-parse HEAD origin/main` · `git status --porcelain=v1 -uall` | both `5bd5bfe9afc3cda1d1777c3431d742b354b86ca9`; porcelain output empty |
+| `git rev-parse v0.12.2 'v0.12.2^{}'` vs `git ls-remote origin 'refs/tags/v0.12.2*'` | `6853d60…` / `40228c5…` on both sides — the published tag was not moved |
+| `git describe --tags` · `git log --oneline v0.12.2..HEAD` | `v0.12.2-4-g5bd5bfe`; four docs commits (`074e2c3`, `07666fb`, `09c2bc9`, `5bd5bfe`) |
+| `git diff --name-only v0.12.2..HEAD -- src lib test package.json` | 0 files — the shipped code is byte-identical to the release tag |
+| `curl …/releases?per_page=5` · `curl -sI …/releases/latest` | `v0.12.2` still newest (published 2026-11-19T23:52:31Z, asset `dsh-grok-workflow-0.12.2.tgz`); `/latest` → `302 …/tag/v0.12.2` |
+| `curl …/commits/{40228c5,5bd5bfe}/check-runs` | tag commit 3/3 success (`Validate and publish`, `Node 22`, `Node 24`); `HEAD` 2/2 success |
+| `curl -I releases/download/v0.12.2/dsh-grok-workflow-0.12.2.tgz` | HTTP 200 — the published asset is downloadable |
+| sha256 walk, repo `lib/` vs `node_modules/dsh-grok-workflow/lib` | `identical=77 differing=0 missing=0 extra=0` |
+| `curl registry.npmjs.org/dsh-grok-workflow` (+ `/latest`) | HTTP 404 on both — nothing was published |
+| `find <DSH core> -newermt '-14 hours' -type f` | 0 files — the core tree was not touched (it is not a git repo) |
+| `ps -o pid,lstart,etimes -p 154637` | pid `154637`, `lstart` `Tue Nov 17 22:49:32 2026`, `etimes` `206772`; boot_id `9d066162…`, `uptime -s` `2026-10-31 07:18:12` |
+| `ss -ltnp` (3080 rows) · `curl --max-time 5 :3080` | `100.111.111.88:3080` still owned by pid `154637`; `HTTP 401` |
+
+**Unchanged conclusion:** no newer tag or Release appeared between the two passes, so there was
+still nothing to fast-forward, and the profile was already pinned at `#v0.12.2`. This pass added no
+repository or profile change beyond these records.
+
 
 ## Self-iteration default template — 2026-11-20 — the document, the constant and the bundle agree, and the switch stores it (`CONFIRMED`)
 

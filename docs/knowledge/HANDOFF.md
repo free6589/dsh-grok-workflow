@@ -1,5 +1,22 @@
 # Agent Handoff
 
+## 2026-11-20 08:20 — 复查：`v0.12.2` 仍是最新，仓库和档案都停在它上面，卡点只剩验收口径
+
+- **From:** agent-60（execution，attempt 2）· **To:** 用户 / `lead`
+- **复查（`CONFIRMED`）**：远端 tag/Release 仍以 `v0.12.2`（`40228c5`）为最新；本地 `main` =
+  `origin/main` = `5bd5bfe`（`git describe` = `v0.12.2-4-g5bd5bfe`），标签是祖先，其后四条 docs
+  提交在 `src`/`lib`/`test`/`package.json` 上与标签 diff = 0 个文件；档案 `~/.dsh/profiles/web`
+  仍钉 `#v0.12.2`、装的 `0.12.2`、77 个 shipped `lib` 文件 sha256 全同；宿主 pid `154637`
+  `lstart` 未变、`etimes` 连续到 206772s+、`:3080` 仍由它持有、GUI 回 `HTTP 401`。两轮之间远端
+  没有新 tag，所以既没有可 fast-forward 的提交，也没有对档案做第二次改动。
+- **卡点（不是执行遗漏）**：验收项「本地 HEAD 等于最新发布标签提交」在「不回退 / 不 force-push /
+  本地远端同步 / 不擅自新发版」四条约束下无解——要让 `HEAD` 正好压在标签上，只能丢已推提交、
+  重写共享历史、或自己造一个 Release。取舍与四个被否方案见 `DECISIONS.md` D-083。
+- **Next action（需操作者二选一）**：①把该验收项改成「`HEAD == origin/main`，发布标签为其祖先，
+  发布代码与标签逐字节相同」；②显式授权发一个 `v0.12.3`（这次提交要含版本号与 changelog），让
+  `HEAD` 正好落在新标签上。在此之前请不要再派代理去「把 HEAD 掰回标签」——那会丢已推提交。
+
+
 ## 2026-11-20 — `web` profile 已更新到 `v0.12.2`（repo 无需变动，DSH 未重启）
 
 - **From:** lead（本会话，update-latest-no-restart）· **To:** 用户 / 下一轮接手者

@@ -1884,3 +1884,32 @@ model selector」）、`test/loop-brakes.spec.ts`（35 条）、`test/loop-runti
   untouched — only unset or whitespace-only templates see the new default, so no existing
   heartbeat changes behaviour on upgrade. The 4000-character cap is unchanged and the shipped
   default uses 3 239 of it.
+
+## D-083 — An upgrade lands on the `origin/main` tip with the release tag as an ancestor; `HEAD` is never rewound onto the tag
+
+- **Status:** CONFIRMED
+- **Date:** 2026-11-20
+- **Decision:** after updating the checkout and the installed profile to the latest published
+  release, "up to date" means: `git ls-remote` and the Releases API name the same newest tag, that
+  tag is an ancestor of `HEAD`, `HEAD == origin/main`, `src`/`lib`/`test`/`package.json` are
+  byte-identical to the tag, and the profile manifest pins that tag. `HEAD` is not moved back onto
+  the tag commit, and the tag is never moved forward onto `HEAD`.
+- **Reason:** `v0.12.2` is followed on `main` by four docs commits (`074e2c3`, `07666fb`,
+  `09c2bc9`, `5bd5bfe`) that this repository's own memory cadence requires. Making `HEAD` equal the
+  tag commit would mean discarding pushed history; moving the tag would mean rewriting a published
+  release. Both break rules that outrank an exact-sha match, and neither makes the installed code
+  any newer.
+- **Alternatives rejected:**
+  1. `git reset --hard v0.12.2` — deletes four pushed commits locally, leaves `main` behind
+     `origin/main`, and drops tracked evidence files from the worktree.
+  2. `git push --force origin v0.12.2:main` — rewrites shared history to make `HEAD` equal the tag;
+     forbidden outright.
+  3. Cut a fresh `v0.12.3` at `HEAD` so the tip itself is a release tag — manufactures a release
+     nobody authorized (`AGENTS.md` requires explicit authorization) and needs a version bump plus
+     matching changelog notes for a docs-only change.
+  4. `git checkout v0.12.2` — reports the right sha while silently detaching the branch; the next
+     commit would land on no branch.
+- **Consequences:** an acceptance check worded as "`HEAD` equals the release tag commit" cannot be
+  satisfied while the other constraints hold; the reachable end state is "`HEAD == origin/main`,
+  tag is an ancestor, shipped code byte-identical". Future verification must read the check that
+  way, or the operator must authorize a new release.
