@@ -2,6 +2,34 @@
 
 Real commands and results only. Do not add expected results here.
 
+## Profile update to the published release — 2026-11-20 — repo had nothing to pull, profile moved `#v0.12.1` → `#v0.12.2`, host never restarted (`CONFIRMED`)
+
+**Change:** the `web` profile pinned `dsh-grok-workflow` at `github:free6589/dsh-grok-workflow#v0.12.1`
+(installed `0.12.1`); it now pins `#v0.12.2`. The repository itself needed no change.
+
+| command | result |
+| --- | --- |
+| `git fetch --tags --prune origin` then `git rev-parse HEAD origin/main` | both `07666fb375fbbafb991bbe9d9ebb69d82b841493` — nothing to fast-forward |
+| `git ls-remote --tags origin 'refs/tags/v0.12*'` | newest is `refs/tags/v0.12.2` → `40228c551f115ee027a6a60a3d8bc27d7c8c4000`; no newer tag exists on the remote |
+| `git merge-base --is-ancestor v0.12.2 HEAD` | exit 0 — the tag is an ancestor; `git describe` = `v0.12.2-2-g07666fb`, `v0.12.2..HEAD` = two docs commits (`074e2c3`, `07666fb`) touching only `docs/knowledge/{HANDOFF,STATE,VALIDATION}.md` |
+| `curl api.github.com/repos/free6589/dsh-grok-workflow/releases?per_page=3` | latest = `v0.12.2`, published 2026-11-19T23:52:31Z, draft `False`, prerelease `False`, asset `dsh-grok-workflow-0.12.2.tgz` (596 412 bytes, `uploaded`) |
+| `curl .../commits/40228c5…/check-runs` | `Validate and publish v0.12.2` success · `Node 22` success · `Node 24` success |
+| `curl .../actions/runs?head_sha=07666fb…` | `CI` success, run `44641483552` |
+| `dsh plugin --profile web add github:free6589/dsh-grok-workflow#v0.12.2` | exit 0 in 8.9 s — downloaded `codeload.github.com/free6589/dsh-grok-workflow/tar.gz/40228c551f115ee027a6a60a3d8bc27d7c8c4000`, `Packages: +2` |
+| `dsh plugin --profile web ls dsh-grok-workflow --depth 0` | `dsh-grok-workflow@0.12.2` |
+| `grep -A3 'dsh-grok-workflow:' pnpm-lock.yaml` | `specifier: github:free6589/dsh-grok-workflow#v0.12.2` · `version: https://codeload…tar.gz/40228c551f115ee027a6a60a3d8bc27d7c8c4000` |
+| per-file `sha256sum` of every shipped `lib/**/*.js`+`*.d.ts` vs repo `lib/` | `identical=77 differing=0` (the tarball ships no `*.map`, matching `files` in `package.json`) |
+| `ps -o pid,lstart,etimes -p 154637` before/after | pid `154637`, `lstart` `Tue Nov 17 22:49:32 2026` unchanged, `etimes` 206082 → 206168 s; `/proc/sys/kernel/random/boot_id` unchanged, `uptime -s` still `2026-10-31 07:18:12` |
+| `curl -o /dev/null -w '%{http_code}' http://100.111.111.88:3080/` | `HTTP 401` — the host is answering (auth-gated), not restarted |
+| `grep -rln 'fs\.watch\|chokidar\|watchFile'` in the DSH core package | 0 hits — the core does not watch profile files, and `docs/RELEASING.md` states a profile restart is needed after switching versions |
+
+**Not active yet:** the on-disk profile is `0.12.2`; the live host keeps the `0.12.1` module graph
+until the profile is rebooted, which this task forbade.
+
+**`NOT_RUN`:** DSH restart/reload, force-push, any tag move, npm publish
+(`registry.npmjs.org/dsh-grok-workflow` still 404), DSH core edits (that tree is not a git repo and
+had no file modified in the preceding 3 hours).
+
 ## Self-iteration default template — 2026-11-20 — the document, the constant and the bundle agree, and the switch stores it (`CONFIRMED`)
 
 **Change:** `DEFAULT_ITERATE_TEMPLATE` was a twelve-line generic prompt; it is now the

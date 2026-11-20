@@ -1,0 +1,53 @@
+### profile-update evidence 2026-11-20T08:05:37+08:00
+
+## 1. repo <-> remote (git, no force)
+$ git rev-parse HEAD origin/main
+07666fb375fbbafb991bbe9d9ebb69d82b841493
+07666fb375fbbafb991bbe9d9ebb69d82b841493
+$ git merge-base --is-ancestor v0.12.2 HEAD && echo ancestor-ok
+ancestor-ok
+$ git describe --tags --always
+v0.12.2-2-g07666fb
+$ git log --oneline v0.12.2..HEAD
+07666fb docs(rsi): handoff for 0.12.2 release
+074e2c3 docs(rsi): record 0.12.2 release (CI + Release refs)
+
+## 2. remote tags v0.12.x (git ls-remote)
+efed41d27b93b881cb095dac1ab1ee7e315fa8f2	refs/tags/v0.12.0
+983902520d2dbc590ea4feecb6af29760418b9f1	refs/tags/v0.12.0^{}
+db2b17deb95108df2ba005d4ff88f67897581f30	refs/tags/v0.12.1
+23d33697dac7bedcce0c2c532c532a1a084bfb27	refs/tags/v0.12.1^{}
+6853d60da59dc44eccd1a23c905f7d3a14837d9a	refs/tags/v0.12.2
+40228c551f115ee027a6a60a3d8bc27d7c8c4000	refs/tags/v0.12.2^{}
+
+## 3. GitHub releases (api, unauthenticated)
+v0.12.2 | published 2026-11-19T23:52:31Z | draft False | prerelease False | assets ['dsh-grok-workflow-0.12.2.tgz']
+v0.12.1 | published 2026-11-19T19:10:14Z | draft False | prerelease False | assets ['dsh-grok-workflow-0.12.1.tgz']
+v0.12.0 | published 2026-11-19T18:26:44Z | draft False | prerelease False | assets ['dsh-grok-workflow-0.12.0.tgz']
+
+## 4. CI check-runs for tag commit 40228c5
+Validate and publish v0.12.2 | completed | success
+Node 22 | completed | success
+Node 24 | completed | success
+
+## 5. profile install state
+specifier: github:free6589/dsh-grok-workflow#v0.12.2
+installed: 0.12.2
+32:      dsh-grok-workflow:
+33-        specifier: github:free6589/dsh-grok-workflow#v0.12.2
+34-        version: https://codeload.github.com/free6589/dsh-grok-workflow/tar.gz/40228c551f115ee027a6a60a3d8bc27d7c8c4000
+35-      dsh-infinite-gen-5:
+lib diff (excluding .map): 0 differences
+
+## 6. host continuity
+boot_id: 9d066162-58a9-4164-afa6-80202741eeb2  uptime_since: 2026-10-31 07:18:12
+    PID                  STARTED ELAPSED CMD
+ 154637 Tue Nov 17 22:49:32 2026  206168 /home/fish/.local/share/mise/installs/node/26.8.1/bin/node /home/fish/.local/bin/dsh web --host 100.111.111.88 --port 3080 --no-open
+GUI http://100.111.111.88:3080/ -> HTTP 401
+
+## 7. tree state
+## main...origin/main
+?? .rsi/evidence/profile-update-0.12.2/
+
+## 5b. per-file sha256 of every shipped lib file vs repo HEAD lib
+identical=77 differing=0

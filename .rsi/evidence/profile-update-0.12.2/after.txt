@@ -1,0 +1,11 @@
+=== AFTER 2026-11-20T08:04:36+08:00 ===
+profile dep spec: github:free6589/dsh-grok-workflow#v0.12.2
+installed version: 0.12.2
+installed resolved from: /home/fish/.dsh/profiles/web/node_modules/dsh-grok-workflow
+lock spec+version:
+32:      dsh-grok-workflow:
+33-        specifier: github:free6589/dsh-grok-workflow#v0.12.2
+34-        version: https://codeload.github.com/free6589/dsh-grok-workflow/tar.gz/40228c551f115ee027a6a60a3d8bc27d7c8c4000
+35-      dsh-infinite-gen-5:
+host pid/start/elapsed:  154637 | Tue Nov 17 22:49:32 2026 | 206104s
+boot uptime s: 1730784

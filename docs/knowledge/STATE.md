@@ -1,5 +1,16 @@
 # Project State
 
+Last updated: 2026-11-20 (**`web` profile 已更新到已发布的 `v0.12.2`，仓库无需变动，DSH 未重启** —
+仓库侧本地 `main` = `origin/main` = `07666fb`（`git describe` = `v0.12.2-2-g07666fb`），标签
+`v0.12.2`（`40228c5`）是祖先、其后只有两条 docs 提交，`src`/`lib` 与标签逐字节相同，远端最新
+tag/Release 仍是 `v0.12.2`，故无提交可 fast-forward、也没有回退到标签提交；档案侧
+`~/.dsh/profiles/web` 的 `dsh-grok-workflow` 由 `#v0.12.1` 升到 `#v0.12.2`
+（`dsh plugin --profile web add`，锁文件解析到 `40228c5` tarball，`pnpm ls` = `0.12.2`，
+`node_modules` 内 77 个 `lib/**/*.js|.d.ts` 与仓库 `lib/` sha256 全同）。DSH 主进程 pid
+`154637` 的 `lstart`/boot_id 未变、GUI 仍应答——**未重启**；核心无档案 watcher，运行中的进程仍
+是 `0.12.1` 代码，两条修复要等下次 profile 启动。NOT_RUN（遵约束）：重启/重载、force-push、
+移动标签、npm 发布、改 DSH 核心。证据 `.rsi/evidence/profile-update-0.12.2/`。）
+
 Last updated: 2026-11-20 (**round-026 收口：R6 + R9，CI 全绿，未发版** —
 `resolveConfig` 传错 `grokDefault` 现在直接拒绝（不再静默按 off 跑）；
 COMPLETED 轮次不再把重试救回来的失败印进 `Failures:`（两处渲染器同规则，

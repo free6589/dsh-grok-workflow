@@ -1,5 +1,32 @@
 # Agent Handoff
 
+## 2026-11-20 — `web` profile 已更新到 `v0.12.2`（repo 无需变动，DSH 未重启）
+
+- **From:** lead（本会话，update-latest-no-restart）· **To:** 用户 / 下一轮接手者
+- **仓库侧（`CONFIRMED`）**：本地 `main` = `origin/main` = `07666fb`，`git describe` 为
+  `v0.12.2-2-g07666fb`；`v0.12.2`（`40228c5`）是 `HEAD` 的祖先，`v0.12.2..HEAD` 只有两条
+  docs 提交（`074e2c3`、`07666fb`），`src/`+`lib/` 与标签逐字节相同。远端最新 tag/Release
+  仍是 `v0.12.2`，无更新可拉——**没有做任何 fast-forward，也没有回退到标签提交**（回退会丢
+  掉那两条已推的发布记录提交，且会让本地落后远端）。
+- **档案侧（`CONFIRMED`）**：`~/.dsh/profiles/web` 的 `dsh-grok-workflow` 从
+  `github:free6589/dsh-grok-workflow#v0.12.1` 升到 `#v0.12.2`，用文档里的
+  `dsh plugin --profile web add ...`（`docs/RELEASING.md` §版本切换）执行；pnpm 解析到
+  `codeload.../tar.gz/40228c5...`，`pnpm ls` 报 `dsh-grok-workflow@0.12.2`，`node_modules`
+  里的 77 个 `lib/**/*.js|d.ts` 与仓库 `lib/` 逐文件 sha256 一致（只少 `.map`，因为发包
+  `files` 不含它们）。`package.json` 只改了这一行，锁文件随之更新。
+- **DSH 未重启（`CONFIRMED`）**：`dsh web` 主进程 pid `154637`，`lstart` 仍是
+  `Tue Nov 17 22:49:32 2026`，`etimes` 从 206082s 连续涨到 206168s+；`/proc` boot_id 未变、
+  上次开机仍是 2026-10-31；`http://100.111.111.88:3080/` 仍应答（HTTP 401 = 活着但要鉴权）。
+- **代价（`CONFIRMED`，必须写清楚）**：DSH 0.2.2-rc.3 的核心里没有对档案文件的 watcher
+  （`grep -rln 'fs.watch|chokidar|watchFile'` 在核心包内 0 命中），`docs/RELEASING.md` 也写明
+  「切换版本后请重启对应 DSH profile」。**所以磁盘/档案已是 `0.12.2`，当前进程内存里跑的仍是
+  `0.12.1` 的模块**；`0.12.1 → 0.12.2` 的两条修复（`grokDefault` fail-closed、COMPLETED 不计
+  已恢复失败）要等下次 profile 启动才生效。
+- **未做（`NOT_RUN`，遵约束）**：未重启/重载 DSH、未 force-push、未移动任何标签、未 npm 发布
+  （`registry.npmjs.org/dsh-grok-workflow` 仍 404）、未改 DSH 核心（该目录无 `git`，最近 3 小时
+  无文件改动）。
+- 证据：`.rsi/evidence/profile-update-0.12.2/`（`before.txt` / `after.txt` / `verify.log`）。
+
 ## 2026-11-20 — `0.12.2` 已发版（round-026：R6 + R9）
 
 - **From:** lead（本会话）· **To:** 用户 / 下一轮接手者
@@ -10,8 +37,8 @@
 - **内容**：R6 `resolveConfig` 拒收坏 `grokDefault`（fail-closed，不再静默关工作流）+
   R9 COMPLETED 轮次不计已恢复失败（报告与台账同规则，PARTIAL 不受影响）。
   `npm run ci` 68/1229 全绿；`verify:lib` 153 文件一致。
-- **NOT_RUN**：真实定时投递、GUI 手动点击拍照。本机 `web` profile 仍是旧版，
-  想用新版就从 `github:free6589/dsh-grok-workflow#v0.12.2` 更新。
+- **NOT_RUN**：真实定时投递、GUI 手动点击拍照。（本机 `web` profile 当时还是旧版；已在下面
+  第一条「`web` profile 已更新到 `v0.12.2`」里升到 `#v0.12.2`。）
 
 ## 2026-11-20 — `0.12.1` 已发版（round-025：自迭代默认模板）
 
