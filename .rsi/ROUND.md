@@ -1244,9 +1244,11 @@ no history is rewritten, and no round is force-pushed.
   与"链坏只损失台账"不符——改成 `try/catch` 丢掉 ledger（`text === human`），并在链用例组里加
   "drops the ledger instead of the answer when diagnostics are on"（这条在改动前抛错，是新增的第 14 个红点）。
 - **门禁（`CONFIRMED`）**：`npm run typecheck` exit 0（`typecheck.txt`）、`npx oxlint src test`
-  24 warnings / 0 errors（与基线同，`oxlint.txt`）、`npm run ci` exit 0 = **70 文件 / 1295 测试 PASS**，
+  24 warnings / 0 errors（与基线同，`oxlint.txt`）、预检 `npm run ci` exit 0 = **70 文件 / 1295 测试 PASS**，
   `verify:lib` 报 `lib/ at bffd0b4 is the build of src/ at bffd0b4 (153 files, byte-identical)`
-  （`ci-preliminary.txt`）。发版 CI 由 `finish-round.py` 重跑并记在 `ci.txt`。
+  （`ci-preliminary.txt`）。发版时 `finish-round.py` 重跑 `npm run ci` exit 0 = **70 文件 / 1296 测试 PASS**
+  （`ci.txt`；多 1 例是收口时纳入的 `test/rsi-ledger.spec.ts` 第 39 轮行）。远端 CI `44788061342` success、
+  Release `44788066114` success（`01272af`，tag `v0.12.15`）。
 - **文档一致性（`CONFIRMED`）**：继承来的 `CHANGELOG.md` 双语条目被插进了**已经发布**的
   `## [0.12.14]` 段里——即 0.12.14 的发布说明宣称了一条该 tag 并不包含的修复。本轮把它移到
   `[Unreleased]`（并把 0.12.14 段恢复成 HEAD 的逐字节内容），另加一条路由行拒绝的条目，双语同步。
@@ -1260,4 +1262,7 @@ no history is rewritten, and no round is force-pushed.
   投递触发）；把 0.12.15 装进 `~/.dsh/profiles/web`（发版后需要操作者/主会话的一次 `plugin add`）；
   `13→38` 之外的整树回归由 `npm run ci` 覆盖，但 Node 24 那条矩阵只在远端跑。
 - **建议版本**：**patch**（`0.12.15`）——用户可见的修复，无 API/配置面变化；本轮直接发版。
+- **收口（`CONFIRMED`，发版后）**：commit `01272af`、annotated tag `v0.12.15` 已推（远端 `8a13c46`）；
+  `npm run ci` 70/1296 全绿；远端 CI `44788061342` success、Release `44788066114` success；
+  LOG 第 39 行的 `{{TAG}}` 占位已填成 `v0.12.15`。旧标签未动，无 force-push。
 - **status:** OK
