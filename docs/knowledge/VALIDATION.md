@@ -4830,3 +4830,22 @@ commit/tag/CI/Release 均取自已提交记录，无编造）后门禁码变为 
 `npm run verify:lib` 提交时复核。证据 `.rsi/evidence/round-035/`。
 
 **未验证（`NOT_RUN`）**：真机 GUI；真实定时投递。
+
+## Round 89 — 2026-11-20 — `0.12.11` 发版：回退两个从没绿过的断言（`CONFIRMED`）
+
+**版本判定**：patch。发版修复，无生产代码改动。
+
+**背景**：`v0.12.10`（`0d91e45`）带了两个窄折行测试，与同提交源码不一致，
+干净树上 2 failed → 远端 CI 红、Release 没建出来。并发轮在工作树里重写这俩测试，
+但发版不能等：先回退到上一个全绿状态，完整修复由并发轮另行发版。
+
+**命令与结果（`CONFIRMED`）**：
+
+| 命令 | 结果 |
+| --- | --- |
+| 干净树 `0d91e45` 复现 | 2 failed（`fold 1 kept encoded material`、`tail of 1 kept more`） |
+| `5749a08` 回退 2 个坏测试 | 本地 `test/redact.spec.ts` 42 passed |
+| 干净 worktree（`d181812` 检出）`npm run ci` | exit 0，68 文件 / 1234 测试 PASS |
+| `tag -a v0.12.11` → `d181812` + `push` | 成功，无 force-push |
+| 远端 CI `44681025399` | success |
+| Release `44681029703` | success；Release `Grok Workflow for DSH v0.12.11` + asset `dsh-grok-workflow-0.12.11.tgz` |
