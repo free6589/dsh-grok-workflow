@@ -24,6 +24,27 @@
   故「armed through 2026-12-01」这条只能由主会话/操作者续订（延长到 12-01 或改成每日 rrule）。
 - **未验证（`NOT_RUN`）**：真机 GUI 手点、把 base64 私钥喂给运行中的插件看报告。
 
+### 接手时的四条遗留不确定性（2026-11-20 · `0.12.5`）
+
+1. **检查点注释上限偏差（未闭合，已定位）**：`src/checkpoint/schema.ts:59` 的注释说拒绝带跑到
+   1,048,576，但密封文件带 129 字节完整性记录，`writeCheckpoint` 的文件上限把合法载荷卡在
+   **1,048,447**（A33 实测 1,019,510 + 129）。round 27 当时不改的理由是「发版后动源码会让 `lib/`
+   与 `v0.12.3` 不一致」——`0.12.5` 已经重建过 `lib/`，这个理由失效，一行注释即可修，已作为
+   `POOL.md` 的 P 项排队。
+2. **`readCheckpoint` 无生产调用者（已闭合为事实）**：在本提交 `a85d3bb` 上核过——定义在
+   `src/checkpoint/writer.ts:137`，全仓库除 `wiring.ts:246` 的一句文档提及外无引用；`src/run.ts:21`
+   只导入写侧的 `createCheckpointRecorder` / `unloadCheckpointRecorders`，`src/index.ts` 不导出
+   checkpoint 模块。所以 round 27 修的是**读写往返**断裂，不是观察到的续跑失败。
+3. **宿主进程内存里的代码身份不可观测（未变，`NOT_RUN`）**：插件不打印版本、ESM 缓存无版本标记、
+   `dsh-hmr` 挂载为 `root: []`，只能证明「磁盘/档案/prof 标签一致 + 宿主未重启」。
+4. **GUI 点按与真实定时投递（一半闭合）**：真实定时投递本轮**首次拿到硬证据**——只读快照显示
+   `RSI heartbeat` 行 `lastDelivery.scheduledAt = 2026-11-20T01:01:50Z`、
+   `deliveredAt = 2026-11-20T01:02:00.707Z` 且带 `messageId`，行 `status: active`、只有一个归属会话
+   `session-3a683cb6…`（证据 `.rsi/evidence/round-029/schedule-row.txt`）。**但该行 rrule 是
+   `FREQ=MINUTELY;INTERVAL=60;COUNT=10`，最后一次 2026-11-20T10:01:50Z，撑不到 2026-12-01**；
+   本会话是子代理，宿主拒绝 `schedule_*`（`A delegated subagent cannot use scheduled tasks`），
+   所以「续订到 12-01」只能由主会话或操作者做。GUI 手点仍 `NOT_RUN`。
+
 ## 2026-11-20 — `0.12.4` 已发版（round-028：R11）
 
 - **From:** RSI 心跳轮（本会话）· **To:** 用户 / 下一轮接手者
