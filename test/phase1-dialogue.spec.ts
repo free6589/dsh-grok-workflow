@@ -17,7 +17,7 @@ import { apply } from '../src/index.js'
 import { REPORT_BEGIN, REPORT_END } from '../src/answer.js'
 import { FIXED_TIMEOUT_MS, resolveConfig } from '../src/config.js'
 import { parseMemberLabel } from '../src/naming.js'
-import { DELIVERY_RECORD } from '../src/records.js'
+import { DELIVERY_RECORD, TERMINAL_RECORD } from '../src/records.js'
 import { createActiveState, runWorkflow } from '../src/run.js'
 import { maxTotalAgentsFor, routeBudgetFor } from '../src/script.js'
 import { callerTask, execution, task, verification } from './fixtures.js'
@@ -196,6 +196,19 @@ function recordsOf(session: Session, type: string): unknown[] {
     .map(event => pluginRecordOf(event))
     .filter(record => record !== undefined && record.type === type)
     .map(record => record!.data)
+}
+
+/**
+ * Terminal texts the plugin kept when it could not render a chat row.
+ *
+ * A cancelled turn is rejected before any `step/start`, so an `assistant/message`
+ * cannot be attached to it: the token meter pairs every assistant row with a step
+ * and replays an unpaired one as a hard error, which stalls compaction and breaks
+ * `/compact` for the rest of the session. The terminal is kept as a plugin record
+ * instead, and these tests read it from there.
+ */
+function terminalTexts(session: Session): string[] {
+  return recordsOf(session, TERMINAL_RECORD).map(record => String((record as { text?: unknown }).text ?? ''))
 }
 
 interface Decision { kind: string; messages?: UserMessage[] }
@@ -931,7 +944,13 @@ describe('P0-4: a cancelled turn keeps the message and states the terminal', () 
     // must not write the same words twice.
     expect(derived.filter(text => text === '把这个表格整理成周报')).toHaveLength(1)
     expect(derived[0]).toBe('把这个表格整理成周报')
-    const last = derived[derived.length - 1]!
+    // A cancelled turn has no open step, so the terminal is *not* an assistant row:
+    // an unpaired `assistant/message` is what made every later token-meter replay
+    // throw, which is how `/compact` started failing. It is kept as a record.
+    expect(live.ownEvents().filter(event => event.type === 'assistant/message')).toHaveLength(0)
+    const terminal = terminalTexts(live)
+    expect(terminal).toHaveLength(1)
+    const last = terminal[0]!
     expect(last).toContain('取消')
     expect(last).toContain('cancelled')
     // A stopped run must never read as success.
@@ -1009,8 +1028,11 @@ describe('P0-4: a cancelled turn keeps the message and states the terminal', () 
 
     expect(decision.kind).toBe('reject')
     const transcript = texts(live)
-    const all = transcript.join('\n')
-    expect(transcript.filter(text => text === request)).toHaveLength(1)
+    // Only the user's words reach the transcript: the terminal cannot be a chat row
+    // without an open step, so it is kept in the terminal record below.
+    expect(transcript).toEqual([request])
+    expect(live.ownEvents().filter(event => event.type === 'assistant/message')).toHaveLength(0)
+    const all = terminalTexts(live).join('\n')
     // Round 28: the cancelled terminal states the kept report as a human
     // conclusion, never relayed — no success preamble, no markers, no `PARTIAL`
     // status word from the machine ledger.
@@ -1044,7 +1066,10 @@ describe('P0-4: a cancelled turn keeps the message and states the terminal', () 
     expect(ctx.engine.startCalls).toHaveLength(0)
     const derived = texts(live)
     expect(derived.filter(text => text === '把登录接口改成 JWT 校验')).toHaveLength(1)
-    const last = derived[derived.length - 1]!
+    expect(live.ownEvents().filter(event => event.type === 'assistant/message')).toHaveLength(0)
+    const terminal = terminalTexts(live)
+    expect(terminal).toHaveLength(1)
+    const last = terminal[0]!
     expect(last).toContain('取消')
     expect(last).toContain('没有启动任何工人')
     expect(last).not.toContain('COMPLETED')
@@ -1070,7 +1095,9 @@ describe('P1: front-desk calls share the plugin lifecycle', () => {
     expect(decision.kind).toBe('enter')
     expect(run.cancel).toHaveBeenCalled()
     expect(run.dispose).toHaveBeenCalled()
-    expect(texts(live).join('\n')).toContain('unloaded')
+    // The interruption notice is kept as a terminal record: the disposal happens
+    // outside any step, so it cannot be an assistant row either.
+    expect(terminalTexts(live).join('\n')).toContain('unloaded')
     expect(texts(live)).toContain('run npm test')
   })
 

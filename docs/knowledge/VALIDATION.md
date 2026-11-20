@@ -2,6 +2,58 @@
 
 Real commands and results only. Do not add expected results here.
 
+## `/compact` failed on any session this plugin wrote a receipt into — fixed 2026-11-20 (`CONFIRMED`)
+
+**Symptom:** the user reported that `/compact` shows an error. Root cause is not in the
+command: the plugin wrote an `assistant/message` outside an open step, and DSH's token meter
+refuses to replay such a journal.
+
+**Reproduction (repo code + local DSH, no model, no network):**
+`node scripts/repro-compact.mjs` builds an in-memory `Session` at pre-step, calls the shipped
+writer, then drives the *real* `/compact` command (`@deepseek-ai/dsh-command-compact`) over the
+*real* compaction engine (`dsh-compaction-basic`) and the *real* meter (`dsh-token-meter`),
+all from the installed DSH.
+
+| state | command | result |
+| --- | --- | --- |
+| pre-fix (`src/records.ts` at `0d91e45`) | `node scripts/repro-compact.mjs` | exit **1**; writer `appended`; `measure` → `token meter: assistant/message at seq 2 has no matching step/start event`; `/compact` → `{kind: "threw", text: "<that error>"}` (`.rsi/evidence/compact-fix/before.txt`) |
+| fixed | `node scripts/repro-compact.mjs` | exit **0**; writer `refused`; `measure.ok = true` (`totalTokens` 12); `/compact` → `{kind: "success", text: "No compactable history yet."}` (`.rsi/evidence/compact-fix/after.txt`) |
+
+**Note on the wrap the diagnosis predicted:** `compactNow()`'s outer `try/catch` cannot wrap
+the failure — its callback is `async`, so the rejection escapes as a raw error instead of
+`ManualCompactionError('busy')`. The measured outcome is therefore the meter's own message
+reaching the command handler, not the "not idle" sentence. (`docs/knowledge/evidence/diag-ctx-compaction-2026-11-07.md` §R5 said `busy`; that was a source-reading hypothesis and is
+corrected here.)
+
+**Why it hit real sessions:** a scan of 120 archived sessions in this workspace
+(`/tmp/scan-orphans.mjs`, read-only `zstd -dc` + JSON walk) found 10 sessions carrying an
+out-of-step `assistant/message`: 4 `grok-workflow/workflow-receipt`, 4
+`grok-workflow/workflow-notice`, 6 model-attributed (the cancelled terminal) and 1 other.
+
+**Fix:** `openStepOf()` reads the session's own log for the step that is actually open;
+`appendAssistantInStep()` is now the only writer of `assistant/message` (instant receipt,
+unload notice, cancelled terminal) and refuses when no step is open. A refused receipt/notice
+is preserved as the `plugin:grok-workflow/terminal` record. The receipt's model call is skipped
+when the row cannot be written, so the refusal does not buy a model call it cannot use.
+
+**Tests (deterministic, no model/network):**
+
+| command | result |
+| --- | --- |
+| `npx vitest run test/compact-step-pairing.spec.ts` (fixed) | exit 0 — 6 tests pass, replaying through the real `@deepseek-ai/dsh-token-meter` |
+| same file on the pre-fix `src/` (`git stash push -- src/records.ts src/gate.ts`) | exit 1 — `refuses the instant receipt at pre-step` fails `expected true to be false`, and `keeps the unload notice as a record…` fails on the orphan row |
+| `npx vitest run` (rebased onto `39eda66`, i.e. the current `main`) | exit 0 — **70 files / 1268 tests pass** |
+| `npx vitest run` on the original base `0d91e45` | exit 1 — 69 files / 1240 pass, 2 failures in `test/redact.spec.ts`. Those two are **pre-existing at `0d91e45`**: a pristine `git worktree add /tmp/base-check 0d91e45` + `npx vitest run test/redact.spec.ts` reproduces the same 2 failures, and `main` has since fixed them (round 36). Not this change. |
+| `npm run typecheck` | exit 0 |
+| `npm run lint` | exit 0 — 24 warnings, 0 errors (unchanged from `0d91e45`) |
+| `npm run verify:lib` at `32ccc97` | exit 0 — `lib/ at 32ccc97 is the build of src/ at 32ccc97 (153 files, byte-identical)` |
+
+**Deliberate loss (P0-4 shape changed):** the cancelled terminal, the unload notice and the
+team-tier live receipt are no longer rendered as chat rows, because DSH's meter has no legal
+shape for an assistant row outside a step. The texts are kept as terminal records and the
+dispose/delivery records still carry the facts. Follow-up pooled: render them from a legal
+channel (progress panel / a client-rendered notice row).
+
 ## Round 36 — narrow base64 folds, footer boundary, and a suite that passes on a clean tree (`CONFIRMED`)
 
 | command | result |
@@ -4904,3 +4956,14 @@ commit/tag/CI/Release 均取自已提交记录，无编造）后门禁码变为 
 `npm run verify:lib` 提交时复核。证据 `.rsi/evidence/round-038/`。
 
 **未验证（`NOT_RUN`）**：真机 GUI；真实定时投递。
+
+## Round 93 — 2026-11-20 — `0.12.13` 发版：非字符串 model/provider（`CONFIRMED`）
+
+**版本判定**：patch。fail-closed 收紧，无 API 变化。
+
+| 命令 | 结果 |
+| --- | --- |
+| `git commit 7825ca7`（R38）+ `490edce`（证据） | CI 69/1263 全绿为基 |
+| `tag -a v0.12.13` + `push main` + `push tag` | 成功，无 force-push |
+| 远端 CI `44697135387` | success |
+| Release `44697140006` | success；asset `dsh-grok-workflow-0.12.13.tgz` |

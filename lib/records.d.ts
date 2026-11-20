@@ -32,6 +32,22 @@ export interface DeliveryRecord {
     /** Explicit outcome label for diagnostics (status or failure cause). */
     outcome: string;
 }
+/**
+ * Record type owned by this plugin: a turn terminal the transcript could not carry.
+ *
+ * A cancelled turn is rejected before any `step/start`, so its terminal cannot be
+ * an assistant row (see {@link appendAssistantInStep}). The words still matter —
+ * they say why the run stopped and what verified work survives — so they are kept
+ * here: one ignorable record, redacted and bounded, readable from the session log.
+ */
+export declare const TERMINAL_RECORD = "plugin:grok-workflow/terminal";
+/** Payload stored for one turn terminal that had no open step to attach to. */
+export interface TerminalRecord {
+    /** Record schema version owned by this plugin. */
+    v: 1;
+    /** Terminal text as composed for the reader; redacted and bounded. */
+    text: string;
+}
 /** Record type owned by this plugin: the model-route ledger of one run. */
 export declare const ROUTING_RECORD = "plugin:grok-workflow/routing";
 /**
@@ -160,6 +176,8 @@ declare module '@deepseek-ai/dsh-session' {
         'plugin:grok-workflow/delivery': DeliveryRecord;
         /** One observation of this plugin being unloaded (t45, P0-1). */
         'plugin:grok-workflow/dispose': DisposeRecord;
+        /** A turn terminal the transcript could not carry (no open step). */
+        'plugin:grok-workflow/terminal': TerminalRecord;
     }
 }
 /**
@@ -335,7 +353,86 @@ export declare function createWorkflowProgressRecorder(session: Session | undefi
  * the cancellation that follows it.
  */
 export declare function recordDispose(session: Session | undefined, record: DisposeRecord, logger: WorkflowLogger): boolean;
-/** Append an instant team-tier receipt so the run never looks blank while in flight. */
+/** A step a plugin-written assistant row may attach to. */
+export interface OpenStep {
+    turn: number;
+    step: number;
+}
+/**
+ * The step currently open in the session log, or `undefined` when none is.
+ *
+ * DSH's token meter replays the journal with one hard pairing rule: an
+ * `assistant/message` is legal only between a `step/start` and its `step/end` for
+ * the same `(turn, step)` (`@deepseek-ai/dsh-token-meter` 0.2.1-rc.2,
+ * `advanceMeasurement`: `assistant/message at seq N has no matching step/start
+ * event`). A row written outside one is not a cosmetic oddity: the first replay
+ * throws, and because the fold cursor never advances past the offending seq, every
+ * later replay throws at that same seq.
+ *
+ * That is the whole of the `/compact` failure measured in
+ * `scripts/repro-compact.mjs`: `BasicCompactionEngine.compactNow()` measures
+ * before it selects a range, so a single out-of-step row makes `/compact` fail on
+ * a session that otherwise looks healthy, and makes automatic compaction fail the
+ * same way (silently — `agent/pre-step` only warns and continues the turn).
+ *
+ * `turn/end` and any `step/end` close the pair: the plugin's question is "may I
+ * append *now*", so anything short of an unambiguously open step counts as closed.
+ *
+ * @param session - session whose own log is read; a session without `ownEvents`
+ *   (a test double) reports no open step.
+ * @returns the open `(turn, step)`, or `undefined`.
+ */
+export declare function openStepOf(session: Session): OpenStep | undefined;
+/** The assistant source a plugin row carries; `model` names which row it is. */
+export interface PluginRowSource {
+    provider: string;
+    model: string;
+}
+/**
+ * Append one assistant row attributed to this plugin, but only inside an open step.
+ *
+ * Every assistant row this plugin writes goes through here, so the token meter's
+ * pairing rule (see {@link openStepOf}) has exactly one place to hold. When no step
+ * is open the row is *refused*, not relocated: the `(turn, step)` a closed turn
+ * recorded is not an open pair either, and a row invented under a later step would
+ * read as model output the model never produced.
+ *
+ * A refused row costs the reader one line; writing it costs the session its
+ * compaction, which is the trade this function exists to make in the other
+ * direction.
+ *
+ * @param session - target session; absent means nothing to write.
+ * @param text - row text, already composed and redacted by the caller.
+ * @param source - attribution carried on the row.
+ * @param logger - receives one line either way; never a silent drop.
+ * @param label - which row this is, for the log line.
+ * @returns true when the row is in the session surface.
+ */
+export declare function appendAssistantInStep(session: Session | undefined, text: string, source: PluginRowSource, logger: WorkflowLogger, label: string): boolean;
+/**
+ * Persist a turn terminal that had no open step to attach to.
+ *
+ * Written only as the fallback for a refused assistant row: the reader loses the
+ * rendered line either way, but the reason and any verified partial work stay in
+ * the session log instead of being dropped on the floor. Best effort, like every
+ * other record here — a session that refuses the write costs the record only.
+ *
+ * @param session - target session; absent means nothing to write.
+ * @param text - terminal text; redacted and bounded before it is stored.
+ * @param logger - receives the failure when the record cannot be written.
+ * @returns true when the record is in the session log.
+ */
+export declare function recordTerminal(session: Session | undefined, text: string, logger: WorkflowLogger): boolean;
+/**
+ * Append an instant team-tier receipt so the run never looks blank while in flight.
+ *
+ * The gate composes this row in `agent/pre-step`, which is dispatched *before* the
+ * step begins, so in practice no step is open and the row is refused. The receipt
+ * is kept as a call site (rather than deleted) because the step pairing — not the
+ * wording — is what decides it: a runtime that dispatches the gate inside an open
+ * step still gets the live row, and the progress panel is where a live row belongs
+ * on a runtime that does not (pooled as follow-up work).
+ */
 export declare function appendInstantReceipt(session: Session | undefined, text: string, logger: WorkflowLogger): boolean;
 /**
  * Write the one-shot interruption notice into the session whose run was cut.
@@ -357,6 +454,13 @@ export declare function appendInstantReceipt(session: Session | undefined, text:
  * `[grok-workflow]` prefix, so a reader can tell it apart from anything the model
  * generated. It also enters the surface, which is deliberate: the next turn then
  * knows the mandatory workflow is off instead of silently assuming it ran.
+ *
+ * What that shape may not do is land outside an open step (see
+ * {@link appendAssistantInStep}): a disposal runs after the turn ended, so the row
+ * is refused there and the interruption survives only in the dispose record
+ * (`DISPOSE_RECORD`: trigger, call site, interrupted run ids). Losing the rendered
+ * line is the deliberate half of that trade — the rendered line used to cost the
+ * session its compaction, permanently.
  */
 export declare function appendUnloadNotice(session: Session | undefined, text: string, logger: WorkflowLogger): boolean;
 //# sourceMappingURL=records.d.ts.map

@@ -19,7 +19,7 @@ import { Session, pluginRecordOf } from '@deepseek-ai/dsh-session'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type { WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
 import { FIXED_MAX_ACTIVE_RUNS, FIXED_MAX_ACTIVE_RUNS_TOTAL, FIXED_MAX_RETRIES, FIXED_SHOW_PROGRESS, resolveConfig } from '../src/config.js'
-import { DISPOSE_RECORD, callSiteFrames, classifyDisposeTrigger } from '../src/records.js'
+import { DISPOSE_RECORD, TERMINAL_RECORD, callSiteFrames, classifyDisposeTrigger } from '../src/records.js'
 import {
   activeCountOfSession,
   createActiveState,
@@ -129,19 +129,20 @@ function disposeRecords(session_: Session): { v: number, activeRuns: number, run
 }
 
 /**
- * Every notice row the plugin appended: an assistant message attributed to the
- * plugin's `workflow-notice` model, carrying the `[grok-workflow]` prefix.
+ * Every notice the plugin kept for a session whose runs it cut.
+ *
+ * A disposal runs after the turn ended, so no `step/start` is open and an
+ * `assistant/message` cannot be attached to one (the token meter replays an
+ * unpaired row as a hard error, which stalls compaction and `/compact` for the
+ * rest of the session — see `openStepOf` in `src/records.ts`). The notice's own
+ * sentence is kept in the plugin's terminal record instead, and these tests read
+ * it from there.
  */
 function noticeTexts(session_: Session): string[] {
-  const texts: string[] = []
-  for (const event of session_.ownEvents()) {
-    if ((event as { type?: string }).type !== 'assistant/message') continue
-    const data = (event as { data?: { message?: { source?: { model?: string }, content?: { text?: string }[] } } }).data
-    if (data?.message?.source?.model !== 'workflow-notice') continue
-    const text = (data.message.content ?? []).map(block => block.text ?? '').join('')
-    texts.push(text)
-  }
-  return texts
+  return session_.ownEvents()
+    .map(event => pluginRecordOf(event))
+    .filter(record => record !== undefined && record.type === TERMINAL_RECORD)
+    .map(record => String((record!.data as { text?: unknown }).text ?? ''))
 }
 
 const MANAGEMENT_STACK = [
@@ -333,7 +334,7 @@ describe('the unload notice (P0-2, damage-based)', () => {
     expect(outcome.cause).toBe('unloaded')
     expect(engine.runs[0]!.cancel).toHaveBeenCalled()
     expect(engine.runs[0]!.dispose).toHaveBeenCalled()
-    expect(recorder.warnings.join('\n')).toContain('unload notice not written')
+    expect(recorder.warnings.join('\n')).toContain('terminal record not persisted')
     expect(recorder.warnings.join('\n')).toContain('dispose record not persisted')
   })
 })
