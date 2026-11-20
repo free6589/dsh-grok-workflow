@@ -1,0 +1,4 @@
+
+> dsh-grok-workflow@0.12.14 typecheck
+> tsc -p tsconfig.json --noEmit
+

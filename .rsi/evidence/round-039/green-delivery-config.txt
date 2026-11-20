@@ -1,0 +1,12 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+ ✓ test/delivery-human-block.spec.ts (38 tests) 1578ms
+     ✓ stays inside the cap for every knob, in both language orders  777ms
+ ✓ test/config.spec.ts (40 tests) 103ms
+
+ Test Files  2 passed (2)
+      Tests  78 passed (78)
+   Start at  00:07:57
+   Duration  2.63s (transform 596ms, setup 0ms, import 708ms, tests 1.68s, environment 0ms)
+

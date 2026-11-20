@@ -1,0 +1,374 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.tmp/rsi39-red
+
+ ❯ test/delivery-human-block.spec.ts (34 tests | 14 failed) 1398ms
+     ✓ keeps a reason that contains an identifier token ("attempt:") 11ms
+     ✓ keeps a reason that merely quotes a ledger label mid-sentence 1ms
+     ✓ drops no failed task from the block 2ms
+     ✓ keeps the same reason in the English block 1ms
+     ✓ still drops a line that is a ledger label 1ms
+     ✓ still keeps the answer when the echo is the only line 0ms
+     ✓ still keeps every ledger label out of the human block, and in the ledger 3ms
+     ✓ drops a line that carries an identifier key, and keeps a reason that mentions one 1ms
+     ✓ hides the ledger by default and shows it on request 1ms
+     ✓ never dresses a partial run as a completed one 1ms
+     ✓ keeps the head and the verdict when the block is over budget 3ms
+     ✓ still fits a short block unchanged 1ms
+     ✓ keeps the second language head and verdict, not just the first 3ms
+     × keeps the second language verdict whole when the first block is at the cap 150ms
+     × keeps both verdicts when the first language is Chinese 134ms
+     ✓ charges neither language more than the single-pass cap 250ms
+     × keeps the head and the whole verdict and cuts only at a line boundary 4ms
+     × marks the cut so a reader knows the middle is missing 2ms
+     × keeps the same guarantee in the Chinese block 2ms
+     × leaves no lone surrogate when a caveat is longer than one clamped line 2ms
+     × leaves no lone surrogate in either language of a bilingual pair 3ms
+     ✓ is exactly the two single-language blocks and one blank line 7ms
+     ✓ adds no cut marker to a block that fits 1ms
+     × names the role, the position and the shape for a non-string route 1ms
+     × checks every role, not only worker 1ms
+     × points at the entry that is wrong, not the first one 0ms
+     × refuses a chain that is not an array, naming the role 1ms
+     × refuses a routing map that is not a record 1ms
+     × never coerces a bad route into a readable one 0ms
+     ✓ still prints a well-formed chain, and "inherit" for an empty one 0ms
+     ✓ keeps the human block readable when a chain is malformed 0ms
+     × drops the ledger instead of the answer when diagnostics are on 1ms
+     ✓ stays inside the cap for every knob, in both language orders  798ms
+     ✓ does not pass the cap by throwing away text it had room for 7ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 14 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/delivery-human-block.spec.ts > round 37: the bilingual cap keeps both heads and both verdicts > keeps the second language verdict whole when the first block is at the cap
+AssertionError: expected 'Answer: Done.\nNext: The direction wa…' to contain '以上是结论（6 项里 1 项可用，5 项没做成）；明细已记入台账。'
+
+- Expected
++ Received
+
+- 以上是结论（6 项里 1 项可用，5 项没做成）；明细已记入台账。
++ Answer: Done.
++ Next: The direction was right but the acceptance checks were not met; restate them more precisely and I will run it again.
++ Achieved: Weather.
++ Not done:
++ - Hotel price check result：The supplier endpoint returned malformed rows note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note
++ - Hotel price check result：The supplier endpoint returned malformed rows note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note
++ - Hotel price check result：The supplier endpoint returned malformed rows note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note
++ - Hotel price check result：The supplier endpoint returned malformed rows note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note
++ - Hotel price check result：The supplier endpoint returned malformed rows note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note
++ Worth knowing:
++ - The airport bus timetable could not be retrieved note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note n
++ - The airport bus timetable could not be retrieved note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note n
++ - The airport bus timetable could not be retrieved note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note n
++ - The airport bus timetable could not be retrieved note note note note note note note note
++ That is the conclusion (1 of 6 usable, 5 not done); details are in the ledger.
++
++ 答案：Done.
++ 下一步：方向对了但没达到验收标准；把验收标准说细一点再发一次，我会重跑一遍。
++ 做成的：Weather。
++ 没做成的：
++ - Hotel price check result：The supplier endpoint returned malformed rows note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note
++ - Hotel price check result：The supplier endpoint returned malformed rows note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note
++ - Hotel price check result：The supplier endpoint returned malformed rows note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note
++ - Hotel price check result：The supplier endpoint returned malformed rows note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note
++ - Hotel price check result：The supplier endpoint returned malformed rows note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note
++ 需要你知道的：
++ - The airport bus timetable could not be retrieved note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note n
++ - The airport bus timetable could not be retrieved note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note n
++ - The airport bus timetable could not be retrieved note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note n
++ - The airport bus timetable could not be retrieved note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note n
++ 以上是结论（6 项里 1 项可用，5 项没做成）；明细已记入台…
+
+ ❯ test/delivery-human-block.spec.ts:433:20
+    431|       expect(text).toContain(EN_TAIL)
+    432|       // The second language is the block the blind cut used to eat.
+    433|       expect(text).toContain(ZH_TAIL)
+       |                    ^
+    434|       expect(loneSurrogates(text)).toEqual([])
+    435|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/14]⎯
+
+ FAIL  test/delivery-human-block.spec.ts > round 37: the bilingual cap keeps both heads and both verdicts > keeps both verdicts when the first language is Chinese
+AssertionError: expected '答案：Done.\n下一步：方向对了但没达到验收标准；把验收标准说细一点再…' to contain 'That is the conclusion (1 of 6 usable…'
+
+- Expected
++ Received
+
+- That is the conclusion (1 of 6 usable, 5 not done); details are in the ledger.
++ 答案：Done.
++ 下一步：方向对了但没达到验收标准；把验收标准说细一点再发一次，我会重跑一遍。
++ 做成的：Weather。
++ 没做成的：
++ - Hotel price check result：The supplier endpoint returned malformed rows note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note
++ - Hotel price check result：The supplier endpoint returned malformed rows note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note
++ - Hotel price check result：The supplier endpoint returned malformed rows note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note
++ - Hotel price check result：The supplier endpoint returned malformed rows note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note
++ - Hotel price check result：The supplier endpoint returned malformed rows note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note
++ 需要你知道的：
++ - The airport bus timetable could not be retrieved note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note n
++ - The airport bus timetable could not be retrieved note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note n
++ - The airport bus timetable could not be retrieved note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note n
++ - The airport bus timetable could not be retrieved note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note n
++ 以上是结论（6 项里 1 项可用，5 项没做成）；明细已记入台账。
++
++ Answer: Done.
++ Next: The direction was right but the acceptance checks were not met; restate them more precisely and I will run it again.
++ Achieved: Weather.
++ Not done:
++ - Hotel price check result：The supplier endpoint returned malformed rows note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note
++ - Hotel price check result：The supplier endpoint returned malformed rows note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note
++ - Hotel price check result：The supplier endpoint returned malformed rows note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note
++ - Hotel price check result：The supplier endpoint returned malformed rows note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note
++ - Hotel price check result：The supplier endpoint returned malformed rows note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note
++ Worth knowing:
++ - The airport bus timetable could not be retrieved note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note n
++ - The airport bus timetable could not be retrieved note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note n
++ - The airport bus timetable could not be retrieved note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note n
++ - The airport bus timetable could not be retrieved note note note note note note note note
++ That is the conclusion (1 of 6 usable, 5 not done); details are in the ledge…
+
+ ❯ test/delivery-human-block.spec.ts:444:20
+    442|       expect(text).toContain('答案：')
+    443|       expect(text).toContain(ZH_TAIL)
+    444|       expect(text).toContain(EN_TAIL)
+       |                    ^
+    445|       expect(loneSurrogates(text)).toEqual([])
+    446|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/14]⎯
+
+ FAIL  test/delivery-human-block.spec.ts > round 37: an over-cap block cuts the middle, not a verdict and not a word > keeps the head and the whole verdict and cuts only at a line boundary
+AssertionError: expected [ Array(1) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "- The airport bus timetable could not be retrieved note note note note",
++ ]
+
+ ❯ test/delivery-human-block.spec.ts:475:23
+    473|       .filter(line => !STRUCTURAL.test(line))
+    474|       .filter(line => !line.endsWith(SENTINEL))
+    475|     expect(fragments).toEqual([])
+       |                       ^
+    476|   })
+    477|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/14]⎯
+
+ FAIL  test/delivery-human-block.spec.ts > round 37: an over-cap block cuts the middle, not a verdict and not a word > marks the cut so a reader knows the middle is missing
+AssertionError: expected [ 'Answer: Done.', …(14) ] to include '…'
+ ❯ test/delivery-human-block.spec.ts:480:30
+    478|   it('marks the cut so a reader knows the middle is missing', () => {
+    479|     const text = humanConclusion(edgeReport({ knob: 240 }), { lang: 'e…
+    480|     expect(text.split('\n')).toContain('…')
+       |                              ^
+    481|   })
+    482|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/14]⎯
+
+ FAIL  test/delivery-human-block.spec.ts > round 37: an over-cap block cuts the middle, not a verdict and not a word > keeps the same guarantee in the Chinese block
+AssertionError: expected [ Array(1) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "- The airport bus timetable could not be retrieved note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note note ",
++ ]
+
+ ❯ test/delivery-human-block.spec.ts:492:23
+    490|       .filter(line => !STRUCTURAL.test(line))
+    491|       .filter(line => !line.endsWith(SENTINEL))
+    492|     expect(fragments).toEqual([])
+       |                       ^
+    493|   })
+    494| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/14]⎯
+
+ FAIL  test/delivery-human-block.spec.ts > round 37: a clamp never splits an astral character > leaves no lone surrogate when a caveat is longer than one clamped line
+AssertionError: expected [ 'high surrogate at 1721' ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "high surrogate at 1721",
++ ]
+
+ ❯ test/delivery-human-block.spec.ts:499:34
+    497|   it('leaves no lone surrogate when a caveat is longer than one clampe…
+    498|     const text = humanConclusion(edgeReport({ knob: 200, emoji: true }…
+    499|     expect(loneSurrogates(text)).toEqual([])
+       |                                  ^
+    500|     expect(text).toContain('Answer:')
+    501|     expect(text.endsWith(EN_TAIL)).toBe(true)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/14]⎯
+
+ FAIL  test/delivery-human-block.spec.ts > round 37: a clamp never splits an astral character > leaves no lone surrogate in either language of a bilingual pair
+AssertionError: expected [ 'high surrogate at 1655', …(1) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "high surrogate at 1655",
++   "high surrogate at 4162",
++ ]
+
+ ❯ test/delivery-human-block.spec.ts:506:34
+    504|   it('leaves no lone surrogate in either language of a bilingual pair'…
+    505|     const text = humanConclusion(edgeReport({ knob: 240, emoji: true }…
+    506|     expect(loneSurrogates(text)).toEqual([])
+       |                                  ^
+    507|     expect(text).toContain(ZH_TAIL)
+    508|     expect(text).toContain(EN_TAIL)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/14]⎯
+
+ FAIL  test/delivery-human-block.spec.ts > round 40: a chain value that is not a route label is refused by path > names the role, the position and the shape for a non-string route
+AssertionError: roles.worker[1] as a number: expected undefined to be an instance of Error
+ ❯ test/delivery-human-block.spec.ts:576:28
+    574|       const where = `roles.worker[1] as ${label}`
+    575|       const error = thrownBy(() => machineLedger(withChain('worker', […
+    576|       expect(error, where).toBeInstanceOf(Error)
+       |                            ^
+    577|       // Path first, then shape: the operator with five chains configu…
+    578|       // otherwise left guessing which route carries the wrong value.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/14]⎯
+
+ FAIL  test/delivery-human-block.spec.ts > round 40: a chain value that is not a route label is refused by path > checks every role, not only worker
+AssertionError: planner: expected [Function] to throw an error
+
+- Expected:
+null
+
++ Received:
+undefined
+
+ ❯ test/delivery-human-block.spec.ts:587:10
+    585|     for (const role of ['planner', 'worker', 'verifier', 'supervisor',…
+    586|       expect(() => machineLedger(withChain(role, ['a/m1', 7])), role)
+    587|         .toThrow(`delivery: roles.${role}[1] must be a "provider/model…
+       |          ^
+    588|     }
+    589|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/14]⎯
+
+ FAIL  test/delivery-human-block.spec.ts > round 40: a chain value that is not a route label is refused by path > points at the entry that is wrong, not the first one
+AssertionError: expected [Function] to throw an error
+
+- Expected:
+null
+
++ Received:
+undefined
+
+ ❯ test/delivery-human-block.spec.ts:593:8
+    591|   it('points at the entry that is wrong, not the first one', () => {
+    592|     expect(() => machineLedger(withChain('worker', ['a/m1', 'b/m2', 'c…
+    593|       .toThrow(/^delivery: roles\.worker\[3\] must be a "provider\/mod…
+       |        ^
+    594|   })
+    595|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/14]⎯
+
+ FAIL  test/delivery-human-block.spec.ts > round 40: a chain value that is not a route label is refused by path > refuses a chain that is not an array, naming the role
+AssertionError: expected [Function] to throw error including 'delivery: roles.worker must be an arr…' but got 'chain.join is not a function'
+
+Expected: "delivery: roles.worker must be an array of "provider/model" strings, got string"
+Received: "chain.join is not a function"
+
+ ❯ test/delivery-human-block.spec.ts:599:8
+    597|     // `worker: 'a/m1'` used to reach `chain.join` and throw a bare Ty…
+    598|     expect(() => machineLedger(withChain('worker', 'a/m1')))
+    599|       .toThrow(`delivery: roles.worker must be an array of "provider/m…
+       |        ^
+    600|     expect(() => machineLedger(withChain('verifier', { 0: 'a/m1' })))
+    601|       .toThrow(`delivery: roles.verifier must be an array of "provider…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/14]⎯
+
+ FAIL  test/delivery-human-block.spec.ts > round 40: a chain value that is not a route label is refused by path > refuses a routing map that is not a record
+AssertionError: expected [Function] to throw error including 'delivery: roles must be a record of p…' but got 'Cannot read properties of undefined (…'
+
+Expected: "delivery: roles must be a record of per-role chains, got undefined"
+Received: "Cannot read properties of undefined (reading 'planner')"
+
+ ❯ test/delivery-human-block.spec.ts:608:43
+    606|     for (const [value, got] of [[undefined, 'undefined'], [null, 'null…
+    607|       const report = { ...base, routing: value } as unknown as Workflo…
+    608|       expect(() => machineLedger(report)).toThrow(`delivery: roles mus…
+       |                                           ^
+    609|     }
+    610|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/14]⎯
+
+ FAIL  test/delivery-human-block.spec.ts > round 40: a chain value that is not a route label is refused by path > never coerces a bad route into a readable one
+AssertionError: expected undefined to be an instance of Error
+ ❯ test/delivery-human-block.spec.ts:615:19
+    613|     // The old line rendered `worker=a/m1 → 7 → ` and read as a config…
+    614|     const error = thrownBy(() => machineLedger(withChain('worker', ['a…
+    615|     expect(error).toBeInstanceOf(Error)
+       |                   ^
+    616|     expect((error as Error).message).not.toMatch(/worker=a\/m1/)
+    617|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/14]⎯
+
+ FAIL  test/delivery-human-block.spec.ts > round 40: a chain value that is not a route label is refused by path > drops the ledger instead of the answer when diagnostics are on
+AssertionError: expected 'Grok workflow: PARTIAL\nObjective: 查一…' to be undefined
+
+- Expected:
+undefined
+
++ Received:
+"Grok workflow: PARTIAL
+Objective: 查一下新加坡这周的天气并给出出行建议
+Plan: caller; 3 task(s); 1 verified
+Failures: 1 infrastructure, 1 quality
+- a: verified (1 attempt) — Task a
+- b: failed (1 attempt) — 酒店价格
+  incomplete (infrastructure): task aborted before any attempt: [infrastructure/timeout] provider exploded
+- c: failed (1 attempt) — 机场巴士时刻
+  incomplete (quality): verify step rejected: Plan: step 2 was skipped by the runner
+Confirmed evidence:
+- a: 天气已核验 → verified 天气已核验 in file:///tmp/report
+Incomplete:
+- b (infrastructure): task aborted before any attempt: [infrastructure/timeout] provider exploded
+- c (quality): verify step rejected: Plan: step 2 was skipped by the runner
+Uncertainties:
+- c: 机场巴士时刻未取得，行程建议可能偏差
+Final answer:
+天气已核验；酒店价格与机场巴士时刻未取得。
+Synthesis: deterministic
+Model routes: planner=inherit; worker=a/m1 → 7; verifier=inherit; supervisor=inherit; synthesizer=inherit"
+
+ ❯ test/delivery-human-block.spec.ts:637:25
+    635|     // diagnostics are the extra half, the answer is the delivery.
+    636|     const view = deliverReport(withChain('worker', ['a/m1', 7]), { dia…
+    637|     expect(view.ledger).toBeUndefined()
+       |                         ^
+    638|     expect(view.human.startsWith('Answer:')).toBe(true)
+    639|     expect(view.text).not.toContain('Model routes:')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/14]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  14 failed | 20 passed (34)
+   Start at  00:31:04
+   Duration  1.77s (transform 170ms, setup 0ms, import 217ms, tests 1.40s, environment 0ms)
+

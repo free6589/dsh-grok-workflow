@@ -1185,3 +1185,79 @@ no history is rewritten, and no round is force-pushed.
 - **未验证（`NOT_RUN`）**：真机 GUI；真实定时投递。
 - **建议版本**：patch（fail-closed 收紧，无 API 变化；CHANGELOG 记 Fixed 双语）。
 - **status:** OK
+
+## Round 39 — 2026-11-21 — 交付边界：双语上限两侧各保结论，路由链拒绝非法标签（`CONFIRMED`）
+
+- **启动读取（R1）**：`AGENTS.md`、`docs/RELEASING.md`、`docs/LOCAL-TESTING.md`、
+  `docs/ACCEPTANCE.md`、`docs/knowledge/STATE.md`、`CHANGELOG.md`、`.rsi/PROTOCOL.md`、
+  `.rsi/POOL.md`、`.rsi/STATE.md`、`.rsi/LOG.md` 末段、`.rsi/ROUND.md` 末段、
+  `.rsi/ledger.jsonl` 末段；HANDOFF 在 `docs/knowledge/HANDOFF.md`（根目录没有，本轮补一份指针）。
+- **git 状态（`CONFIRMED`）**：`main...origin/main`，HEAD `bffd0b4`（0.12.14），无本地独有提交。
+  树上有**并发轮留下的未提交改动**（`CHANGELOG.md`、`src/checkpoint/schema.ts`、`src/delivery/index.ts`、
+  `test/delivery-human-block.spec.ts`、`?? test/checkpoint-bound.spec.ts`、`?? test/config-chain-types.spec.ts`），
+  四个 tracked 文件的 mtime 全是 23:14:35 —— 上一轮发版时把它们 stash 隔离、发完原样恢复，**是刻意保留的**，
+  不是新写入。门禁 `heartbeat-guard.sh --round auto` 因此报 `SKIP code=dirty-tracked next_round=39`：
+  上一轮"已开未闭合"。本轮的处理方式是**把这批残留当作本轮的内容集独立复核并入账**（round 34 先例），
+  而不是在它之上另起一题，也不是把残留再 stash 一次。
+- **STOP 探针（`CONFIRMED`）**：`.rsi/tools/stop-probe.sh 39` → `2026-11-21T00:06:49+08:00 round=39
+  cwd=/home/fish/projects_mine/dsh-grok-workflow cmd='test -e .rsi/STOP' -> STOP ABSENT`
+  （`.rsi/evidence/stop-probes.txt`）。`.rsi/STOP` 不存在，§7 的停止条件都不成立。被作废的
+  "round 11 后停止" 与 "P1/P2 空即停" 两条仍按 `.rsi/LOG.md` 的更正条视为 VOID，未作为理由。
+- **选题（R2）**：`iterate-plan.mjs --pool` 报 `top_next=line 94`（`repairLimitOverruns` 死路径，
+  S/low）。本轮选的是**比它更高一级**的主题：双语交付在 4800 字符上限处**丢掉第二种语言的结论**——
+  用户直接读到的文本是错的，属 P0 功能错误，高于 S/low 的配置死路径。同一模块同一份 spec 里还带着
+  `Model routes:` 行的路由链校验（台账把数字/`null`/对象拼成一条"配置"、非数组链抛裸 `TypeError`），
+  两者都是"边界输入被交付层原样吐出来"，故作为同一主题下的两处改动，不拆成两轮。
+- **缺陷与数字（`CONFIRMED`，实测）**：旧 `humanConclusion` 用
+  `both.length <= 4800 ? both : both.slice(0, 4799) + '…'` 直接切拼接结果。一块正好在单遍上限 2400、
+  另一块 2399，加两字符分隔符 = **4801**，超一个字符；那一刀吃掉的是**第二种**语言结论的末尾
+  （`明细已记入台…`）。实测 `pairCaps(2400,2400)=[2399,2399]`、`pairCaps(2400,2399)=[2399,2399]`
+  （和 4798 + 2 = 4800，两种语言结论都在）、`pairCaps(2400,100)=[2400,100]`、`pairCaps(2400,0)=[2400,0]`。
+  同一处旧代码还有两处边界：中间切口不理行边界（半个词直接缝在结论上、且无标记），所有截断都按
+  UTF-16 码元切（切在增补字符中间会留下孤立代理项，渲染成替换方块）。
+- **改动**：`src/delivery/index.ts`
+  - `cutCodeUnits()` —— 唯一的截断入口，末位是高代理项时退一格，所有 clamp 都走它；
+  - `composeHuman()` → `composeHumanParts()`（返回 block + verdict tail）、`clampHumanBlock()`
+    （先留结论尾，再缩头，中间按行边界切并用 `…` 标记接缝）、`pairCaps()`（导出，预算两半分并从短块
+    匀出余量，永不返回负值）；
+  - `ROUTE_ROLES` / `gotType()` / `routeChains()` —— 按报告顺序读五条链，拒绝非 record 的映射、
+    非数组的链、非字符串的条目，报出 `roles.worker[1] must be a "provider/model" string, got number`；
+    `machineLedger` 改用 `routeChains(report.routing)`。链坏掉只损失台账那一行（`humanConclusion`
+    不读 routing，`answer.ts` 的 `foldedLedger` 也会丢掉渲染不了的台账），不影响结论。
+  - `lib/delivery/*` 由本树 `src/` 重建（只这四个文件变）。
+- **红绿（`CONFIRMED`，独立 worktree 实跑）**：在 `bffd0b4` 的 detached worktree（`.tmp/rsi39-red`）里
+  放入本轮 spec 的副本——只去掉 `pairCaps` 的导入符号与它那 5 条直调用例（HEAD 不导出该函数）——
+  `npx vitest run test/delivery-human-block.spec.ts` → **14 failed / 20 passed (34)**
+  （`.rsi/evidence/round-039/red-at-bffd0b4.txt`，exit 1）。修后本树同一份 spec **39 passed**
+  （`it(` 13 → 39，无 `skip`/`only`/`todo`）。**诚实口径**：26 条新用例里 **14 条**在改动前的模块上失败
+  （真正的钉子）、**5 条**是 `pairCaps` 直调用例（HEAD 根本没有该函数）、**7 条**在改动前也通过
+  （回归守卫：旧码本来就对，钉住别被这轮改坏）——不把这 26 条都说成"钉住修复"。scoped 绿跑
+  `delivery + config` = 79 passed（`green-delivery-config.txt`）。
+- **独立评审（D，fresh context）**：第一轮 **FAIL**，四条。其中两条是评审在 00:13 看到
+  `CHANGELOG.md` 被清空——那是我在抽取发版 changelog 正文（`finish-round.py` 不读 `[Unreleased]`，
+  它把 `## [x.y.z]` + 正文插在最新版本段之上），条目此时活在 `.rsi/evidence/round-039/spec.json`
+  的 `changelog` 字段里；机制自查：`[Unreleased]` 空、0.12.14 段与 HEAD 逐字节一致、新段是第一个
+  `## [x.y.z]`（`test/docs-version.spec.ts` 的要求）。另两条是真缺陷并已修：
+  (a) `cutCodeUnits` 的注释声称"本模块每个 clamp 都走这里"，而台账的 `MAX_LEDGER_CHARS` 截断仍按
+  码元切——注释收窄到"每个人话块 clamp"，台账那处并进 POOL（没有能被校验器放行的 8000 字符报告，
+  无实测形状可钉）；(b) `deliverReport` 在 `diagnostics: true` 且链非法时会把已组好的人话块一起抛掉，
+  与"链坏只损失台账"不符——改成 `try/catch` 丢掉 ledger（`text === human`），并在链用例组里加
+  "drops the ledger instead of the answer when diagnostics are on"（这条在改动前抛错，是新增的第 14 个红点）。
+- **门禁（`CONFIRMED`）**：`npm run typecheck` exit 0（`typecheck.txt`）、`npx oxlint src test`
+  24 warnings / 0 errors（与基线同，`oxlint.txt`）、`npm run ci` exit 0 = **70 文件 / 1295 测试 PASS**，
+  `verify:lib` 报 `lib/ at bffd0b4 is the build of src/ at bffd0b4 (153 files, byte-identical)`
+  （`ci-preliminary.txt`）。发版 CI 由 `finish-round.py` 重跑并记在 `ci.txt`。
+- **文档一致性（`CONFIRMED`）**：继承来的 `CHANGELOG.md` 双语条目被插进了**已经发布**的
+  `## [0.12.14]` 段里——即 0.12.14 的发布说明宣称了一条该 tag 并不包含的修复。本轮把它移到
+  `[Unreleased]`（并把 0.12.14 段恢复成 HEAD 的逐字节内容），另加一条路由行拒绝的条目，双语同步。
+- **并发残留的处理（`CONFIRMED`）**：`src/checkpoint/schema.ts` 的 docblock 改写与
+  `test/checkpoint-bound.spec.ts`（156 行）、`test/config-chain-types.spec.ts`（188 行）不属于本主题，
+  也没有进本轮的提交。bytes 原样存进 `.rsi/evidence/round-039/preserved/`
+  （`checkpoint-docblock.patch` 经 `git apply --check` 验证可干净应用、两份 spec 存 `.txt`），
+  `.rsi/POOL.md` 记了 PRESERVED 条与恢复命令；树因此回到单一主题，留下的是证据而不是半成品。
+  同一次提交也把并发轮留下的 evidence 笔记（`?? .rsi/evidence/*.md` 等）纳入版本库——它们本来就是证据。
+- **未验证（`NOT_RUN`）**：真实 DSH GUI 手点（`bilingual` 开关下的实际渲染）；真实定时投递（本轮不是心跳
+  投递触发）；把 0.12.15 装进 `~/.dsh/profiles/web`（发版后需要操作者/主会话的一次 `plugin add`）；
+  `13→38` 之外的整树回归由 `npm run ci` 覆盖，但 Node 24 那条矩阵只在远端跑。
+- **建议版本**：**patch**（`0.12.15`）——用户可见的修复，无 API/配置面变化；本轮直接发版。
+- **status:** OK

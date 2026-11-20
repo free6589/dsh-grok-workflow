@@ -106,6 +106,21 @@ here and are marked DONE when their commit lands.
   (verdict) and cuts the middle; each language block is clamped independently so the second
   language keeps its own verdict. Pinned by `test/delivery-human-block.spec.ts` (3 its).
   Evidence `.rsi/evidence/round-036/`.
+- R39 DONE · The round-36 head/tail clamp still leaked at the *pair* boundary. `humanConclusion`
+  bounded the two blocks by slicing their concatenation, so one block at the single-pass cap
+  (2400) plus one at 2399 plus the two-character separator is **4801**, one over the 4800 cap,
+  and the blind cut ate the last characters of the **second** language's verdict
+  (`明细已记入台…`). The middle cut also ignored line breaks (a half-word sewn onto the verdict)
+  and every clamp cut through UTF-16 code units (a lone surrogate renders as a replacement box).
+  The pair budget is now split by `pairCaps` (exported, five direct tests), the middle cut lands
+  on a line boundary, `…` marks the junction, and every cut goes through `cutCodeUnits`, which
+  never splits an astral character; the verdict is reserved before the head is allowed to shrink.
+  Same module, same spec: the ledger's `Model routes:` line handed `report.routing` to `Array#join`,
+  so a number/`null`/object inside a chain was coerced into a readable route and a non-array chain
+  threw a bare `TypeError` — `routeChains` now refuses with path and shape
+  (`roles.worker[1] must be a "provider/model" string, got number`), and a malformed chain costs the
+  ledger line, never the answer. Red 13 failed / 20 passed on the pre-change module (bffd0b4), green
+  38 passed after. Evidence `.rsi/evidence/round-039/`.
 - R11 DONE · the cancelled terminal stated the kept report via `relayText` (success preamble +
   markers + folded ledger), reading as if the workflow had finished. Round 28 composes it
   via `humanConclusion` instead (`src/gate.ts` `cancelledText`); the ledger stays in the
@@ -180,6 +195,18 @@ here and are marked DONE when their commit lands.
   sealed file, writes at it and one byte over, then reads the source back and requires the comment
   to state it (`D-087`, `A36`). The behaviour was already right (round 27) — this round closed the
   prose and pinned it. Evidence `.rsi/evidence/round-031/`.
+- PRESERVED (round 39) · A parallel round-39/40 attempt in this checkout wrote a longer
+  `CHECKPOINT_LIMITS.maxBytes` docblock that separates the *file* bound from the legal payload
+  ceiling and derives both numbers, plus `test/checkpoint-bound.spec.ts` (156 lines) that locks the
+  comment instead of asserting the numbers merely appear. Round 39 needed a single-theme tree, so
+  the bytes were preserved rather than shipped:
+  `.rsi/evidence/round-039/preserved/checkpoint-docblock.patch` (applies cleanly with
+  `git apply --check`) and `.../checkpoint-bound.spec.ts.txt` (restore with
+  `cp ... test/checkpoint-bound.spec.ts`). Ready to land as its own docs round — no runtime line
+  changes, so no version bump per `docs/RELEASING.md`. Also preserved:
+  `.../config-chain-types.spec.ts.txt`, an 188-line spec for the round-38 `model`/`provider`
+  refusal; decide first whether it adds coverage over the committed `test/config.spec.ts` case or
+  only duplicates it, so the count does not grow without a second behaviour. S / low.
 - R10 DONE · `durationMs` is gated on `msCeiling` (`wiring.ts:784-790`, `schema.ts:624`), fixed in
   round 22 and shipped in `0.11.20`.
 - P · `recordableTimeoutMs`'s upper guard is vacuous (`msCeiling === MAX_SAFE_INTEGER`), so a

@@ -1,0 +1,188 @@
+import { describe, expect, it } from 'vitest'
+import { Config, ROLE_KEYS, resolveConfig, snapshotConfig } from '../src/config.js'
+
+/**
+ * Chain route type validation in `resolveConfig` (RSI round 39).
+ *
+ * Round 38 replaced the read of `model`/`provider` inside `resolveChain` with an
+ * explicit type check. The old code read the field through the optional chain and
+ * called `.trim()` on whatever it found, so a number, an object or an array threw a
+ * bare `TypeError` ("…?.trim is not a function") out of the config loader — naming
+ * neither the key that was wrong nor the role and index it was wrong at. The
+ * operator saw a stack trace instead of `roles.worker[0].model must be a model id
+ * string, got number`.
+ *
+ * This spec locks that refusal shut for every non-string shape. It sits on the lower
+ * of two layers: the `Config` schema catches most of these at the settings page, but
+ * `resolveConfig` is also reached directly (a hand-built config object, an embedder,
+ * a document read back on load), and that is exactly the path a bare `TypeError`
+ * used to escape from. `null` is the awkward one — a `null` model survives the
+ * schema unchanged, and a `null` provider is defaulted to the empty string there —
+ * so the reader is the only place that can name neither-inherited-nor-string.
+ */
+
+/**
+ * Every shape that is not a model/provider id, with the word the error uses for it.
+ *
+ * `threwBefore` marks the rows the old `?.trim()` read turned into a bare `TypeError`
+ * (it called `.trim()` on the value); `null` is the one row that did not, because the
+ * optional chain short-circuited first — see the reproduction test below.
+ */
+interface NonString {
+  label: string
+  value: unknown
+  /** `typeof` of the value, as the refusal spells it (`typeof null` is `object`). */
+  got: string
+  threwBefore: boolean
+}
+
+const NON_STRING: NonString[] = [
+  { label: 'a number', value: 42, got: 'number', threwBefore: true },
+  { label: 'NaN', value: Number.NaN, got: 'number', threwBefore: true },
+  { label: 'Infinity', value: Number.POSITIVE_INFINITY, got: 'number', threwBefore: true },
+  { label: 'a bigint', value: 10n, got: 'bigint', threwBefore: true },
+  { label: 'a boolean', value: true, got: 'boolean', threwBefore: true },
+  { label: 'an object', value: { id: 'm' }, got: 'object', threwBefore: true },
+  { label: 'an array', value: ['m'], got: 'object', threwBefore: true },
+  { label: 'a Date', value: new Date(0), got: 'object', threwBefore: true },
+  { label: 'a Map', value: new Map(), got: 'object', threwBefore: true },
+  { label: 'a symbol', value: Symbol('m'), got: 'symbol', threwBefore: true },
+  { label: 'a function', value: () => 'm', got: 'function', threwBefore: true },
+  { label: 'null', value: null, got: 'object', threwBefore: false },
+]
+
+/** Run `fn` and hand back whatever it threw (`undefined` when it threw nothing). */
+function thrownBy(fn: () => unknown): unknown {
+  try {
+    fn()
+  } catch (error) {
+    return error
+  }
+  return undefined
+}
+
+/**
+ * The pre-round-38 read of one route field, reproduced verbatim in shape.
+ *
+ * `entry?.model?.trim() ?? ''` is the line the fix replaced. It is rebuilt here
+ * rather than read from history so the reproduction is part of the suite: the
+ * regression is not "an error message changed", it is "the reader used to call a
+ * method on a value it had never checked", and this is what that did.
+ */
+function oldTrimRead(route: { model?: unknown, provider?: unknown }, key: 'model' | 'provider'): string {
+  return (route[key] as string | undefined)?.trim() ?? ''
+}
+
+describe('chain route type validation (resolveChain)', () => {
+  it('refuses a non-string model with the full path and the got-type, in every role', () => {
+    for (const role of ROLE_KEYS) {
+      for (const { label, value, got } of NON_STRING) {
+        const where = `roles.${role}[0].model as ${label}`
+        const error = thrownBy(() => resolveConfig({ roles: { [role]: [{ model: value }] } } as never))
+        // The regression itself: a plain `Error` out of the reader, never a `TypeError`
+        // from calling a method on the value.
+        expect(error, where).toBeInstanceOf(Error)
+        expect(error, where).not.toBeInstanceOf(TypeError)
+        expect((error as Error).name, where).toBe('Error')
+        // Path first, then the shape: `[0]` and the role both have to be there, or the
+        // operator with five chains configured is left guessing which route to fix.
+        expect((error as Error).message, where)
+          .toBe(`roles.${role}[0].model must be a model id string, got ${got}`)
+      }
+    }
+  })
+
+  it('refuses a non-string provider with the full path and the got-type, in every role', () => {
+    for (const role of ROLE_KEYS) {
+      for (const { label, value, got } of NON_STRING) {
+        const where = `roles.${role}[0].provider as ${label}`
+        const error = thrownBy(() => resolveConfig({ roles: { [role]: [{ provider: value, model: 'm1' }] } } as never))
+        expect(error, where).toBeInstanceOf(Error)
+        expect(error, where).not.toBeInstanceOf(TypeError)
+        expect((error as Error).name, where).toBe('Error')
+        expect((error as Error).message, where)
+          .toBe(`roles.${role}[0].provider must be a provider id string, got ${got}`)
+      }
+    }
+  })
+
+  it('names the failing route by index, not only by role', () => {
+    // A chain is the common case for the roles that have one, and `[0]` alone would be
+    // wrong half the time: the refusal has to point at the route that carries the value.
+    expect(() => resolveConfig({ roles: { worker: [{ model: 'm1' }, { model: 'm2' }, { model: 7 }] } } as never))
+      .toThrow(/^roles\.worker\[2\]\.model must be a model id string, got number$/)
+    expect(() => resolveConfig({ roles: { supervisor: [{ model: 'm1' }, { provider: {}, model: 'm2' }] } } as never))
+      .toThrow(/^roles\.supervisor\[1\]\.provider must be a provider id string, got object$/)
+    // A chain of good routes still resolves to the same chain: the refusal is per
+    // route, so the check does not widen into "any route is odd, refuse the role".
+    expect(resolveConfig({ roles: { worker: [{ model: 'm1' }, { model: 'm2' }] } } as never).roles.worker)
+      .toEqual([{ model: 'm1' }, { model: 'm2' }])
+  })
+
+  it('reproduces the pre-fix bare TypeError, and shows what null did instead', () => {
+    // Before round 38 these shapes reached `.trim()` and threw a `TypeError` with no
+    // path in it — the bug this suite is the regression guard for.
+    for (const { label, value, threwBefore } of NON_STRING) {
+      if (!threwBefore) continue
+      expect(() => oldTrimRead({ model: value }, 'model'), `old model read, ${label}`).toThrow(TypeError)
+      expect(() => oldTrimRead({ provider: value }, 'provider'), `old provider read, ${label}`).toThrow(TypeError)
+      // …and none of them throws a `TypeError` through the reader any more.
+      const error = thrownBy(() => resolveConfig({ roles: { worker: [{ model: 'm1', provider: value }] } } as never))
+      expect(error, `reader, provider ${label}`).not.toBeInstanceOf(TypeError)
+    }
+    // `null` was the quiet half of the bug: the optional chain short-circuited, so the
+    // old read produced `''` — a null model was then refused as if it were *empty*
+    // ("must be a non-empty model id", blaming the wrong thing), and a null provider
+    // silently became "inherit the run's provider", which is a configuration the
+    // operator never wrote. Both are now refused by name.
+    expect(oldTrimRead({ model: null }, 'model')).toBe('')
+    expect(oldTrimRead({ provider: null }, 'provider')).toBe('')
+    expect(() => resolveConfig({ roles: { worker: [{ model: null }] } } as never))
+      .toThrow(/^roles\.worker\[0\]\.model must be a model id string, got object$/)
+    expect(() => resolveConfig({ roles: { worker: [{ provider: null, model: 'm1' }] } } as never))
+      .toThrow(/^roles\.worker\[0\]\.provider must be a provider id string, got object$/)
+  })
+
+  it('refuses a route entry or a chain of the wrong shape without a TypeError', () => {
+    // The route slot itself (`normalizeRoute`) and the chain slot (`resolveChain`) are
+    // the two neighbouring refusals: a numeric, null or boolean route, and a role whose
+    // value is not a list at all. Each names its own path, none of them is a TypeError.
+    for (const [label, entry] of [['a number', 7], ['null', null], ['a boolean', true]] as const) {
+      const error = thrownBy(() => resolveConfig({ roles: { worker: [entry] } } as never))
+      expect(error, `route entry as ${label}`).not.toBeInstanceOf(TypeError)
+      expect((error as Error).message, `route entry as ${label}`)
+        .toBe('roles.worker[0] must be a route object or a model id string')
+    }
+    for (const [label, chain] of [['a string', 'fast'], ['null', null], ['a number', 5]] as const) {
+      const error = thrownBy(() => resolveConfig({ roles: { worker: chain } } as never))
+      expect(error, `chain as ${label}`).not.toBeInstanceOf(TypeError)
+      expect((error as Error).message, `chain as ${label}`).toBe('roles.worker must be an array of routes')
+    }
+  })
+
+  it('keeps the reader as the backstop for a document the settings schema lets through', () => {
+    // The settings page is the layer an operator actually types into, and it is not a
+    // total function over types: it leaves a `null` model in place and defaults a
+    // `null` provider to `''`. So the reader must still refuse the value it is handed
+    // on load — this test pins the reader, and states the schema's behaviour as
+    // observed rather than requiring it (tightening the schema is a change to the
+    // other layer, and the reader stays correct either way).
+    const parsedNullModel = thrownBy(() => Config({ roles: { worker: [{ model: null }] } } as never))
+    if (parsedNullModel !== undefined) {
+      // A schema that refuses it must still not refuse it with a bare TypeError.
+      expect(parsedNullModel, 'schema, null model').not.toBeInstanceOf(TypeError)
+    } else {
+      const document = snapshotConfig(Config({ roles: { worker: [{ model: null }] } } as never) as Record<string, unknown>) as Record<string, unknown>
+      const chain = (document['roles'] as { worker: Record<string, unknown>[] }).worker
+      expect(chain[0]!['model'], 'schema kept the null').toBeNull()
+      // The exact shape the schema emits, read back by the reader: path and shape named.
+      expect(() => resolveConfig(document as never))
+        .toThrow(/^roles\.worker\[0\]\.model must be a model id string, got object$/)
+    }
+    const parsedNullProvider = thrownBy(() => Config({ roles: { worker: [{ provider: null, model: 'm1' }] } } as never))
+    expect(parsedNullProvider, 'schema, null provider').not.toBeInstanceOf(TypeError)
+    // Whatever the schema made of it, a direct read of the written value is refused.
+    expect(() => resolveConfig({ roles: { worker: [{ provider: null, model: 'm1' }] } } as never))
+      .toThrow(/^roles\.worker\[0\]\.provider must be a provider id string, got object$/)
+  })
+})

@@ -19,11 +19,11 @@
  *   that simply removed the guard would fail the second half of this file.
  */
 import { describe, expect, it } from 'vitest'
-import { deliverReport, humanConclusion, machineLedger } from '../src/delivery/index.js'
+import { deliverReport, humanConclusion, machineLedger, pairCaps } from '../src/delivery/index.js'
 import { resolveConfig, FIXED_MAX_RETRIES} from '../src/config.js'
 import { assertWorkflowReport } from '../src/report.js'
 import { maxTotalAgentsFor, routeBudgetFor } from '../src/script.js'
-import type { WorkflowReport } from '../src/types.js'
+import type { RoleName, WorkflowReport } from '../src/types.js'
 import { execution, failingVerification, task, verification } from './fixtures.js'
 
 const LIMITS = { maxConcurrency: 2, maxTasks: 4 } as const
@@ -323,5 +323,401 @@ describe('the bilingual clamp keeps both verdicts', () => {
     })(), { bilingual: true })
     expect(text).toContain('That is the conclusion')
     expect(text).toContain('以上是结论')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Round 37: the truncation edges. Round 36 kept head+tail inside one language
+// block but left the *pair* clamp a blind `slice(0, cap - 1)`, and the single
+// block's middle cut was a raw code-unit slice: it could eat the second
+// language's verdict, leave a half-word, or split an astral character. The
+// fixture below builds a legal PARTIAL report whose composed block sits exactly
+// on the boundary (`knob` moves one failure reason one code unit at a time), so
+// every edge is reachable deterministically, with no clock, engine or model.
+// ---------------------------------------------------------------------------
+
+const EDGE_LIMITS = { maxConcurrency: 2, maxTasks: 6 } as const
+const edgeConfig = resolveConfig(EDGE_LIMITS)
+/** The verdict tail this six-task PARTIAL fixture ends each language block with. */
+const ZH_TAIL = '以上是结论（6 项里 1 项可用，5 项没做成）；明细已记入台账。'
+const EN_TAIL = 'That is the conclusion (1 of 6 usable, 5 not done); details are in the ledger.'
+/** A sentinel no composer writes, so a line cut short shows up as a missing one. */
+const SENTINEL = 'ENDZ'
+/** Header lines carry no bullet; every other kept line is fixture content. */
+const STRUCTURAL = /^(?:Answer:|Next: |Achieved: |Not done:|Worth knowing:|- \d+ more did not finish|答案：|下一步：|做成的：|没做成的：|需要你知道的：|- 另有 )/
+
+/** `prefix` padded with whole words to exactly `n` code units, ending in `mark`. */
+function fillTo(prefix: string, n: number, mark = ''): string {
+  const body = Math.max(0, n - mark.length)
+  let out = prefix
+  while (out.length < body) out += ' note'
+  return `${out.slice(0, body)}${mark}`
+}
+
+/**
+ * A legal six-task PARTIAL report whose human block is built to land on the cap.
+ *
+ * `knob` is the length of one failure reason, so the composed block grows by
+ * exactly one character per step; `mark` puts a sentinel at the end of every
+ * content line; `emoji` replaces one caveat with astral characters.
+ */
+function edgeReport(opts: { knob?: number, mark?: string, emoji?: boolean } = {}): WorkflowReport {
+  const { knob = 240, mark = '', emoji = false } = opts
+  const mk = (id: string, title: string) => ({ ...task(id, [title + ' checked']), title })
+  const ok = mk('a', 'Weather')
+  const checked = verification(ok)
+  const fixedReason = fillTo('The supplier endpoint returned malformed rows', 240, mark)
+  const rows = ['b', 'c', 'd', 'e'].map((id) => {
+    const t = mk(id, 'Hotel price check result')
+    return { t, reason: fixedReason }
+  })
+  const knobTask = mk('f', 'Hotel price check result')
+  rows.push({ t: knobTask, reason: fillTo('The supplier endpoint returned malformed rows', knob, mark) })
+  const caveat = (index: number): string => (emoji && index === 0)
+    ? '😀'.repeat(200)
+    : fillTo('The airport bus timetable could not be retrieved', 240, mark)
+  const objective = 'Check the weather'
+  return assertWorkflowReport({
+    schemaVersion: 'grok-workflow/v1', status: 'partial', objective,
+    plan: { source: 'caller', tasks: [ok, ...rows.map(row => row.t)], error: '' },
+    tasks: [
+      { ...ok, status: 'verified', attempts: [{ attempt: 1, status: 'verified', execution: execution('ok'), verification: checked, passed: true, error: '' }], error: '' },
+      ...rows.map(row => ({ ...row.t, status: 'failed' as const, attempts: [{ attempt: 1, status: 'failed' as const, execution: execution('', { status: 'failed' }), verification: failingVerification(row.t, 'x'), passed: false, error: row.reason }], error: row.reason })),
+    ],
+    confirmed: [{ taskId: 'a', criterion: 'Weather checked', evidence: checked.criteria[0]!.evidence }],
+    incomplete: rows.map(row => ({ taskId: row.t.id, reason: row.reason, category: 'quality' as const })),
+    errors: [],
+    uncertainties: [0, 1, 2, 3].map(index => ({ taskId: 'a', text: caveat(index) })),
+    routing: { planner: [], worker: [], verifier: [], supervisor: [], synthesizer: [] },
+    routes: [],
+    synthesis: { mode: 'deterministic', summary: 'Done.' },
+    limits: { ...EDGE_LIMITS, maxRetries: FIXED_MAX_RETRIES, maxTotalAgents: maxTotalAgentsFor(6, FIXED_MAX_RETRIES, routeBudgetFor(edgeConfig)) },
+  }, objective, edgeConfig)
+}
+
+/** Every lone surrogate — the half of an astral character a blind cut leaves behind. */
+function loneSurrogates(text: string): string[] {
+  const found: string[] = []
+  for (let index = 0; index < text.length; index += 1) {
+    const code = text.charCodeAt(index)
+    if (code >= 0xD800 && code <= 0xDBFF) {
+      const next = text.charCodeAt(index + 1)
+      if (next >= 0xDC00 && next <= 0xDFFF) index += 1
+      else found.push(`high surrogate at ${index}`)
+    } else if (code >= 0xDC00 && code <= 0xDFFF) {
+      found.push(`low surrogate at ${index}`)
+    }
+  }
+  return found
+}
+
+describe('round 37: the bilingual cap keeps both heads and both verdicts', () => {
+  // The pair clamp exists because one block at the 2400 single-pass cap plus one
+  // at 2399 plus the two-character separator is 4801: one character over 4800.
+  // The old `slice(0, cap - 1)` cut the last two characters off the second
+  // language's verdict and appended `…` — `明细已记入台…`.
+  // One knob step moves the composed block one code unit, so this sweep walks the
+  // whole boundary: under the cap, exactly on it, and over it in both directions.
+  // On the round-36 source the pair landed at 2400 + 2399 + 2 = 4801 for two knobs
+  // in this range and the blind pair cut truncated the second verdict there; the
+  // assertions below are what caught it.
+  const KNOBS = Array.from({ length: 121 }, (_, index) => 160 + index)
+
+  it('keeps the second language verdict whole when the first block is at the cap', () => {
+    for (const knob of KNOBS) {
+      const text = humanConclusion(edgeReport({ knob }), { lang: 'en', bilingual: true })
+      expect(text.length).toBeLessThanOrEqual(4800)
+      expect(text).toContain('Answer:')
+      expect(text).toContain(EN_TAIL)
+      // The second language is the block the blind cut used to eat.
+      expect(text).toContain(ZH_TAIL)
+      expect(loneSurrogates(text)).toEqual([])
+    }
+  })
+
+  it('keeps both verdicts when the first language is Chinese', () => {
+    for (const knob of KNOBS) {
+      const text = humanConclusion(edgeReport({ knob }), { lang: 'zh', bilingual: true })
+      expect(text.length).toBeLessThanOrEqual(4800)
+      expect(text).toContain('答案：')
+      expect(text).toContain(ZH_TAIL)
+      expect(text).toContain(EN_TAIL)
+      expect(loneSurrogates(text)).toEqual([])
+    }
+  })
+
+  it('charges neither language more than the single-pass cap', () => {
+    for (const knob of KNOBS) {
+      const text = humanConclusion(edgeReport({ knob }), { lang: 'en', bilingual: true })
+      const [first, second] = text.split('\n\n')
+      // Both halves survive the pair clamp: a dropped language is unreadable by
+      // exactly the reader the mirror exists for.
+      expect(first!.length).toBeLessThanOrEqual(2400)
+      expect(second!.length).toBeLessThanOrEqual(2400)
+      expect(second).toBeDefined()
+    }
+  })
+})
+
+describe('round 37: the pair budget is split, never cut blind', () => {
+  // 4800 is the bilingual cap and `\n\n` is the separator the pair adds back, so
+  // this is the budget the two blocks actually share.
+  const BUDGET = 4800 - 2
+
+  it('gives both blocks room when each one sits on the single-pass cap', () => {
+    const [first, second] = pairCaps(2400, 2400, BUDGET)
+    // Neither language is emptied: the mirror exists for both readers.
+    expect(first).toBe(2399)
+    expect(second).toBe(2399)
+    expect(first + second).toBeLessThanOrEqual(BUDGET)
+  })
+
+  it('closes the 4801 window the blind pair cut fell through', () => {
+    // The measured boundary: one block on the cap plus one a character short plus
+    // the separator is 4801, one over. Round 36 answered `both.slice(0, 4799) +
+    // '…'`, which ate the last two characters of the second language's verdict
+    // (`明细已记入台…`); the split charges the overflow to the block with slack.
+    expect(2400 + 2399 + 2).toBe(4801)
+    const [first, second] = pairCaps(2400, 2399, BUDGET)
+    expect(first + second + 2).toBeLessThanOrEqual(4800)
+    expect(second).toBe(2399)
+    expect(first).toBe(2399)
+  })
+
+  it('never shortens a pair that already fits', () => {
+    for (const [firstLen, secondLen] of [[300, 500], [1200, 3598], [1, 1]] as const) {
+      expect(pairCaps(firstLen, secondLen, BUDGET)).toEqual([firstLen, secondLen])
+    }
+  })
+
+  it('hands the unused half to the block that needs it', () => {
+    // The short block leaves nearly the whole budget over; the long block gets all
+    // of it back and is delivered in full rather than clipped for symmetry.
+    expect(pairCaps(2400, 100, BUDGET)).toEqual([2400, 100])
+  })
+
+  it('never returns a negative cap, whatever the budget', () => {
+    for (const budget of [0, 1, 3, 10, -5]) {
+      const [first, second] = pairCaps(2400, 2400, budget)
+      expect(first).toBeGreaterThanOrEqual(0)
+      expect(second).toBeGreaterThanOrEqual(0)
+      expect(first + second).toBeLessThanOrEqual(Math.max(0, budget))
+    }
+  })
+})
+
+describe('round 37: an over-cap block cuts the middle, not a verdict and not a word', () => {
+  it('keeps the head and the whole verdict and cuts only at a line boundary', () => {
+    const text = humanConclusion(edgeReport({ knob: 240, mark: SENTINEL }), { lang: 'en' })
+    expect(text.length).toBeLessThanOrEqual(2400)
+    expect(text.startsWith('Answer:')).toBe(true)
+    expect(text.endsWith(EN_TAIL)).toBe(true)
+    expect(loneSurrogates(text)).toEqual([])
+    // A cut inside a line leaves a fragment whose sentinel is gone.
+    const fragments = text.split('\n')
+      .filter(line => line !== '' && line !== '…' && line !== EN_TAIL)
+      .filter(line => !STRUCTURAL.test(line))
+      .filter(line => !line.endsWith(SENTINEL))
+    expect(fragments).toEqual([])
+  })
+
+  it('marks the cut so a reader knows the middle is missing', () => {
+    const text = humanConclusion(edgeReport({ knob: 240 }), { lang: 'en' })
+    expect(text.split('\n')).toContain('…')
+  })
+
+  it('keeps the same guarantee in the Chinese block', () => {
+    const text = humanConclusion(edgeReport({ knob: 240, mark: SENTINEL }), { lang: 'zh' })
+    expect(text.length).toBeLessThanOrEqual(2400)
+    expect(text.startsWith('答案：')).toBe(true)
+    expect(text.endsWith(ZH_TAIL)).toBe(true)
+    const fragments = text.split('\n')
+      .filter(line => line !== '' && line !== '…' && line !== ZH_TAIL)
+      .filter(line => !STRUCTURAL.test(line))
+      .filter(line => !line.endsWith(SENTINEL))
+    expect(fragments).toEqual([])
+  })
+})
+
+describe('round 37: a clamp never splits an astral character', () => {
+  it('leaves no lone surrogate when a caveat is longer than one clamped line', () => {
+    const text = humanConclusion(edgeReport({ knob: 200, emoji: true }), { lang: 'en' })
+    expect(loneSurrogates(text)).toEqual([])
+    expect(text).toContain('Answer:')
+    expect(text.endsWith(EN_TAIL)).toBe(true)
+  })
+
+  it('leaves no lone surrogate in either language of a bilingual pair', () => {
+    const text = humanConclusion(edgeReport({ knob: 240, emoji: true }), { lang: 'zh', bilingual: true })
+    expect(loneSurrogates(text)).toEqual([])
+    expect(text).toContain(ZH_TAIL)
+    expect(text).toContain(EN_TAIL)
+  })
+})
+
+describe('round 37: under-cap delivery is byte for byte what it was', () => {
+  it('is exactly the two single-language blocks and one blank line', () => {
+    for (const report of [partialReport(), edgeReport({ knob: 60 })]) {
+      const zh = humanConclusion(report, { lang: 'zh' })
+      const en = humanConclusion(report, { lang: 'en' })
+      expect(zh.length).toBeLessThan(2400)
+      expect(en.length).toBeLessThan(2400)
+      expect(humanConclusion(report, { lang: 'zh', bilingual: true })).toBe(`${zh}\n\n${en}`)
+      expect(humanConclusion(report, { lang: 'en', bilingual: true })).toBe(`${en}\n\n${zh}`)
+    }
+  })
+
+  it('adds no cut marker to a block that fits', () => {
+    const text = humanConclusion(edgeReport({ knob: 60 }), { lang: 'zh' })
+    expect(text).not.toContain('…')
+    expect(text.endsWith(ZH_TAIL)).toBe(true)
+  })
+})
+
+
+// ---------------------------------------------------------------------------
+// Round 40: the route line is the one place a delivery restates a
+// *configuration*, and `Array#join` used to accept anything. A number, a boolean
+// or a `null` in a chain was coerced into the line (`worker=a/m1 → 7 → `) — a
+// chain nobody configured — and a chain that was not an array at all threw
+// `TypeError: chain.join is not a function` out of the ledger, naming neither the
+// role nor the position. The chain is now checked entry by entry, and the refusal
+// carries the path an operator needs (`roles.worker[1]`) plus the shape it found.
+// ---------------------------------------------------------------------------
+
+/** Shapes a chain entry must not be, with the word the refusal uses for each. */
+const NOT_A_ROUTE: { label: string, value: unknown, got: string }[] = [
+  { label: 'a number', value: 7, got: 'number' },
+  { label: 'NaN', value: Number.NaN, got: 'number' },
+  { label: 'a boolean', value: true, got: 'boolean' },
+  { label: 'a bigint', value: 10n, got: 'bigint' },
+  { label: 'an object', value: { provider: 'a', model: 'm1' }, got: 'object' },
+  { label: 'an array', value: ['a/m1'], got: 'array' },
+  { label: 'a null', value: null, got: 'null' },
+  { label: 'an undefined', value: undefined, got: 'undefined' },
+  { label: 'a symbol', value: Symbol('m1'), got: 'symbol' },
+]
+
+/** `partialReport()` with one role's chain replaced by `chain`, past the report type. */
+function withChain(role: RoleName, chain: unknown): WorkflowReport {
+  const base = partialReport()
+  return { ...base, routing: { ...base.routing, [role]: chain } } as unknown as WorkflowReport
+}
+
+/** Whatever `fn` throws, or `undefined` when it threw nothing. */
+function thrownBy(fn: () => unknown): unknown {
+  try {
+    fn()
+  } catch (error) {
+    return error
+  }
+  return undefined
+}
+
+describe('round 40: a chain value that is not a route label is refused by path', () => {
+  it('names the role, the position and the shape for a non-string route', () => {
+    for (const { label, value, got } of NOT_A_ROUTE) {
+      const where = `roles.worker[1] as ${label}`
+      const error = thrownBy(() => machineLedger(withChain('worker', ['a/m1', value])))
+      expect(error, where).toBeInstanceOf(Error)
+      // Path first, then shape: the operator with five chains configured is
+      // otherwise left guessing which route carries the wrong value.
+      expect((error as Error).message, where)
+        .toBe(`delivery: roles.worker[1] must be a "provider/model" string, got ${got}`)
+    }
+  })
+
+  it('checks every role, not only worker', () => {
+    for (const role of ['planner', 'worker', 'verifier', 'supervisor', 'synthesizer'] as const) {
+      expect(() => machineLedger(withChain(role, ['a/m1', 7])), role)
+        .toThrow(`delivery: roles.${role}[1] must be a "provider/model" string, got number`)
+    }
+  })
+
+  it('points at the entry that is wrong, not the first one', () => {
+    expect(() => machineLedger(withChain('worker', ['a/m1', 'b/m2', 'c/m3', 4])))
+      .toThrow(/^delivery: roles\.worker\[3\] must be a "provider\/model" string, got number$/)
+  })
+
+  it('refuses a chain that is not an array, naming the role', () => {
+    // `worker: 'a/m1'` used to reach `chain.join` and throw a bare TypeError.
+    expect(() => machineLedger(withChain('worker', 'a/m1')))
+      .toThrow(`delivery: roles.worker must be an array of "provider/model" strings, got string`)
+    expect(() => machineLedger(withChain('verifier', { 0: 'a/m1' })))
+      .toThrow(`delivery: roles.verifier must be an array of "provider/model" strings, got object`)
+  })
+
+  it('refuses a routing map that is not a record', () => {
+    const base = partialReport()
+    for (const [value, got] of [[undefined, 'undefined'], [null, 'null'], ['worker:a/m1', 'string']] as const) {
+      const report = { ...base, routing: value } as unknown as WorkflowReport
+      expect(() => machineLedger(report)).toThrow(`delivery: roles must be a record of per-role chains, got ${got}`)
+    }
+  })
+
+  it('never coerces a bad route into a readable one', () => {
+    // The old line rendered `worker=a/m1 → 7 → ` and read as a configured chain.
+    const error = thrownBy(() => machineLedger(withChain('worker', ['a/m1', 7])))
+    expect(error).toBeInstanceOf(Error)
+    expect((error as Error).message).not.toMatch(/worker=a\/m1/)
+  })
+
+  it('still prints a well-formed chain, and "inherit" for an empty one', () => {
+    expect(machineLedger(withChain('worker', ['a/m1', 'b/m2']))).toContain('worker=a/m1 → b/m2')
+    expect(machineLedger(withChain('worker', []))).toContain('worker=inherit')
+  })
+
+  it('keeps the human block readable when a chain is malformed', () => {
+    // The chain is machine bookkeeping; a bad one must not cost the reader the answer.
+    const text = humanConclusion(withChain('worker', ['a/m1', 7]), { lang: 'en' })
+    expect(text.startsWith('Answer:')).toBe(true)
+    // The verdict is the sentence the reader needs; it lives only in the tail.
+    expect(text).toContain('That is the conclusion (1 of 3 usable, 2 not done)')
+  })
+
+  it('drops the ledger instead of the answer when diagnostics are on', () => {
+    // A direct caller of `deliverReport` gets no `foldedLedger` guard
+    // (`src/answer.ts`), so the refusal must not escape from this layer either:
+    // diagnostics are the extra half, the answer is the delivery.
+    const view = deliverReport(withChain('worker', ['a/m1', 7]), { diagnostics: true, lang: 'en' })
+    expect(view.ledger).toBeUndefined()
+    expect(view.human.startsWith('Answer:')).toBe(true)
+    expect(view.text).not.toContain('Model routes:')
+    expect(view.text).toBe(view.human)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Round 40: the bilingual cap itself (4800), measured over the whole boundary
+// rather than asserted one knob at a time, and pinned so a clamp that simply
+// returned less than it had room for cannot pass the bound.
+// ---------------------------------------------------------------------------
+
+describe('round 40: the bilingual pair never crosses 4800 characters', () => {
+  const KNOBS = Array.from({ length: 201 }, (_, index) => 100 + index)
+
+  it('stays inside the cap for every knob, in both language orders', () => {
+    for (const knob of KNOBS) {
+      for (const lang of ['zh', 'en'] as const) {
+        const text = humanConclusion(edgeReport({ knob }), { lang, bilingual: true })
+        expect(text.length, `knob=${knob} lang=${lang}`).toBeLessThanOrEqual(4800)
+      }
+    }
+  })
+
+  it('does not pass the cap by throwing away text it had room for', () => {
+    // The bound above is satisfiable by returning one language, or by cutting both
+    // blocks to a fraction of their caps. Measured at these three knobs the pair is
+    // 4509–4672 characters with both blocks over 2000, so the clamp is spending the
+    // budget it has instead of clearing the cap by starving a language.
+    for (const knob of [200, 240, 280]) {
+      const text = humanConclusion(edgeReport({ knob }), { lang: 'en', bilingual: true })
+      const [first, second] = text.split('\n\n')
+      expect(first!.length, `knob=${knob} first`).toBeGreaterThan(2000)
+      expect(second!.length, `knob=${knob} second`).toBeGreaterThan(2000)
+      expect(text.length, `knob=${knob} total`).toBeGreaterThan(4400)
+      expect(text).toContain(EN_TAIL)
+      expect(text).toContain(ZH_TAIL)
+    }
   })
 })

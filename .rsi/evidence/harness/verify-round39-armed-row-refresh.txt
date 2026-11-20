@@ -1,0 +1,16 @@
+# the heartbeat row as the Host stores it (read-only inspection, prompt text not printed)
+# re-captured 2026-11-20T08:34:00.569Z by agent-130 (round-39 verification, attempt 2)
+# this is the content .rsi/evidence/harness/armed-row.txt SHOULD hold: that file is a
+# 14:40 pre-arm snapshot (prompt_len 3239). Not applied here — verify-* only write scope.
+id             schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab
+title          RSI heartbeat
+rrule          DTSTART:20261120T073657Z\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=969
+scheduledAt    2026-11-20T08:36:57.000Z
+deliveries     7
+prompt_len     2319
+prompt first line: # RSI heartbeat
+prompt mentions 'heartbeat-guard.sh': True
+prompt mentions '--round auto': True
+prompt mentions '--max-rounds 1000': True
+prompt mentions 'HEARTBEAT-PROMPT': False
+prompt mentions 'HARNESS.md': False

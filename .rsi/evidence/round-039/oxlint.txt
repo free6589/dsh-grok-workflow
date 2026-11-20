@@ -1,0 +1,240 @@
+
+  ! eslint(no-unused-vars): Class 'RecordingSession' is declared but never used.
+     ,-[test/gate.spec.ts:184:7]
+ 183 | /** Session that records surface appends, used by the append-strategy tests. */
+ 184 | class RecordingSession {
+     :       ^^^^^^^^|^^^^^^^
+     :               `-- 'RecordingSession' is declared here
+ 185 |   readonly id = 'sess-recording'
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'agent' is declared but never used. Unused variables should start with a '_'.
+     ,-[test/human-output-contract.spec.ts:358:13]
+ 357 |     const mounted = await mount()
+ 358 |     const { agent, done } = await deliver(mounted)
+     :             ^^|^^
+     :               `-- 'agent' is declared here
+ 359 |     mounted.engine.runs[0]!.complete(completedReport(objectiveOf(mounted)))
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'agent' is declared but never used. Unused variables should start with a '_'.
+     ,-[test/human-output-contract.spec.ts:379:13]
+ 378 |     const mounted = await mount()
+ 379 |     const { agent, done } = await deliver(mounted)
+     :             ^^|^^
+     :               `-- 'agent' is declared here
+ 380 |     mounted.engine.runs[0]!.complete(partialReport(objectiveOf(mounted)))
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'agent' is declared but never used. Unused variables should start with a '_'.
+     ,-[test/human-output-contract.spec.ts:396:13]
+ 395 |     const mounted = await mount()
+ 396 |     const { agent, done } = await deliver(mounted)
+     :             ^^|^^
+     :               `-- 'agent' is declared here
+ 397 |     mounted.engine.runs[0]!.fail('error', 'boom')
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'agent' is declared but never used. Unused variables should start with a '_'.
+     ,-[test/human-output-contract.spec.ts:414:13]
+ 413 |     const mounted = await mount()
+ 414 |     const { agent, done } = await deliver(mounted)
+     :             ^^|^^
+     :               `-- 'agent' is declared here
+ 415 |     mounted.engine.runs[0]!.complete(completedReport(objectiveOf(mounted)))
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'agent' is declared but never used. Unused variables should start with a '_'.
+     ,-[test/human-output-contract.spec.ts:428:13]
+ 427 |     const mounted = await mount()
+ 428 |     const { agent, done } = await deliver(mounted)
+     :             ^^|^^
+     :               `-- 'agent' is declared here
+ 429 |     mounted.engine.runs[0]!.complete(partialReport(objectiveOf(mounted)))
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'agent' is declared but never used. Unused variables should start with a '_'.
+     ,-[test/human-output-contract.spec.ts:474:13]
+ 473 |     const mounted = await mount()
+ 474 |     const { agent, done } = await deliver(mounted)
+     :             ^^|^^
+     :               `-- 'agent' is declared here
+ 475 |     mounted.engine.runs[0]!.complete(partialReport(objectiveOf(mounted)))
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Identifier 'LoopError' is imported but never used.
+   ,-[test/iterate.spec.ts:7:3]
+ 6 |   LOOP_TASK_TITLE,
+ 7 |   LoopError,
+   :   ^^^^|^^^^
+   :       `-- 'LoopError' is imported here
+ 8 |   createLoopService,
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'ITERATE_ROUTE_PATH' is imported but never used.
+    ,-[test/heartbeat-identity.spec.ts:34:3]
+ 33 | import {
+ 34 |   ITERATE_ROUTE_PATH,
+    :   ^^^^^^^^^|^^^^^^^^
+    :            `-- 'ITERATE_ROUTE_PATH' is imported here
+ 35 |   ITERATE_TASK_TITLE,
+    `----
+  help: Consider removing this import.
+
+  ! unicorn(no-useless-spread): Using a spread operator here creates a new object unnecessarily.
+     ,-[src/gate.ts:647:7]
+ 646 |     lines.push('', '取消前保留的工作流报告：', humanConclusion(report, {
+ 647 |       ...opts.lang === undefined ? {} : { lang: opts.lang },
+     :       ^^^
+ 648 |     }))
+     `----
+  help: `opts.lang === undefined ? {} : { lang: opts.lang }` returns a new object. Spreading it into an object expression to create a new object is redundant.
+
+  ! unicorn(no-useless-spread): Using a spread operator here creates a new object unnecessarily.
+      ,-[src/gate.ts:1149:9]
+ 1148 |       return relayText(answer.report, answer.header, {
+ 1149 |         ...answer.lang === undefined ? {} : { lang: answer.lang },
+      :         ^^^
+ 1150 |       })
+      `----
+  help: This expression returns a new object. Spreading it into an object expression to create a new object is redundant.
+
+  ! eslint(no-unused-vars): Function 'resolveSwitchOn' is declared but never used.
+     ,-[src/config.ts:674:10]
+ 673 |  */
+ 674 | function resolveSwitchOn(list: FailureClass[] | undefined): FailureClass[] {
+     :          ^^^^^^^|^^^^^^^
+     :                 `-- 'resolveSwitchOn' is declared here
+ 675 |   if (list === undefined || list.length === 0) return []
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Function 'parseSingleRoute' is declared but never used.
+     ,-[src/config.ts:776:10]
+ 775 |  */
+ 776 | function parseSingleRoute(path: string, value: string | undefined): ModelRoute | undefined {
+     :          ^^^^^^^^|^^^^^^^
+     :                  `-- 'parseSingleRoute' is declared here
+ 777 |   const raw = (value ?? '').trim()
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Type alias 'OverrunField' is declared but never used.
+     ,-[src/config.ts:908:6]
+ 907 | /** @see {@link LimitField} */
+ 908 | type OverrunField = LegacyLimitField
+     :      ^^^^^^|^^^^^
+     :            `-- 'OverrunField' is declared here
+ 909 | 
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-useless-escape): Unnecessary escape character '['
+     ,-[src/redact.ts:273:348]
+ 272 |     name: 'key-value',
+ 273 |     pattern: /(?<![A-Za-z0-9])((?:[A-Za-z0-9]+[_-]){0,8}(?:api[_-]?key|access[_-]?key(?:[_-]?id)?|private[_-]?key|secret[_-]?access[_-]?key|secret[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|session[_-]?id|client[_-]?secret|token|secret|passphrase|password|passwd|pass|pwd|session|credentials?))(["']?)(\s*[:=]\s*)(?!["'\[{]|required\b|optional\b|enabled\b|disabled\b|true\b|false\b|null\b|none\b)([^\s,;}\]]{6,})/gi,
+     :                                                                                                                                                                                                                                                                                                                                                            ^^
+ 274 |     replacement: '$1$2$3[REDACTED]',
+     `----
+  help: Replace `\[` with `[`.
+
+  ! eslint(no-unused-vars): Type 'RoleName' is imported but never used.
+    ,-[src/run.ts:39:93]
+ 38 | import { redactDeep, redactError, redactSecrets } from './redact.js'
+ 39 | import type { FailureCategory, FinalStatus, IncompleteItem, NormalizedTask, ResolvedConfig, RoleName, WorkflowReport } from './types.js'
+    :                                                                                             ^^^^|^^^
+    :                                                                                                 `-- 'RoleName' is imported here
+ 40 | 
+    `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Interface 'TaskRow' is declared but never used.
+     ,-[test/timeout-config.spec.ts:245:13]
+ 244 | 
+ 245 |   interface TaskRow {
+     :             ^^^|^^^
+     :                `-- 'TaskRow' is declared here
+ 246 |     id: string
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Parameter 'draft' is declared but never used. Unused parameters should start with a '_'.
+     ,-[src/client/index.js:797:24]
+ 796 |      */
+ 797 |     function comboWarn(draft) {
+     :                        ^^|^^
+     :                          `-- 'draft' is declared here
+ 798 |       return false
+     `----
+  help: Consider removing this parameter.
+
+  ! eslint(no-unused-vars): Function 'ScalarField' is declared but never used.
+      ,-[src/client/index.js:1180:14]
+ 1179 | 
+ 1180 |     function ScalarField(props) {
+      :              ^^^^^|^^^^^
+      :                   `-- 'ScalarField' is declared here
+ 1181 |       const { field, draft, disabled, onChange, t } = props
+      `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Function 'ClassPicker' is declared but never used.
+      ,-[src/client/index.js:1213:14]
+ 1212 |     // site is explicit instead of a silent deletion.
+ 1213 |     function ClassPicker(props) {
+      :              ^^^^^|^^^^^
+      :                   `-- 'ClassPicker' is declared here
+ 1214 |       return null
+      `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Parameter 'props' is declared but never used. Unused parameters should start with a '_'.
+      ,-[src/client/index.js:1213:26]
+ 1212 |     // site is explicit instead of a silent deletion.
+ 1213 |     function ClassPicker(props) {
+      :                          ^^|^^
+      :                            `-- 'props' is declared here
+ 1214 |       return null
+      `----
+  help: Consider removing this parameter.
+
+  ! eslint(no-unused-vars): Function 'TriageModelPicker' is declared but never used.
+      ,-[src/client/index.js:1317:14]
+ 1316 |     // page) so the removal site is explicit instead of a silent deletion.
+ 1317 |     function TriageModelPicker(props) {
+      :              ^^^^^^^^|^^^^^^^^
+      :                      `-- 'TriageModelPicker' is declared here
+ 1318 |       return null
+      `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Parameter 'props' is declared but never used. Unused parameters should start with a '_'.
+      ,-[src/client/index.js:1317:32]
+ 1316 |     // page) so the removal site is explicit instead of a silent deletion.
+ 1317 |     function TriageModelPicker(props) {
+      :                                ^^|^^
+      :                                  `-- 'props' is declared here
+ 1318 |       return null
+      `----
+  help: Consider removing this parameter.
+
+  ! eslint(no-unused-vars): Variable 'enumRow' is declared but never used. Unused variables should start with a '_'.
+      ,-[src/client/index.js:1461:13]
+ 1460 |       const fieldByKey = (key) => FIELDS.find((field) => field.key === key)
+ 1461 |       const enumRow = (key) => {
+      :             ^^^|^^^
+      :                `-- 'enumRow' is declared here
+ 1462 |         const field = fieldByKey(key)
+      `----
+  help: Consider removing this declaration.
+
+Found 24 warnings and 0 errors.
+Finished in 44ms on 116 files with 96 rules using 6 threads.

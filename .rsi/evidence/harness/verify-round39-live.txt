@@ -1,0 +1,111 @@
+# raw read-only capture — armed heartbeat row, round 39 verification (attempt 2)
+# captured 2026-11-20T08:32:09Z / 2026-11-20T16:32:09+08:00
+# commit 366d169
+
+== 1. git state ==
+## main...origin/main
+ M lib/checkpoint/schema.d.ts
+ M lib/checkpoint/schema.d.ts.map
+
+== 2. node .rsi/tools/iterate-plan.mjs --arm-spec ==
+arm-spec status=OPEN title="RSI heartbeat" mode=edit id=schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab
+arm-spec rounds=962 window=39..1000 interval=60 remaining=962 used=38
+arm-spec rrule=DTSTART:20261120T093210Z\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=962
+arm-spec prompt=.rsi/HEARTBEAT-PROMPT.md chars=2319/4000 fits=yes
+arm-spec live-row=schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab COUNT=969 delivered=7
+arm-spec next: row schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab carries the slot title with COUNT covering 7 delivered occurrence(s); edit its rrule to the one above, keep the title and prompt
+ARM_SPEC_EXIT=0
+
+== 3. node .rsi/tools/iterate-plan.mjs --verify-row ==
+verify status=ARMED title="RSI heartbeat" remaining=962
+verify row=schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab COUNT=969 delivered=7 covered=962 last=2026-12-30T15:36:57.000Z
+verify check title ok: row schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab carries the slot title
+verify check rule-parsed ok: COUNT=969, INTERVAL=60
+verify check within-row-maximum ok: COUNT=969 vs row maximum 1000
+verify check covers-remaining-budget ok: 962 round(s) left in the row (COUNT 969 - 7 delivered) vs 962 remaining
+verify check has-a-future-occurrence ok: last occurrence 2026-12-30T15:36:57.000Z vs now 2026-11-20T08:32:09.926Z
+verify store=/home/fish/.dsh/storages/schedule.json
+verify detail=row schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab still owes 962 round(s) at 60-minute steps, last one 2026-12-30T15:36:57.000Z
+VERIFY_EXIT=0
+
+== 4. read-only probe of the host store (/tmp/probe-row.mjs; prompt text never printed) ==
+row_id            schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab
+title             "RSI heartbeat"
+kind              rrule
+rrule             "DTSTART:20261120T073657Z\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=969"
+status            active
+scheduledAt(next) 2026-11-20T08:36:57.000Z
+prompt_len        2319
+md_block_len      2319
+byteIdentical     true
+legacy_header     false
+prompt has "heartbeat-guard.sh" = true
+prompt has "--round auto" = true
+prompt has "--max-rounds 1000" = true
+prompt has "top_next" = true
+prompt first line "# RSI heartbeat"
+deliveryHistory   7 record(s)
+last delivery     deliveredAt=2026-11-20T07:36:57.106Z scheduledAt=2026-11-20T07:36:57.000Z
+
+== 5. DTSTART-anchored recomputation, computed fresh (/tmp/s5.mjs) ==
+DTSTART      20261120T073657Z  FREQ=MINUTELY  INTERVAL=60  COUNT=969
+span         968 h = 968 x 60 min
+last_utc     2026-12-30T15:36:57.000Z
+last_sgt     2026-12-30 23:36:57 Asia/Singapore
+matches_tool true
+
+== 6. evidence-file mtimes (armed-row.txt untouched by this task) ==
+2026-11-20 14:40:18.057107745 +0800  603 bytes  .rsi/evidence/harness/armed-row.txt
+2026-11-20 14:45:14.627803239 +0800  1421 bytes  .rsi/evidence/harness/armed-verified.txt
+
+== 7. host store mtime (no schedule write during this task) ==
+2026-11-20 15:36:57.110107818 +0800  /home/fish/.dsh/storages/schedule.json
+
+== 8. schedule_* availability for this session ==
+schedule_list -> {"code":"subagent_session","message":"A delegated subagent cannot use scheduled tasks."}
+(the whole schedule_* family is refused for a delegated subagent: mutation is structurally unavailable, not merely avoided)
+
+== 9. the two probe scripts, verbatim (so this capture is reproducible after /tmp is gone) ==
+--- /tmp/probe-row.mjs ---
+import fs from 'node:fs'
+const j = JSON.parse(fs.readFileSync('/home/fish/.dsh/storages/schedule.json', 'utf8'))
+const id = 'schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab'
+const e = j.tables.tasks[id], rec = e.record, pr = rec.prompt || ''
+const md = fs.readFileSync('.rsi/HEARTBEAT-PROMPT.md', 'utf8')
+const S = '<!-- arm-prompt:start -->', E = '<!-- arm-prompt:end -->'
+const block = md.slice(md.indexOf(S) + S.length, md.indexOf(E)).trim()
+const dh = (e.deliveryHistory && e.deliveryHistory.records) || []
+console.log('row_id            ' + id)
+console.log('title             ' + JSON.stringify(rec.title))
+console.log('kind              ' + rec.kind)
+console.log('rrule             ' + JSON.stringify(rec.rrule))
+console.log('status            ' + e.status)
+console.log('scheduledAt(next) ' + rec.scheduledAt)
+console.log('prompt_len        ' + pr.length)
+console.log('md_block_len      ' + block.length)
+console.log('byteIdentical     ' + (block === pr))
+console.log('legacy_header     ' + /self-iteration round/.test(pr))
+for (const m of ['heartbeat-guard.sh', '--round auto', '--max-rounds 1000', 'top_next']) {
+  console.log('prompt has ' + JSON.stringify(m) + ' = ' + pr.includes(m))
+}
+console.log('prompt first line ' + JSON.stringify(pr.split('\n')[0]))
+console.log('deliveryHistory   ' + dh.length + ' record(s)')
+if (dh.length) {
+  const l = dh[dh.length - 1]
+  console.log('last delivery     deliveredAt=' + l.deliveredAt + ' scheduledAt=' + l.scheduledAt)
+}
+--- /tmp/s5.mjs ---
+import fs from 'node:fs'
+const j = JSON.parse(fs.readFileSync('/home/fish/.dsh/storages/schedule.json', 'utf8'))
+const rec = j.tables.tasks['schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab'].record
+const parts = String(rec.rrule).split('\n')
+const dt = /^DTSTART:(\d{8}T\d{6}Z)$/.exec(parts[0])[1]
+const rr = Object.fromEntries(parts[1].replace(/^RRULE:/, '').split(';').map((kv) => kv.split('=')))
+const iv = Number(rr.INTERVAL), cnt = Number(rr.COUNT)
+const s = Date.UTC(+dt.slice(0,4), +dt.slice(4,6)-1, +dt.slice(6,8), +dt.slice(9,11), +dt.slice(11,13), +dt.slice(13,15))
+const last = s + (cnt - 1) * iv * 60000
+console.log('DTSTART      ' + dt + '  FREQ=' + rr.FREQ + '  INTERVAL=' + iv + '  COUNT=' + cnt)
+console.log('span         ' + (last - s) / 3600000 + ' h = ' + (cnt - 1) + ' x ' + iv + ' min')
+console.log('last_utc     ' + new Date(last).toISOString())
+console.log('last_sgt     ' + new Date(last).toLocaleString('sv-SE', { timeZone: 'Asia/Singapore' }) + ' Asia/Singapore')
+console.log('matches_tool ' + (new Date(last).toISOString() === '2026-12-30T15:36:57.000Z'))

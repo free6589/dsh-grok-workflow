@@ -1,0 +1,155 @@
+ATTEMPT 2 — INDEPENDENT VERIFICATION OF THE RE-ARM STATE
+Captured 2026-11-20T13:42–13:52+08:00 (05:42–05:52Z) by agent-97 (delegated subagent).
+Everything below was measured in this attempt. Nothing here is copied from 00–05, and
+nothing here claims a re-arm happened.
+
+====================================================================
+1. THE ROW, AS IT ACTUALLY STANDS
+====================================================================
+Store: ~/.dsh/storages/schedule.json  (shape: tables.tasks.<id>.record)
+
+  id      schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab
+  title   RSI heartbeat
+  kind    rrule
+  rrule   DTSTART:20261120T010150Z\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=10
+  next    scheduledAt 2026-11-20T06:01:50.000Z
+  5 deliveries on record, every one targeting session-3a683cb6-1eaa-4b33-9eb9-57e1ef0b955b
+
+Byte-identical to the pre-attempt state recorded in 00-heartbeat-row.json. No edit landed
+between attempt 1 and attempt 2. The store holds exactly two tasks; the other is
+schedule-12eadb13-… `派发个人助理灵感箱` (FREQ=DAILY;BYHOUR=9,13,18,22), which drives no RSI
+round and is therefore not a re-arm of this heartbeat.
+
+====================================================================
+2. TIMEZONE-EXPLICIT COVERAGE MATH (Asia/Singapore)
+====================================================================
+Target = the whole of 2026-12-01 in Asia/Singapore. end_of_dec1 = 2026-12-01T23:59:59+08:00
+= 2026-12-01T15:59:59Z. Computed with zoneinfo('Asia/Singapore'), not by hand offset.
+
+  rule as stored        COUNT=10 from 2026-11-20T01:01:50Z
+                        last 2026-11-20T10:01:50Z = 2026-11-20T18:01:50+08:00
+                        covers end of 2026-12-01 SGT?  NO   short by 269.97 h
+
+  chain arm 1           COUNT=100 from 2026-11-20T06:43:07Z  (the planner's default shape)
+                        last 2026-11-24T09:43:07Z = 2026-11-24T17:43:07+08:00
+                        covers end of 2026-12-01 SGT?  NO   short by 174.28 h
+
+  single shape          COUNT=965 from 2026-11-20T06:43:07Z
+                        last 2026-12-30T10:43:07Z = 2026-12-30T18:43:07+08:00
+                        covers end of 2026-12-01 SGT?  YES  margin 690.72 h
+
+  minimum sufficient    COUNT=275 from the same anchor
+                        last 2026-12-01T16:43:07Z = 2026-12-02T00:43:07+08:00  (just past the boundary)
+
+CORRECTION TO ATTEMPT 1's VERIFICATION. The verifier wrote that 05-arm-cross-check.md was
+"stale against the current harness.json" because the default plan prints COUNT=100
+(2026-11-24). That reading ran `iterate-plan.mjs` in its default shape. The file it called
+stale quoted `plan shape=single`, and that output is reproducible right now:
+
+  $ node .rsi/tools/iterate-plan.mjs --shape single
+  plan shape=single total=1000 used=35 remaining=965
+  arm 1/1 rounds=965 rounds_window=36..1000
+  arm 1/1 rrule=DTSTART:20261120T064307Z\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=965
+
+So 05 was accurate and the criticism rested on a different command. The substantive point
+that survives is sharper than either attempt stated: under `harness.json shape=chain` (the
+current default, armCapRounds=100) NO single row can reach 2026-12-01 at all — 100 hourly
+rounds is ~4.2 days. Criterion 1 is satisfiable only through the `single` shape (or any
+hand-set COUNT >= 275). That is the decision the operator has to make, and it is why the
+naive "paste the default plan" handoff in 04/05 would have failed quality on its own.
+
+Anchor derivation, verified in source rather than assumed:
+  .rsi/tools/iterate-plan.mjs:197-200 — rruleFor() sets
+  start = ceil(now/1000)*1000 + intervalMinutes*60_000, i.e. now + 60 min. The first
+  occurrence after an edit is therefore ~1 h after the edit, not immediate.
+
+====================================================================
+3. DELIVERY IS REAL — RE-MEASURED FROM THE HOST-WRITTEN TRANSCRIPT
+====================================================================
+Source of truth (not a report, not the store): the session transcript the Host writes.
+
+  ~/.dsh/sessions/--home-fish-projects_mine-dsh-grok-workflow--/session-3a683cb6-1eaa-4b33-9eb9-57e1ef0b955b/session.v4.jsonl.zstd
+
+  $ zstd -dc <that file> > /tmp/hb-sess.jsonl    # 6190 events
+  selector: type=='user/message' && data.source.kind=='schedule' && 'REMINDER BATCH' in text
+
+  #    occurrence_at (data.source)      event time (relayed)     schedule_id
+  3956 2026-11-20T01:01:50.000Z  2026-11-20T01:02:00.717Z  schedule-0bbbef5f-…
+  4389 2026-11-20T02:01:50.000Z  2026-11-20T02:01:50.091Z  schedule-0bbbef5f-…
+  4484 2026-11-20T03:01:50.000Z  2026-11-20T03:01:50.258Z  schedule-0bbbef5f-…
+  4889 2026-11-20T04:01:50.000Z  2026-11-20T04:01:50.235Z  schedule-0bbbef5f-…
+  5568 2026-11-20T05:01:50.000Z  2026-11-20T05:01:50.080Z  schedule-0bbbef5f-…
+
+The store's deliveryHistory holds the same five occurrences with messageIds 892c091e → 01:01:50Z,
+c5019813 → 02:01:50Z, 2ff80a3c → 03:01:50Z, fd404ffa → 04:01:50Z, ef163f3d → 05:01:50Z. Two
+independent host-written artifacts agree one-for-one. Three further schedule-sourced events
+(lines 2751, 2752, 3884) are change notices, not deliveries.
+
+Scope of this proof, stated plainly: it establishes that a delivery for this row reaches a
+session and is recorded by the Host. All five precede any re-arm. There is no post-re-arm
+delivery to show, because no re-arm exists — criterion 2 is unmet for that reason and no
+other.
+
+Incidental finding, recorded not acted on: the prompt actually delivered at 05:01:50Z is the
+older `# RSI heartbeat — self-iteration round` text, not the current .rsi/HEARTBEAT.md
+template. A row whose prompt predates the template it is supposed to run is a separate defect
+from this task's scope.
+
+====================================================================
+4. THE BLOCKER, RE-CONFIRMED FROM THREE INDEPENDENT ANGLES
+====================================================================
+4.1 Tool policy (measured now, not inherited)
+    schedule_list() → {"code":"subagent_session","message":"A delegated subagent cannot use
+    scheduled tasks."}   Same refusal for the whole schedule_* family. This session is a
+    delegated subagent (agent-97, under lead), so the refusal is scoped to that fact.
+
+4.2 The product's own arm path is user-only (read in source this attempt)
+    src/loop.ts:502   if (actorSessionId !== undefined) {
+    src/loop.ts:504     'loop/user-only',
+    src/loop.ts:505     "a loop heartbeat can be opened only by the user from the composer switch;
+                         an agent cannot open one on the user's behalf"
+    src/loop-surface.ts:149 — the iterate route handler; :217 and :367 refuse `open` as
+    loop/user-only (403). The model-facing `grok_loop` tool documents the same at :188
+    ('open is refused (user-only)'). So all three surfaces — HTTP route, composer switch,
+    model tool — reject an actor-bearing caller by construction.
+
+4.3 There is no config-driven arm to fall back on (checked this attempt, which attempt 1
+    asserted only indirectly)
+    src/index.ts:293-297 — readConfig() feeds policy() at open time; the comment states
+    loopEnabled "stays the deployment default for a future automatic driver". Confirmed by
+    grep: loopEnabled has no server-side consumer outside src/config.ts validation
+    (:964-967, :991) and the client settings UI; nothing arms a row on load.
+    The live profile (/home/fish/.dsh/profiles/web/cordis.patch.yml, grok-workflow block at
+    :555-579) sets loopEnabled: true and mode: full but sets NEITHER loopMaxRounds NOR
+    iterateIntervalMin, so the effective caps are the defaults —
+    src/config.ts:139 DEFAULT_LOOP_MAX_ROUNDS = 10 and the 60-min interval floor — and
+    src/config.ts:992 refuses loopMaxRounds > 100 at load (HARD_LIMITS.loopMaxRounds at
+    src/config.ts:42). A switch flip today would therefore write COUNT=10, i.e. 10 hours,
+    which is worse than the row it replaces.
+
+4.4 What I deliberately did not do
+    I did not write ~/.dsh/storages/schedule.json out of band. That is a writing side-channel
+    around both the tool-policy refusal in 4.1 and the user-only rule in 4.2, AGENTS.md
+    forbids bypassing tool-policy controls, and the Host rewrites the row on every delivery
+    (its `scheduledAt`/deliveryHistory moved five times today), so an out-of-band edit would
+    most likely be clobbered at the next beat anyway. An edit that cannot be shown to stick
+    is not a re-arm.
+
+====================================================================
+5. LEDGER / ROUND STATE (criterion 3)
+====================================================================
+  .rsi/ledger.jsonl      31 rows, max round 35, tail statuses OK/OK/OK, 0 BLOCKED,
+                         0 rows mentioning rearm/re-arm
+  .rsi/ROUND.md          trailing `## Round` section is Round 35 (.rsi/ROUND.md:1072)
+  .rsi/ROUND-036.md      exists (round 36 landed: commits e3be559 code, 13d2273 harness,
+                         aabed51 records) but round 36 has NO ledger row and NO `## Round 36`
+                         section in ROUND.md — see the collision note in 07.
+
+  $ .rsi/tools/heartbeat-guard.sh --round 37 --max-rounds 1000
+  RESUME code=none next_round=37 threshold=3 max_rounds=1000 blocked_streak=0
+  round_max=35 ledger_max=35 dirty_tracked=0 report_open=0 exit 0
+
+So the gate would authorise a round now (the tree went clean when round 36 landed; it was
+`SKIP code=dirty-tracked` during attempt 1). It authorises a round, not an arming: no ledger
+row, tag or CI reference can honestly be written for a re-arm that did not happen, and I
+wrote none. Criterion 3 is unmet, and the honest record of why is this file.

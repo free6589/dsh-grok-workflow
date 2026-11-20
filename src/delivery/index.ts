@@ -171,10 +171,28 @@ export function diagnosticsEnabled(value?: DiagnosticsSwitch): boolean {
   }
 }
 
+/**
+ * Cut `text` to at most `max` UTF-16 code units without splitting a character.
+ *
+ * `String#slice` counts code units, so a cut that lands between the two halves of
+ * an astral character (an emoji in a task title, a rare CJK ideograph) leaves a
+ * lone surrogate behind, which renders as a replacement box. Every human-block
+ * clamp cuts through here for that reason. The ledger's own {@link MAX_LEDGER_CHARS}
+ * clamp does not, and is pooled: reaching 8,000 characters needs a report this
+ * validator cannot produce, so there is no measured shape to pin it with yet.
+ */
+function cutCodeUnits(text: string, max: number): string {
+  if (max <= 0) return ''
+  if (text.length <= max) return text
+  const last = text.charCodeAt(max - 1)
+  const end = last >= 0xD800 && last <= 0xDBFF ? max - 1 : max
+  return text.slice(0, end)
+}
+
 /** Collapse whitespace and clamp one value to a single bounded line. */
 function oneLine(text: string, max: number): string {
   const flat = text.replace(/\s+/g, ' ').trim()
-  return flat.length <= max ? flat : `${flat.slice(0, Math.max(0, max - 1))}…`
+  return flat.length <= max ? flat : `${cutCodeUnits(flat, Math.max(0, max - 1))}…`
 }
 
 /** Escape a literal for a regular expression. */
@@ -500,7 +518,7 @@ function nextStep(report: WorkflowReport, lang: DeliveryLang): string {
 }
 
 /**
- * Build the plain-language block for one settled run.
+ * Compose the block for one language, before the char bound is applied.
  *
  * Order is deliberate: the run's own answer first, then the advice/next step
  * in the run's original wording, then what was and was not achieved, then the
@@ -509,9 +527,9 @@ function nextStep(report: WorkflowReport, lang: DeliveryLang): string {
  *
  * @param report - validated report (or an explicit failure report).
  * @param lang - language this pass is written in.
- * @returns the human block, bounded by {@link MAX_HUMAN_CHARS}.
+ * @returns the composed block and the verdict tail it ends with.
  */
-function composeHuman(report: WorkflowReport, lang: DeliveryLang): string {
+function composeHumanParts(report: WorkflowReport, lang: DeliveryLang): { block: string, tail: string } {
   const zh = lang === 'zh'
   const verifiedTasks = report.tasks.filter(task => task.status === 'verified')
   const verified = verifiedTasks.length
@@ -586,17 +604,75 @@ function composeHuman(report: WorkflowReport, lang: DeliveryLang): string {
   const tail = statusTail(report, verified, total, lang)
   push(tail)
 
-  const block = stripIds(composeBlock(lines), report)
-  if (block.length <= MAX_HUMAN_CHARS) return block
-  // Round 36: the old tail-cut dropped the verdict line (and, in bilingual
-  // delivery, the whole second language): the reader never learned the count.
-  // Keep the head (the answer) and the tail (the verdict) and cut the middle.
+  return { block: stripIds(composeBlock(lines), report), tail }
+}
+
+/**
+ * Bound one composed block to `cap` characters, keeping both ends a reader needs.
+ *
+ * The head line is the answer and the tail is the verdict, and the count appears
+ * nowhere else in the delivery — so both are kept and the middle is what gets
+ * cut (round 36). Three details decide the shape of that cut (round 37):
+ *
+ * - The tail is reserved first. The verdict is unrecoverable from anywhere else,
+ *   so when the cap cannot hold it beside the head, the head is what shrinks.
+ * - The middle ends on a line break when its window carries one, so no line is
+ *   handed over half-written. Every line this block is built from is bounded by
+ *   {@link oneLine}, so reaching a break costs at most one bounded line.
+ * - `…` marks the junction, so a reader can tell text is missing instead of
+ *   reading a stitched-together sentence.
+ *
+ * @param block - composed block, possibly over `cap`.
+ * @param tail - the verdict tail the block ends with.
+ * @param cap - maximum length in UTF-16 code units.
+ * @returns the block, at most `cap` characters.
+ */
+function clampHumanBlock(block: string, tail: string, cap: number): string {
+  if (block.length <= cap) return block
+  const keepTail = `…\n${tail}`
+  // A cap too small for the whole verdict still gets as much of it as fits:
+  // dropping it would leave a summary with no conclusion at all.
+  if (keepTail.length >= cap) return `${cutCodeUnits(tail, cap - 1)}…`
   const head = block.split('\n')[0] ?? ''
-  const keepTail = block.endsWith(tail) ? `\n${tail}` : `…\n${tail}`
-  const budget = MAX_HUMAN_CHARS - 1 - head.length - keepTail.length
-  if (budget <= 0) return `${head.slice(0, MAX_HUMAN_CHARS - 1)}…`
-  const middle = block.slice(head.length, head.length + budget)
-  return `${head}${middle}${keepTail}`
+  const room = cap - keepTail.length
+  const headKeep = cutCodeUnits(head, room)
+  const rest = room - headKeep.length
+  if (rest <= 0) return `${headKeep}${keepTail}`
+  const window = block.slice(head.length, head.length + rest)
+  const brk = window.lastIndexOf('\n')
+  const middle = brk >= 0 ? window.slice(0, brk + 1) : cutCodeUnits(window, rest)
+  return `${headKeep}${middle}${keepTail}`
+}
+
+/**
+ * Split one bilingual pair's character budget between its two blocks.
+ *
+ * Round 36 bounded the pair as `both.length <= cap ? both : slice(0, cap - 1) +
+ * '…'` — a blind cut of the concatenation. One block at the single-pass cap plus
+ * one at `cap - 1` plus the two-character separator is 4801, one over the 4800
+ * cap, and that cut ate the last characters of the *second* language's verdict
+ * (`明细已记入台…`) — the language the mirror exists to serve. Both blocks are
+ * whole deliveries: each carries a head and a verdict, and the verdict appears
+ * nowhere else. So the budget is halved and then topped up from whatever the
+ * shorter block does not need, and no block can be left with nothing.
+ *
+ * Exported because the arithmetic is what failed and it is worth pinning with
+ * the incident's own numbers; {@link humanConclusion} is the only caller.
+ *
+ * @param firstLen - composed length of the first block.
+ * @param secondLen - composed length of the second block.
+ * @param budget - characters available to both blocks, separator excluded.
+ * @returns the caps, in call order; they never sum past `budget`.
+ */
+export function pairCaps(firstLen: number, secondLen: number, budget: number): [number, number] {
+  const room = Math.max(0, budget)
+  let first = Math.min(firstLen, Math.floor(room / 2))
+  let second = Math.min(secondLen, room - first)
+  const slack = room - first - second
+  const toFirst = Math.min(slack, firstLen - first)
+  first += toFirst
+  second += Math.min(slack - toFirst, secondLen - second)
+  return [first, second]
 }
 
 /**
@@ -616,12 +692,79 @@ export function humanConclusion(
   opts: { lang?: DeliveryLang, bilingual?: boolean } = {},
 ): string {
   const lang: DeliveryLang = opts.lang ?? 'zh'
-  if (opts.bilingual !== true) return composeHuman(report, lang)
-  const first = composeHuman(report, lang)
-  const second = composeHuman(report, lang === 'zh' ? 'en' : 'zh')
-  const both = second === '' ? first : `${first}\n\n${second}`
-  const cap = MAX_HUMAN_CHARS * 2
-  return both.length <= cap ? both : `${both.slice(0, cap - 1)}…`
+  const first = composeHumanParts(report, lang)
+  const firstBlock = clampHumanBlock(first.block, first.tail, MAX_HUMAN_CHARS)
+  if (opts.bilingual !== true) return firstBlock
+  const second = composeHumanParts(report, lang === 'zh' ? 'en' : 'zh')
+  const secondBlock = clampHumanBlock(second.block, second.tail, MAX_HUMAN_CHARS)
+  if (secondBlock === '') return firstBlock
+  const separator = '\n\n'
+  // Round 37: the pair is bounded by splitting the budget between the two blocks
+  // ({@link pairCaps}) instead of cutting the concatenation, so only middle text
+  // can go and every block keeps its head and its verdict. {@link clampHumanBlock}
+  // already keeps a single block inside the single-pass cap, so a block is only
+  // cut twice when the two of them together genuinely overflow.
+  const budget = MAX_HUMAN_CHARS * 2 - separator.length
+  const [firstCap, secondCap] = pairCaps(firstBlock.length, secondBlock.length, budget)
+  const left = clampHumanBlock(firstBlock, first.tail, firstCap)
+  const right = clampHumanBlock(secondBlock, second.tail, secondCap)
+  return `${left}${separator}${right}`
+}
+
+/** The five routed roles, in the order `src/report.ts` renders them. */
+const ROUTE_ROLES = ['planner', 'worker', 'verifier', 'supervisor', 'synthesizer'] as const
+
+/**
+ * Name a value's shape for a refusal.
+ *
+ * `typeof` is enough for everything except the two shapes it misnames: `null` is
+ * `object`, and an array is `object` too — neither tells an operator what to fix.
+ */
+function gotType(value: unknown): string {
+  if (value === null) return 'null'
+  if (Array.isArray(value)) return 'array'
+  return typeof value
+}
+
+/**
+ * Read the per-role chains the ledger prints, refusing anything but `provider/model` labels.
+ *
+ * The routing map is report data, and the ledger used to hand it straight to
+ * `Array#join`: a number, a boolean or a `null` in a chain was coerced into the
+ * line (`worker=a/m1 → 7 → `), and a chain that was not an array at all threw a
+ * bare `TypeError: chain.join is not a function` out of the ledger, naming neither
+ * the role nor the position. Both are the same defect as a truncated block: the
+ * reader is handed text that describes something other than what ran. The route
+ * line is the one place a *configuration* is restated, and an operator debugging a
+ * fallback reads it as the truth about which chain was in force, so every entry is
+ * checked and the refusal carries its path (`roles.worker[1]`) and the shape found.
+ *
+ * An absent or `null` chain means "inherit", matching `routeLabels` in
+ * `src/report.ts`; roles are read in report order so the line cannot drift.
+ *
+ * @param routing - the report's `routing` map, as data.
+ * @returns role and chain pairs, in report order.
+ * @throws Error when the map, a chain or a route label is not the expected shape.
+ */
+function routeChains(routing: unknown): [string, string[]][] {
+  if (typeof routing !== 'object' || routing === null || Array.isArray(routing)) {
+    throw new Error(`delivery: roles must be a record of per-role chains, got ${gotType(routing)}`)
+  }
+  const map = routing as Record<string, unknown>
+  return ROUTE_ROLES.map((role): [string, string[]] => {
+    const path = `roles.${role}`
+    const chain = map[role]
+    if (chain === undefined || chain === null) return [role, []]
+    if (!Array.isArray(chain)) {
+      throw new Error(`delivery: ${path} must be an array of "provider/model" strings, got ${gotType(chain)}`)
+    }
+    return [role, chain.map((entry, index) => {
+      if (typeof entry !== 'string') {
+        throw new Error(`delivery: ${path}[${index}] must be a "provider/model" string, got ${gotType(entry)}`)
+      }
+      return entry
+    })]
+  })
 }
 
 /** Count failures per category, so the ledger separates "provider down" from "work short". */
@@ -709,8 +852,9 @@ export function machineLedger(report: WorkflowReport): string {
   // Five routed roles, in report order (`src/report.ts` `ROLE_NAMES`): a run
   // configured with a supervisor chain must name it the same way `renderReport`
   // does, or the ledger reads "no supervision" for a supervised run (R8-ledger).
-  const configured = (['planner', 'worker', 'verifier', 'supervisor', 'synthesizer'] as const)
-    .map(role => [role, report.routing[role]] as const)
+  // The chains are checked first (round 40): a coerced route reads as a chain that
+  // was never configured, and a non-array chain used to escape as a bare TypeError.
+  const configured = routeChains(report.routing)
   lines.push(`Model routes: ${configured.map(([role, chain]) => `${role}=${chain.length === 0 ? 'inherit' : chain.join(' → ')}`).join('; ')}`)
   if (report.limits.timeoutMs !== undefined) {
     lines.push(`Deadline: ${report.limits.timeoutMs} ms per run (enforced by the plugin)`)
@@ -759,7 +903,18 @@ export function deliverReport(report: WorkflowReport, opts: DeliveryOptions = {}
   // `DeliveryOptions` is a superset of what the block composer reads, so it is
   // handed over as is rather than rebuilt into a second options object.
   const human = humanConclusion(report, opts)
-  const ledger = diagnostics ? machineLedger(report) : undefined
+  // The ledger is diagnostics: a report whose routing cannot be rendered must still
+  // deliver the answer, so a refused chain drops the ledger here instead of escaping
+  // as a thrown delivery. `src/answer.ts` `foldedLedger` makes the same call on the
+  // relay path; this is the layer a direct caller of `deliverReport` sees.
+  let ledger: string | undefined
+  if (diagnostics) {
+    try {
+      ledger = machineLedger(report)
+    } catch {
+      ledger = undefined
+    }
+  }
   const text = ledger === undefined ? human : `${human}\n\n${LEDGER_RULE}\n\n${ledger}`
   return {
     diagnostics,

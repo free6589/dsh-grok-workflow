@@ -1,0 +1,217 @@
+# Read-only end-state verification of the armed heartbeat row — round 39
+# captured 2026-11-20T18:15:35+08:00 / 2026-11-20T10:15:35Z
+# commit 366d169 (HEAD == origin/main per `git status --short --branch`)
+# task: harness_verify — verify row end-state WITHOUT MUTATION
+# verdict: FAIL on the ARMED criterion. The row is well-formed, covers the calendar (through
+#          2026-12-30), and carries the harness prompt byte-for-byte — but it is 2 occurrences
+#          short of ARMED by the tool's own arithmetic, so `--verify-row` exits 21 (NOT_ARMED).
+#          No mutation was performed to repair it (out of scope by constraint).
+
+== 0. Read-only guarantee ==
+
+Commands executed by this task (all reads; no schedule_edit / schedule_create / tag / commit):
+
+  node .rsi/tools/iterate-plan.mjs --verify-row
+  node .rsi/tools/iterate-plan.mjs --verify-row --json
+  node .rsi/tools/iterate-plan.mjs --arm-spec
+  node -e '<read-only probe of ~/.dsh/storages/schedule.json>'
+  node -e '<arithmetic recomputation from DTSTART/COUNT>'
+  git status --short --branch ; git log --oneline -3
+
+Host schedule store, hashed before and after the run:
+
+  path      /home/fish/.dsh/storages/schedule.json
+  mtime     2026-11-20T10:00:00.130Z   (before first probe AND after last probe — unchanged)
+  bytes     52946
+  sha256    1ba1f85e2133edf7807cd1cc5b61a15508034b16e1aafe0c19d7c3b6b409646a   (identical both times)
+
+The store mtime (10:00:00Z) precedes this task's first tool call (10:14Z), and the hash is
+identical at the start and end of the run: nothing in the task wrote to the schedule store.
+
+git status before and after this task is identical (3 tracked modifications and the untracked
+evidence/test files were already present, none authored here):
+
+  ## main...origin/main
+   M src/checkpoint/schema.ts
+   M src/delivery/index.ts
+   M test/delivery-human-block.spec.ts
+  ?? .rsi/evidence/baseline-round39-attempt2.md          (pre-existing)
+  ?? .rsi/evidence/baseline-round39.md                   (pre-existing)
+  ?? .rsi/evidence/checkpoint-comment-fix.md             (pre-existing)
+  ?? .rsi/evidence/ci-health-round39.md                  (pre-existing)
+  ?? .rsi/evidence/delivery-bilingual-edge.md            (pre-existing)
+  ?? .rsi/evidence/harness/verify-round39-armed-row-refresh.txt (pre-existing)
+  ?? .rsi/evidence/harness/verify-round39-live.txt       (pre-existing)
+  ?? .rsi/evidence/harness/verify-round39.md             (pre-existing)
+  ?? .rsi/evidence/heartbeat-rearm/05-arm-cross-check.md (pre-existing)
+  ?? .rsi/evidence/heartbeat-rearm/06-attempt2-verification.txt (pre-existing)
+  ?? .rsi/evidence/heartbeat-rearm/07-handoff-one-call.md (pre-existing)
+  ?? .rsi/evidence/runtime-audit-2026-11-20.md           (pre-existing)
+  ?? .rsi/evidence/triage-round39.md                     (pre-existing)
+  ?? test/checkpoint-bound.spec.ts                       (pre-existing)
+  ?? test/config-chain-types.spec.ts                     (pre-existing)
+
+The only file this task created is the evidence file you are reading
+(.rsi/evidence/harness/verify-row-endstate-round39.txt). It is not committed.
+
+== 1. `--verify-row` — verbatim output, exit code 21 ==
+
+$ node .rsi/tools/iterate-plan.mjs --verify-row ; echo EXIT=$?
+verify status=NOT_ARMED title="RSI heartbeat" remaining=962
+verify row=schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab COUNT=969 delivered=9 covered=960 last=2026-12-30T15:36:57.000Z
+verify check title ok: row schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab carries the slot title
+verify check rule-parsed ok: COUNT=969, INTERVAL=60
+verify check within-row-maximum ok: COUNT=969 vs row maximum 1000
+verify check covers-remaining-budget FAIL: 960 round(s) left in the row (COUNT 969 - 9 delivered) vs 962 remaining
+verify check has-a-future-occurrence ok: last occurrence 2026-12-30T15:36:57.000Z vs now 2026-11-20T10:14:21.812Z
+verify store=/home/fish/.dsh/storages/schedule.json
+verify detail=row schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab does not cover the 962 rounds left: covers-remaining-budget
+verify next: node .rsi/tools/iterate-plan.mjs --arm-spec --json   (then the one schedule call it names)
+EXIT=21
+
+Per the tool's own documented exit table (header of .rsi/tools/iterate-plan.mjs):
+
+  0   plan printed, budget open (or: `--verify-row` found the harness ARMED)
+  21  `--verify-row` found the harness NOT_ARMED (nobody is going to deliver the rounds)
+  22  `--verify-row` could not read the store
+
+So this run is exit 21 → status NOT_ARMED. The acceptance criterion "exits 0 with status ARMED in
+this run" is NOT met. The machine-readable form agrees:
+
+  status=NOT_ARMED covered=960 remaining=962
+  checks=title:ok,rule-parsed:ok,within-row-maximum:ok,covers-remaining-budget:FAIL,has-a-future-occurrence:ok
+  detail=row schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab does not cover the 962 rounds left: covers-remaining-budget
+
+== 2. Covered vs remaining, independently recomputed ==
+
+Tool numbers: COUNT=969, delivered=9 → covered = 969 − 9 = 960; remaining = 962.
+Recomputed from the stored rule (DTSTART 20261120T073657Z, FREQ=MINUTELY, INTERVAL=60, COUNT=969),
+without trusting the tool's own subtraction:
+
+  COUNT=969  last=2026-12-30T15:36:57.000Z  covered_at_delivered9=960
+  COUNT=970  last=2026-12-30T16:36:57.000Z  covered_at_delivered9=961
+  COUNT=971  last=2026-12-30T17:36:57.000Z  covered_at_delivered9=962
+  COUNT=972  last=2026-12-30T18:36:57.000Z  covered_at_delivered9=963
+  needed COUNT (delivered 9 + remaining 962) = 971
+
+covered(960) != remaining(962): short by 2. Needs COUNT=971 to balance, still <= the row
+maximum of 1000.
+
+Other arithmetic facts that DO hold:
+  - last occurrence 2026-12-30T15:36:57Z  >= 2026-12-01  ✓ (30 days of margin)
+  - COUNT 969 <= row maximum 1000        ✓
+  - next occurrence 2026-11-20T10:36:57Z (row.status=active, so deliveries continue)  ✓
+
+Why it drifted since the last green check (prior evidence
+.rsi/evidence/harness/verify-round39-live.txt, captured 08:32Z, status=ARMED, delivered=7,
+covered=962, remaining=962): the row has since delivered twice more (deliveryHistory 7 → 9, last
+deliveredAt 2026-11-20T09:36:57.106Z) while the ledger stayed at round 38 / used=38, i.e. remaining
+did not fall. A delivered occurrence that opens no round (the guard's SKIP path) burns one
+occurrence out of COUNT without consuming a round, so a COUNT sized exactly to `remaining`
+decays to NOT_ARMED on its own. That is the whole of the deficit: 2 skip deliveries after 08:32Z.
+
+Do NOT read this as "the row is dead": 960 of the 962 remaining rounds still have a future
+occurrence. The single failing check is coverage arithmetic, and it is repairable by one operator
+rrule edit (see §5) — deliberately not performed here.
+
+== 3. Row prompt markers — checked read-only, prompt text never printed ==
+
+Probe source: ~/.dsh/storages/schedule.json → tables.tasks["schedule-0bbbef5f-..."].record.prompt.
+Only booleans, lengths, hashes and the 4 command lines are reproduced; the rest of the prompt body
+is not echoed into this file.
+
+  prompt_chars        2319
+  prompt_sha256       1e4b66af46a5e58fab6cba54500ccc4707beada5a9e68f4d4bf751dbf3b53fe2
+  md_block_chars      2319   (.rsi/HEARTBEAT-PROMPT.md text between <!-- arm-prompt:start/end -->)
+  byte_identical      true   (row prompt === canonical arm block, same sha256)
+  crlf_present        false
+  prompt_lines        41
+
+  marker "heartbeat-guard.sh"          PRESENT
+  marker "--round auto"                PRESENT
+  marker "--max-rounds 1000"           PRESENT
+  marker ".rsi/HEARTBEAT.md"           PRESENT   (harness contract reference)
+  marker ".rsi/tools/iterate-plan.mjs" PRESENT   (harness tool reference)
+  marker "--arm-spec"                  PRESENT
+  marker ".rsi/PROTOCOL.md"            PRESENT
+  marker "AGENTS.md"                   PRESENT
+  marker "top_next"                    PRESENT
+  marker "harness" (literal word)      ABSENT
+
+The four command/reference lines the prompt carries (quoted exactly, these are repo paths and
+argv, not secrets):
+
+  L9:  .rsi/tools/heartbeat-guard.sh --round auto --max-rounds 1000 --record
+  L28: `node .rsi/tools/iterate-plan.mjs --pool` names as `top_next`. Never re-rank the file.
+  L31: 4. `npm run ci` must exit 0 (`verify:lib` included; rebuild `lib/` when `src/` changed).
+  L38: - Do not arm, extend or delete the heartbeat row: `.rsi/tools/iterate-plan.mjs --arm-spec` prints
+
+Reading of the criterion "harness reference": the prompt is byte-identical to the harness arm block
+in .rsi/HEARTBEAT-PROMPT.md and references the harness contract (.rsi/HEARTBEAT.md), the harness
+planner (.rsi/tools/iterate-plan.mjs --arm-spec / --pool) and .rsi/PROTOCOL.md, so the "harness
+reference" clause holds in substance. It does NOT contain the literal string "harness" — that word
+appears only in the commentary outside the arm-prompt markers (HEARTBEAT-PROMPT.md:5,9). Flagged
+rather than smoothed over, in case the criterion was meant literally.
+
+Also confirmed: prompt_chars reported by `--arm-spec` (2319/4000 fits=yes) matches the row's stored
+prompt length exactly, and the arm-spec output is:
+
+$ node .rsi/tools/iterate-plan.mjs --arm-spec ; echo EXIT=$?
+arm-spec status=OPEN title="RSI heartbeat" mode=edit id=schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab
+arm-spec rounds=962 window=39..1000 interval=60 remaining=962 used=38
+arm-spec rrule=DTSTART:20261120T111423Z\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=962
+arm-spec prompt=.rsi/HEARTBEAT-PROMPT.md chars=2319/4000 fits=yes
+arm-spec live-row=schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab COUNT=969 delivered=9
+arm-spec next: row schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab carries the slot title with COUNT covering 9 delivered occurrence(s); edit its rrule to the one above, keep the title and prompt
+EXIT=0
+
+Note the discrepancy this exposes: `--verify-row` said remaining=962 while `--arm-spec` (a few
+seconds later, its own rrule derived from the live clock) also says remaining=962 but proposes
+COUNT=962 with a fresh DTSTART — i.e. a re-anchor to "now" would make covered=962=remaining and
+turn the row ARMED. The stored rule (COUNT=969 anchored 07:36:57Z) cannot, because 9 occurrences
+are already spent.
+
+== 4. Row fields as read (no field touched) ==
+
+  id           schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab
+  title        "RSI heartbeat"
+  kind         rrule
+  status       active
+  rrule        DTSTART:20261120T073657Z \n RRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=969
+  updatedAt    2026-11-20T09:36:57.215Z
+  scheduledAt  2026-11-20T10:36:57.000Z  (next occurrence, still future)
+  deliveries   9 records in deliveryHistory.records, last deliveredAt 2026-11-20T09:36:57.106Z
+  ledger       .rsi/ledger.jsonl has 34 lines, highest round 38 → plan used=38, remaining=962
+
+== 5. What the fix would be (described, NOT executed) ==
+
+Constraint: no schedule_edit / schedule_create by this task. The one call `--arm-spec` names is an
+edit of this row's rrule to `DTSTART:20261120T111423Z` + `FREQ=MINUTELY;INTERVAL=60;COUNT=962`,
+keeping title and prompt; equivalently, keeping the current DTSTART and raising COUNT to 971 would
+also satisfy every check. Either is an operator/arming decision (HEARTBEAT-PROMPT.md:49-50, D-066,
+D-093: "arming stays the operator's"), so it is left undone and reported instead.
+
+A durable observation for the pool, not fixed here: a COUNT provisioned exactly equal to
+`remaining` is strictly consumed by any skip delivery, so an exactly-balanced row drifts to
+NOT_ARMED without anyone editing it. Provisioning a small surplus (or having the verify step run
+right after arming rather than hours later) would avoid a false "armed" state that decays between
+verifications.
+
+== 6. Criterion-by-criterion ==
+
+  [FAIL] `--verify-row` exits 0 with status ARMED in this run
+         → exit 21, status=NOT_ARMED (checks: covers-remaining-budget FAIL, 960 < 962). §1, §2.
+  [PASS] covered vs remaining and coverage window quoted
+         → covered=960 vs remaining=962 (NOT equal); last 2026-12-30T15:36:57Z >= 2026-12-01;
+           COUNT 969 <= row maximum 1000. §1, §2. (Equality clause therefore FAILS; window and
+           bound PASS.)
+  [PASS] prompt contains heartbeat-guard.sh, --round auto, --max-rounds 1000 and a harness
+         reference, verified without mutating the row
+         → all PRESENT, byte-identical to the canonical arm block; literal word "harness" absent,
+           flagged. §3.
+  [PASS] no schedule_edit / schedule_create / tag / source edit performed
+         → store sha256 and mtime identical before/after; git status unchanged; the only write is
+           this evidence file. §0.
+
+Bottom line: prompt end-state CONFIRMED; rrule/coverage end-state NOT CONFIRMED as ARMED — the row
+is 2 occurrences short, and fixing it needs an arming call this task is forbidden to make.

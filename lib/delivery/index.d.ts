@@ -81,6 +81,27 @@ export declare function dedupeBilingual(text: string, lang: DeliveryLang): strin
 /** The run's own answer, first: one plain half-sentence that stands on its own. */
 export declare function answerLead(report: WorkflowReport, lang: DeliveryLang): string;
 /**
+ * Split one bilingual pair's character budget between its two blocks.
+ *
+ * Round 36 bounded the pair as `both.length <= cap ? both : slice(0, cap - 1) +
+ * '…'` — a blind cut of the concatenation. One block at the single-pass cap plus
+ * one at `cap - 1` plus the two-character separator is 4801, one over the 4800
+ * cap, and that cut ate the last characters of the *second* language's verdict
+ * (`明细已记入台…`) — the language the mirror exists to serve. Both blocks are
+ * whole deliveries: each carries a head and a verdict, and the verdict appears
+ * nowhere else. So the budget is halved and then topped up from whatever the
+ * shorter block does not need, and no block can be left with nothing.
+ *
+ * Exported because the arithmetic is what failed and it is worth pinning with
+ * the incident's own numbers; {@link humanConclusion} is the only caller.
+ *
+ * @param firstLen - composed length of the first block.
+ * @param secondLen - composed length of the second block.
+ * @param budget - characters available to both blocks, separator excluded.
+ * @returns the caps, in call order; they never sum past `budget`.
+ */
+export declare function pairCaps(firstLen: number, secondLen: number, budget: number): [number, number];
+/**
  * Build the plain-language block for one settled run.
  *
  * One pass per language, in the order the reader is most likely to read: `lang`

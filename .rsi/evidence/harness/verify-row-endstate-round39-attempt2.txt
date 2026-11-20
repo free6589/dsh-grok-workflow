@@ -1,0 +1,234 @@
+# harness row end-state verification — attempt 2 (read-only, no mutation)
+# generated 2026-11-20T10:30:22Z / 2026-11-20T18:30:22+0800
+# cwd /home/fish/projects_mine/dsh-grok-workflow  HEAD 366d169
+
+== 0a. store fingerprint BEFORE this attempt's probes ==
+sha256_before 1ba1f85e2133edf7807cd1cc5b61a15508034b16e1aafe0c19d7c3b6b409646a
+mtime_before  2026-11-20 18:00:00.130476535 +0800  size 52946
+
+== 1. node .rsi/tools/iterate-plan.mjs --verify-row ==
+verify status=NOT_ARMED title="RSI heartbeat" remaining=962
+verify row=schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab COUNT=969 delivered=9 covered=960 last=2026-12-30T15:36:57.000Z
+verify check title ok: row schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab carries the slot title
+verify check rule-parsed ok: COUNT=969, INTERVAL=60
+verify check within-row-maximum ok: COUNT=969 vs row maximum 1000
+verify check covers-remaining-budget FAIL: 960 round(s) left in the row (COUNT 969 - 9 delivered) vs 962 remaining
+verify check has-a-future-occurrence ok: last occurrence 2026-12-30T15:36:57.000Z vs now 2026-11-20T10:30:22.548Z
+verify store=/home/fish/.dsh/storages/schedule.json
+verify detail=row schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab does not cover the 962 rounds left: covers-remaining-budget
+verify next: node .rsi/tools/iterate-plan.mjs --arm-spec --json   (then the one schedule call it names)
+VERIFY_EXIT=21
+
+== 2. node .rsi/tools/iterate-plan.mjs --verify-row --json ==
+{
+  "kind": "rsi-arm-verify",
+  "status": "NOT_ARMED",
+  "title": "RSI heartbeat",
+  "storePath": "/home/fish/.dsh/storages/schedule.json",
+  "row": {
+    "id": "schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab",
+    "title": "RSI heartbeat",
+    "rrule": "DTSTART:20261120T073657Z\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=969",
+    "scheduledAt": "2026-11-20T10:36:57.000Z",
+    "promptChars": 2319,
+    "deliveries": 9
+  },
+  "covered": 960,
+  "remaining": 962,
+  "checks": [
+    {
+      "name": "title",
+      "ok": true,
+      "detail": "row schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab carries the slot title"
+    },
+    {
+      "name": "rule-parsed",
+      "ok": true,
+      "detail": "COUNT=969, INTERVAL=60"
+    },
+    {
+      "name": "within-row-maximum",
+      "ok": true,
+      "detail": "COUNT=969 vs row maximum 1000"
+    },
+    {
+      "name": "covers-remaining-budget",
+      "ok": false,
+      "detail": "960 round(s) left in the row (COUNT 969 - 9 delivered) vs 962 remaining"
+    },
+    {
+      "name": "has-a-future-occurrence",
+      "ok": true,
+      "detail": "last occurrence 2026-12-30T15:36:57.000Z vs now 2026-11-20T10:30:25.989Z"
+    }
+  ],
+  "detail": "row schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab does not cover the 962 rounds left: covers-remaining-budget"
+}
+JSON_EXIT=21
+
+== 3. node .rsi/tools/iterate-plan.mjs --arm-spec (prompt char budget) ==
+arm-spec status=OPEN title="RSI heartbeat" mode=edit id=schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab
+arm-spec rounds=962 window=39..1000 interval=60 remaining=962 used=38
+arm-spec rrule=DTSTART:20261120T113027Z\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=962
+arm-spec prompt=.rsi/HEARTBEAT-PROMPT.md chars=2319/4000 fits=yes
+arm-spec live-row=schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab COUNT=969 delivered=9
+arm-spec next: row schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab carries the slot title with COUNT covering 9 delivered occurrence(s); edit its rrule to the one above, keep the title and prompt
+ARM_EXIT=0
+
+== 4. independent arithmetic (no tool code reused) ==
+anchor                        2026-11-20T07:36:57.000Z
+COUNT                         969  INTERVAL 60 min
+lastOccurrence                2026-12-30T15:36:57.000Z
+occurrencesOfThisAnchorDue    3
+futureOccurrencesThisAnchor   966
+toolCovered (COUNT - 9 hist)  960
+remainingRounds (1000 - 38)   962
+deficitUnderToolRule          2
+neededCOUNTForToolGate        971
+armSpecProposalCovered        953  (COUNT 962 minus the same 9 history rows)
+
+== 5. row prompt end-state (read-only probe; prompt text never printed) ==
+rowTitle       "RSI heartbeat"  status active
+rrule          "DTSTART:20261120T073657Z\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=969"
+scheduledAt    2026-11-20T10:36:57.000Z  record.updatedAt 2026-11-20T09:36:57.215Z
+promptChars    2319  lines 41
+promptSha256   1e4b66af46a5e58fab6cba54500ccc4707beada5a9e68f4d4bf751dbf3b53fe2
+armBlockChars  2319  sha256 1e4b66af46a5e58fab6cba54500ccc4707beada5a9e68f4d4bf751dbf3b53fe2
+byteIdenticalToArmBlock true
+marker "heartbeat-guard.sh" true
+marker "--round auto" true
+marker "--max-rounds 1000" true
+marker ".rsi/HEARTBEAT.md" true
+marker ".rsi/tools/iterate-plan.mjs" true
+marker ".rsi/PROTOCOL.md" true
+marker "AGENTS.md" true
+marker "harness" false
+  L9 ".rsi/tools/heartbeat-guard.sh --round auto --max-rounds 1000 --record"
+  L17 "- `STOP` — open no round. Print the stop summary from `.rsi/HEARTBEAT.md` step 5 and end."
+  L19 "## Steps 1–5 — follow `.rsi/HEARTBEAT.md`"
+  L22 "one theme only, `.rsi/PROTOCOL.md` steps 1–6, then the round report). In short:"
+  L28 "`node .rsi/tools/iterate-plan.mjs --pool` names as `top_next`. Never re-rank the file."
+  L38 "- Do not arm, extend or delete the heartbeat row: `.rsi/tools/iterate-plan.mjs --arm-spec` prints"
+  L40 "- Concurrency default 10 / hard max 100; retries default 1 / hard max 3 (`AGENTS.md`)."
+
+== 6. delivery history of the row (read-only; timestamps only) ==
+records 9 earlierRecordsPruned false earlierRecordsUnavailable false
+  #1 scheduledAt 2026-11-20T01:01:50.000Z deliveredAt 2026-11-20T01:02:00.707Z
+  #2 scheduledAt 2026-11-20T02:01:50.000Z deliveredAt 2026-11-20T02:01:50.081Z
+  #3 scheduledAt 2026-11-20T03:01:50.000Z deliveredAt 2026-11-20T03:01:50.247Z
+  #4 scheduledAt 2026-11-20T04:01:50.000Z deliveredAt 2026-11-20T04:01:50.157Z
+  #5 scheduledAt 2026-11-20T05:01:50.000Z deliveredAt 2026-11-20T05:01:50.070Z
+  #6 scheduledAt 2026-11-20T06:01:50.000Z deliveredAt 2026-11-20T06:01:50.285Z
+  #7 scheduledAt 2026-11-20T07:36:57.000Z deliveredAt 2026-11-20T07:36:57.106Z
+  #8 scheduledAt 2026-11-20T08:36:57.000Z deliveredAt 2026-11-20T08:36:57.049Z
+  #9 scheduledAt 2026-11-20T09:36:57.000Z deliveredAt 2026-11-20T09:36:57.215Z
+lastDelivery {"scheduledAt":"2026-11-20T09:36:57.000Z","deliveredAt":"2026-11-20T09:36:57.215Z","messageId":"d8671d9c-96af-4bc9-8fd7-879872c35723","targetSessionId":"session-3a683cb6-1eaa-4b33-9eb9-57e1ef0b955b"}
+createdAt 2026-11-20T00:01:49.999Z
+note: #1-#6 carry scheduledAt at the :01:50 cadence of the PREVIOUS rule; only #7-#9 fall on this anchor (07:36:57Z + k*60min).
+
+== 7. remaining-rounds source: .rsi/ledger.jsonl ==
+ledgerLines 34 maxRound 38 minRound 2
+missingBetween [18,23,24,26]
+remaining = 1000 - maxRound = 962
+
+== 8. no-mutation check AFTER all probes ==
+1ba1f85e2133edf7807cd1cc5b61a15508034b16e1aafe0c19d7c3b6b409646a  /home/fish/.dsh/storages/schedule.json
+mtime_after 2026-11-20 18:00:00.130476535 +0800  size 52946
+--- git status --short --branch ---
+## main...origin/main
+ M CHANGELOG.md
+ M lib/delivery/index.d.ts
+ M lib/delivery/index.d.ts.map
+ M lib/delivery/index.js
+ M lib/delivery/index.js.map
+ M src/checkpoint/schema.ts
+ M src/delivery/index.ts
+ M test/delivery-human-block.spec.ts
+?? .rsi/evidence/baseline-reconcile-round39.md
+?? .rsi/evidence/baseline-round39-attempt2.md
+?? .rsi/evidence/baseline-round39.md
+?? .rsi/evidence/checkpoint-comment-fix.md
+?? .rsi/evidence/ci-health-round39.md
+?? .rsi/evidence/ci-lib-consistency-round39-attempt1.md
+?? .rsi/evidence/delivery-bilingual-edge.md
+?? .rsi/evidence/harness/verify-round39-armed-row-refresh.txt
+?? .rsi/evidence/harness/verify-round39-live.txt
+?? .rsi/evidence/harness/verify-round39.md
+?? .rsi/evidence/harness/verify-row-endstate-round39-attempt2.txt
+?? .rsi/evidence/harness/verify-row-endstate-round39.txt
+?? .rsi/evidence/heartbeat-rearm/05-arm-cross-check.md
+?? .rsi/evidence/heartbeat-rearm/06-attempt2-verification.txt
+?? .rsi/evidence/heartbeat-rearm/07-handoff-one-call.md
+?? .rsi/evidence/runtime-audit-2026-11-20.md
+?? .rsi/evidence/triage-round39-reattempt.md
+?? .rsi/evidence/triage-round39.md
+?? test/checkpoint-bound.spec.ts
+?? test/config-chain-types.spec.ts
+--- newest tags ---
+v0.12.13 2026-11-20 15:43:59 +0800
+v0.12.12 2026-11-20 14:16:30 +0800
+v0.12.11 2026-11-20 13:26:15 +0800
+tag_count 61
+
+== 9. verdict per acceptance criterion ==
+
+C1  `--verify-row` exits 0 with status ARMED in this run
+    RESULT: NOT MET. VERIFY_EXIT=21, status=NOT_ARMED (both text and --json forms,
+    reproduced twice in this attempt at 18:28 and 18:30 +08). Exit 21 is the tool's
+    documented NOT_ARMED code (.rsi/tools/iterate-plan.mjs:44-48).
+
+C2  covered == remaining, last occurrence >= 2026-12-01, COUNT <= row maximum, output quoted
+    RESULT: NOT MET on the equality clause. covered=960 vs remaining=962 (deficit 2).
+      last occurrence 2026-12-30T15:36:57.000Z  >= 2026-12-01            PASS
+      COUNT 969 <= row maximum 1000                                      PASS
+      covered 960 == remaining 962                                       FAIL
+    Output is quoted verbatim in sections 1-3.
+
+C3  Row prompt contains heartbeat-guard.sh, --round auto, --max-rounds 1000 and a
+    harness reference, without mutating the row
+    RESULT: MET (with one caveat). Section 5: prompt 2319 chars, sha256
+    1e4b66af46a5e58fab6cba54500ccc4707beada5a9e68f4d4bf751dbf3b53fe2, byte-identical
+    to the `arm-prompt` block of .rsi/HEARTBEAT-PROMPT.md (lines 11-53). Markers on
+    L9 `.rsi/tools/heartbeat-guard.sh --round auto --max-rounds 1000 --record`; harness
+    references on L17/L19 (.rsi/HEARTBEAT.md), L22 (.rsi/PROTOCOL.md), L28/L38
+    (.rsi/tools/iterate-plan.mjs), L40 (AGENTS.md). CAVEAT: the literal token
+    "harness" does not occur in the prompt body (marker check prints false); the clause
+    holds only as "references to harness files".
+
+C4  No schedule_edit / schedule_create / tag / source edit; evidence quotes verify output
+    RESULT: MET. Section 8: store sha256 1ba1f85e2133edf7807cd1cc5b61a15508034b16e1aafe0c19d7c3b6b409646a
+    and mtime 2026-11-20 18:00:00.130476535 +0800 are identical to the pre-probe
+    fingerprint in section 0a (both predate this attempt); row record.updatedAt is still
+    2026-11-20T09:36:57.215Z; newest tag v0.12.13 (15:43:59 +08) and tag_count 61 are
+    unchanged; git status shows only this one new untracked file plus the pre-existing
+    concurrent-writer edits (CHANGELOG.md, lib/delivery/*, src/checkpoint/schema.ts,
+    src/delivery/index.ts, test/delivery-human-block.spec.ts) that were already dirty
+    before this attempt.
+
+== 10. why the gate fails, and what would make it pass ==
+
+The tool computes `covered = COUNT - deliveryHistory.records.length`
+(.rsi/tools/iterate-plan.mjs:466, 498). For this row that is 969 - 9 = 960, because the
+history still holds six rows (#1-#6) whose scheduledAt is on the PREVIOUS rule's :01:50
+cadence; only #7-#9 are occurrences of the current anchor DTSTART:20261120T073657Z.
+Against 966 physically future occurrences (969 minus the 3 occurrences of this anchor
+already due) the row would deliver rounds 39..1000 and still have 4 slots left, but the
+tool never sees that: it subtracts all nine.
+
+Consequences, stated plainly:
+  * The row will not be reported ARMED again while its history carries the six legacy rows
+    and COUNT stays 969; each new delivery pushes covered down by one.
+  * The one call that clears the gate is an rrule edit to COUNT=971 keeping
+    DTSTART:20261120T073657Z (971 - 9 = 962 = remaining, last occurrence
+    2026-12-30T17:36:57Z, still <= 1000). This is a schedule_edit: arming stays the
+    operator's, and this task's constraints forbid it, so it is reported, not performed.
+  * The tool's own proposal is NOT equivalent: `--arm-spec` prints
+    DTSTART:20261120T112852Z..COUNT=962 (section 3), which under the same subtraction is
+    962 - 9 = 953 < 962 and would verify NOT_ARMED again. That inconsistency between
+    `--arm-spec` and `--verify-row` is a tool-level finding, recorded here rather than
+    reconciled by an edit.
+
+== 11. nothing else was touched ==
+No schedule_edit, no schedule_create, no tag, no source/test/doc edit, no commit, no
+network call. The store was only ever read (JSON.parse) and its prompt reduced to a
+length plus sha256; no prompt text is reproduced in this file.
