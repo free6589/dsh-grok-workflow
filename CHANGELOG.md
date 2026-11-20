@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.12.14] - 2026-11-20
+
 ### Fixed / 修复
 
 - **`/compact` no longer fails on a session this plugin wrote a receipt into / 插件写过回执的会话里 `/compact` 不再报错** —
