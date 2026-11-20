@@ -298,6 +298,59 @@ describe('redaction shapes the earlier rules missed', () => {
     expect(output.match(/[A-Za-z0-9+/]{20,}/)).toBeNull()
   })
 
+  it('redacts a base64 key folded narrower than its own encoded banner', () => {
+    // A hand wrap (`fold -w 8`) breaks the *encoded banner itself* across lines, so the
+    // contiguous 20-character literal `base64-private-key` never appears and the whole key
+    // reached the report. Every width measured this round (8, 12, 16, 19, 20, 21, 22, 23)
+    // kept 100% of the encoded block; 24 was the first width the literal survived.
+    const pem = `-----BEGIN PRIVATE KEY-----\n${'M'.repeat(89)}\n-----END PRIVATE KEY-----\n`
+    const pgp = `-----BEGIN PGP PRIVATE KEY BLOCK-----\n\n${'m'.repeat(120)}\n=abcd\n-----END PGP PRIVATE KEY BLOCK-----\n`
+    const fold = (armor: string, width: number) => {
+      const encoded = Buffer.from(armor, 'utf8').toString('base64')
+      return (encoded.match(new RegExp(`.{1,${width}}`, 'g')) ?? []).join('\n')
+    }
+    // Whatever encoded material is left in the output is decoded and inspected: the point
+    // is that no surviving fragment still spells part of the banner. A short tail (the end
+    // of the encoding, i.e. the armor footer) is allowed to survive, so counting lines or
+    // characters would be the wrong assertion.
+    const survivingBanner = (output: string) =>
+      (output.match(/[A-Za-z0-9+/=]{4,}/g) ?? [])
+        .map(run => Buffer.from(run, 'base64').toString('latin1'))
+        .join('\n')
+    for (const [label, armor] of [['PEM', pem], ['PGP', pgp]] as const) {
+      for (const width of [8, 12, 16, 19, 20, 21, 22, 23]) {
+        const blob = fold(armor, width)
+        const output = redactSecrets(`Private key dump (${label}, fold ${width}):\n${blob}\nnext line stays`)
+        expect(output, `${label} at ${width} columns`).toContain('[REDACTED PRIVATE KEY]')
+        expect(survivingBanner(output), `${label} at ${width} columns kept encoded banner debris`).not.toContain('PRIVATE KEY')
+        expect(output, `${label} at ${width} columns`).toContain('next line stays')
+      }
+    }
+  })
+
+  it('redacts a narrow-folded base64 key that sits in a JSON field', () => {
+    // The same blob arrives as one long JSON string with `\n` escapes; the fold is real
+    // text, so the document has to stay parseable after replacement.
+    const pgp = `-----BEGIN PGP PRIVATE KEY BLOCK-----\n\n${'k'.repeat(60)}\n-----END PGP PRIVATE KEY BLOCK-----\n`
+    const folded = (Buffer.from(pgp, 'utf8').toString('base64').match(/.{1,11}/g) ?? []).join('\n')
+    const parsed = JSON.parse(redactSecrets(JSON.stringify({ keyring: folded, note: 'keep' }))) as Record<string, string>
+    expect(parsed.keyring).toBe('[REDACTED PRIVATE KEY]')
+    expect(parsed.note).toBe('keep')
+  })
+
+  it('leaves a narrow-folded public key and certificate alone', () => {
+    // Fold tolerance must not become fold-driven over-reach: the public banner shares
+    // `-----BEGIN PGP P` with the private one, and a certificate is public material.
+    const fold = (armor: string, width: number) => {
+      const encoded = Buffer.from(armor, 'utf8').toString('base64')
+      return (encoded.match(new RegExp(`.{1,${width}}`, 'g')) ?? []).join('\n')
+    }
+    const publicKey = fold('-----BEGIN PGP PUBLIC KEY BLOCK-----\n\nmQENBF8fakefake\n=abcd\n-----END PGP PUBLIC KEY BLOCK-----\n', 8)
+    const certificate = fold('-----BEGIN CERTIFICATE-----\nMIIBfakeCertBody\n-----END CERTIFICATE-----\n', 8)
+    expect(redactSecrets(`pub\n${publicKey}`)).toBe(`pub\n${publicKey}`)
+    expect(redactSecrets(`cert\n${certificate}`)).toBe(`cert\n${certificate}`)
+  })
+
   it('leaves base64 public material and unrelated blobs alone', () => {
     const encode = (text: string) => Buffer.from(text, 'utf8').toString('base64')
     // Redaction over-reach is noise: a public certificate, a public GnuPG key and

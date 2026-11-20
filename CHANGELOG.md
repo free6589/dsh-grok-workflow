@@ -5,6 +5,27 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.12.8] - 2026-11-20
+
+### Fixed / 修复
+
+- **A hand-folded base64 private key is redacted instead of being printed verbatim / 手工折行的 base64 私钥不再原样落进报告** —
+  0.12.5 and 0.12.6 matched a contiguous 20-character piece of the *encoded* banner, so a blob
+  whose lines are narrower than that piece (a `fold -w 8` key file, a paste wrapped by an editor)
+  split the marker itself and matched nothing: every measured width from 8 to 23 columns left 100%
+  of the encoded block in the report, and 24 was the first width that redacted. The rule now lets a
+  line break — a real newline, or the `\n` escape a JSON string carries — fall between any two
+  characters of the banner, and consumes a folded block's continuation lines down to eight
+  characters, which is what a `w >= 8` fold puts on each line. A narrower fold is still left alone:
+  at that width a continuation line cannot be told apart from a word of prose. Public keys,
+  certificates and ordinary base64 blobs are still untouched.
+  / 0.12.5 与 0.12.6 匹配的是**编码后**横幅里连续 20 个字符，所以只要一行的宽度窄于这一段
+  （`fold -w 8` 的私钥文件、被编辑器折过行的粘贴），标记自身就被拆开，什么也匹配不上：本轮实测
+  8 至 23 列的每一种宽度都让整块编码原文留在报告里，24 列才是第一个能脱敏的宽度。规则现在允许
+  换行——真实换行，或 JSON 字符串里的 `\n` 转义——出现在横幅任意两个字符之间，并把折行块的续行
+  吃到 8 个字符为止（`w >= 8` 的折行每行正好不少于 8 个）。更窄的折行仍不处理：那种宽度下续行
+  与散文单词无法区分。公钥、证书与普通 base64 数据保持原样。
+
 ## [0.12.7] - 2026-11-20
 
 ### Removed / 移除

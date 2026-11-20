@@ -14,6 +14,56 @@ export interface RedactionRule {
 }
 
 /**
+ * The encoded form of a private-key banner, spelled out so that a line break may fall
+ * between any two of its characters.
+ *
+ * A key file that was `base64 -w0`'d carries no banner the armor rules can see — the
+ * armor only exists after decoding — so the rules match the *encoded* banner instead.
+ * Base64 emits independent 4-character groups of 3 source bytes, so a PEM body embedded
+ * at an unknown byte offset starts its banner in a different group: three possible
+ * starting offsets, three different 20-character literals, all taken from bytes 3..17 of
+ * the decoded banner so no literal depends on the bytes that precede the block. GnuPG
+ * armor encodes the same way, so the same three offsets are spelled out for
+ * `-----BEGIN PGP PRIVATE KEY BLOCK` and its legacy `SECRET` spelling; each PGP window
+ * reaches byte 17 of the banner, which is what keeps it apart from `PGP PUBLIC KEY
+ * BLOCK` (`PRI`/`SEC` vs `PUB`).
+ *
+ * The folds are the reason this is generated rather than written out: `fold -w 8` breaks
+ * the encoded banner itself, and a contiguous literal then matches nothing at all, so a
+ * hand-wrapped (or `fold`ed) key reached the report verbatim at every width measured
+ * (`docs/knowledge/RESEARCH.md` A37).
+ */
+const BASE64_PRIVATE_KEY_WINDOWS: readonly string[] = [
+  'LS1CRUdJTiBQUklWQVRF',
+  'LUJFR0lOIFBSSVZBVEUg',
+  'QkVHSU4gUFJJVkFURSBL',
+  'LS1CRUdJTiBQR1AgUFJJ',
+  'LUJFR0lOIFBHUCBQUklW',
+  'QkVHSU4gUEdQIFBSSVZB',
+  'LS1CRUdJTiBQR1AgU0VD',
+  'LUJFR0lOIFBHUCBTRUNS',
+  'QkVHSU4gUEdQIFNFQ1JF',
+]
+
+/**
+ * A line break inside a folded blob: a real newline, or the two-character `\n` escape a
+ * JSON string carries once the blob sits in a field (`{"keyring":"LS0t…\nJTiB…"}`).
+ */
+const BASE64_BREAK = '(?:\\r?\\n|\\\\n)'
+
+/**
+ * Where a folded blob can end. Requiring one of these after a continuation line is what
+ * keeps a short word from being eaten: without it, `\nnext line stays` matches as a
+ * one-character-wide fold and the report loses the first word of the next sentence.
+ */
+const BASE64_BLOB_END = `(?=${BASE64_BREAK}|["']|$|[,}\\]])`
+
+/** One encoded window whose characters a line break may separate. */
+function foldable(window: string): string {
+  return window.split('').join(`${BASE64_BREAK}?`)
+}
+
+/**
  * The single source of truth for credential shapes.
  *
  * The generated workflow script cannot import host code, so `src/script.ts`
@@ -36,27 +86,29 @@ export const REDACTION_RULES: readonly RedactionRule[] = [
     replacement: '[REDACTED PRIVATE KEY]',
   },
   {
-    // A key file that was `base64 -w0`'d, or that sits base64-encoded inside a
-    // JSON field or a larger blob, carries no banner the rules above can see:
-    // the armor only exists after decoding. Match the *encoded* banner instead.
-    // Base64 emits independent 4-character groups of 3 source bytes, so a PEM
-    // body embedded at an unknown byte offset starts its banner in a different
-    // group: there are three possible starting offsets and each yields a
-    // different 20-character literal. All three are spelled out below, taken
-    // from bytes 3..17 of `-----BEGIN PRIVATE KEY` ("---BEGIN PRIVATE") so no
-    // literal depends on the bytes that precede the block. No ordinary base64
-    // text or prose contains one of them by chance.
-    // GnuPG armor is encoded the same way, so the same three offsets are spelled
-    // out for `-----BEGIN PGP PRIVATE KEY BLOCK` and its `SECRET` spelling. Each
-    // PGP window reaches byte 17 of the banner, which is what keeps it apart from
-    // `PGP PUBLIC KEY BLOCK` ("PRI"/"SEC" vs "PUB"); a window that stopped at the
-    // shared `-----BEGIN PGP P` prefix would redact public keys as well.
-    // Both the blob before the banner and the rest of it are replaced, so no
-    // key material survives; continuation lines of a wrapped blob are consumed
-    // while the first non-base64 line ends the match. A base64 `CERTIFICATE`
-    // block is left alone on purpose: it is public material (`docs/ARCHITECTURE.md`).
+    // A key file that was `base64 -w0`'d, that sits base64-encoded inside a JSON field,
+    // or that was hand-folded, is only visible through its encoded banner — see
+    // `BASE64_PRIVATE_KEY_WINDOWS` above for the literals, the three group alignments and
+    // why a fold is tolerated inside them.
+    // Both the blob before the banner and the rest of it are replaced, so no key material
+    // survives; continuation lines of a folded blob are consumed while the first line that
+    // is not base64-only ends the match. The continuation floor drops from sixteen to
+    // eight: every continuation line of a `w >= 8` fold carries at least eight characters,
+    // while the sixteen a 64/76-column wrap needs would leave a hand-folded block almost
+    // entirely in place. Eight is also the floor that keeps a following word out of the
+    // match — `BASE64_BLOB_END` pins the line boundary. A fold narrower than eight columns
+    // is left alone on purpose: at that width a continuation line cannot be told apart
+    // from a word of prose, and `base64` itself never folds below 76. The final line of a
+    // block is consumed only when it is that long, so a shorter tail — the end of the
+    // encoding, i.e. the armor footer — may survive; it carries no key material
+    // (`docs/knowledge/RESEARCH.md` A37, the trade-off round 30 documented as well).
+    // A base64 `CERTIFICATE` block is left alone on purpose: it is public material
+    // (`docs/ARCHITECTURE.md`).
     name: 'base64-private-key',
-    pattern: /(?<![A-Za-z0-9+/])[A-Za-z0-9+/]*(?:LS1CRUdJTiBQUklWQVRF|LUJFR0lOIFBSSVZBVEUg|QkVHSU4gUFJJVkFURSBL|LS1CRUdJTiBQR1AgUFJJ|LUJFR0lOIFBHUCBQUklW|QkVHSU4gUEdQIFBSSVZB|LS1CRUdJTiBQR1AgU0VD|LUJFR0lOIFBHUCBTRUNS|QkVHSU4gUEdQIFNFQ1JF)[A-Za-z0-9+/=]*(?:\r?\n[A-Za-z0-9+/=]{16,})*/g,
+    pattern: new RegExp(
+      `(?<![A-Za-z0-9+/])[A-Za-z0-9+/]*(?:${BASE64_PRIVATE_KEY_WINDOWS.map(foldable).join('|')})[A-Za-z0-9+/=]*(?:${BASE64_BREAK}[A-Za-z0-9+/=]{8,}${BASE64_BLOB_END})*`,
+      'g',
+    ),
     replacement: '[REDACTED PRIVATE KEY]',
   },
   {

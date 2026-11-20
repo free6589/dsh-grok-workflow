@@ -1,0 +1,7 @@
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/redact.spec.ts > redaction shapes the earlier rules missed > redacts a base64 key folded narrower than its own encoded banner
+AssertionError: PEM at 8 columns: expected 'Private key dump (PEM, fold 8):\nLS0t…' to contain '[REDACTED PRIVATE KEY]'
+ FAIL  test/redact.spec.ts > redaction shapes the earlier rules missed > redacts a narrow-folded base64 key that sits in a JSON field
+AssertionError: expected 'LS0tLS1CRUd\nJTiBQR1AgUF\nJJVkFURSBLR…' to be '[REDACTED PRIVATE KEY]' // Object.is equality
+ Test Files  1 failed (1)
+      Tests  2 failed | 38 passed (40)

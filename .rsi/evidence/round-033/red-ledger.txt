@@ -1,0 +1,5 @@
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/rsi-ledger.spec.ts > the RSI ledger admits every documented round > admits the newest round report, which is what the heartbeat gate reads
+AssertionError: expected [ 2, 3, 4, 5, 6, 7, 8, 9, 10, …(12) ] to include 32
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed (5)
