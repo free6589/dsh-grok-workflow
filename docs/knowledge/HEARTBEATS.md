@@ -168,3 +168,25 @@ this plugin's, and was not measured here.
   heartbeat. Nothing in it was written.
 - What the Automation UI displays for a reclaimed row, and how the switch repaints when the stored
   prompt is edited outside the page.
+
+## 1000-round harness — one delivery is one round, one row is one arm (2026-11-20)
+
+The user's budget is 1000 rounds, and no process counts to 1000: a scheduled delivery opens exactly
+one round, and one heartbeat row carries at most 100 rounds — the width `HARD_LIMITS.loopMaxRounds`
+lets the plugin ask for. 1000 rounds is therefore ten arms of ≤100, armed one at a time. The contract
+is `.rsi/HARNESS.md`; the numbers are `.rsi/harness.json`; the next arm is computed from
+`.rsi/ROUND.md` + `.rsi/ledger.jsonl` by `.rsi/tools/iterate-plan.mjs`.
+
+What this adds to the heartbeat facts above:
+
+| fact | value | evidence |
+| --- | --- | --- |
+| policy ceiling on one row | `COUNT` clamped to 1..1000 by `loopPolicyFromConfig` | `src/loop.ts:383-386`; `loopRrule` itself does not clamp (measured, `A40`) |
+| what the plugin's switch may ask for | ≤100 (`loopMaxRounds` refused above 100 at load) | `src/config.ts:42`, `:992` |
+| guard ceiling | `--max-rounds 1000`: round 1001 → `STOP code=round-cap` | `.rsi/evidence/harness/guard-cap.txt` |
+| budget accounting | used = higher of `ROUND.md` / `ledger.jsonl`; remaining = 1000 − used | `.rsi/tools/iterate-plan.mjs`; `test/iterate-plan.spec.ts` |
+| this repository's own heartbeat prompt | 6,964 B — above `MAX_LOOP_PROMPT_CHARS` 4,000, so it cannot be armed through the plugin's loop route | `heartbeat-guard.sh --prompt | wc -c`; `src/loop.ts:112` |
+
+`NOT_RUN` (unchanged, and the reason the harness is explicit about it): a real delivery under an armed
+harness row, and the arming action itself — both are a user action or a session with Schedule tools
+(D-066), and this attempt was a delegated subagent, refused by `schedule_list`.

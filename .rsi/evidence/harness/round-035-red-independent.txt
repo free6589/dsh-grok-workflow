@@ -1,0 +1,70 @@
+
+ RUN  v4.1.12 /tmp/rsi-verify35
+
+ ❯ test/config.spec.ts (38 tests | 1 failed) 102ms
+     ✓ refuses an unknown key instead of silently dropping it 4ms
+     × refuses an unknown key one level down instead of silently dropping it (round 35) 6ms
+     ✓ rejects every removed key as unknown (R-06), with the migration named 3ms
+     ✓ refuses a configuration written for a newer version 0ms
+     ✓ normalizes a bare model id shorthand into a route (migration) 0ms
+     ✓ treats an empty chain as inherit rather than an error 0ms
+     ✓ refuses a model repeated inside one chain 0ms
+     ✓ refuses an empty model, an over-long id and a too-long chain 1ms
+     ✓ refuses a removed switching policy key as unknown (R-06) 0ms
+     ✓ fills every documented default through the schema 2ms
+     ✓ validates the four repeat-run keys and defaults a loop off and bounded 2ms
+     ✓ carries bilingual metadata on the four repeat-run keys, agreeing with the envelope 3ms
+     ✓ fixes the removed retry count at 1 and the synthesis default at layered 0ms
+     ✓ gates the workflow behind the per-session grok-mode default, off by default 1ms
+     ✓ names grokDefault in the one-line effective-configuration signature 0ms
+     ✓ fails on a provider the runtime does not have 0ms
+     ✓ fails on a model the provider enumerates but does not declare 1ms
+     ✓ checks every routed role, the supervisor included 1ms
+     ✓ notes instead of failing when the runtime cannot judge the route 0ms
+     ✓ reports the generated settings page for this plugin 3ms
+     ✓ matches the plain Config schema by uid when no volatile rebound happened 1ms
+     ✓ keeps the generated script clamps identical to HARD_LIMITS (single source) 0ms
+     ✓ pins the documented run limits: default 10/1, hard maximum 100/3 0ms
+     ✓ applies the documented defaults inside the script, without swallowing an explicit 0 56ms
+     ✓ degrades quietly on a runtime without a settings service 0ms
+     ✓ uses the built-in switching policy (T4: switchOn removed, always built-in) 4ms
+     ✓ budgets an empty plan exactly like a missing one (t27/F3) 0ms
+     ✓ bounds the run ledger by recordLimit and writes nothing at 0 2ms
+     ✓ names the deadline and every role chain, with "inherit" for an unset role 0ms
+     ✓ shows the chains in order, so a fallback is visible without a run 0ms
+     ✓ travels into the workflow request, so the report can state the deadline 0ms
+     ✓ keeps the task verified and carries the notes into the report 2ms
+     ✓ still fails when the same verifier marks a criterion unmet 2ms
+     ✓ still fails when the verifier verdict is fail, notes or not 3ms
+     ✓ defaults to 60 minutes and carries that value into the request and the log line 0ms
+     ✓ accepts any non-negative integer, including 0 for unlimited 0ms
+     ✓ fails closed on a negative, fractional or non-numeric deadline (R-06) 0ms
+     ✓ refuses the same values in the schema, so a profile patch cannot store one 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/config.spec.ts > configuration surface > refuses an unknown key one level down instead of silently dropping it (round 35)
+AssertionError: expected [Function] to throw an error
+
+- Expected:
+null
+
++ Received:
+undefined
+
+ ❯ test/config.spec.ts:63:8
+     61|     // exactly like a setting that does not work. Both levels are name…
+     62|     expect(() => resolveConfig({ roles: { reviewer: [{ model: 'r1' }] …
+     63|       .toThrow(/unknown configuration key "roles\.reviewer"; accepted …
+       |        ^
+     64|     expect(() => resolveConfig({ roles: { worker: [{ model: 'w1', maxI…
+     65|       .toThrow(/unknown configuration key "roles\.worker\[0\]\.maxInfl…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 37 passed (38)
+   Start at  13:34:51
+   Duration  478ms (transform 207ms, setup 0ms, import 260ms, tests 102ms, environment 0ms)
+

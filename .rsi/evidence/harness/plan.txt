@@ -1,0 +1,23 @@
+plan shape=chain total=1000 used=35 remaining=965
+arms=10 interval=60 guard_args="--max-rounds 1000 --threshold 3" status=OPEN
+arm 1/10 rounds=100 rounds_window=36..135
+arm 1/10 rrule=DTSTART:20261120T061844Z\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=100
+arm 2/10 rounds=100 rounds_window=136..235
+arm 2/10 rrule=(armed when arm 1 ends; COUNT=100, INTERVAL=60)
+arm 3/10 rounds=100 rounds_window=236..335
+arm 3/10 rrule=(armed when arm 2 ends; COUNT=100, INTERVAL=60)
+arm 4/10 rounds=100 rounds_window=336..435
+arm 4/10 rrule=(armed when arm 3 ends; COUNT=100, INTERVAL=60)
+arm 5/10 rounds=100 rounds_window=436..535
+arm 5/10 rrule=(armed when arm 4 ends; COUNT=100, INTERVAL=60)
+arm 6/10 rounds=100 rounds_window=536..635
+arm 6/10 rrule=(armed when arm 5 ends; COUNT=100, INTERVAL=60)
+arm 7/10 rounds=100 rounds_window=636..735
+arm 7/10 rrule=(armed when arm 6 ends; COUNT=100, INTERVAL=60)
+arm 8/10 rounds=100 rounds_window=736..835
+arm 8/10 rrule=(armed when arm 7 ends; COUNT=100, INTERVAL=60)
+arm 9/10 rounds=100 rounds_window=836..935
+arm 9/10 rrule=(armed when arm 8 ends; COUNT=100, INTERVAL=60)
+arm 10/10 rounds=65 rounds_window=936..1000
+arm 10/10 rrule=(armed when arm 9 ends; COUNT=65, INTERVAL=60)
+envelope maxConcurrency=10/100 retries=1/3

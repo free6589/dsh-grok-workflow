@@ -1,0 +1,10 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+ ✓ test/iterate-plan.spec.ts (15 tests) 107ms
+
+ Test Files  1 passed (1)
+      Tests  15 passed (15)
+   Start at  13:27:17
+   Duration  327ms (transform 80ms, setup 0ms, import 108ms, tests 107ms, environment 0ms)
+

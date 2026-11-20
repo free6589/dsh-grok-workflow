@@ -35,6 +35,17 @@
   心跳轮次第 0 步先跑 `.rsi/tools/heartbeat-guard.sh --round <N> --record`，按它的
   `RESUME`/`SKIP`/`STOP` 决定开不开本轮；`SKIP` 表示上一轮未闭合，不得在其上再开一轮。
 
+## 预算与心跳（1000 轮，分臂推进）
+- 总量 1000 轮，数字与规则在 `.rsi/harness.json` + `.rsi/HARNESS.md`；一轮 = 一次定时投递，
+  一次投递只做一轮，进程里没有数到 1000 的循环。
+- 心跳行是一条 `RRULE`，`INTERVAL=60`、`COUNT≤100`（`HARD_LIMITS.loopMaxRounds`）；行跑完即停，
+  下一臂由人（或持有 `schedule_*` 的会话）按 `.rsi/tools/iterate-plan.mjs` 打印的 `rrule` 续订，
+  本轮不得自己续、不得嵌套 workflow（D-066、D-092）。
+- 门禁：`.rsi/tools/heartbeat-guard.sh --round <N> --max-rounds 1000 --record`；
+  `round-cap` / `budget-exhausted` 表示预算用尽，`blocked-streak` / `stall-unclosed` / `stop-file` /
+  `protocol-stop` 各自由谁清除，见 `.rsi/HARNESS.md` 的停止规则表。
+- 预算用尽不是失败：池里没有高于风险的主题时按本轮停止条件收尾，不为了用满 1000 而凑数。
+
 ## 本轮应停止的情况（写入 ROUND.md 的 status 字段）
 - status: STOP 当：待办池里没有价值高于风险的主题；连续失败 2 轮；发现自己违反了红线。
 - 否则 status: OK。

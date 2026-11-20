@@ -1337,3 +1337,40 @@ round 33 那次把 1.23 ms 抬到 7.86 ms 的代价没有被再放大：新增�
 
 **为什么不能更宽**：把断行放宽成「任意反斜杠 + n」会开始吃正常转义文本，而 `BASE64_BLOB_END`
 只锚续行、管不到断行位置（`D-089`）。这是本规则的宽度上限，不是实现遗漏。
+
+## A40 — 1000 轮预算能落到哪一层：policy 钳位 1000、配置面 100、门禁 cap 只在调用方（2026-11-20，harness，`CONFIRMED`）
+
+**测的是什么**：把「1000 轮」这个用户要求落到插件既有边界上，到底哪一层允许它。
+
+**测量（本机，`CONFIRMED`）**：
+
+- `loopRrule` **不做钳位**：`loopRrule(60, 5000, 0)` 输出 `COUNT=5000`（`src/loop.ts:412-416`）。
+  钳位在 `loopPolicyFromConfig`：`clampInteger(rounds, 1, 1000, 10)`（`src/loop.ts:383-386`）。
+  所以「一行最多 1000 轮」是**政策**的上限，不是格式化函数的行为——按 `loopRrule` 的注释推断会错。
+- 配置面更窄：`HARD_LIMITS.loopMaxRounds = 100`（`src/config.ts:42`），载入时
+  `integer('loopMaxRounds', …, 1, 100)`（`src/config.ts:992`）拒绝 >100。插件自己的开关因此
+  **写不出超过 100 轮的行**；`loopPolicyFromConfig` 的 1000 只对外部直接构造的行有效。
+- 门禁的 cap 是**调用方**给的：`heartbeat-guard.sh --round 1000 --max-rounds 1000` → `RESUME`；
+  `--round 1001 --max-rounds 1000` → `STOP code=round-cap`（exit 20）；不传 `--max-rounds` →
+  `RESUME max_rounds=0`（即上限不会自己出现）。实测见 `.rsi/evidence/harness/guard-cap.txt`。
+- 子代理拿不到定时工具（本轮实测）：`schedule_list()` → `{"code":"subagent_session","message":"A delegated
+  subagent cannot use scheduled tasks."}`；`open()` 对任何带 actor 的调用报 `loop/user-only`。
+- RSI 心跳行的实况（引 `.rsi/evidence/heartbeat-rearm/04-rearm-plan.md`，非本轮实测）：
+  `schedule-0bbbef5f-…`，`INTERVAL=60`、`COUNT=10`，已投递 5/10，最后一次 `2026-11-20T10:01:50Z`。
+- 仓库自己的心跳 prompt 长度：`heartbeat-guard.sh --prompt --round 36 | wc -c` = **6,964 B**，超过
+  `MAX_LOOP_PROMPT_CHARS = 4000`（`src/loop.ts:112`）。因此这一整段 prompt **不能**从插件的 loop 面
+  （`POST /grok-workflow/loop`）落盘——那条路会以 `loop/prompt` 拒绝；能落盘的只有 ≤4000 B 的
+  iterate 模板，或直接 `schedule_create` 的 prompt。
+
+**结论**：1000 轮只能以「每臂 ≤100 轮 + 外部续订 + 门禁 cap 1000」的形态落地（`D-092`），
+`.rsi/harness.json` 记录这些数字，`test/iterate-plan.spec.ts` 把它们逐个钉在
+`HARD_LIMITS` / `DEFAULT_LOOP_INTERVAL_MINUTES` / `loopPolicyFromConfig` 上，钉歪了会红（实测把
+`intervalMinutes` 改成 30、`armCapRounds` 改成 99，9 个用例失败，`.rsi/evidence/harness/red-pin.txt`）。
+
+**未测（`NOT_RUN`）**：真实定时投递（续订是操作者/带工具会话的动作）；开关手点；`open()` 原地改写
+`COUNT` 的运行时行为（只从 `src/loop.ts` 与上一轮证据读到，没有实测翻转）。
+
+**更正（round 36，`CONFIRMED`）**：上面「1–24 列全部脱敏」只对**占位符出现**成立，对**材料是否
+留下**不成立。round 36 用同一块（272 字符编码）逐列实测：宽 1–7 时占位符确实出现，但编码留下
+244–252 个字符，且这些字符解回去就是横幅与密钥本体（`A41`）。round 33/34 的断言只解码「≥4 字符
+的残留片段」，而窄折行把材料切成每行 ≤7 字符的碎片，逐片解码自然是垃圾——这就是当时没看出来的原因。

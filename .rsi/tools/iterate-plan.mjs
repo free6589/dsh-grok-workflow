@@ -53,7 +53,11 @@ export const HARNESS_FILE = '.rsi/harness.json'
 export const DEFAULT_HARNESS = {
   version: 1,
   totalRounds: 1000,
-  shape: 'single',
+  // `chain` by default: an arm is then at most `armCapRounds` rounds, which is the width the
+  // plugin itself caps its own loop at (`HARD_LIMITS.loopMaxRounds`), so every arm is a row the
+  // plugin could have created for itself. `single` is legal — the row format and the policy both
+  // allow 1000 — but only a row armed outside the plugin's switch should use it (D-092).
+  shape: 'chain',
   intervalMinutes: 60,
   armCapRounds: 100,
   rowMaxRounds: 1000,

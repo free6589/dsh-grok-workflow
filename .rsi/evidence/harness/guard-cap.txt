@@ -1,0 +1,15 @@
+## guard ceiling probe (temp repo: round_max=ledger_max=1000)
+$ heartbeat-guard.sh --round 1000 --max-rounds 1000
+RESUME code=none next_round=1000 threshold=3 max_rounds=1000 blocked_streak=0 round_max=1000 ledger_max=1000 dirty_tracked=0 report_open=0 unclosed_skips=0
+git unavailable: dirtiness not checked
+EXIT=0
+
+$ heartbeat-guard.sh --round 1001 --max-rounds 1000
+STOP code=round-cap next_round=1001 threshold=3 max_rounds=1000 blocked_streak=0 round_max=1000 ledger_max=1000 dirty_tracked=0 report_open=0 unclosed_skips=0
+git unavailable: dirtiness not checked
+EXIT=20
+
+$ heartbeat-guard.sh --round 1001   (no cap: the ceiling is the caller s)
+RESUME code=none next_round=1001 threshold=3 max_rounds=0 blocked_streak=0 round_max=1000 ledger_max=1000 dirty_tracked=0 report_open=0 unclosed_skips=0
+git unavailable: dirtiness not checked
+EXIT=0

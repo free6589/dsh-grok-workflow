@@ -1,0 +1,23 @@
+pool open=21 total=47
+open 1/21 line=72 marker="P" text=P · `roles` that is not an object at all is still silently read as "every chain empty":
+open 2/21 line=77 marker="P" text=P · A non-string `model`/`provider` throws a bare `TypeError` naming neither key nor shape
+open 3/21 line=79 marker="P" text=P · `repairLimitOverruns` still clamps seven removed keys through `LEGACY_LIMIT_CAPS`
+open 4/21 line=82 marker="P" text=P · Six fail-closed branches have no test: `config.ts:654`, `:444`, `:462`, `:438`, `:680`,
+open 5/21 line=89 marker="P" text=P · The 2400-char clamp drops the verdict line and, in bilingual delivery, the whole second
+open 6/21 line=96 marker="P" text=P · The "bilingual" mirror repeats the same sentence under English labels
+open 7/21 line=107 marker="P" text=P · A fallback partial that verified everything says `0 项没做成` and never mentions the
+open 8/21 line=109 marker="P" text=P · `dedupeBilingual` deletes a deliberately repeated sentence from an answer (`:429`).
+open 9/21 line=120 marker="P" text=P · `progress.notReported` is still the right answer for a stage with no rows and no evidence;
+open 10/21 line=132 marker="P" text=P · Edge nodes (Start/End) print the same `Not reported in the events` copy although
+open 11/21 line=134 marker="P" text=P · `meta.phases` (which does declare `检查`) is dropped at `run-start` (`records.ts:597`), so
+open 12/21 line=137 marker="P" text=P · Fixtures feed the panel a stream shape the recorder cannot produce (`phase: '执行'`), which
+open 13/21 line=161 marker="P" text=P · `recordableTimeoutMs`'s upper guard is vacuous (`msCeiling === MAX_SAFE_INTEGER`), so a
+open 14/21 line=164 marker="P" text=P · A caller-supplied `git` provider returning `head: ''` makes every write fail
+open 15/21 line=166 marker="P" text=P · Restore decisions drop `title`, `attempt`, `updatedAt` while claiming `retain` keeps the
+open 16/21 line=168 marker="P" text=P · Integrity is verified over the validator's normalized rebuild, so changing `git.head`'s
+open 17/21 line=170 marker="P" text=P · Five validator refusal branches are untested (`resume/validator.ts:231`, `:274`, `:290`,
+open 18/21 line=172 marker="P" text=P · `completed` is retained with no evidence, while a bare `success` is refused as a
+open 19/21 line=186 marker="P" text=P · Both README "Models per role" examples are patches the loader refuses:
+open 20/21 line=188 marker="P" text=P · README validation bullet still says "more than three routes" and "an unknown `switchOn`
+open 21/21 line=191 marker="P" text=P · `docs/knowledge/DESIGN-progress-tab.md` §4 documents the old delivery-template spine and
+top_next=line 72

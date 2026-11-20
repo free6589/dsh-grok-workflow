@@ -31,7 +31,12 @@ approval, decide and record. Work in this repository only.
 
 Run, from the repository root:
 
-    .rsi/tools/heartbeat-guard.sh --round {{NEXT_ROUND}} --record
+    .rsi/tools/heartbeat-guard.sh --round {{NEXT_ROUND}} --max-rounds 1000 --record
+
+The `--max-rounds 1000` is this loop's budget, not a preference: round 1001 is a `STOP`
+(`code=round-cap`) and the budget is spent (`.rsi/HARNESS.md`, `.rsi/harness.json`). Pass it
+every time — without a cap the guard would resume past 1000, which is why the ceiling is written
+into this prompt instead of remembered.
 
 The **first word** of its output decides this turn:
 
@@ -143,6 +148,11 @@ Defaults: `--threshold 3` (same number as `DEFAULT_LOOP_FAIL_STREAK` in `src/con
 `--max-rounds 0` (no cap). The plugin's `loopMaxRounds` default of 10 belongs to its repeat-run
 surface, not to this loop — passing 10 here would stop the RSI loop at its eleventh round, so the
 guard refuses to apply that number unless the operator asks for it explicitly.
+
+**The harness passes `--max-rounds 1000`.** The 1000-round budget and every other number the loop
+runs on live in `.rsi/harness.json`; `.rsi/HARNESS.md` says what each one means, how the budget is
+spent in arms of at most 100 rounds, and which stop code ends the loop. The arm to arm next comes
+from `.rsi/tools/iterate-plan.mjs`, which computes it from `.rsi/ROUND.md` and `.rsi/ledger.jsonl`.
 
 **Why `dirty-tracked` counts only tracked files.** This repository keeps two untracked things on
 purpose (the operator's settings mock, and evidence bundles whose `*.log` members are

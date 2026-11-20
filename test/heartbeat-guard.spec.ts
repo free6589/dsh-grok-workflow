@@ -253,7 +253,11 @@ describe('the prompt carries the records the next turn has to reconcile', () => 
     const result = runGuard(root, '--prompt')
     expect(result.status).toBe(0)
     expect(result.out).toContain('RSI heartbeat — round 14')
-    expect(result.out).toContain('.rsi/tools/heartbeat-guard.sh --round 14 --record')
+    // The harness's ceiling travels in the prompt: a prompt that named the guard without
+    // `--max-rounds 1000` would resume past the budget, because the guard's own default is no
+    // cap (`.rsi/HARNESS.md`, `A40`).
+    expect(result.out).toContain('.rsi/tools/heartbeat-guard.sh --round 14 --max-rounds 1000 --record')
+    expect(result.out).toContain('code=round-cap')
     expect(result.out).toContain('gate landing: counts, NR reconciliation, baselines')
     expect(result.out).toContain('round-013')
     expect(result.out).toContain('.rsi/STATE.md')
