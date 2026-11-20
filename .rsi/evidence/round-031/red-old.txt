@@ -1,0 +1,111 @@
+== pre-round-31 tree: git archive of 949c1c1 + round-31 spec ==
+== command: npx vitest run test/checkpoint-schema.spec.ts -t "bounds the payload" ==
+== env: v26.8.1 Linux x86_64, /tmp/rsi-old-031, node_modules symlinked ==
+== the behaviour half passes on old code (round 27 fixed the bound); the comment guard fails ==
+
+
+ RUN  v4.1.12 /tmp/rsi-old-031
+
+ ❯ test/checkpoint-schema.spec.ts (38 tests | 1 failed | 37 skipped) 725ms
+     ↓ carries every documented section (run plan tasks agents stages evidence git time min-context)
+     ↓ normalizes plan write paths and defaults absent task rows to pending
+     ↓ builds an auto min-context digest from objective, plan, and evidence
+     ↓ carries the run's durable task identity, redacted and bounded (B12)
+     ↓ keeps a caller-supplied digest verbatim and marks the source
+     ↓ redacts credential shapes in every free-text field
+     ↓ bounds oversized text with an explicit ellipsis, never a dangling surrogate
+     ↓ bounds the auto digest by the digest limit
+     ↓ is stable across key insertion order and drops undefined fields
+     ↓ produces the same checksum for the same input, twice in a row
+     ↓ detects any payload mutation through the checksum
+     ↓ reports a byte-count mismatch when the stored byte length lies
+     ↓ refuses to seal a payload above the size bound
+     ↓ accepts a sealed round trip unchanged
+     ↓ rejects a wrong version, an unknown status, and a non-integer timestamp
+     ↓ rejects oversized fields, too many tasks, and a taskCount mismatch
+     ↓ rejects a missing section and a malformed integrity record
+     ↓ rejects a malformed git head
+     ↓ pins the documented concurrency and retry bounds
+     ↓ reports what is outside the envelope, without blocking a read
+     ↓ derives the envelope from the config constants, so it cannot drift
+     ↓ refuses a checkpoint whose limits leave the contract (B07)
+     ↓ records the contract defaults when the caller supplies no limits at all (B15)
+     ↓ reads a legacy row that the writer would now refuse, and refuses a bad one on write
+     ↓ sanitizes run ids into safe file names
+     ↓ separates two ids that sanitize to the same name (B14)
+     ↓ writes via a temporary file and leaves no temporary residue
+     ↓ round-trips through read with the integrity record verified
+     ↓ reads back a payload the writer accepted above the row-count ceiling
+     × bounds the payload by the file bound minus the integrity record 724ms
+     ↓ replaces an existing checkpoint atomically on a second write
+     ↓ keeps the file byte-identical for identical input
+     ↓ never writes a secret to disk
+     ↓ cleans up the temporary file when the rename fails
+     ↓ reports an io error when a path component is not a directory
+     ↓ refuses an oversized file before parsing it
+     ↓ refuses corrupt JSON and a file without an integrity record
+     ↓ refuses a missing file with an io error
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/checkpoint-schema.spec.ts > atomic writer > bounds the payload by the file bound minus the integrity record
+AssertionError: expected '`bytes` counts the payload the *write…' to contain '1,048,447'
+
+- Expected
++ Received
+
+- 1,048,447
++ `bytes` counts the payload the *writer* accepted, so the only bound it
++       // can honestly have is the writer's own: `maxBytes`. `countCeiling` bounds
++       // row counts, not payload size — checking it here refused every legal
++       // payload between 1,000,000 and 1,048,576 bytes, which sealed and wrote
++       // fine and then read back as `invalid`.
++       bytes: inRange(integer(raw['bytes'], 'integrity.bytes'), 1, CHECKPOINT_LIMITS.maxBytes, 'integrity.bytes'),
++     }
++   }
++
++   return {
++     version,
++     run,
++     plan,
++     tasks,
++     agents,
++     stages,
++     evidence,
++     git,
++     time,
++     minContext,
++     limits,
++     watchdog,
++     ...(integrity === undefined ? {} : { integrity }),
++   }
++ }
++
++ /* ------------------------------------------------------------------ *
++  * Documented limit contract
++  * ------------------------------------------------------------------ */
++
++ /**
++  * Compare recorded limits against the documented engine-hook contract
++  * ({@link ENGINE_HOOK_LIMITS}). Returns one human-readable violation per
++  * out-of-envelope value; an empty list means the run matched the contract.
++  * This never throws and never blocks a write — it is a reporting aid.
++  */
++ export function limitContract
+
+ ❯ test/checkpoint-schema.spec.ts:556:48
+    554|     const start = source.indexOf('`bytes` counts the payload')
+    555|     expect(start).toBeGreaterThan(0)
+    556|     expect(source.slice(start, start + 1_200)).toContain(cap.toLocaleS…
+       |                                                ^
+    557|   })
+    558|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 37 skipped (38)
+   Start at  10:18:02
+   Duration  1.04s (transform 161ms, setup 0ms, import 196ms, tests 725ms, environment 0ms)
+

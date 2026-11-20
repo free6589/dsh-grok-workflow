@@ -4665,3 +4665,32 @@ base64 公钥不误伤。`docs/ARCHITECTURE.md` 覆盖清单与「已知缺口�
 
 **未验证（`NOT_RUN`）**：GUI 手点；心跳行 `2026-11-20T10:01:50Z` 之后的真实定时投递（子代理被拒
 `schedule_*`，见 `.rsi/evidence/round-030/schedule-row.txt`）。
+
+## Round 83 — 2026-11-20 — round-031：检查点注释把「拒绝带」的上界说成 1,048,576（`CONFIRMED`，不发版）
+
+**选题**：`POOL.md` checkpoint 一节的第一条非 DONE 项（round 27 留下的注释偏差，也是 round 29 的
+HANDOFF 里点名的第一条遗留不确定性）。选题前与树对表：`src/checkpoint/schema.ts:859-864` 仍写
+「between 1,000,000 and 1,048,576」，条目成立。
+
+**病与判定的关键**：真值不是 129 字节固定开销——完整性记录是
+`,"integrity":{"algorithm":"sha256","checksum":"<64 hex>","bytes":<n>}`，即 **122 字节 + `n` 的十进制
+位数**：4,000 字节载荷配 126 字节记录，1,048,447 配 129 字节。所以「拒绝带到 1,048,576」永远多算
+了 129 字节：写入侧在 **1,048,448** 就拒绝。**行为本身是对的（round 27 已双向按 `maxBytes` 收敛），
+错的是注释**——所以本轮是「测量 + 守卫」，不是行为修复。
+
+**改动**：`src/checkpoint/schema.ts` 注释改为「1,048,447（7 位计数，129 字节记录）」并点名守卫；
+`test/checkpoint-schema.spec.ts` 新增 1 条用例：从真实封存文件量出记录开销（122 + 位数），解出上限，
+在 **1,048,447** 处写入成功（文件正好 1,048,576 字节、读回完整）、**1,048,448** 处被 `too-large`
+拒绝，最后 `readFile` 读回 `src/checkpoint/schema.ts` 并要求注释写出该上限。`lib/` 随 `src/` 重建。
+
+**红绿（`CONFIRMED`，证据 `.rsi/evidence/round-031/`）**：
+- 改前：`git archive 949c1c1` 树 + 新 spec，`npx vitest run test/checkpoint-schema.spec.ts
+  -t "bounds the payload"` → **1 failed | 37 skipped**，失败点是注释守卫（旧注释没有 `1,048,447`）。
+  行为那半在旧代码上就通过——这条要写明：本轮没有行为缺陷可修。
+- 改后：同文件 **38 passed**（基线 37，+1）。
+- `npm run ci` exit 0 = **68 文件 / 1236 测试 PASS**，typecheck 0 错、oxlint 24w/0e。
+
+**不发版（记录理由）**：只改注释与测试，无用户可见变化、无配置面/API/报告格式变化；按
+`docs/RELEASING.md` 的版本规则不发版、不打标签，`CHANGELOG.md` 也不加条目（`[Unreleased]` 保持空，
+表示没有用户可见变化待发布）。代价是 `lib/checkpoint/schema.js` 会随注释重建但版本号不变——这正是
+`npm run verify:lib` 的意义所在（提交后复核见 `verify-lib-post.txt`）。

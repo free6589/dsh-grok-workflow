@@ -2021,3 +2021,29 @@ model selector」）、`test/loop-brakes.spec.ts`（35 条）、`test/loop-runti
   consumed once, then each of the nine alternatives is tried at each backtrack position), 3.7 ms for
   a 1 MB blob that does carry a marker, 1.9 ms for 12,000 short runs. Report-sized text is far below
   that; the full table on the same 1 MB blob takes 62.1 ms, so the base64 rule is not the cost driver.
+
+## D-087 — A comment that quotes a measured constant is guarded by the test that measures it
+
+- **Status:** CONFIRMED
+- **Date:** 2026-11-20 (round 31)
+- **Decision:** when a source comment states a number that the surrounding code and tests can measure,
+  the test that measures it also reads the source back and requires the comment to name the measured
+  value. `test/checkpoint-schema.spec.ts` derives the writer's 1,048,447-byte payload ceiling from a
+  real sealed file and then asserts that `src/checkpoint/schema.ts` says so.
+- **Why:** the round-27 comment claimed the refused band ran to 1,048,576 while the writer refuses from
+  1,048,448 up; the behaviour was correct and the prose was not, so no behavioural test could catch it,
+  and the wrong number was carried as an uncertainty through four rounds. A comment is a claim a reader
+  acts on; leaving it untested makes every "documented bound" a candidate for the same drift.
+- **Why not a docs-only fix:** the same drift would return with the next edit. The guard costs one
+  `readFile` and one `toContain`, and it fails loudly (`1,048,447` vs `1,048,576`) with a message that
+  says which constant moved.
+- **Alternatives rejected:**
+  1. Export the ceiling as a constant and comment "see the constant" — a comment that points at code
+     still drifts in the *other* direction (a reader quoting it from memory), and it hides the arithmetic
+     (122 bytes plus the digits of the byte count) that makes 1,048,447 non-obvious.
+  2. Fold the ceiling into `CHECKPOINT_LIMITS` as a second bound — a new public number that callers
+     would have to keep in step with `maxBytes`; the writer's real bound is the file bound.
+  3. Rewrite the comment to avoid numbers — the ceiling is the actionable part of the contract (how big
+     a payload a caller may hand the writer), so removing it would remove the reason to read it.
+- **Scope:** this is a documentation guard, not a policy switch. It applies where a comment quotes a
+  constant the suite can measure; prose that explains *why* is left alone.

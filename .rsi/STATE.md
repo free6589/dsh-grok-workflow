@@ -1,3 +1,5 @@
+Updated: 2026-11-20T10:20+08:00 · round 31 (checkpoint payload-ceiling comment) · `npm run ci` 68 files / 1236 tests PASS · no release (comment + test only, no user-visible change) · previous release `0.12.6` (`e7150ab`, tag `v0.12.6`, CI `44659057507`, Release `44659061505`)
+
 Updated: 2026-11-20T10:13+08:00 · round 30 (base64-wrapped GnuPG private key) · `npm run ci` 68 files / 1235 tests PASS · `verify:lib` byte-identical at `e7150ab` · released `0.12.6` (commit `e7150ab`, tag `v0.12.6` object `167b475`, CI `44659057507`, Release `44659061505`, asset 600,316 B)
 
 Updated: 2026-11-20T09:45+08:00 · round 29 (base64-wrapped private key) · `npm run ci` 68 files / 1233 tests PASS · released `0.12.5` (commit `5b7cae1`, tag `v0.12.5`, CI `44656151053`, Release `44656153854`)
@@ -10,6 +12,14 @@ and `v0.12.1` (`23d3369`, CI `44595376323`, Release `44595391505`)
 
 ## Facts
 
+- Round 31 (this round): the round-27 comment claimed the refused band ran to 1,048,576, but the
+  integrity record is 122 bytes plus the decimal digits of `bytes` (129 only for a 7-digit count), so
+  `writeCheckpoint` refuses from 1,048,448. The behaviour was right; the prose was not. The comment now
+  names 1,048,447 with the arithmetic, and one test measures the record from a real sealed file, writes
+  at the ceiling (file exactly 1,048,576 B, reads back intact), refuses at +1, then reads the source back
+  and requires the comment to state that number. Red/green is over the comment: pre-round source fails
+  the last assertion. No release — comment and test only (`D-087`, `A36`, VALIDATION Round 83).
+  Evidence `.rsi/evidence/round-031/`.
 - Round 30 (this round): a base64-wrapped *GnuPG* private key (`base64`d keyring export, key in a
   JSON field) reached reports verbatim — round 29 closed only the PEM half. `base64-private-key` now
   carries nine literals: the `PRIVATE` and legacy `SECRET` banner at all three group alignments; the

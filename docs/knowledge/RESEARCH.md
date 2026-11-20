@@ -1261,3 +1261,28 @@ Source: 只读审计 + 本轮新增实现与单测。依据 = `src/guardian.ts`�
   carries at least 16 characters; base64 `CERTIFICATE` and `PGP PUBLIC KEY BLOCK` stay untouched;
   `lib/script.js` remains byte-identical because `src/script.ts` renders `REDACTION_RULES` at module
   load, so the prompt-side redactor picked the new literals up with no second edit.
+
+## A36 — The integrity record is 122 bytes plus the decimal digits of the byte count (2026-11-20, round 31)
+
+- **Why this entry exists:** the number a reader was given for the writer's payload ceiling was
+  "`maxBytes - 129`", and 129 only holds for a 7-digit `integrity.bytes`. Measured this round on real
+  sealed files: the record is `,"integrity":{"algorithm":"sha256","checksum":"<64 hex>","bytes":<n>}`,
+  i.e. **122 bytes plus the digits of `n`** — 126 bytes for a 4,000-byte payload, 129 at 1,048,447.
+  A constant "129" is right at the ceiling it is quoted for and wrong everywhere else, which is why a
+  comment that quotes it must quote the ceiling too.
+- **The ceiling itself (`CONFIRMED`, at the ceiling):** the largest payload whose file still fits
+  `maxBytes` satisfies `payload + 122 + digits(payload) ≤ 1,048,576`; the self-consistent solution is
+  **1,048,447** (7 digits, 129 bytes of record, file exactly 1,048,576). Writing that payload produces
+  a file of exactly `maxBytes` and reads back intact; 1,048,448 is refused `too-large`.
+- **What was actually wrong:** the behaviour, not the comment. Round 27 already bounded both sides by
+  `maxBytes`, so the writer accepted exactly 1,048,447 before this round too — the defect was a comment
+  that said the refused band ran to 1,048,576, i.e. it claimed 129 bytes of headroom that no caller can
+  use. The round therefore lands *measurement plus a guard*, and the red/green is over the comment, not
+  over behaviour: `test/checkpoint-schema.spec.ts` now derives the record size from a sealed file,
+  solves for the ceiling, writes at it and one byte over, then reads `src/checkpoint/schema.ts` back and
+  requires the comment to name that ceiling. On the pre-round source the same test fails on the last
+  assertion (the comment said 1,048,576).
+- **Exact payload sizing is possible (`CONFIRMED`), and cheap:** evidence rows move a payload in
+  ~2,055-byte steps, but `minContext.digest` is copied verbatim at one byte per character (capped by
+  `digestChars`), so rows set the bulk and the digest trims the remainder. Five `buildCheckpoint` calls
+  plus two real writes size the boundary exactly, in ~570 ms.

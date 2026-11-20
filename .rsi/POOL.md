@@ -130,12 +130,13 @@ here and are marked DONE when their commit lands.
 - STALE (round 29) · "`integrity.bytes` is bounded by `countCeiling` (1,000,000) on read but
   `maxBytes` (1,048,576) on write" — fixed in round 27 (`fd6a5ee`); both sides use `maxBytes`.
   The entry above it (R27 DONE) is the record; this duplicate stayed behind.
-- P · The comment added in round 27 says the refused band runs to 1,048,576, but a sealed file
-  carries a 129-byte integrity record, so `writeCheckpoint`'s file bound caps a legal payload at
-  **1,048,447** (`schema.ts:59`). Cosmetic-only, but it is the carried uncertainty A33 recorded
-  as "left untouched because editing shipped source after the tag would make `lib/` differ from
-  `v0.12.3`" — `0.12.5` rebuilds `lib/` anyway, so that reason no longer applies and the one-line
-  correction is ready for its own round. S / low.
+- R31 DONE · The comment added in round 27 said the refused band runs to 1,048,576, but a sealed
+  file carries the integrity record — **122 bytes plus the decimal digits of the byte count**, so
+  129 at the ceiling — and `writeCheckpoint`'s file bound caps a legal payload at **1,048,447**.
+  The comment now names that ceiling, and `test/checkpoint-schema.spec.ts` derives it from a real
+  sealed file, writes at it and one byte over, then reads the source back and requires the comment
+  to state it (`D-087`, `A36`). The behaviour was already right (round 27) — this round closed the
+  prose and pinned it. Evidence `.rsi/evidence/round-031/`.
 - R10 DONE · `durationMs` is gated on `msCeiling` (`wiring.ts:784-790`, `schema.ts:624`), fixed in
   round 22 and shipped in `0.11.20`.
 - P · `recordableTimeoutMs`'s upper guard is vacuous (`msCeiling === MAX_SAFE_INTEGER`), so a

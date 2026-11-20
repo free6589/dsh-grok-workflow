@@ -859,8 +859,13 @@ export function assertCheckpoint(value: unknown): WorkflowCheckpoint {
       // `bytes` counts the payload the *writer* accepted, so the only bound it
       // can honestly have is the writer's own: `maxBytes`. `countCeiling` bounds
       // row counts, not payload size — checking it here refused every legal
-      // payload between 1,000,000 and 1,048,576 bytes, which sealed and wrote
-      // fine and then read back as `invalid`.
+      // payload between 1,000,000 and the largest the writer can produce, which
+      // sealed and wrote fine and then read back as `invalid`. That largest
+      // payload is not `maxBytes`: `maxBytes` bounds the *file*, and a sealed file
+      // carries the integrity record — 122 bytes plus the decimal digits of the
+      // byte count — so the writer's ceiling for the payload itself is 1,048,447
+      // (a 7-digit count, i.e. a 129-byte record). Pinned by
+      // `test/checkpoint-schema.spec.ts`.
       bytes: inRange(integer(raw['bytes'], 'integrity.bytes'), 1, CHECKPOINT_LIMITS.maxBytes, 'integrity.bytes'),
     }
   }

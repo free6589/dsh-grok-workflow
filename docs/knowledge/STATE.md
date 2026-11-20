@@ -1,3 +1,15 @@
+Last updated: 2026-11-20 10:20 +08:00 (**round-031：检查点「拒绝带」上限的注释多算了 129 字节** —
+行为自 round 27 起就是对的（写入侧双向按 `maxBytes` 收敛），错的是注释：完整性记录不是固定 129 字节，
+而是 **122 字节 + `bytes` 的十进制位数**（4,000 字节载荷配 126 字节、1,048,447 配 129 字节），所以
+`writeCheckpoint` 从 **1,048,448** 就拒绝，真上限是 **1,048,447**。注释改正并点名守卫；
+`test/checkpoint-schema.spec.ts` 新增 1 条：从真实封存文件量出开销→解出上限→在 1,048,447 处写入成功
+（文件正好 1,048,576 字节、读回完整）→1,048,448 处 `too-large`→把 `src/checkpoint/schema.ts` 读回来
+要求注释写出该上限。`npm run ci` exit 0 = **68 文件 / 1236 测试 PASS**（基线 1235，+1）；typecheck 0 错、
+oxlint 24w/0e。红绿：旧码 worktree 里该用例 **1 failed**（注释守卫），新码 **38 passed**。
+文档：`DECISIONS.md` D-087、`RESEARCH.md` A36、`VALIDATION.md` Round 83。证据 `.rsi/evidence/round-031/`。
+**不发版**：只改注释与测试，无用户可见变化，按 `docs/RELEASING.md` 不 bump、不打 tag、`[Unreleased]` 保持空。
+上一版仍是 `0.12.6`（commit `e7150ab`、tag `v0.12.6`、CI `44659057507`、Release `44659061505`）。）
+
 Last updated: 2026-11-20 10:13 +08:00 (**round-030：base64 包裹的 GnuPG 私钥不再原样进报告** —
 round 29 只堵了 PEM 这一半，`base64` 过的 GnuPG 钥匙串导出/JSON 字段里的密钥整块进报告、诊断和
 复查/重试提示词，因为编码形态里根本不存在解码后的横幅。`base64-private-key` 从 3 条标记扩到 9 条

@@ -90,6 +90,34 @@ function evidenceSizedInput(rows: number): CheckpointInput {
   }
 }
 
+/**
+ * Input whose sealed payload is exactly `target` bytes.
+ *
+ * Evidence rows move the payload in ~2,055-byte steps, so they cannot land on a
+ * boundary; the min-context digest is copied verbatim at one byte per character
+ * (capped by `digestChars`), so it trims the remainder. The row count is chosen
+ * first and then the digest fills the difference, which makes an exact byte size
+ * reachable without a search over a megabyte of candidates.
+ */
+function inputOfPayloadBytes(target: number): CheckpointInput {
+  const build = (rows: number, digest: number): CheckpointInput => ({
+    ...evidenceSizedInput(rows),
+    minContext: { digest: 'd'.repeat(digest) },
+  })
+  const payload = (rows: number, digest: number) =>
+    Buffer.byteLength(canonicalJson(stripIntegrity(buildCheckpoint(build(rows, digest), NOW))), 'utf8')
+  const perRow = payload(101, 0) - payload(100, 0)
+  let rows = Math.max(1, Math.floor((target - payload(0, 0)) / perRow))
+  while (rows > 1 && payload(rows, 0) > target) rows -= 1
+  const digest = target - payload(rows, 0)
+  if (digest < 0 || digest > CHECKPOINT_LIMITS.digestChars) {
+    throw new Error(`cannot size a payload of ${target} bytes (rows ${rows}, digest ${digest})`)
+  }
+  const sized = payload(rows, digest)
+  if (sized !== target) throw new Error(`payload of ${target} bytes came out ${sized}`)
+  return build(rows, digest)
+}
+
 function payloadBytesForRows(rows: number): number {
   return Buffer.byteLength(canonicalJson(stripIntegrity(buildCheckpoint(evidenceSizedInput(rows), NOW))), 'utf8')
 }
@@ -491,6 +519,41 @@ describe('atomic writer', () => {
     expect(read.integrity!.bytes).toBe(bytes)
     expect(read.integrity!.checksum).toBe(result.checksum)
     expect(verifyCheckpointIntegrity(read)).toEqual({ ok: true })
+  })
+
+  it('bounds the payload by the file bound minus the integrity record', async () => {
+    // `maxBytes` bounds the file, and a sealed file carries the integrity record,
+    // so the payload the writer can accept stops short of it. Measure the record
+    // instead of repeating the arithmetic in the comment: the gap comes from a
+    // real sealed file, and the ceiling is then written at, and one byte over.
+    const sample = sealCheckpoint(buildCheckpoint(inputOfPayloadBytes(4_000), NOW))
+    const sampleBytes = sample.integrity!.bytes
+    const fixed = Buffer.byteLength(canonicalJson(sample), 'utf8') - sampleBytes - String(sampleBytes).length
+    expect(fixed).toBe(122)
+    // The record repeats the byte count in decimal, so its size follows the digit
+    // count: the ceiling is the largest payload that still fits the file bound
+    // together with its own record, which is why it is not simply `maxBytes - 129`.
+    let cap: number = CHECKPOINT_LIMITS.maxBytes
+    for (let digits = 1; digits <= 7; digits += 1) {
+      const candidate = CHECKPOINT_LIMITS.maxBytes - fixed - digits
+      if (String(candidate).length === digits) cap = candidate
+    }
+    expect(cap).toBe(1_048_447)
+
+    const atCap = await writeCheckpoint(target(), inputOfPayloadBytes(cap))
+    expect(atCap.bytes).toBe(CHECKPOINT_LIMITS.maxBytes)
+    // The reader's bound accepts the file the writer produced at the ceiling.
+    expect((await readCheckpoint(target())).integrity!.bytes).toBe(cap)
+
+    await expect(writeCheckpoint(target(), inputOfPayloadBytes(cap + 1)))
+      .rejects.toMatchObject({ reason: 'too-large' })
+
+    // The comment on `integrity.bytes` quotes this ceiling; read the source back so
+    // the number a reader is told cannot drift from the one the writer enforces.
+    const source = await readFile(new URL('../src/checkpoint/schema.ts', import.meta.url), 'utf8')
+    const start = source.indexOf('`bytes` counts the payload')
+    expect(start).toBeGreaterThan(0)
+    expect(source.slice(start, start + 1_200)).toContain(cap.toLocaleString('en-US'))
   })
 
   it('replaces an existing checkpoint atomically on a second write', async () => {

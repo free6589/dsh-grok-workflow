@@ -939,3 +939,31 @@ no history is rewritten, and no round is force-pushed.
   heartbeat beyond 2026-11-20T10:01:50Z, because this subagent is refused `schedule_*`
   (`A delegated subagent cannot use scheduled tasks`) and the row's rrule ends there.
 - **status:** OK
+
+## Round 31 — the checkpoint comment claimed a payload ceiling 129 bytes too high
+
+- **Theme:** `.rsi/POOL.md` checkpoint section, first non-DONE entry — the round-27 comment that said
+  the refused band runs to 1,048,576, which is also the first carried uncertainty named in the 0.12.5
+  handoff.
+- **What was wrong, exactly:** the integrity record is not a fixed 129 bytes; it is
+  `,"integrity":{"algorithm":"sha256","checksum":"<64 hex>","bytes":<n>}`, i.e. **122 bytes plus the
+  decimal digits of `n`** — 126 for a 4,000-byte payload, 129 at 1,048,447. The writer refuses from
+  1,048,448, so the prose was 129 bytes optimistic. The behaviour had been correct since round 27:
+  this round is measurement plus a guard, not a behaviour fix.
+- **Change:** `src/checkpoint/schema.ts` comment now states 1,048,447 with the arithmetic and names the
+  guard; `test/checkpoint-schema.spec.ts` gained one test that measures the record from a real sealed
+  file, solves for the ceiling, writes at it (file exactly 1,048,576 bytes, reads back intact) and one
+  byte over (`too-large`), then reads `src/checkpoint/schema.ts` back and requires the comment to name
+  the ceiling. `lib/` rebuilt. `D-087`, `A36`, VALIDATION Round 83.
+- **Red/green:** pre-round tree (`git archive 949c1c1` + new spec, `/tmp/rsi-old-031`):
+  `npx vitest run test/checkpoint-schema.spec.ts -t "bounds the payload"` → **1 failed | 37 skipped**
+  at the comment assertion. Fixed tree → **38 passed** (baseline 37). `npm run ci` **68 files / 1236
+  tests PASS**, typecheck 0, oxlint 24w/0e.
+- **No release, on purpose:** comment and test only — no user-visible change, no config/API/report
+  change, so no version bump, no tag, and no `[Unreleased]` entry (`docs/RELEASING.md` version rule).
+  `lib/checkpoint/schema.js` is rebuilt anyway; `npm run verify:lib` after the commit is the check that
+  the pair still matches.
+- **Evidence:** `.rsi/evidence/round-031/` (`red-old.txt`, `red-new.txt`, `ci.txt`, `verify-lib-post.txt`).
+- **Unverified (`NOT_RUN`):** nothing behavioural; the changed line is a comment and the added test
+  runs offline against real writer calls.
+- **status:** OK

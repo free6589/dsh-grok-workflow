@@ -1,5 +1,23 @@
 # Agent Handoff
 
+## 2026-11-20 — round-031：检查点上限注释多算 129 字节（`CONFIRMED`，不发版）
+
+- **From:** agent-73（RSI round 31 子代理）· **To:** 下一轮接手者 / 主会话
+- **选题（`CONFIRMED`）**：`POOL.md` checkpoint 一节第一条非 DONE 项，也是 `0.12.5` HANDOFF 里点名的
+  第一条遗留不确定性（注释准确性）。选题前对表：`src/checkpoint/schema.ts:859-864` 仍写 1,048,576。
+- **结论（`CONFIRMED`）**：完整性记录 = **122 字节 + `bytes` 的十进制位数**（4,000 字节载荷 126 字节、
+  1,048,447 配 129 字节），所以写入侧从 **1,048,448** 就拒绝；真上限 **1,048,447**。**行为自 round 27
+  起就是对的，错的是注释**——本轮是「测量 + 守卫」，无行为修复。
+- **改动**：`src/checkpoint/schema.ts` 注释改为 1,048,447 并写出算式；`test/checkpoint-schema.spec.ts`
+  新增 1 条（量开销 → 解上限 → 1,048,447 写入成功且文件正好 1,048,576 B → 1,048,448 `too-large` →
+  读回源码要求注释写出该数）；`lib/` 重建。`D-087`、`A36`、VALIDATION Round 83。
+- **红绿**：旧码 worktree `-t "bounds the payload"` → **1 failed | 37 skipped**（注释守卫）；新码
+  **38 passed**。`npm run ci` **68 文件 / 1236 测试 PASS**。证据 `.rsi/evidence/round-031/`。
+- **不发版（记录理由）**：只改注释与测试，无用户可见变化，按 `docs/RELEASING.md` 不 bump、不打 tag、
+  `CHANGELOG.md` 的 `[Unreleased]` 保持空。当前版本仍是 `0.12.6`。
+- **遗留三条仍在**（详见下节）：base64 折行 <24 列不匹配（M/low）、宿主内存版本不可观测、GUI 手点
+  `NOT_RUN`；以及**心跳行 rrule 只到 2026-11-20T10:01:50Z，需主会话续订**。
+
 ## 2026-11-20 — round-030：base64 包裹的 GnuPG 私钥不再原样进报告（`CONFIRMED`，已发版 `0.12.6`）
 
 - **From:** agent-73（RSI round 30 子代理）· **To:** 下一轮接手者 / 主会话

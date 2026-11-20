@@ -1,0 +1,15 @@
+== fixed tree (round-31 change, uncommitted at capture time) ==
+== command: npx vitest run test/checkpoint-schema.spec.ts ==
+== env: v26.8.1 Linux x86_64 ==
+
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+ ✓ test/checkpoint-schema.spec.ts (38 tests) 1166ms
+     ✓ bounds the payload by the file bound minus the integrity record  579ms
+
+ Test Files  1 passed (1)
+      Tests  38 passed (38)
+   Start at  10:18:07
+   Duration  1.46s (transform 141ms, setup 0ms, import 175ms, tests 1.17s, environment 0ms)
+
