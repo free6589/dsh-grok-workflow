@@ -1,0 +1,25 @@
+Independent delivery evidence for the RSI heartbeat row
+Source A: host-written session transcript, decompressed for this check
+$ zstd -dc ~/.dsh/sessions/--home-fish-projects_mine-dsh-grok-workflow--/session-3a683cb6-1eaa-4b33-9eb9-57e1ef0b955b/session.v4.jsonl.zstd > /tmp/sess-3a683cb6.jsonl
+selector: event type == user/message AND data.source.kind == "schedule" AND text contains "REMINDER BATCH"
+
+transcript line 3956: 1 reminder(s)
+   schedule_id=schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab  occurrence_at=2026-11-20T01:01:50.000Z  prompt_chars=3239
+transcript line 4389: 1 reminder(s)
+   schedule_id=schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab  occurrence_at=2026-11-20T02:01:50.000Z  prompt_chars=3239
+transcript line 4484: 1 reminder(s)
+   schedule_id=schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab  occurrence_at=2026-11-20T03:01:50.000Z  prompt_chars=3239
+transcript line 4889: 1 reminder(s)
+   schedule_id=schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab  occurrence_at=2026-11-20T04:01:50.000Z  prompt_chars=3239
+transcript line 5568: 1 reminder(s)
+   schedule_id=schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab  occurrence_at=2026-11-20T05:01:50.000Z  prompt_chars=3239
+
+Source B: Schedule store rows (host-written), deliveryHistory
+   scheduledAt=2026-11-20T01:01:50.000Z  deliveredAt=2026-11-20T01:02:00.707Z  messageId=892c091e-7d3c-4054-9abb-58e89c4d8452
+   scheduledAt=2026-11-20T02:01:50.000Z  deliveredAt=2026-11-20T02:01:50.081Z  messageId=c5019813-fd87-42d5-94c7-ffa00c456ad6
+   scheduledAt=2026-11-20T03:01:50.000Z  deliveredAt=2026-11-20T03:01:50.247Z  messageId=2ff80a3c-5bc0-4850-8748-47233bc75f9d
+   scheduledAt=2026-11-20T04:01:50.000Z  deliveredAt=2026-11-20T04:01:50.157Z  messageId=fd404ffa-7566-4e94-9741-361b8f523d14
+   scheduledAt=2026-11-20T05:01:50.000Z  deliveredAt=2026-11-20T05:01:50.070Z  messageId=ef163f3d-bb3b-4895-ac3b-827ce8969bd6
+
+Total deliveries on record: 5 of COUNT=10 -> rows left after the last delivery: 5
+All of these precede any re-arm; none of them can serve as 'delivery after re-arm'.

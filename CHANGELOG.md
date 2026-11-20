@@ -5,6 +5,26 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.12.10] - 2026-11-20
+
+### Fixed / 修复
+
+- **An unknown configuration key one level down is refused instead of dropped / 配置里深一层的未知键不再被静默丢弃** —
+  only the top level of the configuration was checked, so a role name this build does not route
+  (`roles.reviewer`) and a route field typo (`maxInflight` written for `maxInFlight`) were discarded
+  while the stored patch kept them: the patch read as configured and the run ignored it. The reader
+  now checks all three levels and refuses with the full path (`roles.worker[0].maxInflight`), naming
+  the closest accepted key, exactly as a top-level key always was. A valid patch is unaffected.
+  **Migration:** delete the key the error names, there is no replacement for it; the five accepted
+  role names are `planner`, `worker`, `verifier`, `synthesizer`, `supervisor`, and the three accepted
+  route fields are `provider`, `model`, `maxInFlight`.
+  / 配置原先只查最外层，所以本构建不路由的角色名（`roles.reviewer`）和路由字段的手误
+  （把 `maxInFlight` 写成 `maxInflight`）会被直接丢掉，而补丁里还留着——看着配好了，运行时当它
+  不存在。现在三层都查，拒绝时报出完整路径（`roles.worker[0].maxInflight`）并给出最接近的可用键，
+  与最外层一直以来的处理一致；合法补丁不受影响。**迁移：** 把报错点名的键删掉，它没有替代值；
+  可用的五个角色名是 `planner`、`worker`、`verifier`、`synthesizer`、`supervisor`，可用的三个
+  路由字段是 `provider`、`model`、`maxInFlight`。
+
 ## [0.12.9] - 2026-11-20
 
 ### Fixed / 修复

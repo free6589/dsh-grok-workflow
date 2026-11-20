@@ -241,7 +241,11 @@ the entry id (`grok-workflow`), reports `applies: 'live'` and `autoGenerate`
 revision check (`SETTINGS_CONFLICT`) into the profile patch file. The plugin
 declares `ctx.settings.configure({ auto: true })` in `apply()` (soft failure on
 runtimes without the hook) and validates its own configuration at load:
-unknown keys are refused, `configVersion` is bounded, and every configured
+unknown keys are refused at every level the reader accepts — the top level, a
+role name under `roles`, and a field of a route object (`assertKnownNestedKeys()`,
+`ROLE_KEYS` / `ROUTE_KEYS`; the exported schema passes unknown *nested* keys
+through to `apply()` unchanged, measured in RESEARCH A39, so the reader is where
+that refusal has to happen) —, `configVersion` is bounded, and every configured
 route — all five routed roles, `supervisor` included, since its route is read
 from the same table and it runs per task after that task's verifier — is checked
 against `llm.listProviders()` plus, where the provider enumerates them, its

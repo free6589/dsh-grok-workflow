@@ -4784,3 +4784,49 @@ commit/tag/CI/Release 均取自已提交记录，无编造）后门禁码变为 
 | `tag -a v0.12.9` + `push main` + `push tag` | 成功，无 force-push，旧标签未动 |
 | 远端 CI `44673443254` | success |
 | Release `44673449471` | success；Release `Grok Workflow for DSH v0.12.9` + asset `dsh-grok-workflow-0.12.9.tgz` |
+
+## Round 88 — 2026-11-20 — round-035：配置里深一层的未知键被静默丢弃（`CONFIRMED`，发版 `0.12.10`）
+
+**选题（`CONFIRMED`）**：`POOL.md` 顶部的 Configuration 项——`assertKnownKeys` 只查最外层，
+`roles.reviewer`（本构建不路由的角色名）与路由字段手误（`maxInflight` 写成 `maxInFlight`）
+被丢掉，而存下来的补丁里还留着。测于提交的 `lib/config.js`（`.rsi/evidence/round-035/nested-key-probe.mjs`）：
+`roles.reviewer` 载入后只剩五个角色、`weight`/`maxInflight` 载入后只剩 `model`，最外层
+`maxRetires` 照旧被拒。
+
+**关键测量（`A39`）**：导出的 `Config` schema 对**深一层**的未知键是**透传**，不是丢弃——
+`Config({ roles: { reviewer: [{ model: 'r1' }] } })` 的输出里 `roles` 仍带 `reviewer`。
+所以拒绝只能发生在 `resolveConfig` 的读取侧；放在 schema 里会直接让整行 `did not activate`，
+而放在读取侧与最外层现有的失败方式一致（`resolveConfig` 抛错→`readConfig` 无修复项→原样抛出）。
+
+**改动**：`src/config.ts` 新增 `ROLE_KEYS`/`ROUTE_KEYS` 与 `closestKey()`，`assertKnownKeys`
+拆出 `assertKnownNestedKeys()` 走 `roles.<角色>` 与 `roles.<角色>[<i>].<字段>` 两层，报错带完整
+路径与最接近的可用键；裸模型 id 简写与非数组链跳过（各自仍由 `resolveChain` 报错）。
+`test/config.spec.ts` +1 用例（角色名/字段手误/第二条路由的下标、schema 往返、五角色三字段
+与裸简写的不过度拒绝、两个键集与 `Object.keys(resolveConfig({}).roles)` 对齐）。
+`README.md`/`README.zh-CN.md`/`docs/ARCHITECTURE.md` 各一段说明与迁移口径。
+
+**红绿（`CONFIRMED`，本 attempt 独立实跑）**：把 `assertKnownNestedKeys(config.roles)` 调用去掉
+（即修复前的「只查最外层」行为）后 `test/config.spec.ts` **1 failed / 37 passed**，失败点正是
+`roles.reviewer` 未抛错（`.rsi/evidence/round-035/red-spec.txt`）；恢复后 **38 passed**。
+修复前用提交版 `lib/` 跑的行为探针见 `red-probe.txt`。
+
+**命令与结果（`CONFIRMED`）**：`npm run ci` exit 0 = **68 文件 / 1233 测试 PASS**（基线 68/1232，
++1）；typecheck 0 错；oxlint **24 warnings / 0 errors**；`npm run verify:lib` 在 `HEAD` 上
+`153 files byte-identical`（该脚本比对的是**已提交**的 src/lib 对，因此提交后需复跑，见 Round 89）。
+
+**未验证（`NOT_RUN`）**：真机 GUI 手点（需已认证浏览器会话）；真实定时投递（操作方动作，D-066）；
+`roles` 传非对象的纯程序化路径（已入池，非本轮范围）。
+
+## Round 88 — 2026-11-20 — R35：嵌套未知配置键（`CONFIRMED`，未发版）
+
+**主题**：POOL 池顶 `P ·` 项（S/medium，需迁移说明）——未知键只在顶层被拒，深一层静默丢弃。
+
+**改动**：`src/config.ts`（`ROLE_KEYS`/`ROUTE_KEYS` + `assertKnownKeys` 三层检查 +
+最接近键提示）；`test/config.spec.ts` +2 用例；两份 README 迁移说明；
+`CHANGELOG.md` 双语 Fixed；`lib/` 重建；版本号 `0.12.10`。
+
+**命令与结果（`CONFIRMED`，本树实跑）**：新用例旧码上失败；
+修后 `test/config.spec.ts` 全绿；`npm run ci` exit 0 = **68 文件 / 1233 测试 PASS**；
+`npm run verify:lib` 提交时复核。证据 `.rsi/evidence/round-035/`。
+
+**未验证（`NOT_RUN`）**：真机 GUI；真实定时投递。

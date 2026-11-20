@@ -1,0 +1,505 @@
+
+> dsh-grok-workflow@0.12.10 ci
+> npm run typecheck && npm run lint && npm run verify:lib && npm test
+
+
+> dsh-grok-workflow@0.12.10 typecheck
+> tsc -p tsconfig.json --noEmit
+
+
+> dsh-grok-workflow@0.12.10 lint
+> oxlint src test
+
+
+  ! eslint(no-unused-vars): Interface 'TaskRow' is declared but never used.
+     ,-[test/timeout-config.spec.ts:245:13]
+ 244 | 
+ 245 |   interface TaskRow {
+     :             ^^^|^^^
+     :                `-- 'TaskRow' is declared here
+ 246 |     id: string
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'agent' is declared but never used. Unused variables should start with a '_'.
+     ,-[test/human-output-contract.spec.ts:358:13]
+ 357 |     const mounted = await mount()
+ 358 |     const { agent, done } = await deliver(mounted)
+     :             ^^|^^
+     :               `-- 'agent' is declared here
+ 359 |     mounted.engine.runs[0]!.complete(completedReport(objectiveOf(mounted)))
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'agent' is declared but never used. Unused variables should start with a '_'.
+     ,-[test/human-output-contract.spec.ts:379:13]
+ 378 |     const mounted = await mount()
+ 379 |     const { agent, done } = await deliver(mounted)
+     :             ^^|^^
+     :               `-- 'agent' is declared here
+ 380 |     mounted.engine.runs[0]!.complete(partialReport(objectiveOf(mounted)))
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'agent' is declared but never used. Unused variables should start with a '_'.
+     ,-[test/human-output-contract.spec.ts:396:13]
+ 395 |     const mounted = await mount()
+ 396 |     const { agent, done } = await deliver(mounted)
+     :             ^^|^^
+     :               `-- 'agent' is declared here
+ 397 |     mounted.engine.runs[0]!.fail('error', 'boom')
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'agent' is declared but never used. Unused variables should start with a '_'.
+     ,-[test/human-output-contract.spec.ts:414:13]
+ 413 |     const mounted = await mount()
+ 414 |     const { agent, done } = await deliver(mounted)
+     :             ^^|^^
+     :               `-- 'agent' is declared here
+ 415 |     mounted.engine.runs[0]!.complete(completedReport(objectiveOf(mounted)))
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'agent' is declared but never used. Unused variables should start with a '_'.
+     ,-[test/human-output-contract.spec.ts:428:13]
+ 427 |     const mounted = await mount()
+ 428 |     const { agent, done } = await deliver(mounted)
+     :             ^^|^^
+     :               `-- 'agent' is declared here
+ 429 |     mounted.engine.runs[0]!.complete(partialReport(objectiveOf(mounted)))
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'agent' is declared but never used. Unused variables should start with a '_'.
+     ,-[test/human-output-contract.spec.ts:474:13]
+ 473 |     const mounted = await mount()
+ 474 |     const { agent, done } = await deliver(mounted)
+     :             ^^|^^
+     :               `-- 'agent' is declared here
+ 475 |     mounted.engine.runs[0]!.complete(partialReport(objectiveOf(mounted)))
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Identifier 'LoopError' is imported but never used.
+   ,-[test/iterate.spec.ts:7:3]
+ 6 |   LOOP_TASK_TITLE,
+ 7 |   LoopError,
+   :   ^^^^|^^^^
+   :       `-- 'LoopError' is imported here
+ 8 |   createLoopService,
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'ITERATE_ROUTE_PATH' is imported but never used.
+    ,-[test/heartbeat-identity.spec.ts:34:3]
+ 33 | import {
+ 34 |   ITERATE_ROUTE_PATH,
+    :   ^^^^^^^^^|^^^^^^^^
+    :            `-- 'ITERATE_ROUTE_PATH' is imported here
+ 35 |   ITERATE_TASK_TITLE,
+    `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Parameter 'draft' is declared but never used. Unused parameters should start with a '_'.
+     ,-[src/client/index.js:797:24]
+ 796 |      */
+ 797 |     function comboWarn(draft) {
+     :                        ^^|^^
+     :                          `-- 'draft' is declared here
+ 798 |       return false
+     `----
+  help: Consider removing this parameter.
+
+  ! eslint(no-unused-vars): Function 'ScalarField' is declared but never used.
+      ,-[src/client/index.js:1180:14]
+ 1179 | 
+ 1180 |     function ScalarField(props) {
+      :              ^^^^^|^^^^^
+      :                   `-- 'ScalarField' is declared here
+ 1181 |       const { field, draft, disabled, onChange, t } = props
+      `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Function 'ClassPicker' is declared but never used.
+      ,-[src/client/index.js:1213:14]
+ 1212 |     // site is explicit instead of a silent deletion.
+ 1213 |     function ClassPicker(props) {
+      :              ^^^^^|^^^^^
+      :                   `-- 'ClassPicker' is declared here
+ 1214 |       return null
+      `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Parameter 'props' is declared but never used. Unused parameters should start with a '_'.
+      ,-[src/client/index.js:1213:26]
+ 1212 |     // site is explicit instead of a silent deletion.
+ 1213 |     function ClassPicker(props) {
+      :                          ^^|^^
+      :                            `-- 'props' is declared here
+ 1214 |       return null
+      `----
+  help: Consider removing this parameter.
+
+  ! eslint(no-unused-vars): Function 'TriageModelPicker' is declared but never used.
+      ,-[src/client/index.js:1317:14]
+ 1316 |     // page) so the removal site is explicit instead of a silent deletion.
+ 1317 |     function TriageModelPicker(props) {
+      :              ^^^^^^^^|^^^^^^^^
+      :                      `-- 'TriageModelPicker' is declared here
+ 1318 |       return null
+      `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Parameter 'props' is declared but never used. Unused parameters should start with a '_'.
+      ,-[src/client/index.js:1317:32]
+ 1316 |     // page) so the removal site is explicit instead of a silent deletion.
+ 1317 |     function TriageModelPicker(props) {
+      :                                ^^|^^
+      :                                  `-- 'props' is declared here
+ 1318 |       return null
+      `----
+  help: Consider removing this parameter.
+
+  ! eslint(no-unused-vars): Variable 'enumRow' is declared but never used. Unused variables should start with a '_'.
+      ,-[src/client/index.js:1461:13]
+ 1460 |       const fieldByKey = (key) => FIELDS.find((field) => field.key === key)
+ 1461 |       const enumRow = (key) => {
+      :             ^^^|^^^
+      :                `-- 'enumRow' is declared here
+ 1462 |         const field = fieldByKey(key)
+      `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Function 'resolveSwitchOn' is declared but never used.
+     ,-[src/config.ts:643:10]
+ 642 |  */
+ 643 | function resolveSwitchOn(list: FailureClass[] | undefined): FailureClass[] {
+     :          ^^^^^^^|^^^^^^^
+     :                 `-- 'resolveSwitchOn' is declared here
+ 644 |   if (list === undefined || list.length === 0) return []
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Function 'parseSingleRoute' is declared but never used.
+     ,-[src/config.ts:734:10]
+ 733 |  */
+ 734 | function parseSingleRoute(path: string, value: string | undefined): ModelRoute | undefined {
+     :          ^^^^^^^^|^^^^^^^
+     :                  `-- 'parseSingleRoute' is declared here
+ 735 |   const raw = (value ?? '').trim()
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Type alias 'OverrunField' is declared but never used.
+     ,-[src/config.ts:866:6]
+ 865 | /** @see {@link LimitField} */
+ 866 | type OverrunField = LegacyLimitField
+     :      ^^^^^^|^^^^^
+     :            `-- 'OverrunField' is declared here
+ 867 | 
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-useless-escape): Unnecessary escape character '['
+     ,-[src/redact.ts:253:348]
+ 252 |     name: 'key-value',
+ 253 |     pattern: /(?<![A-Za-z0-9])((?:[A-Za-z0-9]+[_-]){0,8}(?:api[_-]?key|access[_-]?key(?:[_-]?id)?|private[_-]?key|secret[_-]?access[_-]?key|secret[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|session[_-]?id|client[_-]?secret|token|secret|passphrase|password|passwd|pass|pwd|session|credentials?))(["']?)(\s*[:=]\s*)(?!["'\[{]|required\b|optional\b|enabled\b|disabled\b|true\b|false\b|null\b|none\b)([^\s,;}\]]{6,})/gi,
+     :                                                                                                                                                                                                                                                                                                                                                            ^^
+ 254 |     replacement: '$1$2$3[REDACTED]',
+     `----
+  help: Replace `\[` with `[`.
+
+  ! eslint(no-unused-vars): Type 'RoleName' is imported but never used.
+    ,-[src/run.ts:39:93]
+ 38 | import { redactDeep, redactError, redactSecrets } from './redact.js'
+ 39 | import type { FailureCategory, FinalStatus, IncompleteItem, NormalizedTask, ResolvedConfig, RoleName, WorkflowReport } from './types.js'
+    :                                                                                             ^^^^|^^^
+    :                                                                                                 `-- 'RoleName' is imported here
+ 40 | 
+    `----
+  help: Consider removing this import.
+
+  ! unicorn(no-useless-spread): Using a spread operator here creates a new object unnecessarily.
+     ,-[src/gate.ts:639:7]
+ 638 |     lines.push('', '取消前保留的工作流报告：', humanConclusion(report, {
+ 639 |       ...opts.lang === undefined ? {} : { lang: opts.lang },
+     :       ^^^
+ 640 |     }))
+     `----
+  help: `opts.lang === undefined ? {} : { lang: opts.lang }` returns a new object. Spreading it into an object expression to create a new object is redundant.
+
+  ! unicorn(no-useless-spread): Using a spread operator here creates a new object unnecessarily.
+      ,-[src/gate.ts:1131:9]
+ 1130 |       return relayText(answer.report, answer.header, {
+ 1131 |         ...answer.lang === undefined ? {} : { lang: answer.lang },
+      :         ^^^
+ 1132 |       })
+      `----
+  help: This expression returns a new object. Spreading it into an object expression to create a new object is redundant.
+
+  ! eslint(no-unused-vars): Class 'RecordingSession' is declared but never used.
+     ,-[test/gate.spec.ts:184:7]
+ 183 | /** Session that records surface appends, used by the append-strategy tests. */
+ 184 | class RecordingSession {
+     :       ^^^^^^^^|^^^^^^^
+     :               `-- 'RecordingSession' is declared here
+ 185 |   readonly id = 'sess-recording'
+     `----
+  help: Consider removing this declaration.
+
+Found 24 warnings and 0 errors.
+Finished in 61ms on 114 files with 96 rules using 6 threads.
+
+> dsh-grok-workflow@0.12.10 verify:lib
+> node scripts/verify-lib.mjs
+
+client bundle: 237735 bytes → lib/client.js
+lib/ at 91ed287 is the build of src/ at 91ed287 (153 files, byte-identical)
+
+> dsh-grok-workflow@0.12.10 test
+> npm run build && vitest run
+
+
+> dsh-grok-workflow@0.12.10 build
+> tsc -p tsconfig.build.json && node scripts/build-client.mjs
+
+client bundle: 237735 bytes → lib/client.js
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+(node:3052596) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGTERM listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:3052596) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGINT listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:3052596) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGHUP listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+ ✓ test/gate.spec.ts (52 tests) 12195ms
+     ✓ rejects an admitted user message and starts exactly one run  431ms
+     ✓ routes one user message only once even when pre-step fires again  318ms
+     ✓ serializes a second message instead of running it concurrently  604ms
+     ✓ admits a second message while the first run is still open (in-turn serializes, T4)  659ms
+     ✓ admits while a run is open without waiting for idle (in-turn, T4)  607ms
+     ✓ reads history when the run starts so a queued follow-up sees the previous answer  613ms
+     ✓ never retries a refused batch on its own (host re-send is the only path)  622ms
+     ✓ writes a redacted routing ledger when a route switched during the run  362ms
+     ✓ delivers the validated report in the open turn (in-turn, T4)  310ms
+     ✓ prepends a plain-language summary in full mode (B plan)  310ms
+     ✓ never dresses a failed run in the success header (B plan)  354ms
+     ✓ delivers an explicit failure answer when the engine reports an error  357ms
+     ✓ delivers a failure answer when report validation rejects the engine value  353ms
+     ✓ forwards bounded conversation history for a follow-up message  304ms
+     ✓ does not read back the message it just committed (in-turn, B06)  354ms
+     ✓ admits a 4000-character message at the 32000-character objective limit  300ms
+     ✓ admits a 4001-character message at the 32000-character objective limit  307ms
+     ✓ admits a 10000-character message at the 32000-character objective limit  317ms
+     ✓ admits a 32000-character message at the 32000-character objective limit  321ms
+     ✓ records the delivery durably so a restart cannot start the run again  312ms
+     ✓ keeps working when the session refuses the delivery record  314ms
+     ✓ admits every session regardless of preset (gate always on, T4)  610ms
+     ✓ keeps the turn open, then enters the step with the validated report  360ms
+     ✓ renders the first user message while the run is still in flight (P0-5)  349ms
+     ✓ enters a failure report when the run failed, so the user is never left without output  356ms
+     ✓ stops waiting when the turn aborts mid-run and does not hang  354ms
+     ✓ answers when the plugin is unloaded mid-run  352ms
+     ✓ writes no routing ledger when the engine failed before a report existed  352ms
+     ✓ hands the second round a digest of the first round instead of a blank slate  395ms
+     ✓ sends no carry-over on a first round  305ms
+(node:3052697) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGTERM listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:3052697) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGINT listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:3052697) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGHUP listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+ ✓ test/phase1-dialogue.spec.ts (33 tests) 8287ms
+     ✓ publishes the claimed message, then the report, once each, in that order  454ms
+     ✓ survives a reload: the transcript replays the original message then the report  315ms
+     ✓ in-turn: the claimed message is entered with the answer in the same step (T4)  303ms
+     ✓ in-turn: the original message and the report are both in the durable log (T4)  305ms
+     ✓ hands the quick worker the original request together with the choice  333ms
+     ✓ hands the team the original request together with the choice  714ms
+     ✓ never lets another session answer this session’s question  665ms
+     ✓ consumes a pending question once, so a repeated answer cannot start a second run  659ms
+     ✓ says the question is void when the user answers something else  331ms
+     ✓ keeps an earlier unanswered request when a second question arrives (B04)  700ms
+     ✓ cuts the resumed request to the objective budget instead of refusing the run (B08)  726ms
+     ✓ tells a cancellation apart from a provider failure  352ms
+     ✓ cancels the running engine once and reports the stop, without a retry  353ms
+     ✓ keeps the tasks that had already been verified when the run is stopped  349ms
+     ✓ turns a deadline into its own terminal state (regression, T4 fixed deadline)  332ms
+     ✓ names an unload as an unload, not as a caller cancellation  360ms
+     ✓ keeps the typed message once and writes the cancelled terminal when the run is stopped  358ms
+     ✓ writes verified partial work into the cancelled transcript  370ms
+ ✓ test/lifecycle-disposal.spec.ts (15 tests) 6608ms
+     ✓ records what it cancelled before it cancels it  723ms
+     ✓ distinguishes an unload cancellation from a caller cancellation  315ms
+     ✓ tells the interrupted session exactly once, and says what was lost  616ms
+     ✓ says the process was shutting down when a signal arrived first  308ms
+     ✓ cancels the runs even when the session refuses both the notice and the record  306ms
+     ✓ one session can no longer starve every other session  950ms
+     ✓ counts an admitted run that has not started yet against its own session only  911ms
+     ✓ keeps a process-wide backstop and names the sessions holding it  2424ms
+ ✓ test/gate-partial-head.spec.ts (12 tests) 5560ms
+     ✓ opens with the head, not with the ledger, on the front desk team path  796ms
+     ✓ says the same in English, in the same order  636ms
+     ✓ gives the full-mode path the same head (no path composes its own)  305ms
+     ✓ always shows the head (humanSummary fixed on, T4)  634ms
+     ✓ states the failure and what to do about it  637ms
+     ✓ keeps the failure marker out of the success path  633ms
+     ✓ keeps the human block first and the machine report folded behind it  631ms
+     ✓ hides the routing ledger from the visible block by default  639ms
+     ✓ keeps diagnostics off (showDiagnostics fixed false, T4)  644ms
+(node:3053092) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGTERM listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:3053092) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGINT listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:3053092) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGHUP listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+ ✓ test/triage.spec.ts (43 tests) 4303ms
+     ✓ a session /grok record forces the full workflow even when the deployment uses the front desk  501ms
+     ✓ answers a simple task with one worker and says so  319ms
+     ✓ runs the whole workflow for a complex request and greets the user  711ms
+     ✓ asks one question instead of guessing, and remembers the answer  1073ms
+     ✓ hands the worker the answered request and the new work in the same message (B05)  336ms
+     ✓ upgrades to the team when the message asks for it  695ms
+     ✓ retries once with a structured answer when the plain call returns nothing  306ms
+     ✓ keeps the pre-t52 text when the front desk is off  319ms
+ ✓ test/plugin-lifecycle.spec.ts (17 tests) 3692ms
+     ✓ registers the tool and prompt section, then executes through the workflow engine  455ms
+     ✓ accepts an objective exactly at the limit  329ms
+     ✓ enforces the fixed per-session run cap (maxActiveRuns=2, T4)  708ms
+     ✓ cancels and disposes active runs during plugin unload  356ms
+     ✓ rejects a malformed successful workflow report instead of trusting it  357ms
+     ✓ returns the canonical validated report and drops unknown engine fields  363ms
+     ✓ rejects a complete-shaped report whose task status contradicts completed  353ms
+     ✓ returns a failed report when the deadline cancels the run  346ms
+ ✓ test/reliability.spec.ts (25 tests) 3566ms
+     ✓ reports a deliberate stop as cancelled instead of blaming configuration  460ms
+     ✓ files a deliberate stop under its own category when it produces a report  353ms
+     ✓ starts one workflow per user message even when pre-step fires again  304ms
+     ✓ cancels in-flight runs and refuses new work when the plugin unloads  354ms
+     ✓ starts clean after a reload instead of inheriting the old queue  587ms
+     ✓ uses the live roles chain for a gated run, not the load-time snapshot  301ms
+(node:3053327) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/progress.spec.ts (12 tests) 3281ms
+     ✓ records run-start, one row per subagent, then run-end  1027ms
+     ✓ closes the node as cancelled when the caller cancels  362ms
+     ✓ leaves the workflow intact when the session refuses every progress append  918ms
+     ✓ always writes progress (showProgress fixed on, T4), and still runs the workflow  917ms
+(node:3053347) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+stdout | test/checkpoint-engine-wire.spec.ts > engine wiring writes real checkpoints > records a verified run: tasks, five-role agent rows, evidence, and no extra model calls
+[smoke] status=completed file=/tmp/dsh-grok-workflow-test-checkpoints/checkpoint-12b3f9d6-72fc-40ff-8cbe-37eca1f242b2-95b40925.json resume=none reason=the run already completed, so re-driving it would redo verified work
+
+stdout | test/checkpoint-engine-wire.spec.ts > engine wiring writes real checkpoints > records a rejected run and answers the resume question with what to re-drive
+[smoke] status=failed file=/tmp/dsh-grok-workflow-test-checkpoints/checkpoint-ec33e2f4-0210-40b2-97bd-c6597af27773-395e10a4.json resume=resume unfinished=a
+
+ ✓ test/checkpoint-engine-wire.spec.ts (2 tests) 3049ms
+     ✓ records a verified run: tasks, five-role agent rows, evidence, and no extra model calls  1319ms
+     ✓ records a rejected run and answers the resume question with what to re-drive  1729ms
+ ✓ test/objective-limit.spec.ts (17 tests) 3429ms
+     ✓ admits a 4000-character message and forwards the whole objective  462ms
+     ✓ admits a 4001-character message and forwards the whole objective  320ms
+     ✓ admits a 32000-character message and forwards the whole objective  323ms
+     ✓ accepts a 4000-character objective and returns a report carrying it whole  312ms
+     ✓ accepts a 4001-character objective and returns a report carrying it whole  312ms
+     ✓ accepts a 32000-character objective and returns a report carrying it whole  320ms
+     ✓ builds a fallback plan from the whole 4000-character objective when the planner fails  318ms
+     ✓ builds a fallback plan from the whole 4001-character objective when the planner fails  317ms
+     ✓ builds a fallback plan from the whole 32000-character objective when the planner fails  342ms
+     ✓ lib/input.js, lib/intake.js and lib/gate.js carry the same 32000 limit  396ms
+ ✓ test/human-output-contract.spec.ts (10 tests) 2306ms
+     ✓ opens a COMPLETED run with the plain summary, inside the relay markers  465ms
+     ✓ opens a PARTIAL run with the plain summary too, with the honest count  379ms
+     ✓ never dresses a FAILED run in the success sentence  359ms
+     ✓ always delivers the human sentence (humanSummary fixed on, T4)  364ms
+     ✓ folds the ledger below the closing marker, where it stays parseable  366ms
+     ✓ keeps the ledger folded even for a full delivery (T4 fixed)  363ms
+ ✓ test/timeout-config.spec.ts (12 tests) 1540ms
+     ✓ fires the default 3600000 ms deadline with a Timeout report naming the bound  466ms
+     ✓ fires a small configured deadline (120000 ms) with the same Timeout shape  338ms
+     ✓ arms no timer at 0: advancing 24 h leaves the run pending with no Timeout  378ms
+     ✓ reports cause cancelled — not timeout — when the caller aborts an unlimited run  346ms
+ ✓ test/composition.spec.ts (9 tests) 1327ms
+     ✓ enters a user batch inside the full composition and issues no request (in-turn, T4)  431ms
+     ✓ keeps every appended message inside the entered decision in both placements (in-turn, T4)  583ms
+ ✓ test/checkpoint-schema.spec.ts (38 tests) 1390ms
+     ✓ bounds the payload by the file bound minus the integrity record  723ms
+ ✓ test/grok-on-ingress.spec.ts (5 tests) 1082ms
+     ✓ still runs the full team for the message and delivers the report afterwards  419ms
+     ✓ a saturated queue keeps the blocking path instead of promising a background run  497ms
+ ✓ test/triage-recall.spec.ts (28 tests) 765ms
+     ✓ after the fix (earlier round has the research): answered from it, one worker, no re-asking  417ms
+     ✓ answers from a docs/knowledge file that holds the answer  311ms
+ ✓ test/guardian.spec.ts (12 tests) 729ms
+     ✓ runWorkflow wires a resident guardian next to progress and archiver  672ms
+ ✓ test/heartbeat-guard.spec.ts (14 tests) 612ms
+(node:3054408) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/memory-archive.spec.ts (21 tests) 624ms
+ ✓ test/checkpoint-wiring.spec.ts (31 tests) 467ms
+     ✓ writes one cancelled checkpoint when the plugin is unloaded mid-run  372ms
+ ✓ test/loader.spec.ts (3 tests) 417ms
+     ✓ loads the built bundle, registers grok_workflow with the real tool registry, and unregisters on fiber disposal  397ms
+ ✓ test/loop-runtime-wiring.spec.ts (5 tests) 419ms
+     ✓ opens a heartbeat whose rule is the operator's own round cap and interval  323ms
+ ✓ test/issue-watch.spec.ts (2 tests) 274ms
+ ✓ test/config-limits-repair.spec.ts (24 tests) 243ms
+ ✓ test/fallback-shards.spec.ts (16 tests) 234ms
+stderr | test/client.spec.ts > client settings page: reading, failure and retry > keeps still reading, read failed and not served as three different pages
+[grok-workflow] no settings namespace projects this plugin's fields: the row is disabled, renamed with an unreadable projection, or did not activate (see docs/LOCAL-TESTING.md#enable). The Grok workflow page cannot appear until it does.
+
+(node:3054769) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/client.spec.ts (97 tests) 360ms
+ ✓ test/orchestrator.spec.ts (26 tests) 213ms
+ ✓ test/route-concurrency.spec.ts (15 tests) 196ms
+ ✓ test/paths.spec.ts (18 tests) 183ms
+ ✓ test/recovery-kill-restart.spec.ts (3 tests) 171ms
+ ✓ test/routing.spec.ts (25 tests) 157ms
+(node:3054851) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/engine-contract.spec.ts (15 tests) 140ms
+ ✓ test/synthesis-guardrails.spec.ts (17 tests) 139ms
+ ✓ test/command.spec.ts (19 tests) 137ms
+(node:3054902) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/failure-paths.spec.ts (15 tests) 123ms
+ ✓ test/carryover.spec.ts (21 tests) 122ms
+ ✓ test/redact.spec.ts (41 tests) 103ms
+ ✓ test/loop-surface.spec.ts (21 tests) 104ms
+ ✓ test/config.spec.ts (38 tests) 98ms
+(node:3054958) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/team-engine.spec.ts (12 tests) 82ms
+ ✓ test/naming.spec.ts (15 tests) 80ms
+ ✓ test/delivery.spec.ts (14 tests) 75ms
+ ✓ test/loop.spec.ts (35 tests) 76ms
+ ✓ test/recovery-artifacts.spec.ts (9 tests) 75ms
+ ✓ test/loop-brakes.spec.ts (35 tests) 70ms
+ ✓ test/history.spec.ts (16 tests) 61ms
+ ✓ test/records-redaction.spec.ts (4 tests) 56ms
+ ✓ test/delivery-human-block.spec.ts (10 tests) 23ms
+ ✓ test/report.spec.ts (42 tests) 22ms
+ ✓ test/settings-projection.spec.ts (4 tests) 20ms
+ ✓ test/progress-tab.spec.ts (34 tests) 20ms
+ ✓ test/docs-config-keys.spec.ts (12 tests) 18ms
+ ✓ test/heartbeat-identity.spec.ts (16 tests) 15ms
+(node:3055100) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/progress-connector.spec.ts (10 tests) 14ms
+ ✓ test/resume-validator.spec.ts (19 tests) 14ms
+ ✓ test/panel-links.spec.ts (16 tests) 14ms
+ ✓ test/config-synthesis-fallback.spec.ts (8 tests) 15ms
+ ✓ test/mode.spec.ts (18 tests) 12ms
+ ✓ test/input.spec.ts (13 tests) 11ms
+ ✓ test/docs-version.spec.ts (8 tests) 10ms
+ ✓ test/triage-followup.spec.ts (5 tests) 10ms
+ ✓ test/iterate.spec.ts (9 tests) 11ms
+ ✓ test/rsi-ledger.spec.ts (5 tests) 10ms
+ ✓ test/criterion.spec.ts (5 tests) 8ms
+ ✓ test/i18n-parity.spec.ts (6 tests) 7ms
+ ✓ test/intake.spec.ts (14 tests) 7ms
+ ✓ test/docs-architecture-version.spec.ts (3 tests) 5ms
+ ✓ test/iterate-template.spec.ts (7 tests) 5ms
+
+ Test Files  68 passed (68)
+      Tests  1233 passed (1233)
+   Start at  13:03:00
+   Duration  81.96s (transform 1.40s, setup 0ms, import 4.78s, tests 69.49s, environment 7ms)
+

@@ -216,6 +216,16 @@ export declare const CONFIG_VERSION = 1;
  * work", which is the failure mode the settings surface must not have.
  */
 export declare const CONFIG_KEYS: readonly ["toolName", "mode", "grokDefault", "roles", "synthesis", "maxConcurrency", "maxTasks", "timeoutMs", "loopEnabled", "loopMaxRounds", "loopFailStreak", "loopIntervalMin", "iterateIntervalMin", "iterateTemplate", "configVersion"];
+/**
+ * The role names a configuration may route, in the order `resolveConfig` builds them.
+ *
+ * Listed here as well as in `resolveConfig` so the nested key check can name them:
+ * the two lists are pinned against each other by `test/config.spec.ts`, so a role
+ * added to one side cannot be silently unmapped on the other.
+ */
+export declare const ROLE_KEYS: readonly ["planner", "worker", "verifier", "synthesizer", "supervisor"];
+/** The keys one route object may carry; `maxInFlight` is the per-route lane ceiling. */
+export declare const ROUTE_KEYS: readonly ["provider", "model", "maxInFlight"];
 /** Every key removed by the T4 slim-down; a patch that still carries one is rejected (R-06). */
 export declare const REMOVED_CONFIG_KEYS: readonly ["enforceGate", "gateRequired", "gateScope", "gatePreset", "answerStrategy", "triageAsk", "triageModel", "triageClassifier", "triageFollowupAsFast", "instantReceipt", "humanSummary", "showDiagnostics", "historyTurns", "historyChars", "maxQueuedMessages", "maxRetries", "maxActiveRuns", "maxActiveRunsTotal", "subagentProvider", "switchOn", "recordRuns", "recordLimit", "showProgress"];
 /** One stored limit the schema had to clamp, as the parse saw it. */
@@ -483,13 +493,17 @@ export type RouteInput = ModelRoute | string;
 /** Failure classes a user may name in `switchOn`. */
 export declare const SWITCHABLE_CLASSES: readonly ["rate-limit", "server-error", "connection", "timeout", "model-unavailable", "format-error", "agent-start-failed"];
 /**
- * Reject unknown top-level keys instead of letting the schema drop them.
+ * Reject unknown keys instead of letting the loader and the schema drop them.
  *
- * A silently ignored key is indistinguishable from a setting that does not
- * work, and the whole point of the configuration layer (D) is that a user can
- * tell those apart. The message names the closest accepted key.
+ * Three levels are checked, because a dropped key reads identically at every one of
+ * them: a silently ignored setting looks exactly like a setting that does not work,
+ * which is the failure mode the settings surface must not have. The nested levels are
+ * `roles.<role>` (a role name this build does not route — `reviewer` was the reported
+ * typo) and `roles.<role>[<index>].<key>` (a route field, `maxInflight` being the one
+ * the pool reported). The check runs before the chains are normalized, so a route
+ * written as a bare model id is skipped rather than read as an object.
  * @param config - raw user configuration.
- * @throws If a key is not part of the configuration surface.
+ * @throws If a key at any level is not part of the configuration surface.
  */
 export declare function assertKnownKeys(config: Record<string, unknown>): void;
 /**

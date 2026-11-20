@@ -8,6 +8,8 @@ import {
   FIXED_MAX_RETRIES,
   HARD_LIMITS,
   REMOVED_CONFIG_KEYS,
+  ROLE_KEYS,
+  ROUTE_KEYS,
   describeResolvedConfig,
   resolveConfig,
   snapshotConfig,
@@ -51,6 +53,40 @@ describe('configuration surface', () => {
   it('refuses an unknown key instead of silently dropping it', () => {
     expect(() => resolveConfig({ maxRetires: 2 } as never)).toThrow(/unknown configuration key "maxRetires"/)
     for (const key of CONFIG_KEYS) expect(() => resolveConfig({ [key]: undefined } as never)).not.toThrow()
+  })
+
+  it('refuses an unknown key one level down instead of silently dropping it (round 35)', () => {
+    // The pool entry: only the top level was checked, so `roles.reviewer` and a route's
+    // `maxInflight` were discarded while the stored document kept them — a typo looked
+    // exactly like a setting that does not work. Both levels are named now.
+    expect(() => resolveConfig({ roles: { reviewer: [{ model: 'r1' }] } } as never))
+      .toThrow(/unknown configuration key "roles\.reviewer"; accepted roles: planner, worker, verifier, synthesizer, supervisor/)
+    expect(() => resolveConfig({ roles: { worker: [{ model: 'w1', maxInflight: 3 }] } } as never))
+      .toThrow(/unknown configuration key "roles\.worker\[0\]\.maxInflight" \(did you mean "maxInFlight"\?\)/)
+    expect(() => resolveConfig({ roles: { planner: [{ model: 'p1' }, { model: 'p2', weight: 2 }] } } as never))
+      .toThrow(/unknown configuration key "roles\.planner\[1\]\.weight"; accepted route keys: provider, model, maxInFlight/)
+
+    // The same document the host hands over: the schema passes unknown nested keys
+    // through (measured, `A39`), so the refusal has to happen in this reader.
+    const fromSchema = snapshotConfig(Config({ roles: { reviewer: [{ model: 'r1' }] } } as never) as Record<string, unknown>)
+    expect(Object.keys(fromSchema.roles as object)).toContain('reviewer')
+    expect(() => resolveConfig(fromSchema as never)).toThrow(/unknown configuration key "roles\.reviewer"/)
+
+    // No over-reach: the five role names, the three route keys, the bare-id shorthand
+    // and an empty chain all still load, and the two key sets are the surface itself.
+    const ok = resolveConfig({
+      roles: {
+        planner: ['p1'],
+        worker: [{ provider: 'x', model: 'w1', maxInFlight: 2 }],
+        verifier: [],
+        synthesizer: [{ model: 's1' }],
+        supervisor: [],
+      },
+    } as never)
+    expect(Object.keys(ok.roles)).toEqual([...ROLE_KEYS])
+    expect(ok.roles.worker).toEqual([{ provider: 'x', model: 'w1', maxInFlight: 2 }])
+    expect([...ROLE_KEYS]).toEqual(['planner', 'worker', 'verifier', 'synthesizer', 'supervisor'])
+    expect([...ROUTE_KEYS]).toEqual(['provider', 'model', 'maxInFlight'])
   })
 
   it('rejects every removed key as unknown (R-06), with the migration named', () => {

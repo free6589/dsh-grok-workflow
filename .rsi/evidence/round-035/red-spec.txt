@@ -1,0 +1,40 @@
+     ✓ budgets an empty plan exactly like a missing one (t27/F3) 0ms
+     ✓ bounds the run ledger by recordLimit and writes nothing at 0 3ms
+     ✓ names the deadline and every role chain, with "inherit" for an unset role 0ms
+     ✓ shows the chains in order, so a fallback is visible without a run 0ms
+     ✓ travels into the workflow request, so the report can state the deadline 0ms
+     ✓ keeps the task verified and carries the notes into the report 2ms
+     ✓ still fails when the same verifier marks a criterion unmet 3ms
+     ✓ still fails when the verifier verdict is fail, notes or not 3ms
+     ✓ defaults to 60 minutes and carries that value into the request and the log line 0ms
+     ✓ accepts any non-negative integer, including 0 for unlimited 0ms
+     ✓ fails closed on a negative, fractional or non-numeric deadline (R-06) 0ms
+     ✓ refuses the same values in the schema, so a profile patch cannot store one 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/config.spec.ts > configuration surface > refuses an unknown key one level down instead of silently dropping it (round 35)
+AssertionError: expected [Function] to throw an error
+
+- Expected:
+null
+
++ Received:
+undefined
+
+ ❯ test/config.spec.ts:63:8
+     61|     // exactly like a setting that does not work. Both levels are name…
+     62|     expect(() => resolveConfig({ roles: { reviewer: [{ model: 'r1' }] …
+     63|       .toThrow(/unknown configuration key "roles\.reviewer"; accepted …
+       |        ^
+     64|     expect(() => resolveConfig({ roles: { worker: [{ model: 'w1', maxI…
+     65|       .toThrow(/unknown configuration key "roles\.worker\[0\]\.maxInfl…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 37 passed (38)
+   Start at  12:44:16
+   Duration  1.18s (transform 891ms, setup 0ms, import 945ms, tests 113ms, environment 0ms)
+

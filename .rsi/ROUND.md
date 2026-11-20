@@ -1068,3 +1068,23 @@ no history is rewritten, and no round is force-pushed.
 - **未验证（`NOT_RUN`）**：真机 GUI 手点；真实定时投递（操作方动作，D-066）；三层及以上转义。
 - **建议版本**：patch → `0.12.9`（安全修复，行为向后兼容；CHANGELOG 记 Fixed 双语）。
 - **status:** OK
+
+## Round 35 — 2026-11-20 — 嵌套未知配置键不再被静默丢弃（`CONFIRMED`，patch `0.12.10`）
+
+- **选题（R2）**：POOL 池顶 `P ·` 项（S/medium）——未知键只在顶层被拒，深一层静默丢弃。
+  需迁移说明（ stricter load），属 POOL 已批准项内的收紧。
+- **缺陷**：`roles.reviewer`（本构建不路由的角色名）、路由字段手误 `maxInflight`
+  被丢弃而补丁里还留着：看着配好了，运行时当它不存在。`Config` schema 在宿主路径
+  拒收顶层未知键，但直读路径（`resolveConfig`）与嵌套层无检查。
+- **改动**：`src/config.ts` 新增 `ROLE_KEYS`/`ROUTE_KEYS` + `assertKnownKeys` 走三层
+  （顶层/角色名/路由字段），拒绝时报完整路径并给出最接近可用键；
+  `test/config.spec.ts` +2 用例（两层拒绝、schema 往返、不过度）；两份 README 迁移说明、
+  `CHANGELOG.md` 双语 Fixed、`lib/` 重建。版本号 `0.12.10`。
+- **红绿（`CONFIRMED`）**：新用例在旧码上失败（嵌套键被吞）；修后
+  `test/config.spec.ts` 全绿；`npm run ci` exit 0 = **68 文件 / 1233 测试 PASS**；
+  typecheck 0 错；`npm run verify:lib` 提交时复核。
+- **证据**：`.rsi/evidence/round-035/`（`red-spec.txt`、`red-probe.txt`、`ci.txt`、
+  `nested-key-probe.mjs`）。
+- **未验证（`NOT_RUN`）**：真机 GUI；真实定时投递。
+- **建议版本**：patch → `0.12.10`（fail-closed 收紧，合法补丁不受影响；CHANGELOG 记 Fixed 双语）。
+- **status:** OK

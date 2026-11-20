@@ -59,9 +59,21 @@ here and are marked DONE when their commit lands.
   pins the note. Evidence `.rsi/evidence/round-019/`.
 - R6 DONE · `resolveConfig` validates `grokDefault` and fails closed (`config.ts:700`); shipped in
   `0.12.2` (`c1be0c7`), pinned by `test/config.spec.ts`. (The pool entry said PENDING until round 27.)
-- P · Unknown keys are rejected at the top level but silently dropped one level down:
-  `roles.reviewer` and a route's `maxInflight` are discarded (`config.ts:337`, `:439`, `:385`)
-  while the stored document keeps them. S / medium (stricter load needs a migration note).
+- R35 DONE · Unknown keys were rejected at the top level but silently dropped one level down:
+  `roles.reviewer` and a route's `maxInflight` were discarded while the stored document kept them.
+  `assertKnownKeys` now also walks `roles` (role name) and each route object (field), naming the
+  full path — `roles.worker[0].maxInflight (did you mean "maxInFlight"?)` — with `ROLE_KEYS` /
+  `ROUTE_KEYS` pinned to what `resolveConfig` builds. Measured (`A39`): the exported `Config` schema
+  passes unknown *nested* keys through to `apply()` unchanged, so the reader is the only place the
+  refusal can happen. Migration note in both READMEs and `CHANGELOG.md` (a valid patch is unaffected;
+  the named key has no replacement). `test/config.spec.ts` pins both levels, the schema round trip
+  and the no-over-reach cases; on the pre-fix source (top-level check only) the new case fails.
+  Evidence `.rsi/evidence/round-035/`.
+- P · `roles` that is not an object at all is still silently read as "every chain empty":
+  `resolveConfig({ roles: 'worker:m1' })` loads with five empty chains (`config.ts` `resolveConfig`,
+  measured in `.rsi/evidence/round-035/nested-key-probe.mjs`), because `config.roles?.planner` on a
+  non-object yields `undefined`. The schema refuses it on the host path (a `z.object` issue), so this
+  is the programmatic path only. S / low.
 - P · A non-string `model`/`provider` throws a bare `TypeError` naming neither key nor shape
   (`config.ts:456`, `:461`). S / low.
 - P · `repairLimitOverruns` still clamps seven removed keys through `LEGACY_LIMIT_CAPS`

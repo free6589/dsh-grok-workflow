@@ -318,6 +318,18 @@ export const CONFIG_KEYS = [
   'configVersion',
 ] as const
 
+/**
+ * The role names a configuration may route, in the order `resolveConfig` builds them.
+ *
+ * Listed here as well as in `resolveConfig` so the nested key check can name them:
+ * the two lists are pinned against each other by `test/config.spec.ts`, so a role
+ * added to one side cannot be silently unmapped on the other.
+ */
+export const ROLE_KEYS = ['planner', 'worker', 'verifier', 'synthesizer', 'supervisor'] as const
+
+/** The keys one route object may carry; `maxInFlight` is the per-route lane ceiling. */
+export const ROUTE_KEYS = ['provider', 'model', 'maxInFlight'] as const
+
 /** Every key removed by the T4 slim-down; a patch that still carries one is rejected (R-06). */
 export const REMOVED_CONFIG_KEYS = [
   'enforceGate',
@@ -545,24 +557,78 @@ export const SWITCHABLE_CLASSES = [
 ] as const
 
 /**
- * Reject unknown top-level keys instead of letting the schema drop them.
+ * The accepted key that a misspelt one most likely meant, if any.
  *
- * A silently ignored key is indistinguishable from a setting that does not
- * work, and the whole point of the configuration layer (D) is that a user can
- * tell those apart. The message names the closest accepted key.
+ * Deliberately crude (a four-character prefix shared either way): it only ever adds a
+ * hint to an error that already names the offending key and the accepted list, so a
+ * wrong guess cannot change what is refused.
+ * @param key - the key the document carries.
+ * @param accepted - the keys this level accepts.
+ * @returns The closest accepted key, or `undefined` when nothing is close.
+ */
+function closestKey(key: string, accepted: readonly string[]): string | undefined {
+  const lower = key.toLowerCase()
+  return accepted.find(candidate => candidate.toLowerCase().startsWith(lower.slice(0, 4)))
+    ?? accepted.find(candidate => lower.startsWith(candidate.toLowerCase().slice(0, 4)))
+}
+
+/**
+ * Reject unknown keys instead of letting the loader and the schema drop them.
+ *
+ * Three levels are checked, because a dropped key reads identically at every one of
+ * them: a silently ignored setting looks exactly like a setting that does not work,
+ * which is the failure mode the settings surface must not have. The nested levels are
+ * `roles.<role>` (a role name this build does not route — `reviewer` was the reported
+ * typo) and `roles.<role>[<index>].<key>` (a route field, `maxInflight` being the one
+ * the pool reported). The check runs before the chains are normalized, so a route
+ * written as a bare model id is skipped rather than read as an object.
  * @param config - raw user configuration.
- * @throws If a key is not part of the configuration surface.
+ * @throws If a key at any level is not part of the configuration surface.
  */
 export function assertKnownKeys(config: Record<string, unknown>): void {
   const known = new Set<string>(CONFIG_KEYS)
   for (const key of Object.keys(config)) {
     if (known.has(key)) continue
-    const suggestion = CONFIG_KEYS.find(candidate => candidate.toLowerCase().startsWith(key.toLowerCase().slice(0, 4)))
-      ?? CONFIG_KEYS.find(candidate => key.toLowerCase().startsWith(candidate.toLowerCase().slice(0, 4)))
+    const suggestion = closestKey(key, CONFIG_KEYS)
     throw new Error(
       `unknown configuration key "${key}"${suggestion === undefined ? '' : ` (did you mean "${suggestion}"?)`}; ` +
       `accepted keys: ${CONFIG_KEYS.join(', ')}`,
     )
+  }
+  assertKnownNestedKeys(config.roles)
+}
+
+/**
+ * Reject an unknown role name or route field inside `roles`.
+ *
+ * A value that is not an object (or a chain that is not an array) is left to the
+ * chain resolver, which already refuses it with its own message; this function only
+ * answers "is this key part of the surface".
+ * @param roles - the raw `roles` value.
+ * @throws If a role name or a route field is unknown.
+ */
+function assertKnownNestedKeys(roles: unknown): void {
+  if (roles === null || typeof roles !== 'object' || Array.isArray(roles)) return
+  for (const [role, chain] of Object.entries(roles as Record<string, unknown>)) {
+    if (!(ROLE_KEYS as readonly string[]).includes(role)) {
+      throw new Error(
+        `unknown configuration key "roles.${role}"; ` +
+        `accepted roles: ${ROLE_KEYS.join(', ')}`,
+      )
+    }
+    if (!Array.isArray(chain)) continue
+    for (const [index, route] of chain.entries()) {
+      if (route === null || typeof route !== 'object' || Array.isArray(route)) continue
+      for (const key of Object.keys(route as Record<string, unknown>)) {
+        if ((ROUTE_KEYS as readonly string[]).includes(key)) continue
+        const suggestion = closestKey(key, ROUTE_KEYS)
+        throw new Error(
+          `unknown configuration key "roles.${role}[${index}].${key}"` +
+          `${suggestion === undefined ? '' : ` (did you mean "${suggestion}"?)`}; ` +
+          `accepted route keys: ${ROUTE_KEYS.join(', ')}`,
+        )
+      }
+    }
   }
 }
 

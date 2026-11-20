@@ -1,0 +1,7 @@
+schema keeps roles.reviewer: ["get"]
+resolveConfig(schema output) roles: ACCEPTED -> [{"model":"w"}]
+roles.reviewer reaches the plugin?: ACCEPTED -> ["planner","worker","verifier","synthesizer","supervisor"]
+route maxInflight: ACCEPTED -> [{"model":"w"}]
+route weight: ACCEPTED -> [{"model":"w"}]
+top-level maxRetires: REFUSED -> unknown configuration key "maxRetires"; accepted keys: toolName, mode, grokDefault, roles, synthesis, maxConcurrency, maxTasks, timeoutMs, loopEnabled, loopMaxRounds, loopFailStreak, loopIntervalMin, iterateIntervalMin, iterateTemplate, configVersion
+roles as a string: ACCEPTED -> {"planner":[],"worker":[],"verifier":[],"synthesizer":[],"supervisor":[]}
