@@ -2209,3 +2209,38 @@ base64 字符且长度 ≥8 的行（安全方向的过度脱敏），但 `BASE6
 
 **不做**：不改 `HARD_LIMITS.loopMaxRounds` 的 100、不改 `loopPolicyFromConfig` 的 1000 钳位、
 不在插件里加定时器或自续机制、不写宿主 schedule 存储（那是绕过工具策略，也是 AGENTS.md 的红线）。
+
+## D-094 — 插件不再在 step 之外写 `assistant/message`；渲染不了的终态改存记录（2026-11-20）
+
+**背景**：用户报 `/compact` 报错。根因不在命令：本插件在 `agent/pre-step`（step 尚未打开）写
+`assistant/message`，DSH 的 token 计量器回放时要求每条 `assistant/message` 都落在同一
+`(turn, step)` 的 `step/start`…`step/end` 之间，第一次回放即抛
+`token meter: assistant/message at seq N has no matching step/start event`，且折叠游标不越过该
+seq，此后每次都抛在同一处。`compactNow()` 先测量再选范围 → `/compact` 报错，自动压缩同样失效
+（`agent/pre-step` 只 warn 后继续）。三个写点同源：即时回执（`src/records.ts`）、卸载通知、
+取消终态（`src/gate.ts` 的 `commitCancelled`）。实测 120 个归档会话里 10 个中招
+（4 回执 / 4 通知 / 6 模型署名 + 1 其他）。
+
+**选择**：
+- (a) 保留行、给回执补一对合成 `step/start`…`step/end`——对计量器合法，但等于在日志里伪造
+  agent loop 从未发生的 step，违背「日志即事实」；否。
+- (b) 延后到下一次 `step/start` 再写——合法且能渲染，但那一行会作为**模型自己的话**进入下一轮
+  的请求面（源是模型身份），把插件文字塞进模型发言；否。
+- (c) 改成 `user/message`——不触发配对规则，但 t45 已实测：非 `user` 源的 user 行在 stock Web
+  会话里**不渲染**，等于静默丢弃；否。
+- (d) 加闸门 `openStepOf()`：没有打开的 step 就不写；被拒的回执/通知文字改存
+  `plugin:grok-workflow/terminal` 记录（可读、可审计）；采。
+
+**代价（明确记录）**：P0-4 的取消终态、卸载通知、团队档实时回执不再是聊天行。事实不丢：终态与
+通知文字进 terminal 记录，`DISPOSE_RECORD`/`DELIVERY_RECORD` 仍在。回执的模型调用在写不出行时
+一并跳过，不为一条注定被拒的行付钱。**后续入池**：用合法通道渲染它们（进度面板 / 客户端自绘行）。
+
+**测量与回归**：`node scripts/repro-compact.mjs` 驱动真实 `/compact`
+（`dsh-command-compact` + `dsh-compaction-basic` + `dsh-token-meter`，本机安装版）：
+修前 exit 1 且 `/compact` 抛上述错误，修后 exit 0 且 `/compact` 答
+`No compactable history yet.`。`test/compact-step-pairing.spec.ts` 用真实计量器回放：
+修前 4 例红（`expected true to be false`、孤儿行存在），修后 6 例全绿。
+
+**另一处纠正**：`docs/knowledge/evidence/diag-ctx-compaction-2026-11-07.md` §R5 推断手动压缩会
+被包成 `ManualCompactionError('busy')`；实测**不会**——`compactNow()` 的外层 `try/catch` 包不住
+`async` 回调的 rejection，原始计量器错误直接落到命令处理器。文档已在该报告旁注明。

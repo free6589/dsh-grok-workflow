@@ -5,6 +5,34 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Fixed / 修复
+
+- **`/compact` no longer fails on a session this plugin wrote a receipt into / 插件写过回执的会话里 `/compact` 不再报错** —
+  DSH's token meter replays the journal with one hard pairing rule: an `assistant/message`
+  is legal only between a `step/start` and its `step/end` for the same `(turn, step)`. The
+  team-tier instant receipt runs in `agent/pre-step`, i.e. before the step opens, so the row
+  it wrote had no step behind it; the first replay threw `token meter: assistant/message at
+  seq N has no matching step/start event` and, because the fold cursor never advances past
+  that seq, every later replay threw at the same place. `/compact` measures before it selects
+  a range, so it answered with an error on a session that otherwise looked healthy, and
+  automatic compaction failed the same way — silently, since `agent/pre-step` only warns and
+  continues the turn. Every assistant row this plugin writes (instant receipt, unload notice,
+  cancelled terminal) now goes through one gate that refuses to write outside an open step.
+  A refused row is not dropped: the receipt and notice text are kept as the plugin's
+  `plugin:grok-workflow/terminal` record, so the reason and any verified partial work are
+  still readable from the session log. The rendered chat row is what is gone, because DSH has
+  no legal shape for one there.
+  / DSH 的 token 计量器回放日志时有一条硬配对规则：`assistant/message` 只能落在同一
+  `(turn, step)` 的 `step/start` 与 `step/end` 之间。团队档的即时回执写在 `agent/pre-step`，
+  也就是 step 尚未打开之时，因此那一行背后没有任何 step；第一次回放即抛
+  `token meter: assistant/message at seq N has no matching step/start event`，且折叠游标
+  不会越过该 seq，此后每次回放都在同一处抛错。`/compact` 先测量再选范围，于是在一个看起来
+  正常的会话上报错，自动压缩同样失效——而且是静默的，`agent/pre-step` 只记一条 warn 就继续。
+  现在本插件写的每一条 assistant 行（即时回执、卸载通知、取消终态）都走同一道闸门：没有
+  打开的 step 就不写。被拒的行不会丢字：回执与通知的文字改存本插件的
+  `plugin:grok-workflow/terminal` 记录，原因与已验证的部分成果仍可从会话日志读出；失去的是
+  渲染出来的那一行，因为 DSH 在那里没有合法的形状。
+
 ## [0.12.12] - 2026-11-20
 
 ### Fixed / 修复

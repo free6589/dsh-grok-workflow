@@ -368,3 +368,17 @@ d5448c9a-…  receipts=0 orphans=0
 8. `/home/fish/dsh-layerfs/profiles/web/cordis.patch.yml:26-44（模型 contextWindow/maxTokens）, 1044-1051（grok-workflow 配置）`
 9. `src/records.ts:671-693`、`src/gate.ts:787-793`、`src/config.ts:137`
 10. `docs/knowledge/evidence/diag-ctx-compaction-verify-metric.mjs`（已入库；诊断时位于未跟踪的 `out/diag/verify-metric.mjs`）+ 其 STEP 1–5 输出（§4 R1）
+
+---
+
+## 更正（2026-11-20，D-094）：手动 `/compact` 的错误形状
+
+本报告 §R5 推断「手动压缩会被包成 `ManualCompactionError('busy')`，用户看到 busy 提示」。实测
+**不是**：`compactNow()` 的外层 `try { return agent.runMaintenance(async …) } catch { throw
+new ManualCompactionError('busy', …) }` 包不住 `async` 回调的 rejection——测量错误以**原始错误**
+逃出，`dsh-command-compact` 的 `executeCompact` 只把 `ManualCompactionError` 转成文案，其余
+`throw error`，所以用户看到的是计量器自己的那句
+`token meter: assistant/message at seq N has no matching step/start event`。
+
+复现：`node scripts/repro-compact.mjs`（仓库内，驱动真实 `/compact` 命令 + 真实压缩引擎 + 真实
+计量器，本机安装版 DSH）。证据：`.rsi/evidence/compact-fix/before.txt`。根因修复见 `D-094`。

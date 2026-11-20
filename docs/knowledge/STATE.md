@@ -9,6 +9,20 @@ checkpoint 上界 1,048,447 的注释与用例属 round 31（`a97d099`），本�
 `verify:lib` 153 files byte-identical；HEAD `aabed51`（含并发 harness 轮）上 `npm run ci` exit 0 =
 **69 文件 / 1251 测试 PASS**。**未发版**（`0.12.10`/`0.12.11` 由并发进程发出，规则随 `0.12.10` 已在线上）。
 
+Last updated: 2026-11-20 14:20 +08:00 (**compact 修复：插件不再在 step 之外写 `assistant/message`** —
+用户报 `/compact` 报错，根因是回执/通知/取消终态三处都在没有打开 step 时写 assistant 行，DSH 的
+token 计量器回放第一次就抛 `token meter: assistant/message at seq N has no matching step/start
+event`，游标不前进 → 此后每次测量都抛，`compactNow()` 先测量 → `/compact` 报错、自动压缩静默失效。
+新增 `openStepOf()` 闸门（`src/records.ts`），三个写点统一走 `appendAssistantInStep()`；被拒的
+回执/通知文字改存 `plugin:grok-workflow/terminal` 记录（`D-094`）。真实 `/compact` 复现脚本
+`scripts/repro-compact.mjs`：修前 exit 1 且抛上述错误，修后 exit 0 且答
+`No compactable history yet.`；新回归 `test/compact-step-pairing.spec.ts` 用真实计量器回放，
+修前 4 红、修后 6 绿。`npx vitest run` = **70 文件 / 1268 测试全绿**（rebase 到 `39eda66` 后；
+在 `0d91e45` 上是 69 文件 / 1240 通过 + 2 例 `test/redact.spec.ts` 既存红，属并发脱敏轮，
+已用干净 worktree 复现）。`npm run typecheck`/`lint`/`verify:lib` 均 exit 0。
+**未发版、未打 tag**。本轮先在独立 worktree（主 checkout 当时有并发轮未提交改动）完成，
+再 rebase 到 `39eda66`。）
+
 Last updated: 2026-11-20 12:05 +08:00 (**round-033：手工折行的 base64 私钥整块落进报告；顺带修好账本滞后** —
 `base64-private-key` 的窗口原是连续 20 字符字面量，任何窄于它的折行都把标记自身拆开，实测
 8/12/16/19/20/21/22/23 列全部整块留存、24 列才第一次生效。窗口改为生成式、字符间可容忍一个断行

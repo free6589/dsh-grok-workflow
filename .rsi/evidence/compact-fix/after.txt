@@ -1,0 +1,27 @@
+{
+  "receiptEnabled": true,
+  "writer": "refused",
+  "events": [
+    {
+      "seq": 0,
+      "type": "turn/start",
+      "turn": 1
+    },
+    {
+      "seq": 1,
+      "type": "user/message"
+    }
+  ],
+  "measure": {
+    "ok": true,
+    "totalTokens": 12,
+    "nodes": 1
+  },
+  "compactNow": {
+    "ok": true
+  },
+  "slashCompact": {
+    "kind": "success",
+    "text": "No compactable history yet."
+  }
+}

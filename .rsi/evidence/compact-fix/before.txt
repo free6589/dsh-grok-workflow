@@ -1,0 +1,39 @@
+{
+  "receiptEnabled": true,
+  "writer": "appended",
+  "events": [
+    {
+      "seq": 0,
+      "type": "turn/start",
+      "turn": 1
+    },
+    {
+      "seq": 1,
+      "type": "user/message"
+    },
+    {
+      "seq": 2,
+      "type": "assistant/message",
+      "turn": 1,
+      "step": 0,
+      "source": {
+        "kind": "model",
+        "provider": "grok-workflow",
+        "model": "workflow-receipt"
+      }
+    }
+  ],
+  "measure": {
+    "ok": false,
+    "error": "token meter: assistant/message at seq 2 has no matching step/start event"
+  },
+  "compactNow": {
+    "ok": false,
+    "error": "raw: token meter: assistant/message at seq 2 has no matching step/start event"
+  },
+  "slashCompact": {
+    "kind": "threw",
+    "text": "token meter: assistant/message at seq 2 has no matching step/start event",
+    "rejected": true
+  }
+}

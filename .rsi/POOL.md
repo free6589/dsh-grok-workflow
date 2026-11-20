@@ -138,6 +138,12 @@ here and are marked DONE when their commit lands.
 
 ## Progress panel (`src/progress-tab.ts`, `src/client/index.js`, `src/records.ts`)
 
+- P · 团队档「实时回执」与取消终态、卸载通知都不再是聊天行（`D-094`：DSH 的 token 计量器要求
+  `assistant/message` 落在打开的 `step/start`…`step/end` 之间）。文字已存入
+  `plugin:grok-workflow/terminal` 记录，缺的是渲染：把这三类文本画在进度面板里，或用客户端插件
+  自绘一行（`src/client/index.js`），不再借 `assistant/message`。M / medium.
+  Evidence `.rsi/evidence/compact-fix/`。
+
 - P0 DONE · Execute/Verify printed `Not reported in the events` because rows were matched by
   `agent-start.data.phase`, which the script fills with the plan-task group title, never
   `执行`/`检查` (`progress-tab.ts:543-580`, tokens `:184-185`, producer `script.ts:1849-1852`).

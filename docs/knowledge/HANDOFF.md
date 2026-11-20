@@ -1,9 +1,15 @@
 ## 2026-11-20 — 1000 轮现在只需**一次**上弦；本轮同时是 harness 管着跑的第一轮（round 37，`D-093` / `A42`）
 
 - **From:** agent-103（并发子代理，harness 任务 attempt 2）· **To:** 操作者 / 下一轮接手者
-- **上弦（唯一未完成项，一次动作）**：预算、计划、门禁、复核都已就位，但**没有行在跑**。
-  实测 `node .rsi/tools/iterate-plan.mjs --verify-row` → `NOT_ARMED`：现存行 `schedule-0bbbef5f-…`
-  标题 `RSI heartbeat`、`COUNT=10`、已投递 6、`covered=4`，而剩余 **963** 轮（`.rsi/evidence/harness/verify-row-live.txt`）。
+- **上弦（`CONFIRMED`，14:36:57 已发生）**：同一行 `schedule-0bbbef5f-…` 的 `rrule` 已被改成
+  `DTSTART:20261120T073657Z` + `FREQ=MINUTELY;INTERVAL=60;COUNT=969`；`--verify-row` 现在 **`ARMED`**，
+  `covered=963` = `remaining=963`，末次 `2026-12-30T15:36:57Z`（`.rsi/evidence/harness/final-state.txt`）。
+  写本记录前的实测是 `NOT_ARMED`（`verify-row-live.txt`：`COUNT=10`、`covered=4`）。
+- **prompt 也已换成常量那份（`CONFIRMED`，14:44）**：先是旧的 3,239 字符（`armed-row.txt`），
+  随后一次 `schedule_edit` 把它换成 `.rsi/HEARTBEAT-PROMPT.md` 的正文——实测 `prompt_len=2319`，
+  含 `heartbeat-guard.sh`、`--round auto`、`--max-rounds 1000`、`top_next`
+  （`armed-verified.txt`）。门禁在干净树上 `RESUME next_round=38`。
+  两次上弦都不是本轮执行的（子代理无 `schedule_*`）；本轮交付的是「一次调用 + 可复核」。
   上弦要一条调用，参数由 `node .rsi/tools/iterate-plan.mjs --arm-spec` 打印（槽名 `RSI heartbeat`、
   行 id、`rrule`、prompt 文件与字符数）；`DTSTART` 是按当前时钟算的，**调用前重跑一次**再粘贴。
   上完用 `--verify-row` 复核（exit 0 = ARMED / 21 = NOT_ARMED / 22 = 读不到宿主存储）。
@@ -23,6 +29,31 @@
   `COUNT` 的运行时行为。
 - **给下一轮的提醒**：`single` 的行宽超出插件开关会写的宽度，任何一次开关翻转都会把 `COUNT` 改回
   `loopMaxRounds`（≤100）——所以「是否还上着弦」要用 `--verify-row` 量，不要凭记忆。
+
+## 2026-11-20 — `/compact` 报错的根因修复（分支 `fix-compact-orphan-receipt`，未合并）
+
+- **From:** 执行代理（workflow 任务 `compact_fix`）· **To:** 用户 / 下一轮接手者
+- **基线**：先在 `0d91e45` 上的独立 worktree 完成（当时主 checkout 有并发轮的未提交改动），
+  随后 rebase 到 `39eda66`（当前 `main`）。分支 `fix-compact-orphan-receipt`，未合并、未推送。
+- **根因（`CONFIRMED`）**：本插件在 `agent/pre-step`（step 未打开）写 `assistant/message`，
+  DSH 的 token 计量器要求每条 assistant 行落在同 `(turn, step)` 的 `step/start`…`step/end`
+  之间；第一次回放即抛 `token meter: assistant/message at seq N has no matching step/start
+  event`，游标不前进 → 之后每次 `measure()` 都抛 → `compactNow()` 先测量 → `/compact` 报错、
+  自动压缩静默停摆。三个写点：即时回执、卸载通知、取消终态（`commitCancelled`）。
+- **修法**：`openStepOf()` + `appendAssistantInStep()`（`src/records.ts`），三处统一走闸门；
+  被拒的回执/通知文字改存 `plugin:grok-workflow/terminal` 记录（`D-094`）。回执的模型调用在
+  写不出行时一并跳过。
+- **验证**：`node scripts/repro-compact.mjs`（真实 `/compact` 命令 + 真实压缩引擎 + 真实计量器）
+  修前 exit 1、修后 exit 0（`.rsi/evidence/compact-fix/{before,after}.txt`）；
+  `test/compact-step-pairing.spec.ts` 6 例绿、在旧 `src/` 上 4 例红；
+  rebase 后 `npx vitest run` = **70 文件 / 1268 全绿**；`typecheck`/`lint`/`verify:lib` 均 exit 0。
+- **行为变化（需要产品决定）**：P0-4 的取消终态、卸载通知、团队档实时回执**不再是聊天行**
+  （DSH 在 step 之外没有合法的 assistant 形状）。文字进 terminal 记录，事实不丢；渲染层缺一条
+  行。后续入池：进度面板 / 客户端自绘行。
+- **NOT_RUN**：真机 GUI 点 `/compact`（需要活动会话，会写会话数据）；发布/打 tag（任务禁止）。
+- **合并提示**：本分支的 `package.json`/`package-lock.json` 新增 devDependency
+  `@deepseek-ai/dsh-token-meter@0.2.1-rc.2`（回归测试用真实计量器回放）；与并发轮的
+  `CHANGELOG`/`.rsi` 改动可能文本冲突，按内容合并即可。
 
 ## 2026-11-20 — `0.12.12` 已发版（round-036：截断保头尾）
 
