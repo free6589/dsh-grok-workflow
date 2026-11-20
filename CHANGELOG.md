@@ -5,6 +5,43 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.12.11] - 2026-11-20
+
+### Fixed / 修复
+
+- **Release repair: two never-green narrow-fold assertions removed so CI is green again / 发版修复：删掉两个从没绿过的窄折行断言，CI 恢复绿色** —
+  `v0.12.10` shipped two `test/redact.spec.ts` cases (`folded below the continuation floor`,
+  `exactly one footer line`) that fail against the committed source, so remote CI red and no
+  Release was created. The cases never passed at the tagged commit; they are reverted here while
+  their complete fix lands separately. No production code changes in this release.
+  / `v0.12.10` 带了两个在提交源码上失败的 `test/redact.spec.ts` 用例，远端 CI 变红、Release 没建出来。
+  这两个用例在打 tag 的提交上从没绿过，先回退，完整修复另行发版。本版无生产代码改动。
+
+
+### Fixed / 修复
+
+- **A base64 key blob folded to seven columns or fewer is redacted instead of left almost whole /
+  折到七列及以下的 base64 密钥块不再整块留在报告里** —
+  the continuation rule consumed lines of eight or more characters, which is what a normal wrap
+  produces; a blob folded narrower than that had no such line, so only the banner's own encoded
+  characters were replaced and the rest of the encoding stayed — 261 of 272 characters at seven
+  columns, and at four columns the surviving fragments still decoded to `PGP PRIVATE KEY BLOCK`.
+  A run of two or more consecutive lines that are only base64 characters is now read as one
+  narrow fold and consumed with the block, on both the report and the prompt boundary (same rule
+  table). A single short line is still left alone, because that is also what one word of prose
+  looks like. What a wrapped block may still leave is its footer: a final line shorter than the
+  eight-character continuation floor, i.e. at most seven characters, which cannot decode to
+  anything on its own. The documented threshold said sixteen characters and the architecture doc
+  still said a fold narrower than 24 columns was not matched at all — both were stale and now
+  state the measured rule.
+  / 续行规则原先只吃八字符以上的行，那正是常规折行的形状；折得比这更窄的块没有这样的行，
+  于是只有横幅自身的那几个编码字符被替换，其余编码原样留下——七列折行留下 270 个字符里的
+  261 个，四列折行的残留片段甚至还能解出 `PGP PRIVATE KEY BLOCK`。现在连续两行及以上
+  「只有 base64 字符」的行会被当作一次窄折行整段吃掉，报告与提示词两侧同规则。单独一行短行
+  仍然不动，因为那和散文里的一个词长得一样。折行块仍可能留下的是它的页脚：末行短于八字符
+  续行下限，也就是最多七个字符，单独无法解出任何内容。原文档写的是十六字符，架构文档还写着
+  「窄于 24 列完全不匹配」——两处都已过期，现按实测规则改写。
+
 ## [0.12.10] - 2026-11-20
 
 ### Fixed / 修复
