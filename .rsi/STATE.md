@@ -1,8 +1,23 @@
-Updated: 2026-11-20T12:28+08:00 · round 34 (double-escaped folded base64 key) · `npm run ci` 68 files / 1232 tests PASS · releasing patch `0.12.9` (code commit `5d3bcea`; tag / CI / Release ids recorded in the follow-up release commit) · previous release `0.12.8` (`9f91684`, tag `v0.12.8`, CI `44670766356`, Release `44670771402`)
+Updated: 2026-11-20T14:20+08:00 · round 37 (roles shape refused; harness now needs ONE arming action) · `npm run ci` 69 files / 1261 tests PASS · code commit `eb61ac8` · harness commit `621f2ab` · no release this round (`0.12.12` was published by the concurrent agent on `61c7cb8`)
 
 Previous rounds: `0.12.8`/`9f91684` (33, CI `44670766356`, Release `44670771402`) · `0.12.7`/`56e701d` (32) · `0.12.6`/`e7150ab` (30, CI `44659057507`, Release `44659061505`) · `0.12.5`/`5b7cae1` (29, CI `44656151053`, Release `44656153854`) · `0.12.4`/`5cd2b1c` (28, CI `44652383452`, Release `44652387975`) · `0.12.3`/`fd6a5ee` (27, CI `44647313571`, Release `44647317251`) · `0.12.2`/`40228c5` · `0.12.1`/`23d3369` — per-round detail lives in `.rsi/ROUND.md`, `.rsi/LOG.md` and `.rsi/ledger.jsonl`.
 ## Facts
 
+- Round 37 (this round): `resolveConfig` read `config.roles?.planner`, so a `roles` that was a string, an
+  array or `null` produced `undefined` for all five roles — the load succeeded with **no route configured**
+  and the report said "inherit the run's route" five times. `assertKnownKeys` now refuses a present,
+  non-object `roles` with its shape named (`got a string "worker:m1"`); absent `roles` and `{}` still load,
+  and the chain-shorthand case is still `resolveChain`'s. Red/green: the new case fails on the pre-change
+  reader (1 failed, `.rsi/evidence/harness/round-037-red.txt`) and `test/config.spec.ts` is 39 passed after.
+  The same round replaced the harness's default shape: `single` — one row carries the whole remaining
+  `COUNT`, so round 1000 costs **one** arming action instead of ten (D-092's cost was in direct conflict
+  with "no prompting"). New: `iterate-plan.mjs --arm-spec` (slot title, row to edit, `rrule`, prompt size
+  against the 4000-char bound), `--verify-row` (reads the host schedule store, prompt **lengths only**,
+  `COUNT - deliveries` vs remaining → `ARMED`/`NOT_ARMED`/`UNKNOWN`), the constant arm prompt
+  `.rsi/HEARTBEAT-PROMPT.md` (measured 2,319 chars), and `heartbeat-guard.sh --round auto` (round from
+  `ROUND.md`/`ledger.jsonl`, higher wins, +1). Measured on this host: `--verify-row` → `NOT_ARMED`,
+  `covered=4` vs `remaining=965` — the loop is still unarmed, and that is now a measurement, not a claim.
+  `npm run ci` 69 files / 1261 tests PASS. `D-093`, `A42`. Evidence `.rsi/evidence/harness/`.
 - Round 34 (this round): a log line that already carries literal `\n` breaks, forwarded inside another
   JSON document, doubles every backslash; `BASE64_BREAK` only knew the single form, so a folded base64
   private-key block reached reports verbatim (measured on the pre-round source: the new case keeps a
@@ -33,35 +48,12 @@ Previous rounds: `0.12.8`/`9f91684` (33, CI `44670766356`, Release `44670771402`
   Released `0.12.8`: tag `v0.12.8` on `9f91684`, remote CI `44670766356` success, Release
   `44670771402` success (asset `dsh-grok-workflow-0.12.8.tgz`, 602,301 B).
   Evidence `.rsi/evidence/round-033/`.
-- Round 31 (this round): the round-27 comment claimed the refused band ran to 1,048,576, but the
-  integrity record is 122 bytes plus the decimal digits of `bytes` (129 only for a 7-digit count), so
-  `writeCheckpoint` refuses from 1,048,448. The behaviour was right; the prose was not. The comment now
-  names 1,048,447 with the arithmetic, and one test measures the record from a real sealed file, writes
-  at the ceiling (file exactly 1,048,576 B, reads back intact), refuses at +1, then reads the source back
-  and requires the comment to state that number. Red/green is over the comment: pre-round source fails
-  the last assertion. No release — comment and test only (`D-087`, `A36`, VALIDATION Round 83).
-  Evidence `.rsi/evidence/round-031/`.
-- Round 30 (this round): a base64-wrapped *GnuPG* private key (`base64`d keyring export, key in a
-  JSON field) reached reports verbatim — round 29 closed only the PEM half. `base64-private-key` now
-  carries nine literals: the `PRIVATE` and legacy `SECRET` banner at all three group alignments; the
-  windows reach byte 17, where `PRI`/`SEC` separate from `PUB`, so base64 public keys stay untouched
-  (measured: a marker on the shared `-----BEGIN PGP ` prefix matches public blobs). Red/green: pre-fix
-  source fails 2 of 3 new cases with the whole block in the output; 37 passed after (+2 over 35).
-  Also measured and pooled, not fixed: a blob wrapped narrower than 24 columns splits the marker and
-  is not matched at all. D-086, A35, VALIDATION Round 81/82. Evidence `.rsi/evidence/round-030/`.
-  Heartbeat row unchanged: `status: active`, single owner, two real deliveries recorded
-  (01:01:50Z, 02:01:50Z), rrule still ends 2026-11-20T10:01:50Z — a subagent cannot edit `schedule_*`.
-- Round 29 (this round): a base64-wrapped PEM (`base64 -w0` key file, JSON field, blob inside a
-  larger encoding) reached reports verbatim — every armor rule matched the decoded banner, and
-  only a secret-named label (`PRIVATE_KEY=`) happened to catch it. New rule `base64-private-key`
-  matches the banner's encoded form at all three group alignments, replaces the whole blob
-  including wrapped continuation lines; base64 `CERTIFICATE` and base64 PGP armor stay untouched.
-  Red/green: on the pre-fix source the two positive cases fail with the whole key body in the
-  output; 35 passed after (+3 over baseline). D-085, A34, VALIDATION Round 79.
-  Evidence `.rsi/evidence/round-029/`. Heartbeat row: `status: active`, single owner, one real
-  delivery confirmed, but `COUNT=10` hourly ends 2026-11-20T10:01:50Z — not through 2026-12-01,
-  and this session cannot touch `schedule_*` (subagent refusal).
-
+- Round 36: the 2400-char human-block clamp kept the head and cut the verdict; it now keeps head and
+  tail (bilingual halves independently). Code `aa5e79c`, released as `0.12.12` (`61c7cb8`, Release
+  `44686655900` success) by the concurrent agent. `.rsi/ROUND.md` round 36.
+- Rounds 29-31 (condensed; detail in `.rsi/ROUND.md`, `.rsi/ledger.jsonl`, `docs/knowledge/VALIDATION.md`):
+  base64-wrapped PEM and GnuPG keys redacted in their encoded form (`D-085`, `D-086`); the checkpoint
+  payload-ceiling comment corrected to the measured 1,048,447 (`D-087`, `A36`).
 - Round 27 (this round): `assertCheckpoint` bounded `integrity.bytes` with `countCeiling`
   (1,000,000, a row-count backstop) while `sealCheckpoint` accepts payloads up to `maxBytes`
   (1,048,576). A payload in between sealed, wrote, then read back `invalid` — an unrestorable

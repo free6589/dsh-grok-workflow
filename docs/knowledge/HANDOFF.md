@@ -1,3 +1,29 @@
+## 2026-11-20 — 1000 轮现在只需**一次**上弦；本轮同时是 harness 管着跑的第一轮（round 37，`D-093` / `A42`）
+
+- **From:** agent-103（并发子代理，harness 任务 attempt 2）· **To:** 操作者 / 下一轮接手者
+- **上弦（唯一未完成项，一次动作）**：预算、计划、门禁、复核都已就位，但**没有行在跑**。
+  实测 `node .rsi/tools/iterate-plan.mjs --verify-row` → `NOT_ARMED`：现存行 `schedule-0bbbef5f-…`
+  标题 `RSI heartbeat`、`COUNT=10`、已投递 6、`covered=4`，而剩余 **963** 轮（`.rsi/evidence/harness/verify-row-live.txt`）。
+  上弦要一条调用，参数由 `node .rsi/tools/iterate-plan.mjs --arm-spec` 打印（槽名 `RSI heartbeat`、
+  行 id、`rrule`、prompt 文件与字符数）；`DTSTART` 是按当前时钟算的，**调用前重跑一次**再粘贴。
+  上完用 `--verify-row` 复核（exit 0 = ARMED / 21 = NOT_ARMED / 22 = 读不到宿主存储）。
+  子代理拿不到 `schedule_*`（本轮第 2 次实测 `{"code":"subagent_session"}`），所以这一动作属于你。
+- **交付（`CONFIRMED`）**：`.rsi/harness.json` 默认 `shape: single`（一行 `COUNT=剩余全部`，一次上弦到 1000 轮）；
+  `iterate-plan.mjs` 新增 `--arm-spec` / `--verify-row`（只读宿主存储、只取 prompt 长度）；
+  常量 prompt `.rsi/HEARTBEAT-PROMPT.md`（实测 2,319 字符 ≤ `MAX_LOOP_PROMPT_CHARS` 4000，两个上弦通道都能装）；
+  门禁 `heartbeat-guard.sh --round auto`（轮次按记录自算）。`chain`（每臂 ≤100）保留。
+  `D-092` 的「10 次续订」被 `D-093` 取代：那与用户「不提示」直接冲突，且两次 attempt 都没等到。
+- **本轮落地的增量（`CONFIRMED`）**：`roles` 为非对象时拒绝装载（此前五条链全空而装载成功），
+  `test/config.spec.ts` 38 → 39，旧读取器上 1 failed（`.rsi/evidence/harness/round-037-red.txt`）。
+  `test/iterate-plan.spec.ts` 15 → 21、`test/heartbeat-guard.spec.ts` 14 → 15，新用例在旧工具上
+  10 failed / 26 passed（`red-tool-pre-change.txt`）。`npm run ci` 69 文件 / 1261 测试 PASS。
+- **未发版（`CONFIRMED`）**：`CHANGELOG.md` 的 `roles` 收紧记在 `[Unreleased]`；同一 checkout 有并发
+  进程持有未提交的 `src/delivery` 改动，此刻 bump 会抢版本号（`0.12.12` 已由它发出，指向 `61c7cb8`）。
+- **未做（`NOT_RUN`）**：真实定时投递（无已上弦的行）；GUI 手点 Self-iterate 开关；`open()` 原地改写
+  `COUNT` 的运行时行为。
+- **给下一轮的提醒**：`single` 的行宽超出插件开关会写的宽度，任何一次开关翻转都会把 `COUNT` 改回
+  `loopMaxRounds`（≤100）——所以「是否还上着弦」要用 `--verify-row` 量，不要凭记忆。
+
 ## 2026-11-20 — `0.12.12` 已发版（round-036：截断保头尾）
 
 - **From:** RSI 心跳轮（本会话）· **To:** 用户 / 下一轮接手者

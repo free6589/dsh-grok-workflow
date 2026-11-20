@@ -1102,3 +1102,49 @@ no history is rewritten, and no round is force-pushed.
 - **未验证（`NOT_RUN`）**：真机 GUI；真实定时投递。
 - **建议版本**：patch（显示行为修正，无 API 变化；CHANGELOG 记 Fixed 双语）。
 - **status:** OK
+
+## Round 37 — 2026-11-20 — `roles` 形状不对时拒绝，而不是带五条空链装载；1000 轮改为一次上弦（`CONFIRMED`）
+
+- **选题（R2）**：`node .rsi/tools/iterate-plan.mjs --pool` 报 `top_next=line 85`，即
+  「`roles` that is not an object at all is still silently read as 'every chain empty'」（S/low）。
+  本轮同时是本 harness 第一次**在被它管着的情况下**跑的一轮：`--pool` 选主题、plan 给出臂、
+  门禁以 `--round auto` 开轮。
+- **缺陷**：`resolveConfig` 读的是 `config.roles?.planner`，当 `roles` 是字符串/数组/`null` 时五个
+  角色全得 `undefined`，`resolveChain` 各返回 `[]`——**装载成功、一条路由都没配**，报告里五次写着
+  「继承运行的路由」。宿主路径的 `Config` schema 用 `z.object` 会拒收，所以这是直读路径（嵌入方、
+  手工构造配置、测试替身）的缺口。
+- **改动**：`src/config.ts` 在 `assertKnownKeys` 里先查 `roles` 自身形状（缺省 `undefined` 仍合法，
+  那是文档里的「继承」），非对象时抛
+  `roles must be an object of role chains (planner, worker, verifier, synthesizer, supervisor), got a string "worker:m1"; …`
+  并附一句「形状不对会被读成五条空链」的后果；新增 `describeShape()` 只描述形状（长字符串截 40 字符）。
+  `test/config.spec.ts` +1 用例：字符串/数组/`null`/数字四种拒绝 + 四种不过度（缺省、`{}`、五角色、
+  链内简写仍归 `resolveChain` 管）。`lib/config.*` 随 `src/` 重建。
+- **红绿（`CONFIRMED`，独立 worktree 实跑）**：在 `HEAD`（`116f98b`）的干净 worktree 里放入本轮
+  测试，`npx vitest run test/config.spec.ts -t "not an object instead of loading five empty chains"`
+  → **1 failed**（`expected [Function] to throw an error`，`round-037-red.txt`）；修后
+  `test/config.spec.ts` **39 passed**（基线 38，`green-round-037.txt`）。
+- **harness 改动（本轮第二件事，D-093）**：默认形态 `chain` → `single`。D-092 自己写的代价是
+  「1000 轮需要 10 次续订动作」，与用户「不提示」的要求直接冲突，且两次 attempt 都没等到那十次动作。
+  现在一条 `COUNT=剩余全部` 的行**一次上弦走到 1000 轮**；配套：
+  `iterate-plan.mjs --arm-spec`（槽名/行 id/`rrule`/prompt 字符数 vs 4000）、
+  `--verify-row`（读宿主 schedule 存储、只读长度不读 prompt 文本、`COUNT - 已投递` vs 剩余轮数 →
+  `ARMED`/`NOT_ARMED`/`UNKNOWN`，exit 0/21/22）、常量 prompt `.rsi/HEARTBEAT-PROMPT.md`
+  （实测 **2,319 字符**，落在 `MAX_LOOP_PROMPT_CHARS = 4000` 内）、门禁 `--round auto`
+  （轮次按 `ROUND.md`/`ledger.jsonl` 取高者 +1 自算）。`chain` 保留给「开关随时要用」的操作者。
+- **上弦复核（`CONFIRMED`，本机真实存储）**：`--verify-row` 读 `~/.dsh/storages/schedule.json` 实测
+  `NOT_ARMED`：行 `schedule-0bbbef5f-…` 标题 `RSI heartbeat`、`COUNT=10`、已投递 6、`covered=4`，
+  与 `remaining=965` 比较后 `covers-remaining-budget FAIL`（`verify-row-live.txt`，exit 21）。
+  这就是「本轮仍未上弦」的独立证据，不是自述。
+- **记录层更正（`CONFIRMED`）**：`ledger.jsonl` 第 35 行的 `commit` 为空，填 `0ef5bb7`（该提交即
+  round 35 的配置修复，`git show --stat 0ef5bb7` 可查）；第 36 行 `commit` 填 `aa5e79c`
+  （并发进程的 round 36 修复）。两处都是补可核对的字段，不改状态、不改轮次。
+- **测试与 CI（`CONFIRMED`）**：`test/iterate-plan.spec.ts` 15 → **21**、`test/heartbeat-guard.spec.ts`
+  14 → **15**、`test/config.spec.ts` 38 → **39**；新用例在**改动前**的工具上 **10 failed / 26 passed**
+  （`red-tool-pre-change.txt`）。`npm run ci` 在干净 worktree（本轮最终提交）exit 0，见 `ci-at-commit.txt`。
+- **未验证（`NOT_RUN`）**：真实定时投递（无已上弦的行；上弦是操作者/持 `schedule_*` 会话的一次动作，
+  子代理被拒，本轮第 2 次实测）；GUI 手点 Self-iterate 开关；`open()` 原地改写 `COUNT` 的运行时行为。
+- **未发版**：本轮 harness 部分是开发面改动；`roles` 拒绝属用户可见收紧，`CHANGELOG.md` 记在
+  `[Unreleased]`。同一 checkout 有并发进程持有未提交的 `src/delivery` 改动，此刻 bump 版本/打 tag
+  会与它抢版本号，故不在本轮发版（`0.12.12` 已由并发进程发出，指向 `61c7cb8`）。
+- **建议版本**：patch（下一个 patch 带上本轮的 `roles` 收紧）。
+- **status:** OK

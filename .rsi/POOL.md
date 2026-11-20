@@ -82,11 +82,11 @@ here and are marked DONE when their commit lands.
   the named key has no replacement). `test/config.spec.ts` pins both levels, the schema round trip
   and the no-over-reach cases; on the pre-fix source (top-level check only) the new case fails.
   Evidence `.rsi/evidence/round-035/`.
-- P · `roles` that is not an object at all is still silently read as "every chain empty":
-  `resolveConfig({ roles: 'worker:m1' })` loads with five empty chains (`config.ts` `resolveConfig`,
-  measured in `.rsi/evidence/round-035/nested-key-probe.mjs`), because `config.roles?.planner` on a
-  non-object yields `undefined`. The schema refuses it on the host path (a `z.object` issue), so this
-  is the programmatic path only. S / low.
+- R37 DONE · `roles` that is not an object at all was silently read as "every chain empty":
+  `resolveConfig({ roles: 'worker:m1' })` loaded with five empty chains, because `config.roles?.planner`
+  on a non-object yields `undefined`. `assertKnownKeys` now refuses a present, non-object `roles` with
+  its shape named (`got a string "worker:m1"`); an absent `roles` and `{}` still load. Test fails on the
+  pre-change reader (`.rsi/evidence/harness/round-037-red.txt`), passes after. Commit `eb61ac8`.
 - P · A non-string `model`/`provider` throws a bare `TypeError` naming neither key nor shape
   (`config.ts:456`, `:461`). S / low.
 - P · `repairLimitOverruns` still clamps seven removed keys through `LEGACY_LIMIT_CAPS`
