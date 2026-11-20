@@ -1,3 +1,22 @@
+Last updated: 2026-11-20 15:50 +08:00 (**compact 修复已并入 main** —
+用户报 `/compact` 报错，根因是回执/通知/取消终态三处都在没有打开 step 时写 assistant 行，DSH 的
+token 计量器回放第一次就抛 `token meter: assistant/message at seq N has no matching step/start
+event`，游标不前进 → 此后每次测量都抛，`compactNow()` 先测量 → `/compact` 报错、自动压缩静默失效。
+修复：新增 `openStepOf()` 闸门（`src/records.ts`），三个写点统一走 `appendAssistantInStep()`；被拒的
+回执/通知文字改存 `plugin:grok-workflow/terminal` 记录（`D-094`）。
+**并入方式**：`fix-compact-orphan-receipt`（分支提交 `5fb5da0`，base `39eda66`）普通 merge 进 `main`，
+唯一冲突是 `CHANGELOG.md`——本次修复留在 `[Unreleased]`，`0.12.13` 已发版段原样保留，未改版本号、
+未打新 tag。`lib/` 由合并后的 `src/` 重建，`git status -- lib/` 为空（分支提交的 `lib/` 就是合并后源码
+的构建产物）。`@deepseek-ai/dsh-token-meter` 是本轮新增 devDependency，主 checkout 原先没装
+（`tsc` 报 TS2307，`npm install` 后 exit 0）。
+**合并树上实测**：`npx vitest run` = **70 文件 / 1269 测试 PASS**（`39eda66` 上 1262 + 本修复 6 +
+R38 1）；`npm run typecheck` / `lint`（0 error、24 warning）/ `build` / `verify:lib` 均 exit 0。
+**之前 / 之后同一条命令**：`scripts/repro-compact.mjs` 在合并前的 mainline `490edce` 自己的 `lib/` 上
+exit 1（计量器错误直达 `/compact` handler），在合并后的 `main` 上 exit 0 并答
+`No compactable history yet.`；`test/compact-step-pairing.spec.ts` 在 `490edce` 树上 4 红 / 2 绿，
+在合并后 6 绿、连跑两次同结果。证据 `.rsi/evidence/compact-fix/{main-before,main-after,main-before-test}.txt`。
+GUI 手点 `/compact` 仍属 NOT_RUN（会真的压缩一个活动会话）。
+
 Last updated: 2026-11-20 13:38 +08:00 (**round-036：base64 折行低于续行下限时整块留下；checkpoint 上界文档复核** —
 折到 7 列及以下的 base64 私钥块，窗口能匹配但没有任何一行够长当续行，于是 272 字符里留 244 个，
 解回去就是横幅与密钥本体（round 33/34 的断言只解码 ≥4 字符碎片，看不见）。新增
@@ -8,20 +27,6 @@ checkpoint 上界 1,048,447 的注释与用例属 round 31（`a97d099`），本�
 代码提交 `e3be559`；干净 worktree 上 `npm run ci` exit 0 = **68 文件 / 1236 测试 PASS**、
 `verify:lib` 153 files byte-identical；HEAD `aabed51`（含并发 harness 轮）上 `npm run ci` exit 0 =
 **69 文件 / 1251 测试 PASS**。**未发版**（`0.12.10`/`0.12.11` 由并发进程发出，规则随 `0.12.10` 已在线上）。
-
-Last updated: 2026-11-20 14:20 +08:00 (**compact 修复：插件不再在 step 之外写 `assistant/message`** —
-用户报 `/compact` 报错，根因是回执/通知/取消终态三处都在没有打开 step 时写 assistant 行，DSH 的
-token 计量器回放第一次就抛 `token meter: assistant/message at seq N has no matching step/start
-event`，游标不前进 → 此后每次测量都抛，`compactNow()` 先测量 → `/compact` 报错、自动压缩静默失效。
-新增 `openStepOf()` 闸门（`src/records.ts`），三个写点统一走 `appendAssistantInStep()`；被拒的
-回执/通知文字改存 `plugin:grok-workflow/terminal` 记录（`D-094`）。真实 `/compact` 复现脚本
-`scripts/repro-compact.mjs`：修前 exit 1 且抛上述错误，修后 exit 0 且答
-`No compactable history yet.`；新回归 `test/compact-step-pairing.spec.ts` 用真实计量器回放，
-修前 4 红、修后 6 绿。`npx vitest run` = **70 文件 / 1268 测试全绿**（rebase 到 `39eda66` 后；
-在 `0d91e45` 上是 69 文件 / 1240 通过 + 2 例 `test/redact.spec.ts` 既存红，属并发脱敏轮，
-已用干净 worktree 复现）。`npm run typecheck`/`lint`/`verify:lib` 均 exit 0。
-**未发版、未打 tag**。本轮先在独立 worktree（主 checkout 当时有并发轮未提交改动）完成，
-再 rebase 到 `39eda66`。）
 
 Last updated: 2026-11-20 12:05 +08:00 (**round-033：手工折行的 base64 私钥整块落进报告；顺带修好账本滞后** —
 `base64-private-key` 的窗口原是连续 20 字符字面量，任何窄于它的折行都把标记自身拆开，实测

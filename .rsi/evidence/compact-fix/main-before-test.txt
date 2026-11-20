@@ -1,0 +1,110 @@
+# test/compact-step-pairing.spec.ts against the pre-fix mainline tree (490edce) — exit 1, 4 failed / 2 passed
+# command: cp test/compact-step-pairing.spec.ts into the 490edce tree, then: npx vitest run test/compact-step-pairing.spec.ts
+
+ RUN  v4.1.12 /tmp/compact-before
+
+ ❯ test/compact-step-pairing.spec.ts (6 tests | 4 failed) 21ms
+     ✓ replays an unpaired assistant row as a hard error — the `/compact` failure 8ms
+     × refuses the instant receipt at pre-step, so the session still measures 6ms
+     ✓ writes the receipt at the open step’s own pair, and still measures 2ms
+     × keeps the unload notice as a record when the disposal has no step to attach to 3ms
+     × closes on step/end and on turn/end 1ms
+     × reports no open step for a session that cannot list its events 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/compact-step-pairing.spec.ts > the plugin never writes an assistant row without an open step > refuses the instant receipt at pre-step, so the session still measures
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/compact-step-pairing.spec.ts:99:61
+     97|     // Red on the pre-fix source: this returned true and appended the …
+     98|     // which made the measurement below throw instead of returning a n…
+     99|     expect(appendInstantReceipt(session, '档位：团队档', silent)).toBe(false)
+       |                                                             ^
+    100|
+    101|     expect(session.ownEvents().filter(event => event.type === 'assista…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  test/compact-step-pairing.spec.ts > the plugin never writes an assistant row without an open step > keeps the unload notice as a record when the disposal has no step to attach to
+AssertionError: expected [ { type: 'assistant/message', …(4) } ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "data": {
++       "message": {
++         "content": [
++           {
++             "text": "[grok-workflow] the run was cut by an unload",
++             "type": "text",
++           },
++         ],
++         "id": "3e13e2c8-39dc-4bb8-a75a-82e5508eaea0",
++         "role": "assistant",
++         "source": {
++           "kind": "model",
++           "model": "workflow-notice",
++           "provider": "grok-workflow",
++         },
++       },
++       "step": 0,
++       "stream": [],
++       "turn": 1,
++     },
++     "seq": 2,
++     "surfaceOp": "append",
++     "time": 1795160965226,
++     "type": "assistant/message",
++   },
++ ]
+
+ ❯ test/compact-step-pairing.spec.ts:126:85
+    124|     expect(appendUnloadNotice(session, '[grok-workflow] the run was cu…
+    125|
+    126|     expect(session.ownEvents().filter(event => event.type === 'assista…
+       |                                                                                     ^
+    127|     expect(() => meter().measure(session)).not.toThrow()
+    128|     const { TERMINAL_RECORD } = await import('../src/records.js')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  test/compact-step-pairing.spec.ts > openStepOf reads the same boundary the meter enforces > closes on step/end and on turn/end
+TypeError: openStepOf is not a function
+ ❯ test/compact-step-pairing.spec.ts:152:12
+    150|     const session = atPreStep('sess-open-step-boundary')
+    151|     session.append('step/start', { turn: 1, step: 0 })
+    152|     expect(openStepOf(session)).toEqual({ turn: 1, step: 0 })
+       |            ^
+    153|
+    154|     session.append('step/end', { turn: 1, step: 0 })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  test/compact-step-pairing.spec.ts > openStepOf reads the same boundary the meter enforces > reports no open step for a session that cannot list its events
+TypeError: openStepOf is not a function
+ ❯ test/compact-step-pairing.spec.ts:168:12
+    166|   it('reports no open step for a session that cannot list its events',…
+    167|     const { openStepOf } = await boundary()
+    168|     expect(openStepOf({} as Session)).toBeUndefined()
+       |            ^
+    169|   })
+    170| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 2 passed (6)
+   Start at  15:49:24
+   Duration  325ms (transform 116ms, setup 0ms, import 183ms, tests 21ms, environment 0ms)
+
