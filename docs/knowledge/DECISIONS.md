@@ -2047,3 +2047,25 @@ model selector」）、`test/loop-brakes.spec.ts`（35 条）、`test/loop-runti
      a payload a caller may hand the writer), so removing it would remove the reason to read it.
 - **Scope:** this is a documentation guard, not a policy switch. It applies where a comment quotes a
   constant the suite can measure; prose that explains *why* is left alone.
+
+## D-088 — 折行的 base64 私钥用「容忍自身断行的标记」堵，不用解码复核（2026-11-20，round 33）
+
+**背景**：`base64-private-key` 的 9 条窗口是连续 20 字符字面量，折行窄于它就把标记自身拆开，
+于是 8–23 列的手工折行块整块落进报告（round 33 实测）。池里给了两条路：容忍断行的标记，或
+解码后再查。
+
+**决定**：选容忍断行的标记。`REDACTION_RULES` 是纯正则表，`src/script.ts` 按
+`pattern.source` + `replacement` 把它逐条镜像进生成的 workflow 脚本；因此「同一份声明同时保护
+报告边界与复查/重试提示词」这条既有不变式（`D-085`）只在纯正则下成立。解码复核无法被这样镜像，
+一旦引入就会得到两套实现，而 `test/redact.spec.ts` 的 host↔script 语料一致性检查也就失去意义。
+
+**具体做法**：窗口由 `BASE64_PRIVATE_KEY_WINDOWS.map(foldable)` 生成，字符之间允许一个
+`BASE64_BREAK`——真实换行，或 JSON 字符串序列化后的 `\n` 两个字符（否则 JSON 字段里的折行块依然
+漏）；续行下限从 16 降到 **8**（`w >= 8` 的折行每行正好不少于 8 字符），并用 `BASE64_BLOB_END`
+要求续行之后必须是行边界、字符串引号或输入结束。
+
+**代价与边界（都写进池与注释）**：① 折行 ≤7 列仍不处理——那种宽度下续行与散文单词无法区分，
+要覆盖只能引宽度感知或解码复核，另作一项；② 续行下限定在 8 会吃掉紧跟私钥块、整行都是
+base64 字符且长度 ≥8 的行（安全方向的过度脱敏），但 `BASE64_BLOB_END` 挡住了「吃掉散文下一个
+单词」这一实际风险（`tail`、`ERROR` 这类 4–5 字符行不再被吃）；③ 块尾最后一行若短于 8 字符会
+留下几个编码字符——那是编码尾部即 armor 页脚，不含密钥材料（round 30 记录过同一取舍）。

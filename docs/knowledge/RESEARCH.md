@@ -1286,3 +1286,29 @@ Source: 只读审计 + 本轮新增实现与单测。依据 = `src/guardian.ts`�
   ~2,055-byte steps, but `minContext.digest` is copied verbatim at one byte per character (capped by
   `digestChars`), so rows set the bulk and the digest trims the remainder. Five `buildCheckpoint` calls
   plus two real writes size the boundary exactly, in ~570 ms.
+
+## A37 — 折行把 base64 标记自己拆开：哪些宽度能修、哪些不能（2026-11-20，round 33，`CONFIRMED`）
+
+**测量**：把一个 `-----BEGIN PRIVATE KEY-----` 与一个 `-----BEGIN PGP PRIVATE KEY BLOCK-----` 的
+编码块按 `w` 列折行后交给 round 32 的 `base64-private-key`，`w ∈ {8,12,16,19,20,21,22,23}`
+**全部整块留存**（输出里既没有占位符，也没有任何字符被替换），`w = 24` 是第一个整块被替换的
+宽度。原因不是 PGP 那六条新字面量，而是标记本身的宽度：20 字符的连续字面量在任何 `< 20` 列的
+折行里必然跨行，而 `.` 在不带 `s` 标志时也不匹配换行；续行规则另需每行 ≥16 字符，窄折行的续行
+（8–22 字符）连它也不满足。
+
+**修法实测（round 33，`CONFIRMED`）**：窗口字符之间允许一个断行（真实换行或 JSON 的 `\n` 转义）
+后，8/12/16/19/20/21/22/23 列 × PEM/PGP 八种宽度全部整块脱敏，折行公钥、折行证书与普通 base64
+块保持原样（`test/redact.spec.ts`）。
+
+**边界一（`CONFIRMED`，保留）**：折行 ≤7 列仍不脱敏。把续行下限压到 1 会让 `\nnext line stays`
+被当成一行宽 4 的折行吃掉首词（实测：`tail`、`next` 这类行会消失），所以下限取 8——`w >= 8` 的
+折行每行正好不少于 8 字符，而更窄的折行与散文在字符集上不可区分。
+
+**边界二（`CONFIRMED`，实测数值）**：同一条规则在 116 KB 散文上的耗时从 1.23 ms 升到 7.86 ms
+（每字符 2–3 个可选分支使失败路径变长）；284 KB、含 4 000 个「近失配」窗口的对抗输入 38.6 ms。
+报告体量（`redactSecrets` 整表在 116 KB 上 43 ms）远低于此，按可接受记录在案。
+
+**记录层（`CONFIRMED`）**：`.rsi/ledger.jsonl` 与 `.rsi/ROUND.md` 的轮次必须同步——门禁
+`heartbeat-guard.sh` 的「上一轮未闭合」判据之一就是 `round_max > ledger_max`（`code=round-without-ledger`），
+而账本停在 25、报告已到 32 时它会一直 SKIP，第三次升级为 `stall-unclosed` 的 STOP。表现为
+「所有测试都绿、循环却停摆」，因此该不变式必须由测试而非人工看住（`test/rsi-ledger.spec.ts`）。

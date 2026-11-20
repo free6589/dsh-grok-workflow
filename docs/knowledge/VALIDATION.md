@@ -4723,3 +4723,30 @@ bundle 不用；唯一引用是自有测试 + gui-fold 的类型 import），再
 | `tag -a v0.12.7` + `push main` + `push tag` | 成功，无 force-push，旧标签未动 |
 | 远端 CI `44666191493` | success |
 | Release `44666195466` | success；Release `Grok Workflow for DSH v0.12.7` + asset `dsh-grok-workflow-0.12.7.tgz` |
+
+## Round 86 — 2026-11-20 — round-033：手工折行的 base64 私钥 / 账本滞后（`CONFIRMED`，发版 `0.12.8`）
+
+**主题（池顶，`POOL.md` 红脱敏项）**：base64 块**折行窄于 24 列时完全不脱敏**。标记是一段连续的
+20 字符字面量，任何窄于它的折行都把标记自身拆到两行；续行规则还要求每行 ≥16 字符。round 30 量到
+8/12/16/19/20/21/22/23 列全部整块留存、24 列才第一次生效。
+
+**改动**：`src/redact.ts`——9 条窗口改由 `BASE64_PRIVATE_KEY_WINDOWS` + `foldable()` 生成，字符
+之间允许一个 `BASE64_BREAK`（真实换行或 JSON 字符串里的 `\n` 转义）；续行下限 16 → **8**，并用
+`BASE64_BLOB_END`（行边界/引号/输入结束）锚定，避免把散文里的下一个单词当成折行吃掉。决策见
+`D-088`，实测见 `A37`。`test/redact.spec.ts` +3 用例（8 种折行宽度 × PEM/PGP、JSON 字段里的折行
+块、折行公钥/证书的不过度匹配）。
+
+**红绿（本树实跑）**：把 `src/redact.ts` 换回 `HEAD` 版本后 `npx vitest run test/redact.spec.ts`
+= **2 failed / 38 passed**（折行用例报 `expected … to contain '[REDACTED PRIVATE KEY]'`，JSON 用例
+把整块编码原文原样返回）；改后 **40 passed**。
+
+**记录层（同轮前置修复，`CONFIRMED`）**：`heartbeat-guard.sh --round 33 --record` 首跑给出
+`SKIP code=round-without-ledger next_round=33 round_max=32 ledger_max=25`。第 32 轮实际已闭合
+（收尾段带 `status: OK`、`report_open=0`、树干净、无 `.rsi/STOP`），所以这是账本滞后造成的假信号：
+`.rsi/ledger.jsonl` 停在 25，`ROUND.md`/`LOG.md`/`STATE.md` 已到 32。补齐 27–32 六行（每行的
+commit/tag/CI/Release 均取自已提交记录，无编造）后门禁码变为 `dirty-tracked`（本轮自己的改动）。
+新增 `test/rsi-ledger.spec.ts`（5 用例）钉住门禁读的不变式：账本必须承认最新的 `ROUND.md` 轮次、
+不得写进报告里没有的轮次、每行必须带 theme/status/at/evidence 且 evidence 路径存在、`ROUND.md`
+收尾段必须带 status。对旧账本该用例 **1 failed**（`expected [2,3,…,25] to include 32`），补行后
+**5 passed**。这类缺陷此前没有任何测试会变红——门禁三轮 `SKIP` 就升级为 `stall-unclosed` 的
+`STOP`，而全套测试仍然是绿的。

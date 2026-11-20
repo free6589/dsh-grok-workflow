@@ -34,14 +34,21 @@ here and are marked DONE when their commit lands.
   `test/redact.spec.ts` pins three alignments, the wrapped shape and the public-key no-over-reach
   case; on the pre-fix source both positive cases leak the whole block. Evidence
   `.rsi/evidence/round-030/`.
-- P · A base64 blob wrapped *narrower than 24 columns* is not redacted at all: the marker is a
-  20-character contiguous literal, so any wrap below 20 characters splits it across lines, and the
-  continuation rule additionally needs ≥16 characters per line. Measured this round for both
-  armors: wraps of 8/12/16/19/20/21/22/23 columns leave 100% of the encoded block in place, 24 is
-  the first width that redacts (pre-existing for PEM since round 29 — the marker width, not the new
-  PGP literals, sets the floor). Fixing it needs a marker that tolerates a break between its own
-  characters, or a decode pass; both are a decision of their own. M / low (real `base64` wraps at 76
-  and `-w0` does not wrap; the risk is a hand-wrapped paste).
+- R33 DONE · A base64 blob wrapped *narrower than 24 columns* was not redacted at all: the marker
+  was a contiguous 20-character literal, so any wrap below 20 characters split it across lines, and
+  the continuation rule additionally needed ≥16 characters per line (measured: 8/12/16/19/20/21/22/23
+  columns left 100% of the encoded block, 24 was the first width that redacted). The nine encoded
+  windows are now generated so a line break — a real newline or the `\n` escape a JSON string
+  carries — may fall between any two of their characters, and continuation lines are consumed down
+  to eight characters with a line-boundary anchor (`src/redact.ts`, `D-088`, `A37`).
+  `test/redact.spec.ts` pins eight fold widths for both armors, the JSON-field fold and the
+  no-over-reach cases; on the pre-round source the two positive cases leak the whole block.
+  Evidence `.rsi/evidence/round-033/`.
+- P · A base64 blob folded to **7 columns or fewer** is still left alone: at that width a
+  continuation line cannot be told apart from a word of prose, and the rule's floor is the eight
+  characters a `w >= 8` fold puts on every line (`src/redact.ts`, `BASE64_BLOB_END`). Covering it
+  needs a width-aware pass (a decode and re-encode probe) rather than one regex. S / low (real
+  `base64` wraps at 76 and `-w0` does not wrap at all).
 
 ## Configuration (`src/config.ts`, `src/settings.ts`, `src/index.ts`)
 

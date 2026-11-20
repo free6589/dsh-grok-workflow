@@ -1,3 +1,12 @@
+Last updated: 2026-11-20 12:05 +08:00 (**round-033：手工折行的 base64 私钥整块落进报告；顺带修好账本滞后** —
+`base64-private-key` 的窗口原是连续 20 字符字面量，任何窄于它的折行都把标记自身拆开，实测
+8/12/16/19/20/21/22/23 列全部整块留存、24 列才第一次生效。窗口改为生成式、字符间可容忍一个断行
+（真实换行或 JSON `\n` 转义），续行下限 16→8 并按行边界锚定（`D-088`、`A37`）；折行 ≤7 列仍留，
+并入池。同轮修掉记录层缺陷：`.rsi/ledger.jsonl` 停在 25、`ROUND.md` 已到 32，门禁读到
+`round-without-ledger`（三轮 SKIP 会升级成 STOP），补 27–32 六行并新增 `test/rsi-ledger.spec.ts`。
+`npm run ci` exit 0 = **68 文件 / 1231 测试 PASS**。**已发版 `0.12.8`**：commit `9f91684`、annotated
+tag `v0.12.8` 已推。）
+
 Last updated: 2026-11-20 11:10 +08:00 (**round-032：删零调用的面板投影模块，未发版** —
 `src/panel.ts`（286 行）零生产导入者（`src/` 零引用、`src/index.ts` 不导出、bundle 不用），
 活面板走 `progress-tab.ts` + bundle 渲染器。删模块 + 自有测试（557 行）；

@@ -1,5 +1,23 @@
 # Agent Handoff
 
+## 2026-11-20 — `0.12.8`（round-033：手工折行的 base64 私钥 + 账本滞后）
+
+- **From:** agent-78（RSI round 33 子代理）· **To:** 下一轮接手者 / 主会话
+- **选题（`CONFIRMED`）**：`POOL.md` 池顶红脱敏项——base64 块折行窄于 24 列时整块留存。
+  标记原为连续 20 字符字面量，折行把它自己拆到两行；实测 8/12/16/19/20/21/22/23 列全部不脱敏，
+  24 列才第一次生效。
+- **本轮改动**：`src/redact.ts` 的 9 条窗口改为生成式并可容忍自身断行（真实换行或 JSON `\n`
+  转义），续行下限 16 → 8 且按行边界锚定（`D-088`、`A37`）；`test/redact.spec.ts` +3 用例；
+  新增 `test/rsi-ledger.spec.ts`（5 用例）；`.rsi/ledger.jsonl` 补齐 27–32 六行。
+- **记录层修复（重要，`CONFIRMED`）**：`heartbeat-guard.sh --round 33` 首跑是
+  `SKIP code=round-without-ledger`（报告到 32、账本停在 25）。第 32 轮实际已闭合，是假信号；
+  但该 SKIP 连续三次会升级为 `stall-unclosed` 的 **STOP**，即整条无人值守循环会在**所有测试仍绿**
+  的情况下停摆。补行 + 新测试已修好，门禁码恢复为 `dirty-tracked`（当轮自己的改动）。
+- **红绿（`CONFIRMED`）**：旧码 `test/redact.spec.ts` 2 failed / 38 passed → 新码 40 passed；
+  账本用例对旧账本 1 failed → 补行后 5 passed；`npm run ci` exit 0 = 68 文件 / 1231 测试 PASS。
+- **NOT_RUN**：真实定时投递、GUI 手点（操作方动作，D-066）；折行 ≤7 列的块（池里新项）。
+  本机 `web` profile 仍是旧版，想用新版从 `github:free6589/dsh-grok-workflow#v0.12.8` 更新。
+
 ## 2026-11-20 — `0.12.7` 已发版（round-032：删 panel 死代码）
 
 - **From:** RSI 心跳轮（本会话）· **To:** 用户 / 下一轮接手者

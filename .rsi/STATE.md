@@ -1,17 +1,22 @@
-Updated: 2026-11-20T10:20+08:00 · round 31 (checkpoint payload-ceiling comment) · `npm run ci` 68 files / 1236 tests PASS · no release (comment + test only, no user-visible change) · previous release `0.12.6` (`e7150ab`, tag `v0.12.6`, CI `44659057507`, Release `44659061505`)
+Updated: 2026-11-20T12:05+08:00 · round 33 (hand-folded base64 key + ledger backfill) · `npm run ci` 68 files / 1231 tests PASS · released `0.12.8` (commit `9f91684`) · previous release `0.12.7` (`56e701d`, tag `v0.12.7`, CI `44666191493`, Release `44666195466`)
 
-Updated: 2026-11-20T10:13+08:00 · round 30 (base64-wrapped GnuPG private key) · `npm run ci` 68 files / 1235 tests PASS · `verify:lib` byte-identical at `e7150ab` · released `0.12.6` (commit `e7150ab`, tag `v0.12.6` object `167b475`, CI `44659057507`, Release `44659061505`, asset 600,316 B)
-
-Updated: 2026-11-20T09:45+08:00 · round 29 (base64-wrapped private key) · `npm run ci` 68 files / 1233 tests PASS · released `0.12.5` (commit `5b7cae1`, tag `v0.12.5`, CI `44656151053`, Release `44656153854`)
-
-Updated: 2026-11-20T08:45+08:00 · round 27 (checkpoint read-side byte bound) · **released
-`0.12.3`**: commit `fd6a5ee`, tag `v0.12.3`, CI `44647313571`, Release `44647317251` ·
-`npm run ci` 68 files / 1230 tests PASS · web profile on `#v0.12.3` (host pid `154637` never
-restarted) · previous releases `v0.12.2` (`40228c5`, CI `44641153858`, Release `44641158387`)
-and `v0.12.1` (`23d3369`, CI `44595376323`, Release `44595391505`)
-
+Previous rounds: `0.12.7`/`56e701d` (32) · `0.12.6`/`e7150ab` (30, CI `44659057507`, Release `44659061505`) · `0.12.5`/`5b7cae1` (29, CI `44656151053`, Release `44656153854`) · `0.12.4`/`5cd2b1c` (28, CI `44652383452`, Release `44652387975`) · `0.12.3`/`fd6a5ee` (27, CI `44647313571`, Release `44647317251`) · `0.12.2`/`40228c5` · `0.12.1`/`23d3369` — per-round detail lives in `.rsi/ROUND.md`, `.rsi/LOG.md` and `.rsi/ledger.jsonl`.
 ## Facts
 
+- Round 33 (this round): a base64 block folded narrower than its own encoded banner (a `fold -w 8`
+  key file, an editor-wrapped paste) reached reports verbatim — the marker was a contiguous
+  20-character literal, so the fold split the marker itself; measured widths 8/12/16/19/20/21/22/23
+  all kept 100% of the block and 24 was the first width that redacted. The nine windows are now
+  generated (`BASE64_PRIVATE_KEY_WINDOWS` + `foldable()`) with `BASE64_BREAK` allowed between any two
+  characters (real newline or the JSON `
+` escape), continuation floor 16 → 8, and
+  `BASE64_BLOB_END` anchors each continuation line so prose is not eaten (`D-088`, `A37`).
+  A fold of ≤7 columns is left alone and pooled. The same round repaired the loop's own gate:
+  `.rsi/ledger.jsonl` stopped at round 25 while `ROUND.md` documented 27–32, so
+  `heartbeat-guard.sh` read `code=round-without-ledger` (SKIP on every heartbeat, STOP after three);
+  six rows backfilled and `test/rsi-ledger.spec.ts` pins the invariant. Red/green: pre-round source
+  2 failed / 38 passed → 40 passed; ledger test 1 failed on the old ledger → 5 passed.
+  Evidence `.rsi/evidence/round-033/`.
 - Round 31 (this round): the round-27 comment claimed the refused band ran to 1,048,576, but the
   integrity record is 122 bytes plus the decimal digits of `bytes` (129 only for a 7-digit count), so
   `writeCheckpoint` refuses from 1,048,448. The behaviour was right; the prose was not. The comment now
@@ -67,21 +72,28 @@ and `v0.12.1` (`23d3369`, CI `44595376323`, Release `44595391505`)
 
 ## Installed profile (web)
 
-- `~/.dsh/profiles/web` carries `dsh-grok-workflow` at the newest published tag; the shipped
-  `lib/` is byte-identical to the tag's (`diff -r --exclude='*.map'` = 0).
-- DSH host pid `154637` has run since 2026-11-17T22:49:32 without a restart through every
-  profile update (`lstart` and boot id `9d066162-…` unchanged). `docs/knowledge/HANDOFF.md`
-  records which version each update installed.
+- `~/.dsh/profiles/web` carries `dsh-grok-workflow` at the newest published tag; the shipped `lib/`
+  is byte-identical to the tag's (`diff -r --exclude='*.map'` = 0). DSH host pid `154637` has run
+  since 2026-11-17T22:49:32 without a restart through every profile update (`lstart` and boot id
+  `9d066162-…` unchanged); `docs/knowledge/HANDOFF.md` records which version each update installed.
 
 ## Pool (`.rsi/POOL.md`)
 
-- Re-checked against the tree this round: `records.ts` redaction, `history.ts` truncate order,
-  `answerLead` sentence count, R6, R9, R10 are all resolved (marked STALE/DONE with anchors).
-- Still open: R11 (the cancelled terminal still composes `relayText`, preamble + markers) and the
-  `src/panel.ts` importer question. Next round should start there.
+- Closed by rounds 28–33: R11 (cancelled terminal composes `humanConclusion`), the `src/panel.ts`
+  importer question (module deleted), the checkpoint payload-ceiling comment (round 31) and the
+  narrow-folded base64 block (round 33, this round — 8..23 columns now redacted).
+- Still open and next in line: folds of **7 columns or fewer** (pooled this round), the nested
+  unknown-key drop (`config.ts`), the bare `TypeError` on a non-string `model`/`provider`, the
+  `repairLimitOverruns` dead path, the 2400-char clamp that drops the verdict line, the
+  "bilingual" mirror that repeats one sentence, the fallback-partial sentence, `meta.phases`
+  dropping at `run-start`, the resume policy/integrity/validator items and the README model/validation
+  bullets. Start at the top of `POOL.md`.
+- Record-layer repair of this round is pinned by `test/rsi-ledger.spec.ts`: the ledger must admit the
+  newest `ROUND.md` round, carry the fields a reviewer reads, and point at existing evidence. Rounds
+  0/1 and 18/23/24/26 have no ledger row and 18/23/24/26/29 have no `ROUND.md` section — pre-existing
+  gaps left as they are, recorded here rather than back-filled with invented numbers.
 
 ## Failures / counters
 
 - Consecutive failed rounds: 0. Consecutive no-value rounds: 0.
-- Standing `NOT_RUN` (operator action, D-066): a real scheduled delivery of a heartbeat, and a
-  manual browser click-through with a screenshot.
+- Standing `NOT_RUN` (operator action, D-066): a real scheduled heartbeat delivery and a manual click-through.
