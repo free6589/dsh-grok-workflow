@@ -636,10 +636,12 @@ test compares the two implementations over one corpus.
 
 Covered shapes, in table order:
 
-1. `PRIVATE KEY` blocks — PEM and PGP armor (`BEGIN PGP PRIVATE KEY BLOCK`) — replaced whole.
-   The same block also when it is itself base64: a `base64 -w0`'d key file, or one sitting in a
-   JSON field or a larger blob, carries no banner until it is decoded, so the rule matches the
-   banner's *encoded* form at all three base64 group alignments and replaces the whole blob.
+1. `PRIVATE KEY` blocks — PEM and PGP armor (`BEGIN PGP PRIVATE KEY BLOCK`, plus the legacy
+   `SECRET KEY BLOCK` spelling) — replaced whole. The same block also when it is itself base64: a
+   `base64 -w0`'d key file, or one sitting in a JSON field or a larger blob, carries no banner
+   until it is decoded, so the rule matches either banner's *encoded* form at all three base64
+   group alignments and replaces the whole blob. The PGP match reaches byte 17 of the banner,
+   where `PRI`/`SEC` diverge from `PUB`, so a base64 public key is not caught by accident.
 2. Provider tokens by prefix: JWT, `sk-`/`rk-`/`pk-`, `ghp_`/`github_pat_`, `glpat-`, `npm_`,
    `xox*`, `AKIA`/`ASIA`, `AIza`, `ya29.`, Telegram bot tokens, Slack webhooks.
 3. `Cookie` / `Set-Cookie` header values — including the form written inside a quoted shell
@@ -663,11 +665,12 @@ Two deliberate asymmetries:
 - **A value ends at a token boundary** — whitespace, end of line, or one of `,;}&|<>})]`. An
   unterminated value used to swallow `;user=app` and `Path=/` from the same line.
 
-Known gaps: base64-wrapped *PGP armor* still has no rule (base64-wrapped PEM does), a wrapped
-base64 blob whose final line is shorter than 16 characters keeps that fragment — footer bytes,
-not key material, since the tail of the encoding is the end of the block — base64
-`CERTIFICATE` blocks are deliberately left alone as public material, and no list of shapes is
-complete. Redaction is a safety net, not a guarantee (see the README security section).
+Known gaps: a wrapped base64 blob whose final line is shorter than 16 characters keeps that
+fragment — footer bytes, not key material, since the tail of the encoding is the end of the
+block — base64 `CERTIFICATE` and `PGP PUBLIC KEY BLOCK` blocks are deliberately left alone as
+public material, a blob wrapped **narrower than 24 columns** is not matched at all (the marker is a
+20-character contiguous literal plus the ≥16-character continuation rule; measured for both armors
+in round 30), and no list of shapes is complete. Redaction is a safety net, not a guarantee (see the README security section).
 
 ## Known architecture limits (MVP)
 

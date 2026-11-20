@@ -260,13 +260,55 @@ describe('redaction shapes the earlier rules missed', () => {
     expect(output.match(/[A-Za-z0-9+/]{20,}/)).toBeNull()
   })
 
+  it('redacts a base64-wrapped GnuPG private key at every byte alignment', () => {
+    const pgp = [
+      '-----BEGIN PGP PRIVATE KEY BLOCK-----',
+      '',
+      'lQOYBF8fakefakefakefakefakefakefakefakefakefakefakefakefakefake',
+      '=abcd',
+      '-----END PGP PRIVATE KEY BLOCK-----',
+      '',
+    ].join('\n')
+    const encode = (text: string) => Buffer.from(text, 'utf8').toString('base64')
+    // GnuPG armor is wrapped exactly like a PEM file, and what it carries is the
+    // private key. Before this round the rule knew only the encoded PEM banner,
+    // so a `base64`d keyring export reached the report verbatim.
+    for (const prefix of ['', 'Z', 'ZZ']) {
+      const blob = encode(prefix + pgp.replace(/\n/g, ''))
+      const output = redactSecrets(`tool result: ${blob}`)
+      expect(output).toContain('[REDACTED PRIVATE KEY]')
+      expect(output).not.toContain('LS0tLS1CRUdJTiBQR1Ag')
+      expect(output.match(/[A-Za-z0-9+/]{20,}/)).toBeNull()
+    }
+    // `SECRET KEY BLOCK` is the legacy spelling of the same material.
+    const secret = encode(pgp.replace('PRIVATE KEY', 'SECRET KEY').replace(/\n/g, ''))
+    expect(redactSecrets(`key: ${secret}`)).toBe('key: [REDACTED PRIVATE KEY]')
+  })
+
+  it('redacts a wrapped base64 GnuPG key across its continuation lines', () => {
+    // A keyring export is far longer than a bare PEM, so a wrapped blob is the
+    // normal shape: every continuation line has to be consumed or the tail of the
+    // block survives.
+    const pgp = `-----BEGIN PGP PRIVATE KEY BLOCK-----\n\n${'m'.repeat(120)}\n=abcd\n-----END PGP PRIVATE KEY BLOCK-----\n`
+    const wrapped = Buffer.from(pgp, 'utf8').toString('base64').replace(/(.{64})/g, '$1\n').trimEnd()
+    expect(wrapped.split('\n').length).toBeGreaterThan(2)
+    const output = redactSecrets(`Private key dump:\n${wrapped}\nnext line stays`)
+    expect(output).toContain('[REDACTED PRIVATE KEY]')
+    expect(output).toContain('next line stays')
+    expect(output.match(/[A-Za-z0-9+/]{20,}/)).toBeNull()
+  })
+
   it('leaves base64 public material and unrelated blobs alone', () => {
     const encode = (text: string) => Buffer.from(text, 'utf8').toString('base64')
-    // Redaction over-reach is noise: a public certificate and an ordinary image
-    // blob are not secrets, and the three banner encodings must not match them.
+    // Redaction over-reach is noise: a public certificate, a public GnuPG key and
+    // an ordinary image blob are not secrets, so the banner encodings must not
+    // match them. The GnuPG case is the sharp one: `BEGIN PGP P` is shared with
+    // the private banner, and only `PUB` vs `PRI`/`SEC` tells them apart.
     const certificate = encode('-----BEGIN CERTIFICATE-----\nMIIBfakeCertBody\n-----END CERTIFICATE-----\n')
+    const publicKey = encode('-----BEGIN PGP PUBLIC KEY BLOCK-----\n\nmQENBF8fakefake\n=abcd\n-----END PGP PUBLIC KEY BLOCK-----\n')
     const png = encode(`\x89PNG\r\n\x1a\n${'x'.repeat(64)}`)
     expect(redactSecrets(`cert ${certificate}`)).toBe(`cert ${certificate}`)
+    expect(redactSecrets(`pub ${publicKey}`)).toBe(`pub ${publicKey}`)
     expect(redactSecrets(`img ${png}`)).toBe(`img ${png}`)
   })
 
@@ -467,6 +509,7 @@ describe('prompt redaction parity', () => {
     '-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBg\n-----END PRIVATE KEY-----',
     '-----BEGIN PGP PRIVATE KEY BLOCK-----\nlQOYBFfakeArmoredBody\n-----END PGP PRIVATE KEY BLOCK-----',
     `PRIVATE_KEY=${Buffer.from('-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkfakeBODY\n-----END PRIVATE KEY-----\n', 'utf8').toString('base64')}`,
+    `keyring ${Buffer.from('-----BEGIN PGP PRIVATE KEY BLOCK-----\nlQOYBFfakeArmoredBody\n-----END PGP PRIVATE KEY BLOCK-----\n', 'utf8').toString('base64')}`,
     `curl -H 'Cookie: PHPSESSID=abc123def456' https://example.test`,
     'https://bucket.s3.amazonaws.com/o?X-Amz-Signature=FAKESIGNATUREVALUE&X-Amz-Expires=900',
     'https://storage.googleapis.com/o?X-Goog-Signature=FAKESIGNATUREVALUE',

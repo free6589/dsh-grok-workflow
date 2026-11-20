@@ -4609,3 +4609,34 @@ armor 规则（`:27` `private-key`、`:31` `pgp-private-key`），都匹配解�
 声明版本、安装示例标签、已发布标签清单，以及 `docs/LOCAL-TESTING.md` 的 tarball 名四处由守卫逼出
 （首轮 ci 因此 6 failed，改完复跑 exit 0）——这正是 `test/docs-version.spec.ts` 与
 `test/docs-config-keys.spec.ts` 存在的意义。
+
+## Round 81 — 2026-11-20 — round-030：base64 包裹的 GnuPG 私钥原先整块落进报告（`CONFIRMED`）
+
+**选题**：`POOL.md` 红脱敏一节的第一条非 DONE 项 `P · Base64-wrapped *PGP armor*`（round 29 留下
+的已知缺口，按 PROTOCOL 优先级属「功能错误」，泄漏面）。选题前与树对表：`src/redact.ts` 的
+`base64-private-key` 仍只有三条 PEM 标记（`grep -c QR1AgUF src/redact.ts` → 0），条目成立，未陈旧。
+
+**病**：`-----BEGIN PGP PRIVATE KEY BLOCK-----` 的编码形态（`base64` 过的钥匙串导出、JSON 字段里的
+密钥）里不存在任何解码后的横幅，而两条 armor 规则只匹配字面横幅，于是整块 GnuPG 私钥原样进报告、
+诊断信息和复查/重试提示词。GnuPG 块比裸 PEM 长得多，通常是多行折行的块，所以续行也必须吃掉。
+
+**改动**：`src/redact.ts` 的 `base64-private-key` 规则从 3 条标记扩到 9 条——PGP `PRIVATE` 与遗留
+`SECRET` 两种横幅 × 三种 base64 分组对齐；匹配窗口取到横幅第 17 字节，把 `PRI`/`SEC` 与 `PUB` 分开，
+base64 公钥不误伤。`docs/ARCHITECTURE.md` 覆盖清单与「已知缺口」段、`CHANGELOG.md` 双语条目同步；
+`lib/redact.js` 随 `src/` 重建（`lib/script.js` 字节不变——脚本在模块加载时从 `REDACTION_RULES` 渲染）。
+
+**红绿（`CONFIRMED`，本机实跑，证据 `.rsi/evidence/round-030/`）**：
+- 改前：在 `HEAD df6cf4b` 的 `git archive` 树里（`/tmp/rsi-old-030`，`node_modules` 软链，新 spec
+  拷入）跑 `npx vitest run test/redact.spec.ts -t "GnuPG"` → **2 failed | 35 skipped**，失败输出是
+  真泄漏：`expected 'Private key dump:\nLS0tLS1CRUdJTiBQR1…' to contain '[REDACTED PRIVATE KEY]'`，
+  收到的整串就是 base64 后的 GnuPG 块（含续行）。`red-old.txt`
+- 改后：`npx vitest run test/redact.spec.ts` → **37 passed**（基线 35，+2）。`red-new.txt`
+- 第三条守卫（base64 `CERTIFICATE`、base64 `PGP PUBLIC KEY BLOCK`、PNG 块不动）两侧都绿——它是
+  防误伤守卫，不是修复探针。
+
+**门禁（`CONFIRMED`）**：`npm run ci` exit 0 = **68 文件 / 1235 测试 PASS**（基线 1233，只增不减），
+`typecheck` 0 错，`oxlint` 24w/0e，`verify:lib` 153 files；日志 `.rsi/evidence/round-030/ci.txt`。
+
+**未验证（`NOT_RUN`）**：真机 GUI 手动把一段 base64 的 GnuPG 私钥喂给运行的插件看报告；
+真实定时投递（D-066 属操作者动作，本会话是子代理，`schedule_*` 被宿主拒绝：
+`{"code":"subagent_session","message":"A delegated subagent cannot use scheduled tasks."}`）。

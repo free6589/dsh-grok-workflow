@@ -1219,3 +1219,45 @@ Source: 只读审计 + 本轮新增实现与单测。依据 = `src/guardian.ts`�
   module load, so the new rule reaches the prompt-side redactor with no second edit — `lib/script.js`
   is byte-identical after the rebuild while `lib/redact.js` changes. `test/redact.spec.ts`'s parity
   corpus gained one base64 sample, so host/script equality is pinned over the new shape too.
+
+## A35 — The GnuPG half of the encoded-armor gap: which windows survive alignment, and which ones over-reach (2026-11-20, round 30)
+
+- **Why this entry exists:** `A34` closed base64-wrapped *PEM* and recorded the PGP half as a known
+  gap ("the two banners diverge at byte 11, so it needs its own three markers"). Re-checked against
+  `HEAD df6cf4b` before choosing the round: `src/redact.ts` matched only the three PEM encodings, so a
+  `base64`d GnuPG keyring export reached reports, diagnostics and verifier/retry prompts verbatim.
+  The pool entry was true and not stale.
+- **The divergence is at byte 15, not byte 11 (`CONFIRMED`):** `-----BEGIN PGP PRIVATE KEY BLOCK-----`
+  and `-----BEGIN PGP SECRET KEY BLOCK-----` agree through byte 14 (`-----BEGIN PGP `) and split at
+  15 (`P` vs `S`); the *public* banner splits one byte later (`PU` vs `PR`). A 15-byte window
+  therefore has to reach byte 17 to separate `PRI`/`SEC` from `PUB` — a window anchored at byte 0 is
+  shared with the public armor.
+- **The six encodings (`CONFIRMED`, computed and then pinned by test):** for
+  `-----BEGIN PGP PRIVATE KEY BLOCK`, bytes 3..17, 4..18 and 5..19 encode as
+  `LS1CRUdJTiBQR1AgUFJJ`, `LUJFR0lOIFBHUCBQUklW` and `QkVHSU4gUEdQIFBSSVZB`; the `SECRET` banner
+  yields `LS1CRUdJTiBQR1AgU0VD`, `LUJFR0lOIFBHUCBTRUNS` and `QkVHSU4gUEdQIFNFQ1JF`.
+  The derivation reproduces the three round-29 PEM literals exactly, which is the cross-check that the
+  window method was applied the same way.
+- **Over-reach measured, not assumed:** the 20-character group that encodes bytes 0..14 is
+  `LS0tLS1CRUdJTiBQR1Ag` for the private blob, and a base64 `PGP PUBLIC KEY BLOCK` blob starts with
+  that same literal (`startsWith` → `true`). A shared-prefix marker would redact public keys. The
+  shipped windows do not: `test/redact.spec.ts` asserts a base64 public key blob comes back unchanged,
+  next to the existing `CERTIFICATE` case.
+- **Cost measured at HEAD (`CONFIRMED`, min of 5 runs, Node 26.8.1):** the rule alone takes 12.1 ms on
+  a 1 MB single-run blob with no marker (the worst case: the greedy run is consumed once, then nine
+  alternatives are retried at every backtrack position), 3.7 ms on a 1 MB blob that does carry a
+  marker, and 1.9 ms on 12,000 short runs (287 KB). The full table on the same 1 MB blob is 62.1 ms,
+  so the enlarged alternation is not what dominates a large input.
+- **Narrow wraps measured, and this is a real gap (`CONFIRMED`):** the marker is a 20-character
+  contiguous literal, so a blob wrapped below 20 columns splits it across lines and nothing matches.
+  Measured on a 184-character encoded GnuPG block: wrap widths 8, 12, 16, 19, 20, 21, 22 and 23
+  leave 180–184 of 184 encoded characters in the output (no redaction at all), 24 is the first width
+  that redacts (marker contiguity 20 plus the ≥16-character continuation rule), and 24/29 leave a
+  10–12-character tail — the documented footer fragment. The same floor applies to PEM since round
+  29: it is the marker width, not the new PGP literals, that sets it. Real `base64` wraps at 76
+  columns and `-w0` does not wrap, so the exposure is a hand-wrapped paste; pooled as its own item
+  rather than papered over.
+- **Boundaries unchanged:** a wrapped blob is still consumed line by line while each continuation
+  carries at least 16 characters; base64 `CERTIFICATE` and `PGP PUBLIC KEY BLOCK` stay untouched;
+  `lib/script.js` remains byte-identical because `src/script.ts` renders `REDACTION_RULES` at module
+  load, so the prompt-side redactor picked the new literals up with no second edit.

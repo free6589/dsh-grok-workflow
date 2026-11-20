@@ -26,9 +26,22 @@ here and are marked DONE when their commit lands.
   are deliberately untouched. `test/redact.spec.ts` pins the three alignments, the wrapped shape,
   JSON parseability and the no-over-reach cases; on the pre-fix source the two positive cases
   leak the whole blob. Evidence `.rsi/evidence/round-029/`.
-- P · Base64-wrapped *PGP armor* (`BEGIN PGP PRIVATE KEY BLOCK` after decoding) still has no rule:
-  the round-29 marker set is the PEM banner only, because the two armors diverge at byte 11.
-  Adding it needs three more alignment markers. S / low.
+- R30 DONE · Base64-wrapped *PGP armor* (`BEGIN PGP PRIVATE KEY BLOCK` after decoding) had no rule:
+  the round-29 marker set was the PEM banner only. The rule now carries six more literals — the
+  `PRIVATE` and legacy `SECRET` banner at all three base64 group alignments — and the windows reach
+  byte 17, where `PRI`/`SEC` separate from `PUB`, so a base64 `PGP PUBLIC KEY BLOCK` is still left
+  alone (measured: a bytes-0..14 marker would match public blobs, `RESEARCH.md` A35). `D-086`.
+  `test/redact.spec.ts` pins three alignments, the wrapped shape and the public-key no-over-reach
+  case; on the pre-fix source both positive cases leak the whole block. Evidence
+  `.rsi/evidence/round-030/`.
+- P · A base64 blob wrapped *narrower than 24 columns* is not redacted at all: the marker is a
+  20-character contiguous literal, so any wrap below 20 characters splits it across lines, and the
+  continuation rule additionally needs ≥16 characters per line. Measured this round for both
+  armors: wraps of 8/12/16/19/20/21/22/23 columns leave 100% of the encoded block in place, 24 is
+  the first width that redacts (pre-existing for PEM since round 29 — the marker width, not the new
+  PGP literals, sets the floor). Fixing it needs a marker that tolerates a break between its own
+  characters, or a decode pass; both are a decision of their own. M / low (real `base64` wraps at 76
+  and `-w0` does not wrap; the risk is a hand-wrapped paste).
 
 ## Configuration (`src/config.ts`, `src/settings.ts`, `src/index.ts`)
 

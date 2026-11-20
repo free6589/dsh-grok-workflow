@@ -1,0 +1,34 @@
+== wrap-width boundary for base64-private-key (round 30, HEAD+round-30 change) ==
+== command: node -e '<inline>' against lib/redact.js (built from src/ at this commit) ==
+== env: v26.8.1 Linux x86_64 ==
+
+armor: PGP PRIVATE KEY BLOCK (encoded length 184)
+  w=0 redacted=true survivorChars=0/184
+  w=8 redacted=false survivorChars=184/184
+  w=12 redacted=false survivorChars=180/184
+  w=16 redacted=false survivorChars=184/184
+  w=19 redacted=false survivorChars=184/184
+  w=20 redacted=false survivorChars=180/184
+  w=21 redacted=false survivorChars=184/184
+  w=22 redacted=false survivorChars=184/184
+  w=23 redacted=false survivorChars=184/184
+  w=24 redacted=true survivorChars=0/184
+  w=29 redacted=true survivorChars=10/184
+  w=32 redacted=true survivorChars=0/184
+  w=64 redacted=true survivorChars=0/184
+  w=76 redacted=true survivorChars=0/184
+armor: PRIVATE KEY (encoded length 156)
+  w=0 redacted=true survivorChars=0/156
+  w=8 redacted=false survivorChars=152/156
+  w=12 redacted=false survivorChars=156/156
+  w=16 redacted=false survivorChars=156/156
+  w=19 redacted=false survivorChars=152/156
+  w=20 redacted=false survivorChars=156/156
+  w=21 redacted=false survivorChars=156/156
+  w=22 redacted=false survivorChars=154/156
+  w=23 redacted=false survivorChars=156/156
+  w=24 redacted=true survivorChars=12/156
+  w=29 redacted=true survivorChars=11/156
+  w=32 redacted=true survivorChars=0/156
+  w=64 redacted=true survivorChars=0/156
+  w=76 redacted=true survivorChars=0/156

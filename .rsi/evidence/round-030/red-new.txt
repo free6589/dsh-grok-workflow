@@ -1,0 +1,16 @@
+== fixed tree (uncommitted round-30 change) ==
+== command: npx vitest run test/redact.spec.ts ==
+== env: v26.8.1 on Linux x86_64 ==
+
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+ ✓ test/redact.spec.ts (37 tests) 54ms
+
+ Test Files  1 passed (1)
+      Tests  37 passed (37)
+   Start at  10:04:35
+   Duration  431ms (transform 221ms, setup 0ms, import 258ms, tests 54ms, environment 0ms)
+
+
+== baseline before this round was 35 tests; +2 new cases ==

@@ -1985,3 +1985,39 @@ model selector」）、`test/loop-brakes.spec.ts`（35 条）、`test/loop-runti
 - **Consequences:** adding an encoded shape costs three literals, and the doc-family test now pins
   `base64` in both READMEs and `docs/ARCHITECTURE.md` so the promise cannot rot. `redactSecrets`
   stays a table walk, so rule order still decides overlaps.
+
+## D-086 — The second armor's encoded form is six more literals in the same rule, and the window must reach byte 17
+
+- **Status:** CONFIRMED
+- **Date:** 2026-11-20 (round 30)
+- **Decision:** the base64-wrapped *GnuPG* private-key gap (left open by `D-085`) is closed inside the
+  existing `base64-private-key` rule: six literals instead of three — the encoded form of the
+  `PRIVATE` and the legacy `SECRET` spelling, each at all three base64 group alignments. No second
+  rule, no decode pass, unchanged replacement text.
+- **Why the same rule and not a second one:** both armors are the same fact at the same boundary
+  (*encoded armor must not reach a report*), they share the replacement, and the leading-run /
+  continuation-line semantics are identical. A second rule would duplicate those semantics and split
+  one audit story into two that can drift; keeping one rule also keeps rule order — which still
+  decides overlaps — unchanged for every other shape.
+- **Why the PGP window reaches byte 17 of the banner:** `-----BEGIN PGP ` (bytes 0..14) is shared by
+  the private and the *public* armor, so a marker built from it cannot tell them apart. Measured this
+  round: the 20-character group encoding bytes 0..14 of a private blob is
+  `LS0tLS1CRUdJTiBQR1Ag` and a base64 `PGP PUBLIC KEY BLOCK` blob **starts with exactly that literal**
+  (`pubBlob.startsWith(sharedMarker) === true`). Windows at bytes 3..17, 4..18 and 5..19 include
+  `PRI`/`SEC` vs `PUB`, which is the first byte triple where the two banners diverge.
+- **Why `SECRET` is included:** `BEGIN PGP SECRET KEY BLOCK` is the legacy spelling of the same
+  material, three more literals cost nothing, and leaving it out would reopen the same leak for old
+  keyrings.
+- **Alternatives rejected:**
+  1. One marker on the shared `-----BEGIN PGP P` prefix — measured above to redact base64 *public*
+     keys as well, i.e. exactly the over-redaction `D-085` refused for `CERTIFICATE`.
+  2. A decode-and-inspect pass — host-only, so the prompt boundary would stay weaker than the report
+     boundary (the argument in `D-085` still holds).
+  3. A separate `base64-pgp-private-key` rule — two rules with identical replacement and identical
+     leading-run semantics; the only gain is a distinct diagnostic name, which the round does not
+     need and no consumer reads.
+- **Consequences:** the alternation is now nine literals, and the worst case for the rule scales with
+  it — measured at HEAD: 12.1 ms for a 1 MB single-run blob with no marker (the greedy run is
+  consumed once, then each of the nine alternatives is tried at each backtrack position), 3.7 ms for
+  a 1 MB blob that does carry a marker, 1.9 ms for 12,000 short runs. Report-sized text is far below
+  that; the full table on the same 1 MB blob takes 62.1 ms, so the base64 rule is not the cost driver.

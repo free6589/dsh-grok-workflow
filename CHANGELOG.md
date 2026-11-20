@@ -5,6 +5,25 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.12.6] - 2026-11-20
+
+### Fixed / 修复
+
+- **A base64-wrapped GnuPG private key is redacted instead of being printed verbatim / base64 包裹的 GnuPG 私钥不再原样落进报告** —
+  0.12.5 closed this hole for PEM armor only, so the encoded form of `-----BEGIN PGP PRIVATE KEY BLOCK-----`
+  (a `base64`d keyring export, a key sitting in a JSON field) still reached reports, diagnostics and
+  verifier/retry prompts with the whole block intact. The same rule now matches the GnuPG banner's
+  encoded form at all three base64 group alignments, for both the `PRIVATE` and the legacy `SECRET`
+  spelling, and replaces the blob including a wrapped blob's continuation lines. Public keys are
+  deliberately not covered: the match reaches byte 17 of the banner, where `PRI`/`SEC` and `PUB`
+  diverge, so base64 `PGP PUBLIC KEY BLOCK` and `CERTIFICATE` blocks survive unchanged.
+  / 0.12.5 只堵上了 PEM armor 这一半：`-----BEGIN PGP PRIVATE KEY BLOCK-----` 的编码形态
+  （`base64` 过的钥匙串导出、JSON 字段里的密钥）仍会带着完整块进报告、诊断信息和复查/重试提示词。
+  同一条规则现在也匹配 GnuPG 横幅的**编码形态**（三种 base64 分组对齐全盖，`PRIVATE` 与遗留的
+  `SECRET` 两种写法都算），整块替换，带换行的续行一并吃掉。公钥故意不覆盖：匹配窗口取到横幅第 17
+  字节，`PRI`/`SEC` 与 `PUB` 正是在那里分开，所以 base64 的 `PGP PUBLIC KEY BLOCK` 与
+  `CERTIFICATE` 块保持原样。
+
 ## [0.12.5] - 2026-11-20
 
 ### Fixed / 修复

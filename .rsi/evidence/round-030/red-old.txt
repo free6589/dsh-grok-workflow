@@ -1,0 +1,101 @@
+== pre-fix tree: git archive of df6cf4b (before round 30) + round-30 spec copied in ==
+== command: npx vitest run test/redact.spec.ts -t "GnuPG" ==
+== env: v26.8.1 on Linux x86_64, worktree /tmp/rsi-old-030, node_modules symlinked to the repo's ==
+== expected: the new positive cases FAIL because src/redact.ts has no base64 GnuPG marker ==
+
+HEAD is df6cf4bbfd95adf83850d72a796a5880fd125f9a docs(rsi): pin the four carried uncertainties at 0.12.5, including the readCheckpoint caller check
+
+0
+0 marker literals in src/redact.ts
+
+
+ RUN  v4.1.12 /tmp/rsi-old-030
+
+ ❯ test/redact.spec.ts (37 tests | 2 failed | 35 skipped) 14ms
+     ↓ redacts known API key and token shapes
+     ↓ redacts private key blocks and preserves non-secret prose
+     ↓ redacts compound environment-variable assignments
+     ↓ redacts access/private/secret keys and Stripe underscore tokens
+     ↓ redacts userinfo in non-HTTP URIs without touching ordinary text
+     ↓ redacts GitLab and npm token prefixes
+     ↓ does not redact ordinary words or numbers
+     ↓ redacts recursively without mutating the source
+     ↓ redacts database URLs and scoped tokens recursively
+     ↓ renders errors without leaking secrets
+     ↓ redacts Azure SAS signatures
+     ↓ redacts Basic authorization in header and JSON form
+     ↓ redacts a Cookie header inside a quoted shell argument
+     ↓ redacts presigned URL signatures from S3, GCS and generic gateways
+     ↓ redacts PGP armored private keys
+     ↓ redacts a base64-wrapped private key at every byte alignment
+     ↓ redacts a wrapped base64 key across its continuation lines
+     × redacts a base64-wrapped GnuPG private key at every byte alignment 11ms
+     × redacts a wrapped base64 GnuPG key across its continuation lines 2ms
+     ↓ leaves base64 public material and unrelated blobs alone
+     ↓ keeps the rest of the line and an already-redacted placeholder intact
+     ↓ does not rewrite non-secret code that mentions a secret-like name
+     ↓ redacts short values for the secret-key spellings the env rule lacked
+     ↓ redacts header-style credential keys by name in deep copies
+     ↓ redacts a quoted JSON secret and keeps the JSON valid
+     ↓ redacts sensitive values by JSON key name without touching other keys
+     ↓ redacts db_pass, Cookie, fine-grained GitHub, ASIA and Google OAuth values
+     ↓ redacts JSON secrets that contain escaped quotes and keeps the JSON valid
+     ↓ redacts numeric JSON secrets without breaking JSON
+     ↓ redacts short env-style values and camelCase keys
+     ↓ redacts session/credentials keys, indented Cookie headers and keeps non-secret words
+     ↓ redacts passphrase/pwd keys and values
+     ↓ preserves ordinary prose that merely mentions a secret-like word
+     ↓ keeps an adversarial 100 KB input under a measured time bound
+     ↓ applies the same rules in the generated script as on the host
+     ↓ exposes every rule to the generated script
+     ↓ keeps every family named in both READMEs and the architecture doc
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/redact.spec.ts > redaction shapes the earlier rules missed > redacts a base64-wrapped GnuPG private key at every byte alignment
+AssertionError: expected 'tool result: LS0tLS1CRUdJTiBQR1AgUFJJ…' to contain '[REDACTED PRIVATE KEY]'
+
+Expected: "[REDACTED PRIVATE KEY]"
+Received: "tool result: LS0tLS1CRUdJTiBQR1AgUFJJVkFURSBLRVkgQkxPQ0stLS0tLWxRT1lCRjhmYWtlZmFrZWZha2VmYWtlZmFrZWZha2VmYWtlZmFrZWZha2VmYWtlZmFrZWZha2VmYWtlZmFrZT1hYmNkLS0tLS1FTkQgUEdQIFBSSVZBVEUgS0VZIEJMT0NLLS0tLS0="
+
+ ❯ test/redact.spec.ts:279:22
+    277|       const blob = encode(prefix + pgp.replace(/\n/g, ''))
+    278|       const output = redactSecrets(`tool result: ${blob}`)
+    279|       expect(output).toContain('[REDACTED PRIVATE KEY]')
+       |                      ^
+    280|       expect(output).not.toContain('LS0tLS1CRUdJTiBQR1Ag')
+    281|       expect(output.match(/[A-Za-z0-9+/]{20,}/)).toBeNull()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/redact.spec.ts > redaction shapes the earlier rules missed > redacts a wrapped base64 GnuPG key across its continuation lines
+AssertionError: expected 'Private key dump:\nLS0tLS1CRUdJTiBQR1…' to contain '[REDACTED PRIVATE KEY]'
+
+- Expected
++ Received
+
+- [REDACTED PRIVATE KEY]
++ Private key dump:
++ LS0tLS1CRUdJTiBQR1AgUFJJVkFURSBLRVkgQkxPQ0stLS0tLQoKbW1tbW1tbW1t
++ bW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1t
++ bW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1t
++ bW1tbW1tbW1tbW1tbW1tCj1hYmNkCi0tLS0tRU5EIFBHUCBQUklWQVRFIEtFWSBC
++ TE9DSy0tLS0tCg==
++ next line stays
+
+ ❯ test/redact.spec.ts:296:20
+    294|     expect(wrapped.split('\n').length).toBeGreaterThan(2)
+    295|     const output = redactSecrets(`Private key dump:\n${wrapped}\nnext …
+    296|     expect(output).toContain('[REDACTED PRIVATE KEY]')
+       |                    ^
+    297|     expect(output).toContain('next line stays')
+    298|     expect(output.match(/[A-Za-z0-9+/]{20,}/)).toBeNull()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 35 skipped (37)
+   Start at  10:04:27
+   Duration  399ms (transform 216ms, setup 0ms, import 253ms, tests 14ms, environment 0ms)
+
