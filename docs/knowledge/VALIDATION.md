@@ -92,7 +92,10 @@ the run emits `tool-workflow/run-start` / `agent-start` / `agent-end`.
 (`39eda66`) and the same message leaves the defect class the meter rejects — an
 `assistant/message` after `turn/end` with no `step/start` behind it
 (`prefix-orphan-journal.txt`): `session-01125c86-…` seq 40 and `session-d86b5415-…` seq 25,
-both `source=workflow-notice`. The fixed build's fresh-profile runs produce none.
+both `source=workflow-notice`. The fixed build in the same `headless` shape writes none —
+`session-abeab5ac-…`, 26 events, `orphans=[]` (`headless-after-journal.txt`). In that fixed
+run the notice path was not reached (no `plugin:grok-workflow/terminal` record), so the
+refusal itself is covered by `test/compact-step-pairing.spec.ts`.
 
 **Limits (`CONFIRMED` / `BLOCKED`):**
 

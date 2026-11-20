@@ -65,8 +65,11 @@ message leaves exactly the defect the meter rejects: an `assistant/message` writ
 == session-d86b5415-…  ORPHAN seq=25 turn=1 step=1 source=workflow-notice  (27 events)
 ```
 
-That is the same class of row as the reported `seq 3553` receipt. With the fixed build the
-fresh-profile runs above produce none.
+That is the same class of row as the reported `seq 3553` receipt. The fixed build in the
+same `headless` shape writes none: `session-abeab5ac-…`, 26 events, `orphans=[]`
+(`headless-after-journal.txt`). In that fixed run the notice path was not reached at all
+(no `plugin:grok-workflow/terminal` record), so the refusal itself is evidenced by
+`test/compact-step-pairing.spec.ts`, not by this run.
 
 ## Limits (stated, not hidden)
 

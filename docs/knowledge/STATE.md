@@ -1675,6 +1675,9 @@ worker 链上限 50（HARD_LIMITS.chainLength）
 - **对照（`CONFIRMED`）**：pre-fix 构建（`39eda66`）的 `headless` profile 跑同一条消息，
   日志里留下越界行 `session-01125c86-…` seq 40、`session-d86b5415-…` seq 25
   （`source=workflow-notice`）——正是计量器拒绝的那一类；修复后的 fresh-profile 运行没有。
+  修复构建的 `headless` 同形跑法同样 0 条越界行（`session-abeab5ac-…`，26 事件，
+  `headless-after-journal.txt`）；该次没走到通知写入点，故「拒绝写入」本身仍由
+  `test/compact-step-pairing.spec.ts` 证明。
 - **未验证 / `BLOCKED`**：想用 SDK `session/resume` 把那条 pre-fix 日志直接喂给 `/compact`，
   被拒：`SessionFormatError: system/message requires a protected first surface head`
   （headless 会话格式与 SDK 读取器不兼容）。因此「命令层 before/after」仍以

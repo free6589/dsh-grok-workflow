@@ -1,0 +1,13 @@
+# headless one-shot, same message, pre-fix vs fixed build (2026-11-20)
+
+## pre-fix build (39eda66)
+== session-01125c86-ca4f-4f20-88c0-722fd85b55e7
+ORPHAN seq=40 turn=1 step=1 source=workflow-notice
+events 42
+== session-d86b5415-1399-488d-9ee9-a0f50409a7d5
+ORPHAN seq=25 turn=1 step=1 source=workflow-notice
+events 27
+
+## fixed build (366d169)
+session=session-abeab5ac-9588-4d85-b8fc-eb1621c58157 events=26 orphans=[]
+no plugin:grok-workflow/terminal record in this run: the notice path was not reached
