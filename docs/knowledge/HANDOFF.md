@@ -1,3 +1,23 @@
+## 2026-11-20 — round 36：折行下限与页脚规则（`A41` / `D-091`）
+
+- **From:** round 36（并发子代理）· **To:** 操作者 / 下一轮接手者
+- **落地（`CONFIRMED`）**：`src/redact.ts` 的 `BASE64_CONTINUATION` 让窄于续行下限的折行按「短行连排」
+  整段被吃（修前 7 列留 244/272 字符且可解回密钥）；页脚规则按实测改写（末行 <8 留、≥8 吃），
+  `docs/ARCHITECTURE.md` 的「16 字符」「窄于 24 列完全不匹配」两处过期文字已删。
+  `test/redact.spec.ts` +3 用例，代码提交 `e3be559`。
+- **验收线状态**：base64 PGP armor 两侧边界 = 已覆盖并有直接断言（round 30 的规则 + 本轮用例）；
+  checkpoint 合法载荷上界 1,048,447 = round 31 已关（`a97d099`），本轮复核通过；
+  页脚字节规则 = 本轮关闭（规则 + 用例 + 架构引用）。
+- **门禁**：干净 worktree @ `e3be559` 上 `npm run ci` exit 0 = 68 文件 / 1236 测试 PASS、
+  `verify:lib` byte-identical。**工作树里**的 CI 有 1 例失败，属并发进程未提交的
+  `.rsi/HEARTBEAT.md`（`--max-rounds 1000`）与其守卫脚本，与本轮无关；同一 spec 在 `d181812` 干净
+  worktree 里 14/14 passed。
+- **并发警告（必读）**：本轮期间另一进程把本轮的 `src/redact.ts` 扫进配置提交 `0ef5bb7`、把第一版
+  （自身有 bug 的）用例扫进 `0d91e45`，随后在 `5749a08` 以「never-green」为由删掉，并发了
+  `v0.12.10`/`v0.12.11`。`e3be559` 重新落地修正版用例。**下一个接手者请先 `git log --oneline -8`
+  确认 HEAD 与本记录的关系**，不要假设工作树干净。
+- **未做（`NOT_RUN`）**：真实定时投递；开关手点；三重及以上转义；GUI 端到端点按。
+
 # Agent Handoff
 
 ## 2026-11-20 — 1000 轮预算的 harness 已落地（分臂 ≤100 轮，`D-092` / `A40`）

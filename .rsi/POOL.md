@@ -49,6 +49,19 @@ here and are marked DONE when their commit lands.
   every backslash, which the single-backslash break branch could not match). `BASE64_BREAK` gained
   the double-backslash branch; `test/redact.spec.ts` pins the 24-col double-encoded shape.
   Evidence `.rsi/evidence/round-034/`. Residual: triple-or-deeper escaping (no measured shape).
+- R36 DONE · A base64 blob folded **below the eight-character continuation floor** was left almost
+  whole: the fold-tolerant window matched the encoded banner, but no line was long enough to be a
+  continuation line, so 244 of 272 encoded characters survived at seven columns — and decoded back
+  to the banner and the key body (`A41`; the round-33/34 assertion only decoded ≥4-character
+  fragments, which a narrow fold shatters into per-line noise). A run of two or more base64-only
+  lines is now consumed as one narrow fold (`BASE64_CONTINUATION`, `D-091`), with the run optional
+  so wider folds still match. The documented footer rule was stale in two places and is now the
+  measured one: a final line under 8 characters survives (≤7 characters, ≤5 decoded bytes), and the
+  old "narrower than 24 columns is not matched at all / 16-character floor" prose in
+  `ARCHITECTURE` is gone. `test/redact.spec.ts` pins widths 1–7 (report + prompt realm), both sides
+  of the 7/8 footer boundary, the over-reach boundary (two short lines yes, one no) and the base64
+  PGP banner at both boundaries; on the pre-fix source (`91ed287`) the narrow-fold case fails with
+  252 characters kept. Evidence `.rsi/evidence/round-036/`.
 
 ## Configuration (`src/config.ts`, `src/settings.ts`, `src/index.ts`)
 

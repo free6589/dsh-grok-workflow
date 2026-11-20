@@ -2,6 +2,19 @@
 
 Real commands and results only. Do not add expected results here.
 
+## Round 36 — narrow base64 folds, footer boundary, and a suite that passes on a clean tree (`CONFIRMED`)
+
+| command | result |
+| --- | --- |
+| `npx vitest run test/redact.spec.ts` | 44 passed (baseline 41, +3) |
+| `git show 91ed287:src/redact.ts > src/redact.ts` then the same spec | 1 failed / 43 passed — `fold 1 kept encoded material: expected 252 to be less than 8`; restored immediately from a saved copy |
+| `node .rsi/evidence/round-036/fold-floor-probe.mjs` (fixed build) | widths 1–4 leave 4/4/3/4 chars, 5–24 leave 0–6; footer: tail 7 survives, tail 8 consumed; report and prompt realm identical at every width |
+| same probe in a worktree built at `91ed287` | widths 1–7 leave 244–252 of 272 encoded chars; at width 7 the leftover decodes back to the banner and the key body (`.rsi/evidence/round-036/prefix-fold-floor-probe.txt`) |
+| `npm run ci` in a clean worktree at `e3be559` | exit 0 — `Test Files 68 passed (68)`, `Tests 1236 passed (1236)`; `verify:lib` printed `lib/ at e3be559 is the build of src/ at e3be559 (153 files, byte-identical)` |
+| `npm run ci` in the working tree | exit 1 — 68 files passed, `test/heartbeat-guard.spec.ts` 1 failed / 1250 passed. Cause is the concurrent process's uncommitted `.rsi/HEARTBEAT.md` (`--max-rounds 1000` prompt line) and its guard script, not this round |
+| `npx vitest run test/heartbeat-guard.spec.ts` in a clean worktree at `d181812` | 14 passed — the failure above does not exist without the concurrent uncommitted change |
+| performance, single run | 112,123-char 5-column fold 1 ms; 94,665-char 76-column fold 1 ms; 100 KB adversarial (`a_` × 50,000) unchanged |
+
 ## Profile update to the published release — 2026-11-20 — repo had nothing to pull, profile moved `#v0.12.1` → `#v0.12.2`, host never restarted (`CONFIRMED`)
 
 **Change:** the `web` profile pinned `dsh-grok-workflow` at `github:free6589/dsh-grok-workflow#v0.12.1`

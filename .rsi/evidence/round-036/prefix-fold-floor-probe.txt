@@ -1,0 +1,49 @@
+module: /tmp/wt-prefix/lib/redact.js
+encoded blob: 272 characters
+
+fold width | placeholder | surviving encoded chars | prompt realm identical
+         1 |        true |                     252 | true
+         2 |        true |                     252 | true
+         3 |        true |                     251 | true
+         4 |        true |                     252 | true
+         5 |        true |                     247 | true
+         6 |        true |                     248 | true
+         7 |        true |                     244 | true
+         8 |        true |                       0 | true
+         9 |        true |                       2 | true
+        10 |        true |                       2 | true
+        11 |        true |                       0 | true
+        12 |        true |                       0 | true
+        13 |        true |                       0 | true
+        14 |        true |                       6 | true
+        15 |        true |                       2 | true
+        16 |        true |                       0 | true
+        17 |        true |                       0 | true
+        18 |        true |                       2 | true
+        19 |        true |                       6 | true
+        20 |        true |                       0 | true
+        21 |        true |                       0 | true
+        22 |        true |                       0 | true
+        23 |        true |                       0 | true
+        24 |        true |                       0 | true
+
+footer boundary: 64-column wrap, final line length -> what survives
+tail  1 | survives= true | output="[REDACTED PRIVATE KEY]\nS" | prompt realm identical=true
+tail  3 | survives= true | output="[REDACTED PRIVATE KEY]\nSy0" | prompt realm identical=true
+tail  5 | survives= true | output="[REDACTED PRIVATE KEY]\nSy0tL" | prompt realm identical=true
+tail  7 | survives= true | output="[REDACTED PRIVATE KEY]\nSy0tLS0" | prompt realm identical=true
+tail  8 | survives=false | output="[REDACTED PRIVATE KEY]" | prompt realm identical=true
+tail  9 | survives=false | output="[REDACTED PRIVATE KEY]" | prompt realm identical=true
+tail 12 | survives=false | output="[REDACTED PRIVATE KEY]" | prompt realm identical=true
+
+over-reach boundary: short one-word lines directly after a wrapped blob
+one short line kept=true | two short lines kept=true | paragraph kept=true
+
+public material and prose are untouched
+base64 PGP PUBLIC KEY BLOCK unchanged=true
+prose unchanged=true
+
+performance (single run, milliseconds)
+fold  5 | 112123 chars | 5.92 ms
+fold 76 | 94665 chars | 0.80 ms
+adversarial 100 KB | 29.29 ms
