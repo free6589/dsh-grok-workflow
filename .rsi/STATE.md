@@ -1,9 +1,23 @@
-Updated: 2026-11-20T12:05+08:00 · round 33 (hand-folded base64 key + ledger backfill) · `npm run ci` 68 files / 1231 tests PASS · released `0.12.8` (commit `9f91684`, CI `44670766356`, Release `44670771402`) · previous release `0.12.7` (`56e701d`, tag `v0.12.7`, CI `44666191493`, Release `44666195466`)
+Updated: 2026-11-20T12:28+08:00 · round 34 (double-escaped folded base64 key) · `npm run ci` 68 files / 1232 tests PASS · releasing patch `0.12.9` (code commit `5d3bcea`; tag / CI / Release ids recorded in the follow-up release commit) · previous release `0.12.8` (`9f91684`, tag `v0.12.8`, CI `44670766356`, Release `44670771402`)
 
-Previous rounds: `0.12.7`/`56e701d` (32) · `0.12.6`/`e7150ab` (30, CI `44659057507`, Release `44659061505`) · `0.12.5`/`5b7cae1` (29, CI `44656151053`, Release `44656153854`) · `0.12.4`/`5cd2b1c` (28, CI `44652383452`, Release `44652387975`) · `0.12.3`/`fd6a5ee` (27, CI `44647313571`, Release `44647317251`) · `0.12.2`/`40228c5` · `0.12.1`/`23d3369` — per-round detail lives in `.rsi/ROUND.md`, `.rsi/LOG.md` and `.rsi/ledger.jsonl`.
+Previous rounds: `0.12.8`/`9f91684` (33, CI `44670766356`, Release `44670771402`) · `0.12.7`/`56e701d` (32) · `0.12.6`/`e7150ab` (30, CI `44659057507`, Release `44659061505`) · `0.12.5`/`5b7cae1` (29, CI `44656151053`, Release `44656153854`) · `0.12.4`/`5cd2b1c` (28, CI `44652383452`, Release `44652387975`) · `0.12.3`/`fd6a5ee` (27, CI `44647313571`, Release `44647317251`) · `0.12.2`/`40228c5` · `0.12.1`/`23d3369` — per-round detail lives in `.rsi/ROUND.md`, `.rsi/LOG.md` and `.rsi/ledger.jsonl`.
 ## Facts
 
-- Round 33 (this round): a base64 block folded narrower than its own encoded banner (a `fold -w 8`
+- Round 34 (this round): a log line that already carries literal `\n` breaks, forwarded inside another
+  JSON document, doubles every backslash; `BASE64_BREAK` only knew the single form, so a folded base64
+  private-key block reached reports verbatim (measured on the pre-round source: the new case keeps a
+  `nIEtFWS0tLS0tCk1NTU1NTU1N` run). The break now also matches the doubled form (`D-089`), which keeps the
+  rule pure-regex so `src/script.ts` still mirrors `REDACTION_RULES` by `pattern.source`. Measured: PGP
+  public key and certificate stay untouched across real-newline / `\n` / `\\n` folds, prose with `\\n`
+  is returned unchanged, private key redacted in all three forms with the JSON still parseable; cost is
+  unchanged (174,000 B prose 9.14 ms → 9.08 ms A/B, `perf-probe.mjs`). Red/green: pre-round source
+  **1 failed**, after **41 passed** (baseline 40); `npm run ci` 68 files / 1232 tests PASS.
+  **Provenance:** this attempt inherited the round-34 change set uncommitted from the interrupted prior
+  attempt (whose `npm run ci` was red only on the round-33 ledger invariant — `ROUND.md` documented
+  round 34 with no ledger row); round 33 itself was already landed and released as `0.12.8` at `06651e0`.
+  This attempt verified the change independently, closed the records and landed the release.
+  Evidence `.rsi/evidence/round-034/`.
+- Round 33: a base64 block folded narrower than its own encoded banner (a `fold -w 8`
   key file, an editor-wrapped paste) reached reports verbatim — the marker was a contiguous
   20-character literal, so the fold split the marker itself; measured widths 8/12/16/19/20/21/22/23
   all kept 100% of the block and 24 was the first width that redacted. The nine windows are now
@@ -81,10 +95,14 @@ Previous rounds: `0.12.7`/`56e701d` (32) · `0.12.6`/`e7150ab` (30, CI `44659057
 
 ## Pool (`.rsi/POOL.md`)
 
-- Closed by rounds 28–33: R11 (cancelled terminal composes `humanConclusion`), the `src/panel.ts`
-  importer question (module deleted), the checkpoint payload-ceiling comment (round 31) and the
-  narrow-folded base64 block (round 33, this round — 8..23 columns now redacted).
-- Still open and next in line: folds of **7 columns or fewer** (pooled this round), the nested
+- Closed by rounds 28–34: R11 (cancelled terminal composes `humanConclusion`), the `src/panel.ts`
+  importer question (module deleted), the checkpoint payload-ceiling comment (round 31), the
+  narrow-folded base64 block (round 33 — 8..23 columns redacted) and the double-escaped fold
+  (round 34, this round — `\\n` breaks now matched).
+- Pool note corrected this round: "folds of 7 columns or fewer" was measured against the *pre-round-33*
+  source. On HEAD, real-newline folds of 1–24 columns are all redacted, so that entry is stale rather
+  than open; the live residual is triple-or-deeper escaping (no measured shape).
+- Still open and next in line: triple-or-deeper escaping, the nested
   unknown-key drop (`config.ts`), the bare `TypeError` on a non-string `model`/`provider`, the
   `repairLimitOverruns` dead path, the 2400-char clamp that drops the verdict line, the
   "bilingual" mirror that repeats one sentence, the fallback-partial sentence, `meta.phases`

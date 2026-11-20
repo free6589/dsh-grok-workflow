@@ -1030,19 +1030,41 @@ no history is rewritten, and no round is force-pushed.
 
 ## Round 34 — 2026-11-20 — 双重转义的折行 base64 块整块落进报告（`CONFIRMED`，patch `0.12.9`）
 
-- **选题（R2）**：POOL 池顶 P 项——窄折行 base64 块的残留。先实测再定界：HEAD 上真换行
-  折行 1–24 列**全部已脱敏**（round 33 的修复已覆盖），池里"≤7 列留存"是基于修前旧码的
-  过时描述。活着的缺口是**双重转义**：已带字面 `\n` 的日志行再被包进另一层 JSON，
-  反斜杠加倍成 `\\n`，`BASE64_BREAK` 的单反斜杠分支对不上，整块原文落进报告。
-- **改动**：`src/redact.ts` `BASE64_BREAK` 加第三分支（双反斜杠+n），注释说明两层覆盖
-  与三层不跟的原因；`test/redact.spec.ts` +1 用例（24 列折行 + 双重 stringify，
-  断言脱敏、无残留、JSON 可解析）。同一份 `REDACTION_RULES` 被 `script.ts` 按 source
-  镜像，报告边界与提示词边界同步，无分叉（D-088 方向不变）。
-- **红绿（`CONFIRMED`，本树实跑）**：新用例在旧码上 **1 failed**（整块原文落进输出）；
-  修后 `test/redact.spec.ts` **41 passed**（基线 40）；`npm run ci` exit 0 =
-  **68 文件 / 1232 测试 PASS**（干净树基线 68/1231，+1，无既有断言被放宽），typecheck 0 错，
-  oxlint 24w/0e；`npm run verify:lib` 提交后复核。
-- **证据**：`.rsi/evidence/round-034/`（`green-spec-run.txt`、`ci.txt`）。
-- **未验证（`NOT_RUN`）**：真机 GUI 手点；真实定时投递；三重及以上转义。
+- **轮次归属（`CONFIRMED`）**：本 attempt 接手时 **round 33 已落地并已发版**——HEAD `06651e0`，
+  `v0.12.8` 指向 `9f91684`，远端 CI `44670766356` 与 Release `44670771402` 均 success。工作树里
+  留着的是上一 attempt 中断前的**未提交 round 34 改动集**，在该树上 `npm run ci` 是红的，唯一失败
+  是 round 33 新增的账本不变式（`ROUND.md` 已写 round 34、`ledger.jsonl` 没有第 34 行，
+  `ci-before-ledger-row.txt`）。丢弃它会销毁已验证的工作、留着它会让门禁因 `dirty_tracked` 与
+  `round_max>ledger_max` 停摆，所以本 attempt 做的是**独立复核 + 补收尾记录 + 落地发版**；
+  代码改动本身不是本 attempt 写的。
+- **选题（R2）**：POOL 池顶 `P ·` 项——窄折行 base64 块的残留。先实测再定界：HEAD 上**真换行**
+  折行 1–24 列**已全部脱敏**（round 33 的修复已覆盖），池里「≤7 列留存」是基于修前旧码的过时描述。
+  活着的缺口是**双重转义**：已带字面 `\n` 的日志行再被包进另一层 JSON `stringify`，反斜杠加倍成
+  `\\n`，`BASE64_BREAK` 的单反斜杠分支对不上，整块编码原文落进报告。
+- **决策（D-089）**：仍走纯正则（延续 `D-088`）——`BASE64_BREAK` 增加匹配**双反斜杠 + n** 的第三个
+  分支，而不是放宽成「任意反斜杠」；放宽会吞正常转义文本，三层及以上转义无实测形状，留作池内残留。
+  `REDACTION_RULES` 被 `src/script.ts` 按 `pattern.source` + `replacement` 镜像，报告边界与
+  复查/重试提示词继续同源。
+- **改动**：`src/redact.ts`（`BASE64_BREAK` 加双反斜杠分支 + 注释说明两层覆盖、三层不跟的理由）；
+  `test/redact.spec.ts` +1 用例（24 列折行 + 双重 `stringify`：断言出现占位符、无 `LS0tLS1CRUdJTi`
+  残留、无 20+ 字符 base64 片段）；`lib/redact.*` 随 `src/` 重建。
+- **红绿（`CONFIRMED`，本 attempt 独立实跑）**：把 `src/redact.ts` 换回 `HEAD` 版本后新用例
+  **1 failed**，输出留着 `nIEtFWS0tLS0tCk1NTU1NTU1N` 这类片段（`red.txt`），源码原样还原；修后
+  `test/redact.spec.ts` **41 passed**（基线 40，`green-spec.txt`）；`npm run ci` exit 0 =
+  **68 文件 / 1232 测试 PASS**（基线 68/1231，+1，无既有断言被放宽），typecheck 0 错，
+  oxlint 24w/0e，`verify:lib` 153 files byte-identical。
+- **过脱敏与性能（`CONFIRMED`，探针入库）**：`reach-probe.mjs` 对折行 PGP 公钥与折行证书各跑三种
+  断行（真换行 / `\n` / `\\n`）六种组合**全部不脱敏**，带 `\\n` 的散文原样返回，私钥块三种断行全部
+  整块脱敏且 JSON 可解析。`perf-probe.mjs` 对 `HEAD` 与当前 `lib/redact.js` 做 A/B：174,000 B 散文
+  **9.14 ms → 9.08 ms（×0.99）**，42,039 B 对抗输入 2.48 ms——新增分支无可测耗时变化。
+- **记录层（`CONFIRMED`）**：`ledger.jsonl` 补第 34 行（`commit` `5d3bcea`、`tag` `v0.12.9`，
+  CI/Release 号在发布回填提交写实）；round 33 的 `test/rsi-ledger.spec.ts` 正是让这种滞后变红的
+  用例，本轮先红后绿。**异常记录**：本 attempt 开始时该行不存在，12:14:44 工作树里出现过一行
+  `commit`/`tag` 为空、ci 字段未核对且无可归因进程的 round 34 记录，已按实测值重写，未采信其
+  未经核对的 ci 断言。
+- **证据**：`.rsi/evidence/round-034/`（`red.txt`、`green-spec.txt`、`perf.txt`、`perf-probe.mjs`、
+  `reach.txt`、`reach-probe.mjs`、`ci.txt`、`ci-before-ledger-row.txt`、本 attempt 的 `ci-*.txt`、
+  `verify-lib.txt`）。
+- **未验证（`NOT_RUN`）**：真机 GUI 手点；真实定时投递（操作方动作，D-066）；三层及以上转义。
 - **建议版本**：patch → `0.12.9`（安全修复，行为向后兼容；CHANGELOG 记 Fixed 双语）。
 - **status:** OK
