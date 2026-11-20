@@ -86,7 +86,7 @@ the run emits `tool-workflow/run-start` / `agent-start` / `agent-end`.
 | same command (run 2) | exit 0 — same `/compact` text; 55 events, **0** out-of-step rows (`run-team-2.json`) |
 | `node scripts/repro-compact.mjs` at `366d169` | exit 0 — writer `refused`, `measure.ok = true`, `/compact` → `No compactable history yet.` (`repro-after.txt`) |
 | `npx vitest run test/compact-step-pairing.spec.ts` (clean worktree at `366d169`) | exit 0 — 6 tests pass |
-| `npm run ci` (clean worktree at `366d169`, `node_modules` linked) | exit 0 — typecheck 0; oxlint 24 warnings / 0 errors; `lib/ at 366d169 is the build of src/ at 366d169 (153 files, byte-identical)`; **70 files / 1269 tests pass** |
+| `npm run ci` (clean worktree at `d4eef65`; `src/` identical to `366d169`) | exit 0 — typecheck 0; oxlint 24 warnings / 0 errors; `lib/ at d4eef65 is the build of src/ at d4eef65 (153 files, byte-identical)`; **70 files / 1269 tests pass** (`.rsi/evidence/compact-e2e/ci-366d169.txt`) |
 
 **Pre-fix journal the harness can see:** a `headless` profile carrying the pre-fix build
 (`39eda66`) and the same message leaves the defect class the meter rejects — an
