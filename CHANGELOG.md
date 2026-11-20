@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.12.12] - 2026-11-20
+
 ### Fixed / 修复
 
 - **An over-budget human block keeps its verdict line instead of cutting it / 超长的中文结论不再把结论行截掉** —
