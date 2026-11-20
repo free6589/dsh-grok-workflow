@@ -1,0 +1,12 @@
+### final 2026-11-20T08:43:06+08:00
+    PID                  STARTED ELAPSED
+ 154637 Tue Nov 17 22:49:32 2026  208414
+9d066162-58a9-4164-afa6-80202741eeb2
+gui 401
+12:    "dsh-grok-workflow": "github:free6589/dsh-grok-workflow#v0.12.3",
+42:        "dsh-grok-workflow",
+installed 0.12.3
+19398d8246b7ea8e8ddae6a5e94e69384dded407
+19398d8246b7ea8e8ddae6a5e94e69384dded407
+## main...origin/main
+?? .rsi/evidence/round-027/final-state.txt
