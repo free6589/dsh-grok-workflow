@@ -2,7 +2,7 @@ Last updated: 2026-11-20 09:10 +08:00 (**round-028 收口：R11，CI 全绿，�
 取消终结不再走 `relayText`（成功前言+markers+折叠台账），改说人话结论；
 `phase1-dialogue` 3 个旧断言随行为同步更新（行为断言未动）。
 `npm run ci` exit 0 = **68 文件 / 1230 测试 PASS**；`lib/` 随 `src/` 重建。
-**未提交、未发版、未打 tag**——等收尾发版。）
+**已发版 `0.12.4`**：commit `5cd2b1c`、annotated tag `v0.12.4` 已推，远端 CI `44652383452` success、Release `44652387975` success（asset `dsh-grok-workflow-0.12.4.tgz`）。）
 
 # Project State
 

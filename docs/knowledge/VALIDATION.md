@@ -4548,3 +4548,17 @@ throwaway worktree 里把上限改回 `countCeiling`，新用例 **1 failed / 36
 oxlint 24w/0e；`npm run verify:lib` 153 文件一致。证据 `.rsi/evidence/round-028/`。
 
 **未验证（`NOT_RUN`）**：真机 GUI 手动取消一次看终结；真实定时投递。
+
+## Round 78 — 2026-11-20 — `0.12.4` 发版：R11（`CONFIRMED`）
+
+**版本判定**：patch。取消终结文案修正，无新配置面、无 API 变化。
+
+**命令与结果（`CONFIRMED`）**：
+
+| 命令 | 结果 |
+| --- | --- |
+| `git commit 5cd2b1c`（R11 改动+记忆+CHANGELOG+证据） | 21 files |
+| `npm run verify:lib`（提交后） | `lib/ at 5cd2b1c is the build of src/ at 5cd2b1c`（153 files byte-identical） |
+| `tag -a v0.12.4` + `push main` + `push tag` | 成功，无 force-push，旧标签未动 |
+| 远端 CI `44652383452` | success |
+| Release `44652387975` | success；Release `Grok Workflow for DSH v0.12.4` + asset `dsh-grok-workflow-0.12.4.tgz` |
