@@ -1,3 +1,17 @@
+Last updated: 2026-11-20 22:45 +08:00 (**存量会话离线修复 + 新 profile 实测** —
+用户报的 `session-3a683cb6` 的 `/compact` 报错已修好：该会话两行旧版卸载通知
+（seq 3553、seq 5424，无 `step/start` 的 `assistant/message`）已在离线改为同 seq/同时间的
+`plugin:grok-workflow/terminal` 记录，文字逐字保留，seq 0–7476 连续；真实 DSH 0.2.2-rc.3
+`Session.create` + `TokenMeter.measure` 全量回放从"seq 3553 抛错"变为
+"7507 事件、`totalTokens=508565` 通过"（`REPAIR EFFECTIVE: true`）。
+`test/compact-step-pairing.spec.ts` +1 用例（7 绿）钉住"terminal 形状过 meter"。
+新 profile `verify-compact`（`sdk` 模板、插件 `link:` 安装）上 `drive.mjs --team`：
+真实团队档 turn + 真实 `/compact` 一次通过
+（`Compacted 7 history items`，0 孤儿行，`ok: true`）。
+`npm run ci` 在含并发轮改动的全树上 72 文件 / 1306 测试 PASS。
+备份 `.rsi/evidence/compact-repair-20261120/`（before 日志 + 测量输出）。
+工作树仍有并发轮未提交改动（CHANGELOG/`src/delivery` 等），本轮只动了测试文件，未发版。
+
 Last updated: 2026-11-20 15:50 +08:00 (**compact 修复已并入 main** —
 用户报 `/compact` 报错，根因是回执/通知/取消终态三处都在没有打开 step 时写 assistant 行，DSH 的
 token 计量器回放第一次就抛 `token meter: assistant/message at seq N has no matching step/start

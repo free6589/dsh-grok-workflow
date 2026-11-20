@@ -56,6 +56,16 @@ when the row cannot be written, so the refusal does not buy a model call it cann
 | `npm run build` on the merged tree | exit 0 — `tsc -p tsconfig.build.json` + client bundle 237,735 bytes; no `lib/` file changed |
 | `npm run typecheck` before `npm install` | exit **2** — `test/compact-step-pairing.spec.ts(26,28): error TS2307: Cannot find module '@deepseek-ai/dsh-token-meter'`. The devDependency is in `package.json`/`package-lock.json` but was never installed in this checkout; `npm install` (5 packages) then `typecheck` exits 0. **A fresh clone must run `npm install` before `tsc`.** |
 
+**Repair of the already-poisoned session + fresh-profile verification (2026-11-20, `CONFIRMED`):**
+
+| command | result |
+| --- | --- |
+| offline repair of `session-3a683cb6` (seq 3553 + seq 5424 `assistant/message` → same-seq `plugin:grok-workflow/terminal`, text verbatim, seq 0–7476 contiguous) | real DSH 0.2.2-rc.3 `Session.create` + `TokenMeter.measure` full replay: BEFORE backup throws `token meter: assistant/message at seq 3553 has no matching step/start event`; AFTER measures 7507 events / `totalTokens=508565` (`.rsi/evidence/compact-repair-20261120/repair-measure.txt`, `REPAIR EFFECTIVE: true`) |
+| `node .rsi/evidence/compact-e2e/drive.mjs --home $PWD/.tmp/verify-home --profile verify-compact --team` | exit 0 — real team-tier turn + real `/compact` → `Compacted 7 history items (~6140 tokens)`; 0 orphan rows; `ok: true` (profile deleted after the run, journal was in `.tmp/`, gitignored) |
+| `npx vitest run test/compact-step-pairing.spec.ts` | exit 0 — **7 tests pass** (+1 repair-shape case: terminal record carrying the same words passes the meter the orphan broke) |
+| `node scripts/repro-compact.mjs` | exit 0 — writer `refused`, `measure.ok`, `/compact` success |
+| `npm run ci` (full tree incl. concurrent rounds' changes) | exit 0 — **72 files / 1306 tests PASS** |
+
 **Deliberate loss (P0-4 shape changed):** the cancelled terminal, the unload notice and the
 team-tier live receipt are no longer rendered as chat rows, because DSH's meter has no legal
 shape for an assistant row outside a step. The texts are kept as terminal records and the

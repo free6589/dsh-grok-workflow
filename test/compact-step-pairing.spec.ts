@@ -137,7 +137,56 @@ describe('the plugin never writes an assistant row without an open step', () => 
   })
 })
 
-/* ------------------------------------------------------- the pairing reader -- */
+/* ------------------------------------ repair of an already-orphaned row -- */
+
+/**
+ * Repair invariant for journals that already carry the defect (2026-11-20,
+ * session-3a683cb6: seq 3553 + seq 5424, both `workflow-notice` rows written by
+ * the pre-fix disposer with no `step/start` behind them).
+ *
+ * The fix (`openStepOf` + `appendAssistantInStep`) prevents new orphans but
+ * does not rewrite history: a journal that already carries one still fails the
+ * meter on replay. The supported repair is a shape change only — the orphan
+ * `assistant/message` becomes the plugin's own `plugin:grok-workflow/terminal`
+ * record at the same seq/time, so no text is lost (the dispose + delivery
+ * records stay untouched) and the meter's pairing rule passes again. Anything
+ * else (dropping the seq, renumbering, editing text) would fork the journal.
+ */
+describe('repair of an already-orphaned assistant row', () => {
+  it('a terminal record carrying the same words passes the meter the orphan broke', async () => {
+    const { recordTerminal, TERMINAL_RECORD } = await import('../src/records.js')
+    const orphanText = '[grok-workflow] the run was cut by an unload'
+
+    // Control: the pre-fix shape (assistant row, no step behind it) breaks the meter.
+    const broken = atPreStep('sess-repair-orphan')
+    broken.append('assistant/message', {
+      turn: 1,
+      step: 0,
+      message: createAssistantMessage({
+        content: [{ type: 'text', text: orphanText }],
+        source: { provider: 'grok-workflow', model: 'workflow-notice' },
+      }),
+      stream: [],
+    }, { surfaceOp: 'append' })
+    expect(() => meter().measure(broken)).toThrow(/has no matching step\/start event/)
+
+    // Repaired shape: the same words as the plugin's terminal record, no
+    // assistant row. Seq preservation is a file-level property (the repair
+    // rewrites the journal at the same seq, verified by the seq-contiguity
+    // check on session-3a683cb6); the Session API assigns seqs, so what is
+    // pinned here is the shape the meter accepts.
+    const repaired = atPreStep('sess-repair-terminal')
+    expect(recordTerminal(repaired, orphanText, silent)).toBe(true)
+    expect(repaired.ownEvents().filter(event => event.type === 'assistant/message')).toEqual([])
+    expect(() => meter().measure(repaired)).not.toThrow()
+    const kept = repaired.ownEvents()
+      .map(event => (String((event as { type?: unknown }).type) === TERMINAL_RECORD
+        ? (event as { data?: { text?: string } }).data
+        : undefined))
+      .filter(record => record !== undefined)
+    expect(kept.map(record => record.text)).toEqual([orphanText])
+  })
+})
 
 describe('openStepOf reads the same boundary the meter enforces', () => {
   // Loaded here rather than at the top of the file so the two writer tests above

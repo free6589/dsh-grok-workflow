@@ -1,3 +1,21 @@
+## 2026-11-20 — 存量会话离线修复 + 新 profile 实测（`CONFIRMED`）
+
+- **From:** 本会话 · **To:** 用户 / 下一轮接手者
+- **修了什么**：用户报的 `session-3a683cb6` 里两行旧版卸载通知（seq 3553、seq 5424）
+  已离线改为同 seq/同时间的 `plugin:grok-workflow/terminal` 记录，文字逐字保留，
+  seq 0–7476 连续，`dispose`/`delivery` 记录不动。`5fb5da0` 只防新增、不改历史，
+  所以这一步是必需的。
+- **验证（`CONFIRMED`）**：真实 DSH 0.2.2-rc.3 全量回放——修复前备份在 seq 3553 抛错，
+  修复后 7507 事件/`totalTokens=508565` 通过（`REPAIR EFFECTIVE: true`，
+  `.rsi/evidence/compact-repair-20261120/`）；新 profile `verify-compact` 上
+  `drive.mjs --team` 一次通过（真实团队档 turn + 真实 `/compact` 成功，0 孤儿行）；
+  `test/compact-step-pairing.spec.ts` 7 绿；`npm run ci` 72/1306 全绿（含并发轮改动）。
+- **本轮改动**：只动了 `test/compact-step-pairing.spec.ts`（+1 用例）+ 记忆文档；
+  `src/`/`lib/` 零改动。并发轮的未提交改动（CHANGELOG/`src/delivery` 等）原样保留，
+  未代提交。**未发版**（任务只要求修 bug + 实测）。
+- **备份**：修复前日志在 `.rsi/evidence/compact-repair-20261120/session-3a683cb6-before.jsonl.zstd`；
+  另有一份同名备份在 `.tmp/`（gitignored）。回滚 = 把备份写回会话目录同名文件。
+
 ## 2026-11-20 — `0.12.13` 已发版（round-038：非字符串 model/provider）
 
 - **From:** RSI 心跳轮（本会话）· **To:** 用户 / 下一轮接手者

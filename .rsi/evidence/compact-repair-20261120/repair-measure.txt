@@ -1,0 +1,3 @@
+BEFORE (pre-repair backup): events: 7477 => {"ok":false,"error":"token meter: assistant/message at seq 3553 has no matching step/start event"}
+AFTER  (repaired on-disk) : events: 7507 => {"ok":true,"totalTokens":508565,"nodes":1438}
+REPAIR EFFECTIVE: true
