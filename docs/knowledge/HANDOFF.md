@@ -45,10 +45,10 @@
 
 - **From:** 执行代理（workflow 任务 `compact_fix`）· **To:** 用户 / 下一轮接手者
 - **落地（`CONFIRMED`）**：先在 `0d91e45` 上的独立 worktree 完成（当时主 checkout 有并发轮的
-  未提交改动），rebase 到 `39eda66` 成为分支提交 `5fb5da0`，再以普通 merge 并入 `main`。
-  合并时 `main` 已到 `490edce`（R38 发了 `0.12.13`）；唯一冲突是 `CHANGELOG.md`——本修复留在
-  `[Unreleased]`，已发版的 `0.12.13` 段原样保留。**未改版本号、未打新 tag、无 force-push。**
-  合并后 `lib/` 由 `src/` 重建，`git status -- lib/` 为空。
+  未提交改动），rebase 到 `39eda66` 成为分支提交 `5fb5da0`，由**并发的发版轮**以 merge 提交
+  `e80ed6d`（父 `490edce` + `5fb5da0`）并入 `main`。其 `CHANGELOG` 解法与本轮独立解出的一致：
+  本修复留在 `[Unreleased]`，已发版的 `0.12.13` 段原样保留。**未改版本号、未打新 tag、无 force-push。**
+  合并后 `lib/` 由 `src/` 重建，`git status -- lib/` 为空，`verify:lib` 在合并树 exit 0。
 - **根因（`CONFIRMED`）**：本插件在 `agent/pre-step`（step 未打开）写 `assistant/message`，
   DSH 的 token 计量器要求每条 assistant 行落在同 `(turn, step)` 的 `step/start`…`step/end`
   之间；第一次回放即抛 `token meter: assistant/message at seq N has no matching step/start
@@ -69,9 +69,10 @@
   （DSH 在 step 之外没有合法的 assistant 形状）。文字进 terminal 记录，事实不丢；渲染层缺一条
   行。后续入池：进度面板 / 客户端自绘行。
 - **NOT_RUN**：真机 GUI 点 `/compact`（需要活动会话，会写会话数据）；发布/打 tag（任务禁止）。
-- **合并结果（`CONFIRMED`）**：`CHANGELOG.md` 是唯一文本冲突，已按「未发布留 `[Unreleased]`、
-  已发布段不动」解掉；`src`/`lib`/`test` 与并发轮（`src/config.ts`、`lib/config.*`、
-  `test/config.spec.ts`）无重叠。
+- **合并结果（`CONFIRMED`）**：`CHANGELOG.md` 是唯一文本冲突，按「未发布留 `[Unreleased]`、
+  已发布段不动」解掉，与并发轮的解法逐字一致；`src`/`lib`/`test` 与并发轮（`src/config.ts`、
+  `lib/config.*`、`test/config.spec.ts`）无重叠，合并树上两侧改动并存（`src/records.ts`、
+  `src/gate.ts`、三份测试与分支逐字一致，`src/config.ts` 带 R38 的形状拒绝）。
 
 ## 2026-11-20 — `0.12.12` 已发版（round-036：截断保头尾）
 

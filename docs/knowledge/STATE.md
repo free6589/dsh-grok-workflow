@@ -4,10 +4,11 @@ token 计量器回放第一次就抛 `token meter: assistant/message at seq N ha
 event`，游标不前进 → 此后每次测量都抛，`compactNow()` 先测量 → `/compact` 报错、自动压缩静默失效。
 修复：新增 `openStepOf()` 闸门（`src/records.ts`），三个写点统一走 `appendAssistantInStep()`；被拒的
 回执/通知文字改存 `plugin:grok-workflow/terminal` 记录（`D-094`）。
-**并入方式**：`fix-compact-orphan-receipt`（分支提交 `5fb5da0`，base `39eda66`）普通 merge 进 `main`，
-唯一冲突是 `CHANGELOG.md`——本次修复留在 `[Unreleased]`，`0.12.13` 已发版段原样保留，未改版本号、
-未打新 tag。`lib/` 由合并后的 `src/` 重建，`git status -- lib/` 为空（分支提交的 `lib/` 就是合并后源码
-的构建产物）。`@deepseek-ai/dsh-token-meter` 是本轮新增 devDependency，主 checkout 原先没装
+**并入方式**：分支 `fix-compact-orphan-receipt`（`5fb5da0`，base `39eda66`）由**并发的发版轮**以 merge
+提交 `e80ed6d`（父 `490edce` + `5fb5da0`）并入 `main`；其 `CHANGELOG` 解法与本轮独立解出的一致——
+修复留在 `[Unreleased]`、`0.12.13` 已发版段原样保留。**未改版本号、未打新 tag、无 force-push。**
+`lib/` 由合并后的 `src/` 重建，`git status -- lib/` 为空（分支提交的 `lib/` 就是合并后源码的构建产物，
+`verify:lib` 在合并树上 exit 0：153 files byte-identical）。`@deepseek-ai/dsh-token-meter` 是本轮新增 devDependency，主 checkout 原先没装
 （`tsc` 报 TS2307，`npm install` 后 exit 0）。
 **合并树上实测**：`npx vitest run` = **70 文件 / 1269 测试 PASS**（`39eda66` 上 1262 + 本修复 6 +
 R38 1）；`npm run typecheck` / `lint`（0 error、24 warning）/ `build` / `verify:lib` 均 exit 0。

@@ -18,6 +18,8 @@ all from the installed DSH.
 | --- | --- | --- |
 | pre-fix (`src/records.ts` at `0d91e45`) | `node scripts/repro-compact.mjs` | exit **1**; writer `appended`; `measure` → `token meter: assistant/message at seq 2 has no matching step/start event`; `/compact` → `{kind: "threw", text: "<that error>"}` (`.rsi/evidence/compact-fix/before.txt`) |
 | fixed | `node scripts/repro-compact.mjs` | exit **0**; writer `refused`; `measure.ok = true` (`totalTokens` 12); `/compact` → `{kind: "success", text: "No compactable history yet."}` (`.rsi/evidence/compact-fix/after.txt`) |
+| **pre-merge mainline** `490edce`, its own committed `lib/` | `node scripts/repro-compact.mjs` | exit **1**; the meter's pairing error reaches the `/compact` handler (`.rsi/evidence/compact-fix/main-before.txt`) |
+| **merged `main`** (branch `5fb5da0` merged as `e80ed6d`) | `node scripts/repro-compact.mjs` | exit **0**; writer `refused`; `measure.ok = true`; `/compact` → `{kind: "success", text: "No compactable history yet."}` (`.rsi/evidence/compact-fix/main-after.txt`) |
 
 **Note on the wrap the diagnosis predicted:** `compactNow()`'s outer `try/catch` cannot wrap
 the failure — its callback is `async`, so the rejection escapes as a raw error instead of
@@ -42,11 +44,17 @@ when the row cannot be written, so the refusal does not buy a model call it cann
 | --- | --- |
 | `npx vitest run test/compact-step-pairing.spec.ts` (fixed) | exit 0 — 6 tests pass, replaying through the real `@deepseek-ai/dsh-token-meter` |
 | same file on the pre-fix `src/` (`git stash push -- src/records.ts src/gate.ts`) | exit 1 — `refuses the instant receipt at pre-step` fails `expected true to be false`, and `keeps the unload notice as a record…` fails on the orphan row |
-| `npx vitest run` (rebased onto `39eda66`, i.e. the current `main`) | exit 0 — **70 files / 1268 tests pass** |
+| `npx vitest run` (rebased branch, base `39eda66`) | exit 0 — **70 files / 1268 tests pass** |
+| `npx vitest run` on the **merged `main`** (branch merged as `e80ed6d`, with round 38 on top) | exit 0 — **70 files / 1269 tests pass** (1262 base + 6 from this fix + 1 from round 38) |
+| `npx vitest run test/compact-step-pairing.spec.ts` inside the **pre-merge mainline** tree (`490edce`) | exit 1 — 4 failed / 2 passed, so the spec is red on the state that carried the defect (`.rsi/evidence/compact-fix/main-before-test.txt`) |
+| `npx vitest run test/compact-step-pairing.spec.ts` on merged `main`, run twice | exit 0 both times — 6 tests pass, identical result |
 | `npx vitest run` on the original base `0d91e45` | exit 1 — 69 files / 1240 pass, 2 failures in `test/redact.spec.ts`. Those two are **pre-existing at `0d91e45`**: a pristine `git worktree add /tmp/base-check 0d91e45` + `npx vitest run test/redact.spec.ts` reproduces the same 2 failures, and `main` has since fixed them (round 36). Not this change. |
 | `npm run typecheck` | exit 0 |
 | `npm run lint` | exit 0 — 24 warnings, 0 errors (unchanged from `0d91e45`) |
-| `npm run verify:lib` at `32ccc97` | exit 0 — `lib/ at 32ccc97 is the build of src/ at 32ccc97 (153 files, byte-identical)` |
+| `npm run verify:lib` at `32ccc97` (branch) | exit 0 — `lib/ at 32ccc97 is the build of src/ at 32ccc97 (153 files, byte-identical)` |
+| `npm run verify:lib` on the merged tree | exit 0 — `lib/ at b3fad83 is the build of src/ at b3fad83 (153 files, byte-identical)`; the branch's committed `lib/` is therefore the build of the merged `src/`, and `git status -- lib/` after a rebuild is empty |
+| `npm run build` on the merged tree | exit 0 — `tsc -p tsconfig.build.json` + client bundle 237,735 bytes; no `lib/` file changed |
+| `npm run typecheck` before `npm install` | exit **2** — `test/compact-step-pairing.spec.ts(26,28): error TS2307: Cannot find module '@deepseek-ai/dsh-token-meter'`. The devDependency is in `package.json`/`package-lock.json` but was never installed in this checkout; `npm install` (5 packages) then `typecheck` exits 0. **A fresh clone must run `npm install` before `tsc`.** |
 
 **Deliberate loss (P0-4 shape changed):** the cancelled terminal, the unload notice and the
 team-tier live receipt are no longer rendered as chat rows, because DSH's meter has no legal
