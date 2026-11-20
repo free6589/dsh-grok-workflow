@@ -1185,4 +1185,8 @@ Source: 只读审计 + 本轮新增实现与单测。依据 = `src/guardian.ts`�
   **2,055 bytes** in the canonical payload. 481 rows → **1,001,015 bytes** (above `countCeiling`
   1,000,000, below `maxBytes` 1,048,576); 503 rows still fit under the file bound with the integrity
   record. So the write-then-unreadable band is ~22 rows wide, and the new test lands in the middle
-  of it rather than at an exact byte.
+  of it rather than at an exact byte. The upper edge is **1,048,447**, not 1,048,576: an
+  independent probe measured the sealed file at payload + **129** bytes (1,019,510 → 1,019,639),
+  so `writeCheckpoint`'s file bound is what caps a legal payload. The comment added to
+  `src/checkpoint/schema.ts` says "…and 1,048,576" — 129 bytes loose, cosmetic only, left
+  untouched because editing shipped source after the tag would make `lib/` differ from `v0.12.3`.

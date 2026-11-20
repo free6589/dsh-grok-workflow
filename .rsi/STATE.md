@@ -1,9 +1,10 @@
 # RSI State (overwritten every round; keep under 100 lines)
 
-Updated: 2026-11-20T08:55+08:00 · round 27 (checkpoint read-side byte bound) · release line
-`0.12.3` cut from this round · `npm run ci` 68 files / 1230 tests PASS · previous releases
-`v0.12.2` (`40228c5`, CI `44641153858`, Release `44641158387`) and `v0.12.1` (`23d3369`,
-CI `44595376323`, Release `44595391505`)
+Updated: 2026-11-20T08:45+08:00 · round 27 (checkpoint read-side byte bound) · **released
+`0.12.3`**: commit `fd6a5ee`, tag `v0.12.3`, CI `44647313571`, Release `44647317251` ·
+`npm run ci` 68 files / 1230 tests PASS · web profile on `#v0.12.3` (host pid `154637` never
+restarted) · previous releases `v0.12.2` (`40228c5`, CI `44641153858`, Release `44641158387`)
+and `v0.12.1` (`23d3369`, CI `44595376323`, Release `44595391505`)
 
 ## Facts
 

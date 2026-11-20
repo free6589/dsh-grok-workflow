@@ -1,0 +1,9 @@
+{
+ "pkg": "/home/fish/.dsh/profiles/web/node_modules/dsh-grok-workflow/lib",
+ "rows": 481,
+ "payloadBytes": 1001051,
+ "countCeiling": 1000000,
+ "fileBytes": 1001180,
+ "readIntegrityBytes": 1001051,
+ "readsBack": true
+}

@@ -9,7 +9,12 @@ oxlint 24w/0e、`verify:lib` 提交后复核 153 files byte-identical。**选题
 R6/R9 随 0.12.2、R10 随 0.11.20），R11 仍成立（`gate.ts:611-644` 仍组合 `relayText`）。
 文档：`DECISIONS.md` D-084、`RESEARCH.md` A33、`VALIDATION.md` Round 76、`ARCHITECTURE.md`
 的字节上限句。证据 `.rsi/evidence/round-027/`。NOT_RUN：真实定时投递（D-066）、GUI 手动点击拍照。
-发版见 `docs/RELEASING.md`，CI/Release 号记在 `.rsi/LOG.md` 第 27 行。）
+发版见 `docs/RELEASING.md`。**已发版 `0.12.3`**：commit `fd6a5ee`、annotated tag
+`v0.12.3`（对象 `0c66263`）已推，远端 CI `44647313571` success、Release `44647317251`
+success（asset `dsh-grok-workflow-0.12.3.tgz`，597,237 B）。档案 `~/.dsh/profiles/web`
+升到 `#v0.12.3`（`lib/` 与标签 `diff -r` = 0），宿主 pid `154637` 未重启；装好的产物自身
+跑通 1,001,051 B 载荷落盘→读回。独立复查 `reviewer-027` = `ACCEPT`（worktree 里改回旧上限
+复现 1 failed / 36 passed）。NOT_RUN：运行中进程内存里的代码身份、复制档案实例的 GUI 交互。
 
 # Project State
 

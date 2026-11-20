@@ -1,3 +1,5 @@
+# Agent Handoff
+
 ## 2026-11-20 08:55 — round-027：检查点「写得进读不出」修掉，接下来只剩 R11 与 panel 问题
 
 - **From:** agent-65（round 27，update-then-self-iterate）· **To:** 下一轮 / 用户
@@ -9,13 +11,20 @@
   answerLead 句数、R6、R9、R10），已在池里标 STALE/DONE 并注明锚点。**下一轮从这里接**：R11
   （取消终结消息仍在组合 `relayText` 的前导与标记，`gate.ts:611-644`）与 `src/panel.ts` 无生产
   导入者（只有三个测试文件引用）这两条。
-- **发行**：本轮的改动是 patch 级（读侧拒绝语义修复，无新配置面）。`docs/RELEASING.md` 的
-  发布动作、CI/Release 号与标签记在 `.rsi/LOG.md` 第 27 行与 `VALIDATION.md` Round 76。
+- **发行（`CONFIRMED`）**：patch 级（读侧拒绝语义修复，无新配置面）。发布提交 `fd6a5ee`、
+  annotated tag `v0.12.3`（对象 `0c66263`）已推；远端 CI `44647313571` success、
+  Release `44647317251` success（`dsh-grok-workflow-0.12.3.tgz`，597,237 B）。旧标签未动、
+  无 force-push。`verify:lib` 提交后 = `lib/ at fd6a5ee is the build of src/ at fd6a5ee`。
+- **档案（`CONFIRMED`）**：`~/.dsh/profiles/web` 升到 `#v0.12.3`，`lib/` 与
+  `git archive v0.12.3 lib` 的 `diff -r --exclude='*.map'` = 0；宿主 pid `154637` 未重启；
+  `plugin_manager` 里 `include:grok-workflow` 仍 `fiberPhase: active`。装好的产物自身跑通
+  1,001,051 B 载荷的落盘→读回（`.rsi/evidence/round-027/shipped-roundtrip.txt`）。
+- **没做到的一件小事（`CONFIRMED`，故意不动）**：`src/checkpoint/schema.ts` 的注释把带的上沿
+  写成 1,048,576，实际是 1,048,447（整文件多出 129 字节的 integrity 记录）。发布后改注解会让
+  `lib/` 与 `v0.12.3` 不再逐字节相同，故留给下一轮连同代码一起改。
 - **仍 `NOT_RUN`（需操作者）**：真实定时投递一轮心跳（D-066，要占一个真实间隔）、GUI 手动点击截图。
 - **注意**：`~/.dsh/profiles/web` 已升到本轮 tag；宿主 pid 至今未重启，profile 更新只改磁盘上的
   安装物，验收口径按 D-083 读（`HEAD == origin/main`、发布标签为祖先、发布代码与标签逐字节相同）。
-
-# Agent Handoff
 
 ## 2026-11-20 08:20 — 复查：`v0.12.2` 仍是最新，仓库和档案都停在它上面，卡点只剩验收口径
 

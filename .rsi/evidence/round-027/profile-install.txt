@@ -1,0 +1,10 @@
+✓ Lockfile passes supply-chain policies (verified 33m ago)
+Progress: resolved 0, reused 1, downloaded 0, added 0
+Downloading https://codeload.github.com/free6589/dsh-grok-workflow/tar.gz/fd6a5eed10c6953ea88619b4ae56133f8fcca5b4: 0.00 B/21.98 MB
+Downloading https://codeload.github.com/free6589/dsh-grok-workflow/tar.gz/fd6a5eed10c6953ea88619b4ae56133f8fcca5b4: 15.73 MB/21.98 MB
+Packages: +2
+++
+Progress: resolved 26, reused 24, downloaded 1, added 2, done
+[WARN] Issues with peer dependencies found. Run "pnpm peers check" to list them.
+Done in 12.2s using pnpm v12.4.2
+EXIT=0

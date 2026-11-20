@@ -1,0 +1,12 @@
+### profile after install 2026-11-20T08:38:03+08:00
+installed 0.12.3
+12:    "dsh-grok-workflow": "github:free6589/dsh-grok-workflow#v0.12.3",
+42:        "dsh-grok-workflow",
+## lib parity: installed vs tag v0.12.3
+diff-exit=0
+## host process unchanged
+    PID                  STARTED ELAPSED
+ 154637 Tue Nov 17 22:49:32 2026  208111
+9d066162-58a9-4164-afa6-80202741eeb2
+## GUI alive
+401

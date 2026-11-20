@@ -4495,3 +4495,34 @@ GUI 手动点击拍照。
 `src` 改一行上限加注释；既有 36 条用例全绿。
 
 **未验证（`NOT_RUN`）**：真实定时投递（D-066）、GUI 手动点击截图。
+
+### 0.12.3 发版记录（`CONFIRMED`，2026-11-20T08:37Z 起）
+
+| 项目 | 值 |
+| --- | --- |
+| 发布提交 | `fd6a5ee`（`main`，27 files，含 `src`/`lib`/`test`/记忆/证据） |
+| 标签 | annotated `v0.12.3`（tag 对象 `0c66263`，指向 `fd6a5ee`），已推，旧标签未动、无 force-push |
+| `npm run verify:lib`（提交后） | `lib/ at fd6a5ee is the build of src/ at fd6a5ee`（153 files byte-identical，`verify-lib-postcommit.txt`） |
+| `npm run ci`（bump 后、提交前） | exit 0，68 文件 / 1230 测试 PASS（`ci-after-bump.txt`） |
+| 远端 CI | run `44647313571` success（main，Node 22/24） |
+| Release workflow | run `44647317251` success；Release `Grok Workflow for DSH v0.12.3` 已发布（`isDraft=false`,`isPrerelease=false`） |
+| 资产 | `dsh-grok-workflow-0.12.3.tgz`，597,237 B，sha256 `78e7e5f9…` |
+
+**档案更新（`CONFIRMED`，未重启宿主）**：`~/.dsh/profiles/web` 由 `#v0.12.2` 升到
+`#v0.12.3`（`dsh plugin --profile web add github:free6589/dsh-grok-workflow#v0.12.3`，输出
+`EXIT=0`，`profile-install.txt`），`package.json` 里 pin = `#v0.12.3`、装入版本 `0.12.3`，
+`lib/` 与 `git archive v0.12.3 lib` 的 `diff -r --exclude='*.map'` **exit 0**（`profile-after-install.txt`）。
+宿主 pid `154637` 的 `lstart` 与 boot id `9d066162-…` 未变、`etimes` 208111s、`:3080` 仍回 401；
+`plugin_manager` 列出 `include:grok-workflow` / `enabled: true` / `fiberPhase: active`——改动
+档案后插件仍在运行宿主里挂载。**装好的那份产物本身**跑真实文件系统往返
+（`shipped-roundtrip.txt`）：481 行 1,001,051 字节载荷 → 文件 1,001,180 字节 → 读回
+`integrity.bytes` 一致、校验通过（改前同一形状会 `invalid`）。复制档案 `loopfix-verify`
+升到 `0.12.3` 后在 `:3452` 起实例、`/` 回 401（服务在），验完已停。
+
+**独立复查（子代理 `reviewer-027`，alternate-prompt）**：`ACCEPT`。它在 `HEAD fd241c8` 的
+throwaway worktree 里把上限改回 `countCeiling`，新用例 **1 failed / 36 passed** 并在
+`assertCheckpoint` 的旧上限处报错；另用真实 490 行载荷（1,019,510 B）实测修前
+`write OK / read THREW invalid`、修后 `read OK`。测试 diff = 65 插入 / 0 删除；无既有断言被放宽。
+
+**未验证（`NOT_RUN`）**：运行中宿主进程内存里的代码身份（插件不打印版本、ESM 缓存无版本标记，
+无 watcher 观测手段）；复制档案实例的 GUI 交互需 cookie；真实定时投递（D-066）、GUI 手动点击截图。

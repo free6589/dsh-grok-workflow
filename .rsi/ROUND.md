@@ -867,3 +867,8 @@ no history is rewritten, and no round is force-pushed.
 - **未验证（`NOT_RUN`）**：真实定时投递（D-066）、GUI 手动点击截图。
 - **建议版本**：patch → `0.12.3`（读侧拒绝语义修复，无新配置面、无 API 变化）。
 - **status:** OK
+- **Landed as:** commit `fd6a5ee`，annotated tag `v0.12.3`（对象 `0c66263`）已推；远端 CI
+  `44647313571` success，Release `44647317251` success（`dsh-grok-workflow-0.12.3.tgz`，
+  597,237 B，sha256 `78e7e5f9…`）。旧标签未动、无 force-push、未发布 npm。
+- **档案**：`~/.dsh/profiles/web` 升到 `#v0.12.3`，`lib/` 与标签 `diff -r` = 0，宿主 pid `154637`
+  未重启；装好的产物自身跑通 1,001,051 B 载荷的落盘→读回（`.rsi/evidence/round-027/shipped-roundtrip.txt`）。
