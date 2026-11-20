@@ -1,5 +1,30 @@
 # Agent Handoff
 
+## 2026-11-20 — 1000 轮预算的 harness 已落地（分臂 ≤100 轮，`D-092` / `A40`）
+
+- **From:** agent-89（并发子代理，harness 任务）· **To:** 操作者 / 下一轮接手者
+- **交付（`CONFIRMED`）**：`.rsi/harness.json`（预算 1000、间隔 60、臂宽 100、门禁 cap 1000、
+  信封 10/100 并发与 1/3 重试）、`.rsi/tools/iterate-plan.mjs`（只读的计划器：从
+  `ROUND.md` + `ledger.jsonl` 算剩余与下一臂的 `rrule`，`--pool` 给池顶）、`.rsi/HARNESS.md`
+  （设计、停止规则表、每轮纪律、卸载契约）、`test/iterate-plan.spec.ts`（15 用例，把每个数字钉在
+  `HARD_LIMITS` / `DEFAULT_LOOP_INTERVAL_MINUTES` / `loopPolicyFromConfig` 上）。
+  `.rsi/HEARTBEAT.md` 的 step 0 现在带 `--max-rounds 1000`，`.rsi/PROTOCOL.md` 加了预算段。
+- **落地形态（`D-092`）**：一轮 = 一次投递；一行 = 一臂 ≤100 轮（= `HARD_LIMITS.loopMaxRounds`）；
+  1000 轮 = 10 臂，逐臂续订；进程内不循环，本轮也不自续（`D-066`）。
+- **必须由人（或持有 `schedule_*` 的会话）做的一件事**：续订心跳行。旧行
+  `schedule-0bbbef5f-…`（`COUNT=10`）最后一次是 `2026-11-20T10:01:50Z`，已经用尽；下一臂的
+  `rrule` 由 `node .rsi/tools/iterate-plan.mjs` 打印（当前：臂 1/10，`rounds=100`，窗口 36..135）。
+  配置面需先设 `loopMaxRounds: 100` + `iterateIntervalMin: 60`，否则开关写的行比计划窄。
+- **未做（`NOT_RUN`）**：真实定时投递；开关手点；`open()` 原地改写 `COUNT` 的运行时行为。
+- **并发记录（重要，`CONFIRMED`）**：本轮工作期间同一 checkout 另有进程在跑 RSI 轮
+  （round 35 的收尾提交 `0ef5bb7`/`0d91e45`，随后 round 36 的 `src/redact.ts` 改动）。我的
+  `.rsi/harness.json` 与 `.rsi/tools/iterate-plan.mjs` 被 `0d91e45` 一并提交（当时尚未带测试），
+  `test/iterate-plan.spec.ts` 与 `.d.mts` 一度被清掉、已重建并补交。**任何一轮提交前都要
+  `git status` 逐文件确认，不要 `git add -A`。**
+- **发现的记录缺口**：`POOL.md` 与 `D-090` 引用了 `A39`，但 `docs/knowledge/RESEARCH.md` 里没有
+  `A39` 这一节（round 35 的 schema 透传测量只留在 `.rsi/evidence/round-035/nested-key-probe.mjs`）。
+  这是悬空引用，应由 round 35 的归属方补写或改引；本文件不代写他人的测量。
+
 ## 2026-11-20 — `0.12.9` 已发版（round-034：双重转义折行 base64 块）
 
 - **From:** RSI 心跳轮（本会话，并发收尾）· **To:** 用户 / 下一轮接手者
