@@ -5,6 +5,19 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.12.13] - 2026-11-20
+
+### Fixed / 修复
+
+- **A non-string `model`/`provider` is refused with its path and shape instead of a bare `TypeError` / 非字符串的 `model`/`provider` 会报出完整路径与类型，不再是裸 `TypeError`** —
+  a route entry like `{ model: 42 }` fell through to `?.trim()`, which threw V8's
+  `entry?.model?.trim is not a function` — naming neither the key nor the shape.
+  The reader now refuses with the full path (`roles.worker[0].model must be a model id
+  string, got number`), like every other shape refusal in this reader.
+  / `{ model: 42 }` 这类路由条目会掉进 `?.trim()`，抛 V8 的 `entry?.model?.trim is not a
+  function`——键名和形状都没说。现在与读侧其它形状拒绝一致，报出完整路径。
+
+
 ## [0.12.12] - 2026-11-20
 
 ### Fixed / 修复

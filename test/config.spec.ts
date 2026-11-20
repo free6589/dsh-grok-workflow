@@ -162,6 +162,18 @@ describe('configuration surface', () => {
       .toThrow(/maximum chain length is 50/)
   })
 
+  it('refuses a non-string model/provider with the key and shape named (round 38)', () => {
+    // Before: `entry?.model?.trim()` threw a bare `TypeError` naming neither the key
+    // nor the shape. Now the refusal carries the full path, like every other one
+    // in this reader.
+    expect(() => resolveConfig({ roles: { worker: [{ model: 42 }] } } as never))
+      .toThrow(/roles\.worker\[0\]\.model must be a model id string, got number/)
+    expect(() => resolveConfig({ roles: { worker: [{ provider: 42, model: 'x' }] } } as never))
+      .toThrow(/roles\.worker\[0\]\.provider must be a provider id string, got number/)
+    expect(() => resolveConfig({ roles: { worker: [{ provider: {}, model: 'x' }] } } as never))
+      .toThrow(/roles\.worker\[0\]\.provider must be a provider id string, got object/)
+  })
+
   it('refuses a removed switching policy key as unknown (R-06)', () => {
     // T4: `switchOn` is fixed to the built-in policy (empty); a stored value is unknown.
     expect(() => resolveConfig({ switchOn: ['timeout'] } as never))

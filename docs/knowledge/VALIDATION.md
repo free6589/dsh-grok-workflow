@@ -4891,3 +4891,16 @@ commit/tag/CI/Release 均取自已提交记录，无编造）后门禁码变为 
 | 发版提交 `61c7cb8` + `tag -a v0.12.12` → `61c7cb8` + push | 成功，无 force-push |
 | Release `44686655900` | success；Release `Grok Workflow for DSH v0.12.12` + asset `dsh-grok-workflow-0.12.12.tgz` |
 | 说明 | 并发轮在 tag 后又推了 `eb61ac8`/`621f2ab`；CI 栏显示的是新 HEAD，并发轮自行负责 |
+
+## Round 92 — 2026-11-20 — R38：非字符串 model/provider（`CONFIRMED`，未发版）
+
+**主题**：POOL `P ·`（S/low）——bare TypeError 不带键名形状。
+
+**改动**：`src/config.ts` `resolveChain` 显式类型检查 + 完整路径拒绝；
+`test/config.spec.ts` +1 用例（3 断言）。附带：`null` model 改走类型错分支。
+
+**命令与结果（`CONFIRMED`，本树实跑）**：新用例旧码 **1 failed**（bare TypeError）；
+修后 **40 passed**；`npm run ci` exit 0 = **69 文件 / 1263 测试 PASS**；
+`npm run verify:lib` 提交时复核。证据 `.rsi/evidence/round-038/`。
+
+**未验证（`NOT_RUN`）**：真机 GUI；真实定时投递。

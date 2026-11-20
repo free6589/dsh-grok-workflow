@@ -1170,3 +1170,18 @@ no history is rewritten, and no round is force-pushed.
   `RESUME next_round=38`（`round_max=37 ledger_max=37`），即下一轮就是第 38 轮，第 1001 轮会被
   `round-cap` 拒绝（`.rsi/evidence/harness/armed-verified.txt`、`guard-cap.txt`）。
 
+
+## Round 38 — 2026-11-20 — 非字符串 model/provider 报完整路径（`CONFIRMED`）
+
+- **选题（R2）**：POOL 池顶 `P ·` 项（S/low）——`entry?.model?.trim()` 对非字符串抛 bare
+  `TypeError`，不带键名不带形状。锚点干净（`src/config.ts`，并发轮未动）。
+- **改动**：`resolveChain` 显式类型检查，拒绝带完整路径 + got-type；
+  `test/config.spec.ts` +1 用例（3 断言：数字 model、数字 provider、对象 provider）。
+  附带：`{model: null}` 从"空字符串"分支改走"类型错"分支（更准）。
+- **红绿（`CONFIRMED`，本树实跑）**：新用例旧码上 **1 failed**（bare TypeError）；
+  修后 `test/config.spec.ts` **40 passed**；`npm run ci` exit 0 =
+  **69 文件 / 1263 测试 PASS**；typecheck 0 错。
+- **证据**：`.rsi/evidence/round-038/`（`ci-mine.txt`）。
+- **未验证（`NOT_RUN`）**：真机 GUI；真实定时投递。
+- **建议版本**：patch（fail-closed 收紧，无 API 变化；CHANGELOG 记 Fixed 双语）。
+- **status:** OK

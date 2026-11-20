@@ -87,8 +87,10 @@ here and are marked DONE when their commit lands.
   on a non-object yields `undefined`. `assertKnownKeys` now refuses a present, non-object `roles` with
   its shape named (`got a string "worker:m1"`); an absent `roles` and `{}` still load. Test fails on the
   pre-change reader (`.rsi/evidence/harness/round-037-red.txt`), passes after. Commit `eb61ac8`.
-- P · A non-string `model`/`provider` throws a bare `TypeError` naming neither key nor shape
-  (`config.ts:456`, `:461`). S / low.
+- R38 DONE · A non-string `model`/`provider` threw a bare `TypeError` (`?.trim is not a
+  function`). `resolveChain` now refuses with the full path + got-type
+  (`roles.worker[0].model must be a model id string, got number`), pinned by
+  `test/config.spec.ts`. Evidence `.rsi/evidence/round-038/`.
 - P · `repairLimitOverruns` still clamps seven removed keys through `LEGACY_LIMIT_CAPS`
   (`config.ts:612-636`) and announces a cap that is not the fixed value (`maxActiveRuns` says 4,
   the fixed value is 2). Dead path, misleading warning. S / low.
