@@ -4769,3 +4769,18 @@ commit/tag/CI/Release 均取自已提交记录，无编造）后门禁码变为 
 `.rsi/evidence/round-034/`（`green-spec-run.txt`、`ci.txt`，无密钥）。
 
 **未验证（`NOT_RUN`）**：真机 GUI；真实定时投递；三重及以上转义。
+
+## Round 87 — 2026-11-20 — `0.12.9` 发版：双重转义折行 base64 块（`CONFIRMED`）
+
+**版本判定**：patch。安全修复，行为向后兼容。
+
+**命令与结果（`CONFIRMED`）**：
+
+| 命令 | 结果 |
+| --- | --- |
+| R3 提交 `5d3bcea`（并发心跳轮落地，与本轮 R3 同内容：源码+测试+CHANGELOG+bump+证据） | 20 files |
+| R5/R6 提交 `4b751b3`（本轮记忆：ROUND/LOG/POOL/STATE/VALIDATION/ledger） | 6 files |
+| `npm run verify:lib`（提交后） | `lib/ at 4b751b3 is the build of src/ at 4b751b3`（153 files byte-identical） |
+| `tag -a v0.12.9` + `push main` + `push tag` | 成功，无 force-push，旧标签未动 |
+| 远端 CI `44673443254` | success |
+| Release `44673449471` | success；Release `Grok Workflow for DSH v0.12.9` + asset `dsh-grok-workflow-0.12.9.tgz` |

@@ -20,7 +20,7 @@ HEAD 上真换行折行 1–24 列已全盖（round 33），活缺口是已带�
 （反斜杠加倍，单反斜杠断行分支对不上）。`BASE64_BREAK` 加双反斜杠分支 +1 用例；
 报告/提示词两边界同走 `REDACTION_RULES`，无分叉。
 `npm run ci` exit 0 = **68 文件 / 1232 测试 PASS**（基线 68/1231，+1）；
-`lib/redact.*` 随 `src/` 重建。**未提交、未发版、未打 tag**——等收尾发版。）
+`lib/redact.*` 随 `src/` 重建。**已发版 `0.12.9`**：R3 提交 `5d3bcea`（并发轮落地）+ R5/R6 提交 `4b751b3`、annotated tag `v0.12.9` 已推，远端 CI `44673443254` success、Release `44673449471` success（asset `dsh-grok-workflow-0.12.9.tgz`）。）
 
 Last updated: 2026-11-20 10:20 +08:00 (**round-031：检查点「拒绝带」上限的注释多算了 129 字节** —
 行为自 round 27 起就是对的（写入侧双向按 `maxBytes` 收敛），错的是注释：完整性记录不是固定 129 字节，
