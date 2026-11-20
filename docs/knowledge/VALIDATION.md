@@ -4877,3 +4877,17 @@ commit/tag/CI/Release 均取自已提交记录，无编造）后门禁码变为 
 `.rsi/evidence/round-036/`。
 
 **未验证（`NOT_RUN`）**：真机 GUI；真实定时投递。
+
+## Round 91 — 2026-11-20 — `0.12.12` 发版：截断保头尾（`CONFIRMED`）
+
+**版本判定**：patch。显示行为修正，无 API 变化。
+
+**命令与结果（`CONFIRMED`）**：
+
+| 命令 | 结果 |
+| --- | --- |
+| `git commit aa5e79c`（R36 改动+记忆+CHANGELOG+证据） | R36 文件 |
+| `npm run verify:lib`（提交后） | byte-identical |
+| 发版提交 `61c7cb8` + `tag -a v0.12.12` → `61c7cb8` + push | 成功，无 force-push |
+| Release `44686655900` | success；Release `Grok Workflow for DSH v0.12.12` + asset `dsh-grok-workflow-0.12.12.tgz` |
+| 说明 | 并发轮在 tag 后又推了 `eb61ac8`/`621f2ab`；CI 栏显示的是新 HEAD，并发轮自行负责 |

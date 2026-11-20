@@ -36,7 +36,7 @@ HEAD 上真换行折行 1–24 列已全盖（round 33），活缺口是已带�
 Last updated: 2026-11-20 14:10 +08:00 (**round-036 收口：2400 截断保头尾，未发版** —
 超长人话块从尾砍，结论行被砍、双语时第二语言全没。现在保头（答案）+保尾（结论），
 从中间砍；双语每块独立截。`test/delivery-human-block.spec.ts` +3 用例（旧码 1 failed）。
-`npm run ci` exit 0（69/1262，含并发轮测试）。**未提交、未发版、未打 tag**。）
+`npm run ci` exit 0（69/1262，含并发轮测试）。**已发版 `0.12.12`**：R36 提交 `aa5e79c`、发版提交 `61c7cb8`、annotated tag `v0.12.12`（→`61c7cb8`）已推，Release `44686655900` success（asset `dsh-grok-workflow-0.12.12.tgz`）。）
 
 Last updated: 2026-11-20 13:05 +08:00 (**round-035 收口：嵌套未知键，未发版** —
 `roles.reviewer` 与路由字段手误 `maxInflight` 曾被静默丢弃（补丁留着、运行忽略）。
