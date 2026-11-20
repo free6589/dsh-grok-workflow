@@ -583,10 +583,20 @@ function composeHuman(report: WorkflowReport, lang: DeliveryLang): string {
     }
   }
 
-  push(statusTail(report, verified, total, lang))
+  const tail = statusTail(report, verified, total, lang)
+  push(tail)
 
   const block = stripIds(composeBlock(lines), report)
-  return block.length <= MAX_HUMAN_CHARS ? block : `${block.slice(0, MAX_HUMAN_CHARS - 1)}…`
+  if (block.length <= MAX_HUMAN_CHARS) return block
+  // Round 36: the old tail-cut dropped the verdict line (and, in bilingual
+  // delivery, the whole second language): the reader never learned the count.
+  // Keep the head (the answer) and the tail (the verdict) and cut the middle.
+  const head = block.split('\n')[0] ?? ''
+  const keepTail = block.endsWith(tail) ? `\n${tail}` : `…\n${tail}`
+  const budget = MAX_HUMAN_CHARS - 1 - head.length - keepTail.length
+  if (budget <= 0) return `${head.slice(0, MAX_HUMAN_CHARS - 1)}…`
+  const middle = block.slice(head.length, head.length + budget)
+  return `${head}${middle}${keepTail}`
 }
 
 /**

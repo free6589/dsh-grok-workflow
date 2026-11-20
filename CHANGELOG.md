@@ -7,6 +7,31 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ### Fixed / 修复
 
+- **An over-budget human block keeps its verdict line instead of cutting it / 超长的中文结论不再把结论行截掉** —
+  `composeHuman` cut from the tail, so an over-long block lost the verdict line
+  (`statusTail`) — and, in bilingual delivery, the whole second language.
+  It now keeps the head (the answer) and the tail (the verdict) and cuts the middle;
+  each language block is clamped on its own, so the second language keeps its verdict too.
+  / `composeHuman` 从尾部截断，超长时结论行（`statusTail`）被砍掉，双语时整个第二语言也没了。
+  现在保留头部（答案）与尾部（结论），从中间截；双语每块独立截断，第二语言也有结论。
+
+
+### Fixed / 修复
+
+- **A `roles` value of the wrong shape is refused instead of loading five empty chains /
+  `roles` 形状不对时直接拒绝，而不是带着五条空链装载** —
+  `resolveConfig` reads `config.roles?.planner`, which on a string, an array or `null` is
+  `undefined` for every role: the load succeeded with no route configured at all, and the report
+  said "inherit the run's route" five times. A `roles` value that is present and is not an object
+  is now refused with its shape named (`got a string "worker:m1"`), while an absent `roles` and an
+  empty object still load as before. The settings schema already refused these on the host path;
+  this closes the direct reader, which is also reached by an embedder or a hand-built config.
+  / `resolveConfig` 读的是 `config.roles?.planner`，当 `roles` 是字符串、数组或 `null` 时，五个角色
+  全都得到 `undefined`：装载成功、却一条路由都没配，报告里五次写着「继承运行的路由」。现在只要
+  `roles` 存在却不是对象就拒绝，并点明实际形状（`got a string "worker:m1"`）；`roles` 缺省与空对象
+  仍按原样装载。设置 schema 在宿主路径上本来就拒收这些值，这里补的是直读路径，嵌入方与手工构造的
+  配置也走这条路。
+
 - **The narrow-fold rule now has the tests that pin it, and the documented footer rule is the
   measured one / 窄折行规则补上钉住它的用例，页脚规则改为实测口径** —
   `0.12.10` shipped the rule that redacts a base64 key blob folded to seven columns or fewer, but

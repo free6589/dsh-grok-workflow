@@ -4863,3 +4863,17 @@ commit/tag/CI/Release 均取自已提交记录，无编造）后门禁码变为 
 | `tag -a v0.12.11` → `d181812` + `push` | 成功，无 force-push |
 | 远端 CI `44681025399` | success |
 | Release `44681029703` | success；Release `Grok Workflow for DSH v0.12.11` + asset `dsh-grok-workflow-0.12.11.tgz` |
+
+## Round 90 — 2026-11-20 — R36：2400 截断保头尾（`CONFIRMED`，未发版）
+
+**主题**：POOL `P ·`（S/low）——超长从尾砍，结论行被砍、双语第二语言全没。
+
+**改动**：`src/delivery/index.ts` `composeHuman` 保头+保尾、中间砍；双语独立截断。
+`test/delivery-human-block.spec.ts` +3 用例。
+
+**命令与结果（`CONFIRMED`，本树实跑）**：新用例旧码 **1 failed**（LEN=2400 整、无结论）；
+修后 **13 passed**（基线 10）；`npm run ci` exit 0 = **69 文件 / 1262 测试 PASS**
+（含并发轮的 iterate-plan/guard 测试）；typecheck 0 错。证据
+`.rsi/evidence/round-036/`。
+
+**未验证（`NOT_RUN`）**：真机 GUI；真实定时投递。

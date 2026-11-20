@@ -236,3 +236,92 @@ describe('B10: the delivery view is unchanged around the human block', () => {
     expect(text).not.toContain('以上是结论；明细已记入台账。')
   })
 })
+
+describe('the 2400-char clamp keeps the verdict line', () => {
+  // Round 36 (POOL `P ·`): the old tail-cut dropped the verdict line — and, in bilingual
+  // delivery, the whole second language — so the reader never learned the count.
+  // The clamp now keeps the head (the answer) and the tail (the verdict) and cuts
+  // the middle instead.
+  const longReason = 'The supplier API returned malformed data and the price verification cannot proceed until the supplier fixes the endpoint, and if the supplier does not fix it promptly we must find an alternative data source so the task keeps moving instead of stalling halfway through'
+  const longUnc = 'The airport bus timetable could not be retrieved and departure times need confirmation from the station before accurate advice can be given, and taxis or ride-hailing are fallback options so the trip is not delayed by the missing timetable data'
+  const WIDE_LIMITS = { maxConcurrency: 2, maxTasks: 6 } as const
+  const wideConfig = resolveConfig(WIDE_LIMITS)
+  function overBudgetReport(): WorkflowReport {
+    const mk = (id: string, title: string) => ({ ...task(id, [title + ' checked']), title })
+    const ok = mk('a', 'Weather')
+    const checked = verification(ok)
+    const failed = ['b', 'c', 'd', 'e', 'f'].map((id) => {
+      const t = mk(id, 'Hotel price check result confirmation')
+      return { t, reason: longReason }
+    })
+    const objective = 'Check the weather'
+    return assertWorkflowReport({
+      schemaVersion: 'grok-workflow/v1', status: 'partial', objective,
+      plan: { source: 'caller', tasks: [ok, ...failed.map(f => f.t)], error: '' },
+      tasks: [
+        { ...ok, status: 'verified', attempts: [{ attempt: 1, status: 'verified', execution: execution('ok'), verification: checked, passed: true, error: '' }], error: '' },
+        ...failed.map(f => ({ ...f.t, status: 'failed' as const, attempts: [{ attempt: 1, status: 'failed' as const, execution: execution('', { status: 'failed' }), verification: failingVerification(f.t, 'x'), passed: false, error: f.reason }], error: f.reason })),
+      ],
+      confirmed: [{ taskId: 'a', criterion: 'Weather checked', evidence: checked.criteria[0]!.evidence }],
+      incomplete: failed.map(f => ({ taskId: f.t.id, reason: f.reason, category: 'quality' as const })),
+      errors: [],
+      uncertainties: Array.from({ length: 10 }, () => ({ taskId: 'a', text: longUnc })),
+      routing: { planner: [], worker: [], verifier: [], supervisor: [], synthesizer: [] },
+      routes: [],
+      synthesis: { mode: 'deterministic', summary: 'Done.' },
+      limits: { ...WIDE_LIMITS, maxRetries: FIXED_MAX_RETRIES, maxTotalAgents: maxTotalAgentsFor(6, FIXED_MAX_RETRIES, routeBudgetFor(wideConfig)) },
+    }, objective, wideConfig)
+  }
+
+  it('keeps the head and the verdict when the block is over budget', () => {
+    const text = humanConclusion(overBudgetReport(), { lang: 'en' })
+    expect(text.length).toBeLessThanOrEqual(2400)
+    expect(text).toContain('Answer:')
+    expect(text).toContain('That is the conclusion')
+    expect(text).toContain('of 6 usable')
+  })
+
+  it('still fits a short block unchanged', () => {
+    const text = humanConclusion(partialReport(), { lang: 'en' })
+    expect(text).toContain('Not done:')
+    expect(text).toContain('That is the conclusion')
+  })
+})
+
+describe('the bilingual clamp keeps both verdicts', () => {
+  it('keeps the second language head and verdict, not just the first', () => {
+    // The POOL item names this half explicitly: the old tail-cut dropped the
+    // whole second language, so a reader whose language the rules guessed wrong
+    // got a summary nobody can read.
+    const text = humanConclusion((() => {
+      const mk = (id: string, title: string) => ({ ...task(id, [title + ' checked']), title })
+      const ok = mk('a', 'Weather')
+      const checked = verification(ok)
+      const longReason = 'The supplier API returned malformed data and the price verification cannot proceed until the supplier fixes the endpoint, and if the supplier does not fix it promptly we must find an alternative data source so the task keeps moving instead of stalling halfway through'
+      const failed = ['b', 'c', 'd', 'e', 'f'].map((id) => {
+        const t = mk(id, 'Hotel price check result confirmation')
+        return { t, reason: longReason }
+      })
+      const objective = 'Check the weather'
+      const wideConfig = resolveConfig({ maxConcurrency: 2, maxTasks: 6 })
+      return assertWorkflowReport({
+        schemaVersion: 'grok-workflow/v1', status: 'partial', objective,
+        plan: { source: 'caller', tasks: [ok, ...failed.map(f => f.t)], error: '' },
+        tasks: [
+          { ...ok, status: 'verified', attempts: [{ attempt: 1, status: 'verified', execution: execution('ok'), verification: checked, passed: true, error: '' }], error: '' },
+          ...failed.map(f => ({ ...f.t, status: 'failed' as const, attempts: [{ attempt: 1, status: 'failed' as const, execution: execution('', { status: 'failed' }), verification: failingVerification(f.t, 'x'), passed: false, error: f.reason }], error: f.reason })),
+        ],
+        confirmed: [{ taskId: 'a', criterion: 'Weather checked', evidence: checked.criteria[0]!.evidence }],
+        incomplete: failed.map(f => ({ taskId: f.t.id, reason: f.reason, category: 'quality' as const })),
+        errors: [],
+        uncertainties: Array.from({ length: 10 }, () => ({ taskId: 'a', text: 'The airport bus timetable could not be retrieved and departure times need confirmation from the station before accurate advice can be given.' })),
+        routing: { planner: [], worker: [], verifier: [], supervisor: [], synthesizer: [] },
+        routes: [],
+        synthesis: { mode: 'deterministic', summary: 'Done.' },
+        limits: { maxConcurrency: 2, maxTasks: 6, maxRetries: FIXED_MAX_RETRIES, maxTotalAgents: maxTotalAgentsFor(6, FIXED_MAX_RETRIES, routeBudgetFor(wideConfig)) },
+      }, objective, wideConfig)
+    })(), { bilingual: true })
+    expect(text).toContain('That is the conclusion')
+    expect(text).toContain('以上是结论')
+  })
+})

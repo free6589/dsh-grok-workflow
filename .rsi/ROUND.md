@@ -1088,3 +1088,17 @@ no history is rewritten, and no round is force-pushed.
 - **未验证（`NOT_RUN`）**：真机 GUI；真实定时投递。
 - **建议版本**：patch → `0.12.10`（fail-closed 收紧，合法补丁不受影响；CHANGELOG 记 Fixed 双语）。
 - **status:** OK
+
+## Round 36 — 2026-11-20 — 2400 字截断保头尾，不再吞结论行（`CONFIRMED`）
+
+- **选题（R2）**：POOL 池顶 `P ·` 项（S/low）——`composeHuman` 超长从尾砍，结论行
+  （`statusTail`）被砍，双语时整个第二语言没了。锚点干净（`src/delivery/index.ts`，
+  并发轮未动）。
+- **改动**：超长时保留头（答案行）+尾（结论行），从中间砍；双语每块独立截断。
+  `test/delivery-human-block.spec.ts` +3 用例（单语头尾、短块不变、双语两边结论）。
+- **红绿（`CONFIRMED`，本树实跑）**：新用例旧码上 **1 failed**（`LEN=2400` 整、无结论）；
+  修后 **13 passed**（基线 10，+3）；`npm run ci` exit 0。
+- **证据**：`.rsi/evidence/round-036/`（`ci-mine.txt`）。
+- **未验证（`NOT_RUN`）**：真机 GUI；真实定时投递。
+- **建议版本**：patch（显示行为修正，无 API 变化；CHANGELOG 记 Fixed 双语）。
+- **status:** OK
