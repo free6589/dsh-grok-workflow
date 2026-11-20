@@ -1,5 +1,16 @@
 # Agent Handoff
 
+## 2026-11-20 — `0.12.7` 已发版（round-032：删 panel 死代码）
+
+- **From:** RSI 心跳轮（本会话）· **To:** 用户 / 下一轮接手者
+- **发版（`CONFIRMED`）**：patch（删减死代码，用户可见行为不变）。commit `56e701d`、
+  annotated tag `v0.12.7` 已推；远端 CI `44666191493` success、Release `44666195466`
+  success（asset `dsh-grok-workflow-0.12.7.tgz`）。旧标签未动，无 force-push。
+- **内容**：删 `src/panel.ts`（286 行）+ 自有测试（557 行）；`gui-fold.ts` 自带类型。
+  `npm run ci` 67/1223 全绿（-13 例皆所删模块自有测试）。
+- **NOT_RUN**：真机 GUI；真实定时投递。本机 `web` profile 仍是旧版，
+  想用新版就从 `github:free6589/dsh-grok-workflow#v0.12.7` 更新。
+
 ## 2026-11-20 — round-031：检查点上限注释多算 129 字节（`CONFIRMED`，不发版）
 
 - **From:** agent-73（RSI round 31 子代理）· **To:** 下一轮接手者 / 主会话
