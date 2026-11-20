@@ -91,11 +91,23 @@ here and are marked DONE when their commit lands.
   function`). `resolveChain` now refuses with the full path + got-type
   (`roles.worker[0].model must be a model id string, got number`), pinned by
   `test/config.spec.ts`. Evidence `.rsi/evidence/round-038/`.
-- P · `repairLimitOverruns` still clamps seven removed keys through `LEGACY_LIMIT_CAPS`
-  (`config.ts:612-636`) and announces a cap that is not the fixed value (`maxActiveRuns` says 4,
-  the fixed value is 2). Dead path, misleading warning. S / low.
+- R40 DONE · `repairLimitOverruns` no longer clamps removed keys: the `LEGACY_LIMIT_CAPS`
+  branch "repaired" `maxRetries:5→3` / `maxActiveRuns:5→4` with a "takes effect as" warning,
+  yet `resolveConfig` still refused the repaired shape (`unknown configuration key`) — the
+  clamp saved nothing and the sentence lied about the enforced value (measured: the warning
+  announced `maxActiveRuns` taking effect as 4 while the run enforces `FIXED_MAX_ACTIVE_RUNS=2`).
+  The branch, `LEGACY_LIMIT_CAPS`, `LegacyLimitField`/`OverrunField` and `legacyRecordOverrun`
+  are deleted; removed keys are left untouched so the refusal names the real defect. Live-table
+  behaviour unchanged (`maxConcurrency:120→100` still clamps and loads). Pinned by a new
+  round-40 case in `test/config-limits-repair.spec.ts`. Evidence `.rsi/evidence/round-040/`.
+- NEXT (round 41) · Shortlist ordered in `STATE.md` → "Next round shortlist (round 41)", four
+  candidates with disjoint file lists: S1 docs-only checkpoint bound
+  (`src/checkpoint/schema.ts` + new `test/checkpoint-bound.spec.ts`, already preserved), S2 the
+  fail-closed config branches below (`src/config.ts` + `test/config-limits-repair.spec.ts`), S3 the
+  validator branches below (`src/resume/validator.ts` + `test/resume-validator.spec.ts`), S4 README
+  model/validation bullets (`README.md`). One round takes one candidate.
 - P · Six fail-closed branches have no test: `config.ts:654`, `:444`, `:462`, `:438`, `:680`,
-  `:826`. Coverage only (mutation run needed to show they bite). S / low.
+  `:826`. Coverage only (mutation run needed to show they bite). S / low. [S2]
 
 ## Report and delivery (`src/report.ts`, `src/delivery/index.ts`, `src/answer.ts`)
 

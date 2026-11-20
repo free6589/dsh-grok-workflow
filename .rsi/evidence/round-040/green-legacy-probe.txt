@@ -1,0 +1,9 @@
+in: {"maxRetries":5} -> repaired: {"maxRetries":5} warnings: 0
+  resolve(repaired) throws: unknown configuration key "maxRetries"; accepted keys: toolN
+in: {"maxActiveRuns":5} -> repaired: {"maxActiveRuns":5} warnings: 0
+  resolve(repaired) throws: unknown configuration key "maxActiveRuns"; accepted keys: to
+in: {"historyTurns":1000001} -> repaired: {"historyTurns":1000001} warnings: 0
+  resolve(repaired) throws: unknown configuration key "historyTurns"; accepted keys: too
+in: {"maxConcurrency":120} -> repaired: {"maxConcurrency":100} warnings: 1
+  resolve(repaired): LOADED
+buffer notes: [{"field":"maxConcurrency","stored":120,"cap":100}]

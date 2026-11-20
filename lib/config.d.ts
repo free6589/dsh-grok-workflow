@@ -533,6 +533,36 @@ export declare function repairSynthesisInconsistency(raw: GrokWorkflowConfig): {
     repaired: GrokWorkflowConfig;
     warnings: string[];
 };
+/**
+ * Repair a stored limit that exceeds the hard maximum (B07, B02, D-031).
+ *
+ * Every key in `LIMIT_CAPS` is a quota envelope, not a preference: the Host refuses to
+ * run above it (`resolveConfig`), and that refusal is correct. A profile patch written
+ * before a cap was restored can still hold the old wider number, and failing the whole
+ * row for it leaves the user with no settings page to fix it from — the same deadlock
+ * D-031 removed for the synthesis mismatch. So a stored overrun takes effect as the
+ * cap, announced once.
+ *
+ * Which keys are in scope is `LIMIT_CAPS`'s answer, not this function's: that is what
+ * keeps the schema clamp and this repair from disagreeing about a bound, and what let
+ * the two documented limits (B07) become every numeric hard limit (B02) without a
+ * second table to maintain.
+ *
+ * Only an *overrun* is recoverable here: a number above the maximum. Everything
+ * else is left exactly as it is for `resolveConfig` to reject (R-06) — a value
+ * below the minimum, a non-number, an unknown key or a malformed chain is not a
+ * "the cap moved" problem, and silently rewriting it would hide a real error.
+ * The input is not mutated; a non-matching input returns unchanged with no
+ * warnings, so the caller can chain this with the other repair unconditionally.
+ *
+ * Each clamped overrun is also *recorded* in the same buffer the schema clamp writes
+ * to (B04), so the caller announces it through one deduplicated path with one wording
+ * instead of logging here: this function runs inside a read that may still throw for
+ * an unrelated defect, and a read happens per message, so logging here would repeat
+ * the line on every message for as long as the patch keeps failing.
+ * @param raw - raw user configuration (plain snapshot shape).
+ * @returns The clamped config plus human-readable warnings (empty when nothing matched).
+ */
 export declare function repairLimitOverruns(raw: GrokWorkflowConfig): {
     repaired: GrokWorkflowConfig;
     warnings: string[];

@@ -1,0 +1,7 @@
+in: {"maxRetries":5} -> repaired: {"maxRetries":3} warnings: 1
+  resolve(repaired) throws: unknown configuration key "maxRetries"; accepted keys: toolName, mode, grokDefau
+in: {"maxActiveRuns":5} -> repaired: {"maxActiveRuns":4} warnings: 1
+  resolve(repaired) throws: unknown configuration key "maxActiveRuns"; accepted keys: toolName, mode, grokDe
+in: {"historyTurns":1000001} -> repaired: {"historyTurns":1000000} warnings: 1
+  resolve(repaired) throws: unknown configuration key "historyTurns"; accepted keys: toolName, mode, grokDef
+buffer notes: [{"field":"maxRetries","stored":5,"cap":3},{"field":"maxActiveRuns","stored":5,"cap":4},{"field":"historyTurns","stored":1000001,"cap":1000000}]

@@ -1,5 +1,11 @@
 # Delivery: truncation boundary + chain validation (round 40)
 
+> **Provenance (added at the round-40 closeout, 2026-11-21).** This is a pre-ship capture written
+> during an interrupted attempt that carried the label "round 40". The work it measures shipped as
+> **round 39** in `01272af` (`v0.12.15`), and the live spec now titles those cases `round 39`. The
+> commands and outputs below are left verbatim; only this note is new. See `STATE.md` → "Numbering
+> reconciled (round-40 closeout)".
+
 Scope: `src/delivery/index.ts` and `test/delivery-human-block.spec.ts` only, plus this file.
 Working tree only: nothing committed, nothing pushed, no build, no full CI, no network, no model,
 no credentials touched. All times local (Asia/Singapore), 2026-11-20.

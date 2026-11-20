@@ -884,39 +884,11 @@ export function repairSynthesisInconsistency(raw: GrokWorkflowConfig): { repaire
  * @param raw - raw user configuration (plain snapshot shape).
  * @returns The clamped config plus human-readable warnings (empty when nothing matched).
  */
-/**
- * Numeric caps that a stale profile patch may still carry (pre-T4). The T4
- * slim-down removed them from the schema, so they are unknown keys now; the
- * schema/`assertKnownKeys` path refuses the load (R-06) and this repair only
- * serves programmatic callers that bypass the schema.
- */
-const LEGACY_LIMIT_CAPS = {
-  maxConcurrency: HARD_LIMITS.maxConcurrency,
-  maxRetries: HARD_LIMITS.maxRetries,
-  maxQueuedMessages: HARD_LIMITS.maxQueuedMessages,
-  historyTurns: HARD_LIMITS.historyTurns,
-  historyChars: HARD_LIMITS.historyChars,
-  maxTasks: HARD_LIMITS.maxTasks,
-  maxActiveRuns: HARD_LIMITS.maxActiveRuns,
-  maxActiveRunsTotal: HARD_LIMITS.maxActiveRunsTotal,
-  recordLimit: HARD_LIMITS.recordEntries,
-} as const
-
-type LegacyLimitField = keyof typeof LEGACY_LIMIT_CAPS
-
-/** @see {@link LimitField} */
-type OverrunField = LegacyLimitField
-
-function legacyRecordOverrun(field: LegacyLimitField, stored: number): void {
-  recordedOverruns.set(`${field}:${stored}`, { field: field as LimitField, stored, cap: (LEGACY_LIMIT_CAPS as Record<string, number>)[field]! })
-}
-
 export function repairLimitOverruns(raw: GrokWorkflowConfig): { repaired: GrokWorkflowConfig; warnings: string[] } {
   const out: GrokWorkflowConfig = { ...raw }
   const warnings: string[] = []
-  // The live caps first, read off the same table the schema clamp reads: a key added
-  // to `LIMIT_CAPS` is repaired here the moment it exists (B02), including the two
-  // repeat-run caps this round added.
+  // The live caps, read off the same table the schema clamp reads: a key added
+  // to `LIMIT_CAPS` is repaired here the moment it exists (B02).
   for (const field of Object.keys(LIMIT_CAPS) as LimitField[]) {
     const cap = LIMIT_CAPS[field]
     const stored = (raw as Record<string, unknown>)[field]
@@ -926,18 +898,6 @@ export function repairLimitOverruns(raw: GrokWorkflowConfig): { repaired: GrokWo
     ;(out as Record<string, unknown>)[field] = cap
     recordOverrun(field, stored)
     warnings.push(limitOverrunWarning({ field, stored, cap }))
-  }
-  // Then the pre-T4 numbers a programmatic caller may still carry. They are unknown
-  // keys by the time `resolveConfig` runs, so this cannot save such a row; it keeps
-  // the announcement a stale caller used to get instead of silently dropping it.
-  for (const field of Object.keys(LEGACY_LIMIT_CAPS) as LegacyLimitField[]) {
-    if (field in LIMIT_CAPS) continue
-    const cap = LEGACY_LIMIT_CAPS[field]
-    const stored = (raw as Record<string, unknown>)[field]
-    if (typeof stored !== 'number' || !(stored > cap)) continue
-    ;(out as Record<string, unknown>)[field] = cap
-    legacyRecordOverrun(field, stored)
-    warnings.push(limitOverrunWarning({ field: field as LimitField, stored, cap }))
   }
   return { repaired: warnings.length === 0 ? raw : out, warnings }
 }

@@ -327,7 +327,7 @@ describe('the bilingual clamp keeps both verdicts', () => {
 })
 
 // ---------------------------------------------------------------------------
-// Round 37: the truncation edges. Round 36 kept head+tail inside one language
+// Round 39: the truncation edges. Round 36 kept head+tail inside one language
 // block but left the *pair* clamp a blind `slice(0, cap - 1)`, and the single
 // block's middle cut was a raw code-unit slice: it could eat the second
 // language's verdict, leave a half-word, or split an astral character. The
@@ -411,7 +411,7 @@ function loneSurrogates(text: string): string[] {
   return found
 }
 
-describe('round 37: the bilingual cap keeps both heads and both verdicts', () => {
+describe('round 39: the bilingual cap keeps both heads and both verdicts', () => {
   // The pair clamp exists because one block at the 2400 single-pass cap plus one
   // at 2399 plus the two-character separator is 4801: one character over 4800.
   // The old `slice(0, cap - 1)` cut the last two characters off the second
@@ -459,7 +459,7 @@ describe('round 37: the bilingual cap keeps both heads and both verdicts', () =>
   })
 })
 
-describe('round 37: the pair budget is split, never cut blind', () => {
+describe('round 39: the pair budget is split, never cut blind', () => {
   // 4800 is the bilingual cap and `\n\n` is the separator the pair adds back, so
   // this is the budget the two blocks actually share.
   const BUDGET = 4800 - 2
@@ -506,7 +506,7 @@ describe('round 37: the pair budget is split, never cut blind', () => {
   })
 })
 
-describe('round 37: an over-cap block cuts the middle, not a verdict and not a word', () => {
+describe('round 39: an over-cap block cuts the middle, not a verdict and not a word', () => {
   it('keeps the head and the whole verdict and cuts only at a line boundary', () => {
     const text = humanConclusion(edgeReport({ knob: 240, mark: SENTINEL }), { lang: 'en' })
     expect(text.length).toBeLessThanOrEqual(2400)
@@ -539,7 +539,7 @@ describe('round 37: an over-cap block cuts the middle, not a verdict and not a w
   })
 })
 
-describe('round 37: a clamp never splits an astral character', () => {
+describe('round 39: a clamp never splits an astral character', () => {
   it('leaves no lone surrogate when a caveat is longer than one clamped line', () => {
     const text = humanConclusion(edgeReport({ knob: 200, emoji: true }), { lang: 'en' })
     expect(loneSurrogates(text)).toEqual([])
@@ -555,7 +555,7 @@ describe('round 37: a clamp never splits an astral character', () => {
   })
 })
 
-describe('round 37: under-cap delivery is byte for byte what it was', () => {
+describe('round 39: under-cap delivery is byte for byte what it was', () => {
   it('is exactly the two single-language blocks and one blank line', () => {
     for (const report of [partialReport(), edgeReport({ knob: 60 })]) {
       const zh = humanConclusion(report, { lang: 'zh' })
@@ -576,7 +576,7 @@ describe('round 37: under-cap delivery is byte for byte what it was', () => {
 
 
 // ---------------------------------------------------------------------------
-// Round 40: the route line is the one place a delivery restates a
+// Round 39: the route line is the one place a delivery restates a
 // *configuration*, and `Array#join` used to accept anything. A number, a boolean
 // or a `null` in a chain was coerced into the line (`worker=a/m1 → 7 → `) — a
 // chain nobody configured — and a chain that was not an array at all threw
@@ -614,7 +614,7 @@ function thrownBy(fn: () => unknown): unknown {
   return undefined
 }
 
-describe('round 40: a chain value that is not a route label is refused by path', () => {
+describe('round 39: a chain value that is not a route label is refused by path', () => {
   it('names the role, the position and the shape for a non-string route', () => {
     for (const { label, value, got } of NOT_A_ROUTE) {
       const where = `roles.worker[1] as ${label}`
@@ -688,12 +688,12 @@ describe('round 40: a chain value that is not a route label is refused by path',
 })
 
 // ---------------------------------------------------------------------------
-// Round 40: the bilingual cap itself (4800), measured over the whole boundary
+// Round 39: the bilingual cap itself (4800), measured over the whole boundary
 // rather than asserted one knob at a time, and pinned so a clamp that simply
 // returned less than it had room for cannot pass the bound.
 // ---------------------------------------------------------------------------
 
-describe('round 40: the bilingual pair never crosses 4800 characters', () => {
+describe('round 39: the bilingual pair never crosses 4800 characters', () => {
   const KNOBS = Array.from({ length: 201 }, (_, index) => 100 + index)
 
   it('stays inside the cap for every knob, in both language orders', () => {

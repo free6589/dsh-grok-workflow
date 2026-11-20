@@ -1,9 +1,28 @@
-Updated: 2026-11-21T01:58+08:00 · round 39 (delivery pair clamp keeps both 4800 verdicts + `Model routes:` refuses illegal chains) · `npm run ci` 70 files / 1296 tests PASS · code+evidence commit `01272af` · release `0.12.15` on `01272af` · tag `v0.12.15` pushed (remote `8a13c46`) · remote CI `44788061342` success / Release `44788066114` success · evidence `.rsi/evidence/round-039/`
+Updated: 2026-11-21T07:35+08:00 · round 40 CLOSED (repairLimitOverruns drops the LEGACY dead path; removed keys refused, not clamped) · `npm run ci` 70 files / 1297 tests PASS · no version bump — `0.12.15` (`01272af`) stays the published release, the fix is unreleased and suggests patch · gate `RESUME next_round=41`
 
 Previous rounds: `0.12.14`/`c0eabef` (compact 回执，CI `44760621921`, Release `44760644587`) · `0.12.13`/`e80ed6d`（合并 `5fb5da0`） · `0.12.12`/`61c7cb8` (36, 协作轮) · `0.12.9`/`5d3bcea` (34) · `0.12.8`/`9f91684` (33, CI `44670766356`, Release `44670771402`) · `0.12.6`/`e7150ab` (30, CI `44659057507`, Release `44659061505`) · `0.12.5`/`5b7cae1` (29, CI `44656151053`, Release `44656153854`) — 每轮细节在 `.rsi/ROUND.md`、`.rsi/LOG.md`、`.rsi/ledger.jsonl`。
 ## Facts
 
-- Round 39 (this round): bilingual delivery was bounded by slicing the concatenation of the two
+- Round 40 (this round, closed): `repairLimitOverruns` no longer clamps removed keys through
+  `LEGACY_LIMIT_CAPS` — the branch "repaired" `maxRetries:5→3` / `maxActiveRuns:5→4` and announced a
+  cap it could not deliver (the run enforces `FIXED_MAX_ACTIVE_RUNS=2`), yet `resolveConfig` still
+  refused the repaired shape (`unknown configuration key`), so the clamp saved nothing and the
+  warning lied. `LEGACY_LIMIT_CAPS`, `LegacyLimitField`/`OverrunField`, `legacyRecordOverrun` and the
+  second loop are deleted (net -44 lines in `src/config.ts`); removed keys are left untouched so
+  `assertKnownKeys` names the real defect. Live-table behaviour unchanged (`maxConcurrency:120→100`
+  still clamps and loads). `lib/config.*` rebuilt from this tree, not hand-edited. Measured red→green
+  in `.rsi/evidence/round-040/`. **Version:** no bump and no tag — `0.12.15` (`01272af`, remote tag
+  `8a13c46`) stays the published release; this fix sits unreleased and suggests patch.
+  **Next action:** the round-41 shortlist below.
+- **Numbering reconciled (round-40 closeout):** `test/delivery-human-block.spec.ts` labelled its
+  cases `round 37` (5 cases) and `round 40` (2 cases) for work that the commit message, `ROUND.md`
+  §39, the LOG row and the ledger all attribute to **round 39**; both labels came from the
+  interrupted round-37/40 attempts that produced the set. All ten label sites (two section comments
+  plus eight `describe` titles) now say `round 39`, matching `01272af`. Comment/title text only — no
+  assertion, fixture or expectation was touched. Round 37 stays `roles`-shape + harness arming, round
+  38 stays non-string `model`/`provider`, round 40 stays this config repair. The pre-ship capture
+  `.rsi/evidence/delivery-round40.md` keeps its verbatim outputs under a provenance header.
+- Round 39: bilingual delivery was bounded by slicing the concatenation of the two
   blocks, and 2400 + 2399 + 2 = **4801** — one over the 4800 cap — so the blind cut ate the last
   characters of the **second** language's verdict (`明细已记入台…`). `pairCaps` now splits the budget
   (measured: `pairCaps(2400,2400)=[2399,2399]`, `(2400,2399)=[2399,2399]`, `(2400,100)=[2400,100]`),
@@ -51,11 +70,32 @@ Previous rounds: `0.12.14`/`c0eabef` (compact 回执，CI `44760621921`, Release
   checkpoint-bound docblock + spec at `.rsi/evidence/round-039/preserved/` — a docs-only round, no
   version bump; and `test/config-chain-types.spec.ts`, whose coverage overlaps the committed
   `test/config.spec.ts` case (decide before adding it, or the count grows without a second behaviour). S / low.
-- Still open and next in line: `repairLimitOverruns` still clamps seven removed keys through
-  `LEGACY_LIMIT_CAPS` (dead path, misleading warning), six fail-closed config branches with no test,
-  the "bilingual" mirror repeating one sentence, the fallback-partial `0 项没做成`, `dedupeBilingual`,
-  `progress.notReported`, the resume policy/integrity/validator items, the README model/validation
-  bullets and `DESIGN-progress-tab.md`. Start at the top of `POOL.md`.
+## Next round shortlist (round 41) — 4 candidates, disjoint file lists
+
+Take one whole round from this list; none of them shares a file with another, so a later round can
+pick the next without a merge question. Ordered by cost, cheapest first.
+
+1. **S1 · docs-only checkpoint bound** — land the preserved docblock + its spec. Files:
+   `src/checkpoint/schema.ts` (`CHECKPOINT_LIMITS.maxBytes` comment only) and a new
+   `test/checkpoint-bound.spec.ts` (restore with `cp .rsi/evidence/round-039/preserved/checkpoint-bound.spec.ts.txt test/checkpoint-bound.spec.ts`;
+   the patch half is `.rsi/evidence/round-039/preserved/checkpoint-docblock.patch`, `git apply --check` clean).
+   No runtime line changes ⇒ no version bump per `docs/RELEASING.md`. S.
+2. **S2 · config fail-closed coverage** — the six untested refusal branches. Files: `src/config.ts`
+   (`:654`, `:444`, `:462`, `:438`, `:680`, `:826`) plus `test/config-limits-repair.spec.ts`.
+   Coverage only; a mutation run is needed to show each branch bites. S / low.
+3. **S3 · resume validator coverage** — the five untested refusal branches. Files:
+   `src/resume/validator.ts` (`:231`, `:274`, `:290`, `:296`, `:308`) plus `test/resume-validator.spec.ts`.
+   Coverage only. S / low.
+4. **S4 · docs truth pass** — the README examples the loader refuses (`synthesis: deterministic`, the
+   removed `switchOn` key; EN ~176-183, zh ~169-176) and the stale "more than three routes" bullet
+   (real limit `HARD_LIMITS.chainLength` = 50). File: `README.md` only. S / low.
+
+- `test/config-chain-types.spec.ts` (preserved) overlaps the committed `test/config.spec.ts` case —
+  decide before adding it, or the test count grows without a second behaviour.
+- Deferred, not in the shortlist (needs a measured shape or a product decision): the "bilingual"
+  mirror repeating one sentence, the fallback-partial `0 项没做成`, `dedupeBilingual`,
+  `progress.notReported`, the resume integrity/`recordableTimeoutMs` items, the ledger's own
+  8,000-character clamp, and `DESIGN-progress-tab.md` §4. Still listed in `POOL.md`.
 - The ledger's own 8,000-character clamp is pooled (no validated report reaches it, so no measured
   shape to pin it with yet); the human-block clamps are covered by `cutCodeUnits`.
 

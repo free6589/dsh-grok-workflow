@@ -1266,3 +1266,41 @@ no history is rewritten, and no round is force-pushed.
   `npm run ci` 70/1296 全绿；远端 CI `44788061342` success、Release `44788066114` success；
   LOG 第 39 行的 `{{TAG}}` 占位已填成 `v0.12.15`。旧标签未动，无 force-push。
 - **status:** OK
+
+## Round 40 — 2026-11-21 — `repairLimitOverruns` 不再钳制已移除的键（`CONFIRMED`）
+
+- **门禁（R1）**：`heartbeat-guard.sh --round 40 --record` 首跑 `SKIP code=dirty-tracked`
+  （`dirty_tracked=1`，唯一脏文件是本 turn 自己刚跑的 `stop-probe.sh 40` 在
+  `.rsi/evidence/stop-probes.txt` 上追加的一行——探针脚本的写入目标是 tracked 文件，
+  所以"跑探针"本身把树弄脏）。`git checkout --` 还原该行后重跑门禁
+  `RESUME code=none next_round=40 round_max=39 ledger_max=39 dirty_tracked=0`，再开轮。
+  `.rsi/STOP` 不存在。
+- **选题（R2）**：POOL 池顶 `P ·` 项——`repairLimitOverruns` 经 `LEGACY_LIMIT_CAPS` 钳制
+  七个已移除键并宣布一个并非执行值的上限（`maxActiveRuns` 说 4，实际执行的是
+  `FIXED_MAX_ACTIVE_RUNS=2`）。S/low，小修（单文件行为收紧 + 守卫用例），免研究。
+- **缺陷（`CONFIRMED`，实测）**：`repairLimitOverruns({ maxRetries: 5 })` 返回
+  `{ maxRetries: 3 }` + 1 条"已按 3 生效"警告，但 `resolveConfig` 对该修复后形状仍抛
+  `unknown configuration key "maxRetries"`——钳制救不回装载，警告还撒谎。同理
+  `maxActiveRuns: 5→4`（宣布按 4 生效，实际跑的是 fixed 2）、`historyTurns` 等。
+  红色证据 `.rsi/evidence/round-040/red-legacy-probe.txt`（lib 旧构建实跑）。
+- **改动**：`src/config.ts` 删除 `LEGACY_LIMIT_CAPS`、`LegacyLimitField`/`OverrunField`、
+  `legacyRecordOverrun` 与第二循环（-44 行净删）；`repairLimitOverruns` 只走 `LIMIT_CAPS`。
+  移除键现在原样留给 `assertKnownKeys` 拒绝（报出真实缺陷），不再写"按 cap 生效"的警告，
+  不再污染 `takeLimitOverruns()` 缓冲。另修一句陈旧注释（"two repeat-run caps this round
+  added"）。`lib/config.*` 由本树 `src/` 重建（`lib/config.d.ts` 的 +30 行是此前构建漏掉的
+  `repairLimitOverruns` docstring，本次如实同步，无手改）。
+- **红绿（`CONFIRMED`，本树实跑）**：修后探针 `maxRetries:5` / `maxActiveRuns:5` /
+  `historyTurns:1000001` 均 `repaired === input`、0 警告、仍走 unknown-key 拒绝；
+  `maxConcurrency:120→100` 照旧钳制并装载（`green-legacy-probe.txt`）。
+  新守卫用例 `test/config-limits-repair.spec.ts` "does not clamp a removed numeric key…"
+  覆盖三键 + live 表回归；该文件 24→**25 passed**。`test/config.spec.ts` 40、
+  `test/input.spec.ts` 13 同轮全绿。
+- **门禁（`CONFIRMED`）**：`npm run typecheck` exit 0；`npm run ci` exit 0 =
+  **70 文件 / 1297 测试 PASS**（基线 70/1296，+1，无删除无 skip）；`npx oxlint` 23 warnings /
+  0 errors；`npm run verify:lib` = `lib/ at 3a8b87d is the build of src/ at 3a8b87d
+  (153 files, byte-identical)`（构建在记录基线 commit 之后跑，产物对应工作树；发版时重跑为准）。
+- **POOL**：该 `P ·` 项记 `R40 DONE`（含恢复信息）；池顶回到"六处 fail-closed 无测试分支"。
+- **未验证（`NOT_RUN`）**：真机 GUI 手点；真实定时投递；发版（本轮不 bump、不打 tag、不建 Release）。
+- **建议版本**：patch（fail-closed 收紧 + 删误导警告，无 API/配置面变化；CHANGELOG 记 Fixed 双语，
+  由发版轮搬运）。
+- **status:** OK

@@ -203,6 +203,26 @@ describe('LIMIT_CAPS: one clamp table for every user-configurable numeric cap (B
     }
     expect(takeLimitOverruns()).toEqual([])
   })
+
+  it('does not clamp a removed numeric key to a cap it cannot deliver (round 40)', () => {
+    // The deleted LEGACY_LIMIT_CAPS branch clamped `maxRetries: 5` to 3 and
+    // `maxActiveRuns: 5` to 4 with a "takes effect as" warning, yet a config
+    // carrying either key still fails `resolveConfig` — the clamp saved
+    // nothing and the sentence lied about the enforced value. The repair now
+    // leaves removed keys untouched so the refusal names the real defect.
+    for (const raw of [{ maxRetries: 5 }, { maxActiveRuns: 5 }, { historyTurns: 1000001 }]) {
+      const { repaired, warnings } = repairLimitOverruns(raw as never)
+      expect(repaired).toEqual(raw)
+      expect(warnings).toEqual([])
+      expect(() => resolveConfig(repaired)).toThrow(/unknown configuration key/)
+    }
+    expect(takeLimitOverruns()).toEqual([])
+    // The live table is untouched: a real overrun still clamps and loads.
+    const { repaired, warnings } = repairLimitOverruns({ maxConcurrency: 120 } as never)
+    expect(repaired).toEqual({ maxConcurrency: 100 })
+    expect(warnings).toHaveLength(1)
+    expect(resolveConfig(repaired).maxConcurrency).toBe(100)
+  })
 })
 
 /**
