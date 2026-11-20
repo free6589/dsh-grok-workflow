@@ -1,0 +1,10 @@
+Round 32 red state (before the fix):
+- src/panel.ts (286 lines) had zero production importers: no src/ module imports it,
+  src/index.ts does not export it, src/client/index.js does not use it.
+  Only test/panel.spec.ts (557 lines) and test/gui-fold.ts (a type import) referenced it.
+- Its "guarantee" (only a task-level result can produce a pass word) was never
+  executed by any production path; the live panel is rendered by progress-tab.ts
+  plus the bundle renderer covered by test/panel-links.spec.ts.
+- Deleting the files is the red: the dead code exists in the tree.
+Green: files deleted, gui-fold.ts carries its own PanelEvent type,
+  67 files / 1223 tests PASS, verify:lib byte-identical.

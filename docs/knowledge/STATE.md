@@ -1,3 +1,10 @@
+Last updated: 2026-11-20 11:10 +08:00 (**round-032：删零调用的面板投影模块，未发版** —
+`src/panel.ts`（286 行）零生产导入者（`src/` 零引用、`src/index.ts` 不导出、bundle 不用），
+活面板走 `progress-tab.ts` + bundle 渲染器。删模块 + 自有测试（557 行）；
+`test/gui-fold.ts` 自带 `PanelEvent` 类型供 `test/progress.spec.ts`。
+`npm run ci` exit 0 = **67 文件 / 1223 测试 PASS**（-13 例皆所删模块自有测试）；
+`npm run verify:lib` 153 files byte-identical。**未提交、未发版、未打 tag**。）
+
 Last updated: 2026-11-20 10:20 +08:00 (**round-031：检查点「拒绝带」上限的注释多算了 129 字节** —
 行为自 round 27 起就是对的（写入侧双向按 `maxBytes` 收敛），错的是注释：完整性记录不是固定 129 字节，
 而是 **122 字节 + `bytes` 的十进制位数**（4,000 字节载荷配 126 字节、1,048,447 配 129 字节），所以

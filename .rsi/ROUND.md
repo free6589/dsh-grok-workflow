@@ -967,3 +967,21 @@ no history is rewritten, and no round is force-pushed.
 - **Unverified (`NOT_RUN`):** nothing behavioural; the changed line is a comment and the added test
   runs offline against real writer calls.
 - **status:** OK
+
+## Round 32 — 2026-11-20 — 删除零生产调用者的面板投影模块（`CONFIRMED`）
+
+- **选题（R2）**：POOL `Open questions` 唯一 H 项——`src/panel.ts` 无生产导入者。
+  先证实后动手：`src/` 零 import、`src/index.ts` 不导出、`src/client/index.js` 不用；
+  唯一引用是 `test/panel.spec.ts` + `test/gui-fold.ts` 的类型 import。
+  活面板走 `progress-tab.ts` + bundle 渲染器（`test/panel-links.spec.ts` 钉住）。
+  删减（M/medium，POOL 已批准"delete or wire"，选 delete），原因与迁移见 CHANGELOG。
+- **改动**：删 `src/panel.ts`（286 行）+ `test/panel.spec.ts`（557 行）；
+  `test/gui-fold.ts` 自带 `PanelEvent` 类型（`test/progress.spec.ts` 仍用它，保留）。
+- **红绿（`CONFIRMED`，本树实跑）**：删文件即红（死代码存在）；
+  修后 `test/progress.spec.ts` **12 passed**；`npm run ci` exit 0 =
+  **67 文件 / 1223 测试 PASS**（基线 68/1236，-13 例皆为所删模块的自有测试，
+  无既有断言被放宽）；typecheck 0 错；`npm run verify:lib` 153 files byte-identical。
+- **证据**：`.rsi/evidence/round-032/`（`ci.txt`、`red-note.txt`）。
+- **未验证（`NOT_RUN`）**：真机 GUI 手点；真实定时投递。
+- **建议版本**：patch（删减死代码，用户可见行为不变；CHANGELOG 记 Removed 双语）。
+- **status:** OK

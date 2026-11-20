@@ -5,6 +5,19 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.12.7] - 2026-11-20
+
+### Removed / 移除
+
+- **Deleted the unused panel projection module (`src/panel.ts`) / 删除了从未被生产调用的面板投影模块** —
+  it had no production importer (no `src/` module imports it, `src/index.ts` does not export it,
+  the browser bundle does not use it); the only references were its own spec and a type import in
+  the GUI-fold transcription. The live panel renders through `progress-tab.ts` plus the bundle
+  renderer pinned by `test/panel-links.spec.ts`, so nothing user-visible changes.
+  / 它没有任何生产调用方（没有 `src/` 模块引用它，`src/index.ts` 不导出它，浏览器 bundle 不用它）；
+  唯一的引用是它自己的测试和 GUI 折叠转录里的一处类型引用。线上板走 `progress-tab.ts` 加 bundle
+  渲染器（`test/panel-links.spec.ts` 钉住），用户可见行为不变。
+
 ## [0.12.6] - 2026-11-20
 
 ### Fixed / 修复

@@ -181,6 +181,9 @@ here and are marked DONE when their commit lands.
 
 ## Open questions
 
-- `src/panel.ts` has no production importer (only `test/panel.spec.ts`, `test/gui-fold.ts`); its
-  "only a task-level result can produce a pass word" guarantee may never run. H — verify against
-  the shipped bundle before deciding to delete or wire it. M / medium.
+- R32 DONE · `src/panel.ts` had no production importer (only `test/panel.spec.ts` +
+  a type import in `test/gui-fold.ts`); its guarantee never ran in production while the live
+  panel renders via `progress-tab.ts` + the bundle renderer (`test/panel-links.spec.ts`).
+  Deleted `src/panel.ts` (286 lines) + `test/panel.spec.ts` (557 lines); `test/gui-fold.ts`
+  now carries its own `PanelEvent` type for `test/progress.spec.ts`. Evidence
+  `.rsi/evidence/round-032/`.

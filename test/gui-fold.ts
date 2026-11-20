@@ -11,10 +11,14 @@
  * importing the browser bundle — is deliberate: a test must not claim to run the GUI,
  * and a DSH upgrade that changes the fold should fail these assertions loudly.
  *
- * `test/panel.spec.ts` runs our projection (`src/panel.ts`) next to this fold so the
- * two can be compared event by event.
+ * `test/progress.spec.ts` runs the recorded events through this fold to pin the
+ * stock component's grouping and status mapping.
  */
-import type { PanelEvent } from '../src/panel.js'
+/** One recorded session event, in the shape a reader gets it back. */
+export interface PanelEvent {
+  readonly type: string
+  readonly data: Readonly<Record<string, unknown>>
+}
 
 /** One folded member row, exactly as the component models it. */
 export interface FoldedMember {

@@ -4694,3 +4694,18 @@ HANDOFF 里点名的第一条遗留不确定性）。选题前与树对表：`sr
 `docs/RELEASING.md` 的版本规则不发版、不打标签，`CHANGELOG.md` 也不加条目（`[Unreleased]` 保持空，
 表示没有用户可见变化待发布）。代价是 `lib/checkpoint/schema.js` 会随注释重建但版本号不变——这正是
 `npm run verify:lib` 的意义所在（提交后复核见 `verify-lib-post.txt`）。
+
+## Round 84 — 2026-11-20 — R32：删 `src/panel.ts` 死代码（`CONFIRMED`，未发版）
+
+**主题**：POOL `Open questions` 的 H 项——先证实（`src/` 零 import、`index.ts` 不导出、
+bundle 不用；唯一引用是自有测试 + gui-fold 的类型 import），再删除。
+活面板走 `progress-tab.ts` + bundle 渲染器（`panel-links.spec.ts` 钉住），用户可见行为不变。
+
+**改动**：删 `src/panel.ts` + `test/panel.spec.ts`；`test/gui-fold.ts` 自带类型。
+删减理由与迁移见 CHANGELOG `[Unreleased]` Removed 双语条。
+
+**命令与结果（`CONFIRMED`，本树实跑）**：`test/progress.spec.ts` 12 passed；
+`npm run ci` exit 0 = **67 文件 / 1223 测试 PASS**；typecheck 0 错，oxlint 24w/0e；
+`npm run verify:lib` 153 files byte-identical。证据 `.rsi/evidence/round-032/`。
+
+**未验证（`NOT_RUN`）**：真机 GUI；真实定时投递。
