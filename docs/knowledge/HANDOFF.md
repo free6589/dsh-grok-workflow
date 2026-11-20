@@ -5,10 +5,11 @@
   `DTSTART:20261120T073657Z` + `FREQ=MINUTELY;INTERVAL=60;COUNT=969`；`--verify-row` 现在 **`ARMED`**，
   `covered=963` = `remaining=963`，末次 `2026-12-30T15:36:57Z`（`.rsi/evidence/harness/final-state.txt`）。
   写本记录前的实测是 `NOT_ARMED`（`verify-row-live.txt`：`COUNT=10`、`covered=4`）。
-- **仍缺一次动作（`CONFIRMED` 的缺口）**：这一行的 `prompt` 还是旧的 3,239 字符那份，不含
-  `heartbeat-guard.sh` / `--round auto` / `--max-rounds 1000` / `HARNESS.md`（`armed-row.txt`）。
-  投递会来、轮次有限，但跑的是旧纪律。补齐要一次 `schedule_edit`（`prompt` = `.rsi/HEARTBEAT-PROMPT.md`
-  标记之间的正文，2,319 字符）；本轮无权执行。
+- **prompt 也已换成常量那份（`CONFIRMED`，14:44）**：先是旧的 3,239 字符（`armed-row.txt`），
+  随后一次 `schedule_edit` 把它换成 `.rsi/HEARTBEAT-PROMPT.md` 的正文——实测 `prompt_len=2319`，
+  含 `heartbeat-guard.sh`、`--round auto`、`--max-rounds 1000`、`top_next`
+  （`armed-verified.txt`）。门禁在干净树上 `RESUME next_round=38`。
+  两次上弦都不是本轮执行的（子代理无 `schedule_*`）；本轮交付的是「一次调用 + 可复核」。
   上弦要一条调用，参数由 `node .rsi/tools/iterate-plan.mjs --arm-spec` 打印（槽名 `RSI heartbeat`、
   行 id、`rrule`、prompt 文件与字符数）；`DTSTART` 是按当前时钟算的，**调用前重跑一次**再粘贴。
   上完用 `--verify-row` 复核（exit 0 = ARMED / 21 = NOT_ARMED / 22 = 读不到宿主存储）。

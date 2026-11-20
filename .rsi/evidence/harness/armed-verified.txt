@@ -1,0 +1,22 @@
+# captured 2026-11-20T14:45:14+08:00 at 695672f
+verify status=ARMED title="RSI heartbeat" remaining=963
+verify row=schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab COUNT=969 delivered=6 covered=963 last=2026-12-30T15:36:57.000Z
+verify check title ok: row schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab carries the slot title
+verify check rule-parsed ok: COUNT=969, INTERVAL=60
+verify check within-row-maximum ok: COUNT=969 vs row maximum 1000
+verify check covers-remaining-budget ok: 963 round(s) left in the row (COUNT 969 - 6 delivered) vs 963 remaining
+verify check has-a-future-occurrence ok: last occurrence 2026-12-30T15:36:57.000Z vs now 2026-11-20T06:45:14.577Z
+verify store=/home/fish/.dsh/storages/schedule.json
+verify detail=row schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab still owes 963 round(s) at 60-minute steps, last one 2026-12-30T15:36:57.000Z
+VERIFY_EXIT=0
+row title          RSI heartbeat
+row rrule          DTSTART:20261120T073657Z\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=969
+row prompt_len     2319
+prompt mentions 'heartbeat-guard.sh': True
+prompt mentions '--round auto': True
+prompt mentions '--max-rounds 1000': True
+prompt mentions 'top_next': True
+prompt mentions 'HARNESS.md': False
+## guard with the round derived from the records
+RESUME code=none next_round=38 threshold=3 max_rounds=1000 blocked_streak=0 round_max=37 ledger_max=37 dirty_tracked=0 report_open=0 unclosed_skips=0
+GUARD_EXIT=0

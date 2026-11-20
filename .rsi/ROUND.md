@@ -1158,9 +1158,15 @@ no history is rewritten, and no round is force-pushed.
 - `--verify-row` → **`ARMED`**，`covered=963` = `remaining=963`，末次 `2026-12-30T15:36:57Z`
   （`.rsi/evidence/harness/final-state.txt`，exit 0）。
 - 行仍是槽名 `RSI heartbeat`、6 次历史投递保留、`COUNT=969 ≤ rowMaxRounds 1000`。
-- **缺口（必须记下）**：行的 `prompt` 仍是旧的 3,239 字符那份（首行 `# RSI heartbeat — self-iteration round`），
-  不含 `heartbeat-guard.sh`、`--round auto`、`--max-rounds 1000`、`HEARTBEAT-PROMPT`、`HARNESS.md`
-  任何一项（`.rsi/evidence/harness/armed-row.txt`）。也就是说：**投递会发生、轮次有限（969 次），
-  但这 963 轮跑的仍是旧 prompt 的纪律，不是本轮这份**。补齐它需要第二次 `schedule_edit`
-  （`prompt` = `.rsi/HEARTBEAT-PROMPT.md` 标记之间的正文，实测 2,319 字符），本轮无权执行。
+- **先记下、随后被补齐的缺口**：14:37 那一刻行的 `prompt` 还是旧的 3,239 字符那份（首行
+  `# RSI heartbeat — self-iteration round`），不含 `heartbeat-guard.sh` / `--round auto` /
+  `--max-rounds 1000` / `HEARTBEAT-PROMPT`（`.rsi/evidence/harness/armed-row.txt`）——投递会发生、
+  轮次有限，但跑的是旧纪律。**14:44 已由第二次 `schedule_edit` 补齐**：`prompt_len=2319`，且实测
+  含 `heartbeat-guard.sh`、`--round auto`、`--max-rounds 1000`、`top_next`
+  （`.rsi/evidence/harness/armed-verified.txt`）。两次上弦都不是本轮执行的（子代理无 `schedule_*`），
+  本轮做的是**把它变成可测**：`--arm-spec` 给出那一次调用的全部参数，`--verify-row` 事后判定
+  `ARMED`/`NOT_ARMED`/`UNKNOWN`，缺什么字段就报哪个 check 失败。
+- **门禁就绪（`CONFIRMED`）**：`heartbeat-guard.sh --round auto --max-rounds 1000` 在干净树上
+  `RESUME next_round=38`（`round_max=37 ledger_max=37`），即下一轮就是第 38 轮，第 1001 轮会被
+  `round-cap` 拒绝（`.rsi/evidence/harness/armed-verified.txt`、`guard-cap.txt`）。
 
