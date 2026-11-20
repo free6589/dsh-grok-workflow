@@ -15,6 +15,13 @@ Last updated: 2026-11-20 11:10 +08:00 (**round-032：删零调用的面板投影
 `npm run ci` exit 0 = **67 文件 / 1223 测试 PASS**（-13 例皆所删模块自有测试）；
 `npm run verify:lib` 153 files byte-identical。**已发版 `0.12.7`**：commit `56e701d`、annotated tag `v0.12.7` 已推，远端 CI `44666191493` success、Release `44666195466` success（asset `dsh-grok-workflow-0.12.7.tgz`）。）
 
+Last updated: 2026-11-20 12:10 +08:00 (**round-034：双重转义的折行 base64 块，未发版** —
+HEAD 上真换行折行 1–24 列已全盖（round 33），活缺口是已带字面 `\n` 的日志行再包一层 JSON
+（反斜杠加倍，单反斜杠断行分支对不上）。`BASE64_BREAK` 加双反斜杠分支 +1 用例；
+报告/提示词两边界同走 `REDACTION_RULES`，无分叉。
+`npm run ci` exit 0 = **68 文件 / 1232 测试 PASS**（基线 68/1231，+1）；
+`lib/redact.*` 随 `src/` 重建。**未提交、未发版、未打 tag**——等收尾发版。）
+
 Last updated: 2026-11-20 10:20 +08:00 (**round-031：检查点「拒绝带」上限的注释多算了 129 字节** —
 行为自 round 27 起就是对的（写入侧双向按 `maxBytes` 收敛），错的是注释：完整性记录不是固定 129 字节，
 而是 **122 字节 + `bytes` 的十进制位数**（4,000 字节载荷配 126 字节、1,048,447 配 129 字节），所以

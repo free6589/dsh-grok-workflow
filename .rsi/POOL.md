@@ -44,11 +44,11 @@ here and are marked DONE when their commit lands.
   `test/redact.spec.ts` pins eight fold widths for both armors, the JSON-field fold and the
   no-over-reach cases; on the pre-round source the two positive cases leak the whole block.
   Evidence `.rsi/evidence/round-033/`.
-- P · A base64 blob folded to **7 columns or fewer** is still left alone: at that width a
-  continuation line cannot be told apart from a word of prose, and the rule's floor is the eight
-  characters a `w >= 8` fold puts on every line (`src/redact.ts`, `BASE64_BLOB_END`). Covering it
-  needs a width-aware pass (a decode and re-encode probe) rather than one regex. S / low (real
-  `base64` wraps at 76 and `-w0` does not wrap at all).
+- R34 DONE · Narrow real-newline folds (1–24 cols) already redacted since round 33; the live gap
+  was **double-escaped** breaks (a pre-escaped `\n` log line wrapped in another JSON layer doubles
+  every backslash, which the single-backslash break branch could not match). `BASE64_BREAK` gained
+  the double-backslash branch; `test/redact.spec.ts` pins the 24-col double-encoded shape.
+  Evidence `.rsi/evidence/round-034/`. Residual: triple-or-deeper escaping (no measured shape).
 
 ## Configuration (`src/config.ts`, `src/settings.ts`, `src/index.ts`)
 

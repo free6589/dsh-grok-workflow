@@ -4750,3 +4750,22 @@ commit/tag/CI/Release 均取自已提交记录，无编造）后门禁码变为 
 收尾段必须带 status。对旧账本该用例 **1 failed**（`expected [2,3,…,25] to include 32`），补行后
 **5 passed**。这类缺陷此前没有任何测试会变红——门禁三轮 `SKIP` 就升级为 `stall-unclosed` 的
 `STOP`，而全套测试仍然是绿的。
+
+## Round 86 — 2026-11-20 — R34：双重转义的折行 base64 块（`CONFIRMED`，未发版）
+
+**主题**：POOL 池顶窄折行项。先实测定界：HEAD 上真换行折行 1–24 列已全部脱敏
+（round 33 的容忍断行标记已覆盖），池里"≤7 列留存"是基于修前旧码的过时描述。
+活着的缺口是双重转义——已带字面 `\\n` 的日志行再被 `JSON.stringify` 包一层，
+反斜杠加倍，`BASE64_BREAK` 的单反斜杠分支匹配不上，整块原文落进报告。
+
+**改动**：`src/redact.ts` `BASE64_BREAK` 加双反斜杠分支 + 注释（两层覆盖、三层不跟、
+散文误伤同级）；`test/redact.spec.ts` +1 用例（24 列折行 + 双重 stringify，
+断言脱敏、无 20+ 残留、JSON 可解析）。`script.ts` 按 `pattern.source` 镜像，
+两边界同步。
+
+**命令与结果（`CONFIRMED`，本树实跑）**：新用例旧码上 **1 failed**（整块原文）；
+修后 `test/redact.spec.ts` **41 passed**（基线 40）；`npm run ci` exit 0 =
+**68 文件 / 1232 测试 PASS**；typecheck 0 错，oxlint 24w/0e。证据
+`.rsi/evidence/round-034/`（`green-spec-run.txt`、`ci.txt`，无密钥）。
+
+**未验证（`NOT_RUN`）**：真机 GUI；真实定时投递；三重及以上转义。

@@ -1027,3 +1027,22 @@ no history is rewritten, and no round is force-pushed.
   JSON `\n` 转义与真实换行之外的其它转义形态。
 - **建议版本**：patch → `0.12.8`（安全修复，行为向后兼容；CHANGELOG 记 Fixed 双语）。
 - **status:** OK
+
+## Round 34 — 2026-11-20 — 双重转义的折行 base64 块整块落进报告（`CONFIRMED`，patch `0.12.9`）
+
+- **选题（R2）**：POOL 池顶 P 项——窄折行 base64 块的残留。先实测再定界：HEAD 上真换行
+  折行 1–24 列**全部已脱敏**（round 33 的修复已覆盖），池里"≤7 列留存"是基于修前旧码的
+  过时描述。活着的缺口是**双重转义**：已带字面 `\n` 的日志行再被包进另一层 JSON，
+  反斜杠加倍成 `\\n`，`BASE64_BREAK` 的单反斜杠分支对不上，整块原文落进报告。
+- **改动**：`src/redact.ts` `BASE64_BREAK` 加第三分支（双反斜杠+n），注释说明两层覆盖
+  与三层不跟的原因；`test/redact.spec.ts` +1 用例（24 列折行 + 双重 stringify，
+  断言脱敏、无残留、JSON 可解析）。同一份 `REDACTION_RULES` 被 `script.ts` 按 source
+  镜像，报告边界与提示词边界同步，无分叉（D-088 方向不变）。
+- **红绿（`CONFIRMED`，本树实跑）**：新用例在旧码上 **1 failed**（整块原文落进输出）；
+  修后 `test/redact.spec.ts` **41 passed**（基线 40）；`npm run ci` exit 0 =
+  **68 文件 / 1232 测试 PASS**（干净树基线 68/1231，+1，无既有断言被放宽），typecheck 0 错，
+  oxlint 24w/0e；`npm run verify:lib` 提交后复核。
+- **证据**：`.rsi/evidence/round-034/`（`green-spec-run.txt`、`ci.txt`）。
+- **未验证（`NOT_RUN`）**：真机 GUI 手点；真实定时投递；三重及以上转义。
+- **建议版本**：patch → `0.12.9`（安全修复，行为向后兼容；CHANGELOG 记 Fixed 双语）。
+- **status:** OK
