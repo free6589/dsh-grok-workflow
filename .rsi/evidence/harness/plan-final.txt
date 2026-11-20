@@ -1,0 +1,7 @@
+# final state at 39eda66 · captured 2026-11-20T14:37:06+08:00
+plan shape=single total=1000 used=37 remaining=963
+arms=1 interval=60 guard_args="--max-rounds 1000 --threshold 3" status=OPEN
+arm 1/1 rounds=963 rounds_window=38..1000
+arm 1/1 rrule=DTSTART:20261120T073707Z\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=963
+envelope maxConcurrency=10/100 retries=1/3
+EXIT=0

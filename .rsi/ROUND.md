@@ -1148,3 +1148,19 @@ no history is rewritten, and no round is force-pushed.
   会与它抢版本号，故不在本轮发版（`0.12.12` 已由并发进程发出，指向 `61c7cb8`）。
 - **建议版本**：patch（下一个 patch 带上本轮的 `roles` 收紧）。
 - **status:** OK
+
+### 更正（同日 14:37，`CONFIRMED`）——行已经上弦了，且 prompt 不是新的常量那份
+
+写上面「未上弦」时 `--verify-row` 确为 `NOT_ARMED`；14:36:57 有人用一次 `schedule_edit` 把同一行
+（`schedule-0bbbef5f-…`）的 `rrule` 改成 `DTSTART:20261120T073657Z` +
+`RRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=969`。现在实测：
+
+- `--verify-row` → **`ARMED`**，`covered=963` = `remaining=963`，末次 `2026-12-30T15:36:57Z`
+  （`.rsi/evidence/harness/final-state.txt`，exit 0）。
+- 行仍是槽名 `RSI heartbeat`、6 次历史投递保留、`COUNT=969 ≤ rowMaxRounds 1000`。
+- **缺口（必须记下）**：行的 `prompt` 仍是旧的 3,239 字符那份（首行 `# RSI heartbeat — self-iteration round`），
+  不含 `heartbeat-guard.sh`、`--round auto`、`--max-rounds 1000`、`HEARTBEAT-PROMPT`、`HARNESS.md`
+  任何一项（`.rsi/evidence/harness/armed-row.txt`）。也就是说：**投递会发生、轮次有限（969 次），
+  但这 963 轮跑的仍是旧 prompt 的纪律，不是本轮这份**。补齐它需要第二次 `schedule_edit`
+  （`prompt` = `.rsi/HEARTBEAT-PROMPT.md` 标记之间的正文，实测 2,319 字符），本轮无权执行。
+

@@ -1,9 +1,14 @@
 ## 2026-11-20 — 1000 轮现在只需**一次**上弦；本轮同时是 harness 管着跑的第一轮（round 37，`D-093` / `A42`）
 
 - **From:** agent-103（并发子代理，harness 任务 attempt 2）· **To:** 操作者 / 下一轮接手者
-- **上弦（唯一未完成项，一次动作）**：预算、计划、门禁、复核都已就位，但**没有行在跑**。
-  实测 `node .rsi/tools/iterate-plan.mjs --verify-row` → `NOT_ARMED`：现存行 `schedule-0bbbef5f-…`
-  标题 `RSI heartbeat`、`COUNT=10`、已投递 6、`covered=4`，而剩余 **963** 轮（`.rsi/evidence/harness/verify-row-live.txt`）。
+- **上弦（`CONFIRMED`，14:36:57 已发生）**：同一行 `schedule-0bbbef5f-…` 的 `rrule` 已被改成
+  `DTSTART:20261120T073657Z` + `FREQ=MINUTELY;INTERVAL=60;COUNT=969`；`--verify-row` 现在 **`ARMED`**，
+  `covered=963` = `remaining=963`，末次 `2026-12-30T15:36:57Z`（`.rsi/evidence/harness/final-state.txt`）。
+  写本记录前的实测是 `NOT_ARMED`（`verify-row-live.txt`：`COUNT=10`、`covered=4`）。
+- **仍缺一次动作（`CONFIRMED` 的缺口）**：这一行的 `prompt` 还是旧的 3,239 字符那份，不含
+  `heartbeat-guard.sh` / `--round auto` / `--max-rounds 1000` / `HARNESS.md`（`armed-row.txt`）。
+  投递会来、轮次有限，但跑的是旧纪律。补齐要一次 `schedule_edit`（`prompt` = `.rsi/HEARTBEAT-PROMPT.md`
+  标记之间的正文，2,319 字符）；本轮无权执行。
   上弦要一条调用，参数由 `node .rsi/tools/iterate-plan.mjs --arm-spec` 打印（槽名 `RSI heartbeat`、
   行 id、`rrule`、prompt 文件与字符数）；`DTSTART` 是按当前时钟算的，**调用前重跑一次**再粘贴。
   上完用 `--verify-row` 复核（exit 0 = ARMED / 21 = NOT_ARMED / 22 = 读不到宿主存储）。

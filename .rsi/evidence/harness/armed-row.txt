@@ -1,0 +1,13 @@
+# the heartbeat row as the Host stores it (read-only inspection, prompt text not printed)
+id             schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab
+title          RSI heartbeat
+rrule          DTSTART:20261120T073657Z\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=969
+scheduledAt    2026-11-20T07:36:57.000Z
+deliveries     6
+prompt_len     3239
+prompt first line: # RSI heartbeat — self-iteration round
+prompt mentions 'heartbeat-guard.sh': False
+prompt mentions '--round auto': False
+prompt mentions '--max-rounds 1000': False
+prompt mentions 'HEARTBEAT-PROMPT': False
+prompt mentions 'HARNESS.md': False
