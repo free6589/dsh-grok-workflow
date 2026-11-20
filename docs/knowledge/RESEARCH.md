@@ -1190,3 +1190,32 @@ Source: 只读审计 + 本轮新增实现与单测。依据 = `src/guardian.ts`�
   so `writeCheckpoint`'s file bound is what caps a legal payload. The comment added to
   `src/checkpoint/schema.ts` says "…and 1,048,576" — 129 bytes loose, cosmetic only, left
   untouched because editing shipped source after the tag would make `lib/` differ from `v0.12.3`.
+
+## A34 — How a base64-wrapped key hides from every armor rule, and what detects it (2026-11-20, round 29)
+
+- **Why this entry exists:** `.rsi/POOL.md` carried one redaction entry (`P · Base64-wrapped PEM has
+  no rule`) since the 2026-11-18 audits. Re-checked against `HEAD ce856cb` before choosing the round:
+  it was still true — `src/redact.ts` has exactly two armor rules (`private-key` `:27`,
+  `pgp-private-key` `:31`) and both match the literal banner, which a base64 blob does not contain.
+- **Why the wrap defeats the table (`CONFIRMED`, measured this round):** base64 encodes independent
+  3-byte groups into 4 characters, so the banner only exists after decoding. Two consequences: (a)
+  the name-based rules are the only accidental catch, and they fire only when a secret-named label
+  precedes the blob — `PRIVATE_KEY=<blob>` *was* redacted before this round (by `key-value`, as
+  `[REDACTED]`), which is exactly why the defect hides: a neutral label (`tool result: <blob>`) or a
+  JSON key such as `k` left the whole key in the report; (b) the same PEM embedded at source byte
+  offset 0, 1 or 2 of a larger blob starts its banner in a different 4-character group, so one literal
+  is not enough.
+- **The three encodings (`CONFIRMED`):** for `-----BEGIN PRIVATE KEY`, bytes 3..17
+  (`---BEGIN PRIVATE`) encode as `LS1CRUdJTiBQUklWQVRF` (offset 0), `LUJFR0lOIFBSSVZBVEUg`
+  (offset 1) and `QkVHSU4gUFJJVkFURSBL` (offset 2). Probe: blobs built with 0/1/2/5/10 leading bytes
+  each hit exactly one marker, and the alignment follows `prefix length mod 3`.
+- **Boundaries measured, not assumed:** a base64 `CERTIFICATE` blob, base64 PGP armor, a PNG-encoded
+  blob, a JWT and prose are all unchanged by the new rule; one 1 MB single-run base64 blob redacts in
+  **8.5 ms** and 12,000 short runs (492 KB) in **5.3 ms**, so the lookbehind plus greedy-run shape is
+  linear enough for report-sized text. A wrapped blob is consumed line by line while each continuation
+  carries at least 16 characters; a final line shorter than that keeps a fragment of the block's
+  footer (public bytes), which is documented in `docs/ARCHITECTURE.md` rather than papered over.
+- **Why the mirror stays free:** `src/script.ts` builds `WORKFLOW_SCRIPT` from `REDACTION_RULES` at
+  module load, so the new rule reaches the prompt-side redactor with no second edit — `lib/script.js`
+  is byte-identical after the rebuild while `lib/redact.js` changes. `test/redact.spec.ts`'s parity
+  corpus gained one base64 sample, so host/script equality is pinned over the new shape too.

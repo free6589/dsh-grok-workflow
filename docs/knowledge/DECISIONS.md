@@ -1946,3 +1946,42 @@ model selector」）、`test/loop-brakes.spec.ts`（35 条）、`test/loop-runti
 - **Consequences:** a rule for future fields — *a validator bound on a writer-produced quantity is
   read off the writer*, and a test that only builds a small payload cannot see this class of defect.
   `test/checkpoint-schema.spec.ts` now sizes a payload across the boundary instead of shrinking it.
+
+## D-085 — An encoded credential is matched in its encoded form; the rule table stays pure regex
+
+- **Status:** CONFIRMED
+- **Date:** 2026-11-20 (round 29)
+- **Decision:** the base64-wrapped PEM gap is closed by a *rule in the existing table*
+  (`base64-private-key`) that matches the banner's base64 encoding, not by a decode-and-inspect
+  pass inside `redactSecrets`. The rule spells out the banner's three possible encodings, one per
+  base64 group alignment, and replaces the whole blob including the continuation lines of a
+  wrapped blob.
+- **Why the rule table and not a decode pass:** `src/script.ts` renders `REDACTION_RULES` into the
+  generated workflow script (`redactionRulesSource`), so prompt-side redaction and report-side
+  redaction share one table by construction and `test/redact.spec.ts` pins them equal over a
+  corpus. A decode pass would live in `redactSecrets` only, leaving the prompt boundary weaker
+  than the report boundary — the opposite of what the boundary needs — unless the pass were also
+  emitted as a source snippet into the script template, which adds a second hand-maintained copy —
+  the failure mode `A32` records for the iteration template's three copies.
+- **Why three encodings and not one:** base64 emits independent 4-character groups of 3 source
+  bytes, so the same PEM text embedded at byte offset 0/1/2 of a larger blob starts its banner in a
+  different group and produces three different encoded forms. Measured in round 29: prefixes of 0,
+  1, 2, 5 and 10 bytes each hit exactly one marker of the three. Matching bytes 3..17 (i.e.
+  `---BEGIN PRIVATE`) rather than bytes 0.. keeps each marker independent of the bytes before it.
+- **What is deliberately not covered:** base64 *PGP armor* (the two banners diverge at byte 11, so
+  it needs its own three markers — pooled), base64 `CERTIFICATE` blocks (public material, and the
+  rule must not turn ordinary log noise into a false redaction), and a wrapped blob whose final
+  line is shorter than 16 characters, which keeps a fragment of the block's *footer*, not key
+  material, because the tail of the encoding is the end of the block.
+- **Alternatives rejected:**
+  1. Decode every ≥N-character base64 run and inspect the bytes — linear and exact, but host-only
+     (see above) and it turns redaction into a parser, which the module's "safety net, not a
+     license" framing does not support.
+  2. One marker only, for the aligned case — misses the embedded blob, which is the shape that
+     occurs when a key file sits inside a larger dump.
+  3. Loosen the continuation threshold to catch short final lines — swallows the first word of the
+     next line when that word is base64-shaped (`next`), i.e. over-redaction of prose; and the
+     fragment it recovers is public footer bytes.
+- **Consequences:** adding an encoded shape costs three literals, and the doc-family test now pins
+  `base64` in both READMEs and `docs/ARCHITECTURE.md` so the promise cannot rot. `redactSecrets`
+  stays a table walk, so rule order still decides overlaps.

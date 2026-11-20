@@ -1,4 +1,4 @@
-# RSI State (overwritten every round; keep under 100 lines)
+Updated: 2026-11-20T09:45+08:00 · round 29 (base64-wrapped private key) · `npm run ci` 68 files / 1233 tests PASS · release `0.12.5` in flight
 
 Updated: 2026-11-20T08:45+08:00 · round 27 (checkpoint read-side byte bound) · **released
 `0.12.3`**: commit `fd6a5ee`, tag `v0.12.3`, CI `44647313571`, Release `44647317251` ·
@@ -7,6 +7,17 @@ restarted) · previous releases `v0.12.2` (`40228c5`, CI `44641153858`, Release 
 and `v0.12.1` (`23d3369`, CI `44595376323`, Release `44595391505`)
 
 ## Facts
+
+- Round 29 (this round): a base64-wrapped PEM (`base64 -w0` key file, JSON field, blob inside a
+  larger encoding) reached reports verbatim — every armor rule matched the decoded banner, and
+  only a secret-named label (`PRIVATE_KEY=`) happened to catch it. New rule `base64-private-key`
+  matches the banner's encoded form at all three group alignments, replaces the whole blob
+  including wrapped continuation lines; base64 `CERTIFICATE` and base64 PGP armor stay untouched.
+  Red/green: on the pre-fix source the two positive cases fail with the whole key body in the
+  output; 35 passed after (+3 over baseline). D-085, A34, VALIDATION Round 79.
+  Evidence `.rsi/evidence/round-029/`. Heartbeat row: `status: active`, single owner, one real
+  delivery confirmed, but `COUNT=10` hourly ends 2026-11-20T10:01:50Z — not through 2026-12-01,
+  and this session cannot touch `schedule_*` (subagent refusal).
 
 - Round 27 (this round): `assertCheckpoint` bounded `integrity.bytes` with `countCeiling`
   (1,000,000, a row-count backstop) while `sealCheckpoint` accepts payloads up to `maxBytes`

@@ -1,0 +1,28 @@
+# Read-only snapshot of the host Schedule store (no credentials; ids are local session ids)
+# file: ~/.dsh/storages/schedule.json, read via node fs (schedule_list is refused for a delegated subagent)
+
+id: schedule-12eadb13-49c0-4479-9ac2-0d0e8e7ff1d0
+  target(row): {"kind":"session","sessionId":"session-a52a4e1d-e601-494e-990d-7ad2cea40ed8"}
+  title: "派发个人助理灵感箱"
+  status: active
+  target(record): undefined
+  involvedSessionIds: ["session-03c7307d-fa30-454d-bf9d-269f55777cd4","session-a52a4e1d-e601-494e-990d-7ad2cea40ed8"]
+  rrule: DTSTART;TZID=Asia/Singapore:20261117T090000 ~ RRULE:FREQ=DAILY;BYHOUR=9,13,18,22;BYMINUTE=0
+  scheduledAt: 2026-11-20T05:00:00.000Z
+  promptChars: 500
+  lastDelivery: scheduledAt=2026-11-20T01:00:00.000Z deliveredAt=2026-11-20T01:00:00.185Z
+
+id: schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab
+  target(row): {"kind":"session","sessionId":"session-3a683cb6-1eaa-4b33-9eb9-57e1ef0b955b"}
+  title: "RSI heartbeat"
+  status: active
+  target(record): undefined
+  involvedSessionIds: ["session-3a683cb6-1eaa-4b33-9eb9-57e1ef0b955b"]
+  rrule: DTSTART:20261120T010150Z ~ RRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=10
+  scheduledAt: 2026-11-20T02:01:50.000Z
+  promptChars: 3239
+  lastDelivery: scheduledAt=2026-11-20T01:01:50.000Z deliveredAt=2026-11-20T01:02:00.707Z
+
+Conclusion: the RSI heartbeat row exists, is active, has exactly one owning session and one
+confirmed real delivery, but its rrule (FREQ=MINUTELY;INTERVAL=60;COUNT=10) ends on
+2026-11-20T10:01:50Z, so it does NOT sustain rounds through 2026-12-01.

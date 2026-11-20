@@ -4562,3 +4562,30 @@ oxlint 24w/0e；`npm run verify:lib` 153 文件一致。证据 `.rsi/evidence/ro
 | `tag -a v0.12.4` + `push main` + `push tag` | 成功，无 force-push，旧标签未动 |
 | 远端 CI `44652383452` | success |
 | Release `44652387975` | success；Release `Grok Workflow for DSH v0.12.4` + asset `dsh-grok-workflow-0.12.4.tgz` |
+
+## Round 79 — 2026-11-20 — round-029：base64 包裹的私钥原先整块落进报告（`CONFIRMED`）
+
+**选题**：`POOL.md` 里红脱敏一节的 `P · Base64-wrapped PEM has no rule`（文档序上第一条非 DONE
+项；按 PROTOCOL 的优先级属「功能错误」，泄漏面）。选题前与树对表：`src/redact.ts` 仍只有两条
+armor 规则（`:27` `private-key`、`:31` `pgp-private-key`），都匹配解码后的横幅，base64 块里根本
+不存在该横幅——条目成立，未陈旧。
+
+**病与它的隐身方式**：`PRIVATE_KEY=<base64>` 这种带敏感名的写法，旧代码其实被 `key-value` 规则
+顺手改成 `[REDACTED]`；所以缺陷只在「标签中性」时暴露（`tool result: <blob>`、JSON 里的 `k`），
+整把私钥原样进报告。三组 base64 分组对齐（源字节偏移 0/1/2）各产生一种编码，一种字面量不够。
+
+**改动**：`src/redact.ts` 新增 `base64-private-key` 规则（三条对齐标记，匹配整个 blob 含换行续行）；
+`docs/ARCHITECTURE.md` 覆盖清单与「已知缺口」段、两份 README 安全条目同步；`lib/redact.js` 随
+`src/` 重建（`lib/script.js` 字节不变——脚本在模块加载时从 `REDACTION_RULES` 渲染，规则自动跟着走）。
+
+**红绿（`CONFIRMED`，本树实跑）**：在 `HEAD ce856cb` 的 detached worktree 里跑新 spec
+`npx vitest run test/redact.spec.ts -t "base64"` → **2 failed / 1 passed / 32 skipped**，
+失败输出是真泄漏：`expected 'tool result: LS0tLS1CRUdJTiBQUklWQVRF…' to contain '[REDACTED PRIVATE KEY]'`，
+收到的整串就是 base64 私钥体。同文件在新代码上 **35 passed**（基线 32，+3）。
+第三个新用例（base64 `CERTIFICATE`、PNG 块不动）在两侧都绿——它是防误伤守卫，不是修复探针。
+
+**门禁**：`npm run ci` exit 0 = **68 文件 / 1233 测试 PASS**（基线 1230，只增不减），
+`typecheck` 0 错，`oxlint` 24w/0e；`npm run verify:lib` = 153 files byte-identical。
+
+**未验证（`NOT_RUN`）**：真机 GUI 手动把一段 base64 私钥喂给运行的插件看报告；
+真实定时投递（D-066 属操作者动作，本会话是子代理，`schedule_*` 工具被拒）。

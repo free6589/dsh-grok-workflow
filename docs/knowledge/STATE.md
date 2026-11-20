@@ -1,3 +1,15 @@
+Last updated: 2026-11-20 09:45 +08:00 (**round-029：base64 包裹的私钥不再原样进报告** —
+每条 armor 规则匹配的都是解码后的横幅，所以 `base64 -w0` 的密钥文件、或藏在 JSON 字段/blob 里的
+base64 私钥整块进报告；旧代码只在前面恰好有敏感名标签（`PRIVATE_KEY=`）时才被 `key-value` 顺手
+挡住。新规则 `base64-private-key` 匹配横幅的编码形态，三种分组对齐全盖，整块替换含换行续行；
+base64 `CERTIFICATE` 与被 base64 包裹的 PGP armor 有意不动（后者仍是池里的缺口）。
+`npm run ci` exit 0 = **68 文件 / 1233 测试 PASS**（基线 1230，+3）；typecheck 0 错、oxlint 24w/0e、
+`verify:lib` 153 files byte-identical。红绿：旧码 worktree 里新用例 2 failed / 1 passed，失败输出
+就是整串 base64 私钥体。文档：`DECISIONS.md` D-085、`RESEARCH.md` A34、`VALIDATION.md` Round 79、
+`ARCHITECTURE.md` 覆盖清单与已知缺口、两份 README 安全条目。证据 `.rsi/evidence/round-029/`。
+NOT_RUN：真机 GUI 手点、真实定时投递（子代理被拒 `schedule_*`；现有心跳行 `COUNT=10` 只到
+2026-11-20T10:01:50Z，撑不到 12-01，需主会话续订）。）
+
 Last updated: 2026-11-20 09:10 +08:00 (**round-028 收口：R11，CI 全绿，未发版** —
 取消终结不再走 `relayText`（成功前言+markers+折叠台账），改说人话结论；
 `phase1-dialogue` 3 个旧断言随行为同步更新（行为断言未动）。

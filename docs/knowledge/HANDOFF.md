@@ -1,5 +1,25 @@
 # Agent Handoff
 
+## 2026-11-20 — round-029：base64 包裹的私钥不再原样进报告（`CONFIRMED`，发版 `0.12.5`）
+
+- **From:** agent-70（RSI round 29 子代理）· **To:** 下一轮接手者 / 用户
+- **选题（`CONFIRMED`）**：`POOL.md` 红脱敏一节第一条非 DONE 项（`P · Base64-wrapped PEM has no
+  rule`）。选题前与 `HEAD ce856cb` 对表：`src/redact.ts` 只有 `:27`/`:31` 两条 armor 规则，都匹配
+  解码后的横幅，条目成立。
+- **本轮改动**：新规则 `base64-private-key`（三条分组对齐标记，整块替换含续行）；
+  `docs/ARCHITECTURE.md` 覆盖清单 + 已知缺口段；两份 README 安全条目；`lib/redact.js` 重建。
+  细节见 `DECISIONS.md` D-085、`RESEARCH.md` A34、`VALIDATION.md` Round 79。
+- **红绿**：旧码 worktree 里新用例 **2 failed / 1 passed**，失败输出就是整串 base64 私钥体；
+  新码 **35 passed**（基线 32）。`npm run ci` **68 文件 / 1233 测试 PASS**，`verify:lib` 153 files
+  一致。证据 `.rsi/evidence/round-029/`。
+- **心跳行状态（`CONFIRMED`，只读核对 `~/.dsh/storages/schedule.json`）**：`RSI heartbeat` 行存在、
+  `status: active`、只归属 `session-3a683cb6…`、prompt 3239 字符；`lastDelivery` 显示
+  2026-11-20T01:01:50Z 投递成功（首次真实投递成立）。**但 rrule 是
+  `FREQ=MINUTELY;INTERVAL=60;COUNT=10`，最后一次落在 2026-11-20T10:01:50Z——撑不到 2026-12-01。**
+  子代理会话被宿主拒绝使用 `schedule_*` 工具（`A delegated subagent cannot use scheduled tasks`），
+  故「armed through 2026-12-01」这条只能由主会话/操作者续订（延长到 12-01 或改成每日 rrule）。
+- **未验证（`NOT_RUN`）**：真机 GUI 手点、把 base64 私钥喂给运行中的插件看报告。
+
 ## 2026-11-20 — `0.12.4` 已发版（round-028：R11）
 
 - **From:** RSI 心跳轮（本会话）· **To:** 用户 / 下一轮接手者

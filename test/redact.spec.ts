@@ -219,6 +219,57 @@ describe('redaction shapes the earlier rules missed', () => {
     expect(output).toContain('after')
   })
 
+  it('redacts a base64-wrapped private key at every byte alignment', () => {
+    const pem = [
+      '-----BEGIN PRIVATE KEY-----',
+      'MIIEvQIBADANBgkqhkfakeKEYBODY',
+      '-----END PRIVATE KEY-----',
+      '',
+    ].join('\n')
+    const encode = (text: string) => Buffer.from(text, 'utf8').toString('base64')
+    // Base64 emits 4-character groups of 3 source bytes, so a PEM body embedded
+    // at source byte offset 0/1/2 begins its banner in a different group. Before
+    // this rule none of the three forms was touched: the armor only exists after
+    // decoding, and every rule above matches the decoded banner. The blob carries
+    // a neutral label on purpose — a `PRIVATE_KEY=` name would be caught by the
+    // name rules, which is exactly the case that hides this defect.
+    for (const prefix of ['', 'Z', 'ZZ']) {
+      const blob = encode(prefix + pem.replace(/\n/g, ''))
+      const output = redactSecrets(`tool result: ${blob}`)
+      expect(output).toContain('[REDACTED PRIVATE KEY]')
+      expect(output).not.toContain('LS0tLS1CRUdJTi')
+      // No base64 debris survives, so no part of the encoded key remains.
+      expect(output.match(/[A-Za-z0-9+/]{20,}/)).toBeNull()
+    }
+    // A base64 key in a JSON field keeps the document parseable.
+    const json = redactSecrets(JSON.stringify({ k: encode(pem.replace(/\n/g, '')) }))
+    expect(json).not.toContain('LS0tLS1CRUdJTi')
+    expect(JSON.parse(json)).toEqual({ k: '[REDACTED PRIVATE KEY]' })
+  })
+
+  it('redacts a wrapped base64 key across its continuation lines', () => {
+    // 89 body bytes make the encoded blob exactly three 64-character lines, so
+    // the whole blob is full-width wraps — the shape a bare `base64` produces.
+    const pem = `-----BEGIN PRIVATE KEY-----\n${'M'.repeat(89)}\n-----END PRIVATE KEY-----\n`
+    const blob = Buffer.from(pem, 'utf8').toString('base64')
+    expect(blob).toHaveLength(192)
+    const wrapped = blob.replace(/(.{64})/g, '$1\n').trimEnd()
+    const output = redactSecrets(`Private key dump:\n${wrapped}\nnext line stays`)
+    expect(output).toContain('[REDACTED PRIVATE KEY]')
+    expect(output).toContain('next line stays')
+    expect(output.match(/[A-Za-z0-9+/]{20,}/)).toBeNull()
+  })
+
+  it('leaves base64 public material and unrelated blobs alone', () => {
+    const encode = (text: string) => Buffer.from(text, 'utf8').toString('base64')
+    // Redaction over-reach is noise: a public certificate and an ordinary image
+    // blob are not secrets, and the three banner encodings must not match them.
+    const certificate = encode('-----BEGIN CERTIFICATE-----\nMIIBfakeCertBody\n-----END CERTIFICATE-----\n')
+    const png = encode(`\x89PNG\r\n\x1a\n${'x'.repeat(64)}`)
+    expect(redactSecrets(`cert ${certificate}`)).toBe(`cert ${certificate}`)
+    expect(redactSecrets(`img ${png}`)).toBe(`img ${png}`)
+  })
+
   it('keeps the rest of the line and an already-redacted placeholder intact', () => {
     // `;user=app` used to be swallowed by an unterminated env value.
     expect(redactSecrets('db_pass=hunter2;user=app')).toBe('db_pass=[REDACTED];user=app')
@@ -415,6 +466,7 @@ describe('prompt redaction parity', () => {
     `jwt ${fake('eyJhbGciOiJIUzI1NiJ9', '.eyJzdWIiOiIxMjM0NTY3ODkwIn0', '.signature12345')}`,
     '-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBg\n-----END PRIVATE KEY-----',
     '-----BEGIN PGP PRIVATE KEY BLOCK-----\nlQOYBFfakeArmoredBody\n-----END PGP PRIVATE KEY BLOCK-----',
+    `PRIVATE_KEY=${Buffer.from('-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkfakeBODY\n-----END PRIVATE KEY-----\n', 'utf8').toString('base64')}`,
     `curl -H 'Cookie: PHPSESSID=abc123def456' https://example.test`,
     'https://bucket.s3.amazonaws.com/o?X-Amz-Signature=FAKESIGNATUREVALUE&X-Amz-Expires=900',
     'https://storage.googleapis.com/o?X-Goog-Signature=FAKESIGNATUREVALUE',
@@ -463,6 +515,7 @@ describe('documentation names the covered credential families', () => {
     'X-Amz-Signature',
     'X-Goog-Signature',
     'userinfo',
+    'base64',
   ]
   const docs = ['README.md', 'README.zh-CN.md', 'docs/ARCHITECTURE.md']
 

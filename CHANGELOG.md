@@ -5,6 +5,25 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.12.5] - 2026-11-20
+
+### Fixed / 修复
+
+- **A base64-wrapped private key is redacted instead of being printed verbatim / base64 包裹的私钥不再原样落进报告** —
+  every armor rule matched the decoded banner, so a key file that had been `base64 -w0`'d, or that
+  sat base64-encoded in a JSON field or a larger blob, reached reports, diagnostics and
+  verifier/retry prompts with the whole key body intact. It was caught only when a secret-named
+  label happened to precede the blob (`PRIVATE_KEY=…`), which is why the gap stayed invisible in
+  ordinary logs. The rule table now matches the banner's encoded form at all three base64 group
+  alignments and replaces the whole blob, continuation lines of a wrapped blob included. Public
+  material is left alone: base64 `CERTIFICATE` blocks and base64-wrapped PGP armor (still a
+  documented gap) are untouched.
+  / 所有 armor 规则匹配的都是解码后的横幅，所以被 `base64 -w0` 处理过的密钥文件、或藏在 JSON
+  字段/更大 blob 里的 base64 私钥，会带着完整密钥体进报告、诊断信息和复查/重试提示词。只有当 blob
+  前面恰好有敏感名标签（`PRIVATE_KEY=…`）时才被顺手挡住——这正是它在普通日志里隐身的原因。现在规则
+  表匹配横幅的**编码形态**（三种 base64 分组对齐全盖），整块替换，带换行的续行一并吃掉。公开材料
+  不动：base64 的 `CERTIFICATE` 块与被 base64 包裹的 PGP armor（仍是已记录的缺口）保持原样。
+
 ## [0.12.4] - 2026-11-20
 
 ### Fixed / 修复

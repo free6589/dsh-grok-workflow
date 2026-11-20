@@ -36,6 +36,26 @@ export const REDACTION_RULES: readonly RedactionRule[] = [
     replacement: '[REDACTED PRIVATE KEY]',
   },
   {
+    // A key file that was `base64 -w0`'d, or that sits base64-encoded inside a
+    // JSON field or a larger blob, carries no banner the rules above can see:
+    // the armor only exists after decoding. Match the *encoded* banner instead.
+    // Base64 emits independent 4-character groups of 3 source bytes, so a PEM
+    // body embedded at an unknown byte offset starts its banner in a different
+    // group: there are three possible starting offsets and each yields a
+    // different 20-character literal. All three are spelled out below, taken
+    // from bytes 3..17 of `-----BEGIN PRIVATE KEY` ("---BEGIN PRIVATE") so no
+    // literal depends on the bytes that precede the block. No ordinary base64
+    // text or prose contains one of them by chance.
+    // Both the blob before the banner and the rest of it are replaced, so no
+    // key material survives; continuation lines of a wrapped blob are consumed
+    // while the first non-base64 line ends the match. A base64-wrapped PGP
+    // armor and a base64 `CERTIFICATE` are therefore left alone on purpose: the
+    // former is a known gap, the latter is public material (`docs/ARCHITECTURE.md`).
+    name: 'base64-private-key',
+    pattern: /(?<![A-Za-z0-9+/])[A-Za-z0-9+/]*(?:LS1CRUdJTiBQUklWQVRF|LUJFR0lOIFBSSVZBVEUg|QkVHSU4gUFJJVkFURSBL)[A-Za-z0-9+/=]*(?:\r?\n[A-Za-z0-9+/=]{16,})*/g,
+    replacement: '[REDACTED PRIVATE KEY]',
+  },
+  {
     name: 'jwt',
     pattern: /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g,
     replacement: '[REDACTED JWT]',

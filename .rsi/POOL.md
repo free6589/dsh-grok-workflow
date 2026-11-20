@@ -17,8 +17,18 @@ here and are marked DONE when their commit lands.
   Re-checked against HEAD `fd241c8`; nothing left to do here.
 - STALE (round 27) · `renderHistory` now redacts a bounded window first and truncates
   after (`src/history.ts:97-109`), which is the order the defect asked for.
-- P · Base64-wrapped PEM has no rule (a `BEGIN PRIVATE KEY` body that is itself
-  base64 of a PEM block). Recorded in `docs/ARCHITECTURE.md` as a known gap. S / low.
+- R29 DONE · Base64-wrapped PEM had no rule: a `BEGIN PRIVATE KEY` body that is itself base64
+  (`base64 -w0` key file, a JSON field, a blob inside a larger encoding) reached the report
+  verbatim, because every armor rule matched the *decoded* banner and the `key-value` rules only
+  catch it when a secret-named label happens to precede it. New `base64-private-key` rule matches
+  the banner's encoded form at all three base64 group alignments and replaces the whole blob
+  (continuation lines of a wrapped blob included); a base64 `CERTIFICATE` and base64 PGP armor
+  are deliberately untouched. `test/redact.spec.ts` pins the three alignments, the wrapped shape,
+  JSON parseability and the no-over-reach cases; on the pre-fix source the two positive cases
+  leak the whole blob. Evidence `.rsi/evidence/round-029/`.
+- P · Base64-wrapped *PGP armor* (`BEGIN PGP PRIVATE KEY BLOCK` after decoding) still has no rule:
+  the round-29 marker set is the PEM banner only, because the two armors diverge at byte 11.
+  Adding it needs three more alignment markers. S / low.
 
 ## Configuration (`src/config.ts`, `src/settings.ts`, `src/index.ts`)
 
@@ -104,9 +114,15 @@ here and are marked DONE when their commit lands.
   the writer's bound; `test/checkpoint-schema.spec.ts` sizes a payload across the boundary
   (481 max-width evidence rows = 1,001,015 bytes). Evidence `.rsi/evidence/round-027/`.
 
-- P · `integrity.bytes` is bounded by `countCeiling` (1,000,000) on read but `maxBytes`
-  (1,048,576) on write (`schema.ts:59`, `:859`), so a legal payload in between writes fine and
-  reads back `invalid`. S / low.
+- STALE (round 29) · "`integrity.bytes` is bounded by `countCeiling` (1,000,000) on read but
+  `maxBytes` (1,048,576) on write" — fixed in round 27 (`fd6a5ee`); both sides use `maxBytes`.
+  The entry above it (R27 DONE) is the record; this duplicate stayed behind.
+- P · The comment added in round 27 says the refused band runs to 1,048,576, but a sealed file
+  carries a 129-byte integrity record, so `writeCheckpoint`'s file bound caps a legal payload at
+  **1,048,447** (`schema.ts:59`). Cosmetic-only, but it is the carried uncertainty A33 recorded
+  as "left untouched because editing shipped source after the tag would make `lib/` differ from
+  `v0.12.3`" — `0.12.5` rebuilds `lib/` anyway, so that reason no longer applies and the one-line
+  correction is ready for its own round. S / low.
 - R10 DONE · `durationMs` is gated on `msCeiling` (`wiring.ts:784-790`, `schema.ts:624`), fixed in
   round 22 and shipped in `0.11.20`.
 - P · `recordableTimeoutMs`'s upper guard is vacuous (`msCeiling === MAX_SAFE_INTEGER`), so a
