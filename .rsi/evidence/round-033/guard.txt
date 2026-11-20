@@ -1,0 +1,1 @@
+RESUME code=none next_round=34 threshold=3 max_rounds=0 blocked_streak=0 round_max=33 ledger_max=33 dirty_tracked=0 report_open=0 unclosed_skips=0
