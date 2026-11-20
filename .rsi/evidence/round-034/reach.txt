@@ -1,0 +1,13 @@
+# over-reach probe, working tree build
+# command: node .rsi/evidence/round-034/reach-probe.mjs
+
+PGP public break="\n" redacted=false
+PGP public break="\\n" redacted=false
+PGP public break="\\\\n" redacted=false
+CERTIFICATE break="\n" redacted=false
+CERTIFICATE break="\\n" redacted=false
+CERTIFICATE break="\\\\n" redacted=false
+prose untouched = true
+PRIVATE break="\n" redacted=true parses=true
+PRIVATE break="\\n" redacted=true parses=true
+PRIVATE break="\\\\n" redacted=true parses=true

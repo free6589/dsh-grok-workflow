@@ -46,10 +46,13 @@ const BASE64_PRIVATE_KEY_WINDOWS: readonly string[] = [
 ]
 
 /**
- * A line break inside a folded blob: a real newline, or the two-character `\n` escape a
- * JSON string carries once the blob sits in a field (`{"keyring":"LS0t…\nJTiB…"}`).
+ * A line break inside a folded blob: a real newline, the two-character `\n` escape a
+ * JSON string carries once the blob sits in a field (`{"keyring":"LS0t…\nJTiB…"}`),
+ * or that escape doubled (`\\n`) when an already-escaped log line is forwarded inside
+ * another JSON document. A third layer would need its own branch; two covers the
+ * forwarded-log shape without turning the break into "any backslashes".
  */
-const BASE64_BREAK = '(?:\\r?\\n|\\\\n)'
+const BASE64_BREAK = '(?:\\r?\\n|\\\\n|\\\\\\\\n)'
 
 /**
  * Where a folded blob can end. Requiring one of these after a continuation line is what

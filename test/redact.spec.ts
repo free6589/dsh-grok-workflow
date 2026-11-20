@@ -338,6 +338,21 @@ describe('redaction shapes the earlier rules missed', () => {
     expect(parsed.note).toBe('keep')
   })
 
+  it('redacts a folded base64 key that arrives double-escaped', () => {
+    // A log line that already carries `\n` escapes, forwarded inside another JSON
+    // document, doubles every backslash: the separators read `\\n` (two chars
+    // backslash + n, twice). Before this round the break rule only knew the single
+    // form, so the whole encoded block reached the report verbatim.
+    const pem = `-----BEGIN PRIVATE KEY-----\n${'M'.repeat(89)}\n-----END PRIVATE KEY-----\n`
+    const blob = Buffer.from(pem, 'utf8').toString('base64')
+    const folded = (blob.match(/.{1,24}/g) ?? []).join('\\n')
+    const input = 'forwarded: ' + JSON.stringify({ log: folded })
+    const output = redactSecrets(input)
+    expect(output).toContain('[REDACTED PRIVATE KEY]')
+    expect(output).not.toContain('LS0tLS1CRUdJTi')
+    expect(output.match(/[A-Za-z0-9+/]{20,}/)).toBeNull()
+  })
+
   it('leaves a narrow-folded public key and certificate alone', () => {
     // Fold tolerance must not become fold-driven over-reach: the public banner shares
     // `-----BEGIN PGP P` with the private one, and a certificate is public material.

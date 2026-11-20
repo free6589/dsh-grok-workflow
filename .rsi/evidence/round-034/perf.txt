@@ -1,0 +1,5 @@
+# perf A/B, HEAD build vs working tree build (median of 12)
+# command: git show HEAD:lib/redact.js > /tmp/r34/redact-head.mjs && node .rsi/evidence/round-034/perf-probe.mjs /tmp/r34/redact-head.mjs
+
+174000 B prose: baseline 9.14 ms -> now 9.08 ms (x0.99)
+adversarial 42039 B: now 2.48 ms

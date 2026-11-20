@@ -5,6 +5,19 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.12.9] - 2026-11-20
+
+### Fixed / 修复
+
+- **A double-escaped folded base64 key is redacted instead of leaking verbatim / 双重转义的折行 base64 密钥不再原文落进报告** —
+  a log line that already carries literal `\n` breaks, forwarded inside another JSON document,
+  doubles every backslash; the break rule only knew the single form, so the whole encoded block
+  reached reports verbatim. The break now also matches the doubled form; single, real-newline and
+  double-escaped folds are all pinned by `test/redact.spec.ts`.
+  / 已带字面 `\n` 断行的日志行再被包进另一层 JSON，反斜杠会加倍；断行规则只认单层形式，
+  整块编码原文落进报告。现在连双重转义也认，单层/真换行/双重转义三种折行都有用例钉住。
+
+
 ## [0.12.8] - 2026-11-20
 
 ### Fixed / 修复

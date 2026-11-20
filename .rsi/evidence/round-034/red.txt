@@ -1,0 +1,33 @@
+# red proof: the round-34 test against HEAD's src/redact.ts (pre-round source)
+# command: git show HEAD:src/redact.ts > src/redact.ts && npx vitest run test/redact.spec.ts -t 'double-escaped'
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/redact.spec.ts > redaction shapes the earlier rules missed > redacts a folded base64 key that arrives double-escaped
+AssertionError: expected [ 'nIEtFWS0tLS0tCk1NTU1NTU1N', …(3) ] to be null
+
+- Expected:
+null
+
++ Received:
+[
+  "nIEtFWS0tLS0tCk1NTU1NTU1N",
+]
+
+ ❯ test/redact.spec.ts:353:48
+    351|     expect(output).toContain('[REDACTED PRIVATE KEY]')
+    352|     expect(output).not.toContain('LS0tLS1CRUdJTi')
+    353|     expect(output.match(/[A-Za-z0-9+/]{20,}/)).toBeNull()
+       |                                                ^
+    354|   })
+    355|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 40 skipped (41)
+   Start at  12:16:02
+   Duration  540ms (transform 318ms, setup 0ms, import 356ms, tests 50ms, environment 0ms)
+

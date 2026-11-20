@@ -1,0 +1,13 @@
+# green: test/redact.spec.ts on the working tree (41 = 40 baseline + 1 new)
+# command: npx vitest run test/redact.spec.ts
+
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+ ✓ test/redact.spec.ts (41 tests) 110ms
+
+ Test Files  1 passed (1)
+      Tests  41 passed (41)
+   Start at  12:16:23
+   Duration  596ms (transform 302ms, setup 0ms, import 343ms, tests 110ms, environment 0ms)
+

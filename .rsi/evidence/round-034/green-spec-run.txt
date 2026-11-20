@@ -1,0 +1,10 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+ ✓ test/redact.spec.ts (41 tests) 105ms
+
+ Test Files  1 passed (1)
+      Tests  41 passed (41)
+   Start at  12:08:26
+   Duration  485ms (transform 226ms, setup 0ms, import 267ms, tests 105ms, environment 0ms)
+
