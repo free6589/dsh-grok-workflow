@@ -1,3 +1,14 @@
+## 2026-11-20 — `0.12.13` 已发版（round-038：非字符串 model/provider）
+
+- **From:** RSI 心跳轮（本会话）· **To:** 用户 / 下一轮接手者
+- **发版（`CONFIRMED`）**：patch（fail-closed 收紧）。R38 提交 `7825ca7`（+证据 `490edce`）、
+  发版提交 `61c7cb8`、annotated tag `v0.12.13` 已推；远端 CI `44697135387` success、
+  Release `44697140006` success（asset `dsh-grok-workflow-0.12.13.tgz`）。
+  旧标签未动，无 force-push。
+- **内容**：非字符串 `model`/`provider` 拒绝带完整路径 + got-type。
+  `npm run ci` 69/1263 全绿。
+- **NOT_RUN**：真机 GUI；真实定时投递。本机 `web` profile 仍是旧版。
+
 ## 2026-11-20 — 1000 轮现在只需**一次**上弦；本轮同时是 harness 管着跑的第一轮（round 37，`D-093` / `A42`）
 
 - **From:** agent-103（并发子代理，harness 任务 attempt 2）· **To:** 操作者 / 下一轮接手者
