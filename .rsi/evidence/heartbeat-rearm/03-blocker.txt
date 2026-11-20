@@ -1,0 +1,37 @@
+Why this attempt could not perform the re-arm (three independent observations)
+captured: 2026-11-20T13:0x+08:00 (Asia/Singapore); this tree is being modified concurrently
+
+1) Schedule tools are closed to a delegated subagent. Two calls, same policy answer:
+   schedule_list()  -> {"code":"subagent_session","message":"A delegated subagent cannot use scheduled tasks."}
+   schedule_view(id=schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab) -> same JSON
+   schedule_create / schedule_edit are the same tool family and were not called again.
+
+2) The product path that writes this row is user-only by construction.
+   src/loop.ts:501-506   open() throws LoopError('loop/user-only', ...) whenever actorSessionId != undefined,
+                         i.e. for any agent: "a loop heartbeat can be opened only by the user from the
+                         composer switch; an agent cannot open one on the user's behalf".
+   src/index.ts:313-330  the 'RSI heartbeat' row is the second createLoopService instance (Iterate); it is
+                         reached only through the composer Self-iterate switch / POST /grok-workflow/iterate
+                         (src/loop-surface.ts:144-151). The only model-facing loop tool is grok_loop
+                         (src/loop.ts:132) and its 'open' action is refused by design.
+   src/loop.ts:522-541   a re-open with a different rounds/interval edits the existing row in place
+                         (line 523 compares interval and COUNT; 538 patches patch.timing.rrule) -- that is
+                         the re-arm mechanism, and it needs a user flip.
+
+3) The RSI round gate refuses to open a round on this tree, so no ledger/ROUND row could be written
+   for a re-arm even if one had happened (such a row would be exactly a skipped-gate row):
+   $ .rsi/tools/heartbeat-guard.sh --round 36 ; echo EXIT=$?
+SKIP code=dirty-tracked next_round=36 threshold=3 max_rounds=0 blocked_streak=0 round_max=35 ledger_max=35 dirty_tracked=2 report_open=0 unclosed_skips=0
+first uncommitted: lib/redact.js
+   EXIT=10  (10 = SKIP, 0 = RESUME, 20 = STOP)
+
+   The dirty files at capture time belong to the concurrent round-35 work, not to this attempt:
+   ## main...origin/main [ahead 1]
+    M lib/redact.js
+    M lib/redact.js.map
+   ?? .rsi/evidence/heartbeat-rearm/03-blocker.txt
+
+4) Concurrency note (observed, not inferred): a concurrent round-35 agent committed 0ef5bb7 at
+   2026-11-20T13:05+08:00 and swept this attempt's first three evidence files into that commit
+   (git show --stat 0ef5bb7 lists .rsi/evidence/heartbeat-rearm/00..02). This attempt committed
+   nothing, pushed nothing, and wrote no ledger or ROUND row.
