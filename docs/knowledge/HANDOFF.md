@@ -2249,3 +2249,29 @@ Issue #1 状态评论 issuecomment-6927842856。
   只对着载入期注释写**。
 - **Next action**：`src/delivery/index.ts:695` 与 `src/run.ts:141` 仍只列四个角色（同一类缺陷，
   review 顺带确认），各开一轮；P3-01/P3-02 仍未动；`src/index.ts:292` 注释仍 HYPOTHESIS。
+
+## 2026-11-20 — `/compact` 修复：全新 profile 端到端验收已补（`CONFIRMED`）
+
+- **From:** agent-6（执行代理）· **To:** 用户 / 下一轮接手者
+- **做了什么（`CONFIRMED`）**：补上修复提交 `5fb5da0` 缺的那一项验收——在**全新** DSH profile
+  里跑真实 `/compact`。`compactfix-verify`（`sdk` 模板，一次性 `DSH_HOME`）+
+  `dsh plugin add` 本检出；`.rsi/evidence/compact-e2e/drive.mjs` 用本地桩模型驱动一条团队档
+  消息（真实闸门 + 真实 workflow 引擎 + 真实 token meter），随后 `/compact` 两次都成功：
+  `Compacted 7 history items (~6140 tokens).`，0 条越界 assistant 行。
+- **门禁（`CONFIRMED`）**：`npm run ci` 在 `366d169` 干净 worktree exit 0 =
+  **70 文件 / 1269 测试**（24 warnings / 0 errors，`lib/` byte-identical）；回归
+  `test/compact-step-pairing.spec.ts` 6 passed；`scripts/repro-compact.mjs` exit 0。
+- **证据**：`.rsi/evidence/compact-e2e/`（`README.md`、`drive.mjs`、`fake-model.mjs`、
+  `run-team.json`、`run-team-2.json`、`run-before.json`、`run-orphan-compact.json`、
+  `repro-after.txt`、`prefix-orphan-journal.txt`）。
+- **没动**：`src/`、`test/`、`lib/`、版本号、tag、Release、profile（一次性 home 已删）；
+  并发写入者的未提交改动（`src/checkpoint/schema.ts`、`src/delivery/index.ts`、
+  `test/delivery-human-block.spec.ts`、`CHANGELOG.md`）未提交。
+- **BLOCKED（具体条件）**：SDK `session/resume` 读不了 headless 格式会话
+  （`SessionFormatError: system/message requires a protected first surface head`），所以没能在
+  profile 层把「已坏会话 → `/compact`」重放一遍；该 before/after 仍由
+  `scripts/repro-compact.mjs` 承担。
+- **Next action**：若要修**已坏**的历史会话，需要一条一次性迁移（重放时跳过/移出越界行），
+  这是新工作，不在本次修复范围内；另：`grokDefault` 默认 `off` 时闸门不接管消息，文档/README
+  若要讲「装好即生效」，应写明这一点。
+

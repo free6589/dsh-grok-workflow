@@ -1,0 +1,16 @@
+{
+  "profile": "sdk-after",
+  "home": "/home/fish/projects_mine/dsh-grok-workflow/.tmp/e2e-before-home",
+  "sessionId": "session-01125c86-ca4f-4f20-88c0-722fd85b55e7",
+  "resumed": true,
+  "teamTierRequested": false,
+  "initialize": {
+    "serverInfo": {
+      "name": "deepseek-harness-sdk-runtime",
+      "version": "0.0.1"
+    }
+  },
+  "error": "session \"session-01125c86-ca4f-4f20-88c0-722fd85b55e7\": stored log is corrupt: SessionFormatError: system/message requires a protected first surface head (raw log: /home/fish/projects_mine/dsh-grok-workflow/.tmp/e2e-before-home/sessions/--home-fish-projects_mine-dsh-grok-workflow--/session-01125c86-ca4f-4f20-88c0-722fd85b55e7/session.v4.jsonl.zstd)",
+  "dshStderrTail": [],
+  "ok": false
+}

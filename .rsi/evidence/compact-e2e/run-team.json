@@ -1,0 +1,45 @@
+{
+  "profile": "compactfix-verify",
+  "home": "/home/fish/projects_mine/dsh-grok-workflow/.tmp/e2e-home",
+  "sessionId": "17a94098-69c1-4046-a768-efb31e5783b5",
+  "teamTierRequested": true,
+  "initialize": {
+    "serverInfo": {
+      "name": "deepseek-harness-sdk-runtime",
+      "version": "0.0.1"
+    }
+  },
+  "prompt": {
+    "kind": "prompt",
+    "messageId": "797283cc-49b8-443b-970a-2f838e31e172"
+  },
+  "wait": {},
+  "compact": {
+    "kind": "command",
+    "execution": {
+      "commandId": "cmd-d57db15a-1",
+      "result": {
+        "kind": "success",
+        "text": "Compacted 7 history items (~6140 tokens).",
+        "sourceEventSeq": 29
+      }
+    }
+  },
+  "assistantTexts": [
+    "A local deterministic answer for the compact verification run.",
+    "A local deterministic answer for the compact verification run.",
+    "A local deterministic answer for the compact verification run."
+  ],
+  "pairing": {
+    "orphanAssistantRows": [],
+    "checkedEvents": 77
+  },
+  "meterErrorInCompact": false,
+  "pluginEvents": [],
+  "turnEnded": true,
+  "dshStderrTail": [
+    "(node:19) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time",
+    "(Use `node --trace-warnings ...` to show where the warning was created)"
+  ],
+  "ok": true
+}

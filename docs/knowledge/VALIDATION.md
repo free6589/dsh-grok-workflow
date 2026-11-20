@@ -62,6 +62,54 @@ shape for an assistant row outside a step. The texts are kept as terminal record
 dispose/delivery records still carry the facts. Follow-up pooled: render them from a legal
 channel (progress panel / a client-rendered notice row).
 
+## `/compact` in a fresh DSH profile — end-to-end verification, 2026-11-20 (`CONFIRMED`)
+
+The acceptance that the component repro cannot give: a **new** DSH profile with the fixed
+plugin installed as a bundle row, a real team-tier turn, then the real `/compact` command.
+
+**Environment:** `dsh --version` → `0.2.2-rc.3`; Node.js 26.8.1; plugin = this checkout at
+`366d169` (0.12.13, `link:` install); profile `compactfix-verify` created from the `sdk`
+template in a throw-away `DSH_HOME` (`.tmp/e2e-home`, gitignored, deleted afterwards).
+
+**Real vs mocked:** everything except the model. The profile, Loader, `agent/pre-step`
+gate, agent loop, session journal, token meter and the command registry are the installed
+DSH. The model is `fake-model.mjs`, a local OpenAI-completions stub (the one boundary
+`AGENTS.md` allows mocking); the route's key env var holds a placeholder, never a credential.
+Activation is observed, not assumed: `request/header.tools` contains `grok_workflow`, and
+the run emits `tool-workflow/run-start` / `agent-start` / `agent-end`.
+
+| command | result |
+| --- | --- |
+| `dsh --profile compactfix-verify --from-default-profile sdk --dump-config` | exit 0 — fresh profile, `workflow-ptc` enabled |
+| `DSH_HOME=.tmp/e2e-home dsh plugin --profile compactfix-verify add "$PWD"` | exit 0 — `dsh-grok-workflow link:../../../..`, bundle row `grok-workflow` in `--dump-config` |
+| `node .rsi/evidence/compact-e2e/drive.mjs --home .tmp/e2e-home --profile compactfix-verify --team` (run 1) | exit 0 — team-tier turn ran; `/compact` → `{kind:"success", text:"Compacted 7 history items (~6140 tokens)."}`; 77 events, **0** out-of-step `assistant/message` (`.rsi/evidence/compact-e2e/run-team.json`) |
+| same command (run 2) | exit 0 — same `/compact` text; 55 events, **0** out-of-step rows (`run-team-2.json`) |
+| `node scripts/repro-compact.mjs` at `366d169` | exit 0 — writer `refused`, `measure.ok = true`, `/compact` → `No compactable history yet.` (`repro-after.txt`) |
+| `npx vitest run test/compact-step-pairing.spec.ts` (clean worktree at `366d169`) | exit 0 — 6 tests pass |
+| `npm run ci` (clean worktree at `366d169`, `node_modules` linked) | exit 0 — typecheck 0; oxlint 24 warnings / 0 errors; `lib/ at 366d169 is the build of src/ at 366d169 (153 files, byte-identical)`; **70 files / 1269 tests pass** |
+
+**Pre-fix journal the harness can see:** a `headless` profile carrying the pre-fix build
+(`39eda66`) and the same message leaves the defect class the meter rejects — an
+`assistant/message` after `turn/end` with no `step/start` behind it
+(`prefix-orphan-journal.txt`): `session-01125c86-…` seq 40 and `session-d86b5415-…` seq 25,
+both `source=workflow-notice`. The fixed build's fresh-profile runs produce none.
+
+**Limits (`CONFIRMED` / `BLOCKED`):**
+
+- `grokDefault` must be `on`; at the default `off` the gate returns `pass: mode-off` and the
+  turn exercises nothing. The first attempt did exactly that (tool list still showed
+  `grok_workflow`), so activation and gate engagement are reported separately.
+- The orphaned session was **not** re-driven through `/compact` at profile level: the SDK
+  runtime refuses to load a headless-format session before any command runs —
+  `SessionFormatError: system/message requires a protected first surface head`
+  (`run-orphan-compact.json`). The command-level before/after remains
+  `scripts/repro-compact.mjs` (component harness).
+- The fix prevents new orphans; it does not repair journals that already carry one, and no
+  migration is claimed.
+- The interactive (`sdk`/web) admission delivers the team-tier first answer through
+  `enterAfter`, so it never calls the receipt writer; the writer is exercised by the
+  blocking path (headless) and by `test/compact-step-pairing.spec.ts`.
+
 ## Round 36 — narrow base64 folds, footer boundary, and a suite that passes on a clean tree (`CONFIRMED`)
 
 | command | result |

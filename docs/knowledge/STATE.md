@@ -1653,3 +1653,32 @@ worker 链上限 50（HARD_LIMITS.chainLength）
   同日更早几次共享树是红的，红点全在并发写入者的半成品（设置页语法错、`test/client.spec.ts`
   的 `TS2304`、配置面 5 文件），与本修复无关。
 - **未做**：真机 GUI 连发两条（`NOT_RUN`，本树有并发写入者，留给收尾组）；commit/push/发版未授权。
+
+## 2026-11-20 — `/compact` 修复在「全新 DSH profile」里的端到端验收（`CONFIRMED`）
+
+- **前提（`CONFIRMED`）**：`HEAD` = `366d169`（0.12.13）；本机 `dsh --version` = `0.2.2-rc.3`，
+  Node 26.8.1。工作树里 `src/checkpoint/schema.ts`、`src/delivery/index.ts`、
+  `test/delivery-human-block.spec.ts`、`CHANGELOG.md` 是并发写入者的未提交改动，本轮
+  **没有**提交它们；测试在 `.tmp/verify-head`（`366d169` 的干净 worktree，`node_modules` 软链）
+  里跑，避开这些半成品。
+- **做了什么（`CONFIRMED`）**：新建 `compactfix-verify`（`sdk` 模板 + 一次性 `DSH_HOME`
+  `.tmp/e2e-home`），`dsh plugin add` 把本检出装成 bundle 行；用
+  `.rsi/evidence/compact-e2e/drive.mjs` 起一个本地 OpenAI-completions 桩模型（唯一 mock 边界），
+  经 SDK 的 `session/query` 发一条团队档消息（真实 `agent/pre-step` 闸门 → 真实 workflow 引擎），
+  再发真实 `/compact`。两次运行都 exit 0：`Compacted 7 history items (~6140 tokens).`，
+  日志里 0 条越界 `assistant/message`。激活不是推断：`request/header.tools` 含
+  `grok_workflow`，且出现 `tool-workflow/run-start|agent-start|agent-end`。
+- **门禁（`CONFIRMED`）**：`npm run ci` 在 `366d169` 干净 worktree exit 0 —— typecheck 0、
+  oxlint 24 warnings / 0 errors、`lib/ at 366d169 … (153 files, byte-identical)`、
+  **70 文件 / 1269 测试 PASS**；`npx vitest run test/compact-step-pairing.spec.ts` 6 passed；
+  `node scripts/repro-compact.mjs` exit 0（writer `refused`，`/compact` success）。
+- **对照（`CONFIRMED`）**：pre-fix 构建（`39eda66`）的 `headless` profile 跑同一条消息，
+  日志里留下越界行 `session-01125c86-…` seq 40、`session-d86b5415-…` seq 25
+  （`source=workflow-notice`）——正是计量器拒绝的那一类；修复后的 fresh-profile 运行没有。
+- **未验证 / `BLOCKED`**：想用 SDK `session/resume` 把那条 pre-fix 日志直接喂给 `/compact`，
+  被拒：`SessionFormatError: system/message requires a protected first surface head`
+  （headless 会话格式与 SDK 读取器不兼容）。因此「命令层 before/after」仍以
+  `scripts/repro-compact.mjs` 为准，不是 profile 重放。
+- **边界**：修复只防新增越界行，**不修复**已经写坏的历史会话（无迁移，未声称有）；
+  `grokDefault` 必须为 `on`，否则闸门 `pass: mode-off`（首次尝试即如此，工具已注册但消息没被接管）。
+
