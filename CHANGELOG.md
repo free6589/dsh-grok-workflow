@@ -5,6 +5,23 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Fixed / 修复
+
+- **The narrow-fold rule now has the tests that pin it, and the documented footer rule is the
+  measured one / 窄折行规则补上钉住它的用例，页脚规则改为实测口径** —
+  `0.12.10` shipped the rule that redacts a base64 key blob folded to seven columns or fewer, but
+  the assertions that came with it were withdrawn in `0.12.11` (they failed as committed). They are
+  restored in a corrected form: fold widths 1–7 redact on the report and the prompt boundary, a
+  final line of seven characters survives as the armor's footer while eight is consumed, two
+  consecutive short lines are read as a narrow fold and one is not, and the base64 PGP banner is
+  asserted at both boundaries. The architecture doc's stale "16-character threshold / narrower than
+  24 columns is not matched at all" prose now states the measured rule.
+  / `0.12.10` 已发出「折到七列及以下的 base64 密钥块也会被脱敏」的规则，但随附的断言在
+  `0.12.11` 被撤回（提交上去的版本本身是红的）。现在以修正后的形式补回：折行 1–7 列在报告与提示词
+  两侧都脱敏，末行七个字符作为页脚保留、八个字符即被吃掉，连续两行短行按窄折行处理、单行不处理，
+  base64 的 PGP 横幅在两侧都有断言。架构文档里过期的「16 字符阈值 / 窄于 24 列完全不匹配」已按实测
+  规则改写。
+
 ## [0.12.11] - 2026-11-20
 
 ### Fixed / 修复
