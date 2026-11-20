@@ -1,4 +1,4 @@
-Updated: 2026-11-20T14:20+08:00 · round 37 (roles shape refused; harness now needs ONE arming action) · `npm run ci` 69 files / 1261 tests PASS · code commit `eb61ac8` · harness commit `621f2ab` · no release this round (`0.12.12` was published by the concurrent agent on `61c7cb8`)
+Updated: 2026-11-20T14:20+08:00 · round 37 (roles shape refused; harness now needs ONE arming action) · `npm run ci` 69 files / 1262 tests PASS · code commit `eb61ac8` · harness commit `621f2ab` · no release this round (`0.12.12` was published by the concurrent agent on `61c7cb8`)
 
 Previous rounds: `0.12.8`/`9f91684` (33, CI `44670766356`, Release `44670771402`) · `0.12.7`/`56e701d` (32) · `0.12.6`/`e7150ab` (30, CI `44659057507`, Release `44659061505`) · `0.12.5`/`5b7cae1` (29, CI `44656151053`, Release `44656153854`) · `0.12.4`/`5cd2b1c` (28, CI `44652383452`, Release `44652387975`) · `0.12.3`/`fd6a5ee` (27, CI `44647313571`, Release `44647317251`) · `0.12.2`/`40228c5` · `0.12.1`/`23d3369` — per-round detail lives in `.rsi/ROUND.md`, `.rsi/LOG.md` and `.rsi/ledger.jsonl`.
 ## Facts
@@ -17,7 +17,7 @@ Previous rounds: `0.12.8`/`9f91684` (33, CI `44670766356`, Release `44670771402`
   `.rsi/HEARTBEAT-PROMPT.md` (measured 2,319 chars), and `heartbeat-guard.sh --round auto` (round from
   `ROUND.md`/`ledger.jsonl`, higher wins, +1). Measured on this host: `--verify-row` → `NOT_ARMED`,
   `covered=4` vs `remaining=965` — the loop is still unarmed, and that is now a measurement, not a claim.
-  `npm run ci` 69 files / 1261 tests PASS. `D-093`, `A42`. Evidence `.rsi/evidence/harness/`.
+  `npm run ci` 69 files / 1262 tests PASS. `D-093`, `A42`. Evidence `.rsi/evidence/harness/`.
 - Round 34 (this round): a log line that already carries literal `\n` breaks, forwarded inside another
   JSON document, doubles every backslash; `BASE64_BREAK` only knew the single form, so a folded base64
   private-key block reached reports verbatim (measured on the pre-round source: the new case keeps a
