@@ -11,6 +11,7 @@ Real commands and results only. Do not add expected results here.
 | `node .rsi/evidence/round-036/fold-floor-probe.mjs` (fixed build) | widths 1–4 leave 4/4/3/4 chars, 5–24 leave 0–6; footer: tail 7 survives, tail 8 consumed; report and prompt realm identical at every width |
 | same probe in a worktree built at `91ed287` | widths 1–7 leave 244–252 of 272 encoded chars; at width 7 the leftover decodes back to the banner and the key body (`.rsi/evidence/round-036/prefix-fold-floor-probe.txt`) |
 | `npm run ci` in a clean worktree at `e3be559` | exit 0 — `Test Files 68 passed (68)`, `Tests 1236 passed (1236)`; `verify:lib` printed `lib/ at e3be559 is the build of src/ at e3be559 (153 files, byte-identical)` |
+| `npm run ci` in a clean worktree at `aabed51` (HEAD, after the concurrent harness commit) | exit 0 — `Test Files 69 passed (69)`, `Tests 1251 passed (1251)`; `verify:lib` printed `lib/ at aabed51 is the build of src/ at aabed51 (153 files, byte-identical)` |
 | `npm run ci` in the working tree | exit 1 — 68 files passed, `test/heartbeat-guard.spec.ts` 1 failed / 1250 passed. Cause is the concurrent process's uncommitted `.rsi/HEARTBEAT.md` (`--max-rounds 1000` prompt line) and its guard script, not this round |
 | `npx vitest run test/heartbeat-guard.spec.ts` in a clean worktree at `d181812` | 14 passed — the failure above does not exist without the concurrent uncommitted change |
 | performance, single run | 112,123-char 5-column fold 1 ms; 94,665-char 76-column fold 1 ms; 100 KB adversarial (`a_` × 50,000) unchanged |

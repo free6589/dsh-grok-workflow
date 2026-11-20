@@ -51,7 +51,8 @@ round 33/34 没看出来，是因为断言只解码「≥4 字符的残留片段
 | A/B：`git show 91ed287:src/redact.ts` 覆盖后跑同一 spec | **1 failed**（`fold 1 kept encoded material: expected 252 to be less than 8`），其余 43 passed |
 | `node .rsi/evidence/round-036/fold-floor-probe.mjs`（修后） | 宽 1–4 残留 4/4/3/4，5–24 残留 0–6；页脚 7 留、8 吃；两侧逐字相同 |
 | 同脚本在 `91ed287` 的 worktree 构建上 | 宽 1–7 残留 244–252（`.rsi/evidence/round-036/prefix-fold-floor-probe.txt`） |
-| `npm run ci`（干净 worktree @ `e3be559`） | **exit 0**：68 文件 / 1236 测试 PASS，`verify:lib` 153 files byte-identical |
+| `npm run ci`（干净 worktree @ `e3be559`，仅本轮改动） | **exit 0**：68 文件 / 1236 测试 PASS，`verify:lib` 153 files byte-identical |
+| `npm run ci`（干净 worktree @ `aabed51`，即当前 HEAD，含并发进程的 harness 轮） | **exit 0**：**69 文件 / 1251 测试 PASS**，`verify:lib` byte-identical |
 | 性能（同机单跑） | 112,123 字符 5 列折行块 1 ms；94,665 字符 76 列块 1 ms；100 KB 对抗输入仍在既有上限内 |
 
 **工作树里的 `npm run ci` 是 1 failed / 1250 passed（69 文件）**：失败的是

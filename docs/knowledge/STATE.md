@@ -6,7 +6,8 @@ Last updated: 2026-11-20 13:38 +08:00 (**round-036：base64 折行低于续行�
 删除；`test/redact.spec.ts` +3 用例（折行 1–7 两侧、页脚 7/8 两侧、base64 PGP 两侧边界）。
 checkpoint 上界 1,048,447 的注释与用例属 round 31（`a97d099`），本轮复核通过、未改动（`A41`、`D-091`）。
 代码提交 `e3be559`；干净 worktree 上 `npm run ci` exit 0 = **68 文件 / 1236 测试 PASS**、
-`verify:lib` 153 files byte-identical。**未发版**（`0.12.10`/`0.12.11` 由并发进程发出，规则随 `0.12.10` 已在线上）。
+`verify:lib` 153 files byte-identical；HEAD `aabed51`（含并发 harness 轮）上 `npm run ci` exit 0 =
+**69 文件 / 1251 测试 PASS**。**未发版**（`0.12.10`/`0.12.11` 由并发进程发出，规则随 `0.12.10` 已在线上）。
 
 Last updated: 2026-11-20 12:05 +08:00 (**round-033：手工折行的 base64 私钥整块落进报告；顺带修好账本滞后** —
 `base64-private-key` 的窗口原是连续 20 字符字面量，任何窄于它的折行都把标记自身拆开，实测

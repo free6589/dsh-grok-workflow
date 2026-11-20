@@ -122,6 +122,11 @@ stall rule bounds even that.
 - The budget is a ceiling, not a target: `PROTOCOL.md`'s stop conditions end the loop before 1000
   rounds if the pool has nothing worth doing. "Keep going because rounds remain" is the failure this
   budget exists to prevent, not a goal.
+- **A round counts when it is recorded.** Both the plan and the guard read `.rsi/ROUND.md` and
+  `.rsi/ledger.jsonl`, so a round that landed code and wrote neither is invisible to both — the one
+  gap this accounting cannot see (observed 2026-11-20: `e3be559`, round 36's fix, reached `main`
+  before its round row existed). The record is the round's own last act, and a missing one is what
+  step 1 of the next heartbeat is there to find.
 
 ## One round, inside the harness
 

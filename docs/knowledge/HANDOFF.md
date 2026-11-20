@@ -9,7 +9,7 @@
   checkpoint 合法载荷上界 1,048,447 = round 31 已关（`a97d099`），本轮复核通过；
   页脚字节规则 = 本轮关闭（规则 + 用例 + 架构引用）。
 - **门禁**：干净 worktree @ `e3be559` 上 `npm run ci` exit 0 = 68 文件 / 1236 测试 PASS、
-  `verify:lib` byte-identical。**工作树里**的 CI 有 1 例失败，属并发进程未提交的
+  `verify:lib` byte-identical；HEAD `aabed51` 上 `npm run ci` exit 0 = 69 文件 / 1251 测试 PASS。**工作树里**的 CI 有 1 例失败，属并发进程未提交的
   `.rsi/HEARTBEAT.md`（`--max-rounds 1000`）与其守卫脚本，与本轮无关；同一 spec 在 `d181812` 干净
   worktree 里 14/14 passed。
 - **并发警告（必读）**：本轮期间另一进程把本轮的 `src/redact.ts` 扫进配置提交 `0ef5bb7`、把第一版
