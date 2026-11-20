@@ -56,6 +56,17 @@ when the row cannot be written, so the refusal does not buy a model call it cann
 | `npm run build` on the merged tree | exit 0 — `tsc -p tsconfig.build.json` + client bundle 237,735 bytes; no `lib/` file changed |
 | `npm run typecheck` before `npm install` | exit **2** — `test/compact-step-pairing.spec.ts(26,28): error TS2307: Cannot find module '@deepseek-ai/dsh-token-meter'`. The devDependency is in `package.json`/`package-lock.json` but was never installed in this checkout; `npm install` (5 packages) then `typecheck` exits 0. **A fresh clone must run `npm install` before `tsc`.** |
 
+**Release `0.12.14` + web profile update (2026-11-20, `CONFIRMED`):**
+
+| command | result |
+| --- | --- |
+| `npm version patch --no-git-tag-version` + CHANGELOG `[Unreleased]` → `## [0.12.14] - 2026-11-20` + README/LOCAL-TESTING version sync | `package.json`/`package-lock.json` = 0.12.14; `test/docs-version.spec.ts` + `test/docs-config-keys.spec.ts` 20 pass |
+| `npm run ci` on the clean release tree (concurrent WIP stashed) | exit 0 — **71 files / 1276 tests PASS** |
+| `git push origin main` + `git tag -a v0.12.14` + `git push origin v0.12.14` | tag `25435d5` → `c0eabef`; CI run `44760621921` success; Release run `44760644587` success; Release `v0.12.14` published with `dsh-grok-workflow-0.12.14.tgz` |
+| `dsh plugin --profile web add github:free6589/dsh-grok-workflow#v0.12.14` | `plugin ls` = 0.12.14; installed `lib/` `.js`/`.d.ts` byte-identical to the repo; gate functions present; bundle row mounted |
+
+One wrinkle: the first bare `add github:free6589/dsh-grok-workflow` reused the locked 0.12.13 resolution, so the pin `#v0.12.14` was required. Host process was not restarted, so the running instance still carries the old build until the next profile boot.
+
 **Repair of the already-poisoned session + fresh-profile verification (2026-11-20, `CONFIRMED`):**
 
 | command | result |

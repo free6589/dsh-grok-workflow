@@ -1,3 +1,18 @@
+Last updated: 2026-11-20 23:15 +08:00 (**已发版 `0.12.14`，web profile 已更新** —
+`v0.12.14`（annotated tag → `c0eabef`）已推，远端 CI `44760621921` success、
+Release `44760644587` success（asset `dsh-grok-workflow-0.12.14.tgz`）。
+内容即 `[Unreleased]` 里那条 `/compact` 修复；发版提交只含版本号+CHANGELOG+README
+版本联动（`package.json`/`package-lock.json` 0.12.14，README 双语版号/示例/tag 列表
+同步到 v0.12.14，`v0.12.13` 保留在已发布列表里）。
+`~/.dsh/profiles/web` 的 `dsh-grok-workflow` 已从 `github:` 未固定版升到
+`github:free6589/dsh-grok-workflow#v0.12.14`（`plugin ls` = 0.12.14，`lib/` 的
+`.js`/`.d.ts` 与仓库逐字节一致，闸门三件套在装好的包里确认存在）。
+**工作树仍有并发轮未提交改动**（CHANGELOG 双语条目第二条、`src/delivery`、
+`src/checkpoint/schema`、`test/delivery-human-block`、`test/checkpoint-bound`、
+`test/config-chain-types`），发版时已 stash 隔离、发完原样恢复；`test/checkpoint-bound`
+依赖被 stash 的 schema 注释改动，发版校验时曾临时移开、已放回。
+未改版本号之外的东西，无 force-push，旧标签未动。
+
 Last updated: 2026-11-20 22:45 +08:00 (**存量会话离线修复 + 新 profile 实测** —
 用户报的 `session-3a683cb6` 的 `/compact` 报错已修好：该会话两行旧版卸载通知
 （seq 3553、seq 5424，无 `step/start` 的 `assistant/message`）已在离线改为同 seq/同时间的

@@ -1,3 +1,21 @@
+## 2026-11-20 — 已发版 `0.12.14`，web profile 已更新到该版（`CONFIRMED`）
+
+- **发版（`CONFIRMED`）**：patch 发版。发版提交 `c0eabef`、annotated tag `v0.12.14` 已推；
+  远端 CI `44760621921` success、Release `44760644587` success
+ （asset `dsh-grok-workflow-0.12.14.tgz`）。内容即 `/compact` 修复那条；
+  发版时并发轮 WIP 已 stash 隔离，发完原样恢复（仍是未提交状态，不属本版）。
+  旧标签未动，无 force-push。
+- **web profile（`CONFIRMED`）**：`~/.dsh/profiles/web` 的 `dsh-grok-workflow` 从
+  `github:` 未固定版升到 `github:free6589/dsh-grok-workflow#v0.12.14`；
+  `plugin ls` = 0.12.14，装好的 `lib/` 与仓库 `.js`/`.d.ts` 逐字节一致
+  （仅 sourcemap 附带差异），`openStepOf`/`appendAssistantInStep`/`TERMINAL_RECORD`
+  在装好的包里确认存在，bundle 行 `grok-workflow` 正常挂载。
+  注意：宿主进程（pid `154637`，11-17 启动）未重启，运行中的仍是旧代码；
+  下次 profile 启动（或宿主重启）后生效。
+- **给下一轮的提醒**：发版校验曾因 `test/checkpoint-bound.spec.ts`
+ （并发轮的新测试，依赖被 stash 的 schema 注释）红过一次——当时临时移开、
+  发完已放回，不要误当成本版问题删掉它。
+
 ## 2026-11-20 — 存量会话离线修复 + 新 profile 实测（`CONFIRMED`）
 
 - **From:** 本会话 · **To:** 用户 / 下一轮接手者
