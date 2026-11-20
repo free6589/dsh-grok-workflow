@@ -89,6 +89,31 @@ describe('configuration surface', () => {
     expect([...ROUTE_KEYS]).toEqual(['provider', 'model', 'maxInFlight'])
   })
 
+  it('refuses a `roles` value that is not an object instead of loading five empty chains (round 37)', () => {
+    // The pool entry: `config.roles?.planner` on a string, an array or null yields
+    // `undefined`, so `resolveChain` returns `[]` five times and the load succeeds with
+    // no route configured at all — a whole-document shape error that read as "inherit
+    // every route". The schema refuses these on the host path (a `z.object` issue), so
+    // the refusal has to happen in this reader, which is also reached directly.
+    expect(() => resolveConfig({ roles: 'worker:m1' } as never))
+      .toThrow(/roles must be an object of role chains \(planner, worker, verifier, synthesizer, supervisor\), got a string "worker:m1"/)
+    expect(() => resolveConfig({ roles: [{ model: 'm1' }] } as never))
+      .toThrow(/roles must be an object of role chains .*, got an array of 1/)
+    expect(() => resolveConfig({ roles: null } as never))
+      .toThrow(/roles must be an object of role chains .*, got null/)
+    expect(() => resolveConfig({ roles: 42 } as never))
+      .toThrow(/roles must be an object of role chains .*, got a number 42/)
+
+    // No over-reach: absent (the documented "inherit"), an empty object and the five
+    // role names all still load, and the shorthand inside a chain is still the chain
+    // resolver's call, not this check's.
+    expect(resolveConfig({} as never).roles.planner).toEqual([])
+    expect(resolveConfig({ roles: {} } as never).roles.worker).toEqual([])
+    expect(resolveConfig({ roles: { worker: ['w1'] } } as never).roles.worker).toEqual([{ model: 'w1' }])
+    expect(() => resolveConfig({ roles: { worker: 'w1' } } as never))
+      .toThrow(/roles\.worker must be an array of routes/)
+  })
+
   it('rejects every removed key as unknown (R-06), with the migration named', () => {
     // The slim-down keeps exactly 15 keys (nine plus the four repeat-run keys and
     // the two self-iteration keys); the other 23 are unknown now.

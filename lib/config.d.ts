@@ -502,8 +502,14 @@ export declare const SWITCHABLE_CLASSES: readonly ["rate-limit", "server-error",
  * typo) and `roles.<role>[<index>].<key>` (a route field, `maxInflight` being the one
  * the pool reported). The check runs before the chains are normalized, so a route
  * written as a bare model id is skipped rather than read as an object.
+ *
+ * The `roles` value's own shape is checked here first: `resolveChain` reads
+ * `config.roles?.planner`, which on a string, an array or `null` is `undefined` for every
+ * role — five empty chains, a successful load, and no route configured at all. Absent
+ * (`undefined`) stays legal; it is the documented "inherit the run's route".
  * @param config - raw user configuration.
- * @throws If a key at any level is not part of the configuration surface.
+ * @throws If a key at any level is not part of the configuration surface, or if `roles`
+ *   is present and is not an object.
  */
 export declare function assertKnownKeys(config: Record<string, unknown>): void;
 /**
