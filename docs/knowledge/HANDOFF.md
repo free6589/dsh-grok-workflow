@@ -13,6 +13,9 @@
   `SKIP code=round-without-ledger`（报告到 32、账本停在 25）。第 32 轮实际已闭合，是假信号；
   但该 SKIP 连续三次会升级为 `stall-unclosed` 的 **STOP**，即整条无人值守循环会在**所有测试仍绿**
   的情况下停摆。补行 + 新测试已修好，门禁码恢复为 `dirty-tracked`（当轮自己的改动）。
+- **发版（`CONFIRMED`）**：patch `0.12.8`。commit `9f91684`、annotated tag `v0.12.8` 已推；远端
+  CI `44670766356` success、Release `44670771402` success（asset
+  `dsh-grok-workflow-0.12.8.tgz`，602,301 B）。旧标签未动（`v0.12.7` 仍在 `56e701d`），无 force-push。
 - **红绿（`CONFIRMED`）**：旧码 `test/redact.spec.ts` 2 failed / 38 passed → 新码 40 passed；
   账本用例对旧账本 1 failed → 补行后 5 passed；`npm run ci` exit 0 = 68 文件 / 1231 测试 PASS。
 - **NOT_RUN**：真实定时投递、GUI 手点（操作方动作，D-066）；折行 ≤7 列的块（池里新项）。

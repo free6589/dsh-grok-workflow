@@ -1,4 +1,4 @@
-Updated: 2026-11-20T12:05+08:00 · round 33 (hand-folded base64 key + ledger backfill) · `npm run ci` 68 files / 1231 tests PASS · released `0.12.8` (commit `9f91684`) · previous release `0.12.7` (`56e701d`, tag `v0.12.7`, CI `44666191493`, Release `44666195466`)
+Updated: 2026-11-20T12:05+08:00 · round 33 (hand-folded base64 key + ledger backfill) · `npm run ci` 68 files / 1231 tests PASS · released `0.12.8` (commit `9f91684`, CI `44670766356`, Release `44670771402`) · previous release `0.12.7` (`56e701d`, tag `v0.12.7`, CI `44666191493`, Release `44666195466`)
 
 Previous rounds: `0.12.7`/`56e701d` (32) · `0.12.6`/`e7150ab` (30, CI `44659057507`, Release `44659061505`) · `0.12.5`/`5b7cae1` (29, CI `44656151053`, Release `44656153854`) · `0.12.4`/`5cd2b1c` (28, CI `44652383452`, Release `44652387975`) · `0.12.3`/`fd6a5ee` (27, CI `44647313571`, Release `44647317251`) · `0.12.2`/`40228c5` · `0.12.1`/`23d3369` — per-round detail lives in `.rsi/ROUND.md`, `.rsi/LOG.md` and `.rsi/ledger.jsonl`.
 ## Facts
@@ -16,6 +16,8 @@ Previous rounds: `0.12.7`/`56e701d` (32) · `0.12.6`/`e7150ab` (30, CI `44659057
   `heartbeat-guard.sh` read `code=round-without-ledger` (SKIP on every heartbeat, STOP after three);
   six rows backfilled and `test/rsi-ledger.spec.ts` pins the invariant. Red/green: pre-round source
   2 failed / 38 passed → 40 passed; ledger test 1 failed on the old ledger → 5 passed.
+  Released `0.12.8`: tag `v0.12.8` on `9f91684`, remote CI `44670766356` success, Release
+  `44670771402` success (asset `dsh-grok-workflow-0.12.8.tgz`, 602,301 B).
   Evidence `.rsi/evidence/round-033/`.
 - Round 31 (this round): the round-27 comment claimed the refused band ran to 1,048,576, but the
   integrity record is 122 bytes plus the decimal digits of `bytes` (129 only for a 7-digit count), so

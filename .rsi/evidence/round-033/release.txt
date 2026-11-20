@@ -1,0 +1,3 @@
+tag v0.12.8 draft False prerelease False
+url https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.12.8
+asset dsh-grok-workflow-0.12.8.tgz 602301 uploaded

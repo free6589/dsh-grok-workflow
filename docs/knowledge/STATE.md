@@ -5,7 +5,8 @@ Last updated: 2026-11-20 12:05 +08:00 (**round-033：手工折行的 base64 私�
 并入池。同轮修掉记录层缺陷：`.rsi/ledger.jsonl` 停在 25、`ROUND.md` 已到 32，门禁读到
 `round-without-ledger`（三轮 SKIP 会升级成 STOP），补 27–32 六行并新增 `test/rsi-ledger.spec.ts`。
 `npm run ci` exit 0 = **68 文件 / 1231 测试 PASS**。**已发版 `0.12.8`**：commit `9f91684`、annotated
-tag `v0.12.8` 已推。）
+tag `v0.12.8` 已推；远端 CI `44670766356` success、Release `44670771402` success
+（asset `dsh-grok-workflow-0.12.8.tgz`，602,301 B）。）
 
 Last updated: 2026-11-20 11:10 +08:00 (**round-032：删零调用的面板投影模块，未发版** —
 `src/panel.ts`（286 行）零生产导入者（`src/` 零引用、`src/index.ts` 不导出、bundle 不用），
