@@ -1,5 +1,16 @@
 # Agent Handoff
 
+## 2026-11-20 — `0.12.4` 已发版（round-028：R11）
+
+- **From:** RSI 心跳轮（本会话）· **To:** 用户 / 下一轮接手者
+- **发版（`CONFIRMED`）**：patch（取消终结文案修正）。commit `5cd2b1c`、annotated tag
+  `v0.12.4` 已推；远端 CI `44652383452` success、Release `44652387975` success
+  （asset `dsh-grok-workflow-0.12.4.tgz`）。旧标签未动，无 force-push。
+- **内容**：取消终结改说人话结论（不再带成功前言/markers/折叠台账）；
+  `phase1-dialogue` 3 旧断言随行为同步更新。`npm run ci` 68/1230 全绿。
+- **NOT_RUN**：真机 GUI 手动取消看终结；真实定时投递。本机 `web` profile 仍是旧版，
+  想用新版就从 `github:free6589/dsh-grok-workflow#v0.12.4` 更新。
+
 ## 2026-11-20 08:55 — round-027：检查点「写得进读不出」修掉，接下来只剩 R11 与 panel 问题
 
 - **From:** agent-65（round 27，update-then-self-iterate）· **To:** 下一轮 / 用户
