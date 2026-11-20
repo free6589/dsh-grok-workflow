@@ -51,3 +51,18 @@ GUI http://100.111.111.88:3080/ -> HTTP 401
 
 ## 5b. per-file sha256 of every shipped lib file vs repo HEAD lib
 identical=77 differing=0
+
+## 8. post-push state 2026-11-20T08:08:35+08:00
+$ git rev-parse HEAD origin/main
+09c2bc9c6b5a29f4b024dc10fe96d2d3704aae2a
+09c2bc9c6b5a29f4b024dc10fe96d2d3704aae2a
+$ git ls-remote origin refs/heads/main
+09c2bc9c6b5a29f4b024dc10fe96d2d3704aae2a	refs/heads/main
+$ git status --short --branch
+## main...origin/main
+ M .rsi/evidence/profile-update-0.12.2/verify.txt
+
+CI run for 09c2bc9: CI completed success https://github.com/free6589/dsh-grok-workflow/actions/runs/44643183871
+profile installed: 0.12.2 spec: github:free6589/dsh-grok-workflow#v0.12.2
+    PID                  STARTED ELAPSED
+ 154637 Tue Nov 17 22:49:32 2026  206344
