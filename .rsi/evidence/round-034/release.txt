@@ -1,0 +1,11 @@
+# remote release, tag and run ids
+# commands: gh release view v0.12.9 --json ...; gh run list; git ls-remote --tags origin
+
+{"assets":[{"apiUrl":"https://api.github.com/repos/free6589/dsh-grok-workflow/releases/assets/770421197","contentType":"application/x-gtar","createdAt":"2026-11-20T04:18:26Z","digest":"sha256:706f4c6da9652144b3103d57c31b02e53caecac90a3ddb3efa1e9b138b5c5a74","downloadCount":0,"id":"RA_kwDOVWgu184t67HN","label":"","name":"dsh-grok-workflow-0.12.9.tgz","size":602672,"state":"uploaded","updatedAt":"2026-11-20T04:18:26Z","url":"https://github.com/free6589/dsh-grok-workflow/releases/download/v0.12.9/dsh-grok-workflow-0.12.9.tgz"}],"isDraft":false,"isPrerelease":false,"publishedAt":"2026-11-20T04:18:27Z","tagName":"v0.12.9"}
+
+completed	success	docs(rsi): close the D-089 anchor round 34 cited and record A38 measu…	CI	main	push	44674240785	52s	2026-11-20T04:24:56Z
+completed	success	docs(rsi): handoff for 0.12.9 release	CI	main	push	44673738901	47s	2026-11-20T04:20:25Z
+completed	success	docs(rsi): adopt concurrent round-34收尾 (attribution, perf, reach matr…	CI	main	push	44673702327	44s	2026-11-20T04:20:07Z
+completed	success	docs(rsi): record 0.12.9 release (CI + Release refs)	CI	main	push	44673608055	52s	2026-11-20T04:19:17Z
+completed	success	docs(rsi): round 34 reports and memory (double-escaped base64 fold)	Release	v0.12.9	push	44673449471	44s	2026-11-20T04:17:48Z
+completed	success	docs(rsi): round 34 reports and memory (double-escaped base64 fold)	CI	main	push	44673443254	45s	2026-11-20T04:17:45Z

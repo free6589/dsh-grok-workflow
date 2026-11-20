@@ -1,0 +1,4 @@
+# heartbeat guard, read-only invocation (no --record)
+# command: bash .rsi/tools/heartbeat-guard.sh --round 35
+
+RESUME code=none next_round=35 threshold=3 max_rounds=0 blocked_streak=0 round_max=34 ledger_max=34 dirty_tracked=0 report_open=0 unclosed_skips=0

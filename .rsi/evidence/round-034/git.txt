@@ -1,0 +1,15 @@
+# final git state
+# commands: git status --short --branch; git rev-parse HEAD; git ls-remote origin main; git log --oneline -6
+
+## main...origin/main
+?? .rsi/evidence/round-034/git.txt
+?? .rsi/evidence/round-034/guard.txt
+local  HEAD: 7008eec73e8fd9f7ad4407d55e9ca55bd46c5cb9
+remote main: 7008eec73e8fd9f7ad4407d55e9ca55bd46c5cb9
+
+7008eec docs(rsi): close the D-089 anchor round 34 cited and record A38 measurements
+d78fb53 docs(rsi): handoff for 0.12.9 release
+28a6566 docs(rsi): adopt concurrent round-34收尾 (attribution, perf, reach matrix, ledger backfill)
+7e312e4 docs(rsi): record 0.12.9 release (CI + Release refs)
+4b751b3 docs(rsi): round 34 reports and memory (double-escaped base64 fold)
+5d3bcea fix(redact): a double-escaped folded base64 key reached reports verbatim (RSI round 34)
