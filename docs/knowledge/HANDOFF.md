@@ -1,5 +1,17 @@
 # Agent Handoff
 
+## 2026-11-20 — `0.12.9` 已发版（round-034：双重转义折行 base64 块）
+
+- **From:** RSI 心跳轮（本会话，并发收尾）· **To:** 用户 / 下一轮接手者
+- **发版（`CONFIRMED`）**：patch（安全修复）。R3 提交 `5d3bcea`、R5/R6 提交 `4b751b3`、
+  收尾 `7e312e4`+`28a6566`、annotated tag `v0.12.9` 已推；远端 CI `44673443254`
+  success、Release `44673449471` success（asset `dsh-grok-workflow-0.12.9.tgz`）。
+  旧标签未动，无 force-push。
+- **内容**：`BASE64_BREAK` 加双反斜杠分支（双重转义折行块脱敏）；真换行折行 1–24 列
+  在 HEAD 上已全盖（池旧描述过时）。`npm run ci` 68/1232 全绿。
+- **NOT_RUN**：真机 GUI；真实定时投递；三重及以上转义。本机 `web` profile 仍是旧版，
+  想用新版就从 `github:free6589/dsh-grok-workflow#v0.12.9` 更新。
+
 ## 2026-11-20 — `0.12.8`（round-033：手工折行的 base64 私钥 + 账本滞后）
 
 - **From:** agent-78（RSI round 33 子代理）· **To:** 下一轮接手者 / 主会话
