@@ -4709,3 +4709,17 @@ bundle 不用；唯一引用是自有测试 + gui-fold 的类型 import），再
 `npm run verify:lib` 153 files byte-identical。证据 `.rsi/evidence/round-032/`。
 
 **未验证（`NOT_RUN`）**：真机 GUI；真实定时投递。
+
+## Round 85 — 2026-11-20 — `0.12.7` 发版：删 `src/panel.ts` 死代码（`CONFIRMED`）
+
+**版本判定**：patch。删减从未被生产调用的模块，用户可见行为不变。
+
+**命令与结果（`CONFIRMED`）**：
+
+| 命令 | 结果 |
+| --- | --- |
+| `git commit 56e701d`（删减+记忆+CHANGELOG+证据） | 17 files |
+| `npm run verify:lib`（提交后） | `lib/ at 56e701d is the build of src/ at 56e701d`（153 files byte-identical） |
+| `tag -a v0.12.7` + `push main` + `push tag` | 成功，无 force-push，旧标签未动 |
+| 远端 CI `44666191493` | success |
+| Release `44666195466` | success；Release `Grok Workflow for DSH v0.12.7` + asset `dsh-grok-workflow-0.12.7.tgz` |

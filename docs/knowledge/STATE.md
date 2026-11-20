@@ -3,7 +3,7 @@ Last updated: 2026-11-20 11:10 +08:00 (**round-032：删零调用的面板投影
 活面板走 `progress-tab.ts` + bundle 渲染器。删模块 + 自有测试（557 行）；
 `test/gui-fold.ts` 自带 `PanelEvent` 类型供 `test/progress.spec.ts`。
 `npm run ci` exit 0 = **67 文件 / 1223 测试 PASS**（-13 例皆所删模块自有测试）；
-`npm run verify:lib` 153 files byte-identical。**未提交、未发版、未打 tag**。）
+`npm run verify:lib` 153 files byte-identical。**已发版 `0.12.7`**：commit `56e701d`、annotated tag `v0.12.7` 已推，远端 CI `44666191493` success、Release `44666195466` success（asset `dsh-grok-workflow-0.12.7.tgz`）。）
 
 Last updated: 2026-11-20 10:20 +08:00 (**round-031：检查点「拒绝带」上限的注释多算了 129 字节** —
 行为自 round 27 起就是对的（写入侧双向按 `maxBytes` 收敛），错的是注释：完整性记录不是固定 129 字节，
