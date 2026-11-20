@@ -1,0 +1,9 @@
+# captured 2026-11-20T14:07:16+08:00
+
+ ✓ test/heartbeat-guard.spec.ts (15 tests) 680ms
+
+ Test Files  1 passed (1)
+      Tests  15 passed (15)
+   Start at  14:07:17
+   Duration  858ms (transform 45ms, setup 0ms, import 57ms, tests 680ms, environment 0ms)
+

@@ -1405,3 +1405,43 @@ round 33 那次把 1.23 ms 抬到 7.86 ms 的代价没有被再放大：新增�
 
 **仍不覆盖**：宽 1–4 时折行的**第一行**（≤4 字符，因为匹配从横幅自身 base64 对齐处开始）会留下；
 它单独不可解，且与页脚同理。
+
+## A42 — 一次上弦能覆盖 1000 轮吗：行宽、prompt 上限、自算轮次与上弦复核的实测（2026-11-20，harness，round 37，`CONFIRMED`）
+
+**测的是什么**：D-093 把默认形态从「十臂各 ≤100 轮」改成「一行覆盖剩余全部」之后，四个前提是否
+真的成立——行能不能那么宽、prompt 能不能装下、轮次能不能自算、上弦与否能不能被测出来。
+
+**测量（本机，`CONFIRMED`，证据在 `.rsi/evidence/harness/`）**：
+
+- **行宽**：`loopPolicyFromConfig(0, 60, 5000, 3).rounds = 1000`、`loopRrule(60, 5000, 0)` 输出
+  `COUNT=5000`（A40 已测，本轮 `test/iterate-plan.spec.ts` 继续钉住）。`iterate-plan.mjs --arm-spec`
+  在 `used=35` 时打印 `rounds=965 window=36..1000`，`rrule=…COUNT=965`（`plan-single.txt`、`arm-spec.txt`）。
+- **prompt 上限**：`heartbeat-guard.sh --prompt --round 36 | wc -c` = 6,964 B（A40 记录），
+  超过 `MAX_LOOP_PROMPT_CHARS = 4000`（`src/loop.ts:112`）。新增的常量 prompt
+  `.rsi/HEARTBEAT-PROMPT.md` 取标记之间正文实测 **2,319 字符**，`--arm-spec` 打印
+  `chars=2319/4000 fits=yes`；`test/iterate-plan.spec.ts` 把 `promptMaxChars` 钉在
+  `MAX_LOOP_PROMPT_CHARS` 上，并对真实文件断言 `promptFits === true`，所以文件变长会让 CI 红。
+- **轮次自算**：`heartbeat-guard.sh --round auto --max-rounds 1000` 取
+  `max(round_max, ledger_max) + 1`。实测（`.rsi/evidence/harness/guard-auto.txt` 与
+  `test/heartbeat-guard.spec.ts` 的新用例）：报告与账本都为 13 时 `next_round=14`；只有账本多出
+  第 14 行时 `next_round=15` 且 `code=ledger-without-round`（SKIP）——与 `iterate-plan.mjs` 的
+  `used = max(reportMax, ledgerMax)` 同一口径。`--round 40` 仍显式优先，`--round soon` 仍 64。
+- **上弦复核**：`--verify-row` 对本机真实存储
+  （`~/.dsh/storages/schedule.json`，`tables.tasks`）实测 `status=NOT_ARMED`：
+  行 `schedule-0bbbef5f-…` 标题 `RSI heartbeat`、`COUNT=10`、已投递 6、`covered=4`，
+  与 `remaining=965` 比较后 `covers-remaining-budget FAIL`（`verify-row-live.txt`，exit 21）。
+  同一工具对测试夹具里 `COUNT=995`、0 次投递的行给 `ARMED`（exit 0），对 `COUNT=1001` 的行因
+  超过 `rowMaxRounds` 给 `NOT_ARMED`，对不存在的存储给 `UNKNOWN`（exit 22）。
+- **`roles` 形状**（round 37 的池顶项）：修前 `resolveConfig({ roles: 'worker:m1' })` 装载成功且
+  五条链全空（`config.roles?.planner` 在字符串上得 `undefined`），修后抛
+  `roles must be an object of role chains (…), got a string "worker:m1"`；schema 路径本来就拒收
+  （`z.object`），所以这是直读路径的缺口。红绿：`.rsi/evidence/harness/round-037-red.txt` /
+  `green-round-037.txt`。
+- **子代理拿不到定时工具**（本轮再次实测，第 2 次）：`schedule_list()` →
+  `{"code":"subagent_session","message":"A delegated subagent cannot use scheduled tasks."}`。
+  因此「上弦」在两次 attempt 里都没有发生，`--verify-row` 的 `NOT_ARMED` 就是这件事的独立证据。
+
+**结论**：`single` 的四个前提全部实测成立，唯一缺的是那一次上弦动作——它属于操作者或持
+`schedule_*` 的会话（D-066、D-093），本轮把它压缩成一次调用并给出复核命令。
+
+**未测（`NOT_RUN`）**：真实投递（无已上弦的行）；开关手点；`open()` 原地改写 `COUNT` 的运行时行为。

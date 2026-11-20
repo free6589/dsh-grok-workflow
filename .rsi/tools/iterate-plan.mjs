@@ -3,12 +3,13 @@
  * Bounded iteration plan for the RSI loop (`.rsi/HARNESS.md`).
  *
  * The loop's budget is 1000 rounds. This tool answers exactly one question, from durable
- * state and nothing else: toward that budget, which heartbeat row should be armed next,
- * how many rounds may it carry, and what stops the loop. It deliberately does not arm
- * anything: a scheduled task is the operator's action (`docs/knowledge/DECISIONS.md` D-066),
- * and a delegated subagent is refused by the schedule tools. What it removes is the
- * reasoning step — the arithmetic, the plugin's own bounds, and the stop flags are
- * computed here and printed, so arming the next arm is one copy-paste, not a judgement call.
+ * state and nothing else: toward that budget, which heartbeat row should be armed, how many
+ * rounds may it carry, and what stops the loop. It deliberately does not arm anything: a
+ * scheduled task is the operator's action (`docs/knowledge/DECISIONS.md` D-066, D-093), and a
+ * delegated subagent is refused by the schedule tools. What it removes is the reasoning step —
+ * the arithmetic, the plugin's own bounds and the stop flags are computed here, `--arm-spec`
+ * turns them into the one call that spends the whole budget, and `--verify-row` measures
+ * afterwards whether that call is still in force.
  *
  * Read-only: it opens files under the repository and prints. It writes nothing, starts no
  * timer, and keeps no state between runs — the durable state is `.rsi/ledger.jsonl` plus
@@ -17,24 +18,38 @@
  * Usage:
  *   iterate-plan.mjs [--root DIR] [--now EPOCH_MS] [--shape single|chain]
  *                    [--total N] [--interval N] [--arm-cap N] [--json] [--pool]
+ *                    [--arm-spec] [--verify-row] [--store FILE]
  *
  *   --root DIR      repository to read (default: the repository this script is in)
  *   --now EPOCH_MS  clock reading for the `DTSTART` anchor (default: now); tests set it
- *   --shape …       override `.rsi/harness.json` `shape`: `single` (one row, up to the row
- *                   maximum) or `chain` (arms of at most `armCapRounds`)
+ *   --shape …       override `.rsi/harness.json` `shape`: `single` (one row covering the whole
+ *                   remaining budget — the default, so ONE arming action reaches round 1000)
+ *                   or `chain` (arms of at most `armCapRounds`, each armed when its
+ *                   predecessor ends)
  *   --total N       override the budget in rounds
  *   --interval N    override the heartbeat interval in minutes
  *   --arm-cap N     override the per-arm round cap
  *   --json          print the plan as one JSON object instead of the text lines
  *   --pool          print the open POOL items in file order and mark the next one
+ *   --arm-spec      print the single Schedule call this budget needs: the slot title, the row
+ *                   to edit (or `create`), the exact `rrule`, and the prompt with its size
+ *                   checked against the plugin's own bound
+ *   --verify-row    read the host's schedule store (never the prompt text) and say whether the
+ *                   harness is ARMED: does a row carry the slot title, and does its remaining
+ *                   `COUNT` still cover every round the budget has left
+ *   --store FILE    schedule store `--verify-row` reads
+ *                   (default: `$DSH_SCHEDULE_STORE`, else `~/.dsh/storages/schedule.json`)
  *
  * Exit codes:
- *   0   plan printed, budget open
+ *   0   plan printed, budget open (or: `--verify-row` found the harness ARMED)
  *   20  budget exhausted: the ledger already accounts for every round (a stop, not an error)
+ *   21  `--verify-row` found the harness NOT_ARMED (nobody is going to deliver the rounds)
+ *   22  `--verify-row` could not read the store (absent or unreadable: state unknown)
  *   64  bad argument or unusable harness configuration
  *   65  `--root` is not this repository
  */
 import { existsSync, readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -53,14 +68,21 @@ export const HARNESS_FILE = '.rsi/harness.json'
 export const DEFAULT_HARNESS = {
   version: 1,
   totalRounds: 1000,
-  // `chain` by default: an arm is then at most `armCapRounds` rounds, which is the width the
-  // plugin itself caps its own loop at (`HARD_LIMITS.loopMaxRounds`), so every arm is a row the
-  // plugin could have created for itself. `single` is legal — the row format and the policy both
-  // allow 1000 — but only a row armed outside the plugin's switch should use it (D-092).
-  shape: 'chain',
+  // `single` by default: one row carries the whole remaining budget, so reaching round 1000
+  // costs exactly ONE arming action and nothing after it — the loop runs the 1000 rounds by
+  // itself and stops at the ceiling. `chain` (arms of at most `armCapRounds`, each armed when
+  // its predecessor ends) stays available for an operator who wants every row inside the width
+  // the plugin's own switch writes; it costs one arming action per arm (D-092, D-093).
+  shape: 'single',
   intervalMinutes: 60,
   armCapRounds: 100,
   rowMaxRounds: 1000,
+  // The row's storage identity (`ITERATE_TASK_TITLE` in `src/loop.ts`) and the prompt the arm
+  // stores. Both are checked against src/ by `test/iterate-plan.spec.ts`, so the harness cannot
+  // arm a row the plugin would not recognise, or store a prompt its own gate would refuse.
+  taskTitle: 'RSI heartbeat',
+  promptFile: '.rsi/HEARTBEAT-PROMPT.md',
+  promptMaxChars: 4000,
   stop: { blockedStreak: 3, skipStreak: 3, roundCap: 1000 },
   envelope: { maxConcurrency: 10, hardMaxConcurrency: 100, retries: 1, hardMaxRetries: 3 },
 }
@@ -141,6 +163,12 @@ export function validateHarness(config) {
   if (!SHAPES.includes(config.shape)) {
     throw new PlanError(`shape must be one of ${SHAPES.join(', ')}, got ${JSON.stringify(config.shape)}`)
   }
+  for (const [name, value] of [['taskTitle', config.taskTitle], ['promptFile', config.promptFile]]) {
+    if (typeof value !== 'string' || value.trim() === '') {
+      throw new PlanError(`${name} must be a non-empty string, got ${JSON.stringify(value)}`)
+    }
+  }
+  whole('promptMaxChars', config.promptMaxChars, 200, 100000)
   const envelope = config.envelope
   whole('envelope.maxConcurrency', envelope.maxConcurrency, 1, INVARIANT_ENVELOPE.maxConcurrency)
   whole('envelope.hardMaxConcurrency', envelope.hardMaxConcurrency, 1, INVARIANT_ENVELOPE.maxConcurrency)
@@ -287,6 +315,206 @@ export function buildPlan(config, state, now) {
   return plan
 }
 
+/** Where the host's schedule store lives when `--store` and `$DSH_SCHEDULE_STORE` are absent. */
+export const DEFAULT_SCHEDULE_STORE = join(homedir(), '.dsh/storages/schedule.json')
+
+/**
+ * The prompt one arm stores, and whether it fits the bound the plugin enforces.
+ *
+ * The prompt is a file in the repository rather than a string in the plan, because a row is
+ * armed once and delivered 1000 times: the text has to be the constant one, not this round's
+ * numbers. `heartbeat-guard.sh --round auto` derives the round inside the delivered turn, so
+ * the same bytes open every round of the budget (`.rsi/HEARTBEAT-PROMPT.md`).
+ * @param root - repository root.
+ * @param config - validated harness configuration.
+ * @returns `{ file, path, chars, limit, fits, missing }`.
+ */
+export function readPrompt(root, config) {
+  const file = config.promptFile
+  const path = join(root, file)
+  if (!existsSync(path)) {
+    return { file, path, text: '', chars: 0, limit: config.promptMaxChars, fits: false, missing: true }
+  }
+  const source = readFileSync(path, 'utf8')
+  // A file may carry its own commentary around the prompt (this one does). What a row stores is
+  // the text between the markers when they are present, and the whole file otherwise.
+  const start = source.indexOf('<!-- arm-prompt:start -->')
+  const end = source.indexOf('<!-- arm-prompt:end -->')
+  const text = start !== -1 && end > start
+    ? source.slice(start + '<!-- arm-prompt:start -->'.length, end).trim()
+    : source.trim()
+  return {
+    file, path, text, chars: text.length, limit: config.promptMaxChars,
+    fits: text.length <= config.promptMaxChars, missing: false,
+  }
+}
+
+/**
+ * The one Schedule call that spends the remaining budget.
+ *
+ * Everything a caller needs and nothing it has to compute: the slot title the plugin matches
+ * (`isLoopSlot` / `slotOf` in `src/loop.ts` — a renamed row stops being the slot), the `rrule`
+ * byte-identical to the plugin's own builder, the prompt file with its size against
+ * `MAX_LOOP_PROMPT_CHARS`, and whether an existing row of that title is there to edit.
+ * @param root - repository root.
+ * @param config - validated harness configuration.
+ * @param plan - the computed plan.
+ * @param store - `readScheduleStore` result, or `null` when the store was not consulted.
+ * @returns the arm specification.
+ */
+export function buildArmSpec(root, config, plan, store) {
+  const prompt = readPrompt(root, config)
+  const live = store?.status === 'ok'
+    ? store.rows.filter(row => row.title === config.taskTitle).sort((a, b) => b.deliveries - a.deliveries)[0] ?? null
+    : null
+  const arm = plan.arms[0] ?? null
+  return {
+    kind: 'rsi-arm-spec',
+    status: plan.status,
+    title: config.taskTitle,
+    mode: live === null ? 'create' : 'edit',
+    id: live?.id ?? null,
+    rounds: arm?.rounds ?? 0,
+    roundsWindow: arm === null ? null : `${arm.firstRound}..${arm.lastRound}`,
+    intervalMinutes: config.intervalMinutes,
+    rrule: arm?.rrule ?? null,
+    promptFile: prompt.file,
+    promptText: prompt.text,
+    promptChars: prompt.chars,
+    promptLimit: prompt.limit,
+    promptFits: prompt.fits,
+    promptMissing: prompt.missing,
+    guardArgs: plan.guardArgs,
+    remaining: plan.remaining,
+    used: plan.used,
+    rowMaxRounds: config.rowMaxRounds,
+    liveRow: live,
+    note: live === null
+      ? 'no row carries the slot title: create one with this rrule, title and prompt, then run --verify-row'
+      : `row ${live.id} carries the slot title with COUNT covering ${live.deliveries} delivered occurrence(s); `
+        + 'edit its rrule to the one above, keep the title and prompt',
+  }
+}
+
+/**
+ * Parse the parts of an `RRULE` the harness cares about.
+ *
+ * Only the shapes this harness writes are understood: a UTC `DTSTART`, `FREQ=MINUTELY` with an
+ * interval, and a finite `COUNT`. Anything else is reported as unparsed rather than guessed at,
+ * because a rule whose end the tool cannot compute is a rule whose coverage it cannot claim.
+ * @param rrule - the stored rule.
+ * @returns `{ ok, count?, startMs?, stepMinutes?, lastMs?, reason? }`.
+ */
+export function parseArmRule(rrule) {
+  if (typeof rrule !== 'string' || rrule.trim() === '') return { ok: false, reason: 'no rule stored' }
+  const freq = /FREQ=([A-Z]+)/.exec(rrule)
+  const count = /COUNT=(\d+)/.exec(rrule)
+  const interval = /INTERVAL=(\d+)/.exec(rrule)
+  const start = /DTSTART:(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/.exec(rrule)
+  if (count === null) return { ok: false, reason: 'the rule has no COUNT, so it never ends' }
+  if (freq === null || freq[1] !== 'MINUTELY') return { ok: false, reason: `FREQ=${freq?.[1] ?? 'absent'} is not the harness's MINUTELY` }
+  if (start === null) return { ok: false, reason: 'the rule has no UTC DTSTART' }
+  const startMs = Date.UTC(
+    Number(start[1]), Number(start[2]) - 1, Number(start[3]),
+    Number(start[4]), Number(start[5]), Number(start[6]),
+  )
+  const stepMinutes = Number(interval?.[1] ?? 60)
+  const occurrences = Number(count[1])
+  return { ok: true, count: occurrences, startMs, stepMinutes, lastMs: startMs + (occurrences - 1) * stepMinutes * 60_000 }
+}
+
+/**
+ * Read the host's schedule store, without its prompt text.
+ *
+ * The file is the Host's, not this repository's: it is read, never written, and the prompt of
+ * every row is reduced to its length so that reading the store can never print a task's content.
+ * @param path - store path.
+ * @returns `{ status, path, rows, reason? }` with `status` one of `ok`, `absent`, `unreadable`.
+ */
+export function readScheduleStore(path) {
+  if (!existsSync(path)) return { status: 'absent', path, rows: [], reason: 'the file does not exist' }
+  let doc
+  try {
+    doc = JSON.parse(readFileSync(path, 'utf8'))
+  } catch (error) {
+    return { status: 'unreadable', path, rows: [], reason: `not valid JSON: ${error.message}` }
+  }
+  const tasks = doc?.tables?.tasks
+  if (tasks === null || typeof tasks !== 'object') {
+    return { status: 'unreadable', path, rows: [], reason: 'tables.tasks is missing' }
+  }
+  const rows = []
+  for (const [id, entry] of Object.entries(tasks)) {
+    const record = entry?.record ?? {}
+    rows.push({
+      id,
+      title: typeof record.title === 'string' ? record.title : null,
+      rrule: typeof record.rrule === 'string' ? record.rrule : null,
+      scheduledAt: typeof record.scheduledAt === 'string' ? record.scheduledAt : null,
+      promptChars: typeof record.prompt === 'string' ? record.prompt.length : 0,
+      deliveries: Array.isArray(entry?.deliveryHistory?.records) ? entry.deliveryHistory.records.length : 0,
+    })
+  }
+  return { status: 'ok', path, rows }
+}
+
+/**
+ * Is the harness armed right now?
+ *
+ * The question the loop cannot ask itself from inside a round, and the one a landed design has
+ * to answer honestly: a budget, a plan and a guard are worth nothing if no row is going to
+ * deliver the rounds. `covered = COUNT - deliveries` is the number of rounds the row still has
+ * to give; it is compared with the budget's remaining rounds, and the row may not be wider than
+ * the plan's own row maximum (a wider row would spend budget past the last planned round).
+ * @param spec - `buildArmSpec` result.
+ * @param store - `readScheduleStore` result.
+ * @param now - clock reading in epoch milliseconds.
+ * @returns `{ status, checks, covered, row, detail }`; `status` is `ARMED`, `NOT_ARMED` or `UNKNOWN`.
+ */
+export function verifyArm(spec, store, now) {
+  const out = {
+    kind: 'rsi-arm-verify',
+    status: 'UNKNOWN',
+    title: spec.title,
+    storePath: store.path,
+    row: null,
+    covered: 0,
+    remaining: spec.remaining,
+    checks: [],
+    detail: '',
+  }
+  if (store.status !== 'ok') {
+    out.detail = `the schedule store could not be read (${store.status}: ${store.reason}); the armed state is unknown`
+    return out
+  }
+  const row = store.rows.find(candidate => candidate.title === spec.title) ?? null
+  out.row = row
+  if (row === null) {
+    out.status = 'NOT_ARMED'
+    out.detail = `no row carries the slot title "${spec.title}"; nothing will deliver the ${spec.remaining} rounds left`
+    return out
+  }
+  const rule = parseArmRule(row.rrule)
+  const covered = rule.ok ? Math.max(0, rule.count - row.deliveries) : 0
+  out.covered = covered
+  const check = (name, ok, detail) => out.checks.push({ name, ok, detail })
+  check('title', true, `row ${row.id} carries the slot title`)
+  check('rule-parsed', rule.ok, rule.ok ? `COUNT=${rule.count}, INTERVAL=${rule.stepMinutes}` : rule.reason)
+  check('within-row-maximum', rule.ok && rule.count <= spec.rowMaxRounds,
+    rule.ok ? `COUNT=${rule.count} vs row maximum ${spec.rowMaxRounds}` : 'not parsed')
+  check('covers-remaining-budget', covered >= spec.remaining,
+    `${covered} round(s) left in the row (COUNT ${rule.ok ? rule.count : '?'} - ${row.deliveries} delivered) vs ${spec.remaining} remaining`)
+  check('has-a-future-occurrence', rule.ok && rule.lastMs !== null && rule.lastMs >= now,
+    rule.ok && rule.lastMs !== null
+      ? `last occurrence ${new Date(rule.lastMs).toISOString()} vs now ${new Date(now).toISOString()}`
+      : 'not parsed')
+  out.status = out.checks.every(item => item.ok) ? 'ARMED' : 'NOT_ARMED'
+  out.detail = out.status === 'ARMED'
+    ? `row ${row.id} still owes ${covered} round(s) at ${rule.stepMinutes}-minute steps, last one ${new Date(rule.lastMs).toISOString()}`
+    : `row ${row.id} does not cover the ${spec.remaining} rounds left: ${out.checks.filter(item => !item.ok).map(item => item.name).join(', ')}`
+  return out
+}
+
 /**
  * List the POOL items that are still open, in file order, and mark the first.
  *
@@ -333,14 +561,56 @@ export function renderText(plan) {
   return lines.join('\n')
 }
 
+/** Render the arm specification as the lines a caller reads before the one call. */
+export function renderArmSpec(spec) {
+  if (spec.status === 'EXHAUSTED') {
+    return `arm-spec status=EXHAUSTED: the budget accounts for every round; arm nothing (stop code=budget-exhausted)`
+  }
+  const rule = spec.rrule === null ? '(none)' : spec.rrule.replace('\n', '\\n')
+  const live = spec.liveRow === null
+    ? 'none'
+    : `${spec.liveRow.id} COUNT=${parseArmRule(spec.liveRow.rrule).count ?? '?'} delivered=${spec.liveRow.deliveries}`
+  return [
+    `arm-spec status=${spec.status} title="${spec.title}" mode=${spec.mode} id=${spec.id ?? '(create a new row)'}`,
+    `arm-spec rounds=${spec.rounds} window=${spec.roundsWindow ?? '(none)'} interval=${spec.intervalMinutes} remaining=${spec.remaining} used=${spec.used}`,
+    `arm-spec rrule=${rule}`,
+    `arm-spec prompt=${spec.promptFile} chars=${spec.promptChars}/${spec.promptLimit} fits=${spec.promptFits ? 'yes' : 'NO'}`,
+    `arm-spec live-row=${live}`,
+    `arm-spec next: ${spec.note}`,
+  ].join('\n')
+}
+
+/** Render `--verify-row` as a verdict, one line per check, then the next action. */
+export function renderArmVerify(result) {
+  const lines = [`verify status=${result.status} title="${result.title}" remaining=${result.remaining}`]
+  if (result.row !== null) {
+    const rule = parseArmRule(result.row.rrule)
+    lines.push(
+      `verify row=${result.row.id} COUNT=${rule.ok ? rule.count : '?'} delivered=${result.row.deliveries} `
+      + `covered=${result.covered} last=${rule.ok && rule.lastMs !== null ? new Date(rule.lastMs).toISOString() : '?'}`,
+    )
+  }
+  for (const check of result.checks) {
+    lines.push(`verify check ${check.name} ${check.ok ? 'ok' : 'FAIL'}: ${check.detail}`)
+  }
+  lines.push(`verify store=${result.storePath}`)
+  lines.push(`verify detail=${result.detail}`)
+  if (result.status !== 'ARMED') {
+    lines.push('verify next: node .rsi/tools/iterate-plan.mjs --arm-spec --json   (then the one schedule call it names)')
+  }
+  return lines.join('\n')
+}
+
 /** Parse `--flag value` / `--flag` arguments. */
 export function parseArgs(argv) {
-  const options = { json: false, pool: false }
-  const valued = ['--root', '--now', '--shape', '--total', '--interval', '--arm-cap']
+  const options = { json: false, pool: false, armSpec: false, verifyRow: false }
+  const valued = ['--root', '--now', '--shape', '--total', '--interval', '--arm-cap', '--store']
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
     if (arg === '--json') { options.json = true; continue }
     if (arg === '--pool') { options.pool = true; continue }
+    if (arg === '--arm-spec') { options.armSpec = true; continue }
+    if (arg === '--verify-row') { options.verifyRow = true; continue }
     if (arg === '-h' || arg === '--help') { options.help = true; continue }
     if (!valued.includes(arg)) throw new PlanError(`unknown argument ${arg}`)
     const value = argv[index + 1]
@@ -381,7 +651,21 @@ export function run(argv, { defaultRoot, now = () => Date.now() } = {}) {
   if (options.interval !== undefined) overrides.intervalMinutes = options.interval
   if (options.armCap !== undefined) overrides.armCapRounds = options.armCap
   const config = loadHarness(root, overrides)
-  const plan = buildPlan(config, readLoopState(root), options.now ?? now())
+  const clock = options.now ?? now()
+  const plan = buildPlan(config, readLoopState(root), clock)
+  if (options.armSpec || options.verifyRow) {
+    const storePath = resolve(options.store ?? process.env.DSH_SCHEDULE_STORE ?? DEFAULT_SCHEDULE_STORE)
+    const store = readScheduleStore(storePath)
+    const spec = buildArmSpec(root, config, plan, store)
+    if (options.armSpec) {
+      return { code: plan.status === 'EXHAUSTED' ? 20 : 0, out: options.json ? JSON.stringify(spec, null, 2) : renderArmSpec(spec) }
+    }
+    const result = verifyArm(spec, store, clock)
+    return {
+      code: result.status === 'ARMED' ? 0 : result.status === 'NOT_ARMED' ? 21 : 22,
+      out: options.json ? JSON.stringify(result, null, 2) : renderArmVerify(result),
+    }
+  }
   return {
     code: plan.status === 'EXHAUSTED' ? 20 : 0,
     out: options.json ? JSON.stringify(plan, null, 2) : renderText(plan),

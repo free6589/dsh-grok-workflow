@@ -35,13 +35,20 @@
   心跳轮次第 0 步先跑 `.rsi/tools/heartbeat-guard.sh --round <N> --record`，按它的
   `RESUME`/`SKIP`/`STOP` 决定开不开本轮；`SKIP` 表示上一轮未闭合，不得在其上再开一轮。
 
-## 预算与心跳（1000 轮，分臂推进）
+## 预算与心跳（1000 轮，一次上弦）
 - 总量 1000 轮，数字与规则在 `.rsi/harness.json` + `.rsi/HARNESS.md`；一轮 = 一次定时投递，
   一次投递只做一轮，进程里没有数到 1000 的循环。
-- 心跳行是一条 `RRULE`，`INTERVAL=60`、`COUNT≤100`（`HARD_LIMITS.loopMaxRounds`）；行跑完即停，
-  下一臂由人（或持有 `schedule_*` 的会话）按 `.rsi/tools/iterate-plan.mjs` 打印的 `rrule` 续订，
-  本轮不得自己续、不得嵌套 workflow（D-066、D-092）。
-- 门禁：`.rsi/tools/heartbeat-guard.sh --round <N> --max-rounds 1000 --record`；
+- 心跳行是一条 `RRULE`，`INTERVAL=60`、有限 `COUNT`。默认 `shape: single`：这一行的 `COUNT`
+  就是**剩余全部轮数**，所以走完 1000 轮只需要**一次**上弦动作，之后不再需要任何人介入
+  （D-093）。`chain`（每臂 ≤100 轮，上一臂跑完再上下一臂）留给愿意让每一行都落在插件开关
+  宽度内的人，代价是每臂一次上弦。
+- 上弦只有一次动作：`node .rsi/tools/iterate-plan.mjs --arm-spec` 打印槽名、`rrule` 与
+  `.rsi/HEARTBEAT-PROMPT.md` 的字符数（对 4000 上限）；用 `schedule_*` 或插件开关落地后，
+  用 `--verify-row` 复核 `COUNT - 已投递` 是否仍覆盖剩余轮数（`0` ARMED / `21` NOT_ARMED /
+  `22` 读不到宿主存储）。本轮不得自己上弦、不得嵌套 workflow（D-066、D-092、D-093）。
+- 门禁：`.rsi/tools/heartbeat-guard.sh --round auto --max-rounds 1000 --record`；
+  `--round auto` 按记录自算轮次（`ROUND.md` 与 `ledger.jsonl` 取高者 +1），所以一个常量 prompt
+  就能开完整个预算的每一轮。
   `round-cap` / `budget-exhausted` 表示预算用尽，`blocked-streak` / `stall-unclosed` / `stop-file` /
   `protocol-stop` 各自由谁清除，见 `.rsi/HARNESS.md` 的停止规则表。
 - 预算用尽不是失败：池里没有高于风险的主题时按本轮停止条件收尾，不为了用满 1000 而凑数。

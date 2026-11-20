@@ -241,6 +241,31 @@ describe('stop conditions end the loop without opening a round', () => {
     expect(third.out).toContain('unclosed_skips=2')
   })
 
+  it('derives the round itself with --round auto, so one constant prompt can open every round', () => {
+    // One arming action has to cover 1000 rounds (`.rsi/HEARTBEAT-PROMPT.md`, `D-093`), so the
+    // prompt cannot carry a round number that goes stale: `--round auto` computes it the way the
+    // plan does — the higher of the two records, plus one.
+    const root = createRepo(closedPair())
+    const auto = runGuard(root, '--round', 'auto')
+    expect(auto.status).toBe(0)
+    expect(auto.out).toContain('next_round=14')
+
+    // A round written into the ledger but not into ROUND.md still counts as spent, exactly as
+    // `.rsi/tools/iterate-plan.mjs` counts it; the verdict is a skip, the number is still 15.
+    const ledgerAhead = createRepo({
+      rounds: [{ round: 13, status: 'OK', theme: 'gate landing' }],
+      ledger: [ledgerLine(13, 'OK', 'gate landing'), ledgerLine(14, 'OK', 'redaction call-site hardening')],
+    })
+    const ahead = runGuard(ledgerAhead, '--round', 'auto')
+    expect(ahead.status).toBe(10)
+    expect(ahead.out).toContain('next_round=15')
+    expect(ahead.out).toContain('code=ledger-without-round')
+
+    // An explicit number still wins, and a non-numeric round is still refused.
+    expect(runGuard(root, '--round', '40').out).toContain('next_round=40')
+    expect(runGuard(root, '--round', 'soon').status).toBe(64)
+  })
+
   it('rejects a threshold below one instead of silently accepting it', () => {
     const root = createRepo(closedPair())
     expect(runGuard(root, '--threshold', '0').status).toBe(64)

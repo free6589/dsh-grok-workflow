@@ -1,0 +1,12 @@
+# captured 2026-11-20T14:04:11+08:00
+verify status=NOT_ARMED title="RSI heartbeat" remaining=965
+verify row=schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab COUNT=10 delivered=6 covered=4 last=2026-11-20T10:01:50.000Z
+verify check title ok: row schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab carries the slot title
+verify check rule-parsed ok: COUNT=10, INTERVAL=60
+verify check within-row-maximum ok: COUNT=10 vs row maximum 1000
+verify check covers-remaining-budget FAIL: 4 round(s) left in the row (COUNT 10 - 6 delivered) vs 965 remaining
+verify check has-a-future-occurrence ok: last occurrence 2026-11-20T10:01:50.000Z vs now 2026-11-20T06:04:11.743Z
+verify store=/home/fish/.dsh/storages/schedule.json
+verify detail=row schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab does not cover the 965 rounds left: covers-remaining-budget
+verify next: node .rsi/tools/iterate-plan.mjs --arm-spec --json   (then the one schedule call it names)
+EXIT=21

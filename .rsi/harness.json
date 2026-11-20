@@ -1,10 +1,13 @@
 {
   "version": 1,
   "totalRounds": 1000,
-  "shape": "chain",
+  "shape": "single",
   "intervalMinutes": 60,
   "armCapRounds": 100,
   "rowMaxRounds": 1000,
+  "taskTitle": "RSI heartbeat",
+  "promptFile": ".rsi/HEARTBEAT-PROMPT.md",
+  "promptMaxChars": 4000,
   "stop": {
     "blockedStreak": 3,
     "skipStreak": 3,

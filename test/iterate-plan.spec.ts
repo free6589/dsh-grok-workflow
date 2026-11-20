@@ -9,19 +9,29 @@ import {
   FIXED_MAX_RETRIES,
   HARD_LIMITS,
 } from '../src/config.js'
-import { DEFAULT_LOOP_INTERVAL_MINUTES, loopPolicyFromConfig, loopRrule } from '../src/loop.js'
+import {
+  DEFAULT_LOOP_INTERVAL_MINUTES,
+  ITERATE_TASK_TITLE,
+  MAX_LOOP_PROMPT_CHARS,
+  loopPolicyFromConfig,
+  loopRrule,
+} from '../src/loop.js'
 import {
   DEFAULT_HARNESS,
   INVARIANT_ENVELOPE,
   armSizes,
+  buildArmSpec,
   buildPlan,
   loadHarness,
+  parseArmRule,
   readLoopState,
   readPool,
+  readScheduleStore,
   renderText,
   rruleFor,
   run,
   validateHarness,
+  verifyArm,
 } from '../.rsi/tools/iterate-plan.mjs'
 
 /**
@@ -42,6 +52,8 @@ import {
  */
 
 const toolPath = fileURLToPath(new URL('../.rsi/tools/iterate-plan.mjs', import.meta.url))
+/** The repository's own arm prompt: the bytes an arm would store, not a fixture version of them. */
+const armPrompt = readFileSync(fileURLToPath(new URL('../.rsi/HEARTBEAT-PROMPT.md', import.meta.url)), 'utf8')
 const guardPath = fileURLToPath(new URL('../.rsi/tools/heartbeat-guard.sh', import.meta.url))
 
 /** One round's ledger row, in the shape `.rsi/ledger.jsonl` uses. */
@@ -64,6 +76,7 @@ function fixtureRepo(options: {
   roundSections?: boolean
   harness?: unknown
   pool?: string[]
+  prompt?: string
 } = {}): string {
   const root = mkdtempSync(join(tmpdir(), 'iterate-plan-'))
   const rsi = join(root, '.rsi')
@@ -80,7 +93,23 @@ function fixtureRepo(options: {
     writeFileSync(join(rsi, 'harness.json'), typeof options.harness === 'string' ? options.harness : JSON.stringify(options.harness))
   }
   if (options.pool !== undefined) writeFileSync(join(rsi, 'POOL.md'), `${options.pool.join('\n')}\n`)
+  if (options.prompt !== undefined) writeFileSync(join(rsi, 'HEARTBEAT-PROMPT.md'), options.prompt)
   return root
+}
+
+/** A schedule store in the shape the Host writes (`tables.tasks`), for `--verify-row`. */
+function scheduleStore(rows: Array<{ id?: string; title: string; rrule: string; deliveries?: number }>): string {
+  const path = join(mkdtempSync(join(tmpdir(), 'schedule-store-')), 'schedule.json')
+  const tasks: Record<string, unknown> = {}
+  rows.forEach((row, index) => {
+    const id = row.id ?? `schedule-fixture-${index}`
+    tasks[id] = {
+      record: { title: row.title, rrule: row.rrule, scheduledAt: '2026-11-20T06:00:00.000Z', prompt: 'p'.repeat(120) },
+      deliveryHistory: { records: Array.from({ length: row.deliveries ?? 0 }, () => ({})) },
+    }
+  })
+  writeFileSync(path, JSON.stringify({ unit: 'schedule', global: {}, tables: { tasks } }))
+  return path
 }
 
 describe('the harness configuration is the plugin\'s own bounds', () => {
@@ -193,7 +222,7 @@ describe('the round budget is cut into bounded arms', () => {
     expect(single.arms[0]!.firstRound).toBe(36)
     expect(single.arms[0]!.lastRound).toBe(1000)
 
-    const chained = buildPlan(validateHarness(DEFAULT_HARNESS), state, 0)
+    const chained = buildPlan(validateHarness({ ...DEFAULT_HARNESS, shape: 'chain' }), state, 0)
     expect(chained.arms).toHaveLength(10)
     expect(chained.arms[0]!.rounds).toBe(100)
     expect(chained.arms[0]!.firstRound).toBe(36)
@@ -254,16 +283,17 @@ describe('the plan CLI is read-only and refuses what it cannot honour', () => {
     const before = readdirSync(join(root, '.rsi')).sort()
     const text = run([], { defaultRoot: root, now: () => 0 })
     expect(text.code).toBe(0)
-    expect(text.out).toMatch(/^plan shape=chain total=1000 used=5 remaining=995/)
-    expect(text.out).toMatch(/arms=10 interval=60 guard_args="--max-rounds 1000 --threshold 3" status=OPEN/)
-    expect(text.out).toMatch(/arm 1\/10 rounds=100 rounds_window=6\.\.105/)
-    expect(text.out).toMatch(/rrule=DTSTART:\d{8}T\d{6}Z\\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=100/)
-    expect(text.out).toMatch(/arm 10\/10 rounds=95 rounds_window=906\.\.1000/)
+    // The default shape is `single`: one row carries the whole remaining budget, which is what
+    // makes reaching round 1000 cost exactly one arming action (D-093).
+    expect(text.out).toMatch(/^plan shape=single total=1000 used=5 remaining=995/)
+    expect(text.out).toMatch(/arms=1 interval=60 guard_args="--max-rounds 1000 --threshold 3" status=OPEN/)
+    expect(text.out).toMatch(/arm 1\/1 rounds=995 rounds_window=6\.\.1000/)
+    expect(text.out).toMatch(/rrule=DTSTART:\d{8}T\d{6}Z\\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=995/)
     expect(text.out).toMatch(/envelope maxConcurrency=10\/100 retries=1\/3/)
 
     const json = run(['--json'], { defaultRoot: root, now: () => 0 })
     expect(JSON.parse(json.out)).toMatchObject({
-      kind: 'rsi-iteration-plan', shape: 'chain', total: 1000, used: 5, remaining: 995, status: 'OPEN',
+      kind: 'rsi-iteration-plan', shape: 'single', total: 1000, used: 5, remaining: 995, status: 'OPEN',
     })
     expect(readdirSync(join(root, '.rsi')).sort()).toEqual(before)
   })
@@ -277,9 +307,9 @@ describe('the plan CLI is read-only and refuses what it cannot honour', () => {
     expect(() => run([], { defaultRoot: mkdtempSync(join(tmpdir(), 'iterate-plan-empty-')) })).toThrow(/--root must name the repository/)
     // A shape override reaches the plan; an unknown one is refused by the same validator.
     expect(run([], { defaultRoot: fixtureRepo({ rounds: [1, 2] }), now: () => 0 }).out)
-      .toMatch(/shape=chain[\s\S]*arms=10/)
-    expect(run(['--shape', 'single'], { defaultRoot: fixtureRepo({ rounds: [1, 2] }), now: () => 0 }).out)
       .toMatch(/shape=single[\s\S]*arms=1/)
+    expect(run(['--shape', 'chain'], { defaultRoot: fixtureRepo({ rounds: [1, 2] }), now: () => 0 }).out)
+      .toMatch(/shape=chain[\s\S]*arms=10/)
     expect(() => run(['--shape', 'forever'], { defaultRoot: spent })).toThrow(/shape must be one of/)
   })
 
@@ -319,5 +349,142 @@ describe('the plan CLI is read-only and refuses what it cannot honour', () => {
     expect(plan.arms.reduce((sum: number, arm: { rounds: number }) => sum + arm.rounds, 0)).toBe(plan.remaining)
     expect(plan.remaining + plan.used).toBe(1000)
     expect(readFileSync(toolPath, 'utf8')).not.toMatch(/setInterval|setTimeout|while \(true\)|for \(;;\)/)
+
+    // The arm prompt this repository would store fits the bound the plugin itself enforces, so
+    // the same bytes can be armed by the operator's task or by the composer's switch.
+    const spec = spawnSync(
+      process.execPath,
+      [toolPath, '--arm-spec', '--json', '--store', join(repoRoot, '.rsi/evidence/no-such-store.json')],
+      { cwd: repoRoot, encoding: 'utf8' },
+    )
+    expect(spec.stderr).toBe('')
+    expect(spec.status).toBe(0)
+    const arm = JSON.parse(spec.stdout)
+    expect(arm.title).toBe(ITERATE_TASK_TITLE)
+    expect(arm.promptFits).toBe(true)
+    expect(arm.promptChars).toBeGreaterThan(500)
+    expect(arm.promptChars).toBeLessThanOrEqual(MAX_LOOP_PROMPT_CHARS)
+    expect(arm.rrule).toMatch(/^DTSTART:\d{8}T\d{6}Z\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=\d+$/)
+  })
+})
+
+describe('one arming action spends the budget, and the harness says whether it is armed', () => {
+  const now = Date.parse('2026-11-20T05:00:00Z')
+
+  it('names the slot title, the row to edit and a rule that covers every remaining round', () => {
+    const root = fixtureRepo({ rounds: [1, 2, 3, 4, 5], prompt: armPrompt })
+    const config = loadHarness(root)
+    const plan = buildPlan(config, readLoopState(root), now)
+    const store = readScheduleStore(scheduleStore([
+      { id: 'schedule-live', title: 'RSI heartbeat', rrule: 'DTSTART:20261120T010150Z\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=10', deliveries: 5 },
+    ]))
+    const spec = buildArmSpec(root, config, plan, store)
+
+    // The title is the plugin's storage identity, not a label: a row named anything else stops
+    // being the slot `isLoopSlot` / `slotOf` recognise (`src/loop.ts:338`, `:457`).
+    expect(spec.title).toBe(ITERATE_TASK_TITLE)
+    expect(spec.mode).toBe('edit')
+    expect(spec.id).toBe('schedule-live')
+    expect(spec.rounds).toBe(995)
+    expect(spec.roundsWindow).toBe('6..1000')
+    expect(spec.rrule).toBe(plan.arms[0]!.rrule)
+    expect(spec.rrule).toBe(loopRrule(60, 995, now))
+    // The prompt bound the harness enforces IS the plugin's own, and the file fits it — which is
+    // what lets the composer's switch arm the same bytes the operator's task would store.
+    expect(config.promptMaxChars).toBe(MAX_LOOP_PROMPT_CHARS)
+    expect(spec.promptLimit).toBe(MAX_LOOP_PROMPT_CHARS)
+    expect(spec.promptFits).toBe(true)
+    expect(spec.promptChars).toBeGreaterThan(500)
+    expect(spec.promptChars).toBeLessThanOrEqual(MAX_LOOP_PROMPT_CHARS)
+    // Round-agnostic on purpose: one arming action, then the guard derives each round itself.
+    expect(spec.promptText).toContain('heartbeat-guard.sh --round auto --max-rounds 1000 --record')
+    expect(spec.promptText).not.toMatch(/\{\{/)
+    expect(spec.note).toMatch(/edit its rrule to the one above/)
+
+    const cli = run(['--arm-spec', '--store', store.path, '--json'], { defaultRoot: root, now: () => now })
+    expect(cli.code).toBe(0)
+    expect(JSON.parse(cli.out)).toMatchObject({ kind: 'rsi-arm-spec', mode: 'edit', rounds: 995, promptFits: true })
+    // With no row of that title the same plan asks for a create, not an edit.
+    const fresh = buildArmSpec(root, config, plan, readScheduleStore(scheduleStore([])))
+    expect(fresh.mode).toBe('create')
+    expect(fresh.id).toBeNull()
+  })
+
+  it('measures the armed state: a spent row is NOT_ARMED, a row that still owes the budget is ARMED', () => {
+    const root = fixtureRepo({ rounds: [1, 2, 3, 4, 5] })
+    const config = loadHarness(root)
+    const plan = buildPlan(config, readLoopState(root), now)
+
+    const spent = readScheduleStore(scheduleStore([
+      { id: 'schedule-live', title: 'RSI heartbeat', rrule: 'DTSTART:20261120T010150Z\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=10', deliveries: 5 },
+    ]))
+    const spentSpec = buildArmSpec(root, config, plan, spent)
+    const spentVerdict = verifyArm(spentSpec, spent, now)
+    expect(spentVerdict.status).toBe('NOT_ARMED')
+    expect(spentVerdict.covered).toBe(5)
+    expect(spentVerdict.checks.find(check => check.name === 'covers-remaining-budget')?.ok).toBe(false)
+    expect(spentVerdict.detail).toMatch(/does not cover the 995 rounds left/)
+    expect(run(['--verify-row', '--store', spent.path], { defaultRoot: root, now: () => now }).code).toBe(21)
+
+    const armed = readScheduleStore(scheduleStore([
+      { id: 'schedule-live', title: 'RSI heartbeat', rrule: rruleFor(60, 995, now) },
+    ]))
+    const armedVerdict = verifyArm(buildArmSpec(root, config, plan, armed), armed, now)
+    expect(armedVerdict.status).toBe('ARMED')
+    expect(armedVerdict.covered).toBe(995)
+    expect(armedVerdict.checks.every(check => check.ok)).toBe(true)
+    expect(run(['--verify-row', '--store', armed.path], { defaultRoot: root, now: () => now }).code).toBe(0)
+
+    // A row wider than the plan's row maximum would spend budget past the last planned round.
+    const tooWide = readScheduleStore(scheduleStore([
+      { id: 'schedule-live', title: 'RSI heartbeat', rrule: rruleFor(60, 1001, now) },
+    ]))
+    expect(verifyArm(buildArmSpec(root, config, plan, tooWide), tooWide, now).status).toBe('NOT_ARMED')
+  })
+
+  it('says UNKNOWN rather than guessing when the store is missing', () => {
+    const root = fixtureRepo({ rounds: [1, 2, 3, 4, 5] })
+    const config = loadHarness(root)
+    const plan = buildPlan(config, readLoopState(root), now)
+    const missing = join(mkdtempSync(join(tmpdir(), 'schedule-none-')), 'schedule.json')
+    const store = readScheduleStore(missing)
+    expect(store.status).toBe('absent')
+    const verdict = verifyArm(buildArmSpec(root, config, plan, store), store, now)
+    expect(verdict.status).toBe('UNKNOWN')
+    expect(verdict.detail).toMatch(/armed state is unknown/)
+    expect(run(['--verify-row', '--store', missing], { defaultRoot: root, now: () => now }).code).toBe(22)
+  })
+
+  it('reads a store without ever surfacing a row\'s prompt text', () => {
+    const store = readScheduleStore(scheduleStore([
+      { id: 'schedule-live', title: 'RSI heartbeat', rrule: 'DTSTART:20261120T010150Z\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=10', deliveries: 5 },
+    ]))
+    expect(store.status).toBe('ok')
+    expect(store.rows[0]!.promptChars).toBe(120)
+    expect(JSON.stringify(store)).not.toContain('p'.repeat(120))
+    expect(JSON.stringify(store)).not.toContain('prompt"')
+  })
+
+  it('refuses a repository with no arm prompt instead of claiming it fits', () => {
+    const root = fixtureRepo({ rounds: [1, 2, 3, 4, 5] })
+    const config = loadHarness(root)
+    const plan = buildPlan(config, readLoopState(root), now)
+    const spec = buildArmSpec(root, config, plan, readScheduleStore(join(root, 'nowhere.json')))
+    expect(spec.promptMissing).toBe(true)
+    expect(spec.promptFits).toBe(false)
+    expect(spec.promptChars).toBe(0)
+  })
+
+  it('parses only the rules it can actually account for', () => {
+    expect(parseArmRule(rruleFor(60, 3, 0))).toMatchObject({ ok: true, count: 3, stepMinutes: 60 })
+    expect(parseArmRule('DTSTART:20260101T000000Z\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=2'))
+      .toMatchObject({ ok: true, count: 2, lastMs: Date.UTC(2026, 0, 1, 1, 0, 0) })
+    expect(parseArmRule('')).toMatchObject({ ok: false })
+    // An endless rule, a non-minute frequency and a local-time anchor are all refused rather
+    // than read as "covers everything".
+    expect(parseArmRule('DTSTART:20260101T000000Z\nRRULE:FREQ=MINUTELY;INTERVAL=60')).toMatchObject({ ok: false })
+    expect(parseArmRule('DTSTART:20260101T000000Z\nRRULE:FREQ=DAILY;COUNT=3')).toMatchObject({ ok: false })
+    expect(parseArmRule('DTSTART;TZID=Asia/Singapore:20260101T000000\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=3'))
+      .toMatchObject({ ok: false })
   })
 })

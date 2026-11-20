@@ -1,0 +1,8 @@
+# captured 2026-11-20T14:04:11+08:00
+arm-spec status=OPEN title="RSI heartbeat" mode=edit id=schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab
+arm-spec rounds=965 window=36..1000 interval=60 remaining=965 used=35
+arm-spec rrule=DTSTART:20261120T070412Z\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=965
+arm-spec prompt=.rsi/HEARTBEAT-PROMPT.md chars=2319/4000 fits=yes
+arm-spec live-row=schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab COUNT=10 delivered=6
+arm-spec next: row schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab carries the slot title with COUNT covering 6 delivered occurrence(s); edit its rrule to the one above, keep the title and prompt
+EXIT=0

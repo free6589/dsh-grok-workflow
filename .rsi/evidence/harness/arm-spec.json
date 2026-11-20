@@ -1,0 +1,32 @@
+# captured 2026-11-20T14:04:11+08:00
+{
+  "kind": "rsi-arm-spec",
+  "status": "OPEN",
+  "title": "RSI heartbeat",
+  "mode": "edit",
+  "id": "schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab",
+  "rounds": 965,
+  "roundsWindow": "36..1000",
+  "intervalMinutes": 60,
+  "rrule": "DTSTART:20261120T070412Z\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=965",
+  "promptFile": ".rsi/HEARTBEAT-PROMPT.md",
+  "promptText": "# RSI heartbeat\n\nThis message was delivered by a schedule (`source.kind = \"schedule\"`), not by the operator.\nNobody will answer inside this turn: do not ask questions, do not wait for approval, decide and\nrecord. Work in `dsh-grok-workflow` only.\n\n## Step 0 — guard first\n\n    .rsi/tools/heartbeat-guard.sh --round auto --max-rounds 1000 --record\n\n`--round auto` derives the round from the repository's own records (`.rsi/ROUND.md`, `.rsi/ledger.jsonl`),\n`--max-rounds 1000` is the budget. The **first word** decides this turn:\n\n- `RESUME` — the previous round is closed. Continue.\n- `SKIP` — a round is still open (the guard names the signal). Open no round, pick no theme, edit\n  nothing, commit nothing; say in two sentences what is unclosed and end the turn.\n- `STOP` — open no round. Print the stop summary from `.rsi/HEARTBEAT.md` step 5 and end.\n\n## Steps 1–5 — follow `.rsi/HEARTBEAT.md`\n\nRead that file now; it is the contract for this turn (reconcile STATE/LOG/HANDOFF against the tree,\none theme only, `.rsi/PROTOCOL.md` steps 1–6, then the round report). In short:\n\n1. Reconcile `.rsi/STATE.md`, `.rsi/LOG.md` and the newest `docs/knowledge/HANDOFF.md` against\n   `git log --oneline -5` and `git status --short --branch`. A record that contradicts the tree is a\n   finding, not an order.\n2. Exactly one theme: the open `.rsi/POOL.md` item that\n   `node .rsi/tools/iterate-plan.mjs --pool` names as `top_next`. Never re-rank the file.\n3. Code plus a test in the same round: the test fails on the old source and passes on the new one.\n   Verify independently — the round's own report is a claim, not evidence.\n4. `npm run ci` must exit 0 (`verify:lib` included; rebuild `lib/` when `src/` changed).\n5. Record the round in `.rsi/ROUND.md` **and** `.rsi/ledger.jsonl` before you end the turn. A round\n   counts when it is recorded; both files are what the guard and the plan read.\n\n## Boundaries\n\n- No in-process loop, no nested workflow, no second theme. One delivery is one round.\n- Do not arm, extend or delete the heartbeat row: `.rsi/tools/iterate-plan.mjs --arm-spec` prints\n  the one call, and arming stays the operator's (`D-066`, `D-093`).\n- Concurrency default 10 / hard max 100; retries default 1 / hard max 3 (`AGENTS.md`).\n- Never write a secret into a record; `NOT_RUN` where nothing was executed.",
+  "promptChars": 2319,
+  "promptLimit": 4000,
+  "promptFits": true,
+  "promptMissing": false,
+  "guardArgs": "--max-rounds 1000 --threshold 3",
+  "remaining": 965,
+  "used": 35,
+  "rowMaxRounds": 1000,
+  "liveRow": {
+    "id": "schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab",
+    "title": "RSI heartbeat",
+    "rrule": "DTSTART:20261120T010150Z\nRRULE:FREQ=MINUTELY;INTERVAL=60;COUNT=10",
+    "scheduledAt": "2026-11-20T07:01:50.000Z",
+    "promptChars": 3239,
+    "deliveries": 6
+  },
+  "note": "row schedule-0bbbef5f-602e-4700-a5ff-806009cff4ab carries the slot title with COUNT covering 6 delivered occurrence(s); edit its rrule to the one above, keep the title and prompt"
+}
+EXIT=0

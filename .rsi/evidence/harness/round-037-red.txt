@@ -1,0 +1,27 @@
+# round 37 test against the PRE-CHANGE reader (HEAD 116f98b)
+# command: npx vitest run test/config.spec.ts -t 'not an object instead of loading five empty chains'
+ FAIL  test/config.spec.ts > configuration surface > refuses a `roles` value that is not an object instead of loading five empty chains (round 37)
+AssertionError: expected [Function] to throw an error
+
+- Expected:
+null
+
++ Received:
+undefined
+
+ ❯ test/config.spec.ts:99:8
+     97|     // the refusal has to happen in this reader, which is also reached…
+     98|     expect(() => resolveConfig({ roles: 'worker:m1' } as never))
+     99|       .toThrow(/roles must be an object of role chains \(planner, work…
+       |        ^
+    100|     expect(() => resolveConfig({ roles: [{ model: 'm1' }] } as never))
+    101|       .toThrow(/roles must be an object of role chains .*, got an arra…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 38 skipped (39)
+   Start at  14:04:48
+   Duration  411ms (transform 221ms, setup 0ms, import 274ms, tests 10ms, environment 0ms)
+

@@ -7,6 +7,12 @@ This file holds that message. The template between the markers is the deliverabl
 task instruction, and `.rsi/tools/heartbeat-guard.sh --prompt` prints it with the last-round
 summary and this round's numbers already filled in.
 
+**What an arm actually stores** is the shorter, round-agnostic prompt in
+`.rsi/HEARTBEAT-PROMPT.md` — the same bytes for all 1000 rounds, under the plugin's 4000-character
+bound, with `heartbeat-guard.sh --round auto` deriving the round inside the delivered turn. This
+file stays the contract that prompt points at, and `--prompt` stays available for a one-off
+delivery that wants the summary inlined (`D-093`).
+
 ## Why the summary has to be inside the prompt
 
 `src/carryover.ts` compiles earlier rounds into a bounded digest, but only for a batch the gate

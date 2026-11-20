@@ -21,7 +21,10 @@
 #                      [--record] [--prompt]
 #
 #   --root DIR        repository to inspect (default: the repository this script is in)
-#   --round N         round number this heartbeat would open (default: highest round + 1)
+#   --round N|auto    round number this heartbeat would open (default: highest round + 1).
+#                     `auto` derives it the way the plan does — the higher of `ROUND.md` and
+#                     `ledger.jsonl`, plus one — so one constant prompt can be armed once and
+#                     open every round of the budget (`.rsi/HEARTBEAT-PROMPT.md`)
 #   --threshold N     consecutive BLOCKED rounds / consecutive skips that stop the loop
 #                     (default 3, matching DEFAULT_LOOP_FAIL_STREAK in src/config.ts)
 #   --max-rounds N    refuse to open a round above N; 0 means no cap (default 0 — the RSI
@@ -34,6 +37,7 @@ set -u
 
 root=$(cd "$(dirname "$0")/../.." && pwd)
 round=0
+round_auto=0
 threshold=3
 max_rounds=0
 record=0
@@ -52,9 +56,14 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+case "$round" in
+  auto) round_auto=1; round=0 ;;
+esac
+
 for pair in "round:$round" "threshold:$threshold" "max-rounds:$max_rounds"; do
   name=${pair%%:*}
   value=${pair#*:}
+  if [ "$name" = round ] && [ "$round_auto" -eq 1 ]; then continue; fi
   case "$value" in
     ''|*[!0-9]*) printf 'heartbeat-guard: --%s must be a whole number, got "%s"\n' "$name" "$value" >&2; exit 64 ;;
   esac
@@ -134,7 +143,14 @@ if command -v git >/dev/null 2>&1 && git -C "$root" rev-parse --is-inside-work-t
 fi
 
 if [ "$round" -le 0 ]; then
-  round=$((round_max + 1))
+  if [ "$round_auto" -eq 1 ]; then
+    # The higher of the two records, exactly as `.rsi/tools/iterate-plan.mjs` counts a spent
+    # round: a round recorded in one place was still spent, so the next one is above it.
+    round=$((round_max + 1))
+    [ "$ledger_max" -ge "$round" ] && round=$((ledger_max + 1))
+  else
+    round=$((round_max + 1))
+  fi
 fi
 
 # Which signal says the previous round is not closed. First match wins; each code is stable

@@ -1,0 +1,16 @@
+# captured 2026-11-20T14:14:48+08:00 in a throwaway repo (not this checkout)
+# command: .rsi/tools/heartbeat-guard.sh --root $FIXTURE --round auto --max-rounds 1000
+## fixture: ROUND.md and ledger both at round 13
+RESUME code=none next_round=14 threshold=3 max_rounds=1000 blocked_streak=0 round_max=13 ledger_max=13 dirty_tracked=0 report_open=0 unclosed_skips=0
+git unavailable: dirtiness not checked
+EXIT=0
+## fixture: ledger one round ahead of ROUND.md
+SKIP code=ledger-without-round next_round=15 threshold=3 max_rounds=1000 blocked_streak=0 round_max=13 ledger_max=14 dirty_tracked=0 report_open=0 unclosed_skips=0
+git unavailable: dirtiness not checked
+EXIT=10
+## explicit round still wins, non-numeric still refused
+SKIP code=ledger-without-round next_round=40 threshold=3 max_rounds=1000 blocked_streak=0 round_max=13 ledger_max=14 dirty_tracked=0 report_open=0 unclosed_skips=0
+git unavailable: dirtiness not checked
+EXIT=10
+heartbeat-guard: --round must be a whole number, got "soon"
+EXIT=64

@@ -1,0 +1,27 @@
+# the harness's new cases against the PRE-CHANGE tool (HEAD 116f98b)
+# command: npx vitest run test/iterate-plan.spec.ts test/heartbeat-guard.spec.ts
+    472|     const spec = buildArmSpec(root, config, plan, readScheduleStore(jo…
+       |                                                   ^
+    473|     expect(spec.promptMissing).toBe(true)
+    474|     expect(spec.promptFits).toBe(false)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/10]⎯
+
+ FAIL  test/iterate-plan.spec.ts > one arming action spends the budget, and the harness says whether it is armed > parses only the rules it can actually account for
+TypeError: parseArmRule is not a function
+ ❯ test/iterate-plan.spec.ts:479:12
+    477|
+    478|   it('parses only the rules it can actually account for', () => {
+    479|     expect(parseArmRule(rruleFor(60, 3, 0))).toMatchObject({ ok: true,…
+       |            ^
+    480|     expect(parseArmRule('DTSTART:20260101T000000Z\nRRULE:FREQ=MINUTELY…
+    481|       .toMatchObject({ ok: true, count: 2, lastMs: Date.UTC(2026, 0, 1…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/10]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  10 failed | 26 passed (36)
+   Start at  14:05:19
+   Duration  1.14s (transform 137ms, setup 0ms, import 176ms, tests 722ms, environment 0ms)
+
