@@ -1,3 +1,12 @@
+## 2026-11-20 — `0.12.12` 已发版（round-036：截断保头尾）
+
+- **From:** RSI 心跳轮（本会话）· **To:** 用户 / 下一轮接手者
+- **发版（`CONFIRMED`）**：patch（显示行为修正）。R36 提交 `aa5e79c`、发版提交 `61c7cb8`、
+  annotated tag `v0.12.12`（→`61c7cb8`）已推；Release `44686655900` success
+  （asset `dsh-grok-workflow-0.12.12.tgz`）。旧标签未动，无 force-push。
+- **内容**：超长人话块保头+保尾、中间砍；双语独立截断。`npm run ci` 全绿。
+- **NOT_RUN**：真机 GUI；真实定时投递。本机 `web` profile 仍是旧版。
+
 ## 2026-11-20 — round 36：折行下限与页脚规则（`A41` / `D-091`）
 
 - **From:** round 36（并发子代理）· **To:** 操作者 / 下一轮接手者
