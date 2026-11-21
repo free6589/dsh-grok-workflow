@@ -1,0 +1,83 @@
+scenario=mixed width=1440
+  spine: 7 segments, layout=single-row (y=64, 7 columns) (start:done plan:done execute:doing verify:doing synthesize:pending answer:pending end:doing)
+  band: 4 cards below=true padLeft=681px firstCardLeft=681
+  cards: stage:plan<-stage:plan[1:done:c0] stage:execute<-phase:任务 1 · 读代码[2:done:c1,3:done:c2] stage:execute<-phase:任务 2 · 补测试[5:doing:c4] stage:verify<-stage:verify[4:doing:c3]
+  links: filled,filled,flowing,idle,idle,flowing
+  wires: trunk(stage:plan) M241 86 L241 120 | trunk(stage:execute) M446 86 L446 220 | trunk(stage:verify) M651 86 L651 270 | branch(stage:plan->stage:plan) M241 120 L681 120 | branch(stage:execute->phase:任务 1 · 读代码) M446 170 L681 170 | branch(stage:execute->phase:任务 2 · 补测试) M446 220 L681 220 | branch(stage:verify->stage:verify) M651 270 L681 270
+  settle: 3 完成 · 2 未结算 parts=ok:3@802px,open:2@535px empty=null
+  overflowX=false overflowRight=0
+  removed={"jump":0,"branch":0,"member":0,"more":0,"detail":0,"zoom":0,"retry":0,"copyButton":0} inertClicks={"openedDelta":0,"sameDom":true} pills={"targets":["c0","c1","c2","c4","c3"],"opened":["c0","c1","c2","c4","c3"]}
+scenario=running width=1440
+  spine: 7 segments, layout=single-row (y=64, 7 columns) (start:done plan:pending execute:doing verify:done synthesize:pending answer:pending end:doing)
+  band: 2 cards below=true padLeft=476px firstCardLeft=476
+  cards: stage:execute<-phase:任务 1 · 定位渲染错乱[1:done:c1,2:done:c2] stage:execute<-phase:任务 2 · 修复样式与数据分支[3:doing:c3]
+  links: filled,flowing,idle,filled,idle,flowing
+  wires: trunk(stage:execute) M446 86 L446 170 | branch(stage:execute->phase:任务 1 · 定位渲染错乱) M446 120 L476 120 | branch(stage:execute->phase:任务 2 · 修复样式与数据分支) M446 170 L476 170
+  settle: 2 完成 · 1 未结算 parts=ok:2@892px,open:1@445px empty=null
+  overflowX=false overflowRight=0
+  removed={"jump":0,"branch":0,"member":0,"more":0,"detail":0,"zoom":0,"retry":0,"copyButton":0} inertClicks={"openedDelta":0,"sameDom":true} pills={"targets":["c1","c2","c3"],"opened":["c1","c2","c3"]}
+scenario=failed width=1200
+  spine: 7 segments, layout=single-row (y=64, 7 columns) (start:done plan:pending execute:failed verify:doing synthesize:pending answer:pending end:doing)
+  band: 1 cards below=true padLeft=407px firstCardLeft=407
+  cards: stage:execute<-phase:任务 1 · 修复[1:failed:c1,2:doing:c2]
+  links: filled,idle,flowing,idle,idle,flowing
+  wires: trunk(stage:execute) M377 86 L377 120 | branch(stage:execute->phase:任务 1 · 修复) M377 120 L407 120
+  settle: 1 失败 · 1 未结算 parts=bad:1@548px,open:1@548px empty=null
+  overflowX=false overflowRight=0
+  removed={"jump":0,"branch":0,"member":0,"more":0,"detail":0,"zoom":0,"retry":0,"copyButton":0} inertClicks={"openedDelta":0,"sameDom":true} pills={"targets":["c1","c2"],"opened":["c1","c2"]}
+scenario=done width=1200
+  spine: 7 segments, layout=single-row (y=64, 7 columns) (start:done plan:pending execute:done verify:pending synthesize:pending answer:pending end:done)
+  band: 1 cards below=true padLeft=407px firstCardLeft=407
+  cards: stage:execute<-phase:任务 1 · 修复[1:done:c1]
+  links: filled,idle,filled,idle,idle,idle
+  wires: trunk(stage:execute) M377 86 L377 120 | branch(stage:execute->phase:任务 1 · 修复) M377 120 L407 120
+  settle: 1 完成 parts=ok:1@1149px empty=null
+  overflowX=false overflowRight=0
+  removed={"jump":0,"branch":0,"member":0,"more":0,"detail":0,"zoom":0,"retry":0,"copyButton":0} inertClicks={"openedDelta":0,"sameDom":true} pills={"targets":["c1"],"opened":["c1"]}
+scenario=empty width=1200
+  spine: 0 segments, layout=stacked (0 rows, 0 columns) ()
+  band: 0 cards below=undefined padLeft=undefined firstCardLeft=undefined
+  cards: 
+  links: 
+  wires: 
+  settle: absent
+  overflowX=null overflowRight=0
+  removed={"jump":0,"branch":0,"member":0,"more":0,"detail":0,"zoom":0,"retry":0,"copyButton":0} inertClicks={"openedDelta":0,"sameDom":true} pills={"targets":[],"opened":[]}
+scenario=running width=1024
+  spine: 7 segments, layout=single-row (y=64, 7 columns) (start:done plan:pending execute:doing verify:done synthesize:pending answer:pending end:doing)
+  band: 2 cards below=true padLeft=357px firstCardLeft=357
+  cards: stage:execute<-phase:任务 1 · 定位渲染错乱[1:done:c1,2:done:c2] stage:execute<-phase:任务 2 · 修复样式与数据分支[3:doing:c3]
+  links: filled,flowing,idle,filled,idle,flowing
+  wires: trunk(stage:execute) M327 86 L327 170 | branch(stage:execute->phase:任务 1 · 定位渲染错乱) M327 120 L357 120 | branch(stage:execute->phase:任务 2 · 修复样式与数据分支) M327 170 L357 170
+  settle: 2 完成 · 1 未结算 parts=ok:2@614px,open:1@307px empty=null
+  overflowX=false overflowRight=0
+  removed={"jump":0,"branch":0,"member":0,"more":0,"detail":0,"zoom":0,"retry":0,"copyButton":0} inertClicks={"openedDelta":0,"sameDom":true} pills={"targets":["c1","c2","c3"],"opened":["c1","c2","c3"]}
+scenario=running width=760
+  spine: 7 segments, layout=single-row (y=64, 7 columns) (start:done plan:pending execute:doing verify:done synthesize:pending answer:pending end:doing)
+  band: 2 cards below=true padLeft=282px firstCardLeft=282
+  cards: stage:execute<-phase:任务 1 · 定位渲染错乱[1:done:c1,2:done:c2] stage:execute<-phase:任务 2 · 修复样式与数据分支[3:doing:c3]
+  links: filled,flowing,idle,filled,idle,flowing
+  wires: trunk(stage:execute) M252 86 L252 170 | branch(stage:execute->phase:任务 1 · 定位渲染错乱) M252 120 L282 120 | branch(stage:execute->phase:任务 2 · 修复样式与数据分支) M252 170 L282 170
+  settle: 2 完成 · 1 未结算 parts=ok:2@438px,open:1@219px empty=null
+  overflowX=false overflowRight=0
+  removed={"jump":0,"branch":0,"member":0,"more":0,"detail":0,"zoom":0,"retry":0,"copyButton":0} inertClicks={"openedDelta":0,"sameDom":true} pills={"targets":["c1","c2","c3"],"opened":["c1","c2","c3"]}
+scenario=running width=480
+  spine: 7 segments, layout=stacked (7 rows, 1 columns) (start:done plan:pending execute:doing verify:done synthesize:pending answer:pending end:doing)
+  band: 2 cards below=true padLeft=12px firstCardLeft=12
+  cards: stage:execute<-phase:任务 1 · 定位渲染错乱[1:done:c1,2:done:c2] stage:execute<-phase:任务 2 · 修复样式与数据分支[3:doing:c3]
+  links: filled,flowing,idle,filled,idle,flowing
+  wires: trunk(stage:execute) M38 303 L38 775 | branch(stage:execute->phase:任务 1 · 定位渲染错乱) M38 725 L12 725 | branch(stage:execute->phase:任务 2 · 修复样式与数据分支) M38 775 L12 775
+  settle: 2 完成 · 1 未结算 parts=ok:2@251px,open:1@125px empty=null
+  overflowX=false overflowRight=0
+  removed={"jump":0,"branch":0,"member":0,"more":0,"detail":0,"zoom":0,"retry":0,"copyButton":0} inertClicks={"openedDelta":0,"sameDom":true} pills={"targets":["c1","c2","c3"],"opened":["c1","c2","c3"]}
+scenario=running width=390
+  spine: 7 segments, layout=stacked (7 rows, 1 columns) (start:done plan:pending execute:doing verify:done synthesize:pending answer:pending end:doing)
+  band: 2 cards below=true padLeft=12px firstCardLeft=12
+  cards: stage:execute<-phase:任务 1 · 定位渲染错乱[1:done:c1,2:done:c2] stage:execute<-phase:任务 2 · 修复样式与数据分支[3:doing:c3]
+  links: filled,flowing,idle,filled,idle,flowing
+  wires: trunk(stage:execute) M38 303 L38 775 | branch(stage:execute->phase:任务 1 · 定位渲染错乱) M38 725 L12 725 | branch(stage:execute->phase:任务 2 · 修复样式与数据分支) M38 775 L12 775
+  settle: 2 完成 · 1 未结算 parts=ok:2@191px,open:1@96px empty=null
+  overflowX=false overflowRight=0
+  removed={"jump":0,"branch":0,"member":0,"more":0,"detail":0,"zoom":0,"retry":0,"copyButton":0} inertClicks={"openedDelta":0,"sameDom":true} pills={"targets":["c1","c2","c3"],"opened":["c1","c2","c3"]}
+shot two-track-1440.png 104752 bytes from mixed@1440
+shot two-track-760.png 82851 bytes from running@760

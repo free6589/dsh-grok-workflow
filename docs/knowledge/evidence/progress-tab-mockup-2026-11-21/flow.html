@@ -33,14 +33,6 @@
   .gw-head { display: flex; align-items: center; gap: 10px; padding: 12px 20px 0; }
   .gw-head h3 { margin: 0; font-size: 14px; font-weight: 600; }
   .gw-pct { color: var(--label2); font-variant-numeric: tabular-nums; }
-  .gw-zoom { margin-left: auto; display: inline-flex; gap: 4px; }
-  .gw-zoom button {
-    min-width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
-    border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: 12px;
-    color: var(--label2); background: transparent; cursor: pointer;
-  }
-  .gw-zoom button:hover { color: var(--label); border-color: var(--idle); }
-
   .gw-settle { display: flex; align-items: center; gap: 14px; padding: 10px 20px 0; font-size: 11px; color: var(--label2); }
   .gw-settle .bar { flex: 1 1 auto; display: flex; height: 8px; border-radius: 999px; overflow: hidden; background: var(--fill); }
   .gw-settle .bar i { display: block; height: 100%; }
@@ -119,9 +111,10 @@
   <div class="gw-head">
     <h3 id="run-title"></h3>
     <span class="gw-pct" id="run-pct"></span>
-    <div class="gw-zoom"><button type="button">−</button><button type="button">1x</button><button type="button">+</button></div>
   </div>
 
+  <!-- Always present once a run exists: an empty bar plus "no settled row yet" is the
+       honest reading of a run that declared nothing (see ·settle.unsettled·). -->
   <div class="gw-settle">
     <div class="bar" id="settle-bar"></div>
     <span id="settle-text"></span>

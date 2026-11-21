@@ -39,8 +39,6 @@ export declare const PROGRESS_DETAIL_EVENT_TYPE = "tool-workflow/stage-detail";
 export declare const PROGRESS_VIEW_TARGET = "grok-progress";
 /** Conversation node kind owned by the tab (namespaced for the same reason). */
 export declare const PROGRESS_NODE_KIND = "grok-progress-run";
-/** `localStorage` key holding the reader's zoom factor. */
-export declare const PROGRESS_ZOOM_STORAGE_KEY = "dsh.gw.progress.zoom";
 /** The five states the track colours; `cancelled` reuses the blocked colour. */
 export type ProgressState = 'pending' | 'doing' | 'done' | 'blocked' | 'cancelled' | 'failed';
 /** Where one detail field's value came from. */

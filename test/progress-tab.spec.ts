@@ -6,7 +6,6 @@ import {
   PROGRESS_NODE_KIND,
   PROGRESS_STAGES,
   PROGRESS_VIEW_TARGET,
-  PROGRESS_ZOOM_STORAGE_KEY,
   deriveTrack,
   detailFor,
   detailSourcesOf,
@@ -98,7 +97,6 @@ describe('progress tab: the event contract', () => {
     // plugin, so they carry this plugin's own prefix instead of a generic word.
     expect(PROGRESS_VIEW_TARGET).toBe('grok-progress')
     expect(PROGRESS_NODE_KIND.startsWith('grok-progress')).toBe(true)
-    expect(PROGRESS_ZOOM_STORAGE_KEY).toBe('dsh.gw.progress.zoom')
     // The spine is this engine's own phase order, not a delivery template of our own:
     // plan/execute/verify/synthesize/answer are the headers `src/naming.ts` emits, and the
     // plan tasks land in between (they are appended as extra nodes).

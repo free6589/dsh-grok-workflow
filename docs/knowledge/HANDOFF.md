@@ -1,3 +1,30 @@
+## 2026-11-21 — 进度页双带落地 + 0.12.19（`CONFIRMED`，本地；远端结果见下）
+
+- **From:** 本会话（agent-12）· **To:** 下一轮接手者
+- **用户/lead 拍板**：真机 UI 必须对齐 `docs/knowledge/evidence/progress-tab-mockup-2026-11-21/flow.html`；
+  缩放控件一起删掉；结算条在没有已声明行时也要出现（显示 `progress.settle.unsettled`）；
+  失败重试维持 Phase 2 不做。
+- **改了什么**：`src/client/index.js` 的 `ProgressView` 重写（fixed 7-stage spine + 竖向任务带 +
+  实测 SVG 干线/支线 + 结算条）、`ProgressNode` 加耗时条、新增 `ProgressTaskCard`/`ProgressPill`/
+  `measureProgressWires`/`progressSettleParts`/`progressMemberState`/`progressNodeDuration`；
+  删 zoom 全套（含 `src/progress-tab.ts` 的 `PROGRESS_ZOOM_STORAGE_KEY`）与手风琴分支全部样式/文案；
+  `lib/client.js` 由 `npm run build` 重建（与 `src/client/index.js` 字节一致）。
+- **测试**：`test/client.spec.ts`、`test/progress-connector.spec.ts`、`test/progress-tab.spec.ts` 同步；
+  `npm run typecheck` 0 error、`npm run lint` 0 error / 23 warning（既有）、`npm run verify:lib` 字节一致、
+  `npm test` **73 文件 / 1349 测试 PASS**。
+- **证据**：`docs/knowledge/evidence/progress-tab-two-track-2026-11-21/`（`make-page.mjs` + `run.mjs`
+  可复算；`geometry.txt` 9 个场景×宽度；`two-track-1440.png`、`two-track-760.png`）。
+- **踩过的坑（下一个人别重踩）**：
+  1. 共用一个 `--user-data-dir` 时 `file://` 文档会走缓存，第二个场景会悄悄渲染第一个场景的
+     fixture → `run.mjs` 每次启动用一次性 profile。
+  2. `--screenshot` 在第一帧就落盘，那时连线还没收敛 → 截图改用「dump 收敛后的 `#host` 子树 →
+     静态页截图」；dump 时必须砍掉 `<script>`，否则静态页会自己重渲染成默认 fixture。
+  3. Chrome 窗口最小 500 px，窄视口要放进同源 iframe 才吃得到 `@media (max-width: 480px)`。
+  4. 卡片若按 owner 各自缩进，后面段的干线会**穿过**前面段的卡片；统一内距（= 最右干线 + 30）
+     只有支线互相交叉，没有线穿卡片。这是刻意选择，别改回去。
+- **没做 / 仍不做**：失败重试（Phase 2）；真实 DSH GUI 截图（本轮只在 Chromium 里跑真 bundle +
+  真样式表，宿主挂载未验）；Firefox/Safari 与 200% 浏览器缩放未测。
+
 ## 2026-11-21 — 进度页详情卡删除 + 胶囊直达（已发版 `0.12.18`）`CONFIRMED`
 
 - **From:** 本会话（lead）· **To:** 下一轮接手者

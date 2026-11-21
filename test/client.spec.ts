@@ -87,8 +87,6 @@ interface ProgressBundle {
   kind: string
   viewId: string
   viewOrder: number
-  zoomKey: string
-  zoom: { min: number, max: number, step: number }
   eventTypes: string[]
   stages: Array<{ key: string, tokens: string[], edge: boolean }>
   stateColor: Record<string, string>
@@ -115,8 +113,6 @@ interface ProgressBundle {
   percent(members: ProgressMember[]): { settled: number, declared: number, value: number } | undefined
   deriveTrack(run: ProgressRun | undefined, labelFor: (key: string) => string): ProgressTrack | undefined
   duration(ms: number | undefined): string | undefined
-  readZoom(): number
-  writeZoom(value: number): void
   createStatus(): { getSnapshot(): string, getMessage(): string | undefined, subscribe(fn: () => void): () => void, set(state: string, message?: string): void }
 }
 
@@ -288,6 +284,7 @@ function loadBundle(): Bundle {
     },
     useState: (initial: unknown) => hooks().useState(initial),
     useEffect: () => {},
+    useRef: (initial: unknown) => ({ current: initial === undefined ? null : initial }),
     useMemo: (factory: () => unknown) => factory(),
     useSyncExternalStore: (_subscribe: unknown, getSnapshot: () => unknown) => getSnapshot(),
   }
@@ -1526,7 +1523,6 @@ describe('client progress tab: registration', () => {
     expect(progress.kind.startsWith('grok-progress')).toBe(true)
     // The stock chat is order 0 and the trajectory view order 10, so 20 is "third".
     expect(progress.viewOrder).toBe(20)
-    expect(progress.zoomKey).toBe('dsh.gw.progress.zoom')
 
     const { conversation } = fakeConversation()
     const mounted = mountProgressOn(conversation, fakeSessions())
@@ -1801,21 +1797,20 @@ describe('client progress tab: the fold and the five states', () => {
   })
 })
 
-describe('client progress tab: member pills jump straight to the child session', () => {
-  /** The run every case below shows: two rows in one stage, one still running
-   * so the stage opens its branch on the first render. */
+describe('client progress tab: row pills jump straight to the child session', () => {
+  /** The run every case below shows: one plan task with two rows, one still running. */
   const run: ProgressRun = {
     runId: 'run-42',
     name: '任务团队 · 2 个任务',
     anchorSeq: 1,
     members: [
-      progressMember(1, '执行', 'completed'),
-      progressMember(2, '执行'),
+      progressMember(1, '任务 1 · 读代码', 'completed', { label: '执行' }),
+      progressMember(2, '任务 1 · 读代码', undefined, { label: '检查' }),
     ],
     startedAt: 1_000,
   }
 
-  it('renders no detail popover anywhere on the tab', () => {
+  it('renders no detail card anywhere on the tab', () => {
     const t = translator('zh')
     const view = renderProgress({
       t,
@@ -1830,7 +1825,7 @@ describe('client progress tab: member pills jump straight to the child session',
     expect(elements.some((element) => element.props['data-gw-progress-fact'] !== undefined)).toBe(false)
   })
 
-  it('renders one open pill per openable row, and the pill opens that row', () => {
+  it('renders one pill per openable row, and each pill opens its own child session', () => {
     const t = translator('zh')
     const opened: string[] = []
     const view = renderProgress({
@@ -1840,18 +1835,20 @@ describe('client progress tab: member pills jump straight to the child session',
       canOpen: (childId: string) => childId === 'child-1',
       openChild: (childId: string) => { opened.push(childId) },
     })
-    const pills = walk(view.run()).filter((element) => element.props['data-gw-progress-open'] === true)
-    // Two rows in this stage, one of them openable: exactly one pill, and it opens it.
+    const pills = walk(view.run()).filter((element) => element.props['data-gw-progress-open'] !== undefined)
+    // Two rows, one of them openable: exactly one button pill, and it opens that row.
     expect(pills).toHaveLength(1)
+    expect(pills[0]!.props['data-gw-progress-open']).toBe('child-1')
     ;(pills[0]!.props['onClick'] as () => void)()
     expect(opened).toEqual(['child-1'])
     // The pill says where it goes, in both languages.
     for (const locale of ['zh', 'en']) {
       expect(translate(locale, 'progress.member.open'), locale).not.toBe('progress.member.open')
     }
+    expect(String(pills[0]!.props['aria-label'])).toContain(translate('zh', 'progress.member.open'))
   })
 
-  it('keeps an unopenable row inert: no pill, no click anywhere on the card', () => {
+  it('still shows every row when nothing can be opened, and nothing is clickable', () => {
     const t = translator('zh')
     const view = renderProgress({
       t,
@@ -1860,11 +1857,39 @@ describe('client progress tab: member pills jump straight to the child session',
       canOpen: () => false,
       openChild: () => { throw new Error('must not open an unopenable row') },
     })
-    // No pills at all: the only click handlers left on the tab are the zoom buttons.
-    expect(walk(view.run()).filter((element) => element.props['data-gw-progress-open'] === true)).toHaveLength(0)
+    // Both rows keep their pill, as plain spans: the topology is unchanged, the action is
+    // simply absent.
+    const pills = walk(view.run()).filter((element) => element.props['data-gw-progress-pill'] !== undefined)
+    expect(pills.map((pill) => pill.props['data-gw-progress-pill'])).toEqual([1, 2])
+    expect(walk(view.run()).filter((element) => element.props['data-gw-progress-open'] !== undefined)).toHaveLength(0)
     for (const element of walk(view.run())) {
       if (element.props['data-progress-zoom'] !== undefined) continue
-      expect(element.props['onClick'], String(element.props['data-gw-progress-node'] ?? element.props['data-gw-progress-member'] ?? '')).toBeUndefined()
+      expect(element.props['onClick'], String(element.props['data-gw-progress-task'] ?? element.props['data-gw-progress-node'] ?? '')).toBeUndefined()
+    }
+  })
+
+  it('keeps a click on a stage or on a blank card area inert', () => {
+    const t = translator('zh')
+    const view = renderProgress({
+      t,
+      progressT: t,
+      useGrokProgress: (select: (value: unknown) => unknown) => select({ runs: [run], activeRun: run }),
+      canOpen: () => true,
+      openChild: () => { throw new Error('a card is not a control') },
+    })
+    const elements = walk(view.run())
+    const stages = elements.filter((element) => element.props['data-gw-progress-node'] === true)
+    expect(stages).toHaveLength(bundle.GROK_WORKFLOW_PROGRESS.stages.length)
+    for (const stage of stages) {
+      expect(stage.props['onClick'], String(stage.props['data-node-key'])).toBeUndefined()
+      expect(stage.props['tabIndex']).toBeUndefined()
+      expect(stage.props['role']).toBeUndefined()
+    }
+    const cards = elements.filter((element) => typeof element.props['data-gw-progress-task'] === 'string')
+    expect(cards.length).toBeGreaterThan(0)
+    for (const card of cards) {
+      expect(card.props['onClick'], String(card.props['data-gw-progress-task'])).toBeUndefined()
+      expect(card.props['tabIndex']).toBeUndefined()
     }
   })
 })
@@ -1899,47 +1924,46 @@ describe('client progress tab: styles, zoom and empty snapshots', () => {
     expect(progress.css).toContain('@media (max-width: 480px)')
     // …and the track itself turns vertical under 480px (no sideways scroll).
     expect(progress.css).toMatch(/@media \(max-width: 480px\)[\s\S]*flex-direction: column/)
-    // 28px rings, sized from the zoom variable rather than a fixed px font.
+    // 28px rings at a fixed size: the sizes are plain px again now that the zoom factor
+    // is gone, so nothing multiplies the typography behind the reader's back.
     expect(progress.css).toContain('width: 28px')
-    expect(progress.css).toContain('--gw-zoom')
+    expect(progress.css).not.toContain('--gw-zoom')
   })
 
-  it('puts the open stage panel below the spine and never inside the flex line', () => {
+  it('puts the task band below the spine and never inside the flex line', () => {
     const t = translator('zh')
     const run: ProgressRun = {
       runId: 'run-branch',
       name: '任务团队',
       anchorSeq: 1,
-      members: [progressMember(1, '执行', 'completed'), progressMember(2, '执行', undefined)],
+      members: [
+        progressMember(1, '任务 1 · 读代码', 'completed', { label: '执行' }),
+        progressMember(2, '任务 1 · 读代码', undefined, { label: '检查' }),
+      ],
     }
     const tree = progress.component({ t, progressT: t, useGrokProgress: (select: (value: unknown) => unknown) => select({ runs: [run], activeRun: run }) })
     const elements = walk(tree)
     const track = elements.find((element) => element.props['data-gw-progress-track'] === true)!
-    const branch = elements.find((element) => typeof element.props['data-gw-progress-branch'] === 'string')
-    expect(branch, 'the running stage opens its branch by default').toBeDefined()
-    expect(branch!.props['id']).toBe('gw-branch-stage:execute')
-    // The regression: the branch used to be a `width: 100%` sibling inside the
-    // horizontal track, so opening it took its width out of the segments and crushed
-    // every one of them to ~20px. It must live outside the track's flex line.
-    expect(walk(track.children).some((element) => element.props['data-gw-progress-branch'] !== undefined)).toBe(false)
-    // It carries the state its stem is coloured from, now that it is not a segment child.
-    expect(branch!.props['data-state']).toBe('doing')
-    // The owning segment is a static mark: no accordion wiring points at the panel.
-    const execute = elements.find((element) => element.props['data-node-key'] === 'stage:execute')!
-    expect(execute.props['aria-expanded']).toBeUndefined()
-    expect(execute.props['aria-controls']).toBeUndefined()
-    // A running stage's connector flows into it, and the meta line carries a tooltip
-    // because a narrow column clips it with an ellipsis.
+    const band = elements.find((element) => element.props['data-gw-progress-tasks'] === true)!
+    expect(band, 'the band renders below the spine').toBeDefined()
+    // The regression the two tracks exist for: a `width: 100%` card inside the horizontal
+    // flex line took its width out of the segments and crushed every one of them.
+    expect(walk(track.children).some((element) => element.props['data-gw-progress-task'] !== undefined)).toBe(false)
+    expect(walk(band.children).some((element) => element.props['data-gw-progress-node'] !== undefined)).toBe(false)
+    // The card names the line it hangs from, which is what the wires are measured against.
+    const card = elements.find((element) => typeof element.props['data-gw-progress-task'] === 'string')!
+    expect(card.props['data-owner']).toBe('stage:execute')
+    expect(card.props['data-state']).toBe('doing')
+    // A running stage's connector flows on, and every meta line keeps its tooltip because
+    // a narrow column clips it with an ellipsis.
     expect(elements.some((element) => element.props['data-gw-progress-link'] === true && element.props['data-flowing'] === 'true')).toBe(true)
     const metas = elements.filter((element) => element.props['data-gw-progress-meta'] === true)
     expect(metas.length).toBeGreaterThan(0)
     for (const meta of metas) expect(typeof meta.props['title']).toBe('string')
   })
 
-  it('explains a branch that has no rows of its own, instead of showing an empty panel', () => {
+  it('leaves a stage with no rows out of the band and says so on its own meta line', () => {
     const t = translator('zh')
-    // A settled run opens nothing, so force the default open onto the empty start
-    // branch: the doing row below belongs to a different stage and leaves start empty.
     const run: ProgressRun = {
       runId: 'run-empty-branch',
       name: '任务团队',
@@ -1951,15 +1975,19 @@ describe('client progress tab: styles, zoom and empty snapshots', () => {
       progressT: t,
       useGrokProgress: (select: (value: unknown) => unknown) => select({ runs: [run], activeRun: run }),
     }))
-    const panel = tree.find((element) => element.props['data-gw-progress-branch'] === 'stage:verify')
-    expect(panel, 'the doing stage opens its panel').toBeDefined()
-    // Stages are static marks now: no stage carries a click handler.
+    // Only the stage that owns the row gets a card; the six other stages stay marks with
+    // their own sentence, so an empty band never reads as missing work.
+    const cards = tree.filter((element) => typeof element.props['data-gw-progress-task'] === 'string')
+    expect(cards.map((card) => card.props['data-owner'])).toEqual(['stage:verify'])
+    const start = tree.find((element) => element.props['data-node-key'] === 'stage:start')!
+    expect(String(texts(start).join(' '))).toContain(translate('zh', 'progress.notReported'))
+    // Stages are static marks: no stage carries a click handler.
     for (const node of tree.filter((element) => element.props['data-gw-progress-node'] === true)) {
       expect(node.props['onClick'], String(node.props['data-node-key'])).toBeUndefined()
     }
   })
 
-  it('draws the state ring and one connector axis, without the head-striking hairline', () => {
+  it('draws the state ring, one connector axis and the wire layer', () => {
     // The ring is geometry in CSS; its colour is the inline `borderColor` from
     // `stateColor`. Without these rules the mark renders as an empty inline span.
     expect(progress.css).toContain('.gw-progress-ring {')
@@ -1967,43 +1995,42 @@ describe('client progress tab: styles, zoom and empty snapshots', () => {
     expect(progress.css).toContain('border-radius: 50%')
     expect(progress.css).toContain('.gw-progress-glyph')
     // The per-segment hairline sat at `top: 23px` behind a transparent head and struck
-    // through the ring and the label; the axis is now the connector between segments,
-    // on the ring's centre line (13px).
+    // through the ring and the label; the axis is the connector between segments, on the
+    // ring's centre line (6px segment pad + 14px half-ring = 19px).
     expect(progress.css).not.toContain('.gw-progress-seg-line')
-    expect(progress.css).toMatch(/\.gw-progress-link \{[^}]*margin-top: 13px/)
-    expect(progress.css).toContain('.gw-progress-branch[data-state="doing"] .gw-progress-stem')
+    expect(progress.css).toMatch(/\.gw-progress-link \{[^}]*margin-top: 19px/)
+    // The band's connector is the measured wire layer, not a CSS drawing: the trunk and the
+    // branches have to know where the owner ring actually landed.
+    expect(progress.css).toContain('.gw-progress-wires')
+    expect(progress.css).toContain('pointer-events: none')
     // Motion stays decoration: both the pulse and the flowing dashes stop on request.
     expect(progress.css).toMatch(/prefers-reduced-motion: reduce[\s\S]*gw-progress-link\[data-flowing="true"\]/)
     // A narrow column stacks the ring above the label instead of squeezing the label.
     expect(progress.css).toMatch(/@media \(max-width: 720px\)[\s\S]*flex-direction: column/)
   })
 
-  it('zooms through font-size and remembers the factor, clamped to its range', () => {
-    expect(progress.zoom).toEqual({ min: 0.8, max: 1.6, step: 0.1 })
-    const memory = new Map<string, string>()
-    const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
-    Object.defineProperty(globalThis, 'localStorage', {
-      configurable: true,
-      writable: true,
-      value: {
-        getItem: (key: string) => (memory.has(key) ? memory.get(key)! : null),
-        setItem: (key: string, value: string) => { memory.set(key, value) },
-      },
-    })
-    try {
-      expect(progress.readZoom()).toBe(1)
-      progress.writeZoom(1.3)
-      expect(memory.get('dsh.gw.progress.zoom')).toBe('1.3')
-      expect(progress.readZoom()).toBe(1.3)
-      progress.writeZoom(9)
-      expect(progress.readZoom()).toBe(1.6)
-      progress.writeZoom(0.1)
-      expect(progress.readZoom()).toBe(0.8)
-      progress.writeZoom(1)
-      expect(progress.readZoom()).toBe(1)
-    } finally {
-      if (descriptor === undefined) delete (globalThis as unknown as { localStorage?: unknown }).localStorage
-      else Object.defineProperty(globalThis, 'localStorage', descriptor)
+  it('ships no zoom control and no zoom state any more', () => {
+    // The mockup's zoom pill was chrome, not information: the tab is one layout at one
+    // size, and a stored factor was a second source of geometry the wires would have had
+    // to be re-measured against. Nothing reads or writes it now.
+    expect(progress.css).not.toContain('--gw-zoom')
+    expect(progress.css).not.toContain('.gw-progress-zoom')
+    const t = translator('zh')
+    const run: ProgressRun = {
+      runId: 'run-zoom',
+      name: '任务团队',
+      anchorSeq: 1,
+      members: [progressMember(1, '执行', 'completed')],
+      stopReason: 'completed',
+    }
+    const elements = walk(progress.component({ t, progressT: t, useGrokProgress: (select: (value: unknown) => unknown) => select({ runs: [run], activeRun: run }) }))
+    // The only controls left on the tab are the row pills, and none of them is a zoom.
+    expect(elements.some((element) => element.props['data-progress-zoom'] !== undefined)).toBe(false)
+    expect(elements.some((element) => typeof element.props['style'] === 'object' && element.props['style'] !== null && '--gw-zoom' in (element.props['style'] as Record<string, unknown>))).toBe(false)
+    for (const locale of ['zh', 'en']) {
+      expect(translate(locale, 'progress.zoomIn')).toBe('progress.zoomIn')
+      expect(translate(locale, 'progress.zoomOut')).toBe('progress.zoomOut')
+      expect(translate(locale, 'progress.zoomReset')).toBe('progress.zoomReset')
     }
   })
 

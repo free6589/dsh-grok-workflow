@@ -3,6 +3,47 @@
 Notable user-facing changes are recorded here in English and Simplified Chinese.
 用户可见的功能和修复会在这里以英文和简体中文记录。
 
+## [0.12.19] - 2026-11-21
+
+### Changed / 变更
+
+- **The Progress tab is the mockup's two tracks: a fixed seven-stage spine and a vertical task band / 进度页改成效果图的双带：固定七段脊 + 竖向任务带** —
+  The spine is exactly the seven template stages (`起点`/`规划`/`执行`/`检查`/`汇总`/`回答`/`终点`)
+  in one horizontal row, whatever the plan declares: a `任务 n · …` row group is a card in the
+  band below, never an extra segment squeezing the seven. Each card is joined to the stage line
+  that owns it by a measured trunk and one branch per card (a plan task hangs off `执行`; a row
+  whose phase names a stage hangs off that stage), so a running task's connector joins the line
+  it actually runs under. Every row keeps its own pill and jumps straight to its child session;
+  the card itself, the stage marks and the blank card area are inert. Stage meta lines now carry
+  the measured row time and a 3 px rail draws it as length (baseline: the slowest stage of the
+  run), and a settle bar groups the declared rows by outcome. Removed: the accordion branch
+  panel, the `+N` collapse line, the member cards, and the zoom control (with its stored factor,
+  its three copy keys and the `--gw-zoom` multiplier). Failure retry stays deferred (Phase 2),
+  and nothing here ships a retry affordance.
+  / 脊就是模板的七段（`起点`/`规划`/`执行`/`检查`/`汇总`/`回答`/`终点`），无论计划声明多少任务都横排
+  一行：`任务 n · …` 这样的行组是下方带里的一张卡，不再多出一个段去挤那七段。每张卡用实测的干线和
+  一支支线接在**拥有它的那条段线**上（计划任务挂 `执行`；phase 本身点名某段的行挂那一段），所以
+  运行中的任务接的正是它实际跑在下面的那条线。每行仍保留自己的胶囊，点了直达对应子会话；卡片本身、
+  阶段、卡片空白处全部 inert。段的 meta 行现在带实测行耗时，下面 3 px 的条把它画成长度（基线是本次
+  运行最慢的一段），顶部结算条按结果分布已声明的行。删掉了：手风琴分支面板、`+N` 收起行、成员卡，
+  以及缩放控件（连同它存的倍率、三条文案和 `--gw-zoom` 倍率）。失败重试仍推迟（Phase 2），这次
+  没有发布任何重试入口。
+
+### Fixed / 修复
+
+- **The real tab matches `flow.html` again / 真机重新对齐效果图** —
+  `docs/knowledge/evidence/progress-tab-mockup-2026-11-21/flow.html` is the reference; the tab had
+  drifted from it (rows lived inside one opened stage instead of under the spine, and a
+  jump-to-first-failure control fronted the track). The mockup is synced in the same commit: the
+  zoom pill is gone, and the settle bar is documented as always present once a run exists.
+  Geometry evidence — spine row count, trunk x per owner, branch y per card, pill targets, inert
+  clicks, and the removed-element sweep at nine scenario/width pairs — is in
+  `docs/knowledge/evidence/progress-tab-two-track-2026-11-21/`.
+  / `flow.html` 是参照物，而真机已经偏离它（行挤在一个被展开的阶段里，而轨道前面还挂着一个「跳到首个
+  失败」）。本次同提交同步了效果图：缩放胶囊删除，结算条注明「只要有一次运行就始终存在」。几何证据
+  （每个宽度下的脊行数、每条干线的 x、每张卡支线的 y、胶囊目标、inert 点击、以及被删元素的扫描）在
+  `docs/knowledge/evidence/progress-tab-two-track-2026-11-21/`。
+
 ## [0.12.18] - 2026-11-21
 
 ### Changed / 变更

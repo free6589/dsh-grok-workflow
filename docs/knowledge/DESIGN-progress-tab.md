@@ -148,15 +148,17 @@
 - **状态环**：`.gw-progress-ring`（28×28、`border: 2px solid --dsw-alias-state-idle-primary`、
   `border-radius: 50%`）+ `.gw-progress-glyph`；颜色由内联 `borderColor`/`color` 取
   `PROGRESS_STATE_COLOR`，`pending` 因此是空心环而不是空白。
-- **连接线**：`segment 之间`一条轴线（`.gw-progress-link`，18×2px，`margin-top: 13px` 与环心同高）；
+- **连接线**：`segment 之间`一条轴线（`.gw-progress-link`，18×2px，`margin-top: 19px` = 段 6px 上内距 + 14px 半环，与环心同高）；
   `data-filled` 只在该段 `done` 时填绿，`data-flowing` 表示下一段正在跑（蓝色流动虚线）。
   segment 内部的横线已删除（旧实现会在透明 head 后面横穿环与 label）。
 - **doing 脉冲只在 CSS**（`@keyframes gw-progress-pulse` 作用于 doing 的环），
   `@media (prefers-reduced-motion: reduce)` 同时停掉脉冲与流动虚线。
-- **缩放**：`--gw-zoom` + `font-size: calc(13px * var(--gw-zoom))`，`localStorage['dsh.gw.progress.zoom']`（0.8–1.6，步长 0.1）；storage 被拒只损失偏好，不损失 Tab。
-- **键盘 / aria**：轨道 `role="group"` + `aria-label`；节点是 `button`，`aria-label` = `「阶段 · 状态」`，`aria-expanded` 表示详情是否展开；roving tabindex（恰好一个 0，其余 −1），`←/→/Home/End` 移动并同步焦点。
+- **缩放（0.12.19 删除）**：曾经的 `--gw-zoom` 倍率、`localStorage['dsh.gw.progress.zoom']` 与三颗
+  按钮一起移除——它是界面装饰而不是信息，而且会把实测的连线几何再乘一次。字号改为固定 px。
+- **键盘 / aria**：轨道 `role="group"` + `aria-label`；段是静态 `li`（无 `tabIndex`、无 `onClick`、无 `aria-expanded`），`aria-label` = `「阶段 · 状态 · meta」`；唯一的控件是行胶囊（`button`，`aria-label` = `「打开子会话 · 行名」`）。
 - **窄屏**：`@media (max-width: 720px)` 收紧间距、连接线收窄，head 转为竖排（环在上、label 在下）；
-  `@media (max-width: 480px)` 轨道转竖排 step list（连接线隐藏）、详情变为**底部抽屉**（字段单列）。
+  `@media (max-width: 480px)` 轨道转竖排 step list（连接线与连带 SVG 一起隐藏），任务带回到 12px 内距、
+  卡片满宽——这一宽度下没有画干线的地方，顺序本身承载拓扑（见 §17）。
 - **展开分支在脊柱之外**：见 §14。
 
 ## 10. 降级矩阵
@@ -386,3 +388,61 @@ Phase 2（失败重试）暂不做。本节记录实际改动。
 3. C 在 ≤480 px 的底部抽屉形态下怎么排：缩进 + 连线，还是两行合成一张卡（执行/检查各一行）。
 4. E 切换历史 run 时，header 的百分比与「跳转到首个失败」是否跟着切（`selectActiveRun`
    目前假定只有一个活动 run）。
+
+## 17. 双带落地：固定脊 + 竖向任务带（2026-11-21，0.12.19）
+
+参照物是 `docs/knowledge/evidence/progress-tab-mockup-2026-11-21/flow.html`（§15 的 A+C+D+B 组合）。
+本节只记**实际做了什么**与**仍然不做什么**；几何证据在
+`docs/knowledge/evidence/progress-tab-two-track-2026-11-21/`（9 个场景×宽度 + 两张图），
+组件与测量在 `src/client/index.js`（`ProgressView`、`ProgressNode`、`ProgressTaskCard`、
+`ProgressPill`、`measureProgressWires`、`progressSettleParts`）。
+
+### 17.1 结构（`CONFIRMED`）
+
+```text
+section.gw-progress
+  style            ← 作用域样式表，随 Tab 卸载
+  .gw-progress-head       标题 + 「已结算/已声明 · 百分比」（live region）
+  .gw-progress-settle     结算条（按 outcome 分段，虚线 = 未结算）+ 图例；有运行就一直在
+  .gw-progress-flow
+    ul.gw-progress-track  7 段固定脊（每段：环 + label + meta + 3px 耗时条）+ 6 条段间连接线
+    ul.gw-progress-tasks  任务带：每组行一张卡（卡 = 环 + 名称 + 已结算/耗时 + 行胶囊）
+    svg.gw-progress-wires 实测的干线（每 owner 一条）+ 支线（每卡一条，带箭头）
+```
+
+- **脊只有 7 段。** `node.kind !== 'extra'` 才进脊；`任务 n · …` 这类计划任务进任务带。所以计划
+  任务再多，七个模板段也不会被挤窄（§15.2 的第 1 条盲点）。
+- **任务带按 owner 挂线**：`data-owner` = `stage:execute`（计划任务，引擎在 `执行` 槽里宣告它）
+  或该行 phase 点名的段。干线 x = 该段圆环中心 x，支线 y = 卡片中线 y，终点 = 卡片左边
+  （`viewBox` 用 `.gw-progress-flow` 的相对坐标）。
+- **卡与段都是 inert**：没有 `onClick`、没有 `tabIndex`。唯一控件是行胶囊；`canOpen(childId)` 为假
+  时胶囊退化成 `span`（形状保留、不可点），因此打不开的行不会跳到别的会话。
+- **实测而不是估算**：干线 x 是 flex 折出来的结果，只能量。`useEffect` 每次渲染后量一次，并用
+  `ResizeObserver`（有的话）+ `window.resize` 重画；测量结果与上一次相同则不触发渲染，所以收敛
+  在 2–3 帧内结束。没有 layout 的宿主（桩渲染器、零宽列）量不到就不画连线，任务带退化成普通列表。
+- **窄屏（≤480 px）**：脊转竖排 step list，`.gw-progress-wires` 与段间连接线一起隐藏，任务带
+  回到 12px 内距、卡片满宽。这一宽度下没有画干线的地方，顺序即拓扑——这是**明确的取舍**，
+  不是遗漏。
+
+### 17.2 时间（`CONFIRMED`，口径同 §15.6）
+
+- 段的耗时 = 该段各行 `endedAt - startedAt` 之和，**两端都在才算**；缺一端的分段不计，整段没有
+  可测行则该段 `data-empty="true"`（虚线轨道），不画零长度填充。
+- 耗时条基线 = 本次运行里最慢的一段（跨段可比、跨运行不可比）；同一数字同时写在 meta 行，
+  读屏不依赖条长。
+- 结算条的分段宽度 = 该 outcome 的行数 ÷ 已声明行数；`未结算` 画成虚线缺口，因为那里没有结果。
+
+### 17.3 明确删除（`CONFIRMED`）
+
+手风琴分支面板与 `+N` 收起行（`.gw-progress-branch/members/member/more/stem`）、跳到首个失败
+按钮、缩放控件（`PROGRESS_ZOOM_*`、`readProgressZoom`/`writeProgressZoom`、三颗按钮、三条文案、
+`--gw-zoom` 倍率）、以及 §16 已删的详情卡。测试里用 `data-gw-progress-*` 逐个断言它们的缺席
+（`test/client.spec.ts`、`test/progress-connector.spec.ts`），浏览器证据里另有
+`removed={jump:0,branch:0,member:0,more:0,detail:0,zoom:0,retry:0,copyButton:0}` 的扫描。
+
+### 17.4 仍然不做（Phase 2 / 未立项）
+
+- **失败重试**：仍然没有（用户已定推迟）。`src/progress-tab.ts` 的 `details`/`detailFor` 仍照收
+  `stage-detail` 事件，视图不消费；将来立项时不必改 fold。
+- **run 历史条（E）**、**跨任务依赖箭头（F）**：不画事件流里没有的关系。
+- **zoom**：不复活。要更大的字请调浏览器/DSH 字号，Tab 不再自己造一个倍率。

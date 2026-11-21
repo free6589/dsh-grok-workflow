@@ -49,9 +49,6 @@ export const PROGRESS_VIEW_TARGET = 'grok-progress'
 /** Conversation node kind owned by the tab (namespaced for the same reason). */
 export const PROGRESS_NODE_KIND = 'grok-progress-run'
 
-/** `localStorage` key holding the reader's zoom factor. */
-export const PROGRESS_ZOOM_STORAGE_KEY = 'dsh.gw.progress.zoom'
-
 /** The five states the track colours; `cancelled` reuses the blocked colour. */
 export type ProgressState = 'pending' | 'doing' | 'done' | 'blocked' | 'cancelled' | 'failed'
 

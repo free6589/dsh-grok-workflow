@@ -2,6 +2,23 @@
 
 Real commands and results only. Do not add expected results here.
 
+## 已发版 `0.12.19` — 2026-11-21 (`CONFIRMED`, agent-12)
+
+**Changed:** 进度页真机对齐 `flow.html`：固定七段脊 + 竖向任务带 + 实测 SVG 干线/支线 + 结算条；
+删手风琴分支、跳失败按钮、缩放控件；`package.json`/`package-lock.json` 0.12.19；双语 README 与
+CHANGELOG 同步；效果图 `flow.html` 同步删缩放胶囊。
+
+| state | command | result |
+| --- | --- | --- |
+| working tree | `npm run typecheck` | exit **0** — 0 errors |
+| working tree | `npm run lint` | exit **0** — 23 warnings / 0 errors（与 0.12.18 同量级，无新增） |
+| working tree | `npm run build` + `cmp src/client/index.js lib/client.js` | 字节一致（253678 bytes） |
+| working tree | `npm run verify:lib` | `lib/` 与 `src/` 构建字节一致 |
+| working tree | `npm test` | exit **0** — **73 files / 1349 tests PASS** |
+| Chromium (真 bundle + 真样式表) | `node docs/knowledge/evidence/progress-tab-two-track-2026-11-21/run.mjs` | 9 个场景×宽度全部 PASS：脊 `single-row (y=64, 7 columns)`；`execute` 干线 `M446`=环心 446；支线 y=卡中线；`removed` 全 0；`inertClicks.openedDelta=0`；`pills.targets==opened` |
+| narrow | 同上（480/390 px，iframe 视口） | 脊 `stacked (7 rows)`、任务带 `padding-left:12px`、`overflowX=false`、`overflowRight=0` |
+| real DSH GUI | — | **NOT_RUN**：本轮没在宿主里截图，只证明 bundle+样式表在 Chromium 里的布局与交互 |
+
 ## 已发版 `0.12.16` — 2026-11-21 (`CONFIRMED`, lead 收尾)
 
 **Changed:** `[Unreleased]` 三条归档为 `## [0.12.16]`（总开关、`/grok` 容错、进度页修复）；

@@ -73,6 +73,7 @@ function loadBundle(): Bundle {
     },
     useState: (initial: unknown) => [typeof initial === 'function' ? (initial as () => unknown)() : initial, () => {}],
     useEffect: () => {},
+    useRef: (initial: unknown) => ({ current: initial === undefined ? null : initial }),
     useMemo: (factory: () => unknown) => factory(),
     useSyncExternalStore: (_subscribe: unknown, getSnapshot: () => unknown) => getSnapshot(),
   }
@@ -289,66 +290,80 @@ describe('client progress tab: the state glyph', () => {
   })
 })
 
-describe('client progress tab: static spine with a default-open branch (A+C)', () => {
-  it('opens the first failed branch by default, and only one branch at a time', () => {
-    const nodes = walk(renderRun(run)).filter((element) => element.props['data-gw-progress-node'] === true)
-    // Stages are static marks: none of them is expandable or in the tab order.
-    expect(nodes.filter((node) => node.props['aria-expanded'] === true)).toHaveLength(0)
-    expect(nodes.filter((node) => node.props['tabIndex'] === 0)).toHaveLength(0)
-    for (const node of nodes) expect(node.props['onClick']).toBeUndefined()
-    // Only the default-open branch renders.
-    const branches = walk(renderRun(run)).filter((element) => element.props['data-gw-progress-branch'] !== undefined)
-    expect(branches).toHaveLength(1)
-    expect(branches[0]!.props['data-gw-progress-branch']).toBe('stage:verify')
-    // The jump button exists exactly when there is a failure.
-    expect(walk(renderRun(run)).some((element) => element.props['data-gw-progress-jump'] === true)).toBe(true)
+describe('client progress tab: two tracks (fixed spine + task band)', () => {
+  /** The run every case below shows: a plan task with two rows, one still running. */
+  const taskRun: ProgressRun = {
+    runId: 'run-task',
+    name: '任务团队 · 2 个任务',
+    anchorSeq: 1,
+    members: [
+      { seq: 1, label: '执行', childId: 'child-1', order: 0, phase: '任务 1 · 读代码', outcome: 'completed' },
+      { seq: 2, label: '检查', childId: 'child-2', order: 1, phase: '任务 1 · 读代码', outcome: 'completed' },
+      { seq: 3, label: '执行', childId: 'child-3', order: 2, phase: '任务 2 · 补测试' },
+    ],
+  }
+
+  const runOf = (members: ProgressRun['members']): ProgressRun => ({
+    runId: 'run-under-test',
+    name: '任务团队',
+    anchorSeq: 1,
+    members,
   })
 
-  it('opens the doing branch when there is no failure, and nothing when settled', () => {
-    const running: ProgressRun = {
-      runId: 'run-doing',
-      name: '任务团队',
-      anchorSeq: 1,
-      members: [progressMember(1, '执行')],
-    }
-    const branches = walk(renderRun(running))
-      .filter((element) => element.props['data-gw-progress-branch'] !== undefined)
-    expect(branches).toHaveLength(1)
-    expect(branches[0]!.props['data-gw-progress-branch']).toBe('stage:execute')
-    const settled: ProgressRun = {
-      runId: 'run-settled',
-      name: '任务团队',
-      anchorSeq: 1,
-      members: [progressMember(1, '执行', 'completed')],
-      stopReason: 'completed',
-    }
-    expect(walk(renderRun(settled))
-      .filter((element) => element.props['data-gw-progress-branch'] !== undefined))
-      .toHaveLength(0)
-    expect(walk(renderRun(settled)).some((element) => element.props['data-gw-progress-jump'] === true)).toBe(false)
+  it('keeps the spine at the seven fixed stages, in one row, whatever the plan declares', () => {
+    const tree = walk(renderRun(taskRun))
+    const spine = tree.filter((element) => element.props['data-gw-progress-node'] === true)
+    expect(spine).toHaveLength(progress.stages.length)
+    expect(spine.map((node) => node.props['data-node-key'])).toEqual([
+      'stage:start', 'stage:plan', 'stage:execute', 'stage:verify', 'stage:synthesize', 'stage:answer', 'stage:end',
+    ])
+    // The plan tasks are cards in the band, never spine segments.
+    expect(spine.some((node) => String(node.props['data-node-key']).startsWith('phase:'))).toBe(false)
+    const tasks = tree.filter((element) => typeof element.props['data-gw-progress-task'] === 'string')
+    expect(tasks.map((card) => card.props['data-gw-progress-task'])).toEqual([
+      'phase:任务 1 · 读代码',
+      'phase:任务 2 · 补测试',
+    ])
   })
 
-  it('shows three member cards and a real +N line past three members', () => {
-    const many: ProgressRun = {
-      runId: 'run-many',
-      name: '任务团队',
-      anchorSeq: 1,
-      members: [
-        progressMember(1, '执行', 'completed'),
-        progressMember(2, '执行', 'completed'),
-        progressMember(3, '执行', 'completed'),
-        progressMember(4, '执行', 'completed'),
-        progressMember(5, '执行'),
-      ],
-    }
-    const tree = renderRun(many)
-    const cards = walk(tree).filter((element) => element.props['data-gw-progress-member'] !== undefined)
-    expect(cards).toHaveLength(3)
-    const more = walk(tree).find((element) => element.props['data-gw-progress-more'] !== undefined)!
-    expect(more.props['data-gw-progress-more']).toBe(2)
-    expect(texts(more).join('')).toContain('+2')
-    // The failed badge and the meta count line travel on the segment head.
-    const verify = walk(tree).find((element) => element.props['data-node-key'] === 'stage:execute')!
-    expect(String(texts(verify).join(''))).toContain('5')
+  it('hangs every card off the stage line that owns it', () => {
+    const tree = walk(renderRun(taskRun))
+    const cards = tree.filter((element) => typeof element.props['data-gw-progress-task'] === 'string')
+    // A plan task is announced in the execute slot: it joins the execute line.
+    for (const card of cards) expect(card.props['data-owner']).toBe('stage:execute')
+    // A row whose phase names a stage joins that stage's line instead.
+    const verifyOnly = walk(renderRun(runOf([
+      { seq: 1, label: '检查', childId: 'child-v', order: 0, phase: '检查', outcome: 'completed' },
+    ]))).filter((element) => typeof element.props['data-gw-progress-task'] === 'string')
+    expect(verifyOnly).toHaveLength(1)
+    expect(verifyOnly[0]!.props['data-owner']).toBe('stage:verify')
+  })
+
+  it('renders the cards below the spine, and the spine outside the band', () => {
+    const tree = walk(renderRun(taskRun))
+    const track = tree.find((element) => element.props['data-gw-progress-track'] === true)!
+    const band = tree.find((element) => element.props['data-gw-progress-tasks'] === true)!
+    expect(band).toBeDefined()
+    // The regression the two tracks exist for: a full-width card inside the horizontal
+    // flex line took its width out of the segments and crushed all seven of them.
+    expect(walk(track.children).some((element) => element.props['data-gw-progress-task'] !== undefined)).toBe(false)
+    expect(walk(band.children).some((element) => element.props['data-gw-progress-node'] !== undefined)).toBe(false)
+  })
+
+  it('carries no jump-to-failure control, no branch panel and no +N collapse line', () => {
+    const tree = walk(renderRun(run))
+    expect(tree.some((element) => element.props['data-gw-progress-jump'] === true)).toBe(false)
+    expect(tree.some((element) => element.props['data-gw-progress-branch'] !== undefined)).toBe(false)
+    expect(tree.some((element) => element.props['data-gw-progress-more'] !== undefined)).toBe(false)
+  })
+
+  it('gives every row its own pill, in plan order, with a mini arrow between two of them', () => {
+    const tree = walk(renderRun(taskRun))
+    const pills = tree.filter((element) => element.props['data-gw-progress-pill'] !== undefined)
+    expect(pills.map((pill) => pill.props['data-gw-progress-pill'])).toEqual([1, 2, 3])
+    // The arrow between the two rows of task 1 names the row it points at.
+    const minis = tree.filter((element) => element.props['data-gw-progress-mini'] !== undefined)
+    expect(minis.map((mini) => [mini.props['data-gw-progress-mini'], mini.props['data-tone']]))
+      .toEqual([[2, 'ok']])
   })
 })

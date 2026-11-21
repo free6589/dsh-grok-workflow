@@ -1,3 +1,24 @@
+Last updated: 2026-11-21 16:45 +08:00（**已发版 `0.12.19`：进度页改成效果图的双带 = 固定七段脊 + 竖向任务带** —
+`src/client/index.js` 的 `ProgressView` 重写为三段结构：`.gw-progress-settle`（按 outcome 分段的
+结算条，有运行就一直在）+ `.gw-progress-track`（**只有** 7 个模板段，`kind:'extra'` 的计划任务
+不再进脊）+ `.gw-progress-tasks`（每组行一张 inert 卡片，行胶囊直调 `openChild`）。
+新增 `measureProgressWires`：量出每个 owner 段的环心 x 与卡片中线 y，画一条干线 + 每卡一支带箭头
+的支线（相对 `.gw-progress-flow` 坐标；`ResizeObserver` + `window.resize` 重画，实测相同则不
+重渲染）；`progressNodeDuration`/`progressSettleParts`/`progressMemberState` 一并导出给测试。
+删除：手风琴分支面板与 `+N` 行、跳到首个失败按钮、缩放控件（`PROGRESS_ZOOM_*`、
+`readProgressZoom`/`writeProgressZoom`、三颗按钮、三条文案、`--gw-zoom`；`src/progress-tab.ts`
+的 `PROGRESS_ZOOM_STORAGE_KEY` 同时删除）、`.gw-progress-member/open/more/branch/stem/source`
+全套样式。文案：删 `progress.jumpToFirstFailure`/`progress.branch.showMore`/`progress.zoom*`，
+增 `progress.settle.{aria,ok,bad,warn,open,unsettled}` 与 `progress.tasks.aria`（中英齐）。
+测试：`test/client.spec.ts`（胶囊三例扩成四例：每行一颗、直达自己的 child、不可开行仍显示但
+inert、点阶段/卡片空白无反应；三条样式断言重写）与 `test/progress-connector.spec.ts`（A+C 分支
+三例换成双带五例：脊恒 7 段、owner 挂线、带在脊下方、被删元素缺席、每行一颗胶囊）同步。
+`npm run ci` exit 0 = **73 文件 / 1349 测试 PASS**。几何证据（9 个场景×宽度 + 两张图）
+`docs/knowledge/evidence/progress-tab-two-track-2026-11-21/`（1440 px 单行 7 列、owner 干线
+x=446=执行环心、支线落卡片左边、`removed` 全 0、点阶段/卡片 `openedDelta:0`、逐颗胶囊打开
+自己的 child）。**Phase 2（失败重试）仍不做**，`details`/`detailFor` 保留供将来立项。
+`test/progress-tab.spec.ts` 同步删掉 zoom 常量断言。效果图 `flow.html` 也同步删了缩放胶囊。）
+
 Last updated: 2026-11-21 16:00 +08:00（**已发版 `0.12.18`：进度页详情卡删除、胶囊直达子会话** —
 Q1/Q2 按用户拍板落地：阶段与任务的详情浮层一起删除，点卡片空白处什么都不发生；
 Phase 2（失败重试）暂不做。`src/client/index.js`：`ProgressDetail` 与详情样式/
