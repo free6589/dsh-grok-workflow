@@ -16,7 +16,7 @@ flex 行、head 换行与 720/480 断点、空阶段面板说明（`progressNode
 | 修复后工作树 | 同上 | **PASS** 48 用例 / 0 条（`geometry-after.txt`） |
 | 修复前 vs 工作树 | `node red-probe.mjs` | 4 条结构事实全部翻转（`red-probe.txt`） |
 | 工作树 | `npx vitest run test/client.spec.ts test/progress-tab.spec.ts test/progress-connector.spec.ts test/panel-links.spec.ts` | **171 passed**（112 + 34 + 10 + 16，空分支那例之前是 111+34+10+16） |
-| HEAD `72e20b9` | `npm run ci` | exit **0** — 72 files / **1344 tests PASS**，typecheck 0 错，oxlint 23 warnings / 0 errors，`verify:lib` 157 文件逐字节一致（`ci.txt`） |
+| 工作树（代码仍为 `72e20b9`，证据/文档提交后再跑一次） | `npm run ci` | exit **0** — 72 files / **1344 tests PASS**，typecheck 0 错，oxlint 23 warnings / 0 errors，`verify:lib` 157 文件逐字节一致（`ci.txt`） |
 
 **NOT_RUN:** 真机 DSH Web 面板手点；`blocked` 详情在 ≤480 px 抽屉形态的单独截图。
 
