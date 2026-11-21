@@ -289,13 +289,14 @@ describe('client progress tab: the state glyph', () => {
   })
 })
 
-describe('client progress tab: accordion spine (A+C)', () => {
-  it('opens the first failed segment by default, and only one segment at a time', () => {
+describe('client progress tab: static spine with a default-open branch (A+C)', () => {
+  it('opens the first failed branch by default, and only one branch at a time', () => {
     const nodes = walk(renderRun(run)).filter((element) => element.props['data-gw-progress-node'] === true)
-    const open = nodes.filter((node) => node.props['aria-expanded'] === true)
-    expect(open).toHaveLength(1)
-    expect(open[0]!.props['data-node-key']).toBe('stage:verify')
-    // Only the open segment renders a branch.
+    // Stages are static marks: none of them is expandable or in the tab order.
+    expect(nodes.filter((node) => node.props['aria-expanded'] === true)).toHaveLength(0)
+    expect(nodes.filter((node) => node.props['tabIndex'] === 0)).toHaveLength(0)
+    for (const node of nodes) expect(node.props['onClick']).toBeUndefined()
+    // Only the default-open branch renders.
     const branches = walk(renderRun(run)).filter((element) => element.props['data-gw-progress-branch'] !== undefined)
     expect(branches).toHaveLength(1)
     expect(branches[0]!.props['data-gw-progress-branch']).toBe('stage:verify')
@@ -303,17 +304,17 @@ describe('client progress tab: accordion spine (A+C)', () => {
     expect(walk(renderRun(run)).some((element) => element.props['data-gw-progress-jump'] === true)).toBe(true)
   })
 
-  it('opens the doing segment when there is no failure, and nothing when settled', () => {
+  it('opens the doing branch when there is no failure, and nothing when settled', () => {
     const running: ProgressRun = {
       runId: 'run-doing',
       name: '任务团队',
       anchorSeq: 1,
       members: [progressMember(1, '执行')],
     }
-    const open = walk(renderRun(running))
-      .filter((element) => element.props['data-gw-progress-node'] === true && element.props['aria-expanded'] === true)
-    expect(open).toHaveLength(1)
-    expect(open[0]!.props['data-node-key']).toBe('stage:execute')
+    const branches = walk(renderRun(running))
+      .filter((element) => element.props['data-gw-progress-branch'] !== undefined)
+    expect(branches).toHaveLength(1)
+    expect(branches[0]!.props['data-gw-progress-branch']).toBe('stage:execute')
     const settled: ProgressRun = {
       runId: 'run-settled',
       name: '任务团队',
@@ -322,7 +323,7 @@ describe('client progress tab: accordion spine (A+C)', () => {
       stopReason: 'completed',
     }
     expect(walk(renderRun(settled))
-      .filter((element) => element.props['data-gw-progress-node'] === true && element.props['aria-expanded'] === true))
+      .filter((element) => element.props['data-gw-progress-branch'] !== undefined))
       .toHaveLength(0)
     expect(walk(renderRun(settled)).some((element) => element.props['data-gw-progress-jump'] === true)).toBe(false)
   })

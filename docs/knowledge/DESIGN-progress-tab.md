@@ -277,3 +277,112 @@ red-probe、`npm run ci` 日志、可重跑的页面与断言脚本）。基线 
   用例包含一次点击展开。修复前 **40 例 / 884 条**不变量失败（仅空态通过），修复后 **0 条**。
 - **未覆盖（`NOT_RUN`）**：真机 DSH Web 面板手点（本机会话里没有本插件写的 `tool-workflow/*`
   运行）；`blocked` 详情在 ≤480 px 抽屉形态的单独截图。
+
+
+## 16. 详情卡删除与胶囊直达（2026-11-21，实现，Phase 1 落地）
+
+用户拍板：Q1 阶段与任务的详情卡一起删除；Q2 点卡片空白处什么都不发生；
+Phase 2（失败重试）暂不做。本节记录实际改动。
+
+- **删掉的东西**：`ProgressDetail` 组件与 `gw-progress-detail` 全套样式（含 ≤480 px
+  底部抽屉规则、`gw-progress-facts/row/field/actions`）；`selectedKey` / `copy` /
+  `focusedKey` / roving tabindex / `toggleSegment` / `onKeyDown` 方向键处理；
+  `detailSources` 注入点；`progress.detail.*`（18 key）、`progress.none`、
+  `progress.collapse`、`progress.branch.memberCount/blockedCount` 文案；
+  `detailFor` / `detailSources` / `parseCoordination` 的 bundle 导出。
+  `detailFields` / `detailEventType` 导出保留（fold 仍收 `stage-detail` 事件，见下）。
+- **阶段（`ProgressNode`）**：`button` → 静态 `div`，无 `onClick` / `tabIndex` /
+  `aria-expanded` / `aria-controls`；`title` tooltip 与 `aria-label` 保留。
+- **成员卡（`ProgressMemberCard`）**：`button` → 静态 `div`，无 `onClick`；
+  文案末的 `.gw-progress-member-note` 不再 `margin-left: auto`（右端让给胶囊）；
+  可开行（`childId` 非空且 `canOpen(childId)`）末尾多一个 `.gw-progress-open`
+  胶囊（文案 `progress.member.open`：「打开子会话」/「Open child session」，
+  `title` + `aria-label` 带行名），点击直调 `openChild(childId)`；
+  不可开行无胶囊、整卡 inert。
+- **分支面板**：默认展开规则不变（首个 failed，无则首个 doing，否则全收）；
+  空分支仍显示同一句 `progressNodeMeta` 说明。
+- **数据源不变量未动**：fold（四个 `tool-workflow/*` + `stage-detail` 归档到
+  `details`）与 `detailSourcesOf`（`src/progress-tab.ts`）保留——事件照收，
+  只是视图不再消费。重试（Phase 2）将来若立项，可直接用这批 `details`。
+- **测试**：`test/client.spec.ts` 的「detail ladder」整块替换为三例（无详情 DOM、
+  一行可开一胶囊且能打开、不可开行全 inert）；手风琴/aria 断言按静态阶段更新；
+  `mono` 字体断言改为 `not.toContain`（详情是唯一的 mono 用途）；
+  `test/progress-connector.spec.ts` 的两例改断「默认分支仍按 failed→doing 打开」，
+  不再断 `aria-expanded`。
+- **效果图**：`docs/knowledge/evidence/progress-tab-mockup-2026-11-21/flow.html`
+  已同步（删 hint 段落、删 inspector、任务卡 inert、胶囊为 `#child-<id>` 占位链接；
+  `flow-task-detail.png` / `flow-stage-detail.png` 两张旧截图已删除）。
+
+## 15. 候选图型评估（2026-11-21，只有设计，无施工）
+
+本节只记判断与数据边界。`src/progress-tab.ts`、`src/client/index.js`、任何测试均**未修改**，
+因此本节没有任何可运行的验证结果——所有「可以做」都是 `HYPOTHESIS`，所有「数据在」都是
+对 `src/progress-tab.ts` 的 `CONFIRMED` 阅读结论。
+
+触发点：用户在 1506×549 的真机截图上问「进度页还有什么别的流程图画法更好」。
+
+### 15.1 现状复述（CONFIRMED）
+
+- 轨道 = `PROGRESS_STAGES` 七段固定脊椎（`src/progress-tab.ts:181`），未命中任何阶段的
+  `phase` 追加为独立节点，插在 `执行` 与 `检查` 之间（§4.1）。
+- 渲染 = 单行 `flex` 等分：段内 28 px 状态环 + label（ellipsis）+ 一行 meta，段间 18 px
+  连接线（`src/client/index.js:3359` 起）。展开的分支面板在轨道**下方**（§14）。
+- 「无横向滚动」是既有断言：`test/client.spec.ts:2007` 要求 CSS 不含 `overflow-x: auto`。
+- 时间信息齐备，但只出现在详情浮层：`ProgressMemberFact.startedAt/endedAt`
+  （`src/progress-tab.ts:127-130`）、`ProgressRunFacts.startedAt/endedAt`（同文件 142-145）。
+  口径是**父会话观测到该事件的时刻**，不是子进程 CPU 时间。
+
+### 15.2 观测到的三个盲点
+
+| # | 现象 | 证据 |
+| --- | --- | --- |
+| 1 | 任务节点一多，标签全被截断 | 截图 1506 px 宽、16 个节点，`任务 2…` 至 `任务 8…` 全部 ellipsis。根因是模板段（恒 7 个）与任务段（1..N 个，N 由计划决定）共用一条等分 `flex` |
+| 2 | 并发不可见 | 工作流并发默认 10（`AGENTS.md` 架构不变量）；轨道是线性脊椎，两行并行与两行串行渲染完全相同 |
+| 3 | 耗时不可见 | 时间戳只进详情浮层（§7），轨道节点自身没有任何时间痕迹 |
+
+### 15.3 候选图型
+
+「数据来源」列只区分两件事：**现有事件已足够**（四个 `tool-workflow/*` 事件 + 外层 `seq`/`time`），
+还是**需要 recorder 扩展**（会动 `src/records.ts`，属另一批改动）。
+
+| 代号 | 图型 | 回答的问题 | 数据来源 | 不变量影响 | 代价 |
+| --- | --- | --- | --- | --- | --- |
+| A | 双带拆分：上带只放 7 个模板段，下带放真实任务节点 | 任务节点多时不再压垮模板段，标签不再截断 | 现有事件已足够（`deriveTrack` 已区分 `stage` 与追加节点） | 中：下带若要滚动，与 `client.spec.ts:2007` 的「无横向滚动」冲突，须先决定是「只对上带断言」还是「下带换行不滚动」 | 中高，需按 §14 的 8 宽度用例表重测 |
+| B | 段内耗时条：每个节点下一条 2 px 条，长度 = 该段成员总耗时 ÷ run 总时长 | 哪一段慢、卡在哪 | 现有事件已足够（`startedAt`/`endedAt` 两端都有才画，缺一端不估算） | 低：纯段内新增元素，不动等分与连接线 | 低 |
+| C | 任务内执行/检查配对：同一 `phase` 的 worker 行与 verifier 行竖向连线、检查行缩进 | 这个任务验了没、验的是什么 | 现有事件已足够（`label` 角色词，`STAGE_ROLE_LABELS` 已在用） | 低：只改分支面板内部的排列，不动轨道、不动状态与百分比 | 低 |
+| D | 结算堆积条：一条 100% 宽分段条，按 `outcome` 分色 + 计数 | 失败了几条，不用逐个点开 | 现有事件已足够（`outcome` 原话 + `declared`） | 低：替换或补充 header 里的 `7/11 · 64%` | 极低 |
+| E | Run 历史条：顶部 chip 列表，每 run 一个（名字、终态色、时长），点击切换 | 上一次跑到哪、多久 | 现有事件已足够（`foldProgressRuns` 返回全部 run，`selectActiveRun` 只挑一个，`src/progress-tab.ts:469`） | 中：引入「非活动 run」状态，需处理旧 run 无 `doing` 行的空态；`selectActiveRun` 语义要改写或并存 | 中低 |
+| F | 真依赖图（DAG，带分支与汇合） | 任务之间谁等谁 | **需要 recorder 扩展**：`run-start` 加计划（任务 id / 标题 / 依赖） | 高：现有「模板脊椎」概念要重写 | 高，且属新事件契约 |
+
+### 15.4 分批建议
+
+1. **第一批：C + D + B。** 三者都在现有 DOM 内加东西，不动等分布局，不动状态机与百分比
+   语义，风险集中在几何断言的更新（`test/client.spec.ts`、`test/progress-connector.spec.ts`）。
+2. **第二批：A。** 它解决 15.2 的第 1 条，但要动布局契约与那条 `overflow-x` 断言，
+   须单独一轮按 §14 的口径做测量（6 场景 × 8 宽度）。
+3. **第三批：E，然后 F。** E 是 §13 已列出的未做项；F 必须排在 recorder 扩展之后，
+   否则连线只能按到达顺序编，违反 §1「不显示事件流里不存在的数字/关系」。
+
+### 15.5 明确不做
+
+- **环形百分比仪表**：与 header 里已有的 `7/11 · 64%` 重复，纯装饰。
+- **ETA / 剩余时间**：事件流里没有计划总数与速率，估算即发明数字，与 §1 非目标冲突。
+- **跨任务依赖连线**：任务之间的依赖关系事件里没有。C 只画**任务内部**的 worker→verifier
+  配对，那是真事实；跨任务箭头不是。
+
+### 15.6 若将来施工的前置条件
+
+- 颜色仍全走 token，CSS 不含字面色值（§9 的既有断言）。
+- 新数字只能来自事件：`declared`、`settled`、`outcome`、时间戳两端。缺一端就写 `—`。
+- TS 纯函数与 `src/client/index.js` 手写镜像**双份 fixture 断言**（§11 的既有做法），
+  新增派生（如耗时、堆积段、配对分组）必须在两边各写一次。
+- 任何布局改动都要跑 §14 的几何用例表，而不是只看一张截图。
+
+### 15.7 未决问题（施工前必须回答）
+
+1. A 的下带：允许带内横向滚动（改断言），还是固定换行、超过 N 行折叠成「+N 个任务」？
+2. B 的条长基线：run 总时长（跨段可比），还是该段最长成员（段内可比、跨段不可比）？
+   两者信息不同，不能混用同一个视觉。
+3. C 在 ≤480 px 的底部抽屉形态下怎么排：缩进 + 连线，还是两行合成一张卡（执行/检查各一行）。
+4. E 切换历史 run 时，header 的百分比与「跳转到首个失败」是否跟着切（`selectActiveRun`
+   目前假定只有一个活动 run）。

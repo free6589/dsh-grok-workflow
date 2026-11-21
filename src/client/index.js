@@ -301,23 +301,7 @@ window.__ModuleLoader__.load({
       'progress.notReported': 'Not reported in the events',
       'progress.empty.title': 'No workflow progress in this session yet',
       'progress.empty.body': 'The track is folded from the four tool-workflow events this plugin records; it appears once a run starts.',
-      'progress.detail.title': 'Stage detail',
-      'progress.detail.close': 'Close',
-      'progress.detail.engine': 'Engine facts',
-      'progress.detail.stage': 'Stage report',
-      'progress.detail.rows': '{count} rows',
-      'progress.detail.runId': 'runId',
-      'progress.detail.seq': 'seq',
-      'progress.detail.label': 'Label',
-      'progress.detail.phase': 'Phase',
-      'progress.detail.childId': 'Child session',
-      'progress.detail.outcome': 'Outcome',
-      'progress.detail.duration': 'Duration',
-      'progress.detail.open': 'Open child session',
-      'progress.detail.copy': 'Copy coordination block',
-      'progress.detail.copied': 'Copied',
-      'progress.detail.copyFailed': 'Copy failed',
-      'progress.detail.noBlock': 'No coordination block to copy',
+      'progress.member.open': 'Open child session',
       'progress.source.stageDetail': 'Source: stage-detail event',
       'progress.source.coordination': 'Source: child coordination block',
       'progress.source.notReported': 'Source: not reported',
@@ -328,16 +312,12 @@ window.__ModuleLoader__.load({
       'progress.field.localRuntimeVerified': 'Local runtime verified',
       'progress.field.blockers': 'Blockers',
       'progress.field.nextAction': 'Next action',
-      'progress.none': '—',
       // --- Spine + accordion branch (A+C): new copy only, every old key above is untouched. ---
       'progress.jumpToFirstFailure': 'Jump to first failure',
-      'progress.collapse': 'Collapse',
-      'progress.branch.memberCount': '{count} members',
       'progress.branch.showMore': '+{more} more (show all {total})',
       'progress.branch.settledOf': '{settled}/{declared}',
       'progress.branch.running': '{count} running',
       'progress.branch.failedCount': 'Failed {count}',
-      'progress.branch.blockedCount': 'Blocked {count}',
       'progress.branch.evidenceRows': '{count} rows ran inside the plan tasks below',
       'progress.evidenceHint': 'ran inside the plan tasks listed below',
       'status.progressMissing': 'The Progress tab is not mounted: this composition has no uiConversation service, so the track cannot appear.',
@@ -516,23 +496,7 @@ window.__ModuleLoader__.load({
       'progress.notReported': '事件中没有报告',
       'progress.empty.title': '这次会话还没有工作流进度',
       'progress.empty.body': '轨道由本插件记录的四个 tool-workflow 事件折叠而成；开始一次工作流后就会出现。',
-      'progress.detail.title': '阶段详情',
-      'progress.detail.close': '关闭',
-      'progress.detail.engine': '引擎事实',
-      'progress.detail.stage': '阶段报告',
-      'progress.detail.rows': '{count} 行',
-      'progress.detail.runId': 'runId',
-      'progress.detail.seq': 'seq',
-      'progress.detail.label': '标签',
-      'progress.detail.phase': '阶段',
-      'progress.detail.childId': '子会话',
-      'progress.detail.outcome': '结果',
-      'progress.detail.duration': '耗时',
-      'progress.detail.open': '打开子会话',
-      'progress.detail.copy': '复制协调块',
-      'progress.detail.copied': '已复制',
-      'progress.detail.copyFailed': '复制失败',
-      'progress.detail.noBlock': '没有可复制的协调块',
+      'progress.member.open': '打开子会话',
       'progress.source.stageDetail': '来源：stage-detail 事件',
       'progress.source.coordination': '来源：子会话协调块',
       'progress.source.notReported': '来源：未报告',
@@ -543,16 +507,12 @@ window.__ModuleLoader__.load({
       'progress.field.localRuntimeVerified': '本机真机验证',
       'progress.field.blockers': '卡点',
       'progress.field.nextAction': '下一步',
-      'progress.none': '—',
       // --- 脊 + 手风琴分支（A+C）：只新增文案，上面旧 key 一字不动。 ---
       'progress.jumpToFirstFailure': '跳到首个失败',
-      'progress.collapse': '收起',
-      'progress.branch.memberCount': '{count} 个成员',
       'progress.branch.showMore': '+{more} 个已收起（点击展开全部 {total} 个）',
       'progress.branch.settledOf': '{settled}/{declared}',
       'progress.branch.running': '{count} 运行中',
       'progress.branch.failedCount': '失败 {count}',
-      'progress.branch.blockedCount': '阻塞 {count}',
       'progress.branch.evidenceRows': '{count} 行在下方任务节点中执行',
       'progress.evidenceHint': '在下方任务节点中执行',
       'status.progressMissing': '进度 Tab 未挂载：当前组合没有 uiConversation 服务，轨道不会出现。',
@@ -2837,11 +2797,8 @@ window.__ModuleLoader__.load({
       '.gw-progress-track { display: flex; align-items: stretch; gap: 0; box-sizing: border-box;',
       '  width: 100%; min-width: 0; padding: 10px 12px 4px; margin: 0; list-style: none; }',
       '.gw-progress-seg { flex: 1 1 0; min-width: 0; position: relative; display: flex; flex-direction: column;',
-      '  padding: 0 10px 8px; border: 0; border-right: 1px solid var(--dsw-alias-border-l2, currentColor);',
-      '  background: transparent; color: inherit; font: inherit; cursor: pointer; text-align: left; }',
+      '  padding: 0 10px 8px; border: 0; border-right: 1px solid var(--dsw-alias-border-l2, currentColor); text-align: left; }',
       '.gw-progress-seg:last-child { border-right: 0; }',
-      '.gw-progress-seg:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: -2px; border-radius: 8px; }',
-      '.gw-progress-seg[aria-expanded="true"] { background: var(--dsw-alias-fill-l2, transparent); }',
       // The head wraps instead of squeezing: the ring keeps its 28px, and a long label
       // or a failure badge moves to the next line rather than collapsing the label to 0.
       '.gw-progress-seg-head { position: relative; z-index: 1; display: flex; align-items: center; flex-wrap: wrap;',
@@ -2884,13 +2841,16 @@ window.__ModuleLoader__.load({
       '.gw-progress-branch[data-state="cancelled"] .gw-progress-stem { background: var(--dsw-alias-state-warn-primary, currentColor); }',
       '.gw-progress-members { margin: 0; padding: 0; list-style: none; min-width: 0; max-width: 100%; }',
       '.gw-progress-members > li { min-width: 0; max-width: 100%; }',
-      // A member card: state dot + name + status words on the right. Colour is never
-      // the only encoding: every card also carries an icon word (✓/…/✕/!/×) and text.
+      // A member card: state dot + name + status words. The card itself is inert;
+      // the only action is the open pill at its end. Colour is never the only
+      // encoding: every card also carries an icon word (✓/…/✕/!/×) and text.
       '.gw-progress-member { display: flex; align-items: center; gap: 8px; width: 100%; box-sizing: border-box;',
       '  min-height: 32px; margin-bottom: 6px; padding: 5px 9px; border: 1px solid var(--dsw-alias-border-l2, currentColor);',
-      '  border-radius: 9px; background: transparent; color: inherit; font: inherit; font-size: calc(12px * var(--gw-zoom, 1));',
-      '  cursor: pointer; text-align: left; }',
-      '.gw-progress-member:hover { border-color: var(--dsw-alias-state-business-primary, currentColor); }',
+      '  border-radius: 9px; background: transparent; font-size: calc(12px * var(--gw-zoom, 1)); text-align: left; }',
+      '.gw-progress-open { flex: none; margin-left: auto; min-height: 24px; padding: 1px 10px;',
+      '  border: 1px solid var(--dsw-alias-border-l2, currentColor); border-radius: 999px;',
+      '  background: transparent; color: inherit; font: inherit; font-size: calc(11px * var(--gw-zoom, 1)); cursor: pointer; }',
+      '.gw-progress-open:hover { border-color: var(--dsw-alias-state-business-primary, currentColor); }',
       '.gw-progress-member .gw-progress-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--dsw-alias-state-idle-primary, currentColor); }',
       '.gw-progress-member[data-state="done"] .gw-progress-dot { background: var(--dsw-alias-state-success-primary, currentColor); }',
       '.gw-progress-member[data-state="doing"] .gw-progress-dot { background: var(--dsw-alias-state-business-primary, currentColor); }',
@@ -2902,7 +2862,8 @@ window.__ModuleLoader__.load({
       '.gw-progress-member[data-state="failed"] { border-left: 3px solid var(--dsw-alias-state-error-primary, currentColor); padding-left: 7px; }',
       '.gw-progress-member[data-state="blocked"] { border-style: dashed; }',
       '.gw-progress-member-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }',
-      '.gw-progress-member-note { margin-left: auto; flex: none; color: var(--dsw-alias-label-secondary, inherit); font-size: calc(11px * var(--gw-zoom, 1)); }',
+      // The note no longer pushes right: the open pill owns the right edge.
+      '.gw-progress-member-note { flex: none; color: var(--dsw-alias-label-secondary, inherit); font-size: calc(11px * var(--gw-zoom, 1)); }',
       '.gw-progress-more { width: 100%; padding: 5px; border: 1px dashed var(--dsw-alias-border-l2, currentColor); border-radius: 9px;',
       '  background: transparent; color: inherit; font: inherit; font-size: calc(12px * var(--gw-zoom, 1)); cursor: pointer; }',
       // Jump-to-failure sits above the spine; hidden entirely when there is no failure.
@@ -2922,23 +2883,7 @@ window.__ModuleLoader__.load({
       '.gw-progress-legend { display: flex; gap: 12px; flex-wrap: wrap; margin: 6px 4px 0;',
       '  font-size: calc(11px * var(--gw-zoom, 1)); color: var(--dsw-alias-label-secondary, inherit); }',
       '.gw-progress-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }',
-      '.gw-progress-detail { box-sizing: border-box; margin: 8px 12px 4px; padding: 12px 14px;',
-      '  border: 1px solid var(--dsw-alias-border-l2, currentColor); border-radius: 12px; max-width: 560px;',
-      '  background: var(--dsw-alias-bg-layer-2, var(--dsw-alias-bg-layer-1, transparent)); }',
-      '.gw-progress-detail h4 { margin: 10px 0 4px; font-size: calc(12px * var(--gw-zoom, 1)); font-weight: 600; }',
-      '.gw-progress-detail-head { display: flex; align-items: center; gap: 8px; }',
-      '.gw-progress-detail-head strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }',
-      '.gw-progress-facts { margin: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px 10px; }',
-      '.gw-progress-facts dt { color: var(--dsw-alias-label-secondary, inherit); }',
-      '.gw-progress-facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere;',
-      '  font-family: var(--dsw-font-family-mono, ui-monospace, monospace); font-size: calc(12px * var(--gw-zoom, 1)); }',
-      '.gw-progress-row { border-top: 1px solid var(--dsw-alias-border-l2, currentColor); padding-top: 6px; margin-top: 6px; }',
-      '.gw-progress-field { display: grid; grid-template-columns: minmax(72px, max-content) minmax(0, 1fr) max-content; gap: 4px 10px; align-items: baseline; }',
-      '.gw-progress-field-value { min-width: 0; overflow-wrap: anywhere; }',
       '.gw-progress-source { color: var(--dsw-alias-label-secondary, inherit); font-size: calc(11px * var(--gw-zoom, 1)); }',
-      '.gw-progress-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }',
-      '.gw-progress-actions button { min-height: 28px; padding: 2px 10px; border: 1px solid var(--dsw-alias-border-l2, currentColor); border-radius: 8px;',
-      '  background: transparent; color: inherit; font: inherit; cursor: pointer; }',
       '.gw-progress-empty { padding: 12px 4px; color: var(--dsw-alias-label-secondary, inherit); }',
       '@keyframes gw-progress-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }',
       // Motion is decoration here: the state word already says "running".
@@ -2967,23 +2912,19 @@ window.__ModuleLoader__.load({
       '    border-inline-start-color: var(--dsw-alias-state-warn-primary, currentColor); }',
       '  .gw-progress-link { display: none; }',
       '  .gw-progress-branch { margin: 4px 10px 6px; }',
-      '  .gw-progress-detail { position: fixed; top: auto; left: 0; right: 0; bottom: 0; max-width: none;',
-      '    border-radius: 12px 12px 0 0; max-height: 60vh; overflow-y: auto; }',
-      '  .gw-progress-field { grid-template-columns: minmax(0, 1fr); }',
       '}',
     ].join('\n')
 
     /**
      * One spine segment.
      *
-     * A+C (v2 方案A): the segment is the unit of the accordion — one click toggles
-     * its branch, and at most one segment is open at a time. The head carries the
-     * ring, the title, a failure red dot plus badge when the segment has failures,
-     * and one meta line with the settled/declared count (collapsed segments show
-     * only this line, never member cards).
+     * A+C (v2 方案A): the segment is a static mark, not a button — clicking it does
+     * nothing. The head carries the ring, the title, a failure red dot plus badge
+     * when the segment has failures, and one meta line with the settled/declared
+     * count.
      * @param node - derived node model.
-     * @param props - render inputs (copy, expanded state, handler).
-     * @returns the segment button.
+     * @param props - translator.
+     * @returns the segment element.
      */
     /**
      * The one-line count under a segment.
@@ -3011,7 +2952,7 @@ window.__ModuleLoader__.load({
     }
 
     function ProgressNode(node, props) {
-      const t = props.t
+      const t = (props === undefined || props.t === undefined) ? translator(FALLBACK_LOCALE) : props.t
       const stateText = t(PROGRESS_STATE_KEY[node.state])
       const label = node.label === '' ? t('progress.unphased') : node.label
       // Rows that ran under this stage but render as their own plan-task nodes. Read once:
@@ -3026,22 +2967,18 @@ window.__ModuleLoader__.load({
             : (evidence.length > 0 ? t('progress.evidenceHint') : t('progress.notReported'))))
       const failedCount = node.members.filter((member) => member.outcome === 'failed').length
       const meta = progressNodeMeta(node, t)
-      return h('button', {
+      // A stage is a static mark, not a button: clicking it does nothing. The only
+      // actions on this tab are the open pills inside the branch below.
+      return h('div', {
         key: node.key,
-        type: 'button',
         className: 'gw-progress-seg',
         'data-gw-progress-node': true,
         'data-node-key': node.key,
         'data-kind': node.kind,
         'data-state': node.state,
         'data-derived': node.derived ? 'true' : undefined,
-        'data-selected': props.selected ? 'true' : undefined,
-        tabIndex: props.tabIndex,
         title: tip,
         'aria-label': `${label} · ${stateText} · ${meta}`,
-        'aria-expanded': props.expanded,
-        'aria-controls': props.expanded ? `gw-branch-${node.key}` : undefined,
-        onClick: () => props.onToggle(node.key),
       },
       h('span', { className: 'gw-progress-seg-head' },
         // One colour source: the ring's border and the glyph inherit the same token, so a
@@ -3066,8 +3003,9 @@ window.__ModuleLoader__.load({
     /**
      * One member card inside an expanded branch.
      *
-     * Clicking a card keeps the old behaviour: it selects the segment and opens the
-     * existing detail popover for that segment's rows.
+     * The card itself is inert: a click on it does nothing. The only action is the
+     * open pill, rendered exactly when the panel rule says the row is openable, which
+     * jumps straight to that child session instead of opening a detail popover.
      */
     function ProgressMemberCard(member, props) {
       const t = props.t
@@ -3079,115 +3017,40 @@ window.__ModuleLoader__.load({
       const name = member.label === '' ? t('progress.unphased') : member.label
       const note = state === 'doing' ? t(PROGRESS_STATE_KEY.doing)
         : (member.outcome === 'failed' ? `✕ seq ${member.seq}` : stateText)
+      const openable = member.childId !== '' && props.canOpen(member.childId)
       return h('li', { key: `member:${member.seq}` },
-        h('button', {
-          type: 'button',
+        h('div', {
           className: 'gw-progress-member',
           'data-gw-progress-member': member.seq,
           'data-state': state,
           title: `${name} · ${stateText}`,
-          'aria-label': `${name} · ${stateText}`,
-          onClick: () => props.onOpenMember(),
         },
         h('span', { className: 'gw-progress-dot', 'aria-hidden': 'true' }),
         h('span', { className: 'gw-progress-member-name', title: name }, name),
-        h('span', { className: 'gw-progress-member-note' }, note)))
-    }
-
-    /**
-     * The detail popover: three sections, in the order a reader needs them.
-     *
-     * 1. the header (which stage, which state),
-     * 2. the engine facts, verbatim per row (`runId`, `seq`, label, phase, childId,
-     *    outcome, duration) — nothing here is interpreted,
-     * 3. the stage report's seven fields with the source of each value, and the two
-     *    actions a reader can take: copy the coordination block, open a child session.
-     * @param props - selected node plus the faces the tab injected.
-     * @returns the popover element.
-     */
-    function ProgressDetail(props) {
-      const t = props.t
-      const node = props.node
-      const report = props.report
-      const stateText = t(PROGRESS_STATE_KEY[node.state])
-      const sourceKey = (source) => (source === 'not-reported' ? 'notReported' : (source === 'stage-detail' ? 'stageDetail' : 'coordination'))
-      const fields = report.fields.map((field) => h('div', {
-        key: field.key,
-        className: 'gw-progress-field',
-        'data-gw-progress-field': field.key,
-        'data-source': field.source,
-      },
-      h('span', { className: 'gw-progress-field-label' }, t(`progress.field.${field.key}`)),
-      h('span', { className: 'gw-progress-field-value', 'data-gw-progress-value': true },
-        field.value === undefined ? t('progress.none') : field.value),
-      h('span', { className: 'gw-progress-source', 'data-gw-progress-source': sourceKey(field.source) }, t(`progress.source.${sourceKey(field.source)}`))))
-      const rows = node.members.map((member) => {
-        const duration = progressDuration(member.startedAt === undefined || member.endedAt === undefined ? undefined : member.endedAt - member.startedAt)
-        const facts = [
-          ['progress.detail.seq', String(member.seq)],
-          ['progress.detail.label', member.label === '' ? t('progress.none') : member.label],
-          ['progress.detail.phase', member.phase === undefined ? t('progress.none') : member.phase],
-          ['progress.detail.childId', member.childId === '' ? t('progress.none') : member.childId],
-          ['progress.detail.outcome', member.outcome === undefined ? t(PROGRESS_STATE_KEY.doing) : member.outcome],
-          ['progress.detail.duration', duration === undefined ? t('progress.none') : duration],
-        ]
-        const canOpen = member.childId !== '' && props.canOpen(member.childId)
-        return h('div', { key: String(member.seq), className: 'gw-progress-row', 'data-gw-progress-row': member.seq },
-          h('dl', { className: 'gw-progress-facts' }, facts.flatMap(([key, value]) => [
-            h('dt', { key: `${key}:t` }, t(key)),
-            h('dd', { key: `${key}:d`, 'data-gw-progress-fact': key }, value),
-          ])),
-          canOpen
-            ? h('button', {
-              type: 'button',
-              'data-gw-progress-open': true,
-              onClick: () => props.openChild(member.childId),
-            }, t('progress.detail.open'))
-            : null)
-      })
-      const copyable = report.coordinationRaw !== undefined
-      return h('div', {
-        className: 'gw-progress-detail',
-        'data-progress-detail': true,
-        role: 'group',
-        'aria-label': t('progress.detail.title'),
-      },
-      h('div', { className: 'gw-progress-detail-head' },
-        h('strong', { 'data-detail-title': true }, node.label === '' ? t('progress.unphased') : node.label),
-        h('span', { className: 'gw-progress-percent', 'data-detail-state': node.state }, stateText),
-        h('button', {
-          type: 'button',
-          style: { marginLeft: 'auto' },
-          'data-gw-progress-close': true,
-          'aria-label': t('progress.detail.close'),
-          onClick: () => props.onClose(),
-        }, t('progress.detail.close'))),
-      h('h4', null, t('progress.detail.engine')),
-      h('dl', { className: 'gw-progress-facts' },
-        h('dt', null, t('progress.detail.runId')),
-        h('dd', { 'data-detail-run-id': true }, props.runId),
-        h('dt', null, t('progress.detail.rows', { count: node.members.length })),
-        h('dd', null, node.phases.length === 0 ? t('progress.none') : node.phases.join(' · '))),
-      rows.length === 0 ? h('p', { className: 'gw-progress-source' }, t('progress.notReported')) : rows,
-      h('h4', null, t('progress.detail.stage')),
-      fields,
-      h('div', { className: 'gw-progress-actions' },
-        h('button', {
-          type: 'button',
-          'data-gw-progress-copy': true,
-          disabled: !copyable,
-          title: copyable ? t('progress.detail.copy') : t('progress.detail.noBlock'),
-          onClick: () => props.onCopy(),
-        }, props.copy === 'copied' ? t('progress.detail.copied') : (props.copy === 'failed' ? t('progress.detail.copyFailed') : t('progress.detail.copy')))))
+        h('span', { className: 'gw-progress-member-note' }, note),
+        openable
+          ? h('button', {
+            type: 'button',
+            className: 'gw-progress-open',
+            'data-gw-progress-open': true,
+            title: t('progress.member.open'),
+            'aria-label': `${t('progress.member.open')} · ${name}`,
+            onClick: () => props.openChild(member.childId),
+          }, t('progress.member.open'))
+          : null))
     }
 
     /**
      * The "进度" view.
      *
      * Props come from the slot's injected faces (`useGrokProgress`, `progressT`,
-     * `canOpen`, `openChild`, `detailSources`) plus the framework seat `t`. The component
-     * never reads the DOM for data and never fetches: everything it renders is the folded
-     * event stream plus its own view state (zoom, selection, copy status).
+     * `canOpen`, `openChild`) plus the framework seat `t`. The component never
+     * reads the DOM for data and never fetches: everything it renders is the folded
+     * event stream plus its own view state (zoom, which branch is open).
+     *
+     * There is no detail popover: a stage is a static mark and a member card is
+     * inert. The only action is the open pill on an openable row, which jumps
+     * straight to that child session.
      * @param props - slot props.
      * @returns the tab element.
      */
@@ -3199,9 +3062,6 @@ window.__ModuleLoader__.load({
         [snapshot, props.t, props.progressT],
       )
       const [zoom, setZoom] = useState(readProgressZoom)
-      const [selectedKey, setSelectedKey] = useState(undefined)
-      const [focusedKey, setFocusedKey] = useState(undefined)
-      const [copy, setCopy] = useState('idle')
       const [showAllKey, setShowAllKey] = useState(undefined)
       const nodes = track === undefined ? [] : track.nodes
       // A+C accordion: at most one segment is expanded at a time. The default
@@ -3222,19 +3082,9 @@ window.__ModuleLoader__.load({
         const failed = nodes.find((node) => node.members.some((member) => member.outcome === 'failed'))
         return failed === undefined ? undefined : failed.key
       })()
-      const toggleSegment = (key) => {
-        setExpandedKey(effectiveExpanded === key ? null : key)
-        setSelectedKey(key)
-        setFocusedKey(key)
-        setCopy('idle')
-        setShowAllKey(undefined)
-      }
       const jumpToFailure = () => {
         if (firstFailedKey === undefined) return
         setExpandedKey(firstFailedKey)
-        setSelectedKey(firstFailedKey)
-        setFocusedKey(firstFailedKey)
-        setCopy('idle')
         setShowAllKey(undefined)
       }
       // Segments and the connectors between them, in render order. The connector after a
@@ -3260,56 +3110,15 @@ window.__ModuleLoader__.load({
           })
         }
       })
-      const selected = selectedKey === undefined ? undefined : nodes.find((node) => node.key === selectedKey)
-      const rovingKey = focusedKey === undefined ? (nodes.length === 0 ? undefined : nodes[0].key) : focusedKey
       const applyZoom = (next) => {
         const value = Math.min(PROGRESS_ZOOM_MAX, Math.max(PROGRESS_ZOOM_MIN, Math.round(next * 10) / 10))
         setZoom(value)
         writeProgressZoom(value)
       }
       const onKeyDown = (event) => {
-        const keys = nodes.map((node) => node.key)
-        if (keys.length === 0) return
-        const at = keys.indexOf(rovingKey)
-        let next = at
-        if (event.key === 'ArrowRight') next = Math.min(keys.length - 1, at + 1)
-        else if (event.key === 'ArrowLeft') next = Math.max(0, at - 1)
-        else if (event.key === 'ArrowUp') next = Math.max(0, at - 1)
-        else if (event.key === 'ArrowDown') next = Math.min(keys.length - 1, at + 1)
-        else if (event.key === 'Home') next = 0
-        else if (event.key === 'End') next = keys.length - 1
-        else if (event.key === 'Enter' && at >= 0) { toggleSegment(keys[at]); return }
-        else if (event.key === 'Escape') {
-          if (effectiveExpanded !== undefined) setExpandedKey(null)
-          else setSelectedKey(undefined)
-          setCopy('idle')
-          return
-        } else return
-        if (typeof event.preventDefault === 'function') event.preventDefault()
-        setFocusedKey(keys[next])
-        // Roving tabindex means focus has to follow the selection, and only the DOM can
-        // move it; the guard keeps a headless render (tests) harmless.
-        const root = event.currentTarget
-        if (root !== undefined && root !== null && typeof root.querySelectorAll === 'function') {
-          const target = root.querySelectorAll('[data-gw-progress-node]')[next]
-          if (target !== undefined && typeof target.focus === 'function') target.focus()
-        }
-      }
-      // The ladder's real port: the node's own `stage-detail` payload (matched by phase,
-      // with the run-level one as fallback), overridden by whatever a caller injects.
-      const injectedSources = selected === undefined || typeof props.detailSources !== 'function' ? {} : (props.detailSources(selected) || {})
-      const detailSources = selected === undefined || track === undefined
-        ? injectedSources
-        : progressDetailSources(track, selected, injectedSources)
-      const report = selected === undefined ? undefined : progressDetailFor(detailSources)
-      const copyBlock = async () => {
-        const raw = report === undefined ? undefined : report.coordinationRaw
-        try {
-          if (raw === undefined || globalThis.navigator === undefined || globalThis.navigator.clipboard === undefined) throw new Error('no coordination block')
-          await globalThis.navigator.clipboard.writeText(raw)
-          setCopy('copied')
-        } catch {
-          setCopy('failed')
+        if (event.key === 'Escape' && effectiveExpanded !== undefined) {
+          setExpandedKey(null)
+          setShowAllKey(undefined)
         }
       }
       const canOpen = typeof props.canOpen === 'function' ? props.canOpen : () => false
@@ -3376,13 +3185,11 @@ window.__ModuleLoader__.load({
             })
             : ProgressNode(entry.node, {
               t,
-              selected: selected !== undefined && selected.key === entry.node.key,
-              expanded: effectiveExpanded === entry.node.key,
-              tabIndex: entry.node.key === rovingKey ? 0 : -1,
-              onToggle: toggleSegment,
             })))),
           // The one open stage's member panel, below the spine and at full width: its
           // cards are readable at any window width, and opening it cannot move a segment.
+          // Cards are inert; the only action is the open pill on an openable row, which
+          // jumps straight to that child session.
           openBranch === undefined ? null : h('div', {
             key: `branch:${openBranch.node.key}`,
             className: 'gw-progress-branch',
@@ -3394,11 +3201,8 @@ window.__ModuleLoader__.load({
           h('ul', { className: 'gw-progress-members' },
             openBranch.members.map((member) => ProgressMemberCard(member, {
               t,
-              onOpenMember: () => {
-                setSelectedKey(openBranch.node.key)
-                setFocusedKey(openBranch.node.key)
-                setCopy('idle')
-              },
+              canOpen,
+              openChild: (childId) => { if (typeof props.openChild === 'function') props.openChild(childId) },
             })),
             openBranch.hidden > 0 && !openBranch.showAll
               ? h('li', { key: 'more' }, h('button', {
@@ -3408,23 +3212,12 @@ window.__ModuleLoader__.load({
                 onClick: () => setShowAllKey(openBranch.node.key),
               }, t('progress.branch.showMore', { more: openBranch.hidden, total: openBranch.node.members.length })))
               : null),
-          // A stage with no rows of its own still opens (it is a button), so the panel says
+          // A stage with no rows of its own still renders, so the panel says
           // why it is empty rather than rendering a hollow box.
           openBranch.members.length === 0
             ? h('p', { className: 'gw-progress-source', 'data-gw-progress-branch-empty': true }, progressNodeMeta(openBranch.node, t))
             : null),
-        ],
-      selected === undefined || report === undefined ? null : ProgressDetail({
-        t,
-        node: selected,
-        report,
-        runId: track.runId,
-        copy,
-        canOpen,
-        openChild: (childId) => { if (typeof props.openChild === 'function') props.openChild(childId) },
-        onCopy: copyBlock,
-        onClose: () => { setSelectedKey(undefined); setCopy('idle') },
-      }))
+        ])
     }
 
     /**
@@ -3663,11 +3456,6 @@ window.__ModuleLoader__.load({
               workspace.openSession({ parentSessionId: sessionId, childSessionId: childId, mode })
               return true
             },
-            // The tab resolves level 1 itself, from the node's own `stage-detail` payload.
-            // This injection point exists for a caller that can read a child session's
-            // text; a view cannot, so nothing is supplied here and the ladder falls to
-            // "not reported" — which it says, instead of showing an empty cell.
-            detailSources: () => ({}),
           }
         },
       }

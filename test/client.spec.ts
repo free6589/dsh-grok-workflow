@@ -91,7 +91,6 @@ interface ProgressBundle {
   zoom: { min: number, max: number, step: number }
   eventTypes: string[]
   stages: Array<{ key: string, tokens: string[], edge: boolean }>
-  detailFields: string[]
   stateColor: Record<string, string>
   stateKey: Record<string, string>
   css: string
@@ -115,11 +114,6 @@ interface ProgressBundle {
   nodeState(members: ProgressMember[], ended: boolean): string
   percent(members: ProgressMember[]): { settled: number, declared: number, value: number } | undefined
   deriveTrack(run: ProgressRun | undefined, labelFor: (key: string) => string): ProgressTrack | undefined
-  detailFor(sources?: Record<string, unknown>): {
-    fields: Array<{ key: string, value?: string, source: string }>
-    coordinationRaw?: string
-  }
-  parseCoordination(text: string | undefined): { fields: Record<string, string>, raw: string } | undefined
   duration(ms: number | undefined): string | undefined
   readZoom(): number
   writeZoom(value: number): void
@@ -1807,163 +1801,36 @@ describe('client progress tab: the fold and the five states', () => {
   })
 })
 
-describe('client progress tab: the detail ladder', () => {
-  const progress = bundle.GROK_WORKFLOW_PROGRESS
-  const block = ['```grok-coordination', JSON.stringify({
-    workCommit: 'abc1234',
-    testsRun: ['npx vitest run test/client.spec.ts'],
-    results: 'tests pass',
-  }, null, 2), '```'].join('\n')
-
-  it('labels every field with its source, strongest first', () => {
-    const report = progress.detailFor({ stageDetail: { WORK_COMMIT: 'from-event' }, coordinationText: block })
-    const byKey = new Map(report.fields.map((field) => [field.key, field]))
-    expect(byKey.get('workCommit')).toEqual({ key: 'workCommit', value: 'from-event', source: 'stage-detail' })
-    expect(byKey.get('testsRun')).toEqual({ key: 'testsRun', value: 'npx vitest run test/client.spec.ts', source: 'coordination' })
-    expect(byKey.get('results')).toEqual({ key: 'results', value: 'tests pass', source: 'coordination' })
-    for (const key of ['changes', 'localRuntimeVerified', 'blockers', 'nextAction']) {
-      expect(byKey.get(key)).toEqual({ key, source: 'not-reported' })
-    }
-    expect(report.fields).toHaveLength(progress.detailFields.length)
-    expect(progress.detailFields).toEqual(['workCommit', 'changes', 'testsRun', 'results', 'localRuntimeVerified', 'blockers', 'nextAction'])
-    expect(report.coordinationRaw).toContain('abc1234')
-  })
-
-  it('degrades to seven "not reported" rows, with the badge copy in both languages', () => {
-    const report = progress.detailFor()
-    expect(report.fields).toHaveLength(7)
-    expect(report.fields.every((field) => field.source === 'not-reported' && field.value === undefined)).toBe(true)
-    expect(report.coordinationRaw).toBeUndefined()
-    for (const locale of ['zh', 'en']) {
-      for (const key of ['progress.source.stageDetail', 'progress.source.coordination', 'progress.source.notReported']) {
-        expect(translate(locale, key), `${locale} ${key}`).not.toBe(key)
-      }
-      // Every field has a real label in both languages, never a key.
-      for (const field of progress.detailFields) {
-        expect(translate(locale, `progress.field.${field}`), `${locale} ${field}`).not.toBe(`progress.field.${field}`)
-      }
-      // A missing value renders an em dash, never a blank cell.
-      expect(translate(locale, 'progress.none')).toBe('—')
-    }
-  })
-
-  it('accepts only an explicit coordination block', () => {
-    expect(progress.parseCoordination(block)?.fields.workCommit).toBe('abc1234')
-    const nested = ['```json', JSON.stringify({ coordination: { blockers: 'none' } }), '```'].join('\n')
-    expect(progress.parseCoordination(nested)?.fields).toEqual({ blockers: 'none' })
-    expect(progress.parseCoordination(['```json', JSON.stringify({ workCommit: 'a', results: 'b' }), '```'].join('\n'))?.fields.workCommit).toBe('a')
-    expect(progress.parseCoordination(['```json', JSON.stringify({ results: 'b' }), '```'].join('\n'))).toBeUndefined()
-    // The AGENTS.md labelled form, bare or fenced.
-    const labelled = ['WORK_COMMIT: abc1234', 'CHANGES: spine', 'TESTS_RUN: npx vitest run', 'TEST_RESULTS: PASS', 'NEXT_ACTION: screenshot'].join('\n')
-    expect(progress.parseCoordination(labelled)?.fields).toEqual({
-      workCommit: 'abc1234', changes: 'spine', testsRun: 'npx vitest run', results: 'PASS', nextAction: 'screenshot',
-    })
-    expect(progress.parseCoordination(['```text', labelled, '```'].join('\n'))?.fields.nextAction).toBe('screenshot')
-    expect(progress.parseCoordination('NEXT_ACTION: 继续')).toBeUndefined()
-    expect(progress.parseCoordination('CHANGES: a.ts; result: ok')).toBeUndefined()
-    expect(progress.parseCoordination(undefined)).toBeUndefined()
-  })
-
-  /** The run every render-based case below shows: two rows, one phase each. */
+describe('client progress tab: member pills jump straight to the child session', () => {
+  /** The run every case below shows: two rows in one stage, one still running
+   * so the stage opens its branch on the first render. */
   const run: ProgressRun = {
     runId: 'run-42',
     name: '任务团队 · 2 个任务',
     anchorSeq: 1,
     members: [
       progressMember(1, '执行', 'completed'),
-      progressMember(2, '执行', 'completed'),
+      progressMember(2, '执行'),
     ],
     startedAt: 1_000,
   }
 
-  it('opens a node into three sections: header, engine facts and the seven-field report', () => {
-    const t = translator('zh')
-    const view = renderProgress({
-      t,
-      progressT: t,
-      useGrokProgress: (select: (value: unknown) => unknown) => select({ runs: [run], activeRun: run }),
-      detailSources: () => ({ coordinationText: block }),
-    })
-    const before = walk(view.run())
-    expect(before.some((element) => element.props['data-progress-detail'] === true)).toBe(false)
-
-    const execute = before.find((element) => element.props['data-node-key'] === 'stage:execute')!
-    ;(execute.props['onClick'] as () => void)()
-    const detail = walk(view.run()).find((element) => element.props['data-progress-detail'] === true)!
-    expect(detail, 'detail popover').toBeDefined()
-
-    const detailText = texts(detail).join('\n')
-    // Section 1: which stage and which state.
-    expect(detailText).toContain(bundle.GROK_WORKFLOW_DICT['zh']!['progress.stage.execute'])
-    expect(detailText).toContain(bundle.GROK_WORKFLOW_DICT['zh']!['progress.state.done'])
-    // Section 2: the engine facts, verbatim.
-    expect(detailText).toContain('run-42')
-    expect(detailText).toContain('child-1')
-    expect(detailText).toContain('completed')
-    expect(detailText).toContain('执行')
-    // Section 3: seven fields, each with the source it came from.
-    const fields = walk(detail).filter((element) => element.props['data-gw-progress-field'] !== undefined)
-    expect(fields).toHaveLength(progress.detailFields.length)
-    const sources = fields.map((field) => field.props['data-source'])
-    expect(sources.filter((source) => source === 'coordination')).toHaveLength(3)
-    expect(sources.filter((source) => source === 'not-reported')).toHaveLength(4)
-    // A field's value and its badge are both on screen; a missing one is an em dash.
-    const workCommit = fields.find((field) => field.props['data-gw-progress-field'] === 'workCommit')!
-    expect(texts(workCommit).join(' ')).toContain('abc1234')
-    expect(texts(workCommit).join(' ')).toContain(bundle.GROK_WORKFLOW_DICT['zh']!['progress.source.coordination'])
-    const nextAction = fields.find((field) => field.props['data-gw-progress-field'] === 'nextAction')!
-    expect(texts(nextAction).join(' ')).toContain('—')
-    expect(texts(nextAction).join(' ')).toContain(bundle.GROK_WORKFLOW_DICT['zh']!['progress.source.notReported'])
-  })
-
-  it('copies the coordination block through the clipboard and reports what happened', async () => {
-    const t = translator('zh')
-    const copied: string[] = []
-    const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'navigator')
-    Object.defineProperty(globalThis, 'navigator', {
-      configurable: true,
-      writable: true,
-      value: { clipboard: { writeText: async (text: string) => { copied.push(text) } } },
-    })
-    try {
-      const view = renderProgress({
-        t,
-        progressT: t,
-        useGrokProgress: (select: (value: unknown) => unknown) => select({ runs: [run], activeRun: run }),
-        detailSources: () => ({ coordinationText: block }),
-      })
-      const execute = walk(view.run()).find((element) => element.props['data-node-key'] === 'stage:execute')!
-      ;(execute.props['onClick'] as () => void)()
-      const open = walk(view.run())
-      const copy = open.find((element) => element.props['data-gw-progress-copy'] === true)!
-      expect(copy.props['disabled']).toBe(false)
-      ;(copy.props['onClick'] as () => void)()
-      await new Promise((resolve) => setTimeout(resolve, 0))
-      expect(copied).toHaveLength(1)
-      expect(copied[0]).toContain('"workCommit"')
-      const after = walk(view.run()).find((element) => element.props['data-gw-progress-copy'] === true)!
-      expect(texts(after).join('')).toBe(bundle.GROK_WORKFLOW_DICT['zh']!['progress.detail.copied'])
-    } finally {
-      if (descriptor === undefined) delete (globalThis as unknown as { navigator?: unknown }).navigator
-      else Object.defineProperty(globalThis, 'navigator', descriptor)
-    }
-  })
-
-  it('disables the copy action when no coordination block exists', () => {
+  it('renders no detail popover anywhere on the tab', () => {
     const t = translator('zh')
     const view = renderProgress({
       t,
       progressT: t,
       useGrokProgress: (select: (value: unknown) => unknown) => select({ runs: [run], activeRun: run }),
     })
-    const execute = walk(view.run()).find((element) => element.props['data-node-key'] === 'stage:execute')!
-    ;(execute.props['onClick'] as () => void)()
-    const copy = walk(view.run()).find((element) => element.props['data-gw-progress-copy'] === true)!
-    expect(copy.props['disabled']).toBe(true)
-    expect(copy.props['title']).toBe(bundle.GROK_WORKFLOW_DICT['zh']!['progress.detail.noBlock'])
+    const elements = walk(view.run())
+    expect(elements.some((element) => element.props['data-progress-detail'] === true)).toBe(false)
+    expect(elements.some((element) => element.props['data-gw-progress-copy'] === true)).toBe(false)
+    expect(elements.some((element) => element.props['data-gw-progress-row'] === true)).toBe(false)
+    expect(elements.some((element) => element.props['data-gw-progress-field'] !== undefined)).toBe(false)
+    expect(elements.some((element) => element.props['data-gw-progress-fact'] !== undefined)).toBe(false)
   })
 
-  it('offers "open child session" only for a row the panel rule would open', () => {
+  it('renders one open pill per openable row, and the pill opens that row', () => {
     const t = translator('zh')
     const opened: string[] = []
     const view = renderProgress({
@@ -1973,13 +1840,32 @@ describe('client progress tab: the detail ladder', () => {
       canOpen: (childId: string) => childId === 'child-1',
       openChild: (childId: string) => { opened.push(childId) },
     })
-    const execute = walk(view.run()).find((element) => element.props['data-node-key'] === 'stage:execute')!
-    ;(execute.props['onClick'] as () => void)()
-    const buttons = walk(view.run()).filter((element) => element.props['data-gw-progress-open'] === true)
-    // Two rows in this stage, one of them openable: exactly one button, and it opens it.
-    expect(buttons).toHaveLength(1)
-    ;(buttons[0]!.props['onClick'] as () => void)()
+    const pills = walk(view.run()).filter((element) => element.props['data-gw-progress-open'] === true)
+    // Two rows in this stage, one of them openable: exactly one pill, and it opens it.
+    expect(pills).toHaveLength(1)
+    ;(pills[0]!.props['onClick'] as () => void)()
     expect(opened).toEqual(['child-1'])
+    // The pill says where it goes, in both languages.
+    for (const locale of ['zh', 'en']) {
+      expect(translate(locale, 'progress.member.open'), locale).not.toBe('progress.member.open')
+    }
+  })
+
+  it('keeps an unopenable row inert: no pill, no click anywhere on the card', () => {
+    const t = translator('zh')
+    const view = renderProgress({
+      t,
+      progressT: t,
+      useGrokProgress: (select: (value: unknown) => unknown) => select({ runs: [run], activeRun: run }),
+      canOpen: () => false,
+      openChild: () => { throw new Error('must not open an unopenable row') },
+    })
+    // No pills at all: the only click handlers left on the tab are the zoom buttons.
+    expect(walk(view.run()).filter((element) => element.props['data-gw-progress-open'] === true)).toHaveLength(0)
+    for (const element of walk(view.run())) {
+      if (element.props['data-progress-zoom'] !== undefined) continue
+      expect(element.props['onClick'], String(element.props['data-gw-progress-node'] ?? element.props['data-gw-progress-member'] ?? '')).toBeUndefined()
+    }
   })
 })
 
@@ -1991,7 +1877,9 @@ describe('client progress tab: styles, zoom and empty snapshots', () => {
       expect(progress.stateColor[state]).toMatch(/^var\(--dsw-alias-/)
     }
     expect(progress.css).toContain('var(--dsw-font-family-sans')
-    expect(progress.css).toContain('var(--dsw-font-family-mono')
+    // The detail popover owned the only mono use (engine facts); without it there is
+    // no mono left in the tab.
+    expect(progress.css).not.toContain('var(--dsw-font-family-mono')
     // No literal colour and no light-only surface anywhere in the scoped rules.
     expect(progress.css).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
     expect(progress.css).not.toMatch(/\brgba?\(/)
@@ -2009,8 +1897,6 @@ describe('client progress tab: styles, zoom and empty snapshots', () => {
     expect(progress.css).toContain('prefers-reduced-motion: reduce')
     expect(progress.css).toContain('@media (max-width: 720px)')
     expect(progress.css).toContain('@media (max-width: 480px)')
-    // The narrow layout is a bottom drawer, not a squeezed popover.
-    expect(progress.css).toMatch(/@media \(max-width: 480px\)[\s\S]*position: fixed/)
     // …and the track itself turns vertical under 480px (no sideways scroll).
     expect(progress.css).toMatch(/@media \(max-width: 480px\)[\s\S]*flex-direction: column/)
     // 28px rings, sized from the zoom variable rather than a fixed px font.
@@ -2038,10 +1924,10 @@ describe('client progress tab: styles, zoom and empty snapshots', () => {
     expect(walk(track.children).some((element) => element.props['data-gw-progress-branch'] !== undefined)).toBe(false)
     // It carries the state its stem is coloured from, now that it is not a segment child.
     expect(branch!.props['data-state']).toBe('doing')
-    // The owning segment still points at it, so `aria-controls` is not a dangling id.
+    // The owning segment is a static mark: no accordion wiring points at the panel.
     const execute = elements.find((element) => element.props['data-node-key'] === 'stage:execute')!
-    expect(execute.props['aria-expanded']).toBe(true)
-    expect(execute.props['aria-controls']).toBe('gw-branch-stage:execute')
+    expect(execute.props['aria-expanded']).toBeUndefined()
+    expect(execute.props['aria-controls']).toBeUndefined()
     // A running stage's connector flows into it, and the meta line carries a tooltip
     // because a narrow column clips it with an ellipsis.
     expect(elements.some((element) => element.props['data-gw-progress-link'] === true && element.props['data-flowing'] === 'true')).toBe(true)
@@ -2050,30 +1936,27 @@ describe('client progress tab: styles, zoom and empty snapshots', () => {
     for (const meta of metas) expect(typeof meta.props['title']).toBe('string')
   })
 
-  it('explains a stage that opened with no rows of its own, instead of showing an empty panel', () => {
+  it('explains a branch that has no rows of its own, instead of showing an empty panel', () => {
     const t = translator('zh')
+    // A settled run opens nothing, so force the default open onto the empty start
+    // branch: the doing row below belongs to a different stage and leaves start empty.
     const run: ProgressRun = {
       runId: 'run-empty-branch',
       name: '任务团队',
       anchorSeq: 1,
-      members: [progressMember(1, '执行', 'completed')],
+      members: [progressMember(1, '检查')],
     }
-    const view = renderProgress({
+    const tree = walk(progress.component({
       t,
       progressT: t,
       useGrokProgress: (select: (value: unknown) => unknown) => select({ runs: [run], activeRun: run }),
-    })
-    const start = walk(view.run()).find((element) => element.props['data-node-key'] === 'stage:start')!
-    ;(start.props['onClick'] as () => void)()
-    const tree = walk(view.run())
-    const panel = tree.find((element) => element.props['data-gw-progress-branch'] !== undefined)
-    expect(panel, 'the clicked stage opens its panel').toBeDefined()
-    expect(walk(panel!.children).filter((element) => element.props['data-gw-progress-member'] !== undefined)).toHaveLength(0)
-    // The panel is a button target, so "nothing here" has to be said in words — the same
-    // sentence the collapsed segment already carries, not a hollow box.
-    const line = walk(panel!.children).find((element) => element.props['data-gw-progress-branch-empty'] === true)
-    expect(line, 'the empty panel carries the reason').toBeDefined()
-    expect(texts(line!).join('')).toContain(bundle.GROK_WORKFLOW_DICT['zh']!['progress.notReported'])
+    }))
+    const panel = tree.find((element) => element.props['data-gw-progress-branch'] === 'stage:verify')
+    expect(panel, 'the doing stage opens its panel').toBeDefined()
+    // Stages are static marks now: no stage carries a click handler.
+    for (const node of tree.filter((element) => element.props['data-gw-progress-node'] === true)) {
+      expect(node.props['onClick'], String(node.props['data-node-key'])).toBeUndefined()
+    }
   })
 
   it('draws the state ring and one connector axis, without the head-striking hairline', () => {
@@ -2160,11 +2043,9 @@ describe('client progress tab: styles, zoom and empty snapshots', () => {
     expect(nodes).toHaveLength(progress.stages.length)
     expect(nodes.map((node) => node.props['data-state'])).toContain('done')
     expect(texts(filled).join('\n')).toContain('1/1 · 100%')
-    // Roving tabindex: exactly one node is in the tab order.
-    expect(nodes.filter((node) => node.props['tabIndex'] === 0)).toHaveLength(1)
-    // Aria: the track is a labelled group, every node has a name, and at most one
-    // segment is expanded (the accordion default follows the run: failed first,
-    // else doing, else nothing). A settled run opens nothing.
+    // Aria: the track is a labelled group and every node has a name; stages are
+    // static marks, so nothing is in the tab order and nothing is expandable.
+    expect(nodes.filter((node) => node.props['tabIndex'] === 0)).toHaveLength(0)
     expect(walk(filled).some((element) => element.props['role'] === 'group' && element.props['aria-label'] !== undefined)).toBe(true)
     expect(nodes.every((node) => typeof node.props['aria-label'] === 'string' && node.props['aria-label'].includes('·'))).toBe(true)
     expect(nodes.filter((node) => node.props['aria-expanded'] === true)).toHaveLength(0)

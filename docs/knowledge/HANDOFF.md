@@ -1,3 +1,22 @@
+## 2026-11-21 — 进度页详情卡删除 + 胶囊直达（未发版，待打 tag）`CONFIRMED`
+
+- **From:** 本会话（lead）· **To:** 下一轮接手者
+- **用户拍板**：Q1 阶段与任务详情卡一起删；Q2 点卡片空白处什么都不发生；Phase 2（失败重试）暂不做。
+- **改了什么**（`src/client/index.js` + `lib/client.js` 重建）：`ProgressDetail` 组件与
+  `gw-progress-detail` 全套样式删除；`ProgressNode`/成员卡改静态 div（无 onClick/tabIndex/
+  aria-expanded）；可开行末尾新增 `.gw-progress-open` 胶囊，直调 `openChild(childId)`；
+  不可开行无胶囊。`detailFor`/`detailSources`/`parseCoordination` 的 bundle 导出移除；
+  `detailFields`/`detailEventType` 导出与 `stage-detail` fold 保留（视图不消费，重试立项可用）。
+  文案：删 `progress.detail.*` 等 22 key，增 `progress.member.open` 中英。
+- **测试**：`test/client.spec.ts`（detail ladder → 三例 pill 断言，aria/mono 同步）、
+  `test/progress-connector.spec.ts`（改断默认展开分支）。`npm run ci` exit 0 =
+  73 文件 / 1346 测试 PASS。
+- **效果图**：`evidence/progress-tab-mockup-2026-11-21/flow.html` 已同步新交互（删 hint、
+  删 inspector、卡片 inert、胶囊为 `#child-<id>` 占位链接）；旧详情截图已删。
+- **下一步**：打 `v0.12.18`（见本轮 CHANGELOG `[Unreleased]` 条目 → 归档到 `## [0.12.18]`，
+  `package.json` + `package-lock.json` 同步 bump，README 版号同步， annotated tag + push，
+  等远端 CI success 后发 Release）。重试（Phase 2）未立项，不动。
+
 ## 2026-11-21 — 已发版 `0.12.16`（lead 收尾，总开关+命令容错+进度页）`CONFIRMED`
 
 - **From:** 本会话（lead）· **To:** 下一轮接手者 / agent-49
@@ -13,7 +32,7 @@
   （命令关→按钮读→门控拦→按钮开→门控放行，同一条记录）PASS；进度页几何 48 用例 PASS。
   完整 Web boot 在沙箱下起不来（MCP 写只读路径），未跑——记为环境受限，不冒充。
 - **tag 归属**：`v0.12.16` 归本版。agent-49 的 `clone-profile` 范围（脚本+测试+证据）
-  未合入本版，其提交请打 `v0.12.17` 或后续号，不要复用 `v0.12.16`。
+  未合入本版，其提交请打 `v0.12.18` 或后续号，不要复用 `v0.12.16`。
 - **本地 CI**：`npm run ci` exit 0 = 73 文件 / 1350 测试 PASS（含 clone 6 例）。
 
 ## 2026-11-21 — 进度页 UI 展示缺陷修复（展开分支移出脊柱）`CONFIRMED`
@@ -2417,10 +2436,10 @@ Issue #1 状态评论 issuecomment-6927842856。
 - **并发（`CONFIRMED`）**：本轮期间同树有并发发布轮写入 0.12.16（commit `f24fc87`
   + tag `v0.12.16`）。本轮只暂存自己的文件（脚本/测试/证据/记忆/CHANGELOG 的
   `[Unreleased]` 段），未触碰 `package.json`、`package-lock.json`、README 的版本声明。
-- **未 push（`CONFIRMED`）**：commit 与 `v0.12.17` tag 都在本地。推 tag 会触发 Release
+- **未 push（`CONFIRMED`）**：commit 与 `v0.12.18` tag 都在本地。推 tag 会触发 Release
   工作流并创建 GitHub Release —— 未获授权，因此没有推。`package.json` 仍是 0.12.16，
-  所以 `v0.12.17` 是 milestone tag 而非发布版本；要发布 0.12.17 时先
-  `git tag -d v0.12.17`，再按发版流程 bump + 重新打 tag。
+  所以 `v0.12.18` 是 milestone tag 而非发布版本；要发布 0.12.18 时先
+  `git tag -d v0.12.18`，再按发版流程 bump + 重新打 tag。
 - **Next action**：若要把克隆用于 CI，把 `home-patch.sandbox.yml` 那类机器级 MCP 关闭
   做成可复用步骤；另：`cordis.patch.yml` 里 3 条 patch 告警（`layerfs-host`、
   `agent-teams` 未找到，`deepseek-account` 名称不匹配）是源配置漂移，与克隆无关，值得单开一轮清理。

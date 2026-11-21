@@ -3,7 +3,26 @@
 Notable user-facing changes are recorded here in English and Simplified Chinese.
 用户可见的功能和修复会在这里以英文和简体中文记录。
 
-## [Unreleased]
+## [0.12.18] - 2026-11-21
+
+### Changed / 变更
+
+- **The Progress tab no longer opens a detail card; member pills jump straight to the child session / 进度页不再弹详情卡，成员胶囊直达子会话** —
+  Stages are static marks now: clicking a stage does nothing, and clicking a member
+  card does nothing. The only action is the pill on an openable row ("打开子会话" /
+  "Open child session"), which jumps straight to that child session through the
+  existing `openChild` path (same `panelMemberMode` rule as the chat panel: the child
+  must belong to this run and have a `continuable`/`one-shot` mode, otherwise the row
+  stays pill-less and inert). The detail popover is gone — no seven-field report, no
+  copy-coordination button — along with the selection, accordion-toggle and copy
+  clipboard state that only served it. Unopenable rows render no pill and never open
+  the wrong session.
+  / 阶段变成纯展示：点阶段、点任务卡都什么都不发生。唯一的动作是可打开行上的胶囊
+  （「打开子会话」），经现有的 `openChild` 通道直达该子会话（和对话面板同一条
+  `panelMemberMode` 规则：子会话必须属于这次运行且 mode 为 `continuable`/`one-shot`，
+  否则该行没有胶囊、保持 inert，绝不会跳错会话）。详情浮层整个删除——七字段报告、
+  复制协调块按钮都不再有；只为它存在的选中、手风琴开关、剪贴板状态一并清理。
+  打不开的行没有胶囊，点了也不会有反应。
 
 ### Added / 新增
 

@@ -1,3 +1,13 @@
+Last updated: 2026-11-21 15:43 +08:00（**进度页详情卡已删、胶囊直达子会话，未发版** —
+Q1/Q2 按用户拍板落地：阶段与任务的详情浮层一起删除，点卡片空白处什么都不发生；
+Phase 2（失败重试）暂不做。`src/client/index.js`：`ProgressDetail` 与详情样式/
+选中/复制/roving-tabindex 全删，`ProgressNode` 与成员卡改为静态 div，唯一动作是
+可开行末尾的「打开子会话」胶囊（直调 `openChild`，不可开行无胶囊）。文案删
+`progress.detail.*` 等 22 key，新增 `progress.member.open`。测试：detail ladder 整块
+替换为三例 pill 断言，手风琴/aria/mono 断言同步；`test/progress-connector.spec.ts`
+两例改断默认展开分支。`npm run ci` exit 0 = **73 文件 / 1346 测试 PASS**。
+CHANGELOG `[Unreleased]` 已记中英双语条目。**未发版**，版本号仍 `0.12.16`。）
+
 Last updated: 2026-11-21 10:05 +08:00（**已发版 `0.12.16`** —
 `v0.12.16`（annotated tag → `f24fc87`）已推，远端 CI `44853807202` success、
 Release 已发布（asset `dsh-grok-workflow-0.12.16.tgz`）。
@@ -1815,7 +1825,7 @@ worker 链上限 50（HARD_LIMITS.chainLength）
   `cordis.yml`），parity 因此以 5 个界定文件的 sha256 为准；克隆里的机器级 MCP
   （serena / phone-use）在沙箱内写外部路径被拒，用 home 级 patch
   `.rsi/evidence/profile-clone/home-patch.sandbox.yml` 关掉后 boot 日志零 traceback。
-- **未做（`NOT_RUN`）**：未 push、未建 GitHub Release、未改仓库可见性；`v0.12.17` 是本地
+- **未做（`NOT_RUN`）**：未 push、未建 GitHub Release、未改仓库可见性；`v0.12.18` 是本地
   milestone tag（`package.json` 仍是 0.12.16），推它会因 tag≠package 版本被 Release 工作流
   拦下（fail-closed，按设计）。
 

@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<title>进度 Tab — 候选图型效果图</title>
+<style>
+  /* ---- DSH tokens (mock values; the real tab reads these from the shell) ---- */
+  html[data-theme="light"] {
+    --dsw-alias-label-primary: #1f2328;
+    --dsw-alias-label-secondary: #6b7280;
+    --dsw-alias-label-inverse: #ffffff;
+    --dsw-alias-border-l2: #d8dde4;
+    --dsw-alias-fill-l2: #f2f4f7;
+    --dsw-alias-bg-layer-1: #ffffff;
+    --dsw-alias-bg-layer-2: #ffffff;
+    --dsw-alias-state-business-primary: #2f6fed;
+    --dsw-alias-state-success-primary: #15803d;
+    --dsw-alias-state-error-primary: #d1242f;
+    --dsw-alias-state-warn-primary: #b45309;
+    --dsw-alias-state-idle-primary: #c3c9d2;
+    --mock-page: #ffffff;
+  }
+  html[data-theme="dark"] {
+    --dsw-alias-label-primary: #e6e8eb;
+    --dsw-alias-label-secondary: #98a1ac;
+    --dsw-alias-label-inverse: #0e1116;
+    --dsw-alias-border-l2: #39414b;
+    --dsw-alias-fill-l2: #222831;
+    --dsw-alias-bg-layer-1: #14181e;
+    --dsw-alias-bg-layer-2: #1b2129;
+    --dsw-alias-state-business-primary: #6aa6ff;
+    --dsw-alias-state-success-primary: #46c07a;
+    --dsw-alias-state-error-primary: #ff6b6b;
+    --dsw-alias-state-warn-primary: #e0a33a;
+    --dsw-alias-state-idle-primary: #4b535e;
+    --mock-page: #14181e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--mock-page); color: var(--dsw-alias-label-primary);
+    font-family: "Noto Sans CJK SC", "Source Han Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---- shell chrome, only to place the tab in context ---- */
+  .chrome { padding: 14px 20px 0; border-bottom: 1px solid var(--dsw-alias-border-l2); }
+  .chrome-title { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 14px; }
+  .chrome-title .mode { font-size: 12px; font-weight: 400; color: var(--dsw-alias-label-secondary); }
+  .chrome-tabs { display: flex; gap: 22px; margin-top: 12px; font-size: 13px; color: var(--dsw-alias-label-secondary); }
+  .chrome-tabs span { padding: 6px 0 9px; }
+  .chrome-tabs .on { color: var(--dsw-alias-label-primary); font-weight: 600; box-shadow: inset 0 -2px 0 var(--dsw-alias-state-business-primary); }
+
+  /* ---- the progress panel: real class names from src/client/index.js ---- */
+  .gw-progress {
+    position: relative; width: 100%; color: var(--dsw-alias-label-primary);
+    font-size: 13px; padding: 4px 0 14px;
+  }
+  .gw-progress-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 20px 0; }
+  .gw-progress-title { margin: 0; font-size: 14px; font-weight: 600; }
+  .gw-progress-percent { font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-secondary); }
+  .gw-progress-zoom { margin-left: auto; display: inline-flex; gap: 4px; }
+  .gw-progress-zoom span {
+    min-width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px; font-size: 12px;
+    color: var(--dsw-alias-label-secondary);
+  }
+
+  /* ---- D: settlement bar (new) ---- */
+  .gw-settle { padding: 10px 20px 0; }
+  .gw-settle-bar { display: flex; height: 8px; border-radius: 999px; overflow: hidden; background: var(--dsw-alias-fill-l2); }
+  .gw-settle-bar i { display: block; height: 100%; }
+  .gw-settle-bar i.done { background: var(--dsw-alias-state-success-primary); }
+  .gw-settle-bar i.failed { background: var(--dsw-alias-state-error-primary); }
+  .gw-settle-bar i.cancel { background: var(--dsw-alias-state-warn-primary); }
+  .gw-settle-bar i.open {
+    background: repeating-linear-gradient(90deg, var(--dsw-alias-state-idle-primary) 0 5px, transparent 5px 9px);
+  }
+  .gw-settle-legend { display: flex; gap: 14px; margin-top: 6px; font-size: 11px; color: var(--dsw-alias-label-secondary); }
+  .gw-settle-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: 1px; }
+
+  .gw-progress-jump {
+    margin: 10px 20px 0; padding: 4px 12px; border: 1px solid var(--dsw-alias-border-l2);
+    border-radius: 9px; background: transparent; color: inherit; font: inherit; font-size: 12px;
+  }
+
+  /* ---- A: two bands ---- */
+  .gw-band-label {
+    display: flex; align-items: center; gap: 8px; margin: 16px 20px 0; padding-bottom: 6px;
+    font-size: 11px; letter-spacing: .04em; color: var(--dsw-alias-label-secondary);
+    border-bottom: 1px solid var(--dsw-alias-border-l2);
+  }
+  .gw-band-label b { font-weight: 600; color: var(--dsw-alias-label-primary); font-size: 11px; }
+  .gw-band-label .hint { margin-left: auto; }
+
+  .gw-progress-track { display: flex; align-items: stretch; gap: 0; width: 100%; padding: 12px 20px 4px; margin: 0; list-style: none; }
+  .gw-progress-seg {
+    flex: 1 1 0; min-width: 0; position: relative; display: flex; flex-direction: column;
+    padding: 0 10px 8px; border-right: 1px solid var(--dsw-alias-border-l2); text-align: left;
+  }
+  .gw-progress-seg:last-child { border-right: 0; }
+  .gw-progress-seg-head { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; min-width: 0; width: 100%; min-height: 28px; }
+  .gw-progress-ring {
+    flex: none; width: 28px; height: 28px; border: 2px solid var(--dsw-alias-state-idle-primary);
+    border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  }
+  .gw-progress-glyph { font-size: 12px; line-height: 1; }
+  .gw-progress-label { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; }
+  .gw-progress-meta { margin-top: 4px; width: 100%; color: var(--dsw-alias-label-secondary); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gw-progress-link { flex: 0 0 auto; align-self: flex-start; width: 18px; height: 2px; margin-top: 13px; border-radius: 999px; background: var(--dsw-alias-border-l2); }
+  .gw-progress-link[data-filled="true"] { background: var(--dsw-alias-state-success-primary); }
+  .gw-progress-link[data-flowing="true"] {
+    background: repeating-linear-gradient(90deg, var(--dsw-alias-state-business-primary) 0 6px, transparent 6px 10px);
+  }
+
+  /* ---- B: per-stage duration bar (new) ---- */
+  .gw-dur { display: block; height: 3px; margin-top: 7px; border-radius: 999px; background: var(--dsw-alias-fill-l2); }
+  .gw-dur i { display: block; height: 100%; border-radius: 999px; background: var(--dsw-alias-state-success-primary); }
+  .gw-dur[data-state="doing"] i { background: var(--dsw-alias-state-business-primary); }
+  .gw-dur[data-empty="true"] { background: repeating-linear-gradient(90deg, var(--dsw-alias-border-l2) 0 3px, transparent 3px 6px); }
+
+  /* ---- A: task band (new) ---- */
+  .gw-taskband { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 20px 4px; }
+  .gw-task {
+    display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 6px 10px;
+    border: 1px solid var(--dsw-alias-border-l2); border-radius: 10px; font-size: 12px; min-width: 0;
+  }
+  .gw-task .gw-progress-ring { width: 16px; height: 16px; border-width: 2px; }
+  .gw-task .gw-progress-glyph { font-size: 9px; }
+  .gw-task-name { font-weight: 600; white-space: nowrap; }
+  .gw-task-count { color: var(--dsw-alias-label-secondary); font-variant-numeric: tabular-nums; }
+  .gw-task-time { color: var(--dsw-alias-label-secondary); font-variant-numeric: tabular-nums; }
+  .gw-task[data-state="failed"] { border-left: 3px solid var(--dsw-alias-state-error-primary); padding-left: 8px; }
+  .gw-task[data-state="doing"] { border-color: var(--dsw-alias-state-business-primary); }
+  .gw-task[data-open="true"] { background: var(--dsw-alias-fill-l2); }
+
+  /* ---- C: worker → verifier pairing inside the branch (new) ---- */
+  .gw-progress-branch {
+    margin: 10px 20px 6px; padding: 10px 12px 4px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 10px;
+  }
+  .gw-progress-branch[data-state="failed"] .gw-progress-stem { background: var(--dsw-alias-state-error-primary); }
+  .gw-progress-stem { width: 2px; height: 10px; margin: 0 0 8px 11px; border-radius: 2px; background: var(--dsw-alias-border-l2); }
+  .gw-branch-head { display: flex; align-items: baseline; gap: 8px; margin: 0 0 8px; font-size: 12px; }
+  .gw-branch-head b { font-size: 13px; }
+  .gw-branch-head .state { color: var(--dsw-alias-label-secondary); }
+  .gw-pairs { margin: 0; padding: 0; list-style: none; }
+  .gw-pair { display: flex; align-items: stretch; min-width: 0; }
+  .gw-rail { position: relative; flex: none; width: 18px; }
+  .gw-rail::before { content: ""; position: absolute; left: 8px; width: 2px; background: var(--dsw-alias-border-l2); }
+  .gw-pair[data-pos="first"] .gw-rail::before { top: 16px; bottom: -6px; }
+  .gw-pair[data-pos="last"] .gw-rail::before { top: -6px; height: 22px; }
+  .gw-pair[data-pos="last"] .gw-rail::after {
+    content: ""; position: absolute; left: 8px; top: 15px; width: 14px; height: 2px; background: var(--dsw-alias-border-l2);
+  }
+  /* the rail stays neutral: the failed card's own left bar is the only red mark */
+  .gw-pair[data-pos="last"][data-tone="bad"] .gw-rail::before,
+  .gw-pair[data-pos="last"][data-tone="bad"] .gw-rail::after { background: var(--dsw-alias-state-idle-primary); }
+  .gw-member {
+    flex: 1 1 auto; display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 32px;
+    margin-bottom: 6px; padding: 5px 9px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 9px;
+    font-size: 12px; margin-left: 14px;
+  }
+  .gw-pair[data-pos="first"] .gw-member { margin-left: 0; }
+  .gw-member[data-state="failed"] { border-left: 3px solid var(--dsw-alias-state-error-primary); padding-left: 7px; }
+  .gw-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--dsw-alias-state-idle-primary); }
+  .gw-member[data-state="done"] .gw-dot { background: var(--dsw-alias-state-success-primary); }
+  .gw-member[data-state="failed"] .gw-dot { background: var(--dsw-alias-state-error-primary); }
+  .gw-role { flex: none; font-size: 11px; padding: 0 6px; border-radius: 999px; border: 1px solid var(--dsw-alias-border-l2); color: var(--dsw-alias-label-secondary); }
+  .gw-member-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gw-member-note { margin-left: auto; flex: none; color: var(--dsw-alias-label-secondary); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .gw-branch-foot { margin: 2px 0 6px 18px; font-size: 11px; color: var(--dsw-alias-label-secondary); }
+
+  .mock-note { margin: 8px 20px 0; font-size: 11px; color: var(--dsw-alias-label-secondary); opacity: .75; }
+</style>
+</head>
+<body>
+<div class="chrome">
+  <div class="chrome-title">执行 ssh aigateway 告诉我上面… <span class="mode">标准模式</span></div>
+  <div class="chrome-tabs"><span>对话</span><span>轨迹</span><span class="on">进度</span></div>
+</div>
+
+<div class="gw-progress">
+  <div class="gw-progress-head">
+    <h3 class="gw-progress-title">任务团队 · 8 个任务</h3>
+    <span class="gw-progress-percent">7/11 · 64%</span>
+    <div class="gw-progress-zoom"><span>−</span><span>1x</span><span>+</span></div>
+  </div>
+
+  <!-- D -->
+  <div class="gw-settle">
+    <div class="gw-settle-bar">
+      <i class="done" style="width:54.6%"></i><i class="failed" style="width:9.1%"></i><i class="open" style="width:36.3%"></i>
+    </div>
+    <div class="gw-settle-legend">
+      <span><i style="background:var(--dsw-alias-state-success-primary)"></i>6 完成</span>
+      <span><i style="background:var(--dsw-alias-state-error-primary)"></i>1 失败</span>
+      <span><i style="background:var(--dsw-alias-state-warn-primary)"></i>0 取消</span>
+      <span><i style="background:var(--dsw-alias-state-idle-primary)"></i>4 未结算</span>
+      <span style="margin-left:auto">已声明 11 行 · 结算不是任务判定</span>
+    </div>
+  </div>
+
+  <button class="gw-progress-jump">跳转到首个失败</button>
+
+  <!-- A: upper band = the fixed spine -->
+  <div class="gw-band-label"><b>流程</b><span>固定 7 段</span><span class="hint">宽度不随任务数变化</span></div>
+  <div class="gw-progress-track">
+    <div class="gw-progress-seg" data-state="done">
+      <div class="gw-progress-seg-head">
+        <span class="gw-progress-ring" style="border-color:var(--dsw-alias-state-success-primary);color:var(--dsw-alias-state-success-primary)"><span class="gw-progress-glyph">✓</span></span>
+        <span class="gw-progress-label">起点</span>
+      </div>
+      <span class="gw-progress-meta">run 已开始</span>
+      <span class="gw-dur" data-empty="true"></span>
+    </div>
+    <span class="gw-progress-link" data-filled="true"></span>
+    <div class="gw-progress-seg" data-state="done">
+      <div class="gw-progress-seg-head">
+        <span class="gw-progress-ring" style="border-color:var(--dsw-alias-state-success-primary);color:var(--dsw-alias-state-success-primary)"><span class="gw-progress-glyph">✓</span></span>
+        <span class="gw-progress-label">规划</span>
+      </div>
+      <span class="gw-progress-meta">1/1 · 3 s</span>
+      <span class="gw-dur"><i style="width:7%"></i></span>
+    </div>
+    <span class="gw-progress-link" data-filled="true"></span>
+    <div class="gw-progress-seg" data-state="done">
+      <div class="gw-progress-seg-head">
+        <span class="gw-progress-ring" style="border-color:var(--dsw-alias-state-success-primary);color:var(--dsw-alias-state-success-primary)"><span class="gw-progress-glyph">✓</span></span>
+        <span class="gw-progress-label">执行</span>
+      </div>
+      <span class="gw-progress-meta">8 行 · 18 s</span>
+      <span class="gw-dur"><i style="width:43%"></i></span>
+    </div>
+    <span class="gw-progress-link" data-flowing="true"></span>
+    <div class="gw-progress-seg" data-state="doing">
+      <div class="gw-progress-seg-head">
+        <span class="gw-progress-ring" style="border-color:var(--dsw-alias-state-business-primary);color:var(--dsw-alias-state-business-primary)"><span class="gw-progress-glyph">…</span></span>
+        <span class="gw-progress-label">检查</span>
+      </div>
+      <span class="gw-progress-meta">2 行在跑 · 12 s</span>
+      <span class="gw-dur" data-state="doing"><i style="width:29%"></i></span>
+    </div>
+    <span class="gw-progress-link"></span>
+    <div class="gw-progress-seg" data-state="pending">
+      <div class="gw-progress-seg-head">
+        <span class="gw-progress-ring"><span class="gw-progress-glyph"></span></span>
+        <span class="gw-progress-label">汇总</span>
+      </div>
+      <span class="gw-progress-meta">事件中没有报告</span>
+      <span class="gw-dur" data-empty="true"></span>
+    </div>
+    <span class="gw-progress-link"></span>
+    <div class="gw-progress-seg" data-state="pending">
+      <div class="gw-progress-seg-head">
+        <span class="gw-progress-ring"><span class="gw-progress-glyph"></span></span>
+        <span class="gw-progress-label">回答</span>
+      </div>
+      <span class="gw-progress-meta">事件中没有报告</span>
+      <span class="gw-dur" data-empty="true"></span>
+    </div>
+    <span class="gw-progress-link"></span>
+    <div class="gw-progress-seg" data-state="pending">
+      <div class="gw-progress-seg-head">
+        <span class="gw-progress-ring"><span class="gw-progress-glyph"></span></span>
+        <span class="gw-progress-label">终点</span>
+      </div>
+      <span class="gw-progress-meta">运行未结束</span>
+      <span class="gw-dur" data-empty="true"></span>
+    </div>
+  </div>
+
+  <!-- A: lower band = the real plan tasks -->
+  <div class="gw-band-label"><b>任务</b><span>8 个 · 换行不滚动</span><span class="hint">标签不再被截断</span></div>
+  <div class="gw-taskband">
+    <div class="gw-task" data-state="done">
+      <span class="gw-progress-ring" style="border-color:var(--dsw-alias-state-success-primary);color:var(--dsw-alias-state-success-primary)"><span class="gw-progress-glyph">✓</span></span>
+      <span class="gw-task-name">任务 1 · 读代码</span><span class="gw-task-count">1/1</span><span class="gw-task-time">4 s</span>
+    </div>
+    <div class="gw-task" data-state="done">
+      <span class="gw-progress-ring" style="border-color:var(--dsw-alias-state-success-primary);color:var(--dsw-alias-state-success-primary)"><span class="gw-progress-glyph">✓</span></span>
+      <span class="gw-task-name">任务 2 · 定位入口</span><span class="gw-task-count">1/1</span><span class="gw-task-time">6 s</span>
+    </div>
+    <div class="gw-task" data-state="doing">
+      <span class="gw-progress-ring" style="border-color:var(--dsw-alias-state-business-primary);color:var(--dsw-alias-state-business-primary)"><span class="gw-progress-glyph">…</span></span>
+      <span class="gw-task-name">任务 3 · 复现缺陷</span><span class="gw-task-count">0/1</span><span class="gw-task-time">5 s</span>
+    </div>
+    <div class="gw-task" data-state="done">
+      <span class="gw-progress-ring" style="border-color:var(--dsw-alias-state-success-primary);color:var(--dsw-alias-state-success-primary)"><span class="gw-progress-glyph">✓</span></span>
+      <span class="gw-task-name">任务 4 · 改样式</span><span class="gw-task-count">2/2</span><span class="gw-task-time">8 s</span>
+    </div>
+    <div class="gw-task" data-state="done">
+      <span class="gw-progress-ring" style="border-color:var(--dsw-alias-state-success-primary);color:var(--dsw-alias-state-success-primary)"><span class="gw-progress-glyph">✓</span></span>
+      <span class="gw-task-name">任务 5 · 补单测</span><span class="gw-task-count">2/2</span><span class="gw-task-time">9 s</span>
+    </div>
+    <div class="gw-task" data-state="failed" data-open="true">
+      <span class="gw-progress-ring" style="border-color:var(--dsw-alias-state-error-primary);color:var(--dsw-alias-state-error-primary)"><span class="gw-progress-glyph">✕</span></span>
+      <span class="gw-task-name">任务 6 · 真机截图</span><span class="gw-task-count">1/2</span><span class="gw-task-time">7 s</span>
+    </div>
+    <div class="gw-task" data-state="pending">
+      <span class="gw-progress-ring"><span class="gw-progress-glyph"></span></span>
+      <span class="gw-task-name">任务 7 · 更新文档</span><span class="gw-task-count">0/1</span><span class="gw-task-time">—</span>
+    </div>
+    <div class="gw-task" data-state="pending">
+      <span class="gw-progress-ring"><span class="gw-progress-glyph"></span></span>
+      <span class="gw-task-name">任务 8 · 收尾提交</span><span class="gw-task-count">0/1</span><span class="gw-task-time">—</span>
+    </div>
+  </div>
+
+  <!-- C: the open task's branch, worker → verifier -->
+  <div class="gw-progress-branch" data-state="failed">
+    <div class="gw-progress-stem"></div>
+    <p class="gw-branch-head"><b>任务 6 · 真机截图</b><span class="state">失败 · 1/2 已结算</span></p>
+    <ul class="gw-pairs">
+      <li class="gw-pair" data-pos="first" data-tone="bad">
+        <span class="gw-rail"></span>
+        <div class="gw-member" data-state="done">
+          <span class="gw-dot"></span><span class="gw-role">执行</span>
+          <span class="gw-member-name">worker · 抓 8 个宽度</span>
+          <span class="gw-member-note">完成 · 4.2 s</span>
+        </div>
+      </li>
+      <li class="gw-pair" data-pos="last" data-tone="bad">
+        <span class="gw-rail"></span>
+        <div class="gw-member" data-state="failed">
+          <span class="gw-dot"></span><span class="gw-role">检查</span>
+          <span class="gw-member-name">verifier · 几何断言</span>
+          <span class="gw-member-note">失败 · 2.8 s</span>
+        </div>
+      </li>
+    </ul>
+    <p class="gw-branch-foot">检查行缩进并挂在执行行下方：一个任务的「做了」和「验了」连在一起看。</p>
+  </div>
+
+  <p class="mock-note">效果图：布局与配色按现有 token 与几何（28 px 环、13 px 正文、18 px 连接线）绘制；数字为演示数据，非真实运行。</p>
+</div>
+<script>
+  if (new URLSearchParams(location.search).get('theme') === 'dark') {
+    document.documentElement.dataset.theme = 'dark'
+  }
+</script>
+</body>
+</html>
