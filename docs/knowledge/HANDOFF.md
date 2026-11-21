@@ -1,3 +1,21 @@
+## 2026-11-21 — 已发版 `0.12.16`（lead 收尾，总开关+命令容错+进度页）`CONFIRMED`
+
+- **From:** 本会话（lead）· **To:** 下一轮接手者 / agent-49
+- **发版**：`f24fc87` 已推，annotated tag `v0.12.16` 已推；远端 CI `44853807202` success、
+  Release 已发布（asset `dsh-grok-workflow-0.12.16.tgz`）。旧标签未动，无 force-push。
+- **内容**：`[Unreleased]` 三条归档——总开关（按钮+路由）、`/grok` 去空白不分大小写、
+  进度页展开分支移出脊柱；外加设置冒烟脚本字段数改从 `CONFIG_KEYS` 读、
+  LOCAL-TESTING 包名跟版本。`package.json`/`package-lock.json` 0.12.16，
+  README 双语版号/示例/tag 列表同步到 `v0.12.16`（`v0.12.15` 保留在已发布列表里）。
+- **实测**：`clone-profile` 把线上 `web` profile 复制到隔离目录（7334 文件，2 移位链接修复，
+  `cordis.patch.yml:378` 一处 key 形值脱敏，3 悬空链接是线上继承的），装包后
+  `lib/client.js`/`lib/mode-surface.js` 与仓库逐字节一致；总开关端到端
+  （命令关→按钮读→门控拦→按钮开→门控放行，同一条记录）PASS；进度页几何 48 用例 PASS。
+  完整 Web boot 在沙箱下起不来（MCP 写只读路径），未跑——记为环境受限，不冒充。
+- **tag 归属**：`v0.12.16` 归本版。agent-49 的 `clone-profile` 范围（脚本+测试+证据）
+  未合入本版，其提交请打 `v0.12.17` 或后续号，不要复用 `v0.12.16`。
+- **本地 CI**：`npm run ci` exit 0 = 73 文件 / 1350 测试 PASS（含 clone 6 例）。
+
 ## 2026-11-21 — 进度页 UI 展示缺陷修复（展开分支移出脊柱）`CONFIRMED`
 
 - **From:** 本会话（子代理 agent-35）· **To:** lead / 下一轮接手者
@@ -2387,3 +2405,22 @@ Issue #1 状态评论 issuecomment-6927842856。
   这是新工作，不在本次修复范围内；另：`grokDefault` 默认 `off` 时闸门不接管消息，文档/README
   若要讲「装好即生效」，应写明这一点。
 
+
+## 2026-11-21 — profile 克隆轮：交接（`CONFIRMED`）
+
+- **From:** agent-49（执行代理）· **To:** 用户 / 下一轮接手者
+- **落地（`CONFIRMED`）**：`scripts/clone-profile.mjs`、`test/profile-clone.spec.ts`
+  （6 例）、证据 `.rsi/evidence/profile-clone/`（README + 脱敏日志 + `home-patch.sandbox.yml`）。
+  复现并修复：profile 搬家后相对 `link:` 依赖断裂（`dsh plugin list` 硬失败）、
+  `cordis.patch.yml:378` 的 `sk-` 渠道密钥被复制。克隆实测：`dsh plugin list` exit 0、
+  `--dump-config` 0 条 skip、web UI 200、插件 client bundle 200/237809。
+- **并发（`CONFIRMED`）**：本轮期间同树有并发发布轮写入 0.12.16（commit `f24fc87`
+  + tag `v0.12.16`）。本轮只暂存自己的文件（脚本/测试/证据/记忆/CHANGELOG 的
+  `[Unreleased]` 段），未触碰 `package.json`、`package-lock.json`、README 的版本声明。
+- **未 push（`CONFIRMED`）**：commit 与 `v0.12.17` tag 都在本地。推 tag 会触发 Release
+  工作流并创建 GitHub Release —— 未获授权，因此没有推。`package.json` 仍是 0.12.16，
+  所以 `v0.12.17` 是 milestone tag 而非发布版本；要发布 0.12.17 时先
+  `git tag -d v0.12.17`，再按发版流程 bump + 重新打 tag。
+- **Next action**：若要把克隆用于 CI，把 `home-patch.sandbox.yml` 那类机器级 MCP 关闭
+  做成可复用步骤；另：`cordis.patch.yml` 里 3 条 patch 告警（`layerfs-host`、
+  `agent-teams` 未找到，`deepseek-account` 名称不匹配）是源配置漂移，与克隆无关，值得单开一轮清理。

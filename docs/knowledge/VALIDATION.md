@@ -2,6 +2,25 @@
 
 Real commands and results only. Do not add expected results here.
 
+## 已发版 `0.12.16` — 2026-11-21 (`CONFIRMED`, lead 收尾)
+
+**Changed:** `[Unreleased]` 三条归档为 `## [0.12.16]`（总开关、`/grok` 容错、进度页修复）；
+`package.json`/`package-lock.json` 0.12.16；README 双语同步；冒烟脚本字段数从 `CONFIG_KEYS`
+读；LOCAL-TESTING 包名跟版本。提交 `f24fc87`，tag `v0.12.16`，均已推。
+
+| state | command | result |
+| --- | --- | --- |
+| working tree | `npm run ci` | exit **0** — **73 files / 1350 tests PASS** |
+| remote | CI run `44853807202` (push `f24fc87`) | **success** |
+| remote | Release `v0.12.16` | published, asset `dsh-grok-workflow-0.12.16.tgz` |
+| clone env | `node scripts/clone-profile.mjs --src ~/.dsh/profiles/web --home .tmp/gw-newhome --name web-test` | **ok** — 7334 files, 2 links relinked, 3 inherited-dangling, 1 secret line redacted (`cordis.patch.yml:378`) |
+| clone env | `dsh plugin --profile web-test add …/dsh-grok-workflow-0.12.16.tgz` + `diff` installed `lib/` vs repo `lib/` | exit 0; `client.js` + `mode-surface.js` byte-identical |
+| repo | `node ./mode-e2e-check.mjs`（真 `node:http` + 真路由 + 真 `Session`） | **PASS**: command off → button status → gate pass → button on → gate admit, one record |
+| repo | `node check.mjs`（当前 `src/client/index.js`，Chromium 真实排版） | **PASS** 48 cases, 0 problems |
+
+**NOT_RUN（环境受限）:** 隔离环境的完整 Web boot（沙箱下 MCP 写只读路径，启动日志被淹没，
+端口曾起来但探针无应答）；真机 GUI 手点。agent-49 的 `clone-profile` 范围未合入本版。
+
 ## 进度页 UI 展示缺陷（展开分支移出脊柱）— 2026-11-21（`CONFIRMED`）
 
 **Changed:** `src/client/index.js`——分支从 `.gw-progress-track` 的 flex 行移到轨道下方面板
@@ -5125,3 +5144,36 @@ commit/tag/CI/Release 均取自已提交记录，无编造）后门禁码变为 
 | `tag -a v0.12.13` + `push main` + `push tag` | 成功，无 force-push |
 | 远端 CI `44697135387` | success |
 | Release `44697140006` | success；asset `dsh-grok-workflow-0.12.13.tgz` |
+
+## Round 94 — 2026-11-21 — profile 克隆与新 profile 专项测试（`CONFIRMED`，未发版）
+
+**主题**：把当前 `web` profile 复制成新 profile，在新 profile 里专项测试、修复、提交打 tag。
+
+**改动**：新增 `scripts/clone-profile.mjs`（复制 + 重算相对链接 + 就地脱敏 + parity/依赖/
+链接自证）、`test/profile-clone.spec.ts`（6 例），证据 `.rsi/evidence/profile-clone/`。
+
+**命令与结果（`CONFIRMED`，本树实跑）**：
+
+| 命令 | 结果 |
+| --- | --- |
+| 手工 `cp -a` 克隆 + `DSH_HOME=<clone> dsh plugin --profile web-clone list` | **exit 1**，`cannot resolve profile bundle "dsh-system-prompt-design"` |
+| 手工 `cp -a` 克隆 + `dsh --profile web-clone --dump-config` | exit 0 但有 1 条 `skipping profile bundle "dsh-system-prompt-design"` |
+| `node scripts/clone-profile.mjs --src ~/.dsh/profiles/web --home .tmp/profile-clone/dsh-home --name web-clone --force` | exit 0：7422 文件 / 85582807 字节 / relink 2 / 继承悬空 3 / parity 5/5 / 依赖 0 未解析 / 脱敏 1 行 |
+| `DSH_HOME=<clone> dsh plugin --profile web-clone list` | exit 0，`15 packages` |
+| `DSH_HOME=<clone> dsh --profile web-clone --dump-config` | exit 0，0 条 skip（剩 3 条源配置漂移告警） |
+| `DSH_HOME=<clone> dsh --profile web-clone --no-open --host 127.0.0.1 --port 32997` | `dsh web: http://127.0.0.1:32997/…` |
+| `curl -L <boot url>` | `200 / 45259`，`<title>DeepSeek Harness</title>`，`__DSH_BOOT__` 存在 |
+| 解析 `__DSH_BOOT__.entries` | 88 条，含 `dsh-grok-workflow`（`client.js&rev=5ed443a5559d`） |
+| `curl /plugins/??dsh-grok-workflow/client.js&rev=5ed443a5559d` | `200 / 237809`；去掉 `&rev=` 是 `404`（资产端点拒绝陈旧引用，不是插件没挂载） |
+| `npx vitest run test/profile-clone.spec.ts` | 6 passed |
+| `npm run ci` | exit 0 = **73 文件 / 1350 测试**，oxlint 0 errors，`verify:lib` byte-identical |
+
+**未验证（`NOT_RUN` / `BLOCKED`）**：
+- 源 profile 的 `--dump-config` 跑不了：它会重写 `cordis.yml`，而 `~/.dsh` 本会话只读
+  （`EROFS: read-only file system, open '/home/fish/.dsh/profiles/web/cordis.yml'`）。
+  parity 因此用 5 个界定文件的 sha256（脱敏后）比对，不是比对 dump。
+- 克隆的**服务端**工具注册没有对着模型跑过一次（无模型、无凭据、不引入桩模型）；已证的
+  是组合树、依赖解析、web 启动、客户端注册表与资产可取，不是「发一条消息能跑 workflow」。
+- 机器级 MCP（serena / phone-use）在沙箱内写外部路径被拒（8 条 `Read-only file system`），
+  用 home 级 patch 关掉后 boot 日志干净；未验证它们在克隆里能否正常工作（沙箱外才可能）。
+- push / GitHub Release 未做（未授权）；`v0.12.17` 是本地 milestone tag。

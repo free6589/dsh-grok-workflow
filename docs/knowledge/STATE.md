@@ -1,3 +1,14 @@
+Last updated: 2026-11-21 10:05 +08:00（**已发版 `0.12.16`** —
+`v0.12.16`（annotated tag → `f24fc87`）已推，远端 CI `44853807202` success、
+Release 已发布（asset `dsh-grok-workflow-0.12.16.tgz`）。
+内容：对话框底部 workflow 总开关（按钮+`POST /grok-workflow/mode` 路由）、
+`/grok` 开关词去空白不分大小写、进度页展开分支移出脊柱；另修设置冒烟脚本字段数写死
+（`CONFIG_KEYS` 为准）与 LOCAL-TESTING 包名。`npm run ci` 本地 73 文件 / 1350 测试 PASS。
+实测：线上 `web` profile 用 `clone-profile` 复制到隔离目录（7334 文件，2 链接修复，
+1 处 key 形值脱敏），装包后字节与仓库一致；总开关端到端（命令关→按钮读→门控拦→
+按钮开→门控放行）PASS，进度页几何 48 用例 PASS。完整 Web boot 在沙箱下受限未跑。
+agent-49 的 `clone-profile` 脚本+测试+证据是并发范围，未合入本版。）
+
 Last updated: 2026-11-21 08:40 +08:00（**进度页 UI 展示缺陷已修：展开分支移出脊柱（Chromium 实测 48 用例 0 问题）** —
 `0eb5d8f` 的发布形态里，展开阶段的成员面板是横向 `.gw-progress-track` 的又一个 flex 子项并带
 `width: 100%`，1200 px 下把每个 stage 挤到 21 px、label 计算宽度 0；默认展开（failed 优先、
@@ -1770,3 +1781,40 @@ worker 链上限 50（HARD_LIMITS.chainLength）
 - **边界**：修复只防新增越界行，**不修复**已经写坏的历史会话（无迁移，未声称有）；
   `grokDefault` 必须为 `on`，否则闸门 `pass: mode-off`（首次尝试即如此，工具已注册但消息没被接管）。
 
+
+## 2026-11-21 — profile 克隆 + 新 profile 专项测试（`CONFIRMED`，未发版）
+
+- **做了什么（`CONFIRMED`）**：新增 `scripts/clone-profile.mjs`，把当前 `web` profile
+  克隆到一次性 `DSH_HOME`（`.tmp/profile-clone/dsh-home`，gitignored），profile 名
+  `web-clone`；在该克隆里做专项测试并修复复现出的两处问题。逐条证据见
+  `.rsi/evidence/profile-clone/README.md`。
+- **复现缺陷 1（`CONFIRMED`）**：`cp -a` 手工复制出的 profile 不解析。`node_modules/dsh-system-prompt-design`
+  与 `dsh-token-usage` 是指向 `../../../../projects_mine/…` 的相对符号链接，只从
+  `~/.dsh/profiles/web/` 深度成立。后果不是降级而是硬失败：
+  `DSH_HOME=<clone> dsh plugin --profile web-clone list` **exit 1**
+  （`cannot resolve profile bundle "dsh-system-prompt-design"`），
+  `dsh --profile web-clone --dump-config` 静默 `skipping profile bundle` 1 条。
+  修复后同一命令 exit 0、`15 packages`、skipping 0 条。
+- **复现缺陷 2（`CONFIRMED`）**：`~/.dsh/profiles/web/cordis.patch.yml` 第 378 行
+  `channelSecrets` 下是一条 `sk-` 开头的真实渠道密钥（`sk-` + 39 字符）。逐字节复制等于
+  把活凭据再复制一份到没人审计的目录。脚本对 profile 自有文件就地脱敏（占位符
+  `sk-REDACTED-BY-CLONE-PROFILE`），报告只记「文件 + 行号 + 模式名」，并以
+  `redact(source) == target` 逐字节证明 5/5 parity。`node_modules` 内的 4 处命中属依赖自带
+  测试样例，标 `vendored` 不动（改写依赖内容会破坏包完整性）。
+- **实测（`CONFIRMED`）**：克隆 `7422` 文件 / `85582807` 字节；链接 7 条，relink 2 条，
+  源里本来就悬空 3 条（`node_modules/git`、`.bin/openwrite-*`）按继承上报而非克隆损伤；
+  依赖 15 条 0 未解析；20 条 bundle 行中 8 条由 DSH 安装体解析。克隆内 web app 起得来：
+  `dsh web: http://127.0.0.1:32997/`，UI `http_code=200 bytes=45259`
+  （`<title>DeepSeek Harness</title>`），`__DSH_BOOT__.entries` 88 条且含
+  `dsh-grok-workflow`，其 `client.js&rev=5ed443a5559d` 经该服务器取到 `200 / 237809` 字节。
+- **门禁（`CONFIRMED`）**：新增 `test/profile-clone.spec.ts` 6 例全绿（`npx vitest run
+  test/profile-clone.spec.ts`）；`npm run ci` 本树 exit 0 = **73 文件 / 1350 测试**，
+  oxlint 0 errors，`verify:lib` byte-identical。
+- **沙箱边界（`CONFIRMED`）**：本会话 `~/.dsh` 只读，故源 profile 的 `--dump-config`
+  无法执行（`EROFS … /home/fish/.dsh/profiles/web/cordis.yml`，`--dump-config` 会重写
+  `cordis.yml`），parity 因此以 5 个界定文件的 sha256 为准；克隆里的机器级 MCP
+  （serena / phone-use）在沙箱内写外部路径被拒，用 home 级 patch
+  `.rsi/evidence/profile-clone/home-patch.sandbox.yml` 关掉后 boot 日志零 traceback。
+- **未做（`NOT_RUN`）**：未 push、未建 GitHub Release、未改仓库可见性；`v0.12.17` 是本地
+  milestone tag（`package.json` 仍是 0.12.16），推它会因 tag≠package 版本被 Release 工作流
+  拦下（fail-closed，按设计）。
