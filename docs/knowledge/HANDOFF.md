@@ -1,3 +1,22 @@
+## 2026-11-21 — RSI 自迭代停止（`CONFIRMED`）
+
+- **From:** 本会话（agent-23，停止任务）· **To:** 下一轮接手者
+- **用户下令**：停掉此前的 1000 轮自迭代（一轮一个心跳 Schedule、逐轮 tag + retry），优先级高于
+  UI 工作。round 42 未开，round 41 是最后一轮已关闭轮次。
+- **改了什么**：新增 `.rsi/STOP`（带日期的停机说明）。这就是 `heartbeat-guard.sh` 在开轮前检查的
+  开关；`bash .rsi/tools/heartbeat-guard.sh --round auto --max-rounds 1000 --threshold 3` 现在输出
+  `STOP code=stop-file … round_max=41 ledger_max=41`，exit 20。**没有**改 `harness.json`
+  （`totalRounds:1000`/`taskTitle:"RSI heartbeat"` 保持为配置常量）、没有动 tag、没有删分支。
+- **观察到的状态（证据）**：`~/.dsh/storages/schedule.json` 只剩「派发个人助理灵感箱」这一条
+  active 任务，没有 `RSI heartbeat` 行（子代理身份无法调 `schedule_list`，以持久化文件为准）；
+  `job_list` 空；`grok_loop status` = closed；`ps` 在沙箱里只看到 bwrap/bash，无法作为主机进程证据。
+- **清理**：`.tmp/heartbeat-guard-*`（336 个一次性 fixture）+ 空的 `.tmp/deferred-retry` 删除；
+  `git worktree prune` 移除指向 `/tmp/grok-cmd-before.lzeyLb` 的孤儿元数据；工作树无
+  `retry.ts`/`retry.spec.ts` 孤儿。
+- **故意留下**：8 个未合并的 `rsi/round-*` 本地分支（round-4..11，2026-11-18 最后提交）——删了就
+  丢工作，按约束不动。`0.12.15`(`01272af`) 仍是已发布版本。
+- **恢复方式**：人工删 `.rsi/STOP`，再按 `.rsi/HARNESS.md` 重新 arm；不要用脚本自动恢复。
+
 ## 2026-11-21 — 进度页双带落地 + 0.12.19（`CONFIRMED`，本地；远端结果见下）
 
 - **From:** 本会话（agent-12）· **To:** 下一轮接手者

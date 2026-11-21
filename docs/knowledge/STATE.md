@@ -1,3 +1,18 @@
+Last updated: 2026-11-21 18:05 +08:00（**RSI 自迭代已停止，`CONFIRMED`** — 用户下令停掉此前的
+1000 轮自迭代（每轮一个心跳 Schedule、逐轮 tag + retry）；round 42 从未开，round 41 是最后一轮
+已关闭的轮次。停止动作：新建 `.rsi/STOP`（guard 在开轮前测它），`bash .rsi/tools/heartbeat-guard.sh
+--round auto --max-rounds 1000 --threshold 3` 现在返回 `STOP code=stop-file … round_max=41
+ledger_max=41`（exit 20），即任何重建的心跳行也开不出新轮。Schedule 持久化文件
+`~/.dsh/storages/schedule.json` 里只剩无关的每日任务「派发个人助理灵感箱」，没有 `RSI heartbeat`
+行（本会话是子代理，`schedule_list` 工具对子代理直接拒绝，故以持久化文件为证据）；后台任务
+`job_list` 为空，`grok_loop status` 报本会话 heartbeat closed。清理：`.tmp/` 下 336 个
+`heartbeat-guard-*` 一次性 fixture 与空的 `.tmp/deferred-retry` 已删；`git worktree prune` 清掉
+指向已消失 `/tmp/grok-cmd-before.lzeyLb` 的孤儿 worktree 元数据。工作树无 `retry.ts`/`retry.spec.ts`
+孤儿（`find` + `git ls-files | grep retry` 均无）。**未动**：8 个未合并的 `rsi/round-*` 本地分支
+（round-4..11，最后提交 2026-11-18）按「不重写历史、不丢工作」原样保留；`0.12.15`(`01272af`)
+仍是已发布版本，未移 tag。`harness.json` 的 `totalRounds:1000`/`taskTitle:"RSI heartbeat"` 是
+配置常量，未改；恢复迭代 = 人工删 `.rsi/STOP` 再按 `HARNESS.md` 重新 arm。）
+
 Last updated: 2026-11-21 16:45 +08:00（**已发版 `0.12.19`：进度页改成效果图的双带 = 固定七段脊 + 竖向任务带** —
 `src/client/index.js` 的 `ProgressView` 重写为三段结构：`.gw-progress-settle`（按 outcome 分段的
 结算条，有运行就一直在）+ `.gw-progress-track`（**只有** 7 个模板段，`kind:'extra'` 的计划任务

@@ -1,0 +1,14 @@
+Operator stop — RSI self-iteration halted 2026-11-21T18:0x+08:00
+
+Reason: the operator ordered the 1000-round self-iteration (one scheduled heartbeat per round,
+per-iteration tag + retry) stopped. Round 42 was never opened; round 41 is the last closed round.
+
+This file is the switch `.rsi/tools/heartbeat-guard.sh` tests before it opens a round: with it
+present the guard returns `STOP code=stop-file` (exit 20) and opens nothing, even if a heartbeat
+Schedule row is recreated. Remove this file only when a human deliberately resumes the loop.
+
+State at stop:
+- RSI heartbeat Schedule row: absent from the Schedule store (only the unrelated daily
+  "派发个人助理灵感箱" task remains).
+- Background jobs / workflow runs: none.
+- Published release: 0.12.15 (01272af) — unchanged; no tag moved, no history rewritten.
