@@ -1,4 +1,4 @@
-Last updated: 2026-11-21 15:43 +08:00（**进度页详情卡已删、胶囊直达子会话，未发版** —
+Last updated: 2026-11-21 16:00 +08:00（**已发版 `0.12.18`：进度页详情卡删除、胶囊直达子会话** —
 Q1/Q2 按用户拍板落地：阶段与任务的详情浮层一起删除，点卡片空白处什么都不发生；
 Phase 2（失败重试）暂不做。`src/client/index.js`：`ProgressDetail` 与详情样式/
 选中/复制/roving-tabindex 全删，`ProgressNode` 与成员卡改为静态 div，唯一动作是
@@ -6,7 +6,7 @@ Phase 2（失败重试）暂不做。`src/client/index.js`：`ProgressDetail` �
 `progress.detail.*` 等 22 key，新增 `progress.member.open`。测试：detail ladder 整块
 替换为三例 pill 断言，手风琴/aria/mono 断言同步；`test/progress-connector.spec.ts`
 两例改断默认展开分支。`npm run ci` exit 0 = **73 文件 / 1346 测试 PASS**。
-CHANGELOG `[Unreleased]` 已记中英双语条目。**未发版**，版本号仍 `0.12.16`。）
+CHANGELOG `[Unreleased]` 已记中英双语条目。**已发版**：`v0.12.18` 已推，远端 CI `44882426442` success、Release 已发布（asset `dsh-grok-workflow-0.12.18.tgz`）。）
 
 Last updated: 2026-11-21 10:05 +08:00（**已发版 `0.12.16`** —
 `v0.12.16`（annotated tag → `f24fc87`）已推，远端 CI `44853807202` success、
