@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.12.16] - 2026-11-21
+
 ### Added / 新增
 
 - **The composer dock gains a workflow master switch next to auto-continue and self-iterate / 对话框底部在「自动接着跑」「自迭代」旁新增 workflow 总开关** —

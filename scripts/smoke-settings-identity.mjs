@@ -38,7 +38,7 @@ if (modulePath === '') {
 }
 
 const real = await import(pathToFileURL(modulePath).href)
-const { Config } = await import('../lib/config.js')
+const { Config, CONFIG_KEYS } = await import('../lib/config.js')
 const { describeSelf, describeSurface } = await import('../lib/settings.js')
 
 // Exactly what SettingsForms.describe() produces for one entry.
@@ -63,7 +63,10 @@ const printed = surface.level === 'warn' ? `WARN  ${surface.text}` : `INFO  ${su
 const failures = []
 if (view === undefined) failures.push('describeSelf() did not recognise the descriptor')
 if (view?.matchedBy !== 'value') failures.push(`matchedBy was ${String(view?.matchedBy)}, expected "value"`)
-if (view?.fields?.length !== 21) failures.push(`fields was ${String(view?.fields?.length)}, expected 21`)
+// CONFIG_KEYS is the single source of truth: 15 accepted keys as of the loop/repeat
+// surface (was 21 before the settings page was trimmed; hard-coding it here hid the
+// drift until the smoke check failed).
+if (view?.fields?.length !== CONFIG_KEYS.length) failures.push(`fields was ${String(view?.fields?.length)}, expected ${CONFIG_KEYS.length}`)
 if (surface.level !== 'info') failures.push(`diagnostics level was ${surface.level}, expected "info"`)
 if (!surface.text.includes('identified by value')) failures.push('diagnostics line does not name the identity path')
 if (surface.text.includes('no generated descriptor')) failures.push('diagnostics still claims the page is unreadable')
