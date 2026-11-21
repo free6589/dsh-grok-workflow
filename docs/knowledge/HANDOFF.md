@@ -13,9 +13,8 @@
   73 文件 / 1346 测试 PASS。
 - **效果图**：`evidence/progress-tab-mockup-2026-11-21/flow.html` 已同步新交互（删 hint、
   删 inspector、卡片 inert、胶囊为 `#child-<id>` 占位链接）；旧详情截图已删。
-- **下一步**：打 `v0.12.18`（见本轮 CHANGELOG `[Unreleased]` 条目 → 归档到 `## [0.12.18]`，
-  `package.json` + `package-lock.json` 同步 bump，README 版号同步， annotated tag + push，
-  等远端 CI success 后发 Release）。重试（Phase 2）未立项，不动。
+- **发版**：`c121aa3` 已推，annotated tag `v0.12.18` 已推；远端 CI `44882426442` success、
+  Release 已发布（asset `dsh-grok-workflow-0.12.18.tgz`）。重试（Phase 2）未立项，不动。
 
 ## 2026-11-21 — 已发版 `0.12.16`（lead 收尾，总开关+命令容错+进度页）`CONFIRMED`
 
