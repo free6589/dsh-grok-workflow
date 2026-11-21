@@ -218,11 +218,16 @@ function measure() {
 function report(out) {
   window.__diag = out
   document.documentElement.setAttribute('data-diag', JSON.stringify(out))
-  const pre = document.createElement('pre')
-  pre.id = 'diag'
+  let pre = document.getElementById('diag')
+  if (pre === null) {
+    pre = document.createElement('pre')
+    pre.id = 'diag'
+    pre.style.cssText = 'font:11px monospace;white-space:pre-wrap;border-top:2px solid #c00;margin-top:12px;padding:8px'
+    document.body.appendChild(pre)
+  }
+  // Overwrite, never append: a click re-renders, and the dumped DOM must carry the
+  // geometry of the final paint rather than the first one.
   pre.textContent = JSON.stringify(out, null, 1)
-  pre.style.cssText = 'font:11px monospace;white-space:pre-wrap;border-top:2px solid #c00;margin-top:12px;padding:8px'
-  document.body.appendChild(pre)
 }
 
 rootProps = propsOf()
