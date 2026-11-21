@@ -9,6 +9,8 @@ import { installGate } from './gate.js'
 import { ITERATE_TASK_TITLE, createLoopService, loopPolicyFromConfig, scheduleServiceOf } from './loop.js'
 import { installLoop } from './loop-surface.js'
 import type { LoopHostContext } from './loop-surface.js'
+import { installModeRoute } from './mode-surface.js'
+import type { ModeHostContext } from './mode-surface.js'
 import { installShutdownProbe } from './records.js'
 import { normalizeCallerTasks, GrokWorkflowInputError, TASK_LIMITS } from './input.js'
 import { renderReport } from './report.js'
@@ -327,6 +329,25 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
   })
 
   installLoop({ ctx: ctx as unknown as LoopHostContext, loop, logger, iterate })
+
+  // The composer's master switch rides the same durable mode record `/grok`
+  // writes: a browser click has no commanding agent, so it gets one exact route
+  // (`POST /grok-workflow/mode`) instead of a second store. `status` reports the
+  // live `grokDefault` fallback, which is exactly what the gate applies when no
+  // record exists — the default is stated once, never copied into the button.
+  installModeRoute({
+    ctx: ctx as unknown as ModeHostContext,
+    fallback: () => {
+      try {
+        return readConfig().grokDefault === 'on'
+      } catch {
+        // A broken live edit must not make "is the workflow on?" unanswerable:
+        // the load-time snapshot is the same fallback the gate uses.
+        return config.grokDefault === 'on'
+      }
+    },
+    logger,
+  })
 
   // T4: the gate is always on (enforceGate removed) — every top-level user
   // message passes the front desk.
