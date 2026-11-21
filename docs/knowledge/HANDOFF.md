@@ -1,3 +1,21 @@
+## 2026-11-21 — 对话框底部第三个开关「workflow总开关」`CONFIRMED`（UI 侧；core 路由在并发轮）
+
+- **From:** 本会话（子代理 agent-37）· **To:** lead / 下一轮接手者
+- **做完了什么**：`src/client/index.js` 的 composer dock 现在挂三个开关——loop(90)、iterate(91)、
+  **mode(92)**。第三个是 `/grok on|off` 的按钮形态：`POST /grok-workflow/mode`，body
+  `{action:'status'|'set', sessionId, enabled?}`，回 `{ok,action,mode:{enabled,source,…}}`，
+  真相源是会话记录 `plugin:grok-workflow/mode`（与斜杠命令、门控同一条）。挂载读一次；点击
+  `set` 目标值并用回包重绘，被拒就保留上一状态并显示原因；无记录时显示路由报回的 `grokDefault`
+  （UI 不写死默认值、不建 `masterEnabled` 存储）。关闭态三重提示：文案「关」/空心灯/熄灭胶囊。
+  传输抽成 `routeUrl`/`postRoute` 供三个开关共用；`startBothSwitches` 更名 `startDockSwitches`。
+- **证据**：`npm run ci` exit 0 = 72 文件 / 1341 例 PASS，`verify:lib` 通过；两条负对照（改错路由
+  常量 2 红、关闭态画成开启 4 红）与日志在 `docs/knowledge/evidence/workflow-switch-button-20261121/`。
+- **没做的事**：真机 GUI 手点（`NOT_RUN`）；未发版、未 bump 版本；`src/mode-surface.ts` /
+  `src/index.ts` / `lib/index.*` / `lib/mode-surface.*` / `test/mode-surface.spec.ts` 属 core 兄弟
+  的并发改动，我没有提交它们。
+- **接手要点**：若 core 再改路由形状，只需同步 `MODE_ROUTE_PATH`/`MODE_ACTIONS`/`parseModePayload`
+  三处与 `test/client.spec.ts` 里的契约用例；dock 里三格的 order 不要重排。
+
 ## 2026-11-21 — `/grok` 参数解析容错（命令层）；裸 `/grok`=开 未回退（`CONFIRMED`）
 
 - **From:** 本会话（子代理 agent-38）· **To:** lead / 下一轮接手者 / agent-37（dock 开关）

@@ -5,6 +5,25 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Added / 新增
+
+- **The composer dock gains a workflow master switch next to auto-continue and self-iterate / 对话框底部在「自动接着跑」「自迭代」旁新增 workflow 总开关** —
+  The third button is the `/grok on|off` toggle in clickable form: it reads and writes
+  the session's own mode record (`plugin:grok-workflow/mode`, the record the gate already
+  honors) through `POST /grok-workflow/mode`, so the button and the command can never
+  disagree about whether this session runs workflow work. It paints only what the route
+  reads back — a click that the Host refuses leaves the last known state on screen with
+  the reason beside it instead of flipping optimistically. Off is stated three ways (the
+  word, a hollow lamp, the unlit pill) so a grey switch can never read as "still running".
+  With no record yet the button shows the deployment default the route reports; the
+  default is never hardcoded in the UI, and no second `masterEnabled` store was added.
+  / 第三个按钮就是可点的 `/grok on|off`：读写会话自己的模式记录
+  （`plugin:grok-workflow/mode`，门控本来就读的那条），经 `POST /grok-workflow/mode`
+  落地，所以按钮和斜杠命令不可能对「这个会话要不要跑工作流」各说一套。界面只画路由回读
+  出来的状态——宿主拒绝的点击保留最后已知状态并说明原因，不做乐观翻转。关闭有三重提示
+  （文案、空心指示灯、熄灭的胶囊），灰色的开关不会被读成「还在跑」。没有记录时显示路由
+  报回的部署默认值：默认值绝不在 UI 里写死，也没有新增第二份 `masterEnabled` 存储。
+
 ### Changed / 变更
 
 - **`/grok` reads its switch word after trimming and without regard to case / `/grok` 的开关词去空白后不分大小写** —
@@ -23,6 +42,28 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
   （空格、制表符、换行、U+00A0、U+3000），所以只有那个词决定结果。`on`/`off`/空 之外的
   一切仍然只是用法错误、不写任何记录；参数不是字符串时同样只回用法提示，既不落到
   「无参数=开」那条分支（裸 `/grok` 仍然开启，见 D-028），也不会抛异常。
+
+### Fixed / 修复
+
+- **The Progress tab's open stage is a panel below the spine, not a column inside it / 进度页展开的阶段改为脊柱下方的面板，不再作为其中一列** —
+  The members of the open stage were rendered as one more child of the horizontal
+  `.gw-progress-track` flex line, carrying `width: 100%`, so opening a stage competed with the
+  stages themselves for width; the "jump to first failure" button was a flex item in that row as
+  well. Both are outside the spine now: the panel is one bordered block under the track
+  (`data-state` on the panel carries the open stage's state, and the stem's colour follows it) and
+  the jump button sits above it. The ring is the state mark again — a hollow 28 px ring for
+  `pending` instead of a blank head — the connector between two stages owns the running animation
+  (`data-flowing`) while still filling only where the track has passed `done`, the head wraps
+  instead of squeezing its label to zero width in a narrow column, and the meta line carries its
+  full sentence as a `title` because it is ellipsized. Under 720 px the ring stacks above its
+  label; under 480 px the connectors are hidden together with the vertical step list.
+  / 展开阶段的成员此前是横向 `.gw-progress-track` 里的又一个 `width: 100%` 子项，于是「展开一个
+  阶段」要和阶段本身抢宽度；「跳到首个失败」按钮当时也是那一行里的 flex 项。现在两者都在脊柱
+  之外：面板是轨道下方一块带边框与圆角的独立区域（阶段状态挂在面板的 `data-state` 上，竖线颜色
+  跟着它走），跳转按钮在轨道上方。状态标记回到圆环本身——`pending` 是空心的 28px 环，不再是一
+  块空白头部；两个阶段之间的连接线接管「正在跑」的流动动画（`data-flowing`），并且仍然只在左侧
+  阶段 `done` 时填实；头部改为换行，窄列里不再把标签压成零宽；元信息行会被省略号截断，补上
+  `title` 以便读全句。720px 以下圆环叠在标签之上，480px 以下连接线随竖向步骤列表一起隐藏。
 
 ## [0.12.15] - 2026-11-21
 

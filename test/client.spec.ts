@@ -4,6 +4,9 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_ITERATE_INTERVAL_MIN, DEFAULT_ITERATE_TEMPLATE, DEFAULT_LOOP_FAIL_STREAK, DEFAULT_LOOP_INTERVAL_MIN, DEFAULT_LOOP_MAX_ROUNDS, DEFAULT_MAX_CONCURRENCY, DEFAULT_MAX_TASKS, DEFAULT_TIMEOUT_MS, HARD_LIMITS, SWITCHABLE_CLASSES } from '../src/config.js'
 import { ITERATE_ROUTE_PATH, ITERATE_TASK_TITLE, LOOP_ROUTE_PATH, LOOP_TASK_TITLE, LOOP_TOOL_NAME, createLoopService, loopPolicyFromConfig } from '../src/loop.js'
 import { createLoopTool, dispatchIterateAction, handleLoopRoute } from '../src/loop-surface.js'
+import { Session as SessionClass } from '@deepseek-ai/dsh-session'
+import { readModeRecord } from '../src/mode.js'
+import { handleModeRoute, MODE_ROUTE_PATH as CORE_MODE_ROUTE_PATH } from '../src/mode-surface.js'
 
 /**
  * The browser settings page is hand-written JavaScript (the host serves it verbatim in
@@ -40,6 +43,7 @@ interface Bundle {
   GROK_WORKFLOW_PROGRESS: ProgressBundle
   GROK_WORKFLOW_LOOP: LoopSwitchBundle
   GROK_WORKFLOW_ITERATE: LoopSwitchBundle
+  GROK_WORKFLOW_MODE: ModeSwitchBundle
   GROK_WORKFLOW_INTERNALS: {
     draftOf(value?: Record<string, unknown>): Draft
     validate(draft: Draft): Finding[]
@@ -135,6 +139,35 @@ type LoopSnapshotLike = {
   intervalMinutes?: number
   rounds?: number
   nextAt?: string
+}
+
+/** One answer from the mode route: the record as written, or the stated refusal. */
+type ModeAnswer =
+  | { ok: true, mode: { enabled: boolean, setBy?: string, turn?: number, workflowMode?: string } }
+  | { ok: false, code: string, error: string }
+
+/**
+ * The workflow switch (`GROK_WORKFLOW_MODE`): the `/grok on|off` toggle as a dock button.
+ *
+ * It is not a heartbeat, so it has no interval and no `open`/`close` pair: `set(true)` is
+ * `/grok on`, `set(false)` is `/grok off`, and both write the one session record the
+ * slash command and the gate already share.
+ */
+interface ModeSwitchBundle {
+  routePath: string
+  switchId: string
+  switchOrder: number
+  dataAttr: string
+  actions: string[]
+  component: (props: Record<string, unknown>) => unknown
+  mount: (ctx: unknown, i18n: unknown) => (() => void) | undefined
+  send: (body: Record<string, unknown>, fetchImpl?: unknown) => Promise<ModeAnswer>
+  read: (sessionId: string, fetchImpl?: unknown) => Promise<ModeAnswer>
+  set: (sessionId: string, enabled: boolean, fetchImpl?: unknown) => Promise<ModeAnswer>
+  parsePayload: (payload: unknown, status: number) => ModeAnswer
+  text: (t: Translator, state: Record<string, unknown>) => string
+  failureText: (t: Translator, error: unknown) => string
+  url: () => string
 }
 
 /**
@@ -562,12 +595,13 @@ describe('client settings page: wiring to the DSH locale service (t42)', () => {
     bundle.apply(ctx)
     // The page is mounted once before the locale service arrives and once after: only the
     // second registration survives, and it is the one carrying the namespace.
-    // Four live registrations: the settings page, the task panel renderer and the
-    // two composer-dock switches (additive, registered last: loop, then iterate).
-    expect(live()).toHaveLength(4)
+    // Five live registrations: the settings page, the task panel renderer and the
+    // three composer-dock switches (additive, registered last: loop, iterate, mode).
+    expect(live()).toHaveLength(5)
     const byId = (id: string) => live().find((entry: { options: Record<string, unknown> }) => entry.options['id'] === id)
     expect(byId('grok-workflow-loop'), 'the loop switch is registered').toBeDefined()
     expect(byId('grok-workflow-iterate'), 'the self-iterate switch is registered').toBeDefined()
+    expect(byId('grok-workflow-mode'), 'the workflow switch is registered').toBeDefined()
     expect(live()[0]!.options['name']).toBe('plugins.item')
     expect(live()[0]!.options['locale']).toBe('grok-workflow')
     expect(typeof live()[0]!.options['label']).toBe('function')
@@ -603,7 +637,7 @@ describe('client settings page: wiring to the DSH locale service (t42)', () => {
     expect(() => bundle.apply(ctx)).not.toThrow()
     // No locale face ⇒ no `locale` option: the renderer throws a SlotAssemblyError for an
     // entry that names a namespace while no face is installed.
-    expect(live()).toHaveLength(4)
+    expect(live()).toHaveLength(5)
     expect(live()[0]!.options['locale']).toBeUndefined()
     expect(live()[1]!.options['locale']).toBeUndefined()
     // The task panel shadows the stock `workflow-run` renderer by priority (lowest renders);
@@ -631,9 +665,9 @@ describe('client settings page: wiring to the DSH locale service (t42)', () => {
     const locale = fakeLocale('zh')
     const { ctx, live, slots, disposers } = fakeContext(locale)
     bundle.apply(ctx)
-    // The settings page, the task-panel renderer and both switches are all mounted, and
+    // The settings page, the task-panel renderer and all three switches are mounted, and
     // the `locale` fiber handed back exactly one disposer per injected scope it entered.
-    expect(live()).toHaveLength(4)
+    expect(live()).toHaveLength(5)
     expect(disposers).toHaveLength(2)
     const mounted = slots.length
     const unbind = disposers[0]!
@@ -658,7 +692,7 @@ describe('client settings page: wiring to the DSH locale service (t42)', () => {
     const { ctx, live, slots, disposers } = fakeContext(fakeLocale('zh'))
     const dispose = bundle.apply(ctx) as unknown as () => void
     const mounted = slots.length
-    expect(live()).toHaveLength(4)
+    expect(live()).toHaveLength(5)
     dispose()
     expect(live()).toHaveLength(0)
     expect(slots.length).toBe(mounted)
@@ -708,6 +742,121 @@ function stylesOf(node: unknown, out: Array<Record<string, unknown>> = []): Arra
     if (typeof style === 'object' && style !== null) out.push(style as Record<string, unknown>)
   }
   return out
+}
+
+/* ------------------------------------------------------------ the component -- */
+
+type SwitchRender = { cells: unknown[], index: number, effects: Array<() => unknown> }
+let switchRender: SwitchRender | undefined
+
+/**
+ * React stand-in whose `useEffect` actually runs.
+ *
+ * The shared stub in this file deliberately does not run effects (the settings page
+ * writes its draft from one, and replaying that after a click would undo the click).
+ * The switch *reads on mount*, so its half of the file needs the opposite: effects are
+ * collected during a render and executed once, the way React does after the commit.
+ */
+const switchReact = {
+  createElement: (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]): unknown => {
+    const element: Element = { type, props: props ?? {}, children: children.flat(Infinity) as unknown[] }
+    return typeof type === 'function' ? (type as (props: Record<string, unknown>) => unknown)(element.props) : element
+  },
+  useState: (initial: unknown) => {
+    const render = switchRender!
+    const at = render.index++
+    if (at >= render.cells.length) render.cells[at] = typeof initial === 'function' ? (initial as () => unknown)() : initial
+    return [render.cells[at], (next: unknown) => {
+      render.cells[at] = typeof next === 'function' ? (next as (value: unknown) => unknown)(render.cells[at]) : next
+    }]
+  },
+  useEffect: (fn: () => unknown) => { switchRender!.effects.push(fn) },
+  useMemo: (factory: () => unknown) => factory(),
+  useSyncExternalStore: (_subscribe: unknown, getSnapshot: () => unknown) => getSnapshot(),
+}
+
+/** The bundle again, loaded with {@link switchReact}. */
+function loadSwitchExports(): Record<string, unknown> {
+  const source = readFileSync(new URL('../src/client/index.js', import.meta.url), 'utf8')
+  let registration: { id: string, factory: (require: (id: string) => unknown) => Record<string, unknown> } | undefined
+  const record = globalThis as unknown as { window?: { __ModuleLoader__?: { load(spec: never): void } } | undefined }
+  const previous = record.window
+  record.window = { __ModuleLoader__: { load: (spec) => { registration = spec } } }
+  try {
+    new Function(source)()
+  } finally {
+    record.window = previous
+  }
+  expect(registration?.id).toBe('dsh-grok-workflow')
+  return registration!.factory((id) => {
+    if (id === 'react') return switchReact
+    throw new Error(`the bundle must not require ${id} at load time`)
+  })
+}
+
+/** The loop switch's own share of the bundle (the shape every dock switch mounts with). */
+function loadSwitchBundle(): LoopSwitchBundle {
+  return loadSwitchExports()['GROK_WORKFLOW_LOOP'] as LoopSwitchBundle
+}
+
+/** Render the switch, run its mount effect once, and re-render what React would show. */
+function mountSwitch(component: (props: Record<string, unknown>) => unknown, props: Record<string, unknown>, dataAttr = 'loop') {
+  const render: SwitchRender = { cells: [], index: 0, effects: [] }
+  const run = (): unknown => {
+    render.index = 0
+    render.effects = []
+    const before = switchRender
+    switchRender = render
+    try {
+      return component(props)
+    } finally {
+      switchRender = before
+    }
+  }
+  // Resolved promises plus the effect's own chain: a macrotask flush is enough and, unlike
+  // a fixed number of microtasks, does not depend on how many `then`s the code adds.
+  const settle = async () => {
+    for (let turn = 0; turn < 4; turn += 1) await new Promise((resolve) => setTimeout(resolve, 0))
+  }
+  return {
+    async mount() {
+      const first = run()
+      const effects = render.effects.slice()
+      render.effects = []
+      for (const effect of effects) await effect()
+      await settle()
+      return { first, tree: run() }
+    },
+    async click(tree: unknown) {
+      const button = walk(tree).find((element) => element.props[`data-${dataAttr}-toggle`] === true)
+      expect(button, `the ${dataAttr} switch renders a toggle`).toBeDefined()
+      ;(button!.props['onClick'] as () => void)()
+      await settle()
+      return run()
+    },
+  }
+}
+
+const toggleOf = (tree: unknown) => walk(tree).find((element) => element.props['data-loop-toggle'] === true)!
+
+/** The workflow switch's own toggle and lamp, found by their own attributes. */
+const toggleIn = (tree: unknown) => walk(tree).find((element) => element.props['data-mode-toggle'] === true)!
+const lampIn = (tree: unknown) => walk(tree).find((element) => element.props['data-mode-lamp'] !== undefined)
+  ?.props['data-mode-lamp']
+
+/** A fetch stand-in: records the POST body and answers from a script, one per call. */
+function scriptedFetch(script: Array<{ status?: number, body?: unknown, throws?: boolean }>) {
+  const posted: Array<Record<string, unknown>> = []
+  const urls: string[] = []
+  const fetchImpl = async (url: string, init: Record<string, unknown>) => {
+    urls.push(url)
+    posted.push(JSON.parse(String(init['body'])) as Record<string, unknown>)
+    const answer = script.shift()
+    if (answer === undefined) throw new Error('unscripted loop call')
+    if (answer.throws === true) throw new Error('socket closed')
+    return { status: answer.status ?? 200, json: async () => answer.body }
+  }
+  return { posted, urls, fetchImpl }
 }
 
 describe('client settings page: reading, failure and retry', () => {
@@ -1869,6 +2018,57 @@ describe('client progress tab: styles, zoom and empty snapshots', () => {
     expect(progress.css).toContain('--gw-zoom')
   })
 
+  it('puts the open stage panel below the spine and never inside the flex line', () => {
+    const t = translator('zh')
+    const run: ProgressRun = {
+      runId: 'run-branch',
+      name: '任务团队',
+      anchorSeq: 1,
+      members: [progressMember(1, '执行', 'completed'), progressMember(2, '执行', undefined)],
+    }
+    const tree = progress.component({ t, progressT: t, useGrokProgress: (select: (value: unknown) => unknown) => select({ runs: [run], activeRun: run }) })
+    const elements = walk(tree)
+    const track = elements.find((element) => element.props['data-gw-progress-track'] === true)!
+    const branch = elements.find((element) => typeof element.props['data-gw-progress-branch'] === 'string')
+    expect(branch, 'the running stage opens its branch by default').toBeDefined()
+    expect(branch!.props['id']).toBe('gw-branch-stage:execute')
+    // The regression: the branch used to be a `width: 100%` sibling inside the
+    // horizontal track, so opening it took its width out of the segments and crushed
+    // every one of them to ~20px. It must live outside the track's flex line.
+    expect(walk(track.children).some((element) => element.props['data-gw-progress-branch'] !== undefined)).toBe(false)
+    // It carries the state its stem is coloured from, now that it is not a segment child.
+    expect(branch!.props['data-state']).toBe('doing')
+    // The owning segment still points at it, so `aria-controls` is not a dangling id.
+    const execute = elements.find((element) => element.props['data-node-key'] === 'stage:execute')!
+    expect(execute.props['aria-expanded']).toBe(true)
+    expect(execute.props['aria-controls']).toBe('gw-branch-stage:execute')
+    // A running stage's connector flows into it, and the meta line carries a tooltip
+    // because a narrow column clips it with an ellipsis.
+    expect(elements.some((element) => element.props['data-gw-progress-link'] === true && element.props['data-flowing'] === 'true')).toBe(true)
+    const metas = elements.filter((element) => element.props['data-gw-progress-meta'] === true)
+    expect(metas.length).toBeGreaterThan(0)
+    for (const meta of metas) expect(typeof meta.props['title']).toBe('string')
+  })
+
+  it('draws the state ring and one connector axis, without the head-striking hairline', () => {
+    // The ring is geometry in CSS; its colour is the inline `borderColor` from
+    // `stateColor`. Without these rules the mark renders as an empty inline span.
+    expect(progress.css).toContain('.gw-progress-ring {')
+    expect(progress.css).toContain('border: 2px solid var(--dsw-alias-state-idle-primary')
+    expect(progress.css).toContain('border-radius: 50%')
+    expect(progress.css).toContain('.gw-progress-glyph')
+    // The per-segment hairline sat at `top: 23px` behind a transparent head and struck
+    // through the ring and the label; the axis is now the connector between segments,
+    // on the ring's centre line (13px).
+    expect(progress.css).not.toContain('.gw-progress-seg-line')
+    expect(progress.css).toMatch(/\.gw-progress-link \{[^}]*margin-top: 13px/)
+    expect(progress.css).toContain('.gw-progress-branch[data-state="doing"] .gw-progress-stem')
+    // Motion stays decoration: both the pulse and the flowing dashes stop on request.
+    expect(progress.css).toMatch(/prefers-reduced-motion: reduce[\s\S]*gw-progress-link\[data-flowing="true"\]/)
+    // A narrow column stacks the ring above the label instead of squeezing the label.
+    expect(progress.css).toMatch(/@media \(max-width: 720px\)[\s\S]*flex-direction: column/)
+  })
+
   it('zooms through font-size and remembers the factor, clamped to its range', () => {
     expect(progress.zoom).toEqual({ min: 0.8, max: 1.6, step: 0.1 })
     const memory = new Map<string, string>()
@@ -2083,21 +2283,6 @@ describe('client composer dock: the loop switch (one Host operation, two callers
     return source.slice(start, end)
   })()
 
-  /** A fetch stand-in: records the POST body and answers from a script, one per call. */
-  function scriptedFetch(script: Array<{ status?: number, body?: unknown, throws?: boolean }>) {
-    const posted: Array<Record<string, unknown>> = []
-    const urls: string[] = []
-    const fetchImpl = async (url: string, init: Record<string, unknown>) => {
-      urls.push(url)
-      posted.push(JSON.parse(String(init['body'])) as Record<string, unknown>)
-      const answer = script.shift()
-      if (answer === undefined) throw new Error('unscripted loop call')
-      if (answer.throws === true) throw new Error('socket closed')
-      return { status: answer.status ?? 200, json: async () => answer.body }
-    }
-    return { posted, urls, fetchImpl }
-  }
-
   it('pins the route and the action list to the Host, and the tool still refuses to open', async () => {
     // The path is the Host's own constant, not a second spelling of it.
     expect(loop.routePath).toBe(LOOP_ROUTE_PATH)
@@ -2236,96 +2421,6 @@ describe('client composer dock: the loop switch (one Host operation, two callers
     expect(loop.text(translator('en'), closed)).toBe(enDict['loop.switch.off'])
   })
 
-  /* ------------------------------------------------------------ the component -- */
-
-  type SwitchRender = { cells: unknown[], index: number, effects: Array<() => unknown> }
-  let switchRender: SwitchRender | undefined
-
-  /**
-   * React stand-in whose `useEffect` actually runs.
-   *
-   * The shared stub in this file deliberately does not run effects (the settings page
-   * writes its draft from one, and replaying that after a click would undo the click).
-   * The switch *reads on mount*, so its half of the file needs the opposite: effects are
-   * collected during a render and executed once, the way React does after the commit.
-   */
-  const switchReact = {
-    createElement: (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]): unknown => {
-      const element: Element = { type, props: props ?? {}, children: children.flat(Infinity) as unknown[] }
-      return typeof type === 'function' ? (type as (props: Record<string, unknown>) => unknown)(element.props) : element
-    },
-    useState: (initial: unknown) => {
-      const render = switchRender!
-      const at = render.index++
-      if (at >= render.cells.length) render.cells[at] = typeof initial === 'function' ? (initial as () => unknown)() : initial
-      return [render.cells[at], (next: unknown) => {
-        render.cells[at] = typeof next === 'function' ? (next as (value: unknown) => unknown)(render.cells[at]) : next
-      }]
-    },
-    useEffect: (fn: () => unknown) => { switchRender!.effects.push(fn) },
-    useMemo: (factory: () => unknown) => factory(),
-    useSyncExternalStore: (_subscribe: unknown, getSnapshot: () => unknown) => getSnapshot(),
-  }
-
-  /** The bundle again, loaded with {@link switchReact}. */
-  function loadSwitchBundle(): LoopSwitchBundle {
-    const source = readFileSync(new URL('../src/client/index.js', import.meta.url), 'utf8')
-    let registration: { id: string, factory: (require: (id: string) => unknown) => Record<string, unknown> } | undefined
-    const record = globalThis as unknown as { window?: { __ModuleLoader__?: { load(spec: never): void } } | undefined }
-    const previous = record.window
-    record.window = { __ModuleLoader__: { load: (spec) => { registration = spec } } }
-    try {
-      new Function(source)()
-    } finally {
-      record.window = previous
-    }
-    expect(registration?.id).toBe('dsh-grok-workflow')
-    const loaded = registration!.factory((id) => {
-      if (id === 'react') return switchReact
-      throw new Error(`the bundle must not require ${id} at load time`)
-    })
-    return loaded['GROK_WORKFLOW_LOOP'] as LoopSwitchBundle
-  }
-
-  /** Render the switch, run its mount effect once, and re-render what React would show. */
-  function mountSwitch(component: (props: Record<string, unknown>) => unknown, props: Record<string, unknown>, dataAttr = 'loop') {
-    const render: SwitchRender = { cells: [], index: 0, effects: [] }
-    const run = (): unknown => {
-      render.index = 0
-      render.effects = []
-      const before = switchRender
-      switchRender = render
-      try {
-        return component(props)
-      } finally {
-        switchRender = before
-      }
-    }
-    // Resolved promises plus the effect's own chain: a macrotask flush is enough and, unlike
-    // a fixed number of microtasks, does not depend on how many `then`s the code adds.
-    const settle = async () => {
-      for (let turn = 0; turn < 4; turn += 1) await new Promise((resolve) => setTimeout(resolve, 0))
-    }
-    return {
-      async mount() {
-        const first = run()
-        const effects = render.effects.slice()
-        render.effects = []
-        for (const effect of effects) await effect()
-        await settle()
-        return { first, tree: run() }
-      },
-      async click(tree: unknown) {
-        const button = walk(tree).find((element) => element.props[`data-${dataAttr}-toggle`] === true)
-        expect(button, `the ${dataAttr} switch renders a toggle`).toBeDefined()
-        ;(button!.props['onClick'] as () => void)()
-        await settle()
-        return run()
-      },
-    }
-  }
-
-  const toggleOf = (tree: unknown) => walk(tree).find((element) => element.props['data-loop-toggle'] === true)!
 
   it('reads the loop on mount, and stays inert until it knows the state', async () => {
     const loaded = loadSwitchBundle()
@@ -2536,6 +2631,307 @@ describe('client composer dock: the loop switch (one Host operation, two callers
       const iterateFinal = await iterateView.click(iterateOpened)
       expect(texts(iterateFinal).join(' ')).toContain(zhDict['iterate.switch.off'])
       expect(rows).toHaveLength(0)
+    } finally {
+      ;(globalThis as unknown as { document?: unknown }).document = previousDocument
+      server.closeAllConnections()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  })
+})
+
+/**
+ * The composer-dock workflow switch: `/grok on|off` as a third button.
+ *
+ * It sits beside auto-continue and self-iterate and touches neither: no interval, no
+ * Schedule task, no `open`/`close` — only the session record `plugin:grok-workflow/mode`
+ * that `src/mode.ts` owns, which is the record `src/gate.ts` reads and the record the
+ * slash command writes. What is pinned here:
+ *
+ * 1. **The contract with the Host.** Route path, action list and answer shape are
+ *    asserted as written, so the button and the route cannot drift into two protocols.
+ * 2. **The toggle is real.** A click posts `set` with the flipped value and repaints
+ *    from the Host's answer, not from its own optimism.
+ * 3. **Off reads as off.** The word, the lamp and the pill all say off, and the on-copy
+ *    is absent — an off switch must never look like work still running.
+ * 4. **Its own row only.** No stylesheet rule, no DOM query, and no read of a neighbour
+ *    switch's attributes.
+ */
+describe('client composer dock: the workflow switch (`/grok on|off` as a button)', () => {
+  const SESSION = '2d7bd1e7-1111-2222-3333-444455556666'
+  const MODE = '/grok-workflow/mode'
+  const zhDict = bundle.GROK_WORKFLOW_DICT['zh']!
+  const enDict = bundle.GROK_WORKFLOW_DICT['en']!
+
+  const modeSwitch = (): ModeSwitchBundle => loadSwitchExports()['GROK_WORKFLOW_MODE'] as ModeSwitchBundle
+  /** The workflow switch's own section of the bundle, for the "touches nothing else" checks. */
+  const modeSource = (() => {
+    const source = readFileSync(new URL('../src/client/index.js', import.meta.url), 'utf8')
+    const start = source.indexOf('const MODE_ROUTE_PATH')
+    const end = source.indexOf('/** Required services for the page')
+    expect(start, 'the workflow switch section is in the bundle').toBeGreaterThan(0)
+    expect(end, 'the section ends where the page registration begins').toBeGreaterThan(start)
+    return source.slice(start, end)
+  })()
+
+  it('pins the route, the action list and the body shapes to the Host contract', async () => {
+    const mode = modeSwitch()
+    expect(mode.routePath).toBe(MODE)
+    expect(mode.switchId).toBe('grok-workflow-mode')
+    expect(mode.actions).toEqual(['status', 'set'])
+    expect(mode.url()).toBe(MODE)
+
+    // A read is a read: one POST, the session, nothing else.
+    const read = scriptedFetch([{ body: { ok: true, action: 'status', mode: { enabled: false } } }])
+    expect(await mode.read(SESSION, read.fetchImpl)).toEqual({ ok: true, mode: { enabled: false } })
+    expect(read.urls).toEqual([MODE])
+    expect(read.posted).toEqual([{ action: 'status', sessionId: SESSION }])
+
+    // A write names the value it wants, so the switch never has to trust its own view.
+    const on = scriptedFetch([{ body: { ok: true, action: 'set', mode: { enabled: true } } }])
+    expect(await mode.set(SESSION, true, on.fetchImpl)).toEqual({ ok: true, mode: { enabled: true } })
+    expect(on.posted).toEqual([{ action: 'set', sessionId: SESSION, enabled: true }])
+    const off = scriptedFetch([{ body: { ok: true, action: 'set', mode: { enabled: false } } }])
+    await mode.set(SESSION, false, off.fetchImpl)
+    expect(off.posted).toEqual([{ action: 'set', sessionId: SESSION, enabled: false }])
+  })
+
+  it('refuses to report a state a body does not carry', () => {
+    const mode = modeSwitch()
+    // `ok` without the record is not "on" and not "off": it is a refusal to report.
+    expect(mode.parsePayload({ ok: true, action: 'status' }, 200))
+      .toMatchObject({ ok: false, code: 'mode/internal' })
+    expect(mode.parsePayload({ ok: true, mode: { enabled: 'yes' } }, 200))
+      .toMatchObject({ ok: false, code: 'mode/internal' })
+    // A proxy page or an empty 500 is not a snapshot either.
+    expect(mode.parsePayload('<html>', 502)).toMatchObject({ ok: false, code: 'mode/internal' })
+    expect(mode.parsePayload(undefined, 500)).toMatchObject({ ok: false, code: 'mode/internal' })
+    // The fence's own 403 means "no accepted user credential"; the record is not the issue.
+    expect(mode.parsePayload(undefined, 403)).toMatchObject({ ok: false, code: 'mode/session' })
+    // A stated code survives, so the route's own vocabulary reaches the sentence.
+    expect(mode.parsePayload({ ok: false, code: 'mode/persist', error: 'disk said no' }, 503))
+      .toEqual({ ok: false, code: 'mode/persist', error: 'disk said no' })
+    // No transport at all is a transport failure, never a throw.
+    expect(mode.parsePayload(undefined, undefined as unknown as number)).toMatchObject({ ok: false })
+  })
+
+  it('reports a dead transport as a failure instead of a state change', async () => {
+    const mode = modeSwitch()
+    const closed = scriptedFetch([{ throws: true }])
+    expect(await mode.read(SESSION, closed.fetchImpl)).toMatchObject({ ok: false, code: 'mode/transport' })
+    expect(await mode.set(SESSION, true, closed.fetchImpl)).toMatchObject({ ok: false, code: 'mode/transport' })
+  })
+
+  it('reads on mount, stays inert until it knows, and repaints what the Host answered', async () => {
+    const mode = modeSwitch()
+    const { posted, fetchImpl } = scriptedFetch([
+      { body: { ok: true, action: 'status', mode: { enabled: true, setBy: 'command:/grok' } } },
+      { body: { ok: true, action: 'set', mode: { enabled: false, setBy: 'switch:mode' } } },
+    ])
+    const view = mountSwitch(mode.component, { sessionId: SESSION, t: translator('zh'), modeSend: fetchImpl }, 'mode')
+    const { first, tree } = await view.mount()
+
+    // Before the answer arrives a click would guess at the gate; the switch refuses.
+    expect(toggleIn(first).props['disabled']).toBe(true)
+    expect(texts(first).join(' ')).toContain(zhDict['mode.switch.reading'])
+    expect(posted).toEqual([{ action: 'status', sessionId: SESSION }])
+
+    expect(toggleIn(tree).props['disabled']).toBe(false)
+    expect(toggleIn(tree).props['aria-checked']).toBe(true)
+    expect(texts(tree).join(' ')).toContain(zhDict['mode.switch.on'])
+    expect(lampIn(tree)).toBe('on')
+
+    // The click asks the Host for `off` and paints the answer, not the click.
+    const after = await view.click(tree)
+    expect(posted[1]).toEqual({ action: 'set', sessionId: SESSION, enabled: false })
+    expect(toggleIn(after).props['aria-checked']).toBe(false)
+    expect(texts(after).join(' ')).toContain(zhDict['mode.switch.off'])
+  })
+
+  it('says off three ways, and never leaves the on-copy on screen', async () => {
+    const mode = modeSwitch()
+    const { fetchImpl } = scriptedFetch([
+      { body: { ok: true, action: 'status', mode: { enabled: false } } },
+    ])
+    const view = mountSwitch(mode.component, { sessionId: SESSION, t: translator('zh'), modeSend: fetchImpl }, 'mode')
+    const { tree } = await view.mount()
+    const toggle = toggleIn(tree)
+
+    // The word, the lamp and the pill: a person who only sees the pill still sees grey
+    // and a hollow ring, and a person who only reads sees 关.
+    expect(toggle.props['aria-checked']).toBe(false)
+    expect(texts(tree).join(' ')).toContain(zhDict['mode.switch.off'])
+    expect(lampIn(tree)).toBe('off')
+    expect((toggle.props['style'] as Record<string, unknown>)['background']).toBe('#d1d5db')
+    expect(texts(tree).join(' ')).not.toContain(zhDict['mode.switch.on'])
+    // The lamp is decoration, not content: a screen reader hears the switch and the line.
+    expect(walk(tree).find((element) => element.props['data-mode-lamp'] !== undefined)!.props['aria-hidden']).toBe('true')
+  })
+
+  it('keeps the last known state when the Host refuses the write', async () => {
+    const mode = modeSwitch()
+    const { fetchImpl } = scriptedFetch([
+      { body: { ok: true, action: 'status', mode: { enabled: true } } },
+      { status: 403, body: { ok: false, code: 'mode/session', error: 'user only' } },
+    ])
+    const view = mountSwitch(mode.component, { sessionId: SESSION, t: translator('en'), modeSend: fetchImpl }, 'mode')
+    const { tree } = await view.mount()
+    const refused = await view.click(tree)
+    // The toggle did not flip: the record was never written.
+    expect(toggleIn(refused).props['aria-checked']).toBe(true)
+    expect(walk(refused).find((element) => element.props['data-mode-state'] === 'failed')).toBeDefined()
+    expect(texts(refused).join(' ')).toContain(translate('en', 'mode.switch.failed', { message: 'user only' }))
+  })
+
+  it('renders inert copy instead of a switch when there is no session', async () => {
+    const mode = modeSwitch()
+    const { posted, fetchImpl } = scriptedFetch([])
+    const view = mountSwitch(mode.component, { t: translator('zh'), modeSend: fetchImpl }, 'mode')
+    const { tree } = await view.mount()
+    expect(toggleIn(tree).props['disabled']).toBe(true)
+    expect(texts(tree).join(' ')).toContain(zhDict['mode.switch.noSession'])
+    // Nothing was asked of the Host: there is no session to ask about.
+    expect(posted).toEqual([])
+  })
+
+  it('retries the read after a failed one instead of writing blind', async () => {
+    const mode = modeSwitch()
+    const { posted, fetchImpl } = scriptedFetch([
+      { throws: true },
+      { body: { ok: true, action: 'status', mode: { enabled: false } } },
+    ])
+    const view = mountSwitch(mode.component, { sessionId: SESSION, t: translator('zh'), modeSend: fetchImpl }, 'mode')
+    const { tree } = await view.mount()
+    expect(walk(tree).find((element) => element.props['data-mode-state'] === 'failed')).toBeDefined()
+    const recovered = await view.click(tree)
+    // The click re-read; it did not post a guess at a value it never saw.
+    expect(posted[1]).toEqual({ action: 'status', sessionId: SESSION })
+    expect(toggleIn(recovered).props['aria-checked']).toBe(false)
+    expect(texts(recovered).join(' ')).toContain(zhDict['mode.switch.off'])
+  })
+
+  it('mounts in the composer dock only, after the two heartbeats, with the namespace when one exists', () => {
+    const mode = modeSwitch()
+    const registered: Array<{ options: Record<string, unknown>, component: unknown }> = []
+    const ctx = (refuse = false) => ({
+      slots: {
+        inject: (_name: string, factory: () => unknown) => factory(),
+        register: (options: Record<string, unknown>, component: unknown) => {
+          if (refuse) throw new Error('slot refused')
+          registered.push({ options, component })
+          return () => {}
+        },
+      },
+    })
+    const warn = console.warn
+    console.warn = () => {}
+    try {
+      mode.mount(ctx(), { locale: { bind: () => translator('zh') } })
+      expect(registered).toHaveLength(1)
+      expect(registered[0]!.options['name']).toBe('conversation.composer.dock')
+      expect(registered[0]!.options['id']).toBe(mode.switchId)
+      // Third in the strip: the two heartbeats keep their orders (90, 91).
+      expect(registered[0]!.options['order']).toBe(92)
+      expect(registered[0]!.options['order']).toBeGreaterThan((bundle.GROK_WORKFLOW_ITERATE).switchOrder)
+      expect(registered[0]!.options['locale']).toBe('grok-workflow')
+      expect(registered[0]!.component).toBe(mode.component)
+
+      // No locale face ⇒ no namespace on the entry, exactly like the page and the heartbeats.
+      mode.mount(ctx(), {})
+      expect(registered[1]!.options['locale']).toBeUndefined()
+
+      // A refusing registry costs this switch and nothing else: no throw out of `apply`.
+      expect(mode.mount(ctx(true), {})).toBeUndefined()
+    } finally {
+      console.warn = warn
+    }
+  })
+
+  it('carries its copy in both languages, and neither falls back to a key id', () => {
+    const keys = Object.keys(enDict).filter((key) => key.startsWith('mode.switch.'))
+    expect(keys.length).toBeGreaterThanOrEqual(8)
+    for (const key of keys) {
+      expect(zhDict[key], key).toBeTypeOf('string')
+      expect(zhDict[key], key).not.toBe(enDict[key])
+    }
+    // The task's own wording, character for character.
+    expect(zhDict['mode.switch.label']).toBe('workflow总开关')
+    const mode = modeSwitch()
+    expect(mode.text(translator('zh'), { phase: 'ready', mode: { enabled: false } })).toBe(zhDict['mode.switch.off'])
+    expect(mode.text(translator('en'), { phase: 'ready', mode: { enabled: false } })).toBe(enDict['mode.switch.off'])
+    expect(mode.text(translator('zh'), { phase: 'ready', mode: { enabled: true } })).toBe(zhDict['mode.switch.on'])
+    expect(mode.text(translator('en'), { phase: 'ready', mode: { enabled: true } })).toBe(enDict['mode.switch.on'])
+  })
+
+  it('never reaches for the DOM or a neighbour switch, and adds no stylesheet rule', () => {
+    expect(modeSource).not.toMatch(/querySelector/)
+    expect(modeSource).not.toMatch(/getElementById/)
+    // No page-level CSS: the lamp and the rows are inline styles on this switch's own nodes.
+    expect(modeSource).not.toMatch(/h\('style'/)
+    // It reads no other switch's attributes and no model selector.
+    expect(modeSource).not.toMatch(/data-loop-(toggle|state)|data-iterate-(toggle|state)/)
+    expect(modeSource).not.toMatch(/conversation\.input\.model/)
+  })
+})
+
+/**
+ * The workflow switch on the production path: real page fetch, real route, real record.
+ *
+ * The v0.11.21 lesson applied to the third switch — no scripted success anywhere. The
+ * page's own `fetch` posts to a real `node:http` server whose handler is the shipped
+ * `handleModeRoute` over a real `Session`; every state the button paints came from the
+ * route reading the session's own log, and the click's persistence is asserted by
+ * reading that log back with `readModeRecord`. A mocked transport cannot pass this.
+ */
+describe('client composer dock: the workflow switch against the real Host route', () => {
+  const SESSION = '4b1f0f6a-2222-3333-4444-555566667777'
+  const zhDict = bundle.GROK_WORKFLOW_DICT['zh']!
+
+  it('writes the session record a click asks for, and paints only what the route read back', async () => {
+    const session = SessionClass.create(SESSION as never)
+    const server = createServer((req, res) => {
+      const path = (req.url ?? '').split('?')[0]!
+      if (path !== CORE_MODE_ROUTE_PATH) {
+        res.statusCode = 404
+        res.end()
+        return
+      }
+      return void handleModeRoute({
+        sessions: { get: (id: string) => (id === SESSION ? session : undefined) },
+        // The deployment default: this session has no record yet, and the route (not the
+        // button) is what turns that into the state on screen.
+        fallback: () => false,
+      }, req, res)
+    })
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+    const address = server.address() as { port: number }
+    const baseURI = `http://127.0.0.1:${address.port}/`
+    const previousDocument = (globalThis as unknown as { document?: unknown }).document
+    ;(globalThis as unknown as { document?: unknown }).document = { baseURI }
+    try {
+      const mode = loadSwitchExports()['GROK_WORKFLOW_MODE'] as ModeSwitchBundle
+      expect(mode.routePath).toBe(CORE_MODE_ROUTE_PATH)
+
+      const view = mountSwitch(mode.component, { sessionId: SESSION, t: translator('zh') }, 'mode')
+      const { tree } = await view.mount()
+      // No record: the fallback the route reported (`false`) is what renders, and nothing
+      // was written by a read.
+      expect(readModeRecord(session)).toBeUndefined()
+      expect(toggleIn(tree).props['aria-checked']).toBe(false)
+      expect(texts(tree).join(' ')).toContain(zhDict['mode.switch.off'])
+
+      const on = await view.click(tree)
+      const written = readModeRecord(session)
+      expect(written).toMatchObject({ v: 1, enabled: true, setBy: 'switch:mode', workflowMode: 'full' })
+      expect(toggleIn(on).props['aria-checked']).toBe(true)
+      expect(texts(on).join(' ')).toContain(zhDict['mode.switch.on'])
+
+      const off = await view.click(on)
+      expect(readModeRecord(session)).toMatchObject({ v: 1, enabled: false, setBy: 'switch:mode' })
+      expect(readModeRecord(session)!.workflowMode).toBeUndefined()
+      expect(toggleIn(off).props['aria-checked']).toBe(false)
+      expect(texts(off).join(' ')).toContain(zhDict['mode.switch.off'])
+      // The lamp agrees with the record, not with the click count.
+      expect(walk(off).find((element) => element.props['data-mode-lamp'] !== undefined)!.props['data-mode-lamp']).toBe('off')
     } finally {
       ;(globalThis as unknown as { document?: unknown }).document = previousDocument
       server.closeAllConnections()

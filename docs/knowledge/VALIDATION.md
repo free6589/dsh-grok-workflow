@@ -2,6 +2,32 @@
 
 Real commands and results only. Do not add expected results here.
 
+## Composer-dock workflow switch (`/grok on|off` as a third button) — 2026-11-21 (`CONFIRMED`, UI scope)
+
+**Changed (mine):** `src/client/index.js` (mode switch factory + component + registration,
+`GROK_WORKFLOW_MODE`, shared `routeUrl`/`postRoute` transport), `test/client.spec.ts`
+(harness hoisted to module scope, +12 tests), `lib/client.js` rebuilt.
+**Not mine:** `src/mode-surface.ts`, `src/index.ts`, `lib/mode-surface.*`, `lib/index.*`,
+`test/mode-surface.spec.ts` are the concurrent core round's, left uncommitted by me.
+
+| state | command | result |
+| --- | --- | --- |
+| working tree (final) | `npm run ci` | exit **0** — typecheck 0 errors, oxlint **23 warnings / 0 errors**, `verify:lib` pass, **72 files / 1341 tests PASS** (`docs/knowledge/evidence/workflow-switch-button-20261121/ci.txt`) |
+| working tree (final) | `npx vitest run test/client.spec.ts` | **109 passed** (`…/client-spec.txt`) |
+| negative control: `MODE_ROUTE_PATH` changed to `/grok-workflow/modes` | `npx vitest run test/client.spec.ts -t "workflow switch"` | **2 failed / 10 passed** — the contract pin against `MODE_ROUTE_PATH` from `src/mode-surface.ts` and the real-route test (`…/red-route-path.txt`); source restored byte-identically after the run |
+| negative control: off state painted as on (`enabledNow = known`) | same command | **4 failed / 8 passed** — "says off three ways", "retries the read…", the production-path record test and one more (`…/red-paint-on.txt`); source restored byte-identically |
+
+**Production path inside the suite (not a mock):** the browser component is loaded from the
+real bundle, posts through the page's own `fetch` into a real `node:http` server whose handler
+is the shipped `handleModeRoute` over a real `Session`; the click's persistence is asserted by
+reading the session log back with `readModeRecord` (`enabled:true, setBy:'switch:mode',
+workflowMode:'full'`, then `enabled:false` with no `workflowMode`). No scripted success is used
+in that case.
+
+**NOT_RUN:** a real browser click in a live DSH profile (needs the plugin mounted and a user at
+the GUI); the composer dock's own layout in the browser (the tests render the component tree,
+not the composed shell).
+
 ## `/grok` switch word: trimming + case-insensitivity — 2026-11-21 (`CONFIRMED`)
 
 **Changed:** `src/command.ts` handler (`typeof rawInput` guard, `arg.toLowerCase()` before the

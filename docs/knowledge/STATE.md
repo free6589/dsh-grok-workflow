@@ -1,3 +1,21 @@
+Last updated: 2026-11-21 08:10 +08:00（**对话框底部第三个开关：workflow 总开关（`/grok on|off` 的按钮形态），未发版** —
+`src/client/index.js` 新增 `MODE_ROUTE_PATH='/grok-workflow/mode'`、`MODE_ACTIONS=['status','set']`、
+`MODE_SWITCH_ORDER=92`、`makeModeSwitch` 形态的 `ModeSwitch` 组件与 `GROK_WORKFLOW_MODE` 导出；
+dock 三挂载（`startBothSwitches` 改名 `startDockSwitches`，loop 90 / iterate 91 / mode 92）。
+传输层抽成共享 `routeUrl`/`postRoute`，loop/iterate 的 `send` 改用它（行为与错误码不变）。
+按钮读写的是 `src/mode-surface.ts`（agent-36）已落地的 `POST /grok-workflow/mode`：body
+`{action,sessionId,enabled?}`，回 `{ok,action,mode:{enabled,...}}`，真相源 = 会话记录
+`plugin:grok-workflow/mode`；UI **不硬编码默认值**（无记录时显示路由报回的 `grokDefault`），
+也不新增 `masterEnabled` 存储。关闭态三重提示：文案「关」、空心指示灯、熄灭胶囊。
+`npm run ci` exit 0 = **72 文件 / 1341 测试 PASS**、typecheck 0 错、oxlint 23 warnings / 0 errors、
+`verify:lib` 通过；`lib/client.js` 随 `src/` 重建。红证据：改错路由常量 → 2 failed；
+把关闭态画成开启 → 4 failed（`docs/knowledge/evidence/workflow-switch-button-20261121/`）。
+**未发版**：只加 UI 与测试，版本号未动。NOT_RUN：真实浏览器 GUI 手点（需在真机 profile 里
+装载后点一次，prod 路径证据止于「真 client bundle → 真 `node:http` → 真 `handleModeRoute` →
+真 `Session` 记录回读」）。**工作树其余改动属并发轮**：`src/index.ts`、`src/mode-surface.ts`、
+`lib/index.*`、`lib/mode-surface.*`、`test/mode-surface.spec.ts` 是 core 兄弟（agent-36）的，
+本轮未提交它们。）
+
 Last updated: 2026-11-21 08:05 +08:00 (**`/grok` 开关词改为「去空白 + 不分大小写」** —
 任务「实现 /grok on|off 斜杠命令」派到我名下；实测该命令**早已存在**（`src/command.ts` +
 `src/mode.ts` + `src/gate.ts:521`，D-028/D-029/D-078 已定），本轮只补真实缺口：`rawInput` 解析。

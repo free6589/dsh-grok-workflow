@@ -1,0 +1,154 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+ ❯ test/client.spec.ts (109 tests | 2 failed | 97 skipped) 81ms
+     ↓ registers under the package id and asks only for real cordis services
+     ↓ renders the visible keys: 11 fields plus the 5 role chains
+     ↓ keeps the numeric bounds identical to HARD_LIMITS
+     ↓ keeps the numeric defaults identical to src/config.ts
+     ↓ keeps the per-route cap bounds identical to HARD_LIMITS
+     ↓ keeps the switchable-class export empty: switchOn is fixed since T4
+     ↓ covers the five T5 roles (supervisor added to the four documented ones)
+     ↓ numbers the role cards in execution order (supervise before summarize)
+     ↓ ships lib/client.js byte-identical to the source (no stale bundle)
+     ↓ ships exactly the two locales DSH ships, both complete
+     ↓ carries the same key set in both languages (no half-translated dictionary)
+     ↓ translates every key the page derives from data (fields, roles, groups)
+     ↓ translates every validation finding in both languages, including the error keys in the code
+     ↓ renders role ids as localized names and interpolates every parameter
+     ↓ falls back to English for an unknown locale and to the key for an unknown entry
+     ↓ registers both dictionaries on the locale service under the plugin namespace
+     ↓ declares the locale namespace on the slot so the framework seats a live `t`
+     ↓ re-reads the active language for the card label instead of freezing it at boot
+     ↓ renders the card summary in the language the framework seat reports
+     ↓ keeps the page mountable in a composition without a locale service
+     ↓ never prints a key id when the seated `t` cannot resolve one
+     ↓ drops every registration on unbind instead of rebuilding them in a dead scope
+     ↓ lets the plugin disposer win when it runs first, and stays idempotent after that
+     ↓ keeps still reading, read failed and not served as three different pages
+     ↓ retries the mirror read through the face and shows the form once it answers
+     ↓ renders the repeat-run rows with their labels in both languages
+     ↓ says what 0 means on the rows whose minimum is 0, in both languages
+     ↓ offers no retry when the composition has no way to re-read
+     ↓ renders no key id even when the seat answers every key with the key
+     ↓ colours the live status line through --dsw-alias tokens
+     ↓ seeds every field and all four chains from an absent value
+     ↓ carries the template textarea through draft → ops → save, like every other key
+     ↓ refuses a template over the prompt bound, in both languages
+     ↓ survives a non-object roles section instead of crashing the page
+     ↓ rejects a stored enum value outside the offered options
+     ↓ rejects a repeat-run switch that is not a real boolean
+     ↓ keeps a chain the Host published and fills the roles the document omits
+     ↓ accepts the defaults and reports a numeric field outside its bounds
+     ↓ has no preset gate: a fresh draft always validates clean
+     ↓ bounds a chain at fifty routes and names the offending entry
+     ↓ treats two blank routes as unfinished rows, not duplicates (t32 regression)
+     ↓ rejects a duplicate route and a route without a model beyond the length limit
+     ↓ rejects a per-route cap outside 1..64 and accepts blank for unlimited
+     ↓ ships the per-route cap and mode-card copy in both languages
+     ↓ ignores a legacy switchOn value: it is fixed policy, not a page field
+     ↓ accepts a summarizer chain without any synthesis cross-check
+     ↓ sends only what changed, one path op per field and per role
+     ↓ never emits a path op for a structural key
+     ↓ binds to the shipped namespace id when the Host publishes it
+     ↓ follows a renamed Loader row instead of silently losing the page (t34 residual)
+     ↓ reports a missing namespace so the page can say why it is absent
+     ↓ warns (not blocks) when a chain has 2+ routes but every cap is blank
+     ↓ registers a namespaced view entry after chat and trajectory, without a priority
+     ↓ defaults to the chat tab: it never selects or pins itself
+     ↓ keeps the copy on the plugin namespace and declares it only with a locale face
+     ↓ degrades to no tab (with a stated reason) when the registries refuse it
+     ↓ keeps the tab out entirely without a uiConversation service, and the page says so
+     ↓ remounts on a locale change from the disposer, never leaving two tabs
+     ↓ resolves the target it registered and no other
+     ↓ folds the four recorded events and ignores everything else
+     ↓ settles out of order and idempotently, and drops what nobody declared
+     ↓ picks the newest run, preferring the one still running
+     ↓ renders pending, doing, done, blocked and failed from the events alone
+     ↓ reports settled rows over declared rows, and nothing when nothing was declared
+     ↓ appends an unmatched phase as a real node between execute and verify, and keeps an unphased row
+     ↓ mirrors the role-label evidence, so execute and verify are not rendered as never reported
+     ↓ labels every field with its source, strongest first
+     ↓ degrades to seven "not reported" rows, with the badge copy in both languages
+     ↓ accepts only an explicit coordination block
+     ↓ opens a node into three sections: header, engine facts and the seven-field report
+     ↓ copies the coordination block through the clipboard and reports what happened
+     ↓ disables the copy action when no coordination block exists
+     ↓ offers "open child session" only for a row the panel rule would open
+     ↓ keeps every colour on a --dsw-alias token and the family on a --dsw-font token
+     ↓ scopes every rule to .gw-progress, with the full-width spine and the vertical narrow layout
+     ↓ zooms through font-size and remembers the factor, clamped to its range
+     ↓ returns the same snapshot object when nothing the track renders changed
+     ↓ renders the empty state and the track from a snapshot, without inventing rows
+     ↓ survives a snapshot with a missing field instead of throwing
+     ↓ gives a blocked node the derived-state tooltip, not a guess
+     ↓ keeps the engine’s own cancelled word on the node and the end mark
+     ↓ marks a template stage the events never reported instead of borrowing a state
+     ↓ reports the rows a stage ran inside plan tasks instead of saying it was never reported
+     ↓ pins the route and the action list to the Host, and the tool still refuses to open
+     ↓ keeps the self-iterate switch on its own route and its own slot
+     ↓ posts to the Host route with the browser credential and reads the answer back
+     ↓ reports a refusal as a refusal instead of a state change
+     ↓ mounts in the composer dock only, additive, and with the namespace when one exists
+     ↓ never reaches for the model selector or any DOM outside its own row
+     ↓ carries its copy in both languages, and neither falls back to a key id
+     ↓ reads the loop on mount, and stays inert until it knows the state
+     ↓ opens on a click and closes on the next one, through the shared Host operation
+     ↓ says why a refused open did nothing, and does not flip anyway
+     ↓ reports a Host without a scheduler in its own words, and stays off
+     ↓ uses the page fetch on the production path, not loopSend itself
+     ↓ renders inert copy instead of a switch when there is no session
+     ↓ drives both switches through the real page fetch into the real routes and services
+     × pins the route, the action list and the body shapes to the Host contract 12ms
+     ✓ refuses to report a state a body does not carry 3ms
+     ✓ reports a dead transport as a failure instead of a state change 2ms
+     ✓ reads on mount, stays inert until it knows, and repaints what the Host answered 15ms
+     ✓ says off three ways, and never leaves the on-copy on screen 6ms
+     ✓ keeps the last known state when the Host refuses the write 11ms
+     ✓ renders inert copy instead of a switch when there is no session 6ms
+     ✓ retries the read after a failed one instead of writing blind 10ms
+     ✓ mounts in the composer dock only, after the two heartbeats, with the namespace when one exists 2ms
+     ✓ carries its copy in both languages, and neither falls back to a key id 2ms
+     ✓ never reaches for the DOM or a neighbour switch, and adds no stylesheet rule 1ms
+     × writes the session record a click asks for, and paints only what the route read back 10ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/client.spec.ts > client composer dock: the workflow switch (`/grok on|off` as a button) > pins the route, the action list and the body shapes to the Host contract
+AssertionError: expected '/grok-workflow/modes' to be '/grok-workflow/mode' // Object.is equality
+
+Expected: "/grok-workflow/mode"
+Received: "/grok-workflow/modes"
+
+ ❯ test/client.spec.ts:2627:28
+    2625|   it('pins the route, the action list and the body shapes to the Host …
+    2626|     const mode = modeSwitch()
+    2627|     expect(mode.routePath).toBe(MODE)
+       |                            ^
+    2628|     expect(mode.switchId).toBe('grok-workflow-mode')
+    2629|     expect(mode.actions).toEqual(['status', 'set'])
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/client.spec.ts > client composer dock: the workflow switch against the real Host route > writes the session record a click asks for, and paints only what the route read back
+AssertionError: expected '/grok-workflow/modes' to be '/grok-workflow/mode' // Object.is equality
+
+Expected: "/grok-workflow/mode"
+Received: "/grok-workflow/modes"
+
+ ❯ test/client.spec.ts:2861:30
+    2859|     try {
+    2860|       const mode = loadSwitchExports()['GROK_WORKFLOW_MODE'] as ModeSw…
+    2861|       expect(mode.routePath).toBe(CORE_MODE_ROUTE_PATH)
+       |                              ^
+    2862|
+    2863|       const view = mountSwitch(mode.component, { sessionId: SESSION, t…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 10 passed | 97 skipped (109)
+   Start at  08:09:12
+   Duration  1.15s (transform 229ms, setup 0ms, import 912ms, tests 81ms, environment 0ms)
+

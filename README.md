@@ -266,6 +266,8 @@ A loop is one durable task in the Host's Schedule service, not a timer inside th
 
 **The self-iterate switch, beside it.** A second composer-dock switch, id `grok-workflow-iterate`, posts to `/grok-workflow/iterate` and drives a second service whose slot is the `RSI heartbeat` title — so the two switches can never create, report or delete each other's row. Its open sends no prompt and no interval: the stored prompt is the profile's `iterateTemplate` (edited in the settings page's *Self-iteration* group, textarea; empty falls back to the built-in default) and the interval floor is `iterateIntervalMin`. An `RSI heartbeat` delivery routes as an ordinary schedule message — the gate's loop routing never claims it — and the row deliberately outlives the plugin (it is the repository's own beat); disarm it with the same switch or through DSH's own Automation tasks.
 
+**The workflow switch, after them.** A third dock switch, id `grok-workflow-mode`, is the `/grok on|off` toggle in clickable form: it POSTs `{"action":"status"|"set","sessionId":…,"enabled":…}` to `/grok-workflow/mode`, which reads and writes the session's own mode record — the same `plugin:grok-workflow/mode` record the slash command writes and the gate already honors, so the button and the command cannot disagree. It reads once on mount, paints only what the route read back (a refused write leaves the last state and says why), and shows the deployment `grokDefault` when the session has no record yet: the default is never restated in the UI and no second switch store exists. Off is stated three ways — the word, a hollow lamp and the unlit pill — so a grey switch never reads as "still running".
+
 Opening a loop is one explicit browser request:
 
 ```json
