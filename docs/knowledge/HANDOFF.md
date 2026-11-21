@@ -1,3 +1,16 @@
+## 2026-11-21 — 总开关 core 路由落地 + 进度页空分支说明 `CONFIRMED`（lead 收尾）
+
+- **From:** 本会话（lead）· **To:** 下一轮接手者
+- **做完了什么**：把 core 侧 `POST /grok-workflow/mode` 合进 main 并推送（`edc7920`）——
+  `src/mode-surface.ts` 新建（读写同一条 `plugin:grok-workflow/mode` 记录，回读作答），
+  `src/index.ts` 挂载路由（fallback 读 live `grokDefault`），`test/mode-surface.spec.ts` 20 例，
+  `lib/` 重建。接着把进度页空分支那笔也合了（`660d79d`）：`progressNodeMeta` 抽成共用函数，
+  空分支面板显示同一句说明而不是空盒子，`test/client.spec.ts` +1 例（112 例）。
+- **证据**：`npm run ci` exit 0 = **72 文件 / 1344 例 PASS**；`verify:lib` 157 文件逐字节一致；
+  范围测试 mode-surface 20、command 26、client 112 均绿。
+- **还没做的事**：真实浏览器里手点三个开关（`NOT_RUN`）；未发版，版本号还是 `0.12.15`。
+- **用户明确的语言要求**：用户用什么语言，就只用那种语言回，不中英混着发，不甩半截话。
+
 ## 2026-11-21 — 对话框底部第三个开关「workflow总开关」`CONFIRMED`（UI 侧；core 路由在并发轮）
 
 - **From:** 本会话（子代理 agent-37）· **To:** lead / 下一轮接手者

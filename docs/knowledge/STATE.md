@@ -1,3 +1,12 @@
+Last updated: 2026-11-21 08:35 +08:00（**总开关 core 路由已落地并推送（`edc7920`），进度页空分支说明已合（`660d79d`）** —
+`src/mode-surface.ts` 新建：`POST /grok-workflow/mode` 读写同一条 `plugin:grok-workflow/mode`
+记录（按钮和 `/grok` 同源，门控 `gate.ts:521` 读同一条），回读作答；`src/index.ts` 挂载，
+fallback 读 live `grokDefault`。`test/mode-surface.spec.ts` 20 例（状态读写、拒绝码、门控联动、
+重启可恢复、同源保证）。进度页：`progressNodeMeta` 抽成共用，空分支面板显示同一句说明。
+`npm run ci` exit 0 = **72 文件 / 1344 测试 PASS**，typecheck 0 错，oxlint 0 error，
+`verify:lib` 157 文件逐字节一致。**未发版**，版本号仍 `0.12.15`。NOT_RUN：真实浏览器手点三开关。
+另记：**用户要求回消息只用用户用的语言，不中英双语、不发半截话**。）
+
 Last updated: 2026-11-21 08:10 +08:00（**对话框底部第三个开关：workflow 总开关（`/grok on|off` 的按钮形态），未发版** —
 `src/client/index.js` 新增 `MODE_ROUTE_PATH='/grok-workflow/mode'`、`MODE_ACTIONS=['status','set']`、
 `MODE_SWITCH_ORDER=92`、`makeModeSwitch` 形态的 `ModeSwitch` 组件与 `GROK_WORKFLOW_MODE` 导出；

@@ -2,6 +2,21 @@
 
 Real commands and results only. Do not add expected results here.
 
+## 总开关 core 路由落地 + 进度页空分支 — 2026-11-21 (`CONFIRMED`, lead 收尾)
+
+**Changed:** 新建 `src/mode-surface.ts`（`POST /grok-workflow/mode`，读写 `plugin:grok-workflow/mode`
+同一条记录）、`src/index.ts` 挂载、`test/mode-surface.spec.ts` 20 例；进度页
+`src/client/index.js`（`progressNodeMeta` 抽取 + 空分支面板说明）、`test/client.spec.ts` +1 例；
+`lib/` 随 `src/` 重建。提交 `edc7920` + `660d79d`，均已推 `origin/main`。
+
+| state | command | result |
+| --- | --- | --- |
+| working tree | `npm run ci` | exit **0** — **72 files / 1344 tests PASS**，typecheck 0 错，oxlint 0 error |
+| working tree | `npm run verify:lib` | `lib/ at 660d79d is the build of src/ at 660d79d (157 files, byte-identical)` |
+| working tree | `npx vitest run test/mode-surface.spec.ts test/command.spec.ts test/client.spec.ts` | **157 passed**（20 + 26 + 111，当时 `client.spec` 还是 111，进度页那例合入后变 112） |
+
+**NOT_RUN:** 真实浏览器 GUI 手点三个开关；未发版（`0.12.15` 未动）。
+
 ## Composer-dock workflow switch (`/grok on|off` as a third button) — 2026-11-21 (`CONFIRMED`, UI scope)
 
 **Changed (mine):** `src/client/index.js` (mode switch factory + component + registration,
