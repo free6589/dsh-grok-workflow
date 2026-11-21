@@ -5177,3 +5177,22 @@ commit/tag/CI/Release 均取自已提交记录，无编造）后门禁码变为 
 - 机器级 MCP（serena / phone-use）在沙箱内写外部路径被拒（8 条 `Read-only file system`），
   用 home 级 patch 关掉后 boot 日志干净；未验证它们在克隆里能否正常工作（沙箱外才可能）。
 - push / GitHub Release 未做（未授权）；`v0.12.17` 是本地 milestone tag。
+
+### Round 94 追加 — 第三处复现：`iterate-plan` 的守卫测试依赖「开发者树是干净的」（`CONFIRMED`）
+
+专项测试跑通后，`npm run ci` 用仓库文档化的 `TMPDIR=$PWD/.tmp` 跑法仍是红的：
+
+```text
+FAIL test/iterate-plan.spec.ts > resumes at the last budgeted round and stops one above it
+AssertionError: expected 10 to be +0
+```
+
+- **根因（`CONFIRMED`）**：`fixtureRepo()` 只建 `.rsi/` 不建 git 仓库；守卫用
+  `git -C "$root" status --porcelain --untracked-files=no` 探测，而 `git -C` 会往上找仓库——
+  `TMPDIR=$PWD/.tmp` 时找到的正是本检出，于是把**本树的未提交文件**报成 `dirty_tracked`，
+  守卫按设计 `SKIP exit 10`。09:47 的基线绿是因为当时树是干净的；本轮一有未提交改动就红。
+- **修复**：`fixtureRepo()` 里 `git init -q`，让被检查的树就是 fixture 自己的。
+- **红绿（`CONFIRMED`）**：修前 `npx vitest run test/iterate-plan.spec.ts`（`TMPDIR=$PWD/.tmp`）
+  1 failed / 20 passed；修后 21 passed，默认 TMPDIR 同样 21 passed。
+- **边界**：没有改 `.rsi/tools/heartbeat-guard.sh` 的生产语义（`--root` 指仓库这条约定不变），
+  只让 fixture 真的成为它自称的那个仓库。

@@ -1818,3 +1818,9 @@ worker 链上限 50（HARD_LIMITS.chainLength）
 - **未做（`NOT_RUN`）**：未 push、未建 GitHub Release、未改仓库可见性；`v0.12.17` 是本地
   milestone tag（`package.json` 仍是 0.12.16），推它会因 tag≠package 版本被 Release 工作流
   拦下（fail-closed，按设计）。
+
+- **追加（`CONFIRMED`）**：专项测试期间第三处复现——`test/iterate-plan.spec.ts` 的守卫用例在
+  仓库文档化的 `TMPDIR=$PWD/.tmp` 跑法下，只要本树有未提交改动就 `expected 10 to be +0`
+  （`fixtureRepo()` 没 `git init`，守卫的 `git -C` 往上找到本检出）。已在 `fixtureRepo()` 里
+  `git init -q` 修复：修前 1 failed/20 passed → 修后 21 passed（两种 TMPDIR 都是）。
+  `npm run ci` 复跑 exit 0 = **73 文件 / 1350 测试**。

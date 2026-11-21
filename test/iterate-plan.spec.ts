@@ -79,6 +79,13 @@ function fixtureRepo(options: {
   prompt?: string
 } = {}): string {
   const root = mkdtempSync(join(tmpdir(), 'iterate-plan-'))
+  // The guard asks `git -C "$root" status --porcelain`, and `git -C` walks up until it
+  // finds a repository. Under the documented per-run `TMPDIR=$PWD/.tmp` that repository is
+  // this checkout, so the guard reported *our* uncommitted files and skipped with exit 10
+  // whenever the developer had work in progress. Give the fixture its own repository so
+  // the checked tree is always the fixture's.
+  const init = spawnSync('git', ['init', '-q'], { cwd: root, encoding: 'utf8' })
+  expect(init.status, init.stderr).toBe(0)
   const rsi = join(root, '.rsi')
   mkdirSync(rsi, { recursive: true })
   const rounds = options.rounds ?? []

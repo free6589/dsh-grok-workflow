@@ -1,0 +1,9 @@
+# HTTP probe of the cloned profile (web-clone), derived from the captured artifacts.
+ui_html_bytes=45259
+ui_title=DeepSeek Harness
+boot_payload_present=true
+client_entries=88
+grok_entry_ids=dsh-grok-workflow
+grok_entry_url=plugins/??dsh-grok-workflow/client.js&rev=5ed443a5559d
+client_js_bytes=237809
+dsh_release={"version":"0.2.2-rc.3","commit":"6b729fe"}

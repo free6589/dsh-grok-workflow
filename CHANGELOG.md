@@ -5,6 +5,26 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Added / 新增
+
+- **Cloning a profile is a checked operation instead of `cp -a` / profile 克隆变成有测试的操作，而不是 `cp -a`** —
+  `scripts/clone-profile.mjs` copies a profile into a throw-away `$DSH_HOME`, then repairs what a copy
+  breaks and proves it: every relative `link:` symlink is re-derived against the clone's own depth (two
+  dependencies in the live `web` profile dangle at any other depth, and DSH does not degrade — `dsh plugin
+  --profile <clone> list` aborts with "cannot resolve profile bundle"), credential-shaped values in
+  profile-owned files are redacted in place with a location-only report (the live `cordis.patch.yml`
+  carries a real `sk-` channel secret), and parity is asserted as `redact(source) == target` byte for byte
+  across the five files that define a profile. `test/profile-clone.spec.ts` runs the real script against a
+  synthetic profile, so link repair, redaction, the `--force` refusal, the fail-closed `--keep-secrets`
+  path, and the "already dangling in the source is inherited, not clone damage" rule are covered without a
+  model or a network. `/ 把 profile 复制到一次性 `$DSH_HOME`，并修复「复制」本身弄坏的东西：
+  `link:` 依赖的相对符号链接按克隆自己的深度重算（当前 `web` profile 有两条依赖只在其原始深度成立，
+  而 DSH 不会降级——`dsh plugin --profile <clone> list` 直接以「cannot resolve profile bundle」失败）；
+  profile 自有文件里的凭据形状值就地脱敏，报告只留文件与行号（活 `cordis.patch.yml` 里有一条真实
+  `sk-` 渠道密钥）；parity 以「脱敏后的源 == 目标」逐字节断言，覆盖界定一个 profile 的五个文件。
+  `test/profile-clone.spec.ts` 跑真实脚本，覆盖链接修复、脱敏、`--force` 拒绝、`--keep-secrets`
+  的 fail-closed 路径，以及「源里本来就悬空算继承、不算克隆损伤」，全程不需要模型和网络。
+
 ## [0.12.16] - 2026-11-21
 
 ### Added / 新增

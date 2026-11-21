@@ -1,0 +1,13 @@
+# Home-level patch for the throw-away $DSH_HOME of a cloned profile.
+#
+# A cloned `web` profile re-runs its machine-level MCP servers, and those write outside
+# the profile (serena's ~/.serena/logs, phone-use's ~/.local/share/phone-use/state.json).
+# In a sandboxed or CI clone those writes are denied, so the boot log fills with tracebacks
+# even though the web app serves. Disabling the three machine-bound MCP entries here keeps
+# the clone self-contained; it changes nothing about the bundles under test.
+- id: mcp-serena
+  disabled: true
+- id: mcp-mobile-phone
+  disabled: true
+- id: mcp-lingshu-shared
+  disabled: true

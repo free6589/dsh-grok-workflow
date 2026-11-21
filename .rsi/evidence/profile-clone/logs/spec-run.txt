@@ -1,0 +1,10 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+ ✓ test/profile-clone.spec.ts (6 tests) 380ms
+
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+   Start at  10:02:34
+   Duration  545ms (transform 29ms, setup 0ms, import 41ms, tests 380ms, environment 0ms)
+

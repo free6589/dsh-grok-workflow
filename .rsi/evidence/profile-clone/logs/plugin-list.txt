@@ -1,0 +1,22 @@
+Legend: production dependency, optional only, dev only
+
+dsh-profile-web /home/fish/projects_mine/dsh-grok-workflow/.tmp/profile-clone/dsh-home/profiles/web-clone (PRIVATE)
+│
+│   dependencies:
+├── @ai-native-sdlc-plugin/dsh-sdlc@0.6.2
+├── @dickpy/dsh-imagegen@1.9.3
+├── @mill413/dsh-session-resume@0.4.2
+├── @mzzsfy/dsh-cron-board@0.7.5
+├── @nanmicoder/dsh-agent-teams@0.1.30
+├── chat-in-dsh@1.2.0
+├── dsh-delete-session@0.2.4
+├── dsh-grok-workflow@0.12.15
+├── dsh-infinite-gen-5@file:../../plugins/dsh-infinite-gen-5
+├── dsh-llm-error-retry@0.20.1
+├── dsh-model-fix@0.36.11
+├── dsh-peak-valley-router@0.12.0
+├── dsh-system-prompt-design@link:../../../projects_mine/dsh-system-md
+├── dsh-web-mobile@3.2.1
+└── dsh-workspace-mover@2.4.3
+
+15 packages

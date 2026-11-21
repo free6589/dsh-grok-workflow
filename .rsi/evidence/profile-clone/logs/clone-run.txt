@@ -1,0 +1,6 @@
+clone-profile: ok — /home/fish/projects_mine/dsh-grok-workflow/.tmp/profile-clone/dsh-home/profiles/web-clone
+  files 7422 -> 7422 (85582807 bytes)
+  links 7 (relinked 2, already dangling in the source 3)
+  parity 5/5 equal after redaction
+  dependencies 15 declared, 0 unresolved (8/20 bundles from the installation)
+  credentials redacted: 1 line(s) in 1 file(s); vendored fixtures: 4 file(s)

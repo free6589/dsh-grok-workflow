@@ -1,0 +1,3 @@
+dsh: [/home/fish/projects_mine/dsh-grok-workflow/.tmp/profile-clone/dsh-home/profiles/web-clone/cordis.patch.yml] patch: entry "layerfs-host" not found
+dsh: [/home/fish/projects_mine/dsh-grok-workflow/.tmp/profile-clone/dsh-home/profiles/web-clone/cordis.patch.yml] patch: entry "agent-teams" not found
+dsh: [/home/fish/projects_mine/dsh-grok-workflow/.tmp/profile-clone/dsh-home/profiles/web-clone/cordis.patch.yml] patch: name mismatch for "deepseek-account" (expected "@deepseek-ai/dsh-deepseek-account", got "@deepseek-ai/dsh-deepseek-account-platform"), skipping

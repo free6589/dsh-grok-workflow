@@ -1,0 +1,148 @@
+{
+  "ok": true,
+  "failures": [],
+  "source": {
+    "dir": "/home/fish/.dsh/profiles/web",
+    "files": 7422,
+    "links": 7
+  },
+  "target": {
+    "dir": "/home/fish/projects_mine/dsh-grok-workflow/.tmp/profile-clone/dsh-home/profiles/web-clone",
+    "home": "/home/fish/projects_mine/dsh-grok-workflow/.tmp/profile-clone/dsh-home",
+    "files": 7422,
+    "links": 7,
+    "bytes": 85582807
+  },
+  "parity": [
+    {
+      "file": "cordis.yml",
+      "sourceSha256": "c300dcf2ebc5f02062d6591268d29d3db6fe45e0cb138f5467276fe2ba06076e",
+      "expectedSha256": "c300dcf2ebc5f02062d6591268d29d3db6fe45e0cb138f5467276fe2ba06076e",
+      "targetSha256": "c300dcf2ebc5f02062d6591268d29d3db6fe45e0cb138f5467276fe2ba06076e",
+      "equal": true
+    },
+    {
+      "file": "cordis.patch.yml",
+      "sourceSha256": "66f70587344808ebf673ef9f8fa73598ab8e16c3dbe40ce847c2a86425dcc9cc",
+      "expectedSha256": "23dab0774482bcdfc88bf4d14e0507ea81400739d01b7c63b870393933bccaba",
+      "targetSha256": "23dab0774482bcdfc88bf4d14e0507ea81400739d01b7c63b870393933bccaba",
+      "equal": true
+    },
+    {
+      "file": "package.json",
+      "sourceSha256": "fffcacf2844adf4acd6645dda65792527bf8d02b4deec02f94c01a3adcc8d15f",
+      "expectedSha256": "fffcacf2844adf4acd6645dda65792527bf8d02b4deec02f94c01a3adcc8d15f",
+      "targetSha256": "fffcacf2844adf4acd6645dda65792527bf8d02b4deec02f94c01a3adcc8d15f",
+      "equal": true
+    },
+    {
+      "file": "pnpm-workspace.yaml",
+      "sourceSha256": "6b5ecea74821f0663c39b240036af34309e86e152bd390840c2490a0e53f2f2f",
+      "expectedSha256": "6b5ecea74821f0663c39b240036af34309e86e152bd390840c2490a0e53f2f2f",
+      "targetSha256": "6b5ecea74821f0663c39b240036af34309e86e152bd390840c2490a0e53f2f2f",
+      "equal": true
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "sourceSha256": "017cdee3298b3e7553c98280f4fc826d64f8188b351b676e3f4aae3ec3607d3a",
+      "expectedSha256": "017cdee3298b3e7553c98280f4fc826d64f8188b351b676e3f4aae3ec3607d3a",
+      "targetSha256": "017cdee3298b3e7553c98280f4fc826d64f8188b351b676e3f4aae3ec3607d3a",
+      "equal": true
+    }
+  ],
+  "links": [
+    {
+      "path": "node_modules/.bin/dsh-agent-teams-doctor",
+      "sourceTarget": "../@nanmicoder/dsh-agent-teams/scripts/doctor.mjs",
+      "target": "../@nanmicoder/dsh-agent-teams/scripts/doctor.mjs",
+      "sourceResolves": true,
+      "repaired": false,
+      "resolvesAfterRepair": true
+    },
+    {
+      "path": "node_modules/.bin/js-yaml",
+      "sourceTarget": "../js-yaml/bin/js-yaml.js",
+      "target": "../js-yaml/bin/js-yaml.js",
+      "sourceResolves": true,
+      "repaired": false,
+      "resolvesAfterRepair": true
+    },
+    {
+      "path": "node_modules/.bin/openwrite-maintenance",
+      "sourceTarget": "../dsh-openwrite/scripts/maintenance.mjs",
+      "target": "../dsh-openwrite/scripts/maintenance.mjs",
+      "sourceResolves": false,
+      "repaired": false,
+      "resolvesAfterRepair": false
+    },
+    {
+      "path": "node_modules/.bin/openwrite-safe-upgrade",
+      "sourceTarget": "../dsh-openwrite/scripts/safe-upgrade.mjs",
+      "target": "../dsh-openwrite/scripts/safe-upgrade.mjs",
+      "sourceResolves": false,
+      "repaired": false,
+      "resolvesAfterRepair": false
+    },
+    {
+      "path": "node_modules/dsh-system-prompt-design",
+      "sourceTarget": "../../../../projects_mine/dsh-system-md",
+      "target": "../../../../../../../dsh-system-md",
+      "sourceResolves": true,
+      "repaired": true,
+      "resolvesAfterRepair": true
+    },
+    {
+      "path": "node_modules/dsh-token-usage",
+      "sourceTarget": "../../../../projects_mine/dsh-token-usage",
+      "target": "../../../../../../../dsh-token-usage",
+      "sourceResolves": true,
+      "repaired": true,
+      "resolvesAfterRepair": true
+    },
+    {
+      "path": "node_modules/git",
+      "sourceTarget": "../github.com:free6589/dsh-grok-workflow.git",
+      "target": "../github.com:free6589/dsh-grok-workflow.git",
+      "sourceResolves": false,
+      "repaired": false,
+      "resolvesAfterRepair": false
+    }
+  ],
+  "redactions": [
+    {
+      "file": "cordis.patch.yml",
+      "lines": [
+        378
+      ],
+      "patterns": [
+        "openai-style-key"
+      ],
+      "redacted": true
+    }
+  ],
+  "vendoredSecretHits": [
+    {
+      "file": "node_modules/dsh-infinite-gen-5/adapters/test-endpoint-inventory.mjs",
+      "lines": 1
+    },
+    {
+      "file": "node_modules/dsh-infinite-gen-5/adapters/test-image-embed.mjs",
+      "lines": 1
+    },
+    {
+      "file": "node_modules/dsh-infinite-gen-5/adapters/test-openai-embed.mjs",
+      "lines": 2
+    },
+    {
+      "file": "node_modules/dsh-infinite-gen-5/adapters/verify_adapters.mjs",
+      "lines": 1
+    }
+  ],
+  "declared": {
+    "dependencies": 15,
+    "bundles": 20,
+    "installationBundles": 8,
+    "unresolved": []
+  },
+  "secretHits": 1
+}

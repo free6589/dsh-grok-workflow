@@ -2287,3 +2287,22 @@ seq，此后每次都抛在同一处。`compactNow()` 先测量再选范围 → 
   `grokDefault: 'on'` 下读作 `pass/mode-off`，round trip 回到默认。
 - 改前/改后：`docs/knowledge/evidence/grok-command-grammar-20261121/{before,after}.txt`
   （改前 4 failed / 22 passed，改后 26 passed）。
+
+## D-096 — profile 克隆用「重算相对链接 + 就地脱敏」，不用 `pnpm install` 重装（2026-11-21）
+
+**背景**：把一个 pnpm 管理的 DSH profile 复制到另一个 `$DSH_HOME` 时，`link:` / `file:`
+依赖与个人配置里的渠道密钥同时搬家。
+
+**选型**：
+- 链接：复制后按**克隆自己的位置**重算每条相对符号链接（`path.relative` 到源解析出的绝对
+  目标）。保留相对形态，所以日后 `pnpm install` 的解析语义不变。
+  放弃「改成绝对路径」（可移植性更差）与「在克隆里 `pnpm install` 重装」（要网络/要 store，
+  且会掩盖「复制本身是否忠实」这一被测点）。
+- 密钥：profile 自有文件**就地脱敏**并把判定写成 `redact(source) == target` 的逐字节 parity；
+  报告只留文件、行号、模式名。
+  放弃「只报告不脱敏」（复制品里仍有活凭据）与「拒绝克隆」（克隆本身是正当操作）。
+- 只把**克隆引入**的悬空链接算缺陷；源里本来就悬空的（`node_modules/git`、
+  `.bin/openwrite-*`）按继承上报。否则脚本会在最需要审计的 profile 上直接失败。
+- `node_modules` 内的密钥形状命中标 `vendored` 不动：那是依赖自带测试样例，改写会破坏包内容。
+
+**代价**：脱敏后的克隆不能直接拿真实凭据跑模型；要真跑需要自己回填，这是有意的。

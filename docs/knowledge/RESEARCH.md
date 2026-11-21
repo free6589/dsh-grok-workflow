@@ -1445,3 +1445,25 @@ round 33 那次把 1.23 ms 抬到 7.86 ms 的代价没有被再放大：新增�
 `schedule_*` 的会话（D-066、D-093），本轮把它压缩成一次调用并给出复核命令。
 
 **未测（`NOT_RUN`）**：真实投递（无已上弦的行）；开关手点；`open()` 原地改写 `COUNT` 的运行时行为。
+
+
+## 2026-11-21 — profile 搬家：相对链接与凭据是两件会被复制放大的人为事实
+
+- **`link:` 依赖的路径基准是 profile 目录，不是仓库**（`CONFIRMED`）：`~/.dsh/profiles/web/node_modules`
+  下 `dsh-system-prompt-design -> ../../../../projects_mine/dsh-system-md`，从
+  `~/.dsh/profiles/web/` 解析到 `~/projects_mine/dsh-system-md`，换个深度的 `$DSH_HOME` 就悬空。
+  `pnpm list` 把 lockfile 里的 spec 也记成同一相对形态（`link:../../../projects_mine/dsh-system-md`），
+  所以「重装一次就好了」只在装的时候成立，复制后不成立。
+- **DSH 对解析失败不降级**（`CONFIRMED`）：`dsh plugin --profile <name> list` 在
+  `resolveBundleDir` 抛错并 exit 1；`--dump-config` 只在 stderr 打一行
+  `skipping profile bundle "…"` 然后 exit 0 —— 后者静默，前者硬失败，两种表现都实测到了
+  （`.rsi/evidence/profile-clone/`）。
+- **`--dump-config` 会写 profile**（`CONFIRMED`）：`prepareProfile` 先把 `cordis.yml` 重写一遍，
+  所以只读的 profile 目录（如 `~/.dsh` 在沙箱内）根本 dump 不出来
+  （`EROFS: read-only file system, open '/home/fish/.dsh/profiles/web/cordis.yml'`）。
+  要比对组合树，先得有写权限，或改用界定文件的哈希。
+- **`@deepseek-ai/*` bundle 行不由 profile 提供**（`CONFIRMED`）：`node_modules/@deepseek-ai` 只有
+  `cosmokit`、`schemastery`，20 条 bundle 行里 8 条从 DSH 安装体解析。把它算成「依赖未解析」是误报。
+- **克隆的机器级副作用**（`CONFIRMED`）：`mcp-serena` 写 `~/.serena/logs/<date>`、`mcp-mobile-phone` 写
+  `~/.local/share/phone-use/state.json`，沙箱内 8 条 `Read-only file system`；应用仍能服务，
+  但日志被 traceback 淹没。home 级 patch（`$DSH_HOME/cordis.patch.yml`）按 entry id 关掉即可。
