@@ -1,0 +1,11 @@
+┌─────────┬─────────────────────────────────────────────────────────┬───────────────┬──────────────────────┐
+│ (index) │ fact                                                    │ HEAD (before) │ working tree (after) │
+├─────────┼─────────────────────────────────────────────────────────┼───────────────┼──────────────────────┤
+│ 0       │ 'branch is a sibling inside the flex track (defect A)'  │ true          │ false                │
+│ 1       │ 'CSS draws the 28px state ring (defect B)'              │ false         │ true                 │
+│ 2       │ 'CSS still ships the head-striking seg-line (defect C)' │ true          │ false                │
+│ 3       │ 'meta line has a tooltip when clipped (defect D)'       │ false         │ true                 │
+└─────────┴─────────────────────────────────────────────────────────┴───────────────┴──────────────────────┘
+PROBE: every pinned fact differs between HEAD and the working tree (the new tests fail on HEAD).
+(node:3) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)

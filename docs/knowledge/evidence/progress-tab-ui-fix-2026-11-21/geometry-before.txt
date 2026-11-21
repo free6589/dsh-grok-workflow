@@ -1,0 +1,938 @@
+# geometry check — before (HEAD 0eb5d8f) (page-before.html)
+┌─────────┬──────────────────────┬──────────┬────────────┬──────────┬───────┬────────────┬────────┐
+│ (index) │ case                 │ segments │ minSegment │ minLabel │ rings │ branches   │ status │
+├─────────┼──────────────────────┼──────────┼────────────┼──────────┼───────┼────────────┼────────┤
+│ 0       │ 'empty@1440'         │ 0        │ 0          │ 0        │ '0/0' │ '-'        │ 'PASS' │
+│ 1       │ 'empty@1200'         │ 0        │ 0          │ 0        │ '0/0' │ '-'        │ 'PASS' │
+│ 2       │ 'empty@900'          │ 0        │ 0          │ 0        │ '0/0' │ '-'        │ 'PASS' │
+│ 3       │ 'empty@760'          │ 0        │ 0          │ 0        │ '0/0' │ '-'        │ 'PASS' │
+│ 4       │ 'empty@600'          │ 0        │ 0          │ 0        │ '0/0' │ '-'        │ 'PASS' │
+│ 5       │ 'empty@520'          │ 0        │ 0          │ 0        │ '0/0' │ '-'        │ 'PASS' │
+│ 6       │ 'empty@480'          │ 0        │ 0          │ 0        │ '0/0' │ '-'        │ 'PASS' │
+│ 7       │ 'empty@390'          │ 0        │ 0          │ 0        │ '0/0' │ '-'        │ 'PASS' │
+│ 8       │ 'loading@1440'       │ 8        │ 20         │ 0        │ '0/8' │ '1123x65'  │ 'FAIL' │
+│ 9       │ 'loading@1200'       │ 8        │ 20         │ 0        │ '0/8' │ '883x65'   │ 'FAIL' │
+│ 10      │ 'loading@900'        │ 8        │ 20         │ 0        │ '0/8' │ '583x65'   │ 'FAIL' │
+│ 11      │ 'loading@760'        │ 8        │ 20         │ 0        │ '0/8' │ '443x65'   │ 'FAIL' │
+│ 12      │ 'loading@600'        │ 8        │ 12         │ 0        │ '0/8' │ '347x65'   │ 'FAIL' │
+│ 13      │ 'loading@520'        │ 8        │ 12         │ 0        │ '0/8' │ '267x65'   │ 'FAIL' │
+│ 14      │ 'loading@480'        │ 8        │ 12         │ 0        │ '0/8' │ '227x65'   │ 'FAIL' │
+│ 15      │ 'loading@390'        │ 8        │ 12         │ 0        │ '0/8' │ '137x65'   │ 'FAIL' │
+│ 16      │ 'running@1440'       │ 9        │ 20         │ 0        │ '0/9' │ '1084x65'  │ 'FAIL' │
+│ 17      │ 'running@1200'       │ 9        │ 20         │ 0        │ '0/9' │ '844x65'   │ 'FAIL' │
+│ 18      │ 'running@900+detail' │ 9        │ 20         │ 0        │ '0/9' │ '544x65'   │ 'FAIL' │
+│ 19      │ 'running@760'        │ 9        │ 20         │ 0        │ '0/9' │ '404x65'   │ 'FAIL' │
+│ 20      │ 'running@600'        │ 9        │ 12         │ 0        │ '0/9' │ '316x65'   │ 'FAIL' │
+│ 21      │ 'running@520'        │ 9        │ 12         │ 0        │ '0/9' │ '236x65'   │ 'FAIL' │
+│ 22      │ 'running@480'        │ 9        │ 12         │ 0        │ '0/9' │ '196x65'   │ 'FAIL' │
+│ 23      │ 'running@390'        │ 9        │ 12         │ 0        │ '0/9' │ '106x65'   │ 'FAIL' │
+│ 24      │ 'done@1440'          │ 8        │ 160        │ 26       │ '0/8' │ '-'        │ 'FAIL' │
+│ 25      │ 'done@1200'          │ 8        │ 130        │ 26       │ '0/8' │ '-'        │ 'FAIL' │
+│ 26      │ 'done@900'           │ 8        │ 93         │ 26       │ '0/8' │ '-'        │ 'FAIL' │
+│ 27      │ 'done@760'           │ 8        │ 75         │ 26       │ '0/8' │ '-'        │ 'FAIL' │
+│ 28      │ 'done@600'           │ 8        │ 55         │ 26       │ '0/8' │ '-'        │ 'FAIL' │
+│ 29      │ 'done@520'           │ 8        │ 45         │ 16       │ '0/8' │ '-'        │ 'FAIL' │
+│ 30      │ 'done@480'           │ 8        │ 40         │ 11       │ '0/8' │ '-'        │ 'FAIL' │
+│ 31      │ 'done@390'           │ 8        │ 29         │ 0        │ '0/8' │ '-'        │ 'FAIL' │
+│ 32      │ 'failed@1440'        │ 8        │ 20         │ 0        │ '0/8' │ '1036x103' │ 'FAIL' │
+│ 33      │ 'failed@1200'        │ 8        │ 20         │ 0        │ '0/8' │ '800x103'  │ 'FAIL' │
+│ 34      │ 'failed@900'         │ 8        │ 20         │ 0        │ '0/8' │ '507x103'  │ 'FAIL' │
+│ 35      │ 'failed@760'         │ 8        │ 20         │ 0        │ '0/8' │ '373x103'  │ 'FAIL' │
+│ 36      │ 'failed@600'         │ 8        │ 12         │ 0        │ '0/8' │ '275x103'  │ 'FAIL' │
+│ 37      │ 'failed@520'         │ 8        │ 12         │ 0        │ '0/8' │ '200x103'  │ 'FAIL' │
+│ 38      │ 'failed@480'         │ 8        │ 12         │ 0        │ '0/8' │ '163x103'  │ 'FAIL' │
+│ 39      │ 'failed@390'         │ 8        │ 12         │ 0        │ '0/8' │ '83x112'   │ 'FAIL' │
+│ 40      │ 'longtext@1440'      │ 9        │ 20         │ 0        │ '0/9' │ '1084x65'  │ 'FAIL' │
+│ 41      │ 'longtext@1200'      │ 9        │ 20         │ 0        │ '0/9' │ '844x65'   │ 'FAIL' │
+│ 42      │ 'longtext@900'       │ 9        │ 20         │ 0        │ '0/9' │ '544x65'   │ 'FAIL' │
+│ 43      │ 'longtext@760'       │ 9        │ 20         │ 0        │ '0/9' │ '404x65'   │ 'FAIL' │
+│ 44      │ 'longtext@600'       │ 9        │ 12         │ 0        │ '0/9' │ '316x65'   │ 'FAIL' │
+│ 45      │ 'longtext@520'       │ 9        │ 12         │ 0        │ '0/9' │ '236x65'   │ 'FAIL' │
+│ 46      │ 'longtext@480'       │ 9        │ 12         │ 0        │ '0/9' │ '196x65'   │ 'FAIL' │
+│ 47      │ 'longtext@390'       │ 9        │ 12         │ 0        │ '0/9' │ '106x65'   │ 'FAIL' │
+└─────────┴──────────────────────┴──────────┴────────────┴──────────┴───────┴────────────┴────────┘
+RESULT: FAIL (884 problems in 40 cases)
+- loading@1440: segment stage:start: label collapsed to 0px
+- loading@1440: segment stage:start: head collapsed to 0px
+- loading@1440: segment stage:start: ring is 9x19
+- loading@1440: segment stage:plan: label collapsed to 0px
+- loading@1440: segment stage:plan: head collapsed to 0px
+- loading@1440: segment stage:plan: ring is 0x0
+- loading@1440: segment stage:execute: label collapsed to 0px
+- loading@1440: segment stage:execute: head collapsed to 0px
+- loading@1440: segment stage:execute: ring is 8x17
+- loading@1440: segment phase:任务 1 · 排查: label collapsed to 0px
+- loading@1440: segment phase:任务 1 · 排查: head collapsed to 0px
+- loading@1440: segment phase:任务 1 · 排查: ring is 8x17
+- loading@1440: segment stage:verify: label collapsed to 0px
+- loading@1440: segment stage:verify: head collapsed to 0px
+- loading@1440: segment stage:verify: ring is 0x0
+- loading@1440: segment stage:synthesize: label collapsed to 0px
+- loading@1440: segment stage:synthesize: head collapsed to 0px
+- loading@1440: segment stage:synthesize: ring is 0x0
+- loading@1440: segment stage:answer: label collapsed to 0px
+- loading@1440: segment stage:answer: head collapsed to 0px
+- loading@1440: segment stage:answer: ring is 0x0
+- loading@1440: segment stage:end: label collapsed to 0px
+- loading@1440: segment stage:end: head collapsed to 0px
+- loading@1440: segment stage:end: ring is 8x17
+- loading@1200: segment stage:start: label collapsed to 0px
+- loading@1200: segment stage:start: head collapsed to 0px
+- loading@1200: segment stage:start: ring is 9x19
+- loading@1200: segment stage:plan: label collapsed to 0px
+- loading@1200: segment stage:plan: head collapsed to 0px
+- loading@1200: segment stage:plan: ring is 0x0
+- loading@1200: segment stage:execute: label collapsed to 0px
+- loading@1200: segment stage:execute: head collapsed to 0px
+- loading@1200: segment stage:execute: ring is 8x17
+- loading@1200: segment phase:任务 1 · 排查: label collapsed to 0px
+- loading@1200: segment phase:任务 1 · 排查: head collapsed to 0px
+- loading@1200: segment phase:任务 1 · 排查: ring is 8x17
+- loading@1200: segment stage:verify: label collapsed to 0px
+- loading@1200: segment stage:verify: head collapsed to 0px
+- loading@1200: segment stage:verify: ring is 0x0
+- loading@1200: segment stage:synthesize: label collapsed to 0px
+- loading@1200: segment stage:synthesize: head collapsed to 0px
+- loading@1200: segment stage:synthesize: ring is 0x0
+- loading@1200: segment stage:answer: label collapsed to 0px
+- loading@1200: segment stage:answer: head collapsed to 0px
+- loading@1200: segment stage:answer: ring is 0x0
+- loading@1200: segment stage:end: label collapsed to 0px
+- loading@1200: segment stage:end: head collapsed to 0px
+- loading@1200: segment stage:end: ring is 8x17
+- loading@900: segment stage:start: label collapsed to 0px
+- loading@900: segment stage:start: head collapsed to 0px
+- loading@900: segment stage:start: ring is 9x19
+- loading@900: segment stage:plan: label collapsed to 0px
+- loading@900: segment stage:plan: head collapsed to 0px
+- loading@900: segment stage:plan: ring is 0x0
+- loading@900: segment stage:execute: label collapsed to 0px
+- loading@900: segment stage:execute: head collapsed to 0px
+- loading@900: segment stage:execute: ring is 8x17
+- loading@900: segment phase:任务 1 · 排查: label collapsed to 0px
+- loading@900: segment phase:任务 1 · 排查: head collapsed to 0px
+- loading@900: segment phase:任务 1 · 排查: ring is 8x17
+- loading@900: segment stage:verify: label collapsed to 0px
+- loading@900: segment stage:verify: head collapsed to 0px
+- loading@900: segment stage:verify: ring is 0x0
+- loading@900: segment stage:synthesize: label collapsed to 0px
+- loading@900: segment stage:synthesize: head collapsed to 0px
+- loading@900: segment stage:synthesize: ring is 0x0
+- loading@900: segment stage:answer: label collapsed to 0px
+- loading@900: segment stage:answer: head collapsed to 0px
+- loading@900: segment stage:answer: ring is 0x0
+- loading@900: segment stage:end: label collapsed to 0px
+- loading@900: segment stage:end: head collapsed to 0px
+- loading@900: segment stage:end: ring is 8x17
+- loading@760: segment stage:start: label collapsed to 0px
+- loading@760: segment stage:start: head collapsed to 0px
+- loading@760: segment stage:start: ring is 9x19
+- loading@760: segment stage:plan: label collapsed to 0px
+- loading@760: segment stage:plan: head collapsed to 0px
+- loading@760: segment stage:plan: ring is 0x0
+- loading@760: segment stage:execute: label collapsed to 0px
+- loading@760: segment stage:execute: head collapsed to 0px
+- loading@760: segment stage:execute: ring is 8x17
+- loading@760: segment phase:任务 1 · 排查: label collapsed to 0px
+- loading@760: segment phase:任务 1 · 排查: head collapsed to 0px
+- loading@760: segment phase:任务 1 · 排查: ring is 8x17
+- loading@760: segment stage:verify: label collapsed to 0px
+- loading@760: segment stage:verify: head collapsed to 0px
+- loading@760: segment stage:verify: ring is 0x0
+- loading@760: segment stage:synthesize: label collapsed to 0px
+- loading@760: segment stage:synthesize: head collapsed to 0px
+- loading@760: segment stage:synthesize: ring is 0x0
+- loading@760: segment stage:answer: label collapsed to 0px
+- loading@760: segment stage:answer: head collapsed to 0px
+- loading@760: segment stage:answer: ring is 0x0
+- loading@760: segment stage:end: label collapsed to 0px
+- loading@760: segment stage:end: head collapsed to 0px
+- loading@760: segment stage:end: ring is 8x17
+- loading@600: segment stage:start: label collapsed to 0px
+- loading@600: segment stage:start: head collapsed to 0px
+- loading@600: segment stage:start: ring is 9x19
+- loading@600: segment stage:plan: label collapsed to 0px
+- loading@600: segment stage:plan: head collapsed to 0px
+- loading@600: segment stage:plan: ring is 0x0
+- loading@600: segment stage:execute: label collapsed to 0px
+- loading@600: segment stage:execute: head collapsed to 0px
+- loading@600: segment stage:execute: ring is 8x17
+- loading@600: segment phase:任务 1 · 排查: label collapsed to 0px
+- loading@600: segment phase:任务 1 · 排查: head collapsed to 0px
+- loading@600: segment phase:任务 1 · 排查: ring is 8x17
+- loading@600: segment stage:verify: label collapsed to 0px
+- loading@600: segment stage:verify: head collapsed to 0px
+- loading@600: segment stage:verify: ring is 0x0
+- loading@600: segment stage:synthesize: label collapsed to 0px
+- loading@600: segment stage:synthesize: head collapsed to 0px
+- loading@600: segment stage:synthesize: ring is 0x0
+- loading@600: segment stage:answer: label collapsed to 0px
+- loading@600: segment stage:answer: head collapsed to 0px
+- loading@600: segment stage:answer: ring is 0x0
+- loading@600: segment stage:end: label collapsed to 0px
+- loading@600: segment stage:end: head collapsed to 0px
+- loading@600: segment stage:end: ring is 8x17
+- loading@520: segment stage:start: label collapsed to 0px
+- loading@520: segment stage:start: head collapsed to 0px
+- loading@520: segment stage:start: ring is 9x19
+- loading@520: segment stage:plan: label collapsed to 0px
+- loading@520: segment stage:plan: head collapsed to 0px
+- loading@520: segment stage:plan: ring is 0x0
+- loading@520: segment stage:execute: label collapsed to 0px
+- loading@520: segment stage:execute: head collapsed to 0px
+- loading@520: segment stage:execute: ring is 8x17
+- loading@520: segment phase:任务 1 · 排查: label collapsed to 0px
+- loading@520: segment phase:任务 1 · 排查: head collapsed to 0px
+- loading@520: segment phase:任务 1 · 排查: ring is 8x17
+- loading@520: segment stage:verify: label collapsed to 0px
+- loading@520: segment stage:verify: head collapsed to 0px
+- loading@520: segment stage:verify: ring is 0x0
+- loading@520: segment stage:synthesize: label collapsed to 0px
+- loading@520: segment stage:synthesize: head collapsed to 0px
+- loading@520: segment stage:synthesize: ring is 0x0
+- loading@520: segment stage:answer: label collapsed to 0px
+- loading@520: segment stage:answer: head collapsed to 0px
+- loading@520: segment stage:answer: ring is 0x0
+- loading@520: segment stage:end: label collapsed to 0px
+- loading@520: segment stage:end: head collapsed to 0px
+- loading@520: segment stage:end: ring is 8x17
+- loading@480: segment stage:start: label collapsed to 0px
+- loading@480: segment stage:start: head collapsed to 0px
+- loading@480: segment stage:start: ring is 9x19
+- loading@480: segment stage:plan: label collapsed to 0px
+- loading@480: segment stage:plan: head collapsed to 0px
+- loading@480: segment stage:plan: ring is 0x0
+- loading@480: segment stage:execute: label collapsed to 0px
+- loading@480: segment stage:execute: head collapsed to 0px
+- loading@480: segment stage:execute: ring is 8x17
+- loading@480: segment phase:任务 1 · 排查: label collapsed to 0px
+- loading@480: segment phase:任务 1 · 排查: head collapsed to 0px
+- loading@480: segment phase:任务 1 · 排查: ring is 8x17
+- loading@480: segment stage:verify: label collapsed to 0px
+- loading@480: segment stage:verify: head collapsed to 0px
+- loading@480: segment stage:verify: ring is 0x0
+- loading@480: segment stage:synthesize: label collapsed to 0px
+- loading@480: segment stage:synthesize: head collapsed to 0px
+- loading@480: segment stage:synthesize: ring is 0x0
+- loading@480: segment stage:answer: label collapsed to 0px
+- loading@480: segment stage:answer: head collapsed to 0px
+- loading@480: segment stage:answer: ring is 0x0
+- loading@480: segment stage:end: label collapsed to 0px
+- loading@480: segment stage:end: head collapsed to 0px
+- loading@480: segment stage:end: ring is 8x17
+- loading@390: segment stage:start: label collapsed to 0px
+- loading@390: segment stage:start: head collapsed to 0px
+- loading@390: segment stage:start: ring is 9x19
+- loading@390: segment stage:plan: label collapsed to 0px
+- loading@390: segment stage:plan: head collapsed to 0px
+- loading@390: segment stage:plan: ring is 0x0
+- loading@390: segment stage:execute: label collapsed to 0px
+- loading@390: segment stage:execute: head collapsed to 0px
+- loading@390: segment stage:execute: ring is 8x17
+- loading@390: segment phase:任务 1 · 排查: label collapsed to 0px
+- loading@390: segment phase:任务 1 · 排查: head collapsed to 0px
+- loading@390: segment phase:任务 1 · 排查: ring is 8x17
+- loading@390: segment stage:verify: label collapsed to 0px
+- loading@390: segment stage:verify: head collapsed to 0px
+- loading@390: segment stage:verify: ring is 0x0
+- loading@390: segment stage:synthesize: label collapsed to 0px
+- loading@390: segment stage:synthesize: head collapsed to 0px
+- loading@390: segment stage:synthesize: ring is 0x0
+- loading@390: segment stage:answer: label collapsed to 0px
+- loading@390: segment stage:answer: head collapsed to 0px
+- loading@390: segment stage:answer: ring is 0x0
+- loading@390: segment stage:end: label collapsed to 0px
+- loading@390: segment stage:end: head collapsed to 0px
+- loading@390: segment stage:end: ring is 8x17
+- running@1440: segment stage:start: label collapsed to 0px
+- running@1440: segment stage:start: head collapsed to 0px
+- running@1440: segment stage:start: ring is 9x19
+- running@1440: segment stage:plan: label collapsed to 0px
+- running@1440: segment stage:plan: head collapsed to 0px
+- running@1440: segment stage:plan: ring is 0x0
+- running@1440: segment stage:execute: label collapsed to 0px
+- running@1440: segment stage:execute: head collapsed to 0px
+- running@1440: segment stage:execute: ring is 8x17
+- running@1440: segment phase:任务 1 · 定位渲染错乱: label collapsed to 0px
+- running@1440: segment phase:任务 1 · 定位渲染错乱: head collapsed to 0px
+- running@1440: segment phase:任务 1 · 定位渲染错乱: ring is 9x19
+- running@1440: segment phase:任务 2 · 修复样式与数据分支: label collapsed to 0px
+- running@1440: segment phase:任务 2 · 修复样式与数据分支: head collapsed to 0px
+- running@1440: segment phase:任务 2 · 修复样式与数据分支: ring is 8x17
+- running@1440: segment stage:verify: label collapsed to 0px
+- running@1440: segment stage:verify: head collapsed to 0px
+- running@1440: segment stage:verify: ring is 9x19
+- running@1440: segment stage:synthesize: label collapsed to 0px
+- running@1440: segment stage:synthesize: head collapsed to 0px
+- running@1440: segment stage:synthesize: ring is 0x0
+- running@1440: segment stage:answer: label collapsed to 0px
+- running@1440: segment stage:answer: head collapsed to 0px
+- running@1440: segment stage:answer: ring is 0x0
+- running@1440: segment stage:end: label collapsed to 0px
+- running@1440: segment stage:end: head collapsed to 0px
+- running@1440: segment stage:end: ring is 8x17
+- running@1200: segment stage:start: label collapsed to 0px
+- running@1200: segment stage:start: head collapsed to 0px
+- running@1200: segment stage:start: ring is 9x19
+- running@1200: segment stage:plan: label collapsed to 0px
+- running@1200: segment stage:plan: head collapsed to 0px
+- running@1200: segment stage:plan: ring is 0x0
+- running@1200: segment stage:execute: label collapsed to 0px
+- running@1200: segment stage:execute: head collapsed to 0px
+- running@1200: segment stage:execute: ring is 8x17
+- running@1200: segment phase:任务 1 · 定位渲染错乱: label collapsed to 0px
+- running@1200: segment phase:任务 1 · 定位渲染错乱: head collapsed to 0px
+- running@1200: segment phase:任务 1 · 定位渲染错乱: ring is 9x19
+- running@1200: segment phase:任务 2 · 修复样式与数据分支: label collapsed to 0px
+- running@1200: segment phase:任务 2 · 修复样式与数据分支: head collapsed to 0px
+- running@1200: segment phase:任务 2 · 修复样式与数据分支: ring is 8x17
+- running@1200: segment stage:verify: label collapsed to 0px
+- running@1200: segment stage:verify: head collapsed to 0px
+- running@1200: segment stage:verify: ring is 9x19
+- running@1200: segment stage:synthesize: label collapsed to 0px
+- running@1200: segment stage:synthesize: head collapsed to 0px
+- running@1200: segment stage:synthesize: ring is 0x0
+- running@1200: segment stage:answer: label collapsed to 0px
+- running@1200: segment stage:answer: head collapsed to 0px
+- running@1200: segment stage:answer: ring is 0x0
+- running@1200: segment stage:end: label collapsed to 0px
+- running@1200: segment stage:end: head collapsed to 0px
+- running@1200: segment stage:end: ring is 8x17
+- running@900+detail: segment stage:start: label collapsed to 0px
+- running@900+detail: segment stage:start: head collapsed to 0px
+- running@900+detail: segment stage:start: ring is 9x19
+- running@900+detail: segment stage:plan: label collapsed to 0px
+- running@900+detail: segment stage:plan: head collapsed to 0px
+- running@900+detail: segment stage:plan: ring is 0x0
+- running@900+detail: segment stage:execute: label collapsed to 0px
+- running@900+detail: segment stage:execute: head collapsed to 0px
+- running@900+detail: segment stage:execute: ring is 8x17
+- running@900+detail: segment phase:任务 1 · 定位渲染错乱: label collapsed to 0px
+- running@900+detail: segment phase:任务 1 · 定位渲染错乱: head collapsed to 0px
+- running@900+detail: segment phase:任务 1 · 定位渲染错乱: ring is 9x19
+- running@900+detail: segment phase:任务 2 · 修复样式与数据分支: label collapsed to 0px
+- running@900+detail: segment phase:任务 2 · 修复样式与数据分支: head collapsed to 0px
+- running@900+detail: segment phase:任务 2 · 修复样式与数据分支: ring is 8x17
+- running@900+detail: segment stage:verify: label collapsed to 0px
+- running@900+detail: segment stage:verify: head collapsed to 0px
+- running@900+detail: segment stage:verify: ring is 9x19
+- running@900+detail: segment stage:synthesize: label collapsed to 0px
+- running@900+detail: segment stage:synthesize: head collapsed to 0px
+- running@900+detail: segment stage:synthesize: ring is 0x0
+- running@900+detail: segment stage:answer: label collapsed to 0px
+- running@900+detail: segment stage:answer: head collapsed to 0px
+- running@900+detail: segment stage:answer: ring is 0x0
+- running@900+detail: segment stage:end: label collapsed to 0px
+- running@900+detail: segment stage:end: head collapsed to 0px
+- running@900+detail: segment stage:end: ring is 8x17
+- running@760: segment stage:start: label collapsed to 0px
+- running@760: segment stage:start: head collapsed to 0px
+- running@760: segment stage:start: ring is 9x19
+- running@760: segment stage:plan: label collapsed to 0px
+- running@760: segment stage:plan: head collapsed to 0px
+- running@760: segment stage:plan: ring is 0x0
+- running@760: segment stage:execute: label collapsed to 0px
+- running@760: segment stage:execute: head collapsed to 0px
+- running@760: segment stage:execute: ring is 8x17
+- running@760: segment phase:任务 1 · 定位渲染错乱: label collapsed to 0px
+- running@760: segment phase:任务 1 · 定位渲染错乱: head collapsed to 0px
+- running@760: segment phase:任务 1 · 定位渲染错乱: ring is 9x19
+- running@760: segment phase:任务 2 · 修复样式与数据分支: label collapsed to 0px
+- running@760: segment phase:任务 2 · 修复样式与数据分支: head collapsed to 0px
+- running@760: segment phase:任务 2 · 修复样式与数据分支: ring is 8x17
+- running@760: segment stage:verify: label collapsed to 0px
+- running@760: segment stage:verify: head collapsed to 0px
+- running@760: segment stage:verify: ring is 9x19
+- running@760: segment stage:synthesize: label collapsed to 0px
+- running@760: segment stage:synthesize: head collapsed to 0px
+- running@760: segment stage:synthesize: ring is 0x0
+- running@760: segment stage:answer: label collapsed to 0px
+- running@760: segment stage:answer: head collapsed to 0px
+- running@760: segment stage:answer: ring is 0x0
+- running@760: segment stage:end: label collapsed to 0px
+- running@760: segment stage:end: head collapsed to 0px
+- running@760: segment stage:end: ring is 8x17
+- running@600: segment stage:start: label collapsed to 0px
+- running@600: segment stage:start: head collapsed to 0px
+- running@600: segment stage:start: ring is 9x19
+- running@600: segment stage:plan: label collapsed to 0px
+- running@600: segment stage:plan: head collapsed to 0px
+- running@600: segment stage:plan: ring is 0x0
+- running@600: segment stage:execute: label collapsed to 0px
+- running@600: segment stage:execute: head collapsed to 0px
+- running@600: segment stage:execute: ring is 8x17
+- running@600: segment phase:任务 1 · 定位渲染错乱: label collapsed to 0px
+- running@600: segment phase:任务 1 · 定位渲染错乱: head collapsed to 0px
+- running@600: segment phase:任务 1 · 定位渲染错乱: ring is 9x19
+- running@600: segment phase:任务 2 · 修复样式与数据分支: label collapsed to 0px
+- running@600: segment phase:任务 2 · 修复样式与数据分支: head collapsed to 0px
+- running@600: segment phase:任务 2 · 修复样式与数据分支: ring is 8x17
+- running@600: segment stage:verify: label collapsed to 0px
+- running@600: segment stage:verify: head collapsed to 0px
+- running@600: segment stage:verify: ring is 9x19
+- running@600: segment stage:synthesize: label collapsed to 0px
+- running@600: segment stage:synthesize: head collapsed to 0px
+- running@600: segment stage:synthesize: ring is 0x0
+- running@600: segment stage:answer: label collapsed to 0px
+- running@600: segment stage:answer: head collapsed to 0px
+- running@600: segment stage:answer: ring is 0x0
+- running@600: segment stage:end: label collapsed to 0px
+- running@600: segment stage:end: head collapsed to 0px
+- running@600: segment stage:end: ring is 8x17
+- running@520: segment stage:start: label collapsed to 0px
+- running@520: segment stage:start: head collapsed to 0px
+- running@520: segment stage:start: ring is 9x19
+- running@520: segment stage:plan: label collapsed to 0px
+- running@520: segment stage:plan: head collapsed to 0px
+- running@520: segment stage:plan: ring is 0x0
+- running@520: segment stage:execute: label collapsed to 0px
+- running@520: segment stage:execute: head collapsed to 0px
+- running@520: segment stage:execute: ring is 8x17
+- running@520: segment phase:任务 1 · 定位渲染错乱: label collapsed to 0px
+- running@520: segment phase:任务 1 · 定位渲染错乱: head collapsed to 0px
+- running@520: segment phase:任务 1 · 定位渲染错乱: ring is 9x19
+- running@520: segment phase:任务 2 · 修复样式与数据分支: label collapsed to 0px
+- running@520: segment phase:任务 2 · 修复样式与数据分支: head collapsed to 0px
+- running@520: segment phase:任务 2 · 修复样式与数据分支: ring is 8x17
+- running@520: segment stage:verify: label collapsed to 0px
+- running@520: segment stage:verify: head collapsed to 0px
+- running@520: segment stage:verify: ring is 9x19
+- running@520: segment stage:synthesize: label collapsed to 0px
+- running@520: segment stage:synthesize: head collapsed to 0px
+- running@520: segment stage:synthesize: ring is 0x0
+- running@520: segment stage:answer: label collapsed to 0px
+- running@520: segment stage:answer: head collapsed to 0px
+- running@520: segment stage:answer: ring is 0x0
+- running@520: segment stage:end: label collapsed to 0px
+- running@520: segment stage:end: head collapsed to 0px
+- running@520: segment stage:end: ring is 8x17
+- running@480: segment stage:start: label collapsed to 0px
+- running@480: segment stage:start: head collapsed to 0px
+- running@480: segment stage:start: ring is 9x19
+- running@480: segment stage:plan: label collapsed to 0px
+- running@480: segment stage:plan: head collapsed to 0px
+- running@480: segment stage:plan: ring is 0x0
+- running@480: segment stage:execute: label collapsed to 0px
+- running@480: segment stage:execute: head collapsed to 0px
+- running@480: segment stage:execute: ring is 8x17
+- running@480: segment phase:任务 1 · 定位渲染错乱: label collapsed to 0px
+- running@480: segment phase:任务 1 · 定位渲染错乱: head collapsed to 0px
+- running@480: segment phase:任务 1 · 定位渲染错乱: ring is 9x19
+- running@480: segment phase:任务 2 · 修复样式与数据分支: label collapsed to 0px
+- running@480: segment phase:任务 2 · 修复样式与数据分支: head collapsed to 0px
+- running@480: segment phase:任务 2 · 修复样式与数据分支: ring is 8x17
+- running@480: segment stage:verify: label collapsed to 0px
+- running@480: segment stage:verify: head collapsed to 0px
+- running@480: segment stage:verify: ring is 9x19
+- running@480: segment stage:synthesize: label collapsed to 0px
+- running@480: segment stage:synthesize: head collapsed to 0px
+- running@480: segment stage:synthesize: ring is 0x0
+- running@480: segment stage:answer: label collapsed to 0px
+- running@480: segment stage:answer: head collapsed to 0px
+- running@480: segment stage:answer: ring is 0x0
+- running@480: segment stage:end: label collapsed to 0px
+- running@480: segment stage:end: head collapsed to 0px
+- running@480: segment stage:end: ring is 8x17
+- running@390: segment stage:start: label collapsed to 0px
+- running@390: segment stage:start: head collapsed to 0px
+- running@390: segment stage:start: ring is 9x19
+- running@390: segment stage:plan: label collapsed to 0px
+- running@390: segment stage:plan: head collapsed to 0px
+- running@390: segment stage:plan: ring is 0x0
+- running@390: segment stage:execute: label collapsed to 0px
+- running@390: segment stage:execute: head collapsed to 0px
+- running@390: segment stage:execute: ring is 8x17
+- running@390: segment phase:任务 1 · 定位渲染错乱: label collapsed to 0px
+- running@390: segment phase:任务 1 · 定位渲染错乱: head collapsed to 0px
+- running@390: segment phase:任务 1 · 定位渲染错乱: ring is 9x19
+- running@390: segment phase:任务 2 · 修复样式与数据分支: label collapsed to 0px
+- running@390: segment phase:任务 2 · 修复样式与数据分支: head collapsed to 0px
+- running@390: segment phase:任务 2 · 修复样式与数据分支: ring is 8x17
+- running@390: segment stage:verify: label collapsed to 0px
+- running@390: segment stage:verify: head collapsed to 0px
+- running@390: segment stage:verify: ring is 9x19
+- running@390: segment stage:synthesize: label collapsed to 0px
+- running@390: segment stage:synthesize: head collapsed to 0px
+- running@390: segment stage:synthesize: ring is 0x0
+- running@390: segment stage:answer: label collapsed to 0px
+- running@390: segment stage:answer: head collapsed to 0px
+- running@390: segment stage:answer: ring is 0x0
+- running@390: segment stage:end: label collapsed to 0px
+- running@390: segment stage:end: head collapsed to 0px
+- running@390: segment stage:end: ring is 8x17
+- done@1440: segment stage:start: ring is 9x19
+- done@1440: segment stage:plan: ring is 0x0
+- done@1440: segment stage:execute: ring is 9x19
+- done@1440: segment phase:任务 1 · 修复: ring is 9x19
+- done@1440: segment stage:verify: ring is 0x0
+- done@1440: segment stage:synthesize: ring is 0x0
+- done@1440: segment stage:answer: ring is 0x0
+- done@1440: segment stage:end: ring is 9x19
+- done@1200: segment stage:start: ring is 9x19
+- done@1200: segment stage:plan: ring is 0x0
+- done@1200: segment stage:execute: ring is 9x19
+- done@1200: segment phase:任务 1 · 修复: ring is 9x19
+- done@1200: segment stage:verify: ring is 0x0
+- done@1200: segment stage:synthesize: ring is 0x0
+- done@1200: segment stage:answer: ring is 0x0
+- done@1200: segment stage:end: ring is 9x19
+- done@900: segment stage:start: ring is 9x19
+- done@900: segment stage:plan: ring is 0x0
+- done@900: segment stage:execute: ring is 9x19
+- done@900: segment phase:任务 1 · 修复: ring is 9x19
+- done@900: segment stage:verify: ring is 0x0
+- done@900: segment stage:synthesize: ring is 0x0
+- done@900: segment stage:answer: ring is 0x0
+- done@900: segment stage:end: ring is 9x19
+- done@760: segment stage:start: ring is 9x19
+- done@760: segment stage:plan: ring is 0x0
+- done@760: segment stage:execute: ring is 9x19
+- done@760: segment phase:任务 1 · 修复: ring is 9x19
+- done@760: segment stage:verify: ring is 0x0
+- done@760: segment stage:synthesize: ring is 0x0
+- done@760: segment stage:answer: ring is 0x0
+- done@760: segment stage:end: ring is 9x19
+- done@600: segment stage:start: ring is 9x19
+- done@600: segment stage:plan: ring is 0x0
+- done@600: segment stage:execute: ring is 9x19
+- done@600: segment phase:任务 1 · 修复: ring is 9x19
+- done@600: segment stage:verify: ring is 0x0
+- done@600: segment stage:synthesize: ring is 0x0
+- done@600: segment stage:answer: ring is 0x0
+- done@600: segment stage:end: ring is 9x19
+- done@520: segment stage:start: ring is 9x19
+- done@520: segment stage:plan: ring is 0x0
+- done@520: segment stage:execute: ring is 9x19
+- done@520: segment phase:任务 1 · 修复: ring is 9x19
+- done@520: segment stage:verify: ring is 0x0
+- done@520: segment stage:synthesize: ring is 0x0
+- done@520: segment stage:answer: ring is 0x0
+- done@520: segment stage:end: ring is 9x19
+- done@480: segment stage:start: ring is 9x19
+- done@480: segment stage:plan: ring is 0x0
+- done@480: segment stage:execute: ring is 9x19
+- done@480: segment phase:任务 1 · 修复: ring is 9x19
+- done@480: segment stage:verify: ring is 0x0
+- done@480: segment stage:synthesize: ring is 0x0
+- done@480: segment stage:answer: ring is 0x0
+- done@480: segment stage:end: ring is 9x19
+- done@390: segment stage:start: label collapsed to 0px
+- done@390: segment stage:start: ring is 9x19
+- done@390: segment stage:plan: ring is 0x0
+- done@390: segment stage:execute: label collapsed to 0px
+- done@390: segment stage:execute: ring is 9x19
+- done@390: segment phase:任务 1 · 修复: label collapsed to 0px
+- done@390: segment phase:任务 1 · 修复: ring is 9x19
+- done@390: segment stage:verify: ring is 0x0
+- done@390: segment stage:synthesize: ring is 0x0
+- done@390: segment stage:answer: ring is 0x0
+- done@390: segment stage:end: label collapsed to 0px
+- done@390: segment stage:end: ring is 9x19
+- failed@1440: segment stage:start: label collapsed to 0px
+- failed@1440: segment stage:start: head collapsed to 0px
+- failed@1440: segment stage:start: ring is 9x19
+- failed@1440: segment stage:plan: label collapsed to 0px
+- failed@1440: segment stage:plan: head collapsed to 0px
+- failed@1440: segment stage:plan: ring is 0x0
+- failed@1440: segment stage:execute: label collapsed to 0px
+- failed@1440: segment stage:execute: head collapsed to 0px
+- failed@1440: segment stage:execute: ring is 8x17
+- failed@1440: segment phase:任务 1 · 修复: label collapsed to 0px
+- failed@1440: segment phase:任务 1 · 修复: head collapsed to 0px
+- failed@1440: segment phase:任务 1 · 修复: ring is 8x17
+- failed@1440: segment stage:verify: label collapsed to 0px
+- failed@1440: segment stage:verify: head collapsed to 0px
+- failed@1440: segment stage:verify: ring is 8x17
+- failed@1440: segment stage:synthesize: label collapsed to 0px
+- failed@1440: segment stage:synthesize: head collapsed to 0px
+- failed@1440: segment stage:synthesize: ring is 0x0
+- failed@1440: segment stage:answer: label collapsed to 0px
+- failed@1440: segment stage:answer: head collapsed to 0px
+- failed@1440: segment stage:answer: ring is 0x0
+- failed@1440: segment stage:end: label collapsed to 0px
+- failed@1440: segment stage:end: head collapsed to 0px
+- failed@1440: segment stage:end: ring is 8x17
+- failed@1200: segment stage:start: label collapsed to 0px
+- failed@1200: segment stage:start: head collapsed to 0px
+- failed@1200: segment stage:start: ring is 9x19
+- failed@1200: segment stage:plan: label collapsed to 0px
+- failed@1200: segment stage:plan: head collapsed to 0px
+- failed@1200: segment stage:plan: ring is 0x0
+- failed@1200: segment stage:execute: label collapsed to 0px
+- failed@1200: segment stage:execute: head collapsed to 0px
+- failed@1200: segment stage:execute: ring is 8x17
+- failed@1200: segment phase:任务 1 · 修复: label collapsed to 0px
+- failed@1200: segment phase:任务 1 · 修复: head collapsed to 0px
+- failed@1200: segment phase:任务 1 · 修复: ring is 8x17
+- failed@1200: segment stage:verify: label collapsed to 0px
+- failed@1200: segment stage:verify: head collapsed to 0px
+- failed@1200: segment stage:verify: ring is 8x17
+- failed@1200: segment stage:synthesize: label collapsed to 0px
+- failed@1200: segment stage:synthesize: head collapsed to 0px
+- failed@1200: segment stage:synthesize: ring is 0x0
+- failed@1200: segment stage:answer: label collapsed to 0px
+- failed@1200: segment stage:answer: head collapsed to 0px
+- failed@1200: segment stage:answer: ring is 0x0
+- failed@1200: segment stage:end: label collapsed to 0px
+- failed@1200: segment stage:end: head collapsed to 0px
+- failed@1200: segment stage:end: ring is 8x17
+- failed@900: segment stage:start: label collapsed to 0px
+- failed@900: segment stage:start: head collapsed to 0px
+- failed@900: segment stage:start: ring is 9x19
+- failed@900: segment stage:plan: label collapsed to 0px
+- failed@900: segment stage:plan: head collapsed to 0px
+- failed@900: segment stage:plan: ring is 0x0
+- failed@900: segment stage:execute: label collapsed to 0px
+- failed@900: segment stage:execute: head collapsed to 0px
+- failed@900: segment stage:execute: ring is 8x17
+- failed@900: segment phase:任务 1 · 修复: label collapsed to 0px
+- failed@900: segment phase:任务 1 · 修复: head collapsed to 0px
+- failed@900: segment phase:任务 1 · 修复: ring is 8x17
+- failed@900: segment stage:verify: label collapsed to 0px
+- failed@900: segment stage:verify: head collapsed to 0px
+- failed@900: segment stage:verify: ring is 8x17
+- failed@900: segment stage:synthesize: label collapsed to 0px
+- failed@900: segment stage:synthesize: head collapsed to 0px
+- failed@900: segment stage:synthesize: ring is 0x0
+- failed@900: segment stage:answer: label collapsed to 0px
+- failed@900: segment stage:answer: head collapsed to 0px
+- failed@900: segment stage:answer: ring is 0x0
+- failed@900: segment stage:end: label collapsed to 0px
+- failed@900: segment stage:end: head collapsed to 0px
+- failed@900: segment stage:end: ring is 8x17
+- failed@760: segment stage:start: label collapsed to 0px
+- failed@760: segment stage:start: head collapsed to 0px
+- failed@760: segment stage:start: ring is 9x19
+- failed@760: segment stage:plan: label collapsed to 0px
+- failed@760: segment stage:plan: head collapsed to 0px
+- failed@760: segment stage:plan: ring is 0x0
+- failed@760: segment stage:execute: label collapsed to 0px
+- failed@760: segment stage:execute: head collapsed to 0px
+- failed@760: segment stage:execute: ring is 8x17
+- failed@760: segment phase:任务 1 · 修复: label collapsed to 0px
+- failed@760: segment phase:任务 1 · 修复: head collapsed to 0px
+- failed@760: segment phase:任务 1 · 修复: ring is 8x17
+- failed@760: segment stage:verify: label collapsed to 0px
+- failed@760: segment stage:verify: head collapsed to 0px
+- failed@760: segment stage:verify: ring is 8x17
+- failed@760: segment stage:synthesize: label collapsed to 0px
+- failed@760: segment stage:synthesize: head collapsed to 0px
+- failed@760: segment stage:synthesize: ring is 0x0
+- failed@760: segment stage:answer: label collapsed to 0px
+- failed@760: segment stage:answer: head collapsed to 0px
+- failed@760: segment stage:answer: ring is 0x0
+- failed@760: segment stage:end: label collapsed to 0px
+- failed@760: segment stage:end: head collapsed to 0px
+- failed@760: segment stage:end: ring is 8x17
+- failed@600: segment stage:start: label collapsed to 0px
+- failed@600: segment stage:start: head collapsed to 0px
+- failed@600: segment stage:start: ring is 9x19
+- failed@600: segment stage:plan: label collapsed to 0px
+- failed@600: segment stage:plan: head collapsed to 0px
+- failed@600: segment stage:plan: ring is 0x0
+- failed@600: segment stage:execute: label collapsed to 0px
+- failed@600: segment stage:execute: head collapsed to 0px
+- failed@600: segment stage:execute: ring is 8x17
+- failed@600: segment phase:任务 1 · 修复: label collapsed to 0px
+- failed@600: segment phase:任务 1 · 修复: head collapsed to 0px
+- failed@600: segment phase:任务 1 · 修复: ring is 8x17
+- failed@600: segment stage:verify: label collapsed to 0px
+- failed@600: segment stage:verify: head collapsed to 0px
+- failed@600: segment stage:verify: ring is 8x17
+- failed@600: segment stage:synthesize: label collapsed to 0px
+- failed@600: segment stage:synthesize: head collapsed to 0px
+- failed@600: segment stage:synthesize: ring is 0x0
+- failed@600: segment stage:answer: label collapsed to 0px
+- failed@600: segment stage:answer: head collapsed to 0px
+- failed@600: segment stage:answer: ring is 0x0
+- failed@600: segment stage:end: label collapsed to 0px
+- failed@600: segment stage:end: head collapsed to 0px
+- failed@600: segment stage:end: ring is 8x17
+- failed@520: segment stage:start: label collapsed to 0px
+- failed@520: segment stage:start: head collapsed to 0px
+- failed@520: segment stage:start: ring is 9x19
+- failed@520: segment stage:plan: label collapsed to 0px
+- failed@520: segment stage:plan: head collapsed to 0px
+- failed@520: segment stage:plan: ring is 0x0
+- failed@520: segment stage:execute: label collapsed to 0px
+- failed@520: segment stage:execute: head collapsed to 0px
+- failed@520: segment stage:execute: ring is 8x17
+- failed@520: segment phase:任务 1 · 修复: label collapsed to 0px
+- failed@520: segment phase:任务 1 · 修复: head collapsed to 0px
+- failed@520: segment phase:任务 1 · 修复: ring is 8x17
+- failed@520: segment stage:verify: label collapsed to 0px
+- failed@520: segment stage:verify: head collapsed to 0px
+- failed@520: segment stage:verify: ring is 8x17
+- failed@520: segment stage:synthesize: label collapsed to 0px
+- failed@520: segment stage:synthesize: head collapsed to 0px
+- failed@520: segment stage:synthesize: ring is 0x0
+- failed@520: segment stage:answer: label collapsed to 0px
+- failed@520: segment stage:answer: head collapsed to 0px
+- failed@520: segment stage:answer: ring is 0x0
+- failed@520: segment stage:end: label collapsed to 0px
+- failed@520: segment stage:end: head collapsed to 0px
+- failed@520: segment stage:end: ring is 8x17
+- failed@480: segment stage:start: label collapsed to 0px
+- failed@480: segment stage:start: head collapsed to 0px
+- failed@480: segment stage:start: ring is 9x19
+- failed@480: segment stage:plan: label collapsed to 0px
+- failed@480: segment stage:plan: head collapsed to 0px
+- failed@480: segment stage:plan: ring is 0x0
+- failed@480: segment stage:execute: label collapsed to 0px
+- failed@480: segment stage:execute: head collapsed to 0px
+- failed@480: segment stage:execute: ring is 8x17
+- failed@480: segment phase:任务 1 · 修复: label collapsed to 0px
+- failed@480: segment phase:任务 1 · 修复: head collapsed to 0px
+- failed@480: segment phase:任务 1 · 修复: ring is 8x17
+- failed@480: segment stage:verify: label collapsed to 0px
+- failed@480: segment stage:verify: head collapsed to 0px
+- failed@480: segment stage:verify: ring is 8x17
+- failed@480: segment stage:synthesize: label collapsed to 0px
+- failed@480: segment stage:synthesize: head collapsed to 0px
+- failed@480: segment stage:synthesize: ring is 0x0
+- failed@480: segment stage:answer: label collapsed to 0px
+- failed@480: segment stage:answer: head collapsed to 0px
+- failed@480: segment stage:answer: ring is 0x0
+- failed@480: segment stage:end: label collapsed to 0px
+- failed@480: segment stage:end: head collapsed to 0px
+- failed@480: segment stage:end: ring is 8x17
+- failed@390: segment stage:start: label collapsed to 0px
+- failed@390: segment stage:start: head collapsed to 0px
+- failed@390: segment stage:start: ring is 9x19
+- failed@390: segment stage:plan: label collapsed to 0px
+- failed@390: segment stage:plan: head collapsed to 0px
+- failed@390: segment stage:plan: ring is 0x0
+- failed@390: segment stage:execute: label collapsed to 0px
+- failed@390: segment stage:execute: head collapsed to 0px
+- failed@390: segment stage:execute: ring is 8x17
+- failed@390: segment phase:任务 1 · 修复: label collapsed to 0px
+- failed@390: segment phase:任务 1 · 修复: head collapsed to 0px
+- failed@390: segment phase:任务 1 · 修复: ring is 8x17
+- failed@390: segment stage:verify: label collapsed to 0px
+- failed@390: segment stage:verify: head collapsed to 0px
+- failed@390: segment stage:verify: ring is 8x17
+- failed@390: segment stage:synthesize: label collapsed to 0px
+- failed@390: segment stage:synthesize: head collapsed to 0px
+- failed@390: segment stage:synthesize: ring is 0x0
+- failed@390: segment stage:answer: label collapsed to 0px
+- failed@390: segment stage:answer: head collapsed to 0px
+- failed@390: segment stage:answer: ring is 0x0
+- failed@390: segment stage:end: label collapsed to 0px
+- failed@390: segment stage:end: head collapsed to 0px
+- failed@390: segment stage:end: ring is 8x17
+- longtext@1440: segment stage:start: label collapsed to 0px
+- longtext@1440: segment stage:start: head collapsed to 0px
+- longtext@1440: segment stage:start: ring is 9x19
+- longtext@1440: segment stage:plan: label collapsed to 0px
+- longtext@1440: segment stage:plan: head collapsed to 0px
+- longtext@1440: segment stage:plan: ring is 0x0
+- longtext@1440: segment stage:execute: label collapsed to 0px
+- longtext@1440: segment stage:execute: head collapsed to 0px
+- longtext@1440: segment stage:execute: ring is 8x17
+- longtext@1440: segment phase:任务 2 · 修复进度标签页在窄宽度下标签被截断、成员卡片相互重叠且详情浮层文字溢出的回归问题（含样式与数据分支）: label collapsed to 0px
+- longtext@1440: segment phase:任务 2 · 修复进度标签页在窄宽度下标签被截断、成员卡片相互重叠且详情浮层文字溢出的回归问题（含样式与数据分支）: head collapsed to 0px
+- longtext@1440: segment phase:任务 2 · 修复进度标签页在窄宽度下标签被截断、成员卡片相互重叠且详情浮层文字溢出的回归问题（含样式与数据分支）: ring is 9x19
+- longtext@1440: segment phase:任务 3 · 补测试与宽度断言: label collapsed to 0px
+- longtext@1440: segment phase:任务 3 · 补测试与宽度断言: head collapsed to 0px
+- longtext@1440: segment phase:任务 3 · 补测试与宽度断言: ring is 8x17
+- longtext@1440: segment stage:verify: label collapsed to 0px
+- longtext@1440: segment stage:verify: head collapsed to 0px
+- longtext@1440: segment stage:verify: ring is 9x19
+- longtext@1440: segment stage:synthesize: label collapsed to 0px
+- longtext@1440: segment stage:synthesize: head collapsed to 0px
+- longtext@1440: segment stage:synthesize: ring is 0x0
+- longtext@1440: segment stage:answer: label collapsed to 0px
+- longtext@1440: segment stage:answer: head collapsed to 0px
+- longtext@1440: segment stage:answer: ring is 0x0
+- longtext@1440: segment stage:end: label collapsed to 0px
+- longtext@1440: segment stage:end: head collapsed to 0px
+- longtext@1440: segment stage:end: ring is 8x17
+- longtext@1200: segment stage:start: label collapsed to 0px
+- longtext@1200: segment stage:start: head collapsed to 0px
+- longtext@1200: segment stage:start: ring is 9x19
+- longtext@1200: segment stage:plan: label collapsed to 0px
+- longtext@1200: segment stage:plan: head collapsed to 0px
+- longtext@1200: segment stage:plan: ring is 0x0
+- longtext@1200: segment stage:execute: label collapsed to 0px
+- longtext@1200: segment stage:execute: head collapsed to 0px
+- longtext@1200: segment stage:execute: ring is 8x17
+- longtext@1200: segment phase:任务 2 · 修复进度标签页在窄宽度下标签被截断、成员卡片相互重叠且详情浮层文字溢出的回归问题（含样式与数据分支）: label collapsed to 0px
+- longtext@1200: segment phase:任务 2 · 修复进度标签页在窄宽度下标签被截断、成员卡片相互重叠且详情浮层文字溢出的回归问题（含样式与数据分支）: head collapsed to 0px
+- longtext@1200: segment phase:任务 2 · 修复进度标签页在窄宽度下标签被截断、成员卡片相互重叠且详情浮层文字溢出的回归问题（含样式与数据分支）: ring is 9x19
+- longtext@1200: segment phase:任务 3 · 补测试与宽度断言: label collapsed to 0px
+- longtext@1200: segment phase:任务 3 · 补测试与宽度断言: head collapsed to 0px
+- longtext@1200: segment phase:任务 3 · 补测试与宽度断言: ring is 8x17
+- longtext@1200: segment stage:verify: label collapsed to 0px
+- longtext@1200: segment stage:verify: head collapsed to 0px
+- longtext@1200: segment stage:verify: ring is 9x19
+- longtext@1200: segment stage:synthesize: label collapsed to 0px
+- longtext@1200: segment stage:synthesize: head collapsed to 0px
+- longtext@1200: segment stage:synthesize: ring is 0x0
+- longtext@1200: segment stage:answer: label collapsed to 0px
+- longtext@1200: segment stage:answer: head collapsed to 0px
+- longtext@1200: segment stage:answer: ring is 0x0
+- longtext@1200: segment stage:end: label collapsed to 0px
+- longtext@1200: segment stage:end: head collapsed to 0px
+- longtext@1200: segment stage:end: ring is 8x17
+- longtext@900: segment stage:start: label collapsed to 0px
+- longtext@900: segment stage:start: head collapsed to 0px
+- longtext@900: segment stage:start: ring is 9x19
+- longtext@900: segment stage:plan: label collapsed to 0px
+- longtext@900: segment stage:plan: head collapsed to 0px
+- longtext@900: segment stage:plan: ring is 0x0
+- longtext@900: segment stage:execute: label collapsed to 0px
+- longtext@900: segment stage:execute: head collapsed to 0px
+- longtext@900: segment stage:execute: ring is 8x17
+- longtext@900: segment phase:任务 2 · 修复进度标签页在窄宽度下标签被截断、成员卡片相互重叠且详情浮层文字溢出的回归问题（含样式与数据分支）: label collapsed to 0px
+- longtext@900: segment phase:任务 2 · 修复进度标签页在窄宽度下标签被截断、成员卡片相互重叠且详情浮层文字溢出的回归问题（含样式与数据分支）: head collapsed to 0px
+- longtext@900: segment phase:任务 2 · 修复进度标签页在窄宽度下标签被截断、成员卡片相互重叠且详情浮层文字溢出的回归问题（含样式与数据分支）: ring is 9x19
+- longtext@900: segment phase:任务 3 · 补测试与宽度断言: label collapsed to 0px
+- longtext@900: segment phase:任务 3 · 补测试与宽度断言: head collapsed to 0px
+- longtext@900: segment phase:任务 3 · 补测试与宽度断言: ring is 8x17
+- longtext@900: segment stage:verify: label collapsed to 0px
+- longtext@900: segment stage:verify: head collapsed to 0px
+- longtext@900: segment stage:verify: ring is 9x19
+- longtext@900: segment stage:synthesize: label collapsed to 0px
+- longtext@900: segment stage:synthesize: head collapsed to 0px
+- longtext@900: segment stage:synthesize: ring is 0x0
+- longtext@900: segment stage:answer: label collapsed to 0px
+- longtext@900: segment stage:answer: head collapsed to 0px
+- longtext@900: segment stage:answer: ring is 0x0
+- longtext@900: segment stage:end: label collapsed to 0px
+- longtext@900: segment stage:end: head collapsed to 0px
+- longtext@900: segment stage:end: ring is 8x17
+- longtext@760: segment stage:start: label collapsed to 0px
+- longtext@760: segment stage:start: head collapsed to 0px
+- longtext@760: segment stage:start: ring is 9x19
+- longtext@760: segment stage:plan: label collapsed to 0px
+- longtext@760: segment stage:plan: head collapsed to 0px
+- longtext@760: segment stage:plan: ring is 0x0
+- longtext@760: segment stage:execute: label collapsed to 0px
+- longtext@760: segment stage:execute: head collapsed to 0px
+- longtext@760: segment stage:execute: ring is 8x17
+- longtext@760: segment phase:任务 2 · 修复进度标签页在窄宽度下标签被截断、成员卡片相互重叠且详情浮层文字溢出的回归问题（含样式与数据分支）: label collapsed to 0px
+- longtext@760: segment phase:任务 2 · 修复进度标签页在窄宽度下标签被截断、成员卡片相互重叠且详情浮层文字溢出的回归问题（含样式与数据分支）: head collapsed to 0px
+- longtext@760: segment phase:任务 2 · 修复进度标签页在窄宽度下标签被截断、成员卡片相互重叠且详情浮层文字溢出的回归问题（含样式与数据分支）: ring is 9x19
+- longtext@760: segment phase:任务 3 · 补测试与宽度断言: label collapsed to 0px
+- longtext@760: segment phase:任务 3 · 补测试与宽度断言: head collapsed to 0px
+- longtext@760: segment phase:任务 3 · 补测试与宽度断言: ring is 8x17
+- longtext@760: segment stage:verify: label collapsed to 0px
+- longtext@760: segment stage:verify: head collapsed to 0px
+- longtext@760: segment stage:verify: ring is 9x19
+- longtext@760: segment stage:synthesize: label collapsed to 0px
+- longtext@760: segment stage:synthesize: head collapsed to 0px
+- longtext@760: segment stage:synthesize: ring is 0x0
+- longtext@760: segment stage:answer: label collapsed to 0px
+- longtext@760: segment stage:answer: head collapsed to 0px
+- longtext@760: segment stage:answer: ring is 0x0
+- longtext@760: segment stage:end: label collapsed to 0px
+- longtext@760: segment stage:end: head collapsed to 0px
+- longtext@760: segment stage:end: ring is 8x17
+- longtext@600: segment stage:start: label collapsed to 0px
+- longtext@600: segment stage:start: head collapsed to 0px
+- longtext@600: segment stage:start: ring is 9x19
+- longtext@600: segment stage:plan: label collapsed to 0px
+- longtext@600: segment stage:plan: head collapsed to 0px
+- longtext@600: segment stage:plan: ring is 0x0
+- longtext@600: segment stage:execute: label collapsed to 0px
+- longtext@600: segment stage:execute: head collapsed to 0px
+- longtext@600: segment stage:execute: ring is 8x17
+- longtext@600: segment phase:任务 2 · 修复进度标签页在窄宽度下标签被截断、成员卡片相互重叠且详情浮层文字溢出的回归问题（含样式与数据分支）: label collapsed to 0px
+- longtext@600: segment phase:任务 2 · 修复进度标签页在窄宽度下标签被截断、成员卡片相互重叠且详情浮层文字溢出的回归问题（含样式与数据分支）: head collapsed to 0px
+- longtext@600: segment phase:任务 2 · 修复进度标签页在窄宽度下标签被截断、成员卡片相互重叠且详情浮层文字溢出的回归问题（含样式与数据分支）: ring is 9x19
+- longtext@600: segment phase:任务 3 · 补测试与宽度断言: label collapsed to 0px
+- longtext@600: segment phase:任务 3 · 补测试与宽度断言: head collapsed to 0px
+- longtext@600: segment phase:任务 3 · 补测试与宽度断言: ring is 8x17
+- longtext@600: segment stage:verify: label collapsed to 0px
+- longtext@600: segment stage:verify: head collapsed to 0px
+- longtext@600: segment stage:verify: ring is 9x19
+- longtext@600: segment stage:synthesize: label collapsed to 0px
+- longtext@600: segment stage:synthesize: head collapsed to 0px
+- longtext@600: segment stage:synthesize: ring is 0x0
+- longtext@600: segment stage:answer: label collapsed to 0px
+- longtext@600: segment stage:answer: head collapsed to 0px
+- longtext@600: segment stage:answer: ring is 0x0
+- longtext@600: segment stage:end: label collapsed to 0px
+- longtext@600: segment stage:end: head collapsed to 0px
+- longtext@600: segment stage:end: ring is 8x17
+- longtext@520: segment stage:start: label collapsed to 0px
+- longtext@520: segment stage:start: head collapsed to 0px
+- longtext@520: segment stage:start: ring is 9x19
+- longtext@520: segment stage:plan: label collapsed to 0px
+- longtext@520: segment stage:plan: head collapsed to 0px
+- longtext@520: segment stage:plan: ring is 0x0
+- longtext@520: segment stage:execute: label collapsed to 0px
+- longtext@520: segment stage:execute: head collapsed to 0px
+- longtext@520: segment stage:execute: ring is 8x17
+- longtext@520: segment phase:任务 2 · 修复进度标签页在窄宽度下标签被截断、成员卡片相互重叠且详情浮层文字溢出的回归问题（含样式与数据分支）: label collapsed to 0px
+- longtext@520: segment phase:任务 2 · 修复进度标签页在窄宽度下标签被截断、成员卡片相互重叠且详情浮层文字溢出的回归问题（含样式与数据分支）: head collapsed to 0px
+- longtext@520: segment phase:任务 2 · 修复进度标签页在窄宽度下标签被截断、成员卡片相互重叠且详情浮层文字溢出的回归问题（含样式与数据分支）: ring is 9x19
+- longtext@520: segment phase:任务 3 · 补测试与宽度断言: label collapsed to 0px
+- longtext@520: segment phase:任务 3 · 补测试与宽度断言: head collapsed to 0px
+- longtext@520: segment phase:任务 3 · 补测试与宽度断言: ring is 8x17
+- longtext@520: segment stage:verify: label collapsed to 0px
+- longtext@520: segment stage:verify: head collapsed to 0px
+- longtext@520: segment stage:verify: ring is 9x19
+- longtext@520: segment stage:synthesize: label collapsed to 0px
+- longtext@520: segment stage:synthesize: head collapsed to 0px
+- longtext@520: segment stage:synthesize: ring is 0x0
+- longtext@520: segment stage:answer: label collapsed to 0px
+- longtext@520: segment stage:answer: head collapsed to 0px
+- longtext@520: segment stage:answer: ring is 0x0
+- longtext@520: segment stage:end: label collapsed to 0px
+- longtext@520: segment stage:end: head collapsed to 0px
+- longtext@520: segment stage:end: ring is 8x17
+- longtext@480: segment stage:start: label collapsed to 0px
+- longtext@480: segment stage:start: head collapsed to 0px
+- longtext@480: segment stage:start: ring is 9x19
+- longtext@480: segment stage:plan: label collapsed to 0px
+- longtext@480: segment stage:plan: head collapsed to 0px
+- longtext@480: segment stage:plan: ring is 0x0
+- longtext@480: segment stage:execute: label collapsed to 0px
+- longtext@480: segment stage:execute: head collapsed to 0px
+- longtext@480: segment stage:execute: ring is 8x17
+- longtext@480: segment phase:任务 2 · 修复进度标签页在窄宽度下标签被截断、成员卡片相互重叠且详情浮层文字溢出的回归问题（含样式与数据分支）: label collapsed to 0px
+- longtext@480: segment phase:任务 2 · 修复进度标签页在窄宽度下标签被截断、成员卡片相互重叠且详情浮层文字溢出的回归问题（含样式与数据分支）: head collapsed to 0px
+- longtext@480: segment phase:任务 2 · 修复进度标签页在窄宽度下标签被截断、成员卡片相互重叠且详情浮层文字溢出的回归问题（含样式与数据分支）: ring is 9x19
+- longtext@480: segment phase:任务 3 · 补测试与宽度断言: label collapsed to 0px
+- longtext@480: segment phase:任务 3 · 补测试与宽度断言: head collapsed to 0px
+- longtext@480: segment phase:任务 3 · 补测试与宽度断言: ring is 8x17
+- longtext@480: segment stage:verify: label collapsed to 0px
+- longtext@480: segment stage:verify: head collapsed to 0px
+- longtext@480: segment stage:verify: ring is 9x19
+- longtext@480: segment stage:synthesize: label collapsed to 0px
+- longtext@480: segment stage:synthesize: head collapsed to 0px
+- longtext@480: segment stage:synthesize: ring is 0x0
+- longtext@480: segment stage:answer: label collapsed to 0px
+- longtext@480: segment stage:answer: head collapsed to 0px
+- longtext@480: segment stage:answer: ring is 0x0
+- longtext@480: segment stage:end: label collapsed to 0px
+- longtext@480: segment stage:end: head collapsed to 0px
+- longtext@480: segment stage:end: ring is 8x17
+- longtext@390: segment stage:start: label collapsed to 0px
+- longtext@390: segment stage:start: head collapsed to 0px
+- longtext@390: segment stage:start: ring is 9x19
+- longtext@390: segment stage:plan: label collapsed to 0px
+- longtext@390: segment stage:plan: head collapsed to 0px
+- longtext@390: segment stage:plan: ring is 0x0
+- longtext@390: segment stage:execute: label collapsed to 0px
+- longtext@390: segment stage:execute: head collapsed to 0px
+- longtext@390: segment stage:execute: ring is 8x17
+- longtext@390: segment phase:任务 2 · 修复进度标签页在窄宽度下标签被截断、成员卡片相互重叠且详情浮层文字溢出的回归问题（含样式与数据分支）: label collapsed to 0px
+- longtext@390: segment phase:任务 2 · 修复进度标签页在窄宽度下标签被截断、成员卡片相互重叠且详情浮层文字溢出的回归问题（含样式与数据分支）: head collapsed to 0px
+- longtext@390: segment phase:任务 2 · 修复进度标签页在窄宽度下标签被截断、成员卡片相互重叠且详情浮层文字溢出的回归问题（含样式与数据分支）: ring is 9x19
+- longtext@390: segment phase:任务 3 · 补测试与宽度断言: label collapsed to 0px
+- longtext@390: segment phase:任务 3 · 补测试与宽度断言: head collapsed to 0px
+- longtext@390: segment phase:任务 3 · 补测试与宽度断言: ring is 8x17
+- longtext@390: segment stage:verify: label collapsed to 0px
+- longtext@390: segment stage:verify: head collapsed to 0px
+- longtext@390: segment stage:verify: ring is 9x19
+- longtext@390: segment stage:synthesize: label collapsed to 0px
+- longtext@390: segment stage:synthesize: head collapsed to 0px
+- longtext@390: segment stage:synthesize: ring is 0x0
+- longtext@390: segment stage:answer: label collapsed to 0px
+- longtext@390: segment stage:answer: head collapsed to 0px
+- longtext@390: segment stage:answer: ring is 0x0
+- longtext@390: segment stage:end: label collapsed to 0px
+- longtext@390: segment stage:end: head collapsed to 0px
+- longtext@390: segment stage:end: ring is 8x17

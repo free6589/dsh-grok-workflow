@@ -142,11 +142,22 @@
 - **颜色全走 token**：`doing→--dsw-alias-state-business-primary`、`done→…-success-primary`、`failed→…-error-primary`、`blocked/cancelled→…-warn-primary`、`pending→…-idle-primary`；边框 `--dsw-alias-border-l2`，浮层底 `--dsw-alias-bg-layer-2`，文字 `--dsw-alias-label-primary/secondary`。**无 hex、无 rgba**（测试断言 CSS 中不含任何字面色值），因此深/浅色与对比度主题下不会留下硬编码浅色块。缺 token 时回退到 `inherit`/`transparent`，不会渲染出错误的浅色。
 - **字体**：`--dsw-font-family-sans`（正文）、`--dsw-font-family-mono`（引擎事实）。
 - **`<style>` 作用域**：所有规则以 `.gw-progress` 开头；样式元素渲染在 Tab 自己的树里，Tab 卸载时由 React 移除——切换 Tab 无残留样式，即使残留也因前缀不会外溢。
-- **轨道**：`height: 96px`、`overflow-x: auto`、`scroll-snap-type: x mandatory`、节点 `scroll-snap-align: center`；28px 环形标记 + 标签（`width: 84px`，超出 ellipsis）。
-- **doing 脉冲只在 CSS**（`@keyframes gw-progress-pulse`），`@media (prefers-reduced-motion: reduce)` 停用。
+- **轨道**：`display: flex`，等分（`flex: 1 1 0`）、无横向滚动（`test/client.spec.ts` 钉住
+  `not.toContain('overflow-x: auto')`）；每段 = 28px 状态环 + 阶段名（ellipsis）+ 一行 meta，
+  head `flex-wrap: wrap`，窄列时环叠到 label 上方而不是把 label 压成 0。
+- **状态环**：`.gw-progress-ring`（28×28、`border: 2px solid --dsw-alias-state-idle-primary`、
+  `border-radius: 50%`）+ `.gw-progress-glyph`；颜色由内联 `borderColor`/`color` 取
+  `PROGRESS_STATE_COLOR`，`pending` 因此是空心环而不是空白。
+- **连接线**：`segment 之间`一条轴线（`.gw-progress-link`，18×2px，`margin-top: 13px` 与环心同高）；
+  `data-filled` 只在该段 `done` 时填绿，`data-flowing` 表示下一段正在跑（蓝色流动虚线）。
+  segment 内部的横线已删除（旧实现会在透明 head 后面横穿环与 label）。
+- **doing 脉冲只在 CSS**（`@keyframes gw-progress-pulse` 作用于 doing 的环），
+  `@media (prefers-reduced-motion: reduce)` 同时停掉脉冲与流动虚线。
 - **缩放**：`--gw-zoom` + `font-size: calc(13px * var(--gw-zoom))`，`localStorage['dsh.gw.progress.zoom']`（0.8–1.6，步长 0.1）；storage 被拒只损失偏好，不损失 Tab。
 - **键盘 / aria**：轨道 `role="group"` + `aria-label`；节点是 `button`，`aria-label` = `「阶段 · 状态」`，`aria-expanded` 表示详情是否展开；roving tabindex（恰好一个 0，其余 −1），`←/→/Home/End` 移动并同步焦点。
-- **窄屏**：`@media (max-width: 720px)` 收紧间距与节点宽；`@media (max-width: 480px)` 详情变为**底部抽屉**（`position: fixed; bottom: 0`，字段单列）。
+- **窄屏**：`@media (max-width: 720px)` 收紧间距、连接线收窄，head 转为竖排（环在上、label 在下）；
+  `@media (max-width: 480px)` 轨道转竖排 step list（连接线隐藏）、详情变为**底部抽屉**（字段单列）。
+- **展开分支在脊柱之外**：见 §14。
 
 ## 10. 降级矩阵
 
@@ -239,3 +250,30 @@ npx vitest run test/panel.spec.ts test/phase1-dialogue.spec.ts
   该开关，但复现本文档 §11 的验证步骤时必须用**打包产物**安装，否则会先卡在开关上。
 - **仍未做**：单 run 之外的历史轨道、`relay`/`append` 形态的进度展示、多语言切换的实时重绘截图
   （locale 重挂有单测，没有截图）。
+
+## 14. 回填：展开分支移出脊柱（2026-11-21，UI 缺陷修复）
+
+本节只回填事实与修正。证据目录
+`docs/knowledge/evidence/progress-tab-ui-fix-2026-11-21/`（前后各 7 张截图、48 用例几何表、
+red-probe、`npm run ci` 日志、可重跑的页面与断言脚本）。基线 `0eb5d8f`，修复在
+`7496ae4` / `660d79d` 两个提交里。
+
+- **缺陷（`CONFIRMED`，Chromium 实测）**：A+C 方案把「展开阶段的成员」作为
+  `.gw-progress-track` 的又一个 flex 子项渲染，且它带 `width: 100%`——于是打开一个阶段就是
+  让分支去和七个 stage 抢宽度。默认展开规则（`failed` 优先，其次 `doing`）意味着**任何进行中
+  的运行都会触发**：1200 px 下每个 segment 只剩 21 px，head 与 label 计算宽度 0，7 个阶段名
+  全部消失。同时 `.gw-progress-ring` 只有 reduced-motion 里的一处引用、没有基础规则，环是
+  8–9×17–19 px 的无边框内联 span，状态色写在看不见的 `borderColor` 上。
+- **修法**：分支改为轨道**下方**的独立面板（`data-state` 挂在面板上，stem 颜色随它），
+  `跳转到首个失败` 移到轨道上方；`.gw-progress-ring` / `.gw-progress-glyph` 补齐几何；
+  segment 内横线删除，连接线压到环心（13px）并新增 `data-flowing`；head `flex-wrap: wrap`，
+  720 px 以下环上 label 下；≤480 px 连接线随竖排隐藏。空阶段打开时面板写
+  `progress.notReported` / `progress.branch.evidenceRows`（`progressNodeMeta` 抽取共用），
+  不再是空盒子。
+- **不变量未变**：分支仍只属于一个阶段（`aria-controls` 仍指向 `gw-branch-<key>`），
+  `.gw-progress-link` 的填充规则与 `test/progress-connector.spec.ts` 的断言一致
+  （只在前一段 `done` 时 `data-filled`），样式仍全 token、无字面色值、无横向滚动。
+- **测量口径**：48 个用例 = 6 场景 × 8 宽度（1440/1200/900/760/600/520/480/390），其中一个
+  用例包含一次点击展开。修复前 **40 例 / 884 条**不变量失败（仅空态通过），修复后 **0 条**。
+- **未覆盖（`NOT_RUN`）**：真机 DSH Web 面板手点（本机会话里没有本插件写的 `tool-workflow/*`
+  运行）；`blocked` 详情在 ≤480 px 抽屉形态的单独截图。

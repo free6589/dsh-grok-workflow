@@ -1,3 +1,21 @@
+## 2026-11-21 — 进度页 UI 展示缺陷修复（展开分支移出脊柱）`CONFIRMED`
+
+- **From:** 本会话（子代理 agent-35）· **To:** lead / 下一轮接手者
+- **缺陷**：`0eb5d8f` 里展开阶段的成员分支是横向 `.gw-progress-track` 的又一个 flex 子项且
+  `width: 100%`，所以打开一个阶段（默认就会打开 `failed`/`doing`）会把七个 stage 挤到 21 px、
+  label 宽度 0；`.gw-progress-ring` 没有基础样式，状态环不可见。
+- **改了什么**（`src/client/index.js`，已随 `7496ae4`/`660d79d` 入库）：分支移到轨道下方
+  （`trackChildren` 只产出 segment + 连接线，面板在 `openBranch` 里单独渲染，`data-state` 在面板上）；
+  环 28 px/2 px/50%；删掉 segment 内横线，连接线 `margin-top: 13px` 与环心同高并新增 `data-flowing`；
+  `跳转到首个失败` 移出 flex 行；head `flex-wrap`，≤720 px 环上 label 下；≤480 px 连接线隐藏；
+  空阶段面板显示 `progressNodeMeta` 那句说明。`test/client.spec.ts` +3 例（112）。
+- **证据**：`docs/knowledge/evidence/progress-tab-ui-fix-2026-11-21/`——前后各 7 张截图、
+  48 用例几何表（修复前 884 条失败 / 修复后 0）、red-probe（四条结构事实在 HEAD 与工作树全部翻转）、
+  `ci.txt`（`npm run ci` exit 0，72 文件 / 1344 测试）。
+- **复现**：`make-page.mjs --source <版本>` 生成页面，Chromium 无头截图；`check.mjs` 跑几何断言。
+- **未做**：真机 DSH Web 面板手点（本机 `:3080` 会话没有本插件写的 `tool-workflow/*` 运行，
+  需先跑一次真实工作流）；`blocked` 抽屉形态单独截图；发版未授权。
+
 ## 2026-11-21 — 总开关 core 路由落地 + 进度页空分支说明 `CONFIRMED`（lead 收尾）
 
 - **From:** 本会话（lead）· **To:** 下一轮接手者

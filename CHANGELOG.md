@@ -56,7 +56,10 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
   (`data-flowing`) while still filling only where the track has passed `done`, the head wraps
   instead of squeezing its label to zero width in a narrow column, and the meta line carries its
   full sentence as a `title` because it is ellipsized. Under 720 px the ring stacks above its
-  label; under 480 px the connectors are hidden together with the vertical step list.
+  label; under 480 px the connectors are hidden together with the vertical step list. A stage
+  whose rows all render as their own plan-task nodes still opens, and its panel then states why
+  it is empty (`Not reported in the events`, or how many rows ran below) instead of drawing a
+  hollow box.
   / 展开阶段的成员此前是横向 `.gw-progress-track` 里的又一个 `width: 100%` 子项，于是「展开一个
   阶段」要和阶段本身抢宽度；「跳到首个失败」按钮当时也是那一行里的 flex 项。现在两者都在脊柱
   之外：面板是轨道下方一块带边框与圆角的独立区域（阶段状态挂在面板的 `data-state` 上，竖线颜色
@@ -64,6 +67,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
   块空白头部；两个阶段之间的连接线接管「正在跑」的流动动画（`data-flowing`），并且仍然只在左侧
   阶段 `done` 时填实；头部改为换行，窄列里不再把标签压成零宽；元信息行会被省略号截断，补上
   `title` 以便读全句。720px 以下圆环叠在标签之上，480px 以下连接线随竖向步骤列表一起隐藏。
+  某阶段的行全部渲染成下方的计划任务节点时它仍然可以点开，此时面板写明为什么是空的（「事件中
+  没有报告」，或有多少行在下方运行），不再画一个空盒子。
 
 ## [0.12.15] - 2026-11-21
 

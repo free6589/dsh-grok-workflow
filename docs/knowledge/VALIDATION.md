@@ -2,6 +2,24 @@
 
 Real commands and results only. Do not add expected results here.
 
+## 进度页 UI 展示缺陷（展开分支移出脊柱）— 2026-11-21（`CONFIRMED`）
+
+**Changed:** `src/client/index.js`——分支从 `.gw-progress-track` 的 flex 行移到轨道下方面板
+（`trackChildren` 只留 segment + 连接线）、`.gw-progress-ring`/`.gw-progress-glyph` 基础几何、
+删除 `.gw-progress-seg-line`、连接线 `margin-top: 13px` + `data-flowing`、`跳转到首个失败` 移出
+flex 行、head 换行与 720/480 断点、空阶段面板说明（`progressNodeMeta` 抽取）；`test/client.spec.ts`
++3 例（实例化空分支那例由 lead 合入时计 112）；`docs/knowledge/DESIGN-progress-tab.md` §9/§14。
+
+| state | command | result |
+| --- | --- | --- |
+| 修复前 `0eb5d8f` | `node check.mjs`（48 用例几何断言） | **FAIL** 40 用例 / 884 条（`geometry-before.txt`） |
+| 修复后工作树 | 同上 | **PASS** 48 用例 / 0 条（`geometry-after.txt`） |
+| 修复前 vs 工作树 | `node red-probe.mjs` | 4 条结构事实全部翻转（`red-probe.txt`） |
+| 工作树 | `npx vitest run test/client.spec.ts test/progress-tab.spec.ts test/progress-connector.spec.ts test/panel-links.spec.ts` | **171 passed**（112 + 34 + 10 + 16，空分支那例之前是 111+34+10+16） |
+| HEAD `72e20b9` | `npm run ci` | exit **0** — 72 files / **1344 tests PASS**，typecheck 0 错，oxlint 23 warnings / 0 errors，`verify:lib` 157 文件逐字节一致（`ci.txt`） |
+
+**NOT_RUN:** 真机 DSH Web 面板手点；`blocked` 详情在 ≤480 px 抽屉形态的单独截图。
+
 ## 总开关 core 路由落地 + 进度页空分支 — 2026-11-21 (`CONFIRMED`, lead 收尾)
 
 **Changed:** 新建 `src/mode-surface.ts`（`POST /grok-workflow/mode`，读写 `plugin:grok-workflow/mode`

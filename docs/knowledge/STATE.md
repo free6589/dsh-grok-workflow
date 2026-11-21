@@ -1,3 +1,15 @@
+Last updated: 2026-11-21 08:40 +08:00（**进度页 UI 展示缺陷已修：展开分支移出脊柱（Chromium 实测 48 用例 0 问题）** —
+`0eb5d8f` 的发布形态里，展开阶段的成员面板是横向 `.gw-progress-track` 的又一个 flex 子项并带
+`width: 100%`，1200 px 下把每个 stage 挤到 21 px、label 计算宽度 0；默认展开（failed 优先、
+其次 doing）意味着任何进行中的运行都会散架。`.gw-progress-ring` 当时只有 reduced-motion 引用、
+没有基础规则，环是 8–9×17–19 px 无边框内联 span。现分支渲染在轨道**下方**（`data-state` 在面板上），
+环补齐 28 px/2 px 几何，segment 内横线删除、连接线压到环心 13 px 并新增 `data-flowing`，
+head 可换行、≤720 px 环上 label 下、≤480 px 连接线随竖排隐藏，空阶段面板写同一句说明。
+几何断言 48 例（6 场景 × 8 宽度）修复前 40 例/884 条失败、修复后 0 条；`npm run ci` exit 0 =
+**72 文件 / 1344 测试 PASS**，`verify:lib` 157 文件逐字节一致。证据
+`docs/knowledge/evidence/progress-tab-ui-fix-2026-11-21/`。**未发版**（0.12.15 未动）。
+NOT_RUN：真机 DSH Web 面板手点；`blocked` 抽屉形态单独截图。）
+
 Last updated: 2026-11-21 08:35 +08:00（**总开关 core 路由已落地并推送（`edc7920`），进度页空分支说明已合（`660d79d`）** —
 `src/mode-surface.ts` 新建：`POST /grok-workflow/mode` 读写同一条 `plugin:grok-workflow/mode`
 记录（按钮和 `/grok` 同源，门控 `gate.ts:521` 读同一条），回读作答；`src/index.ts` 挂载，
