@@ -37,6 +37,10 @@ existed) failed like this:
 | `dsh plugin --profile web-clone list` (with `DSH_HOME` at the clone) | **exit 1**, `cannot resolve profile bundle "dsh-system-prompt-design"` | exit 0, `15 packages` |
 | `dsh --profile web-clone --dump-config` | exit 0 but **1** `skipping profile bundle "dsh-system-prompt-design"` | exit 0, **0** skipped bundles |
 
+The control run is committed at `logs/control-plain-copy.txt`
+(`dsh plugin --profile web-plain list` on a plain `cp -a` copy: `exit 1`,
+`cannot resolve profile bundle "dsh-system-prompt-design"`).
+
 The script re-derives each link against the clone's own location
 (`path.relative(cloneNodeModules, sourceResolvedTarget)`), which keeps the relative shape a
 later `pnpm install` expects. Two links are relinked; three others

@@ -1,0 +1,7 @@
+# Control: a plain cp -a copy of ~/.dsh/profiles/web into a shallower $DSH_HOME.
+# Command: DSH_HOME=<control home> dsh plugin --profile web-plain list
+# Result: exit 1 — link: dependencies are stored relative to the profile directory,
+#         so the copy resolves nothing that the original resolved.
+
+Error: dsh: cannot resolve profile bundle "dsh-system-prompt-design" from the dsh installation or /home/fish/projects_mine/dsh-grok-workflow/.tmp/profile-clone/control-home/profiles/web-plain; run 'dsh plugin --profile web-plain install' if its dependency is not installed
+exit=1
