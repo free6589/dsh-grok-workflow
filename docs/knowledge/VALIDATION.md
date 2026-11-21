@@ -2,6 +2,25 @@
 
 Real commands and results only. Do not add expected results here.
 
+## `/grok` switch word: trimming + case-insensitivity — 2026-11-21 (`CONFIRMED`)
+
+**Changed:** `src/command.ts` handler (`typeof rawInput` guard, `arg.toLowerCase()` before the
+`on`/`off` match). Bare `/grok` still enables (D-028); invalid arguments still write nothing.
+
+| state | command | result |
+| --- | --- | --- |
+| pre-change `src/command.ts` (`0eb5d8f`) + the new spec, in a detached worktree | `npx vitest run test/command.spec.ts` | **4 failed / 22 passed** — `rawInput "ON"` / `"OFF"` answered with the usage line, and `undefined` threw `TypeError: Cannot read properties of undefined (reading 'trim')` (`docs/knowledge/evidence/grok-command-grammar-20261121/before.txt`) |
+| working tree | `npx vitest run test/command.spec.ts` | **26 passed** (`docs/knowledge/evidence/grok-command-grammar-20261121/after.txt`) |
+| working tree | `npm test` (= `npm run build && vitest run`) | **1 failed / 1308 passed (70 files + `test/client.spec.ts`)** — the single failure is `test/client.spec.ts` "the built client bundle stays byte-identical", caused by a **concurrent, uncommitted** edit of `src/client/index.js` (another round's composer switch, `+91` lines) landing between my `build-client` copy and the spec |
+| working tree, after the concurrent client edit grew | `npx vitest run --exclude 'test/client.spec.ts'` | **70 files / 1212 passed**, 0 failed |
+| working tree | `npm run typecheck` | exit **0** |
+| working tree | `npm run lint` | **0 errors, 23 warnings** (all pre-existing; `src/command.ts` and `test/command.spec.ts` lint clean on their own: 0/0) |
+
+Not mine to fix: `test/client.spec.ts` now reports **15 failed / 82 passed** against the
+in-progress `src/client/index.js` of the concurrent round (keys and route wiring that do not exist
+yet); that file's state at my last observation was `M` (uncommitted), so it is not part of this
+round's verdict and must be re-run by whoever lands it.
+
 ## `/compact` failed on any session this plugin wrote a receipt into — fixed 2026-11-20 (`CONFIRMED`)
 
 **Symptom:** the user reported that `/compact` shows an error. Root cause is not in the

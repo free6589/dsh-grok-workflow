@@ -73,10 +73,12 @@ export declare const GROK_USAGE_TEXT = "Usage: /grok [on|off]. This text was not
 /**
  * The `/grok` command definition: arg grammar owned by the handler.
  *
- * The grammar is deliberately unchanged: empty or `on` enables, `off` disables.
- * Only what happens to everything else changed, from a terse one-line usage
- * error that looked like silence to an explicit refusal that says the text was
- * discarded (and, for a prompt-shaped argument, measures it in both languages).
+ * The grammar: empty or `on` enables, `off` disables. The switch word is matched
+ * case-insensitively and after trimming, because `rawInput` is whatever the
+ * commands parser sliced off the first line — `/grok ON`, `/grok  Off ` and
+ * `/grok\ton` are the same intent, and refusing them on a capital letter was a
+ * pure spelling test on the user's keyboard. Everything else is refused and
+ * never touches the toggle.
  */
 export declare function grokCommand(logger?: CommandLogger): GrokCommandDefinition;
 /**

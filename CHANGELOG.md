@@ -5,6 +5,25 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Changed / 变更
+
+- **`/grok` reads its switch word after trimming and without regard to case / `/grok` 的开关词去空白后不分大小写** —
+  The handler compared `rawInput.trim()` against the two literals `on` and `off`, so
+  `/grok ON`, `/grok Off ` or `/grok` followed by a tab answered with the usage line and
+  left the session alone: the casing of the user's keyboard decided whether the command
+  was understood. The word is now lower-cased before it is matched, and `trim` already
+  removes every Unicode whitespace code point (spaces, tabs, newlines, U+00A0, U+3000),
+  so the word is the only thing that decides. Everything that is not `on`/`off`/empty is
+  still a usage error that writes no record, and an invocation whose argument is not a
+  string answers with the same usage line instead of falling through to the
+  empty-argument branch (bare `/grok` still enables — D-028) or throwing.
+  / 处理器此前把 `rawInput.trim()` 与 `on`、`off` 两个字面量直接比较，于是 `/grok ON`、
+  `/grok Off `、`/grok` 后面跟一个制表符都只回用法提示并且不动会话：命令能不能被听懂取决
+  于用户键盘的大小写。现在先统一小写再比对；`trim` 本来就剥掉所有 Unicode 空白码点
+  （空格、制表符、换行、U+00A0、U+3000），所以只有那个词决定结果。`on`/`off`/空 之外的
+  一切仍然只是用法错误、不写任何记录；参数不是字符串时同样只回用法提示，既不落到
+  「无参数=开」那条分支（裸 `/grok` 仍然开启，见 D-028），也不会抛异常。
+
 ## [0.12.15] - 2026-11-21
 
 ### Fixed / 修复

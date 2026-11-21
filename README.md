@@ -26,7 +26,7 @@ You do not write a workflow script. Install the plugin, restart your profile, an
 | Requirement | What this plugin does |
 |---|---|
 | **A front desk in front of every message** | An `agent/pre-step` gate claims each user message and the front desk picks a tier — `direct`, `quick`, `team` or `ask` — stating the tier and its reason on the answer's first line. The full plan→execute→verify workflow runs on the `team` tier; nothing falls back silently to ordinary direct answering. |
-| **Opt-in per session, honest about it** | `grokDefault: off` means a session chats normally until `/grok` turns the workflow on for it; `/grok off` turns it back. A toggle that cannot be persisted is reported as a failure instead of being claimed. |
+| **Opt-in per session, honest about it** | `grokDefault: off` means a session chats normally until `/grok` turns the workflow on for it; `/grok off` turns it back. The switch word is matched after trimming and case-insensitively (`/grok ON`, `/grok  Off ` work); anything else answers with `/grok [on|off]` and leaves the toggle alone. A toggle that cannot be persisted is reported as a failure instead of being claimed. |
 | **Per-role model choice** | `roles.planner`, `roles.worker`, `roles.verifier`, `roles.synthesizer` each carry their own model. |
 | **Ordered fallback chains per role** | Up to 50 routes per role; a route-level failure advances that role's chain and the routes actually used are recorded in the report. |
 | **Operable settings** | The exported `Config` *is* the DSH settings page: live values, unknown keys rejected with a suggestion, chains validated against the providers the runtime really has. |

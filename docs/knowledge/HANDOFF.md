@@ -1,3 +1,30 @@
+## 2026-11-21 — `/grok` 参数解析容错（命令层）；裸 `/grok`=开 未回退（`CONFIRMED`）
+
+- **From:** 本会话（子代理 agent-38）· **To:** lead / 下一轮接手者 / agent-37（dock 开关）
+- **做完了什么（`CONFIRMED`）**：`/grok on|off` 命令早已存在，本轮补的是解析容错——
+  `src/command.ts` 里 `trim()` 后 `toLowerCase()` 再比 `on`/`off`（`/grok ON`、`/grok  Off `、
+  `/grok<TAB>on` 都生效）；参数不是字符串时回用法提示而不是抛 `TypeError`，也不落进「空=开」
+  分支写一个没人要的开关。`on`/`off`/空 之外一切参数仍只回用法提示、不写记录。
+  证据：`test/command.spec.ts` 改前 4 红 / 改后 26 绿
+  （`docs/knowledge/evidence/grok-command-grammar-20261121/{before,after}.txt`），
+  `npx vitest run --exclude 'test/client.spec.ts'` = 70 文件 / 1212 例 PASS，
+  `npm run typecheck` exit 0，`npm run lint` 0 error / 23 warning。
+- **没做的事（明确）**：委派 AC 有「无参数也要用法提示且不改状态」一条，**没有照做**。裸 `/grok`=开
+  是已发布契约（`D-028`、README 双语两处、`src/client/index.js` 的 `status.off.detail`、
+  4 条既有用例），改成报错属于行为回退，任务里没有用户请求要它。冲突写在 `D-095`，
+  等 lead/用户裁决；要改只需 `src/command.ts` 那行 `enable = arg === '' || word === 'on'`
+  加 4 条测试。
+- **状态模型澄清给 UI 侧**：仓库没有 `masterEnabled`。总开关 = 会话记录
+  `plugin:grok-workflow/mode` 的 `enabled`（写 `setMode`、读 `readModeRecord`/`isModeEnabled`，
+  门控 `src/gate.ts:521`，兜底配置默认 `grokDefault`）。agent-37 的 dock 开关走
+  `POST /grok-workflow/mode`（`status|set`）写同一条记录即同源；不要在配置里再加一个键。
+- **工作树状态（重要）**：提交本轮时 `src/client/index.js` 仍有并发轮未提交改动（+91 行，
+  dock 总开关），`test/client.spec.ts` 因此 15 红。本轮只提交 `src/command.ts`、
+  `test/command.spec.ts`、`lib/command.*`、README 双语两行、CHANGELOG、docs；**没有**提交
+  并发轮的 `src/client/index.js`，也**没有**把它的半成品 `lib/client.js` 一起提交。
+  下一轮收尾时要先跑一次 `npm run build` 再跑 `test/client.spec.ts`。
+- **未做**：未发版、未改版本号、未动 tag、无 force-push、未改 DSH core、未写任何密钥。
+
 ## 2026-11-20 — 已发版 `0.12.14`，web profile 已更新到该版（`CONFIRMED`）
 
 - **发版（`CONFIRMED`）**：patch 发版。发版提交 `c0eabef`、annotated tag `v0.12.14` 已推；

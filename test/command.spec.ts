@@ -13,11 +13,15 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { Session } from '@deepseek-ai/dsh-session'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import { grokCommand, GROK_USAGE_TEXT, registerGrokCommand } from '../src/command.js'
 import type { GrokCommandAgent, GrokCommandDefinition, GrokCommandResult } from '../src/command.js'
 import { apply } from '../src/index.js'
 import { isModeEnabled, readModeRecord, setMode } from '../src/mode.js'
 import { isPromptShapedArgument } from '../src/intake.js'
+import { classifyPreStep } from '../src/gate.js'
+import { resolveConfig } from '../src/config.js'
 
 /** Documented settle texts (also asserted verbatim below). */
 const ON_TEXT = 'Grok workflow ON — every message now runs the full plan→execute→verify workflow.'
@@ -115,6 +119,115 @@ describe('grok command handler (arg parsing → toggle state)', () => {
     expect(readModeRecord(fresh)).toBeUndefined()
   })
 })
+
+/* ----------------------------------------- grammar: case and whitespace -- */
+
+/**
+ * `/grok` takes a switch word, not a spelling test.
+ *
+ * `rawInput` is whatever the commands parser sliced off the first line, so its
+ * casing and its surrounding whitespace belong to the keyboard, not to the
+ * intent. Every variant below must reach the same durable state and the same
+ * settle text as the lowercase, unspaced form.
+ */
+describe('grok command handler (case and whitespace tolerance)', () => {
+  const ON_VARIANTS = ['on', 'ON', 'On', 'oN', ' on', 'on ', '  ON  ', '\ton\n', '\u3000on\u3000', '\u00a0ON\u00a0']
+  const OFF_VARIANTS = ['off', 'OFF', 'Off', 'oFf', ' off', 'off ', '  OFF  ', '\toff\n', '\u3000OFF\u3000', '\u00a0Off\u00a0']
+
+  it('enables for every casing and whitespace variant of on', () => {
+    ON_VARIANTS.forEach((raw, index) => {
+      const session = realSession(`sess-variant-on-${index}`)
+      expect(invoke(raw, new FakeAgent(session)), `rawInput ${JSON.stringify(raw)}`).toEqual({ kind: 'success', text: ON_TEXT })
+      expect(isModeEnabled(session)).toBe(true)
+      expect(readModeRecord(session)?.setBy).toBe('command:/grok')
+    })
+  })
+
+  it('disables for every casing and whitespace variant of off, from an enabled session', () => {
+    OFF_VARIANTS.forEach((raw, index) => {
+      const session = realSession(`sess-variant-off-${index}`)
+      invoke('on', new FakeAgent(session))
+      expect(isModeEnabled(session)).toBe(true)
+      expect(invoke(raw, new FakeAgent(session)), `rawInput ${JSON.stringify(raw)}`).toEqual({ kind: 'success', text: OFF_TEXT })
+      expect(isModeEnabled(session)).toBe(false)
+      expect(readModeRecord(session)?.setBy).toBe('command:/grok off')
+    })
+  })
+
+  it('refuses a nearly-right word without changing the toggle', () => {
+    // Case tolerance must not become a spell-check bypass: a word that is not
+    // `on`/`off` is still a usage error, and the toggle keeps its last value.
+    for (const raw of ['onn', 'OF', 'ON please', 'off.', 'on;off', 'ON OFF']) {
+      const session = realSession(`sess-variant-bad-${raw.length}-${raw.charCodeAt(0)}`)
+      invoke('on', new FakeAgent(session))
+      expect(invoke(raw, new FakeAgent(session)), `rawInput ${JSON.stringify(raw)}`).toEqual({ kind: 'error', text: GROK_USAGE_TEXT })
+      expect(isModeEnabled(session)).toBe(true)
+    }
+  })
+
+  it('treats a non-string argument as a usage error, not as "no argument means on"', () => {
+    // A malformed invocation must not throw and must not write: the empty-input
+    // branch (bare `/grok` enables) is only for a real empty string.
+    for (const raw of [undefined, null, 42, {}]) {
+      const session = realSession(`sess-variant-shape-${String(raw)}`)
+      const result = invoke(raw as never, new FakeAgent(session))
+      expect(result).toEqual({ kind: 'error', text: GROK_USAGE_TEXT })
+      expect(readModeRecord(session)).toBeUndefined()
+    }
+  })
+})
+
+/* --------------------------------------- command ↔ settings switch state -- */
+
+/**
+ * The command and the settings page's master switch must never disagree.
+ *
+ * The settings switch persists the deployment default (`grokDefault`), and the
+ * command persists the session record; `classifyPreStep` reads the record and
+ * falls back to the default (src/gate.ts:521). So "both agree" is a claim about
+ * one read: after `/grok on` the gate admits even with the switch stored off,
+ * and after `/grok off` it passes even with the switch stored on — and the
+ * record the command wrote is the record the gate read.
+ */
+describe('grok command and the master switch read one state', () => {
+  /** One user message, classified the way the Host classifies it. */
+  function verdict(session: Session, grokDefault: 'on' | 'off'): { kind: string; reason?: string } {
+    const message = createUserMessage({
+      content: [{ type: 'text', text: 'do the thing' }],
+      source: { kind: 'user' } as never,
+    }) as UserMessage
+    return classifyPreStep(
+      { config: resolveConfig({ grokDefault }) },
+      { agent: { session }, messages: [message], turn: 1, step: 1, signal: new AbortController().signal } as never,
+    ) as { kind: string; reason?: string }
+  }
+
+  it('admits after /grok on even when the switch is stored off', () => {
+    const session = realSession('sess-cmd-switch-on')
+    expect(verdict(session, 'off')).toEqual({ kind: 'pass', reason: 'mode-off' })
+    invoke('on', new FakeAgent(session))
+    expect(verdict(session, 'off')).toMatchObject({ kind: 'admit' })
+  })
+
+  it('passes after /grok off even when the switch is stored on', () => {
+    const session = realSession('sess-cmd-switch-off')
+    expect(verdict(session, 'on')).toMatchObject({ kind: 'admit' })
+    invoke('off', new FakeAgent(session))
+    expect(verdict(session, 'on')).toEqual({ kind: 'pass', reason: 'mode-off' })
+  })
+
+  it('settles with the state the gate will read, and the round trip returns to the switch default', () => {
+    const session = realSession('sess-cmd-switch-round-trip')
+    const agent = new FakeAgent(session)
+    expect(invoke('OFF', agent)).toEqual({ kind: 'success', text: OFF_TEXT })
+    expect(verdict(session, 'off')).toEqual({ kind: 'pass', reason: 'mode-off' })
+    expect(invoke('On', agent)).toEqual({ kind: 'success', text: ON_TEXT })
+    expect(verdict(session, 'off')).toMatchObject({ kind: 'admit' })
+    expect(invoke('OFF', agent)).toEqual({ kind: 'success', text: OFF_TEXT })
+    expect(verdict(session, 'on')).toEqual({ kind: 'pass', reason: 'mode-off' })
+  })
+})
+
 
 /* ------------------------------------------------- handler: failed writes -- */
 

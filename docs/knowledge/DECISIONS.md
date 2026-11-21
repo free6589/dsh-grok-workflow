@@ -2244,3 +2244,46 @@ seq，此后每次都抛在同一处。`compactNow()` 先测量再选范围 → 
 **另一处纠正**：`docs/knowledge/evidence/diag-ctx-compaction-2026-11-07.md` §R5 推断手动压缩会
 被包成 `ManualCompactionError('busy')`；实测**不会**——`compactNow()` 的外层 `try/catch` 包不住
 `async` 回调的 rejection，原始计量器错误直接落到命令处理器。文档已在该报告旁注明。
+
+## D-095 — `/grok` 的开关词「去空白 + 不分大小写」；裸 `/grok` 仍然=开；状态字段是 mode 记录的 `enabled`，不新造 `masterEnabled`（2026-11-21）
+
+**Status:** `CONFIRMED`（`src/command.ts` 已改，`test/command.spec.ts` 26 例在改后全绿、改前 4 红）
+
+**Decision:**
+1. 开关词解析：`rawInput.trim()` 后统一小写再比对 `on`/`off`。`trim` 覆盖空格、制表符、换行、
+   U+00A0、U+3000，所以 `/grok ON`、`/grok  Off `、`/grok<TAB>on` 与全小写无空格等价。
+2. **裸 `/grok`（空参数）仍然=开**，不改成用法提示（见下方「与委派 AC 的冲突」）。
+3. `on`/`off`/空 之外一切参数仍只回 `Usage: /grok [on|off]. This text was not sent as a prompt,
+   so nothing ran.`，**不写任何记录**；提示词形状的参数仍走 `src/intake.ts` 的实测双语拒绝（D-078）。
+4. 参数不是字符串（畸形调用）时直接回用法提示：既不落进「空=开」分支写一个没人要的开关，
+   也不抛未捕获异常。`@deepseek-ai/dsh-commands` 的 `parseCommand` 本身总是切出字符串，这一条是
+   对宿主差异的防御，不是猜测新契约。
+
+**Reason:** 命令是给人按的；大小写和首尾空白属于键盘，不属于意图。旧实现把它当拼写考试：
+`/grok ON` 得到用法提示且 `enabled` 不动，用户看到的却是「命令没听懂」。
+
+**与委派 AC 的冲突（明确记录，不静默）：** 本轮任务 JSON 的验收项写「无参数或非法参数时返回
+用法提示且不改变状态」。其中「非法参数」完全成立；「无参数」与本仓库已发布契约相反：
+`D-028` 定「`/grok` 开、`/grok off` 关」，README 双语两处、`README.md:29`、
+`src/client/index.js` 的 `status.off.detail`（"Send /grok for one serious run"）、
+`test/command.spec.ts` 的 4 条既有用例都按「裸 `/grok` 开启」写，且仓库里存量的团队任务提示词
+普遍以 `/grok` 开头。把空参数改成报错是一次**已发布行为的回退**，任务里没有任何一个用户请求
+要它。因此本轮保留 D-028，把冲突写进这里与交接，交由 lead/用户裁决；若裁决要改，改动点只有
+`src/command.ts` 的 `enable = arg === '' || word === 'on'` 一行加 4 条测试。
+
+**`masterEnabled` 不存在，也不新增：** 仓库里唯一的总开关状态是会话插件记录
+`plugin:grok-workflow/mode` 的 payload（`src/mode.ts` 的 `ModeRecord`，字段 `enabled`），
+写 `setMode(...)`、读 `readModeRecord`/`isModeEnabled`，门控在 `src/gate.ts:521` 读它并以
+`grokDefault` 为兜底；设置页「总开关」写的是配置默认值 `grokDefault`。`grep -r masterEnabled`
+全仓零命中。再引入一个 `masterEnabled` 会让「命令说的」和「门控读的」变成两份真相，正是任务
+约束要避免的。
+
+**Evidence:**
+- `test/command.spec.ts`「case and whitespace tolerance」：10 个 on 变体 / 10 个 off 变体逐个
+  断言写入后的 `enabled` 与 `setBy`；`onn`、`OF`、`ON please`、`off.`、`on;off`、`ON OFF` 逐个
+  断言用法提示且开关保持原值；`undefined`/`null`/`42`/`{}` 断言不抛、不写。
+- `test/command.spec.ts`「grok command and the master switch read one state」：用真实
+  `classifyPreStep` 验证 `/grok on` 在 `grokDefault: 'off'` 下被承认、`/grok off` 在
+  `grokDefault: 'on'` 下读作 `pass/mode-off`，round trip 回到默认。
+- 改前/改后：`docs/knowledge/evidence/grok-command-grammar-20261121/{before,after}.txt`
+  （改前 4 failed / 22 passed，改后 26 passed）。

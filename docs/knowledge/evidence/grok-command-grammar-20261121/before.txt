@@ -1,0 +1,124 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.tmp/grok-cmd-before.Bipc6l
+
+ ❯ test/command.spec.ts (26 tests | 4 failed) 153ms
+     ✓ enables the toggle for empty input 3ms
+     ✓ enables the toggle for on (whitespace trimmed) 0ms
+     ✓ disables the toggle for off (whitespace trimmed) 1ms
+     ✓ leaves a fresh session off when off is the first command 0ms
+     ✓ returns a usage error and does not change the toggle for a bad arg 1ms
+     × enables for every casing and whitespace variant of on 8ms
+     × disables for every casing and whitespace variant of off, from an enabled session 1ms
+     ✓ refuses a nearly-right word without changing the toggle 1ms
+     × treats a non-string argument as a usage error, not as "no argument means on" 1ms
+     ✓ admits after /grok on even when the switch is stored off 2ms
+     ✓ passes after /grok off even when the switch is stored on 0ms
+     × settles with the state the gate will read, and the round trip returns to the switch default 1ms
+     ✓ settles error, never the success wording, when the session refuses the write 0ms
+     ✓ reports the state the session really has when the write does not land 0ms
+     ✓ settles error when the append is accepted but never readable back 5ms
+     ✓ settles error on an agent without a session instead of claiming success 0ms
+     ✓ still settles success for a write the session really holds 0ms
+     ✓ settles success for on and off, error for a bad arg 0ms
+     ✓ refuses a pasted team prompt with the measured, bilingual refusal 0ms
+     ✓ also covers the "/grok on /grok …" shape the fresh session carried 0ms
+     ✓ keeps the terse grammar error for a one-line argument, never silence 0ms
+     ✓ readModeRecord reflects the value and setBy after the handler runs 0ms
+     ✓ records the agent turn when the agent exposes one, else 0 0ms
+     ✓ registers grok only once a commands service is composed (real cordis) 67ms
+     ✓ is wired by the plugin entry apply() (real cordis inject) 56ms
+     ✓ stays inert on a host without the plugin registry mixin 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/command.spec.ts > grok command handler (case and whitespace tolerance) > enables for every casing and whitespace variant of on
+AssertionError: rawInput "ON": expected { kind: 'error', …(1) } to deeply equal { kind: 'success', …(1) }
+
+- Expected
++ Received
+
+  {
+-   "kind": "success",
+-   "text": "Grok workflow ON — every message now runs the full plan→execute→verify workflow.",
++   "kind": "error",
++   "text": "Usage: /grok [on|off]. This text was not sent as a prompt, so nothing ran.",
+  }
+
+ ❯ test/command.spec.ts:140:86
+    138|     ON_VARIANTS.forEach((raw, index) => {
+    139|       const session = realSession(`sess-variant-on-${index}`)
+    140|       expect(invoke(raw, new FakeAgent(session)), `rawInput ${JSON.str…
+       |                                                                                      ^
+    141|       expect(isModeEnabled(session)).toBe(true)
+    142|       expect(readModeRecord(session)?.setBy).toBe('command:/grok')
+ ❯ test/command.spec.ts:138:17
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  test/command.spec.ts > grok command handler (case and whitespace tolerance) > disables for every casing and whitespace variant of off, from an enabled session
+AssertionError: rawInput "OFF": expected { kind: 'error', …(1) } to deeply equal { kind: 'success', …(1) }
+
+- Expected
++ Received
+
+  {
+-   "kind": "success",
+-   "text": "Grok workflow OFF — normal chat.",
++   "kind": "error",
++   "text": "Usage: /grok [on|off]. This text was not sent as a prompt, so nothing ran.",
+  }
+
+ ❯ test/command.spec.ts:151:86
+    149|       invoke('on', new FakeAgent(session))
+    150|       expect(isModeEnabled(session)).toBe(true)
+    151|       expect(invoke(raw, new FakeAgent(session)), `rawInput ${JSON.str…
+       |                                                                                      ^
+    152|       expect(isModeEnabled(session)).toBe(false)
+    153|       expect(readModeRecord(session)?.setBy).toBe('command:/grok off')
+ ❯ test/command.spec.ts:147:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  test/command.spec.ts > grok command handler (case and whitespace tolerance) > treats a non-string argument as a usage error, not as "no argument means on"
+TypeError: Cannot read properties of undefined (reading 'trim')
+ ❯ Object.handler src/command.ts:120:28
+    118|       // Grammar: trim; empty or `on` enables, `off` disables, anythin…
+    119|       // refused and must NOT change the toggle.
+    120|       const arg = rawInput.trim()
+       |                            ^
+    121|       const enable = arg === '' || arg === 'on'
+    122|       if (!enable && arg !== 'off') {
+ ❯ invoke test/command.spec.ts:70:24
+ ❯ test/command.spec.ts:173:22
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  test/command.spec.ts > grok command and the master switch read one state > settles with the state the gate will read, and the round trip returns to the switch default
+AssertionError: expected { kind: 'error', …(1) } to deeply equal { kind: 'success', …(1) }
+
+- Expected
++ Received
+
+  {
+-   "kind": "success",
+-   "text": "Grok workflow OFF — normal chat.",
++   "kind": "error",
++   "text": "Usage: /grok [on|off]. This text was not sent as a prompt, so nothing ran.",
+  }
+
+ ❯ test/command.spec.ts:222:34
+    220|     const session = realSession('sess-cmd-switch-round-trip')
+    221|     const agent = new FakeAgent(session)
+    222|     expect(invoke('OFF', agent)).toEqual({ kind: 'success', text: OFF_…
+       |                                  ^
+    223|     expect(verdict(session, 'off')).toEqual({ kind: 'pass', reason: 'm…
+    224|     expect(invoke('On', agent)).toEqual({ kind: 'success', text: ON_TE…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 22 passed (26)
+   Start at  07:55:37
+   Duration  854ms (transform 410ms, setup 0ms, import 513ms, tests 153ms, environment 0ms)
+

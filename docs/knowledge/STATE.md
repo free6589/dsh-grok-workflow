@@ -1,3 +1,20 @@
+Last updated: 2026-11-21 08:05 +08:00 (**`/grok` 开关词改为「去空白 + 不分大小写」** —
+任务「实现 /grok on|off 斜杠命令」派到我名下；实测该命令**早已存在**（`src/command.ts` +
+`src/mode.ts` + `src/gate.ts:521`，D-028/D-029/D-078 已定），本轮只补真实缺口：`rawInput` 解析。
+改法：`trim()` 后 `toLowerCase()` 再比 `on`/`off`（`trim` 覆盖空格/制表符/换行/U+00A0/U+3000），
+非字符串参数直接回用法提示（旧代码在那里抛 `TypeError`），`on`/`off`/空之外仍不写任何记录。
+**裸 `/grok` 仍然=开**：委派 AC 里「无参数也要用法提示」与本仓库已发布契约（D-028、README 双语、
+客户端 `status.off.detail`、4 条既有测试）相反，未按 AC 回退，冲突写进 `D-095` 与交接待裁决。
+状态字段澄清：不存在 `masterEnabled`；唯一总开关是会话记录 `plugin:grok-workflow/mode.enabled`
+（兜底配置默认值 `grokDefault`），命令与 Agent-37 的 dock 开关（`POST /grok-workflow/mode`，
+`status|set`）读同一条记录。
+**测试**：`test/command.spec.ts` 19→26 例（+7），改前 4 红 / 改后 26 绿（证据
+`docs/knowledge/evidence/grok-command-grammar-20261121/`）；`npx vitest run --exclude
+'test/client.spec.ts'` = **70 文件 / 1212 例 PASS**；`npm run typecheck` exit 0；`npm run lint`
+0 error / 23 warning。`test/client.spec.ts` 当前 **15 红**，来自并发轮未提交的
+`src/client/index.js`（+91 行，dock 总开关），不由本轮引入、也未提交其文件。
+**未发版、未改版本号、无 force-push；未改 DSH core、未写密钥。**
+
 Last updated: 2026-11-20 23:15 +08:00 (**已发版 `0.12.14`，web profile 已更新** —
 `v0.12.14`（annotated tag → `c0eabef`）已推，远端 CI `44760621921` success、
 Release `44760644587` success（asset `dsh-grok-workflow-0.12.14.tgz`）。

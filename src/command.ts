@@ -104,10 +104,12 @@ export const GROK_USAGE_TEXT = 'Usage: /grok [on|off]. This text was not sent as
 /**
  * The `/grok` command definition: arg grammar owned by the handler.
  *
- * The grammar is deliberately unchanged: empty or `on` enables, `off` disables.
- * Only what happens to everything else changed, from a terse one-line usage
- * error that looked like silence to an explicit refusal that says the text was
- * discarded (and, for a prompt-shaped argument, measures it in both languages).
+ * The grammar: empty or `on` enables, `off` disables. The switch word is matched
+ * case-insensitively and after trimming, because `rawInput` is whatever the
+ * commands parser sliced off the first line — `/grok ON`, `/grok  Off ` and
+ * `/grok\ton` are the same intent, and refusing them on a capital letter was a
+ * pure spelling test on the user's keyboard. Everything else is refused and
+ * never touches the toggle.
  */
 export function grokCommand(logger?: CommandLogger): GrokCommandDefinition {
   return {
@@ -115,11 +117,17 @@ export function grokCommand(logger?: CommandLogger): GrokCommandDefinition {
     description: 'Turn the grok workflow on or off',
     input: { hint: '[on|off]' },
     handler: ({ agent, rawInput }) => {
-      // Grammar: trim; empty or `on` enables, `off` disables, anything else is
-      // refused and must NOT change the toggle.
+      // A malformed invocation is an error, not an enable: an invocation object
+      // without a string argument must never fall through to "no argument means
+      // on" and write a toggle nobody asked for.
+      if (typeof rawInput !== 'string') return { kind: 'error', text: GROK_USAGE_TEXT }
+      // Grammar: trim, then match the switch word case-insensitively. `trim`
+      // removes every Unicode `WhiteSpace` code point (spaces, tabs, newlines,
+      // U+00A0, U+3000), so the word is the only thing that decides.
       const arg = rawInput.trim()
-      const enable = arg === '' || arg === 'on'
-      if (!enable && arg !== 'off') {
+      const word = arg.toLowerCase()
+      const enable = arg === '' || word === 'on'
+      if (!enable && word !== 'off') {
         // A pasted prompt that opens with `/grok` reaches this line with the whole
         // prompt as its argument. Answering that with the usage line alone is what
         // made a 2 000-character request vanish; state the measured loss instead.
