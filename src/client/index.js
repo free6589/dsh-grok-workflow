@@ -2985,6 +2985,31 @@ window.__ModuleLoader__.load({
      * @param props - render inputs (copy, expanded state, handler).
      * @returns the segment button.
      */
+    /**
+     * The one-line count under a segment.
+     *
+     * A stage whose rows render as their own plan-task nodes is not "not reported": it
+     * says how many rows ran under it, because an empty row list is not an absence. The
+     * same sentence fills the panel of a stage that has no rows of its own, so opening it
+     * shows why it is empty instead of an empty box.
+     * @param node - derived node model.
+     * @param t - translator.
+     * @returns the meta sentence.
+     */
+    function progressNodeMeta(node, t) {
+      const evidence = Array.isArray(node.evidence) ? node.evidence : []
+      const failedCount = node.members.filter((member) => member.outcome === 'failed').length
+      const doingCount = node.members.filter((member) => member.outcome === undefined).length
+      const settled = node.members.filter((member) => member.outcome !== undefined).length
+      return node.members.length === 0
+        ? (evidence.length > 0 ? t('progress.branch.evidenceRows', { count: evidence.length }) : t('progress.notReported'))
+        : [
+          t('progress.branch.settledOf', { settled, declared: node.members.length }),
+          ...(doingCount > 0 ? [t('progress.branch.running', { count: doingCount })] : []),
+          ...(failedCount > 0 ? [t('progress.branch.failedCount', { count: failedCount })] : []),
+        ].join(' · ')
+    }
+
     function ProgressNode(node, props) {
       const t = props.t
       const stateText = t(PROGRESS_STATE_KEY[node.state])
@@ -3000,17 +3025,7 @@ window.__ModuleLoader__.load({
             ? t('progress.extraHint')
             : (evidence.length > 0 ? t('progress.evidenceHint') : t('progress.notReported'))))
       const failedCount = node.members.filter((member) => member.outcome === 'failed').length
-      const doingCount = node.members.filter((member) => member.outcome === undefined).length
-      const settled = node.members.filter((member) => member.outcome !== undefined).length
-      // A stage whose rows render as their own plan-task nodes is not "not reported": it
-      // says how many rows ran under it, because an empty row list is not an absence.
-      const meta = node.members.length === 0
-        ? (evidence.length > 0 ? t('progress.branch.evidenceRows', { count: evidence.length }) : t('progress.notReported'))
-        : [
-          t('progress.branch.settledOf', { settled, declared: node.members.length }),
-          ...(doingCount > 0 ? [t('progress.branch.running', { count: doingCount })] : []),
-          ...(failedCount > 0 ? [t('progress.branch.failedCount', { count: failedCount })] : []),
-        ].join(' · ')
+      const meta = progressNodeMeta(node, t)
       return h('button', {
         key: node.key,
         type: 'button',
@@ -3392,7 +3407,12 @@ window.__ModuleLoader__.load({
                 'data-gw-progress-more': openBranch.hidden,
                 onClick: () => setShowAllKey(openBranch.node.key),
               }, t('progress.branch.showMore', { more: openBranch.hidden, total: openBranch.node.members.length })))
-              : null)),
+              : null),
+          // A stage with no rows of its own still opens (it is a button), so the panel says
+          // why it is empty rather than rendering a hollow box.
+          openBranch.members.length === 0
+            ? h('p', { className: 'gw-progress-source', 'data-gw-progress-branch-empty': true }, progressNodeMeta(openBranch.node, t))
+            : null),
         ],
       selected === undefined || report === undefined ? null : ProgressDetail({
         t,

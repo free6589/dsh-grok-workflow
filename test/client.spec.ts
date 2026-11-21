@@ -746,6 +746,38 @@ function stylesOf(node: unknown, out: Array<Record<string, unknown>> = []): Arra
 
 /* ------------------------------------------------------------ the component -- */
 
+/**
+ * Render the progress tab with the real hook cells, so a click is a real second render.
+ * @param props - the props to render with.
+ * @returns `run()` for a render pass; state set by a click survives into the next one.
+ */
+function renderProgress(props: Record<string, unknown>) {
+  const cells: unknown[] = []
+  const local: Hooks = {
+    index: 0,
+    cells,
+    useState(initial: unknown) {
+      const at = this.index++
+      if (at >= this.cells.length) this.cells[at] = typeof initial === 'function' ? (initial as () => unknown)() : initial
+      const set = (next: unknown) => {
+        this.cells[at] = typeof next === 'function' ? (next as (value: unknown) => unknown)(this.cells[at]) : next
+      }
+      return [this.cells[at], set]
+    },
+  }
+  const run = (): unknown => {
+    const before = rendering
+    rendering = local
+    local.index = 0
+    try {
+      return bundle.GROK_WORKFLOW_PROGRESS.component(props)
+    } finally {
+      rendering = before
+    }
+  }
+  return { run }
+}
+
 type SwitchRender = { cells: unknown[], index: number, effects: Array<() => unknown> }
 let switchRender: SwitchRender | undefined
 
@@ -1832,38 +1864,6 @@ describe('client progress tab: the detail ladder', () => {
     expect(progress.parseCoordination(undefined)).toBeUndefined()
   })
 
-  /**
-   * Render the tab with the real hook cells, so a click is a real second render.
-   * @param props - the props to render with.
-   * @returns `run()` for a render pass and `click(element)` for a button press.
-   */
-  function renderProgress(props: Record<string, unknown>) {
-    const cells: unknown[] = []
-    const local: Hooks = {
-      index: 0,
-      cells,
-      useState(initial: unknown) {
-        const at = this.index++
-        if (at >= this.cells.length) this.cells[at] = typeof initial === 'function' ? (initial as () => unknown)() : initial
-        const set = (next: unknown) => {
-          this.cells[at] = typeof next === 'function' ? (next as (value: unknown) => unknown)(this.cells[at]) : next
-        }
-        return [this.cells[at], set]
-      },
-    }
-    const run = (): unknown => {
-      const before = rendering
-      rendering = local
-      local.index = 0
-      try {
-        return progress.component(props)
-      } finally {
-        rendering = before
-      }
-    }
-    return { run }
-  }
-
   /** The run every render-based case below shows: two rows, one phase each. */
   const run: ProgressRun = {
     runId: 'run-42',
@@ -2048,6 +2048,32 @@ describe('client progress tab: styles, zoom and empty snapshots', () => {
     const metas = elements.filter((element) => element.props['data-gw-progress-meta'] === true)
     expect(metas.length).toBeGreaterThan(0)
     for (const meta of metas) expect(typeof meta.props['title']).toBe('string')
+  })
+
+  it('explains a stage that opened with no rows of its own, instead of showing an empty panel', () => {
+    const t = translator('zh')
+    const run: ProgressRun = {
+      runId: 'run-empty-branch',
+      name: '任务团队',
+      anchorSeq: 1,
+      members: [progressMember(1, '执行', 'completed')],
+    }
+    const view = renderProgress({
+      t,
+      progressT: t,
+      useGrokProgress: (select: (value: unknown) => unknown) => select({ runs: [run], activeRun: run }),
+    })
+    const start = walk(view.run()).find((element) => element.props['data-node-key'] === 'stage:start')!
+    ;(start.props['onClick'] as () => void)()
+    const tree = walk(view.run())
+    const panel = tree.find((element) => element.props['data-gw-progress-branch'] !== undefined)
+    expect(panel, 'the clicked stage opens its panel').toBeDefined()
+    expect(walk(panel!.children).filter((element) => element.props['data-gw-progress-member'] !== undefined)).toHaveLength(0)
+    // The panel is a button target, so "nothing here" has to be said in words — the same
+    // sentence the collapsed segment already carries, not a hollow box.
+    const line = walk(panel!.children).find((element) => element.props['data-gw-progress-branch-empty'] === true)
+    expect(line, 'the empty panel carries the reason').toBeDefined()
+    expect(texts(line!).join('')).toContain(bundle.GROK_WORKFLOW_DICT['zh']!['progress.notReported'])
   })
 
   it('draws the state ring and one connector axis, without the head-striking hairline', () => {
