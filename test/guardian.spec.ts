@@ -7,8 +7,8 @@
  *   quality), and acts only by cancelling the run once — it never calls
  *   `agent()`, so it costs zero model calls and adds no agent role.
  * - Stuck = timeout or heartbeat-loss: one open child older than its budget
- *   fires, the run is cancelled at most once, and the finding lands in the
- *   terminal report as a `Guardian` error (evidence, not a verdict).
+ *   receives one rescue nudge (or an observation if rescue is unavailable);
+ *   the parent run is never cancelled by liveness detection.
  * - Unload leaves nothing behind: `dispose()`/`finish()` disarm the timer,
  *   `unloadRunGuardians(state)` disposes every live guardian of one instance.
  */
@@ -115,7 +115,7 @@ describe('resident guardian state machine', () => {
 })
 
 describe('stuck-child handling', () => {
-  it('discovers a hung child and cancels the run once, with a bounded finding', () => {
+  it('discovers a hung child and records a non-destructive rescue/observation finding', () => {
     const clock = manualClock()
     const warnings: string[] = []
     const recorded: Array<{ seq: number, action: string }> = []
@@ -138,26 +138,26 @@ describe('stuck-child handling', () => {
     expect(findings.length).toBe(1)
     expect(findings[0]?.seq).toBe(1)
     expect(findings[0]?.label).toBe('stuck worker')
-    expect(findings[0]?.action).toBe('cancel-run')
+    expect(findings[0]?.action).toBe('observe')
     expect(recorded).toHaveLength(1)
     expect(recorded[0]).toMatchObject({
       seq: 1,
       label: 'stuck worker',
       signal: 'heartbeat-loss',
-      action: 'cancel-run',
+      action: 'observe',
       reason: expect.stringContaining('within 10000 ms'),
       atMs: expect.any(Number),
     })
     expect(findings[0]?.reason).toContain('within 10000 ms')
-    expect(cancel).toHaveBeenCalledTimes(1)
+    expect(cancel).not.toHaveBeenCalled()
     // A second sweep appends no second finding and cancels no second time:
     // the bound is structural (at most one cancel per run).
     clock.advance(120_000)
     expect(guardian.check().length).toBe(1)
     expect(cancel).toHaveBeenCalledTimes(1)
     const settlement = guardian.finish('cancelled')
-    expect(settlement.cancelled).toBe(true)
-    expect(settlement.cancelReason).toContain('stuck worker')
+    expect(settlement.cancelled).toBe(false)
+    expect(settlement.cancelReason).toBeUndefined()
     expect(warnings).toEqual([])
   })
 
