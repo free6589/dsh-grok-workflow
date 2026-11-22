@@ -19,6 +19,35 @@ runner 进程静默带走（exit 0 无输出），Node 24+ 无此行为。修法
 
 # Validation Log
 
+## 已发版 `0.13.3` — 2026-11-22（`CONFIRMED`，7 个 rsi 分支合入后发版）
+
+**Changed:** `rsi/round-4/5/6/7/8/10/11` 逐个 `cherry-pick -x` 到 main（明细见
+`.rsi/evidence/rsi-rounds-merged-0.13.3-2026-11-22.md`：4/7 是真修复，5/6/10 的源码早已在 main
+（Round 26/22/`msCeiling`、`ROLE_ORDER` supervisor），分支带的是缺失的回归测试；8 只取标签修复，
+路由列表已由 Round 40 的 `routeChains` 覆盖；11 只取「无任务行不说 0/0」分支）。
+发版提交 `5d614f3`（CHANGELOG 0.13.3 双语 + 版本钉 + `lib/` 重建），tag `v0.13.3`。
+
+| state | command | result |
+| --- | --- | --- |
+| working tree | `npm run build` | tsc + client bundle 无错，`lib/client.js` 266237 bytes |
+| working tree | `npm run typecheck` | exit 0 |
+| working tree | `npm run lint` | 23 warnings / 0 errors（全部既有声明告警） |
+| working tree | `npm test`（build + vitest） | **78 files / 1464 tests PASS**，exit 0 |
+| 定向 | `npx vitest run test/gate-partial-head.spec.ts test/config.spec.ts test/redact.spec.ts test/delivery-human-block.spec.ts` | 1 failed → 修 Q11 分隔符后 147 passed |
+| 定向 | `npx vitest run test/delivery-human-block.spec.ts test/delivery.spec.ts test/checkpoint-wiring.spec.ts test/phase1-dialogue.spec.ts` | **127 passed** |
+| HEAD 配对 | `npm run ci`（`5d614f3`） | exit **0**；`lib/ at 5d614f3 is the build of src/ at 5d614f3 (165 files, byte-identical)`；78 files / 1464 tests |
+| 产物实测 | `node -e "…redactSecrets(…)…"`（`lib/redact.js`） | `Authorization: Token/ApiKey`、`Proxy-Authorization: Digest`、无 scheme 裸值、JSON 键值 → 全部 `[REDACTED]`；`Bearer` 走专规则；`Authorization: none` 原样保留 |
+| remote | CI `44978408473` (push `5d614f3`) | **success** (Node 22 + Node 24) |
+| remote | Release `44978415364` (`v0.13.3`) | **success**, published（资产 `dsh-grok-workflow-0.13.3.tgz`，676729 bytes） |
+
+**唯一需要跟着修复走的既有断言：** `test/delivery-human-block.spec.ts` 的 Q11
+「leaves a reason that already fits byte for byte alone」原来在英文块里钉全角冒号——正是 round 7
+要修的行为，改为 `- Hotel price check: …` 并写明原因（`f3fd972`）。
+
+**分支删除：** 7 个 rsi 分支本地已删、远端本就没有（`git ls-remote --heads origin` 只剩
+`cloud/harden-issue-watcher-prompt-boundary`、`feat/audit-layer`、`fix/token-meter-safe-session-messages`、`main`），
+SHA 与 cherry-pick 对应记录在 `.rsi/evidence/branch-cleanup-2026-11-22/DELETED.shas`（`7adc33c`）。
+
 ## 已发版 `0.13.2` — 2026-11-22（`CONFIRMED`，lead 收尾）
 
 **Changed:** guardian 误杀修复 + 固定左栏 + `lib/panel.*`/t55 删除 + 发版号 0.13.2。
