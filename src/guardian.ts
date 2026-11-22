@@ -802,7 +802,6 @@ export function createRunGuardian(options: GuardianOptions): RunGuardian {
       const settlement: GuardianSettlement = {
         findings: [...findings],
         cancelled: false,
-        ...cancelReason === undefined ? {} : { cancelReason },
       }
       release()
       return settlement
