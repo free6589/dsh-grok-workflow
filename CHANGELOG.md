@@ -5,6 +5,25 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.5] - 2026-11-22
+
+### Fixed / 修复
+
+- **The three composer switches sit left of the model selector / 三个开关搬到模型选择器左边** —
+  Auto-continue, self-iterate and the workflow switch lived in the ambient strip
+  under the composer (`conversation.composer.dock`), whose render gate hides it in
+  a new session's hero composer — so the switches vanished exactly when a user
+  most needed them. All three now register in the tool row's own `list` slot
+  (`conversation.input.right`), rendered immediately before the model selector; the
+  row's gate is the selector's own (`sessionId !== undefined`), so the switches
+  appear in new sessions too. Routes, state and behavior are byte-identical —
+  only the mount point moved.
+  / 自动接着跑、自迭代、workflow 总开关原来挂在对话框下面的环境条
+  （`conversation.composer.dock`），新会话时那条不渲染，开关正好在最需要的时候
+  看不见。现在三个都改挂工具行自己的 `list` 位（`conversation.input.right`），
+  紧贴模型选择器左边；工具行的显示条件就是选择器自己的（有 session 就显示），
+  新会话也有。路由、状态、行为逐字节没变，只换了挂载点。
+
 ## [0.13.4] - 2026-11-22
 
 ### Fixed / 修复
