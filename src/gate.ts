@@ -1317,18 +1317,20 @@ export function installGate(deps: GateDeps): boolean {
   ): boolean => {
     // A cancelled turn never enters a step, so the loop will never commit the
     // batch: the plugin must write it here or the user's words vanish. Surface
-    // position 0 is poison ONLY when a later system head can arrive after it —
-    // i.e. on a live turn 1 that will continue. A cancelled turn is over
-    // (`reject` ends it; no step opens, no head follows), so the write is safe
+    // position 0 is poison ONLY when a later system head can arrive after it.
+    // A mid-run or post-run cancel ends its own turn (`reject`: no step opens,
+    // no head follows on this turn), and a later turn's head arrives through
+    // the `[head, head]` replace the validator allows — so the write is safe
     // and required. Only the pre-cancelled headless turn-1 case (aborted
-    // before anything ran) still suppresses the write, where even the
-    // cancelled row would take position 0 with no head ever following; there
-    // the terminal record still states the reason.
+    // before anything ran, head never established, nothing follows) still
+    // suppresses it, where even the cancelled row would take position 0 with
+    // no head ever following; there the terminal record still states why.
     const preCancelled = payload.signal?.aborted === true
     const owner = sessionOf(agent)
+    const headlessTurn1 = owner === undefined || !surfaceHasHead(owner, payload.turn)
     const kept = alreadySurfaced
       ? true
-      : preCancelled && (owner === undefined || !surfaceHasHead(owner, payload.turn))
+      : preCancelled && headlessTurn1
         ? false
         : commitClaimed(agent, payload.messages)
     const session = sessionOf(agent)
