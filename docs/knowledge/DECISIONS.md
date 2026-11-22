@@ -2410,3 +2410,35 @@ journal 里可能还有历史 `cancel-run` finding，fold 不能把它吃成 obs
 
 **Reason（为什么保留已死的 `cancel-run`）：** fold 读的是历史 journal，不是只读新代码的输出。
 删分支等于改写历史显示——旧 finding 会从"取消过"变成"观察"，这是事实篡改。类型与映射都保留三元。
+
+## D-101 — 安装失败根因：`/tmp` usrquota 配额，不是 `/home` 空间；allowBuilds 不用加（2026-11-22，`CONFIRMED`）
+
+**背景**：用户 `dsh plugin --profile web add github:free6589/dsh-grok-workflow#v0.13.9`
+报 `ERR_PNPM_GIT_FETCHER_IO … Disk quota exceeded (os error 122)` + dsh 通用提示
+"add the exact key under allowBuilds"。
+
+**Decision:**
+1. **真凶是 `/tmp` 的 `usrquota` 配额**：`/tmp`（tmpfs 16G）挂载带 `usrquota`；`git init` 写几 KB
+   即 `error: copy-fd: write returned: Disk quota exceeded`，而 `/home`（btrfs 198G，余 13G，
+   quota 未启用）写 500MB 一次成功。pnpm git fetcher 的临时 clone 走 `/tmp`，撞配额即
+   `os error 122`。`EDQUOT=122`（`ENOSPC=28` 另有所指），dsh 的 disk-full 分类只认
+   `ENOSPC|no space left`，故本次按 unknown 透出 pnpm 原生行。
+2. **`allowBuilds` 不加**：dsh `plugin.ts:104` 对一切形如 git 的 spec 在 exit≠0 时无条件打印该提示，
+   与本次 fetcher 失败无关；pnpm 真正的 prepare-block 是另一个错误码。本插件无
+   prepare/postinstall，tag 树自带 `lib/`，历史同类安装零 allowBuilds 全绿。加了反而按 README
+   语义"以用户权限放行脚本执行"，扩大信任面。
+3. **修法**：删 `/tmp` 确认无用的旧验证目录 + ISO（用户批 1234，约 4G，81%→50%），
+   不碰 `/home` 应用数据；原样重试安装命令。
+
+**Evidence:** agent-2 只读诊断（pnpm.log 事后只有 85 字节摘要是设计使然，CLI 模式 stdout
+inherit 不进 buffer；profile mtime/lockfile 与"失败还原"行为一致）；我亲测
+`git fetch --depth 1 origin tag v0.13.9` 修前 `EDQUOT` 修后 exit 0；
+`plugin add` exit 0（10.5s），装机 `0.13.9` lock tarball `c93b2bf`，`lib/` 逐字节一致。
+
+**Consequences:** 今后装机先看 `df -h /tmp` + 试 `git init` 写小文件；`allowBuilds` 只在报错变为
+`ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED` / `Ignored build scripts` 时才加，且只加 pnpm 当时打印的
+exact key。重试安装建议用 `script` 留全量终端（事后 pnpm.log 只有摘要）。
+
+**遗留低严重（非本轮引入）**：`src/run.ts` rescue executor `catch` 后 `logger.warn` 再 `throw error`，
+注释写 "Never throws into the run"——实际靠 `guardian.ts` 的 try/catch 兜住，run 不受影响。
+v0.13.8 已是这样。属历史小瑕疵 + 双重 warn，后轮把 `throw` 改吞掉以符注释（agent-4 审出）。

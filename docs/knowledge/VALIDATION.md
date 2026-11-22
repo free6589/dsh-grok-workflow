@@ -5393,3 +5393,17 @@ AssertionError: expected 10 to be +0
 
 **NOT_RUN:** `web` profile 热加载安装（沙箱只读 EROFS；待宿主执行 `dsh plugin --profile web add
 github:free6589/dsh-grok-workflow#v0.13.9`）；真机 GUI 手点 observe finding 显示。
+
+## `v0.13.9` 装机 + 双子代理实测 — 2026-11-22 (`CONFIRMED`, lead)
+
+| state | command | result |
+| --- | --- | --- |
+| probe (quota) | `git init -q + git fetch --depth 1 origin tag v0.13.9` in `/tmp` | 修前 `copy-fd: Disk quota exceeded`；清 `/tmp`（81%→50%）后 exit **0** |
+| probe (home) | `dd 500MB → /home/fish/.cache/quota-probe-home` | 一次成功（反证非 `/home` 空间问题） |
+| install | `dsh plugin --profile web add github:free6589/dsh-grok-workflow#v0.13.9` | exit **0**（10.5s）；装机 `0.13.9`，lock tarball `c93b2bf` |
+| parity | `diff -rq lib/ <installed>/lib` + sha256 `progress-tab.js` | 逐字节一致（含 observe 三态） |
+| audit (agent-4) | 三侧一致 + 历史兼容 + 恒false + 空指针/i18n | 干净，无新增 bug；低严重遗留 1（`run.ts` rescue `throw` 与注释不符，见 D-101） |
+| runtime (agent-3) | 隔离 profile Loader/settings/gate/boot + observe fold 定向 | PASS；真机一句话端到端 NOT_RUN（无模型凭证）；curl 直调 describe NOT_RUN（WS mux 通道不对） |
+| cleanup | 删 scratch profiles + `.tmp/dsh-gw-verify` + `/tmp` 探针 | done；`git status` 仅剩既有 untracked |
+
+**No release needed:** 本轮无源码改动（仅记忆文档），`package.json` 仍 `0.13.9`，不发 `v0.13.10`。

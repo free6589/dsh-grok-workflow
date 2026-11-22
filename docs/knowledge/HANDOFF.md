@@ -2601,3 +2601,12 @@ Issue #1 状态评论 issuecomment-6927842856。
 - **找 bug**：PR #47（guardian-ui-and-timeout-budget）改漏一处——`src/progress-tab.ts` 纯折叠函数仍是旧映射（非 rescue 一律 cancel-run），host 记为 `observe` 的 finding 会被画成"已触发整轮取消"。已修（与 bundle 同规则三态）+ 回归测试（progress-tab 1 例 + connector 1 例）。红验证：只藏 src 时新用例 1 failed / 34 skipped。
 - **发了什么**：发版提交 `c93b2bf` 已推，annotated tag `v0.13.9` 已推（本地旧 tag 先删后建，远端当时无此 tag）；远端 CI `45001378298` success、Release `45001393005` success 并已发布（asset `dsh-grok-workflow-0.13.9.tgz`）。本地 `npm run ci` exit 0：78 files / 1484 tests PASS。
 - **没做的**：`web` profile 热加载安装——本会话沙箱只读（`bwrap --ro-bind`，`plugin add` 报 EROFS），装机仍是 `v0.13.8`。需用户在宿主执行：`dsh plugin --profile web add github:free6589/dsh-grok-workflow#v0.13.9`（dsh 不重启，原地更新，运行中实例下次 profile boot 生效）。
+
+## 2026-11-22 — `v0.13.9` 装机成功 + 双子代理实测（`CONFIRMED`）
+
+- **From:** 本会话（lead）· **To:** 下一轮接手者
+- **安装失败根因（`CONFIRMED`）**：用户 `plugin add` 报 `ERR_PNPM_GIT_FETCHER_IO … Disk quota exceeded (os error 122)`。子代理 agent-2 只读诊断 + 我亲测：`/tmp` 的 `usrquota` 配额是真凶——`git init` 写几 KB 都 `EDQUOT`，而 `/home` 写 500MB 一次成功；`btrfs quota` 未启用，`/home` 余 13G。`allowBuilds` 提示是 dsh 无条件打印的通用话术（`plugin.ts:104`，spec 像 git 就打印），本插件无 prepare/postinstall、tag 树自带 `lib/`，**不用加**（加了反而放行脚本执行、扩大信任面）。
+- **腾空间（用户已批 1234 全删）**：`/tmp/sup37/sup37b/sv-isolate/v32/p6verify/a2p-deploy/alpine ISO/lobster-verify-target/gateway-backup-3065/opencode` 约 4G；`/tmp` 81%→50%；`git fetch --depth 1 origin tag v0.13.9` 恢复 exit 0。
+- **装机（`CONFIRMED`，dsh 未重启）**：`dsh plugin --profile web add github:free6589/dsh-grok-workflow#v0.13.9` exit 0（10.5s）；装机 `0.13.9`（lock tarball `c93b2bf`），`lib/` 与仓库逐字节一致（含 observe 三态 `progress-tab.js:259`）。
+- **双审**：agent-4 三侧一致干净（详见 D-101；低严重遗留：`run.ts` rescue executor `throw` 与注释不符，后轮动）；agent-3 隔离 profile 实测 PASS（Loader 工具+prompt、settings 投影、gate off/on、web boot 无 pending、observe fold 定向）。真机一句话端到端 NOT_RUN（无模型凭证）；`curl` 直调 settings describe NOT_RUN（实例走 WS mux+cookie，非真实通道）。
+- **收尾**：scratch profile（gw-isolated-verify/gw-web-verify）+ `.tmp/dsh-gw-verify` + `/tmp` 探针目录已删；`git status` 仅剩既有 untracked（`.rsi/evidence/*`、`sg-weather.html` 等，并发轮产物，本轮未动）。本地无源码改动、无需发版 `v0.13.10`。

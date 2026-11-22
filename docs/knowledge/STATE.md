@@ -1955,3 +1955,17 @@ Last updated: 2026-11-22 16:10 +08:00（**已发版 `0.13.9`：Guardian 非破�
 发版提交 `c93b2bf`（8 文件：src+2 测试+CHANGELOG 0.13.9 并入 observe 条+`lib/` 重建）已推；
 annotated tag `v0.13.9` 已推；远端 CI `45001378298` success、Release `45001393005` success 并已发布。
 本地 `npm run ci` exit 0（78 文件 / 1484 测试）。`web` profile 仍是 `v0.13.8`（沙箱只读装不上，待宿主执行安装命令）。）
+
+Last updated: 2026-11-22 17:00 +08:00（**`v0.13.9` 已装进 `web` profile 并实测，`CONFIRMED`** —
+安装失败根因是 `/tmp` 的 `usrquota` 配额（git 连 `init` 写几 KB 都 `EDQUOT`，同盘 `/home` 写 500MB 一次成功），
+不是 `/home` 空间不足；`allowBuilds` 提示是 dsh 无条件打印的通用话术，本插件无构建脚本、tag 树自带 `lib/`，
+**不用加**。按用户批准删 `/tmp` 旧验证目录+ISO（sup37/sup37b/sv-isolate/v32/p6verify/a2p-deploy/
+alpine ISO/lobster-verify-target/gateway-backup-3065/opencode，约 4G），`/tmp` 81%→50%，
+git fetch 恢复。`dsh plugin --profile web add github:free6589/dsh-grok-workflow#v0.13.9` exit 0：
+装机 `0.13.9`（lock tarball `c93b2bf`），`lib/` 与仓库逐字节一致。dsh 未重启，运行中实例下次 boot 生效。
+子代理双审：agent-4 三侧一致性干净（observe/rescue/cancel-run 对齐，历史 cancel-run 显示正确，
+`cancelled===true` 均为历史兼容展示分支；附带低严重观察：`src/run.ts` rescue executor `catch` 后
+`throw` 与"Never throws"注释不符，v0.13.8 即有，后轮再动）；
+agent-3 隔离 profile 实测（Loader 注册工具+prompt、settings 投影 14 字段、gate off放行/on接管、
+web 模板 boot 无 pending、observe fold 定向 PASS）。本地无源码改动、无需发版。scratch profile 与
+`.tmp/dsh-gw-verify` 已清。详情见 D-101。）
