@@ -60,18 +60,15 @@
  *
  * Handling action and its upper bound: when either signal fires the guardian
  * marks the child as already nudged and records one bounded finding. If a
- * child session and rescue executor are available, it interrupts only that
- * child and sends recovery guidance; otherwise it records an observation.
- * It never calls `run.cancel()`. The one-shot nudge prevents repeated
- * interruptions, while the workflow's own deadline remains the outer safety
+ * child session and rescue executor are available, it queues one recovery
+ * message for that child; otherwise it records an observation. It never
+ * interrupts the child or calls `run.cancel()`. The one-shot nudge prevents
+ * repeated messages, while the workflow's own deadline remains the outer safety
  * bound. The guardian never retries, re-plans, or re-drives tasks.
  *
- * Findings are evidence, not verdicts: `finish()` folds them into the
- * terminal report's `errors` list as `{ phase: 'Guardian', category:
- * 'cancelled' }` entries when the run's own report carries none for the
- * timed-out child, so a reader can tell "the work did not finish because a
- * child stalled" apart from "the work was judged and failed". Nothing here
- * changes `status` computation: a run with no verified task is still
+ * Findings are evidence, not task failures. They are kept in the progress
+ * journal and Guardian panel, never inserted into the report's `errors` list.
+ * Nothing here changes `status` computation: a run with no verified task is still
  * `failed`, a run with kept work is still `partial`/`failed` by the existing
  * rules in `run.ts`.
  */
@@ -221,8 +218,8 @@ export interface GuardianOptions {
    */
   sessionHeartbeat?: SessionHeartbeatReader
   /**
-   * Rescue executor (C3): interrupt the child and deliver the adjudicator's
-   * guidance. Called once per `guardian rescue` log line the script emits;
+   * Rescue executor (C3): queue recovery guidance for the child without
+   * interrupting its active turn. Called once per `guardian rescue` log line;
    * unlimited by design (per operator decision) — each call appends one
    * `rescue` finding, so the spend is auditable in the terminal report.
    * A callback that throws is contained as a warning, never as a failed run.
@@ -630,10 +627,9 @@ export function createRunGuardian(options: GuardianOptions): RunGuardian {
 
   /**
    * C3 rescue: the script's adjudicator judged a stalled child
-   * interrupt-recoverable and broadcast `guardian rescue seq=N ...
-   * guidance=...` on the log channel. The host interrupts that child and
-   * delivers the guidance; the child's context is preserved, so it wakes
-   * with new instructions instead of being killed and retried. Unlimited by
+   * recoverable and broadcast `guardian rescue seq=N ... guidance=...`.
+   * The host queues the guidance in that child's session without interrupting
+   * the active turn or killing its running command. Unlimited by
    * operator decision — each rescue appends one finding, so the spend is
    * auditable. Never throws: an unknown seq, a missing executor, or a
    * throwing executor costs a warning at most, never the run.
@@ -887,7 +883,7 @@ export interface RunGuardian {
   runHeartbeat(info: unknown, at?: number): void
   /**
    * Observe one `guardian rescue` log line from the script. Parses the seq
-   * and guidance, interrupts that child and delivers the guidance through
+   * and guidance, queues the guidance for that child without interrupting it
    * the injected executor. Unknown seq, settled child, missing guidance or
    * executor, and throwing executor are all contained — never the run.
    * Lines arriving before adoption are buffered and replayed on adopt.
