@@ -16,9 +16,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: ['22', '24']
+        node: ['22']
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
@@ -39,7 +41,7 @@ jobs:
           git commit -m "chore(build): sync exact TypeScript compiler output"
           git push origin "HEAD:${GITHUB_HEAD_REF}"
       - name: Upload generated lib for exact CI sync
-        if: always()
+        if: matrix.node == '22'
         uses: actions/upload-artifact@v4
         with:
           name: generated-lib-debug
