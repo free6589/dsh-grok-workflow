@@ -1,3 +1,17 @@
+## 2026-11-22 — 已发版 `0.13.11`：守卫判停预算永远跟随单次调用预算（`CONFIRMED`）
+
+- **From:** 本会话（lead）· **To:** 下一轮接手者
+- **发了什么**：`52d7522` 已推，annotated tag `v0.13.11` 已推；远端 CI `45017440836`
+  success、Release `45017443293` success 并已发布。本地 `npm test` 80/1526 PASS，
+  `verify:lib` byte-identical；typecheck 唯一报错是并发轮未跟踪的 nyc `.tsx`
+ （`--jsx` 未开，本轮无关）；lint 0 errors。
+- **内容**：见 D-104（`run.ts` 去三元永远传 `childTimeoutMs`、hint 中英各一句、+1 回归测试；
+  真机 `DSH_HOME` 副本 + 真实模型跑通，`guardian-start.budgetMs=7200000`，`guardian-end`
+  无取消零处置）。
+- **没做的**：并发轮的未跟踪文件未动（`src/weather/`、`test/nyc*.spec.ts` 等不属本轮，
+  它们让 `npm run ci` 的 typecheck 整步变红——下次发版前要么它们先合入修好 `--jsx`，
+  要么发版流程继续用"分段门禁"）；120 分钟跑满 NOT_RUN。
+
 ## 2026-11-22 — D-104 Guardian 预算跟随 120 分钟 + 真机实测通过（`CONFIRMED`，未发版、未提交）
 
 - **From:** 本会话（lead）· **To:** 下一轮接手者

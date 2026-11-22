@@ -1,7 +1,7 @@
-Last updated: 2026-11-22 19:10 +08:00（**D-104 Guardian 预算跟随 120 分钟 + 真机实测通过 `CONFIRMED` 未发版** —
-去掉 `run.ts` 三元永远传 `config.childTimeoutMs`；hint 中英各加一句；+1 回归测试。
-`npm run ci` exit 0（80 文件 / 1526 测试）。真机：`DSH_HOME` 副本 + 真实模型跑通，
-`guardian-start.budgetMs=7200000`，`guardian-end` 无取消零处置。未提交未发版。）
+Last updated: 2026-11-22 19:30 +08:00（**已发版 `0.13.11`：守卫判停预算永远跟随单次调用预算，`CONFIRMED`** —
+发版提交 `52d7522` + tag `v0.13.11` 已推；远端 CI `45017440836` success、Release `45017443293`
+success 并已发布。本地门禁：typecheck（除并发轮 nyc/--jsx 单错外干净）、lint 0 errors、
+`npm test` 80 文件 / 1526 测试 PASS、`verify:lib` byte-identical。）
 用户提「主会话当沟通渠道 + 规划助手跑中重规划」。实查：会话没被占死（team 档后台跑，
 `src/gate.ts answerTeamInteractive()`），真问题是跑中新消息走整轮 cancel + 窄重启
 （`gate.ts` Redirect-on-new-message 段，`CONFIRMED`）。地基四条（`CONFIRMED`，证据在
