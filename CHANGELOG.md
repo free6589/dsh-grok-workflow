@@ -3,6 +3,16 @@
 Notable user-facing changes are recorded here in English and Simplified Chinese.
 用户可见的功能和修复会在这里以英文和简体中文记录。
 
+## [Unreleased]
+
+## [0.13.14] - 2026-11-22
+
+### Fixed / 修复
+
+- **Sessions no longer corrupt on restart when the plugin is installed / 装了插件的会话重启不再损坏** —
+  Any session the plugin touched used to fail to reopen after a DSH restart with `stored session … is corrupt: system/message requires a protected first surface head`. The gate wrote the user's message to the surface before the host's own system head on fresh sessions, so the stored log was poisoned from the first turn and every later reopen threw. The gate now publishes only onto an established surface; on a headless first turn the message rides the normal enter path and lands after the head, exactly once. Cancelled turns follow the same rule, so a cancelled first turn can no longer poison a later turn either. Sessions already corrupted by the old build cannot be repaired by this update; new sessions stay clean.
+  / 凡是插件碰过的会话，DSH 重启后都打不开（`stored session … is corrupt: system/message requires a protected first surface head`）。根因是插件在新会话首轮抢在宿主系统头之前先写了用户消息，存档从第一轮就被写坏，之后每次重开必炸。现在插件只在已立稳的 surface 上预发布；无头首轮的消息走正常进场流程、落在系统头之后，且只出现一次。取消走同一规则，首轮取消也不会再污染后续轮次。旧版本已写坏的会话本版修不了；新会话不再写坏。
+
 ## [0.13.13] - 2026-11-22
 
 ### Fixed / 修复
