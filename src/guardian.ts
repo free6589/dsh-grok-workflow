@@ -23,12 +23,10 @@
  *   across runs. The one periodic check is a single `setInterval`, `unref()`ed
  *   so it never keeps the process alive, armed only between `adopt()` and
  *   `finish()`/`dispose()`, exactly like the checkpoint recorder's timer.
- * - Bounded by construction: per-child timeout and stall limits are inherited
- *   from the run's own `config.timeoutMs` (a fraction of the run deadline, so
- *   the guardian always fires before the deadline does), retries are the
- *   engine's own per-task retries (the guardian never retries anything
- *   itself — it only cancels, and the script's bounded retry loop decides what
- *   runs again), and no loop in this module is unbounded.
+ * - Bounded by construction: per-child stall detection is inherited from the
+ *   run deadline. A stalled child receives one rescue nudge; the guardian
+ *   never cancels the parent run. The workflow's own deadline remains the
+ *   final outer bound, and no loop in this module is unbounded.
  * - No ownerless background work: `dispose()` clears the timer, removes the
  *   event listeners, and empties the registry. `disposeActiveState` (plugin
  *   unload) reaches every live guardian through the same instance registry
@@ -61,17 +59,12 @@
  *   what they report, not in when they fire.
  *
  * Handling action and its upper bound: when either signal fires the guardian
- * marks the child `timed-out`, records one bounded finding
- * (`{ seq, label, action: 'cancel-run', reason }`), and calls `cancel()` on
- * the run **once per guardian** with the reason
- * `workflow guardian: child <label> (seq <n>) made no progress within <ms> ms`.
- * Cancelling the run — not the child — is the only action the host side owns:
- * there is no per-child cancel handle on `WorkflowRun`, and reaching into the
- * engine to kill one child would be a second scheduler. The bound is therefore
- * structural: at most one cancel per run, further firings only append findings
- * (bounded at `GUARDIAN_LIMITS.maxFindings`). The script's own bounded retry
- * loop then decides per task whether the attempt is retried; the guardian
- * never retries, never re-plans, never re-drives.
+ * marks the child as already nudged and records one bounded finding. If a
+ * child session and rescue executor are available, it interrupts only that
+ * child and sends recovery guidance; otherwise it records an observation.
+ * It never calls `run.cancel()`. The one-shot nudge prevents repeated
+ * interruptions, while the workflow's own deadline remains the outer safety
+ * bound. The guardian never retries, re-plans, or re-drives tasks.
  *
  * Findings are evidence, not verdicts: `finish()` folds them into the
  * terminal report's `errors` list as `{ phase: 'Guardian', category:
@@ -119,8 +112,8 @@ export interface GuardianFinding {
   label: string
   /** Which liveness signal fired. */
   signal: GuardianSignal
-  /** What the guardian did (always `cancel-run` — the only host-owned kill; `rescue` steers instead). */
-  action: 'cancel-run' | 'rescue'
+  /** What the guardian did: steer the child, or record an observation if it cannot. */
+  action: 'observe' | 'rescue'
   /** Human-readable reason, bounded and redacted. */
   reason: string
   /** Epoch milliseconds at which the signal fired. */
@@ -131,10 +124,8 @@ export interface GuardianFinding {
 export interface GuardianSettlement {
   /** Findings recorded over the run's lifetime (possibly empty). */
   findings: GuardianFinding[]
-  /** True when this guardian cancelled its run. */
+  /** Always false: liveness detection never cancels the workflow. */
   cancelled: boolean
-  /** The cancel reason used, when `cancelled` is true. */
-  cancelReason?: string
 }
 
 /** The run handle the guardian may cancel (structural subset of `WorkflowRun`). */
@@ -355,8 +346,6 @@ export function createRunGuardian(options: GuardianOptions): RunGuardian {
   let run: GuardianRunHandle | undefined
   let timer: unknown
   let disposed = false
-  let cancelFired = false
-  let cancelReason: string | undefined
   let stopReason: WorkflowStopReason | undefined
   // B1: the freshest run-level narration (workflow/phase or workflow/log).
   // A run that narrates is a run that progresses, even when one child is
@@ -394,19 +383,6 @@ export function createRunGuardian(options: GuardianOptions): RunGuardian {
     }
   }
 
-  const cancelOnce = (reason: string): void => {
-    if (cancelFired) return
-    cancelFired = true
-    cancelReason = reason
-    const live = run
-    if (live === undefined) return
-    try {
-      live.cancel(reason)
-    } catch (error) {
-      logger.warn(`workflow guardian could not cancel run ${runId}: ${findingText(error instanceof Error ? error.message : String(error), GUARDIAN_LIMITS.reasonChars)}`)
-    }
-  }
-
   const fireFor = (child: WatchedChild, signal: GuardianSignal, at: number, evidence?: string): void => {
     if (child.timedOut) return
     child.timedOut = true
@@ -414,15 +390,30 @@ export function createRunGuardian(options: GuardianOptions): RunGuardian {
     const reason = evidence === undefined || evidence === ''
       ? `workflow guardian: child ${who} made no progress within ${budgetMs} ms (${signal})`
       : `workflow guardian: child ${who} made no progress within ${budgetMs} ms (${signal}); last life: ${evidence}`
+    const canRescue = child.childId !== '' && options.rescue !== undefined
+    const guidance = [
+      'You appear to have stopped making observable progress.',
+      'Do not terminate the workflow or abandon the task.',
+      'First inspect the current command/tool state and determine whether it is still running, waiting for input, or genuinely stuck.',
+      'If it is waiting, continue or resolve that wait. If it failed, recover from the last known-good state.',
+      'Preserve completed work, save a concise checkpoint, then continue toward the original acceptance criteria.',
+      'If you cannot finish, return a precise partial result and the remaining blocker instead of hanging.',
+    ].join(' ')
     appendFinding({
       seq: child.seq,
       label: child.label.slice(0, GUARDIAN_LIMITS.labelChars),
       signal,
-      action: 'cancel-run',
+      action: canRescue ? 'rescue' : 'observe',
       reason: findingText(reason, GUARDIAN_LIMITS.reasonChars),
       atMs: at,
     })
-    cancelOnce(reason)
+    if (canRescue) {
+      try {
+        options.rescue?.(child.childId, guidance)
+      } catch (error) {
+        logger.warn(`workflow guardian rescue failed for child seq ${child.seq}: ${findingText(error instanceof Error ? error.message : String(error), GUARDIAN_LIMITS.reasonChars)}`)
+      }
+    }
   }
 
   /** One periodic sweep: every open child older than the budget fires. */
@@ -716,7 +707,7 @@ export function createRunGuardian(options: GuardianOptions): RunGuardian {
   const guardian: RunGuardian = {
     get runId() { return runId },
     get findings() { return [...findings] },
-    get cancelled() { return cancelFired },
+    get cancelled() { return false },
     adopt(handle: GuardianRunHandle): void {
       if (disposed) return
       if (run !== undefined) return
@@ -810,7 +801,7 @@ export function createRunGuardian(options: GuardianOptions): RunGuardian {
       disarmTimer()
       const settlement: GuardianSettlement = {
         findings: [...findings],
-        cancelled: cancelFired,
+        cancelled: false,
         ...cancelReason === undefined ? {} : { cancelReason },
       }
       release()
@@ -834,7 +825,7 @@ export function createRunGuardian(options: GuardianOptions): RunGuardian {
         open,
         settled,
         findings: findings.length,
-        cancelled: cancelFired,
+        cancelled: false,
         timerArmed: timer !== undefined,
         listeners: listeners.length,
         disposed,
@@ -878,7 +869,7 @@ export interface RunGuardian {
   readonly runId: string
   /** Findings recorded so far (a copy). */
   readonly findings: GuardianFinding[]
-  /** True once this guardian cancelled its run. */
+  /** Always false: liveness detection never cancels the workflow. */
   readonly cancelled: boolean
   /** Adopt the live run handle; arms the single periodic check. Idempotent. */
   adopt(handle: GuardianRunHandle): void
