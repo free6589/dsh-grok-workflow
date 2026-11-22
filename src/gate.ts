@@ -1224,12 +1224,38 @@ export function installGate(deps: GateDeps): boolean {
    * source, same text and attachments — because a re-created "looks the same"
    * message would lose its identity and could be routed a second time.
    *
+   * Surface-head rule: the session's first surface event must be the host's
+   * `system/message` (DSH `relationships.ts`: any `system/message` that arrives
+   * after a non-empty surface without an established protected head throws
+   * `SessionFormatError`, and the stored log can never be reopened afterwards
+   * — this is the `stored session … is corrupt: system/message requires a
+   * protected first surface head` failure). The loop writes that head inside
+   * `step()` — strictly *after* this pre-step listener runs — so appending a
+   * claimed batch while the surface is still empty lands `user/message` at
+   * surface position 0 on a fresh session and corrupts it permanently. Once
+   * the head exists (any later step — the surface fold is monotonic and
+   * survives `turn/end`), appending ahead of the next `system/message` is
+   * safe: that message either appends to a protected surface or rewrites node
+   * 0 through the exact `[head, head]` replace the validator allows. The gate
+   * therefore publishes only when the session either already surfaces at
+   * least one node (`session.surface.nodes`, the live view the host maintains
+   * on the session in DSH ≥ 0.2.1) or is past the first turn (where turn 1 must
+   * have committed a head through the loop); otherwise it leaves the write to
+   * the loop's own commit of `enter.messages` (the `surfaced=false` decision
+   * path carries the batch, so no words are lost — only the mid-run early
+   * echo is deferred to the entered step).
+   *
    * @returns true when the message is in the session surface.
    */
-  const commitClaimed = (agent: Agent, claimed: readonly UserMessage[]): boolean => {
+  const commitClaimed = (agent: Agent, claimed: readonly UserMessage[], turn?: number): boolean => {
     const session = sessionOf(agent)
     if (session === undefined || claimed.length === 0) return false
     try {
+      // No surface yet on turn 1 means the host head is not established (fresh
+      // or restored session before its first step): writing now would poison
+      // position 0 and corrupt the stored log. Returning false routes the batch
+      // through `enter.messages`, which the loop commits after the head.
+      if (!surfaceHasHead(session, turn)) return false
       for (const message of claimed) session.append('user/message', message, { surfaceOp: 'append' })
       return true
     } catch (error) {
@@ -1238,6 +1264,31 @@ export function installGate(deps: GateDeps): boolean {
       logger.warn(`gate could not keep the user message in the transcript: ${redactError(error)}`)
       return false
     }
+  }
+
+  /**
+   * True when publishing a claimed batch cannot take surface position 0.
+   *
+   * Read-only: reads the live surface view the host maintains on the session
+   * (`session.surface.nodes`, present in DSH ≥ 0.2.1). A test or runtime double
+   * without that accessor falls through to the turn rule: only turn 1 on an
+   * empty surface suppresses the publish, which is exactly the corrupting case
+   * (turn 2+ implies turn 1 already committed the head through the loop, and
+   * the surface fold is monotonic across `turn/end`). Any read failure is a
+   * closed gate: `false` keeps the batch on the `enter.messages` path, which
+   * the loop commits safely.
+   *
+   * @param session - session whose surface is inspected.
+   * @param turn - the claiming turn (payload.turn); turn 1 may be the head.
+   * @returns true when an append cannot poison position 0.
+   */
+  function surfaceHasHead(session: Session, turn?: number): boolean {
+    try {
+      if (session.surface.nodes.length > 0) return true
+    } catch {
+      // No live surface on this double: fall through to the turn rule below.
+    }
+    return typeof turn === 'number' && turn > 1
   }
 
   /**
@@ -1264,7 +1315,7 @@ export function installGate(deps: GateDeps): boolean {
     text: string,
     alreadySurfaced = false,
   ): boolean => {
-    const kept = alreadySurfaced ? true : commitClaimed(agent, payload.messages)
+    const kept = alreadySurfaced ? true : commitClaimed(agent, payload.messages, payload.turn)
     const session = sessionOf(agent)
     if (session === undefined) return kept
     const options = agent.options ?? {}
@@ -1756,7 +1807,7 @@ export function installGate(deps: GateDeps): boolean {
     // The history snapshot is taken first, so the published message is not also
     // read back as prior conversation.
     const history = collectHistory(sessionOf(agent), { turns: FIXED_HISTORY_TURNS, chars: FIXED_HISTORY_CHARS })
-    const surfaced = commitClaimed(agent, payload.messages)
+    const surfaced = commitClaimed(agent, payload.messages, payload.turn)
     // The main-session channel (src/channel.ts, `replan` on): one decision point,
     // placed before either admission, because a message that arrives while this
     // session's run is still working is not a new request whatever its own shape

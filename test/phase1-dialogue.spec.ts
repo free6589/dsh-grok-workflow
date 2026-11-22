@@ -11,7 +11,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import { createSystemMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import { Session, pluginRecordOf } from '@deepseek-ai/dsh-session'
 import { apply } from '../src/index.js'
 import { REPORT_BEGIN, REPORT_END } from '../src/answer.js'
@@ -169,6 +169,16 @@ function payload(
   return { agent, messages, turn: 1, step: 1, signal }
 }
 
+function payloadAt(
+  agent: FakeAgent,
+  messages: UserMessage[],
+  turn: number,
+  step: number,
+  signal: AbortSignal = new AbortController().signal,
+): Record<string, unknown> {
+  return { agent, messages, turn, step, signal }
+}
+
 /** The default waterfall decision: the claimed batch plus runtime context. */
 function nextWith(messages: UserMessage[]): () => Promise<unknown> {
   return async () => ({ kind: 'enter', messages })
@@ -179,6 +189,46 @@ function answerOf(decision: Decision): string {
   const messages = decision.messages ?? []
   expect(messages.length).toBeGreaterThan(0)
   return textOf(messages[messages.length - 1]!)
+}
+
+function firstTurnMessage(text: string): UserMessage {
+  return userMessage(text)
+}
+
+/**
+ * Reopen the session the way a DSH restart replays the stored log.
+ *
+ * The host validator (`dsh-session-format-v3-to-v4` `foldSurface`) requires
+ * the first surface event to be the system head — a `user/message` at surface
+ * position 0 throws `system/message requires a protected first surface head`
+ * on every reopen and bricks the session. Replaying that fold here (same
+ * rule, same order) turns a regression into a red test instead of a corrupt
+ * user session.
+ */
+function assertReopenable(live: Session): void {
+  const surface: number[] = []
+  let protectedHead: number | undefined
+  for (const event of live.ownEvents()) {
+    const record = event as { type?: string; seq?: number; surfaceOp?: unknown }
+    if (
+      record.type !== 'system/message'
+      && record.type !== 'user/message'
+      && record.type !== 'developer/message'
+      && record.type !== 'assistant/message'
+      && record.type !== 'tool/result'
+    ) continue
+    if (record.type === 'system/message' && surface.length > 0 && protectedHead === undefined) {
+      throw new Error('system/message requires a protected first surface head')
+    }
+    if (record.surfaceOp === 'append') {
+      if (record.type === 'system/message' && surface.length === 0 && typeof record.seq === 'number') {
+        protectedHead = record.seq
+      }
+      if (typeof record.seq === 'number') surface.push(record.seq)
+    }
+  }
+  const reopened = Session.create('sess-head-reopened' as never, live.snapshotEvents())
+  expect(reopened.ownEvents().length).toBe(live.ownEvents().length)
 }
 
 function textOf(message: UserMessage): string {
@@ -216,12 +266,25 @@ interface Decision { kind: string; messages?: UserMessage[] }
 /**
  * Apply {@link Decision} the way `AgentLoop.step()` does.
  *
- * `dsh-agent-loop/lib/index.js` `step()` appends every `decision.messages` entry whose
- * source is not `runtime-context` as a `user/message` session event, then appends the
- * projected runtime context. Replaying that here is what makes a transcript
- * assertion meaningful: the decision is the only writer.
+ * `dsh-agent-loop/lib/index.js` `step()` first appends `step/start` and the
+ * projected `system/message` head, then every `decision.messages` entry whose
+ * source is not `runtime-context` as a `user/message` session event. Replaying
+ * that order here is what makes a transcript assertion meaningful — and what
+ * keeps the replayed log reopenable: the host validator requires the first
+ * surface event to be the system head (`system/message requires a protected
+ * first surface head`), so the head is committed before the batch.
  */
-function commit(session: Session, decision: Decision): void {
+function commitHead(session: Session, turn = 1, step = 1): void {
+  session.append('step/start', { turn, step })
+  session.append(
+    'system/message',
+    { turn, step, message: createSystemMessage('test head') },
+    { surfaceOp: 'append' },
+  )
+}
+
+function commit(session: Session, decision: Decision, turn = 1, step = 1): void {
+  commitHead(session, turn, step)
   for (const message of decision.messages ?? []) {
     const source = (message.source as { kind?: string } | undefined)?.kind
     if (source === 'runtime-context') continue
@@ -1141,5 +1204,77 @@ describe('B18: the hybrid classifier states its own reason', () => {
     // on its own, and no classifier call starts.
     expect(answer).toContain('确认档')
     expect(ctx.engine.startCalls).toHaveLength(0)
+  })
+})
+
+/* --------------------------------- surface-head regression (corrupt log) -- */
+
+/**
+ * Session-corruption regression: `stored session … is corrupt:
+ * system/message requires a protected first surface head`.
+ *
+ * Root cause (DSH `dsh-session-format-v3-to-v4/src/relationships.ts`
+ * `foldSurface`): the first surface event of a stored log must be the host's
+ * `system/message` head. The gate used to append the claimed `user/message`
+ * from `agent/pre-step` — which the loop dispatches *before* `step/start` and
+ * the system projection — so on a fresh session the plugin's row landed at
+ * surface position 0 and the later system head threw on every reopen.
+ *
+ * The gate now publishes only onto an established surface (turn 2+, or a
+ * session that already surfaces a node); on a headless turn-1 session the
+ * batch stays in `enter.messages` for the loop to commit after the head.
+ * These cases pin that contract against the real host validator
+ * (`assertReleasedV4Relationships`), not just the plugin's own fold.
+ */
+describe('surface head: the plugin never takes position 0', () => {
+  it('leaves the claimed batch to enter.messages on a headless turn-1 session', async () => {
+    const ctx = new FakeContext()
+    ctx.engine.autoRun = true
+    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
+    const live = session('sess-head-turn1')
+    const agent = new FakeAgent(live)
+    const claimed = [userMessage('首轮消息不应抢占 surface 头')]
+
+    const decision = await ctx.preStep()(payload(agent, claimed), nextWith(claimed)) as Decision
+    // Nothing published: the surface is still empty (no head to preserve yet).
+    expect(live.ownEvents().filter(event => (event as { type?: string }).type === 'user/message')).toHaveLength(0)
+    // The batch rides the decision instead, so no words are lost …
+    expect((decision.messages ?? []).map(textOf)).toContain('首轮消息不应抢占 surface 头')
+    commit(live, decision)
+    // … and the replayed log opens with the system head, so it reopens cleanly.
+    assertReopenable(live)
+  })
+
+  it('publishes mid-run on an established surface (turn 2)', async () => {
+    const ctx = new FakeContext()
+    ctx.engine.autoRun = true
+    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
+    const live = session('sess-head-turn2')
+    const agent = new FakeAgent(live)
+    const claimed = [userMessage('次轮消息仍可提前可见')]
+    commitHead(live, 1, 1)
+    live.append('user/message', firstTurnMessage('首轮已落盘'), { surfaceOp: 'append' })
+
+    const decision = await ctx.preStep()(payloadAt(agent, claimed, 2, 1), nextWith(claimed)) as Decision
+    // Head established: the early echo is back …
+    expect(live.ownEvents().filter(event => (event as { type?: string }).type === 'user/message')).toHaveLength(1)
+    // … exactly once: the decision must not carry it again.
+    const carried = (decision.messages ?? []).map(textOf)
+    expect(carried.filter(text => text === '次轮消息仍可提前可见')).toHaveLength(0)
+    assertReopenable(live)
+  })
+
+  it('a rejected turn-1 batch degrades to enter.messages, never to a headless append', async () => {
+    const ctx = new FakeContext()
+    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
+    const live = session('sess-head-turn1-reject')
+    const agent = new FakeAgent(live)
+    const controller = new AbortController()
+    controller.abort()
+
+    const decision = await ctx.preStep()(payload(agent, [userMessage('取消也不应写坏头部')], controller.signal), nextWith([])) as Decision
+    expect(decision.kind).toBe('reject')
+    expect(live.ownEvents().filter(event => (event as { type?: string }).type === 'user/message')).toHaveLength(0)
+    assertReopenable(live)
   })
 })
