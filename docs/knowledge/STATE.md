@@ -1,3 +1,15 @@
+Last updated: 2026-11-22 10:45 +08:00（**分支清理：删 26 本地 + 26 远端已合并分支，`CONFIRMED`** —
+本地 40→10、远端 35→4。删的都是 `merge-base --is-ancestor` 确认已进 main 的（26 个本地 `branch -d`
+全过、无需 `-D`；远端 24 个 MERGED + 2 个复核后确认已合的）。剩下本地 9 + 远端独有 2：
+`rsi/round-4..8,10,11`（7 个真未合：round-4 Authorization 全 scheme 脱敏等安全修复都不在 main 里，
+删了丢工作——留着）、`feat/audit-layer` + `feat/user-delivery`（本地：report-audit.ts /
+22 文件 user-delivery 层，main 里没有——留着）、远端独有 `cloud/harden-issue-watcher`（11 提交）
++ `fix/token-meter`（4 提交，main 有等价 Round 22 但提交不同——留着）。另删 4 个已超期本地
+（`release/0.5.1` PR #42 后 2 提交被 0.6.0 取代、`wip/grok-switch` 被 rebased 版取代、
+`fix/fallback-shards` 本地是旧镜像、`feat/layered-synthesis` 已随 0.8.0 发版）与远端
+`feat/user-delivery`/`release/0.5.1` 镜像。删除记录 `.rsi/evidence/branch-cleanup-2026-11-22/DELETED.shas`，
+未提交。open PR 0 个。）
+
 Last updated: 2026-11-22 10:15 +08:00（**已发版 `0.13.2`：guardian 超时误杀修复 + 固定左栏 + 孤儿产物清理，`CONFIRMED`** —
 `b0411c8` 已推，tag `v0.13.2` 已推；远端 CI `44974715432` success、Release `44974726161` success
 并已发布。本地 `npm run ci` exit 0：78 文件 / 1454 测试 PASS。）

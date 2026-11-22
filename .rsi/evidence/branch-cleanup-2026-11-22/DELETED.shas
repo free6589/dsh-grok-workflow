@@ -1,0 +1,62 @@
+# 2026-11-22 branch cleanup: deleted branch tips (recoverable via GitHub reflog/remote cache or local git objects until gc)
+# Format: <branch> <sha> <status> <reason>
+fix-compact-orphan-receipt 5fb5da07fad75693973abcafe073604a95e812 MERGED-LOCAL+REMOTE deleted: merged via PR, in main
+lib-repair 8c8e367 MERGED-LOCAL deleted: in main
+rsi/round-9 17e3a12 MERGED-LOCAL deleted: zero unique commits, in main
+release/0.8.0 375c198 MERGED-LOCAL+REMOTE deleted: PR #45 merged
+feat/carryover-structured-memory 84e6894 MERGED-LOCAL deleted: in main
+release/0.6.0 146dce7 MERGED-LOCAL+REMOTE deleted: PR #43 merged
+feat/fast-context-v051 45d721a MERGED-LOCAL+REMOTE deleted: PR #41 merged
+release/0.5.0 6a9aa3e MERGED-LOCAL+REMOTE deleted: PR #40 merged
+feat/context-carryover-archive-recall a52f130 MERGED-LOCAL+REMOTE deleted: PR #39 merged
+release/0.4.0 472d043 MERGED-LOCAL+REMOTE deleted: PR #38 merged
+feat/triage-history-hybrid e89daf9 MERGED-LOCAL+REMOTE deleted: PR #37 merged
+release/0.3.0 f8cb09e MERGED-LOCAL+REMOTE deleted: PR #36 merged
+release/0.2.7 0e8a7e7 MERGED-LOCAL+REMOTE deleted: PR #33 merged
+feat/route-concurrency 164022a MERGED-LOCAL+REMOTE deleted: PR #32 merged
+release/0.2.6 97a4c53 MERGED-LOCAL+REMOTE deleted: PR #31 merged
+feat/settings-polish 9b3be03 MERGED-LOCAL+REMOTE deleted: PR #30 merged
+feat/settings-novice-ui a2d255f MERGED-LOCAL+REMOTE deleted: PR #29 merged
+docs/matrix-024-memory 31ab42f MERGED-LOCAL+REMOTE deleted: in main
+docs/gui-verify-memory 30bdd55 MERGED-LOCAL+REMOTE deleted: in main
+wip/grok-switch-rebased d1acf60 MERGED-LOCAL+REMOTE deleted: PR #27 merged
+fix/phase1-dialogue-reliability 0d6b257 MERGED-LOCAL+REMOTE deleted: in main
+fix/workflow-objective-limit-32000 b00eb78 MERGED-LOCAL+REMOTE deleted: PR #25 merged, in main
+feat/phase2-task-progress-panel 93a31c2 MERGED-LOCAL deleted: in main
+fix/verify-chain 177d234 MERGED-LOCAL+REMOTE deleted: PR #20 merged, in main
+fix/redact-hardening 3debda3 MERGED-LOCAL deleted: in main
+chore/release-and-versioning MERGED-REMOTE deleted: in main
+cloud/fix-credential-redaction-formats MERGED-REMOTE deleted: in main
+docs/beginner-friendly-bilingual-homepage MERGED-REMOTE deleted: in main
+feat/synthesis-fallback MERGED-REMOTE deleted: PR #35 merged
+fix/fallback-shards 8197261+6e902e0 MERGED-REMOTE deleted: PR #26 merged (local was stale mirror)
+fix/p1-lifecycle-cancelled-results-deadline MERGED-REMOTE deleted: PR #44 merged
+fix/phase1-dialogue-reliability MERGED-REMOTE deleted: in main (dup of local)
+fix/redact-hardening MERGED-REMOTE deleted: in main (dup of local)
+release/0.2.4 MERGED-REMOTE deleted: PR #28 merged
+release/0.2.7-dup MERGED-REMOTE deleted: dup, see release/0.2.7
+release/0.3.0-dup MERGED-REMOTE deleted: dup
+release/0.4.0-dup MERGED-REMOTE deleted: dup
+release/0.5.0-dup MERGED-REMOTE deleted: dup
+release/0.6.0-dup MERGED-REMOTE deleted: dup
+release/0.8.0-dup MERGED-REMOTE deleted: dup, see release/0.8.0
+fix-compact-orphan-receipt-dup MERGED-REMOTE deleted: dup of local
+fix/verify-chain-dup MERGED-REMOTE deleted: dup
+fix/workflow-objective-limit-32000-dup MERGED-REMOTE deleted: dup
+release/0.5.1 3ba6f12 SUPERSEDED-LOCAL+REMOTE deleted: PR #42 merged squash 5cc66be; 2 post-PR commits superseded by 0.6.0 (ca040e4) — DELIBERATE, see HANDOFF
+wip/grok-switch 7f10164 SUPERSEDED-LOCAL deleted: D-028/D-029 shipped via wip/grok-switch-rebased PR #27 — DELIBERATE
+fix/fallback-shards-local SUPERSEDED-LOCAL deleted: PR #26 merged; local mirror stale — DELIBERATE
+feat/layered-synthesis-guardrails 37124be SUPERSEDED-LOCAL deleted: Section IV shipped in 0.8.0 (PR #45) — DELIBERATE
+feat/user-delivery-remote SUPERSEDED-REMOTE deleted: no userDelivery code in main, 22-file diff unreferenced — DELIBERATE, recoverable
+# KEPT (deliberate, not deleted):
+# rsi/round-4 c8de4fa: Authorization any-scheme redact — NOT in main, real unmerged security fix
+# rsi/round-5 206db6b+0d25c3b: supervisor chain validation — NOT in main
+# rsi/round-6 5e4a980+5cba3da: unknown grokDefault refuse — main has equivalent (Round 26) but different path
+# rsi/round-7 a25776f+89042f9: failure-row separator language — NOT in main
+# rsi/round-8 644897b: ledger supervisor role — NOT in main
+# rsi/round-10 6d9a11e: durationMs ceiling — main has equivalent (Round 22) but different commit
+# rsi/round-11 8f90138+e191f24: relay instructions + gate tests — NOT in main
+# feat/audit-layer 7626233 (local+remote): report-audit.ts — NOT in main, 996-line feature
+# feat/user-delivery c799988 (local): 22-file user-delivery layer — NOT in main
+# cloud/harden-issue-watcher-prompt-boundary (remote-only): 11-commit watcher hardening — NOT in main
+# fix/token-meter-safe-session-messages (remote-only): 4-commit lifecycle fix — NOT in main
