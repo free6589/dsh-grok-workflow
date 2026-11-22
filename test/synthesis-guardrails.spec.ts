@@ -293,6 +293,35 @@ describe('layered synthesis: constrained polish and factual guardrails', () => {
     expect(summary).toContain('1/1 项任务已由独立检查核验')
   })
 
+  it('resubmits once when the synthesizer prose-answers without the tool call (session-290e7334)', async () => {
+    // session-290e7334: the synthesizer child answered prose, the engine
+    // recorded no structured value, and the run reported format-error with no
+    // retry. The prompt must demand the tool call and the script must resubmit once.
+    const plan = [task('a')]
+    let calls = 0
+    const agent: ScriptAgent = async (_prompt, options) => {
+      if (roleOf(options.label) === 'synthesizer') {
+        calls += 1
+        if (calls === 1) return 'Task a is done and its evidence is verified.'
+        return { summary: 'Task a is done and its evidence is verified.' }
+      }
+      if (roleOf(options.label) === 'worker') return execution('did the work')
+      if (roleOf(options.label) === 'verifier') return verification(plan[0]!)
+      throw new Error(`unexpected label ${options.label}`)
+    }
+    const run = await runWorkflowScript(
+      WORKFLOW_SCRIPT,
+      args({ tasks: plan, roles: { synthesizer: [{ model: 'writer' }] } }),
+      agent,
+    )
+    expect(run.report.status).toBe('completed')
+    expect(run.report.synthesis.error ?? '').not.toContain('no valid')
+    expect(run.report.synthesis.summary).toContain('Task a is done')
+    const synthCalls = run.calls.filter(c => roleOf(c.label) === 'synthesizer')
+    expect(synthCalls).toHaveLength(2)
+    expect(synthCalls[0]!.prompt).toMatch(/结构化结果工具|structured result tool/)
+  })
+
   it('writes the polish prompt in the run language and keeps en free of forced Chinese', async () => {
     const plan = [task('a')]
     const prompts: string[] = []

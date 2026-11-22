@@ -5,6 +5,14 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.15] - 2026-11-23
+
+### Fixed / 修复
+
+- **The summarizer no longer dies on a prose-only answer / 汇总不再因一句话没交表就死** —
+  The synthesizer child sometimes answered in prose without calling the structured result tool, and the run recorded `format-error: child returned no valid structured result` with no retry: the narrative was written but never submitted. Both Polish prompts now demand the tool call (`{"summary": "<narrative>"}` exactly once), and the script resubmits once on the same attempt when the first call carries no structured value — borrowing the worker's resubmit pattern, so a child that already holds the narrative only pays one short submit call instead of losing the whole polish. A resubmit that still misses keeps the original error.
+  / 汇总子代理有时只回正文、没调交稿工具，整轮就记一笔格式错、连重交机会都不给：稿子写好了但没交上来。两套润色提示词现在都写明必须调一次交稿工具（`{"summary": "<稿子>"}`），第一下没交上时脚本在同轮内再叫一次——跟工人的重交一个路数，稿子已经在手里，只补一次交表，不重写、不花重试次数。重交还没交上就保留原错。
+
 ## [0.13.14] - 2026-11-22
 
 ### Fixed / 修复
