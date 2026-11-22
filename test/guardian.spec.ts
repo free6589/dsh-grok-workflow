@@ -119,6 +119,7 @@ describe('stuck-child handling', () => {
     const clock = manualClock()
     const warnings: string[] = []
     const recorded: Array<{ seq: number, action: string }> = []
+    const rescued: Array<{ childId: string, guidance: string }> = []
     const guardian = createRunGuardian({
       runId: 'run-1',
       childBudgetMs: 10_000,
@@ -126,6 +127,7 @@ describe('stuck-child handling', () => {
       schedule: () => ({}) as unknown,
       cancelSchedule: () => {},
       logger: { warn: (message: string) => { warnings.push(message) } },
+      rescue: (childId, guidance) => { rescued.push({ childId, guidance }) },
       onFinding: finding => { recorded.push(finding) },
     })
     const cancel = vi.fn()
@@ -138,13 +140,16 @@ describe('stuck-child handling', () => {
     expect(findings.length).toBe(1)
     expect(findings[0]?.seq).toBe(1)
     expect(findings[0]?.label).toBe('stuck worker')
-    expect(findings[0]?.action).toBe('observe')
+    expect(findings[0]?.action).toBe('rescue')
     expect(recorded).toHaveLength(1)
+    expect(rescued).toHaveLength(1)
+    expect(rescued[0]?.childId).toBe('child-1')
+    expect(rescued[0]?.guidance).toContain('Do not terminate the workflow')
     expect(recorded[0]).toMatchObject({
       seq: 1,
       label: 'stuck worker',
       signal: 'heartbeat-loss',
-      action: 'observe',
+      action: 'rescue',
       reason: expect.stringContaining('within 10000 ms'),
       atMs: expect.any(Number),
     })
