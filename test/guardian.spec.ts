@@ -118,6 +118,7 @@ describe('stuck-child handling', () => {
   it('discovers a hung child and cancels the run once, with a bounded finding', () => {
     const clock = manualClock()
     const warnings: string[] = []
+    const recorded: Array<{ seq: number, action: string }> = []
     const guardian = createRunGuardian({
       runId: 'run-1',
       childBudgetMs: 10_000,
@@ -127,7 +128,6 @@ describe('stuck-child handling', () => {
       logger: { warn: (message: string) => { warnings.push(message) } },
       onFinding: finding => { recorded.push(finding) },
     })
-    const recorded: Array<{ seq: number, action: string }> = []
     const cancel = vi.fn()
     guardian.adopt({ id: 'run-1', cancel })
     guardian.agentStart(info('run-1'), start(1, 'stuck worker'))
