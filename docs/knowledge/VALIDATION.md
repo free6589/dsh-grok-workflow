@@ -31,6 +31,8 @@ runner 进程静默带走（exit 0 无输出），Node 24+ 无此行为。修法
 | working tree | `npm run build` + bundle parity | `src/client/index.js === lib/client.js`（266237 bytes） |
 | working tree (HEAD pair) | `npm run verify:lib` | HEAD 配对一致（发版前）；发版提交后以 CI 的 `lib/` 检查为准 |
 | working tree | harness 重跑（CHECK 执行）| exit 0，`problems: []`，与已提交 JSON 逐字节一致 |
+| remote | CI run `44974715432` (push `b0411c8`) | **success** (Node 22 + Node 24) |
+| remote | Release `v0.13.2` run `44974726161` | **success**, published |
 
 **Root cause of the stop:** 宿主 guardian 与脚本 `raceChildCall` 预算同为 10 min；
 脚本的 Q8 wait×2 adjudication 还没判完，宿主已整轮 cancel（session-77a3f6fb turn 38，

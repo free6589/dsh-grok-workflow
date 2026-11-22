@@ -1,9 +1,6 @@
-Last updated: 2026-11-22 10:00 +08:00（**已发版 `0.13.2`：guardian 超时误杀修复 + 固定左栏 + 孤儿产物清理** —
-`src/guardian.ts` 的 `guardianChildBudgetMs(timeoutMs, childTimeoutMs?)` 在有守卫路由时把宿主预算扩到
-`script child budget + GUARDIAN_MAX_WAITS × GUARDIAN_WAIT_MS`（仍受 10 min 上限与 run deadline 约束）；
-`src/run.ts` 在 `guardianModel` 已配时传入 `CHILD_TIMEOUT_MS`，无守卫时行为与旧版逐字相同。
-另含：任务 2 固定左栏（40px gutter + 折线 wiring）、`lib/panel.*` 孤儿产物删除、t55 重复规则删除。
-`npm test` 78 文件 / 1454 测试 PASS。详见 HANDOFF/DECISIONS/VALIDATION 本轮条目。）
+Last updated: 2026-11-22 10:15 +08:00（**已发版 `0.13.2`：guardian 超时误杀修复 + 固定左栏 + 孤儿产物清理，`CONFIRMED`** —
+`b0411c8` 已推，tag `v0.13.2` 已推；远端 CI `44974715432` success、Release `44974726161` success
+并已发布。本地 `npm run ci` exit 0：78 文件 / 1454 测试 PASS。）
 
 Last updated: 2026-11-22 01:17 +08:00（**Wave 4 合流与 A1–A6 验收：合流可演示，A1–A5 `CONFIRMED`，A6 `CONFIRMED`（`npm run ci` 01:13 78 files / 1438 tests、01:33 复验 78/1439、两次 exit 0）；未改 Wave 1–3 源码** —
 新增验收件 `test/wave4-acceptance.spec.ts`（8 例：L1×DAG 合流 4 例、A6 包络 4 例）与证据目录

@@ -1,7 +1,8 @@
 ## 2026-11-22 — 已发版 `0.13.2`：guardian 误杀修复 + 固定左栏 + 孤儿清理（`CONFIRMED`）
 
 - **From:** 本会话（lead）· **To:** 下一轮接手者
-- **发了什么**：（待填：commit、tag、CI run、Release run）
+- **发了什么**：`b0411c8` 已推，annotated tag `v0.13.2` 已推；远端 CI `44974715432` success、
+  Release `44974726161` success、Release 已发布（`v0.13.2`，资产 `dsh-grok-workflow-0.13.2.tgz`）。
 - **内容**：guardian 预算覆盖 wait 窗口（D-097，根因见 VALIDATION）；进度任务带固定 40px
   左栏 + 折线 wiring（CHECK 7/7）；`lib/panel.*` 孤儿产物删除（`src/panel.ts` 在 `56e701d`
   已删，`lib/` 残留 4 文件零引用）；t55 重复规则删除（与 TESTING.md 覆盖率 0.82）。
