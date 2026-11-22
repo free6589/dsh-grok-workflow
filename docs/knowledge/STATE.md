@@ -1,3 +1,10 @@
+Last updated: 2026-11-22 12:45 +08:00（**已发版 `0.13.5`：三个开关搬到模型选择器左边，`CONFIRMED`** —
+前人已把 slot 搬迁写完躺在工作树（`src/client/index.js` + `lib/client.js` + 测试同步，逻辑零改动），
+我接手验证：`test/client.spec.ts` 119 例全过 → 全量 CI exit 0（78 文件 / 1472 测试）→ 修了 sed
+吃掉 `#` 的两个 README 散文 tag（`docs-version.spec.ts` 钉死 `` `#vX.Y.Z` `` 格式）→ 重跑 CI 全绿。
+发版提交 `eedc135` + tag `v0.13.5` 已推；远端 CI `44986288540` success、Release `44986290567`
+success 并已发布（tgz 681K）。`??` 未跟踪文件未动，不属本轮。）
+
 Last updated: 2026-11-22 11:34 +08:00（**已发版 `0.13.4`：B1/B2/B3 守卫存活信号，`CONFIRMED`** —
 `993e5de` 已推，annotated tag `v0.13.4` 已推；远端 CI `44981149499` success、
 Release `44981159054` success 并已发布。本地 `npm run ci` exit 0：78 文件 /
