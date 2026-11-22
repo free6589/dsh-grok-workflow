@@ -1885,3 +1885,9 @@ worker 链上限 50（HARD_LIMITS.chainLength）
   （`fixtureRepo()` 没 `git init`，守卫的 `git -C` 往上找到本检出）。已在 `fixtureRepo()` 里
   `git init -q` 修复：修前 1 failed/20 passed → 修后 21 passed（两种 TMPDIR 都是）。
   `npm run ci` 复跑 exit 0 = **73 文件 / 1350 测试**。
+
+Last updated: 2026-11-22 08:33 +08:00（**已发版 `0.13.1`：动态转向全量 Wave 0–4 + Node 22 超时测试修复** —
+`14156a6`（0.13.0 内容：Wave 0 薄语义设计、Wave 1 显示层四小版、Wave 2 运行时三件套、Wave 3 DAG、Wave 4 合流验收）因 Node 22 CI 失败未发布；
+`8357423` 修测试（hung child 30 s backstop，不改逻辑）；`b5c1af0` 发版 0.13.1。远端 CI `44967040278` success、
+Release `44967043122` success、`v0.13.1` 已发布。本地 `npm run ci`：78 文件 / 1449 测试 PASS（Node 26 + Node 22 双验），
+`verify:lib` 169 文件逐字节一致。`v0.13.0` tag 留在原提交不动（immutable，未发布成功也不复用）。）

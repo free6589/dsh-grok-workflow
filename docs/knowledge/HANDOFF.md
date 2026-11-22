@@ -1,3 +1,21 @@
+## 2026-11-22 — 已发版 `0.13.1`：动态转向 Waves 0–4 全量（lead 收尾）`CONFIRMED`
+
+- **From:** 本会话（lead）· **To:** 下一轮接手者
+- **发了什么**：`b5c1af0` 已推，annotated tag `v0.13.1` 已推；远端 CI `44967040278` success、
+  Release `44967043122` success、Release 已发布（`v0.13.1`）。`v0.13.0`（`14156a6`）因 Node 22
+  CI 挂掉从未发布成功，tag 留原地不动，本版另起号。
+- **内容**：Wave 0 薄语义（`DESIGN-dynamic-steering-semantics.md` 三态/判定表/取消结算/继承规则）、
+  Wave 1 显示层（复核改名/分钟制/标题全留/prompt 首行/人话转交）、Wave 2 运行时（per-call 超时竞速/
+  守卫判停 wait×2/8K 继承摘要）、Wave 3 DAG（`dependsOn` 波次校验 fail-closed、`blocked` 传染不烧重试、
+  上游证据摘要）、Wave 4 合流验收（retain/redrive 实跑、A1–A6）。配置面 16 键（新增 `guardianModel`）。
+- **修了什么才发出去**：`8357423` 只改 `test/timeout.spec.ts`——Node 22 的 bare `vm` 下连续多轮各留一个
+  跨 realm 永不 settle 的 promise 会静默吞掉进程，hung child 加 30 s unref 兜底（不断言可观测，不改逻辑）。
+  Node 26 + Node 22 本地双验 78/1449 全绿。
+- **审计**：三路子代理只读审计（语义+脚本 / 显示+配置 / 测试+新模块）结论：Wave 1 四小版全 CONFIRMED；
+  Wave 2/3/4 CONFIRMED，仅 Wave 4「调度级按波 retain 跳过执行」为 HYPOTHESIS（retain 目前是提示词级建议，
+  无机器门控）；Q8 默认空=不判停（与 PLAN 里「默认复用 triageModel」不一致，按实现为准）。
+- **没做的**：RSI 自迭代仍停着（`.rsi/STOP` 在，工作树后续改动与心跳无关）；失败重试 Phase 2 未立项。
+
 ## 2026-11-22 — Wave 4 合流与验收（`CONFIRMED`，agent-72）
 
 - **From:** Wave 4 执行子代理（agent-72）· **To:** Lead / 发版者

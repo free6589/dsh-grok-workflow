@@ -1,3 +1,22 @@
+## 已发版 `0.13.1` — 2026-11-22 (`CONFIRMED`, lead 收尾)
+
+**Changed:** `14156a6`（Wave 0–4 全量，未发布）+ `8357423`（Node 22 测试修复）+ `b5c1af0`
+（发版号 0.13.1 + CHANGELOG + 双语 README/LOCAL-TESTING 同步）。
+
+| state | command | result |
+| --- | --- | --- |
+| working tree (Node 26) | `npm run ci` | exit **0** — **78 files / 1449 tests PASS** |
+| working tree (Node 22.23.4) | `npx vitest run` | **78 files / 1449 tests PASS**（含 `timeout.spec.ts` 19/19） |
+| working tree | `npm run verify:lib` | `lib/ at b5c1af0 is the build of src/ at b5c1af0 (169 files, byte-identical)` |
+| remote | CI run `44967040278` (push `b5c1af0`) | **success** (Node 22 + Node 24) |
+| remote | Release `v0.13.1` run `44967043122` | **success**, published |
+| remote (failed, superseded) | Release `v0.13.0` run `44965154667` | **failure**（Node 22 `timeout.spec.ts` 1 超时）；tag 留原地，号段废弃不复用 |
+
+**Root cause of the 0.13.0 failure:** `test/timeout.spec.ts` 的无-guardian 用例在 bare `vm` 里跑
+`Atomics.waitAsync` 计时；Node 22 下连续多轮各留一个跨 realm 永不 settle 的 worker promise 会把
+runner 进程静默带走（exit 0 无输出），Node 24+ 无此行为。修法只动测试：hung child 加 30 s unref
+兜底，不改脚本逻辑，不断言可观测。
+
 # Validation Log
 
 ## Wave 4 合流与 A1–A6 验收 — 2026-11-22（`CONFIRMED`，agent-72）
