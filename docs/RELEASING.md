@@ -176,6 +176,13 @@ For the next release, follow the checklist below. The tag must point to a commit
 
 6. Do not move or overwrite a tag after a GitHub Release exists. If the first release validation fails before any Release is created, fix the workflow/source, delete and recreate the tag at the fixed commit, and record the move. After a Release exists, publish a new version instead. The release workflow currently runs on Node.js 22 only; main CI covers Node 22 and 24.
 
+
+### Recovery record — v0.13.9 / v0.13.9 首次发布校验恢复记录
+
+The first `v0.13.9` tag pointed at `f41e6ed` and the Release workflow correctly stopped at `npm test`: six documentation-version assertions still expected `0.13.8` in the two READMEs and `docs/LOCAL-TESTING.md`. No GitHub Release or package artifact was created. The documentation is corrected on `main`; after CI passes, delete and recreate this tag at the corrected commit, then confirm the Release workflow completes. Do not move a tag after a GitHub Release exists.
+
+首次 `v0.13.9` 标签指向 `f41e6ed`，Release 工作流在 `npm test` 阶段按预期停止：两份 README 和 `docs/LOCAL-TESTING.md` 仍有六项文档版本断言停留在 `0.13.8`。本次没有创建 GitHub Release，也没有生成安装包。文档已在 `main` 修正；CI 通过后，删除并在修正后的提交上重新创建该标签，再确认 Release 工作流完成。已有 GitHub Release 的标签不得移动。
+
 ## Install or return to a fixed version / 安装指定版本或回退
 
 After the corresponding tag exists, add the version suffix `#vX.Y.Z` to the GitHub install spec:
