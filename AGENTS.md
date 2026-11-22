@@ -65,6 +65,15 @@ validation/decision/research records, then commit and push shareable changes.
 
 ## Release and version discipline
 
+- When the operator says 发版 / 打tag / 发布 (or otherwise explicitly asks for
+  a release), run the full five-step flow without stopping to ask: `npm run ci`
+  (must exit 0) → create annotated tag `vX.Y.Z` on the release commit → push
+  `main` → push the tag → watch the remote Release run until success, then
+  close out memory docs. Report only when done or blocked.
+- Never skip the CI gate, never push a tag before CI passes locally, and never
+  leave a pushed tag unwatched — a pushed `v*` tag always triggers the Release
+  workflow; confirm it went green.
+
 - Record each user-visible feature, bug fix, or security fix under `[Unreleased]` in `CHANGELOG.md`, in both English and Simplified Chinese.
 - Do not bump the package version for every development commit. Bump `package.json` and `package-lock.json` together when preparing a release, and update the matching changelog section.
 - Use version tags in the form `vMAJOR.MINOR.PATCH`. Publish only from a merged `main` commit after CI passes.
