@@ -82,14 +82,17 @@ function stageNode(track: ReturnType<typeof deriveTrack>, key: string) {
 }
 
 describe('progress tab: the event contract', () => {
-  it('folds exactly the four recorder events and namespaces its view target and node kind', () => {
+  it('folds the progress and Guardian event contract and namespaces its view target and node kind', () => {
     expect(PROGRESS_EVENT_TYPES).toEqual([
       'tool-workflow/run-start',
       'tool-workflow/agent-start',
       'tool-workflow/agent-end',
+      'tool-workflow/guardian-start',
+      'tool-workflow/guardian-finding',
+      'tool-workflow/guardian-end',
       'tool-workflow/run-end',
     ])
-    // The optional detail payload is deliberately *not* one of the four: it can add field
+    // The optional detail payload is not a lifecycle event: it can add field
     // values to a node but must never decide a state.
     expect(PROGRESS_DETAIL_EVENT_TYPE).toBe('tool-workflow/stage-detail')
     expect((PROGRESS_EVENT_TYPES as readonly string[]).includes(PROGRESS_DETAIL_EVENT_TYPE)).toBe(false)
@@ -109,14 +112,32 @@ describe('progress tab: the event contract', () => {
     const runs = foldProgressRuns([
       rec('tool-workflow/run-start', { runId: 'run-1', name: '任务团队 · 2 个任务' }, 10, 1_000),
       rec('tool-workflow/agent-start', { runId: 'run-1', seq: 1, label: '执行', phase: '任务 1 · 修复登录', childId: 'c1' }, 11, 1_100),
-      rec('tool-workflow/agent-end', { runId: 'run-1', seq: 1, outcome: 'completed' }, 12, 2_100),
-      rec('tool-workflow/run-end', { runId: 'run-1', stopReason: 'completed' }, 13, 2_200),
+      rec('tool-workflow/guardian-start', { runId: 'run-1', armed: true, budgetMs: 300_000 }, 12, 1_200),
+      rec('tool-workflow/guardian-finding', { runId: 'run-1', seq: 1, label: '执行', signal: 'timeout', action: 'rescue', reason: 'rescued with guidance', atMs: 1_500 }, 13, 1_500),
+      rec('tool-workflow/agent-end', { runId: 'run-1', seq: 1, outcome: 'completed' }, 14, 2_100),
+      rec('tool-workflow/guardian-end', { runId: 'run-1', cancelled: false, findingCount: 1 }, 15, 2_150),
+      rec('tool-workflow/run-end', { runId: 'run-1', stopReason: 'completed' }, 16, 2_200),
     ])
     expect(runs).toHaveLength(1)
     const run = runs[0]!
     expect(run.runId).toBe('run-1')
     expect(run.anchorSeq).toBe(10)
     expect(run.stopReason).toBe('completed')
+    expect(run.guardian).toEqual({
+      started: true,
+      armed: true,
+      budgetMs: 300_000,
+      ended: true,
+      cancelled: false,
+      findings: [{
+        seq: 1,
+        label: '执行',
+        signal: 'timeout',
+        action: 'rescue',
+        reason: 'rescued with guidance',
+        atMs: 1_500,
+      }],
+    })
     expect(run.members).toEqual([
       {
         seq: 1,
