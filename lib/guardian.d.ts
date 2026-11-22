@@ -208,6 +208,8 @@ export interface GuardianOptions {
      * A callback that throws is contained as a warning, never as a failed run.
      */
     rescue?: (childId: string, guidance: string) => void;
+    /** Called after a bounded finding is stored; failures are contained and never affect the run. */
+    onFinding?: (finding: GuardianFinding) => void;
 }
 /** Derive one child's stall budget from the run's own deadline. */
 export declare function guardianChildBudgetMs(timeoutMs: number, childTimeoutMs?: number): number;
