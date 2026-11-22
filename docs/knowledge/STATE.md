@@ -1,4 +1,9 @@
-Last updated: 2026-11-22 21:10 +08:00（**lead 合流完成：通道 + 重规划 + 汇总三步 + 红色语义，全量 82/1594 PASS，`CONFIRMED` 未发版** —
+Last updated: 2026-11-22 21:30 +08:00（**已发版 `0.13.12`：主会话通道 + 波边界重规划 + 汇总三步 + 红色语义，`CONFIRMED`** —
+发版提交 `9220b51` + tag `v0.13.12` 已推；远端 CI `45027528312` success、Release
+`45027541442` success 并已发布（asset `dsh-grok-workflow-0.13.12.tgz`）。本地门禁：
+`npm run ci` exit 0（80 文件 / 1553 测试 PASS，停车场移出 nyc 孤儿后 typecheck 干净），
+lint 0 errors，`verify:lib` byte-identical。发货内容见 CHANGELOG `[0.13.12]` 四条：
+通道、重规划合并、汇总三步、红语义。工作树剩余 `??` 皆并发轮孤儿未动。）
 接 agent-8 通道 lane 与 planner_replan lane；lead 修 5 个假环境按名存工具 +
 reliability 计数 15→16 + client.spec Bundle 口子。`npm test` 82 文件 / 1594 测试 PASS；
 typecheck 仅剩 nyc `--jsx` 孤儿一错；lint 0 errors；build + verify:lib byte-identical。
