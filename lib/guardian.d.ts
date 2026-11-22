@@ -11,8 +11,8 @@
  * observing the same `workflow/agent-start` / `workflow/agent-end` events the
  * progress recorder and the memory archiver already consume, judging
  * *liveness* (never quality), and acting only through channels the plugin
- * already owns — cancel a stuck run, record what happened, and let the normal
- * terminal path turn that into an honest report.
+ * already owns — queue recovery guidance for a stalled child, record what
+ * happened, and let the normal terminal path produce an honest report.
  *
  * What it deliberately does NOT do (architecture constraints):
  *
@@ -23,12 +23,10 @@
  *   across runs. The one periodic check is a single `setInterval`, `unref()`ed
  *   so it never keeps the process alive, armed only between `adopt()` and
  *   `finish()`/`dispose()`, exactly like the checkpoint recorder's timer.
- * - Bounded by construction: per-child timeout and stall limits are inherited
- *   from the run's own `config.timeoutMs` (a fraction of the run deadline, so
- *   the guardian always fires before the deadline does), retries are the
- *   engine's own per-task retries (the guardian never retries anything
- *   itself — it only cancels, and the script's bounded retry loop decides what
- *   runs again), and no loop in this module is unbounded.
+ * - Bounded by construction: per-child stall detection is inherited from the
+ *   run deadline. A stalled child receives one rescue nudge; the guardian
+ *   never cancels the parent run. The workflow's own deadline remains the
+ *   final outer bound, and no loop in this module is unbounded.
  * - No ownerless background work: `dispose()` clears the timer, removes the
  *   event listeners, and empties the registry. `disposeActiveState` (plugin
  *   unload) reaches every live guardian through the same instance registry
@@ -61,24 +59,16 @@
  *   what they report, not in when they fire.
  *
  * Handling action and its upper bound: when either signal fires the guardian
- * marks the child `timed-out`, records one bounded finding
- * (`{ seq, label, action: 'cancel-run', reason }`), and calls `cancel()` on
- * the run **once per guardian** with the reason
- * `workflow guardian: child <label> (seq <n>) made no progress within <ms> ms`.
- * Cancelling the run — not the child — is the only action the host side owns:
- * there is no per-child cancel handle on `WorkflowRun`, and reaching into the
- * engine to kill one child would be a second scheduler. The bound is therefore
- * structural: at most one cancel per run, further firings only append findings
- * (bounded at `GUARDIAN_LIMITS.maxFindings`). The script's own bounded retry
- * loop then decides per task whether the attempt is retried; the guardian
- * never retries, never re-plans, never re-drives.
+ * marks the child as already nudged and records one bounded finding. If a
+ * child session and rescue executor are available, it queues one recovery
+ * message for that child; otherwise it records an observation. It never
+ * interrupts the child or calls `run.cancel()`. The one-shot nudge prevents
+ * repeated messages, while the workflow's own deadline remains the outer safety
+ * bound. The guardian never retries, re-plans, or re-drives tasks.
  *
- * Findings are evidence, not verdicts: `finish()` folds them into the
- * terminal report's `errors` list as `{ phase: 'Guardian', category:
- * 'cancelled' }` entries when the run's own report carries none for the
- * timed-out child, so a reader can tell "the work did not finish because a
- * child stalled" apart from "the work was judged and failed". Nothing here
- * changes `status` computation: a run with no verified task is still
+ * Findings are evidence, not task failures. They are kept in the progress
+ * journal and Guardian panel, never inserted into the report's `errors` list.
+ * Nothing here changes `status` computation: a run with no verified task is still
  * `failed`, a run with kept work is still `partial`/`failed` by the existing
  * rules in `run.ts`.
  */
@@ -94,7 +84,7 @@ export declare const GUARDIAN_LIMITS: {
     readonly labelChars: 160;
     /** Reason characters kept per finding. */
     readonly reasonChars: 400;
-    /** Upper bound of one child's budget: the guardian never waits longer than this. */
+    /** Base child timeout when no adjudication route is configured. */
     readonly childTimeoutCapMs: 600000;
     /** Lower bound of one child's budget: below this the timer is noise, not signal. */
     readonly childTimeoutFloorMs: 5000;
@@ -113,8 +103,8 @@ export interface GuardianFinding {
     label: string;
     /** Which liveness signal fired. */
     signal: GuardianSignal;
-    /** What the guardian did (always `cancel-run` — the only host-owned kill; `rescue` steers instead). */
-    action: 'cancel-run' | 'rescue';
+    /** What the guardian did: steer the child, or record an observation if it cannot. */
+    action: 'observe' | 'rescue';
     /** Human-readable reason, bounded and redacted. */
     reason: string;
     /** Epoch milliseconds at which the signal fired. */
@@ -124,10 +114,8 @@ export interface GuardianFinding {
 export interface GuardianSettlement {
     /** Findings recorded over the run's lifetime (possibly empty). */
     findings: GuardianFinding[];
-    /** True when this guardian cancelled its run. */
+    /** Always false: liveness detection never cancels the workflow. */
     cancelled: boolean;
-    /** The cancel reason used, when `cancelled` is true. */
-    cancelReason?: string;
 }
 /** The run handle the guardian may cancel (structural subset of `WorkflowRun`). */
 export interface GuardianRunHandle {
@@ -201,8 +189,8 @@ export interface GuardianOptions {
      */
     sessionHeartbeat?: SessionHeartbeatReader;
     /**
-     * Rescue executor (C3): interrupt the child and deliver the adjudicator's
-     * guidance. Called once per `guardian rescue` log line the script emits;
+     * Rescue executor (C3): queue recovery guidance for the child without
+     * interrupting its active turn. Called once per `guardian rescue` log line;
      * unlimited by design (per operator decision) — each call appends one
      * `rescue` finding, so the spend is auditable in the terminal report.
      * A callback that throws is contained as a warning, never as a failed run.
@@ -230,7 +218,7 @@ export interface RunGuardian {
     readonly runId: string;
     /** Findings recorded so far (a copy). */
     readonly findings: GuardianFinding[];
-    /** True once this guardian cancelled its run. */
+    /** Always false: liveness detection never cancels the workflow. */
     readonly cancelled: boolean;
     /** Adopt the live run handle; arms the single periodic check. Idempotent. */
     adopt(handle: GuardianRunHandle): void;
@@ -249,7 +237,7 @@ export interface RunGuardian {
     runHeartbeat(info: unknown, at?: number): void;
     /**
      * Observe one `guardian rescue` log line from the script. Parses the seq
-     * and guidance, interrupts that child and delivers the guidance through
+     * and guidance, queues the guidance for that child without interrupting it
      * the injected executor. Unknown seq, settled child, missing guidance or
      * executor, and throwing executor are all contained — never the run.
      * Lines arriving before adoption are buffered and replayed on adopt.

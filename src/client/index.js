@@ -334,7 +334,8 @@ window.__ModuleLoader__.load({
       'progress.guardian.budget': 'Child liveness budget · {seconds}s',
       'progress.guardian.empty': 'No intervention recorded',
       'progress.guardian.count': '{count} intervention(s)',
-      'progress.guardian.rescue': 'Rescue guidance delivered',
+      'progress.guardian.rescue': 'Recovery guidance queued',
+      'progress.guardian.observe': 'Observed · left running',
       'progress.guardian.cancel': 'Run cancellation requested',
       'progress.tasks.aria': 'Rows by stage',
       'progress.branch.settledOf': '{settled}/{declared}',
@@ -549,7 +550,8 @@ window.__ModuleLoader__.load({
       'progress.guardian.budget': '子任务存活判断预算 · {seconds} 秒',
       'progress.guardian.empty': '暂无处置记录',
       'progress.guardian.count': '{count} 条处置记录',
-      'progress.guardian.rescue': '已发送救援指引',
+      'progress.guardian.rescue': '已排队发送恢复指引',
+      'progress.guardian.observe': '已记录异常 · 继续运行',
       'progress.guardian.cancel': '已触发整轮取消',
       'progress.tasks.aria': '按阶段分组的行',
       'progress.branch.settledOf': '{settled}/{declared}',
@@ -2520,7 +2522,7 @@ window.__ModuleLoader__.load({
             seq: memberSeq,
             label: typeof data.label === 'string' ? data.label : '',
             signal: data.signal === 'heartbeat-loss' ? 'heartbeat-loss' : 'timeout',
-            action: data.action === 'rescue' ? 'rescue' : 'cancel-run',
+            action: data.action === 'rescue' ? 'rescue' : data.action === 'cancel-run' ? 'cancel-run' : 'observe',
             reason: typeof data.reason === 'string' ? data.reason : '',
             atMs: Number.isFinite(data.atMs) ? data.atMs : undefined,
           })
@@ -3799,11 +3801,11 @@ window.__ModuleLoader__.load({
         ? h('p', { className: 'gw-progress-guardian-empty' }, t('progress.guardian.empty'))
         : h('ul', { className: 'gw-progress-guardian-list', 'aria-label': t('progress.guardian.count', { count: findings.length }) },
           findings.slice(-4).map((finding, index) => {
-            const actionKey = finding.action === 'rescue' ? 'progress.guardian.rescue' : 'progress.guardian.cancel'
+            const actionKey = finding.action === 'rescue' ? 'progress.guardian.rescue' : finding.action === 'observe' ? 'progress.guardian.observe' : 'progress.guardian.cancel'
             const label = typeof finding.label === 'string' && finding.label !== '' ? finding.label : '#' + finding.seq
             return h('li', {
               key: 'guardian:' + finding.seq + ':' + (finding.atMs === undefined ? index : finding.atMs),
-              'data-action': finding.action === 'rescue' ? 'rescue' : 'cancel-run',
+              'data-action': finding.action === 'rescue' ? 'rescue' : finding.action === 'observe' ? 'observe' : 'cancel-run',
               title: typeof finding.reason === 'string' ? finding.reason : undefined,
             },
             h('span', { className: 'gw-progress-guardian-finding-label' }, label),
@@ -4042,6 +4044,18 @@ window.__ModuleLoader__.load({
             data: { runId: state.runId, seq: member.seq, outcome: member.outcome },
             time: member.endedAt,
           })),
+          ...(state.guardian?.started === true ? [{
+            type: 'tool-workflow/guardian-start',
+            data: { runId: state.runId, armed: state.guardian.armed, budgetMs: state.guardian.budgetMs },
+          }] : []),
+          ...(state.guardian?.findings ?? []).map((finding) => ({
+            type: 'tool-workflow/guardian-finding',
+            data: { runId: state.runId, ...finding },
+          })),
+          ...(state.guardian?.ended === true ? [{
+            type: 'tool-workflow/guardian-end',
+            data: { runId: state.runId, cancelled: state.guardian.cancelled },
+          }] : []),
           ...(state.stopReason === undefined ? [] : [{ type: 'tool-workflow/run-end', data: { runId: state.runId, stopReason: state.stopReason }, time: state.endedAt }]),
           { type: match.event.type, data: match.event.data, time: match.event.time },
         ]
@@ -4051,6 +4065,7 @@ window.__ModuleLoader__.load({
           runId: run.runId,
           name: run.name,
           members: run.members,
+          ...run.guardian === undefined ? {} : { guardian: run.guardian },
           startedAt: run.startedAt,
           endedAt: run.endedAt,
           stopReason: run.stopReason,
@@ -4073,6 +4088,7 @@ window.__ModuleLoader__.load({
             name: state.name,
             anchorSeq,
             members: state.members,
+            guardian: state.guardian,
             startedAt: state.startedAt,
             endedAt: state.endedAt,
             stopReason: state.stopReason,

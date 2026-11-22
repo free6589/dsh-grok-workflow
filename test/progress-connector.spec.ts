@@ -524,7 +524,7 @@ describe('client progress tab: Guardian monitor side lane', () => {
     const copy = texts(tree).join('\n')
     expect(copy).toContain('Guardian 监控')
     expect(copy).toContain('监控中')
-    expect(copy).toContain('已发送救援指引')
+    expect(copy).toContain('已排队发送恢复指引')
     expect(progress.css).toContain('.gw-progress-overview')
     expect(progress.css).toContain('color-mix(in srgb, var(--dsw-alias-state-success-primary)')
   })

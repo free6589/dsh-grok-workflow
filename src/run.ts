@@ -23,7 +23,7 @@ import { buildWorkflowRequest } from './script.js'
 import { inheritanceForSession } from './carryover.js'
 import { teamWorkflowEngine } from './team-engine.js'
 import { createCheckpointRecorder, unloadCheckpointRecorders } from './checkpoint/wiring.js'
-import { GUARDIAN_LIMITS, createRunGuardian, guardianChildBudgetMs, unloadRunGuardians } from './guardian.js'
+import { createRunGuardian, guardianChildBudgetMs, unloadRunGuardians } from './guardian.js'
 import type { FileHeartbeat, GuardianSettlement, SessionHeartbeat } from './guardian.js'
 import { CHILD_TIMEOUT_MS } from './timeout.js'
 import { deliverReport } from './delivery/index.js'
@@ -902,29 +902,23 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
       }
       return freshest
     },
-    // C3 rescue executor: the script's adjudicator judged a stalled child
-    // interrupt-recoverable and broadcast it on the log channel. The host
-    // interrupts that child (waking a command-wait) and delivers the
-    // adjudicator's guidance; the child's context is preserved. Unlimited
-    // by operator decision — each rescue appends one finding, so the spend
-    // is auditable in the terminal report. Never throws into the run.
+    // C3 rescue executor: deliver recovery guidance without interrupting the
+    // child's active turn. The message is queued in the child session, so a
+    // long-running command is allowed to finish instead of being killed.
+    // Each rescue is recorded in the terminal report. Never throws into the run.
     rescue: (childId: string, guidance: string): void => {
       try {
         const subagents = (ctx as unknown as {
           subagents?: {
-            interrupt?: (targetId: string, authority: unknown) => void
             sendMessage?: (sender: unknown, targetId: string, content: unknown[], options: unknown) => Promise<unknown>
           }
         }).subagents
         if (subagents === undefined || subagents === null) return
-        if (typeof subagents.interrupt === 'function') {
-          subagents.interrupt(childId, { kind: 'ancestor', agent })
-        }
         if (typeof subagents.sendMessage === 'function') {
           const content = [createUserMessage({
             content: [{
               type: 'text',
-              text: `Guardian rescue (your wait budget expired; this steers you instead of killing the run): ${guidance}`,
+              text: `Guardian recovery notice (your task is still running; do not abandon or restart active work): ${guidance}`,
             }],
             source: { kind: 'grok-workflow' },
           })]
@@ -1011,7 +1005,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
     // C3 rescue channel: the script broadcasts `guardian rescue …` on the
     // same log bus the B1 heartbeat already hears. The heartbeat keeps the
     // signal; the rescue line is additionally parsed for seq + guidance and
-    // executed (interrupt + steered message). A bus without log events costs
+    // executed (a queued recovery message, without interrupting active work). A bus without log events costs
     // both, never the run.
     listen(() => ctx.on('workflow/log', (info, message) => {
       guardian.runHeartbeat(info)
@@ -1238,10 +1232,9 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
   } finally {
     if (timer !== undefined) clearTimeout(timer)
     if (cancelOnAbort !== undefined) signal.removeEventListener('abort', cancelOnAbort)
-    // Settle the resident guardian first: its findings describe *why* the run
-    // stopped when a stall cancelled it, and they must be folded into the
-    // report before the checkpoint/archive paths read it. The guardian never
-    // changes the report's status — only the errors list gains entries.
+    // Settle the resident guardian first. Its findings are diagnostic
+    // supervision events, not task failures, so they remain in the progress
+    // journal and are not injected into the workflow report's errors.
     try {
       guardianSettlement = guardian.finish(settledStop)
     } catch (error) {
@@ -1252,18 +1245,6 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
       cancelled: guardianSettlement?.cancelled ?? guardian.cancelled,
       findingCount: guardianSettlement?.findings.length ?? guardian.findings.length,
     })
-    if (guardianSettlement !== undefined && guardianSettlement.findings.length > 0 && lastReport !== undefined) {
-      const known = new Set(
-        lastReport.errors.map(entry => `${entry.phase} ${entry.message}`),
-      )
-      for (const finding of guardianSettlement.findings.slice(0, GUARDIAN_LIMITS.maxFindings)) {
-        const message = finding.reason
-        const key = `Guardian ${message}`
-        if (known.has(key)) continue
-        known.add(key)
-        lastReport.errors.push({ phase: 'Guardian', message, category: 'cancelled' })
-      }
-    }
     // Close the node even when this function throws: an abandoned node would read
     // as "still running" in the panel until the turn ends.
     if (run !== undefined) progress?.runEnd(run.id, progressStopReason(settledStop ?? 'error', reportStatus))

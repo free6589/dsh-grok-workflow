@@ -109,7 +109,7 @@ describe('timeout tiers', () => {
     expect(COMMAND_TIMEOUT_SECONDS).toBe(120)
   })
 
-  it('gives the host watchdog the same ten-minute child budget as the script race', () => {
+  it('keeps the ten-minute base budget when no adjudicator is configured', () => {
     // The script race is the per-call path; the host guardian is the tier that is
     // live in a realm without timers (it cancels the run instead of one call). If
     // the two budgets drifted, the documented "10 minutes, then stop" would hold
@@ -129,16 +129,21 @@ describe('timeout tiers', () => {
     // (GUARDIAN_MAX_WAITS slices), so the script's own verdict lands first.
     // The numbers live in timeout.ts; the script mirrors them (pinned below),
     // so the host reads the same source instead of a second copy.
+    const adjudicationWindow = GUARDIAN_MAX_WAITS * GUARDIAN_ADJUDICATION_MS
     const waitExtension = GUARDIAN_MAX_WAITS * GUARDIAN_WAIT_MS
-    expect(waitExtension).toBe(600_000)
-    // Long deadline: capped at the same 10 min ceiling, never above it.
-    expect(guardianChildBudgetMs(7_200_000, CHILD_TIMEOUT_MS)).toBe(CHILD_TIMEOUT_MS)
-    expect(guardianChildBudgetMs(3_600_000, CHILD_TIMEOUT_MS)).toBe(CHILD_TIMEOUT_MS)
-    // Without a guardian route nothing changes: the old single-budget path.
+    const scriptWindow = CHILD_TIMEOUT_MS + waitExtension + adjudicationWindow
+    const hostGrace = GUARDIAN_LIMITS.checkIntervalMs
+    expect(adjudicationWindow).toBe(120_000)
+    expect(scriptWindow).toBe(1_320_000)
+    // One host sweep interval is added after the script's last possible wait.
+    expect(guardianChildBudgetMs(7_200_000, CHILD_TIMEOUT_MS)).toBe(scriptWindow + hostGrace)
+    expect(guardianChildBudgetMs(3_600_000, CHILD_TIMEOUT_MS)).toBe(scriptWindow + hostGrace)
+    // No adjudicator keeps the original ten-minute base budget.
     expect(guardianChildBudgetMs(3_600_000, undefined)).toBe(CHILD_TIMEOUT_MS)
     expect(guardianChildBudgetMs(3_600_000)).toBe(CHILD_TIMEOUT_MS)
-    // A short deadline still binds: the host never waits past the run's own end.
+    // The run deadline still wins when it is shorter than the watchdog window.
     expect(guardianChildBudgetMs(30_000, CHILD_TIMEOUT_MS)).toBe(30_000)
+    expect(guardianChildBudgetMs(1_000_000, CHILD_TIMEOUT_MS)).toBe(1_000_000)
     // Unlimited still disarms, even with a guardian configured.
     expect(guardianChildBudgetMs(0, CHILD_TIMEOUT_MS)).toBe(0)
   })
