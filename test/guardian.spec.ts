@@ -4,7 +4,7 @@
  * What this pins (and what it deliberately does not):
  * - The guardian is parallel supervision, not the serial `supervisor` role:
  *   it starts observing before the run exists, judges liveness (never
- *   quality), and acts only by cancelling the run once — it never calls
+ *   quality), and nudges a stalled child without cancelling the parent — it never calls
  *   `agent()`, so it costs zero model calls and adds no agent role.
  * - Stuck = timeout or heartbeat-loss: one open child older than its budget
  *   receives one rescue nudge (or an observation if rescue is unavailable);
@@ -150,14 +150,12 @@ describe('stuck-child handling', () => {
     })
     expect(findings[0]?.reason).toContain('within 10000 ms')
     expect(cancel).not.toHaveBeenCalled()
-    // A second sweep appends no second finding and cancels no second time:
-    // the bound is structural (at most one cancel per run).
+    // A second sweep does not interrupt or cancel the still-running workflow.
     clock.advance(120_000)
     expect(guardian.check().length).toBe(1)
-    expect(cancel).toHaveBeenCalledTimes(1)
+    expect(cancel).not.toHaveBeenCalled()
     const settlement = guardian.finish('cancelled')
     expect(settlement.cancelled).toBe(false)
-    expect(settlement.cancelReason).toBeUndefined()
     expect(warnings).toEqual([])
   })
 
@@ -183,7 +181,7 @@ describe('stuck-child handling', () => {
     // The first child starved while the run still showed life: a timeout.
     expect(findings[0]?.seq).toBe(1)
     expect(findings[0]?.signal).toBe('timeout')
-    expect(cancel).toHaveBeenCalledTimes(1)
+    expect(cancel).not.toHaveBeenCalled()
     // Let the run itself go silent: the second child then fires as a
     // heartbeat-loss, still without a second cancel.
     clock.advance(2_000)
@@ -191,7 +189,7 @@ describe('stuck-child handling', () => {
     expect(later.length).toBe(2)
     expect(later[1]?.seq).toBe(2)
     expect(later[1]?.signal).toBe('heartbeat-loss')
-    expect(cancel).toHaveBeenCalledTimes(1)
+    expect(cancel).not.toHaveBeenCalled()
     guardian.finish('cancelled')
   })
 
@@ -208,7 +206,7 @@ describe('stuck-child handling', () => {
     guardian.finish('completed')
   })
 
-  it('a cancel that throws is contained as a warning, never as a failed run', () => {
+  it('never invokes the run cancel handle when a child stalls', () => {
     const clock = manualClock()
     const warnings: string[] = []
     const guardian = createRunGuardian({
@@ -227,7 +225,7 @@ describe('stuck-child handling', () => {
     clock.advance(6_000)
     const findings = guardian.check()
     expect(findings.length).toBe(1)
-    expect(warnings.some(message => message.includes('could not cancel run run-1'))).toBe(true)
+    expect(warnings).toEqual([])
     guardian.finish('cancelled')
   })
 })
@@ -248,7 +246,7 @@ describe('rescue: interrupt and steer instead of killing', () => {  it('a rescue
     guardian.agentStart(info('run-1'), start(3, 'lost worker'))
     clock.advance(11_000)
     guardian.noteRescue(info('run-1'), 'guardian rescue seq=3 label=lost worker guidance=stop waiting, continue with what you have')
-    // The child is steered, not killed: no cancel, one rescue finding.
+    // The child is steered with a queued message, not interrupted or killed.
     expect(rescued).toEqual([{ childId: 'child-3', guidance: 'stop waiting, continue with what you have' }])
     expect(cancel).not.toHaveBeenCalled()
     const findings = guardian.check()
@@ -343,7 +341,7 @@ describe('session heartbeat: a child with a fresh turn is alive', () => {
     guardian.agentStart(info('run-1'), start(1, 'silent worker'))
     clock.advance(11_000)
     expect(guardian.check().length).toBe(1)
-    expect(cancel).toHaveBeenCalledTimes(1)
+    expect(cancel).not.toHaveBeenCalled()
     guardian.finish('cancelled')
   })
 
@@ -364,7 +362,7 @@ describe('session heartbeat: a child with a fresh turn is alive', () => {
     clock.advance(11_000)
     expect(guardian.check().length).toBe(1)
     expect(calls).toBeGreaterThan(0)
-    expect(cancel).toHaveBeenCalledTimes(1)
+    expect(cancel).not.toHaveBeenCalled()
     guardian.finish('cancelled')
   })
 })
@@ -391,7 +389,7 @@ describe('liveness signals: a child that shows life must not fire', () => {
     const findings = guardian.check()
     expect(findings.length).toBe(2)
     expect(findings.every(finding => finding?.signal === 'timeout')).toBe(true)
-    expect(cancel).toHaveBeenCalledTimes(1)
+    expect(cancel).not.toHaveBeenCalled()
     guardian.finish('cancelled')
   })
 
@@ -433,7 +431,7 @@ describe('liveness signals: a child that shows life must not fire', () => {
     clock.advance(11_000)
     expect(guardian.check().length).toBe(1)
     expect(calls).toBeGreaterThan(0)
-    expect(cancel).toHaveBeenCalledTimes(1)
+    expect(cancel).not.toHaveBeenCalled()
     guardian.finish('cancelled')
   })
 
@@ -478,7 +476,7 @@ describe('liveness signals: a child that shows life must not fire', () => {
     clock.advance(11_000)
     expect(lookups).toBeGreaterThan(0)
     expect(guardian.check().length).toBe(1)
-    expect(cancel).toHaveBeenCalledTimes(1)
+    expect(cancel).not.toHaveBeenCalled()
     guardian.finish('cancelled')
   })
 })
@@ -710,9 +708,7 @@ describe('guardian unload cleanup', () => {
       failureMode: 'report',
     })
     expect(noticed.filter(message => message.includes('rescue'))).toEqual([])
-    expect(interrupted.length).toBe(1)
-    expect(interrupted[0]?.target).toBe('child-9')
-    expect((interrupted[0]?.authority as { kind?: string }).kind).toBe('ancestor')
+    expect(interrupted).toEqual([])
     expect(messaged.length).toBe(1)
     expect(messaged[0]?.target).toBe('child-9')
     expect(messaged[0]?.text).toContain('stop waiting, continue with what you have')
