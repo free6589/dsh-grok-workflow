@@ -1,3 +1,11 @@
+Last updated: 2026-11-22 22:40 +08:00（**已发版 `0.13.13`：带编号的计划任务即使标题含阶段词也独立成卡，`CONFIRMED`** —
+发版提交 `5ab9e26` + tag `v0.13.13` 已推；远端 Release `45033581188` success 并已发布
+（asset `dsh-grok-workflow-0.13.13.tgz`）。本地门禁：`npm run ci` exit 0（81 文件 / 1561 测试 PASS），
+lint 0 errors，`verify:lib` byte-identical。根因见 D-106：`任务 7 · 合并为干净可并发执行计划`被脊柱
+`执行` token 误收；修法是编号优先于阶段词（双实现同步 + 双回归）。真机隔离 soak `CONFIRMED`
+（同形状 phase 成卡、spine 为空）。远端 CI `45033565040` Node 24 绿、Node 22 在 channel A4 单点红
+（本地 41/41 PASS，0.13.12 带过来的时序敏感用例，与本版无关，不挡 Release）。）
+
 Last updated: 2026-11-22 21:30 +08:00（**已发版 `0.13.12`：主会话通道 + 波边界重规划 + 汇总三步 + 红色语义，`CONFIRMED`** —
 发版提交 `9220b51` + tag `v0.13.12` 已推；远端 CI `45027528312` success、Release
 `45027541442` success 并已发布（asset `dsh-grok-workflow-0.13.12.tgz`）。本地门禁：

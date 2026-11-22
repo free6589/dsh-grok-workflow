@@ -5501,3 +5501,23 @@ toolName/configVersion = 页面 16）；`test/client.spec.ts` ProgressBundle 补
 （`src/weather/` + `test/nyc*.spec.ts` 未跟踪，他 lane 未动）；全量 `npm test`
 已绿。真机 GUI 手势 NOT_RUN（跑中发话看波边界并入 + 进度页更新 + 「停」看
 取消结算，需真实浏览器会话 + 真模型）。
+
+## 2026-11-22 — D-106 进度脊柱编号优先：发版 `0.13.13`（`CONFIRMED` 发版，CI 单点红记录）
+
+- **改了什么**：`src/progress-tab.ts` `stageForPhase()` 导出去并前置 `taskNumberIn()` 检查；
+  `src/client/index.js` `progressStageForPhase()` 同镜像；`test/progress-tab.spec.ts` +
+  `test/client.spec.ts` 各 +1 回归（任务 7 形状：phase 含"执行"但带 `任务 7` 前缀，不断 spine 为空、extra 为 1）。
+- **根因（`CONFIRMED`）**：会话 session-076c2337 的 seq 318 行 phase=`任务 7 · 合并为干净可并发执行计划`，
+  旧折叠按 `执行` token 收进脊柱 `执行` 段，所以显示在"规划"下面而不是"任务 7"。
+- **验证**：本地 `npm run ci` exit 0（81 文件 / 1561 测试）；`npm run build` + `verify:lib`
+  byte-identical；隔离真机 soak（`DSH_HOME` 副本 + 真实模型 `runanywhere/deepseek-v4.1-flash`）
+  跑出同形状 phase，fold 后任务 7 成卡、spine 为空（pre-fix 会进脊柱）。
+- **发版**：`chore(release): prepare v0.13.13` 已推；tag `v0.13.13` 已推；远端 Release
+  `45033581188` success 并已发布（asset `dsh-grok-workflow-0.13.13.tgz`）。
+- **CI 单点红（NOT blocking）**：远端 CI `45033565040` Node 24 绿、Node 22 在 `npm test` 挂
+  `test/channel.spec.ts:431`（A4 carried round 后 `steeringForSession` 非空）；本地同文件 41/41 PASS。
+  属 0.13.12 带过来的通道 lane 时序敏感用例（Node 22 单线程调度差），与本版进度改动无关（改动文件
+  仅 progress-tab/client/测试/文档，channel 零触碰），下轮由通道 lane 跟进。
+- **野生活动提醒**：本轮工作树里三番出现未提交的 `src/gate.ts` surface-head 半成品
+  （`surfaceHasHead` + `test/phase1-dialogue.spec.ts` 大段），无提交无文档归属，已原样存
+  `.tmp/keep-stray*.patch` 未提交——疑似并发会话正在写，请归属方认领，勿当成本轮改动。

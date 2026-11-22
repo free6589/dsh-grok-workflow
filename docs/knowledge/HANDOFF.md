@@ -1,3 +1,18 @@
+## 2026-11-22 — 已发版 `0.13.13`：进度脊柱编号优先（`CONFIRMED`）
+
+- **From:** 本会话（lead）· **To:** 下一轮接手者
+- **发了什么**：发版提交 `5ab9e26` 已推，annotated tag `v0.13.13` 已推；远端 Release `45033581188`
+  success 并已发布（asset `dsh-grok-workflow-0.13.13.tgz`）。本地 `npm run ci` exit 0：
+  81 files / 1561 tests PASS；`verify:lib` byte-identical；lint 0 errors。
+- **内容**：见 D-106（`stageForPhase()` 编号优先 + client 镜像 + 双回归；会话 session-076c2337
+  的 seq 318 `任务 7 · 合并为干净可并发执行计划` 实证；真机隔离 soak 同形状验证通过）。
+- **远端 CI 单点红**：`45033565040` Node 24 绿、Node 22 挂 `test/channel.spec.ts:431` A4
+ （本地 41/41 PASS；0.13.12 通道 lane 的时序敏感用例，与本版零交集，不挡 Release，已记 VALIDATION）。
+- **野生活动**：工作树曾三番冒出未提交的 `src/gate.ts` surface-head 半成品（`surfaceHasHead`），
+  已原样存 `.tmp/keep-stray*.patch` 未提交——疑似并发会话在写，请归属方认领。
+- **分支收尾**：`fix-progress-task-number-first` worktree 还在（基线 0.13.11，已合完），可删；
+  `fix/session-surface-head*` 已删。`??` 孤儿（`.rsi/evidence/*` 等）皆并发轮未动，不属本版。
+
 ## 2026-11-22 — lead 合流：通道 + 重规划 + 汇总三步 + 红色语义，全量 82/1594 PASS（`CONFIRMED`，未发版）
 
 - **From:** 本会话（lead）· **To:** 下一轮接手者
