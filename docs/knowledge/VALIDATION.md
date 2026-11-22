@@ -1,3 +1,17 @@
+## 已发版 0.13.18 团队调度层 v1 + 取消测试竞态修复 — 2026-11-23 (`CONFIRMED`)
+
+| state | command | result |
+| --- | --- | --- |
+| branch `team-dispatch-v1` → main `f18e17b` | `npm run ci` | **exit 0：85 files / 1617 tests PASS**（新增 taskboard 13 + dispatcher 11 + handoff 15；含 progress 取消用例竞态修复）；typecheck 干净；lint 0 errors；`verify:lib` byte-identical（217 文件） |
+| 同上 | 真机 soak（隔离 DSH_HOME + tgz 安装 + 真模型 muse-spark） | **PASS**：bundle 组合正常；MODEL_OK；两任务依赖链跑通（hello.txt `TEAM_OK` 落盘）；任务板独立复验 fail→重试→pass→依赖放行→重启恢复 |
+| 同上 | 任务板/dispatcher/handoff 独立复验（lib 产物直调） | **PASS**：依赖阻塞、CAB 冲突、重启恢复、四项白名单、三项硬拒绝、缺字段/裸文字打回、四行双语渲染 |
+| remote main `f18e17b` | CI workflow `45070692108` | **success**（2m4s） |
+| remote tag `v0.13.18` | Release workflow `45070695678` | **success**（2m13s），GitHub Release `v0.13.18` 已发布（asset `dsh-grok-workflow-0.13.18.tgz`） |
+
+**Changed:** `src/taskboard/`（调度真相：原子 jsonl + CAS + 依赖 + 不可变 completed）、`src/dispatcher/`（L1 大管家：白名单四项 + 三项硬拒绝 + 启停恢复）、`src/handoff/`（四行契约 + 可复验证据指针 + 双语渲染进 report）；主链 plan → execute → verify → retry → synthesize 未动。
+**前车之鉴：** `v0.13.17` 的 Release workflow 挂在 `test/progress.spec.ts` 的取消用例（远端 1 failed / 本地 3 次 PASS）：resume 扫描给启动加了 ~12 ms IO，固定 10 ms 睡眠的 abort 落在引擎启动前，走无事件路径读 `undefined.type`。修法是轮询等第一个子调用出现再 abort（本版合流重发 v0.13.18 双绿）。**教训：** 凡启动路径加 IO，必须同步审计所有固定睡眠的取消/超时用例。
+**Honest boundary:** L3 小组长未做（不足 20 worker 规模）；dispatcher 与 taskboard 的对接点是 `TaskReader` 接口（dispatcher 自带板，合流未做）；跑中改需求（step 5-4）NOT_RUN，需真实 GUI 会话；v0.13.17 tag 已推但 Release 失败，属坏 tag 留置（不可移动），以 v0.13.18 为准。
+
 ## 已发版 0.13.16 手动清单第二轮（6 件需求） — 2026-11-23 (`CONFIRMED`)
 
 | state | command | result |

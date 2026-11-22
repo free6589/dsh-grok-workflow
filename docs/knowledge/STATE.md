@@ -1,3 +1,10 @@
+Last updated: 2026-11-23 05:15 +08:00（**已发版 `0.13.18`：团队调度层 v1 + 取消测试竞态修复，`CONFIRMED`** —
+发版提交 `f18e17b` + tag `v0.13.18` 已推；远端 CI `45070692108` success、Release `45070695678`
+success 并已发布（asset `dsh-grok-workflow-0.13.18.tgz`）。本地门禁：`npm run ci` exit 0（85 文件 / 1617 测试
+PASS），真机 soak PASS（MODEL_OK + 两任务依赖链 + 任务板 fail→重试→pass→重启恢复），lint 0 errors，
+`verify:lib` byte-identical。`v0.13.17` 的 Release 曾挂在 progress 取消用例时序竞态（resume 扫描 +12ms），
+修测试后重发本版双绿；v0.13.17 属坏 tag 留置。L3 小组长未做（规模不够）；跑中改需求待真实 GUI 验证。）
+
 Last updated: 2026-11-23 04:40 +08:00（**已发版 `0.13.16`：手动清单第二轮 6 件需求，`CONFIRMED`** —
 发版提交 `1591665` + tag `v0.13.16` 已推；远端 CI `45067182761` success、Release `45067195044`
 success 并已发布（asset `dsh-grok-workflow-0.13.16.tgz`）。本地门禁：`npm run ci` exit 0（82 文件 / 1578 测试

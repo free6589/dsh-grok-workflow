@@ -1,3 +1,18 @@
+## 2026-11-23 — 已发版 `0.13.18`：团队调度层 v1 + 取消测试竞态修复（`CONFIRMED`）
+
+- **From:** 本会话（lead）· **To:** 下一轮接手者
+- **发了什么**：发版提交 `f18e17b` 已推，annotated tag `v0.13.18` 已推；远端 CI `45070692108`
+  success、Release `45070695678` success 并已发布（asset `dsh-grok-workflow-0.13.18.tgz`）。
+  本地 `npm run ci` exit 0：85 files / 1617 tests PASS；`verify:lib` byte-identical；真机 soak PASS。
+- **内容**：`src/taskboard/`（调度真相）+ `src/dispatcher/`（L1 大管家）+ `src/handoff/`（四行契约进 report），
+  D-108；主链未动。三 lane 子代理并行交付，lead 独立复验（依赖阻塞/CAS 冲突/重启恢复/三项硬拒绝/缺字段打回）。
+- **事故**：`v0.13.17` 的 Release 挂在 progress 取消用例（远端红/本地绿）：resume 扫描 +12ms 启动 IO，
+  固定 10ms 睡眠的 abort 落在引擎启动前。已修（轮询等子调用）并重发本版。v0.13.17 为坏 tag 留置不动。
+- **分支收尾**：`team-dispatch-v1` 已合流 main，可 24h 内删除；本 worktree（fix-synth-resubmit）在 main 上，
+  无残留。主工作树另有 naming/面板线 37 文件未提交，与本版无关。
+- **未做**：L3 小组长（规模不够）；dispatcher↔taskboard 合流（`TaskReader` 接口已留）；跑中改需求需真实 GUI；
+  第三节 5 件拍板项未动。
+
 ## 2026-11-23 — 已发版 `0.13.16`：手动清单第二轮 6 件需求（`CONFIRMED`）
 
 - **From:** 本会话（lead）· **To:** 下一轮接手者
