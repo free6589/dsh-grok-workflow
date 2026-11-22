@@ -1,3 +1,15 @@
+## 2026-11-22 — 已发版 `0.13.10`：单次调用预算可配默认 120 分钟（`CONFIRMED`）
+
+- **From:** 本会话（lead）· **To:** 下一轮接手者
+- **发了什么**：`697564a` 已推，annotated tag `v0.13.10` 已推；远端 CI `45011630777`
+  success、Release `45011644468` success 并已发布。本地 `npm run ci` exit 0：
+  80 files / 1525 tests PASS。
+- **内容**：见 D-102（`childTimeoutMs` 新键、默认/上限 120 分钟、设置页分钟编辑、报告校验/渲染、
+  旧报告豁免）。
+- **没做的**：并发轮的未跟踪文件未动（`src/weather/`、`test/nyc*.spec.ts`、`sg-weather.html`、
+  `.rsi/evidence/*` 等不属本轮）；`tsconfig*.json` 的 jsx/tsx 改动非本轮引入仍在工作树未处理；
+  真机 120 分钟长任务实跑 NOT_RUN。
+
 ## 2026-11-22 — childTimeoutMs 单次调用预算 120 分钟（`CONFIRMED`，未发版、未提交）
 
 - **From:** 本会话（lead）· **To:** 下一轮接手者
