@@ -1,11 +1,12 @@
 /**
- * Cooperative timeouts (Q6): three tiers, one funnel, no host-side child kill.
+ * Cooperative timeouts (Q6): three tiers, one funnel, no host-side process kill.
  *
  * The engine offers exactly one cancellation handle — `WorkflowRun.cancel()`, which
- * stops the whole run — so a single hung child cannot be killed from the host
- * (`src/guardian.ts` can only cancel the run). The fix is therefore inside the script:
- * every `agent()` call races a timer, and a call that loses the race is settled as a
- * failed attempt, which the existing bounded retry already knows how to continue.
+ * stops the whole run. The host has no safe per-child process-kill handle, so
+ * Guardian never cancels the parent run for a liveness finding. The script can
+ * stop waiting on one `agent()` call and classify that attempt as timed out; this
+ * is not an OS-process kill or a command interruption. The task's bounded retry
+ * then decides whether to try a smaller step.
  *
  * The funnel, cheapest first:
  *
@@ -69,9 +70,9 @@ export declare function resolveChildTimeoutMs(value: unknown): number;
 export declare function childTimeoutReason(role: string, childTimeoutMs: number): string;
 /** Milliseconds one `wait` verdict extends a stalled call. */
 export declare const GUARDIAN_WAIT_MS = 300000;
-/** How many times one stalled call may be extended before it is killed. */
+/** How many times one stalled call may be extended before the call attempt times out. */
 export declare const GUARDIAN_MAX_WAITS = 2;
-/** Milliseconds the adjudication call itself may run; its failure is a kill. */
+/** Milliseconds the adjudication call itself may run; timeout settles the attempt. */
 export declare const GUARDIAN_ADJUDICATION_MS = 60000;
 /** What the guardian model decided about one stalled call. */
 export type GuardianVerdict = 'wait' | 'kill' | 'rescue';
@@ -82,8 +83,8 @@ export type GuardianVerdict = 'wait' | 'kill' | 'rescue';
  * "guidance": "…"}`; a string reply and a bare `verdict` field are accepted
  * the same way, because the schema travels but a degraded gateway may still
  * answer plain text. Anything unreadable returns `undefined`, which the
- * caller treats as a kill: an adjudicator that cannot answer has no evidence
- * for a wait — and none for a rescue either.
+ * caller treats as a timed-out attempt: an adjudicator that cannot answer has no
+ * evidence for extending the wait or sending recovery guidance.
  * @param value - the child's structured result, its reply string, or anything else.
  * @returns the verdict, or `undefined` when nothing readable was said.
  */
@@ -102,9 +103,10 @@ export declare function parseGuardianVerdict(value: unknown): GuardianVerdict | 
 export declare function guardianWaitMs(deadlineRemainingMs: number): number;
 /**
  * What happens to one stalled call, from the verdict and the budget (S7 pure function).
- * A rescue grants the same slice a wait would: the host interrupts the child
- * and delivers the guidance, and the child wakes with new instructions.
- * @param verdict - the parsed guardian verdict; `undefined` reads as a kill.
+ * A rescue grants the same slice a wait would; the host queues guidance for
+ * the child without interrupting its active turn. `kill` means stop waiting on
+ * this call and let the task retry, not terminate the underlying process.
+ * @param verdict - the parsed guardian verdict; `undefined` times out the attempt.
  * @param waitsUsed - waits already granted to this call.
  * @param deadlineRemainingMs - milliseconds until the run deadline.
  * @returns `'wait'` when one more slice is affordable, else `'kill'`.
