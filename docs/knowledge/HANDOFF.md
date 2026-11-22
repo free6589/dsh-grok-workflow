@@ -1,3 +1,61 @@
+## 2026-11-22 — lead 合流：通道 + 重规划 + 汇总三步 + 红色语义，全量 82/1594 PASS（`CONFIRMED`，未发版）
+
+- **From:** 本会话（lead）· **To:** 下一轮接手者
+- **接了什么**：agent-8 通道 lane（`src/channel.ts` + `src/gate.ts` 单一决策点
+  `answerOnChannel()` + `src/run.ts` steeringToken 透传 + `src/types.ts` replan 开关 +
+  `test/channel.spec.ts` 41 例）已合入工作树；planner_replan lane
+  （`src/steering.ts`/`src/replan.ts`/`src/script.ts` 波边界拉取 + `src/report.ts`
+  台账 + 汇总三步 `SUMMARY_MAX_ATTEMPTS=3` 起草-检查-复核 + `test/replan.spec.ts` 17 例）
+  已合入；红色语义 lane（`src/progress-tab.ts` + `src/client/index.js`：行红留痕、
+  卡/段/条按现状判、连接线中性 + `progress.settle.retried` + `test/client.spec.ts`
+  measureWires 口子）已合入。
+- **lead 修了什么**：5 个假环境按名存工具（plugin-lifecycle/reliability/
+  timeout-config/config-limits-repair/config-synthesis-fallback 的 FakeContext
+  `tool` 改 getter 按 `grok_workflow` 取，Cordis 真 fiber 两处同理）——根因是
+  `src/index.ts` 多注册了 `grok_replan_intents`，旧测试只留最后一个工具；
+  `test/reliability.spec.ts` 设置页计数 `15 of 18` → `16 of 18`（replan 新键）；
+  `test/client.spec.ts` ProgressBundle 补
+  `recoveredFailures/currentFailureCount/settleParts/measureWires` 四个接口声明。
+- **门禁（本轮实测）**：`npm test` **82 文件 / 1594 测试 PASS**；typecheck 唯一报错是
+  并发轮未跟踪 `test/nycforecast.spec.ts` 的 `--jsx`（他 lane 孤儿，与本轮无关）；
+  lint 0 errors（27 warnings 皆 pre-existing）；`npm run build` +
+  `npm run verify:lib` byte-identical（165 files）。
+- **没做的**：未提交、未发版；真机 GUI 手势 NOT_RUN（跑中发话看波边界并入 +
+  进度页更新 + 「停」看取消结算，需真实浏览器会话 + 真模型）；nyc 天气孤儿
+  （`src/weather/` + `test/nyc*.spec.ts` + `sg-weather.html`）未动——下次发版前要么
+  修好 `--jsx` 合入，要么继续分段门禁。
+- **下一步**：用户说发版才走五步流（ci → tag → push main → push tag → 盯 Release）；
+  发版前确认 `replan` 默认关的文档口径（README/LOCAL-TESTING 已有 `replan` 行，
+  设置页开关默认关）。
+
+## 2026-11-22 — L2 主会话通道（通道侧）落地，未发版（`CONFIRMED`，session_channel lane）
+
+- **From:** session_channel lane（agent-8）· **To:** lead 合流 / 下一轮接手者
+- **本 lane 的文件**（lead 拍板 Option B）：新 `src/channel.ts`、`src/gate.ts`
+  （`answerOnChannel()` / `runChannelRound()` / `cancelLiveRuns()`）、`src/run.ts`
+  （只加 `RunWorkflowOptions.steeringToken?` 透传）、`src/types.ts`
+  （`GrokWorkflowConfig.replan?`）、`test/channel.spec.ts`（新）。
+  **没碰** `src/steering.ts`/`src/replan.ts`/`src/script.ts`/`src/client/**`/`src/progress-tab.ts`。
+- **行为**：`replan` 开时，跑中消息立刻回执并进活计划（波边界并入）；只有裸 `停/stop/取消`
+  取消整轮（经 run 自己的 `cancel()`，结算走 `keepCancelledWork()`）；没有在跑的任务时裸叫停
+  只回一句、不派工；整轮结算时未取用的要求用「上一轮 objective + 要求」开下一轮，不丢。
+- **门禁**：`test/channel.spec.ts` 41 PASS；gate/grok-on/phase1/triage-recall/composition
+  5 文件 128 PASS；`tsc --noEmit` 只剩并发轮 nyc `.tsx` 的 `--jsx`（他 lane）；oxlint 我 lane
+  0 errors；`npm run build` + `verify:lib` exit 0。
+- **已知红灯不属本 lane（合流前必须由对应 lane 修）**：
+  `test/plugin-lifecycle.spec.ts`(17) / `test/reliability.spec.ts`(6) /
+  `test/timeout-config.spec.ts`(6) / `test/config-limits-repair.spec.ts`(5) /
+  `test/config-synthesis-fallback.spec.ts`(2) 的根因是 `src/index.ts` 现在注册了**第二个工具**
+  `grok_replan_intents`，而测试的 FakeContext 只留"最后一个注册的工具"，于是 `ctx.tool` 变成它、
+  `execute({objective})` 报 `missing required property "token"`；另有一例设置页字段数断言
+  `15 of 18` 需随 `replan` 变 `16 of 18`。修法二选一：测试按名字挑工具，或 index lane 让
+  steering 工具后注册/不覆盖 `ctx.tool`。**不要**在本 lane 的文件里绕。
+- **没做的**：全量 `npm run ci` NOT_RUN（lead 统一跑）；**真机 GUI 手势 NOT_RUN** —
+  需要真实浏览器会话 + 真实模型：跑中发一句「再加一个…」看回执立即出现、看进度页在波边界后
+  出现新任务、再发「停」看取消结算报告。子任务级热取消仍是非目标（引擎无 per-child 句柄）。
+- **合流提示**：本 lane 的 gate 改动是**结构化**的（删掉 team/full 里两份 steering 块，改为
+  `answerInTurn` 单一决策点），若与他 lane 的 gate 补丁冲突，以 `answerOnChannel()` 为锚点重放。
+
 ## 2026-11-22 — 已发版 `0.13.11`：守卫判停预算永远跟随单次调用预算（`CONFIRMED`）
 
 - **From:** 本会话（lead）· **To:** 下一轮接手者

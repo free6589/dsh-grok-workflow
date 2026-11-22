@@ -92,11 +92,15 @@ class FakeContext {
   readonly warnings: string[] = []
   readonly infos: string[] = []
   readonly listeners = new Map<string, (payload: unknown, next: () => Promise<unknown>) => Promise<unknown>>()
-  tool: ExecutableTool | undefined
+  readonly toolsByName = new Map<string, ExecutableTool>()
+  get tool(): ExecutableTool | undefined { return this.toolsByName.get('grok_workflow') }
   readonly engine = new FakeEngine()
 
   readonly tools = {
-    register: (tool: ExecutableTool) => { this.tool = tool; return () => { this.tool = undefined } },
+    register: (tool: ExecutableTool) => {
+      this.toolsByName.set(tool.name, tool)
+      return () => { if (this.toolsByName.get(tool.name) === tool) this.toolsByName.delete(tool.name) }
+    },
   }
 
   readonly systemPrompt = {
@@ -502,7 +506,7 @@ describe('reliability: live configuration and diagnostics', () => {
     expect(described.level).toBe('info')
     expect(described.text).toContain('page auto-generated')
     expect(described.text).toContain('grok-workflow')
-    expect(described.text).toContain(`15 of ${CONFIG_KEYS.length} field(s) on the page`)
+    expect(described.text).toContain(`16 of ${CONFIG_KEYS.length} field(s) on the page`)
     expect(described.text).toContain('schema matches')
   })
 })

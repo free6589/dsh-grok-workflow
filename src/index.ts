@@ -14,6 +14,7 @@ import type { ModeHostContext } from './mode-surface.js'
 import { installShutdownProbe } from './records.js'
 import { normalizeCallerTasks, GrokWorkflowInputError, TASK_LIMITS } from './input.js'
 import { renderReport } from './report.js'
+import { STEERING_TOOL_NAME, closeAllSteering, pullSteering } from './steering.js'
 import { redactError } from './redact.js'
 import { createActiveState, disposeActiveState, runWorkflow } from './run.js'
 import type { ActiveState } from './run.js'
@@ -147,6 +148,9 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
     // were cancelled 573 ms apart with no way to tell who unloaded the plugin.
     // The raw stack is captured here, at the only place that knows the answer,
     // and `disposeActiveState` records what it attributes it to (t45, P0-1).
+    // The steering queues die with the run; an unload closes them explicitly so a
+    // reloaded plugin cannot hand an old token to a new boundary child.
+    closeAllSteering()
     await disposeActiveState(state, {
       logger,
       ...new Error('dsh-grok-workflow disposer').stack === undefined
@@ -289,6 +293,35 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
   })
 
   ctx.tools.register(tool)
+
+  // Mid-run replan channel (L2): the boundary planner child of a running workflow
+  // pulls the demands queued for its run with this tool. The run token is the only
+  // credential: an unknown token answers an empty list, so a stale child costs one
+  // call instead of the run. Registered always, inert until a run with `replan` on
+  // opens a queue.
+  const replanTool = defineTool({
+    name: STEERING_TOOL_NAME,
+    description: [
+      'Pull the user demands queued for the running plan identified by the token.',
+      'Only a workflow boundary planner should call this, once, with the run token from its prompt.',
+    ].join(' '),
+    parameters: {
+      token: {
+        type: 'string' as const,
+        required: true as const,
+        description: 'Run token quoted in the boundary prompt. Consumes every queued demand exactly once.',
+      },
+    },
+    output: {
+      schema: { type: 'json' as const },
+      render: (_args, value) => [{ type: 'text' as const, text: JSON.stringify(value) }],
+    },
+    isConcurrencySafe: () => true,
+    async execute(args) {
+      return pullSteering(args.token) as never
+    },
+  })
+  ctx.tools.register(replanTool)
 
   // Repeat-run driver (Host loop service). A loop is one durable Schedule rrule task
   // whose delivery target is the same session; this plugin owns no timer, so an open

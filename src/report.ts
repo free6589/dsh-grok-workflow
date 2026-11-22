@@ -3,6 +3,8 @@ import type {
   RouteTrailEntry, ExecutionResult, FailureCategory, FinalStatus, VerificationResult, WorkflowReport } from './types.js'
 import type { ModelRoute, ResolvedConfig, RoleName } from './types.js'
 import { criterionKey, TASK_LIMITS } from './input.js'
+import { REPLAN_LIMITS } from './replan.js'
+import type { ReplanDecision } from './replan.js'
 import { maxTotalAgentsFor, routeBudgetFor } from './script.js'
 import { shardCountFor, splitObjective } from './shards.js'
 import { planWaveReason, WAVE_LIMIT } from './waves.js'
@@ -329,6 +331,69 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
       }
     }
   }
+  // Mid-run replan (L2): the plan version and the boundary ledger. A version above
+  // 1 without a matching `applied` row would claim replanning that the ledger does
+  // not show, so the two are checked against each other instead of trusted apart.
+  const planVersion = plan.version === undefined ? 1 : number(plan.version, 'plan.version')
+  if (!Number.isInteger(planVersion) || planVersion < 1) {
+    throw new Error(`workflow result plan.version must be a positive integer, got ${planVersion}`)
+  }
+  const planReplans: ReplanDecision[] = plan.replans === undefined
+    ? []
+    : array(plan.replans, 'plan.replans').map((item, index) => {
+      const row = record(item, `plan.replans[${index}]`)
+      const version = number(row.version, `plan.replans[${index}].version`)
+      const wave = number(row.wave, `plan.replans[${index}].wave`)
+      const decision = string(row.decision, `plan.replans[${index}].decision`)
+      if (!Number.isInteger(version) || version < 2) {
+        throw new Error(`workflow result plan.replans[${index}].version must be an integer above 1`)
+      }
+      if (!Number.isInteger(wave) || wave < 1) {
+        throw new Error(`workflow result plan.replans[${index}].wave must be a positive integer`)
+      }
+      if (decision !== 'applied' && decision !== 'rejected' && decision !== 'none') {
+        throw new Error(`workflow result plan.replans[${index}].decision is not applied, rejected or none`)
+      }
+      const idList = (value: unknown, field: string): string[] =>
+        array(value, field).map((id, position) => string(id, `${field}[${position}]`))
+      const reason = string(row.reason ?? '', `plan.replans[${index}].reason`)
+      if (reason.length > REPLAN_LIMITS.decisionChars) {
+        throw new Error(`workflow result plan.replans[${index}].reason is over the ${REPLAN_LIMITS.decisionChars}-character bound`)
+      }
+      const addedTaskIds = idList(row.addedTaskIds ?? [], `plan.replans[${index}].addedTaskIds`)
+      const updatedTaskIds = idList(row.updatedTaskIds ?? [], `plan.replans[${index}].updatedTaskIds`)
+      const removedTaskIds = idList(row.removedTaskIds ?? [], `plan.replans[${index}].removedTaskIds`)
+      if (addedTaskIds.length + updatedTaskIds.length + removedTaskIds.length > REPLAN_LIMITS.maxEdits) {
+        throw new Error(`workflow result plan.replans[${index}] names more edits than the ${REPLAN_LIMITS.maxEdits} limit`)
+      }
+      return {
+        version,
+        wave,
+        decision: decision as ReplanDecision['decision'],
+        reason,
+        addedTaskIds,
+        updatedTaskIds,
+        removedTaskIds,
+        reordered: row.reordered === true,
+      }
+    })
+  if (planReplans.length > REPLAN_LIMITS.maxBoundaries) {
+    throw new Error(`workflow result plan.replans has ${planReplans.length} rows; the boundary limit is ${REPLAN_LIMITS.maxBoundaries}`)
+  }
+  const applied = planReplans.filter(row => row.decision === 'applied')
+  if (planVersion > 1) {
+    if (applied.length === 0) {
+      throw new Error('workflow result plan.version claims a replan but plan.replans records no applied merge')
+    }
+    if (applied[applied.length - 1]!.version !== planVersion) {
+      throw new Error(`workflow result plan.version ${planVersion} disagrees with the last applied merge (version ${applied[applied.length - 1]!.version})`)
+    }
+    for (let index = 1; index < applied.length; index++) {
+      if (applied[index]!.version <= applied[index - 1]!.version) {
+        throw new Error('workflow result plan.replans applied versions must strictly increase')
+      }
+    }
+  }
   const tasks = array(root.tasks, 'tasks').map((item, index) => {
     const task = record(item, `tasks[${index}]`)
     const taskStatus = string(task.status, `tasks[${index}].status`) as (typeof TASK_STATUSES)[number]
@@ -470,8 +535,11 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
     // the configured maximum for a planner or fallback plan. Anything outside that
     // window did not come from this plugin's request builder.
     const budget = routeBudgetFor(config)
+    // The request builder adds the bounded replan-boundary children when the run
+    // carries a replan token, so the window has to allow them: a report is not
+    // invalid for spending planner calls the merge was allowed to make.
     const minimumAgents = maxTotalAgentsFor(tasks.length, maxRetries, budget)
-    const maximumAgents = maxTotalAgentsFor(fallbackTaskCap, maxRetries, budget)
+    const maximumAgents = maxTotalAgentsFor(fallbackTaskCap, maxRetries, budget, REPLAN_LIMITS.maxBoundaries)
     if (maxTotalAgents < minimumAgents || maxTotalAgents > maximumAgents) {
       throw new Error(
         `workflow result limits.maxTotalAgents ${maxTotalAgents} is outside the allowed range ${minimumAgents}-${maximumAgents}`,
@@ -710,6 +778,8 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
       source: source as WorkflowReport['plan']['source'],
       tasks: planTasks,
       ...planWaves === undefined ? {} : { waves: planWaves },
+      ...planVersion === 1 ? {} : { version: planVersion },
+      ...planReplans.length === 0 ? {} : { replans: planReplans },
       error: planError,
       ...planFailure === undefined ? {} : { failure: planFailure },
     },

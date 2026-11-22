@@ -5,6 +5,8 @@ declare module '@deepseek-ai/dsh-llm' {
   }
 }
 
+import type { ReplanDecision } from './replan.js'
+
 /** Public and report types for dsh-grok-workflow. */
 
 /** Final workflow status. These are the only values the plugin may report. */
@@ -191,6 +193,17 @@ export interface GrokWorkflowConfig {
    */
   childTimeoutMs?: number
   /**
+   * Mid-run replan switch. `false` (default) keeps every message its own round:
+   * a run is never joined, and the only way to stop one is the run's own bounds.
+   *
+   * `true` opens the main-session channel (`src/channel.ts`): a message typed while
+   * a run is working is answered at once, and it either stops that run (a bare
+   * "停"/"stop"/"取消") or joins its remaining plan at the next wave boundary through
+   * `src/steering.ts` + `src/replan.ts`, so work already in flight is neither
+   * cancelled nor redone.
+   */
+  replan?: boolean
+  /**
    * Repeat-run switch. `false` (default) means one run per message; `true` lets a
    * repeat-run driver start another round when the previous one ended unfinished.
    */
@@ -251,6 +264,8 @@ export interface ResolvedConfig {
   timeoutMs: number
   /** Per child-call stall budget in milliseconds (default 120 min, ceiling 120 min). */
   childTimeoutMs: number
+  /** Mid-run replan switch (default off): merge new demands at a wave boundary. */
+  replan: boolean
   /**
    * Repeat-run surface, resolved and validated. These are carried here so a
    * repeat-run driver reads them from exactly one shape; `resolveConfig` does not
@@ -434,6 +449,19 @@ export interface PlanReport {
    * array. Every plan task appears exactly once, and in plan order.
    */
   waves?: string[][]
+  /**
+   * Plan version the run ended at (1 = never replanned). Absent on reports produced
+   * before mid-run replan existed; a version above 1 means at least one boundary
+   * merged a new demand into the unstarted waves.
+   */
+  version?: number
+  /**
+   * One row per wave boundary the replan channel visited, in order. A `rejected`
+   * row changes nothing (the run kept its old plan); an `applied` row names the
+   * tasks it added, updated, removed or re-ordered. Absent when the channel never
+   * ran.
+   */
+  replans?: ReplanDecision[]
   error?: string
   /** Why the plan is not the planner's own (planner fault, with a category). */
   failure?: AttemptFailure | null

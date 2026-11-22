@@ -785,7 +785,9 @@ describe('mandatory entry gate', () => {
     const ctx = new FakeContext()
     applyWith(ctx)
     expect(ctx.handlers.has('agent/pre-step')).toBe(true)
-    expect(ctx.registeredTools).toHaveLength(1)
+    // Two tools now: the workflow tool and the mid-run replan pull tool a boundary
+    // planner child calls. The gate itself still registers exactly one handler.
+    expect(ctx.registeredTools).toHaveLength(2)
   })
 
   it('fails closed after the plugin was unloaded', async () => {

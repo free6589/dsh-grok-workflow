@@ -326,6 +326,7 @@ export const CONFIG_KEYS = [
   'maxTasks',
   'timeoutMs',
   'childTimeoutMs',
+  'replan',
   'loopEnabled',
   'loopMaxRounds',
   'loopFailStreak',
@@ -1028,6 +1029,11 @@ export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
   // Self-iteration template (R-06): a string within the same bound the loop prompt
   // has; whitespace-only is legal and falls back to the built-in default at open
   // time, so a half-finished edit cannot arm an empty heartbeat.
+  const replanRaw: unknown = (config as { replan?: unknown }).replan
+  const replan = replanRaw === undefined ? false : replanRaw
+  if (typeof replan !== 'boolean') {
+    throw new Error(`replan must be true or false, got "${String(replanRaw)}"`)
+  }
   const iterateTemplateRaw: unknown = (config as { iterateTemplate?: unknown }).iterateTemplate
   const iterateTemplateInput = iterateTemplateRaw === undefined ? DEFAULT_ITERATE_TEMPLATE : iterateTemplateRaw
   if (typeof iterateTemplateInput !== 'string') {
@@ -1051,6 +1057,7 @@ export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
     maxTasks: integer('maxTasks', config.maxTasks ?? DEFAULT_MAX_TASKS, 1, HARD_LIMITS.maxTasks),
     timeoutMs: timeoutInteger('timeoutMs', config.timeoutMs ?? DEFAULT_TIMEOUT_MS),
     childTimeoutMs: integer('childTimeoutMs', config.childTimeoutMs ?? DEFAULT_CHILD_TIMEOUT_MS, HARD_LIMITS.childTimeoutMs.min, HARD_LIMITS.childTimeoutMs.max),
+    replan,
     loopEnabled,
     loopMaxRounds: integer('loopMaxRounds', config.loopMaxRounds ?? DEFAULT_LOOP_MAX_ROUNDS, 1, HARD_LIMITS.loopMaxRounds),
     loopFailStreak: integer('loopFailStreak', config.loopFailStreak ?? DEFAULT_LOOP_FAIL_STREAK, 1, HARD_LIMITS.loopFailStreak),

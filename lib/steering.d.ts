@@ -1,0 +1,105 @@
+/**
+ * The live steering channel: what a mid-run message becomes.
+ *
+ * The workflow engine gives a running script no way to receive data (its `args` are
+ * cloned at start, its realm has no timers and no fs, and the only host action is a
+ * whole-run cancel), so a demand that arrives mid-run is *pulled* by the script at a
+ * wave boundary: the boundary planner child calls {@link STEERING_TOOL_NAME}, the
+ * host hands over whatever the run's session queued, and marks it consumed.
+ *
+ * This module is that queue and its lifetime. It is deliberately small and inert
+ * when the feature is off: a run that never registers a queue costs nothing, and a
+ * gate path with no live queue behaves exactly as it did before.
+ *
+ * Bounds: at most {@link STEERING_LIMITS.maxQueued} pending intents per run, one
+ * intent is at most {@link STEERING_LIMITS.intentChars} characters, and an overflow
+ * drops the oldest intent and counts the drop instead of growing without limit.
+ */
+/** Tool a boundary planner child calls to pull the demands queued for its run. */
+export declare const STEERING_TOOL_NAME = "grok_replan_intents";
+/** Bounds on the live queue. */
+export declare const STEERING_LIMITS: {
+    /** Pending intents one run may hold; the oldest is dropped past this. */
+    readonly maxQueued: 8;
+    /** Characters one intent may carry; a longer message is truncated, never dropped. */
+    readonly intentChars: 2000;
+};
+/** One queued demand, in the session's own words. */
+export interface SteeringIntent {
+    /** Stable id, `<token>-<n>`, so a merge can name what it consumed. */
+    id: string;
+    /** The user's message, bounded. */
+    text: string;
+    /** When it arrived (epoch ms), for ordering only. */
+    atMs: number;
+}
+/** What the pull tool answers. */
+export interface SteeringPull {
+    intents: SteeringIntent[];
+    /** Intents dropped because the queue was full. */
+    dropped: number;
+}
+/**
+ * One run's pending demands.
+ *
+ * `take()` is the only consumer: it hands over everything pending and clears the
+ * queue in one step, so a boundary child that is retried on another route cannot
+ * see the same demand twice.
+ */
+export declare class SteeringQueue {
+    readonly token: string;
+    private readonly pending;
+    private droppedCount;
+    private sequence;
+    constructor(token: string);
+    /** True when at least one demand is waiting. */
+    get size(): number;
+    /** Dropped-intent count so far. */
+    get dropped(): number;
+    /**
+     * Queue one message for the next boundary.
+     * @param text - the user's message.
+     * @param nowMs - arrival time (injected so tests are deterministic).
+     * @returns true when it was queued, false when it was empty and ignored.
+     */
+    push(text: string, nowMs?: number): boolean;
+    /**
+     * Consume every pending demand.
+     * @returns the intents in arrival order, plus the drop count.
+     */
+    take(): SteeringPull;
+}
+/**
+ * Register a run's steering channel.
+ * @param sessionId - the session the run belongs to.
+ * @param token - the run token (a fresh one when omitted, for tests).
+ * @returns the queue and the token the script must quote.
+ */
+export declare function openSteering(sessionId: string, token?: string): {
+    token: string;
+    queue: SteeringQueue;
+};
+/**
+ * Close a run's channel.
+ * @param token - the token returned by {@link openSteering}.
+ */
+export declare function closeSteering(token: string): void;
+/** Close every channel (plugin unload). */
+export declare function closeAllSteering(): void;
+/**
+ * The live queue a message for this session should join.
+ * @param sessionId - the session the message arrived in.
+ * @returns the queue, or undefined when no run is steering.
+ */
+export declare function steeringForSession(sessionId: string): SteeringQueue | undefined;
+/**
+ * The pull tool's implementation: consume the demands for one token.
+ *
+ * An unknown token answers empty instead of throwing: a stale boundary child must
+ * cost one useless call, never the run. The token is compared exactly and is never
+ * echoed back.
+ * @param token - the run token the child read from its prompt.
+ * @returns the consumed intents (empty for an unknown token).
+ */
+export declare function pullSteering(token: unknown): SteeringPull;
+//# sourceMappingURL=steering.d.ts.map

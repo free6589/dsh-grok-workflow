@@ -3,6 +3,28 @@
 Notable user-facing changes are recorded here in English and Simplified Chinese.
 用户可见的功能和修复会在这里以英文和简体中文记录。
 
+## [0.13.12] - 2026-11-22
+
+### Added / 新增
+
+- **The main session stays a chat channel while a run works / 跑中主会话仍是可对话的渠道** —
+  With `replan` on, a message sent while a run is working is answered at once instead of after the run: the receipt says the demand joined the live plan, that the next wave boundary folds it into the tasks that have not started, that verified work is not redone, and how to stop (`停` / `stop`). Nothing already running is interrupted, and the decision returns before the workflow settles, so the conversation never waits for a run. The demand reaches the planner with a bounded snapshot of the conversation attached, because a short "改成 C" is unanswerable at the boundary on its own. A bare `停` / `stop` / `取消` is the only message that cancels a run; with nothing running it is answered instead of being admitted as a task. A demand still queued when the run settles opens the next round from `previous objective + demand` rather than being dropped.
+  / 打开 `replan` 后，跑中发来的消息立刻得到回执，而不是等整轮结束：回执说明这条要求已并入正在跑的计划、下一个波边界把它合进还没开始的任务、已验证的成果不会重做，并给出叫停方式（`停` / `stop`）。已在跑的任务不会被打断，决定在整轮结算前就返回，所以对话不必等工作流跑完。要求会带着一段有边界的对话快照交给规划器——只有一句"改成 C"在边界上是无法解释的。只有裸的 `停` / `stop` / `取消` 才会取消整轮；没有在跑的任务时这句话会被直接回答，而不是被当成任务派工。整轮结束时还没被取用的要求，会用"上一轮目标 + 新要求"开启下一轮，不会丢失。
+
+- **Mid-run demands merge into the live plan at wave boundaries / 跑中需求在波边界并入活计划** —
+  With `replan` on, each wave boundary spends at most one planner-route call (at most `min(waves, 4)` per run) to fold queued demands into the tasks that have not started yet: add, update, remove or re-order unstarted tasks and waves. Settled tasks (`verified` / `failed` / `blocked`) are read-only and never re-executed; edits naming a running task are refused and the run keeps its plan. Every merge is recorded in the report (`plan.version` plus a per-boundary ledger row), so a reader sees which version ran and what each merge changed.
+  / 打开 `replan` 后，每个波边界最多花一次规划调用（每轮至多 `min(波数, 4)` 次），把排队的要求并进还没开始的任务：新增、修改、删除或重排未启动的任务与波。已结算的任务（`verified` / `failed` / `blocked`）只读、不重跑；点名正在跑的任务的改动会被拒绝，整轮按原计划继续。每次合并都记进报告（`plan.version` + 逐边界台账），读者能看到跑的是第几版计划、每次合并改了什么。
+
+- **The summary passes a draft-check-verify gate, never a single pass / 汇总走起草-检查-复核三步，不过不发** —
+  The final narrative is written in at most three drafts (the first plus two rewrites): a deterministic check validates the composed candidate against the report (verdict stated as the report has it, open tasks named, uncertainties kept, command/test ledger carried), then an independent verification re-walks the raw task results with its own walker and recomputed counts. A draft that fails either step goes back to the writer with the finding; only a draft that passes both is delivered. When no draft passes, the deterministic narrative — itself gated — is the answer, and the report says why.
+  / 最终结语最多写三稿（首稿 + 两次重写）：确定性检查先按报告验一遍（结论与报告一致、未完成任务点名、不确定性保留、命令/测试台账带上），再由独立复核用自己的走法重走一遍原始任务结果、重算计数。任一步不过就带着原因打回重写；两步都过才发。没有一稿通过时，用同样过审的确定性回退顶上，报告里写明原因。
+
+### Fixed / 修复
+
+- **Red means "still broken now": recovered history clears the aggregate, the failed row keeps its mark, wires stay neutral / 红色只表示"现在还坏着"：恢复后聚合消红、行留痕、线中性** —
+  A task that failed one attempt and verified on a retry used to dye its card, its stage, the settle bar and the connecting wire red. Now a failure replaced by a later completed attempt of the same call no longer colours the aggregate (card, segment, settle bar): the badge counts only unrecovered failures, and the connecting wires carry no state colour at all. The failed row itself keeps its red mark, so "it failed once and is fine now" stays visible instead of reading as "the whole round is red".
+  / 任务某次失败、重试后通过，过去会把整张卡、整个阶段、结算条和连接线都染红。现在同一调用被后续通过覆盖的失败不再染聚合（卡片、段、结算条）：徽标只数"现在还坏着"的行，连接线彻底不带状态色。失败的那行自己照样留红——"出过一次错、现在全好了"看得见，而不是"整轮都是红的"。
+
 ## [0.13.11] - 2026-11-22
 
 ### Fixed / 修复

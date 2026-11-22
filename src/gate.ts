@@ -51,6 +51,10 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { delimiter, join } from 'node:path'
 import { acceptedEnterText, frontDeskText, noticeEnterText, noticeText, relayText, RELAY_SOURCE_KIND } from './answer.js'
 import { carryoverBounds, carryoverForSession, inheritanceForSession } from './carryover.js'
+import {
+  CHANNEL_OUTCOMES, classifyChannelMessage, composeCarriedRequest, composeIntentText,
+  idleStopNote, steerReceipt, stopNote, STEER_CANCEL_REASON,
+} from './channel.js'
 import { humanConclusion } from './delivery/index.js'
 import { collectHistory, composeObjective, renderHistory } from './history.js'
 import { TASK_LIMITS } from './input.js'
@@ -68,6 +72,7 @@ import {
 import type { DeliveryPhase } from './records.js'
 import { redactError, redactSecrets } from './redact.js'
 import type { ActiveState, RunOutcome, WorkflowLogger } from './run.js'
+import { STEERING_LIMITS, closeSteering, openSteering, steeringForSession } from './steering.js'
 import { runSingleCall, runWorkflow } from './run.js'
 import { isLoopHeartbeat, scheduleServiceOf } from './loop.js'
 import { createLoopBrakes } from './loop-brakes.js'
@@ -1081,6 +1086,7 @@ export function installGate(deps: GateDeps): boolean {
     signal?: AbortSignal,
     history?: string,
     lang?: TriageLang,
+    steeringToken?: string,
   ): Promise<Answer> => {
     // P0-5: `in-turn` publishes the claimed message before the run, so the caller
     // snapshots the history first and passes it here — otherwise the message the
@@ -1128,6 +1134,10 @@ export function installGate(deps: GateDeps): boolean {
         ctx, config: safe(), state, logger, agent, objective, failureMode: 'report',
         ...carryover.digest === '' ? {} : { carryover: carryover.digest },
         ...signal === undefined ? {} : { signals: [signal] },
+        // Mid-run replan (L2): the run token a boundary planner child quotes when it
+        // pulls the demands queued while this round works. Omitted unless the channel
+        // opened one, so a round with no channel stays byte-identical to before.
+        ...steeringToken === undefined ? {} : { steeringToken },
       })
     } catch (error) {
       // Busy instance, unloaded plugin or an unbuildable request: state it, do not bypass.
@@ -1280,6 +1290,176 @@ export function installGate(deps: GateDeps): boolean {
   }
 
   /**
+   * Stop every live workflow run of one session (the one channel action that stops work).
+   *
+   * Only an explicit stop reaches here: `classifyChannelMessage` returns `stop` for a
+   * bare "停" / "stop" / "取消" and nothing else, because cancelling costs the user
+   * everything that was in flight. The cancel goes through the run's own
+   * `cancel(reason)`, so the settlement is the ordinary one (`keepCancelledWork()`):
+   * verified work is kept, unfinished tasks are marked, and the cancellation report
+   * lands in this conversation rather than a silent gap.
+   *
+   * A cancel that throws is reported, never swallowed: the run may still be live, and
+   * the next message would otherwise join a plan nobody is executing.
+   *
+   * @param sessionId - session/agent key the runs are registered under.
+   * @returns how many live runs were asked to stop.
+   */
+  const cancelLiveRuns = async (sessionId: string): Promise<number> => {
+    const live: { runId: string; cancel: (reason: string) => unknown }[] = []
+    for (const [run, info] of state.active) {
+      if (info.sessionId !== sessionId) continue
+      live.push({ runId: String(info.runId), cancel: reason => run.cancel(reason) })
+    }
+    for (const target of live) {
+      try {
+        await target.cancel(STEER_CANCEL_REASON)
+      } catch (error) {
+        logger.warn(`steering could not cancel ${target.runId}: ${redactError(error)}`)
+      }
+    }
+    return live.length
+  }
+
+  /**
+   * Answer one message on the main-session channel, or decline it.
+   *
+   * This is the whole of the session-side behaviour the user asked for, in one
+   * place, so it cannot drift between the triage and `full` admissions:
+   *
+   * - a **bare stop** while this session has a run working cancels that run (the
+   *   only message that may) and states the terminal; the same word with nothing
+   *   running is answered instead of being admitted as a task;
+   * - anything else, while a run is working, joins that run's plan through
+   *   `src/steering.ts` — with the conversation snapshot attached — and gets an
+   *   immediate receipt naming the merge point and how to stop. Nothing already
+   *   running is interrupted, and the decision returns before the run settles, so
+   *   the main session never waits for a workflow.
+   *
+   * A run that never opened a channel (a tool call, `replan` off, or no live run)
+   * declines here and the caller takes its pre-existing path.
+   *
+   * @param agent - agent the batch belongs to.
+   * @param verdict - the admitted classification (its request is what was typed).
+   * @param entry - delivery entry the decision is recorded against.
+   * @param base - messages the step will enter.
+   * @param history - conversation snapshot taken before this batch was published.
+   * @param opts - the admission's own `enterAfter` (so the answer is entered the
+   *   same way the blocking path enters one).
+   * @returns the decision when the channel answered, `undefined` when it declines.
+   */
+  const answerOnChannel = async (
+    agent: Agent,
+    verdict: Extract<Classification, { kind: 'admit' }>,
+    entry: GateEntry,
+    base: readonly UserMessage[],
+    history: string,
+    opts: {
+      enterAfter: (base: readonly UserMessage[], text: string, surfaced?: boolean) => PreStepDecision
+      surfaced: boolean
+    },
+  ): Promise<PreStepDecision | undefined> => {
+    const lang = detectLanguage(verdict.request)
+    const queue = steeringForSession(verdict.agentId)
+    const intent = classifyChannelMessage(verdict.request)
+    if (queue === undefined) {
+      // Nothing was running (or nothing opened a channel). A bare stop must still
+      // not be admitted: the word "停" would spend a planner, a worker and a
+      // verifier on itself. Every other message takes the normal path.
+      if (intent.kind !== 'stop') return undefined
+      record(agent, entry, 'delivered', CHANNEL_OUTCOMES.idleStop)
+      return opts.enterAfter(base, idleStopNote(lang), opts.surfaced)
+    }
+    // A channel exists, so a run of this session is working. Without a later turn
+    // there is nowhere to deliver the receipt or the report — keep the blocking path.
+    if (!canBackgroundDeliver(agent)) return undefined
+    if (intent.kind === 'stop') {
+      await cancelLiveRuns(verdict.agentId)
+      record(agent, entry, 'delivered', CHANNEL_OUTCOMES.stop)
+      return opts.enterAfter(base, stopNote(lang), opts.surfaced)
+    }
+    const pushed = queue.push(composeIntentText(
+      firstAnswerContext(sessionOf(agent), history),
+      verdict.request,
+      STEERING_LIMITS.intentChars,
+    ))
+    if (!pushed) return undefined
+    record(agent, entry, 'delivered', CHANNEL_OUTCOMES.steered)
+    return opts.enterAfter(base, steerReceipt(lang, queue.size), opts.surfaced)
+  }
+
+  /**
+   * Run one admitted round with the mid-run channel open for exactly its lifetime.
+   *
+   * Opening the channel here (not inside `runWorkflow`) is what keeps the channel
+   * honest: the run's own early returns cannot leak a queue that would then swallow
+   * the next message, and the `finally` below sees every outcome — a report, a
+   * kept cancellation, a deadline, an engine error.
+   *
+   * Two things happen at the end, and both are required for "no wasted work":
+   * - the run's verification report is delivered into this conversation
+   *   (`deliverAndRecord`), so progress and conclusion appear where the user is;
+   * - a demand still queued when the run settles opens the next round from
+   *   `previous objective + demand` (`composeCarriedRequest`), because the run's end
+   *   is not a decision about the user's message and dropping it would be the
+   *   silent loss the channel exists to prevent.
+   *
+   * @param agent - agent that owns the round.
+   * @param entry - delivery entry the round's answer is recorded against.
+   * @param request - the request this round runs (already composed).
+   * @param lang - language of the user's message.
+   * @param history - conversation snapshot taken *before* the batch was published.
+   */
+  const runChannelRound = async (
+    agent: Agent,
+    entry: GateEntry,
+    request: string,
+    lang: TriageLang,
+    history: string,
+  ): Promise<void> => {
+    let steering: ReturnType<typeof openSteering> | undefined
+    try {
+      steering = safe().replan ? openSteering(entry.agentId) : undefined
+    } catch (error) {
+      // A channel that cannot open must not cost the round: it runs unsteered.
+      logger.warn(`steering channel could not open for ${entry.key}: ${redactError(error)}`)
+      steering = undefined
+    }
+    try {
+      await deliverAndRecord(agent, entry, await runTeam(agent, request, undefined, history, lang, steering?.token))
+    } finally {
+      if (steering !== undefined) {
+        // Consume before closing: a boundary planner that already pulled gets an
+        // empty take, so a demand is either merged into the run or carried into the
+        // next round — never both, never neither.
+        const queue = steeringForSession(entry.agentId)
+        const leftover = queue !== undefined && queue.token === steering.token
+          ? queue.take()
+          : { intents: [], dropped: 0 }
+        closeSteering(steering.token)
+        const carried = leftover.intents.map(intent => intent.text)
+        if (carried.length > 0 && !state.disposed) {
+          try {
+            const next = composeCarriedRequest(request, carried, TASK_LIMITS.objectiveChars)
+            const accepted = enqueue(entry.agentId, async () => {
+              const lateHistory = collectHistory(
+                sessionOf(agent),
+                { turns: FIXED_HISTORY_TURNS, chars: FIXED_HISTORY_CHARS },
+                entry.messageIds,
+              )
+              await runChannelRound(agent, entry, next, lang, lateHistory)
+            })
+            if (accepted) record(agent, entry, 'started', CHANNEL_OUTCOMES.carried)
+            else logger.warn(`steering carried ${carried.length} demand(s) for ${entry.key} into a full queue`)
+          } catch (error) {
+            logger.warn(`steering could not carry the late demand for ${entry.key}: ${redactError(error)}`)
+          }
+        }
+      }
+    }
+  }
+
+  /**
    * Team tier on an interactive run (B: 边聊边干).
    *
    * triage-team + effectiveMode `triage` + background-deliverable agent: one
@@ -1389,7 +1569,7 @@ export function installGate(deps: GateDeps): boolean {
           { turns: FIXED_HISTORY_TURNS, chars: FIXED_HISTORY_CHARS },
           entry.messageIds,
         )
-        await deliverAndRecord(agent, entry, await runTeam(agent, target, undefined, lateHistory, tier.lang))
+        await runChannelRound(agent, entry, target, tier.lang, lateHistory)
       })
       if (!accepted) return undefined
       return opts.enterAfter(base, answerText(firstAnswer, true), opts.surfaced)
@@ -1452,7 +1632,7 @@ export function installGate(deps: GateDeps): boolean {
           { turns: FIXED_HISTORY_TURNS, chars: FIXED_HISTORY_CHARS },
           entry.messageIds,
         )
-        await deliverAndRecord(agent, entry, await runTeam(agent, admit.request, undefined, lateHistory, lang))
+        await runChannelRound(agent, entry, admit.request, lang, lateHistory)
       })
       // `started` only once the batch is actually queued: `enqueue` schedules the task
       // on a later microtask, so this still lands before the run executes tool effects,
@@ -1577,6 +1757,15 @@ export function installGate(deps: GateDeps): boolean {
     // read back as prior conversation.
     const history = collectHistory(sessionOf(agent), { turns: FIXED_HISTORY_TURNS, chars: FIXED_HISTORY_CHARS })
     const surfaced = commitClaimed(agent, payload.messages)
+    // The main-session channel (src/channel.ts, `replan` on): one decision point,
+    // placed before either admission, because a message that arrives while this
+    // session's run is still working is not a new request whatever its own shape
+    // would classify as. It answers the stop and forward cases and returns
+    // `undefined` for everything else, so the rest of this function is unchanged.
+    if (safe().replan) {
+      const channel = await answerOnChannel(agent, verdict, entry, base, history, { enterAfter, surfaced })
+      if (channel !== undefined) return channel
+    }
     // B (边聊边干): triage-team on a background-deliverable agent answers the
     // live first answer in this turn and admits the workflow behind it.
     // answerStrategy is NOT consulted: the config default stays `in-turn`; this

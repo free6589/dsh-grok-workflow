@@ -114,6 +114,10 @@ interface ProgressBundle {
   deriveTrack(run: ProgressRun | undefined, labelFor: (key: string) => string): ProgressTrack | undefined
   duration(ms: number | undefined): string | undefined
   createStatus(): { getSnapshot(): string, getMessage(): string | undefined, subscribe(fn: () => void): () => void, set(state: string, message?: string): void }
+  recoveredFailures(members: ProgressMember[]): Set<number>
+  currentFailureCount(members: ProgressMember[]): number
+  settleParts(members: ProgressMember[], t: Translator): Array<Record<string, unknown>>
+  measureWires(root: unknown): { paths: Array<Record<string, unknown>> }
 }
 
 /** One answer from the loop route, in the switch's own vocabulary. */
@@ -2468,6 +2472,132 @@ describe('client progress tab: the settle bar, the rails and the narrow layout',
     const meta = walk(card).find((element) => element.props['data-gw-progress-task-meta'] === true)
     expect(meta).toBeDefined()
     expect(texts(meta!).join('')).toBe('3.0 s')
+  })
+})
+
+/**
+ * Red means *still broken now*, in the bundle the browser actually runs.
+ *
+ * The typed suite (`test/progress-tab.spec.ts`) states the same rule from the same
+ * fixtures; this block pins the four places the reader sees it: the settle bar, the spine
+ * segment, the task card, and the row pills that keep the failed attempt's own mark. The
+ * connection lines are structure and carry no status colour at all.
+ */
+describe('client progress tab: red is the current state, not the history', () => {
+  const progress = bundle.GROK_WORKFLOW_PROGRESS
+  const t = translator('zh')
+
+  /** Attempt 1 fails on the worker; attempt 2 runs the worker and the verifier cleanly. */
+  const recovered: ProgressMember[] = [
+    progressMember(1, '任务 2 · 写文档', 'failed', { label: '执行' }),
+    progressMember(2, '任务 2 · 写文档', 'completed', { label: '执行（尝试 2）' }),
+    progressMember(3, '任务 2 · 写文档', 'completed', { label: '检查（尝试 2）' }),
+  ]
+
+  /** The same task, failing both attempts. */
+  const stillBroken: ProgressMember[] = [
+    progressMember(1, '任务 2 · 写文档', 'failed', { label: '执行' }),
+    progressMember(2, '任务 2 · 写文档', 'failed', { label: '执行（尝试 2）' }),
+  ]
+
+  function renderOf(members: ProgressMember[], stopReason: string) {
+    const run: ProgressRun = { runId: 'r-red', name: '任务团队', anchorSeq: 1, members, stopReason }
+    return progress.component({
+      t,
+      progressT: t,
+      useGrokProgress: (select: (value: unknown) => unknown) => select({ runs: [run], activeRun: run }),
+    })
+  }
+
+  it('drops the failed attempt out of the bar instead of drawing it red', () => {
+    const tree = renderOf([...recovered, progressMember(4, '任务 1 · 读代码', 'completed', { label: '执行' })], 'completed')
+    const parts = walk(tree).filter((element) => typeof element.props['data-gw-progress-settle-part'] === 'number')
+    // No red segment survives a recovery: the failed row is reported as retried.
+    expect(parts.map((part) => part.props['data-tone'])).toEqual(['ok', 'retried'])
+    expect(parts.map((part) => part.props['data-gw-progress-settle-part'])).toEqual([3, 1])
+    expect(translate('zh', 'progress.settle.retried', { count: 1 })).toBe('1 已重试')
+    expect(translate('en', 'progress.settle.retried', { count: 1 })).toBe('1 retried')
+  })
+
+  it('keeps the spine green and the card non-red once the retry verified, and keeps the row pill red', () => {
+    const tree = renderOf(recovered, 'completed')
+    const elements = walk(tree)
+    // The spine segment that ran the task: green, no failure dot, no failure badge.
+    const execute = elements.find((element) => element.props['data-node-key'] === 'stage:execute')!
+    expect(execute.props['data-state']).toBe('done')
+    expect(walk(execute).some((element) => element.props['data-gw-progress-faildot'] === true)).toBe(false)
+    expect(walk(execute).some((element) => element.props['data-gw-progress-failbadge'] !== undefined)).toBe(false)
+    expect(texts(execute).join(' ')).not.toContain('失败')
+    // The card itself: done, not failed — its ring is the state mark a reader reads.
+    const card = elements.find((element) => typeof element.props['data-gw-progress-task'] === 'string')!
+    expect(card.props['data-state']).toBe('done')
+    expect(walk(card).find((element) => element.props['data-gw-progress-glyph'] !== undefined)!.props['data-gw-progress-glyph']).toBe('done')
+    // …and the failed attempt keeps its own mark on its own pill: that trace is the point.
+    const pills = walk(card).filter((element) => typeof element.props['data-gw-progress-pill'] === 'number')
+    expect(pills.map((pill) => pill.props['data-state'])).toEqual(['failed', 'done', 'done'])
+  })
+
+  it('still shows red in bar, spine and card while the failure is not recovered', () => {
+    const tree = renderOf(stillBroken, 'error')
+    const elements = walk(tree)
+    const parts = walk(tree).filter((element) => typeof element.props['data-gw-progress-settle-part'] === 'number')
+    expect(parts.filter((part) => part.props['data-tone'] === 'bad').map((part) => part.props['data-gw-progress-settle-part'])).toEqual([2])
+    const execute = elements.find((element) => element.props['data-node-key'] === 'stage:execute')!
+    expect(execute.props['data-state']).toBe('failed')
+    expect(walk(execute).some((element) => element.props['data-gw-progress-faildot'] === true)).toBe(true)
+    const card = elements.find((element) => typeof element.props['data-gw-progress-task'] === 'string')!
+    expect(card.props['data-state']).toBe('failed')
+    expect(walk(card).find((element) => element.props['data-gw-progress-glyph'] !== undefined)!.props['data-gw-progress-glyph']).toBe('failed')
+  })
+
+  it('keeps the failure badge only while the failure is current', () => {
+    // A stage-owned row (phase `执行`) is the one place a segment draws the count badge.
+    const broken = renderOf([progressMember(1, '执行', 'failed', { label: '执行' })], 'error')
+    const brokenExecute = walk(broken).find((element) => element.props['data-node-key'] === 'stage:execute')!
+    expect(walk(brokenExecute).find((element) => element.props['data-gw-progress-failbadge'] !== undefined)?.props['data-gw-progress-failbadge']).toBe(1)
+    expect(texts(brokenExecute).join(' ')).toContain(translate('zh', 'progress.branch.failedCount', { count: 1 }))
+    // Recovered: the same segment loses the badge and the failed-row sentence.
+    const healed = renderOf([
+      progressMember(1, '执行', 'failed', { label: '执行' }),
+      progressMember(2, '执行', 'completed', { label: '执行（尝试 2）' }),
+    ], 'completed')
+    const healedExecute = walk(healed).find((element) => element.props['data-node-key'] === 'stage:execute')!
+    expect(healedExecute.props['data-state']).toBe('done')
+    expect(walk(healedExecute).some((element) => element.props['data-gw-progress-failbadge'] !== undefined)).toBe(false)
+    expect(texts(healedExecute).join(' ')).not.toContain(translate('zh', 'progress.branch.failedCount', { count: 1 }))
+  })
+
+  it('draws the connection wires neutral: no state tone, no dash, one border-token stroke', () => {
+    const wires = progress.measureWires({
+      querySelectorAll: (selector: string) => selector === '[data-gw-progress-task]'
+        ? [{
+          getAttribute: (name: string) => (name === 'data-owner' ? 'stage:execute' : name === 'data-gw-progress-task' ? 'phase:任务 2 · 写文档' : 'failed'),
+          getBoundingClientRect: () => ({ top: 240, left: 40, height: 80, width: 1300 }),
+        }]
+        : [],
+      querySelector: (selector: string) => {
+        if (selector === '[data-gw-progress-track]') return { getBoundingClientRect: () => ({ top: 100, bottom: 188, left: 0, width: 1440, height: 88 }) } as never
+        if (selector.startsWith('.gw-progress-track')) return { querySelector: () => ({ getBoundingClientRect: () => ({ left: 432, width: 28 }) }), getAttribute: () => 'failed' } as never
+        return null
+      },
+      getBoundingClientRect: () => ({ top: 100, left: 0, width: 1440, height: 500 }),
+    } as never)
+    // A failed owner still measures to the same geometry: status never reaches the line.
+    expect(wires.paths).toHaveLength(2)
+    for (const path of wires.paths) {
+      expect('tone' in path).toBe(false)
+      expect('style' in path).toBe(false)
+    }
+    // Nothing in the bundle can colour a wire from a state any more: the style helper that
+    // took a tone is gone, so no rendering path can reattach one.
+    const source = readFileSync(new URL('../src/client/index.js', import.meta.url), 'utf8')
+    expect(source).not.toContain('progressWireStyle')
+    expect(source).not.toMatch(/'data-tone': path\.tone/)
+    // The neutral stroke is a border token, so the line follows the theme and claims no state.
+    expect(progress.css).toMatch(/\.gw-progress-wire \{[^}]*stroke: var\(--dsw-alias-border-l2/)
+    expect(progress.css).toMatch(/\.gw-progress-wire-head \{[^}]*fill: var\(--dsw-alias-border-l2/)
+    expect(progress.css).not.toMatch(/\.gw-progress-wire[^{]*\{[^}]*state-error/)
+    expect(progress.css).not.toMatch(/strokeDasharray/)
   })
 })
 

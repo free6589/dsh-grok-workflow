@@ -1,0 +1,10 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow
+
+ ✓ test/channel.spec.ts (41 tests) 486ms
+
+ Test Files  1 passed (1)
+      Tests  41 passed (41)
+   Start at  20:54:09
+   Duration  1.40s (transform 645ms, setup 0ms, import 782ms, tests 486ms, environment 0ms)
+

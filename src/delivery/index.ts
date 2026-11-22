@@ -652,6 +652,18 @@ function composeHumanParts(report: WorkflowReport, lang: DeliveryLang): { block:
     : nextStep(report, lang)
   push((zh ? '下一步：' : 'Next: ') + advice)
 
+  // A mid-run replan is a fact about this answer, not diagnostics: the run the
+  // reader asked for was changed by a message they sent, so saying which version
+  // ran and that finished work was kept belongs here, before the task detail.
+  const appliedReplans = (report.plan.replans ?? []).filter(row => row.decision === 'applied')
+  if (appliedReplans.length > 0) {
+    const version = report.plan.version ?? appliedReplans[appliedReplans.length - 1]!.version
+    const added = appliedReplans.reduce((sum, row) => sum + row.addedTaskIds.length, 0)
+    push(zh
+      ? `过程：计划已更新到第 ${version} 版（并入 ${appliedReplans.length} 次新要求，新增 ${added} 个任务），已经完成的部分没有重跑。`
+      : `Process: the plan reached version ${version} (${appliedReplans.length} new demand(s) merged, ${added} task(s) added); work already finished was not rerun.`)
+  }
+
   // What was achieved, named the way a reader knows it (title, never id).
   const doneTitles = verifiedTasks
     .slice(0, 4)

@@ -1,3 +1,26 @@
+## 未发版 L2 主会话通道（通道侧）— 2026-11-22 (`CONFIRMED`，session_channel lane)
+
+**Changed:** 新 `src/channel.ts`（分类/文案/意图组装 + 无损 carry 组装）、`src/gate.ts`
+（`answerOnChannel()` 单一决策点、`runChannelRound()` 每轮通道生命周期、`cancelLiveRuns()`、
+team/full 两条后台接纳改走同一壳）、`src/run.ts`（`RunWorkflowOptions.steeringToken?` 透传 +
+`buildWorkflowRequest` 第八参）、`src/types.ts`（`GrokWorkflowConfig.replan?`）、
+`test/channel.spec.ts`（新，41 例）、README 两行 `replan` 描述、CHANGELOG `[Unreleased]`。
+
+| state | command | result |
+| --- | --- | --- |
+| working tree (Node 26) | `npx vitest run test/channel.spec.ts` | **41 tests PASS**（证据 `evidence/session-channel-2026-11-22/channel-tests.txt`） |
+| working tree | `npx vitest run test/gate.spec.ts test/grok-on-ingress.spec.ts test/phase1-dialogue.spec.ts test/triage-recall.spec.ts test/composition.spec.ts` | **5 files / 128 tests PASS**（`gate-suites.txt`） |
+| working tree | `node --experimental-strip-types` 探针跑 `lib/channel.js` 的 12 条消息分类 | 只有裸 `停/停一下/请停下来/取消/stop/Stop it` 判 stop；`停止旧的缓存策略`、`写一个停车位管理页面`、`能不能停一下？` 全判 forward（`classification-probe.txt`） |
+| working tree | `npx tsc -p tsconfig.json --noEmit` | 仅并发轮 `test/nycforecast.spec.ts` 的 `--jsx` 一错（他 lane，未跟踪文件） |
+| working tree | `npx oxlint src/channel.ts src/gate.ts src/run.ts test/channel.spec.ts` | 0 errors / 2 warnings（`cancelledText` 既有 useless-spread、`run.ts` 既有 `RoleName` 未用，均非本轮引入） |
+| working tree | `npm run build` → `node scripts/build-client.mjs` | exit 0；`npm run verify:lib` exit 0（校验 HEAD↔HEAD，未触碰工作树 lib） |
+
+**Honest boundary:** 全量 `npm run ci` NOT_RUN（lead 跨 lane 统一跑；本轮并发 lane 的
+`test/client.spec.ts measureWires`、`test/nycforecast.spec.ts --jsx` 仍是红）。**真实浏览器里
+"跑中发消息→回执→波边界并入→进度页更新"的手势验证 NOT_RUN**：这需要真实 GUI 会话与真实模型，
+本轮只在 host 侧用真实 `apply()` 组合 + 假引擎钉住了语义（A1–A5）。撞到 `停掉` 之外的
+"取消某个具体任务"（子任务级热取消）仍是非目标：引擎没有 per-child 句柄。
+
 ## 未发版 D-104 Guardian 预算跟随 childTimeoutMs — 2026-11-22 (`CONFIRMED`，lead 本轮)
 
 **Changed:** `src/run.ts`（去掉 `guardianModel === undefined ? undefined :` 三元，永远传
@@ -5455,3 +5478,26 @@ github:free6589/dsh-grok-workflow#v0.13.9`）；真机 GUI 手点 observe findin
 | cleanup | 删 scratch profiles + `.tmp/dsh-gw-verify` + `/tmp` 探针 | done；`git status` 仅剩既有 untracked |
 
 **No release needed:** 本轮无源码改动（仅记忆文档），`package.json` 仍 `0.13.9`，不发 `v0.13.10`。
+
+## lead 合流：通道 + 重规划 + 汇总三步 + 红色语义 — 2026-11-22 (`CONFIRMED`，未发版)
+
+**Changed:** 5 个 FakeContext 按名存工具（plugin-lifecycle/reliability/
+timeout-config/config-limits-repair/config-synthesis-fallback：`tool` 改 getter
+按 `grok_workflow` 取，Cordis 真 fiber 两处同理）；`test/reliability.spec.ts`
+设置页计数 `15 of 18` → `16 of 18`（`replan` 新键，`CONFIG_KEYS` 18 键减
+toolName/configVersion = 页面 16）；`test/client.spec.ts` ProgressBundle 补
+`recoveredFailures/currentFailureCount/settleParts/measureWires` 四个接口声明。
+
+| state | command | result |
+| --- | --- | --- |
+| working tree (Node 26) | `npm test` | **82 files / 1594 tests PASS** |
+| working tree | `npx tsc -p tsconfig.json --noEmit` | 仅 `test/nycforecast.spec.ts` `--jsx` 一错（并发轮 nyc 孤儿，他 lane） |
+| working tree | `npm run lint` | 0 errors / 27 warnings（pre-existing） |
+| working tree | `npm run build` + `npm run verify:lib` | byte-identical（165 files） |
+| targeted | `npx vitest run test/progress-tab.spec.ts test/progress-connector.spec.ts test/client.spec.ts test/channel.spec.ts test/replan.spec.ts test/synthesis-guardrails.spec.ts` | **6 files / 258 tests PASS**（红语义 + 通道 + 重规划 + 汇总三步） |
+| targeted | `npx vitest run test/plugin-lifecycle.spec.ts test/reliability.spec.ts test/timeout-config.spec.ts test/config-limits-repair.spec.ts test/config-synthesis-fallback.spec.ts` | **5 files / 87 tests PASS**（本轮修的） |
+
+**Honest boundary:** `npm run ci` 的 typecheck 整步仍被 nyc `.tsx` 孤儿挡住
+（`src/weather/` + `test/nyc*.spec.ts` 未跟踪，他 lane 未动）；全量 `npm test`
+已绿。真机 GUI 手势 NOT_RUN（跑中发话看波边界并入 + 进度页更新 + 「停」看
+取消结算，需真实浏览器会话 + 真模型）。

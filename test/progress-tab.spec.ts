@@ -11,9 +11,11 @@ import {
   detailSourcesOf,
   foldProgressRuns,
   formatDuration,
+  currentFailureCount,
   nodeState,
   parseCoordinationBlock,
   percentOf,
+  recoveredFailureSeqs,
   selectActiveRun,
 } from '../src/progress-tab.js'
 import type { ProgressEventRecord, ProgressMemberFact, ProgressRunFacts } from '../src/progress-tab.js'
@@ -268,6 +270,92 @@ describe('progress tab: the five states and their precedence', () => {
   it('an unfinished row on a still-open run is doing, never blocked', () => {
     expect(nodeState([member(1, '执行')], false)).toBe('doing')
     expect(nodeState([member(1, '执行')], true)).toBe('blocked')
+  })
+})
+
+/**
+ * Red means *still broken now*.
+ *
+ * A task that failed attempt 1 and verified on attempt 2 carries both rows. The later
+ * completion replaces the earlier failure for every aggregate (card, spine segment, bar),
+ * while the failed row keeps its own mark — so the reader sees "it failed once, then it
+ * passed" instead of a task that is dyed red for the rest of the run.
+ */
+describe('progress tab: red is the current state, not the history', () => {
+  /** Attempt 1 fails on the worker, attempt 2 runs the worker and the verifier cleanly. */
+  const recoveredTask = (): ProgressMemberFact[] => [
+    member(1, '任务 2 · 写文档', 'failed', { label: '执行' }),
+    member(2, '任务 2 · 写文档', 'completed', { label: '执行（尝试 2）' }),
+    member(3, '任务 2 · 写文档', 'completed', { label: '检查（尝试 2）' }),
+  ]
+
+  it('clears the card only when a later attempt of that same call completed', () => {
+    const track = trackOf(recoveredTask(), 'completed')
+    const card = track.nodes.find((node) => node.key === 'phase:任务 2 · 写文档')!
+    expect(card.state).toBe('done')
+    // The failed row is still a declared row and still carries its own failed mark.
+    expect(card.members.map((entry) => entry.outcome)).toEqual(['failed', 'completed', 'completed'])
+    expect(recoveredFailureSeqs(card.members)).toEqual(new Set([1]))
+    expect(currentFailureCount(card.members)).toBe(0)
+    // The card's own chain: the execute capsule aggregates both attempts, so it is done too.
+    expect(card.chain?.find((slot) => slot.key === 'execute')?.state).toBe('done')
+    expect(card.chain?.find((slot) => slot.key === 'execute')?.members.map((entry) => entry.seq)).toEqual([1, 2])
+  })
+
+  it('keeps the stage that ran the recovered task out of red, and the bar count at zero', () => {
+    const track = trackOf([
+      member(1, '任务 1 · 读代码', 'completed', { label: '执行' }),
+      ...recoveredTask(),
+      member(4, '任务 3 · 补测试', 'completed', { label: '执行' }),
+    ], 'completed')
+    const execute = stageNode(track, 'execute')
+    expect(execute.state).toBe('done')
+    expect(currentFailureCount(execute.evidence)).toBe(0)
+    // The percentage still counts every declared row, failures included: 5 settled of 5.
+    expect(track.percent).toEqual({ settled: 5, declared: 5, value: 100 })
+  })
+
+  it('keeps a failure red when the retry has not settled yet, and when it failed again', () => {
+    // Attempt 2 is still running: not recovered, so the card is still broken now.
+    const running = trackOf([
+      member(1, '任务 2 · 写文档', 'failed', { label: '执行' }),
+      member(2, '任务 2 · 写文档', undefined, { label: '执行（尝试 2）' }),
+    ], undefined)
+    expect(running.nodes.find((node) => node.key === 'phase:任务 2 · 写文档')?.state).toBe('failed')
+
+    // Both attempts failed: still red, and both rows count.
+    const broken = trackOf([
+      member(1, '任务 2 · 写文档', 'failed', { label: '执行' }),
+      member(2, '任务 2 · 写文档', 'failed', { label: '执行（尝试 2）' }),
+    ], 'error')
+    const card = broken.nodes.find((node) => node.key === 'phase:任务 2 · 写文档')!
+    expect(card.state).toBe('failed')
+    expect(currentFailureCount(card.members)).toBe(2)
+    expect(stageNode(broken, 'execute').state).toBe('failed')
+  })
+
+  it('never lets another task’s success recover this task’s failure', () => {
+    // The completion belongs to 任务 3, a different phase: it says nothing about 任务 2.
+    const track = trackOf([
+      member(1, '任务 2 · 写文档', 'failed', { label: '执行' }),
+      member(2, '任务 3 · 补测试', 'completed', { label: '执行' }),
+    ], 'error')
+    expect(track.nodes.find((node) => node.key === 'phase:任务 2 · 写文档')?.state).toBe('failed')
+    expect(recoveredFailureSeqs(track.nodes.find((node) => node.key === 'phase:任务 2 · 写文档')!.members)).toEqual(new Set())
+    // The stage aggregates both rows, and one of them is still broken.
+    expect(stageNode(track, 'execute').state).toBe('failed')
+  })
+
+  it('treats a resubmit inside one attempt as recovered: same label, same attempt', () => {
+    // `script.ts` asks once more in the SAME attempt when the worker's result was
+    // unparseable, so both rows carry `执行` and the later completion replaces the first.
+    const track = trackOf([
+      member(1, '任务 2 · 写文档', 'failed', { label: '执行' }),
+      member(2, '任务 2 · 写文档', 'completed', { label: '执行' }),
+      member(3, '任务 2 · 写文档', 'completed', { label: '检查' }),
+    ], 'completed')
+    expect(track.nodes.find((node) => node.key === 'phase:任务 2 · 写文档')?.state).toBe('done')
+    expect(recoveredFailureSeqs(track.nodes.find((node) => node.key === 'phase:任务 2 · 写文档')!.members)).toEqual(new Set([1]))
   })
 })
 

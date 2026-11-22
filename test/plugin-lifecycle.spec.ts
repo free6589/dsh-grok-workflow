@@ -64,11 +64,15 @@ class FakeRun {
 class FakeContext {
   readonly effects: (() => Promise<void> | void)[] = []
   readonly warnings: string[] = []
-  tool: ExecutableTool | undefined
+  readonly toolsByName = new Map<string, ExecutableTool>()
+  get tool(): ExecutableTool | undefined { return this.toolsByName.get('grok_workflow') }
   promptSections: unknown[] = []
   readonly engine = new FakeEngine()
   readonly tools = {
-    register: (tool: ExecutableTool) => { this.tool = tool; return () => { this.tool = undefined } },
+    register: (tool: ExecutableTool) => {
+      this.toolsByName.set(tool.name, tool)
+      return () => { if (this.toolsByName.get(tool.name) === tool) this.toolsByName.delete(tool.name) }
+    },
   }
 
   readonly systemPrompt = {

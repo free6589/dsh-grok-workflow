@@ -45,10 +45,10 @@ dsh --profile grok-workflow-dev --from-default-profile headless --dump-config
 Then install the plugin:
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.13.11
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.13.12
 ```
 
-> `#v0.13.11` is the current release. Pin the tag you actually want; omitting it follows `main`, which is not a release. Do not run `--from-default-profile` after `plugin add`: it replaces the profile and removes the plugin you just installed.
+> `#v0.13.12` is the current release. Pin the tag you actually want; omitting it follows `main`, which is not a release. Do not run `--from-default-profile` after `plugin add`: it replaces the profile and removes the plugin you just installed.
 
 Then restart the profile so DSH loads the new plugin:
 
@@ -208,7 +208,7 @@ supervisor keeps that job (fail-only after verification).
 
 ## Configuration reference
 
-Configuration belongs to the profile's `cordis.patch.yml` (or a `--patch` overlay), under the bundle row. The surface is exactly seventeen keys (`timeoutMs` joined in `0.11.0`, `childTimeoutMs` joined now, the four `loop*` keys with the repeat-run settings, the two `iterate*` keys with the self-iteration heartbeat, and `guardianModel` the single stall-judge route); anything else is rejected at load, so a stale patch fails loudly instead of looking like a setting that does nothing:
+Configuration belongs to the profile's `cordis.patch.yml` (or a `--patch` overlay), under the bundle row. The surface is exactly eighteen keys (`timeoutMs` joined in `0.11.0`, `childTimeoutMs` joined now, the four `loop*` keys with the repeat-run settings, the two `iterate*` keys with the self-iteration heartbeat, and `guardianModel` the single stall-judge route); anything else is rejected at load, so a stale patch fails loudly instead of looking like a setting that does nothing:
 
 ```yaml
 - id: grok-workflow
@@ -237,6 +237,7 @@ Configuration belongs to the profile's `cordis.patch.yml` (or a `--patch` overla
 | `maxTasks` | `10` | `100` | Maximum caller or planner tasks |
 | `timeoutMs` | `3600000` (60 min) | any non-negative integer (`0` = unlimited) | Run deadline in milliseconds. `0` arms no timer; a value above `2147483647` (the largest `setTimeout` delay) is treated as unlimited internally while the report records the configured number |
 | `childTimeoutMs` | `7200000` (120 min) | `1000`–`7200000` | Per child-call stall budget in milliseconds. One `agent()` call runs this long before the run stops waiting on it (timeout of that attempt, then the task's bounded retry); the run deadline still caps the whole run |
+| `replan` | `false` | `true` \| `false` | Mid-run replan. When on, a message sent while a run is working is answered at once and joins that run instead of starting a second round: the wave boundary folds it into the tasks that have not started yet, settled work is preserved and never re-executed, and the plan version plus a boundary ledger travel in the report. The receipt says where the message went and how to stop; a bare `停`/`stop`/`取消` is the only message that cancels the run, and a demand still queued when the run ends opens the next round instead of being dropped. Off by default because each boundary costs one planner-route call (at most `min(waves, 4)` per run) |
 | `loopEnabled` | `false` | `true` \| `false` | Deployment default for repeat runs. It is stored, validated and projected to the settings page, but no automatic driver reads it yet: nothing is scheduled until a browser request opens the loop ([Repeat runs](#repeat-runs-the-loop-heartbeat)). A saved `on` alone does not start a round |
 | `loopMaxRounds` | `10` | `100` | Round bound stored in the loop's schedule rule (`COUNT`), so the schedule ends itself after that many rounds. Each round is a full workflow run, so this is a quota envelope, not a preference |
 | `loopFailStreak` | `3` | `20` | Consecutive failed rounds the heartbeat text asks the round to stop after. The Host records delivery, not round success, so this is guidance carried into the round, not a host-enforced counter |
@@ -347,13 +348,13 @@ The plugin reuses DSH's workflow engine and subagents. It does not replace DSH's
 
 ## Versions and release notes
 
-The package version in this repository is `0.13.11`. Install or roll back to an exact release with a tag suffix:
+The package version in this repository is `0.13.12`. Install or roll back to an exact release with a tag suffix:
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.13.11
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.13.12
 ```
 
-Use only a tag that exists on GitHub. Published: `v0.1.0`, `v0.2.0`, `v0.2.1`, `v0.2.2`, `v0.2.3`, `v0.2.4`, `v0.2.5`, `v0.2.6`, `v0.2.7`, `v0.3.0`, `v0.4.0`, `v0.5.0`, `v0.5.1`, `v0.6.0`, `v0.7.0`, `v0.8.0`, `v0.9.0`, `v0.9.1`, `v0.9.2`, `v0.9.3`, `v0.9.4`, `v0.10.0`, `v0.10.1`, `v0.10.2`, `v0.11.0`, `v0.11.1`, `v0.11.2`, `v0.11.3`, `v0.11.4`, `v0.11.5`, `v0.11.6`, `v0.11.7`, `v0.11.8`, `v0.11.9`, `v0.11.10`, `v0.11.11`, `v0.11.12`, `v0.11.13`, `v0.11.14`, `v0.11.15`, `v0.11.16`, `v0.11.17`, `v0.11.18`, `v0.11.19`, `v0.11.20`, `v0.11.21`, `v0.12.0`, `v0.12.1`, `v0.12.2`, `v0.12.3`, `v0.12.4`, `v0.12.5`, `v0.12.6`, `v0.12.7`, `v0.12.8`, `v0.12.9`, `v0.12.10`, `v0.12.11`, `v0.12.12`, `v0.12.13`, `v0.12.14`, `v0.12.15`, `v0.12.16`, `v0.12.19`, `v0.13.1`, `v0.13.2`, `v0.13.3`, `v0.13.4`, `v0.13.5`, `v0.13.6`, `v0.13.9`, `v0.13.10` and `v0.13.11`. The unpinned command follows `main` and does not pin a release. `v0.2.0-rc.1` also exists on GitHub but is not a release: it predates the release workflow and its `package.json` still declares `0.1.0`. The `v0.11.14` tag is not a release either: its committed `lib/` was built from an earlier `src/`, so the release workflow stopped at its artifact check and never published it. Install the `v0.11.15` pin above; that tag is left in place only because published tags are immutable. See the [changelog](CHANGELOG.md) and the [release guide](docs/RELEASING.md) for the versioning and rollback rules.
+Use only a tag that exists on GitHub. Published: `v0.1.0`, `v0.2.0`, `v0.2.1`, `v0.2.2`, `v0.2.3`, `v0.2.4`, `v0.2.5`, `v0.2.6`, `v0.2.7`, `v0.3.0`, `v0.4.0`, `v0.5.0`, `v0.5.1`, `v0.6.0`, `v0.7.0`, `v0.8.0`, `v0.9.0`, `v0.9.1`, `v0.9.2`, `v0.9.3`, `v0.9.4`, `v0.10.0`, `v0.10.1`, `v0.10.2`, `v0.11.0`, `v0.11.1`, `v0.11.2`, `v0.11.3`, `v0.11.4`, `v0.11.5`, `v0.11.6`, `v0.11.7`, `v0.11.8`, `v0.11.9`, `v0.11.10`, `v0.11.11`, `v0.11.12`, `v0.11.13`, `v0.11.14`, `v0.11.15`, `v0.11.16`, `v0.11.17`, `v0.11.18`, `v0.11.19`, `v0.11.20`, `v0.11.21`, `v0.12.0`, `v0.12.1`, `v0.12.2`, `v0.12.3`, `v0.12.4`, `v0.12.5`, `v0.12.6`, `v0.12.7`, `v0.12.8`, `v0.12.9`, `v0.12.10`, `v0.12.11`, `v0.12.12`, `v0.12.13`, `v0.12.14`, `v0.12.15`, `v0.12.16`, `v0.12.19`, `v0.13.1`, `v0.13.2`, `v0.13.3`, `v0.13.4`, `v0.13.5`, `v0.13.6`, `v0.13.9`, `v0.13.10`, `v0.13.11` and `v0.13.12`. The unpinned command follows `main` and does not pin a release. `v0.2.0-rc.1` also exists on GitHub but is not a release: it predates the release workflow and its `package.json` still declares `0.1.0`. The `v0.11.14` tag is not a release either: its committed `lib/` was built from an earlier `src/`, so the release workflow stopped at its artifact check and never published it. Install the `v0.11.15` pin above; that tag is left in place only because published tags are immutable. See the [changelog](CHANGELOG.md) and the [release guide](docs/RELEASING.md) for the versioning and rollback rules.
 
 ## Testing and development
 

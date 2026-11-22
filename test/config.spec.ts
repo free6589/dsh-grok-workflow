@@ -115,12 +115,12 @@ describe('configuration surface', () => {
   })
 
   it('rejects every removed key as unknown (R-06), with the migration named', () => {
-    // The surface keeps exactly 17 keys (nine plus childTimeoutMs, the four
-    // repeat-run keys, the two self-iteration keys, and the Q8 guardianModel
-    // single route); the other 23 are unknown now.
+    // The surface keeps exactly 18 keys (nine plus childTimeoutMs, the mid-run
+    // replan switch, the four repeat-run keys, the two self-iteration keys, and the
+    // Q8 guardianModel single route); the other 23 are unknown now.
     expect(CONFIG_KEYS).toEqual([
       'toolName', 'mode', 'grokDefault', 'roles', 'guardianModel', 'synthesis',
-      'maxConcurrency', 'maxTasks', 'timeoutMs', 'childTimeoutMs',
+      'maxConcurrency', 'maxTasks', 'timeoutMs', 'childTimeoutMs', 'replan',
       'loopEnabled', 'loopMaxRounds', 'loopFailStreak', 'loopIntervalMin',
       'iterateIntervalMin', 'iterateTemplate',
       'configVersion',
@@ -491,9 +491,9 @@ describe('route validation against the runtime', () => {
     const surface = describeSurface(ctx)
     expect(surface.level).toBe('info')
     expect(surface.text).toContain('identified by value')
-    // The log states both numbers: 15 volatile keys reach the generated page,
-    // 17 are accepted (toolName/configVersion are plain, not volatile).
-    expect(surface.text).toContain(`15 of ${CONFIG_KEYS.length} field(s) on the page`)
+    // The log states both numbers: 16 volatile keys reach the generated page,
+    // 18 are accepted (toolName/configVersion are plain, not volatile).
+    expect(surface.text).toContain(`16 of ${CONFIG_KEYS.length} field(s) on the page`)
     // A foreign schema is not ours, and no field list may be invented from it.
     const foreign = ctxWith({
       settings: {

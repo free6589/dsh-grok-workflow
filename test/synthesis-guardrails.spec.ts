@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { HARD_LIMITS, resolveConfig } from '../src/config.js'
 import { assertWorkflowReport } from '../src/report.js'
-import { buildWorkflowRequest, maxTotalAgentsFor, routeBudgetFor, WORKFLOW_SCRIPT } from '../src/script.js'
+import { buildWorkflowRequest, maxTotalAgentsFor, routeBudgetFor, SUMMARY_MAX_ATTEMPTS, WORKFLOW_SCRIPT } from '../src/script.js'
 import { runWorkflowScript, type ScriptAgent, roleOf, idOfPhase } from './helpers.js'
 import { execution, task, verification } from './fixtures.js'
 
@@ -334,18 +334,21 @@ describe('layered synthesis: configuration surface', () => {
     expect(() => resolveConfig({ synthesis: 'fast' } as never)).toThrow(/synthesis must be/)
   })
 
-  it('budgets the synthesizer call for layered runs only when a chain exists', () => {
+  it('budgets every gated draft for layered runs only when a chain exists', () => {
     const withChain = resolveConfig({ synthesis: 'layered', roles: { synthesizer: [{ model: 'w' }] } } as never)
     const withoutChain = resolveConfig({ synthesis: 'layered' } as never)
-    expect(routeBudgetFor(withChain).synthesizer).toBe(1)
+    // The three-step gate may spend the first draft plus two rewrites, and each
+    // draft call may fall through every configured route.
+    expect(SUMMARY_MAX_ATTEMPTS).toBe(3)
+    expect(routeBudgetFor(withChain).synthesizer).toBe(SUMMARY_MAX_ATTEMPTS)
     expect(routeBudgetFor(withoutChain).synthesizer).toBe(0)
     expect(maxTotalAgentsFor(2, 1, routeBudgetFor(withChain)))
-      .toBe(maxTotalAgentsFor(2, 1, routeBudgetFor(withoutChain)) + 1)
-    // The older policies keep their exact budgets.
+      .toBe(maxTotalAgentsFor(2, 1, routeBudgetFor(withoutChain)) + SUMMARY_MAX_ATTEMPTS)
+    // The older policy is gated too; a run without a synthesizer chain spends nothing.
     expect(routeBudgetFor(resolveConfig({} as never)).synthesizer).toBe(0)
     expect(
       routeBudgetFor(resolveConfig({ synthesis: 'model', roles: { synthesizer: [{ model: 'w' }] } } as never)).synthesizer,
-    ).toBe(1)
+    ).toBe(SUMMARY_MAX_ATTEMPTS)
   })
 
   it('pins the script-side guardrail bounds to HARD_LIMITS', () => {

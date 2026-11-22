@@ -2533,3 +2533,45 @@ byte-identical。真机实测 `CONFIRMED`（见 VALIDATION D-104 段）：`DSH_H
 
 **Cost / open:** 每边界一次 cheap 模型调用（上限 `min(波数,4)`，计入 `maxTotalAgents`，撞 `AGENT_CAP` 要一起算）；
 无 intent 也付一次调用。省钱的「搭车」变体与其余五个选择见设计 §8 D1–D6。
+
+## D-105 — 通道侧收敛成「一个决策点 + 每轮一个通道生命周期」；取消只认裸叫停（2026-11-22，未发版）
+
+**背景**：D-103 定了「波边界拉取」的地基，实施被拆成两个 lane。本 lane 只做**通道侧**
+（`src/channel.ts` + `src/gate.ts` + `src/run.ts`），合流与 boundary 拉取属 planner_replan lane
+（`src/steering.ts`/`src/replan.ts`/`src/script.ts`）。实施中发现三个必须定死的问题，每条都写进代码。
+
+**Decision:**
+1. **单一决策点**：通道接纳只有 `answerOnChannel()` 一处，放在 `answerInTurn` 里、team/full 两条
+   接纳之前。理由：跑中消息是「对活计划的补充」，不是新请求；它的 tier 不该由它自己的长短决定
+   （实测：一句「再加一条…」在 triage 档会被判 fast，从而绕过 team 接纳，永远进不了计划）。
+   收掉了 team 接纳与 full 接纳里各一份的重复 steering 块。
+2. **取消只认裸叫停**：`classifyChannelMessage()` 只把裸 `停/停下/取消/stop/cancel…`（或短句里的强祈使）
+   判为 stop；带问号、含 stop 字的长任务（`停止旧的缓存策略`、`写一个停车位管理页面`）一律 forward。
+   非对称是安全边界：「猜你想停」花掉全部在飞的活，「多排一条要求」只花一个边界。
+   没有在跑的任务时，裸叫停回一句「没有在跑的任务」，**不派工**（否则"停"会花掉 planner+worker+verifier）。
+3. **每轮一个通道生命周期**：`runChannelRound()` 开通道 → `runTeam(steeringToken)` → 交付 → `finally`
+   里先 `take()` 再 `closeSteering()`。开关放在 gate 而不是 `runWorkflow`：run 自身的早退
+   （per-session cap、启动前取消、请求构建失败）不会漏一个队列在 `bySession` 里吞掉下一条消息。
+   `run.ts` 只加 `steeringToken?` 透传，不持有通道状态。
+4. **未取用即带入下一轮**：`finally` 里 take 到的 intent 用 `composeCarriedRequest(上一轮 objective, 要求)`
+   递归开下一轮（台账 `steer-carried-to-next-round`）。所以一条要求只有两种结局：被边界并进活计划，或开下一轮；
+   不会两头都占（take 是唯一消费点），也不会丢。
+5. **intent 带对话上下文**：`composeIntentText()` 把用户原话 + 有界对话快照（`collectHistory` +
+   `firstAnswerContext`）装进同一条 intent，请求优先不截断、上下文被截时标 `…`。
+   理由是边界子只看得见「剩余波 + 已结算摘要」，一句「改成 C」单独出现是不可解释的。
+
+**Reason:** 通道的正确性只能靠「只有一个消费者 + 只有一个取消入口 + 只有一个决策点」保证；
+分散实现会重演本次实测抓到的两个坑（tier 绕过、idle-stop 抢在 live-run 判断之前）。
+
+**Alternatives rejected:** (a) 在 team/full 接纳里各写一份通道块——tier 依赖，已证会漏；
+(b) 在 `runWorkflow` 里开通道——早退路径泄漏队列；(c) 让 stop 也走"并入"——用户叫停就变成加任务；
+(d) 未取用 intent 直接丢——用户的话消失，正是要消灭的失败模式。
+
+**Evidence:** `test/channel.spec.ts`（41 例，含 A1–A5 逐条）+ 证据目录
+`docs/knowledge/evidence/session-channel-2026-11-22/`；`npx vitest run test/gate.spec.ts
+test/grok-on-ingress.spec.ts test/phase1-dialogue.spec.ts test/triage-recall.spec.ts
+test/composition.spec.ts` → 128 PASS。全量 `npm run ci` 与真机 GUI 手势 NOT_RUN。
+
+**Cost / open:** 通道只在 `replan: true` 时打开（默认关，见 D-104 相邻的配置口径）；
+`replan` 关闭时行为与发版版一致，跑中消息仍旧各自成轮。子任务级热取消仍是非法（引擎无 per-child 句柄）。
+

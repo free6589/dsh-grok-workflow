@@ -330,6 +330,7 @@ window.__ModuleLoader__.load({
       'progress.settle.aria': 'Settled rows by outcome',
       'progress.settle.ok': '{count} done',
       'progress.settle.bad': '{count} failed',
+      'progress.settle.retried': '{count} retried',
       'progress.settle.warn': '{count} cancelled',
       'progress.settle.open': '{count} unsettled',
       'progress.settle.unsettled': 'no settled row yet',
@@ -549,6 +550,7 @@ window.__ModuleLoader__.load({
       'progress.settle.aria': '按结果分布的已声明行',
       'progress.settle.ok': '{count} 完成',
       'progress.settle.bad': '{count} 失败',
+      'progress.settle.retried': '{count} 已重试',
       'progress.settle.warn': '{count} 已取消',
       'progress.settle.open': '{count} 未结算',
       'progress.settle.unsettled': '尚无结算行',
@@ -2614,21 +2616,92 @@ window.__ModuleLoader__.load({
     }
 
     /**
+     * The label a retry adds, taken back off: `<role>（尝试 2）` / `<role> (attempt 2)` → `<role>`.
+     *
+     * `naming.ts` `memberLabel` appends the attempt suffix and nothing else, so dropping a
+     * trailing bracketed run that carries a digit folds the attempts of one call onto one
+     * lane without re-parsing roles here.
+     */
+    function progressAttemptBaseLabel(label) {
+      const text = typeof label === 'string' ? label.trim() : ''
+      const match = /^(.*?)\s*[（(][^（()）]*\d[^（()）]*[)）]$/u.exec(text)
+      if (match === null) return text
+      return (match[1] || '').trim()
+    }
+
+    /**
+     * The unit one row belongs to: one task's one role call, across its attempts.
+     *
+     * Same phase and same role lane is the same unit — that is what a retry keeps
+     * (`任务 2 · 标题` + `执行` on every attempt), and two tasks differ by their phase, so
+     * one task's completion can never mark another task's failure recovered.
+     */
+    function progressAttemptUnit(member) {
+      const phase = member.phase === undefined ? '' : member.phase
+      return `${phase}\u0000${progressAttemptBaseLabel(member.label)}`
+    }
+
+    /**
+     * The rows whose failure a later attempt of the same unit has already replaced.
+     *
+     * Red means "still broken now", so a failure is current only while nothing later in
+     * its own unit settled `completed`. A later attempt still running has not recovered
+     * it, and a completion in another unit does not touch it. The row keeps its own mark.
+     * @param members - rows aggregated by one node.
+     * @returns the `seq` of every recovered failure row.
+     */
+    function progressRecoveredFailures(members) {
+      const recovered = new Set()
+      for (const member of members) {
+        if (member.outcome !== 'failed') continue
+        const unit = progressAttemptUnit(member)
+        for (const later of members) {
+          if (later.order <= member.order) continue
+          if (later.outcome !== 'completed') continue
+          if (progressAttemptUnit(later) !== unit) continue
+          recovered.add(member.seq)
+          break
+        }
+      }
+      return recovered
+    }
+
+    /**
+     * How many of a node's rows are failing now — recovered history excluded.
+     * @param members - rows aggregated by one node.
+     * @returns the number of unrecovered failed rows.
+     */
+    function progressCurrentFailureCount(members) {
+      const recovered = progressRecoveredFailures(members)
+      let count = 0
+      for (const member of members) {
+        if (member.outcome === 'failed' && !recovered.has(member.seq)) count += 1
+      }
+      return count
+    }
+
+    /**
      * State of one stage, in the fixed precedence
      * `failed` → `doing` → `done` → `blocked` → `cancelled` → `pending`.
+     *
+     * `failed` is a *current* failure: a row whose failure a later attempt of the same
+     * unit replaced no longer colours the aggregate, because red has to mean "still
+     * broken now". The row keeps its own red mark; only the aggregate clears.
      *
      * `blocked` is derived (a run that ended over a row it never settled, or an outcome
      * that is neither a completion nor a cancellation) and the tooltip names the evidence;
      * `cancelled` is the engine's own word, never derived from an absence.
      */
     function progressNodeState(members, ended) {
-      const settled = members.filter((member) => member.outcome !== undefined)
-      const unsettled = members.length - settled.length
-      if (members.some((member) => member.outcome === 'failed')) return 'failed'
+      const recovered = progressRecoveredFailures(members)
+      const current = recovered.size === 0 ? members : members.filter((member) => !recovered.has(member.seq))
+      const settled = current.filter((member) => member.outcome !== undefined)
+      const unsettled = current.length - settled.length
+      if (settled.some((member) => member.outcome === 'failed')) return 'failed'
       if (!ended && unsettled > 0) return 'doing'
-      if (members.length > 0 && settled.length === members.length && settled.every((member) => member.outcome === 'completed')) return 'done'
+      if (settled.length > 0 && settled.length === current.length && settled.every((member) => member.outcome === 'completed')) return 'done'
       if (ended && unsettled > 0) return 'blocked'
-      if (members.some((member) => member.outcome === 'cancelled')) return 'cancelled'
+      if (settled.some((member) => member.outcome === 'cancelled')) return 'cancelled'
       if (settled.some((member) => member.outcome !== 'completed' && member.outcome !== 'cancelled')) return 'blocked'
       return 'pending'
     }
@@ -3112,6 +3185,9 @@ window.__ModuleLoader__.load({
       '.gw-progress-settle-part[data-tone="ok"] { background: var(--dsw-alias-state-success-primary, currentColor); }',
       '.gw-progress-settle-part[data-tone="bad"] { background: var(--dsw-alias-state-error-primary, currentColor); }',
       '.gw-progress-settle-part[data-tone="warn"] { background: var(--dsw-alias-state-warn-primary, currentColor); }',
+      // A row that failed and was then replaced by a completed attempt: settled, not red
+      // (nothing is broken now), and not `ok` either (that attempt did fail).
+      '.gw-progress-settle-part[data-tone="retried"] { background: var(--dsw-alias-label-secondary, currentColor); }',
       '.gw-progress-settle-part[data-tone="open"] { background: repeating-linear-gradient(90deg, var(--dsw-alias-state-idle-primary, currentColor) 0 5px, transparent 5px 9px); }',
       '.gw-progress-settle-legend { flex: none; font-variant-numeric: tabular-nums; }',
       // Fresh mint and soft sky surfaces are mixed with semantic DSH tokens, so
@@ -3139,8 +3215,8 @@ window.__ModuleLoader__.load({
       // horizontal flex line would take its width out of the segments and crush them.
       '.gw-progress-flow { position: relative; margin-top: 2px; }',
       '.gw-progress-wires { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }',
-      '.gw-progress-wire { fill: none; stroke-width: 2; }',
-      '.gw-progress-wire-head { stroke: none; }',
+      '.gw-progress-wire { fill: none; stroke: var(--dsw-alias-border-l2, currentColor); stroke-width: 2; }',
+      '.gw-progress-wire-head { stroke: none; fill: var(--dsw-alias-border-l2, currentColor); }',
       '.gw-progress-track, .gw-progress-tasks { position: relative; z-index: 1; box-sizing: border-box; margin: 0; list-style: none; }',
       '.gw-progress-track { display: flex; align-items: stretch; gap: 0; width: 100%; min-width: 0; padding: 10px 12px 4px; }',
       '.gw-progress-seg { flex: 1 1 0; min-width: 0; position: relative; display: flex; flex-direction: column;',
@@ -3328,7 +3404,7 @@ window.__ModuleLoader__.load({
       if (node.members.length === 0) {
         return evidence.length > 0 ? t('progress.branch.evidenceRows', { count: evidence.length }) : t('progress.notReported')
       }
-      const failedCount = node.members.filter((member) => member.outcome === 'failed').length
+      const failedCount = progressCurrentFailureCount(node.members)
       const doingCount = node.members.filter((member) => member.outcome === undefined).length
       const settled = node.members.filter((member) => member.outcome !== undefined).length
       const duration = progressDuration(progressNodeDuration(node, now))
@@ -3380,7 +3456,7 @@ window.__ModuleLoader__.load({
           : (node.kind === 'extra'
             ? t('progress.extraHint')
             : (evidence.length > 0 ? t('progress.evidenceHint') : t('progress.notReported'))))
-      const failedCount = node.members.filter((member) => member.outcome === 'failed').length
+      const failedCount = progressCurrentFailureCount(node.members)
       const meta = progressNodeMeta(node, t, now)
       const duration = progressNodeDuration(node, now)
       // The rail's baseline is the slowest stage of this run, so the lengths compare the
@@ -3586,7 +3662,7 @@ window.__ModuleLoader__.load({
      * Whether two measured wire sets are the same, so a re-measure does not re-render.
      * @param left - current set.
      * @param right - freshly measured set.
-     * @returns whether every vertex, tone and the lane depth match.
+     * @returns whether every vertex and the lane depth match.
      */
     function sameProgressWires(left, right) {
       if (left === right) return true
@@ -3595,7 +3671,7 @@ window.__ModuleLoader__.load({
       for (let index = 0; index < left.paths.length; index += 1) {
         const a = left.paths[index]
         const b = right.paths[index]
-        if (a.kind !== b.kind || a.owner !== b.owner || a.card !== b.card || a.tone !== b.tone) return false
+        if (a.kind !== b.kind || a.owner !== b.owner || a.card !== b.card) return false
         if (a.points.length !== b.points.length) return false
         for (let at = 0; at < a.points.length; at += 1) {
           if (a.points[at][0] !== b.points[at][0] || a.points[at][1] !== b.points[at][1]) return false
@@ -3669,7 +3745,6 @@ window.__ModuleLoader__.load({
             kind: 'branch',
             owner,
             card: card.getAttribute('data-gw-progress-task'),
-            tone: card.getAttribute('data-state') || 'pending',
             // The stub ends on the card's own left edge, so the arrow lands on the border
             // however the card's padding and border weight are styled.
             points: [[channel, y], [Math.round(rect.left - frame.left), y]],
@@ -3679,7 +3754,6 @@ window.__ModuleLoader__.load({
           kind: 'trunk',
           owner,
           card: undefined,
-          tone: segment.getAttribute('data-state') || 'pending',
           points: [[x, trackBottom], [x, laneY], [channel, laneY], [channel, last]],
         })
         paths.push(...stubs)
@@ -3699,9 +3773,11 @@ window.__ModuleLoader__.load({
     /**
      * The settle bar's parts: the declared rows grouped by outcome (D).
      *
-     * Four tones, and every one of them is a count over rows the stream declared — no
+     * Five tones, and every one of them is a count over rows the stream declared — no
      * share is estimated. `open` is the unsettled rest, drawn as a dashed gap because a
-     * colour there would read as a result.
+     * colour there would read as a result. `retried` is a row that failed and was then
+     * replaced by a completed attempt of the same call: it is settled, it is not red, and
+     * calling it done would be a lie about the attempt that failed.
      * @param members - the run's rows.
      * @param t - translator.
      * @returns the parts, in the order they are drawn.
@@ -3709,10 +3785,12 @@ window.__ModuleLoader__.load({
     function progressSettleParts(members, t) {
       const declared = Array.isArray(members) ? members.length : 0
       if (declared === 0) return []
+      const recovered = progressRecoveredFailures(members)
       const count = (predicate) => members.filter(predicate).length
       const candidates = [
         { tone: 'ok', count: count((member) => member.outcome === 'completed') },
-        { tone: 'bad', count: count((member) => member.outcome === 'failed') },
+        { tone: 'bad', count: count((member) => member.outcome === 'failed' && !recovered.has(member.seq)) },
+        { tone: 'retried', count: count((member) => member.outcome === 'failed' && recovered.has(member.seq)) },
         {
           tone: 'warn',
           count: count((member) => {
@@ -3730,12 +3808,6 @@ window.__ModuleLoader__.load({
           label: t(`progress.settle.${part.tone}`, { count: part.count }),
           width: Math.round((part.count / declared) * 1000) / 10,
         }))
-    }
-
-    /** Where one wire is drawn: the state token's stroke, and the dashes of a running one. */
-    function progressWireStyle(tone, dashed) {
-      const stroke = PROGRESS_STATE_COLOR[tone] === undefined ? PROGRESS_STATE_COLOR.pending : PROGRESS_STATE_COLOR[tone]
-      return dashed ? { stroke, strokeDasharray: '6 4' } : { stroke }
     }
 
     /**
@@ -3946,6 +4018,10 @@ window.__ModuleLoader__.load({
           'data-gw-progress-tasks': true,
           'aria-label': t('progress.tasks.aria'),
         }, cards.map((node) => ProgressTaskCard(node, { t, canOpen, openChild, now: running ? clock : undefined })))
+      // The wires are structure, not status: they say which segment owns which card and
+      // carry no state colour at all. A line dyed red would implicate every card it
+      // points at (a recovered task, a task still waiting), so status stays on the card's
+      // own ring and pills, where it belongs to one row.
       const svg = wires.paths.length === 0
         ? null
         : h('svg', {
@@ -3960,9 +4036,7 @@ window.__ModuleLoader__.load({
             className: 'gw-progress-wire',
             'data-gw-progress-wire': 'trunk',
             'data-owner': path.owner,
-            'data-tone': path.tone,
             d: progressWireDraw(path.points),
-            style: progressWireStyle(path.tone, false),
           })
           : h('g', { key: `branch:${path.owner}:${path.card}`, 'data-gw-progress-wire-branch': path.card },
             h('path', {
@@ -3970,14 +4044,11 @@ window.__ModuleLoader__.load({
               'data-gw-progress-wire': 'branch',
               'data-owner': path.owner,
               'data-card': path.card,
-              'data-tone': path.tone,
               d: progressWireDraw(path.points),
-              style: progressWireStyle(path.tone, path.tone === 'doing'),
             }),
             h('polygon', {
               className: 'gw-progress-wire-head',
               points: progressWireHead(path.points),
-              style: { fill: progressWireStyle(path.tone, false).stroke },
             })))))
       return h('section', {
         className: 'gw-progress',
@@ -5245,6 +5316,8 @@ window.__ModuleLoader__.load({
       fold: foldProgressEvents,
       selectActiveRun,
       nodeState: progressNodeState,
+      recoveredFailures: progressRecoveredFailures,
+      currentFailureCount: progressCurrentFailureCount,
       percent: progressPercent,
       deriveTrack: deriveProgressTrack,
       detailFor: progressDetailFor,

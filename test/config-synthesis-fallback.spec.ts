@@ -107,9 +107,13 @@ describe('apply() load-time synthesis fallback (P1)', () => {
   class FakeCtx {
     readonly warnings: string[] = []
     readonly infos: string[] = []
-    tool: FakeTool | undefined
+    readonly toolsByName = new Map<string, FakeTool>()
+    get tool(): FakeTool | undefined { return this.toolsByName.get('grok_workflow') }
     readonly tools = {
-      register: (tool: FakeTool) => { this.tool = tool; return () => { this.tool = undefined } },
+      register: (tool: FakeTool) => {
+        this.toolsByName.set(tool.name, tool)
+        return () => { if (this.toolsByName.get(tool.name) === tool) this.toolsByName.delete(tool.name) }
+      },
     }
     readonly systemPrompt = {
       section: () => () => {},

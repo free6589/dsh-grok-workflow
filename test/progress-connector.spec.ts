@@ -48,7 +48,6 @@ interface ProgressWirePath {
   kind: string
   owner: string
   card?: string
-  tone: string
   points: Array<[number, number]>
 }
 

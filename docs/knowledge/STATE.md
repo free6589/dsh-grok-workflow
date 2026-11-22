@@ -1,3 +1,42 @@
+Last updated: 2026-11-22 21:10 +08:00（**lead 合流完成：通道 + 重规划 + 汇总三步 + 红色语义，全量 82/1594 PASS，`CONFIRMED` 未发版** —
+接 agent-8 通道 lane 与 planner_replan lane；lead 修 5 个假环境按名存工具 +
+reliability 计数 15→16 + client.spec Bundle 口子。`npm test` 82 文件 / 1594 测试 PASS；
+typecheck 仅剩 nyc `--jsx` 孤儿一错；lint 0 errors；build + verify:lib byte-identical。
+红色语义四处按"当前还坏着才红、历史只留行级痕迹、结构线中性"收敛，258 例专项全绿。
+未提交未发版；真机 GUI 手势与 nyc 孤儿 NOT_RUN。详见 HANDOFF 首条。）
+
+Last updated: 2026-11-22 21:00 +08:00（**主会话通道（L2 通道侧）落地，`CONFIRMED` 未发版** —
+用户原始诉求：主会话永远可对话，不等工作流跑完，跑中改需求不掐整轮、不白跑。本轮只做**通道侧**
+（lead 拍板 Option B：`src/channel.ts` + `src/gate.ts` + `src/run.ts` 归本 lane；
+`src/steering.ts`/`src/replan.ts`/`src/script.ts` 归 planner_replan lane，接口冻结）。
+
+产出：
+- 新 `src/channel.ts`（纯函数 + 文案）：`classifyChannelMessage()` 只认裸 `停/stop/取消`
+  为 stop（问题句、含 stop 字的长任务一律 forward，非对称是安全边界）；
+  `composeIntentText()` 把用户原话 + 有界对话快照装进一条 intent；`composeCarriedRequest()`
+  用"上一轮 objective + 未取用要求"开下一轮；`steerReceipt/stopNote/idleStopNote/carriedNote`
+  中英成对；`CHANNEL_OUTCOMES` 四个台账标签。
+- `src/gate.ts`：**单一决策点** `answerOnChannel()`（在 team/full 两条接纳之前，收掉了原先
+  两处重复 steering 块）：有活通道 → stop 走 `cancelLiveRuns()`（唯一合法取消，经 run 自己的
+  `cancel()`，结算走 `keepCancelledWork()`），其余 `push(composeIntentText(...))` 后立刻回执；
+  无活通道 + 裸停 → 回"没有在跑的任务"而不派工；其余返回 `undefined` 走原路。
+  `runChannelRound()` 是每轮的唯一执行壳：开通道（`openSteering`）→ `runTeam(steeringToken)` →
+  交付 → `finally` 里先 `take()` 再 `closeSteering()`，未取用要求用 `composeCarriedRequest()`
+  递归开下一轮（`steer-carried-to-next-round`），所以要求只会"并入"或"带入下一轮"，不会两头都占或都不占。
+  team/full 两条后台接纳改走 `runChannelRound`。
+- `src/run.ts`：只加 `RunWorkflowOptions.steeringToken?` 与 `buildWorkflowRequest(..., token)`
+  透传（通道开关归 gate，run 自身早退不会泄漏队列）；`src/types.ts` 补 `GrokWorkflowConfig.replan?`。
+
+验证（本轮实测）：`npx vitest run test/channel.spec.ts` → **41 tests PASS**；
+`npx vitest run test/gate.spec.ts test/grok-on-ingress.spec.ts test/phase1-dialogue.spec.ts
+test/triage-recall.spec.ts test/composition.spec.ts` → **128 tests PASS**；
+`npx tsc -p tsconfig.json --noEmit` 仅剩并发轮 nyc `.tsx` `--jsx` 一错（他 lane）；
+`npx oxlint src/channel.ts src/gate.ts src/run.ts test/channel.spec.ts` → 0 errors / 2 warnings
+（`cancelledText` 既有 spread、`run.ts` 既有 `RoleName` 未用，均非本轮）；
+`npm run build` + `npm run verify:lib` exit 0。**全量 `npm run ci` NOT_RUN**（lead 统一跑）。
+**真机 GUI 手势验证 NOT_RUN**（改的是 host 侧循环，需真实浏览器会话双击；见 HANDOFF 待办）。
+证据：`docs/knowledge/evidence/session-channel-2026-11-22/`。）
+
 Last updated: 2026-11-22 19:30 +08:00（**已发版 `0.13.11`：守卫判停预算永远跟随单次调用预算，`CONFIRMED`** —
 发版提交 `52d7522` + tag `v0.13.11` 已推；远端 CI `45017440836` success、Release `45017443293`
 success 并已发布。本地门禁：typecheck（除并发轮 nyc/--jsx 单错外干净）、lint 0 errors、

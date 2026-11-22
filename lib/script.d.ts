@@ -1,6 +1,16 @@
 import type { NamingLanguage } from './naming.js';
 import type { FailureClass, ModelRoute, NormalizedTask, ResolvedConfig, RoleName, SynthesisPolicy } from './types.js';
 /**
+ * How many summary drafts one run may spend through the three-step gate: the
+ * first draft plus two rewrites.
+ *
+ * Interpolated into the generated script, so the guest's own bound and the
+ * host's child-call budget cannot drift apart. The gate is not "one polish and
+ * done": a draft that fails the check or the independent verification goes back
+ * to the writer, and only a draft that passes both is delivered.
+ */
+export declare const SUMMARY_MAX_ATTEMPTS = 3;
+/**
  * The orchestration script is static. User data crosses the workflow boundary as
  * `args` JSON, never as source text; this keeps the sandbox contract explicit
  * and makes the script reviewable and testable outside a model call.
@@ -114,9 +124,15 @@ export interface RouteBudget {
  *
  * The synthesizer budget follows the configured policy, not the two-value
  * `SynthesisMode` type union: the layered policy travels as the runtime value
- * `"layered"` and spends one synthesizer call per run — but only when a chain is
+ * `"layered"` and spends synthesizer calls per run — but only when a chain is
  * configured, because a layered run without a chain answers from the
  * deterministic narrative and spends nothing.
+ *
+ * With a chain, the budget covers the whole gated pipeline: up to
+ * {@link SUMMARY_MAX_ATTEMPTS} drafts (the first draft plus the bounded rewrites)
+ * times the chain length, because each draft call may fall through every route.
+ * A single-draft budget would abort a rewrite-heavy run with AGENT_CAP exactly
+ * when the gate is doing its job.
  */
 export declare function routeBudgetFor(config: ResolvedConfig): RouteBudget;
 /**
@@ -129,6 +145,6 @@ export declare function routeBudgetFor(config: ResolvedConfig): RouteBudget;
  * with a guardian configured every per-call block is widened by that factor;
  * without one the formula is byte-identical to the pre-guardian one.
  */
-export declare function maxTotalAgentsFor(tasks: number, retries: number, budget?: RouteBudget): number;
-export declare function buildWorkflowRequest(objective: string, tasks: NormalizedTask[] | undefined, config: ResolvedConfig, namingLanguage?: NamingLanguage, carryover?: string, busyRoutes?: string[], inheritance?: string): WorkflowRequestPayload;
+export declare function maxTotalAgentsFor(tasks: number, retries: number, budget?: RouteBudget, replans?: number): number;
+export declare function buildWorkflowRequest(objective: string, tasks: NormalizedTask[] | undefined, config: ResolvedConfig, namingLanguage?: NamingLanguage, carryover?: string, busyRoutes?: string[], inheritance?: string, replanToken?: string): WorkflowRequestPayload;
 //# sourceMappingURL=script.d.ts.map

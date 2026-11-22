@@ -264,9 +264,13 @@ describe('B04: repair announcements share the schema path', () => {
 class FakeCtx {
   readonly warnings: string[] = []
   readonly infos: string[] = []
-  tool: { name: string } | undefined
+  readonly toolsByName = new Map<string, { name: string }>()
+  get tool(): { name: string } | undefined { return this.toolsByName.get('grok_workflow') }
   readonly tools = {
-    register: (tool: { name: string }) => { this.tool = tool; return () => { this.tool = undefined } },
+    register: (tool: { name: string }) => {
+      this.toolsByName.set(tool.name, tool)
+      return () => { if (this.toolsByName.get(tool.name) === tool) this.toolsByName.delete(tool.name) }
+    },
   }
   readonly systemPrompt = {
     section: () => () => {},
@@ -365,8 +369,11 @@ describe('B07 at the host layer: a real Cordis fiber', () => {
 
   async function loadWith(schema: unknown) {
     const ctx = new Context()
-    let registered: { name: string } | undefined
-    ctx.provide('tools', { register: (tool: { name: string }) => { registered = tool; return () => {} } })
+    const registeredByName = new Map<string, { name: string }>()
+    ctx.provide('tools', { register: (tool: { name: string }) => {
+      registeredByName.set(tool.name, tool)
+      return () => { if (registeredByName.get(tool.name) === tool) registeredByName.delete(tool.name) }
+    } })
     ctx.provide('workflowEngine', { start: () => undefined })
     ctx.provide('systemPrompt', { section: () => () => {}, getSectionOrder: () => 2600 })
     let seen: Record<string, unknown> | undefined
@@ -383,7 +390,7 @@ describe('B07 at the host layer: a real Cordis fiber', () => {
     await new Promise(resolve => setTimeout(resolve, 50))
     const state = (fiber as unknown as { state: number }).state
     await (fiber as unknown as { dispose: () => Promise<void> }).dispose()
-    return { state, seen, registered }
+    return { state, seen, registered: registeredByName.get('grok_workflow') }
   }
 
   it('activates on a stored 8 and hands the plugin 8 (under the 100 cap, T6)', async () => {
@@ -395,8 +402,11 @@ describe('B07 at the host layer: a real Cordis fiber', () => {
 
   it('clamps a stored 120 to the 100 cap at the host layer', async () => {
     const ctx = new Context()
-    let registered: { name: string } | undefined
-    ctx.provide('tools', { register: (tool: { name: string }) => { registered = tool; return () => {} } })
+    const registeredByName = new Map<string, { name: string }>()
+    ctx.provide('tools', { register: (tool: { name: string }) => {
+      registeredByName.set(tool.name, tool)
+      return () => { if (registeredByName.get(tool.name) === tool) registeredByName.delete(tool.name) }
+    } })
     ctx.provide('workflowEngine', { start: () => undefined })
     ctx.provide('systemPrompt', { section: () => () => {}, getSectionOrder: () => 2600 })
     let seen: Record<string, unknown> | undefined
@@ -414,7 +424,7 @@ describe('B07 at the host layer: a real Cordis fiber', () => {
     await (fiber as unknown as { dispose: () => Promise<void> }).dispose()
     expect(state).toBe(ACTIVE)
     expect(seen).toMatchObject({ maxConcurrency: 100 })
-    expect(registered?.name).toBe('grok_workflow')
+    expect(registeredByName.get('grok_workflow')?.name).toBe('grok_workflow')
   })
 
   it('control: the pre-B07 schema still fails the fiber before apply()', async () => {

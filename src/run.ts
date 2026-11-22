@@ -424,6 +424,14 @@ export interface RunWorkflowOptions {
   /** Extra cancellation sources (the tool's exec signal, or the gate's own). */
   signals?: AbortSignal[]
   /**
+   * Live steering token (L2), opened by the caller through `src/steering.ts`.
+   *
+   * A run that carries one lets the script's boundary planner child pull the
+   * demands queued while it works; a run without one has no channel at all, so a
+   * mid-run message keeps its pre-L2 meaning (a queued round).
+   */
+  steeringToken?: string
+  /**
    * How non-timeout failures leave this function: the tool contract throws so a
    * caller sees an error, while the gate converts every failure into an explicit
    * failure report that it can show the user.
@@ -649,6 +657,10 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
     options.carryover,
     busyHint,
     inheritance,
+    // L2: the token the boundary planner child quotes to pull queued demands. The
+    // caller that opened the channel owns closing it, so this function never leaks a
+    // channel on an early return (cap refusal, pre-start cancellation).
+    options.steeringToken,
   )
   // Two independent caps (t41, P1-3): the per-session one is what a user can
   // reason about ("this conversation already runs two workflows"), and the

@@ -1,0 +1,12 @@
+"停" => {"kind":"stop","reason":"marker:停"}
+"停一下。" => {"kind":"stop","reason":"marker:停一下"}
+"请停下来" => {"kind":"stop","reason":"marker:停下来"}
+"取消" => {"kind":"stop","reason":"marker:取消"}
+"stop" => {"kind":"stop","reason":"marker:stop"}
+"Stop it" => {"kind":"stop","reason":"marker:stop it"}
+"停止旧的缓存策略" => {"kind":"forward","reason":"no-stop-marker"}
+"改成 C 方案" => {"kind":"forward","reason":"no-stop-marker"}
+"为什么任务 2 是红的" => {"kind":"forward","reason":"question:为什么"}
+"能不能停一下？" => {"kind":"forward","reason":"question:能不能"}
+"写一个停车位管理页面" => {"kind":"forward","reason":"no-stop-marker"}
+"再加一个任务：补一版 README" => {"kind":"forward","reason":"no-stop-marker"}

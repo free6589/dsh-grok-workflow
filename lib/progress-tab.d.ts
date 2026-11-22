@@ -22,6 +22,10 @@
  * - A run that ended with a row it never settled is `blocked` and says so in its tooltip:
  *   the stream cannot tell a cancellation from a crash, so the tab does not guess one.
  * - `cancelled` is the engine's own outcome word, kept verbatim rather than re-derived.
+ * - `failed` is a *current* failure. Attempts are rows, so a task that failed attempt 1 and
+ *   verified on attempt 2 carries both rows; the later completion replaces the earlier
+ *   failure for the aggregate (card, segment, bar) while the failed row keeps its own mark
+ *   (`recoveredFailureSeqs`). Red therefore means "still broken now", never "was broken".
  */
 /** The seven progress and Guardian lifecycle events the tab folds; other events are ignored. */
 export declare const PROGRESS_EVENT_TYPES: readonly ["tool-workflow/run-start", "tool-workflow/agent-start", "tool-workflow/agent-end", "tool-workflow/guardian-start", "tool-workflow/guardian-finding", "tool-workflow/guardian-end", "tool-workflow/run-end"];
@@ -293,8 +297,37 @@ export declare function foldProgressRuns(records: readonly ProgressEventRecord[]
  */
 export declare function selectActiveRun(runs: readonly ProgressRunFacts[]): ProgressRunFacts | undefined;
 /**
+ * The rows whose failure a later attempt of the same unit has already replaced.
+ *
+ * Red means *still broken now*, so a failure is only current while nothing later in its
+ * own unit settled `completed` — a retry, or a resubmit that produced the structured
+ * result the first call missed. A failure with a later attempt still running stays
+ * current (it is not recovered yet); a failure in another unit, however recently that
+ * other unit completed, stays current. The row itself keeps its own mark either way:
+ * this decides what the card, the segment and the bar colour, not what the row says.
+ * @param members - rows aggregated by one node.
+ * @returns the `seq` of every recovered failure row.
+ */
+export declare function recoveredFailureSeqs(members: readonly ProgressMemberFact[]): Set<number>;
+/**
+ * How many of a node's rows are failing *now* — recovered history excluded.
+ *
+ * This is the count the red badge shows. The failure badge names work that is still
+ * broken; a failure a later attempt replaced is visible on its own row pill, which is
+ * the row-level trace the card keeps.
+ * @param members - rows aggregated by one node.
+ * @returns the number of unrecovered failed rows.
+ */
+export declare function currentFailureCount(members: readonly ProgressMemberFact[]): number;
+/**
  * The state of one node, in the precedence the design fixes:
  * `failed` → `doing` → `done` → `blocked` → `cancelled` → `pending`.
+ *
+ * `failed` is a *current* failure: a row whose failure a later attempt of the same unit
+ * replaced no longer colours the aggregate (see {@link recoveredFailureSeqs}), because red
+ * has to mean "still broken now" — one task that failed and then verified cleanly must not
+ * dye the stage that ran it, the bar, or its own card. The row keeps its own red mark; only
+ * the aggregate clears.
  *
  * `blocked` is the only derived state: the run ended (or the engine reported an outcome
  * that is neither a completion nor a cancellation) while a row was still unsettled. The

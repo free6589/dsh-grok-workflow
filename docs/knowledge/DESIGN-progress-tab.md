@@ -87,7 +87,7 @@
 
 | 状态 | 判定 | 数据来源 |
 | --- | --- | --- |
-| `failed` | 该节点任一行 `outcome === 'failed'` | 事件原话 |
+| `failed` | 该节点存在**当前**失败行（历史失败、且同一单元后续尝试已 `completed` 的行不算） | 事件原话 + §5.1 的恢复规则 |
 | `doing` | run 未结束且存在未结算行 | 事件（缺 `agent-end`） |
 | `done` | 行非空且**全部**结算为 `completed` | 事件原话 |
 | `blocked`（派生） | run 已结束仍有未结算行；或某行 outcome 既非 completed 也非 cancelled | 由缺失/异常**推导**，tooltip 说明 |
@@ -95,6 +95,33 @@
 | `pending` | 其余（含无行的模板阶段） | 空态 |
 
 **blocked 一律带 tooltip**：`progress.derived.runEndedUnsettled`（运行已结束但有未结算行）或 `progress.derived.outcomeUnsettled`（引擎 outcome 既非完成也非取消）。`blocked` 是唯一派生状态；`cancelled` 只用引擎自己的词，绝不由「没有结算」推出来。
+
+### 5.1 红色只表示「现在还是坏的」（2026-11-22）
+
+引擎把**尝试**记成行，不把任务记成行：`任务 2` 第 1 次 `执行` 失败、第 2 次通过，流里就是
+`执行:failed` + `执行（尝试 2）:completed` + `检查（尝试 2）:completed` 三行。旧规则
+「该节点任一行 `failed` → 节点 `failed`」于是把**已经修好**的任务继续染红：任务卡、执行段、
+顶部结算条全红，纵向连线还被染成红色，连带指着别的任务卡。用户已经明确否掉这条读法。
+
+现在的规则：
+
+- **单元（unit）** = 同一 `phase` + 同一角色通道（label 去掉 `（尝试 n）` / `(attempt n)` 后缀）。
+  同一单元的多行就是同一调用的多次尝试；不同任务的 worker 行 label 相同但 phase 不同，
+  所以**一个任务的成功永远不能把另一个任务的失败判成恢复**。
+- **恢复** = 同一单元里存在 `order` 更靠后的 `completed` 行。这时该失败行仍留在 `members`
+  （百分比照旧统计它），只是不再决定卡片、段、条的聚合状态（`recoveredFailureSeqs()`）。
+- **未恢复**：后续尝试还在跑就没恢复（仍红）；后续尝试又失败也没恢复（仍红，且两条都计入）。
+- **行级痕迹保留**：该失败行自己的 pill / `data-state` 仍是 `failed`，读者能看到
+  「失败过一次，然后通过了」。
+- **四处的颜色来源**：任务卡（`node.state` → 环 + 左侧红边）、脊椎段（`data-state` + 红点 +
+  红色计数徽标）、顶部结算条（`data-tone="bad"`）、以及 `失败 {count}` 那句 meta 文案，
+  全部只看当前失败（`currentFailureCount()`）。
+- **纵向连线不带状态**：主干与分支线只用 `--dsw-alias-border-l2` 描边，没有 `data-tone`、
+  没有虚线、没有内联 style。一条线会指着多张卡，染红就等于把绿的、还没跑的一起定罪。
+  状态只由卡片自己的环、pill 和脊椎段表达。
+- **结算条新增 `retried` 色调**（`progress.settle.retried`，`{count} 已重试`）：这一行结算了、
+  但现在不红；叫它 `完成` 会谎报那次失败，所以单独一档灰色。
+
 
 ## 6. 百分比
 
@@ -204,6 +231,7 @@ npx vitest run test/panel.spec.ts test/phase1-dialogue.spec.ts
 覆盖点：
 
 - 五态 + 优先级：`test/progress-tab.spec.ts`（`pending/doing/done/blocked/failed/cancelled`，含 failed 压过未完成行、blocked 两种派生理由、cancelled 原话）与 `test/client.spec.ts`（同一批 fixture 跑手写 JS 镜像）。
+- 红色只表示当前失败（§5.1）：`test/progress-tab.spec.ts` 的「red is the current state, not the history」（恢复后卡片/段变 `done`、重试未结算仍 `failed`、跨任务不互相恢复、同一 attempt 内 resubmit 算恢复、百分比照旧含失败行）与 `test/client.spec.ts` 的同名块（结算条无红段且出现 `retried`、脊椎无红点/红徽标/`失败 n` 文案、卡片环 `done` 而失败行 pill 仍 `failed`、连线无 tone 无 style、CSS 只用 border token）。Before/after 实测见 `.rsi/evidence/red-semantics-2026-11-22.md`。
 - 百分比：`settled/declared`、`declared=0` 缺席、`75%`、`100%`。
 - 详情三级来源：L1 压过 L2、L2 补齐、其余 `not-reported`、空值 `—`、坏块/散文拒绝、L1+L2 都缺时七行全 L3。
 - 降级：无 run 空态、缺字段渲染不抛、绑定失败、注册失败（含 `console.warn` 断言）、无 clipboard。
@@ -352,7 +380,7 @@ Phase 2（失败重试）暂不做。本节记录实际改动。
 | A | 双带拆分：上带只放 7 个模板段，下带放真实任务节点 | 任务节点多时不再压垮模板段，标签不再截断 | 现有事件已足够（`deriveTrack` 已区分 `stage` 与追加节点） | 中：下带若要滚动，与 `client.spec.ts:2007` 的「无横向滚动」冲突，须先决定是「只对上带断言」还是「下带换行不滚动」 | 中高，需按 §14 的 8 宽度用例表重测 |
 | B | 段内耗时条：每个节点下一条 2 px 条，长度 = 该段成员总耗时 ÷ run 总时长 | 哪一段慢、卡在哪 | 现有事件已足够（`startedAt`/`endedAt` 两端都有才画，缺一端不估算） | 低：纯段内新增元素，不动等分与连接线 | 低 |
 | C | 任务内执行/检查配对：同一 `phase` 的 worker 行与 verifier 行竖向连线、检查行缩进 | 这个任务验了没、验的是什么 | 现有事件已足够（`label` 角色词，`STAGE_ROLE_LABELS` 已在用） | 低：只改分支面板内部的排列，不动轨道、不动状态与百分比 | 低 |
-| D | 结算堆积条：一条 100% 宽分段条，按 `outcome` 分色 + 计数 | 失败了几条，不用逐个点开 | 现有事件已足够（`outcome` 原话 + `declared`） | 低：替换或补充 header 里的 `7/11 · 64%` | 极低 |
+| D | 结算堆积条：一条 100% 宽分段条，按 `outcome` 分色 + 计数（2026-11-22 起为五档：`ok`/`bad`/`retried`/`warn`/`open`，`bad` 只数当前未恢复的失败） | 失败了几条、有几条是失败后重试通过的，不用逐个点开 | 现有事件已足够（`outcome` 原话 + `declared`） | 低：替换或补充 header 里的 `7/11 · 64%` | 极低 |
 | E | Run 历史条：顶部 chip 列表，每 run 一个（名字、终态色、时长），点击切换 | 上一次跑到哪、多久 | 现有事件已足够（`foldProgressRuns` 返回全部 run，`selectActiveRun` 只挑一个，`src/progress-tab.ts:469`） | 中：引入「非活动 run」状态，需处理旧 run 无 `doing` 行的空态；`selectActiveRun` 语义要改写或并存 | 中低 |
 | F | 真依赖图（DAG，带分支与汇合） | 任务之间谁等谁 | **需要 recorder 扩展**：`run-start` 加计划（任务 id / 标题 / 依赖） | 高：现有「模板脊椎」概念要重写 | 高，且属新事件契约 |
 
