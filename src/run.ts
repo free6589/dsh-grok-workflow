@@ -1005,7 +1005,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
     // C3 rescue channel: the script broadcasts `guardian rescue …` on the
     // same log bus the B1 heartbeat already hears. The heartbeat keeps the
     // signal; the rescue line is additionally parsed for seq + guidance and
-    // executed (interrupt + steered message). A bus without log events costs
+    // executed (a queued recovery message, without interrupting active work). A bus without log events costs
     // both, never the run.
     listen(() => ctx.on('workflow/log', (info, message) => {
       guardian.runHeartbeat(info)
@@ -1232,10 +1232,9 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
   } finally {
     if (timer !== undefined) clearTimeout(timer)
     if (cancelOnAbort !== undefined) signal.removeEventListener('abort', cancelOnAbort)
-    // Settle the resident guardian first: its findings describe *why* the run
-    // stopped when a stall cancelled it, and they must be folded into the
-    // report before the checkpoint/archive paths read it. The guardian never
-    // changes the report's status — only the errors list gains entries.
+    // Settle the resident guardian first. Its findings are diagnostic
+    // supervision events, not task failures, so they remain in the progress
+    // journal and are not injected into the workflow report's errors.
     try {
       guardianSettlement = guardian.finish(settledStop)
     } catch (error) {
@@ -1246,18 +1245,6 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
       cancelled: guardianSettlement?.cancelled ?? guardian.cancelled,
       findingCount: guardianSettlement?.findings.length ?? guardian.findings.length,
     })
-    if (guardianSettlement !== undefined && guardianSettlement.findings.length > 0 && lastReport !== undefined) {
-      const known = new Set(
-        lastReport.errors.map(entry => `${entry.phase} ${entry.message}`),
-      )
-      for (const finding of guardianSettlement.findings.slice(0, GUARDIAN_LIMITS.maxFindings)) {
-        const message = finding.reason
-        const key = `Guardian ${message}`
-        if (known.has(key)) continue
-        known.add(key)
-        lastReport.errors.push({ phase: 'Guardian', message, category: 'cancelled' })
-      }
-    }
     // Close the node even when this function throws: an abandoned node would read
     // as "still running" in the panel until the turn ends.
     if (run !== undefined) progress?.runEnd(run.id, progressStopReason(settledStop ?? 'error', reportStatus))
