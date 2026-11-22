@@ -335,7 +335,7 @@ window.__ModuleLoader__.load({
       'status.progressMissing': 'The Progress tab is not mounted: this composition has no uiConversation service, so the track cannot appear.',
       'status.progressFailed': 'The Progress tab could not be registered: {message}. Everything else keeps working.',
 
-      // --- The composer-dock loop switch ---
+      // --- The composer tool-row loop switch ---
       'loop.switch.label': 'Auto-continue',
       'loop.switch.aria': 'Auto-continue this session',
       'loop.switch.off': 'Off',
@@ -348,7 +348,7 @@ window.__ModuleLoader__.load({
       'loop.switch.unavailable': 'This Host has no scheduler, so a loop cannot start here.',
       'loop.switch.failed': 'The loop service did not answer: {message}',
 
-      // --- The composer-dock self-iteration switch (a second slot, its own route) ---
+      // --- The composer tool-row self-iteration switch (a second slot, its own route) ---
       'iterate.switch.label': 'Self-iterate',
       'iterate.switch.aria': 'Self-iterate this session',
       'iterate.switch.off': 'Off',
@@ -361,7 +361,7 @@ window.__ModuleLoader__.load({
       'iterate.switch.unavailable': 'This Host has no scheduler, so a self-iteration heartbeat cannot start here.',
       'iterate.switch.failed': 'The self-iteration service did not answer: {message}',
 
-      // --- The composer-dock workflow switch (the `/grok on|off` toggle, third slot) ---
+      // --- The composer tool-row workflow switch (the `/grok on|off` toggle, third slot) ---
       // Same record as the slash command (`plugin:grok-workflow/mode`), so the copy says
       // what the session does, not what the deployment default is: an unrecorded session
       // shows the Host's `grokDefault`, which the route reports.
@@ -549,7 +549,7 @@ window.__ModuleLoader__.load({
       'loop.switch.unavailable': '这台 Host 没有调度器，开不了续跑。',
       'loop.switch.failed': '续跑服务没有回应：{message}',
 
-      // --- The composer-dock self-iteration switch (a second slot, its own route) ---
+      // --- The composer tool-row self-iteration switch (a second slot, its own route) ---
       'iterate.switch.label': '自迭代',
       'iterate.switch.aria': '这个会话自动迭代',
       'iterate.switch.off': '关',
@@ -989,9 +989,9 @@ window.__ModuleLoader__.load({
       ok: { color: STATUS_COLOR.done },
       mono: { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: '12px' },
       /**
-       * The composer-dock strip. Ambient, not a card: it sits *under* the composer and
-       * must not compete with it, so it is one muted line on the theme's own surface
-       * tokens rather than a panel with a border of its own.
+       * One switch's cell in the composer tool row. Ambient, not a card: it must not
+       * compete with the model selector it sits beside, so it is one muted line on the
+       * theme's own surface tokens rather than a panel with a border of its own.
        */
       loopDock: { display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', padding: '2px 2px', fontSize: '12px', lineHeight: 1.5, color: 'var(--dsw-alias-label-secondary, inherit)' },
       loopLabel: { fontWeight: 600 },
@@ -999,7 +999,7 @@ window.__ModuleLoader__.load({
        * The workflow switch's lamp. Filled when the session runs workflow work, a hollow
        * ring when it does not — the non-textual half of "off", so a grey pill is never
        * the only signal that the switch is off. Both are component-local inline styles:
-       * no page-level rule and nothing that touches a neighbour in the dock.
+       * no page-level rule and nothing that touches a neighbour in the row.
        */
       dockDot: { display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', flex: 'none', background: STATUS_COLOR.done },
       dockDotOff: { display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', flex: 'none', boxSizing: 'border-box', border: '2px solid var(--dsw-alias-border-l2, rgba(128,128,128,0.7))', background: 'transparent' },
@@ -3942,7 +3942,7 @@ window.__ModuleLoader__.load({
       subscribe: () => () => {},
     }
 
-    // ─── Composer dock: the two heartbeat switches ──────────────────────────────
+    // ─── Composer tool row: the two heartbeat switches ──────────────────────────
     //
     // The repeat-run heartbeat is the user's to start, and these switches are the user's
     // half of that rule. They are not a second implementation: every request goes to the
@@ -3965,10 +3965,10 @@ window.__ModuleLoader__.load({
     // stored prompt, which is what keeps the settings page's textarea and the armed
     // heartbeat from disagreeing.
     //
-    // They sit in `conversation.composer.dock` — the ambient strip under the composer
-    // card, a `list` slot the conversation shell declares. The model-selector control in
-    // the tool row belongs to model selection and stays untouched: neither switch reads
-    // or moves it, and no code here reaches for its DOM.
+    // They sit in the composer tool row, in the `list` slot the shell renders immediately
+    // before the model selector ({@link SWITCH_SLOT}). The model-selector control itself
+    // belongs to model selection and stays untouched: no switch reads or moves it, and no
+    // code here reaches for its DOM.
     const LOOP_ROUTE_PATH = '/grok-workflow/loop'
     const ITERATE_ROUTE_PATH = '/grok-workflow/iterate'
     // The workflow switch is not a heartbeat: it flips the same session record `/grok
@@ -3979,6 +3979,19 @@ window.__ModuleLoader__.load({
     const LOOP_SWITCH_ORDER = 90
     const ITERATE_SWITCH_ORDER = 91
     const MODE_SWITCH_ORDER = 92
+    /**
+     * The one slot all three switches register into.
+     *
+     * `conversation.input.right` is the tool row's own `list` slot — "compact controls
+     * before the composer submit action" — and the shell renders it ahead of the
+     * model-selector seat, so an entry here sits immediately left of that selector rather
+     * than in the ambient strip under the card. Two consequences matter: the row's render
+     * gate is `sessionId !== undefined` (the model selector's own gate, not the dock's
+     * `variant === 'composer'`), so the switches appear in the hero composer of a new
+     * session as well; and the slot's stock occupancy is empty, so a fresh id appends
+     * rather than replacing anything.
+     */
+    const SWITCH_SLOT = 'conversation.input.right'
     /** The actions both routes dispatch; pinned against the tool schema by the spec. */
     const LOOP_ACTIONS = ['status', 'close', 'open']
     /** The actions the mode route dispatches: read the record, or write it on/off. */
@@ -4044,10 +4057,10 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * Build one composer-dock heartbeat switch.
+     * Build one composer-tool-row heartbeat switch.
      *
      * The two switches differ in exactly four facts — the route path, the registration
-     * id, the dock order and the copy prefix — and nothing else: the same state machine,
+     * id, the slot order and the copy prefix — and nothing else: the same state machine,
      * the same transport rules and the same DOM contract apply to both, so one factory
      * keeps them from drifting apart.
      * @param config - `routePath` (the exact Host route), `switchId` (the slot
@@ -4232,7 +4245,7 @@ window.__ModuleLoader__.load({
       }
 
       /**
-       * Register the switch in the composer dock.
+       * Register the switch in the composer tool row.
        *
        * `locale: NS` is added only when the composition installs a locale face — the same
        * rule the settings page follows, for the same reason: a registration that names a
@@ -4245,13 +4258,13 @@ window.__ModuleLoader__.load({
        */
       function start(ctx, i18n) {
         const options = {
-          name: 'conversation.composer.dock',
+          name: SWITCH_SLOT,
           id: switchId,
           order: switchOrder,
         }
         if (i18n.locale !== undefined) options.locale = NS
         try {
-          return ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register(options, Switch))
+          return ctx.slots.inject(SWITCH_SLOT, () => ctx.slots.register(options, Switch))
         } catch (error) {
           const message = error && error.message ? error.message : String(error)
           console.warn(`[grok-workflow] the ${textPrefix} switch could not be registered (${message}); settings are unaffected.`)
@@ -4443,7 +4456,7 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * Register the workflow switch in the composer dock.
+     * Register the workflow switch in the composer tool row.
      *
      * Same rule as the heartbeats: `locale: NS` only when a locale face exists, additive
      * own id, and a refusing registry costs this switch and nothing else.
@@ -4453,13 +4466,13 @@ window.__ModuleLoader__.load({
      */
     function startModeSwitch(ctx, i18n) {
       const options = {
-        name: 'conversation.composer.dock',
+        name: SWITCH_SLOT,
         id: 'grok-workflow-mode',
         order: MODE_SWITCH_ORDER,
       }
       if (i18n.locale !== undefined) options.locale = NS
       try {
-        return ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register(options, ModeSwitch))
+        return ctx.slots.inject(SWITCH_SLOT, () => ctx.slots.register(options, ModeSwitch))
       } catch (error) {
         const message = error && error.message ? error.message : String(error)
         console.warn(`[grok-workflow] the mode switch could not be registered (${message}); settings are unaffected.`)
@@ -4478,21 +4491,21 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * Mount the three dock switches and return one disposer that takes them away.
+     * Mount the three tool-row switches and return one disposer that takes them away.
      *
      * Auto-continue and self-iterate are heartbeats; the workflow switch is the session
-     * toggle `/grok on|off` writes. They share a strip and nothing else: each owns a
+     * toggle `/grok on|off` writes. They share a slot and nothing else: each owns a
      * route, an id and a state line, so one switch can never create, report or delete
      * another's state.
      *
-     * Each mount is additive and fails soft on its own: a dock that refuses one
+     * Each mount is additive and fails soft on its own: a registry that refuses one
      * registration costs that switch and still keeps the others, and a disposer that
      * only owns the registrations that actually landed never takes down a neighbor's.
      * @param ctx - the browser plugin context.
      * @param i18n - live locale binding.
      * @returns a combined disposer, or `undefined` when nothing was registered.
      */
-    function startDockSwitches(ctx, i18n) {
+    function startComposerSwitches(ctx, i18n) {
       const landed = [LOOP_SWITCH.mount(ctx, i18n), ITERATE_SWITCH.mount(ctx, i18n), MODE_SWITCH.mount(ctx, i18n)]
         .filter((disposer) => typeof disposer === 'function')
       if (landed.length === 0) return undefined
@@ -4621,7 +4634,7 @@ window.__ModuleLoader__.load({
 
       let stop = startPages(ctx, face, i18n)
       /**
-       * Disposer of the composer-dock switch.
+       * Disposer of the composer tool-row switch.
        *
        * Mounted unconditionally, unlike the panel and the tab: the switch needs nothing
        * but the slot registry this bundle already requires, and a missing switch would
@@ -4681,7 +4694,7 @@ window.__ModuleLoader__.load({
         startProgress()
       }
       /**
-       * Mount the composer-dock switches under the current locale binding.
+       * Mount the composer tool-row switches under the current locale binding.
        *
        * Three are mounted: the auto-continue loop switch, beside it the self-iterate
        * switch, and after them the workflow switch (`/grok on|off` in button form). Each
@@ -4692,7 +4705,7 @@ window.__ModuleLoader__.load({
       const startSwitch = () => {
         if (disposed) return
         switchMounted = true
-        stopSwitch = startDockSwitches(ctx, i18n)
+        stopSwitch = startComposerSwitches(ctx, i18n)
       }
       /** Drop the current switch registration and mount it again. */
       const restartSwitch = () => {
@@ -4747,8 +4760,8 @@ window.__ModuleLoader__.load({
           stop = startPages(ctx, face, i18n)
           restartPanel()
           restartProgress()
-          // Last, so the switch joins the list after the page and the panel: the composer
-          // dock is additive, and the entries that existed before keep their positions.
+          // Last, so the switch joins the list after the page and the panel: the slot is
+          // additive, and the entries that existed before keep their positions.
           restartSwitch()
           return teardown
         })
@@ -4872,14 +4885,14 @@ window.__ModuleLoader__.load({
      */
     exports.GROK_WORKFLOW_LOOP = LOOP_SWITCH
     /**
-     * Composer-dock self-iteration switch: the browser half of the iterate route.
+     * Composer-tool-row self-iteration switch: the browser half of the iterate route.
      * Pinned by `test/client.spec.ts` against `ITERATE_ROUTE_PATH` in `src/loop.ts`
      * and against the identity separation in `test/iterate.spec.ts`, so the two
      * switches cannot drift into sharing a slot.
      */
     exports.GROK_WORKFLOW_ITERATE = ITERATE_SWITCH
     /**
-     * Composer-dock workflow switch: `/grok on|off` as a button. Pinned by
+     * Composer-tool-row workflow switch: `/grok on|off` as a button. Pinned by
      * `test/client.spec.ts` against the mode route's path, action list and answer
      * shape, so the button and the slash command cannot drift into two switches.
      */

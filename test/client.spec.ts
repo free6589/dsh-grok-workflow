@@ -161,7 +161,7 @@ interface ModeSwitchBundle {
 }
 
 /**
- * The composer-dock switch (`GROK_WORKFLOW_LOOP`).
+ * The composer tool-row switch (`GROK_WORKFLOW_LOOP`).
  *
  * Pinned against the Host here rather than trusted: this half of the bundle is hand-written
  * JavaScript, so the only thing that keeps its route, its actions and its authorization
@@ -588,7 +588,7 @@ describe('client settings page: wiring to the DSH locale service (t42)', () => {
     // The page is mounted once before the locale service arrives and once after: only the
     // second registration survives, and it is the one carrying the namespace.
     // Five live registrations: the settings page, the task panel renderer and the
-    // three composer-dock switches (additive, registered last: loop, iterate, mode).
+    // three composer tool-row switches (additive, registered last: loop, iterate, mode).
     expect(live()).toHaveLength(5)
     const byId = (id: string) => live().find((entry: { options: Record<string, unknown> }) => entry.options['id'] === id)
     expect(byId('grok-workflow-loop'), 'the loop switch is registered').toBeDefined()
@@ -2380,7 +2380,7 @@ describe('client progress tab: the settle bar, the rails and the narrow layout',
 /* ------------------------------------------------------------------ loop switch -- */
 
 /**
- * The composer-dock loop switch: the *user's* half of the repeat-run feature.
+ * The composer tool-row loop switch: the *user's* half of the repeat-run feature.
  *
  * Three things are pinned here, and none of them is cosmetic:
  * 1. **One operation, two callers.** The switch posts to the route `src/loop.ts` names,
@@ -2389,11 +2389,11 @@ describe('client progress tab: the settle bar, the rails and the narrow layout',
  * 2. **User-only.** The tool refuses `open`; the browser path is the only one that opens.
  *    That asymmetry is the authorization, so it is asserted in the same test as the shared
  *    action list rather than trusted to a comment.
- * 3. **The composer dock, and nothing else.** The switch is additive in
- *    `conversation.composer.dock`; the model selector in the composer's tool row is not
- *    read, moved or referenced.
+ * 3. **The composer tool row, and nothing else.** The switch is additive in
+ *    `conversation.input.right` — the row's own list slot, rendered just before the model
+ *    selector — and that selector is not read, moved or referenced.
  */
-describe('client composer dock: the loop switch (one Host operation, two callers)', () => {
+describe('client composer tool row: the loop switch (one Host operation, two callers)', () => {
   const SESSION = '2d7bd1e7-1111-2222-3333-444455556666'
   const zhDict = bundle.GROK_WORKFLOW_DICT['zh']!
   const enDict = bundle.GROK_WORKFLOW_DICT['en']!
@@ -2402,7 +2402,7 @@ describe('client composer dock: the loop switch (one Host operation, two callers
   /** The switch section of the bundle source, for the "touches nothing else" checks. */
   const switchSource = (() => {
     const source = readFileSync(new URL('../src/client/index.js', import.meta.url), 'utf8')
-    const start = source.indexOf('// ─── Composer dock: the two heartbeat switches')
+    const start = source.indexOf('// ─── Composer tool row: the two heartbeat switches')
     const end = source.indexOf('/** Required services for the page')
     expect(start, 'the heartbeat switch section is in the bundle').toBeGreaterThan(0)
     expect(end, 'the section ends where the page registration begins').toBeGreaterThan(start)
@@ -2491,7 +2491,7 @@ describe('client composer dock: the loop switch (one Host operation, two callers
     expect(await loop.read(SESSION, null)).toMatchObject({ ok: false, code: 'loop/transport' })
   })
 
-  it('mounts in the composer dock only, additive, and with the namespace when one exists', () => {
+  it('mounts in the tool row beside the model selector only, additive, and with the namespace when one exists', () => {
     const registered: Array<{ options: Record<string, unknown>, component: unknown }> = []
     const ctx = (refuse = false) => ({
       slots: {
@@ -2508,7 +2508,9 @@ describe('client composer dock: the loop switch (one Host operation, two callers
     try {
       loop.mount(ctx(), { locale: { bind: () => translator('zh') } })
       expect(registered).toHaveLength(1)
-      expect(registered[0]!.options['name']).toBe('conversation.composer.dock')
+      // The tool row's own list slot: the shell renders it immediately before
+      // `conversation.input.model`, so this entry sits left of the model selector.
+      expect(registered[0]!.options['name']).toBe('conversation.input.right')
       expect(registered[0]!.options['id']).toBe(loop.switchId)
       expect(registered[0]!.options['order']).toBe(loop.switchOrder)
       // A fresh id in a `list` slot: this adds a row, it does not replace a shipped one.
@@ -2529,6 +2531,9 @@ describe('client composer dock: the loop switch (one Host operation, two callers
   it('never reaches for the model selector or any DOM outside its own row', () => {
     const source = readFileSync(new URL('../src/client/index.js', import.meta.url), 'utf8')
     expect(source).not.toMatch(/conversation\.input\.model/)
+    // The ambient strip under the card is no longer a mount point: the switches belong to
+    // the tool row, so the old slot must not creep back in as a second registration.
+    expect(source).not.toMatch(/conversation\.composer\.dock/)
     // The switch renders through React and posts through fetch; it never queries the page.
     expect(switchSource).not.toMatch(/querySelector/)
     expect(switchSource).not.toMatch(/getElementById/)
@@ -2766,7 +2771,7 @@ describe('client composer dock: the loop switch (one Host operation, two callers
 })
 
 /**
- * The composer-dock workflow switch: `/grok on|off` as a third button.
+ * The composer tool-row workflow switch: `/grok on|off` as a third button.
  *
  * It sits beside auto-continue and self-iterate and touches neither: no interval, no
  * Schedule task, no `open`/`close` — only the session record `plugin:grok-workflow/mode`
@@ -2782,7 +2787,7 @@ describe('client composer dock: the loop switch (one Host operation, two callers
  * 4. **Its own row only.** No stylesheet rule, no DOM query, and no read of a neighbour
  *    switch's attributes.
  */
-describe('client composer dock: the workflow switch (`/grok on|off` as a button)', () => {
+describe('client composer tool row: the workflow switch (`/grok on|off` as a button)', () => {
   const SESSION = '2d7bd1e7-1111-2222-3333-444455556666'
   const MODE = '/grok-workflow/mode'
   const zhDict = bundle.GROK_WORKFLOW_DICT['zh']!
@@ -2935,7 +2940,7 @@ describe('client composer dock: the workflow switch (`/grok on|off` as a button)
     expect(texts(recovered).join(' ')).toContain(zhDict['mode.switch.off'])
   })
 
-  it('mounts in the composer dock only, after the two heartbeats, with the namespace when one exists', () => {
+  it('mounts in the tool row after the two heartbeats, with the namespace when one exists', () => {
     const mode = modeSwitch()
     const registered: Array<{ options: Record<string, unknown>, component: unknown }> = []
     const ctx = (refuse = false) => ({
@@ -2953,7 +2958,8 @@ describe('client composer dock: the workflow switch (`/grok on|off` as a button)
     try {
       mode.mount(ctx(), { locale: { bind: () => translator('zh') } })
       expect(registered).toHaveLength(1)
-      expect(registered[0]!.options['name']).toBe('conversation.composer.dock')
+      // Same slot as the two heartbeats, still left of the model selector.
+      expect(registered[0]!.options['name']).toBe('conversation.input.right')
       expect(registered[0]!.options['id']).toBe(mode.switchId)
       // Third in the strip: the two heartbeats keep their orders (90, 91).
       expect(registered[0]!.options['order']).toBe(92)
@@ -3008,7 +3014,7 @@ describe('client composer dock: the workflow switch (`/grok on|off` as a button)
  * route reading the session's own log, and the click's persistence is asserted by
  * reading that log back with `readModeRecord`. A mocked transport cannot pass this.
  */
-describe('client composer dock: the workflow switch against the real Host route', () => {
+describe('client composer tool row: the workflow switch against the real Host route', () => {
   const SESSION = '4b1f0f6a-2222-3333-4444-555566667777'
   const zhDict = bundle.GROK_WORKFLOW_DICT['zh']!
 

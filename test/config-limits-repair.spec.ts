@@ -509,7 +509,7 @@ function renderWith(value: Record<string, unknown>): unknown {
       inject: (_name: string, fn: () => unknown) => fn(),
       register: (options: Record<string, unknown>, component: (props: Record<string, unknown>) => unknown) => {
         // This bundle registers more than one slot (the settings page, the task panel, the
-        // composer-dock switch); this block is about the page, so it takes that entry by
+        // composer tool-row switches); this block is about the page, so it takes that entry by
         // name instead of whatever registered last.
         if (options['name'] !== 'plugins.item') return () => {}
         page = { options, component }
