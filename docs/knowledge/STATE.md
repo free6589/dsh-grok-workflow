@@ -1,3 +1,11 @@
+Last updated: 2026-11-22 14:00 +08:00（**已发版 `0.13.7`：任务带缩进+排序+三链常显，`CONFIRMED`** —
+前人已把三件套写完躺在工作树（`src/progress-tab.ts` 固定三链 PROGRESS_CHAIN + taskNumber 排序 +
+guardian 判别，`src/client/index.js` 镜像 + 16px 缩进 + pending 虚线胶囊），我接手收尾：
+补 4 个 i18n key（chain.execute/check/review/pendingHint 中英）→ 修旧测试
+（按"每行一胶囊"写的改按"固定三链"断言）→ 重建 lib → 全量 CI exit 0
+（78 文件 / 1480 测试）。发版提交 `5d31383` + tag `v0.13.7` 已推；远端 CI `44991529208`
+success、Release `44991531822` success 并已发布。）
+
 Last updated: 2026-11-22 13:28 +08:00（**已发版 `0.13.6`：守卫问心跳 + 打断重救，`CONFIRMED`** —
 `8e129c1` 已推，annotated tag `v0.13.6` 已推；远端 CI `44989417857` success、
 Release `44989425946` success 并已发布。本地 `npm run ci` exit 0：78 文件 /
