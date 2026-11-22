@@ -206,7 +206,7 @@ type ProgressRun = {
     budgetMs: number
     ended: boolean
     cancelled: boolean
-    findings: Array<{ seq: number, label: string, signal: 'timeout' | 'heartbeat-loss', action: 'cancel-run' | 'rescue', reason: string, atMs?: number }>
+    findings: Array<{ seq: number, label: string, signal: 'timeout' | 'heartbeat-loss', action: 'cancel-run' | 'rescue' | 'observe', reason: string, atMs?: number }>
   }
   startedAt?: number
   endedAt?: number
@@ -1786,11 +1786,17 @@ describe('client progress tab: the fold and the five states', () => {
     state = definition.update({ state }, {
       event: rec('tool-workflow/guardian-finding', {
         runId: 'r-live', seq: 3, label: '执行 3', signal: 'timeout',
-        action: 'rescue', reason: 'rescued with guidance', atMs: 2_000,
+        action: 'rescue', reason: 'recovery guidance queued', atMs: 2_000,
       }, 12, 2_000),
     })
     state = definition.update({ state }, {
-      event: rec('tool-workflow/guardian-end', { runId: 'r-live', cancelled: false, findingCount: 1 }, 13, 2_100),
+      event: rec('tool-workflow/guardian-finding', {
+        runId: 'r-live', seq: 4, label: '执行 4', signal: 'heartbeat-loss',
+        action: 'observe', reason: 'no child session available; left running', atMs: 2_050,
+      }, 13, 2_050),
+    })
+    state = definition.update({ state }, {
+      event: rec('tool-workflow/guardian-end', { runId: 'r-live', cancelled: false, findingCount: 2 }, 14, 2_100),
     })
     const node = definition.buildViewNode({
       state,
@@ -1805,7 +1811,10 @@ describe('client progress tab: the fold and the five states', () => {
       budgetMs: 1_320_000,
       ended: true,
       cancelled: false,
-      findings: [{ seq: 3, action: 'rescue', reason: 'rescued with guidance' }],
+      findings: [
+        { seq: 3, action: 'rescue', reason: 'recovery guidance queued' },
+        { seq: 4, action: 'observe', reason: 'no child session available; left running' },
+      ],
     })
     const t = translator('zh')
     const view = progress.component({
@@ -1817,7 +1826,9 @@ describe('client progress tab: the fold and the five states', () => {
     const panel = elements.find((element) => element.props['data-gw-progress-guardian'] === true)
     expect(panel).toBeDefined()
     expect(panel!.props['data-state']).toBe('finished')
-    expect(texts(panel).join(' ')).toContain('已发送救援指引')
+    expect(texts(panel).join(' ')).toContain('已排队发送恢复指引')
+    expect(texts(panel).join(' ')).toContain('已记录异常 · 继续运行')
+    expect(elements.some(element => element.props['data-action'] === 'observe')).toBe(true)
   })
 
   it('settles out of order and idempotently, and drops what nobody declared', () => {
