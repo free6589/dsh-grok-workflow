@@ -1,4 +1,11 @@
-Last updated: 2026-11-22 10:45 +08:00（**分支清理：删 26 本地 + 26 远端已合并分支，`CONFIRMED`** —
+Last updated: 2026-11-22 11:00 +08:00（**已发版 `0.13.3`：7 个 RSI 分支全收 + 分支清零，`CONFIRMED`** —
+前人已把 7 个 `rsi/round-*` cherry-pick 进 main（12 提交 `fff56c4..f3fd972`，`src/redact`/`delivery`/`gate`
++ 3 测试修复 + 4 测试补钉；4 块源码 main 已有等价实现故只收测试——验证过行为一致），我接手验证：
+定向 7 文件 230 例全绿 → `npm run build`（`lib/` 与 `src/` 字节一致）→ `npm run ci` exit 0
+（78 文件 / 1464 测试）。发版提交 `5d614f3` + tag `v0.13.3` 已推；远端 CI `44978408473` success、
+Release `44978415364` success 并已发布。7 个 rsi 分支本地已删（SHA 已记 DELETED.shas），远端本就
+没有。现本地仅 `feat/audit-layer` + `feat/user-delivery`（真未合，另议），远端仅
+`cloud/harden-issue-watcher` + `fix/token-meter`（远端独有，另议）。open PR 0。）
 本地 40→10、远端 35→4。删的都是 `merge-base --is-ancestor` 确认已进 main 的（26 个本地 `branch -d`
 全过、无需 `-D`；远端 24 个 MERGED + 2 个复核后确认已合的）。剩下本地 9 + 远端独有 2：
 `rsi/round-4..8,10,11`（7 个真未合：round-4 Authorization 全 scheme 脱敏等安全修复都不在 main 里，
