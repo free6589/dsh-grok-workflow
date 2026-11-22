@@ -38,7 +38,7 @@ export const PROGRESS_EVENT_TYPES = [
 /**
  * The optional detail payload, kept apart from {@link PROGRESS_EVENT_TYPES} on purpose.
  *
- * The state of the track comes from the four events above and from nothing else. This
+ * Track state comes from progress lifecycle events; Guardian findings only populate its side lane. This
  * one only ever *adds* field values to a node, so a stream without it renders exactly
  * what it rendered before. `createWorkflowProgressRecorder` does not write it today; the
  * tab reads it so that a recorder (or another bundle) that does write it is used instead
