@@ -301,7 +301,13 @@ describe('progress wiring: the real engine writes what the panel folds', () => {
       failureMode: 'report',
       signals: [controller.signal],
     })
-    await new Promise(resolve => setTimeout(resolve, 10))
+    // Cancel only after the worker is actually running: a fixed sleep races the
+    // run's startup IO (checkpoint resume scan), and an abort that lands before
+    // the engine starts takes a different path with no progress events at all.
+    const deadline = Date.now() + 10_000
+    while (engine.children.length === 0 && Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 5))
+    }
     controller.abort()
     const outcome = await pending
     expect(outcome.cause).toBe('cancelled')
