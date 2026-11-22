@@ -3,6 +3,14 @@
 Notable user-facing changes are recorded here in English and Simplified Chinese.
 用户可见的功能和修复会在这里以英文和简体中文记录。
 
+## [0.13.11] - 2026-11-22
+
+### Fixed / 修复
+
+- **Guardian stall budget always follows the per-call budget, default 120 minutes / 守卫判停预算永远跟随单次调用预算，默认 120 分钟** —
+  The host Guardian previously fell back to the old 10-minute cap when no guardian route was configured (`guardianModel` empty), so the progress page still showed "600 seconds" even after the per-call budget became 120 minutes. The budget now always follows `childTimeoutMs` (default 120 minutes); a configured route only buys adjudication slices, never changes the budget. The settings hint says so in both languages.
+  / 之前没配判停路由（`guardianModel` 为空）时，宿主守卫会退回旧的 10 分钟上限，所以单次调用预算改成 120 分钟后进度页仍显示"600 秒"。现在预算永远跟随 `childTimeoutMs`（默认 120 分钟）；配路由只决定卡住时是否多等两轮裁决，不改变预算。设置页中英提示已写明这一点。
+
 ## [0.13.10] - 2026-11-22
 
 ### Added / 新增
