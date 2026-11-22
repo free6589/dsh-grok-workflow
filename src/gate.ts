@@ -1325,9 +1325,10 @@ export function installGate(deps: GateDeps): boolean {
     // cancelled row would take position 0 with no head ever following; there
     // the terminal record still states the reason.
     const preCancelled = payload.signal?.aborted === true
+    const owner = sessionOf(agent)
     const kept = alreadySurfaced
       ? true
-      : preCancelled && !surfaceHasHead(sessionOf(agent), payload.turn)
+      : preCancelled && (owner === undefined || !surfaceHasHead(owner, payload.turn))
         ? false
         : commitClaimed(agent, payload.messages)
     const session = sessionOf(agent)
