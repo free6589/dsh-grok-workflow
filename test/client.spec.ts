@@ -1,7 +1,7 @@
 import { createServer } from 'node:http'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_ITERATE_INTERVAL_MIN, DEFAULT_ITERATE_TEMPLATE, DEFAULT_LOOP_FAIL_STREAK, DEFAULT_LOOP_INTERVAL_MIN, DEFAULT_LOOP_MAX_ROUNDS, DEFAULT_MAX_CONCURRENCY, DEFAULT_MAX_TASKS, DEFAULT_TIMEOUT_MS, HARD_LIMITS, SWITCHABLE_CLASSES } from '../src/config.js'
+import { DEFAULT_CHILD_TIMEOUT_MS, DEFAULT_ITERATE_INTERVAL_MIN, DEFAULT_ITERATE_TEMPLATE, DEFAULT_LOOP_FAIL_STREAK, DEFAULT_LOOP_INTERVAL_MIN, DEFAULT_LOOP_MAX_ROUNDS, DEFAULT_MAX_CONCURRENCY, DEFAULT_MAX_TASKS, DEFAULT_TIMEOUT_MS, HARD_LIMITS, SWITCHABLE_CLASSES } from '../src/config.js'
 import { ITERATE_ROUTE_PATH, ITERATE_TASK_TITLE, LOOP_ROUTE_PATH, LOOP_TASK_TITLE, LOOP_TOOL_NAME, createLoopService, loopPolicyFromConfig } from '../src/loop.js'
 import { createLoopTool, dispatchIterateAction, handleLoopRoute } from '../src/loop-surface.js'
 import { Session as SessionClass } from '@deepseek-ai/dsh-session'
@@ -317,16 +317,17 @@ describe('client settings page bundle', () => {
     expect(typeof bundle.apply).toBe('function')
   })
 
-  // T5 slim page plus the four repeat-run keys, the two self-iteration keys and
-  // the Q8 guardian model: 12 visible FIELDS (grokDefault/mode/maxConcurrency/
-  // maxTasks/timeoutMs, the four loop keys, iterateIntervalMin, the iterateTemplate
-  // textarea and guardianModel) plus the 5 role chains equal the 16-leaf-key
-  // configuration surface (toolName/roles/synthesis/configVersion are structural,
+  // T5 slim page plus the four repeat-run keys, the two self-iteration keys,
+  // the Q8 guardian model and childTimeoutMs: 13 visible FIELDS
+  // (grokDefault/mode/maxConcurrency/maxTasks/timeoutMs/childTimeoutMs,
+  // the four loop keys, iterateIntervalMin, the iterateTemplate textarea and
+  // guardianModel) plus the 5 role chains equal the 17-leaf-key configuration
+  // surface (toolName/roles/synthesis/configVersion are structural,
   // rendered nowhere).
   // Number bounds mirror HARD_LIMITS (100 / 20) and the defaults (10 / 3 / 0); the
   // suite pins all three so a quiet drift fails here instead of in the GUI.
-  it('renders the visible keys: 12 fields plus the 5 role chains', () => {
-    const visible = ['grokDefault', 'guardianModel', 'maxConcurrency', 'maxTasks', 'mode', 'timeoutMs',
+  it('renders the visible keys: 13 fields plus the 5 role chains', () => {
+    const visible = ['childTimeoutMs', 'grokDefault', 'guardianModel', 'maxConcurrency', 'maxTasks', 'mode', 'timeoutMs',
       'loopEnabled', 'loopMaxRounds', 'loopFailStreak', 'loopIntervalMin',
       'iterateIntervalMin', 'iterateTemplate']
     expect(bundle.GROK_WORKFLOW_FIELDS.map(field => field.key).sort()).toEqual(visible.slice().sort())
@@ -344,6 +345,8 @@ describe('client settings page bundle', () => {
       // any non-negative safe integer, so the page mirrors that instead of
       // inventing a ceiling the plugin would not enforce.
       timeoutMs: [0, Number.MAX_SAFE_INTEGER],
+      // The per-call stall budget: 1 s floor, 120 min ceiling (same as default).
+      childTimeoutMs: [HARD_LIMITS.childTimeoutMs.min, HARD_LIMITS.childTimeoutMs.max],
       // Repeat-run caps are quota envelopes (each round is a full run), so the page
       // shows the same bounds the schema clamps to. An interval spends no quota and
       // therefore has no practical ceiling either; 0 starts the next round at once.
@@ -368,6 +371,7 @@ describe('client settings page bundle', () => {
     expect(defs.get('maxConcurrency')?.def).toBe(DEFAULT_MAX_CONCURRENCY)
     expect(defs.get('maxTasks')?.def).toBe(DEFAULT_MAX_TASKS)
     expect(defs.get('timeoutMs')?.def).toBe(DEFAULT_TIMEOUT_MS)
+    expect(defs.get('childTimeoutMs')?.def).toBe(DEFAULT_CHILD_TIMEOUT_MS)
     expect(defs.get('loopMaxRounds')?.def).toBe(DEFAULT_LOOP_MAX_ROUNDS)
     expect(defs.get('loopFailStreak')?.def).toBe(DEFAULT_LOOP_FAIL_STREAK)
     expect(defs.get('loopIntervalMin')?.def).toBe(DEFAULT_LOOP_INTERVAL_MIN)
@@ -1423,6 +1427,7 @@ describe('client settings page: draft, validation and path ops', () => {
       maxConcurrency: 10,
       maxTasks: 10,
       timeoutMs: 3_600_000,
+      childTimeoutMs: 7_200_000,
       loopEnabled: false,
       loopMaxRounds: 10,
       loopFailStreak: 3,

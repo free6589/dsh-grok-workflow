@@ -1,3 +1,19 @@
+## 2026-11-22 — childTimeoutMs 单次调用预算 120 分钟（`CONFIRMED`，未发版、未提交）
+
+- **From:** 本会话（lead）· **To:** 下一轮接手者
+- **为什么做**：用户原话"守卫出了问题，10 分钟上限……把它改成默认 120 分钟"。纽约天气 UI 截图：
+  `任务进度 5/5 · 100%` 但 Guardian 连刷 4 条"已触发整轮取消"——子任务 10 分钟被掐。三处写死
+  10 分钟：`CHILD_TIMEOUT_MS`、`childTimeoutCapMs`、脚本镜像。D-097 只修抢跑没修预算本身。
+- **改了什么**：新键 `childTimeoutMs`（schema 鉗制 + resolve 1000–7200000 + 设置页分钟编辑 1–120 +
+  报告校验/渲染），默认/上限 120 分钟（`DEFAULT_CHILD_TIMEOUT_MS`/`CHILD_TIMEOUT_MAX_MS`/
+  `childTimeoutCapMs` 三处 7.2M）；`CHILD_TIMEOUT_MS` 留作旧报告 `0` 豁免锚点。详见 D-102。
+- **测试**：`npm run ci` exit 0（80/1525）；`build` + `verify:lib` byte-identical；lint 3 告警是
+  stash 验证过的 pre-existing。旧报告在新默认下重验失败是预期的。
+- **没做的**：未提交、未发版（用户没说发版，只说加设置——提交了等发版指令；commit 不 push 不 force）。
+  真机 120 分钟长任务实跑 NOT_RUN；旧补丁超限钳制 load 路径 NOT_RUN。
+  tsconfig.json/tsconfig.build.json 的 jsx/tsx 改动非本轮引入（`git log` 显示来自旧提交混入工作树），
+  本轮未动、未提交——下轮接手者确认归属后再处理。`tsconfig` 那两行没进本次文件清单。
+
 ## 2026-11-22 — 已发版 `0.13.6`：守卫问心跳 + 打断重救（`CONFIRMED`）
 
 - **From:** 本会话（lead）· **To:** 下一轮接手者

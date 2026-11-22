@@ -150,9 +150,9 @@ describe('config limit repair (B07)', () => {
 describe('LIMIT_CAPS: one clamp table for every user-configurable numeric cap (B02, T4)', () => {
   it('clamps each listed limit in the schema, records one note, and repairs the same number', () => {
     // T4 kept the two run limits in the table; the repeat-run caps joined them with
-    // the loop keys. The other former caps are fixed internally (their patches are
-    // unknown keys).
-    expect(Object.keys(LIMIT_CAPS).sort()).toEqual(['iterateIntervalMin', 'loopFailStreak', 'loopIntervalMin', 'loopMaxRounds', 'maxConcurrency', 'maxTasks'])
+    // the loop keys, and childTimeoutMs joined as the per-call budget. The other
+    // former caps are fixed internally (their patches are unknown keys).
+    expect(Object.keys(LIMIT_CAPS).sort()).toEqual(['childTimeoutMs', 'iterateIntervalMin', 'loopFailStreak', 'loopIntervalMin', 'loopMaxRounds', 'maxConcurrency', 'maxTasks'])
     for (const [field, cap] of Object.entries(LIMIT_CAPS)) {
       takeLimitOverruns()
       const stored = cap + 1
@@ -185,6 +185,12 @@ describe('LIMIT_CAPS: one clamp table for every user-configurable numeric cap (B
     // timeoutMs is a real key, but it has no clamp: 0 means unlimited and any
     // non-negative integer is accepted as written, so it stays out of the table.
     expect(Object.keys(LIMIT_CAPS)).not.toContain('timeoutMs')
+    // childTimeoutMs is the one clamp whose cap equals its default: a stored
+    // overrun takes effect as the 120-minute default itself.
+    expect(LIMIT_CAPS.childTimeoutMs).toBe(7_200_000)
+    expect(LIMIT_CAPS.childTimeoutMs).toBe(HARD_LIMITS.childTimeoutMs.max)
+    expect(resolveConfig({ childTimeoutMs: 7_200_000 } as never).childTimeoutMs).toBe(7_200_000)
+    expect(resolveConfig({}).childTimeoutMs).toBe(7_200_000)
     expect(resolveConfig({ timeoutMs: 0 } as never).timeoutMs).toBe(0)
     expect(resolveConfig({ timeoutMs: 7_200_000 } as never).timeoutMs).toBe(7_200_000)
     expect(() => Config({ maxTasks: '500' } as never)).toThrow(/maxTasks expected number/)

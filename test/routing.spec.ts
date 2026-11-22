@@ -16,6 +16,7 @@ function args(overrides: Record<string, unknown> = {}): Record<string, unknown> 
     maxRetries: 1,
     maxTasks: 6,
     maxTotalAgents: 40,
+    childTimeoutMs: 7_200_000,
     roles: { planner: [], worker: [], verifier: [], synthesizer: [] },
     synthesis: 'deterministic',
     ...overrides,

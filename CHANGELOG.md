@@ -3,6 +3,14 @@
 Notable user-facing changes are recorded here in English and Simplified Chinese.
 用户可见的功能和修复会在这里以英文和简体中文记录。
 
+## [Unreleased]
+
+### Added / 新增
+
+- **Configurable per-call stall budget, default 120 minutes / 单次调用预算可配置，默认 120 分钟** —
+  New `childTimeoutMs` key (settings page shows minutes, 1–120; stored in milliseconds): one `agent()` call runs this long before the run stops waiting on it, while the run deadline still caps the whole run. The old 10-minute default killed healthy slow children; the new 120-minute default always loads, and any stored overrun clamps to it.
+  / 新增 `childTimeoutMs` 配置（设置页按分钟编辑 1–120，存毫秒）：一次 `agent()` 调用最多跑这么久，超时只算该次失败走任务重试，整轮仍受运行死线约束。旧的 10 分钟默认会误杀正常慢任务；新的 120 分钟默认直接生效，超限存值钳制到它。
+
 ## [0.13.9] - 2026-11-22
 
 ### Fixed / 修复

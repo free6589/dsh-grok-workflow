@@ -133,6 +133,10 @@ window.__ModuleLoader__.load({
       // max is Number.MAX_SAFE_INTEGER (no practical cap); the number widget
       // below steps within [min, max] and the schema rejects out-of-range input.
       { key: 'timeoutMs', group: 'limits', kind: 'number', min: 0, max: Number.MAX_SAFE_INTEGER, def: 3600000 },
+      // Per child-call stall budget (minutes on the page, ms stored): the script races
+      // every agent() against it and settles a loser as a timeout of that attempt.
+      // Default 120 min, ceiling 120 min; floor 1 s keeps the timer a signal.
+      { key: 'childTimeoutMs', group: 'limits', kind: 'number', min: 1000, max: 7200000, def: 7200000 },
       // Repeat runs (the loop keys): one full run per round, so the round cap and
       // the fail streak are the quota envelope. Bounds mirror HARD_LIMITS
       // (loopMaxRounds 100, loopFailStreak 20, loopIntervalMin 10080 = seven days)
@@ -207,6 +211,8 @@ window.__ModuleLoader__.load({
       'field.maxTasks': 'Splits per job',
       'field.timeoutMs': 'Run deadline (minutes)',
       'field.timeoutMs.hint': 'Default 60 minutes. 0 = no limit (no timer is armed).',
+      'field.childTimeoutMs': 'One call at most (minutes)',
+      'field.childTimeoutMs.hint': 'Default 120 minutes. One agent() call runs this long before the run stops waiting on it; the run deadline still caps the whole run.',
       // Q8: the guardian judge — a single model, first in the roles group.
       'field.guardianModel': 'Guardian (stall judge)',
       'field.guardianModel.hint': 'Judges a stalled child before it is killed: wait extends by 5 minutes at most twice, never past the run deadline. Empty = off, a timed-out call fails straight to retry.',
@@ -264,6 +270,7 @@ window.__ModuleLoader__.load({
       'unit.ms': 'ms · 0 = unlimited',
       // Q9: the deadline is edited in minutes and stored in milliseconds.
       'unit.deadlineMinutes': 'min · 0 = no limit',
+      'unit.childMinutes': 'min',
       'unit.rounds': 'rounds',
       'unit.failures': 'in a row',
       // 0 is not "start immediately": it asks for the loop's own floor (the larger of
@@ -426,6 +433,8 @@ window.__ModuleLoader__.load({
       'field.maxTasks': '一次拆几件',
       'field.timeoutMs': '运行死线（分钟）',
       'field.timeoutMs.hint': '默认 60 分钟。0 = 不限时（不设 timer）。',
+      'field.childTimeoutMs': '单次调用上限（分钟）',
+      'field.childTimeoutMs.hint': '默认 120 分钟。一次 agent() 调用最多跑这么久，超时只重试该任务；整轮仍受运行死线约束。',
       // Q8：守卫判停模型——单字段，位于角色链之前。
       'field.guardianModel': '守卫（判停模型）',
       'field.guardianModel.hint': '子代理卡死先取证再判：判 wait 最多延长 5 分钟×2，且不越过运行死线；留空 = 不判停，超时直接按失败重试。',
@@ -481,6 +490,7 @@ window.__ModuleLoader__.load({
       'unit.tasks': '件',
       'unit.ms': '毫秒 · 0 = 不限时',
       'unit.deadlineMinutes': '分钟 · 0 = 不限时',
+      'unit.childMinutes': '分钟',
       'unit.rounds': '轮',
       'unit.failures': '轮',
       // 0 不是「立刻开始」：它表示用循环自己的下限（60 分钟与一轮最坏耗时取大），
@@ -1571,11 +1581,12 @@ window.__ModuleLoader__.load({
       // Q9 (v0.13): a field whose stored unit differs from the unit it is edited in.
       // The value stays milliseconds everywhere else (schema, validation, report);
       // only the control converts, so nothing downstream has to know about minutes.
-      const NUMBER_SCALES = { timeoutMs: 60000 }
+      const NUMBER_SCALES = { timeoutMs: 60000, childTimeoutMs: 60000 }
       const NUMBER_UNITS = {
         maxConcurrency: 'unit.jobs',
         maxTasks: 'unit.tasks',
         timeoutMs: 'unit.deadlineMinutes',
+        childTimeoutMs: 'unit.childMinutes',
         loopMaxRounds: 'unit.rounds',
         loopFailStreak: 'unit.failures',
         loopIntervalMin: 'unit.minutes',
@@ -1691,7 +1702,9 @@ window.__ModuleLoader__.load({
           // Q9: the reader reported "there is no deadline setting", because a
           // millisecond number with a terse label reads as an internal knob. The
           // hint says the default and what 0 means, in the same place the control is.
-          h('p', { style: styles.hint, 'data-gw-timeout-hint': true }, t('field.timeoutMs.hint'))),
+          h('p', { style: styles.hint, 'data-gw-timeout-hint': true }, t('field.timeoutMs.hint')),
+          numberRow('childTimeoutMs'),
+          h('p', { style: styles.hint, 'data-gw-child-timeout-hint': true }, t('field.childTimeoutMs.hint'))),
         // --- 4 · 自动接着干 (the repeat-run switch and its three bounds) ---
         h('div', { style: styles.card },
           h('h3', { style: styles.groupTitle }, t('group.loop')),

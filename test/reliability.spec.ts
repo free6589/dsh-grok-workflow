@@ -502,7 +502,7 @@ describe('reliability: live configuration and diagnostics', () => {
     expect(described.level).toBe('info')
     expect(described.text).toContain('page auto-generated')
     expect(described.text).toContain('grok-workflow')
-    expect(described.text).toContain(`14 of ${CONFIG_KEYS.length} field(s) on the page`)
+    expect(described.text).toContain(`15 of ${CONFIG_KEYS.length} field(s) on the page`)
     expect(described.text).toContain('schema matches')
   })
 })

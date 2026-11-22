@@ -31,8 +31,19 @@ export declare const COMMAND_TIMEOUT_SECONDS = 120;
  * "which one stopped it?".
  */
 export declare const CHILD_TIMEOUT_MS = 600000;
+/**
+ * Default per-call budget in milliseconds: 120 minutes (user request 2026-11-22).
+ *
+ * The old 10-minute default killed healthy slow children (session-77a3f6fb,
+ * D-097). The run deadline (`timeoutMs`, default 60 min) still caps the whole
+ * run, so a call budget above it only matters for runs whose deadline was
+ * raised or removed. `0` is not "unlimited" here: a call with no bound is the
+ * stall this exists to stop, so `resolveChildTimeoutMs` keeps falling back to
+ * the default for unusable values.
+ */
+export declare const DEFAULT_CHILD_TIMEOUT_MS = 7200000;
 /** Hard ceiling for the value a caller may pass through, in milliseconds. */
-export declare const CHILD_TIMEOUT_MAX_MS = 3600000;
+export declare const CHILD_TIMEOUT_MAX_MS = 7200000;
 /** Where a stalled call was stopped. */
 export type TimeoutTier = 'command' | 'task' | 'run';
 /** One tier's bound, in milliseconds. `run` is absent when the deadline is unlimited. */

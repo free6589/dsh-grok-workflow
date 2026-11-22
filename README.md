@@ -199,15 +199,16 @@ The rendered answer adds a `Failures: 1 infrastructure, 1 quality` line, so a pr
 A stalled child is reported the same way a stop is: the resident parallel
 guardian watches every child from run start (`workflow/agent-start` /
 `agent-end`), and when one makes no progress within its budget — `min(run
-deadline, 10 minutes)`, disarmed for an explicitly unlimited run — it cancels
-the run at most once and records a `Guardian` error naming the child, so a
-reader can tell "the work stalled" apart from "the work was judged". It never
-judges quality: the serial supervisor keeps that job (fail-only after
-verification).
+deadline, childTimeoutMs)`, disarmed for an explicitly unlimited run — it
+records a `Guardian` finding naming the child (and, when a rescue channel is
+available, queues one bounded recovery instruction to the affected child
+session instead of cancelling the run), so a reader can tell "the work
+stalled" apart from "the work was judged". It never judges quality: the serial
+supervisor keeps that job (fail-only after verification).
 
 ## Configuration reference
 
-Configuration belongs to the profile's `cordis.patch.yml` (or a `--patch` overlay), under the bundle row. The surface is exactly sixteen keys (`timeoutMs` joined in `0.11.0`, the four `loop*` keys with the repeat-run settings, the two `iterate*` keys with the self-iteration heartbeat, and `guardianModel` the single stall-judge route); anything else is rejected at load, so a stale patch fails loudly instead of looking like a setting that does nothing:
+Configuration belongs to the profile's `cordis.patch.yml` (or a `--patch` overlay), under the bundle row. The surface is exactly seventeen keys (`timeoutMs` joined in `0.11.0`, `childTimeoutMs` joined now, the four `loop*` keys with the repeat-run settings, the two `iterate*` keys with the self-iteration heartbeat, and `guardianModel` the single stall-judge route); anything else is rejected at load, so a stale patch fails loudly instead of looking like a setting that does nothing:
 
 ```yaml
 - id: grok-workflow
@@ -235,6 +236,7 @@ Configuration belongs to the profile's `cordis.patch.yml` (or a `--patch` overla
 | `maxConcurrency` | `10` | `100` | Child agents in flight per run |
 | `maxTasks` | `10` | `100` | Maximum caller or planner tasks |
 | `timeoutMs` | `3600000` (60 min) | any non-negative integer (`0` = unlimited) | Run deadline in milliseconds. `0` arms no timer; a value above `2147483647` (the largest `setTimeout` delay) is treated as unlimited internally while the report records the configured number |
+| `childTimeoutMs` | `7200000` (120 min) | `1000`–`7200000` | Per child-call stall budget in milliseconds. One `agent()` call runs this long before the run stops waiting on it (timeout of that attempt, then the task's bounded retry); the run deadline still caps the whole run |
 | `loopEnabled` | `false` | `true` \| `false` | Deployment default for repeat runs. It is stored, validated and projected to the settings page, but no automatic driver reads it yet: nothing is scheduled until a browser request opens the loop ([Repeat runs](#repeat-runs-the-loop-heartbeat)). A saved `on` alone does not start a round |
 | `loopMaxRounds` | `10` | `100` | Round bound stored in the loop's schedule rule (`COUNT`), so the schedule ends itself after that many rounds. Each round is a full workflow run, so this is a quota envelope, not a preference |
 | `loopFailStreak` | `3` | `20` | Consecutive failed rounds the heartbeat text asks the round to stop after. The Host records delivery, not round success, so this is guidance carried into the round, not a host-enforced counter |
@@ -255,7 +257,7 @@ Two levels below the key list are checked the same way (since **0.12.10**): a ro
 
 Because the plugin exports its `Config`, DSH projects it into the standard settings surface automatically: the fields on that page are the fields this plugin reads — there is no second, decorative source of truth. Edits are live: an edit reaches the next message, and an invalid edit is refused with its reason while delivery keeps the last valid snapshot.
 
-The page shows five things and nothing else: the on/off switch, the mode (`auto`/`full`), the five role chains as "channel → model" dropdowns fed by the runtime's declared models, the three run limits (jobs at once, splits per job, run deadline), and the repeat-run group (its switch plus the three bounds: rounds, consecutive failures, minutes between rounds). No per-field explanations, no read-only area, no diagnostics panel.
+The page shows five things and nothing else: the on/off switch, the mode (`auto`/`full`), the five role chains as "channel → model" dropdowns fed by the runtime's declared models, the four run limits (jobs at once, splits per job, run deadline, one-call budget), and the repeat-run group (its switch plus the three bounds: rounds, consecutive failures, minutes between rounds). No per-field explanations, no read-only area, no diagnostics panel.
 
 ### Repeat runs (the loop heartbeat)
 

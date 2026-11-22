@@ -50,7 +50,7 @@ function manualClock(startAt = 1_000_000) {
 
 describe('guardian child budget', () => {
   it('derives one child budget from the run deadline, capped and floored', () => {
-    expect(guardianChildBudgetMs(3_600_000)).toBe(GUARDIAN_LIMITS.childTimeoutCapMs)
+    expect(guardianChildBudgetMs(7_200_000)).toBe(GUARDIAN_LIMITS.childTimeoutCapMs)
     expect(guardianChildBudgetMs(60_000)).toBe(60_000)
     expect(guardianChildBudgetMs(0)).toBe(0)
     expect(guardianChildBudgetMs(-1)).toBe(0)

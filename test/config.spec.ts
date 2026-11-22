@@ -115,12 +115,12 @@ describe('configuration surface', () => {
   })
 
   it('rejects every removed key as unknown (R-06), with the migration named', () => {
-    // The slim-down keeps exactly 16 keys (nine plus the four repeat-run keys,
-    // the two self-iteration keys, and the Q8 guardianModel single route); the
-    // other 23 are unknown now.
+    // The surface keeps exactly 17 keys (nine plus childTimeoutMs, the four
+    // repeat-run keys, the two self-iteration keys, and the Q8 guardianModel
+    // single route); the other 23 are unknown now.
     expect(CONFIG_KEYS).toEqual([
       'toolName', 'mode', 'grokDefault', 'roles', 'guardianModel', 'synthesis',
-      'maxConcurrency', 'maxTasks', 'timeoutMs',
+      'maxConcurrency', 'maxTasks', 'timeoutMs', 'childTimeoutMs',
       'loopEnabled', 'loopMaxRounds', 'loopFailStreak', 'loopIntervalMin',
       'iterateIntervalMin', 'iterateTemplate',
       'configVersion',
@@ -464,14 +464,14 @@ describe('route validation against the runtime', () => {
     const projected = Object.keys(descriptor.value).sort()
     expect(projected).not.toContain('toolName')   // not volatile => not projected
     expect(projected).not.toContain('configVersion')   // not volatile => not projected
-    // The page is the 14 volatile keys (toolName/configVersion are structural);
-    // Q8 added guardianModel as the 14th.
+    // The page is the 15 volatile keys (toolName/configVersion are structural);
+    // childTimeoutMs is the 15th.
     expect(projected).toEqual([
-      'grokDefault', 'guardianModel', 'iterateIntervalMin', 'iterateTemplate', 'loopEnabled',
+      'childTimeoutMs', 'grokDefault', 'guardianModel', 'iterateIntervalMin', 'iterateTemplate', 'loopEnabled',
       'loopFailStreak', 'loopIntervalMin', 'loopMaxRounds', 'maxConcurrency', 'maxTasks', 'mode',
       'roles', 'synthesis', 'timeoutMs',
     ])
-    expect(projected).toHaveLength(14)
+    expect(projected).toHaveLength(15)
     const ctx = ctxWith({
       settings: { configure: () => () => {}, describe: () => [descriptor] },
     })
@@ -491,9 +491,9 @@ describe('route validation against the runtime', () => {
     const surface = describeSurface(ctx)
     expect(surface.level).toBe('info')
     expect(surface.text).toContain('identified by value')
-    // The log states both numbers: 14 volatile keys reach the generated page,
-    // 16 are accepted (toolName/configVersion are plain, not volatile).
-    expect(surface.text).toContain(`14 of ${CONFIG_KEYS.length} field(s) on the page`)
+    // The log states both numbers: 15 volatile keys reach the generated page,
+    // 17 are accepted (toolName/configVersion are plain, not volatile).
+    expect(surface.text).toContain(`15 of ${CONFIG_KEYS.length} field(s) on the page`)
     // A foreign schema is not ours, and no field list may be invented from it.
     const foreign = ctxWith({
       settings: {

@@ -43,14 +43,16 @@ release.
 
 Configuration keys and their hard limits are listed in the
 [README configuration table](../README.md#configuration-reference).
-The plugin accepts exactly sixteen keys (`toolName`, `mode`, `grokDefault`, `roles`,
-`guardianModel`, `synthesis`, `maxConcurrency`, `maxTasks`, `timeoutMs`, `loopEnabled`,
+The plugin accepts exactly seventeen keys (`toolName`, `mode`, `grokDefault`, `roles`,
+`guardianModel`, `synthesis`, `maxConcurrency`, `maxTasks`, `timeoutMs`, `childTimeoutMs`, `loopEnabled`,
 `loopMaxRounds`, `loopFailStreak`, `loopIntervalMin`, `iterateIntervalMin`,
 `iterateTemplate`, `configVersion`);
 everything else is fixed inside the plugin (`maxRetries=1`,
 `maxActiveRuns=2` per session / `8` per process) and a patch that still carries
 a removed key is rejected at load. `timeoutMs` defaults to `3600000` (60 min);
-`0` means unlimited. Values are tightened by the calling profile,
+`0` means unlimited. `childTimeoutMs` defaults to `7200000` (120 min, ceiling
+`7200000`, floor `1000`): one `agent()` call runs this long before the run stops
+waiting on it, while the run deadline still caps the whole run. Values are tightened by the calling profile,
 not by editing this repository.
 
 ## Enable

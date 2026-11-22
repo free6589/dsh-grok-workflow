@@ -1,3 +1,7 @@
+Last updated: 2026-11-22 18:10 +08:00（**childTimeoutMs 单次调用预算 120 分钟 `CONFIRMED` 未发版** —
+新键可配（设置页分钟 1–120、存毫秒 1000–7200000、超限钳制到 120 分钟本身）、默认/上限 120 分钟、
+三处写死 10 分钟全换。`npm run ci` exit 0（80 文件 / 1525 测试）。未提交未发版。）
+
 Last updated: 2026-11-22 14:00 +08:00（**已发版 `0.13.7`：任务带缩进+排序+三链常显，`CONFIRMED`** —
 前人已把三件套写完躺在工作树（`src/progress-tab.ts` 固定三链 PROGRESS_CHAIN + taskNumber 排序 +
 guardian 判别，`src/client/index.js` 镜像 + 16px 缩进 + pending 虚线胶囊），我接手收尾：

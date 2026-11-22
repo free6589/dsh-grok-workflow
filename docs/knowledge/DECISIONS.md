@@ -2442,3 +2442,41 @@ exact key。重试安装建议用 `script` 留全量终端（事后 pnpm.log 只
 **遗留低严重（非本轮引入）**：`src/run.ts` rescue executor `catch` 后 `logger.warn` 再 `throw error`，
 注释写 "Never throws into the run"——实际靠 `guardian.ts` 的 try/catch 兜住，run 不受影响。
 v0.13.8 已是这样。属历史小瑕疵 + 双重 warn，后轮把 `throw` 改吞掉以符注释（agent-4 审出）。
+
+## D-102 — 单次子调用预算可配，默认 120 分钟（2026-11-22，未发版）
+
+**背景**：用户原话"守卫出了问题，10 分钟上限"：纽约天气 UI 那轮（截图：`任务进度 5/5 · 100%` 但
+Guardian 连续 4 条"已触发整轮取消"）里子任务 10 分钟被掐。根因是三处写死的 10 分钟——
+`src/timeout.ts` `CHILD_TIMEOUT_MS=600_000`（脚本竞速回退）、脚本镜像 `return 600000` /
+`Math.min(3600000,…)`、`src/guardian.ts` `childTimeoutCapMs=600_000`（宿主预算上限）。D-097 只修了
+宿主抢跑（宿主等脚本判完），没修"预算本身太小"。D-098 已论证"调大预算只会推迟误杀"——但那是
+"杀错"语境；本轮用户要的是"别掐正常慢任务"，10 分钟对 UI 打磨类任务本就不够，这是预算不足不是误判。
+
+**Decision:**
+1. 新键 `childTimeoutMs`：schema（`clampedLimit('childTimeoutMs', 1000)` 走 `LIMIT_CAPS` 钳制通道，
+   超限存值钳制不断行）+ `resolveConfig`（`integer(..., 1000, 7200000)`）+ 设置页（分钟编辑 1–120，
+   `NUMBER_SCALES`/`unit.childMinutes`/中英 hint/第四行控件）+ 报告（`limits.childTimeoutMs`
+   校验 + 渲染 `Child budget` 行）。键总数 16→17（README 中英 + LOCAL-TESTING + 三个 spec 的拼写表同步）。
+2. 默认 **120 分钟**（`DEFAULT_CHILD_TIMEOUT_MS=7_200_000`，`src/timeout.ts` 与 `src/config.ts`
+   各一份，`config.ts` 的 schema 默认读自 `CHILD_TIMEOUT_MAX_MS` 同源）：旧 `CHILD_TIMEOUT_MS=600_000`
+   保留为"旧报告兼容锚点"——校验里 `childTimeoutMs===0 && config===600_000` 的旧脚本豁免分支要它
+   讲清楚 0 是哪来的，不再做任何人默认值。
+3. 上限 = 默认 = 120 分钟（`CHILD_TIMEOUT_MAX_MS` 3.6M→7.2M，`childTimeoutCapMs` 600s→7200s，
+   脚本镜像同步）。超限存值钳制到默认本身，等价于"没配过"。
+4. 脚本回退值与上限同步（`return 7200000` / `Math.min(7200000,…)`），host 传参
+   `config.childTimeoutMs` 替代写死的 `CHILD_TIMEOUT_MS`（`src/run.ts`）。
+5. 旧报告兼容：`limits.childTimeoutMs` 缺失不校验（旧报告没这字段）；`0` 只在
+   配置仍是旧 10 分钟默认（`600_000`）时豁免——新默认下 0 是非法值，`resolveConfig`
+   本来就拒收。新旧报告永远走同一条校验臂，不分叉。
+
+**Reason（为什么上限不开放）：** 单次调用无上限 = 挂死的孩子永远占着 worker 池，
+`maxRetries` 的重试也永远等不到。120 分钟是"UI 打磨类任务够用"与"挂死止损"的折中；
+真要更长应该调 `timeoutMs`（整轮死线）而不是把单次竞速也放开——两者是父子关系（rule B），
+不是同一个旋钮。
+
+**Evidence:** `npm run ci` exit 0 — **80 files / 1525 tests PASS**（基线 1480 + 本轮 45：
+timeout 9 处同步 + config/guardian/client/settings/docs/orchestrator/routing/engine 旧断言 + 新钳制断言）；
+`npm run build` + `verify:lib` byte-identical。真机长任务实测 NOT_RUN。
+
+**代价**：无 guardian 的 run 行为变化（10→120 分钟竞速）；旧 10 分钟报告在新默认下重验会失败
+（字段 0 ≠ 7200000），这是预期的——旧预算本来就不是现在的预算。

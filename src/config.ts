@@ -1,5 +1,6 @@
 import z from '@deepseek-ai/schemastery'
 import { MAX_LOOP_PROMPT_CHARS } from './loop.js'
+import { CHILD_TIMEOUT_MAX_MS } from './timeout.js'
 import type { FailureClass, GrokWorkflowConfig, ModelRoute, ResolvedConfig, RoleName, SynthesisPolicy } from './types.js'
 
 /** Hard limits; user configuration can only tighten these. */
@@ -29,6 +30,8 @@ export const HARD_LIMITS = {
   chainLength: 50,
   /** Maximum characters in one provider or model id. */
   routeChars: 120,
+  /** Per child-call stall budget in milliseconds: default and ceiling 120 minutes. */
+  childTimeoutMs: { min: 1_000, max: CHILD_TIMEOUT_MAX_MS },
   /** Per-route in-flight ceiling (`maxInFlight`): 1 keeps a private lane, 64 is the widest share. */
   routeInFlight: { min: 1, max: 64 },
   /** Extreme backstop on child calls charged against one task (worker + verifier + supervisor). */
@@ -83,6 +86,8 @@ export const LIMIT_CAPS = {
   loopFailStreak: HARD_LIMITS.loopFailStreak,
   loopIntervalMin: HARD_LIMITS.loopIntervalMin,
   iterateIntervalMin: HARD_LIMITS.iterateIntervalMin,
+  /** Per-call stall budget: the default is the ceiling, so an overrun clamps to the default itself. */
+  childTimeoutMs: HARD_LIMITS.childTimeoutMs.max,
 } as const
 
 /** A configuration key whose stored number takes effect clamped to its hard maximum. */
@@ -102,6 +107,16 @@ export type LimitField = keyof typeof LIMIT_CAPS
  * unbounded run is exactly what this plugin exists to avoid.
  */
 export const DEFAULT_TIMEOUT_MS = 3_600_000
+
+/** Default per child-call stall budget in milliseconds: 120 minutes.
+ *
+ * User request 2026-11-22: the old 10-minute default killed healthy slow
+ * children (session-77a3f6fb, D-097). Configurable as `childTimeoutMs`
+ * (settings page shows minutes); the hard ceiling is `CHILD_TIMEOUT_MAX_MS`
+ * in `src/timeout.ts`, deliberately the same 120 minutes, so the default
+ * always loads and any stored overrun clamps to itself.
+ */
+export const DEFAULT_CHILD_TIMEOUT_MS = 7_200_000
 
 /**
  * Historical name for the same binding, kept because tests and older imports
@@ -310,6 +325,7 @@ export const CONFIG_KEYS = [
   'maxConcurrency',
   'maxTasks',
   'timeoutMs',
+  'childTimeoutMs',
   'loopEnabled',
   'loopMaxRounds',
   'loopFailStreak',
@@ -482,9 +498,16 @@ export const Config = z.object({
   // timeoutMs is user-configurable with no hard upper limit: any non-negative
   // integer up to MAX_SAFE_INTEGER is accepted, 0 = unlimited (no timer);
   // negatives, fractions, NaN and non-numbers fail closed (R-06).
+  // childTimeoutMs is the per child-call stall budget: 1 s floor, 120 min
+  // ceiling (HARD_LIMITS.childTimeoutMs). The floor keeps the timer a signal
+  // rather than noise; the ceiling equals the default so an overrun clamps to
+  // the default itself.
   maxConcurrency: clampedLimit('maxConcurrency', 1).default(DEFAULT_MAX_CONCURRENCY).volatile(),
   maxTasks: clampedLimit('maxTasks', 1).default(DEFAULT_MAX_TASKS).volatile(),
   timeoutMs: z.natural().min(0).max(Number.MAX_SAFE_INTEGER).default(DEFAULT_TIMEOUT_MS).volatile(),
+  childTimeoutMs: clampedLimit('childTimeoutMs', HARD_LIMITS.childTimeoutMs.min).default(DEFAULT_CHILD_TIMEOUT_MS)
+    .description('Per child-call stall budget in milliseconds, 1000-7200000 (default 120 minutes). One agent() call runs this long before the run stops waiting on it; the run deadline still caps the whole run. 单次子调用能跑多久，毫秒，1000-7200000（默认 120 分钟）；单次调用超时只重试该任务，运行死线仍是整轮上限')
+    .volatile(),
   // Repeat-run surface. The four keys are accepted, validated and editable here so
   // the loop service has one place to read them from; the defaults keep a loop off,
   // capped and bounded (see DEFAULT_LOOP_*). Every capped number is clamped through
@@ -1027,6 +1050,7 @@ export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
     maxRetries,
     maxTasks: integer('maxTasks', config.maxTasks ?? DEFAULT_MAX_TASKS, 1, HARD_LIMITS.maxTasks),
     timeoutMs: timeoutInteger('timeoutMs', config.timeoutMs ?? DEFAULT_TIMEOUT_MS),
+    childTimeoutMs: integer('childTimeoutMs', config.childTimeoutMs ?? DEFAULT_CHILD_TIMEOUT_MS, HARD_LIMITS.childTimeoutMs.min, HARD_LIMITS.childTimeoutMs.max),
     loopEnabled,
     loopMaxRounds: integer('loopMaxRounds', config.loopMaxRounds ?? DEFAULT_LOOP_MAX_ROUNDS, 1, HARD_LIMITS.loopMaxRounds),
     loopFailStreak: integer('loopFailStreak', config.loopFailStreak ?? DEFAULT_LOOP_FAIL_STREAK, 1, HARD_LIMITS.loopFailStreak),
@@ -1125,6 +1149,7 @@ export function describeResolvedConfig(config: ResolvedConfig): string {
   }
   return [
     `timeoutMs=${config.timeoutMs}`,
+    `childTimeoutMs=${config.childTimeoutMs}`,
     `maxTasks=${config.maxTasks}`,
     `maxConcurrency=${config.maxConcurrency}`,
     `maxRetries=${FIXED_MAX_RETRIES}`,

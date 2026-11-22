@@ -25,7 +25,6 @@ import { teamWorkflowEngine } from './team-engine.js'
 import { createCheckpointRecorder, unloadCheckpointRecorders } from './checkpoint/wiring.js'
 import { createRunGuardian, guardianChildBudgetMs, unloadRunGuardians } from './guardian.js'
 import type { FileHeartbeat, GuardianSettlement, SessionHeartbeat } from './guardian.js'
-import { CHILD_TIMEOUT_MS } from './timeout.js'
 import { deliverReport } from './delivery/index.js'
 import type { DeliveryView } from './delivery/index.js'
 import { assertWorkflowReport, failureReport } from './report.js'
@@ -856,12 +855,12 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
    */
   const guardian = createRunGuardian({
     runId: '',
-    // The script races every agent() against CHILD_TIMEOUT_MS and, with a
-    // guardian route configured, may extend one stalled call through
+    // The script races every agent() against the configured per-call budget and,
+    // with a guardian route configured, may extend one stalled call through
     // adjudication before settling it. The host budget covers that window so
     // it never cancels the run out from under the script's own verdict —
     // the race that killed a healthy 10-minute child in session-77a3f6fb.
-    childBudgetMs: guardianChildBudgetMs(deadlineMs, config.guardianModel === undefined ? undefined : CHILD_TIMEOUT_MS),
+    childBudgetMs: guardianChildBudgetMs(deadlineMs, config.guardianModel === undefined ? undefined : config.childTimeoutMs),
     logger,
     state,
     onFinding: finding => recordGuardianProgress('tool-workflow/guardian-finding', {

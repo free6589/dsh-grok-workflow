@@ -225,6 +225,7 @@ describe('generated workflow script on the real engine', () => {
       maxConcurrency: 2,
       maxRetries: 1,
       maxTasks: 6,
+      childTimeoutMs: 7_200_000,
       ...overrides,
     }
   }

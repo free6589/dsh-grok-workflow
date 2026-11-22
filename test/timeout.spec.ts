@@ -8,6 +8,7 @@ import {
   CHILD_TIMEOUT_MAX_MS,
   CHILD_TIMEOUT_MS,
   COMMAND_TIMEOUT_SECONDS,
+  DEFAULT_CHILD_TIMEOUT_MS,
   GUARDIAN_ADJUDICATION_MS,
   GUARDIAN_MAX_WAITS,
   GUARDIAN_WAIT_MS,
@@ -56,6 +57,13 @@ function config() {
   return resolveConfig({ maxConcurrency: 2, maxTasks: 4 })
 }
 
+/** One second per-call budget, agreed between request and validation. */
+function oneSecondBudget(): { args: Record<string, unknown>, config: ReturnType<typeof config> } {
+  const resolved = resolveConfig({ maxConcurrency: 2, maxTasks: 4, childTimeoutMs: 1_000 })
+  const request = buildWorkflowRequest(OBJECTIVE, [task('a')], resolved)
+  return { args: request.args, config: resolved }
+}
+
 function args(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   const request = buildWorkflowRequest(OBJECTIVE, [task('a')], config())
   return { ...request.args, ...overrides }
@@ -89,19 +97,19 @@ describe('timeout tiers', () => {
   })
 
   it('clamps a caller value into the range the script enforces', () => {
-    expect(resolveChildTimeoutMs(undefined)).toBe(CHILD_TIMEOUT_MS)
-    expect(resolveChildTimeoutMs('')).toBe(CHILD_TIMEOUT_MS)
-    expect(resolveChildTimeoutMs(0)).toBe(CHILD_TIMEOUT_MS)
-    expect(resolveChildTimeoutMs(-5)).toBe(CHILD_TIMEOUT_MS)
+    expect(resolveChildTimeoutMs(undefined)).toBe(DEFAULT_CHILD_TIMEOUT_MS)
+    expect(resolveChildTimeoutMs('')).toBe(DEFAULT_CHILD_TIMEOUT_MS)
+    expect(resolveChildTimeoutMs(0)).toBe(DEFAULT_CHILD_TIMEOUT_MS)
+    expect(resolveChildTimeoutMs(-5)).toBe(DEFAULT_CHILD_TIMEOUT_MS)
     expect(resolveChildTimeoutMs(1)).toBe(1_000)
     expect(resolveChildTimeoutMs('120000')).toBe(120_000)
     expect(resolveChildTimeoutMs(CHILD_TIMEOUT_MAX_MS * 4)).toBe(CHILD_TIMEOUT_MAX_MS)
   })
 
   it('says which call overran and what to do next', () => {
-    const reason = childTimeoutReason('worker', CHILD_TIMEOUT_MS)
+    const reason = childTimeoutReason('worker', DEFAULT_CHILD_TIMEOUT_MS)
     expect(reason).toContain('worker')
-    expect(reason).toContain('10 minute')
+    expect(reason).toContain('120 minute')
     expect(reason).toContain('retry')
   })
 
@@ -109,13 +117,13 @@ describe('timeout tiers', () => {
     expect(COMMAND_TIMEOUT_SECONDS).toBe(120)
   })
 
-  it('keeps the ten-minute base budget when no adjudicator is configured', () => {
+  it('keeps the 120-minute base budget when no adjudicator is configured', () => {
     // The script race is the per-call path; the host guardian is the tier that is
     // live in a realm without timers (it cancels the run instead of one call). If
-    // the two budgets drifted, the documented "10 minutes, then stop" would hold
+    // the two budgets drifted, the documented "120 minutes, then stop" would hold
     // on one tier and lie on the other.
-    expect(GUARDIAN_LIMITS.childTimeoutCapMs).toBe(CHILD_TIMEOUT_MS)
-    expect(guardianChildBudgetMs(3_600_000)).toBe(CHILD_TIMEOUT_MS)
+    expect(GUARDIAN_LIMITS.childTimeoutCapMs).toBe(DEFAULT_CHILD_TIMEOUT_MS)
+    expect(guardianChildBudgetMs(7_200_000)).toBe(DEFAULT_CHILD_TIMEOUT_MS)
     expect(guardianChildBudgetMs(30_000)).toBe(30_000)
     // An unlimited run arms no watchdog: it is not second-guessed.
     expect(guardianChildBudgetMs(0)).toBe(0)
@@ -131,21 +139,21 @@ describe('timeout tiers', () => {
     // so the host reads the same source instead of a second copy.
     const adjudicationWindow = GUARDIAN_MAX_WAITS * GUARDIAN_ADJUDICATION_MS
     const waitExtension = GUARDIAN_MAX_WAITS * GUARDIAN_WAIT_MS
-    const scriptWindow = CHILD_TIMEOUT_MS + waitExtension + adjudicationWindow
+    const scriptWindow = DEFAULT_CHILD_TIMEOUT_MS + waitExtension + adjudicationWindow
     const hostGrace = GUARDIAN_LIMITS.checkIntervalMs
     expect(adjudicationWindow).toBe(120_000)
-    expect(scriptWindow).toBe(1_320_000)
+    expect(scriptWindow).toBe(7_920_000)
     // One host sweep interval is added after the script's last possible wait.
-    expect(guardianChildBudgetMs(7_200_000, CHILD_TIMEOUT_MS)).toBe(scriptWindow + hostGrace)
-    expect(guardianChildBudgetMs(3_600_000, CHILD_TIMEOUT_MS)).toBe(scriptWindow + hostGrace)
-    // No adjudicator keeps the original ten-minute base budget.
-    expect(guardianChildBudgetMs(3_600_000, undefined)).toBe(CHILD_TIMEOUT_MS)
-    expect(guardianChildBudgetMs(3_600_000)).toBe(CHILD_TIMEOUT_MS)
+    // The window is capped by the base cap plus the extension, and by the run deadline.
+    expect(guardianChildBudgetMs(30_000_000, DEFAULT_CHILD_TIMEOUT_MS)).toBe(scriptWindow + hostGrace)
+    // No adjudicator keeps the base budget.
+    expect(guardianChildBudgetMs(30_000_000, undefined)).toBe(DEFAULT_CHILD_TIMEOUT_MS)
+    expect(guardianChildBudgetMs(30_000_000)).toBe(DEFAULT_CHILD_TIMEOUT_MS)
     // The run deadline still wins when it is shorter than the watchdog window.
-    expect(guardianChildBudgetMs(30_000, CHILD_TIMEOUT_MS)).toBe(30_000)
-    expect(guardianChildBudgetMs(1_000_000, CHILD_TIMEOUT_MS)).toBe(1_000_000)
+    expect(guardianChildBudgetMs(30_000, DEFAULT_CHILD_TIMEOUT_MS)).toBe(30_000)
+    expect(guardianChildBudgetMs(1_000_000, DEFAULT_CHILD_TIMEOUT_MS)).toBe(1_000_000)
     // Unlimited still disarms, even with a guardian configured.
-    expect(guardianChildBudgetMs(0, CHILD_TIMEOUT_MS)).toBe(0)
+    expect(guardianChildBudgetMs(0, DEFAULT_CHILD_TIMEOUT_MS)).toBe(0)
   })
 })
 
@@ -237,7 +245,8 @@ describe('the generated script enforces the child budget', () => {
     expect(WORKFLOW_SCRIPT).toContain('Atomics.waitAsync(sleepCell, 0, 0, delay)')
     expect(WORKFLOW_SCRIPT).toContain('const canRaceCalls = hasHostTimer || sleepCell !== null;')
     expect(WORKFLOW_SCRIPT).toContain('})(args ? args.childTimeoutMs : undefined);')
-    expect(WORKFLOW_SCRIPT).toContain("return 600000;")
+    expect(WORKFLOW_SCRIPT).toContain("return 7200000;")
+    expect(WORKFLOW_SCRIPT).toContain('Math.min(7200000, Math.max(1000, Math.floor(parsed)));')
     expect(WORKFLOW_SCRIPT).toContain('CHILD_TIMEOUT:')
     // Every prompt that tells a child to run commands carries the rule.
     expect(WORKFLOW_SCRIPT.match(/timeout 120/g)?.length ?? 0).toBeGreaterThanOrEqual(4)
@@ -278,9 +287,11 @@ describe('the generated script enforces the child budget', () => {
     }
     // A real run's realm has no timers, so the mechanism is exercised with one
     // injected: the same code path a realm with a timer would take.
+    // The validation config agrees on the 1 s budget (see oneSecondBudget).
+    const { args: runArgs, config: runConfig } = oneSecondBudget()
     const run = await runWorkflowScript(
       WORKFLOW_SCRIPT,
-      args({ childTimeoutMs: 1_000 }),
+      { ...runArgs },
       agent,
       { setTimeout, clearTimeout },
     )
@@ -290,7 +301,7 @@ describe('the generated script enforces the child budget', () => {
     expect(first?.failure?.reason).toContain('child budget')
     // The run survives: the retry verified, so the report is a completion.
     expect(run.report.status).toBe('completed')
-    expect(() => assertWorkflowReport(run.report, OBJECTIVE, config())).not.toThrow()
+    expect(() => assertWorkflowReport(run.report, OBJECTIVE, runConfig)).not.toThrow()
   }, 20_000)
 
   it('extends a stalled call once the guardian says wait, and the child still wins', async () => {
@@ -317,14 +328,17 @@ describe('the generated script enforces the child budget', () => {
       return verification(taskValue as never)
     }
     const deadline = 30_000
-    const { args: runArgs, config: runConfig } = argsFor(deadline, { childTimeoutMs: 1_000, guardianModel: { model: 'guardian-x' } })
+    const { args: runArgs, config: runConfig } = argsFor(deadline, { guardianModel: { model: 'guardian-x' } })
+    const budgeted = resolveConfig({ maxConcurrency: 2, maxTasks: 4, timeoutMs: deadline, childTimeoutMs: 1_000, roles: { worker: [{ model: 'guardian-x' }] } } as never)
+    const budgetedRequest = buildWorkflowRequest(OBJECTIVE, [task('a')], budgeted)
+    const budgetedArgs = { ...budgetedRequest.args, guardianModel: { model: 'guardian-x' } }
     // No injected timer: this is the engine-shaped realm (bare context plus the five
     // hooks), so the extension comes from the same Atomics timer a real run uses.
-    const run = await runWorkflowScript(WORKFLOW_SCRIPT, runArgs, agent)
+    const run = await runWorkflowScript(WORKFLOW_SCRIPT, budgetedArgs, agent)
     expect(guardianCalls).toBe(1)
     expect(run.report.status).toBe('completed')
     expect(run.report.tasks[0]?.attempts).toHaveLength(1)
-    expect(() => assertWorkflowReport(run.report, OBJECTIVE, runConfig)).not.toThrow()
+    expect(() => assertWorkflowReport(run.report, OBJECTIVE, budgeted)).not.toThrow()
   }, 20_000)
 
   it('kills the stalled call when the guardian says kill, and the task still retries', async () => {
@@ -344,15 +358,17 @@ describe('the generated script enforces the child budget', () => {
       return verification(taskValue as never)
     }
     const deadline = 30_000
-    const { args: runArgs, config: runConfig } = argsFor(deadline, { childTimeoutMs: 1_000, guardianModel: { model: 'guardian-x' } })
+    const budgeted = resolveConfig({ maxConcurrency: 2, maxTasks: 4, timeoutMs: deadline, childTimeoutMs: 1_000, roles: { worker: [{ model: 'guardian-x' }] } } as never)
+    const budgetedRequest = buildWorkflowRequest(OBJECTIVE, [task('a')], budgeted)
+    const budgetedArgs = { ...budgetedRequest.args, guardianModel: { model: 'guardian-x' } }
     // Real-realm path again: kill verdict, then the bounded retry.
-    const run = await runWorkflowScript(WORKFLOW_SCRIPT, runArgs, agent)
+    const run = await runWorkflowScript(WORKFLOW_SCRIPT, budgetedArgs, agent)
     // One adjudication per stall, then the timeout path the task already knows.
     expect(guardianCalls).toBe(1)
     expect(workerCalls).toBe(2)
     expect(run.report.status).toBe('completed')
     expect(run.report.tasks[0]?.attempts[0]?.failure?.class).toBe('timeout')
-    expect(() => assertWorkflowReport(run.report, OBJECTIVE, runConfig)).not.toThrow()
+    expect(() => assertWorkflowReport(run.report, OBJECTIVE, budgeted)).not.toThrow()
   }, 20_000)
 
   it('stops granting waits at the run deadline without asking the guardian again (rule B)', async () => {    let guardianCalls = 0
@@ -371,15 +387,17 @@ describe('the generated script enforces the child budget', () => {
       return verification(taskValue as never)
     }
     const deadline = 3_000
-    const { args: runArgs, config: runConfig } = argsFor(deadline, { childTimeoutMs: 1_000, guardianModel: { model: 'guardian-x' } })
+    const budgeted = resolveConfig({ maxConcurrency: 2, maxTasks: 4, timeoutMs: deadline, childTimeoutMs: 1_000, roles: { worker: [{ model: 'guardian-x' }] } } as never)
+    const budgetedRequest = buildWorkflowRequest(OBJECTIVE, [task('a')], budgeted)
+    const budgetedArgs = { ...budgetedRequest.args, guardianModel: { model: 'guardian-x' } }
     // 3 s deadline: the first slice expires at 1 s (guardian says wait, the
     // extension is truncated to the remaining ~2 s), and the second expiry
     // finds no room left — the kill fires without a second AI call.
-    const run = await runWorkflowScript(WORKFLOW_SCRIPT, runArgs, agent, { setTimeout, clearTimeout })
+    const run = await runWorkflowScript(WORKFLOW_SCRIPT, budgetedArgs, agent, { setTimeout, clearTimeout })
     expect(guardianCalls).toBe(1)
     expect(workerCalls).toBe(2)
     expect(run.report.status).toBe('completed')
-    expect(() => assertWorkflowReport(run.report, OBJECTIVE, runConfig)).not.toThrow()
+    expect(() => assertWorkflowReport(run.report, OBJECTIVE, budgeted)).not.toThrow()
   }, 20_000)
 
   it('broadcasts a rescue line when the guardian says rescue, and grants the slice', async () => {
@@ -405,14 +423,16 @@ describe('the generated script enforces the child budget', () => {
       return verification(taskValue as never)
     }
     const deadline = 30_000
-    const { args: runArgs, config: runConfig } = argsFor(deadline, { childTimeoutMs: 1_000, guardianModel: { model: 'guardian-x' } })
-    const run = await runWorkflowScript(WORKFLOW_SCRIPT, runArgs, agent)
+    const budgeted = resolveConfig({ maxConcurrency: 2, maxTasks: 4, timeoutMs: deadline, childTimeoutMs: 1_000, roles: { worker: [{ model: 'guardian-x' }] } } as never)
+    const budgetedRequest = buildWorkflowRequest(OBJECTIVE, [task('a')], budgeted)
+    const budgetedArgs = { ...budgetedRequest.args, guardianModel: { model: 'guardian-x' } }
+    const run = await runWorkflowScript(WORKFLOW_SCRIPT, budgetedArgs, agent)
     expect(guardianCalls).toBe(1)
     const rescueLine = run.events.find(event => event.startsWith('log:guardian rescue'))
     expect(rescueLine).toContain('guidance=stop waiting, continue with what you have')
     expect(run.report.status).toBe('completed')
     expect(run.report.tasks[0]?.attempts).toHaveLength(1)
-    expect(() => assertWorkflowReport(run.report, OBJECTIVE, runConfig)).not.toThrow()
+    expect(() => assertWorkflowReport(run.report, OBJECTIVE, budgeted)).not.toThrow()
   }, 20_000)
 
   it('fails a stalled call straight to retry when no guardian is configured', async () => {
@@ -428,9 +448,10 @@ describe('the generated script enforces the child budget', () => {
       }
       return verification(taskValue as never)
     }
+    const { args: runArgs, config: runConfig } = oneSecondBudget()
     const run = await runWorkflowScript(
       WORKFLOW_SCRIPT,
-      args({ childTimeoutMs: 1_000 }),
+      { ...runArgs },
       agent,
     )
     expect(workerCalls).toBe(2)
@@ -439,6 +460,7 @@ describe('the generated script enforces the child budget', () => {
     expect(run.report.tasks[0]?.attempts[0]?.failure?.class).toBe('timeout')
     expect(run.report.tasks[0]?.attempts[0]?.failure?.reason).toContain('child budget')
     expect(run.report.status).toBe('completed')
+    expect(() => assertWorkflowReport(run.report, OBJECTIVE, runConfig)).not.toThrow()
   }, 20_000)
 
   it('leaves a responsive call alone in the realm with no host timer', async () => {

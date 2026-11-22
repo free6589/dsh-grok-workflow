@@ -85,7 +85,7 @@ export declare const GUARDIAN_LIMITS: {
     /** Reason characters kept per finding. */
     readonly reasonChars: 400;
     /** Base child timeout when no adjudication route is configured. */
-    readonly childTimeoutCapMs: 600000;
+    readonly childTimeoutCapMs: 7200000;
     /** Lower bound of one child's budget: below this the timer is noise, not signal. */
     readonly childTimeoutFloorMs: 5000;
     /** How often the single periodic check runs. */

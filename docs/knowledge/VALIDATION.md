@@ -1,3 +1,30 @@
+## 未发版 childTimeoutMs 单次调用预算 120 分钟 — 2026-11-22 (`CONFIRMED`，lead 本轮)
+
+**Changed:** `src/timeout.ts`（`DEFAULT_CHILD_TIMEOUT_MS=7_200_000` + `CHILD_TIMEOUT_MAX_MS` 3.6M→7.2M，
+`CHILD_TIMEOUT_MS` 保留为旧报告兼容锚点）、`src/config.ts`（`CONFIG_KEYS` +1、`DEFAULT_CHILD_TIMEOUT_MS`、
+`HARD_LIMITS.childTimeoutMs`、`LIMIT_CAPS.childTimeoutMs` 钳制通道、`resolveConfig` integer(1000,7200000)、
+`describeResolvedConfig` 加行）、`src/types.ts`（`GrokWorkflowConfig`/`ResolvedConfig`/`WorkflowReport.limits`
+三处）、`src/script.ts`（回退 7200000 + 上限 7200000 + `buildWorkflowRequest` 传 `config.childTimeoutMs` +
+报告 `limits.childTimeoutMs`）、`src/run.ts`（`guardianChildBudgetMs(deadline, config.childTimeoutMs)`）、
+`src/report.ts`（校验 + `failureReport` + 渲染 `Child budget` 行 + 旧报告豁免）、
+`src/guardian.ts`（`childTimeoutCapMs` 600s→7200s）、`src/client/index.js`（FIELDS 行 + 分钟 scale +
+`unit.childMinutes` + 中英 label/hint + 第四行控件）、`CHANGELOG [Unreleased]`、`README` 中英（17 键 +
+新行 + 四运行上限）、`docs/LOCAL-TESTING.md`、测试（timeout/config/guardian/client/settings/docs/
+orchestrator/routing/engine-contract/config-limits-repair 同步 + 新钳制断言）。
+
+| state | command | result |
+| --- | --- | --- |
+| working tree (Node 26) | `npm run ci` | exit **0** — **80 files / 1525 tests PASS** |
+| working tree | `npm run typecheck` | exit **0** — 0 errors |
+| working tree | `npm run lint` | 0 errors, 3 pre-existing warnings (unchanged on stash) |
+| working tree | `npm run build` + `npm run verify:lib` | byte-identical (`lib/` 165 files) |
+| real DSH Web GUI | — | **NOT_RUN**：未在宿主界面看 120 分钟长任务实跑 |
+| real profile patch | — | **NOT_RUN**：未验证旧补丁超限钳制到 120 分钟的 load 路径 |
+
+**Honest boundary:** `CHILD_TIMEOUT_MS=600_000` 不再是任何人的默认值，仅是旧报告 `0` 豁免的锚点；
+旧报告（`limits.childTimeoutMs` 缺失或 `0`）在新默认 `7_200_000` 下重验会失败是预期的；
+`guardian.ts` 里 `checkIntervalMs=10s` 没动扫间隔不是预算。
+
 ## 未发版 B1/B2/B3 守卫存活信号 — 2026-11-22 (`CONFIRMED`，lead 本轮)
 
 **Changed:** `src/guardian.ts`（B1 `runHeartbeat` + B2 `fileHeartbeat`/`writesPathsForPhase`

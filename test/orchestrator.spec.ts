@@ -13,6 +13,7 @@ function args(tasks: unknown[] | null, overrides: Record<string, unknown> = {}):
     maxConcurrency: 2,
     maxRetries: 1,
     maxTasks: 6,
+    childTimeoutMs: 7_200_000,
     ...overrides,
   }
   // Mirror the request builder: the child cap is derived from the task count

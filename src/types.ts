@@ -184,6 +184,13 @@ export interface GrokWorkflowConfig {
    */
   timeoutMs?: number
   /**
+   * Per child-call stall budget in milliseconds. Default 120 minutes,
+   * hard ceiling 120 minutes. `0` is not allowed: a call with no bound is
+   * the stall the watchdog exists to stop, so an unusable value falls back
+   * to the default. The run deadline still caps the whole run (rule B).
+   */
+  childTimeoutMs?: number
+  /**
    * Repeat-run switch. `false` (default) means one run per message; `true` lets a
    * repeat-run driver start another round when the previous one ended unfinished.
    */
@@ -242,6 +249,8 @@ export interface ResolvedConfig {
   maxTasks: number
   /** Run deadline in milliseconds. 0 = unlimited (no timer is armed). */
   timeoutMs: number
+  /** Per child-call stall budget in milliseconds (default 120 min, ceiling 120 min). */
+  childTimeoutMs: number
   /**
    * Repeat-run surface, resolved and validated. These are carried here so a
    * repeat-run driver reads them from exactly one shape; `resolveConfig` does not
@@ -454,5 +463,7 @@ export interface WorkflowReport {
     maxTotalAgents: number
     /** The deadline the run actually ran under (t47: it used to live only in memory). */
     timeoutMs?: number
+    /** The per-call stall budget the run actually ran under. */
+    childTimeoutMs?: number
   }
 }

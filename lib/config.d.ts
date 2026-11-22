@@ -27,6 +27,11 @@ export declare const HARD_LIMITS: {
     readonly chainLength: 50;
     /** Maximum characters in one provider or model id. */
     readonly routeChars: 120;
+    /** Per child-call stall budget in milliseconds: default and ceiling 120 minutes. */
+    readonly childTimeoutMs: {
+        readonly min: 1000;
+        readonly max: 7200000;
+    };
     /** Per-route in-flight ceiling (`maxInFlight`): 1 keeps a private lane, 64 is the widest share. */
     readonly routeInFlight: {
         readonly min: 1;
@@ -81,6 +86,8 @@ export declare const LIMIT_CAPS: {
     readonly loopFailStreak: 20;
     readonly loopIntervalMin: 10080;
     readonly iterateIntervalMin: 10080;
+    /** Per-call stall budget: the default is the ceiling, so an overrun clamps to the default itself. */
+    readonly childTimeoutMs: 7200000;
 };
 /** A configuration key whose stored number takes effect clamped to its hard maximum. */
 export type LimitField = keyof typeof LIMIT_CAPS;
@@ -98,6 +105,15 @@ export type LimitField = keyof typeof LIMIT_CAPS;
  * unbounded run is exactly what this plugin exists to avoid.
  */
 export declare const DEFAULT_TIMEOUT_MS = 3600000;
+/** Default per child-call stall budget in milliseconds: 120 minutes.
+ *
+ * User request 2026-11-22: the old 10-minute default killed healthy slow
+ * children (session-77a3f6fb, D-097). Configurable as `childTimeoutMs`
+ * (settings page shows minutes); the hard ceiling is `CHILD_TIMEOUT_MAX_MS`
+ * in `src/timeout.ts`, deliberately the same 120 minutes, so the default
+ * always loads and any stored overrun clamps to itself.
+ */
+export declare const DEFAULT_CHILD_TIMEOUT_MS = 7200000;
 /**
  * Historical name for the same binding, kept because tests and older imports
  * read it. It is no longer a *fixed* value: `timeoutMs` is configurable, and
@@ -215,7 +231,7 @@ export declare const CONFIG_VERSION = 1;
  * a typo that is silently ignored looks exactly like a setting that "does not
  * work", which is the failure mode the settings surface must not have.
  */
-export declare const CONFIG_KEYS: readonly ["toolName", "mode", "grokDefault", "roles", "guardianModel", "synthesis", "maxConcurrency", "maxTasks", "timeoutMs", "loopEnabled", "loopMaxRounds", "loopFailStreak", "loopIntervalMin", "iterateIntervalMin", "iterateTemplate", "configVersion"];
+export declare const CONFIG_KEYS: readonly ["toolName", "mode", "grokDefault", "roles", "guardianModel", "synthesis", "maxConcurrency", "maxTasks", "timeoutMs", "childTimeoutMs", "loopEnabled", "loopMaxRounds", "loopFailStreak", "loopIntervalMin", "iterateIntervalMin", "iterateTemplate", "configVersion"];
 /**
  * The role names a configuration may route, in the order `resolveConfig` builds them.
  *
@@ -272,6 +288,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     maxConcurrency: z<number, number, "volatile-defined">;
     maxTasks: z<number, number, "volatile-defined">;
     timeoutMs: z<number, number, "volatile-defined">;
+    childTimeoutMs: z<number, number, "volatile-defined">;
     loopEnabled: z<boolean, boolean, "volatile-defined">;
     loopMaxRounds: z<number, number, "volatile-defined">;
     loopFailStreak: z<number, number, "volatile-defined">;
@@ -387,6 +404,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     maxConcurrency: z<number, number, "volatile-defined">;
     maxTasks: z<number, number, "volatile-defined">;
     timeoutMs: z<number, number, "volatile-defined">;
+    childTimeoutMs: z<number, number, "volatile-defined">;
     loopEnabled: z<boolean, boolean, "volatile-defined">;
     loopMaxRounds: z<number, number, "volatile-defined">;
     loopFailStreak: z<number, number, "volatile-defined">;
