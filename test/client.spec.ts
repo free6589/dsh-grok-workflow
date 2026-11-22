@@ -200,6 +200,14 @@ type ProgressRun = {
   name: string
   anchorSeq: number
   members: ProgressMember[]
+  guardian?: {
+    started: boolean
+    armed: boolean
+    budgetMs: number
+    ended: boolean
+    cancelled: boolean
+    findings: Array<{ seq: number, label: string, signal: 'timeout' | 'heartbeat-loss', action: 'cancel-run' | 'rescue', reason: string, atMs?: number }>
+  }
   startedAt?: number
   endedAt?: number
   stopReason?: string
@@ -1712,23 +1720,38 @@ describe('client progress tab: the fold and the five states', () => {
     return node!
   }
 
-  it('folds the four recorded events and ignores everything else', () => {
+  it('folds progress and Guardian lifecycle events while ignoring unrelated rows', () => {
     expect(progress.eventTypes).toEqual([
       'tool-workflow/run-start',
       'tool-workflow/agent-start',
       'tool-workflow/agent-end',
+      'tool-workflow/guardian-start',
+      'tool-workflow/guardian-finding',
+      'tool-workflow/guardian-end',
       'tool-workflow/run-end',
     ])
     const runs = progress.fold([
       rec('tool-workflow/run-start', { runId: 'r1', name: '任务团队 · 2 个任务' }, 10, 1_000),
       rec('tool-workflow/agent-start', { runId: 'r1', seq: 1, label: '执行', phase: '任务 1 · 修复', childId: 'c1' }, 11, 1_100),
-      rec('tool-workflow/agent-end', { runId: 'r1', seq: 1, outcome: 'completed' }, 12, 2_100),
-      rec('assistant/message', { runId: 'r1', text: 'noise' }, 13),
-      rec('tool-workflow/run-end', { runId: 'r1', stopReason: 'completed' }, 14, 2_200),
+      rec('tool-workflow/guardian-start', { runId: 'r1', armed: true, budgetMs: 300_000 }, 12, 1_200),
+      rec('tool-workflow/guardian-finding', { runId: 'r1', seq: 1, label: '执行', signal: 'timeout', action: 'rescue', reason: 'rescued with guidance', atMs: 1_500 }, 13, 1_500),
+      rec('tool-workflow/agent-end', { runId: 'r1', seq: 1, outcome: 'completed' }, 14, 2_100),
+      rec('assistant/message', { runId: 'r1', text: 'noise' }, 15),
+      rec('tool-workflow/guardian-end', { runId: 'r1', cancelled: false, findingCount: 1 }, 16, 2_150),
+      rec('tool-workflow/run-end', { runId: 'r1', stopReason: 'completed' }, 17, 2_200),
     ])
     expect(runs).toHaveLength(1)
     expect(runs[0]!.runId).toBe('r1')
     expect(runs[0]!.stopReason).toBe('completed')
+    expect(runs[0]!.guardian?.findings).toEqual([{
+      seq: 1,
+      label: '执行',
+      signal: 'timeout',
+      action: 'rescue',
+      reason: 'rescued with guidance',
+      atMs: 1_500,
+    }])
+    expect(runs[0]!.guardian?.ended).toBe(true)
     expect(runs[0]!.members).toEqual([{
       seq: 1,
       label: '执行',
