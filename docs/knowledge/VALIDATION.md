@@ -1,3 +1,17 @@
+## 已发版 0.13.16 手动清单第二轮（6 件需求） — 2026-11-23 (`CONFIRMED`)
+
+| state | command | result |
+| --- | --- | --- |
+| worktree fix-synth-resubmit `1591665` | `npm run ci` | **exit 0：82 files / 1578 tests PASS**；typecheck 干净；lint 0 errors；`verify:lib` byte-identical（181 文件） |
+| 同上 | 真机 soak（隔离 DSH_HOME + tgz 安装 + 真模型） | **PASS**：bundle 组合正常；MODEL_OK；一句话西湖有人话结论。网关 `wb/cn:deepseek-v4.1-flash` 503 无健康账号时 soak 切 `muse-spark-1.3` 验证通过 |
+| remote main `1591665` | CI workflow `45067182761` | **success**（2m0s） |
+| remote tag `v0.13.16` | Release workflow `45067195044` | **success**（2m7s），GitHub Release `v0.13.16` 已发布（asset `dsh-grok-workflow-0.13.16.tgz`） |
+
+**Changed:** `DEFAULT_TIMEOUT_MS = 0`（不限时）+ 设置页不限时文案；`replan` 可见开关（默认关）；设置页升级入口（`GROK_WORKFLOW_UPDATE` version/latest/command + 4 中英 key）；`runWorkflow` 启动扫同会话 checkpoint 续跑（carry-over 上下文，2s 预算 + skip 缝）；进度脊柱删永久空"回答"格（6 格）；`installModeRoute` 缺 webServer 打 warn（405 插件侧）。
+**Tests:** triage `route` 等后台启动（≤5s）；guardian 心跳用例 `resumeLister: 'skip'`；phase1 deadline 用例 skip；mode-surface +1 warn 断言（21 例）；report 0-deadline 三断言同步。
+**Root cause fixed this round:** resume 扫描的 macrotask 让后台启动晚于测试断言（triage 3 + guardian 1 + phase1 1 共 5 例红）；report 旧断言按 360 万 deadline 写而 0 不进报告（2 例）。
+**Honest boundary:** 405 真机复现（Allow 头确认）NOT_RUN，需宿主路由未挂载的环境；第 5 件拍板项（绘画失败查因）不在本仓库，已排除；第三节 5 件拍板项未动。
+
 ## 已发版 0.13.14 会话 surface-head 损坏修复 — 2026-11-22 (`CONFIRMED`)（接上条未发版记录）
 
 | state | command | result |

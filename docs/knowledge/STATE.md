@@ -1,3 +1,10 @@
+Last updated: 2026-11-23 04:40 +08:00（**已发版 `0.13.16`：手动清单第二轮 6 件需求，`CONFIRMED`** —
+发版提交 `1591665` + tag `v0.13.16` 已推；远端 CI `45067182761` success、Release `45067195044`
+success 并已发布（asset `dsh-grok-workflow-0.13.16.tgz`）。本地门禁：`npm run ci` exit 0（82 文件 / 1578 测试
+PASS，含 resume/triage/guardian/report/mode-surface 新增与同步断言），真机 soak PASS（MODEL_OK + 西湖一句话），
+lint 0 errors，`verify:lib` byte-identical。7 件中 6 件落地（405 只做插件侧 warn，真机复现待宿主环境）；第 7 件（证据收集）D-107 降级做。
+主工作树另有 naming/面板线（fix/session-surface-head-6 残留）未动，与本版无关。）
+
 Last updated: 2026-11-22 23:10 +08:00（**已发版 `0.13.14`：装了插件的会话重启不再损坏，`CONFIRMED`** —
 发版提交 `dea1be4` + tag `v0.13.14` 已推；远端 Release `45036278236` success 并已发布
 （asset `dsh-grok-workflow-0.13.14.tgz`）。本地门禁：`npm run ci` exit 0（81 文件 / 1564 测试 PASS），

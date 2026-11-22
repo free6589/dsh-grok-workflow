@@ -1,3 +1,19 @@
+## 2026-11-23 — 已发版 `0.13.16`：手动清单第二轮 6 件需求（`CONFIRMED`）
+
+- **From:** 本会话（lead）· **To:** 下一轮接手者
+- **发了什么**：发版提交 `1591665` 已推，annotated tag `v0.13.16` 已推；远端 CI `45067182761`
+  success、Release `45067195044` success 并已发布（asset `dsh-grok-workflow-0.13.16.tgz`）。
+  本地 `npm run ci` exit 0：82 files / 1578 tests PASS；`verify:lib` byte-identical；真机 soak PASS。
+- **内容**：需求 1 超时默认 0、需求 2 replan 可见开关（默认关）、需求 4 升级入口、需求 5 删回答格、
+  需求 6 断点续跑接线、需求 3 定位 + 挂载 warn；需求 7 D-107 降级做。405 真机复现待宿主环境。
+- **主工作树另有线**：naming/面板改动（fix/session-surface-head-6 残留，`src/gate.ts` 等 37 文件未提交）
+  与本版无关，不要合进来；发版用的是本 worktree 的 `main`（1591665）。
+- **Team 任务**：task-1/2/4/6/7 complete 且已合流验证；task-3 complete（定位 + lead 补 warn）；task-5
+  complete（删格，已合流）。7 件全部 complete，无 in_progress 残留。
+- **已知坑**：resume 扫描是 macrotask，同步读订阅/断言启动的测试必须等（triage route 已加 ≤5s 等待；
+  guardian/phase1 用 `resumeLister: 'skip'`）；网关 `wb/cn:deepseek-v4.1-flash` 今晚 503 无健康账号，
+  soak 切 muse-spark 验证。
+
 ## 2026-11-22 — 已发版 `0.13.13`：进度脊柱编号优先（`CONFIRMED`）
 
 - **From:** 本会话（lead）· **To:** 下一轮接手者
