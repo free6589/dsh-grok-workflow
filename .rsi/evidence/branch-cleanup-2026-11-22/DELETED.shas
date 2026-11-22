@@ -60,7 +60,12 @@ feat/user-delivery-remote SUPERSEDED-REMOTE deleted: no userDelivery code in mai
 # feat/user-delivery c799988 (local): 22-file user-delivery layer — NOT in main
 # cloud/harden-issue-watcher-prompt-boundary (remote-only): 11-commit watcher hardening — NOT in main
 # fix/token-meter-safe-session-messages (remote-only): 4-commit lifecycle fix — NOT in main
-# 2026-11-22 11:00 — 7 rsi branches merged into 0.13.3, then deleted (content verified in tag v0.13.3)
+# 2026-11-22 ~11:25 — 3 obsolete branches deleted (main has superseded all three)
+feat/user-delivery c799988fad1e33721cf25a19aa06b3b87a920b5c SUPERSEDED-LOCAL deleted: 11-08 snapshot, 204 commits behind; main delivery/index.ts (1034 lines) evolved past it via 0.11.19+ — DELIBERATE
+cloud/harden-issue-watcher-prompt-boundary f53a63fea845977855b1a453a3346de61c86d617 SUPERSEDED-REMOTE deleted: 11-commit watcher hardening; main watch-issues.sh already has SECURITY BOUNDARY + REMINDER (lines 232/237), PR #12 closed unmerged — DELIBERATE
+fix/token-meter-safe-session-messages 99dda09541a2cef25c177bda6b7ac433ed010fb8 SUPERSEDED-REMOTE deleted: 4-commit lifecycle cleanup (-207/+33); main gate.ts already delivers via real followup (line 701) — DELIBERATE
+# KEPT: feat/audit-layer 7626233 (local+remote) — 208-line renderAuditTrail NOT in main, still useful
+# NOTE: 11:20-11:21 worktree has another concurrent task's uncommitted guardian/run/script changes — NOT touched by this cleanup
 rsi/round-4 c8de4fa7823ecc6c301d038fec76e88c6ba209e0 CHERRY-PICKED-AS fff56c4 (redact any-scheme) — VERIFIED in tag (authorization-other-scheme x1)
 rsi/round-5 206db6bcf588915ed92b9aad1895617c66784816 CHERRY-PICKED-AS c1e09c0+e05d925 (supervisor validation; settings.ts already in main Round-equivalent) — tests in tag
 rsi/round-6 5e4a980165745c40c3c583ed017e038c0f7802d8 CHERRY-PICKED-AS 9a1df59+d1522ac (grokDefault refuse; config.ts already in main Round-26) — tests in tag
