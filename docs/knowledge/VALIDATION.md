@@ -1,3 +1,26 @@
+## 未发版 B1/B2/B3 守卫存活信号 — 2026-11-22 (`CONFIRMED`，lead 本轮)
+
+**Changed:** `src/guardian.ts`（B1 `runHeartbeat` + B2 `fileHeartbeat`/`writesPathsForPhase`
++ 开火 reason 带 `last life` 证据）、`src/run.ts`（订阅 `workflow/phase`/`workflow/log`、
+`writesPathsForPhase` 导出纯函数、`statSync` 文件心跳接线）、`src/script.ts`
+（worker/verifier/supervisor/resubmit 四处 `callRole` 传 `writesPaths` 进 guard、
+`adjudicateStall` prompt 加声明路径证据 + RULES）、`test/guardian.spec.ts`（18 例）、
+`test/timeout.spec.ts`（+1 钉 prompt）、`CHANGELOG.md`（`[Unreleased]` 中英双语）。
+
+| state | command | result |
+| --- | --- | --- |
+| working tree (Node 26) | `npm run ci` | exit **0** — **78 files / 1472 tests PASS**（基线 0.13.3 的 1454 + 本轮 8：guardian 7 + timeout 1） |
+| working tree | `npm run typecheck` | exit **0** — 0 errors |
+| working tree | `npm run verify:lib` | byte-identical（`lib/` 165 files 与 `src/` 构建一致） |
+| working tree | `npx vitest run test/guardian.spec.ts test/timeout.spec.ts` | **40 tests PASS**（18 + 22） |
+| real DSH Web GUI | — | **NOT_RUN**：未在宿主界面点开多波运行看守卫行为 |
+| real model adjudication | — | **NOT_RUN**：adjudicator 走脚本化 prompt 断言，未做模型实测裁决质量 |
+
+**Honest boundary:** planner 现场编 plan 的 run 无 B2（`args.tasks === null`
+宿主无映射）；`fileHeartbeat` 抛错/无声明/未知 phase 一律退回旧预算规则。
+引擎 `SUPPORTED_AGENT_OPTIONS` 五键 allowlist 已实测：脚本侧带 `writesPaths`
+直接 `UNSUPPORTED_OPTION` 抛错，故走宿主反查（D-098 被否决备选）。
+
 ## 已发版 `0.13.1` — 2026-11-22 (`CONFIRMED`, lead 收尾)
 
 **Changed:** `14156a6`（Wave 0–4 全量，未发布）+ `8357423`（Node 22 测试修复）+ `b5c1af0`

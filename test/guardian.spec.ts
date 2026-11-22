@@ -23,7 +23,7 @@ import {
 } from '../src/guardian.js'
 import { createActiveState } from '../src/run.js'
 import { resolveConfig } from '../src/config.js'
-import { runWorkflow } from '../src/run.js'
+import { runWorkflow, writesPathsForPhase } from '../src/run.js'
 import { Session } from '@deepseek-ai/dsh-session'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type { WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
@@ -221,6 +221,155 @@ describe('stuck-child handling', () => {
   })
 })
 
+describe('liveness signals: a child that shows life must not fire', () => {
+  it('a run-level phase/log event refreshes run liveness, downgrading heartbeat-loss', () => {
+    const clock = manualClock()
+    const guardian = createRunGuardian({
+      runId: 'run-1',
+      childBudgetMs: 10_000,
+      now: clock.now,
+      schedule: () => ({}) as unknown,
+      cancelSchedule: () => {},
+    })
+    const cancel = vi.fn()
+    guardian.adopt({ id: 'run-1', cancel })
+    guardian.agentStart(info('run-1'), start(1, 'slow worker'))
+    guardian.agentStart(info('run-1'), start(2, 'other worker'))
+    clock.advance(11_000)
+    // The run itself narrated a phase 1s ago: the run is alive, so both
+    // quiet children fire as their own lone stalls (timeout) — neither
+    // may claim the run went silent (heartbeat-loss).
+    guardian.runHeartbeat(info('run-1'), clock.now() - 1_000)
+    const findings = guardian.check()
+    expect(findings.length).toBe(2)
+    expect(findings.every(finding => finding?.signal === 'timeout')).toBe(true)
+    expect(cancel).toHaveBeenCalledTimes(1)
+    guardian.finish('cancelled')
+  })
+
+  it('a declared write path with a fresh mtime keeps its child alive past budget', () => {
+    const clock = manualClock()
+    const guardian = createRunGuardian({
+      runId: 'run-1',
+      childBudgetMs: 10_000,
+      now: clock.now,
+      schedule: () => ({}) as unknown,
+      cancelSchedule: () => {},
+      // Absolute epoch ms, like a stat mtime: the declared file moved 1.5s ago.
+      fileHeartbeat: () => ({ path: 'docs/evidence.md', atMs: clock.now() - 1_500 }),
+    })
+    const cancel = vi.fn()
+    guardian.adopt({ id: 'run-1', cancel })
+    guardian.agentStart(info('run-1'), { ...start(1, 'writing worker'), writesPaths: ['docs/evidence.md'] })
+    clock.advance(11_000)
+    // The child's declared file moved 1.5s ago: it is writing, not wedged.
+    expect(guardian.check()).toEqual([])
+    expect(cancel).not.toHaveBeenCalled()
+    guardian.finish('completed')
+  })
+
+  it('an unreadable file heartbeat degrades to the old behaviour (fires)', () => {
+    const clock = manualClock()
+    let calls = 0
+    const guardian = createRunGuardian({
+      runId: 'run-1',
+      childBudgetMs: 10_000,
+      now: clock.now,
+      schedule: () => ({}) as unknown,
+      cancelSchedule: () => {},
+      fileHeartbeat: () => { calls += 1; throw new Error('EPERM') },
+    })
+    const cancel = vi.fn()
+    guardian.adopt({ id: 'run-1', cancel })
+    guardian.agentStart(info('run-1'), { ...start(1, 'worker'), writesPaths: ['x.md'] })
+    clock.advance(11_000)
+    expect(guardian.check().length).toBe(1)
+    expect(calls).toBeGreaterThan(0)
+    expect(cancel).toHaveBeenCalledTimes(1)
+    guardian.finish('cancelled')
+  })
+
+  it('rebuilds declared paths from the phase header when the event carries none', () => {
+    const clock = manualClock()
+    const guardian = createRunGuardian({
+      runId: 'run-1',
+      childBudgetMs: 10_000,
+      now: clock.now,
+      schedule: () => ({}) as unknown,
+      cancelSchedule: () => {},
+      // The engine forwards only {seq,label,phase,childId}: the host maps
+      // phase `任务 2 · …` back to the caller plan's second task.
+      writesPathsForPhase: (phase: string) => phase.includes('任务 2') ? ['docs/evidence.md'] : [],
+      fileHeartbeat: () => ({ path: 'docs/evidence.md', atMs: clock.now() - 1_500 }),
+    })
+    const cancel = vi.fn()
+    guardian.adopt({ id: 'run-1', cancel })
+    // No writesPaths on the event itself — the host leg must supply them.
+    guardian.agentStart(info('run-1'), { seq: 2, label: '执行', phase: '任务 2 · 进度任务带', childId: 'child-2' })
+    clock.advance(11_000)
+    expect(guardian.check()).toEqual([])
+    expect(cancel).not.toHaveBeenCalled()
+    guardian.finish('completed')
+  })
+
+  it('a phase the plan does not know keeps the old budget-only rule', () => {
+    const clock = manualClock()
+    let lookups = 0
+    const guardian = createRunGuardian({
+      runId: 'run-1',
+      childBudgetMs: 10_000,
+      now: clock.now,
+      schedule: () => ({}) as unknown,
+      cancelSchedule: () => {},
+      writesPathsForPhase: () => { lookups += 1; return [] },
+      fileHeartbeat: () => ({ path: 'x.md', atMs: clock.now() - 1_000 }),
+    })
+    const cancel = vi.fn()
+    guardian.adopt({ id: 'run-1', cancel })
+    guardian.agentStart(info('run-1'), { seq: 3, label: '执行', phase: '任务 9 · 不存在的任务', childId: 'child-3' })
+    clock.advance(11_000)
+    expect(lookups).toBeGreaterThan(0)
+    expect(guardian.check().length).toBe(1)
+    expect(cancel).toHaveBeenCalledTimes(1)
+    guardian.finish('cancelled')
+  })
+})
+
+describe('writesPathsForPhase: phase header back to caller plan', () => {
+  const plan = (paths: string[] | null) => [{
+    id: 't1',
+    title: 'alpha',
+    objective: 'o',
+    expectedOutput: 'e',
+    acceptanceCriteria: ['a'],
+    context: '',
+    constraints: [],
+    writesPaths: paths,
+  }, {
+    id: 't2',
+    title: 'beta',
+    objective: 'o',
+    expectedOutput: 'e',
+    acceptanceCriteria: ['a'],
+    context: '',
+    constraints: [],
+    writesPaths: ['docs/b.md'],
+  }]
+
+  it('maps 任务 n and Task n to the nth plan task', () => {
+    expect(writesPathsForPhase(plan(['docs/a.md']), '任务 1 · alpha')).toEqual(['docs/a.md'])
+    expect(writesPathsForPhase(plan(['docs/a.md']), 'Task 1 · alpha')).toEqual(['docs/a.md'])
+    expect(writesPathsForPhase(plan(['docs/a.md']), '任务 2 · beta')).toEqual(['docs/b.md'])
+  })
+
+  it('yields nothing for unknown phases and planner-built plans', () => {
+    expect(writesPathsForPhase(plan(['docs/a.md']), '任务 9 · 不存在的任务')).toEqual([])
+    expect(writesPathsForPhase(plan(['docs/a.md']), '汇总')).toEqual([])
+    expect(writesPathsForPhase(plan(null), '任务 1 · alpha')).toEqual([])
+    expect(writesPathsForPhase(null, '任务 1 · alpha')).toEqual([])
+  })
+})
+
 describe('guardian unload cleanup', () => {
   it('runWorkflow wires a resident guardian next to progress and archiver', async () => {
     // Parallel existence, through the real run path: the guardian subscribes
@@ -291,6 +440,66 @@ describe('guardian unload cleanup', () => {
     expect(registeredRunGuardians(state)).toBe(0)
     expect(listeners.get('workflow/agent-start') ?? []).toEqual([])
     expect(listeners.get('workflow/agent-end') ?? []).toEqual([])
+  })
+
+  it('the run subscribes phase/log heartbeats alongside the guardian pair', async () => {
+    // B1 wiring: the host must hear the script's narration, or runHeartbeat
+    // never fires and every quiet child reads as a silent run.
+    const listeners = new Map<string, ((...args: unknown[]) => void)[]>()
+    const on = (name: string, fn: (...args: unknown[]) => void): (() => void) => {
+      const rows = listeners.get(name) ?? []
+      rows.push(fn)
+      listeners.set(name, rows)
+      return () => {
+        listeners.set(name, (listeners.get(name) ?? []).filter(entry => entry !== fn))
+      }
+    }
+    let peaks: Record<string, number> = {}
+    const engine = {
+      async start(request: WorkflowStartRequest): Promise<{ id: string, meta: WorkflowStartRequest['meta'], result: Promise<{ value: unknown, stopReason: string, agentsStarted: number }>, cancel: (reason?: string) => void, dispose: () => Promise<void> }> {
+        return {
+          id: 'run-heartbeat-1',
+          meta: request.meta,
+          result: Promise.resolve({ value: null, stopReason: 'completed', agentsStarted: 0 }),
+          cancel: () => {},
+          dispose: async () => {},
+        }
+      },
+    }
+    const ctx = { workflowEngine: engine, logger: () => ({ warn: () => {} }), on } as never
+    const state = createActiveState()
+    const agent = { session: Session.create('sess-guardian-heartbeat' as SessionId) } as never
+    const pending = runWorkflow({
+      ctx,
+      config: resolveConfig({ timeoutMs: 6_000 }),
+      state,
+      logger: { warn: () => {} },
+      agent,
+      objective: 'heartbeat wiring exists',
+      failureMode: 'report',
+      callerTasks: [{
+        id: 't1',
+        title: 'writes a file',
+        objective: 'write x',
+        expectedOutput: 'x',
+        acceptanceCriteria: ['x exists'],
+        context: '',
+        constraints: [],
+        writesPaths: ['docs/x.md'],
+      }],
+    })
+    // Capture peaks before the run settles and releases its listeners.
+    peaks = {
+      start: (listeners.get('workflow/agent-start') ?? []).length,
+      end: (listeners.get('workflow/agent-end') ?? []).length,
+      phase: (listeners.get('workflow/phase') ?? []).length,
+      log: (listeners.get('workflow/log') ?? []).length,
+    }
+    await pending
+    expect(peaks.start).toBeGreaterThanOrEqual(3)
+    expect(peaks.end).toBeGreaterThanOrEqual(3)
+    expect(peaks.phase).toBeGreaterThanOrEqual(1)
+    expect(peaks.log).toBeGreaterThanOrEqual(1)
   })
 
   it('dispose clears the timer and leaves no residue behind', () => {

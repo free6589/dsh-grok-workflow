@@ -153,7 +153,22 @@ interface WatchedChild {
   settled: boolean
   outcome?: WorkflowAgentOutcome
   timedOut: boolean
+  /** Task-declared write paths this child may touch (B2 file heartbeat scope). */
+  writesPaths: string[]
+  /** Epoch ms of the freshest declared-file change seen for this child. */
+  lastFileActivityMs: number
 }
+
+/** One declared write path with the freshest change the host has seen. */
+export interface FileHeartbeat {
+  /** The declared path that moved, verbatim. */
+  path: string
+  /** Epoch milliseconds of the freshest change observed. */
+  atMs: number
+}
+
+/** Read the freshest change among a child's declared write paths, if any. */
+export type FileHeartbeatReader = (writesPaths: readonly string[]) => FileHeartbeat | undefined
 
 /** Options for one guardian. Every field is optional except identity. */
 export interface GuardianOptions {
@@ -177,6 +192,21 @@ export interface GuardianOptions {
   logger?: WorkflowLogger
   /** Plugin instance state, for the unload registry. */
   state?: object
+  /**
+   * File-heartbeat reader (B2): given a child's task-declared write paths,
+   * return the freshest change seen, or `undefined` when nothing moved.
+   * A reader that throws is treated as "no signal" — never as a verdict.
+   * Absent means no task declared paths, and the old budget-only rule holds.
+   */
+  fileHeartbeat?: FileHeartbeatReader
+  /**
+   * Rebuild a child's declared write paths from its phase header (B2 host
+   * leg): the engine forwards only `{seq,label,phase,childId}`, so a path
+   * the script knew cannot ride the event. The host maps phase `任务 n` back
+   * to the caller plan's nth task. Absent (planner-built plans) means no
+   * child carries paths and the old rule holds.
+   */
+  writesPathsForPhase?: (phase: string) => string[]
 }
 
 /** Derive one child's stall budget from the run's own deadline. */
@@ -216,11 +246,28 @@ interface AgentStartInfo {
   seq?: unknown
   label?: unknown
   childId?: unknown
+  phase?: unknown
+  writesPaths?: unknown
 }
 
 /** Payload shape the engine hands to `workflow/agent-end` listeners. */
 interface AgentEndInfo extends AgentStartInfo {
   outcome?: unknown
+}
+
+/** Declared write paths from an agent-start payload, if the caller carried them. */
+function writesPathsOf(payload: AgentStartInfo): string[] {
+  const raw = payload.writesPaths
+  if (!Array.isArray(raw)) return []
+  const out: string[] = []
+  for (const entry of raw) {
+    if (typeof entry !== 'string') continue
+    const trimmed = entry.trim()
+    if (trimmed === '' || trimmed.length > 300) continue
+    if (out.length >= 16) break
+    out.push(trimmed)
+  }
+  return out
 }
 
 function seqOf(value: unknown): number | undefined {
@@ -265,7 +312,7 @@ export function createRunGuardian(options: GuardianOptions): RunGuardian {
    * the run back (the same window the progress recorder buffers for), so an
    * early child is buffered, not dropped. Bounded: foreign runs pass through.
    */
-  const pendingStarts: Array<{ runId: string, seq: number, label: string, childId: string, at: number }> = []
+  const pendingStarts: Array<{ runId: string, seq: number, label: string, childId: string, writesPaths: string[], at: number }> = []
   const pendingEnds: Array<{ runId: string, seq: number, label: string, outcome: WorkflowAgentOutcome, at: number }> = []
   const PENDING_LIMIT = 64
   let run: GuardianRunHandle | undefined
@@ -274,6 +321,10 @@ export function createRunGuardian(options: GuardianOptions): RunGuardian {
   let cancelFired = false
   let cancelReason: string | undefined
   let stopReason: WorkflowStopReason | undefined
+  // B1: the freshest run-level narration (workflow/phase or workflow/log).
+  // A run that narrates is a run that progresses, even when one child is
+  // quiet — run-wide silence, not one quiet child, is the heartbeat-loss.
+  let runHeartbeatAtMs = 0
   const listeners: (() => void)[] = []
 
   const armed = Number.isFinite(budgetMs) && (budgetMs as number) > 0
@@ -296,10 +347,13 @@ export function createRunGuardian(options: GuardianOptions): RunGuardian {
     }
   }
 
-  const fireFor = (child: WatchedChild, signal: GuardianSignal, at: number): void => {
+  const fireFor = (child: WatchedChild, signal: GuardianSignal, at: number, evidence?: string): void => {
     if (child.timedOut) return
     child.timedOut = true
-    const reason = `workflow guardian: child ${child.label === '' ? `#${child.seq}` : `"${child.label}" (seq ${child.seq})`} made no progress within ${budgetMs} ms (${signal})`
+    const who = child.label === '' ? `#${child.seq}` : `"${child.label}" (seq ${child.seq})`
+    const reason = evidence === undefined || evidence === ''
+      ? `workflow guardian: child ${who} made no progress within ${budgetMs} ms (${signal})`
+      : `workflow guardian: child ${who} made no progress within ${budgetMs} ms (${signal}); last life: ${evidence}`
     appendFinding({
       seq: child.seq,
       label: child.label.slice(0, GUARDIAN_LIMITS.labelChars),
@@ -315,24 +369,36 @@ export function createRunGuardian(options: GuardianOptions): RunGuardian {
   const check = (at: number = clock()): void => {
     if (disposed || !armed) return
     if (stopReason !== undefined) return
-    let latestActivity = 0
+    let latestActivity = runHeartbeatAtMs
     for (const child of children.values()) {
       if (!child.settled && !child.timedOut) {
         if (child.lastEventAtMs > latestActivity) latestActivity = child.lastEventAtMs
+        const beat = fileHeartbeatOf(child, at)
+        if (beat !== undefined) {
+          child.lastFileActivityMs = Math.max(child.lastFileActivityMs, beat.atMs)
+          if (beat.atMs > latestActivity) latestActivity = beat.atMs
+        }
       }
     }
     for (const child of children.values()) {
       if (child.settled || child.timedOut) continue
+      // B2: the child's declared files moved recently — it is writing, not
+      // wedged. A stale file is no signal: the budget still applies.
+      const beat = fileHeartbeatOf(child, at)
+      const beatAt = beat?.atMs ?? child.lastFileActivityMs
+      if (beat !== undefined) child.lastFileActivityMs = Math.max(child.lastFileActivityMs, beat.atMs)
+      if (beatAt > 0 && at - beatAt < budgetMs) continue
       const silentFor = at - child.startedAtMs
       if (silentFor < budgetMs) continue
-      // Timeout: this child itself never settled within its budget.
-      // Heartbeat-loss: nothing from this run followed its start within the
-      // same budget — the run-wide silence corroborates the stall. Both fire
-      // together because on the host side they are the same observation; the
-      // recorded signal names which half the reader should trust.
+      // B1: fresh run narration downgrades the signal. A quiet child beside
+      // a narrating run is a lone stall (timeout); only a run that itself
+      // went silent earns a heartbeat-loss.
       const runSilentFor = latestActivity === 0 ? silentFor : at - latestActivity
       const signal: GuardianSignal = runSilentFor >= budgetMs ? 'heartbeat-loss' : 'timeout'
-      fireFor(child, signal, at)
+      const evidence = beatAt > 0
+        ? `file ${Math.round((at - beatAt) / 1000)}s ago`
+        : (latestActivity > 0 ? `run narration ${Math.round((at - latestActivity) / 1000)}s ago` : undefined)
+      fireFor(child, signal, at, evidence)
     }
   }
 
@@ -385,12 +451,24 @@ export function createRunGuardian(options: GuardianOptions): RunGuardian {
     const at = clock()
     const label = findingText(textOf(payload.label ?? (info as AgentStartInfo).label).trim(), GUARDIAN_LIMITS.labelChars)
     const childId = textOf(payload.childId ?? (info as AgentStartInfo).childId)
+    // B2 host leg: the event carries phase but not paths (the engine's option
+    // allowlist drops anything else), so the host maps phase back to the
+    // caller plan. A lookup that throws is no paths, never a verdict.
+    const phase = textOf(payload.phase ?? (info as AgentStartInfo).phase)
+    let writesPaths = writesPathsOf(payload)
+    if (writesPaths.length === 0 && phase !== '' && options.writesPathsForPhase !== undefined) {
+      try {
+        writesPaths = writesPathsOf({ writesPaths: options.writesPathsForPhase(phase) })
+      } catch {
+        writesPaths = []
+      }
+    }
     // Pre-adoption: the engine has not handed back a run yet. Buffer the row
     // by its own run id; `adopt()` replays rows that belong to the live run.
     if (run === undefined) {
       if (runId !== '' && eventRunId !== runId) return
       if (pendingStarts.length >= PENDING_LIMIT) pendingStarts.shift()
-      pendingStarts.push({ runId: eventRunId, seq, label, childId, at })
+      pendingStarts.push({ runId: eventRunId, seq, label, childId, writesPaths, at })
       return
     }
     if (eventRunId !== runId) return
@@ -412,6 +490,8 @@ export function createRunGuardian(options: GuardianOptions): RunGuardian {
       lastEventAtMs: at,
       settled: false,
       timedOut: false,
+      writesPaths,
+      lastFileActivityMs: 0,
     })
   }
 
@@ -450,6 +530,8 @@ export function createRunGuardian(options: GuardianOptions): RunGuardian {
         settled: true,
         outcome,
         timedOut: false,
+        writesPaths: [],
+        lastFileActivityMs: 0,
       })
       return
     }
@@ -468,6 +550,39 @@ export function createRunGuardian(options: GuardianOptions): RunGuardian {
     void result
     stopReason = 'completed'
     disarmTimer()
+  }
+
+  /**
+   * B1 run-level heartbeat: the script narrated a phase or log line.
+   * A run that narrates is progressing — one quiet child beside fresh
+   * narration is a lone stall (timeout), not a silent run (heartbeat-loss),
+   * and a child quieter than the narration itself is still working.
+   */
+  const noteRunHeartbeat = (info: unknown, at?: number): void => {
+    if (disposed) return
+    const infoId = (info as { id?: unknown } | null)?.id
+    if (typeof infoId !== 'string' && typeof infoId !== 'number') return
+    if (runId !== '' && String(infoId).trim() !== runId) return
+    const stamp = typeof at === 'number' && Number.isFinite(at) ? at : clock()
+    if (stamp > runHeartbeatAtMs) runHeartbeatAtMs = stamp
+  }
+
+  /**
+   * B2 file heartbeat: the freshest declared-path change for one child.
+   * A reader that throws, or a child with no declared paths, yields no
+   * signal — the old budget-only rule holds, never a false alive.
+   */
+  const fileHeartbeatOf = (child: WatchedChild, at: number): FileHeartbeat | undefined => {
+    const reader = options.fileHeartbeat
+    if (reader === undefined || child.writesPaths.length === 0) return undefined
+    try {
+      const beat = reader(child.writesPaths)
+      if (beat === undefined) return undefined
+      if (!Number.isFinite(beat.atMs) || beat.atMs <= 0 || beat.atMs > at) return undefined
+      return beat
+    } catch {
+      return undefined
+    }
   }
 
   const guardian: RunGuardian = {
@@ -497,6 +612,8 @@ export function createRunGuardian(options: GuardianOptions): RunGuardian {
           lastEventAtMs: row.at,
           settled: false,
           timedOut: false,
+          writesPaths: row.writesPaths,
+          lastFileActivityMs: 0,
         })
       }
       for (const row of pendingEnds.splice(0)) {
@@ -513,6 +630,8 @@ export function createRunGuardian(options: GuardianOptions): RunGuardian {
             settled: true,
             outcome: row.outcome,
             timedOut: false,
+            writesPaths: [],
+            lastFileActivityMs: 0,
           })
           continue
         }
@@ -538,6 +657,10 @@ export function createRunGuardian(options: GuardianOptions): RunGuardian {
     runEnd(info: unknown): void {
       if (disposed) return
       noteRunEnd(info)
+    },
+    runHeartbeat(info: unknown, at?: number): void {
+      if (disposed) return
+      noteRunHeartbeat(info, at)
     },
     check(now?: number): GuardianFinding[] {
       check(now ?? clock())
@@ -626,6 +749,13 @@ export interface RunGuardian {
   agentEnd(info: unknown, member?: unknown): void
   /** Observe the run's terminal event. */
   runEnd(info: unknown): void
+  /**
+   * Observe one run-level narration (`workflow/phase` or `workflow/log`).
+   * A narrating run is a progressing run: it downgrades a quiet child from
+   * heartbeat-loss to its own timeout, and never marks a child alive by
+   * itself. Never throws.
+   */
+  runHeartbeat(info: unknown, at?: number): void
   /** Run one liveness sweep now; returns the findings so far. */
   check(now?: number): GuardianFinding[]
   /** Settle the guardian and release everything; returns the terminal settlement. */

@@ -79,6 +79,14 @@ export declare function configRouteLabels(config: ResolvedConfig): string[];
 export declare function snapshotBusyRoutes(state: ActiveState): string[];
 /** Short label used in thrown messages and rendered failures. */
 export declare function workflowLabel(config: ResolvedConfig): string;
+/**
+ * Rebuild a child's task-declared write paths from its phase header (B2 host
+ * leg). Phase headers number tasks in plan order in both languages
+ * (`任务 n · …` / `Task n · …`), and the caller-plan array is that order.
+ * Unknown phases and planner-built (null) plans yield no paths — those
+ * children keep the old budget-only rule, never a false alive.
+ */
+export declare function writesPathsForPhase(tasks: NormalizedTask[] | null, phase: string): string[];
 /** Inputs the plugin disposer can offer about how it was reached. */
 export interface DisposalContext {
     logger?: WorkflowLogger;

@@ -10,6 +10,8 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { Session } from '@deepseek-ai/dsh-session'
 import type { WorkflowRun, WorkflowStartRequest, WorkflowStopReason } from '@deepseek-ai/dsh-workflow'
+import { statSync } from 'node:fs'
+import { join } from 'node:path'
 import { namingLanguageFromSettings } from './naming.js'
 import type { NamingLanguage } from './naming.js'
 import {
@@ -21,7 +23,7 @@ import { inheritanceForSession } from './carryover.js'
 import { teamWorkflowEngine } from './team-engine.js'
 import { createCheckpointRecorder, unloadCheckpointRecorders } from './checkpoint/wiring.js'
 import { GUARDIAN_LIMITS, createRunGuardian, guardianChildBudgetMs, unloadRunGuardians } from './guardian.js'
-import type { GuardianSettlement } from './guardian.js'
+import type { FileHeartbeat, GuardianSettlement } from './guardian.js'
 import { CHILD_TIMEOUT_MS } from './timeout.js'
 import { deliverReport } from './delivery/index.js'
 import type { DeliveryView } from './delivery/index.js'
@@ -193,6 +195,21 @@ function describeHolder(info: ActiveRunInfo, now: number): string {
 /** Short label used in thrown messages and rendered failures. */
 export function workflowLabel(config: ResolvedConfig): string {
   return config.toolName
+}
+
+/**
+ * Rebuild a child's task-declared write paths from its phase header (B2 host
+ * leg). Phase headers number tasks in plan order in both languages
+ * (`任务 n · …` / `Task n · …`), and the caller-plan array is that order.
+ * Unknown phases and planner-built (null) plans yield no paths — those
+ * children keep the old budget-only rule, never a false alive.
+ */
+export function writesPathsForPhase(tasks: NormalizedTask[] | null, phase: string): string[] {
+  if (tasks === null) return []
+  const match = /(?:任务|Task)\s*(\d+)/.exec(phase)
+  if (match === null) return []
+  const paths = tasks[Number(match[1]) - 1]?.writesPaths
+  return Array.isArray(paths) ? paths.filter((entry): entry is string => typeof entry === 'string') : []
 }
 
 /** Inputs the plugin disposer can offer about how it was reached. */
@@ -833,6 +850,36 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
     childBudgetMs: guardianChildBudgetMs(deadlineMs, config.guardianModel === undefined ? undefined : CHILD_TIMEOUT_MS),
     logger,
     state,
+    // B2 file heartbeat: the engine only forwards {seq,label,phase,childId},
+    // so the script's declared paths cannot ride the event. The host rebuilds
+    // them from the caller plan via writesPathsForPhase. Planner-built plans
+    // are null here — those children keep the old budget-only rule, never a
+    // false alive. A stat that throws (deleted file, no permission) is no signal.
+    writesPathsForPhase: (phase: string): string[] => writesPathsForPhase(request.args.tasks, phase),
+    fileHeartbeat: (writesPaths: readonly string[]): FileHeartbeat | undefined => {
+      if (writesPaths.length === 0) return undefined
+      const root = process.cwd()
+      let freshest: FileHeartbeat | undefined
+      for (const declared of writesPaths) {
+        if (typeof declared !== 'string' || declared.trim() === '') continue
+        // Absolute declarations are used as-is; anything else is relative to
+        // the run's shared working directory (every child shares one cwd, so
+        // there is exactly one place to look — no global sweep, no false hits
+        // from another task's files).
+        const absolute = declared.startsWith('/') ? declared : join(root, declared)
+        let mtimeMs: number | undefined
+        try {
+          const stat = statSync(absolute, { throwIfNoEntry: false })
+          if (stat === undefined) continue
+          mtimeMs = stat.mtimeMs
+        } catch {
+          continue
+        }
+        if (mtimeMs === undefined || !Number.isFinite(mtimeMs)) continue
+        if (freshest === undefined || mtimeMs > freshest.atMs) freshest = { path: declared, atMs: mtimeMs }
+      }
+      return freshest
+    },
   })
   /** Guardian findings folded into the terminal report, when the run settles. */
   let guardianSettlement: GuardianSettlement | undefined
@@ -865,6 +912,13 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
     listen(() => ctx.on('workflow/agent-start', (info, member) => { guardian.agentStart(info, member) }))
     listen(() => ctx.on('workflow/agent-end', (info, member) => { guardian.agentEnd(info, member) }))
     listen(() => ctx.on('workflow/end', (info) => { guardian.runEnd(info) }))
+    // B1 run heartbeat: the script narrates phase/log while its children work.
+    // A narrating run is a progressing run — one quiet child beside fresh
+    // narration is a lone stall, not a silent run. Listeners are contained
+    // like every other `listen()` row: a bus without these events costs the
+    // signal, never the run.
+    listen(() => ctx.on('workflow/phase', (info) => { guardian.runHeartbeat(info) }))
+    listen(() => ctx.on('workflow/log', (info) => { guardian.runHeartbeat(info) }))
   }
   try {
     try {

@@ -223,6 +223,14 @@ function adjudicateStall(guard, waits, remainingMs, done) {
     done(verdict, reason);
   };
   const minutes = function (ms) { return Math.max(1, Math.round(ms / 60000)); };
+  // B3: the task's declared write paths go into the evidence so the
+  // adjudicator knows what files a living child of this task should touch.
+  // A child that declared paths but shows no run narration is more suspect
+  // than one whose run keeps logging; the host-side file heartbeat (fresh
+  // mtime on these paths) is folded into the Guardian finding reason.
+  const declaredPaths = Array.isArray(guard.writesPaths) && guard.writesPaths.length > 0
+    ? guard.writesPaths.filter(function (p) { return typeof p === 'string'; }).slice(0, 16).join(', ')
+    : '';
   const prompt = [
     'Guardian · stall adjudication',
     'You are the guardian model inside a verified workflow run. One child agent has stopped making observable progress and its wait budget expired. Judge from the evidence below whether the child is still working or wedged; you cannot see the child, so reason from what the run reports.',
@@ -232,9 +240,11 @@ function adjudicateStall(guard, waits, remainingMs, done) {
     '- wait budget already exceeded: ' + minutes(childTimeoutMs) + ' minutes',
     '- waits granted so far: ' + waits + ' of ' + GUARDIAN_MAX_WAITS,
     '- time left before the run deadline: ' + (remainingMs === Infinity ? 'unlimited' : minutes(remainingMs) + ' minutes'),
+    '- task-declared write paths: ' + (declaredPaths === '' ? '(none declared)' : declaredPaths),
     '',
     'RULES:',
     '- Answer wait only when a child of this role plausibly still runs long work (a large build, a broad test sweep, a long edit) and the deadline has room for one more five-minute slice.',
+    '- A child whose task declared write paths and whose run keeps narrating phase/log lines is more likely alive; a child with declared paths but a silent run is more suspect.',
     '- Answer kill when the child gives no reason to expect progress, or the deadline cannot afford the slice.',
     '- Answer with JSON exactly: {"verdict":"wait"} or {"verdict":"kill","reason":"<=200 chars"}',
     'Do not include credentials, tokens, passwords, or private keys.'
@@ -781,7 +791,7 @@ async function callRole(role, prompt, options) {
     let value = null;
     let thrown = null;
     try {
-      value = await raceChildCall(agent(prompt, call), { role: role, label: options.label });
+      value = await raceChildCall(agent(prompt, call), { role: role, label: options.label, writesPaths: options.writesPaths });
     } catch (error) {
       thrown = error;
     }
@@ -2564,7 +2574,8 @@ async function runTaskUnsafe(task, taskIndex, upstreamText) {
         schema: EXECUTION_SCHEMA,
         label: memberLabel('worker', attempt),
         phase: taskGroupTitle(taskPosition, task.title),
-        attempt: attempt
+        attempt: attempt,
+        writesPaths: task.writesPaths
       });
       if (worker.ok) {
         attemptRoute = worker.label;
@@ -2598,7 +2609,8 @@ async function runTaskUnsafe(task, taskIndex, upstreamText) {
           schema: EXECUTION_SCHEMA,
           label: memberLabel('worker', attempt),
           phase: taskGroupTitle(taskPosition, task.title),
-          attempt: attempt
+          attempt: attempt,
+          writesPaths: task.writesPaths
         });
         if (resubmit.ok) {
           const resubmittedExecution = normalizeExecution(resubmit.value);
@@ -2624,7 +2636,8 @@ async function runTaskUnsafe(task, taskIndex, upstreamText) {
           schema: VERIFICATION_SCHEMA,
           label: memberLabel('verifier', attempt),
           phase: taskGroupTitle(taskPosition, task.title),
-          attempt: attempt
+          attempt: attempt,
+          writesPaths: task.writesPaths
         });
         if (verifier.ok) {
           if (attemptRoute === '') attemptRoute = verifier.label;
@@ -2662,7 +2675,8 @@ async function runTaskUnsafe(task, taskIndex, upstreamText) {
           schema: VERIFICATION_SCHEMA,
           label: memberLabel('supervisor'),
           phase: taskGroupTitle(taskPosition, task.title),
-          attempt: attempt
+          attempt: attempt,
+          writesPaths: task.writesPaths
         });
         if (supervision.ok) {
           const supervised = normalizeVerification(supervision.value);

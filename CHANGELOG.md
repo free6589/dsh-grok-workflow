@@ -3,6 +3,29 @@
 Notable user-facing changes are recorded here in English and Simplified Chinese.
 用户可见的功能和修复会在这里以英文和简体中文记录。
 
+## [Unreleased]
+
+## [0.13.4] - 2026-11-22
+
+### Fixed / 修复
+
+- **A working child is no longer killed as stalled / 正在干活的子任务不再被当成卡死杀掉** —
+  The resident guardian judged liveness only from `agent-start`/`agent-end`, so a child doing
+  real slow work (a long build, a broad test sweep, writing evidence files) looked identical to
+  a wedged one and the whole run was cancelled at the 10-minute budget. Three signals now feed
+  the verdict: (1) the run's own `phase`/`log` narration counts as run-level liveness, so a quiet
+  child beside a narrating run is its own lone stall, not a silent run; (2) a task's declared
+  `writesPaths` are watched for mtime movement — fresh file activity keeps that child alive past
+  the budget; (3) the stall-adjudication prompt carries the task's declared paths, so the judge
+  knows what files a living child should be touching. Children of planner-built plans (no
+  caller plan to map phases back to) keep the old budget-only rule — never a false alive.
+  / 宿主守卫原来只看 `agent-start`/`agent-end` 判存活，干慢活的孩子（长构建、大测试扫、写证据文件）
+  和真卡死的长得一模一样，到 10 分钟预算整轮被杀。现在三个信号一起判：(1) run 自己的
+  `phase`/`log` 叙述算 run 级存活，run 在说话时安静的孩子只是自己的 stall，不是整轮沉默；
+  (2) 盯着任务声明的 `writesPaths` 看 mtime，文件在动就保活；(3) 判停 prompt 里带上该任务的
+  声明路径，裁决者知道活着的孩子应该在碰哪些文件。planner 现场编的 plan（宿主没有 caller
+  plan 可反查）走旧规则——不做假保活。
+
 ## [0.13.3] - 2026-11-22
 
 ### Fixed / 修复

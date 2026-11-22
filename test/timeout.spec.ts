@@ -239,6 +239,9 @@ describe('the generated script enforces the child budget', () => {
     // Rule B lives in the script too: the deadline anchors at the run's start.
     expect(WORKFLOW_SCRIPT).toContain('const runStartedAtMs = nowMs();')
     expect(WORKFLOW_SCRIPT).toContain('runStartedAtMs + runDeadlineMs')
+    // B3: the adjudication prompt carries the task's declared write paths, so
+    // the judge knows what files a living child of this task should touch.
+    expect(WORKFLOW_SCRIPT).toContain('task-declared write paths')
   })
 
   it('settles a hung call as a timeout and retries the task instead of failing the run', async () => {

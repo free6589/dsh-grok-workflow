@@ -134,6 +134,15 @@ export interface GuardianRunHandle {
     readonly id: string;
     cancel(reason?: string): void;
 }
+/** One declared write path with the freshest change the host has seen. */
+export interface FileHeartbeat {
+    /** The declared path that moved, verbatim. */
+    path: string;
+    /** Epoch milliseconds of the freshest change observed. */
+    atMs: number;
+}
+/** Read the freshest change among a child's declared write paths, if any. */
+export type FileHeartbeatReader = (writesPaths: readonly string[]) => FileHeartbeat | undefined;
 /** Options for one guardian. Every field is optional except identity. */
 export interface GuardianOptions {
     /**
@@ -156,6 +165,21 @@ export interface GuardianOptions {
     logger?: WorkflowLogger;
     /** Plugin instance state, for the unload registry. */
     state?: object;
+    /**
+     * File-heartbeat reader (B2): given a child's task-declared write paths,
+     * return the freshest change seen, or `undefined` when nothing moved.
+     * A reader that throws is treated as "no signal" — never as a verdict.
+     * Absent means no task declared paths, and the old budget-only rule holds.
+     */
+    fileHeartbeat?: FileHeartbeatReader;
+    /**
+     * Rebuild a child's declared write paths from its phase header (B2 host
+     * leg): the engine forwards only `{seq,label,phase,childId}`, so a path
+     * the script knew cannot ride the event. The host maps phase `任务 n` back
+     * to the caller plan's nth task. Absent (planner-built plans) means no
+     * child carries paths and the old rule holds.
+     */
+    writesPathsForPhase?: (phase: string) => string[];
 }
 /** Derive one child's stall budget from the run's own deadline. */
 export declare function guardianChildBudgetMs(timeoutMs: number, childTimeoutMs?: number): number;
@@ -186,6 +210,13 @@ export interface RunGuardian {
     agentEnd(info: unknown, member?: unknown): void;
     /** Observe the run's terminal event. */
     runEnd(info: unknown): void;
+    /**
+     * Observe one run-level narration (`workflow/phase` or `workflow/log`).
+     * A narrating run is a progressing run: it downgrades a quiet child from
+     * heartbeat-loss to its own timeout, and never marks a child alive by
+     * itself. Never throws.
+     */
+    runHeartbeat(info: unknown, at?: number): void;
     /** Run one liveness sweep now; returns the findings so far. */
     check(now?: number): GuardianFinding[];
     /** Settle the guardian and release everything; returns the terminal settlement. */

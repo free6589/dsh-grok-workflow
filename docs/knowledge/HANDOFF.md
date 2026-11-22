@@ -1,3 +1,19 @@
+## 2026-11-22 — B1/B2/B3 守卫存活信号（`CONFIRMED`，未发版、未提交）
+
+- **From:** 本会话（lead）· **To:** 下一轮接手者
+- **为什么做**：用户原话「这个杀错了，子代理明明在工作」。旧守卫只看
+  agent-start/end，干慢活和真卡死长得一样，到点杀整轮。D-097 只修了抢跑没修瞎。
+- **改了什么**：B1 run 心跳（phase/log 订阅→`runHeartbeat`，信号降级不豁免）；
+  B2 文件心跳（`writesPathsForPhase` 中英 phase 反查 + `statSync` mtime保活；
+  引擎 allowlist 五键实测死路故走宿主反查）；B3 裁决证据（prompt 加声明路径
+  + RULES + 开火 reason 带 `last life`）。详见 D-098。
+- **测试**：`npm run ci` exit 0 — 78 files / 1472 tests PASS；typecheck 0 错；
+  `verify:lib` byte-identical。基线 1454 + 本轮 8（guardian 7 + timeout 1）。
+- **诚实边界**：planner 现场编 plan 无 B2；抛错/无声明/未知 phase 退旧规则。
+  真机 GUI 手点 + 模型实测裁决质量 NOT_RUN。
+- **没做的**：未提交、未发版（等用户确认；commit 后别 push 别 force）。
+  C（宿主只标记不杀）单独立项未动。`lib/` 已由 `npm run build` 重建。
+
 ## 2026-11-22 — 已发版 `0.13.2`：guardian 误杀修复 + 固定左栏 + 孤儿清理（`CONFIRMED`）
 
 - **From:** 本会话（lead）· **To:** 下一轮接手者

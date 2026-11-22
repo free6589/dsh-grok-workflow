@@ -2331,3 +2331,45 @@ wait×2 adjudication 还没判完宿主已经杀了整轮。
 
 **代价**：配了 guardian 的 run 上，最坏单子任务多等 10 min（两次 wait）才整轮 cancel；
 不配 guardian 的 run 行为零变化。
+
+## D-098 — 守卫看三个存活信号，不再只看开始/结束（2026-11-22，未发版）
+
+**背景**：用户原话「这个杀错了，子代理明明在工作」。旧守卫只订阅
+`workflow/agent-start`/`agent-end`/`workflow/end`，到预算没结算就杀整轮；
+干慢活的孩子和真卡死的一模一样。D-097 只修了宿主抢跑（宿主等脚本判完），
+没修「瞎」本身。
+
+**Decision:**
+1. **B1 run 心跳**：宿主新增订阅 `workflow/phase` + `workflow/log`
+   → `guardian.runHeartbeat`。run 在叙述 = run 在推进；安静的孩子 + 新鲜的
+   run 叙述 = 该孩子自己的 timeout，不再是 heartbeat-loss（信号降级，不豁免）。
+2. **B2 文件心跳**：`agent-start` 事件只带 `{seq,label,phase,childId}`
+   （引擎 `SUPPORTED_AGENT_OPTIONS` 写死五键，多一个就抛 `UNSUPPORTED_OPTION`，
+   脚本侧带不上），宿主用 `writesPathsForPhase(tasks, phase)` 从 caller plan
+   按 `任务 n`/`Task n` 反查声明路径，再 `statSync` 看 mtime。新鲜（预算内）
+   = 活着，直接保活；stale 或读不到 = 无信号，走旧规则。planner 现场编的
+   plan（`args.tasks === null`）无映射——旧规则，不做假保活。
+3. **B3 裁决证据**：`adjudicateStall` prompt 加 `task-declared write paths`
+   一行 + RULES 加一条（有声明路径 + run 在叙述 = 更可能活着；有声明但
+   run 沉默 = 更可疑）。宿主开火 reason 带 `last life: file Xs ago` /
+   `run narration Xs ago`，终端报告里能读到当时看到了什么。
+
+**Reason:** 杀错的根因是信息不够，不是预算不对。调大预算只会把误杀推迟，
+三个正交信号（run 在说话、文件在动、裁决者知道该看什么文件）才是对症。
+“无信号 = 按旧规则杀”是故意的：保活必须有证据，沉默永远不算活着。
+
+**Evidence:** `test/guardian.spec.ts` 18 例（含 B1/B2/runHeartbeat/
+writesPathsForPhase 中英映射/不可读降级/未知 phase 旧规则 7 例）；
+`test/timeout.spec.ts` +1（prompt 带声明路径钉住）；`npm run ci`
+78 files / 1472 tests PASS。
+
+**代价**：`check()` 每轮对有声明路径的 open child 做 `statSync`（B2，路径数
+≤16，有上限）；B1/B3 零新增调用。planner 模式的 run 无 B2（宿主看不到现场
+编的 plan），这是诚实边界不是缺陷——B1 对两种 plan 都有效。
+
+**被否决的备选**：脚本 `agent()` call 里带 `writesPaths`（引擎 allowlist
+直接抛错，实测确认死路）；轮询子会话 `ownEvents`（`ctx.session` 是 lookup，
+但子会话归引擎的 subagent 域管，宿主跨域读要走未公开的 seam，架构上越界）；
+全局扫 cwd mtime（所有 child 共享一个 cwd，扫全目录会把别的 task 的写算到
+这个孩子头上——B2 按声明路径盯正是为了避开这个）。C（宿主只标记不杀）
+单独立项：它改变“挂死的 run 什么时候结算”这个用户可见语义。
