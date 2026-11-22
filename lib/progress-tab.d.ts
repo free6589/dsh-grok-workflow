@@ -120,6 +120,32 @@ export interface ProgressStageDefinition {
  * stage becomes a node of its own, so the spine never hides a declared phase.
  */
 export declare const PROGRESS_STAGES: readonly ProgressStageDefinition[];
+/** One capsule of the fixed chain a plan-task card shows. */
+export interface ProgressChainStageDefinition {
+    key: 'execute' | 'check' | 'review';
+    /** Role labels (`naming.ts` `memberLabel`) that fill this capsule. */
+    tokens: readonly string[];
+}
+/**
+ * The fixed per-task chain, in render order: `执行` → `检查` → `复核`
+ * (`worker` → `verifier` → `supervisor`).
+ *
+ * A task's rows arrive as role calls, so a card can say which gates a task actually
+ * reached. The chain is fixed rather than derived from what arrived: a capsule no row
+ * reached renders `pending` with a dashed border, because "the verify call never ran" is
+ * a fact a reader needs, and a missing capsule would hide it.
+ */
+export declare const PROGRESS_CHAIN: readonly ProgressChainStageDefinition[];
+/** One rendered capsule of a plan-task card's fixed chain. */
+export interface ProgressChainSlot {
+    key: ProgressChainStageDefinition['key'];
+    /** Rows of the card that fill this capsule, in plan order (more than one on a retry). */
+    members: ProgressMemberFact[];
+    /** The capsule's aggregate state; `pending` when no row reached it. */
+    state: ProgressState;
+    /** Whether at least one row reached the capsule (false is the dashed pending look). */
+    reached: boolean;
+}
 /** One `tool-workflow/stage-detail` payload, as the stream carried it. */
 export interface ProgressStageDetailFact {
     /** Phase header the payload names, when it names one. */
@@ -157,6 +183,17 @@ export interface ProgressNodeModel {
     reason?: 'runEndedUnsettled' | 'outcomeUnsettled';
     /** Level-1 detail payload for this node, when the stream carried one for its phase. */
     stageDetail?: ProgressStageDetailFact;
+    /** Plan-task position the phase header names (`任务 3 · 标题` → 3); absent when it names none. */
+    taskNumber?: number;
+    /** Set for the guardian adjudication card, which is a call of its own, not a plan task. */
+    guardian?: true;
+    /**
+     * The fixed Execute-Check-Review chain of a plan-task card, in render order.
+     *
+     * Absent on a stage segment and on the guardian card: neither is a plan task, so neither
+     * has a worker → verifier → supervisor chain to show.
+     */
+    chain?: ProgressChainSlot[];
 }
 /** Rows settled over rows declared; the tab's only percentage. */
 export interface ProgressPercent {
@@ -254,8 +291,63 @@ export declare function nodeState(members: readonly ProgressMemberFact[], ended:
  */
 export declare function percentOf(members: readonly ProgressMemberFact[]): ProgressPercent | undefined;
 /**
- * Derive the track one run renders.
+ * The fixed chain of one task card: three capsules, in render order, filled by the rows
+ * whose role label names them.
  *
+ * The list is never shorter than {@link PROGRESS_CHAIN}: an unreached capsule is part of
+ * the answer (`reached: false`, `pending`), not a gap. A row whose label names no capsule
+ * — the planner, a synthesizer call, a child with no role word — stays in the card's
+ * `members` and renders after the chain, so no declared row is dropped.
+ * @param members - the card's rows, in plan order.
+ * @param ended - whether `run-end` was seen, which turns an unsettled capsule into `blocked`.
+ * @returns one slot per chain step.
+ */
+export declare function chainOf(members: readonly ProgressMemberFact[], ended: boolean): ProgressChainSlot[];
+/**
+ * The plan-task position a phase header names (`任务 3 · 标题` → 3, `Task 10 · x` → 10).
+ *
+ * This is the number the engine puts in `taskGroupTitle`, read back as a number so that
+ * `任务 10` sorts after `任务 2` instead of before it.
+ * @param phase - the recorded phase header.
+ * @returns the position, or undefined when the header names none.
+ */
+export declare function taskNumberIn(phase: string | undefined): number | undefined;
+/**
+ * Whether a recorded phase (or label) names the guardian adjudication call.
+ *
+ * The engine records that call as `phase: 'Guardian'` / `label: 'guardian adjudication'`,
+ * so it is a card of its own beside the plan tasks: not a numbered task, and not a step of
+ * any task's chain. Matching is anchored, so a plan task that merely mentions the guardian
+ * in its title (`任务 1 · Guardian 判停`) stays a plan task.
+ * @param text - a phase header or a row label.
+ * @returns whether this is the guardian card.
+ */
+export declare function isGuardianCard(text: string | undefined): boolean;
+/** One task-band card before it becomes a node: the phase it was recorded under and its rows. */
+export interface ProgressTaskCardDraft {
+    phase: string;
+    members: ProgressMemberFact[];
+}
+/**
+ * Order the task band: plan tasks by their number, then the guardian card, the rest where
+ * they were.
+ *
+ * Three rules, applied in this order:
+ *
+ * 1. **Numbered cards sort by number.** The slots numbered cards already hold are refilled
+ *    in ascending order, so `任务 10` follows `任务 2` and a run that announced its tasks out
+ *    of order reads in plan order.
+ * 2. **The guardian card sits after the numbered cards.** It is not a plan task, so it may
+ *    not land between `任务 2` and `任务 3`.
+ * 3. **An unnumbered card keeps its position.** A phase this build reads no number from (an
+ *    unphased row, a phase of its own) stays where the run put it: moving it would claim an
+ *    order the stream never declared.
+ * @param cards - the band's cards, in arrival order.
+ * @returns the cards in render order (the same card objects, never copies).
+ */
+export declare function orderTaskCards<T extends ProgressTaskCardDraft>(cards: readonly T[]): T[];
+/**
+ * Derive the track one run renders.
  * Every recorded phase is either aggregated into the spine stage it names or appended as
  * a node of its own. The spine therefore never hides a phase, and a template stage with
  * no recorded phase stays `pending` rather than borrowing a neighbour's state.

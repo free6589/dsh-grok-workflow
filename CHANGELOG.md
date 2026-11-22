@@ -5,6 +5,25 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.7] - 2026-11-22
+
+### Fixed / 修复
+
+- **Plan-task cards step in, sort by number, and always show the three gates / 任务卡缩进、按编号排序、三关常显** —
+  Cards of the `执行` group step in 16px from the band's edge (the guardian card
+  keeps the edge), so the band reads as a hierarchy instead of a flat list. Cards
+  sort by the task number their phase header names (`任务 10` after `任务 2`,
+  not before it); the guardian card stays after the numbered ones. Every card
+  shows the fixed `执行 → 检查 → 复核` chain: a gate no row reached renders as a
+  dashed `pending` capsule ("this gate has not run yet") instead of vanishing, so
+  "the check never ran" stays visible. Routes, states and behavior are unchanged —
+  only order, indent and chain display moved.
+  / `执行` 组下的任务卡统一缩进 16px（守卫卡贴边不动），带子有了层级不再是平铺。
+  卡片按标题里的任务编号排序（`任务 10` 排在 `任务 2` 后面，不再按事件到达顺序）。
+  每张卡固定显示 `执行 → 检查 → 复核` 三关：没跑到的显示为虚线 `pending` 胶囊
+  （"这一关还没跑"），而不是直接消失——"检查没跑"这个事实看得见。路由、状态、
+  行为都没动，只改了顺序、缩进和链的显示。
+
 ## [0.13.6] - 2026-11-22
 
 ### Fixed / 修复

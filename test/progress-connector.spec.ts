@@ -387,14 +387,26 @@ describe('client progress tab: two tracks (fixed spine + task band)', () => {
     expect(tree.some((element) => element.props['data-gw-progress-more'] !== undefined)).toBe(false)
   })
 
-  it('gives every row its own pill, in plan order, with a mini arrow between two of them', () => {
+  it('shows the fixed execute-check-review chain per card, pending when unreached', () => {
     const tree = walk(renderRun(taskRun))
-    const pills = tree.filter((element) => element.props['data-gw-progress-pill'] !== undefined)
-    expect(pills.map((pill) => pill.props['data-gw-progress-pill'])).toEqual([1, 2, 3])
-    // The arrow between the two rows of task 1 names the row it points at.
+    // Task 1 reached execute + check (pills with chain keys), review is a dashed pending capsule.
+    // Task 2 reached execute only (still running): check + review pending.
+    const chained = tree.filter((element) => element.props['data-gw-progress-chain'] !== undefined)
+    expect(chained.map((slot) => slot.props['data-gw-progress-chain'])).toEqual([
+      'execute', 'check', 'review', 'execute', 'check', 'review',
+    ])
+    expect(chained.map((slot) => slot.props['data-state'])).toEqual([
+      'done', 'done', 'pending', 'doing', 'pending', 'pending',
+    ])
+    // The pending capsules are placeholders (chain key, no pill seq); reached ones are pills.
+    const pending = chained.filter((slot) => slot.props['data-pending'] === 'true')
+    expect(pending.map((slot) => slot.props['data-gw-progress-chain'])).toEqual([
+      'review', 'check', 'review',
+    ])
+    // The arrow between two capsules names the capsule it points at.
     const minis = tree.filter((element) => element.props['data-gw-progress-mini'] !== undefined)
     expect(minis.map((mini) => [mini.props['data-gw-progress-mini'], mini.props['data-tone']]))
-      .toEqual([[2, 'ok']])
+      .toEqual([['check', 'ok'], ['review', 'pending'], ['check', 'pending'], ['review', 'pending']])
   })
 })
 
