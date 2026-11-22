@@ -902,29 +902,23 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
       }
       return freshest
     },
-    // C3 rescue executor: the script's adjudicator judged a stalled child
-    // interrupt-recoverable and broadcast it on the log channel. The host
-    // interrupts that child (waking a command-wait) and delivers the
-    // adjudicator's guidance; the child's context is preserved. Unlimited
-    // by operator decision — each rescue appends one finding, so the spend
-    // is auditable in the terminal report. Never throws into the run.
+    // C3 rescue executor: deliver recovery guidance without interrupting the
+    // child's active turn. The message is queued in the child session, so a
+    // long-running command is allowed to finish instead of being killed.
+    // Each rescue is recorded in the terminal report. Never throws into the run.
     rescue: (childId: string, guidance: string): void => {
       try {
         const subagents = (ctx as unknown as {
           subagents?: {
-            interrupt?: (targetId: string, authority: unknown) => void
             sendMessage?: (sender: unknown, targetId: string, content: unknown[], options: unknown) => Promise<unknown>
           }
         }).subagents
         if (subagents === undefined || subagents === null) return
-        if (typeof subagents.interrupt === 'function') {
-          subagents.interrupt(childId, { kind: 'ancestor', agent })
-        }
         if (typeof subagents.sendMessage === 'function') {
           const content = [createUserMessage({
             content: [{
               type: 'text',
-              text: `Guardian rescue (your wait budget expired; this steers you instead of killing the run): ${guidance}`,
+              text: `Guardian recovery notice (your task is still running; do not abandon or restart active work): ${guidance}`,
             }],
             source: { kind: 'grok-workflow' },
           })]
