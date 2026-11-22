@@ -1776,7 +1776,7 @@ describe('client progress tab: the fold and the five states', () => {
         kind: string
       }) => { data: Record<string, unknown> }
     }
-    const definition = progress.eventDefinition as Definition
+    const definition = progress.eventDefinition as unknown as Definition
     let state = definition.start(undefined, {
       event: rec('tool-workflow/run-start', { runId: 'r-live', name: '任务团队' }, 10, 1_000),
     })

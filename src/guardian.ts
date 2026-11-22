@@ -249,15 +249,16 @@ export function guardianChildBudgetMs(timeoutMs: number, childTimeoutMs?: number
   // configured the script may extend one stalled call by GUARDIAN_MAX_WAITS
   // slices before it settles the call as a timeout. The host must not cancel
   // the whole run while the script is still inside that adjudication window —
-  // otherwise a healthy-but-slow child (10 min of real progress, as in
-  // session-77a3f6fb turn 38) is killed as "no progress" before the script's
-  // own verdict can land. The host budget therefore covers the script's child
-  // budget plus the full wait extension, still capped at childTimeoutCapMs.
+  // otherwise a healthy-but-slow child is killed as "no progress" before the
+  // script's own verdict can land. The host budget therefore covers both
+  // adjudication calls, both wait slices, and one host check interval of grace.
   if (childTimeoutMs !== undefined && Number.isFinite(childTimeoutMs) && childTimeoutMs > 0) {
     const scriptBudget = Math.trunc(childTimeoutMs)
     // Each wait slice is preceded by one bounded 60 s adjudication call.
-    // test/timeout.spec.ts pins this allowance to GUARDIAN_ADJUDICATION_MS.
-    const waitExtension = GUARDIAN_MAX_WAITS * (GUARDIAN_WAIT_MS + 60_000)
+    // The host also leaves one check interval as scheduling grace, so its
+    // periodic sweep cannot race the script's own final timeout.
+    // test/timeout.spec.ts pins the 60 s allowance to GUARDIAN_ADJUDICATION_MS.
+    const waitExtension = GUARDIAN_MAX_WAITS * (GUARDIAN_WAIT_MS + 60_000) + GUARDIAN_LIMITS.checkIntervalMs
     budget = Math.min(Math.trunc(timeoutMs), Math.max(budget, scriptBudget + waitExtension))
     // The base cap plus the extension window is the hard bound for a configured guardian.
     budget = Math.min(budget, GUARDIAN_LIMITS.childTimeoutCapMs + waitExtension)
