@@ -183,12 +183,10 @@ function raceChildCall(promise, guard) {
         adjudicateStall(guard, waits, remaining, function (verdict, reason, guidance) {
           if (settled) return;
           // Rescue: the adjudicator thinks this child can be steered back.
-          // The script cannot interrupt (it owns no subagent seam), so it
-          // broadcasts the rescue on the log channel and grants the same
-          // slice a wait would: the host hears the line, interrupts the
-          // child, delivers the guidance, and the child wakes with new
-          // instructions. Unlimited rescues per user decision — each one is
-          // one adjudication call, already bounded by the wait budget.
+          // The script cannot reach into the child session. It broadcasts the
+          // rescue on the log channel; the host queues recovery guidance without
+          // interrupting the active turn. The same wait slice is granted so the
+          // underlying call can finish normally. Each adjudication is bounded.
           if (verdict === 'rescue') {
             const line = 'guardian rescue seq=' + String(guard.seq) + ' label=' + String(guard.label).slice(0, 120)
               + ' guidance=' + String(guidance === undefined || guidance === null || guidance === '' ? reason : guidance).slice(0, 200);
