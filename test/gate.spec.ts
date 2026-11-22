@@ -1058,7 +1058,7 @@ describe('in-turn delivery (default strategy)', () => {
     expect(decision.messages.map(message => textOf(message)).join('\n')).toContain(typed)
     commitDecision(session, decision)
     expect(answerOf(decision)).toContain(REPORT_BEGIN)
-    expect(surfaced()).toEqual([typed])
+    expect(surfaced()).toEqual([typed, expect.stringContaining(REPORT_BEGIN) as unknown as string])
   })
 
   it('enters a failure report when the run failed, so the user is never left without output', async () => {
