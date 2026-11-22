@@ -58,6 +58,16 @@ describe('guardian child budget', () => {
     expect(guardianChildBudgetMs(1_000)).toBe(0)
     expect(guardianChildBudgetMs(GUARDIAN_LIMITS.childTimeoutFloorMs)).toBe(GUARDIAN_LIMITS.childTimeoutFloorMs)
   })
+
+  it('always follows the configured per-call budget, with or without a guardian route', () => {
+    // Regression 2026-11-22: run.ts gated the second argument on
+    // `guardianModel === undefined`, so a run without a guardian route fell
+    // back to the 10-minute cap even though childTimeoutMs defaults to
+    // 120 minutes. The budget must follow the config in both cases —
+    // the route only decides adjudication slices, never the budget itself.
+    expect(guardianChildBudgetMs(7_200_000, 7_200_000)).toBe(7_200_000)
+    expect(guardianChildBudgetMs(3_600_000, 7_200_000)).toBe(3_600_000)
+  })
 })
 
 describe('resident guardian state machine', () => {

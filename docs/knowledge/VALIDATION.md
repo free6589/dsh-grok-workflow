@@ -1,3 +1,24 @@
+## 未发版 D-104 Guardian 预算跟随 childTimeoutMs — 2026-11-22 (`CONFIRMED`，lead 本轮)
+
+**Changed:** `src/run.ts`（去掉 `guardianModel === undefined ? undefined :` 三元，永远传
+`config.childTimeoutMs`）、`src/client/index.js`（`childTimeoutMs` 中英 hint 各加一句守卫跟随）、
+`test/guardian.spec.ts`（+1 回归例：有无路由预算一致）。
+
+| state | command | result |
+| --- | --- | --- |
+| working tree (Node 26) | `npm run ci` | exit **0** — **80 files / 1526 tests PASS** |
+| working tree | `npm run typecheck` | exit **0** — 0 errors |
+| working tree | `npm run build` + `npm run verify:lib` | byte-identical |
+| real DSH headless (`DSH_HOME=$PWD/.dsh-home` 副本，`~/.dsh` 沙箱只读故复制 profile） | `dsh plugin add` tgz + `--dump-config` | `grok-workflow` 行组合成功，0 Error |
+| real model `agent2api/deepseek-v4.1-flash` via `bifrost-completions`（chat 探活 200 `PING`） | `dsh headless 'grok_workflow …写 GW-SMOKE-OK 进文件'` | run completed，`artifact.txt` 含 `GW-SMOKE-OK`，报告 `completed` 1/1 verified |
+| same run journal | `guardian-start` | `{"armed":true,"budgetMs":7200000}` — **600 秒老根已除，默认 120 分钟生效** |
+| same run journal | `guardian-end` | `{"cancelled":false,"findingCount":0}` — 无误杀 |
+
+**Honest boundary:** 真机跑的是短任务（预算 120 分钟未跑满，只验证预算数值正确下发）；
+120 分钟长任务跑满 NOT_RUN。`agent-default-model` 需覆盖为 bifrost 路由（headless 模板默认
+`deepseek-official` 在本机无 key，走 `MISSING_CREDENTIAL`）。`.dsh-home/` 与 `.tmp/gw-verify/`
+已删除，未进提交。
+
 ## 未发版 childTimeoutMs 单次调用预算 120 分钟 — 2026-11-22 (`CONFIRMED`，lead 本轮)
 
 **Changed:** `src/timeout.ts`（`DEFAULT_CHILD_TIMEOUT_MS=7_200_000` + `CHILD_TIMEOUT_MAX_MS` 3.6M→7.2M，

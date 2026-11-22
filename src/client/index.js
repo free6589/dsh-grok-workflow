@@ -212,7 +212,7 @@ window.__ModuleLoader__.load({
       'field.timeoutMs': 'Run deadline (minutes)',
       'field.timeoutMs.hint': 'Default 60 minutes. 0 = no limit (no timer is armed).',
       'field.childTimeoutMs': 'One call at most (minutes)',
-      'field.childTimeoutMs.hint': 'Default 120 minutes. One agent() call runs this long before the run stops waiting on it; the run deadline still caps the whole run.',
+      'field.childTimeoutMs.hint': 'Default 120 minutes. One agent() call runs this long before the run stops waiting on it; the Guardian stall budget follows this number too; the run deadline still caps the whole run.',
       // Q8: the guardian judge — a single model, first in the roles group.
       'field.guardianModel': 'Guardian (stall judge)',
       'field.guardianModel.hint': 'Judges a stalled child before it is killed: wait extends by 5 minutes at most twice, never past the run deadline. Empty = off, a timed-out call fails straight to retry.',
@@ -434,7 +434,7 @@ window.__ModuleLoader__.load({
       'field.timeoutMs': '运行死线（分钟）',
       'field.timeoutMs.hint': '默认 60 分钟。0 = 不限时（不设 timer）。',
       'field.childTimeoutMs': '单次调用上限（分钟）',
-      'field.childTimeoutMs.hint': '默认 120 分钟。一次 agent() 调用最多跑这么久，超时只重试该任务；整轮仍受运行死线约束。',
+      'field.childTimeoutMs.hint': '默认 120 分钟。一次 agent() 调用最多跑这么久，超时只重试该任务；守卫判停预算同样跟这个数；整轮仍受运行死线约束。',
       // Q8：守卫判停模型——单字段，位于角色链之前。
       'field.guardianModel': '守卫（判停模型）',
       'field.guardianModel.hint': '子代理卡死先取证再判：判 wait 最多延长 5 分钟×2，且不越过运行死线；留空 = 不判停，超时直接按失败重试。',

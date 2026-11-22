@@ -2480,3 +2480,56 @@ timeout 9 处同步 + config/guardian/client/settings/docs/orchestrator/routing/
 
 **代价**：无 guardian 的 run 行为变化（10→120 分钟竞速）；旧 10 分钟报告在新默认下重验会失败
 （字段 0 ≠ 7200000），这是预期的——旧预算本来就不是现在的预算。
+
+## D-104 — Guardian 预算永远跟 `childTimeoutMs`，配没配判停路由只决定 adjudication 不决定预算（2026-11-22，未发版）
+
+**背景**：用户截图"子任务存活判断预算 · 600 秒"：0.13.10 把脚本侧竞速改成 120 分钟，
+但 `src/run.ts:863` 传 Guardian 预算时写了 `config.guardianModel === undefined ? undefined : config.childTimeoutMs`——
+没配判停路由（默认空）的 run 退回旧预算 `min(deadline, 600_000)`，600 秒老根还在。设置页也找不到"守卫时间"：
+`childTimeoutMs` 行叫"单次调用上限（分钟）"，Guardian 预算从来不是可配项（`GUARDIAN_LIMITS.childTimeoutCapMs` 写死）。
+
+**Decision:**
+1. `run.ts` 去掉三元，永远传 `config.childTimeoutMs`（默认 120 分钟）。配没配 `guardianModel`
+   只决定卡住时是否走 adjudication 等一等，不决定预算是多少。
+2. 设置页 `childTimeoutMs` 中英 hint 各加一句"守卫判停预算同样跟这个数"——一行文案，不新增键。
+3. 回归钉死：`test/guardian.spec.ts` 加一例 `guardianChildBudgetMs(7_200_000, 7_200_000) === 7_200_000`
+   且 `guardianChildBudgetMs(3_600_000, 7_200_000) === 3_600_000`（"有无路由预算一致"）。
+
+**Evidence:** `npm run ci` exit 0 — **80 files / 1526 tests PASS**（+1 新例）；`build` + `verify:lib`
+byte-identical。真机实测 `CONFIRMED`（见 VALIDATION D-104 段）：`DSH_HOME` 副本 + `bifrost-completions`
+真实模型 `agent2api/deepseek-v4.1-flash`（chat 探活 200），`guardian-start.budgetMs=7200000`，
+`guardian-end {cancelled:false, findingCount:0}`，`artifact.txt` 含 `GW-SMOKE-OK` 且报告 completed 1/1 verified。
+
+**代价**：无——之前没配路由的 run 预算从 600 秒变成 120 分钟，正是用户要的"默认 120 分钟"。
+
+## D-103 — 跑中转向只能是「波边界拉取」，不能是「host 推送」（2026-11-22，设计待拍板）
+
+**背景**：用户 2026-11-22 提的想法——主会话当沟通渠道，跑中发的消息转给规划助手重新规划、加任务。
+实查后真问题不是「会话被占死」（team 档后台跑时本来就能聊），而是「跑中一说话就整轮取消 + 窄重启」：
+`src/gate.ts` 的 Redirect-on-new-message 路径把 live run 掐掉，靠 `carriedPendingRequest()` 拼需求重开。
+正在跑的那一波白跑，planner 也可能把已 retained 的活重规划一遍。
+
+**Decision:**
+1. 跑中消息在通道侧**排队不取消**（显式 `/stop` 仍立即取消），立即回一句 ack 说明会在下一波边界并入。
+2. 取用只能由脚本在**波边界**发起一次 `agent()` 完成（`runWaves()` 每波结算后），
+   因为沙箱里 host→script 没有通道：realm 是 `vm.createContext({})` + 六个全局（`agent/parallel/pipeline/phase/log/args`），
+   `args` 起跑即 `structuredClone`，`WorkflowRun` 只有整轮 `cancel(reason)`，孩子一次性（见
+   `docs/knowledge/evidence/midrun-channel-steering-2026-11-22/`）。
+3. 合流判定写成纯函数（`src/steering.ts`，尚未创建）：只许改未启动的波与任务，已结算任务终态只读；
+   校验与 planner 首轮同一套 fail-closed（依赖只认 verified、禁环、波数 ≤ 8、总数 ≤ `maxTasks`）；
+   非法即拒、整轮不动、台账记 rejected。
+4. 开关 `channelSteering` 默认关；关时与今天逐字节一致。转向不延长 deadline、不改 objective。
+5. 没并完的 intent 走 `carriedPendingRequest()` 进下一轮，与 L1 继承同一条路，不丢不重放。
+
+**Reason:** 不改 DSH core 是 `AGENTS.md` 硬约束；「留一个常驻规划孩子让脚本随时问」不成立（孩子一次性、脚本无 fs 无定时器）；
+引擎级注入接口不存在，`dsh-agent-teams` 同样做不到（`PLAN` §10.2 X1）。拉取是唯一不碰 core 的通道。
+
+**Alternatives rejected:** (a) 改 core 加注入接口；(b) 脚本轮询文件（realm 无 fs）；(c) 宿主改 `args`（起跑即克隆）；
+(d) 保持「取消 + 重启」（用户抱怨的正是这个：丢在跑的一波）。
+
+**Evidence:** 设计 `docs/knowledge/DESIGN-midrun-channel-steering.md`（附录 A 逐条 `CONFIRMED`）；
+`npx vitest run test/docs-version.spec.ts test/docs-config-keys.spec.ts test/docs-architecture-version.spec.ts`
+→ 23 tests PASS（docs-only 改动不破文档守卫）。实施 NOT_RUN（本决策只到设计，用户未拍板）。
+
+**Cost / open:** 每边界一次 cheap 模型调用（上限 `min(波数,4)`，计入 `maxTotalAgents`，撞 `AGENT_CAP` 要一起算）；
+无 intent 也付一次调用。省钱的「搭车」变体与其余五个选择见设计 §8 D1–D6。

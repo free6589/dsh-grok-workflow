@@ -1,3 +1,18 @@
+Last updated: 2026-11-22 19:10 +08:00（**D-104 Guardian 预算跟随 120 分钟 + 真机实测通过 `CONFIRMED` 未发版** —
+去掉 `run.ts` 三元永远传 `config.childTimeoutMs`；hint 中英各加一句；+1 回归测试。
+`npm run ci` exit 0（80 文件 / 1526 测试）。真机：`DSH_HOME` 副本 + 真实模型跑通，
+`guardian-start.budgetMs=7200000`，`guardian-end` 无取消零处置。未提交未发版。）
+用户提「主会话当沟通渠道 + 规划助手跑中重规划」。实查：会话没被占死（team 档后台跑，
+`src/gate.ts answerTeamInteractive()`），真问题是跑中新消息走整轮 cancel + 窄重启
+（`gate.ts` Redirect-on-new-message 段，`CONFIRMED`）。地基四条（`CONFIRMED`，证据在
+`docs/knowledge/evidence/midrun-channel-steering-2026-11-22/`）：realm 是 `vm.createContext({})` +
+`agent/parallel/pipeline/phase/log/args` 六个全局；`args` 起跑即 `structuredClone`；host 只有整轮
+`cancel(reason)`；孩子一次性。结论：没有 host→script 推送通道，转向只能由脚本在**波边界**拉取。
+产出 `docs/knowledge/DESIGN-midrun-channel-steering.md`（三件套 + 六条语义 + A1–A6 + D1–D6 + 附录取证）、
+D-103。`npx vitest run test/docs-version.spec.ts test/docs-config-keys.spec.ts
+test/docs-architecture-version.spec.ts` → 23 tests PASS（docs-only 不破文档守卫）。
+**未改任何 src、未跑全量 `npm run ci`、未提交**；实施与真机验证 NOT_RUN。）
+
 Last updated: 2026-11-22 18:20 +08:00（**已发版 `0.13.10`：单次调用预算可配默认 120 分钟，`CONFIRMED`** —
 发版提交 `697564a` + tag `v0.13.10` 已推；远端 CI `45011630777` success、Release `45011644468`
 success 并已发布。本地 `npm run ci` exit 0：80 文件 / 1525 测试 PASS。）

@@ -1,3 +1,16 @@
+## 2026-11-22 — D-104 Guardian 预算跟随 120 分钟 + 真机实测通过（`CONFIRMED`，未发版、未提交）
+
+- **From:** 本会话（lead）· **To:** 下一轮接手者
+- **为什么做**：用户两问——"为什么还是 10 分钟"（进度页 `600 秒` 老根）+"设置页看不到守卫时间"。
+  根因：`run.ts:863` 的三元把预算和"配没配判停路由"绑在一起，没配路由就退回 `min(deadline,600_000)`；
+  设置页 `childTimeoutMs` 行不叫守卫时间，Guardian 预算本就不是可配项。
+- **改了什么**：去掉三元永远传 `config.childTimeoutMs`；hint 中英各加一句守卫跟随；+1 回归测试。
+  详见 D-104。
+- **测试**：`npm run ci` exit 0（80/1526）；`build` + `verify:lib` byte-identical。真机实测
+  `CONFIRMED`：`DSH_HOME` 副本 + 真实模型跑通，`guardian-start.budgetMs=7200000`，
+  `guardian-end` 无取消零处置，产物文件 + completed 报告双确认。`.dsh-home/` 已删。
+- **没做的**：未提交、未发版（等用户指令；commit 不 push 不 force）。120 分钟跑满 NOT_RUN。
+
 ## 2026-11-22 — 已发版 `0.13.10`：单次调用预算可配默认 120 分钟（`CONFIRMED`）
 
 - **From:** 本会话（lead）· **To:** 下一轮接手者
@@ -9,6 +22,24 @@
 - **没做的**：并发轮的未跟踪文件未动（`src/weather/`、`test/nyc*.spec.ts`、`sg-weather.html`、
   `.rsi/evidence/*` 等不属本轮）；`tsconfig*.json` 的 jsx/tsx 改动非本轮引入仍在工作树未处理；
   真机 120 分钟长任务实跑 NOT_RUN。
+
+## 2026-11-22 — 跑中转向薄设计（L2 通道转向）：只出文档，实施等拍板（`CONFIRMED` 文档 / 实施 `NOT_RUN`）
+
+- **From:** 本会话（agent-2）· **To:** 下一轮接手者 / lead
+- **为什么做**：用户想法——主会话当沟通渠道，跑中发的消息交给规划助手重新规划（加任务）。
+  实查后先纠了一个前提：会话没被占死（team 档后台跑、主会话先拿首答就归还）；真问题是
+  **跑中一说话就整轮 cancel + 窄重启**（`src/gate.ts` Redirect-on-new-message 段），在跑的那一波白跑。
+- **做了什么**：`docs/knowledge/DESIGN-midrun-channel-steering.md`（薄设计）+ D-103 + 证据目录
+  `docs/knowledge/evidence/midrun-channel-steering-2026-11-22/`（5 个只读抓取，`README.md` 带复现命令）。
+  核心结论：沙箱是 `vm.createContext({})` + 六个全局、`args` 起跑即 `structuredClone`、
+  host 只有整轮 `cancel(reason)`、孩子一次性 → **没有 host→script 推送通道**，转向只能「波边界拉取」。
+- **没做的（明确）**：`src/` 一行未改；`npm run ci` 全量 NOT_RUN（只跑了三个文档守卫 spec，23 tests PASS）；
+  未提交、未发版；设计待用户拍板（§8 D1–D6）。
+- **下一步**：用户拍板 D1–D6 → 实施顺序建议：`src/steering.ts` 纯函数（`merge`/校验）先写测试 →
+  `src/gate.ts` 排队 + ack（开关默认关）→ `src/script.ts` 波边界 `agent()` 取用 → 报告 `steering[]`
+  （注意 `assertWorkflowReport()` 逐字段重建，不加就静默丢字段）→ 设置页开关 → `npm run ci`。
+- **坑提醒**：转向调用计入 `maxTotalAgents`（ptc 撞顶抛 `AGENT_CAP`），改 plan 时必须一起算；
+  报告校验器不会因为多一个字段报错，但也**不会带出来**。
 
 ## 2026-11-22 — childTimeoutMs 单次调用预算 120 分钟（`CONFIRMED`，未发版、未提交）
 
