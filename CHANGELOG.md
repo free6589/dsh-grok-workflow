@@ -3,6 +3,52 @@
 Notable user-facing changes are recorded here in English and Simplified Chinese.
 用户可见的功能和修复会在这里以英文和简体中文记录。
 
+## [0.13.3] - 2026-11-22
+
+### Fixed / 修复
+
+- **`Authorization` headers are redacted whatever the scheme / 任意 scheme 的 `Authorization` 头都会被脱敏** —
+  The rule list knew only `Bearer` and `Basic`, so `Authorization: Token …`, `ApiKey …`, `Digest …`,
+  `OAuth …` and a bare opaque value passed verbatim into report bodies, history text, gate answers,
+  records and memory archives. One added rule (`authorization-other-scheme`, `src/redact.ts`) covers
+  every other scheme and the scheme-less case as a header line and as the JSON key form, keeps the
+  header name so the redacted line still says what leaked, and leaves `Authorization: none` /
+  `required` / `[REDACTED]` and prose about the header untouched. No existing rule was weakened.
+  / 规则表原来只认 `Bearer` 和 `Basic`，`Authorization: Token …`、`ApiKey …`、`Digest …`、`OAuth …`
+  以及不带 scheme 的裸值会原样进入报告正文、历史文本、gate 应答、记录和记忆归档。新增一条规则
+  （`authorization-other-scheme`，`src/redact.ts`）覆盖其他所有 scheme 与无 scheme 的情况，行内头和
+  JSON 键值两种写法都管，并保留头名让脱敏后的行仍说明漏了什么；`Authorization: none` / `required` /
+  `[REDACTED]` 与正文里提到该头的句子不受影响。未削弱任何既有规则。
+
+- **A failure row uses the block's own separator / 失败行分隔符跟随该块的语言** —
+  `Not done:` rows were built with a hard-coded full-width colon, so an English reader saw
+  `- Hotel price：the source refused the request` — two punctuation systems in one sentence. The
+  separator now comes from the same `zh` flag the rest of the human block uses (`：` / `: `); the
+  Chinese block is byte-for-byte unchanged.
+  / `Not done:` 的行原来写死全角冒号，英文读者会看到 `- Hotel price：the source refused…`，
+  一句话里两套标点。分隔符现在取自人话块本来就有的 `zh` 标志（`：` / `: `）；中文块逐字节不变。
+
+- **The machine ledger names the synthesis mode under its own label / 机器台账用独立标签写明合成方式** —
+  A run whose model narrative failed printed `Synthesis: model narrative unavailable (…)` and then
+  `Synthesis: deterministic`: one label, two facts, so a reader or a parser had to guess which line
+  said what. The mode line is now `Synthesis mode: <mode>` and joined `LEDGER_LABELS`, so the human
+  block scrubs it like every other field label; the failure note keeps `Synthesis:`.
+  / 模型叙述失败的一轮会先打 `Synthesis: model narrative unavailable (…)`，再打
+  `Synthesis: deterministic`：一个标签两种事实，读的人或解析器得猜每行说的是什么。方式行改为
+  `Synthesis mode: <mode>` 并加入 `LEDGER_LABELS`，人话块像其他字段标签一样把它擦掉；失败说明继续用
+  `Synthesis:`。
+
+### Tests / 测试
+
+- **Recovered RSI regression coverage / 补回 RSI 回归覆盖** — Four load-time and delivery invariants
+  that `main` had implemented but never pinned now have tests: an unknown provider in `roles.supervisor`
+  fails the load (and an all-blank supervisor chain notes it), `resolveConfig` refuses an unknown
+  `grokDefault` on the direct-construction path, and a checkpoint records a `durationMs` past the
+  16-minute mark instead of dropping it.
+  / `main` 已实现但一直没有测试钉住四条不变量，现在补上：`roles.supervisor` 里未知 provider 会在加载时
+  报错（全空 supervisor 链给提示）、`resolveConfig` 在直接构造路径上拒绝未知 `grokDefault`、
+  checkpoint 会记录超过 16 分钟标记的 `durationMs` 而不是丢弃。
+
 ## [0.13.2] - 2026-11-22
 
 ### Fixed / 修复
