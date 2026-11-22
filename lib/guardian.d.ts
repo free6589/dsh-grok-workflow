@@ -94,7 +94,7 @@ export declare const GUARDIAN_LIMITS: {
     readonly labelChars: 160;
     /** Reason characters kept per finding. */
     readonly reasonChars: 400;
-    /** Upper bound of one child's budget: the guardian never waits longer than this. */
+    /** Base child timeout when no adjudication route is configured. */
     readonly childTimeoutCapMs: 600000;
     /** Lower bound of one child's budget: below this the timer is noise, not signal. */
     readonly childTimeoutFloorMs: 5000;
