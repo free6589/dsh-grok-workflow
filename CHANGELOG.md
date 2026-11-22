@@ -3,7 +3,7 @@
 Notable user-facing changes are recorded here in English and Simplified Chinese.
 用户可见的功能和修复会在这里以英文和简体中文记录。
 
-## [Unreleased]
+## [0.13.17] - 2026-11-23
 
 ### Added / 新增
 
