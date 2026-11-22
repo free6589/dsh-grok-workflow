@@ -827,7 +827,9 @@ describe('Q11: a truncated reason stops where a sentence stops, never inside a w
   it('leaves a reason that already fits byte for byte alone', () => {
     const reason = 'The supplier endpoint returned malformed rows.'
     const line = failedReasonLine(humanConclusion(oneFailedReport(reason), { lang: 'en' }))
-    expect(line).toBe('- Hotel price check：The supplier endpoint returned malformed rows.')
+    // The separator follows the block's language (round 7): an English row carries
+    // the ASCII colon, so this case must not pin the full-width one.
+    expect(line).toBe('- Hotel price check: The supplier endpoint returned malformed rows.')
     expect(line).not.toContain('…')
   })
 })
