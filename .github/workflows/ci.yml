@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   test:
@@ -16,11 +16,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: ['22']
+        node: ['22', '24']
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref || github.ref_name }}
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
@@ -29,15 +27,6 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run build
-      - name: Sync generated build artifacts
-        run: |
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add lib/
-          if ! git diff --cached --quiet; then
-            git commit -m 'chore(build): sync generated Guardian artifacts'
-            git push origin HEAD:${{ github.head_ref || github.ref_name }}
-          fi
       - run: git diff --exit-code -- lib/
       - run: npm test
       - run: npm pack --dry-run
