@@ -182,6 +182,21 @@ describe('progress tab: the event contract', () => {
     expect(runs[0]!.members).toEqual([])
   })
 
+  it('keeps an observe finding as observed, not as a run cancellation', () => {
+    const runs = foldProgressRuns([
+      rec('tool-workflow/run-start', { runId: 'run-1', name: '任务团队' }, 10),
+      rec('tool-workflow/guardian-finding', { runId: 'run-1', seq: 1, label: '执行', signal: 'timeout', action: 'observe', reason: 'left running', atMs: 1_500 }, 13),
+    ])
+    expect(runs[0]!.guardian?.findings).toEqual([{
+      seq: 1,
+      label: '执行',
+      signal: 'timeout',
+      action: 'observe',
+      reason: 'left running',
+      atMs: 1_500,
+    }])
+  })
+
   it('takes the newest run as the active one and prefers the still-open one on a tie', () => {
     const older = runFacts([member(1, '任务 1 · 修复', 'completed')], 'completed', { runId: 'old', anchorSeq: 10 })
     const newest = runFacts([], undefined, { runId: 'new', anchorSeq: 30 })

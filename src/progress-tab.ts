@@ -137,7 +137,7 @@ export interface ProgressGuardianFindingFact {
   seq: number
   label: string
   signal: 'timeout' | 'heartbeat-loss'
-  action: 'cancel-run' | 'rescue'
+  action: 'cancel-run' | 'rescue' | 'observe'
   reason: string
   atMs?: number
 }
@@ -493,7 +493,7 @@ export function foldProgressRuns(records: readonly ProgressEventRecord[]): Progr
         seq: memberSeq,
         label: typeof data['label'] === 'string' ? data['label'] : '',
         signal: data['signal'] === 'heartbeat-loss' ? 'heartbeat-loss' : 'timeout',
-        action: data['action'] === 'rescue' ? 'rescue' : 'cancel-run',
+        action: data['action'] === 'rescue' ? 'rescue' : data['action'] === 'cancel-run' ? 'cancel-run' : 'observe',
         reason: typeof data['reason'] === 'string' ? data['reason'] : '',
         ...typeof data['atMs'] === 'number' && Number.isFinite(data['atMs']) ? { atMs: data['atMs'] } : {},
       })

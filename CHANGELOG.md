@@ -3,11 +3,13 @@
 Notable user-facing changes are recorded here in English and Simplified Chinese.
 用户可见的功能和修复会在这里以英文和简体中文记录。
 
-## [Unreleased]
-
 ## [0.13.9] - 2026-11-22
 
 ### Fixed / 修复
+
+- **An `observe` Guardian finding no longer renders as a run cancellation / `observe` 处置不再显示为整轮取消** —
+  The pure fold (`src/progress-tab.ts`) kept the pre-0.13.9 mapping `rescue → rescue, else cancel-run`, so a finding the host records as `observe` (stall seen, workflow deliberately left running) rendered as `已触发整轮取消` / `data-action="cancel-run"`. The fold now follows the bundle's own rule (`rescue → rescue`, `cancel-run → cancel-run`, else `observe`), and the fact type admits all three actions.
+  / 纯折叠函数仍沿用 0.13.9 之前的映射（非 `rescue` 一律按 `cancel-run`），宿主记为 `observe`（看到停滞、刻意让工作流继续跑）的处置会被画成"已触发整轮取消"。现已与 bundle 同规则，并补了 `observe` 的回归测试。
 
 - **Guardian recovery no longer interrupts an active child or cancels the parent run / Guardian 自动恢复不再打断正在执行的子代理，也不再取消整个工作流** —
   A liveness timeout now queues one bounded recovery instruction to the affected child session when available, asking it to inspect its current command, checkpoint its progress, and continue the original task. If no rescue channel is available, Guardian records the observation and leaves the workflow running. The configured workflow deadline remains the outer limit.

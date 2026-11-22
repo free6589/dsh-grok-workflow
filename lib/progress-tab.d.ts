@@ -80,7 +80,7 @@ export interface ProgressGuardianFindingFact {
     seq: number;
     label: string;
     signal: 'timeout' | 'heartbeat-loss';
-    action: 'cancel-run' | 'rescue';
+    action: 'cancel-run' | 'rescue' | 'observe';
     reason: string;
     atMs?: number;
 }

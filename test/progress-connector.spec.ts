@@ -40,7 +40,7 @@ type ProgressRun = {
     budgetMs: number
     ended: boolean
     cancelled: boolean
-    findings: Array<{ seq: number, label: string, signal: 'timeout' | 'heartbeat-loss', action: 'cancel-run' | 'rescue', reason: string, atMs?: number }>
+    findings: Array<{ seq: number, label: string, signal: 'timeout' | 'heartbeat-loss', action: 'cancel-run' | 'rescue' | 'observe', reason: string, atMs?: number }>
   }
 }
 
@@ -527,5 +527,32 @@ describe('client progress tab: Guardian monitor side lane', () => {
     expect(copy).toContain('已排队发送恢复指引')
     expect(progress.css).toContain('.gw-progress-overview')
     expect(progress.css).toContain('color-mix(in srgb, var(--dsw-alias-state-success-primary)')
+  })
+
+  it('renders an observe finding as observed, not as a run cancellation', () => {
+    const observeRun: ProgressRun = {
+      ...run,
+      guardian: {
+        started: true,
+        armed: true,
+        budgetMs: 300_000,
+        ended: false,
+        cancelled: false,
+        findings: [{
+          seq: 3,
+          label: '执行 3',
+          signal: 'timeout',
+          action: 'observe',
+          reason: 'no child session available; left running',
+          atMs: 2_000,
+        }],
+      },
+    }
+    const tree = walk(renderRun(observeRun))
+    const copy = texts(tree).join('\n')
+    expect(copy).toContain('已记录异常 · 继续运行')
+    expect(copy).not.toContain('已触发整轮取消')
+    const items = tree.filter((element) => element.props['data-action'] !== undefined)
+    expect(items.every((element) => element.props['data-action'] === 'observe')).toBe(true)
   })
 })
