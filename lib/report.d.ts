@@ -1,5 +1,6 @@
 import type { FailureCategory, WorkflowReport } from './types.js';
 import type { ResolvedConfig } from './types.js';
+import type { HandoffContract } from './handoff/contract.js';
 export declare function assertWorkflowReport(value: unknown, objective: string, config: ResolvedConfig): WorkflowReport;
 export declare function failureReport(objective: string, config: ResolvedConfig, phase: string, message: string, category?: FailureCategory): WorkflowReport;
 /**
@@ -19,6 +20,20 @@ export declare function failureSummary(report: WorkflowReport): {
     category: FailureCategory;
     count: number;
 }[];
+/**
+ * Options for {@link renderReport}. `showDiagnostics` opens the ledger lines
+ * (Model routes / Deadline / Route switches / Errors). `handoff` appends the
+ * fixed four-line handoff block (交接契约, zh) rendered by `src/handoff/`.
+ * The contract itself is validated by that module; this function only renders
+ * an already-validated contract and never changes the main report flow.
+ */
+export interface RenderReportOptions {
+    showDiagnostics?: boolean;
+    /** Validated handoff contract to append (zh block). */
+    handoff?: HandoffContract;
+    /** Validated handoff contract to append (en block, after the zh block). */
+    handoffEn?: HandoffContract;
+}
 /** Render a concise model-facing view; the canonical JSON remains available to PTC.
  *
  * B plan: machine diagnostics (Model routes / Deadline / Route switches /
@@ -26,7 +41,5 @@ export declare function failureSummary(report: WorkflowReport): {
  * is true (default false). Final answer / Confirmed evidence / task rows /
  * Incomplete always render.
  */
-export declare function renderReport(report: WorkflowReport, opts?: {
-    showDiagnostics?: boolean;
-}): string;
+export declare function renderReport(report: WorkflowReport, opts?: RenderReportOptions): string;
 //# sourceMappingURL=report.d.ts.map

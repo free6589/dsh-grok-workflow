@@ -1,0 +1,1 @@
+{"version":3,"file":"index.d.ts","sourceRoot":"","sources":["../../src/handoff/index.ts"],"names":[],"mappings":"AAAA;;GAEG;AACH,OAAO,EAAE,cAAc,EAAE,cAAc,EAAE,oBAAoB,EAAE,qBAAqB,EAAE,iBAAiB,EAAE,MAAM,eAAe,CAAA;AAC9H,YAAY,EAAE,eAAe,EAAE,gBAAgB,EAAE,sBAAsB,EAAE,MAAM,eAAe,CAAA;AAC9F,OAAO,EAAE,gBAAgB,EAAE,aAAa,EAAE,oBAAoB,EAAE,MAAM,aAAa,CAAA;AACnF,YAAY,EAAE,WAAW,EAAE,MAAM,aAAa,CAAA"}

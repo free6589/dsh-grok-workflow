@@ -2604,3 +2604,13 @@ test/composition.spec.ts` → 128 PASS。全量 `npm run ci` 与真机 GUI 手�
 `test/progress-tab.spec.ts` + `test/client.spec.ts` 各 +1 回归（任务 7 形状）；
 真机隔离 soak（见 VALIDATION）：live headless 跑出同形状 phase，fold 后任务 7 成卡、
 spine 为空，pre-fix 形状会进脊柱。
+
+## D-108 — 团队调度层三件套：任务板真相 + 大管家白名单 + 交接契约四行（2026-11-23，未发版）
+
+- **Status:** CONFIRMED（本轮三 lane 落地，85 文件 / 1617 测试 PASS，独立复验通过）
+- **Decision:**
+1. 调度真相独立于执行：`src/taskboard/` 落盘任务板（原子 jsonl + checksum，CAS 认领，completed 不可变，依赖前置检查），与现有 checkpoint（运行快照）分开——板是"要做什么"，checkpoint 是"跑成什么样"。
+2. L1 只做记事分派回收：`src/dispatcher/` 纯决策层，白名单四项放行、三项（改已完成/改正在跑/改 verdict）硬拒绝；verdict 只能 verifier 写，大管家不能改分。
+3. 交接契约固定四行（结论/证据指针/未决问题/下一步），证据必须带可复验指针（路径 + checksum/行号），裸文字自述打回；`src/report.ts` 只做增量 append，不动主流程。
+- **Alternatives rejected:** (a) 复用 checkpoint 当任务板——checkpoint 是运行快照语义，无 CAS/依赖/不可变约束，硬套会污染恢复语义；(b) gate 里直接写调度逻辑——gate 已够复杂，独立模块可测，大管家以后常驻化也有地方放；(c) 契约放宽允许空未决问题——"无未决"本身也是一条有效信息，显式写 `none` 比空着更诚实。
+- **Evidence:** `test/taskboard.spec.ts` 13 例 + 独立复验（依赖阻塞/CAS 冲突/重启恢复）；`test/dispatcher.spec.ts` 11 例；`test/handoff.spec.ts` 15 例（缺字段/裸文字打回）。

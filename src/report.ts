@@ -5,6 +5,8 @@ import type { ModelRoute, ResolvedConfig, RoleName } from './types.js'
 import { criterionKey, TASK_LIMITS } from './input.js'
 import { REPLAN_LIMITS } from './replan.js'
 import type { ReplanDecision } from './replan.js'
+import type { HandoffContract } from './handoff/contract.js'
+import { renderHandoffSection } from './handoff/render.js'
 import { maxTotalAgentsFor, routeBudgetFor } from './script.js'
 import { shardCountFor, splitObjective } from './shards.js'
 import { planWaveReason, WAVE_LIMIT } from './waves.js'
@@ -901,6 +903,21 @@ export function failureSummary(report: WorkflowReport): { category: FailureCateg
   return order.filter(category => counts.has(category)).map(category => ({ category, count: counts.get(category) ?? 0 }))
 }
 
+/**
+ * Options for {@link renderReport}. `showDiagnostics` opens the ledger lines
+ * (Model routes / Deadline / Route switches / Errors). `handoff` appends the
+ * fixed four-line handoff block (交接契约, zh) rendered by `src/handoff/`.
+ * The contract itself is validated by that module; this function only renders
+ * an already-validated contract and never changes the main report flow.
+ */
+export interface RenderReportOptions {
+  showDiagnostics?: boolean
+  /** Validated handoff contract to append (zh block). */
+  handoff?: HandoffContract
+  /** Validated handoff contract to append (en block, after the zh block). */
+  handoffEn?: HandoffContract
+}
+
 /** Render a concise model-facing view; the canonical JSON remains available to PTC.
  *
  * B plan: machine diagnostics (Model routes / Deadline / Route switches /
@@ -908,7 +925,7 @@ export function failureSummary(report: WorkflowReport): { category: FailureCateg
  * is true (default false). Final answer / Confirmed evidence / task rows /
  * Incomplete always render.
  */
-export function renderReport(report: WorkflowReport, opts?: { showDiagnostics?: boolean }): string {
+export function renderReport(report: WorkflowReport, opts?: RenderReportOptions): string {
   const verified = report.tasks.filter(task => task.status === 'verified').length
   const lines: string[] = [
     `Grok workflow: ${report.status.toUpperCase()}`,
@@ -969,6 +986,15 @@ export function renderReport(report: WorkflowReport, opts?: { showDiagnostics?: 
   }
   if (report.synthesis.error !== undefined) {
     lines.push(`Synthesis: model narrative unavailable (${oneLine(report.synthesis.error, 300)}); the report above is complete`)
+  }
+  // Handoff (task-10): the fixed four-line contract, rendered by `src/handoff/`
+  // as an independent section. This block is additive — it never changes the
+  // rows above, so the main report flow stays untouched.
+  if (opts?.handoff !== undefined) {
+    lines.push(renderHandoffSection(opts.handoff, 'zh'))
+  }
+  if (opts?.handoffEn !== undefined) {
+    lines.push(renderHandoffSection(opts.handoffEn, 'en'))
   }
   // B plan + t47: diagnostics are opt-in via showDiagnostics. t46 saw the
   // Model-routes line appear only after a settings save and could not tell

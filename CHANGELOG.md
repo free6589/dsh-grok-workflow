@@ -3,6 +3,14 @@
 Notable user-facing changes are recorded here in English and Simplified Chinese.
 用户可见的功能和修复会在这里以英文和简体中文记录。
 
+## [Unreleased]
+
+### Added / 新增
+
+- **Persistent team dispatch layer: taskboard + dispatcher + handoff contract / 常驻团队调度层：任务板 + 大管家 + 交接契约** —
+  The plugin grows the first half of a long-running team manager on top of the existing plan → execute → verify → retry → synthesize chain (which keeps working unchanged). `src/taskboard/` persists the scheduling truth (globally unique task ids, CAS claims, status/owner/dependency/version, atomic jsonl store, restart recovery). `src/dispatcher/` is the resident L1 steward: it only records, dispatches and reclaims — four whitelisted ops (create / update-pending / reassign / mark-blocked) and three hard refusals (editing completed or running tasks, writing the verifier's verdict). `src/handoff/` fixes the four-line contract (conclusion / evidence pointers / open questions / next steps), rejects bare-text self-reports, and renders it into the report in both languages.
+  / 插件在现有主链（规划→执行→核验→重试→汇总，原样可用）之上长出常驻团队管理的上半身。`src/taskboard/` 落盘调度真相（任务 id 全局唯一、CAS 认领、状态/归属/依赖/版本、原子 jsonl 存储、重启可恢复）。`src/dispatcher/` 是常驻大管家：只记事分派回收——四项白名单（新增/改未开始/重派/标阻塞）+ 三项硬拒绝（改已完成、改正在跑、改核验结论）。`src/handoff/` 固定四行交接契约（结论/证据指针/未决问题/下一步），拒绝裸文字自述，并双语渲染进报告。
+
 ## [0.13.16] - 2026-11-23
 
 ### Added / 新增
