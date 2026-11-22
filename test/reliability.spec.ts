@@ -199,10 +199,10 @@ describe('reliability: cancellation and deadlines', () => {
   })
 
   it('turns a deadline into an infrastructure report instead of an exception', async () => {
-    // T4: the deadline is FIXED_TIMEOUT_MS (1h), so a hanging engine cannot be
-    // awaited in a unit test. Pinned here: the fixed deadline value, and the
-    // failureReport Timeout/infrastructure shape the deadline path builds.
-    expect(FIXED_TIMEOUT_MS).toBe(3_600_000)
+    // The default deadline is 0 = unlimited (operator decision), so a hanging
+    // run cannot be awaited in a unit test. Pinned here: the unlimited default,
+    // and the failureReport Timeout/infrastructure shape the deadline path builds.
+    expect(FIXED_TIMEOUT_MS).toBe(0)
     const report = failureReport('do the thing', resolveConfig({ maxConcurrency: 1 }), 'Timeout', 'workflow exceeded the 3600000 ms deadline and was cancelled')
     expect(report.status).toBe('failed')
     expect(report.errors[0]?.phase).toBe('Timeout')
@@ -219,11 +219,11 @@ describe('reliability: cancellation and deadlines', () => {
    * plugin wins on its own.
    */
   it('reports the deadline on time even when the engine ignores the cancel', async () => {
-    // T4: same as above — the 1h fixed deadline cannot be awaited. Pinned here:
+    // The default deadline is 0 = unlimited and cannot be awaited. Pinned here:
     // the deadline path cancels the run with a reason naming the deadline
     // (run.ts: `workflow deadline exceeded after ${FIXED_TIMEOUT_MS} ms`), not
     // the caller. The race wiring itself is unchanged from t47.
-    expect(FIXED_TIMEOUT_MS).toBe(3_600_000)
+    expect(FIXED_TIMEOUT_MS).toBe(0)
     const report = failureReport('do the thing', resolveConfig({ maxConcurrency: 1 }), 'Timeout', `workflow deadline exceeded after ${FIXED_TIMEOUT_MS} ms`)
     expect(report.status).toBe('failed')
     expect(report.errors[0]?.phase).toBe('Timeout')

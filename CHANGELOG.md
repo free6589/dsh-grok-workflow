@@ -3,7 +3,31 @@
 Notable user-facing changes are recorded here in English and Simplified Chinese.
 用户可见的功能和修复会在这里以英文和简体中文记录。
 
-## [Unreleased]
+## [0.13.16] - 2026-11-23
+
+### Added / 新增
+
+- **A missing workflow-switch route now warns instead of failing silently / 总开关路由没挂上时给出告警不再静默** —
+  The 405 root cause: the settings-page switch only sends `POST /grok-workflow/mode`, the plugin only answers POST on that exact route, but when the Host composition lacks the `webServer` service the route is never mounted and the browser hits the Host fallback (empty-body 405) instead. The mount now logs a warning naming the missing service, so the next "the mode route answered HTTP 405" can be told apart from a real method mismatch; the `mode-surface` suite pins the warning alongside the 20 passing handler tests.
+  / 405 的根因：设置页开关只发 `POST /grok-workflow/mode`，插件也只在这个精确路由上收 POST，但宿主编排里缺 `webServer` 服务时路由根本没挂上，浏览器打到的是宿主 fallback（空包体 405）。现在挂载失败会打一条点名缺失服务的 warn，下次再看到"the mode route answered HTTP 405"就能分清是路由没挂还是真的方法不对；`mode-surface` 套件在 20 个 handler 测试之外把这条 warn 也钉住了。
+
+- **A crashed run now resumes from its checkpoint / 崩掉的活现在能从存档接上** —
+  The plugin wrote a checkpoint file for every run but never asked it whether to re-drive unfinished work (`RESUME_DECISION_WIRING.wired` was `false` with no production caller). On startup `runWorkflow` now scans the run's checkpoint directory for a file that answers `resume` — newest first, torn or foreign files skipped, `completed` / possibly-live `running` files ignored — and only for the same session, so one chat's crash never seeds another chat's run. A hit travels as the new run's carry-over context (the interrupted run's digest plus its unfinished task ids), so the planner sees what was done and which tasks are still open; an explicit caller `carryover` still wins, and a missing or unusable checkpoint simply starts fresh. No engine-level resume is claimed: the engine still journals nothing, the new run re-drives rather than restores.
+  / 插件以前每轮都写 checkpoint 文件，却从没问过它"要不要把没干完的活捡起来"（`RESUME_DECISION_WIRING.wired` 是 `false`、没有生产调用方）。现在 `runWorkflow` 启动时会扫一遍 checkpoint 目录找答 `resume` 的文件——按最新优先、坏文件和陌生文件跳过、`completed`/可能还活着的 `running` 不碰——而且只认**同一个会话**的，别人的崩溃不会串进你的新活。命中后把中断那轮的摘要和没干完的任务 id 拼成新轮的 carry-over 上下文，规划器一眼看到哪些已做、哪些还开着；调用方显式传的 `carryover` 照样优先，没文件或文件不可用就照常新开。这不是引擎级恢复：引擎依然什么都不记，新轮是重跑而不是复活。
+
+- **Mid-run replan has a visible settings switch (still off by default) / 跑中并入活计划有了设置页可见开关（默认仍关闭）** —
+  `replan` was already an accepted key but had no schema declaration and no settings-page row, so a saved value behaved differently from what the page showed. The key is now a declared volatile boolean with a bilingual description, and the settings page's *Repeat runs* group shows a switch for it (Chinese: 跑中并入活计划), shaped exactly like the repeat-run switch. The default stays `false`: an unset run still answers a mid-run message in its own round, and joining a run at a wave boundary stays opt-in because every boundary spends one planner-route call (at most `min(waves, 4)` per run). A stored `true` travels through the schema and `resolveConfig` unchanged; a non-boolean is refused at load.
+  / `replan` 以前是"认但不显示"的键：配置面接受它，但 schema 里没声明、设置页上也没这一行，存了值跟页面显示的不一致。现在它是声明过的 volatile 布尔键（带中英双语说明），设置页"自动接着干"分组里有同形状的可见开关（中文名"跑中并入活计划"）。默认值仍是 `false`：不填时跑中消息照旧另起一轮；下个波边界并入活计划仍是手动 opt-in，因为每个边界要花一次规划调用（每轮至多 `min(波数, 4)` 次）。存过的 `true` 会原样经过 schema 与 `resolveConfig` 生效；非布尔值在加载时拒绝。
+
+### Changed / 变更
+
+- **The progress page drops the permanently empty "Answer" cell / 进度页删掉永远空着的"回答"格** —
+  The progress spine listed an `回答` / `Answer` stage that no workflow event can ever fill: the track only folds `tool-workflow/*` child-call events, while the final answer is delivered by the gate (`relayText`) in the turn's own message — the script emits `phase('plan' | 'execute' | 'synthesize')` but never an answer child call. The cell therefore read `pending` on every run, including completed ones, which looked like unfinished work. The spine now ends at `汇总` / `Synthesize`; the six cells are `起点 → 规划 → 执行 → 检查 → 汇总 → 终点`. A `回答`-labelled event arriving from another bundle still renders as its own node instead of being silently dropped.
+  / 进度条上一直有个"回答"格，但没有任何工作流事件能填满它：轨道只折叠 `tool-workflow/*` 子调用事件，而最终答案是门禁在回合消息里直接发的（`relayText`）——脚本只发 `phase('规划'|'执行'|'汇总')`，从没有"回答"子调用。所以这个格子每轮都是"待开始"，连跑完的轮次也像没干完。现在脊柱止于"汇总"，六个格是"起点 → 规划 → 执行 → 检查 → 汇总 → 终点"。若别的 bundle 发来带"回答"标签的事件，仍会照常独立成节点，不会吞掉。
+
+- **The run deadline now defaults to unlimited / 运行死线默认改为不限时** —
+  `timeoutMs` previously defaulted to `3_600_000` (60 minutes): an unset run armed a one-hour timer and was cancelled at the deadline. The default is now `0` (no timer is armed), so a run has no deadline unless the caller sets one — the settings page shows `0` with "unlimited" wording in both languages, and the `0` = unlimited behaviour everywhere else (waiting, guardian budget, checkpoint omission, report line) is unchanged. Set `timeoutMs` explicitly to restore a bound.
+  / `timeoutMs` 过去默认 `3_600_000`（60 分钟）：不填就自带一小时计时、到点取消。现在默认改为 `0`（不设 timer），不填就是不限时——设置页显示 `0` 并用中英两语写明"不限时"，其余各处的 `0` = 不限时语义（等待、守卫预算、checkpoint 省略、报告行）保持不变。需要设限就显式填写 `timeoutMs`.
 
 ## [0.13.15] - 2026-11-23
 

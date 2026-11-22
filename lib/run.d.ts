@@ -156,6 +156,15 @@ export interface RunWorkflowOptions {
      */
     steeringToken?: string;
     /**
+     * Filesystem access for the broken-run resume scan (see
+     * `findResumableCheckpoint` in `src/checkpoint/wiring.ts`). Absent in
+     * production: the real checkpoint directory is scanned. Tests pass an empty
+     * stub or a scratch directory, so a suite with fake timers — or a shared
+     * home directory full of other sessions' checkpoints — never pays for or
+     * sees the real folder.
+     */
+    resumeLister?: import('./checkpoint/wiring.js').CheckpointLister | 'skip';
+    /**
      * How non-timeout failures leave this function: the tool contract throws so a
      * caller sees an error, while the gate converts every failure into an explicit
      * failure report that it can show the user.

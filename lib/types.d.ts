@@ -179,14 +179,13 @@ export interface GrokWorkflowConfig {
      */
     childTimeoutMs?: number;
     /**
-     * Mid-run replan switch. `false` (default) keeps every message its own round:
-     * a run is never joined, and the only way to stop one is the run's own bounds.
-     *
-     * `true` opens the main-session channel (`src/channel.ts`): a message typed while
-     * a run is working is answered at once, and it either stops that run (a bare
-     * "停"/"stop"/"取消") or joins its remaining plan at the next wave boundary through
-     * `src/steering.ts` + `src/replan.ts`, so work already in flight is neither
-     * cancelled nor redone.
+     * Mid-run replan switch (`false` by default, `DEFAULT_REPLAN`): keep every
+     * message its own round, or open the main-session channel (`src/channel.ts`):
+     * a message typed while a run is working is answered at once, and it either
+     * stops that run (a bare "停"/"stop"/"取消") or joins its remaining plan at
+     * the next wave boundary through `src/steering.ts` + `src/replan.ts`, so work
+     * already in flight is neither cancelled nor redone. Editable on the settings
+     * page ("自动接着干" group), same boolean-switch shape as `loopEnabled`.
      */
     replan?: boolean;
     /**
@@ -249,7 +248,7 @@ export interface ResolvedConfig {
     timeoutMs: number;
     /** Per child-call stall budget in milliseconds (default 120 min, ceiling 120 min). */
     childTimeoutMs: number;
-    /** Mid-run replan switch (default off): merge new demands at a wave boundary. */
+    /** Mid-run replan switch (default off, settings page has a visible switch): merge new demands at a wave boundary. */
     replan: boolean;
     /**
      * Repeat-run surface, resolved and validated. These are carried here so a

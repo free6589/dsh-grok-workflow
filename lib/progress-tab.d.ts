@@ -135,13 +135,16 @@ export interface ProgressStageDefinition {
 /**
  * The track's fixed spine: this engine's own phases, in the order it runs them.
  *
- * The five work stages are the phase headers `src/naming.ts` actually emits for a staged
- * delivery job — `规划` / `执行` / `检查` / `汇总` / `回答` (`phaseLabel`: plan, execute,
- * verify, synthesize, answer) — plus one slot for the plan tasks themselves, which the
+ * The four work stages are the phase headers `src/naming.ts` actually emits for a staged
+ * delivery job — `规划` / `执行` / `检查` / `汇总` (`phaseLabel`: plan, execute,
+ * verify, synthesize) — plus one slot for the plan tasks themselves, which the
  * engine announces as `任务 n · 标题` (`taskGroupTitle`) and which land between `执行`
- * and `检查` because that is where the workers run. A stage whose token no recorded
- * phase carries stays `pending` and says it was not reported; a phase that names no
- * stage becomes a node of its own, so the spine never hides a declared phase.
+ * and `检查` because that is where the workers run. The final answer is delivered by
+ * the gate (`relayText` in the turn's own message), never as a workflow child call,
+ * so no `回答` event can ever reach this track — the spine does not list a stage no
+ * event can fill. A stage whose token no recorded phase carries stays `pending` and
+ * says it was not reported; a phase that names no stage becomes a node of its own, so
+ * the spine never hides a declared phase.
  */
 export declare const PROGRESS_STAGES: readonly ProgressStageDefinition[];
 /** One capsule of the fixed chain a plan-task card shows. */

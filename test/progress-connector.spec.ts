@@ -192,13 +192,13 @@ function glyphOf(run: ProgressRun, nodeKey: string): Element | undefined {
 }
 
 /**
- * Six rows over six spine stages, deliberately missing no state: `规划`/`执行` settled as
- * completed, `检查` failed, `汇总` cancelled, `回答` still open, and the run still open so
- * the unsettled row is `doing` and not the derived `blocked`.
+ * Five rows over five spine stages, deliberately missing no state: `规划`/`执行` settled as
+ * completed, `检查` failed, `汇总` cancelled, and the run still open so the unsettled
+ * reality reads through the open end instead of a permanently empty cell.
  */
 const run: ProgressRun = {
   runId: 'run-connector',
-  name: '任务团队 · 6 行',
+  name: '任务团队 · 5 行',
   anchorSeq: 1,
   members: [
     progressMember(1, '规划', 'completed'),
@@ -206,7 +206,6 @@ const run: ProgressRun = {
     progressMember(3, '执行', 'completed'),
     progressMember(4, '检查', 'failed'),
     progressMember(5, '汇总', 'cancelled'),
-    progressMember(6, '回答'),
   ],
 }
 
@@ -230,7 +229,7 @@ describe('client progress tab: the connectors between nodes', () => {
     const states = parts
       .filter((part) => part.props['data-gw-progress-node'] === true)
       .map((node) => String(node.props['data-state']))
-    expect(states).toEqual(['done', 'done', 'done', 'failed', 'cancelled', 'doing', 'doing'])
+    expect(states).toEqual(['done', 'done', 'done', 'failed', 'cancelled', 'doing'])
 
     // A connector belongs to the pair it sits in: its fill answer is the state of the node
     // immediately before it, and `data-filled` is absent — not the string `false` — when
@@ -246,16 +245,16 @@ describe('client progress tab: the connectors between nodes', () => {
       expect(part.props['data-filled'], `after ${String(previousState)}`).toBe(previousState === 'done' ? 'true' : undefined)
     }
     // start/plan/execute are done; everything from `检查` on left the line empty, because a
-    // failed, cancelled or still-running node has not led anywhere.
-    expect(fills).toEqual([true, true, true, false, false, false])
+    // failed or cancelled node has not led anywhere: no stage ends permanently empty.
+    expect(fills).toEqual([true, true, true, false, false])
   })
 
   it('never fills a connector for a run that has done no work at all', () => {
     const idle: ProgressRun = { runId: 'run-idle', name: '任务团队', anchorSeq: 1, members: [] }
     const connectors = trackParts(idle).filter((part) => part.props['data-gw-progress-link'] === true)
-    // The start mark alone counts as passed, and nothing else: one filled line, then five
+    // The start mark alone counts as passed, and nothing else: one filled line, then four
     // empty ones — an empty track never reads as progress.
-    expect(connectors.map((connector) => connector.props['data-filled'])).toEqual(['true', undefined, undefined, undefined, undefined, undefined])
+    expect(connectors.map((connector) => connector.props['data-filled'])).toEqual(['true', undefined, undefined, undefined, undefined])
   })
 })
 
@@ -277,7 +276,7 @@ describe('client progress tab: the state glyph', () => {
 
   it('renders the glyph of the node’s own state, keyed by that state', () => {
     const rendered: Array<[string, string]> = []
-    for (const [key, state] of [['stage:plan', 'done'], ['stage:verify', 'failed'], ['stage:synthesize', 'cancelled'], ['stage:answer', 'doing']] as const) {
+    for (const [key, state] of [['stage:plan', 'done'], ['stage:verify', 'failed'], ['stage:synthesize', 'cancelled'], ['stage:end', 'doing']] as const) {
       const glyph = glyphOf(run, key)
       expect(glyph, key).toBeDefined()
       expect(glyph!.props['data-gw-progress-glyph']).toBe(state)
@@ -347,12 +346,12 @@ describe('client progress tab: two tracks (fixed spine + task band)', () => {
     members,
   })
 
-  it('keeps the spine at the seven fixed stages, in one row, whatever the plan declares', () => {
+  it('keeps the spine at the six fixed stages, in one row, whatever the plan declares', () => {
     const tree = walk(renderRun(taskRun))
     const spine = tree.filter((element) => element.props['data-gw-progress-node'] === true)
     expect(spine).toHaveLength(progress.stages.length)
     expect(spine.map((node) => node.props['data-node-key'])).toEqual([
-      'stage:start', 'stage:plan', 'stage:execute', 'stage:verify', 'stage:synthesize', 'stage:answer', 'stage:end',
+      'stage:start', 'stage:plan', 'stage:execute', 'stage:verify', 'stage:synthesize', 'stage:end',
     ])
     // The plan tasks are cards in the band, never spine segments.
     expect(spine.some((node) => String(node.props['data-node-key']).startsWith('phase:'))).toBe(false)
@@ -382,7 +381,7 @@ describe('client progress tab: two tracks (fixed spine + task band)', () => {
     const band = tree.find((element) => element.props['data-gw-progress-tasks'] === true)!
     expect(band).toBeDefined()
     // The regression the two tracks exist for: a full-width card inside the horizontal
-    // flex line took its width out of the segments and crushed all seven of them.
+    // flex line took its width out of the segments and crushed all six of them.
     expect(walk(track.children).some((element) => element.props['data-gw-progress-task'] !== undefined)).toBe(false)
     expect(walk(band.children).some((element) => element.props['data-gw-progress-node'] !== undefined)).toBe(false)
   })

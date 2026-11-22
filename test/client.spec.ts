@@ -1,7 +1,7 @@
 import { createServer } from 'node:http'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_CHILD_TIMEOUT_MS, DEFAULT_ITERATE_INTERVAL_MIN, DEFAULT_ITERATE_TEMPLATE, DEFAULT_LOOP_FAIL_STREAK, DEFAULT_LOOP_INTERVAL_MIN, DEFAULT_LOOP_MAX_ROUNDS, DEFAULT_MAX_CONCURRENCY, DEFAULT_MAX_TASKS, DEFAULT_TIMEOUT_MS, HARD_LIMITS, SWITCHABLE_CLASSES } from '../src/config.js'
+import { DEFAULT_CHILD_TIMEOUT_MS, DEFAULT_ITERATE_INTERVAL_MIN, DEFAULT_ITERATE_TEMPLATE, DEFAULT_LOOP_FAIL_STREAK, DEFAULT_LOOP_INTERVAL_MIN, DEFAULT_LOOP_MAX_ROUNDS, DEFAULT_MAX_CONCURRENCY, DEFAULT_MAX_TASKS, DEFAULT_REPLAN, DEFAULT_TIMEOUT_MS, HARD_LIMITS, SWITCHABLE_CLASSES } from '../src/config.js'
 import { ITERATE_ROUTE_PATH, ITERATE_TASK_TITLE, LOOP_ROUTE_PATH, LOOP_TASK_TITLE, LOOP_TOOL_NAME, createLoopService, loopPolicyFromConfig } from '../src/loop.js'
 import { createLoopTool, dispatchIterateAction, handleLoopRoute } from '../src/loop-surface.js'
 import { Session as SessionClass } from '@deepseek-ai/dsh-session'
@@ -322,16 +322,18 @@ describe('client settings page bundle', () => {
   })
 
   // T5 slim page plus the four repeat-run keys, the two self-iteration keys,
-  // the Q8 guardian model and childTimeoutMs: 13 visible FIELDS
+  // the Q8 guardian model, childTimeoutMs and the mid-run replan switch:
+  // 14 visible FIELDS
   // (grokDefault/mode/maxConcurrency/maxTasks/timeoutMs/childTimeoutMs,
-  // the four loop keys, iterateIntervalMin, the iterateTemplate textarea and
-  // guardianModel) plus the 5 role chains equal the 17-leaf-key configuration
+  // replan, the four loop keys, iterateIntervalMin, the iterateTemplate textarea and
+  // guardianModel) plus the 5 role chains equal the 18-leaf-key configuration
   // surface (toolName/roles/synthesis/configVersion are structural,
   // rendered nowhere).
   // Number bounds mirror HARD_LIMITS (100 / 20) and the defaults (10 / 3 / 0); the
   // suite pins all three so a quiet drift fails here instead of in the GUI.
-  it('renders the visible keys: 13 fields plus the 5 role chains', () => {
+  it('renders the visible keys: 14 fields plus the 5 role chains', () => {
     const visible = ['childTimeoutMs', 'grokDefault', 'guardianModel', 'maxConcurrency', 'maxTasks', 'mode', 'timeoutMs',
+      'replan',
       'loopEnabled', 'loopMaxRounds', 'loopFailStreak', 'loopIntervalMin',
       'iterateIntervalMin', 'iterateTemplate']
     expect(bundle.GROK_WORKFLOW_FIELDS.map(field => field.key).sort()).toEqual(visible.slice().sort())
@@ -384,8 +386,13 @@ describe('client settings page bundle', () => {
     // hand-written bundle — the pin is what keeps them from drifting).
     expect(defs.get('iterateIntervalMin')?.def).toBe(DEFAULT_ITERATE_INTERVAL_MIN)
     expect(defs.get('iterateTemplate')?.def).toBe(DEFAULT_ITERATE_TEMPLATE)
-    // A loop is opt-in: the page's switch starts off, like the schema default.
+    // A loop and a mid-run replan are opt-in: the page's switches start off,
+    // like the schema defaults.
     expect(defs.get('loopEnabled')?.def).toBe(false)
+    // The replan row is the same boolean-switch shape as loopEnabled.
+    expect(defs.get('replan')).toMatchObject({ kind: 'boolean', group: 'loop', def: false })
+    expect(defs.get('replan')?.def).toBe(DEFAULT_REPLAN)
+    expect(DEFAULT_REPLAN).toBe(false)
     expect(DEFAULT_MAX_CONCURRENCY).toBe(10)
     expect(DEFAULT_MAX_TASKS).toBe(10)
     expect(DEFAULT_LOOP_MAX_ROUNDS).toBe(10)
@@ -1068,7 +1075,7 @@ describe('client settings page: reading, failure and retry', () => {
   })
 
   it('renders the repeat-run rows with their labels in both languages', () => {
-    const loopKeys = ['loopEnabled', 'loopMaxRounds', 'loopFailStreak', 'loopIntervalMin']
+    const loopKeys = ['replan', 'loopEnabled', 'loopMaxRounds', 'loopFailStreak', 'loopIntervalMin']
     for (const [locale, dict] of [['zh', zhDict], ['en', bundle.GROK_WORKFLOW_DICT['en']!]] as const) {
       const { component, props } = mounted(faceFor(READY))
       const tree = renderPage(component, {
@@ -1118,13 +1125,13 @@ describe('client settings page: reading, failure and retry', () => {
 
   it('edits the run deadline in minutes and still saves milliseconds (Q9)', async () => {
     // The reader's report was "there is no deadline setting": a number labelled
-    // `毫秒` where the value is 3600000 reads as an internal knob, not a setting.
+    // `毫秒` where a raw millisecond value sits reads as an internal knob, not a setting.
     // The control now shows minutes, the wire keeps milliseconds, and the hint
     // states the default and what 0 means right beside the control.
     const mutations: Array<{ ops: unknown[], revision: unknown }> = []
     const ready = faceFor({
       status: 'ready',
-      view: { writable: true, namespaces: [{ ns: 'grok-workflow', revision: 7, value: { roles: {}, timeoutMs: 3_600_000 } }] },
+      view: { writable: true, namespaces: [{ ns: 'grok-workflow', revision: 7, value: { roles: {}, timeoutMs: 0 } }] },
       error: null,
     })
     const { component, props } = mounted(ready, mutations)
@@ -1137,14 +1144,14 @@ describe('client settings page: reading, failure and retry', () => {
       expect(element).toBeDefined()
       return element!
     }
-    // 3 600 000 ms is 60 minutes on screen.
-    expect(input().props['value']).toBe('60')
+    // 0 ms is 0 minutes on screen (the default is unlimited).
+    expect(input().props['value']).toBe('0')
     expect(input().props['min']).toBe(0)
 
-    // A step is one minute, not one millisecond: 60 → 61.
+    // A step is one minute, not one millisecond: 0 → 1.
     await view.click(walk(tree).find(candidate => candidate.props['data-step'] === 'timeoutMs-up')!)
     tree = view.run()
-    expect(input().props['value']).toBe('61')
+    expect(input().props['value']).toBe('1')
 
     // Typing minutes stores milliseconds: 90 minutes is 5 400 000.
     ;(input().props['onChange'] as (event: { target: { value: string } }) => void)({ target: { value: '90' } })
@@ -1160,7 +1167,7 @@ describe('client settings page: reading, failure and retry', () => {
     const hint = walk(tree).find(candidate => candidate.props['data-gw-timeout-hint'] === true)
     expect(hint).toBeDefined()
     expect(texts(hint!).join('')).toBe(zhDict['field.timeoutMs.hint']!)
-    expect(zhDict['field.timeoutMs.hint']!).toContain('60')
+    expect(zhDict['field.timeoutMs.hint']!).toContain('不限时')
     expect(zhDict['field.timeoutMs.hint']!).toContain('0 = 不限时')
   })
 
@@ -1279,6 +1286,21 @@ describe('client settings page: draft, validation and path ops', () => {
     for (const flag of [true, false]) {
       expect(validate({ ...draftOf(undefined), loopEnabled: flag })).toEqual([])
     }
+  })
+
+  it('rejects a mid-run replan switch that is not a real boolean', () => {
+    const bad = { ...draftOf(undefined), replan: 'on' }
+    const findings = validate(bad)
+    expect(findings).toEqual([{ key: 'error.badBoolean', params: { key: 'replan' } }])
+    expect(messagesIn(findings, en).some(text => text.includes('on or off'))).toBe(true)
+    expect(messagesIn(findings, zh).some(text => text.includes('开和关'))).toBe(true)
+    // Both real booleans validate clean, so the switch itself is never blocked.
+    for (const flag of [true, false]) {
+      expect(validate({ ...draftOf(undefined), replan: flag })).toEqual([])
+    }
+    // The finding names the row in words, in both languages — never a raw key.
+    expect(formatError({ key: 'error.badBoolean', params: { key: 'replan' } }, en)).toContain('Join a running plan')
+    expect(formatError({ key: 'error.badBoolean', params: { key: 'replan' } }, zh)).toContain('跑中并入活计划')
   })
 
   it('keeps a chain the Host published and fills the roles the document omits', () => {
@@ -1430,8 +1452,9 @@ describe('client settings page: draft, validation and path ops', () => {
       mode: 'triage',
       maxConcurrency: 10,
       maxTasks: 10,
-      timeoutMs: 3_600_000,
+      timeoutMs: 0,
       childTimeoutMs: 7_200_000,
+      replan: false,
       loopEnabled: false,
       loopMaxRounds: 10,
       loopFailStreak: 3,
@@ -2085,7 +2108,7 @@ describe('client progress tab: styles, zoom and empty snapshots', () => {
   it('scopes every rule to .gw-progress, with the full-width spine and the vertical narrow layout', () => {
     const rules = progress.css.split('\n').filter((line) => line.includes('{') && !line.trim().startsWith('@'))
     for (const rule of rules) expect(rule.trim().startsWith('.gw-progress')).toBe(true)
-    // A+C: the spine takes the full width once (7 equal parts, no sideways scroll).
+    // A+C: the spine takes the full width once (6 equal parts, no sideways scroll).
     expect(progress.css).toContain('.gw-progress-track')
     expect(progress.css).toContain('width: 100%')
     expect(progress.css).not.toContain('overflow-x: auto')
@@ -2146,7 +2169,7 @@ describe('client progress tab: styles, zoom and empty snapshots', () => {
       progressT: t,
       useGrokProgress: (select: (value: unknown) => unknown) => select({ runs: [run], activeRun: run }),
     }))
-    // Only the stage that owns the row gets a card; the six other stages stay marks with
+    // Only the stage that owns the row gets a card; the five other stages stay marks with
     // their own sentence, so an empty band never reads as missing work.
     const cards = tree.filter((element) => typeof element.props['data-gw-progress-task'] === 'string')
     expect(cards.map((card) => card.props['data-owner'])).toEqual(['stage:verify'])
@@ -2376,7 +2399,7 @@ describe('client progress tab: the settle bar, the rails and the narrow layout',
     })
   }
 
-  it('keeps the spine at the seven fixed stages however many tasks the plan declares', () => {
+  it('keeps the spine at the six fixed stages however many tasks the plan declares', () => {
     // Eight plan tasks, one row each: the band grows, the spine does not.
     const members = Array.from({ length: 8 }, (_, index) => progressMember(index + 1, `任务 ${index + 1} · 步骤`, 'completed', { label: '执行' }))
     const tree = treeOf(members, 'completed')
@@ -2424,7 +2447,7 @@ describe('client progress tab: the settle bar, the rails and the narrow layout',
       progressMember(3, '汇总', 'completed'),
     ], 'completed')
     const rails = walk(tree).filter((element) => element.props['data-gw-progress-dur'] === true)
-    // The spine is the template, so the rail count follows the seven stages, never the plan.
+    // The spine is the template, so the rail count follows the six stages, never the plan.
     expect(rails).toHaveLength(progress.stages.length)
     const railOf = (key: string): Element => {
       const node = walk(tree).find((element) => element.props['data-node-key'] === key)!

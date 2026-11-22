@@ -6,7 +6,7 @@
  * able to fail the attempt, never to pass it. That stage cannot see a child
  * that never settles: a worker whose `agent()` call hangs keeps the script's
  * worker pool occupied, and the only bound that fires is the run-level
- * deadline (default 60 minutes). This module is the parallel counterpart: one
+ * deadline (default 0 = unlimited, no timer unless the caller sets one). This module is the parallel counterpart: one
  * `RunGuardian` per run, created in `runWorkflow` before the engine starts,
  * observing the same `workflow/agent-start` / `workflow/agent-end` events the
  * progress recorder and the memory archiver already consume, judging

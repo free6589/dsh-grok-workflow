@@ -252,7 +252,7 @@ async function compose(
 
 describe('the loop keys reach the running plugin, not only the settings page', () => {
   it('opens a heartbeat whose rule is the operator\'s own round cap and interval', async () => {
-    // 180 minutes of configured wait, a 7-round cap, and a 60-minute worst-case round.
+    // 180 minutes of configured wait, a 7-round cap, and a 60-minute worst-case round (explicit timeoutMs).
     // 180 is above both floors, so it must survive verbatim; `COUNT=7` is the cap the
     // operator wrote, not the default 10.
     const { ctx, capture } = await compose({

@@ -495,16 +495,16 @@ describe('the active-run cap is per session (P1-3)', () => {
 /* ---------------------------------------------------- 4. the deadline default -- */
 
 describe('the deadline default (P1-4; configurable since 0.11.0)', () => {
-  it('is 60 minutes, not the 30 that killed two real runs at 30m00s', () => {
-    // The default is the measured one; a caller may raise, lower or disable it.
+  it('is unlimited (0): a run has no deadline unless the caller sets one', () => {
+    // The default is unlimited by operator decision; a caller may set a bound.
     expect(configOf().maxRetries).toBe(FIXED_MAX_RETRIES)
-    expect(configOf().timeoutMs).toBe(3_600_000)
+    expect(configOf().timeoutMs).toBe(0)
     expect(configOf({ timeoutMs: 86_400_000 }).timeoutMs).toBe(86_400_000)
-    expect(configOf({ timeoutMs: 0 }).timeoutMs).toBe(0)
+    expect(configOf({ timeoutMs: 3_600_000 }).timeoutMs).toBe(3_600_000)
   })
 
   it('reports the fixed deadline it actually used', async () => {
-    // T4: the deadline is fixed at 60 minutes and cannot be shortened through
+    // The default deadline is 0 = unlimited and cannot be awaited,
     // config, so this test pins the message shape against a short deadline by
     // other means is NOT_RUN here — instead assert the fixed value and that a
     // report names it.

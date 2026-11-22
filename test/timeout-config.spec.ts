@@ -15,9 +15,8 @@ import { callerTask, task } from './fixtures.js'
 /**
  * v0.11.0: the run deadline is the ninth config key (`timeoutMs`).
  *
- * Committed contract (85541ad, must not drift without a version bump):
- * default 3_600_000 (60 min, measured in t45); 0 = unlimited (no timer is
- * armed — an explicit opt-in, never the default); any non-negative integer up
+ * Committed contract (85541ad, updated for the 0-default change): default
+ * 0 = unlimited (no timer is armed, never the opt-in it used to be); any non-negative integer up
  * to MAX_SAFE_INTEGER is accepted; negatives, fractions, NaN and non-numbers
  * fail the load with a reason naming `timeoutMs`; a value above
  * MAX_TIMER_DELAY_MS (the setTimeout ceiling Node fires immediately) runs
@@ -116,9 +115,9 @@ afterEach(() => {
 })
 
 describe('timeoutMs default and validation (v0.11.0 contract)', () => {
-  it('defaults to 60 minutes and aliases the historical FIXED_TIMEOUT_MS name', () => {
-    expect(resolveConfig({}).timeoutMs).toBe(3_600_000)
-    expect(DEFAULT_TIMEOUT_MS).toBe(3_600_000)
+  it('defaults to unlimited (0) and aliases the historical FIXED_TIMEOUT_MS name', () => {
+    expect(resolveConfig({}).timeoutMs).toBe(0)
+    expect(DEFAULT_TIMEOUT_MS).toBe(0)
     expect(FIXED_TIMEOUT_MS).toBe(DEFAULT_TIMEOUT_MS)
   })
 
@@ -145,13 +144,13 @@ describe('timeoutMs default and validation (v0.11.0 contract)', () => {
 })
 
 describe('timeoutMs deadline behaviour (fake timers, hanging engine)', () => {
-  it('fires the default 3600000 ms deadline with a Timeout report naming the bound', async () => {
+  it('fires a configured 3600000 ms deadline with a Timeout report naming the bound', async () => {
     vi.useFakeTimers()
     const ctx = new FakeContext()
-    apply(ctx as never, {})
-    const pending = ctx.tool!.execute({ objective: 'hangs with default deadline' }, exec())
+    apply(ctx as never, { timeoutMs: 3_600_000 })
+    const pending = ctx.tool!.execute({ objective: 'hangs with the configured deadline' }, exec())
     await vi.waitFor(() => expect(ctx.engine.startCalls).toHaveLength(1))
-    const report = await vi.advanceTimersByTimeAsync(DEFAULT_TIMEOUT_MS + 1_000).then(() => pending) as {
+    const report = await vi.advanceTimersByTimeAsync(3_600_000 + 1_000).then(() => pending) as {
       status: string
       limits: { timeoutMs?: number }
       errors: { phase: string; message: string; category: string }[]
@@ -159,8 +158,8 @@ describe('timeoutMs deadline behaviour (fake timers, hanging engine)', () => {
     expect(report.status).toBe('failed')
     expect(report.errors[0]!.phase).toBe('Timeout')
     expect(report.errors[0]!.category).toBe('infrastructure')
-    expect(report.errors[0]!.message).toContain(`workflow exceeded the ${DEFAULT_TIMEOUT_MS} ms deadline`)
-    expect(report.limits.timeoutMs).toBe(DEFAULT_TIMEOUT_MS)
+    expect(report.errors[0]!.message).toContain('workflow exceeded the 3600000 ms deadline')
+    expect(report.limits.timeoutMs).toBe(3_600_000)
     expect(ctx.engine.runs[0]!.cancel).toHaveBeenCalled()
     await ctx.dispose()
   })

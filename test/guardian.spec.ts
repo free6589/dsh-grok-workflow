@@ -639,6 +639,11 @@ describe('guardian unload cleanup', () => {
       agent,
       objective: 'heartbeat wiring exists',
       failureMode: 'report',
+      // Skip the broken-run resume scan: it is real filesystem IO (a macrotask
+      // that yields the sync segment), while this test snapshots subscriptions
+      // taken synchronously before the run settles. The scan is covered in
+      // checkpoint-wiring.spec.ts; the heartbeat wiring does not depend on it.
+      resumeLister: 'skip',
       callerTasks: [{
         id: 't1',
         title: 'writes a file',

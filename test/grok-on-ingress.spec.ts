@@ -11,7 +11,7 @@
  *
  * That single-step-at-a-time discipline is the whole point: an `in-turn` gate holds
  * the step open for the entire workflow run, and every message the user types in the
- * meantime is invisible until the run ends (default deadline 60 minutes).
+ * meantime is invisible until the run ends (default deadline 0 = unlimited).
  */
 
 import { describe, expect, it, vi } from 'vitest'

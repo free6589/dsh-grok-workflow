@@ -151,18 +151,16 @@ export interface ResumeOptions {
 /**
  * Whether {@link resumeDecision} is reached from a production entry point.
  *
- * **NOT_RUN**: it is not, today. The function is exported, unit-covered and used
- * by the checkpoint smoke spec, but no shipped path calls it — the visible entry
- * would be a resume surface in `src/run.ts` or the `/grok` command, and neither
- * asks this question. This marker is the machine-checkable form of that statement
- * (`test/checkpoint-wiring.spec.ts` pins it), so the gap cannot be mistaken for a
- * wired feature: flip `wired` and name the caller in `entry` in the same commit
- * that connects it.
+ * **WIRED**: `src/run.ts` asks this question at startup (`findResumableCheckpoint`
+ * below scans the run's checkpoint directory, and `runWorkflow` carries a `resume`
+ * decision's `seed` as the run's carry-over context). The visible entry is
+ * `runWorkflow` — every shipped path (the tool, the gate, a loop round) runs
+ * through it, so it covers `/grok` too.
  */
 export declare const RESUME_DECISION_WIRING: {
-    readonly wired: false;
+    readonly wired: true;
     readonly entry: string | undefined;
-    readonly note: "no production caller: resumeDecision is exported and tested, but nothing in the shipped plugin asks it whether to re-drive a checkpoint";
+    readonly note: "runWorkflow scans the checkpoint directory at startup and carries a resume seed as carry-over context";
 };
 /**
  * Decide what a host should do with one checkpoint.
@@ -179,15 +177,80 @@ export declare const RESUME_DECISION_WIRING: {
  * `grok-workflow.resume-checkpoint` and decides task by task what may be retained
  * verbatim; the two answer different questions over different artifacts.
  *
- * Wiring state: **no production path calls this yet** — see
- * {@link RESUME_DECISION_WIRING}, which is the single place that says so. It is
- * deliberately not faked into a visible surface here; a checkpoint module cannot
- * invent a resume entry without owning a run.
+ * Wiring state: `runWorkflow` in `src/run.ts` calls
+ * {@link findResumableCheckpoint} at startup and carries a `resume` decision's
+ * `seed` as the run's carry-over context (see {@link RESUME_DECISION_WIRING}).
  * @param checkpoint - a verified checkpoint (as returned by `readCheckpoint`).
  * @param options - clock and staleness overrides.
  * @returns The decision, its reason, and the task ids a resume would re-drive.
  */
 export declare function resumeDecision(checkpoint: WorkflowCheckpoint, options?: ResumeOptions): ResumeDecision;
+/** One resumable checkpoint found on disk, with the decision it produced. */
+export interface ResumableCheckpoint {
+    /** Absolute path of the checkpoint file that answered `resume`. */
+    path: string;
+    /** The verified checkpoint itself (checksum already checked by the reader). */
+    checkpoint: WorkflowCheckpoint;
+    /** The `resume` answer for this file. */
+    decision: ResumeDecision;
+}
+export interface CheckpointLister {
+    /** File names directly inside the checkpoint directory (no recursion). */
+    listCheckpointFiles(dir: string): Promise<string[]>;
+    /** Modification time of one checkpoint file, in epoch milliseconds. `undefined` = skip the file. */
+    checkpointMtimeMs(path: string): Promise<number | undefined>;
+}
+export interface FindResumableOptions extends ResumeOptions, CheckpointDirectoryOptions {
+    /** Only consider checkpoints recorded for this session; others belong to other chats. */
+    sessionId?: string;
+    logger?: CheckpointLogger;
+    /**
+     * Filesystem access for the scan. Production passes nothing (real `readdir`
+     * + `stat`, same as the recorder's writer). Tests pass a stub or an empty
+     * directory, so a suite with fake timers or a shared home directory never
+     * pays for — or sees — the real checkpoint folder.
+     *
+     * The scan also races itself against `timeoutMs` (default 2 s): the directory
+     * listing and every file read share one budget, and a scan that cannot finish
+     * in time answers "start fresh" instead of holding the run's startup open.
+     * Fake-timer suites cannot advance past an in-flight fs syscall, and a cold
+     * disk must never be able to starve the run's own deadline — so a slow scan
+     * is a skipped scan, never a stuck start.
+     */
+    lister?: CheckpointLister;
+    /**
+     * Wall-clock budget for the whole scan in milliseconds. Defaults to 2 000;
+     * `0` or negative disables the scan (answers `undefined` immediately), and
+     * non-finite values fall back to the default. Tests with fake timers pass
+     * `0` to skip the filesystem entirely; a shared home directory passes a
+     * stub lister instead of the real folder.
+     */
+    scanTimeoutMs?: number;
+}
+/** Default wall-clock budget for one resume scan. */
+export declare const RESUME_SCAN_TIMEOUT_MS = 2000;
+/**
+ * Scan the checkpoint directory for a file that answers `resume`.
+ *
+ * Read-only and fail-closed: an unreadable directory, a torn file, a
+ * version the schema no longer accepts, or a file whose checksum no longer
+ * matches is skipped, never thrown — the absence of a usable checkpoint is a
+ * normal answer ("start fresh"), not a failed start. `completed` and `wait`
+ * files are skipped in the same pass: there is nothing to re-drive, or the
+ * writer may still be alive.
+ *
+ * Files are read newest-first (by mtime, then by name for a stable order), and
+ * the first `resume` wins, so a run that crashed yesterday restarts from its
+ * freshest unfinished state rather than its oldest one. When `sessionId` is
+ * given, files recorded for other sessions are skipped: one chat's crash must
+ * never seed another chat's run. A file with no recorded session (older
+ * builds did not write one) is skipped when a session filter is active, for
+ * the same reason.
+ *
+ * @param options - checkpoint directory (`dir`), clock and staleness overrides.
+ * @returns the newest resumable checkpoint, or `undefined` when there is none.
+ */
+export declare function findResumableCheckpoint(options?: FindResumableOptions): Promise<ResumableCheckpoint | undefined>;
 /** Minimal logger surface; matches `WorkflowLogger` in `src/run.ts` structurally. */
 export interface CheckpointLogger {
     warn(message: string): void;

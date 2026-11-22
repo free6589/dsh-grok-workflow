@@ -92,19 +92,23 @@ export declare const LIMIT_CAPS: {
 /** A configuration key whose stored number takes effect clamped to its hard maximum. */
 export type LimitField = keyof typeof LIMIT_CAPS;
 /**
- * Default run deadline in milliseconds: 60 minutes (t45, P1-4).
+ * Default run deadline in milliseconds: 0 = unlimited (no timer is armed).
  *
- * The 30-minute default was measured wrong twice in one afternoon — two
+ * The 60-minute default was measured wrong twice in one afternoon — two
  * four-task runs were killed at exactly 30m00s and 30m01s — while real
- * four-task runs finish in 878 s / 1148 s / 1801 s. 60 minutes keeps a hung
- * run bounded and gives the observed worst case roughly 2x headroom (D-017).
+ * four-task runs finish in 878 s / 1148 s / 1801 s. 60 minutes kept a hung
+ * run bounded and gave the observed worst case roughly 2x headroom (D-017).
+ * The operator decision is now the opposite: a run has no deadline unless
+ * the caller sets one, so the default carries no timer at all. A caller
+ * that wants a bound sets `timeoutMs` explicitly in the profile patch or
+ * on the settings page.
  *
  * `timeoutMs` is user-configurable since 0.11.0: a caller raises or lowers it
  * in the profile patch or on the settings page. `0` means unlimited — no timer
- * is armed — and is an explicit opt-in, never the default, because an
- * unbounded run is exactly what this plugin exists to avoid.
+ * is armed — and is now the default as well, because the operator chose
+ * unbounded runs over a fixed 60-minute cap.
  */
-export declare const DEFAULT_TIMEOUT_MS = 3600000;
+export declare const DEFAULT_TIMEOUT_MS = 0;
 /** Default per child-call stall budget in milliseconds: 120 minutes.
  *
  * User request 2026-11-22: the old 10-minute default killed healthy slow
@@ -119,7 +123,7 @@ export declare const DEFAULT_CHILD_TIMEOUT_MS = 7200000;
  * read it. It is no longer a *fixed* value: `timeoutMs` is configurable, and
  * this constant names its default.
  */
-export declare const FIXED_TIMEOUT_MS = 3600000;
+export declare const FIXED_TIMEOUT_MS = 0;
 /**
  * Largest delay `setTimeout` accepts without overflowing (2^31 - 1).
  *
@@ -132,6 +136,17 @@ export declare const MAX_TIMER_DELAY_MS = 2147483647;
 export declare const FIXED_MAX_RETRIES = 1;
 /** Default maximum tasks per run. */
 export declare const DEFAULT_MAX_TASKS = 10;
+/**
+ * Mid-run replan switch (default off): a message sent while a run is working is
+ * answered at once and joins that run at the next wave boundary instead of
+ * starting a second round.
+ *
+ * Off by default because every boundary spends one planner-route call (at most
+ * `min(waves, 4)` per run): joining a run spends quota, so it is opt-in, never
+ * assumed. Quoted here once so the schema, `resolveConfig`, the settings page
+ * and the docs cannot disagree about what "unset" means.
+ */
+export declare const DEFAULT_REPLAN = false;
 /**
  * Defaults of the repeat-run surface (`loopEnabled` / `loopMaxRounds` /
  * `loopFailStreak` / `loopIntervalMin`).
@@ -224,7 +239,7 @@ export declare const DEFAULT_MAX_ACTIVE_RUNS_TOTAL = 8;
 export declare const CONFIG_VERSION = 1;
 /**
  * Every top-level key the configuration accepts, in schema order.
- * Thirteen keys in the accepted surface; eleven of them reach the settings
+ * Eighteen keys in the accepted surface; sixteen of them reach the settings
  * page (`toolName` and `configVersion` are plain, not volatile, so the runtime
  * projection drops them — pinned in `test/settings-projection.spec.ts`).
  * Kept explicit so an unknown key can be rejected instead of silently dropped:
@@ -289,6 +304,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     maxTasks: z<number, number, "volatile-defined">;
     timeoutMs: z<number, number, "volatile-defined">;
     childTimeoutMs: z<number, number, "volatile-defined">;
+    replan: z<boolean, boolean, "volatile-defined">;
     loopEnabled: z<boolean, boolean, "volatile-defined">;
     loopMaxRounds: z<number, number, "volatile-defined">;
     loopFailStreak: z<number, number, "volatile-defined">;
@@ -405,6 +421,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     maxTasks: z<number, number, "volatile-defined">;
     timeoutMs: z<number, number, "volatile-defined">;
     childTimeoutMs: z<number, number, "volatile-defined">;
+    replan: z<boolean, boolean, "volatile-defined">;
     loopEnabled: z<boolean, boolean, "volatile-defined">;
     loopMaxRounds: z<number, number, "volatile-defined">;
     loopFailStreak: z<number, number, "volatile-defined">;

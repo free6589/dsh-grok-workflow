@@ -1,8 +1,8 @@
 // Browser half of dsh-grok-workflow: the Settings → Plugins → "Grok workflow" page.
 //
 // Why this file exists at all (measured, t32): the Host serves this plugin's
-// namespace (`settings/describe` → ns "grok-workflow", autoGenerate: true, 11 volatile
-// top-level keys out of 13 accepted — `toolName` and `configVersion` are plain, so the
+// namespace (`settings/describe` → ns "grok-workflow", autoGenerate: true, 16 volatile
+// top-level keys out of 18 accepted — `toolName` and `configVersion` are plain, so the
 // runtime projection drops them) but the stock web client renders *no* page for a namespace on its own. Every
 // feature ships a client bundle that registers a `plugins.item` tab and is kept alive by
 // `configForms.whileServed([ns])`, so without one the plugin is invisible in the GUI
@@ -132,11 +132,17 @@ window.__ModuleLoader__.load({
       // Run deadline in milliseconds: 0 = unlimited (no timer is armed).
       // max is Number.MAX_SAFE_INTEGER (no practical cap); the number widget
       // below steps within [min, max] and the schema rejects out-of-range input.
-      { key: 'timeoutMs', group: 'limits', kind: 'number', min: 0, max: Number.MAX_SAFE_INTEGER, def: 3600000 },
+      { key: 'timeoutMs', group: 'limits', kind: 'number', min: 0, max: Number.MAX_SAFE_INTEGER, def: 0 },
       // Per child-call stall budget (minutes on the page, ms stored): the script races
       // every agent() against it and settles a loser as a timeout of that attempt.
       // Default 120 min, ceiling 120 min; floor 1 s keeps the timer a signal.
       { key: 'childTimeoutMs', group: 'limits', kind: 'number', min: 1000, max: 7200000, def: 7200000 },
+      // Mid-run replan (L2): a message sent while a run is working is answered at
+      // once and folded into the live plan at the next wave boundary. Off by
+      // default because every boundary spends one planner-route call (at most
+      // min(waves, 4) per run) — joining a run spends quota, so it is opt-in.
+      // Same boolean-switch shape as `loopEnabled`.
+      { key: 'replan', group: 'loop', kind: 'boolean', def: false },
       // Repeat runs (the loop keys): one full run per round, so the round cap and
       // the fail streak are the quota envelope. Bounds mirror HARD_LIMITS
       // (loopMaxRounds 100, loopFailStreak 20, loopIntervalMin 10080 = seven days)
@@ -171,6 +177,21 @@ window.__ModuleLoader__.load({
     const ROUTE_INFLIGHT_MAX = 64
 
     const GROUPS = ['mode', 'roles', 'limits', 'loop', 'iterate']
+
+    /**
+     * Upgrade card facts, pinned by `test/update-entry.spec.ts`.
+     *
+     * The card on the settings page shows the installed plugin version and the
+     * newest known release side by side; the upgrade itself reuses the existing
+     * plugin-install channel (`dsh plugin add`), never a second installer.
+     * `PLUGIN_VERSION` is the shipped version (release task bumps it with
+     * package.json); `UPDATE_LATEST` is the newest published release, refreshed
+     * by a later round and intentionally static here so the page never phones
+     * home on its own. Both must stay plain `X.Y.Z` strings (see `isVersion`).
+     */
+    const PLUGIN_VERSION = '0.13.16'
+    const UPDATE_LATEST = '0.13.16'
+    const UPDATE_COMMAND = 'dsh plugin --profile <profile> add github:free6589/dsh-grok-workflow#v' + UPDATE_LATEST
 
     // ---------------------------------------------------------------------------
     // Dictionaries. Keys are the contract between this table and every render site;
@@ -210,13 +231,15 @@ window.__ModuleLoader__.load({
       'field.maxConcurrency': 'Jobs at once',
       'field.maxTasks': 'Splits per job',
       'field.timeoutMs': 'Run deadline (minutes)',
-      'field.timeoutMs.hint': 'Default 60 minutes. 0 = no limit (no timer is armed).',
+      'field.timeoutMs.hint': 'Default unlimited (0 = no timer is armed). 0 = no limit; set minutes for a deadline.',
       'field.childTimeoutMs': 'One call at most (minutes)',
       'field.childTimeoutMs.hint': 'Default 120 minutes. One agent() call runs this long before the run stops waiting on it; the Guardian stall budget follows this number too; the run deadline still caps the whole run.',
       // Q8: the guardian judge — a single model, first in the roles group.
       'field.guardianModel': 'Guardian (stall judge)',
       'field.guardianModel.hint': 'Judges a stalled child before it is killed: wait extends by 5 minutes at most twice, never past the run deadline. Empty = off, a timed-out call fails straight to retry.',
       'field.loopEnabled': 'Repeat by default',
+      'field.replan': 'Join a running plan (mid-run)',
+      'field.replan.hint': 'Off by default. On, a message sent while a run is working is answered at once and joins that run at the next wave boundary; settled work is never redone.',
       'field.loopMaxRounds': 'Rounds at most',
       'field.loopFailStreak': 'Stop after failed rounds',
       'field.loopIntervalMin': 'Minutes between rounds',
@@ -231,6 +254,8 @@ window.__ModuleLoader__.load({
       'option.grokDefault.on': 'On',
       'option.loopEnabled.off': 'Off',
       'option.loopEnabled.on': 'On',
+      'option.replan.off': 'Off',
+      'option.replan.on': 'On',
 
       'mode.auto.title': 'Auto pilot',
       'mode.auto.detail': 'Judge first, then call the team only when needed.',
@@ -300,7 +325,6 @@ window.__ModuleLoader__.load({
       'progress.stage.execute': 'Execute',
       'progress.stage.verify': 'Verify',
       'progress.stage.synthesize': 'Synthesize',
-      'progress.stage.answer': 'Answer',
       'progress.stage.end': 'End',
       'progress.unphased': 'Unphased',
       'progress.extraHint': 'Plan task, appended from its phase',
@@ -406,6 +430,10 @@ window.__ModuleLoader__.load({
       'error.tooLong': '{role} entry {index}: the channel/model text is over {limit} characters.',
       'error.duplicate': '{role} entry {index} repeats an earlier row — duplicates change nothing.',
       'error.badCap': '{role} entry {index}: the cap must be a whole number between {min} and {max}, or blank for unlimited.',
+      'update.title': 'Plugin version',
+      'update.body': 'Installed {current}, latest release {target}. Upgrade with: {command}',
+      'update.copy': 'Copy command',
+      'update.current': 'installed',
     }
 
     const ZH = {
@@ -433,13 +461,15 @@ window.__ModuleLoader__.load({
       'field.maxConcurrency': '同时干几件',
       'field.maxTasks': '一次拆几件',
       'field.timeoutMs': '运行死线（分钟）',
-      'field.timeoutMs.hint': '默认 60 分钟。0 = 不限时（不设 timer）。',
+      'field.timeoutMs.hint': '默认不限时（0 = 不设 timer）。0 = 不限时；填分钟数即设死线。',
       'field.childTimeoutMs': '单次调用上限（分钟）',
       'field.childTimeoutMs.hint': '默认 120 分钟。一次 agent() 调用最多跑这么久，超时只重试该任务；守卫判停预算同样跟这个数；整轮仍受运行死线约束。',
       // Q8：守卫判停模型——单字段，位于角色链之前。
       'field.guardianModel': '守卫（判停模型）',
       'field.guardianModel.hint': '子代理卡死先取证再判：判 wait 最多延长 5 分钟×2，且不越过运行死线；留空 = 不判停，超时直接按失败重试。',
       'field.loopEnabled': '默认自动续跑',
+      'field.replan': '跑中并入活计划',
+      'field.replan.hint': '默认关闭。打开后，跑中发来的消息立刻得到回执，并在下个波边界并入正在跑的计划；已验证的成果不会重做。',
       'field.loopMaxRounds': '最多跑几轮',
       'field.loopFailStreak': '连败几轮就停',
       'field.loopIntervalMin': '两轮之间隔几分钟',
@@ -454,6 +484,8 @@ window.__ModuleLoader__.load({
       'option.grokDefault.on': '开',
       'option.loopEnabled.off': '关',
       'option.loopEnabled.on': '开',
+      'option.replan.off': '关',
+      'option.replan.on': '开',
 
       'mode.auto.title': '自动挡',
       'mode.auto.detail': '先看难易，难的才开团队。',
@@ -520,7 +552,6 @@ window.__ModuleLoader__.load({
       'progress.stage.execute': '执行',
       'progress.stage.verify': '检查',
       'progress.stage.synthesize': '汇总',
-      'progress.stage.answer': '回答',
       'progress.stage.end': '终点',
       'progress.unphased': '未分阶段',
       'progress.extraHint': '计划任务，按 phase 追加',
@@ -624,6 +655,10 @@ window.__ModuleLoader__.load({
       'error.tooLong': '{role} 第 {index} 条的通道/模型文字超过 {limit} 字。',
       'error.duplicate': '{role} 第 {index} 条跟前面的重复了，重复不顶用。',
       'error.badCap': '{role} 第 {index} 条的并发上限得是 {min} 到 {max} 之间的整数，留空就是不限。',
+      'update.title': '插件版本',
+      'update.body': '已装 {current}，最新发布 {target}。升级命令：{command}',
+      'update.copy': '复制命令',
+      'update.current': '已装版本',
     }
 
     /** Shipped locales, in the order the locale plugin registers them. */
@@ -1430,6 +1465,38 @@ window.__ModuleLoader__.load({
     function TriageModelPicker(props) {
       return null
     }
+    /**
+     * The version/upgrade card: current installed version vs newest release.
+     *
+     * Read-only on purpose — it shows two facts and one copyable command that
+     * reuses the existing install channel (`dsh plugin add`, i.e. the `plugin
+     * add` semantics the README documents). It never phones home: the latest
+     * release is the static `UPDATE_LATEST`, refreshed by a release round.
+     * @param props - `{ t }`, the guarded translator for the active language.
+     */
+    function UpdateCard(props) {
+      const { t } = props
+      const [copied, setCopied] = useState(false)
+      const copy = () => {
+        try {
+          const done = () => setCopied(true)
+          if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            Promise.resolve(navigator.clipboard.writeText(UPDATE_COMMAND)).then(done, done)
+          } else {
+            done()
+          }
+        } catch {
+          setCopied(true)
+        }
+      }
+      return h('div', { style: styles.card, 'data-gw-update': `${PLUGIN_VERSION}:${UPDATE_LATEST}` },
+        h('h3', { style: styles.groupTitle }, t('update.title')),
+        h('p', { style: styles.hint }, t('update.body', { current: PLUGIN_VERSION, target: UPDATE_LATEST, command: UPDATE_COMMAND })),
+        h('p', { style: styles.mono, 'data-gw-update-command': true }, UPDATE_COMMAND),
+        h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' } },
+          h('span', { style: styles.hint }, `${t('update.current')}: ${PLUGIN_VERSION}`),
+          h('button', { type: 'button', style: styles.button, onClick: copy, 'data-action': 'update-copy' }, t('update.copy'))))
+    }
 
     /**
      * The live one-line status under the intro, derived from the current draft:
@@ -1719,6 +1786,16 @@ window.__ModuleLoader__.load({
               label: t(draft.loopEnabled === true ? 'option.loopEnabled.on' : 'option.loopEnabled.off'),
             }),
           }),
+          h(FieldRow, {
+            key: 'replan', fieldKey: 'replan',
+            title: t('field.replan'),
+            control: h(Toggle, {
+              on: draft.replan === true, disabled,
+              onFlip: (next) => onChange('replan', next),
+              label: t(draft.replan === true ? 'option.replan.on' : 'option.replan.off'),
+            }),
+          }),
+          h('p', { style: styles.hint, 'data-gw-replan-hint': true }, t('field.replan.hint')),
           numberRow('loopMaxRounds'),
           numberRow('loopFailStreak'),
           numberRow('loopIntervalMin')),
@@ -1738,6 +1815,9 @@ window.__ModuleLoader__.load({
             }),
           }),
           h('p', { style: styles.hint, 'data-gw-template-hint': true }, t('field.iterateTemplate.hint'))),
+        // --- 6 · 插件版本 (read-only upgrade entry: current vs latest, copy the
+        // `dsh plugin add` line — never a second installer) ---
+        h(UpdateCard, { t }),
         warnEmptyCap
           ? h('div', { style: styles.warn },
             h('strong', null, t('warn.emptyCap.title')),
@@ -2307,10 +2387,13 @@ window.__ModuleLoader__.load({
     /**
      * The track's spine: this engine's own phases, in the order it runs them.
      *
-     * The five work stages are the phase headers `src/naming.ts` emits — `规划` / `执行` /
-     * `检查` / `汇总` / `回答` (`phaseLabel`: plan, execute, verify, synthesize, answer) —
+     * The four work stages are the phase headers `src/naming.ts` emits — `规划` / `执行` /
+     * `检查` / `汇总` (`phaseLabel`: plan, execute, verify, synthesize) —
      * plus the plan tasks the engine announces as `任务 n · 标题` (`taskGroupTitle`), which
      * are appended between `执行` and `检查` because that is where the workers run.
+     * The final answer is delivered by the gate (`relayText` in the turn's own message),
+     * never as a workflow child call, so no `回答` event can ever reach this track —
+     * the spine does not list a stage no event can fill.
      *
      * A CJK token matches anywhere; a token with Latin letters must sit on word
      * boundaries, or `ui` reads inside `build`, `tag` inside `stage` and `sync` inside
@@ -2322,7 +2405,6 @@ window.__ModuleLoader__.load({
       { key: 'execute', tokens: ['执行', 'execute'], edge: false },
       { key: 'verify', tokens: ['检查', '核验', 'verify'], edge: false },
       { key: 'synthesize', tokens: ['汇总', 'synthesize'], edge: false },
-      { key: 'answer', tokens: ['回答', 'answer'], edge: false },
       { key: 'end', tokens: [], edge: true },
     ]
 
@@ -2780,7 +2862,6 @@ window.__ModuleLoader__.load({
       execute: ['执行', 'execute', 'worker'],
       verify: ['检查', '核验', 'verify', 'check', 'verifier'],
       synthesize: ['汇总助手', 'summarize', 'synthesizer'],
-      answer: ['回答', 'answer'],
     }
 
     /** The first spine stage whose role label names it, if a label names one. */
@@ -3217,7 +3298,7 @@ window.__ModuleLoader__.load({
       '.gw-progress-guardian-list li[data-action="rescue"] { border-inline-start-color: var(--dsw-alias-state-success-primary, currentColor); background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 5%, transparent); }',
       '.gw-progress-guardian-finding-label { font-weight: 600; }',
       '.gw-progress-guardian-finding-action { color: var(--dsw-alias-label-secondary, inherit); }',
-      // A (two tracks): the spine keeps the full width for the seven fixed stages, and the
+      // A (two tracks): the spine keeps the full width for the six fixed stages, and the
       // rows hang from it in their own vertical band. A `width: 100%` card inside the
       // horizontal flex line would take its width out of the segments and crush them.
       '.gw-progress-flow { position: relative; margin-top: 2px; }',
@@ -3844,7 +3925,7 @@ window.__ModuleLoader__.load({
      *
      * Two tracks over one model, which is what the mockup shows:
      *
-     * - **the spine** — the seven fixed stages of the process template, in one horizontal
+     * - **the spine** — the six fixed stages of the process template, in one horizontal
      *   row, with the connector between each pair and the measured-time rail under each;
      * - **the task band** — one card per group of rows, below the spine, in one fixed left
      *   gutter. Each owner group unwinds from its stage's ring into its own channel in that
@@ -3916,7 +3997,7 @@ window.__ModuleLoader__.load({
       const [wires, setWires] = useState(EMPTY_PROGRESS_WIRES)
       const nodes = track === undefined ? [] : track.nodes
       // The spine is the template, never the plan: a `任务 n · …` row group is a card in the
-      // band below, so the seven fixed stages keep one row of their own however many tasks
+      // band below, so the six fixed stages keep one row of their own however many tasks
       // the plan declares.
       const spine = nodes.filter((node) => node.kind !== 'extra')
       const cards = nodes.filter((node) => node.kind !== 'edge' && node.members.length > 0)
@@ -5280,8 +5361,10 @@ window.__ModuleLoader__.load({
     /** Internals pinned by test/client.spec.ts (no runtime caller). */
     exports.GROK_WORKFLOW_INTERNALS = {
       validate, formatError, fieldLabel, opsFor, draftOf, resolveNamespace, translate, translator, activeLocale,
-      comboWarn, emptyCapWarn, limitOverrunWarn, EnumField, ROLE_ORDER,
+      comboWarn, emptyCapWarn, limitOverrunWarn, EnumField, ROLE_ORDER, UpdateCard,
+      PLUGIN_VERSION, UPDATE_LATEST, UPDATE_COMMAND,
     }
+    exports.GROK_WORKFLOW_UPDATE = { version: PLUGIN_VERSION, latest: UPDATE_LATEST, command: UPDATE_COMMAND }
     /** Task panel: the `workflow-run` node renderer this bundle registers in place of the stock one. */
     exports.GROK_WORKFLOW_PANEL = {
       NS: PANEL_NS,

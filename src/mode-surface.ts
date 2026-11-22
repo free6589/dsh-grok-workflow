@@ -227,7 +227,13 @@ export function installModeRoute(options: InstallModeRouteOptions): void {
   const inject = ctx.inject as (deps: readonly string[], cb: (child: ModeHostContext) => void) => unknown
   inject(['webServer', 'connection', 'sessions'], (child) => {
     const webServer = child.webServer
-    if (webServer === undefined) return
+    if (webServer === undefined) {
+      options.logger?.warn?.(
+        'grok-workflow mode route not mounted: the Host composition has no webServer service, '
+        + 'so the settings-page workflow switch answers through the Host fallback instead of this plugin',
+      )
+      return
+    }
     child.effect?.(() => asDisposer(webServer.register({
       kind: 'exact',
       path: MODE_ROUTE_PATH,

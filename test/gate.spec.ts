@@ -1145,15 +1145,15 @@ describe('in-turn delivery (default strategy)', () => {
   })
 
   it('turns its own deadline into a failure report instead of waiting forever', async () => {
-    // T4: the deadline is FIXED_TIMEOUT_MS (1h) and cannot be awaited in a unit
+    // The default deadline is 0 = unlimited and cannot be awaited in a unit
     // test. Pinned here: the report the deadline race builds — a failed
-    // infrastructure Timeout naming the fixed deadline (run.ts), and that a
+    // infrastructure Timeout naming the configured deadline (run.ts), and that a
     // hanging run's cancel reason names the deadline, not the caller.
     // The race wiring itself is pinned in reliability.spec.ts; the hang path
     // cannot be awaited here either.
     const { failureReport } = await import('../src/report.js')
     const { FIXED_TIMEOUT_MS } = await import('../src/config.js')
-    expect(FIXED_TIMEOUT_MS).toBe(3_600_000)
+    expect(FIXED_TIMEOUT_MS).toBe(0)
     const report = failureReport('run the workflow', resolveConfig({ grokDefault: 'on' }), 'Timeout', `workflow exceeded the ${FIXED_TIMEOUT_MS} ms deadline and was cancelled`)
     expect(report.status).toBe('failed')
     expect(report.errors[0]?.phase).toBe('Timeout')

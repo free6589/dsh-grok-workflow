@@ -49,7 +49,7 @@ The plugin accepts exactly eighteen keys (`toolName`, `mode`, `grokDefault`, `ro
 `iterateTemplate`, `configVersion`);
 everything else is fixed inside the plugin (`maxRetries=1`,
 `maxActiveRuns=2` per session / `8` per process) and a patch that still carries
-a removed key is rejected at load. `timeoutMs` defaults to `3600000` (60 min);
+a removed key is rejected at load. `timeoutMs` defaults to `0` (unlimited);
 `0` means unlimited. `childTimeoutMs` defaults to `7200000` (120 min, ceiling
 `7200000`, floor `1000`): one `agent()` call runs this long before the run stops
 waiting on it, while the run deadline still caps the whole run. Values are tightened by the calling profile,
@@ -74,7 +74,7 @@ Verified activation, step by step (anyone can repeat it):
 dsh --profile grok-workflow-dev --from-default-profile web
 
 # 2. install the packed plugin (adds the dependency AND the bundle row)
-dsh plugin --profile grok-workflow-dev add ./dsh-grok-workflow-0.13.15.tgz
+dsh plugin --profile grok-workflow-dev add ./dsh-grok-workflow-0.13.16.tgz
 
 # 3. re-enable a workflow provider in the profile patch
 #    <profile>/cordis.patch.yml:
@@ -143,8 +143,8 @@ cp "$DSH_HOME/profiles/<name>/cordis.patch.yml" \
 # 2. install the packed plugin. A *new path* every time: `dsh plugin add` with the same
 #    `file:` spec is a pnpm no-op, so an unchanged path can silently keep the old contents.
 DEST="/tmp/install-$(date +%s%N)"      # a spec this profile has never been given
-mkdir -p "$DEST" && cp dsh-grok-workflow-0.13.15.tgz "$DEST/"
-dsh plugin --profile <name> add "$DEST/dsh-grok-workflow-0.13.15.tgz"
+mkdir -p "$DEST" && cp dsh-grok-workflow-0.13.16.tgz "$DEST/"
+dsh plugin --profile <name> add "$DEST/dsh-grok-workflow-0.13.16.tgz"
 
 # 3. verify the installed bytes, not the pack
 node -p "require('$DSH_HOME/profiles/<name>/node_modules/dsh-grok-workflow/package.json').version"

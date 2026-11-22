@@ -35,7 +35,6 @@ const LABELS: Record<string, string> = {
   execute: '执行',
   verify: '检查',
   synthesize: '汇总',
-  answer: '回答',
   end: '终点',
 }
 const labelFor = (key: string): string => LABELS[key] ?? key
@@ -103,11 +102,13 @@ describe('progress tab: the event contract', () => {
     expect(PROGRESS_VIEW_TARGET).toBe('grok-progress')
     expect(PROGRESS_NODE_KIND.startsWith('grok-progress')).toBe(true)
     // The spine is this engine's own phase order, not a delivery template of our own:
-    // plan/execute/verify/synthesize/answer are the headers `src/naming.ts` emits, and the
+    // plan/execute/verify/synthesize are the headers `src/naming.ts` emits, and the
     // plan tasks land in between (they are appended as extra nodes).
-    expect(PROGRESS_STAGES.map((stage) => stage.key)).toEqual(['start', 'plan', 'execute', 'verify', 'synthesize', 'answer', 'end'])
+    expect(PROGRESS_STAGES.map((stage) => stage.key)).toEqual(['start', 'plan', 'execute', 'verify', 'synthesize', 'end'])
     expect(PROGRESS_STAGES.find((stage) => stage.key === 'plan')?.tokens).toContain('规划')
-    expect(PROGRESS_STAGES.find((stage) => stage.key === 'answer')?.tokens).toContain('回答')
+    // No `回答` stage: the final answer is delivered by the gate in the turn's own
+    // message, never as a child call, so no event can ever fill it.
+    expect(PROGRESS_STAGES.some((stage) => stage.key === 'answer')).toBe(false)
   })
 
   it('folds the recorded stream into one run with its rows and settlement', () => {
@@ -368,14 +369,12 @@ describe('progress tab: the track', () => {
       member(4, '任务 2 · 写文档', 'failed'),
       member(5, '检查', 'completed'),
       member(6, '汇总', 'completed'),
-      member(7, '回答', 'completed'),
     ]
     const track = trackOf(members, 'completed')
     expect(stageNode(track, 'plan').state).toBe('done')
     expect(stageNode(track, 'execute').state).toBe('done')
     expect(stageNode(track, 'verify').state).toBe('done')
     expect(stageNode(track, 'synthesize').state).toBe('done')
-    expect(stageNode(track, 'answer').state).toBe('done')
     // The plan tasks are nodes of their own, between `执行` (where the workers run) and
     // `检查` (which reads their evidence).
     const keys = track.nodes.map((node) => node.key)
@@ -387,9 +386,13 @@ describe('progress tab: the track', () => {
     expect(extraNode.label).toBe('任务 1 · 修复登录')
     expect(extraNode.state).toBe('done')
     expect(track.nodes.find((node) => node.key === 'phase:任务 2 · 写文档')?.state).toBe('failed')
+    // The spine is now six nodes: five edges/stages plus the plan-task extras. The final
+    // answer is delivered by the gate in the turn's own message, never as a child call,
+    // so the spine carries no `回答` cell — nothing here is permanently empty.
+    expect(track.nodes.filter((node) => node.key === 'stage:answer')).toHaveLength(0)
     // Every declared row lands in exactly one node: the track and the percentage agree.
     const rendered = track.nodes.flatMap((node) => node.members.map((entry) => entry.seq)).sort((a, b) => a - b)
-    expect(rendered).toEqual([1, 2, 3, 4, 5, 6, 7])
+    expect(rendered).toEqual([1, 2, 3, 4, 5, 6])
   })
 
   it('binds a Latin token only on word boundaries, so a substring is not a stage', () => {
@@ -401,19 +404,21 @@ describe('progress tab: the track', () => {
       member(2, '任务 2 · reexecuted twice', 'completed', neutral),
       member(3, '任务 3 · answerless draft', 'completed', neutral),
     ], 'completed')
-    // `explain` carries `plan`, `reexecuted` carries `execute` and `answerless` carries
-    // `answer` — substrings, not words. None of them names a stage, so no stage claims a
-    // row on the phase channel and the three rows become extras.
-    for (const key of ['plan', 'execute', 'verify', 'synthesize', 'answer']) {
+    // `explain` carries `plan` and `reexecuted` carries `execute` — substrings, not
+    // words. `answerless` used to carry the removed `answer` stage's token; it now names
+    // no stage either. None of them names a stage, so no stage claims a row on the phase
+    // channel and the three rows become extras.
+    for (const key of ['plan', 'execute', 'verify', 'synthesize']) {
       expect(stageNode(track, key).members, key).toEqual([])
       expect(stageNode(track, key).evidence, key).toEqual([])
       expect(stageNode(track, key).state, key).toBe('pending')
     }
     expect(track.nodes.filter((node) => node.kind === 'extra')).toHaveLength(3)
-    // A whole word binds, and so does a Chinese phase header.
+    // A whole word binds. The `回答` header no longer binds a spine stage: it becomes
+    // a node of its own, like any undeclared phase.
     const bound = trackOf([member(1, 'Plan the work', 'completed'), member(2, '准备材料后回答', 'completed')], 'completed')
     expect(stageNode(bound, 'plan').state).toBe('done')
-    expect(stageNode(bound, 'answer').state).toBe('done')
+    expect(bound.nodes.some((node) => node.key === 'stage:answer')).toBe(false)
   })
 
   it('names no stage for the three words the old spine mis-read: ui, tag and sync', () => {
@@ -429,7 +434,7 @@ describe('progress tab: the track', () => {
       member(1, '任务 1 · UI build of the stage target', 'completed', neutral),
       member(2, '任务 2 · async sync of the tag list', 'completed', neutral),
     ], 'completed')
-    for (const key of ['plan', 'execute', 'verify', 'synthesize', 'answer']) {
+    for (const key of ['plan', 'execute', 'verify', 'synthesize']) {
       expect(stageNode(decoys, key).members, key).toEqual([])
       expect(stageNode(decoys, key).evidence, key).toEqual([])
       expect(stageNode(decoys, key).state, key).toBe('pending')

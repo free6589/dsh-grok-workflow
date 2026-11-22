@@ -22,6 +22,7 @@ import {
   checkpointDir,
   checkpointFile,
   createCheckpointRecorder,
+  findResumableCheckpoint,
   isHostRole,
   phaseFromTitle,
   RESUME_DECISION_WIRING,
@@ -30,7 +31,8 @@ import {
 } from '../src/checkpoint/wiring.js'
 import type { CheckpointEventSource, RunCheckpointRecorder } from '../src/checkpoint/wiring.js'
 import { buildCheckpoint, sealCheckpoint } from '../src/checkpoint/schema.js'
-import { checkpointFileName, readCheckpoint } from '../src/checkpoint/writer.js'
+import type { WorkflowCheckpoint } from '../src/checkpoint/schema.js'
+import { checkpointFileName, readCheckpoint, writeCheckpoint } from '../src/checkpoint/writer.js'
 import { createActiveState, disposeActiveState, runWorkflow } from '../src/run.js'
 import type { ActiveState, WorkflowLogger } from '../src/run.js'
 import { resolveConfig } from '../src/config.js'
@@ -163,7 +165,7 @@ describe('periodic checkpoints', () => {
     const events = new FakeEvents()
     const dir = witnessDir('witness-periodic')
     // Test-only deadline: 60 s only keeps the clock arithmetic below small. The
-    // production 60 min deadline *is* representable — `limits.timeoutMs` and
+    // an explicit deadline *is* representable — `limits.timeoutMs` and
     // `watchdog.deadlineMs` are bounded by `msCeiling`, not by the count ceiling —
     // so nothing would be dropped there; the semantics (passed deadline -> host
     // fact) are identical either way.
@@ -395,7 +397,7 @@ describe('unload checkpoints', () => {
       ...options({ directory: dir, now: () => now }),
       startedAtMs: now,
       // Test-only deadline (see above): 60 s keeps the clock arithmetic small and
-      // nothing more — the production 60 min value is representable, because the
+      // nothing more — an explicit deadline value is representable, because the
       // checkpoint bounds timeoutMs and deadlineMs by `msCeiling`. Same code path.
       limits: { maxConcurrency: 10, maxRetries: 1, maxTasks: 12, timeoutMs: 60_000 },
     })
@@ -412,13 +414,12 @@ describe('unload checkpoints', () => {
 /* ------------------------------------------------------------- 4. no roles -- */
 
 describe('four roles, host-side only', () => {
-  it('states plainly that the resume decision has no production caller (B12)', () => {
-    // The alternative to wiring it this round is saying so in a form a test can
-    // read: this marker is what keeps "exported and tested" from being mistaken
-    // for "reachable by a user".
-    expect(RESUME_DECISION_WIRING.wired).toBe(false)
-    expect(RESUME_DECISION_WIRING.entry).toBeUndefined()
-    expect(RESUME_DECISION_WIRING.note).toContain('no production caller')
+  it('routes the resume decision through runWorkflow (wired)', () => {
+    // The marker keeps "exported and tested" from being mistaken for an
+    // unwired feature: it names the production caller that asks the question.
+    expect(RESUME_DECISION_WIRING.wired).toBe(true)
+    expect(RESUME_DECISION_WIRING.entry).toBe('src/run.ts:runWorkflow')
+    expect(RESUME_DECISION_WIRING.note).not.toContain('no production caller')
   })
 
   it('knows exactly the five roles the plugin runs', () => {
@@ -609,6 +610,97 @@ describe('resume decision', () => {
     expect(decision.action).toBe('resume')
     expect(decision.reason).toContain('a new run can re-drive them from the recorded context')
   })
+
+  it('finds nothing in an empty or missing directory', async () => {
+    expect(await findResumableCheckpoint({ dir: join(scratch, 'resume-empty') })).toBeUndefined()
+    const missing = join(scratch, 'resume-missing', `no-such-dir-${Date.now()}`)
+    expect(await findResumableCheckpoint({ dir: missing })).toBeUndefined()
+  })
+
+  it('skips a torn file and resumes from the intact one', async () => {
+    const dir = join(scratch, 'resume-torn')
+    const torn: WorkflowCheckpoint = sealCheckpoint(buildCheckpoint({
+      run: { runId: 'run-torn', objective: 'ship it', status: 'cancelled' },
+      plan: { source: 'planner', tasks: [] },
+      tasks: [{ id: 'task-torn', title: 'torn', status: 'pending', attempts: 0 }],
+      time: { startedAtMs: 1_000_000, updatedAtMs: 1_000_000 },
+      minContext: { objective: 'ship it', digest: 'TORN-DIGEST' },
+    }))
+    const intact: WorkflowCheckpoint = sealCheckpoint(buildCheckpoint({
+      run: { runId: 'run-intact', objective: 'ship it', status: 'cancelled' },
+      plan: { source: 'planner', tasks: [] },
+      tasks: [{ id: 'task-intact', title: 'intact', status: 'pending', attempts: 0 }],
+      time: { startedAtMs: 1_000_000, updatedAtMs: 1_000_000 },
+      minContext: { objective: 'ship it', digest: 'INTACT-DIGEST' },
+    }))
+    await writeCheckpoint(checkpointFile('run-torn', { dir }), {
+      run: { runId: 'run-torn', objective: 'ship it', status: 'cancelled' },
+      plan: { source: 'planner', tasks: [] },
+      tasks: [{ id: 'task-torn', title: 'torn', status: 'pending', attempts: 0 }],
+      time: { startedAtMs: 1_000_000, updatedAtMs: 1_000_000 },
+      minContext: { objective: 'ship it', digest: 'TORN-DIGEST' },
+    })
+    await writeCheckpoint(checkpointFile('run-intact', { dir }), {
+      run: { runId: 'run-intact', objective: 'ship it', status: 'cancelled' },
+      plan: { source: 'planner', tasks: [] },
+      tasks: [{ id: 'task-intact', title: 'intact', status: 'pending', attempts: 0 }],
+      time: { startedAtMs: 1_000_000, updatedAtMs: 1_000_000 },
+      minContext: { objective: 'ship it', digest: 'INTACT-DIGEST' },
+    })
+    // Tear one file after sealing: the checksum no longer matches, so the scan
+    // must pass over it instead of throwing.
+    const { writeFile } = await import('node:fs/promises')
+    await writeFile(checkpointFile('run-torn', { dir }), JSON.stringify({ ...torn, run: { ...torn.run, objective: 'tampered' } }))
+    const found = await findResumableCheckpoint({ dir })
+    expect(found?.decision.runId).toBe('run-intact')
+    expect(found?.decision.seed).toBe('INTACT-DIGEST')
+    expect(found?.decision.unfinished).toEqual(['task-intact'])
+    void intact
+  })
+
+  it('ignores files that answer completed or wait', async () => {
+    const dir = join(scratch, 'resume-skip')
+    const nowSeed = Date.now()
+    // A `completed` file has nothing left to re-drive.
+    await writeCheckpoint(checkpointFile('run-done', { dir }), {
+      run: { runId: 'run-done', objective: 'ship it', status: 'completed' },
+      plan: { source: 'planner', tasks: [] },
+      tasks: [{ id: 'task-done', title: 'done', status: 'verified', attempts: 1 }],
+      time: { startedAtMs: 1_000_000, updatedAtMs: 1_000_000 },
+      minContext: { objective: 'ship it', digest: 'DONE-DIGEST' },
+    })
+    // A fresh `running` file may still be owned by a live process: fail-safe `wait`.
+    await writeCheckpoint(checkpointFile('run-live', { dir }), {
+      run: { runId: 'run-live', objective: 'ship it', status: 'running' },
+      plan: { source: 'planner', tasks: [] },
+      tasks: [{ id: 'task-live', title: 'live', status: 'running', attempts: 1 }],
+      time: { startedAtMs: nowSeed, updatedAtMs: nowSeed },
+      minContext: { objective: 'ship it', digest: 'LIVE-DIGEST' },
+    })
+    expect(await findResumableCheckpoint({ dir, now: nowSeed + 500 })).toBeUndefined()
+  })
+
+  it('stays inside one session: another chat crash never seeds this run', async () => {
+    const dir = join(scratch, 'resume-session')
+    await writeCheckpoint(checkpointFile('run-other-chat', { dir }), {
+      run: { runId: 'run-other-chat', objective: 'other chat', status: 'cancelled', sessionId: 'sess-other' },
+      plan: { source: 'planner', tasks: [] },
+      tasks: [{ id: 'task-other', title: 'other', status: 'pending', attempts: 0 }],
+      time: { startedAtMs: 1_000_000, updatedAtMs: 1_000_000 },
+      minContext: { objective: 'other chat', digest: 'OTHER-DIGEST' },
+    })
+    await writeCheckpoint(checkpointFile('run-my-chat', { dir }), {
+      run: { runId: 'run-my-chat', objective: 'my chat', status: 'cancelled', sessionId: 'sess-mine' },
+      plan: { source: 'planner', tasks: [] },
+      tasks: [{ id: 'task-mine', title: 'mine', status: 'pending', attempts: 0 }],
+      time: { startedAtMs: 1_000_001, updatedAtMs: 1_000_001 },
+      minContext: { objective: 'my chat', digest: 'MINE-DIGEST' },
+    })
+    // Same directory, but only my chat's crash is visible to my session.
+    expect((await findResumableCheckpoint({ dir, sessionId: 'sess-mine' }))?.decision.runId).toBe('run-my-chat')
+    expect((await findResumableCheckpoint({ dir, sessionId: 'sess-other' }))?.decision.runId).toBe('run-other-chat')
+    expect(await findResumableCheckpoint({ dir, sessionId: 'sess-stranger' })).toBeUndefined()
+  })
 })
 
 /* ------------------------------------------- 7. the run/disposal integration -- */
@@ -669,10 +761,10 @@ describe('run lifecycle and disposal', () => {
       // End to end, through the real `runWorkflow`: the durable task label the
       // engine hands back reaches the file, not only a synthetic `adopt` (B12).
       expect(checkpoint.run.name).toBe(run.meta.name)
-      // The default deadline (60 min) is a representable bound for this schema, so
-      // the file records the deadline the run actually had instead of dropping it.
-      expect(checkpoint.limits.timeoutMs).toBe(3_600_000)
-      expect(checkpoint.time.deadlineAtMs).toBeGreaterThan(0)
+      // The default deadline is 0 = unlimited, which the checkpoint omits
+      // (absent and 0 both name "no deadline"), so the file records no bound.
+      expect(checkpoint.limits.timeoutMs).toBeUndefined()
+      expect(checkpoint.time.deadlineAtMs).toBeUndefined()
       expect(checkpoint.stages.map(stage => stage.phase)).toEqual(['plan'])
       const decision = resumeDecision(checkpoint)
       expect(decision.action).toBe('none')
@@ -725,6 +817,78 @@ describe('run lifecycle and disposal', () => {
       if (previous === undefined) delete process.env.GROK_WORKFLOW_CHECKPOINT_DIR
       else process.env.GROK_WORKFLOW_CHECKPOINT_DIR = previous
     }
+  })
+
+  it('runs fresh when no checkpoint says resume, and resumes from the newest resumable one', async () => {
+    // No-checkpoint path: the scratch checkpoint dir is empty for this run id,
+    // so the scan answers "start fresh" and a fresh run leaves its own
+    // cancelled file (cut before any report: nothing to re-drive).
+    const emptyDir = await mkdtemp(join(scratch, 'resume-run-fresh-'))
+    const previous = process.env.GROK_WORKFLOW_CHECKPOINT_DIR
+    process.env.GROK_WORKFLOW_CHECKPOINT_DIR = emptyDir
+    const events = new FakeEvents()
+    const recorder = new Recorder()
+    const fresh = new HangingRun()
+    const freshState = createActiveState()
+    const freshCtx = {
+      on: events.on,
+      workflowEngine: { start: async () => fresh },
+      logger: () => recorder.logger,
+    } as never
+    const freshAgent = { session: { id: 'sess-resume-fresh', header: { delegationDepth: 0 } } } as never
+    let freshCheckpoint: WorkflowCheckpoint | undefined
+    let seeded: Awaited<ReturnType<typeof findResumableCheckpoint>>
+    const seedDir = await mkdtemp(join(scratch, 'resume-run-seed-'))
+    // Seed the session-scoped checkpoint BEFORE starting the fresh run: if the
+    // scan ever crossed sessions, the fresh run in 'sess-resume-fresh' would
+    // pick up 'sess-resume-mine''s crash and the request check below would fail.
+    const staleSeed = Date.now() - CHECKPOINT_WIRING_LIMITS.staleAfterMs.default - 60_000
+    await writeCheckpoint(checkpointFile('run-old-unfinished', { dir: seedDir }), {
+      run: { runId: 'run-old-unfinished', objective: 'finish the parser', status: 'cancelled', sessionId: 'sess-resume-mine' },
+      plan: { source: 'planner', tasks: [] },
+      tasks: [
+        { id: 'task-a', title: 'done work', status: 'verified', attempts: 1 },
+        { id: 'task-b', title: 'open work', status: 'pending', attempts: 1 },
+      ],
+      time: { startedAtMs: staleSeed, updatedAtMs: staleSeed },
+      minContext: { objective: 'finish the parser', digest: 'SEED-DIGEST-9f3c' },
+    })
+    try {
+      process.env.GROK_WORKFLOW_CHECKPOINT_DIR = emptyDir
+      // The empty dir has no file for this session: the scan says "start
+      // fresh" and the engine receives no seeded carry-over.
+      expect(await findResumableCheckpoint({ dir: emptyDir, sessionId: 'sess-resume-fresh' })).toBeUndefined()
+      const pending = runWorkflow({
+        ctx: freshCtx,
+        config: resolveConfig({} as never),
+        state: freshState,
+        logger: recorder.logger,
+        agent: freshAgent,
+        objective: 'start fresh',
+        failureMode: 'report',
+      })
+      while (freshState.runs.size === 0) await new Promise(resolve => { setImmediate(resolve) })
+      await disposeActiveState(freshState, { logger: recorder.logger })
+      await pending
+      const freshFile = checkpointFile(fresh.id, { dir: emptyDir })
+      freshCheckpoint = await readCheckpoint(freshFile)
+      expect(freshCheckpoint.run.status).toBe('cancelled')
+      expect(resumeDecision(freshCheckpoint).action).toBe('none')
+      // Resume path: the seeded file answers `resume` for its own session only.
+      seeded = await findResumableCheckpoint({ dir: seedDir, sessionId: 'sess-resume-mine' })
+      expect(await findResumableCheckpoint({ dir: seedDir, sessionId: 'sess-resume-fresh' })).toBeUndefined()
+    } finally {
+      if (previous === undefined) delete process.env.GROK_WORKFLOW_CHECKPOINT_DIR
+      else process.env.GROK_WORKFLOW_CHECKPOINT_DIR = previous
+      await rm(emptyDir, { recursive: true, force: true })
+      await rm(seedDir, { recursive: true, force: true })
+    }
+    // Assert outside the env-var window: the seeded file names what a fresh
+    // run in the same session would continue from.
+    expect(freshCheckpoint?.run.status).toBe('cancelled')
+    expect(seeded?.decision.action).toBe('resume')
+    expect(seeded?.decision.unfinished).toEqual(['task-b'])
+    expect(String(seeded?.decision.seed)).toContain('SEED-DIGEST-9f3c')
   })
 })
 

@@ -22,7 +22,7 @@ import {
 import { buildWorkflowRequest } from './script.js'
 import { inheritanceForSession } from './carryover.js'
 import { teamWorkflowEngine } from './team-engine.js'
-import { createCheckpointRecorder, unloadCheckpointRecorders } from './checkpoint/wiring.js'
+import { createCheckpointRecorder, findResumableCheckpoint, unloadCheckpointRecorders } from './checkpoint/wiring.js'
 import { createRunGuardian, guardianChildBudgetMs, unloadRunGuardians } from './guardian.js'
 import type { FileHeartbeat, GuardianSettlement, SessionHeartbeat } from './guardian.js'
 import { deliverReport } from './delivery/index.js'
@@ -432,6 +432,15 @@ export interface RunWorkflowOptions {
    */
   steeringToken?: string
   /**
+   * Filesystem access for the broken-run resume scan (see
+   * `findResumableCheckpoint` in `src/checkpoint/wiring.ts`). Absent in
+   * production: the real checkpoint directory is scanned. Tests pass an empty
+   * stub or a scratch directory, so a suite with fake timers — or a shared
+   * home directory full of other sessions' checkpoints — never pays for or
+   * sees the real folder.
+   */
+  resumeLister?: import('./checkpoint/wiring.js').CheckpointLister | 'skip'
+  /**
    * How non-timeout failures leave this function: the tool contract throws so a
    * caller sees an error, while the gate converts every failure into an explicit
    * failure report that it can show the user.
@@ -638,6 +647,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
   const { ctx, config, state, logger, agent, objective } = options
   if (state.disposed) throw new Error(`${workflowLabel(config)} is unavailable: plugin has been unloaded`)
   const callerTasks = options.callerTasks
+  const mode = options.failureMode ?? 'throw'
   // C1 cross-run hint: snapshot which route labels other live runs configured
   // (approximate, run-level only — see snapshotBusyRoutes/A16). Taken before
   // admission so the snapshot never includes this run itself; omitted from the
@@ -648,20 +658,6 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
   // is computed here rather than by each caller so every entry point — the tool, the
   // gate, a loop round — inherits identically, and so a steering round never redoes
   // work the previous round verified.
-  const inheritance = inheritanceForSession(sessionOfAgent(agent))
-  const request = buildWorkflowRequest(
-    objective,
-    callerTasks,
-    config,
-    progressNamingLanguage(ctx),
-    options.carryover,
-    busyHint,
-    inheritance,
-    // L2: the token the boundary planner child quotes to pull queued demands. The
-    // caller that opened the channel owns closing it, so this function never leaks a
-    // channel on an early return (cap refusal, pre-start cancellation).
-    options.steeringToken,
-  )
   // Two independent caps (t41, P1-3): the per-session one is what a user can
   // reason about ("this conversation already runs two workflows"), and the
   // process-wide one only exists so a fleet of sessions cannot unbounded the
@@ -697,7 +693,68 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
     )
   }
 
-  const mode = options.failureMode ?? 'throw'
+  // Broken-run resume: before admitting anything, ask the checkpoint
+  // directory whether a previous run left unfinished work. `resume` never
+  // means engine-level resume (the engine journals nothing) — it means the
+  // seed of the interrupted run travels as this run's carry-over context, so
+  // the planner sees what was done and which task ids are still open. A
+  // missing directory, a torn file, a `completed`/`wait` file, or an explicit
+  // caller `carryover` all mean "start fresh": nothing throws, nothing blocks.
+  //
+  // The scan is real filesystem IO (readdir + stat + read per candidate) under
+  // a 2 s budget (a slow scan answers "start fresh" instead of holding startup
+  // open). It is also skipped whenever the answer cannot change the run: an
+  // explicit caller `carryover` already names the context, a run that can name
+  // no session id starts fresh by construction, and a caller-passed
+  // `resumeLister: 'skip'` (the fake-timer seam — fake timers cannot advance
+  // past an in-flight fs syscall) skips the filesystem entirely.
+  const callerSeed = options.carryover !== undefined && options.carryover.trim() !== '' ? options.carryover : undefined
+  // The recorder below writes the session id into each checkpoint, so the
+  // scan can stay inside this chat: an "unknown session" run (no session on
+  // the agent) must never inherit a stranger's crash — it starts fresh by
+  // construction, with no directory scan at all. An explicit caller
+  // `carryover` already names the context, so it also skips the scan.
+  const resumed = callerSeed !== undefined || sessionIdOf(agent) === 'unknown-session' || options.resumeLister === 'skip'
+    ? undefined
+    : await findResumableCheckpoint({
+      logger,
+      sessionId: sessionIdOf(agent),
+      // Test seam: suites on a shared home directory pass a stub lister or a
+      // scratch dir instead of the real checkpoint folder.
+      ...options.resumeLister === undefined ? {} : { lister: options.resumeLister },
+    })
+  const resumedSeed = resumed === undefined ? undefined : resumed.decision.seed.trim()
+  const carryover = options.carryover !== undefined && options.carryover.trim() !== ''
+    ? options.carryover
+    : resumedSeed !== undefined && resumedSeed !== ''
+      ? [
+          resumed!.decision.reason,
+          `unfinished: ${resumed!.decision.unfinished.join(', ')}`,
+          `context: ${resumedSeed}`,
+        ].join('\n')
+      : undefined
+  if (resumed !== undefined && carryover !== options.carryover) {
+    logger.info?.(
+      `grok-workflow resume: continuing ${resumed.decision.runId} ` +
+      `(${resumed.decision.unfinished.length} unfinished task(s): ${resumed.decision.unfinished.join(', ')})`,
+    )
+  }
+
+  const inheritance = inheritanceForSession(sessionOfAgent(agent))
+  const request = buildWorkflowRequest(
+    objective,
+    callerTasks,
+    config,
+    progressNamingLanguage(ctx),
+    carryover,
+    busyHint,
+    inheritance,
+    // L2: the token the boundary planner child quotes to pull queued demands. The
+    // caller that opened the channel owns closing it, so this function never leaks a
+    // channel on an early return (cap refusal, pre-start cancellation).
+    options.steeringToken,
+  )
+
   const timeoutController = new AbortController()
   let timedOut = false
   // t47: the deadline is a plugin-owned bound, not a hint to the engine. The
@@ -851,7 +908,10 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
       maxTasks: config.maxTasks,
       timeoutMs: deadlineMs,
     },
-    ...options.carryover === undefined || options.carryover.trim() === '' ? {} : { minContextDigest: options.carryover },
+    // The resumed seed travels as this run's own MIN context too: the file the
+    // next crash leaves behind names what this run re-drove, not only what the
+    // caller carried.
+    ...carryover === undefined || carryover.trim() === '' ? {} : { minContextDigest: carryover },
   })
   /**
    * The resident parallel guardian for this run.

@@ -15,7 +15,7 @@ import { createSystemMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import { Session, pluginRecordOf } from '@deepseek-ai/dsh-session'
 import { apply } from '../src/index.js'
 import { REPORT_BEGIN, REPORT_END } from '../src/answer.js'
-import { FIXED_TIMEOUT_MS, resolveConfig } from '../src/config.js'
+import { resolveConfig } from '../src/config.js'
 import { parseMemberLabel } from '../src/naming.js'
 import { DELIVERY_RECORD, TERMINAL_RECORD } from '../src/records.js'
 import { createActiveState, runWorkflow } from '../src/run.js'
@@ -943,21 +943,24 @@ describe('P0-4: cancellation reaches a terminal state', () => {
   })
 
   it('turns a deadline into its own terminal state (regression, T4 fixed deadline)', async () => {
-    // T4: the deadline is fixed at 60 minutes — fake timers stand in for it.
+    // The default deadline is 0 = unlimited — fake timers stand in for the configured one.
     vi.useFakeTimers()
     try {
       const ctx = new FakeContext()
       ctx.engine.hang = true
       const pending = runWorkflow({
         ctx: ctx as never,
-        config: resolveConfig({ maxConcurrency: 1 }),
+        config: resolveConfig({ maxConcurrency: 1, timeoutMs: 3_600_000 }),
         state: createActiveState(),
         logger: { warn: () => {} },
         agent: agentOf(session('sess-p04-timeout')) as never,
         objective: 'do the thing',
         failureMode: 'report',
+        // Fake timers cannot advance past an in-flight fs syscall; skip the
+        // resume scan (covered in checkpoint-wiring.spec.ts).
+        resumeLister: 'skip',
       })
-      const outcome = await vi.advanceTimersByTimeAsync(FIXED_TIMEOUT_MS + 1_000).then(() => pending)
+      const outcome = await vi.advanceTimersByTimeAsync(3_600_000 + 1_000).then(() => pending)
       expect(outcome.cause).toBe('timeout')
       expect(outcome.report.errors[0]?.phase).toBe('Timeout')
       expect(outcome.report.errors[0]?.category).toBe('infrastructure')

@@ -94,19 +94,23 @@ export const LIMIT_CAPS = {
 export type LimitField = keyof typeof LIMIT_CAPS
 
 /**
- * Default run deadline in milliseconds: 60 minutes (t45, P1-4).
+ * Default run deadline in milliseconds: 0 = unlimited (no timer is armed).
  *
- * The 30-minute default was measured wrong twice in one afternoon — two
+ * The 60-minute default was measured wrong twice in one afternoon — two
  * four-task runs were killed at exactly 30m00s and 30m01s — while real
- * four-task runs finish in 878 s / 1148 s / 1801 s. 60 minutes keeps a hung
- * run bounded and gives the observed worst case roughly 2x headroom (D-017).
+ * four-task runs finish in 878 s / 1148 s / 1801 s. 60 minutes kept a hung
+ * run bounded and gave the observed worst case roughly 2x headroom (D-017).
+ * The operator decision is now the opposite: a run has no deadline unless
+ * the caller sets one, so the default carries no timer at all. A caller
+ * that wants a bound sets `timeoutMs` explicitly in the profile patch or
+ * on the settings page.
  *
  * `timeoutMs` is user-configurable since 0.11.0: a caller raises or lowers it
  * in the profile patch or on the settings page. `0` means unlimited — no timer
- * is armed — and is an explicit opt-in, never the default, because an
- * unbounded run is exactly what this plugin exists to avoid.
+ * is armed — and is now the default as well, because the operator chose
+ * unbounded runs over a fixed 60-minute cap.
  */
-export const DEFAULT_TIMEOUT_MS = 3_600_000
+export const DEFAULT_TIMEOUT_MS = 0
 
 /** Default per child-call stall budget in milliseconds: 120 minutes.
  *
@@ -139,6 +143,18 @@ export const FIXED_MAX_RETRIES = 1
 
 /** Default maximum tasks per run. */
 export const DEFAULT_MAX_TASKS = 10
+
+/**
+ * Mid-run replan switch (default off): a message sent while a run is working is
+ * answered at once and joins that run at the next wave boundary instead of
+ * starting a second round.
+ *
+ * Off by default because every boundary spends one planner-route call (at most
+ * `min(waves, 4)` per run): joining a run spends quota, so it is opt-in, never
+ * assumed. Quoted here once so the schema, `resolveConfig`, the settings page
+ * and the docs cannot disagree about what "unset" means.
+ */
+export const DEFAULT_REPLAN = false
 
 /**
  * Defaults of the repeat-run surface (`loopEnabled` / `loopMaxRounds` /
@@ -308,7 +324,7 @@ export const CONFIG_VERSION = 1
 
 /**
  * Every top-level key the configuration accepts, in schema order.
- * Thirteen keys in the accepted surface; eleven of them reach the settings
+ * Eighteen keys in the accepted surface; sixteen of them reach the settings
  * page (`toolName` and `configVersion` are plain, not volatile, so the runtime
  * projection drops them — pinned in `test/settings-projection.spec.ts`).
  * Kept explicit so an unknown key can be rejected instead of silently dropped:
@@ -492,7 +508,7 @@ export const Config = z.object({
   // session turns grok mode on (the runtime toggle overrides this default).
   grokDefault: z.union([z.const('on'), z.const('off')]).default('off').volatile(),
   // concurrency (default 10, hard maximum 100), task cap (default 10, hard
-  // maximum 100) and run deadline (default 60 min, no hard upper limit).
+  // maximum 100) and run deadline (default 0 = unlimited, no hard upper limit).
   // Every other former numeric limit is a fixed internal constant (see
   // FIXED_* above); a patch that still carries one is rejected as an unknown
   // key (R-06).
@@ -508,6 +524,17 @@ export const Config = z.object({
   timeoutMs: z.natural().min(0).max(Number.MAX_SAFE_INTEGER).default(DEFAULT_TIMEOUT_MS).volatile(),
   childTimeoutMs: clampedLimit('childTimeoutMs', HARD_LIMITS.childTimeoutMs.min).default(DEFAULT_CHILD_TIMEOUT_MS)
     .description('Per child-call stall budget in milliseconds, 1000-7200000 (default 120 minutes). One agent() call runs this long before the run stops waiting on it; the run deadline still caps the whole run. 单次子调用能跑多久，毫秒，1000-7200000（默认 120 分钟）；单次调用超时只重试该任务，运行死线仍是整轮上限')
+    .volatile(),
+  // Mid-run replan switch (`src/channel.ts`, `src/steering.ts`, `src/replan.ts`).
+  // `false` (DEFAULT_REPLAN) keeps every message its own round; `true` answers a
+  // message sent while a run is working at once and folds it into the live plan
+  // at the next wave boundary. Off by default because every boundary spends one
+  // planner-route call (at most `min(waves, 4)` per run): joining a run spends
+  // quota, so it is opt-in, never assumed. Bilingual `description()` like every
+  // other switch, so a host rendering the schema without this plugin's client
+  // states the same contract.
+  replan: z.boolean().default(DEFAULT_REPLAN)
+    .description('Off by default: a message sent while a run is working starts its own round; on, it is answered at once and joins the live plan at the next wave boundary (settled work is never redone). 默认关闭：跑中发来的消息另起一轮；打开后立刻回执并在下个波边界并入活计划（已验证的成果不重跑）')
     .volatile(),
   // Repeat-run surface. The four keys are accepted, validated and editable here so
   // the loop service has one place to read them from; the defaults keep a loop off,
@@ -1030,7 +1057,7 @@ export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
   // has; whitespace-only is legal and falls back to the built-in default at open
   // time, so a half-finished edit cannot arm an empty heartbeat.
   const replanRaw: unknown = (config as { replan?: unknown }).replan
-  const replan = replanRaw === undefined ? false : replanRaw
+  const replan = replanRaw === undefined ? DEFAULT_REPLAN : replanRaw
   if (typeof replan !== 'boolean') {
     throw new Error(`replan must be true or false, got "${String(replanRaw)}"`)
   }

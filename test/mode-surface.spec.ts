@@ -357,6 +357,19 @@ describe('mounting the switch route', () => {
     expect(() => installModeRoute({ ctx: noInject, fallback: () => true })).not.toThrow()
   })
 
+  it('warns when the composition has no web server, so a silent 405 is diagnosable', () => {
+    const warned: string[] = []
+    const child: ModeHostContext = {
+      connection: { requestRejection: () => undefined },
+      effect: (() => {}) as unknown as NonNullable<ModeHostContext['effect']>,
+    }
+    const ctx: ModeHostContext = {
+      inject: (_deps: readonly string[], callback: (child: ModeHostContext) => void) => { callback(child) },
+    }
+    installModeRoute({ ctx, fallback: () => true, logger: { warn: (message: string) => { warned.push(message) } } as never })
+    expect(warned.some(message => message.includes('no webServer'))).toBe(true)
+  })
+
   it('drives the switch through the registered handler', async () => {
     const target = session()
     const wired = wiring({ sessions: [target] })

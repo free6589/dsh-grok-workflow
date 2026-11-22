@@ -671,9 +671,19 @@ describe('t47: the report states its routes and its deadline', () => {
   })
 
   it('carries the deadline the run actually ran under', () => {
+    // Default 0 = unlimited: no deadline row is carried. An explicit deadline
+    // still round-trips below (see timeout-config coverage).
     const accepted = assertWorkflowReport(report({ timeoutMs: FIXED_TIMEOUT_MS }), OBJECTIVE, config)
-    expect(accepted.limits.timeoutMs).toBe(FIXED_TIMEOUT_MS)
-    expect(renderReport(accepted, diag)).toContain(`Deadline: ${FIXED_TIMEOUT_MS} ms per run`)
+    expect(accepted.limits.timeoutMs).toBeUndefined()
+    expect(renderReport(accepted, diag)).not.toContain('Deadline:')
+  })
+
+  it('carries an explicit deadline when the caller sets one', () => {
+    const explicit = 3_600_000
+    const explicitConfig = resolveConfig({ maxConcurrency: 2, maxTasks: 6, timeoutMs: explicit })
+    const accepted = assertWorkflowReport(report({ timeoutMs: explicit }), OBJECTIVE, explicitConfig)
+    expect(accepted.limits.timeoutMs).toBe(explicit)
+    expect(renderReport(accepted, diag)).toContain(`Deadline: ${explicit} ms per run`)
   })
 
   it('rejects a result that ran under a different deadline than the plugin enforces', () => {
@@ -688,7 +698,8 @@ describe('t47: the report states its routes and its deadline', () => {
     // all-empty default made "no chain" and "chain unknown here" look the same (t46).
     expect(text).toContain('worker=bifrost-completions/wb/cn:deepseek-v4.1-flash')
     expect(text).toContain('planner=inherit')
-    expect(text).toContain(`Deadline: ${FIXED_TIMEOUT_MS} ms per run`)
+    // Default 0 = unlimited carries no deadline row; an explicit deadline still renders.
+    expect(text).not.toContain('Deadline:')
   })
 
   it('accepts a legacy result that does not mention a deadline', () => {

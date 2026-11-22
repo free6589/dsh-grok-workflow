@@ -472,6 +472,20 @@ async function route(
   // blocking path (full mode, or a team run on a one-shot agent) enters the
   // final report itself, so entered text that already holds a report is final.
   const enteredHasReport = entered.includes('Grok workflow:')
+  // The team run starts behind a macrotask (the broken-run resume scan reads
+  // the checkpoint directory before admission), so a background admission may
+  // not have called `engine.start` yet when the entered receipt lands. Give
+  // the background task one short window to start before deciding which path
+  // this message took; a direct answer never starts anything and falls through
+  // immediately once the window lapses.
+  if (!enteredHasReport && !ctx.engine.startCalls.some(call => call.meta.name !== 'Front desk')) {
+    await vi.waitFor(() => {
+      if (!ctx.engine.startCalls.some(call => call.meta.name !== 'Front desk')) {
+        throw new Error('background team run not started yet')
+      }
+    }, { timeout: 5_000 })
+      .catch(() => {})
+  }
   if (!enteredHasReport && ctx.engine.startCalls.some(call => call.meta.name !== 'Front desk')) {
     await vi.waitFor(() => {
       if (agent.followups.length <= seen) throw new Error('background report not delivered yet')

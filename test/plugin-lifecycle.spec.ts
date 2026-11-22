@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from 'vitest'
-import { FIXED_TIMEOUT_MS } from '../src/config.js'
 import { apply } from '../src/index.js'
 import type { WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
 import { callerTask, execution, task, verification } from './fixtures.js'
@@ -275,12 +274,12 @@ describe('plugin lifecycle and tool boundary', () => {
   })
 
   it('returns the deadline while workflow startup is still pending, then disposes a late run', async () => {
-    // T4: the deadline is fixed (FIXED_TIMEOUT_MS) — fake timers stand in for
-    // the 60 minutes so the suite stays fast.
+    // The default deadline is 0 = unlimited, so the test configures an explicit
+    // bound — fake timers stand in for it so the suite stays fast.
     vi.useFakeTimers()
     try {
       const ctx = new FakeContext()
-      apply(ctx as never, {})
+      apply(ctx as never, { timeoutMs: 3_600_000 })
       let release!: () => void
       ctx.engine.startGate = new Promise(resolve => { release = resolve })
       const pending = ctx.tool!.execute({ objective: 'startup never resolves before the deadline' }, exec())
@@ -288,7 +287,7 @@ describe('plugin lifecycle and tool boundary', () => {
 
       const raced = await Promise.race([
         pending.then(report => ({ kind: 'settled' as const, report: report as { status: string; errors: { phase: string }[] } })),
-        vi.advanceTimersByTimeAsync(FIXED_TIMEOUT_MS + 1_000).then(() => ({ kind: 'stuck' as const })),
+        vi.advanceTimersByTimeAsync(3_600_000 + 1_000).then(() => ({ kind: 'stuck' as const })),
       ])
       // Always release the fake engine so a regression fails cleanly instead of
       // leaving a pending promise behind for the rest of the suite.
@@ -333,16 +332,17 @@ describe('plugin lifecycle and tool boundary', () => {
   })
 
   it('returns timeout when startup resolves after the deadline', async () => {
-    // T4: fixed deadline — fake timers instead of a real 60-minute wait.
+    // The default deadline is 0 = unlimited — an explicit bound is configured
+    // here; fake timers stand in for it instead of a real wait.
     vi.useFakeTimers()
     try {
       const ctx = new FakeContext()
-      apply(ctx as never, {})
+      apply(ctx as never, { timeoutMs: 3_600_000 })
       let release!: () => void
       ctx.engine.startGate = new Promise(resolve => { release = resolve })
       const pending = ctx.tool!.execute({ objective: 'late startup' }, exec())
       await vi.waitFor(() => expect(ctx.engine.startCalls).toHaveLength(1))
-      await vi.advanceTimersByTimeAsync(FIXED_TIMEOUT_MS + 1_000)
+      await vi.advanceTimersByTimeAsync(3_600_000 + 1_000)
       release()
       const report = await pending as { status: string; errors: { phase: string }[] }
       expect(report.status).toBe('failed')
@@ -356,16 +356,17 @@ describe('plugin lifecycle and tool boundary', () => {
   })
 
   it('returns timeout when startup rejects after the deadline', async () => {
-    // T4: fixed deadline — fake timers instead of a real 60-minute wait.
+    // The default deadline is 0 = unlimited — an explicit bound is configured
+    // here; fake timers stand in for it instead of a real wait.
     vi.useFakeTimers()
     try {
       const ctx = new FakeContext()
-      apply(ctx as never, {})
+      apply(ctx as never, { timeoutMs: 3_600_000 })
       let release!: () => void
       ctx.engine.startGate = new Promise(resolve => { release = resolve })
       const pending = ctx.tool!.execute({ objective: 'late rejection' }, exec())
       await vi.waitFor(() => expect(ctx.engine.startCalls).toHaveLength(1))
-      await vi.advanceTimersByTimeAsync(FIXED_TIMEOUT_MS + 1_000)
+      await vi.advanceTimersByTimeAsync(3_600_000 + 1_000)
       ctx.engine.startGateError = new Error('startup aborted')
       release()
       const report = await pending as { status: string; errors: { phase: string }[] }
@@ -378,14 +379,15 @@ describe('plugin lifecycle and tool boundary', () => {
   })
 
   it('returns a failed report when the deadline cancels the run', async () => {
-    // T4: fixed deadline — fake timers instead of a real 60-minute wait. The
-    // engine never settles, so advancing past the deadline must fail the run.
+    // The default deadline is 0 = unlimited — an explicit bound is configured
+    // here. The engine never settles, so advancing past the configured deadline
+    // must fail the run.
     vi.useFakeTimers()
     try {
       const ctx = new FakeContext()
-      apply(ctx as never, {})
+      apply(ctx as never, { timeoutMs: 3_600_000 })
       const pending = ctx.tool!.execute({ objective: 'too slow' }, exec())
-      const report = await vi.advanceTimersByTimeAsync(FIXED_TIMEOUT_MS + 1_000).then(() => pending) as { status: string; errors: { phase: string }[] }
+      const report = await vi.advanceTimersByTimeAsync(3_600_000 + 1_000).then(() => pending) as { status: string; errors: { phase: string }[] }
       expect(report.status).toBe('failed')
       expect(report.errors[0]!.phase).toBe('Timeout')
       await ctx.dispose()

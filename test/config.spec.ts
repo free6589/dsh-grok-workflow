@@ -4,6 +4,7 @@ import {
   CONFIG_VERSION,
   Config,
   DEFAULT_MAX_CONCURRENCY,
+  DEFAULT_REPLAN,
   DEFAULT_TIMEOUT_MS,
   FIXED_MAX_RETRIES,
   HARD_LIMITS,
@@ -206,6 +207,7 @@ describe('configuration surface', () => {
       synthesis: 'layered',
       mode: 'triage',
       grokDefault: 'off',
+      replan: false,
       loopEnabled: false,
       loopMaxRounds: 10,
       loopFailStreak: 3,
@@ -338,6 +340,37 @@ describe('configuration surface', () => {
     expect(describeResolvedConfig(resolveConfig({}))).toContain('grokDefault=off')
     expect(describeResolvedConfig(resolveConfig({ grokDefault: 'on' } as never))).toContain('grokDefault=on')
   })
+
+  it('defaults the mid-run replan switch off, carries it through the schema, and states it bilingually', () => {
+    // Opt-in, never the default: joining a run spends one planner-route call
+    // per wave boundary (at most min(waves, 4) per run), so "unset" must read
+    // as its own round — the pre-switch behavior — not as a joined run.
+    expect(DEFAULT_REPLAN).toBe(false)
+    expect(resolveConfig({} as never).replan).toBe(false)
+    expect((snapshotConfig(Config({} as never)) as Record<string, unknown>).replan).toBe(false)
+    // A stored setting travels through the schema and resolveConfig unchanged.
+    const parsed = snapshotConfig(Config({ replan: true } as never))
+    expect(parsed).toMatchObject({ replan: true })
+    expect(resolveConfig(parsed as never)).toMatchObject({ replan: true })
+    // Bilingual contract on the schema, like the other switches: the label is the
+    // client's i18n key, but the meaning travels with the schema.
+    interface SchemaNode {
+      meta: Record<string, unknown>
+    }
+    const dict = (Config as unknown as { dict: Record<string, SchemaNode> }).dict
+    const text = dict['replan']?.meta?.description
+    expect(typeof text, 'replan carries no schema description').toBe('string')
+    expect(text as string, 'replan description has no Chinese half').toMatch(/[\u4e00-\u9fff]/)
+    expect(text as string, 'replan description has no English half').toMatch(/[A-Za-z]{3,}/)
+    const refs = (Config.toJSON() as { refs?: Record<string, { meta?: { description?: unknown } }> }).refs ?? {}
+    const onWire = new Set(Object.values(refs)
+      .map(ref => ref.meta?.description)
+      .filter((item): item is string => typeof item === 'string'))
+    expect(onWire, 'replan description is missing from Config.toJSON().refs').toContain(text as string)
+    // Fail closed (R-06): a non-boolean is refused, never read as a setting.
+    expect(() => Config({ replan: 'on' } as never)).toThrow(/replan expected boolean/)
+    expect(() => resolveConfig({ replan: 'on' } as never)).toThrow(/replan must be true or false/)
+  })
 })
 
 describe('route validation against the runtime', () => {
@@ -464,14 +497,14 @@ describe('route validation against the runtime', () => {
     const projected = Object.keys(descriptor.value).sort()
     expect(projected).not.toContain('toolName')   // not volatile => not projected
     expect(projected).not.toContain('configVersion')   // not volatile => not projected
-    // The page is the 15 volatile keys (toolName/configVersion are structural);
-    // childTimeoutMs is the 15th.
+    // The page is the 16 volatile keys (toolName/configVersion are structural);
+    // replan is the 16th (settings page switch, "自动接着干" group).
     expect(projected).toEqual([
       'childTimeoutMs', 'grokDefault', 'guardianModel', 'iterateIntervalMin', 'iterateTemplate', 'loopEnabled',
-      'loopFailStreak', 'loopIntervalMin', 'loopMaxRounds', 'maxConcurrency', 'maxTasks', 'mode',
+      'loopFailStreak', 'loopIntervalMin', 'loopMaxRounds', 'maxConcurrency', 'maxTasks', 'mode', 'replan',
       'roles', 'synthesis', 'timeoutMs',
     ])
-    expect(projected).toHaveLength(15)
+    expect(projected).toHaveLength(16)
     const ctx = ctxWith({
       settings: { configure: () => () => {}, describe: () => [descriptor] },
     })
@@ -653,7 +686,7 @@ describe('configuration reaches the run', () => {
 describe('t47: the effective configuration is nameable', () => {
   it('names the deadline and every role chain, with "inherit" for an unset role', () => {
     const described = describeResolvedConfig(resolveConfig({}))
-    expect(described).toContain(`timeoutMs=${3_600_000}`)
+    expect(described).toContain('timeoutMs=0')
     expect(described).toContain('gate=on')
     expect(described).toContain('roles=planner:inherit worker:inherit verifier:inherit synthesizer:inherit supervisor:inherit')
   })
@@ -674,8 +707,8 @@ describe('t47: the effective configuration is nameable', () => {
   it('travels into the workflow request, so the report can state the deadline', () => {
     const config = resolveConfig({ maxConcurrency: 1 })
     const request = buildWorkflowRequest('Ship the verified result', [task('a')], config)
-    // T4: the deadline is fixed, not configurable.
-    expect((request.args as { timeoutMs: number }).timeoutMs).toBe(3_600_000)
+    // The default deadline is 0 = unlimited (operator decision).
+    expect((request.args as { timeoutMs: number }).timeoutMs).toBe(0)
   })
 })
 
@@ -762,18 +795,18 @@ describe('t49: a non-blocking verifier note does not fail a verified task', () =
  * The deadline used to be a fixed internal constant, which made "the run was
  * killed at 60 minutes" unanswerable from the outside and impossible to change
  * without editing the plugin. It is now a user-configurable key with three
- * pinned properties: the 60-minute default survives (t45 measured it), any
+ * pinned properties: the 0 = unlimited default survives (operator decision), any
  * non-negative integer is accepted, and an invalid value fails the load instead
  * of being silently rewritten.
  */
 describe('the run deadline is user-configurable (0 = unlimited)', () => {
-  it('defaults to 60 minutes and carries that value into the request and the log line', () => {
+  it('defaults to unlimited (0) and carries that value into the request and the log line', () => {
     const config = resolveConfig({})
-    expect(config.timeoutMs).toBe(3_600_000)
+    expect(config.timeoutMs).toBe(0)
     expect(DEFAULT_TIMEOUT_MS).toBe(config.timeoutMs)
     const request = buildWorkflowRequest('Ship the verified result', [task('a')], config)
-    expect((request.args as { timeoutMs: number }).timeoutMs).toBe(3_600_000)
-    expect(describeResolvedConfig(config)).toContain('timeoutMs=3600000')
+    expect((request.args as { timeoutMs: number }).timeoutMs).toBe(0)
+    expect(describeResolvedConfig(config)).toContain('timeoutMs=0')
   })
 
   it('accepts any non-negative integer, including 0 for unlimited', () => {

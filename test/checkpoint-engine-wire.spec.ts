@@ -109,7 +109,7 @@ async function checkpointFor(dir: string, objective: string): Promise<{ file: st
 /* -------------------------------------------------------------------- tests -- */
 
 describe('engine wiring writes real checkpoints', () => {
-  it('records a verified run: tasks, five-role agent rows, evidence, and no extra model calls', async () => {
+  it('records a verified run with no extra child calls from the resume scan', async () => {
     const engine = createEngineHarness(call => (call.prompt.includes('You are the execution agent')
       ? { structured: execution }
       : { structured: verification(true) }))
@@ -144,10 +144,11 @@ describe('engine wiring writes real checkpoints', () => {
     // Stages come from the script's own phase labels, observed through the engine.
     expect(checkpoint.stages.map(stage => stage.phase)).toContain('plan')
     expect(checkpoint.plan.source).toBe('caller')
-    // The 60 min default is a representable deadline (the checkpoint's own
-    // msCeiling accepts every timeoutMs the config accepts), so the row records
-    // the bound the run actually had instead of dropping it.
-    expect(checkpoint.watchdog).toEqual({ deadlineHit: false, cancelled: false, deadlineMs: 3_600_000 })
+    // With the default deadline (0 = unlimited) the checkpoint omits the
+    // timeout fields entirely (absent and 0 both name "no deadline"); the
+    // msCeiling still accepts every timeoutMs the config accepts, so a set
+    // bound is recorded as-is instead of being dropped.
+    expect(checkpoint.watchdog).toEqual({ deadlineHit: false, cancelled: false })
 
     const decision = resumeDecision(checkpoint)
     expect(decision.action).toBe('none')
