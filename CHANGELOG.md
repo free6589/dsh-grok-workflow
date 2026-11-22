@@ -3,6 +3,14 @@
 Notable user-facing changes are recorded here in English and Simplified Chinese.
 用户可见的功能和修复会在这里以英文和简体中文记录。
 
+## [0.13.18] - 2026-11-23
+
+### Fixed / 修复
+
+- **Cancel-path progress test no longer races startup IO / 取消路径的进度测试不再跟启动 IO 赛跑** —
+  The `closes the node as cancelled` test aborted on a fixed 10 ms sleep, but the resume scan added ~12 ms of startup IO: on a slow runner the abort lands before the engine starts, which takes a no-events path and the assertion reads `undefined.type`. The test now polls for the worker's first child call (up to 10 s) and only then aborts, so the cancel always lands mid-run. No production code changed.
+  / "调用方取消即关节点"用例原来睡死 10 毫秒就取消，但续跑扫描给启动加了约 12 毫秒 IO：慢机器上取消落在引擎启动之前，走无事件路径，断言读到 `undefined.type`。现在用例轮询等到第一个子调用出现（至多 10 秒）再取消，取消永远落在运行中。生产代码未动。
+
 ## [0.13.17] - 2026-11-23
 
 ### Added / 新增
