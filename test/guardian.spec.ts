@@ -235,7 +235,8 @@ describe('stuck-child handling', () => {
   })
 })
 
-describe('rescue: interrupt and steer instead of killing', () => {  it('a rescue log line interrupts the child and delivers the guidance', () => {
+describe('rescue: queue guidance without interrupting active work', () => {
+  it('a rescue log line queues guidance without interrupting the child', () => {
     const clock = manualClock()
     const rescued: Array<{ childId: string, guidance: string }> = []
     const guardian = createRunGuardian({
@@ -653,9 +654,9 @@ describe('guardian unload cleanup', () => {
     expect(peaks.log).toBeGreaterThanOrEqual(1)
   })
 
-  it('a rescue log line interrupts the child and delivers the guidance', async () => {
+  it('a rescue log line queues guidance without interrupting the child', async () => {
     // C3 host leg: the script broadcasts `guardian rescue …` on workflow/log;
-    // the host interrupts that child and steers it, preserving its context.
+    // the host queues guidance for the child without interrupting its active turn.
     const listeners = new Map<string, ((...args: unknown[]) => void)[]>()
     const on = (name: string, fn: (...args: unknown[]) => void): (() => void) => {
       const rows = listeners.get(name) ?? []
