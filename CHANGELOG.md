@@ -5,6 +5,22 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.9] - 2026-11-22
+
+### Fixed / 修复
+
+- **Guardian recovery no longer interrupts an active child or cancels the parent run / Guardian 自动恢复不再打断正在执行的子代理，也不再取消整个工作流** —
+  A liveness timeout now queues one bounded recovery instruction to the affected child session when available, asking it to inspect its current command, checkpoint its progress, and continue the original task. If no rescue channel is available, Guardian records the observation and leaves the workflow running. The configured workflow deadline remains the outer limit.
+  / 子代理疑似停滞时，Guardian 会在恢复通道可用的情况下向对应会话排队发送一次有边界的恢复指令，让子代理检查当前命令、保存检查点并继续原任务；恢复通道不可用时只记录异常，不擅自中止工作流。原有工作流总期限仍然是最终边界。
+
+- **Guardian progress monitoring survives incremental view updates / 增量更新时 Guardian 进度监控栏保持正常显示** —
+  Preserve the Guardian lifecycle state while the conversation view receives incremental updates.
+  / 对话视图增量更新时保留 Guardian 生命周期状态，避免进度页监控栏异常消失。
+
+- **The host watchdog allows the Guardian adjudication window to finish / 宿主看门狗为 Guardian 裁决等待窗口留出时间** —
+  Extend the host watchdog budget to cover the script's adjudication and wait window without racing a healthy slow child, while keeping the workflow deadline as the cap.
+  / 扩展宿主看门狗预算，使判停裁决和等待窗口能够完成，避免与正常但执行较慢的子代理争抢；预算仍受工作流总期限约束。
+
 ## [0.13.8] - 2026-11-22
 
 ### Added / 新增
