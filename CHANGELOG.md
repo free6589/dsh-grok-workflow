@@ -3,6 +3,16 @@
 Notable user-facing changes are recorded here in English and Simplified Chinese.
 用户可见的功能和修复会在这里以英文和简体中文记录。
 
+## [0.13.1] - 2026-11-22
+
+### Fixed / 修复
+
+- **Timeout tests pass on Node 22 as well as Node 24 / 超时测试在 Node 22 与 Node 24 下都通过** —
+  The script's cooperative timeout is unchanged; only the test's hung child got a 30 s backstop so
+  sequential `vm` runs no longer drop the Node 22 runner on teardown.
+  / 超时机制本身没动，只给测试里的挂起子调用加了 30 秒兜底，连续 `vm` 运行不再把 Node 22 的
+  runner 在收尾时带崩。
+
 ## [0.13.0] - 2026-11-22
 
 ### Added / 新增
