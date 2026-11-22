@@ -125,7 +125,9 @@ describe('stuck-child handling', () => {
       schedule: () => ({}) as unknown,
       cancelSchedule: () => {},
       logger: { warn: (message: string) => { warnings.push(message) } },
+      onFinding: finding => { recorded.push(finding) },
     })
+    const recorded: Array<{ seq: number, action: string }> = []
     const cancel = vi.fn()
     guardian.adopt({ id: 'run-1', cancel })
     guardian.agentStart(info('run-1'), start(1, 'stuck worker'))
@@ -137,6 +139,7 @@ describe('stuck-child handling', () => {
     expect(findings[0]?.seq).toBe(1)
     expect(findings[0]?.label).toBe('stuck worker')
     expect(findings[0]?.action).toBe('cancel-run')
+    expect(recorded).toEqual([{ seq: 1, action: 'cancel-run' }])
     expect(findings[0]?.reason).toContain('within 10000 ms')
     expect(cancel).toHaveBeenCalledTimes(1)
     // A second sweep appends no second finding and cancels no second time:
