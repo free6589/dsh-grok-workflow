@@ -1316,23 +1316,21 @@ export function installGate(deps: GateDeps): boolean {
     alreadySurfaced = false,
   ): boolean => {
     // A cancelled turn never enters a step, so the loop will never commit the
-    // batch: the plugin must write it here or the user's words vanish. Surface
-    // position 0 is poison ONLY when a later system head can arrive after it.
-    // A mid-run or post-run cancel ends its own turn (`reject`: no step opens,
-    // no head follows on this turn), and a later turn's head arrives through
-    // the `[head, head]` replace the validator allows — so the write is safe
-    // and required. Only the pre-cancelled headless turn-1 case (aborted
-    // before anything ran, head never established, nothing follows) still
-    // suppresses it, where even the cancelled row would take position 0 with
-    // no head ever following; there the terminal record still states why.
-    const preCancelled = payload.signal?.aborted === true
+    // batch: the plugin must write it here or the user's words vanish — but a
+    // headless turn-1 write takes surface position 0, and if the session later
+    // continues (turn 2 with a system head), the reopen replay throws
+    // `system/message requires a protected first surface head` and bricks the
+    // session (measured: cancel-then-continue replays exactly this way). So a
+    // cancelled batch is appended ONLY onto an established surface (turn 2+,
+    // or a session that already surfaces a node); on a headless turn 1 the
+    // words are NOT appended — the terminal record states the reason, and the
+    // delivery record keeps the batch routable for the retry.
     const owner = sessionOf(agent)
-    const headlessTurn1 = owner === undefined || !surfaceHasHead(owner, payload.turn)
     const kept = alreadySurfaced
       ? true
-      : preCancelled && headlessTurn1
-        ? false
-        : commitClaimed(agent, payload.messages)
+      : owner !== undefined && surfaceHasHead(owner, payload.turn)
+        ? commitClaimed(agent, payload.messages)
+        : false
     const session = sessionOf(agent)
     if (session === undefined) return kept
     const options = agent.options ?? {}
