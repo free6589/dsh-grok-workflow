@@ -1,3 +1,14 @@
+## 已发版 0.13.14 会话 surface-head 损坏修复 — 2026-11-22 (`CONFIRMED`)（接上条未发版记录）
+
+| state | command | result |
+| --- | --- | --- |
+| main `dea1be4` | `npm run ci` | **exit 0：81 files / 1564 tests PASS**；typecheck 干净；lint 0 errors（既有 warnings）；`verify:lib` byte-identical |
+| remote | Release workflow `45036278236` | **success**，GitHub Release `v0.13.14` 已发布（asset `dsh-grok-workflow-0.13.14.tgz`） |
+| remote | CI on main `45036269190` | **success** |
+
+**Honest boundary:** 用户侧已砖的 33 个父会话本版修不了（需 host 侧修复或丢弃）；
+真机 GUI 手势验证 NOT_RUN。
+
 ## 会话 surface-head 损坏修复 — 2026-11-22 (`CONFIRMED`，fix/session-surface-head-6，未发版)
 
 **Changed:** `src/gate.ts`（`commitClaimed(agent, claimed, turn?)` + `surfaceHasHead()`

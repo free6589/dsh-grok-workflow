@@ -1,3 +1,11 @@
+Last updated: 2026-11-22 23:10 +08:00（**已发版 `0.13.14`：装了插件的会话重启不再损坏，`CONFIRMED`** —
+发版提交 `dea1be4` + tag `v0.13.14` 已推；远端 Release `45036278236` success 并已发布
+（asset `dsh-grok-workflow-0.13.14.tgz`）。本地门禁：`npm run ci` exit 0（81 文件 / 1564 测试 PASS），
+lint 0 errors，`verify:lib` byte-identical。远端 CI `45036269190` success。根因：`commitClaimed()`
+在无头首轮抢写 `user/message` 到 surface 位置 0，后续 system 头一到即砖（99 父会话：OK 53 /
+CORRUPT 33 / NOSYS 13）；修法是 `surfaceHasHead()` 门 + 取消同规则 + 3 例回归。
+用户侧已砖的旧会话本版修不了，需 host 侧处理；新会话不再写坏。）
+
 Last updated: 2026-11-22 23:00 +08:00（**会话损坏修复已合流并发版中，`CONFIRMED`** —
 分支 `fix/session-surface-head-6` 已合流 main；以下为合流前记录。
 

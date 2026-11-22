@@ -2740,6 +2740,21 @@ Issue #1 状态评论 issuecomment-6927842856。
   做成可复用步骤；另：`cordis.patch.yml` 里 3 条 patch 告警（`layerfs-host`、
   `agent-teams` 未找到，`deepseek-account` 名称不匹配）是源配置漂移，与克隆无关，值得单开一轮清理。
 
+## 2026-11-22 — 已发版 `0.13.14`：会话重启损坏修复（`CONFIRMED`）
+
+- **From:** 本会话（lead）· **To:** 下一轮接手者
+- **发了什么**：发版提交 `dea1be4` 已推，annotated tag `v0.13.14` 已推；远端 CI
+  `45036269190` success、Release `45036278236` success 并已发布
+ （asset `dsh-grok-workflow-0.13.14.tgz`）。本地 `npm run ci` exit 0：81 文件 / 1564 测试 PASS。
+- **根因**：`commitClaimed()` 在 `agent/pre-step`（loop 写 head 之前）预发布 `user/message`，
+  新会话首条 surface 变成用户话，后续 system 头即炸；重启全量回放才抛，所以活会话当时不报错、
+  重启全砖。99 父会话扫描：OK 53 / CORRUPT 33 / NOSYS 13，CORRUPT 全 `first=(user,message)`。
+- **修法**：`surfaceHasHead()` 门（已建立 surface 或 turn 2+ 才预发布，否则走 `enter.messages`
+  由 loop 在 head 后提交）；取消同规则。回归：`commitHead` + `assertReopenable` +
+  `surface head` 3 例；`gate.spec.ts` 5 例同步。`lib/` 已重建并随 src 提交。
+- **没做的**：用户侧已砖的 33 个父会话插件修不了，需 host 侧修复或丢弃；真机 GUI 手势验证 NOT_RUN。
+- **Next action**：分支 `fix/session-surface-head-6` 已合流，可按 AGENTS.md 在 24h 内删除。
+
 ## 2026-11-22 — 会话损坏根因已定位并修复（未发版，`CONFIRMED`，fix/session-surface-head-6）
 
 - **用户报障**：凡开过 dsh-grok-workflow 插件的会话，dsh 重启后打不开：
