@@ -98,7 +98,7 @@ export const GUARDIAN_LIMITS = {
   labelChars: 160,
   /** Reason characters kept per finding. */
   reasonChars: 400,
-  /** Upper bound of one child's budget: the guardian never waits longer than this. */
+  /** Base child timeout when no adjudication route is configured. */
   childTimeoutCapMs: 600_000,
   /** Lower bound of one child's budget: below this the timer is noise, not signal. */
   childTimeoutFloorMs: 5_000,
@@ -255,9 +255,12 @@ export function guardianChildBudgetMs(timeoutMs: number, childTimeoutMs?: number
   // budget plus the full wait extension, still capped at childTimeoutCapMs.
   if (childTimeoutMs !== undefined && Number.isFinite(childTimeoutMs) && childTimeoutMs > 0) {
     const scriptBudget = Math.trunc(childTimeoutMs)
-    const waitExtension = GUARDIAN_MAX_WAITS * GUARDIAN_WAIT_MS
+    // Each wait slice is preceded by one bounded 60 s adjudication call.
+    // test/timeout.spec.ts pins this allowance to GUARDIAN_ADJUDICATION_MS.
+    const waitExtension = GUARDIAN_MAX_WAITS * (GUARDIAN_WAIT_MS + 60_000)
     budget = Math.min(Math.trunc(timeoutMs), Math.max(budget, scriptBudget + waitExtension))
-    budget = Math.min(budget, GUARDIAN_LIMITS.childTimeoutCapMs)
+    // The base cap plus the extension window is the hard bound for a configured guardian.
+    budget = Math.min(budget, GUARDIAN_LIMITS.childTimeoutCapMs + waitExtension)
   }
   if (budget < GUARDIAN_LIMITS.childTimeoutFloorMs) return 0
   return budget

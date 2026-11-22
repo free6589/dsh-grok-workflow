@@ -129,16 +129,23 @@ describe('timeout tiers', () => {
     // (GUARDIAN_MAX_WAITS slices), so the script's own verdict lands first.
     // The numbers live in timeout.ts; the script mirrors them (pinned below),
     // so the host reads the same source instead of a second copy.
+    const adjudicationWindow = GUARDIAN_MAX_WAITS * GUARDIAN_ADJUDICATION_MS
     const waitExtension = GUARDIAN_MAX_WAITS * GUARDIAN_WAIT_MS
-    expect(waitExtension).toBe(600_000)
-    // Long deadline: capped at the same 10 min ceiling, never above it.
-    expect(guardianChildBudgetMs(7_200_000, CHILD_TIMEOUT_MS)).toBe(CHILD_TIMEOUT_MS)
-    expect(guardianChildBudgetMs(3_600_000, CHILD_TIMEOUT_MS)).toBe(CHILD_TIMEOUT_MS)
+    const scriptWindow = CHILD_TIMEOUT_MS + waitExtension + adjudicationWindow
+    expect(adjudicationWindow).toBe(120_000)
+    expect(scriptWindow).toBe(1_320_000)
+    // With a guardian route the host leaves room for the initial call, both
+    // adjudication calls and both wait slices before it can cancel the run.
+    expect(guardianChildBudgetMs(7_200_000, CHILD_TIMEOUT_MS)).toBe(scriptWindow)
+    expect(guardianChildBudgetMs(3_600_000, CHILD_TIMEOUT_MS)).toBe(scriptWindow)
+    // The base cap without an adjudicator remains the original ten-minute budget.
+    expect(guardianChildBudgetMs(3_600_000, undefined)).toBe(CHILD_TIMEOUT_MS)
     // Without a guardian route nothing changes: the old single-budget path.
     expect(guardianChildBudgetMs(3_600_000, undefined)).toBe(CHILD_TIMEOUT_MS)
     expect(guardianChildBudgetMs(3_600_000)).toBe(CHILD_TIMEOUT_MS)
     // A short deadline still binds: the host never waits past the run's own end.
     expect(guardianChildBudgetMs(30_000, CHILD_TIMEOUT_MS)).toBe(30_000)
+    expect(guardianChildBudgetMs(1_000_000, CHILD_TIMEOUT_MS)).toBe(1_000_000)
     // Unlimited still disarms, even with a guardian configured.
     expect(guardianChildBudgetMs(0, CHILD_TIMEOUT_MS)).toBe(0)
   })

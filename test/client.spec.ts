@@ -1764,6 +1764,62 @@ describe('client progress tab: the fold and the five states', () => {
     }])
   })
 
+  it('carries Guardian events through incremental updates into the rendered monitor lane', () => {
+    type Event = ReturnType<typeof rec>
+    type Definition = {
+      start: (context: unknown, match: { event: Event }) => Record<string, unknown>
+      update: (context: { state: Record<string, unknown> }, match: { event: Event }) => Record<string, unknown>
+      buildViewNode: (context: {
+        state: Record<string, unknown>
+        start: { event: Event, location: unknown }
+        key: string
+        kind: string
+      }) => { data: Record<string, unknown> }
+    }
+    const definition = progress.eventDefinition as Definition
+    let state = definition.start(undefined, {
+      event: rec('tool-workflow/run-start', { runId: 'r-live', name: '任务团队' }, 10, 1_000),
+    })
+    state = definition.update({ state }, {
+      event: rec('tool-workflow/guardian-start', { runId: 'r-live', armed: true, budgetMs: 1_320_000 }, 11, 1_100),
+    })
+    state = definition.update({ state }, {
+      event: rec('tool-workflow/guardian-finding', {
+        runId: 'r-live', seq: 3, label: '执行 3', signal: 'timeout',
+        action: 'rescue', reason: 'rescued with guidance', atMs: 2_000,
+      }, 12, 2_000),
+    })
+    state = definition.update({ state }, {
+      event: rec('tool-workflow/guardian-end', { runId: 'r-live', cancelled: false, findingCount: 1 }, 13, 2_100),
+    })
+    const node = definition.buildViewNode({
+      state,
+      start: { event: rec('tool-workflow/run-start', { runId: 'r-live', name: '任务团队' }, 10, 1_000), location: {} },
+      key: 'r-live',
+      kind: progress.kind,
+    })
+    const liveRun = node.data as unknown as ProgressRun
+    expect(liveRun.guardian).toMatchObject({
+      started: true,
+      armed: true,
+      budgetMs: 1_320_000,
+      ended: true,
+      cancelled: false,
+      findings: [{ seq: 3, action: 'rescue', reason: 'rescued with guidance' }],
+    })
+    const t = translator('zh')
+    const view = progress.component({
+      t,
+      progressT: t,
+      useGrokProgress: (select: (value: unknown) => unknown) => select({ runs: [liveRun], activeRun: liveRun }),
+    })
+    const elements = walk(view)
+    const panel = elements.find((element) => element.props['data-gw-progress-guardian'] === true)
+    expect(panel).toBeDefined()
+    expect(panel!.props['data-state']).toBe('finished')
+    expect(texts(panel).join(' ')).toContain('已发送救援指引')
+  })
+
   it('settles out of order and idempotently, and drops what nobody declared', () => {
     const runs = progress.fold([
       rec('tool-workflow/agent-end', { runId: 'r1', seq: 2, outcome: 'failed' }, 12),
