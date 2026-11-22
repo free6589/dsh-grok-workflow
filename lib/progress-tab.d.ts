@@ -75,6 +75,24 @@ export interface ProgressMemberFact {
     /** Engine outcome (`completed` / `failed` / `cancelled` / …); absent while running. */
     outcome?: string;
 }
+/** A liveness intervention recorded by the Guardian (not a task-quality verdict). */
+export interface ProgressGuardianFindingFact {
+    seq: number;
+    label: string;
+    signal: 'timeout' | 'heartbeat-loss';
+    action: 'cancel-run' | 'rescue';
+    reason: string;
+    atMs?: number;
+}
+/** The monitor's recorded lifecycle for one workflow run. */
+export interface ProgressGuardianFacts {
+    started: boolean;
+    armed: boolean;
+    budgetMs: number;
+    ended: boolean;
+    cancelled: boolean;
+    findings: ProgressGuardianFindingFact[];
+}
 /** One run as the stream describes it. */
 export interface ProgressRunFacts {
     runId: string;
@@ -89,6 +107,8 @@ export interface ProgressRunFacts {
     /** Engine stop reason from `run-end`; absent while the run is open. */
     stopReason?: string;
     members: ProgressMemberFact[];
+    /** Guardian liveness state, present only when this build recorded it. */
+    guardian?: ProgressGuardianFacts;
     /** Level-1 detail payloads the stream carried for this run, in arrival order. */
     details: ProgressStageDetailFact[];
 }
