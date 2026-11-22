@@ -1,3 +1,13 @@
+## 2026-11-22 — 已发版 `0.13.4`：B1/B2/B3 守卫存活信号（`CONFIRMED`）
+
+- **From:** 本会话（lead）· **To:** 下一轮接手者
+- **发了什么**：`993e5de` 已推，annotated tag `v0.13.4` 已推；远端 CI `44981149499`
+  success、Release `44981159054` success 并已发布。本地 `npm run ci` exit 0：
+  78 files / 1472 tests PASS。
+- **内容**：见 D-098（B1 run 心跳 / B2 文件心跳 / B3 裁决证据）。planner 现场编
+  plan 无 B2（诚实边界）。真机 GUI 手点 + 模型实测裁决质量 NOT_RUN。
+- **没做的**：C（宿主只标记不杀）单独立项未动；并发轮的未跟踪文件未动。
+
 ## 2026-11-22 — B1/B2/B3 守卫存活信号（`CONFIRMED`，未发版、未提交）
 
 - **From:** 本会话（lead）· **To:** 下一轮接手者

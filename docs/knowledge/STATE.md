@@ -1,10 +1,8 @@
-Last updated: 2026-11-22 11:28 +08:00（**B1/B2/B3 守卫存活信号落地 `CONFIRMED` 未发版** —
-B1 run 心跳（phase/log→runHeartbeat，信号降级不豁免）+ B2 文件心跳
-（`writesPathsForPhase` 中英反查 + `statSync` mtime 保活；引擎 allowlist 五键实测，
-脚本侧带路径死路故走宿主反查）+ B3 裁决证据（prompt 加声明路径 + RULES +
-开火 reason `last life`）。`npm run ci` exit 0：78 files / 1472 tests PASS
-（1454 + 8）。`CHANGELOG [Unreleased]` 中英双语、D-098、VALIDATION、HANDOFF 已记。
-planner 现场 plan 无 B2（诚实边界）。未提交未发版，等用户确认；C 单独立项未动。）
+Last updated: 2026-11-22 11:34 +08:00（**已发版 `0.13.4`：B1/B2/B3 守卫存活信号，`CONFIRMED`** —
+`993e5de` 已推，annotated tag `v0.13.4` 已推；远端 CI `44981149499` success、
+Release `44981159054` success 并已发布。本地 `npm run ci` exit 0：78 文件 /
+1472 测试 PASS。`??` 未跟踪文件（并发轮的 `.rsi/evidence/*`、
+`docs/knowledge/evidence/branch-cleanup-2026-11-22/`）未动，不属本轮。）
 
 Last updated: 2026-11-22 11:00 +08:00（**已发版 `0.13.3`：7 个 RSI 分支全收 + 分支清零，`CONFIRMED`** —
 前人已把 7 个 `rsi/round-*` cherry-pick 进 main（12 提交 `fff56c4..f3fd972`，`src/redact`/`delivery`/`gate`
