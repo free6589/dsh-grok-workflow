@@ -36,11 +36,41 @@ type ProgressRun = {
   stopReason?: string
 }
 
+interface ProgressWirePath {
+  kind: string
+  owner: string
+  card?: string
+  tone: string
+  points: Array<[number, number]>
+}
+
+interface ProgressWireSet {
+  width: number
+  height: number
+  depth: number
+  paths: ProgressWirePath[]
+}
+
+type FlowStub = {
+  querySelectorAll(selector: string): Array<{
+    getAttribute(name: string): string | null
+    getBoundingClientRect(): { top: number, left: number, height: number, width: number }
+  }>
+  querySelector(selector: string): {
+    getBoundingClientRect(): { top: number, bottom: number, left: number, width: number, height: number }
+    querySelector?(selector: string): { getBoundingClientRect(): { left: number, width: number } } | null
+    getAttribute?(name: string): string | null
+  } | null
+  getBoundingClientRect(): { top: number, width: number, height: number }
+}
+
 interface ProgressBundle {
   component: (props: Record<string, unknown>) => unknown
   stages: Array<{ key: string, tokens: string[], edge: boolean }>
   stateGlyph: Record<string, string>
   stateColor: Record<string, string>
+  css: string
+  measureWires(flow: unknown): ProgressWireSet
 }
 
 interface Bundle {
@@ -365,5 +395,84 @@ describe('client progress tab: two tracks (fixed spine + task band)', () => {
     const minis = tree.filter((element) => element.props['data-gw-progress-mini'] !== undefined)
     expect(minis.map((mini) => [mini.props['data-gw-progress-mini'], mini.props['data-tone']]))
       .toEqual([[2, 'ok']])
+  })
+})
+
+describe('client progress tab: fixed left gutter + elbow wires', () => {
+  it('keeps the band in one constant 40px gutter whatever stage owns a card', () => {
+    // The regression this pins: the indent used to be the right-most owner's ring
+    // centre + 30, so one row owned by a late stage pushed the whole band right.
+    expect(progress.css).toContain('.gw-progress-tasks { width: 100%')
+    expect(progress.css).toMatch(/\.gw-progress-tasks \{[^}]*padding: 0 12px 0 40px/)
+    expect(progress.css).not.toContain('--gw-wire-pad')
+    // The gutter leaves room only for the lane depth: cards never move sideways.
+    expect(progress.css).toMatch(/\.gw-progress-tasks \{[^}]*margin-top: calc\(12px \+ var\(--gw-wire-depth, 0px\)\)/)
+  })
+
+  it('hides the wires and drops the band back to 12px under 480px', () => {
+    expect(progress.css).toMatch(/@media \(max-width: 480px\)[\s\S]*\.gw-progress-wires \{ display: none/)
+    expect(progress.css).toMatch(/@media \(max-width: 480px\)[\s\S]*\.gw-progress-tasks \{[^}]*padding-left: 12px/)
+  })
+
+  /**
+   * One owner group on a laid-out stub: ring centre x=446, spine bottom y=88,
+   * the first (and only) group takes lane 0 / channel 18, one stub to the card.
+   */
+  function stubFlow(): FlowStub {
+    const card = {
+      getAttribute: (name: string) => (name === 'data-owner' ? 'stage:execute' : name === 'data-gw-progress-task' ? 'phase:任务 1' : 'doing'),
+      getBoundingClientRect: () => ({ top: 240, left: 40, height: 80, width: 1300 }),
+    }
+    const track = {
+      getBoundingClientRect: () => ({ top: 100, bottom: 188, left: 0, width: 1440, height: 88 }),
+    }
+    const ring = { getBoundingClientRect: () => ({ left: 432, width: 28 }) }
+    const segment = {
+      querySelector: () => ring,
+      getAttribute: () => 'doing',
+      getBoundingClientRect: () => ({}),
+    }
+    return {
+      querySelectorAll: (selector: string) => (selector === '[data-gw-progress-task]' ? [card] : []),
+      querySelector: (selector: string) => {
+        if (selector === '[data-gw-progress-track]') return track as never
+        if (selector.startsWith('.gw-progress-track')) return segment as never
+        return null
+      },
+      getBoundingClientRect: () => ({ top: 100, left: 0, width: 1440, height: 500 }),
+    }
+  }
+
+  it('unwinds one group as ring -> lane -> channel -> card stub, inside the gutter', () => {
+    const wires = progress.measureWires(stubFlow())
+    expect(wires.depth).toBeGreaterThanOrEqual(0)
+    expect(wires.paths).toHaveLength(2)
+    const [trunk, stub] = wires.paths
+    expect(trunk!.kind).toBe('trunk')
+    expect(trunk!.owner).toBe('stage:execute')
+    // Down from the ring (x=446, spine bottom 88), one lane leftwards under the
+    // spine, then down the group's own channel in the gutter to the card's height.
+    expect(trunk!.points).toEqual([[446, 88], [446, 92], [18, 92], [18, 180]])
+    expect(stub!.kind).toBe('branch')
+    expect(stub!.points).toEqual([[18, 180], [40, 180]])
+    // The gutter legs stay left of the cards: the channel's vertical run and
+    // every stub never enter a card. The ring drop (first leg) and the lane run
+    // (second leg) travel from the owner's ring to the gutter by design — the
+    // lane lives under the spine (y=92, above the cards at y=140+), so neither
+    // leg runs through a card.
+    const ringX = (trunk!.points[0] as [number, number])[0]
+    expect(ringX).toBe(446)
+    const laneY = (trunk!.points[1] as [number, number])[1]
+    expect(laneY).toBe(92)
+    const channelX = (trunk!.points[2] as [number, number])[0]
+    expect(channelX).toBe(18)
+    expect(stub!.points).toEqual([[18, 180], [40, 180]])
+    const channelLeg = trunk!.points.slice(2)
+    for (const [x] of channelLeg) expect(x).toBeLessThanOrEqual(40)
+  })
+
+  it('degrades to a plain list without layout instead of inventing coordinates', () => {
+    expect(progress.measureWires(null)).toEqual({ width: 0, height: 0, depth: 0, paths: [] })
+    expect(progress.measureWires({})).toEqual({ width: 0, height: 0, depth: 0, paths: [] })
   })
 })

@@ -19,6 +19,47 @@ runner 进程静默带走（exit 0 无输出），Node 24+ 无此行为。修法
 
 # Validation Log
 
+## 已发版 `0.13.2` — 2026-11-22（`CONFIRMED`，lead 收尾）
+
+**Changed:** guardian 误杀修复 + 固定左栏 + `lib/panel.*`/t55 删除 + 发版号 0.13.2。
+
+| state | command | result |
+| --- | --- | --- |
+| working tree | `npm test` | **78 files / 1454 tests PASS**（exit 0，含新增 6 例） |
+| working tree | `npm run typecheck` | exit 0 |
+| working tree | `npm run lint` | 23 warnings / 0 errors（既有，与 0.13.1 同量级） |
+| working tree | `npm run build` + bundle parity | `src/client/index.js === lib/client.js`（266237 bytes） |
+| working tree (HEAD pair) | `npm run verify:lib` | HEAD 配对一致（发版前）；发版提交后以 CI 的 `lib/` 检查为准 |
+| working tree | harness 重跑（CHECK 执行）| exit 0，`problems: []`，与已提交 JSON 逐字节一致 |
+
+**Root cause of the stop:** 宿主 guardian 与脚本 `raceChildCall` 预算同为 10 min；
+脚本的 Q8 wait×2 adjudication 还没判完，宿主已整轮 cancel（session-77a3f6fb turn 38，
+执行子任务 58e1b72f 存活 601087 ms 且一直在推进，adjudication 子任务 69b39c89 仅存活 1 秒）。
+
+**NOT_RUN:** 真实 DSH Web GUI 手点；真实模型端到端。
+
+## session-77a3f6fb 中断恢复 + guardian 误杀修复 — 2026-11-22（`CONFIRMED`，未发版）
+
+**Changed:** `src/guardian.ts`（`guardianChildBudgetMs` 加 `childTimeoutMs?` 参数，有守卫时覆盖
+wait 窗口）+ `src/run.ts`（配了 `guardianModel` 才传 `CHILD_TIMEOUT_MS`）+ `test/timeout.spec.ts`（+1 例）
++ `test/progress-connector.spec.ts`（+5 例，固定左栏验收）+ `lib/` 随 `src/` 重建。
+
+| state | command | result |
+| --- | --- | --- |
+| working tree | `npx vitest run test/timeout.spec.ts test/guardian.spec.ts` | 2 files / **32 tests PASS** |
+| working tree | `npx vitest run test/progress-connector.spec.ts test/client.spec.ts test/progress-tab.spec.ts` | 3 files / **169 tests PASS**（CHECK 独立复验） |
+| working tree | `npm test` | **78 files / 1454 tests PASS**（exit 0） |
+| working tree | `npm run build` + `node -e cmp` | `src/client/index.js === lib/client.js`（266237 bytes） |
+| working tree | `npx tsc -p tsconfig.build.json --noEmit` | exit 0 |
+| working tree | harness 重跑 `python3 .rsi/evidence/fixed-gutter-2026-11-22.py 1440 760 480`（CHECK 执行） | exit 0，`problems: []`，与已提交 JSON 逐字节一致 |
+
+**Root cause of the stop:** 宿主 guardian 与脚本 `raceChildCall` 预算同为 10 min；
+脚本的 Q8 wait×2 adjudication 还没判完，宿主已整轮 cancel。证据：执行子任务
+58e1b72f 存活 601087 ms（10.0 min）且一直在推进（证据 md 已写完、截图已看、diff 已审），
+guardian adjudication 子任务 69b39c89 仅存活 1 秒。
+
+**NOT_RUN:** 真实 DSH Web GUI 手点；真实模型端到端；发版（CHANGELOG/版本号未动）。
+
 ## Wave 4 合流与 A1–A6 验收 — 2026-11-22（`CONFIRMED`，agent-72）
 
 **Changed:** 只加验收件，不改 Wave 1–3 源码：`test/wave4-acceptance.spec.ts`（8 例）与

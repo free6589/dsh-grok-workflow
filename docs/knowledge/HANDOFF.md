@@ -1,3 +1,30 @@
+## 2026-11-22 — 已发版 `0.13.2`：guardian 误杀修复 + 固定左栏 + 孤儿清理（`CONFIRMED`）
+
+- **From:** 本会话（lead）· **To:** 下一轮接手者
+- **发了什么**：（待填：commit、tag、CI run、Release run）
+- **内容**：guardian 预算覆盖 wait 窗口（D-097，根因见 VALIDATION）；进度任务带固定 40px
+  左栏 + 折线 wiring（CHECK 7/7）；`lib/panel.*` 孤儿产物删除（`src/panel.ts` 在 `56e701d`
+  已删，`lib/` 残留 4 文件零引用）；t55 重复规则删除（与 TESTING.md 覆盖率 0.82）。
+- **没做的**：并发轮的未跟踪文件未动（`docs/cleanup/`、`docs-history-audit/`、`research/`、
+  其他 `.rsi/evidence/*`）；真实 GUI 手点 NOT_RUN。
+
+## 2026-11-22 — session-77a3f6fb 中断恢复 + guardian 误杀修复（`CONFIRMED`，未发版）
+
+- **From:** 本会话（lead）· **To:** 下一轮接手者
+- **为什么停了**：不是用户叫停，也不是任务失败。turn 38 的 run-6599 里任务 1（复核）已做完，
+  任务 2（固定左栏）的执行子任务在 10 分 01 秒被宿主 guardian 整轮 cancel——当时它正在收尾
+  （证据 md 已写、截图已看、diff 已审，只差最后几个行号核对）。同秒启动的 guardian
+  adjudication 子任务只活 1 秒就随整轮一起被取消，Q8 的 wait×2 还没判完。
+- **根因**：宿主与脚本的两层 10 min 预算完全重合，宿主先杀整轮，脚本的 wait 续命永远跑不出来。
+- **修了什么**：`guardianChildBudgetMs(timeoutMs, childTimeoutMs?)`——有守卫路由时宿主预算覆盖
+  `childBudget + 2×5min wait`（仍受 10 min 上限与 deadline 约束）；`run.ts` 只在配了
+  `guardianModel` 时传参，无守卫 run 行为零变化。详见 D-097。
+- **任务收尾**：任务 2 的 CHECK 独立核验 7/7 PASS（`test/progress-connector.spec.ts` +5 例、
+  `test/timeout.spec.ts` +1 例，`npm test` 78/1454 全绿，几何 harness `problems: []`）。
+  原 run 的任务 2 不用重跑——代码与证据都在工作树里，只差提交。
+- **没做的**：未提交、未发版（工作树另有并发轮的 `lib/panel.*` 删除、`t55` 规则删除、
+  `docs/cleanup/`、`research/` 等未跟踪文件，不属本任务，未代提交）；真实 GUI 手点 NOT_RUN。
+
 ## 2026-11-22 — 已发版 `0.13.1`：动态转向 Waves 0–4 全量（lead 收尾）`CONFIRMED`
 
 - **From:** 本会话（lead）· **To:** 下一轮接手者

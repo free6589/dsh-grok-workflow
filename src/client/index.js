@@ -2848,6 +2848,29 @@ window.__ModuleLoader__.load({
     }
 
     /**
+     * The band's wire geometry, shared by the stylesheet and the measurement.
+     *
+     * The left gutter is a constant. It used to be the right-most owner's trunk position,
+     * so a row owned by a later stage widened the indent and pushed every card right: the
+     * band moved when nothing about the cards had changed. Attribution now comes from the
+     * wire, not from how far a card is indented.
+     *
+     * Inside that gutter each owner group gets one channel and one elbow lane under the
+     * spine, so two owners never share a run that would read as a single line.
+     */
+    const PROGRESS_WIRE_PAD = 40
+    const PROGRESS_WIRE_BAND_GAP = 12
+    const PROGRESS_WIRE_CHANNEL_X = 18
+    const PROGRESS_WIRE_CHANNEL_STEP = 10
+    // The last x a channel may take: the gutter's inner edge. A run that declares rows in
+    // more stages than the step has room for tightens the step instead of pushing a channel
+    // under the cards, and the lanes stay distinct either way.
+    const PROGRESS_WIRE_CHANNEL_INNER = 38
+    const PROGRESS_WIRE_LANE_GAP = 4
+    const PROGRESS_WIRE_LANE_STEP = 8
+    const PROGRESS_WIRE_LANE_CLEARANCE = 4
+
+    /**
      * The track's stylesheet, scoped to `.gw-progress`.
      *
      * Every colour is a `--dsw-alias-*` token and every family is a `--dsw-font-*` token,
@@ -2926,13 +2949,13 @@ window.__ModuleLoader__.load({
       '.gw-progress-link[data-flowing="true"] {',
       '  background: repeating-linear-gradient(90deg, var(--dsw-alias-state-business-primary, currentColor) 0 6px, transparent 6px 10px);',
       '  animation: gw-progress-flow 1s linear infinite; }',
-      // The task band: one card per task group, indented past the trunk the wires draw. The
-      // indent arrives as `--gw-wire-pad` from the measured geometry; without a measurement
-      // (no layout, or the narrow layout that hides the wires) the fallback keeps the cards
-      // fully readable.
-      '.gw-progress-tasks { width: 100%; margin-top: 12px; padding: 0 12px 0 var(--gw-wire-pad, 12px); }',
-      // One indent for the whole band, past the right-most trunk: a card must never have a
-      // trunk running through it, and a branch may only cross another branch's line.
+      // The task band: one card per task group, behind a fixed left gutter wide enough for
+      // every wire channel. The gutter is a constant so the cards do not move when a later
+      // stage owns a task; only the top margin grows, because that is where the elbow lanes
+      // under the spine live and a lane may not run across a card.
+      `.gw-progress-tasks { width: 100%; margin-top: calc(${PROGRESS_WIRE_BAND_GAP}px + var(--gw-wire-depth, 0px)); padding: 0 12px 0 ${PROGRESS_WIRE_PAD}px; }`,
+      // The gutter keeps every channel left of the cards: a card must never have a wire
+      // running through it, and a stub only ever spans the gutter itself.
       '.gw-progress-task { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; box-sizing: border-box; min-height: 40px;',
       '  width: 100%; max-width: 100%; margin: 0 0 10px; padding: 6px 10px;',
       '  border: 1px solid var(--dsw-alias-border-l2, currentColor); border-radius: 10px;',
@@ -2998,7 +3021,7 @@ window.__ModuleLoader__.load({
       '  .gw-progress-seg[data-state="blocked"], .gw-progress-seg[data-state="cancelled"] {',
       '    border-inline-start-color: var(--dsw-alias-state-warn-primary, currentColor); }',
       '  .gw-progress-link, .gw-progress-wires { display: none; }',
-      '  .gw-progress-tasks { padding-left: 12px; }',
+      `  .gw-progress-tasks { padding-left: 12px; margin-top: ${PROGRESS_WIRE_BAND_GAP}px; }`,
       '}',
     ].join('\n')
 
@@ -3241,43 +3264,55 @@ window.__ModuleLoader__.load({
         h('span', { className: 'gw-progress-subs' }, subs)))
     }
 
-    /** No wires and the CSS fallback indent: what a host without layout gets. */
-    const EMPTY_PROGRESS_WIRES = { width: 0, height: 0, pad: 0, paths: [] }
+    /** No wires and no lane depth: what a host without layout gets. */
+    const EMPTY_PROGRESS_WIRES = { width: 0, height: 0, depth: 0, paths: [] }
 
     /**
      * Whether two measured wire sets are the same, so a re-measure does not re-render.
      * @param left - current set.
      * @param right - freshly measured set.
-     * @returns whether every path and the indent match.
+     * @returns whether every vertex, tone and the lane depth match.
      */
     function sameProgressWires(left, right) {
       if (left === right) return true
-      if (left.width !== right.width || left.height !== right.height || left.pad !== right.pad) return false
+      if (left.width !== right.width || left.height !== right.height || left.depth !== right.depth) return false
       if (left.paths.length !== right.paths.length) return false
       for (let index = 0; index < left.paths.length; index += 1) {
         const a = left.paths[index]
         const b = right.paths[index]
-        if (a.kind !== b.kind || a.owner !== b.owner || a.tone !== b.tone) return false
-        if (a.x !== b.x || a.y !== b.y || a.x2 !== b.x2 || a.card !== b.card || a.height !== b.height) return false
+        if (a.kind !== b.kind || a.owner !== b.owner || a.card !== b.card || a.tone !== b.tone) return false
+        if (a.points.length !== b.points.length) return false
+        for (let at = 0; at < a.points.length; at += 1) {
+          if (a.points[at][0] !== b.points[at][0] || a.points[at][1] !== b.points[at][1]) return false
+        }
       }
       return true
     }
 
     /**
-     * Measure the trunk and branch geometry from the laid-out DOM.
+     * Measure the elbow and stub geometry from the laid-out DOM.
      *
-     * The owner stage's ring centre is a flex result, not a number anyone can derive, so
-     * it has to be read after layout — the same thing the mockup does. A host without
-     * layout (a stub renderer, a zero-width column) yields no paths: the band then renders
-     * as a plain list instead of as a graph with invented coordinates.
+     * Only the owner's ring centre has to be read: it is a flex result, not a number anyone
+     * can derive, so it is measured after layout — the same thing the mockup does. Every
+     * other coordinate is either a constant of the left gutter or the card's own rect.
+     *
+     * One group is one unwind: down from the ring, one lane leftwards under the spine, then
+     * down the group's own channel in the gutter. A card's stub is the last step — a short
+     * arrow into its left edge — so the group's line is readable without indenting the card.
+     *
+     * A host without layout (a stub renderer, a zero-width column) yields no paths: the band
+     * then renders as a plain list instead of as a graph with invented coordinates.
      * @param flow - the `.gw-progress-flow` element, when there is one.
      * @returns the measured wire set.
      */
     function measureProgressWires(flow) {
       if (flow === null || flow === undefined) return EMPTY_PROGRESS_WIRES
-      if (typeof flow.querySelectorAll !== 'function' || typeof flow.getBoundingClientRect !== 'function') return EMPTY_PROGRESS_WIRES
+      if (typeof flow.querySelectorAll !== 'function' || typeof flow.querySelector !== 'function') return EMPTY_PROGRESS_WIRES
+      if (typeof flow.getBoundingClientRect !== 'function') return EMPTY_PROGRESS_WIRES
       const frame = flow.getBoundingClientRect()
       if (!(frame.width > 1) || !(frame.height > 1)) return EMPTY_PROGRESS_WIRES
+      const track = flow.querySelector('[data-gw-progress-track]')
+      if (track === null || track === undefined || typeof track.getBoundingClientRect !== 'function') return EMPTY_PROGRESS_WIRES
       const cards = Array.from(flow.querySelectorAll('[data-gw-progress-task]'))
       if (cards.length === 0) return EMPTY_PROGRESS_WIRES
       const groups = new Map()
@@ -3288,53 +3323,61 @@ window.__ModuleLoader__.load({
         if (list === undefined) groups.set(owner, [card])
         else list.push(card)
       }
-      const trunks = []
-      const branches = []
-      let pad = 0
+      const trackBottom = Math.round(track.getBoundingClientRect().bottom - frame.top)
+      const paths = []
+      let depth = 0
+      let lane = 0
+      const channelStep = groups.size > 1
+        ? Math.min(PROGRESS_WIRE_CHANNEL_STEP, Math.floor((PROGRESS_WIRE_CHANNEL_INNER - PROGRESS_WIRE_CHANNEL_X) / (groups.size - 1)))
+        : PROGRESS_WIRE_CHANNEL_STEP
       for (const [owner, members] of groups) {
         const segment = flow.querySelector(`.gw-progress-track [data-node-key="${owner}"]`)
         const anchor = segment === null || segment === undefined || typeof segment.querySelector !== 'function'
           ? null
           : segment.querySelector('.gw-progress-ring')
+        // Without a measured ring there is no origin for the line: a stub alone would pin an
+        // arrow on a card to an owner the reader cannot see.
         if (anchor === null || typeof anchor.getBoundingClientRect !== 'function') continue
         const ring = anchor.getBoundingClientRect()
-        const box = segment.getBoundingClientRect()
         const x = Math.round(ring.left - frame.left + ring.width / 2)
-        const top = Math.round(box.bottom - frame.top + 2)
-        let bottom = top
+        const laneY = trackBottom + PROGRESS_WIRE_LANE_GAP + lane * PROGRESS_WIRE_LANE_STEP
+        // One lane and one channel per group: two groups that shared either would draw a
+        // collinear run that reads as one owner.
+        const channel = PROGRESS_WIRE_CHANNEL_X + lane * channelStep
+        const stubs = []
+        let last = laneY
         for (const card of members) {
           const rect = card.getBoundingClientRect()
           const y = Math.round(rect.top - frame.top + rect.height / 2)
-          if (y > bottom) bottom = y
-          branches.push({
+          if (y > last) last = y
+          stubs.push({
             kind: 'branch',
             owner,
             card: card.getAttribute('data-gw-progress-task'),
             tone: card.getAttribute('data-state') || 'pending',
-            x,
-            x2: Math.round(rect.left - frame.left),
-            y,
-            height: 0,
+            // The stub ends on the card's own left edge, so the arrow lands on the border
+            // however the card's padding and border weight are styled.
+            points: [[channel, y], [Math.round(rect.left - frame.left), y]],
           })
         }
-        trunks.push({
+        paths.push({
           kind: 'trunk',
           owner,
           card: undefined,
           tone: segment.getAttribute('data-state') || 'pending',
-          x,
-          x2: x,
-          y: top,
-          height: bottom - top,
+          points: [[x, trackBottom], [x, laneY], [channel, laneY], [channel, last]],
         })
-        // The band's indent clears the right-most trunk, so no card sits on a line.
-        pad = Math.max(pad, x + 30)
+        paths.push(...stubs)
+        // The band's top margin has to clear the deepest lane, or an elbow would run across
+        // the first card; the gutter itself never moves, so the cards keep their left edge.
+        depth = Math.max(depth, laneY - trackBottom + PROGRESS_WIRE_LANE_CLEARANCE - PROGRESS_WIRE_BAND_GAP)
+        lane += 1
       }
       return {
         width: Math.round(frame.width),
         height: Math.round(frame.height),
-        pad,
-        paths: [...trunks, ...branches],
+        depth: Math.max(0, depth),
+        paths,
       }
     }
 
@@ -3381,14 +3424,38 @@ window.__ModuleLoader__.load({
     }
 
     /**
+     * One measured wire as an SVG path.
+     *
+     * Every vertex is written out — `V`/`H` would be shorter, but the measurement is the
+     * only thing that knows which axis a leg belongs to, so the path states both numbers.
+     * @param points - measured vertices, already rounded to whole pixels.
+     * @returns the `d` attribute.
+     */
+    function progressWireDraw(points) {
+      return points.map((point, index) => `${index === 0 ? 'M' : 'L'}${point[0]} ${point[1]}`).join(' ')
+    }
+
+    /**
+     * The arrow that lands on a card's left edge and points into the card.
+     * @param points - the stub's measured vertices; the last one is the card edge.
+     * @returns the polygon's point list.
+     */
+    function progressWireHead(points) {
+      const tip = points[points.length - 1]
+      return `${tip[0]},${tip[1]} ${tip[0] - 8},${tip[1] - 4.5} ${tip[0] - 8},${tip[1] + 4.5}`
+    }
+
+    /**
      * The "进度" view.
      *
      * Two tracks over one model, which is what the mockup shows:
      *
      * - **the spine** — the seven fixed stages of the process template, in one horizontal
      *   row, with the connector between each pair and the measured-time rail under each;
-     * - **the task band** — one card per group of rows, below the spine, joined to the
-     *   spine segment that owns it by a measured trunk and one branch per card.
+     * - **the task band** — one card per group of rows, below the spine, in one fixed left
+     *   gutter. Each owner group unwinds from its stage's ring into its own channel in that
+     *   gutter, and every card takes a short arrow off the channel into its left edge, so
+     *   the line says who owns the card instead of the card's indentation saying it.
      *
      * A stage is a static mark and a card is inert: clicking either does nothing. The only
      * action is a row's pill, rendered exactly when the shell can open that child session,
@@ -3529,7 +3596,7 @@ window.__ModuleLoader__.load({
             'data-gw-progress-wire': 'trunk',
             'data-owner': path.owner,
             'data-tone': path.tone,
-            d: `M${path.x} ${path.y} L${path.x} ${path.y + path.height}`,
+            d: progressWireDraw(path.points),
             style: progressWireStyle(path.tone, false),
           })
           : h('g', { key: `branch:${path.owner}:${path.card}`, 'data-gw-progress-wire-branch': path.card },
@@ -3539,12 +3606,12 @@ window.__ModuleLoader__.load({
               'data-owner': path.owner,
               'data-card': path.card,
               'data-tone': path.tone,
-              d: `M${path.x} ${path.y} L${path.x2} ${path.y}`,
+              d: progressWireDraw(path.points),
               style: progressWireStyle(path.tone, path.tone === 'doing'),
             }),
             h('polygon', {
               className: 'gw-progress-wire-head',
-              points: `${path.x2},${path.y} ${path.x2 - 8},${path.y - 4.5} ${path.x2 - 8},${path.y + 4.5}`,
+              points: progressWireHead(path.points),
               style: { fill: progressWireStyle(path.tone, false).stroke },
             })))))
       return h('section', {
@@ -3567,7 +3634,7 @@ window.__ModuleLoader__.load({
             className: 'gw-progress-flow',
             'data-gw-progress-flow': true,
             ref: flowRef,
-            style: wires.pad > 0 ? { '--gw-wire-pad': `${wires.pad}px` } : undefined,
+            style: { '--gw-wire-depth': `${wires.depth}px` },
           },
           h('ul', {
             className: 'gw-progress-track',

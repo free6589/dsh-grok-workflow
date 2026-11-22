@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<title>spine parity — real bundle render</title>
+<style>
+  html[data-theme="light"] {
+    --dsw-alias-label-primary: #1f2328; --dsw-alias-label-secondary: #6b7280;
+    --dsw-alias-border-l2: #d8dde4; --dsw-alias-fill-l2: #f2f4f7;
+    --dsw-alias-state-success-primary: #15803d; --dsw-alias-state-error-primary: #d1242f;
+    --dsw-alias-state-warn-primary: #b45309; --dsw-alias-state-idle-primary: #c3c9d2;
+    --dsw-alias-state-business-primary: #2f6fed;
+    --dsw-font-family-sans: "Noto Sans CJK SC", "Source Han Sans SC", system-ui, sans-serif;
+  }
+  html, body { margin: 0; padding: 0; background: #fff; color: #1f2328;
+    font-family: var(--dsw-font-family-sans); }
+  .frame { background: #fff; box-sizing: border-box; padding: 0; margin: 0 0 24px; }
+  .frame-label { font: 12px/1.4 monospace; color: #666; padding: 2px 4px; }
+  #results { white-space: pre-wrap; font: 12px/1.5 monospace; }
+</style>
+</head>
+<body>
+<div id="frames"></div>
+<pre id="results">PENDING</pre>
+<script>
+  window.__ModuleLoader__ = { load: function (spec) { window.__registration = spec } }
+</script>
+<script src="file:///home/fish/projects_mine/dsh-grok-workflow/lib/client.js"></script>
+<script>
+(function () {
+  'use strict'
+  var reg = window.__registration
+  if (reg === undefined || reg === null) throw new Error('bundle did not register a module')
+
+  // ---- mini React ---------------------------------------------------------
+  // The bundle is React-flavoured: it builds a plain element tree and uses five
+  // hooks. This shim runs the component for real against a real DOM, so flex
+  // layout, media queries and getBoundingClientRect are the browser's answers.
+  var runtime = { cells: [], index: 0, effects: [], dirty: false }
+
+  function cell(index, initial) {
+    if (!(index in runtime.cells)) runtime.cells[index] = initial
+    return runtime.cells[index]
+  }
+
+  var ReactShim = {
+    createElement: function (type, props) {
+      var children = Array.prototype.slice.call(arguments, 2).flat(Infinity)
+      var element = { type: type, props: props || {}, children: children }
+      return typeof type === 'function' ? type(element.props) : element
+    },
+    useState: function (initial) {
+      var index = runtime.index++
+      var store = cell(index, { value: typeof initial === 'function' ? initial() : initial })
+      var set = function (next) {
+        var value = typeof next === 'function' ? next(store.value) : next
+        if (!Object.is(value, store.value)) { store.value = value; runtime.dirty = true }
+      }
+      return [store.value, set]
+    },
+    useRef: function (initial) {
+      var index = runtime.index++
+      return cell(index, { current: initial === undefined ? null : initial })
+    },
+    useMemo: function (factory, deps) {
+      var index = runtime.index++
+      var store = cell(index, { value: undefined, deps: undefined })
+      var previous = store.deps
+      var changed = previous === undefined || deps === undefined || previous.length !== deps.length
+      if (!changed) {
+        for (var i = 0; i < deps.length; i++) if (!Object.is(previous[i], deps[i])) { changed = true; break }
+      }
+      if (changed) { store.value = factory(); store.deps = deps }
+      return store.value
+    },
+    useEffect: function (fn) { runtime.effects.push(fn) },
+    useSyncExternalStore: function (_subscribe, getSnapshot) { return getSnapshot() },
+  }
+
+  var exports = reg.factory(function (id) {
+    if (id === 'react') return ReactShim
+    throw new Error('unexpected require: ' + id)
+  })
+  var progress = exports.GROK_WORKFLOW_PROGRESS
+  var t = exports.GROK_WORKFLOW_INTERNALS.translator('zh')
+  var css = progress.css
+  var component = progress.component
+
+  // ---- stub tree -> real DOM ---------------------------------------------
+  var SVG_NS = 'http://www.w3.org/2000/svg'
+  var SVG_TAGS = { svg: 1, g: 1, path: 1, line: 1, circle: 1, polyline: 1, polygon: 1, rect: 1 }
+  var ATTR_ALIAS = { strokeWidth: 'stroke-width', strokeDasharray: 'stroke-dasharray',
+    strokeLinecap: 'stroke-linecap' }
+
+  function applyProps(el, props) {
+    Object.keys(props).forEach(function (key) {
+      var value = props[key]
+      if (value === undefined || value === null || value === false) return
+      if (key === 'key' || key === 'children') return
+      if (key === 'ref') { if (value !== null && typeof value === 'object') value.current = el; return }
+      if (key === 'className') { el.setAttribute('class', Array.isArray(value) ? value.filter(Boolean).join(' ') : String(value)); return }
+      if (key === 'style') {
+        Object.keys(value).forEach(function (name) {
+          var cssValue = value[name]
+          if (cssValue === undefined || cssValue === null) return
+          if (name.slice(0, 2) === '--') el.style.setProperty(name, String(cssValue))
+          else el.style[name] = cssValue
+        })
+        return
+      }
+      if (typeof value === 'function') return
+      el.setAttribute(ATTR_ALIAS[key] || key, String(value))
+    })
+  }
+
+  function renderNode(node, parent) {
+    if (node === null || node === undefined || node === false || node === true) return
+    if (Array.isArray(node)) { node.forEach(function (child) { renderNode(child, parent) }); return }
+    if (typeof node === 'string' || typeof node === 'number') {
+      parent.appendChild(document.createTextNode(String(node)))
+      return
+    }
+    var el = SVG_TAGS[node.type] === 1
+      ? document.createElementNS(SVG_NS, node.type)
+      : document.createElement(node.type)
+    applyProps(el, node.props)
+    node.children.forEach(function (child) { renderNode(child, el) })
+    parent.appendChild(el)
+  }
+
+  // ---- cases -------------------------------------------------------------
+  // One case is one run shape the recorder can write. A carries three owner stages,
+  // B twelve plan tasks all owned by execute, C one verify row, E one execute row
+  // (C and E exist to compare the card's left edge across owners), and D four stages,
+  // which is more owner groups than the ten-pixel channel step has room for.
+  function row(seq, phase, label, outcome, startedAt, endedAt) {
+    var member = { seq: seq, label: label, phase: phase, childId: 'c' + seq, order: seq, startedAt: startedAt }
+    if (outcome !== undefined) member.outcome = outcome
+    if (endedAt !== undefined) member.endedAt = endedAt
+    return member
+  }
+
+  function runOf(id, members) {
+    return { runId: id, name: '任务团队', anchorSeq: 1, members: members }
+  }
+
+  var cases = [
+    { id: 'A-three-owners', members: [
+      row(1, '规划', '规划', 'completed', 0, 3000),
+      row(10, '执行', '执行', 'completed', 3000, 7000),
+      row(11, '执行', '执行', 'completed', 3000, 7100),
+      row(12, '执行', '执行', 'completed', 3000, 6100),
+      row(13, '执行', '执行', 'failed', 3000, 10800),
+      row(14, '执行', '执行', 'completed', 3000, 8200),
+      row(15, '执行', '执行', 'completed', 3000, 8300),
+      row(16, '执行', '执行', 'completed', 3000, 7300),
+      row(17, '执行', '执行', 'completed', 3000, 8000),
+      row(18, '检查', '检查', 'completed', 11000, 20400),
+      row(19, '检查', '检查', undefined, 11000),
+    ] },
+    { id: 'B-twelve-plan-tasks', members: Array.from({ length: 12 }, function (_unused, index) {
+      return row(index + 1, '任务 ' + (index + 1) + ' · 步骤', '执行', 'completed', index * 1000, index * 1000 + 900)
+    }) },
+    { id: 'C-verify-only', members: [row(1, '检查', '检查', 'completed', 0, 1200)] },
+    { id: 'D-four-owners', members: [
+      row(1, '规划', '规划', 'completed', 0, 1000),
+      row(2, '执行', '执行', 'completed', 1000, 2000),
+      row(3, '检查', '检查', 'completed', 2000, 3000),
+      row(4, '回答', '回答', undefined, 3000),
+    ] },
+    { id: 'E-execute-only', members: [row(1, '执行', '执行', 'completed', 0, 1200)] },
+    // F: two plan tasks in one owner group plus one verify row, so a single group's channel
+    // has two cards to cover and a second group sits below it on its own channel.
+    { id: 'F-two-cards-one-group', members: [
+      row(1, '任务 1 · 读代码', '执行', 'completed', 0, 900),
+      row(2, '任务 2 · 补测试', '执行', undefined, 900),
+      row(3, '检查', '检查', 'completed', 2000, 2600),
+    ] },
+  ]
+
+  // ---- measuring ---------------------------------------------------------
+  function parsePath(d) {
+    var points = []
+    var re = /([ML])\s*(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)/g
+    var match = re.exec(d)
+    while (match !== null) {
+      points.push([Number(match[2]), Number(match[3])])
+      match = re.exec(d)
+    }
+    return points
+  }
+
+  function parsePoints(text) {
+    return text.trim().split(/\s+/).map(function (pair) {
+      var parts = pair.split(',')
+      return [Number(parts[0]), Number(parts[1])]
+    })
+  }
+
+  function rectOf(element, frame) {
+    var rect = element.getBoundingClientRect()
+    return {
+      left: +(rect.left - frame.left).toFixed(2),
+      top: +(rect.top - frame.top).toFixed(2),
+      right: +(rect.right - frame.left).toFixed(2),
+      bottom: +(rect.bottom - frame.top).toFixed(2),
+      width: +rect.width.toFixed(2),
+      height: +rect.height.toFixed(2),
+    }
+  }
+
+  function mountCase(entry, width) {
+    var frame = document.createElement('div')
+    frame.className = 'frame'
+    frame.setAttribute('data-case', entry.id)
+    frame.style.width = width + 'px'
+    var label = document.createElement('div')
+    label.className = 'frame-label'
+    label.textContent = entry.id + ' @ ' + width + 'px'
+    frame.appendChild(label)
+    var host = document.createElement('div')
+    host.style.width = width + 'px'
+    frame.appendChild(host)
+    document.getElementById('frames').appendChild(frame)
+
+    var run = runOf('run-' + entry.id, entry.members)
+    var snapshot = { runs: [run], activeRun: run }
+    var props = {
+      t: t,
+      progressT: t,
+      useGrokProgress: function (select) { return select(snapshot) },
+      canOpen: function () { return true },
+      openChild: function () {},
+    }
+    runtime.cells = []
+    for (var pass = 0; pass < 10; pass++) {
+      runtime.index = 0
+      runtime.effects = []
+      runtime.dirty = false
+      host.textContent = ''
+      renderNode(component(props), host)
+      runtime.effects.forEach(function (fn) { fn() })
+      if (!runtime.dirty) break
+    }
+    return { host: host, passes: pass }
+  }
+
+  function inspect(entry, width) {
+    var mounted = mountCase(entry, width)
+    var host = mounted.host
+    var flow = host.querySelector('[data-gw-progress-flow]')
+    var frame = flow.getBoundingClientRect()
+    var track = host.querySelector('[data-gw-progress-track]')
+    var band = host.querySelector('[data-gw-progress-tasks]')
+    var svg = host.querySelector('[data-gw-progress-wires]')
+    var trackRect = rectOf(track, frame)
+    var bandStyle = getComputedStyle(band)
+    var flowStyle = getComputedStyle(flow)
+
+    var cards = Array.prototype.slice.call(host.querySelectorAll('[data-gw-progress-task]')).map(function (card) {
+      var owner = card.getAttribute('data-owner')
+      var segment = host.querySelector('.gw-progress-track [data-node-key="' + owner + '"]')
+      var ring = segment === null ? null : segment.querySelector('.gw-progress-ring')
+      return {
+        key: card.getAttribute('data-gw-progress-task'),
+        owner: owner,
+        state: card.getAttribute('data-state'),
+        rect: rectOf(card, frame),
+        ringX: ring === null ? null : +((ring.getBoundingClientRect().left + ring.getBoundingClientRect().width / 2) - frame.left).toFixed(2),
+      }
+    })
+
+    var trunks = Array.prototype.slice.call(host.querySelectorAll('[data-gw-progress-wire="trunk"]')).map(function (path) {
+      return {
+        owner: path.getAttribute('data-owner'),
+        tone: path.getAttribute('data-tone'),
+        d: path.getAttribute('d'),
+        points: parsePath(path.getAttribute('d')),
+      }
+    })
+
+    var branches = Array.prototype.slice.call(host.querySelectorAll('[data-gw-progress-wire="branch"]')).map(function (path) {
+      var group = path.parentNode
+      var head = group.querySelector('.gw-progress-wire-head')
+      return {
+        owner: path.getAttribute('data-owner'),
+        card: path.getAttribute('data-card'),
+        tone: path.getAttribute('data-tone'),
+        d: path.getAttribute('d'),
+        points: parsePath(path.getAttribute('d')),
+        headPoints: head === null ? null : parsePoints(head.getAttribute('points')),
+        groupAttr: group.getAttribute('data-gw-progress-wire-branch'),
+      }
+    })
+
+    return {
+      case: entry.id,
+      width: width,
+      passes: mounted.passes,
+      innerWidth: window.innerWidth,
+      trackBottom: +trackRect.bottom.toFixed(2),
+      bandRect: rectOf(band, frame),
+      bandPaddingLeft: bandStyle.paddingLeft,
+      bandMarginTop: bandStyle.marginTop,
+      flowDepthVar: flowStyle.getPropertyValue('--gw-wire-depth').trim(),
+      svgDisplay: svg === null ? 'missing' : getComputedStyle(svg).display,
+      svgRect: svg === null ? null : rectOf(svg, frame),
+      cards: cards,
+      trunks: trunks,
+      branches: branches,
+      counts: {
+        cards: cards.length,
+        trunks: trunks.length,
+        branches: branches.length,
+        heads: host.querySelectorAll('.gw-progress-wire-head').length,
+      },
+    }
+  }
+
+  var width = document.documentElement.clientWidth
+  var out = []
+  cases.forEach(function (entry) {
+    out.push(inspect(entry, width))
+  })
+  window.__RESULT = out
+  document.getElementById('results').textContent = 'JSON_START' + JSON.stringify(out) + 'JSON_END'
+  document.title = 'done'
+})()
+</script>
+</body>
+</html>

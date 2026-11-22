@@ -120,6 +120,28 @@ describe('timeout tiers', () => {
     // An unlimited run arms no watchdog: it is not second-guessed.
     expect(guardianChildBudgetMs(0)).toBe(0)
   })
+
+  it('covers the script wait window when a guardian route is configured', () => {
+    // Regression for session-77a3f6fb turn 38: the host fired at 10 min while
+    // the script was still inside its Q8 adjudication window, killing a child
+    // that had shown 10 min of real progress. With a guardian configured the
+    // host budget covers the script child budget plus the full wait extension
+    // (GUARDIAN_MAX_WAITS slices), so the script's own verdict lands first.
+    // The numbers live in timeout.ts; the script mirrors them (pinned below),
+    // so the host reads the same source instead of a second copy.
+    const waitExtension = GUARDIAN_MAX_WAITS * GUARDIAN_WAIT_MS
+    expect(waitExtension).toBe(600_000)
+    // Long deadline: capped at the same 10 min ceiling, never above it.
+    expect(guardianChildBudgetMs(7_200_000, CHILD_TIMEOUT_MS)).toBe(CHILD_TIMEOUT_MS)
+    expect(guardianChildBudgetMs(3_600_000, CHILD_TIMEOUT_MS)).toBe(CHILD_TIMEOUT_MS)
+    // Without a guardian route nothing changes: the old single-budget path.
+    expect(guardianChildBudgetMs(3_600_000, undefined)).toBe(CHILD_TIMEOUT_MS)
+    expect(guardianChildBudgetMs(3_600_000)).toBe(CHILD_TIMEOUT_MS)
+    // A short deadline still binds: the host never waits past the run's own end.
+    expect(guardianChildBudgetMs(30_000, CHILD_TIMEOUT_MS)).toBe(30_000)
+    // Unlimited still disarms, even with a guardian configured.
+    expect(guardianChildBudgetMs(0, CHILD_TIMEOUT_MS)).toBe(0)
+  })
 })
 
 describe('Q8 guardian adjudication: the pure wait/kill rules', () => {

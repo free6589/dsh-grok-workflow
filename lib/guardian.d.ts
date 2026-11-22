@@ -158,7 +158,7 @@ export interface GuardianOptions {
     state?: object;
 }
 /** Derive one child's stall budget from the run's own deadline. */
-export declare function guardianChildBudgetMs(timeoutMs: number): number;
+export declare function guardianChildBudgetMs(timeoutMs: number, childTimeoutMs?: number): number;
 /**
  * Create the resident guardian for one run.
  *

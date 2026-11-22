@@ -1,0 +1,1801 @@
+{
+ "widths": [
+  1440,
+  760,
+  480
+ ],
+ "problems": [],
+ "reports": [
+  {
+   "width": 1440,
+   "cases": [
+    {
+     "case": "A-three-owners",
+     "innerWidth": 1440,
+     "passes": 2,
+     "bandPaddingLeft": "40px",
+     "bandMarginTop": "24px",
+     "depthVar": "12px",
+     "svg": "block",
+     "counts": {
+      "cards": 3,
+      "trunks": 3,
+      "branches": 3,
+      "heads": 3
+     },
+     "cardLefts": [
+      40
+     ],
+     "owners": [
+      "stage:execute",
+      "stage:plan",
+      "stage:verify"
+     ],
+     "trunks": [
+      {
+       "owner": "stage:plan",
+       "d": "M241 88 L241 92 L18 92 L18 132",
+       "ringX": 241,
+       "laneY": 92,
+       "lane": 0,
+       "channel": 18,
+       "lastCardY": 132,
+       "cardCentres": [
+        132
+       ]
+      },
+      {
+       "owner": "stage:execute",
+       "d": "M446 88 L446 100 L28 100 L28 182",
+       "ringX": 446,
+       "laneY": 100,
+       "lane": 1,
+       "channel": 28,
+       "lastCardY": 182,
+       "cardCentres": [
+        182
+       ]
+      },
+      {
+       "owner": "stage:verify",
+       "d": "M651 88 L651 108 L38 108 L38 232",
+       "ringX": 651,
+       "laneY": 108,
+       "lane": 2,
+       "channel": 38,
+       "lastCardY": 232,
+       "cardCentres": [
+        232
+       ]
+      }
+     ],
+     "branches": [
+      {
+       "card": "stage:plan",
+       "owner": "stage:plan",
+       "d": "M18 132 L40 132",
+       "head": [
+        [
+         40,
+         132
+        ],
+        [
+         32,
+         127.5
+        ],
+        [
+         32,
+         136.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 132
+      },
+      {
+       "card": "stage:execute",
+       "owner": "stage:execute",
+       "d": "M28 182 L40 182",
+       "head": [
+        [
+         40,
+         182
+        ],
+        [
+         32,
+         177.5
+        ],
+        [
+         32,
+         186.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 182
+      },
+      {
+       "card": "stage:verify",
+       "owner": "stage:verify",
+       "d": "M38 232 L40 232",
+       "head": [
+        [
+         40,
+         232
+        ],
+        [
+         32,
+         227.5
+        ],
+        [
+         32,
+         236.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 232
+      }
+     ]
+    },
+    {
+     "case": "B-twelve-plan-tasks",
+     "innerWidth": 1440,
+     "passes": 1,
+     "bandPaddingLeft": "40px",
+     "bandMarginTop": "12px",
+     "depthVar": "0px",
+     "svg": "block",
+     "counts": {
+      "cards": 12,
+      "trunks": 1,
+      "branches": 12,
+      "heads": 12
+     },
+     "cardLefts": [
+      40
+     ],
+     "owners": [
+      "stage:execute"
+     ],
+     "trunks": [
+      {
+       "owner": "stage:execute",
+       "d": "M446 88 L446 92 L18 92 L18 670",
+       "ringX": 446,
+       "laneY": 92,
+       "lane": 0,
+       "channel": 18,
+       "lastCardY": 670,
+       "cardCentres": [
+        120,
+        170,
+        220,
+        270,
+        320,
+        370,
+        420,
+        470,
+        520,
+        570,
+        620,
+        670
+       ]
+      }
+     ],
+     "branches": [
+      {
+       "card": "phase:任务 1 · 步骤",
+       "owner": "stage:execute",
+       "d": "M18 120 L40 120",
+       "head": [
+        [
+         40,
+         120
+        ],
+        [
+         32,
+         115.5
+        ],
+        [
+         32,
+         124.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 120
+      },
+      {
+       "card": "phase:任务 2 · 步骤",
+       "owner": "stage:execute",
+       "d": "M18 170 L40 170",
+       "head": [
+        [
+         40,
+         170
+        ],
+        [
+         32,
+         165.5
+        ],
+        [
+         32,
+         174.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 170
+      },
+      {
+       "card": "phase:任务 3 · 步骤",
+       "owner": "stage:execute",
+       "d": "M18 220 L40 220",
+       "head": [
+        [
+         40,
+         220
+        ],
+        [
+         32,
+         215.5
+        ],
+        [
+         32,
+         224.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 220
+      },
+      {
+       "card": "phase:任务 4 · 步骤",
+       "owner": "stage:execute",
+       "d": "M18 270 L40 270",
+       "head": [
+        [
+         40,
+         270
+        ],
+        [
+         32,
+         265.5
+        ],
+        [
+         32,
+         274.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 270
+      },
+      {
+       "card": "phase:任务 5 · 步骤",
+       "owner": "stage:execute",
+       "d": "M18 320 L40 320",
+       "head": [
+        [
+         40,
+         320
+        ],
+        [
+         32,
+         315.5
+        ],
+        [
+         32,
+         324.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 320
+      },
+      {
+       "card": "phase:任务 6 · 步骤",
+       "owner": "stage:execute",
+       "d": "M18 370 L40 370",
+       "head": [
+        [
+         40,
+         370
+        ],
+        [
+         32,
+         365.5
+        ],
+        [
+         32,
+         374.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 370
+      },
+      {
+       "card": "phase:任务 7 · 步骤",
+       "owner": "stage:execute",
+       "d": "M18 420 L40 420",
+       "head": [
+        [
+         40,
+         420
+        ],
+        [
+         32,
+         415.5
+        ],
+        [
+         32,
+         424.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 420
+      },
+      {
+       "card": "phase:任务 8 · 步骤",
+       "owner": "stage:execute",
+       "d": "M18 470 L40 470",
+       "head": [
+        [
+         40,
+         470
+        ],
+        [
+         32,
+         465.5
+        ],
+        [
+         32,
+         474.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 470
+      },
+      {
+       "card": "phase:任务 9 · 步骤",
+       "owner": "stage:execute",
+       "d": "M18 520 L40 520",
+       "head": [
+        [
+         40,
+         520
+        ],
+        [
+         32,
+         515.5
+        ],
+        [
+         32,
+         524.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 520
+      },
+      {
+       "card": "phase:任务 10 · 步骤",
+       "owner": "stage:execute",
+       "d": "M18 570 L40 570",
+       "head": [
+        [
+         40,
+         570
+        ],
+        [
+         32,
+         565.5
+        ],
+        [
+         32,
+         574.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 570
+      },
+      {
+       "card": "phase:任务 11 · 步骤",
+       "owner": "stage:execute",
+       "d": "M18 620 L40 620",
+       "head": [
+        [
+         40,
+         620
+        ],
+        [
+         32,
+         615.5
+        ],
+        [
+         32,
+         624.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 620
+      },
+      {
+       "card": "phase:任务 12 · 步骤",
+       "owner": "stage:execute",
+       "d": "M18 670 L40 670",
+       "head": [
+        [
+         40,
+         670
+        ],
+        [
+         32,
+         665.5
+        ],
+        [
+         32,
+         674.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 670
+      }
+     ]
+    },
+    {
+     "case": "C-verify-only",
+     "innerWidth": 1440,
+     "passes": 1,
+     "bandPaddingLeft": "40px",
+     "bandMarginTop": "12px",
+     "depthVar": "0px",
+     "svg": "block",
+     "counts": {
+      "cards": 1,
+      "trunks": 1,
+      "branches": 1,
+      "heads": 1
+     },
+     "cardLefts": [
+      40
+     ],
+     "owners": [
+      "stage:verify"
+     ],
+     "trunks": [
+      {
+       "owner": "stage:verify",
+       "d": "M651 88 L651 92 L18 92 L18 120",
+       "ringX": 651,
+       "laneY": 92,
+       "lane": 0,
+       "channel": 18,
+       "lastCardY": 120,
+       "cardCentres": [
+        120
+       ]
+      }
+     ],
+     "branches": [
+      {
+       "card": "stage:verify",
+       "owner": "stage:verify",
+       "d": "M18 120 L40 120",
+       "head": [
+        [
+         40,
+         120
+        ],
+        [
+         32,
+         115.5
+        ],
+        [
+         32,
+         124.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 120
+      }
+     ]
+    },
+    {
+     "case": "D-four-owners",
+     "innerWidth": 1440,
+     "passes": 2,
+     "bandPaddingLeft": "40px",
+     "bandMarginTop": "32px",
+     "depthVar": "20px",
+     "svg": "block",
+     "counts": {
+      "cards": 4,
+      "trunks": 4,
+      "branches": 4,
+      "heads": 4
+     },
+     "cardLefts": [
+      40
+     ],
+     "owners": [
+      "stage:answer",
+      "stage:execute",
+      "stage:plan",
+      "stage:verify"
+     ],
+     "trunks": [
+      {
+       "owner": "stage:plan",
+       "d": "M241 88 L241 92 L18 92 L18 140",
+       "ringX": 241,
+       "laneY": 92,
+       "lane": 0,
+       "channel": 18,
+       "lastCardY": 140,
+       "cardCentres": [
+        140
+       ]
+      },
+      {
+       "owner": "stage:execute",
+       "d": "M446 88 L446 100 L24 100 L24 190",
+       "ringX": 446,
+       "laneY": 100,
+       "lane": 1,
+       "channel": 24,
+       "lastCardY": 190,
+       "cardCentres": [
+        190
+       ]
+      },
+      {
+       "owner": "stage:verify",
+       "d": "M651 88 L651 108 L30 108 L30 240",
+       "ringX": 651,
+       "laneY": 108,
+       "lane": 2,
+       "channel": 30,
+       "lastCardY": 240,
+       "cardCentres": [
+        240
+       ]
+      },
+      {
+       "owner": "stage:answer",
+       "d": "M1061 88 L1061 116 L36 116 L36 290",
+       "ringX": 1061,
+       "laneY": 116,
+       "lane": 3,
+       "channel": 36,
+       "lastCardY": 290,
+       "cardCentres": [
+        290
+       ]
+      }
+     ],
+     "branches": [
+      {
+       "card": "stage:plan",
+       "owner": "stage:plan",
+       "d": "M18 140 L40 140",
+       "head": [
+        [
+         40,
+         140
+        ],
+        [
+         32,
+         135.5
+        ],
+        [
+         32,
+         144.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 140
+      },
+      {
+       "card": "stage:execute",
+       "owner": "stage:execute",
+       "d": "M24 190 L40 190",
+       "head": [
+        [
+         40,
+         190
+        ],
+        [
+         32,
+         185.5
+        ],
+        [
+         32,
+         194.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 190
+      },
+      {
+       "card": "stage:verify",
+       "owner": "stage:verify",
+       "d": "M30 240 L40 240",
+       "head": [
+        [
+         40,
+         240
+        ],
+        [
+         32,
+         235.5
+        ],
+        [
+         32,
+         244.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 240
+      },
+      {
+       "card": "stage:answer",
+       "owner": "stage:answer",
+       "d": "M36 290 L40 290",
+       "head": [
+        [
+         40,
+         290
+        ],
+        [
+         32,
+         285.5
+        ],
+        [
+         32,
+         294.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 290
+      }
+     ]
+    },
+    {
+     "case": "E-execute-only",
+     "innerWidth": 1440,
+     "passes": 1,
+     "bandPaddingLeft": "40px",
+     "bandMarginTop": "12px",
+     "depthVar": "0px",
+     "svg": "block",
+     "counts": {
+      "cards": 1,
+      "trunks": 1,
+      "branches": 1,
+      "heads": 1
+     },
+     "cardLefts": [
+      40
+     ],
+     "owners": [
+      "stage:execute"
+     ],
+     "trunks": [
+      {
+       "owner": "stage:execute",
+       "d": "M446 88 L446 92 L18 92 L18 120",
+       "ringX": 446,
+       "laneY": 92,
+       "lane": 0,
+       "channel": 18,
+       "lastCardY": 120,
+       "cardCentres": [
+        120
+       ]
+      }
+     ],
+     "branches": [
+      {
+       "card": "stage:execute",
+       "owner": "stage:execute",
+       "d": "M18 120 L40 120",
+       "head": [
+        [
+         40,
+         120
+        ],
+        [
+         32,
+         115.5
+        ],
+        [
+         32,
+         124.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 120
+      }
+     ]
+    },
+    {
+     "case": "F-two-cards-one-group",
+     "innerWidth": 1440,
+     "passes": 2,
+     "bandPaddingLeft": "40px",
+     "bandMarginTop": "16px",
+     "depthVar": "4px",
+     "svg": "block",
+     "counts": {
+      "cards": 3,
+      "trunks": 2,
+      "branches": 3,
+      "heads": 3
+     },
+     "cardLefts": [
+      40
+     ],
+     "owners": [
+      "stage:execute",
+      "stage:verify"
+     ],
+     "trunks": [
+      {
+       "owner": "stage:execute",
+       "d": "M446 88 L446 92 L18 92 L18 174",
+       "ringX": 446,
+       "laneY": 92,
+       "lane": 0,
+       "channel": 18,
+       "lastCardY": 174,
+       "cardCentres": [
+        124,
+        174
+       ]
+      },
+      {
+       "owner": "stage:verify",
+       "d": "M651 88 L651 100 L28 100 L28 224",
+       "ringX": 651,
+       "laneY": 100,
+       "lane": 1,
+       "channel": 28,
+       "lastCardY": 224,
+       "cardCentres": [
+        224
+       ]
+      }
+     ],
+     "branches": [
+      {
+       "card": "phase:任务 1 · 读代码",
+       "owner": "stage:execute",
+       "d": "M18 124 L40 124",
+       "head": [
+        [
+         40,
+         124
+        ],
+        [
+         32,
+         119.5
+        ],
+        [
+         32,
+         128.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 124
+      },
+      {
+       "card": "phase:任务 2 · 补测试",
+       "owner": "stage:execute",
+       "d": "M18 174 L40 174",
+       "head": [
+        [
+         40,
+         174
+        ],
+        [
+         32,
+         169.5
+        ],
+        [
+         32,
+         178.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 174
+      },
+      {
+       "card": "stage:verify",
+       "owner": "stage:verify",
+       "d": "M28 224 L40 224",
+       "head": [
+        [
+         40,
+         224
+        ],
+        [
+         32,
+         219.5
+        ],
+        [
+         32,
+         228.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 224
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "width": 760,
+   "cases": [
+    {
+     "case": "A-three-owners",
+     "innerWidth": 760,
+     "passes": 2,
+     "bandPaddingLeft": "40px",
+     "bandMarginTop": "24px",
+     "depthVar": "12px",
+     "svg": "block",
+     "counts": {
+      "cards": 3,
+      "trunks": 3,
+      "branches": 3,
+      "heads": 3
+     },
+     "cardLefts": [
+      40
+     ],
+     "owners": [
+      "stage:execute",
+      "stage:plan",
+      "stage:verify"
+     ],
+     "trunks": [
+      {
+       "owner": "stage:plan",
+       "d": "M144 133 L144 137 L18 137 L18 177",
+       "ringX": 143.84,
+       "laneY": 137,
+       "lane": 0,
+       "channel": 18,
+       "lastCardY": 177,
+       "cardCentres": [
+        177
+       ]
+      },
+      {
+       "owner": "stage:execute",
+       "d": "M252 133 L252 145 L28 145 L28 238",
+       "ringX": 251.7,
+       "laneY": 145,
+       "lane": 1,
+       "channel": 28,
+       "lastCardY": 238,
+       "cardCentres": [
+        238
+       ]
+      },
+      {
+       "owner": "stage:verify",
+       "d": "M360 133 L360 153 L38 153 L38 299",
+       "ringX": 359.56,
+       "laneY": 153,
+       "lane": 2,
+       "channel": 38,
+       "lastCardY": 299,
+       "cardCentres": [
+        299
+       ]
+      }
+     ],
+     "branches": [
+      {
+       "card": "stage:plan",
+       "owner": "stage:plan",
+       "d": "M18 177 L40 177",
+       "head": [
+        [
+         40,
+         177
+        ],
+        [
+         32,
+         172.5
+        ],
+        [
+         32,
+         181.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 177
+      },
+      {
+       "card": "stage:execute",
+       "owner": "stage:execute",
+       "d": "M28 238 L40 238",
+       "head": [
+        [
+         40,
+         238
+        ],
+        [
+         32,
+         233.5
+        ],
+        [
+         32,
+         242.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 238
+      },
+      {
+       "card": "stage:verify",
+       "owner": "stage:verify",
+       "d": "M38 299 L40 299",
+       "head": [
+        [
+         40,
+         299
+        ],
+        [
+         32,
+         294.5
+        ],
+        [
+         32,
+         303.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 299
+      }
+     ]
+    },
+    {
+     "case": "B-twelve-plan-tasks",
+     "innerWidth": 760,
+     "passes": 1,
+     "bandPaddingLeft": "40px",
+     "bandMarginTop": "12px",
+     "depthVar": "0px",
+     "svg": "block",
+     "counts": {
+      "cards": 12,
+      "trunks": 1,
+      "branches": 12,
+      "heads": 12
+     },
+     "cardLefts": [
+      40
+     ],
+     "owners": [
+      "stage:execute"
+     ],
+     "trunks": [
+      {
+       "owner": "stage:execute",
+       "d": "M252 88 L252 92 L18 92 L18 670",
+       "ringX": 251.7,
+       "laneY": 92,
+       "lane": 0,
+       "channel": 18,
+       "lastCardY": 670,
+       "cardCentres": [
+        120,
+        170,
+        220,
+        270,
+        320,
+        370,
+        420,
+        470,
+        520,
+        570,
+        620,
+        670
+       ]
+      }
+     ],
+     "branches": [
+      {
+       "card": "phase:任务 1 · 步骤",
+       "owner": "stage:execute",
+       "d": "M18 120 L40 120",
+       "head": [
+        [
+         40,
+         120
+        ],
+        [
+         32,
+         115.5
+        ],
+        [
+         32,
+         124.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 120
+      },
+      {
+       "card": "phase:任务 2 · 步骤",
+       "owner": "stage:execute",
+       "d": "M18 170 L40 170",
+       "head": [
+        [
+         40,
+         170
+        ],
+        [
+         32,
+         165.5
+        ],
+        [
+         32,
+         174.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 170
+      },
+      {
+       "card": "phase:任务 3 · 步骤",
+       "owner": "stage:execute",
+       "d": "M18 220 L40 220",
+       "head": [
+        [
+         40,
+         220
+        ],
+        [
+         32,
+         215.5
+        ],
+        [
+         32,
+         224.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 220
+      },
+      {
+       "card": "phase:任务 4 · 步骤",
+       "owner": "stage:execute",
+       "d": "M18 270 L40 270",
+       "head": [
+        [
+         40,
+         270
+        ],
+        [
+         32,
+         265.5
+        ],
+        [
+         32,
+         274.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 270
+      },
+      {
+       "card": "phase:任务 5 · 步骤",
+       "owner": "stage:execute",
+       "d": "M18 320 L40 320",
+       "head": [
+        [
+         40,
+         320
+        ],
+        [
+         32,
+         315.5
+        ],
+        [
+         32,
+         324.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 320
+      },
+      {
+       "card": "phase:任务 6 · 步骤",
+       "owner": "stage:execute",
+       "d": "M18 370 L40 370",
+       "head": [
+        [
+         40,
+         370
+        ],
+        [
+         32,
+         365.5
+        ],
+        [
+         32,
+         374.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 370
+      },
+      {
+       "card": "phase:任务 7 · 步骤",
+       "owner": "stage:execute",
+       "d": "M18 420 L40 420",
+       "head": [
+        [
+         40,
+         420
+        ],
+        [
+         32,
+         415.5
+        ],
+        [
+         32,
+         424.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 420
+      },
+      {
+       "card": "phase:任务 8 · 步骤",
+       "owner": "stage:execute",
+       "d": "M18 470 L40 470",
+       "head": [
+        [
+         40,
+         470
+        ],
+        [
+         32,
+         465.5
+        ],
+        [
+         32,
+         474.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 470
+      },
+      {
+       "card": "phase:任务 9 · 步骤",
+       "owner": "stage:execute",
+       "d": "M18 520 L40 520",
+       "head": [
+        [
+         40,
+         520
+        ],
+        [
+         32,
+         515.5
+        ],
+        [
+         32,
+         524.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 520
+      },
+      {
+       "card": "phase:任务 10 · 步骤",
+       "owner": "stage:execute",
+       "d": "M18 570 L40 570",
+       "head": [
+        [
+         40,
+         570
+        ],
+        [
+         32,
+         565.5
+        ],
+        [
+         32,
+         574.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 570
+      },
+      {
+       "card": "phase:任务 11 · 步骤",
+       "owner": "stage:execute",
+       "d": "M18 620 L40 620",
+       "head": [
+        [
+         40,
+         620
+        ],
+        [
+         32,
+         615.5
+        ],
+        [
+         32,
+         624.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 620
+      },
+      {
+       "card": "phase:任务 12 · 步骤",
+       "owner": "stage:execute",
+       "d": "M18 670 L40 670",
+       "head": [
+        [
+         40,
+         670
+        ],
+        [
+         32,
+         665.5
+        ],
+        [
+         32,
+         674.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 670
+      }
+     ]
+    },
+    {
+     "case": "C-verify-only",
+     "innerWidth": 760,
+     "passes": 1,
+     "bandPaddingLeft": "40px",
+     "bandMarginTop": "12px",
+     "depthVar": "0px",
+     "svg": "block",
+     "counts": {
+      "cards": 1,
+      "trunks": 1,
+      "branches": 1,
+      "heads": 1
+     },
+     "cardLefts": [
+      40
+     ],
+     "owners": [
+      "stage:verify"
+     ],
+     "trunks": [
+      {
+       "owner": "stage:verify",
+       "d": "M360 88 L360 92 L18 92 L18 120",
+       "ringX": 359.56,
+       "laneY": 92,
+       "lane": 0,
+       "channel": 18,
+       "lastCardY": 120,
+       "cardCentres": [
+        120
+       ]
+      }
+     ],
+     "branches": [
+      {
+       "card": "stage:verify",
+       "owner": "stage:verify",
+       "d": "M18 120 L40 120",
+       "head": [
+        [
+         40,
+         120
+        ],
+        [
+         32,
+         115.5
+        ],
+        [
+         32,
+         124.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 120
+      }
+     ]
+    },
+    {
+     "case": "D-four-owners",
+     "innerWidth": 760,
+     "passes": 2,
+     "bandPaddingLeft": "40px",
+     "bandMarginTop": "32px",
+     "depthVar": "20px",
+     "svg": "block",
+     "counts": {
+      "cards": 4,
+      "trunks": 4,
+      "branches": 4,
+      "heads": 4
+     },
+     "cardLefts": [
+      40
+     ],
+     "owners": [
+      "stage:answer",
+      "stage:execute",
+      "stage:plan",
+      "stage:verify"
+     ],
+     "trunks": [
+      {
+       "owner": "stage:plan",
+       "d": "M144 88 L144 92 L18 92 L18 140",
+       "ringX": 143.84,
+       "laneY": 92,
+       "lane": 0,
+       "channel": 18,
+       "lastCardY": 140,
+       "cardCentres": [
+        140
+       ]
+      },
+      {
+       "owner": "stage:execute",
+       "d": "M252 88 L252 100 L24 100 L24 190",
+       "ringX": 251.7,
+       "laneY": 100,
+       "lane": 1,
+       "channel": 24,
+       "lastCardY": 190,
+       "cardCentres": [
+        190
+       ]
+      },
+      {
+       "owner": "stage:verify",
+       "d": "M360 88 L360 108 L30 108 L30 240",
+       "ringX": 359.56,
+       "laneY": 108,
+       "lane": 2,
+       "channel": 30,
+       "lastCardY": 240,
+       "cardCentres": [
+        240
+       ]
+      },
+      {
+       "owner": "stage:answer",
+       "d": "M575 88 L575 116 L36 116 L36 290",
+       "ringX": 575.28,
+       "laneY": 116,
+       "lane": 3,
+       "channel": 36,
+       "lastCardY": 290,
+       "cardCentres": [
+        290
+       ]
+      }
+     ],
+     "branches": [
+      {
+       "card": "stage:plan",
+       "owner": "stage:plan",
+       "d": "M18 140 L40 140",
+       "head": [
+        [
+         40,
+         140
+        ],
+        [
+         32,
+         135.5
+        ],
+        [
+         32,
+         144.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 140
+      },
+      {
+       "card": "stage:execute",
+       "owner": "stage:execute",
+       "d": "M24 190 L40 190",
+       "head": [
+        [
+         40,
+         190
+        ],
+        [
+         32,
+         185.5
+        ],
+        [
+         32,
+         194.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 190
+      },
+      {
+       "card": "stage:verify",
+       "owner": "stage:verify",
+       "d": "M30 240 L40 240",
+       "head": [
+        [
+         40,
+         240
+        ],
+        [
+         32,
+         235.5
+        ],
+        [
+         32,
+         244.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 240
+      },
+      {
+       "card": "stage:answer",
+       "owner": "stage:answer",
+       "d": "M36 290 L40 290",
+       "head": [
+        [
+         40,
+         290
+        ],
+        [
+         32,
+         285.5
+        ],
+        [
+         32,
+         294.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 290
+      }
+     ]
+    },
+    {
+     "case": "E-execute-only",
+     "innerWidth": 760,
+     "passes": 1,
+     "bandPaddingLeft": "40px",
+     "bandMarginTop": "12px",
+     "depthVar": "0px",
+     "svg": "block",
+     "counts": {
+      "cards": 1,
+      "trunks": 1,
+      "branches": 1,
+      "heads": 1
+     },
+     "cardLefts": [
+      40
+     ],
+     "owners": [
+      "stage:execute"
+     ],
+     "trunks": [
+      {
+       "owner": "stage:execute",
+       "d": "M252 88 L252 92 L18 92 L18 120",
+       "ringX": 251.7,
+       "laneY": 92,
+       "lane": 0,
+       "channel": 18,
+       "lastCardY": 120,
+       "cardCentres": [
+        120
+       ]
+      }
+     ],
+     "branches": [
+      {
+       "card": "stage:execute",
+       "owner": "stage:execute",
+       "d": "M18 120 L40 120",
+       "head": [
+        [
+         40,
+         120
+        ],
+        [
+         32,
+         115.5
+        ],
+        [
+         32,
+         124.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 120
+      }
+     ]
+    },
+    {
+     "case": "F-two-cards-one-group",
+     "innerWidth": 760,
+     "passes": 2,
+     "bandPaddingLeft": "40px",
+     "bandMarginTop": "16px",
+     "depthVar": "4px",
+     "svg": "block",
+     "counts": {
+      "cards": 3,
+      "trunks": 2,
+      "branches": 3,
+      "heads": 3
+     },
+     "cardLefts": [
+      40
+     ],
+     "owners": [
+      "stage:execute",
+      "stage:verify"
+     ],
+     "trunks": [
+      {
+       "owner": "stage:execute",
+       "d": "M252 88 L252 92 L18 92 L18 174",
+       "ringX": 251.7,
+       "laneY": 92,
+       "lane": 0,
+       "channel": 18,
+       "lastCardY": 174,
+       "cardCentres": [
+        124,
+        174
+       ]
+      },
+      {
+       "owner": "stage:verify",
+       "d": "M360 88 L360 100 L28 100 L28 224",
+       "ringX": 359.56,
+       "laneY": 100,
+       "lane": 1,
+       "channel": 28,
+       "lastCardY": 224,
+       "cardCentres": [
+        224
+       ]
+      }
+     ],
+     "branches": [
+      {
+       "card": "phase:任务 1 · 读代码",
+       "owner": "stage:execute",
+       "d": "M18 124 L40 124",
+       "head": [
+        [
+         40,
+         124
+        ],
+        [
+         32,
+         119.5
+        ],
+        [
+         32,
+         128.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 124
+      },
+      {
+       "card": "phase:任务 2 · 补测试",
+       "owner": "stage:execute",
+       "d": "M18 174 L40 174",
+       "head": [
+        [
+         40,
+         174
+        ],
+        [
+         32,
+         169.5
+        ],
+        [
+         32,
+         178.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 174
+      },
+      {
+       "card": "stage:verify",
+       "owner": "stage:verify",
+       "d": "M28 224 L40 224",
+       "head": [
+        [
+         40,
+         224
+        ],
+        [
+         32,
+         219.5
+        ],
+        [
+         32,
+         228.5
+        ]
+       ],
+       "cardLeft": 40,
+       "cardCentre": 224
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "width": 480,
+   "cases": [
+    {
+     "case": "A-three-owners",
+     "innerWidth": 480,
+     "passes": 1,
+     "bandPaddingLeft": "12px",
+     "bandMarginTop": "12px",
+     "depthVar": "12px",
+     "svg": "none",
+     "counts": {
+      "cards": 3,
+      "trunks": 3,
+      "branches": 3,
+      "heads": 3
+     },
+     "cardLefts": [
+      12
+     ],
+     "owners": [
+      "stage:execute",
+      "stage:plan",
+      "stage:verify"
+     ],
+     "trunks": [],
+     "branches": []
+    },
+    {
+     "case": "B-twelve-plan-tasks",
+     "innerWidth": 480,
+     "passes": 1,
+     "bandPaddingLeft": "12px",
+     "bandMarginTop": "12px",
+     "depthVar": "0px",
+     "svg": "none",
+     "counts": {
+      "cards": 12,
+      "trunks": 1,
+      "branches": 12,
+      "heads": 12
+     },
+     "cardLefts": [
+      12
+     ],
+     "owners": [
+      "stage:execute"
+     ],
+     "trunks": [],
+     "branches": []
+    },
+    {
+     "case": "C-verify-only",
+     "innerWidth": 480,
+     "passes": 1,
+     "bandPaddingLeft": "12px",
+     "bandMarginTop": "12px",
+     "depthVar": "0px",
+     "svg": "none",
+     "counts": {
+      "cards": 1,
+      "trunks": 1,
+      "branches": 1,
+      "heads": 1
+     },
+     "cardLefts": [
+      12
+     ],
+     "owners": [
+      "stage:verify"
+     ],
+     "trunks": [],
+     "branches": []
+    },
+    {
+     "case": "D-four-owners",
+     "innerWidth": 480,
+     "passes": 1,
+     "bandPaddingLeft": "12px",
+     "bandMarginTop": "12px",
+     "depthVar": "20px",
+     "svg": "none",
+     "counts": {
+      "cards": 4,
+      "trunks": 4,
+      "branches": 4,
+      "heads": 4
+     },
+     "cardLefts": [
+      12
+     ],
+     "owners": [
+      "stage:answer",
+      "stage:execute",
+      "stage:plan",
+      "stage:verify"
+     ],
+     "trunks": [],
+     "branches": []
+    },
+    {
+     "case": "E-execute-only",
+     "innerWidth": 480,
+     "passes": 1,
+     "bandPaddingLeft": "12px",
+     "bandMarginTop": "12px",
+     "depthVar": "0px",
+     "svg": "none",
+     "counts": {
+      "cards": 1,
+      "trunks": 1,
+      "branches": 1,
+      "heads": 1
+     },
+     "cardLefts": [
+      12
+     ],
+     "owners": [
+      "stage:execute"
+     ],
+     "trunks": [],
+     "branches": []
+    },
+    {
+     "case": "F-two-cards-one-group",
+     "innerWidth": 480,
+     "passes": 1,
+     "bandPaddingLeft": "12px",
+     "bandMarginTop": "12px",
+     "depthVar": "4px",
+     "svg": "none",
+     "counts": {
+      "cards": 3,
+      "trunks": 2,
+      "branches": 3,
+      "heads": 3
+     },
+     "cardLefts": [
+      12
+     ],
+     "owners": [
+      "stage:execute",
+      "stage:verify"
+     ],
+     "trunks": [],
+     "branches": []
+    }
+   ]
+  }
+ ]
+}

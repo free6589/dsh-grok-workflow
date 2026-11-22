@@ -2306,3 +2306,28 @@ seq，此后每次都抛在同一处。`compactNow()` 先测量再选范围 → 
 - `node_modules` 内的密钥形状命中标 `vendored` 不动：那是依赖自带测试样例，改写会破坏包内容。
 
 **代价**：脱敏后的克隆不能直接拿真实凭据跑模型；要真跑需要自己回填，这是有意的。
+
+## D-097 — 宿主 guardian 预算覆盖脚本 wait 窗口（2026-11-22，已发版 `0.13.2`）
+
+**背景**：session-77a3f6fb turn 38，执行子任务在 10 分 01 秒被宿主 guardian 整轮 cancel，
+当时它正在收尾（写证据 md、截图已看完、diff 已审完）；同秒启动的 guardian adjudication
+子任务只活 1 秒就随整轮一起被取消。宿主与脚本的两层 10 min 预算完全重合，Q8 的
+wait×2 adjudication 还没判完宿主已经杀了整轮。
+
+**Decision:**
+1. `guardianChildBudgetMs(timeoutMs, childTimeoutMs?)`：有守卫路由时宿主预算 =
+   `min(deadline, max(旧预算, childBudget + GUARDIAN_MAX_WAITS × GUARDIAN_WAIT_MS))`，
+   仍受 10 min 上限与 run deadline 约束；无守卫/无限 deadline 时与旧版逐字相同。
+2. 常量只读 `src/timeout.ts` 的 `GUARDIAN_MAX_WAITS`/`GUARDIAN_WAIT_MS`
+  （脚本里的镜像由 `test/timeout.spec.ts` 钉住相等，不做第二份拷贝）。
+3. `src/run.ts` 只在 `config.guardianModel` 已配时传入 `CHILD_TIMEOUT_MS`。
+
+**Reason:** 裁决权属于先看到超时的那一层。旧行为里两层同时看到超时，宿主的 cancel
+整轮先生效，脚本的 wait 续命永远跑不出来——等于 Q8 的 adjudication 被自己的看门狗
+杀了。新行为让脚本先判（wait 则续命，kill 则走重试），宿主只在脚本也放弃后才杀整轮。
+
+**Evidence:** `test/timeout.spec.ts`「covers the script wait window」7 断言；
+`test/guardian.spec.ts` 12 例与 `npm test` 78/1454 全绿；typecheck 0 错。
+
+**代价**：配了 guardian 的 run 上，最坏单子任务多等 10 min（两次 wait）才整轮 cancel；
+不配 guardian 的 run 行为零变化。

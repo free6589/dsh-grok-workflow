@@ -3,6 +3,51 @@
 Notable user-facing changes are recorded here in English and Simplified Chinese.
 用户可见的功能和修复会在这里以英文和简体中文记录。
 
+## [0.13.2] - 2026-11-22
+
+### Fixed / 修复
+
+- **A stalled child is judged before it is killed / 判停先判后杀：慢子任务不再被误杀** —
+  When a guardian route is configured, the host-side watchdog budget now covers the script's
+  child budget plus the full Q8 adjudication window (`GUARDIAN_MAX_WAITS × GUARDIAN_WAIT_MS`),
+  still capped at 10 minutes and the run deadline. A healthy-but-slow child is no longer cancelled
+  as "no progress" while the script is still inside its wait-or-kill adjudication; the script's
+  own verdict lands first, and only then does the host cancel the run.
+  / 配了守卫路由时，宿主侧看门狗预算现在覆盖脚本子预算 + 完整的 Q8 判停窗口
+  （`GUARDIAN_MAX_WAITS × GUARDIAN_WAIT_MS`），仍受 10 分钟上限与运行死线约束。
+  干活慢但健康的子任务，不会再在脚本还在走 wait-or-kill 裁决时被当成"无进展"杀掉；
+  脚本自己的裁决先落，宿主只在脚本也放弃后才杀整轮。
+
+- **The progress task band no longer shifts with the current stage / 进度任务带不再随当前环节右移** —
+  The band's left indent is now a constant 40px gutter instead of a measured value derived from
+  the owning stage's ring centre; attribution comes from the elbow wire (ring → lane under the
+  spine → gutter channel → card stub with a right-pointing arrow), not from how far a card is
+  indented. Cards starting at the same x whatever stage owns them; wires hidden and the band back
+  to 12px under 480px; `data-owner` / `data-gw-progress-wire` / arrowheads / the seven-stage spine
+  / card contents all unchanged.
+  / 任务带的左缩进从"按所属环节圆环中心量出来"改成常量 40px 左栏；归属靠折线表达
+  （圆环 → 脊下车道 → 左栏通道 → 卡片 stub 右向箭头），不靠缩进表达。无论哪个环节拥有卡片，
+  卡片都从同一个 x 起步；480px 以下连线隐藏、带子回到 12px；`data-owner` /
+  `data-gw-progress-wire` / 箭头 / 七段脊 / 卡片内容全部未动。
+
+### Removed / 删除
+
+- **Delete stale `lib/panel.*` build artifacts / 删除陈旧的 `lib/panel.*` 构建产物** —
+  `src/panel.ts` was deleted in `56e701d` (RSI round 32) but its four compiled outputs stayed in
+  `lib/`. Zero references in `src/` / `lib/` / `scripts/` / `test/`; not in `package.json` exports;
+  superseded by `src/progress-tab.ts` + `src/client/index.js`. Verified: rebuild emits no `panel.*`,
+  165 files in `lib/`, module resolution clean, full suite green.
+  / `src/panel.ts` 已在 `56e701d`（RSI round 32）删除，但 4 个编译产物留在 `lib/` 里。
+  `src/` / `lib/` / `scripts/` / `test/` 零引用；不在 `package.json` exports 内；
+  已被 `src/progress-tab.ts` + `src/client/index.js` 取代。已验证：重建不再产出 `panel.*`，
+  `lib/` 165 文件，模块解析干净，全量测试绿灯。
+
+- **Remove the duplicated t55 workspace-isolation rule / 删除重复的 t55 工作区隔离规则** —
+  `docs/knowledge/evidence/t55/workspace-isolation-rule.md` overlaps `docs/knowledge/TESTING.md`
+  at 0.82 (6-gram coverage); the canonical rule lives in TESTING.md.
+  / `docs/knowledge/evidence/t55/workspace-isolation-rule.md` 与 `docs/knowledge/TESTING.md`
+  的 6-gram 覆盖率 0.82；以 TESTING.md 中的正文为准。
+
 ## [0.13.1] - 2026-11-22
 
 ### Fixed / 修复

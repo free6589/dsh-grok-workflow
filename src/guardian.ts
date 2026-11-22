@@ -85,6 +85,7 @@
 
 import type { WorkflowAgentOutcome, WorkflowStopReason } from '@deepseek-ai/dsh-workflow'
 import { redactError } from './redact.js'
+import { GUARDIAN_MAX_WAITS, GUARDIAN_WAIT_MS } from './timeout.js'
 import type { WorkflowLogger } from './run.js'
 
 /** Bounds of the guardian. All counts are per run, never global. */
@@ -179,11 +180,25 @@ export interface GuardianOptions {
 }
 
 /** Derive one child's stall budget from the run's own deadline. */
-export function guardianChildBudgetMs(timeoutMs: number): number {
+export function guardianChildBudgetMs(timeoutMs: number, childTimeoutMs?: number): number {
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return 0
-  const capped = Math.min(Math.trunc(timeoutMs), GUARDIAN_LIMITS.childTimeoutCapMs)
-  if (capped < GUARDIAN_LIMITS.childTimeoutFloorMs) return 0
-  return capped
+  let budget = Math.min(Math.trunc(timeoutMs), GUARDIAN_LIMITS.childTimeoutCapMs)
+  // Q8 wait slices live inside the script's own race: when a guardian route is
+  // configured the script may extend one stalled call by GUARDIAN_MAX_WAITS
+  // slices before it settles the call as a timeout. The host must not cancel
+  // the whole run while the script is still inside that adjudication window —
+  // otherwise a healthy-but-slow child (10 min of real progress, as in
+  // session-77a3f6fb turn 38) is killed as "no progress" before the script's
+  // own verdict can land. The host budget therefore covers the script's child
+  // budget plus the full wait extension, still capped at childTimeoutCapMs.
+  if (childTimeoutMs !== undefined && Number.isFinite(childTimeoutMs) && childTimeoutMs > 0) {
+    const scriptBudget = Math.trunc(childTimeoutMs)
+    const waitExtension = GUARDIAN_MAX_WAITS * GUARDIAN_WAIT_MS
+    budget = Math.min(Math.trunc(timeoutMs), Math.max(budget, scriptBudget + waitExtension))
+    budget = Math.min(budget, GUARDIAN_LIMITS.childTimeoutCapMs)
+  }
+  if (budget < GUARDIAN_LIMITS.childTimeoutFloorMs) return 0
+  return budget
 }
 
 /** Bounded, redacted text for a finding field. */
