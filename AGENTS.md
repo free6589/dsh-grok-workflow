@@ -92,3 +92,26 @@ NEXT_ACTION: <one clear next action>
 
 If a push failed, say which files are unsynced and why. Never imply that a
 remote agent can see local-only commits.
+
+## Branch hygiene / 分支卫生
+
+- One task, one branch. Never open a branch for a task another live branch
+  already covers — check `git branch -a` first.
+- Delete a branch within 24h after its PR merges (GitHub's delete-branch
+  button, plus `git branch -d` locally). A merged branch left alive is litter.
+- Long-running experimental branches (`rsi/*`, `feat/*`) get a decision date
+  in HANDOFF.md: merge, rebase, or delete by then. No immortal branches.
+
+## Local test cleanup / 本地测试收尾
+
+- Test scratch files stay out of the tree: use TMPDIR (`.tmp/`, gitignored),
+  never the repo root, `docs/`, or `src/` for ad-hoc probes, dumps, or
+  screenshots. Prefer `mktemp -d` scoped to one run and remove it when done.
+- Before ending a session, `git status --short` must show no test leftovers:
+  no `*.log`, `*.tgz`, `*.bak`, `*.orig`, `*~`, harness HTML/PNG, or /tmp
+  copies that were only needed to verify one claim. Evidence kept as a
+  validation bottom-line goes under `.rsi/evidence/` or
+  `docs/knowledge/evidence/` and is referenced from VALIDATION.md; everything
+  else is deleted, not committed.
+- Never commit a scratch file "temporarily" to carry it across steps — use the
+  staging path (`.session-stage/`, gitignored) or pass it through the session.
