@@ -1015,11 +1015,11 @@ describe('P0-4: a cancelled turn keeps the message and states the terminal', () 
 
     // Nothing can be entered into a cancelled turn: the decision must be a rejection.
     expect(decision.kind).toBe('reject')
-    const derived = texts(live)
-    // The claimed batch never reaches the loop, so the plugin is the only writer and
-    // must not write the same words twice.
-    expect(derived.filter(text => text === '把这个表格整理成周报')).toHaveLength(1)
-    expect(derived[0]).toBe('把这个表格整理成周报')
+    // Headless turn-1 cancel: the batch is NOT appended (it would take surface
+    // position 0 and brick the session on the next turn's system head), so the
+    // transcript carries no user row — but the terminal record states why, and
+    // the delivery record keeps the batch routable for the retry.
+    expect(live.ownEvents().filter(event => event.type === 'user/message')).toHaveLength(0)
     // A cancelled turn has no open step, so the terminal is *not* an assistant row:
     // an unpaired `assistant/message` is what made every later token-meter replay
     // throw, which is how `/compact` started failing. It is kept as a record.
@@ -1032,8 +1032,7 @@ describe('P0-4: a cancelled turn keeps the message and states the terminal', () 
     // A stopped run must never read as success.
     expect(last).not.toContain('COMPLETED')
     expect(last).not.toContain('已开启')
-    // The user message is a durable event, not just a render-time echo.
-    expect(live.ownEvents().filter(event => event.type === 'user/message')).toHaveLength(1)
+    assertReopenable(live)
   })
 
   it('writes verified partial work into the cancelled transcript', async () => {
@@ -1103,10 +1102,10 @@ describe('P0-4: a cancelled turn keeps the message and states the terminal', () 
     const decision = await pending
 
     expect(decision.kind).toBe('reject')
-    const transcript = texts(live)
-    // Only the user's words reach the transcript: the terminal cannot be a chat row
-    // without an open step, so it is kept in the terminal record below.
-    expect(transcript).toEqual([request])
+    // Headless turn-1 cancel: no user row is appended (position-0 rule), so the
+    // transcript carries no user words — but the terminal record states why,
+    // and the verified work is still stated there.
+    expect(live.ownEvents().filter(event => event.type === 'user/message')).toHaveLength(0)
     expect(live.ownEvents().filter(event => event.type === 'assistant/message')).toHaveLength(0)
     const all = terminalTexts(live).join('\n')
     // Round 28: the cancelled terminal states the kept report as a human
@@ -1140,8 +1139,9 @@ describe('P0-4: a cancelled turn keeps the message and states the terminal', () 
 
     expect(decision.kind).toBe('reject')
     expect(ctx.engine.startCalls).toHaveLength(0)
-    const derived = texts(live)
-    expect(derived.filter(text => text === '把登录接口改成 JWT 校验')).toHaveLength(1)
+    // Headless turn-1 pre-cancel: no user row is appended (position-0 rule) —
+    // the terminal record states why instead.
+    expect(live.ownEvents().filter(event => event.type === 'user/message')).toHaveLength(0)
     expect(live.ownEvents().filter(event => event.type === 'assistant/message')).toHaveLength(0)
     const terminal = terminalTexts(live)
     expect(terminal).toHaveLength(1)
@@ -1149,6 +1149,7 @@ describe('P0-4: a cancelled turn keeps the message and states the terminal', () 
     expect(last).toContain('取消')
     expect(last).toContain('没有启动任何工人')
     expect(last).not.toContain('COMPLETED')
+    assertReopenable(live)
   })
 })
 
@@ -1174,7 +1175,10 @@ describe('P1: front-desk calls share the plugin lifecycle', () => {
     // The interruption notice is kept as a terminal record: the disposal happens
     // outside any step, so it cannot be an assistant row either.
     expect(terminalTexts(live).join('\n')).toContain('unloaded')
-    expect(texts(live)).toContain('run npm test')
+    // Headless turn-1: no user row is appended (position-0 rule); the batch
+    // stays routable via the delivery record for the retry.
+    expect(live.ownEvents().filter(event => event.type === 'user/message')).toHaveLength(0)
+    assertReopenable(live)
   })
 
   it('returns from quick-worker startup on unload and disposes a run that arrives late', async () => {
@@ -1269,8 +1273,8 @@ describe('surface head: the plugin never takes position 0', () => {
     live.append('user/message', firstTurnMessage('首轮已落盘'), { surfaceOp: 'append' })
 
     const decision = await ctx.preStep()(payloadAt(agent, claimed, 2, 1), nextWith(claimed)) as Decision
-    // Head established: the early echo is back …
-    expect(live.ownEvents().filter(event => (event as { type?: string }).type === 'user/message')).toHaveLength(1)
+    // Head established: the early echo is back (turn-1 row + turn-2 publish).
+    expect(live.ownEvents().filter(event => (event as { type?: string }).type === 'user/message')).toHaveLength(2)
     // … exactly once: the decision must not carry it again.
     const carried = (decision.messages ?? []).map(textOf)
     expect(carried.filter(text => text === '次轮消息仍可提前可见')).toHaveLength(0)
