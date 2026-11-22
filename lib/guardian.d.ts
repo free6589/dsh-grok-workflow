@@ -11,8 +11,8 @@
  * observing the same `workflow/agent-start` / `workflow/agent-end` events the
  * progress recorder and the memory archiver already consume, judging
  * *liveness* (never quality), and acting only through channels the plugin
- * already owns — cancel a stuck run, record what happened, and let the normal
- * terminal path turn that into an honest report.
+ * already owns — queue recovery guidance for a stalled child, record what
+ * happened, and let the normal terminal path produce an honest report.
  *
  * What it deliberately does NOT do (architecture constraints):
  *
