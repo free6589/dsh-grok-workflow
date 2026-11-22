@@ -5371,3 +5371,25 @@ AssertionError: expected 10 to be +0
   1 failed / 20 passed；修后 21 passed，默认 TMPDIR 同样 21 passed。
 - **边界**：没有改 `.rsi/tools/heartbeat-guard.sh` 的生产语义（`--root` 指仓库这条约定不变），
   只让 fixture 真的成为它自称的那个仓库。
+
+## 已发版 `0.13.9`（含 observe 折叠修复）— 2026-11-22 (`CONFIRMED`, lead)
+
+**Changed:** `src/progress-tab.ts`（fold 三态 + fact 类型三动作）+ `test/progress-tab.spec.ts`（+1 observe
+回归）+ `test/progress-connector.spec.ts`（类型拓宽 + 1 observe 渲染回归）+ `CHANGELOG.md`
+（observe 条并入 `## [0.13.9]`）+ `lib/progress-tab.*` 重建。发版提交 `c93b2bf`。
+
+| state | command | result |
+| --- | --- | --- |
+| working tree (Node 26) | `npm run ci` | exit **0** — **78 files / 1484 tests PASS** |
+| working tree | `npm run typecheck` / `lint` / `verify:lib` | 0 errors / 23 warnings / byte-identical |
+| red probe | `git stash push -- src/progress-tab.ts` 后跑新用例 | **1 failed / 34 skipped**（旧映射下 observe 被判 cancel-run），`stash pop` 后恢复 |
+| targeted | `npx vitest run test/progress-tab.spec.ts test/progress-connector.spec.ts test/client.spec.ts` | 3 files / **173 tests PASS** |
+| remote | CI run `45001378298` (push `c93b2bf`) | **success** |
+| remote | Release `v0.13.9` run `45001393005` | **success**, published（asset `dsh-grok-workflow-0.13.9.tgz`） |
+
+**Bug class:** PR #47 把 host/guardian/script/client 四侧改成 observe/rescue 非破坏式，但纯折叠侧
+`src/progress-tab.ts` 漏跟（类型 `ProgressGuardianFindingFact.action` 仍是二元，fold 仍是二元映射）。
+症状：`observe` finding 在进度页显示为"已触发整轮取消"（`data-action="cancel-run"`），与 bundle 渲染矛盾。
+
+**NOT_RUN:** `web` profile 热加载安装（沙箱只读 EROFS；待宿主执行 `dsh plugin --profile web add
+github:free6589/dsh-grok-workflow#v0.13.9`）；真机 GUI 手点 observe finding 显示。

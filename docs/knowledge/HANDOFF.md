@@ -2593,3 +2593,11 @@ Issue #1 状态评论 issuecomment-6927842856。
 - **Next action**：若要把克隆用于 CI，把 `home-patch.sandbox.yml` 那类机器级 MCP 关闭
   做成可复用步骤；另：`cordis.patch.yml` 里 3 条 patch 告警（`layerfs-host`、
   `agent-teams` 未找到，`deepseek-account` 名称不匹配）是源配置漂移，与克隆无关，值得单开一轮清理。
+
+## 2026-11-22 — 已发版 `0.13.9`：Guardian 非破坏式恢复 + observe 折叠修复（`CONFIRMED`）
+
+- **From:** 本会话（lead）· **To:** 下一轮接手者
+- **同步结论**：本地 `main` = 远端 `origin/main`（`418a4a9`，fetch 已对表）。远端 v0.13.9 曾打 tag 但 Release 校验失败（docs 版本断言 6 项停留在 0.13.8），操作员删 tag 留恢复记录（`docs/RELEASING.md` Recovery record）。本次重打、无 Release 历史污染。
+- **找 bug**：PR #47（guardian-ui-and-timeout-budget）改漏一处——`src/progress-tab.ts` 纯折叠函数仍是旧映射（非 rescue 一律 cancel-run），host 记为 `observe` 的 finding 会被画成"已触发整轮取消"。已修（与 bundle 同规则三态）+ 回归测试（progress-tab 1 例 + connector 1 例）。红验证：只藏 src 时新用例 1 failed / 34 skipped。
+- **发了什么**：发版提交 `c93b2bf` 已推，annotated tag `v0.13.9` 已推（本地旧 tag 先删后建，远端当时无此 tag）；远端 CI `45001378298` success、Release `45001393005` success 并已发布（asset `dsh-grok-workflow-0.13.9.tgz`）。本地 `npm run ci` exit 0：78 files / 1484 tests PASS。
+- **没做的**：`web` profile 热加载安装——本会话沙箱只读（`bwrap --ro-bind`，`plugin add` 报 EROFS），装机仍是 `v0.13.8`。需用户在宿主执行：`dsh plugin --profile web add github:free6589/dsh-grok-workflow#v0.13.9`（dsh 不重启，原地更新，运行中实例下次 profile boot 生效）。

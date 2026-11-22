@@ -2393,3 +2393,20 @@ writesPathsForPhase 中英映射/不可读降级/未知 phase 旧规则 7 例）
 **代价**：重救走 `guardianModel`（用户已批无限次，finding 留账可查）；无 guardianModel 的 run 行为零变化（adjudication 不跑，rescue 不存在）。D-098 的被否决项「读子会话 ownEvents」被 C1 的 `subagentTiming` 投影取代——读投影不读 log，不碰内容，O(1) 不扫全 log。
 
 **被否决的备选**：host 侧直接调模型判类型（host 无调模型先例，`ctx.llm` 只用来列 provider；判读放脚本 adjudication，多一种 verdict 而已）；B1 升级为保活（“run 在说话=孩子活着”会把真死孩子和 run 噪音混在一起，B1 保持降级不定罪）；C（只标记不杀）仍单独立项。
+
+## D-100 — `observe` finding 的三侧一致：bundle 已对，纯折叠跟上（2026-11-22，已发版 0.13.9）
+
+**背景**：PR #47 把 Guardian 从"取消整轮"改成"非破坏式"（rescue 排队恢复指引 / observe 只记录不打扰），
+改了 host（`guardian.ts` action 三态）、脚本（`script.ts`/`timeout.ts` 文案）、bundle（`client/index.js`
+三态渲染 + i18n），但纯折叠侧 `src/progress-tab.ts` 没跟：类型仍是 `'cancel-run' | 'rescue'`，
+fold 仍是 `rescue → rescue else cancel-run`。
+
+**Decision:** 纯侧跟 bundle 对齐：fact 类型加 `| 'observe'`，fold 用 bundle 同规则
+（`rescue → rescue`，`cancel-run → cancel-run`，else `observe`）。`cancel-run` 分支保留——旧会话
+journal 里可能还有历史 `cancel-run` finding，fold 不能把它吃成 observe。
+
+**Evidence:** 新回归 2 例（fold 级 + connector 渲染级）；红验证旧码 1 failed；`npm run ci`
+78/1484 全绿；远端 CI + Release 双绿。
+
+**Reason（为什么保留已死的 `cancel-run`）：** fold 读的是历史 journal，不是只读新代码的输出。
+删分支等于改写历史显示——旧 finding 会从"取消过"变成"观察"，这是事实篡改。类型与映射都保留三元。

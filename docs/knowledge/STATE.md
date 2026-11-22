@@ -1947,3 +1947,11 @@ Last updated: 2026-11-22 08:33 +08:00（**已发版 `0.13.1`：动态转向全�
 `8357423` 修测试（hung child 30 s backstop，不改逻辑）；`b5c1af0` 发版 0.13.1。远端 CI `44967040278` success、
 Release `44967043122` success、`v0.13.1` 已发布。本地 `npm run ci`：78 文件 / 1449 测试 PASS（Node 26 + Node 22 双验），
 `verify:lib` 169 文件逐字节一致。`v0.13.0` tag 留在原提交不动（immutable，未发布成功也不复用）。）
+
+Last updated: 2026-11-22 16:10 +08:00（**已发版 `0.13.9`：Guardian 非破坏式恢复 + observe 折叠修复，`CONFIRMED`** —
+远端本就领先（PR #47，guardian 不再打断子代理/不取消整轮）；本地 `main` = `origin/main` = `418a4a9`，
+旧 `v0.13.9` tag 因 Release 校验失败已被删（RELEASING 有恢复记录）。本轮抓到 PR #47 改漏：
+`src/progress-tab.ts` 纯折叠把 `observe` 误标成 `cancel-run`（bundle 侧已对，纯侧没跟）。
+发版提交 `c93b2bf`（8 文件：src+2 测试+CHANGELOG 0.13.9 并入 observe 条+`lib/` 重建）已推；
+annotated tag `v0.13.9` 已推；远端 CI `45001378298` success、Release `45001393005` success 并已发布。
+本地 `npm run ci` exit 0（78 文件 / 1484 测试）。`web` profile 仍是 `v0.13.8`（沙箱只读装不上，待宿主执行安装命令）。）
