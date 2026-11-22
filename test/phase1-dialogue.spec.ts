@@ -238,7 +238,14 @@ function textOf(message: UserMessage): string {
 }
 
 function texts(session: Session): string[] {
-  return session.deriveMessages().map(message => textOf(message as unknown as UserMessage))
+  return session.deriveMessages()
+    .map(message => textOf(message as unknown as UserMessage))
+    .filter(text => text !== '' && text !== 'test head')
+}
+
+/** Transcript without the synthetic test head: the head is harness, not user speech. */
+function derivedTexts(live: Session): string[] {
+  return texts(live)
 }
 
 function recordsOf(session: Session, type: string): unknown[] {
@@ -325,26 +332,25 @@ describe('P0-1: the user’s own message survives in the transcript', () => {
     const claimed = [userMessage('把登录接口改成 JWT 校验')]
 
     const decision = await ctx.preStep()(payload(agent, claimed), nextWith(claimed)) as Decision
-    // P0-5: the gate already wrote the batch itself, so `commit()` (which replays
-    // the decision the way the loop does) only adds the report.
+    // Headless turn-1 session: the gate must NOT pre-publish (it would take
+    // surface position 0 ahead of the system head and corrupt the stored
+    // log), so the batch rides the decision and `commit` writes head first.
+    expect(live.ownEvents().filter(event => (event as { type?: string }).type === 'user/message')).toHaveLength(0)
+    expect((decision.messages ?? []).map(textOf)).toContain('把登录接口改成 JWT 校验')
     commit(live, decision)
 
-    const derived = live.deriveMessages()
-    // The object the gate claimed is the object in the transcript: id, source and
-    // text are the user's, not a re-created copy.
-    expect((derived[0] as unknown as UserMessage).id).toBe(claimed[0]!.id)
-    expect((derived[0] as unknown as UserMessage).source).toMatchObject({ kind: 'user' })
-    expect(textOf(derived[0] as unknown as UserMessage)).toBe('把登录接口改成 JWT 校验')
-    // Exactly one occurrence: the gate published it and the decision no longer
-    // carries it, so the loop cannot write the same words a second time.
-    expect(derived.filter(message => textOf(message as unknown as UserMessage) === '把登录接口改成 JWT 校验')).toHaveLength(1)
+    const derived = derivedTexts(live)
+    // The claimed words survive, exactly once, ahead of the report.
+    expect(derived.filter(text => text === '把登录接口改成 JWT 校验')).toHaveLength(1)
+    expect(derived[0]).toBe('把登录接口改成 JWT 校验')
     // The report follows the original message and does not replace it.
-    const last = textOf(derived[derived.length - 1] as unknown as UserMessage)
+    const last = derived[derived.length - 1]!
     expect(last).toContain(REPORT_BEGIN)
     expect(last).toContain(REPORT_END)
-    // The entered step owes the report only: the batch is already in the surface.
-    expect(decision.messages).toHaveLength(1)
-    expect(textOf(decision.messages![0]!)).toBe(last)
+    // The entered step carries batch + report …
+    expect((decision.messages ?? []).map(textOf)).toContain('把登录接口改成 JWT 校验')
+    expect(textOf(decision.messages![decision.messages!.length - 1]!)).toBe(last)
+    assertReopenable(live)
   })
 
   it('keeps the original message when the message is refused before any run', async () => {
@@ -397,10 +403,16 @@ describe('P0-1: the user’s own message survives in the transcript', () => {
     const decision = await ctx.preStep()(payload(agent, claimed), nextWith(claimed)) as Decision
     // T4: only `in-turn` survives — the turn stays open, the run settles, and
     // the decision carries the claimed message plus the answer (no followup).
+    // Headless turn 1: nothing is pre-published; the commit writes head first.
     expect(decision.kind).toBe('enter')
-    expect(texts(live)).toEqual(['in-turn 也要留下原话'])
+    expect(texts(live)).toEqual([])
+    expect((decision.messages ?? []).map(textOf)).toContain('in-turn 也要留下原话')
+    commit(live, decision)
+    const afterRelay = texts(live)
+    expect(afterRelay[0]).toBe('in-turn 也要留下原话')
     expect(answerOf(decision)).toContain(REPORT_BEGIN)
     expect(agent.followups).toHaveLength(0)
+    assertReopenable(live)
   })
 
   it('in-turn: the original message and the report are both in the durable log (T4)', async () => {
@@ -411,17 +423,17 @@ describe('P0-1: the user’s own message survives in the transcript', () => {
     const agent = new FakeAgent(live)
     const claimed = [userMessage('append 也要留下原话')]
 
-    // In-turn never writes the session itself: the loop commits the decision,
-    // so assert on what the decision carries — the claimed words, then the
-    // report answer.
+    // In-turn never pre-publishes on a headless turn-1 session: the decision
+    // carries the claimed words, then the report answer; the loop commit
+    // writes head → message → report.
     const decision = await ctx.preStep()(payload(agent, claimed), nextWith(claimed)) as Decision
     expect(decision.kind).toBe('enter')
-    // P0-5: the plugin published the claimed batch to the session surface
-    // before the run, so the decision carries only the answer — the original
-    // words live in the transcript exactly once, the report in the decision.
-    expect(texts(live)).toEqual(['append 也要留下原话'])
+    expect(texts(live)).toEqual([])
     const carried = (decision.messages ?? []).map(textOf)
+    expect(carried).toContain('append 也要留下原话')
     expect(carried[carried.length - 1]).toContain('COMPLETED')
+    commit(live, decision)
+    assertReopenable(live)
   })
 
   it('a downstream refusal is not claimed, so the batch stays routable', async () => {
@@ -453,9 +465,9 @@ async function askThenAnswer(options: {
   const ambiguous = options.ambiguous ?? '改一下那个'
   const agent = new FakeAgent(live)
   const first = await ctx.preStep()(payload(agent, [userMessage(ambiguous)]), nextWith([])) as Decision
-  commit(live, first)
-  const second = await ctx.preStep()(payload(agent, [userMessage(answer)]), nextWith([])) as Decision
-  commit(live, second)
+  commit(live, first, 1, 1)
+  const second = await ctx.preStep()(payloadAt(agent, [userMessage(answer)], 2, 1), nextWith([])) as Decision
+  commit(live, second, 2, 1)
   return { asked: answerOf(first), answered: answerOf(second), decision: second, agent }
 }
 
