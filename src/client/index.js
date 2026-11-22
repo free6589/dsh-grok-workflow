@@ -2747,8 +2747,15 @@ window.__ModuleLoader__.load({
       }
     }
 
-    /** The first spine stage whose token the phase header carries. */
+    /** The first spine stage whose token the phase header carries.
+     *
+     * Numbered plan tasks (`任务 7 · 标题`) always win over stage tokens: a title
+     * that mentions a stage word (`任务 7 · 合并为干净可并发执行计划`) names a plan
+     * task, not the `执行` stage. Without this, the extra task lands as a stage
+     * row under `规划`. Mirror of `stageForPhase` in `src/progress-tab.ts`.
+     */
     function progressStageForPhase(phase) {
+      if (progressTaskNumber(phase) !== undefined) return undefined
       const haystack = phase.toLowerCase()
       for (const stage of PROGRESS_STAGES) {
         if (stage.edge) continue

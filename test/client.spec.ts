@@ -1936,6 +1936,17 @@ describe('client progress tab: the fold and the five states', () => {
     expect(rendered).toEqual([1, 2, 3])
   })
 
+  it('keeps a numbered plan task mentioning a stage word on its own card, never on the spine', () => {
+    // Mirror of the typed regression: `任务 7 · …执行…` must stay `任务 7`, not an `执行` stage row.
+    const track = trackOf([
+      progressMember(20, '任务 7 · 合并为干净可并发执行计划', 'completed', { label: '执行' }),
+      progressMember(21, '任务 7 · 合并为干净可并发执行计划', 'completed', { label: '检查' }),
+    ], 'completed')
+    expect(stage(track, 'execute').members).toEqual([])
+    expect(track.nodes.find((node) => node.key === 'phase:任务 7 · 合并为干净可并发执行计划')?.kind).toBe('extra')
+    expect(track.nodes.filter((node) => node.kind === 'extra')).toHaveLength(1)
+  })
+
   it('mirrors the role-label evidence, so execute and verify are not rendered as never reported', () => {
     const track = trackOf([
       progressMember(1, '任务 1 · 修复登录', 'completed', { label: '执行' }),

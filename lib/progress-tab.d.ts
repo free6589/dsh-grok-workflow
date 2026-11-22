@@ -343,6 +343,14 @@ export declare function nodeState(members: readonly ProgressMemberFact[], ended:
  * @returns the percentage, absent when nothing was declared.
  */
 export declare function percentOf(members: readonly ProgressMemberFact[]): ProgressPercent | undefined;
+/** The first spine stage whose token the phase header carries.
+ *
+ * Numbered plan tasks (`任务 7 · 标题`) always win over stage tokens: a title that
+ * mentions a stage word (`任务 7 · 合并为干净可并发执行计划`) names a plan task,
+ * not the `执行` stage. Without this, the extra task lands as a stage row under
+ * `规划`.
+ */
+export declare function stageForPhase(phase: string): ProgressStageDefinition | undefined;
 /**
  * The fixed chain of one task card: three capsules, in render order, filled by the rows
  * whose role label names them.
