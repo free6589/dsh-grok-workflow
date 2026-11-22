@@ -1,3 +1,13 @@
+## 2026-11-22 — 已发版 `0.13.6`：守卫问心跳 + 打断重救（`CONFIRMED`）
+
+- **From:** 本会话（lead）· **To:** 下一轮接手者
+- **发了什么**：`8e129c1` 已推，annotated tag `v0.13.6` 已推；远端 CI `44989417857`
+  success、Release `44989425946` success 并已发布。本地 `npm run ci` exit 0：
+  78 files / 1480 tests PASS。
+- **内容**：见 D-099（C1 会话心跳 / C3 打断重救 / 10s 一扫）。真机实救 + 模型实测
+  rescue NOT_RUN，后续 run 验证。
+- **没做的**：并发轮的未跟踪文件未动；方法二读内容判类型未做（判读在 adjudication 内）。
+
 ## 2026-11-22 — C1/C3 守卫问心跳 + 打断重救（`CONFIRMED`，未发版、未提交）
 
 - **From:** 本会话（lead）· **To:** 下一轮接手者

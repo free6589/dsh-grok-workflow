@@ -1,3 +1,8 @@
+Last updated: 2026-11-22 13:28 +08:00（**已发版 `0.13.6`：守卫问心跳 + 打断重救，`CONFIRMED`** —
+`8e129c1` 已推，annotated tag `v0.13.6` 已推；远端 CI `44989417857` success、
+Release `44989425946` success 并已发布。本地 `npm run ci` exit 0：78 文件 /
+1480 测试 PASS。）
+
 Last updated: 2026-11-22 13:16 +08:00（**C1/C3 守卫问心跳 + 打断重救落地 `CONFIRMED` 未发版** —
 10s 一扫 + C1 会话心跳（`subagentTiming.active.through` 只取时间戳，planner 模式也管）+
 C3 rescue 全链（adjudicator 判 rescue→脚本广播→host interrupt+递引导语→finding 留账，
