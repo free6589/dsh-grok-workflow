@@ -50,7 +50,7 @@ import type { Message, UserMessage } from '@deepseek-ai/dsh-llm'
 import { readdirSync, readFileSync } from 'node:fs'
 import { delimiter, join } from 'node:path'
 import { acceptedEnterText, frontDeskText, noticeEnterText, noticeText, relayText, RELAY_SOURCE_KIND } from './answer.js'
-import { carryoverBounds, carryoverForSession } from './carryover.js'
+import { carryoverBounds, carryoverForSession, inheritanceForSession } from './carryover.js'
 import { humanConclusion } from './delivery/index.js'
 import { collectHistory, composeObjective, renderHistory } from './history.js'
 import { TASK_LIMITS } from './input.js'
@@ -74,7 +74,7 @@ import { createLoopBrakes } from './loop-brakes.js'
 import type { LoopBrakeCode, LoopBrakePort } from './loop-brakes.js'
 import {
   FIXED_HISTORY_CHARS, FIXED_HISTORY_TURNS, FIXED_INSTANT_RECEIPT, FIXED_MAX_QUEUED_MESSAGES,
-  FIXED_TRIAGE_ASK, FIXED_TRIAGE_FOLLOWUP_AS_FAST,
+  FIXED_SHOW_DIAGNOSTICS, FIXED_TRIAGE_ASK, FIXED_TRIAGE_FOLLOWUP_AS_FAST,
 } from './config.js'
 import {
   askLine, chatReply, classifyTriage, detectLanguage, expiredAskNote, firstAnswerFallback, firstAnswerPrompt,
@@ -1080,10 +1080,18 @@ export function installGate(deps: GateDeps): boolean {
     // snapshots the history first and passes it here — otherwise the message the
     // user just typed would also appear as "conversation so far" and the objective
     // would carry it twice.
+    // L1 inheritance (Q2, v0.13): the tasks an earlier round of this session already
+    // verified are part of the objective itself, under their own 8K budget
+    // (`INHERITANCE_LIMITS.chars`), so every child prompt that shows the objective —
+    // planner, verifier, supervisor, synthesizer — reads the same "do not redo this"
+    // decision instead of re-deriving it. `composeObjective` drops the oldest block
+    // first when the objective budget is tight, so the inherited list survives a
+    // long forwarded transcript.
     const objective = composeObjective(
       history ?? collectHistory(sessionOf(agent), { turns: FIXED_HISTORY_TURNS, chars: FIXED_HISTORY_CHARS }),
       request,
       TASK_LIMITS.objectiveChars,
+      inheritanceForSession(sessionOf(agent)),
     )
     if (objective === undefined) {
       // Reached only after a message passed admission (a queued follow-up re-reads
@@ -1147,6 +1155,10 @@ export function installGate(deps: GateDeps): boolean {
     if (answer.kind === 'report') {
       return relayText(answer.report, answer.header, {
         ...answer.lang === undefined ? {} : { lang: answer.lang },
+        // Q11(c): the switch that decides whether the machine ledger rides inside
+        // the relay or stays folded below it. Fixed off (T4), but consulted here —
+        // this is the one place that composes the text the user actually receives.
+        showDiagnostics: FIXED_SHOW_DIAGNOSTICS,
       })
     }
     if (answer.kind === 'direct') return frontDeskText(answer.text)

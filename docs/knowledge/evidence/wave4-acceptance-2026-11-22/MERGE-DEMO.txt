@@ -1,0 +1,69 @@
+
+==============================================================================
+ROUND 1 — a two-wave DAG: wave 1 verifies, wave 2 fails
+==============================================================================
+Grok workflow: PARTIAL
+Objective: Ship the two-wave plan
+Plan: planner; 2 task(s); 1 verified
+Failures: 2 quality
+Wave 1/2:
+- a: verified (1 attempt) — Task a
+Wave 2/2:
+- b: failed (2 attempts) — Task b
+  incomplete (quality): verifier verdict was fail
+Confirmed evidence:
+- a: a works → verified a works in file:///tmp/report
+Incomplete:
+- b (quality): verifier verdict was fail
+Final answer:
+总体状态：部分完成；1/2 项任务已由独立检查核验。 已确认（独立核验）： - 任务 a：有一项计划结果已由独立检查确认。 未完成（未通过核验）： - 任务 b：verifier verdict was fail 命令与测试——检查者核验：通过 1、失败 1、未运行 0；执行者自报：通过 2、失败 0、未运行 0。
+
+[wave structure] [["a"],["b"]]
+[worker order]   ["a","b","b"]
+
+==============================================================================
+INHERITANCE — what the next round is told (compiled from the round-1 report message)
+==============================================================================
+INHERITED WORK FROM EARLIER ROUNDS (verified work is carried forward, not redone):
+Round -1 redrive (generation 2): b — did not verify in an earlier round, so it runs again as a new generation
+Round -1 retain (generation 1): a — verified in an earlier round, so its work and evidence are carried forward instead of redone
+  detail a: Task a
+
+==============================================================================
+ROUND 2 — re-plan only the open wave + the new intent; wave 1 is not redone
+==============================================================================
+[planner prompt, inheritance block]
+INHERITED WORK (decided from earlier rounds of this session; this is a decision, not a suggestion):
+"INHERITED WORK FROM EARLIER ROUNDS (verified work is carried forward, not redone):\nRound -1 redrive (generation 2): b — did not verify in an earlier round, so it runs again as a new generation\nRound -1 retain (generation 1): a — verified in an earlier round, so its work and evidence are carried forward instead of redone\n  detail a: Task a"
+Retained tasks are already verified: do not redo them and do not re-verify them as if they were new. Redriven tasks start over from nothing. If you believe a retained task must be redone, say so in your result instead of silently redoing it.
+
+
+[worker order]   ["b","c"]   (no "a": the verified wave is retained)
+[tasks]          [["b","verified"],["c","verified"]]
+[wave structure] [["b"],["c"]]
+Grok workflow: COMPLETED
+Objective: Ship the two-wave plan and add a codegen step
+Plan: planner; 2 task(s); 2 verified
+Wave 1/2:
+- b: verified (1 attempt) — Task b
+Wave 2/2:
+- c: verified (1 attempt) — Task c
+Confirmed evidence:
+- b: b works → verified b works in file:///tmp/report
+- c: c works → verified c works in file:///tmp/report
+Final answer:
+总体状态：已完成；2/2 项任务已由独立检查核验。 已确认（独立核验）： - 任务 b：有一项计划结果已由独立检查确认。 - 任务 c：有一项计划结果已由独立检查确认。 命令与测试——检查者核验：通过 2、失败 0、未运行 0；执行者自报：通过 2、失败 0、未运行 0。
+
+==============================================================================
+ROUND 3 — known boundary: a dependency on a retained id is not resolvable yet
+==============================================================================
+[plan source] fallback
+[plan error]  planner returned no valid plan: task d depends on unknown task a
+[tasks]       [["task-1","verified"]]
+
+==============================================================================
+A6 — the documented envelope the runs above used
+==============================================================================
+[round 1 limits] concurrency 4, retries 1
+[round 2 limits] concurrency 4, retries 1
+[over-limit payload 500/9 ->] concurrency 100, retries 3 (clamped, not trusted)

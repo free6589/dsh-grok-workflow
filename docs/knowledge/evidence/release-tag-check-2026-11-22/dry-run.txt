@@ -1,0 +1,73 @@
+# dry-run — 2026-11-22 01:3x (this attempt)
+# script: docs/knowledge/evidence/release-tag-check-2026-11-22/release-dry-run.mjs (read-only: git objects + optional worktree overlay)
+
+== A. replay the published tag from the committed tree (no worktree overlay) ==
+$ node docs/knowledge/evidence/release-tag-check-2026-11-22/release-dry-run.mjs --ref HEAD --tag v0.12.19
+PASS  TAG_FORMAT                         v0.12.19 matches ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$
+PASS  TAG_ON_MAIN                        bd32506 is an ancestor of origin/main
+PASS  PACKAGE_VERSION                    package.json 0.12.19 vs tag v0.12.19
+BLOCK TAG_IS_NEW                         v0.12.19 already exists at 283577a; moving a published tag is forbidden
+PASS  CHANGELOG_SECTION                  [0.12.19] section is 40 lines (release.yml requires >= 4)
+PASS  CHANGELOG_BILINGUAL                2 bullets, 2 carry both EN and ZH on the bullet line, 2 carry ZH
+WARN  UNRELEASED_SECTION                 no [Unreleased] section: AGENTS.md asks for one, test/docs-version.spec.ts:110-114 requires the file to open with the package version
+PASS  CHANGELOG_OPENS_WITH_PACKAGE_VERSION first numbered section is [0.12.19], package.json says 0.12.19
+WARN  UNRELEASED_BILINGUAL               no [Unreleased] section to check for bilingual entries
+INFO  LIB_TRACKED_FILES                  157 tracked files at bd32506 (40 .js, 39 .d.ts, 78 .map)
+BLOCK WORKTREE_CLEAN                     82 uncommitted path(s) under lib/, src/, test/ (first: M lib/answer.d.ts)
+BLOCK LIB_UNTRACKED                      12 untracked lib/ path(s)
+summary: 12 checks, 3 BLOCK, 2 WARN
+verdict: REFUSE TO TAG
+exit=1
+
+== A2. same tag, worktree overlay (this attempt's CHANGELOG [Unreleased]) ==
+$ node docs/knowledge/evidence/release-tag-check-2026-11-22/release-dry-run.mjs --ref HEAD --tag v0.12.19 --worktree
+PASS  TAG_FORMAT                         v0.12.19 matches ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$
+PASS  TAG_ON_MAIN                        bd32506 is an ancestor of origin/main
+PASS  PACKAGE_VERSION                    package.json 0.12.19 vs tag v0.12.19
+BLOCK TAG_IS_NEW                         v0.12.19 already exists at 283577a; moving a published tag is forbidden
+PASS  CHANGELOG_SECTION                  [0.12.19] section is 40 lines (release.yml requires >= 4)
+PASS  CHANGELOG_BILINGUAL                2 bullets, 2 carry both EN and ZH on the bullet line, 2 carry ZH
+PASS  UNRELEASED_SECTION                 CHANGELOG.md carries an [Unreleased] section
+PASS  CHANGELOG_OPENS_WITH_PACKAGE_VERSION first numbered section is [0.12.19], package.json says 0.12.19
+PASS  UNRELEASED_BILINGUAL               [Unreleased] has 4 bullet(s), 4 carry both EN and ZH on the bullet line
+INFO  LIB_TRACKED_FILES                  157 tracked files at bd32506 (40 .js, 39 .d.ts, 78 .map)
+BLOCK WORKTREE_CLEAN                     82 uncommitted path(s) under lib/, src/, test/ (first: M lib/answer.d.ts)
+BLOCK LIB_UNTRACKED                      12 untracked lib/ path(s)
+summary: 12 checks, 3 BLOCK, 0 WARN
+verdict: REFUSE TO TAG
+exit=1
+
+== B. next version without the release prep (version still 0.12.19) ==
+$ node docs/knowledge/evidence/release-tag-check-2026-11-22/release-dry-run.mjs --ref HEAD --tag v0.12.20 --worktree
+PASS  TAG_FORMAT                         v0.12.20 matches ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$
+PASS  TAG_ON_MAIN                        bd32506 is an ancestor of origin/main
+BLOCK PACKAGE_VERSION                    package.json 0.12.19 vs tag v0.12.20
+PASS  TAG_IS_NEW                         no refs/tags/v0.12.20 exists
+BLOCK CHANGELOG_SECTION                  CHANGELOG.md has no "## [0.12.20]" section at bd32506
+PASS  UNRELEASED_SECTION                 CHANGELOG.md carries an [Unreleased] section
+PASS  CHANGELOG_OPENS_WITH_PACKAGE_VERSION first numbered section is [0.12.19], package.json says 0.12.19
+PASS  UNRELEASED_BILINGUAL               [Unreleased] has 4 bullet(s), 4 carry both EN and ZH on the bullet line
+INFO  LIB_TRACKED_FILES                  157 tracked files at bd32506 (40 .js, 39 .d.ts, 78 .map)
+BLOCK WORKTREE_CLEAN                     82 uncommitted path(s) under lib/, src/, test/ (first: M lib/answer.d.ts)
+BLOCK LIB_UNTRACKED                      12 untracked lib/ path(s)
+summary: 11 checks, 4 BLOCK, 0 WARN
+verdict: REFUSE TO TAG
+exit=1
+
+== C. replay the real historical release commit 283577a (gate must be able to pass) ==
+$ node docs/knowledge/evidence/release-tag-check-2026-11-22/release-dry-run.mjs --ref 283577a --tag v0.12.19 --allow-existing-tag
+PASS  TAG_FORMAT                         v0.12.19 matches ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$
+PASS  TAG_ON_MAIN                        283577a is an ancestor of origin/main
+PASS  PACKAGE_VERSION                    package.json 0.12.19 vs tag v0.12.19
+INFO  TAG_IS_NEW                         v0.12.19 already points at 283577a; replay allowed
+PASS  CHANGELOG_SECTION                  [0.12.19] section is 40 lines (release.yml requires >= 4)
+PASS  CHANGELOG_BILINGUAL                2 bullets, 2 carry both EN and ZH on the bullet line, 2 carry ZH
+WARN  UNRELEASED_SECTION                 no [Unreleased] section: AGENTS.md asks for one, test/docs-version.spec.ts:110-114 requires the file to open with the package version
+PASS  CHANGELOG_OPENS_WITH_PACKAGE_VERSION first numbered section is [0.12.19], package.json says 0.12.19
+WARN  UNRELEASED_BILINGUAL               no [Unreleased] section to check for bilingual entries
+INFO  LIB_TRACKED_FILES                  157 tracked files at 283577a (40 .js, 39 .d.ts, 78 .map)
+INFO  WORKTREE_CLEAN                     skipped: target 283577a is not the checked-out commit
+INFO  LIB_UNTRACKED                      skipped: target 283577a is not the checked-out commit
+summary: 12 checks, 0 BLOCK, 2 WARN
+verdict: WOULD TAG (no tag was created)
+exit=0

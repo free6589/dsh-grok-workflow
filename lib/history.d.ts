@@ -32,12 +32,21 @@ export declare function renderHistory(messages: readonly Message[], bounds: Hist
 /** Render the durable history of one session, tolerating an unavailable session. */
 export declare function collectHistory(session: Session | undefined, bounds: HistoryBounds, excludeIds?: readonly string[]): string;
 /**
- * Compose the gate objective from forwarded history and the current message.
+ * Compose the gate objective from forwarded history, inherited work and the current
+ * message.
+ *
+ * The three blocks are ordered oldest → newest: inherited work first (what earlier
+ * rounds already verified, with its own 8K budget from `src/carryover.ts`), then the
+ * rendered conversation history, then the current request. When the limit is tight
+ * the *oldest* block is the one that gives way — history is dropped before any
+ * inherited decision, and inherited lines are dropped from their old end — because a
+ * round that already verified work must not lose that list to a stale transcript.
  *
  * @param history - already rendered history block, or an empty string.
  * @param request - the current user message text.
  * @param limit - maximum length of the composed objective; the current message is never shortened.
+ * @param inheritance - rendered L1 inheritance digest, or an empty string on a first round.
  * @returns the objective, or `undefined` when the current message alone exceeds the limit.
  */
-export declare function composeObjective(history: string, request: string, limit: number): string | undefined;
+export declare function composeObjective(history: string, request: string, limit: number, inheritance?: string): string | undefined;
 //# sourceMappingURL=history.d.ts.map

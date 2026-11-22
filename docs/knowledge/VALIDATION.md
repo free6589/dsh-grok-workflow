@@ -1,5 +1,23 @@
 # Validation Log
 
+## Wave 4 合流与 A1–A6 验收 — 2026-11-22（`CONFIRMED`，agent-72）
+
+**Changed:** 只加验收件，不改 Wave 1–3 源码：`test/wave4-acceptance.spec.ts`（8 例）与
+`docs/knowledge/evidence/wave4-acceptance-2026-11-22/`（`ACCEPTANCE.md`、`MERGE-DEMO.txt`、
+`capture-merge-demo.mjs`、`CI-WAVE4.log`、`CI-WAVE4-first-run-exit1.log`、`CI-WAVE4-attempt2.log`）。
+
+| state | command | result |
+| --- | --- | --- |
+| working tree | `npm run ci`（01:06 基线，本波改动前） | exit **0** — 77 files / 1429 tests PASS |
+| working tree | `npm run ci`（01:11，含本波 8 例） | exit **1** — 78 files / 1422 tests；唯一失败是 `test/delivery.spec.ts` 被并发编辑写到一半（`Expected ',' or ')' but found Identifier`，mtime 01:12:30 晚于起始 01:11:44），本波 8 例在该次已全绿 |
+| working tree | `npm run ci`（01:13，同树，等并发写落定） | exit **0** — **78 files / 1438 tests PASS**（`verify:lib` 一致、oxlint 23 warnings / 0 errors、typecheck 0 错） |
+| working tree | `npm run ci`（01:33，收尾独立复验） | exit **0** — **78 files / 1439 tests PASS**；比 01:13 多的 1 例来自并行工作对 `test/naming.spec.ts` 的改动（Q10(b) 组标题不截断），本波 spec 仍 8 例全绿；日志 `CI-WAVE4-attempt2.log` |
+| working tree | `npx vitest run test/wave4-acceptance.spec.ts` | 8 tests PASS |
+| working tree | `npx vitest run test/waves.spec.ts test/inheritance.spec.ts test/wave4-acceptance.spec.ts` | 3 files / 47 tests PASS（01:32 复跑同结果） |
+| built `lib/`（VM 真脚本） | `node docs/knowledge/evidence/wave4-acceptance-2026-11-22/capture-merge-demo.mjs` | 两轮实跑：PARTIAL(`a` verified / `b` failed) → 继承含 `retain a` + `redrive b` → 次轮只跑 `b`、`c`，COMPLETED；越界载荷 500/9 夹回 100/3（01:32 复跑输出与 `MERGE-DEMO.txt` 逐字节一致） |
+| real DSH GUI | — | **NOT_RUN**：没有在宿主界面点开多波运行的进度面板（本波只用 VM + 真渲染器） |
+| real model | — | **NOT_RUN**：子代理全部脚本化，planner 是否真的遵守继承块属提示词契约，未做模型实测 |
+
 Real commands and results only. Do not add expected results here.
 
 ## 已发版 `0.12.19` — 2026-11-21 (`CONFIRMED`, agent-12)

@@ -309,12 +309,90 @@ describe('relay/in-turn 文本：可见块与人话块一致，台账折叠在�
     expect(text.slice(text.indexOf(REPORT_END))).toContain('Grok workflow: COMPLETED')
   })
 
-  it('ignores the removed diagnostics opt-in: the ledger stays folded (T4)', () => {
-    const text = relayText(completedReport(), undefined, { showDiagnostics: true })
-    const visible = between(text)
-    expect(visible).not.toContain('Grok workflow: COMPLETED')
-    expect(visible).toContain('答案：')
-    expect(text).toContain(LEDGER_GUARD)
+  it('shows the machine ledger inside the markers only when diagnostics are on (Q11 c)', () => {
+    // Default (Q11 a): the human block alone travels inside the markers, and the
+    // ledger is folded below them as the durable copy carry-over reads back.
+    const off = relayText(completedReport())
+    expect(between(off)).not.toContain('Grok workflow: COMPLETED')
+    expect(off).toContain(LEDGER_GUARD)
+    expect(off.slice(off.indexOf(REPORT_END))).toContain('Grok workflow: COMPLETED')
+
+    // `showDiagnostics` on (Q11 b): the ledger travels inside the markers, and is
+    // not duplicated below them.
+    const on = relayText(completedReport(), undefined, { showDiagnostics: true })
+    expect(between(on)).toContain('Grok workflow: COMPLETED')
+    expect(between(on)).toContain('答案：')
+    expect(on).not.toContain(LEDGER_GUARD)
+    expect(on.slice(on.indexOf(REPORT_END))).not.toContain('Grok workflow: COMPLETED')
+  })
+
+  it('keeps the incident machine tokens out of the visible block (Q11)', () => {
+    // The reported message: a reason quoting `RESUME code=none …` plus a
+    // `src/script.ts:12` reference. Those are ledger words, and the visible block
+    // is human text — the model is told to reproduce it verbatim, so anything left
+    // here is printed as is.
+    const reason = 'the RSI heartbeat stopped early: RESUME code=none next_round=42 见 src/script.ts:12'
+    const ok = task('a', ['天气已核验'])
+    const bad = { ...task('b', ['酒店价格已核验']), title: '酒店价格' }
+    const checked = verification(ok)
+    const report = assertWorkflowReport({
+      schemaVersion: 'grok-workflow/v1',
+      status: 'partial',
+      objective: OBJECTIVE,
+      plan: { source: 'caller', tasks: [ok, bad], error: '' },
+      tasks: [
+        {
+          ...ok,
+          status: 'verified',
+          attempts: [{ attempt: 1, execution: execution('查到新加坡本周多雨'), verification: checked, passed: true, error: '' }],
+          error: '',
+        },
+        {
+          ...bad,
+          status: 'failed',
+          attempts: [{
+            attempt: 1,
+            execution: execution('尝试查询酒店价格'),
+            verification: failingVerification(bad, '价格来源打不开'),
+            passed: false,
+            error: reason,
+          }],
+          error: reason,
+        },
+      ],
+      confirmed: [{ taskId: 'a', criterion: '天气已核验', evidence: checked.criteria[0]!.evidence }],
+      incomplete: [{ taskId: 'b', reason, category: 'infrastructure' as const }],
+      errors: [],
+      uncertainties: [{ taskId: 'b', text: reason }],
+      synthesis: { mode: 'deterministic', summary: '天气已核验；酒店价格未取得。' },
+      limits: { ...LIMITS, maxRetries: WIRE_RETRIES, maxTotalAgents: maxTotalAgentsFor(2, FIXED_MAX_RETRIES, routeBudgetFor(config)) },
+    }, OBJECTIVE, config)
+    const visible = between(relayText(report))
+    // The reason itself survives — it is the run's own explanation (B10)...
+    expect(visible).toContain('the RSI heartbeat stopped early')
+    // ...but the machine assignments and the source reference do not.
+    expect(visible).not.toContain('code=')
+    expect(visible).not.toContain('next_round=')
+    expect(visible).not.toContain('src/script.ts')
+  })
+
+  it('switches the relay instruction from verbatim to paraphrase when the ledger travels (Q11 b)', () => {
+    const preambleOf = (text: string): string => text.slice(0, text.indexOf(REPORT_BEGIN))
+    // The human block is human text: reproducing it word for word is exactly right.
+    const off = preambleOf(relayText(completedReport()))
+    expect(off).toContain('Reply with those lines exactly as given')
+    // A ledger is machine text: the same instruction is what produced `code=` and
+    // half sentences in the reply, so it is replaced by the paraphrase contract.
+    const on = preambleOf(relayText(completedReport(), undefined, { showDiagnostics: true }))
+    expect(on).not.toContain('Reply with those lines exactly as given')
+    expect(on).toContain('in your own words')
+    expect(on).toContain('keep every number and every file path exactly as given')
+    expect(on).toContain('never print a machine field name')
+    expect(on).toContain('no "code="')
+    // A failure keeps its own wording, with or without diagnostics.
+    const failed = failureReport(OBJECTIVE, config, 'Plan', 'planner unavailable')
+    expect(preambleOf(relayText(failed, undefined, { showDiagnostics: true })))
+      .toContain('never describe this as success')
   })
 
   it('folds the ledger for a PARTIAL run too, and keeps it parseable for carry-over', () => {

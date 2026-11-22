@@ -26,6 +26,7 @@ export async function runWorkflowScript(
   script: string,
   args: Record<string, unknown>,
   agent: ScriptAgent,
+  globals: Record<string, unknown> = {},
 ): Promise<ScriptRun> {
   const events: string[] = []
   const calls: AgentCall[] = []
@@ -41,6 +42,10 @@ export async function runWorkflowScript(
     return agent(prompt, options)
   }
   const context = vm.createContext({
+    // The real guest realm exposes no timers (the engine injects only
+    // agent/parallel/pipeline/phase/log/args), so a case that needs a timer has to
+    // supply one explicitly — that is what `globals` is for.
+    ...globals,
     agent: wrapped,
     phase: (title: string) => { events.push(`phase:${title}`) },
     log: (message: string) => { events.push(`log:${message}`) },

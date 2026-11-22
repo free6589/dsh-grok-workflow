@@ -1,0 +1,28 @@
+# docs-version gate (test/docs-version.spec.ts) — 2026-11-22
+
+## 1. real repo, worktree as it stands (CHANGELOG.md now carries [Unreleased])
+$ npx vitest run test/docs-version.spec.ts
+ ✓ test/docs-version.spec.ts (8 tests) 15ms
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+
+## 2. isolated copy of the four files the spec reads (positive control)
+$ cd .release-check-tmp/docsver && npx vitest run test/docs-version.spec.ts
+(package.json restored from the repo copy first)
+ ✓ test/docs-version.spec.ts (8 tests) 25ms
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+
+## 3. same copy, package.json bumped to 0.12.20 and nothing else changed (negative control)
+     × states the current package version in English 9ms
+     × states the current package version in Simplified Chinese 1ms
+     × pins every install example to the current release tag 3ms
+     × names only the current release when a tag is spelled out in prose 1ms
+     × lists published tags in ascending order ending at the current release 2ms
+     × opens the changelog with the version the package declares 1ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  1 failed (1)
+      Tests  6 failed | 2 passed (8)
+
+reading: the guard is real (a bare version bump turns 6 assertions red) and it coexists with
+an [Unreleased] heading, because every assertion matches ^## \[(\d+\.\d+\.\d+)\] only.

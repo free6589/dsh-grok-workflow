@@ -173,10 +173,14 @@ export function validateRoutes(ctx: Context, config: ResolvedConfig): RouteValid
   const notes: string[] = []
   const llm = serviceOf<LlmRuntimeLike>(ctx, 'llm')
   const settings = serviceOf<SettingsFormsLike>(ctx, 'settings')
-  const configured: { role: RoleName; route: ModelRoute }[] = []
+  const configured: { key: string; route: ModelRoute }[] = []
   for (const role of ROLE_ORDER) {
-    for (const route of config.roles[role]) configured.push({ role, route })
+    for (const route of config.roles[role]) configured.push({ key: `roles.${role}`, route })
   }
+  // The guardian route (Q8) is validated like a role route, under its own key
+  // name: it is a single route, not a chain, so it gets one entry and its
+  // failures name `guardianModel` rather than a role.
+  if (config.guardianModel !== undefined) configured.push({ key: 'guardianModel', route: config.guardianModel })
   if (configured.length === 0) return { errors, notes }
   // Empty-cap heads-up (never a failure): a chain with 2+ routes where every
   // maxInFlight is blank can never overflow — blank = unlimited = never yields.
@@ -205,28 +209,28 @@ export function validateRoutes(ctx: Context, config: ResolvedConfig): RouteValid
     return { errors, notes }
   }
   const known = providers.map(item => item.id)
-  for (const { role, route } of configured) {
+  for (const { key, route } of configured) {
     const provider = route.provider
     if (provider === undefined || provider === '') {
-      notes.push(`roles.${role} route ${route.model} inherits the run's provider; only the model id is checked by the engine`)
+      notes.push(`${key} route ${route.model} inherits the run's provider; only the model id is checked by the engine`)
       continue
     }
     if (!known.includes(provider)) {
-      errors.push(`roles.${role} names provider "${provider}", which this runtime does not have; known providers: ${known.join(', ')}`)
+      errors.push(`${key} names provider "${provider}", which this runtime does not have; known providers: ${known.join(', ')}`)
       continue
     }
     if (settings === undefined || typeof settings.describe !== 'function') {
-      notes.push(`roles.${role} model "${route.model}" was not checked: this runtime exposes no settings service`)
+      notes.push(`${key} model "${route.model}" was not checked: this runtime exposes no settings service`)
       continue
     }
     const models = declaredModels(provider, llm, settings)
     if (models === undefined) {
-      notes.push(`roles.${role} model "${route.model}" was not checked: provider "${provider}" enumerates no models`)
+      notes.push(`${key} model "${route.model}" was not checked: provider "${provider}" enumerates no models`)
       continue
     }
     if (!models.includes(route.model)) {
       errors.push(
-        `roles.${role} names model "${route.model}", which provider "${provider}" does not enumerate; ` +
+        `${key} names model "${route.model}", which provider "${provider}" does not enumerate; ` +
         `declared: ${models.join(', ')}`,
       )
     }

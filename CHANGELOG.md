@@ -3,6 +3,79 @@
 Notable user-facing changes are recorded here in English and Simplified Chinese.
 用户可见的功能和修复会在这里以英文和简体中文记录。
 
+## [0.13.0] - 2026-11-22
+
+### Added / 新增
+
+- **Plans run as waves, and a single-wave report says why / 计划按波执行，单波报告写明原因** —
+  A plan task may declare `dependsOn`; the longest dependency path decides which wave the task
+  belongs to, and a plan is rejected as a whole when it declares more than eight waves
+  (`WAVE_LIMIT` in `src/waves.ts`), a dependency that points at its own wave or a later one, an
+  unknown id, itself, or a cycle. Every report that ran as one wave now carries a `Wave reason:`
+  line (`single-task`, `dependency-chain`, `write-overlap` or `planned`), because "1 wave" alone
+  cannot tell a one-line job from a plan whose tasks could not run together.
+  / 计划任务可以声明 `dependsOn`，最长的依赖链决定该任务落在哪一波；声明超过八波（`src/waves.ts`
+  的 `WAVE_LIMIT`）、依赖指向本波或更晚的波、指向未知 id、指向自己、或成环，整份计划被拒。只跑了
+  一波的报告现在会带一行 `Wave reason:`（`single-task`/`dependency-chain`/`write-overlap`/
+  `planned`）——只说「1 波」看不出是一行活，还是本该并行却挤成了一波。
+
+- **A downstream task receives what its verified upstream produced / 下游任务拿到上游已验证的产出** —
+  A task that declares `dependsOn` gets a bounded digest of what each dependency actually produced
+  (2000 characters per dependency, with a cap on the whole block), rendered into the child prompt by
+  `upstreamDigestSource()` in `src/upstream.ts`. A dependency that verified with only a prose summary
+  produced no artifact — a child's self-report is not verification — so its dependents are failed
+  instead of being run against nothing.
+  / 声明了 `dependsOn` 的任务会收到每个依赖实际产出的摘要块（单个依赖 2000 字符，整块另有上限），由
+  `src/upstream.ts` 的 `upstreamDigestSource()` 渲染进子代理提示词。只留下散文总结、没有产出任何
+  凭证的依赖不算交付（子代理的自述不是核验），它的下游任务直接判失败，而不是空着手去跑。
+
+- **A hung child call is settled as a timeout instead of running to the deadline / 卡住的子调用按超时结算** —
+  Every `agent()` call now races a timer inside the generated script: a call that loses the race is
+  settled as a `timeout` failure, which the existing bounded retry already knows how to continue, so
+  one stalled child no longer holds the run until the deadline. The tiers are 120 s for a single
+  shell command (stated in the child's own prompt), 600000 ms per task call
+  (`CHILD_TIMEOUT_MS` in `src/timeout.ts`), and the configured `timeoutMs` for the whole run —
+  unchanged, still the only deadline an operator sets.
+  / 生成脚本里的每次 `agent()` 调用现在都和一个计时器赛跑：输掉的一方按 `timeout` 失败结算，交给
+  已有的有界重试续跑，一个卡住的子代理不再把整次运行拖到死线。三档是：单条 shell 命令 120 秒
+  （写在子代理自己的提示词里）、单次任务调用 600000 毫秒（`src/timeout.ts` 的 `CHILD_TIMEOUT_MS`）、
+  以及整次运行沿用配置的 `timeoutMs`——这一档没变，仍是操作者唯一要设的死线。
+
+- **`guardianModel`: a stalled child is judged before it is killed / 判停单路由：先取证再判停** —
+  New configuration key, a single route (`{provider?, model?}`, not a chain) for the resident
+  guardian: when a child call outlives its task timeout, the judge is asked first, and a `wait`
+  verdict extends that call by 300000 ms (`GUARDIAN_WAIT_MS`), at most twice, never past the run
+  deadline. Left empty the judge is off and a timed-out call goes straight to the task's bounded
+  retry. The configuration surface is sixteen keys from this section on.
+  / 新配置键，单条路由（`{provider?, model?}`，不是链）交给常驻监护：子调用超过任务超时后先问判官，
+  判 `wait` 就把这次调用延长 300000 毫秒（`GUARDIAN_WAIT_MS`），最多两次，且不越过运行死线。留空
+  即不判停，超时直接进任务的有界重试。从本节起配置面是十六个键。
+
+- **Reopening a run inherits what the last round verified / 重开一轮继承上轮已验证的产出** —
+  A steering round no longer redoes finished work: it reads the previous round's report back out of
+  the transcript and carries a bounded inheritance digest (8000 characters, verified rows first,
+  details dropped before the list) into the new plan. A task the last round verified is `retain`ed,
+  a task it failed or left `blocked` is `redriven`; cancelling a run keeps `blocked` rows as
+  `blocked` instead of rewriting them as failures. Inheritance is a prompt-level constraint — a
+  planner that ignores it and redoes retained work is a planner defect, not a silent merge.
+  / 转向重开不再重做已验证的工作：新一轮从对话记录里读回上一轮的报告，带一份有界的继承摘要（8000
+  字符，已验证清单优先、细节先砍）进新计划。上轮已验证的任务 `retain` 不重跑，上轮失败或 `blocked`
+  的任务 `redrive` 重跑；取消整轮时 `blocked` 行保持 `blocked`，不改写成失败。继承是提示词级约束——
+  planner 无视它重做了保留工作，那是 planner 缺陷，不会静默合并。
+
+### Changed / 变更
+
+- **Display wording: review, deadline in minutes, task titles in full / 显示层：复核改名、分钟制死线、标题全留** —
+  `supervisor` renders as `复核` / `Reviewer` everywhere a reader sees it (internal keys unchanged);
+  the run deadline is edited in minutes and stored in milliseconds (`0` = unlimited, default 60 min);
+  a plan-task group header shows the whole title (no truncation; the run title keeps its bound) and a
+  worker prompt opens with `角色 · 任务标题`; the relay ships the human block by default and only
+  attaches the machine ledger when `showDiagnostics` is on, cutting at sentence boundaries.
+  / `supervisor` 在读者可见处一律写作`复核` / `Reviewer`（内部键不动）；运行死线按分钟编辑、按毫秒
+  存储（`0` = 不限时，默认 60 分钟）；计划任务组标题显示全名不再截断（运行标题仍有上限），子代理
+  提示词首行统一 `角色 · 任务标题`；转交默认只给人话块，`showDiagnostics` 开才附机器台账，截断按
+  句子边界不断词。
+
 ## [0.12.19] - 2026-11-21
 
 ### Changed / 变更

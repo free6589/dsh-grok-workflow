@@ -1,0 +1,20 @@
+--- extracted release.yml gate step (25 lines) ---
+set -euo pipefail
+if [[ ! "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+  echo "Expected a semantic version tag like v0.1.0; got: $RELEASE_TAG" >&2
+...
+
+== negative: version bumped, section still named [Unreleased] ==
+if (start < 0) throw new Error('CHANGELOG.md is missing a section for [' + version + ']')
+Error: CHANGELOG.md is missing a section for [0.12.20]
+negative exit=1 (design: non-zero)
+
+== positive: version bumped and the [Unreleased] entries renamed to [0.12.20] ==
+positive exit=0 (design: 0)
+release-notes.md: 47 lines
+## [0.12.20] - 2026-11-22
+
+### Added / 新增
+
+
+rehearsal: PASS (gate rejects the unbumped section and accepts the release-prep one)

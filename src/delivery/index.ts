@@ -195,6 +195,97 @@ function oneLine(text: string, max: number): string {
   return flat.length <= max ? flat : `${cutCodeUnits(flat, Math.max(0, max - 1))}…`
 }
 
+/** Characters that end a sentence in either shipped language. */
+const SENTENCE_ENDS = '。！？!?'
+/** Characters that end a clause: a cut here still leaves a readable fragment. */
+const CLAUSE_ENDS = '；;，、：,'
+
+/**
+ * Index just past the last sentence end at or before `room`, or -1.
+ *
+ * An ASCII full stop only counts where a sentence can end: the next character has
+ * to be whitespace or the end of the text, so `0.12.19`, `src/answer.ts:106` and
+ * `1,234.5` are never mistaken for a sentence and cut in half.
+ */
+function lastSentenceCut(text: string, room: number): number {
+  let best = -1
+  for (let index = 0; index < room; index += 1) {
+    const char = text[index]!
+    if (SENTENCE_ENDS.includes(char)) {
+      best = index + 1
+      continue
+    }
+    if (char !== '.') continue
+    const next = text[index + 1]
+    if (next === undefined || next === ' ' || next === '\n' || next === '\t') best = index + 1
+  }
+  return best
+}
+
+/** Index just past the last clause separator at or before `room`, or -1. */
+function lastClauseCut(text: string, room: number): number {
+  for (let index = room - 1; index >= 0; index -= 1) {
+    if (CLAUSE_ENDS.includes(text[index]!)) return index + 1
+  }
+  return -1
+}
+
+/** Index of the last whitespace run before `room`, or -1: a cut between words. */
+function lastWordCut(text: string, room: number): number {
+  const match = /\s+\S*$/.exec(text.slice(0, room))
+  return match === null ? -1 : match.index
+}
+
+/**
+ * The longest prefix of `text` within `room` that ends where a reader can stop.
+ *
+ * Preference order is sentence end, then clause separator, then between words;
+ * a boundary that threw away most of the window is rejected in favour of the next
+ * one, so a lone full stop early in a long sentence cannot shrink the line to
+ * almost nothing. No `…` is appended: every caller here draws its own omission
+ * mark, and two of them in a row read as a stutter.
+ *
+ * This is the Q11 rule at the character level: a relayed report used to hand the
+ * model half a sentence (`the RSI heart…`), and a fragment that stops inside a
+ * word is unreadable in exactly the way a whole sentence is not.
+ *
+ * @param text - the text to bound.
+ * @param room - maximum length in UTF-16 code units.
+ * @returns the prefix, at most `room` characters.
+ */
+function boundaryPrefix(text: string, room: number): string {
+  if (room <= 0) return ''
+  if (text.length <= room) return text
+  for (const find of [lastSentenceCut, lastClauseCut, lastWordCut]) {
+    const cut = find(text, room)
+    if (cut > 0 && cut * 4 >= room) return text.slice(0, cut).trimEnd()
+  }
+  return cutCodeUnits(text, room)
+}
+
+/**
+ * One bounded line of human prose, cut at a sentence or word boundary.
+ *
+ * Same job as {@link oneLine} for the free text a reader actually reads — a
+ * failure reason, a caveat, the run's own answer — with the Q11 rule applied: when
+ * the text has to be cut, it is cut where a sentence ends (or, failing that,
+ * between words), never in the middle of one.
+ *
+ * @param text - the prose to bound.
+ * @param max - maximum length in UTF-16 code units, `…` included.
+ * @returns the bounded line.
+ */
+function sentenceLine(text: string, max: number): string {
+  const flat = text.replace(/\s+/g, ' ').trim()
+  if (flat.length <= max) return flat
+  const room = Math.max(1, max - 1)
+  for (const find of [lastSentenceCut, lastClauseCut, lastWordCut]) {
+    const cut = find(flat, room)
+    if (cut > 0 && cut * 4 >= room) return `${flat.slice(0, cut).trimEnd()}…`
+  }
+  return `${cutCodeUnits(flat, room)}…`
+}
+
 /** Escape a literal for a regular expression. */
 function literal(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -281,6 +372,10 @@ const MACHINE_DETAIL: readonly (readonly [RegExp, string])[] = [
   // (B10): `[infrastructure/timeout]` is a failure reason's own words, not a
   // route, so a pair wrapped in `[…]` is left alone.
   [/(?<![[])\b(?=[\w.-]*[A-Za-z])[\w.-]+\/[\w.:-]+(?![\]])/g, ' '],
+  // Machine assignments a child model quotes back verbatim (`RESUME code=none
+  // next_round=42`, Q11). Only this closed list of keys is touched, so ordinary
+  // prose that happens to contain `x=1` is never rewritten.
+  [/\b(?:verdict|code|class|failureClass|next_round|blocked_streak|round|streak|seq|childId|taskId|runId)\s*=\s*[^\s，。；;]+/g, ' '],
   // Tally phrasing: the run's own count sentences, never an answer.
   [/\b\d[\d,]*\s*ms\s+per\s+run\b/gi, ' '],
   [/\d+\s*项任务(?:全部)?核验通过/g, ' '],
@@ -315,7 +410,9 @@ function stripMachineDetail(line: string): string {
     .replace(/([，,、；;：:])\s*(?=[，,、；;：:。.])/g, '')
     // A leading dash is a list bullet, so it is deliberately not trimmed here.
     .replace(/^[\s，,、；;：:。.…]+/, '')
-    .replace(/[\s，,、；;…]+$/, '')
+    // A trailing `…` survives on purpose (Q11): it is this module's own truncation
+    // mark, and stripping it left a cut line reading as if nothing were missing.
+    .replace(/[\s，,、；;]+$/, '')
     .trim()
 }
 
@@ -472,7 +569,7 @@ export function answerLead(report: WorkflowReport, lang: DeliveryLang): string {
     const clean = stripIds(scrubbed, report)
     if (clean === '') continue
     tried += 1
-    if (!tainted(clean)) return oneLine(dedupeBilingual(clean, lang), 400)
+    if (!tainted(clean)) return sentenceLine(dedupeBilingual(clean, lang), 400)
   }
   // Never fall back to the raw ledger: paraphrase the first confirmation instead
   // (no criterion/evidence verbatim), and name the open questions when the run
@@ -484,7 +581,7 @@ export function answerLead(report: WorkflowReport, lang: DeliveryLang): string {
     const open = report.uncertainties.length > 0
       ? (lang === 'zh' ? '还有未确认的细节，见下文。' : 'Open details are listed below.')
       : ''
-    return oneLine(`${lead}${open}`, 400)
+    return sentenceLine(`${lead}${open}`, 400)
   }
   if (report.uncertainties.length > 0) {
     return lang === 'zh'
@@ -578,7 +675,7 @@ function composeHumanParts(report: WorkflowReport, lang: DeliveryLang): { block:
       // the only place a reader sees it (B10). Machine detail (commands, paths,
       // digests, coordinates, routes) is still stripped, because a reader cannot
       // use it — but the line itself is never dropped for mentioning a token.
-      const reason = oneLine(stripMachineDetail(item?.reason ?? task.error ?? ''), 240)
+      const reason = sentenceLine(stripMachineDetail(item?.reason ?? task.error ?? ''), 240)
       const name = titleOf(report, task.id, report.tasks.indexOf(task))
       push(reason === '' ? `- ${name}` : `- ${name}：${reason}`, false)
     })
@@ -588,7 +685,7 @@ function composeHumanParts(report: WorkflowReport, lang: DeliveryLang): { block:
   // A failure with no task rows (deadline, engine error) still needs its reason.
   // When task rows exist the reason is already above, so it is not repeated here.
   if (report.status === 'failed' && undone.length === 0 && report.errors.length > 0) {
-    const reason = oneLine(stripMachineDetail(report.errors[0]!.message), 300)
+    const reason = sentenceLine(stripMachineDetail(report.errors[0]!.message), 300)
     if (reason !== '') push(zh ? `原因：${reason}` : `Reason: ${reason}`, false)
   }
 
@@ -597,7 +694,7 @@ function composeHumanParts(report: WorkflowReport, lang: DeliveryLang): { block:
   if (caveats.length > 0) {
     push(zh ? '需要你知道的：' : 'Worth knowing:')
     for (const item of caveats) {
-      push(`- ${oneLine(scrub(item.text), 240)}`)
+      push(`- ${sentenceLine(scrub(item.text), 240)}`)
     }
   }
 
@@ -640,7 +737,9 @@ function clampHumanBlock(block: string, tail: string, cap: number): string {
   if (rest <= 0) return `${headKeep}${keepTail}`
   const window = block.slice(head.length, head.length + rest)
   const brk = window.lastIndexOf('\n')
-  const middle = brk >= 0 ? window.slice(0, brk + 1) : cutCodeUnits(window, rest)
+  // No line break inside the window means the cut lands inside one line, so it is
+  // taken at a sentence or word boundary instead of at an arbitrary character.
+  const middle = brk >= 0 ? window.slice(0, brk + 1) : boundaryPrefix(window, rest)
   return `${headKeep}${middle}${keepTail}`
 }
 

@@ -1,0 +1,16 @@
+{
+  "file": "docs/knowledge/DESIGN-dynamic-steering-semantics.md",
+  "lines": 252,
+  "blocks": 83,
+  "headings": 11,
+  "bullets": 48,
+  "paragraphs": 19,
+  "tableBlocks": 5,
+  "tableRows": 51,
+  "fences": 0,
+  "findings": 0,
+  "advisoryEnds": 1
+}
+ADVISORY (block ends lacking sentence-final punctuation — confirm each is metadata):
+  - L3: ...- 日期：2026-11-21 起草，2026-11-22 复核修订
+OK: no readability findings

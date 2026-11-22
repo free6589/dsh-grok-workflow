@@ -10,6 +10,17 @@ declare module '@deepseek-ai/dsh-llm' {
 /** Final workflow status. These are the only values the plugin may report. */
 export type FinalStatus = 'completed' | 'partial' | 'failed'
 
+/**
+ * One task's terminal status.
+ *
+ * `verified` and `failed` say the task ran; `blocked` says it did not run because a
+ * task it depends on did not verify (see
+ * `docs/knowledge/DESIGN-dynamic-steering-semantics.md` §1). A `blocked` task spends
+ * no retry and is never counted as a verifier mistake, and no report that contains
+ * one may be `completed`.
+ */
+export type TaskStatus = 'verified' | 'failed' | 'blocked'
+
 /** A plan task supplied by the caller (all work is independent). */
 export interface TaskInput {
   /** Stable task id. Generated as `task-N` when omitted. */
@@ -26,6 +37,12 @@ export interface TaskInput {
    * anything. `[]` declares a task that writes nothing.
    */
   writesPaths?: string[]
+  /**
+   * Task ids this task depends on (v0.13 DAG). A dependency must point at a task in
+   * an earlier wave; the plan is rejected, naming the offending task, when it does
+   * not. A task whose dependency did not verify is reported `blocked`, never run.
+   */
+  dependsOn?: string[]
 }
 
 /** Fully normalized task used inside the generated workflow. */
@@ -42,6 +59,13 @@ export interface NormalizedTask {
    * the task declared that it writes nothing.
    */
   writesPaths: string[] | null
+  /** Validated dependency ids; absent when the task declared none. */
+  dependsOn?: string[]
+  /**
+   * 0-based wave this task belongs to. Only present on plans that declared waves;
+   * a flat plan is one wave and carries no field (an absent value reads as 0).
+   */
+  wave?: number
   /**
    * Original goal id shared by every shard of a planner-failure fallback plan.
    * Absent for caller and planner plans, which have no synthetic shards.
@@ -137,6 +161,15 @@ export interface GrokWorkflowConfig {
   grokDefault?: 'on' | 'off'
   /** Per-role ordered model chains (planner/worker/verifier/synthesizer/supervisor). */
   roles?: RoleRouting
+  /**
+   * Single guardian model route (Q8), not a chain: the model that judges a
+   * stalled child before the script kills it (`wait` extends by 5 minutes at
+   * most twice, never past the run deadline; `kill` settles the call as a
+   * failure the task's bounded retry continues). An empty/absent model disables
+   * adjudication — a timed-out call then fails straight to retry, exactly as it
+   * did before the guardian existed.
+   */
+  guardianModel?: ModelRoute
   /** Final-answer policy: `layered` (markdown direct output, default) or one model call. */
   synthesis?: SynthesisPolicy
   /** Configuration surface version; unknown/newer versions are refused. */
@@ -189,6 +222,12 @@ export interface ResolvedConfig {
   grokDefault: 'on' | 'off'
   /** Effective per-role chains; an empty array means "inherit the run's route". */
   roles: Record<RoleName, ModelRoute[]>
+  /**
+   * The configured guardian route (Q8), or `undefined` when none is set: a run
+   * without one adjudicates nothing and a timed-out call fails straight to the
+   * task's bounded retry, exactly as it did before the guardian existed.
+   */
+  guardianModel?: ModelRoute
   synthesis: SynthesisPolicy
   /**
    * True when the load-time repair (`repairSynthesisInconsistency`) rewrote
@@ -371,7 +410,7 @@ export interface TaskReport {
   writesPaths: string[] | null
   /** Shared original-goal id for planner-failure fallback shards. */
   originGoalId?: string
-  status: 'verified' | 'failed'
+  status: TaskStatus
   attempts: AttemptReport[]
   error?: string
 }
@@ -380,6 +419,12 @@ export interface TaskReport {
 export interface PlanReport {
   source: 'caller' | 'planner' | 'fallback' | 'unavailable'
   tasks: NormalizedTask[]
+  /**
+   * The plan as waves of task ids, in execution order (v0.13 DAG). Absent on a
+   * report produced before waves existed; a single-wave plan carries one inner
+   * array. Every plan task appears exactly once, and in plan order.
+   */
+  waves?: string[][]
   error?: string
   /** Why the plan is not the planner's own (planner fault, with a category). */
   failure?: AttemptFailure | null

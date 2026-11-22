@@ -139,6 +139,15 @@ export declare function truncateTaskTitle(title: unknown, limit?: number): strin
  */
 export declare function taskGroupTitle(index: number, title: unknown, language?: NamingLanguage): string;
 /**
+ * The complete task title, whitespace-collapsed and trimmed.
+ *
+ * Separate from {@link truncateTaskTitle} on purpose: the group header shows the whole
+ * title (Q10(b)), while {@link runTitle} still bounds the run's own name.
+ * @param title - the task title as planned.
+ * @returns the title to render.
+ */
+export declare function displayTitle(title: unknown): string;
+/**
  * Build the member label for one role call.
  *
  * `attempt` counts from 1, and only a repeated attempt is called out: the first

@@ -277,9 +277,12 @@ describe('task-level safety nets', () => {
   })
 
   it('turns a crash in the task pool into one failed row per task', async () => {
+    // v0.13: the plan runs wave by wave, so the plain pool is the single-wave
+    // branch inside `runWave`. The safety net is unchanged: whatever throws inside
+    // the pool still becomes one failed row per task instead of no report at all.
     const script = sabotage(
-      'results = await mapLimit(plan.tasks, maxConcurrency, runTask);',
-      'results = await mapLimit(plan.tasks, maxConcurrency, function (t) { throw new Error(\'sabotage-in-pool\'); });',
+      '    : mapLimit(entries, limit, runner);',
+      '    : mapLimit(entries, limit, function () { throw new Error(\'sabotage-in-pool\'); });',
     )
     const run = await runWorkflowScript(script, args(), async () => verification(task('a')))
     expect(run.report.status).toBe('failed')

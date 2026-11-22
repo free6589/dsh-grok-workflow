@@ -309,15 +309,16 @@ describe('client settings page bundle', () => {
     expect(typeof bundle.apply).toBe('function')
   })
 
-  // T5 slim page plus the four repeat-run keys and the two self-iteration keys:
-  // 11 visible FIELDS (grokDefault/mode/maxConcurrency/maxTasks/timeoutMs, the four
-  // loop keys, iterateIntervalMin and the iterateTemplate textarea) plus the 5 role
-  // chains equal the 15-leaf-key configuration surface (toolName/roles/synthesis/
-  // configVersion are structural, rendered nowhere).
+  // T5 slim page plus the four repeat-run keys, the two self-iteration keys and
+  // the Q8 guardian model: 12 visible FIELDS (grokDefault/mode/maxConcurrency/
+  // maxTasks/timeoutMs, the four loop keys, iterateIntervalMin, the iterateTemplate
+  // textarea and guardianModel) plus the 5 role chains equal the 16-leaf-key
+  // configuration surface (toolName/roles/synthesis/configVersion are structural,
+  // rendered nowhere).
   // Number bounds mirror HARD_LIMITS (100 / 20) and the defaults (10 / 3 / 0); the
   // suite pins all three so a quiet drift fails here instead of in the GUI.
-  it('renders the visible keys: 11 fields plus the 5 role chains', () => {
-    const visible = ['grokDefault', 'maxConcurrency', 'maxTasks', 'mode', 'timeoutMs',
+  it('renders the visible keys: 12 fields plus the 5 role chains', () => {
+    const visible = ['grokDefault', 'guardianModel', 'maxConcurrency', 'maxTasks', 'mode', 'timeoutMs',
       'loopEnabled', 'loopMaxRounds', 'loopFailStreak', 'loopIntervalMin',
       'iterateIntervalMin', 'iterateTemplate']
     expect(bundle.GROK_WORKFLOW_FIELDS.map(field => field.key).sort()).toEqual(visible.slice().sort())
@@ -468,8 +469,8 @@ describe('client settings page: bilingual copy (t42)', () => {
 
   it('renders role ids as localized names and interpolates every parameter', () => {
     const finding: Finding = { key: 'error.chainTooLong', params: { role: 'supervisor', limit: bundle.GROK_WORKFLOW_CHAIN_LIMIT } }
-    expect(formatError(finding, zh)).toBe('4 · 监督 备用链最多 50 条，删掉多余的。')
-    expect(formatError(finding, en)).toBe('4 · Supervise can keep at most 50 backup routes — remove the extras.')
+    expect(formatError(finding, zh)).toBe('4 · 复核 备用链最多 50 条，删掉多余的。')
+    expect(formatError(finding, en)).toBe('4 · Review can keep at most 50 backup routes — remove the extras.')
     // A numeric finding names its field in words, not with the settings key: `maxTasks`
     // is an identifier and reading it inside a Chinese sentence is a leak, not a label.
     const number: Finding = { key: 'error.number', params: { key: 'maxTasks', min: 1, max: 100 } }
@@ -903,7 +904,7 @@ describe('client settings page: reading, failure and retry', () => {
    * No locale and no workspace are injected: this block is about the settings page alone,
    * and it hands the page its `t` seat directly.
    */
-  function fakePageContext(face: Record<string, unknown>) {
+  function fakePageContext(face: Record<string, unknown>, mutations: Array<{ ops: unknown[], revision: unknown }> = []) {
     const slots: Array<{ options: Record<string, unknown>, component: (props: Record<string, unknown>) => unknown, disposed: boolean }> = []
     const ctx = {
       effect: (fn: () => unknown) => {
@@ -917,7 +918,15 @@ describe('client settings page: reading, failure and retry', () => {
           const dispose = fn()
           return typeof dispose === 'function' ? dispose : () => {}
         },
-        get: () => ({ mutate: async () => true }),
+        // A save is recorded, so a test can read what the page actually wrote: the
+        // number controls convert the unit they show, and that conversion is the half
+        // of the contract a rendered value cannot prove (Q9).
+        get: () => ({
+          mutate: async (ops: unknown[], revision: unknown) => {
+            mutations.push({ ops, revision })
+            return true
+          },
+        }),
       },
       slots: {
         inject: (_name: string, fn: () => unknown) => fn(),
@@ -932,8 +941,8 @@ describe('client settings page: reading, failure and retry', () => {
   }
 
   /** Register the page and take the component plus the props the plugin manager injects. */
-  function mounted(face: Record<string, unknown>) {
-    const { ctx, live } = fakePageContext(face)
+  function mounted(face: Record<string, unknown>, mutations: Array<{ ops: unknown[], revision: unknown }> = []) {
+    const { ctx, live } = fakePageContext(face, mutations)
     bundle.apply(ctx)
     const options = live()[0]!.options
     const injected = (options['inject'] as () => Record<string, unknown>)()
@@ -1067,8 +1076,11 @@ describe('client settings page: reading, failure and retry', () => {
     // meaning can live: `0` means "unlimited" for the deadline and "the loop's own
     // floor" for the interval — never "start immediately". README's key table uses the
     // same words, and `test/docs-config-keys.spec.ts` keeps that table honest.
+    // Q9: the deadline is edited in minutes (`unit.deadlineMinutes`) while the stored
+    // value stays milliseconds; `unit.ms` survives only as the dictionary entry the
+    // parity test still checks, not as the row's suffix.
     const rows: Array<{ field: string, unit: string }> = [
-      { field: 'timeoutMs', unit: 'unit.ms' },
+      { field: 'timeoutMs', unit: 'unit.deadlineMinutes' },
       { field: 'loopIntervalMin', unit: 'unit.minutes' },
     ]
     const floorWording = { zh: /下限/, en: /floor/ } as const
@@ -1086,6 +1098,54 @@ describe('client settings page: reading, failure and retry', () => {
         expect(texts(row!).join('\n'), `${locale} ${field} unit`).toContain(dict[unit]!)
       }
     }
+  })
+
+  it('edits the run deadline in minutes and still saves milliseconds (Q9)', async () => {
+    // The reader's report was "there is no deadline setting": a number labelled
+    // `毫秒` where the value is 3600000 reads as an internal knob, not a setting.
+    // The control now shows minutes, the wire keeps milliseconds, and the hint
+    // states the default and what 0 means right beside the control.
+    const mutations: Array<{ ops: unknown[], revision: unknown }> = []
+    const ready = faceFor({
+      status: 'ready',
+      view: { writable: true, namespaces: [{ ns: 'grok-workflow', revision: 7, value: { roles: {}, timeoutMs: 3_600_000 } }] },
+      error: null,
+    })
+    const { component, props } = mounted(ready, mutations)
+    const view = renderPage(component, props)
+    let tree = view.run()
+    // `data-field` sits on the row wrapper too, so the control is the number input.
+    const input = (): Element => {
+      const element = walk(tree).find(candidate =>
+        candidate.props['data-field'] === 'timeoutMs' && candidate.props['type'] === 'number')
+      expect(element).toBeDefined()
+      return element!
+    }
+    // 3 600 000 ms is 60 minutes on screen.
+    expect(input().props['value']).toBe('60')
+    expect(input().props['min']).toBe(0)
+
+    // A step is one minute, not one millisecond: 60 → 61.
+    await view.click(walk(tree).find(candidate => candidate.props['data-step'] === 'timeoutMs-up')!)
+    tree = view.run()
+    expect(input().props['value']).toBe('61')
+
+    // Typing minutes stores milliseconds: 90 minutes is 5 400 000.
+    ;(input().props['onChange'] as (event: { target: { value: string } }) => void)({ target: { value: '90' } })
+    tree = view.run()
+    expect(input().props['value']).toBe('90')
+    await view.click(walk(tree).find(candidate => candidate.props['data-action'] === 'save')!)
+    expect(mutations).toHaveLength(1)
+    const written = (mutations[0]!.ops as Array<{ op: string, path: string[], value: unknown }>)
+      .filter(op => op.path[0] === 'timeoutMs')
+    expect(written).toEqual([{ op: 'set', path: ['timeoutMs'], value: 5_400_000 }])
+
+    // The hint says the default and what 0 means, in the reader's language.
+    const hint = walk(tree).find(candidate => candidate.props['data-gw-timeout-hint'] === true)
+    expect(hint).toBeDefined()
+    expect(texts(hint!).join('')).toBe(zhDict['field.timeoutMs.hint']!)
+    expect(zhDict['field.timeoutMs.hint']!).toContain('60')
+    expect(zhDict['field.timeoutMs.hint']!).toContain('0 = 不限时')
   })
 
   it('offers no retry when the composition has no way to re-read', () => {
@@ -1361,6 +1421,7 @@ describe('client settings page: draft, validation and path ops', () => {
       loopIntervalMin: 0,
       iterateIntervalMin: 0,
       iterateTemplate: '',
+      guardianModel: { provider: '', model: '' },
       roles: { planner: [], worker: [], verifier: [], synthesizer: [], supervisor: [] },
     })
     const view = {
@@ -2184,6 +2245,137 @@ describe('client progress tab: derived states say where they came from', () => {
     expect(texts(enExecute).join(' ')).toContain('2 rows ran inside the plan tasks below')
   })
 })
+
+describe('client progress tab: the settle bar, the rails and the narrow layout', () => {
+  const progress = bundle.GROK_WORKFLOW_PROGRESS
+  const t = translator('zh')
+
+  /** Render one run and hand back the stub tree the component produced. */
+  function treeOf(members: ProgressMember[], stopReason?: string) {
+    const run: ProgressRun = {
+      runId: 'r-parts',
+      name: '任务团队',
+      anchorSeq: 1,
+      members,
+      ...stopReason === undefined ? {} : { stopReason },
+    }
+    return progress.component({
+      t,
+      progressT: t,
+      useGrokProgress: (select: (value: unknown) => unknown) => select({ runs: [run], activeRun: run }),
+    })
+  }
+
+  it('keeps the spine at the seven fixed stages however many tasks the plan declares', () => {
+    // Eight plan tasks, one row each: the band grows, the spine does not.
+    const members = Array.from({ length: 8 }, (_, index) => progressMember(index + 1, `任务 ${index + 1} · 步骤`, 'completed', { label: '执行' }))
+    const tree = treeOf(members, 'completed')
+    const spine = walk(tree).filter((element) => element.props['data-gw-progress-node'] === true)
+    expect(spine).toHaveLength(progress.stages.length)
+    expect(spine.some((node) => String(node.props['data-node-key']).startsWith('phase:'))).toBe(false)
+    const cards = walk(tree).filter((element) => typeof element.props['data-gw-progress-task'] === 'string')
+    expect(cards).toHaveLength(8)
+    // A plan task is announced in the execute slot, so every one of them joins that line.
+    expect(cards.every((card) => card.props['data-owner'] === 'stage:execute')).toBe(true)
+  })
+
+  it('splits the settle bar by outcome and draws the unsettled rest as a gap', () => {
+    const tree = treeOf([
+      progressMember(1, '执行', 'completed'),
+      progressMember(2, '执行', 'completed'),
+      progressMember(3, '执行', 'failed'),
+      progressMember(4, '执行', 'cancelled'),
+      progressMember(5, '执行'),
+      progressMember(6, '执行'),
+    ])
+    const parts = walk(tree).filter((element) => typeof element.props['data-gw-progress-settle-part'] === 'number')
+    // Four tones in the order they are drawn: `warn` is the engine's own cancellation
+    // word, and `open` is the unsettled rest — a colour there would read as a result.
+    expect(parts.map((part) => part.props['data-tone'])).toEqual(['ok', 'bad', 'warn', 'open'])
+    expect(parts.map((part) => part.props['data-gw-progress-settle-part'])).toEqual([2, 1, 1, 2])
+    // Every width is a count over the six declared rows, not an estimate.
+    expect(parts.map((part) => (part.props['style'] as { width: string }).width)).toEqual(['33.3%', '16.7%', '16.7%', '33.3%'])
+    const legend = walk(tree).find((element) => element.props['data-gw-progress-settle-legend'] === true)!
+    expect(texts(legend).join('')).toBe('2 完成 · 1 失败 · 1 已取消 · 2 未结算')
+  })
+
+  it('keeps the bar on a run that declared nothing and names the gap instead of an empty result', () => {
+    const tree = treeOf([], 'completed')
+    const bar = walk(tree).find((element) => element.props['data-gw-progress-settle'] === true)!
+    expect(bar.props['data-empty']).toBe('true')
+    expect(walk(tree).some((element) => typeof element.props['data-gw-progress-settle-part'] === 'number')).toBe(false)
+    expect(texts(tree).join('\n')).toContain(bundle.GROK_WORKFLOW_DICT['zh']!['progress.settle.unsettled'])
+  })
+
+  it('draws one duration rail per spine segment, scaled to the slowest stage of the run', () => {
+    const tree = treeOf([
+      progressMember(1, '执行', 'completed', { startedAt: 1_000, endedAt: 5_000 }),
+      progressMember(2, '检查', 'completed', { startedAt: 6_000, endedAt: 8_000 }),
+      progressMember(3, '汇总', 'completed'),
+    ], 'completed')
+    const rails = walk(tree).filter((element) => element.props['data-gw-progress-dur'] === true)
+    // The spine is the template, so the rail count follows the seven stages, never the plan.
+    expect(rails).toHaveLength(progress.stages.length)
+    const railOf = (key: string): Element => {
+      const node = walk(tree).find((element) => element.props['data-node-key'] === key)!
+      return walk(node).find((element) => element.props['data-gw-progress-dur'] === true)!
+    }
+    const fillOf = (key: string): Element | undefined => walk(railOf(key)).find((element) => element.type === 'i')
+    // 4 s against the run's slowest stage (4 s) fills the rail; 2 s is half of it.
+    expect(railOf('stage:execute').props['data-empty']).toBeUndefined()
+    expect((fillOf('stage:execute')!.props['style'] as { width: string }).width).toBe('100%')
+    expect((fillOf('stage:verify')!.props['style'] as { width: string }).width).toBe('50%')
+    // A settled row whose stream carried no timestamps is "not measured": a dashed rail,
+    // never a zero-length fill that would read as a fast stage.
+    expect(railOf('stage:synthesize').props['data-empty']).toBe('true')
+    expect(fillOf('stage:synthesize')).toBeUndefined()
+  })
+
+  it('hides the measured wires under 480px, where the spine stacks and the band takes the width', () => {
+    expect(progress.css).toMatch(/@media \(max-width: 480px\)[\s\S]*\.gw-progress-link, \.gw-progress-wires \{ display: none/)
+  })
+
+  it('wraps the task name in CSS instead of ellipsizing it (Q10 b)', () => {
+    // A full label in the DOM is still a truncated label on screen if the stylesheet
+    // clips it, so the two halves are pinned together.
+    expect(progress.css).toMatch(/\.gw-progress-task-name \{[^}]*overflow-wrap: anywhere/)
+    expect(progress.css).not.toMatch(/\.gw-progress-task-name \{[^}]*text-overflow: ellipsis/)
+  })
+
+  it('shows the whole task name and no attempt counter on the card (Q10 b)', () => {
+    // The panel used to print `任务 n · <24 字>… 1/1`: the name was cut short and the
+    // attempt count answered a question nobody asked. The name now wraps in full and
+    // the count is gone — the attempts a failure spent stay on that row's own pills.
+    const name = '任务 1 · 把认证中间件的每个 provider 统一到同一个时钟上再重跑全部用例'
+    const tree = treeOf([progressMember(1, name, 'completed')], 'completed')
+    const card = walk(tree).find((element) => typeof element.props['data-gw-progress-task'] === 'string')!
+    const cardName = walk(card).find((element) => element.props['data-gw-progress-task-name'] === true)!
+    expect(texts(cardName).join('')).toBe(name)
+    // No `x/y` suffix anywhere on the card, and no truncation mark in the name.
+    expect(texts(card).join(' ')).not.toMatch(/\d+\s*\/\s*\d+/)
+    expect(texts(cardName).join('')).not.toContain('…')
+  })
+
+  it('measures a running row against the panel clock, so its time is not blank (Q10 b)', () => {
+    // A settled row carries `endedAt` and keeps its measured span. A row still running
+    // carries only `startedAt`, so the panel supplies "now" from its own 1 s clock —
+    // without it the card had no number at all while the work was happening.
+    const tree = treeOf([progressMember(1, '任务 1 · 执行中', undefined, { startedAt: Date.now() - 5_000 })])
+    const card = walk(tree).find((element) => typeof element.props['data-gw-progress-task'] === 'string')!
+    const meta = walk(card).find((element) => element.props['data-gw-progress-task-meta'] === true)
+    expect(meta).toBeDefined()
+    expect(texts(meta!).join('')).toMatch(/^\d+\.\d s$/)
+  })
+
+  it('keeps the measured time of a settled row instead of ticking it (Q10 b)', () => {
+    const tree = treeOf([progressMember(1, '任务 1 · 已完成', 'completed', { startedAt: 1_000, endedAt: 4_000 })], 'completed')
+    const card = walk(tree).find((element) => typeof element.props['data-gw-progress-task'] === 'string')!
+    const meta = walk(card).find((element) => element.props['data-gw-progress-task-meta'] === true)
+    expect(meta).toBeDefined()
+    expect(texts(meta!).join('')).toBe('3.0 s')
+  })
+})
+
 
 /* ------------------------------------------------------------------ loop switch -- */
 

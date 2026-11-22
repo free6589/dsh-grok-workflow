@@ -99,7 +99,7 @@ interface NamingCopy {
 export const NAMING_COPY: Record<NamingLanguage, NamingCopy> = {
   zh: {
     workflow: '任务团队',
-    roles: { planner: '规划助手', worker: '执行', verifier: '检查', supervisor: '监督', synthesizer: '汇总助手' },
+    roles: { planner: '规划助手', worker: '执行', verifier: '检查', supervisor: '复核', synthesizer: '汇总助手' },
     taskGroup: '任务 {index} · {title}',
     attempt: '{role}（尝试 {n}）',
     phases: { plan: '规划', execute: '执行', verify: '检查', synthesize: '汇总', answer: '回答' },
@@ -108,7 +108,7 @@ export const NAMING_COPY: Record<NamingLanguage, NamingCopy> = {
       planner: '规划助手调用',
       worker: '执行代理',
       verifier: '检查调用',
-      supervisor: '监督调用',
+      supervisor: '复核调用',
       synthesizer: '汇总调用',
     },
     callStates: {
@@ -130,7 +130,7 @@ export const NAMING_COPY: Record<NamingLanguage, NamingCopy> = {
   },
   en: {
     workflow: 'Task team',
-    roles: { planner: 'Planner', worker: 'Execute', verifier: 'Check', supervisor: 'Supervisor', synthesizer: 'Summarizer' },
+    roles: { planner: 'Planner', worker: 'Execute', verifier: 'Check', supervisor: 'Reviewer', synthesizer: 'Summarizer' },
     taskGroup: 'Task {index} · {title}',
     attempt: '{role} (attempt {n})',
     phases: { plan: 'Plan', execute: 'Execute', verify: 'Verify', synthesize: 'Synthesize', answer: 'Answer' },
@@ -139,7 +139,7 @@ export const NAMING_COPY: Record<NamingLanguage, NamingCopy> = {
       planner: 'Planner call',
       worker: 'Execute agent',
       verifier: 'Check call',
-      supervisor: 'Supervisor call',
+      supervisor: 'Reviewer call',
       synthesizer: 'Summarizer call',
     },
     callStates: {
@@ -243,7 +243,24 @@ export function truncateTaskTitle(title: unknown, limit: number = TASK_TITLE_DIS
 export function taskGroupTitle(index: number, title: unknown, language: NamingLanguage = 'zh'): string {
   const copy = NAMING_COPY[language]
   const position = Number.isFinite(index) && index > 0 ? Math.trunc(index) : 1
-  return fill(copy.taskGroup, { index: String(position), title: truncateTaskTitle(title) })
+  // Q10(b): the group header is not truncated any more. The task name is the one
+  // thing a reader needs in full, and the panel wraps it instead of cutting it; the
+  // run title keeps its own 80-character bound (`runTitle`), which is where a length
+  // limit still belongs.
+  return fill(copy.taskGroup, { index: String(position), title: displayTitle(title) })
+}
+
+/**
+ * The complete task title, whitespace-collapsed and trimmed.
+ *
+ * Separate from {@link truncateTaskTitle} on purpose: the group header shows the whole
+ * title (Q10(b)), while {@link runTitle} still bounds the run's own name.
+ * @param title - the task title as planned.
+ * @returns the title to render.
+ */
+export function displayTitle(title: unknown): string {
+  const text = typeof title === 'string' ? title.trim() : ''
+  return text.replace(/\s+/g, ' ')
 }
 
 /**
@@ -434,9 +451,14 @@ function namingTruncate(title) {
   return characters.slice(0, NAMING_TITLE_LIMIT).join('') + NAMING_ELLIPSIS;
 }
 
+function displayTitle(title) {
+  const text = typeof title === 'string' ? title.trim() : '';
+  return text.replace(/\\s+/g, ' ');
+}
+
 function taskGroupTitle(index, title) {
   const position = index > 0 ? Math.trunc(index) : 1;
-  return namingFill(NAMING.taskGroup, { index: String(position), title: namingTruncate(title) });
+  return namingFill(NAMING.taskGroup, { index: String(position), title: displayTitle(title) });
 }
 
 function memberLabel(role, attempt) {

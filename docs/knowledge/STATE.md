@@ -1,3 +1,18 @@
+Last updated: 2026-11-22 01:17 +08:00（**Wave 4 合流与 A1–A6 验收：合流可演示，A1–A5 `CONFIRMED`，A6 `CONFIRMED`（`npm run ci` 01:13 78 files / 1438 tests、01:33 复验 78/1439、两次 exit 0）；未改 Wave 1–3 源码** —
+新增验收件 `test/wave4-acceptance.spec.ts`（8 例：L1×DAG 合流 4 例、A6 包络 4 例）与证据目录
+`docs/knowledge/evidence/wave4-acceptance-2026-11-22/`（`ACCEPTANCE.md` 逐项台账、`MERGE-DEMO.txt`
+合流实跑、`capture-merge-demo.mjs` 可复跑、`CI-WAVE4.log` 绿灯与 `CI-WAVE4-first-run-exit1.log`
+首次非绿原样留档、`CI-WAVE4-attempt2.log` 收尾复验）。合流实跑：第一轮两波 DAG（wave 1 `a` 已验证、wave 2 `b` 失败 → PARTIAL）→ 插件
+报告消息读回成轮次 → 继承摘要 `retain (generation 1): a` + `redrive (generation 2): b` → 第二轮只把
+`b`、`c` 交给 worker（`a` 一次未重跑），波结构保留、COMPLETED。A4 补一条：`blocked` 行回到下一轮是
+`redrive`（理由 `blocked in an earlier round`），不是 `retain`。边界如实记 4 条：① 下一轮 plan 不能把
+`dependsOn` 指向 retained id（波次校验看不见它，整份 plan 被拒、退 fallback）；② 继承是提示词级约束，
+无结构校验阻止 planner 重做 retained 工作；③ `reverify`/`replan`/`changedFields` 生产不可达（唯一调用点
+`src/run.ts:625` 不传 `ResumeOptions`）；④ `buildInheritanceDigest` 单轮内行序被 `reverse()` 整体倒置，
+与注释「已完成先说」相反（低，未改）。A6 上限未被放宽：常量 10/1/100/3、配置 `maxConcurrency:101` 直接
+抛错且 `maxRetries` 不是配置键、脚本把 500/9 夹回 100/3，三处读数一致；`PLAN-dynamic-steering` §5 A6
+写的「默认 3/1、硬上限 6/3」是陈旧计划文本，未据其改代码，待 Lead 订正。）
+
 Last updated: 2026-11-21 18:05 +08:00（**RSI 自迭代已停止，`CONFIRMED`** — 用户下令停掉此前的
 1000 轮自迭代（每轮一个心跳 Schedule、逐轮 tag + retry）；round 42 从未开，round 41 是最后一轮
 已关闭的轮次。停止动作：新建 `.rsi/STOP`（guard 在开轮前测它），`bash .rsi/tools/heartbeat-guard.sh

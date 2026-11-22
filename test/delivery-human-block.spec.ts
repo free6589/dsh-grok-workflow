@@ -721,3 +721,100 @@ describe('round 39: the bilingual pair never crosses 4800 characters', () => {
     }
   })
 })
+
+// ---------------------------------------------------------- Q11 sentence cut --
+
+/**
+ * One failed task whose recorded reason is `reason`, through the real validator.
+ * @param reason - the run's own account of why the task failed.
+ * @returns a legal PARTIAL report with that reason in `incomplete[0]`.
+ */
+function oneFailedReport(reason: string): WorkflowReport {
+  const ok = task('a', ['Weather checked'])
+  const bad = { ...task('b', ['Hotel price checked']), title: 'Hotel price check' }
+  const checked = verification(ok)
+  const limits = { maxConcurrency: 2, maxTasks: 2 } as const
+  const oneConfig = resolveConfig(limits)
+  return assertWorkflowReport({
+    schemaVersion: 'grok-workflow/v1',
+    status: 'partial',
+    objective: 'Check the weather',
+    plan: { source: 'caller', tasks: [ok, bad], error: '' },
+    tasks: [
+      {
+        ...ok,
+        status: 'verified',
+        attempts: [{ attempt: 1, status: 'verified', execution: execution('ok'), verification: checked, passed: true, error: '' }],
+        error: '',
+      },
+      {
+        ...bad,
+        status: 'failed',
+        attempts: [{
+          attempt: 1,
+          status: 'failed',
+          execution: execution('', { status: 'failed' }),
+          verification: failingVerification(bad, 'x'),
+          passed: false,
+          error: reason,
+        }],
+        error: reason,
+      },
+    ],
+    confirmed: [{ taskId: 'a', criterion: 'Weather checked', evidence: checked.criteria[0]!.evidence }],
+    incomplete: [{ taskId: 'b', reason, category: 'quality' as const }],
+    errors: [],
+    uncertainties: [],
+    routing: { planner: [], worker: [], verifier: [], supervisor: [], synthesizer: [] },
+    routes: [],
+    synthesis: { mode: 'deterministic', summary: 'Done.' },
+    limits: { ...limits, maxRetries: FIXED_MAX_RETRIES, maxTotalAgents: maxTotalAgentsFor(2, FIXED_MAX_RETRIES, routeBudgetFor(oneConfig)) },
+  }, 'Check the weather', oneConfig)
+}
+
+/** The delivered line for the failed task, or `''` when the block carries none. */
+function failedReasonLine(text: string): string {
+  return text.split('\n').find(line => line.startsWith('- Hotel price check')) ?? ''
+}
+
+describe('Q11: a truncated reason stops where a sentence stops, never inside a word', () => {
+  // The incident: a relayed report handed the model `the RSI heart…` — half a
+  // sentence, and unreadable for exactly that reason. The relay default is now the
+  // human block alone, so the human block itself may not carry a half sentence.
+
+  it('cuts an over-long English reason at the end of a whole sentence', () => {
+    const sentence = 'The supplier endpoint returned malformed rows for the price check. '
+    const reason = sentence.repeat(6)
+    expect(reason.length).toBeGreaterThan(240)
+    const line = failedReasonLine(humanConclusion(oneFailedReport(reason), { lang: 'en' }))
+    expect(line).not.toBe('')
+    // The cut is marked, and the mark follows a full stop rather than a word.
+    expect(line.endsWith('…')).toBe(true)
+    expect(line).toMatch(/\.…$/)
+  })
+
+  it('falls back to a word boundary when the reason has no sentence end at all', () => {
+    const words = ['alpha', 'bravo', 'charlie', 'delta', 'uniform']
+    const reason = Array.from({ length: 60 }, (_, index) => words[index % words.length]).join(' ')
+    expect(reason.length).toBeGreaterThan(240)
+    const line = failedReasonLine(humanConclusion(oneFailedReport(reason), { lang: 'en' }))
+    expect(line.endsWith('…')).toBe(true)
+    // The word before the cut is whole, not a fragment of one.
+    expect(line).toMatch(/(?:^|\s)(?:alpha|bravo|charlie|delta|uniform)…$/)
+  })
+
+  it('cuts a Chinese reason at a full stop too', () => {
+    const reason = '供应链接口返回的数据格式有问题，价格无法核验。'.repeat(12)
+    expect(reason.length).toBeGreaterThan(240)
+    const line = failedReasonLine(humanConclusion(oneFailedReport(reason), { lang: 'zh' }))
+    expect(line).not.toBe('')
+    expect(line).toMatch(/。…$/)
+  })
+
+  it('leaves a reason that already fits byte for byte alone', () => {
+    const reason = 'The supplier endpoint returned malformed rows.'
+    const line = failedReasonLine(humanConclusion(oneFailedReport(reason), { lang: 'en' }))
+    expect(line).toBe('- Hotel price check：The supplier endpoint returned malformed rows.')
+    expect(line).not.toContain('…')
+  })
+})

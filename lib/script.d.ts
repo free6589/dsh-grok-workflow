@@ -24,9 +24,22 @@ export interface WorkflowRequestPayload {
         maxRetries: number;
         maxTasks: number;
         maxTotalAgents: number;
+        /**
+         * Q6: cooperative per-call timeout in milliseconds. The script races every
+         * `agent()` against it and settles a loser as a `timeout` failure of that
+         * attempt, so one hung child costs a retry instead of the whole run.
+         */
+        childTimeoutMs: number;
         /** The deadline the plugin enforces for this run (0 = unlimited, no host timer; the guest never arms its own timer). */
         timeoutMs: number;
         roles: Record<RoleName, ModelRoute[]>;
+        /**
+         * Q8: the single guardian route that judges a stalled child before the
+         * script kills it. Absent when no guardian is configured — the run then
+         * settles a timed-out call straight to its task's bounded retry, exactly
+         * as it did before the guardian existed.
+         */
+        guardianModel?: ModelRoute;
         /**
          * Final-answer policy: `deterministic`, `model`, or `layered` (the Section IV
          * layered policy, which travels as the third runtime value). The script maps
@@ -44,6 +57,11 @@ export interface WorkflowRequestPayload {
          * redacted by `src/carryover.ts`. Absent on a first round.
          */
         carryover?: string;
+        /**
+         * L1 inheritance (v0.13): the task-level decisions a new round inherits, already
+         * compiled and bounded by `src/carryover.ts`. Absent on a first round.
+         */
+        inheritance?: string;
         /**
          * Cross-run hint (C1, approximate): route labels other live runs
          * configured, snapshotted host-side at admission. Absent/empty on a
@@ -83,6 +101,13 @@ export interface RouteBudget {
     supervisor: number;
     /** Synthesizer calls per run (0 when synthesis is deterministic). */
     synthesizer: number;
+    /**
+     * Whether guardian adjudication is configured (Q8). When it is, every timed-out
+     * child call may spend up to {@link GUARDIAN_MAX_WAITS} adjudication calls, so
+     * the child cap multiplies the per-attempt block to keep AGENT_CAP from firing
+     * exactly when the guardian is giving a stalled child its second chance.
+     */
+    guardian?: boolean;
 }
 /**
  * Derive the per-run call budget from the configured chains.
@@ -99,8 +124,11 @@ export declare function routeBudgetFor(config: ResolvedConfig): RouteBudget;
  *
  * Chains multiply the per-attempt cost, so the cap must be derived from the
  * effective routes; a cap that only counts attempts would abort a run mid-flight
- * with AGENT_CAP as soon as a fallback route is used.
+ * with AGENT_CAP as soon as a fallback route is used. Guardian adjudication
+ * (Q8) adds at most {@link GUARDIAN_MAX_WAITS} calls per timed-out call, so
+ * with a guardian configured every per-call block is widened by that factor;
+ * without one the formula is byte-identical to the pre-guardian one.
  */
 export declare function maxTotalAgentsFor(tasks: number, retries: number, budget?: RouteBudget): number;
-export declare function buildWorkflowRequest(objective: string, tasks: NormalizedTask[] | undefined, config: ResolvedConfig, namingLanguage?: NamingLanguage, carryover?: string, busyRoutes?: string[]): WorkflowRequestPayload;
+export declare function buildWorkflowRequest(objective: string, tasks: NormalizedTask[] | undefined, config: ResolvedConfig, namingLanguage?: NamingLanguage, carryover?: string, busyRoutes?: string[], inheritance?: string): WorkflowRequestPayload;
 //# sourceMappingURL=script.d.ts.map

@@ -162,7 +162,9 @@ describe('every workflow child prompt opens with its display title', () => {
     expect(planner).toHaveLength(1)
     expect(firstLine(planner[0]!.prompt)).toBe('规划助手')
     const workers = calls.filter(call => roleOf(call.label) === 'worker')
-    expect(workers.map(call => firstLine(call.prompt))).toEqual(['Task a', 'Task b'])
+    // Q10(a): worker prompts open with `角色 · 任务标题`, not the bare task
+    // title — the panel derives the row label from this first line.
+    expect(workers.map(call => firstLine(call.prompt))).toEqual(['执行 · Task a', '执行 · Task b'])
     const verifiers = calls.filter(call => roleOf(call.label) === 'verifier')
     expect(verifiers.map(call => firstLine(call.prompt))).toEqual(['检查 · Task a', '检查 · Task b'])
     // No child opens with its persona line any more: the title comes first.

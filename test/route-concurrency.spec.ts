@@ -269,7 +269,10 @@ describe('per-route concurrency caps with overflow to the next route', () => {
     const plain = buildWorkflowRequest('Ship the verified result', [task('a')], config, 'en')
     expect(hinted.args.busyRoutes).toEqual(['w1'])
     expect('busyRoutes' in plain.args).toBe(false)
-    expect(routeBudgetFor(config)).toEqual({ planner: 1, worker: 2, verifier: 1, supervisor: 0, synthesizer: 0 })
+    // The guardian is not a budgeted chain (no fallback, its verdict is kill),
+    // so it rides as a boolean beside the per-role budget: `false` here because
+    // no guardian route is configured in this case.
+    expect(routeBudgetFor(config)).toEqual({ planner: 1, worker: 2, verifier: 1, supervisor: 0, synthesizer: 0, guardian: false })
     expect(hinted.maxTotalAgents).toBe(plain.maxTotalAgents)
     expect(hinted.maxTotalAgents).toBe(maxTotalAgentsFor(1, 1, routeBudgetFor(config)))
   })

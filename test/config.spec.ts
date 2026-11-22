@@ -115,10 +115,11 @@ describe('configuration surface', () => {
   })
 
   it('rejects every removed key as unknown (R-06), with the migration named', () => {
-    // The slim-down keeps exactly 15 keys (nine plus the four repeat-run keys and
-    // the two self-iteration keys); the other 23 are unknown now.
+    // The slim-down keeps exactly 16 keys (nine plus the four repeat-run keys,
+    // the two self-iteration keys, and the Q8 guardianModel single route); the
+    // other 23 are unknown now.
     expect(CONFIG_KEYS).toEqual([
-      'toolName', 'mode', 'grokDefault', 'roles', 'synthesis',
+      'toolName', 'mode', 'grokDefault', 'roles', 'guardianModel', 'synthesis',
       'maxConcurrency', 'maxTasks', 'timeoutMs',
       'loopEnabled', 'loopMaxRounds', 'loopFailStreak', 'loopIntervalMin',
       'iterateIntervalMin', 'iterateTemplate',
@@ -172,6 +173,21 @@ describe('configuration surface', () => {
       .toThrow(/roles\.worker\[0\]\.provider must be a provider id string, got number/)
     expect(() => resolveConfig({ roles: { worker: [{ provider: {}, model: 'x' }] } } as never))
       .toThrow(/roles\.worker\[0\]\.provider must be a provider id string, got object/)
+  })
+
+  it('takes guardianModel as one route only: a chain or array is refused (Q8)', () => {
+    // The adjudicator has no fallback chain: its own failure is itself a verdict
+    // (kill), so a second route would never be consulted — the config refuses the
+    // shape instead of silently reading only its first element.
+    expect(() => resolveConfig({ guardianModel: [{ model: 'm1' }, { model: 'm2' }] } as never))
+      .toThrow(/guardianModel must be a single route object \{provider\?, model\}, got an array of 2/)
+    expect(() => resolveConfig({ guardianModel: [] } as never))
+      .toThrow(/guardianModel must be a single route object/)
+    expect(resolveConfig({ guardianModel: { provider: 'p', model: 'm' } } as never).guardianModel)
+      .toEqual({ provider: 'p', model: 'm' })
+    expect(resolveConfig({ guardianModel: { model: 'm' } } as never).guardianModel)
+      .toEqual({ model: 'm' })
+    expect(resolveConfig({}).guardianModel).toBeUndefined()
   })
 
   it('refuses a removed switching policy key as unknown (R-06)', () => {
@@ -402,13 +418,14 @@ describe('route validation against the runtime', () => {
     const projected = Object.keys(descriptor.value).sort()
     expect(projected).not.toContain('toolName')   // not volatile => not projected
     expect(projected).not.toContain('configVersion')   // not volatile => not projected
-    // The page is the 13 volatile keys (toolName/configVersion are structural).
+    // The page is the 14 volatile keys (toolName/configVersion are structural);
+    // Q8 added guardianModel as the 14th.
     expect(projected).toEqual([
-      'grokDefault', 'iterateIntervalMin', 'iterateTemplate', 'loopEnabled', 'loopFailStreak',
-      'loopIntervalMin', 'loopMaxRounds', 'maxConcurrency', 'maxTasks', 'mode', 'roles',
-      'synthesis', 'timeoutMs',
+      'grokDefault', 'guardianModel', 'iterateIntervalMin', 'iterateTemplate', 'loopEnabled',
+      'loopFailStreak', 'loopIntervalMin', 'loopMaxRounds', 'maxConcurrency', 'maxTasks', 'mode',
+      'roles', 'synthesis', 'timeoutMs',
     ])
-    expect(projected).toHaveLength(13)
+    expect(projected).toHaveLength(14)
     const ctx = ctxWith({
       settings: { configure: () => () => {}, describe: () => [descriptor] },
     })
@@ -428,9 +445,9 @@ describe('route validation against the runtime', () => {
     const surface = describeSurface(ctx)
     expect(surface.level).toBe('info')
     expect(surface.text).toContain('identified by value')
-    // The log states both numbers: 13 volatile keys reach the generated page,
-    // 15 are accepted (toolName/configVersion are plain, not volatile).
-    expect(surface.text).toContain(`13 of ${CONFIG_KEYS.length} field(s) on the page`)
+    // The log states both numbers: 14 volatile keys reach the generated page,
+    // 16 are accepted (toolName/configVersion are plain, not volatile).
+    expect(surface.text).toContain(`14 of ${CONFIG_KEYS.length} field(s) on the page`)
     // A foreign schema is not ours, and no field list may be invented from it.
     const foreign = ctxWith({
       settings: {

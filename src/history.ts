@@ -146,27 +146,83 @@ export function collectHistory(
   }
 }
 
+/** Room kept for the history block before it is worth attaching at all. */
+const MIN_BLOCK_ROOM = 16
+
 /**
- * Compose the gate objective from forwarded history and the current message.
+ * Fit an inherited-work block into the room the objective leaves for it.
+ *
+ * The digest is ordered oldest → newest, so the *newest* decisions are the ones
+ * worth keeping when it has to shrink: the header line stays, then whole trailing
+ * lines are kept from the end until the room runs out, and a `…` line states that
+ * earlier lines were omitted. Lines are never cut in half.
+ * @param digest - the rendered inheritance digest (already under its own 8K cap).
+ * @param room - characters available for this block.
+ * @returns the block, or `''` when not even the header fits.
+ */
+function fitInheritance(digest: string, room: number): string {
+  if (digest === '' || room < MIN_BLOCK_ROOM) return ''
+  if (digest.length <= room) return digest
+  const lines = digest.split('\n')
+  const header = lines[0] ?? ''
+  if (header.length + 2 > room) return ''
+  // Only the decision lines are worth keeping when the block has to shrink: a
+  // `detail` line describes a decision, so keeping details without their lines
+  // would hand the reader conclusions with no subjects. The newest decisions are
+  // kept, the oldest give way, and `…` says so.
+  const decisions = lines.slice(1).filter(text => !text.startsWith('  detail ') && !text.startsWith('[truncated:'))
+  const kept: string[] = []
+  let used = header.length
+  for (let index = decisions.length - 1; index >= 0; index -= 1) {
+    const text = decisions[index]!
+    if (used + 1 + text.length + 2 > room) break
+    used += 1 + text.length
+    kept.unshift(text)
+  }
+  if (kept.length === 0) return ''
+  return `${[header, ...kept].join('\n')}\n…`
+}
+
+/**
+ * Compose the gate objective from forwarded history, inherited work and the current
+ * message.
+ *
+ * The three blocks are ordered oldest → newest: inherited work first (what earlier
+ * rounds already verified, with its own 8K budget from `src/carryover.ts`), then the
+ * rendered conversation history, then the current request. When the limit is tight
+ * the *oldest* block is the one that gives way — history is dropped before any
+ * inherited decision, and inherited lines are dropped from their old end — because a
+ * round that already verified work must not lose that list to a stale transcript.
  *
  * @param history - already rendered history block, or an empty string.
  * @param request - the current user message text.
  * @param limit - maximum length of the composed objective; the current message is never shortened.
+ * @param inheritance - rendered L1 inheritance digest, or an empty string on a first round.
  * @returns the objective, or `undefined` when the current message alone exceeds the limit.
  */
-export function composeObjective(history: string, request: string, limit: number): string | undefined {
+export function composeObjective(
+  history: string,
+  request: string,
+  limit: number,
+  inheritance = '',
+): string | undefined {
   // The limit applies to the user's message itself: it is the instruction that
   // must arrive whole, so a message at the limit is never refused because the
   // "Current request:" label would push the composed objective one line over.
   if (request.length > limit) return undefined
   const base = `Current request:\n${request}`
   // The label is dropped rather than shortening the message: at the very top of
-  // the range the objective is exactly the request, with no history attached.
+  // the range the objective is exactly the request, with nothing attached.
   if (base.length > limit) return request
-  if (history === '') return base
   // Two characters separate the blocks, and the ellipsis needs one more.
-  const room = limit - base.length - 2
-  if (room < 16) return base
-  const trimmed = history.length > room ? `${history.slice(0, room - 1)}…` : history
-  return `${trimmed}\n\n${base}`
+  let room = limit - base.length - 2
+  const inherited = fitInheritance(inheritance, room)
+  if (inherited !== '') room -= inherited.length + 2
+  const historyBlock = ((): string => {
+    if (history === '') return ''
+    if (room < MIN_BLOCK_ROOM) return ''
+    return history.length > room ? `${history.slice(0, room - 1)}…` : history
+  })()
+  const blocks = [inherited, historyBlock, base].filter(block => block !== '')
+  return blocks.join('\n\n')
 }

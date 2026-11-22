@@ -1207,6 +1207,34 @@ describe('cross-round carry-over', () => {
     expect((await carryP) as { kind: string }).toMatchObject({ kind: 'enter' })
   })
 
+  it('puts the inherited work into the objective the engine is started with', async () => {
+    // L1 (Q2): the objective — not a side channel — is what every child prompt that
+    // shows it reads, so the gate composes the inherited decisions into it, under
+    // their own 8K budget, ahead of the forwarded history.
+    const ctx = new FakeContext()
+    applyWith(ctx)
+    ctx.engine.autoRun = true
+    const session = Session.create('sess-inherit-gate' as never)
+    session.append('user/message', userMessage('measure the retry loop'), { surfaceOp: 'append' })
+    session.append('user/message', userMessage(reportText(), 'grok-workflow'), { surfaceOp: 'append' })
+    const agent = new FakeAgent({ session })
+    const inheritP = ctx.preStep()(payload(agent, [userMessage('finish the retry work')], 2, 1), passingNext([]))
+    await waitFor(() => ctx.engine.startCalls.length === 1)
+    const args = ctx.engine.startCalls[0]!.args as Record<string, unknown>
+    const objective = String(args.objective)
+    expect(objective).toContain('INHERITED WORK FROM EARLIER ROUNDS')
+    // The earlier round verified task `a`: this round must not redo it.
+    expect(objective).toContain('retain (generation 1): a')
+    expect(objective).toContain('Current request:')
+    expect(objective).toContain('finish the retry work')
+    // The block is first (oldest material) and the request last.
+    expect(objective.indexOf('INHERITED WORK')).toBeLessThan(objective.indexOf('Current request:'))
+    // The worker prompt has no objective, so the same block still travels as its
+    // own arg for that prompt — the objective is not the only carrier.
+    expect(String(args.inheritance)).toContain('retain (generation 1): a')
+    expect((await inheritP) as { kind: string }).toMatchObject({ kind: 'enter' })
+  })
+
   it('sends no carry-over on a first round', async () => {
     const ctx = new FakeContext()
     applyWith(ctx)

@@ -1,3 +1,17 @@
+## 2026-11-22 — Wave 4 合流与验收（`CONFIRMED`，agent-72）
+
+- **From:** Wave 4 执行子代理（agent-72）· **To:** Lead / 发版者
+- **已做**：`test/wave4-acceptance.spec.ts`（8 例）与证据目录
+  `docs/knowledge/evidence/wave4-acceptance-2026-11-22/`（台账 `ACCEPTANCE.md`、合流实跑
+  `MERGE-DEMO.txt` + 复跑脚本 `capture-merge-demo.mjs`、两份 CI 日志）。Wave 1–3 源码未动。
+- **结论**：A1–A5 `CONFIRMED`、A6 `CONFIRMED`（`npm run ci` 78 files / 1438 tests、exit 0）。
+  合流可演示：verified 波 `retain`、只重排未完成波 + 新增意图、`blocked` 行回来是 `redrive`。
+- **留给下一手**：① 让「依赖 retained id」可解析（目前整份 plan 被拒退 fallback，`ACCEPTANCE.md` B1）；
+  ② 若要让 A1 从"提示词纪律"升级成"结构保证"，需要在新 plan 上做 retained 去重校验（B2）；
+  ③ `reverify`/`replan` 仍无生产调用者（B3）；④ 订正 `PLAN-dynamic-steering-2026-11-21.md` §5 A6 的
+  「3/1、6/3」旧数（代码与 `AGENTS.md` 是 10/100、1/3）。
+- **未做**：真实 DSH Web GUI 手点、真实模型端到端（见 `ACCEPTANCE.md` §6）。未提交、未打 tag、未 push。
+
 ## 2026-11-21 — RSI 自迭代停止（`CONFIRMED`）
 
 - **From:** 本会话（agent-23，停止任务）· **To:** 下一轮接手者

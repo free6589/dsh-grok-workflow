@@ -305,6 +305,7 @@ export const CONFIG_KEYS = [
   'mode',
   'grokDefault',
   'roles',
+  'guardianModel',
   'synthesis',
   'maxConcurrency',
   'maxTasks',
@@ -526,6 +527,19 @@ export const Config = z.object({
     synthesizer: z.array(z.object({ provider: z.string().default(''), model: z.string(), maxInFlight: z.natural().min(HARD_LIMITS.routeInFlight.min).max(HARD_LIMITS.routeInFlight.max) })).default([]),
     supervisor: z.array(z.object({ provider: z.string().default(''), model: z.string(), maxInFlight: z.natural().min(HARD_LIMITS.routeInFlight.min).max(HARD_LIMITS.routeInFlight.max) })).default([]),
   }).default({ planner: [], worker: [], verifier: [], synthesizer: [], supervisor: [] }).volatile(),
+  // Guardian model (Q8): the single route that judges a stalled child before the
+  // script kills it. One route, not a chain — an adjudicator has no fallback
+  // because its failure is itself a verdict (kill). An empty/blank model disables
+  // adjudication: a timed-out call then fails straight to the task's bounded
+  // retry, exactly as it did before the guardian existed. The route shape is the
+  // same `{provider, model}` pair the role chains carry, so "选已有路由" is the
+  // same picker, just without the chain machinery.
+  guardianModel: z.object({
+    provider: z.string().default(''),
+    model: z.string().default(''),
+  }).default({ provider: '', model: '' })
+    .description('Single model that judges a stalled child (wait extends 5 min at most twice, never past the run deadline; empty disables adjudication). 判停的单个模型：子代理卡死先取证再判，判 wait 最多延长 5 分钟×2 且不越过运行死线；留空 = 不判停')
+    .volatile(),
   // Final-answer policy (T4: `layered` default, markdown direct output). The
   // verified report is always the base; one constrained polish call runs when a
   // synthesizer chain is configured, and a deterministic natural-language
@@ -936,6 +950,26 @@ export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
   if (mode !== 'full' && mode !== 'triage') {
     throw new Error(`mode must be "full" or "triage", got "${String((config as { mode?: unknown }).mode)}"`)
   }
+  // Guardian model (Q8): one route, normalized like a chain route but with its
+  // own failure wording (the key is `guardianModel`, not `roles.<role>`). An
+  // absent key, a null, or a route with a blank model all read as "no guardian",
+  // so an untouched settings page stays byte-identical to the pre-guardian one.
+  const guardianRaw: unknown = (config as { guardianModel?: unknown }).guardianModel
+  let guardianModel: ModelRoute | undefined
+  if (guardianRaw !== undefined && guardianRaw !== null) {
+    if (typeof guardianRaw !== 'object' || Array.isArray(guardianRaw)) {
+      throw new Error(`guardianModel must be a single route object {provider?, model}, got ${describeShape(guardianRaw)}`)
+    }
+    const route = guardianRaw as { provider?: unknown, model?: unknown }
+    const provider = route.provider === undefined || route.provider === null ? '' : String(route.provider)
+    const model = route.model === undefined || route.model === null ? '' : String(route.model)
+    if (provider.length > HARD_LIMITS.routeChars || model.length > HARD_LIMITS.routeChars) {
+      throw new Error(`guardianModel route fields are limited to ${HARD_LIMITS.routeChars} characters`)
+    }
+    if (model !== '') {
+      guardianModel = provider === '' ? { model } : { provider, model }
+    }
+  }
   // Round 26: `grokDefault` was the one enum this reader never checked. The `Config`
   // schema refuses a bad value, but `resolveConfig` is also reached directly (a
   // hand-built config object, an embedder, a test double), and there a typo used to
@@ -983,6 +1017,9 @@ export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
   return {
     toolName,
     roles,
+    // Omitted entirely when no guardian is configured (exactOptionalPropertyTypes):
+    // an unconfigured run's resolved shape stays byte-identical to the pre-guardian one.
+    ...guardianModel === undefined ? {} : { guardianModel },
     synthesis,
     mode,
     grokDefault,

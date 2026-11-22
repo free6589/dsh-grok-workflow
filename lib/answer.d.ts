@@ -6,14 +6,21 @@
  * (measured to be reproduced exactly in DSH 0.2.1-rc.2, single sample). Failure
  * reports take the same path: a failed workflow must never look like an answer.
  *
- * Two blocks travel in one message, and only one of them is user-visible:
+ * Two blocks travel in one message, and by default only one of them is
+ * user-visible (Q11(c)):
  *
- * - **between the markers** the delivery layer's human block
+ * - **by default, between the markers** the delivery layer's human block alone
  *   (`src/delivery/index.ts`: what was done, what came of it, what is next, in
- *   both languages). `showDiagnostics` adds the machine ledger there too, because
- *   a reader who asked for it wants it.
- * - **below the closing marker** the machine ledger, under an explicit internal
- *   guard, when it is hidden. It is not part of the reply: the preamble forbids
+ *   both languages). The machine ledger — `code=`, `src/file.ts:12`, `ledger`,
+ *   the field labels — is folded into the internal block below the markers.
+ * - **with `showDiagnostics` on, between the markers** the human block *and* the
+ *   machine ledger, and the preamble switches from "reproduce these lines
+ *   exactly" to "restate the conclusion in human words, keep every number and
+ *   path exact, never print a machine field name". That is the whole of Q11:
+ *   a verbatim instruction over machine text is what produced a reply full of
+ *   `RESUME code=none …` and half-cut English sentences.
+ * - **below the closing marker**, under an explicit internal guard, the durable
+ *   copy of the ledger. It is not part of the reply: the preamble forbids
  *   quoting it. It stays in the message because that is the durable copy
  *   cross-round carry-over reads back out of the transcript (`src/carryover.ts`
  *   parses exactly these field labels), and because the Progress node detail is

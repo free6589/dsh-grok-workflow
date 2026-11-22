@@ -76,11 +76,13 @@ describe('P1-1: one task is one group', () => {
     expect(taskGroupTitle(1, 'Fix the login API', 'en')).toBe('Task 1 · Fix the login API')
   })
 
-  it('truncates a long title in the header but keeps the whole title in the report', async () => {
+  it('shows the whole title in the header and keeps the whole title in the report', async () => {
+    // Q10(b): the group header is not truncated any more — the panel wraps the
+    // full task title, and `runTitle` keeps the only remaining length bound.
     const title = 'Refactor the authentication middleware so every provider shares one clock'
     expect(title.length).toBeGreaterThan(TASK_TITLE_DISPLAY_LIMIT)
     const header = taskGroupTitle(1, title, 'zh')
-    expect(header).toBe(`任务 1 · ${title.slice(0, TASK_TITLE_DISPLAY_LIMIT)}…`)
+    expect(header).toBe(`任务 1 · ${title}`)
     expect(truncateTaskTitle(title, 3)).toBe('Ref…')
     expect(truncateTaskTitle('😀😀😀', 2)).toBe('😀😀…')
 
@@ -96,7 +98,8 @@ describe('P1-1: one task is one group', () => {
     }, agent)
     // The row the report carries is untouched, so the full title survives.
     expect(run.report.plan.tasks[0]!.title).toBe(title)
-    expect(run.calls[0]!.phase!.endsWith('…')).toBe(true)
+    expect(run.calls[0]!.phase!.endsWith('…')).toBe(false)
+    expect(run.calls[0]!.phase).toBe(`任务 1 · ${title}`)
   })
 })
 
@@ -210,7 +213,7 @@ describe('P1-3: two languages, no per-run configuration', () => {
   it('ships Chinese copy for the names Issue #22 lists', () => {
     expect(NAMING_COPY.zh.workflow).toBe('任务团队')
     expect(NAMING_COPY.zh.roles).toEqual({
-      planner: '规划助手', worker: '执行', verifier: '检查', supervisor: '监督', synthesizer: '汇总助手',
+      planner: '规划助手', worker: '执行', verifier: '检查', supervisor: '复核', synthesizer: '汇总助手',
     })
     expect(['plan', 'execute', 'verify', 'synthesize'].map(kind => phaseLabel(kind as never, 'zh')))
       .toEqual(['规划', '执行', '检查', '汇总'])
@@ -221,6 +224,20 @@ describe('P1-3: two languages, no per-run configuration', () => {
     expect(CJK.test(english)).toBe(false)
     expect(phaseLabel('plan', 'en')).toBe('Plan')
     expect(runTitle('en', 2)).toBe('Task team · 2 tasks')
+  })
+
+  it('renames the supervisor to Reviewer in English copy (Q7), keys untouched', () => {
+    // The rename is display-only: `RoleName` stays 'supervisor', the config key
+    // stays `roles.supervisor`, and only the two user-visible strings moved.
+    expect(NAMING_COPY.en.roles.supervisor).toBe('Reviewer')
+    expect(NAMING_COPY.en.callSubjects.supervisor).toBe('Reviewer call')
+    // Chinese renamed the same way (`监督`→`复核`) — the `ships Chinese copy`
+    // test above pins it, and this pins the pair so the two languages cannot
+    // drift apart again.
+    expect(NAMING_COPY.zh.roles.supervisor).toBe('复核')
+    expect(NAMING_COPY.zh.callSubjects.supervisor).toBe('复核调用')
+    // No shipped string still says the old English word.
+    expect(JSON.stringify(NAMING_COPY)).not.toContain('Supervisor')
   })
 
   it('reads the language from the Host locale setting, defaulting to Chinese', () => {

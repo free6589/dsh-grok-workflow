@@ -5,8 +5,11 @@ import type { ModelRoute, ResolvedConfig, RoleName } from './types.js'
 import { criterionKey, TASK_LIMITS } from './input.js'
 import { maxTotalAgentsFor, routeBudgetFor } from './script.js'
 import { shardCountFor, splitObjective } from './shards.js'
+import { planWaveReason, WAVE_LIMIT } from './waves.js'
 
 const STATUSES: readonly FinalStatus[] = ['completed', 'partial', 'failed']
+/** The three task terminal states (thin design §1). */
+const TASK_STATUSES = ['verified', 'failed', 'blocked'] as const
 const MAX_RENDER_CHARS = 8_000
 
 function record(value: unknown, path: string): Record<string, unknown> {
@@ -301,10 +304,35 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
       ...originGoalIdField(task.originGoalId, `plan.tasks[${index}].originGoalId`),
     }
   })
+  // Wave structure (v0.13). Optional, because a report produced before waves existed
+  // has none; when present it must partition the plan tasks exactly, in plan order —
+  // a wave list that invents, drops or reorders a task would make the schedule a claim
+  // no plan supports.
+  const planWaves = plan.waves === undefined
+    ? undefined
+    : array(plan.waves, 'plan.waves').map((item, index) =>
+      array(item, `plan.waves[${index}]`).map((id, position) => string(id, `plan.waves[${index}][${position}]`)))
+  if (planWaves !== undefined) {
+    if (planWaves.length === 0) {
+      throw new Error('workflow result plan.waves must declare at least one wave')
+    }
+    if (planWaves.length > WAVE_LIMIT) {
+      throw new Error(`workflow result plan.waves declares ${planWaves.length} waves, over the limit of ${WAVE_LIMIT}`)
+    }
+    const flattened = planWaves.flat()
+    if (flattened.length !== planTasks.length) {
+      throw new Error('workflow result plan.waves does not cover every plan task exactly once')
+    }
+    for (let index = 0; index < flattened.length; index++) {
+      if (flattened[index] !== planTasks[index]!.id) {
+        throw new Error(`workflow result plan.waves disagrees with plan.tasks at index ${index}`)
+      }
+    }
+  }
   const tasks = array(root.tasks, 'tasks').map((item, index) => {
     const task = record(item, `tasks[${index}]`)
-    const taskStatus = string(task.status, `tasks[${index}].status`)
-    if (taskStatus !== 'verified' && taskStatus !== 'failed') {
+    const taskStatus = string(task.status, `tasks[${index}].status`) as (typeof TASK_STATUSES)[number]
+    if (!TASK_STATUSES.includes(taskStatus)) {
       throw new Error(`workflow result has invalid tasks[${index}].status "${taskStatus}"`)
     }
     return {
@@ -631,11 +659,14 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
     // a real reason. A fallback partial whose single task verified legitimately has
     // no failed task, so this stays vacuous there (its provenance is plan.error).
     for (const task of tasks) {
-      if (task.status !== 'failed') continue
+      // A blocked task is accounted for like a failed one, but with its own wording:
+      // "did not run" still has to be reported once with a reason that names the
+      // upstream task that stopped it (thin design §2).
+      if (task.status !== 'failed' && task.status !== 'blocked') continue
       const entries = incomplete.filter(item => item.taskId === task.id)
       if (entries.length !== 1 || entries[0]!.reason.trim() === '') {
         throw new Error(
-          `workflow result task ${task.id} failed but is not reported exactly once in incomplete with a non-empty reason`,
+          `workflow result task ${task.id} ${task.status === 'blocked' ? 'is blocked but is not reported exactly once in incomplete with a non-empty reason' : 'failed but is not reported exactly once in incomplete with a non-empty reason'}`,
         )
       }
     }
@@ -669,6 +700,7 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
     plan: {
       source: source as WorkflowReport['plan']['source'],
       tasks: planTasks,
+      ...planWaves === undefined ? {} : { waves: planWaves },
       error: planError,
       ...planFailure === undefined ? {} : { failure: planFailure },
     },
@@ -802,6 +834,12 @@ export function renderReport(report: WorkflowReport, opts?: { showDiagnostics?: 
     `Objective: ${oneLine(report.objective, 300)}`,
     `Plan: ${report.plan.source}; ${report.tasks.length} task(s); ${verified} verified`,
   ]
+  // A5: a single-wave plan says why it is single. Without the sentence a reader
+  // cannot tell a one-line job from a plan that could not run in parallel, and the
+  // difference is the whole question "did the team actually work together?".
+  const waveCount = report.plan.waves === undefined ? undefined : report.plan.waves.length
+  const waveReason = planWaveReason(report.plan.tasks, waveCount, 'en')
+  if (waveReason !== undefined) lines.push(`Wave reason: ${waveReason}`)
   const failures = failureSummary(report)
   if (failures.length > 0) {
     lines.push(`Failures: ${failures.map(entry => `${entry.count} ${entry.category}`).join(', ')}`)
@@ -809,10 +847,25 @@ export function renderReport(report: WorkflowReport, opts?: { showDiagnostics?: 
   if (report.plan.failure !== undefined && report.plan.failure !== null && report.plan.failure.category !== undefined) {
     lines.push(`Plan failure: ${report.plan.failure.class} (${report.plan.failure.category})`)
   }
+  // Per-wave rows (Wave 3): the wave a task belongs to is part of what happened, so a
+  // multi-wave plan renders one heading per wave. A single-wave plan has nothing to
+  // group and keeps the flat list it always had.
+  const waveOfTask = new Map<string, number>()
+  if (report.plan.waves !== undefined && report.plan.waves.length > 1) {
+    report.plan.waves.forEach((ids, wave) => { for (const id of ids) waveOfTask.set(id, wave) })
+  }
+  let renderedWave = -1
   for (const task of report.tasks) {
     const attempts = task.attempts.length
+    const wave = waveOfTask.get(task.id)
+    if (wave !== undefined && wave !== renderedWave) {
+      renderedWave = wave
+      lines.push(`Wave ${wave + 1}/${report.plan.waves!.length}:`)
+    }
     lines.push(`- ${task.id}: ${task.status} (${attempts} attempt${attempts === 1 ? '' : 's'}) — ${oneLine(task.title, 160)}`)
-    if (task.status === 'failed') {
+    // A blocked task reports the same evidence line a failed one does: "did not run"
+    // is not a pass, and its reason names the upstream task that stopped it.
+    if (task.status === 'failed' || task.status === 'blocked') {
       const category = categoryOfTask(task)
       lines.push(`  incomplete${category === undefined ? '' : ` (${category})`}: ${oneLine(task.error || task.expectedOutput, 500)}`)
     }

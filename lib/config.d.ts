@@ -215,7 +215,7 @@ export declare const CONFIG_VERSION = 1;
  * a typo that is silently ignored looks exactly like a setting that "does not
  * work", which is the failure mode the settings surface must not have.
  */
-export declare const CONFIG_KEYS: readonly ["toolName", "mode", "grokDefault", "roles", "synthesis", "maxConcurrency", "maxTasks", "timeoutMs", "loopEnabled", "loopMaxRounds", "loopFailStreak", "loopIntervalMin", "iterateIntervalMin", "iterateTemplate", "configVersion"];
+export declare const CONFIG_KEYS: readonly ["toolName", "mode", "grokDefault", "roles", "guardianModel", "synthesis", "maxConcurrency", "maxTasks", "timeoutMs", "loopEnabled", "loopMaxRounds", "loopFailStreak", "loopIntervalMin", "iterateIntervalMin", "iterateTemplate", "configVersion"];
 /**
  * The role names a configuration may route, in the order `resolveConfig` builds them.
  *
@@ -371,6 +371,13 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
             maxInFlight: z<number, number, "plain">;
         }>>[], "defined">;
     }>>>, "volatile-defined">;
+    guardianModel: z<NoInfer<Schemastery.ObjectS<NoInfer<{
+        provider: z<string, string, "defined">;
+        model: z<string, string, "defined">;
+    }>>>, NoInfer<Schemastery.ObjectT<NoInfer<{
+        provider: z<string, string, "defined">;
+        model: z<string, string, "defined">;
+    }>>>, "volatile-defined">;
     synthesis: z<"model" | "layered", "model" | "layered", "volatile-defined">;
     configVersion: z<number, number, "defined">;
 }>>, Schemastery.ObjectT<NoInfer<{
@@ -478,6 +485,13 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
             model: z<string, string, "plain">;
             maxInFlight: z<number, number, "plain">;
         }>>[], "defined">;
+    }>>>, "volatile-defined">;
+    guardianModel: z<NoInfer<Schemastery.ObjectS<NoInfer<{
+        provider: z<string, string, "defined">;
+        model: z<string, string, "defined">;
+    }>>>, NoInfer<Schemastery.ObjectT<NoInfer<{
+        provider: z<string, string, "defined">;
+        model: z<string, string, "defined">;
     }>>>, "volatile-defined">;
     synthesis: z<"model" | "layered", "model" | "layered", "volatile-defined">;
     configVersion: z<number, number, "defined">;
