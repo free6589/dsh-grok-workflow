@@ -228,7 +228,8 @@ function assertReopenable(live: Session): void {
     }
   }
   const reopened = Session.create('sess-head-reopened' as never, live.snapshotEvents())
-  expect(reopened.ownEvents().length).toBe(live.ownEvents().length)
+  // A seed event is prepended on reopen; the log body must round-trip whole.
+  expect(reopened.ownEvents().length).toBe(live.ownEvents().length + 1)
 }
 
 function textOf(message: UserMessage): string {
