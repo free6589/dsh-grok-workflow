@@ -2740,6 +2740,27 @@ Issue #1 状态评论 issuecomment-6927842856。
   做成可复用步骤；另：`cordis.patch.yml` 里 3 条 patch 告警（`layerfs-host`、
   `agent-teams` 未找到，`deepseek-account` 名称不匹配）是源配置漂移，与克隆无关，值得单开一轮清理。
 
+## 2026-11-22 — 会话损坏根因已定位并修复（未发版，`CONFIRMED`，fix/session-surface-head-6）
+
+- **用户报障**：凡开过 dsh-grok-workflow 插件的会话，dsh 重启后打不开：
+  `stored session … is corrupt: system/message requires a protected first surface head`。
+- **根因（`CONFIRMED`，三路子代理取证 + 隔离复现）**：DSH `dsh-session-format-v3-to-v4`
+  `foldSurface` 要求存储 log 的首个 surface 事件必须是宿主的 `system/message` 头。
+  本插件 `src/gate.ts` 的 `commitClaimed()` 在 `agent/pre-step`（loop 写 `step/start` +
+  系统投影**之前**）就 `append('user/message', …, {surfaceOp:'append'})`，新会话首条
+  surface 变成 user 话，后续 system 头一到即炸；重启全量回放才抛，所以活会话当时不报错、
+  重启全砖。99 个父会话扫描：OK 53 / CORRUPT 33 / NOSYS 13，CORRUPT 全部
+  `first=(user,message)` 且后有 `system/message`。取消路径同理（cancel-then-continue
+  照样砖，已实测）。
+- **修法**：`surfaceHasHead()` 门——已有 surface 节点或 turn 2+ 才预发布，否则 batch 走
+  `enter.messages` 由 loop 在 head 之后提交；取消走同一规则。回归：`commitHead` 复刻
+  loop 顺序 + `assertReopenable` 回放 validator 规则 + `surface head` 3 例；
+  `gate.spec.ts` 5 例期望同步。`npm run ci` exit 0 = **81 文件 / 1564 测试 PASS**，
+  `verify:lib` byte-identical。
+- **没做的**：未发版、未 push（分支 `fix/session-surface-head-6`，commits ddf5e5e 起 7 个）；
+  用户侧已砖的 33 个父会话插件修不了，需 host 侧修复或丢弃；真机 GUI 验证 NOT_RUN。
+- **下一步**：合流 main → 按五步流发版；发版说明写清"升级后新会话不再写坏，既有砖会话需手动处理"。
+
 ## 2026-11-22 — 已发版 `0.13.9`：Guardian 非破坏式恢复 + observe 折叠修复（`CONFIRMED`）
 
 - **From:** 本会话（lead）· **To:** 下一轮接手者

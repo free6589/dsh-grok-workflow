@@ -1,3 +1,12 @@
+Last updated: 2026-11-22 22:55 +08:00（**会话损坏根因已定位并修复，未发版，`CONFIRMED`** —
+分支 `fix/session-surface-head-6`：`src/gate.ts` 的 `commitClaimed()` 不再在无头 turn-1 预发布
+`user/message`（`surfaceHasHead()` 门：已有 surface 节点或 turn 2+ 才发布，否则走 `enter.messages`
+由 loop 在 head 之后提交）；取消路径同规则（cancel-then-continue 同样会砖）。回归：
+`test/phase1-dialogue.spec.ts` 新增 `surface head` 3 例 + `commitHead`/`assertReopenable`  harness；
+`test/gate.spec.ts` 5 例期望同步（batch rides enter）。`npm run ci` exit 0 = **81 文件 / 1564 测试 PASS**，
+`verify:lib` byte-identical。未提交发版；用户侧已砖的 33 个父会话只能由 host 侧修复或丢弃，
+插件不再写坏新会话。根因取证见 HANDOFF 末条。）
+
 Last updated: 2026-11-22 22:40 +08:00（**已发版 `0.13.13`：带编号的计划任务即使标题含阶段词也独立成卡，`CONFIRMED`** —
 发版提交 `5ab9e26` + tag `v0.13.13` 已推；远端 Release `45033581188` success 并已发布
 （asset `dsh-grok-workflow-0.13.13.tgz`）。本地门禁：`npm run ci` exit 0（81 文件 / 1561 测试 PASS），

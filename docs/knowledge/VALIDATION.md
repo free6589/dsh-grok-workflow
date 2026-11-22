@@ -1,3 +1,22 @@
+## 会话 surface-head 损坏修复 — 2026-11-22 (`CONFIRMED`，fix/session-surface-head-6，未发版)
+
+**Changed:** `src/gate.ts`（`commitClaimed(agent, claimed, turn?)` + `surfaceHasHead()`
+门：仅已建立 surface 或 turn 2+ 才预发布；取消路径同规则）、`test/phase1-dialogue.spec.ts`
+（`commitHead` 复刻 loop 顺序、`assertReopenable` 回放 validator、`surface head` 3 例、
+旧 P0-1/P0-4 期望同步）、`test/gate.spec.ts`（B06 + in-turn 5 例同步）、`lib/` 重建。
+
+| state | command | result |
+| --- | --- | --- |
+| branch fix/session-surface-head-6 | 隔离复现（real `Session` + host validator）：pre-step 顺序 user→system | **THROWS `system/message requires a protected first surface head`**（`CONFIRMED`，与用户报错同文） |
+| 同上 | head→user 顺序 | **NO-THROW** |
+| 同上 | cancel-then-continue（turn-1 user 行 + turn-2 head） | **THROWS**（取消路径同砖，修法覆盖） |
+| branch | `npx vitest run test/phase1-dialogue.spec.ts test/gate.spec.ts test/composition.spec.ts test/triage-recall.spec.ts` | **4 files / 126 tests PASS**（126 = 36+53+余） |
+| branch | `npm run ci` | **exit 0：81 files / 1564 tests PASS**；typecheck 干净（除并发轮 nyc `--jsx` 孤儿）；lint 0 errors（3 warnings 皆既有/测试 harness）；`verify:lib` byte-identical |
+| raw logs（只读） | 99 父会话扫描 | **OK 53 / CORRUPT 33 / NOSYS 13**；CORRUPT 全 `first=(user,message)` + 后续 `system/message` |
+
+**Honest boundary:** 用户侧已砖的 33 个父会话本插件修不了（需 host 侧修复或丢弃）；
+真机 GUI 手势验证 NOT_RUN；未 push 未发版。
+
 ## 未发版 L2 主会话通道（通道侧）— 2026-11-22 (`CONFIRMED`，session_channel lane)
 
 **Changed:** 新 `src/channel.ts`（分类/文案/意图组装 + 无损 carry 组装）、`src/gate.ts`
