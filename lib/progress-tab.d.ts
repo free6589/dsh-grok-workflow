@@ -23,12 +23,12 @@
  *   the stream cannot tell a cancellation from a crash, so the tab does not guess one.
  * - `cancelled` is the engine's own outcome word, kept verbatim rather than re-derived.
  */
-/** The four event types the tab folds; every other type is ignored. */
-export declare const PROGRESS_EVENT_TYPES: readonly ["tool-workflow/run-start", "tool-workflow/agent-start", "tool-workflow/agent-end", "tool-workflow/run-end"];
+/** The seven progress and Guardian lifecycle events the tab folds; other events are ignored. */
+export declare const PROGRESS_EVENT_TYPES: readonly ["tool-workflow/run-start", "tool-workflow/agent-start", "tool-workflow/agent-end", "tool-workflow/guardian-start", "tool-workflow/guardian-finding", "tool-workflow/guardian-end", "tool-workflow/run-end"];
 /**
  * The optional detail payload, kept apart from {@link PROGRESS_EVENT_TYPES} on purpose.
  *
- * The state of the track comes from the four events above and from nothing else. This
+ * Track state comes from progress lifecycle events; Guardian findings only populate its side lane. This
  * one only ever *adds* field values to a node, so a stream without it renders exactly
  * what it rendered before. `createWorkflowProgressRecorder` does not write it today; the
  * tab reads it so that a recorder (or another bundle) that does write it is used instead
