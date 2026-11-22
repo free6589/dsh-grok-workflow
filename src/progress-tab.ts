@@ -742,8 +742,15 @@ function phaseCarriesToken(haystack: string, token: string): boolean {
   }
 }
 
-/** The first spine stage whose token the phase header carries. */
-function stageForPhase(phase: string): ProgressStageDefinition | undefined {
+/** The first spine stage whose token the phase header carries.
+ *
+ * Numbered plan tasks (`任务 7 · 标题`) always win over stage tokens: a title that
+ * mentions a stage word (`任务 7 · 合并为干净可并发执行计划`) names a plan task,
+ * not the `执行` stage. Without this, the extra task lands as a stage row under
+ * `规划`.
+ */
+export function stageForPhase(phase: string): ProgressStageDefinition | undefined {
+  if (taskNumberIn(phase) !== undefined) return undefined
   const haystack = phase.toLowerCase()
   for (const stage of PROGRESS_STAGES) {
     if (stage.edge) continue

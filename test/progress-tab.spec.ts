@@ -446,6 +446,18 @@ describe('progress tab: the track', () => {
     expect(stageNode(bound, 'plan').state).toBe('done')
   })
 
+  it('puts a numbered plan task mentioning a stage word on its own card, never on the spine', () => {
+    // Regression: `任务 7 · 合并为干净可并发执行计划` carries `执行`, so the old
+    // spine swallowed it as an `执行` stage row under `规划` instead of `任务 7`.
+    const track = trackOf([
+      member(20, '任务 7 · 合并为干净可并发执行计划', 'completed', { label: '执行' }),
+      member(21, '任务 7 · 合并为干净可并发执行计划', 'completed', { label: '检查' }),
+    ], 'completed')
+    expect(stageNode(track, 'execute').members).toEqual([])
+    expect(track.nodes.find((node) => node.key === 'phase:任务 7 · 合并为干净可并发执行计划')?.kind).toBe('extra')
+    expect(track.nodes.filter((node) => node.kind === 'extra')).toHaveLength(1)
+  })
+
   it('keys a plan-task node by its whole phase header, so two identical titles stay apart', () => {
     const track = trackOf([
       member(1, '任务 1 · 修复登录', 'completed'),

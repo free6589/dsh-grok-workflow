@@ -3,6 +3,14 @@
 Notable user-facing changes are recorded here in English and Simplified Chinese.
 用户可见的功能和修复会在这里以英文和简体中文记录。
 
+## [Unreleased] / 未发布
+
+### Fixed / 修复
+
+- **A numbered plan task keeps its own card even when its title mentions a stage word / 带编号的计划任务即使标题含阶段词也独立成卡** —
+  A plan task whose title contains a stage word (e.g. `任务 7 · 合并为干净可并发执行计划` carries `执行`) used to be swallowed by the spine's `执行` segment and rendered as a stage row under `规划` instead of its own `任务 7` card. Numbered phases (`任务 N · …` / `Task N · …`) now always win over stage tokens: they render as their own task-band card, and the spine only keeps genuine stage rows.
+  / 标题里带阶段词的计划任务（例如 `任务 7 · 合并为干净可并发执行计划` 里带了"执行"）过去会被脊柱的"执行"段收走，在"规划"下面显示成一行阶段行，而不是独立的"任务 7"卡片。现在带编号的 phase（`任务 N · …` / `Task N · …`）永远优先于阶段关键词：它们在任务带里独立成卡，脊柱只保留真正的阶段行。
+
 ## [0.13.12] - 2026-11-22
 
 ### Added / 新增

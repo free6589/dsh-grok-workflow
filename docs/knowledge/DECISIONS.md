@@ -2575,3 +2575,32 @@ test/composition.spec.ts` → 128 PASS。全量 `npm run ci` 与真机 GUI 手�
 **Cost / open:** 通道只在 `replan: true` 时打开（默认关，见 D-104 相邻的配置口径）；
 `replan` 关闭时行为与发版版一致，跑中消息仍旧各自成轮。子任务级热取消仍是非法（引擎无 per-child 句柄）。
 
+
+## D-106 — 进度脊柱：带编号的计划任务永远优先于阶段关键词（2026-11-22，未发版）
+
+**背景**：用户报 session-076c2337 的进度页：规划下面的"执行"行是任务 1–6 跑完后加上去的，
+问"它为什么在规划下面，而不是任务 7"。实查会话事件：那一行的 phase 是
+`任务 7 · 合并为干净可并发执行计划`，标题里带了"执行"二字，被 `stageForPhase()`
+按 `执行` token 收进脊柱的 `执行` 段，而不是任务带里的任务 7 卡片。任务没丢，
+是显示分错了筐。
+
+**Decision:**
+1. `stageForPhase()` 先看 `taskNumberIn()`：phase 带 `任务 N` / `Task N` 前缀的一律
+   返回 undefined（不进脊柱），由任务带按编号成卡。脊柱只收真正的阶段行
+   （`规划`、`执行`、`检查`…）与英文阶段词。
+2. 双实现同步：`src/progress-tab.ts`（TS 纯函数）与 `src/client/index.js` 手写镜像
+   （`progressStageForPhase` + 前置的 `progressTaskNumber`，同作用域函数声明提升可用）
+   同改；共用同一回归用例形状（任务 7 标题含"执行"，断 spine 为空、extra 为 1）。
+3. 导出性变化：`stageForPhase` 由模块私有改为 `export`，供测试与将来复用；行为上
+   只收窄（带编号的不再进脊柱），不带编号的行与之前逐字节一致。
+
+**Reason:** 编号是引擎写死的（`taskGroupTitle`），标题是 planner 现场编的；
+用编号判定永远不会被标题里的阶段词污染。用"后来者优先"修标题黑名单是补不完的。
+
+**Alternatives rejected:** (a) 标题避开阶段词——靠人记住，不可靠；(b) 脊柱关键词加白名单——
+标题空间无界，拦不住"执行回归"这类正常词。
+
+**Evidence:** 会话 session-076c2337 事件（seq 318 `任务 7 · 合并为干净可并发执行计划`）；
+`test/progress-tab.spec.ts` + `test/client.spec.ts` 各 +1 回归（任务 7 形状）；
+真机隔离 soak（见 VALIDATION）：live headless 跑出同形状 phase，fold 后任务 7 成卡、
+spine 为空，pre-fix 形状会进脊柱。
