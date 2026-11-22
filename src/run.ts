@@ -9,6 +9,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { Session } from '@deepseek-ai/dsh-session'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { WorkflowRun, WorkflowStartRequest, WorkflowStopReason } from '@deepseek-ai/dsh-workflow'
 import { statSync } from 'node:fs'
 import { join } from 'node:path'
@@ -23,7 +24,7 @@ import { inheritanceForSession } from './carryover.js'
 import { teamWorkflowEngine } from './team-engine.js'
 import { createCheckpointRecorder, unloadCheckpointRecorders } from './checkpoint/wiring.js'
 import { GUARDIAN_LIMITS, createRunGuardian, guardianChildBudgetMs, unloadRunGuardians } from './guardian.js'
-import type { FileHeartbeat, GuardianSettlement } from './guardian.js'
+import type { FileHeartbeat, GuardianSettlement, SessionHeartbeat } from './guardian.js'
 import { CHILD_TIMEOUT_MS } from './timeout.js'
 import { deliverReport } from './delivery/index.js'
 import type { DeliveryView } from './delivery/index.js'
@@ -880,6 +881,74 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
       }
       return freshest
     },
+    // C3 rescue executor: the script's adjudicator judged a stalled child
+    // interrupt-recoverable and broadcast it on the log channel. The host
+    // interrupts that child (waking a command-wait) and delivers the
+    // adjudicator's guidance; the child's context is preserved. Unlimited
+    // by operator decision — each rescue appends one finding, so the spend
+    // is auditable in the terminal report. Never throws into the run.
+    rescue: (childId: string, guidance: string): void => {
+      try {
+        const subagents = (ctx as unknown as {
+          subagents?: {
+            interrupt?: (targetId: string, authority: unknown) => void
+            sendMessage?: (sender: unknown, targetId: string, content: unknown[], options: unknown) => Promise<unknown>
+          }
+        }).subagents
+        if (subagents === undefined || subagents === null) return
+        if (typeof subagents.interrupt === 'function') {
+          subagents.interrupt(childId, { kind: 'ancestor', agent })
+        }
+        if (typeof subagents.sendMessage === 'function') {
+          const content = [createUserMessage({
+            content: [{
+              type: 'text',
+              text: `Guardian rescue (your wait budget expired; this steers you instead of killing the run): ${guidance}`,
+            }],
+            source: { kind: 'grok-workflow' },
+          })]
+          const delivered = subagents.sendMessage(agent, childId, content as never, { signal: combined.signal } as never)
+          if (delivered !== undefined && typeof (delivered as Promise<unknown>).catch === 'function') {
+            (delivered as Promise<unknown>).catch((error: unknown) => {
+              logger.warn(`workflow guardian rescue message not admitted for ${childId}: ${redactError(error)}`)
+            })
+          }
+        }
+      } catch (error) {
+        logger.warn(`workflow guardian rescue executor failed for ${childId}: ${redactError(error)}`)
+        throw error
+      }
+    },
+    // C1 session heartbeat: ask the child's own session when its turn last
+    // moved, through the subagent timing projection (active.through). Only
+    // the timestamp travels — never message content. Anything unreadable
+    // (released session, unregistered projection, no open turn) is no
+    // signal, and the older rules below still apply. The lookup is
+    // best-effort: a context without a session store costs the signal,
+    // never the run.
+    sessionHeartbeat: (childId: string): SessionHeartbeat | undefined => {
+      try {
+        const sessions = (ctx as unknown as { session?: { get?: (id: string) => unknown } }).session
+        const get = sessions?.get
+        if (typeof get !== 'function') return undefined
+        const child = get.call(sessions, childId) as object | undefined
+        if (child === undefined || child === null) return undefined
+        const projections = (ctx as unknown as {
+          sessionProjections?: { stateOf?: (session: object, key: string) => unknown }
+        }).sessionProjections
+        const stateOf = projections?.stateOf
+        if (typeof stateOf !== 'function') return undefined
+        const timing = stateOf.call(projections, child, 'subagentTiming') as
+          | { active?: { through?: unknown } }
+          | undefined
+        const through = timing?.active?.through
+        return typeof through === 'number' && Number.isFinite(through) && through > 0
+          ? { atMs: through }
+          : undefined
+      } catch {
+        return undefined
+      }
+    },
   })
   /** Guardian findings folded into the terminal report, when the run settles. */
   let guardianSettlement: GuardianSettlement | undefined
@@ -918,7 +987,15 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
     // like every other `listen()` row: a bus without these events costs the
     // signal, never the run.
     listen(() => ctx.on('workflow/phase', (info) => { guardian.runHeartbeat(info) }))
-    listen(() => ctx.on('workflow/log', (info) => { guardian.runHeartbeat(info) }))
+    // C3 rescue channel: the script broadcasts `guardian rescue …` on the
+    // same log bus the B1 heartbeat already hears. The heartbeat keeps the
+    // signal; the rescue line is additionally parsed for seq + guidance and
+    // executed (interrupt + steered message). A bus without log events costs
+    // both, never the run.
+    listen(() => ctx.on('workflow/log', (info, message) => {
+      guardian.runHeartbeat(info)
+      if (typeof message === 'string' && message.includes('guardian rescue')) guardian.noteRescue(info, message)
+    }))
   }
   try {
     try {

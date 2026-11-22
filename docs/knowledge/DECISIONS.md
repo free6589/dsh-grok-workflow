@@ -2373,3 +2373,23 @@ writesPathsForPhase 中英映射/不可读降级/未知 phase 旧规则 7 例）
 全局扫 cwd mtime（所有 child 共享一个 cwd，扫全目录会把别的 task 的写算到
 这个孩子头上——B2 按声明路径盯正是为了避开这个）。C（宿主只标记不杀）
 单独立项：它改变“挂死的 run 什么时候结算”这个用户可见语义。
+
+## D-099 — 守卫问心跳 + 拉回来不杀（2026-11-22，未发版）
+
+**背景**：用户要三件事——①扫一遍 10 秒（嫌 1 秒太费）；②守卫定期查子会话活没活（方法一为主，没动静再读内容方法二）；③卡住的打断再发消息救（停了再救，不是插队）；守卫可以用模型（设置页配了 `guardianModel` 就是让它花的）；重救无限次。
+
+**Decision:**
+1. **10 秒一扫**：`GUARDIAN_LIMITS.checkIntervalMs` 1s→10s。轮询只比内存时间戳，省的是调度；B1/B2/C1 心跳全是事件驱动（事件到立刻刷新），发现卡死最多晚 10 秒——10 分钟预算面前是噪音。
+2. **C1 问会话心跳**：host 侧 `sessionHeartbeat` 读孩子自己会话的 `subagentTiming.active.through`（`ctx.sessionProjections.stateOf`，同步读内存），预算内有动静=活着，不管文件。只取时间戳不看内容；stale/读不到/无 open turn→无信号退老规则。这也覆盖 planner 现场 plan（B2 无映射的短板补上）。
+3. **C3 打断+重救**：判停模型可答 `rescue` + `guidance`（prompt 加规则+schema）；脚本 `raceChildCall` 收到 rescue 就 `log('guardian rescue seq=N … guidance=…')` 广播+按 wait 续一格；host 订阅 `workflow/log` 收到就 `interrupt(childId, {kind:'ancestor', agent})` 打断 + `sendMessage` 递引导语。孩子上下文保留，醒来继续干。无限次（用户拍板），每次一条 `rescue` finding 留账。递不进去（未知 seq/已结算/无引导语/无执行器/抛错）一律 containment，无 warn 外无影响。
+4. **pre-adoption buffer**：真机上 log 可能比 adopt 先到（fake 引擎 microtask 实测复现），`pendingRescues` 按 run id 缓存，adopt 回放顺序 start→rescue→end（rescue 必须在 end 前，否则 settled 挡掉——这个坑是红测抓出来的）。
+5. **`timeout.ts` 同步**：`GuardianVerdict` 加 `rescue`，`parseGuardianVerdict` 认三态，`guardianDecision('rescue')`=wait（同 wait 规则：次数+deadline 双约束，不是无脑续）。
+
+**Reason:** 判和救必须分家——脚本有模型能判但无 seam 不能救，host 有 seam 能救但无模型不能判。`guardian rescue` log 行是两者唯一的交接点：脚本只判+广播，host 只执行+留账，host 不编内容（引导语是 adjudicator 写的，host 原样转发）。“睡死型”（等 IO/等锁）interrupt 能叫醒（cancel 信号）；真醒不来的下一轮预算照杀，不无底洞。
+
+**Evidence:** `test/guardian.spec.ts` 27 例（含 session 心跳 3 + rescue 单元 3 + host 接线 2）；
+`test/timeout.spec.ts` +rescue 解析/决策/prompt 广播钉；脚本 rescue 广播集成（adjudicator 答 rescue→events 里有 `guardian rescue` 行→attempt 不加长）。`npm run ci` 78 files / 1480 tests PASS；typecheck 0 错。
+
+**代价**：重救走 `guardianModel`（用户已批无限次，finding 留账可查）；无 guardianModel 的 run 行为零变化（adjudication 不跑，rescue 不存在）。D-098 的被否决项「读子会话 ownEvents」被 C1 的 `subagentTiming` 投影取代——读投影不读 log，不碰内容，O(1) 不扫全 log。
+
+**被否决的备选**：host 侧直接调模型判类型（host 无调模型先例，`ctx.llm` 只用来列 provider；判读放脚本 adjudication，多一种 verdict 而已）；B1 升级为保活（“run 在说话=孩子活着”会把真死孩子和 run 噪音混在一起，B1 保持降级不定罪）；C（只标记不杀）仍单独立项。

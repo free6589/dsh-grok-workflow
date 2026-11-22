@@ -103,7 +103,7 @@ export const GUARDIAN_LIMITS = {
   /** Lower bound of one child's budget: below this the timer is noise, not signal. */
   childTimeoutFloorMs: 5_000,
   /** How often the single periodic check runs. */
-  checkIntervalMs: 1_000,
+  checkIntervalMs: 10_000,
   /** Upper bound of one periodic-check wait on unload (the disposer must finish). */
   unloadTimeoutMs: 3_000,
 } as const
@@ -119,8 +119,8 @@ export interface GuardianFinding {
   label: string
   /** Which liveness signal fired. */
   signal: GuardianSignal
-  /** What the guardian did (always `cancel-run` — the only host-owned action). */
-  action: 'cancel-run'
+  /** What the guardian did (always `cancel-run` — the only host-owned kill; `rescue` steers instead). */
+  action: 'cancel-run' | 'rescue'
   /** Human-readable reason, bounded and redacted. */
   reason: string
   /** Epoch milliseconds at which the signal fired. */
@@ -170,6 +170,20 @@ export interface FileHeartbeat {
 /** Read the freshest change among a child's declared write paths, if any. */
 export type FileHeartbeatReader = (writesPaths: readonly string[]) => FileHeartbeat | undefined
 
+/** What the child's own session says about its open turn (timestamps only). */
+export interface SessionHeartbeat {
+  /** Epoch milliseconds of the freshest turn activity observed. */
+  atMs: number
+}
+
+/**
+ * Read one child's session liveness by its engine child id.
+ * Returns the freshest turn timestamp, or `undefined` when the child session
+ * cannot be read (released, unregistered key, no open turn). Only timestamps
+ * travel — never message content. A reader that throws reads as "no signal".
+ */
+export type SessionHeartbeatReader = (childId: string) => SessionHeartbeat | undefined
+
 /** Options for one guardian. Every field is optional except identity. */
 export interface GuardianOptions {
   /**
@@ -207,6 +221,22 @@ export interface GuardianOptions {
    * child carries paths and the old rule holds.
    */
   writesPathsForPhase?: (phase: string) => string[]
+  /**
+   * Session-heartbeat reader (C1): given the engine child id, return the
+   * freshest turn timestamp from the child's own session, or `undefined`
+   * when it cannot be read. Fresh (within budget) means the child is talking
+   * — it stays alive regardless of files or narration. Stale or unreadable
+   * degrades to the older signals, never to a false alive.
+   */
+  sessionHeartbeat?: SessionHeartbeatReader
+  /**
+   * Rescue executor (C3): interrupt the child and deliver the adjudicator's
+   * guidance. Called once per `guardian rescue` log line the script emits;
+   * unlimited by design (per operator decision) — each call appends one
+   * `rescue` finding, so the spend is auditable in the terminal report.
+   * A callback that throws is contained as a warning, never as a failed run.
+   */
+  rescue?: (childId: string, guidance: string) => void
 }
 
 /** Derive one child's stall budget from the run's own deadline. */
@@ -314,6 +344,7 @@ export function createRunGuardian(options: GuardianOptions): RunGuardian {
    */
   const pendingStarts: Array<{ runId: string, seq: number, label: string, childId: string, writesPaths: string[], at: number }> = []
   const pendingEnds: Array<{ runId: string, seq: number, label: string, outcome: WorkflowAgentOutcome, at: number }> = []
+  const pendingRescues: Array<{ runId: string, message: string }> = []
   const PENDING_LIMIT = 64
   let run: GuardianRunHandle | undefined
   let timer: unknown
@@ -326,6 +357,24 @@ export function createRunGuardian(options: GuardianOptions): RunGuardian {
   // quiet — run-wide silence, not one quiet child, is the heartbeat-loss.
   let runHeartbeatAtMs = 0
   const listeners: (() => void)[] = []
+
+  /**
+   * C1 session heartbeat: the child's own turn timestamp. Fresh means the
+   * child talked recently — alive, no matter what the files say. Stale or
+   * unreadable yields no signal; only timestamps travel, never content.
+   */
+  const sessionHeartbeatOf = (child: WatchedChild): SessionHeartbeat | undefined => {
+    const reader = options.sessionHeartbeat
+    if (reader === undefined || child.childId === '') return undefined
+    try {
+      const beat = reader(child.childId)
+      if (beat === undefined) return undefined
+      if (!Number.isFinite(beat.atMs) || beat.atMs <= 0) return undefined
+      return beat
+    } catch {
+      return undefined
+    }
+  }
 
   const armed = Number.isFinite(budgetMs) && (budgetMs as number) > 0
 
@@ -382,6 +431,14 @@ export function createRunGuardian(options: GuardianOptions): RunGuardian {
     }
     for (const child of children.values()) {
       if (child.settled || child.timedOut) continue
+      // C1: the child's own session talked recently — it is alive no matter
+      // what the files say. A stale turn or an unreadable session is no
+      // signal: the older rules below still apply.
+      const sessionBeat = sessionHeartbeatOf(child)
+      if (sessionBeat !== undefined) {
+        if (sessionBeat.atMs > latestActivity) latestActivity = sessionBeat.atMs
+        if (at - sessionBeat.atMs < budgetMs) continue
+      }
       // B2: the child's declared files moved recently — it is writing, not
       // wedged. A stale file is no signal: the budget still applies.
       const beat = fileHeartbeatOf(child, at)
@@ -395,9 +452,11 @@ export function createRunGuardian(options: GuardianOptions): RunGuardian {
       // went silent earns a heartbeat-loss.
       const runSilentFor = latestActivity === 0 ? silentFor : at - latestActivity
       const signal: GuardianSignal = runSilentFor >= budgetMs ? 'heartbeat-loss' : 'timeout'
-      const evidence = beatAt > 0
-        ? `file ${Math.round((at - beatAt) / 1000)}s ago`
-        : (latestActivity > 0 ? `run narration ${Math.round((at - latestActivity) / 1000)}s ago` : undefined)
+      const evidence = sessionBeat !== undefined && at - sessionBeat.atMs < budgetMs * 2
+        ? `session ${Math.round((at - sessionBeat.atMs) / 1000)}s ago`
+        : (beatAt > 0
+          ? `file ${Math.round((at - beatAt) / 1000)}s ago`
+          : (latestActivity > 0 ? `run narration ${Math.round((at - latestActivity) / 1000)}s ago` : undefined))
       fireFor(child, signal, at, evidence)
     }
   }
@@ -568,6 +627,64 @@ export function createRunGuardian(options: GuardianOptions): RunGuardian {
   }
 
   /**
+   * C3 rescue: the script's adjudicator judged a stalled child
+   * interrupt-recoverable and broadcast `guardian rescue seq=N ...
+   * guidance=...` on the log channel. The host interrupts that child and
+   * delivers the guidance; the child's context is preserved, so it wakes
+   * with new instructions instead of being killed and retried. Unlimited by
+   * operator decision — each rescue appends one finding, so the spend is
+   * auditable. Never throws: an unknown seq, a missing executor, or a
+   * throwing executor costs a warning at most, never the run.
+   */
+  const noteRescue = (info: unknown, message: unknown): void => {
+    if (disposed) return
+    const text = typeof message === 'string' ? message : ''
+    if (text === '' || !text.includes('guardian rescue')) return
+    const infoId = (info as { id?: unknown } | null)?.id
+    const eventRunId = typeof infoId === 'string' || typeof infoId === 'number' ? String(infoId).trim() : ''
+    // Pre-adoption: the engine has not handed back a run yet. Buffer the line
+    // by its own run id (like the start/end rows); `adopt()` replays lines
+    // that belong to the live run.
+    if (run === undefined) {
+      if (runId !== '' && eventRunId !== runId) return
+      if (pendingRescues.length >= PENDING_LIMIT) pendingRescues.shift()
+      pendingRescues.push({ runId: eventRunId !== '' ? eventRunId : runId, message: text })
+      return
+    }
+    if (eventRunId !== '' && eventRunId !== runId) return
+    fireRescue(text)
+  }
+
+  const fireRescue = (text: string): void => {
+    const seqMatch = /seq=(\d+)/.exec(text)
+    if (seqMatch === null) return
+    const seq = Number(seqMatch[1])
+    if (!Number.isInteger(seq) || seq < 0) return
+    const child = children.get(seq)
+    if (child === undefined || child.settled || child.timedOut) return
+    const guidanceMatch = /guidance=([\s\S]*)$/.exec(text)
+    const guidance = (guidanceMatch?.[1] ?? '').trim().slice(0, 200)
+    if (guidance === '') return
+    if (child.childId === '') return
+    const executor = options.rescue
+    if (executor === undefined) return
+    try {
+      executor(child.childId, guidance)
+    } catch (error) {
+      logger.warn(`workflow guardian rescue failed for child seq ${seq}: ${findingText(error instanceof Error ? error.message : String(error), GUARDIAN_LIMITS.reasonChars)}`)
+      return
+    }
+    appendFinding({
+      seq,
+      label: child.label.slice(0, GUARDIAN_LIMITS.labelChars),
+      signal: 'timeout',
+      action: 'rescue',
+      reason: findingText(`workflow guardian: rescued child "${child.label}" (seq ${seq}) with guidance: ${guidance}`, GUARDIAN_LIMITS.reasonChars),
+      atMs: clock(),
+    })
+  }
+
+  /**
    * B2 file heartbeat: the freshest declared-path change for one child.
    * A reader that throws, or a child with no declared paths, yields no
    * signal — the old budget-only rule holds, never a false alive.
@@ -616,6 +733,13 @@ export function createRunGuardian(options: GuardianOptions): RunGuardian {
           lastFileActivityMs: 0,
         })
       }
+      // Rescues replay before ends: a rescue broadcast while the child was
+      // still open must steer it; replaying ends first would mark the child
+      // settled and wrongly drop a rescue that arrived before the end.
+      for (const row of pendingRescues.splice(0)) {
+        if (row.runId !== runId) continue
+        fireRescue(row.message)
+      }
       for (const row of pendingEnds.splice(0)) {
         if (row.runId !== runId) continue
         const child = children.get(row.seq)
@@ -661,6 +785,10 @@ export function createRunGuardian(options: GuardianOptions): RunGuardian {
     runHeartbeat(info: unknown, at?: number): void {
       if (disposed) return
       noteRunHeartbeat(info, at)
+    },
+    noteRescue(info: unknown, message: unknown): void {
+      if (disposed) return
+      noteRescue(info, message)
     },
     check(now?: number): GuardianFinding[] {
       check(now ?? clock())
@@ -756,6 +884,14 @@ export interface RunGuardian {
    * itself. Never throws.
    */
   runHeartbeat(info: unknown, at?: number): void
+  /**
+   * Observe one `guardian rescue` log line from the script. Parses the seq
+   * and guidance, interrupts that child and delivers the guidance through
+   * the injected executor. Unknown seq, settled child, missing guidance or
+   * executor, and throwing executor are all contained — never the run.
+   * Lines arriving before adoption are buffered and replayed on adopt.
+   */
+  noteRescue(info: unknown, message: unknown): void
   /** Run one liveness sweep now; returns the findings so far. */
   check(now?: number): GuardianFinding[]
   /** Settle the guardian and release everything; returns the terminal settlement. */

@@ -21,6 +21,32 @@
 引擎 `SUPPORTED_AGENT_OPTIONS` 五键 allowlist 已实测：脚本侧带 `writesPaths`
 直接 `UNSUPPORTED_OPTION` 抛错，故走宿主反查（D-098 被否决备选）。
 
+## 未发版 C1/C3 守卫问心跳 + 打断重救 — 2026-11-22 (`CONFIRMED`，lead 本轮)
+
+**Changed:** `src/guardian.ts`（`checkIntervalMs` 1s→10s + `sessionHeartbeat` +
+`noteRescue`/`fireRescue` + `pendingRescues` pre-adoption buffer + adopt 回放
+start→rescue→end + `GuardianFinding.action` 加 `rescue`）、`src/timeout.ts`
+（`GuardianVerdict` 加 `rescue` + parser/decision 同步）、`src/script.ts`
+（adjudication prompt 加 rescue 规则 + schema `verdict` enum 加 `rescue` +
+`guidance` + `raceChildCall` 收 rescue 广播 log + 按 wait 续格）、`src/run.ts`
+（`sessionHeartbeat` 读 `subagentTiming.active.through` + `rescue` 执行器
+interrupt+sendMessage + `workflow/log` 订阅解析 rescue 行）、
+`test/guardian.spec.ts`（27 例）、`test/timeout.spec.ts`（rescue 解析/决策/广播钉）、
+`CHANGELOG.md`（`[Unreleased]` 一修两变中英双语）。
+
+| state | command | result |
+| --- | --- | --- |
+| working tree (Node 26) | `npm run ci` | exit **0** — **78 files / 1480 tests PASS**（0.13.5 基线 1472 + 本轮 8） |
+| working tree | `npm run typecheck` | exit **0** — 0 errors |
+| working tree | `npm run verify:lib` | byte-identical |
+| working tree | `npx vitest run test/guardian.spec.ts test/timeout.spec.ts` | **48 tests PASS**（27 + 21） |
+| real DSH Web GUI | — | **NOT_RUN**：未在宿主界面看 rescue 实救 |
+| real model adjudication | — | **NOT_RUN**：rescue verdict 未做模型实测（脚本化 adjudicator 只断广播不断质量） |
+| real interrupt/sendMessage | — | **NOT_RUN**：host 执行器只在 fake seam 上测通，未在真机子代理上实救 |
+
+**Honest boundary:** 无 `guardianModel` 的 run 行为零变化；rescue 无限次但每次一条 finding 留账；
+pre-adoption 到达的 rescue 行靠 buffer 不丢（fake 引擎 microtask 复现，红测抓到回放顺序坑已修）。
+
 ## 已发版 `0.13.1` — 2026-11-22 (`CONFIRMED`, lead 收尾)
 
 **Changed:** `14156a6`（Wave 0–4 全量，未发布）+ `8357423`（Node 22 测试修复）+ `b5c1af0`

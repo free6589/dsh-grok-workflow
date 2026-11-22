@@ -74,15 +74,16 @@ export declare const GUARDIAN_MAX_WAITS = 2;
 /** Milliseconds the adjudication call itself may run; its failure is a kill. */
 export declare const GUARDIAN_ADJUDICATION_MS = 60000;
 /** What the guardian model decided about one stalled call. */
-export type GuardianVerdict = 'wait' | 'kill';
+export type GuardianVerdict = 'wait' | 'kill' | 'rescue';
 /**
  * Parse one adjudication result.
  *
- * The child answers `{"verdict": "wait" | "kill", "reason": "…"}`; a string
- * reply and a bare `verdict` field are accepted the same way, because the
- * schema travels but a degraded gateway may still answer plain text. Anything
- * unreadable returns `undefined`, which the caller treats as a kill: an
- * adjudicator that cannot answer has no evidence for a wait.
+ * The child answers `{"verdict": "wait" | "kill" | "rescue", "reason": "…",
+ * "guidance": "…"}`; a string reply and a bare `verdict` field are accepted
+ * the same way, because the schema travels but a degraded gateway may still
+ * answer plain text. Anything unreadable returns `undefined`, which the
+ * caller treats as a kill: an adjudicator that cannot answer has no evidence
+ * for a wait — and none for a rescue either.
  * @param value - the child's structured result, its reply string, or anything else.
  * @returns the verdict, or `undefined` when nothing readable was said.
  */
@@ -101,6 +102,8 @@ export declare function parseGuardianVerdict(value: unknown): GuardianVerdict | 
 export declare function guardianWaitMs(deadlineRemainingMs: number): number;
 /**
  * What happens to one stalled call, from the verdict and the budget (S7 pure function).
+ * A rescue grants the same slice a wait would: the host interrupts the child
+ * and delivers the guidance, and the child wakes with new instructions.
  * @param verdict - the parsed guardian verdict; `undefined` reads as a kill.
  * @param waitsUsed - waits already granted to this call.
  * @param deadlineRemainingMs - milliseconds until the run deadline.

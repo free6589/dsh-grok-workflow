@@ -221,6 +221,143 @@ describe('stuck-child handling', () => {
   })
 })
 
+describe('rescue: interrupt and steer instead of killing', () => {  it('a rescue log line interrupts the child and delivers the guidance', () => {
+    const clock = manualClock()
+    const rescued: Array<{ childId: string, guidance: string }> = []
+    const guardian = createRunGuardian({
+      runId: 'run-1',
+      childBudgetMs: 10_000,
+      now: clock.now,
+      schedule: () => ({}) as unknown,
+      cancelSchedule: () => {},
+      rescue: (childId: string, guidance: string) => { rescued.push({ childId, guidance }) },
+    })
+    const cancel = vi.fn()
+    guardian.adopt({ id: 'run-1', cancel })
+    guardian.agentStart(info('run-1'), start(3, 'lost worker'))
+    clock.advance(11_000)
+    guardian.noteRescue(info('run-1'), 'guardian rescue seq=3 label=lost worker guidance=stop waiting, continue with what you have')
+    // The child is steered, not killed: no cancel, one rescue finding.
+    expect(rescued).toEqual([{ childId: 'child-3', guidance: 'stop waiting, continue with what you have' }])
+    expect(cancel).not.toHaveBeenCalled()
+    const findings = guardian.check()
+    const rescue = findings.find(finding => finding?.action === 'rescue')
+    expect(rescue?.seq).toBe(3)
+    expect(rescue?.reason).toContain('stop waiting')
+    guardian.finish('completed')
+  })
+
+  it('a rescue for an unknown or settled child is a contained no-op', () => {
+    const clock = manualClock()
+    const rescued: string[] = []
+    const warnings: string[] = []
+    const guardian = createRunGuardian({
+      runId: 'run-1',
+      childBudgetMs: 10_000,
+      now: clock.now,
+      schedule: () => ({}) as unknown,
+      cancelSchedule: () => {},
+      logger: { warn: (message: string) => { warnings.push(message) } },
+      rescue: (childId: string) => { rescued.push(childId) },
+    })
+    const cancel = vi.fn()
+    guardian.adopt({ id: 'run-1', cancel })
+    guardian.agentStart(info('run-1'), start(1, 'worker'))
+    guardian.noteRescue(info('run-1'), 'guardian rescue seq=9 label=ghost guidance=go on')
+    guardian.agentEnd(info('run-1'), end(1))
+    guardian.noteRescue(info('run-1'), 'guardian rescue seq=1 label=done guidance=go on')
+    guardian.noteRescue(info('run-1'), 'not a rescue line')
+    expect(rescued).toEqual([])
+    expect(warnings).toEqual([])
+    expect(cancel).not.toHaveBeenCalled()
+    guardian.finish('completed')
+  })
+
+  it('a throwing rescue executor is contained as a warning', () => {
+    const clock = manualClock()
+    const warnings: string[] = []
+    const guardian = createRunGuardian({
+      runId: 'run-1',
+      childBudgetMs: 10_000,
+      now: clock.now,
+      schedule: () => ({}) as unknown,
+      cancelSchedule: () => {},
+      logger: { warn: (message: string) => { warnings.push(message) } },
+      rescue: () => { throw new Error('seam down') },
+    })
+    const cancel = vi.fn()
+    guardian.adopt({ id: 'run-1', cancel })
+    guardian.agentStart(info('run-1'), start(2, 'worker'))
+    guardian.noteRescue(info('run-1'), 'guardian rescue seq=2 label=worker guidance=keep going')
+    expect(cancel).not.toHaveBeenCalled()
+    expect(warnings.some(message => message.includes('rescue failed'))).toBe(true)
+    guardian.finish('completed')
+  })
+})
+
+describe('session heartbeat: a child with a fresh turn is alive', () => {
+  it('a fresh child-session turn keeps its child alive past budget', () => {
+    const clock = manualClock()
+    const guardian = createRunGuardian({
+      runId: 'run-1',
+      childBudgetMs: 10_000,
+      now: clock.now,
+      schedule: () => ({}) as unknown,
+      cancelSchedule: () => {},
+      // The child's own session says its turn moved 1.5s ago: only the
+      // timestamp is read, never the content.
+      sessionHeartbeat: () => ({ atMs: clock.now() - 1_500 }),
+    })
+    const cancel = vi.fn()
+    guardian.adopt({ id: 'run-1', cancel })
+    guardian.agentStart(info('run-1'), start(1, 'talking worker'))
+    clock.advance(11_000)
+    expect(guardian.check()).toEqual([])
+    expect(cancel).not.toHaveBeenCalled()
+    guardian.finish('completed')
+  })
+
+  it('a stale child-session turn degrades to the old behaviour (fires)', () => {
+    const clock = manualClock()
+    const guardian = createRunGuardian({
+      runId: 'run-1',
+      childBudgetMs: 10_000,
+      now: clock.now,
+      schedule: () => ({}) as unknown,
+      cancelSchedule: () => {},
+      sessionHeartbeat: () => ({ atMs: clock.now() - 30_000 }),
+    })
+    const cancel = vi.fn()
+    guardian.adopt({ id: 'run-1', cancel })
+    guardian.agentStart(info('run-1'), start(1, 'silent worker'))
+    clock.advance(11_000)
+    expect(guardian.check().length).toBe(1)
+    expect(cancel).toHaveBeenCalledTimes(1)
+    guardian.finish('cancelled')
+  })
+
+  it('an unreadable session degrades to the old behaviour (fires)', () => {
+    const clock = manualClock()
+    let calls = 0
+    const guardian = createRunGuardian({
+      runId: 'run-1',
+      childBudgetMs: 10_000,
+      now: clock.now,
+      schedule: () => ({}) as unknown,
+      cancelSchedule: () => {},
+      sessionHeartbeat: () => { calls += 1; return undefined },
+    })
+    const cancel = vi.fn()
+    guardian.adopt({ id: 'run-1', cancel })
+    guardian.agentStart(info('run-1'), start(1, 'gone worker'))
+    clock.advance(11_000)
+    expect(guardian.check().length).toBe(1)
+    expect(calls).toBeGreaterThan(0)
+    expect(cancel).toHaveBeenCalledTimes(1)
+    guardian.finish('cancelled')
+  })
+})
+
 describe('liveness signals: a child that shows life must not fire', () => {
   it('a run-level phase/log event refreshes run liveness, downgrading heartbeat-loss', () => {
     const clock = manualClock()
@@ -500,6 +637,74 @@ describe('guardian unload cleanup', () => {
     expect(peaks.end).toBeGreaterThanOrEqual(3)
     expect(peaks.phase).toBeGreaterThanOrEqual(1)
     expect(peaks.log).toBeGreaterThanOrEqual(1)
+  })
+
+  it('a rescue log line interrupts the child and delivers the guidance', async () => {
+    // C3 host leg: the script broadcasts `guardian rescue …` on workflow/log;
+    // the host interrupts that child and steers it, preserving its context.
+    const listeners = new Map<string, ((...args: unknown[]) => void)[]>()
+    const on = (name: string, fn: (...args: unknown[]) => void): (() => void) => {
+      const rows = listeners.get(name) ?? []
+      rows.push(fn)
+      listeners.set(name, rows)
+      return () => {
+        listeners.set(name, (listeners.get(name) ?? []).filter(entry => entry !== fn))
+      }
+    }
+    const emit = (name: string, ...args: unknown[]): void => {
+      for (const fn of listeners.get(name) ?? []) fn(...args)
+    }
+    const interrupted: Array<{ target: string, authority: unknown }> = []
+    const messaged: Array<{ target: string, text: string }> = []
+    const subagents = {
+      interrupt: (targetSessionId: string, authority: unknown) => {
+        interrupted.push({ target: targetSessionId, authority })
+      },
+      sendMessage: async (_sender: unknown, targetId: string, content: Array<{ content?: Array<{ text?: string }> }>) => {
+        const text = content.map(block => (block.content ?? []).map(part => part.text ?? '').join('')).join('')
+        messaged.push({ target: targetId, text })
+        return 'inbox-1'
+      },
+    }
+    const engine = {
+      async start(request: WorkflowStartRequest): Promise<{ id: string, meta: WorkflowStartRequest['meta'], result: Promise<{ value: unknown, stopReason: string, agentsStarted: number }>, cancel: (reason?: string) => void, dispose: () => Promise<void> }> {
+        let resolve!: (value: { value: unknown, stopReason: string, agentsStarted: number }) => void
+        const result = new Promise<{ value: unknown, stopReason: string, agentsStarted: number }>(accept => { resolve = accept })
+        queueMicrotask(() => {
+          emit('workflow/agent-start', { id: 'run-rescue-1' }, { seq: 1, label: 'lost worker', childId: 'child-9' })
+          emit('workflow/log', { id: 'run-rescue-1' }, 'guardian rescue seq=1 label=lost worker guidance=stop waiting, continue with what you have')
+          emit('workflow/agent-end', { id: 'run-rescue-1' }, { seq: 1, outcome: 'completed' })
+          resolve({ value: null, stopReason: 'completed', agentsStarted: 1 })
+        })
+        return {
+          id: 'run-rescue-1',
+          meta: request.meta,
+          result,
+          cancel: () => {},
+          dispose: async () => {},
+        }
+      },
+    }
+    const ctx = { workflowEngine: engine, logger: () => ({ warn: () => {} }), on, subagents } as never
+    const state = createActiveState()
+    const agent = { session: Session.create('sess-guardian-rescue' as SessionId) } as never
+    const noticed: string[] = []
+    await runWorkflow({
+      ctx,
+      config: resolveConfig({ timeoutMs: 6_000 }),
+      state,
+      logger: { warn: (message: string) => { noticed.push(message) } },
+      agent,
+      objective: 'rescue wiring exists',
+      failureMode: 'report',
+    })
+    expect(noticed.filter(message => message.includes('rescue'))).toEqual([])
+    expect(interrupted.length).toBe(1)
+    expect(interrupted[0]?.target).toBe('child-9')
+    expect((interrupted[0]?.authority as { kind?: string }).kind).toBe('ancestor')
+    expect(messaged.length).toBe(1)
+    expect(messaged[0]?.target).toBe('child-9')
+    expect(messaged[0]?.text).toContain('stop waiting, continue with what you have')
   })
 
   it('dispose clears the timer and leaves no residue behind', () => {

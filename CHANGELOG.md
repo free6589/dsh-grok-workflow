@@ -5,6 +5,47 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.6] - 2026-11-22
+
+### Fixed / 修复
+
+- **A stalled child can now be steered instead of killed / 卡住的子任务现在可以被拉回来而不是杀掉** —
+  The guardian used to know only one move: cancel the whole run. Now the stall
+  adjudicator may answer `rescue` with a guidance line; the script broadcasts it
+  on the log channel, and the host interrupts that child and delivers the
+  guidance — the child's context is preserved, so it wakes with new instructions
+  instead of being retried from scratch. Each rescue is recorded as a `rescue`
+  finding, so the spend is auditable. Unlimited by operator decision; a rescue
+  that cannot be delivered (unknown child, settled child, missing executor) is
+  a contained no-op, never the run.
+  / 守卫以前只会一招：整轮取消。现在判停模型可以回答 `rescue` 并附一句引导语；
+  脚本在 log 通道广播，宿主打断那个孩子并把引导语递进去——孩子的上下文保留，
+  醒来带着新指示继续干而不是从头重试。每次重救记一条 `rescue` finding，
+  花了多少有数。按操作员决定不限次数；递不进去的重救（孩子未知/已结算/
+  无执行器）是无害空操作，不影响 run。
+
+### Changed / 变更
+
+- **The guardian checks every 10 seconds instead of every second / 守卫从每秒扫一遍改为每 10 秒扫一遍** —
+  The sweep only compares in-memory timestamps, so the saving is scheduling, not
+  CPU; heartbeats stay event-driven (a phase/log/file/session event refreshes
+  liveness immediately), and a stall is discovered at most 10 s later — noise
+  against a 10-minute budget.
+  / 轮询只比内存时间戳，省的是调度不是 CPU；心跳仍是事件驱动（phase/log/
+  文件/会话事件立刻刷新存活），发现卡死最多晚 10 秒——在 10 分钟预算面前是噪音。
+
+- **The guardian asks the child's own session whether it is still talking / 守卫会问孩子自己的会话还在不在说话** —
+  Before firing, the guardian reads the child's `subagentTiming` projection
+  (`active.through`): a turn that moved within budget means the child is alive,
+  no matter what the files say. Only the timestamp travels, never message
+  content. Stale or unreadable degrades to the older signals, never to a false
+  alive. This also covers planner-built plans, which have no caller plan to map
+  write paths back to.
+  / 开火前守卫读孩子自己会话的 `subagentTiming` 投影（`active.through`）：预算内
+  有动静就是活着，不管文件动没动。只取时间戳不看内容。stale 或读不到退回
+  老信号，不做假保活。这也覆盖了 planner 现场编的计划（宿主无 caller plan 可
+  反查写路径）。
+
 ## [0.13.5] - 2026-11-22
 
 ### Fixed / 修复

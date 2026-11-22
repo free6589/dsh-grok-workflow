@@ -148,8 +148,11 @@ describe('Q8 guardian adjudication: the pure wait/kill rules', () => {
   it('parses a verdict from every shape the child may answer in', () => {
     expect(parseGuardianVerdict({ verdict: 'wait' })).toBe('wait')
     expect(parseGuardianVerdict({ verdict: 'kill', reason: 'wedged' })).toBe('kill')
+    expect(parseGuardianVerdict({ verdict: 'rescue', reason: 'lost', guidance: 'go on' })).toBe('rescue')
     expect(parseGuardianVerdict({ reply: 'WAIT' })).toBe('wait')
+    expect(parseGuardianVerdict({ reply: 'RESCUE' })).toBe('rescue')
     expect(parseGuardianVerdict('kill')).toBe('kill')
+    expect(parseGuardianVerdict('rescue')).toBe('rescue')
     // Unreadable is not a wait: the caller treats undefined as a kill.
     expect(parseGuardianVerdict({ verdict: 'extend' })).toBeUndefined()
     expect(parseGuardianVerdict({})).toBeUndefined()
@@ -181,6 +184,11 @@ describe('Q8 guardian adjudication: the pure wait/kill rules', () => {
     // A kill verdict and an unreadable one are both kills.
     expect(guardianDecision('kill', 0, 600_000)).toBe('kill')
     expect(guardianDecision(undefined, 0, 600_000)).toBe('kill')
+    // A rescue grants the same slice a wait would: the host interrupts and steers.
+    expect(guardianDecision('rescue', 0, 600_000)).toBe('wait')
+    expect(guardianDecision('rescue', 1, 300_000)).toBe('wait')
+    expect(guardianDecision('rescue', 2, 600_000)).toBe('kill')
+    expect(guardianDecision('rescue', 0, 0)).toBe('kill')
   })
 
   it('mirrors the wait rules in the generated script', () => {
@@ -242,6 +250,10 @@ describe('the generated script enforces the child budget', () => {
     // B3: the adjudication prompt carries the task's declared write paths, so
     // the judge knows what files a living child of this task should touch.
     expect(WORKFLOW_SCRIPT).toContain('task-declared write paths')
+    // C3: the adjudicator may answer rescue with a guidance line; the script
+    // broadcasts it on the log channel for the host to execute.
+    expect(WORKFLOW_SCRIPT).toContain('rescue')
+    expect(WORKFLOW_SCRIPT).toContain('guardian rescue seq=')
   })
 
   it('settles a hung call as a timeout and retries the task instead of failing the run', async () => {
@@ -338,8 +350,7 @@ describe('the generated script enforces the child budget', () => {
     expect(() => assertWorkflowReport(run.report, OBJECTIVE, runConfig)).not.toThrow()
   }, 20_000)
 
-  it('stops granting waits at the run deadline without asking the guardian again (rule B)', async () => {
-    let guardianCalls = 0
+  it('stops granting waits at the run deadline without asking the guardian again (rule B)', async () => {    let guardianCalls = 0
     let workerCalls = 0
     const agent: ScriptAgent = async (prompt, options) => {
       if (options.label === 'guardian adjudication') {
@@ -363,6 +374,39 @@ describe('the generated script enforces the child budget', () => {
     expect(guardianCalls).toBe(1)
     expect(workerCalls).toBe(2)
     expect(run.report.status).toBe('completed')
+    expect(() => assertWorkflowReport(run.report, OBJECTIVE, runConfig)).not.toThrow()
+  }, 20_000)
+
+  it('broadcasts a rescue line when the guardian says rescue, and grants the slice', async () => {
+    // C3 flow: the adjudicator judges the stalled child steerable, the script
+    // logs `guardian rescue …` for the host to execute, and the call gets the
+    // same slice a wait would — a child that answers during it still wins.
+    let guardianCalls = 0
+    let workerCalls = 0
+    const agent: ScriptAgent = async (prompt, options) => {
+      if (options.label === 'guardian adjudication') {
+        guardianCalls += 1
+        return { verdict: 'rescue', reason: 'waiting on input', guidance: 'stop waiting, continue with what you have' }
+      }
+      const taskValue = taskFromPrompt(prompt)
+      if (roleOf(options.label) === 'worker') {
+        workerCalls += 1
+        if (workerCalls === 1) {
+          await new Promise(resolve => setTimeout(resolve, 2_500))
+          return execution('did a late')
+        }
+        return execution(`did ${taskValue.id}`)
+      }
+      return verification(taskValue as never)
+    }
+    const deadline = 30_000
+    const { args: runArgs, config: runConfig } = argsFor(deadline, { childTimeoutMs: 1_000, guardianModel: { model: 'guardian-x' } })
+    const run = await runWorkflowScript(WORKFLOW_SCRIPT, runArgs, agent)
+    expect(guardianCalls).toBe(1)
+    const rescueLine = run.events.find(event => event.startsWith('log:guardian rescue'))
+    expect(rescueLine).toContain('guidance=stop waiting, continue with what you have')
+    expect(run.report.status).toBe('completed')
+    expect(run.report.tasks[0]?.attempts).toHaveLength(1)
     expect(() => assertWorkflowReport(run.report, OBJECTIVE, runConfig)).not.toThrow()
   }, 20_000)
 

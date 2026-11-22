@@ -1,3 +1,12 @@
+## 2026-11-22 — C1/C3 守卫问心跳 + 打断重救（`CONFIRMED`，未发版、未提交）
+
+- **From:** 本会话（lead）· **To:** 下一轮接手者
+- **为什么做**：用户拍板四件事——①扫一遍 10s；②方法一为主（问会话心跳）+方法二（没动静读内容判类型，先只做时间戳判不读内容）；③卡住打断再发消息救（interrupt+sendMessage，不是插队）；④守卫可用模型（guardianModel 就是让它花的）、重救无限次。
+- **改了什么**：10s 一扫（事件驱动心跳不动）；C1 `subagentTiming.active.through` 问心跳（只取时间戳，planner 模式也管）；C3 rescue 全链（prompt→广播→interrupt+递话→finding 留账，无限次）；pre-adoption buffer（红测抓到回放顺序坑）。详见 D-099。
+- **测试**：`npm run ci` exit 0（78/1480）；guardian 27 + timeout 21 全绿。脚本 rescue 广播集成已钉（events 里有行+attempt 不加长）。
+- **诚实边界**：真机实救 NOT_RUN（host 执行器只在 fake seam 测通）；模型实测 rescue 判读 NOT_RUN；无 guardianModel 行为零变化。
+- **没做的**：未提交、未发版（等用户确认；commit 后不 push 不 force 等发版指令）。
+
 ## 2026-11-22 — 已发版 `0.13.4`：B1/B2/B3 守卫存活信号（`CONFIRMED`）
 
 - **From:** 本会话（lead）· **To:** 下一轮接手者

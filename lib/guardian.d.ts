@@ -99,7 +99,7 @@ export declare const GUARDIAN_LIMITS: {
     /** Lower bound of one child's budget: below this the timer is noise, not signal. */
     readonly childTimeoutFloorMs: 5000;
     /** How often the single periodic check runs. */
-    readonly checkIntervalMs: 1000;
+    readonly checkIntervalMs: 10000;
     /** Upper bound of one periodic-check wait on unload (the disposer must finish). */
     readonly unloadTimeoutMs: 3000;
 };
@@ -113,8 +113,8 @@ export interface GuardianFinding {
     label: string;
     /** Which liveness signal fired. */
     signal: GuardianSignal;
-    /** What the guardian did (always `cancel-run` — the only host-owned action). */
-    action: 'cancel-run';
+    /** What the guardian did (always `cancel-run` — the only host-owned kill; `rescue` steers instead). */
+    action: 'cancel-run' | 'rescue';
     /** Human-readable reason, bounded and redacted. */
     reason: string;
     /** Epoch milliseconds at which the signal fired. */
@@ -143,6 +143,18 @@ export interface FileHeartbeat {
 }
 /** Read the freshest change among a child's declared write paths, if any. */
 export type FileHeartbeatReader = (writesPaths: readonly string[]) => FileHeartbeat | undefined;
+/** What the child's own session says about its open turn (timestamps only). */
+export interface SessionHeartbeat {
+    /** Epoch milliseconds of the freshest turn activity observed. */
+    atMs: number;
+}
+/**
+ * Read one child's session liveness by its engine child id.
+ * Returns the freshest turn timestamp, or `undefined` when the child session
+ * cannot be read (released, unregistered key, no open turn). Only timestamps
+ * travel — never message content. A reader that throws reads as "no signal".
+ */
+export type SessionHeartbeatReader = (childId: string) => SessionHeartbeat | undefined;
 /** Options for one guardian. Every field is optional except identity. */
 export interface GuardianOptions {
     /**
@@ -180,6 +192,22 @@ export interface GuardianOptions {
      * child carries paths and the old rule holds.
      */
     writesPathsForPhase?: (phase: string) => string[];
+    /**
+     * Session-heartbeat reader (C1): given the engine child id, return the
+     * freshest turn timestamp from the child's own session, or `undefined`
+     * when it cannot be read. Fresh (within budget) means the child is talking
+     * — it stays alive regardless of files or narration. Stale or unreadable
+     * degrades to the older signals, never to a false alive.
+     */
+    sessionHeartbeat?: SessionHeartbeatReader;
+    /**
+     * Rescue executor (C3): interrupt the child and deliver the adjudicator's
+     * guidance. Called once per `guardian rescue` log line the script emits;
+     * unlimited by design (per operator decision) — each call appends one
+     * `rescue` finding, so the spend is auditable in the terminal report.
+     * A callback that throws is contained as a warning, never as a failed run.
+     */
+    rescue?: (childId: string, guidance: string) => void;
 }
 /** Derive one child's stall budget from the run's own deadline. */
 export declare function guardianChildBudgetMs(timeoutMs: number, childTimeoutMs?: number): number;
@@ -217,6 +245,14 @@ export interface RunGuardian {
      * itself. Never throws.
      */
     runHeartbeat(info: unknown, at?: number): void;
+    /**
+     * Observe one `guardian rescue` log line from the script. Parses the seq
+     * and guidance, interrupts that child and delivers the guidance through
+     * the injected executor. Unknown seq, settled child, missing guidance or
+     * executor, and throwing executor are all contained — never the run.
+     * Lines arriving before adoption are buffered and replayed on adopt.
+     */
+    noteRescue(info: unknown, message: unknown): void;
     /** Run one liveness sweep now; returns the findings so far. */
     check(now?: number): GuardianFinding[];
     /** Settle the guardian and release everything; returns the terminal settlement. */
