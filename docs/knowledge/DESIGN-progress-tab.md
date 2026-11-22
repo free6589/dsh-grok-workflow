@@ -446,3 +446,19 @@ section.gw-progress
   `stage-detail` 事件，视图不消费；将来立项时不必改 fold。
 - **run 历史条（E）**、**跨任务依赖箭头（F）**：不画事件流里没有的关系。
 - **zoom**：不复活。要更大的字请调浏览器/DSH 字号，Tab 不再自己造一个倍率。
+
+## 18. Guardian 监控侧栏与清新配色（0.13.8）
+
+进度页新增一条独立的 Guardian 监控侧栏。它只消费会话中实际写入的
+`tool-workflow/guardian-start`、`guardian-finding`、`guardian-end` 事件，不根据
+运行时间猜测“卡住”，也不把 Guardian 的存活判断当成任务质量结论。
+
+- **状态来源**：启动事件写入 timeout guard 是否启用及子任务预算；每次 finding
+  由 Guardian 的同一处受控入口写入；结束事件记录是否取消本轮与处置数量。
+- **展示范围**：侧栏显示监控中/未启用/结束/已取消、检查预算、救援指导或整轮取消
+  记录。旧会话没有这些事件时不显示空的 Guardian 卡片。
+- **职责分离**：Guardian 记录只解释存活监控与处置；任务通过与否仍由原有 report /
+  verifier 证据决定。结算比例仍是已结算 child call / 已声明 child call，不是任务通过率。
+- **配色**：结算卡、任务卡和 Guardian 卡使用 DSH 语义 token 与 `color-mix()` 混合
+  出轻量薄荷绿、浅青蓝表面，不固定浅色背景；暗色和高对比主题仍由宿主 token 决定。
+  720px 以下总览上下堆叠，窄屏继续沿用既有脊线竖排和任务列表布局。
