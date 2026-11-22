@@ -5,6 +5,20 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.8] - 2026-11-22
+
+### Added / 新增
+
+- **A live Guardian lane in the Progress tab / 进度页新增 Guardian 监控侧栏** —
+  The tab now records and displays the Guardian's real lifecycle, liveness budget,
+  and rescue/cancellation findings. The side lane is separate from task verification:
+  a liveness intervention is not a task-quality verdict. The overview and task cards
+  use soft mint/sky tints mixed from DSH semantic theme tokens, preserving dark-mode
+  and contrast behaviour.
+  / 进度页现在会记录并展示 Guardian 的真实生命周期、子任务存活判断预算，以及救援/
+  取消处置。监控侧栏与任务核验分开，存活处置不等于任务质量结论。总览和任务卡使用
+  DSH 语义主题变量混合出浅薄荷绿与浅青蓝，不固定浅色背景，保留暗色和高对比主题适配。
+
 ## [0.13.7] - 2026-11-22
 
 ### Fixed / 修复

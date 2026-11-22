@@ -24,18 +24,21 @@
  * - `cancelled` is the engine's own outcome word, kept verbatim rather than re-derived.
  */
 
-/** The four event types the tab folds; every other type is ignored. */
+/** The seven progress and Guardian lifecycle events the tab folds; other events are ignored. */
 export const PROGRESS_EVENT_TYPES = [
   'tool-workflow/run-start',
   'tool-workflow/agent-start',
   'tool-workflow/agent-end',
+  'tool-workflow/guardian-start',
+  'tool-workflow/guardian-finding',
+  'tool-workflow/guardian-end',
   'tool-workflow/run-end',
 ] as const
 
 /**
  * The optional detail payload, kept apart from {@link PROGRESS_EVENT_TYPES} on purpose.
  *
- * The state of the track comes from the four events above and from nothing else. This
+ * Track state comes from progress lifecycle events; Guardian findings only populate its side lane. This
  * one only ever *adds* field values to a node, so a stream without it renders exactly
  * what it rendered before. `createWorkflowProgressRecorder` does not write it today; the
  * tab reads it so that a recorder (or another bundle) that does write it is used instead
@@ -129,6 +132,26 @@ export interface ProgressMemberFact {
   outcome?: string
 }
 
+/** A liveness intervention recorded by the Guardian (not a task-quality verdict). */
+export interface ProgressGuardianFindingFact {
+  seq: number
+  label: string
+  signal: 'timeout' | 'heartbeat-loss'
+  action: 'cancel-run' | 'rescue'
+  reason: string
+  atMs?: number
+}
+
+/** The monitor's recorded lifecycle for one workflow run. */
+export interface ProgressGuardianFacts {
+  started: boolean
+  armed: boolean
+  budgetMs: number
+  ended: boolean
+  cancelled: boolean
+  findings: ProgressGuardianFindingFact[]
+}
+
 /** One run as the stream describes it. */
 export interface ProgressRunFacts {
   runId: string
@@ -143,6 +166,8 @@ export interface ProgressRunFacts {
   /** Engine stop reason from `run-end`; absent while the run is open. */
   stopReason?: string
   members: ProgressMemberFact[]
+  /** Guardian liveness state, present only when this build recorded it. */
+  guardian?: ProgressGuardianFacts
   /** Level-1 detail payloads the stream carried for this run, in arrival order. */
   details: ProgressStageDetailFact[]
 }
@@ -394,6 +419,7 @@ export function foldProgressRuns(records: readonly ProgressEventRecord[]): Progr
     order: number[]
     settlements: Map<number, string>
     details: ProgressStageDetailFact[]
+    guardian?: ProgressGuardianFacts
   }
   const drafts = new Map<string, Draft>()
   let index = 0
@@ -444,6 +470,43 @@ export function foldProgressRuns(records: readonly ProgressEventRecord[]): Progr
       })
       continue
     }
+    if (record.type === 'tool-workflow/guardian-start') {
+      const previous = draft.guardian
+      const budget = Number(data['budgetMs'])
+      draft.guardian = {
+        started: true,
+        armed: data['armed'] === true,
+        budgetMs: Number.isFinite(budget) && budget > 0 ? Math.trunc(budget) : 0,
+        ended: previous?.ended ?? false,
+        cancelled: previous?.cancelled ?? false,
+        findings: previous?.findings ?? [],
+      }
+      continue
+    }
+    if (record.type === 'tool-workflow/guardian-finding') {
+      const memberSeq = Number(data['seq'])
+      if (!Number.isFinite(memberSeq)) continue
+      const guardian: ProgressGuardianFacts = draft.guardian ?? {
+        started: false, armed: false, budgetMs: 0, ended: false, cancelled: false, findings: [],
+      }
+      guardian.findings.push({
+        seq: memberSeq,
+        label: typeof data['label'] === 'string' ? data['label'] : '',
+        signal: data['signal'] === 'heartbeat-loss' ? 'heartbeat-loss' : 'timeout',
+        action: data['action'] === 'rescue' ? 'rescue' : 'cancel-run',
+        reason: typeof data['reason'] === 'string' ? data['reason'] : '',
+        ...typeof data['atMs'] === 'number' && Number.isFinite(data['atMs']) ? { atMs: data['atMs'] } : {},
+      })
+      draft.guardian = guardian
+      continue
+    }
+    if (record.type === 'tool-workflow/guardian-end') {
+      const previous: ProgressGuardianFacts = draft.guardian ?? {
+        started: false, armed: false, budgetMs: 0, ended: false, cancelled: false, findings: [],
+      }
+      draft.guardian = { ...previous, ended: true, cancelled: data['cancelled'] === true }
+      continue
+    }
     if (record.type === 'tool-workflow/agent-start') {
       const memberSeq = Number(data['seq'])
       if (!Number.isFinite(memberSeq)) continue
@@ -489,6 +552,7 @@ export function foldProgressRuns(records: readonly ProgressEventRecord[]): Progr
       anchorSeq: draft.anchorSeq,
       members,
       details: draft.details,
+      ...draft.guardian === undefined ? {} : { guardian: draft.guardian },
       ...draft.startedAt === undefined ? {} : { startedAt: draft.startedAt },
       ...draft.endedAt === undefined ? {} : { endedAt: draft.endedAt },
       ...draft.stopReason === undefined ? {} : { stopReason: draft.stopReason },

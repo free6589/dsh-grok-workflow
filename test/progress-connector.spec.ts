@@ -34,6 +34,14 @@ type ProgressRun = {
   anchorSeq: number
   members: ProgressMember[]
   stopReason?: string
+  guardian?: {
+    started: boolean
+    armed: boolean
+    budgetMs: number
+    ended: boolean
+    cancelled: boolean
+    findings: Array<{ seq: number, label: string, signal: 'timeout' | 'heartbeat-loss', action: 'cancel-run' | 'rescue', reason: string, atMs?: number }>
+  }
 }
 
 interface ProgressWirePath {
@@ -486,5 +494,38 @@ describe('client progress tab: fixed left gutter + elbow wires', () => {
   it('degrades to a plain list without layout instead of inventing coordinates', () => {
     expect(progress.measureWires(null)).toEqual({ width: 0, height: 0, depth: 0, paths: [] })
     expect(progress.measureWires({})).toEqual({ width: 0, height: 0, depth: 0, paths: [] })
+  })
+})
+
+describe('client progress tab: Guardian monitor side lane', () => {
+  it('shows recorded liveness state and rescue evidence without inventing a task verdict', () => {
+    const guardianRun: ProgressRun = {
+      ...run,
+      guardian: {
+        started: true,
+        armed: true,
+        budgetMs: 300_000,
+        ended: false,
+        cancelled: false,
+        findings: [{
+          seq: 3,
+          label: '执行 3',
+          signal: 'timeout',
+          action: 'rescue',
+          reason: 'workflow guardian rescued child with guidance',
+          atMs: 2_000,
+        }],
+      },
+    }
+    const tree = walk(renderRun(guardianRun))
+    const panel = tree.find((element) => element.props['data-gw-progress-guardian'] === true)
+    expect(panel).toBeDefined()
+    expect(panel!.props['data-state']).toBe('active')
+    const copy = texts(tree).join('\n')
+    expect(copy).toContain('Guardian 监控')
+    expect(copy).toContain('监控中')
+    expect(copy).toContain('已发送救援指引')
+    expect(progress.css).toContain('.gw-progress-overview')
+    expect(progress.css).toContain('color-mix(in srgb, var(--dsw-alias-state-success-primary)')
   })
 })

@@ -237,6 +237,8 @@ export interface GuardianOptions {
    * A callback that throws is contained as a warning, never as a failed run.
    */
   rescue?: (childId: string, guidance: string) => void
+  /** Called after a bounded finding is stored; failures are contained and never affect the run. */
+  onFinding?: (finding: GuardianFinding) => void
 }
 
 /** Derive one child's stall budget from the run's own deadline. */
@@ -381,6 +383,11 @@ export function createRunGuardian(options: GuardianOptions): RunGuardian {
   const appendFinding = (finding: GuardianFinding): void => {
     if (findings.length >= GUARDIAN_LIMITS.maxFindings) return
     findings.push(finding)
+    try {
+      options.onFinding?.(finding)
+    } catch (error) {
+      logger.warn(`workflow guardian finding observer failed: ${findingText(error instanceof Error ? error.message : String(error), GUARDIAN_LIMITS.reasonChars)}`)
+    }
   }
 
   const cancelOnce = (reason: string): void => {

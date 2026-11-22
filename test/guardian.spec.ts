@@ -118,6 +118,7 @@ describe('stuck-child handling', () => {
   it('discovers a hung child and cancels the run once, with a bounded finding', () => {
     const clock = manualClock()
     const warnings: string[] = []
+    const recorded: Array<{ seq: number, action: string }> = []
     const guardian = createRunGuardian({
       runId: 'run-1',
       childBudgetMs: 10_000,
@@ -125,6 +126,7 @@ describe('stuck-child handling', () => {
       schedule: () => ({}) as unknown,
       cancelSchedule: () => {},
       logger: { warn: (message: string) => { warnings.push(message) } },
+      onFinding: finding => { recorded.push(finding) },
     })
     const cancel = vi.fn()
     guardian.adopt({ id: 'run-1', cancel })
@@ -137,6 +139,15 @@ describe('stuck-child handling', () => {
     expect(findings[0]?.seq).toBe(1)
     expect(findings[0]?.label).toBe('stuck worker')
     expect(findings[0]?.action).toBe('cancel-run')
+    expect(recorded).toHaveLength(1)
+    expect(recorded[0]).toMatchObject({
+      seq: 1,
+      label: 'stuck worker',
+      signal: 'heartbeat-loss',
+      action: 'cancel-run',
+      reason: expect.stringContaining('within 10000 ms'),
+      atMs: expect.any(Number),
+    })
     expect(findings[0]?.reason).toContain('within 10000 ms')
     expect(cancel).toHaveBeenCalledTimes(1)
     // A second sweep appends no second finding and cancels no second time:

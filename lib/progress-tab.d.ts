@@ -23,12 +23,12 @@
  *   the stream cannot tell a cancellation from a crash, so the tab does not guess one.
  * - `cancelled` is the engine's own outcome word, kept verbatim rather than re-derived.
  */
-/** The four event types the tab folds; every other type is ignored. */
-export declare const PROGRESS_EVENT_TYPES: readonly ["tool-workflow/run-start", "tool-workflow/agent-start", "tool-workflow/agent-end", "tool-workflow/run-end"];
+/** The seven progress and Guardian lifecycle events the tab folds; other events are ignored. */
+export declare const PROGRESS_EVENT_TYPES: readonly ["tool-workflow/run-start", "tool-workflow/agent-start", "tool-workflow/agent-end", "tool-workflow/guardian-start", "tool-workflow/guardian-finding", "tool-workflow/guardian-end", "tool-workflow/run-end"];
 /**
  * The optional detail payload, kept apart from {@link PROGRESS_EVENT_TYPES} on purpose.
  *
- * The state of the track comes from the four events above and from nothing else. This
+ * Track state comes from progress lifecycle events; Guardian findings only populate its side lane. This
  * one only ever *adds* field values to a node, so a stream without it renders exactly
  * what it rendered before. `createWorkflowProgressRecorder` does not write it today; the
  * tab reads it so that a recorder (or another bundle) that does write it is used instead
@@ -75,6 +75,24 @@ export interface ProgressMemberFact {
     /** Engine outcome (`completed` / `failed` / `cancelled` / …); absent while running. */
     outcome?: string;
 }
+/** A liveness intervention recorded by the Guardian (not a task-quality verdict). */
+export interface ProgressGuardianFindingFact {
+    seq: number;
+    label: string;
+    signal: 'timeout' | 'heartbeat-loss';
+    action: 'cancel-run' | 'rescue';
+    reason: string;
+    atMs?: number;
+}
+/** The monitor's recorded lifecycle for one workflow run. */
+export interface ProgressGuardianFacts {
+    started: boolean;
+    armed: boolean;
+    budgetMs: number;
+    ended: boolean;
+    cancelled: boolean;
+    findings: ProgressGuardianFindingFact[];
+}
 /** One run as the stream describes it. */
 export interface ProgressRunFacts {
     runId: string;
@@ -89,6 +107,8 @@ export interface ProgressRunFacts {
     /** Engine stop reason from `run-end`; absent while the run is open. */
     stopReason?: string;
     members: ProgressMemberFact[];
+    /** Guardian liveness state, present only when this build recorded it. */
+    guardian?: ProgressGuardianFacts;
     /** Level-1 detail payloads the stream carried for this run, in arrival order. */
     details: ProgressStageDetailFact[];
 }
