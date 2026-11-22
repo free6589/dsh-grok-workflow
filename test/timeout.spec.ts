@@ -22,6 +22,26 @@ import { execution, task, verification } from './fixtures.js'
 import { roleOf, runWorkflowScript, taskFromPrompt, type ScriptAgent } from './helpers.js'
 
 /**
+ * A child that never answers on its own — but releases the process on exit.
+ *
+ * Node 22's `vm` silently drops the process when several sequential runs each
+ * leave a cross-realm never-settling promise behind the script's `Atomics`
+ * race (measured: five ordered `runWorkflowScript` runs with a bare
+ * `new Promise(() => {})` worker exit 0 with no output after the first
+ * `await`; Node 24+ and single runs are unaffected). A 30 s backstop is past
+ * every timeout in this file (the longest slice is ~3 s), so no passing
+ * assertion can observe it — it only lets the runner tear down cleanly.
+ */
+function hungChild(): Promise<never> {
+  return new Promise<never>((_, reject) => {
+    const timer = setTimeout(() => reject(new Error('hung-child backstop: the test ended without settling me')), 30_000)
+    if (typeof timer === 'object' && timer !== null && typeof (timer as { unref?: unknown }).unref === 'function') {
+      (timer as unknown as { unref(): void }).unref()
+    }
+  })
+}
+
+/**
  * Q6 cooperative timeout: three tiers, one funnel, no host-side child kill.
  *
  * The pure tiering is tested directly; the script's own race is tested by driving the
@@ -208,7 +228,7 @@ describe('the generated script enforces the child budget', () => {
         workerCalls += 1
         if (workerCalls === 1) {
           // A child that never answers: the script must stop waiting on its own.
-          return await new Promise(() => {})
+          return await hungChild()
         }
         return execution(`did ${taskValue.id}`)
       }
@@ -276,7 +296,7 @@ describe('the generated script enforces the child budget', () => {
       const taskValue = taskFromPrompt(prompt)
       if (roleOf(options.label) === 'worker') {
         workerCalls += 1
-        if (workerCalls === 1) return await new Promise(() => {})
+        if (workerCalls === 1) return await hungChild()
         return execution(`did ${taskValue.id}`)
       }
       return verification(taskValue as never)
@@ -304,7 +324,7 @@ describe('the generated script enforces the child budget', () => {
       const taskValue = taskFromPrompt(prompt)
       if (roleOf(options.label) === 'worker') {
         workerCalls += 1
-        if (workerCalls === 1) return await new Promise(() => {})
+        if (workerCalls === 1) return await hungChild()
         return execution(`did ${taskValue.id}`)
       }
       return verification(taskValue as never)
@@ -329,7 +349,7 @@ describe('the generated script enforces the child budget', () => {
       const taskValue = taskFromPrompt(prompt)
       if (roleOf(options.label) === 'worker') {
         workerCalls += 1
-        if (workerCalls === 1) return await new Promise(() => {})
+        if (workerCalls === 1) return await hungChild()
         return execution(`did ${taskValue.id}`)
       }
       return verification(taskValue as never)
