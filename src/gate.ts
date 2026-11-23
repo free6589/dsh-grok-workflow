@@ -74,8 +74,8 @@ import { redactError, redactSecrets } from './redact.js'
 import type { ActiveState, RunOutcome, WorkflowLogger } from './run.js'
 import { STEERING_LIMITS, closeSteering, openSteering, steeringForSession } from './steering.js'
 import {
-  amendRequest, captainAnswer, captainApproveNote, captainAskText, captainPreviewFallback,
-  captainPreviewPrompt, captainVoidNote, CAPTAIN_LIMITS,
+  amendRequest, approvedRequest, captainAnswer, captainApproveNote, captainAskText,
+  captainPreviewFallback, captainPreviewPrompt, captainVoidNote, CAPTAIN_LIMITS,
 } from './captain.js'
 import { captainBrief, readCaptainMemory } from './captain-memory.js'
 import { runSingleCall, runWorkflow } from './run.js'
@@ -810,11 +810,14 @@ export function installGate(deps: GateDeps): boolean {
   const pendingAsks = new Map<string, PendingAsk>()
   /**
    * The captain's split confirmation (round-071): the request the split was about,
-   * the language to answer in, and when it was asked. Same shape and lifetime as
-   * the front-desk question above — one answer per question, ten minutes — because
-   * the user experienced both as one kind of question ("确认").
+   * the split itself (`preview`, exactly the text the user read), the language to
+   * answer in, and when it was asked. The preview is kept because the approval is
+   * about *that* split: without it the run could re-split freely and the user would
+   * pay for a plan they never agreed to. Same shape and lifetime as the front-desk
+   * question above — one answer per question, ten minutes — because the user
+   * experienced both as one kind of question ("确认").
    */
-  const pendingCaptains = new Map<string, { request: string, lang: TriageLang, askedAt: number }>()
+  const pendingCaptains = new Map<string, { request: string, lang: TriageLang, askedAt: number, preview: string }>()
   const PENDING_TTL_MS = 10 * 60_000
 
   /** A consumed pending question, and whether its TTL had already run out. */
@@ -841,7 +844,7 @@ export function installGate(deps: GateDeps): boolean {
    * that. The dispatch itself is the caller's: this only says what the message
    * means.
    */
-  const takeCaptainPending = (agentId: string): { kind: 'live' | 'expired', ask: { request: string, lang: TriageLang, askedAt: number } } | undefined => {
+  const takeCaptainPending = (agentId: string): { kind: 'live' | 'expired', ask: { request: string, lang: TriageLang, askedAt: number, preview: string } } | undefined => {
     const ask = pendingCaptains.get(agentId)
     if (ask === undefined) return undefined
     pendingCaptains.delete(agentId)
@@ -945,7 +948,7 @@ export function installGate(deps: GateDeps): boolean {
           if (meaning === 'approve' || meaning === 'amend') {
             const forRun = meaning === 'amend'
               ? amendRequest(captainPending.ask.request, request)
-              : captainPending.ask.request
+              : approvedRequest(captainPending.ask.request, captainPending.ask.preview)
             const dispatched = await runTeam(agent, forRun, signal, history, captainPending.ask.lang)
             // The approval a user just gave is part of the answer: a report that
             // silently appeared would leave them wondering whether it used the
@@ -1106,7 +1109,7 @@ export function installGate(deps: GateDeps): boolean {
           ...signal === undefined ? {} : { signals: [signal] },
         })
         const previewText = preview.ok ? sanitizeFirstAnswer(preview.text) : ''
-        pendingCaptains.set(agentId, { request: target, lang: tier.lang, askedAt: Date.now() })
+        pendingCaptains.set(agentId, { request: target, lang: tier.lang, askedAt: Date.now(), preview: previewText })
         return {
           kind: 'direct',
           text: [
@@ -1685,7 +1688,7 @@ export function installGate(deps: GateDeps): boolean {
           pendingCaptains.delete(admit.agentId)
           const forRun = meaning === 'amend'
             ? amendRequest(captainPending.request, admit.request)
-            : captainPending.request
+            : approvedRequest(captainPending.request, captainPending.preview)
           const entry = entryOf(admit, payload)
           record(agent, entry, 'started', 'admitted-team-background')
           const accepted = enqueue(admit.agentId, async () => {
@@ -1744,7 +1747,7 @@ export function installGate(deps: GateDeps): boolean {
           ...opts.signal === undefined ? {} : { signals: [opts.signal] },
         })
         const previewText = preview.ok ? sanitizeFirstAnswer(preview.text) : ''
-        pendingCaptains.set(admit.agentId, { request: target, lang: tier.lang, askedAt: Date.now() })
+        pendingCaptains.set(admit.agentId, { request: target, lang: tier.lang, askedAt: Date.now(), preview: previewText })
         const question: Answer = {
           kind: 'direct',
           text: [

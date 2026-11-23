@@ -79,4 +79,20 @@ export declare function captainVoidNote(lang: TriageLang, expired: boolean): str
  * @returns one request, bounded to the amendment budget.
  */
 export declare function amendRequest(original: string, amendment: string): string;
+/**
+ * Fold the split the user approved into the request the run receives.
+ *
+ * The preview is the only thing the user actually agreed to. Dispatching the bare
+ * original request let the planner re-split freely afterwards, so the confirmation
+ * was a promise the run did not have to keep: the user approved one split and paid
+ * for another. The original request stays whole and the approved split follows it as
+ * a bound — it names the tasks, it does not rewrite the request — so a message that
+ * *changes* the split still goes through {@link amendRequest} instead.
+ * @param original - the request the confirmation was asked about.
+ * @param preview - the split the user approved, verbatim (`''` when the preview call
+ *   could not answer and the user confirmed the default split).
+ * @returns one request, bounded to the amendment budget; the original untouched when
+ *   there is no split to keep.
+ */
+export declare function approvedRequest(original: string, preview: string): string;
 //# sourceMappingURL=captain.d.ts.map
