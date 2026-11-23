@@ -1,3 +1,29 @@
+## round-075 `fix/verifier-supervisor-resubmit` — 判定角色同次尝试补交（未合流，`CONFIRMED`） — 2026-11-24
+
+| state | command | result |
+| --- | --- | --- |
+| 基线与工作树 | `git worktree add -b fix/verifier-supervisor-resubmit .agents/worktrees/fix-verifier-supervisor-resubmit main` | 从 `main` `7f626f5`（0.13.24）开出；共享工作树当时是 detached `a6103ad` 且带 40+ 处未提交改动（他人 lane），未动 |
+| 红（新用例对旧脚本） | `git show HEAD:src/script.ts > src/script.ts && npx vitest run test/verifier-resubmit.spec.ts` | **7 failed / 1 passed**；证据 `.rsi/evidence/round-075/red-verifier-resubmit.txt`（旧脚本：verifier/supervisor 无补交、`structured_output` 归 `unknown`、空结构原因不辨角色、调用上限未含补交） |
+| 绿（新用例） | `npx vitest run test/verifier-resubmit.spec.ts` | **8 passed** |
+| 受影响的既有口径 | `npx vitest run test/routing.spec.ts test/engine-contract.spec.ts` | 两个 spec 钉了旧上限算术（`7` / `1 + 1*2*2 + 2`）；改为按 `maxTotalAgentsFor` 推导（`taskCap()`）与注释后的新算术（11 / 15），语义未变 |
+| 全量 | `npx vitest run` | **93 files / 1737 tests PASS** |
+| 静态门禁 | `npm run typecheck`；`npm run lint`；`npm run build` | typecheck exit 0；lint **0 errors / 37 warnings**（既有 warning，未新增；新 spec 0 warning）；`lib/` 与 client bundle 303813 B 重建 |
+
+**根因（`CONFIRMED`，session-6cd6053d）**：检查/复核子代理的 structured_output 里混入未转义的英文双引号，
+宿主解析失败返回 `null`；`callRole` 把 `null` 记成 `format-error` 后立刻换路，链路只有一条时整次尝试即失败。
+worker 有同次尝试内重交（`resubmitPrompt`），verifier/supervisor 没有，于是"判定其实是 pass"变成一次整任务重做
+（实测 19.5 分钟）。另外 `classifyFailureText` 只认带空格的 `structured output`，宿主的 `structured_output`
+与 `Expected ','` 解析原话落到 `unknown`，报告读起来像来源故障。
+
+**修法**：① `verifierResubmitPrompt` / `supervisorResubmitPrompt` + 两个同次尝试补交分支（与 worker 同规则：
+一次、不花 retry、失败即保留原失败）；② `verifierPrompt` / `supervisorPrompt` 加引号与 800 字规范，
+`VERIFICATION_SCHEMA` 的 `evidence`/`finding` 加软上限描述；③ `callRole` 的 `null` 分支 reason 带角色与
+"structured output missing or unparsable"，`classifyFailureText` 补 `structured_output` 与 JSON 解析模式；
+④ `maxTotalAgentsFor` 的每次尝试块按 ×2 计（首次调用 + 补交），否则救援路会撞 `AGENT_CAP`。
+
+**Honest boundary**：真机隔离 soak `NOT_RUN`（本轮不发布，未装进 fork profile）；补交只在子代理"有值但解析失败
+或没交值"时触发，传输/来源故障与 setup 故障仍走原路（有用例钉住）。
+
 ## 已发版 0.13.24 队长拆法绑定 + 首轮可见 + 确认单次消费 — 2026-11-24 (`CONFIRMED`)
 
 | state | command | result |

@@ -1,0 +1,25 @@
+    188|       expect(run.report.tasks[0]?.attempts[0]?.failure?.class, message…
+       |                                                                         ^
+    189|       expect(run.report.tasks[0]?.attempts[0]?.failure?.category).toBe…
+    190|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/7]⎯
+
+ FAIL  test/verifier-resubmit.spec.ts > child cap covers the resubmits > sizes every attempt for one resubmit per role
+AssertionError: expected 33 to be greater than or equal to 60
+ ❯ test/verifier-resubmit.spec.ts:202:55
+    200|     // chain again on the resubmit, so the per-attempt block counts tw…
+    201|     const perAttempt = 2 * (budget.worker + budget.verifier + budget.s…
+    202|     expect(maxTotalAgentsFor(tasks, retries, budget)).toBeGreaterThanO…
+       |                                                       ^
+    203|   })
+    204| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/7]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  7 failed | 1 passed (8)
+   Start at  01:30:15
+   Duration  1.06s (transform 717ms, setup 0ms, import 779ms, tests 156ms, environment 0ms)
+

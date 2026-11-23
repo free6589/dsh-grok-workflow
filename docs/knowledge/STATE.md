@@ -1,3 +1,13 @@
+Last updated: 2026-11-24 01:35 +08:00（**判定角色的引号错误不再让整件事重做，`CONFIRMED` 未合流** —
+分支 `fix/verifier-supervisor-resubmit`（worktree `.agents/worktrees/fix-verifier-supervisor-resubmit`，从 `main`
+`7f626f5` 开出）：session-6cd6053d 的检查/复核子代理 structured_output 里有未转义英文双引号 → 宿主返回 `null`
+→ 判定其实是 pass 却整任务重做（19.5 分钟）。worker 早有同次尝试补交，verifier/supervisor 没有，现在补上
+（同样一次、不花 retry）；提示词与结果结构加引号/800 字规范；空结构原因点名角色、`structured_output` 与
+`Expected ','` 归 format-error；`maxTotalAgentsFor` 的每尝试块 ×2 以容纳补交。门禁：`npx vitest run`
+**93 files / 1737 tests PASS**（新增 `test/verifier-resubmit.spec.ts` 8 例，红→绿证据
+`.rsi/evidence/round-075/red-verifier-resubmit.txt`），typecheck exit 0，lint 0 errors，`lib/` 同提交重建。
+真机 soak `NOT_RUN`（本轮不发布）。详见 VALIDATION 首条。）
+
 Last updated: 2026-11-24 01:30 +08:00（**已发版 `0.13.24`：三路合流（队长拆法绑定 + 首轮消息立刻可见 + 确认单次消费），隔离真机 soak PASS，`CONFIRMED`** —
 三路各自从 `main` `63cc1db`（0.13.23）开出，`--no-ff` 依次合入 `release/0.13.24`：`fix/captain-approve` `00fc203` →
 `fix/gate-route-msgvis` `f831fca` → `docs/user-soak-fork-profile` `57eadb9`。冲突 5 处（`src/gate.ts` ×4 + `test/captain-confirm.spec.ts` 导入）

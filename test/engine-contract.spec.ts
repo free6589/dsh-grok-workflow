@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { MaterializeError, materializeFromRealm } from '@deepseek-ai/dsh-workflow-ptc'
 import { resolveConfig } from '../src/config.js'
 import { assertWorkflowReport } from '../src/report.js'
-import { WORKFLOW_SCRIPT } from '../src/script.js'
+import { maxTotalAgentsFor, routeBudgetFor, WORKFLOW_SCRIPT } from '../src/script.js'
 import type { NormalizedTask } from '../src/types.js'
 import { createEngineHarness, type EngineHarness } from './engine-harness.js'
 
@@ -218,6 +218,13 @@ describe('generated workflow script on the real engine', () => {
     confidence: 'high',
   })
 
+  // The cap one task costs with two attempts and every role inheriting its
+  // route, derived from the plugin's own builder (it also covers the
+  // same-attempt resubmits), so a formula change never leaves a stale literal.
+  function taskCap(): number {
+    return maxTotalAgentsFor(1, 1, routeBudgetFor(resolveConfig({ maxConcurrency: 2, maxTasks: 6 })))
+  }
+
   function runArgs(tasks: NormalizedTask[], overrides: Record<string, unknown> = {}) {
     return {
       objective: 'Ship the verified result',
@@ -248,7 +255,7 @@ describe('generated workflow script on the real engine', () => {
       }
       return { structured: verificationResult(taskFromPrompt(call.prompt)) }
     })
-    const args = { ...runArgs([callerTask]), maxTotalAgents: 7 }
+    const args = { ...runArgs([callerTask]), maxTotalAgents: taskCap() }
     const result = await engine.run(WORKFLOW_SCRIPT, { args })
     expect(result.stopReason).toBe('completed')
     const validated = assertWorkflowReport(result.value, 'Ship the verified result', resolveConfig({ maxConcurrency: 2, maxTasks: 6 }))
@@ -265,7 +272,7 @@ describe('generated workflow script on the real engine', () => {
       }
       return { structured: verificationResult(taskFromPrompt(call.prompt), false) }
     })
-    const args = { ...runArgs([callerTask]), maxTotalAgents: 7 }
+    const args = { ...runArgs([callerTask]), maxTotalAgents: taskCap() }
     const result = await engine.run(WORKFLOW_SCRIPT, { args })
     expect(result.stopReason).toBe('completed')
     const validated = assertWorkflowReport(result.value, 'Ship the verified result', resolveConfig({ maxConcurrency: 2, maxTasks: 6 }))
