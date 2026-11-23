@@ -1,3 +1,16 @@
+## 2026-11-23 — round-47 已合流 main 未发版：恢复证据深拷（`CONFIRMED`，soak BLOCKED）
+
+- **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
+- **做了什么**：报告面第 5 条。恢复计划只拷证据数组没拷条目，改恢复后引用串改已校验检查点。
+  改为逐项深拷（输出/文件不动）；+1 别名回归；`npm run ci` exit 0（85/1639，首跑 1 flake 重跑绿）；
+  lead 独立红绿复验成立。
+- **真机**：两试 BLOCKED（headless 新 profile / fork live web profile，插件链路通；
+  bifrost 网关连续 502 无额度，未跑出 COMPLETED，未伪造）。本次不发版。
+- **合流**：`rsi/round-47`（`87ef9fa`）已 `--no-ff` 合入 main 系 worktree（合流 `7115a41`）；
+  `rsi/round-47` 分支可 24h 内删除。`CHANGELOG [Unreleased]` 中英文已记 1 条待发。
+- **未做（下轮池）**：并发面 hung 波/guardian 双心跳/路径归一/超时常量；配置面 Cookie JSON/
+  guardianModel 空白与未知键/gate 无钩子。网关恢复后给 round-47 补 soak 再发版。
+
 ## 2026-11-23 — 已发版 `0.13.20`：账本不可用标记（`CONFIRMED`）
 
 - **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者

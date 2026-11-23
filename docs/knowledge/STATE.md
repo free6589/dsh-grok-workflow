@@ -1,3 +1,8 @@
+Last updated: 2026-11-23 14:55 +08:00（**round-47 已合流 main 未发版：恢复证据深拷，`CONFIRMED`，soak BLOCKED** —
+合流提交 `7115a41`（main `43cdc1f` + `87ef9fa`）；`npm run ci` exit 0（85 文件 / 1639 测试 PASS，+1 别名回归；
+首跑 1 flake 偶发挂后重跑全绿）。真机两试 BLOCKED（bifrost 网关 502 无额度，插件链路通，未伪造）；
+`CHANGELOG [Unreleased]` 中英文已记，不发版，待网关恢复补 soak。）
+
 Last updated: 2026-11-23 14:35 +08:00（**已发版 `0.13.20`：账本不可用标记，`CONFIRMED`** —
 发版提交 `f228484` + tag `v0.13.20` 已推；远端 CI `45125209602` success、Release `45125227599`
 success 并已发布（asset `dsh-grok-workflow-0.13.20.tgz`）。本地门禁：`npm run ci` exit 0（85 文件 / 1638 测试

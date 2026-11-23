@@ -1,3 +1,15 @@
+## round-47 恢复证据深拷（soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
+
+| state | command | result |
+| --- | --- | --- |
+| worktree rsi-round-47 `87ef9fa`（main `43cdc1f` + 本轮 1 提交） | `npx vitest run test/resume-validator.spec.ts -t "deep-copies evidence"`（旧码 stash） | **1 failed / 19 skipped**：新用例红（别名污染复现） |
+| 同上（新码） | `npx vitest run test/resume-validator.spec.ts` | **20 passed** |
+| 同上（新码） | `npm run ci`（lead 独立重跑） | **exit 0：85 files / 1639 tests PASS**（首跑 1 flake 挂后重跑全绿，与本改动无关文件的偶发时序用例） |
+| 隔离 soak 两试 | headless 新 profile / fork live web profile + 真模型 | **BLOCKED**：插件安装与组合链路通；bifrost 网关连续 502 空回包，无可用额度，未跑出 COMPLETED，未伪造 |
+
+**Changed:** `src/resume/policy.ts`（evidence 逐项深拷，outputs/files 不动）+ `test/resume-validator.spec.ts`（+1 别名回归）+ `lib/` 重建 + `CHANGELOG [Unreleased]` 中英双语 + `.rsi/evidence/round-047/`（red/green/ci/soak，两试 BLOCKED 如实记）。
+**Honest boundary:** 真机 BLOCKED（网关 502），不发版；攒 `[Unreleased]` 待网关恢复后补 soak 再发。
+
 ## 已发版 0.13.20 账本不可用标记 — 2026-11-23 (`CONFIRMED`)
 
 | state | command | result |
