@@ -164,17 +164,17 @@ describe('dispatcher prohibitions (three hard refusals)', () => {
 })
 
 describe('dispatcher session lifecycle', () => {
-  it('start/stop deactivates the session and refuses new intents', () => {
+  it('start/stop deactivates the session and refuses new intents', async () => {
     const session = createDispatcherSession()
     expect(session.isActive).toBe(true)
-    expect(handleDispatcherIntent(session, {
+    expect((await handleDispatcherIntent(session, {
       op: 'create',
       id: 'task-1',
       title: 'First',
-    }).ok).toBe(true)
-    stopDispatcherSession(session)
+    })).ok).toBe(true)
+    await stopDispatcherSession(session)
     expect(session.isActive).toBe(false)
-    const refused = handleDispatcherIntent(session, {
+    const refused = await handleDispatcherIntent(session, {
       op: 'create',
       id: 'task-2',
       title: 'Second',
@@ -184,33 +184,33 @@ describe('dispatcher session lifecycle', () => {
     expect(refused.code).toBe('invalid:session-inactive')
   })
 
-  it('resume restores the persisted board from disk', () => {
+  it('resume restores the persisted board from disk', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'dispatcher-resume-'))
     try {
       const first = new DispatcherSession(dir)
       first.start()
-      expect(handleDispatcherIntent(first, {
+      expect((await handleDispatcherIntent(first, {
         op: 'create',
         id: 'task-1',
         title: 'Persisted',
         owner: 'agent-8',
-      }).ok).toBe(true)
-      expect(handleDispatcherRawIntent(first, {
+      })).ok).toBe(true)
+      expect((await handleDispatcherRawIntent(first, {
         op: 'mark-blocked',
         id: 'task-1',
         reason: 'waiting on store',
-      }).ok).toBe(true)
-      stopDispatcherSession(first)
+      })).ok).toBe(true)
+      await stopDispatcherSession(first)
 
       const second = new DispatcherSession(dir)
-      const resumed = resumeDispatcherBoard(second)
+      const resumed = await resumeDispatcherBoard(second)
       expect(resumed.restored).toBe(true)
       expect(resumed.tasks).toBe(1)
       expect(second.isActive).toBe(true)
       expect(second.get('task-1')).toMatchObject({ status: 'blocked' })
 
       // The restored board still enforces the policy: reclaim via reassign.
-      const reclaimed = handleDispatcherRawIntent(second, {
+      const reclaimed = await handleDispatcherRawIntent(second, {
         op: 'reassign',
         id: 'task-1',
         owner: 'agent-9',
@@ -222,11 +222,11 @@ describe('dispatcher session lifecycle', () => {
     }
   })
 
-  it('resume on a fresh directory starts empty without pretending to restore', () => {
+  it('resume on a fresh directory starts empty without pretending to restore', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'dispatcher-fresh-'))
     try {
       const session = new DispatcherSession(dir)
-      const resumed = resumeDispatcherBoard(session)
+      const resumed = await resumeDispatcherBoard(session)
       expect(resumed.restored).toBe(false)
       expect(resumed.tasks).toBe(0)
       expect(session.isActive).toBe(true)

@@ -1,95 +1,156 @@
 /**
- * L1 dispatcher session: start/stop/resume and the persisted task board.
+ * L1 dispatcher session: start/stop/resume over the persistent `TaskBoard`.
  *
  * The session is the only place that applies policy decisions to a board. The
  * policy (`policy.ts`) stays pure — it decides, this session applies — so the
  * gate can call the policy without owning any state, and the session owns the
  * state without deciding anything itself.
  *
- * Persistence is a single JSON file (`board.json` under the given directory),
- * written atomically (tmp file + rename, same directory) after every applied
- * effect and on `stop()`. `resume()` reads that file back, so a restarted L1
- * steward picks up exactly the board it left behind.
+ * Round-57: this session no longer owns a memory `Map` or a self-made
+ * `board.json`. It holds a `TaskBoard` (persisted as `store.jsonl`: jsonl +
+ * sha-256 + tmp+rename — see `src/taskboard/store.ts`) and reads it through
+ * the round-56 `boardReader(board)` adapter (`board-reader.ts`), so the policy
+ * still sees the `TaskReader` it expects (`has` straight through, missing
+ * `get` as `undefined`, `in_progress→running` / `failed→blocked` translation).
+ * The pre-round-57 `board.json` format is neither read nor written: the
+ * unified persistence format is `store.jsonl`.
  *
- * Task-8 docking point: the `src/taskboard/` store now has `has`/`get` by
- * task id, but its `get` throws `TaskboardError('not-found')` for a missing
- * id while `TaskReader` wants `get` to return `undefined`. Pointing this
- * session at that store therefore still needs a small adapter that catches
- * the not-found throw and returns `undefined` instead (next round's work —
- * Round-56 update: the read adapter has landed (`board-reader.ts` —
- * `boardReader(board)` wraps a `TaskBoard` as the `TaskReader` the policy
- * reads, mapping `in_progress→running` / `failed→blocked`, `null` owner to
- * absent, and missing rows to `undefined`). Next round swaps this session
- * onto the `TaskBoard` store through that adapter; until then this file is
- * still self-contained and touches no other module.
+ * Async choice: `TaskBoard` opens and writes are all async, so `handle`,
+ * `handleRaw`, `stop` and `resume` are async too — each awaits the board open
+ * (lazy: the first call opens it) and then the board write before returning.
+ * `createDispatcherSession` keeps its sync signature (construct + `start()`,
+ * which touches no disk state except clearing a stale store file — see
+ * below). WHY lazy-open instead of a separate `await session.ready()`: there
+ * is no second init call for callers to forget; every entry point ensures the
+ * board exactly once. Callers must `await` each handle (documented on the
+ * methods); concurrent un-awaited handles interleave like any racing writers.
+ *
+ * Field placement (no silent drops):
+ * - `id`/`title`-on-create/`status`/`owner`/`detail` live on the board — truth.
+ * - `objective` (create/update) and `title` edits (update-pending) have nowhere
+ *   to land: the store has no objective column and no title edit, and this
+ *   round must not change the store contract. They live in a session-side
+ *   memory overlay, merged into every `get`/`list` read. WHY the overlay
+ *   instead of refusing: refusing would break the four-op whitelist the gate
+ *   already relies on (`update-pending` with an objective is a legal intent);
+ *   silently dropping would lie about what was recorded. The overlay is
+ *   honestly process-local — a restarted process keeps board truth and loses
+ *   only these patches — and `resume()` documents that by clearing it.
+ * - `blockedReason` maps to the board `detail` in both directions; `verdict`
+ *   is never written (the policy refuses verdict writes before apply).
+ * - `mark-blocked` on an unowned pending row claims it first under the holder
+ *   `dispatcher`: the board has no pending→blocked edge (claim is required),
+ *   and the intent names no owner. WHY a holder instead of overlaying: the
+ *   blocked state then really persists and reclaims naturally via reassign;
+ *   the holder name says who staged it. Owned rows claim under their owner.
+ * - `create` with an empty-string owner stays unowned: the board requires a
+ *   non-empty owner and the policy does not refuse it, so collapsing (not
+ *   throwing) keeps the allowed intent truthful.
+ *
+ * Lifecycle: `start()` opens fresh (clears the overlay; directory sessions
+ * also remove a stale `store.jsonl` so the next open starts empty — same net
+ * effect as the old memory clear plus overwrite-on-persist; use `resume()`
+ * for existing state, never `start()`), `stop()` deactivates (board already
+ * persisted every write, so there is nothing to flush) and removes a
+ * memory-only session's ephemeral backing, `resume()` reopens the persisted
+ * board and reactivates. While inactive every intent is refused with
+ * `invalid:session-inactive`. A corrupt store throws from `resume()` and the
+ * session stays inactive — fail closed, never guess at the board.
  */
 import { type DispatcherDecision, type DispatcherIntent, type DispatcherTask, type TaskReader } from './policy.js';
-/** On-disk shape of the persisted board. Versioned for future migrations. */
-export interface DispatcherBoardFile {
-    version: 1;
-    tasks: DispatcherTask[];
-}
 /** What `resume()` found on disk. */
 export interface DispatcherResumeResult {
-    /** True when a board file existed and loaded; false when starting empty. */
+    /** True when a store existed and loaded; false when starting empty. */
     restored: boolean;
     /** Number of tasks on the board after resume. */
     tasks: number;
-    /** Where the board file lives (undefined for memory-only sessions). */
+    /** Where the board persists (undefined for memory-only sessions). */
     path?: string;
 }
-/** Read and validate a board file; throws on corruption (fail closed). */
-export declare function readBoardFile(path: string): DispatcherTask[];
 /**
  * The L1 steward session.
  *
- * Lifecycle: `start()` opens a fresh board (memory-only unless a directory
- * was given), `stop()` persists and deactivates, `resume()` reloads the
- * persisted board and reactivates. While inactive every intent is refused
- * with `invalid:session-inactive` — a stopped steward records nothing.
+ * Lifecycle: `start()` opens fresh, `stop()` deactivates, `resume()` reloads
+ * the persisted board and reactivates. While inactive every intent is refused
+ * with `invalid:session-inactive` — a stopped steward records nothing. Every
+ * mutating entry is async: await it, then the board (and the overlay) already
+ * reflect the decision.
  */
 export declare class DispatcherSession implements TaskReader {
-    private readonly boardPath;
-    private readonly tasks;
+    private readonly boardDir;
+    private board;
+    /** Ephemeral backing for memory-only sessions; removed on `stop()`. */
+    private memDir;
+    /** Memory overlay for objective/title patches the board cannot store. */
+    private readonly overlays;
     private active;
     constructor(boardDir?: string);
     /** True while the session accepts intents. */
     get isActive(): boolean;
-    /** Where the board persists (undefined for memory-only sessions). */
+    /** Directory holding `store.jsonl` (undefined for memory-only sessions). */
     get path(): string | undefined;
     /** TaskReader surface, so policy decisions read this session directly. */
     get(id: string): DispatcherTask | undefined;
     /** TaskReader surface. */
     has(id: string): boolean;
-    /** Current board contents, sorted by id for determinism. */
+    /**
+     * Current board contents, sorted by id for determinism, with the memory
+     * overlay applied. Rows carrying `objective` or a patched `title` show this
+     * process's overlay values — a restarted process shows board truth until
+     * the overlay is re-recorded.
+     */
     list(): DispatcherTask[];
-    /** Open the session with an empty board. */
+    /**
+     * Open the session with an empty board.
+     *
+     * Clears the overlay and drops any open board handle; directory sessions
+     * also remove a stale `store.jsonl` so the lazily reopened board starts
+     * empty. For existing persisted state use `resume()`, never `start()`.
+     */
     start(): void;
-    /** Persist (when a directory was given) and deactivate. */
-    stop(): void;
+    /**
+     * Deactivate the session.
+     *
+     * Deactivation itself is synchronous (a handle issued after `stop()`
+     * returns is still refused); the returned promise only covers removing a
+     * memory-only session's ephemeral backing. The board needs no flush: every
+     * write already persisted before its handle returned.
+     */
+    stop(): Promise<void>;
     /**
      * Reopen the session from the persisted board.
      *
-     * No board file yet means a first start: the session activates with an
-     * empty board and reports `restored: false`. A corrupt file throws and the
-     * session stays inactive — fail closed, never guess at the board.
+     * No store yet means a first start: the session activates with an empty
+     * board and reports `restored: false`. A corrupt store throws and the
+     * session stays inactive — fail closed, never guess at the board. The
+     * memory overlay is cleared: board truth survives the restart, overlay
+     * patches do not (see the `SessionOverlay` note above).
      */
-    resume(): DispatcherResumeResult;
+    resume(): Promise<DispatcherResumeResult>;
     /**
      * Decide one typed intent and, when allowed, apply its effect to the board.
      *
-     * Refusals change nothing. Allowed intents persist immediately (when a
-     * directory was given), so a crash loses at most nothing already answered.
+     * Refusals change nothing. Allowed intents persist before this returns, so
+     * a crash loses at most nothing already answered — and an immediate read
+     * already reflects the decision.
      */
-    handle(intent: DispatcherIntent): DispatcherDecision;
+    handle(intent: DispatcherIntent): Promise<DispatcherDecision>;
     /**
      * Decide one untyped (gate-side JSON) intent and apply it when allowed.
      *
-     * Same apply-and-persist rule as {@link handle}; unknown operations and
+     * Same decide-then-persist rule as {@link handle}; unknown operations and
      * verdict writes are refused before anything is touched.
      */
-    handleRaw(raw: Record<string, unknown>): DispatcherDecision;
+    handleRaw(raw: Record<string, unknown>): Promise<DispatcherDecision>;
+    /**
+     * Open (once) and return the writable board.
+     *
+     * Directory sessions open their real directory; memory-only sessions open a
+     * session-private ephemeral directory that `stop()` removes. Either way the
+     * board persists every mutation before the applying handle returns.
+     */
+    private ensureBoard;
+    private applyOverlay;
     private applyEffect;
-    private persist;
 }
 //# sourceMappingURL=session.d.ts.map

@@ -1,0 +1,29 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/rsi-round-57
+
+ ❯ test/dispatcher-board.spec.ts (3 tests | 1 failed) 12ms
+     × persists creates to store.jsonl (never board.json) and reloads them 7ms
+     ✓ reads a missing id as undefined through the adapter 0ms
+     ✓ keeps a mark-blocked reason across a reload via the board detail 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/dispatcher-board.spec.ts > DispatcherSession on the TaskBoard store > persists creates to store.jsonl (never board.json) and reloads them
+AssertionError: expected [ 'board.json' ] to include 'store.jsonl'
+ ❯ test/dispatcher-board.spec.ts:47:19
+     45|
+     46|     const files = await readdir(dir)
+     47|     expect(files).toContain('store.jsonl')
+       |                   ^
+     48|     expect(files).not.toContain('board.json')
+     49|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 passed (3)
+   Start at  17:48:47
+   Duration  579ms (transform 426ms, setup 0ms, import 449ms, tests 12ms, environment 0ms)
+
+vitest-exit:1
