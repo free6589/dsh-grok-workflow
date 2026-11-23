@@ -281,6 +281,9 @@ class FakeCtx {
     info: (message: string) => { this.infos.push(message) },
   })
   effect = (installer: () => unknown) => installer()
+  // Real cordis Context always exposes `on`; these tool-path tests run on a
+  // runtime with the hook, so stub it (the hookless runtime is pinned in gate.spec.ts).
+  readonly on = (): (() => void) => () => {}
 }
 
 /**

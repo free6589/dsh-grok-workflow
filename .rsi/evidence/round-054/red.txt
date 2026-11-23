@@ -1,0 +1,25 @@
+ FAIL  test/gate.spec.ts > mandatory entry gate > fails closed with a load-time error when the hook is missing (gate always on, T4)
+AssertionError: expected [Function] to throw an error
+
+- Expected:
+null
+
++ Received:
+undefined
+
+ ❯ test/gate.spec.ts:507:51
+    505|     // T4: no gateRequired switch — a missing hook fails the load loud…
+    506|     // of degrading to a warning while the main model answers directly.
+    507|     expect(() => apply(withoutHook as never, {})).toThrow(/agent\/pre-…
+       |                                                   ^
+    508|   })
+    509|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 52 skipped (53)
+   Start at  16:56:35
+   Duration  2.45s (transform 1.99s, setup 0ms, import 2.11s, tests 14ms, environment 0ms)
+

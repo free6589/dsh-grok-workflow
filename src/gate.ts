@@ -737,10 +737,9 @@ export function installGate(deps: GateDeps): boolean {
   const host = ctx as unknown as { on?: (event: string, handler: unknown) => () => void }
   const on = host.on
   if (typeof on !== 'function') {
-    // T4: no gateRequired switch anymore — a runtime without the hook is always
-    // fail-open with a warning, never a load error.
-    logger.warn('agent/pre-step is unavailable: mandatory entry is disabled in this runtime')
-    return false
+    // T4: no gateRequired switch anymore — a runtime without the hook fails the
+    // load loudly, never a warning with the main model answering directly.
+    throw new Error('agent/pre-step is unavailable: mandatory entry cannot be enforced in this runtime')
   }
   const queues = new Map<string, AgentQueue>()
 

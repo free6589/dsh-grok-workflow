@@ -1,0 +1,2 @@
+soak: BLOCKED — live gateway returns 502 on this machine (same as round-53), no real-model run attempted this round.
+No live home touched; no credentials used; all fixtures fake (p/m/m1/m2).
