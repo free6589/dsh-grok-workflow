@@ -1,3 +1,16 @@
+## round-42 Slack 令牌全系前缀脱敏补齐 — 2026-11-23 (`CONFIRMED`，未发版)
+
+| state | command | result |
+| --- | --- | --- |
+| worktree rsi-round-42 `e9fd908`（main `d525fb2` + 本轮 1 提交） | `npx vitest run test/redact.spec.ts`（旧码 stash） | **1 failed / 45 passed**：新用例红（`xoxc/xoxd/xoxo/xoxe` 漏网原文进输出） |
+| 同上（新码） | `npx vitest run test/redact.spec.ts` | **46 passed** |
+| 同上（新码） | `npm run ci` | **exit 0：85 files / 1634 tests PASS**；typecheck 干净；lint 0 errors（既有 warnings）；`verify:lib` byte-identical（217 文件） |
+| 同上 | `git stash` → 旧码单测 → `stash pop`（lead 独立复验） | **复现成立**：旧码 `1 failed / 45 skipped`，新码 `46 passed`；`lib/redact.js` 含 `xox[a-z]`；证据目录无真密钥 |
+
+**Changed:** `src/redact.ts`（`slack-token` 正则 `[abprs]` → `[a-z]` + 注释）+ `test/redact.spec.ts`（+1 全前缀回归）+ `lib/` 重建 + `CHANGELOG [Unreleased]` 中英双语 + `.rsi/evidence/round-042/`（red/green/ci 摘要）。
+**Root cause:** Slack 各系令牌前缀不止 b/p/a/r/s，枚举子集必然漏网新系；ARCHITECTURE 写的是 `xox*`，代码落后于文档。
+**Honest boundary:** 真机 GUI 手点 NOT_RUN；未发版（`[Unreleased]` 攒版）；本轮只动脱敏一处，其余 14 条子代理发现未动。
+
 ## 已发版 0.13.18 团队调度层 v1 + 取消测试竞态修复 — 2026-11-23 (`CONFIRMED`)
 
 | state | command | result |

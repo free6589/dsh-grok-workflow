@@ -1,3 +1,8 @@
+Last updated: 2026-11-23 12:30 +08:00（**round-42 已合流 main 未发版：Slack 令牌全系前缀脱敏补齐，`CONFIRMED`** —
+合流提交 `b5ec52e`（main `d525fb2` + `e9fd908`）；`npm run ci` exit 0（85 文件 / 1634 测试 PASS，+1 全前缀回归），
+lint 0 errors，`verify:lib` 217 文件 byte-identical。`CHANGELOG [Unreleased]` 中英文已记，攒版待发。
+子代理三面 15 条发现中先落风险最高的 1 条；其余 14 条见 POOL/下一轮。）
+
 Last updated: 2026-11-23 05:15 +08:00（**已发版 `0.13.18`：团队调度层 v1 + 取消测试竞态修复，`CONFIRMED`** —
 发版提交 `f18e17b` + tag `v0.13.18` 已推；远端 CI `45070692108` success、Release `45070695678`
 success 并已发布（asset `dsh-grok-workflow-0.13.18.tgz`）。本地门禁：`npm run ci` exit 0（85 文件 / 1617 测试
