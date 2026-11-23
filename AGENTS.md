@@ -166,3 +166,30 @@ remote agent can see local-only commits.
   into plain words first.
 - Use everyday analogies, never jargon.
 - Answer yes/no questions with "yes" or "no" first, then explain. Never circle.
+
+
+【主代理与子代理异步协作规则】
+
+1. 主代理创建子代理后，必须记录每个子代理的 agent_id、任务、预期产出。
+
+2. 子代理独立执行，主代理不得在派发任务后立即无条件进入 wait_agent 阻塞等待。
+
+3. 主代理优先继续执行其他可以独立完成的工作，充分利用并行时间。
+
+4. 子代理完成后，优先使用 DSH 原生 subagent completion notification 唤醒主代理，不要求用户手动催促。
+
+5. 需要等待时，使用 wait_agent 等待事件，不要通过高频 list_agents 轮询状态。
+
+6. 收到完成通知后，主代理必须读取子代理最终结果，检查任务是否真正完成，不能仅凭 inactive 状态认定成功。
+
+7. 某个子代理失败时，只重新分配失败的任务，不要无条件重启其他已经完成的子代理。
+
+8. 所有子代理完成后，主代理统一进行结果整合、交叉检查和最终汇报。
+
+9. wait_agent 超时不代表子代理失败，也不代表子代理被终止。超时后重新判断任务状态。
+
+10. 禁止为了等待子代理而结束整个主代理会话。
+
+11. 主代理派发子代理后必须登记 agent_id、任务、预期产出与截止时间；正常情况靠 DSH 原生 completion notification 唤醒，不轮询。
+
+12. 兜底心跳：超截止时间未收到完成通知，主代理主动查询一次任务状态；活着继续等，失败/丢失只重派失败块，不重启已完成部分。
