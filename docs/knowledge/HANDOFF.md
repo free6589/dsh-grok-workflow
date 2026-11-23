@@ -1,3 +1,18 @@
+## 2026-11-23 — round-48 已合流 main 未发版：无定时器 hung 兜底（`CONFIRMED`，soak BLOCKED）
+
+- **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
+- **做了什么**：并发面第 1 条。无定时器 realm 裸等卡死整波及重规划边界。无定时器分支改走宿主时钟
+  盯 settlement，预算内未答用同一前缀判停走重试；无时钟/无预算才裸等（注释写明）。
+  +1 真无定时器 realm 回归；`npm run ci` exit 0（85/1640）；lead 独立红绿复验成立。
+- **偏离**：任务单 `Promise.race` 在该分支物理不可用（无 timer 无到期端）；子代理亲验 PTC 空上下文
+  后改 settlement+时钟轮询，等价语义。
+- **真机**：BLOCKED（插件链路通；`MISSING_CREDENTIAL`/网关 502 无额度，未伪造）。本次不发版。
+- **合流**：`rsi/round-48`（`bca1613`）已 `--no-ff` 合入 main 系 worktree（合流 `3284778`）；
+  `rsi/round-48` 分支可 24h 内删除。`CHANGELOG [Unreleased]` 中英文已记 2 条待发。
+  另：worktree 空 node_modules 导致 `verify:lib` 缺 tsc 系环境问题，已软链主树依赖解决。
+- **未做（下轮池）**：并发面 guardian 双心跳/路径归一/超时常量；配置面 Cookie JSON/
+  guardianModel 空白与未知键/gate 无钩子。网关恢复后给 round-47/48 补 soak 再发版。
+
 ## 2026-11-23 — round-47 已合流 main 未发版：恢复证据深拷（`CONFIRMED`，soak BLOCKED）
 
 - **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者

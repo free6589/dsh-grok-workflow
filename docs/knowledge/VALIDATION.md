@@ -1,3 +1,16 @@
+## round-48 无定时器 hung 调用兜底（soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
+
+| state | command | result |
+| --- | --- | --- |
+| worktree rsi-round-48 `bca1613`（main `974a3f6` + 本轮 1 提交） | `npx vitest run test/timeout.spec.ts -t "no timer at all"`（旧码 stash） | **1 failed / 21 skipped**：20s 超时 wedge（被修形状） |
+| 同上（新码） | `npx vitest run test/timeout.spec.ts` | **22 passed** |
+| 同上（新码） | `npm run ci`（lead 独立：修 worktree 空 node_modules 软链后） | **exit 0：85 files / 1640 tests PASS**；typecheck 干净；lint 0 errors；`verify:lib` byte-identical（217 文件） |
+| 隔离 soak | headless 新 profile + 真模型 | **BLOCKED**：插件链路通；`MISSING_CREDENTIAL` 无额度，未跑出 COMPLETED，未伪造 |
+
+**Changed:** `src/script.ts`（无定时器分支宿主时钟盯 settlement + 同前缀判停；无时钟/无预算才裸等）+ `test/timeout.spec.ts`（+1 真无定时器 realm 回归）+ `lib/` 重建 + `CHANGELOG [Unreleased]` 中英双语 + `.rsi/evidence/round-048/`。
+**Deviation:** 任务单写的 `Promise.race` 在该分支物理不可用（无 timer 就没有"到期"端）；子代理亲验 PTC 空上下文后改用 settlement+时钟轮询，等价语义已在注释写明。
+**Honest boundary:** `verify:lib` 首跑报 worktree 空 node_modules 缺 tsc（环境问题，基线同复现；lead 已软链主树依赖后通过）；真机 BLOCKED（网关 502/无额度），不发版。
+
 ## round-47 恢复证据深拷（soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
 
 | state | command | result |
