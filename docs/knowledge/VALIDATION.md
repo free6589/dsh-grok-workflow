@@ -1,3 +1,16 @@
+## round-45 账本尾部行边界截断 + 真机 soak — 2026-11-23 (`CONFIRMED`，发版前)
+
+| state | command | result |
+| --- | --- | --- |
+| worktree rsi-round-45 `ed50e94`（main `fcb7ecf` + 本轮 1 提交） | `npx vitest run test/delivery.spec.ts -t "clips an overlong ledger"`（旧码 stash） | **1 failed / 19 skipped**：新用例红（旧码无统一标记） |
+| 同上（新码） | `npx vitest run test/delivery.spec.ts` | **20 passed** |
+| 同上（新码） | `npm run ci` | **exit 0：85 files / 1637 tests PASS**；typecheck 干净；lint 0 errors（30 warnings 既有）；`verify:lib` byte-identical |
+| 同上 | lead 独立红绿复验（stash→旧码红→pop→新码绿→build→全量门禁） | **复现成立**；证据目录无真密钥 |
+| 隔离 soak（`DSH_HOME=<scratch>`，headless 模板新 profile `grok-soak-45`，新端口，live 未碰） | 真模型 `wb/cn:deepseek-v4.1-flash` caller 双任务 | **PASS**：`COMPLETED 2/2 verified`（写 8 字节文件 + 算术）；截断标记同构建可达；scratch 已删，无残留 |
+
+**Changed:** `src/delivery/index.ts`（账本尾部行边界 + `cutCodeUnits` 防乱码 + `renderReport` 同款截断标记）+ `test/delivery.spec.ts`（+1 超限账本回归）+ `lib/` 重建 + `CHANGELOG [Unreleased]` 中英双语 + `.rsi/evidence/round-045/`（red/green/ci/build/soak）。
+**Honest boundary:** 超 8000 字账本只在单测构造，真机只验链路通；depth-1 子代理直调被 harness 拒绝（改 depth-0 root 代发）；寒暄进 full 门被判失败属设计行为。
+
 ## round-44 截断行加 +N more 标记 — 2026-11-23 (`CONFIRMED`，未发版)
 
 | state | command | result |

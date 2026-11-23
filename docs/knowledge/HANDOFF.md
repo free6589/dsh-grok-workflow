@@ -1,3 +1,16 @@
+## 2026-11-23 — round-45 已合流 main 待发版：账本尾部行边界截断 + 真机 soak（`CONFIRMED`）
+
+- **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者 / 发版
+- **做了什么**：报告面第 4 条。账本尾部裸切 8000 字（劈 emoji、中途断行、自创省略号）。
+  改为预算内最后整行收尾 + 防乱码切割 + 与正式报告同一句截断标记；+1 超限账本回归；
+  `npm run ci` exit 0（85/1637）；lead 独立红绿复验成立。
+- **真机**：隔离 `DSH_HOME` + headless 新 profile + 真模型 caller 双任务 **PASS**
+ （`COMPLETED 2/2 verified`，写文件 + 算术双证据；标记同构建可达；scratch 已删）。
+- **合流**：`rsi/round-45`（`ed50e94`）已 `--no-ff` 合入 main 系 worktree（合流 `b8318bd`）；
+  `rsi/round-45` 分支可 24h 内删除。`CHANGELOG [Unreleased]` 中英文已记 5 条待发。
+- **下一步**：攒版已够（round-42/43/44/45 共 4 修 + 手动清单遗留），按自动发版要求走五步流发 `0.13.19`。
+- **未做**：报告面账本吞错/resume 浅拷贝；并发面 4 条；配置面 3 条。真机 GUI 手点 NOT_RUN。
+
 ## 2026-11-23 — round-44 已合流 main 未发版：截断行加 +N more 标记（`CONFIRMED`）
 
 - **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者

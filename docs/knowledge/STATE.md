@@ -1,3 +1,8 @@
+Last updated: 2026-11-23 13:55 +08:00（**round-45 已合流 main 待发版：账本尾部行边界截断 + 真机 soak PASS，`CONFIRMED`** —
+合流提交 `b8318bd`（main `fcb7ecf` + `ed50e94`）；`npm run ci` exit 0（85 文件 / 1637 测试 PASS，+1 超限账本回归），
+lint 0 errors，`verify:lib` byte-identical。隔离 soak PASS（headless 新 profile + 真模型 caller 双任务 2/2 verified）。
+`CHANGELOG [Unreleased]` 中英文已记 5 条待发；真机+门禁双绿，具备发版条件。）
+
 Last updated: 2026-11-23 13:05 +08:00（**round-44 已合流 main 未发版：截断行加 +N more 标记，`CONFIRMED`** —
 合流提交 `f4590ea`（main `598afb6` + `70dec37`）；`npm run ci` exit 0（85 文件 / 1636 测试 PASS，+1 双边一致回归），
 lint 0 errors，`verify:lib` 217 文件 byte-identical。`CHANGELOG [Unreleased]` 中英文已记，攒版待发。）
