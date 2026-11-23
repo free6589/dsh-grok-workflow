@@ -1,3 +1,16 @@
+## 0.13.28 已发：同一处修法，`v0.13.27` 只留标签没发（门禁在远端挂了一条时序断言）— 2026-11-24
+
+| state | command | result |
+| --- | --- | --- |
+| `v0.13.27` 门禁（远端） | push `main` + tag `v0.13.27` 后 `gh run view` | **FAIL**：`CI` `45290948155` 与 `Release` `45290964335` 都在 `test/dead-routes.spec.ts > counts a call that hung…` 挂掉，报 `deadRoutes` 有 **2** 行（本地 1000 ms 预算下只跑出 1 行）。根因：让挂死可观测的 1 秒子调用预算，在负载高的 runner 上**活路**也会输掉，于是整表 `toEqual` 变成了一条延迟断言 |
+| 修法（只改用例） | 断言收窄到「挂死那条路」：它的 `timeout` 行、它的 2 次调用、以及表翻之后不再有它的调用 | `CONFIRMED`（本地 24/24 绿） |
+| 复现远端那条形状 | 临时把活路子代理改成 1400 ms 慢于 1000 ms 预算后重跑该用例 | **PASS**（`4485 ms`）——证明这条用例不再依赖活路延迟 |
+| `v0.13.28` 门禁 | `npm run ci`（`8f34701`） | **exit 0：97 files / 1820 tests PASS**，typecheck 干净，lint 0 errors / 36 warnings（全既有），`verify:lib` byte-identical |
+| 发版 | tag `v0.13.28` → push `main` → push tag | `CONFIRMED`：`CI` `45292347165` **success**，`Release` `45292352796` **success**，已发布 asset `dsh-grok-workflow-0.13.28.tgz`（<https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.28>） |
+| `v0.13.27` 的处理 | 已发布的标签不移动（`v0.11.14` 先例）：标签留着、不发布任何东西，同样改动随 0.13.28 发；两份 README 与 CHANGELOG 都写明了这件事 | `CONFIRMED` |
+
+**教训**：短预算 + 整表断言 = 延迟测试。真机 soak 那两条形状（进表、排后）本身没变，坏在用例把「活路的延迟」也纳入了断言范围。
+
 ## 0.13.27 返工 soak 判 **PASS**：死路由在真机上真的进表了（503 与挂死两种都验）— 2026-11-24（T4 返工子代理 agent-108）
 
 | state | command | result |

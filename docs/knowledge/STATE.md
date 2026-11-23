@@ -1,3 +1,14 @@
+Last updated: 2026-11-24 08:00 +08:00（**已发版 `0.13.28`：死路由在真机上真的进表了，`CONFIRMED`** —
+发版提交 `8f34701`（返工 `cd0c909` → 合流 `78c1907` → 用例修 `0113211` → 发版准备）+ tag `v0.13.28` 已推；
+远端 `CI` `45292347165` success、`Release` `45292352796` success，已发布 asset `dsh-grok-workflow-0.13.28.tgz`
+（<https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.28>）。`v0.13.27` 只留标签没发：它的门禁在远端
+挂在一条对时序敏感的新用例上（让挂死可观测的 1 秒预算，在负载高的 runner 上「活路」也会输掉，整表断言就变成了延迟断言），
+修的是用例，随 0.13.28 发。D-120 的两条根因都堵上：① 记账改用专用 `routeHealth`（挂死也进表，`switchModel` 仍 false）；
+② 5xx/断连/429 的死因经宿主 twin 以 `CHILD_DEATH: <class>: <原话>` 拒绝回灌脚本。真机 soak（隔离 `DSH_HOME`、假 503 端点 +
+假挂死端点 + 本机网关、`maxConcurrency:1`）：503 轮 5/5 verified、死路由只吃 2 次调用、第 3~5 题一次不打它、台账
+`server-error (2 in a row)`；挂死轮 `timeout (2 in a row)`。证据 `.rsi/evidence/soak-deadroutes-01327-fix/`。
+门禁：`npm run ci` exit 0（97 files / 1820 tests）。live `~/.dsh` 与线上实例全程未动。）
+
 Last updated: 2026-11-24 07:20 +08:00（**0.13.27 返工：死路由在真机上真的进表了，`CONFIRMED`（单测 + 真机 soak），待发版** —
 上一轮合流 soak 判 FAIL 的两条根因都堵上了（D-121）。① 记账不再拿 `switchModel` 当闸门，挂死的路用专用
 `routeHealth:'timeout'` 进表（`switchModel` 仍为 false，任务仍改写措辞重试）；② 5xx/断连/429 的死因由宿主 twin

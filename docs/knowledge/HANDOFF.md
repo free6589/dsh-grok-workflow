@@ -1,3 +1,19 @@
+## 2026-11-24 — 0.13.28 已发；`v0.13.27` 只留标签（门禁在远端挂了一条时序断言）
+
+- **From:** T4 返工子代理（agent-108） · **To:** lead / 下一个接手者
+- **结果**：`v0.13.28` 已发布（tag `v0.13.28`，提交 `8f34701`；远端 `CI` `45292347165` success、
+  `Release` `45292352796` success；asset `dsh-grok-workflow-0.13.28.tgz`）。
+- **`v0.13.27` 为什么没发**：标签推上去之后远端门禁在新增的挂死用例上挂了——`deadRoutes` 出现 2 行（本地只有 1 行）。
+  让挂死可观测的 1 秒子调用预算，在负载高的 runner 上「活路」也会输掉，于是整表 `toEqual` 变成了一条延迟断言。
+  改法是收窄断言（只看挂死那条路：它的 `timeout` 行、它的 2 次调用、表翻之后不再有它），并临时把活路改成慢于预算复现了
+  远端那条形状。已发布的标签不移动（`v0.11.14` 先例），所以同样改动随 0.13.28 发；README/CHANGELOG 都写明了。
+- **留给下一个人的两件小事**：① 挂死轮的 soak 仍只证到「进表 + 排后」，「第 3 条任务起不打它」是在 503 轮上取到的
+  （挂死轮几次都被外层模型塌成 1 条任务，且短预算下 planner 自己会超时→fallback）；要补就直接调 `grok_workflow` 指定 `tasks`，
+  或用更长的 `childTimeoutMs`。② `src/delivery/index.ts` 的 `machineLedger` 与 `report.renderReport` 仍是两份并列诊断视图，
+  `Dead routes` 只在后者（D-119 的范围），要对齐就一起改并补一条「两份一致」的用例。
+- **分支**：`feat/dead-routes`（`.tmp/wt-dead-routes`）与 `release/0.13.27`（`.tmp/wt-rel-01327`）都已合入 `main`
+  （`main` = `8f34701`）；两个 worktree 按指示保留，分支可在 24h 内删。
+
 ## 2026-11-24 — 0.13.27 返工：死路由的两条根因都堵上，真机 soak PASS（`CONFIRMED`）
 
 - **From:** T4 返工子代理（agent-108） · **To:** lead / 下一个接手者
