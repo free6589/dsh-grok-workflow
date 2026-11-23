@@ -144,11 +144,11 @@ Each entry records the decision, evidence, alternatives, and status.
 
 - **Status:** CONFIRMED（随 0.2.0 发布说明一并发布）
 - **Date:** 2026-10-26
-- **Decision:** `0.2.0` 把强制入口（`enforceGate`）默认设为 `true`，即"每条用户消息走完整工作流"成为默认行为；`0.1.0` 的"仅模型主动调用工具"改为需要显式 `enforceGate: false`。
-- **Reason:** 用户核心需求 A 就是"每条消息强制完整工作流"；把它做成默认关闭的可选项，等于交付了一个不满足需求的默认形态。
+- **Decision:** `0.2.0` 把强制入口（`enforceGate`）默认设为 `true`，即「每条用户消息走完整工作流」成为默认行为；`0.1.0` 的「仅模型主动调用工具」改为需要显式 `enforceGate: false`。
+- **Reason:** 用户核心需求 A 就是「每条消息强制完整工作流」；把它做成默认关闭的可选项，等于交付了一个不满足需求的默认形态。
 - **Compatibility:** 报告为纯增量扩展（`writesPaths`、失败 `class`/`category`），但配置面收紧（未知键拒绝、链校验、`switchOn` 白名单），且验收标准归一化去重会拒绝部分旧输入——这三点必须在更新日志的 breaking notes 明写。
 - **Alternatives rejected:** 默认关闭（默认不满足需求）；一次性大版本 `1.0.0`（内部仍有 L2 路由、链编辑器未做，版本号会虚高）。
-- **Consequences:** 升级者若不想要强制入口必须显式关闭；要求"绝不静默降级"的部署需再加 `gateRequired: true`。
+- **Consequences:** 升级者若不想要强制入口必须显式关闭；要求「绝不静默降级」的部署需再加 `gateRequired: true`。
 
 ## D-012 — 安装后严格测试与修复发布闭环（用户 2026-10-26 指示）
 
@@ -162,111 +162,111 @@ Each entry records the decision, evidence, alternatives, and status.
 - **Date:** 2026-10-27
 - **Decision 1（服务不重启）:** 不得重启、杀死或改动正在运行的本机 `dsh web` 服务（当前 live 实例 `:3090`，PID 825935，`DSH_HOME=/home/fish/dsh-layerfs`）。任何验证都在**新建 profile + 新端口的新实例**上做；live 的重新加载只能由用户批准后执行，实施者只提供步骤清单。
 - **Decision 2（队长只计划不实施）:** 队长（captain）只做计划、派单、验收与整合，**一切实现由子代理完成**；队长不得亲自写代码/改文件。
-- **Reason（规则 1）:** live 实例承载用户的真实会话与工作区；重启会中断在跑的任务、丢掉内存态（而"设置写入只影响下一条消息"的语义正是为了不打断在跑的任务）。t32 的一次 `pkill -f "profile web-grok-debug"` 差点匹配到自己的命令行并波及无关进程，说明"按模式杀进程"本身就不安全——改为按 `ss -ltnp` 解析出的 PID 精确 kill。
-- **Reason（规则 2）:** 实施与验收必须分离，否则"自测自过"；独立子代理 + 单写者 + 队长验收是本项目已经跑通的模式（t15/t29/t32）。
+- **Reason（规则 1）:** live 实例承载用户的真实会话与工作区；重启会中断在跑的任务、丢掉内存态（而「设置写入只影响下一条消息」的语义正是为了不打断在跑的任务）。t32 的一次 `pkill -f "profile web-grok-debug"` 差点匹配到自己的命令行并波及无关进程，说明「按模式杀进程」本身就不安全——改为按 `ss -ltnp` 解析出的 PID 精确 kill。
+- **Reason（规则 2）:** 实施与验收必须分离，否则「自测自过」；独立子代理 + 单写者 + 队长验收是本项目已经跑通的模式（t15/t29/t32）。
 - **Evidence:** t32 全程在 `/home/fish/dsh-layerfs/profiles/web-grok-debug` + `127.0.0.1:3199` 上取证，结束后仅 kill 自己启动的 PID；live `PID 825935` 全程存活（多次 `ps -o pid -p 825935` 校验）。
 - **Alternatives rejected:** 直接重启 live 观察效果（违反用户边界）；用 `pkill -f` 省事（t32 已出现自伤）。
 
-## D-014 — 激活前提：图形/工具面出现 `grok_workflow` 需要"工作流 provider 行是启用的"（t32/t33 实测，t35 修正）
+## D-014 — 激活前提：图形/工具面出现 `grok_workflow` 需要「工作流 provider 行是启用的」（t32/t33 实测，t35 修正）
 
 - **Status:** CONFIRMED
 - **Date:** 2026-10-27（t35 补充实测口径）
-- **Decision:** 任何安装说明都必须包含"在 profile 的 `cordis.patch.yml` 里把 `workflow-ptc` 的 `disabled` 置为 `false`（`provider: spawn`）"这一步，并把"激活"定义成四条可检验事实（启动无 pending 警告、`settings/describe` 有命名空间、GUI 有 Grok workflow 卡片、真实会话 `request/header.tools` 含 `grok_workflow`）。
+- **Decision:** 任何安装说明都必须包含"在 profile 的 `cordis.patch.yml` 里把 `workflow-ptc` 的 `disabled` 置为 `false`（`provider: spawn`）「这一步，并把」激活"定义成四条可检验事实（启动无 pending 警告、`settings/describe` 有命名空间、GUI 有 Grok workflow 卡片、真实会话 `request/header.tools` 含 `grok_workflow`）。
 - **Reason（逐层实测，不是推断）:** `@deepseek-ai/dsh-base/cordis.patch.yml`（第 397-406 行）把 `ptc-runtime`、`workflow-ptc`（`config.provider: spawn`）、`tool-workflow` 作为**启用**行插进基础组合；`@deepseek-ai/dsh-web-app/cordis.patch.yml`（第 567-568 行）随后把 `workflow-ptc` 与 `tool-workflow` 一起置 `disabled: true`。所以：
   - **headless / tui（只叠 base）本来就带引擎** —— 这解释了阶段 3 以来所有 headless 端到端运行不需要任何额外步骤；
-  - **只有 web 需要补这一行**；`agent preset` 与 `dsh --preset` 在 0.2.1-rc.2 里都不重新启用它（无此 CLI 参数，`dsh-agent-preset` 也不 patch cordis），能启用它的是"去掉 web-app 层"或"任意后置层写 `- id: workflow-ptc / disabled: false`"——即 t34/F6 所记的"重新启用"实质由 **base 层 / 显式 patch** 完成，不是某个 preset。
+  - **只有 web 需要补这一行**；`agent preset` 与 `dsh --preset` 在 0.2.1-rc.2 里都不重新启用它（无此 CLI 参数，`dsh-agent-preset` 也不 patch cordis），能启用它的是「去掉 web-app 层」或"任意后置层写 `- id: workflow-ptc / disabled: false`"——即 t34/F6 所记的「重新启用」实质由 **base 层 / 显式 patch** 完成，不是某个 preset。
 - **Reason（同源风险）:** `dsh plugin add` 只把包放进 `dsh.profile.bundles`（`--dump-config` 能看到行），**装包 ≠ 激活**；服务缺失时 Cordis 让插件长期 `pending`，`apply()` 永不执行 → 无工具、无设置面、无门禁。t33 的 92,716 字符系统提示里 0 次 `grok_workflow` 正是这个原因。
 - **Evidence:** t32 在新 profile 上对比同一配置：`workflow-ptc.disabled: true` → 启动打印 `grok-workflow (dsh-grok-workflow): pending (waiting for service: workflowEngine)`，`settings/describe` 无该命名空间；改为 `disabled: false` 后启动干净，`settings/describe` 出现 `grok-workflow`（`autoGenerate: true`，17 字段），真实 GUI 会话 `request/header.tools` 出现 `grok_workflow` 并触发门禁。t35 在 0.2.1 上重复该结论（`docs/knowledge/VALIDATION.md` Round 3、`docs/knowledge/evidence/t32/`）。
 - **Consequences:** 0.2.0/0.2.1 的安装/升级说明新增一步；`subagentProvider` 只接受 DSH 子代理提供者名（`spawn`/`fork`），填 LLM 供应商名会让每次运行 fail-closed（`no subagent provider registered for "<id>"`）。
-- **Addendum（t35/F7）— `plugin add` 与 `dsh.profile.bundles` 的真实边界:** `dsh plugin add` 结尾走 `reconcile()`（`@deepseek-ai/dsh-plugin-manager/lib/index.js:326-341`）：非依赖的层条目（如 `@deepseek-ai/dsh-base`）无条件保留；是依赖的条目**仅当其安装包仍声明 `dsh.bundle`** 时保留；新装依赖只有声明 `dsh.bundle` 才追加为层，否则只当普通依赖并打印 `<name> declares no dsh.bundle — installed as a plain dependency, not a profile layer`。所以"覆盖 bundles"的准确说法是"按依赖与 `dsh.bundle` 元数据对账"：t32 里层条目消失的真因是安装包清单的 `dsh` 字段被脚本重写成只剩 `client`（`dsh.bundle` 丢失），而不是"新包挤掉旧包"。安装后必须核对 `dsh.profile.bundles` 仍在（见 `docs/LOCAL-TESTING.md` 的 live 生效步骤第 4 步）。
+- **Addendum（t35/F7）— `plugin add` 与 `dsh.profile.bundles` 的真实边界:** `dsh plugin add` 结尾走 `reconcile()`（`@deepseek-ai/dsh-plugin-manager/lib/index.js:326-341`）：非依赖的层条目（如 `@deepseek-ai/dsh-base`）无条件保留；是依赖的条目**仅当其安装包仍声明 `dsh.bundle`** 时保留；新装依赖只有声明 `dsh.bundle` 才追加为层，否则只当普通依赖并打印 `<name> declares no dsh.bundle — installed as a plain dependency, not a profile layer`。所以「覆盖 bundles」的准确说法是"按依赖与 `dsh.bundle` 元数据对账"：t32 里层条目消失的真因是安装包清单的 `dsh` 字段被脚本重写成只剩 `client`（`dsh.bundle` 丢失），而不是「新包挤掉旧包」。安装后必须核对 `dsh.profile.bundles` 仍在（见 `docs/LOCAL-TESTING.md` 的 live 生效步骤第 4 步）。
 
 ## D-015 — 设置页文案跟随 DSH 语言设置（t42）
 
 - **Status:** CONFIRMED
 - **Date:** 2026-10-27
 - **Decision:** 设置页的**全部**文案（卡片标题/简介、分组标题、字段标签、数值范围、角色链编辑器、只读行、保存/放弃、保存结果、全部校验错误）经由组合自带的 `@deepseek-ai/dsh-client-locale` 解析：bundle 用 `ctx.locale.register('grok-workflow', { zh, en })` 注册字典，并给 `plugins.item` 槽声明 `locale: 'grok-workflow'` 以取得框架的 `t` 座位。**不**读 `navigator.language`，不做自己的语言探测。
-- **Reason:** 用户要求"随 DSH 设置的中/英文变化，与 DSH 原生设置页一致"；该包正是 Settings → General → Language 与 `<html lang>` 的所有者，且渲染器在每次 locale revision 上重算 `t` 座位（`useLocaleRevision`），所以页面、卡片标题与简介都能就地换语言，无需重载。
-- **Reason（为何不把 `locale` 写进 `inject`）:** Cordis 没有可选注入，`inject` 里的名字即硬依赖；缺服务会让插件停在 `pending`，而 DSH 把 pending 当作**整个 web 客户端启动失败**上报。为一个"最坏也只是英文"的页面换取 GUI 启动失败不划算，因此 `apply()` 先以自带 translator 挂载，再用嵌套 `ctx.inject(['locale'], …)` 取得服务后注册字典并重挂（带着 `locale`）。`inject` 仍为 `['slots','configForms']`。
+- **Reason:** 用户要求「随 DSH 设置的中/英文变化，与 DSH 原生设置页一致」；该包正是 Settings → General → Language 与 `<html lang>` 的所有者，且渲染器在每次 locale revision 上重算 `t` 座位（`useLocaleRevision`），所以页面、卡片标题与简介都能就地换语言，无需重载。
+- **Reason（为何不把 `locale` 写进 `inject`）:** Cordis 没有可选注入，`inject` 里的名字即硬依赖；缺服务会让插件停在 `pending`，而 DSH 把 pending 当作**整个 web 客户端启动失败**上报。为一个「最坏也只是英文」的页面换取 GUI 启动失败不划算，因此 `apply()` 先以自带 translator 挂载，再用嵌套 `ctx.inject(['locale'], …)` 取得服务后注册字典并重挂（带着 `locale`）。`inject` 仍为 `['slots','configForms']`。
 - **Reason（`ctx.get('locale')` 不是替代）:** `Context#_getImpl` 走本 fiber 的 isolate 映射，未注入的服务对它同样不可见，随后的属性读取会抛 `cannot get property "locale" without inject`（实测，本任务第一版即踩此坑）。
 - **Evidence:** `test/client.spec.ts` 结构性钉住（两字典键集相同、数据派生键双语且不退化、每条 finding 两种语言不同、`apply()` 注册双语字典并声明 `locale`、无 locale 服务时仍可挂载）；GUI 双语取证见 `docs/knowledge/evidence/t42/`（经 Settings → Language 切换，`<html lang>` 由 `en` → `zh-CN`，重载后保持）；`npm run ci` 全绿（19 文件 / 293 测试）。
-- **Alternatives rejected:** 硬编码中英混排（0.2.1 的做法：视觉噪音、无法把值嵌进句子、无视用户所选语言）；读 `navigator.language`（与 DSH 设置不同源，用户改了设置页不变，正是本次要修的偏差）；自建 i18n 表（与原生设置页不一致，且会与 locale 插件抢"当前语言"这个唯一事实）。
+- **Alternatives rejected:** 硬编码中英混排（0.2.1 的做法：视觉噪音、无法把值嵌进句子、无视用户所选语言）；读 `navigator.language`（与 DSH 设置不同源，用户改了设置页不变，正是本次要修的偏差）；自建 i18n 表（与原生设置页不一致，且会与 locale 插件抢「当前语言」这个唯一事实）。
 - **Consequences:** 新增文案必须同时写 `zh` 与 `en`，否则测试失败；校验结果保持 `{key, params}` 数据形态（新增错误码需同步两语言）；`docs/knowledge/evidence/t42/` 成为页面文案的取证基线。
 
-## D-016 — 并发槽位按会话计，另设进程级总量兜底（t45，修 t41 实证的"一会话饿死所有会话"）
+## D-016 — 并发槽位按会话计，另设进程级总量兜底（t45，修 t41 实证的「一会话饿死所有会话」）
 
 - **Status:** CONFIRMED
 - **Date:** 2026-10-27
 - **Decision:** `maxActiveRuns` 的语义改为**每会话**（默认仍 2），新增 `maxActiveRunsTotal`（默认 8，硬上限 16）作为**进程级**兜底；两条限额分别校验，拒绝文案必须写明**谁占着槽**（run id + 已跑时长；总量拒绝则列 session + 该会话 run 数与最老 run 时长）。
-- **Reason:** t41 在三个不同 workspace 记录到 4 次 `start-failed`，全部发生在"已有 2 个 run 并存"的时刻，而 `createActiveState()` 在 `apply` 作用域里被全进程共享——即**一个会话的两个长 run 可以饿死所有其它会话**，用户在一个窗口发问会收到"already has 2 active run(s)"这种无法自救的英文拒绝。日记账（`plugin:grok-workflow/delivery` 8 条）可复现：2a7c7254 t7 + 08daa48b t64 两个长 run 期间，3335d3d3/0b073299/2ef91d3e 三个会话各被拒。
-- **Reason（为何不是 per-workspace）:** 会话是 DSH 的配额与审计单位（`session.id` 在 gate/records/routing 里已经是身份），workspace 只是 cwd 分组；一个 workspace 里可以有多个并行会话，按 workspace 计会让"同一个文件夹开两个会话"互相挤占，且我们拿不到稳定的 workspace 身份（只有 cwd 字符串，软链/重命名都会漂移）。
+- **Reason:** t41 在三个不同 workspace 记录到 4 次 `start-failed`，全部发生在「已有 2 个 run 并存」的时刻，而 `createActiveState()` 在 `apply` 作用域里被全进程共享——即**一个会话的两个长 run 可以饿死所有其它会话**，用户在一个窗口发问会收到"already has 2 active run(s)"这种无法自救的英文拒绝。日记账（`plugin:grok-workflow/delivery` 8 条）可复现：2a7c7254 t7 + 08daa48b t64 两个长 run 期间，3335d3d3/0b073299/2ef91d3e 三个会话各被拒。
+- **Reason（为何不是 per-workspace）:** 会话是 DSH 的配额与审计单位（`session.id` 在 gate/records/routing 里已经是身份），workspace 只是 cwd 分组；一个 workspace 里可以有多个并行会话，按 workspace 计会让「同一个文件夹开两个会话」互相挤占，且我们拿不到稳定的 workspace 身份（只有 cwd 字符串，软链/重命名都会漂移）。
 - **Reason（为何仍要保留全局兜底）:** 没有总量限制时，N 个会话就可能有 2N 个 run、每个 run `maxConcurrency` 个 spawn 子代理，进程级 fd/内存/模型配额会先崩掉；8 个并发 run 是实测下仍可控的量级，且它只在**多会话同时长跑**这种罕见场景触发。
-- **Evidence:** `test/lifecycle-disposal.spec.ts` 三例：①同一会话 2 个长 run 后第 3 个被拒且文案含 `maxActiveRuns is 2 per session` 与 `holding: run run-1 (running …)`，同时**另一个会话照常起跑**（修复前这里会被拒，即回归复现）；②"已 admit 未 start"的 run 只计入本会话、不影响其它会话；③`maxActiveRunsTotal` 达上限时拒绝并列出占槽会话。变异验证：把按会话计数改回 `state.runs.size + state.pending`，上述三例全部失败。
-- **Consequences:** 设置页把 `maxActiveRuns` 标签改为"每会话活跃运行上限 / Active runs per session"，并新增"全部会话活跃运行上限 / Active runs across all sessions"；`CONFIG_KEYS` 22 → 23，volatile 投影 18 → 19（`test/settings-projection.spec.ts` 与 `test/config.spec.ts` 同步钉住）。行为变化对既有安装是**放宽**（原来被全局挤占的会话现在能跑），不会让之前能跑的场景变失败。
+- **Evidence:** `test/lifecycle-disposal.spec.ts` 三例：①同一会话 2 个长 run 后第 3 个被拒且文案含 `maxActiveRuns is 2 per session` 与 `holding: run run-1 (running …)`，同时**另一个会话照常起跑**（修复前这里会被拒，即回归复现）；②「已 admit 未 start」的 run 只计入本会话、不影响其它会话；③`maxActiveRunsTotal` 达上限时拒绝并列出占槽会话。变异验证：把按会话计数改回 `state.runs.size + state.pending`，上述三例全部失败。
+- **Consequences:** 设置页把 `maxActiveRuns` 标签改为「每会话活跃运行上限 / Active runs per session」，并新增「全部会话活跃运行上限 / Active runs across all sessions」；`CONFIG_KEYS` 22 → 23，volatile 投影 18 → 19（`test/settings-projection.spec.ts` 与 `test/config.spec.ts` 同步钉住）。行为变化对既有安装是**放宽**（原来被全局挤占的会话现在能跑），不会让之前能跑的场景变失败。
 
 ## D-017 — 单次工作流 deadline 默认 30 分钟 → 60 分钟（t45，按实测改，不做按任务数自适应）
 
 - **Status:** CONFIRMED
 - **Date:** 2026-10-27
-- **Decision:** `timeoutMs` 默认值改为 `3_600_000`（60 分钟），硬上限保持 `86_400_000`；工具注册时的 `timeoutMs` 仍为 `min(timeoutMs + 60_000, 86_400_000)`，跟随该值。**不**引入"按任务数自适应"的默认算方式。
-- **Reason:** t41 实测两次被杀在 `30m00s` 与 `30m01s`（2a7c7254 t6、cb452931 t39），报告的失败行是 `workflow exceeded the 1800000 ms deadline and was cancelled`；而真跑完的四任务工作流用时 878 s / 1148 s / 1801 s。即 30 分钟是**贴着真实工作量**的刀口，不是安全边际：四任务 + 一条慢 provider 链就会撞线。60 分钟给观测到的最坏情况约 2x 余量，同时仍保住"挂死的 run 不会永远占着槽"这一性质。
-- **Reason（为何不做自适应）:** 任务数在 planner 返回前未知（门禁路径先规划后执行），而 deadline 必须在启动时定；用 `maxTasks` 猜上限等于把"最多 12 个任务"当成"必然 12 个任务"，在常见 1-2 任务场景下给出 6 小时的荒唐上限。需要更长 deadline 的用户可以在 profile patch 里显式写（该值已能被 `configVersion` 前的 schema 校验），把"要多长"留给人而不是公式。
+- **Decision:** `timeoutMs` 默认值改为 `3_600_000`（60 分钟），硬上限保持 `86_400_000`；工具注册时的 `timeoutMs` 仍为 `min(timeoutMs + 60_000, 86_400_000)`，跟随该值。**不**引入「按任务数自适应」的默认算方式。
+- **Reason:** t41 实测两次被杀在 `30m00s` 与 `30m01s`（2a7c7254 t6、cb452931 t39），报告的失败行是 `workflow exceeded the 1800000 ms deadline and was cancelled`；而真跑完的四任务工作流用时 878 s / 1148 s / 1801 s。即 30 分钟是**贴着真实工作量**的刀口，不是安全边际：四任务 + 一条慢 provider 链就会撞线。60 分钟给观测到的最坏情况约 2x 余量，同时仍保住「挂死的 run 不会永远占着槽」这一性质。
+- **Reason（为何不做自适应）:** 任务数在 planner 返回前未知（门禁路径先规划后执行），而 deadline 必须在启动时定；用 `maxTasks` 猜上限等于把「最多 12 个任务」当成「必然 12 个任务」，在常见 1-2 任务场景下给出 6 小时的荒唐上限。需要更长 deadline 的用户可以在 profile patch 里显式写（该值已能被 `configVersion` 前的 schema 校验），把「要多长」留给人而不是公式。
 - **Evidence:** `test/lifecycle-disposal.spec.ts`：默认值断言 `3_600_000`、硬上限仍可设到 `86_400_000`、以及一次真实超时报告里写出"`1000 ms deadline`"（证明报告用的是**实际生效**的值而不是硬编码文案）；`test/input.spec.ts` 与 `test/client.spec.ts` 同步钉住默认值与设置页范围。变异验证：把默认值改回 `1_800_000`，两处断言立即失败。
 - **Consequences:** 设置页 `timeoutMs` 的默认值显示为 `3600000`（范围 1000–86400000 不变）；t42 取证截图里的 `default 1800000` 属于**历史基线**，不再代表当前默认值。仍遗留一条真实缺口：deadline 临近没有进度事件（t41 的 P1-3/U-9），本决策不覆盖，记在 WORKFLOW-DESIGN 的 DD-13 与 VALIDATION Round 5 的 NOT_RUN 里。
 
-## D-018 — deadline 由插件自己强制执行（t47，修 t46 实证的"引擎不收 abort"）
+## D-018 — deadline 由插件自己强制执行（t47，修 t46 实证的「引擎不收 abort」）
 
 - **Status:** CONFIRMED
 - **Date:** 2026-10-28
-- **Decision:** `runWorkflow` 的 deadline 不再"abort 一个 signal 然后等引擎收尾"，而是**插件自己的硬上限**：一次 `Promise.race([run.result, deadline])`，deadline 先到就 `run.cancel('workflow deadline exceeded after N ms')` 并当场返回超时报告；`config.timeoutMs` 同时进入运行报告（`Deadline: <n> ms per run (enforced by the plugin)`）。
-- **Reason:** t46 在设置页保存 60 000 ms 后，运行在 2 分 40 秒、5 分钟时仍在工作；本轮用**干净重启 + profile patch 直写 60 000**复现并定性：报告自己说 `workflow exceeded the 60000 ms deadline and was cancelled; the engine had not settled`，UI 上运行节点在 **61.5 s** 离开 `running`。即**设置到达了运行时，是引擎在长子调用中不响应 abort**——t46 的两个候选原因里是第二个。原实现只能"请求取消"，上限的可靠性等于引擎的合作度。
-- **Reason（为何报告里要写 deadline）:** t46 无法回答"到底哪个值在生效"——该值只存在于内存。现在它与路由链一起写进报告，会话日志即可自证。
+- **Decision:** `runWorkflow` 的 deadline 不再「abort 一个 signal 然后等引擎收尾」，而是**插件自己的硬上限**：一次 `Promise.race([run.result, deadline])`，deadline 先到就 `run.cancel('workflow deadline exceeded after N ms')` 并当场返回超时报告；`config.timeoutMs` 同时进入运行报告（`Deadline: <n> ms per run (enforced by the plugin)`）。
+- **Reason:** t46 在设置页保存 60 000 ms 后，运行在 2 分 40 秒、5 分钟时仍在工作；本轮用**干净重启 + profile patch 直写 60 000**复现并定性：报告自己说 `workflow exceeded the 60000 ms deadline and was cancelled; the engine had not settled`，UI 上运行节点在 **61.5 s** 离开 `running`。即**设置到达了运行时，是引擎在长子调用中不响应 abort**——t46 的两个候选原因里是第二个。原实现只能「请求取消」，上限的可靠性等于引擎的合作度。
+- **Reason（为何报告里要写 deadline）:** t46 无法回答「到底哪个值在生效」——该值只存在于内存。现在它与路由链一起写进报告，会话日志即可自证。
 - **Reason（为何同时改取消原因）:** 原代码把 deadline 触发的取消写成 `workflow cancelled by its caller`，把责任指向用户；现在写 `workflow deadline exceeded after N ms`，与 unload（`plugin unloaded`）、用户中止（`by its caller`）三分为三。
 - **Evidence:** `test/reliability.spec.ts` 新增"stubborn engine"用例：`cancel()` 是 no-op 的引擎下，1 000 ms deadline 约 1.0 s 返回 Timeout 报告（修复前会一直等），并断言 cancel 原因含 `workflow deadline exceeded` 且不含 `by its caller`；`test/report.spec.ts` 断言 `Deadline:` 行与 `limits.timeoutMs` 不符即拒收；真机取证 `docs/knowledge/evidence/t47/B1-deadline-report.txt`、`A-run.log`。
-- **Alternatives rejected:** 只改文档、把"引擎不合作"留作已知问题（用户拿不到按时报告，且下一次仍会被误判为"设置没生效"）；在引擎侧修 abort（属 DSH 核心，越界）。
+- **Alternatives rejected:** 只改文档、把「引擎不合作」留作已知问题（用户拿不到按时报告，且下一次仍会被误判为「设置没生效」）；在引擎侧修 abort（属 DSH 核心，越界）。
 - **Consequences:** 超时报告可能先于引擎真正停下出现——报告文案已明说 `the engine had not settled, so this report is the authoritative result`；被杀掉的 run 仍走既有 `run.dispose()` 路径。
 
 ## D-019 — 卸载提示行：只入台账 + 报告是唯一用户可见通道（t47，插件侧无渲染路径）
 
 - **Status:** CONFIRMED（0.2.3 提案挂在末尾）
 - **Date:** 2026-10-28
-- **Decision:** 卸载时写入的提示行**保持** `assistant/message`（`source: grok-workflow/workflow-notice`，带 `surfaceOp: 'append'`）不变；**不再**把它当作 transcript 通道承诺。用户告知由报告承担，提示行的第二个作用（把"强制工作流已关闭"写进下一轮上下文）保留。
+- **Decision:** 卸载时写入的提示行**保持** `assistant/message`（`source: grok-workflow/workflow-notice`，带 `surfaceOp: 'append'`）不变；**不再**把它当作 transcript 通道承诺。用户告知由报告承担，提示行的第二个作用（把「强制工作流已关闭」写进下一轮上下文）保留。
 - **Reason:** 该行位于 `turn=1 step=0`，而客户端只为 `step/start` 开节点（`dsh-client-ui-chat/lib/client.js:8094-8108`：`step/start → start`，`assistant/message` + `surfaceOp: append → update`），`buildViewNode` 又需要该 step 节点的 `publishedAssistantData`；本会话第一个 `step/start` 出现在提示行之后（`seq 14`，`turn 1 step 1`），故 `1:0` 永远没有节点，行被丢弃。可选路径逐条被堵：伪造 `step/start` 会往日志里塞一个 agent loop 从未开启的 step（loop 的编号、`turn-process` 分组与下一轮上下文都从日志推导）；`system/message` 渲染成**系统提示卡**（`client.js:9947-9966`），用它等于宣称提示词变了；`conversation.chat.node` 是**按 key 的渲染座位**（`client.js:7180-7215`，key 为 user/steering/context/turn-trigger/system-prompt/assistant-step…），节点只能由 chat 包自己的投影创建（`chatNode()` 是模块私有）；包里没有任何 toast/notice API。
-- **Reason（为何不改成 plugin 事件）:** 提示行现在会进入 surface，下一轮上下文因此知道"强制工作流已关闭"——这是 t45 的设计意图；改成不可渲染的 `plugin:*` 事件会丢掉这个作用，而换不来任何用户可见性。
+- **Reason（为何不改成 plugin 事件）:** 提示行现在会进入 surface，下一轮上下文因此知道「强制工作流已关闭」——这是 t45 的设计意图；改成不可渲染的 `plugin:*` 事件会丢掉这个作用，而换不来任何用户可见性。
 - **Evidence:** `docs/knowledge/evidence/t47/`：`E5-notice-event.json`（事件含 `surfaceOp: "append"`，`turn 1 step 0`）、`E3-conversation-after-unload.{png,txt}`（同一会话的 transcript 里没有该行）、`E5-report-relay.txt`（同一 run 的报告写明因卸载被取消）。同时纠正 t46 的错误结论：该事件**带** `surfaceOp`，t46 是在 `data` 里找的。
 - **Alternatives rejected:** 写成 `user/message`（t45 已测：非 `user` source 的用户行不被渲染，且会伪造用户发言）；写进当前 step 的 `assistant/message`（会把模型回复覆盖掉）；在卸载瞬间发 toast（bundle 正在被销毁，且 toast 是瞬时的，不构成可回溯的告知）。
-- **Consequences (0.2.3 提案):** 要让插件写出"能看见的一行"，需要 DSH 侧提供其一：①公开的 chat node 贡献 API（插件自带 key + 自己的投影），或 ②带投影的 notice 事件类型。两者都在"外部插件、不改核心"的边界之外，故本版如实降级，未静默丢弃。
+- **Consequences (0.2.3 提案):** 要让插件写出「能看见的一行」，需要 DSH 侧提供其一：①公开的 chat node 贡献 API（插件自带 key + 自己的投影），或 ②带投影的 notice 事件类型。两者都在「外部插件、不改核心」的边界之外，故本版如实降级，未静默丢弃。
 
 ## D-020 — 任务判定只认结构化判断，散文字段不参与（t49，修 8/12 报告的质量失败）
 
 - **Status:** CONFIRMED
 - **Date:** 2026-10-28
 - **Decision:** `checkVerification` 的判定依据是 verifier 的**结构化判断**：`verdict`、每条验收标准一条 `criteria`（含 `met` 与非空 `evidence`）、以及 `checkedEvidence` 非空、criteria 条数与任务一致。散文字段 `issues` **不参与判定**：已通过任务的 `issues` 以 `verifier note: …` 进入报告 `Uncertainties`。`verdict: fail` 或任一 `met: false` 仍然判失败。
-- **Reason:** 测试 home 12 份报告里 **8 份**失败的 reason 全是 `verifier reported issues: …`，而该字符串由 `checkVerification` 里**晚于** verdict 检查的分支产出 ⇒ 这 8 次 verifier 的 `verdict` 都是 `pass`，任务只因它写了句备注就判失败。备注自己的措辞是"non-blocking"、"minor observation rather than a failure"、"does not affect any acceptance criterion"、"判定为满足"。即这是**我方判定缺陷**，不是"flash 当 verifier 太严"也不是"worker 太弱"：同一批数据里 verifier 从未把某条标准判为不满足。
-- **Reason（为何不让散文否决结构）:** 两个权威并存时弱者胜出，等于要求模型"不许有任何意见"才能通过；模型对散文的用词不可控（本次是提示词从未定义 `issues` 的含义，只要求该字段存在）。判定的可解释性也要求单一权威：`met`/`evidence` 可逐条核对，散文不可。
+- **Reason:** 测试 home 12 份报告里 **8 份**失败的 reason 全是 `verifier reported issues: …`，而该字符串由 `checkVerification` 里**晚于** verdict 检查的分支产出 ⇒ 这 8 次 verifier 的 `verdict` 都是 `pass`，任务只因它写了句备注就判失败。备注自己的措辞是"non-blocking"、"minor observation rather than a failure"、"does not affect any acceptance criterion"、「判定为满足」。即这是**我方判定缺陷**，不是「flash 当 verifier 太严」也不是「worker 太弱」：同一批数据里 verifier 从未把某条标准判为不满足。
+- **Reason（为何不让散文否决结构）:** 两个权威并存时弱者胜出，等于要求模型「不许有任何意见」才能通过；模型对散文的用词不可控（本次是提示词从未定义 `issues` 的含义，只要求该字段存在）。判定的可解释性也要求单一权威：`met`/`evidence` 可逐条核对，散文不可。
 - **Reason（为何补提示词）:** 只改代码会让 `issues` 变成陷阱（模型以为写了有用、实际被降级为备注）。提示词现明确：`issues` 只放**阻塞性问题**，且必须与 `verdict: fail` / `met: false` 一致；残余疑虑写 `confidence`。
 - **Evidence:** `test/config.spec.ts` 新增三例（不含阻塞项、只用**真机原文**当 `issues` → `COMPLETED` 且备注进 `Uncertainties`；`met: false` → 仍失败；`verdict: fail` → 仍失败）；变异验证：恢复 `if (issues.length > 0) return …` 后 3 例中 2 例失败。真机：同一 flash 三链、同一批目标句（t46 第 1/4 轮曾失败）在修复后两次 `COMPLETED`（`docs/knowledge/evidence/t49/Q2-report.txt`、`Q4-report.txt`）。逐份归类的分析见 VALIDATION Round 8 与 `evidence/t49/README.md`。
-- **Alternatives rejected:** 保留 `issues ⇒ fail`，靠换更强模型绕过（用户仍会因一句备注丢弃整轮工作，且把产品缺陷伪装成模型能力问题）；只改提示词不改代码（散文仍能否决结构化判断，模型换个说法就又失败）；把 `issues` 全部删掉（丢掉真实观察，报告里就看不到"这次取证是间接的"这类重要限定）。
-- **Consequences:** 发布说明不得把"质量"说成提升——这是判定缺陷的修复，不是模型变强；0.2.2 的报告会把非阻塞备注放在 `Uncertainties`，读者仍能看到限定语。想更严/更松的验证属于 `roles.verifier` 的模型选择。`maxRetries: 0` 下真实质量问题仍是一次即失败、不重试。
+- **Alternatives rejected:** 保留 `issues ⇒ fail`，靠换更强模型绕过（用户仍会因一句备注丢弃整轮工作，且把产品缺陷伪装成模型能力问题）；只改提示词不改代码（散文仍能否决结构化判断，模型换个说法就又失败）；把 `issues` 全部删掉（丢掉真实观察，报告里就看不到「这次取证是间接的」这类重要限定）。
+- **Consequences:** 发布说明不得把「质量」说成提升——这是判定缺陷的修复，不是模型变强；0.2.2 的报告会把非阻塞备注放在 `Uncertainties`，读者仍能看到限定语。想更严/更松的验证属于 `roles.verifier` 的模型选择。`maxRetries: 0` 下真实质量问题仍是一次即失败、不重试。
 
-## D-021 — 每条消息必过"前台"，前台公开分流四档（t52，语义变更）
+## D-021 — 每条消息必过「前台」，前台公开分流四档（t52，语义变更）
 
 - **Status:** CONFIRMED（用户明确授权，方案 C）
 - **Date:** 2026-10-28
-- **Decision:** 需求 A 的原文"每条用户消息强制走完整工作流"改为"**每条用户消息必过前台（front desk），前台公开给出档位与理由，绝不偷懒跳过**"。前台把消息分成四档：`chat`（直答档，模板秒回）、`fast`（快手档，单工人一次调用）、`team`（团队档，完整工作流 + 开工迎宾 + 进度面板）、`ask`（确认档，反问一句"这个要动用团队吗？可回复：简单 / 团队"）。配置 `mode: 'triage' | 'full'`，`full` 逐字节复现 0.2.2 之前的行为（每条消息都走团队，无档位行、无迎宾语、无轻量调用），旧模式的用户不受影响。
-- **Reason:** 铁律的代价是每条"你好"都付一次规划+干活+检查；用户要的是"该省的省、该认真时认真，但**不许偷偷降级**"。因此判据从"是否走完整工作流"变成"是否公开档位并给出理由"：直答与快手档都在回答里写明"档位：X — 因为：…"，且直答档明说"这条没有动用团队"、快手档明说"只派了一个工人"。偷懒（不说明就单干）仍是被禁止的。
-- **Reason（判据必须便宜）:** 分流是纯字符串判定（`src/triage.ts`，无时钟、无 I/O、无模型调用），因为一次分类用模型会给每条消息加一次成本与延迟——包括本该"秒回"的问候。规则判不准的部分交给用户：这正是 `ask` 档存在的意义，比"猜"便宜也比"猜"诚实。
-- **Reason（直答档用模板而非一次调用）:** 实测在 :3100 上，直答档的一次模型调用返回 `{"reply":null}`（`agentsStarted=1 value={"reply":null}`），而同一脚本的快手档正常返回答案；模板同时满足"秒回"这一档位承诺，且没有失败模式。见 VALIDATION Round 9。
+- **Decision:** 需求 A 的原文「每条用户消息强制走完整工作流」改为「**每条用户消息必过前台（front desk），前台公开给出档位与理由，绝不偷懒跳过**」。前台把消息分成四档：`chat`（直答档，模板秒回）、`fast`（快手档，单工人一次调用）、`team`（团队档，完整工作流 + 开工迎宾 + 进度面板）、`ask`（确认档，反问一句「这个要动用团队吗？可回复：简单 / 团队」）。配置 `mode: 'triage' | 'full'`，`full` 逐字节复现 0.2.2 之前的行为（每条消息都走团队，无档位行、无迎宾语、无轻量调用），旧模式的用户不受影响。
+- **Reason:** 铁律的代价是每条「你好」都付一次规划+干活+检查；用户要的是「该省的省、该认真时认真，但**不许偷偷降级**」。因此判据从「是否走完整工作流」变成「是否公开档位并给出理由」：直答与快手档都在回答里写明「档位：X — 因为：…」，且直答档明说「这条没有动用团队」、快手档明说「只派了一个工人」。偷懒（不说明就单干）仍是被禁止的。
+- **Reason（判据必须便宜）:** 分流是纯字符串判定（`src/triage.ts`，无时钟、无 I/O、无模型调用），因为一次分类用模型会给每条消息加一次成本与延迟——包括本该「秒回」的问候。规则判不准的部分交给用户：这正是 `ask` 档存在的意义，比「猜」便宜也比「猜」诚实。
+- **Reason（直答档用模板而非一次调用）:** 实测在 :3100 上，直答档的一次模型调用返回 `{"reply":null}`（`agentsStarted=1 value={"reply":null}`），而同一脚本的快手档正常返回答案；模板同时满足「秒回」这一档位承诺，且没有失败模式。见 VALIDATION Round 9。
 - **Reason（档位文字跟随消息语言而非 DSH 界面语言）:** 用户可能界面是英文而用中文提问，此时中文迎宾语才是他要的；消息语言同步可得。设置页的中英双语仍跟随 DSH 语言（那是浏览器端的 i18n 契约）。
 - **Evidence:** `test/triage.spec.ts`（t52 交付时 22 例，t53 F1 修复后 **26 例**：分类表、彩蛋与回答语境、强制升级、`full` 回退、各档行为、措辞双语、14 条定向样本回归）；`npm test` 22 文件 / **366** 例（336 → 358 → 362 → 365 → 366，不回退）；真机矩阵见 VALIDATION Round 9/10 与 `docs/knowledge/evidence/t52/`、`evidence/t54/`。
-- **Alternatives rejected:** 继续铁律（每条消息都付团队成本，用户已明确否决）；纯模型分类器（每条消息多一次调用/延迟，且判定依据进了不可审计的地方）；静默降级（不告诉用户走了哪档——这正是需求要禁的"偷懒"）；把 `ask` 档做成"猜一个"（用户明确要"拿不准就问"）。
-- **Consequences:** 新增 3 个配置键（`mode`、`triageAsk`、`triageModel`），配置键总数 23 → **26**；`mode: 'full'` 是回退通道，`triageAsk: false` 让拿不准直接升级到团队档。既有测试里凡测"门禁/运行"的用例显式写 `mode: 'full'`，语义不变。
+- **Alternatives rejected:** 继续铁律（每条消息都付团队成本，用户已明确否决）；纯模型分类器（每条消息多一次调用/延迟，且判定依据进了不可审计的地方）；静默降级（不告诉用户走了哪档——这正是需求要禁的「偷懒」）；把 `ask` 档做成「猜一个」（用户明确要「拿不准就问」）。
+- **Consequences:** 新增 3 个配置键（`mode`、`triageAsk`、`triageModel`），配置键总数 23 → **26**；`mode: 'full'` 是回退通道，`triageAsk: false` 让拿不准直接升级到团队档。既有测试里凡测「门禁/运行」的用例显式写 `mode: 'full'`，语义不变。
 
 ## D-022 — 前台判据是规则，档位文字跟随消息语言（t52）
 
 - **Status:** CONFIRMED
 - **Date:** 2026-10-28
-- **Decision:** `classifyTriage()` 只读消息文本与两项策略（`mode`、`triageAsk`）；语言由消息是否含 CJK 决定（`detectLanguage`）。优先级：`full` 模式 → 上一轮"确认档"的回答 → 显式升级（"用团队"）→ 寒暄词典 → 指向型模糊（"把这个弄一下"）→ 长度/信号计分（`deliverables` 计数、多步连接词、分句数）。
-- **Reason:** 规则可测、可解释、零延迟；每条规则都在 `test/triage.spec.ts` 里有正反例。CJK 判定是为了让"双语措辞"落在用户读得懂的语言上（见 D-021）。
+- **Decision:** `classifyTriage()` 只读消息文本与两项策略（`mode`、`triageAsk`）；语言由消息是否含 CJK 决定（`detectLanguage`）。优先级：`full` 模式 → 上一轮「确认档」的回答 → 显式升级（「用团队」）→ 寒暄词典 → 指向型模糊（「把这个弄一下」）→ 长度/信号计分（`deliverables` 计数、多步连接词、分句数）。
+- **Reason:** 规则可测、可解释、零延迟；每条规则都在 `test/triage.spec.ts` 里有正反例。CJK 判定是为了让「双语措辞」落在用户读得懂的语言上（见 D-021）。
 - **Evidence:** 分类表在 t52 交付时 21 例通过，t53 F1 追加后 `test/triage.spec.ts` 共 26 例；`full` 模式回归：既有 336 例在 `mode: 'full'` 下全部保持（t52 后 358，t53 F1 后 362，t56 后 365，t58 后 366）。
 - **Alternatives rejected:** 读 DSH 的 `locale` 偏好作为唯一依据（它是浏览器偏好，可能与消息语言不一致，且需经 `settings.describe()` 重读整个命名空间）；英文动词不加词边界（实测 `run.ts` 被当成动词 `run`，把重构任务压到快手档——已修，测试钉住）。
 - **Consequences:** 规则漏判由 `ask` 档承接，不会静默降级；新增词汇需要同时补测试与 `DETAIL` 文案。
@@ -276,31 +276,31 @@ Each entry records the decision, evidence, alternatives, and status.
 - **Status:** CONFIRMED
 - **Date:** 2026-10-28
 - **Decision:** `fast` 档用 `workflowEngine.start()` 跑一段"只有一个 `agent()`"的脚本（`runSingleCall`），不直接调 provider，也不复用完整工作流脚本。该调用分两次形态：**主调用不带 schema**（子代理的自然语言回答就是答案），只有在主调用拿不到任何文本时才**重试一次带 schema 的结构化调用**（`{"reply": …}`）。
-- **Reason:** 直接调 provider 会绕开引擎已经做对的三件事：把子 agent 归属到父 agent、计入子 agent 上限、发出 `workflow/agent-start` 供进度面板显示；而完整工作流会给"简单任务"强加规划与复核的成本。失败时不静默升级为团队档（否则档位行就是谎话），而是如实告知"快手档没答出来"。
-- **Evidence:** `test/triage.spec.ts`（快手档 1 次调用、失败不改档位）；真机 :3100 快手档返回"30"并带"只派了一个工人"（`evidence/t52/M2-fast.txt`）。
-- **Alternatives rejected:** 复用完整脚本（两次以上调用、分钟级延迟）；直连 provider（丢失归属/上限/进度）；失败后自动升级（档位行失真，且用户以为"很快"却等了几分钟）。
-- **Consequences:** 快手档模型由 `triageModel` 覆盖，留空即用本次运行的路线；一次调用失败就是失败，需要重发或说"用团队"。
+- **Reason:** 直接调 provider 会绕开引擎已经做对的三件事：把子 agent 归属到父 agent、计入子 agent 上限、发出 `workflow/agent-start` 供进度面板显示；而完整工作流会给「简单任务」强加规划与复核的成本。失败时不静默升级为团队档（否则档位行就是谎话），而是如实告知「快手档没答出来」。
+- **Evidence:** `test/triage.spec.ts`（快手档 1 次调用、失败不改档位）；真机 :3100 快手档返回"30"并带「只派了一个工人」（`evidence/t52/M2-fast.txt`）。
+- **Alternatives rejected:** 复用完整脚本（两次以上调用、分钟级延迟）；直连 provider（丢失归属/上限/进度）；失败后自动升级（档位行失真，且用户以为「很快」却等了几分钟）。
+- **Consequences:** 快手档模型由 `triageModel` 覆盖，留空即用本次运行的路线；一次调用失败就是失败，需要重发或说「用团队」。
 
 ## D-024 — 确认档的记忆在插件内存里，10 分钟、用后即弃（t53 F1，明确披露）
 
 - **Status:** CONFIRMED
 - **Date:** 2026-10-28
-- **Decision:** `ask` 档问出的那句"这个要动用团队吗？"以及用户随后回答的"简单/团队"，存在 `installGate` 内的 `pendingAsks: Map<agentId, askedAt>` 里：**进程内存**、TTL 10 分钟、取值即删（`takePending`）。不做会话持久化。
-- **Reason:** 持久化需要把"本会话正等待一次分档回答"写进会话事件再读回来；本插件能**写**自己的记录（`plugin:grok-workflow/delivery`），但没有在真机上验证过的"读回自己历史记录"的接口，猜一个 API 会在运行期变成新的失败面——这比一次可以说明白的遗忘更糟。因此选择"诚实降级"：过期或重载后的裸"简单/团队"落 `chat` 档并明说原因（`stale-choice`），绝不静默开跑用户没配对任务的活儿，也不崩。
-- **Reason（为什么不能靠猜）:** 没有 pending 时把裸"团队"当强制升级，会让一句回答过期的"团队"启动一次完整工作流，花的钱和"这条消息要干什么"完全无关；把裸"简单"当快手档则会让一个工人去执行一个不存在的任务。两种都比"问回一句"更糟。
+- **Decision:** `ask` 档问出的那句「这个要动用团队吗？」以及用户随后回答的「简单/团队」，存在 `installGate` 内的 `pendingAsks: Map<agentId, askedAt>` 里：**进程内存**、TTL 10 分钟、取值即删（`takePending`）。不做会话持久化。
+- **Reason:** 持久化需要把「本会话正等待一次分档回答」写进会话事件再读回来；本插件能**写**自己的记录（`plugin:grok-workflow/delivery`），但没有在真机上验证过的「读回自己历史记录」的接口，猜一个 API 会在运行期变成新的失败面——这比一次可以说明白的遗忘更糟。因此选择「诚实降级」：过期或重载后的裸「简单/团队」落 `chat` 档并明说原因（`stale-choice`），绝不静默开跑用户没配对任务的活儿，也不崩。
+- **Reason（为什么不能靠猜）:** 没有 pending 时把裸「团队」当强制升级，会让一句回答过期的「团队」启动一次完整工作流，花的钱和「这条消息要干什么」完全无关；把裸「简单」当快手档则会让一个工人去执行一个不存在的任务。两种都比「问回一句」更糟。
 - **Evidence:** `test/triage.spec.ts`「does not crash on a bare choice word with no question waiting」（4 个裸词 → `chat`/`stale-choice`，且回答里说明了原因；`pending: true` 时同样四个词正确读作回答）；真机 t54 矩阵把这四个词逐条发过（`evidence/t54/`）。用户可见披露：README「The front desk」小节与 `DETAIL['stale-choice']`。
-- **Consequences:** 插件重载、或隔了十分钟以上再回"简单/团队"，会收到"上一轮没有待回答的分流问题…"的回答，需要把任务和选择写在一起（例如"用团队：把 X 改成 Y"）。这是记录在 README 的限制，不是缺陷。
-- **Alternatives rejected:** 会话持久化（无验证过的读回接口，风险高于收益，见上）；永不失效（一句隔夜的"团队"启动一次完整工作流）；静默把裸词当强制升级（见上）。
+- **Consequences:** 插件重载、或隔了十分钟以上再回「简单/团队」，会收到「上一轮没有待回答的分流问题…」的回答，需要把任务和选择写在一起（例如「用团队：把 X 改成 Y」）。这是记录在 README 的限制，不是缺陷。
+- **Alternatives rejected:** 会话持久化（无验证过的读回接口，风险高于收益，见上）；永不失效（一句隔夜的「团队」启动一次完整工作流）；静默把裸词当强制升级（见上）。
 
 ## D-025 — 档位判定的顺序就是它的正确性：短路规则必须让位给强信号（t53 F1 blocker）
 
 - **Status:** CONFIRMED
 - **Date:** 2026-10-28
-- **Decision:** `classifyTriage` 的规则顺序固定为：`full` 模式 → 上一轮确认档的回答 / 裸选词 → 点名团队 → 寒暄词典 → 插件自述 → **指向模糊** → 长目标 → **多步（先…然后/序号/顿号/分号/并+动词）** → 团队计分 → **已识别的问句形态（≥ 快手档，绝不用模板）** → **短而惰性（模板）** → 冲突反问 → 快手 → 反问/升级。两条硬约束：①任何"廉价短路"（模板直答）必须排在全部强信号之后；②带锚点（路径/文件名/错误码/代码片段）的"这个报错"不算模糊，直接派工。
-- **Reason:** t53 验收 blocker 的根因不是某条规则写错，而是**顺序**：`len<=40 && 无交付物 && 无动作动词 && 单句` 这条"短即寒暄"的短路排在多步与提问之前，于是"为什么天空是蓝的""先备份然后升级""这个报错 src/x.ts:42"全被模板答成寒暄，活儿一点没干。同时"模糊即反问"过宽，把带路径的真实报错也拦下来反问了一遍。
-- **Reason（为什么提问单独成信号）:** 问句往往短、没有动作动词、没有交付物名词——按词汇计分永远落在"惰性"一侧，而它恰恰是**一定要去查证**的一类消息。把它作为独立信号提到短路之前，"短问句"就不再依赖长度或动词表。
-- **Evidence:** `test/triage.spec.ts` 新增 4 组回归（14 条 t53 定向样本 + 中英对照若干）：短问句中/英各 3-4 条 → `fast`/`question`；短两步"先…然后/再"、"备份数据库并通知我"、`1) 2)`、`一、二、`、分号分隔 → `team`；带路径/错误码/片段的"这个报错" → 不止反问（`fast`），而"改一下那个"仍反问；裸词 → `chat`/`stale-choice`。全量 `npm run ci`：22 文件 / **362** 例（此后 365、366，见 D-026/D-027）。真机 :3100 逐条复验见 VALIDATION Round 10 与 `docs/knowledge/evidence/t54/`。
-- **Alternatives rejected:** 只加提问词典、不改顺序（多步仍被短路吃掉）；把"短"阈值调小（治不了"先备份然后升级"这种 7 字两步）；用模型判断"这是不是问句"（又是每条消息一次调用，见 D-022）；把模糊判定整体删掉（"改一下那个"就没人问了）。
+- **Decision:** `classifyTriage` 的规则顺序固定为：`full` 模式 → 上一轮确认档的回答 / 裸选词 → 点名团队 → 寒暄词典 → 插件自述 → **指向模糊** → 长目标 → **多步（先…然后/序号/顿号/分号/并+动词）** → 团队计分 → **已识别的问句形态（≥ 快手档，绝不用模板）** → **短而惰性（模板）** → 冲突反问 → 快手 → 反问/升级。两条硬约束：①任何「廉价短路」（模板直答）必须排在全部强信号之后；②带锚点（路径/文件名/错误码/代码片段）的「这个报错」不算模糊，直接派工。
+- **Reason:** t53 验收 blocker 的根因不是某条规则写错，而是**顺序**：`len<=40 && 无交付物 && 无动作动词 && 单句` 这条「短即寒暄」的短路排在多步与提问之前，于是「为什么天空是蓝的」「先备份然后升级」「这个报错 src/x.ts:42」全被模板答成寒暄，活儿一点没干。同时「模糊即反问」过宽，把带路径的真实报错也拦下来反问了一遍。
+- **Reason（为什么提问单独成信号）:** 问句往往短、没有动作动词、没有交付物名词——按词汇计分永远落在「惰性」一侧，而它恰恰是**一定要去查证**的一类消息。把它作为独立信号提到短路之前，「短问句」就不再依赖长度或动词表。
+- **Evidence:** `test/triage.spec.ts` 新增 4 组回归（14 条 t53 定向样本 + 中英对照若干）：短问句中/英各 3-4 条 → `fast`/`question`；短两步「先…然后/再」、「备份数据库并通知我」、`1) 2)`、`一、二、`、分号分隔 → `team`；带路径/错误码/片段的「这个报错」 → 不止反问（`fast`），而「改一下那个」仍反问；裸词 → `chat`/`stale-choice`。全量 `npm run ci`：22 文件 / **362** 例（此后 365、366，见 D-026/D-027）。真机 :3100 逐条复验见 VALIDATION Round 10 与 `docs/knowledge/evidence/t54/`。
+- **Alternatives rejected:** 只加提问词典、不改顺序（多步仍被短路吃掉）；把「短」阈值调小（治不了「先备份然后升级」这种 7 字两步）；用模型判断「这是不是问句」（又是每条消息一次调用，见 D-022）；把模糊判定整体删掉（「改一下那个」就没人问了）。
 - **Consequences:** 规则顺序从此是**被测试钉住的产品契约**：新增短路规则必须排在多步/提问之后，否则回归测试会失败。`TriageSignals` 增加 `question` 与 `concrete` 两个字段，供后续规则复用。
 
 ## D-026 — t56 收尾：两条契约缺口按「改实现」补齐，并记下英文问句的教训
@@ -308,30 +308,30 @@ Each entry records the decision, evidence, alternatives, and status.
 - **Status:** CONFIRMED
 - **Date:** 2026-10-28
 - **Decision:** 三处缺口一律**改实现**而不是改契约文字（D-025 已经承诺过它们）：
-  1. **句尾"几"**：`QUESTION` 从 `几[个号年月天时分秒]` 放宽为 `几(?![十百千万乎])`，于是 `等于几`、`得几`、
-     `几台`、`几条记录`、`是几`、`剩几`、`几核` 都算问句（"几十/几百/几乎/几何"不算）。
+  1. **句尾「几」**：`QUESTION` 从 `几[个号年月天时分秒]` 放宽为 `几(?![十百千万乎])`，于是 `等于几`、`得几`、
+     `几台`、`几条记录`、`是几`、`剩几`、`几核` 都算问句（「几十/几百/几乎/几何」不算）。
   2. **纯顿号列表**：新增 `COMMA_LIST = /(?:[^\s、，。；;:：]{1,10}、){2,}/`——**三个及以上**顿号项算多步
      （`改配置、重启、验证` → 团队档）。两个项（`读、写`）不算：那通常是一个动作的两种说法，判成团队是浪费。
   3. **`并+动词`**：动词表补 `回滚|回退|重启|验证|灰度`。
-  另外 `vague`（模糊即反问）**让位给提问**：带指向词的问句（`这个得几`）是"要去查一下"，不是"线索不足"，因此
+  另外 `vague`（模糊即反问）**让位给提问**：带指向词的问句（`这个得几`）是「要去查一下」，不是「线索不足」，因此
   `vague` 规则加了 `&& !question`；无对象的指向（`改一下那个`）仍然反问。
-- **Reason（为什么改实现）:** 契约文字是产品承诺，实现在它后面；如果为了省事改文字，就等于把"用户以为有保护"变成
-  "文档承认没保护"。这三条都在 D-025 里写明承诺过，所以必须让代码追上文字。
+- **Reason（为什么改实现）:** 契约文字是产品承诺，实现在它后面；如果为了省事改文字，就等于把「用户以为有保护」变成
+  「文档承认没保护」。这三条都在 D-025 里写明承诺过，所以必须让代码追上文字。
 - **Reason（英文的教训）:** t56 真机复验抓到一条单测没覆盖的误判——`is this repo using esm or cjs` 既没有 `?`，
   也不含任何 wh-词，于是被判成 `确认档`，前台对一个问题反问了一遍。英文是非问句的形态是**助动词前置**，不是问号；
   规则据此补 `\b(?:is|are|was|were|does|do|did|can|could|should|would|will|have|has)\s+(?:it|this|that|…)\b`。
   同时给 `MULTI_STEP` 补英文顺序词（`then`/`first…then`/`afterwards`/`finally`），保证 `do this then that` 仍先被
-  判成多步，不会被"助动词前置"吃成问句。
-- **Evidence:** `test/triage.spec.ts` 追加 3 组共 5 个断言块（句尾"几"8 例、顿号/回滚、英文是非问句 5 例 + `do this
+  判成多步，不会被「助动词前置」吃成问句。
+- **Evidence:** `test/triage.spec.ts` 追加 3 组共 5 个断言块（句尾「几」8 例、顿号/回滚、英文是非问句 5 例 + `do this
   then that` 反例），全量 **22 文件 / 365 例**；真机 44 条矩阵在隔离工作区 `/tmp/t56-work` 上跑（VALIDATION Round 11，
   `evidence/t56/`）。误判修好前后的真机证据：同一句 `is this repo using esm or cjs` 修前 `Tier: confirm`（会话日志
   `session-b2159958…` 第 6 条），修后 `档位：快手档`。
-- **Consequences:** 分类器的"问句"面更宽了（更多短消息落在快手档），这是有意的：问句是最不能省的一类消息。
+- **Consequences:** 分类器的「问句」面更宽了（更多短消息落在快手档），这是有意的：问句是最不能省的一类消息。
   两个不变量因此可写死为测试断言：**多步永不吃模板、已识别的问句形态永不用模板**。
-- **Alternatives rejected:** 只补中文顿号（英文是非问句继续误判）；把"三个顿号项"降成两个（`读、写` 会被判团队）；
+- **Alternatives rejected:** 只补中文顿号（英文是非问句继续误判）；把「三个顿号项」降成两个（`读、写` 会被判团队）；
   用模型判断问句（每条消息一次调用，见 D-022）。
 
-## D-027 — 问句按**形态**识别，不按词表；"绝不用模板"只对**已识别的形态**承诺（t58）
+## D-027 — 问句按**形态**识别，不按词表；「绝不用模板」只对**已识别的形态**承诺（t58）
 
 - **Status:** CONFIRMED
 - **Date:** 2026-10-28
@@ -343,20 +343,20 @@ Each entry records the decision, evidence, alternatives, and status.
      `我该用 yarn 还是 pnpm` 是问句，`他还是走了` / `他还是没有提交` / `我还是觉得应该用 pnpm` 不是。
   3. **`谁`**：`/谁/u`，再用 `WHO_REPORTED`（`问/说/告诉/知道` 后 6 字内出现 `谁`）排除转述：
      `端口 8080 被谁占了` 是问句，`他问是谁负责发布` 不是。
-  口径同时收紧：文档与测试里"问句永不用模板"改为"**已识别的问句形态**永不用模板"——规则没认出来的形态
+  口径同时收紧：文档与测试里「问句永不用模板」改为「**已识别的问句形态**永不用模板」——规则没认出来的形态
   （例如纯陈述式的偏好表达）不在这条承诺之内，落 `直答档` 也不算违反契约。
 - **Reason（为什么形态化）:** t57 的三个对抗探针——`端口 8080 被谁占了`、`logs 里 500 多不多`、
   `我该用 yarn 还是 pnpm`——对任何读者都是明显问句，却一个词典词都不含。逐词打补丁会一直输给这类句子
-  （上一轮刚补了 `几`，这一轮又冒出三个），所以改成"识别问句的**构造**"：重复动词、二选一、疑问代词。
+  （上一轮刚补了 `几`，这一轮又冒出三个），所以改成「识别问句的**构造**」：重复动词、二选一、疑问代词。
   这三条覆盖了汉语是非问句与选择问句的主要形态，且不依赖任何领域词。
-- **Reason（为什么必须同时写边界）:** 形态规则天然会误伤陈述：`他还是走了`（副词"还是"）、
+- **Reason（为什么必须同时写边界）:** 形态规则天然会误伤陈述：`他还是走了`（副词「还是」）、
   `他还是没有提交`（副词 + 否定）、`他问是谁负责发布`（转述）。所以每条形态都配一条**排除规则**，
-  并且把边界写成测试断言——否则"修好一个问题问句"会换回"把陈述句当问句"。
+  并且把边界写成测试断言——否则「修好一个问题问句」会换回「把陈述句当问句」。
 - **Evidence:** `test/triage.spec.ts`「recognises A不A / A没A, 还是 and 谁 as question shapes」：8 条问句
   全部 `fast`/`question`（含 t57 三条原句），4 条陈述句断言 `reason !== 'question'`，另加 `备份还是升级`
   （真二选一）仍为问句；`npm run ci` **22 文件 / 366 例**全绿。**这一轮只做规则级验证，没有跑真机矩阵**：
-  改动全在分类器规则内，单测是权威证据，真机只会重复 Round 11 已经证明的"档位行照常出现"。
-- **Consequences:** "问句"这条不变量从"永远成立"变成"**对已识别形态成立**"，并且是被排除规则钉住的可测边界。
+  改动全在分类器规则内，单测是权威证据，真机只会重复 Round 11 已经证明的「档位行照常出现」。
+- **Consequences:** 「问句」这条不变量从「永远成立」变成「**对已识别形态成立**」，并且是被排除规则钉住的可测边界。
   以后再遇到新形态（例如 `V 不 V` 之外的 `要不要/行不行`——已被同一规则覆盖），应先写形态再写排除，而不是加词。
 - **Alternatives rejected:** 继续加词（`谁`/`还是`/`多不多` 各加一条，下一批探针照样漏）；不写排除规则
   （陈述句被当成问句反问一遍，比漏判更烦人）；用模型判断问句（每条消息一次调用，见 D-022）。
@@ -365,7 +365,7 @@ Each entry records the decision, evidence, alternatives, and status.
 
 - **Status:** CONFIRMED（设计已定；phase 1 落地中：`src/mode.ts` 已测通，config/gate 接线在跑）
 - **Date:** 2026-10-28
-- **Decision:** 把"每条用户消息强制走工作流"从硬闸门改造成**会话级、运行时可用命令随时切**的 `/grok` 开关：
+- **Decision:** 把「每条用户消息强制走工作流」从硬闸门改造成**会话级、运行时可用命令随时切**的 `/grok` 开关：
   1. `/grok` 开（= 该会话走完整工作流）、`/grok off` 关（= 不拦，回普通聊天）。
   2. **默认关**（`grokDefault: 'off'`）：装好是普通聊天，`/grok` 才开。
   3. 状态存成一条插件记录 `plugin:grok-workflow/mode`（`{v:1, enabled, turn, setBy}`），
@@ -373,15 +373,15 @@ Each entry records the decision, evidence, alternatives, and status.
   4. 与现有三层**正交**：`enforceGate`（全局拦不拦）／`/grok`（本会话开不开）／`mode: full|triage`
      （开了之后走全套还是前台分诊）。
   5. 落点：`classifyPreStep` 新增一条 `pass, reason:'mode-off'` 放行分支（复用现成放行通道，
-     与 `subagent`/`out-of-scope`/`already-routed` 同路），只在"本会被认领"的批次上触发。
-- **Reason:** 用户要"可控、能命令随时切、别每条都硬拦"，同时保留"不静默降级"（默认关→开后仍走完整流程）。
+     与 `subagent`/`out-of-scope`/`already-routed` 同路），只在「本会被认领」的批次上触发。
+- **Reason:** 用户要「可控、能命令随时切、别每条都硬拦」，同时保留「不静默降级」（默认关→开后仍走完整流程）。
   plan-mode 式心智（命令 + 持久状态）比硬钩子更贴 DSH 原生、冲突更少。
 - **Evidence:** `src/mode.ts` + `test/mode.spec.ts`（13 例：读写、整值替换、坏记录不覆盖、fallback、写失败 warn-and-continue），
   持久机制实测见 RESEARCH.md「plugin-record persistence」。config/gate 接线 + 全套回归由集成轮补证。
-- **Consequences:** 失去"每条消息都强制验证"的**默认**保证（默认关，靠用时 `/grok` 开）；换来可控、少冲突、好懂。
-  "状态跨重启/翻记录不丢"由插件记录天然提供，无需新机制。
+- **Consequences:** 失去「每条消息都强制验证」的**默认**保证（默认关，靠用时 `/grok` 开）；换来可控、少冲突、好懂。
+  「状态跨重启/翻记录不丢」由插件记录天然提供，无需新机制。
 - **Alternatives rejected:** 保留硬闸门（不可控、易与其它插件/团队消息/webhook 冲突）；改成工具呈现模式
-  （native/ptc，语义错位，grok-workflow 本就跑在 PTC 运行时上）；状态只存内存（重启/翻记录就丢，违反"不静默降级"）。
+  （native/ptc，语义错位，grok-workflow 本就跑在 PTC 运行时上）；状态只存内存（重启/翻记录就丢，违反「不静默降级」）。
 - **Follow-up (2026-10-28):** config/gate 接线落地（`grokDefault:'off'` 默认 + `classifyPreStep`
   新增 `pass, reason:'mode-off'`，复用现成放行通道）；`npm run ci` **385 例 / 23 文件**全绿
   （+4 gate、+2 config）。`/grok` 命令模块随后补，之后停给用户验收。
@@ -397,18 +397,18 @@ Each entry records the decision, evidence, alternatives, and status.
 - **Decision:**
   1. `checkVerification` 从"`execution.status === 'failed'` 才否决"改为"**必须 `completed` 才可通过**"。
      自报 `partial`/`failed` 是执行者的承认，任何 verifier 的 pass 都不能把它翻成 verified。
-  2. planner 提示词禁止把目标改写成"尝试 X 并如实报告"/"预期失败"；验收标准必须是目标要求的**终态**。
+  2. planner 提示词禁止把目标改写成「尝试 X 并如实报告」/「预期失败」；验收标准必须是目标要求的**终态**。
      verifier 提示词：executor 说被阻塞/拒绝/未达成时，verdict 必须 fail。
   3. `ModeRecord` 增加可选 `workflowMode`；`/grok` 写入 `'full'`，闸门用它覆盖部署 `mode`。
      配置级 `grokDefault: 'on'` 仍尊重 `mode`（部署方选择分诊还是全流程）。
 - **Reason:** T5（真模型）里 `/proc` 写入必然失败、worker 自报 BLOCKED，却因 planner 把目标软化 +
-  `partial` 不被拦而报 `COMPLETED`。这与插件存在的理由（"不把'做完了'当完成"）直接冲突，
-  属于最高优先级缺陷。`/grok` 文案承诺完整流程，但 `mode: triage` 会静默改走前台分诊，同样是"说假话"。
+  `partial` 不被拦而报 `COMPLETED`。这与插件存在的理由（「不把'做完了'当完成」）直接冲突，
+  属于最高优先级缺陷。`/grok` 文案承诺完整流程，但 `mode: triage` 会静默改走前台分诊，同样是「说假话」。
 - **Evidence:** `test/orchestrator.spec.ts`（partial + 通过 verifier → failed）；`test/triage.spec.ts`
   （会话记录 → 无档位行）；`test/mode.spec.ts`（形状校验）；`test/command.spec.ts`（写入形状）。
   真机：T5 → `COMPLETED`（修前）/ `FAILED`（修后 T5b），T6 `PARTIAL`，见 VALIDATION Round 12。
-- **Consequences:** 更严：执行者自报未完成的活不能再被"验收标准改写"洗白；代价是 worker 用词偏保守时
-  会更多地落 `partial`/`failed`（这与"绝不静默降级"一致；重试一次仍可救回）。
+- **Consequences:** 更严：执行者自报未完成的活不能再被「验收标准改写」洗白；代价是 worker 用词偏保守时
+  会更多地落 `partial`/`failed`（这与「绝不静默降级」一致；重试一次仍可救回）。
 - **Alternatives rejected:** 只拦 `failed`（`partial` 仍可洗白，T5 就是这个口子）；只在提示词里劝
   planner（模型会漂移，必须有机械兜底）；把 `/grok` 文案改软（用户要的是完整流程，不是改文案）。
 
@@ -423,7 +423,7 @@ Each entry records the decision, evidence, alternatives, and status.
      （`queuedMs` 累加），不推进备用链、不消耗重试、不触动 `switchOn`。
   3. 证据与失败分离：`skippedBusy` / `queuedMs` 进 trail（`Route overflows …` 单独渲染，
      不进 `Route switches:`），台账 `recordRouting` 同步透传并做截断/取整。
-- **Reason:** 并发上限与失败是两回事：前者是"这条路正忙"，后者是"这条路不通"。混为一谈会把
+- **Reason:** 并发上限与失败是两回事：前者是「这条路正忙」，后者是「这条路不通」。混为一谈会把
   正常的负载分流读成故障切换，污染失败统计与重试预算。
 - **Evidence:** `test/route-concurrency.spec.ts`（7 例：校验拒绝、溢出分流、`skippedBusy`、
   全满排队峰值=1、clamp 钉死 `HARD_LIMITS`、预算不变、渲染与台账透传）；
@@ -442,21 +442,21 @@ Each entry records the decision, evidence, alternatives, and status.
 - **Decision:** 只有两种 `synthesis` / `roles.synthesizer` 不一致是**可恢复**的，
   load（含每次 `readConfig`）时 warn + 按修后值生效，工具/门禁/设置面照常激活：
   (a) 链非空 + `deterministic` → 按 `model` 生效；(b) `synthesis: model` + 链空 →
-  按 `deterministic` 生效。warn 文案含"已按…生效，请在设置页确认"，有效配置签名带
+  按 `deterministic` 生效。warn 文案含「已按…生效，请在设置页确认」，有效配置签名带
   `synthesis=<mode> (repaired)` 自证。其它（未知键/provider/模型、越界、畸形链、
   `switchOn`、budget）一律仍 hard fail（R-06 不动）；修后形状若还带第二缺陷，
   以第二缺陷为准抛错（修不掩错）。设置页对同样两种不一致红字拦 Save
   （`error.synthesisChainUnused`/`Missing`，中英双语）；合法组合才放行。
-- **Reason:** 配错一行就整行 `did not activate`，连设置页都没了，等于"没地方改"的死锁
+- **Reason:** 配错一行就整行 `did not activate`，连设置页都没了，等于「没地方改」的死锁
   （本轮 oper 现场：`synthesis` 缺省 `deterministic` + 配了 synthesizer 链）。
   这两形的用户意图是明确的（有链≈想要模型重写；要模型重写但链空≈先按规则跑），
-  修完意图不变；其它错误意图不明，一修就是"看起来能跑实际路由是错的"。
+  修完意图不变；其它错误意图不明，一修就是「看起来能跑实际路由是错的」。
 - **Evidence:** `test/config-synthesis-fallback.spec.ts`（8 例：a/b 双向修复、
   一致不动、未知键/越界数/畸形链不动、可恢复形下藏第二缺陷仍抛、`apply()` 三例、
   `(repaired)` 标记）；`test/client.spec.ts` 跨字段拦 Save（含空行不算链）；
   `npm run ci` 31 文件 / 540 测试；`lib/` 同步。
 - **Consequences:** `ResolvedConfig` 增可选 `synthesisRepaired?: boolean`
- （仅修后置位，`resolveConfig` 本身不置）；`ARCHITECTURE` 增"可恢复 vs 不可恢复"小节；
+ （仅修后置位，`resolveConfig` 本身不置）；`ARCHITECTURE` 增「可恢复 vs 不可恢复」小节；
   `CHANGELOG [Unreleased]` 中英双语。
 - **Alternatives rejected:** 全局 lenient 默认（吞掉拼错 provider 这类真错误）；
   只修 load 不修运行期 save（坏 save 仍杀下次启动）；只 host 修不加设置页联动
@@ -502,15 +502,15 @@ Each entry records the decision, evidence, alternatives, and status.
   `historyTurns`/`historyChars`，硬上限 `CARRYOVER_LIMITS = { rounds: 24, chars: 12000 }`，
   超限保留最新一轮并写明丢弃轮数；③注入点为 `args.carryover` → 四个角色提示词，
   首轮不带该键（payload 与此前逐字节一致）；④无前序信息时完全静默，不占位、不编造。
-- **Reason:** 用户可见失败是"我这轮是单次进来的，看不到刚才上面的研究结果"——子代理确实看不到，
-  所以修的是"让它看到"，而不是"让它别这么说"。改 records/归档会撞独立任务的写路径。
+- **Reason:** 用户可见失败是「我这轮是单次进来的，看不到刚才上面的研究结果」——子代理确实看不到，
+  所以修的是「让它看到」，而不是「让它别这么说」。改 records/归档会撞独立任务的写路径。
 - **Consequences:** 新增 `src/carryover.ts`；`src/script.ts`、`src/run.ts`、`src/gate.ts`
   （仅 `runTeam` 注入，提问判定逻辑零改动）、`src/index.ts`（工具路径同样注入）各加薄薄一层。
 - **Alternatives rejected:** 新增持久 digest 记录（跨轮存储在 records/归档，属独立任务，且会多一份
   可能与报告不一致的副本）；把整段上一轮报告塞进 objective（无界、且会把历史与指令混在一起）；
   让子代理自己回读会话文件（`session.v4.jsonl.zstd` 是 zstd 二进制，子代理没有会话读取工具）。
 - **已知副作用（不在本次范围）：** 会话首条消息被 `in-turn` 在 `pre-step` 抢先写成
-  `user/message` 时，`--session-id` 恢复会因"system/message 必须是首个 surface head"失败
+  `user/message` 时，`--session-id` 恢复会因「system/message 必须是首个 surface head」失败
   （VALIDATION.md Round 21 的 F1，`CONFIRMED` 且仍开放）。
 
 ## D-036 — 存档不设开关、不分档：写入随轮次发生，读回不依赖插件（v0.5 未发布）
@@ -548,12 +548,12 @@ Each entry records the decision, evidence, alternatives, and status.
   ④未命中且**本例会话里已经说过话**时，提问下方追加一行「先查后问：查了 N 处，还缺 X」，只要一项；还没说过话的新会话不追加——那句原样提问本身就是最诚实的形式，因此逐字节不变；
   ⑤只读、有界、脱敏、**不新增配置键、不新增记录类型、不新增归档**。
 - **Reason:** 用户可见失败是 `session-7e079b80` 型：研究结果就在会话里，追问却被要求重述。根因不是
-  "记忆不存在"，而是**提问前没查**。把"查"插在提问这一步之前，既修掉失败形态，又不改任何其他档位。
+  「记忆不存在」，而是**提问前没查**。把「查」插在提问这一步之前，既修掉失败形态，又不改任何其他档位。
 - **Consequences:** `src/triage.ts`（召回判定/说明/提示词）、`src/gate.ts`（磁盘读取 + 接线 +
   `GateDeps.memoryDocRoots`）。`src/config.ts`、`records.ts`、`carryover.ts` 未改。
-- **Alternatives rejected:** 让模型自己判断"要不要再问"（不确定、每次多一次调用、单测无法钉）；
+- **Alternatives rejected:** 让模型自己判断「要不要再问」（不确定、每次多一次调用、单测无法钉）；
   把整段会话硬塞进 ask 判定（无界，且必然自命中）；用向量/语义检索（本轮约束是确定性单测，且会引入
-  依赖与在线能力）；改 `expiredAskNote`/`unusedAskNote`（那是 P0-2 的档位选择语义，与"知识是否存在"
+  依赖与在线能力）；改 `expiredAskNote`/`unusedAskNote`（那是 P0-2 的档位选择语义，与「知识是否存在」
   无关，改它会削弱既有断言）。
 - **已知缺陷（本轮发现并已修，`CONFIRMED`）：** 首版把本轮消息当历史（`relay` 先 `commitClaimed()`
   再 `produceAnswer()`），任何追问都会命中自己；`collectRecallSources(…, exclude=request)` 剔除后修复，
@@ -573,7 +573,7 @@ Each entry records the decision, evidence, alternatives, and status.
   （`Route overflows (cross-run hint)`，`src/records.ts`/`src/report.ts` 透传）；③C2 不做——
   精确全局信号量不可行（A16：`ctx.workflowEngine.start` 不接受 host 回调注入、`bindings()` 写死 6 键、
   脚本全局表只注入 `agent/parallel/pipeline/phase/log/args`，沙箱封闭）。
-- **Reason:** 用户可见失败是"配了多条路由却永远只走第一条"——根因是全空 Cap = 不限 = 永不让路，
+- **Reason:** 用户可见失败是「配了多条路由却永远只走第一条」——根因是全空 Cap = 不限 = 永不让路，
   且计数只活在单次 run 内。B组把空陷阱摆到台面上（提醒不拦），C1 用廉价 run 级 hint 做近似分流，
   精确锁（C2）经 spike 证伪后不再追。
 - **Consequences:** `src/settings.ts`（`validateRoutes` notes）、`src/client/index.js`
@@ -586,7 +586,7 @@ Each entry records the decision, evidence, alternatives, and status.
 
 ## D-039 — 子代理顶栏显示名不改 DSH core：判定为 BLOCKED，只记证据与上游改动清单
 
-- **Status:** BLOCKED（历史判定，2026-11-08 已被 D-041 推翻并落地；原判定依据：源码级 `CONFIRMED`，见 VALIDATION.md Round 27 的 8 处行号，当时结论"插件侧无文档化扩展点"）
+- **Status:** BLOCKED（历史判定，2026-11-08 已被 D-041 推翻并落地；原判定依据：源码级 `CONFIRMED`，见 VALIDATION.md Round 27 的 8 处行号，当时结论「插件侧无文档化扩展点」）
 - **Date:** 2026-11-07
 - **Decision:** 用户要求"顶栏每个子代理显示具体任务名，不出现 `任务团队 child N` 或提示词原文"。
   经逐行取证，主标签由 DSH core 在创建子代理时写死
@@ -597,7 +597,7 @@ Each entry records the decision, evidence, alternatives, and status.
 - **Reason:** 插件已经做对了它这一层——每次 `agent()` 都传 `label`（`src/script.ts:1188/1213/1324/1438`），
   DSH 自己的工具文档也把 `label` 写成 "(display)"（`dsh-tool-workflow/lib/index.js:143`），
   丢标签发生在引擎内部（`runtime.ts:183-188` 不转发、`host.ts:205` 写死）。
-  在这种情况下，插件侧任何"修复"都只能是绕过契约的脏补，风险大于收益，且违反 AGENTS.md 的
+  在这种情况下，插件侧任何「修复」都只能是绕过契约的脏补，风险大于收益，且违反 AGENTS.md 的
   "never modify the DSH core repository … use documented extension points only"。
 - **Consequences:** 无源码改动；`CHANGELOG.md` 不加条目（没有用户可见变更可记）。
   记录：`VALIDATION.md` Round 27、本节、`STATE.md`、`HANDOFF.md`。
@@ -607,13 +607,13 @@ Each entry records the decision, evidence, alternatives, and status.
   （`You are the planning agent…`）。插件可在 `workflow/agent-start`（事件里带 `childId`）后调用文档化服务
   `ctx.sessionTitle.rename(session, <任务名>)`（`@deepseek-ai/dsh-session-title` 的 `SessionTitleService.rename`）
   把次级行改成任务名。**但这只去掉提示词原文，`任务团队 child N` 主标签仍在**，因此不满足本任务验收条款 1，
-  本轮不做；若用户接受"主标签保留、次级行变任务名"，可作为独立小任务实施。
+  本轮不做；若用户接受「主标签保留、次级行变任务名」，可作为独立小任务实施。
 - **Upstream ask（NOT_RUN）：** `runtime.ts` 把 `opts.label` 放进 `startAgent`；`host.ts` 的 `childRequest()`
   接收 `label` 且 `startChild()` 用 `label: request.label ?? \`${meta.name} child ${callId}\``。约 3 行，改完插件零改动即生效。
 - **Addendum（2026-11-07 晚，第二次尝试，Round 28）：** 状态维持 **BLOCKED**。Round 27 的判定由第二次尝试
   **独立重验**（源码链逐条重读）并用**隔离 profile 真机复现**坐实：复用 `out/v060-verify/*.patch.yml`，
   在 `out/childname-verify/`（profile `cnamer`）跑一轮团队档（COMPLETED，2 任务 verified，6 子代理），
-  6 个子会话首个 `subagent/descriptor` 全部为 `"label":"任务团队 child N"`（N=1..6），而父会话
+  6 个子会话首个 `subagent/descriptor` 全部为 `"label":「任务团队 child N」`（N=1..6），而父会话
   `tool-workflow/agent-start` 证明插件标签（`规划助手`/`执行`/`检查`）确实随每次 `agent()` 传入——
   与用户截图逐字一致，且 live `:3090`、operator `DSH_HOME`、DSH core 均未触碰。
   证据：`docs/knowledge/evidence/childname-blocked/`（README + `child-descriptor-events.txt` +
@@ -645,7 +645,7 @@ Each entry records the decision, evidence, alternatives, and status.
   自绘渲染器；行可开性 = 子会话存在 + `parentId` 匹配本 run + `subagent.mode` 为
   `continuable`/`one-shot`，**不读成员状态**（运行中/已完成/失败/取消/中断一视同仁）。
 - **Reason:** ①库存渲染器把链接钉在 `member.status === 'running'`（可开性其实与状态无关，
-  子会话与投影在结束后依然在）；②渲染器层是唯一同时满足"不改 DSH core"与"恢复链接"的
+  子会话与投影在结束后依然在）；②渲染器层是唯一同时满足「不改 DSH core」与「恢复链接」的
   文档化扩展点（`dsh-client-ui-workflow-run` 无任何配置可放宽该条件）。
 - **优先级遮蔽（本轮实测学到的硬约束）**：键控槽位同键同优先级会让**另一个注册者**整条
   boot fiber 失败（首轮实测：库存 `dsh-client-ui-workflow-run` 报 "1 entry did not activate"，
@@ -671,12 +671,12 @@ Each entry records the decision, evidence, alternatives, and status.
   非 PTC 引擎原样返回并 warn；②`src/script.ts` + `src/triage.ts` + `src/gate.ts`——
   每个子代理提示词的首行改为描述性标题（规划助手/任务标题/检查 · 任务标题/快速应答/前台直答等），
   人设行保持第二行；③`src/run.ts` 两处 `ctx.workflowEngine.start` 改走 `teamWorkflowEngine(ctx, logger)`。
-- **Reason:** D-039 的三次执行把"逐调用扩展点"逐个排除了，但漏掉一个服务级扩展点：
+- **Reason:** D-039 的三次执行把「逐调用扩展点」逐个排除了，但漏掉一个服务级扩展点：
   插件本来就持有 `ctx.workflowEngine`（自己的 inject），而 `PtcWorkflowEngine.start()`
   在 start 时才读 `runCtx.subagents`（`workflow-ptc/src/index.ts:157`）——把 run 起在
-  "同一引擎 + 装饰过的 subagents"上，`startActivation` 的调用方就变成了插件，
+  「同一引擎 + 装饰过的 subagents」上，`startActivation` 的调用方就变成了插件，
   label 归调用方的契约（types.d.ts:122-124）站在插件这边。不改 core、不改引擎、
-  不碰共享服务实例；上游 3 行 ask（D-039）从"必要"降级为"可选的简化"。
+  不碰共享服务实例；上游 3 行 ask（D-039）从「必要」降级为「可选的简化」。
 - **Consequences:** 子代理描述符（GUI 主名）= 提示词首行；twin 构造失败/非 PTC 引擎时
   原样回退并 `logger.warn` 一次性（可观测的静默降级）；cordis 解析的硬事实沉淀为 A18。
   真机证据：`docs/knowledge/evidence/childname-fix-2026-11-08/`（终版 6/6 描述性、
@@ -713,7 +713,7 @@ Each entry records the decision, evidence, alternatives, and status.
 - **Reason（用户现象）:** `session-00fca25f…` 是 `COMPLETED`，但用户看到的只有台账并评价「不像人话」。
   源码层面 `full` 在 `produceAnswer` 里直接 `return runTeam(...)`，绕开了 triage 分支里唯一拼
   `humanSummary` 的那段；再叠加 `SUCCESS_PREAMBLE` 的「不许总结」，主模型连润色都不被允许。
-- **Reason（为何 Uncertainties 不藏）:** 两条独立理由：①它是给读者的诚实限定语（"这项只在一台机器测过"），
+- **Reason（为何 Uncertainties 不藏）:** 两条独立理由：①它是给读者的诚实限定语（「这项只在一台机器测过」），
   不是路由台账；②`src/carryover.ts` 的 `parseReportRound` 从上一轮**渲染文本**里解析
   `Uncertainties:`，藏掉会让每一轮追问都静默丢失该上下文。`test/carryover.spec.ts` 的既有用例
   在误藏时会 FAIL（`expected '' to contain 'only measured on one host'`），构成回归保护。
@@ -824,25 +824,25 @@ Each entry records the decision, evidence, alternatives, and status.
 
 - **Status:** CONFIRMED（源码 + 单测；`test/config-limits-repair.spec.ts` 的 `LIMIT_CAPS` 与 `B04` 两组）
 - **Date:** 2026-11-15
-- **Decision:** ① `src/config.ts` 的 `LIMIT_CAPS` 是**唯一**的"哪些数值键按硬上限钳制、界是多少"的
+- **Decision:** ① `src/config.ts` 的 `LIMIT_CAPS` 是**唯一**的「哪些数值键按硬上限钳制、界是多少」的
   声明，值一律读 `HARD_LIMITS`；schema 侧 `clampedLimit(field, min)` 与载入期
   `repairLimitOverruns()` 都从这张表取界，新增上限只加一行。② 两层钳制都**只记账**
   （`recordOverrun()`），唯一发声点是 `src/index.ts` 的 `announceOverruns()`，按 `field:stored`
   用 set 去重后 `logger.warn`。③ 设置页横幅读 `entry.user`（用户层），不读 `entry.value`（生效值）。
 - **Reason:** 旧实现把 `maxConcurrency`/`maxRetries` 的界写了两处（schema 与 repair），第二个界
   永远落后一步；而报错路径那条读**每条消息**走一次，原来的逐条 `logger.warn` 会在补丁仍超限时
-  每消息刷一行，用户看到的是刷屏而不是"一次修复"。横幅读生效值则更糟：用户存 `8`、生效 `6`，
+  每消息刷一行，用户看到的是刷屏而不是「一次修复」。横幅读生效值则更糟：用户存 `8`、生效 `6`，
   横幅若显示 `6` 等于替用户改口，用户无法知道自己的补丁被改了。
 - **Alternatives rejected:** 把界放进每个 schema 字段字面量（两处界会再次漂移）；在 repair 里直接
   `logger.warn`（那条读可能因别的缺陷抛错，且没有去重锚点）；把 `configVersion` 也纳入钳制
-  （它是线上契约，不匹配必须拒载，改写会造出"版本对得上"的假象）；把每路由 `maxInFlight` 纳入
+  （它是线上契约，不匹配必须拒载，改写会造出「版本对得上」的假象）；把每路由 `maxInFlight` 纳入
   （它的界属于链内判定 `HARD_LIMITS.routeInFlight`，与顶层标量不是同一类）。
 - **Consequences:** 表内 10 个字段的越界都在载入时按上限生效、并只警告一次；低于下限、非数字、
-  程序化 `resolveConfig` 越界仍硬拒（R-06 不变）；因此"存量补丁不再让整行起不来"覆盖面从 2 个
+  程序化 `resolveConfig` 越界仍硬拒（R-06 不变）；因此「存量补丁不再让整行起不来」覆盖面从 2 个
   键扩到 10 个键，但**上限本身一个都没放宽**。真机复核这半边 = Round2 §1 的产物身份，
   行为面仍由单测覆盖（`test/config-limits-repair.spec.ts`）。
 
-## D-048 — 进度 Tab：脊椎按整词绑定、详情走来源阶梯、连线填充只陈述"已走过"（2026-11-15）
+## D-048 — 进度 Tab：脊椎按整词绑定、详情走来源阶梯、连线填充只陈述「已走过」（2026-11-15）
 
 - **Status:** CONFIRMED（`src/progress-tab.ts` + `src/client/index.js` 同构实现；
   `test/progress-tab.spec.ts`、`test/progress-connector.spec.ts`）
@@ -853,13 +853,13 @@ Each entry records the decision, evidence, alternatives, and status.
   ③ 连线只在**左侧节点自己 `done`** 时填充，`failed`/`blocked` 留空；节点环内一个状态字形，
   聚合多行时用行数替换字形。
 - **Reason:** 松匹配在真实 phase 头上产生了三次误报（`ui`→`build`、`tag`→`stage`/`target`、
-  `sync`→`async`），把没人跑过的阶段画成"跑过了"——进度视图一旦会撒谎就没有观测价值。协调块
+  `sync`→`async`），把没人跑过的阶段画成「跑过了」——进度视图一旦会撒谎就没有观测价值。协调块
   只认显式块（围栏 json/`grok-coordination`、围栏内 `LABEL: value`、无围栏的同款标签块），
-  是因为把散文猜成字段等于伪造证据；连线与字形的语义同理：填充=已走过，不是"看起来在跑"。
-- **Alternatives rejected:** 把连线做成"运行到这里就亮"（流里没有这个事实）；用模糊/编辑距离
-  匹配阶段名（误报只会更隐蔽）；把协调块从散文里正则抽字段（无法区分"报告了"与"提到了"）；
+  是因为把散文猜成字段等于伪造证据；连线与字形的语义同理：填充=已走过，不是「看起来在跑」。
+- **Alternatives rejected:** 把连线做成「运行到这里就亮」（流里没有这个事实）；用模糊/编辑距离
+  匹配阶段名（误报只会更隐蔽）；把协调块从散文里正则抽字段（无法区分「报告了」与「提到了」）；
   聚合多行时仍显示单个字形（行数是更可核对的事实）。
-- **Consequences:** 未命中的模板阶段永远 `pending` 并标"事件里没有报告"；一次真实运行若中途失败，
+- **Consequences:** 未命中的模板阶段永远 `pending` 并标「事件里没有报告」；一次真实运行若中途失败，
   线上的填充状态停在最后一个 `done` 节点，与引擎结局一致。`blocked`/`cancelled` 的真机触发仍是
   `NOT_RUN`（单测覆盖），不因为改了这一层就升级为真机结论。
 
@@ -936,14 +936,14 @@ Each entry records the decision, evidence, alternatives, and status.
 - **Status:** CONFIRMED（代码+测试落地，未发布）
 - **Date:** 2026-11-15
 - **Decision:**
-  1. 答案渲染与执行管线解耦：`full` 的"逐字节复现旧行为"指 plan/execute/verify/report 管线，
+  1. 答案渲染与执行管线解耦：`full` 的「逐字节复现旧行为」指 plan/execute/verify/report 管线，
      不包括 delivery 渲染。A 对 `full`/`triage` 一视同仁；要旧机器原文开 `showDiagnostics` 或
      关 `humanSummary`。
   2. `SUCCESS_PREAMBLE` 逐字复述保留（实测只有逐字复述稳定），顺序问题在 delivery 层解，不在
-     preamble 解（否决"让模型先说答案再贴 markers"）。
+     preamble 解（否决「让模型先说答案再贴 markers」）。
   3. 默认行为变更声明：`answerStrategy` 配置默认值不动（仍 `in-turn`）；改变的是 triage-team
      在可交互运行时的走法（`receipt-then-relay`），不可交互（one-shot/headless）回落 `in-turn`。
-  4. 取消语义定为"整轮取消 + 窄化重起"，V1 不做子任务级定向取消（engine 无 per-task cancel）。
+  4. 取消语义定为「整轮取消 + 窄化重起」，V1 不做子任务级定向取消（engine 无 per-task cancel）。
   5. B10 vs scrub 边界：失败原因行豁免 `tainted` 整行丢弃，只过 `stripMachineDetail`
      （保语义、去标识符）；`[infrastructure/timeout]` 类 `[a/b]`  bracket 永不进路由模式。
 - **Evidence:** `src/delivery/index.ts`（answerLead/statusTail/scrub）、`src/script.ts`
@@ -959,18 +959,18 @@ Each entry records the decision, evidence, alternatives, and status.
 - **Date:** 2026-11-15
 - **Decision:** 固定的是四要素信息结构（①听懂 ②已知/未知 ③后台查哪几方向 ④怎么打断），
   每句话现场组织；首答走一次轻量 `runSingleCall`（复用 `triageModel` 快手链路，不为首答开团队），
-  失败降级为简短模板且明说"模板兜底"。`triageLine` 档位声明保留（可审计性），`greetingLine`
+  失败降级为简短模板且明说「模板兜底」。`triageLine` 档位声明保留（可审计性），`greetingLine`
   固定写法不再作首答。
 - **Evidence:** `src/triage.ts`（firstAnswerPrompt/sanitizeFirstAnswer/firstAnswerFallback）、
   `src/gate.ts`（produceFirstAnswer/answerTeamInteractive）。
-- **Consequences:** 测试钉"两次同输入首答不逐字重复"方向待补（本轮未加）；模板句全文匹配即失败。
+- **Consequences:** 测试钉「两次同输入首答不逐字重复」方向待补（本轮未加）；模板句全文匹配即失败。
 
 ## D-052 — 进度 Tab A+C：七段脊 + 单展开分支 + 窄屏竖排（只改渲染 + CSS）
 
 - **Status:** CONFIRMED（代码 + 单测 + 隔离真机）
 - **Date:** 2026-11-16
 - **Decision:** 采用 session-0ee2a233 的 10 路结论（方案A主推 + C窄屏形态，不做B泳道）：
-  ①脊 7 等分占满宽，自身永不横滚；②横管时间、竖管归属；③手风琴同时只开一段（默认首个失败→首个 doing→全收）；④展开段默认 3 卡 + 实数 `+N`（N=M-3），分支 ≤4 行；⑤失败只标一处（2px 左红条 + 列头红点 + badge），阻塞灰虚边，running 蓝流动虚线绝不用绿；⑥有失败才有"跳到首个失败"按钮；⑦<480px 转竖排（Ant 竖排语义）；⑧默认露出 3 个；⑨颜色只用 5 状态色全走 token，色盲靠图标 + 文字。
+  ①脊 7 等分占满宽，自身永不横滚；②横管时间、竖管归属；③手风琴同时只开一段（默认首个失败→首个 doing→全收）；④展开段默认 3 卡 + 实数 `+N`（N=M-3），分支 ≤4 行；⑤失败只标一处（2px 左红条 + 列头红点 + badge），阻塞灰虚边，running 蓝流动虚线绝不用绿；⑥有失败才有「跳到首个失败」按钮；⑦<480px 转竖排（Ant 竖排语义）；⑧默认露出 3 个；⑨颜色只用 5 状态色全走 token，色盲靠图标 + 文字。
 - **Reason:** 宽度只花一次（窄面板永不横滚）；两根轴抢同一语义感知是反的（CHI/Timeline）；下游没 succeeded 就点亮绿线会骗人（Argo）。
 - **Alternatives rejected:** B 横向泳道（高度随成员数爆炸，无真实日期退化成空轴；成员常年 >10 再议）；多层缩进树（层级伪造）；新依赖/daisyUI 引入（抄思路不引包）。
 - **Consequences:** `test/client.spec.ts` 的 96px/snap/`aria-expanded` 全收断言、`progress-connector.spec.ts` 的 count-glyph 断言按新行为更新；`DESIGN-progress-tab.md §4` 的 9 段旧模板文字已漂移（待改文档，不在施工面）。
@@ -980,7 +980,7 @@ Each entry records the decision, evidence, alternatives, and status.
 
 - **Status:** CONFIRMED（现象） / HYPOTHESIS（归因 loader 无 cache-bust import）
 - **Date:** 2026-11-16
-- **Decision:** 新构建进运行中 live 进程**无已验证的免重启路径**（`dsh plugin add` 只换文件，进程仍跑旧模块；设置页改值无需重启，但那是值不是代码）。验证一律新 profile + 新端口（`acgtest/:3225` 标准路径）。live 更新等用户指令：要么用户重启 DSH，要么用户接受"只换文件不生效"的现状。
+- **Decision:** 新构建进运行中 live 进程**无已验证的免重启路径**（`dsh plugin add` 只换文件，进程仍跑旧模块；设置页改值无需重启，但那是值不是代码）。验证一律新 profile + 新端口（`acgtest/:3225` 标准路径）。live 更新等用户指令：要么用户重启 DSH，要么用户接受「只换文件不生效」的现状。
 - **Evidence:** agent-11 只读侦察（HANDOFF 段）；`docs/LOCAL-TESTING.md §Activate` 步骤 5；HANDOFF 2026-11-08 loader 根因。
 
 ## D-054 — 补交步 A：格式缺失同 attempt 补一次，不花重试额度
@@ -994,7 +994,7 @@ Each entry records the decision, evidence, alternatives, and status.
   补交是最短路径重试，不动核验严格性，不给 prose 开口子。
 - **Alternatives rejected:** 启发式从 prose 提取字段（拆 verification 地基，t59 口子重开）；
   engine 续原 child 会话（`agent()` 契约无此通道，CONFIRMED 不支持）；补交计入 maxAttempts
-  （违背用户"便宜"的原意；attempts 语义是"第几次尝试"，补交不是新尝试）。
+  （违背用户「便宜」的原意；attempts 语义是「第几次尝试」，补交不是新尝试）。
 - **Evidence:** `src/script.ts`（`resubmitPrompt` + worker 循环）、`src/report.ts` 白名单、
   `src/types.ts`、`test/failure-paths.spec.ts`（same-attempt resubmit 3 例）。
 
@@ -1012,12 +1012,12 @@ Each entry records the decision, evidence, alternatives, and status.
      `switchOn=[]` 内置策略、`subagentProvider` 空。
   3. 设置页只渲染 4 标量 + 5 角色链（9 叶键），无 hint、无用途说明、无 Danger、无只读区；
      `mode` 页上显示 `auto/full`（`auto`=triage 语义）；输出为模型直出的 markdown。
-- **Reason:** 用户原话"设置页好多选项，小白看不懂，不要介绍每个选项的用途，要简单明了"。
+- **Reason:** 用户原话「设置页好多选项，小白看不懂，不要介绍每个选项的用途，要简单明了」。
   mock（`settings-simple-mock.html`）三轮定稿：总开关 / 执行模型（5 角色 × fallback + 监督）/ 高级（两数）。
 - **Evidence:** `src/config.ts`（CONFIG_KEYS/REMOVED/FIXED_*）、`src/client/index.js`
   （4 卡片渲染）、`test/client.spec.ts`（72 例）、CHANGELOG `[Unreleased]` 双语迁移说明。
 - **Alternatives rejected:** 隐藏键保留 schema 可配（用户选了 schema 也删除，干净但破坏兼容，
-  以迁移说明 + R-06 拒载覆盖）；页上限 100 但硬上限保持 6（"填了不生效"的落差不可接受）。
+  以迁移说明 + R-06 拒载覆盖）；页上限 100 但硬上限保持 6（「填了不生效」的落差不可接受）。
 - **Consequences:** 旧补丁含 24 键任一即拒载，需手动删除；`relay/append` 投递删除（one-shot 下丢答案）；
   1h deadline 单测不可真等，改静态断言（reliability/memory-archive）。
 
@@ -1033,7 +1033,7 @@ Each entry records the decision, evidence, alternatives, and status.
      `(50+50+50)×4=600`（`test/routing.spec.ts` 钉死）。
   3. 上限同步放宽：`maxConcurrency/maxTasks` 默认 10/10、上限 100/100
      （用户定值；AGENTS.md 不变量同步更新）。
-- **Reason:** 用户要求"每个步骤可以选多个模型 fallback" + "监督可以监督每个环节"。
+- **Reason:** 用户要求「每个步骤可以选多个模型 fallback」 + 「监督可以监督每个环节」。
 - **Evidence:** `src/script.ts`（`supervisorPrompt`/调用门/预算）、`src/report.ts`/`records.ts`/
   `naming.ts`（监督/监督调用/Supervisor）/`checkpoint` 五元组、`test/routing.spec.ts`
   backstop 公式、`npm run ci` 级全量 951 绿。
@@ -1065,12 +1065,12 @@ Each entry records the decision, evidence, alternatives, and status.
   接受 `0 … MAX_SAFE_INTEGER`，`0` = 不设 timer；非法值 fail closed（R-06），
   不做钳制。超过 `setTimeout` 上限（`MAX_TIMER_DELAY_MS = 2^31-1`）的值内部按不限时
   处理，但报告与 checkpoint 记录配置值本身。checkpoint 的 `msCeiling` 随之从
-  "镜像 `HARD_LIMITS.timeoutMs`" 改成 `MAX_SAFE_INTEGER`，不再因为"记录不了"而丢掉
+  "镜像 `HARD_LIMITS.timeoutMs`" 改成 `MAX_SAFE_INTEGER`，不再因为「记录不了」而丢掉
   真实死线。
-- **Reason:** t45 实测过一次"改死线要改代码"的成本：30 分钟默认在同一个下午杀掉两次
+- **Reason:** t45 实测过一次「改死线要改代码」的成本：30 分钟默认在同一个下午杀掉两次
   真实四任务运行（30m00s / 30m01s），而真实运行耗时为 878 s / 1148 s / 1801 s ——
   默认值必须是可调参数而不是常量，才能在不重新发版的情况下适配更长的任务。
-  但默认值仍是 60 分钟而不是不限时：AGENTS.md 的不变量是"有界"，
+  但默认值仍是 60 分钟而不是不限时：AGENTS.md 的不变量是「有界」，
   不限时必须由调用方显式选择（`0`），不能成为默认。
 - **Evidence:** `src/config.ts`（`DEFAULT_TIMEOUT_MS`/`MAX_TIMER_DELAY_MS`/
   `timeoutInteger`/`CONFIG_KEYS` 9 键）、`src/run.ts`（`deadlineArmed` 两处入口）、
@@ -1078,9 +1078,9 @@ Each entry records the decision, evidence, alternatives, and status.
   （`recordableTimeoutMs`）、`test/config.spec.ts` 新增 4 例、
   `test/checkpoint-engine-wire.spec.ts`/`test/checkpoint-wiring.spec.ts` 记录真实死线、
   README 中英配置表、`docs/LOCAL-TESTING.md`。
-- **Alternatives rejected:** 默认 `0`（不限时）：与"有界工作流"的项目不变量冲突，
+- **Alternatives rejected:** 默认 `0`（不限时）：与「有界工作流」的项目不变量冲突，
   一次卡住的运行会一直挂着；把上限钉在 `HARD_LIMITS.timeoutMs`（原 604,800,000）：
-  用户明确要"没有实际上限"，且报告/checkpoint 现在都按配置值记录。
+  用户明确要「没有实际上限」，且报告/checkpoint 现在都按配置值记录。
 - **Consequences:** 设置页从两个数字变成三个数字；`REMOVED_CONFIG_KEYS` 从 24 变 23；
   旧补丁里写 `timeoutMs` 不再被拒载，而是生效。
 
@@ -2099,7 +2099,7 @@ base64 字符且长度 ≥8 的行（安全方向的过度脱敏），但 `BASE6
 ## D-090 — 深一层的未知键在读取侧拒绝，schema 保持透传（2026-11-20，round 35）
 
 **背景**：配置面只在最外层拒绝未知键。`roles.reviewer` 与路由字段手误（`maxInflight`）
-被静默丢弃，而补丁里留着它们——"设了也不生效"的失败模式换了一层又回来了（`POOL.md` R35）。
+被静默丢弃，而补丁里留着它们——「设了也不生效」的失败模式换了一层又回来了（`POOL.md` R35）。
 
 **测量**：`@deepseek-ai/schemastery` 的 `z.object` 对未知键**透传**（`Config({roles:{reviewer:[…]}})`
 的输出仍带 `reviewer`，`A39`），所以宿主路径上这些键确实会到 `apply()`；而 `Config` 对
@@ -2109,14 +2109,14 @@ base64 字符且长度 ≥8 的行（安全方向的过度脱敏），但 `BASE6
 - (a) 在 `Config` 上加 `.strict()` / 手写拒绝——拒绝发生在宿主解析阶段，整行 `did not activate`，
   且 settings 页生成的表单要跟着改；否。
 - (b) 在 `assertKnownKeys` 里加两层（角色名、路由字段），报错与最外层同形（`unknown configuration
-  key "<完整路径>" … (did you mean …?)` + 可用集合）；采。
+  key 「<完整路径>」 … (did you mean …?)` + 可用集合）；采。
 - (c) 只加一层（角色名）——路由字段的手误正是池里点名的第二个例子；否。
 
-**代价与迁移**：这是**更严格**的载入，一份带多余键的存量补丁会从"静默忽略"变成"载入失败并点名"。
+**代价与迁移**：这是**更严格**的载入，一份带多余键的存量补丁会从「静默忽略」变成「载入失败并点名」。
 失败信息给出完整路径与最接近的可用键，因此按 patch 发布并在 `CHANGELOG` 写明迁移（删掉被点名的键，
 它没有替代值）。与最外层未知键一直以来的行为一致，不是新的失败类别。
 
-**不做**：`roles` 传非对象时纯程序化路径仍被读成"五个空链"（schema 已挡住宿主路径），入池。
+**不做**：`roles` 传非对象时纯程序化路径仍被读成「五个空链」（schema 已挡住宿主路径），入池。
 
 ## D-092 — 1000 轮预算分臂推进：每臂 ≤100 轮，进程内不循环（2026-11-20，harness）
 
@@ -2396,7 +2396,7 @@ writesPathsForPhase 中英映射/不可读降级/未知 phase 旧规则 7 例）
 
 ## D-100 — `observe` finding 的三侧一致：bundle 已对，纯折叠跟上（2026-11-22，已发版 0.13.9）
 
-**背景**：PR #47 把 Guardian 从"取消整轮"改成"非破坏式"（rescue 排队恢复指引 / observe 只记录不打扰），
+**背景**：PR #47 把 Guardian 从「取消整轮」改成「非破坏式」（rescue 排队恢复指引 / observe 只记录不打扰），
 改了 host（`guardian.ts` action 三态）、脚本（`script.ts`/`timeout.ts` 文案）、bundle（`client/index.js`
 三态渲染 + i18n），但纯折叠侧 `src/progress-tab.ts` 没跟：类型仍是 `'cancel-run' | 'rescue'`，
 fold 仍是 `rescue → rescue else cancel-run`。
@@ -2409,7 +2409,7 @@ journal 里可能还有历史 `cancel-run` finding，fold 不能把它吃成 obs
 78/1484 全绿；远端 CI + Release 双绿。
 
 **Reason（为什么保留已死的 `cancel-run`）：** fold 读的是历史 journal，不是只读新代码的输出。
-删分支等于改写历史显示——旧 finding 会从"取消过"变成"观察"，这是事实篡改。类型与映射都保留三元。
+删分支等于改写历史显示——旧 finding 会从「取消过」变成「观察」，这是事实篡改。类型与映射都保留三元。
 
 ## D-101 — 安装失败根因：`/tmp` usrquota 配额，不是 `/home` 空间；allowBuilds 不用加（2026-11-22，`CONFIRMED`）
 
@@ -2426,12 +2426,12 @@ journal 里可能还有历史 `cancel-run` finding，fold 不能把它吃成 obs
 2. **`allowBuilds` 不加**：dsh `plugin.ts:104` 对一切形如 git 的 spec 在 exit≠0 时无条件打印该提示，
    与本次 fetcher 失败无关；pnpm 真正的 prepare-block 是另一个错误码。本插件无
    prepare/postinstall，tag 树自带 `lib/`，历史同类安装零 allowBuilds 全绿。加了反而按 README
-   语义"以用户权限放行脚本执行"，扩大信任面。
+   语义「以用户权限放行脚本执行」，扩大信任面。
 3. **修法**：删 `/tmp` 确认无用的旧验证目录 + ISO（用户批 1234，约 4G，81%→50%），
    不碰 `/home` 应用数据；原样重试安装命令。
 
 **Evidence:** agent-2 只读诊断（pnpm.log 事后只有 85 字节摘要是设计使然，CLI 模式 stdout
-inherit 不进 buffer；profile mtime/lockfile 与"失败还原"行为一致）；我亲测
+inherit 不进 buffer；profile mtime/lockfile 与「失败还原」行为一致）；我亲测
 `git fetch --depth 1 origin tag v0.13.9` 修前 `EDQUOT` 修后 exit 0；
 `plugin add` exit 0（10.5s），装机 `0.13.9` lock tarball `c93b2bf`，`lib/` 逐字节一致。
 
@@ -2445,12 +2445,12 @@ v0.13.8 已是这样。属历史小瑕疵 + 双重 warn，后轮把 `throw` 改�
 
 ## D-102 — 单次子调用预算可配，默认 120 分钟（2026-11-22，未发版）
 
-**背景**：用户原话"守卫出了问题，10 分钟上限"：纽约天气 UI 那轮（截图：`任务进度 5/5 · 100%` 但
-Guardian 连续 4 条"已触发整轮取消"）里子任务 10 分钟被掐。根因是三处写死的 10 分钟——
+**背景**：用户原话「守卫出了问题，10 分钟上限」：纽约天气 UI 那轮（截图：`任务进度 5/5 · 100%` 但
+Guardian 连续 4 条「已触发整轮取消」）里子任务 10 分钟被掐。根因是三处写死的 10 分钟——
 `src/timeout.ts` `CHILD_TIMEOUT_MS=600_000`（脚本竞速回退）、脚本镜像 `return 600000` /
 `Math.min(3600000,…)`、`src/guardian.ts` `childTimeoutCapMs=600_000`（宿主预算上限）。D-097 只修了
-宿主抢跑（宿主等脚本判完），没修"预算本身太小"。D-098 已论证"调大预算只会推迟误杀"——但那是
-"杀错"语境；本轮用户要的是"别掐正常慢任务"，10 分钟对 UI 打磨类任务本就不够，这是预算不足不是误判。
+宿主抢跑（宿主等脚本判完），没修「预算本身太小」。D-098 已论证「调大预算只会推迟误杀」——但那是
+「杀错」语境；本轮用户要的是「别掐正常慢任务」，10 分钟对 UI 打磨类任务本就不够，这是预算不足不是误判。
 
 **Decision:**
 1. 新键 `childTimeoutMs`：schema（`clampedLimit('childTimeoutMs', 1000)` 走 `LIMIT_CAPS` 钳制通道，
@@ -2459,10 +2459,10 @@ Guardian 连续 4 条"已触发整轮取消"）里子任务 10 分钟被掐。�
    校验 + 渲染 `Child budget` 行）。键总数 16→17（README 中英 + LOCAL-TESTING + 三个 spec 的拼写表同步）。
 2. 默认 **120 分钟**（`DEFAULT_CHILD_TIMEOUT_MS=7_200_000`，`src/timeout.ts` 与 `src/config.ts`
    各一份，`config.ts` 的 schema 默认读自 `CHILD_TIMEOUT_MAX_MS` 同源）：旧 `CHILD_TIMEOUT_MS=600_000`
-   保留为"旧报告兼容锚点"——校验里 `childTimeoutMs===0 && config===600_000` 的旧脚本豁免分支要它
+   保留为「旧报告兼容锚点」——校验里 `childTimeoutMs===0 && config===600_000` 的旧脚本豁免分支要它
    讲清楚 0 是哪来的，不再做任何人默认值。
 3. 上限 = 默认 = 120 分钟（`CHILD_TIMEOUT_MAX_MS` 3.6M→7.2M，`childTimeoutCapMs` 600s→7200s，
-   脚本镜像同步）。超限存值钳制到默认本身，等价于"没配过"。
+   脚本镜像同步）。超限存值钳制到默认本身，等价于「没配过」。
 4. 脚本回退值与上限同步（`return 7200000` / `Math.min(7200000,…)`），host 传参
    `config.childTimeoutMs` 替代写死的 `CHILD_TIMEOUT_MS`（`src/run.ts`）。
 5. 旧报告兼容：`limits.childTimeoutMs` 缺失不校验（旧报告没这字段）；`0` 只在
@@ -2470,7 +2470,7 @@ Guardian 连续 4 条"已触发整轮取消"）里子任务 10 分钟被掐。�
    本来就拒收。新旧报告永远走同一条校验臂，不分叉。
 
 **Reason（为什么上限不开放）：** 单次调用无上限 = 挂死的孩子永远占着 worker 池，
-`maxRetries` 的重试也永远等不到。120 分钟是"UI 打磨类任务够用"与"挂死止损"的折中；
+`maxRetries` 的重试也永远等不到。120 分钟是「UI 打磨类任务够用」与「挂死止损」的折中；
 真要更长应该调 `timeoutMs`（整轮死线）而不是把单次竞速也放开——两者是父子关系（rule B），
 不是同一个旋钮。
 
@@ -2483,24 +2483,24 @@ timeout 9 处同步 + config/guardian/client/settings/docs/orchestrator/routing/
 
 ## D-104 — Guardian 预算永远跟 `childTimeoutMs`，配没配判停路由只决定 adjudication 不决定预算（2026-11-22，未发版）
 
-**背景**：用户截图"子任务存活判断预算 · 600 秒"：0.13.10 把脚本侧竞速改成 120 分钟，
+**背景**：用户截图「子任务存活判断预算 · 600 秒」：0.13.10 把脚本侧竞速改成 120 分钟，
 但 `src/run.ts:863` 传 Guardian 预算时写了 `config.guardianModel === undefined ? undefined : config.childTimeoutMs`——
-没配判停路由（默认空）的 run 退回旧预算 `min(deadline, 600_000)`，600 秒老根还在。设置页也找不到"守卫时间"：
-`childTimeoutMs` 行叫"单次调用上限（分钟）"，Guardian 预算从来不是可配项（`GUARDIAN_LIMITS.childTimeoutCapMs` 写死）。
+没配判停路由（默认空）的 run 退回旧预算 `min(deadline, 600_000)`，600 秒老根还在。设置页也找不到「守卫时间」：
+`childTimeoutMs` 行叫「单次调用上限（分钟）」，Guardian 预算从来不是可配项（`GUARDIAN_LIMITS.childTimeoutCapMs` 写死）。
 
 **Decision:**
 1. `run.ts` 去掉三元，永远传 `config.childTimeoutMs`（默认 120 分钟）。配没配 `guardianModel`
    只决定卡住时是否走 adjudication 等一等，不决定预算是多少。
-2. 设置页 `childTimeoutMs` 中英 hint 各加一句"守卫判停预算同样跟这个数"——一行文案，不新增键。
+2. 设置页 `childTimeoutMs` 中英 hint 各加一句「守卫判停预算同样跟这个数」——一行文案，不新增键。
 3. 回归钉死：`test/guardian.spec.ts` 加一例 `guardianChildBudgetMs(7_200_000, 7_200_000) === 7_200_000`
-   且 `guardianChildBudgetMs(3_600_000, 7_200_000) === 3_600_000`（"有无路由预算一致"）。
+   且 `guardianChildBudgetMs(3_600_000, 7_200_000) === 3_600_000`（「有无路由预算一致」）。
 
 **Evidence:** `npm run ci` exit 0 — **80 files / 1526 tests PASS**（+1 新例）；`build` + `verify:lib`
 byte-identical。真机实测 `CONFIRMED`（见 VALIDATION D-104 段）：`DSH_HOME` 副本 + `bifrost-completions`
 真实模型 `agent2api/deepseek-v4.1-flash`（chat 探活 200），`guardian-start.budgetMs=7200000`，
 `guardian-end {cancelled:false, findingCount:0}`，`artifact.txt` 含 `GW-SMOKE-OK` 且报告 completed 1/1 verified。
 
-**代价**：无——之前没配路由的 run 预算从 600 秒变成 120 分钟，正是用户要的"默认 120 分钟"。
+**代价**：无——之前没配路由的 run 预算从 600 秒变成 120 分钟，正是用户要的「默认 120 分钟」。
 
 ## D-103 — 跑中转向只能是「波边界拉取」，不能是「host 推送」（2026-11-22，设计待拍板）
 
@@ -2548,7 +2548,7 @@ byte-identical。真机实测 `CONFIRMED`（见 VALIDATION D-104 段）：`DSH_H
 2. **取消只认裸叫停**：`classifyChannelMessage()` 只把裸 `停/停下/取消/stop/cancel…`（或短句里的强祈使）
    判为 stop；带问号、含 stop 字的长任务（`停止旧的缓存策略`、`写一个停车位管理页面`）一律 forward。
    非对称是安全边界：「猜你想停」花掉全部在飞的活，「多排一条要求」只花一个边界。
-   没有在跑的任务时，裸叫停回一句「没有在跑的任务」，**不派工**（否则"停"会花掉 planner+worker+verifier）。
+   没有在跑的任务时，裸叫停回一句「没有在跑的任务」，**不派工**（否则「停」会花掉 planner+worker+verifier）。
 3. **每轮一个通道生命周期**：`runChannelRound()` 开通道 → `runTeam(steeringToken)` → 交付 → `finally`
    里先 `take()` 再 `closeSteering()`。开关放在 gate 而不是 `runWorkflow`：run 自身的早退
    （per-session cap、启动前取消、请求构建失败）不会漏一个队列在 `bySession` 里吞掉下一条消息。
@@ -2564,7 +2564,7 @@ byte-identical。真机实测 `CONFIRMED`（见 VALIDATION D-104 段）：`DSH_H
 分散实现会重演本次实测抓到的两个坑（tier 绕过、idle-stop 抢在 live-run 判断之前）。
 
 **Alternatives rejected:** (a) 在 team/full 接纳里各写一份通道块——tier 依赖，已证会漏；
-(b) 在 `runWorkflow` 里开通道——早退路径泄漏队列；(c) 让 stop 也走"并入"——用户叫停就变成加任务；
+(b) 在 `runWorkflow` 里开通道——早退路径泄漏队列；(c) 让 stop 也走「并入」——用户叫停就变成加任务；
 (d) 未取用 intent 直接丢——用户的话消失，正是要消灭的失败模式。
 
 **Evidence:** `test/channel.spec.ts`（41 例，含 A1–A5 逐条）+ 证据目录
@@ -2578,9 +2578,9 @@ test/composition.spec.ts` → 128 PASS。全量 `npm run ci` 与真机 GUI 手�
 
 ## D-106 — 进度脊柱：带编号的计划任务永远优先于阶段关键词（2026-11-22，未发版）
 
-**背景**：用户报 session-076c2337 的进度页：规划下面的"执行"行是任务 1–6 跑完后加上去的，
-问"它为什么在规划下面，而不是任务 7"。实查会话事件：那一行的 phase 是
-`任务 7 · 合并为干净可并发执行计划`，标题里带了"执行"二字，被 `stageForPhase()`
+**背景**：用户报 session-076c2337 的进度页：规划下面的「执行」行是任务 1–6 跑完后加上去的，
+问「它为什么在规划下面，而不是任务 7」。实查会话事件：那一行的 phase 是
+`任务 7 · 合并为干净可并发执行计划`，标题里带了「执行」二字，被 `stageForPhase()`
 按 `执行` token 收进脊柱的 `执行` 段，而不是任务带里的任务 7 卡片。任务没丢，
 是显示分错了筐。
 
@@ -2590,15 +2590,15 @@ test/composition.spec.ts` → 128 PASS。全量 `npm run ci` 与真机 GUI 手�
    （`规划`、`执行`、`检查`…）与英文阶段词。
 2. 双实现同步：`src/progress-tab.ts`（TS 纯函数）与 `src/client/index.js` 手写镜像
    （`progressStageForPhase` + 前置的 `progressTaskNumber`，同作用域函数声明提升可用）
-   同改；共用同一回归用例形状（任务 7 标题含"执行"，断 spine 为空、extra 为 1）。
+   同改；共用同一回归用例形状（任务 7 标题含「执行」，断 spine 为空、extra 为 1）。
 3. 导出性变化：`stageForPhase` 由模块私有改为 `export`，供测试与将来复用；行为上
    只收窄（带编号的不再进脊柱），不带编号的行与之前逐字节一致。
 
 **Reason:** 编号是引擎写死的（`taskGroupTitle`），标题是 planner 现场编的；
-用编号判定永远不会被标题里的阶段词污染。用"后来者优先"修标题黑名单是补不完的。
+用编号判定永远不会被标题里的阶段词污染。用「后来者优先」修标题黑名单是补不完的。
 
 **Alternatives rejected:** (a) 标题避开阶段词——靠人记住，不可靠；(b) 脊柱关键词加白名单——
-标题空间无界，拦不住"执行回归"这类正常词。
+标题空间无界，拦不住「执行回归」这类正常词。
 
 **Evidence:** 会话 session-076c2337 事件（seq 318 `任务 7 · 合并为干净可并发执行计划`）；
 `test/progress-tab.spec.ts` + `test/client.spec.ts` 各 +1 回归（任务 7 形状）；
@@ -2609,49 +2609,49 @@ spine 为空，pre-fix 形状会进脊柱。
 
 - **Status:** CONFIRMED（本轮三 lane 落地，85 文件 / 1617 测试 PASS，独立复验通过）
 - **Decision:**
-1. 调度真相独立于执行：`src/taskboard/` 落盘任务板（原子 jsonl + checksum，CAS 认领，completed 不可变，依赖前置检查），与现有 checkpoint（运行快照）分开——板是"要做什么"，checkpoint 是"跑成什么样"。
+1. 调度真相独立于执行：`src/taskboard/` 落盘任务板（原子 jsonl + checksum，CAS 认领，completed 不可变，依赖前置检查），与现有 checkpoint（运行快照）分开——板是「要做什么」，checkpoint 是「跑成什么样」。
 2. L1 只做记事分派回收：`src/dispatcher/` 纯决策层，白名单四项放行、三项（改已完成/改正在跑/改 verdict）硬拒绝；verdict 只能 verifier 写，大管家不能改分。
 3. 交接契约固定四行（结论/证据指针/未决问题/下一步），证据必须带可复验指针（路径 + checksum/行号），裸文字自述打回；`src/report.ts` 只做增量 append，不动主流程。
-- **Alternatives rejected:** (a) 复用 checkpoint 当任务板——checkpoint 是运行快照语义，无 CAS/依赖/不可变约束，硬套会污染恢复语义；(b) gate 里直接写调度逻辑——gate 已够复杂，独立模块可测，大管家以后常驻化也有地方放；(c) 契约放宽允许空未决问题——"无未决"本身也是一条有效信息，显式写 `none` 比空着更诚实。
+- **Alternatives rejected:** (a) 复用 checkpoint 当任务板——checkpoint 是运行快照语义，无 CAS/依赖/不可变约束，硬套会污染恢复语义；(b) gate 里直接写调度逻辑——gate 已够复杂，独立模块可测，大管家以后常驻化也有地方放；(c) 契约放宽允许空未决问题——「无未决」本身也是一条有效信息，显式写 `none` 比空着更诚实。
 - **Evidence:** `test/taskboard.spec.ts` 13 例 + 独立复验（依赖阻塞/CAS 冲突/重启恢复）；`test/dispatcher.spec.ts` 11 例；`test/handoff.spec.ts` 15 例（缺字段/裸文字打回）。
 
 ## D-109 · 405 的插件侧第二成因：挂载靠三个服务、读请求只能 POST
 
 - **时间**：2026-11-23 · **状态**：`CONFIRMED`（源码与测试）· **来源**：`manual-sessions-unfinished.md` Sec.2-3
-- **问题**：设置页总开关按一下就报"模式服务没有回应：the mode route answered HTTP 405"。0.13.16 只补了
-  "缺 webServer 就打 warn"，没解决另两种同样静默的情形。
+- **问题**：设置页总开关按一下就报「模式服务没有回应：the mode route answered HTTP 405」。0.13.16 只补了
+  「缺 webServer 就打 warn」，没解决另两种同样静默的情形。
 - **读到的源码事实（`CONFIRMED`）**：`src/mode-surface.ts` 的 `installModeRoute` 用
   `inject(['webServer','connection','sessions'])` —— 三个服务同时可用才回调，缺一个就整条路由不挂；
   该回调里 `handleModeRoute` 对非 POST 一律 `ModeError('mode/method','POST only')` → 405；
   客户端 `parseModePayload` 只有在响应体带 `error` 时才显示服务端那句，空包体 405 就退化成
-  "the mode route answered HTTP 405"。所以"空包体 405"必然来自**不是本插件**的应答（宿主 fallback）。
+  "the mode route answered HTTP 405"。所以「空包体 405」必然来自**不是本插件**的应答（宿主 fallback）。
 - **选定的做法**：挂载只要求 `webServer` + `connection`；会话服务改成按请求 `resolveSessions()`（先 `ctx['sessions']`，
   再 `ctx.get('sessions')`），取不到回 `503 mode/unavailable`。读请求同时接受
   `GET ?action=status&sessionId=…`（写一律拒绝，URL 不留状态变更）；被拒的方法带方法名与 URL 记 warn。
-  客户端：读取遇 405 用 GET 重试一次，失败时用 `mode/method` 码并点名"方法被拒"。
+  客户端：读取遇 405 用 GET 重试一次，失败时用 `mode/method` 码并点名「方法被拒」。
 - **没选的替代**：① 让客户端只发 GET（写就得靠别的通道，且状态变更进 URL 会留下 prefetch 触发的风险）；
-  ② 改宿主让它接住未知路由（AGENTS.md §4/§5 禁止碰核心）；③ 给插件加第二个状态存储（会破坏"只有一条真相"）。
-- **验证**：`test/mode-surface.spec.ts` 24 例（含"GET 读成功"、"GET 写被拒 405"、"PUT 被拒且 warn 带方法名"、
-  "没有 sessions 服务但 `get('sessions')` 可达时仍挂载并读成功"、"完全没有会话服务回 503"）；
+  ② 改宿主让它接住未知路由（AGENTS.md §4/§5 禁止碰核心）；③ 给插件加第二个状态存储（会破坏「只有一条真相」）。
+- **验证**：`test/mode-surface.spec.ts` 24 例（含「GET 读成功」、「GET 写被拒 405」、「PUT 被拒且 warn 带方法名」、
+  "没有 sessions 服务但 `get('sessions')` 可达时仍挂载并读成功"、「完全没有会话服务回 503」）；
   `test/client.spec.ts` 新增两例（405 后 GET 重试成功；两路都被拒时报 `mode/method` 且写不重试）。
-- **仍然未知（`HYPOTHESIS`）**：操作员当时那一次究竟是"路由没挂"还是"前置代理只放行 GET"，现场无日志可判。
+- **仍然未知（`HYPOTHESIS`）**：操作员当时那一次究竟是「路由没挂」还是「前置代理只放行 GET」，现场无日志可判。
 
 ## D-110 · 进度页跨阶段连线：一条公共弯道 + 一根公共轨（按 2026-11-21 原话收口）
 
 - **时间**：2026-11-23 · **状态**：`CONFIRMED`（源码与测试）· **来源**：`manual-sessions-unfinished.md` Sec.3-1
-- **原话**："进度页跨阶段的线太多，合并成一根"。当时只看了效果图，没有开工。
+- **原话**：「进度页跨阶段的线太多，合并成一根」。当时只看了效果图，没有开工。
 - **做法**：`measureProgressWires` 保留每个环节自己的圆点下垂段与每张卡的短接线，但把
-  "每环节一条弯道 + 一条竖槽"改成整带共用一条弯道与一条竖槽，竖线只画一次、成为一根连到最深卡片的 `rail`。
+  「每环节一条弯道 + 一条竖槽」改成整带共用一条弯道与一条竖槽，竖线只画一次、成为一根连到最深卡片的 `rail`。
   卡片左边距、槽宽、状态色（连线永远不带状态色）全部不变。
-- **代价**：两个环节共用竖槽后，肉眼靠"线在哪一条槽"分辨归属不再可能——归属改由各自的圆点下垂段和卡片短线承载。
+- **代价**：两个环节共用竖槽后，肉眼靠「线在哪一条槽」分辨归属不再可能——归属改由各自的圆点下垂段和卡片短线承载。
   这是原话要求的直接结果，已记入分歧日志供操作员复核。
-- **验证**：`test/progress-connector.spec.ts` 19 例，新增"两个环节只画一根轨、共用同一弯道与同一竖槽"；
+- **验证**：`test/progress-connector.spec.ts` 19 例，新增「两个环节只画一根轨、共用同一弯道与同一竖槽」；
   `test/client.spec.ts` 连线中性用例改为断言 `['trunk','branch','rail']`。
 
 ## D-111 · Sec.2-7 与 Sec.3-2/3/4/5：本轮记账不实现（待操作员一句话）
 
 - **时间**：2026-11-23 · **状态**：Sec.2-7 `BLOCKED`（待拍板）；Sec.3-2/3/4/5 `BLOCKED`（待拍板/越界）
-- **口径**：本轮任务允许"严格按原话执行并记分歧"，但源文件对这五项写的不是"去做"，是"要不要做/要不要重新确认/你定"。
+- **口径**：本轮任务允许「严格按原话执行并记分歧」，但源文件对这五项写的不是「去做」，是「要不要做/要不要重新确认/你定」。
   在操作员没有给一句话之前硬做，等于替操作员拍板——尤其 Sec.3-3 会改变汇总的**真值来源**（从确定性检查改成
   模型角色复核），成本与误拒后果都要人认。
 - **逐项**：
@@ -2659,10 +2659,10 @@ spine 为空，pre-fix 形状会进脊柱。
     （插件版本/宿主版本/运行时/生效配置摘要/本轮任务数）随报告一起落盘"，接进 `renderReport` 的可选段，
     不新建独立通道。等一句话即可开工。
   - Sec.3-2 429 勾选框：`triageModel` 整套已被移除（`CONFIRMED`，`src/triage.ts` 只剩命名/角色解析）。
-    需求描述的是被删掉的那套机制，原样实现等于复活已删的架构；要不要以"角色链失败后的显式换人条件"重做需拍板。
+    需求描述的是被删掉的那套机制，原样实现等于复活已删的架构；要不要以「角色链失败后的显式换人条件」重做需拍板。
   - Sec.3-3 汇总走检查/复核角色：现状是 `src/script.ts` `reviewSummaryDraft`（check + 独立 verify，纯确定性，
     失败回退确定性叙述而绝不回退模型文本）。改成走配置的 verifier/supervisor 模型角色会花额度、并把
-    "假通过"的风险重新引入模型自评；要么确认现状即满足原意，要么明确"要模型角色复核"再改。
+    「假通过」的风险重新引入模型自评；要么确认现状即满足原意，要么明确「要模型角色复核」再改。
   - Sec.3-4 答案长相一致：只有操作员能判，需要一次开/不开插件的人工并排比对（`NOT_RUN`）。
   - Sec.3-5 绘画任务失败：本插件无图像功能（`CONFIRMED`），失败不在本仓库；继续查需要操作员授权范围。
 
@@ -2672,7 +2672,7 @@ spine 为空，pre-fix 形状会进脊柱。
 - **背景**：源会话 `session-7fed81c2` 的原话是「第三阶段：为 dsh-grok-workflow 实现 Host Evidence Collector
   （宿主侧证据收集与核验）」。仓库里确实没有 `src/evidence*`（`CONFIRMED`，`ls src` 无该模块），这一阶段从未开工。
 - **为什么不在本轮开工**：源文件自己的「差什么」写的是「先确认这一阶段还要不要做」，不是「去做」。
-  这一项与 Sec.3 的五件不同——那五件是"要不要这么做"的取舍，这一件是"还要不要这个阶段"的存废。
+  这一项与 Sec.3 的五件不同——那五件是「要不要这么做」的取舍，这一件是「还要不要这个阶段」的存废。
   在没有那句话之前写代码，等于替操作员决定要不要维护一条新的证据通道。
 - **第一刀（等一句话即可开工，成本约一天）**：
   1. `src/evidence.ts`：纯函数 `collectHostEvidence(input)` —— 输入是宿主已有的值（插件版本、DSH/config 版本、
@@ -2680,9 +2680,9 @@ spine 为空，pre-fix 形状会进脊柱。
      输出 `{label, value}[]`，只读、无 shell、无网络、无密钥；`renderHostEvidence()` 渲染成单段，字符数封顶。
   2. 接线：作为 `renderReport` 的**可选段**（`showDiagnostics` 打开时才出现）与诊断台账的一行，
      不进人话块、不进 relay 标记内文本——证据是给维护者看的，不是给读者看的。
-  3. 核验：`test/evidence.spec.ts` 钉住"只含白名单字段 / 字符串封顶 / 无密钥形状 / 同一输入两次渲染逐字节一致"。
-- **不做也可以**：现有 `renderReport` + checkpoint + 进度节点已经覆盖了"这一轮到底跑了什么"；
-  宿主侧证据额外回答的是"跑在什么样的宿主上"。若操作员认为这层不需要，本条直接结案、不再排期。
+  3. 核验：`test/evidence.spec.ts` 钉住「只含白名单字段 / 字符串封顶 / 无密钥形状 / 同一输入两次渲染逐字节一致」。
+- **不做也可以**：现有 `renderReport` + checkpoint + 进度节点已经覆盖了「这一轮到底跑了什么」；
+  宿主侧证据额外回答的是「跑在什么样的宿主上」。若操作员认为这层不需要，本条直接结案、不再排期。
 
 ## D-113 · 手工清单 12 项顺序执行（第 2 轮）：逐项落地或记账（2026-11-23）
 
@@ -2690,16 +2690,16 @@ spine 为空，pre-fix 形状会进脊柱。
 - **口径**：`manual-sessions-unfinished.md` 第二节 7 件 → 第三节 5 件；一项一分支（自合完的 `main` 尖端开），
   合前 `npm run ci` 必须 exit 0。十二项**每一项**都有自己的分支与绿日志：`.rsi/evidence/rsi-seq-12/logs/ci-r2-*.log`。
 - **决定 1（Sec.2-2）：replan 默认改成开。** 原话是「主会话应该永远能插话，但现在默认关着」，
-  上一轮选了"给开关、默认关"，只满足了原话里的"或者"分支，没解决"默认关着"。本轮改成默认开：
+  上一轮选了「给开关、默认关」，只满足了原话里的「或者」分支，没解决「默认关着」。本轮改成默认开：
   只有跑中真的来消息才花一次规划调用（每轮至多 4 次），设置页开关保留。代价写进 CHANGELOG 与 README。
 - **决定 2（Sec.3-2）：只把操作员点名的 429 做成勾选框，不复活整套 `switchOn`。** T4 已把按类别配置删除，
-  整表复活等于推翻既有瘦身；新增 `switchOnRateLimit`（默认开）只暴露"429 要不要换人"这一个判断，
+  整表复活等于推翻既有瘦身；新增 `switchOnRateLimit`（默认开）只暴露「429 要不要换人」这一个判断，
   关掉时脚本收到其余六类白名单。方向由操作员原话决定，范围是本轮的取舍。
 - **决定 3（Sec.3-3）：汇总门保持确定性，但把判定写进报告。** 改成走 verifier/supervisor 模型角色会花额度、
-  并把"假通过"重新交给模型自评；本轮不动真值来源，改为让两道门的判定可见（`synthesis.review` +
-  报告 `Summary review:` 行）。若操作员要的是"真要模型复核"，那是新决定，代价照实说。
+  并把「假通过」重新交给模型自评；本轮不动真值来源，改为让两道门的判定可见（`synthesis.review` +
+  报告 `Summary review:` 行）。若操作员要的是「真要模型复核」，那是新决定，代价照实说。
 - **决定 4（Sec.2-1 / 2-5 / 2-6 / 3-1）：代码已在，补的是钉子。** 这四项的实现分别在 `1591665`、`adc7fb4`，
-  本轮不为"再合一次"而重写；每项仍走自己的分支，落地的是能让它不再退化的东西：
+  本轮不为「再合一次」而重写；每项仍走自己的分支，落地的是能让它不再退化的东西：
   Sec.2-1 宿主工具死线与双 README 默认值、Sec.2-5 设计文档六段脊椎守卫、Sec.2-6 `resumeCarryover` 抽取+用例、
   Sec.3-1 连线模型文档。
 - **决定 5（Sec.2-7）：`BLOCKED`，见 D-112。** 源文件自己要求先确认阶段存废；第一刀设计已写清。
@@ -2710,16 +2710,16 @@ spine 为空，pre-fix 形状会进脊柱。
 
 - **时间**：2026-11-23 · **状态**：代码落地、未提交（分支 `captain-pack`）
 - **决定 1（确认轮的开关位置）**：确认轮只属于前台（`mode: triage`），不新增配置键。
-  理由：`/grok on` 已承诺"完整工作流"，再问一遍拆法是违背承诺；部署级 `full` 也不该被塞进一层问询。
+  理由：`/grok on` 已承诺「完整工作流」，再问一遍拆法是违背承诺；部署级 `full` 也不该被塞进一层问询。
   代价：想关掉确认只能用 full 模式（较粗）；若操作员要单独开关，那是下一个决定。
-- **决定 2（"停/改"放计划字段）**：模型通过 `onFailure: "stop"` 表达"某项没过验收就别往下跑"，
-  脚本只执行、不解释；非法值按 `continue`，旧计划含义不变。未做"边界再问一次模型"的版本：
+- **决定 2（「停/改」放计划字段）**：模型通过 `onFailure: "stop"` 表达「某项没过验收就别往下跑」，
+  脚本只执行、不解释；非法值按 `continue`，旧计划含义不变。未做「边界再问一次模型」的版本：
   它会在每次失败边界多花一次 planner 调用，且与 `replan` 的边界调用叠加，代价不划算。
 - **决定 3（三叠纸落在台账旁）**：`profile.md` / `experience.md` 与 `archive.jsonl` 同目录
   （`archiveDir()` 同一解析链），不新建目录、不写 live 家目录以外的地方；画像只由显式写入方
-  （记忆 CLI）维护，不从对话自动抽取——"什么值得长期记"是要模型判断的，本轮不扩大。
-- **决定 4（旧用例只补一步、不放宽）**：团队档改为"先确认"，三条既有用例（triage 两条、
-  partial-head 的 `deliver`、channel 的跑中插话）都只是先发一条"确认"，原断言原样保留。
+  （记忆 CLI）维护，不从对话自动抽取——「什么值得长期记」是要模型判断的，本轮不扩大。
+- **决定 4（旧用例只补一步、不放宽）**：团队档改为「先确认」，三条既有用例（triage 两条、
+  partial-head 的 `deliver`、channel 的跑中插话）都只是先发一条「确认」，原断言原样保留。
 - **代价/缺口**：确认轮的预览是一次独立轻调用，正式跑仍重新规划（两次规划）；`verify:lib` 不覆盖未提交
   工作树，提交前须重跑 build 并连 `lib/` 一起提交；真机 soak `NOT_RUN`。
 
@@ -2740,29 +2740,29 @@ spine 为空，pre-fix 形状会进脊柱。
 3. 默认**单语**：`relayText` 传 `bilingual: false`，语言跟随 `opts.lang`（请求语言）。
 4. synthesizer 笼子放宽：允许「结果：/怎么用：/注意：」三段（别的标题、列表、Markdown 仍拒），
    叙事上界 700 字 / 300 词；**caveats 由它重写**，`layeredNotesBlock` 不再原文贴 uncertainties，
-   门禁把"每条原句必须出现"换成"必须有 caveat 段"（`hasCaveatSection`，check 与 verify 两侧都查；
+   门禁把「每条原句必须出现」换成「必须有 caveat 段」（`hasCaveatSection`，check 与 verify 两侧都查；
    确定性回退的 `待确认`/`Open questions` 也算）。
 
 **取舍与代价**（写清，供复核）：
-- 丢掉的是"逐字覆盖"这条最强保证：模型现在可以重写 caveat，理论上可以写得很淡。换来的结构保证是
+- 丢掉的是「逐字覆盖」这条最强保证：模型现在可以重写 caveat，理论上可以写得很淡。换来的结构保证是
   **caveat 段必须存在**（缺段直接打回，三次后落确定性回退），以及 `polishGuardrail` 原有的
-  否认/编造/机器 token 拦截全部保留。为什么接受：逐字贴原文正是"电报体 + 重复"的来源，而且它把
+  否认/编造/机器 token 拦截全部保留。为什么接受：逐字贴原文正是「电报体 + 重复」的来源，而且它把
   报告腔直接搬进答案。
 - 单语的代价：语言猜错时读者会拿到一种陌生语言（旧的双语镜像就是为这个）。取舍依据是
   `TriageLang` 现在来自请求本身而不是空话，且双语让每条答案都长一倍、只为了让其中一半可读。
-- 交付物路径开了例外，其余路径仍删：路径是"东西在哪"的答案，删掉等于把结论挖个洞；
+- 交付物路径开了例外，其余路径仍删：路径是「东西在哪」的答案，删掉等于把结论挖个洞；
   但报告里随手引用的 `src/x.ts:12` 对读者无用，照旧删。
 
 **备选（未采纳）**：① 只把 `FIXED_SHOW_DIAGNOSTICS` 打开——那会把台账塞进可见块，正是要修的病；
-② 让 delivery 层直接写最终答案、不要主模型参与——拿不到"按用户原问题重写"这一步；
-③ 保留"逐字覆盖"只提高字数——电报体的根因是指令形状，不是长度。
+② 让 delivery 层直接写最终答案、不要主模型参与——拿不到「按用户原问题重写」这一步；
+③ 保留「逐字覆盖」只提高字数——电报体的根因是指令形状，不是长度。
 
 ## D-116 · T1 null 语义塌陷：宿主侧后置回填（已实现，未合流）；哨兵包只留备选（2026-11-24）
 
 - **Status:** CONFIRMED（实现 + 单测）；真机 soak `NOT_RUN`（留给合流方）
 - **Date:** 2026-11-24
 - **分支:** `fix/null-collapse-t1`（worktree `.agents/worktrees/fix-null-collapse-t1`，从 `main` `6b0eb62` 开出）
-- **问题（`CONFIRMED`）:** 引擎把"子代理死掉"和"没交结构化结果"折成同一个 `null`（证据见
+- **问题（`CONFIRMED`）:** 引擎把「子代理死掉」和「没交结构化结果」折成同一个 `null`（证据见
   `RESEARCH.md` 2026-11-24 条）。`src/script.ts` 的 `callRole` 只能一律记 `format-error`；
   agent-99 的 3691 次子调用里有 530 次传输/鉴权/超时被写成格式错，真格式错 25 次（误标率按那批样本算约 95%）。
 - **决定:** 不碰引擎、不改脚本路由，在插件自己的 seam 上取证、在报告层回填：
@@ -2776,29 +2776,29 @@ spine 为空，pre-fix 形状会进脊柱。
      且同组里不能有真的"`completed` 但没交结构化结果"的子代理。改 class/reason/category，
      连带把 `incomplete` / `errors` / `task.error` / `plan` 里那句同文改成新类（否则文案还留着旧结论）。
   3. 新增失败类 `cancelled`（`types.ts` + `report.ts` 白名单），归 `cancelled` 类别：被取消既不是格式错，
-     也不能被读成"重发就有用"。
+     也不能被读成「重发就有用」。
   4. `classifyFailureText` 两个表（guest 与宿主镜像）都加了 401/403/unauthorized/forbidden/permission denied
-     → `model-unavailable`：403 以前落 `unknown`，读起来像"不知道发生了什么"。两表由
+     → `model-unavailable`：403 以前落 `unknown`，读起来像「不知道发生了什么」。两表由
      `test/null-collapse.spec.ts` 从 `WORKFLOW_SCRIPT` 里把 guest 函数抠出来逐条比对，钉成一张表。
   5. `src/memory/recorder.ts` 的兜底文案接一个 `childCause(childId)`：子代理没留下任何文字时，
-     归档不再只说"它的 transcript 里既没有文本也没有结构化提交"，而是补上真实死因。
-- **为什么不上"让引擎抛错"这条更彻底的路:** 剧本能把 `AGENT_RESULT` 的 message 分类成真因（并且天然
+     归档不再只说「它的 transcript 里既没有文本也没有结构化提交」，而是补上真实死因。
+- **为什么不上「让引擎抛错」这条更彻底的路:** 剧本能把 `AGENT_RESULT` 的 message 分类成真因（并且天然
   不会触发同次补交），但 rejection 要跨 PTC 的进程边界，错误文本能否完整带过去在 `engine-harness.ts`
   的 in-process 运行时上**证不出来**（harness 自己的注释就写了它证明不了进程隔离）。按 AGENTS.md 的
-  "证据说不清就不许写 CONFIRMED"，本轮不做。
+  「证据说不清就不许写 CONFIRMED」，本轮不做。
 - **已知边界（诚实记账）:** 回填只改**报告**。脚本那次决定已经做完了，所以一个 403 子代理仍会花掉一次
-  "同次尝试补交"、仍会走完路由链——"403 不烧链路"这句在行为上还不成立，只有"403 不再被写成格式错"成立。
-  同一 run 内并发另一个 run 的子代理也会落进同一个台账窗口，靠"同 role/attempt 且死因一致"的收敛规则兜住
+  「同次尝试补交」、仍会走完路由链——「403 不烧链路」这句在行为上还不成立，只有「403 不再被写成格式错」成立。
+  同一 run 内并发另一个 run 的子代理也会落进同一个台账窗口，靠「同 role/attempt 且死因一致」的收敛规则兜住
   （不一致就不改，宁可保留旧文案也不新增一处分不清的标签）。
 - **备选（结构性第二步，本轮只登记、不实现）:**
-  - **B1 哨兵包（首选）:** 引擎的 `null` 换不成哨兵，那就换一层——把"子代理终态"作为 `agent()` 的**返回值旁路**
+  - **B1 哨兵包（首选）:** 引擎的 `null` 换不成哨兵，那就换一层——把「子代理终态」作为 `agent()` 的**返回值旁路**
     传给脚本：插件在 twin 里给每个 activation 分配一个 run 内单调序号，宿主侧维护 `seq → {stopReason,
     diagnostic}`，并把这张表作为 `args` 的一部分随**下一次** `start()` 注入（同一 run 内不行），
-    即"下一轮知道上一轮的死因"；只适合跨轮预算/路由调整，不适合当次尝试决策。
+    即「下一轮知道上一轮的死因」；只适合跨轮预算/路由调整，不适合当次尝试决策。
   - **B2 让脚本看见死因:** 需要引擎在 `childResult` 里带上 `diagnostic`（上游改动/提 issue），或
-    允许脚本注册一个"子代理终态回调"。这是唯一能让"403 不烧链路"自然成立的路，属于上游改动。
+    允许脚本注册一个「子代理终态回调」。这是唯一能让「403 不烧链路」自然成立的路，属于上游改动。
   - **B3 宿主主动降级路线:** 一个 route 在 run 内连续 `N` 次同类死亡后，宿主把这条 route 标记为
-    "本轮不可用"，后续 run 的 `buildWorkflowRequest` 直接不派给它（`busyHint` 已有类似通道：跨 run 提示）。
+    「本轮不可用」，后续 run 的 `buildWorkflowRequest` 直接不派给它（`busyHint` 已有类似通道：跨 run 提示）。
     比 B1 简单，但同样管不到当次尝试。
 - **Consequences:** 误标消失（报告/答案/记忆三处都说真因）；分类表一处改两处生效；`cancelled` 进入失败类
   词表；已知边界写进 `VALIDATION.md`，不是悄悄省略。
@@ -2815,14 +2815,14 @@ spine 为空，pre-fix 形状会进脊柱。
   （它原来恰好发嵌套形状，正是把差异挡住的原因），`test/null-collapse.spec.ts` 加一例钉住 role/attempt/route。
 - **② 没有 diagnostic（未修）:** `spawn`（in-process）子代理的 `SubagentResult` 只有 `{output, stopReason, structured}`
   （`dsh-subagent/lib/index.js:1229-1250` 的 `captureLocalResult`），`diagnostic` 只由 external provider 产出。所以真机上
-  一次 401 死亡只能拿到 `stopReason: 'error'`，`childFailureClass` 落到 `unknown`，给不出"超时/鉴权/传输"的细分。
+  一次 401 死亡只能拿到 `stopReason: 'error'`，`childFailureClass` 落到 `unknown`，给不出「超时/鉴权/传输」的细分。
   可选的下一步：读子会话自己的 `turn/end` 事件（宿主侧新增一条读取，或 D-116 B2 的上游通道）。
-- **备选（本轮未采纳）:** 在报告里对 `unknown` 加一句"服务商没有给出失败原文"——能让读者知道这是信息缺失而不是
+- **备选（本轮未采纳）:** 在报告里对 `unknown` 加一句「服务商没有给出失败原文」——能让读者知道这是信息缺失而不是
   分类器的疏忽，但会加长每条失败行，留待与 ② 一起做。
-- **Consequences:** 任何"在引擎 seam 上取证"的改动，验证必须包含一次**真机** run；单测跑在自制 harness 上，
+- **Consequences:** 任何「在引擎 seam 上取证」的改动，验证必须包含一次**真机** run；单测跑在自制 harness 上，
   harness 的 spec 形状一旦与真引擎不同，功能可以整体失效而不报警。
 
-## D-118 · 死因只能从子代理自己的会话记录里取；取不到就说"原因未知"；交付那行按 task id 重建（2026-11-24）
+## D-118 · 死因只能从子代理自己的会话记录里取；取不到就说「原因未知」；交付那行按 task id 重建（2026-11-24）
 
 - **Status:** ① CONFIRMED（真机 round 078 PASS）；② CONFIRMED；③ CONFIRMED
 - **来源:** `release/0.13.26` 的隔离真机 soak 复跑（`.rsi/evidence/round-078/soak.txt`）
@@ -2835,10 +2835,10 @@ spine 为空，pre-fix 形状会进脊柱。
   `agent-start` 抓会话），结算时再读。分类先看服务商的 `code`（`AUTH`/`RATE_LIMIT`/`TIMEOUT`/`HTTP_5xx`…，
   见 `failureClassForCode`），再看原话文本表；代码表只列没有歧义的映射，其余回落到文本，免得给未知代码编一个类。
 - **备选（未采纳）:** 只读引擎结果里的 `stopReason` —— 那就是 0.13.25 的行为，真机上只能说 `error`，
-  读者拿不到"密钥被拒"这一层；等上游给 spawn 结果补 `diagnostic` 属上游改动，本版不阻塞。
+  读者拿不到「密钥被拒」这一层；等上游给 spawn 结果补 `diagnostic` 属上游改动，本版不阻塞。
 - **② 取不到就诚实:** 一条死亡如果哪儿都没记下原文，报告写
-  `the child ended abnormally (cause unknown)`（`CHILD_CAUSE_UNKNOWN`），不再写"没有返回有效的结构化结果"。
-  旧句子的毛病是它在描述"少交了一份表"，读者会去重发；而重发对一次鉴权失败毫无用处。
+  `the child ended abnormally (cause unknown)`（`CHILD_CAUSE_UNKNOWN`），不再写「没有返回有效的结构化结果」。
+  旧句子的毛病是它在描述「少交了一份表」，读者会去重发；而重发对一次鉴权失败毫无用处。
 - **③ 交付那行不能靠句子匹配:** 答案里的「仍未完成（来自报告）」块由脚本在**修复之前**抄进
   `report.synthesis.summary`，交付层逐字打印它。round 077 的修法用 `includes(failure.reason)` 去替换，
   在真机上一条也匹配不上（同一件事的两种写法：`report.incomplete[].reason` 带
@@ -2846,7 +2846,7 @@ spine 为空，pre-fix 形状会进脊柱。
   认识那行块标记（中文/英文两种），取 `- 任务 <id>：` / `- task <id>:` 里的 id，用修好的行重新拼一条
   （同样的 160 字上限），块外一个字符不动。逐字替换仍然先跑一遍，覆盖措辞没漂移的行。
 - **Consequences:** 报告、答案、归档三处说同一个原因；`format-error` 只留给真的没交结果
-  或服务商自己说格式不对的子代理；任何"在引擎 seam 上取证"的改动都必须配一次真机 run，
+  或服务商自己说格式不对的子代理；任何「在引擎 seam 上取证」的改动都必须配一次真机 run，
   因为单测的假 seam 与真引擎在两个方向上都可能不一致（本轮又见一例：devDeps 钉 `0.2.1-rc.2` 发嵌套 spec，
   运行时 `0.2.2-rc.3` 发扁平 spec）。
 
@@ -2884,3 +2884,24 @@ spine 为空，pre-fix 形状会进脊柱。
 - **Consequences:** 一条死路由每轮最多省下「任务数 − 2」次子调用（以及这些调用各自的挂死等待）；代价是
   「死的路在第 3 次之前仍会被试一次」。峰值并发上限与跨 run 提示（C1）语义未变：空道仍是溢出、不是失败。
   任何改动家族表或阈值的提交必须同时改 `HARD_LIMITS.deadRoute`（`test/dead-routes.spec.ts` 把两侧钉成一处）。
+
+## D-120 · 死路由表在真机上是空表（D-119 被否证）与两条修法（2026-11-24）
+
+- **Status:** ① CONFIRMED（真机 5 次 503 调用 / 8 次挂死调用，台账无 `Dead routes` 行）；② CONFIRMED（读码：两个产出点都进不了表）。
+- **来源:** 合流方 soak（`release/0.13.27`，`main` `5678dd8` + `feat/dead-routes`），证据
+  `.rsi/evidence/soak-deadroutes-01327/`，记录见 `VALIDATION.md` 首条。
+- **事实：** D-119 的三条取舍本身没被推翻（排最后而不删、满载落死路由、429 跟开关），被推翻的是它的**前提**——
+  「连续两次传输故障会被记下来」。真机上没有路径能给 `noteRouteFailure` 一个
+  `{class ∈ {timeout, connection, server-error, rate-limit}, switchModel: true}` 的失败：
+  `childTimeoutFailure()` 给 `switchModel: false`（挂死不算换模型的证据），而 5xx / 断连 / 429 在 spawn 引擎里表现为
+  「子代理死了 → `agent()` 返回 `null` → `format-error`」（家族外）。于是表为空、`deadRoutes` 不出现、路由永不降级。
+- **修法一（推荐，最小）：** 把 `childTimeoutFailure()` 的 `switchModel` 打开（或另加一个只供路由健康使用的标记），
+  让「挂死的那条路」真的会排到最后 —— 这正是 D-119 自己举的动机（一次子调用 + 一次完整挂死等待）。
+  代价：任务从「改措辞重试同一路由」变成「先换路由」，要在 D-119 里把这条语义变化写明。
+- **修法二（补齐 5xx / 断连 / 429）：** 把子代理的死因回灌给 guest。原文已经在子会话 `turn/end`，宿主也已有台账
+  （`src/child-outcomes.ts`）与末尾改写 `report.routes[]` 的 `reclassifyNullCollapses`；缺的是「本轮后续调用也能用」的跨调用通道。
+  否决「只在宿主侧补记一张表」：宿主的改写发生在 run 收尾，对同一 run 剩下的调用没有任何作用，而需求恰恰是**省掉后续调用**。
+- **否决"把 `format-error` 也算进族表"：** 名不副实会让真格式错（子代理 JSON 写坏、重发一次即可）也降级一条好路由，
+  与 D-119 的窄表理由冲突；如果走这条路，必须只对「宿主台账证明是传输死因」的塌陷记账，而不是对 `format-error` 记账。
+- **教训（与 D-118 同类）：** 单测把 `{class:'server-error', switchModel:true}` 手工喂进 `noteRouteFailure`，测的是「表怎么记」，
+  不是「引擎会不会给出这种失败」。任何依赖「某类失败会带着某个标志抵达」的改动，必须配一条**真引擎形状**的用例或一次真机 run。

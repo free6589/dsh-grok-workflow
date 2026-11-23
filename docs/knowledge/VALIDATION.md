@@ -1,3 +1,29 @@
+## 0.13.27 合流 soak 判 **FAIL**：死路由这条账在真机上一条都记不住，0.13.27 未发 — 2026-11-24（合流方）
+
+| state | command | result |
+| --- | --- | --- |
+| 合流 | `git worktree add .tmp/wt-rel-01327 -b release/0.13.27 5678dd8` → `git merge --no-ff feat/dead-routes` | 无冲突（分支本就从 `main` 开出）；共享脏树 detached `a6103ad` 一行未动（临时证据目录进共享树后即时删除）；合后 `npm run build` 后 `git status` 干净 → `lib/` 与 `src/` 逐字节一致 |
+| 门禁（合流点） | `npm run ci` | **exit 0：97 files / 1814 tests PASS**，typecheck 干净，lint 0 errors，`verify:lib` byte-identical |
+| 隔离真机 soak 环境 | `scripts/clone-profile.mjs` 克隆 `headless` → `.tmp/soak-01327/headless-home`（parity 4/4，0 凭据）；插件行 `file://…/wt-rel-01327/lib/index.js`；`DSH_HOME` = 该 scratch，独立 `HOME`；live `~/.dsh` 零写入、线上实例未动 | `CONFIRMED` |
+| 路由造法（两条真路由 + 两条假端点） | worker 链 = `soak-dead/soak/dead-model → soak-live/wb/cn:deepseek-v4.1-flash`（provider 目录写在 soak overlay 里；`soak-dead` 是 `127.0.0.1:18471`：`/models` 正常、`/chat/completions` 一律 503 并逐条记日志；`soak-hang` 是 `127.0.0.1:18472`：连上后永不应答） | `CONFIRMED`（两端口真回 503 / 真挂住，`bad-hits.txt`、`hang-hits.txt`） |
+| **503 路由、无并发上限**（5 任务，`maxInFlight 8`） | `dsh --profile headless-soak --patch model.patch.yml --patch plugin-tool-nocap.patch.yml 「<5 小题>」` | **5 次 worker 调用全部落在死路由上（30 次 HTTP = 5×6 次传输层重试），报告台账 5 行 `format-error — worker returned no valid structured result`，`Dead routes` 段 0 行，`deadRoutes` 未出现**（`run-f.txt`） |
+| **挂死路由、无并发上限**（4 任务，`childTimeoutMs 20000`） | 同上换 `model-hang.patch.yml` + `plugin-tool-hang-nocap.patch.yml` | **4 条任务各自 attempt 1 与 attempt 2 都再次落在挂死路由上（8 行 `timeout`），`Dead routes` 还是 0 行**（`run-g.txt`） |
+| 上一轮看似「有效」的两次（`maxInFlight 1`） | 同 503 / 同挂死，死路由 `maxInFlight 1` | 死路由只收到 2 次调用 —— 但台账写明原因：后三条是 `skipped full soak-dead/soak/dead-model`（**空道溢出**，不是降级），台账仍无 `Dead routes`（`run-d.txt`） |
+| 成功率 | 以上各 run | 503 与挂死 run 都 `COMPLETED` 且 5/5 或 3/4 `verified`（挂死那轮 task-1 因两次超时失败）→ **成功率不受影响**（这也不是本轮要证的那一条） |
+| 诊断开 / 关 | 探针 `lib/` 副本把 `FIXED_SHOW_DIAGNOSTICS` 与 `src/index.ts` 的 `renderReport(value)` 改成 `{showDiagnostics:true}`（**只翻诊断可见性，不动路由**），交付文本即含 `Model routes:` / `Route switches:` | 开关「开」时台账确实出现（`run-d/f/g.txt` 里都有 `Route switches:` 段）；**但 `Dead routes` 段始终不存在 —— 因为表里没有行，不是没渲染** |
+| 生产形状（gate 内联路径） | `grokDefault: on`，同一 profile | **`NOT_RUN`（被环境挡住）**：headless profile 上该路径每个 worker 都死于 `agent() could not start a child: Error: no subagent provider registered for "spawn"`（`agent-start-failed`），而同一 profile 的 tool 路径能正常起子代理；用已安装 0.13.24 做对照则 gate 根本没接管（`run-ctl.log` 无 workflow）。**是环境/接缝问题，不是本轮改动引起，但也因此没能在生产路径上取证** |
+
+**根因（`CONFIRMED`，读码 + 两组真机日志互证）**：死路由表的写入条件是
+`ROUTE_HEALTH_FAMILIES[failure.class] === 1 && failure.switchModel === true`（`src/script.ts` `routeHealthFamily`），而真机上能产生这两种失败的路径**都给不出这个组合**：
+
+1. **挂死（timeout）**：唯一来源是 `childTimeoutFailure()`（`src/script.ts:422`），它把 `switchModel` 定成 `false`（原意「挂死不是换模型的证据，任务改措辞重试」）→ 永远不计数。真机日志 8 行 `timeout`、表仍为空，正是这条。
+2. **服务商 5xx / 连接断 / 429**：spawn 引擎把「子代理死了」和「子代理没交结构化结果」都塌成 `agent()` 返回 `null`，脚本走 `value === null` 分支固定记 `format-error`（不在族表里）→ 也不计数。真机日志 5 行 `format-error` 就是这条，而子会话自己的 `turn/end` 里明明写着 `503: {"message":"service unavailable…","code":503}`。
+3. 于是 `{timeout, connection, server-error, rate-limit}` 这四个族在真机上**没有任何一条代码路径能带着 `switchModel: true` 抵达**：`agent-start-failed`（引擎没起子代理）、`unknown`、`inherit`、`format-error` 本就被排除，剩下的 timeout 又被 `switchModel: false` 拦住 → `deadRoutes` 永远为空、`Dead routes` 永远不出现、路由永远不会排到最后。
+
+**单测为什么全绿（`CONFIRMED`，与 round 077 同类的「假 seam」教训）**：`test/dead-routes.spec.ts` 的 18 例是拿手工构造的 `{class:'server-error', switchModel:true}` 失败对象直接喂 `noteRouteFailure`，它测的是「表怎么记」，不是「真引擎会不会记」。真实引擎给出的失败只有"null → format-error"和「subagent 超时 → switchModel:false」两种，两者都进不了表。**没有一条用例走过真引擎的失败形状**。
+
+**结论：不发 0.13.27。** CHANGELOG `[Unreleased]` 写的「连续两次传输故障（超时、断连、5xx、429）之后这条路排到最后」在真机上不成立：实测 5 次调用一次不少地打在 503 路由上，20 秒预算下 4 条任务的两次尝试也全部打在挂死路由上。发版提交、tag、push 一律未做；`release/0.13.27` 只留合流 + 本记录，未推送。`taskId` 进报告行那一半是好的（`test/dead-routes.spec.ts` 覆盖且真机报告行可见），但它撑不起这条 CHANGELOG 段落。
+
 ## 死路由与 task id 进报告行：单测红→绿 + 门禁 exit 0，真机 soak 留给合流方 — 2026-11-24
 
 | state | command | result |
@@ -33,7 +59,7 @@
 | 正常路径 | 3196，全部角色 `bifrost-soak`（`wb/cn:deepseek-v4.1-flash`，本机网关 167 个 id 含该 id） | 「已完成，用时 9秒」+ 一句中文答案，3 个子代理（`happy.png`） |
 | 死掉的 run | 3198，worker → `bifrost-badkey`（`BIFROST_BADKEY=sk-soak-refused-key-probe`，实测网关 401），其它角色不变 | 4 个 worker 子代理真的死于 `401 virtual key is required …`。交付写「worker call produced no result: the child run ended abnormally (401: {…virtual key is required…})」，`no valid structured result` 出现 **0** 次（`dead.png`、`dead-delivery.txt`） |
 | 死因来源 | 子会话自己的 `turn/end`（`src/child-evidence.ts` 折 `turn/end` 的 `reason.error` 与 `assistant/attempt` 的 `finish` 分片） | `CONFIRMED`：spawn 路径的 `SubagentResult` 确实没有 `diagnostic`，而子会话有原文；归档摘要从「the child run ended \`error\`」变成带 401 原文（`dead-archive-excerpt.jsonl`） |
-| 混合死因 | 同一 run 里规划助手死于真格式错（`Tool call "structured_output": Expected ',' or ']' …`） | 规划行保留 format-error，worker 行写鉴权失败 → "各按自己死因" 在真机上成立 |
+| 混合死因 | 同一 run 里规划助手死于真格式错（`Tool call "structured_output": Expected ',' or ']' …`） | 规划行保留 format-error，worker 行写鉴权失败 → 「各按自己死因」 在真机上成立 |
 | 交付「仍未完成」行 | `report.synthesis.summary` 的 notes 块按 task id 重建（`repairAnswerNotes`） | `CONFIRMED`：截图里该行是 401 原文，不是 round 077 那句旧文案 |
 | 环境事实 | web UI 版本行 | 运行栈 `dsh 0.2.2-rc.3-6b729fe`；引擎 `dsh-workflow-ptc 0.2.2-rc.3` 发扁平 spec；但 `package.json` devDeps 仍钉 `0.2.1-rc.2`（该版本发**嵌套** spec）→ 见 D-118 的边界说明 |
 | live 与线上 | 全程 | live `~/.dsh` 只读（本会话对它 EROFS，零写入），线上 `100.111.111.88:3080` 未动、未重启；`.tmp/soak-t1/` 已整目录删除 |
@@ -42,7 +68,7 @@
 
 | state | command | result |
 | --- | --- | --- |
-| 合流 | `git merge --no-ff fix/null-collapse-t1`（worktree `.tmp/wt-rel-0-13-26`，从 `main` `6b0eb62`） | 无冲突（分支本就从 `main` 开出），`git merge` 字面"冲突两边都保留"无适用场景；共享脏树（detached `a6103ad`）一行未动 |
+| 合流 | `git merge --no-ff fix/null-collapse-t1`（worktree `.tmp/wt-rel-0-13-26`，从 `main` `6b0eb62`） | 无冲突（分支本就从 `main` 开出），`git merge` 字面「冲突两边都保留」无适用场景；共享脏树（detached `a6103ad`）一行未动 |
 | 门禁（合流点） | `npm run ci` | **exit 0：95 files / 1771 tests PASS**，typecheck 干净，lint 0 errors，`verify:lib` byte-identical |
 | 隔离真机 soak | fork live `web` profile → `.tmp/soak-01326/dsh-home`（`scripts/clone-profile.mjs`，parity 5/5，1 行凭据按设计脱敏），独立 `HOME`，两个实例 `127.0.0.1:3196`/`3198`，模型 `wb/cn:deepseek-v4.1-flash`，原生 CDP 驱动 | **FAIL**（详见 `.rsi/evidence/round-077/soak.txt`）：正常路径 PASS（工作流跑通、交付一句人话）；**死掉子代理的 run 仍把死因写成格式错** |
 | 死掉 run 的造法 | overlay 把 worker 路由换到同网关的 `bifrost-badkey`（`apiKeyEnv BIFROST_BADKEY=sk-soak-refused-key-probe`） | 4 个 worker 子代理（attempt 1×2、attempt 2×2）真实死亡，子会话 `turn/end` = `401 virtual key is required … code:AUTH`；交付给用户那段仍是 `worker returned no valid structured result (structured output missing or unparsable)` |
@@ -50,10 +76,10 @@
 | 根因 2（未修） | 读 `dsh-subagent/lib/index.js:1229-1250` | spawn（in-process）子代理的 `SubagentResult` 只有 `{output, stopReason, structured}`，**没有 `diagnostic`**（`diagnostic` 只由 external provider 产出）→ 真机上只能得到 `stopReason=error`，`childFailureClass` 只能给 `unknown`，分辨不出超时/鉴权/传输 |
 | 附带 | 实测 | 即使根因 1 修好，交付里「仍未完成（来自报告）」那行仍是旧文案：`report.incomplete[].reason` 与 `failure.reason` 不逐字相同，`repairText` 的 `includes()` 匹配不上（只改到 `errors`/`task.error`） |
 | 修后门禁 | `npm run ci` | **exit 0：95 files / 1772 tests PASS**（新增一例钉住扁平 spec 的 role/attempt/route），`verify:lib` byte-identical |
-| 结论 | — | **不发 0.13.26**：CHANGELOG `[Unreleased]` 里"超时报超时 / 密钥被拒报不可用 / 记忆归档带死因"与真机实测不符（实测文案是 `the child run ended \`error\``）。修法留在 `release/0.13.26`（未推送、未打 tag） |
+| 结论 | — | **不发 0.13.26**：CHANGELOG `[Unreleased]` 里「超时报超时 / 密钥被拒报不可用 / 记忆归档带死因」与真机实测不符（实测文案是 `the child run ended \`error\``）。修法留在 `release/0.13.26`（未推送、未打 tag） |
 
 **为什么单测全绿而真机不生效（`CONFIRMED`）**：`test/engine-harness.ts` 的假子代理 seam 仿的是"嵌套 `request`"形状，
-而真引擎发扁平形状；19 例都在假 seam 上跑，所以 `role` 永远解析成功、`diagnostic` 永远有值。这类"harness 与真 seam 形状不一致"
+而真引擎发扁平形状；19 例都在假 seam 上跑，所以 `role` 永远解析成功、`diagnostic` 永远有值。这类「harness 与真 seam 形状不一致」
 只能由真机 soak 抓出来——本轮正是它的价值。
 
 
@@ -76,12 +102,12 @@ agent-99 全量扫描（3691 次子调用 / 21 run）：530 次传输、鉴权�
 **修法（不改引擎、不改脚本路由）**：`src/team-engine.ts` 的 twin 在 `subagents.startActivation` 上记每条子代理的
 真实终态（`stopReason` + `diagnostic` + `childId` + 从提示词首行解析的 role/attempt + route）进
 `src/child-outcomes.ts` 的有界台账；`src/run.ts` 在报告通过校验后、脱敏前用 `reclassifyNullCollapses` 只回填
-"无歧义"的 null 塌陷行（同 role/attempt 死因唯一，且同组没有真的 prose-only 子代理），并同步 `incomplete`/
+「无歧义」的 null 塌陷行（同 role/attempt 死因唯一，且同组没有真的 prose-only 子代理），并同步 `incomplete`/
 `errors`/`task.error`/`plan.error` 里的同一句文案；`cancelled` 成为合法失败类；401/403/forbidden 在 guest 与宿主
 两张表里都归 `model-unavailable`（由用例从 `WORKFLOW_SCRIPT` 抠出 guest 函数逐条比对钉死）；归档兜底文案带上真实死因。
 
 **已知边界（不是遗漏，是设计）**：回填只改报告。403 子代理仍会花掉一次同次尝试补交、仍会走完路由链——
-"403 不烧链路"在行为上仍不成立；真要不烧，需要让脚本看见死因（`DECISIONS.md` D-116 的 B1/B2/B3 备选，未实现）。
+「403 不烧链路」在行为上仍不成立；真要不烧，需要让脚本看见死因（`DECISIONS.md` D-116 的 B1/B2/B3 备选，未实现）。
 
 ## 已发版 0.13.25 判定角色补交 + 最终答案重写 + 派发心跳规则 — 2026-11-24 (`CONFIRMED`)
 
@@ -111,7 +137,7 @@ agent-99 全量扫描（3691 次子调用 / 21 run）：530 次传输、鉴权�
 
 **根因（`CONFIRMED`，session-6cd6053d）**：检查/复核子代理的 structured_output 里混入未转义的英文双引号，
 宿主解析失败返回 `null`；`callRole` 把 `null` 记成 `format-error` 后立刻换路，链路只有一条时整次尝试即失败。
-worker 有同次尝试内重交（`resubmitPrompt`），verifier/supervisor 没有，于是"判定其实是 pass"变成一次整任务重做
+worker 有同次尝试内重交（`resubmitPrompt`），verifier/supervisor 没有，于是「判定其实是 pass」变成一次整任务重做
 （实测 19.5 分钟）。另外 `classifyFailureText` 只认带空格的 `structured output`，宿主的 `structured_output`
 与 `Expected ','` 解析原话落到 `unknown`，报告读起来像来源故障。
 
@@ -127,9 +153,9 @@ worker 有同次尝试内重交（`resubmitPrompt`），verifier/supervisor 没�
 ## 分支 `fix/final-answer-rewrite` — 最终答案改写（2026-11-24，`CONFIRMED`，未合流未发版）
 
 用户报的现象：跑完的答案是 200 字以内的电报体，而且只取了第一句。实查四处成因（`CONFIRMED`）：
-`src/answer.ts` 默认 relay 让主模型"逐字复述"块内文本 → 块即答案；`src/delivery/index.ts` `answerLead`
+`src/answer.ts` 默认 relay 让主模型「逐字复述」块内文本 → 块即答案；`src/delivery/index.ts` `answerLead`
 只取 summary 第一句（`sentenceLine(..., 400)`）；`relayText` 硬编码 `bilingual: true` → 每条答案中英各一份；
-`synthesizerHardRules` 限死"200 字、无标题无列表"，且 `layeredNotesBlock` 把 uncertainties 原文贴一遍。
+`synthesizerHardRules` 限死「200 字、无标题无列表」，且 `layeredNotesBlock` 把 uncertainties 原文贴一遍。
 修法见 DECISIONS D-115；四条改动的函数级清单见 HANDOFF 首条。
 
 | state | command | result |
@@ -142,40 +168,40 @@ worker 有同次尝试内重交（`resubmitPrompt`），verifier/supervisor 没�
 | 类型 | `npx tsc -p tsconfig.json --noEmit` | exit 0 |
 | lint | `npx oxlint src test` | **0 errors / 35 warnings**（35 条皆既有：`test/delivery.spec.ts` 等未用解构参数）；改动文件单跑 `oxlint src/answer.ts src/delivery/index.ts src/script.ts test/final-answer-rewrite.spec.ts` → 0 warnings 0 errors |
 | 产物 | `npm run build` → `npm run verify:lib` | `lib/` 与本分支 `src/` byte-identical（229 files），`lib/` 随分支一并提交 |
-| 真机 soak（用户视角） | — | **NOT_RUN**：本分支口径是"离线契约 + 全量单测 + 产物校验"，真机 fork-profile soak 留给合流方统一做 |
+| 真机 soak（用户视角） | — | **NOT_RUN**：本分支口径是「离线契约 + 全量单测 + 产物校验」，真机 fork-profile soak 留给合流方统一做 |
 
 **被改了期望的旧用例（逐条，都是契约变更，不是放宽）**：
-`test/delivery.spec.ts` Q11(b) 从"默认逐字、diagnostics 才改写"改成"默认就改写"；
-`test/human-output-contract.spec.ts` 三处 `Answer:` 断言改成"中文块不含英文镜像"（单语），失败态改为断言英文句不存在；
-`test/gate-partial-head.spec.ts` 失败态英文建议句改成"不得出现"；`test/delivery-human-block.spec.ts` 的
+`test/delivery.spec.ts` Q11(b) 从「默认逐字、diagnostics 才改写」改成「默认就改写」；
+`test/human-output-contract.spec.ts` 三处 `Answer:` 断言改成「中文块不含英文镜像」（单语），失败态改为断言英文句不存在；
+`test/gate-partial-head.spec.ts` 失败态英文建议句改成「不得出现」；`test/delivery-human-block.spec.ts` 的
 `STRUCTURAL` 前缀表补 `做成了：`/`交付物：`/`Deliverable:`（块新增两行）、`relayText` 显式要英文块；
-`test/synthesis-guardrails.spec.ts` 的"附注原文贴 caveat"改成"由 synthesizer 重写、附注不再复制"。
+`test/synthesis-guardrails.spec.ts` 的「附注原文贴 caveat」改成「由 synthesizer 重写、附注不再复制」。
 
 **Honest boundary**：以上全是离线确定性证据（报告值 → 文本），没有一次真实模型重写被观察到；
-"主模型会不会按要求重写、会不会把交付物路径读对"属 HYPOTHESIS，必须由合流后的真机 soak 回答。
+「主模型会不会按要求重写、会不会把交付物路径读对」属 HYPOTHESIS，必须由合流后的真机 soak 回答。
 
 ## 已发版 0.13.24 队长拆法绑定 + 首轮可见 + 确认单次消费 — 2026-11-24 (`CONFIRMED`)
 
 | state | command | result |
 | --- | --- | --- |
-| 合流 `release/0.13.24`（`fix/captain-approve` ⊕ `fix/gate-route-msgvis` ⊕ `docs/user-soak-fork-profile`） | `git merge --no-ff` ×3 | 冲突 5 处（`src/gate.ts` ×4 + `test/captain-confirm.spec.ts` 导入 1 处）+ `lib/gate.*` 源映射；按"两边功能都留"手工合 |
+| 合流 `release/0.13.24`（`fix/captain-approve` ⊕ `fix/gate-route-msgvis` ⊕ `docs/user-soak-fork-profile`） | `git merge --no-ff` ×3 | 冲突 5 处（`src/gate.ts` ×4 + `test/captain-confirm.spec.ts` 导入 1 处）+ `lib/gate.*` 源映射；按「两边功能都留」手工合 |
 | 合流后组件 | `npx tsc -p tsconfig.json --noEmit`；`npx vitest run test/captain-confirm.spec.ts test/gate.spec.ts test/channel.spec.ts test/grok-on-ingress.spec.ts test/phase1-dialogue.spec.ts` | tsc exit 0；**5 files / 154 tests PASS** |
 | 发版提交 `b1fead6` | `npm run ci` | **exit 0：92 files / 1729 tests PASS**；typecheck 干净；lint 0 errors；`verify:lib` byte-identical（229 files） |
-| 真机隔离 soak（用户视角） | 见 `.rsi/evidence/round-074/soak.txt`（fork 的 web profile + 独立 `DSH_HOME`/`HOME` + 本机网关 `wb/cn:deepseek-v4.1-flash`，headless Chromium + CDP 在 GUI 里发消息） | **PASS**：队长报拆法 → 回「确认」→ 派发目标含 `USER APPROVED THIS SPLIT` 与原拆法三行，round `status completed · verified 2/2 · 8 criteria`；两个新会话（`mode: full`）首句在 t+5s / t+8s 已可见、其下仍是"正在分析请求"，ea28b24e 空转未复现 |
+| 真机隔离 soak（用户视角） | 见 `.rsi/evidence/round-074/soak.txt`（fork 的 web profile + 独立 `DSH_HOME`/`HOME` + 本机网关 `wb/cn:deepseek-v4.1-flash`，headless Chromium + CDP 在 GUI 里发消息） | **PASS**：队长报拆法 → 回「确认」→ 派发目标含 `USER APPROVED THIS SPLIT` 与原拆法三行，round `status completed · verified 2/2 · 8 criteria`；两个新会话（`mode: full`）首句在 t+5s / t+8s 已可见、其下仍是「正在分析请求」，ea28b24e 空转未复现 |
 | 远端 | Release workflow `45223728613`（tag `v0.13.24` → `b1fead6`） | **success**；GitHub Release `v0.13.24` 已发布 |
-| 远端 | CI on main `45223718435`（`b1fead6`） | **Node 24 success / Node 22 failure**：`test/captain-confirm.spec.ts` 2 例（`voids an unanswered confirmation…` 收到"并入正在跑的这一轮"回执、`does not ask when the session forced the full shape`）。根因：`src/steering.ts` 通道注册表是模块级、用例共用 `sess-captain`，前一用例后台轮的 `finally` 晚于其断言收尾 → 下一用例看到"有通道、没活轮"。本地 Node 22.23.4 与 Node 26 隔离跑该文件 3/3 全绿，只在 2 vCPU runner 复现 |
+| 远端 | CI on main `45223718435`（`b1fead6`） | **Node 24 success / Node 22 failure**：`test/captain-confirm.spec.ts` 2 例（`voids an unanswered confirmation…` 收到「并入正在跑的这一轮」回执、`does not ask when the session forced the full shape`）。根因：`src/steering.ts` 通道注册表是模块级、用例共用 `sess-captain`，前一用例后台轮的 `finally` 晚于其断言收尾 → 下一用例看到「有通道、没活轮」。本地 Node 22.23.4 与 Node 26 隔离跑该文件 3/3 全绿，只在 2 vCPU runner 复现 |
 | 修 flake（仅 test，`e767ba6`） | `afterEach(() => closeAllSteering())` + `npm run ci` | **exit 0：92 files / 1729 tests**；产品代码与 `lib/` 未动，`verify:lib` 仍 byte-identical |
 
-**合流决策（两边都留，逐条）**：① `pendingCaptains` 存 `preview`（round-073 的"派活的正是你看过的那套拆法"），
+**合流决策（两边都留，逐条）**：① `pendingCaptains` 存 `preview`（round-073 的「派活的正是你看过的那套拆法」），
 同时保持 round-072 的单次消费形状 `CaptainPending`（TTL 只判一次、由 `answerInTurn` 取下后逐段下传）；
-② `askCaptain(agentId, request, lang, preview)` 保留 B04 的"上一问未被答就承接"规则并记录本次预览；
+② `askCaptain(agentId, request, lang, preview)` 保留 B04 的「上一问未被答就承接」规则并记录本次预览；
 ③ 审批三条路（交互后台 / 完整形状阻塞 / 完整形状后台）统一 `approvedRequest(request, preview)`，
 原话整段保留、拆法作为约束附后；④ `test/captain-confirm.spec.ts` 同时保留两个 lane 的导入，并新增一条
 "完整形状也带 `USER APPROVED THIS SPLIT`"的断言（两 lane 各自的用例都不会覆盖这条交叉行为）。
 
-**Honest boundary**：soak 的两次首轮可见都跑得快（7–11 秒），证据是"运行中"（t+5s / t+8s）的 GUI 实况 + 截图，
-不是长跑逐秒录像；0.13.23 的坏法是"整轮零消息"，本轮同形状未复现。`answerOnChannel` 仍以"通道存在"作为
-"本轮在跑"的判据，结算到 `finally` 收尾之间的极短窗口里回执会略超前（要求靠 carry 进下一轮、不会丢），
+**Honest boundary**：soak 的两次首轮可见都跑得快（7–11 秒），证据是「运行中」（t+5s / t+8s）的 GUI 实况 + 截图，
+不是长跑逐秒录像；0.13.23 的坏法是「整轮零消息」，本轮同形状未复现。`answerOnChannel` 仍以「通道存在」作为
+「本轮在跑」的判据，结算到 `finally` 收尾之间的极短窗口里回执会略超前（要求靠 carry 进下一轮、不会丢），
 本轮未改产品语义，记为待办。
 
 ## round-073 `fix/gate-route-msgvis` — 首轮可见 + 队长确认一次性消费（未合流，`CONFIRMED`） — 2026-11-24
@@ -187,7 +213,7 @@ worker 有同次尝试内重交（`resubmitPrompt`），verifier/supervisor 没�
 | 绿（相关 spec） | `npx vitest run test/gate.spec.ts test/captain-confirm.spec.ts test/channel.spec.ts test/gate-partial-head.spec.ts test/grok-on-ingress.spec.ts test/triage.spec.ts` | **163 passed** |
 | 受影响的旧行为用例 | `npx vitest run test/phase1-dialogue.spec.ts test/objective-limit.spec.ts test/reliability.spec.ts test/gate.spec.ts` | 旧码把"首轮 `full` 形状阻塞在轮内"钉死；改为"有宿主 head 的会话仍阻塞发布（`headed()` 夹具）＋首轮新契约单测"后全绿。`phase1` 的 `headed()` 需 `step/end` 关闭那一步，否则 `appendAssistantInStep` 把终端写成 assistant 行 |
 | 全量门禁 | `npm run ci` | **exit 0：92 files / 1722 tests PASS**（subset 三次重复：`test/channel.spec.ts` 5×42 全绿、`test/captain-confirm.spec.ts` 4×9 全绿） |
-| 顺手修的测试竞态 | `npx vitest run test/channel.spec.ts -t A4` | 旧码 3 次里 1 次红（`steeringForSession` 在"下一轮刚开始"瞬间还在），新码改为等待频道关闭；**不是本次行为改动引起**，属既有竞态 |
+| 顺手修的测试竞态 | `npx vitest run test/channel.spec.ts -t A4` | 旧码 3 次里 1 次红（`steeringForSession` 在「下一轮刚开始」瞬间还在），新码改为等待频道关闭；**不是本次行为改动引起**，属既有竞态 |
 | lib 同步 | `npm run build` | `tsc -p tsconfig.build.json` + client bundle 303813 B；`lib/` 随提交一起进 |
 | 真机 soak | — | `NOT_RUN`（本轮不发布；离线上门禁 + 单测为准） |
 
@@ -206,7 +232,7 @@ worker 有同次尝试内重交（`resubmitPrompt`），verifier/supervisor 没�
 | soak 抓出的文案缺陷 | `npx vitest run test/experience-pack.spec.ts`（修前红/修后绿） | 修前 **25 passed / 1 failed**（`已经做完 0 项` 与英文无分隔）；修后 **26 passed**；提交 `2e52498` |
 | 真机隔离 soak・§1 | `DSH_HOME=.tmp/soak072/dsh-home dsh --profile headless --patch .tmp/soak072/soak.patch.yml "<two-task prompt>"` | **exit 0**；run record `status completed · verified 2/2 task(s) · confirmed 10 criterion/criteria`；`one/alpha.txt` 8B sha256 `e583bee0…`、`two/beta.txt` 7B sha256 `57da01d5…`；恢复点 `run.status=completed`、`tasks=task-a-alpha:verified, task-b-beta:verified`、`agents=7`、`plan.source=planner`、`inFlight=null`；`experience.md` 已有 1 行复盘（第 5 路真实落盘） |
 | 真机隔离 soak・§2 | `DSH_HOME=… node status-probe.mjs`（真 journal 多帧 zstd 解出 47 事件 → 真 `Session` → `lib/command.js` 真 handler） | `/grok status` → `kind=success`，答出 run id/状态/守卫/可续跑恢复点路径/未完成清单 |
-| 真机隔离 soak・§3 | `DSH_HOME=… node unload-probe.mjs`（真 `disposeActiveState` + 真 guardian；只有引擎是永不 settle 的替身边界） | 会话通知原文含 `Before cancelling, it waited 402ms for 1 subagent call(s) in flight (1 were still open when the window closed)`；dispose record `{"waitedMs":402,"openAtStart":1,"openAtEnd":1,"runsSettled":0,"deadlineHit":true}`；停下文案含"插件在运行中被卸载（或升级）…原样再发一次就接着跑"；守卫行 `守卫：2 条发现，未终止任何子代理；本轮由插件卸载取消。` |
+| 真机隔离 soak・§3 | `DSH_HOME=… node unload-probe.mjs`（真 `disposeActiveState` + 真 guardian；只有引擎是永不 settle 的替身边界） | 会话通知原文含 `Before cancelling, it waited 402ms for 1 subagent call(s) in flight (1 were still open when the window closed)`；dispose record `{"waitedMs":402,"openAtStart":1,"openAtEnd":1,"runsSettled":0,"deadlineHit":true}`；停下文案含「插件在运行中被卸载（或升级）…原样再发一次就接着跑」；守卫行 `守卫：2 条发现，未终止任何子代理；本轮由插件卸载取消。` |
 | 真机那一轮的守卫行 | `grep '守卫：' .tmp/soak072/run1.log` | `守卫：0 条发现，未终止任何子代理；本轮无人取消（正常跑完）。`（英文同段） |
 | 密钥卫生 | `grep -rlF "$BIFROST_VIRTUAL_KEY" .tmp/soak072 .rsi/evidence/round-072` | **0 个文件**（overlay 只写 `apiKeyEnv`；证据只记模型名） |
 | 发版门禁 | `npm run ci`（`c4eaffa`） | **exit 0：92 files / 1717 tests PASS**；`verify:lib` → `lib/ at c4eaffa is the build of src/ at c4eaffa (229 files, byte-identical)` |
@@ -218,7 +244,7 @@ worker 有同次尝试内重交（`resubmitPrompt`），verifier/supervisor 没�
 **说明**
 - 合流中修了一处**生产会静默失效**的载荷形状偏差：exp-pack 从 `workflow/agent-start` 的第一参数读
   `seq/label/phase/childId`，真实 payload 在第二参数（`WorkflowAgentInfo`）。单路测试跟着错形状写，所以全绿；
-  合并后统一读第二参数，"在飞子代理"才会在真机生效（本轮 soak 的 `stats.inFlight` 与 `inFlight` 行由此而来）。
+  合并后统一读第二参数，「在飞子代理」才会在真机生效（本轮 soak 的 `stats.inFlight` 与 `inFlight` 行由此而来）。
 - soak 的 §2/§3 读的是构建产物 `lib/`，不是源码；只有引擎/网关之外的模型调用是真机。§1 是全真（真网关、真模型、
   真插件、真文件），证据 `.rsi/evidence/round-072/soak.txt`。
 - `dsh` 的 `session.v4.jsonl.zstd` 是**多帧** zstd（本轮 14 帧，32KB）；`zstdDecompressSync` 只解第一帧，
@@ -233,7 +259,7 @@ worker 有同次尝试内重交（`resubmitPrompt`），verifier/supervisor 没�
 | 本工作树 | `git branch --show-current` / `git worktree list` | `captain-pack`（自 `main` `cda5d4e` 开） |
 | 拆排・旧码 | 临时把 `runWaves(..., plan.onFailure === 'stop')` 改成 `false`，`npx vitest run test/captain-plan.spec.ts -t 'honours a captain stop'` | **FAIL / exit 1**（下一波照跑）→ `.rsi/evidence/round-071/red-cutA-stop.txt` |
 | 拆排・新码 | 还原后同命令 | **PASS / exit 0** → `green-cutA-stop.txt` |
-| 前台确认・旧码 | 临时把两处确认分支改成 `if (false)`，`npx vitest run test/captain-confirm.spec.ts` | **5 failed / 1 passed / exit 1**（保留的 1 条是 full 模式"不确认"）→ `red-cutB-confirm.txt` |
+| 前台确认・旧码 | 临时把两处确认分支改成 `if (false)`，`npx vitest run test/captain-confirm.spec.ts` | **5 failed / 1 passed / exit 1**（保留的 1 条是 full 模式「不确认」）→ `red-cutB-confirm.txt` |
 | 前台确认・新码 | 还原后同命令 | **6 passed / exit 0** → `green-cutB-confirm.txt` |
 | 三叠纸・旧码 | 临时让 `captainBrief()` 恒返空，`npx vitest run test/captain-memory.spec.ts test/captain-plan.spec.ts` | **2 failed / 14 passed / exit 1** → `red-cutC-memory.txt` |
 | 三叠纸・新码 | 还原后同命令 | **16 passed / exit 0** → `green-cutC-memory.txt` |
@@ -268,18 +294,18 @@ worker 有同次尝试内重交（`resubmitPrompt`），verifier/supervisor 没�
 的末段 catch 兜成 `500 {code:'mode/internal'}`，客户端渲染成红字。loop 开关不受影响：它只读已注入的
 `webServer` / `connection`。
 **Why the tests missed it（`CONFIRMED`）:** `test/mode-surface.spec.ts` 的 inject/ctx 替身是普通对象字面量，
-属性读取永不抛错，因此"直读成功"这条生产必炸的分支在测试里永远绿；真机 soak 此前只覆盖 workflow 全链路，
+属性读取永不抛错，因此「直读成功」这条生产必炸的分支在测试里永远绿；真机 soak 此前只覆盖 workflow 全链路，
 从未请求过 mode 路由，两层都没暴露。
 **Changed:** `src/mode-surface.ts` `serviceOf()` 直读包 `try/catch`，抛错落 `source.get(name)`（与
 `src/settings.ts:83-91` `serviceOf`、`src/team-engine.ts` `resolveService` 同构）；`??` 链保留；注释写明
-isolate-guarded 与"此处抛错是预期结果"。`test/mode-surface.spec.ts` 把挂载用例的替身换成真 cordis 行为
+isolate-guarded 与「此处抛错是预期结果」。`test/mode-surface.spec.ts` 把挂载用例的替身换成真 cordis 行为
 （未注入名属性读抛错、已注入名返回服务、实现 `get(name)`），断言 POST status / POST set 均 200 且 `enabled` 翻转；
 其余断言未弱化。`lib/` 重建（`build`、`verify:lib` byte-identical）。发版串：`package.json` + `package-lock.json`
 0.13.21→0.13.22、`src/client/index.js` + `lib/client.js` 双常量、两份 README、`docs/LOCAL-TESTING.md`、
 `CHANGELOG [Unreleased]` → `## [0.13.22] - 2026-11-24`（中英双语）。
 **Honest boundary:** 真机 soak 的人读首句是交付层兜底句 "One item passed verification."（默认交付层只把人类段落给用户，
 机器台账在标记内下方），故 stdout 不含 `Grok workflow: COMPLETED` 行；状态以插件自身 memory archive 的 run 记录为准
-（同一 run id，`status completed · verified 2/2`）。首轮 soak 因两个任务同目录并发互相干扰（各自 verifier 对"多出来的文件"
+（同一 run id，`status completed · verified 2/2`）。首轮 soak 因两个任务同目录并发互相干扰（各自 verifier 对「多出来的文件」
 存疑）而读数含 caveat，第二轮改为每任务独立子目录后干净通过；两轮均未伪造、均为真机真模型。未碰 live `~/.dsh`、
 未重启现行实例、未 force-push、未 publish 到 npm。
 
@@ -300,7 +326,7 @@ isolate-guarded 与"此处抛错是预期结果"。`test/mode-surface.spec.ts` �
 
 | state | command | result |
 | --- | --- | --- |
-| worktree rsi-round-64 `e0ca9ca`（main `171b95b` + 本轮 1 提交） | `npx vitest run test/delivery-human-block.spec.ts -t "degraded plan"`（旧码 stash，lead 独立） | **1 failed / 45 skipped**：新用例红（旧码"0 项没做成"无降级） |
+| worktree rsi-round-64 `e0ca9ca`（main `171b95b` + 本轮 1 提交） | `npx vitest run test/delivery-human-block.spec.ts -t "degraded plan"`（旧码 stash，lead 独立） | **1 failed / 45 skipped**：新用例红（旧码「0 项没做成」无降级） |
 | 同上（新码） | `npx vitest run test/delivery-human-block.spec.ts`（lead 独立） | **46 passed** |
 | 同上（新码） | `npm run ci`（lead 独立） | **exit 0：87 files / 1656 tests PASS**；typecheck 干净；lint 0 errors；`verify:lib` byte-identical |
 | 隔离 soak | 网关探针 | **BLOCKED**：网关 502/401（无凭证），未伪造 |
@@ -352,7 +378,7 @@ isolate-guarded 与"此处抛错是预期结果"。`test/mode-surface.spec.ts` �
 | 同上（新码） | `npm run ci`（lead 独立） | **exit 0：87 files / 1652 tests PASS**；typecheck 干净；lint 0 errors；`verify:lib` byte-identical |
 | 隔离 soak | 网关探针 | **BLOCKED**：网关 502，未伪造 |
 
-**Changed:** `README.md` + `README.zh-CN.md`（"固化"行改点名已删，不写成可配值；反引号点名保留，spec 不红）+ `CHANGELOG [Unreleased]` 中英双语 + `.rsi/evidence/round-060/`。纯文档改无行为变化。
+**Changed:** `README.md` + `README.zh-CN.md`（「固化」行改点名已删，不写成可配值；反引号点名保留，spec 不红）+ `CHANGELOG [Unreleased]` 中英双语 + `.rsi/evidence/round-060/`。纯文档改无行为变化。
 **Honest boundary:** 真机 BLOCKED，不发版；`[Unreleased]` 已攒 14 条待发。
 
 ## round-59 两处过期门注释改诚实（soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
@@ -496,7 +522,7 @@ isolate-guarded 与"此处抛错是预期结果"。`test/mode-surface.spec.ts` �
 | 隔离 soak | headless 新 profile + 真模型 | **BLOCKED**：插件链路通；`MISSING_CREDENTIAL` 无额度，未跑出 COMPLETED，未伪造 |
 
 **Changed:** `src/script.ts`（无定时器分支宿主时钟盯 settlement + 同前缀判停；无时钟/无预算才裸等）+ `test/timeout.spec.ts`（+1 真无定时器 realm 回归）+ `lib/` 重建 + `CHANGELOG [Unreleased]` 中英双语 + `.rsi/evidence/round-048/`。
-**Deviation:** 任务单写的 `Promise.race` 在该分支物理不可用（无 timer 就没有"到期"端）；子代理亲验 PTC 空上下文后改用 settlement+时钟轮询，等价语义已在注释写明。
+**Deviation:** 任务单写的 `Promise.race` 在该分支物理不可用（无 timer 就没有「到期」端）；子代理亲验 PTC 空上下文后改用 settlement+时钟轮询，等价语义已在注释写明。
 **Honest boundary:** `verify:lib` 首跑报 worktree 空 node_modules 缺 tsc（环境问题，基线同复现；lead 已软链主树依赖后通过）；真机 BLOCKED（网关 502/无额度），不发版。
 
 ## round-47 恢复证据深拷（soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
@@ -571,7 +597,7 @@ isolate-guarded 与"此处抛错是预期结果"。`test/mode-surface.spec.ts` �
 | 同上 | lead 独立红绿复验（stash→旧码红→pop→新码绿→全量门禁） | **复现成立**；`lib/delivery/index.js` 为同改动编译产物；证据目录无真密钥 |
 
 **Changed:** `src/delivery/index.ts`（machineLedger `failed` → `failed || blocked` + 对齐注释）+ `test/delivery.spec.ts`（+1 blocked 原因行回归，含与 renderReport 逐行一致断言）+ `lib/` 重建 + `CHANGELOG [Unreleased]` 中英双语 + `.rsi/evidence/round-043/`。
-**Root cause:** 同一 report 两种方言：正式报告对 blocked 打原因行，机器台账只对 failed 打，存档丢"没跑成"和上游原因；category 取法两侧本来就一致（blocked 无分类），只需放宽状态条件。
+**Root cause:** 同一 report 两种方言：正式报告对 blocked 打原因行，机器台账只对 failed 打，存档丢「没跑成」和上游原因；category 取法两侧本来就一致（blocked 无分类），只需放宽状态条件。
 **Honest boundary:** 真机 GUI 手点 NOT_RUN；未发版（`[Unreleased]` 攒版）。
 
 ## round-42 Slack 令牌全系前缀脱敏补齐 — 2026-11-23 (`CONFIRMED`，未发版)
@@ -610,7 +636,7 @@ isolate-guarded 与"此处抛错是预期结果"。`test/mode-surface.spec.ts` �
 | remote main `1591665` | CI workflow `45067182761` | **success**（2m0s） |
 | remote tag `v0.13.16` | Release workflow `45067195044` | **success**（2m7s），GitHub Release `v0.13.16` 已发布（asset `dsh-grok-workflow-0.13.16.tgz`） |
 
-**Changed:** `DEFAULT_TIMEOUT_MS = 0`（不限时）+ 设置页不限时文案；`replan` 可见开关（默认关）；设置页升级入口（`GROK_WORKFLOW_UPDATE` version/latest/command + 4 中英 key）；`runWorkflow` 启动扫同会话 checkpoint 续跑（carry-over 上下文，2s 预算 + skip 缝）；进度脊柱删永久空"回答"格（6 格）；`installModeRoute` 缺 webServer 打 warn（405 插件侧）。
+**Changed:** `DEFAULT_TIMEOUT_MS = 0`（不限时）+ 设置页不限时文案；`replan` 可见开关（默认关）；设置页升级入口（`GROK_WORKFLOW_UPDATE` version/latest/command + 4 中英 key）；`runWorkflow` 启动扫同会话 checkpoint 续跑（carry-over 上下文，2s 预算 + skip 缝）；进度脊柱删永久空「回答」格（6 格）；`installModeRoute` 缺 webServer 打 warn（405 插件侧）。
 **Tests:** triage `route` 等后台启动（≤5s）；guardian 心跳用例 `resumeLister: 'skip'`；phase1 deadline 用例 skip；mode-surface +1 warn 断言（21 例）；report 0-deadline 三断言同步。
 **Root cause fixed this round:** resume 扫描的 macrotask 让后台启动晚于测试断言（triage 3 + guardian 1 + phase1 1 共 5 例红）；report 旧断言按 360 万 deadline 写而 0 不进报告（2 例）。
 **Honest boundary:** 405 真机复现（Allow 头确认）NOT_RUN，需宿主路由未挂载的环境；第 5 件拍板项（绘画失败查因）不在本仓库，已排除；第三节 5 件拍板项未动。
@@ -664,9 +690,9 @@ team/full 两条后台接纳改走同一壳）、`src/run.ts`（`RunWorkflowOpti
 
 **Honest boundary:** 全量 `npm run ci` NOT_RUN（lead 跨 lane 统一跑；本轮并发 lane 的
 `test/client.spec.ts measureWires`、`test/nycforecast.spec.ts --jsx` 仍是红）。**真实浏览器里
-"跑中发消息→回执→波边界并入→进度页更新"的手势验证 NOT_RUN**：这需要真实 GUI 会话与真实模型，
+「跑中发消息→回执→波边界并入→进度页更新」的手势验证 NOT_RUN**：这需要真实 GUI 会话与真实模型，
 本轮只在 host 侧用真实 `apply()` 组合 + 假引擎钉住了语义（A1–A5）。撞到 `停掉` 之外的
-"取消某个具体任务"（子任务级热取消）仍是非目标：引擎没有 per-child 句柄。
+「取消某个具体任务」（子任务级热取消）仍是非目标：引擎没有 per-child 句柄。
 
 ## 未发版 D-104 Guardian 预算跟随 childTimeoutMs — 2026-11-22 (`CONFIRMED`，lead 本轮)
 
@@ -2057,7 +2083,7 @@ Artifacts: `docs/knowledge/evidence/t46/`.
 | 1 | (a) Every user message is forced through the workflow — `hi`, a one-line question, and a bare follow-up | **PASS** | Three messages in one session produced exactly three runs (`hi` → planner+1 task+verifier verdict "quality", `1+1 等于几？` → `COMPLETED … 1 verified`, `那 2+2 呢？` → ran and reported one quality finding); no turn produced a direct answer. `A-reports.txt`, `session-evidence.txt` §1 |
 | 2 | (b) Progress is visible while the run is live | **PASS** | The run node first paints at **358 ms** / 40 ms / 21 ms after send (`B-samples-*.json`), carries `data-run-status` through `running` → `completed`/`completed`, and the member list grows with each child agent; `B1-node-hi.png` |
 | 3 | (c) The settings page renders the v0.2.2 fields in both locales, with the 60-minute default | **PASS** | ZH: `每会话活跃运行上限`, `全部会话活跃运行上限`, `3600000`, `按角色模型链`, `保存`; EN: the same four labels in English; card title `Grok workflow` in both; `<html lang>` round-trips `zh-CN` → `en` → `zh-CN`. `C1-settings-zh.*`, `C2-settings-en.*`, `C-settings.log` |
-| 4 | (d) Role chains are editable **through the product** and take effect per role | **PASS with a discrepancy** | Edited the worker chain on the page (second route added by hand), saved: banner "已保存，下一条消息生效。", patch then holds `worker: [wb/cn:no-such-model-probe, wb/cn:deepseek-v4.1-flash]` (`instance-facts.txt`). Effect: the parent session's own requests use `wb/cn:mimo-v2.6-pro` while **all 19 child agents** use `wb/cn:deepseek-v4.1-flash` (`session-evidence.txt` §3). Discrepancy: the report's `Model routes:` line appears only after a settings-page save — the same chain written directly into the profile patch produced no such line (see "open questions") |
+| 4 | (d) Role chains are editable **through the product** and take effect per role | **PASS with a discrepancy** | Edited the worker chain on the page (second route added by hand), saved: banner 「已保存，下一条消息生效。」, patch then holds `worker: [wb/cn:no-such-model-probe, wb/cn:deepseek-v4.1-flash]` (`instance-facts.txt`). Effect: the parent session's own requests use `wb/cn:mimo-v2.6-pro` while **all 19 child agents** use `wb/cn:deepseek-v4.1-flash` (`session-evidence.txt` §3). Discrepancy: the report's `Model routes:` line appears only after a settings-page save — the same chain written directly into the profile patch produced no such line (see "open questions") |
 | 5 | (e) A cut run is explained, not silently dropped | **PASS for unload and caller stop, INCONCLUSIVE for the deadline** | Unload mid-run (plugin switch off with a run live): the delivered report says `FAILED … Failures: 1 cancelled … grok_workflow was cancelled because the plugin was unloaded while the run was in flight (not a deadline and not a manual stop)`. Caller stop: `run-end stopReason=cancelled`, `turn/end aborted/user`, and no report, because the user aborted the turn themselves. Deadline: a 60 000 ms value saved through the page did **not** stop a run that was still working at 2 m 40 s and beyond (`I1-deadline-conversation.txt`), and the value could not be re-read afterwards because the patch was only inspected after the restore — so either the save did not reach the runtime or `ctx.workflowEngine.start` does not act on the aborted signal while a child call is in flight (`src/run.ts:383`, the timer aborts a signal handed to the engine). `E4-report-after-unload.txt`, `F-stop.log`, `I-deadline.log` |
 | 6 | (f) Idempotence, no recursion into subagents, no secret leakage | **PASS** | Runs == deliveries admitted == delivered, 0 duplicates in all 5 user-driven sessions; 19 child sessions, **0** of them started a run; the provider key does not appear in any session file (0 hits) and no `sk-…` string does either. `session-evidence.txt` §1, §2, §5 |
 | 7 | (g) Five consecutive rounds without degradation | **PASS for stability, FAILED for quality — corrected in t49** | Five objectives in a row on the same instance: 155.0 s, 181.9 s, 181.8 s, 181.7 s, and the fifth round finishing `completed`; every run reached a terminal state, none needed a retry — that is exactly what this row measured, and it holds. What it did **not** measure, and what t48 spot-checked: every one of those five rounds' *reports* says `Grok workflow: FAILED` with `Failures: 1 quality` and `0 verified`. The engine finishing (`stopReason: completed`) is not an accepted result. Whole test home, 12 reports: `COMPLETED` 1, failed-for-quality 8, cancelled by deliberate probes 3. Root cause (t49): all 8 quality failures were **one defect** — `checkVerification` failed a task whenever the verifier's prose `issues` was non-empty, even though the verifier had returned `verdict: pass` and its own notes say "non-blocking" / "minor observation rather than a failure" / "does not affect any acceptance criterion". Fixed in `src/script.ts` with regression tests; see Round 8. So: 流程稳定 5/5，质量结果 0/5 `COMPLETED`，根因＝我方判定缺陷（已修），不是模型能力问题。`G-rounds.log`, `G-rounds.json`, `G{1..5}-round.png` |
@@ -2135,7 +2161,7 @@ Not one report said `verifier verdict was fail`, `criterion not met` or
 the verifier had returned **`verdict: pass`** and the task failed purely because its prose `issues`
 list was non-empty. The notes themselves say so: "Minor inaccuracy, **non-blocking**…", "recorded
 as a **minor observation rather than a failure**", "**does not affect any acceptance criterion**",
-"处理合理，不影响本次字节级验证结论", "故**判定为满足**".
+「处理合理，不影响本次字节级验证结论」, 「故**判定为满足**」.
 
 So the answer to *"flash as verifier too strict, or worker too weak?"* is **neither**: the verifier
 was passing the work and adding a caveat, and the plugin turned the caveat into a failure. A
@@ -2208,7 +2234,7 @@ kept verbatim in the evidence directory.
 1. **The chat tier's single call returned nothing.** `agentsStarted=1 value={"reply":null}`: the
    child answered the social message in prose, and the guest collapses "child failed" and "child
    returned no structured value" into `null`. Fix: the direct tier answers from a template — that
-   is also what "秒回" means — and `chatReply()` names what the plugin does.
+   is also what 「秒回」 means — and `chatReply()` names what the plugin does.
 2. **The quick tier failed the same way, intermittently** (same prompt succeeded twice, returned
    `{"reply":null}` twice). Fix: the plain call (no schema, the child's text is the answer) is the
    primary and a schema-shaped call is the retry; the reason line now carries `agentsStarted`, so a
@@ -2313,7 +2339,7 @@ use objectives that name no filesystem action at all.
 
 | 缺口 | 修法 | 用例 |
 |---|---|---|
-| 句尾"几" | `几[个号年月天时分秒]` → `几(?![十百千万乎])` | `3+5等于几`、`这个得几`、`还剩几台机器`、`有几条记录`、`这是几`、`还剩几`、`5的平方是几`、`这台机器几核` → 全部 `fast`/`question` |
+| 句尾「几」 | `几[个号年月天时分秒]` → `几(?![十百千万乎])` | `3+5等于几`、`这个得几`、`还剩几台机器`、`有几条记录`、`这是几`、`还剩几`、`5的平方是几`、`这台机器几核` → 全部 `fast`/`question` |
 | 纯顿号列表 | 新增 `COMMA_LIST`（三个及以上顿号项算多步） | `改配置、重启、验证` → `team`；`读、写` → `fast`（两个项不算多步） |
 | `并+回滚` | 动词表补 `回滚\|回退\|重启\|验证\|灰度` | `并回滚到上一版`、`备份、升级后并回滚` → `team` |
 
@@ -2322,7 +2348,7 @@ use objectives that name no filesystem action at all.
 | 输入 | 修前（真机会话） | 修后（真机会话） |
 |---|---|---|
 | `is this repo using esm or cjs` | `Tier: confirm`（对一个问题反问了一遍） | `档位：快手档` |
-| `这个得几` | `确认档`（被"模糊即反问"拦住） | `快手档` |
+| `这个得几` | `确认档`（被「模糊即反问」拦住） | `快手档` |
 
 修法：英文是非问句按**助动词前置**识别（`is/are/does/do/can/… + this/that/it/…`），并给 `MULTI_STEP` 补英文顺序词
 （`then`/`first…then`/`afterwards`/`finally`），保证 `do this then another` 这类祈使多步不被误判为问句。
@@ -2379,9 +2405,9 @@ use objectives that name no filesystem action at all.
 真机覆盖 **38 / 44**，**误判 0 条**。覆盖方式（全部在隔离工作区 `/tmp/t56-work` 上跑，会话目录
 `sessions/--tmp-t56-work--/session-*` 为证）：第一轮 V1–V14、第二轮 V18–V22 + T1–T5 + T12–T14 + J1–J8、
 第三轮 V15–V17。**未覆盖的 6 条（T6–T11）都是团队档带文件系统动作的样本**：它们在预算内完成不了
-（`先备份然后升级` / `备份数据库并通知我` / 序号与分号形式的那几条），继续等待只会把一个"档位表"变成
-"性能测量"，所以它们以规则判定 + V9–V14 六条团队样本的真机结果为准（那六条在同一实例上全部显示
-`档位：团队档`）。这不是"没测"，是"测得起的部分都测了、测不起的部分如实标注"。
+（`先备份然后升级` / `备份数据库并通知我` / 序号与分号形式的那几条），继续等待只会把一个「档位表」变成
+「性能测量」，所以它们以规则判定 + V9–V14 六条团队样本的真机结果为准（那六条在同一实例上全部显示
+`档位：团队档`）。这不是「没测」，是「测得起的部分都测了、测不起的部分如实标注」。
 
 > 复现注意：一次真机会话同时只能有一个 turn 在跑。第一轮脚本按固定预算发下一条，结果 20 多条消息被
 > 丢弃（会话里 `user/message` 只有 14 条），教训已写进 [TESTING.md](TESTING.md) 规则 10：**发下一条前
@@ -2394,7 +2420,7 @@ use objectives that name no filesystem action at all.
 | 不变量 | 判定 | 证据 |
 |---|---|---|
 | **多步永不吃模板** | 所有多步样本（`先…再/然后`、`1)/一、`序号、顿号列表、分号、`并+动词`）落在 `团队档`，无一落 `直答档` | 本表 team 行 + `test/triage.spec.ts` 的 multi-step 回归组 |
-| **已识别的问句形态永不用模板** | 所有**被规则识别**的问句（中/英，含句尾"几"、`?`、wh-词、助动词前置，以及 t58 补的 `A不A`/`A没A`、`还是` 二选一、`谁`）落在 `快手档` 或以上，无一落 `直答档`、无一落 `确认档`；规则没认出来的形态不在此承诺之内（见 D-027） | 本表 question 行 + 6 组问句回归测试（规则级验证，本轮未跑真机） |
+| **已识别的问句形态永不用模板** | 所有**被规则识别**的问句（中/英，含句尾「几」、`?`、wh-词、助动词前置，以及 t58 补的 `A不A`/`A没A`、`还是` 二选一、`谁`）落在 `快手档` 或以上，无一落 `直答档`、无一落 `确认档`；规则没认出来的形态不在此承诺之内（见 D-027） | 本表 question 行 + 6 组问句回归测试（规则级验证，本轮未跑真机） |
 
 ### 5. 构建与回归
 
@@ -2407,7 +2433,7 @@ use objectives that name no filesystem action at all.
 ### Round 11 addendum (t58) — 规则级验证
 
 t57 的三条 low 修补在本轮完成，**本轮没有真机矩阵**（改动全在分类器规则内，单测是权威证据；真机只会重复
-Round 11 已经证明的"档位行照常出现"）：
+Round 11 已经证明的「档位行照常出现」）：
 
 | 项 | 内容 | 结果 |
 |---|---|---|
@@ -2529,7 +2555,7 @@ node `26.8.1`，模型 `bifrost-completions / wb/cn:deepseek-v4.1-flash`（凭�
 | T2 | `mode: full` + `on`，写 `hello.txt` 并回读 | 完整流程 + 真证据 | **PASS**：`COMPLETED`，1 task verified；`ls/stat/python/od/sha256` 独立证据；文件 15 B 无尾换行 |
 | T3 | `grokDefault: off`（默认），"reply PONG" | 不拦、直接答 | **PASS**：仅 `PONG`，无工作流 |
 | T4 | `mode: full`，两个独立文件任务 | 并行 + 2/2 验证 | **PASS**：`COMPLETED`，2 tasks 2 verified，内容精确；verifier 如实记录兄弟任务不确定性 |
-| T5 | 写 `/proc/grok-should-fail.txt` | 不谎报 | **FAIL（BUG-59-1）**：`COMPLETED`，1 verified —— 目标被 planner 软化成"尝试并如实报告（预期被拒）"，验证员对着软化标准全过 |
+| T5 | 写 `/proc/grok-should-fail.txt` | 不谎报 | **FAIL（BUG-59-1）**：`COMPLETED`，1 verified —— 目标被 planner 软化成「尝试并如实报告（预期被拒）」，验证员对着软化标准全过 |
 | T5b | 同上，修复后 | `FAILED` | **PASS**：`FAILED`，0 verified，`executor reported failed`；planner 恢复真实目标 |
 | T6 | 一个成功 + 一个必然失败 | `PARTIAL` | **PASS**：`PARTIAL`，2 tasks，1 verified |
 | T7 | 回归：`mode: full` 写 `regress.txt` | 仍 `COMPLETED` | 见下（本轮实测） |
@@ -2539,18 +2565,18 @@ node `26.8.1`，模型 `bifrost-completions / wb/cn:deepseek-v4.1-flash`（凭�
 - **现象**：T5 的目标在 `/proc` 下必然失败，worker 自报 `BLOCKED`，但最终 `Grok workflow: COMPLETED`。
 - **根因（两处叠加）**：
   1. `checkVerification` 只在 `execution.status === 'failed'` 时否决，**`partial` 不被拦**；
-  2. planner 被允许把目标改写成"尝试 X 并如实报告"，验收标准因此绕开真实目标（T5 任务标题即
+  2. planner 被允许把目标改写成「尝试 X 并如实报告」，验收标准因此绕开真实目标（T5 任务标题即
      `Attempt /proc/... write, then report ... (expected denial)`）。
 - **修复**：`checkVerification` 改为 **只有 `execution.status === 'completed'` 才可能通过**
   （自报 partial/failed 是承认未完成）；planner 提示词加"验收标准必须是目标要求的**终态**，不得改写成
-  '尝试并报告'/'预期失败'"；verifier 提示词加"executor 说被阻塞/拒绝/未达成时 verdict 必须 fail"。
+  '尝试并报告'/'预期失败'「；verifier 提示词加」executor 说被阻塞/拒绝/未达成时 verdict 必须 fail"。
 - **回归**：`test/orchestrator.spec.ts` 新增"worker 自报 partial + verifier 通过 → 任务必须 failed、
   总状态 failed、尝试数 = 1 + maxRetries"。
 - **复测**：T5b `FAILED`。
 
 ### 3. BUG-59-2（用户可见契约）：`/grok` 承诺完整流程，实际被前台分诊截走
 
-- **现象**：`/grok` 成功文案说"每条消息都走完整工作流"，但部署默认 `mode: triage`，简单消息走直答/快手档
+- **现象**：`/grok` 成功文案说「每条消息都走完整工作流」，但部署默认 `mode: triage`，简单消息走直答/快手档
   （T1 已实测）。
 - **修复**：`ModeRecord` 增加可选 `workflowMode: 'full' | 'triage'`；`/grok` 写入 `workflowMode: 'full'`；
   闸门在 `produceAnswer` 用会话记录的形状覆盖部署 `mode`（配置级 `grokDefault: on` 仍尊重 `mode`，
@@ -2665,7 +2691,7 @@ per-role model chains, concurrency and run records"），安装的 bundle 名为
 
 > 对账澄清（2026-11-18，nr_reconcile）：WORKFLOW-DESIGN.md 的 NR-4（"…; no write was performed"）与 OQ-018（"settings write-to-disk … NOT_RUN — nested path writes are source-confirmed only"）是 t32 之前的过时措辞，已被本节 §2/§3 与 Round 3（t32）的实测取代——真 GUI 保存经 POST /api/settings/mutate 落盘 cordis.patch.yml（含 t32 嵌套 roles.planner 路由写入），revision 0→1、刷新/重启后仍在、对新会话生效，以实测为准。Reconciliation note (2026-11-18, nr_reconcile): WORKFLOW-DESIGN.md NR-4 ("…; no write was performed") and OQ-018 ("settings write-to-disk … NOT_RUN — nested path writes are source-confirmed only") carry stale pre-t32 wording, superseded by the measurements in §2/§3 here and Round 3 (t32) — a real-GUI save persisted to cordis.patch.yml via POST /api/settings/mutate (including t32's nested roles.planner route write), revision 0→1, survives reload/restart, applies to a new session; the measured record prevails.
 
-### 4. 五处环境偏离（必须如实标注，勿当成"标准环境"证据）
+### 4. 五处环境偏离（必须如实标注，勿当成「标准环境」证据）
 
 1. **`DSH_HOME` 不在 `/tmp`**，在 `.workflow-artifacts/gui-verify/dsh-home`。原因：本沙箱 `/tmp` 是
    每次 shell 调用重建的 tmpfs（两次探针复现：上一次写的 `/tmp/gw-probe2/stamp.txt` 下一次即
@@ -2688,7 +2714,7 @@ per-role model chains, concurrency and run records"），安装的 bundle 名为
 ### 5. 本轮不建立的东西（诚实边界）
 
 - **`relay` / `append` 在长驻 GUI 里的投递仍 `NOT_RUN`**（NR-1 的剩下半边）：本轮走的是默认
-  `in-turn` 投递，只证明"长驻 Web GUI 会话里 in-turn 投递能到达用户"，不证明另两条策略。
+  `in-turn` 投递，只证明「长驻 Web GUI 会话里 in-turn 投递能到达用户」，不证明另两条策略。
 - **质量断言仍受模型边界限制**：全部轮次是 `glm-5.3-flash`，不是 `deepseek-v4.1-flash`；
   本轮没有跑质量矩阵（那需要多次运行与独立评分），所以不能据此扩大 `COMPLETED` 率的结论。
 - **只有一个浏览器内核**（Chromium），没有 Safari/Firefox 证据；也没有移动端证据。
@@ -2742,8 +2768,8 @@ run3 首轮 EXIT 0，但直接回答、无报告。文件中的两行原文：
 （其余只有 `turn_start` / `step_start` / `step_end`（`outputTokens: 7`）/ `turn_end`
 （`reason: completed`），全程无 `GROK-WORKFLOW-REPORT`。）同 prompt 重跑一次即 `COMPLETED`
 verified（3667 bytes，含完整报告 `Plan: planner; 1 task(s); 1 verified` + 独立证据行）。
-该异常样本保留在 `logs/` 里，未删除、未掩盖；稳定性结论按"异常之后连续 3 个 EXIT 0 + 报告"
-给出，不按"从未异常"给出。
+该异常样本保留在 `logs/` 里，未删除、未掩盖；稳定性结论按「异常之后连续 3 个 EXIT 0 + 报告」
+给出，不按「从未异常」给出。
 
 ### 3. 本轮不建立的东西（诚实边界）
 
@@ -2767,7 +2793,7 @@ verified（3667 bytes，含完整报告 `Plan: planner; 1 task(s); 1 verified` +
 
 **机制**：默认 `answerStrategy: in-turn` 的 `answerInTurn()` 在
 `src/gate.ts` 里先 `record(..., 'started', 'admitted')`，然后 **`await produceAnswer(...)`
-——整个工作流跑完才返回 `PreStepDecision`**。DSH 的 `AgentLoop.step()` 是"被 claim 的批次"
+——整个工作流跑完才返回 `PreStepDecision`**。DSH 的 `AgentLoop.step()` 是「被 claim 的批次」
 唯一的写入者，它在 step 真正开始时才把 `decision.messages` 逐条 `session.append('user/message')`
 （`dsh-agent-loop/lib/index.js` `step()`：`for (const message of decision.messages) … else
 this.session.append("user/message", message, { surfaceOp: "append" })`）。因此从 pre-step
@@ -2809,7 +2835,7 @@ zstd -dc $S/session.v4.jsonl.zstd | python3 -c "import sys,json;[print(json.load
 以及 `stepBase()` 的注释（"`step()` commits exactly `decision.messages` as `user/message`
 events"）。旧实现把用户消息只放在 `enter.messages` 里，而 `enter` 发生在运行结束之后。
 
-**为什么报告只提到"第一条"**：缺陷对每条 `in-turn` 消息都成立，但第一条最显眼——那时 transcript
+**为什么报告只提到「第一条」**：缺陷对每条 `in-turn` 消息都成立，但第一条最显眼——那时 transcript
 里没有任何别的内容，空 turn + 状态就是全部画面。
 
 ### 2. 修复（`src/gate.ts`，`lib/` 同步重建）
@@ -2847,7 +2873,7 @@ events"）。旧实现把用户消息只放在 `enter.messages` 里，而 `enter
 profile `fm`（`--from-default-profile web`）、`dsh plugin --profile fm add /home/fish/projects_mine/dsh-grok-workflow`
 （link 安装，直接跑仓库 `lib/`）、`dsh --profile fm --host 127.0.0.1 --port 3299 --no-open`、
 所有模型路由指向本机 mock（`MOCK_API_KEY=dummy-not-a-credential`，mock 接受请求后不回复），
-于是工作流一直处于"运行中"，正好能观察运行期间画面。
+于是工作流一直处于「运行中」，正好能观察运行期间画面。
 
 | 状态 | 操作 | 结果 | 截图 |
 |------|------|------|------|
@@ -2868,7 +2894,7 @@ node iso_reload.mjs "$URL" OUT.png "P0-5 AFTER: message must survive a reload" "
   违反 D-013；因此 AFTER 证据来自同一 `dsh web` 产品的隔离实例（同版本 `0.2.1-rc.2`），
   BEFORE 证据同时包含**真实 :3090 会话截图**与隔离实例复现。
 - **mock 模型**：隔离实例的规划/执行/校验都指向不回复的本地 mock，所以 AFTER 截图里团队
-  **不会**产出报告；本轮只验证"消息是否可见"，不验证答案质量。
+  **不会**产出报告；本轮只验证「消息是否可见」，不验证答案质量。
 - **`relay` / `append` 的长驻 GUI 投递**仍 `NOT_RUN`（NR-1 剩余半边），本轮只覆盖默认 `in-turn`。
 - **`gh` Issue 状态评论**：本机 `gh` 已登录 `free6589`，但本轮未向 `[COORDINATION]` Issue
   发状态块（`NOT_RUN`，由队长决定是否补发）。
@@ -2992,9 +3018,9 @@ model route `bifrost-completions/wb/cn:deepseek-v4.1-flash` via `BIFROST_VIRTUAL
 |---|---|---|---|
 | isolated home | `DSH_HOME=./tmp-home040 dsh --profile gw040 --from-default-profile headless` | PASS | `gw040` created; `workflow-ptc provider: spawn` present in dump |
 | install | `dsh plugin --profile gw040 add ./tmp-pack040/dsh-grok-workflow-0.4.0.tgz` | PASS | `+ dsh-grok-workflow file:…tgz`; dump shows `- id: grok-workflow / name: dsh-grok-workflow` + patched `grokDefault: on`, 4 new keys |
-| chat tier | `dsh --profile gw040 --patch gw040.patch.yml "你好"` | PASS EXIT 0 | `级别：直接回答` + greeting template + `（本次未调用子代理团队…）`, `GROK-WORKFLOW-REPORT` envelope |
-| fast tier | `… "算一下 5×6等于多少，只回答数字"` | PASS EXIT 0 | `档位：快手档` + `30` + `（这条只派了一个工人…）` |
-| team tier | `… "帮我重构 run.ts 的超时逻辑，并补上回归测试"` in empty `/tmp/dshgw-040-work` | PASS (gate/report path) EXIT 0 | `档位：团队档` + `Grok workflow: FAILED` with honest `Incomplete (quality)` + uncertainties naming the unresolvable `run.ts` path; no writes outside `/tmp` (TESTING.md isolation kept; scratch dirs removed after) |
+| chat tier | `dsh --profile gw040 --patch gw040.patch.yml 「你好」` | PASS EXIT 0 | `级别：直接回答` + greeting template + `（本次未调用子代理团队…）`, `GROK-WORKFLOW-REPORT` envelope |
+| fast tier | `… 「算一下 5×6等于多少，只回答数字」` | PASS EXIT 0 | `档位：快手档` + `30` + `（这条只派了一个工人…）` |
+| team tier | `… 「帮我重构 run.ts 的超时逻辑，并补上回归测试」` in empty `/tmp/dshgw-040-work` | PASS (gate/report path) EXIT 0 | `档位：团队档` + `Grok workflow: FAILED` with honest `Incomplete (quality)` + uncertainties naming the unresolvable `run.ts` path; no writes outside `/tmp` (TESTING.md isolation kept; scratch dirs removed after) |
 
 ### 4. Boundary (what this round does NOT claim)
 
@@ -3223,7 +3249,7 @@ npx vitest run test/triage.spec.ts test/gate.spec.ts test/triage-followup.spec.t
 | 判定本身 | `recallFromPrior` 7 例 + `classifyTriage` 5 例 + 说明/提示词 5 例 + 磁盘读取 4 例 | 命中/未命中/指针式引用/确定性/上限/脱敏/默认根目录与环境变量覆盖 |
 
 **默认行为不变的口径（判据 3）：** 一个还没说过话的会话，即使磁盘上有记忆文件，得到的仍是改动前
-那句提问（逐字节相等，`keeps a brand-new session's question byte-identical ...`）；只有"使用者已经说过话"
+那句提问（逐字节相等，`keeps a brand-new session's question byte-identical ...`）；只有「使用者已经说过话」
 的会话，未命中时才会在提问下方附加一行「先查后问，还缺 X」——那种情况下问题是可指认的，说明查过哪里
 才是有意义的。
 
@@ -3248,7 +3274,7 @@ follow-up: 刚才那个端口的事你再说一下
 === worker calls: 1 ===
 ```
 
-（"（示例回答）…" 是测试替身返回的固定串；这里被验证的是**材料进了提示词**与**正文形态**，
+（「（示例回答）…」 是测试替身返回的固定串；这里被验证的是**材料进了提示词**与**正文形态**，
 不是模型答案质量。）
 
 ### 3. 回放测试用的失败形态（判据 4）
@@ -3256,7 +3282,7 @@ follow-up: 刚才那个端口的事你再说一下
 `test/triage-recall.spec.ts` 里 `replay: a follow-up about earlier research is answered, not bounced back`
 成对出现，前半段复现失败形态、后半段证明修复：
 
-- 后半段第 1 轮内容（即失败会话里的"研究结果"）：8080 端口被 `dsh-web` 占用、换端口只改
+- 后半段第 1 轮内容（即失败会话里的「研究结果」）：8080 端口被 `dsh-web` 占用、换端口只改
   `cordis.patch.yml` 的 `web.port`、端口占用只表现为 GUI 白屏。
 - 追问句：`刚才那个端口的事你再说一下`——**改动前**该句是确认档（前半段用例断言
   `档位：确认档` + `这个要动用团队吗？可回复：简单 / 团队`，且 0 次模型调用），**改动后**同一句
@@ -3266,10 +3292,10 @@ follow-up: 刚才那个端口的事你再说一下
 
 ### 4. 实施中发现并修复的缺陷（`CONFIRMED`）
 
-- **F1 — 把当前消息当成"历史"，自己命中自己：** 首版 `collectRecallSources()` 直接调
+- **F1 — 把当前消息当成「历史」，自己命中自己：** 首版 `collectRecallSources()` 直接调
   `collectHistory(session)`。但 `relay`/`append` 策略在 `produceAnswer()` 之前就 `commitClaimed()`
   把本轮消息写进了会话（P0-5），于是「刚才那个端口的事你再说一下」的锚点全部在同一句话里命中 →
-  任何问题都会"找到答案"并据自己作答。修法：给 `collectRecallSources()` 加 `exclude` 参数，按
+  任何问题都会「找到答案」并据自己作答。修法：给 `collectRecallSources()` 加 `exclude` 参数，按
   `textOf(message) === request` 剔除本轮消息；`test/triage-recall.spec.ts` 的 `before the fix`
   用例与两个磁盘记忆用例都依赖这一剔除（关掉剔除会立刻变红）。
 
@@ -3289,7 +3315,7 @@ follow-up: 刚才那个端口的事你再说一下
 ### 6. 边界（本轮**不**声称）
 
 - **真机在线模型回放 `NOT_RUN`**：本轮没有起隔离 DSH profile 跑真模型（需在线模型与 profile 准备，
-  任务约束亦要求"单元测试不需要在线模型"）。判据 4 由上面的确定性回放用例满足；真机 GUI 上的
+  任务约束亦要求「单元测试不需要在线模型」）。判据 4 由上面的确定性回放用例满足；真机 GUI 上的
   「追问不再被要求重述」仍待一次带模型的 e2e 复验。
 - **语义匹配是词面锚点，不是向量检索**：`recallFromPrior` 用去停用词的双字/词锚点 + 指针式引用，
   同义改写（例如把「端口」说成「监听地址」）不会命中，会退化为提问（`HYPOTHESIS`：真实会话里
@@ -3351,7 +3377,7 @@ DSH 的自动压缩（`@deepseek-ai/dsh-compaction-basic@0.2.1-rc.2`）经 `agen
 | `npx vitest run test/route-concurrency.spec.ts test/client.spec.ts` | **47/47 PASS**（route-concurrency 13/13，client 34/34） |
 | `npm run ci` | **PASS**（exit 0；typecheck 0 errors；lint 3 warnings / 0 errors 既有基线；vitest **35 files / 624 tests PASS**） |
 | `lib` 同步 | `npm run build` 后二次重建 md5 幂等一致（`IDEMPOTENT_SYNCED`）；`lib/` 变更即 B组+C1 实现的编译产物，随本轮 commit 入库 |
-| `git diff --exit-code -- lib/` | 以入库为准（上条确认后随 commit 同步；约束原文"若不是0则重跑"已满足——重跑后幂等无变化） |
+| `git diff --exit-code -- lib/` | 以入库为准（上条确认后随 commit 同步；约束原文「若不是0则重跑」已满足——重跑后幂等无变化） |
 | DSH core 改动 | 无（`CONFIRMED`：`git status` 仅本仓库文件，无 core 路径） |
 | live `:3090` 重启 | 未做（D-013；live 实例仍跑 `0.2.7`，reload/upgrade 待用户批准） |
 | 真机 live | `NOT_RUN`（本轮纯收尾归档，未起隔离 profile） |
@@ -3434,7 +3460,7 @@ Turn 1 gate-off 问候 exit 0；turn 2 团队档（`mode: full`，worker 双路�
 | 追加第二个 `subagent/descriptor` 事件改 label | `foldSubagentDescriptor` 取**第一条**（`dsh-subagent/lib/index.js:686-698`），契约明写不可改写；且属未文档化的内部日志改写 |
 | 自定义 `SubagentProvider`（`subagentProvider` 选项） | provider 拿到的 label 仍是 manager 传入的 `spec.label`（`dsh-subagent/lib/index.js:1407/1501`）；`ContinuableCreateSpec` 只有 `seed`，没有 label/descriptor 覆盖位 |
 | 把 `meta.name` 改成描述性名字 | 仍是 run 级单值，只会得到 `任务团队 · N 个任务 child 1`，`child N` 还在 |
-| 插件自己调 `ctx.subagents.startActivation({ label })` 建子代理 | 等于绕开 `ctx.workflowEngine` 的 `agent()` 钩子，违反本仓架构不变量（AGENTS.md「primary execution path is a workflow script executed by ctx.workflowEngine」），且验收条款要求"经 agent() 钩子创建的子代理" |
+| 插件自己调 `ctx.subagents.startActivation({ label })` 建子代理 | 等于绕开 `ctx.workflowEngine` 的 `agent()` 钩子，违反本仓架构不变量（AGENTS.md「primary execution path is a workflow script executed by ctx.workflowEngine」），且验收条款要求「经 agent() 钩子创建的子代理」 |
 | 改 DSH core | 明令禁止（AGENTS.md + 本任务 constraints） |
 
 ### 需要的上游改动（**NOT_RUN**，未执行）
@@ -3480,9 +3506,9 @@ DSH core 两处、约 3 行：`runtime.ts` 的 `agent()` 把 `label` 放进 `sta
 | `DSH_HOME=out/childname-verify/home dsh --profile cnamer --from-default-profile headless --dump-config` | exit 0（隔离 home + headless profile 建立） |
 | turn 1（gate off，复用 `out/v060-verify/model-pro.patch.yml` + `plugin-off.patch.yml`） | exit 0，`session-765de8f7-15ae-490b-8c16-ce39018edac9` |
 | turn 2（gate on，`plugin-on.patch.yml`：`mode: full`、`maxTasks: 2`、`maxRetries: 0`、worker 双路由） | exit 0，团队档 COMPLETED，2 任务 verified（一条真实 agnes `format-error` route switch，同 Round 26 形态）；共 **6 个子代理**（planner 1 + worker 2/3/5 + verifier 4/6） |
-| 父会话 `tool-workflow/run-start` | `"name":"任务团队"`（计划先行，开局无任务数后缀） |
-| 父会话 `tool-workflow/agent-start` ×6 | **插件标签确实在传**：`{"label":"规划助手","phase":"规划",…}`、`{"label":"执行","phase":"任务 1 · Create and verify sum.tx…",…}`、`{"label":"检查",…}`（`parent-agent-start-excerpts.txt`） |
-| 6 个子会话首个 `subagent/descriptor`（`zstdcat` + `grep`） | **全部为 `"label":"任务团队 child N"`（N=1..6），`seq 0`，`provider:"spawn"`**（`child-descriptor-events.txt`）——插件传的描述性 label 未到达持久描述符，与用户截图逐字一致 |
+| 父会话 `tool-workflow/run-start` | `"name":「任务团队」`（计划先行，开局无任务数后缀） |
+| 父会话 `tool-workflow/agent-start` ×6 | **插件标签确实在传**：`{"label":「规划助手」,"phase":「规划」,…}`、`{"label":「执行」,"phase":「任务 1 · Create and verify sum.tx…」,…}`、`{"label":「检查」,…}`（`parent-agent-start-excerpts.txt`） |
+| 6 个子会话首个 `subagent/descriptor`（`zstdcat` + `grep`） | **全部为 `"label":「任务团队 child N」`（N=1..6），`seq 0`，`provider:"spawn"`**（`child-descriptor-events.txt`）——插件传的描述性 label 未到达持久描述符，与用户截图逐字一致 |
 
 ### 边界
 
@@ -3921,7 +3947,7 @@ POST /api/settings/describe（RPC envelope {type:"client-request",rpcId,method,p
 ### 3. H1 — 交互（前台 `PASS`；团队档 `BLOCKED`）
 
 ```text
-$ DSH_HOME=.verify-gw/home dsh --profile gwverify-hl --patch mock.patch.yml "你好"
+$ DSH_HOME=.verify-gw/home dsh --profile gwverify-hl --patch mock.patch.yml 「你好」
 → exit 0；stdout（插件自己产出）：
   档位：直答档 — 因为：这是问候/寒暄，没有要做的事，前台直接回答。
 
@@ -3933,7 +3959,7 @@ $ DSH_HOME=.verify-gw/home dsh --profile gwverify-hl --patch mock.patch.yml "你
 ```
 
 ```text
-$ DSH_HOME=.verify-gw/home dsh --profile gwverify-hl --patch mock.patch.yml "用团队跑一个小任务：…"
+$ DSH_HOME=.verify-gw/home dsh --profile gwverify-hl --patch mock.patch.yml 「用团队跑一个小任务：…」
 → exit 0，run FAILED：
   Grok workflow: FAILED
   task-1: failed (2 attempts) — worker failed on every route: [format-error]
@@ -4118,7 +4144,7 @@ $ cd <repo> && TMPDIR=$PWD/.tmp npx vitest run test/gate.spec.ts
 
 即：①`queue is full` 那条**稳定失败**（工作树与基线都失败）；②`append strategy` 那条
 **基线失败、工作树单跑偶过、全量跑失败**——形态上是既有失败 + 时序敏感，不是本轮引入。
-边界：本轮只证明"与基线同形"，**未定位根因、未修**。发版前是否连带处理由 agent-27 / 用户决定；
+边界：本轮只证明「与基线同形」，**未定位根因、未修**。发版前是否连带处理由 agent-27 / 用户决定；
 在此之前 934 全绿**不成立**，写"PASS"会是假话。
 
 ### 5. 真机 Round2（H2 进度 Tab + 安装/加载半边）— 引证，不是本轮自跑
@@ -4131,14 +4157,14 @@ $ cd <repo> && TMPDIR=$PWD/.tmp npx vitest run test/gate.spec.ts
   插件装打包产物 `dsh-grok-workflow-0.9.1.tgz`（sha256 `ac51b89a…`），模型 `127.0.0.1:18088`
   的 `wb/cn:deepseek-v4.1-flash`，headless Chromium 1440×900 / 480×900。
 - 真机四态：`pending` / `doing` / `done` / `failed` = `CONFIRMED`（`failed` 是真实沙箱边界那一次，
-  `End:failed`，人话结论如实写"没做成"）；`blocked` / `cancelled` 本轮 `NOT_TRIGGERED`。
+  `End:failed`，人话结论如实写「没做成」）；`blocked` / `cancelled` 本轮 `NOT_TRIGGERED`。
 - 产物身份半条：`npm run build` 前后 `lib/` 哈希全等 + `cmp` 三者一致（工作树 ↔ profile 安装副本），
   与本节 §2 的本轮复跑结果一致。
 - 安装/加载/前台半边的 Round1 证据仍是 `docs/knowledge/evidence/verify-H1/`（含"关掉
   `workflow-ptc` → `pending (waiting for service: workflowEngine)`"的对照），本轮未复跑，
   **不冒充本轮结果**。
 
-### 6. 用户报告的"机器味"（`CONFIRMED`，截图 `Round2/05-chat-with-run-report.png`）
+### 6. 用户报告的「机器味」（`CONFIRMED`，截图 `Round2/05-chat-with-run-report.png`）
 
 用户看到的那条会话消息，逐字含（我读了截图核对，不是转述别人的话）：
 
@@ -4151,7 +4177,7 @@ $ cd <repo> && TMPDIR=$PWD/.tmp npx vitest run test/gate.spec.ts
   `md5 a64a6f17a1c4c6b1fe39b8a1a8115982`、`find -mindepth 1 -maxdepth 1 -> 仅 'r2-todos.md'`；
 - 结尾 `<<<END-GROK-WORKFLOW-REPORT>>>` 机器 marker；整条消息计 **18.6K token**。
 
-**判定（`CONFIRMED`）**：这版 relay/in-turn 的出站默认是"证据全集"，人话结论即使存在也被机器块
+**判定（`CONFIRMED`）**：这版 relay/in-turn 的出站默认是「证据全集」，人话结论即使存在也被机器块
 盖住；对非技术读者不可读。**要求（用户，经 lead 下达）**：默认只发 human 块 + 下一步，机器证据
 默认收进 Progress 详情 / 诊断开关（`showDiagnostics` 一类），不再 verbatim 全贴。该改动归 agent-27，
 本节只记录证据与判据，**未实现、未验证**（`NOT_RUN`）。
@@ -4379,8 +4405,8 @@ Implementation bugs found and fixed in-round (both `CONFIRMED` by failing test):
 
 1. `$1` 注入：`stripIds` 单字符分支 lookbehind 无捕获组，`$1` 逐字写回
    （`Task a：…` → `Task $1…`）。修：单字符分支替换串用空串。
-2. `核验通过` 自杀：`answerLead` 回落句"有一项已核验通过。"命中自家 MIDLINE，
-   被 `composeBlock` 整行丢弃。修：回落句改"有一项已得出可用结论。"。
+2. `核验通过` 自杀：`answerLead` 回落句「有一项已核验通过。」命中自家 MIDLINE，
+   被 `composeBlock` 整行丢弃。修：回落句改「有一项已得出可用结论。」。
 
 Boundaries: 真机 Web 长驻验证 `NOT_RUN`（首答现场措辞、进度节点、中断重定向均未真机看过）；
 headless e2e（`scripts/e2e-headless-in-turn.sh`）`NOT_RUN`；`full` 管线字节一致性由既有
@@ -4533,8 +4559,8 @@ Save/Discard 在位；scrollW=1440 = innerW（无横向溢出）
    "4 subagents"，Progress 页 7 段：Start ✓ / Plan ✓ 1/1 / Execute / Verify / Synthesize ✓ 2/2 / Answer / End ✓，
    `3/3 · 100%`，`scrollW=innerW=1440`。
 2. `分别查一下北京、上海、广州今天的天气，然后汇总成一句话结论` → 04:00 首答 7s 内落地
-   （"档位：团队档 …… 后台会分别查三地天气 ……"），04:02 后台运行收尾给出
-   "总体状态：已完成；1/1 项任务已由独立检查核验。"，台账
+   （「档位：团队档 …… 后台会分别查三地天气 ……」），04:02 后台运行收尾给出
+   「总体状态：已完成；1/1 项任务已由独立检查核验。」，台账
    `.dsh-home/acgv095/memory/grok-workflow/archive.jsonl` 记录
    `run:eef1f4b7-… status=completed · verified 1/1 · confirmed 6 criteria`，
    task `weather-3cities-summary` 带 2 条 uncertain（工作目录只读挂载、两源措辞差异）。
@@ -4557,7 +4583,7 @@ Save/Discard 在位；scrollW=1440 = innerW（无横向溢出）
 **审计（`CONFIRMED`，10 子代理只读审计，lead 合入）**：
 - 保存链无死路：`form.mutate(ops, revision)` 认深 path（Host `SettingsPathOp.path: readonly string[]`）；
   按钮状态机（disabled/validate/ops/save）走查无恒灰死路（agent-36）。
-- 监督行非缺失而是被淹没：ROLES 5 键全渲染，5 空链文案一字相同（"跟现在一样"），
+- 监督行非缺失而是被淹没：ROLES 5 键全渲染，5 空链文案一字相同（「跟现在一样」），
   监督在旧 bundle 排第 5（首屏下易被截断），用户浏览器跑的还是没重启的旧 bundle（agent-29/agent-35）。
 - 保存失败真凶（agent-28）：① `+加备选` 产空行 → `missingModel` 红错锁保存，静默 return；
   ② `maxInFlight` 有校验无输入框，存量 cap 脏了永远红、永远灰，无处可改；
@@ -4566,7 +4592,7 @@ Save/Discard 在位；scrollW=1440 = innerW（无横向溢出）
 **修复（`CONFIRMED`，`e49acd1` 之后未 push）**：
 1. ROLES 渲染顺序 → planner/worker/verifier/supervisor/synthesizer（序号 1-5 与执行序一致）。
 2. 角色名带序号（`1 · 拆活` … `5 · 收尾`，中英双语）。
-3. 空链文案 → "空着 = 跟这次对话用同一个，没加备选"（EN 同义）。
+3. 空链文案 → 「空着 = 跟这次对话用同一个，没加备选」（EN 同义）。
 4. 数字行步进器（− / ＋，夹取 1-100）+ 补 `unit.jobs`/`unit.tasks`（件/jobs/tasks）。
 5. 模式改双卡片二选一（自动挡/全员上，存 triage/full 不变）+ 新增 mode.* 文案键。
 6. 每行加并发上限 cap 输入框（`data-route-cap`，空=不限）——存量脏 cap 终于有地方改。
@@ -5271,7 +5297,7 @@ C1 跨 run 忙闲快照（`.rsi/POOL.md` R21）。修前探针：只加新用例
 
 ## Round 69 — 2026-11-19 — `0.11.21` 发版：续跑开关生产路径修复（`CONFIRMED`）
 
-**版本判定**：patch。开关从"点不动"恢复"能点"，配置面、报告 schema、5 角色语义都没变。
+**版本判定**：patch。开关从「点不动」恢复「能点」，配置面、报告 schema、5 角色语义都没变。
 
 **命令与结果（`CONFIRMED`，本机实跑）**：
 
@@ -5563,7 +5589,7 @@ CI 全绿为共同基线）。
 
 ## Round 74 — 2026-11-20 — round-026 收口：R6 `grokDefault` 直读 fail-closed + R9 已恢复失败不计数（`CONFIRMED`，未发版）
 
-**主题**：POOL 里两条"报假/报错"类 PENDING——R6（`resolveConfig` 从不校验 `grokDefault`，
+**主题**：POOL 里两条「报假/报错」类 PENDING——R6（`resolveConfig` 从不校验 `grokDefault`，
 拼写错误静默关工作流）+ R9（COMPLETED 轮次把重试救回来的失败也印进 `Failures:`）。
 
 **R6 根因（`CONFIRMED`，复现见 `.rsi/evidence/round-026/red-config-probe.txt`）**：
@@ -5594,7 +5620,7 @@ GUI 手动点击拍照。
 
 ## Round 75 — 2026-11-20 — `0.12.2` 发版：R6 + R9（`CONFIRMED`）
 
-**版本判定**：patch。两条"报假/报错"类修复，无配置面变化、无新功能。
+**版本判定**：patch。两条「报假/报错」类修复，无配置面变化、无新功能。
 
 **命令与结果（`CONFIRMED`）**：
 
@@ -5676,7 +5702,7 @@ throwaway worktree 里把上限改回 `countCeiling`，新用例 **1 failed / 36
 **红绿（`CONFIRMED`，本树实跑）**：
 修前新断言在旧代码上 **1 failed / 11 passed**（正是 R11 的病：带 markers 和台账）；
 修后 `test/gate-partial-head.spec.ts` **12 passed**。
-`test/phase1-dialogue.spec.ts` 有 3 个旧断言建在"终结必须带机器细节"的假设上
+`test/phase1-dialogue.spec.ts` 有 3 个旧断言建在「终结必须带机器细节」的假设上
 （`PARTIAL` 状态词、证据原文、未开始任务标题原文），随行为同步更新——行为断言
 （reject、消息恰保留一次、`cancelled`、无 `COMPLETED`）一个未动。
 
@@ -5890,7 +5916,7 @@ commit/tag/CI/Release 均取自已提交记录，无编造）后门禁码变为 
 ## Round 86 — 2026-11-20 — R34：双重转义的折行 base64 块（`CONFIRMED`，未发版）
 
 **主题**：POOL 池顶窄折行项。先实测定界：HEAD 上真换行折行 1–24 列已全部脱敏
-（round 33 的容忍断行标记已覆盖），池里"≤7 列留存"是基于修前旧码的过时描述。
+（round 33 的容忍断行标记已覆盖），池里「≤7 列留存」是基于修前旧码的过时描述。
 活着的缺口是双重转义——已带字面 `\\n` 的日志行再被 `JSON.stringify` 包一层，
 反斜杠加倍，`BASE64_BREAK` 的单反斜杠分支匹配不上，整块原文落进报告。
 
@@ -6107,7 +6133,7 @@ AssertionError: expected 10 to be +0
 
 **Bug class:** PR #47 把 host/guardian/script/client 四侧改成 observe/rescue 非破坏式，但纯折叠侧
 `src/progress-tab.ts` 漏跟（类型 `ProgressGuardianFindingFact.action` 仍是二元，fold 仍是二元映射）。
-症状：`observe` finding 在进度页显示为"已触发整轮取消"（`data-action="cancel-run"`），与 bundle 渲染矛盾。
+症状：`observe` finding 在进度页显示为「已触发整轮取消」（`data-action="cancel-run"`），与 bundle 渲染矛盾。
 
 **NOT_RUN:** `web` profile 热加载安装（沙箱只读 EROFS；待宿主执行 `dsh plugin --profile web add
 github:free6589/dsh-grok-workflow#v0.13.9`）；真机 GUI 手点 observe finding 显示。
@@ -6153,9 +6179,9 @@ toolName/configVersion = 页面 16）；`test/client.spec.ts` ProgressBundle 补
 
 - **改了什么**：`src/progress-tab.ts` `stageForPhase()` 导出去并前置 `taskNumberIn()` 检查；
   `src/client/index.js` `progressStageForPhase()` 同镜像；`test/progress-tab.spec.ts` +
-  `test/client.spec.ts` 各 +1 回归（任务 7 形状：phase 含"执行"但带 `任务 7` 前缀，不断 spine 为空、extra 为 1）。
+  `test/client.spec.ts` 各 +1 回归（任务 7 形状：phase 含「执行」但带 `任务 7` 前缀，不断 spine 为空、extra 为 1）。
 - **根因（`CONFIRMED`）**：会话 session-076c2337 的 seq 318 行 phase=`任务 7 · 合并为干净可并发执行计划`，
-  旧折叠按 `执行` token 收进脊柱 `执行` 段，所以显示在"规划"下面而不是"任务 7"。
+  旧折叠按 `执行` token 收进脊柱 `执行` 段，所以显示在「规划」下面而不是「任务 7」。
 - **验证**：本地 `npm run ci` exit 0（81 文件 / 1561 测试）；`npm run build` + `verify:lib`
   byte-identical；隔离真机 soak（`DSH_HOME` 副本 + 真实模型 `runanywhere/deepseek-v4.1-flash`）
   跑出同形状 phase，fold 后任务 7 成卡、spine 为空（pre-fix 会进脊柱）。
@@ -6186,7 +6212,7 @@ toolName/configVersion = 页面 16）；`test/client.spec.ts` ProgressBundle 补
   "lib/ at adc7fb4 is the build of src/ at adc7fb4 (217 files, byte-identical)"，说明两条分支的 `lib/client.js`
   文本合并没有留下过期产物。
 - **前轮已合 5 项的复验方式**：基线全绿 + 逐项读源码/测试定点确认（`NOT_RUN` 的部分写在各条里：
-  真机点击开关 `NOT_RUN`；操作员"答案长相"人工并排比对 `NOT_RUN`）。
+  真机点击开关 `NOT_RUN`；操作员「答案长相」人工并排比对 `NOT_RUN`）。
 - **跳过项 `BLOCKED`**：Sec.2-7、Sec.3-2/3/4/5 —— 理由与建议见 `DECISIONS.md` D-111 与
   `.rsi/evidence/rsi-seq-12/REPORT.md` 的分歧日志。
 - **既有未提交工作未被本轮触碰**：主检出仍在 detached `a6103ad`，其 37 个已改文件与 `.rsi/evidence/**` 等等价保留；

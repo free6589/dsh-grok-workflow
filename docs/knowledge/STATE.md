@@ -1,3 +1,18 @@
+Last updated: 2026-11-24 06:10 +08:00（**0.13.27 不发：合流后真机 soak 判 FAIL —— 死路由这条账在真机上一条都记不住** —
+`release/0.13.27`（worktree `.tmp/wt-rel-01327`，从 `main` `5678dd8`＝0.13.26 开出）已把 `feat/dead-routes` 合入，
+合流点 `npm run ci` **exit 0（97 files / 1814 tests）**、`lib/` 与 `src/` 逐字节一致；隔离真机 soak（`headless` profile 克隆进
+`.tmp/soak-01327/headless-home`，`DSH_HOME`/`HOME` 全隔离，两条真路由 + 两个假端点 503 / 挂死）给出否定结论：
+**503 路由无并发上限时 5 次 worker 调用一次不落地打在它上面（30 次 HTTP = 5×6 重试），台账 5 行 `format-error`，`Dead routes` 段 0 行；
+挂死路由（`childTimeoutMs 20000`）4 条任务的 attempt 1/2 也全部打在它上面，8 行 `timeout`，`Dead routes` 仍是 0 行。**
+根因：表要 `class ∈ {timeout, connection, server-error, rate-limit}` **且** `switchModel === true`，而真机上
+`childTimeoutFailure()` 把 `switchModel` 定成 `false`，spawn 引擎又把「子代理死了」塌成 `null`→`format-error`（不在族表里），
+于是四个族在真机上没有任何一条路径能进表 —— 不是渲染没开，是表里没行。单测 18 例全绿是因为它们手工构造
+`{class:'server-error', switchModel:true}` 直接喂 `noteRouteFailure`，从不经过真引擎的失败形状（与 round 077 同类的假 seam 教训）。
+上一轮 `maxInFlight 1` 时「只打了 2 次」是**空道溢出**（台账写着 `skipped full …`），不是降级 —— 别把那条当证据。
+生产形状（gate 内联路径）在 headless profile 上每个 worker 都死于 `no subagent provider registered for "spawn"`（环境/接缝问题，
+`NOT_RUN`）。未 bump 版本、未打 tag、未 push、未合 `main`、未碰 live；共享脏树 `a6103ad` 一行未动。
+取舍与修法见 VALIDATION 首条与 HANDOFF，D-120 记这次否证。）
+
 Last updated: 2026-11-24 05:40 +08:00（**死路由：连续两次传输失败的那条路排到最后，`CONFIRMED`（单测），未合流** —
 分支 `feat/dead-routes`（worktree `.tmp/wt-dead-routes`，从 `main` `5678dd8`＝0.13.26 开出，一任务一分支；共享脏树
 detached `a6103ad` 一行未动）。一条路由连续两次栽在同一类传输故障（timeout / connection / server-error / rate-limit）后，
@@ -24,7 +39,7 @@ Release `45260254869` success 并已发布（asset `dsh-grok-workflow-0.13.26.tg
 分支 `fix/t1-death-evidence`（从 `release/0.13.26` 开出）+ `release/0.13.26` 合流。三处修完：① 扁平/嵌套两种
 activation spec 都读（`activationFacts`，单测钉住两种形状）；② 死因从**子会话自己的 `turn/end`** 取
 （`src/child-evidence.ts`；spawn 路径的 `SubagentResult` 没有 `diagnostic` 这件事由真机确认），分类先看服务商
-`code` 再看原话；拿不到原文就写 `the child ended abnormally (cause unknown)`，不再写"格式不对"；③ 交付里
+`code` 再看原话；拿不到原文就写 `the child ended abnormally (cause unknown)`，不再写「格式不对」；③ 交付里
 「仍未完成」那行按 task id 重建。门禁：`npm run ci` exit 0（96 files / 1796 tests，typecheck 干净，lint 0 errors，
 `verify:lib` byte-identical）。真机 soak 复跑 round 077 同一套形状：正常路径「已完成，用时 9秒」，坏 key 路径
 4 个 worker 真的死于 `401 virtual key is required`、交付写服务商原话、`no valid structured result` 出现 0 次
@@ -37,22 +52,22 @@ Last updated: 2026-11-24 03:50 +08:00（**0.13.26 暂停发布：合流后的 T1
 两个根因（`CONFIRMED`）：① `src/team-engine.ts` 读 `spec.request.prompt`/`spec.request.agentOptions`，真引擎发的是**扁平**
 spec（`prompt`/`agentOptions` 在顶层）→ role 解析为空 → 回填一条不改（harness 的假 seam 用了嵌套形状，把差异挡住，19 例全绿）；
 ② spawn 子代理的 `SubagentResult` 根本没有 `diagnostic`（只有 external provider 有），所以真机只能拿到 `stopReason=error`，
-给不出"超时/鉴权"的分类。①已在本分支修好（+1 例钉住扁平 spec，`npm run ci` exit 0 / 95 files / 1772 tests），②与
+给不出「超时/鉴权」的分类。①已在本分支修好（+1 例钉住扁平 spec，`npm run ci` exit 0 / 95 files / 1772 tests），②与
 `report.incomplete[].reason` 文案没被 `repairText` 覆盖这两处未修。**未打 tag、未推 main、未发版**；修法与证据见
 VALIDATION 首条与 `.rsi/evidence/round-077/`。
 
-Last updated: 2026-11-24 03:10 +08:00（**T1 null 语义塌陷：报告不再把"子代理死了"写成格式错，`CONFIRMED` 未合流** —
+Last updated: 2026-11-24 03:10 +08:00（**T1 null 语义塌陷：报告不再把「子代理死了」写成格式错，`CONFIRMED` 未合流** —
 分支 `fix/null-collapse-t1`（worktree `.agents/worktrees/fix-null-collapse-t1`，从 `main` `6b0eb62` 开出，一任务一分支；
 共享脏树 detached `a6103ad` 未动）。引擎 guest 把 `stopReason !== 'completed'` 和"`completed` 但没交结构化结果"
 都折成 `null`，宿主 `childResult()` 又丢掉 `diagnostic`，所以 `src/script.ts` 的 `callRole` 只能一律写
 `format-error`（agent-99：3691 次子调用里 530 次传输/鉴权/超时被写成格式错，真格式错 25 次）。
 修法全在插件侧：twin 的 `startActivation` 记每条子代理真实终态进有界台账（`src/child-outcomes.ts`），
-`src/run.ts` 在报告校验后、脱敏前按"无歧义"规则回填 class/reason/category，连带改掉 `incomplete`/`errors` 里的
+`src/run.ts` 在报告校验后、脱敏前按「无歧义」规则回填 class/reason/category，连带改掉 `incomplete`/`errors` 里的
 同一句文案；新增失败类 `cancelled`；401/403 归 `model-unavailable`（guest 与宿主两张表由用例钉成一张）；
 归档兜底文案带真实死因。门禁：`npx vitest run` **95 files / 1771 tests PASS**（新增 `test/null-collapse.spec.ts`
 19 例，红 4 failed/1 passed → 绿 19），`npm run ci` **exit 0**，typecheck 干净，lint 0 errors / 35 warnings（全既有），
 `verify:lib` byte-identical。真机 soak `NOT_RUN`（留给合流方）。**已知边界**：回填只改报告，403 子代理仍会花掉
-一次同次尝试补交、仍走完路由链——"不烧链路"要等让脚本看见死因的结构性第二步（`DECISIONS.md` D-116 B1/B2/B3
+一次同次尝试补交、仍走完路由链——「不烧链路」要等让脚本看见死因的结构性第二步（`DECISIONS.md` D-116 B1/B2/B3
 只登记未实现）。详见 VALIDATION 首条。）
 
 Last updated: 2026-11-24 02:30 +08:00（**已发版 `0.13.25`：三路合流（判定角色补交 + 最终答案重写 + 派发心跳规则），隔离真机 soak PASS，`CONFIRMED`** —
@@ -84,7 +99,7 @@ Last updated: 2026-11-24 01:35 +08:00（**判定角色的引号错误不再让�
 35 warnings（全部既有），`verify:lib` byte-identical（229 files），`lib/` 与 `src/` 同提交 `f5b74e4`。
 真机 soak `NOT_RUN`（本轮不发布）。详见 VALIDATION 首条。）
 
-Last updated: 2026-11-24 01:50 +08:00（**分支 `fix/final-answer-rewrite`：最终答案从"逐字复述台账"改成"给料 + 重写"，`CONFIRMED` 未合流** —
+Last updated: 2026-11-24 01:50 +08:00（**分支 `fix/final-answer-rewrite`：最终答案从「逐字复述台账」改成「给料 + 重写」，`CONFIRMED` 未合流** —
 用户诉求：跑完拿到的是一段电报体、而且只取了第一句。改四处（都只在本分支）：
 ① `src/answer.ts` 默认 relay 换 `REWRITE_PREAMBLE`（按用户原问题重写、说清交付物在哪怎么打开、
 禁台账标签/字段名），失败态仍逐字（改写会软化失败）；
@@ -94,7 +109,7 @@ Last updated: 2026-11-24 01:50 +08:00（**分支 `fix/final-answer-rewrite`：�
 ③ 默认单语：`relayText` 传 `bilingual: false`，跟随 `opts.lang`（用户请求语言）；
 ④ `src/script.ts` 的 synthesizer 笼子放宽：允许「结果：/怎么用：/注意：」三段（禁别的标题、禁列表、禁 Markdown），
 叙事上界 700 字 / 300 词，**caveats 由它重写**——`layeredNotesBlock` 不再原文贴 uncertainties，
-门禁把"每条原句必须出现"换成"必须有 caveat 段"（`hasCaveatSection`，check + verify 两侧都查）。
+门禁把「每条原句必须出现」换成「必须有 caveat 段」（`hasCaveatSection`，check + verify 两侧都查）。
 验证：`npx vitest run` → **93 files / 1744 tests PASS**（含新增 `test/final-answer-rewrite.spec.ts` 15 例，
 先红后绿）；`npx tsc -p tsconfig.json --noEmit` exit 0；`npx oxlint src test` 0 errors（35 warnings 皆既有）；
 `npm run build` + `npm run verify:lib` byte-identical（229 files）。真机 soak NOT_RUN（本分支只做离线契约 + 全量单测）。
@@ -103,17 +118,17 @@ Last updated: 2026-11-24 01:50 +08:00（**分支 `fix/final-answer-rewrite`：�
 Last updated: 2026-11-24 01:30 +08:00（**已发版 `0.13.24`：三路合流（队长拆法绑定 + 首轮消息立刻可见 + 确认单次消费），隔离真机 soak PASS，`CONFIRMED`** —
 三路各自从 `main` `63cc1db`（0.13.23）开出，`--no-ff` 依次合入 `release/0.13.24`：`fix/captain-approve` `00fc203` →
 `fix/gate-route-msgvis` `f831fca` → `docs/user-soak-fork-profile` `57eadb9`。冲突 5 处（`src/gate.ts` ×4 + `test/captain-confirm.spec.ts` 导入）
-按"两边功能都要"手工合：`CaptainPending` 既保持单次消费（TTL 只判一次）又携带 `preview`；`askCaptain()` 既保留 B04 承接又记录预览文本；
+按「两边功能都要」手工合：`CaptainPending` 既保持单次消费（TTL 只判一次）又携带 `preview`；`askCaptain()` 既保留 B04 承接又记录预览文本；
 审批三条路（交互 / 完整阻塞 / 完整后台）统一走 `approvedRequest(request, preview)`；`lib/` 取 ours 后 `npm run build` 重建，
-另加 1 条断言钉住"完整形状也带批准拆法"。
+另加 1 条断言钉住「完整形状也带批准拆法」。
 本地门禁：`npm run ci` exit 0（**92 文件 / 1729 测试 PASS**；typecheck 干净；lint 0 errors；`verify:lib` byte-identical，229 文件）。
 发版：prepare `b1fead6` → push main → annotated tag `v0.13.24`（tag 对象 `6d5a88b`）→ push tag → 远端 Release run
 `45223728613` **success**，GitHub Release `v0.13.24` 已发布。
 真机隔离 soak **PASS**（fork 出来的 web profile + 独立 `DSH_HOME` 与独立 `HOME`，浏览器里当用户用；本机网关
 `wb/cn:deepseek-v4.1-flash`）：队长报拆法 → 回「确认」→ 派出去的目标里带 `USER APPROVED THIS SPLIT` 与原拆法三行，
-收尾 `status completed · verified 2/2`；新会话首句（`我想。。` 形状）**立刻可见**，`session-ea28b24e` 的"空转一轮"未复现。
+收尾 `status completed · verified 2/2`；新会话首句（`我想。。` 形状）**立刻可见**，`session-ea28b24e` 的「空转一轮」未复现。
 **发版后补一条**：远端 CI on main `45223718435` 的 Node 22 红了 2 例，根因是 `test/captain-confirm.spec.ts` 的通道状态跨用例泄漏
-（`src/steering.ts` 是模块级注册表，用例共用同一 session id，前一用例的后台轮 `finally` 晚于该用例断言收尾 → 下一用例看到"有通道但没活轮"），
+（`src/steering.ts` 是模块级注册表，用例共用同一 session id，前一用例的后台轮 `finally` 晚于该用例断言收尾 → 下一用例看到「有通道但没活轮」），
 修法 `afterEach(closeAllSteering())`，提交 `e767ba6`（同一提交的 Release 门禁本身是绿的）。
 证据：`.rsi/evidence/round-074/soak.txt` + 三张 GUI 截图、`docs/knowledge/VALIDATION.md` 的 0.13.24 表。）
 
@@ -124,9 +139,9 @@ Last updated: 2026-11-24 00:1x +08:00（**round-073 分支 `fix/gate-route-msgvi
 可后台投递 + 表面可读且为空时，先 `enter` 只带原话让 loop 立刻开 step 提交，团队在后台跑，结论走
 `deliverRelay` 下一轮投递（`answerBehindUnpublished`；不写任何抢先位置的东西）。②**队长确认多处走歪**：
 交互路径用 `pendingCaptains.get` 无 TTL（过期确认照样派活）、`record(started)` 早于 `enqueue`（队列满留假账）、
-`full` 形状没人读这个确认（"确认"自己成了一轮的目标）。修法：`answerInTurn` 在 replan 通道检查之前
+`full` 形状没人读这个确认（「确认」自己成了一轮的目标）。修法：`answerInTurn` 在 replan 通道检查之前
 `takeCaptainPending` 一次并把值传给 `answerOnChannel`/`answerTeamInteractive`/`answerFullBehind`/`produceAnswer`；
-过期不派活；`other` 由阻塞路径统一作废并单独分流；频道在"这是拆法确认"时让路；先 `enqueue` 成功再 `record`。
+过期不派活；`other` 由阻塞路径统一作废并单独分流；频道在「这是拆法确认」时让路；先 `enqueue` 成功再 `record`。
 `/grok on` 语义未动（F7 只出建议）。门禁 `npm run ci` **exit 0：92 files / 1722 tests**；
 新用例对旧码 5 红（`.rsi/evidence/round-073/red-gate-route-msgvis.txt`）。真机 soak `NOT_RUN`（不发布）。）
 
@@ -135,7 +150,7 @@ Last updated: 2026-11-23 23:1x +08:00（**已发版 `0.13.23`：五路合流（�
 `.agents/worktrees/fix-synth-resubmit`：`fix/lifeline3-resume-scan`（仅 test）→ `fix/dispose-drain`（卸载排水）→
 `fix/checkpoint-lifeline-tasks`（没报告也记子代理行）→ `feat/exp-pack-070`（体验档）→ `captain-pack`（队长三件套）。
 冲突共 3 处需要人判：`src/checkpoint/wiring.ts`（工作区状态 × 观察行 × 在飞行表）与
-`src/memory/recorder.ts`（归档后既写更正链接又写经验行）——按"功能都要保留"手工合；
+`src/memory/recorder.ts`（归档后既写更正链接又写经验行）——按「功能都要保留」手工合；
 另 5 处只是 `lib/**/*.map` 源映射，取 ours 后 `npm run build` 重建。合流中修一处**载荷形状**：
 exp-pack 原从 `workflow/agent-start` 第一参数读 `seq/label/phase/childId`，真实形状是第二参数
 （`WorkflowAgentInfo`，见 `emitWorkflowEvent('workflow/agent-start', info, agent)`），合并后统一按真实形状读，
@@ -145,26 +160,26 @@ exp-pack 原从 `workflow/agent-start` 第一参数读 `seq/label/phase/childId`
 `127.0.0.1:18088`，四角色同路由 `wb/cn:deepseek-v4.1-flash`）：双任务 workflow `status completed · verified 2/2`、
 10 criterion，两文件字节/sha 精确；`/grok status` 在真实 journal + 真实恢复点上答出 run 状态/守卫/可续跑/未完成；
 卸载通知（"waited 402ms for 1 subagent call(s) in flight"）与停下文案、守卫结论行都出自构建产物。
-soak 顺带抓出一处文案缺陷并修掉（0 任务被说成"全部做完"、英文三句无分隔），补 2 条用例。
+soak 顺带抓出一处文案缺陷并修掉（0 任务被说成「全部做完」、英文三句无分隔），补 2 条用例。
 发版：prepare `c4eaffa` → push main → tag `v0.13.23` → push tag → 远端 Release run `45202988977` **success**，
 Release `v0.13.23` 已发布（asset `dsh-grok-workflow-0.13.23.tgz`，860889 bytes，sha256 `ed7a7e55…`）。
 证据：`.rsi/evidence/round-072/soak.txt`（脱敏，仅模型名）、`docs/knowledge/VALIDATION.md` 的 0.13.23 表。）
 
 Last updated: 2026-11-23 22:35 +08:00（**round-071 队长三件套已落地，未提交、未推送（分支 `captain-pack`），`CONFIRMED`** —
 三件同分支：①拆排交给模型——`planPrompt()` 改队长宪章、计划新增 `onFailure: continue|stop`
-（`normalizePlan` 归一，非法值=continue）、`runWaves` 在波边界执行"停"（`captainStopResult`）；
-replan 通道本来就在（默认开），只在 `replanPrompt()` 补"停/改"一句。②前台确认——新增 `src/captain.ts`，
+（`normalizePlan` 归一，非法值=continue）、`runWaves` 在波边界执行「停」（`captainStopResult`）；
+replan 通道本来就在（默认开），只在 `replanPrompt()` 补「停/改」一句。②前台确认——新增 `src/captain.ts`，
 gate 的 `pendingCaptains`（同 10 分钟 TTL）接在交互后台与阻塞两条路径，批准/明确改法才派活，
-其它消息作废；`/grok` 完整形状与"前台问完选团队"不重复问。③三叠纸——新增 `src/captain-memory.ts`
+其它消息作废；`/grok` 完整形状与「前台问完选团队」不重复问。③三叠纸——新增 `src/captain-memory.ts`
 （`profile.md` / `experience.md` 与台账同目录），recorder 每轮结算写一条复盘（runId 去重），
 gate 组 brief → `args.captain` → planner/replan 提示词；记忆 CLI 增 `captain`/`profile`/`profile add`/`experience`。
-红绿：每件各一条"旧码红、新码绿"（`.rsi/evidence/round-071/red-cut*.txt` / `green-cut*.txt`）；
+红绿：每件各一条「旧码红、新码绿」（`.rsi/evidence/round-071/red-cut*.txt` / `green-cut*.txt`）；
 `npm run build` exit 0；`npm run ci` exit 0（**90 文件 / 1678 测试 PASS**，基线 87/1656）。
 缺口：预览是独立轻调用，正式跑仍重新规划；画像只能显式写入（不自动蒸馏）；真机 soak `NOT_RUN`。
 `verify:lib` 以 HEAD 为输入，不覆盖未提交的 lib——提交时需再跑一次并连同 `lib/` 一起提交。）
 
 Last updated: 2026-11-23 21:10 +08:00（**已发版 `0.13.22`：composer 工作流开关 500 修复，`CONFIRMED`** —
-用户现象：工具行 workflow 总开关红字"模式服务没有回应：cannot get property sessions without inject"，开关打不开。
+用户现象：工具行 workflow 总开关红字「模式服务没有回应：cannot get property sessions without inject」，开关打不开。
 根因：`src/mode-surface.ts` `serviceOf()` 用属性读取取 `sessions`；真编排只注入 `webServer`+`connection`，
 cordis 对未注入服务的属性读取直接抛错（不是返回 undefined），throw 在 `ctx.get(name)` 兜底之前逃出，
 被 `handleModeRoute` 兜成 `500 mode/internal`。测试没抓住：替身是普通对象字面量，属性读取不抛。
@@ -342,7 +357,7 @@ lint 0 errors，`verify:lib` byte-identical。发货内容见 CHANGELOG `[0.13.1
 接 agent-8 通道 lane 与 planner_replan lane；lead 修 5 个假环境按名存工具 +
 reliability 计数 15→16 + client.spec Bundle 口子。`npm test` 82 文件 / 1594 测试 PASS；
 typecheck 仅剩 nyc `--jsx` 孤儿一错；lint 0 errors；build + verify:lib byte-identical。
-红色语义四处按"当前还坏着才红、历史只留行级痕迹、结构线中性"收敛，258 例专项全绿。
+红色语义四处按「当前还坏着才红、历史只留行级痕迹、结构线中性」收敛，258 例专项全绿。
 未提交未发版；真机 GUI 手势与 nyc 孤儿 NOT_RUN。详见 HANDOFF 首条。）
 
 Last updated: 2026-11-22 21:00 +08:00（**主会话通道（L2 通道侧）落地，`CONFIRMED` 未发版** —
@@ -354,15 +369,15 @@ Last updated: 2026-11-22 21:00 +08:00（**主会话通道（L2 通道侧）落�
 - 新 `src/channel.ts`（纯函数 + 文案）：`classifyChannelMessage()` 只认裸 `停/stop/取消`
   为 stop（问题句、含 stop 字的长任务一律 forward，非对称是安全边界）；
   `composeIntentText()` 把用户原话 + 有界对话快照装进一条 intent；`composeCarriedRequest()`
-  用"上一轮 objective + 未取用要求"开下一轮；`steerReceipt/stopNote/idleStopNote/carriedNote`
+  用「上一轮 objective + 未取用要求」开下一轮；`steerReceipt/stopNote/idleStopNote/carriedNote`
   中英成对；`CHANNEL_OUTCOMES` 四个台账标签。
 - `src/gate.ts`：**单一决策点** `answerOnChannel()`（在 team/full 两条接纳之前，收掉了原先
   两处重复 steering 块）：有活通道 → stop 走 `cancelLiveRuns()`（唯一合法取消，经 run 自己的
   `cancel()`，结算走 `keepCancelledWork()`），其余 `push(composeIntentText(...))` 后立刻回执；
-  无活通道 + 裸停 → 回"没有在跑的任务"而不派工；其余返回 `undefined` 走原路。
+  无活通道 + 裸停 → 回「没有在跑的任务」而不派工；其余返回 `undefined` 走原路。
   `runChannelRound()` 是每轮的唯一执行壳：开通道（`openSteering`）→ `runTeam(steeringToken)` →
   交付 → `finally` 里先 `take()` 再 `closeSteering()`，未取用要求用 `composeCarriedRequest()`
-  递归开下一轮（`steer-carried-to-next-round`），所以要求只会"并入"或"带入下一轮"，不会两头都占或都不占。
+  递归开下一轮（`steer-carried-to-next-round`），所以要求只会「并入」或「带入下一轮」，不会两头都占或都不占。
   team/full 两条后台接纳改走 `runChannelRound`。
 - `src/run.ts`：只加 `RunWorkflowOptions.steeringToken?` 与 `buildWorkflowRequest(..., token)`
   透传（通道开关归 gate，run 自身早退不会泄漏队列）；`src/types.ts` 补 `GrokWorkflowConfig.replan?`。
@@ -400,7 +415,7 @@ Last updated: 2026-11-22 14:00 +08:00（**已发版 `0.13.7`：任务带缩进+�
 前人已把三件套写完躺在工作树（`src/progress-tab.ts` 固定三链 PROGRESS_CHAIN + taskNumber 排序 +
 guardian 判别，`src/client/index.js` 镜像 + 16px 缩进 + pending 虚线胶囊），我接手收尾：
 补 4 个 i18n key（chain.execute/check/review/pendingHint 中英）→ 修旧测试
-（按"每行一胶囊"写的改按"固定三链"断言）→ 重建 lib → 全量 CI exit 0
+（按「每行一胶囊」写的改按「固定三链」断言）→ 重建 lib → 全量 CI exit 0
 （78 文件 / 1480 测试）。发版提交 `5d31383` + tag `v0.13.7` 已推；远端 CI `44991529208`
 success、Release `44991531822` success 并已发布。）
 
@@ -599,9 +614,9 @@ Last updated: 2026-11-20 22:45 +08:00 (**存量会话离线修复 + 新 profile 
 用户报的 `session-3a683cb6` 的 `/compact` 报错已修好：该会话两行旧版卸载通知
 （seq 3553、seq 5424，无 `step/start` 的 `assistant/message`）已在离线改为同 seq/同时间的
 `plugin:grok-workflow/terminal` 记录，文字逐字保留，seq 0–7476 连续；真实 DSH 0.2.2-rc.3
-`Session.create` + `TokenMeter.measure` 全量回放从"seq 3553 抛错"变为
+`Session.create` + `TokenMeter.measure` 全量回放从「seq 3553 抛错」变为
 "7507 事件、`totalTokens=508565` 通过"（`REPAIR EFFECTIVE: true`）。
-`test/compact-step-pairing.spec.ts` +1 用例（7 绿）钉住"terminal 形状过 meter"。
+`test/compact-step-pairing.spec.ts` +1 用例（7 绿）钉住「terminal 形状过 meter」。
 新 profile `verify-compact`（`sdk` 模板、插件 `link:` 安装）上 `drive.mjs --team`：
 真实团队档 turn + 真实 `/compact` 一次通过
 （`Compacted 7 history items`，0 孤儿行，`ok: true`）。
@@ -666,7 +681,7 @@ HEAD 上真换行折行 1–24 列已全盖（round 33），活缺口是已带�
 
 Last updated: 2026-11-20 15:40 +08:00 (**round-038 收口：非字符串 model/provider，未发版** —
 `entry?.model?.trim()` 对非字符串抛 bare TypeError。现在拒绝带完整路径 + got-type；
-`{model: null}` 从"空字符串"分支改走"类型错"分支。`npm run ci` exit 0 =
+`{model: null}` 从「空字符串」分支改走「类型错」分支。`npm run ci` exit 0 =
 **69 文件 / 1263 测试 PASS**（+1 用例）；`lib/` 随 `src/` 重建。
 **已发版 `0.12.13`**：R38 提交 `7825ca7`（+证据 `490edce`）、annotated tag `v0.12.13` 已推，远端 CI `44697135387` success、Release `44697140006` success（asset `dsh-grok-workflow-0.12.13.tgz`）。）
 
@@ -1409,7 +1424,7 @@ turn at a time; Round 16's isolation proof is in `.workflow-artifacts/matrix-024
   **29 files / 522 tests**；`git diff --exit-code -- lib/` = 0；真机 Web GUI 前后对比截图见
   [VALIDATION.md](VALIDATION.md) Round 17 与 `docs/knowledge/evidence/first-message-visible/`。
 - **契约变化（对后续 agent 重要）**：`in-turn` 的 `enter.messages` **不再**包含被 claim 的用户消息；
-  P0-1 的准确表述改为"用户原话在会话 surface 里恰好一次"，写入者随策略不同而不同
+  P0-1 的准确表述改为「用户原话在会话 surface 里恰好一次」，写入者随策略不同而不同
   （`in-turn` 在等待前写、`relay`/`append` 在 reject 后写）。
 - **未做**：`:3090` 实例未热加载（D-013）；`relay`/`append` 长驻 GUI 投递仍 `NOT_RUN`。
 
@@ -1443,7 +1458,7 @@ turn at a time; Round 16's isolation proof is in `.workflow-artifacts/matrix-024
   而 `args.objective` 不含；首轮无该键）。
 - **真机**：隔离 home（`.carryover-e2e/home`，用后即删）+ 隔离工作区 `.carryover-e2e/work`，
   `headless` 模板 profile，模型 `wb/cn:deepseek-v4.1-flash`；第 1 轮 391 已验证，第 2 轮
-  "再加 9" 直接答 `391 + 9 = 400`，未要求用户重述；3 个第 2 轮子代理日志出现 `PRIOR ROUNDS`，
+  「再加 9」 直接答 `391 + 9 = 400`，未要求用户重述；3 个第 2 轮子代理日志出现 `PRIOR ROUNDS`，
   第 1 轮子代理 0 次（`docs/knowledge/evidence/carryover-e2e/`）。
 - **新发现（未修，`CONFIRMED`）**：会话首条消息被 `in-turn` 在 `pre-step` 抢先写成
   `user/message` 后，`--session-id` 恢复报
@@ -1496,7 +1511,7 @@ turn at a time; Round 16's isolation proof is in `.workflow-artifacts/matrix-024
   与环境变量/ask 与 chat 逐字节回归/`session-7e079b80` 形态的回放成对用例/`readMemoryDocs` 降级）。
   全量套件从 34 文件 589 测试 → **35 文件 617 测试**，既有 triage/gate/followup 89 例全绿。
 - **现场发现（`CONFIRMED`，已修）**：`relay` 在 `produceAnswer()` 之前就 `commitClaimed()`，首版召回把
-  本轮消息读成"历史"→ 自命中；`collectRecallSources(…, exclude)` 修复。
+  本轮消息读成「历史」→ 自命中；`collectRecallSources(…, exclude)` 修复。
 - **决策**：D-037。**证据**：`docs/knowledge/evidence/history-first/`。
 - **未做**：真机在线模型两轮回放、`:3090` 热加载（D-013）、版本号与发布。
 
@@ -1525,7 +1540,7 @@ turn at a time; Round 16's isolation proof is in `.workflow-artifacts/matrix-024
   ②**隔离 profile 真机复现成功**：`out/childname-verify/`（profile `cnamer`，headless，模型
   v4-pro + agnes-3.0-flash，密钥仅布尔存在检查）跑一轮团队档 COMPLETED（2 任务 verified，6 个子代理），
   父会话 `tool-workflow/agent-start` 证明插件标签（`规划助手`/`执行`/`检查`）确实在传，
-  而 6 个子会话首个 `subagent/descriptor` **全部**是 `"label":"任务团队 child N"`（N=1..6）——
+  而 6 个子会话首个 `subagent/descriptor` **全部**是 `"label":「任务团队 child N」`（N=1..6）——
   与用户截图逐字一致。证据：`docs/knowledge/evidence/childname-blocked/`。上游 ask 内容不变。
 - **第三次执行补充（2026-11-08，Round 29，`CONFIRMED`）**：结论**维持 BLOCKED**。Round 27/28 链路第三次独立
   重验逐条一致；并新增**类型级证据**关闭末两个扩展点候选（每 run `subagentProvider` 覆盖 +
@@ -1561,7 +1576,7 @@ turn at a time; Round 16's isolation proof is in `.workflow-artifacts/matrix-024
   `client.js:201` 源码链 + 描述符事件；浏览器点开 live `:3090` 验证 NOT_RUN（401，D-013）。
   证据：`docs/knowledge/evidence/childname-fix-2026-11-08/`。
 - **未做**：live `:3090` 的浏览器复验（实例仍是旧插件 0.2.7，需重新部署后人工确认）；
-  上游 3 行 ask 从"必要"降级为"可选简化"，未执行。
+  上游 3 行 ask 从「必要」降级为「可选简化」，未执行。
 - **CHANGELOG**：`[Unreleased]` Fixed 增加英中双语条目"Task-team children are named after
   their work / 任务团队子代理按其工作命名"。
 - **并发注意**：本节与 Round 30 的 fix_completed_links（D-040，已入库 `60cde95`）不冲突；
@@ -1579,7 +1594,7 @@ turn at a time; Round 16's isolation proof is in `.workflow-artifacts/matrix-024
   **0 处 `任务团队 child N`**、0 处提示词原文作主标签；持久 `subagent/descriptor` 与面板逐字一致。
   证据：`evidence/childname-fix-2026-11-08/gui/`（README + 4 截图 + 3 JSON + 描述符摘录）。
 - **记忆更正（只读核实）**：live web profile 的插件 = **released 0.6.0**（2026-11-07 21:54 安装，
-  `lib/team-engine.js` 不存在 → 不含本修复；旧记"仍 0.2.7"过时，本文件与 VALIDATION 已更正）。
+  `lib/team-engine.js` 不存在 → 不含本修复；旧记「仍 0.2.7」过时，本文件与 VALIDATION 已更正）。
 - **验收条款状态**：条款 1/2/3/5/6 满足；条款 4 的「DSH installation 加载 + ≥3 子代理工作流 +
   GUI 顶栏显示描述性名」三项在本机 `CONFIRMED`，唯一未达项 = 特指 live `:3090` 实例本身
   （仍跑不含修复的 released 0.6.0；部署需用户授权，D-013 步骤 5，本会话沙箱只可写工作树）。
@@ -1593,7 +1608,7 @@ turn at a time; Round 16's isolation proof is in `.workflow-artifacts/matrix-024
   未打 tag、未发布、live `:3090` 未动（仍 `0.2.7`，D-013）**。
 - **做了什么**：`src/client/index.js`（= `lib/client.js`）新增 `mountPanel`——经
   `conversation.chat.node` 键控槽位以 `key: 'workflow-run'`、`priority: -1` 重注册聊天任务
-  列表渲染器；成员行可开性只看"子会话能否打开"（`panelMemberMode`），不看状态——运行中、
+  列表渲染器；成员行可开性只看「子会话能否打开」（`panelMemberMode`），不看状态——运行中、
   已完成、失败、取消、中断全部是链接，点击即开子会话（`uiWorkspace.openSession`，可选注入）。
   测试 `test/panel-links.spec.ts` 14 例 + `test/client.spec.ts` 断言更新；
   `package.json` `test:unit` 收入新 spec。
@@ -1707,11 +1722,11 @@ turn at a time; Round 16's isolation proof is in `.workflow-artifacts/matrix-024
   加一行 `sourceMappingURL`（`client-bundle-serving.txt`）；真实会话出站请求的工具表
   **24 个含 `grok_workflow`**（`mock-boundary.txt`）。
 - **前台（chat 档）PASS（`CONFIRMED`）**：
-  `DSH_HOME=.verify-gw/home dsh --profile gwverify-hl --patch mock.patch.yml "你好"` → exit 0，
+  `DSH_HOME=.verify-gw/home dsh --profile gwverify-hl --patch mock.patch.yml 「你好」` → exit 0，
   stdout 由插件自己产出：`档位：直答档 — 因为：这是问候/寒暄，没有要做的事，前台直接回答。`
   且该裁决同时写进了会话日志（`session-dcf8b852…` 的 `user/message` seq 12，`front-desk-relay-message.txt`）。
 - **团队档 model-BLOCKED（`BLOCKED`，不报 PASS）**：同一命令换成
-  `"用团队跑一个小任务：…"` → exit 0，但 run `FAILED`：
+  `「用团队跑一个小任务：…」` → exit 0，但 run `FAILED`：
   `task-1: failed (2 attempts) — worker failed on every route: [format-error] child returned no valid structured result`
   （`interact-team-tier.txt`）。档位行本身正确（`档位：团队档 — 因为：你的消息里点名了团队…`），
   规划/工人子会话都真的起来了；失败点是**被 mock 的模型给不出结构化结果**。
@@ -1834,7 +1849,7 @@ worker 链上限 50（HARD_LIMITS.chainLength）
 - **B04（`CONFIRMED`）**：钳制告警**每次载入一条**。两层钳制都只记账
   （`recordOverrun()`：schema 没有 logger；repair 跑在一个仍可能因别的缺陷抛错的读里），
   由 `src/index.ts` 的 `announceOverruns()` 用一个 set 按 `field:stored` 去重后统一 `logger.warn`；
-  `repairLimitOverruns` 自己的 `warnings` 仍决定"确实修过"。旧写法的问题：那条读路径**每条消息**
+  `repairLimitOverruns` 自己的 `warnings` 仍决定「确实修过」。旧写法的问题：那条读路径**每条消息**
   走一次，只要补丁还在超限就会每消息刷一条告警。
 - **进度 Tab 三处（`CONFIRMED`，`src/progress-tab.ts` 与 `src/client/index.js` 双侧同构）**：
   - **脊椎整词绑定**：拉丁字母 token 只在**词边界**命中，CJK token 仍按子串（`规划` 在
@@ -1848,7 +1863,7 @@ worker 链上限 50（HARD_LIMITS.chainLength）
     否则属性**缺席**而不是 `"false"`）；`failed`/`blocked` 故意留空——线是证据，不是装饰。
     节点环里一个状态字形；节点聚合多行时用**行数**替换字形（可核对的数字优先于符号）。
     钉住：新 spec `test/progress-connector.spec.ts`（7 例，直接渲染 `lib/client.js`，含
-    `blocked` 派生节点与"两行→计数、单行→字形"）。
+    `blocked` 派生节点与「两行→计数、单行→字形」）。
 - **测试（`CONFIRMED`，`TMPDIR=$PWD/.tmp`）**：`npm run ci` → `tsc` **0 错**；`oxlint`
   **4 warning / 0 error**（4 条均为既有：`src/run.ts` 未用 `RoleName`、`src/redact.ts` 多余转义、
   `src/client/index.js` 的 `GROUPS_WITH_FIELDS` 与 `field`）；`npm run build` **幂等**——构建前后
@@ -1858,7 +1873,7 @@ worker 链上限 50（HARD_LIMITS.chainLength）
   4b92278` 后在同一 worktree 跑 `npx vitest run test/gate.spec.ts` → **2 failed | 53 passed**，与本轮
   工作树失败项相同：`refuses a message explicitly when the queue is full and never retries it on its
   own`（单跑也复现）与 `writes the answer into the session when the append strategy is selected`
-  （全量跑复现、单跑偶过）。本轮未改 `src/gate.ts`。**既不写成"已修"，也不写成"产品 PASS"**：
+  （全量跑复现、单跑偶过）。本轮未改 `src/gate.ts`。**既不写成「已修」，也不写成「产品 PASS」**：
   发版前由 agent-27 或用户决定是否连带处理。
 - **真机证据（Round2，`CONFIRMED`）**：`docs/knowledge/evidence/progress-tab-2026-11-15/Round2/`
   ——隔离 `dsh web` `127.0.0.1:3221`、`DSH_HOME=<repo>/.dsh-home/r2`、profile `gwprog2`（自 web 模板）、
@@ -1954,18 +1969,18 @@ worker 链上限 50（HARD_LIMITS.chainLength）
   `docs/ARCHITECTURE.md` 策略段。
 - **A（答案为本）**：`headline()`→`statusTail()`（计数只进尾巴），新增 `answerLead()`（summary
   首完整句→转述回落→绝不回落 ledger），`composeHuman()` 重排（答案→下一步→做成/没做成→caveats→尾巴），
-  删除"关键证据："逐字块；`MACHINE_DETAIL` 新增站号/坐标/Model链/计数施工句 4 类；`answerLead` 回落
-  句自带 `核验通过` 被自家 MIDLINE 误杀→改"有一项已得出可用结论。"；`stripIds` 单字符 lookbehind
+  删除「关键证据：」逐字块；`MACHINE_DETAIL` 新增站号/坐标/Model链/计数施工句 4 类；`answerLead` 回落
+  句自带 `核验通过` 被自家 MIDLINE 误杀→改「有一项已得出可用结论。」；`stripIds` 单字符 lookbehind
   无捕获组导致 `Task a：`→`Task $1`→修替换串为空。
 - **S（synthesizer 硬约束）**：`synthesizerPrompt` + `layeredPolishPrompt` 追加 HARD RULES（中英各一）；
   `polishVerbatimSources` + `polishStyleVerdict` 宿主校验（首句状态行/机器 token/逐字引用/反引号/
   中英复读/标题列表/>200词），`polishGuardrail` 第 5 步；`layeredFallbackSummary` confirmed 段改转述；
-  `layeredPolishPrompt` 旧"照抄加反引号"指示改为"转述不抄"（否则 prompt 与 guardrail 自相矛盾）。
+  `layeredPolishPrompt` 旧「照抄加反引号」指示改为「转述不抄」（否则 prompt 与 guardrail 自相矛盾）。
 - **B/C（边聊边干 + 首答现场写）**：`triage.ts` 新增 `firstAnswerPrompt`（四要素信息结构 + FORBIDDEN）/
   `sanitizeFirstAnswer` / `firstAnswerFallback`（明说模板兜底）/`FIRST_ANSWER_LIMITS`；`gate.ts` 新增
   `canBackgroundDeliver`（whenIdle+followup+session 三探针，失败回落）/`produceFirstAnswer`/
   `answerTeamInteractive`（首答 enter + 后台 enqueue runTeam + `record admitted-team-background`）；
-  `instantReceipt` 固定句删除、函数作写入通道保留、语义改为"是否写首答行"（默认仍 true）。
+  `instantReceipt` 固定句删除、函数作写入通道保留、语义改为「是否写首答行」（默认仍 true）。
 - **测试（`CONFIRMED`）**：`npm run ci` → typecheck 0 错、oxlint **4 warning / 0 error**（基线 5，
   修掉 2 个自带 useless-escape，另 1 个基线 warning 被重写带走）、build 产物一致、
   vitest **51 文件 / 948 测试全 PASS**。29 个旧断言按新行为更新（delivery 4 套件、gate、
@@ -2060,7 +2075,7 @@ worker 链上限 50（HARD_LIMITS.chainLength）
   三城天气（04:00 首答 7s、04:02 后台收尾「1/1 项任务已由独立检查核验」，
   台账 `archive.jsonl` = `run:eef1f4b7-…` completed / verified 1/1 / confirmed 6）。
 - **已知缺口（`CONFIRMED` 现象，归因 `HYPOTHESIS`）**：两次运行的 Execute/Verify 段都渲染为
-  `Not reported in the events`（`members=0`、`branches=0`），与台账/答案中的"已执行并核验"
+  `Not reported in the events`（`members=0`、`branches=0`），与台账/答案中的「已执行并核验」
   矛盾；`deriveTrack` 成员来自 `run.members.phase`，即成员事实未进该会话进度流。
   是否为 supervisor 插入或 in-turn 后台投递引入，**未定位**，未写进 Release notes。
 - **验证（`CONFIRMED`）**：`npm run ci` → typecheck 0 错、oxlint 4w/0e、build 成功、
@@ -2372,17 +2387,17 @@ web 模板 boot 无 pending、observe fold 定向 PASS）。本地无源码改�
 Last updated: 2026-11-23 09:10 +08:00（**手工清单 12 项顺序执行（第 1 轮）/ RSI 顺序跑批，`CONFIRMED`** —
 源文件 `manual-sessions-unfinished.md`（工作区根，未纳入版本库）：第二节 7 件 + 第三节 5 件，严格按顺序、
 一项一分支、合前 `npm run ci` 必须 exit 0。本轮开工前先把 `main`（`e4e03e9`，0.13.18）整树跑了一遍
-`npm run ci`：85 文件 / 1617 测试 PASS，exit 0 —— 这就是"前轮已合项"的绿灯基线（日志 `.rsi/evidence/rsi-seq-12/logs/ci-baseline-main.log`）。
+`npm run ci`：85 文件 / 1617 测试 PASS，exit 0 —— 这就是「前轮已合项」的绿灯基线（日志 `.rsi/evidence/rsi-seq-12/logs/ci-baseline-main.log`）。
 **已合（前轮）4 项复验通过**：Sec.2-1 `DEFAULT_TIMEOUT_MS = 0`（`src/config.ts:113`，`test/timeout-config.spec.ts:119`
 断言 `resolveConfig({}).timeoutMs === 0`）；Sec.2-4 设置页版本/升级入口（`test/update-entry.spec.ts` 4 例）；
-Sec.2-5 进度页不再有"回答"格（`PROGRESS_STAGES` 只有 start/plan/execute/verify/synthesize/end，源码注释明写
+Sec.2-5 进度页不再有「回答」格（`PROGRESS_STAGES` 只有 start/plan/execute/verify/synthesize/end，源码注释明写
 "no `回答` event can ever reach this track"）；Sec.2-6 续跑接线（`RESUME_DECISION_WIRING.wired = true`，
 `src/checkpoint/wiring.ts:221`，生产入口在 `wiring.ts:485` 调 `resumeDecision`）；Sec.2-2 replan 可见开关
 （`src/client/index.js` 的 `loop` 组布尔键 + 设置页行，默认仍 false）。**本轮新合 2 项**：
 Sec.2-3 405 路由（merge `5dc0512`，分支 `rsi/sec2-03-mode-get`）、Sec.3-1 进度页连线合并成一根
 （merge `adc7fb4`，分支 `rsi/sec3-01-single-rail`），两项各自 ci exit 0，合完 `main` 再跑一次 exit 0（85/1623 PASS）。
-**跳过 6 项并记账**：Sec.2-7 宿主证据收集（源文件自己要求"先确认这一阶段还要不要做"，是拍板项而非实现项，
-见 D-111）；Sec.3-2/3/4/5 四项源文件都写明"是否成立要重新确认 / 要你再验一次 / 你定"（见 D-111 与分歧日志）。
+**跳过 6 项并记账**：Sec.2-7 宿主证据收集（源文件自己要求「先确认这一阶段还要不要做」，是拍板项而非实现项，
+见 D-111）；Sec.3-2/3/4/5 四项源文件都写明「是否成立要重新确认 / 要你再验一次 / 你定」（见 D-111 与分歧日志）。
 两条 `rsi/*` 分支已合入 `main`，未 push（本地 `main` 领先 `origin/main` 2 个 merge 提交）。）
 
 Last updated: 2026-11-23 10:20 +08:00（**手工清单 12 项顺序执行（第 2 轮）/ RSI 顺序跑批，`CONFIRMED`** —
@@ -2390,7 +2405,7 @@ Last updated: 2026-11-23 10:20 +08:00（**手工清单 12 项顺序执行（第 
 十二项各自从合完的 `main` 尖端开分支、跑 `npm run ci` exit 0、再合回 `main`，逐项日志在
 `.rsi/evidence/rsi-seq-12/logs/ci-r2-*.log`。
 **本轮新实现**：Sec.2-2 replan 默认打开（`f996cc8`，合 `28c0dd2`）；Sec.2-3 405 补 `Allow: GET, POST`
-（`be6abed`，合 `994f71e`）；Sec.2-4 升级卡直接给"要不要升级"的结论（`81f6c5a`，合 `1d5ef41`）；
+（`be6abed`，合 `994f71e`）；Sec.2-4 升级卡直接给「要不要升级」的结论（`81f6c5a`，合 `1d5ef41`）；
 Sec.3-2 `switchOnRateLimit` 429 勾选框（`7305f17`，合 `cd88e4b`）；Sec.3-3 汇总门判定进报告
 `synthesis.review` + `Summary review:` 行（`b225446`，合 `504bcf3`）。
 **代码已在、本轮补钉子**：Sec.2-1 宿主工具死线 + 双 README 默认值（`22ab037`，合 `a3f57c5`）；

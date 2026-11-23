@@ -1,0 +1,4 @@
+2026-11-23T22:03:27.218Z POST /openai/v1/chat/completions model=soak/hang-model bytes=39118
+2026-11-23T22:03:27.220Z POST /openai/v1/chat/completions model=soak/hang-model bytes=39139
+2026-11-23T22:03:27.220Z POST /openai/v1/chat/completions model=soak/hang-model bytes=39129
+2026-11-23T22:03:27.423Z POST /openai/v1/chat/completions model=soak/hang-model bytes=39122

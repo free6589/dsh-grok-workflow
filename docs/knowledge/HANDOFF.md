@@ -1,3 +1,31 @@
+## 2026-11-24 — 0.13.27 合流 soak 判 FAIL：死路由表在真机上是空表，发版停在合流点（`CONFIRMED` 门禁 + `CONFIRMED` 否证 / 生产路径 `NOT_RUN`）
+
+- **From:** 合流发版子代理（agent-107） · **To:** lead / 下一个接手者
+- **做到哪一步**：`release/0.13.27`（worktree `.tmp/wt-rel-01327`，从 `main` `5678dd8` 开出）合入 `feat/dead-routes`，
+  合流点 `npm run ci` **exit 0（97 files / 1814 tests）**，合后 `npm run build` 后工作树干净（`lib/` 与 `src/` 逐字节一致）。
+  **到此为止**：未 bump 版本、未改 CHANGELOG、未打 tag、未 push、未合 `main`；共享脏树 `a6103ad` 一行未动，live `~/.dsh` 零写入。
+- **为什么停**：隔离真机 soak 否证了这次改动的卖点（细节见 VALIDATION 首条、证据 `.rsi/evidence/soak-deadroutes-01327/`）：
+  一条 503 的假路由，在 5 任务的 run 里被打了 **5 次**（每次 6 个传输重试）；一条永不应答的假路由在 4 任务的 run 里
+  被打了 **8 次**（每条任务两次尝试各一次）；两次的台账里都没有 `Dead routes` 段，`deadRoutes` 根本没生成。
+- **根因一句话**：进表要"传输族 **且** `switchModel === true`"，而真机上 timeout 走 `childTimeoutFailure()`（`switchModel: false`）、
+  5xx/断连/429 走"子代理死了 → `agent()` 返回 null → `format-error`"，两条都不满足条件 → 表永远是空的。
+- **修法（按代价从小到大，任选其一但必须先落一条真机可证的路径）**：
+  1. **最小且最快**：`childTimeoutFailure()` 改 `switchModel: true`（或加一个只给路由健康用的独立标记），让「挂死的那条路」真的会降级；
+     这正好是 D-119 的原始动机（「一次子调用，外加一次完整的挂死等待」）。然后补一条**真引擎形状**的用例（子代理超时 → 表里有一行）。
+  2. **补齐 5xx/断连/429**：让 guest 能看见子代理的死因。真机上原文在子会话 `turn/end`（`503: {"message":…,"code":503}`），
+     宿主已经有 `src/child-outcomes.ts` 的台账和 `reclassifyNullCollapses`（它**已经会改写 `report.routes[]` 的 class**）——
+     但那是 run 末尾的事，改变不了本轮后续调用。要么把这条信息通过引擎接缝回灌给 guest（最干净、也最大），
+     要么在宿主侧把「无歧义塌陷」折算成「下一次调用用的降级名单」（需要持久到同 run 的跨调用状态，接口要另行设计）。
+  3. **诚实的范围收缩**：只发 `taskId` 进报告行那一半（真机可见、单测覆盖），把死路由段落从 CHANGELOG 撤下，等下一条修好再发。
+- **不要做的事**：别再拿 `maxInFlight: 1` 的 run 当证据 —— 那种配置下后几条任务不打死路由是因为**空道溢出**（台账写 `skipped full …`），
+  与降级无关。要证明降级，死路由必须**不设并发上限**，然后数它挨了几下。
+- **一个没解决的问题（不要误读成已修）**：headless profile 上 gate 内联路径（`grokDefault: on`）每个 worker 都死于
+  `agent() could not start a child: Error: no subagent provider registered for "spawn"`，而同 profile 的 tool 路径能正常起子代理；
+  用已安装 0.13.24 做对照则 gate 根本没接管。生产路径本轮 `NOT_RUN`，这条要么是 headless app 的接缝差异，要么是插件自己的
+  twin engine 分支，需要单独一次调查（用 web profile 真机取证最直接）。
+- **清理状态**：`.tmp/soak-01327/`（scratch home、两个假端点脚本、overlay、run 日志）已删；两个本地假端点进程已停；
+  `release/0.13.27` 与 `feat/dead-routes` 两个 worktree 保留给返工（`.tmp/` 下，gitignored）。
+
 ## 2026-11-24 — 死路由 + task id 进报告行：单测到绿，真机留给合流方（`CONFIRMED` 单测 / `NOT_RUN` 真机）
 
 - **From:** T4 实现子代理（agent-106） · **To:** lead / 合流方 / 下一个接手者
@@ -70,14 +98,14 @@
      `test/engine-harness.ts` 改成发扁平形状，`test/null-collapse.spec.ts` 加一例钉住 role/attempt/route；`npm run ci`
      exit 0（95 files / 1772 tests）。修后真机 archive 兜底文案开始带死因（`… ended \`error\``）。
   2. spawn（in-process）子代理的 `SubagentResult` 只有 `{output, stopReason, structured}`，**没有 `diagnostic`**
-     （`dsh-subagent/lib/index.js:1229-1250`；`diagnostic` 只由 external provider 产出）→ 真机拿不到"超时/鉴权"的原文，
+     （`dsh-subagent/lib/index.js:1229-1250`；`diagnostic` 只由 external provider 产出）→ 真机拿不到「超时/鉴权」的原文，
      `childFailureClass` 只能给 `unknown`。**未修**：要么走 D-116 B2（让脚本/宿主看见子会话自己的 `turn/end` 事件，
      属上游改动），要么宿主侧读子会话事件。
   3. 附带未修：交付里「仍未完成（来自报告）」那行仍是旧文案——`report.incomplete[].reason` 与 `failure.reason` 不逐字
      相同，`repairText` 的 `includes()` 匹配不上。
 - **下一步（按序）**：修 ② 与 ③ → `npm run ci` → 重跑同一套 soak（overlay 里 worker→`bifrost-badkey`，看交付是否
-  说鉴权/超时）→ 才走 §7 五步。**CHANGELOG `[Unreleased]` 已按实测改口径**："子代理死了不再写成格式错"成立，
-  "超时报超时 / 密钥被拒报不可用"只在服务商提供 `diagnostic` 时成立。
+  说鉴权/超时）→ 才走 §7 五步。**CHANGELOG `[Unreleased]` 已按实测改口径**：「子代理死了不再写成格式错」成立，
+  「超时报超时 / 密钥被拒报不可用」只在服务商提供 `diagnostic` 时成立。
 - **未做**：未 bump 0.13.26、未打 tag、未推 `main`、未碰 live `~/.dsh`、未重启线上。
 
 
@@ -94,8 +122,8 @@
   `test/null-collapse.spec.ts`（新，19 例）+ `test/engine-harness.ts`（`ChildAnswer` 支持 `diagnostic`）。
 - **门禁**：`npm run ci` exit 0（95 files / 1771 tests）；`lib/` 与 `src/` 同一提交。
 - **合流方要做的**：
-  1. 真机隔离 soak（用户视角，fork 在用 profile，绝不碰 live）：至少跑到一次"某个子代理死掉"的 run，
-     确认交付的答案与台账里那句原因说的是 timeout/鉴权而不是"没交结构化结果"。本分支 `NOT_RUN` 的原因就是这一条。
+  1. 真机隔离 soak（用户视角，fork 在用 profile，绝不碰 live）：至少跑到一次「某个子代理死掉」的 run，
+     确认交付的答案与台账里那句原因说的是 timeout/鉴权而不是「没交结构化结果」。本分支 `NOT_RUN` 的原因就是这一条。
   2. 合流冲突预判：`docs/knowledge/{STATE,VALIDATION,DECISIONS,HANDOFF,RESEARCH}.md` 与 `CHANGELOG.md`
      各留两边；`lib/*` 由 `npm run build` 重建后取 ours 再重建。
 - **别顺手改的**：`gate.ts` / `captain*` / `answer.ts` / delivery 拼装属其他 lane；`report.ts` 只动了失败类白名单
@@ -121,7 +149,7 @@
   本轮变成 CONFIRMED；③透明代理（`127.0.0.1:18099` → 真网关）记录到 verifier 请求命中新提示词的
   `quoteRule` 与答案侧 `rewritePreamble`，说明契约在真模型请求里生效。见 `.rsi/evidence/round-076/soak.txt`。
 - **没覆盖（诚实记）**：判定角色补交在真机上的**自然触发** `NOT_RUN`——三轮 soak 的判定都一次解析成功，没赶上
-  没转义双引号的运气；试过写故障注入（改 verifier 首个流式 tool_call 的参数），但 verifier 是"多轮工具调用"的
+  没转义双引号的运气；试过写故障注入（改 verifier 首个流式 tool_call 的参数），但 verifier 是「多轮工具调用」的
   子代理（一次调用里先跑 478 次 `bash`），结构化结论落在更后面的 HTTP 轮次，注入窗口没能在本轮窗口内可靠命中。
   该分支的证据仍取单测 8 例（红 7 → 绿 8）。
 - **分支收尾**：`fix/verifier-supervisor-resubmit`、`fix/final-answer-rewrite`、`docs/heartbeat-ledger`、
@@ -137,9 +165,9 @@
 - **分支与基线**：`.agents/worktrees/fix-verifier-supervisor-resubmit`（分支 `fix/verifier-supervisor-resubmit`，
   从 `main` `7f626f5`/0.13.24 开出）。共享工作树当时 detached `a6103ad` 且带他人 40+ 处未提交改动，**未动**。
 - **改了什么（只 `src/script.ts` + 测试/文档）**：新增 `verifierResubmitPrompt()`、`supervisorResubmitPrompt()`、
-  `verificationFailure()`；`runTaskUnsafe` 里给 verifier/supervisor 各加一段"同次尝试内补交一次"（镜像 worker
+  `verificationFailure()`；`runTaskUnsafe` 里给 verifier/supervisor 各加一段「同次尝试内补交一次」（镜像 worker
   的 `resubmitPrompt` 分支：仅在 `format-error` 且非 setup 时触发，一次为限，失败保留原失败）；`verifierPrompt` /
-  `supervisorPrompt` 加"英文双引号写「」或单引号、每条证据/发现 800 字内"；`VERIFICATION_SCHEMA` 的
+  `supervisorPrompt` 加「英文双引号写「」或单引号、每条证据/发现 800 字内」；`VERIFICATION_SCHEMA` 的
   `evidence`/`finding` 加同名软上限 `description`；`callRole` 的 `null` 分支 reason 改为
   `"<role> returned no valid structured result (structured output missing or unparsable)"`；
   `classifyFailureText` 补 `structured_output` 与 `Expected ','` / `Expected '}'` 等 JSON 解析模式；
@@ -156,7 +184,7 @@
   只是每尝试块 ×2）。合流时若要保守，可只取 `script.ts` + 两个 spec 改动，`maxTotalAgentsFor` 的 ×2 与
   `routing.spec`/`engine-contract.spec` 必须同进同出。
 
-## 2026-11-24 — round-075 分支 `fix/final-answer-rewrite`：最终答案改成"给料 + 重写"（未合流，`CONFIRMED`）
+## 2026-11-24 — round-075 分支 `fix/final-answer-rewrite`：最终答案改成「给料 + 重写」（未合流，`CONFIRMED`）
 
 - **From:** 修复子代理B2（最终答案 AI 重写）· **To:** lead / 合流者
 - **分支与基线**：`.agents/worktrees/fix-answer-rewrite`（分支 `fix/final-answer-rewrite`，从 `main` `7f626f5` 开出）。
@@ -173,10 +201,10 @@
     `CAVEAT_SECTION` / `hasCaveatSection()`；`synthesizerHardRules()`、`synthesizerPrompt()`、
     `layeredPolishPrompt()` 改成三段 + caveat 重写；`polishStyleVerdict()` 放宽字数；
     `layeredNotesBlock()` 不再贴 uncertainties；`summaryCoverage()` 的 `uncertaintyProbes` → `needsCaveats`；
-    `checkSummaryDraft()` / `verifySummaryDraft()` 换成"必须有 caveat 段"。
+    `checkSummaryDraft()` / `verifySummaryDraft()` 换成「必须有 caveat 段」。
 - **测试**：新增 `test/final-answer-rewrite.spec.ts` 15 例（先红 9 失败 → 后绿；后 2 例是实样复核抓到的路径缺陷），覆盖默认改写 / 整段 summary /
   交付物例外 / 完成态做成了 / 4 条 caveat 上界 / 单语 / 失败仍逐字 / 三段被接受 / 缺注意段被打回。
-  另 13 例旧用例按新契约改了期望（逐条清单见 `VALIDATION.md` 首条），无一是"放宽"：单语、成功态改写、
+  另 13 例旧用例按新契约改了期望（逐条清单见 `VALIDATION.md` 首条），无一是「放宽」：单语、成功态改写、
   附注不再复制 caveat 都是本轮明写的契约变更。
 - **复核抓到的东西（值得记）**：`answerLead` 曾先拆句再拼回，拆句点在 `weekly-report.md` 的 `.` 上，拼回成了
   `weekly-report. md` → 交付物路径不再等于 keep-list → 被机器细节吃掉，读者看到「打开 md 就能看」。改法是
@@ -206,8 +234,8 @@
 - **发版后补的修**：`e767ba6`（仅 test）——`test/captain-confirm.spec.ts` 加 `afterEach(closeAllSteering())`。
   远端 CI on main 第一次跑（`45223718435`）Node 22 红 2 例，根因是模块级通道注册表跨用例泄漏（不是产品缺陷，
   同一提交的 Release 门禁绿）；本地 Node 22/26 隔离跑 3/3 全绿，只有 2 vCPU runner 才复现。
-- **已知边界（未修，记在这里）**：`answerOnChannel` 把"通道存在"当成"本轮还在跑"；轮次刚结算到 `finally` 收尾之间
-  的那一瞬，用户消息会被回执成"并入了正在跑的这一轮"并靠 carry 进入下一轮。生产里窗口极短、要求不会丢，
+- **已知边界（未修，记在这里）**：`answerOnChannel` 把「通道存在」当成「本轮还在跑」；轮次刚结算到 `finally` 收尾之间
+  的那一瞬，用户消息会被回执成「并入了正在跑的这一轮」并靠 carry 进入下一轮。生产里窗口极短、要求不会丢，
   但要更准确就得让 gate 同时看 `state.active`（当时判断：改产品语义的风险高于收益，先记为待办）。
 - **分支收尾**：`fix/captain-approve`、`fix/gate-route-msgvis`、`docs/user-soak-fork-profile`、`release/0.13.24`
   四个 worktree 与其分支已删；另外清掉了 0.13.23 遗留、停在 `main` 上的 `.agents/worktrees/fix-synth-resubmit`（干净树）。
@@ -226,8 +254,8 @@
   （TTL + 先排队后记账）、`answerFullBehind`（`full` 形状的确认：批准派原请求、过期/非回答回作废文案）、
   `answerInTurn`（统一一次 `takeCaptainPending` + 首轮可见路径）。**没碰 `src/captain.ts`、`src/command.ts`。**
 - **行为改动（会影响测试口径）**：`mode:full`（部署级或会话级）＋可后台投递的交互会话，**首轮**不再
-  阻塞在轮内，改为"原话立刻可见 + 结论下一轮投递"。为此 `test/gate.spec.ts`、`test/phase1-dialogue.spec.ts`
-  里钉"首轮阻塞/预发布"的用例改用"已有宿主 head 的会话"夹具（`headed()`，含 `step/end`），首轮新契约由
+  阻塞在轮内，改为「原话立刻可见 + 结论下一轮投递」。为此 `test/gate.spec.ts`、`test/phase1-dialogue.spec.ts`
+  里钉「首轮阻塞/预发布」的用例改用「已有宿主 head 的会话」夹具（`headed()`，含 `step/end`），首轮新契约由
   `gate.spec.ts` 的 P0-5 用例与 `grok-on-ingress.spec.ts` 的新用例单独钉住。
 - **验证**：`npm run ci` exit 0（92 files / 1722 tests；`typecheck`/`lint`/`verify:lib` 全过，`lib/` 随提交）。
   新用例对旧码红：`test/captain-confirm.spec.ts` 3 条、`test/channel.spec.ts` 1 条、
@@ -235,7 +263,7 @@
 - **顺手修的既有竞态**：`test/channel.spec.ts` A4 在旧码上 3 次红 1 次（`steeringForSession` 断言抢在
   下一轮频道关闭之前）；改为等频道关闭。不是本次行为改动引起。
 - **没做/建议（交给 lead 判）**：①`/grok on` 的产品语义未动——它写 `workflowMode:'full'`，而部署级
-  `mode:full` 根本不问队长；线上 profile 是 `mode:full + grokDefault:on`，所以"队长确认"这条路在该
+  `mode:full` 根本不问队长；线上 profile 是 `mode:full + grokDefault:on`，所以「队长确认」这条路在该
   profile 下永远不会走到。要不要让部署级 `full` 也问一次确认，是产品决策，不是本次修复范围。②真机
   隔离 soak `NOT_RUN`（本轮不发布）。③`pendingCaptains` 仍是进程内 Map，重启即失忆（与前台 pending 同构）。
 - **合流提示**：`src/gate.ts` 与 `test/{gate,phase1-dialogue,channel,captain-confirm,grok-on-ingress,
@@ -249,16 +277,16 @@
   → `fix/dispose-drain`（`src/{run,config,guardian,index,records,checkpoint/wiring}.ts` + `test/unload-drain.spec.ts`）
   → `fix/checkpoint-lifeline-tasks`（`src/checkpoint/wiring.ts` 观察行）→ `feat/exp-pack-070`（体验档）
   → `captain-pack`（队长三件套）。五路原本都未提交，先各自提交（`baafd25`/`a3a41fb`/`92f5506`/`e776057`/`5c9aa06`）再合。
-- **冲突处理（以"功能都要保留"为原则）**：3 处需人判——
+- **冲突处理（以「功能都要保留」为原则）**：3 处需人判——
   ① `src/checkpoint/wiring.ts`：`noteAgent` 同时维护「观察行」(`children`) 与「在飞行表」(`live`)，
   `snapshot()` 的 `agents` 走观察行（无报告时）并叠加 `...liveInFlight()`；
   ② `src/memory/recorder.ts`：归档轮次写完后既 `supersedeEarlierRound()` 又 `appendCaptainExperience()`；
   ③ 另有 5 处 `lib/**/*.map`：取 ours 后 `npm run build` 重建（提交的 `lib/` 与 `src/` 一致由 `verify:lib` 证明）。
 - **合流时发现并修的载荷形状偏差**：exp-pack 的 `noteAgent` 从 `workflow/agent-start` 第一参数读
   `seq/label/phase/childId`，真实 payload 在第二参数（`WorkflowAgentInfo`）。合并后统一读第二参数，
-  该 spec 的替身改成真实两参数形状；断言不变。**这是"在飞子代理"在生产里能否真生效的关键**，
+  该 spec 的替身改成真实两参数形状；断言不变。**这是「在飞子代理」在生产里能否真生效的关键**，
   只跑单路测试不会暴露（单路测试跟着错形状写）。
-- **soak 抓出的文案缺陷（已修，`2e52498`）**：0 任务被说成"已经做完 0 项，没有剩下的"（读着像全部做完），
+- **soak 抓出的文案缺陷（已修，`2e52498`）**：0 任务被说成「已经做完 0 项，没有剩下的」（读着像全部做完），
   英文三段无分隔（`…manual stop.All 1 item(s)…`）。`stopNarration` 现在三态（total=0 / left=0 / 其它）+ 分隔符，
   补 2 条用例（`test/experience-pack.spec.ts`）。
 - **门禁**：`npm run ci` exit 0（92 文件 / 1717 测试；`verify:lib` 在 `c4eaffa` byte-identical，229 文件）。
@@ -282,7 +310,7 @@
 - **验证（本人执行）**：`npm run build` exit 0；`npm run ci` exit 0（90 文件 / 1678 测试 PASS）；
   三件各自红/绿见 `.rsi/evidence/round-071/`（red-cutA/red-cutB/red-cutC 与对应 green）。
   改旧行为处：`test/triage.spec.ts` 两条团队档用例、`test/gate-partial-head.spec.ts` 的 `deliver`
-  助手、`test/channel.spec.ts` 的跑中插话用例——都只是先补一步"确认"，断言未放宽。
+  助手、`test/channel.spec.ts` 的跑中插话用例——都只是先补一步「确认」，断言未放宽。
 - **没做/已知缺口**：确认轮的拆法预览是独立轻调用，正式跑仍由脚本内 planner 重新规划（两次规划）；
   用户画像目前只能由操作者用记忆 CLI 显式写入，不从对话自动蒸馏；真机隔离 soak `NOT_RUN`（本轮不发布）。
   `npm run verify:lib` 以 HEAD 为输入（`git archive HEAD`），**不覆盖未提交工作树**；
@@ -301,11 +329,11 @@
   throw 在 `?? serviceOf(ctx,'sessions')` 与 `get(name)` 兜底之前逃出，被 `handleModeRoute` 兜成
   `500 mode/internal`，客户端渲染成红字。
 - **为什么测试没抓住**：`test/mode-surface.spec.ts` 里 inject/ctx 替身是**普通对象字面量**，
-  属性读取永不抛错，于是"直接读成功"这条在生产必炸的路径在测试里一路绿灯；
+  属性读取永不抛错，于是「直接读成功」这条在生产必炸的路径在测试里一路绿灯；
   soak 也从未覆盖 mode 路由（此前只覆盖 workflow 全链路），所以真机也没暴露。
 - **修法**：`serviceOf()` 直读包 `try/catch`，抛错时落 `source.get(name)`（`get` 不受 inject 守卫），
   与 `src/settings.ts:83-91` `serviceOf` / `src/team-engine.ts` `resolveService` 同构；`??` 链原样保留；
-  注释写明 isolate-guarded 及"为什么这是预期结果而不是故障"。
+  注释写明 isolate-guarded 及「为什么这是预期结果而不是故障」。
 - **回归**：`test/mode-surface.spec.ts` 的挂载用例换替身为**真 cordis 行为**（未注入名属性读抛
   `cannot get property "<name>" without inject`、已注入名返回服务、`get(name)` 不受守卫），
   并断言 POST `status` / POST `set` 都 200、`enabled` 双向翻转、无 `mode/internal`。红绿：旧码 500（红）→ 新码 200（绿）。
@@ -337,7 +365,7 @@
 ## 2026-11-23 — round-64 已合流 main 未发版：降级跑完全验自报（`CONFIRMED`，soak BLOCKED）
 
 - **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
-- **做了什么**：部分完成但全验过说"0 项没做成"，读着像全过了（11 个面扫完命中的唯一真 bug）。
+- **做了什么**：部分完成但全验过说「0 项没做成」，读着像全过了（11 个面扫完命中的唯一真 bug）。
   全验专属尾巴点名降级；+1 降级回归 + 2/3 原句逐字 pin；`npm run ci` exit 0（87/1656）；
   lead 独立红绿复验成立。
 - **真机**：BLOCKED（网关 502，未伪造）。本次不发版。
@@ -372,7 +400,7 @@
 ## 2026-11-23 — round-61 已合流 main 未发版：已删键专属报错（`CONFIRMED`，soak BLOCKED）
 
 - **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
-- **做了什么**：已删键只报"未知"，不说"删了"。先查后报：命中删键表就自报名给解法，
+- **做了什么**：已删键只报「未知」，不说「删了」。先查后报：命中删键表就自报名给解法，
   真拼错仍给纠错提示；+1 新回归 + 5 旧断言同步（同等强度）；`npm run ci` exit 0（87/1653）；
   lead 独立红绿复验成立。
 - **真机**：BLOCKED（网关 502，未伪造）。本次不发版。
@@ -384,7 +412,7 @@
 ## 2026-11-23 — round-60 已合流 main 未发版：说明书已删键改诚实（`CONFIRMED`，soak BLOCKED）
 
 - **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
-- **做了什么**：说明书"固化"行把 5 个已删键写成可配值。改点名已删不断点名（spec 锁行文义务保住）；
+- **做了什么**：说明书「固化」行把 5 个已删键写成可配值。改点名已删不断点名（spec 锁行文义务保住）；
   子代理预查发现删写法会红后 STOP 得对，lead 改语义收尾；`npm run ci` exit 0（87/1652）。
 - **真机**：BLOCKED（网关 502，未伪造）。本次不发版。
 - **合流**：`rsi/round-60`（`062bec7`）已 `--no-ff` 合入 main 系 worktree（合流 `7bfff22`）；
@@ -395,7 +423,7 @@
 ## 2026-11-23 — round-59 已合流 main 未发版：两处过期门注释改诚实（`CONFIRMED`，soak BLOCKED）
 
 - **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
-- **做了什么**：两处注释还写着已删除的门开关（"返回否"、"决定门在不在"）；门从 round-54 起常开。
+- **做了什么**：两处注释还写着已删除的门开关（「返回否」、「决定门在不在」）；门从 round-54 起常开。
   注释改对（gate 1 + config 1，lead 追加同类一处）；全文件 sweep 余下均诚实；纯注释改无行为变化；
   `npm run ci` exit 0（87/1652）。
 - **真机**：BLOCKED（网关 502，未伪造）。本次不发版。
@@ -605,7 +633,7 @@
 
 - **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
 - **做了什么**：报告面第 1 条。`renderReport` 对 blocked 打原因行，`machineLedger` 只对 failed 打，
-  存档丢"没跑成"和上游原因。放宽 machineLedger 状态条件 + 1 例回归（含与正式报告逐行一致断言）；
+  存档丢「没跑成」和上游原因。放宽 machineLedger 状态条件 + 1 例回归（含与正式报告逐行一致断言）；
   `npm run ci` exit 0（85/1635）；lead 独立红绿复验成立。
 - **合流**：`rsi/round-43`（`8c06f9e`）已 `--no-ff` 合入 main 系 worktree（合流 `51ec2bb`）；
   `rsi/round-43` 分支可 24h 内删除。`CHANGELOG [Unreleased]` 中英文已记，攒版待发。
@@ -720,7 +748,7 @@
   `test/plugin-lifecycle.spec.ts`(17) / `test/reliability.spec.ts`(6) /
   `test/timeout-config.spec.ts`(6) / `test/config-limits-repair.spec.ts`(5) /
   `test/config-synthesis-fallback.spec.ts`(2) 的根因是 `src/index.ts` 现在注册了**第二个工具**
-  `grok_replan_intents`，而测试的 FakeContext 只留"最后一个注册的工具"，于是 `ctx.tool` 变成它、
+  `grok_replan_intents`，而测试的 FakeContext 只留「最后一个注册的工具」，于是 `ctx.tool` 变成它、
   `execute({objective})` 报 `missing required property "token"`；另有一例设置页字段数断言
   `15 of 18` 需随 `replan` 变 `16 of 18`。修法二选一：测试按名字挑工具，或 index lane 让
   steering 工具后注册/不覆盖 `ctx.tool`。**不要**在本 lane 的文件里绕。
@@ -742,13 +770,13 @@
   无取消零处置）。
 - **没做的**：并发轮的未跟踪文件未动（`src/weather/`、`test/nyc*.spec.ts` 等不属本轮，
   它们让 `npm run ci` 的 typecheck 整步变红——下次发版前要么它们先合入修好 `--jsx`，
-  要么发版流程继续用"分段门禁"）；120 分钟跑满 NOT_RUN。
+  要么发版流程继续用「分段门禁」）；120 分钟跑满 NOT_RUN。
 
 ## 2026-11-22 — D-104 Guardian 预算跟随 120 分钟 + 真机实测通过（`CONFIRMED`，未发版、未提交）
 
 - **From:** 本会话（lead）· **To:** 下一轮接手者
-- **为什么做**：用户两问——"为什么还是 10 分钟"（进度页 `600 秒` 老根）+"设置页看不到守卫时间"。
-  根因：`run.ts:863` 的三元把预算和"配没配判停路由"绑在一起，没配路由就退回 `min(deadline,600_000)`；
+- **为什么做**：用户两问——「为什么还是 10 分钟」（进度页 `600 秒` 老根）+「设置页看不到守卫时间」。
+  根因：`run.ts:863` 的三元把预算和「配没配判停路由」绑在一起，没配路由就退回 `min(deadline,600_000)`；
   设置页 `childTimeoutMs` 行不叫守卫时间，Guardian 预算本就不是可配项。
 - **改了什么**：去掉三元永远传 `config.childTimeoutMs`；hint 中英各加一句守卫跟随；+1 回归测试。
   详见 D-104。
@@ -790,8 +818,8 @@
 ## 2026-11-22 — childTimeoutMs 单次调用预算 120 分钟（`CONFIRMED`，未发版、未提交）
 
 - **From:** 本会话（lead）· **To:** 下一轮接手者
-- **为什么做**：用户原话"守卫出了问题，10 分钟上限……把它改成默认 120 分钟"。纽约天气 UI 截图：
-  `任务进度 5/5 · 100%` 但 Guardian 连刷 4 条"已触发整轮取消"——子任务 10 分钟被掐。三处写死
+- **为什么做**：用户原话「守卫出了问题，10 分钟上限……把它改成默认 120 分钟」。纽约天气 UI 截图：
+  `任务进度 5/5 · 100%` 但 Guardian 连刷 4 条「已触发整轮取消」——子任务 10 分钟被掐。三处写死
   10 分钟：`CHILD_TIMEOUT_MS`、`childTimeoutCapMs`、脚本镜像。D-097 只修抢跑没修预算本身。
 - **改了什么**：新键 `childTimeoutMs`（schema 鉗制 + resolve 1000–7200000 + 设置页分钟编辑 1–120 +
   报告校验/渲染），默认/上限 120 分钟（`DEFAULT_CHILD_TIMEOUT_MS`/`CHILD_TIMEOUT_MAX_MS`/
@@ -903,7 +931,7 @@
 - **结论**：A1–A5 `CONFIRMED`、A6 `CONFIRMED`（`npm run ci` 78 files / 1438 tests、exit 0）。
   合流可演示：verified 波 `retain`、只重排未完成波 + 新增意图、`blocked` 行回来是 `redrive`。
 - **留给下一手**：① 让「依赖 retained id」可解析（目前整份 plan 被拒退 fallback，`ACCEPTANCE.md` B1）；
-  ② 若要让 A1 从"提示词纪律"升级成"结构保证"，需要在新 plan 上做 retained 去重校验（B2）；
+  ② 若要让 A1 从「提示词纪律」升级成「结构保证」，需要在新 plan 上做 retained 去重校验（B2）；
   ③ `reverify`/`replan` 仍无生产调用者（B3）；④ 订正 `PLAN-dynamic-steering-2026-11-21.md` §5 A6 的
   「3/1、6/3」旧数（代码与 `AGENTS.md` 是 10/100、1/3）。
 - **未做**：真实 DSH Web GUI 手点、真实模型端到端（见 `ACCEPTANCE.md` §6）。未提交、未打 tag、未 push。
@@ -1703,7 +1731,7 @@
   `3fe1e657…`，D-055 设置面瘦身的设计输入）已逐字节存到
   `.rsi/archive/settings-simple-mock.html`，来源/完整性/还原命令见
   `.rsi/archive/README.md`，根副本删除。**旧结论「`settings-simple-mock.html` 允许未跟踪、
-  永不入库」就此作废**：仓库不再保留任何"故意未跟踪"的根文件，需要留存的草稿一律放
+  永不入库」就此作废**：仓库不再保留任何「故意未跟踪」的根文件，需要留存的草稿一律放
   `.rsi/archive/`（不进 npm 包，`package.json` `files` 只含 `lib/**`、`docs/*.md`、
   `docs/images` 等）。
 - **门禁（`CONFIRMED`）**：`npm run ci` exit 0 = **63 文件 / 1157 测试 PASS**，
@@ -2188,7 +2216,7 @@
   `evidence/childname-fix-2026-11-08/gui/`（README + 4 截图 + 3 JSON + 描述符摘录）；
   记录：`VALIDATION.md` Round 32、`DECISIONS.md` D-041 Addendum、`RESEARCH.md` A18 补充、STATE。
 - **记忆更正（只读核实）**：live `:3090` web profile 的插件 = **released 0.6.0**（2026-11-07
-  21:54 安装；`lib/team-engine.js` 不存在 → 不含本修复）。旧记"仍 0.2.7"过时，STATE/VALIDATION
+  21:54 安装；`lib/team-engine.js` 不存在 → 不含本修复）。旧记「仍 0.2.7」过时，STATE/VALIDATION
   已更正。live 实例全程未碰（D-013）。
 - **验收条款状态（本轮后）**：条款 1/2/3/5/6 满足；条款 4 的「插件加载于 mise DSH installation +
   ≥3 子代理工作流 + Web GUI 顶栏显示描述性名」三项在本机 `CONFIRMED`（本隔离实例与 live 用同一
@@ -2210,7 +2238,7 @@
   （`workflow-ptc/src/index.ts:157`）；插件用**注入引擎自己的构造函数**建私有 twin，
   把 `subagents` 换成在 `startActivation` 处重写 `spec.label`（= 提示词首行）的视图，
   `reflect.provide` 置空保持私有，非 PTC 引擎原样回退并 warn。不改 core、不改引擎、
-  不碰共享服务实例。上游 3 行 ask 从"必要"降级为"可选简化"。
+  不碰共享服务实例。上游 3 行 ask 从「必要」降级为「可选简化」。
 - **本轮改动（全在本仓库，未提交，随本轮 commit）：**
   `src/team-engine.ts`（新）、`src/run.ts`（两处调用点）、`src/script.ts`/`src/triage.ts`/`src/gate.ts`
   （子代理提示词**首行**改描述性标题，人设第二行）、`test/team-engine.spec.ts`（新，12 例）、
@@ -2276,11 +2304,11 @@
   `out/childname-verify/`（隔离 home + profile `cnamer`，headless，模型 v4-pro + agnes-3.0-flash，
   复用 `out/v060-verify/*.patch.yml`，密钥仅布尔存在检查）跑一轮团队档 COMPLETED（2 任务 verified，
   6 子代理），父会话 `tool-workflow/agent-start` 证明插件标签（`规划助手`/`执行`/`检查`）确实在传，
-  而 6 个子会话首个 `subagent/descriptor` **全部**是 `"label":"任务团队 child N"`（N=1..6）——
+  而 6 个子会话首个 `subagent/descriptor` **全部**是 `"label":「任务团队 child N」`（N=1..6）——
   与用户截图逐字一致。证据：`docs/knowledge/evidence/childname-blocked/`（README + 3 摘录文件）。
 - **结论：BLOCKED 维持。** 主标签由 DSH core 写死并被描述符契约锁成不可改写，插件侧无文档化扩展点；
   按任务约束（"If no extension point exists … report BLOCKED with the specific limitation instead of
-  modifying DSH core"）不做绕行改动。验收条款逐条状态：条款 1/3/4/6 的"修复已实现"部分不可达
+  modifying DSH core「）不做绕行改动。验收条款逐条状态：条款 1/3/4/6 的」修复已实现"部分不可达
   （无修复可交付）；条款 2（DSH core 未改）满足；条款 5（CHANGELOG 条目）不适用（无用户可见变更，D-039 既定）。
 - **本轮改动：** 仅记忆与证据文件——`VALIDATION.md`（Round 28）、`DECISIONS.md`（D-039 Addendum）、
   `STATE.md`（2026-11-07 段补充）、本节、`docs/knowledge/evidence/childname-blocked/`（4 文件）。
@@ -2409,8 +2437,8 @@
   上限/脱敏/默认根/逐字节回归/`session-7e079b80` 形态回放成对用例）。证据：
   `docs/knowledge/evidence/history-first/{ci-summary,recall-spec,regression-suite}.txt`。
 - **决策：** D-037（提问前先读；只读、有界、无新配置键；`ask:false` 时命中仍走快手档）。
-- **现场发现（`CONFIRMED`，已修）：** 首版把本轮消息也算作"历史"（`relay` 在 `produceAnswer()` 前
-  就 `commitClaimed()`），导致任何追问都"命中自己"——现在 `collectRecallSources(…, exclude)` 按
+- **现场发现（`CONFIRMED`，已修）：** 首版把本轮消息也算作「历史」（`relay` 在 `produceAnswer()` 前
+  就 `commitClaimed()`），导致任何追问都「命中自己」——现在 `collectRecallSources(…, exclude)` 按
   `textOf(message) === request` 剔除，`before the fix` 用例守着它。
 - **诚实边界：** 真机在线模型回放 `NOT_RUN`（本轮未起隔离 profile）；语义同义改写不会命中，
   会退化为提问；只读 `docs/knowledge/*.md`，不读 `archive.jsonl`。
@@ -2903,10 +2931,10 @@
 - **验证事实**：`npm test` 33 文件 / 568 测试 PASS；`npm run lint` 0 error（3 个既有 warning）；
   `lib/` 由 `npm test` 的 build 重建；真机两轮 PASS（Round 21），digest 在真子代理提示词里可见。
 - **给下一个 agent 的三条硬约束**：
-  1. 不要为了"跨轮"改 `src/records.ts` 或归档存储——那是独立任务；本轮只用读路径。
+  1. 不要为了「跨轮」改 `src/records.ts` 或归档存储——那是独立任务；本轮只用读路径。
   2. `carryoverBounds` 复用 `historyTurns`/`historyChars`；若要新增配置键，必须同时改设置页
      投影断言（`test/settings-projection.spec.ts` 的封闭键清单）。
-  3. 真机多轮验证不能靠"同一条命令里连发两条消息"（会被丢）；本轮的可行姿势是
+  3. 真机多轮验证不能靠「同一条命令里连发两条消息」（会被丢）；本轮的可行姿势是
      `--session-id` 续跑，且**首条消息必须先走一次 gate-off**（F1 未修）。
 - **下一步**：提交 + 开 PR（`base:main`）；决定 F1 是否另立任务；`:3090` 升级仍需用户批准（D-013）。
 
@@ -2924,7 +2952,7 @@
   `node lib/memory/cli.js recent` 直接读到该轮结果（Round 22）。
 - **给下一个 agent 的四条硬约束**：
   1. **不要**把归档做成配置开关或挂到 `showProgress`：记忆不是展示偏好（D-036）。
-  2. **不要**改成"会话收尾再写"或"dispose 钩子写"——那正是用户点名的失败模式。
+  2. **不要**改成「会话收尾再写」或「dispose 钩子写」——那正是用户点名的失败模式。
   3. 读子代理产出必须走 `ctx.get('sessions')` 且在 **`agent-start`** 捕获会话对象，结论在
      `tool-call.arguments`（JSON 字符串）里而不是 assistant 文本（RESEARCH A15，三条都实测过）。
   4. 真机验证前先确认闸门开着（`grokDefault: "on"`），否则跑一整轮也不会有任何归档。
@@ -3012,7 +3040,7 @@
   export DSH_HOME=$PWD/.verify-gw/home
   dsh --profile gwverify --from-default-profile web --dump-config
   dsh plugin --profile gwverify add "$PWD"
-  dsh --profile gwverify-hl --patch mock.patch.yml "你好"    # 前台 chat 档，无模型也能过
+  dsh --profile gwverify-hl --patch mock.patch.yml 「你好」    # 前台 chat 档，无模型也能过
   # 进度 Tab（H2，需要本机模型网关）
   npm pack --cache .dsh-home/npm-cache --pack-destination .dsh-home/h2-pack
   dsh gwprog --from-default-profile web
@@ -3054,7 +3082,7 @@
   4b92278` → `npx vitest run test/gate.spec.ts` = **2 failed | 53 passed**，与本轮同形
   （`refuses a message explicitly when the queue is full…` 稳定失败；
   `writes the answer into the session when the append strategy is selected` 基线失败、
-  工作树单跑偶过）。**所以现在不能说"全绿"**：谁要在发布前说 PASS，必须先处置这两条。
+  工作树单跑偶过）。**所以现在不能说「全绿」**：谁要在发布前说 PASS，必须先处置这两条。
 - **真机证据路径（别人的成果，我只核对了目录与结论行）**：
   `docs/knowledge/evidence/progress-tab-2026-11-15/Round2/`（隔离 `:3221`、`DSH_HOME=.dsh-home/r2`、
   profile `gwprog2`、装 `0.9.1` 打包产物、headless Chromium、13 PNG + 5 stage 日志 +
@@ -3086,7 +3114,7 @@
   写 `[0.9.2]` 节头 + commit/push/tag + Issue 状态评论（模板见 `AGENTS.md`）；③live
   `:3080`/`:3086`/`:3090` 仍是用户动作（D-013）。
 - **给用户的一句话**：这一版还没发——工作树里的东西能装能跑（真机截图在 Round2 目录），
-  但报告文案要先改成"人话在前、机器证据收起来"，改完再一起发版。
+  但报告文案要先改成「人话在前、机器证据收起来」，改完再一起发版。
 
 ## 2026-11-15 — v0.9.2 收尾发版：本地齐了（`5eb4942`），**push / tag / Issue 评论等人话真机截图**
 
@@ -3184,7 +3212,7 @@
 - **验证**：`npm run ci` 全绿（typecheck 0 错 / lint 4w0e / 51 文件 948 测试 PASS），
   详见 VALIDATION Round 42；实现期抓到并修好 `$1` 注入与 `核验通过` 自杀两个 bug。
 - **没做什么（`NOT_RUN`）**：commit / push / tag / Release（等用户指令）；真机 Web 长驻验证；
-  headless e2e 回归。**不要**以"测试全绿"为由直接发版。
+  headless e2e 回归。**不要**以「测试全绿」为由直接发版。
 - **Next action（用户一步）**：先看行为是否对味（问一个天气类问题：首屏应是 `答案：…` 而不是
   `做完了 N 项…`；team 档应先回一句现场写的人话再后台跑）。对味了说一声，我再走提交→push→
   CI→发版流程；不对味直接说哪句别扭，我改。
@@ -3195,7 +3223,7 @@
 - **做了什么**：A/B/C（答案置顶 + 边聊边干，未提交）+ 进度 Tab A+C（七段脊 + 单展开分支 + 窄屏竖排，只改 `src/client/index.js` 渲染 + CSS，`test/client` + `test/progress-connector` 同步，CHANGELOG `[Unreleased]` +1 条）。`npm run ci` 全绿（51/951），隔离 `acgtest:3225` 真机全过。
 - **验证证据**：`.dsh-home/acg/shots/`（`03/04/05/10/11/12/13/21/22/23` + DOM 日志）——注意该目录在 `.gitignore` 外？（`TMPDIR=$PWD/.tmp` 约定；`acg/` 是否入库由发版组定，默认不入库）。
 - **没做什么（`NOT_RUN`）**：commit / push / tag / Release（等用户指令）；live `:3080` 更新（禁重启，见 D-053——新代码无已验证免重启路径，要么用户重启 DSH，要么接受文件换了进程仍跑旧模块）。
-- **Next action（用户，两步）**：① 看一眼截图（`13-settled-wide`  settled 脊 / `11-spine-narrow` 窄屏竖排），对味了说"提交发版"；② live 更新方式二选一：等下次 DSH 重启自动生效，或用户亲手重启。
+- **Next action（用户，两步）**：① 看一眼截图（`13-settled-wide`  settled 脊 / `11-spine-narrow` 窄屏竖排），对味了说「提交发版」；② live 更新方式二选一：等下次 DSH 重启自动生效，或用户亲手重启。
 
 ## 2026-11-16 — v0.9.3 已发布 + live 文件已换（待用户重启生效）
 
@@ -3213,12 +3241,12 @@
 
 - **From:** lead · **To:** 用户 / 后续代理。**远端未变**：`origin/main` = `01f86de`，
   本轮 5 文件未提交（`src/script|report|types` + `test/failure-paths` + CHANGELOG `[Unreleased]`）。
-- **做了什么**：失败 session `3c296b9a`/seq=5 落盘确证"数据全对、只缺交卷"后，
+- **做了什么**：失败 session `3c296b9a`/seq=5 落盘确证「数据全对、只缺交卷」后，
   按用户拍板 A 实现同 attempt 补交（D-054）：格式缺失补一次、不花重试额度，
   再缺才进正常重试；核验严格性零动。单测 3 例全绿。
 - **没做什么（`NOT_RUN`）**：隔离真机复验（建议发版前 acgtest 跑一次三城天气）；
   B（失败行分类显示）；commit/push/tag/Release（等用户指令）。
-- **Next action（用户）**：说"提交发版"就走 commit→push→CI→tag→Release→live 换文件
+- **Next action（用户）**：说「提交发版」就走 commit→push→CI→tag→Release→live 换文件
  （live 仍需用户重启 DSH 生效，沿 D-013/D-053）。
 
 ## 2026-11-17 — T4 测试迁移交接（agent-5 → lead）
@@ -3241,7 +3269,7 @@
   高级两数 1–100/def10），无 hint/Danger/只读区；②24 键删 + 固定值（见 D-055）；
   ③supervisor 第五角色（见 D-056）；④上限 100/默认 10（AGENTS.md 已同步）。
 - **Next action（用户）**：看 `settings-simple-mock.html`（定稿 mock，可点）→
-  若认可，回复"提交"，lead 即 commit（不 push/tag，发版另听指令）。
+  若认可，回复「提交」，lead 即 commit（不 push/tag，发版另听指令）。
 - **Next action（后续代理）**：先读本轮 STATE/DECISIONS D-055/D-056；
   真机验证 `NOT_RUN`（acgtest 新 profile + 新端口，老规矩）；live `:3090` 未动。
 
@@ -3433,13 +3461,13 @@ Issue #1 状态评论 issuecomment-6927842856。
   `verify:lib` byte-identical。
 - **没做的**：未发版、未 push（分支 `fix/session-surface-head-6`，commits ddf5e5e 起 7 个）；
   用户侧已砖的 33 个父会话插件修不了，需 host 侧修复或丢弃；真机 GUI 验证 NOT_RUN。
-- **下一步**：合流 main → 按五步流发版；发版说明写清"升级后新会话不再写坏，既有砖会话需手动处理"。
+- **下一步**：合流 main → 按五步流发版；发版说明写清「升级后新会话不再写坏，既有砖会话需手动处理」。
 
 ## 2026-11-22 — 已发版 `0.13.9`：Guardian 非破坏式恢复 + observe 折叠修复（`CONFIRMED`）
 
 - **From:** 本会话（lead）· **To:** 下一轮接手者
 - **同步结论**：本地 `main` = 远端 `origin/main`（`418a4a9`，fetch 已对表）。远端 v0.13.9 曾打 tag 但 Release 校验失败（docs 版本断言 6 项停留在 0.13.8），操作员删 tag 留恢复记录（`docs/RELEASING.md` Recovery record）。本次重打、无 Release 历史污染。
-- **找 bug**：PR #47（guardian-ui-and-timeout-budget）改漏一处——`src/progress-tab.ts` 纯折叠函数仍是旧映射（非 rescue 一律 cancel-run），host 记为 `observe` 的 finding 会被画成"已触发整轮取消"。已修（与 bundle 同规则三态）+ 回归测试（progress-tab 1 例 + connector 1 例）。红验证：只藏 src 时新用例 1 failed / 34 skipped。
+- **找 bug**：PR #47（guardian-ui-and-timeout-budget）改漏一处——`src/progress-tab.ts` 纯折叠函数仍是旧映射（非 rescue 一律 cancel-run），host 记为 `observe` 的 finding 会被画成「已触发整轮取消」。已修（与 bundle 同规则三态）+ 回归测试（progress-tab 1 例 + connector 1 例）。红验证：只藏 src 时新用例 1 failed / 34 skipped。
 - **发了什么**：发版提交 `c93b2bf` 已推，annotated tag `v0.13.9` 已推（本地旧 tag 先删后建，远端当时无此 tag）；远端 CI `45001378298` success、Release `45001393005` success 并已发布（asset `dsh-grok-workflow-0.13.9.tgz`）。本地 `npm run ci` exit 0：78 files / 1484 tests PASS。
 - **没做的**：`web` profile 热加载安装——本会话沙箱只读（`bwrap --ro-bind`，`plugin add` 报 EROFS），装机仍是 `v0.13.8`。需用户在宿主执行：`dsh plugin --profile web add github:free6589/dsh-grok-workflow#v0.13.9`（dsh 不重启，原地更新，运行中实例下次 profile boot 生效）。
 
@@ -3463,30 +3491,30 @@ Issue #1 状态评论 issuecomment-6927842856。
 | # | 项 | 结果 | 依据 |
 |---|---|---|---|
 | Sec.2-1 | 运行时限默认 60 分钟 → 0 | 前轮已合（`1591665`），本轮复验 | `src/config.ts:113` `DEFAULT_TIMEOUT_MS = 0`；`test/timeout-config.spec.ts:119` |
-| Sec.2-2 | 主会话可插话：默认开或给开关 | 前轮已合（`1591665`），按"给开关"分支收口 | `src/client/index.js` `replan` 布尔键 + 设置页开关行；默认仍 false（分歧已记） |
-| Sec.2-3 | 总开关一按报 405 | **本轮新合** `5dc0512` | 见下方"405 两个新成因" |
+| Sec.2-2 | 主会话可插话：默认开或给开关 | 前轮已合（`1591665`），按「给开关」分支收口 | `src/client/index.js` `replan` 布尔键 + 设置页开关行；默认仍 false（分歧已记） |
+| Sec.2-3 | 总开关一按报 405 | **本轮新合** `5dc0512` | 见下方「405 两个新成因」 |
 | Sec.2-4 | 设置页一键升级按钮 | 前轮已合（`1591665`），覆盖度 **PARTIAL**（见 D8） | 版本/最新/命令卡片（只读 + 复制安装命令，不联网、不代跑）+ `test/update-entry.spec.ts` 4 例 |
-| Sec.2-5 | 进度页"回答"格永远空 | 前轮已合（`1591665`，按"删格"分支收口） | `PROGRESS_STAGES` 六格无 answer；源码注释写明没有事件能填它 |
+| Sec.2-5 | 进度页「回答」格永远空 | 前轮已合（`1591665`，按「删格」分支收口） | `PROGRESS_STAGES` 六格无 answer；源码注释写明没有事件能填它 |
 | Sec.2-6 | 断点续跑没接上 | 前轮已合（`1591665`） | `RESUME_DECISION_WIRING.wired = true`（`src/checkpoint/wiring.ts:221`），生产调用 `wiring.ts:485` |
-| Sec.2-7 | 宿主证据收集阶段没开工 | **跳过（BLOCKED：待拍板）** | 源文件原话"先确认这一阶段还要不要做"；仓库确无 `src/evidence*`。见 D-111 |
+| Sec.2-7 | 宿主证据收集阶段没开工 | **跳过（BLOCKED：待拍板）** | 源文件原话「先确认这一阶段还要不要做」；仓库确无 `src/evidence*`。见 D-111 |
 | Sec.3-1 | 进度页跨阶段的线太多，合并成一根 | **本轮新合** `adc7fb4` | 一条公共弯道 + 一条公共轨，`test/progress-connector.spec.ts` 新增多组共享轨用例 |
 | Sec.3-2 | 模型失败换人时加 429 勾选框 | 跳过（待拍板） | `triageModel` 整套已移除，需求是否成立源文件自己要求重新确认；见 D-111 |
-| Sec.3-3 | 汇总也要"检查 + 复核"，不只汇总一次 | 跳过（待拍板） | 三轮汇总门已在（`src/script.ts` `reviewSummaryDraft`：check + 独立 verify，纯确定性）；**没走**配置里的 verifier/supervisor 模型角色。要不要改成走角色是成本/真值来源的取舍，见 D-111 |
-| Sec.3-4 | 开插件后答案要和不开时长得一样 | 跳过（待拍板） | 源文件"是否还觉得不一样要你再验一次"——只有操作员能判；人工比对 `NOT_RUN` |
+| Sec.3-3 | 汇总也要「检查 + 复核」，不只汇总一次 | 跳过（待拍板） | 三轮汇总门已在（`src/script.ts` `reviewSummaryDraft`：check + 独立 verify，纯确定性）；**没走**配置里的 verifier/supervisor 模型角色。要不要改成走角色是成本/真值来源的取舍，见 D-111 |
+| Sec.3-4 | 开插件后答案要和不开时长得一样 | 跳过（待拍板） | 源文件「是否还觉得不一样要你再验一次」——只有操作员能判；人工比对 `NOT_RUN` |
 | Sec.3-5 | 查清那次绘画任务为什么失败 | 跳过（范围外） | 本插件无图像功能，失败不在本仓库；是否继续查由操作员定 |
 
 - **405 的两个新成因（`CONFIRMED` 从源码读出，`HYPOTHESIS` 之于操作员那次具体触发）**：
   (a) 路由挂载用了 `inject(['webServer','connection','sessions'])`，三个服务缺一就不挂；0.13.16 只补了
   `webServer` 缺失的告警，**会话服务晚到或只经 `ctx.get('sessions')` 可达**的编排仍会什么都不挂，
-  浏览器的 POST 落到宿主 fallback —— 正是"空包体 405、不带插件说明"的样子。现在改成
+  浏览器的 POST 落到宿主 fallback —— 正是「空包体 405、不带插件说明」的样子。现在改成
   `inject(['webServer','connection'])` + 按请求现取会话服务，取不到回 `503 mode/unavailable`（不再是 404）。
   (b) 读请求现在也吃 `GET ?action=status&sessionId=…`（用 GET 写一律 405），被拒的方法连方法名和 URL 一起
-  `logger.warn`，客户端遇到读取 405 会改用 GET 重试一次并点名"方法被拒"。操作员那一次到底是代理拦 POST
+  `logger.warn`，客户端遇到读取 405 会改用 GET 重试一次并点名「方法被拒」。操作员那一次到底是代理拦 POST
   还是路由没挂，仍无现场日志可判（`HYPOTHESIS`），但两种情形现在都能自证。
 - **没做的**：未发版、未打 tag、未 push（本地 `main` 领先 `origin/main` 2 个 merge 提交）；真机 GUI 点开关
   `NOT_RUN`（不动运行中实例，按 AGENTS.md §5）。
 - **分支**：`rsi/sec2-03-mode-get`、`rsi/sec3-01-single-rail` 已合入 `main`，判定日期 2026-11-24 前删除。
-- **下一步**：① 操作员对 Sec.2-7 + Sec.3-2/3/4/5 各给一句"做 / 不做"；② 决定是否发版把这两条改动推出去。
+- **下一步**：① 操作员对 Sec.2-7 + Sec.3-2/3/4/5 各给一句「做 / 不做」；② 决定是否发版把这两条改动推出去。
 
 ## 2026-11-23 · 手工清单 12 项（第 2 轮）逐项结果与分支台账
 
@@ -3509,5 +3537,5 @@ Issue #1 状态评论 issuecomment-6927842856。
   （合完未删是为让复核者能逐项看分支内容；超期即删）。
 - **未 push**：本地 `main` 领先 `origin/main` 14 个提交（12 项 + 文档批次），远端看不到任何一项；
   未发版、未打 tag、未 npm publish。
-- **下一步**：① 操作员对 Sec.2-7 给一句"做 / 不做"（D-112 已备好第一刀）；② Sec.3-4 按
+- **下一步**：① 操作员对 Sec.2-7 给一句「做 / 不做」（D-112 已备好第一刀）；② Sec.3-4 按
   `docs/knowledge/evidence/answer-parity-2026-11-23.md` 第 2 节做一次并排比对；③ 决定是否发版把这批推出去。
