@@ -1,0 +1,33 @@
+{
+  "reopenTasks": 1,
+  "reopenIds": [
+    "new-3"
+  ],
+  "resumedIds": [
+    "alpha",
+    "beta"
+  ],
+  "afterReassign": {
+    "id": "task-1",
+    "title": "T",
+    "status": "pending",
+    "blockedReason": "waiting",
+    "owner": "lead/agent-9"
+  },
+  "bareOwnerDecision": {
+    "ok": true,
+    "op": "reassign",
+    "id": "task-2",
+    "effect": {
+      "kind": "patch",
+      "id": "task-2",
+      "patch": {
+        "owner": "agent-9"
+      }
+    }
+  },
+  "corruptStart": {
+    "threw": false,
+    "active": true
+  }
+}

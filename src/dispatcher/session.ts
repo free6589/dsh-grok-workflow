@@ -46,6 +46,13 @@
  * - `create` with an empty-string owner stays unowned: the board requires a
  *   non-empty owner and the policy does not refuse it, so collapsing (not
  *   throwing) keeps the allowed intent truthful.
+ * - `creator` (who asked for the task, vs `owner` who executes it) has no
+ *   board column either, so it rides the same overlay. Results are routed
+ *   with `resultRecipient`, which prefers the creator: an owner changes on
+ *   reassignment, the creator never does.
+ * - Queue order is the board's `seq`, not the store file order: `list()` is
+ *   sorted by id for a stable read while `pending()` is FIFO, and both
+ *   survive a restart because `seq` is persisted on the row.
  *
  * Lifecycle: `start()` opens fresh (clears the overlay; directory sessions
  * also remove a stale `store.jsonl` so the next open starts empty — same net
@@ -80,6 +87,11 @@ export interface DispatcherResumeResult {
   restored: boolean
   /** Number of tasks on the board after resume. */
   tasks: number
+  /**
+   * Number of `pending` rows after resume, i.e. the length of the restored
+   * queue. Same order as {@link DispatcherSession.pending}.
+   */
+  pending: number
   /** Where the board persists (undefined for memory-only sessions). */
   path?: string
 }
@@ -88,9 +100,9 @@ export interface DispatcherResumeResult {
  * Memory overlay for fields the board cannot store.
  *
  * WHY this exists: the dispatcher policy allows `create` with an `objective`
- * and `update-pending` with a new `title`/`objective`, but `TaskBoard` rows
- * (`TaskRecord`) have neither an objective column nor a title edit — and this
- * round must not change the store contract. So these patches live here, in
+ * and a new `creator`, and `update-pending` with a new `title`/`objective`, but
+ * `TaskBoard` rows (`TaskRecord`) have none of those columns — and this round
+ * must not change the store contract. So these patches live here, in
  * this process only, applied over every adapter read. Board truth always
  * wins on conflict; the overlay only fills the gaps the board cannot hold. A
  * restart keeps board truth and drops the overlay — that asymmetry is
@@ -101,6 +113,12 @@ interface SessionOverlay {
   objective?: string | undefined
   /** Title patch from update-pending (store has no title edit). */
   title?: string | undefined
+  /**
+   * Full subagent path of the agent that asked for the task (board has no
+   * column). Recorded so `resultRecipient` can route the result back to the
+   * creator instead of the current owner.
+   */
+  creator?: string | undefined
 }
 
 /**
@@ -166,6 +184,26 @@ export class DispatcherSession implements TaskReader {
         return task === undefined ? [] : [this.applyOverlay(task)]
       })
       .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+  }
+
+  /**
+   * The pending queue in arrival order.
+   *
+   * WHY this order and not `list()`'s: a queue is FIFO. The arrival number is
+   * on the board row (`TaskRecord.seq`), so a resumed session hands back the
+   * same order it left behind — which the store file order cannot, because
+   * rows are persisted sorted by id. Overlay fields apply here exactly as in
+   * `list()`.
+   */
+  pending(): DispatcherTask[] {
+    const board = this.board
+    if (board === undefined) return []
+    const read = boardReader(board)
+    return board.arrival().flatMap((record) => {
+      if (record.status !== 'pending') return []
+      const task = read.get(record.id)
+      return task === undefined ? [] : [this.applyOverlay(task)]
+    })
   }
 
   /**
@@ -240,7 +278,7 @@ export class DispatcherSession implements TaskReader {
         await rm(dir, { recursive: true, force: true })
       }
       this.active = true
-      return { restored: false, tasks: 0 }
+      return { restored: false, tasks: 0, pending: 0 }
     }
     let restored: boolean
     try {
@@ -259,7 +297,7 @@ export class DispatcherSession implements TaskReader {
     this.board = board
     this.overlays.clear()
     this.active = true
-    return { restored, tasks: board.size, path: this.boardDir }
+    return { restored, tasks: board.size, pending: this.pending().length, path: this.boardDir }
   }
 
   /**
@@ -339,6 +377,7 @@ export class DispatcherSession implements TaskReader {
     const next: DispatcherTask = { ...task }
     if (overlay.title !== undefined) next.title = overlay.title
     if (overlay.objective !== undefined) next.objective = overlay.objective
+    if (overlay.creator !== undefined) next.creator = overlay.creator
     return next
   }
 
@@ -356,8 +395,11 @@ export class DispatcherSession implements TaskReader {
       if (effect.task.owner !== undefined && effect.task.owner !== '') {
         await board.assign(effect.task.id, effect.task.owner)
       }
-      if (effect.task.objective !== undefined) {
-        this.overlays.set(effect.task.id, { objective: effect.task.objective })
+      if (effect.task.objective !== undefined || effect.task.creator !== undefined) {
+        const overlay: SessionOverlay = {}
+        if (effect.task.objective !== undefined) overlay.objective = effect.task.objective
+        if (effect.task.creator !== undefined) overlay.creator = effect.task.creator
+        this.overlays.set(effect.task.id, overlay)
       }
       return
     }

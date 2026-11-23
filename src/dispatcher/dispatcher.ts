@@ -30,12 +30,16 @@ import {
   DISPATCHER_OPS,
   decideIntent,
   decideRawIntent,
+  isAddressPath,
+  isFullSubagentPath,
+  resultRecipient,
   type DispatcherDecision,
   type DispatcherIntent,
   type DispatcherLifecycle,
   type DispatcherOp,
   type DispatcherRefusalCode,
   type DispatcherTask,
+  type DispatcherTaskPatch,
   type TaskReader,
 } from './policy.js'
 import { DispatcherSession, type DispatcherResumeResult } from './session.js'
@@ -49,9 +53,19 @@ export type {
   DispatcherRefusalCode,
   DispatcherResumeResult,
   DispatcherTask,
+  DispatcherTaskPatch,
   TaskReader,
 }
-export { DISPATCHER_OPS, decideIntent, decideRawIntent, DispatcherSession, boardReader }
+export {
+  DISPATCHER_OPS,
+  decideIntent,
+  decideRawIntent,
+  DispatcherSession,
+  boardReader,
+  isAddressPath,
+  isFullSubagentPath,
+  resultRecipient,
+}
 
 /**
  * Open a dispatcher session.
