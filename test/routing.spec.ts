@@ -95,10 +95,10 @@ describe('per-role routing configuration', () => {
   it('fixes the answer strategy at in-turn (T4: relay/append removed)', () => {
     // t24 measured that a one-shot headless app tears the tree down when the turn
     // closes, which loses a relayed/apped answer (G-18/F9). `in-turn` is the only
-    // behaviour now; the removed values are unknown keys (R-06).
+    // behaviour now; the removed values are removed keys (R-06).
     expect(FIXED_ANSWER_STRATEGY).toBe('in-turn')
-    expect(() => resolveConfig({ answerStrategy: 'relay' } as never)).toThrow(/unknown configuration key/)
-    expect(() => resolveConfig({ answerStrategy: 'append' } as never)).toThrow(/unknown configuration key/)
+    expect(() => resolveConfig({ answerStrategy: 'relay' } as never)).toThrow(/removed configuration key/)
+    expect(() => resolveConfig({ answerStrategy: 'append' } as never)).toThrow(/removed configuration key/)
   })
 
   it('derives the child cap from the effective chains, not from attempts alone', () => {

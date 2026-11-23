@@ -155,8 +155,8 @@ describe('configuration limits', () => {
 
   it('rejects values above the hard cap', () => {
     expect(() => resolveConfig({ maxConcurrency: HARD_LIMITS.maxConcurrency + 1 })).toThrow(/maxConcurrency/)
-    // T4: maxRetries is fixed at 1 and not configurable; a stored value is unknown (R-06).
-    expect(() => resolveConfig({ maxRetries: 2 } as never)).toThrow(/unknown configuration key "maxRetries"/)
+    // T4: maxRetries is fixed at 1 and not configurable; a stored value is removed (R-06).
+    expect(() => resolveConfig({ maxRetries: 2 } as never)).toThrow(/removed configuration key "maxRetries"/)
     expect(resolveConfig({} as never).maxRetries).toBe(FIXED_MAX_RETRIES)
     expect(() => resolveConfig({ maxTasks: HARD_LIMITS.maxTasks + 1 })).toThrow(/maxTasks/)
     expect(() => resolveConfig({ toolName: 'Bad Name' })).toThrow(/toolName/)

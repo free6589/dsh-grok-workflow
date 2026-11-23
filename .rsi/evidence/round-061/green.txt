@@ -1,0 +1,15 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/rsi-round-61
+
+ ✓ test/config-limits-repair.spec.ts (25 tests) 242ms
+ ✓ test/config.spec.ts (49 tests) 111ms
+ ✓ test/routing.spec.ts (25 tests) 159ms
+ ✓ test/wave4-acceptance.spec.ts (8 tests) 139ms
+ ✓ test/config-synthesis-fallback.spec.ts (8 tests) 13ms
+ ✓ test/input.spec.ts (13 tests) 11ms
+
+ Test Files  6 passed (6)
+      Tests  128 passed (128)
+   Start at  18:34:23
+   Duration  2.87s (transform 1.09s, setup 0ms, import 1.51s, tests 675ms, environment 1ms)
+
