@@ -1,3 +1,15 @@
+## 已发版 0.13.20 账本不可用标记 — 2026-11-23 (`CONFIRMED`)
+
+| state | command | result |
+| --- | --- | --- |
+| main `f228484`（发版提交） | `npm run ci` | **exit 0：85 files / 1638 tests PASS**；typecheck 干净；lint 0 errors；`verify:lib` byte-identical |
+| 同上 | 隔离 soak（`grok-soak-46`，真模型 caller 双任务） | **PASS**：`COMPLETED 2/2 verified`；unavailable 标记同构建直调验证；scratch 已删 |
+| remote main `f228484` | CI workflow `45125209602` | **success**（2m8s） |
+| remote tag `v0.13.20` | Release workflow `45125227599` | **success**（2m4s），GitHub Release `v0.13.20` 已发布（asset `dsh-grok-workflow-0.13.20.tgz`） |
+
+**Changed:** 脏路由下直接交付与转交两条路径账本标 unavailable（+1 回归，旧 round-39 断言同步更新）；发版同步 bundle 双常量。
+**Honest boundary:** 脏路由超限账本只在单测构造，真机验链路通；真机 GUI 手点 NOT_RUN。
+
 ## 已发版 0.13.19 账本收尾四修 + 手动清单遗留 — 2026-11-23 (`CONFIRMED`)
 
 | state | command | result |

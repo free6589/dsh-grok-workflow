@@ -1,3 +1,13 @@
+## 2026-11-23 — 已发版 `0.13.20`：账本不可用标记（`CONFIRMED`）
+
+- **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
+- **发了什么**：发版提交 `f228484` 已推，annotated tag `v0.13.20` 已推；远端 CI `45125209602`
+  success、Release `45125227599` success 并已发布（asset `dsh-grok-workflow-0.13.20.tgz`）。
+  本地 `npm run ci` exit 0：85 files / 1638 tests PASS；`verify:lib` byte-identical；真机 soak PASS。
+- **内容**：脏路由下直接交付与转交两条路径账本标 unavailable（旧 round-39 断言同步更新）。
+- **分支收尾**：`rsi/round-46` 可 24h 内删除；远端旧分支未动。
+- **未做**：报告面 resume 浅拷贝；并发面 4 条；配置面 3 条。真机 GUI 手点 NOT_RUN。
+
 ## 2026-11-23 — 已发版 `0.13.19`：账本收尾四修 + 手动清单遗留（`CONFIRMED`）
 
 - **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者

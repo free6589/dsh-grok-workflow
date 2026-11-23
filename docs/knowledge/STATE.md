@@ -1,3 +1,8 @@
+Last updated: 2026-11-23 14:35 +08:00（**已发版 `0.13.20`：账本不可用标记，`CONFIRMED`** —
+发版提交 `f228484` + tag `v0.13.20` 已推；远端 CI `45125209602` success、Release `45125227599`
+success 并已发布（asset `dsh-grok-workflow-0.13.20.tgz`）。本地门禁：`npm run ci` exit 0（85 文件 / 1638 测试
+PASS），真机 soak PASS，lint 0 errors，`verify:lib` byte-identical。）
+
 Last updated: 2026-11-23 14:05 +08:00（**已发版 `0.13.19`：账本收尾四修 + 手动清单遗留，`CONFIRMED`** —
 发版提交 `c85017f` + tag `v0.13.19` 已推；远端 CI `45121816157` success、Release `45121827995`
 success 并已发布（asset `dsh-grok-workflow-0.13.19.tgz`）。本地门禁：`npm run ci` exit 0（85 文件 / 1637 测试
