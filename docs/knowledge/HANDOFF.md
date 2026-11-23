@@ -1,3 +1,15 @@
+## 2026-11-23 — round-64 已合流 main 未发版：降级跑完全验自报（`CONFIRMED`，soak BLOCKED）
+
+- **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
+- **做了什么**：部分完成但全验过说"0 项没做成"，读着像全过了（11 个面扫完命中的唯一真 bug）。
+  全验专属尾巴点名降级；+1 降级回归 + 2/3 原句逐字 pin；`npm run ci` exit 0（87/1656）；
+  lead 独立红绿复验成立。
+- **真机**：BLOCKED（网关 502，未伪造）。本次不发版。
+- **合流**：`rsi/round-64`（`e0ca9ca`）已 `--no-ff` 合入 main 系 worktree（合流 `084ce76`）；
+  `rsi/round-64` 分支可 24h 内删除。`CHANGELOG [Unreleased]` 中英文已记 18 条待发。
+- **下轮**：开新找 bug 面。
+  网关恢复后给 round-47~64 补一次 soak 再发 `0.13.21`。
+
 ## 2026-11-23 — round-63 已合流 main 未发版：插件标记单一定位（`CONFIRMED`，soak BLOCKED）
 
 - **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者

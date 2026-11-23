@@ -1,3 +1,7 @@
+Last updated: 2026-11-23 19:15 +08:00（**round-64 已合流 main 未发版：降级跑完全验自报，`CONFIRMED`，soak BLOCKED** —
+合流提交 `084ce76`（main `171b95b` + `e0ca9ca`）；`npm run ci` exit 0（87 文件 / 1656 测试 PASS，+1 降级回归）。
+真机 BLOCKED（网关 502，未伪造）；`CHANGELOG [Unreleased]` 中英文已记 18 条待发，不发版。）
+
 Last updated: 2026-11-23 19:00 +08:00（**round-63 已合流 main 未发版：插件标记单一定位，`CONFIRMED`，soak BLOCKED** —
 合流提交 `895fb00`（main `7b410f0` + `d745573`）；`npm run ci` exit 0（87 文件 / 1655 测试 PASS，+1 常量钉死回归）。
 真机 BLOCKED（网关 502，未伪造）；`CHANGELOG [Unreleased]` 中英文已记 17 条待发，不发版。）

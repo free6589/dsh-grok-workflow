@@ -1,3 +1,15 @@
+## round-64 降级跑完全验自报（soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
+
+| state | command | result |
+| --- | --- | --- |
+| worktree rsi-round-64 `e0ca9ca`（main `171b95b` + 本轮 1 提交） | `npx vitest run test/delivery-human-block.spec.ts -t "degraded plan"`（旧码 stash，lead 独立） | **1 failed / 45 skipped**：新用例红（旧码"0 项没做成"无降级） |
+| 同上（新码） | `npx vitest run test/delivery-human-block.spec.ts`（lead 独立） | **46 passed** |
+| 同上（新码） | `npm run ci`（lead 独立） | **exit 0：87 files / 1656 tests PASS**；typecheck 干净；lint 0 errors；`verify:lib` byte-identical |
+| 隔离 soak | 网关探针 | **BLOCKED**：网关 502/401（无凭证），未伪造 |
+
+**Changed:** `src/delivery/index.ts`（partial 全验专属尾巴，total===0 edge 不动）+ `test/delivery-human-block.spec.ts`（+1 降级回归 + 2/3 原句逐字 pin）+ `lib/` 重建 + `CHANGELOG [Unreleased]` 中英双语 + `.rsi/evidence/round-064/`。
+**Honest boundary:** 真机 BLOCKED，不发版；`[Unreleased]` 已攒 18 条待发。
+
 ## round-63 插件标记单一定位（soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
 
 | state | command | result |
