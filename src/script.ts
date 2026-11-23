@@ -3587,6 +3587,9 @@ let synthesisSummary = '';
 // narrative). Only read when the caller asked for diagnostics; empty when no
 // narrative was built at all.
 let synthesisSource = '';
+// Sec.3-3: the summary gate's verdict, recorded so the report can state that the
+// summary was checked *and* independently verified (and how many drafts it took).
+let synthesisReview = '';
 // A layered run with humanSummary false builds nothing: machine-only output means
 // the report is the answer, so no narrative is composed and no synthesizer call
 // is spent. synthesis.mode stays "deterministic" because no polish was in play —
@@ -3636,6 +3639,7 @@ if (synthesisPolicy === 'layered' && humanSummary) {
     if (review.ok) {
       synthesisSummary = composed;
       synthesisSource = 'polish';
+      synthesisReview = 'check=pass verify=pass drafts=' + drafts;
       break;
     }
     if (drafts >= SUMMARY_MAX_ATTEMPTS) break;
@@ -3650,6 +3654,8 @@ if (synthesisPolicy === 'layered' && humanSummary) {
     draft = rewrite.text;
   }
   if (synthesisSummary === '' && review !== null) {
+    synthesisReview = 'check=' + (review.stage === 'check' ? 'fail' : 'pass') +
+      ' verify=' + (review.stage === 'verify' ? 'fail' : 'pass') + ' drafts=' + drafts;
     synthesisError = 'polish rejected by the summary gate after ' + drafts + ' draft(s) (' +
       review.stage + (review.stage === 'check' ? ' guardrail' : ' verification') + ': ' + review.reason +
       '); the deterministic summary is used';
@@ -3744,6 +3750,7 @@ if (showDiagnostics && synthesisSummary !== '' && synthesisSource !== '') {
 const synthesisReport = { mode: synthesisMode };
 if (synthesisSummary !== '') synthesisReport.summary = synthesisSummary;
 if (synthesisError !== '') synthesisReport.error = synthesisError;
+if (synthesisReview !== '') synthesisReport.review = synthesisReview;
 
 const report = {
   schemaVersion: 'grok-workflow/v1',

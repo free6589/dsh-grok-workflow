@@ -137,6 +137,23 @@ describe('workflow report semantic contract', () => {
     expect(assertWorkflowReport(report(), OBJECTIVE, config).status).toBe('completed')
   })
 
+  it('carries the summary gate’s verdict into the report (Sec.3-3)', () => {
+    // "汇总环节也要「检查 + 复核」": both gates already ran; the report now states
+    // that they did, so a checked summary is distinguishable from a single-shot one.
+    const withReview = { ...report(), synthesis: { mode: 'model', summary: 'ship it', review: 'check=pass verify=pass drafts=1' } }
+    const accepted = assertWorkflowReport(withReview, OBJECTIVE, config)
+    expect(accepted.synthesis.review).toBe('check=pass verify=pass drafts=1')
+    expect(renderReport(accepted)).toContain('Summary review: check=pass verify=pass drafts=1')
+    // A rejected draft keeps its reason and its stage verdict in one line.
+    const rejected = { ...report({ status: 'completed' }), synthesis: { mode: 'model', summary: 'ship it', review: 'check=fail verify=pass drafts=3' } }
+    expect(renderReport(assertWorkflowReport(rejected, OBJECTIVE, config)))
+      .toContain('Summary review: check=fail verify=pass drafts=3')
+    // A non-string is refused, like every other report field.
+    expect(() => assertWorkflowReport(
+      { ...report(), synthesis: { mode: 'model', review: 7 } } as never, OBJECTIVE, config,
+    )).toThrow(/synthesis.review/)
+  })
+
   it('rejects a verified task with no acceptance criteria', () => {
     expect(() => assertWorkflowReport(report({ tasks: [{ id: 'a', criteria: [] }] }), OBJECTIVE, config))
       .toThrow(/has no acceptance criteria/)
