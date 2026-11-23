@@ -1,0 +1,20 @@
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/carryover.spec.ts > carry-over: the digest is hard-capped > marks lines dropped inside a kept round instead of cutting them silently (round 62)
+AssertionError: expected null not to be null
+ ❯ test/carryover.spec.ts:255:24
+    253|     expect(digest.length).toBeLessThanOrEqual(300)
+    254|     const marker = digest.match(/\+(\d+) more/)
+    255|     expect(marker).not.toBeNull()
+       |                        ^
+    256|     const dropped = Number(marker![1])
+    257|     const shown = (digest.match(/  verified: /g) ?? []).length + (dige…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 21 passed (22)
+   Start at  18:48:43
+   Duration  669ms (transform 346ms, setup 0ms, import 407ms, tests 131ms, environment 0ms)
+

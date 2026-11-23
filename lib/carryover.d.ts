@@ -158,9 +158,11 @@ export declare function collectCarryoverRounds(session: Session | undefined, bou
  *
  * The budget is spent newest-round first and, inside a round, in the order
  * "objective/status → confirmed results → open questions → uncertainties →
- * answer → locators". When the budget runs out the renderer stops, keeps what it
- * already wrote and appends an explicit truncation marker naming how many rounds
- * were dropped — never a silent cut, and never an over-budget string.
+ * answer → locators". When the budget runs out the renderer stops and keeps what
+ * it already wrote: wholly dropped rounds are named by an explicit truncation
+ * marker, and lines dropped *inside* a kept round by a `+N more item(s) in this
+ * round` marker as that round's last line — never a silent cut, and never an
+ * over-budget string.
  *
  * @param rounds - compiled rounds, newest first.
  * @param bounds - character budget (clamped inside).

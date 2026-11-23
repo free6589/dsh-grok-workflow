@@ -1,0 +1,30 @@
+ ✓ test/settings-projection.spec.ts (4 tests) 103ms
+ ✓ test/dispatcher-board.spec.ts (4 tests) 20ms
+ ✓ test/dispatcher.spec.ts (11 tests) 19ms
+ ✓ test/docs-config-keys.spec.ts (13 tests) 16ms
+ ✓ test/board-reader.spec.ts (2 tests) 15ms
+ ✓ test/resume-validator.spec.ts (20 tests) 14ms
+ ✓ test/heartbeat-identity.spec.ts (16 tests) 13ms
+ ✓ test/panel-links.spec.ts (16 tests) 13ms
+ ✓ test/config-synthesis-fallback.spec.ts (8 tests) 13ms
+ ✓ test/progress-hint-absent.spec.ts (6 tests) 13ms
+ ✓ test/mode.spec.ts (18 tests) 12ms
+ ✓ test/docs-version.spec.ts (8 tests) 11ms
+ ✓ test/input.spec.ts (13 tests) 12ms
+ ✓ test/iterate.spec.ts (9 tests) 10ms
+ ✓ test/handoff.spec.ts (15 tests) 10ms
+ ✓ test/rsi-ledger.spec.ts (5 tests) 11ms
+ ✓ test/triage-followup.spec.ts (5 tests) 10ms
+ ✓ test/i18n-parity.spec.ts (6 tests) 8ms
+ ✓ test/criterion.spec.ts (5 tests) 8ms
+ ✓ test/intake.spec.ts (14 tests) 7ms
+ ✓ test/upstream.spec.ts (8 tests) 6ms
+ ✓ test/update-entry.spec.ts (5 tests) 6ms
+ ✓ test/iterate-template.spec.ts (7 tests) 5ms
+ ✓ test/docs-architecture-version.spec.ts (3 tests) 5ms
+
+ Test Files  87 passed (87)
+      Tests  1654 passed (1654)
+   Start at  18:49:11
+   Duration  99.99s (transform 2.52s, setup 0ms, import 7.09s, tests 82.77s, environment 9ms)
+
