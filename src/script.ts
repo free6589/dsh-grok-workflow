@@ -196,8 +196,64 @@ function afterDelay(ms, done) {
 // fails or stalls all reject with the same CHILD_TIMEOUT prefix — the task's
 // bounded retry with new wording continues either way, and the run deadline (rule
 // B) bounds every extension.
+// Budget a child call when the realm has no timer to arm (no canRaceCalls).
+// The clock still moves — the host owns the only wall clock the script can
+// read (nowMs() = Date.now()), so the fallback needs no setTimeout and
+// no Atomics: it watches the child's own settlement for the instant it goes
+// stale. A call that answers keeps flowing: its settlement runs first, the
+// stale flag trips only after, and the budget error fires only when the task
+// pool's own await chain comes back here — i.e. only when the call is still
+// open past its budget. The rejection uses the same CHILD_TIMEOUT prefix the
+// timed race produces, so callers classify it as the same timeout failure.
+function noTimerBudgetMs() {
+  const remaining = runDeadlineMs > 0 ? runStartedAtMs + runDeadlineMs - nowMs() : Infinity;
+  if (!(remaining > 0)) return 0;
+  const grant = Math.min(childTimeoutMs, remaining);
+  return grant >= 1000 ? grant : 0;
+}
+
+// Poll for progress on a child call without a timer: resolves true when the
+// call settles first (the value or error travels on the original promise —
+// this only reports the outcome), false when the budget is spent with the
+// call still open. Each step yields through the pool's own wakeups (one more
+// settled task's .then), never a bare sleep: with no timer in the realm a
+// new Promise(resolve => setTimeout(resolve, ms)) sleep would be a second
+// hang in the same place. A closed realm loop (nothing else pending) resolves
+// after Date.now() says the budget is gone, so a wedge can never pin the
+// wave past the budget — Q8 guardians may still grant slices above this.
+function watchNoTimer(promise, budgetMs) {
+  const deadline = nowMs() + budgetMs;
+  return new Promise(function (resolve) {
+    let settled = false;
+    const finish = function (won) { if (!settled) { settled = true; resolve(won); } };
+    promise.then(function () { finish(true); }, function () { finish(true); });
+    (function step() {
+      // A settled call already resolved above. Otherwise re-arm through the
+      // next microtask chain link: progress elsewhere (any settled sibling,
+      // route drain, wave advance) brings the next check; a quiet realm just
+      // spins microtasks until Date.now() crosses the deadline.
+      if (settled) return;
+      if (!(nowMs() < deadline)) { finish(false); return; }
+      Promise.resolve().then(step);
+    })();
+  });
+}
+
 function raceChildCall(promise, guard) {
-  if (!canRaceCalls) return promise;
+  if (!canRaceCalls) {
+    // No clock, no budget: without Date the fallback could never observe the
+    // deadline (a frozen nowMs() would spin forever), so the call stays bare
+    // rather than hanging the realm on a budget it cannot read.
+    if (!(nowMs() > 0)) return promise;
+    const fallbackMs = noTimerBudgetMs();
+    if (!(fallbackMs > 0)) return promise;
+    return new Promise(function (resolve, reject) {
+      promise.then(resolve, reject);
+      watchNoTimer(promise, fallbackMs).then(function (answered) {
+        if (!answered) reject(new Error('CHILD_TIMEOUT: ' + childTimeoutMs + ' ms'));
+      });
+    });
+  }
   return new Promise(function (resolve, reject) {
     let settled = false;
     let waits = 0;
