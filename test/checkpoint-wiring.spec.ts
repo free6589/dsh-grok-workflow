@@ -391,6 +391,28 @@ describe('unload checkpoints', () => {
     expect(decision.reason).toContain('no task rows')
   })
 
+  it('keeps the status a drained run settled with instead of stamping it cancelled', async () => {
+    const dir = witnessDir('witness-unload-settled')
+    const recorder = createCheckpointRecorder(options({ directory: dir }))
+    recorder.adopt({ id: 'run-13' })
+    // The unload now drains in-flight work first (`src/run.ts`), so a run can
+    // settle *while* the disposer is still waiting — which means its terminal
+    // `finish()` can overlap the unload write. The file must carry the run's own
+    // outcome: stamping `cancelled` over a report the user just watched finish
+    // would be a durable lie, and the next session would resume work that is done.
+    const finishing = recorder.finish({
+      report: reportOf('completed', [taskReport('task-1', 'verified')]),
+      stopReason: 'completed',
+    })
+    const unloading = recorder.unload('the plugin was unloaded while the run was in flight')
+    await Promise.allSettled([finishing, unloading])
+
+    const checkpoint = await readCheckpoint(checkpointFile('run-13', { dir }))
+    expect(checkpoint.run.status).toBe('completed')
+    expect(checkpoint.watchdog.cancelled).toBe(false)
+    expect(checkpoint.tasks.map(task => [task.id, task.status])).toEqual([['task-1', 'verified']])
+  })
+
   it('records a deadline that passed as a host fact', async () => {
     const dir = join(scratch, 'deadline')
     let now = 1_000_000

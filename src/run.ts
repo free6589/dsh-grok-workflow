@@ -17,13 +17,14 @@ import { namingLanguageFromSettings } from './naming.js'
 import type { NamingLanguage } from './naming.js'
 import {
   FIXED_MAX_ACTIVE_RUNS, FIXED_MAX_ACTIVE_RUNS_TOTAL, FIXED_RECORD_LIMIT, FIXED_RECORD_RUNS,
-  FIXED_SHOW_DIAGNOSTICS, FIXED_SHOW_PROGRESS, MAX_TIMER_DELAY_MS,
+  FIXED_SHOW_DIAGNOSTICS, FIXED_SHOW_PROGRESS, FIXED_UNLOAD_DRAIN_MS, FIXED_UNLOAD_DRAIN_QUIET_MS,
+  FIXED_UNLOAD_DRAIN_STEP_MS, MAX_TIMER_DELAY_MS,
 } from './config.js'
 import { buildWorkflowRequest } from './script.js'
 import { inheritanceForSession } from './carryover.js'
 import { teamWorkflowEngine } from './team-engine.js'
 import { createCheckpointRecorder, findResumableCheckpoint, unloadCheckpointRecorders, resumeCarryover } from './checkpoint/wiring.js'
-import { createRunGuardian, guardianChildBudgetMs, unloadRunGuardians } from './guardian.js'
+import { createRunGuardian, guardianChildBudgetMs, openRunGuardianChildren, unloadRunGuardians } from './guardian.js'
 import type { FileHeartbeat, GuardianSettlement, SessionHeartbeat } from './guardian.js'
 import { deliverReport } from './delivery/index.js'
 import type { DeliveryView } from './delivery/index.js'
@@ -37,7 +38,7 @@ import {
   recordDispose,
   recordRouting,
 } from './records.js'
-import type { DisposeRecord, DisposeRunInfo } from './records.js'
+import type { DisposeDrain, DisposeRecord, DisposeRunInfo } from './records.js'
 import { archiveRoundNow, createMemoryArchiver, memberFromEnd, memberFromStart, roundArchiveEvidence, roundArchiveSummary } from './memory/recorder.js'
 import { RELAY_SOURCE_KIND } from './answer.js'
 import { redactDeep, redactError, redactSecrets } from './redact.js'
@@ -218,6 +219,46 @@ export interface DisposalContext {
   logger?: WorkflowLogger
   /** Stack of the disposer call, used for attribution (t45, P0-1). */
   callSite?: string
+  /** Bounded drain performed before anything is cancelled. */
+  drain?: Partial<UnloadDrainPolicy>
+  /**
+   * How many child calls are still open. Defaults to the guardians registered
+   * for `state` (`openRunGuardianChildren`); a test seam, never a switch.
+   */
+  openChildren?: (state: ActiveState) => number
+  /** The wait between two probes. Defaults to a real, `unref`ed timer. */
+  sleep?: (ms: number) => Promise<void>
+}
+
+/**
+ * How long an unload lets work already in flight finish before it cancels.
+ *
+ * The disposer used to cancel every live run on its first line, so an in-process
+ * reload — a settings toggle, an upgrade — threw away a ten-minute child call
+ * that was about to report. Now the disposer first closes the door (no new run
+ * is admitted), then waits while any child call is still open, bounded by
+ * `maxMs`. A child that settles inside the window is settled for real: its
+ * result is in the session before the run is cut. Whatever is still open when
+ * the window closes is cancelled and named in the dispose record, so "the unload
+ * waited" and "the unload waited and killed it anyway" never look the same.
+ *
+ * `maxMs <= 0` disables the window (the old behaviour). A shutdown signal always
+ * skips it: `kill -9` cannot be saved, and a SIGTERM'd process gains nothing from
+ * holding its own exit open for a child the supervisor already killed.
+ */
+export interface UnloadDrainPolicy {
+  /** Hard ceiling on the window, in milliseconds. */
+  maxMs: number
+  /** How long with no open child before the drain believes it is done. */
+  quietMs: number
+  /** How often the open-child count is re-read. */
+  stepMs: number
+}
+
+/** The drain's outcome for one unload, as recorded and as logged. */
+interface DrainOutcome extends DisposeDrain {
+  /** False when the drain never engaged (nothing in flight, or skipped). */
+  engaged: boolean
 }
 
 /** Notice text for a session whose run was cut by an unload. */
@@ -230,12 +271,122 @@ function unloadNoticeText(record: DisposeRecord, interrupted: number): string {
     ? `Cause: the process is shutting down (${record.signals.join(', ')}), so this is not a deadline, not a manual stop and not a plugin setting.`
     : 'Cause: the plugin was unloaded inside a running process (a settings toggle, a reload or an upgrade);'
       + ' the host does not disclose which, and the disposal call path is recorded in this session for whoever asks.'
+  // A drain that engaged is part of what happened, so it is part of what the user
+  // is told: "we waited, and here is what still had to be cut" is a different
+  // situation from "we cut it immediately", and the difference is the only thing
+  // that explains why the unload took a few seconds.
+  const drained = record.drain === undefined
+    ? ''
+    : ` Before cancelling, it waited ${formatElapsed(record.drain.waitedMs)} for ${record.drain.openAtStart} `
+      + `subagent call(s) in flight (${record.drain.openAtEnd} were still open when the window closed`
+      + (record.drain.runsSettled === 0 ? '' : `, and ${record.drain.runsSettled} run(s) finished inside it`)
+      + ').'
   return [
     `[grok-workflow] The plugin was unloaded while this session had ${runs} in flight, so that work was cancelled.`,
     cause,
+    drained,
     'This notice is written once, at unload time. Messages sent until the plugin is enabled again are answered',
     'directly and are no longer forced through the mandatory workflow.',
-  ].join(' ')
+  ].filter(line => line !== '').join(' ')
+}
+
+/** Timer the drain sleeps on, unless a test injects its own. `unref`ed: a window must not hold a process open. */
+function defaultDrainSleep(ms: number): Promise<void> {
+  return new Promise(resolve => {
+    const timer = setTimeout(resolve, ms)
+    timer.unref?.()
+  })
+}
+
+/** One duration from the drain policy, floored and never `NaN`. */
+function drainMs(value: number | undefined, fallback: number, min: number): number {
+  const parsed = typeof value === 'number' && Number.isFinite(value) ? Math.trunc(value) : fallback
+  return Math.max(min, parsed)
+}
+
+/** Resolve the policy an unload actually runs with: every field bounded, nothing unbounded. */
+function drainPolicyOf(overrides: Partial<UnloadDrainPolicy> | undefined): UnloadDrainPolicy {
+  return {
+    maxMs: drainMs(overrides?.maxMs, FIXED_UNLOAD_DRAIN_MS, 0),
+    quietMs: drainMs(overrides?.quietMs, FIXED_UNLOAD_DRAIN_QUIET_MS, 0),
+    stepMs: drainMs(overrides?.stepMs, FIXED_UNLOAD_DRAIN_STEP_MS, 25),
+  }
+}
+
+/**
+ * Wait, bounded, for the child calls already in flight to settle.
+ *
+ * The loop is counted in steps rather than measured against a wall clock, so the
+ * ceiling holds even when a caller-supplied sleep returns early: `maxMs / stepMs`
+ * is the hard iteration bound. It stops on whichever comes first —
+ *
+ * - **Quiet.** No open child for `quietMs`. The quiet window exists because one
+ *   `agent-end` is not the end of a run: the engine starts the next child a
+ *   moment later, so a drain that returned the instant the count hit zero would
+ *   cancel a run in the gap between the planner and its workers.
+ * - **Ceiling.** `maxMs` elapsed. `deadlineHit` is then true and the work still
+ *   open is what the unload cancels.
+ * - **Nothing left to save.** No run is live any more, so the window closes
+ *   early instead of waiting out the quiet period for a plugin with nothing in it.
+ *
+ * A throwing probe or sleep ends the window instead of escaping the disposer.
+ */
+async function drainInFlightChildren(
+  state: ActiveState,
+  runsAtStart: number,
+  policy: UnloadDrainPolicy,
+  probe: (state: ActiveState) => number,
+  sleep: (ms: number) => Promise<void>,
+  logger: WorkflowLogger,
+): Promise<DrainOutcome> {
+  const idle: DrainOutcome = { engaged: false, waitedMs: 0, openAtStart: 0, openAtEnd: 0, runsSettled: 0, deadlineHit: false }
+  if (policy.maxMs <= 0) return idle
+  let openAtStart = 0
+  try {
+    openAtStart = probe(state)
+  } catch {
+    return idle
+  }
+  if (openAtStart <= 0) return idle
+
+  const startedAt = Date.now()
+  const maxSteps = Math.max(1, Math.ceil(policy.maxMs / policy.stepMs))
+  const quietSteps = Math.max(1, Math.ceil(policy.quietMs / policy.stepMs))
+  logger.info?.(
+    `dsh-grok-workflow: unloading with ${openAtStart} subagent call(s) in flight; ` +
+    `waiting up to ${formatElapsed(policy.maxMs)} for them to settle before cancelling`,
+  )
+  let open = openAtStart
+  let quiet = 0
+  let steps = 0
+  while (steps < maxSteps) {
+    try {
+      await sleep(policy.stepMs)
+    } catch {
+      break
+    }
+    steps += 1
+    try {
+      open = probe(state)
+    } catch {
+      break
+    }
+    if (open > 0) {
+      quiet = 0
+      continue
+    }
+    if (state.runs.size === 0) break
+    quiet += 1
+    if (quiet >= quietSteps) break
+  }
+  return {
+    engaged: true,
+    waitedMs: Math.max(0, Date.now() - startedAt),
+    openAtStart,
+    openAtEnd: open,
+    runsSettled: Math.max(0, runsAtStart - state.runs.size),
+    deadlineHit: open > 0,
+  }
 }
 
 /**
@@ -254,6 +405,12 @@ function unloadNoticeText(record: DisposeRecord, interrupted: number): string {
  *    direct answer is the expected behaviour there and a per-message banner
  *    would be noise.
  *
+ * 3. **Give in-flight work a bounded window first.** The disposer used to cancel
+ *    on its first line, which is what threw away a long child call on an
+ *    in-process reload. Now nothing is cancelled until the children already
+ *    running have settled or the window closes (see {@link UnloadDrainPolicy}),
+ *    and the record says which of the two happened.
+ *
  * Every write is contained: this runs inside a disposer, where the session
  * service may already be gone, and a refused record must never stop the
  * cancellation that follows it.
@@ -268,9 +425,12 @@ export async function disposeActiveState(
   state.unloadedAt = now
 
   const runs = [...state.runs]
-  const infos = runs
-    .map(run => state.active.get(run))
-    .filter((info): info is ActiveRunInfo => info !== undefined)
+  // The pairing is kept because the drain can settle a run mid-disposal: after it,
+  // liveness is a question about the *run*, not about the info snapshot taken here.
+  const entries = runs
+    .map(run => ({ run, info: state.active.get(run) }))
+    .filter((entry): entry is { run: WorkflowRun, info: ActiveRunInfo } => entry.info !== undefined)
+  const infos = entries.map(entry => entry.info)
   const record: DisposeRecord = {
     v: 1,
     at: new Date(now).toISOString(),
@@ -294,14 +454,49 @@ export async function disposeActiveState(
     notices: 0,
   }
 
+  // Bounded drain, before anything is written and before anything is aborted.
+  //
+  // Order matters twice over. It has to precede the abort or there is nothing
+  // left to save, and it has to precede the notice because the notice's whole
+  // claim is "this work was cut" — a run that finished inside the window was not
+  // cut, and naming it as interrupted would be a lie the next reader cannot
+  // check. A shutdown signal skips the window: the process is leaving, so the
+  // only thing a wait could do is delay the exit.
+  const drain = record.signals.length > 0
+    ? { engaged: false, waitedMs: 0, openAtStart: 0, openAtEnd: 0, runsSettled: 0, deadlineHit: false }
+    : await drainInFlightChildren(
+        state,
+        runs.length,
+        drainPolicyOf(context.drain),
+        context.openChildren ?? openRunGuardianChildren,
+        context.sleep ?? defaultDrainSleep,
+        logger,
+      )
+  if (drain.engaged) {
+    record.drain = {
+      waitedMs: drain.waitedMs,
+      openAtStart: drain.openAtStart,
+      openAtEnd: drain.openAtEnd,
+      runsSettled: drain.runsSettled,
+      deadlineHit: drain.deadlineHit,
+    }
+  }
+
+  // What is still live once the window closed. Only these runs are cancelled, and
+  // only their sessions are told that work was interrupted.
+  const remaining = [...state.runs]
+  const liveRuns = new Set(remaining)
+
   // One record and at most one notice per affected session, written *before* the
   // abort: afterwards every session is racing its own turn teardown.
   const bySession = new Map<string, { session?: Session; interrupted: number }>()
-  for (const info of infos) {
-    const entry = bySession.get(info.sessionId)
-      ?? { ...info.session === undefined ? {} : { session: info.session }, interrupted: 0 }
-    entry.interrupted += 1
-    bySession.set(info.sessionId, entry)
+  for (const entry of entries) {
+    const bucket = bySession.get(entry.info.sessionId)
+      ?? { ...entry.info.session === undefined ? {} : { session: entry.info.session }, interrupted: 0 }
+    // A drained run still gets its session a record — the unload happened and the
+    // record says what it did — but it counts nothing as interrupted.
+    if (liveRuns.has(entry.run)) bucket.interrupted += 1
+    bySession.set(entry.info.sessionId, bucket)
   }
   if (bySession.size === 0) {
     // Idle unload: nothing was damaged, so nothing is written into any session.
@@ -311,10 +506,17 @@ export async function disposeActiveState(
       `dsh-grok-workflow: disposed with no active run (trigger=${record.trigger}, uptime=${formatElapsed(record.uptimeMs)})`,
     )
   } else {
+    const interrupted = remaining.length
     logger.warn(
       `dsh-grok-workflow: disposing with ${record.activeRuns} active and ${record.pending} starting run(s) ` +
-      `(trigger=${record.trigger}, uptime=${formatElapsed(record.uptimeMs)}, sessions=${bySession.size}); ` +
-      'the runs are cancelled and each affected session receives one interruption notice',
+      `(trigger=${record.trigger}, uptime=${formatElapsed(record.uptimeMs)}, sessions=${bySession.size})` +
+      (drain.engaged
+        ? `; waited ${formatElapsed(drain.waitedMs)} for ${drain.openAtStart} in-flight subagent call(s) `
+          + `(${drain.openAtEnd} still open, ${drain.runsSettled} run(s) settled inside the window)`
+        : '') +
+      (interrupted === 0
+        ? '; nothing is left to cancel'
+        : '; the remaining runs are cancelled and each affected session receives one interruption notice'),
     )
     let notices = 0
     for (const [sessionId, entry] of bySession) {
@@ -322,6 +524,12 @@ export async function disposeActiveState(
         ...record,
         runs: record.runs.filter(run => run.sessionId === sessionId),
         notices: 0,
+      }
+      if (entry.interrupted === 0) {
+        // Every run this session had settled inside the window: no damage, so no
+        // banner, but the unload itself is still recorded on the session.
+        recordDispose(entry.session, scoped, logger)
+        continue
       }
       const wrote = appendUnloadNotice(entry.session, unloadNoticeText(scoped, entry.interrupted), logger)
       if (wrote) notices += 1
@@ -348,7 +556,7 @@ export async function disposeActiveState(
   state.runs.clear()
   state.active.clear()
   state.starting.clear()
-  await Promise.allSettled(runs.map(async run => {
+  await Promise.allSettled(remaining.map(async run => {
     try {
       run.cancel('grok-workflow plugin unloaded')
     } catch (error) {

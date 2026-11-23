@@ -924,14 +924,30 @@ export function createCheckpointRecorder(options: CheckpointRecorderOptions): Ru
 
   /* ------------------------------------------------------------ writes -- */
 
-  const statusNow = (at: number): CheckpointStatus => {
-    if (wiring.unloadedReason !== undefined) return 'cancelled'
+  /**
+   * The status the run itself already reached, or `undefined` while it is open.
+   *
+   * Checked before the unload marker on purpose. Since the disposer drains
+   * in-flight work before it cancels (`src/run.ts`), a run can reach its
+   * settlement while the unload is still waiting — and a checkpoint that stamped
+   * `cancelled` over that report would describe work as lost that the user just
+   * watched finish. An unload only decides the status of a run that had not
+   * settled yet.
+   */
+  const settledStatus = (): CheckpointStatus | undefined => {
     if (wiring.report !== undefined) return reportStatus(wiring.report.status)
     if (wiring.stopReason === 'cancelled') return 'cancelled'
     // A settled stop with no validated report is not a success: the engine may
     // have returned a value this plugin refused (`report-invalid`), and a file
     // that read "completed" there would contradict the report the user saw.
     if (wiring.stopReason !== undefined) return 'failed'
+    return undefined
+  }
+
+  const statusNow = (at: number): CheckpointStatus => {
+    const settled = settledStatus()
+    if (settled !== undefined) return settled
+    if (wiring.unloadedReason !== undefined) return 'cancelled'
     const deadline = deadlineAtMs()
     // A run past its own deadline without a settled report is a failure by the
     // caller's own bound, not a "running" run: the deadline is a host fact.
@@ -942,12 +958,18 @@ export function createCheckpointRecorder(options: CheckpointRecorderOptions): Ru
   const watchdogNow = (at: number): CheckpointWatchdog => {
     const deadline = deadlineAtMs()
     const deadlineHit = wiring.deadlineReason !== undefined || (deadline !== undefined && at >= deadline)
-    const cancelReason = wiring.unloadedReason !== undefined
+    // A run that settled inside the unload window was not cancelled by it, so the
+    // unload reason is not attached to it either.
+    const settled = settledStatus()
+    const unloadedUnsettled = wiring.unloadedReason !== undefined && settled === undefined
+    const cancelReason = unloadedUnsettled
       ? wiring.unloadedReason
-      : wiring.cancelReason ?? wiring.deadlineReason
+      : settled === undefined
+        ? wiring.cancelReason ?? wiring.deadlineReason
+        : settled === 'cancelled' ? wiring.cancelReason ?? wiring.unloadedReason ?? wiring.deadlineReason : undefined
     return {
       deadlineHit,
-      cancelled: wiring.unloadedReason !== undefined || wiring.cancelReason !== undefined || wiring.stopReason === 'cancelled',
+      cancelled: unloadedUnsettled || wiring.cancelReason !== undefined || settled === 'cancelled',
       ...recordableTimeoutMs === undefined ? {} : { deadlineMs: recordableTimeoutMs },
       ...cancelReason === undefined ? {} : { cancelReason },
     }

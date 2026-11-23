@@ -346,6 +346,21 @@ export const FIXED_SHOW_PROGRESS = true
 export const FIXED_SWITCH_ON: Array<'rate-limit' | 'server-error' | 'connection' | 'timeout' | 'model-unavailable' | 'format-error' | 'agent-start-failed'> = []
 /** Gate is always on; `gate.ts` no longer consults any preset/required switch. */
 export const FIXED_GATE_ON = true
+/**
+ * Bounded grace window an unload gives the child calls already in flight.
+ *
+ * An in-process reload used to cancel every live run the moment the disposer
+ * ran, which threw away a ten-minute child call 200 ms before it would have
+ * reported. The window is a ceiling, not a promise: a child that settles inside
+ * it settles, and whatever is still running when it closes is cancelled and
+ * named in the record. Nothing survives `kill -9`, so a shutdown signal skips
+ * the window entirely rather than holding the process open.
+ */
+export const FIXED_UNLOAD_DRAIN_MS = 45_000
+/** How long the drain must see no open child before it trusts "nothing is left". */
+export const FIXED_UNLOAD_DRAIN_QUIET_MS = 1_500
+/** How often the drain re-reads the open-child count. */
+export const FIXED_UNLOAD_DRAIN_STEP_MS = 250
 
 /** Default concurrent workflow runs per session (t45, P1-3). Kept as a fixed internal value (T4). */
 export const DEFAULT_MAX_ACTIVE_RUNS = 2

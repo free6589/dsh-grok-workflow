@@ -137,6 +137,37 @@ export interface DisposeRecord {
   notices: number
   /** Shutdown signals received before disposal; empty for an in-process unload. */
   signals: string[]
+  /**
+   * What the bounded drain did before anything was cancelled.
+   *
+   * Omitted when no child call was open at disposal, when a shutdown signal
+   * skipped the window, and when the window was configured away — "absent" means
+   * nothing was in flight to save, which is the honest answer for an idle
+   * unload. A reader who needs to know whether the grace window helped looks
+   * here: `runsSettled > 0` is work the unload did not throw away.
+   */
+  drain?: DisposeDrain
+}
+
+/**
+ * The bounded grace window an unload gives child calls already in flight.
+ *
+ * Recorded because the difference between "the unload waited and the child
+ * finished" and "the unload waited and the child was killed anyway" is the
+ * whole point of the window, and neither is visible afterwards from the runs
+ * alone.
+ */
+export interface DisposeDrain {
+  /** How long the window stayed open (real elapsed time, bounded by the policy). */
+  waitedMs: number
+  /** Child calls that had started and not ended when the disposer ran. */
+  openAtStart: number
+  /** Child calls still open when the window closed; those were cancelled. */
+  openAtEnd: number
+  /** Runs live at the start that settled inside the window, so nothing was cut. */
+  runsSettled: number
+  /** True when the window ran out with work still in flight. */
+  deadlineHit: boolean
 }
 
 /**

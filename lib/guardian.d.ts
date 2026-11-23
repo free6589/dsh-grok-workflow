@@ -271,6 +271,18 @@ export declare function unregisterRunGuardian(state: object, guardian: RunGuardi
 /** How many guardians are currently registered for an instance (tests/diagnostics). */
 export declare function registeredRunGuardians(state: object): number;
 /**
+ * Child calls that have started and not yet settled, across one instance.
+ *
+ * This is the host-side definition of "work still in flight", and it is the
+ * number an unload drains before it cancels anything: `agent-start` opens a row
+ * and `agent-end` closes it, so a non-zero sum means at least one subagent is
+ * mid-call. Guardians leave the registry when their run settles or is disposed,
+ * so a finished run contributes nothing without a special case.
+ *
+ * Never throws: a guardian that is mid-release counts zero.
+ */
+export declare function openRunGuardianChildren(state: object): number;
+/**
  * Dispose every live guardian for this plugin instance.
  *
  * Called from `disposeActiveState` alongside the run cancellation, so no
