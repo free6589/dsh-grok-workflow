@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.20] - 2026-11-23
+
 ### Fixed / 修复
 
 - **A ledger that cannot render says so instead of vanishing / 账本画不出时会直说，不再悄悄消失** —
