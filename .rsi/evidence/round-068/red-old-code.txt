@@ -1,0 +1,5 @@
+--- 旧码（src/checkpoint/wiring.ts 回到 HEAD，只留新用例）---
+cmd: npx vitest run test/checkpoint-wiring.spec.ts
+     × writes task and agent rows from the engine events when no report exists 18ms
+     × keeps a row for a call whose start predates the recorder 2ms
+      Tests  2 failed | 41 passed (43)
