@@ -1,0 +1,10 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/rsi-round-44
+
+ ✓ test/report.spec.ts (45 tests) 25ms
+
+ Test Files  1 passed (1)
+      Tests  45 passed (45)
+   Start at  12:56:40
+   Duration  522ms (transform 315ms, setup 0ms, import 374ms, tests 25ms, environment 0ms)
+
