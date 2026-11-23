@@ -1,3 +1,15 @@
+## 2026-11-23 — round-55 已合流 main 未发版：任务板存在检查（`CONFIRMED`，soak BLOCKED）
+
+- **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
+- **做了什么**：dispatcher↔taskboard 对接第 1 步。对接注释撒谎（板子无 `has`，`get` 抛错非空读）。
+  板子补不抛错的 `has`；注释改诚实（还差抛错转空读适配器，下轮做）；+1 存在检查回归；
+  `npm run ci` exit 0（85/1646）；lead 独立红绿复验成立。
+- **真机**：BLOCKED（网关 502，未伪造）。本次不发版。
+- **合流**：`rsi/round-55`（`0335cd0`）已 `--no-ff` 合入 main 系 worktree（合流 `af75f9b`）；
+  `rsi/round-55` 分支可 24h 内删除。`CHANGELOG [Unreleased]` 中英文已记 9 条待发。
+- **下轮**：抛错转空读小适配器 + 状态枚举对齐评估（`running` vs `in_progress`、`failed` 缺席）。
+  网关恢复后给 round-47~55 补一次 soak 再发 `0.13.21`。
+
 ## 2026-11-23 — round-54 已合流 main 未发版：缺钩子加载即报错，三面 15 条收官（`CONFIRMED`，soak BLOCKED）
 
 - **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者

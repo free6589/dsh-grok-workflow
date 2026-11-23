@@ -1,3 +1,15 @@
+## round-55 任务板存在检查 + 诚实对接注释（soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
+
+| state | command | result |
+| --- | --- | --- |
+| worktree rsi-round-55 `0335cd0`（main `8a9f138` + 本轮 1 提交） | `npx vitest run test/taskboard.spec.ts -t "agrees with get"`（旧码 stash） | **1 failed / 13 skipped**：新用例红（`has is not a function`） |
+| 同上（新码） | `npx vitest run test/taskboard.spec.ts`（lead 独立） | **14 passed** |
+| 同上（新码） | `npm run ci`（lead 独立） | **exit 0：85 files / 1646 tests PASS**；typecheck 干净；lint 0 errors；`verify:lib` byte-identical |
+| 隔离 soak | 网关探针 | **BLOCKED**：网关 502 无额度，未伪造 |
+
+**Changed:** `src/taskboard/store.ts`（+`has` 不抛错）+ `src/dispatcher/session.ts`（对接注释改诚实：还差抛错转空读适配器，下轮做）+ `test/taskboard.spec.ts`（+1 存在检查回归）+ `lib/` 重建 + `CHANGELOG [Unreleased]` 中英双语 + `.rsi/evidence/round-055/`。
+**Honest boundary:** 真机 BLOCKED，不发版；`[Unreleased]` 已攒 9 条待发。对接只走了一半（`has` 有了，适配器下轮）。
+
 ## round-54 缺钩子加载即报错（三面 15 条收官，soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
 
 | state | command | result |
