@@ -5602,3 +5602,32 @@ toolName/configVersion = 页面 16）；`test/client.spec.ts` ProgressBundle 补
   `.rsi/evidence/rsi-seq-12/REPORT.md` 的分歧日志。
 - **既有未提交工作未被本轮触碰**：主检出仍在 detached `a6103ad`，其 37 个已改文件与 `.rsi/evidence/**` 等等价保留；
   本轮所有提交都在工作树里、都在 `main` 上。
+
+## 2026-11-23 · 手工清单 12 项（第 2 轮）：逐项 ci 与证据
+
+命令一律为 `npm run ci`（= `typecheck && lint && verify:lib && (build && vitest run)`），在工作树
+`.agents/worktrees/fix-synth-resubmit` 内执行，未触碰运行中实例。日志在 `.rsi/evidence/rsi-seq-12/logs/`。
+
+| 跑次 | 分支 / 树 | 结果 | 日志 |
+|---|---|---|---|
+| 基线 | `main`（12 项开工前） | 85 文件 / 1623 测试 PASS，EXIT=0 | `ci-r2-baseline-main.log` |
+| Sec.2-1 | `rsi/sec2-01-timeout-default` | 85 / 1626，EXIT=0 | `ci-r2-sec2-01-timeout-default.log` |
+| Sec.2-2 | `rsi/sec2-02-replan-default` | 85 / 1626，EXIT=0（首次红：`grok-on-ingress` 队列饱和用例按旧默认构造，已按 replan:false 钉住） | `ci-r2-sec2-02-replan-default.log` |
+| Sec.2-3 | `rsi/sec2-03-mode-allow` | 85 / 1626，EXIT=0 | `ci-r2-sec2-03-mode-allow.log` |
+| Sec.2-4 | `rsi/sec2-04-upgrade-verdict` | 85 / 1627，EXIT=0 | `ci-r2-sec2-04-upgrade-verdict.log` |
+| Sec.2-5 | `rsi/sec2-05-answer-cell-doc` | 85 / 1628，EXIT=0（首次红：`test/timeout.spec.ts` 的 `Atomics.waitAsync` 30 s 超时，单独重跑即过，属已知并发抖动） | `ci-r2-sec2-05-answer-cell-doc.log` |
+| Sec.2-6 | `rsi/sec2-06-resume-carryover` | 85 / 1631，EXIT=0 | `ci-r2-sec2-06-resume-carryover.log` |
+| Sec.2-7 | `rsi/sec2-07-host-evidence` | 85 / 1631，EXIT=0（文档项） | `ci-r2-sec2-07-host-evidence.log` |
+| Sec.3-1 | `rsi/sec3-01-rail-doc` | 85 / 1631，EXIT=0（文档项） | `ci-r2-sec3-01-rail-doc.log` |
+| Sec.3-2 | `rsi/sec3-02-switch-on-rate-limit` | 85 / 1632，EXIT=0（首次红：类型缺字段；二次红：`reliability` 仍断言 16 字段） | `ci-r2-sec3-02-switch-on-rate-limit.log` |
+| Sec.3-3 | `rsi/sec3-03-summary-review` | 85 / 1633，EXIT=0 | `ci-r2-sec3-03-summary-review.log` |
+| Sec.3-4 | `rsi/sec3-04-answer-parity` | 85 / 1633，EXIT=0（文档项） | `ci-r2-sec3-04-answer-parity.log` |
+| Sec.3-5 | `rsi/sec3-05-image-scope` | 85 / 1633，EXIT=0（文档项） | `ci-r2-sec3-05-image-scope.log` |
+
+- **红跑都就地修完再合**：没有把红跑留在 `main` 上；每处修法写在对应提交信息里。
+- **`verify:lib`** 在每次 ci 里都执行，因此每条分支提交的 `lib/` 都是同一次 `src/` 的构建。
+- **真实机器行为 `NOT_RUN`**：设置页勾选框、升级卡、进度页单轨的肉眼效果按 `AGENTS.md` §5 未在运行中实例上点验；
+  单元/脚本级用例与 ci 是本轮的全部证据面。
+- **证据文件**：`docs/knowledge/evidence/answer-parity-2026-11-23.md`（Sec.3-4）、
+  `docs/knowledge/evidence/image-task-scope-2026-11-23.md`（Sec.3-5）、
+  `.rsi/evidence/rsi-seq-12/ROUND2.md`（12 项逐条 + 分支台账 + 分歧日志）。

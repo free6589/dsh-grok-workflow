@@ -1480,3 +1480,15 @@ round 33 那次把 1.23 ms 抬到 7.86 ms 的代价没有被再放大：新增�
   一条公共弯道（`PROGRESS_WIRE_LANE_GAP`）与一条公共竖槽（`PROGRESS_WIRE_CHANNEL_X`），竖线只画一次
   （`kind: 'rail'`）；原来每环节各一条弯道/竖槽的常量
   （`PROGRESS_WIRE_CHANNEL_STEP` / `PROGRESS_WIRE_CHANNEL_INNER` / `PROGRESS_WIRE_LANE_STEP`）随之删除。
+
+## 2026-11-23 · 本轮读源码得到的三条事实（`CONFIRMED`）
+
+1. **405 允许方法头**：`src/mode-surface.ts` 的 `MODE_ROUTE_METHODS = ['GET','POST']` 同时驱动方法闸门与
+   405 响应的 `Allow` 头；被拒方法先 `logger.warn`（方法 + URL）再抛 `mode/method`，状态码由
+   `statusForModeCode` 映射，仍是 405。RFC 9110 要求 405 带 `Allow`，此前缺这一条。
+2. **换人策略的入参**：脚本侧的 `switchOn` 数组为空时表示"内置策略（七类全换）"，非空时表示"只有这些类别换"。
+   `switchOnRateLimit=false` 时宿主传 `FIXED_SWITCH_ON_WITHOUT_RATE_LIMIT`（六类），
+   于是 429 不再推进链（`test/config.spec.ts` 有脚本级用例：同一任务两次尝试都落在 `w1`）。
+3. **汇总门的判定**：`src/script.ts` 的 `reviewSummaryDraft` = `checkSummaryDraft` + `verifySummaryDraft`，
+   纯确定性；成功时写 `synthesis.review = 'check=pass verify=pass drafts=N'`，失败时按阶段写
+   `check=fail/verify=fail` 并照旧让确定性叙述接管；`src/report.ts` 归一化该字段并渲染 `Summary review:` 行。

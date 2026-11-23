@@ -2091,3 +2091,19 @@ Sec.2-3 405 路由（merge `5dc0512`，分支 `rsi/sec2-03-mode-get`）、Sec.3-
 **跳过 6 项并记账**：Sec.2-7 宿主证据收集（源文件自己要求"先确认这一阶段还要不要做"，是拍板项而非实现项，
 见 D-111）；Sec.3-2/3/4/5 四项源文件都写明"是否成立要重新确认 / 要你再验一次 / 你定"（见 D-111 与分歧日志）。
 两条 `rsi/*` 分支已合入 `main`，未 push（本地 `main` 领先 `origin/main` 2 个 merge 提交）。）
+
+Last updated: 2026-11-23 10:2x +08:00（**手工清单 12 项顺序执行（第 2 轮）/ RSI 顺序跑批，`CONFIRMED`** —
+源文件 `manual-sessions-unfinished.md`（工作区根，未纳入版本库）。本轮与第 1 轮不同的是**每一项都有自己的分支**：
+十二项各自从合完的 `main` 尖端开分支、跑 `npm run ci` exit 0、再合回 `main`，逐项日志在
+`.rsi/evidence/rsi-seq-12/logs/ci-r2-*.log`。
+**本轮新实现**：Sec.2-2 replan 默认打开（`f996cc8`，合 `28c0dd2`）；Sec.2-3 405 补 `Allow: GET, POST`
+（`be6abed`，合 `994f71e`）；Sec.2-4 升级卡直接给"要不要升级"的结论（`81f6c5a`，合 `1d5ef41`）；
+Sec.3-2 `switchOnRateLimit` 429 勾选框（`7305f17`，合 `cd88e4b`）；Sec.3-3 汇总门判定进报告
+`synthesis.review` + `Summary review:` 行（`b225446`，合 `504bcf3`）。
+**代码已在、本轮补钉子**：Sec.2-1 宿主工具死线 + 双 README 默认值（`22ab037`，合 `a3f57c5`）；
+Sec.2-5 设计文档六段脊椎 + 守卫（`ae72f7d`，合 `8531ac1`）；Sec.2-6 `resumeCarryover` 抽取+用例
+（`2cfe4be`，合 `c7df2ce`）；Sec.3-1 单轨连线文档（`0f9f2e3`，合 `96ad5f2`）。
+**记账**：Sec.2-7 `BLOCKED`（D-112，第一刀设计已写）；Sec.3-4 证据+操作规程（判定 `NOT_RUN`，只有人能判，
+`d947a92`，合 `23820e2`）；Sec.3-5 范围结论（不在本仓库，`943bb86`，合 `a68a372`）。
+**ci 计数**：baseline 1623 → 本轮末 1633（12 次逐项绿 + 末次合并树绿）。未发版、未打 tag、未 push。
+分支 12 条保留供复核，判定删除日期 2026-11-24。分歧 9 条见 `.rsi/evidence/rsi-seq-12/ROUND2.md` §5。）
