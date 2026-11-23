@@ -1,3 +1,16 @@
+## round-44 截断行加 +N more 标记 — 2026-11-23 (`CONFIRMED`，未发版)
+
+| state | command | result |
+| --- | --- | --- |
+| worktree rsi-round-44 `70dec37`（main `598afb6` + 本轮 1 提交） | `npx vitest run test/report.spec.ts`（旧码 stash） | **1 failed / 44 passed**：新用例红（旧码无标记行） |
+| 同上（新码） | `npx vitest run test/report.spec.ts test/delivery.spec.ts` | **64 passed**（45 + 19） |
+| 同上（新码） | `npm run ci` | **exit 0：85 files / 1636 tests PASS**；typecheck 干净；lint 0 errors（30 warnings 既有）；`verify:lib` byte-identical（217 文件） |
+| 同上 | lead 独立红绿复验（stash→旧码红→pop→新码绿→全量门禁） | **复现成立**；`lib/report.js`、`lib/delivery/index.js` 为同改动编译产物；证据目录无真密钥 |
+
+**Changed:** `src/report.ts` + `src/delivery/index.ts`（confirmed/incomplete 节各加 `+N more` 标记行，共 4 处）+ `test/report.spec.ts`（+1 双边一致回归）+ `lib/` 重建 + `CHANGELOG [Unreleased]` 中英双语 + `.rsi/evidence/round-044/`。
+**Scope:** 只修人话必看两节；诊断分节（routeFailures/overflows/errors/uncertainties）不动，避免撑爆 8000 字总闸。
+**Honest boundary:** 真机 GUI 手点 NOT_RUN；未发版（`[Unreleased]` 攒版）。
+
 ## round-43 机器台账补 blocked 原因行 — 2026-11-23 (`CONFIRMED`，未发版)
 
 | state | command | result |

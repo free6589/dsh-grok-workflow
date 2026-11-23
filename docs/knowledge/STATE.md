@@ -1,3 +1,7 @@
+Last updated: 2026-11-23 13:05 +08:00（**round-44 已合流 main 未发版：截断行加 +N more 标记，`CONFIRMED`** —
+合流提交 `f4590ea`（main `598afb6` + `70dec37`）；`npm run ci` exit 0（85 文件 / 1636 测试 PASS，+1 双边一致回归），
+lint 0 errors，`verify:lib` 217 文件 byte-identical。`CHANGELOG [Unreleased]` 中英文已记，攒版待发。）
+
 Last updated: 2026-11-23 12:45 +08:00（**round-43 已合流 main 未发版：机器台账补 blocked 原因行，`CONFIRMED`** —
 合流提交 `51ec2bb`（main `e27d0b6` + `8c06f9e`）；`npm run ci` exit 0（85 文件 / 1635 测试 PASS，+1 blocked 回归），
 lint 0 errors，`verify:lib` 217 文件 byte-identical。`CHANGELOG [Unreleased]` 中英文已记，攒版待发。）

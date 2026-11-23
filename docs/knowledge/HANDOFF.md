@@ -1,3 +1,15 @@
+## 2026-11-23 — round-44 已合流 main 未发版：截断行加 +N more 标记（`CONFIRMED`）
+
+- **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
+- **做了什么**：报告面第 2 条。两版报告超 12 条的已确认/未完成行静默丢失，读者误当完整。
+  前 12 条照常 + 一行 `+N more` 标记（两边同一句）；诊断分节不动。+1 双边一致回归；
+  `npm run ci` exit 0（85/1636）；lead 独立红绿复验成立。
+- **合流**：`rsi/round-44`（`70dec37`）已 `--no-ff` 合入 main 系 worktree（合流 `f4590ea`）；
+  `rsi/round-44` 分支可 24h 内删除。`CHANGELOG [Unreleased]` 中英文已记，攒版待发。
+- **未做（下轮池）**：报告面尾部裸 slice/账本吞错/resume 浅拷贝；
+  并发面 hung 波死等/guardian 双心跳与顺序相关/路径归一分歧/超时常量过期；配置面 Cookie JSON 漏/
+  guardianModel 空白与未知键/gate 无钩子 fail-open。真机 GUI 手点 NOT_RUN。
+
 ## 2026-11-23 — round-43 已合流 main 未发版：机器台账补 blocked 原因行（`CONFIRMED`）
 
 - **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
