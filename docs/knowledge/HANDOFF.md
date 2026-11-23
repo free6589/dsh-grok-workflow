@@ -2837,7 +2837,7 @@ Issue #1 状态评论 issuecomment-6927842856。
 | Sec.2-1 | 运行时限默认 60 分钟 → 0 | 前轮已合（`1591665`），本轮复验 | `src/config.ts:113` `DEFAULT_TIMEOUT_MS = 0`；`test/timeout-config.spec.ts:119` |
 | Sec.2-2 | 主会话可插话：默认开或给开关 | 前轮已合（`1591665`），按"给开关"分支收口 | `src/client/index.js` `replan` 布尔键 + 设置页开关行；默认仍 false（分歧已记） |
 | Sec.2-3 | 总开关一按报 405 | **本轮新合** `5dc0512` | 见下方"405 两个新成因" |
-| Sec.2-4 | 设置页一键升级按钮 | 前轮已合（`1591665`） | 版本/最新/命令卡片 + `test/update-entry.spec.ts` 4 例 |
+| Sec.2-4 | 设置页一键升级按钮 | 前轮已合（`1591665`），覆盖度 **PARTIAL**（见 D8） | 版本/最新/命令卡片（只读 + 复制安装命令，不联网、不代跑）+ `test/update-entry.spec.ts` 4 例 |
 | Sec.2-5 | 进度页"回答"格永远空 | 前轮已合（`1591665`，按"删格"分支收口） | `PROGRESS_STAGES` 六格无 answer；源码注释写明没有事件能填它 |
 | Sec.2-6 | 断点续跑没接上 | 前轮已合（`1591665`） | `RESUME_DECISION_WIRING.wired = true`（`src/checkpoint/wiring.ts:221`），生产调用 `wiring.ts:485` |
 | Sec.2-7 | 宿主证据收集阶段没开工 | **跳过（BLOCKED：待拍板）** | 源文件原话"先确认这一阶段还要不要做"；仓库确无 `src/evidence*`。见 D-111 |

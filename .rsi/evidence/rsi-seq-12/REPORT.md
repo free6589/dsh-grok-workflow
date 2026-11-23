@@ -14,7 +14,7 @@
 | Sec.2-1 | 「运行时限默认还是 60 分钟，我要的是不限时」 | **MERGED（前轮 `1591665`，本轮复验 `CONFIRMED`）** | `src/config.ts:113` `export const DEFAULT_TIMEOUT_MS = 0`；`test/timeout-config.spec.ts:119` `expect(resolveConfig({}).timeoutMs).toBe(0)`；基线 ci 绿 |
 | Sec.2-2 | 「主会话应该永远能插话，但现在默认关着，设置页也没开关」 | **MERGED（前轮 `1591665`；按原话"或者给开关"收口，默认仍 false → 分歧 D2）** | `src/client/index.js` `{ key: 'replan', group: 'loop', kind: 'boolean', def: false }` + 设置页 `field.replan` 开关行 |
 | Sec.2-3 | 「workflow 总开关一按就报 405」 | **MERGED（本轮）`5dc0512`** | 分支 `rsi/sec2-03-mode-get`；ci exit 0（85/1622）；`test/mode-surface.spec.ts` 24 例 |
-| Sec.2-4 | 「设置页没有一键升级按钮」 | **MERGED（前轮 `1591665`，本轮复验 `CONFIRMED`）** | 设置页版本/最新/命令卡片；`test/update-entry.spec.ts` 4 例通过 |
+| Sec.2-4 | 「设置页没有一键升级按钮」 | **MERGED（前轮 `1591665`，本轮复验 `CONFIRMED`）· 覆盖度 PARTIAL（见 D8）** | 设置页版本/最新/命令卡片；`test/update-entry.spec.ts` 4 例通过 |
 | Sec.2-5 | 「进度页的『回答』格子永远是空的」 | **MERGED（前轮 `1591665`；按原话"要么…要么删掉"选删格 → 分歧 D3）** | `PROGRESS_STAGES` 六格（start/plan/execute/verify/synthesize/end），源码注释：no `回答` event can ever reach this track |
 | Sec.2-6 | 「断点续跑只做了一半，出事后不会自己接着跑」 | **MERGED（前轮 `1591665`，本轮复验 `CONFIRMED`）** | `RESUME_DECISION_WIRING = { wired: true }`（`src/checkpoint/wiring.ts:221`）；生产入口 `wiring.ts:485` 调 `resumeDecision` |
 | Sec.2-7 | 「宿主证据收集那一阶段，根本没开工」 | **SKIPPED（`BLOCKED`：源文件自己要求先拍板）** | 仓库确无 `src/evidence*`（`ls src` 无该目录）；源文件"差什么：先确认这一阶段还要不要做" |
@@ -82,6 +82,9 @@
 - **D6（Sec.3-3）**：现状的三步汇总门（草稿 → check → 独立 verify）**已经**是"检查 + 复核"，但是**确定性检查**，
   不走配置里的 verifier/supervisor 模型角色。改成走模型角色会花额度，并把"假通过"的风险重新引入模型自评——
   这是取舍，需操作员一句话。
+- **D8（Sec.2-4）**：现有入口是**只读卡片**——并排显示「已装版本 / 最新已知版本」并给一个复制安装命令的按钮；
+  最新版本是随版本发布的静态常量（刻意不联网），升级本身仍要操作员把命令贴到终端跑，插件不代跑安装。
+  原话问的是"有什么升级的按钮"，所以这算部分覆盖：界面入口有了，一键自助升级没有。
 - **D7（Sec.3-4 / Sec.3-5）**：前者只有操作员能判（需一次开/不开插件的人工并排比对，`NOT_RUN`）；
   后者不在本仓库（本插件无图像功能）。
 
