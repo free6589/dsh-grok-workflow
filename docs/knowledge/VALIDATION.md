@@ -1,3 +1,15 @@
+## round-51 删过期十分钟常量（soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
+
+| state | command | result |
+| --- | --- | --- |
+| worktree rsi-round-51 `d7f8df6`（main `65544af` + 本轮 1 提交） | `grep -rn CHILD_TIMEOUT_MS src/ test/` | 删前 live-code 4 处 → 删后 `src`+`test` 0 处（知识库冻结历史 10 处未动） |
+| 同上（新码） | `npx vitest run test/timeout.spec.ts`（lead 独立） | **22 passed** |
+| 同上（新码） | `npm run ci`（lead 独立） | **exit 0：85 files / 1642 tests PASS**；typecheck 干净；lint 0 errors；`verify:lib` byte-identical |
+| 隔离 soak | 网关探针 | **BLOCKED**：网关 502 无额度，未伪造 |
+
+**Changed:** `src/timeout.ts`（删死导出 + 11 行过期注释，文档改指活默认值）+ `test/timeout.spec.ts`（删 import）+ `lib/` 重建 + `CHANGELOG [Unreleased]` 中英双语 + `.rsi/evidence/round-051/`。纯删除无行为变化，未做红绿对照（grep 前后即证据）。
+**Honest boundary:** 真机 BLOCKED，不发版；`[Unreleased]` 已攒 5 条待发。
+
 ## round-50 报告与调度路径规则统一（soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
 
 | state | command | result |

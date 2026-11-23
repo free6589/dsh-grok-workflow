@@ -1,3 +1,15 @@
+## 2026-11-23 — round-51 已合流 main 未发版：删过期十分钟常量（`CONFIRMED`，soak BLOCKED）
+
+- **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
+- **做了什么**：并发面第 4 条。60 万毫秒死常量只剩文档链接和测试 import 在念，
+  所有活路都走 720 万默认值。删死导出 + 过期注释，文档改指活默认值；纯删除无行为变化。
+  `npm run ci` exit 0（85/1642）；lead 独立验 grep 前后 + 单测 + 全量门禁。
+- **真机**：BLOCKED（网关 502，未伪造）。本次不发版。
+- **合流**：`rsi/round-51`（`d7f8df6`）已 `--no-ff` 合入 main 系 worktree（合流 `2feddd2`）；
+  `rsi/round-51` 分支可 24h 内删除。`CHANGELOG [Unreleased]` 中英文已记 5 条待发。
+- **未做（下轮池）**：配置面 Cookie JSON/guardianModel 空白与未知键/gate 无钩子。
+  网关恢复后给 round-47/48/49/50/51 补 soak 再发版。
+
 ## 2026-11-23 — round-50 已合流 main 未发版：报告与调度路径规则统一（`CONFIRMED`，soak BLOCKED）
 
 - **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
