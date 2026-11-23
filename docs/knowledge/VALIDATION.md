@@ -1,3 +1,14 @@
+## round-59 两处过期门注释改诚实（soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
+
+| state | command | result |
+| --- | --- | --- |
+| worktree rsi-round-59 `33b1e89`（main `1bdda54` + 本轮 1 提交） | `grep -rn` 前后对比（子代理） | 撒谎注释 2 处 → 0 处（gate.ts 1 + config.ts 1；全文件 sweep 余下 `return false` 均诚实） |
+| 同上（新码，lead 追加 config.ts 一处后） | `npm run ci`（lead 独立） | **exit 0：87 files / 1652 tests PASS**；typecheck 干净；lint 0 errors；`verify:lib` byte-identical |
+| 隔离 soak | 网关探针 | **BLOCKED**：网关 502，未伪造 |
+
+**Changed:** `src/gate.ts`（doc 注释 1 行）+ `src/config.ts`（schema 头注 4 行，lead 追加的同类过期注释）+ `test/gate.spec.ts`（2 行注释引用既有断言）+ `lib/` 重建 + `CHANGELOG [Unreleased]` 中英双语 + `.rsi/evidence/round-059/`。纯注释改无行为变化，未做 stash 红绿（grep 前后即证据）。
+**Honest boundary:** 真机 BLOCKED，不发版；`[Unreleased]` 已攒 13 条待发。
+
 ## round-58 打烊清场（soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
 
 | state | command | result |
