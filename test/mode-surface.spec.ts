@@ -49,12 +49,17 @@ function fakeResponse(): FakeResponse {
   }
 }
 
-function fakeRequest(method: string, body?: unknown): never {
+function fakeRequest(method: string, body?: unknown, url?: string): never {
   const payload = body === undefined
     ? []
     : [Buffer.from(typeof body === 'string' ? body : JSON.stringify(body))]
   const stream = Readable.from(payload)
-  return Object.assign(stream, { method, headers: {}, destroy: () => {} }) as never
+  return Object.assign(stream, {
+    method,
+    headers: {},
+    url: url ?? MODE_ROUTE_PATH,
+    destroy: () => {},
+  }) as never
 }
 
 /* ---------------------------------------------------------------- fixtures -- */
@@ -83,9 +88,10 @@ async function call(
   routeDeps: ModeRouteDeps,
   method: string,
   body?: unknown,
+  url?: string,
 ): Promise<{ status: number; body: string; json: Record<string, unknown> | undefined; response: FakeResponse }> {
   const response = fakeResponse()
-  await handleModeRoute(routeDeps, fakeRequest(method, body), response as never)
+  await handleModeRoute(routeDeps, fakeRequest(method, body, url), response as never)
   let json: Record<string, unknown> | undefined
   try {
     json = JSON.parse(response.body) as Record<string, unknown>
@@ -219,11 +225,43 @@ describe('switch set: writes the same durable record the command writes', () => 
 /* --------------------------------------------------------------- refusals -- */
 
 describe('switch route refusals', () => {
-  it('rejects a non-POST request before reading anything', async () => {
+  it('reads the switch over GET, so a method-refusing middle box cannot blank the button', async () => {
     const target = session()
-    const result = await call(deps([target], true), 'GET', { action: 'status', sessionId: SESSION })
-    expect(result.status).toBe(405)
-    expect(result.json).toMatchObject({ ok: false, code: 'mode/method' })
+    const result = await call(
+      deps([target], true),
+      'GET',
+      undefined,
+      `${MODE_ROUTE_PATH}?action=status&sessionId=${SESSION}`,
+    )
+    expect(result.status).toBe(200)
+    expect(result.json).toMatchObject({ ok: true, action: 'status' })
+    expect(modeOf(result)).toMatchObject({ enabled: true, source: 'default' })
+    // A read never writes: the record is still absent afterwards.
+    expect(readModeRecord(target)).toBeUndefined()
+  })
+
+  it('refuses a write over GET and any other method, and says which method it refused', async () => {
+    const target = session()
+    const written = await call(
+      deps([target], true),
+      'GET',
+      undefined,
+      `${MODE_ROUTE_PATH}?action=set&sessionId=${SESSION}&enabled=true`,
+    )
+    expect(written.status).toBe(405)
+    expect(written.json).toMatchObject({ ok: false, code: 'mode/method' })
+    expect(readModeRecord(target)).toBeUndefined()
+
+    const warned: string[] = []
+    const put = await call(
+      deps([target], true, { logger: { warn: (message: string) => { warned.push(message) } } as never }),
+      'PUT',
+      { action: 'status', sessionId: SESSION },
+    )
+    expect(put.status).toBe(405)
+    expect(put.json).toMatchObject({ ok: false, code: 'mode/method' })
+    // The refused request itself is recorded: an unexplained 405 was the reported bug.
+    expect(warned.some(message => message.includes('PUT'))).toBe(true)
   })
 
   it('rejects an unknown action and a body that is not a JSON object', async () => {
@@ -370,8 +408,63 @@ describe('mounting the switch route', () => {
     expect(warned.some(message => message.includes('no webServer'))).toBe(true)
   })
 
-  it('drives the switch through the registered handler', async () => {
+  it('mounts without a `sessions` service and resolves the store when the request arrives', async () => {
     const target = session()
+    const routes: FakeRoute[] = []
+    const webServer = {
+      register: (route: FakeRoute) => {
+        routes.push(route)
+        return () => {}
+      },
+    }
+    // The reported 405: a composition that reaches `sessions` through `get` only. The
+    // old inject list required the property itself, mounted nothing, and let the Host
+    // answer the browser's POST — so the switch failed with no plugin-side explanation.
+    const child: ModeHostContext = {
+      webServer: webServer as unknown as NonNullable<ModeHostContext['webServer']>,
+      connection: { requestRejection: () => undefined },
+      get: (name: string) => (name === 'sessions' ? storeOf([target]) : undefined),
+      effect: ((installer: () => unknown) => {
+        installer()
+        return () => {}
+      }) as unknown as NonNullable<ModeHostContext['effect']>,
+    }
+    const ctx: ModeHostContext = {
+      inject: (_deps: readonly string[], callback: (child: ModeHostContext) => void) => { callback(child) },
+    }
+    installModeRoute({ ctx, fallback: () => true })
+    expect(routes).toHaveLength(1)
+
+    const read = fakeResponse()
+    await routes[0]!.handler(
+      fakeRequest('GET', undefined, `${MODE_ROUTE_PATH}?action=status&sessionId=${SESSION}`),
+      read,
+    )
+    expect(read.statusCode).toBe(200)
+    expect(JSON.parse(read.body)).toMatchObject({ ok: true, mode: { enabled: true } })
+  })
+
+  it('answers a composition with no store at all as unavailable, never as a missing session', async () => {
+    const routes: FakeRoute[] = []
+    const child: ModeHostContext = {
+      webServer: { register: (route: FakeRoute) => { routes.push(route); return () => {} } } as unknown as NonNullable<ModeHostContext['webServer']>,
+      connection: { requestRejection: () => undefined },
+      effect: ((installer: () => unknown) => {
+        installer()
+        return () => {}
+      }) as unknown as NonNullable<ModeHostContext['effect']>,
+    }
+    installModeRoute({
+      ctx: { inject: (_deps: readonly string[], callback: (child: ModeHostContext) => void) => { callback(child) } },
+      fallback: () => true,
+    })
+    const answer = fakeResponse()
+    await routes[0]!.handler(fakeRequest('POST', { action: 'status', sessionId: SESSION }), answer)
+    expect(answer.statusCode).toBe(503)
+    expect(JSON.parse(answer.body)).toMatchObject({ ok: false, code: 'mode/unavailable' })
+  })
+
+  it('drives the switch through the registered handler', async () => {    const target = session()
     const wired = wiring({ sessions: [target] })
     const route = wired.routes[0]!
     const off = fakeResponse()

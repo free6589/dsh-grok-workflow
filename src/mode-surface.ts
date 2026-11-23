@@ -15,8 +15,9 @@
  * `src/gate.ts` (`isModeEnabled(session, grokDefault === 'on')`). The default is
  * therefore never restated here or in the button; both ask this route.
  *
- * Like `src/loop-surface.ts`, the route is optional in a composition (only mounted
- * when `webServer` + `connection` + `sessions` exist) and sits behind the same
+ * Like `src/loop-surface.ts`, the route is optional in a composition (mounted when
+ * `webServer` + `connection` exist; the live-session store is resolved per request, so
+ * a store that mounts later cannot leave the switch unanswered) and sits behind the same
  * trust fence: `connection.requestRejection` is the Host/Origin + browser-auth
  * check DSH's shipped routes use, so a cross-site or unauthenticated request is
  * refused before any state is touched.
@@ -102,6 +103,14 @@ export interface ModeSessionStore {
 export interface ModeRouteDeps {
   /** Live-session lookup; absent in a composition without the store. */
   readonly sessions?: ModeSessionStore | undefined
+  /**
+   * Live-session lookup resolved per request, when the store is a service that may
+   * arrive after this route mounted. Preferred over {@link sessions} when both are
+   * given, so a route never answers from a snapshot of a service that has since
+   * been replaced; `undefined` means "the composition has no store right now" and
+   * is answered as `mode/unavailable` (503), never as a missing session (404).
+   */
+  readonly resolveSessions?: (() => ModeSessionStore | undefined) | undefined
   /**
    * The effective default with no record: the same rule the gate applies, read live.
    * Kept a function so a settings edit reaches the next request.
@@ -201,6 +210,8 @@ export interface ModeHostContext {
   readonly webServer?: ModeWebServer | undefined
   readonly connection?: ModeConnection | undefined
   readonly sessions?: ModeSessionStore | undefined
+  /** Cordis service lookup, the second way a mounted service is reachable. */
+  readonly get?: ((name: string) => unknown) | undefined
   readonly inject?: unknown
   readonly effect?: (installer: () => undefined | (() => unknown)) => unknown
 }
@@ -225,7 +236,12 @@ export function installModeRoute(options: InstallModeRouteOptions): void {
   const { ctx } = options
   if (typeof ctx.inject !== 'function') return
   const inject = ctx.inject as (deps: readonly string[], cb: (child: ModeHostContext) => void) => unknown
-  inject(['webServer', 'connection', 'sessions'], (child) => {
+  // Only the two services the route cannot answer without are required. The
+  // live-session store is resolved per request instead: requiring it here meant that a
+  // composition listing `sessions` later than this fiber mounted *nothing*, and the
+  // browser's POST then fell through to the Host's own unknown-route answer — the
+  // `HTTP 405` the operator saw, with no plugin-side explanation attached to it.
+  inject(['webServer', 'connection'], (child) => {
     const webServer = child.webServer
     if (webServer === undefined) {
       options.logger?.warn?.(
@@ -234,11 +250,13 @@ export function installModeRoute(options: InstallModeRouteOptions): void {
       )
       return
     }
+    const resolveSessions = (): ModeSessionStore | undefined => storeOf(serviceOf(child, 'sessions'))
+      ?? storeOf(serviceOf(ctx, 'sessions'))
     child.effect?.(() => asDisposer(webServer.register({
       kind: 'exact',
       path: MODE_ROUTE_PATH,
       handler: (req, res) => handleModeRoute({
-        sessions: child.sessions ?? ctx.sessions,
+        resolveSessions,
         fallback: options.fallback,
         ...child.connection === undefined ? {} : { connection: child.connection },
         ...options.logger === undefined ? {} : { logger: options.logger },
@@ -248,11 +266,36 @@ export function installModeRoute(options: InstallModeRouteOptions): void {
 }
 
 /**
+ * Read one service off a Host context, directly or through `ctx.get(name)`.
+ *
+ * Cordis exposes a service both as a context property and through `get`, and which of
+ * the two is populated depends on the fiber that mounted it; asking both keeps the
+ * route from concluding "no store" for a composition that has one.
+ * @param source - the context or injected child.
+ * @param name - the service name.
+ * @returns the service, or `undefined` when this composition has none.
+ */
+function serviceOf(source: ModeHostContext | undefined, name: string): unknown {
+  if (source === undefined) return undefined
+  const direct = (source as unknown as Record<string, unknown>)[name]
+  if (direct !== undefined && direct !== null) return direct
+  return typeof source.get === 'function' ? source.get(name) : undefined
+}
+
+/** Accept a live-session lookup of unknown shape, or nothing. */
+function storeOf(value: unknown): ModeSessionStore | undefined {
+  const candidate = value as ModeSessionStore | undefined
+  return typeof candidate?.get === 'function' ? candidate : undefined
+}
+
+/**
  * Answer one browser request.
  *
  * Body: `{ action: 'status' | 'set', sessionId, enabled? }`. `status` only reads;
- * `set` writes and answers the read-back. Deliberately no GET form, so a status
- * read and a toggle share one body shape and the button has one code path.
+ * `set` writes and answers the read-back. A read is also accepted over `GET`
+ * (`?action=status&sessionId=…`), because the switch is the one control that must keep
+ * answering when a proxy or a browser refuses to POST; a write over `GET` is refused,
+ * since a URL is not a place to keep a state change.
  *
  * Exported as the production-path test seam: the tests drive this exact handler
  * with a real `IncomingMessage`-shaped stream, so a hand-mocked success cannot
@@ -275,13 +318,22 @@ export async function handleModeRoute(
       res.end()
       return
     }
-    if (typeof deps.sessions?.get !== 'function') {
+    const sessions = deps.resolveSessions !== undefined ? deps.resolveSessions() : deps.sessions
+    if (typeof sessions?.get !== 'function') {
       throw new ModeError('mode/unavailable', 'this Host has no live-session store, so the switch cannot read a session')
     }
-    if (req.method !== 'POST') {
-      throw new ModeError('mode/method', 'POST only')
+    const method = (req.method ?? 'GET').toUpperCase()
+    if (method !== 'POST' && method !== 'GET') {
+      // Name the method and the URL being refused: the operator's report was an
+      // unexplained `HTTP 405`, and the request that produced it is the one fact no
+      // later investigation can recover, so it is written down here instead.
+      deps.logger?.warn?.(
+        `grok-workflow mode route refused ${method} ${typeof req.url === 'string' ? req.url : MODE_ROUTE_PATH}: `
+        + 'this route reads with GET ?action=status&sessionId=… and writes with POST {action:"set"}',
+      )
+      throw new ModeError('mode/method', `${method} is not supported: read with GET, write with POST`)
     }
-    const body = await readJsonBody(req)
+    const body = method === 'GET' ? readQueryBody(req) : await readJsonBody(req)
     if (body === undefined) {
       throw new ModeError('mode/body', 'a JSON object body is required')
     }
@@ -293,7 +345,7 @@ export async function handleModeRoute(
     if (typeof sessionId !== 'string' || sessionId.trim() === '') {
       throw new ModeError('mode/request', 'sessionId is required')
     }
-    const session = deps.sessions.get(sessionId)
+    const session = sessions.get(sessionId)
     if (session === undefined) {
       throw new ModeError('mode/session', `no live session ${sessionId}`)
     }
@@ -333,6 +385,27 @@ function statusForModeCode(code: ModeErrorCode): number {
     case 'mode/write': return 503
     case 'mode/internal': return 500
   }
+}
+
+/**
+ * Read one `status` request out of the query string.
+ *
+ * Only a read travels in a URL. `action=set` is refused with the method code (405), so
+ * a state change cannot be triggered by a link, a prefetch or an image tag — the same
+ * reason the route has always written over POST.
+ * @param req - the request carrying `?action=status&sessionId=…`.
+ * @returns the body shape the POST path uses, or `undefined` when there is no query.
+ */
+function readQueryBody(req: IncomingMessage): Record<string, unknown> | undefined {
+  const url = typeof req.url === 'string' ? req.url : ''
+  const at = url.indexOf('?')
+  if (at < 0) return undefined
+  const query = new URLSearchParams(url.slice(at + 1))
+  const action = query.get('action') ?? 'status'
+  if (action !== 'status') {
+    throw new ModeError('mode/method', `GET may only read: this route writes over POST (action=${JSON.stringify(action)})`)
+  }
+  return { action, sessionId: query.get('sessionId') ?? '' }
 }
 
 /** Read one bounded JSON object body; `undefined` for anything else. */

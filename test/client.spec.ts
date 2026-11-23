@@ -895,15 +895,17 @@ const lampIn = (tree: unknown) => walk(tree).find((element) => element.props['da
 function scriptedFetch(script: Array<{ status?: number, body?: unknown, throws?: boolean }>) {
   const posted: Array<Record<string, unknown>> = []
   const urls: string[] = []
+  const methods: string[] = []
   const fetchImpl = async (url: string, init: Record<string, unknown>) => {
     urls.push(url)
-    posted.push(JSON.parse(String(init['body'])) as Record<string, unknown>)
+    methods.push(String(init['method'] ?? 'GET'))
+    if (typeof init['body'] === 'string') posted.push(JSON.parse(init['body']) as Record<string, unknown>)
     const answer = script.shift()
     if (answer === undefined) throw new Error('unscripted loop call')
     if (answer.throws === true) throw new Error('socket closed')
     return { status: answer.status ?? 200, json: async () => answer.body }
   }
-  return { posted, urls, fetchImpl }
+  return { posted, urls, methods, fetchImpl }
 }
 
 describe('client settings page: reading, failure and retry', () => {
@@ -3102,6 +3104,27 @@ describe('client composer tool row: the workflow switch (`/grok on|off` as a but
       .toEqual({ ok: false, code: 'mode/persist', error: 'disk said no' })
     // No transport at all is a transport failure, never a throw.
     expect(mode.parsePayload(undefined, undefined as unknown as number)).toMatchObject({ ok: false })
+  })
+
+  it('falls back to a GET read when the POST is refused with 405', async () => {
+    const mode = modeSwitch()
+    const { methods, fetchImpl } = scriptedFetch([
+      { status: 405 },
+      { body: { ok: true, action: 'status', mode: { enabled: true } } },
+    ])
+    expect(await mode.read(SESSION, fetchImpl)).toEqual({ ok: true, mode: { enabled: true } })
+    expect(methods).toEqual(['POST', 'GET'])
+  })
+
+  it('names the refused method when both the POST and the GET fallback are refused', async () => {
+    const mode = modeSwitch()
+    const { methods, fetchImpl } = scriptedFetch([{ status: 405 }, { status: 405 }])
+    expect(await mode.read(SESSION, fetchImpl)).toMatchObject({ ok: false, code: 'mode/method' })
+    expect(methods).toEqual(['POST', 'GET'])
+    // A write is never retried over GET: the POST is the only way to move the switch.
+    const write = scriptedFetch([{ status: 405 }])
+    expect(await mode.set(SESSION, true, write.fetchImpl)).toMatchObject({ ok: false, code: 'mode/method' })
+    expect(write.methods).toEqual(['POST'])
   })
 
   it('reports a dead transport as a failure instead of a state change', async () => {
