@@ -504,6 +504,8 @@ describe('mandatory entry gate', () => {
     })
     // T4: no gateRequired switch — a missing hook fails the load loudly instead
     // of degrading to a warning while the main model answers directly.
+    // Round-59: documents the installGate fail-closed doc fix (throws, never
+    // returns false); the error text below is the contract this pins.
     expect(() => apply(withoutHook as never, {})).toThrow(/agent\/pre-step is unavailable/)
   })
 

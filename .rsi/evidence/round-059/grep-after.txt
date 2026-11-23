@@ -1,0 +1,30 @@
+22: * The gate fails closed: when it cannot run the workflow it still refuses the
+254:    if (typeof candidate.whenIdle !== 'function') return false
+255:    if (typeof candidate.followup !== 'function') return false
+258:    return false
+547:  if (source?.kind !== 'schedule') return false
+709:    return false
+714:/** Install the gate; throws when the runtime cannot host agent/pre-step (fail closed, round-54). */
+721:  let warnedLiveFailure = false
+730:      if (!warnedLiveFailure) {
+731:        warnedLiveFailure = true
+732:        logger.warn(`configuration is invalid, keeping the last good snapshot: ${redactError(error)}`)
+741:    // load loudly, never a warning with the main model answering directly.
+1144:      logger.warn(`gate could not start the workflow: ${reason}`)
+1205:    if (!delivered) logger.warn(`gate could not deliver the workflow answer for ${entry.key}`)
+1251:    if (session === undefined || claimed.length === 0) return false
+1257:      if (!surfaceHasHead(session, turn)) return false
+1263:      logger.warn(`gate could not keep the user message in the transcript: ${redactError(error)}`)
+1264:      return false
+1383:        logger.warn(`steering could not cancel ${target.runId}: ${redactError(error)}`)
+1490:      logger.warn(`steering channel could not open for ${entry.key}: ${redactError(error)}`)
+1518:            else logger.warn(`steering carried ${carried.length} demand(s) for ${entry.key} into a full queue`)
+1520:            logger.warn(`steering could not carry the late demand for ${entry.key}: ${redactError(error)}`)
+1642:      logger.warn(`interactive team admission failed, falling back to in-turn: ${redactError(error)}`)
+1710:      logger.warn(`full-mode admission failed, falling back to in-turn: ${redactError(error)}`)
+1752:      logger.warn(`gate kept the claimed messages after a pre-step failure: ${redactError(error)}`)
+1880:      logger.warn(`gate could not state the failure: ${redactError(error)}`)
+1910:    if (current !== undefined && current.queued >= FIXED_MAX_QUEUED_MESSAGES) return false
+1917:        logger.warn(`gate task failed: ${redactError(error)}`)
+1954:      logger.warn(`gate classification failed: ${reason}`)
+1975:      logger.warn(`gate could not answer in-turn: ${reason}`)

@@ -711,7 +711,7 @@ async function deliverRelay(agent: Agent, text: string): Promise<boolean> {
 }
 
 
-/** Install the gate; returns false when the runtime cannot host `agent/pre-step`. */
+/** Install the gate; throws when the runtime cannot host agent/pre-step (fail closed, round-54). */
 export function installGate(deps: GateDeps): boolean {
   const { ctx, config, state, logger } = deps
   // Live configuration (DD-9 1-2): a settings edit is picked up by the next

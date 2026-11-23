@@ -270,7 +270,7 @@ export declare function cancelledText(reason: string, report?: WorkflowReport, o
  * @returns the head block.
  */
 export declare function humanHead(report: WorkflowReport, lang: TriageLang, enabled: boolean): string | undefined;
-/** Install the gate; returns false when the runtime cannot host `agent/pre-step`. */
+/** Install the gate; throws when the runtime cannot host agent/pre-step (fail closed, round-54). */
 export declare function installGate(deps: GateDeps): boolean;
 export {};
 //# sourceMappingURL=gate.d.ts.map
