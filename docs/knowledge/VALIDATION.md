@@ -1,3 +1,15 @@
+## round-50 报告与调度路径规则统一（soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
+
+| state | command | result |
+| --- | --- | --- |
+| worktree rsi-round-50 `41b932d`（main `55ab9a2` + 本轮 1 提交） | `npx vitest run test/waves.spec.ts -t "case and dot-dot"`（旧码 stash） | **1 failed / 27 skipped**：新用例红（`write-overlap` 判成 `planned`） |
+| 同上（新码） | `npx vitest run test/waves.spec.ts` | **28 passed** |
+| 同上（新码） | `npm run ci`（lead 独立） | **exit 0：85 files / 1642 tests PASS**；typecheck 干净；lint 0 errors；`verify:lib` byte-identical |
+| 隔离 soak | headless 新 profile + 真模型 | **BLOCKED**：插件链路通；`MISSING_CREDENTIAL`/网关 502 无额度，未跑出 COMPLETED，未伪造 |
+
+**Changed:** `src/waves.ts`（删自家归一，复用 `paths.ts` 归一+判交叠；只动报告侧，调度侧不动）+ `test/waves.spec.ts`（+1 大小写/`..` 回归）+ `lib/` 重建 + `CHANGELOG [Unreleased]` 中英双语 + `.rsi/evidence/round-050/`。
+**Honest boundary:** 真机 BLOCKED，不发版；`[Unreleased]` 已攒 4 条待发。
+
 ## round-49 守护单轮单快照（soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
 
 | state | command | result |

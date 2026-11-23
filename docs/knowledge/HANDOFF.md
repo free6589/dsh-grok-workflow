@@ -1,3 +1,15 @@
+## 2026-11-23 — round-50 已合流 main 未发版：报告与调度路径规则统一（`CONFIRMED`，soak BLOCKED）
+
+- **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
+- **做了什么**：并发面第 3 条。报告侧不分大小写不消 `..`，与调度侧说反话。
+  报告侧删自家归一、复用调度规则（只动报告侧）；+1 大小写/`..` 回归；
+  `npm run ci` exit 0（85/1642）；lead 独立红绿复验成立。
+- **真机**：BLOCKED（插件链路通；无额度/网关 502，未伪造）。本次不发版。
+- **合流**：`rsi/round-50`（`41b932d`）已 `--no-ff` 合入 main 系 worktree（合流 `98fc776`）；
+  `rsi/round-50` 分支可 24h 内删除。`CHANGELOG [Unreleased]` 中英文已记 4 条待发。
+- **未做（下轮池）**：并发面超时常量；配置面 Cookie JSON/guardianModel 空白与未知键/
+  gate 无钩子。网关恢复后给 round-47/48/49/50 补 soak 再发版。
+
 ## 2026-11-23 — round-49 已合流 main 未发版：守护单轮单快照（`CONFIRMED`，soak BLOCKED）
 
 - **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
