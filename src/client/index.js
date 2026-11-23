@@ -144,6 +144,10 @@ window.__ModuleLoader__.load({
       // and only when a message arrives mid-run. Same boolean-switch shape as
       // `loopEnabled`.
       { key: 'replan', group: 'loop', kind: 'boolean', def: true },
+      // Rate-limit switching (Sec.3-2): the one failure class the operator named,
+      // as a checkbox. On = the built-in policy (a 429 advances the chain); off =
+      // the six other classes still advance and the 429 keeps its route.
+      { key: 'switchOnRateLimit', group: 'roles', kind: 'boolean', def: true },
       // Repeat runs (the loop keys): one full run per round, so the round cap and
       // the fail streak are the quota envelope. Bounds mirror HARD_LIMITS
       // (loopMaxRounds 100, loopFailStreak 20, loopIntervalMin 10080 = seven days)
@@ -250,6 +254,8 @@ window.__ModuleLoader__.load({
       'field.loopEnabled': 'Repeat by default',
       'field.replan': 'Join a running plan (mid-run)',
       'field.replan.hint': 'On by default. A message sent while a run is working is answered at once and joins that run at the next wave boundary; settled work is never redone. Turn it off to give every message its own round.',
+      'field.switchOnRateLimit': 'Switch model on 429',
+      'field.switchOnRateLimit.hint': 'On by default: a rate-limited (429) route advances to the next model in the chain. Off: only the other failure classes advance, and a 429 keeps the route for the task retry.',
       'field.loopMaxRounds': 'Rounds at most',
       'field.loopFailStreak': 'Stop after failed rounds',
       'field.loopIntervalMin': 'Minutes between rounds',
@@ -483,6 +489,8 @@ window.__ModuleLoader__.load({
       'field.loopEnabled': '默认自动续跑',
       'field.replan': '跑中并入活计划',
       'field.replan.hint': '默认打开。跑中发来的消息立刻得到回执，并在下个波边界并入正在跑的计划；已验证的成果不会重做。关掉后，每条消息另起一轮。',
+      'field.switchOnRateLimit': '限流（429）时换模型',
+      'field.switchOnRateLimit.hint': '默认打开：限流（429）时换到链上的下一个模型。关掉后只有其它失败类别换人，429 留在原路由交给任务重试。',
       'field.loopMaxRounds': '最多跑几轮',
       'field.loopFailStreak': '连败几轮就停',
       'field.loopIntervalMin': '两轮之间隔几分钟',

@@ -322,18 +322,18 @@ describe('client settings page bundle', () => {
   })
 
   // T5 slim page plus the four repeat-run keys, the two self-iteration keys,
-  // the Q8 guardian model, childTimeoutMs and the mid-run replan switch:
-  // 14 visible FIELDS
+  // the Q8 guardian model, childTimeoutMs, the mid-run replan switch and the
+  // 429 switch (Sec.3-2): 15 visible FIELDS
   // (grokDefault/mode/maxConcurrency/maxTasks/timeoutMs/childTimeoutMs,
   // replan, the four loop keys, iterateIntervalMin, the iterateTemplate textarea and
-  // guardianModel) plus the 5 role chains equal the 18-leaf-key configuration
+  // guardianModel, switchOnRateLimit) plus the 5 role chains equal the 19-leaf-key configuration
   // surface (toolName/roles/synthesis/configVersion are structural,
   // rendered nowhere).
   // Number bounds mirror HARD_LIMITS (100 / 20) and the defaults (10 / 3 / 0); the
   // suite pins all three so a quiet drift fails here instead of in the GUI.
-  it('renders the visible keys: 14 fields plus the 5 role chains', () => {
+  it('renders the visible keys: 15 fields plus the 5 role chains', () => {
     const visible = ['childTimeoutMs', 'grokDefault', 'guardianModel', 'maxConcurrency', 'maxTasks', 'mode', 'timeoutMs',
-      'replan',
+      'replan', 'switchOnRateLimit',
       'loopEnabled', 'loopMaxRounds', 'loopFailStreak', 'loopIntervalMin',
       'iterateIntervalMin', 'iterateTemplate']
     expect(bundle.GROK_WORKFLOW_FIELDS.map(field => field.key).sort()).toEqual(visible.slice().sort())
@@ -1457,6 +1457,7 @@ describe('client settings page: draft, validation and path ops', () => {
       timeoutMs: 0,
       childTimeoutMs: 7_200_000,
       replan: false,
+      switchOnRateLimit: true,
       loopEnabled: false,
       loopMaxRounds: 10,
       loopFailStreak: 3,

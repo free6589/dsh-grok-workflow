@@ -152,6 +152,32 @@ export declare const DEFAULT_MAX_TASKS = 10;
  */
 export declare const DEFAULT_REPLAN = true;
 /**
+ * Whether a rate-limited (HTTP 429) route advances to the next model in the chain.
+ *
+ * The built-in switching policy has always advanced on every transport class,
+ * `rate-limit` included, but the operator could not see or change it: the old
+ * `switchOn` key was removed wholesale in T4, and the requirement that survived
+ * it — "模型失败换人时加 429 之类的勾选框" (manual item Sec.3-2) — was left with no
+ * surface at all. This is the one class the operator named, exposed as a single
+ * checkbox, so the policy stays the built-in one and only the named exception is
+ * editable.
+ *
+ * On by default: a 429 means "this route is busy", which is exactly when falling
+ * through to the next model is worth an attempt. Turning it off keeps the route
+ * in place and lets the task's bounded retry decide, which is the right choice
+ * when the next model costs much more than waiting.
+ */
+export declare const DEFAULT_SWITCH_ON_RATE_LIMIT = true;
+/**
+ * The built-in switching classes minus `rate-limit`.
+ *
+ * The script reads an empty `switchOn` as "the built-in policy" and a non-empty
+ * one as "only these classes advance"; so switching 429 off means naming the
+ * remaining six explicitly. Typed against the same union as `FIXED_SWITCH_ON` so
+ * a class added there cannot be forgotten here.
+ */
+export declare const FIXED_SWITCH_ON_WITHOUT_RATE_LIMIT: Array<'server-error' | 'connection' | 'timeout' | 'model-unavailable' | 'format-error' | 'agent-start-failed'>;
+/**
  * Defaults of the repeat-run surface (`loopEnabled` / `loopMaxRounds` /
  * `loopFailStreak` / `loopIntervalMin`).
  *
@@ -250,7 +276,7 @@ export declare const CONFIG_VERSION = 1;
  * a typo that is silently ignored looks exactly like a setting that "does not
  * work", which is the failure mode the settings surface must not have.
  */
-export declare const CONFIG_KEYS: readonly ["toolName", "mode", "grokDefault", "roles", "guardianModel", "synthesis", "maxConcurrency", "maxTasks", "timeoutMs", "childTimeoutMs", "replan", "loopEnabled", "loopMaxRounds", "loopFailStreak", "loopIntervalMin", "iterateIntervalMin", "iterateTemplate", "configVersion"];
+export declare const CONFIG_KEYS: readonly ["toolName", "mode", "grokDefault", "roles", "guardianModel", "synthesis", "maxConcurrency", "maxTasks", "timeoutMs", "childTimeoutMs", "replan", "switchOnRateLimit", "loopEnabled", "loopMaxRounds", "loopFailStreak", "loopIntervalMin", "iterateIntervalMin", "iterateTemplate", "configVersion"];
 /**
  * The role names a configuration may route, in the order `resolveConfig` builds them.
  *
@@ -309,6 +335,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     timeoutMs: z<number, number, "volatile-defined">;
     childTimeoutMs: z<number, number, "volatile-defined">;
     replan: z<boolean, boolean, "volatile-defined">;
+    switchOnRateLimit: z<boolean, boolean, "volatile-defined">;
     loopEnabled: z<boolean, boolean, "volatile-defined">;
     loopMaxRounds: z<number, number, "volatile-defined">;
     loopFailStreak: z<number, number, "volatile-defined">;
@@ -426,6 +453,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     timeoutMs: z<number, number, "volatile-defined">;
     childTimeoutMs: z<number, number, "volatile-defined">;
     replan: z<boolean, boolean, "volatile-defined">;
+    switchOnRateLimit: z<boolean, boolean, "volatile-defined">;
     loopEnabled: z<boolean, boolean, "volatile-defined">;
     loopMaxRounds: z<number, number, "volatile-defined">;
     loopFailStreak: z<number, number, "volatile-defined">;

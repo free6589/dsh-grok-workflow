@@ -203,6 +203,11 @@ export interface GrokWorkflowConfig {
    */
   replan?: boolean
   /**
+   * Whether a rate-limited (429) route advances to the next model in the chain.
+   * Default on; off names the six other classes explicitly (manual item Sec.3-2).
+   */
+  switchOnRateLimit?: boolean
+  /**
    * Repeat-run switch. `false` (default) means one run per message; `true` lets a
    * repeat-run driver start another round when the previous one ended unfinished.
    */
@@ -263,8 +268,14 @@ export interface ResolvedConfig {
   timeoutMs: number
   /** Per child-call stall budget in milliseconds (default 120 min, ceiling 120 min). */
   childTimeoutMs: number
-  /** Mid-run replan switch (default off, settings page has a visible switch): merge new demands at a wave boundary. */
+  /** Mid-run replan switch (default on, settings page has a visible switch): merge new demands at a wave boundary. */
   replan: boolean
+  /**
+   * Whether a rate-limited (429) route advances to the next model in the chain.
+   * Default on (the built-in policy); off names the six other classes explicitly,
+   * so the 429 keeps its route and the task's bounded retry decides.
+   */
+  switchOnRateLimit: boolean
   /**
    * Repeat-run surface, resolved and validated. These are carried here so a
    * repeat-run driver reads them from exactly one shape; `resolveConfig` does not
