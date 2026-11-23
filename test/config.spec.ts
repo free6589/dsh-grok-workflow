@@ -207,7 +207,7 @@ describe('configuration surface', () => {
       synthesis: 'layered',
       mode: 'triage',
       grokDefault: 'off',
-      replan: false,
+      replan: true,
       loopEnabled: false,
       loopMaxRounds: 10,
       loopFailStreak: 3,
@@ -341,17 +341,19 @@ describe('configuration surface', () => {
     expect(describeResolvedConfig(resolveConfig({ grokDefault: 'on' } as never))).toContain('grokDefault=on')
   })
 
-  it('defaults the mid-run replan switch off, carries it through the schema, and states it bilingually', () => {
-    // Opt-in, never the default: joining a run spends one planner-route call
-    // per wave boundary (at most min(waves, 4) per run), so "unset" must read
-    // as its own round — the pre-switch behavior — not as a joined run.
-    expect(DEFAULT_REPLAN).toBe(false)
-    expect(resolveConfig({} as never).replan).toBe(false)
-    expect((snapshotConfig(Config({} as never)) as Record<string, unknown>).replan).toBe(false)
+  it('defaults the mid-run replan switch on, carries it through the schema, and states it bilingually', () => {
+    // On by default (manual item Sec.2-2: the main session must always be able
+    // to talk). The cost stays bounded — one planner-route call per wave
+    // boundary, at most min(waves, 4) per run, and only when a message actually
+    // arrives mid-run — and a stored `false` still gives every message its own
+    // round.
+    expect(DEFAULT_REPLAN).toBe(true)
+    expect(resolveConfig({} as never).replan).toBe(true)
+    expect((snapshotConfig(Config({} as never)) as Record<string, unknown>).replan).toBe(true)
     // A stored setting travels through the schema and resolveConfig unchanged.
-    const parsed = snapshotConfig(Config({ replan: true } as never))
-    expect(parsed).toMatchObject({ replan: true })
-    expect(resolveConfig(parsed as never)).toMatchObject({ replan: true })
+    const parsed = snapshotConfig(Config({ replan: false } as never))
+    expect(parsed).toMatchObject({ replan: false })
+    expect(resolveConfig(parsed as never)).toMatchObject({ replan: false })
     // Bilingual contract on the schema, like the other switches: the label is the
     // client's i18n key, but the meaning travels with the schema.
     interface SchemaNode {
