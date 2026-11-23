@@ -474,4 +474,49 @@ describe('the generated script enforces the child budget', () => {
     expect(run.report.status).toBe('completed')
     expect(run.report.tasks[0]?.attempts[0]?.failure).toBeUndefined()
   })
+
+  it('settles a hung call within budget in a realm with no timer at all', async () => {
+    // Round-48 fallback: a realm with neither setTimeout nor Atomics.waitAsync
+    // (`canRaceCalls === false`) used to await the child bare — a hung child
+    // wedged the wave and every replan boundary after it. The fallback watches
+    // the same settlement on the host clock (no timer armed) and rejects with
+    // the same CHILD_TIMEOUT prefix, so the task retries instead of wedging.
+    // The realm is built by text-sabotage of the two timer probes (the same
+    // technique test/failure-paths.spec.ts uses), so the script under test is
+    // otherwise byte-identical to the shipped one.
+    expect(WORKFLOW_SCRIPT).toContain('const hasHostTimer = ')
+    expect(WORKFLOW_SCRIPT).toContain("if (typeof Atomics.waitAsync !== 'function') return null;")
+    const noTimerScript = WORKFLOW_SCRIPT
+      .replace('const hasHostTimer = ', 'const hasHostTimer = false && ')
+      .replace(
+        "if (typeof Atomics.waitAsync !== 'function') return null;",
+        'return null;',
+      )
+    expect(noTimerScript).toContain('const canRaceCalls = hasHostTimer || sleepCell !== null;')
+    let workerCalls = 0
+    const agent: ScriptAgent = async (prompt, options) => {
+      const taskValue = taskFromPrompt(prompt)
+      if (roleOf(options.label) === 'worker') {
+        workerCalls += 1
+        if (workerCalls === 1) return await hungChild()
+        return execution(`did ${taskValue.id}`)
+      }
+      return verification(taskValue as never)
+    }
+    const { args: runArgs, config: runConfig } = oneSecondBudget()
+    const startedAt = Date.now()
+    const run = await runWorkflowScript(
+      noTimerScript,
+      { ...runArgs },
+      agent,
+    )
+    const elapsed = Date.now() - startedAt
+    expect(workerCalls).toBe(2)
+    expect(run.report.tasks[0]?.attempts[0]?.failure?.class).toBe('timeout')
+    expect(run.report.tasks[0]?.attempts[0]?.failure?.reason).toContain('child budget')
+    expect(run.report.status).toBe('completed')
+    // Within budget (1 s slice; generous ceiling for loaded CI), never wedged.
+    expect(elapsed).toBeLessThan(15_000)
+    expect(() => assertWorkflowReport(run.report, OBJECTIVE, runConfig)).not.toThrow()
+  }, 20_000)
 })

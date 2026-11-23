@@ -1,0 +1,18 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/rsi-round-48
+
+ ✓ test/timeout.spec.ts (22 tests) 12125ms
+     ✓ settles a hung call as a timeout and retries the task instead of failing the run  1061ms
+     ✓ extends a stalled call once the guardian says wait, and the child still wins  2505ms
+     ✓ kills the stalled call when the guardian says kill, and the task still retries  1004ms
+     ✓ stops granting waits at the run deadline without asking the guardian again (rule B)  3005ms
+     ✓ broadcasts a rescue line when the guardian says rescue, and grants the slice  2505ms
+     ✓ fails a stalled call straight to retry when no guardian is configured  1005ms
+     ✓ settles a hung call within budget in a realm with no timer at all  1009ms
+
+ Test Files  1 passed (1)
+      Tests  22 passed (22)
+   Start at  15:38:32
+   Duration  12.82s (transform 524ms, setup 0ms, import 578ms, tests 12.13s, environment 0ms)
+
+EXIT=0

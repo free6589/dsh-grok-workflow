@@ -1,0 +1,48 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/rsi-round-48
+
+ ❯ test/timeout.spec.ts (22 tests | 1 failed | 21 skipped) 20027ms
+     ↓ names the cheapest tier that has been exceeded
+     ↓ ignores a value that is not a positive finite number
+     ↓ clamps a caller value into the range the script enforces
+     ↓ says which call overran and what to do next
+     ↓ keeps the command tier at two minutes
+     ↓ keeps the 120-minute base budget when no adjudicator is configured
+     ↓ covers the script wait window when a guardian route is configured
+     ↓ parses a verdict from every shape the child may answer in
+     ↓ grants the wait slice under rule B: never past the run deadline
+     ↓ decides wait or kill from the verdict, the wait count and the deadline
+     ↓ mirrors the wait rules in the generated script
+     ↓ races on Atomics.waitAsync where no setTimeout exists
+     ↓ carries the race, the default bound and the two-minute command rule
+     ↓ mirrors the guardian adjudication constants from src/timeout.ts
+     ↓ settles a hung call as a timeout and retries the task instead of failing the run
+     ↓ extends a stalled call once the guardian says wait, and the child still wins
+     ↓ kills the stalled call when the guardian says kill, and the task still retries
+     ↓ stops granting waits at the run deadline without asking the guardian again (rule B)
+     ↓ broadcasts a rescue line when the guardian says rescue, and grants the slice
+     ↓ fails a stalled call straight to retry when no guardian is configured
+     ↓ leaves a responsive call alone in the realm with no host timer
+     × settles a hung call within budget in a realm with no timer at all 20025ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/timeout.spec.ts > the generated script enforces the child budget > settles a hung call within budget in a realm with no timer at all
+Error: Test timed out in 20000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/timeout.spec.ts:478:3
+    476|   })
+    477|
+    478|   it('settles a hung call within budget in a realm with no timer at al…
+       |   ^
+    479|     // Round-48 fallback: a realm with neither setTimeout nor Atomics.…
+    480|     // (`canRaceCalls === false`) used to await the child bare — a hun…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 21 skipped (22)
+   Start at  15:36:34
+   Duration  20.69s (transform 487ms, setup 0ms, import 540ms, tests 20.03s, environment 0ms)
+

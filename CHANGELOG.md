@@ -7,6 +7,10 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ### Fixed / 修复
 
+- **A hung child can no longer wedge the wave when the realm has no timer / 无定时器环境下 hung 子调用不再卡死整波** —
+  Without `setTimeout` or `Atomics.waitAsync` the child race awaited bare, so a hung child wedged the wave and every replan boundary after it. The no-timer path now watches settlement on the host clock within the run/child budget and rejects with the same timeout prefix, so the task retries instead of wedging. With no readable clock or no budget the call stays bare rather than hanging on an unreadable deadline.
+  / 没有定时器时子调用是裸等的，一个 hung 住的子调用会卡死整波和后面的重规划边界。现在无定时器路径在运行/子预算内盯着宿主时钟看，超时用同一前缀判停走重试；实在没时钟或没预算才保持裸等，不拿读不出的期限去挂死环境。
+
 - **Restored evidence no longer aliases the checkpoint / 恢复的证据不再与检查点串改** —
   The restore plan shallow-copied the evidence array but shared its items, so editing a restored citation rewrote the validated checkpoint behind it. Evidence items are now copied per item; outputs/files stay as they were (plain strings need no deeper copy).
   / 恢复计划只拷了证据数组没拷里面的条目，改恢复后的引用会串改已校验的检查点。现在每条证据单独拷一份；输出和文件本来就是纯文字，保持原样。

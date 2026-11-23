@@ -1,0 +1,44 @@
+RSI round 48 — isolated live-chain soak (2026-11-23, Asia/Singapore)
+工作目录基线 / baseline: worktree .agents/worktrees/rsi-round-48 @ 974a3f6 (rsi/round-48)
+含 round-48 改动 / includes: raceChildCall 无定时器兜底 (src/script.ts + test + lib 重建)
+DSH: 0.2.2-rc.3 (dsh --version 口径沿用 round-47，同机同版本)
+
+隔离 / isolation
+- DSH_HOME=<worktree>/.tmp/soak-48/home（gitignored，.tmp/ 整目录忽略）
+- live 家目录 ~/.dsh 全程只读检查、未写入；未重启/未触碰现行实例
+- 全程无 web 实例（仅用 headless，用完即退，无残留监听端口）
+
+步骤 / steps (all with DSH_HOME=<scratch>)
+1. 建 profile: dsh --profile grok-soak-48 --from-default-profile headless --dump-config
+   -> 建成。workflow-ptc 行存在且 config provider=spawn（未 disabled）；subagent 提供者在位。
+2. 装插件: dsh plugin --profile grok-soak-48 add <worktree 路径>
+   -> exit 0（link 安装）。--dump-config 含 `grok-workflow` 行。
+3. 模型链路探针 / model-route probe:
+   dsh --profile grok-soak-48 headless 'Say exactly: SOAK-PROBE-OK'
+   -> MISSING_CREDENTIAL（llm-deepseek route "deepseek-official" 无 key；stdout 为空）
+4. 最小真实工作流 / minimal real workflow:
+   dsh --profile grok-soak-48 headless 'Use the grok_workflow tool ... "List the two smallest prime numbers" ...'
+   -> exit 1，同上 MISSING_CREDENTIAL（stdout 为空）。未伪造任何 COMPLETED。
+
+凭证说明 / credentials: 本环境仅做布尔存在性检查（变量名），未读取、未回显任何值；
+隔离家目录无凭证；未从其他 profile 拷贝密钥（LOCAL-TESTING 禁止事项）。
+
+verify:lib 说明 / note: `npm run ci` 内 verify:lib 在本 worktree 报
+  MODULE_NOT_FOUND /tmp/verify-lib-*/node_modules/typescript/bin/tsc ——
+  worktree 的 node_modules 为近空目录（仅 .vite/.vite-temp），脚本将其 symlink
+  进临时目录故 tsc 不可用。属环境问题（沿用 round-47 基线亦同），非本次改动引入。
+  等价手工核验：git archive HEAD + 主树 node_modules 链接 + 主树 tsc 构建，
+  基线 HEAD 的 lib/ 与其构建一致（除本次改动预期的 script.js 外无 DIFF）；
+  改后已 `npm run build` 重建 lib/（script.js + map + d.ts.map 三文件变）。
+
+清理 / cleanup: scratch 家目录 <worktree>/.tmp/soak-48（含 home/ 与原始输出）已整体删除；
+live 家目录未动；无残留进程/端口；无提交、无 push、无改版本。
+
+结论 / verdict: BLOCKED —— 插件安装 + profile 组合链路通（grok-workflow 行 + link 安装成功），
+但隔离环境无可用模型额度（MISSING_CREDENTIAL），未能跑出 COMPLETED。
+无定时器兜底逻辑以单测钉死（见 round-048/ci-test.txt 1640 绿 + green.txt 超时专项 22 绿），
+真机链路待有额度后重跑。
+Verdict: BLOCKED — plugin install + profile composition verified; no usable model
+credential in this environment, so no COMPLETED run observed; nothing fabricated.
+
+证据 / evidence: 本文件 .rsi/evidence/round-048/soak.txt（脱敏，无密钥/token/cookie）。

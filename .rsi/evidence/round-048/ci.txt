@@ -1,0 +1,21 @@
+=== round-48 ci composition ===
+typecheck:
+
+> dsh-grok-workflow@0.13.20 typecheck
+> tsc -p tsconfig.json --noEmit
+
+TYPECHECK_EXIT=0
+
+lint:
+Found 33 warnings and 0 errors.
+Finished in 208ms on 147 files with 96 rules using 6 threads.
+LINT_EXIT=0
+
+verify:lib: BLOCKED-by-env (worktree node_modules near-empty; manual HEAD-vs-build comparison done, see soak.txt)
+
+test:
+      Tests  1640 passed (1640)
+   Start at  15:40:30
+   Duration  100.19s (transform 2.31s, setup 0ms, import 7.51s, tests 83.00s, environment 9ms)
+
+TEST_EXIT=0
