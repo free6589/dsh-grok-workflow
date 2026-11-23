@@ -8,6 +8,8 @@ interface ExecutableTool {
   name: string
   execute(args: Record<string, unknown>, exec: Record<string, unknown>): Promise<unknown>
   output: { render(args: unknown, value: unknown): { type: string; text: string }[] }
+  /** Cooperative host-side tool deadline; absent means the registry arms none. */
+  timeoutMs?: number
 }
 
 class FakeEngine {
@@ -121,6 +123,23 @@ describe('plugin lifecycle and tool boundary', () => {
     expect(ctx.engine.startCalls[0]!.maxTotalAgents).toBeGreaterThan(0)
     const rendered = ctx.tool!.output.render({}, report)
     expect(rendered[0]!.text).toContain('COMPLETED')
+  })
+
+  // Manual item Sec.2-1 ("运行时限默认还是 60 分钟，我要的是不限时"): "0 = unlimited"
+  // is only true end to end if the *host tool definition* carries no deadline
+  // either. `defineTool` rejects a non-positive number, so the registration omits
+  // the field for 0 and for a value past the setTimeout ceiling; a regression
+  // here would put a silent host-side cap back on an unbounded run.
+  it('arms no host tool deadline when the run deadline is unlimited (the default)', () => {
+    const ctx = new FakeContext()
+    apply(ctx as never, {})
+    expect(ctx.tool?.timeoutMs).toBeUndefined()
+  })
+
+  it('gives the tool the run deadline plus 60 s of headroom when one is configured', () => {
+    const ctx = new FakeContext()
+    apply(ctx as never, { timeoutMs: 3_600_000 })
+    expect(ctx.tool?.timeoutMs).toBe(3_660_000)
   })
 
   it('rejects recursive invocation from a subagent', async () => {
