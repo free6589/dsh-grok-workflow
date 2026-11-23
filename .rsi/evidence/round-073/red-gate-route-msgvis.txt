@@ -1,0 +1,136 @@
+# round-073 red evidence: the new cases against the 0.13.23 gate (before the fix)
+#
+# base commit: 63cc1db (branch fix/gate-route-msgvis from main)
+# how: `cp src/gate.ts .tmp/gate.new.ts && git checkout -- src/gate.ts`
+#      `npx vitest run test/captain-confirm.spec.ts test/channel.spec.ts test/grok-on-ingress.spec.ts`
+#      then the working source was restored from .tmp
+# result on the OLD source: 5 failed | 52 passed — every case below is green on the new one
+#   test/captain-confirm.spec.ts  voids an expired confirmation instead of dispatching the plan it names
+#   test/captain-confirm.spec.ts  never hands the full shape the confirmation word as its objective
+#   test/captain-confirm.spec.ts  states an expired confirmation on the full shape instead of running it
+#   test/channel.spec.ts          lets the normal path consume it instead of queueing "确认" into the live run
+#   test/grok-on-ingress.spec.ts  shows the first message of a fresh session before the run finishes (deployment `full`)
+# (the rewritten test/gate.spec.ts first-turn case is red on the old source as well: it waited
+#  for the run at `expect(settled).toBe(false)`; not captured in this log because the file was
+#  run separately.)
+#
+     ✓ omits the context block when there is no conversation yet 0ms
+     ✓ carries the previous objective and the demand in one bounded request 0ms
+     ✓ states an unknown previous objective instead of inventing one 0ms
+     ✓ keeps the demand when the budget is tight, cutting the previous objective first 0ms
+     ✓ the receipt names the merge point, not a new run 0ms
+     ✓ the stop terminal claims no completion and keeps verified work 0ms
+     ✓ an idle stop says nothing was started 0ms
+     ✓ the carried round says why it is one round later 0ms
+     ✓ ledger outcomes are stable strings 1ms
+     ✓ answers the receipt while the run is still live, and leaves the run alone 204ms
+     ✓ A3: queues the demand for the planner together with the conversation 87ms
+     ✓ A4: a demand that never reached a boundary opens the next round 137ms
+     ✓ A1: the conclusion of the round is delivered into the same session 104ms
+     ✓ cancels the live run and starts nothing 108ms
+     ✓ answers a bare stop with nothing running instead of admitting it as a task 2ms
+     ✓ still acknowledges at once (the background admission is not the channel) and starts one round 54ms
+     ✓ acknowledges a mid-run demand into the live plan instead of a second round 95ms
+     × lets the normal path consume it instead of queueing "确认" into the live run 44ms
+ ❯ test/captain-confirm.spec.ts (9 tests | 3 failed) 506ms
+     ✓ states the split and asks once, without starting a run 156ms
+     ✓ dispatches the original request when the user approves 59ms
+     ✓ carries an explicit change into the dispatched request 55ms
+     ✓ voids an unanswered confirmation and routes the new message on its own 7ms
+     ✓ does not ask when the session forced the full shape 13ms
+     ✓ does not ask twice when the front desk question was just answered 140ms
+     × voids an expired confirmation instead of dispatching the plan it names 10ms
+     × never hands the full shape the confirmation word as its objective 59ms
+     × states an expired confirmation on the full shape instead of running it 4ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/captain-confirm.spec.ts > captain foreground: the split is confirmed before any work is dispatched > voids an expired confirmation instead of dispatching the plan it names
+AssertionError: expected '队长确认：按上面报的拆法派活。' to contain '已过期'
+
+Expected: "已过期"
+Received: "队长确认：按上面报的拆法派活。"
+
+ ❯ test/captain-confirm.spec.ts:258:18
+    256|       clock.mockRestore()
+    257|     }
+    258|     expect(text).toContain('已过期')
+       |                  ^
+    259|     expect(ctx.dispatches).toHaveLength(0)
+    260|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  test/captain-confirm.spec.ts > captain foreground: the split is confirmed before any work is dispatched > never hands the full shape the confirmation word as its objective
+AssertionError: expected 'Current request:\n确认' to contain '帮我重构 run.ts 的超时逻辑'
+
+- Expected
++ Received
+
+- 帮我重构 run.ts 的超时逻辑
++ Current request:
++ 确认
+
+ ❯ test/captain-confirm.spec.ts:277:23
+    275|     expect(ctx.dispatches).toHaveLength(1)
+    276|     const objective = String((ctx.dispatches[0]!.args as { objective: …
+    277|     expect(objective).toContain('帮我重构 run.ts 的超时逻辑')
+       |                       ^
+    278|     expect(objective.trim()).not.toBe('确认')
+    279|     expect(text).toContain('队长确认')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  test/captain-confirm.spec.ts > captain foreground: the split is confirmed before any work is dispatched > states an expired confirmation on the full shape instead of running it
+AssertionError: expected '已接单：这条消息正在按整套流程（拆解 → 执行 → 核验）运行。跑完会单独…' to contain '已过期'
+
+Expected: "已过期"
+Received: "已接单：这条消息正在按整套流程（拆解 → 执行 → 核验）运行。跑完会单独发一条结论给你；期间可以继续发消息，新消息会排在这次之后各自开工。"
+
+ ❯ test/captain-confirm.spec.ts:298:18
+    296|     }
+    297|     // The void note is the whole answer: no run and no "确认" objective.
+    298|     expect(text).toContain('已过期')
+       |                  ^
+    299|     await new Promise(resolve => setTimeout(resolve, 20))
+    300|     expect(ctx.dispatches).toHaveLength(0)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  test/channel.spec.ts > a split confirmation is not a demand for the plan in flight > lets the normal path consume it instead of queueing "确认" into the live run
+AssertionError: expected [ { id: 'steer-mwtfs1ic-8-1', …(2) } ] to have a length of +0 but got 1
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ test/channel.spec.ts:560:74
+    558|       // not work to merge, and a demand would both lose the confirmat…
+    559|       // the run on one word.
+    560|       expect(steeringForSession('sess-channel-captain')!.take().intent…
+       |                                                                          ^
+    561|       // It dispatched the plan it confirms instead.
+    562|       await waitFor(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  test/grok-on-ingress.spec.ts > /grok on keeps message ingress open > shows the first message of a fresh session before the run finishes (deployment `full`)
+Error: the first message is still invisible while the run works
+ ❯ test/grok-on-ingress.spec.ts:355:15
+    353|     await vi.waitFor(() => {
+    354|       if (!transcript(session).includes('audit the release pipeline'))…
+    355|         throw new Error('the first message is still invisible while th…
+       |               ^
+    356|       }
+    357|     })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  3 failed (3)
+      Tests  5 failed | 52 passed (57)
+   Start at  23:44:22
+   Duration  4.64s (transform 786ms, setup 0ms, import 1.26s, tests 2.92s, environment 0ms)
+

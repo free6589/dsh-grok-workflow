@@ -348,6 +348,27 @@ user message ──► agent/pre-step ──► classify
   plan through `src/channel.ts` / `src/steering.ts`.
   The preview is advisory: the dispatched run plans again, and the gap is recorded
   in `docs/knowledge/RESEARCH.md` (round-071).
+  Round-072 closed three ways one confirmation could go wrong: the entry is
+  consumed exactly once per batch (`takeCaptainPending`, TTL applied) and the
+  consumed value is handed to every path, so an expired question can never dispatch
+  its plan; a message that is not an answer is voided *and* routed on its own by the
+  path that states the note, never silently dropped; and the batch is queued before
+  it is recorded, so a full queue leaves no delivery record for a run that never
+  started. The channel steps aside for a confirmation (`src/channel.ts`
+  `classifyChannelMessage` would read "确认" as a demand for the live plan), and the
+  full shape — which has no front desk — reads the same entry instead of handing the
+  word "确认" to the planner as the objective.
+- **The first turn of a session never waits for the run to be visible (0.13.24).**
+  A claimed batch may only be published once the host's first surface node exists
+  (`system/message` first, or the stored log can never be reopened), so on a fresh
+  session the gate cannot echo the message ahead of the run — and `in-turn` commits
+  it only when the step opens, i.e. after the workflow settles. A first-turn message
+  in the `full` shape therefore answers with the words alone
+  (`answerBehindUnpublished`): the loop opens the step and commits them at once, the
+  team runs behind them, and the report is delivered as its own message through the
+  same relay path every deferred answer uses. Nothing is written ahead of the host
+  head, so the position-0 rule is untouched; a session whose surface cannot be read,
+  and any shape with a front desk, keep the blocking path unchanged.
 - **The gate reads the live configuration** on every decision (holders, see the
   settings section), so an edit applies to the next message while an in-flight
   run keeps its snapshot; an invalid edit refuses that message with its reason

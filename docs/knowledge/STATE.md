@@ -1,3 +1,16 @@
+Last updated: 2026-11-24 00:1x +08:00（**round-073 分支 `fix/gate-route-msgvis` 落地，未合流未发版，`CONFIRMED`** —
+两个症状同一分支：①**首轮消息不可见**：新会话第一句在 `in-turn` 里既不能预发布（`commitClaimed` 依
+`surfaceHasHead` 拒绝——写在宿主 `system/message` 之前会占 surface 位置 0、把存档写坏，0.13.14 前提），
+又要等整轮结束才由 loop 提交，于是 26 行日志里 `step/start=0`、`user/message=0`。修法：`full` 形状 +
+可后台投递 + 表面可读且为空时，先 `enter` 只带原话让 loop 立刻开 step 提交，团队在后台跑，结论走
+`deliverRelay` 下一轮投递（`answerBehindUnpublished`；不写任何抢先位置的东西）。②**队长确认多处走歪**：
+交互路径用 `pendingCaptains.get` 无 TTL（过期确认照样派活）、`record(started)` 早于 `enqueue`（队列满留假账）、
+`full` 形状没人读这个确认（"确认"自己成了一轮的目标）。修法：`answerInTurn` 在 replan 通道检查之前
+`takeCaptainPending` 一次并把值传给 `answerOnChannel`/`answerTeamInteractive`/`answerFullBehind`/`produceAnswer`；
+过期不派活；`other` 由阻塞路径统一作废并单独分流；频道在"这是拆法确认"时让路；先 `enqueue` 成功再 `record`。
+`/grok on` 语义未动（F7 只出建议）。门禁 `npm run ci` **exit 0：92 files / 1722 tests**；
+新用例对旧码 5 红（`.rsi/evidence/round-073/red-gate-route-msgvis.txt`）。真机 soak `NOT_RUN`（不发布）。）
+
 Last updated: 2026-11-23 23:1x +08:00（**已发版 `0.13.23`：五路合流（保命 3 条 + 体验档 5 条 + 队长三件套），
 隔离真机 soak PASS，`CONFIRMED`** — 五路各自在 `cda5d4e` 开出、`--no-ff` 依次合入 main 系 worktree
 `.agents/worktrees/fix-synth-resubmit`：`fix/lifeline3-resume-scan`（仅 test）→ `fix/dispose-drain`（卸载排水）→

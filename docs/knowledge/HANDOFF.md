@@ -1,3 +1,31 @@
+## 2026-11-24 — round-073 分支 `fix/gate-route-msgvis`：首轮可见 + 队长确认一次性消费（未合流，`CONFIRMED`）
+
+- **From:** 修复子代理B（gate 路由 + 消息可见）· **To:** lead / 合流者
+- **分支与基线**：`.agents/worktrees/fix-gate-msgvis`（分支 `fix/gate-route-msgvis`，从 `63cc1db`/0.13.23 开出）。
+  共享工作树当时是 detached `a6103ad`（0.13.14，**没有** `src/captain.ts`），且 `main` 已被
+  `.agents/worktrees/fix-synth-resubmit` 占用——所以**没有**在共享树切分支，也没碰任何人的未提交改动。
+- **改了什么（只 `src/gate.ts`）**：新增 `CaptainPending` 类型、`askCaptain()`（一问一答 + B04 携带）、
+  `surfaceHasNoHead()`、`answerBehindUnpublished()`；改 `takeCaptainPending` 返回类型、`produceAnswer`
+  （确认由参数传入，`full` 分支也认确认）、`answerOnChannel`（拆法确认让路）、`answerTeamInteractive`
+  （TTL + 先排队后记账）、`answerFullBehind`（`full` 形状的确认：批准派原请求、过期/非回答回作废文案）、
+  `answerInTurn`（统一一次 `takeCaptainPending` + 首轮可见路径）。**没碰 `src/captain.ts`、`src/command.ts`。**
+- **行为改动（会影响测试口径）**：`mode:full`（部署级或会话级）＋可后台投递的交互会话，**首轮**不再
+  阻塞在轮内，改为"原话立刻可见 + 结论下一轮投递"。为此 `test/gate.spec.ts`、`test/phase1-dialogue.spec.ts`
+  里钉"首轮阻塞/预发布"的用例改用"已有宿主 head 的会话"夹具（`headed()`，含 `step/end`），首轮新契约由
+  `gate.spec.ts` 的 P0-5 用例与 `grok-on-ingress.spec.ts` 的新用例单独钉住。
+- **验证**：`npm run ci` exit 0（92 files / 1722 tests；`typecheck`/`lint`/`verify:lib` 全过，`lib/` 随提交）。
+  新用例对旧码红：`test/captain-confirm.spec.ts` 3 条、`test/channel.spec.ts` 1 条、
+  `test/grok-on-ingress.spec.ts` 1 条（证据 `.rsi/evidence/round-073/red-gate-route-msgvis.txt`）。
+- **顺手修的既有竞态**：`test/channel.spec.ts` A4 在旧码上 3 次红 1 次（`steeringForSession` 断言抢在
+  下一轮频道关闭之前）；改为等频道关闭。不是本次行为改动引起。
+- **没做/建议（交给 lead 判）**：①`/grok on` 的产品语义未动——它写 `workflowMode:'full'`，而部署级
+  `mode:full` 根本不问队长；线上 profile 是 `mode:full + grokDefault:on`，所以"队长确认"这条路在该
+  profile 下永远不会走到。要不要让部署级 `full` 也问一次确认，是产品决策，不是本次修复范围。②真机
+  隔离 soak `NOT_RUN`（本轮不发布）。③`pendingCaptains` 仍是进程内 Map，重启即失忆（与前台 pending 同构）。
+- **合流提示**：`src/gate.ts` 与 `test/{gate,phase1-dialogue,channel,captain-confirm,grok-on-ingress,
+  objective-limit,reliability}.spec.ts` + `lib/**` + `CHANGELOG.md` 的 `[Unreleased]` 一起合；合流后
+  建议重跑 `npm run ci` 与一次隔离真机 soak（首轮可见 + 确认过期这两条各看一眼）。
+
 ## 2026-11-23 — 已发版 `0.13.23`：五路合流（保命 1/2/3 + 体验档 5 条 + 队长三件套）+ 隔离真机 soak PASS（`CONFIRMED`）
 
 - **From:** 合并+验证+发版子代理（merge-release）· **To:** lead / 下一轮接手者
