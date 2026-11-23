@@ -1,0 +1,13 @@
+ ✓ test/criterion.spec.ts (5 tests) 9ms
+ ✓ test/i18n-parity.spec.ts (6 tests) 8ms
+ ✓ test/iterate-template.spec.ts (7 tests) 7ms
+ ✓ test/upstream.spec.ts (8 tests) 8ms
+ ✓ test/update-entry.spec.ts (5 tests) 7ms
+ ✓ test/docs-architecture-version.spec.ts (3 tests) 6ms
+
+ Test Files  87 passed (87)
+      Tests  1659 passed (1659)
+   Start at  22:12:22
+   Duration  103.38s (transform 1.94s, setup 0ms, import 7.55s, tests 84.46s, environment 10ms)
+
+CI_EXIT=0

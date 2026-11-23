@@ -412,6 +412,122 @@ describe('unload checkpoints', () => {
   })
 })
 
+/* ------------------------------------------- 3b. a cut run keeps its body -- */
+
+describe('no report: the observed child calls still fill the body', () => {
+  /**
+   * The cancellation shape: the engine ran children, then the run was cut before
+   * any report existed (unload, deadline, `report-invalid`). The file used to
+   * carry `tasks: []`, `agents: []` and nothing else about the work — a corpse
+   * with the pockets emptied. Every fact asserted below is one the engine's own
+   * `workflow/agent-start` / `workflow/agent-end` events stated; nothing here is
+   * derived from a child's self-report, and no role is guessed.
+   */
+  it('writes task and agent rows from the engine events when no report exists', async () => {
+    const events = new FakeEvents()
+    const dir = join(scratch, 'observed-body')
+    let now = 1_000
+    const recorder = createCheckpointRecorder({
+      ...options({ directory: dir, events, now: () => now }),
+      startedAtMs: 1_000,
+    })
+    recorder.adopt({ id: 'run-13' })
+
+    // Payload shape the engine really emits: (runInfo, member).
+    const start = (member: Record<string, unknown>): void => { events.emit('workflow/agent-start', { id: 'run-13' }, member) }
+    const end = (member: Record<string, unknown>): void => { events.emit('workflow/agent-end', { id: 'run-13' }, member) }
+
+    start({ seq: 1, label: '执行', phase: '任务 1 · 修好取消路径', childId: 'child-a' })
+    now = 1_150
+    end({ seq: 1, label: '执行', phase: '任务 1 · 修好取消路径', childId: 'child-a', outcome: 'completed' })
+    start({ seq: 2, label: '执行（尝试 2）', phase: '任务 1 · 修好取消路径', childId: 'child-b' })
+    now = 1_200
+    end({ seq: 2, label: '执行（尝试 2）', phase: '任务 1 · 修好取消路径', childId: 'child-b', outcome: 'cancelled' })
+    start({ seq: 3, label: '检查', phase: '验证任务 2', childId: 'child-c' })
+    // A label that names no host role: the call gets a task row, never an
+    // invented role.
+    start({ seq: 4, label: '临时帮手', phase: '任务 4 · 无关工作', childId: 'child-d' })
+    now = 1_400
+    end({ seq: 4, label: '临时帮手', phase: '任务 4 · 无关工作', childId: 'child-d', outcome: 'completed' })
+    // A different run's events must not be filed under ours.
+    events.emit('workflow/agent-start', { id: 'run-other' }, { seq: 9, label: '执行', childId: 'child-x' })
+
+    const written = await recorder.unload('the plugin was unloaded while the run was in flight')
+    expect(written?.ok).toBe(true)
+    const checkpoint = await readCheckpoint(checkpointFile('run-13', { dir }))
+
+    expect(checkpoint.run.status).toBe('cancelled')
+    // Task rows: id, task name, status, attempts — from the events alone.
+    expect(checkpoint.tasks.map(task => [task.id, task.title, task.status, task.attempts])).toEqual([
+      // `completed` is not `verified`: only a verifier's verdict says verified, and
+      // a row claimed as verified would drop out of `resumeDecision.unfinished`.
+      ['child-a', '任务 1 · 修好取消路径', 'running', 1],
+      ['child-b', '任务 1 · 修好取消路径', 'cancelled', 2],
+      ['child-c', '验证任务 2', 'running', 1],
+      ['child-d', '任务 4 · 无关工作', 'running', 1],
+    ])
+
+    // Agent rows: only settled calls, only roles a label actually names.
+    expect(checkpoint.agents.map(row => [row.role, row.attempt, row.outcome, row.startedAtMs, row.durationMs])).toEqual([
+      ['worker', 1, 'ok', 1_000, 150],
+      ['worker', 2, 'failed', 1_150, 50],
+    ])
+
+    // An observation is not a plan: the plan source stays honestly unavailable.
+    expect(checkpoint.plan).toEqual({ source: 'unavailable', taskCount: 0, tasks: [] })
+    // Evidence needs a verification verdict, which only a report carries.
+    expect(checkpoint.evidence).toEqual([])
+
+    // What the body is for: a cut run now names the work to re-drive instead of
+    // answering "the checkpoint carries no task rows".
+    const decision = resumeDecision(checkpoint)
+    expect(decision.action).toBe('resume')
+    expect(decision.unfinished).toEqual(['child-a', 'child-b', 'child-c', 'child-d'])
+    recorder.dispose()
+  })
+
+  it('keeps a row for a call whose start predates the recorder', async () => {
+    // The recorder subscribes when it is created, but a plugin that is set up mid
+    // run can miss the start. Dropping the call would erase work that plainly ran,
+    // and inventing a start time would claim a span nobody witnessed — so the row
+    // records the end alone, with no timestamps it did not observe.
+    const events = new FakeEvents()
+    const dir = join(scratch, 'end-only')
+    const recorder = createCheckpointRecorder(options({ directory: dir, events }))
+    recorder.adopt({ id: 'run-15' })
+    events.emit('workflow/agent-end', { id: 'run-15' }, {
+      seq: 1, label: '执行', phase: '任务 1 · 早于订阅', childId: 'child-e', outcome: 'failed',
+    })
+
+    await recorder.tick()
+    const checkpoint = await readCheckpoint(checkpointFile('run-15', { dir }))
+    expect(checkpoint.tasks.map(task => [task.id, task.title, task.status, task.attempts])).toEqual([
+      ['child-e', '任务 1 · 早于订阅', 'failed', 1],
+    ])
+    expect(checkpoint.agents).toEqual([{ role: 'worker', outcome: 'failed', attempt: 1 }])
+    recorder.dispose()
+  })
+
+  it('lets a report win over the observed rows, as before', async () => {
+    const events = new FakeEvents()
+    const dir = join(scratch, 'report-wins')
+    const recorder = createCheckpointRecorder(options({ directory: dir, events }))
+    recorder.adopt({ id: 'run-14' })
+    events.emit('workflow/agent-start', { id: 'run-14' }, { seq: 1, label: '执行', phase: '任务 1 · observed', childId: 'child-a' })
+
+    await recorder.finish({
+      report: reportOf('partial', [taskReport('task-1', 'verified')]),
+      stopReason: 'completed',
+    })
+    const checkpoint = await readCheckpoint(checkpointFile('run-14', { dir }))
+    // The report's own rows are the ones that run really produced.
+    expect(checkpoint.tasks.map(task => [task.id, task.status])).toEqual([['task-1', 'verified']])
+    expect(checkpoint.agents.map(row => row.role)).toEqual(['planner', 'worker', 'verifier', 'synthesizer'])
+    expect(checkpoint.plan.source).toBe('planner')
+    recorder.dispose()
+  })
+})
+
 /* ------------------------------------------------------------- 4. no roles -- */
 
 describe('four roles, host-side only', () => {

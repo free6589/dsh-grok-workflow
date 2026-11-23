@@ -14,7 +14,10 @@
  * 2. **Terminal checkpoints.** `finish()` writes the run's final status and the
  *    report-derived rows (tasks, agents, evidence); `unload()` writes the
  *    `cancelled` shape that a plugin unload produces, before the runs are
- *    cancelled, because afterwards there is no run left to describe.
+ *    cancelled, because afterwards there is no run left to describe. A run cut
+ *    before any report existed still carries the child calls the engine
+ *    announced (see {@link ObservedChildCall}), so the file names the work that
+ *    ran instead of saying nothing about it.
  * 3. **Host-side watchdog evidence.** Deadline and cancellation facts flow into
  *    `watchdog` from the host: the recorder's own clock against the deadline it
  *    was given, the engine's `workflow/end` stop reason, and the caller's own
@@ -36,8 +39,12 @@
  *   answers a *host* question — "should a new run be started from this file, and
  *   with which unfinished tasks?" — and says so in its reason string.
  * - It never writes what it cannot observe. Before a report exists the
- *   checkpoint says `plan.source: 'unavailable'` with no tasks and no agent rows,
- *   instead of guessing at the plan from the script text. `git` is written only
+ *   checkpoint says `plan.source: 'unavailable'` with no plan tasks — the plan
+ *   lives inside the script — and records no evidence, which needs a verifier's
+ *   verdict no host-side event carries. The one thing it *can* observe is the
+ *   engine's `agent-start`/`agent-end` stream, and those calls are recorded as
+ *   they were announced: no stage is guessed at, no outcome is invented, and no
+ *   role is named that the call's own label did not name. `git` is written only
  *   when the caller supplies a provider; otherwise the schema default is recorded
  *   and must not be read as an observation.
  *
@@ -71,6 +78,13 @@ export declare const CHECKPOINT_WIRING_LIMITS: {
     readonly maxConsecutiveFailures: 3;
     /** How many distinct run ids one recorder keeps event rows for. */
     readonly rememberedRuns: 4;
+    /**
+     * Upper bound on child calls kept per run, so a runaway script cannot grow the
+     * recorder's memory. The schema's own `maxAgents` bound is the ceiling a file
+     * can carry, and the task rows are sliced to `maxTasks` separately; this is the
+     * raw observation list both are derived from.
+     */
+    readonly observedCalls: 512;
     /**
      * Upper bound on the wait for the unload checkpoint. A disposer must finish;
      * an abandoned write is dropped (it never retries and starts no timer).
