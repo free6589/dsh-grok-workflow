@@ -22,7 +22,7 @@ import {
 import { buildWorkflowRequest } from './script.js'
 import { inheritanceForSession } from './carryover.js'
 import { teamWorkflowEngine } from './team-engine.js'
-import { createCheckpointRecorder, findResumableCheckpoint, unloadCheckpointRecorders } from './checkpoint/wiring.js'
+import { createCheckpointRecorder, findResumableCheckpoint, unloadCheckpointRecorders, resumeCarryover } from './checkpoint/wiring.js'
 import { createRunGuardian, guardianChildBudgetMs, unloadRunGuardians } from './guardian.js'
 import type { FileHeartbeat, GuardianSettlement, SessionHeartbeat } from './guardian.js'
 import { deliverReport } from './delivery/index.js'
@@ -723,16 +723,10 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
       // scratch dir instead of the real checkpoint folder.
       ...options.resumeLister === undefined ? {} : { lister: options.resumeLister },
     })
-  const resumedSeed = resumed === undefined ? undefined : resumed.decision.seed.trim()
-  const carryover = options.carryover !== undefined && options.carryover.trim() !== ''
-    ? options.carryover
-    : resumedSeed !== undefined && resumedSeed !== ''
-      ? [
-          resumed!.decision.reason,
-          `unfinished: ${resumed!.decision.unfinished.join(', ')}`,
-          `context: ${resumedSeed}`,
-        ].join('\n')
-      : undefined
+  // Precedence (caller context wins, then the resume seed, then nothing) lives in
+  // `resumeCarryover`, where it is unit-tested; this call site only supplies the
+  // two inputs.
+  const carryover = resumeCarryover(options.carryover, resumed)
   if (resumed !== undefined && carryover !== options.carryover) {
     logger.info?.(
       `grok-workflow resume: continuing ${resumed.decision.runId} ` +
