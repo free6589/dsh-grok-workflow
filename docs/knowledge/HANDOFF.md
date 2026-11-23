@@ -1,3 +1,28 @@
+## 2026-11-24 — 已发版 `0.13.24`：队长拆法绑定 + 首轮可见 + 确认单次消费（`CONFIRMED`）
+
+- **From:** 合并发版子代理（本会话）· **To:** 下一轮接手者
+- **发了什么**：prepare `b1fead6` 已推，annotated tag `v0.13.24`（对象 `6d5a88b`）已推；远端 Release run
+  `45223728613` success，GitHub Release `v0.13.24` 已发布。本地 `npm run ci` exit 0：92 files / 1729 tests、
+  typecheck 干净、lint 0 errors、`verify:lib` byte-identical（229 files）。
+- **合流**：`release/0.13.24` 从 `main` `63cc1db` 开出，`--no-ff` 三路——`fix/captain-approve` `00fc203`、
+  `fix/gate-route-msgvis` `f831fca`、`docs/user-soak-fork-profile` `57eadb9`。冲突 5 处，两边功能都留
+  （细节见 VALIDATION 0.13.24 表首行与两个 merge commit 的 message）：`preview` 存在 `CaptainPending.ask` 里，
+  `askCaptain(...)` 多一个 `preview` 参数并继续做 B04 承接，审批三条路都调 `approvedRequest`。
+- **真机 soak（用户视角）**：按新 AGENTS §3 规则 fork 在用 web profile（`scripts/clone-profile.mjs`，5/5 parity、
+  凭据按设计脱敏），把**构建产物**装进 fork 的 `node_modules/dsh-grok-workflow`，独立 `DSH_HOME` + 独立 `HOME`，
+  监听 `127.0.0.1:3183`，headless Chromium + CDP 当用户点：队长确认与首轮可见都在 GUI 里实测通过。
+  见 `.rsi/evidence/round-074/soak.txt`。live `~/.dsh` 与线上 3080 实例全程只读/未触碰。
+- **发版后补的修**：`e767ba6`（仅 test）——`test/captain-confirm.spec.ts` 加 `afterEach(closeAllSteering())`。
+  远端 CI on main 第一次跑（`45223718435`）Node 22 红 2 例，根因是模块级通道注册表跨用例泄漏（不是产品缺陷，
+  同一提交的 Release 门禁绿）；本地 Node 22/26 隔离跑 3/3 全绿，只有 2 vCPU runner 才复现。
+- **已知边界（未修，记在这里）**：`answerOnChannel` 把"通道存在"当成"本轮还在跑"；轮次刚结算到 `finally` 收尾之间
+  的那一瞬，用户消息会被回执成"并入了正在跑的这一轮"并靠 carry 进入下一轮。生产里窗口极短、要求不会丢，
+  但要更准确就得让 gate 同时看 `state.active`（当时判断：改产品语义的风险高于收益，先记为待办）。
+- **分支收尾**：`fix/captain-approve`、`fix/gate-route-msgvis`、`docs/user-soak-fork-profile`、`release/0.13.24`
+  四个 worktree 与其分支已删；另外清掉了 0.13.23 遗留、停在 `main` 上的 `.agents/worktrees/fix-synth-resubmit`（干净树）。
+  仍在的旧 worktree（`rsi/*`、`team-dispatch-v1`、`fix-progress-task-number-first`、`feat/live-steering`、
+  `docs/heartbeat-ledger`）不属本轮，未动。
+
 ## 2026-11-24 — round-073 分支 `fix/gate-route-msgvis`：首轮可见 + 队长确认一次性消费（未合流，`CONFIRMED`）
 
 - **From:** 修复子代理B（gate 路由 + 消息可见）· **To:** lead / 合流者

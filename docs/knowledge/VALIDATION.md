@@ -1,3 +1,27 @@
+## 已发版 0.13.24 队长拆法绑定 + 首轮可见 + 确认单次消费 — 2026-11-24 (`CONFIRMED`)
+
+| state | command | result |
+| --- | --- | --- |
+| 合流 `release/0.13.24`（`fix/captain-approve` ⊕ `fix/gate-route-msgvis` ⊕ `docs/user-soak-fork-profile`） | `git merge --no-ff` ×3 | 冲突 5 处（`src/gate.ts` ×4 + `test/captain-confirm.spec.ts` 导入 1 处）+ `lib/gate.*` 源映射；按"两边功能都留"手工合 |
+| 合流后组件 | `npx tsc -p tsconfig.json --noEmit`；`npx vitest run test/captain-confirm.spec.ts test/gate.spec.ts test/channel.spec.ts test/grok-on-ingress.spec.ts test/phase1-dialogue.spec.ts` | tsc exit 0；**5 files / 154 tests PASS** |
+| 发版提交 `b1fead6` | `npm run ci` | **exit 0：92 files / 1729 tests PASS**；typecheck 干净；lint 0 errors；`verify:lib` byte-identical（229 files） |
+| 真机隔离 soak（用户视角） | 见 `.rsi/evidence/round-074/soak.txt`（fork 的 web profile + 独立 `DSH_HOME`/`HOME` + 本机网关 `wb/cn:deepseek-v4.1-flash`，headless Chromium + CDP 在 GUI 里发消息） | **PASS**：队长报拆法 → 回「确认」→ 派发目标含 `USER APPROVED THIS SPLIT` 与原拆法三行，round `status completed · verified 2/2 · 8 criteria`；两个新会话（`mode: full`）首句在 t+5s / t+8s 已可见、其下仍是"正在分析请求"，ea28b24e 空转未复现 |
+| 远端 | Release workflow `45223728613`（tag `v0.13.24` → `b1fead6`） | **success**；GitHub Release `v0.13.24` 已发布 |
+| 远端 | CI on main `45223718435`（`b1fead6`） | **Node 24 success / Node 22 failure**：`test/captain-confirm.spec.ts` 2 例（`voids an unanswered confirmation…` 收到"并入正在跑的这一轮"回执、`does not ask when the session forced the full shape`）。根因：`src/steering.ts` 通道注册表是模块级、用例共用 `sess-captain`，前一用例后台轮的 `finally` 晚于其断言收尾 → 下一用例看到"有通道、没活轮"。本地 Node 22.23.4 与 Node 26 隔离跑该文件 3/3 全绿，只在 2 vCPU runner 复现 |
+| 修 flake（仅 test，`e767ba6`） | `afterEach(() => closeAllSteering())` + `npm run ci` | **exit 0：92 files / 1729 tests**；产品代码与 `lib/` 未动，`verify:lib` 仍 byte-identical |
+
+**合流决策（两边都留，逐条）**：① `pendingCaptains` 存 `preview`（round-073 的"派活的正是你看过的那套拆法"），
+同时保持 round-072 的单次消费形状 `CaptainPending`（TTL 只判一次、由 `answerInTurn` 取下后逐段下传）；
+② `askCaptain(agentId, request, lang, preview)` 保留 B04 的"上一问未被答就承接"规则并记录本次预览；
+③ 审批三条路（交互后台 / 完整形状阻塞 / 完整形状后台）统一 `approvedRequest(request, preview)`，
+原话整段保留、拆法作为约束附后；④ `test/captain-confirm.spec.ts` 同时保留两个 lane 的导入，并新增一条
+"完整形状也带 `USER APPROVED THIS SPLIT`"的断言（两 lane 各自的用例都不会覆盖这条交叉行为）。
+
+**Honest boundary**：soak 的两次首轮可见都跑得快（7–11 秒），证据是"运行中"（t+5s / t+8s）的 GUI 实况 + 截图，
+不是长跑逐秒录像；0.13.23 的坏法是"整轮零消息"，本轮同形状未复现。`answerOnChannel` 仍以"通道存在"作为
+"本轮在跑"的判据，结算到 `finally` 收尾之间的极短窗口里回执会略超前（要求靠 carry 进下一轮、不会丢），
+本轮未改产品语义，记为待办。
+
 ## round-073 `fix/gate-route-msgvis` — 首轮可见 + 队长确认一次性消费（未合流，`CONFIRMED`） — 2026-11-24
 
 | state | command | result |

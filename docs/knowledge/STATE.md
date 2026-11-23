@@ -1,3 +1,20 @@
+Last updated: 2026-11-24 01:30 +08:00（**已发版 `0.13.24`：三路合流（队长拆法绑定 + 首轮消息立刻可见 + 确认单次消费），隔离真机 soak PASS，`CONFIRMED`** —
+三路各自从 `main` `63cc1db`（0.13.23）开出，`--no-ff` 依次合入 `release/0.13.24`：`fix/captain-approve` `00fc203` →
+`fix/gate-route-msgvis` `f831fca` → `docs/user-soak-fork-profile` `57eadb9`。冲突 5 处（`src/gate.ts` ×4 + `test/captain-confirm.spec.ts` 导入）
+按"两边功能都要"手工合：`CaptainPending` 既保持单次消费（TTL 只判一次）又携带 `preview`；`askCaptain()` 既保留 B04 承接又记录预览文本；
+审批三条路（交互 / 完整阻塞 / 完整后台）统一走 `approvedRequest(request, preview)`；`lib/` 取 ours 后 `npm run build` 重建，
+另加 1 条断言钉住"完整形状也带批准拆法"。
+本地门禁：`npm run ci` exit 0（**92 文件 / 1729 测试 PASS**；typecheck 干净；lint 0 errors；`verify:lib` byte-identical，229 文件）。
+发版：prepare `b1fead6` → push main → annotated tag `v0.13.24`（tag 对象 `6d5a88b`）→ push tag → 远端 Release run
+`45223728613` **success**，GitHub Release `v0.13.24` 已发布。
+真机隔离 soak **PASS**（fork 出来的 web profile + 独立 `DSH_HOME` 与独立 `HOME`，浏览器里当用户用；本机网关
+`wb/cn:deepseek-v4.1-flash`）：队长报拆法 → 回「确认」→ 派出去的目标里带 `USER APPROVED THIS SPLIT` 与原拆法三行，
+收尾 `status completed · verified 2/2`；新会话首句（`我想。。` 形状）**立刻可见**，`session-ea28b24e` 的"空转一轮"未复现。
+**发版后补一条**：远端 CI on main `45223718435` 的 Node 22 红了 2 例，根因是 `test/captain-confirm.spec.ts` 的通道状态跨用例泄漏
+（`src/steering.ts` 是模块级注册表，用例共用同一 session id，前一用例的后台轮 `finally` 晚于该用例断言收尾 → 下一用例看到"有通道但没活轮"），
+修法 `afterEach(closeAllSteering())`，提交 `e767ba6`（同一提交的 Release 门禁本身是绿的）。
+证据：`.rsi/evidence/round-074/soak.txt` + 三张 GUI 截图、`docs/knowledge/VALIDATION.md` 的 0.13.24 表。）
+
 Last updated: 2026-11-24 00:1x +08:00（**round-073 分支 `fix/gate-route-msgvis` 落地，未合流未发版，`CONFIRMED`** —
 两个症状同一分支：①**首轮消息不可见**：新会话第一句在 `in-turn` 里既不能预发布（`commitClaimed` 依
 `surfaceHasHead` 拒绝——写在宿主 `system/message` 之前会占 surface 位置 0、把存档写坏，0.13.14 前提），
