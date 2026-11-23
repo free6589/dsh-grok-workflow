@@ -77,6 +77,8 @@ export declare class TaskBoard {
     reload(): Promise<void>;
     /** Read one row; throws `not-found` for an unknown id. The result is a copy. */
     get(id: string): TaskRecord;
+    /** True when a row with this id exists; never throws. */
+    has(id: string): boolean;
     /** List every row, sorted by id. Each entry is a copy. */
     list(): TaskRecord[];
     /**

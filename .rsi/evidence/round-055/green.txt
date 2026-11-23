@@ -1,0 +1,15 @@
+
+> dsh-grok-workflow@0.13.20 build
+> tsc -p tsconfig.build.json && node scripts/build-client.mjs
+
+client bundle: 303813 bytes → lib/client.js
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/rsi-round-55
+
+ ✓ test/taskboard.spec.ts (14 tests) 43ms
+
+ Test Files  1 passed (1)
+      Tests  14 passed (14)
+   Start at  17:17:33
+   Duration  754ms (transform 389ms, setup 0ms, import 410ms, tests 43ms, environment 0ms)
+

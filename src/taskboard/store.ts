@@ -232,6 +232,11 @@ export class TaskBoard {
     return clone(task)
   }
 
+  /** True when a row with this id exists; never throws. */
+  has(id: string): boolean {
+    return this.tasks.has(id)
+  }
+
   /** List every row, sorted by id. Each entry is a copy. */
   list(): TaskRecord[] {
     return [...this.tasks.values()].sort((left, right) => (left.id < right.id ? -1 : 1)).map(clone)
