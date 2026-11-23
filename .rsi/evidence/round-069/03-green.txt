@@ -1,0 +1,4 @@
+### green: scan restored (git checkout -- src/run.ts)
+ ✓ test/checkpoint-engine-wire.spec.ts (6 tests) 255ms
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
