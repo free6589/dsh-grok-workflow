@@ -16,8 +16,12 @@
  * id while `TaskReader` wants `get` to return `undefined`. Pointing this
  * session at that store therefore still needs a small adapter that catches
  * the not-found throw and returns `undefined` instead (next round's work —
- * only the adapter, not a change to the store's throw contract). Until then
- * this file is self-contained and touches no other module.
+ * Round-56 update: the read adapter has landed (`board-reader.ts` —
+ * `boardReader(board)` wraps a `TaskBoard` as the `TaskReader` the policy
+ * reads, mapping `in_progress→running` / `failed→blocked`, `null` owner to
+ * absent, and missing rows to `undefined`). Next round swaps this session
+ * onto the `TaskBoard` store through that adapter; until then this file is
+ * still self-contained and touches no other module.
  */
 import { type DispatcherDecision, type DispatcherIntent, type DispatcherTask, type TaskReader } from './policy.js';
 /** On-disk shape of the persisted board. Versioned for future migrations. */
