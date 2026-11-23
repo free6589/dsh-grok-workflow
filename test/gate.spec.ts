@@ -496,15 +496,15 @@ describe('mandatory entry gate', () => {
     expect(ctx.engine.startCalls).toHaveLength(0)
   })
 
-  it('fails open with a warning when the hook is missing (gate always on, T4)', () => {
+  it('fails closed with a load-time error when the hook is missing (gate always on, T4)', () => {
     const ctx = new FakeContext()
     // A runtime that exposes everything except the pre-step registration hook.
     const withoutHook = new Proxy(ctx, {
       get: (target, property, receiver) => property === 'on' ? undefined : Reflect.get(target, property, receiver),
     })
-    // T4: no gateRequired switch — a missing hook never fails the load.
-    expect(() => apply(withoutHook as never, {})).not.toThrow()
-    expect(ctx.warnings.some(w => w.includes('agent/pre-step is unavailable'))).toBe(true)
+    // T4: no gateRequired switch — a missing hook fails the load loudly instead
+    // of degrading to a warning while the main model answers directly.
+    expect(() => apply(withoutHook as never, {})).toThrow(/agent\/pre-step is unavailable/)
   })
 
   it('writes a redacted routing ledger when a route switched during the run', async () => {
