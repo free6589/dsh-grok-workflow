@@ -379,9 +379,11 @@ const DIGEST_HEADER = 'PRIOR ROUNDS IN THIS SESSION (compiled from earlier turns
  *
  * The budget is spent newest-round first and, inside a round, in the order
  * "objective/status → confirmed results → open questions → uncertainties →
- * answer → locators". When the budget runs out the renderer stops, keeps what it
- * already wrote and appends an explicit truncation marker naming how many rounds
- * were dropped — never a silent cut, and never an over-budget string.
+ * answer → locators". When the budget runs out the renderer stops and keeps what
+ * it already wrote: wholly dropped rounds are named by an explicit truncation
+ * marker, and lines dropped *inside* a kept round by a `+N more item(s) in this
+ * round` marker as that round's last line — never a silent cut, and never an
+ * over-budget string.
  *
  * @param rounds - compiled rounds, newest first.
  * @param bounds - character budget (clamped inside).
@@ -407,24 +409,42 @@ export function buildCarryoverDigest(
   let compiled = 0
   // `full` is set once a line no longer fits. Every later line would fail for the
   // same reason (the budget only shrinks), so the renderer stops spending the
-  // remaining rounds' worth of attempts on it.
+  // remaining rounds' worth of attempts on it. Lines skipped this way are counted
+  // per round and named by an explicit `+N more` marker (see below) — never
+  // silently dropped.
   let full = false
-  const section = (lines: readonly string[]): void => {
+  const section = (lines: readonly string[]): number => {
+    let skipped = 0
     for (const text of lines) {
-      if (full) return
-      if (!push(text)) full = true
+      if (full) {
+        skipped += 1
+        continue
+      }
+      if (!push(text)) {
+        full = true
+        skipped += 1
+      }
     }
+    return skipped
   }
   for (const round of rounds.slice(0, clamped.rounds)) {
     if (full) break
     const head = `Round -${compiled + 1} [${round.status}] ${round.objective === '' ? '(objective not recorded)' : round.objective}`
     if (!push(head)) break
     compiled += 1
-    section(round.confirmed.map(item => `  verified: ${item}`))
-    section(round.incomplete.map(item => `  open: ${item}`))
-    section(round.uncertainties.map(item => `  uncertain: ${item}`))
-    if (round.summary !== undefined) section([`  answer: ${round.summary}`])
-    if (round.locators.length > 0) section([`  readable outputs: ${round.locators.join(', ')}`])
+    let skipped = 0
+    skipped += section(round.confirmed.map(item => `  verified: ${item}`))
+    skipped += section(round.incomplete.map(item => `  open: ${item}`))
+    skipped += section(round.uncertainties.map(item => `  uncertain: ${item}`))
+    if (round.summary !== undefined) skipped += section([`  answer: ${round.summary}`])
+    if (round.locators.length > 0) skipped += section([`  readable outputs: ${round.locators.join(', ')}`])
+    if (skipped > 0) {
+      // Same accounting as the `[truncated: …]` marker below: the line is allowed
+      // to overflow by its own length (it is already `line()`-bounded) and the
+      // hard cut at the end of this function enforces the cap exactly, so the
+      // marker survives in preference to silence even when the budget is gone.
+      kept.push(line(`  … +${skipped} more item(s) in this round (see the session transcript)`, CARRYOVER_LIMITS.itemChars))
+    }
   }
   const dropped = rounds.length - compiled
   if (dropped > 0) {

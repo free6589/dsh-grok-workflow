@@ -237,6 +237,32 @@ describe('carry-over: the digest is hard-capped', () => {
     expect(digest).toMatch(/truncated: 7 earlier round\(s\) omitted/)
   })
 
+  it('marks lines dropped inside a kept round instead of cutting them silently (round 62)', () => {
+    const round = {
+      status: 'completed',
+      objective: 'Research the retry behaviour',
+      confirmed: Array.from({ length: 6 }, (_, index) => `criterion ${index} ${'evidence '.repeat(5)}`.trim()),
+      incomplete: Array.from({ length: 3 }, (_, index) => `open question ${index}`),
+      uncertainties: [],
+      locators: [],
+    }
+    // Tiny budget: the round is kept but some of its rows do not fit. The marker
+    // overflows by its own length (same accounting as the `[truncated: …]`
+    // marker), so only its head — `+N more` — is guaranteed to survive the cut.
+    const digest = buildCarryoverDigest([round], { chars: 300 })
+    expect(digest.length).toBeLessThanOrEqual(300)
+    const marker = digest.match(/\+(\d+) more/)
+    expect(marker).not.toBeNull()
+    const dropped = Number(marker![1])
+    const shown = (digest.match(/  verified: /g) ?? []).length + (digest.match(/  open: /g) ?? []).length
+    expect(shown + dropped).toBe(9)
+    // A generous budget shows every row and marks nothing.
+    const whole = buildCarryoverDigest([round], { chars: 12_000 })
+    expect(whole).not.toContain('more item(s) in this round')
+    expect(whole).toContain('criterion 5')
+    expect(whole).toContain('open question 2')
+  })
+
   it('never splits a surrogate pair at the cut', () => {
     const rounds = [{
       status: 'completed',

@@ -7,6 +7,10 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ### Fixed / 修复
 
+- **A digest that drops rows inside a round now says so / 摘要轮内丢行会自报** —
+  Only wholly dropped rounds were named; lines dropped inside a kept round vanished silently, so a reader mistook a budgeted digest for a complete one. Each kept round now ends with its own `+N more` marker when rows were cut, with the same overflow accounting as the round-level marker.
+  / 以前只有整轮被丢才点名，轮内被吞的行悄悄没了，读摘要的人会把"预算内"当"完整"。现在每轮末尾自报吞了几行，记账方式和整轮标记一致。
+
 - **A removed key now says it was removed / 已删的键会自报"删了"** —
   A patch carrying a removed key only heard "unknown", with no hint the key once existed and was deleted. Removed keys now refuse with their name and the fix (delete it from the patch); genuine typos still get the did-you-mean hint.
   / 带着已删键的补丁以前只听到"未知"，不知道这个键曾经存在还被删了。现在已删键自报名并给解法（从补丁里删掉）；真拼错的还是给纠错提示。

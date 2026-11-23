@@ -1,0 +1,10 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/rsi-round-62
+
+ ✓ test/carryover.spec.ts (22 tests) 127ms
+
+ Test Files  1 passed (1)
+      Tests  22 passed (22)
+   Start at  18:48:48
+   Duration  791ms (transform 489ms, setup 0ms, import 548ms, tests 127ms, environment 0ms)
+

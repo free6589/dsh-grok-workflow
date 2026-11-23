@@ -1,0 +1,5 @@
+round 62 真机 soak: BLOCKED（网关鉴权缺失）
+- 按任务要求真机只做网关探针，不伪造。
+- 探针命令: curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:18088/v1/models --max-time 15
+- 探针结果: http_code=401（网关要 key；取 key = 读用户凭据，禁止。本轮不做真机加载）
+- 时间: 2026-11-23
