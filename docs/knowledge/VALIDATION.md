@@ -1,3 +1,15 @@
+## 已发版 0.13.19 账本收尾四修 + 手动清单遗留 — 2026-11-23 (`CONFIRMED`)
+
+| state | command | result |
+| --- | --- | --- |
+| main `c85017f`（发版提交） | `npm run ci` | **exit 0：85 files / 1637 tests PASS**；typecheck 干净；lint 0 errors（30 warnings 既有）；`verify:lib` byte-identical |
+| 同上 | 隔离 soak（`grok-soak-45`，真模型 caller 双任务） | **PASS**：`COMPLETED 2/2 verified`；截断标记同构建可达；scratch 已删 |
+| remote main `c85017f` | CI workflow `45121816157` | **success**（2m8s） |
+| remote tag `v0.13.19` | Release workflow `45121827995` | **success**（2m4s），GitHub Release `v0.13.19` 已发布（asset `dsh-grok-workflow-0.13.19.tgz`） |
+
+**Changed:** 账本尾部行边界截断（`+1` 超限回归）、截断 `+N more` 标记、blocked 原因行、Slack 全系前缀 + 手动清单遗留（405 双成因/单轨/429 勾选等）。
+**Release fixes:** `PLUGIN_VERSION`/`UPDATE_LATEST` 同步 0.13.19 + build 重建；删本地野标签 `v0.12.17`（远端无此 tag）+ bump 脚本重刷 README 名单（`test/docs-version.spec.ts` 1 红→绿）。
+
 ## round-45 账本尾部行边界截断 + 真机 soak — 2026-11-23 (`CONFIRMED`，发版前)
 
 | state | command | result |

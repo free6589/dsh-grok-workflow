@@ -1,3 +1,15 @@
+## 2026-11-23 — 已发版 `0.13.19`：账本收尾四修 + 手动清单遗留（`CONFIRMED`）
+
+- **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
+- **发了什么**：发版提交 `c85017f` 已推，annotated tag `v0.13.19` 已推；远端 CI `45121816157`
+  success、Release `45121827995` success 并已发布（asset `dsh-grok-workflow-0.13.19.tgz`）。
+  本地 `npm run ci` exit 0：85 files / 1637 tests PASS；`verify:lib` byte-identical；真机 soak PASS。
+- **内容**：round-42/43/44/45 四修（Slack 全系前缀、blocked 原因行、`+N more` 标记、账本尾部行边界）
+  + 手动清单遗留（405 双成因/单轨/429 勾选等）。发版修：bundle 双常量同步 + 删本地野标签
+  `v0.12.17` + 名单重刷。
+- **分支收尾**：`rsi/round-45` 可 24h 内删除；远端旧分支未动。
+- **未做**：报告面账本吞错/resume 浅拷贝；并发面 4 条；配置面 3 条。真机 GUI 手点 NOT_RUN。
+
 ## 2026-11-23 — round-45 已合流 main 待发版：账本尾部行边界截断 + 真机 soak（`CONFIRMED`）
 
 - **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者 / 发版

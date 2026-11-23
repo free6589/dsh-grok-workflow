@@ -1,3 +1,9 @@
+Last updated: 2026-11-23 14:05 +08:00（**已发版 `0.13.19`：账本收尾四修 + 手动清单遗留，`CONFIRMED`** —
+发版提交 `c85017f` + tag `v0.13.19` 已推；远端 CI `45121816157` success、Release `45121827995`
+success 并已发布（asset `dsh-grok-workflow-0.13.19.tgz`）。本地门禁：`npm run ci` exit 0（85 文件 / 1637 测试
+PASS），真机 soak PASS，lint 0 errors，`verify:lib` byte-identical。发版修：bundle 双常量同步 + 删本地野标签
+`v0.12.17` + 名单重刷。）
+
 Last updated: 2026-11-23 13:55 +08:00（**round-45 已合流 main 待发版：账本尾部行边界截断 + 真机 soak PASS，`CONFIRMED`** —
 合流提交 `b8318bd`（main `fcb7ecf` + `ed50e94`）；`npm run ci` exit 0（85 文件 / 1637 测试 PASS，+1 超限账本回归），
 lint 0 errors，`verify:lib` byte-identical。隔离 soak PASS（headless 新 profile + 真模型 caller 双任务 2/2 verified）。
