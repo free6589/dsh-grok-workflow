@@ -46,6 +46,7 @@
 | Sec.3-1 分支（第一次） | `npm run ci` | **exit 1**：`test/client.spec.ts:2622` 仍断言 2 条连线（实际 3：trunk/branch/rail） | 已修并重跑，见下行 |
 | Sec.3-1 分支（重跑） | `npm run ci` | exit 0，85 / 1623 PASS | `logs/ci-sec3-01-single-rail.log` |
 | 合完的 `main`（`adc7fb4`） | `npm run ci` | exit 0，85 / 1623 PASS；`verify:lib`：lib 是 src 的构建，217 文件逐字节一致 | `logs/ci-main-merged.log` |
+| 本轮末 `main`（`cb680ce`，含全部文档与证据） | `npm run ci` | exit 0，85 / 1623 PASS | `logs/ci-main-head.log` |
 
 `npm run ci` = `typecheck && lint && verify:lib && (build && vitest run)`。全部在工作树内跑，未触及运行中实例。
 
