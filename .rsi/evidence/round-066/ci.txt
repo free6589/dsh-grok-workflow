@@ -1,0 +1,10 @@
+=== npm run ci (worktree rsi/fix-mode-switch, base 6314bbb) ===
+336:> node scripts/verify-lib.mjs
+339:lib/ at 6314bbb is the build of src/ at 6314bbb (221 files, byte-identical)
+
+=== test totals ===
+ Test Files  87 passed (87)
+      Tests  1656 passed (1656)
+
+=== mode-surface spec ===
+457: ✓ test/mode-surface.spec.ts (24 tests) 75ms
