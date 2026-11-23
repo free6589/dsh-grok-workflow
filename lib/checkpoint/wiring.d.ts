@@ -251,6 +251,28 @@ export declare const RESUME_SCAN_TIMEOUT_MS = 2000;
  * @returns the newest resumable checkpoint, or `undefined` when there is none.
  */
 export declare function findResumableCheckpoint(options?: FindResumableOptions): Promise<ResumableCheckpoint | undefined>;
+/**
+ * The carry-over context one run starts with, from a caller value and a resume.
+ *
+ * Precedence is the whole rule and it is deliberately one-way:
+ *
+ * - a caller's non-blank `carryover` wins — it names this round's context, and a
+ *   checkpoint from an older crash must not overwrite it;
+ * - otherwise a `resume` answer turns into three lines (its measured reason, the
+ *   unfinished task ids, the seed) so the planner sees what was already done;
+ * - no resume, or a resume with a blank seed, means `undefined` and the request
+ *   payload stays byte-identical to a first round.
+ *
+ * Lives here rather than inline in `runWorkflow` so the second half of the item
+ * ("出事后不会自己接着跑") is testable without a whole run harness: the scan
+ * (`findResumableCheckpoint`) and this composition are the two halves that have
+ * to agree.
+ *
+ * @param callerCarryover - context the caller already compiled, if any.
+ * @param resumed - the checkpoint the startup scan answered with, if any.
+ * @returns the carry-over text, or `undefined` when the run starts fresh.
+ */
+export declare function resumeCarryover(callerCarryover: string | undefined, resumed: ResumableCheckpoint | undefined): string | undefined;
 /** Minimal logger surface; matches `WorkflowLogger` in `src/run.ts` structurally. */
 export interface CheckpointLogger {
     warn(message: string): void;

@@ -27,6 +27,7 @@ import {
   phaseFromTitle,
   RESUME_DECISION_WIRING,
   registeredCheckpointRecorders,
+  resumeCarryover,
   resumeDecision,
 } from '../src/checkpoint/wiring.js'
 import type { CheckpointEventSource, RunCheckpointRecorder } from '../src/checkpoint/wiring.js'
@@ -534,6 +535,44 @@ describe('inert when there is nothing to describe', () => {
 })
 
 /* ------------------------------------------------------- 6. resume decision -- */
+
+describe('resume carry-over (the second half of the item: a run that really continues)', () => {
+  const decisionOf = (seed: string, unfinished: string[]) => ({
+    action: 'resume' as const,
+    reason: 'run run-r was failed when the checkpoint was taken (2026-11-23T01:00:00.000Z)',
+    runId: 'run-r',
+    unfinished,
+    seed,
+  })
+  const resumedOf = (seed: string, unfinished: string[]) => ({
+    path: '/nonexistent/checkpoint-run-r.json',
+    checkpoint: { run: { runId: 'run-r' } } as never,
+    decision: decisionOf(seed, unfinished),
+  })
+
+  it('composes the three lines the planner reads when a run resumes', () => {
+    const text = resumeCarryover(undefined, resumedOf('DIGEST', ['task-2', 'task-3']))
+    expect(text?.split('\n')).toEqual([
+      'run run-r was failed when the checkpoint was taken (2026-11-23T01:00:00.000Z)',
+      'unfinished: task-2, task-3',
+      'context: DIGEST',
+    ])
+  })
+
+  it('lets a caller carry-over win over a checkpoint from an older crash', () => {
+    expect(resumeCarryover('this round has its own context', resumedOf('DIGEST', ['task-2'])))
+      .toBe('this round has its own context')
+    // A blank caller value is not context: the resume seed still applies.
+    expect(resumeCarryover('   ', resumedOf('DIGEST', ['task-2']))).toContain('context: DIGEST')
+  })
+
+  it('starts fresh when there is no resume, or the resumed seed is blank', () => {
+    expect(resumeCarryover(undefined, undefined)).toBeUndefined()
+    expect(resumeCarryover(undefined, resumedOf('   ', ['task-2']))).toBeUndefined()
+  })
+})
+
+
 
 describe('resume decision', () => {
   const checkpointOf = (
