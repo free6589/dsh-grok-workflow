@@ -958,6 +958,32 @@ export function registeredRunGuardians(state: object): number {
 }
 
 /**
+ * Child calls that have started and not yet settled, across one instance.
+ *
+ * This is the host-side definition of "work still in flight", and it is the
+ * number an unload drains before it cancels anything: `agent-start` opens a row
+ * and `agent-end` closes it, so a non-zero sum means at least one subagent is
+ * mid-call. Guardians leave the registry when their run settles or is disposed,
+ * so a finished run contributes nothing without a special case.
+ *
+ * Never throws: a guardian that is mid-release counts zero.
+ */
+export function openRunGuardianChildren(state: object): number {
+  const registered = UNLOAD_REGISTRY.get(state)
+  if (registered === undefined || registered.size === 0) return 0
+  let open = 0
+  for (const guardian of registered) {
+    try {
+      const stats = guardian.stats
+      if (typeof stats.open === 'number' && Number.isFinite(stats.open) && stats.open > 0) open += stats.open
+    } catch {
+      // A guardian that refuses to answer is already gone; count nothing.
+    }
+  }
+  return open
+}
+
+/**
  * Dispose every live guardian for this plugin instance.
  *
  * Called from `disposeActiveState` alongside the run cancellation, so no

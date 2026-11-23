@@ -1,0 +1,105 @@
+round-067 · lifeline 1 — bounded drain on plugin unload (evidence)
+=====================================================================
+Task     : an unload must not cancel a live run on its first line.
+Base     : main cda5d4e — confirmed from the first entry of
+           .agents/worktrees/fix-synth-resubmit/docs/knowledge/STATE.md and equal
+           to `git rev-parse main`.
+Worktree : .agents/worktrees/fix-dispose-drain  (branch fix/dispose-drain, off main)
+Scope    : one requirement only. No commit, no push. Main working tree untouched.
+Date     : 2026-11-23 (+08:00)
+
+WHAT CHANGED (6 files, +336 / -21)
+----------------------------------
+src/config.ts            + FIXED_UNLOAD_DRAIN_MS 45_000, _QUIET_MS 1_500, _STEP_MS 250
+                           (fixed values: no caller can widen the wait)
+src/guardian.ts          + openRunGuardianChildren(state): open `agent-start` minus
+                           `agent-end` rows across one plugin instance — the
+                           host-side definition of "work still in flight"
+src/records.ts           + DisposeDrain record block (waitedMs / openAtStart /
+                           openAtEnd / runsSettled / deadlineHit) and the optional
+                           `drain` field on DisposeRecord
+src/run.ts               + UnloadDrainPolicy and drainInFlightChildren(), counted in
+                           steps so the ceiling holds even when a sleep returns
+                           early. disposeActiveState is now:
+                             mark disposed -> drain (skipped on a shutdown signal) ->
+                             notice + record only for runs still live ->
+                             checkpoint -> abort and cancel what is left ->
+                             guardians.
+                           The interruption notice states the window and what was
+                           still open when it closed.
+src/index.ts             the disposer passes the drain policy explicitly, so the
+                           entry point states the unload budget instead of hiding it
+src/checkpoint/wiring.ts settledStatus() is consulted before the unload marker: a
+                           run that finished inside the window keeps `completed` in
+                           its durable checkpoint instead of being stamped
+                           `cancelled`
+
+RED / GREEN — same tests, old src vs new src
+--------------------------------------------
+Command: npx vitest run test/unload-drain.spec.ts test/checkpoint-wiring.spec.ts
+
+RED (src/ restored to cda5d4e with `git checkout -- src/`, tests unchanged):
+ Test Files  2 failed (2)
+      Tests  4 failed | 42 passed (46)
+ FAIL  test/checkpoint-wiring.spec.ts > unload checkpoints > keeps the status a drained run settled with instead of stamping it cancelled
+AssertionError: expected 'cancelled' to be 'completed' // Object.is equality
+
+  Key assertion — on old code the cancellation is first, so the child's
+  agent-end can never precede it:
+AssertionError: expected [ 'cancel', 'cancel' ] to include 'agent-end'
+ ❯ test/unload-drain.spec.ts:168:19
+    166|     await pending
+
+  The four red failures:
+    FAIL test/checkpoint-wiring.spec.ts > unload checkpoints > keeps the status a drained run settled with instead of stamping it cancelled
+    FAIL test/unload-drain.spec.ts > settles the child call already running before it cancels the run
+    FAIL test/unload-drain.spec.ts > stops at the ceiling and says what it had to leave running
+    FAIL test/unload-drain.spec.ts > uses the fixed policy by default, so no caller can unbound the wait
+
+GREEN (fix re-applied with `git apply .tmp/drain-src.patch`):
+ ✓ test/checkpoint-wiring.spec.ts (41 tests) 196ms
+
+ Test Files  2 passed (2)
+      Tests  46 passed (46)
+
+BUILD + CI
+----------
+npm run build -> exit 0 (tsc -p tsconfig.build.json + client bundle, 303813 bytes)
+npm run ci    -> exit 0
+  typecheck              : pass
+  lint (oxlint src test) : Found 33 warnings and 0 errors.
+  verify:lib             : lib/ at cda5d4e is the build of src/ at cda5d4e (221 files, byte-identical)
+  tests                  :  Test Files  88 passed (88)
+      Tests  1662 passed (1662)
+
+  Baseline on main cda5d4e was 87 files / 1656 tests; now 88 files / 1662 tests
+  (+1 spec file, +6 tests = the 5 drain tests and the 1 checkpoint test).
+
+REGRESSION CASES (red on old code, green on new)
+------------------------------------------------
+1. "settles the child call already running before it cancels the run" — the real
+   guardian reports one open child over the real event bus and the child's
+   agent-end lands inside the window. Old code: order == ['cancel','cancel'] and
+   no 'agent-end' at all. New code: agent-end precedes cancel.
+2. "stops at the ceiling and says what it had to leave running" — a child that
+   never reports; the window stays bounded by step count (<= 10 steps at 100 ms),
+   the record reads openAtEnd 1 / deadlineHit true, and the notice says how many
+   were still open.
+3. "keeps the status a drained run settled with instead of stamping it cancelled"
+   (src/checkpoint/wiring.ts) — finish() in flight while unload() writes; the file
+   must read `completed`. Old code wrote `cancelled`.
+Two guards that must stay silent are pinned too: no window when nothing is open
+(an ordinary disable stays instant) and no window on a shutdown signal.
+
+WHAT THIS DOES NOT DO
+---------------------
+- `kill -9` / SIGTERM remain unrecoverable by design: a shutdown signal skips the
+  window instead of delaying the exit.
+- The window is a ceiling, not a promise: whatever is still open at 45 s is
+  cancelled and named in the record and the notice, never silently kept.
+- Not committed, not pushed. lib/ was rebuilt so verify:lib stays byte-identical.
+  Memory docs (STATE / HANDOFF / VALIDATION) were deliberately left to the
+  integrator so parallel agents do not clobber the same files.
+- No live home was written: vitest.config.ts pins GROK_WORKFLOW_CHECKPOINT_DIR and
+  GROK_WORKFLOW_MEMORY_DIR to a temp dir, and this session wrote only inside the
+  worktree.

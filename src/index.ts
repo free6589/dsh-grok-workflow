@@ -1,7 +1,9 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
-import { DEFAULT_ITERATE_TEMPLATE, FIXED_HISTORY_CHARS, FIXED_HISTORY_TURNS, MAX_TIMER_DELAY_MS, createConfigReader, describeResolvedConfig, limitOverrunWarning, repairLimitOverruns, repairSynthesisInconsistency, resolveConfig, snapshotConfig, takeLimitOverruns } from './config.js'
+import { DEFAULT_ITERATE_TEMPLATE, FIXED_HISTORY_CHARS, FIXED_HISTORY_TURNS, FIXED_UNLOAD_DRAIN_MS,
+  FIXED_UNLOAD_DRAIN_QUIET_MS, FIXED_UNLOAD_DRAIN_STEP_MS, MAX_TIMER_DELAY_MS, createConfigReader, describeResolvedConfig,
+  limitOverrunWarning, repairLimitOverruns, repairSynthesisInconsistency, resolveConfig, snapshotConfig, takeLimitOverruns } from './config.js'
 import { describeSurface, validateRoutes } from './settings.js'
 import { carryoverBounds, carryoverForSession } from './carryover.js'
 import { registerGrokCommand } from './command.js'
@@ -151,8 +153,19 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
     // The steering queues die with the run; an unload closes them explicitly so a
     // reloaded plugin cannot hand an old token to a new boundary child.
     closeAllSteering()
+    // The drain window is stated here, at the plugin boundary, because this is
+    // where "an unload is cheap" used to be decided: an in-process reload cut a
+    // ten-minute child call that was about to report. `disposeActiveState` still
+    // owns the mechanics and reads the same fixed values by default; passing them
+    // explicitly keeps the policy visible to whoever reads the entry point, and a
+    // `kill -9` is unaffected either way.
     await disposeActiveState(state, {
       logger,
+      drain: {
+        maxMs: FIXED_UNLOAD_DRAIN_MS,
+        quietMs: FIXED_UNLOAD_DRAIN_QUIET_MS,
+        stepMs: FIXED_UNLOAD_DRAIN_STEP_MS,
+      },
       ...new Error('dsh-grok-workflow disposer').stack === undefined
         ? {}
         : { callSite: String(new Error('dsh-grok-workflow disposer').stack) },

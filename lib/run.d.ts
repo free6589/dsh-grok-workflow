@@ -92,6 +92,39 @@ export interface DisposalContext {
     logger?: WorkflowLogger;
     /** Stack of the disposer call, used for attribution (t45, P0-1). */
     callSite?: string;
+    /** Bounded drain performed before anything is cancelled. */
+    drain?: Partial<UnloadDrainPolicy>;
+    /**
+     * How many child calls are still open. Defaults to the guardians registered
+     * for `state` (`openRunGuardianChildren`); a test seam, never a switch.
+     */
+    openChildren?: (state: ActiveState) => number;
+    /** The wait between two probes. Defaults to a real, `unref`ed timer. */
+    sleep?: (ms: number) => Promise<void>;
+}
+/**
+ * How long an unload lets work already in flight finish before it cancels.
+ *
+ * The disposer used to cancel every live run on its first line, so an in-process
+ * reload — a settings toggle, an upgrade — threw away a ten-minute child call
+ * that was about to report. Now the disposer first closes the door (no new run
+ * is admitted), then waits while any child call is still open, bounded by
+ * `maxMs`. A child that settles inside the window is settled for real: its
+ * result is in the session before the run is cut. Whatever is still open when
+ * the window closes is cancelled and named in the dispose record, so "the unload
+ * waited" and "the unload waited and killed it anyway" never look the same.
+ *
+ * `maxMs <= 0` disables the window (the old behaviour). A shutdown signal always
+ * skips it: `kill -9` cannot be saved, and a SIGTERM'd process gains nothing from
+ * holding its own exit open for a child the supervisor already killed.
+ */
+export interface UnloadDrainPolicy {
+    /** Hard ceiling on the window, in milliseconds. */
+    maxMs: number;
+    /** How long with no open child before the drain believes it is done. */
+    quietMs: number;
+    /** How often the open-child count is re-read. */
+    stepMs: number;
 }
 /**
  * Cancel every live run; called from the plugin disposer.
@@ -108,6 +141,12 @@ export interface DisposalContext {
  *    disabling the plugin from the settings surface — stays silent, because a
  *    direct answer is the expected behaviour there and a per-message banner
  *    would be noise.
+ *
+ * 3. **Give in-flight work a bounded window first.** The disposer used to cancel
+ *    on its first line, which is what threw away a long child call on an
+ *    in-process reload. Now nothing is cancelled until the children already
+ *    running have settled or the window closes (see {@link UnloadDrainPolicy}),
+ *    and the record says which of the two happened.
  *
  * Every write is contained: this runs inside a disposer, where the session
  * service may already be gone, and a refused record must never stop the
