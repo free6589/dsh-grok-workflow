@@ -1,0 +1,8 @@
+
+ ✓ test/redact.spec.ts (47 tests) 184ms
+
+ Test Files  1 passed (1)
+      Tests  47 passed (47)
+   Start at  16:32:23
+   Duration  795ms (transform 447ms, setup 0ms, import 494ms, tests 184ms, environment 0ms)
+

@@ -1,0 +1,76 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/rsi-round-52
+
+ ❯ test/redact.spec.ts (47 tests | 1 failed | 46 skipped) 56ms
+     ↓ redacts known API key and token shapes
+     ↓ redacts private key blocks and preserves non-secret prose
+     ↓ redacts compound environment-variable assignments
+     ↓ redacts access/private/secret keys and Stripe underscore tokens
+     ↓ redacts userinfo in non-HTTP URIs without touching ordinary text
+     ↓ redacts GitLab and npm token prefixes
+     ↓ redacts slack-token 全前缀 (xoxb/xoxc/xoxd/xoxo/xoxe)
+     ↓ does not redact ordinary words or numbers
+     ↓ redacts recursively without mutating the source
+     ↓ redacts database URLs and scoped tokens recursively
+     ↓ renders errors without leaking secrets
+     ↓ redacts Azure SAS signatures
+     ↓ redacts Basic authorization in header and JSON form
+     ↓ redacts a Cookie header inside a quoted shell argument
+     ↓ redacts presigned URL signatures from S3, GCS and generic gateways
+     ↓ redacts PGP armored private keys
+     ↓ redacts a base64-wrapped private key at every byte alignment
+     ↓ redacts a wrapped base64 key across its continuation lines
+     ↓ redacts a base64-wrapped GnuPG private key at every byte alignment
+     ↓ redacts a wrapped base64 GnuPG key across its continuation lines
+     ↓ redacts a base64 key folded narrower than its own encoded banner
+     ↓ redacts a base64-wrapped GnuPG key at the report and the prompt boundary
+     ↓ redacts a blob folded below the continuation floor instead of leaving its tail
+     ↓ keeps exactly one footer line of a wrapped blob and nothing more
+     ↓ redacts a narrow-folded base64 key that sits in a JSON field
+     ↓ redacts a folded base64 key that arrives double-escaped
+     ↓ leaves a narrow-folded public key and certificate alone
+     ↓ leaves base64 public material and unrelated blobs alone
+     ↓ keeps the rest of the line and an already-redacted placeholder intact
+     ↓ does not rewrite non-secret code that mentions a secret-like name
+     ↓ redacts short values for the secret-key spellings the env rule lacked
+     ↓ redacts header-style credential keys by name in deep copies
+     ↓ redacts a quoted JSON secret and keeps the JSON valid
+     ↓ redacts sensitive values by JSON key name without touching other keys
+     ↓ redacts db_pass, Cookie, fine-grained GitHub, ASIA and Google OAuth values
+     ↓ redacts JSON secrets that contain escaped quotes and keeps the JSON valid
+     ↓ redacts numeric JSON secrets without breaking JSON
+     ↓ redacts short env-style values and camelCase keys
+     ↓ redacts session/credentials keys, indented Cookie headers and keeps non-secret words
+     × redacts flat cookie credential shapes without touching cookie prose 54ms
+     ↓ redacts Authorization headers with non-Bearer schemes
+     ↓ redacts passphrase/pwd keys and values
+     ↓ preserves ordinary prose that merely mentions a secret-like word
+     ↓ keeps an adversarial 100 KB input under a measured time bound
+     ↓ applies the same rules in the generated script as on the host
+     ↓ exposes every rule to the generated script
+     ↓ keeps every family named in both READMEs and the architecture doc
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/redact.spec.ts > JSON, header and placeholder redaction > redacts flat cookie credential shapes without touching cookie prose
+AssertionError: expected '{"cookie":"abc=123"}' to be '{"cookie":"[REDACTED]"}' // Object.is equality
+
+Expected: "{"cookie":"[REDACTED]"}"
+Received: "{"cookie":"abc=123"}"
+
+ ❯ test/redact.spec.ts:634:51
+    632|
+    633|   it('redacts flat cookie credential shapes without touching cookie pr…
+    634|     expect(redactSecrets('{"cookie":"abc=123"}')).toBe('{"cookie":"[RE…
+       |                                                   ^
+    635|     expect(redactSecrets('cookie=abc123')).toBe('cookie=[REDACTED]')
+    636|     expect(redactSecrets('Cookie: abc123')).toBe('Cookie: [REDACTED]')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 46 skipped (47)
+   Start at  16:37:22
+   Duration  1.17s (transform 947ms, setup 0ms, import 993ms, tests 56ms, environment 0ms)
+

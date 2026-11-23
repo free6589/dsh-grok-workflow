@@ -7,6 +7,10 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ### Fixed / 修复
 
+- **Flat cookie credentials are redacted too / 扁平 Cookie 凭证也脱敏** —
+  Only the `Cookie:` header form was redacted; the JSON key form (`{"cookie":"…"}`) and the bare form (`cookie=…`) leaked verbatim, even though a cookie value is a session credential by itself. The key tables now name `cookie` next to `session`, so all three shapes redact; ordinary prose about cookies is untouched.
+  / 以前只有 `Cookie:` 头形会脱敏，JSON 键形和裸 `cookie=` 会原样漏掉——Cookie 值本身就是会话凭证。现在键表里加上 `cookie`，三种形状都脱敏；聊 Cookie 的普通文字不受影响。
+
 - **The stale ten-minute timeout constant is gone / 过期的十分钟超时常量已删除** —
   The 600,000 ms constant no longer bounds anything (every live path uses the 7,200,000 ms default); only its doc link and a test import still named it. The dead export is deleted and the docs point at the live default. No behavior changes.
   / 60 万毫秒那个常量早就不起作用了（所有活路都走 720 万默认值），只剩文档链接和测试 import 还念着它。现在删掉死导出，文档指向活的默认值；行为不变。

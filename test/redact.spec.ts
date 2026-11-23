@@ -630,6 +630,14 @@ describe('JSON, header and placeholder redaction', () => {
     expect(redactSecrets('password: required')).toBe('password: required')
   })
 
+  it('redacts flat cookie credential shapes without touching cookie prose', () => {
+    expect(redactSecrets('{"cookie":"abc=123"}')).toBe('{"cookie":"[REDACTED]"}')
+    expect(redactSecrets('cookie=abc123')).toBe('cookie=[REDACTED]')
+    expect(redactSecrets('Cookie: abc123')).toBe('Cookie: [REDACTED]')
+    const prose = 'Document the cookie policy and test it.'
+    expect(redactSecrets(prose)).toBe(prose)
+  })
+
   it('redacts Authorization headers with non-Bearer schemes', () => {
     const token = fake('9f8e7d6c', '5b4a3f2e', '1d0c')
     const apiKey = fake('3a7f9c2e', '5b8d1f4a', '6c9e')

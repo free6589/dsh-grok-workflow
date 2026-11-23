@@ -1,0 +1,28 @@
+RSI round 52 — 真机 soak（2026-11-23, Asia/Singapore）
+工作目录基线 / baseline: worktree .agents/worktrees/rsi-round-52 @ rsi/round-52（基线 main 95ad6b2）
+含 round-52 改动 / includes: Cookie 脱敏补漏（src/redact.ts key-value 四规则键表各加 cookie 一键
+  + test/redact.spec.ts 新增 1 个 it + npm run build 重建 lib/）
+
+隔离 / isolation
+- 未建 scratch home、未装插件、未跑真机 workflow：网关直连探针已确认 502，无可用链路。
+- live 家目录 ~/.dsh 全程未写入、未重启/未触碰现行实例。
+- 无残留进程/端口；无提交、无 push、无改版本、无密钥读取/回显。
+- 全程假数据（abc=123 / abc123 / opaque），无真实凭证。
+
+步骤 / steps
+1. 真机网关直连探针 / gateway probe (curl, 15s timeout, no key):
+   https://models.fyrali.com/openai/v1/models -> 502
+   https://api.minimax.io/v1/models -> 401（无 key 预期值；fyrali 侧确认 502）
+   真机按网关 502 口径 BLOCKED，未伪造任何 COMPLETED。
+2. 本地验证（非真机，供参考）：新 it 绿（flat cookie shapes）+ npm run build exit 0 +
+   npm run ci 85 文件 / 1643 用例全绿（见 ci.txt；红绿对照见 red.txt/green.txt）。
+
+清理 / cleanup: 无 scratch 产物需清理；live 家目录未动。
+
+结论 / verdict: BLOCKED —— 网关 502，无可用真机链路，未能跑出 COMPLETED；
+行为面由 ci.txt 1643 绿 + red.txt 旧码红对照钉死。
+Verdict: BLOCKED — gateway returns 502, no usable live-model route, so no COMPLETED run
+observed; nothing fabricated.
+
+证据 / evidence: 本文件 .rsi/evidence/round-052/soak.txt + red.txt/green.txt/ci.txt
+（脱敏，无密钥/token/cookie；假数据仅 abc=123 / abc123 / opaque）。
