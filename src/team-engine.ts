@@ -28,6 +28,8 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { Config } from '@deepseek-ai/dsh-workflow-ptc'
 import type { WorkflowEngine } from '@deepseek-ai/dsh-workflow'
+import type { ChildOutcome, ChildOutcomeLog, ChildTerminal } from './child-outcomes.js'
+import { childStopPhrase, createChildOutcomeLog, emptyChildOutcomeLog, roleOfChildTitle } from './child-outcomes.js'
 
 /** Code points a derived child label may occupy — the guest's own defaultLabel rule. */
 export const CHILD_LABEL_LIMIT = 48
@@ -99,17 +101,118 @@ function mirroredConfig(injected: object): Config {
 
 type StartActivation = (spec: ActivationSpecView) => Promise<unknown>
 
+/** The activation receipt the engine's `startChild` keeps, as far as this seam reads it. */
+interface ActivationReceipt {
+  childId?: unknown
+  result?: unknown
+}
+
+/**
+ * Read one field off a settled child result without trusting its shape: the
+ * receipt and its result cross a provider seam, so every read is defensive and a
+ * hostile getter must not break the engine call that produced it.
+ * @param value - the receipt or the settled result.
+ * @param key - the field to read.
+ * @returns The string value, or `undefined`.
+ */
+function field(value: unknown, key: string): string | undefined {
+  try {
+    if (value === null || typeof value !== 'object') return undefined
+    const read = (value as Record<string, unknown>)[key]
+    return typeof read === 'string' ? read : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** The route label a child asked for (`provider/model`, or `inherit`). */
+function requestedRoute(spec: ActivationSpecView): string {
+  const agentOptions = (spec.request as { agentOptions?: { provider?: unknown, model?: unknown } }).agentOptions
+  const provider = typeof agentOptions?.provider === 'string' ? agentOptions.provider : undefined
+  const model = typeof agentOptions?.model === 'string' ? agentOptions.model : undefined
+  if (provider !== undefined && model !== undefined) return `${provider}/${model}`
+  return model ?? 'inherit'
+}
+
+/** The child's display title: the first line of the prompt, as the label rewrite reads it. */
+function promptTitle(spec: ActivationSpecView): string {
+  const blocks = spec.request?.prompt
+  const first = Array.isArray(blocks) ? blocks.find(block => typeof block?.text === 'string') : undefined
+  const text = typeof first?.text === 'string' ? first.text : ''
+  const cut = text.indexOf('\n')
+  return (cut === -1 ? text : text.slice(0, cut)).trim()
+}
+
+/**
+ * Observe one child activation's terminal state into the log.
+ *
+ * This is the half of the null-collapse seam the plugin can see: the engine's
+ * guest only receives `null` for a child that did not finish cleanly, but the
+ * activation receipt's `result` settles with the real `stopReason` and the
+ * provider's `diagnostic`. The observer is attached beside the engine's own
+ * handling and never replaces it: it does not await, does not alter the promise
+ * the engine holds, and swallows nothing it would have to report.
+ * @param outcomes - the log to write into.
+ * @param spec - the activation spec the engine built (before the label rewrite).
+ * @param receipt - what `startActivation` returned.
+ */
+function observeActivation(outcomes: ChildOutcomeLog, spec: ActivationSpecView, receipt: unknown): void {
+  try {
+    const activation = (receipt === null || typeof receipt !== 'object' ? undefined : receipt) as ActivationReceipt | undefined
+    const result = activation?.result
+    if (result === null || typeof result !== 'object' || typeof (result as PromiseLike<unknown>).then !== 'function') return
+    const childId = field(activation, 'childId')
+    const title = promptTitle(spec)
+    const identity = roleOfChildTitle(title)
+    const label = typeof spec.label === 'string' ? spec.label : undefined
+    const base = {
+      ...childId === undefined ? {} : { childId },
+      ...label === undefined ? {} : { label },
+      ...identity === undefined ? {} : { role: identity.role, attempt: identity.attempt },
+      route: requestedRoute(spec),
+    }
+    const record = (outcome: ChildTerminal): void => {
+      try {
+        outcomes.add({ ...base, ...outcome })
+      } catch {
+        // The log is a diagnostic; a refused write must not reject this handler,
+        // which would surface as an unhandled rejection of the engine's own run.
+      }
+    }
+    void (result as Promise<unknown>).then(
+      settled => {
+        record({
+          stopReason: field(settled, 'stopReason') ?? 'completed',
+          ...field(settled, 'diagnostic') === undefined ? {} : { diagnostic: field(settled, 'diagnostic') as string },
+        })
+      },
+      (error: unknown) => {
+        // The seam's infrastructure rejection: the run handle itself failed, so the
+        // child never produced a stop reason. Its message is the only cause there is.
+        record({ stopReason: 'rejected', diagnostic: error instanceof Error ? error.message : String(error) })
+      },
+    )
+  } catch {
+    // Observation is a diagnostic, never a run input: a receipt this seam cannot
+    // read costs the evidence, not the child.
+  }
+}
+
 /**
  * A view of the subagent seam whose `startActivation` rewrites each child's
- * label; every other member reaches the real service. The real service object
- * is never mutated.
+ * label and records the child's terminal state; every other member reaches the
+ * real service. The real service object is never mutated.
  */
-function labeledSubagents(subagents: object): object {
+function labeledSubagents(subagents: object, outcomes: ChildOutcomeLog): object {
   return new Proxy(subagents, {
     get(target, property, receiver) {
       if (property === 'startActivation') {
         const start = Reflect.get(target, property, receiver) as StartActivation
-        return async (spec: ActivationSpecView) => start.call(target, rewriteActivationLabel(spec))
+        return async (spec: ActivationSpecView) => {
+          const receipt = await start.call(target, rewriteActivationLabel(spec))
+          observeActivation(outcomes, spec, receipt)
+          return receipt
+        }
       }
       return Reflect.get(target, property, receiver)
     },
@@ -130,7 +233,7 @@ function labeledSubagents(subagents: object): object {
  * leaves the twin unregistered and the runtime's own `workflowEngine`
  * service untouched.
  */
-function twinContext(injected: object): Context {
+function twinContext(injected: object, outcomes: ChildOutcomeLog): Context {
   const engineCtx = (injected as { ctx?: unknown }).ctx as
     | (Record<string, unknown> & { get?: (name: string) => unknown })
     | undefined
@@ -151,7 +254,7 @@ function twinContext(injected: object): Context {
   const holder = {
     subagents: subagents === null || typeof subagents !== 'object'
       ? subagents
-      : labeledSubagents(subagents as object),
+      : labeledSubagents(subagents as object, outcomes),
     ptcRuntime: resolveService('ptcRuntime'),
     sandboxPolicy: resolveService('sandboxPolicy'),
     workingDirectory: resolveService('workingDirectory'),
@@ -185,12 +288,13 @@ function isPublishedPtcEngine(injected: object): boolean {
 function buildTwin(
   injected: object,
   log: TeamEngineLog | undefined,
+  outcomes: ChildOutcomeLog,
 ): WorkflowEngine | undefined {
   if (!isPublishedPtcEngine(injected)) return undefined
   const Ctor = Object.getPrototypeOf(injected)?.constructor
   try {
     const twin = new (Ctor as new (ctx: Context, config: Config) => WorkflowEngine)(
-      twinContext(injected),
+      twinContext(injected, outcomes),
       mirroredConfig(injected),
     )
     if (typeof twin.start === 'function') return twin
@@ -229,7 +333,7 @@ export function teamWorkflowEngine(ctx: Context, log?: TeamEngineLog): WorkflowE
   if (cached !== undefined) return cached
   let engine = injected as WorkflowEngine
   if (isPublishedPtcEngine(injected as object)) {
-    const twin = buildTwin(injected as object, log)
+    const twin = buildTwin(injected as object, log, childOutcomeLog(ctx))
     if (twin !== undefined) engine = twin
   } else {
     const Ctor = Object.getPrototypeOf(injected as object)?.constructor as { name?: string } | undefined
@@ -242,4 +346,41 @@ export function teamWorkflowEngine(ctx: Context, log?: TeamEngineLog): WorkflowE
 /** The one method of the host logger the seam needs. */
 export interface TeamEngineLog {
   warn(message: string): unknown
+}
+
+const outcomeLogs = new WeakMap<object, ChildOutcomeLog>()
+
+/**
+ * The child-outcome log this context's engine writes into.
+ *
+ * One log per context, created on first use and shared by the twin and the run
+ * that drives it: `mark()` before a run and `since(mark)` after it are what make
+ * the evidence per-run without giving every run its own engine. A context whose
+ * engine the plugin does not decorate (a non-PTC engine, a bare unit-test
+ * context) gets an empty log, so `since()` answers "no evidence" rather than
+ * "nothing happened".
+ * @param ctx - the plugin's runtime context, the same object passed to `teamWorkflowEngine`.
+ * @returns The context's child-outcome log.
+ */
+export function childOutcomeLog(ctx: Context): ChildOutcomeLog {
+  const key = ctx as object
+  if (key === null || typeof key !== 'object') return emptyChildOutcomeLog()
+  const cached = outcomeLogs.get(key)
+  if (cached !== undefined) return cached
+  const created = createChildOutcomeLog()
+  outcomeLogs.set(key, created)
+  return created
+}
+
+/**
+ * The cause phrase for one child, as the memory archive needs it: `undefined` when
+ * this run recorded nothing for that child.
+ * @param log - the context's child-outcome log.
+ * @param childId - the child session id the engine reported.
+ * @returns A bounded one-line cause, or `undefined`.
+ */
+export function childOutcomeCause(log: ChildOutcomeLog, childId: string | undefined): string | undefined {
+  if (childId === undefined) return undefined
+  const outcome: ChildOutcome | undefined = log.of(childId)
+  return outcome === undefined ? undefined : childStopPhrase(outcome)
 }

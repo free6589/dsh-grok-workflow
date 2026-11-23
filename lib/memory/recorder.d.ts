@@ -88,6 +88,18 @@ export interface ArchiveRecorderOptions {
     logger: ArchiveLogger;
     /** Clock injection for deterministic ordering in tests. */
     now?: () => number;
+    /**
+     * Why a child that left no finding stopped, keyed by its session id.
+     *
+     * The engine's `agent-end` payload carries identity and outcome only, so a child
+     * that died (a timeout, a refused key, a cancelled run) used to be archived as
+     * "its transcript carried neither assistant text nor a structured submission" —
+     * a sentence about the transcript that reads as a sentence about the child. The
+     * run's own child-outcome ledger knows the cause; this hook is how it reaches the
+     * entry. Absent (bare tests, a context with no engine seam) the wording is
+     * unchanged.
+     */
+    childCause?: (childId: string) => string | undefined;
 }
 /**
  * Read the last assistant text a child session produced.

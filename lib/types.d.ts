@@ -353,7 +353,13 @@ export interface VerificationResult {
  * `budget-exhausted` and `unknown` are reported honestly and never silently
  * treated as success.
  */
-export type FailureClass = 'rate-limit' | 'server-error' | 'connection' | 'timeout' | 'model-unavailable' | 'format-error' | 'task-failed' | 'verification-failed' | 'agent-start-failed' | 'budget-exhausted' | 'unknown';
+export type FailureClass = 'rate-limit' | 'server-error' | 'connection' | 'timeout' | 'model-unavailable' | 'format-error' | 'task-failed' | 'verification-failed' | 'agent-start-failed' | 'budget-exhausted'
+/**
+ * The child was stopped on purpose: the caller cancelled the run, or the plugin
+ * was unloaded underneath it (t14). Not a form error and not a provider fault,
+ * so a reader must not be told to resend or to switch models.
+ */
+ | 'cancelled' | 'unknown';
 /**
  * Who has to fix a failure (G-4). `infrastructure` = the model service, the
  * network or a deadline failed, so a retry, another route or a later run may

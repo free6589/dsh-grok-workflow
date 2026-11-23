@@ -40,6 +40,12 @@ export interface ChildAnswer {
   stopReason?: string
   structured?: unknown
   /**
+   * The provider's own failure detail for a non-`completed` run, as the real
+   * `SubagentResult.diagnostic` carries it. It is the only cause a killed child
+   * leaves behind.
+   */
+  diagnostic?: string
+  /**
    * Reject the child's result instead of answering it — the real engine's
    * "child run failed" path, which it reports as `WorkflowError(AGENT_RESULT)`
    * with `fatal: true`. Needed to test infrastructure-failure handling (G-4).
@@ -171,6 +177,7 @@ export function createEngineHarness(answer: (call: ChildCall) => ChildAnswer | P
         output: settled.output ?? [{ type: 'text' as const, text: '' }],
         stopReason: settled.stopReason ?? 'completed',
         ...settled.structured === undefined ? {} : { structured: settled.structured },
+        ...settled.diagnostic === undefined ? {} : { diagnostic: settled.diagnostic },
       }
       const result = settled.reject !== undefined
         ? Promise.reject(settled.reject)

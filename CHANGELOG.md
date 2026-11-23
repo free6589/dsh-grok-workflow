@@ -5,6 +5,12 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Fixed / 修复
+
+- **A child that died is no longer reported as a formatting mistake / 子代理死掉不再被写成"格式不对"** —
+  When a child agent timed out, hit a refused key or was cancelled, the report used to record it as a format error and say the child "returned no valid structured result", which reads as "send it again" — the workflow engine hands the script the same empty value for a dead child as for a child that answered without submitting. Measured: 530 transport, auth and timeout deaths were filed as format errors against 25 real ones. The plugin now records what each child actually ended as (the engine's own stop reason plus the provider's failure detail), and rewrites only the rows whose evidence is unambiguous: a timeout is reported as a timeout, a refused key as an unusable model, a stopped child as cancelled, and the sentence around it says why. A child that genuinely finished without submitting keeps its format error and its one free resubmit, which is the case that rescue path exists for. A run whose children died of different causes is left exactly as the script wrote it — a guess there would be the same mistake in a new place. The memory archive also names the cause instead of only saying the transcript was empty.
+  / 子代理超时、密钥被拒、或者被取消时，报告过去一律写成"格式不对"，理由是"子代理没有返回有效的结构化结果"——这句话读起来像"再发一次就好"，而引擎交给脚本的其实对"死掉的子代理"和"答了但没提交的子代理"是同一个空值。实测：530 次传输、鉴权、超时被写成格式错，真正的格式错只有 25 次。现在插件会记下每个子代理真实的结束状态（引擎自己的原因 + 服务商给的失败原文），只改写证据没有歧义的那些行：超时报成超时、密钥被拒报成模型不可用、被停下来的报成"已取消"，旁边那句话也说明原因。真的"答完了但没提交"的子代理仍然保留格式错，也仍然保留那一次免费补交——那条救援路本来就是为它准备的。一个 run 里子代理死因各不相同的话，报告保持脚本原样——在那里猜，等于把同一个毛病换到新地方。记忆归档也不再只说"它的对话记录是空的"，会把死因写出来。
+
 ## [0.13.25] - 2026-11-24
 
 ### Fixed / 修复

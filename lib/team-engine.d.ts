@@ -27,6 +27,7 @@
  */
 import type { Context } from '@deepseek-ai/cordis';
 import type { WorkflowEngine } from '@deepseek-ai/dsh-workflow';
+import type { ChildOutcomeLog } from './child-outcomes.js';
 /** Code points a derived child label may occupy — the guest's own defaultLabel rule. */
 export declare const CHILD_LABEL_LIMIT = 48;
 /** The activation-spec slice the rewrite reads and rewrites (structural, untrusted shape). */
@@ -74,4 +75,25 @@ export declare function teamWorkflowEngine(ctx: Context, log?: TeamEngineLog): W
 export interface TeamEngineLog {
     warn(message: string): unknown;
 }
+/**
+ * The child-outcome log this context's engine writes into.
+ *
+ * One log per context, created on first use and shared by the twin and the run
+ * that drives it: `mark()` before a run and `since(mark)` after it are what make
+ * the evidence per-run without giving every run its own engine. A context whose
+ * engine the plugin does not decorate (a non-PTC engine, a bare unit-test
+ * context) gets an empty log, so `since()` answers "no evidence" rather than
+ * "nothing happened".
+ * @param ctx - the plugin's runtime context, the same object passed to `teamWorkflowEngine`.
+ * @returns The context's child-outcome log.
+ */
+export declare function childOutcomeLog(ctx: Context): ChildOutcomeLog;
+/**
+ * The cause phrase for one child, as the memory archive needs it: `undefined` when
+ * this run recorded nothing for that child.
+ * @param log - the context's child-outcome log.
+ * @param childId - the child session id the engine reported.
+ * @returns A bounded one-line cause, or `undefined`.
+ */
+export declare function childOutcomeCause(log: ChildOutcomeLog, childId: string | undefined): string | undefined;
 //# sourceMappingURL=team-engine.d.ts.map

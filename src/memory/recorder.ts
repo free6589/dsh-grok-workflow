@@ -167,6 +167,18 @@ export interface ArchiveRecorderOptions {
   logger: ArchiveLogger
   /** Clock injection for deterministic ordering in tests. */
   now?: () => number
+  /**
+   * Why a child that left no finding stopped, keyed by its session id.
+   *
+   * The engine's `agent-end` payload carries identity and outcome only, so a child
+   * that died (a timeout, a refused key, a cancelled run) used to be archived as
+   * "its transcript carried neither assistant text nor a structured submission" —
+   * a sentence about the transcript that reads as a sentence about the child. The
+   * run's own child-outcome ledger knows the cause; this hook is how it reaches the
+   * entry. Absent (bare tests, a context with no engine seam) the wording is
+   * unchanged.
+   */
+  childCause?: (childId: string) => string | undefined
 }
 
 type PendingArchiveEvent =
@@ -329,11 +341,20 @@ export function childFinding(
   return finding
 }
 
-/** Say why a child's finding is missing, in terms a reader can act on. */
-function missingReason(session: unknown, childId: string | undefined): string {
-  if (childId === undefined) return 'the engine reported no child session id'
-  if (session === undefined) return 'its child session was not reachable from this context'
-  return 'its transcript carried neither assistant text nor a structured submission'
+/**
+ * Say why a child's finding is missing, in terms a reader can act on.
+ * @param session - the child's captured session, when one was reachable.
+ * @param childId - the child session id the engine reported, when it did.
+ * @param cause - what the child actually settled as, when the run's ledger knows.
+ * @returns One line naming the gap, and the cause when there is one.
+ */
+function missingReason(session: unknown, childId: string | undefined, cause?: string): string {
+  const gap = childId === undefined
+    ? 'the engine reported no child session id'
+    : session === undefined
+      ? 'its child session was not reachable from this context'
+      : 'its transcript carried neither assistant text nor a structured submission'
+  return cause === undefined ? gap : `${gap}; ${cause}`
 }
 
 /**
@@ -395,6 +416,13 @@ export function createMemoryArchiver(options: ArchiveRecorderOptions): MemoryArc
     const label = owned.get(runId)?.runName
     const childId = known?.member.childId
     const finding = childFinding(options.ctx, childId, known?.session)
+    // Containment: the ledger lookup is host code the archive must not depend on.
+    let cause: string | undefined
+    try {
+      cause = childId === undefined ? undefined : options.childCause?.(childId)
+    } catch {
+      cause = undefined
+    }
     // The declared result wins: a child that *submits* an execution or verification
     // result has stated its finding, while its prose is usually a preamble
     // ("I'll create the files…"). A child that only talks gets its text.
@@ -413,7 +441,7 @@ export function createMemoryArchiver(options: ArchiveRecorderOptions): MemoryArc
       ...known?.member.phase === undefined ? {} : { phase: known.member.phase },
       label: known?.member.label ?? (label === undefined ? `agent ${member.seq}` : `${label} · agent ${member.seq}`),
       ...summary === undefined
-        ? { summary: `child ${member.seq} settled as ${member.outcome}; ${missingReason(known?.session, childId)}` }
+        ? { summary: `child ${member.seq} settled as ${member.outcome}; ${missingReason(known?.session, childId, cause)}` }
         : { summary },
       ...finding.evidence.length === 0 ? {} : { evidence: finding.evidence },
     }, archiveOptions())
