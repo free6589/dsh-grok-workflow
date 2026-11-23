@@ -25,6 +25,36 @@ worker 有同次尝试内重交（`resubmitPrompt`），verifier/supervisor 没�
 **Honest boundary**：真机隔离 soak `NOT_RUN`（本轮不发布，未装进 fork profile）；补交只在子代理"有值但解析失败
 或没交值"时触发，传输/来源故障与 setup 故障仍走原路（有用例钉住）。
 
+## 分支 `fix/final-answer-rewrite` — 最终答案改写（2026-11-24，`CONFIRMED`，未合流未发版）
+
+用户报的现象：跑完的答案是 200 字以内的电报体，而且只取了第一句。实查四处成因（`CONFIRMED`）：
+`src/answer.ts` 默认 relay 让主模型"逐字复述"块内文本 → 块即答案；`src/delivery/index.ts` `answerLead`
+只取 summary 第一句（`sentenceLine(..., 400)`）；`relayText` 硬编码 `bilingual: true` → 每条答案中英各一份；
+`synthesizerHardRules` 限死"200 字、无标题无列表"，且 `layeredNotesBlock` 把 uncertainties 原文贴一遍。
+修法见 DECISIONS D-115；四条改动的函数级清单见 HANDOFF 首条。
+
+| state | command | result |
+| --- | --- | --- |
+| 基线 | `git log -1 main` = `7f626f5`；worktree `.agents/worktrees/fix-answer-rewrite`，分支 `fix/final-answer-rewrite` | 共享树当时 detached `a6103ad` 且脏（另一代理在用），本分支从 `main` 新开，未动共享树 |
+| 新增回归（先红） | `npx vitest run test/final-answer-rewrite.spec.ts`（实现前） | **9 failed / 3 passed**（默认仍是逐字、只取第一句、无交付物、双语、笼子拒三段） |
+| 新增回归（后绿） | 同上（实现后） | **15 tests PASS** |
+| 实样渲染复核（人工看输出） | `node .tmp/sample.mjs`（`.tmp/` 已 gitignore，跑完即删）：构造一份带 `file:///srv/out/weekly-report.md` 已完成报告，打印整条 relay 文本 | **抓到真缺陷并修掉**：`answerLead` 曾经先把 summary 拆句再拼回，拆句点在 `weekly-report.md` 的 `.` 上，拼回变成 `weekly-report. md` → 交付物路径不再等于 keep-list → 被 `MACHINE_DETAIL` 吃掉，读者看到 `打开 md 就能看`。改成**按行（段落）处理、不拆句**后，路径逐字节保住；已补 2 例回归（summary 内点名交付物必须逐字保留 / 非交付物路径仍删） |
+| 全量单测 | `npx vitest run` | **93 files / 1744 tests PASS**（改前 1741 + 新增 15，合 1744；旧 13 例按新契约改写后全绿） |
+| 类型 | `npx tsc -p tsconfig.json --noEmit` | exit 0 |
+| lint | `npx oxlint src test` | **0 errors / 35 warnings**（35 条皆既有：`test/delivery.spec.ts` 等未用解构参数）；改动文件单跑 `oxlint src/answer.ts src/delivery/index.ts src/script.ts test/final-answer-rewrite.spec.ts` → 0 warnings 0 errors |
+| 产物 | `npm run build` → `npm run verify:lib` | `lib/` 与本分支 `src/` byte-identical（229 files），`lib/` 随分支一并提交 |
+| 真机 soak（用户视角） | — | **NOT_RUN**：本分支口径是"离线契约 + 全量单测 + 产物校验"，真机 fork-profile soak 留给合流方统一做 |
+
+**被改了期望的旧用例（逐条，都是契约变更，不是放宽）**：
+`test/delivery.spec.ts` Q11(b) 从"默认逐字、diagnostics 才改写"改成"默认就改写"；
+`test/human-output-contract.spec.ts` 三处 `Answer:` 断言改成"中文块不含英文镜像"（单语），失败态改为断言英文句不存在；
+`test/gate-partial-head.spec.ts` 失败态英文建议句改成"不得出现"；`test/delivery-human-block.spec.ts` 的
+`STRUCTURAL` 前缀表补 `做成了：`/`交付物：`/`Deliverable:`（块新增两行）、`relayText` 显式要英文块；
+`test/synthesis-guardrails.spec.ts` 的"附注原文贴 caveat"改成"由 synthesizer 重写、附注不再复制"。
+
+**Honest boundary**：以上全是离线确定性证据（报告值 → 文本），没有一次真实模型重写被观察到；
+"主模型会不会按要求重写、会不会把交付物路径读对"属 HYPOTHESIS，必须由合流后的真机 soak 回答。
+
 ## 已发版 0.13.24 队长拆法绑定 + 首轮可见 + 确认单次消费 — 2026-11-24 (`CONFIRMED`)
 
 | state | command | result |

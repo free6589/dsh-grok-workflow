@@ -23,6 +23,39 @@
   只是每尝试块 ×2）。合流时若要保守，可只取 `script.ts` + 两个 spec 改动，`maxTotalAgentsFor` 的 ×2 与
   `routing.spec`/`engine-contract.spec` 必须同进同出。
 
+## 2026-11-24 — round-075 分支 `fix/final-answer-rewrite`：最终答案改成"给料 + 重写"（未合流，`CONFIRMED`）
+
+- **From:** 修复子代理B2（最终答案 AI 重写）· **To:** lead / 合流者
+- **分支与基线**：`.agents/worktrees/fix-answer-rewrite`（分支 `fix/final-answer-rewrite`，从 `main` `7f626f5` 开出）。
+  共享工作树当时是 detached `a6103ad` 且脏，本分支一行未碰共享树；`script.ts` 的 verifier/supervisor 重试与
+  `gate.ts` 按分工**未动**。
+- **改了哪些函数**（便于 review 定位）：
+  - `src/answer.ts`：新增 `REWRITE_PREAMBLE`（删掉旧 `SUCCESS_PREAMBLE`）；`relayText()` 默认走改写、
+    `bilingual: false`；模块文档与 `RelayOptions.lang` 注释同步。
+  - `src/delivery/index.ts`：新增 `MAX_ANSWER_LEAD_CHARS` / `MAX_DELIVERABLES` / `MAX_DELIVERABLE_CHARS` /
+    `KEEP_TOKEN`(+`_END`) / `LEAD_HEADING` / `deliverablesOf()` / `dedupePieces()` / `joinProse()` /
+    `boundParagraph()`；`answerLead()` 改成整段 summary；`stripMachineDetail(line, keep)` 加交付物例外；
+    `composeBlock(lines, keep)`；`composeHumanParts()` 完成态也发「做成了：」并新增「交付物：」行。
+  - `src/script.ts`：新增 `SYNTHESIS_NARRATIVE_CHARS`(700) / `SYNTHESIS_NARRATIVE_WORDS`(300) /
+    `CAVEAT_SECTION` / `hasCaveatSection()`；`synthesizerHardRules()`、`synthesizerPrompt()`、
+    `layeredPolishPrompt()` 改成三段 + caveat 重写；`polishStyleVerdict()` 放宽字数；
+    `layeredNotesBlock()` 不再贴 uncertainties；`summaryCoverage()` 的 `uncertaintyProbes` → `needsCaveats`；
+    `checkSummaryDraft()` / `verifySummaryDraft()` 换成"必须有 caveat 段"。
+- **测试**：新增 `test/final-answer-rewrite.spec.ts` 15 例（先红 9 失败 → 后绿；后 2 例是实样复核抓到的路径缺陷），覆盖默认改写 / 整段 summary /
+  交付物例外 / 完成态做成了 / 4 条 caveat 上界 / 单语 / 失败仍逐字 / 三段被接受 / 缺注意段被打回。
+  另 13 例旧用例按新契约改了期望（逐条清单见 `VALIDATION.md` 首条），无一是"放宽"：单语、成功态改写、
+  附注不再复制 caveat 都是本轮明写的契约变更。
+- **复核抓到的东西（值得记）**：`answerLead` 曾先拆句再拼回，拆句点在 `weekly-report.md` 的 `.` 上，拼回成了
+  `weekly-report. md` → 交付物路径不再等于 keep-list → 被机器细节吃掉，读者看到「打开 md 就能看」。改法是
+  **按行（段落）处理、不拆句**，并锁 2 例回归。这条只有真渲染一遍才看得见，单测原本不覆盖。
+- **验证**：`npx vitest run` → **93 files / 1744 tests PASS**；`npx tsc -p tsconfig.json --noEmit` exit 0；
+  `npx oxlint src test` 0 errors（35 warnings 全为既有）；`npm run build` + `npm run verify:lib` byte-identical
+  （229 files），`lib/` 随分支提交。**真机 soak `NOT_RUN`**（留给合流方统一做：fork web profile + 独立 `DSH_HOME`）。
+- **合流注意**：① 本文件与 `STATE.md`/`VALIDATION.md`/`DECISIONS.md` 的编号（round-075 / D-115）若与同批
+  其他子代理撞号，按到达顺序重排即可；② `test/synthesis-guardrails.spec.ts` 与 `test/human-output-contract.spec.ts`
+  的期望值已变，合流时以本分支为准，别把旧断言合回来；③ 真机第一件事应验证"模型是不是真的按原问题重写、
+  有没有把交付物路径读对"——这是本轮唯一没有离线证据的部分（HYPOTHESIS）。
+
 ## 2026-11-24 — 已发版 `0.13.24`：队长拆法绑定 + 首轮可见 + 确认单次消费（`CONFIRMED`）
 
 - **From:** 合并发版子代理（本会话）· **To:** 下一轮接手者

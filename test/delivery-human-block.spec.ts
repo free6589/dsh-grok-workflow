@@ -360,7 +360,7 @@ const EN_TAIL = 'That is the conclusion (1 of 6 usable, 5 not done); details are
 /** A sentinel no composer writes, so a line cut short shows up as a missing one. */
 const SENTINEL = 'ENDZ'
 /** Header lines carry no bullet; every other kept line is fixture content. */
-const STRUCTURAL = /^(?:Answer:|Next: |Achieved: |Not done:|Worth knowing:|- \d+ more did not finish|答案：|下一步：|做成的：|没做成的：|需要你知道的：|- 另有 )/
+const STRUCTURAL = /^(?:Answer:|Next: |Achieved: |Deliverable: |Not done:|Worth knowing:|- \d+ more did not finish|答案：|下一步：|做成了：|交付物：|没做成的：|需要你知道的：|- 另有 )/
 
 /** `prefix` padded with whole words to exactly `n` code units, ending in `mark`. */
 function fillTo(prefix: string, n: number, mark = ''): string {
@@ -718,7 +718,8 @@ describe('round 39: a chain value that is not a route label is refused by path',
     expect(view.text).toContain('unavailable')
     // The relay path folds the same marker below the closing marker, so the
     // durable copy never reads as a healthy run either.
-    const relayed = relayText(dirty)
+    // One language now (round-075), so the English block is asked for explicitly.
+    const relayed = relayText(dirty, undefined, { lang: 'en' })
     expect(relayed).toContain(LEDGER_GUARD)
     expect(relayed).toContain('unavailable')
     const visible = relayed.slice(relayed.indexOf(REPORT_BEGIN), relayed.indexOf(REPORT_END))

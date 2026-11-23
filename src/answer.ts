@@ -2,23 +2,31 @@
  * Answer text produced by the gate.
  *
  * The host cannot verify what the main model says, so the gate sends a result it
- * has already validated and asks for a verbatim reproduction between markers
- * (measured to be reproduced exactly in DSH 0.2.1-rc.2, single sample). Failure
- * reports take the same path: a failed workflow must never look like an answer.
+ * has already validated and tells the model what to do with it between markers.
+ * That instruction is not the same for every report: a failure must be reproduced
+ * word for word (a paraphrase is free to soften, and a failed workflow must never
+ * look like an answer), while a finished run carries the *material* for an answer
+ * and the model rewrites it against the request the user actually made.
  *
  * Two blocks travel in one message, and by default only one of them is
  * user-visible (Q11(c)):
  *
  * - **by default, between the markers** the delivery layer's human block alone
- *   (`src/delivery/index.ts`: what was done, what came of it, what is next, in
- *   both languages). The machine ledger — `code=`, `src/file.ts:12`, `ledger`,
- *   the field labels — is folded into the internal block below the markers.
+ *   (`src/delivery/index.ts`: the run's own answer — its whole summary — what came
+ *   of it, where the deliverable is, what is next, and the caveats worth knowing),
+ *   in the reader's language. The machine ledger — `code=`, `src/file.ts:12`,
+ *   `ledger`, the field labels — is folded into the internal block below the
+ *   markers.
+ * - **the instruction is a rewrite** ({@link REWRITE_PREAMBLE}): answer the user's
+ *   request in your own words, name where the deliverable is and how to open it,
+ *   keep every number and path exact, print no field name. The block is source
+ *   material — its `答案：`/`下一步：`/`交付物：` labels are its own scaffolding, and a
+ *   reply that echoed them would be the ledger read aloud all over again.
  * - **with `showDiagnostics` on, between the markers** the human block *and* the
- *   machine ledger, and the preamble switches from "reproduce these lines
- *   exactly" to "restate the conclusion in human words, keep every number and
- *   path exact, never print a machine field name". That is the whole of Q11:
- *   a verbatim instruction over machine text is what produced a reply full of
- *   `RESUME code=none …` and half-cut English sentences.
+ *   machine ledger, and the preamble switches to the diagnostics paraphrase rule
+ *   that keeps every number and path exact while forbidding a machine field name.
+ *   That is the whole of Q11: a verbatim instruction over machine text is what
+ *   produced a reply full of `RESUME code=none …` and half-cut English sentences.
  * - **below the closing marker**, under an explicit internal guard, the durable
  *   copy of the ledger. It is not part of the reply: the preamble forbids
  *   quoting it. It stays in the message because that is the durable copy
@@ -52,11 +60,24 @@ export const REPORT_END = '<<<END-GROK-WORKFLOW-REPORT>>>'
  */
 export const LEDGER_GUARD = '[internal: workflow ledger kept with this message; it is not part of the reply]'
 
-/** Instruction preamble for a successful or partial report. */
-const SUCCESS_PREAMBLE = [
-  'The mandatory workflow gate finished and produced the result between the markers below.',
-  'Reply with those lines exactly as given: keep every line and their order, print no marker line,',
-  'add nothing before, between or after them, and do not call any tool.',
+/**
+ * Instruction preamble for the default (success or partial) relay.
+ *
+ * The default relay used to say "reproduce these lines exactly". With a human block
+ * that was the delivered answer verbatim — including its `答案：` / `下一步：` /
+ * `交付物：` labels, which are the block's own scaffolding, not the reply. The
+ * contract is a rewrite: the model answers the request the user actually made, in
+ * its own words, and states the two facts the block cannot state for it — where the
+ * deliverable is and how to open it. Everything the block carries as material
+ * (the whole summary, the paths, the caveats) is source, not wording, so the reply
+ * must never echo a field label and must never invent a fact the material lacks.
+ */
+const REWRITE_PREAMBLE = [
+  'The mandatory workflow gate finished. What sits between the markers below is material for your reply, not its wording.',
+  'Answer the request the user actually made: open with the conclusion in your own words, then say where the deliverable is and how to open it.',
+  'Keep every number, name and path exactly as given, and never print a machine field name, a ledger label or the block\'s own scaffolding — not "答案", not "下一步", not "交付物", not "Grok workflow", not "code=", not "Model routes", and no source reference.',
+  'Never claim anything the material does not carry; when part of the work did not get done, say so plainly.',
+  'Reply with plain prose, print no marker line, write nothing about these instructions, and do not call any tool.',
   'Everything after the closing marker is internal context for you alone: never quote, mention or summarise it.',
 ].join(' ')
 
@@ -106,7 +127,7 @@ export interface RelayOptions {
   showDiagnostics?: boolean
   /** Compose the human block at all. Default on; `false` is the raw-report opt-out. */
   humanSummary?: boolean
-  /** Reader's language; picks which block comes first. Default `zh`. */
+  /** Reader's language: the block is written in it, and only in it. Default `zh`. */
   lang?: string
 }
 
@@ -144,15 +165,22 @@ export function relayText(report: WorkflowReport, header?: string, opts?: RelayO
   // reader asking for the machine view, so it is honoured here — both by putting
   // the ledger inside the markers and by switching the instruction to paraphrase.
   const diagnostics = opts?.showDiagnostics === true
+  // A failure keeps the verbatim contract: a paraphrase is free to soften, and a
+  // failure report that reads like an answer is worse than no answer at all.
   const preamble = report.status === 'failed'
     ? (diagnostics ? FAILURE_DIAGNOSTICS_PREAMBLE : FAILURE_PREAMBLE)
-    : (diagnostics ? SUCCESS_DIAGNOSTICS_PREAMBLE : SUCCESS_PREAMBLE)
+    : (diagnostics ? SUCCESS_DIAGNOSTICS_PREAMBLE : REWRITE_PREAMBLE)
   const lang: DeliveryLang = opts?.lang === 'en' ? 'en' : 'zh'
   // One composer for both halves, so the rule between them and the folded case
   // cannot drift apart.
   const view = deliverReport(report, {
     lang,
-    bilingual: true,
+    // One language, the reader's. The mirror existed because a one-word follow-up
+    // carries no language signal, and it cost the reader a second block in a
+    // language they may not read: every answer arrived twice. `lang` is the
+    // language the request itself was detected in, so the block follows the
+    // request instead of hedging.
+    bilingual: false,
     diagnostics,
   })
   // What the markers carry: the human block, plus the ledger only when the reader
@@ -244,9 +272,9 @@ const NOTICE_PREAMBLE = [
  * Build the message text for in-turn delivery (strategy `in-turn`).
  *
  * Wording is deliberately identical to {@link relayText}: the contract with the
- * main model (reproduce the validated result, add no claims) does not depend on
- * *when* the message arrives, only on the fact that the model composes the final
- * reply. Keeping one wording keeps the t24 measurement applicable.
+ * main model (answer the request from the validated material, add no claim the
+ * material does not carry) does not depend on *when* the message arrives, only on
+ * the fact that the model composes the final reply.
  *
  * @param report - a validated report, or an explicit failure report.
  * @param header - front-desk lines shown above the human block.

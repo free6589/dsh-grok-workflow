@@ -96,6 +96,24 @@ const LEDGER_RULE = '---'
 /** Human block is clamped so a pathological report cannot flood a chat turn. */
 const MAX_HUMAN_CHARS = 2_400
 
+/**
+ * Characters the answer lead may use, per language.
+ *
+ * The lead used to be the summary's first sentence, capped at 400: a synthesizer
+ * narrative of several sentences lost everything after the opening one, and what
+ * reached the reader was the telegraphic fragment this round is about. The lead is
+ * now the whole summary, bounded so one pathological summary cannot take the whole
+ * block — Chinese is counted in characters, English in a wider window because the
+ * same thought takes more of them.
+ */
+const MAX_ANSWER_LEAD_CHARS: Record<DeliveryLang, number> = { zh: 700, en: 1_400 }
+
+/** How many deliverable paths the human block names before it stops. */
+const MAX_DELIVERABLES = 6
+
+/** Longest one deliverable path may be before it is abbreviated. */
+const MAX_DELIVERABLE_CHARS = 120
+
 /** Ledger is clamped for the same reason (`report.ts` uses the same budget). */
 const MAX_LEDGER_CHARS = 8_000
 
@@ -400,6 +418,15 @@ const MACHINE_DETAIL: readonly (readonly [RegExp, string])[] = [
   [/\ball\s+\d+\s+tasks?\s+(?:passed\s+verification|verified)\b/gi, ' '],
 ]
 /**
+ * Placeholder wrapped around a path that must survive {@link MACHINE_DETAIL}.
+ *
+ * Bracket characters no strip pattern treats as a locator, so the placeholder
+ * reads as an ordinary word until it is swapped back for the real path.
+ */
+const KEEP_TOKEN = '⟦KEEP'
+const KEEP_TOKEN_END = '⟧'
+
+/**
  * Strip machine detail from one line, then tidy the gap it left.
  *
  * Whitespace is collapsed and an emptied bracket or a doubled separator removed,
@@ -407,16 +434,31 @@ const MACHINE_DETAIL: readonly (readonly [RegExp, string])[] = [
  * was nothing but machine detail comes back empty and its caller drops it — a
  * reader losing a bullet is better than a reader being handed a command.
  *
+ * `keep` is the one exception, and it is the reader's, not the report's: a
+ * deliverable locator is where the result is, so a block that opened by naming it
+ * would otherwise print `交付物： ` with the location stripped out. Each kept path
+ * is swapped for a placeholder the patterns above cannot match, and restored after
+ * the tidying, so a path survives verbatim without weakening the strip for any
+ * other path a report happens to quote.
+ *
  * @param line - one already line-split piece of the block.
+ * @param keep - paths that must survive the strip (deliverable locators).
  * @returns the stripped line, possibly empty.
  */
-function stripMachineDetail(line: string): string {
+function stripMachineDetail(line: string, keep: readonly string[] = []): string {
   let out = line
+  const saved: [string, string][] = []
+  for (const path of keep) {
+    if (path === '' || !out.includes(path)) continue
+    const token = `${KEEP_TOKEN}${saved.length}${KEEP_TOKEN_END}`
+    out = out.split(path).join(token)
+    saved.push([token, path])
+  }
   for (const [pattern, replacement] of MACHINE_DETAIL) {
     pattern.lastIndex = 0
     out = out.replace(pattern, replacement)
   }
-  return out
+  out = out
     .replace(/（\s*）|\(\s*\)/g, '')
     .replace(/([（(【[])\s+/g, '$1')
     .replace(/\s+([）)】\]])/g, '$1')
@@ -428,6 +470,8 @@ function stripMachineDetail(line: string): string {
     // mark, and stripping it left a cut line reading as if nothing were missing.
     .replace(/[\s，,、；;]+$/, '')
     .trim()
+  for (const [token, path] of saved) out = out.split(token).join(path)
+  return out
 }
 
 /**
@@ -443,8 +487,40 @@ interface BlockLine {
   guard: boolean
 }
 
-/** Compose the block in order, applying the guard line by line to guarded entries. */
-function composeBlock(lines: readonly BlockLine[]): string {
+/**
+ * The paths this run actually produced, in report order.
+ *
+ * This is the one machine-looking value a reader *needs*: "where is it" is half of
+ * "it is done", and a path stripped out of the block leaves `交付物：` pointing at
+ * nothing. Only a verified task's last attempt counts — a failed attempt's
+ * deliverable is a plan, not a result — and the list is bounded so one run cannot
+ * turn the block into a file listing.
+ *
+ * @param report - validated report.
+ * @returns deliverable locators, at most {@link MAX_DELIVERABLES}.
+ */
+function deliverablesOf(report: WorkflowReport): string[] {
+  const out: string[] = []
+  for (const task of report.tasks) {
+    if (task.status !== 'verified') continue
+    const last = task.attempts[task.attempts.length - 1]
+    for (const row of last?.execution?.deliverables ?? []) {
+      const locator = (row?.locator ?? '').trim()
+      if (locator === '' || out.includes(locator)) continue
+      out.push(locator)
+      if (out.length >= MAX_DELIVERABLES) return out
+    }
+  }
+  return out
+}
+
+/**
+ * Compose the block in order, applying the guard line by line to guarded entries.
+ *
+ * @param lines - the block's lines, guarded or not (see {@link BlockLine}).
+ * @param keep - deliverable paths that must survive the machine-detail strip.
+ */
+function composeBlock(lines: readonly BlockLine[], keep: readonly string[] = []): string {
   const kept: string[] = []
   for (const item of lines) {
     for (const raw of item.text.split('\n')) {
@@ -454,7 +530,7 @@ function composeBlock(lines: readonly BlockLine[]): string {
       // failure reason itself (B10) and keeps its wording — but even there a
       // shell command, a digest or a path is not something a reader can use.
       if (item.guard && tainted(line)) continue
-      const clean = stripMachineDetail(line)
+      const clean = stripMachineDetail(line, keep)
       if (clean === '' && line.trim() !== '') continue
       kept.push(clean)
     }
@@ -553,9 +629,11 @@ function splitSentences(text: string): string[] {
   return out
 }
 
-/** Remove near-duplicate bilingual halves: keep `lang`'s half when it carries the sentence. */
-export function dedupeBilingual(text: string, lang: DeliveryLang): string {
-  const pieces = splitSentences(text)
+/** A section heading the narrative may open with, which the block's own label replaces. */
+const LEAD_HEADING = /^\s*(?:结果|结论|答案|Result|Answer)\s*[:：]\s*/i
+
+/** Drop a bilingual mirror: keep `lang`'s half of every adjacent pair. */
+function dedupePieces(pieces: readonly string[], lang: DeliveryLang): string[] {
   const kept: string[] = []
   let index = 0
   while (index < pieces.length) {
@@ -570,40 +648,86 @@ export function dedupeBilingual(text: string, lang: DeliveryLang): string {
     if (!kept.includes(half)) kept.push(half)
     index += 1
   }
-  return kept.join(' ')
+  return kept
 }
 
-/** The run's own answer, first: one plain half-sentence that stands on its own. */
+/** Remove near-duplicate bilingual halves: keep `lang`'s half when it carries the sentence. */
+export function dedupeBilingual(text: string, lang: DeliveryLang): string {
+  return dedupePieces(splitSentences(text), lang).join(' ')
+}
+
+/**
+ * Bound a paragraph to `cap` characters at a place a reader can stop.
+ *
+ * Same rule as {@link sentenceLine}, applied to text that may carry line breaks:
+ * sentence end first, then a clause, then between words, and a boundary that
+ * throws away most of the window is refused in favour of the next one.
+ *
+ * @param text - the paragraph to bound.
+ * @param cap - maximum length in UTF-16 code units, `…` included.
+ * @returns the bounded paragraph.
+ */
+function boundParagraph(text: string, cap: number): string {
+  const flat = text.replace(/[ \t]+/g, ' ').replace(/\n{2,}/g, '\n').trim()
+  if (flat.length <= cap) return flat
+  const room = Math.max(1, cap - 1)
+  for (const find of [lastSentenceCut, lastClauseCut, lastWordCut]) {
+    const cut = find(flat, room)
+    if (cut > 0 && cut * 3 >= room) return `${flat.slice(0, cut).trimEnd()}…`
+  }
+  return `${cutCodeUnits(flat, room)}…`
+}
+
+/**
+ * The run's own answer: the whole summary, its paragraphs kept.
+ *
+ * The synthesizer already wrote the answer; taking only its first sentence threw
+ * away the rest of what it established (the reported defect: a 200-character
+ * narrative reduced to one line). So every line of the summary travels, guarded
+ * the same way a single sentence was, bounded by {@link MAX_ANSWER_LEAD_CHARS} and
+ * deduplicated against a bilingual mirror — the block's job is to hand the reader
+ * the answer, not to pre-digest it.
+ *
+ * Lines are the unit, never sentences: the summary is a paragraph per section and
+ * splitting it into sentences cut at the `.` inside `weekly-report.md`
+ * (CONFIRMED — the rejoin then read `weekly-report. md`, and the deliverable the
+ * block had just named stopped matching its own keep-list).
+ *
+ * @param report - validated report.
+ * @param lang - language whose half of a bilingual mirror is kept.
+ * @returns the answer, or an honest stand-in when the summary is empty.
+ */
 export function answerLead(report: WorkflowReport, lang: DeliveryLang): string {
   const summary = report.synthesis.summary ?? ''
-  const pieces = summary
-    .split('\n')
-    .map(line => line.trim())
-    .filter(line => line !== '' && !tainted(line))
-    .flatMap(line => splitSentences(line))
-  let tried = 0
-  for (const piece of pieces) {
-    if (tried >= 3) break
-    const stripped = stripMachineDetail(piece)
+  const keep = deliverablesOf(report)
+  const pieces: string[] = []
+  for (const raw of summary.split('\n')) {
+    const line = raw.trim()
+    if (line === '') continue
+    const stripped = stripMachineDetail(line, keep)
     if (stripped === '') continue
     const scrubbed = scrub(stripped)
-    if (scrubbed === '') continue
+    if (scrubbed === '' || tainted(scrubbed)) continue
     const clean = stripIds(scrubbed, report)
-    if (clean === '') continue
-    tried += 1
-    if (!tainted(clean)) return sentenceLine(dedupeBilingual(clean, lang), 400)
+    if (clean !== '' && !tainted(clean)) pieces.push(clean)
   }
+  // A narrative that opens with its own section heading ("结果：…") would read as
+  // `答案：结果：…` once the block adds its own label, so the leading heading is
+  // dropped — the answer keeps the same sentence, without the doubled label.
+  const lead = boundParagraph(dedupePieces(pieces, lang).join('\n'), MAX_ANSWER_LEAD_CHARS[lang])
+    .replace(LEAD_HEADING, '')
+  if (lead !== '') return lead
   // Never fall back to the raw ledger: paraphrase the first confirmation instead
   // (no criterion/evidence verbatim), and name the open questions when the run
   // left any. The fallback sentence must not carry a ledger label itself
   // (`核验通过` is a MIDLINE term): it would be dropped by its own guard.
   const first = report.confirmed[0]
   if (first !== undefined) {
-    const lead = lang === 'zh' ? '有一项已得出可用结论。' : 'One item passed verification.'
+    const head = lang === 'zh' ? '有一项已得出可用结论。' : 'One item passed verification.'
     const open = report.uncertainties.length > 0
       ? (lang === 'zh' ? '还有未确认的细节，见下文。' : 'Open details are listed below.')
       : ''
-    return sentenceLine(`${lead}${open}`, 400)
+    return sentenceLine(`${head}${open}`, 400)
   }
   if (report.uncertainties.length > 0) {
     return lang === 'zh'
@@ -700,7 +824,12 @@ function composeHumanParts(
       : `Process: the plan reached version ${version} (${appliedReplans.length} new demand(s) merged, ${added} task(s) added); work already finished was not rerun.`)
   }
 
-  // What was achieved, named the way a reader knows it (title, never id).
+  // What was achieved, named the way a reader knows it (title, never id), and
+  // where the result is. A completed run used to skip this row — the answer is the
+  // whole block, so naming the work again read as repetition — but that also
+  // dropped the deliverable, and a reader who cannot find what was produced has
+  // been told nothing they can act on. Both statuses get the row; every run that
+  // produced something gets the paths.
   const doneTitles = verifiedTasks
     .slice(0, 4)
     // Position comes from the report, not from the slice: an untitled task must
@@ -708,9 +837,17 @@ function composeHumanParts(
     // this filtered list.
     .map(task => titleOf(report, task.id, report.tasks.indexOf(task)))
     .filter(title => title !== '')
-  if (report.status !== 'completed' && doneTitles.length > 0) {
+  const deliverables = deliverablesOf(report)
+  if (doneTitles.length > 0) {
     const rest = verifiedTasks.length > doneTitles.length ? (zh ? ' 等' : ' and more') : ''
-    push(zh ? `做成的：${doneTitles.join('、')}${rest}。` : `Achieved: ${doneTitles.join(', ')}${rest}.`)
+    push(zh ? `做成了：${doneTitles.join('、')}${rest}。` : `Achieved: ${doneTitles.join(', ')}${rest}.`)
+  }
+  if (deliverables.length > 0) {
+    // The paths are the explicit exception to the machine-detail strip: they are
+    // the answer to "where is it", so stripping them leaves the row pointing at
+    // nothing. Every other path a report quotes is still stripped.
+    const paths = deliverables.map(path => oneLine(path, MAX_DELIVERABLE_CHARS))
+    push(zh ? `交付物：${paths.join('；')}` : `Deliverable: ${paths.join('; ')}`)
   }
 
   // What did not get done, with the reason the run actually recorded.
@@ -758,7 +895,7 @@ function composeHumanParts(
   const tail = `${verdict}${guard}`
   push(tail)
 
-  return { block: stripIds(composeBlock(lines), report), tail }
+  return { block: stripIds(composeBlock(lines, deliverables), report), tail }
 }
 
 /**
