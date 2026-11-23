@@ -1,0 +1,10 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/rsi-round-58
+
+ ✓ test/dispatcher-board.spec.ts (4 tests) 19ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  18:06:01
+   Duration  542ms (transform 385ms, setup 0ms, import 409ms, tests 19ms, environment 0ms)
+

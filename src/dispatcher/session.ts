@@ -202,13 +202,21 @@ export class DispatcherSession implements TaskReader {
    * returns is still refused); the returned promise only covers removing a
    * memory-only session's ephemeral backing. The board needs no flush: every
    * write already persisted before its handle returned.
+   *
+   * WHY clear the overlay and drop the board handle here: `stop` means
+   * "close up and clear the floor" — reads after stop must see nothing
+   * (inactive refuses writes, reads carry no stale rows), and a restart
+   * reloads persisted truth via `resume()`, never via a leftover handle.
    */
   async stop(): Promise<void> {
     this.active = false
+    // Clear the floor: drop the overlay and the board handle so post-stop
+    // reads are empty and a restart goes through resume() (persisted truth).
+    this.overlays.clear()
+    this.board = undefined
     if (this.memDir !== undefined) {
       const dir = this.memDir
       this.memDir = undefined
-      this.board = undefined
       await rm(dir, { recursive: true, force: true })
     }
   }

@@ -106,4 +106,28 @@ describe('DispatcherSession on the TaskBoard store', () => {
       blockedReason: 'fake waiting on store',
     })
   })
+
+  it('clears the floor on stop: reads empty until resume restores truth', async () => {
+    const dir = join(scratch, 'stop-clears')
+    const session = createDispatcherSession(dir)
+    expect((await handleDispatcherIntent(session, {
+      op: 'create',
+      id: 't1',
+      title: 'Fake staged',
+      owner: 'agent-a',
+      objective: 'fake objective',
+    })).ok).toBe(true)
+    await session.stop()
+    expect(session.list()).toEqual([])
+    expect(session.get('t1')).toBeUndefined()
+
+    const resumed = await resumeDispatcherBoard(session)
+    expect(resumed).toMatchObject({ restored: true, tasks: 1 })
+    expect(session.get('t1')).toMatchObject({
+      id: 't1',
+      title: 'Fake staged',
+      status: 'pending',
+      owner: 'agent-a',
+    })
+  })
 })
