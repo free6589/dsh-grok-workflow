@@ -3225,19 +3225,16 @@ window.__ModuleLoader__.load({
      * band moved when nothing about the cards had changed. Attribution now comes from the
      * wire, not from how far a card is indented.
      *
-     * Inside that gutter each owner group gets one channel and one elbow lane under the
-     * spine, so two owners never share a run that would read as a single line.
+     * Inside that gutter the whole band uses **one** elbow lane under the spine and **one**
+     * channel: every owner descends to that single rail, and the rail is drawn once. The
+     * earlier per-owner lanes and channels made the cross-stage lines outnumber the stages
+     * themselves (2026-11-21 request: too many lines, merge into one); attribution now
+     * rides on each owner's own drop and on its stubs, not on how many lanes it occupies.
      */
     const PROGRESS_WIRE_PAD = 40
     const PROGRESS_WIRE_BAND_GAP = 12
     const PROGRESS_WIRE_CHANNEL_X = 18
-    const PROGRESS_WIRE_CHANNEL_STEP = 10
-    // The last x a channel may take: the gutter's inner edge. A run that declares rows in
-    // more stages than the step has room for tightens the step instead of pushing a channel
-    // under the cards, and the lanes stay distinct either way.
-    const PROGRESS_WIRE_CHANNEL_INNER = 38
     const PROGRESS_WIRE_LANE_GAP = 4
-    const PROGRESS_WIRE_LANE_STEP = 8
     const PROGRESS_WIRE_LANE_CLEARANCE = 4
 
     /**
@@ -3805,10 +3802,10 @@ window.__ModuleLoader__.load({
       const trackBottom = Math.round(track.getBoundingClientRect().bottom - frame.top)
       const paths = []
       let depth = 0
-      let lane = 0
-      const channelStep = groups.size > 1
-        ? Math.min(PROGRESS_WIRE_CHANNEL_STEP, Math.floor((PROGRESS_WIRE_CHANNEL_INNER - PROGRESS_WIRE_CHANNEL_X) / (groups.size - 1)))
-        : PROGRESS_WIRE_CHANNEL_STEP
+      // One lane and one channel for the whole band: the rail every owner unwinds onto.
+      const laneY = trackBottom + PROGRESS_WIRE_LANE_GAP
+      const channel = PROGRESS_WIRE_CHANNEL_X
+      let railEnd = laneY
       for (const [owner, members] of groups) {
         const segment = flow.querySelector(`.gw-progress-track [data-node-key="${owner}"]`)
         const anchor = segment === null || segment === undefined || typeof segment.querySelector !== 'function'
@@ -3819,10 +3816,6 @@ window.__ModuleLoader__.load({
         if (anchor === null || typeof anchor.getBoundingClientRect !== 'function') continue
         const ring = anchor.getBoundingClientRect()
         const x = Math.round(ring.left - frame.left + ring.width / 2)
-        const laneY = trackBottom + PROGRESS_WIRE_LANE_GAP + lane * PROGRESS_WIRE_LANE_STEP
-        // One lane and one channel per group: two groups that shared either would draw a
-        // collinear run that reads as one owner.
-        const channel = PROGRESS_WIRE_CHANNEL_X + lane * channelStep
         const stubs = []
         let last = laneY
         for (const card of members) {
@@ -3838,17 +3831,30 @@ window.__ModuleLoader__.load({
             points: [[channel, y], [Math.round(rect.left - frame.left), y]],
           })
         }
+        // The owner's own drop ends on the shared rail: from its ring down through the one
+        // lane, then left into the same channel every other owner uses.
         paths.push({
           kind: 'trunk',
           owner,
           card: undefined,
-          points: [[x, trackBottom], [x, laneY], [channel, laneY], [channel, last]],
+          points: [[x, trackBottom], [x, laneY], [channel, laneY]],
         })
         paths.push(...stubs)
-        // The band's top margin has to clear the deepest lane, or an elbow would run across
+        // The rail runs once, from the lane down to the deepest card any owner hangs.
+        if (last > railEnd) railEnd = last
+        // The band's top margin has to clear the one lane, or the elbow would run across
         // the first card; the gutter itself never moves, so the cards keep their left edge.
         depth = Math.max(depth, laneY - trackBottom + PROGRESS_WIRE_LANE_CLEARANCE - PROGRESS_WIRE_BAND_GAP)
-        lane += 1
+      }
+      // One rail for every owner: the request was fewer cross-stage lines, and this is the
+      // one line they all share instead of one run per group.
+      if (railEnd > laneY) {
+        paths.push({
+          kind: 'rail',
+          owner: 'rail',
+          card: undefined,
+          points: [[channel, laneY], [channel, railEnd]],
+        })
       }
       return {
         width: Math.round(frame.width),
@@ -4126,18 +4132,25 @@ window.__ModuleLoader__.load({
             'data-owner': path.owner,
             d: progressWireDraw(path.points),
           })
-          : h('g', { key: `branch:${path.owner}:${path.card}`, 'data-gw-progress-wire-branch': path.card },
-            h('path', {
+          : path.kind === 'rail'
+            ? h('path', {
+              key: 'rail',
               className: 'gw-progress-wire',
-              'data-gw-progress-wire': 'branch',
-              'data-owner': path.owner,
-              'data-card': path.card,
+              'data-gw-progress-wire': 'rail',
               d: progressWireDraw(path.points),
-            }),
-            h('polygon', {
-              className: 'gw-progress-wire-head',
-              points: progressWireHead(path.points),
-            })))))
+            })
+            : h('g', { key: `branch:${path.owner}:${path.card}`, 'data-gw-progress-wire-branch': path.card },
+              h('path', {
+                className: 'gw-progress-wire',
+                'data-gw-progress-wire': 'branch',
+                'data-owner': path.owner,
+                'data-card': path.card,
+                d: progressWireDraw(path.points),
+              }),
+              h('polygon', {
+                className: 'gw-progress-wire-head',
+                points: progressWireHead(path.points),
+              })))))
       return h('section', {
         className: 'gw-progress',
         'data-gw-progress': true,
