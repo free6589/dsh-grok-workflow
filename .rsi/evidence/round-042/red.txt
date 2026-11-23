@@ -1,0 +1,5 @@
+# 摘要：红相（旧码）= 1 failed / 45 passed（新用例红，旧码只认xoxb，xoxc/xoxd/xoxo/xoxe漏网）；绿相（新码）见下
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/redact.spec.ts > credential redaction > redacts slack-token 全前缀 (xoxb/xoxc/xoxd/xoxo/xoxe)
+ Test Files  1 failed (1)
+      Tests  1 failed | 45 passed (46)

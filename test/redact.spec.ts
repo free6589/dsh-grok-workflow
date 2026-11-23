@@ -104,6 +104,18 @@ describe('credential redaction', () => {
     expect(output).toContain('[REDACTED NPM TOKEN]')
   })
 
+  it('redacts slack-token 全前缀 (xoxb/xoxc/xoxd/xoxo/xoxe)', () => {
+    const tokens = ['xoxb', 'xoxc', 'xoxd', 'xoxo', 'xoxe'].map(prefix =>
+      fake(`${prefix}-`, '1234567890-', 'abcdefghij'),
+    )
+    const output = redactSecrets(`slack tokens: ${tokens.join(' ')}`)
+    for (const token of tokens) expect(output).not.toContain(token)
+    expect(output.match(/\[REDACTED SLACK TOKEN\]/g)).toHaveLength(5)
+    // Ordinary prose without a token shape must survive untouched.
+    expect(redactSecrets('Document the workflow and test it in the sandbox.'))
+      .toBe('Document the workflow and test it in the sandbox.')
+  })
+
   it('does not redact ordinary words or numbers', () => {
     const input = 'The password policy has 12 characters; tokenization is not a token. maxRetries = 1.'
     expect(redactSecrets(input)).toBe(input)

@@ -7,6 +7,12 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ### Fixed / 修复
 
+- **Slack token redaction covers every token family / Slack 令牌脱敏覆盖全系前缀** —
+  The `slack-token` rule only matched five prefixes (`xoxb/p/a/r/s`), so newer families such as `xoxc`/`xoxd`/`xoxo` leaked verbatim into reports and prompts. It now matches any single lowercase letter after `xox`. Ordinary prose without a token shape is untouched.
+  / `slack-token` 规则原来只认五个前缀（`xoxb/p/a/r/s`），`xoxc`/`xoxd`/`xoxo` 等新前缀会原样漏进报告和提示词。现在 `xox` 后面任何一个小写字母都认，没有令牌形状的普通文字不受影响。
+
+### Fixed / 修复
+
 - **The workflow switch answers over GET, and a store that arrives late no longer blanks it / 总开关改用 GET 也答，晚到的会话服务不再把开关变空白** —
   Two more causes of the reported `HTTP 405` are closed on the plugin side. The route used to require `webServer` + `connection` + `sessions` all at mount time; a composition that reaches the live-session store later (or only through `ctx.get('sessions')`) mounted nothing, so the browser's POST fell through to the Host and came back as an empty-body 405 with no plugin sentence attached. The store is now resolved per request, a composition with no store answers `503 mode/unavailable` instead of a misleading missing-session 404, a read is also accepted over `GET ?action=status&sessionId=…` (a write over GET is refused with 405), and a refused method is logged with the method and URL that produced it. The switch retries one refused read over GET and names the refused method instead of reporting the route as silent, so a proxy that only allows GET costs a round-trip instead of the button's state.
   / 报过的 `HTTP 405` 又在插件侧关掉两个成因。以前路由挂载时必须同时具备 `webServer` + `connection` + `sessions` 三个服务：某些编排里会话服务晚到或只能通过 `ctx.get('sessions')` 拿到，于是路由根本没挂上，浏览器的 POST 落到宿主 fallback，回一个空包体 405、不带任何插件侧说明。现在会话服务改成按请求现取；确实没有会话服务时回 `503 mode/unavailable`，不再误报"没有这个会话"的 404；读取也可以用 `GET ?action=status&sessionId=…`（用 GET 写会被 405 拒绝）；被拒的方法会连方法和 URL 一起写进日志。开关遇到读取被拒会自动改用 GET 重试一次，并在彻底失败时点名"方法被拒"，不再只说"服务没回应"——只放行 GET 的代理从此只多花一次往返，不会让开关一直空着。

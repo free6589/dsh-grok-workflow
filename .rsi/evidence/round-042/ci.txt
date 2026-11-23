@@ -1,0 +1,3 @@
+npm run ci → EXIT 0
+typecheck: pass | lint: pass (warnings only, 0 errors) | verify:lib: lib/ at d525fb2 == build of src/ at d525fb2 (217 files, byte-identical; 注：verify:lib 比对的是 HEAD 已提交树，本轮改动尚未提交)
+tests: Test Files 85 passed (85) / Tests 1634 passed (1634)
