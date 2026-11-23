@@ -1,0 +1,14 @@
+round-070 probe — /home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-red70
+ABSENT  | 1 | 失败文案说人话：unloaded 原因 + 战果 + "重发即接着跑"
+         └─ 下一步：这次是被主动停下的，不算失败；要接着做得重新发一次。
+ABSENT  | 2 | 守卫结论进正文：N 条发现 / 未终止子代理 / 由 X 取消
+         └─ 以上是结论（2 项里 1 项可用，1 项没做成）；明细已记入台账。
+ABSENT  | 3 | 收编在飞子代理：checkpoint 记 childId + 最后一步
+         └─ null
+ABSENT  | 4 | /grok status 输出 run 状态/死因/守卫/checkpoint/未完成
+         └─ error: Usage: /grok [on|off]. This text was not sent as a prompt, so nothing ran.
+ABSENT  | 5 | 台账可更正：旧 cancelled/failed round 打 superseded by 链接
+         └─ no export
+
+summary: 0/5 present (red)
+62

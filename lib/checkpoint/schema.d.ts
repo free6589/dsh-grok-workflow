@@ -181,6 +181,26 @@ export interface CheckpointAgent {
     startedAtMs?: number;
     durationMs?: number;
 }
+/**
+ * One child call that was still running when the checkpoint was written.
+ *
+ * Round 70: an unload used to leave nothing behind about the children it cut —
+ * `agents` only ever held settled calls, so "what was in flight and where had it
+ * got to" lived in the process that was being torn down. A resume needs exactly
+ * that: the engine child id (so a later reader can look the child up in the
+ * session store) and the last step the host observed for it.
+ */
+export interface CheckpointInFlight {
+    /** Engine `agent()` sequence number within the run. */
+    seq: number;
+    /** Engine child session id, when the `agent-start` payload carried one. */
+    childId?: string;
+    /** Last host-observed step: the child's phase header, or its label. */
+    lastStep: string;
+    /** Plan task the call belonged to, when the phase names one. */
+    taskId?: string;
+    startedAtMs?: number;
+}
 export interface CheckpointStage {
     phase: CheckpointPhase;
     status: CheckpointStatus;
@@ -246,6 +266,12 @@ export interface WorkflowCheckpoint {
     tasks: CheckpointTask[];
     agents: CheckpointAgent[];
     stages: CheckpointStage[];
+    /**
+     * Child calls still running at write time. Optional: a checkpoint written by an
+     * older build has no such section, and an ordinary run with everything settled
+     * leaves it out rather than writing an empty array.
+     */
+    inFlight?: CheckpointInFlight[];
     evidence: CheckpointEvidence[];
     git: CheckpointGit;
     time: CheckpointTime;
@@ -297,6 +323,14 @@ export interface CheckpointInput {
         startedAtMs?: number;
         endedAtMs?: number;
         error?: string;
+    }[];
+    /** Calls still running at write time (unload/cancel checkpoints). */
+    inFlight?: {
+        seq: number;
+        childId?: string;
+        lastStep: string;
+        taskId?: string;
+        startedAtMs?: number;
     }[];
     evidence?: {
         taskId: string;

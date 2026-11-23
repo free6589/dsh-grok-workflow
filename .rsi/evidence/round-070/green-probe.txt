@@ -1,0 +1,14 @@
+round-070 probe — .
+PRESENT | 1 | 失败文案说人话：unloaded 原因 + 战果 + "重发即接着跑"
+         └─ 下一步：这次是插件在运行中被卸载（或升级）才停的，不是超时，也不是你手动停的。已经做完 1 项，还剩 1 项没做完。原样再发一次就接着跑，已经做好的不会重做。
+PRESENT | 2 | 守卫结论进正文：N 条发现 / 未终止子代理 / 由 X 取消
+         └─ 守卫：2 条发现，未终止任何子代理；本轮由插件卸载取消。
+PRESENT | 3 | 收编在飞子代理：checkpoint 记 childId + 最后一步
+         └─ [{"seq":1,"childId":"child-42","lastStep":"执行"}]
+PRESENT | 4 | /grok status 输出 run 状态/死因/守卫/checkpoint/未完成
+         └─ success: Grok workflow status:
+PRESENT | 5 | 台账可更正：旧 cancelled/failed round 打 superseded by 链接
+         └─ corrections=1
+
+summary: 5/5 present (green)
+62

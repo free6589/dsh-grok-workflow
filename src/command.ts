@@ -42,6 +42,8 @@ import type { Session } from '@deepseek-ai/dsh-session'
 import { readModeRecord, setMode } from './mode.js'
 import type { ModeRecord } from './mode.js'
 import { isPromptShapedArgument, refuseDiscardedCommandPrompt } from './intake.js'
+import { readLatestCheckpointSync } from './checkpoint/wiring.js'
+import { PROGRESS_AGENT_END, PROGRESS_AGENT_START, PROGRESS_RUN_END, PROGRESS_RUN_START } from './records.js'
 
 /** Agent surface the handler needs (the live agent carries more). */
 export interface GrokCommandAgent {
@@ -99,7 +101,154 @@ function toggleFailureText(reason: string, current: ModeRecord | undefined): str
 }
 
 /** The `kind: 'error'` settle text for an argument that is not a toggle word. */
-export const GROK_USAGE_TEXT = 'Usage: /grok [on|off]. This text was not sent as a prompt, so nothing ran.'
+export const GROK_USAGE_TEXT = 'Usage: /grok [on|off|status]. This text was not sent as a prompt, so nothing ran.'
+
+/**
+ * One run's recorded progress, folded from the session's own journal.
+ *
+ * `/grok status` may only report what the session can show: the progress rows this
+ * plugin writes (`tool-workflow/*`), the dispose record, and the checkpoint file.
+ * It never guesses a state from memory, because a status line is the one place a
+ * reader checks a claim they cannot otherwise see.
+ */
+export interface RunStatusFacts {
+  /** Engine run id of the most recent run. */
+  runId?: string
+  /** Durable task label (`run.meta.name`), when the row carried one. */
+  name?: string
+  /** Stop reason the engine settled on, when the run has settled. */
+  stopReason?: string
+  /** Child calls that never settled (still in flight when the row set ends). */
+  inFlight: { seq: number, label: string, phase?: string, childId?: string }[]
+  /** Guardian settlement, when the run recorded one. */
+  guard?: { findings: number, cancelled: boolean }
+}
+
+/**
+ * Fold the session journal into the facts `/grok status` prints.
+ * @param session - session whose own log is read.
+ * @returns The latest run's facts; empty fields when nothing was recorded.
+ */
+export function readRunStatusFacts(session: Session | undefined): RunStatusFacts {
+  const facts: RunStatusFacts = { inFlight: [] }
+  if (session === undefined || typeof session.ownEvents !== 'function') return facts
+  const started = new Map<number, { label: string, phase?: string, childId?: string }>()
+  const settled = new Set<number>()
+  let sawGuard = false
+  for (const event of session.ownEvents()) {
+    const type = (event as { type?: unknown }).type
+    const data = (event as { data?: Record<string, unknown> }).data
+    if (typeof type !== 'string' || data === undefined || data === null) continue
+    if (type === PROGRESS_RUN_START) {
+      if (typeof data['runId'] === 'string') facts.runId = data['runId']
+      if (typeof data['name'] === 'string') facts.name = data['name']
+      // A new run restarts the fold: the status is about the latest run, and the
+      // previous run's stop reason must not be read as this one's.
+      delete facts.stopReason
+      delete facts.guard
+      started.clear()
+      settled.clear()
+      sawGuard = false
+      continue
+    }
+    if (type === PROGRESS_AGENT_START) {
+      const seq = Number(data['seq'])
+      if (!Number.isFinite(seq)) continue
+      started.set(seq, {
+        label: typeof data['label'] === 'string' ? data['label'] : '',
+        ...typeof data['phase'] === 'string' ? { phase: data['phase'] } : {},
+        ...typeof data['childId'] === 'string' && data['childId'] !== '' ? { childId: data['childId'] } : {},
+      })
+      continue
+    }
+    if (type === PROGRESS_AGENT_END) {
+      const seq = Number(data['seq'])
+      if (Number.isFinite(seq)) settled.add(seq)
+      continue
+    }
+    if (type === PROGRESS_RUN_END) {
+      if (typeof data['stopReason'] === 'string') facts.stopReason = data['stopReason']
+      continue
+    }
+    // `tool-workflow/guardian-end` is written by `src/run.ts` with these two fields.
+    if (type === 'tool-workflow/guardian-end') {
+      const findings = Number(data['findingCount'])
+      const cancelled = data['cancelled'] === true
+      if (Number.isFinite(findings)) {
+        facts.guard = { findings, cancelled }
+        sawGuard = true
+      }
+    }
+  }
+  facts.inFlight = [...started.entries()]
+    .filter(([seq]) => !settled.has(seq))
+    .sort((left, right) => left[0] - right[0])
+    .map(([seq, member]) => ({ seq, ...member }))
+  if (!sawGuard) delete facts.guard
+  return facts
+}
+
+/** Plain words for a stop reason, so the status line does not answer in jargon. */
+function stopWords(stopReason: string | undefined): string {
+  if (stopReason === undefined) return 'still running, or it never settled'
+  if (stopReason === 'completed') return 'finished on its own terms'
+  if (stopReason === 'cancelled') return 'cancelled (by the caller, a deadline, or a plugin unload — see the checkpoint cause)'
+  return `stopped with ${stopReason}`
+}
+
+/**
+ * Compose the `/grok status` answer: run state, why it stopped, what the guard saw,
+ * whether a checkpoint can be resumed, and what is still unfinished.
+ *
+ * Everything here is read from the session journal and the checkpoint file, so the
+ * answer survives the process that produced it — which is the whole point of a
+ * status command after an unload.
+ * @param session - session to report on.
+ * @param checkpointDirOverride - explicit checkpoint directory (tests, e2e lanes).
+ * @returns The settled text (never empty).
+ */
+export function grokStatusText(session: Session | undefined, checkpointDirOverride?: string): string {
+  const toggle = readModeRecord(session)
+  const facts = readRunStatusFacts(session)
+  const sessionId = typeof (session as { id?: unknown } | undefined)?.id === 'string' ? (session as { id: string }).id : undefined
+  const latest = readLatestCheckpointSync({
+    ...checkpointDirOverride === undefined ? {} : { dir: checkpointDirOverride },
+    ...sessionId === undefined ? {} : { sessionId },
+  })
+  const lines: string[] = ['Grok workflow status:']
+  lines.push(`- Toggle: ${toggle === undefined ? 'never set in this session' : toggle.enabled ? 'on' : 'off'}`)
+  if (facts.runId === undefined && latest === undefined) {
+    lines.push('- Last run: none recorded in this session')
+    return lines.join('\n')
+  }
+  lines.push(`- Last run: ${facts.name ?? latest?.checkpoint.run.name ?? 'unnamed'} (${facts.runId ?? latest?.checkpoint.run.runId ?? 'unknown id'})`)
+  lines.push(`- State: ${stopWords(facts.stopReason)}`)
+  const stopCause = latest?.checkpoint.run.cause
+  if (stopCause !== undefined) lines.push(`- Why it stopped: ${stopCause}`)
+  const guard = facts.guard
+  lines.push(guard === undefined
+    ? '- Guard: no guardian settlement recorded for this run'
+    : `- Guard: ${guard.findings} finding(s); ${guard.cancelled ? 'it cancelled the run' : 'it never terminated a subagent'}`)
+  if (facts.inFlight.length > 0) {
+    lines.push(`- Still in flight when the rows ended: ${facts.inFlight.map(member => `${member.childId ?? `#${member.seq}`}${member.phase === undefined ? '' : ` (${member.phase})`}`).join(', ')}`)
+  }
+  if (latest === undefined) {
+    lines.push('- Resumable checkpoint: none readable')
+    return lines.join('\n')
+  }
+  const checkpoint = latest.checkpoint
+  const unfinished = checkpoint.tasks.filter(task => task.status !== 'verified').map(task => `${task.id}${task.status === 'pending' ? '' : ` (${task.status})`}`)
+  lines.push(`- Resumable checkpoint: ${checkpoint.run.status} at ${new Date(checkpoint.time.updatedAtMs).toISOString()} (${latest.path})`)
+  const running = checkpoint.inFlight ?? []
+  if (running.length > 0) {
+    lines.push(`- Checkpointed in-flight calls: ${running.map(row => `${row.childId ?? `#${row.seq}`} — ${row.lastStep}`).join('; ')}`)
+  }
+  lines.push(unfinished.length === 0
+    ? '- Unfinished: none; every recorded task verified'
+    : `- Unfinished (${unfinished.length}): ${unfinished.join(', ')}`)
+  lines.push('- To continue: send the same request again; the next run starts from this checkpoint.')
+  return lines.join('\n')
+}
 
 /**
  * The `/grok` command definition: arg grammar owned by the handler.
@@ -114,8 +263,8 @@ export const GROK_USAGE_TEXT = 'Usage: /grok [on|off]. This text was not sent as
 export function grokCommand(logger?: CommandLogger): GrokCommandDefinition {
   return {
     name: 'grok',
-    description: 'Turn the grok workflow on or off',
-    input: { hint: '[on|off]' },
+    description: 'Turn the grok workflow on or off, or report the last run',
+    input: { hint: '[on|off|status]' },
     handler: ({ agent, rawInput }) => {
       // A malformed invocation is an error, not an enable: an invocation object
       // without a string argument must never fall through to "no argument means
@@ -126,6 +275,11 @@ export function grokCommand(logger?: CommandLogger): GrokCommandDefinition {
       // U+00A0, U+3000), so the word is the only thing that decides.
       const arg = rawInput.trim()
       const word = arg.toLowerCase()
+      // `/grok status` answers a question instead of flipping the toggle: it never
+      // writes, so a reader can ask "what happened to my run" without changing the
+      // session's mode. It is matched before the toggle grammar because `status`
+      // would otherwise be refused as a malformed switch word.
+      if (word === 'status') return { kind: 'success', text: grokStatusText(agent.session) }
       const enable = arg === '' || word === 'on'
       if (!enable && word !== 'off') {
         // A pasted prompt that opens with `/grok` reaches this line with the whole

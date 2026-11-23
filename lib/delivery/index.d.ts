@@ -32,6 +32,7 @@
  *   the ledger, in reverse.
  */
 import type { FinalStatus, WorkflowReport } from '../types.js';
+import type { GuardConclusion } from '../report.js';
 /** Language the human block is written in. */
 export type DeliveryLang = 'zh' | 'en';
 /**
@@ -58,6 +59,17 @@ export interface DeliveryOptions {
      * is not a summary. Default `false` so every existing caller keeps one block.
      */
     bilingual?: boolean;
+    /**
+     * Guard settlement for this run, printed as the block's fixed last line.
+     *
+     * The guard watches child calls and never cancels the workflow, and until round
+     * 70 that fact reached only the progress panel — so a reader could not tell a
+     * watched run from an unwatched one. Passed in rather than read off the report:
+     * "the guard recorded nothing" and "no guard was supplied" are different facts.
+     */
+    guard?: GuardConclusion;
+    /** Child calls still running when the run stopped (the resume hint's detail). */
+    inFlight?: number;
 }
 /** One composed delivery: the human block, and the ledger only on request. */
 export interface DeliveryView {
@@ -116,6 +128,8 @@ export declare function pairCaps(firstLen: number, secondLen: number, budget: nu
 export declare function humanConclusion(report: WorkflowReport, opts?: {
     lang?: DeliveryLang;
     bilingual?: boolean;
+    guard?: GuardConclusion;
+    inFlight?: number;
 }): string;
 /**
  * Build the full machine ledger.
@@ -135,7 +149,10 @@ export declare function humanConclusion(report: WorkflowReport, opts?: {
  * @param report - validated report.
  * @returns the ledger text, bounded by {@link MAX_LEDGER_CHARS}.
  */
-export declare function machineLedger(report: WorkflowReport): string;
+export declare function machineLedger(report: WorkflowReport, opts?: {
+    guard?: GuardConclusion;
+    inFlight?: number;
+}): string;
 /**
  * Ledger placeholder when the routing map cannot be rendered (round 46).
  *

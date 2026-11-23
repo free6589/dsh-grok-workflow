@@ -33,6 +33,8 @@
  */
 
 import type { FinalStatus, WorkflowReport } from '../types.js'
+import { guardLine, guardOf, stopNarration } from '../report.js'
+import type { GuardConclusion } from '../report.js'
 
 /** Language the human block is written in. */
 export type DeliveryLang = 'zh' | 'en'
@@ -60,6 +62,17 @@ export interface DeliveryOptions {
    * is not a summary. Default `false` so every existing caller keeps one block.
    */
   bilingual?: boolean
+  /**
+   * Guard settlement for this run, printed as the block's fixed last line.
+   *
+   * The guard watches child calls and never cancels the workflow, and until round
+   * 70 that fact reached only the progress panel — so a reader could not tell a
+   * watched run from an unwatched one. Passed in rather than read off the report:
+   * "the guard recorded nothing" and "no guard was supplied" are different facts.
+   */
+  guard?: GuardConclusion
+  /** Child calls still running when the run stopped (the resume hint's detail). */
+  inFlight?: number
 }
 
 /** One composed delivery: the human block, and the ledger only on request. */
@@ -633,9 +646,14 @@ function nextStep(report: WorkflowReport, lang: DeliveryLang): string {
  *
  * @param report - validated report (or an explicit failure report).
  * @param lang - language this pass is written in.
+ * @param opts - the guard settlement and in-flight count, when the caller has them.
  * @returns the composed block and the verdict tail it ends with.
  */
-function composeHumanParts(report: WorkflowReport, lang: DeliveryLang): { block: string, tail: string } {
+function composeHumanParts(
+  report: WorkflowReport,
+  lang: DeliveryLang,
+  opts: DeliveryOptions = {},
+): { block: string, tail: string } {
   const zh = lang === 'zh'
   const verifiedTasks = report.tasks.filter(task => task.status === 'verified')
   const verified = verifiedTasks.length
@@ -654,10 +672,20 @@ function composeHumanParts(report: WorkflowReport, lang: DeliveryLang): { block:
   }
 
   // The run's own advice/next step, verbatim and moved up: it reads right after
-  // the answer and before the folded process detail.
+  // the answer and before the folded process detail. A run that stopped for a
+  // recorded cause says that cause in everyday words instead (round 70): the
+  // generic "it was stopped on purpose" advice named the wrong actor for an
+  // unload and never said how much survived.
+  // Only a stop whose actor the generic advice gets wrong is replaced: "it was
+  // stopped on purpose" is false for a plugin unload, and neither wording said how
+  // much survived. A deadline or an engine fault keeps its category advice (that
+  // text already says "not your fault, send it again"), and the ledger still
+  // carries the full stop sentence for every cause.
+  const cause = report.stop?.cause
+  const narration = cause === 'unloaded' || cause === 'caller' ? stopNarration(report, lang, opts.inFlight) : undefined
   const advice = report.status === 'completed'
     ? (zh ? '结果可以直接用；哪一项对不上，就把那一项单独再发一次，我会重跑。' : 'The result is usable as it stands; if one item does not match what you expected, send that item again and I will rerun it.')
-    : nextStep(report, lang)
+    : narration ?? nextStep(report, lang)
   push((zh ? '下一步：' : 'Next: ') + advice)
 
   // A mid-run replan is a fact about this answer, not diagnostics: the run the
@@ -721,7 +749,13 @@ function composeHumanParts(report: WorkflowReport, lang: DeliveryLang): { block:
     }
   }
 
-  const tail = statusTail(report, verified, total, lang)
+  // The verdict line, then the fixed guard line, are the block's reserved end:
+  // both are status, both are unrecoverable from anywhere else in the delivery,
+  // and both must survive the character bound (`clampHumanBlock` keeps `tail`).
+  const verdict = statusTail(report, verified, total, lang)
+  const settled = opts.guard ?? guardOf(report)
+  const guard = settled === undefined ? '' : `\n${guardLine(settled, lang)}`
+  const tail = `${verdict}${guard}`
   push(tail)
 
   return { block: stripIds(composeBlock(lines), report), tail }
@@ -811,13 +845,13 @@ export function pairCaps(firstLen: number, secondLen: number, budget: number): [
  */
 export function humanConclusion(
   report: WorkflowReport,
-  opts: { lang?: DeliveryLang, bilingual?: boolean } = {},
+  opts: { lang?: DeliveryLang, bilingual?: boolean, guard?: GuardConclusion, inFlight?: number } = {},
 ): string {
   const lang: DeliveryLang = opts.lang ?? 'zh'
-  const first = composeHumanParts(report, lang)
+  const first = composeHumanParts(report, lang, opts)
   const firstBlock = clampHumanBlock(first.block, first.tail, MAX_HUMAN_CHARS)
   if (opts.bilingual !== true) return firstBlock
-  const second = composeHumanParts(report, lang === 'zh' ? 'en' : 'zh')
+  const second = composeHumanParts(report, lang === 'zh' ? 'en' : 'zh', opts)
   const secondBlock = clampHumanBlock(second.block, second.tail, MAX_HUMAN_CHARS)
   if (secondBlock === '') return firstBlock
   const separator = '\n\n'
@@ -940,7 +974,7 @@ const LEDGER_TRUNCATED_MARKER = '[output truncated; see the canonical structured
  * @param report - validated report.
  * @returns the ledger text, bounded by {@link MAX_LEDGER_CHARS}.
  */
-export function machineLedger(report: WorkflowReport): string {
+export function machineLedger(report: WorkflowReport, opts: { guard?: GuardConclusion, inFlight?: number } = {}): string {
   const verified = report.tasks.filter(task => task.status === 'verified').length
   const lines: string[] = [
     `Grok workflow: ${report.status.toUpperCase()}`,
@@ -1032,6 +1066,13 @@ export function machineLedger(report: WorkflowReport): string {
       lines.push(`- ${entry.phase}${entry.category === undefined ? '' : ` (${entry.category})`}: ${oneLine(entry.message, 300)}`)
     }
   }
+  // Round 70: the stopped-run sentence and the fixed guard line close the ledger
+  // too. The ledger is the machine view of the same run, and a reader who opened
+  // it is exactly the one asking "who killed it, and did the watchdog do anything".
+  const narration = stopNarration(report, 'en', opts.inFlight)
+  if (narration !== undefined) lines.push(`Stop: ${narration}`)
+  const settled = opts.guard ?? guardOf(report)
+  if (settled !== undefined) lines.push(guardLine(settled, 'en'))
   const text = lines.join('\n')
   if (text.length <= MAX_LEDGER_CHARS) return text
   const window = text.slice(0, MAX_LEDGER_CHARS)
@@ -1080,7 +1121,7 @@ export function deliverReport(report: WorkflowReport, opts: DeliveryOptions = {}
   let ledger: string | undefined
   if (diagnostics) {
     try {
-      ledger = machineLedger(report)
+      ledger = machineLedger(report, { ...opts.guard === undefined ? {} : { guard: opts.guard }, ...opts.inFlight === undefined ? {} : { inFlight: opts.inFlight } })
     } catch {
       ledger = LEDGER_UNAVAILABLE
     }

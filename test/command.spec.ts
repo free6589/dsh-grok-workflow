@@ -396,8 +396,11 @@ describe('/grok registration (lazy commands mount)', () => {
     await vi.waitFor(() => expect(recorder.definitions).toHaveLength(1))
     const definition = recorder.definitions[0]!
     expect(definition.name).toBe('grok')
-    expect(definition.description).toBe('Turn the grok workflow on or off')
-    expect(definition.input).toEqual({ hint: '[on|off]' })
+    // Round 70: the command now also answers `/grok status`, so its advertised
+    // description and hint name that third word — a `status` invocation the grammar
+    // accepts while the help text says otherwise is the worse of the two lies.
+    expect(definition.description).toBe('Turn the grok workflow on or off, or report the last run')
+    expect(definition.input).toEqual({ hint: '[on|off|status]' })
     // The registered handler is the real one: it flips the durable toggle.
     const session = realSession('sess-cmd-registered')
     expect(definition.handler({ agent: new FakeAgent(session), rawInput: '' }))

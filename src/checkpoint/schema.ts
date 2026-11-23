@@ -199,6 +199,27 @@ export interface CheckpointAgent {
   durationMs?: number
 }
 
+/**
+ * One child call that was still running when the checkpoint was written.
+ *
+ * Round 70: an unload used to leave nothing behind about the children it cut —
+ * `agents` only ever held settled calls, so "what was in flight and where had it
+ * got to" lived in the process that was being torn down. A resume needs exactly
+ * that: the engine child id (so a later reader can look the child up in the
+ * session store) and the last step the host observed for it.
+ */
+export interface CheckpointInFlight {
+  /** Engine `agent()` sequence number within the run. */
+  seq: number
+  /** Engine child session id, when the `agent-start` payload carried one. */
+  childId?: string
+  /** Last host-observed step: the child's phase header, or its label. */
+  lastStep: string
+  /** Plan task the call belonged to, when the phase names one. */
+  taskId?: string
+  startedAtMs?: number
+}
+
 export interface CheckpointStage {
   phase: CheckpointPhase
   status: CheckpointStatus
@@ -272,6 +293,12 @@ export interface WorkflowCheckpoint {
   tasks: CheckpointTask[]
   agents: CheckpointAgent[]
   stages: CheckpointStage[]
+  /**
+   * Child calls still running at write time. Optional: a checkpoint written by an
+   * older build has no such section, and an ordinary run with everything settled
+   * leaves it out rather than writing an empty array.
+   */
+  inFlight?: CheckpointInFlight[]
   evidence: CheckpointEvidence[]
   git: CheckpointGit
   time: CheckpointTime
@@ -309,6 +336,8 @@ export interface CheckpointInput {
     durationMs?: number
   }[]
   stages?: { phase: CheckpointPhase; status: CheckpointStatus; startedAtMs?: number; endedAtMs?: number; error?: string }[]
+  /** Calls still running at write time (unload/cancel checkpoints). */
+  inFlight?: { seq: number; childId?: string; lastStep: string; taskId?: string; startedAtMs?: number }[]
   evidence?: { taskId: string; criterion: string; claim: string; locator?: string }[]
   git?: { branch?: string; head?: string; dirty: boolean; ahead?: number; behind?: number }
   time?: { startedAtMs?: number; updatedAtMs?: number; durationMs?: number; deadlineAtMs?: number }
@@ -605,6 +634,19 @@ export function buildCheckpoint(input: CheckpointInput, now: number = Date.now()
     }
   })
 
+  // In-flight rows are dropped from the payload when there are none: an ordinary
+  // checkpoint keeps the shape it had before this section existed.
+  const inFlight: CheckpointInFlight[] = (input.inFlight ?? []).slice(0, CHECKPOINT_LIMITS.maxAgents).map((row, index) => {
+    const path = `inFlight[${index}]`
+    return {
+      seq: inRange(integer(row.seq, `${path}.seq`), 0, CHECKPOINT_LIMITS.countCeiling, `${path}.seq`),
+      ...(row.childId === undefined || row.childId === '' ? {} : { childId: text(row.childId, CHECKPOINT_LIMITS.idChars, `${path}.childId`) }),
+      lastStep: text(row.lastStep, CHECKPOINT_LIMITS.titleChars, `${path}.lastStep`),
+      ...(row.taskId === undefined || row.taskId === '' ? {} : { taskId: text(row.taskId, CHECKPOINT_LIMITS.idChars, `${path}.taskId`) }),
+      ...(row.startedAtMs === undefined ? {} : { startedAtMs: integer(row.startedAtMs, `${path}.startedAtMs`) }),
+    }
+  })
+
   const evidence: CheckpointEvidence[] = (input.evidence ?? []).slice(0, CHECKPOINT_LIMITS.maxEvidence).map((row, index) => {
     const path = `evidence[${index}]`
     return {
@@ -680,6 +722,7 @@ export function buildCheckpoint(input: CheckpointInput, now: number = Date.now()
     tasks: taskRows,
     agents,
     stages,
+    ...inFlight.length === 0 ? {} : { inFlight },
     evidence,
     git,
     time,
@@ -800,6 +843,26 @@ export function assertCheckpoint(value: unknown): WorkflowCheckpoint {
     }
   })
 
+  const inFlightRaw = root['inFlight']
+  if (inFlightRaw !== undefined && !Array.isArray(inFlightRaw)) {
+    throw new CheckpointError('invalid', 'checkpoint inFlight must be an array')
+  }
+  if (Array.isArray(inFlightRaw) && inFlightRaw.length > CHECKPOINT_LIMITS.maxAgents) {
+    throw new CheckpointError('invalid', `checkpoint inFlight exceeds ${CHECKPOINT_LIMITS.maxAgents} rows`)
+  }
+  const inFlight: CheckpointInFlight[] | undefined = inFlightRaw === undefined
+    ? undefined
+    : (inFlightRaw as unknown[]).map((item, index) => {
+      const raw = record(item, `inFlight[${index}]`)
+      return {
+        seq: inRange(integer(raw['seq'], `inFlight[${index}].seq`), 0, CHECKPOINT_LIMITS.countCeiling, `inFlight[${index}].seq`),
+        ...(raw['childId'] === undefined ? {} : { childId: bounded(string(raw['childId'], `inFlight[${index}].childId`), CHECKPOINT_LIMITS.idChars, `inFlight[${index}].childId`) }),
+        lastStep: bounded(string(raw['lastStep'], `inFlight[${index}].lastStep`), CHECKPOINT_LIMITS.titleChars, `inFlight[${index}].lastStep`),
+        ...(raw['taskId'] === undefined ? {} : { taskId: bounded(string(raw['taskId'], `inFlight[${index}].taskId`), CHECKPOINT_LIMITS.idChars, `inFlight[${index}].taskId`) }),
+        ...(raw['startedAtMs'] === undefined ? {} : { startedAtMs: integer(raw['startedAtMs'], `inFlight[${index}].startedAtMs`) }),
+      }
+    })
+
   const evidenceRaw = root['evidence']
   if (!Array.isArray(evidenceRaw)) throw new CheckpointError('invalid', 'checkpoint evidence must be an array')
   if (evidenceRaw.length > CHECKPOINT_LIMITS.maxEvidence) throw new CheckpointError('invalid', `checkpoint evidence exceeds ${CHECKPOINT_LIMITS.maxEvidence} rows`)
@@ -885,6 +948,7 @@ export function assertCheckpoint(value: unknown): WorkflowCheckpoint {
     tasks,
     agents,
     stages,
+    ...inFlight === undefined ? {} : { inFlight },
     evidence,
     git,
     time,

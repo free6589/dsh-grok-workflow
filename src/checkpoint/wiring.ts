@@ -58,13 +58,14 @@
  * `buildCheckpoint`.
  */
 
+import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { readdir, stat } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { homedir } from 'node:os'
 import { phaseLabel } from '../naming.js'
 import { redactError, redactSecrets } from '../redact.js'
 import type { RoleName, WorkflowReport } from '../types.js'
-import { CHECKPOINT_LIMITS, ENGINE_HOOK_LIMITS, limitContractViolations } from './schema.js'
+import { assertCheckpoint, CHECKPOINT_LIMITS, ENGINE_HOOK_LIMITS, limitContractViolations, verifyCheckpointIntegrity } from './schema.js'
 import type {
   CheckpointGit,
   CheckpointInput,
@@ -105,6 +106,15 @@ export const CHECKPOINT_WIRING_LIMITS = {
    * 5 minutes.
    */
   staleAfterMs: { min: 1_000, max: 86_400_000, default: 120_000 },
+  /**
+   * Files the synchronous status reader inspects per call, newest mtime first.
+   *
+   * `/grok status` must answer in one tick, so it looks at a bounded window of the
+   * directory rather than walking a long history; the newest run is the one being
+   * asked about, and an older file that is not in the window is not a status
+   * answer worth stalling a command for.
+   */
+  statusScan: 24,
 } as const
 
 /**
@@ -152,6 +162,59 @@ export function checkpointDir(options: CheckpointDirectoryOptions = {}): string 
 /** Path of one run's checkpoint file. One file per run, atomically replaced. */
 export function checkpointFile(runId: string, options: CheckpointDirectoryOptions = {}): string {
   return join(checkpointDir(options), checkpointFileName(runId))
+}
+
+/**
+ * Read the freshest readable checkpoint synchronously.
+ *
+ * `/grok status` is a command handler: it settles a string in the same tick, so it
+ * cannot await the async reader. The read is the same file, the same schema check
+ * and the same integrity check the async path uses, just synchronous, and every
+ * failure (unreadable directory, half-written file, checksum mismatch) returns
+ * `undefined` instead of throwing into the command. The scan is bounded to
+ * {@link CHECKPOINT_WIRING_LIMITS.statusFiles} files, newest first, so a directory
+ * full of history cannot make a status call walk all of it.
+ * @param options - directory override plus an optional session filter.
+ * @returns The newest whole checkpoint, or undefined when none is readable.
+ */
+export function readLatestCheckpointSync(options: StatusReadOptions = {}): { path: string, checkpoint: WorkflowCheckpoint } | undefined {
+  let names: string[]
+  try {
+    names = readdirSync(checkpointDir(options)).filter(name => name.endsWith('.json'))
+  } catch {
+    return undefined
+  }
+  const ranked: { name: string, mtimeMs: number }[] = []
+  for (const name of names.slice(0, CHECKPOINT_WIRING_LIMITS.statusScan)) {
+    try {
+      const info = statSync(join(checkpointDir(options), name))
+      if (info.isFile()) ranked.push({ name, mtimeMs: info.mtimeMs })
+    } catch {
+      // A file that vanished between the listing and the stat is simply not a
+      // candidate; the next-newest one is.
+    }
+  }
+  ranked.sort((left, right) => right.mtimeMs - left.mtimeMs)
+  for (const candidate of ranked) {
+    const path = join(checkpointDir(options), candidate.name)
+    try {
+      const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'))
+      const checkpoint = assertCheckpoint(parsed)
+      if (!verifyCheckpointIntegrity(checkpoint).ok) continue
+      if (options.sessionId !== undefined && checkpoint.run.sessionId !== undefined && checkpoint.run.sessionId !== options.sessionId) continue
+      return { path, checkpoint }
+    } catch {
+      // Unreadable or invalid: try the next one rather than report a file the
+      // reader could not trust.
+    }
+  }
+  return undefined
+}
+
+/** Options for the synchronous status reader. */
+export interface StatusReadOptions extends CheckpointDirectoryOptions {
+  /** Keep only a checkpoint written for this session. */
+  sessionId?: string
 }
 
 /* ------------------------------------------------------------------ *
@@ -639,6 +702,8 @@ export interface CheckpointRecorderStats {
    * Exposed so the give-up is a state a test can read, not only a log line.
    */
   writesStopped: boolean
+  /** Child calls announced and not yet settled (what an unload checkpoint records). */
+  inFlight: number
   agents: CheckpointObservedAgents
 }
 
@@ -697,6 +762,15 @@ interface WiringState {
   listeners: (() => void)[]
   stages: Map<string, CheckpointStage[]>
   agents: Map<string, CheckpointObservedAgents>
+  /**
+   * Child calls the engine announced and has not settled yet, keyed by `seq`.
+   *
+   * Kept as rows rather than only as counters because a checkpoint written during
+   * an unload is the last record of children that never settled: the counters say
+   * "three started", the rows say "these two were still in `execute`, and this is
+   * the child id a later reader can look up".
+   */
+  live: Map<number, { seq: number, childId?: string, lastStep: string, startedAtMs: number }>
 }
 
 /**
@@ -766,6 +840,7 @@ export function createCheckpointRecorder(options: CheckpointRecorderOptions): Ru
     listeners: [],
     stages: new Map(),
     agents: new Map(),
+    live: new Map(),
   }
 
   /**
@@ -881,12 +956,29 @@ export function createCheckpointRecorder(options: CheckpointRecorderOptions): Ru
     if (runId === '') return
     if (wiring.runId !== undefined && runId !== wiring.runId) return
     const counters = agentsOf(runId)
+    const seq = typeof (info as { seq?: unknown }).seq === 'number' ? (info as { seq: number }).seq : undefined
     if (settled) {
       if (outcome === 'failed') counters.failed += 1
       else if (outcome === 'cancelled') counters.cancelled += 1
+      if (seq !== undefined) wiring.live.delete(seq)
       return
     }
     counters.started += 1
+    if (seq === undefined) return
+    if (counters.started > CHECKPOINT_LIMITS.maxAgents) return
+    const raw = info as { label?: unknown, phase?: unknown, childId?: unknown }
+    const phase = typeof raw.phase === 'string' ? raw.phase.trim() : ''
+    const label = typeof raw.label === 'string' ? raw.label.trim() : ''
+    // The last step is what the host actually observed this call doing: its phase
+    // header when the script declared one, otherwise its label. Never invented.
+    const lastStep = phase !== '' ? phase : label !== '' ? label : 'child call in flight'
+    const childId = typeof raw.childId === 'string' && raw.childId !== '' ? raw.childId : undefined
+    wiring.live.set(seq, {
+      seq,
+      ...childId === undefined ? {} : { childId },
+      lastStep,
+      startedAtMs: clock(),
+    })
   }
 
   const noteEnd = (info: unknown, result: unknown): void => {
@@ -953,6 +1045,26 @@ export function createCheckpointRecorder(options: CheckpointRecorderOptions): Ru
     }
   }
 
+  /**
+   * Rows for the child calls still running, in call order.
+   *
+   * Read straight off the live map so the terminal (unload) write describes the
+   * children it is about to cut, not the ones already settled. Empty means "no
+   * child was in flight", which is the ordinary shape of a completed run.
+   */
+  const liveInFlight = (): { inFlight: NonNullable<CheckpointInput['inFlight']> } => {
+    const rows = [...wiring.live.values()]
+      .sort((left, right) => left.seq - right.seq)
+      .slice(0, CHECKPOINT_LIMITS.maxAgents)
+      .map(row => ({
+        seq: row.seq,
+        ...row.childId === undefined ? {} : { childId: row.childId },
+        lastStep: row.lastStep,
+        startedAtMs: row.startedAtMs,
+      }))
+    return rows.length === 0 ? { inFlight: [] } : { inFlight: rows }
+  }
+
   const snapshot = (): CheckpointInput | undefined => {
     const runId = wiring.runId
     if (runId === undefined) return undefined
@@ -984,6 +1096,7 @@ export function createCheckpointRecorder(options: CheckpointRecorderOptions): Ru
       // a fact — an empty array — not an absence.
       stages,
       agents: report === undefined ? [] : agentsFromReport(report),
+      ...liveInFlight(),
       time: {
         startedAtMs: wiring.startedAtMs,
         updatedAtMs: at,
@@ -1104,6 +1217,7 @@ export function createCheckpointRecorder(options: CheckpointRecorderOptions): Ru
       }
     }
     wiring.listeners = []
+    wiring.live.clear()
     if (options.state !== undefined) unregisterCheckpointRecorder(options.state, recorder)
   }
 
@@ -1216,6 +1330,7 @@ export function createCheckpointRecorder(options: CheckpointRecorderOptions): Ru
         timerArmed: wiring.timer !== undefined,
         listeners: wiring.listeners.length,
         writesStopped: wiring.writesStopped,
+        inFlight: wiring.live.size,
         agents: counters === undefined ? { started: 0, failed: 0, cancelled: 0 } : { ...counters },
       }
     },
