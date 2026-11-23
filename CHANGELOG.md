@@ -7,6 +7,10 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ### Fixed / 修复
 
+- **Truncated report rows say how many more / 报告截断处写明还剩几行** —
+  Both report dialects silently dropped every confirmed/incomplete row past the first 12, so a reader mistook a cut list for a complete one. The first 12 rows still render, followed by one `- … +N more` marker line naming the remainder.
+  / 两版报告超过 12 条的已确认/未完成行会静默丢失，读者会把砍过的清单当成完整的。现在前 12 条照常显示，后面加一行 `- … +N more` 写明还剩几行。
+
 - **The machine ledger keeps the blocked task's reason / 机器台账不再丢 blocked 任务的原因** —
   `renderReport` printed the `incomplete` reason for both failed and blocked tasks, but the machine ledger only printed it for failed ones, so the durable copy lost "did not run" and the upstream cause for every blocked task. The ledger now prints the same line for blocked tasks, with no invented category.
   / 正式报告对失败和被堵住的任务都会写 `incomplete` 原因行，但机器台账只给失败任务写，被堵住的任务在存档里丢了"没跑成"和上游原因。现在台账对被堵住的任务写同一行，不编造分类。

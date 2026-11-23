@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { FIXED_TIMEOUT_MS, resolveConfig } from '../src/config.js'
+import { machineLedger } from '../src/delivery/index.js'
 import { assertWorkflowReport, failureReport, renderReport } from '../src/report.js'
 import { maxTotalAgentsFor, routeBudgetFor } from '../src/script.js'
 
@@ -785,5 +786,35 @@ describe('t47: a route switch is visible in the report', () => {
       }],
     }), OBJECTIVE, config), diag)
     expect(text).not.toContain('Route switches:')
+  })
+
+  it('marks truncated confirmed/incomplete rows in both dialects instead of dropping them silently (round 44)', () => {
+    // 13 confirmed + 13 incomplete rows: both renderers show the first 12 and
+    // one `+1 more` marker line, and the 13th detail row stays hidden in both.
+    const spec = report({
+      tasks: [
+        { id: 'ok', criteria: ['ok works'] },
+        { id: 'bad', criteria: ['bad works'], status: 'failed' },
+      ],
+      status: 'partial',
+    })
+    const accepted = assertWorkflowReport(spec, OBJECTIVE, config)
+    const confirmed = Array.from({ length: 13 }, (_, index) => ({
+      taskId: 'ok',
+      criterion: `criterion ${index}`,
+      evidence: 'verified ok works',
+    }))
+    const incomplete = Array.from({ length: 13 }, (_, index) => ({
+      taskId: 'bad',
+      reason: `reason ${index}`,
+    }))
+    const long = { ...accepted, confirmed, incomplete }
+    for (const text of [renderReport(long), machineLedger(long)]) {
+      expect(text).toContain('criterion 11')
+      expect(text).toContain('reason 11')
+      expect(text).toContain('- … +1 more (see the canonical structured result)')
+      expect(text).not.toContain('criterion 12')
+      expect(text).not.toContain('reason 12')
+    }
   })
 })

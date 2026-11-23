@@ -1,0 +1,109 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/rsi-round-44
+
+ ❯ test/report.spec.ts (45 tests | 1 failed) 35ms
+     ✓ accepts the canonical report 4ms
+     ✓ carries the summary gate’s verdict into the report (Sec.3-3) 2ms
+     ✓ rejects a verified task with no acceptance criteria 0ms
+     ✓ rejects an attempt payload outside the closed execution union 0ms
+     ✓ rejects a verification verdict outside the closed union 0ms
+     ✓ rejects unknown confidence and command statuses 1ms
+     ✓ accepts the script normalization fallbacks for every closed union 0ms
+     ✓ rejects a passed attempt whose executor reported partial 0ms
+     ✓ rejects a passed attempt whose verifier verdict is fail 0ms
+     ✓ rejects a passed attempt with no checked evidence 0ms
+     ✓ rejects a verified change task whose execution left no artifact at all 1ms
+     ✓ accepts a summary-only answer task when the verifier checked it 1ms
+     ✓ rejects a change task whose only "artifact" is a not_run command 0ms
+     ✓ rejects passed attempts whose checked evidence entries are all empty 0ms
+     ✓ accepts a summary-only answer for a Chinese factual question 1ms
+     ✓ rejects a summary-only answer when the root objective asks for a change 0ms
+     ✓ rejects summary-only when the Chinese root objective asks for a change 0ms
+     ✓ does not grant the answer-only exemption to an ambiguous objective 0ms
+     ✓ rejects a passed attempt whose checked evidence is missing kind 0ms
+     ✓ rejects a passed attempt whose checked evidence is missing locator 0ms
+     ✓ rejects a passed attempt whose checked evidence is missing finding 0ms
+     ✓ rejects completed when a task result is failed 0ms
+     ✓ rejects confirmed evidence no verifier produced 0ms
+     ✓ rejects confirmed evidence whose criterion was never marked met 0ms
+     ✓ rejects confirmed evidence for an unknown task 0ms
+     ✓ matches confirmed evidence against a formatting-different verifier criterion 1ms
+     ✓ rejects more tasks than maxTasks 0ms
+     ✓ rejects duplicate task ids 0ms
+     ✓ rejects limits.maxTotalAgents outside the request builder window 1ms
+     ✓ rejects a partial report that does not account for its failed task 0ms
+     ✓ rejects a partial report whose failure reason is blank 0ms
+     ✓ rejects a partial report that lists the same failed task twice 0ms
+     ✓ still accepts a verified fallback plan as partial with no failed task 0ms
+     ✓ rejects a fallback plan whose tasks do not carry the request objective 0ms
+     ✓ keeps the ledger out of the default view (B plan) 0ms
+     ✓ prints Model routes with "inherit" when no chain was configured 0ms
+     ✓ prints the configured chains, in chain order, when they exist 0ms
+     ✓ carries the deadline the run actually ran under 0ms
+     ✓ carries an explicit deadline when the caller sets one 0ms
+     ✓ rejects a result that ran under a different deadline than the plugin enforces 0ms
+     ✓ names the configured chains in a failure report too, instead of all-empty 1ms
+     ✓ accepts a legacy result that does not mention a deadline 0ms
+     ✓ renders the failed attempt that caused the switch 1ms
+     ✓ says nothing about switches when every call succeeded 0ms
+     × marks truncated confirmed/incomplete rows in both dialects instead of dropping them silently (round 44) 11ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/report.spec.ts > t47: a route switch is visible in the report > marks truncated confirmed/incomplete rows in both dialects instead of dropping them silently (round 44)
+AssertionError: expected 'Grok workflow: PARTIAL\nObjective: Sh…' to contain '- … +1 more (see the canonical struct…'
+
+- Expected
++ Received
+
+- - … +1 more (see the canonical structured result)
++ Grok workflow: PARTIAL
++ Objective: Ship the verified result
++ Plan: caller; 2 task(s); 1 verified
++ Wave reason: Single wave because the tasks write the same paths in one shared directory, so running them together would corrupt each other's work.
++ - ok: verified (1 attempt) — Task ok
++ - bad: failed (1 attempt) — Task bad
++   incomplete: verification failed
++ Confirmed evidence:
++ - ok: criterion 0 → verified ok works
++ - ok: criterion 1 → verified ok works
++ - ok: criterion 2 → verified ok works
++ - ok: criterion 3 → verified ok works
++ - ok: criterion 4 → verified ok works
++ - ok: criterion 5 → verified ok works
++ - ok: criterion 6 → verified ok works
++ - ok: criterion 7 → verified ok works
++ - ok: criterion 8 → verified ok works
++ - ok: criterion 9 → verified ok works
++ - ok: criterion 10 → verified ok works
++ - ok: criterion 11 → verified ok works
++ Incomplete:
++ - bad: reason 0
++ - bad: reason 1
++ - bad: reason 2
++ - bad: reason 3
++ - bad: reason 4
++ - bad: reason 5
++ - bad: reason 6
++ - bad: reason 7
++ - bad: reason 8
++ - bad: reason 9
++ - bad: reason 10
++ - bad: reason 11
+
+ ❯ test/report.spec.ts:815:20
+    813|       expect(text).toContain('criterion 11')
+    814|       expect(text).toContain('reason 11')
+    815|       expect(text).toContain('- … +1 more (see the canonical structure…
+       |                    ^
+    816|       expect(text).not.toContain('criterion 12')
+    817|       expect(text).not.toContain('reason 12')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 44 passed (45)
+   Start at  12:56:34
+   Duration  654ms (transform 438ms, setup 0ms, import 497ms, tests 35ms, environment 0ms)
+

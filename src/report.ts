@@ -974,11 +974,17 @@ export function renderReport(report: WorkflowReport, opts?: RenderReportOptions)
     for (const item of report.confirmed.slice(0, 12)) {
       lines.push(`- ${item.taskId}: ${oneLine(item.criterion, 200)} → ${oneLine(item.evidence, 400)}`)
     }
+    if (report.confirmed.length > 12) {
+      lines.push(`- … +${report.confirmed.length - 12} more (see the canonical structured result)`)
+    }
   }
   if (report.incomplete.length > 0) {
     lines.push('Incomplete:')
     for (const item of report.incomplete.slice(0, 12)) {
       lines.push(`- ${item.taskId}${item.category === undefined ? '' : ` (${item.category})`}: ${oneLine(item.reason, 500)}`)
+    }
+    if (report.incomplete.length > 12) {
+      lines.push(`- … +${report.incomplete.length - 12} more (see the canonical structured result)`)
     }
   }
   if (report.synthesis.summary !== undefined) {
