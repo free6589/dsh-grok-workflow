@@ -1,3 +1,22 @@
+## 2026-11-24 — 0.13.26 发版：三处补齐 + 真机 soak PASS（`CONFIRMED`）
+
+- **From:** T1 返工子代理 · **To:** lead / 下一个接手者
+- **做了什么**：从 `release/0.13.26`（`60f6a96`，已含扁平 spec 修复）开出 `fix/t1-death-evidence`：
+  1. `src/team-engine.ts` 的 `activationFacts()` 把「标题 + 路由」的读取收成一个纯函数并导出，
+     `test/null-collapse.spec.ts` 用**两种 spec 形状**各钉一例（扁平是引擎真发的，嵌套是旧宿主镜像）；
+  2. 新增 `src/child-evidence.ts`：折子会话的 `turn/end`（`reason.error` = 服务商的 `LlmFailure` 原样）
+     与 `assistant/attempt` 的 `finish` 分片；`src/team-engine.ts` 在 activation 时抓住子会话对象
+     （引擎在结算送达宿主前就 dispose 子代理），结算时读它的死因；`childFailureClass` 先看 `code`
+     （`failureClassForCode`），再看文本表；取不到原文 → `CHILD_CAUSE_UNKNOWN`；
+  3. `reclassifyNullCollapses` 增加按 task id 重建答案里「仍未完成」块的那一步（`repairAnswerNotes`）。
+- **验证**：`npm run ci` exit 0（96 files / 1796 tests）；真机 soak 复跑 round 077 同一套（fork live web profile、
+  两个实例 3196/3198、headless chromium + 原生 CDP 真点发送）→ **PASS**，证据 `.rsi/evidence/round-078/`。
+- **关键的实测事实**（写进 D-118）：spawn 路径的 `SubagentResult` 确实没有 `diagnostic`；死因只在子会话日志里；
+  真机运行栈 `dsh 0.2.2-rc.3-6b729fe`（引擎发**扁平** spec），而 `package.json` devDeps 仍钉 `0.2.1-rc.2`（发**嵌套** spec）——
+  单测的假 seam 与运行时在两个方向上都会不一致，凡在 seam 上取证的改动都必须配真机 run。
+- **未做/边界**：live `~/.dsh` 只读零写入，线上实例未动未重启；`.tmp/soak-t1/` 已删除；
+  `release/0.13.26` 与 `fix/null-collapse-t1` 分支在合流后按 AGENTS §5 处理（本分支合流即删，旧 T1 分支留待 lead 决定）。
+
 ## 2026-11-24 — 0.13.26 发版中止：T1 修复真机不生效，等两处补齐再发（`CONFIRMED`）
 
 - **From:** 合并发版子代理 · **To:** 下一轮接手者 / lead

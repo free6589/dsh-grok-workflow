@@ -2821,3 +2821,31 @@ spine 为空，pre-fix 形状会进脊柱。
   分类器的疏忽，但会加长每条失败行，留待与 ② 一起做。
 - **Consequences:** 任何"在引擎 seam 上取证"的改动，验证必须包含一次**真机** run；单测跑在自制 harness 上，
   harness 的 spec 形状一旦与真引擎不同，功能可以整体失效而不报警。
+
+## D-118 · 死因只能从子代理自己的会话记录里取；取不到就说"原因未知"；交付那行按 task id 重建（2026-11-24）
+
+- **Status:** ① CONFIRMED（真机 round 078 PASS）；② CONFIRMED；③ CONFIRMED
+- **来源:** `release/0.13.26` 的隔离真机 soak 复跑（`.rsi/evidence/round-078/soak.txt`）
+- **① 死因的证据位置:** 引擎在 spawn（in-process）路径交回的 `SubagentResult` 只有
+  `{output, stopReason, structured}`，没有 `diagnostic`（D-117 ②）。但死因并没有消失，它在**子会话自己的日志**里：
+  `turn/end` 的 `reason.error` 就是服务商的 `LlmFailure` 原样（`{message, code, status}`），
+  而死在 turn 收尾之前的子代理，`assistant/attempt` 的 `finish` 分片里也有同一份事实。
+  于是 `src/child-evidence.ts` 只折这两个形状，`src/team-engine.ts` 在 **activation 时**抓住子会话对象
+  （引擎在结算送到宿主之前就 dispose 子代理，事后查 `sessions.get` 查不到——`src/memory/recorder.ts` 早就因为同一原因在
+  `agent-start` 抓会话），结算时再读。分类先看服务商的 `code`（`AUTH`/`RATE_LIMIT`/`TIMEOUT`/`HTTP_5xx`…，
+  见 `failureClassForCode`），再看原话文本表；代码表只列没有歧义的映射，其余回落到文本，免得给未知代码编一个类。
+- **备选（未采纳）:** 只读引擎结果里的 `stopReason` —— 那就是 0.13.25 的行为，真机上只能说 `error`，
+  读者拿不到"密钥被拒"这一层；等上游给 spawn 结果补 `diagnostic` 属上游改动，本版不阻塞。
+- **② 取不到就诚实:** 一条死亡如果哪儿都没记下原文，报告写
+  `the child ended abnormally (cause unknown)`（`CHILD_CAUSE_UNKNOWN`），不再写"没有返回有效的结构化结果"。
+  旧句子的毛病是它在描述"少交了一份表"，读者会去重发；而重发对一次鉴权失败毫无用处。
+- **③ 交付那行不能靠句子匹配:** 答案里的「仍未完成（来自报告）」块由脚本在**修复之前**抄进
+  `report.synthesis.summary`，交付层逐字打印它。round 077 的修法用 `includes(failure.reason)` 去替换，
+  在真机上一条也匹配不上（同一件事的两种写法：`report.incomplete[].reason` 带
+  `failed on every route: [format-error]` 前缀并会被 `clip(…,160)` 截断）。所以改成**按 task id 重建**：
+  认识那行块标记（中文/英文两种），取 `- 任务 <id>：` / `- task <id>:` 里的 id，用修好的行重新拼一条
+  （同样的 160 字上限），块外一个字符不动。逐字替换仍然先跑一遍，覆盖措辞没漂移的行。
+- **Consequences:** 报告、答案、归档三处说同一个原因；`format-error` 只留给真的没交结果
+  或服务商自己说格式不对的子代理；任何"在引擎 seam 上取证"的改动都必须配一次真机 run，
+  因为单测的假 seam 与真引擎在两个方向上都可能不一致（本轮又见一例：devDeps 钉 `0.2.1-rc.2` 发嵌套 spec，
+  运行时 `0.2.2-rc.3` 发扁平 spec）。

@@ -1,0 +1,28 @@
+# Dead path: the worker's route is pointed at a key the gateway refuses, and
+# nothing else changes — the shape round 077 used to expose the collapse.
+- id: grok-workflow
+  config:
+    mode: full
+    grokDefault: on
+    maxConcurrency: 2
+    timeoutMs: 900000
+    loopEnabled: false
+    roles:
+      planner:
+        - provider: bifrost-soak
+          model: "wb/cn:deepseek-v4.1-flash"
+      worker:
+        - provider: bifrost-badkey
+          model: "wb/cn:deepseek-v4.1-flash"
+      verifier:
+        - provider: bifrost-soak
+          model: "wb/cn:deepseek-v4.1-flash"
+      supervisor:
+        - provider: bifrost-soak
+          model: "wb/cn:deepseek-v4.1-flash"
+      synthesizer:
+        - provider: bifrost-soak
+          model: "wb/cn:deepseek-v4.1-flash"
+    guardianModel:
+      provider: bifrost-soak
+      model: "wb/cn:deepseek-v4.1-flash"

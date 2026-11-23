@@ -1,0 +1,28 @@
+# Happy path: every role lands on the working soak route. Only the workflow's own
+# row is replaced; every other row is the live profile's.
+- id: grok-workflow
+  config:
+    mode: full
+    grokDefault: on
+    maxConcurrency: 2
+    timeoutMs: 900000
+    loopEnabled: false
+    roles:
+      planner:
+        - provider: bifrost-soak
+          model: "wb/cn:deepseek-v4.1-flash"
+      worker:
+        - provider: bifrost-soak
+          model: "wb/cn:deepseek-v4.1-flash"
+      verifier:
+        - provider: bifrost-soak
+          model: "wb/cn:deepseek-v4.1-flash"
+      supervisor:
+        - provider: bifrost-soak
+          model: "wb/cn:deepseek-v4.1-flash"
+      synthesizer:
+        - provider: bifrost-soak
+          model: "wb/cn:deepseek-v4.1-flash"
+    guardianModel:
+      provider: bifrost-soak
+      model: "wb/cn:deepseek-v4.1-flash"

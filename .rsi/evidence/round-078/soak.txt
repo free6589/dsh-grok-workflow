@@ -1,0 +1,43 @@
+round 078 — 0.13.26 候选的隔离真机 soak，复跑 round 077 的同一套形状（fork live web profile）
+==========================================================================================
+
+环境: DSH_HOME=.tmp/soak-t1/{happy,dead}/dsh-home（clone-profile 只读克隆 ~/.dsh/profiles/web，parity 5/5，
+     1 行凭据按设计脱敏）；各自独立 HOME；两个实例 127.0.0.1:3196（全部角色走可用路由）/
+     3198（worker 换成被网关拒绝的 key，其它角色不变）
+     运行栈: dsh 0.2.2-rc.3-6b729fe（web UI 自己的版本行）；引擎 dsh-workflow-ptc 0.2.2-rc.3 发**扁平** activation spec
+     模型: wb/cn:deepseek-v4.1-flash（本机网关 127.0.0.1:18088 的 167 个 id 中含该 id）
+     凭据: BIFROST_VIRTUAL_KEY 只从 ~/.dsh/bifrost.env 注入并只在子进程环境里使用，全程未打印；
+           BIFROST_BADKEY=sk-soak-refused-key-probe（假值，实测网关回 401）
+     驱动: headless chromium + 原生 CDP（node 自带 WebSocket，无 playwright）；真点「发送消息」
+     live ~/.dsh 未写（本会话对它是只读挂载，一次 `dsh --help` 触发 EROFS 被挡下，零写入）；
+     线上 100.111.111.88:3080 未动、未重启
+
+§1 正常路径（3196，全部角色 bifrost-soak）—— PASS
+  会话内实测: 「已完成，用时 9秒」+ 一句中文答案（3 个子代理）。
+  证据: .rsi/evidence/round-078/happy.png、happy-delivery.txt。
+
+§2 死掉子代理的 run（3198，worker → bifrost-badkey）—— PASS（本轮的核心断言）
+  4 个 worker 子代理（attempt 1 两个、attempt 2 两个）真的死于 401；子会话自己的 turn/end 记下
+  `401: {"message":"virtual key is required. Provide a virtual key via the x-bf-vk header."}`（code AUTH）。
+  交付给用户的那一段现在写:
+    「仍未完成（来自报告）：任务 worker call produced no result: the child run ended abnormally
+      (401: {"message":"virtual key is required. Provide a virtual key via the x-bf-vk header."})」
+    「没做成的：Complete the objective：worker failed on every worker call produced no result:
+      the child run ended abnormally (401: …)」
+  交付全文 "no valid structured result" 出现次数 = 0（round 077 那一版是主要症状）。
+  证据: .rsi/evidence/round-078/dead.png、dead-delivery.txt、dead-archive-excerpt.jsonl。
+
+§3 三处修复在真机上各自兑现
+  1. spec 形状: 台账现在能按 role/attempt 分组（archive 里 5 条 child 记录带 规划助手/执行/执行（尝试 2）标签，
+     且修复动作真的发生）→ 由 60f6a96 提供，本轮只加了两种形状的单测钉住。
+  2. 死因原文: worker 的 401 原文来自**子会话事件**（engine 的 SubagentResult 在 spawn 路径没有 diagnostic）。
+     同一 run 里规划助手死于另一原因（`Tool call "structured_output": Expected ',' or ']' …`，真的格式错），
+     它保留 format-error —— 混合死因不猜的规则在真机上也守住了。
+  3. 交付「仍未完成」行: 由 task id 重建（reason 句子在真机上与 failure.reason 不逐字相同，逐字替换必漏），
+     截图里那一行已是新文案。
+
+§4 结论
+  0.13.26 PASS：正常路径照旧，死因在用户看到的句子里是服务商原话，格式错的污水不再泼到鉴权失败上。
+
+§5 清理：两个 web 实例与其 chromium 全部停止；.tmp/soak-t1/ 整目录删除（scratch home、chrome profile、
+  overlay、日志、token 文件）。

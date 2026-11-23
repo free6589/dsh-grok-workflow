@@ -1,3 +1,13 @@
+Last updated: 2026-11-24 04:25 +08:00（**0.13.26 五步发版进行中：死因取真原文，真机 soak PASS，`CONFIRMED`** —
+分支 `fix/t1-death-evidence`（从 `release/0.13.26` 开出）+ `release/0.13.26` 合流。三处修完：① 扁平/嵌套两种
+activation spec 都读（`activationFacts`，单测钉住两种形状）；② 死因从**子会话自己的 `turn/end`** 取
+（`src/child-evidence.ts`；spawn 路径的 `SubagentResult` 没有 `diagnostic` 这件事由真机确认），分类先看服务商
+`code` 再看原话；拿不到原文就写 `the child ended abnormally (cause unknown)`，不再写"格式不对"；③ 交付里
+「仍未完成」那行按 task id 重建。门禁：`npm run ci` exit 0（96 files / 1796 tests，typecheck 干净，lint 0 errors，
+`verify:lib` byte-identical）。真机 soak 复跑 round 077 同一套形状：正常路径「已完成，用时 9秒」，坏 key 路径
+4 个 worker 真的死于 `401 virtual key is required`、交付写服务商原话、`no valid structured result` 出现 0 次
+（`.rsi/evidence/round-078/`）。细节见 D-118 与 VALIDATION 首条。）
+
 Last updated: 2026-11-24 03:50 +08:00（**0.13.26 暂停发布：合流后的 T1 修复在真机上不生效，soak `FAIL`** —
 `release/0.13.26`（worktree `.tmp/wt-rel-0-13-26`，从 `main` `6b0eb62` 开出）已无冲突合入 `fix/null-collapse-t1`
 （`npm run ci` exit 0，95 files / 1771 tests），隔离真机 soak 却把这条修复判死：worker 路由换成被网关拒绝的 key 之后，

@@ -1,3 +1,18 @@
+## 修复后真机 soak 判 **PASS**：死因是服务商原话，0.13.26 可发 — 2026-11-24（round 078）
+
+| state | command | result |
+| --- | --- | --- |
+| 分支 | `fix/t1-death-evidence`（从 `release/0.13.26` `60f6a96` 开出；共享脏树 detached `a6103ad` 一行未动） | `CONFIRMED` |
+| 门禁 | `npm run ci` | **exit 0：96 files / 1796 tests PASS**，typecheck 干净，lint 0 errors，`verify:lib` byte-identical |
+| 隔离真机 soak（复跑 round 077 同一套形状） | fork live `web` profile → `.tmp/soak-t1/{happy,dead}/dsh-home`（`scripts/clone-profile.mjs`，parity 5/5，1 行凭据按设计脱敏），独立 `HOME`，`127.0.0.1:3196`（正常）/`3198`（worker → `bifrost-badkey`），headless chromium + 原生 CDP 真点「发送消息」 | **PASS**（`.rsi/evidence/round-078/soak.txt`） |
+| 正常路径 | 3196，全部角色 `bifrost-soak`（`wb/cn:deepseek-v4.1-flash`，本机网关 167 个 id 含该 id） | 「已完成，用时 9秒」+ 一句中文答案，3 个子代理（`happy.png`） |
+| 死掉的 run | 3198，worker → `bifrost-badkey`（`BIFROST_BADKEY=sk-soak-refused-key-probe`，实测网关 401），其它角色不变 | 4 个 worker 子代理真的死于 `401 virtual key is required …`。交付写「worker call produced no result: the child run ended abnormally (401: {…virtual key is required…})」，`no valid structured result` 出现 **0** 次（`dead.png`、`dead-delivery.txt`） |
+| 死因来源 | 子会话自己的 `turn/end`（`src/child-evidence.ts` 折 `turn/end` 的 `reason.error` 与 `assistant/attempt` 的 `finish` 分片） | `CONFIRMED`：spawn 路径的 `SubagentResult` 确实没有 `diagnostic`，而子会话有原文；归档摘要从「the child run ended \`error\`」变成带 401 原文（`dead-archive-excerpt.jsonl`） |
+| 混合死因 | 同一 run 里规划助手死于真格式错（`Tool call "structured_output": Expected ',' or ']' …`） | 规划行保留 format-error，worker 行写鉴权失败 → "各按自己死因" 在真机上成立 |
+| 交付「仍未完成」行 | `report.synthesis.summary` 的 notes 块按 task id 重建（`repairAnswerNotes`） | `CONFIRMED`：截图里该行是 401 原文，不是 round 077 那句旧文案 |
+| 环境事实 | web UI 版本行 | 运行栈 `dsh 0.2.2-rc.3-6b729fe`；引擎 `dsh-workflow-ptc 0.2.2-rc.3` 发扁平 spec；但 `package.json` devDeps 仍钉 `0.2.1-rc.2`（该版本发**嵌套** spec）→ 见 D-118 的边界说明 |
+| live 与线上 | 全程 | live `~/.dsh` 只读（本会话对它 EROFS，零写入），线上 `100.111.111.88:3080` 未动、未重启；`.tmp/soak-t1/` 已整目录删除 |
+
 ## 合流后真机 soak 判 **FAIL**：T1 回填在真机上不生效，0.13.26 未发 — 2026-11-24（round 077）
 
 | state | command | result |
