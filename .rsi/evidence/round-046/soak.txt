@@ -1,0 +1,84 @@
+# soak.txt — rsi/round-46 真机 soak 证据（脱敏）
+
+结论：soak PASS（有额度的真模型，最小真实工作流通；unavailable 标记逻辑在真机可达链路已验证）。
+
+## 环境（隔离，live 未碰）
+
+- 基线：worktree `/home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/rsi-round-46`，
+  分支 `rsi/round-46`（round-46 改动：脏路由下两条交付路径账本标 unavailable 不静默丢，
+  CHANGELOG `[Unreleased]` 已记中英双语；`lib/` 已重建）。
+- 隔离家目录：`<worktree>/.tmp/soak-46/home`（gitignored，`.tmp/`；注：本机沙箱 `/tmp`
+  跨命令调用不持久，故沿用 round-45 同款 worktree 内 `.tmp/` 做法），
+  profile `grok-soak-46` 由 headless 模板新建；headless 模板自带 `workflow-ptc`
+  （`provider: spawn`，启用状态），未改 live `~/.dsh`（profile 名含 `soak`，
+  live 下无此名；全程未重启/未触碰现行实例端口）。
+- 插件安装：`DSH_HOME=<scratch> dsh plugin --profile grok-soak-46 add <worktree>`，
+  `dsh.profile.bundles` = `["@deepseek-ai/dsh-base","@deepseek-ai/dsh-headless","dsh-grok-workflow"]`；
+  `--dump-config` 含 `- id: grok-workflow / name: dsh-grok-workflow` 行，
+  `workflow-ptc` 行 `provider: spawn` 启用状态。
+- 模型补丁：`<worktree>/.tmp/soak-46/soak-model.patch.yml`（本证据目录外，仅 scratch，已随清理删除），
+  provider `bifrost-completions` → `http://127.0.0.1:18088/openai/v1`，
+  模型 `wb/cn:deepseek-v4.1-flash`，凭据只来自环境变量（存在性检查通过为 present，
+  值未读取、未落盘）。
+- 端口：headless 按次起止，无常驻监听（`ss -ltn` 事前事后对比无新增）；live 实例端口全程未动。
+
+## 真模型预检（有额度，非 BLOCKED）
+
+- `wb/cn:deepseek-v4.1-flash` 经本机网关 `chat/completions` 实发 `PONG`
+  （`max_tokens: 5`），`http=200`，返回 `content: 'PONG'`（单 choice）。
+
+## 最小真实工作流（1–2 个简单任务，真模型）
+
+命令形（凭据只来自环境，值不入库）：
+
+```sh
+set -a; . ~/.dsh/bifrost.env; set +a
+DSH_HOME=<scratch>/home dsh --profile grok-soak-46 \
+  --patch <scratch>/soak-model.patch.yml headless --json "<prompt>"
+```
+
+prompt：caller 计划双任务 —— (alpha) 在当前目录写 `soak46-alpha.txt`，
+内容恰为 7 字节 `ALPHA46` 无尾换行并报字节数；(beta) 跑 `expr 19 + 25`…
+（实际 prompt 为 `expr 19 + 23`，见下）报 stdout；要求真实命令证据，COMPLETED 报告收尾。
+
+结果（`exit=0`，13 个 `--json` 事件，脱敏后全文在 scratch `.tmp/`，已清）：
+
+- `tool_call[grok_workflow]` 1 次（depth-0 root 代发）→ `tool_result status: completed`，报告头：
+  `Grok workflow: COMPLETED / Objective: Soak check 46: two tiny verifiable tasks / Plan: caller; 2 task(s); 2 verified`，
+  `Wave reason: Single wave because the tasks write the same paths in one shared directory…`。
+- alpha verified（1 attempt）：`ls -l` 见 `-rw-r--r-- 1 fish fish 7 … soak46-alpha.txt`；
+  `wc -c` → `7`；`od -c` → `A L P H A 4 6`（`0000007`，无尾换行）；
+  hex `41 4c 50 48 41 34 36` 无 `0a`。独立复验通过（本机 `wc -c < file` = 7，
+  `od -An -c/tx1` 一致，`expr 19 + 23` = 42）。
+- beta verified（1 attempt）：`timeout 120 expr 19 + 23` → stdout `42`，`exit=0`。
+- final 文本中文收尾：`完成。两个任务都已独立核验通过…总计 2/2 通过`。
+
+## round-46 unavailable 标记逻辑（真机可达性）
+
+- 本轮工作流 ledger 未脏（小任务如预期不触发脏路由），故真机侧验证的是
+  “插件加载 → 报告产出 → 归档链路通”；脏路由分支（`machineLedger` 仍拒绝、
+  两条交付路径标 unavailable）用同份已构建产物 `lib/`（含本轮改动）在本机直接调用验证：
+- `LEDGER_UNAVAILABLE = "Model routes: unavailable (routing not renderable; see the canonical structured result)"`。
+- 脏报告（`routing.worker = ['a/m1', 7]`，绕开 validator 直达渲染层，与单测同形）：
+  `machineLedger` 仍拒绝 `delivery: roles.worker[1] must be a "provider/model" string, got number`（拒绝行为保持不变）；
+  `deliverReport(dirty, {diagnostics: true})` 不抛：`view.ledger === LEDGER_UNAVAILABLE`，
+  文本含 `unavailable`、含完整 human 块（`Answer:` 开头）；
+  中继路径 `relayText(dirty)` 含 `LEDGER_GUARD` 且含 `unavailable`，可见区仍有结论句。
+- 干净报告 `machineLedger` 正常含 `Model routes:` 行（无回归）。
+
+## 清理
+
+- `soak46-alpha.txt`（7 字节，`ALPHA46` 无尾换行）落在 worktree 根
+  `/home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/rsi-round-46/soak46-alpha.txt` ——
+  系任务指定的写入位置；验收并独立复验后由本子代理删除（`od`/`wc` 双重确认后清理），主工作树无残留。
+- scratch 家目录 `<worktree>/.tmp/soak-46/`（含 profile、run.json、patch、probe 脚本）
+  在证据拷出后删除；无残留监听进程（headless 按次起止），未提交、未推送、未改版本。
+- `git status --short` 验收时仅见本轮既有改动，无 `soak46-alpha.txt`、无 `.tmp` 残留。
+
+## 一句话
+
+soak PASS —— 隔离 headless 实例 + 工作树插件 + 有额度真模型
+（`wb/cn:deepseek-v4.1-flash`）跑通 caller 双任务（`soak46-alpha.txt` 7 字节落盘，
+`expr 19 + 23` = 42），`grok_workflow` COMPLETED 2/2 verified；
+round-46 脏路由 unavailable 标记在同构建产物上可达（拒绝仍抛、两条路径显式标 unavailable 不静默丢）。
+证据：本文件（`.rsi/evidence/round-046/soak.txt`）。

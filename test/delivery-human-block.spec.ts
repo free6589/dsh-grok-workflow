@@ -19,7 +19,8 @@
  *   that simply removed the guard would fail the second half of this file.
  */
 import { describe, expect, it } from 'vitest'
-import { deliverReport, humanConclusion, machineLedger, pairCaps } from '../src/delivery/index.js'
+import { LEDGER_GUARD, REPORT_BEGIN, REPORT_END, relayText } from '../src/answer.js'
+import { deliverReport, humanConclusion, LEDGER_UNAVAILABLE, machineLedger, pairCaps } from '../src/delivery/index.js'
 import { resolveConfig, FIXED_MAX_RETRIES} from '../src/config.js'
 import { assertWorkflowReport } from '../src/report.js'
 import { maxTotalAgentsFor, routeBudgetFor } from '../src/script.js'
@@ -688,15 +689,38 @@ describe('round 39: a chain value that is not a route label is refused by path',
     expect(text).toContain('That is the conclusion (1 of 3 usable, 2 not done)')
   })
 
-  it('drops the ledger instead of the answer when diagnostics are on', () => {
-    // A direct caller of `deliverReport` gets no `foldedLedger` guard
-    // (`src/answer.ts`), so the refusal must not escape from this layer either:
-    // diagnostics are the extra half, the answer is the delivery.
+  it('marks the ledger unavailable instead of dropping it when diagnostics are on', () => {
+    // Round 46: a direct caller of `deliverReport` gets no `foldedLedger` guard
+    // (`src/answer.ts`), so the refusal must not escape from this layer either —
+    // but a silently absent ledger read as a healthy run with no routes. The
+    // answer is still delivered, and the ledger field stays present as an
+    // explicit unavailable marker pointing at the structured result.
     const view = deliverReport(withChain('worker', ['a/m1', 7]), { diagnostics: true, lang: 'en' })
-    expect(view.ledger).toBeUndefined()
+    expect(view.ledger).toBe(LEDGER_UNAVAILABLE)
     expect(view.human.startsWith('Answer:')).toBe(true)
-    expect(view.text).not.toContain('Model routes:')
-    expect(view.text).toBe(view.human)
+    expect(view.text).toContain('unavailable')
+    expect(view.text).toContain(view.human)
+  })
+
+  it('round 46: a dirty chain still delivers the answer with an explicit ledger marker, never a silent drop', () => {
+    // Routing dirt (a number where a "provider/model" string belongs) still
+    // refuses inside `machineLedger` — that refusal is pinned above and stays.
+    const dirty = withChain('worker', ['a/m1', 7])
+    expect(() => machineLedger(dirty)).toThrow('roles.worker[1]')
+    // But the delivery marks the ledger unavailable instead of dropping it: the
+    // text still carries the human answer, names the marker, and never throws.
+    const view = deliverReport(dirty, { diagnostics: true, lang: 'en' })
+    expect(view.ledger).toBe(LEDGER_UNAVAILABLE)
+    expect(view.human.startsWith('Answer:')).toBe(true)
+    expect(view.text).toContain(view.human)
+    expect(view.text).toContain('unavailable')
+    // The relay path folds the same marker below the closing marker, so the
+    // durable copy never reads as a healthy run either.
+    const relayed = relayText(dirty)
+    expect(relayed).toContain(LEDGER_GUARD)
+    expect(relayed).toContain('unavailable')
+    const visible = relayed.slice(relayed.indexOf(REPORT_BEGIN), relayed.indexOf(REPORT_END))
+    expect(visible).toContain('That is the conclusion')
   })
 })
 
