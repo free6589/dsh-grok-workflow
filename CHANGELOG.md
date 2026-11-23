@@ -5,6 +5,14 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.22] - 2026-11-24
+
+### Fixed / 修复
+
+- **The workflow switch opens again in the composer / 工作流总开关又能打开了** —
+  Every request from the settings-page switch answered as a server error — the red "the mode service did not answer: cannot get property sessions without inject" line — so the switch could not be turned on at all. The route asks the Host for the live-session store on each request (so a store that mounts later still answers), but it asked by reading a property the composition never injects, and the runtime refuses that read by throwing rather than returning nothing; the refusal escaped before the fallback lookup and was reported as an internal error. The route now falls back to the runtime's own service lookup when the direct read is refused, the same way the settings page and the team engine already do. Covered by a regression test that reproduces the runtime's refusal instead of a plain stand-in.
+  / 设置页那个开关每次请求都回一个服务器错误——也就是红字"模式服务没有回应：cannot get property sessions without inject"——结果开关根本打不开。这条路由每次请求都去问宿主"会话仓库"在哪（这样晚一步挂载的仓库也照样能应答），但它用的是"直接读属性"的姿势，而运行时对这种没注入的服务不是返回空、而是直接报错；报错在备用查询之前就抛出，于是被兜底成一个内部错误。现在直读被拒时会退到运行时自己的服务查询，跟设置页、任务引擎早已采用的做法一致。补了一条回归测试，用"会真的报错"的替身复现运行时的拒绝，而不是用普通对象蒙混过去。
+
 ## [0.13.21] - 2026-11-23
 
 ### Fixed / 修复

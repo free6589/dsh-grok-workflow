@@ -1,0 +1,60 @@
+round 066 — 真机隔离 soak：composer 工作流开关 500 mode/internal 修复（0.13.22 候选）
+================================================================================
+日期 / date: 2026-11-23（Asia/Singapore）
+基线 / base: origin/main `6314bbb`（= 0.13.21 发布提交）；工作分支 `rsi/fix-mode-switch`
+改动 / change: `src/mode-surface.ts` `serviceOf()` 直接读服务属性包 try/catch，抛错落 `source.get(name)`；
+  `test/mode-surface.spec.ts` 改 1 个用例语义（替身换成真 cordis 守卫行为）。
+构建 / build: `npm run build` exit 0；`lib/` 为 `src/` 的构建（`npm run verify:lib` → byte-identical，221 文件）。
+
+隔离 / isolation
+- 未写 live `~/.dsh`（只读拷贝其 `profiles/headless` 到 scratch）；未重启/未触碰现行实例。
+- scratch home: `<worktree>/.tmp/soak/dsh-home`（`DSH_HOME` 指向它，profile `headless`）。
+- scratch 工作目录: `<worktree>/.tmp/soak/work2`。跑完已整体删除（见文末清理）。
+- 网关: 本机 `http://127.0.0.1:18088/openai/v1`（公网 502 不用）。
+- 模型: `bifrost-completions` / `wb/cn:deepseek-v4.1-flash`（planner/worker/verifier 同一路由）。
+- 凭据: 仅经 `set -a; . ~/.dsh/bifrost.env; set +a` 注入，profile 里只写 `apiKeyEnv: BIFROST_VIRTUAL_KEY`；
+  本文件、补丁、命令行、日志中都不含任何密钥值（补丁与日志已确认无 key 明文）。
+
+§1 真机 headless 双任务 workflow（`dsh --profile headless --patch <overlay> "<prompt>"`）
+命令形式 / command shape:
+  DSH_HOME=<scratch>/dsh-home dsh --profile headless --patch <scratch>/soak.patch.yml "<two-task prompt>"
+退出码 / exit code: 0
+落盘 / written files（逐字节核验）:
+  8 bytes  one/alpha.txt  sha256 e583bee0c3c0a0275cbd49c7c1523d9d686e487801c8de75be8d4882027d3cae  content "alpha-ok"
+  7 bytes  two/beta.txt   sha256 57da01d58b43bb515eb1ce9439de2b1f79b482cc4cb45fe2c8b56c9804470049  content "beta-ok"
+运行记录 / run record（插件自身 memory archive 原文，仅此一行）:
+{"v":1,"id":"run:d5ebc5ab-ddb9-4de6-b9ab-1e08eb66d13f","kind":"round","at":"2026-11-23T12:58:50.494Z","atMs":1795438730494,"summary":"status completed · verified 2/2 task(s) · confirmed 10 criterion/criteria · task task-1 verified: Create one/alpha.txt with exact content alpha-ok and confirm by reading it back —  · task task-2 verified: Create two/beta.txt with exact content beta-ok and confirm by reading it back —  · uncertain: xxd was unavailable (command not found), so hex evidence comes from od -c / od -An -tx1 instead; the byte evidence is equivalent and complete. · uncertain: xxd was unavailable in this environment ('xxd: command not found'), so hex/quoted dumps were produced with od -c and od -An -tx1 instead; byte-level evidence is equivalent. · uncertain: One pre-existing directory named one/ is present in the workspace; it was only stat-tested for existence and not opened, modified, or listed.","sessionId":"session-de66b646-c25b-4423-8469-2e5108567099","runId":"d5ebc5ab-ddb9-4de6-b9ab-1e08eb66d13f","label":"任务团队","status":"completed","objective":"Current request:\nRun a two-task workflow here. Task 1: create the file one/alpha.txt containing exactly alpha-ok (no trailing newline) and read it back to confirm. Task 2: create the file two/beta.txt containing exactly beta-ok (no trailing newline) and read it back to confirm. Each task may touch o…[truncated 74 chars]","evidence":["[task-1] The path one/alpha.txt exists as a regular file relative to the current working directory.: cwd is /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/rsi-fix-mode-switch/.tmp/soak/work2. `ls -la one` shows '-rw-r--r-- 1 fish fish 8 Nov 23 20:57 alpha.txt'; `test -f one/alpha.txt` -> 'regular file: yes'; `find one -type f -printf \"%y %s %p\"` -> 'f 8 one/alpha.txt'.","[task-1] Reading one/alpha.txt from disk yields exactly the characters 'alpha-ok'.: Independent read-back: `c=$(cat one/alpha.txt); printf \"[%s]\\n\" \"$c\"` printed '[alpha-ok]' and the comparison `[ \"$c\" = \"alpha-ok\" ]` printed 'MATCH'. Cross-check: `printf 'alpha-ok' | sha256sum` and `sha256sum one/alpha.txt` both produced e583bee0c3c0a0275cbd49c7c1523d9d686e487801c8de75be8d4882027d3cae.","[task-1] The file byte length is exactly 8; there is no trailing newline (no 0x0a byte at the end).: `wc -c < one/alpha.txt` -> 8. `od -c one/alpha.txt` -> '0000000   a   l   p   h   a   -   o   k / 0000010' with no \\n entry. `od -An -tx1 one/alpha.txt` -> '61 6c 70 68 61 2d 6f 6b'. `tail -c 1 one/alpha.txt | od -An -tx1` -> '6b' ('k'), so the last byte is not 0x0a. `stat -c %s` -> 8.","[task-1] The report includes an actual read-back of the file performed after writing, with the observed content shown.: The executor report lists post-write read-back commands with their observed output: `cat one/alpha.txt` delimited as '[alpha-ok]', the comparison '[ \"$(cat one/alpha.txt)\" = \"alpha-ok\" ] -> MATCH: content == alpha-ok', plus od output '61 6c 70 68 61 2d 6f 6b'. I reproduced every …[truncated 55 chars]","[task-1] No files are created or modified outside the one/ directory.: `find . -maxdepth 1 -mindepth 1 -printf \"%y ... %p\"` shows only './one' and './two'; no scratch/log/backup file in the root. `find one -type f` lists only 'one/alpha.txt'. Metadata-only stat (two/ content deliberately not read, per constraint) gives birth times: one/ 20:57:30.255, one/alpha.txt 20:57:30.256 (single atomic write…[truncated 304 chars]","[task-2] The path two/beta.txt exists as a regular file relative to the current working directory.: In cwd /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/rsi-fix-mode-switch/.tmp/soak/work2, `stat -c '%F %s bytes %n' two/beta.txt` returned 'regular file 7 bytes two/beta.txt'; `ls -la two` shows '-rw-r--r-- 1 fish fish 7 ... beta.txt'.","[task-2] Reading two/beta.txt from disk yields exactly the characters 'beta-ok'.: Independent read-back: `c=$(cat two/beta.txt); printf 'readback=[%s]' \"$c\"` printed 'readback=[beta-ok]', string equality test printed 'COMPARE=MATCH', and ${#c}=7. md5sum of the file (155df78c35d941730490045b337ff300) is identical to `printf 'beta-ok' | md5sum`.","[task-2] The file byte length is exactly 7; there is no trailing newline (no 0x0a byte at the end).: `wc -c < two/beta.txt` = 7. `od -c two/beta.txt` = '0000000 b e t a - o k' ending at offset '0000007' with no \\n; `od -An -tx1` = '62 65 74 61 2d 6f 6b'; final byte via `tail -c 1 two/beta.txt | od -An -tx1` = '6b' (not 0a)."]}
+
+§2 报告状态 / report status（原文 / verbatim）
+  status completed · verified 2/2 task(s) · confirmed 10 criterion/criteria
+  逐角色 / per role（archive 原文摘要）:
+    规划 completed        plan: 2 task(s)
+    执行 task-1 completed Create one/alpha.txt with exactly 8 bytes of 'alpha-ok'
+    执行 task-2 completed Create two/beta.txt with exactly 7 bytes "beta-ok"
+    检查 task-2 completed verdict pass · 5 criterion/criteria checked
+    检查 task-1 completed verdict pass · 5 criterion/criteria checked
+  人读首句 / human block first line（交付层兜底句，非状态）: "One item passed verification."
+  说明 / note: 默认交付层只把人类段落给用户（机器台账在标记内下方），故 stdout 不含
+  `Grok workflow: COMPLETED` 行；状态以上面 archive 记录为准（同一 run id）。
+
+§3 路由级验证 / route-level check（驱动的是构建产物 `lib/mode-surface.js`）
+用带 cordis 守卫的假 context：未注入名属性读取抛
+`cannot get property "<name>" without inject`，已注入名返回服务，`get(name)` 不受守卫；
+`sessions` 只能经 `get()` 拿到（真编排就是这样，路由只注入 webServer + connection）。
+  命令 / command: node .tmp/soak/route-verify.mjs（imports lib/mode-surface.js 的 installModeRoute）
+  输出 / output（原文）:
+    route mounted: yes (/grok-workflow/mode)
+    POST status (no record) -> 200 true
+    POST set enabled=false -> 200 mode.enabled=false source=record
+    POST status (after off) -> 200 mode.enabled=false source=record
+    POST set enabled=true -> 200 mode.enabled=true source=record
+    session record after flips: {"v":1,"enabled":true,"turn":0,"setBy":"switch:mode","workflowMode":"full"}
+    VERDICT: PASS (status/set 200, enabled flipped, no mode/internal)
+
+§4 结论 / verdict
+  soak PASS：真机双任务 workflow 完成（status completed，2/2 verified），两文件逐字节符合；
+  路由级 status/set 全 200 且 enabled 双向翻转成功，无 mode/internal。
+
+§5 清理 / cleanup
+  `<worktree>/.tmp/soak` 全目录已删除（scratch home + 工作目录 + 补丁 + 探针脚本）；
+  live `~/.dsh` 全程只读；无残留进程/端口；无密钥写入任何文件。

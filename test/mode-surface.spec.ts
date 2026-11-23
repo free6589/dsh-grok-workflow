@@ -383,6 +383,46 @@ function wiring(options: { webServer?: boolean; sessions?: Session[] } = {}) {
   return { routes, effects }
 }
 
+interface CordisDouble {
+  /** Injected names: readable as properties, as a real fiber's injections are. */
+  injected: Record<string, unknown>
+  /** Every service in scope, whether or not this fiber injected it. */
+  lookup: Record<string, unknown>
+}
+
+/**
+ * A Host context whose property reads are guarded the way cordis guards them.
+ *
+ * A plain object literal cannot stand in for this: cordis wraps every context in a
+ * proxy whose `get` trap throws `cannot get property "<name>" without inject` for a
+ * service the current fiber did not inject, rather than reading `undefined`. A double
+ * made of an object literal therefore silently accepted the direct read that fails in
+ * the running Host, which is why `mode-surface`'s unguarded `source[name]` read passed
+ * every test and still turned the composer switch into a red error line. This double
+ * keeps the guard, an `inject` list that only injects what it is given, and the
+ * unguarded `get(name)` lookup that resolves anything in scope.
+ */
+function cordisContext(double: CordisDouble): ModeHostContext {
+  const target = {
+    inject: (_deps: readonly string[], callback: (child: ModeHostContext) => void) => { callback(proxy) },
+    get: (name: string) => double.lookup[name],
+    effect: (installer: () => undefined | (() => unknown)) => installer(),
+  }
+  const proxy: ModeHostContext = new Proxy(target as unknown as ModeHostContext, {
+    get(object, property, receiver) {
+      // Symbols (`util.inspect`, `then`) and the context's own members are not
+      // services and are never guarded on a real context either.
+      if (typeof property !== 'string' || Reflect.has(object, property)) {
+        return Reflect.get(object, property, receiver)
+      }
+      if (Reflect.has(double.injected, property)) return double.injected[property]
+      throw new Error(`cannot get property "${property}" without inject`)
+    },
+    has: (object, property) => Reflect.has(object, property) || Reflect.has(double.injected, property as string),
+  })
+  return proxy
+}
+
 describe('mounting the switch route', () => {
   it('registers one exact route on the switch path, tied to the plugin lifetime', () => {
     const wired = wiring()
@@ -412,7 +452,7 @@ describe('mounting the switch route', () => {
     expect(warned.some(message => message.includes('no webServer'))).toBe(true)
   })
 
-  it('mounts without a `sessions` service and resolves the store when the request arrives', async () => {
+  it('mounts without an injected `sessions` and resolves the store through `get`', async () => {
     const target = session()
     const routes: FakeRoute[] = []
     const webServer = {
@@ -421,31 +461,50 @@ describe('mounting the switch route', () => {
         return () => {}
       },
     }
-    // The reported 405: a composition that reaches `sessions` through `get` only. The
-    // old inject list required the property itself, mounted nothing, and let the Host
-    // answer the browser's POST — so the switch failed with no plugin-side explanation.
-    const child: ModeHostContext = {
-      webServer: webServer as unknown as NonNullable<ModeHostContext['webServer']>,
-      connection: { requestRejection: () => undefined },
-      get: (name: string) => (name === 'sessions' ? storeOf([target]) : undefined),
-      effect: ((installer: () => unknown) => {
-        installer()
-        return () => {}
-      }) as unknown as NonNullable<ModeHostContext['effect']>,
-    }
-    const ctx: ModeHostContext = {
-      inject: (_deps: readonly string[], callback: (child: ModeHostContext) => void) => { callback(child) },
-    }
+    // A composition that reaches `sessions` through `get` only — the real one: the
+    // route deliberately injects `webServer` and `connection` alone so a store that
+    // mounts later still answers, which means every direct `sessions` property read
+    // on a real cordis context *throws* instead of reading `undefined`. The old
+    // `serviceOf` let that throw escape, so the `?? serviceOf(ctx, …)` fallback never
+    // ran and the route answered `500 mode/internal`: the composer's red
+    // "模式服务没有回应" line, with the switch unable to open.
+    const ctx = cordisContext({
+      injected: { webServer, connection: { requestRejection: () => undefined } },
+      lookup: { sessions: storeOf([target]) },
+    })
     installModeRoute({ ctx, fallback: () => true })
     expect(routes).toHaveLength(1)
 
+    // The reported request: a POST, which the Host used to answer itself with a 405
+    // when the route mounted nothing, and which the route then answered with a 500
+    // while resolving the store. It must read the store's real session and say 200.
+    const posted = fakeResponse()
+    await routes[0]!.handler(fakeRequest('POST', { action: 'status', sessionId: SESSION }), posted)
+    expect(posted.statusCode).toBe(200)
+    expect(posted.body).not.toContain('mode/internal')
+    expect(JSON.parse(posted.body)).toMatchObject({
+      ok: true,
+      action: 'status',
+      mode: { enabled: true, source: 'default', fallback: true },
+    })
+
+    // A switch that reads but cannot write is the same dead button: the write path
+    // resolves the same guarded store, and the record lands on the real session.
+    const written = fakeResponse()
+    await routes[0]!.handler(fakeRequest('POST', { action: 'set', sessionId: SESSION, enabled: false }), written)
+    expect(written.statusCode).toBe(200)
+    expect(written.body).not.toContain('mode/internal')
+    expect(JSON.parse(written.body)).toMatchObject({ ok: true, action: 'set', mode: { enabled: false, source: 'record' } })
+    expect(readModeRecord(target)).toMatchObject({ enabled: false, setBy: 'switch:mode' })
+
+    // And the read-only GET path the button retries through stays answered.
     const read = fakeResponse()
     await routes[0]!.handler(
       fakeRequest('GET', undefined, `${MODE_ROUTE_PATH}?action=status&sessionId=${SESSION}`),
       read,
     )
     expect(read.statusCode).toBe(200)
-    expect(JSON.parse(read.body)).toMatchObject({ ok: true, mode: { enabled: true } })
+    expect(JSON.parse(read.body)).toMatchObject({ ok: true, mode: { enabled: false, source: 'record' } })
   })
 
   it('answers a composition with no store at all as unavailable, never as a missing session', async () => {

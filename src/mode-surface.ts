@@ -280,13 +280,32 @@ export function installModeRoute(options: InstallModeRouteOptions): void {
  * Cordis exposes a service both as a context property and through `get`, and which of
  * the two is populated depends on the fiber that mounted it; asking both keeps the
  * route from concluding "no store" for a composition that has one.
+ *
+ * The direct read is isolate-guarded: a cordis context is a proxy whose `get` trap
+ * throws `cannot get property "<name>" without inject` for a service this fiber did
+ * not inject, instead of reading `undefined`. `sessions` is deliberately not in the
+ * inject list — the route resolves it per request so a store that mounts later still
+ * answers — so that throw is the *expected* outcome here, not a fault. Letting it
+ * escape is what made the switch fail: the throw left this function before the
+ * `?? serviceOf(ctx, …)` / `get(name)` fallbacks could run, and `handleModeRoute`
+ * reported it as `500 mode/internal` — the composer's red "模式服务没有回应".
+ * `get` is the unguarded lookup (it returns `undefined` for an unprovided name), so
+ * the guard's failure falls through to it, exactly as `src/settings.ts` `serviceOf`
+ * and `src/team-engine.ts` `resolveService` already do.
  * @param source - the context or injected child.
  * @param name - the service name.
  * @returns the service, or `undefined` when this composition has none.
  */
 function serviceOf(source: ModeHostContext | undefined, name: string): unknown {
   if (source === undefined) return undefined
-  const direct = (source as unknown as Record<string, unknown>)[name]
+  let direct: unknown
+  try {
+    direct = (source as unknown as Record<string, unknown>)[name]
+  } catch {
+    // Inject-guarded property read on a real cordis context; `get` below is the
+    // resolution API that is not guarded.
+    direct = undefined
+  }
   if (direct !== undefined && direct !== null) return direct
   return typeof source.get === 'function' ? source.get(name) : undefined
 }
