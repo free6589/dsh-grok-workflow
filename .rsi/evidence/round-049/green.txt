@@ -1,0 +1,10 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/rsi-round-49
+
+ ✓ test/guardian.spec.ts (29 tests) 147ms
+
+ Test Files  1 passed (1)
+      Tests  29 passed (29)
+   Start at  15:56:08
+   Duration  925ms (transform 576ms, setup 0ms, import 664ms, tests 147ms, environment 0ms)
+

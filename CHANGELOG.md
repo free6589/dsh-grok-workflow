@@ -7,6 +7,10 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ### Fixed / 修复
 
+- **One guardian sweep reads each heartbeat once and judges independent of order / 守护单轮扫描只读一次心跳，判定不再随顺序翻转** —
+  One sweep read every file heartbeat twice and judged children in insertion order while progressively raising the run-silence baseline, so an early child never saw a later child's fresh beat and the signal flipped with order. The sweep now snapshots every beat and the global baseline first, then judges without calling any reader; each source is read once per child.
+  / 以前单轮扫描把每个文件心跳读两遍，还边判边抬基线，先判的孩子看不到后孩子的 fresh 心跳，结论随插入顺序翻转。现在先把所有心跳和全局基线快照好，再统一判定不再调读数器；每种心跳每轮每孩子只读一次。
+
 - **A hung child can no longer wedge the wave when the realm has no timer / 无定时器环境下 hung 子调用不再卡死整波** —
   Without `setTimeout` or `Atomics.waitAsync` the child race awaited bare, so a hung child wedged the wave and every replan boundary after it. The no-timer path now watches settlement on the host clock within the run/child budget and rejects with the same timeout prefix, so the task retries instead of wedging. With no readable clock or no budget the call stays bare rather than hanging on an unreadable deadline.
   / 没有定时器时子调用是裸等的，一个 hung 住的子调用会卡死整波和后面的重规划边界。现在无定时器路径在运行/子预算内盯着宿主时钟看，超时用同一前缀判停走重试；实在没时钟或没预算才保持裸等，不拿读不出的期限去挂死环境。

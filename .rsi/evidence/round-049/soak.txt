@@ -1,0 +1,34 @@
+RSI round 49 — isolated live-chain soak (2026-11-23, Asia/Singapore)
+工作目录基线 / baseline: worktree .agents/worktrees/rsi-round-49 @ 8eefaac (rsi/round-49)
+含 round-49 改动 / includes: guardian 单次 sweep 单遍快照 (src/guardian.ts check + test/guardian.spec.ts 1 用例)
+DSH: 0.2.2-rc.3 (dsh --version)
+
+隔离 / isolation
+- DSH_HOME=<worktree>/.tmp/soak-49/home（gitignored，.tmp/ 整目录忽略）
+- live 家目录 ~/.dsh 全程未写入、未重启/未触碰现行实例
+- 仅用 headless 探针，无 web 实例；无残留进程/端口
+
+步骤 / steps (all with DSH_HOME=<scratch>)
+1. 建 profile: dsh --profile grok-soak-49 --from-default-profile headless --dump-config
+   -> 建成 exit 0。
+2. 装插件: dsh plugin --profile grok-soak-49 add <worktree 路径>
+   -> exit 0（link 安装）。
+3. 模型链路探针 / model-route probe:
+   dsh --profile grok-soak-49 headless 'Say exactly: SOAK-PROBE-OK'
+   -> exit 1，MISSING_CREDENTIAL（llm-deepseek route "deepseek-official" 无 key）。
+   真机网关同 502 口径：无可用模型额度，BLOCKED，未伪造任何 COMPLETED。
+
+凭证说明 / credentials: 仅做布尔存在性检查与报错原文记录，未读取、未回显任何值；
+隔离家目录无凭证；未从其他 profile 拷贝密钥。
+
+清理 / cleanup: scratch 家目录 <worktree>/.tmp/soak-49 已整体删除；
+live 家目录未动；无提交、无 push、无改版本。
+
+结论 / verdict: BLOCKED —— 插件安装 + profile 组合链路通（link 安装成功），
+但隔离环境无可用模型凭证（MISSING_CREDENTIAL），未能跑出 COMPLETED。
+单遍快照逻辑以单测钉死（见 round-049/green.txt guardian.spec 29 绿 + ci.txt 1641 绿），
+真机链路待有额度后重跑。
+Verdict: BLOCKED — plugin install + profile composition verified; no usable model
+credential in this environment, so no COMPLETED run observed; nothing fabricated.
+
+证据 / evidence: 本文件 .rsi/evidence/round-049/soak.txt（脱敏，无密钥/token/cookie）。

@@ -1,0 +1,61 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/rsi-round-49
+
+ ❯ test/guardian.spec.ts (29 tests | 1 failed) 154ms
+     ✓ derives one child budget from the run deadline, capped and floored 2ms
+     ✓ always follows the configured per-call budget, with or without a guardian route 0ms
+     ✓ starts with the run and stays parallel: a settling child never fires 50ms
+     ✓ ignores foreign runs and duplicate settlements, like the progress recorder 0ms
+     ✓ an end before its start still settles the row once the start arrives 0ms
+     ✓ discovers a hung child and records a non-destructive rescue/observation finding 2ms
+     ✓ a heartbeat-loss names the run-wide silence, a lone stall names timeout 1ms
+     ✓ an unlimited run deadline disarms the guardian instead of second-guessing it 0ms
+     ✓ never invokes the run cancel handle when a child stalls 0ms
+     ✓ a rescue log line queues guidance without interrupting the child 1ms
+     ✓ a rescue for an unknown or settled child is a contained no-op 0ms
+     ✓ a throwing rescue executor is contained as a warning 0ms
+     ✓ a fresh child-session turn keeps its child alive past budget 0ms
+     ✓ a stale child-session turn degrades to the old behaviour (fires) 0ms
+     ✓ an unreadable session degrades to the old behaviour (fires) 0ms
+     ✓ a run-level phase/log event refreshes run liveness, downgrading heartbeat-loss 0ms
+     ✓ a declared write path with a fresh mtime keeps its child alive past budget 0ms
+     × one sweep reads each heartbeat once and judges independent of insertion order 7ms
+     ✓ an unreadable file heartbeat degrades to the old behaviour (fires) 0ms
+     ✓ rebuilds declared paths from the phase header when the event carries none 46ms
+     ✓ a phase the plan does not know keeps the old budget-only rule 0ms
+     ✓ maps 任务 n and Task n to the nth plan task 0ms
+     ✓ yields nothing for unknown phases and planner-built plans 0ms
+     ✓ runWorkflow wires a resident guardian next to progress and archiver 27ms
+     ✓ the run subscribes phase/log heartbeats alongside the guardian pair 3ms
+     ✓ a rescue log line queues guidance without interrupting the child 5ms
+     ✓ dispose clears the timer and leaves no residue behind 0ms
+     ✓ unloadRunGuardians disposes every live guardian of one instance 0ms
+     ✓ finish releases the registry entry so a settled run holds no guardian 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/guardian.spec.ts > liveness signals: a child that shows life must not fire > one sweep reads each heartbeat once and judges independent of insertion order
+AssertionError: expected 3 to be 2 // Object.is equality
+
+- Expected
++ Received
+
+- 2
++ 3
+
+ ❯ test/guardian.spec.ts:486:31
+    484|     const reversed = runCase([2, 1])
+    485|     // Each heartbeat source is read exactly once per open child per s…
+    486|     expect(forward.fileCalls).toBe(2)
+       |                               ^
+    487|     expect(reversed.fileCalls).toBe(2)
+    488|     expect(forward.sessionCalls).toBe(2)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 28 passed (29)
+   Start at  15:56:00
+   Duration  790ms (transform 431ms, setup 0ms, import 520ms, tests 154ms, environment 0ms)
+

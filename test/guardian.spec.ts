@@ -430,6 +430,69 @@ describe('liveness signals: a child that shows life must not fire', () => {
     guardian.finish('completed')
   })
 
+  it('one sweep reads each heartbeat once and judges independent of insertion order', () => {
+    // Regression round-49: check() swept twice — the first pass read every
+    // file heartbeat to raise latestActivity, the second pass read them all
+    // again to judge, so one sweep cost 2N reader calls and an early child
+    // never saw a later child's fresh beat (signal flipped with Map order).
+    const runCase = (order: Array<1 | 2>) => {
+      const clock = manualClock()
+      let fileCalls = 0
+      let sessionCalls = 0
+      const guardian = createRunGuardian({
+        runId: 'run-1',
+        childBudgetMs: 10_000,
+        now: clock.now,
+        schedule: () => ({}) as unknown,
+        cancelSchedule: () => {},
+        // Counting reader, like a stat cache with a side effect per read.
+        // Both declared files are stale — the fresh liveness below rides on
+        // the session heartbeat only, so the run-silence verdict must come
+        // from one global snapshot, not from judgement order.
+        fileHeartbeat: (paths: readonly string[]) => {
+          fileCalls += 1
+          return { path: paths[0] ?? 'stale.md', atMs: clock.now() - 60_000 }
+        },
+        // The fresh child's own session talked 1s ago — alive by itself.
+        sessionHeartbeat: (childId: string) => {
+          sessionCalls += 1
+          if (childId === 'child-2') return { atMs: clock.now() - 1_000 }
+          return undefined
+        },
+      })
+      const cancel = vi.fn()
+      guardian.adopt({ id: 'run-1', cancel })
+      for (const seq of order) {
+        guardian.agentStart(
+          info('run-1'),
+          seq === 2
+            ? { ...start(2, 'fresh worker'), writesPaths: ['fresh-stale.md'] }
+            : { ...start(1, 'quiet worker'), writesPaths: ['stale.md'] },
+        )
+      }
+      // adopt() runs one internal sweep: reset so the counts below measure
+      // exactly the single sweep under test.
+      fileCalls = 0
+      sessionCalls = 0
+      clock.advance(11_000)
+      const findings = guardian.check()
+      expect(cancel).not.toHaveBeenCalled()
+      guardian.finish('cancelled')
+      return { signals: findings.map((finding) => `${finding.seq}:${finding.signal}`), fileCalls, sessionCalls }
+    }
+    const forward = runCase([1, 2])
+    const reversed = runCase([2, 1])
+    // Each heartbeat source is read exactly once per open child per sweep.
+    expect(forward.fileCalls).toBe(2)
+    expect(reversed.fileCalls).toBe(2)
+    expect(forward.sessionCalls).toBe(2)
+    expect(reversed.sessionCalls).toBe(2)
+    // The quiet child's signal must not flip with insertion order: both
+    // judgements see the fresh beats of the other child before firing.
+    expect(reversed.signals).toEqual(forward.signals)
+    expect(forward.signals).toEqual(['1:timeout'])
+  })
+
   it('an unreadable file heartbeat degrades to the old behaviour (fires)', () => {
     const clock = manualClock()
     let calls = 0
