@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   DETAIL_FIELDS,
@@ -734,5 +735,27 @@ describe('progress tab: honest numbers', () => {
     expect(formatDuration(123_000)).toBe('2 m 3 s')
     expect(formatDuration(-1)).toBeUndefined()
     expect(formatDuration(Number.NaN)).toBeUndefined()
+  })
+})
+
+/**
+ * The design document's "released spine" claim, pinned to the code.
+ *
+ * Manual item Sec.2-5 removed the permanently-empty `回答` stage. The document kept
+ * describing a seven-stage spine, which is exactly the kind of drift that makes a
+ * reader trust a cell that can never fill; the guard below reads the doc and the
+ * exported spine together.
+ */
+describe('design document: the released spine matches PROGRESS_STAGES', () => {
+  const doc = readFileSync(new URL('../docs/knowledge/DESIGN-progress-tab.md', import.meta.url), 'utf8')
+
+  it('quotes the six-stage spine the code exports, with no answer stage', () => {
+    const line = '`起点 → 规划 → 执行 → 检查 → 汇总 → 终点`'
+    expect(doc, 'the released spine is not stated in the design document').toContain(line)
+    expect(doc, 'the design document still promises a 回答 stage').not.toContain('→ 回答 →')
+    expect(doc).toContain('六段固定脊椎')
+    expect(doc).not.toContain('七段固定脊椎')
+    // The quoted spine and the exported track describe the same number of nodes.
+    expect(line.slice(1, -1).split(' → ')).toHaveLength(PROGRESS_STAGES.length)
   })
 })
