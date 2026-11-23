@@ -1,0 +1,102 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/rsi-round-53
+
+ ❯ test/config.spec.ts (48 tests | 2 failed | 46 skipped) 12ms
+     ↓ refuses an unknown key instead of silently dropping it
+     ↓ refuses an unknown key one level down instead of silently dropping it (round 35)
+     ↓ refuses a `roles` value that is not an object instead of loading five empty chains (round 37)
+     ↓ rejects every removed key as unknown (R-06), with the migration named
+     ↓ refuses a configuration written for a newer version
+     ↓ normalizes a bare model id shorthand into a route (migration)
+     ↓ treats an empty chain as inherit rather than an error
+     ↓ refuses a model repeated inside one chain
+     ↓ refuses an empty model, an over-long id and a too-long chain
+     ↓ refuses a non-string model/provider with the key and shape named (round 38)
+     ↓ takes guardianModel as one route only: a chain or array is refused (Q8)
+     × treats a blank guardianModel model as unconfigured and refuses non-string fields (round 53) 9ms
+     × refuses an unknown guardianModel field with the key named (round 53) 2ms
+     ↓ refuses a removed switching policy key as unknown (R-06)
+     ↓ fills every documented default through the schema
+     ↓ validates the four repeat-run keys and defaults a loop off and bounded
+     ↓ carries bilingual metadata on the four repeat-run keys, agreeing with the envelope
+     ↓ fixes the removed retry count at 1 and the synthesis default at layered
+     ↓ gates the workflow behind the per-session grok-mode default, off by default
+     ↓ refuses an unknown grok-mode default on the direct-construction path
+     ↓ names grokDefault in the one-line effective-configuration signature
+     ↓ defaults the mid-run replan switch on, carries it through the schema, and states it bilingually
+     ↓ fails on a provider the runtime does not have
+     ↓ fails on a provider the runtime does not have for the supervisor chain
+     ↓ fails on a model the provider enumerates but does not declare
+     ↓ checks every routed role, the supervisor included
+     ↓ notes instead of failing when the runtime cannot judge the route
+     ↓ notes an all-blank supervisor chain, never fails it
+     ↓ reports the generated settings page for this plugin
+     ↓ matches the plain Config schema by uid when no volatile rebound happened
+     ↓ keeps the generated script clamps identical to HARD_LIMITS (single source)
+     ↓ pins the documented run limits: default 10/1, hard maximum 100/3
+     ↓ applies the documented defaults inside the script, without swallowing an explicit 0
+     ↓ degrades quietly on a runtime without a settings service
+     ↓ uses the built-in switching policy (T4: switchOn removed, always built-in)
+     ↓ keeps a 429 on its route when the operator unticks the switch (Sec.3-2)
+     ↓ budgets an empty plan exactly like a missing one (t27/F3)
+     ↓ bounds the run ledger by recordLimit and writes nothing at 0
+     ↓ names the deadline and every role chain, with "inherit" for an unset role
+     ↓ shows the chains in order, so a fallback is visible without a run
+     ↓ travels into the workflow request, so the report can state the deadline
+     ↓ keeps the task verified and carries the notes into the report
+     ↓ still fails when the same verifier marks a criterion unmet
+     ↓ still fails when the verifier verdict is fail, notes or not
+     ↓ defaults to unlimited (0) and carries that value into the request and the log line
+     ↓ accepts any non-negative integer, including 0 for unlimited
+     ↓ fails closed on a negative, fractional or non-numeric deadline (R-06)
+     ↓ refuses the same values in the schema, so a profile patch cannot store one
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/config.spec.ts > configuration surface > treats a blank guardianModel model as unconfigured and refuses non-string fields (round 53)
+AssertionError: expected { provider: 'p', model: '   ' } to be undefined
+
+- Expected:
+undefined
+
++ Received:
+{
+  "model": "   ",
+  "provider": "p",
+}
+
+ ❯ test/config.spec.ts:199:8
+    197|     // is refused with its shape named instead of coerced via String().
+    198|     expect(resolveConfig({ guardianModel: { provider: 'p', model: '   …
+    199|       .toBeUndefined()
+       |        ^
+    200|     expect(resolveConfig({ guardianModel: { model: '  ' } } as never).…
+    201|       .toBeUndefined()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/config.spec.ts > configuration surface > refuses an unknown guardianModel field with the key named (round 53)
+AssertionError: expected [Function] to throw an error
+
+- Expected:
+null
+
++ Received:
+undefined
+
+ ❯ test/config.spec.ts:212:8
+    210|     // then never take effect — refuse it like the roles nested-key ch…
+    211|     expect(() => resolveConfig({ guardianModel: { model: 'm', maxInFli…
+    212|       .toThrow(/unknown configuration key "guardianModel\.maxInFlight"…
+       |        ^
+    213|   })
+    214|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 46 skipped (48)
+   Start at  16:47:27
+   Duration  566ms (transform 369ms, setup 0ms, import 433ms, tests 12ms, environment 0ms)
+
