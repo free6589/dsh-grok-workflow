@@ -56,8 +56,17 @@ describe('settings-page upgrade entry', () => {
     expect(update.command as string).toContain('add github:free6589/dsh-grok-workflow#v')
   })
 
-  it('carries the four upgrade keys in both languages, with different prose', () => {
-    for (const key of ['update.title', 'update.body', 'update.copy', 'update.current']) {
+  it('states whether an upgrade is needed instead of leaving two numbers to compare', () => {
+    const update = bundle['GROK_WORKFLOW_UPDATE'] as { version: string, latest: string, state: unknown }
+    const upToDate = update.version === update.latest
+    expect(update.state).toBe(upToDate ? 'latest' : 'newer')
+  })
+
+  it('carries the seven upgrade keys in both languages, with different prose', () => {
+    for (const key of [
+      'update.title', 'update.body', 'update.copy', 'update.current',
+      'update.state.latest', 'update.state.newer', 'update.terminal',
+    ]) {
       const zh = bundle['GROK_WORKFLOW_DICT']['zh'][key] as unknown
       const en = bundle['GROK_WORKFLOW_DICT']['en'][key] as unknown
       expect(typeof zh, `zh ${key}`).toBe('string')
@@ -79,6 +88,10 @@ describe('settings-page upgrade entry', () => {
     const rendered = JSON.stringify((UpdateCard as (props: unknown) => unknown)({ t: zhT }))
     expect(rendered).toContain('data-gw-update')
     expect(rendered).toContain('data-gw-update-command')
+    // The verdict and the "this page cannot install for you" note are part of the
+    // card (manual item Sec.2-4), not a separate save-path surface.
+    expect(rendered).toContain('data-gw-update-state')
+    expect(rendered).toContain('data-gw-update-terminal')
     expect(rendered).toContain('data-action')
     expect(rendered).toContain('update-copy')
     // No form field: the card never joins draft/ops/save.
@@ -93,7 +106,10 @@ describe('settings-page upgrade entry', () => {
     for (const locale of ['zh', 'en']) {
       const t = internals.translator(locale)
       const rendered = JSON.stringify(internals.UpdateCard({ t }))
-      for (const key of ['update.title', 'update.body', 'update.copy', 'update.current']) {
+      for (const key of [
+        'update.title', 'update.body', 'update.copy', 'update.current',
+        'update.state.latest', 'update.state.newer', 'update.terminal',
+      ]) {
         expect(rendered, `${locale} ${key}`).not.toContain(key)
       }
     }

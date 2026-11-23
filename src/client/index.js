@@ -193,6 +193,15 @@ window.__ModuleLoader__.load({
     const PLUGIN_VERSION = '0.13.18'
     const UPDATE_LATEST = '0.13.18'
     const UPDATE_COMMAND = 'dsh plugin --profile <profile> add github:free6589/dsh-grok-workflow#v' + UPDATE_LATEST
+    /**
+     * Whether the shipped version is the newest known release.
+     *
+     * The card used to print two numbers and leave the comparison to the reader —
+     * which is the "有什么升级的按钮" complaint in a quieter form (manual item
+     * Sec.2-4). The verdict is derived here, next to the two constants it compares,
+     * so the page and the tests cannot disagree about it.
+     */
+    const UPDATE_UP_TO_DATE = PLUGIN_VERSION === UPDATE_LATEST
 
     // ---------------------------------------------------------------------------
     // Dictionaries. Keys are the contract between this table and every render site;
@@ -435,6 +444,9 @@ window.__ModuleLoader__.load({
       'update.body': 'Installed {current}, latest release {target}. Upgrade with: {command}',
       'update.copy': 'Copy command',
       'update.current': 'installed',
+      'update.state.latest': 'You are on the latest release.',
+      'update.state.newer': 'A newer release is available: {target}.',
+      'update.terminal': 'This page cannot run system commands — paste the command above into a terminal to finish the upgrade.',
     }
 
     const ZH = {
@@ -660,6 +672,9 @@ window.__ModuleLoader__.load({
       'update.body': '已装 {current}，最新发布 {target}。升级命令：{command}',
       'update.copy': '复制命令',
       'update.current': '已装版本',
+      'update.state.latest': '已是最新版本。',
+      'update.state.newer': '有新版本可装：{target}。',
+      'update.terminal': '本页不能替你执行系统命令——把上面的命令贴到终端里跑一次，才算装好。',
     }
 
     /** Shipped locales, in the order the locale plugin registers them. */
@@ -1494,6 +1509,10 @@ window.__ModuleLoader__.load({
         h('h3', { style: styles.groupTitle }, t('update.title')),
         h('p', { style: styles.hint }, t('update.body', { current: PLUGIN_VERSION, target: UPDATE_LATEST, command: UPDATE_COMMAND })),
         h('p', { style: styles.mono, 'data-gw-update-command': true }, UPDATE_COMMAND),
+        h('p',
+          { style: styles.hint, 'data-gw-update-state': UPDATE_UP_TO_DATE ? 'latest' : 'newer' },
+          UPDATE_UP_TO_DATE ? t('update.state.latest') : t('update.state.newer', { target: UPDATE_LATEST })),
+        h('p', { style: styles.hint, 'data-gw-update-terminal': true }, t('update.terminal')),
         h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' } },
           h('span', { style: styles.hint }, `${t('update.current')}: ${PLUGIN_VERSION}`),
           h('button', { type: 'button', style: styles.button, onClick: copy, 'data-action': 'update-copy' }, t('update.copy'))))
@@ -5425,7 +5444,12 @@ window.__ModuleLoader__.load({
       comboWarn, emptyCapWarn, limitOverrunWarn, EnumField, ROLE_ORDER, UpdateCard,
       PLUGIN_VERSION, UPDATE_LATEST, UPDATE_COMMAND,
     }
-    exports.GROK_WORKFLOW_UPDATE = { version: PLUGIN_VERSION, latest: UPDATE_LATEST, command: UPDATE_COMMAND }
+    exports.GROK_WORKFLOW_UPDATE = {
+      version: PLUGIN_VERSION,
+      latest: UPDATE_LATEST,
+      command: UPDATE_COMMAND,
+      state: UPDATE_UP_TO_DATE ? 'latest' : 'newer',
+    }
     /** Task panel: the `workflow-run` node renderer this bundle registers in place of the stock one. */
     exports.GROK_WORKFLOW_PANEL = {
       NS: PANEL_NS,
