@@ -22,7 +22,8 @@ import {
 } from './config.js'
 import { buildWorkflowRequest } from './script.js'
 import { inheritanceForSession } from './carryover.js'
-import { teamWorkflowEngine } from './team-engine.js'
+import { childOutcomeCause, childOutcomeLog, teamWorkflowEngine } from './team-engine.js'
+import { reclassifyNullCollapses } from './child-outcomes.js'
 import { createCheckpointRecorder, findResumableCheckpoint, unloadCheckpointRecorders, resumeCarryover } from './checkpoint/wiring.js'
 import { createRunGuardian, guardianChildBudgetMs, openRunGuardianChildren, unloadRunGuardians } from './guardian.js'
 import type { FileHeartbeat, GuardianSettlement, SessionHeartbeat } from './guardian.js'
@@ -1148,6 +1149,16 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
   }
   const stopProgressListeners: (() => void)[] = []
   /**
+   * The child-outcome ledger for this run (T1).
+   *
+   * The engine's guest sees only `null` for a child that did not finish cleanly;
+   * the twin this plugin drives records what each child actually settled as
+   * (`src/team-engine.ts`), and the mark taken here is what makes the evidence
+   * this run's own rather than the context's whole history.
+   */
+  const childOutcomes = childOutcomeLog(ctx)
+  const childOutcomeMark = childOutcomes.mark()
+  /**
    * The incremental memory archive for this run.
    *
    * Unlike the progress panel this is NOT a presentation switch: it is the durable
@@ -1162,6 +1173,9 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
     ctx,
     logger,
     ...sessionId === undefined ? {} : { sessionId },
+    // A child that left no text left a cause: without it the archive says only
+    // that its transcript was empty, which reads as the child's fault.
+    childCause: childId => childOutcomeCause(childOutcomes, childId),
   })
   /**
    * The run's checkpoint recorder: host-side durability, again not a switch.
@@ -1538,7 +1552,15 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
     }
     if (result.stopReason === 'completed') {
       try {
-        const report = settle(redactDeep(assertWorkflowReport(result.value, objective, config)))
+        const validated = assertWorkflowReport(result.value, objective, config)
+        // T1: the script reported every child that did not submit as a format
+        // error, because that is all the engine's null told it. Rewrite those rows
+        // with the cause each child actually died of, before the report is redacted
+        // and delivered (a provider's own diagnostic is redacted with everything
+        // else). Reporting only: routing and attempt counts are already decided.
+        const repaired = reclassifyNullCollapses(validated, childOutcomes.since(childOutcomeMark))
+        if (repaired > 0) logger.warn(`null-collapse repair: ${repaired} report row(s) rewritten with the child's real failure cause`)
+        const report = settle(redactDeep(validated))
         reportStatus = report.status
         // The ledger is plugin-owned state: the deterministic report is the truth,
         // the record survives for diagnostics and for the next run's audit trail.
@@ -1582,6 +1604,10 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
       const cause = state.unloadedAt !== undefined ? 'unloaded' : 'cancelled'
       const kept = keepCancelledWork(result.value, objective, config, phase, message)
       if (kept !== undefined) {
+        // A cancelled run is where a child's own `aborted` state matters most: the
+        // rows the engine's null turned into format errors are the children this
+        // stop killed, not children that mis-formatted their answer.
+        reclassifyNullCollapses(kept, childOutcomes.since(childOutcomeMark))
         const report = settle(kept, cause)
         lastReport = report
         lastCause = cause

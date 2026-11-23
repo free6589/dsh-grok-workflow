@@ -369,6 +369,12 @@ export type FailureClass =
   | 'verification-failed'
   | 'agent-start-failed'
   | 'budget-exhausted'
+  /**
+   * The child was stopped on purpose: the caller cancelled the run, or the plugin
+   * was unloaded underneath it (t14). Not a form error and not a provider fault,
+   * so a reader must not be told to resend or to switch models.
+   */
+  | 'cancelled'
   | 'unknown'
 
 /**

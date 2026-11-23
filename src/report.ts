@@ -190,6 +190,7 @@ const FAILURE_CLASSES = [
   'verification-failed',
   'agent-start-failed',
   'budget-exhausted',
+  'cancelled',
   'unknown',
 ] as const
 

@@ -2756,3 +2756,49 @@ spine 为空，pre-fix 形状会进脊柱。
 **备选（未采纳）**：① 只把 `FIXED_SHOW_DIAGNOSTICS` 打开——那会把台账塞进可见块，正是要修的病；
 ② 让 delivery 层直接写最终答案、不要主模型参与——拿不到"按用户原问题重写"这一步；
 ③ 保留"逐字覆盖"只提高字数——电报体的根因是指令形状，不是长度。
+
+## D-116 · T1 null 语义塌陷：宿主侧后置回填（已实现，未合流）；哨兵包只留备选（2026-11-24）
+
+- **Status:** CONFIRMED（实现 + 单测）；真机 soak `NOT_RUN`（留给合流方）
+- **Date:** 2026-11-24
+- **分支:** `fix/null-collapse-t1`（worktree `.agents/worktrees/fix-null-collapse-t1`，从 `main` `6b0eb62` 开出）
+- **问题（`CONFIRMED`）:** 引擎把"子代理死掉"和"没交结构化结果"折成同一个 `null`（证据见
+  `RESEARCH.md` 2026-11-24 条）。`src/script.ts` 的 `callRole` 只能一律记 `format-error`；
+  agent-99 的 3691 次子调用里有 530 次传输/鉴权/超时被写成格式错，真格式错 25 次（误标率按那批样本算约 95%）。
+- **决定:** 不碰引擎、不改脚本路由，在插件自己的 seam 上取证、在报告层回填：
+  1. `src/team-engine.ts` 的 twin 装饰 `subagents.startActivation`（本来就为 label 存在），把 run handle 的
+     `result` 结算值（`stopReason` + `diagnostic`）连同 `childId`、从提示词首行解析出的 role/attempt、route
+     记进 `src/child-outcomes.ts` 的有界台账（`CHILD_OUTCOME_LIMIT = 512`，FIFO）；拒绝也算一条（`stopReason:
+     'rejected'`）。台账按 `ctx` 一份，`mark()`/`since(mark)` 让证据按 run 切。
+  2. `src/run.ts` 在报告通过 `assertWorkflowReport` 之后、`redactDeep` 之前调
+     `reclassifyNullCollapses`：只改"class 仍是 `format-error` 且原因含 `no valid structured result`"的行，
+     并且**只在证据无歧义时**改——该角色（优先精确到 attempt）的所有子代理必须死因同类，
+     且同组里不能有真的"`completed` 但没交结构化结果"的子代理。改 class/reason/category，
+     连带把 `incomplete` / `errors` / `task.error` / `plan` 里那句同文改成新类（否则文案还留着旧结论）。
+  3. 新增失败类 `cancelled`（`types.ts` + `report.ts` 白名单），归 `cancelled` 类别：被取消既不是格式错，
+     也不能被读成"重发就有用"。
+  4. `classifyFailureText` 两个表（guest 与宿主镜像）都加了 401/403/unauthorized/forbidden/permission denied
+     → `model-unavailable`：403 以前落 `unknown`，读起来像"不知道发生了什么"。两表由
+     `test/null-collapse.spec.ts` 从 `WORKFLOW_SCRIPT` 里把 guest 函数抠出来逐条比对，钉成一张表。
+  5. `src/memory/recorder.ts` 的兜底文案接一个 `childCause(childId)`：子代理没留下任何文字时，
+     归档不再只说"它的 transcript 里既没有文本也没有结构化提交"，而是补上真实死因。
+- **为什么不上"让引擎抛错"这条更彻底的路:** 剧本能把 `AGENT_RESULT` 的 message 分类成真因（并且天然
+  不会触发同次补交），但 rejection 要跨 PTC 的进程边界，错误文本能否完整带过去在 `engine-harness.ts`
+  的 in-process 运行时上**证不出来**（harness 自己的注释就写了它证明不了进程隔离）。按 AGENTS.md 的
+  "证据说不清就不许写 CONFIRMED"，本轮不做。
+- **已知边界（诚实记账）:** 回填只改**报告**。脚本那次决定已经做完了，所以一个 403 子代理仍会花掉一次
+  "同次尝试补交"、仍会走完路由链——"403 不烧链路"这句在行为上还不成立，只有"403 不再被写成格式错"成立。
+  同一 run 内并发另一个 run 的子代理也会落进同一个台账窗口，靠"同 role/attempt 且死因一致"的收敛规则兜住
+  （不一致就不改，宁可保留旧文案也不新增一处分不清的标签）。
+- **备选（结构性第二步，本轮只登记、不实现）:**
+  - **B1 哨兵包（首选）:** 引擎的 `null` 换不成哨兵，那就换一层——把"子代理终态"作为 `agent()` 的**返回值旁路**
+    传给脚本：插件在 twin 里给每个 activation 分配一个 run 内单调序号，宿主侧维护 `seq → {stopReason,
+    diagnostic}`，并把这张表作为 `args` 的一部分随**下一次** `start()` 注入（同一 run 内不行），
+    即"下一轮知道上一轮的死因"；只适合跨轮预算/路由调整，不适合当次尝试决策。
+  - **B2 让脚本看见死因:** 需要引擎在 `childResult` 里带上 `diagnostic`（上游改动/提 issue），或
+    允许脚本注册一个"子代理终态回调"。这是唯一能让"403 不烧链路"自然成立的路，属于上游改动。
+  - **B3 宿主主动降级路线:** 一个 route 在 run 内连续 `N` 次同类死亡后，宿主把这条 route 标记为
+    "本轮不可用"，后续 run 的 `buildWorkflowRequest` 直接不派给它（`busyHint` 已有类似通道：跨 run 提示）。
+    比 B1 简单，但同样管不到当次尝试。
+- **Consequences:** 误标消失（报告/答案/记忆三处都说真因）；分类表一处改两处生效；`cancelled` 进入失败类
+  词表；已知边界写进 `VALIDATION.md`，不是悄悄省略。

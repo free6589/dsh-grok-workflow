@@ -1619,3 +1619,22 @@ planner 重新规划（两次规划）；若要"预览即计划"需把结构化�
   需把结构化计划从 gate 传进 `runWorkflow`，属于改入参语义，本轮不做。
 - 画像目前只能由操作者/使用者显式写入（记忆 CLI），不从对话自动蒸馏"什么值得长期记"。
 - 真机隔离 soak `NOT_RUN`（本轮只要求 build+ci，且不发布）。
+
+## 2026-11-24 · 子代理"死掉"与"没交结构化结果"在引擎里是同一个 `null`（`CONFIRMED`）
+
+Source: `node_modules/@deepseek-ai/dsh-workflow-ptc/lib/index.js`（0.2.1-rc.2，`WORKFLOW_GUEST_SOURCE` 内联的 guest）
+与 `node_modules/@deepseek-ai/dsh-subagent/lib/types/types.d.ts`。
+
+- guest `WorkflowExecution.agent()`：`result.stopReason !== 'completed'` → 直接 `return null`（无 schema 时也一样），
+  不看 `output`；`completed` 但请求了 schema 而 `result.structured === undefined` → 同样 `return null`。
+  两件事在脚本侧是同一个值，因此脚本无法区分"子代理死了"和"子代理答了但没交结构化结果"。
+- 宿主 `childResult()` 只回 `{output, stopReason, structured?}`：**`SubagentResult.diagnostic` 被丢掉**
+  （`dsh-subagent` 的 `SubagentResult` 明确有 `diagnostic?: string`，「provider-authored, non-assistant failure
+  detail for a non-completed result」）。所以脚本连"为什么死"的原文都拿不到。
+- `stopReason` 的枚举：`completed` / `aborted` / `error` / `max-tokens` / `refusal`（`SubagentStopReasonMap`）。
+- 插件能看到的另一半在宿主侧：`subagents.startActivation()` 返回的 run handle
+  （`{childId, result, dispose}`）上，`result` 结算出的是**真的** `{output, stopReason, structured?, diagnostic?}`。
+  `src/team-engine.ts` 的 twin 正是在这个 seam 上装饰，所以"每个子代理到底怎么结束的"在插件里是可观测的，
+  只是**事后**才可观测（脚本那一轮已经过去）。
+- 本轮据此选择的修法是"宿主后置回填"（见 `DECISIONS.md` D-116）：报告、答案与记忆归档按真实死因改写，
+  不改脚本的路由/重试决定——因为那个决定已经被一个无法解释的 `null` 做完了。
