@@ -1,3 +1,15 @@
+## round-52 扁平 Cookie 凭证补脱敏（soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
+
+| state | command | result |
+| --- | --- | --- |
+| worktree rsi-round-52 `454076a`（main `95ad6b2` + 本轮 1 提交） | `npx vitest run test/redact.spec.ts -t "flat cookie"`（旧码 stash） | **1 failed / 46 skipped**：新用例红（JSON 键形原样漏过） |
+| 同上（新码） | `npx vitest run test/redact.spec.ts`（lead 独立） | **47 passed** |
+| 同上（新码） | `npm run ci`（lead 独立） | **exit 0：85 files / 1643 tests PASS**；typecheck 干净；lint 0 errors；`verify:lib` byte-identical |
+| 隔离 soak | 网关探针 | **BLOCKED**：网关 502 无额度，未伪造 |
+
+**Changed:** `src/redact.ts`（key-value 四规则键表加 `cookie`，头规则不动）+ `test/redact.spec.ts`（+1 三形回归 + prose 不误杀）+ `lib/` 重建 + `CHANGELOG [Unreleased]` 中英双语 + `.rsi/evidence/round-052/`。
+**Honest boundary:** 真机 BLOCKED，不发版；`[Unreleased]` 已攒 6 条待发。
+
 ## round-51 删过期十分钟常量（soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
 
 | state | command | result |

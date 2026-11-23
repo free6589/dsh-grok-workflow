@@ -1,3 +1,15 @@
+## 2026-11-23 — round-52 已合流 main 未发版：扁平 Cookie 补脱敏（`CONFIRMED`，soak BLOCKED）
+
+- **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
+- **做了什么**：配置面第 1 条。只有头形脱敏，JSON 键形和裸形原样漏（Cookie 值本身即凭证）。
+  四规则键表加 `cookie`；+1 三形回归 + prose 不误杀；`npm run ci` exit 0（85/1643）；
+  lead 独立红绿复验成立。
+- **真机**：BLOCKED（网关 502，未伪造）。本次不发版。
+- **合流**：`rsi/round-52`（`454076a`）已 `--no-ff` 合入 main 系 worktree（合流 `196bbc2`）；
+  `rsi/round-52` 分支可 24h 内删除。`CHANGELOG [Unreleased]` 中英文已记 6 条待发。
+- **未做（下轮池）**：配置面 guardianModel 空白与未知键/gate 无钩子。
+  网关恢复后给 round-47/48/49/50/51/52 补 soak 再发版。
+
 ## 2026-11-23 — round-51 已合流 main 未发版：删过期十分钟常量（`CONFIRMED`，soak BLOCKED）
 
 - **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
