@@ -13,7 +13,7 @@
  * | tier | bound | who enforces it | what happens |
  * | --- | --- | --- | --- |
  * | command | 120 s | the child's own prompt (`timeout 120 …`) | the command exits, the child classifies the error and keeps working |
- * | task call | {@link CHILD_TIMEOUT_MS} | the script (`agent()` race) | that call is a `timeout` failure; the task retries with new wording |
+ * | task call | {@link DEFAULT_CHILD_TIMEOUT_MS} | the script (`agent()` race) | that call is a `timeout` failure; the task retries with new wording |
  * | run | the configured deadline | the host (`src/run.ts`) | the whole run stops, with a report |
  *
  * Every function here is pure and testable without an engine, which is the only way a
@@ -21,16 +21,6 @@
  */
 /** Seconds a single shell command may run before it must exit on its own. */
 export declare const COMMAND_TIMEOUT_SECONDS = 120;
-/**
- * Milliseconds one `agent()` call may run before the script settles it as a timeout.
- *
- * Ten minutes: long enough that a legitimate build or test sweep finishes, short
- * enough that a child stuck on an interactive prompt stops costing the run. It is a
- * fixed internal bound on purpose — the user-facing deadline (`timeoutMs`) is the
- * number an operator reasons about, and a second visible deadline would only invite
- * "which one stopped it?".
- */
-export declare const CHILD_TIMEOUT_MS = 600000;
 /**
  * Default per-call budget in milliseconds: 120 minutes (user request 2026-11-22).
  *
@@ -66,7 +56,7 @@ export declare function timeoutTierAt(elapsedMs: number, budget: TimeoutBudget):
 /**
  * Clamp a caller's child-call bound into the range the script enforces.
  *
- * Absent or unusable values fall back to {@link CHILD_TIMEOUT_MS}; `0` is not
+ * Absent or unusable values fall back to {@link DEFAULT_CHILD_TIMEOUT_MS}; `0` is not
  * "unlimited" here, because a call with no bound is the stall this exists to stop.
  * @param value - untrusted value from the request payload.
  * @returns the bound to use, in milliseconds.

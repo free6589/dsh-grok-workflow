@@ -7,6 +7,10 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ### Fixed / 修复
 
+- **The stale ten-minute timeout constant is gone / 过期的十分钟超时常量已删除** —
+  The 600,000 ms constant no longer bounds anything (every live path uses the 7,200,000 ms default); only its doc link and a test import still named it. The dead export is deleted and the docs point at the live default. No behavior changes.
+  / 60 万毫秒那个常量早就不起作用了（所有活路都走 720 万默认值），只剩文档链接和测试 import 还念着它。现在删掉死导出，文档指向活的默认值；行为不变。
+
 - **The single-wave reason uses the same path rule as the scheduler / 单波原因与调度用同一套路径规则** —
   The report side lowercased nothing and never resolved `..`, so `SRC/A` vs `src/a` read as independent and `a/../b` vs `b` read as independent, while the scheduler serialized the first pair and merged the second. The report now normalizes through the scheduler's own rule, so the sentence names the same cause the run acted on.
   / 报告侧原来不分大小写也不消 `..`，`SRC/A` 对 `src/a` 判成独立、`a/../b` 对 `b` 判成独立，而调度侧一个串行一个合并。现在报告走调度同一套归一，写出来的原因和实际跑的一致。
