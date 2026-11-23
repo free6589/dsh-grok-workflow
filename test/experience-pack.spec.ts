@@ -27,7 +27,7 @@ import { Session } from '@deepseek-ai/dsh-session'
 import { grokCommand } from '../src/command.js'
 import { deliverReport, machineLedger } from '../src/delivery/index.js'
 import { FIXED_MAX_RETRIES, resolveConfig } from '../src/config.js'
-import { assertWorkflowReport, guardLine, renderReport, stopNarration } from '../src/report.js'
+import { assertWorkflowReport, failureReport, guardLine, renderReport, stopNarration } from '../src/report.js'
 import { maxTotalAgentsFor, routeBudgetFor } from '../src/script.js'
 import type { RoleName, WorkflowReport } from '../src/types.js'
 import { execution, failingVerification, task, verification } from './fixtures.js'
@@ -125,6 +125,16 @@ function stoppedReport(cause: 'unloaded' | 'caller' | 'deadline' | 'engine' = 'u
   return { ...built, stop: { cause } }
 }
 
+/**
+ * A legal report with no task rows at all: the shape a run leaves when it is cut
+ * before the plan produced anything. `runWorkflow` builds it through
+ * `failureReport`, so this fixture does too.
+ */
+function noTaskReport(cause: 'unloaded' | 'caller' = 'unloaded'): WorkflowReport {
+  const built = failureReport(OBJECTIVE, config, 'Unloaded', 'the plugin was unloaded while the run was in flight', 'cancelled')
+  return { ...built, stop: { cause } }
+}
+
 /** A legal COMPLETED report, for the guard line's "nobody cancelled" half. */
 function completedReport(): WorkflowReport {
   const only = task('a', ['天气已核验'])
@@ -206,6 +216,26 @@ describe('1 — a stopped run says why, what survived, and that resending contin
     // A deadline keeps its existing advice: that text already says "not your fault".
     const deadline = deliverReport(stoppedReport('deadline'), { lang: 'zh' }).human
     expect(deadline).toContain('这次卡在外部服务或时限上')
+  })
+
+  it('never calls a run with no task rows "all finished and nothing left over"', () => {
+    // The soak found this: a run cut before any task row existed printed
+    // "已经做完 0 项，没有剩下的。" — which reads as a clean sweep of no work. The
+    // tally has three cases, and zero is its own: nothing produced a result yet.
+    const zh = deliverReport(noTaskReport(), { lang: 'zh' }).human
+    expect(zh).toContain('还没跑出任何一项')
+    expect(zh).not.toContain('没有剩下的')
+    expect(zh).not.toContain('已经做完 0 项')
+    const en = deliverReport(noTaskReport(), { lang: 'en' }).human
+    expect(en).toContain('No task had produced a result yet')
+    expect(en).not.toContain('All 0 item(s) were finished')
+  })
+
+  it('breaks the English sentences apart instead of running them together', () => {
+    // "…not a manual stop.All 1 item(s)…" was the ledger's own output before this.
+    const ledger = machineLedger(stoppedReport('unloaded'))
+    expect(ledger).not.toMatch(/stop\.[A-Z]/)
+    expect(ledger).toMatch(/not a manual stop\. 1 item\(s\) were finished/)
   })
 
   it('renders the same account in the machine ledger', () => {
