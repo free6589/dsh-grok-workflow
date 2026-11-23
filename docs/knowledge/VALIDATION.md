@@ -6591,8 +6591,11 @@ toolName/configVersion = 页面 16）；`test/client.spec.ts` ProgressBundle 补
 | worktree `team-dispatch-v1`（共享，另有 lane 在改 dispatcher/handoff） | `npx vitest run test/taskboard.spec.ts` | **23 tests PASS**（原 13 + 新增 10：同任务双句柄单赢家/不同行不互相冲掉/中断写留下 inert tmp/撕裂账本拒读/SIGKILL 真进程恢复/持锁进程被杀后锁清掉/活锁尊重到超时/跨重启 id 唯一/跨重启 CAS 守卫/位置解析 2 例）；连续跑 3 次结果一致 |
 | 同上 | `npx tsc -p .tmp/tsconfig.taskboard.json`（范围：`src/taskboard/**` + `test/taskboard.spec.ts`） | **exit 0** |
 | 同上 | `npx tsc -p .tmp/tsconfig.taskboard-build.json`（`rootDir ../src`、`outDir ../lib`，仅 taskboard） | **exit 0**，重建 `lib/taskboard/*`（含新增 `paths.*`），未触碰其他 lib 产物 |
-| 同上 | `npx tsc -p tsconfig.json --noEmit`（全仓） | **FAIL**：`src/dispatcher/session.ts` 3 处 `pending` 缺字段、`test/dispatcher.spec.ts` 5 处（含 `resultRecipient` 无导出）。**属并行 lane 正在改的文件，不在本任务范围，未修改** |
+| 同上 | `npx tsc -p tsconfig.json --noEmit`（全仓，另一 lane 落地后） | **exit 0** |
+| 同上 | `npx vitest run`（全仓） | **85 files / 1649 tests PASS**（含本任务 taskboard 23 例；首次全仓跑时 `test/channel.spec.ts` A4 用例在并行 lane 同时构建/跑测的负载下红过 1 次，随后单跑 4/4 PASS、基线提交 `e4e03e9` 单跑 3/3 PASS——判定为负载型既有 flake，与本提交无关） |
+| 同上 | `npm run lint` | **0 errors**（30 warnings，均为既有未用符号类告警） |
+| 同上 | 复刻 `verify:lib` 流程（`git archive HEAD` → 临时目录 build → `diff -r` 已提交 `lib`） | **byte-identical**（0 行差异）。注：`npm run verify:lib` 本身在本 worktree **跑不了**——它把 `<worktree>/node_modules` 软链进临时目录，而 worktree 无自己的 `node_modules`（typescript 从主检出解析），属环境限制，与本提交无关 |
 
 **Changed：** `src/taskboard/store.ts`（每次改动静默持独占锁：重读 → 按磁盘版本 CAS → 落盘；废弃锁按 `lockStaleMs` 清掉）、`src/taskboard/types.ts`（`TASKBOARD_LOCK`/`TASKBOARD_LOCK_FILE`/`TaskboardOptions`）、`src/taskboard/paths.ts`（新增：`taskboardDir`/`taskboardFile`/`openDefaultTaskboard`，三级解析同 `checkpointDir`）、`src/taskboard/index.ts`、`test/taskboard.spec.ts`、`test/fixtures/taskboard/writer.mjs`（真实子进程，导入 `lib/` 产物）、`vitest.config.ts`（`GROK_WORKFLOW_TASKBOARD_DIR` 指向 tmp）、`docs/ARCHITECTURE.md`（任务板章节：位置/行格式/认领协议/崩溃恢复/上限/证据/边界）、`CHANGELOG.md`。
 **行为变更：** 旧 `taskboard.spec.ts` 的同任务竞态用例断言"两个写者都成功、文件留最后一个"——那正是丢更新缺陷；现改为"恰好一个赢家、输家 `version-conflict`，重开后归属与赢家一致"。
-**Honest boundary：** 全仓 `npm run ci` / `npm run verify:lib` **NOT_RUN**：本 worktree 被另一条 lane 并行占用，其 `src/dispatcher`、`src/handoff`、`src/report`、`src/delivery` 处于编辑中途、typecheck 红（见上表第 4 行），此状态下的全仓门禁结果不反映任务板质量。任务板模块自身的 typecheck、单测与产物重建已独立跑通。锁为单文件系统内的咨询锁（不防恶意绕过、不保证网络盘语义）；rename 后的目录 fsync 是尽力而为，掉电仍可能丢最后一次写——两条都写进架构文档的边界节。
+**Honest boundary：** 提交时刻（`f4cce3d`）本 worktree 仍被另一条 lane 占用，故 `npm run ci` 未作为单条命令执行，而是按其步骤分步跑（typecheck / lint / 全仓 vitest / 复刻 verify:lib），四步全绿；该 lane 随后自行提交了 `14f4e35`（dispatcher），两者同分支先后落地、互不改对方文件。仍未单独观测到的只有"单次 `npm run ci` 调用"的退出码本身。锁为单文件系统内的咨询锁（不防恶意绕过、不保证网络盘语义）；rename 后的目录 fsync 是尽力而为，掉电仍可能丢最后一次写——两条都写进架构文档的边界节。
