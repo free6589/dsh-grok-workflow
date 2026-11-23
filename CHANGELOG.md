@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.25] - 2026-11-24
+
 ### Fixed / 修复
 
 - **One stray quote in a verdict no longer costs the whole task / 一个跑偏的引号不再让整件事重做** —

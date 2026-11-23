@@ -1,0 +1,66 @@
+round 076 — 三路合流后的隔离真机 soak（0.13.25 候选，用户视角）
+================================================================================
+日期 / date: 2026-11-24（Asia/Singapore，01:54–02:20）
+基线 / base: `main` `7f626f5`（= 0.13.24 发布提交）
+合流 / merged（`--no-ff`，按序，release/0.13.25）:
+  1. `fix/verifier-supervisor-resubmit` `f5b74e4`+`73c9067` —— verifier/supervisor 同次尝试补交
+  2. `fix/final-answer-rewrite` `4393514` —— 最终答案改成"给料 + 主模型重写"
+  3. `docs/heartbeat-ledger` `4231c00`（先 rebase 到 main → `be88c36`）—— AGENTS 派发台账 + 心跳 11-12
+冲突：`CHANGELOG.md` + 三份记忆档（两边都留）、`lib/*.map`（取 ours 后重建）；`src/script.ts` 自动合并且两边功能都在
+（`verifierResubmitPrompt`/`supervisorResubmitPrompt` 调用点 3583/3652，`summaryResubmitPrompt` 2827/2845，
+`REWRITE_PREAMBLE` + `answerLead` 整段 summary）。
+
+隔离 / isolation
+- **未写 live `~/.dsh`**：`scripts/clone-profile.mjs` 只读克隆在用 web profile（parity 5/5，1 行凭据按设计脱敏，
+  5 个 link 重指，17 依赖 0 悬空）。live 家目录全程只读——实测无 `DSH_HOME` 时 `dsh web --help` 直接
+  `EROFS: /home/fish/.dsh/profiles/web/cordis.yml`，一个文件都没写。
+- **未重启、未触碰线上实例**：线上 web 仍在 `100.111.111.88:3080`；本轮另起 `127.0.0.1:3185` / `3186`，
+  独立 `DSH_HOME` 与独立 `HOME`（scratch：`.tmp/soak-01325/`）。
+- 模型: 唯一路由 provider `bifrost-soak`（`api: openai-completions`，`baseURL http://127.0.0.1:18088/openai/v1`，
+  `apiKeyEnv BIFROST_VIRTUAL_KEY`），模型 **`wb/cn:deepseek-v4.1-flash`**；planner/worker/verifier/synthesizer/
+  supervisor 与 `agent-default-model` 同路由。网关 `/models` 实测 168 个 id 里该 id 在列（`has wb/cn:deepseek-v4.1-flash: True`）。
+- 凭据: 仅 `set -a; . ~/.dsh/bifrost.env; set +a` 注入环境；overlay 只写 `apiKeyEnv` 名；本轮证据与日志均无 key 值
+  （日志里 `keyPresent` 只记布尔）。
+- 装载 / install: **构建产物装进 fork 出来的 profile**（`node_modules/dsh-grok-workflow/` 的 `lib/`、`package.json`、
+  `cordis.patch.yml` 由本 worktree 覆盖；`lib/script.js` 含 `verifierResubmitPrompt` ×2、`lib/answer.js` 含
+  `REWRITE_PREAMBLE` ×3）。
+- 交互: headless Chromium 155 + 原生 CDP（无 playwright 依赖），在 GUI 里当用户打字/点发送/点审批。
+
+§1 最终答案是人话、且交付物路径正确（d5c5f541 场景）—— `PASS`
+1) 两个问题（`分别用一句话回答两个问题…1) 为什么单元测试不应该依赖网络；2) 什么是幂等。`，禁用文件）:
+   GUI 里收到的是两段中文散文，各自回答一个问题；**没有** `答案：`/`下一步：` 标签，**没有**中英双语镜像，
+   也不是台账那句电文体（台账里 worker 的 summary 仍是一长串分号句，交付出去的是重写后的成品）。收尾
+   `已完成，用时 4秒`，台账三行 `plan: 1 task(s)` → worker → `verdict pass · 5 criterion/criteria checked`。
+   截图 `a1-t25.png`。
+2) 带交付物的一轮（`写一个文件 …/.tmp/soak-01325/work1/hello.md，内容是一句中文问候，然后告诉我你把文件写在了哪里、怎么打开。`）:
+   答案里给的是**那条真实绝对路径**（`…/work1/hello.md`），并写清两种打开方式（文件管理器双击 / `cat`、`xdg-open`），
+   外加一句"第一次写入被沙箱拦下、按提示申请了一次更宽权限才成功"的说明。文件名带 `hello.md` 的 `.` 没有被拆成
+   `hello. md`（正是该分支复核抓到的缺陷）。落盘核对：`hello.md` 内容 `你好！很高兴见到你，祝你今天过得愉快。`。
+   截图 `a2-t90.png`。**这一条把分支里唯一没有离线证据的 HYPOTHESIS（模型是否真按原问题重写、交付物路径读得对不对）
+   变成 CONFIRMED。**
+3) 单语：三次交付全是中文，没有任何一条把同一段话再用英文说一遍。
+
+§2 判定角色补交（round-075 的两条路）—— 契约 `CONFIRMED` / 自然触发 `NOT_RUN`
+- **契约在真机上生效（`CONFIRMED`）**：在 3186 实例前挂一个透明日志代理（`127.0.0.1:18099` → 真网关），
+  记录每次 `/chat/completions` 的原文标志位。verifier 请求逐个命中 `quoteRule=True`
+  （"Keep every evidence and finding string under 800 characters…use 「」 or single quotes"），即新提示词与
+  结果结构里的引号/长度约束确实发给了真模型；worker 侧的 `same-attempt resubmit` 语义仍是同一套。
+- **答案侧改写指令在真机上生效（`CONFIRMED`）**：同一份代理日志里有一条请求命中 `rewritePreamble=True`
+  （"Answer the request the user actually made: open with the conclusion in your own words…"），说明交付块确实是
+  当"原料"交给主模型，而不是让主模型逐字复述。
+- **补交本身在真机上没有被自然触发（`NOT_RUN`，诚实记录）**：三轮 soak 的判定全部一次解析成功，
+  没有出现"结论里带未转义双引号 → 宿主解析失败"的运气。为了逼出这条路，本轮写了故障注入（把 verifier 首个
+  流式 tool_call 的参数改成坏 JSON），但 verifier 是"多轮工具调用"的子代理（一次调用里先跑 478 次 `bash`），
+  结构化结论落在更后面的 HTTP 轮次，注入窗口没能在本轮窗口内可靠命中，因此**没有**把它算成通过。
+  该分支的证据仍是 `test/verifier-resubmit.spec.ts` 的 8 例（真脚本 + 真引擎，只有模型边界是替身；
+  红 7 失败 → 绿 8 通过）与 `npm run ci` 全绿。补交走的 `classifyFailureText` 与已发版的 worker 补交同一条路径。
+- 代理进程与临时 dump 全部只落在 `.tmp/soak-01325/`（gitignored），未进仓库。
+
+§3 结论 / verdict
+soak **PASS**（用户视角，构建产物 + 真网关 + 真模型）：最终答案是人话、单语、交付物路径正确，d5c5f541 的
+"台账摘要 + 只取第一句"坏法未复现；判定角色的新提示词契约与答案改写指令都在真模型请求里得到确认。
+**未覆盖**：判定角色补交路径在真机上的自然触发（见 §2 的 `NOT_RUN`，证据取单测层）。
+
+§4 清理 / cleanup
+`.tmp/soak-01325/`（fork 的 dsh-home、独立 HOME、chromium profile、overlay、代理日志、dump、token）整目录删除；
+headless Chromium、代理、两个 web 实例全部停止；worktree 与三条已合分支在发版后删除。
