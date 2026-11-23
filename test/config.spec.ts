@@ -121,7 +121,7 @@ describe('configuration surface', () => {
     // Q8 guardianModel single route); the other 23 are unknown now.
     expect(CONFIG_KEYS).toEqual([
       'toolName', 'mode', 'grokDefault', 'roles', 'guardianModel', 'synthesis',
-      'maxConcurrency', 'maxTasks', 'timeoutMs', 'childTimeoutMs', 'replan',
+      'maxConcurrency', 'maxTasks', 'timeoutMs', 'childTimeoutMs', 'replan', 'switchOnRateLimit',
       'loopEnabled', 'loopMaxRounds', 'loopFailStreak', 'loopIntervalMin',
       'iterateIntervalMin', 'iterateTemplate',
       'configVersion',
@@ -208,6 +208,7 @@ describe('configuration surface', () => {
       mode: 'triage',
       grokDefault: 'off',
       replan: true,
+      switchOnRateLimit: true,
       loopEnabled: false,
       loopMaxRounds: 10,
       loopFailStreak: 3,
@@ -499,14 +500,15 @@ describe('route validation against the runtime', () => {
     const projected = Object.keys(descriptor.value).sort()
     expect(projected).not.toContain('toolName')   // not volatile => not projected
     expect(projected).not.toContain('configVersion')   // not volatile => not projected
-    // The page is the 16 volatile keys (toolName/configVersion are structural);
-    // replan is the 16th (settings page switch, "自动接着干" group).
+    // The page is the 17 volatile keys (toolName/configVersion are structural);
+    // replan is the switch in the "自动接着干" group, switchOnRateLimit the 429
+    // checkbox (Sec.3-2) in the role group.
     expect(projected).toEqual([
       'childTimeoutMs', 'grokDefault', 'guardianModel', 'iterateIntervalMin', 'iterateTemplate', 'loopEnabled',
       'loopFailStreak', 'loopIntervalMin', 'loopMaxRounds', 'maxConcurrency', 'maxTasks', 'mode', 'replan',
-      'roles', 'synthesis', 'timeoutMs',
+      'roles', 'switchOnRateLimit', 'synthesis', 'timeoutMs',
     ])
-    expect(projected).toHaveLength(16)
+    expect(projected).toHaveLength(17)
     const ctx = ctxWith({
       settings: { configure: () => () => {}, describe: () => [descriptor] },
     })
@@ -526,9 +528,9 @@ describe('route validation against the runtime', () => {
     const surface = describeSurface(ctx)
     expect(surface.level).toBe('info')
     expect(surface.text).toContain('identified by value')
-    // The log states both numbers: 16 volatile keys reach the generated page,
-    // 18 are accepted (toolName/configVersion are plain, not volatile).
-    expect(surface.text).toContain(`16 of ${CONFIG_KEYS.length} field(s) on the page`)
+    // The log states both numbers: 17 volatile keys reach the generated page,
+    // 19 are accepted (toolName/configVersion are plain, not volatile).
+    expect(surface.text).toContain(`17 of ${CONFIG_KEYS.length} field(s) on the page`)
     // A foreign schema is not ours, and no field list may be invented from it.
     const foreign = ctxWith({
       settings: {
@@ -640,6 +642,30 @@ describe('configuration reaches the run', () => {
     expect(failed.map(entry => entry.route)).toEqual(['w1', 'w2', 'w1', 'w2'])
     expect(failed.every(entry => entry.role === 'worker')).toBe(true)
     expect(failed[0]?.failureClass).toBe('rate-limit')
+  })
+
+  it('keeps a 429 on its route when the operator unticks the switch (Sec.3-2)', async () => {
+    const agent: ScriptAgent = async (_prompt, options) => {
+      if (roleOf(options.label) === 'worker') throw Object.assign(new Error('429 Too Many Requests'), { code: 'AGENT_RESULT' })
+      return verification(task('a'))
+    }
+    const config = resolveConfig({
+      maxConcurrency: 1,
+      maxTasks: 4,
+      switchOnRateLimit: false,
+      roles: { worker: [{ model: 'w1' }, { model: 'w2' }] },
+    })
+    const args = buildWorkflowRequest('Ship the verified result', [task('a')], config).args
+    // The six other classes are named explicitly; `rate-limit` is not among them,
+    // so a 429 no longer advances the chain.
+    expect(args.switchOn).not.toContain('rate-limit')
+    expect(args.switchOn).toContain('server-error')
+    const run = await runWorkflowScript(WORKFLOW_SCRIPT, args, agent)
+    // Same two attempts, both on the first route: no failover happened.
+    const routes = (run.report.routes as { route: string, failureClass?: string }[])
+      .filter(entry => entry.failureClass === 'rate-limit')
+    expect(routes.map(entry => entry.route)).toEqual(['w1', 'w1'])
+    expect(run.calls.filter(call => roleOf(call.label) === 'worker')).toHaveLength(2)
   })
 
   it('budgets an empty plan exactly like a missing one (t27/F3)', () => {
