@@ -6,6 +6,7 @@ import type { WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { apply } from '../src/index.js'
+import { approvedRequest, captainAnswer, CAPTAIN_LIMITS } from '../src/captain.js'
 import { callerTask, execution, task, verification } from './fixtures.js'
 import { runWorkflowScript, roleOf } from './helpers.js'
 
@@ -176,16 +177,50 @@ describe('captain foreground: the split is confirmed before any work is dispatch
     expect(ctx.dispatches).toHaveLength(0)
   })
 
-  it('dispatches the original request when the user approves', async () => {
+  it('dispatches the split the user approved, not a fresh one', async () => {
     const ctx = new FakeContext()
     const agent = new FakeAgent()
-    await say(ctx, agent, '帮我重构 run.ts 的超时逻辑，并补上回归测试')
+    const asked = await say(ctx, agent, '帮我重构 run.ts 的超时逻辑，并补上回归测试')
+    // The split the user reads is the split the run has to honour.
+    expect(asked).toContain(ctx.engine.reply.trim())
     const text = await say(ctx, agent, '确认')
     await waitForDispatch(ctx)
     expect(ctx.dispatches).toHaveLength(1)
     const objective = String((ctx.dispatches[0]!.args as { objective: string }).objective)
     expect(objective).toContain('帮我重构 run.ts 的超时逻辑')
+    expect(objective).toContain('USER APPROVED THIS SPLIT')
+    expect(objective).toContain(ctx.engine.reply.trim())
     expect(text).toContain('队长确认')
+  })
+
+  it('dispatches on a stack of polite words, not only on one bare approval', async () => {
+    const ctx = new FakeContext()
+    const agent = new FakeAgent()
+    await say(ctx, agent, '帮我重构 run.ts 的超时逻辑，并补上回归测试')
+    await say(ctx, agent, '好，可以')
+    await waitForDispatch(ctx)
+    expect(ctx.dispatches).toHaveLength(1)
+    const objective = String((ctx.dispatches[0]!.args as { objective: string }).objective)
+    expect(objective).toContain('USER APPROVED THIS SPLIT')
+  })
+
+  it('says the default split is what runs when the preview call failed', async () => {
+    const ctx = new FakeContext()
+    const agent = new FakeAgent()
+    ctx.engine.singleCallError = 'model down'
+    const asked = await say(ctx, agent, '帮我重构 run.ts 的超时逻辑，并补上回归测试')
+    // No split was reported, so the question has to say both ways out: confirm for
+    // the default split, restate the request for another preview.
+    expect(asked).toContain('这次没能先报出具体拆法')
+    expect(asked).toContain('回「确认」就按默认拆法跑')
+    expect(asked).toContain('把要求再说一遍')
+    const text = await say(ctx, agent, '确认')
+    await waitForDispatch(ctx)
+    expect(ctx.dispatches).toHaveLength(1)
+    const objective = String((ctx.dispatches[0]!.args as { objective: string }).objective)
+    expect(objective).toContain('帮我重构 run.ts 的超时逻辑')
+    // Nothing was previewed, so nothing may be claimed as approved.
+    expect(objective).not.toContain('USER APPROVED THIS SPLIT')
   })
 
   it('carries an explicit change into the dispatched request', async () => {
@@ -233,5 +268,41 @@ describe('captain foreground: the split is confirmed before any work is dispatch
     await waitForDispatch(ctx)
     expect(ctx.dispatches).toHaveLength(1)
     expect(text).not.toContain('队长先报拆法')
+  })
+})
+
+describe('captain confirmation: what counts as an answer and what it carries', () => {
+  it('approves a stack of polite words and still refuses a sentence with content', () => {
+    expect(captainAnswer('好，可以')).toBe('approve')
+    expect(captainAnswer('好的，开干')).toBe('approve')
+    expect(captainAnswer('确认。开干')).toBe('approve')
+    expect(captainAnswer('行，那你先看看这个文件')).toBe('other')
+    expect(captainAnswer('确认，可以吗')).toBe('other')
+  })
+
+  it('keeps an edit an edit even when it opens with an approval', () => {
+    expect(captainAnswer('确认，改成两个任务')).toBe('amend')
+    expect(captainAnswer('好的，先做验证部分')).toBe('amend')
+  })
+
+  it('carries the approved split beside the original request', () => {
+    const request = approvedRequest('帮我重构超时逻辑', '任务一：读现有代码\n任务二：写回归测试。')
+    expect(request).toContain('帮我重构超时逻辑')
+    expect(request).toContain('USER APPROVED THIS SPLIT')
+    expect(request).toContain('任务一：读现有代码')
+  })
+
+  it('leaves the request untouched when there was no split to keep', () => {
+    expect(approvedRequest('帮我重构超时逻辑', '')).toBe('帮我重构超时逻辑')
+    expect(approvedRequest('帮我重构超时逻辑', '   ')).toBe('帮我重构超时逻辑')
+  })
+
+  it('keeps the approved split when a long request has to be cut', () => {
+    const composed = approvedRequest('需求'.repeat(4500), 'b'.repeat(5000))
+    expect(composed.length).toBeLessThanOrEqual(CAPTAIN_LIMITS.amendChars)
+    // The request is what gets cut; the split the user agreed to must survive.
+    expect(composed).toContain('USER APPROVED THIS SPLIT')
+    expect(composed).toContain('b'.repeat(200))
+    expect(composed.startsWith('需求')).toBe(true)
   })
 })
