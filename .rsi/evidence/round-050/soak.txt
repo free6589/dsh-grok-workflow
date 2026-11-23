@@ -1,0 +1,36 @@
+RSI round 50 — isolated live-chain soak (2026-11-23, Asia/Singapore)
+工作目录基线 / baseline: worktree .agents/worktrees/rsi-round-50 @ 55ab9a2 (rsi/round-50)
+含 round-50 改动 / includes: 报告侧路径归一复用调度侧 (src/waves.ts import paths.ts + test/waves.spec.ts 1 用例 + lib 重建)
+DSH: 0.2.2-rc.3 (dsh --version)
+
+隔离 / isolation
+- DSH_HOME=<worktree>/.tmp/soak-50/home（gitignored，.tmp/ 整目录忽略）
+- live 家目录 ~/.dsh 全程未写入、未重启/未触碰现行实例
+- 仅用 headless 探针，无 web 实例；无残留进程/端口
+
+步骤 / steps (all with DSH_HOME=<scratch>)
+1. 建 profile: dsh --profile grok-soak-50 --from-default-profile headless --dump-config
+   -> 建成 exit 0。
+2. 装插件: dsh plugin --profile grok-soak-50 add <worktree 路径>
+   -> exit 0（link 安装；plugin list 示 dsh-grok-workflow@link）。
+3. 模型链路探针 / model-route probe:
+   dsh --profile grok-soak-50 headless 'Say exactly: SOAK-PROBE-OK'
+   -> MISSING_CREDENTIAL（llm-deepseek route "deepseek-official" 无 key；stdout 为空）。
+   未拷贝任何密钥，未读取、未回显任何值（仅布尔存在性）。
+4. 真机网关直连探针 / gateway probe (curl, 15s timeout, no key):
+   https://models.fyrali.com/openai/v1/models -> 502
+   https://api.minimax.io/v1/models -> 401（无 key 预期值；fyrali 侧确认 502）
+   真机按网关 502 口径 BLOCKED，未伪造任何 COMPLETED。
+
+清理 / cleanup: scratch 家目录 <worktree>/.tmp/soak-50（含 home/ 与原始输出）已整体删除；
+live 家目录未动；无残留进程/端口；无提交、无 push、无改版本。
+
+结论 / verdict: BLOCKED —— 插件安装 + profile 组合链路通（link 安装 exit 0），
+但隔离环境无可用模型额度（MISSING_CREDENTIAL）且真机网关 502，
+未能跑出 COMPLETED。报告侧归一逻辑以单测钉死（见 green.txt 28 绿 + ci.txt 1642 绿），
+真机链路待有额度/网关恢复后重跑。
+Verdict: BLOCKED — plugin install + profile composition verified; no usable model
+credential in this environment and gateway returns 502, so no COMPLETED run observed;
+nothing fabricated.
+
+证据 / evidence: 本文件 .rsi/evidence/round-050/soak.txt（脱敏，无密钥/token/cookie）。

@@ -13,6 +13,8 @@
  * the reason is part of the rendered report instead of a guess a reader has to make.
  */
 
+import { normalizeWritesPaths, tasksConflict } from './paths.js'
+
 /** Maximum waves a plan may declare. The script enforces the same number. */
 export const WAVE_LIMIT = 8
 
@@ -23,34 +25,6 @@ export type SingleWaveCause = 'single-task' | 'dependency-chain' | 'write-overla
 export interface WaveReasonTask {
   readonly writesPaths: string[] | null
   readonly dependsOn?: readonly string[]
-}
-
-/**
- * Normalize a declared write path the way the scheduler does, so "same path" here
- * means the same thing it means at scheduling time.
- * @param raw - one declared path.
- * @returns the comparison key, or undefined for a blank value.
- */
-function pathKey(raw: string): string | undefined {
-  const text = raw.trim().replace(/\\/g, '/').replace(/\/+$/, '')
-  if (text === '' || text === '.') return undefined
-  return text.replace(/^\.\//, '')
-}
-
-/** Whether two declared path sets cover a common file or directory. */
-function pathsOverlap(left: readonly string[], right: readonly string[]): boolean {
-  if (left.length === 0 || right.length === 0) return false
-  for (const a of left) {
-    const keyA = pathKey(a)
-    if (keyA === undefined) continue
-    for (const b of right) {
-      const keyB = pathKey(b)
-      if (keyB === undefined) continue
-      if (keyA === keyB) return true
-      if (keyA.startsWith(`${keyB}/`) || keyB.startsWith(`${keyA}/`)) return true
-    }
-  }
-  return false
 }
 
 /**
@@ -81,7 +55,15 @@ export function singleWaveCause(
       const left = tasks[i]!.writesPaths
       const right = tasks[j]!.writesPaths
       if (left === null || right === null) return 'write-overlap'
-      if (pathsOverlap(left, right)) return 'write-overlap'
+      // Report-side overlap uses the same rule as the scheduler (src/paths.ts):
+      // declared lists are normalized first, and a declaration that normalizes to
+      // nothing usable (`undefined`) is "unknown" — it conflicts with everything,
+      // the same conservative treatment the scheduler gives it. Only `[]` (writes
+      // nothing) is parallel-safe.
+      const normalLeft = normalizeWritesPaths(left)
+      const normalRight = normalizeWritesPaths(right)
+      if (normalLeft === undefined || normalRight === undefined) return 'write-overlap'
+      if (tasksConflict(normalLeft, normalRight)) return 'write-overlap'
     }
   }
   return 'planned'
