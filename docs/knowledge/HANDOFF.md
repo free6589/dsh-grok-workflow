@@ -1,3 +1,32 @@
+## 2026-11-23 — 已发版 `0.13.22`：composer 工作流开关又能打开（`CONFIRMED`）
+
+- **From:** 修复+验证+发版子代理（agent-83）· **To:** lead / 下一轮接手者
+- **用户现象**：工具行 workflow 总开关红字「模式服务没有回应：cannot get property sessions without inject」，开关打不开；
+  loop 开关正常（它只读已注入的 `webServer` / `connection`）。
+- **根因（诊断子代理亲验）**：`src/mode-surface.ts` `serviceOf()` 用属性读取 `source[name]`；
+  这条路由故意只注入 `webServer` + `connection`，`sessions` 每请求再解析（让晚挂载的仓库也能应答）。
+  真 cordis 上下文对**未注入**服务的属性读取是**抛错**而非返回 undefined，
+  throw 在 `?? serviceOf(ctx,'sessions')` 与 `get(name)` 兜底之前逃出，被 `handleModeRoute` 兜成
+  `500 mode/internal`，客户端渲染成红字。
+- **为什么测试没抓住**：`test/mode-surface.spec.ts` 里 inject/ctx 替身是**普通对象字面量**，
+  属性读取永不抛错，于是"直接读成功"这条在生产必炸的路径在测试里一路绿灯；
+  soak 也从未覆盖 mode 路由（此前只覆盖 workflow 全链路），所以真机也没暴露。
+- **修法**：`serviceOf()` 直读包 `try/catch`，抛错时落 `source.get(name)`（`get` 不受 inject 守卫），
+  与 `src/settings.ts:83-91` `serviceOf` / `src/team-engine.ts` `resolveService` 同构；`??` 链原样保留；
+  注释写明 isolate-guarded 及"为什么这是预期结果而不是故障"。
+- **回归**：`test/mode-surface.spec.ts` 的挂载用例换替身为**真 cordis 行为**（未注入名属性读抛
+  `cannot get property "<name>" without inject`、已注入名返回服务、`get(name)` 不受守卫），
+  并断言 POST `status` / POST `set` 都 200、`enabled` 双向翻转、无 `mode/internal`。红绿：旧码 500（红）→ 新码 200（绿）。
+- **门禁**：`npm run ci` exit 0（87 文件 / 1656 测试 PASS；`verify:lib` byte-identical，221 文件）。
+- **真机隔离 soak PASS**：scratch `DSH_HOME`（只读拷贝 `profiles/headless`）、本机网关 `127.0.0.1:18088`、
+  路由 `bifrost-completions` / `wb/cn:deepseek-v4.1-flash`；双任务 workflow `status completed · verified 2/2 · confirmed 10`，
+  落盘 `one/alpha.txt`（8B，sha `e583bee0…`）+ `two/beta.txt`（7B，sha `57da01d5…`）逐字节符合；
+  路由级用带守卫假 context 驱动构建产物 `lib/mode-surface.js`：status/set 全 200、enabled 双向翻转、无 `mode/internal`。
+  证据 `.rsi/evidence/round-066/soak.txt`（脱敏：只有模型名，无 key 值；scratch 已删，live `~/.dsh` 只读）。
+- **发版**：prepare `192eaac` → main 系合流 `83f4622` → push main → tag `v0.13.22` → push tag；
+  远端 Release run `45180352802` **success**；Release `v0.13.22` 已发布（asset `dsh-grok-workflow-0.13.22.tgz`）。
+- **清理**：发版 worktree `rsi-fix-mode-switch` 与分支 `rsi/fix-mode-switch` 已删；main 系干净。
+
 ## 2026-11-23 — 已发版 `0.13.21`：18 条修复 + 隔离真机 soak PASS（`CONFIRMED`）
 
 - **From:** 发版子代理（agent-81）· **To:** lead / 下一轮接手者

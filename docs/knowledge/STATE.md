@@ -1,3 +1,16 @@
+Last updated: 2026-11-23 21:10 +08:00（**已发版 `0.13.22`：composer 工作流开关 500 修复，`CONFIRMED`** —
+用户现象：工具行 workflow 总开关红字"模式服务没有回应：cannot get property sessions without inject"，开关打不开。
+根因：`src/mode-surface.ts` `serviceOf()` 用属性读取取 `sessions`；真编排只注入 `webServer`+`connection`，
+cordis 对未注入服务的属性读取直接抛错（不是返回 undefined），throw 在 `ctx.get(name)` 兜底之前逃出，
+被 `handleModeRoute` 兜成 `500 mode/internal`。测试没抓住：替身是普通对象字面量，属性读取不抛。
+修法：直读包 try/catch，抛错落 `source.get(name)`，与 `src/settings.ts` / `src/team-engine.ts` 同构。
+红绿：新用例在旧码 `500`（红）/新码 `200`（绿）。`npm run ci` exit 0（87 文件 / 1656 测试 PASS；
+`verify:lib` byte-identical）。真机隔离 soak **PASS**（`DSH_HOME` 副本 + `wb/cn:deepseek-v4.1-flash`：
+双任务 workflow `status completed · verified 2/2`，两文件字节/sha 精确；路由级 status/set 全 200、enabled 双向翻转；
+证据 `.rsi/evidence/round-066/soak.txt`）。发版：prepare `192eaac` → 合流 `83f4622` → push main → tag `v0.13.22`
+→ push tag → 远端 Release run `45180352802` **success**，Release `v0.13.22` 已发布
+（asset `dsh-grok-workflow-0.13.22.tgz`，818677 bytes，sha256 `bc8d456e…`）。）
+
 Last updated: 2026-11-23 20:30 +08:00（**已发版 `0.13.21`：18 条修复 + 隔离真机 soak PASS，`CONFIRMED`** —
 发版提交 `8ff7f82` 经 `26b800d` 合入 main 系 worktree 并推 main；tag `v0.13.21` 已推；远端 Release run
 `45173971212` success 并已发布（asset `dsh-grok-workflow-0.13.21.tgz`）。本地门禁：`npm run ci` exit 0

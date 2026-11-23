@@ -1,3 +1,40 @@
+## 发版 `0.13.22` — composer 工作流开关 500 mode/internal 修复（soak PASS，已发布） — 2026-11-23 (`CONFIRMED`)
+
+| state | command | result |
+| --- | --- | --- |
+| worktree `rsi/fix-mode-switch`（基 `origin/main` `6314bbb`，== 远端） | `git rev-parse origin/main main` | 两值同为 `6314bbb`（发版前 main 与远端一致） |
+| 同上，旧码（`git checkout src/mode-surface.ts` 后） | `npx vitest run test/mode-surface.spec.ts` | **1 failed / 23 passed**：新用例红 —— `expected 500 to be 200`（即 `mode/internal`） |
+| 同上，新码 | `npx vitest run test/mode-surface.spec.ts` | **24 passed** |
+| 同上，新码 | `npm run ci` | **exit 0：87 files / 1656 tests PASS**；`verify:lib` byte-identical（221 文件） |
+| main 系 worktree（合流 `83f4622`） | `npm run ci` | **exit 0：87 files / 1656 tests PASS**；`verify:lib` byte-identical at `83f4622` |
+| 隔离真机 soak（scratch `DSH_HOME` + `wb/cn:deepseek-v4.1-flash`） | `dsh --profile headless --patch <overlay> "<two-task prompt>"` | **exit 0**；run record `status completed · verified 2/2 task(s) · confirmed 10 criterion/criteria`；`one/alpha.txt` 8B sha256 `e583bee0c3c0a0275cbd49c7c1523d9d686e487801c8de75be8d4882027d3cae`、`two/beta.txt` 7B sha256 `57da01d58b43bb515eb1ce9439de2b1f79b482cc4cb45fe2c8b56c9804470049` |
+| 同上，路由级（驱动构建产物 `lib/mode-surface.js`，守卫假 context） | `node .tmp/soak/route-verify.mjs` | **PASS**：`POST status` 200、`POST set` false/true 双向 200、`session record {"v":1,"enabled":true,"turn":0,"setBy":"switch:mode","workflowMode":"full"}`、无 `mode/internal` |
+| 远端 | `gh run watch 45180352802 --exit-status` | **exit 0 / success**：Release run 完成 |
+| 远端 | `gh release view v0.13.22` | `isDraft=false`、`isPrerelease=false`；asset `dsh-grok-workflow-0.13.22.tgz`（818677 bytes，`state=uploaded`，sha256 `bc8d456e…`） |
+
+**Root cause（`CONFIRMED`，诊断子代理亲验 + 本子代理读源码复核）:** `src/mode-surface.ts` `serviceOf()` 用属性读取
+`source[name]` 取 `sessions`；`installModeRoute` 只注入 `['webServer','connection']`（`sessions` 每请求经
+`resolveSessions` 再解析，让晚挂载的仓库也答得上）。真 cordis 上下文对未注入服务的属性读取**抛错**
+（`cannot get property "sessions" without inject`），不是返回 `undefined`；该 throw 在
+`?? serviceOf(ctx,'sessions')` 与 `source.get(name)` 兜底之前就逃出 `serviceOf`，被 `handleModeRoute`
+的末段 catch 兜成 `500 {code:'mode/internal'}`，客户端渲染成红字。loop 开关不受影响：它只读已注入的
+`webServer` / `connection`。
+**Why the tests missed it（`CONFIRMED`）:** `test/mode-surface.spec.ts` 的 inject/ctx 替身是普通对象字面量，
+属性读取永不抛错，因此"直读成功"这条生产必炸的分支在测试里永远绿；真机 soak 此前只覆盖 workflow 全链路，
+从未请求过 mode 路由，两层都没暴露。
+**Changed:** `src/mode-surface.ts` `serviceOf()` 直读包 `try/catch`，抛错落 `source.get(name)`（与
+`src/settings.ts:83-91` `serviceOf`、`src/team-engine.ts` `resolveService` 同构）；`??` 链保留；注释写明
+isolate-guarded 与"此处抛错是预期结果"。`test/mode-surface.spec.ts` 把挂载用例的替身换成真 cordis 行为
+（未注入名属性读抛错、已注入名返回服务、实现 `get(name)`），断言 POST status / POST set 均 200 且 `enabled` 翻转；
+其余断言未弱化。`lib/` 重建（`build`、`verify:lib` byte-identical）。发版串：`package.json` + `package-lock.json`
+0.13.21→0.13.22、`src/client/index.js` + `lib/client.js` 双常量、两份 README、`docs/LOCAL-TESTING.md`、
+`CHANGELOG [Unreleased]` → `## [0.13.22] - 2026-11-24`（中英双语）。
+**Honest boundary:** 真机 soak 的人读首句是交付层兜底句 "One item passed verification."（默认交付层只把人类段落给用户，
+机器台账在标记内下方），故 stdout 不含 `Grok workflow: COMPLETED` 行；状态以插件自身 memory archive 的 run 记录为准
+（同一 run id，`status completed · verified 2/2`）。首轮 soak 因两个任务同目录并发互相干扰（各自 verifier 对"多出来的文件"
+存疑）而读数含 caveat，第二轮改为每任务独立子目录后干净通过；两轮均未伪造、均为真机真模型。未碰 live `~/.dsh`、
+未重启现行实例、未 force-push、未 publish 到 npm。
+
 ## 发版 `0.13.21`（soak PASS，已发布） — 2026-11-23 (`CONFIRMED`)
 
 | state | command | result |
