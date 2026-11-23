@@ -10,9 +10,10 @@
 import type { Message } from '@deepseek-ai/dsh-llm'
 import type { Session } from '@deepseek-ai/dsh-session'
 import { redactSecrets } from './redact.js'
+import { RELAY_SOURCE_KIND } from './answer.js'
 
 /** Source kinds that belong to this plugin and must not be replayed as user history. */
-const PLUGIN_SOURCE_KINDS = new Set(['grok-workflow'])
+const PLUGIN_SOURCE_KINDS = new Set([RELAY_SOURCE_KIND])
 
 /** Bounds applied to the forwarded history. */
 export interface HistoryBounds {

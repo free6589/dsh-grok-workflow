@@ -4,7 +4,7 @@ import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import { createAssistantMessage, createSystemMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import { Session, pluginRecordOf } from '@deepseek-ai/dsh-session'
 import { apply } from '../src/index.js'
-import { REPORT_BEGIN, REPORT_END } from '../src/answer.js'
+import { RELAY_SOURCE_KIND, REPORT_BEGIN, REPORT_END } from '../src/answer.js'
 import { renderReport } from '../src/report.js'
 import type { WorkflowReport } from '../src/types.js'
 import { resolveConfig } from '../src/config.js'
@@ -1292,5 +1292,9 @@ describe('cross-round carry-over', () => {
     await waitFor(() => ctx.engine.startCalls.length === 1)
     expect('carryover' in (ctx.engine.startCalls[0]!.args as Record<string, unknown>)).toBe(false)
     expect((await firstP) as { kind: string }).toMatchObject({ kind: 'enter' })
+  })
+
+  it('pins the relay source kind literal so a rename must update the constant', () => {
+    expect(RELAY_SOURCE_KIND).toBe('grok-workflow')
   })
 })

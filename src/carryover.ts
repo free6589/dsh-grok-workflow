@@ -40,6 +40,7 @@
 import type { Message } from '@deepseek-ai/dsh-llm'
 import type { Session } from '@deepseek-ai/dsh-session'
 import { redactSecrets } from './redact.js'
+import { RELAY_SOURCE_KIND } from './answer.js'
 
 /**
  * Hard ceilings for the digest.
@@ -185,7 +186,7 @@ function textOf(message: Message): string {
  */
 function isPluginReport(message: Message): boolean {
   const source = message.source as { kind?: unknown } | undefined
-  return typeof source?.kind === 'string' && source.kind === 'grok-workflow'
+  return typeof source?.kind === 'string' && source.kind === RELAY_SOURCE_KIND
 }
 
 /** Collect the bounded locators quoted by one round's rows. */

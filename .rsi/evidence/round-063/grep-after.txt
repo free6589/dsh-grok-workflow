@@ -1,0 +1,10 @@
+src/answer.ts:39:export const RELAY_SOURCE_KIND = 'grok-workflow'
+src/checkpoint/wiring.ts:149:  return join(base, 'checkpoints', 'grok-workflow')
+src/client/index.js:33:    const NS = 'grok-workflow'
+src/client/index.js:1759:      return h('div', { style: styles.page, 'data-page': 'grok-workflow' },
+src/gate.ts:1347:        provider: options.provider ?? 'grok-workflow',
+src/memory/archive.ts:147:  return join(base, 'memory', 'grok-workflow')
+src/records.ts:839:    { provider: 'grok-workflow', model: 'workflow-receipt' },
+src/records.ts:861: * (`provider: 'grok-workflow'`, `model: 'workflow-notice'`) and carries a
+src/records.ts:881:    { provider: 'grok-workflow', model: 'workflow-notice' },
+src/types.ts:4:    'grok-workflow': { kind: 'grok-workflow' }
