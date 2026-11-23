@@ -1,3 +1,15 @@
+## 2026-11-23 — round-53 已合流 main 未发版：守护路由 fail-closed（`CONFIRMED`，soak BLOCKED）
+
+- **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
+- **做了什么**：配置面第 2+3 条。空白模型当已配置落盘、非字符串悄悄转字符串、多余键读过就丢。
+  非字符串抛错点名类型、两字段去空格、空格模型视未配置、未知键自报名；+2 回归；
+  `npm run ci` exit 0（85/1645）；lead 独立红绿复验成立。
+- **真机**：BLOCKED（网关 502，未伪造）。本次不发版。
+- **合流**：`rsi/round-53`（`6e723ed`）已 `--no-ff` 合入 main 系 worktree（合流 `49197f8`）；
+  `rsi/round-53` 分支可 24h 内删除。`CHANGELOG [Unreleased]` 中英文已记 7 条待发。
+- **未做（下轮池）**：配置面 gate 无 pre-step 钩子 fail-open（1 件）。
+  网关恢复后给 round-47/48/49/50/51/52/53 补 soak 再发版。
+
 ## 2026-11-23 — round-52 已合流 main 未发版：扁平 Cookie 补脱敏（`CONFIRMED`，soak BLOCKED）
 
 - **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者

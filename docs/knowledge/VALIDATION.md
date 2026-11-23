@@ -1,3 +1,15 @@
+## round-53 守护路由 fail-closed（soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
+
+| state | command | result |
+| --- | --- | --- |
+| worktree rsi-round-53 `6e723ed`（main `71e13b2` + 本轮 1 提交） | `npx vitest run test/config.spec.ts`（旧码 stash） | **2 failed / 46 passed**：新用例红（空白落盘、非 string 被吞、多余键零检查） |
+| 同上（新码） | `npx vitest run test/config.spec.ts`（lead 独立） | **48 passed** |
+| 同上（新码） | `npm run ci`（lead 独立） | **exit 0：85 files / 1645 tests PASS**；typecheck 干净；lint 0 errors；`verify:lib` byte-identical |
+| 隔离 soak | 网关探针 | **BLOCKED**：网关 502 无额度，未伪造 |
+
+**Changed:** `src/config.ts`（非 string 抛错 + trim + 空白视未配置 + 未知键抛错）+ `test/config.spec.ts`（+2 回归）+ `lib/` 重建 + `CHANGELOG [Unreleased]` 中英双语 + `.rsi/evidence/round-053/`。
+**Honest boundary:** 真机 BLOCKED，不发版；`[Unreleased]` 已攒 7 条待发。
+
 ## round-52 扁平 Cookie 凭证补脱敏（soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
 
 | state | command | result |

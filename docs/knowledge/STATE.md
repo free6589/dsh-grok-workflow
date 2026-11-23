@@ -1,3 +1,7 @@
+Last updated: 2026-11-23 16:50 +08:00（**round-53 已合流 main 未发版：守护路由 fail-closed，`CONFIRMED`，soak BLOCKED** —
+合流提交 `49197f8`（main `71e13b2` + `6e723ed`）；`npm run ci` exit 0（85 文件 / 1645 测试 PASS，+2 回归）。
+真机 BLOCKED（网关 502，未伪造）；`CHANGELOG [Unreleased]` 中英文已记 7 条待发，不发版。）
+
 Last updated: 2026-11-23 16:35 +08:00（**round-52 已合流 main 未发版：扁平 Cookie 补脱敏，`CONFIRMED`，soak BLOCKED** —
 合流提交 `196bbc2`（main `95ad6b2` + `454076a`）；`npm run ci` exit 0（85 文件 / 1643 测试 PASS，+1 三形回归）。
 真机 BLOCKED（网关 502，未伪造）；`CHANGELOG [Unreleased]` 中英文已记 6 条待发，不发版。）
