@@ -1,7 +1,8 @@
 import type {
   AttemptFailure,
-  RouteTrailEntry, ExecutionResult, FailureCategory, FinalStatus, StopCause, VerificationResult, WorkflowReport } from './types.js'
+  DeadRouteEntry, RouteTrailEntry, ExecutionResult, FailureCategory, FinalStatus, StopCause, VerificationResult, WorkflowReport } from './types.js'
 import type { ModelRoute, ResolvedConfig, RoleName } from './types.js'
+import { HARD_LIMITS } from './config.js'
 import { criterionKey, TASK_LIMITS } from './input.js'
 import { REPLAN_LIMITS } from './replan.js'
 import type { ReplanDecision } from './replan.js'
@@ -226,11 +227,36 @@ function routeTrail(value: unknown, path: string, max: number): RouteTrailEntry[
       chainIndex: number(entry.chainIndex, `${path}[${index}].chainIndex`),
       route: string(entry.route, `${path}[${index}].route`),
       attempt: number(entry.attempt, `${path}[${index}].attempt`),
+      ...entry.taskId === undefined ? {} : { taskId: string(entry.taskId, `${path}[${index}].taskId`) },
       outcome,
       ...entry.failureClass === undefined ? {} : { failureClass: enumeration(entry.failureClass, FAILURE_CLASSES, `${path}[${index}].failureClass`) },
       ...entry.reason === undefined ? {} : { reason: string(entry.reason, `${path}[${index}].reason`) },
       ...entry.skippedBusy === undefined ? {} : { skippedBusy: stringList(entry.skippedBusy, `${path}[${index}].skippedBusy`) },
       ...entry.queuedMs === undefined ? {} : { queuedMs: number(entry.queuedMs, `${path}[${index}].queuedMs`) },
+    }
+  })
+}
+
+/**
+ * Dead-route rows (`src/script.ts` route health).
+ *
+ * The threshold is re-checked here, not trusted: a row claiming a route died
+ * after one failure would make the report say the run preferred a live route
+ * over a route it had barely tried, and the whole point of the table is that the
+ * evidence was enough to justify moving calls. `streak` carries the real count so
+ * a reader can tell "crossed at 2" from "failed four times in a row".
+ */
+function deadRouteTrail(value: unknown, path: string, max: number): DeadRouteEntry[] {
+  return array(value, path).slice(0, max).map((item, index) => {
+    const entry = record(item, `${path}[${index}]`)
+    const streak = number(entry.streak, `${path}[${index}].streak`)
+    if (streak < HARD_LIMITS.deadRoute.threshold) {
+      throw new Error(`workflow result ${path}[${index}].streak must be at least ${HARD_LIMITS.deadRoute.threshold} (a route is dead only at the threshold)`)
+    }
+    return {
+      route: string(entry.route, `${path}[${index}].route`),
+      class: enumeration(entry.class, FAILURE_CLASSES, `${path}[${index}].class`),
+      streak,
     }
   })
 }
@@ -762,6 +788,12 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
   const routing = root.routing === undefined
     ? { planner: [], worker: [], verifier: [], supervisor: [], synthesizer: [] }
     : routeLabels(root.routing, 'routing')
+  // Dead routes (`src/script.ts` route health): optional, because a run that lost
+  // no route — and every report from an older build — carries none, and bounded
+  // here as a second line of defence against a script that ignored its own bound.
+  const deadRoutes = root.deadRoutes === undefined
+    ? []
+    : deadRouteTrail(root.deadRoutes, 'deadRoutes', HARD_LIMITS.deadRoute.routes)
   // Stop cause and guard settlement (round 70): optional, because a report from an
   // older build carries neither, but validated when present — a stop cause outside
   // the four the run can actually produce would make the presentation layer say
@@ -787,6 +819,7 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
     schemaVersion: 'grok-workflow/v1',
     status: status as FinalStatus,
     routes,
+    ...deadRoutes.length === 0 ? {} : { deadRoutes },
     routing,
     synthesis: {
       mode: synthesisMode,
@@ -1212,6 +1245,16 @@ export function renderReport(report: WorkflowReport, opts?: RenderReportOptions)
       lines.push('Route switches:')
       for (const entry of routeFailures.slice(0, 12)) {
         lines.push(`- ${entry.role} attempt ${entry.attempt} via ${entry.route}: ${entry.failureClass ?? 'unknown'} — ${oneLine(entry.reason ?? '', 200)}`)
+      }
+    }
+    // Dead routes: a route the run stopped preferring after it failed the same
+    // transport family twice. This is a *choice* the run made, not a failure, so
+    // it belongs in the ledger and not in the answer — and the reader needs it to
+    // explain why a task that names three routes only ever called two of them.
+    if (report.deadRoutes !== undefined && report.deadRoutes.length > 0) {
+      lines.push('Dead routes (two consecutive transport failures; live routes are tried first):')
+      for (const entry of report.deadRoutes) {
+        lines.push(`- ${entry.route}: ${entry.class} (${entry.streak} in a row)`)
       }
     }
   // Overflow is not failure and never appears above: a full lane yields to the

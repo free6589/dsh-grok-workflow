@@ -410,6 +410,17 @@ export interface RouteTrailEntry {
   route: string
   /** 1-based task attempt this call belongs to (0 for run-level roles). */
   attempt: number
+  /**
+   * The plan task this call was placed for, on the three task-scoped roles
+   * (worker, verifier, supervisor). Absent on the run-level roles (planner,
+   * synthesizer) and on reports produced before it existed.
+   *
+   * A run places many calls per task — worker, verifier, supervisor, each
+   * possibly across several routes and attempts — so without the task id a
+   * `worker … failed` row left the reader to work out whose call it was from the
+   * role and the attempt number alone.
+   */
+  taskId?: string
   outcome: 'ok' | 'failed'
   failureClass?: FailureClass
   reason?: string
@@ -420,6 +431,25 @@ export interface RouteTrailEntry {
   skippedBusy?: string[]
   /** Milliseconds this call waited for a full route to drain. Absent when it did not wait. */
   queuedMs?: number
+}
+
+/**
+ * One route the run stopped preferring, after it failed the same transport
+ * family on consecutive calls (`src/script.ts` route health).
+ *
+ * Evidence, not a verdict: a dead route is moved behind every live route and is
+ * still tried as a last candidate, and the row disappears the moment that route
+ * answers again. Only timeout / connection / server-error / rate-limit can kill
+ * a route — a credential refusal, a child that never submitted, and an engine
+ * that never started a child all say nothing about the transport.
+ */
+export interface DeadRouteEntry {
+  /** Route label (`provider/model`). Never `inherit`: an inherited call has no chain position to prefer. */
+  route: string
+  /** The transport family that crossed the threshold. */
+  class: FailureClass
+  /** Consecutive counted failures at the moment it crossed (at least `HARD_LIMITS.deadRoute.threshold`). */
+  streak: number
 }
 
 /** One attempt's observed result. */
@@ -496,6 +526,12 @@ export interface WorkflowReport {
   uncertainties: UncertaintyItem[]
   /** Every recorded child call, in call order (bounded, redacted). */
   routes: RouteTrailEntry[]
+  /**
+   * Routes the run stopped preferring, in the order they died. Absent when the
+   * run never lost a route (and on reports produced before the field existed),
+   * so a healthy report carries the same shape it always did.
+   */
+  deadRoutes?: DeadRouteEntry[]
   /** Effective chains, for transparency about what was configured. */
   routing: Record<RoleName, string[]>
   /** Final-answer strategy and its outcome. */

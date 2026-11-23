@@ -3,6 +3,14 @@
 Notable user-facing changes are recorded here in English and Simplified Chinese.
 用户可见的功能和修复会在这里以英文和简体中文记录。
 
+## [Unreleased]
+
+### Changed / 变更
+
+- **A route that keeps failing is tried last, so a task stops paying for a road that is down / 一直失败的那条路排到最后，不再让每件事都为它付一次钱** —
+  When a model route failed the same kind of transport failure twice in a row — timeout, dropped connection, a 5xx from the provider, or a 429 — the run kept placing calls on it for every later task, spending one child call (and, on a route that hangs instead of refusing, one whole child-call stall) before falling through to a route that worked. The run now remembers those two failures and moves that route behind every live route for the rest of the run; it is never removed from the chain, it is still tried when nothing else is left, and the row disappears the moment it answers again. Only transport families count: a refused key (401/403), a child that never submitted a structured result, and an engine that never started a child say nothing about the route, so they are not evidence. A 429 counts only when the 429 switch says a rate-limited route advances to the next model — with the switch off the route is kept and the task retries on it, so a 429 is "busy now", not "down". When every live route is already at its in-flight cap, a dead route with room takes the call instead of the run waiting for a lane to drain. Each call row in the report now also names the task it was placed for, so a failure row can be read without counting attempts, and the diagnostics ledger gains a `Dead routes` block naming the route, the family that killed it and how many failures in a row it took. Nothing new reaches a reader's answer by default: the block is inside the diagnostics switch, and a summary that echoes the label is scrubbed out.
+  / 一条模型路由连续两次栽在同一类传输故障上（超时、连接被断开、服务商 5xx、或 429）时，过去这一轮里后面每件事都还会继续往它身上打电话，先付一次子调用（如果它是挂住而不是直接拒绝，还要付一次完整的子调用等待）才落到能用的路上。现在这一轮会记住这两次失败，把它排到所有活着的路后面；它不会被从链里删掉，别的路都试过之后仍然会试它，而且它一旦答上来这行记录就消失。只有传输类的失败算证据：密钥被拒（401/403）、子代理没交结构化结果、引擎根本没把子代理启动起来，这些都不说明这条路有问题，所以不计数。429 只在「429 勾选框说限流就换人」的时候才算——勾选框关掉时这条路会留着、由任务重试它，那时的 429 意思是「现在忙」，不是「挂了」。当所有活着的路都到并发上限、只剩一条死路由有空位时，这一次调用就直接落到死路由上，而不是干等一条道空出来。报告里每条调用现在还会写明它是为哪件事打的，所以一行失败不用数尝试次数也能读；诊断台账多一块 `Dead routes`，写明是哪条路、死于哪类故障、连续失败了几次。默认情况下读者看到的答案里不会多出这些东西：这一块在诊断开关里，而且模型摘要若抄了这个标签会被清掉。
+
 ## [0.13.26] - 2026-11-24
 
 ### Fixed / 修复
