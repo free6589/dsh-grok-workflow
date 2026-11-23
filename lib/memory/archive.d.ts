@@ -92,6 +92,18 @@ export interface ArchiveEntry {
     summary: string;
     /** File/URL locators the finding rested on, redacted and bounded. */
     evidence?: string[];
+    /**
+     * Id of the entry this one corrects (round 70).
+     *
+     * The archive is append-only, so a correction cannot rewrite the row it is
+     * about: an old `cancelled` round stays on disk exactly as it was written. A
+     * supersession entry points back at it instead, which is what lets a later
+     * reader tell "this round died" from "this round was later carried through by
+     * run X" without the ledger having to lie about the past.
+     */
+    supersedes?: string;
+    /** Id of the entry that replaced the one this entry supersedes. */
+    supersededBy?: string;
 }
 /** Arguments accepted by {@link appendArchiveEntry} (id and summary required). */
 export type ArchiveEntryInput = ArchiveEntry;
@@ -141,6 +153,42 @@ export declare function archiveFile(options?: ArchiveOptions): string;
  *   or summary (an entry without either is not a memory, it is noise).
  */
 export declare function sanitizeEntry(input: ArchiveEntry): ArchiveEntry | undefined;
+/**
+ * Write one supersession entry: "the round at `supersedes` was carried through by
+ * `supersededBy`".
+ *
+ * Append-only by construction: the entry it corrects is never touched, and the
+ * correction carries its own deterministic id (`supersede:<old>:<new>`), so
+ * re-running the same round twice appends once. A correction with a missing side
+ * is refused rather than written — a dangling link would make a reader believe a
+ * round was replaced by something that does not exist.
+ * @param input - the two identities, plus the reason to record alongside them.
+ * @param options - directory and clock overrides.
+ * @returns The append result (never thrown).
+ */
+export declare function appendSupersedeEntry(input: {
+    /** Id of the entry being corrected (a run id or an entry id). */
+    supersedes: string;
+    /** Id of the round that carried the work through. */
+    supersededBy: string;
+    sessionId?: string;
+    /** Why the old round is considered superseded. */
+    reason?: string;
+    objective?: string;
+}, options?: ArchiveOptions): ArchiveAppendResult;
+/** One entry's supersession: which round replaced it, and when that was recorded. */
+export interface Supersession {
+    /** Id of the entry that replaced it. */
+    by: string;
+    /** When the correction was written (ISO 8601). */
+    at: string;
+}
+/**
+ * Index the archive's supersessions by the entry they correct.
+ * @param entries - entries to scan (the correction entries are the ones with `supersedes`).
+ * @returns A map from corrected id to the correction. Newest correction wins.
+ */
+export declare function supersessionMap(entries: readonly ArchiveEntry[]): Map<string, Supersession>;
 /** The ids already present in the archive, for de-duplication. */
 export declare function archivedIds(options?: ArchiveOptions): Set<string>;
 /**

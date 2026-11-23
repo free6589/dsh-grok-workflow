@@ -1,0 +1,355 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-red70
+
+(node:48) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ test/experience-pack.spec.ts (24 tests | 17 failed) 230ms
+     × names the unload in everyday words and never blames the reader 23ms
+     × does the same in English, and keeps the category advice for a deadline 4ms
+     × renders the same account in the machine ledger 3ms
+     × returns nothing at all for a report that recorded no stop 2ms
+     × closes the human block with findings, "nothing killed", and who cancelled 4ms
+     × says nobody cancelled a run that finished on its own, in both languages 1ms
+     × renders off the report itself, so a later reader prints the same line 2ms
+     ✓ does not invent a guard line for a report that carries no settlement 1ms
+     × closes the delivered block and records the settlement on the report 172ms
+     × keeps child id and last observed step in the checkpoint 2ms
+     ✓ leaves the section out entirely when no child was in flight 1ms
+     × writes the in-flight child into the checkpoint on unload, and status can read it back 1ms
+     × tells the reader how many child calls were still running 1ms
+     × reports an empty session honestly instead of guessing 1ms
+     × reports the run state, the guard conclusion and the in-flight child 1ms
+     × points at the resumable checkpoint and lists what is unfinished 3ms
+     ✓ never writes the toggle 1ms
+     × appends a correction and reads it back as one 1ms
+     × renders the link on the correction and on the round it corrects 1ms
+     × writes the link automatically when a later round carries the work through 2ms
+     ✓ does not supersede anything when the later round also failed 1ms
+     ✓ builds a partial report the real validator accepts 0ms
+     ✓ keeps the checkpoint digest builder usable for a caller-shaped input 0ms
+     ✓ names the routed roles the report renders 0ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 17 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/experience-pack.spec.ts > 1 — a stopped run says why, what survived, and that resending continues > names the unload in everyday words and never blames the reader
+AssertionError: expected '答案：有一项已得出可用结论。\n下一步：这次是被主动停下的，不算失败；要接…' to contain '插件在运行中被卸载'
+
+- Expected
++ Received
+
+- 插件在运行中被卸载
++ 答案：有一项已得出可用结论。
++ 下一步：这次是被主动停下的，不算失败；要接着做得重新发一次。
++ 做成的：Task a。
++ 没做成的：
++ - 酒店价格：interrupted: the run was stopped before this task produced a verified result
++ 以上是结论（2 项里 1 项可用，1 项没做成）；明细已记入台账。
+
+ ❯ test/experience-pack.spec.ts:189:18
+    187|     const text = deliverReport(stoppedReport('unloaded'), { lang: 'zh'…
+    188|     // The cause, stated as the reader's own question asks it.
+    189|     expect(text).toContain('插件在运行中被卸载')
+       |                  ^
+    190|     expect(text).toContain('不是超时')
+    191|     expect(text).toContain('也不是你手动停的')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/17]⎯
+
+ FAIL  test/experience-pack.spec.ts > 1 — a stopped run says why, what survived, and that resending continues > does the same in English, and keeps the category advice for a deadline
+AssertionError: expected 'Answer: One item passed verification.…' to contain 'the plugin was unloaded'
+
+- Expected
++ Received
+
+- the plugin was unloaded
++ Answer: One item passed verification.
++ Next: This was stopped on purpose, not a failure; send it again to continue.
++ Achieved: Task a.
++ Not done:
++ - 酒店价格: interrupted: the run was stopped before this task produced a verified result
++ That is the conclusion (1 of 2 usable, 1 not done); details are in the ledger.
+
+ ❯ test/experience-pack.spec.ts:203:21
+    201|   it('does the same in English, and keeps the category advice for a de…
+    202|     const english = deliverReport(stoppedReport('unloaded'), { lang: '…
+    203|     expect(english).toContain('the plugin was unloaded')
+       |                     ^
+    204|     expect(english).toContain('not a timeout')
+    205|     expect(english).toContain('1 item(s) were finished')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/17]⎯
+
+ FAIL  test/experience-pack.spec.ts > 1 — a stopped run says why, what survived, and that resending continues > renders the same account in the machine ledger
+AssertionError: expected 'Grok workflow: PARTIAL\nObjective: 查一…' to contain 'Stop: You stopped this run on purpose'
+
+- Expected
++ Received
+
+- Stop: You stopped this run on purpose
++ Grok workflow: PARTIAL
++ Objective: 查一下新加坡这周的天气并给出出行建议
++ Plan: caller; 2 task(s); 1 verified
++ Failures: 1 cancelled
++ - a: verified (1 attempt) — Task a
++ - b: failed (1 attempt) — 酒店价格
++   incomplete (cancelled): interrupted: the run was stopped before this task produced a verified result
++ Confirmed evidence:
++ - a: 天气已核验 → verified 天气已核验 in file:///tmp/report
++ Incomplete:
++ - b (cancelled): interrupted: the run was stopped before this task produced a verified result
++ Synthesis mode: deterministic
++ Model routes: planner=inherit; worker=inherit; verifier=inherit; supervisor=inherit; synthesizer=inherit
++ Errors:
++ - Cancelled (cancelled): the run was stopped in flight
+
+ ❯ test/experience-pack.spec.ts:213:20
+    211|   it('renders the same account in the machine ledger', () => {
+    212|     const ledger = machineLedger(stoppedReport('caller'))
+    213|     expect(ledger).toContain('Stop: You stopped this run on purpose')
+       |                    ^
+    214|   })
+    215|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/17]⎯
+
+ FAIL  test/experience-pack.spec.ts > 1 — a stopped run says why, what survived, and that resending continues > returns nothing at all for a report that recorded no stop
+TypeError: stopNarration is not a function
+ ❯ test/experience-pack.spec.ts:217:12
+    215|
+    216|   it('returns nothing at all for a report that recorded no stop', () =…
+    217|     expect(stopNarration(completedReport(), 'zh')).toBeUndefined()
+       |            ^
+    218|   })
+    219| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/17]⎯
+
+ FAIL  test/experience-pack.spec.ts > 2 — the guard conclusion is a fixed line in the report body > closes the human block with findings, "nothing killed", and who cancelled
+AssertionError: expected '以上是结论（2 项里 1 项可用，1 项没做成）；明细已记入台账。' to be '守卫：2 条发现，未终止任何子代理；本轮由插件卸载取消。' // Object.is equality
+
+Expected: "守卫：2 条发现，未终止任何子代理；本轮由插件卸载取消。"
+Received: "以上是结论（2 项里 1 项可用，1 项没做成）；明细已记入台账。"
+
+ ❯ test/experience-pack.spec.ts:229:37
+    227|       guard: { findings: 2, terminated: 0, by: 'unloaded' },
+    228|     }).human
+    229|     expect(text.split('\n').at(-1)).toBe('守卫：2 条发现，未终止任何子代理；本轮由插件卸载取消。…
+       |                                     ^
+    230|   })
+    231|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/17]⎯
+
+ FAIL  test/experience-pack.spec.ts > 2 — the guard conclusion is a fixed line in the report body > says nobody cancelled a run that finished on its own, in both languages
+TypeError: guardLine is not a function
+ ❯ test/experience-pack.spec.ts:233:16
+    231|
+    232|   it('says nobody cancelled a run that finished on its own, in both la…
+    233|     const zh = guardLine({ findings: 0, terminated: 0, by: 'none' }, '…
+       |                ^
+    234|     expect(zh).toBe('守卫：0 条发现，未终止任何子代理；本轮无人取消（正常跑完）。')
+    235|     const en = guardLine({ findings: 3, terminated: 0, by: 'deadline' …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/17]⎯
+
+ FAIL  test/experience-pack.spec.ts > 2 — the guard conclusion is a fixed line in the report body > renders off the report itself, so a later reader prints the same line
+AssertionError: expected '新加坡本周多雨，出行请带伞。' to be 'Guard: 1 finding(s), no subagent was …' // Object.is equality
+
+Expected: "Guard: 1 finding(s), no subagent was terminated; nobody cancelled this round (it finished on its own)."
+Received: "新加坡本周多雨，出行请带伞。"
+
+ ❯ test/experience-pack.spec.ts:242:8
+    240|     const report: WorkflowReport = { ...completedReport(), guard: { fi…
+    241|     expect(renderReport(report).split('\n').at(-1))
+    242|       .toBe('Guard: 1 finding(s), no subagent was terminated; nobody c…
+       |        ^
+    243|     expect(machineLedger(report)).toContain('Guard: 1 finding(s)')
+    244|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/17]⎯
+
+ FAIL  test/experience-pack.spec.ts > 2 — end to end: a real run puts the guard line in the answer it delivers > closes the delivered block and records the settlement on the report
+AssertionError: expected undefined to deeply equal { findings: +0, terminated: +0 }
+
+- Expected:
+{
+  "findings": 0,
+  "terminated": 0,
+}
+
++ Received:
+undefined
+
+ ❯ test/experience-pack.spec.ts:272:34
+    270|     expect(outcome.ok).toBe(true)
+    271|     // The data and the text agree, and the line is the last one a rea…
+    272|     expect(outcome.report.guard).toEqual({ findings: 0, terminated: 0 …
+       |                                  ^
+    273|     expect(outcome.delivery?.human.split('\n').at(-1)).toBe('守卫：0 条发现，…
+    274|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/17]⎯
+
+ FAIL  test/experience-pack.spec.ts > 3 — child calls cut by the stop are recorded, and the report says so > keeps child id and last observed step in the checkpoint
+AssertionError: expected undefined to match object { seq: 2, childId: 'child-42', …(1) }
+
+- Expected:
+{
+  "childId": "child-42",
+  "lastStep": "执行",
+  "seq": 2,
+}
+
++ Received:
+undefined
+
+ ❯ test/experience-pack.spec.ts:284:38
+    282|       inFlight: [{ seq: 2, childId: 'child-42', lastStep: '执行' }],
+    283|     }), 1_700_000_000_000)
+    284|     expect(checkpoint.inFlight?.[0]).toMatchObject({ seq: 2, childId: …
+       |                                      ^
+    285|     // The read side accepts it, checksum included.
+    286|     const reread = assertCheckpoint(JSON.parse(JSON.stringify(checkpoi…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/17]⎯
+
+ FAIL  test/experience-pack.spec.ts > 3 — child calls cut by the stop are recorded, and the report says so > writes the in-flight child into the checkpoint on unload, and status can read it back
+AssertionError: expected undefined to be 1 // Object.is equality
+
+- Expected:
+1
+
++ Received:
+undefined
+
+ ❯ test/experience-pack.spec.ts:314:37
+    312|     // The engine's own payload shape: seq, label, phase, childId.
+    313|     listeners.get('workflow/agent-start')?.({ id: 'run-exp-1', seq: 1,…
+    314|     expect(recorder.stats.inFlight).toBe(1)
+       |                                     ^
+    315|     const written = await recorder.unload('the grok-workflow plugin wa…
+    316|     expect(written?.ok).toBe(true)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/17]⎯
+
+ FAIL  test/experience-pack.spec.ts > 3 — child calls cut by the stop are recorded, and the report says so > tells the reader how many child calls were still running
+AssertionError: expected '答案：有一项已得出可用结论。\n下一步：这次是被主动停下的，不算失败；要接…' to contain '停下时还有 2 个子代理在跑'
+
+- Expected
++ Received
+
+- 停下时还有 2 个子代理在跑
++ 答案：有一项已得出可用结论。
++ 下一步：这次是被主动停下的，不算失败；要接着做得重新发一次。
++ 做成的：Task a。
++ 没做成的：
++ - 酒店价格：interrupted: the run was stopped before this task produced a verified result
++ 以上是结论（2 项里 1 项可用，1 项没做成）；明细已记入台账。
+
+ ❯ test/experience-pack.spec.ts:327:18
+    325|   it('tells the reader how many child calls were still running', () =>…
+    326|     const text = deliverReport(stoppedReport('unloaded'), { lang: 'zh'…
+    327|     expect(text).toContain('停下时还有 2 个子代理在跑')
+       |                  ^
+    328|   })
+    329| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/17]⎯
+
+ FAIL  test/experience-pack.spec.ts > 4 — /grok status answers from the session journal and the checkpoint > reports an empty session honestly instead of guessing
+AssertionError: expected 'error' to be 'success' // Object.is equality
+
+Expected: "success"
+Received: "error"
+
+ ❯ test/experience-pack.spec.ts:340:25
+    338|   it('reports an empty session honestly instead of guessing', () => {
+    339|     const result = grokCommand().handler({ agent: { session: realSessi…
+    340|     expect(result.kind).toBe('success')
+       |                         ^
+    341|     expect(result.text).toContain('Grok workflow status:')
+    342|     expect(result.text).toContain('- Toggle: never set in this session…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/17]⎯
+
+ FAIL  test/experience-pack.spec.ts > 4 — /grok status answers from the session journal and the checkpoint > reports the run state, the guard conclusion and the in-flight child
+AssertionError: expected 'Usage: /grok [on|off]. This text was …' to contain 'Last run: 天气与酒店 (run-exp-1)'
+
+Expected: "Last run: 天气与酒店 (run-exp-1)"
+Received: "Usage: /grok [on|off]. This text was not sent as a prompt, so nothing ran."
+
+ ❯ test/experience-pack.spec.ts:356:25
+    354|     append(PROGRESS_RUN_END, { runId: 'run-exp-1', stopReason: 'cancel…
+    355|     const result = grokCommand().handler({ agent: { session }, rawInpu…
+    356|     expect(result.text).toContain('Last run: 天气与酒店 (run-exp-1)')
+       |                         ^
+    357|     expect(result.text).toContain('- State: cancelled')
+    358|     expect(result.text).toContain('- Guard: 2 finding(s); it never ter…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/17]⎯
+
+ FAIL  test/experience-pack.spec.ts > 4 — /grok status answers from the session journal and the checkpoint > points at the resumable checkpoint and lists what is unfinished
+AssertionError: expected 'Usage: /grok [on|off]. This text was …' to contain '- Resumable checkpoint: cancelled'
+
+Expected: "- Resumable checkpoint: cancelled"
+Received: "Usage: /grok [on|off]. This text was not sent as a prompt, so nothing ran."
+
+ ❯ test/experience-pack.spec.ts:381:25
+    379|     const session = realSession('status-resume')
+    380|     const result = grokCommand().handler({ agent: { session }, rawInpu…
+    381|     expect(result.text).toContain('- Resumable checkpoint: cancelled')
+       |                         ^
+    382|     expect(result.text).toContain('Checkpointed in-flight calls: child…
+    383|     expect(result.text).toContain('- Unfinished (1): b')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/17]⎯
+
+ FAIL  test/experience-pack.spec.ts > 5 — the ledger can be corrected with a superseded-by link > appends a correction and reads it back as one
+TypeError: appendSupersedeEntry is not a function
+ ❯ test/experience-pack.spec.ts:407:21
+    405|       runId: 'old', sessionId: 's1', status: 'cancelled', summary: 'th…
+    406|     })
+    407|     const written = appendSupersedeEntry({ supersedes: 'run:old', supe…
+       |                     ^
+    408|     expect(written.written).toBe(true)
+    409|     const entries = readArchive()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/17]⎯
+
+ FAIL  test/experience-pack.spec.ts > 5 — the ledger can be corrected with a superseded-by link > renders the link on the correction and on the round it corrects
+TypeError: appendSupersedeEntry is not a function
+ ❯ test/experience-pack.spec.ts:425:5
+    423|       runId: 'old', status: 'failed', summary: 'the run failed',
+    424|     })
+    425|     appendSupersedeEntry({ supersedes: 'run:old', supersededBy: 'run:n…
+       |     ^
+    426|     const digested = recentArchiveDigest()
+    427|     expect(digested).toContain('superseded by: run:new')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/17]⎯
+
+ FAIL  test/experience-pack.spec.ts > 5 — the ledger can be corrected with a superseded-by link > writes the link automatically when a later round carries the work through
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ test/experience-pack.spec.ts:445:32
+    443|     archiver.dispose()
+    444|     const corrections = readArchive().filter(entry => entry.supersedes…
+    445|     expect(corrections.length).toBe(1)
+       |                                ^
+    446|     expect(corrections[0]!.supersededBy).toBe('run:run-new')
+    447|     expect(logger.warnings).toEqual([])
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/17]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  17 failed | 7 passed (24)
+   Start at  22:30:26
+   Duration  954ms (transform 410ms, setup 0ms, import 529ms, tests 230ms, environment 0ms)
+

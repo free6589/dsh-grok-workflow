@@ -490,5 +490,38 @@ export interface WorkflowReport {
         /** The per-call stall budget the run actually ran under. */
         childTimeoutMs?: number;
     };
+    /**
+     * Why the run stopped, when it did not complete cleanly.
+     *
+     * The run has always known this (`src/run.ts` separates a plugin unload from a
+     * caller stop and from a deadline), but it only lived in the error message, so
+     * the presentation layer had to guess the cause back out of prose. Recording it
+     * as data is what lets the report say "the plugin was unloaded underneath the
+     * run, not a timeout" without parsing its own wording. Absent on a run that
+     * finished on its own terms, and on reports produced before this field existed.
+     */
+    stop?: {
+        cause: StopCause;
+    };
+    /**
+     * Guard (liveness supervisor) settlement: how many findings it recorded and
+     * whether it terminated any child. Recorded by the run, rendered as the fixed
+     * tail line so "the guard watched and did not kill anything" is readable
+     * rather than assumed. Absent on reports produced before this field existed.
+     */
+    guard?: {
+        findings: number;
+        terminated: number;
+    };
 }
+/**
+ * Why a run stopped, in the vocabulary the report and the human block speak.
+ *
+ * - `unloaded` — the plugin was disposed (bundle unmounted, upgrade, restart)
+ *   while the run was in flight. Nobody in the conversation asked for this.
+ * - `caller` — the caller stopped the run on purpose.
+ * - `deadline` — the run's own deadline fired.
+ * - `engine` — the workflow engine failed under the run.
+ */
+export type StopCause = 'unloaded' | 'caller' | 'deadline' | 'engine';
 //# sourceMappingURL=types.d.ts.map

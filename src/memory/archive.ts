@@ -100,6 +100,18 @@ export interface ArchiveEntry {
   summary: string
   /** File/URL locators the finding rested on, redacted and bounded. */
   evidence?: string[]
+  /**
+   * Id of the entry this one corrects (round 70).
+   *
+   * The archive is append-only, so a correction cannot rewrite the row it is
+   * about: an old `cancelled` round stays on disk exactly as it was written. A
+   * supersession entry points back at it instead, which is what lets a later
+   * reader tell "this round died" from "this round was later carried through by
+   * run X" without the ledger having to lie about the past.
+   */
+  supersedes?: string
+  /** Id of the entry that replaced the one this entry supersedes. */
+  supersededBy?: string
 }
 
 /** Arguments accepted by {@link appendArchiveEntry} (id and summary required). */
@@ -204,6 +216,8 @@ export function sanitizeEntry(input: ArchiveEntry): ArchiveEntry | undefined {
     ...status === undefined ? {} : { status },
     ...objective === undefined ? {} : { objective },
     ...evidence === undefined || evidence.length === 0 ? {} : { evidence },
+    ...input.supersedes === undefined ? {} : { supersedes: clampText(input.supersedes, ARCHIVE_LIMITS.idChars) as string },
+    ...input.supersededBy === undefined ? {} : { supersededBy: clampText(input.supersededBy, ARCHIVE_LIMITS.idChars) as string },
   }
 }
 
@@ -256,6 +270,79 @@ function parseLine(line: string): ArchiveEntry | undefined {
   } catch {
     return undefined
   }
+}
+
+/**
+ * Write one supersession entry: "the round at `supersedes` was carried through by
+ * `supersededBy`".
+ *
+ * Append-only by construction: the entry it corrects is never touched, and the
+ * correction carries its own deterministic id (`supersede:<old>:<new>`), so
+ * re-running the same round twice appends once. A correction with a missing side
+ * is refused rather than written — a dangling link would make a reader believe a
+ * round was replaced by something that does not exist.
+ * @param input - the two identities, plus the reason to record alongside them.
+ * @param options - directory and clock overrides.
+ * @returns The append result (never thrown).
+ */
+export function appendSupersedeEntry(
+  input: {
+    /** Id of the entry being corrected (a run id or an entry id). */
+    supersedes: string
+    /** Id of the round that carried the work through. */
+    supersededBy: string
+    sessionId?: string
+    /** Why the old round is considered superseded. */
+    reason?: string
+    objective?: string
+  },
+  options: ArchiveOptions = {},
+): ArchiveAppendResult {
+  const oldId = typeof input.supersedes === 'string' ? input.supersedes.trim() : ''
+  const newId = typeof input.supersededBy === 'string' ? input.supersededBy.trim() : ''
+  if (oldId === '' || newId === '' || oldId === newId) {
+    return { written: false, id: '', reason: 'invalid' }
+  }
+  const now = options.now ?? (() => Date.now())
+  const atMs = now()
+  const reason = typeof input.reason === 'string' && input.reason.trim() !== '' ? input.reason.trim() : 'a later round carried this work through'
+  return appendArchiveEntry({
+    v: 1,
+    id: `supersede:${oldId}:${newId}`,
+    kind: 'note',
+    at: new Date(atMs).toISOString(),
+    atMs,
+    ...input.sessionId === undefined ? {} : { sessionId: input.sessionId },
+    ...input.objective === undefined ? {} : { objective: input.objective },
+    supersedes: oldId,
+    supersededBy: newId,
+    summary: `superseded: ${oldId} was carried through by ${newId} (${reason})`,
+    status: 'superseded',
+  }, options)
+}
+
+/** One entry's supersession: which round replaced it, and when that was recorded. */
+export interface Supersession {
+  /** Id of the entry that replaced it. */
+  by: string
+  /** When the correction was written (ISO 8601). */
+  at: string
+}
+
+/**
+ * Index the archive's supersessions by the entry they correct.
+ * @param entries - entries to scan (the correction entries are the ones with `supersedes`).
+ * @returns A map from corrected id to the correction. Newest correction wins.
+ */
+export function supersessionMap(entries: readonly ArchiveEntry[]): Map<string, Supersession> {
+  const map = new Map<string, Supersession>()
+  const corrections = entries
+    .filter(entry => typeof entry.supersedes === 'string' && entry.supersedes !== '' && typeof entry.supersededBy === 'string' && entry.supersededBy !== '')
+    .sort((left, right) => left.atMs - right.atMs)
+  for (const entry of corrections) {
+    map.set(entry.supersedes!, { by: entry.supersededBy!, at: entry.at })
+  }
+  return map
 }
 
 /** The ids already present in the archive, for de-duplication. */
@@ -366,6 +453,11 @@ export function formatArchiveEntry(entry: ArchiveEntry): string {
   if (entry.objective !== undefined) lines.push(`  objective: ${entry.objective}`)
   lines.push(`  summary: ${entry.summary.replace(/\s*\n\s*/g, ' ⏎ ')}`)
   if (entry.evidence !== undefined) lines.push(`  evidence: ${entry.evidence.join(' | ')}`)
+  // Round 70: a correction has to be readable as one, or a later session reads a
+  // supersession note as an ordinary memory and cites a round that was replaced.
+  if (entry.supersedes !== undefined) {
+    lines.push(`  supersedes: ${entry.supersedes}${entry.supersededBy === undefined ? '' : ` → replaced by ${entry.supersededBy}`}`)
+  }
   return lines.join('\n')
 }
 
@@ -380,8 +472,16 @@ export function recentArchiveDigest(options: ArchiveReadOptions = {}): string {
   if (entries.length === 0) {
     return `memory archive: no entries in ${archiveFile(options)}`
   }
+  // A superseded round is still printed (it is a fact that it happened) but is
+  // marked, so a reader does not treat a cancelled round as the latest verdict on
+  // work that a later round actually finished.
+  const corrections = supersessionMap(entries)
   return [
     `memory archive: ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'} from ${archiveFile(options)} (newest first)`,
-    ...entries.map(entry => formatArchiveEntry(entry)),
+    ...entries.map(entry => {
+      const formatted = formatArchiveEntry(entry)
+      const corrected = entry.kind === 'round' && entry.id !== undefined ? corrections.get(entry.id) : undefined
+      return corrected === undefined ? formatted : `${formatted}\n  superseded by: ${corrected.by} (${corrected.at})`
+    }),
   ].join('\n')
 }

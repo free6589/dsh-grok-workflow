@@ -69,7 +69,53 @@ export interface CommandLogger {
     warn?(message: string): void;
 }
 /** The `kind: 'error'` settle text for an argument that is not a toggle word. */
-export declare const GROK_USAGE_TEXT = "Usage: /grok [on|off]. This text was not sent as a prompt, so nothing ran.";
+export declare const GROK_USAGE_TEXT = "Usage: /grok [on|off|status]. This text was not sent as a prompt, so nothing ran.";
+/**
+ * One run's recorded progress, folded from the session's own journal.
+ *
+ * `/grok status` may only report what the session can show: the progress rows this
+ * plugin writes (`tool-workflow/*`), the dispose record, and the checkpoint file.
+ * It never guesses a state from memory, because a status line is the one place a
+ * reader checks a claim they cannot otherwise see.
+ */
+export interface RunStatusFacts {
+    /** Engine run id of the most recent run. */
+    runId?: string;
+    /** Durable task label (`run.meta.name`), when the row carried one. */
+    name?: string;
+    /** Stop reason the engine settled on, when the run has settled. */
+    stopReason?: string;
+    /** Child calls that never settled (still in flight when the row set ends). */
+    inFlight: {
+        seq: number;
+        label: string;
+        phase?: string;
+        childId?: string;
+    }[];
+    /** Guardian settlement, when the run recorded one. */
+    guard?: {
+        findings: number;
+        cancelled: boolean;
+    };
+}
+/**
+ * Fold the session journal into the facts `/grok status` prints.
+ * @param session - session whose own log is read.
+ * @returns The latest run's facts; empty fields when nothing was recorded.
+ */
+export declare function readRunStatusFacts(session: Session | undefined): RunStatusFacts;
+/**
+ * Compose the `/grok status` answer: run state, why it stopped, what the guard saw,
+ * whether a checkpoint can be resumed, and what is still unfinished.
+ *
+ * Everything here is read from the session journal and the checkpoint file, so the
+ * answer survives the process that produced it — which is the whole point of a
+ * status command after an unload.
+ * @param session - session to report on.
+ * @param checkpointDirOverride - explicit checkpoint directory (tests, e2e lanes).
+ * @returns The settled text (never empty).
+ */
+export declare function grokStatusText(session: Session | undefined, checkpointDirOverride?: string): string;
 /**
  * The `/grok` command definition: arg grammar owned by the handler.
  *

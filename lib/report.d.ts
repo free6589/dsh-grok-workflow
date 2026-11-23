@@ -1,4 +1,4 @@
-import type { FailureCategory, WorkflowReport } from './types.js';
+import type { FailureCategory, StopCause, WorkflowReport } from './types.js';
 import type { ResolvedConfig } from './types.js';
 import type { HandoffContract } from './handoff/contract.js';
 export declare function assertWorkflowReport(value: unknown, objective: string, config: ResolvedConfig): WorkflowReport;
@@ -21,6 +21,75 @@ export declare function failureSummary(report: WorkflowReport): {
     count: number;
 }[];
 /**
+ * What a stopped run achieved, in the two numbers a reader needs before deciding
+ * whether to send the same request again.
+ */
+export interface StopTally {
+    /** Tasks that verified. */
+    done: number;
+    /** Tasks that did not verify. */
+    left: number;
+    /** Tasks the plan named. */
+    total: number;
+}
+/**
+ * How far a run got, counted off its own task rows.
+ * @param report - validated report.
+ * @returns Verified, unfinished and total counts.
+ */
+export declare function stopTally(report: WorkflowReport): StopTally;
+/**
+ * The plain-language account of a run that stopped instead of finishing.
+ *
+ * Requirement (round 70): a cancel used to read as a machine sentence — "was
+ * cancelled before the whole run finished" — which left the reader unable to
+ * tell a plugin unload from their own stop from a timeout, and with no idea
+ * whether anything survived. This sentence names the cause in everyday words,
+ * says what was achieved, and tells the reader that resending continues.
+ *
+ * @param report - validated report; `stop` carries the cause.
+ * @param lang - language of the sentence.
+ * @returns The sentence, or undefined when the run recorded no stop cause.
+ */
+export declare function stopNarration(report: WorkflowReport, lang: 'zh' | 'en', inFlight?: number): string | undefined;
+/**
+ * Who ended the run, for the fixed guard line.
+ *
+ * `none` is a completed run: nothing cancelled it.
+ */
+export interface GuardConclusion {
+    /** Findings the liveness guard recorded (capped by `GUARDIAN_LIMITS.maxFindings`). */
+    findings: number;
+    /** Subagent calls the guard terminated. Zero by construction today. */
+    terminated: number;
+    /** What ended the run. */
+    by: StopCause | 'none';
+}
+/**
+ * The guard settlement a report itself carries, as a renderable conclusion.
+ *
+ * A report produced by a run records `guard` (findings and terminations) and
+ * `stop` (what ended it), so any later renderer — the read-only report tool, a
+ * PTC call, the ledger — can print the same fixed line without being handed the
+ * live guardian.
+ * @param report - validated report.
+ * @returns The conclusion, or undefined when the report predates guard accounting.
+ */
+export declare function guardOf(report: WorkflowReport): GuardConclusion | undefined;
+/**
+ * The report's fixed tail line: what the guard saw and who ended the round.
+ *
+ * The guard is invisible otherwise — it watches child calls, it never cancels the
+ * workflow, and its findings only reached the progress panel — so a reader had no
+ * way to tell "the watchdog was watching and killed nothing" from "nothing was
+ * watching". One fixed line answers that, in both languages.
+ *
+ * @param guard - settlement the run observed.
+ * @param lang - language of the line.
+ * @returns One line, never empty.
+ */
+export declare function guardLine(guard: GuardConclusion, lang: 'zh' | 'en'): string;
+/**
  * Options for {@link renderReport}. `showDiagnostics` opens the ledger lines
  * (Model routes / Deadline / Route switches / Errors). `handoff` appends the
  * fixed four-line handoff block (交接契约, zh) rendered by `src/handoff/`.
@@ -33,6 +102,16 @@ export interface RenderReportOptions {
     handoff?: HandoffContract;
     /** Validated handoff contract to append (en block, after the zh block). */
     handoffEn?: HandoffContract;
+    /**
+     * Guard settlement to print as the report's fixed last line.
+     *
+     * Absent when the caller has no guard to report (a bare renderer, a test, a
+     * PTC call), which is why it is not read off the report: "no finding was
+     * recorded" and "nothing was watching" are different facts.
+     */
+    guard?: GuardConclusion;
+    /** Child calls still running when the run stopped (resume hint detail). */
+    inFlight?: number;
 }
 /** Render a concise model-facing view; the canonical JSON remains available to PTC.
  *

@@ -1,6 +1,6 @@
 import type {
   AttemptFailure,
-  RouteTrailEntry, ExecutionResult, FailureCategory, FinalStatus, VerificationResult, WorkflowReport } from './types.js'
+  RouteTrailEntry, ExecutionResult, FailureCategory, FinalStatus, StopCause, VerificationResult, WorkflowReport } from './types.js'
 import type { ModelRoute, ResolvedConfig, RoleName } from './types.js'
 import { criterionKey, TASK_LIMITS } from './input.js'
 import { REPLAN_LIMITS } from './replan.js'
@@ -194,6 +194,8 @@ const FAILURE_CLASSES = [
 ] as const
 
 const FAILURE_CATEGORIES = ['infrastructure', 'quality', 'configuration', 'cancelled', 'unknown'] as const
+/** Stop causes a report may carry (mirrors `StopCause` in `src/types.ts`). */
+const STOP_CAUSES: readonly StopCause[] = ['unloaded', 'caller', 'deadline', 'engine']
 
 /** Parse an optional failure category; unknown values are rejected, not coerced. */
 function failureCategory(value: unknown, path: string): FailureCategory | undefined {
@@ -759,6 +761,21 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
   const routing = root.routing === undefined
     ? { planner: [], worker: [], verifier: [], supervisor: [], synthesizer: [] }
     : routeLabels(root.routing, 'routing')
+  // Stop cause and guard settlement (round 70): optional, because a report from an
+  // older build carries neither, but validated when present — a stop cause outside
+  // the four the run can actually produce would make the presentation layer say
+  // something no code path did.
+  const stopRoot = root.stop === undefined ? undefined : record(root.stop, 'stop')
+  const stopCause = stopRoot === undefined ? undefined : enumeration(stopRoot.cause, STOP_CAUSES, 'stop.cause')
+  const guardRoot = root.guard === undefined ? undefined : record(root.guard, 'guard')
+  const guardFindings = guardRoot === undefined ? undefined : number(guardRoot.findings, 'guard.findings')
+  if (guardFindings !== undefined && guardFindings < 0) {
+    throw new Error('workflow result guard.findings must not be negative')
+  }
+  const guardTerminated = guardRoot === undefined ? undefined : number(guardRoot.terminated, 'guard.terminated')
+  if (guardTerminated !== undefined && guardTerminated < 0) {
+    throw new Error('workflow result guard.terminated must not be negative')
+  }
   const synthesisRoot = root.synthesis === undefined ? {} : record(root.synthesis, 'synthesis')
   const fallbackMode = config.synthesis === 'model' ? 'model' : 'deterministic'
   const synthesisMode = string(synthesisRoot.mode ?? fallbackMode, 'synthesis.mode')
@@ -799,6 +816,10 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
       ...timeoutMs === undefined || timeoutMs === 0 ? {} : { timeoutMs },
       ...childTimeoutMs === undefined ? {} : { childTimeoutMs },
     },
+    ...stopCause === undefined ? {} : { stop: { cause: stopCause } },
+    ...guardFindings === undefined || guardTerminated === undefined
+      ? {}
+      : { guard: { findings: guardFindings, terminated: guardTerminated } },
   }
 }
 
@@ -905,6 +926,148 @@ export function failureSummary(report: WorkflowReport): { category: FailureCateg
 }
 
 /**
+ * What a stopped run achieved, in the two numbers a reader needs before deciding
+ * whether to send the same request again.
+ */
+export interface StopTally {
+  /** Tasks that verified. */
+  done: number
+  /** Tasks that did not verify. */
+  left: number
+  /** Tasks the plan named. */
+  total: number
+}
+
+/**
+ * How far a run got, counted off its own task rows.
+ * @param report - validated report.
+ * @returns Verified, unfinished and total counts.
+ */
+export function stopTally(report: WorkflowReport): StopTally {
+  const done = report.tasks.filter(task => task.status === 'verified').length
+  return { done, left: report.tasks.length - done, total: report.tasks.length }
+}
+
+/**
+ * The plain-language account of a run that stopped instead of finishing.
+ *
+ * Requirement (round 70): a cancel used to read as a machine sentence — "was
+ * cancelled before the whole run finished" — which left the reader unable to
+ * tell a plugin unload from their own stop from a timeout, and with no idea
+ * whether anything survived. This sentence names the cause in everyday words,
+ * says what was achieved, and tells the reader that resending continues.
+ *
+ * @param report - validated report; `stop` carries the cause.
+ * @param lang - language of the sentence.
+ * @returns The sentence, or undefined when the run recorded no stop cause.
+ */
+export function stopNarration(report: WorkflowReport, lang: 'zh' | 'en', inFlight?: number): string | undefined {
+  const cause = report.stop?.cause
+  if (cause === undefined) return undefined
+  const { done, left } = stopTally(report)
+  const zh = lang === 'zh'
+  const why = zh
+    ? {
+      unloaded: '这次是插件在运行中被卸载（或升级）才停的，不是超时，也不是你手动停的。',
+      caller: '这次是你自己停的，不算失败。',
+      deadline: '这次是到了时限被自动叫停的，不是你的操作。',
+      engine: '这次是内部执行引擎出错停下的，不是你的操作。',
+    }[cause]
+    : {
+      unloaded: 'This run was stopped because the plugin was unloaded (or upgraded) while it was running — not a timeout, and not a manual stop.',
+      caller: 'You stopped this run on purpose, so it is not a failure.',
+      deadline: 'This run was stopped automatically when its time limit ran out, not by anything you did.',
+      engine: 'This run stopped because the execution engine failed underneath it, not because of anything you did.',
+    }[cause]
+  const outcome = zh
+    ? left === 0
+      ? `已经做完 ${done} 项，没有剩下的。`
+      : done === 0
+        ? `一项都还没做完，${left} 项没动。`
+        : `已经做完 ${done} 项，还剩 ${left} 项没做完。`
+    : left === 0
+      ? `All ${done} item(s) were finished, with nothing left over.`
+      : done === 0
+        ? `None of the ${left} item(s) were finished.`
+        : `${done} item(s) were finished and ${left} are still unfinished.`
+  // The resume half is only true for a stop that kept its work, which is every
+  // cause above: `keepCancelledWork` repairs the stopped value instead of
+  // discarding it, and a failure report simply has nothing to keep.
+  const running = inFlight === undefined || inFlight <= 0 ? '' : zh
+    ? `；停下时还有 ${inFlight} 个子代理在跑，它们也记进了恢复点`
+    : `; the ${inFlight} child call(s) still running were written to the checkpoint too`
+  const resume = zh
+    ? `原样再发一次就接着跑，已经做好的不会重做${running}。`
+    : `Sending the same request again picks up from here; work already finished is not redone${running}.`
+  return `${why}${outcome}${resume}`
+}
+
+/**
+ * Who ended the run, for the fixed guard line.
+ *
+ * `none` is a completed run: nothing cancelled it.
+ */
+export interface GuardConclusion {
+  /** Findings the liveness guard recorded (capped by `GUARDIAN_LIMITS.maxFindings`). */
+  findings: number
+  /** Subagent calls the guard terminated. Zero by construction today. */
+  terminated: number
+  /** What ended the run. */
+  by: StopCause | 'none'
+}
+
+/**
+ * The guard settlement a report itself carries, as a renderable conclusion.
+ *
+ * A report produced by a run records `guard` (findings and terminations) and
+ * `stop` (what ended it), so any later renderer — the read-only report tool, a
+ * PTC call, the ledger — can print the same fixed line without being handed the
+ * live guardian.
+ * @param report - validated report.
+ * @returns The conclusion, or undefined when the report predates guard accounting.
+ */
+export function guardOf(report: WorkflowReport): GuardConclusion | undefined {
+  if (report.guard === undefined) return undefined
+  return { findings: report.guard.findings, terminated: report.guard.terminated, by: report.stop?.cause ?? 'none' }
+}
+
+/**
+ * The report's fixed tail line: what the guard saw and who ended the round.
+ *
+ * The guard is invisible otherwise — it watches child calls, it never cancels the
+ * workflow, and its findings only reached the progress panel — so a reader had no
+ * way to tell "the watchdog was watching and killed nothing" from "nothing was
+ * watching". One fixed line answers that, in both languages.
+ *
+ * @param guard - settlement the run observed.
+ * @param lang - language of the line.
+ * @returns One line, never empty.
+ */
+export function guardLine(guard: GuardConclusion, lang: 'zh' | 'en'): string {
+  const zh = lang === 'zh'
+  const ended = zh
+    ? {
+      unloaded: '本轮由插件卸载取消',
+      caller: '本轮由你取消',
+      deadline: '本轮由时限取消',
+      engine: '本轮由内部错误取消',
+      none: '本轮无人取消（正常跑完）',
+    }[guard.by]
+    : {
+      unloaded: 'cancelled by the plugin unload',
+      caller: 'cancelled by the caller',
+      deadline: 'cancelled by the deadline',
+      engine: 'cancelled by an engine error',
+      none: 'nobody cancelled this round (it finished on its own)',
+    }[guard.by]
+  const killed = guard.terminated
+  if (zh) {
+    return `守卫：${guard.findings} 条发现，${killed === 0 ? '未终止任何子代理' : `终止了 ${killed} 个子代理`}；${ended}。`
+  }
+  return `Guard: ${guard.findings} finding(s), ${killed === 0 ? 'no subagent was terminated' : `${killed} subagent(s) terminated`}; ${ended}.`
+}
+
+/**
  * Options for {@link renderReport}. `showDiagnostics` opens the ledger lines
  * (Model routes / Deadline / Route switches / Errors). `handoff` appends the
  * fixed four-line handoff block (交接契约, zh) rendered by `src/handoff/`.
@@ -917,6 +1080,16 @@ export interface RenderReportOptions {
   handoff?: HandoffContract
   /** Validated handoff contract to append (en block, after the zh block). */
   handoffEn?: HandoffContract
+  /**
+   * Guard settlement to print as the report's fixed last line.
+   *
+   * Absent when the caller has no guard to report (a bare renderer, a test, a
+   * PTC call), which is why it is not read off the report: "no finding was
+   * recorded" and "nothing was watching" are different facts.
+   */
+  guard?: GuardConclusion
+  /** Child calls still running when the run stopped (resume hint detail). */
+  inFlight?: number
 }
 
 /** Render a concise model-facing view; the canonical JSON remains available to PTC.
@@ -1075,6 +1248,17 @@ export function renderReport(report: WorkflowReport, opts?: RenderReportOptions)
       lines.push(`- ${item.taskId}: ${oneLine(item.text, 400)}`)
     }
   }
+  // Round 70: a stopped run says, in one plain sentence, why it stopped and what
+  // survived. It sits outside the diagnostics gate because it is the answer's
+  // status, not routing bookkeeping — and it is the only place a reader learns
+  // that resending continues instead of restarting.
+  const narration = stopNarration(report, 'en', opts?.inFlight)
+  if (narration !== undefined) lines.push(`Stop: ${narration}`)
+  // The fixed guard line closes the report, always last: what the watchdog saw and
+  // who ended the round. It comes from the caller's settlement, or from the report
+  // itself when the run recorded one — a report that carries a guard must render it.
+  const guard = opts?.guard ?? guardOf(report)
+  if (guard !== undefined) lines.push(guardLine(guard, 'en'))
   const text = lines.join('\n')
   return text.length <= MAX_RENDER_CHARS
     ? text

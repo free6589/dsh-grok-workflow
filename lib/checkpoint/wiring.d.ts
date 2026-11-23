@@ -104,6 +104,15 @@ export declare const CHECKPOINT_WIRING_LIMITS: {
         readonly max: 86400000;
         readonly default: 120000;
     };
+    /**
+     * Files the synchronous status reader inspects per call, newest mtime first.
+     *
+     * `/grok status` must answer in one tick, so it looks at a bounded window of the
+     * directory rather than walking a long history; the newest run is the one being
+     * asked about, and an older file that is not in the window is not a status
+     * answer worth stalling a command for.
+     */
+    readonly statusScan: 24;
 };
 /**
  * The only roles a checkpoint may name: the five the plugin already runs.
@@ -132,6 +141,28 @@ export interface CheckpointDirectoryOptions {
 export declare function checkpointDir(options?: CheckpointDirectoryOptions): string;
 /** Path of one run's checkpoint file. One file per run, atomically replaced. */
 export declare function checkpointFile(runId: string, options?: CheckpointDirectoryOptions): string;
+/**
+ * Read the freshest readable checkpoint synchronously.
+ *
+ * `/grok status` is a command handler: it settles a string in the same tick, so it
+ * cannot await the async reader. The read is the same file, the same schema check
+ * and the same integrity check the async path uses, just synchronous, and every
+ * failure (unreadable directory, half-written file, checksum mismatch) returns
+ * `undefined` instead of throwing into the command. The scan is bounded to
+ * {@link CHECKPOINT_WIRING_LIMITS.statusFiles} files, newest first, so a directory
+ * full of history cannot make a status call walk all of it.
+ * @param options - directory override plus an optional session filter.
+ * @returns The newest whole checkpoint, or undefined when none is readable.
+ */
+export declare function readLatestCheckpointSync(options?: StatusReadOptions): {
+    path: string;
+    checkpoint: WorkflowCheckpoint;
+} | undefined;
+/** Options for the synchronous status reader. */
+export interface StatusReadOptions extends CheckpointDirectoryOptions {
+    /** Keep only a checkpoint written for this session. */
+    sessionId?: string;
+}
 /**
  * Map a script phase *title* (what `phase()` actually emits) to a checkpoint
  * phase, or `undefined` when the title is not one of this plugin's own labels.
@@ -387,6 +418,8 @@ export interface CheckpointRecorderStats {
      * Exposed so the give-up is a state a test can read, not only a log line.
      */
     writesStopped: boolean;
+    /** Child calls announced and not yet settled (what an unload checkpoint records). */
+    inFlight: number;
     agents: CheckpointObservedAgents;
 }
 export interface CheckpointRecorderOptions {

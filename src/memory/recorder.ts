@@ -29,8 +29,8 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { WorkflowAgentEndInfo, WorkflowAgentInfo, WorkflowAgentOutcome } from '@deepseek-ai/dsh-workflow'
 import { redactError } from '../redact.js'
 import type { WorkflowReport } from '../types.js'
-import type { ArchiveKind, ArchiveOptions } from './archive.js'
-import { appendArchiveEntry } from './archive.js'
+import type { ArchiveEntry, ArchiveKind, ArchiveOptions } from './archive.js'
+import { appendArchiveEntry, appendSupersedeEntry, readArchive, supersessionMap } from './archive.js'
 
 /** Warning sink; the recorder never throws, so this is its only channel. */
 export interface ArchiveLogger {
@@ -86,6 +86,14 @@ export interface MemoryArchiver {
   /** Stop recording and drop anything buffered. */
   dispose(): void
 }
+
+/**
+ * Rounds read back when looking for the round this one carried through.
+ *
+ * Bounded because this is a tail read that runs once per round: the candidate is
+ * always near the end, and a long history must not make finishing a run scan it.
+ */
+const ARCHIVE_LIMITS_READ = 40
 
 /** Runs kept in the pre-adoption buffer; foreign runs pass through it. */
 const PENDING_RUN_LIMIT = 8
@@ -429,6 +437,45 @@ export function createMemoryArchiver(options: ArchiveRecorderOptions): MemoryArc
     if (current.length < PENDING_EVENT_LIMIT) current.push(event)
   }
 
+  /**
+   * Mark the round this one carried through, when there is one.
+   *
+   * Only a round that produced work counts as a continuation (`completed` or
+   * `partial`): a failed attempt does not supersede anything, it repeats it. The
+   * candidate is the newest earlier round in the same session that ended
+   * `cancelled`/`failed` and that no correction already points at, so the ledger
+   * gains one link per replaced round and never a chain of duplicates.
+   * @param input - the round that was just archived.
+   */
+  const supersedeEarlierRound = (input: RoundArchiveInput): void => {
+    if (input.status !== 'completed' && input.status !== 'partial') return
+    try {
+      const options = archiveOptions()
+      const entries: ArchiveEntry[] = readArchive({ ...options, limit: ARCHIVE_LIMITS_READ })
+      const corrections = supersessionMap(entries)
+      const candidate = entries
+        .filter(entry => entry.kind === 'round'
+          && entry.runId !== undefined
+          && entry.runId !== input.runId
+          && entry.atMs <= now()
+          && (entry.status === 'cancelled' || entry.status === 'failed')
+          && !corrections.has(entry.id)
+          && (input.sessionId === undefined || entry.sessionId === undefined || entry.sessionId === input.sessionId))
+        .sort((left, right) => right.atMs - left.atMs)[0]
+      if (candidate === undefined) return
+      appendSupersedeEntry({
+        supersedes: candidate.id,
+        supersededBy: `run:${input.runId}`,
+        ...input.sessionId === undefined ? {} : { sessionId: input.sessionId },
+        ...input.objective === undefined ? {} : { objective: input.objective },
+        reason: `a later round ended ${input.status}`,
+      }, options)
+    } catch (error) {
+      // A correction is memory hygiene, never part of the run's outcome.
+      options.logger.warn(`archive supersession not written: ${redactError(error)}`)
+    }
+  }
+
   return {
     adopt(runId, runName) {
       if (disposed) return
@@ -459,7 +506,7 @@ export function createMemoryArchiver(options: ArchiveRecorderOptions): MemoryArc
       if (roundsWritten.has(input.runId)) return false
       roundsWritten.add(input.runId)
       const atMs = now()
-      return appendArchiveEntry({
+      const written = appendArchiveEntry({
         v: 1,
         id: `run:${input.runId}`,
         kind: 'round',
@@ -474,6 +521,12 @@ export function createMemoryArchiver(options: ArchiveRecorderOptions): MemoryArc
         summary: input.cause === undefined ? input.summary : `${input.summary} (cause: ${input.cause})`,
         ...input.evidence === undefined ? {} : { evidence: input.evidence },
       }, archiveOptions()).written
+      // Round 70: a round that carried earlier unfinished work through leaves a
+      // correction behind, so a later session does not read a dead `cancelled`
+      // round as the latest verdict on work this round finished. Contained like
+      // every other write here: a refused disk costs nothing but the link.
+      if (written) supersedeEarlierRound(input)
+      return written
     },
     dispose() {
       disposed = true
