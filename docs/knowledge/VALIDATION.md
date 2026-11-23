@@ -1,3 +1,16 @@
+## 发版 `0.13.21`（soak PASS，已发布） — 2026-11-23 (`CONFIRMED`)
+
+| state | command | result |
+| --- | --- | --- |
+| 发版 worktree `rsi/release-0.13.21`（基 `9047f72`）bump 后 | `npm run ci` | **首次红**：`test/update-entry.spec.ts` 1 failed（双常量仍 0.13.20，期望 0.13.21）；同步 `src/client/index.js` 双常量 + 重建 `lib/client.js` 后 **exit 0：87 files / 1656 tests PASS** |
+| main 系 worktree（合流 `26b800d`） | `git push origin main` + `git push origin v0.13.21` | **已推**：main `9047f72..26b800d`，tag `v0.13.21` 新建 |
+| 远端 | `gh run watch 45173971212` | **success**（completed）；Release `v0.13.21` 已发布，asset `dsh-grok-workflow-0.13.21.tgz` |
+| 隔离真机 soak | 独立 profile 全链路实跑 | **PASS**：四段全 completed，report COMPLETED，双文件字节/sha 精确（`.agents/worktrees/rsi-soak-65/.rsi/evidence/round-065/soak.txt` §5+§9） |
+
+**Changed:** `package.json` + `package-lock.json` 0.13.20→0.13.21，`src/client/index.js` + `lib/client.js` 双常量同步，
+`README.md` + `README.zh-CN.md` + `docs/LOCAL-TESTING.md` 版本串，`CHANGELOG [Unreleased]` 18 条 → `## [0.13.21]`。
+**Honest boundary:** 中途红过一次，就地修完再发；未碰 live `~/.dsh`；未 force-push。
+
 ## round-64 降级跑完全验自报（soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
 
 | state | command | result |

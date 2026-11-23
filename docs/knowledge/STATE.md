@@ -1,3 +1,11 @@
+Last updated: 2026-11-23 20:30 +08:00（**已发版 `0.13.21`：18 条修复 + 隔离真机 soak PASS，`CONFIRMED`** —
+发版提交 `8ff7f82` 经 `26b800d` 合入 main 系 worktree 并推 main；tag `v0.13.21` 已推；远端 Release run
+`45173971212` success 并已发布（asset `dsh-grok-workflow-0.13.21.tgz`）。本地门禁：`npm run ci` exit 0
+（87 文件 / 1656 测试 PASS）。发版修：`src/client/index.js` + `lib/client.js` 双常量同步到 0.13.21
+（无此则 `test/update-entry.spec.ts` 红）。真机 soak PASS：隔离 profile 全链路实跑，A 轮 planner 换
+`wb/cn:deepseek-v4.1-flash` 后 planner/worker/verifier/synthesizer 四段全 completed，report COMPLETED，
+双文件字节/sha 精确（证据 `.agents/worktrees/rsi-soak-65/.rsi/evidence/round-065/soak.txt` §5+§9）。）
+
 Last updated: 2026-11-23 19:15 +08:00（**round-64 已合流 main 未发版：降级跑完全验自报，`CONFIRMED`，soak BLOCKED** —
 合流提交 `084ce76`（main `171b95b` + `e0ca9ca`）；`npm run ci` exit 0（87 文件 / 1656 测试 PASS，+1 降级回归）。
 真机 BLOCKED（网关 502，未伪造）；`CHANGELOG [Unreleased]` 中英文已记 18 条待发，不发版。）

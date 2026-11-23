@@ -1,3 +1,18 @@
+## 2026-11-23 — 已发版 `0.13.21`：18 条修复 + 隔离真机 soak PASS（`CONFIRMED`）
+
+- **From:** 发版子代理（agent-81）· **To:** lead / 下一轮接手者
+- **做了什么**：发版 worktree（`rsi/release-0.13.21`，基 `9047f72`）`npm run ci` 先绿后红再绿——
+  红因是 bump 脚本没同步 `src/client/index.js` 双常量（`test/update-entry.spec.ts` 期望与 `package.json` 一致）；
+  按既往发版惯例（`f228484`）同步双常量到 0.13.21 + 重建 `lib/client.js` 后 `npm run ci` exit 0
+  （87/1656）。`CHANGELOG [Unreleased]` 18 条搬到 `## [0.13.21]`（日期 2026-11-23）。
+- **发版**：prepare `8ff7f82` → main 系合流 `26b800d` → push main → tag `v0.13.21` → push tag；
+  远端 Release run `45173971212` success，Release 已发布（asset `dsh-grok-workflow-0.13.21.tgz`）。
+- **真机**：隔离 soak PASS（独立 profile 全链路实跑，四段 completed，report COMPLETED，双文件字节/sha 精确；
+  证据 `.agents/worktrees/rsi-soak-65/.rsi/evidence/round-065/soak.txt` §5+§9）。
+- **记忆**：本 HANDOFF / STATE / VALIDATION 同批次更新，另起 commit push。
+- **清理**：发版 worktree 与分支待删（24h 内）。
+- **下轮**：`[Unreleased]` 已空；新修复照常攒条待下版。
+
 ## 2026-11-23 — round-64 已合流 main 未发版：降级跑完全验自报（`CONFIRMED`，soak BLOCKED）
 
 - **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
