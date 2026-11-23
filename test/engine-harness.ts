@@ -42,9 +42,26 @@ export interface ChildAnswer {
   /**
    * The provider's own failure detail for a non-`completed` run, as the real
    * `SubagentResult.diagnostic` carries it. It is the only cause a killed child
-   * leaves behind.
+   * leaves behind — and it is present only on the *external* subagent path.
    */
   diagnostic?: string
+  /**
+   * The failure the child's own session log records, as the real in-process path
+   * leaves it: a `turn/end` whose reason is `{kind: 'error', error: LlmFailure}`.
+   *
+   * This is the shape the published runtime actually produces for a spawn child,
+   * whose `SubagentResult` has no `diagnostic` field at all. When set, the child
+   * gets a live session (through a fake `sessions` store on the harness context)
+   * that carries the event, and no `diagnostic` is added to the result unless the
+   * case also sets one.
+   */
+  sessionFailure?: {
+    message: string
+    code?: string
+    status?: number
+    /** `turn/end` (default) commits a turn closer; `attempt-only` leaves it open. */
+    shape?: 'turn/end' | 'attempt-only'
+  }
   /**
    * Reject the child's result instead of answering it — the real engine's
    * "child run failed" path, which it reports as `WorkflowError(AGENT_RESULT)`
@@ -60,6 +77,48 @@ export interface ChildAnswer {
    * to let the child settle; nothing else about the harness changes.
    */
   gate?: Promise<unknown>
+}
+
+/** The session events one fake child committed, in the runtime's own shapes. */
+function childSessionEvents(failure: NonNullable<ChildAnswer['sessionFailure']>): unknown[] {
+  const fact = {
+    message: failure.message,
+    ...failure.code === undefined ? {} : { code: failure.code },
+    ...failure.status === undefined ? {} : { status: failure.status },
+  }
+  const events: unknown[] = [
+    { type: 'turn/start', seq: 0, data: { turn: 1 } },
+    { type: 'step/start', seq: 1, data: { turn: 1, step: 1 } },
+  ]
+  if (failure.shape === 'attempt-only') {
+    events.push({
+      type: 'assistant/attempt',
+      seq: 2,
+      data: {
+        turn: 1,
+        step: 1,
+        stream: [
+          { type: 'chunk', chunk: { type: 'usage', usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 } } },
+          { type: 'chunk', chunk: { type: 'finish', reason: { kind: 'error', failure: fact } } },
+        ],
+      },
+    })
+    return events
+  }
+  events.push(
+    {
+      type: 'assistant/attempt',
+      seq: 2,
+      data: {
+        turn: 1,
+        step: 1,
+        stream: [{ type: 'chunk', chunk: { type: 'finish', reason: { kind: 'error', failure: fact } } }],
+      },
+    },
+    { type: 'step/end', seq: 3, data: { turn: 1, step: 1 } },
+    { type: 'turn/end', seq: 4, data: { turn: 1, reason: { kind: 'error', error: fact } } },
+  )
+  return events
 }
 
 export interface EngineHarness {
@@ -146,6 +205,8 @@ class InProcessPtcRuntime extends PtcRuntime {
 export function createEngineHarness(answer: (call: ChildCall) => ChildAnswer | Promise<ChildAnswer>): EngineHarness {
   const children: ChildCall[] = []
   const events: string[] = []
+  /** The fake child sessions, keyed the way the host session store keys them. */
+  const sessions = new Map<string, { seq: number, snapshotEvents: (from?: number) => unknown[], ownEvents: () => unknown[] }>()
 
   const provider = {
     name: 'contract-fake',
@@ -181,7 +242,16 @@ export function createEngineHarness(answer: (call: ChildCall) => ChildAnswer | P
         ...agentOptions?.model === undefined ? {} : { model: agentOptions.model },
       }
       children.push(call)
+      const childId = `child-${children.length}`
       const settled = await answer(call)
+      if (settled.sessionFailure !== undefined) {
+        const recorded = childSessionEvents(settled.sessionFailure)
+        sessions.set(childId, {
+          seq: recorded.length,
+          snapshotEvents: (from = 0) => recorded.slice(Math.max(0, from)),
+          ownEvents: () => recorded,
+        })
+      }
       const payload = {
         output: settled.output ?? [{ type: 'text' as const, text: '' }],
         stopReason: settled.stopReason ?? 'completed',
@@ -194,16 +264,17 @@ export function createEngineHarness(answer: (call: ChildCall) => ChildAnswer | P
           ? Promise.resolve(payload)
           : settled.gate.then(() => payload)
       result.catch(() => {})
-      return {
-        childId: `child-${children.length}`,
-        result,
-        async dispose() {},
-      }
+      return { childId, result, async dispose() {} }
     },
   }
 
   const ctx = new Context()
   ctx.provide('subagents', subagents)
+  // The host's session store, reduced to the one read this plugin performs. The
+  // real engine disposes a child before its settlement reaches the host, which is
+  // why the seam captures the session at start — this fake keeps it resident so a
+  // case can prove the read happens at all.
+  ctx.provide('sessions', { get: (id: string) => sessions.get(id) })
   new InProcessPtcRuntime(ctx)
   ctx.provide('sandboxPolicy', { resolve: () => ({ mode: 'danger-full-access' }) })
   ctx.provide('workingDirectory', { ensure: () => process.cwd() })

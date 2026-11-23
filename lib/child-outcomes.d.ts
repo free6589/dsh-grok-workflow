@@ -42,12 +42,26 @@ export declare const CHILD_OUTCOME_LIMIT = 512;
 export declare const CHILD_CAUSE_CHARS = 200;
 /** The guest's null-collapse reason, as `src/script.ts` writes it. */
 export declare const NULL_COLLAPSE_REASON = "no valid structured result";
+/**
+ * What this module says about a child that died with nothing in its log to name
+ * the cause. It is deliberately a statement about the record, not about the child:
+ * the old wording named a missing form ("no valid structured result"), which read
+ * as "send it again" and was wrong for every dead child.
+ */
+export declare const CHILD_CAUSE_UNKNOWN = "the child ended abnormally (cause unknown)";
 /** The terminal facts one child run settled with. */
 export interface ChildTerminal {
     /** The child's `SubagentResult.stopReason` (`completed`/`aborted`/`error`/…). */
     stopReason: string;
     /** The provider's own failure detail, when it gave one. */
     diagnostic?: string;
+    /**
+     * The provider's machine code for that failure (`AUTH`, `RATE_LIMIT`,
+     * `TIMEOUT`, `HTTP_502`, …), when the child's own log carried one. It is read
+     * from the child session's `turn/end`, because the in-process subagent result
+     * has no diagnostic field at all.
+     */
+    code?: string;
 }
 /** One recorded child settlement, with the identity a report row can be matched to. */
 export interface ChildOutcome extends ChildTerminal {
@@ -83,13 +97,27 @@ export declare function createChildOutcomeLog(): ChildOutcomeLog;
 /** The log used when nothing observed the engine (non-PTC engine, bare tests). */
 export declare function emptyChildOutcomeLog(): ChildOutcomeLog;
 /**
+ * The failure class a provider-neutral machine code names, when it names one
+ * unambiguously.
+ *
+ * The codes are `@deepseek-ai/dsh-llm`'s `LlmFailure.code` vocabulary, which the
+ * child session commits verbatim in its `turn/end`. They are a better basis than
+ * the message text: a gateway that answers `401` with prose in another language,
+ * or with no prose at all, still files the same code. Only clear mappings are
+ * listed; anything else falls back to the shared message table, so an unknown
+ * code cannot manufacture a class.
+ * @param code - the failure code, when the log carried one.
+ * @returns The class that code means, or `undefined` when it does not decide one.
+ */
+export declare function failureClassForCode(code: string | undefined): FailureClass | undefined;
+/**
  * The failure class a child's terminal state means.
  *
  * `completed` is the only state that belongs to the format-error family: the
  * child finished and simply never submitted a structured result. Every other
- * state is a death, classified from the provider's own words with the same table
- * the script uses for a thrown failure (`classifyChildFailureText`, pinned equal
- * by `test/null-collapse.spec.ts`).
+ * state is a death, classified first from the provider's machine code and then
+ * from its own words with the same table the script uses for a thrown failure
+ * (`classifyChildFailureText`, pinned equal by `test/null-collapse.spec.ts`).
  * @param outcome - the child's terminal state.
  * @returns The class that state belongs to.
  */
@@ -112,6 +140,11 @@ export declare function categoryForFailureClass(failureClass: FailureClass): Fai
  * The plain-language cause of one child's death, for a report reason or a memory
  * entry. The stop reason leads (it is the engine's own word); the provider's
  * diagnostic follows when there is one.
+ *
+ * A death with no recorded detail says so. It never says the child "returned no
+ * valid structured result": that sentence describes a missing form, so a reader
+ * of a refused key or an expired deadline was told to do the wrong thing. The
+ * wording of the empty case is {@link CHILD_CAUSE_UNKNOWN} for the same reason.
  * @param outcome - the child's terminal state.
  * @returns One bounded line naming the cause.
  */

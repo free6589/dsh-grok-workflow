@@ -30,6 +30,7 @@ import type { Config } from '@deepseek-ai/dsh-workflow-ptc'
 import type { WorkflowEngine } from '@deepseek-ai/dsh-workflow'
 import type { ChildOutcome, ChildOutcomeLog, ChildTerminal } from './child-outcomes.js'
 import { childStopPhrase, createChildOutcomeLog, emptyChildOutcomeLog, roleOfChildTitle } from './child-outcomes.js'
+import { sessionPosition, sessionVerdict } from './child-evidence.js'
 
 /** Code points a derived child label may occupy — the guest's own defaultLabel rule. */
 export const CHILD_LABEL_LIMIT = 48
@@ -166,6 +167,22 @@ function requestedRoute(spec: ActivationSpecView): string {
   return model ?? 'inherit'
 }
 
+/**
+ * What this seam reads out of an activation spec: the child's title line and the
+ * route it asked for.
+ *
+ * Exported because it is the whole of the spec-shape contract and both shapes are
+ * real: the published engine sends it flat, the older host mirror nested it under
+ * `request`. A case that drives only one shape cannot see the other break, which
+ * is exactly how the seam read nothing on every production run while the unit
+ * cases were green.
+ * @param spec - the activation spec, in either shape.
+ * @returns The title line and the route label (`provider/model`, or `inherit`).
+ */
+export function activationFacts(spec: ActivationSpecView): { title: string, route: string } {
+  return { title: promptTitle(spec), route: requestedRoute(spec) }
+}
+
 /** The child's display title: the first line of the prompt, as the label rewrite reads it. */
 function promptTitle(spec: ActivationSpecView): string {
   const blocks = promptBlocks(spec)
@@ -184,24 +201,39 @@ function promptTitle(spec: ActivationSpecView): string {
  * provider's `diagnostic`. The observer is attached beside the engine's own
  * handling and never replaces it: it does not await, does not alter the promise
  * the engine holds, and swallows nothing it would have to report.
+ *
+ * The provider's own words are not on that result for an in-process child
+ * (`captureLocalResult` carries no `diagnostic`), so the child's live session is
+ * captured here — while the engine still holds it — and read at settlement for
+ * the failure its own log recorded (`src/child-evidence.ts`). The capture is
+ * taken at start because the engine disposes the child before the settlement
+ * reaches this seam; a read-only observation that arrives later finds nothing.
  * @param outcomes - the log to write into.
  * @param spec - the activation spec the engine built (before the label rewrite).
  * @param receipt - what `startActivation` returned.
+ * @param lookupSession - resolves a child session id to its live session object.
  */
-function observeActivation(outcomes: ChildOutcomeLog, spec: ActivationSpecView, receipt: unknown): void {
+function observeActivation(
+  outcomes: ChildOutcomeLog,
+  spec: ActivationSpecView,
+  receipt: unknown,
+  lookupSession: SessionLookup,
+): void {
   try {
     const activation = (receipt === null || typeof receipt !== 'object' ? undefined : receipt) as ActivationReceipt | undefined
     const result = activation?.result
     if (result === null || typeof result !== 'object' || typeof (result as PromiseLike<unknown>).then !== 'function') return
     const childId = field(activation, 'childId')
-    const title = promptTitle(spec)
+    const { title, route } = activationFacts(spec)
     const identity = roleOfChildTitle(title)
     const label = typeof spec.label === 'string' ? spec.label : undefined
+    const session = childId === undefined ? undefined : lookupSession(childId)
+    const position = sessionPosition(session)
     const base = {
       ...childId === undefined ? {} : { childId },
       ...label === undefined ? {} : { label },
       ...identity === undefined ? {} : { role: identity.role, attempt: identity.attempt },
-      route: requestedRoute(spec),
+      route,
     }
     const record = (outcome: ChildTerminal): void => {
       try {
@@ -213,9 +245,14 @@ function observeActivation(outcomes: ChildOutcomeLog, spec: ActivationSpecView, 
     }
     void (result as Promise<unknown>).then(
       settled => {
+        const stopReason = field(settled, 'stopReason') ?? 'completed'
+        const engineDiagnostic = field(settled, 'diagnostic')
+        const verdict = stopReason === 'completed' ? undefined : sessionVerdict(session, position)
+        const detail = engineDiagnostic ?? verdict?.failure?.message
         record({
-          stopReason: field(settled, 'stopReason') ?? 'completed',
-          ...field(settled, 'diagnostic') === undefined ? {} : { diagnostic: field(settled, 'diagnostic') as string },
+          stopReason,
+          ...detail === undefined ? {} : { diagnostic: detail },
+          ...verdict?.failure?.code === undefined ? {} : { code: verdict.failure.code },
         })
       },
       (error: unknown) => {
@@ -230,19 +267,43 @@ function observeActivation(outcomes: ChildOutcomeLog, spec: ActivationSpecView, 
   }
 }
 
+/** Resolve a child session id to the live session object, or nothing. */
+type SessionLookup = (childId: string) => unknown
+
+/**
+ * The live-session lookup this seam uses: the host's session store, read the way
+ * every other transcript read in this plugin reads it (`ctx.get('sessions')` —
+ * the documented accessor, because `sessions` is not in this plugin's `inject`
+ * list). The engine's own context is the one resolved from, since that is the
+ * scope the child sessions are created in.
+ * @param resolveService - the engine-context service resolver.
+ * @returns A lookup that answers `undefined` instead of throwing.
+ */
+function sessionLookupFor(resolveService: (name: string) => unknown): SessionLookup {
+  return (childId: string) => {
+    try {
+      const store = resolveService('sessions') as { get?: (id: string) => unknown } | undefined
+      if (store === undefined || store === null || typeof store.get !== 'function') return undefined
+      return store.get(childId) ?? undefined
+    } catch {
+      return undefined
+    }
+  }
+}
+
 /**
  * A view of the subagent seam whose `startActivation` rewrites each child's
  * label and records the child's terminal state; every other member reaches the
  * real service. The real service object is never mutated.
  */
-function labeledSubagents(subagents: object, outcomes: ChildOutcomeLog): object {
+function labeledSubagents(subagents: object, outcomes: ChildOutcomeLog, lookupSession: SessionLookup): object {
   return new Proxy(subagents, {
     get(target, property, receiver) {
       if (property === 'startActivation') {
         const start = Reflect.get(target, property, receiver) as StartActivation
         return async (spec: ActivationSpecView) => {
           const receipt = await start.call(target, rewriteActivationLabel(spec))
-          observeActivation(outcomes, spec, receipt)
+          observeActivation(outcomes, spec, receipt, lookupSession)
           return receipt
         }
       }
@@ -286,7 +347,7 @@ function twinContext(injected: object, outcomes: ChildOutcomeLog): Context {
   const holder = {
     subagents: subagents === null || typeof subagents !== 'object'
       ? subagents
-      : labeledSubagents(subagents as object, outcomes),
+      : labeledSubagents(subagents as object, outcomes, sessionLookupFor(resolveService)),
     ptcRuntime: resolveService('ptcRuntime'),
     sandboxPolicy: resolveService('sandboxPolicy'),
     workingDirectory: resolveService('workingDirectory'),

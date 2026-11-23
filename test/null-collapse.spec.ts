@@ -3,14 +3,16 @@ import { resolveConfig } from '../src/config.js'
 import { assertWorkflowReport } from '../src/report.js'
 import { buildWorkflowRequest, maxTotalAgentsFor, routeBudgetFor, WORKFLOW_SCRIPT } from '../src/script.js'
 import {
+  CHILD_CAUSE_UNKNOWN,
   CHILD_OUTCOME_LIMIT,
   childFailureClass,
   classifyChildFailureText,
   createChildOutcomeLog,
+  failureClassForCode,
   reclassifyNullCollapses,
   type ChildOutcome,
 } from '../src/child-outcomes.js'
-import { childOutcomeCause, childOutcomeLog, teamWorkflowEngine } from '../src/team-engine.js'
+import { activationFacts, childOutcomeCause, childOutcomeLog, teamWorkflowEngine } from '../src/team-engine.js'
 import type { RoleName, WorkflowReport } from '../src/types.js'
 import { createEngineHarness, type ChildAnswer, type ChildCall } from './engine-harness.js'
 import { execution, task, verification } from './fixtures.js'
@@ -47,7 +49,22 @@ function roleOfCall(call: ChildCall): RoleName | undefined {
   return roleOf(headOf(call.prompt))
 }
 
-type Seed = 'prose-only' | 'timeout' | 'forbidden' | 'cancelled'
+type Seed =
+  | 'prose-only'
+  | 'timeout'
+  | 'forbidden'
+  | 'cancelled'
+  /**
+   * The in-process death: the engine's result carries `stopReason: 'error'` and no
+   * diagnostic at all, and the provider's words live only in the child's own
+   * session log. This is the shape the published runtime produces for a spawn
+   * child, and the one the earlier repair could only call `unknown`.
+   */
+  | 'session-refusal'
+  /** The same death, but the log ended mid-turn: only the attempt carries it. */
+  | 'session-attempt-only'
+  /** A death with nothing recorded anywhere: the honest "cause unknown" case. */
+  | 'dead-unknown'
 
 /**
  * One child terminal state, in the engine's own vocabulary.
@@ -76,6 +93,29 @@ function seedAnswer(seed: Seed) {
       output: [{ type: 'text', text: '' }],
       stopReason: 'aborted',
       diagnostic: 'the run was cancelled while this child was working',
+    },
+    'session-refusal': {
+      output: [{ type: 'text', text: '' }],
+      stopReason: 'error',
+      // No `diagnostic`: that is the whole point of this case.
+      sessionFailure: {
+        message: '401: {"message":"virtual key is required. Provide a virtual key via the x-bf-vk header."}',
+        code: 'AUTH',
+        status: 401,
+      },
+    },
+    'session-attempt-only': {
+      output: [{ type: 'text', text: '' }],
+      stopReason: 'error',
+      sessionFailure: {
+        message: '401: {"message":"virtual key is required."}',
+        code: 'AUTH',
+        shape: 'attempt-only',
+      },
+    },
+    'dead-unknown': {
+      output: [{ type: 'text', text: '' }],
+      stopReason: 'error',
     },
   }
   return answer[seed]
@@ -193,6 +233,42 @@ describe('the engine seam records what each child settled as', () => {
     }
   })
 
+  /**
+   * Both spec shapes are real, and the seam must read both.
+   *
+   * The published engine builds the activation spec flat; the older host mirror
+   * nested the same two fields under `request`. The seam read only the nested one
+   * for a whole release, so every production child came back with an empty title
+   * and an `inherit` route while the unit cases (whose fake sent the nested shape)
+   * were green. These two cases are the same assertions against each shape.
+   */
+  it('reads the title and the route out of the flat spec', () => {
+    const facts = activationFacts({
+      label: 'engine label',
+      prompt: [{ type: 'text', text: '执行 · Task a\nbody of the prompt' }],
+      agentOptions: { provider: 'bifrost', model: 'w1' },
+    })
+    expect(facts.title).toBe('执行 · Task a')
+    expect(facts.route).toBe('bifrost/w1')
+  })
+
+  it('reads the title and the route out of the nested spec', () => {
+    const facts = activationFacts({
+      label: 'engine label',
+      request: {
+        prompt: [{ type: 'text', text: '检查 · Task a\nbody of the prompt' }],
+        agentOptions: { provider: 'bifrost', model: 'w1' },
+      },
+    })
+    expect(facts.title).toBe('检查 · Task a')
+    expect(facts.route).toBe('bifrost/w1')
+  })
+
+  it('falls back to the route label the engine uses when nothing was asked for', () => {
+    expect(activationFacts({ label: 'x', prompt: [{ type: 'text', text: '执行 · a' }] }).route).toBe('inherit')
+    expect(activationFacts({ label: 'x', request: { prompt: [] } }).route).toBe('inherit')
+  })
+
   it('captures nothing to repair when every child finishes cleanly', async () => {    const cfg = config()
     const objective = 'Ship the verified result'
     const harness = createEngineHarness(call => {
@@ -260,6 +336,49 @@ describe('a child that died is not reported as a format error', () => {
     // format error for a child the provider refused to serve.
     expect(report.routes.filter(entry => entry.failureClass === 'format-error')).toEqual([])
     expect(report.routes.some(entry => entry.failureClass === 'model-unavailable')).toBe(true)
+  })
+
+  /**
+   * The in-process death. The engine's result carries `stopReason: 'error'` and no
+   * diagnostic (`@deepseek-ai/dsh-subagent` `captureLocalResult`), so the only
+   * place the provider's words exist is the child's own session log — the
+   * `turn/end` the child committed, whose reason is the provider's `LlmFailure`
+   * verbatim. Measured on this machine (round 077): four real 401 child deaths
+   * reached the report as `the child run ended \`error\``.
+   */
+  it('names the provider failure the child session recorded, with no diagnostic on the result', async () => {
+    const { report, rewritten } = await runSeed('session-refusal')
+    expect(rewritten).toBeGreaterThan(0)
+    const failure = report.tasks[0]?.attempts[0]?.failure
+    expect(failure?.class).toBe('model-unavailable')
+    expect(failure?.category).toBe('infrastructure')
+    expect(failure?.reason).toContain('virtual key is required')
+    expect(failure?.reason).not.toContain('no valid structured result')
+    // The route trail is the record a maintainer reads: no row may still claim a
+    // format error for a child the gateway refused.
+    expect(report.routes.filter(entry => entry.failureClass === 'format-error')).toEqual([])
+  })
+
+  it('reads the failure out of the attempt when the child died before its turn closed', async () => {
+    const { report } = await runSeed('session-attempt-only')
+    const failure = report.tasks[0]?.attempts[0]?.failure
+    expect(failure?.class).toBe('model-unavailable')
+    expect(failure?.reason).toContain('virtual key is required')
+  })
+
+  /**
+   * A death with nothing recorded is still not a format error, and it does not
+   * pretend to know more than it does: the report says the child ended abnormally
+   * and that the cause was not recorded.
+   */
+  it('says the cause is unknown instead of inventing a missing form', async () => {
+    const { report, rewritten } = await runSeed('dead-unknown')
+    expect(rewritten).toBeGreaterThan(0)
+    const failure = report.tasks[0]?.attempts[0]?.failure
+    expect(failure?.class).toBe('unknown')
+    expect(failure?.reason).toContain(CHILD_CAUSE_UNKNOWN)
+    expect(failure?.reason).not.toContain('no valid structured result')
+    expect(report.incomplete[0]?.reason).not.toContain('no valid structured result')
   })
 
   it('reports a cancelled child as cancelled', async () => {
@@ -400,6 +519,66 @@ describe('reclassifyNullCollapses', () => {
     expect(report.incomplete[0]!.reason).not.toContain('no valid structured result')
     expect(report.errors[0]!.message).toContain('[timeout]')
     expect(report.tasks[0]!.error).toContain('[timeout]')
+  })
+
+  /**
+   * The delivered answer carries its own copy of the rows.
+   *
+   * The generated script copies the *pre-repair* reason into its report-notes
+   * block and the delivery prints that block to the user, so repairing only the
+   * structured rows left the visible sentence claiming the old cause. Measured on
+   * the release soak (round 077): every structured row had been repaired while the
+   * delivered line still said "no valid structured result". The bullet is rebuilt
+   * by task id, because the sentence a reader sees has drifted from the row it came
+   * from (the delivery strips `route: [format-error]`, a model draft may paraphrase
+   * it), so a sentence-level match is the wrong key.
+   */
+  it("rebuilds the answer's report-notes bullet by task id when its wording drifted", () => {
+    const report = reportFixture()
+    report.synthesis = {
+      mode: 'model',
+      summary: [
+        '答案：这次没做成。',
+        '',
+        '报告附注（以下为报告事实，摘要不改写）：',
+        '仍未完成（来自报告）：',
+        '- 任务 a：worker failed on every worker returned an invalid result',
+        '下一步：把没做成的部分单独再发一次。',
+      ].join('\n'),
+    }
+    expect(reclassifyNullCollapses(report, [outcome()])).toBe(2)
+    const summary = report.synthesis.summary ?? ''
+    expect(summary).not.toContain('invalid result')
+    expect(summary).toContain('- 任务 a：')
+    expect(summary).toContain('the child run timed out')
+    // Everything around the bullet is left exactly as the answer wrote it.
+    expect(summary.startsWith('答案：这次没做成。')).toBe(true)
+    expect(summary.endsWith('下一步：把没做成的部分单独再发一次。')).toBe(true)
+  })
+
+  it('rebuilds the English report-notes block the same way', () => {
+    const report = reportFixture()
+    report.synthesis = {
+      mode: 'model',
+      summary: [
+        'Answer: it did not finish.',
+        'Report notes (facts from the report, not rewritten):',
+        'Still incomplete (from the report):',
+        '- task a: the worker produced an unreadable answer',
+      ].join('\n'),
+    }
+    expect(reclassifyNullCollapses(report, [outcome()])).toBe(2)
+    const summary = report.synthesis.summary ?? ''
+    expect(summary).not.toContain('unreadable answer')
+    expect(summary).toContain('- task a: worker call produced no result: the child run timed out')
+  })
+
+  it('leaves the answer untouched when no row was repaired', () => {
+    const report = reportFixture()
+    const summary = 'Answer.\nStill incomplete (from the report):\n- task a: whatever the script wrote'
+    report.synthesis = { mode: 'model', summary }
+    expect(reclassifyNullCollapses(report, [])).toBe(0)
+    expect(report.synthesis.summary).toBe(summary)
   })
 
   it('declines when the children of one role died of different causes', () => {

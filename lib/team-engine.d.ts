@@ -83,6 +83,22 @@ export declare function childLabelFromPrompt(prompt: unknown, fallback: string):
  */
 export declare function rewriteActivationLabel<T extends ActivationSpecView>(spec: T): T;
 /**
+ * What this seam reads out of an activation spec: the child's title line and the
+ * route it asked for.
+ *
+ * Exported because it is the whole of the spec-shape contract and both shapes are
+ * real: the published engine sends it flat, the older host mirror nested it under
+ * `request`. A case that drives only one shape cannot see the other break, which
+ * is exactly how the seam read nothing on every production run while the unit
+ * cases were green.
+ * @param spec - the activation spec, in either shape.
+ * @returns The title line and the route label (`provider/model`, or `inherit`).
+ */
+export declare function activationFacts(spec: ActivationSpecView): {
+    title: string;
+    route: string;
+};
+/**
  * The engine the plugin's runs execute on.
  *
  * When the runtime injected the published PTC engine, this is a twin of it

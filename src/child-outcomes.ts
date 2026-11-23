@@ -45,6 +45,13 @@ export const CHILD_OUTCOME_LIMIT = 512
 export const CHILD_CAUSE_CHARS = 200
 /** The guest's null-collapse reason, as `src/script.ts` writes it. */
 export const NULL_COLLAPSE_REASON = 'no valid structured result'
+/**
+ * What this module says about a child that died with nothing in its log to name
+ * the cause. It is deliberately a statement about the record, not about the child:
+ * the old wording named a missing form ("no valid structured result"), which read
+ * as "send it again" and was wrong for every dead child.
+ */
+export const CHILD_CAUSE_UNKNOWN = 'the child ended abnormally (cause unknown)'
 
 /** The terminal facts one child run settled with. */
 export interface ChildTerminal {
@@ -52,6 +59,13 @@ export interface ChildTerminal {
   stopReason: string
   /** The provider's own failure detail, when it gave one. */
   diagnostic?: string
+  /**
+   * The provider's machine code for that failure (`AUTH`, `RATE_LIMIT`,
+   * `TIMEOUT`, `HTTP_502`, …), when the child's own log carried one. It is read
+   * from the child session's `turn/end`, because the in-process subagent result
+   * has no diagnostic field at all.
+   */
+  code?: string
 }
 
 /** One recorded child settlement, with the identity a report row can be matched to. */
@@ -128,13 +142,65 @@ export function emptyChildOutcomeLog(): ChildOutcomeLog {
 }
 
 /**
+ * The failure class a provider-neutral machine code names, when it names one
+ * unambiguously.
+ *
+ * The codes are `@deepseek-ai/dsh-llm`'s `LlmFailure.code` vocabulary, which the
+ * child session commits verbatim in its `turn/end`. They are a better basis than
+ * the message text: a gateway that answers `401` with prose in another language,
+ * or with no prose at all, still files the same code. Only clear mappings are
+ * listed; anything else falls back to the shared message table, so an unknown
+ * code cannot manufacture a class.
+ * @param code - the failure code, when the log carried one.
+ * @returns The class that code means, or `undefined` when it does not decide one.
+ */
+export function failureClassForCode(code: string | undefined): FailureClass | undefined {
+  if (code === undefined) return undefined
+  const byCode: Record<string, FailureClass> = {
+    // This route cannot answer: another model or another credential may.
+    AUTH: 'model-unavailable',
+    INVALID_CREDENTIAL: 'model-unavailable',
+    MISSING_CREDENTIAL: 'model-unavailable',
+    NO_CREDENTIAL_STORE: 'model-unavailable',
+    ACCOUNT_SIGN_IN_REQUIRED: 'model-unavailable',
+    ACCOUNT_TOKEN_INVALID: 'model-unavailable',
+    MODEL_UNSUPPORTED: 'model-unavailable',
+    UNKNOWN_MODEL: 'model-unavailable',
+    NO_ADAPTER: 'model-unavailable',
+    INVALID_MODEL_CONTEXT: 'model-unavailable',
+    INVALID_MODEL_MAX_TOKENS: 'model-unavailable',
+    INVALID_MODEL_REASONING: 'model-unavailable',
+    DISCOVERY_UNSUPPORTED: 'model-unavailable',
+    // The route is throttled or out of budget: the same route may work later.
+    RATE_LIMIT: 'rate-limit',
+    QUOTA: 'rate-limit',
+    ACCOUNT_QUOTA: 'rate-limit',
+    TIMEOUT: 'timeout',
+    SERVER: 'server-error',
+    TRANSPORT: 'connection',
+    STREAM_CLOSED: 'connection',
+    ABORTED: 'cancelled',
+  }
+  const exact = byCode[code]
+  if (exact !== undefined) return exact
+  const http = /^HTTP_(\d{3})$/.exec(code)
+  if (http === null) return undefined
+  const status = Number(http[1])
+  if (status === 401 || status === 403 || status === 404) return 'model-unavailable'
+  if (status === 408 || status === 504) return 'timeout'
+  if (status === 429) return 'rate-limit'
+  if (status >= 500) return 'server-error'
+  return undefined
+}
+
+/**
  * The failure class a child's terminal state means.
  *
  * `completed` is the only state that belongs to the format-error family: the
  * child finished and simply never submitted a structured result. Every other
- * state is a death, classified from the provider's own words with the same table
- * the script uses for a thrown failure (`classifyChildFailureText`, pinned equal
- * by `test/null-collapse.spec.ts`).
+ * state is a death, classified first from the provider's machine code and then
+ * from its own words with the same table the script uses for a thrown failure
+ * (`classifyChildFailureText`, pinned equal by `test/null-collapse.spec.ts`).
  * @param outcome - the child's terminal state.
  * @returns The class that state belongs to.
  */
@@ -143,7 +209,7 @@ export function childFailureClass(outcome: ChildTerminal): FailureClass {
   if (stop === 'completed') return 'format-error'
   if (stop === 'aborted' || stop === 'cancelled') return 'cancelled'
   if (stop === 'max-tokens' || stop === 'refusal') return 'unknown'
-  return classifyChildFailureText(outcome.diagnostic)
+  return failureClassForCode(outcome.code) ?? classifyChildFailureText(outcome.diagnostic)
 }
 
 /**
@@ -194,6 +260,11 @@ function oneLine(value: unknown, limit: number = CHILD_CAUSE_CHARS): string {
  * The plain-language cause of one child's death, for a report reason or a memory
  * entry. The stop reason leads (it is the engine's own word); the provider's
  * diagnostic follows when there is one.
+ *
+ * A death with no recorded detail says so. It never says the child "returned no
+ * valid structured result": that sentence describes a missing form, so a reader
+ * of a refused key or an expired deadline was told to do the wrong thing. The
+ * wording of the empty case is {@link CHILD_CAUSE_UNKNOWN} for the same reason.
  * @param outcome - the child's terminal state.
  * @returns One bounded line naming the cause.
  */
@@ -205,8 +276,9 @@ export function childStopPhrase(outcome: ChildTerminal): string {
   else if (stop === 'max-tokens') cause = 'the child hit its own token ceiling'
   else if (stop === 'refusal') cause = 'the child declined the task'
   else if (stop === 'completed') cause = 'the child finished without submitting a structured result'
+  else if (detail === '') return CHILD_CAUSE_UNKNOWN
   else if (/timed? ?out|timeout|deadline exceeded/i.test(detail)) cause = 'the child run timed out'
-  else cause = `the child run ended \`${stop}\``
+  else cause = 'the child run ended abnormally'
   return detail === '' ? cause : `${cause} (${detail})`
 }
 
@@ -338,6 +410,8 @@ export function reclassifyNullCollapses(report: WorkflowReport, outcomes: readon
   const groups = groupOutcomes(outcomes)
   if (groups.attempt.size === 0) return 0
   const repairs: Repair[] = []
+  /** The repair each task row earned, so the answer's own lines can be rebuilt. */
+  const byTask = new Map<string, AttemptFailure>()
   let rewritten = 0
 
   for (const entry of report.routes) {
@@ -359,6 +433,7 @@ export function reclassifyNullCollapses(report: WorkflowReport, outcomes: readon
       if (next === undefined) continue
       repairs.push({ before: failure.reason, after: next.reason, class: next.class, category: next.category ?? 'unknown' })
       attempt.failure = next
+      byTask.set(task.id, next)
       rewritten += 1
     }
   }
@@ -398,7 +473,80 @@ export function reclassifyNullCollapses(report: WorkflowReport, outcomes: readon
   if (planText !== undefined) report.plan.error = planText
   const synthesisText = repairText(report.synthesis.error, repairs).text
   if (synthesisText !== undefined) report.synthesis.error = synthesisText
+  // The delivered answer carries its own copy of the same rows: the generated
+  // script copied the *pre-repair* reason into its report-notes block, and the
+  // delivery prints that block verbatim. Matching it by sentence failed on every
+  // real run (`report.incomplete[].reason` and `failure.reason` are not the same
+  // string), so the block is rebuilt by task id instead.
+  const answered = repairAnswerNotes(report.synthesis.summary, byTask, repairs)
+  if (answered !== undefined) report.synthesis.summary = answered
   return rewritten
+}
+
+/** The marker lines the generated script writes above its incomplete bullets. */
+const INCOMPLETE_MARKERS = ['仍未完成（来自报告）', 'Still incomplete (from the report)']
+/** The bound the generated script applies to one reason inside the notes block. */
+const NOTES_REASON_CHARS = 160
+
+/** Bound one reason the way the generated script's `clip` does. */
+function boundCause(reason: string): string {
+  const raw = reason.trim()
+  if (raw.length <= NOTES_REASON_CHARS) return raw
+  return `${raw.slice(0, Math.max(0, NOTES_REASON_CHARS - 1))}…`
+}
+
+/**
+ * Rebuild the answer's "still incomplete" bullets from the repaired rows.
+ *
+ * The answer is model prose with a machine block appended after it, so the block's
+ * bullets are deterministic text the host can rewrite exactly. The match is by
+ * task id (and by the block's own marker), not by the reason sentence: the reason
+ * in the answer was copied before the repair and may also be clipped, so a
+ * sentence-level `includes()` is the wrong key — measured: zero of the delivered
+ * lines matched while every structured row had been repaired.
+ *
+ * A sentence-level pass runs first, which covers every line whose wording was
+ * copied verbatim. A block that cannot be found, or a bullet whose task was not
+ * repaired, is left exactly as written.
+ * @param summary - the answer text, when the report has one.
+ * @param rows - the repair each task earned, by task id.
+ * @param repairs - every repair applied to the structured rows.
+ * @returns The rebuilt answer, or `undefined` when the report has none.
+ */
+function repairAnswerNotes(
+  summary: string | undefined,
+  rows: ReadonlyMap<string, AttemptFailure>,
+  repairs: readonly Repair[],
+): string | undefined {
+  if (summary === undefined) return undefined
+  const exact = repairText(summary, repairs).text ?? summary
+  if (rows.size === 0) return exact
+  const lines = exact.split('\n')
+  let inBlock = false
+  let changed = false
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]!
+    const trimmed = line.trim()
+    if (INCOMPLETE_MARKERS.some(marker => trimmed.startsWith(marker))) {
+      inBlock = true
+      continue
+    }
+    if (!inBlock) continue
+    // The block ends at its first line that is not one of its own bullets.
+    if (!trimmed.startsWith('-')) {
+      inBlock = false
+      continue
+    }
+    const match = /^(\s*-\s*(?:任务|task)\s+)(\S+?)(\s*[：:]\s*)(.*)$/u.exec(line)
+    if (match === null) continue
+    const next = rows.get(match[2]!)
+    if (next === undefined) continue
+    const rebuilt = `${match[1]}${match[2]}${match[3]}${boundCause(next.reason)}`
+    if (rebuilt === line) continue
+    lines[index] = rebuilt
+    changed = true
+  }
+  return changed ? lines.join('\n') : exact
 }
 
 /** Re-exported so a caller can name the role of a title line the same way here. */
