@@ -1,3 +1,15 @@
+## round-56 板子转读数器适配器（soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
+
+| state | command | result |
+| --- | --- | --- |
+| worktree rsi-round-56 `764dfe4`（main `ac2851a` + 本轮 1 提交） | 适配器移走后 `npx vitest run test/board-reader.spec.ts`（lead 独立红） | **1 failed / no tests**：import 失败（适配器缺席则红） |
+| 同上（新码，恢复后） | `npx vitest run test/board-reader.spec.ts test/dispatcher.spec.ts`（lead 独立） | **13 passed**（新 2 + 调度 11） |
+| 同上（新码） | `npm run ci`（lead 独立） | **exit 0：86 files / 1648 tests PASS**；typecheck 干净；lint 0 errors；`verify:lib` byte-identical |
+| 隔离 soak | 网关探针 | **BLOCKED**：网关 502 无额度，未伪造 |
+
+**Changed:** 新 `src/dispatcher/board-reader.ts`（查无转空读 + 状态翻译 + 其它错原样抛）+ `dispatcher.ts` 导出 + `session.ts` 注释 + `test/board-reader.spec.ts`（+2 回归）+ `lib/` 重建 + `CHANGELOG [Unreleased]` 中英双语 + `.rsi/evidence/round-056/`。未动 policy/store 行为；session 换板是下步。
+**Honest boundary:** 真机 BLOCKED，不发版；`[Unreleased]` 已攒 10 条待发。
+
 ## round-55 任务板存在检查 + 诚实对接注释（soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
 
 | state | command | result |

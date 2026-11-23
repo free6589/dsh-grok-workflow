@@ -1,3 +1,15 @@
+## 2026-11-23 — round-56 已合流 main 未发版：板子转读数器适配器（`CONFIRMED`，soak BLOCKED）
+
+- **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
+- **做了什么**：dispatcher↔taskboard 对接第 2 步。新转接头：查无翻成空读、翻译两个状态词、
+  其它板错照样抛；+2 回归；`npm run ci` exit 0（86/1648）；lead 独立红绿复验成立。
+  未动 policy/store 行为。
+- **真机**：BLOCKED（网关 502，未伪造）。本次不发版。
+- **合流**：`rsi/round-56`（`764dfe4`）已 `--no-ff` 合入 main 系 worktree（合流 `1c223b3`）；
+  `rsi/round-56` 分支可 24h 内删除。`CHANGELOG [Unreleased]` 中英文已记 10 条待发。
+- **下轮**：session 换持久板（经本适配器）+ 持久化格式统一（board.json vs store.jsonl 二选一）。
+  网关恢复后给 round-47~56 补一次 soak 再发 `0.13.21`。
+
 ## 2026-11-23 — round-55 已合流 main 未发版：任务板存在检查（`CONFIRMED`，soak BLOCKED）
 
 - **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
