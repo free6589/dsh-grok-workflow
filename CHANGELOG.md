@@ -7,6 +7,10 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ### Fixed / 修复
 
+- **Two stale comments now tell the truth about the gate / 两处过期注释改说实话** —
+  Two comments still described the removed gate switch (`returns false`, `decide whether the gate exists`); the gate always runs since round-54 and a hookless runtime fails the load. Comments corrected; no behavior changes.
+  / 两处注释还写着已删除的开关（"返回否"、"决定门在不在"）；门从 round-54 起常开，无钩子就加载报错。注释改对；行为不变。
+
 - **Stopping the steward clears the floor / 管家打烊即清场** —
   Stopping only flipped the switch while reads still served stale rows (plus overlay patches) from the dropped handle. Stop now drops the overlay and the board handle, so reads after stop are empty and a restart reloads persisted truth through resume.
   / 打烊以前只关开关，读数还摆着旧货。打烊现在连货架带贴纸一起撤，停后读数为空，重启走 resume 读持久真相。

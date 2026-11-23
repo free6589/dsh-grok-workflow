@@ -1,0 +1,3 @@
+round-59 real-device probe: NOT_RUN (BLOCKED by task scope — brief says 真机按网关 502 必 BLOCKED: 只做网关探针 + 记 soak.txt, 不伪造).
+No gateway probe executed (no target gateway/URL supplied in brief; task is a doc-comment fix, no live behaviour change).
+No real-device steps taken. No data fabricated.
