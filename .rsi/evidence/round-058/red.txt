@@ -1,0 +1,44 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/rsi-round-58
+
+ ❯ test/dispatcher-board.spec.ts (4 tests | 1 failed) 26ms
+     ✓ persists creates to store.jsonl (never board.json) and reloads them 9ms
+     ✓ reads a missing id as undefined through the adapter 1ms
+     ✓ keeps a mark-blocked reason across a reload via the board detail 3ms
+     × clears the floor on stop: reads empty until resume restores truth 8ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/dispatcher-board.spec.ts > DispatcherSession on the TaskBoard store > clears the floor on stop: reads empty until resume restores truth
+AssertionError: expected [ { id: 't1', …(4) } ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "id": "t1",
++     "objective": "fake objective",
++     "owner": "agent-a",
++     "status": "pending",
++     "title": "Fake staged",
++   },
++ ]
+
+ ❯ test/dispatcher-board.spec.ts:121:28
+    119|     })).ok).toBe(true)
+    120|     await session.stop()
+    121|     expect(session.list()).toEqual([])
+       |                            ^
+    122|     expect(session.get('t1')).toBeUndefined()
+    123|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 passed (4)
+   Start at  18:05:50
+   Duration  379ms (transform 71ms, setup 0ms, import 95ms, tests 26ms, environment 0ms)
+

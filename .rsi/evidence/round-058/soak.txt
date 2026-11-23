@@ -1,0 +1,1 @@
+soak probe round-058: gateway http=401 (no live-model run attempted; no creds, no faking) => BLOCKED

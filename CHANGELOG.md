@@ -7,6 +7,10 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ### Fixed / 修复
 
+- **Stopping the steward clears the floor / 管家打烊即清场** —
+  Stopping only flipped the switch while reads still served stale rows (plus overlay patches) from the dropped handle. Stop now drops the overlay and the board handle, so reads after stop are empty and a restart reloads persisted truth through resume.
+  / 打烊以前只关开关，读数还摆着旧货。打烊现在连货架带贴纸一起撤，停后读数为空，重启走 resume 读持久真相。
+
 - **The steward session now runs on the durable board / 管家会话换上持久板** —
   The session kept its own memory map plus a home-made JSON file; it now holds the durable board and reads it through the adapter, with one unified file format. Truth (`id`/title-on-create/status/owner/detail) lives on the board; the two fields the board has no column for ride along in memory and are documented as such. Nothing is silently dropped.
   / 会话以前自带内存表加自制 JSON 文件，现在换上持久板、经转接头读写，文件格式统一成一种。真相字段落板，板上没列的两字段放内存随行并写明，不悄悄丢字段。
