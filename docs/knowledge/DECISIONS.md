@@ -2905,3 +2905,39 @@ spine 为空，pre-fix 形状会进脊柱。
   与 D-119 的窄表理由冲突；如果走这条路，必须只对「宿主台账证明是传输死因」的塌陷记账，而不是对 `format-error` 记账。
 - **教训（与 D-118 同类）：** 单测把 `{class:'server-error', switchModel:true}` 手工喂进 `noteRouteFailure`，测的是「表怎么记」，
   不是「引擎会不会给出这种失败」。任何依赖「某类失败会带着某个标志抵达」的改动，必须配一条**真引擎形状**的用例或一次真机 run。
+
+## D-121 · 死路由的记账改成「失败自己声明」，并把传输死因回灌给脚本（D-120 两条修法都做）与真机取证（2026-11-24）
+
+- **Status:** ① `CONFIRMED`（真机 soak：503 路由与挂死路由各自进表，`Dead routes` 有行，第 3 条任务起不再打那条路）；
+  ② `CONFIRMED`（真引擎形状用例：红灯在旧码上 3 failed，修后绿）。
+- **来源:** T4 返工子代理（agent-108），分支 `feat/dead-routes` 续作（`cd0c909`），合流 `release/0.13.27`（`78c1907`）；
+  证据 `.rsi/evidence/soak-deadroutes-01327-fix/`，记录见 `VALIDATION.md` 首条。
+- **决定一（修法一，改成专用标记而不是打开 `switchModel`）：** `childTimeoutFailure()` 保持 `switchModel: false`，
+  另加 `routeHealth: 'timeout'`；`classifyCallFailure()` 同样按类给出 `routeHealth`；`noteRouteFailure` 只读
+  `failure.routeHealth`，不再拿 `switchModel` 当闸门。
+  - **理由：** 两个问题本来不同。`switchModel` 答「这件事现在要不要换一条路」，`routeHealth` 答「这条路该不该排到最后」。
+    挂死对第二问答「是」（一次挂死等待已经付过），对第一问答「否」（任务改写措辞重试更划算）。用 `switchModel` 当代理，
+    于是真机上 8 行 timeout 一次也没进表。
+  - **代价（比 D-120 修法一原文更小）：** D-120 写的修法是「把 `switchModel` 打开」，代价是「任务从改措辞重试同一路由变成先换路由」。
+    走专用标记没有这个代价：挂死仍然 break 链、任务仍然改写措辞重试，只是那条路在本轮剩下的时间里排到最后。
+  - **429 例外保留：** `rate-limit` 的 `routeHealth` 仍按操作员的勾选框给（D-119：勾选框关掉时这条路由留着，429 意思是「现在忙」）。
+- **决定二（修法二，用拒绝当跨调用通道）：** 宿主 twin 在 `startActivation` 处把回执的 `result` 换成一个「传输死因就拒绝」的
+  promise，拒绝文本形如 `CHILD_DEATH: <class>: <子会话原话>`；引擎把它渲染进 guest 的 `AGENT_RESULT` 错误，脚本
+  `childDeathCause()` 再把它读回来，于是**本轮后续调用**也能知道这条路刚死于 503／断连／429。
+  - **为什么只能是拒绝：** 引擎的 `childResult()` 只投影 `{output, stopReason, structured}`，`args` 在 run 开始时
+    `structuredClone`，guest 的全局只有 `agent/parallel/pipeline/phase/log/args`，没有回程通道。拒绝（→ 引擎抛
+    `AGENT_RESULT`）是唯一能带着文本回到脚本腹地的一条缝。否决「宿主末尾改写报告」：那只改交付，省不下任何后续调用。
+  - **范围故意窄：** 只拒绝四个传输族。密钥被拒（`model-unavailable`）、被取消、真格式错（答完没交结构化结果）仍然走原来的
+    `null` → `format-error`，由 `reclassifyNullCollapses` 在宿主侧按台账改写——这样「格式错算不算这条路的问题」这条
+    D-120 的否决原样保留，也不会把子代理自己写坏 JSON 的账算到路由头上。
+- **被这条通道改写的一处旧断言：** `test/null-collapse.spec.ts` 的 timeout 种子原本断言「宿主改写了 >0 行」，现在脚本自己
+  就把类写成 `timeout` 了，宿主无事可改（`rewritten === 0`），断言改成「脚本已按类写、路由行里没有 format-error」。
+  这不是放宽标准：同一格证据换到了它该在的那一层。
+- **真机取证（同一套 fork/profile 形状）：** 隔离 `DSH_HOME`（`scripts/clone-profile.mjs` 克隆 `headless`，凭据 0 行），
+  两条假端点（`127.0.0.1:18471` 一律 503、`:18472` 连上不应答），worker 链 = [死路, 本机网关 `wb/cn:deepseek-v4.1-flash`]，
+  `maxConcurrency: 1`，插件行指向本 worktree 的 `lib/`；`DSH_HOME`/`HOME` 都是 scratch，live `~/.dsh` 与线上实例未动。
+  503 轮：5 题 5 verified，死路由只吃到 2 次调用（`server-error`），第 3~5 题一次都不打它，台账
+  `Dead routes: soak-dead/soak/dead-model: server-error (2 in a row)`。挂死轮：`timeout (2 in a row)`，那条路同样被排到最后。
+- **教训（写进下一轮的规矩）：** 诊断行只在 `renderReport(..., {showDiagnostics:true})` 里出现，而 `showDiagnostics` 是
+  T4 定死的 false；取证时必须用**只翻可见性**的 lib 副本（本轮：`renderReport(value)` → `renderReport(value,{showDiagnostics:true})`，
+  一处），并把「路由逻辑用的是真 lib」这一点在记录里写清。运行本身用未改动的 `lib/` 复跑一遍即可交叉验证。

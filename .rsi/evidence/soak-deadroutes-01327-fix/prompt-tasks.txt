@@ -1,0 +1,7 @@
+只调用一次 grok_workflow 工具，参数严格如下（不要自己解题、不要写脚本、不要调用第二次）：
+
+objective: 把下面五道小题分别当成五个相互独立的任务来完成，每题给出结论并附可复核的验算。
+
+tasks: [{"id": "t1", "title": "17+25", "objective": "计算 17+25", "expectedOutput": "给出数值结论", "acceptanceCriteria": ["17+25 的结论为 42，并附可复核的验算步骤"]}, {"id": "t2", "title": "144 的平方根", "objective": "求 144 的算术平方根", "expectedOutput": "给出数值结论", "acceptanceCriteria": ["144 的算术平方根为 12，并附 12×12=144 的验算"]}, {"id": "t3", "title": "1000-378", "objective": "计算 1000-378", "expectedOutput": "给出数值结论", "acceptanceCriteria": ["1000-378 的结论为 622，并附反向加法 622+378=1000 的验算"]}, {"id": "t4", "title": "13×7", "objective": "计算 13×7", "expectedOutput": "给出数值结论", "acceptanceCriteria": ["13×7 的结论为 91，并附反向除法 91÷7=13 的验算"]}, {"id": "t5", "title": "2 的 10 次方", "objective": "计算 2 的 10 次方", "expectedOutput": "给出数值结论", "acceptanceCriteria": ["2 的 10 次方为 1024，并附逐次翻倍到 1024 的验算"]}]
+
+工具返回后，把返回的完整文本原样贴出来。

@@ -1,3 +1,15 @@
+Last updated: 2026-11-24 07:20 +08:00（**0.13.27 返工：死路由在真机上真的进表了，`CONFIRMED`（单测 + 真机 soak），待发版** —
+上一轮合流 soak 判 FAIL 的两条根因都堵上了（D-121）。① 记账不再拿 `switchModel` 当闸门，挂死的路用专用
+`routeHealth:'timeout'` 进表（`switchModel` 仍为 false，任务仍改写措辞重试）；② 5xx/断连/429 的死因由宿主 twin
+以「拒绝」回灌给 guest（`CHILD_DEATH: <class>: <子会话原话>`），脚本读回后记真类，本轮后续调用因此会绕开那条路。
+两条都配了**真引擎形状**的用例（旧码上 3 红 → 修后 24 绿），不再是手工喂 `{class, switchModel}` 的假 seam。
+门禁：`npm run ci` exit 0（**97 files / 1820 tests**，typecheck 干净、lint 0 errors / 36 warnings 全既有、
+`verify:lib` byte-identical），合流后 `release/0.13.27` 再跑一次仍 exit 0。隔离真机 soak（克隆 `headless`，独立
+`DSH_HOME`/`HOME`，插件行指向本 worktree 的 `lib/`，worker 链 = [假 503/挂死端点, 本机网关]，`maxConcurrency:1`）：
+**503 轮 PASS** —— 5 题 5 verified、死路由只吃 2 次调用、第 3~5 题一次不打它、台账
+`Dead routes: soak-dead/soak/dead-model: server-error (2 in a row)`；**挂死轮 PASS（记账那一条）** ——
+`timeout (2 in a row)` 且有行。真机证据 `.rsi/evidence/soak-deadroutes-01327-fix/`。live `~/.dsh` 与线上实例未动。）
+
 Last updated: 2026-11-24 06:10 +08:00（**0.13.27 不发：合流后真机 soak 判 FAIL —— 死路由这条账在真机上一条都记不住** —
 `release/0.13.27`（worktree `.tmp/wt-rel-01327`，从 `main` `5678dd8`＝0.13.26 开出）已把 `feat/dead-routes` 合入，
 合流点 `npm run ci` **exit 0（97 files / 1814 tests）**、`lib/` 与 `src/` 逐字节一致；隔离真机 soak（`headless` profile 克隆进

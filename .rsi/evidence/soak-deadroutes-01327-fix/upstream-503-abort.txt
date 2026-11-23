@@ -1,0 +1,8 @@
+(node:7) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+dsh: reasoning:
+The user asks me to call grok_workflow once with an exact objective string. Then paste the full returned text verbatim.
+
+Let me do that.
+
+dsh: SERVER: 503: {"type":"api_error","code":"no_healthy_account","message":"all accounts are temporarily unavailable, please retry later"}

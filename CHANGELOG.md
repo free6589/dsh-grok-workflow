@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.27] - 2026-11-24
+
 ### Changed / 变更
 
 - **A route that keeps failing is tried last, so a task stops paying for a road that is down / 一直失败的那条路排到最后，不再让每件事都为它付一次钱** —

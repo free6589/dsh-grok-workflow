@@ -1,3 +1,29 @@
+## 2026-11-24 — 0.13.27 返工：死路由的两条根因都堵上，真机 soak PASS（`CONFIRMED`）
+
+- **From:** T4 返工子代理（agent-108） · **To:** lead / 下一个接手者
+- **做了什么**（D-121）：在 `feat/dead-routes` 续作（`cd0c909`），合流 `release/0.13.27`（`78c1907`）：
+  1. **记账不再读 `switchModel`**：`childTimeoutFailure()` 保持 `switchModel:false`、新增 `routeHealth:'timeout'`；
+     `classifyCallFailure()` 按类给 `routeHealth`；`noteRouteFailure` 只认 `failure.routeHealth`（429 仍跟随勾选框，D-119 不变）。
+  2. **死因回灌给脚本**：`src/team-engine.ts` 的 twin 在 `startActivation` 处把回执的 `result` 换成「四个传输族就拒绝」的
+     promise，文本 `CHILD_DEATH: <class>: <子会话原话>`；`src/script.ts` 的 `childDeathCause()` 读回，于是**同一 run 后续调用**
+     也绕开那条死路，报告行同时从「格式错」变成服务商原话。
+  3. **补真引擎形状用例**：`test/dead-routes.spec.ts` 加 4 条走真引擎 + twin 的用例（503 死因进表、挂死进表、答完没交结构化
+     不计数、密钥被拒不计数）与 2 条「两侧钉住」（marker + 族表）；`test/null-collapse.spec.ts` 的 timeout 种子改成
+     「脚本自己已按类写、宿主无事可改」。
+- **验证**：旧码上 3 红 → 修后 24 绿；`npm run ci` 在 `feat/dead-routes` 与合流后的 `release/0.13.27` 各 exit 0
+  （97 files / 1820 tests，typecheck 干净，lint 0 errors/36 warnings 全既有，`verify:lib` byte-identical）。
+  真机 soak（隔离 `DSH_HOME`，克隆 `headless`，假 503 端点 + 假挂死端点 + 本机网关，`maxConcurrency:1`）：503 轮 5/5 verified、
+  死路由只吃 2 次调用、第 3~5 题一次不打它、台账 `server-error (2 in a row)`；挂死轮 `timeout (2 in a row)`。
+  证据 `.rsi/evidence/soak-deadroutes-01327-fix/`。
+- **留给下一个人的两件小事**：
+  1. 挂死轮的 soak 只证明了「进表 + 排后」，没能在同一轮里演示「第 3 条任务起不打它」——因为外层模型那几轮都没传 `tasks`，
+     而短 `childTimeout` 下 planner 自己也会超时→fallback 成 1 条任务。要补这一格，最省事的是把 `tasks` 由调用方写死
+     （直接调 `grok_workflow`，不经外层模型），或用更长的 `childTimeoutMs` 让 planner 活下来。
+  2. `src/delivery/index.ts` 的 `machineLedger` 与 `report.renderReport` 仍是两份并列诊断视图，`Dead routes` 只在后者里
+     （按设计稿范围，D-119）。要对齐就一起改并补一条「两份一致」的用例。
+- **分支处理**：`feat/dead-routes`（worktree `.tmp/wt-dead-routes`）已合入 `release/0.13.27`，与 `release/0.13.27`
+  一起在 0.13.27 发版后可删；`release/0.13.27` 合入 `main` 后按 §5 在 24h 内删除。
+
 ## 2026-11-24 — 0.13.27 合流 soak 判 FAIL：死路由表在真机上是空表，发版停在合流点（`CONFIRMED` 门禁 + `CONFIRMED` 否证 / 生产路径 `NOT_RUN`）
 
 - **From:** 合流发版子代理（agent-107） · **To:** lead / 下一个接手者

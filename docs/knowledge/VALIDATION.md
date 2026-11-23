@@ -1,3 +1,24 @@
+## 0.13.27 返工 soak 判 **PASS**：死路由在真机上真的进表了（503 与挂死两种都验）— 2026-11-24（T4 返工子代理 agent-108）
+
+| state | command | result |
+| --- | --- | --- |
+| 分支 | `feat/dead-routes` 续作（worktree `.tmp/wt-dead-routes`）→ 合流 `release/0.13.27`（worktree `.tmp/wt-rel-01327`）；共享脏树 detached `a6103ad` 一行未动 | `CONFIRMED` |
+| 修法（两条，见 D-121） | ① `childTimeoutFailure` 保持 `switchModel:false` 并新增 `routeHealth:'timeout'`；`classifyCallFailure` 也按类给 `routeHealth`；`noteRouteFailure` 只读 `routeHealth`（429 仍跟随勾选框）。② 宿主 twin 把激活回执的 `result` 换成「传输死因就拒绝」的 promise，文本 `CHILD_DEATH: <class>: <子会话原话>`，脚本 `childDeathCause()` 读回并记真类 | `CONFIRMED`（读码 + 用例） |
+| 新用例先红 | `git stash push -- src/script.ts src/team-engine.ts` 后 `npx vitest run test/dead-routes.spec.ts` | **3 failed / 21 passed**：`counts a 503 the engine collapsed to null`、`counts a call that hung…`、`pins the marker and the family table` 三条红 |
+| 新用例后绿 | 同上（恢复修复） | **24 passed（24）**，含 4 条真引擎形状（503 死因进表、挂死进表、答完没交结构化仍不计数、密钥被拒不计数）与 2 条两侧钉住 |
+| 全量 | `npm run ci`（`feat/dead-routes` `cd0c909`） | **exit 0：97 files / 1820 tests PASS**，typecheck 干净，lint **0 errors / 36 warnings（全既有）**，`verify:lib` byte-identical |
+| 合流后门禁 | `npm run ci`（`release/0.13.27` `78c1907`） | **exit 0：97 files / 1820 tests PASS**，同上 |
+| 隔离真机 soak 环境 | `scripts/clone-profile.mjs` 克隆 `headless` → `.tmp/soak-01327r/dsh-home`（parity 4/4，凭据 0 行）；插件行以 `insert` 挂到本 worktree 的 `lib/index.js`；独立 `DSH_HOME` + `HOME`；live `~/.dsh` 零写入、线上 `100.111.111.88:3080` 未动 | `CONFIRMED` |
+| 路由造法 | 两条假端点：`127.0.0.1:18471` 一律 503（`soak-dead/soak/dead-model`）、`127.0.0.1:18472` 连上永不应答（`soak-hang/soak/hang-model`）；真路 = 本机网关 `soak-live/wb/cn:deepseek-v4.1-flash`；worker 链 = [死路, 真路]，`maxConcurrency: 1` | `CONFIRMED`（`curl` 实测 503 / 挂住） |
+| **503 轮**（5 题，caller plan，childTimeout 7200s） | `DSH_HOME=… dsh --profile headless-soak --patch dead.patch.yml 「<五小题>」` | **PASS**：`COMPLETED`，5 题 5 verified；死路由只吃到 **2 次** worker 调用（第 1、2 题），**第 3~5 题一次都没打它**；台账 `Dead routes: soak-dead/soak/dead-model: server-error (2 in a row)`，两行 `Route switches` 都写着子会话原话 `503: {"message":"service unavailable (soak endpoint: this provider is down)","type":"server_error","code":503}`（`run-dead.txt`、`dead-ledger.txt`） |
+| **挂死轮**（同一套，childTimeout 20s / 60s） | 同上换 `hang.patch.yml` | **PASS（记账那一条）**：台账 `Dead routes: soak-hang/soak/hang-model: timeout (2 in a row)`，两条 `timeout` 行都是脚本自己的 `childTimeoutFailure`（`switchModel` 仍是 false），那条路随后被排到最后（`hang-ledger.txt`、`run-hang.txt`、`README.md`）。**如实留白**：这两轮的计划都塌成 1 条任务（外层模型没传 tasks；短 childTimeout 下 planner 也超时→fallback），所以「第 3 条任务起」这一条只在本轮用 503 轮取到证据，挂死轮只证明了「进表 + 排后」 |
+| 诊断行为什么能看见 | 插件把 `showDiagnostics` 定死为 false（T4），台账块只在 `renderReport(…,{showDiagnostics:true})`；本轮用一个**只翻可见性**的 `lib/` 副本（`probe-lib/index.js`：`renderReport(value)` → `renderReport(value,{showDiagnostics:true})`，仅此一处）取证，路由代码与真 `lib/` 逐字节相同 | `CONFIRMED` |
+| 成功率不受影响 | 503 轮 5/5 verified、COMPLETED | `CONFIRMED` |
+
+**结论：0.13.27 的发版理由（CHANGELOG `[Unreleased]`）在真机上现在成立。** 上一轮 FAIL 的两条根因都被堵上：
+挂死那条路会进表（专用标记，不再被 `switchModel:false` 拦住），5xx/断连/429 带着子会话的死因回到脚本（`CHILD_DEATH` 通道），
+两条都配了真引擎形状的用例，而不再是手工喂 `{class, switchModel}` 的假 seam。
+
 ## 0.13.27 合流 soak 判 **FAIL**：死路由这条账在真机上一条都记不住，0.13.27 未发 — 2026-11-24（合流方）
 
 | state | command | result |

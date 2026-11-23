@@ -1,0 +1,15 @@
+Model routes: planner=soak-live/wb/cn:deepseek-v4.1-flash; worker=soak-hang/soak/hang-model → soak-live/wb/cn:deepseek-v4.1-flash; verifier=soak-live/wb/cn:deepseek-v4.1-flash; supervisor=soak-live/wb/cn:deepseek-v4.1-flash; synthesizer=soak-live/wb/cn:deepseek-v4.1-flash
+Deadline: 1800000 ms per run (enforced by the plugin)
+Child budget: 20000 ms per call (the run stops waiting on one call after this long)
+Route switches:
+- planner attempt 0 via soak-live/wb/cn:deepseek-v4.1-flash: timeout — planner call exceeded the 1 minute child budget and was settled as a timeout; retry with a smaller step
+- worker attempt 1 via soak-hang/soak/hang-model: timeout — worker call exceeded the 1 minute child budget and was settled as a timeout; retry with a smaller step
+- worker attempt 2 via soak-hang/soak/hang-model: timeout — worker call exceeded the 1 minute child budget and was settled as a timeout; retry with a smaller step
+Dead routes (two consecutive transport failures; live routes are tried first):
+- soak-hang/soak/hang-model: timeout (2 in a row)
+Errors:
+- Execute: task-1: worker failed on every route: [timeout] worker call exceeded the 1 minute child budget and was settled as a timeout; retry with a smaller step
+- Attempt 1: task-1: worker failed on every route: [timeout] worker call exceeded the 1 minute child budget and was settled as a timeout; retry with a smaller step
+- Attempt 2: task-1: worker failed on every route: [timeout] worker call exceeded the 1 minute child budget and was settled as a timeout; retry with a smaller step
+- Plan: planner failed on every route: [timeout/infrastructure] planner call exceeded the 1 minute child budget and was settled as a timeout; retry with a smaller step
+Guard: 
