@@ -1,4 +1,14 @@
-Last updated: 2026-11-24 04:25 +08:00（**0.13.26 五步发版进行中：死因取真原文，真机 soak PASS，`CONFIRMED`** —
+Last updated: 2026-11-24 04:36 +08:00（**已发版 `0.13.26`：子代理死掉，报告说的是服务商原话，`CONFIRMED`** —
+发版提交 `49e1045`（修复 `019921c` + 发版准备）+ tag `v0.13.26` 已推；远端 CI `45260234450` success、
+Release `45260254869` success 并已发布（asset `dsh-grok-workflow-0.13.26.tgz`，
+<https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.26>）。本地门禁：`npm run ci` exit 0
+（96 files / 1796 tests PASS，含新增 `test/child-evidence.spec.ts` 15 例与扁平/嵌套 spec 两例），lint 0 errors，
+`verify:lib` byte-identical。三处修复（D-118）：① 两种 activation spec 形状都读；② 死因从子会话
+`turn/end`/`assistant/attempt` 取（spawn 路径的 `SubagentResult` 没有 `diagnostic`），拿不到原文就说
+"cause unknown"；③ 交付「仍未完成」行按 task id 重建。真机 soak PASS：`.rsi/evidence/round-078/`。
+仍有一处边界如实留着：合成器在修复之前写下的散文（如「没有交回可解析的成果」）不会被回写，
+只有报告事实块与台账是修好的；改写它需要把修复时机前移到脚本里，见 HANDOFF。）
+
 分支 `fix/t1-death-evidence`（从 `release/0.13.26` 开出）+ `release/0.13.26` 合流。三处修完：① 扁平/嵌套两种
 activation spec 都读（`activationFacts`，单测钉住两种形状）；② 死因从**子会话自己的 `turn/end`** 取
 （`src/child-evidence.ts`；spawn 路径的 `SubagentResult` 没有 `diagnostic` 这件事由真机确认），分类先看服务商

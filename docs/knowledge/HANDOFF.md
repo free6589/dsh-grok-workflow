@@ -14,6 +14,16 @@
 - **关键的实测事实**（写进 D-118）：spawn 路径的 `SubagentResult` 确实没有 `diagnostic`；死因只在子会话日志里；
   真机运行栈 `dsh 0.2.2-rc.3-6b729fe`（引擎发**扁平** spec），而 `package.json` devDeps 仍钉 `0.2.1-rc.2`（发**嵌套** spec）——
   单测的假 seam 与运行时在两个方向上都会不一致，凡在 seam 上取证的改动都必须配真机 run。
+- **发版已完成（2026-11-24 04:36）**：`v0.13.26` 已推并发布
+  （<https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.26>，asset `dsh-grok-workflow-0.13.26.tgz`）；
+  远端 CI `45260234450` success、Release `45260254869` success。`main` = `49e1045`。
+  `fix/t1-death-evidence` 与 `release/0.13.26` 已合流并删除；`fix/null-collapse-t1` 按 lead 要求留着（其内容已合入）。
+- **下一轮可以做的一件事（不是缺陷，是边界）**：合成器在**修复之前**写下的散文（例如
+  「执行的一方在各种尝试下都没有交回可解析的成果」）仍然是旧口径——宿主只回写了报告事实块与台账，
+  模型写的叙述句子回写不了。真机上它和修好的事实块并列出现（截图 round-078 `dead.png`），
+  读者不至于被误导，但两句话并排读起来是矛盾的。要消掉它，得把死因的判定前移到脚本里
+  （D-116 B2 那一类上游通道，或让脚本在写 `incomplete[].reason` 之前就拿到台账）。
+
 - **未做/边界**：live `~/.dsh` 只读零写入，线上实例未动未重启；`.tmp/soak-t1/` 已删除；
   `release/0.13.26` 与 `fix/null-collapse-t1` 分支在合流后按 AGENTS §5 处理（本分支合流即删，旧 T1 分支留待 lead 决定）。
 
