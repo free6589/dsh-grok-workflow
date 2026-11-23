@@ -1,3 +1,14 @@
+## 2026-11-23 — round-58 已合流 main 未发版：打烊清场（`CONFIRMED`，soak BLOCKED）
+
+- **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
+- **做了什么**：stop 只关开关、读数还摆旧货。打烊加清 overlay + 断句柄，停后读数为空，
+  重启走 resume；+1 打烊回归；`npm run ci` exit 0（87/1652）；lead 独立红绿复验成立。
+- **真机**：BLOCKED（网关 502，未伪造）。本次不发版。
+- **合流**：`rsi/round-58`（`656a852`）已 `--no-ff` 合入 main 系 worktree（合流 `326a7c2`）；
+  `rsi/round-58` 分支可 24h 内删除。`CHANGELOG [Unreleased]` 中英文已记 12 条待发。
+- **下轮**：开新方向（gate/报告新找 bug 面，或 research）。
+  网关恢复后给 round-47~58 补一次 soak 再发 `0.13.21`。
+
 ## 2026-11-23 — round-57 已合流 main 未发版：会话换上持久板（`CONFIRMED`，soak BLOCKED）
 
 - **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者

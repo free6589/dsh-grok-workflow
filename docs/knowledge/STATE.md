@@ -1,3 +1,7 @@
+Last updated: 2026-11-23 18:05 +08:00（**round-58 已合流 main 未发版：打烊清场，`CONFIRMED`，soak BLOCKED** —
+合流提交 `326a7c2`（main `a89152a` + `656a852`）；`npm run ci` exit 0（87 文件 / 1652 测试 PASS，+1 打烊回归）。
+真机 BLOCKED（网关 502，未伪造）；`CHANGELOG [Unreleased]` 中英文已记 12 条待发，不发版。）
+
 Last updated: 2026-11-23 18:00 +08:00（**round-57 已合流 main 未发版：会话换上持久板，`CONFIRMED`，soak BLOCKED** —
 合流提交 `42b1b01`（main `8f8f8f3` + `9dc7624`）；`npm run ci` exit 0（87 文件 / 1651 测试 PASS，+3 换板回归）。
 真机 BLOCKED（网关 502，未伪造）；`CHANGELOG [Unreleased]` 中英文已记 11 条待发，不发版；
