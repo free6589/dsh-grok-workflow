@@ -1,3 +1,15 @@
+## round-54 缺钩子加载即报错（三面 15 条收官，soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
+
+| state | command | result |
+| --- | --- | --- |
+| worktree rsi-round-54 `17ed0be`（main `2de6b78` + 本轮 1 提交） | `npx vitest run test/gate.spec.ts -t "hook is missing"`（旧码 stash） | **1 failed / 52 skipped**：新用例红（旧码只 warn 不抛） |
+| 同上（新码） | `npx vitest run test/gate.spec.ts test/plugin-lifecycle.spec.ts test/timeout-config.spec.ts test/config-limits-repair.spec.ts test/config-synthesis-fallback.spec.ts`（lead 独立） | **117 passed** |
+| 同上（新码） | `npm run ci`（lead 独立） | **exit 0：85 files / 1645 tests PASS**；typecheck 干净；lint 0 errors；`verify:lib` byte-identical |
+| 隔离 soak | 网关探针 | **BLOCKED**：网关 502 无额度，未伪造 |
+
+**Changed:** `src/gate.ts`（无钩子 warn+return false → throw 点名原因；调用方 `index.ts` 零处理故选抛错而非改日志）+ `test/gate.spec.ts`（旧 fail-open 断言改 fail-closed）+ 4 个纯 tool 路径 spec 补 `on` 空桩 + `lib/` 重建 + `CHANGELOG [Unreleased]` 中英双语 + `.rsi/evidence/round-054/`。
+**Honest boundary:** 真机 BLOCKED，不发版；`[Unreleased]` 已攒 8 条待发；三面 15 条至此全落（报告 5 + 并发 4 + 配置 6）。
+
 ## round-53 守护路由 fail-closed（soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
 
 | state | command | result |

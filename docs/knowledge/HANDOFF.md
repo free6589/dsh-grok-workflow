@@ -1,3 +1,17 @@
+## 2026-11-23 — round-54 已合流 main 未发版：缺钩子加载即报错，三面 15 条收官（`CONFIRMED`，soak BLOCKED）
+
+- **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
+- **做了什么**：配置面第 4 条（最后一件）。门上写 fail-closed，无钩子却只 warn 放行，
+  主模型直接作答；调用方对 false 零处理，故缺钩子改加载即抛错点名原因（不改 Loader 接线）。
+  旧 fail-open 断言改 fail-closed + 4 纯 tool 路径桩补 `on`；`npm run ci` exit 0（85/1645）；
+  lead 独立红绿复验成立。
+- **真机**：BLOCKED（网关 502，未伪造）。本次不发版。
+- **合流**：`rsi/round-54`（`17ed0be`）已 `--no-ff` 合入 main 系 worktree（合流 `3c2bcc7`）；
+  `rsi/round-54` 分支可 24h 内删除。`CHANGELOG [Unreleased]` 中英文已记 8 条待发。
+- **收官**：三面 15 条全落（报告 5：blocked 原因/`+N more`/尾部行边界/不可用标记/恢复深拷；
+  并发 4：无定时器兜底/单快照/路径统一/删过期常量；配置 6：Slack 全系/Cookie/守护两件/缺钩子）。
+  网关恢复后给 round-47~54 补一次 soak 再发 `0.13.21`。
+
 ## 2026-11-23 — round-53 已合流 main 未发版：守护路由 fail-closed（`CONFIRMED`，soak BLOCKED）
 
 - **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者

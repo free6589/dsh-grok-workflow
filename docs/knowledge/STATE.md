@@ -1,3 +1,8 @@
+Last updated: 2026-11-23 17:05 +08:00（**round-54 已合流 main 未发版：缺钩子加载即报错，三面 15 条收官，`CONFIRMED`，soak BLOCKED** —
+合流提交 `3c2bcc7`（main `2de6b78` + `17ed0be`）；`npm run ci` exit 0（85 文件 / 1645 测试 PASS，改 1 断言 + 4 桩）。
+真机 BLOCKED（网关 502，未伪造）；`CHANGELOG [Unreleased]` 中英文已记 8 条待发，不发版；
+报告 5 + 并发 4 + 配置 6 共 15 条至此全落。）
+
 Last updated: 2026-11-23 16:50 +08:00（**round-53 已合流 main 未发版：守护路由 fail-closed，`CONFIRMED`，soak BLOCKED** —
 合流提交 `49197f8`（main `71e13b2` + `6e723ed`）；`npm run ci` exit 0（85 文件 / 1645 测试 PASS，+2 回归）。
 真机 BLOCKED（网关 502，未伪造）；`CHANGELOG [Unreleased]` 中英文已记 7 条待发，不发版。）
