@@ -31,7 +31,7 @@
  * `stat -c …`, digests, absolute paths and the relay markers themselves.
  */
 
-import { deliverReport, machineLedger } from './delivery/index.js'
+import { deliverReport, LEDGER_UNAVAILABLE, machineLedger } from './delivery/index.js'
 import type { DeliveryLang } from './delivery/index.js'
 import type { WorkflowReport } from './types.js'
 
@@ -111,21 +111,22 @@ export interface RelayOptions {
 }
 
 /**
- * The durable ledger kept below the closing marker, or an empty string.
+ * The durable ledger kept below the closing marker, or the unavailable marker.
  *
  * A validated report always renders (the host validator checks every field this
  * reads). A report that arrives with a hole must still not cost the reader the
  * answer — the human block is composed and bounded separately — so a ledger that
- * cannot be rendered is dropped instead of thrown out of the delivery.
+ * cannot be rendered carries the routing-unavailable marker (round 46) instead
+ * of being thrown out of the delivery or dropped silently.
  *
  * @param report - the report being delivered.
- * @returns the ledger text, or `''` when it cannot be rendered.
+ * @returns the ledger text, or the unavailable marker when it cannot be rendered.
  */
 function foldedLedger(report: WorkflowReport): string {
   try {
     return machineLedger(report)
   } catch {
-    return ''
+    return LEDGER_UNAVAILABLE
   }
 }
 
@@ -165,8 +166,10 @@ export function relayText(report: WorkflowReport, header?: string, opts?: RelayO
   // answer. That path falls back to the ledger itself, which is what the
   // pre-0.7.0 delivery did.
   const body = visible === '' && durable !== '' ? durable : visible
-  // A ledger already inside the markers must not be repeated below them.
-  const folded = durable === '' || visible === '' || view.ledger !== undefined
+  // A ledger already inside the markers must not be repeated below them. The
+  // folded copy is always present now (round 46): when the report itself has no
+  // ledger to fold, `durable` is the unavailable marker, never an empty string.
+  const folded = visible === '' || view.ledger !== undefined
     ? []
     : ['', LEDGER_GUARD, durable]
   return [preamble, '', REPORT_BEGIN, body, REPORT_END, ...folded].join('\n')

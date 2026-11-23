@@ -1,0 +1,34 @@
+[smoke] status=failed file=/tmp/dsh-grok-workflow-test-checkpoints/checkpoint-6a2441a5-f649-4ec8-af94-185587295928-18f4dd57.json resume=resume unfinished=a
+
+ ✓ test/checkpoint-engine-wire.spec.ts (2 tests) 233ms
+ ✓ test/dispatcher.spec.ts (11 tests) 11ms
+ ✓ test/docs-config-keys.spec.ts (13 tests) 17ms
+ ✓ test/i18n-parity.spec.ts (6 tests) 8ms
+ ✓ test/config-synthesis-fallback.spec.ts (8 tests) 15ms
+ ✓ test/checkpoint-bound.spec.ts (5 tests) 1565ms
+     ✓ measures the integrity record and derives the payload ceiling from it  700ms
+     ✓ refuses one payload byte above the ceiling as too large  557ms
+ ✓ test/input.spec.ts (13 tests) 12ms
+ ✓ test/loader.spec.ts (3 tests) 145ms
+ ✓ test/intake.spec.ts (14 tests) 7ms
+ ✓ test/history.spec.ts (16 tests) 64ms
+ ✓ test/update-entry.spec.ts (5 tests) 6ms
+ ✓ test/docs-version.spec.ts (8 tests) 10ms
+ ✓ test/upstream.spec.ts (8 tests) 7ms
+ ✓ test/settings-projection.spec.ts (4 tests) 22ms
+ ✓ test/iterate-template.spec.ts (7 tests) 5ms
+ ✓ test/rsi-ledger.spec.ts (5 tests) 11ms
+ ✓ test/criterion.spec.ts (5 tests) 8ms
+ ✓ test/docs-architecture-version.spec.ts (3 tests) 6ms
+ ✓ test/records-redaction.spec.ts (4 tests) 62ms
+ ✓ test/triage-followup.spec.ts (5 tests) 10ms
+
+ Test Files  85 passed (85)
+      Tests  1638 passed (1638)
+   Start at  14:17:46
+   Duration  99.57s (transform 2.60s, setup 0ms, import 8.23s, tests 81.46s, environment 9ms)
+
+> tsc -p tsconfig.json --noEmit
+
+Found 33 warnings and 0 errors.
+Finished in 143ms on 147 files with 96 rules using 6 threads.

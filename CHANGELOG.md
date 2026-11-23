@@ -5,6 +5,12 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Fixed / 修复
+
+- **A ledger that cannot render says so instead of vanishing / 账本画不出时会直说，不再悄悄消失** —
+  A report whose routing carries a dirty chain still refuses inside the ledger renderer, but both the direct delivery and the relay path dropped the ledger silently, which read as a healthy run with no routes. The ledger now stays present as an explicit unavailable marker pointing at the canonical structured result; the human answer is untouched and nothing is thrown.
+  / 路由里带脏数据的报告在账本渲染器里照旧拒绝，但直接交付和转交两条路都把账本悄悄丢掉，读起来像"本来就没路由的健康轮次"。现在账本会留下一句明确的"不可用"标记并指向结构化正本；人话答案不受影响，也不抛错。
+
 ## [0.13.19] - 2026-11-23
 
 ### Fixed / 修复

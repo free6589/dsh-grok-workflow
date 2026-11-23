@@ -1,0 +1,112 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/rsi-round-46
+
+ ❯ test/delivery-human-block.spec.ts (45 tests | 2 failed) 1232ms
+     ✓ keeps a reason that contains an identifier token ("attempt:") 12ms
+     ✓ keeps a reason that merely quotes a ledger label mid-sentence 1ms
+     ✓ drops no failed task from the block 2ms
+     ✓ keeps the same reason in the English block 1ms
+     ✓ separates a failure row the way the block's language does 1ms
+     ✓ still drops a line that is a ledger label 1ms
+     ✓ still keeps the answer when the echo is the only line 0ms
+     ✓ still keeps every ledger label out of the human block, and in the ledger 5ms
+     ✓ drops a line that carries an identifier key, and keeps a reason that mentions one 1ms
+     ✓ hides the ledger by default and shows it on request 2ms
+     ✓ never dresses a partial run as a completed one 1ms
+     ✓ keeps the head and the verdict when the block is over budget 3ms
+     ✓ still fits a short block unchanged 1ms
+     ✓ keeps the second language head and verdict, not just the first 2ms
+     ✓ keeps the second language verdict whole when the first block is at the cap 206ms
+     ✓ keeps both verdicts when the first language is Chinese 188ms
+     ✓ charges neither language more than the single-pass cap 180ms
+     ✓ gives both blocks room when each one sits on the single-pass cap 0ms
+     ✓ closes the 4801 window the blind pair cut fell through 0ms
+     ✓ never shortens a pair that already fits 0ms
+     ✓ hands the unused half to the block that needs it 0ms
+     ✓ never returns a negative cap, whatever the budget 0ms
+     ✓ keeps the head and the whole verdict and cuts only at a line boundary 1ms
+     ✓ marks the cut so a reader knows the middle is missing 1ms
+     ✓ keeps the same guarantee in the Chinese block 1ms
+     ✓ leaves no lone surrogate when a caveat is longer than one clamped line 1ms
+     ✓ leaves no lone surrogate in either language of a bilingual pair 2ms
+     ✓ is exactly the two single-language blocks and one blank line 5ms
+     ✓ adds no cut marker to a block that fits 1ms
+     ✓ names the role, the position and the shape for a non-string route 1ms
+     ✓ checks every role, not only worker 1ms
+     ✓ points at the entry that is wrong, not the first one 0ms
+     ✓ refuses a chain that is not an array, naming the role 0ms
+     ✓ refuses a routing map that is not a record 1ms
+     ✓ never coerces a bad route into a readable one 0ms
+     ✓ still prints a well-formed chain, and "inherit" for an empty one 0ms
+     ✓ keeps the human block readable when a chain is malformed 0ms
+     × marks the ledger unavailable instead of dropping it when diagnostics are on 8ms
+     × round 46: a dirty chain still delivers the answer with an explicit ledger marker, never a silent drop 2ms
+     ✓ stays inside the cap for every knob, in both language orders  584ms
+     ✓ does not pass the cap by throwing away text it had room for 5ms
+     ✓ cuts an over-long English reason at the end of a whole sentence 1ms
+     ✓ falls back to a word boundary when the reason has no sentence end at all 1ms
+     ✓ cuts a Chinese reason at a full stop too 0ms
+     ✓ leaves a reason that already fits byte for byte alone 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/delivery-human-block.spec.ts > round 39: a chain value that is not a route label is refused by path > marks the ledger unavailable instead of dropping it when diagnostics are on
+AssertionError: expected 'Answer: 天气已核验；酒店价格与机场巴士时刻未取得。\nNext: …' to contain 'unavailable'
+
+- Expected
++ Received
+
+- unavailable
++ Answer: 天气已核验；酒店价格与机场巴士时刻未取得。
++ Next: This was an external service or deadline problem, not your request; sending the same work again later usually goes through.
++ Achieved: Task a.
++ Not done:
++ - 酒店价格: task aborted before any attempt: [infrastructure/timeout] provider exploded
++ - 机场巴士时刻: verify step rejected: Plan: step 2 was skipped by the runner
++ Worth knowing:
++ - 机场巴士时刻未取得，行程建议可能偏差
++ That is the conclusion (1 of 3 usable, 2 not done); details are in the ledger.
+
+ ❯ test/delivery-human-block.spec.ts:701:23
+    699|     expect(view.ledger).toBe(LEDGER_UNAVAILABLE)
+    700|     expect(view.human.startsWith('Answer:')).toBe(true)
+    701|     expect(view.text).toContain('unavailable')
+       |                       ^
+    702|     expect(view.text).toContain(view.human)
+    703|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/delivery-human-block.spec.ts > round 39: a chain value that is not a route label is refused by path > round 46: a dirty chain still delivers the answer with an explicit ledger marker, never a silent drop
+AssertionError: expected 'Answer: 天气已核验；酒店价格与机场巴士时刻未取得。\nNext: …' to contain 'unavailable'
+
+- Expected
++ Received
+
+- unavailable
++ Answer: 天气已核验；酒店价格与机场巴士时刻未取得。
++ Next: This was an external service or deadline problem, not your request; sending the same work again later usually goes through.
++ Achieved: Task a.
++ Not done:
++ - 酒店价格: task aborted before any attempt: [infrastructure/timeout] provider exploded
++ - 机场巴士时刻: verify step rejected: Plan: step 2 was skipped by the runner
++ Worth knowing:
++ - 机场巴士时刻未取得，行程建议可能偏差
++ That is the conclusion (1 of 3 usable, 2 not done); details are in the ledger.
+
+ ❯ test/delivery-human-block.spec.ts:716:23
+    714|     expect(view.human.startsWith('Answer:')).toBe(true)
+    715|     expect(view.text).toContain(view.human)
+    716|     expect(view.text).toContain('unavailable')
+       |                       ^
+    717|     // The relay path folds the same marker below the closing marker, …
+    718|     // durable copy never reads as a healthy run either.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 43 passed (45)
+   Start at  14:19:48
+   Duration  1.96s (transform 540ms, setup 0ms, import 600ms, tests 1.23s, environment 0ms)
+

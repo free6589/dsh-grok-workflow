@@ -137,12 +137,25 @@ export declare function humanConclusion(report: WorkflowReport, opts?: {
  */
 export declare function machineLedger(report: WorkflowReport): string;
 /**
+ * Ledger placeholder when the routing map cannot be rendered (round 46).
+ *
+ * A report whose routing carries a dirty chain (a number, `null`, an object…)
+ * still fails inside {@link machineLedger} — that refusal is pinned by the
+ * round-39 specs and stays. What changes here is the delivery: instead of a
+ * silently absent ledger (which reads as a healthy run with no routes), the
+ * ledger field stays present and says it is unavailable, pointing at the
+ * canonical structured result. The human answer is untouched and nothing is
+ * thrown — only the silent drop becomes an explicit marker.
+ */
+export declare const LEDGER_UNAVAILABLE = "Model routes: unavailable (routing not renderable; see the canonical structured result)";
+/**
  * Compose one delivery: human conclusion first, machine ledger only on request.
  *
  * The default view is the human block alone. `diagnostics` adds the ledger after
  * a horizontal rule, which is the only way any of the machine identifiers reach
  * a reader — so "the summary said it, the ledger proves it" stays true without
- * the second half being mandatory.
+ * the second half being mandatory. When the routing cannot be rendered, the
+ * ledger carries {@link LEDGER_UNAVAILABLE} instead of being dropped.
  *
  * @param report - validated report, or an explicit failure report.
  * @param opts - `diagnostics` switch (default off) and `lang`.
