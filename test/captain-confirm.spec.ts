@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -9,6 +9,7 @@ import { Session } from '@deepseek-ai/dsh-session'
 import { apply } from '../src/index.js'
 import { approvedRequest, captainAnswer, CAPTAIN_LIMITS } from '../src/captain.js'
 import { setMode } from '../src/mode.js'
+import { closeAllSteering } from '../src/steering.js'
 import { callerTask, execution, task, verification } from './fixtures.js'
 import { runWorkflowScript, roleOf } from './helpers.js'
 
@@ -28,6 +29,16 @@ beforeAll(() => {
   memoryDir = mkdtempSync(join(tmpdir(), 'captain-confirm-'))
   process.env.GROK_WORKFLOW_MEMORY_DIR = memoryDir
 })
+// The steering registry is module-global and every case here reuses one session id. A
+// case that starts a background round returns before that round's `finally` closes its
+// channel, so the next case could find a live channel with no live round behind it and
+// watch the gate steer a message nobody will read (the flaky failure on a 2-vCPU
+// runner: an "并入正在跑的这一轮" receipt where the void note belonged). Each case starts
+// with no channel.
+afterEach(() => {
+  closeAllSteering()
+})
+
 afterAll(() => {
   if (previousMemoryDir === undefined) delete process.env.GROK_WORKFLOW_MEMORY_DIR
   else process.env.GROK_WORKFLOW_MEMORY_DIR = previousMemoryDir
