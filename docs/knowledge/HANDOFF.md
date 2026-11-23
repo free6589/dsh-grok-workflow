@@ -1,3 +1,31 @@
+## 2026-11-24 — 死路由 + task id 进报告行：单测到绿，真机留给合流方（`CONFIRMED` 单测 / `NOT_RUN` 真机）
+
+- **From:** T4 实现子代理（agent-106） · **To:** lead / 合流方 / 下一个接手者
+- **做了什么**：从 `main` `5678dd8`（0.13.26）开出 `feat/dead-routes`（worktree `.tmp/wt-dead-routes`），按设计稿
+  §7 的顺序落地：
+  1. `src/script.ts` guest：`ROUTE_HEALTH_LIMITS` / `ROUTE_HEALTH_FAMILIES` / `routeHealth` / `deadRoutes` /
+     `noteRouteFailure` / `noteRouteSuccess` / `isDeadRoute`；失败与成功两处插行；`preferredIndices` 加第三档
+     （死路由排最后，并且满载时优先落死路由而不是排队）；报告组装处快照 `deadRoutes`；
+  2. 六个任务级调用点（worker、worker 补交、verifier、verifier 补交、supervisor、supervisor 补交）传 `taskId`，
+     轨迹行多一个可选 `taskId`（planner / synthesizer 不传）；
+  3. 宿主：`src/types.ts` 加 `DeadRouteEntry` 与 `WorkflowReport.deadRoutes?`、`RouteTrailEntry.taskId?`；
+     `src/config.ts` 加 `HARD_LIMITS.deadRoute = { threshold: 2, routes: 16 }`（guest 侧按值镜像，用例钉住）；
+     `src/report.ts` 解析校验回填 + `showDiagnostics` 下的 `Dead routes` 块；
+  4. 交付层只登记标签（`LEDGER_LABELS` / `MIDLINE_LABELS` 加 `Dead routes`），台账块本身没有加（设计稿范围如此，
+     理由记在 D-119）。
+- **验证**：`npx vitest run test/dead-routes.spec.ts` 先红 12/18 → 后绿 18/18；旧的路由/报告/交付用例逐条重跑
+  8 files / 178 tests PASS（没有一条断言需要改）；`npm test` 97 files / 1814 tests PASS；`npm run ci` exit 0 与
+  `verify:lib` byte-identical 见 VALIDATION 首条的补记。
+- **真机 `NOT_RUN`（这是本轮唯一没做的事）**：死路由的实际收益只能在真机上量（一条会挂死的路由每轮省下的是
+  「任务数 − 2」次子调用等待）。合流方要做的一轮 soak：把一个 provider 指到会 5xx/超时的端点，跑 4 条以上任务的
+  run，确认 ① 第 3 条任务起不再往那条路打电话；② 报告 `deadRoutes` 一行；③ `showDiagnostics` 打开时台账有
+  `Dead routes` 段、关掉时答案里没有；④ 任务成功率不变。
+- **下一轮可以做的一件事**：`src/delivery/index.ts` 的 `machineLedger` 与 `report.renderReport` 现在是两份并列的
+  诊断视图，本轮只把新块加进了后者（按设计稿范围）。若合流方认为两份视图必须逐块对齐，把 `Dead routes` 块也加进
+  `machineLedger` 是一处小改动，但要同时补一条「两份视图一致」的用例，否则下次还是会漂。
+- **边界与卫生**：live `~/.dsh` 零写入、线上实例未动未重启；worktree 在 `.tmp/`（gitignored）内，`node_modules`
+  是指向主仓 `node_modules` 的符号链接（`verify:lib` 需要根上有它）；分支合流后按 AGENTS §5 删除。
+
 ## 2026-11-24 — 0.13.26 发版：三处补齐 + 真机 soak PASS（`CONFIRMED`）
 
 - **From:** T1 返工子代理 · **To:** lead / 下一个接手者

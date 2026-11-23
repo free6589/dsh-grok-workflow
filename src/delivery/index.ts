@@ -144,6 +144,7 @@ const LEDGER_LABELS = [
   'Deadline:',
   'Route switches:',
   'Route overflows',
+  'Dead routes',
   'skipped full',
   'skipped busy',
   'cross-run hint',
@@ -163,6 +164,7 @@ const LEDGER_LABELS = [
  */
 const MIDLINE_LABELS = [
   'Route overflows',
+  'Dead routes',
   'skipped full',
   'skipped busy',
   'cross-run hint',

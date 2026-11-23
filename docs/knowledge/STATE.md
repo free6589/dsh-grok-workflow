@@ -1,3 +1,15 @@
+Last updated: 2026-11-24 05:40 +08:00（**死路由：连续两次传输失败的那条路排到最后，`CONFIRMED`（单测），未合流** —
+分支 `feat/dead-routes`（worktree `.tmp/wt-dead-routes`，从 `main` `5678dd8`＝0.13.26 开出，一任务一分支；共享脏树
+detached `a6103ad` 一行未动）。一条路由连续两次栽在同一类传输故障（timeout / connection / server-error / rate-limit）后，
+本轮把它排到所有活着的路后面：不再从它开始，但仍然留着、别的路都试过之后仍会试，答上来就复活。计数用脚本已有的
+`failure.switchModel` 当闸门，所以 429 跟随操作员的勾选框；鉴权、没交结构化结果、引擎启动失败、unknown、inherit 一律不计数。
+满载时若只有死路由有空位，这一次调用直接落死路由，不排队等 drain（取舍写在 `preferredIndices` 注释里）。
+报告新增可选 `deadRoutes`（封顶 16 丢最旧），诊断台账多一块 `Dead routes`；交付层只登记标签，答案默认看不到。
+同时给 worker / verifier / supervisor 六个调用点加 `taskId`，报告行终于写明「这一行是为哪件事打的」。
+门禁：`npm run ci` exit 0（**97 files / 1814 tests**，新增 `test/dead-routes.spec.ts` 18 例，红 12 → 绿 18），
+typecheck 干净、lint 0 errors（36 warnings 全既有）、`verify:lib` byte-identical。真机 soak `NOT_RUN`（留合流方）。
+三处取舍与否决理由见 D-119，过程中被用例抓住的「`dead` 忘了拼进扫描顺序 → 整轮挂死」记在 VALIDATION 首条。）
+
 Last updated: 2026-11-24 04:36 +08:00（**已发版 `0.13.26`：子代理死掉，报告说的是服务商原话，`CONFIRMED`** —
 发版提交 `49e1045`（修复 `019921c` + 发版准备）+ tag `v0.13.26` 已推；远端 CI `45260234450` success、
 Release `45260254869` success 并已发布（asset `dsh-grok-workflow-0.13.26.tgz`，

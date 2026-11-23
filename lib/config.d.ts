@@ -37,6 +37,20 @@ export declare const HARD_LIMITS: {
         readonly min: 1;
         readonly max: 64;
     };
+    /**
+     * Route health (`src/script.ts` dead routes): how many consecutive counted
+     * transport failures make a route dead, and how many dead routes one run keeps.
+     *
+     * The generated script mirrors both numbers by value (it cannot import host
+     * code) and `test/dead-routes.spec.ts` pins the parity: the threshold is 2
+     * because one transport failure is weather and two in a row is a route, and
+     * the bound is 16 because a chain cannot be longer than 50 and the oldest row
+     * is the one worth dropping first.
+     */
+    readonly deadRoute: {
+        readonly threshold: 2;
+        readonly routes: 16;
+    };
     /** Extreme backstop on child calls charged against one task (worker + verifier + supervisor). */
     readonly maxAttemptsPerTask: 600;
     /**

@@ -805,6 +805,96 @@ function classifyCallFailure(role, error) {
 
 const routeTrail = [];
 
+// Route health (dead routes). A route that fails the same kind of *transport*
+// failure twice in a row, with no answer in between, moves behind every live
+// route for the rest of the run. The motive is cost, not blame: in a three-route
+// chain a dead route takes one child call per task — and one whole child-call
+// stall, when it hangs instead of refusing — before the chain moves on, and the
+// task tells the reader nothing new by paying it.
+//
+// The table is deliberately narrow. Only families where "the transport failed,
+// this route may work later" is an honest reading count:
+//   timeout / connection / server-error / rate-limit
+// The rest say something a second failure cannot change: a credential refusal
+// (401/403, classified model-unavailable) needs a key, not a different route; a
+// missing structured result (format-error) is the child's form, not the
+// transport; an engine that could not start a child (agent-start-failed) never
+// reached the provider; an unknown class is not evidence at all. An inherited
+// call has no chain position to prefer, so the inherit label never enters it.
+//
+// rate-limit stays in the table but follows the operator's 429 switch
+// (switchOn): when the switch says a 429 keeps its route, the task retries the
+// same route on the next attempt, so a 429 says "busy right now", not "this
+// route is dead" — and switchModel is exactly that gate, so it is read here
+// rather than duplicated.
+const ROUTE_HEALTH_LIMITS = { streak: 2, routes: 16 };
+const ROUTE_HEALTH_FAMILIES = { timeout: 1, connection: 1, 'server-error': 1, 'rate-limit': 1 };
+// label -> { family, streak }: consecutive counted failures, no answer between.
+const routeHealth = {};
+// Dead routes, in the order they died (oldest first). Bounded, and past the bound
+// the oldest evidence is the one that goes.
+const deadRouteOrder = [];
+const deadRoutes = {};
+
+function routeHealthFamily(failure) {
+  try {
+    if (!failure) return '';
+    if (ROUTE_HEALTH_FAMILIES[failure.class] !== 1) return '';
+    return failure.switchModel === true ? failure.class : '';
+  } catch (_) { return ''; }
+}
+
+function forgetDeadRoute(label) {
+  if (!deadRoutes[label]) return;
+  delete deadRoutes[label];
+  const at = deadRouteOrder.indexOf(label);
+  if (at !== -1) deadRouteOrder.splice(at, 1);
+}
+
+// Bookkeeping must never fail a call: a failure object with a hostile getter
+// would otherwise turn a reported failure into a thrown one, which is the one
+// thing the routing layer exists to prevent (G-4).
+function noteRouteFailure(route, failure) {
+  try {
+    const label = routeLabel(route);
+    if (label === 'inherit') return;
+    const family = routeHealthFamily(failure);
+    // Not evidence about this route: the streak stays where it is. Only an
+    // answer clears it (noteRouteSuccess) — an uncounted failure neither adds
+    // evidence nor erases the evidence a counted one already gave.
+    if (family === '') return;
+    const prior = routeHealth[label];
+    const streak = (prior ? prior.streak : 0) + 1;
+    routeHealth[label] = { family: family, streak: streak };
+    if (streak < ROUTE_HEALTH_LIMITS.streak) {
+      forgetDeadRoute(label);
+      return;
+    }
+    if (!deadRoutes[label]) deadRouteOrder.push(label);
+    deadRoutes[label] = { family: family, streak: streak };
+    while (deadRouteOrder.length > ROUTE_HEALTH_LIMITS.routes) {
+      const oldest = deadRouteOrder.shift();
+      if (oldest) delete deadRoutes[oldest];
+    }
+  } catch (_) { /* a bookkeeping fault must not fail the call */ }
+}
+
+function noteRouteSuccess(route) {
+  try {
+    const label = routeLabel(route);
+    if (label === 'inherit') return;
+    delete routeHealth[label];
+    forgetDeadRoute(label);
+  } catch (_) { /* a bookkeeping fault must not fail the call */ }
+}
+
+function isDeadRoute(route) {
+  try {
+    const label = routeLabel(route);
+    return label !== 'inherit' && deadRoutes[label] !== undefined;
+  } catch (_) { return false; }
+}
+
 // Per-route in-flight counts, keyed by route label. A capped route that is
 // full overflows to the next chain entry instead of queueing on it; only when
 // every untried route is full does the call wait for a drain (one wake per
@@ -831,9 +921,13 @@ function nowMs() {
   try { return Date.now(); } catch (_) { return 0; }
 }
 
-function traceRoute(role, chainIndex, route, attempt, outcome, failure, extra) {
+function traceRoute(role, chainIndex, route, attempt, outcome, failure, extra, taskId) {
   if (routeTrail.length >= ROUTE_LIMITS.trail) return;
   const entry = { role: role, chainIndex: chainIndex, route: routeLabel(route), attempt: attempt, outcome: outcome };
+  // Which plan task this call belonged to (worker/verifier/supervisor only). A
+  // run can place dozens of calls for a dozen tasks, so a worker failed row
+  // without the task id left the reader to guess whose call it was.
+  if (typeof taskId === 'string' && taskId !== '') entry.taskId = taskId;
   if (failure) {
     entry.failureClass = failure.class;
     entry.reason = failure.reason;
@@ -851,6 +945,7 @@ async function callRole(role, prompt, options) {
   const chain = roleRoutes[role];
   const total = Math.max(1, chain.length);
   const attempt = options.attempt || 0;
+  const taskId = typeof options.taskId === 'string' ? options.taskId : '';
   let lastFailure = null;
   const tried = {};
   let triedCount = 0;
@@ -868,20 +963,31 @@ async function callRole(role, prompt, options) {
     if (waited) extra.queuedMs = queuedMs;
     return extra;
   }
-  // Cross-run hint (C1) scan order: non-busy untried routes first (each in
-  // original chain order), then busy untried routes. Without a hint every
-  // route counts as non-busy, so this degenerates to the original chain order
-  // and the trail below is byte-identical to before.
+  // Scan order, three tiers: live non-busy untried routes first (each in original
+  // chain order), then live routes another run is busy with (C1 hint), then dead
+  // routes. Without a hint and without a dead route the first tier is the whole
+  // chain, so this degenerates to the original order and the trail below stays
+  // byte-identical to before.
+  //
+  // Dead last is also the full-lane tradeoff: when every live route is at its
+  // in-flight cap and only a dead route has room, the scan places the call on the
+  // dead route instead of waiting for a drain. Waiting is unbounded (a drain may
+  // only come when a child finishes, which may be minutes) and the dead route is
+  // still a route — the table is evidence, not a verdict, and it is cleared the
+  // moment that route answers. Spending one attempt now is cheaper than holding
+  // the task on a full lane.
   function preferredIndices() {
     const plain = [];
     const busy = [];
+    const dead = [];
     for (let i = 0; i < total; i++) {
       if (tried[i]) continue;
       const candidate = i < chain.length ? chain[i] : null;
-      if (candidate && hintBusyLabel(routeLabel(candidate))) busy.push(i);
+      if (isDeadRoute(candidate)) dead.push(i);
+      else if (candidate && hintBusyLabel(routeLabel(candidate))) busy.push(i);
       else plain.push(i);
     }
-    return plain.concat(busy);
+    return plain.concat(busy, dead);
   }
   while (triedCount < total) {
     // Hint-adjusted chain order wins: the first untried route with room in
@@ -949,7 +1055,8 @@ async function callRole(role, prompt, options) {
     }
     if (thrown !== null) {
       const failure = isChildTimeout(thrown) ? childTimeoutFailure(role) : classifyCallFailure(role, thrown);
-      traceRoute(role, index, route, attempt, 'failed', failure, overflowExtra());
+      traceRoute(role, index, route, attempt, 'failed', failure, overflowExtra(), taskId);
+      noteRouteFailure(route, failure);
       lastFailure = failure;
       // One mechanism, not two: a setup fault (budget/schema/options) is built
       // with switchModel false, and a content failure (task-failed,
@@ -967,11 +1074,13 @@ async function callRole(role, prompt, options) {
       // reader unable to tell a quoting mistake in the child's JSON (re-sendable
       // in the same attempt) from a dead provider.
       const failure = { role: role, class: 'format-error', reason: role + ' returned no valid structured result (structured output missing or unparsable)', switchModel: true, setup: false, category: 'infrastructure' };
-      traceRoute(role, index, route, attempt, 'failed', failure, overflowExtra());
+      traceRoute(role, index, route, attempt, 'failed', failure, overflowExtra(), taskId);
+      noteRouteFailure(route, failure);
       lastFailure = failure;
       continue;
     }
-    traceRoute(role, index, route, attempt, 'ok', null, overflowExtra());
+    traceRoute(role, index, route, attempt, 'ok', null, overflowExtra(), taskId);
+    noteRouteSuccess(route);
     return { ok: true, value: value, route: route, label: routeLabel(route), failure: null };
   }
   return {
@@ -3491,7 +3600,8 @@ async function runTaskUnsafe(task, taskIndex, upstreamText) {
         label: memberLabel('worker', attempt),
         phase: taskGroupTitle(taskPosition, task.title),
         attempt: attempt,
-        writesPaths: task.writesPaths
+        writesPaths: task.writesPaths,
+        taskId: task.id
       });
       if (worker.ok) {
         attemptRoute = worker.label;
@@ -3526,7 +3636,8 @@ async function runTaskUnsafe(task, taskIndex, upstreamText) {
           label: memberLabel('worker', attempt),
           phase: taskGroupTitle(taskPosition, task.title),
           attempt: attempt,
-          writesPaths: task.writesPaths
+          writesPaths: task.writesPaths,
+          taskId: task.id
         });
         if (resubmit.ok) {
           const resubmittedExecution = normalizeExecution(resubmit.value);
@@ -3553,7 +3664,8 @@ async function runTaskUnsafe(task, taskIndex, upstreamText) {
           label: memberLabel('verifier', attempt),
           phase: taskGroupTitle(taskPosition, task.title),
           attempt: attempt,
-          writesPaths: task.writesPaths
+          writesPaths: task.writesPaths,
+          taskId: task.id
         });
         if (verifier.ok) {
           if (attemptRoute === '') attemptRoute = verifier.label;
@@ -3591,7 +3703,8 @@ async function runTaskUnsafe(task, taskIndex, upstreamText) {
             label: memberLabel('verifier', attempt),
             phase: taskGroupTitle(taskPosition, task.title),
             attempt: attempt,
-            writesPaths: task.writesPaths
+            writesPaths: task.writesPaths,
+            taskId: task.id
           });
           if (resubmit.ok) {
             const resubmittedVerification = normalizeVerification(resubmit.value);
@@ -3629,7 +3742,8 @@ async function runTaskUnsafe(task, taskIndex, upstreamText) {
           label: memberLabel('supervisor'),
           phase: taskGroupTitle(taskPosition, task.title),
           attempt: attempt,
-          writesPaths: task.writesPaths
+          writesPaths: task.writesPaths,
+          taskId: task.id
         });
         if (supervision.ok) {
           const supervised = normalizeVerification(supervision.value);
@@ -3660,7 +3774,8 @@ async function runTaskUnsafe(task, taskIndex, upstreamText) {
             label: memberLabel('supervisor'),
             phase: taskGroupTitle(taskPosition, task.title),
             attempt: attempt,
-            writesPaths: task.writesPaths
+            writesPaths: task.writesPaths,
+            taskId: task.id
           });
           if (resubmit.ok) {
             const resubmitted = normalizeVerification(resubmit.value);
@@ -4072,6 +4187,16 @@ if (synthesisSummary !== '') synthesisReport.summary = synthesisSummary;
 if (synthesisError !== '') synthesisReport.error = synthesisError;
 if (synthesisReview !== '') synthesisReport.review = synthesisReview;
 
+// Dead-route snapshot (ROUTE_HEALTH_LIMITS): the routes this run stopped
+// preferring, in the order they died. Omitted when the table is empty, so a run
+// that never lost a route produces exactly the report it always did.
+const deadRouteReport = [];
+for (let i = 0; i < deadRouteOrder.length; i++) {
+  const label = deadRouteOrder[i];
+  const row = deadRoutes[label];
+  if (row) deadRouteReport.push({ route: label, class: row.family, streak: row.streak });
+}
+
 const report = {
   schemaVersion: 'grok-workflow/v1',
   status: status,
@@ -4108,6 +4233,7 @@ const report = {
   errors: errors,
   uncertainties: uncertainties,
   routes: routeTrail,
+  ...(deadRouteReport.length === 0 ? {} : { deadRoutes: deadRouteReport }),
   routing: {
     planner: roleChainLabels('planner'),
     worker: roleChainLabels('worker'),

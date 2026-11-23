@@ -1,3 +1,28 @@
+## 死路由与 task id 进报告行：单测红→绿 + 门禁 exit 0，真机 soak 留给合流方 — 2026-11-24
+
+| state | command | result |
+| --- | --- | --- |
+| 分支 | `feat/dead-routes`（worktree `.tmp/wt-dead-routes`，从 `main` `5678dd8`＝0.13.26 开出；共享脏树 detached `a6103ad` 一行未动） | `CONFIRMED` |
+| 新用例先红 | `npx vitest run test/dead-routes.spec.ts`（实现前） | **12 failed / 6 passed（18）**：家族表、阈值、次序、task id、宿主校验、诊断行、交付清洗全部缺失 |
+| 新用例后绿 | 同上（实现后） | **18 passed（18）** |
+| 旧用例逐条确认 | `npx vitest run test/routing.spec.ts test/route-concurrency.spec.ts test/report.spec.ts test/delivery.spec.ts test/human-output-contract.spec.ts test/naming.spec.ts test/null-collapse.spec.ts test/synthesis-guardrails.spec.ts` | **8 files / 178 tests PASS**（无一条断言需要改：没有死路由时轨迹与报告逐字节不变） |
+| 全量 | `npm test`（`npm run build` + `vitest run`） | **97 files / 1814 tests PASS**（基线 96 / 1796，+1 文件 +18 例） |
+| 静态 | `npm run typecheck` / `npm run lint` | typecheck 干净；lint **0 errors / 36 warnings**（与基线同数，新增代码 0 条） |
+| 提交后门禁 | `npm run ci`、`npm run verify:lib` | 见文末补记（`verify:lib` 校验的是 HEAD 的 src/lib 配对，必须在提交之后跑） |
+| 真机 soak | 隔离 profile 真跑一轮含死路由的 run | **`NOT_RUN`**（本轮不做真机，留给合流方；理由见 HANDOFF） |
+
+**范围（CONFIRMED）**：`src/script.ts` 家族表 `ROUTE_HEALTH_FAMILIES`（timeout / connection / server-error / rate-limit）+ 阈值
+`ROUTE_HEALTH_LIMITS.streak = 2` + 表上限 16 丢最旧；计数用既有判据 `failure.switchModel`，所以 429 跟随操作员的勾选框；
+`AUTH`(→`model-unavailable`) / `INVALID`·`NOCODE`(→`format-error`) / `agent-start-failed` / `unknown` / `inherit` 一律不计数；
+簿记整段 try/catch（`noteRouteFailure` / `noteRouteSuccess` / `isDeadRoute`），簿记出错不会让调用失败。
+扫描顺序第三档 `preferredIndices` → `plain.concat(busy, dead)`；满载时落死路由而不排队（取舍写在注释里）。
+六个任务级调用点（worker / worker 补交 / verifier / verifier 补交 / supervisor / supervisor 补交）传 `taskId`。
+
+**实现过程中被用例抓住的一个真缺陷（CONFIRMED，值得记）**：第一版 `preferredIndices()` 收集了 `dead` 数组却忘了拼进返回值
+（只 `return plain.concat(busy)`），于是「只剩死路由可选」时扫描顺序为空 → 走 `routeWaiters` 等待分支 → 整轮挂死。
+用例以超时暴露它（`revives a route that answers again…`），修好后调用序列是 `worker c w2 → worker c w1`。
+教训：死路由必须仍然是候选，排最后 ≠ 排除——这不是别的断言能顺带覆盖的细节，值得一条专门的用例。
+
 ## 修复后真机 soak 判 **PASS**：死因是服务商原话，0.13.26 可发 — 2026-11-24（round 078）
 
 | state | command | result |
