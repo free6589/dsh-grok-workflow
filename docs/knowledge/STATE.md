@@ -1,3 +1,7 @@
+Last updated: 2026-11-23 18:25 +08:00（**round-60 已合流 main 未发版：说明书已删键改诚实，`CONFIRMED`，soak BLOCKED** —
+合流提交 `7bfff22`（main `ed06760` + `062bec7`）；`npm run ci` exit 0（87 文件 / 1652 测试 PASS，锁行文 spec 13 项保住）。
+真机 BLOCKED（网关 502，未伪造）；`CHANGELOG [Unreleased]` 中英文已记 14 条待发，不发版。）
+
 Last updated: 2026-11-23 18:15 +08:00（**round-59 已合流 main 未发版：两处过期门注释改诚实，`CONFIRMED`，soak BLOCKED** —
 合流提交 `53e2ea8`（main `1bdda54` + `33b1e89`）；`npm run ci` exit 0（87 文件 / 1652 测试 PASS，纯注释改无行为变化）。
 真机 BLOCKED（网关 502，未伪造）；`CHANGELOG [Unreleased]` 中英文已记 13 条待发，不发版。）

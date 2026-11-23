@@ -1,3 +1,15 @@
+## round-60 说明书已删键改诚实（soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
+
+| state | command | result |
+| --- | --- | --- |
+| worktree rsi-round-60 `062bec7`（main `ed06760` + 本轮 1 提交） | 子代理预查（旧树 `npm run ci`） | **exit 0：87 files / 1652 tests PASS**（含锁行文 spec 13 项；删写法会红故子代理 STOP，lead 改语义不断点名） |
+| 同上（新码） | `npx vitest run test/docs-config-keys.spec.ts`（lead 独立） | **13 passed**（点名义务保住） |
+| 同上（新码） | `npm run ci`（lead 独立） | **exit 0：87 files / 1652 tests PASS**；typecheck 干净；lint 0 errors；`verify:lib` byte-identical |
+| 隔离 soak | 网关探针 | **BLOCKED**：网关 502，未伪造 |
+
+**Changed:** `README.md` + `README.zh-CN.md`（"固化"行改点名已删，不写成可配值；反引号点名保留，spec 不红）+ `CHANGELOG [Unreleased]` 中英双语 + `.rsi/evidence/round-060/`。纯文档改无行为变化。
+**Honest boundary:** 真机 BLOCKED，不发版；`[Unreleased]` 已攒 14 条待发。
+
 ## round-59 两处过期门注释改诚实（soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
 
 | state | command | result |
