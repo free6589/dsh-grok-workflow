@@ -1,3 +1,15 @@
+## round-61 已删键专属报错（soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
+
+| state | command | result |
+| --- | --- | --- |
+| worktree rsi-round-61 `213bcb8`（main `348b284` + 本轮 1 提交） | `npx vitest run test/config.spec.ts test/config-limits-repair.spec.ts`（旧码 stash，lead 独立） | **5 failed / 69 passed**：新断言红（旧码只报 unknown） |
+| 同上（新码） | `npx vitest run test/config.spec.ts test/config-limits-repair.spec.ts test/input.spec.ts test/routing.spec.ts test/wave4-acceptance.spec.ts`（lead 独立） | **120 passed** |
+| 同上（新码） | `npm run ci`（lead 独立） | **exit 0：87 files / 1653 tests PASS**；typecheck 干净；lint 0 errors；`verify:lib` byte-identical |
+| 隔离 soak | 网关探针 | **BLOCKED**：网关 502/401（无凭证），未伪造 |
+
+**Changed:** `src/config.ts`（已删键专属 `removed configuration key`，未删未知键仍 did-you-mean）+ `test/config.spec.ts`（+1 新 it：removed vs 拼写提示）+ 5 个旧断言同步（config/config-limits-repair/input/routing/wave4，同等强度）+ `lib/` 重建 + `CHANGELOG [Unreleased]` 中英双语 + `.rsi/evidence/round-061/`。
+**Honest boundary:** 真机 BLOCKED，不发版；`[Unreleased]` 已攒 15 条待发。
+
 ## round-60 说明书已删键改诚实（soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
 
 | state | command | result |

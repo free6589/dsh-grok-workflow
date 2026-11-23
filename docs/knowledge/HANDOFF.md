@@ -1,3 +1,15 @@
+## 2026-11-23 — round-61 已合流 main 未发版：已删键专属报错（`CONFIRMED`，soak BLOCKED）
+
+- **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
+- **做了什么**：已删键只报"未知"，不说"删了"。先查后报：命中删键表就自报名给解法，
+  真拼错仍给纠错提示；+1 新回归 + 5 旧断言同步（同等强度）；`npm run ci` exit 0（87/1653）；
+  lead 独立红绿复验成立。
+- **真机**：BLOCKED（网关 502，未伪造）。本次不发版。
+- **合流**：`rsi/round-61`（`213bcb8`）已 `--no-ff` 合入 main 系 worktree（合流 `f3562a9`）；
+  `rsi/round-61` 分支可 24h 内删除。`CHANGELOG [Unreleased]` 中英文已记 15 条待发。
+- **下轮**：开新找 bug 面。
+  网关恢复后给 round-47~61 补一次 soak 再发 `0.13.21`。
+
 ## 2026-11-23 — round-60 已合流 main 未发版：说明书已删键改诚实（`CONFIRMED`，soak BLOCKED）
 
 - **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
