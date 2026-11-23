@@ -1,0 +1,5 @@
+soak: BLOCKED — live gateway returns 502 on this machine (same as round-54/55/56), no real-model run attempted this round.
+Probe (no credentials sent, headers/body untouched):
+  GET https://models.fyrali.com/openai/v1/models -> HTTP 502, 0 bytes
+  GET https://models.fyrali.com/ -> HTTP 502, 0 bytes
+No live home touched; no credentials used; all fixtures fake (t1/t9/ghost/agent-a/agent-8/agent-9).

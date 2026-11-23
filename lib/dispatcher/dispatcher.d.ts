@@ -14,6 +14,11 @@
  * - `resumeDispatcherBoard(session)` / `stopDispatcherSession(session)` are
  *   the recovery and shutdown entries; resume reloads the persisted board.
  *
+ * Round-57: the session persists to `store.jsonl` through the `TaskBoard`
+ * store (reads via the round-56 `boardReader` adapter). Every forwarding
+ * function is async — await it, then the board already holds the decision.
+ * `createDispatcherSession` stays sync (construct + start, no disk writes).
+ *
  * Only `handleDispatcherRawIntent` is meant to sit behind a gate branch: the
  * gate parses the operator's stop/run command into a plain `{op, id, ...}`
  * object and forwards it. The dispatcher refuses everything outside its
@@ -21,22 +26,25 @@
  * gate only needs to state the returned `message`.
  */
 import { DISPATCHER_OPS, decideIntent, decideRawIntent, type DispatcherDecision, type DispatcherIntent, type DispatcherLifecycle, type DispatcherOp, type DispatcherRefusalCode, type DispatcherTask, type TaskReader } from './policy.js';
-import { DispatcherSession, type DispatcherBoardFile, type DispatcherResumeResult } from './session.js';
+import { DispatcherSession, type DispatcherResumeResult } from './session.js';
 import { boardReader } from './board-reader.js';
-export type { DispatcherBoardFile, DispatcherDecision, DispatcherIntent, DispatcherLifecycle, DispatcherOp, DispatcherRefusalCode, DispatcherResumeResult, DispatcherTask, TaskReader, };
+export type { DispatcherDecision, DispatcherIntent, DispatcherLifecycle, DispatcherOp, DispatcherRefusalCode, DispatcherResumeResult, DispatcherTask, TaskReader, };
 export { DISPATCHER_OPS, decideIntent, decideRawIntent, DispatcherSession, boardReader };
 /**
  * Open a dispatcher session.
  *
- * @param boardDir - directory holding `board.json`. Omit for a memory-only
+ * @param boardDir - directory holding `store.jsonl`. Omit for a memory-only
  *   session (tests, embeddings without a workspace); pass a workspace
- *   directory in production so `stop()`/`resume()` survive restarts.
+ *   directory in production so `stop()`/`resume()` survive restarts. The
+ *   board itself opens lazily on the first `handle`/`resume`, so this stays
+ *   synchronous. `start()` clears prior state for directory sessions too —
+ *   use `resume()` for existing state, never `start()`.
  */
 export declare function createDispatcherSession(boardDir?: string): DispatcherSession;
 /**
  * Forward one typed intent to the session (decide, then apply when allowed).
  */
-export declare function handleDispatcherIntent(session: DispatcherSession, intent: DispatcherIntent): DispatcherDecision;
+export declare function handleDispatcherIntent(session: DispatcherSession, intent: DispatcherIntent): Promise<DispatcherDecision>;
 /**
  * Forward one gate-side JSON intent to the session.
  *
@@ -44,17 +52,17 @@ export declare function handleDispatcherIntent(session: DispatcherSession, inten
  * edits of completed/running tasks, and intents on an inactive session are
  * all refused with an explicit message the gate can state verbatim.
  */
-export declare function handleDispatcherRawIntent(session: DispatcherSession, raw: Record<string, unknown>): DispatcherDecision;
+export declare function handleDispatcherRawIntent(session: DispatcherSession, raw: Record<string, unknown>): Promise<DispatcherDecision>;
 /**
- * Shut the session down (persists when a directory was given).
+ * Shut the session down (every allowed write already persisted).
  */
-export declare function stopDispatcherSession(session: DispatcherSession): void;
+export declare function stopDispatcherSession(session: DispatcherSession): Promise<void>;
 /**
  * Recover the session from its persisted board.
  *
- * Returns `restored: true` with the task count when a board file existed,
+ * Returns `restored: true` with the task count when a store existed,
  * `restored: false` with an empty board on first start. Throws (fail closed)
  * on a corrupt file and leaves the session inactive.
  */
-export declare function resumeDispatcherBoard(session: DispatcherSession): DispatcherResumeResult;
+export declare function resumeDispatcherBoard(session: DispatcherSession): Promise<DispatcherResumeResult>;
 //# sourceMappingURL=dispatcher.d.ts.map

@@ -7,6 +7,10 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ### Fixed / 修复
 
+- **The steward session now runs on the durable board / 管家会话换上持久板** —
+  The session kept its own memory map plus a home-made JSON file; it now holds the durable board and reads it through the adapter, with one unified file format. Truth (`id`/title-on-create/status/owner/detail) lives on the board; the two fields the board has no column for ride along in memory and are documented as such. Nothing is silently dropped.
+  / 会话以前自带内存表加自制 JSON 文件，现在换上持久板、经转接头读写，文件格式统一成一种。真相字段落板，板上没列的两字段放内存随行并写明，不悄悄丢字段。
+
 - **The board plugs into the dispatcher through a small read adapter / 板子通过小转接头插进调度** —
   The adapter turns the store's not-found throw into an empty read and translates the two status words the dispatcher never had (`in_progress` → started, `failed` → stuck with its reason); every other store error keeps throwing. The session still owns its own board — swapping it onto the durable store is the next step.
   / 转接头把板子的"查无"抛错翻成空读，并翻译调度原来没有的两个状态（进行中→已开始，失败→卡住且带上原因）；其它板错照样抛。会话暂时还管自己的板，换持久板是下一步。

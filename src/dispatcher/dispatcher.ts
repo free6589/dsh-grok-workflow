@@ -14,6 +14,11 @@
  * - `resumeDispatcherBoard(session)` / `stopDispatcherSession(session)` are
  *   the recovery and shutdown entries; resume reloads the persisted board.
  *
+ * Round-57: the session persists to `store.jsonl` through the `TaskBoard`
+ * store (reads via the round-56 `boardReader` adapter). Every forwarding
+ * function is async — await it, then the board already holds the decision.
+ * `createDispatcherSession` stays sync (construct + start, no disk writes).
+ *
  * Only `handleDispatcherRawIntent` is meant to sit behind a gate branch: the
  * gate parses the operator's stop/run command into a plain `{op, id, ...}`
  * object and forwards it. The dispatcher refuses everything outside its
@@ -33,15 +38,10 @@ import {
   type DispatcherTask,
   type TaskReader,
 } from './policy.js'
-import {
-  DispatcherSession,
-  type DispatcherBoardFile,
-  type DispatcherResumeResult,
-} from './session.js'
+import { DispatcherSession, type DispatcherResumeResult } from './session.js'
 import { boardReader } from './board-reader.js'
 
 export type {
-  DispatcherBoardFile,
   DispatcherDecision,
   DispatcherIntent,
   DispatcherLifecycle,
@@ -56,9 +56,12 @@ export { DISPATCHER_OPS, decideIntent, decideRawIntent, DispatcherSession, board
 /**
  * Open a dispatcher session.
  *
- * @param boardDir - directory holding `board.json`. Omit for a memory-only
+ * @param boardDir - directory holding `store.jsonl`. Omit for a memory-only
  *   session (tests, embeddings without a workspace); pass a workspace
- *   directory in production so `stop()`/`resume()` survive restarts.
+ *   directory in production so `stop()`/`resume()` survive restarts. The
+ *   board itself opens lazily on the first `handle`/`resume`, so this stays
+ *   synchronous. `start()` clears prior state for directory sessions too —
+ *   use `resume()` for existing state, never `start()`.
  */
 export function createDispatcherSession(boardDir?: string): DispatcherSession {
   const session = new DispatcherSession(boardDir)
@@ -72,7 +75,7 @@ export function createDispatcherSession(boardDir?: string): DispatcherSession {
 export function handleDispatcherIntent(
   session: DispatcherSession,
   intent: DispatcherIntent,
-): DispatcherDecision {
+): Promise<DispatcherDecision> {
   return session.handle(intent)
 }
 
@@ -86,24 +89,24 @@ export function handleDispatcherIntent(
 export function handleDispatcherRawIntent(
   session: DispatcherSession,
   raw: Record<string, unknown>,
-): DispatcherDecision {
+): Promise<DispatcherDecision> {
   return session.handleRaw(raw)
 }
 
 /**
- * Shut the session down (persists when a directory was given).
+ * Shut the session down (every allowed write already persisted).
  */
-export function stopDispatcherSession(session: DispatcherSession): void {
-  session.stop()
+export function stopDispatcherSession(session: DispatcherSession): Promise<void> {
+  return session.stop()
 }
 
 /**
  * Recover the session from its persisted board.
  *
- * Returns `restored: true` with the task count when a board file existed,
+ * Returns `restored: true` with the task count when a store existed,
  * `restored: false` with an empty board on first start. Throws (fail closed)
  * on a corrupt file and leaves the session inactive.
  */
-export function resumeDispatcherBoard(session: DispatcherSession): DispatcherResumeResult {
+export function resumeDispatcherBoard(session: DispatcherSession): Promise<DispatcherResumeResult> {
   return session.resume()
 }
