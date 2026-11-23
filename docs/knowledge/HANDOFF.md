@@ -3930,3 +3930,20 @@ Issue #1 状态评论 issuecomment-6927842856。
   未发版、未打 tag、未 npm publish。
 - **下一步**：① 操作员对 Sec.2-7 给一句「做 / 不做」（D-112 已备好第一刀）；② Sec.3-4 按
   `docs/knowledge/evidence/answer-parity-2026-11-23.md` 第 2 节做一次并排比对；③ 决定是否发版把这批推出去。
+
+<!-- Carried over from branch `team-dispatch-v1` by its rebase onto main: the text below is that branch's own record of the work. Where it says "未发版" / "NOT_RUN" it describes the tree it was written in, not main; the rebased branch ran the full gate — see the `team-dispatch-v1` rebase entry at the top of this file. -->
+
+## 2026-11-23 — 任务板持久化加固（未发版，`CONFIRMED`）
+
+- **From:** 本会话（board_persist lane）· **To:** 合流/发版者
+- **做了什么**：`src/taskboard/` 的 CAS 从「内存副本比对 + 整份重写」改成「独占锁内重读账本 → 按磁盘版本比较交换 →
+  落盘」，直接修掉两处丢更新：同一任务被两个句柄同时认领（旧实现两边都成功、文件只留一个归属）、不同行并发认领互相
+  冲掉。新增 `src/taskboard/paths.ts` 三级位置解析（`GROK_WORKFLOW_TASKBOARD_DIR` → `$DSH_HOME` +
+  `taskboards/grok-workflow`），落盘位置/行格式/认领协议/崩溃恢复规则写进 `docs/ARCHITECTURE.md` 任务板章节，
+  决策落 D-109。
+- **测试**：`test/taskboard.spec.ts` 23 例连跑 3 次 PASS；新增真实崩溃恢复（SIGKILL 子进程 `test/fixtures/taskboard/writer.mjs`、
+  持锁进程被杀、活锁超时、撕裂账本、中断写 tmp、跨重启 id/CAS）与位置解析用例。`lib/taskboard/*` 已重建（含新 `paths.*`）。
+- **必须知道**：本 worktree 当时被另一条 lane 并行占用（`src/dispatcher`/`src/handoff`/`src/report`/`src/delivery`
+  编辑中途，`tsc --noEmit` 在这些文件红），所以 **全仓 `npm run ci` 与 `verify:lib` 未跑**；两条 lane 都落地后必须整仓
+  重跑门禁再发版。锁是单文件系统内的咨询锁；多机共享板、网络盘 `O_EXCL` 语义不在支持范围。
+- **未做**：dispatcher 与任务板的存储合流（`TaskReader` 接口仍是唯一对接点）；引擎不读板；L3 小组长。

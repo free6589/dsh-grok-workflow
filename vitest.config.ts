@@ -18,6 +18,10 @@ export default defineConfig({
       // writes one, so an unset location would put test checkpoints in the
       // operator's real `$DSH_HOME/checkpoints/grok-workflow`.
       GROK_WORKFLOW_CHECKPOINT_DIR: process.env.GROK_WORKFLOW_CHECKPOINT_DIR ?? join(tmpdir(), 'dsh-grok-workflow-test-checkpoints'),
+      // Same rule for the durable task board (`src/taskboard/paths.ts`): a test
+      // that opens the default board must not land in the operator's real
+      // `$DSH_HOME/taskboards/grok-workflow`.
+      GROK_WORKFLOW_TASKBOARD_DIR: process.env.GROK_WORKFLOW_TASKBOARD_DIR ?? join(tmpdir(), 'dsh-grok-workflow-test-taskboards'),
     },
   },
 })

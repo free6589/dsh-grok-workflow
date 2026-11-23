@@ -6581,3 +6581,18 @@ toolName/configVersion = 页面 16）；`test/client.spec.ts` ProgressBundle 补
 - **证据文件**：`docs/knowledge/evidence/answer-parity-2026-11-23.md`（Sec.3-4）、
   `docs/knowledge/evidence/image-task-scope-2026-11-23.md`（Sec.3-5）、
   `.rsi/evidence/rsi-seq-12/ROUND2.md`（12 项逐条 + 分支台账 + 分歧日志）。
+
+<!-- Carried over from branch `team-dispatch-v1` by its rebase onto main: the text below is that branch's own record of the work. Where it says "未发版" / "NOT_RUN" it describes the tree it was written in, not main; the rebased branch ran the full gate — see the `team-dispatch-v1` rebase entry at the top of this file. -->
+
+## 任务板持久化加固：磁盘 CAS + 认领锁 + 崩溃恢复用例 — 2026-11-23 (`CONFIRMED`，未发版)
+
+| state | command | result |
+| --- | --- | --- |
+| worktree `team-dispatch-v1`（共享，另有 lane 在改 dispatcher/handoff） | `npx vitest run test/taskboard.spec.ts` | **23 tests PASS**（原 13 + 新增 10：同任务双句柄单赢家/不同行不互相冲掉/中断写留下 inert tmp/撕裂账本拒读/SIGKILL 真进程恢复/持锁进程被杀后锁清掉/活锁尊重到超时/跨重启 id 唯一/跨重启 CAS 守卫/位置解析 2 例）；连续跑 3 次结果一致 |
+| 同上 | `npx tsc -p .tmp/tsconfig.taskboard.json`（范围：`src/taskboard/**` + `test/taskboard.spec.ts`） | **exit 0** |
+| 同上 | `npx tsc -p .tmp/tsconfig.taskboard-build.json`（`rootDir ../src`、`outDir ../lib`，仅 taskboard） | **exit 0**，重建 `lib/taskboard/*`（含新增 `paths.*`），未触碰其他 lib 产物 |
+| 同上 | `npx tsc -p tsconfig.json --noEmit`（全仓） | **FAIL**：`src/dispatcher/session.ts` 3 处 `pending` 缺字段、`test/dispatcher.spec.ts` 5 处（含 `resultRecipient` 无导出）。**属并行 lane 正在改的文件，不在本任务范围，未修改** |
+
+**Changed：** `src/taskboard/store.ts`（每次改动静默持独占锁：重读 → 按磁盘版本 CAS → 落盘；废弃锁按 `lockStaleMs` 清掉）、`src/taskboard/types.ts`（`TASKBOARD_LOCK`/`TASKBOARD_LOCK_FILE`/`TaskboardOptions`）、`src/taskboard/paths.ts`（新增：`taskboardDir`/`taskboardFile`/`openDefaultTaskboard`，三级解析同 `checkpointDir`）、`src/taskboard/index.ts`、`test/taskboard.spec.ts`、`test/fixtures/taskboard/writer.mjs`（真实子进程，导入 `lib/` 产物）、`vitest.config.ts`（`GROK_WORKFLOW_TASKBOARD_DIR` 指向 tmp）、`docs/ARCHITECTURE.md`（任务板章节：位置/行格式/认领协议/崩溃恢复/上限/证据/边界）、`CHANGELOG.md`。
+**行为变更：** 旧 `taskboard.spec.ts` 的同任务竞态用例断言"两个写者都成功、文件留最后一个"——那正是丢更新缺陷；现改为"恰好一个赢家、输家 `version-conflict`，重开后归属与赢家一致"。
+**Honest boundary：** 全仓 `npm run ci` / `npm run verify:lib` **NOT_RUN**：本 worktree 被另一条 lane 并行占用，其 `src/dispatcher`、`src/handoff`、`src/report`、`src/delivery` 处于编辑中途、typecheck 红（见上表第 4 行），此状态下的全仓门禁结果不反映任务板质量。任务板模块自身的 typecheck、单测与产物重建已独立跑通。锁为单文件系统内的咨询锁（不防恶意绕过、不保证网络盘语义）；rename 后的目录 fsync 是尽力而为，掉电仍可能丢最后一次写——两条都写进架构文档的边界节。

@@ -22,6 +22,30 @@ export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'b
 export declare const TASKBOARD_SCHEMA: "grok-workflow.taskboard/v1";
 /** Store file name inside the board directory. */
 export declare const TASKBOARD_STORE_FILE: "store.jsonl";
+/**
+ * Cross-process claim lock: every mutation takes an exclusive lock file for
+ * the duration of re-read → apply → persist, so two workers cannot both
+ * observe the same version and both write. A crashed holder leaves the lock
+ * behind; an unreleased lock older than `defaultStaleMs` is treated as
+ * abandoned and removed by the next writer.
+ */
+export declare const TASKBOARD_LOCK: {
+    /** How long a writer waits for the lock before failing with `io`. */
+    readonly defaultTimeoutMs: 5000;
+    /** Age after which an unreleased lock is considered abandoned. */
+    readonly defaultStaleMs: 5000;
+    /** Delay between lock attempts while another writer holds it. */
+    readonly retryMs: 4;
+};
+/** Lock file name inside the board directory (one per board). */
+export declare const TASKBOARD_LOCK_FILE: ".store.jsonl.lock";
+/** Per-board tunables; the defaults are the documented policy. */
+export interface TaskboardOptions {
+    /** Milliseconds to wait for the claim lock; defaults to {@link TASKBOARD_LOCK}. */
+    lockTimeoutMs?: number | undefined;
+    /** Milliseconds before an unreleased lock is abandoned; defaults to {@link TASKBOARD_LOCK}. */
+    lockStaleMs?: number | undefined;
+}
 /** Structural ceilings so one row cannot grow the store without limit. */
 export declare const TASKBOARD_LIMITS: {
     /** Maximum whole-file size read or written. */

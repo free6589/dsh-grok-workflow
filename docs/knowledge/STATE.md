@@ -2551,3 +2551,15 @@ Sec.2-5 设计文档六段脊椎 + 守卫（`ae72f7d`，合 `8531ac1`）；Sec.2
 `d947a92`，合 `23820e2`）；Sec.3-5 范围结论（不在本仓库，`943bb86`，合 `a68a372`）。
 **ci 计数**：baseline 1623 → 本轮末 1633（12 次逐项绿 + 末次合并树绿）。未发版、未打 tag、未 push。
 分支 12 条保留供复核，判定删除日期 2026-11-24。分歧 9 条见 `.rsi/evidence/rsi-seq-12/ROUND2.md` §5。）
+
+<!-- Carried over from branch `team-dispatch-v1` by its rebase onto main: the text below is that branch's own record of the work. Where it says "未发版" / "NOT_RUN" it describes the tree it was written in, not main; the rebased branch ran the full gate — see the `team-dispatch-v1` rebase entry at the top of this file. -->
+
+Last updated: 2026-11-23 08:16 +08:00（**任务板持久化加固，未发版，`CONFIRMED`** —
+`src/taskboard/` 的 CAS 改为对着磁盘校验：每次改动在独占锁文件内「重读→按磁盘版本比较交换→落盘」，修掉旧实现按内存
+整份重写导致的同任务双认领与跨行丢更新。新增 `src/taskboard/paths.ts`（`taskboardDir`/`taskboardFile`/
+`openDefaultTaskboard` 三级解析，落盘位置写进 `docs/ARCHITECTURE.md`）。新增真实崩溃恢复用例：SIGKILL 子进程、
+持锁进程被杀后锁按 5 s 失效窗口清掉、撕裂账本拒读、中断写 tmp inert、跨重启 id 唯一与 CAS 守卫。任务板套件
+23 例连跑 3 次 PASS；模块范围 typecheck exit 0；`lib/taskboard/*` 已重建（含 `paths.*`）。全仓 `npm run ci` /
+`verify:lib` **NOT_RUN**：本 worktree 被并行 lane 占用，其 `src/dispatcher`/`src/handoff`/`src/report`/`src/delivery`
+编辑中途（`tsc --noEmit` 在这些文件红），门禁需等其落地后整仓重跑。行为变更：旧竞态用例"两个写者都成功"改为
+"恰好一个赢家"。主链 plan → execute → verify → retry → synthesize 未动。）

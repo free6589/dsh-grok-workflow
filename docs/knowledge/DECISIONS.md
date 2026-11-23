@@ -2605,6 +2605,29 @@ test/composition.spec.ts` → 128 PASS。全量 `npm run ci` 与真机 GUI 手�
 真机隔离 soak（见 VALIDATION）：live headless 跑出同形状 phase，fold 后任务 7 成卡、
 spine 为空，pre-fix 形状会进脊柱。
 
+## D-109 — 任务板的 CAS 必须对着磁盘校验，改动期间持独占锁；结构性冲突之外不做分布式协调（2026-11-23，未发版）
+
+- **Status:** CONFIRMED
+- **Date:** 2026-11-23
+- **Decision:** `src/taskboard/` 的每次改动（create/claim/assign/setDependencies/complete/fail/block/requeue）都在
+  独占锁文件 `<dir>/.store.jsonl.lock` 内执行「重读账本 → 按磁盘版本做比较交换 → 落盘」。CAS 的比对对象是磁盘上的
+  行，不是句柄里可能过期的内存副本。
+- **Why:** 旧实现按内存整份重写 `store.jsonl`：两个句柄读到同一版本后各自认领同一行，两边都返回成功，文件只留最后
+  一个归属（同任务双认领）；同时认领不同行时会互相冲掉（丢更新）。对「调度真相」层来说这是致命缺陷——认领协议存在
+  的意义就是防止两个 worker 抢到同一件事。
+- **Alternatives considered:**
+  1. 只加锁不重读：锁内仍用旧内存副本，跨进程丢更新依旧存在（否）。
+  2. 改成 append-only 单行追加日志（`O_APPEND` 小于 PIPE_BUF 的写近似原子）：不丢更新且无需锁，但要改行格式与
+     读取语义（按 id 取最后一条），与已发布的 v1 行格式和「原子整体替换」文档冲突，且无法在锁内同时保证
+     「重复 id」「依赖前置」这类跨行不变式（否，留作后续演进）。
+  3. 引入真正的分布式协调（租约服务、文件系统 flock）：超出单机插件范围，网络盘语义不可控（否）。
+- **Consequences:** 每次改动多一次读盘 + 一次锁的 open/unlink；板最多 1024 行、1 MB，代价可忽略。锁是单文件系统内的
+  咨询锁，不防恶意绕过；`O_EXCL`/rename 语义在网络盘上不保证，多机共享板不在支持范围。持锁进程被杀留下的锁按
+  `lockStaleMs`（默认 5 s）判废弃并清掉，因此崩溃不会永久卡死板（代价：真并发下最长等 5 s 才接管）。
+- **Evidence:** `test/taskboard.spec.ts` 23 例（同任务双句柄单赢家、不同行不互相冲掉、SIGKILL 子进程恢复、
+  持锁进程被杀后锁清掉、活锁尊重到超时、撕裂账本拒读、中断写 tmp inert、跨重启 id 唯一与 CAS 守卫、位置解析）；
+  `docs/ARCHITECTURE.md` 任务板章节；`docs/knowledge/VALIDATION.md` 2026-11-23 条目。
+
 ## D-108 — 团队调度层三件套：任务板真相 + 大管家白名单 + 交接契约四行（2026-11-23，未发版）
 
 - **Status:** CONFIRMED（本轮三 lane 落地，85 文件 / 1617 测试 PASS，独立复验通过）
