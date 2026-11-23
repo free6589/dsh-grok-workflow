@@ -2092,7 +2092,7 @@ Sec.2-3 405 路由（merge `5dc0512`，分支 `rsi/sec2-03-mode-get`）、Sec.3-
 见 D-111）；Sec.3-2/3/4/5 四项源文件都写明"是否成立要重新确认 / 要你再验一次 / 你定"（见 D-111 与分歧日志）。
 两条 `rsi/*` 分支已合入 `main`，未 push（本地 `main` 领先 `origin/main` 2 个 merge 提交）。）
 
-Last updated: 2026-11-23 10:2x +08:00（**手工清单 12 项顺序执行（第 2 轮）/ RSI 顺序跑批，`CONFIRMED`** —
+Last updated: 2026-11-23 10:20 +08:00（**手工清单 12 项顺序执行（第 2 轮）/ RSI 顺序跑批，`CONFIRMED`** —
 源文件 `manual-sessions-unfinished.md`（工作区根，未纳入版本库）。本轮与第 1 轮不同的是**每一项都有自己的分支**：
 十二项各自从合完的 `main` 尖端开分支、跑 `npm run ci` exit 0、再合回 `main`，逐项日志在
 `.rsi/evidence/rsi-seq-12/logs/ci-r2-*.log`。

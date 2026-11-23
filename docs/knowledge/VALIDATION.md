@@ -5623,6 +5623,8 @@ toolName/configVersion = 页面 16）；`test/client.spec.ts` ProgressBundle 补
 | Sec.3-3 | `rsi/sec3-03-summary-review` | 85 / 1633，EXIT=0 | `ci-r2-sec3-03-summary-review.log` |
 | Sec.3-4 | `rsi/sec3-04-answer-parity` | 85 / 1633，EXIT=0（文档项） | `ci-r2-sec3-04-answer-parity.log` |
 | Sec.3-5 | `rsi/sec3-05-image-scope` | 85 / 1633，EXIT=0（文档项） | `ci-r2-sec3-05-image-scope.log` |
+| 文档批次 | `rsi/round2-docs` | 85 / 1633，EXIT=0 | `ci-r2-docs-batch.log` |
+| 合完的 `main`（`0602594`） | `main` | 85 / 1633，EXIT=0；`verify:lib`：lib 是 src 的构建，217 文件逐字节一致 | `ci-r2-main-final.log` |
 
 - **红跑都就地修完再合**：没有把红跑留在 `main` 上；每处修法写在对应提交信息里。
 - **`verify:lib`** 在每次 ci 里都执行，因此每条分支提交的 `lib/` 都是同一次 `src/` 的构建。
