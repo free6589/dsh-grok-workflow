@@ -36,10 +36,42 @@ export const CHILD_LABEL_LIMIT = 48
 
 const LABEL_ELLIPSIS = '…'
 
-/** The activation-spec slice the rewrite reads and rewrites (structural, untrusted shape). */
+/**
+ * The activation-spec slice the rewrite reads and rewrites (structural, untrusted
+ * shape).
+ *
+ * Two shapes reach this seam and both are real. The published engine builds the
+ * spec flat — `{ label, prompt, agentOptions, parent, cwd, … }` — and that is what
+ * every production child sends. The engine contract harness builds the same two
+ * fields one level down under `request`, which is also the shape an older
+ * host-side mirror used. Reading only `request.prompt` and `request.agentOptions`
+ * therefore produced an empty title and an `inherit` route on every real run: the
+ * label stayed the engine's own, the role was never parsed, and the null-collapse
+ * repair had no group to match. Both reads are kept, flat first.
+ */
 export interface ActivationSpecView {
   label: string
-  request: { prompt?: readonly { type?: string, text?: string }[] }
+  /** Flat shape (what the published engine sends). */
+  prompt?: readonly { type?: string, text?: string }[]
+  /** Flat shape, same provenance as {@link prompt}. */
+  agentOptions?: { provider?: unknown, model?: unknown }
+  /** Nested shape (engine contract harness, older host mirror). */
+  request?: {
+    prompt?: readonly { type?: string, text?: string }[]
+    agentOptions?: { provider?: unknown, model?: unknown }
+  }
+}
+
+/** The prompt blocks of an activation, whichever of the two shapes it arrived in. */
+function promptBlocks(spec: ActivationSpecView): readonly { type?: string, text?: string }[] | undefined {
+  if (Array.isArray(spec.prompt)) return spec.prompt
+  const nested = spec.request?.prompt
+  return Array.isArray(nested) ? nested : undefined
+}
+
+/** The route options of an activation, whichever shape it arrived in. */
+function specRouteOptions(spec: ActivationSpecView): { provider?: unknown, model?: unknown } | undefined {
+  return spec.agentOptions ?? spec.request?.agentOptions
 }
 
 /**
@@ -66,7 +98,7 @@ export function childLabelFromPrompt(prompt: unknown, fallback: string): string 
  * @returns the spec carrying the descriptive label.
  */
 export function rewriteActivationLabel<T extends ActivationSpecView>(spec: T): T {
-  const blocks = spec.request === undefined ? undefined : spec.request.prompt
+  const blocks = promptBlocks(spec)
   const first = Array.isArray(blocks)
     ? blocks.find(block => typeof block?.text === 'string')
     : undefined
@@ -127,7 +159,7 @@ function field(value: unknown, key: string): string | undefined {
 
 /** The route label a child asked for (`provider/model`, or `inherit`). */
 function requestedRoute(spec: ActivationSpecView): string {
-  const agentOptions = (spec.request as { agentOptions?: { provider?: unknown, model?: unknown } }).agentOptions
+  const agentOptions = specRouteOptions(spec)
   const provider = typeof agentOptions?.provider === 'string' ? agentOptions.provider : undefined
   const model = typeof agentOptions?.model === 'string' ? agentOptions.model : undefined
   if (provider !== undefined && model !== undefined) return `${provider}/${model}`
@@ -136,7 +168,7 @@ function requestedRoute(spec: ActivationSpecView): string {
 
 /** The child's display title: the first line of the prompt, as the label rewrite reads it. */
 function promptTitle(spec: ActivationSpecView): string {
-  const blocks = spec.request?.prompt
+  const blocks = promptBlocks(spec)
   const first = Array.isArray(blocks) ? blocks.find(block => typeof block?.text === 'string') : undefined
   const text = typeof first?.text === 'string' ? first.text : ''
   const cut = text.indexOf('\n')

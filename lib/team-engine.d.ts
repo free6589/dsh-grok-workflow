@@ -30,14 +30,41 @@ import type { WorkflowEngine } from '@deepseek-ai/dsh-workflow';
 import type { ChildOutcomeLog } from './child-outcomes.js';
 /** Code points a derived child label may occupy — the guest's own defaultLabel rule. */
 export declare const CHILD_LABEL_LIMIT = 48;
-/** The activation-spec slice the rewrite reads and rewrites (structural, untrusted shape). */
+/**
+ * The activation-spec slice the rewrite reads and rewrites (structural, untrusted
+ * shape).
+ *
+ * Two shapes reach this seam and both are real. The published engine builds the
+ * spec flat — `{ label, prompt, agentOptions, parent, cwd, … }` — and that is what
+ * every production child sends. The engine contract harness builds the same two
+ * fields one level down under `request`, which is also the shape an older
+ * host-side mirror used. Reading only `request.prompt` and `request.agentOptions`
+ * therefore produced an empty title and an `inherit` route on every real run: the
+ * label stayed the engine's own, the role was never parsed, and the null-collapse
+ * repair had no group to match. Both reads are kept, flat first.
+ */
 export interface ActivationSpecView {
     label: string;
-    request: {
+    /** Flat shape (what the published engine sends). */
+    prompt?: readonly {
+        type?: string;
+        text?: string;
+    }[];
+    /** Flat shape, same provenance as {@link prompt}. */
+    agentOptions?: {
+        provider?: unknown;
+        model?: unknown;
+    };
+    /** Nested shape (engine contract harness, older host mirror). */
+    request?: {
         prompt?: readonly {
             type?: string;
             text?: string;
         }[];
+        agentOptions?: {
+            provider?: unknown;
+            model?: unknown;
+        };
     };
 }
 /**

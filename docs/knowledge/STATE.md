@@ -1,3 +1,14 @@
+Last updated: 2026-11-24 03:50 +08:00（**0.13.26 暂停发布：合流后的 T1 修复在真机上不生效，soak `FAIL`** —
+`release/0.13.26`（worktree `.tmp/wt-rel-0-13-26`，从 `main` `6b0eb62` 开出）已无冲突合入 `fix/null-collapse-t1`
+（`npm run ci` exit 0，95 files / 1771 tests），隔离真机 soak 却把这条修复判死：worker 路由换成被网关拒绝的 key 之后，
+4 个子代理真实的 `401 virtual key is required` 死亡，交付给用户那段仍写 `worker returned no valid structured result`。
+两个根因（`CONFIRMED`）：① `src/team-engine.ts` 读 `spec.request.prompt`/`spec.request.agentOptions`，真引擎发的是**扁平**
+spec（`prompt`/`agentOptions` 在顶层）→ role 解析为空 → 回填一条不改（harness 的假 seam 用了嵌套形状，把差异挡住，19 例全绿）；
+② spawn 子代理的 `SubagentResult` 根本没有 `diagnostic`（只有 external provider 有），所以真机只能拿到 `stopReason=error`，
+给不出"超时/鉴权"的分类。①已在本分支修好（+1 例钉住扁平 spec，`npm run ci` exit 0 / 95 files / 1772 tests），②与
+`report.incomplete[].reason` 文案没被 `repairText` 覆盖这两处未修。**未打 tag、未推 main、未发版**；修法与证据见
+VALIDATION 首条与 `.rsi/evidence/round-077/`。
+
 Last updated: 2026-11-24 03:10 +08:00（**T1 null 语义塌陷：报告不再把"子代理死了"写成格式错，`CONFIRMED` 未合流** —
 分支 `fix/null-collapse-t1`（worktree `.agents/worktrees/fix-null-collapse-t1`，从 `main` `6b0eb62` 开出，一任务一分支；
 共享脏树 detached `a6103ad` 未动）。引擎 guest 把 `stopReason !== 'completed'` 和"`completed` 但没交结构化结果"

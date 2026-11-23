@@ -1,3 +1,30 @@
+## 2026-11-24 — 0.13.26 发版中止：T1 修复真机不生效，等两处补齐再发（`CONFIRMED`）
+
+- **From:** 合并发版子代理 · **To:** 下一轮接手者 / lead
+- **做了什么**：`main`（`6b0eb62`=0.13.25）拉出 `release/0.13.26`（worktree `.tmp/wt-rel-0-13-26`），`--no-ff` 合入
+  `fix/null-collapse-t1`（`82932bc`+`81e6b59`），无冲突。合流点 `npm run ci` exit 0（95 files / 1771 tests）。
+- **为什么没发**：隔离真机 soak `FAIL`（证据 `.rsi/evidence/round-077/`）。正常路径 PASS；把 worker 路由换成被网关
+  拒绝的 key 后，4 个子代理真的死于 `401 virtual key is required`，交付给用户的那段仍写
+  `worker returned no valid structured result (structured output missing or unparsable)`——T1 要修的正是这句。
+- **两个根因**（都在 `82932bc` 里，单测因 harness 用了不真实形状而全绿）：
+  1. `src/team-engine.ts` 的 `promptTitle()`/`requestedRoute()` 读 `spec.request.prompt` / `spec.request.agentOptions`，
+     已发布引擎发的是扁平 spec（`dsh-workflow-ptc/lib/index.js:330-346`：`prompt`/`agentOptions` 在顶层）→ 真机 role 为空、
+     route 恒 `inherit` → 台账分组为空 → 回填一条不改。**已在 `release/0.13.26` 修好**：两个读法都保留、扁平优先，
+     `test/engine-harness.ts` 改成发扁平形状，`test/null-collapse.spec.ts` 加一例钉住 role/attempt/route；`npm run ci`
+     exit 0（95 files / 1772 tests）。修后真机 archive 兜底文案开始带死因（`… ended \`error\``）。
+  2. spawn（in-process）子代理的 `SubagentResult` 只有 `{output, stopReason, structured}`，**没有 `diagnostic`**
+     （`dsh-subagent/lib/index.js:1229-1250`；`diagnostic` 只由 external provider 产出）→ 真机拿不到"超时/鉴权"的原文，
+     `childFailureClass` 只能给 `unknown`。**未修**：要么走 D-116 B2（让脚本/宿主看见子会话自己的 `turn/end` 事件，
+     属上游改动），要么宿主侧读子会话事件。
+  3. 附带未修：交付里「仍未完成（来自报告）」那行仍是旧文案——`report.incomplete[].reason` 与 `failure.reason` 不逐字
+     相同，`repairText` 的 `includes()` 匹配不上。
+- **下一步（按序）**：修 ② 与 ③ → `npm run ci` → 重跑同一套 soak（overlay 里 worker→`bifrost-badkey`，看交付是否
+  说鉴权/超时）→ 才走 §7 五步。**CHANGELOG `[Unreleased]` 已按实测改口径**："子代理死了不再写成格式错"成立，
+  "超时报超时 / 密钥被拒报不可用"只在服务商提供 `diagnostic` 时成立。
+- **未做**：未 bump 0.13.26、未打 tag、未推 `main`、未碰 live `~/.dsh`、未重启线上。
+
+
+
 ## 2026-11-24 — `fix/null-collapse-t1`：子代理死因回填（`CONFIRMED` 未合流，真机 soak `NOT_RUN`）
 
 - **From:** T1 修复子代理 · **To:** 合流方 / 下一轮接手者

@@ -1,0 +1,43 @@
+round 077 — 0.13.26 候选的隔离真机 soak（用户视角，fork live web profile）
+==============================================================================
+
+环境: DSH_HOME=.tmp/soak-01326/dsh-home（clone-profile 只读克隆 ~/.dsh/profiles/web，parity 5/5，1 行凭据按设计脱敏）
+     独立 HOME=.tmp/soak-01326/home；两个实例 127.0.0.1:3196（正常路由）/ 3198（worker 路由换坏 key）
+     模型 wb/cn:deepseek-v4.1-flash（本地网 127.0.0.1:18088 实测 203 个 id 含该 id）；key 只从 ~/.dsh/bifrost.env 注入，全程未打印
+     驱动: 原生 CDP（node 全局 WebSocket，无 playwright）+ headless chromium；点击工作区/输入/按「发送消息」
+     live ~/.dsh 未写（一次误触 dsh web --help 被只读挂载挡下 EROFS，零写入）；线上 100.111.111.88:3080 未动
+
+§1 正常路径：工作流跑通，交付是人话 —— PASS
+  会话内实测：1 个子代理（规划→执行→检查→复核→汇总），交付「已完成，用时 3秒」+ 一句中文答案。
+  证据: .rsi/evidence/round-077/happy.png、happy2-page.txt；archive: status completed · verified 1/1 · confirmed 5。
+
+§2 死掉子代理的 run（worker 路由指向被网关拒绝的 key）—— FAIL（本轮的核心发现）
+  做法: overlay 把 worker 角色指向同网关的 bifrost-badkey（apiKeyEnv BIFROST_BADKEY=sk-soak-refused-key-probe），
+        其它角色不变。4 个 worker 子代理（attempt 1 两个、attempt 2 两个）真的死了，子会话里留下真实死因：
+        turn/end reason = {kind:error, error:{message:"401: {"message":"virtual key is required. Provide a virtual key via the x-bf-vk header."}", code:AUTH}}
+        （子会话 session 2893a429 / 488da5b0 / 4d1b50fd / eb13967c，agentProvider=bifrost-badkey）
+  但交付给用户的那一段仍然写：
+        「仍未完成（来自报告）：- 任务 worker failed on every worker returned no valid structured result (structured output missing or unparsable)」
+        「注意：该任务在每一条尝试路径上都没能产出符合要求的结构化结果」
+  即：T1 修复承诺的「不再写成格式错」在真机上没有兑现（这是 0.13.25+82932bc 的原始行为）。
+
+§3 两个根因（都在 82932bc 的实现里，单测因 harness 用了不真实形状而全绿）
+  根因 1（已在本 worktree 修好，未发布）：src/team-engine.ts 的 promptTitle()/requestedRoute() 读 spec.request.prompt /
+    spec.request.agentOptions，而已发布引擎 dsh-workflow-ptc 传给 subagents.startActivation 的是**扁平** spec
+    （prompt / agentOptions 在顶层，见 dsh-workflow-ptc lib/index.js:330-346）。于是每次真实运行 role 解析为空、
+    route 恒为 inherit → child-outcomes 的分组为空 → reclassifyNullCollapses 一条也不改。
+    test/engine-harness.ts 的假 startActivation 恰好要求 request.request.prompt，掩盖了这个差异（已在 harness 改成发扁平形状 +
+    test/null-collapse.spec.ts 新增一例钉住 role/attempt/route 的读取；修后 20 例全绿，且真机 archive 兜底文案开始带死因）。
+  根因 2（未修，需要结构改动）：spawn（in-process）子代理的 SubagentResult 只有 {output, stopReason, structured}，
+    **没有 diagnostic**（dsh-subagent lib/index.js:1229-1250 captureLocalResult；diagnostic 只由 external provider 产出）。
+    所以真机上 stopReason=error、诊断为空 → childFailureClass 只能给 unknown，无法分辨「超时 / 鉴权 / 传输」。
+    修好根因 1 之后实测的文案是「worker call produced no result: the child run ended `error`」——比「格式错」对，
+    但仍不是 changelog 承诺的「超时报超时、密钥被拒报不可用」。要拿到服务商原话，得让脚本/宿主看见子会话自己的 turn/end 事件（D-116 B2 那一类上游改动）。
+  附带观察：即使根因 1 修好，交付里「仍未完成（来自报告）」那一行仍是旧文案——report.incomplete[].reason 与 failure.reason
+    不逐字相同，repairText 的 includes() 匹配不上（只改了 errors/task.error 的同类句）。这一处也要单独修。
+
+§4 结论
+  0.13.26 不发：合并进来的 T1 修复在真机上不起作用（或只起一半），changelog 里「超时报超时 / 密钥被拒报不可用 / 记忆归档带死因」
+  这几句与实测不符。已把根因 1 的修法与证据留在 release/0.13.26 分支（未推送、未打 tag），供下一轮补齐根因 2 与 incomplete 文案后重跑 soak。
+
+§5 清理：两个 web 实例、headless chromium 全部停止；.tmp/soak-01326/ 整目录删除（scratch home、chrome profile、overlay、日志）。

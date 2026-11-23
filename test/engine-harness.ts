@@ -159,17 +159,26 @@ export function createEngineHarness(answer: (call: ChildCall) => ChildAnswer | P
     },
     async startActivation(request: {
       label?: string
-      request: { prompt: { text: string }[]; outputSchema?: unknown; agentOptions?: { provider?: string; model?: string } }
+      // The published engine builds the spec flat (`prompt`, `agentOptions` at the
+      // top level); the nested `request` shape below is the older host mirror. Both
+      // are accepted so a test can drive either, and flat is what the harness sends.
+      prompt?: { type?: string, text?: string }[]
+      outputSchema?: unknown
+      agentOptions?: { provider?: string, model?: string }
+      request?: { prompt?: { type?: string, text?: string }[], outputSchema?: unknown, agentOptions?: { provider?: string, model?: string } }
     }) {
+      const blocks = request.prompt ?? request.request?.prompt ?? []
+      const outputSchema = request.outputSchema ?? request.request?.outputSchema
+      const agentOptions = request.agentOptions ?? request.request?.agentOptions
       const call: ChildCall = {
-        prompt: request.request.prompt.map(block => block.text).join(''),
+        prompt: blocks.map(block => block.text ?? '').join(''),
         // The durable descriptor label the engine's startChild chose — what the
         // Web GUI team panel shows (`entry.label ?? entry.id`). A raw (untwinned)
         // engine records `<run name> child N` here.
         ...request.label === undefined ? {} : { label: request.label },
-        ...request.request.outputSchema === undefined ? {} : { outputSchema: request.request.outputSchema },
-        ...request.request.agentOptions?.provider === undefined ? {} : { provider: request.request.agentOptions.provider },
-        ...request.request.agentOptions?.model === undefined ? {} : { model: request.request.agentOptions.model },
+        ...outputSchema === undefined ? {} : { outputSchema },
+        ...agentOptions?.provider === undefined ? {} : { provider: agentOptions.provider },
+        ...agentOptions?.model === undefined ? {} : { model: agentOptions.model },
       }
       children.push(call)
       const settled = await answer(call)

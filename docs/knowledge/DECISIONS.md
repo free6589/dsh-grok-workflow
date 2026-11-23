@@ -2802,3 +2802,22 @@ spine 为空，pre-fix 形状会进脊柱。
     比 B1 简单，但同样管不到当次尝试。
 - **Consequences:** 误标消失（报告/答案/记忆三处都说真因）；分类表一处改两处生效；`cancelled` 进入失败类
   词表；已知边界写进 `VALIDATION.md`，不是悄悄省略。
+
+## D-117 · 子代理终态台账要读引擎**真正发的** spec 形状；spawn 路径没有 diagnostic（2026-11-24）
+
+- **Status:** ① CONFIRMED（已修，`release/0.13.26` 未发）；② CONFIRMED（实测与引擎源码都确认），未修
+- **来源:** `release/0.13.26` 的隔离真机 soak（round 077，`.rsi/evidence/round-077/soak.txt`）
+- **① spec 形状（已修）:** 原实现按 `spec.request.prompt` / `spec.request.agentOptions` 读标题与路由，但已发布引擎
+  `dsh-workflow-ptc` 传给 `subagents.startActivation` 的是扁平 spec（`prompt`/`agentOptions` 在顶层，
+  `lib/index.js:330-346`）。后果：真机每次运行的 `role` 解析为空、`route` 恒 `inherit`，`child-outcomes` 的分组为空，
+  `reclassifyNullCollapses` 一条也不改——功能在单测里全绿、在用户面前等于不存在。修法：两种形状都读、扁平优先
+  （`src/team-engine.ts` 的 `promptBlocks`/`specRouteOptions`），并把 `test/engine-harness.ts` 的假 seam 改成发扁平形状
+  （它原来恰好发嵌套形状，正是把差异挡住的原因），`test/null-collapse.spec.ts` 加一例钉住 role/attempt/route。
+- **② 没有 diagnostic（未修）:** `spawn`（in-process）子代理的 `SubagentResult` 只有 `{output, stopReason, structured}`
+  （`dsh-subagent/lib/index.js:1229-1250` 的 `captureLocalResult`），`diagnostic` 只由 external provider 产出。所以真机上
+  一次 401 死亡只能拿到 `stopReason: 'error'`，`childFailureClass` 落到 `unknown`，给不出"超时/鉴权/传输"的细分。
+  可选的下一步：读子会话自己的 `turn/end` 事件（宿主侧新增一条读取，或 D-116 B2 的上游通道）。
+- **备选（本轮未采纳）:** 在报告里对 `unknown` 加一句"服务商没有给出失败原文"——能让读者知道这是信息缺失而不是
+  分类器的疏忽，但会加长每条失败行，留待与 ② 一起做。
+- **Consequences:** 任何"在引擎 seam 上取证"的改动，验证必须包含一次**真机** run；单测跑在自制 harness 上，
+  harness 的 spec 形状一旦与真引擎不同，功能可以整体失效而不报警。

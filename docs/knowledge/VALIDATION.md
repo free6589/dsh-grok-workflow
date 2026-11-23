@@ -1,4 +1,22 @@
-## 未合流 `fix/null-collapse-t1` —— 子代理死因不再被写成格式错（T1，`CONFIRMED`） — 2026-11-24
+## 合流后真机 soak 判 **FAIL**：T1 回填在真机上不生效，0.13.26 未发 — 2026-11-24（round 077）
+
+| state | command | result |
+| --- | --- | --- |
+| 合流 | `git merge --no-ff fix/null-collapse-t1`（worktree `.tmp/wt-rel-0-13-26`，从 `main` `6b0eb62`） | 无冲突（分支本就从 `main` 开出），`git merge` 字面"冲突两边都保留"无适用场景；共享脏树（detached `a6103ad`）一行未动 |
+| 门禁（合流点） | `npm run ci` | **exit 0：95 files / 1771 tests PASS**，typecheck 干净，lint 0 errors，`verify:lib` byte-identical |
+| 隔离真机 soak | fork live `web` profile → `.tmp/soak-01326/dsh-home`（`scripts/clone-profile.mjs`，parity 5/5，1 行凭据按设计脱敏），独立 `HOME`，两个实例 `127.0.0.1:3196`/`3198`，模型 `wb/cn:deepseek-v4.1-flash`，原生 CDP 驱动 | **FAIL**（详见 `.rsi/evidence/round-077/soak.txt`）：正常路径 PASS（工作流跑通、交付一句人话）；**死掉子代理的 run 仍把死因写成格式错** |
+| 死掉 run 的造法 | overlay 把 worker 路由换到同网关的 `bifrost-badkey`（`apiKeyEnv BIFROST_BADKEY=sk-soak-refused-key-probe`） | 4 个 worker 子代理（attempt 1×2、attempt 2×2）真实死亡，子会话 `turn/end` = `401 virtual key is required … code:AUTH`；交付给用户那段仍是 `worker returned no valid structured result (structured output missing or unparsable)` |
+| 根因 1（已修） | 读 `dsh-workflow-ptc` 真源 + 实测 | `src/team-engine.ts` 的 `promptTitle()`/`requestedRoute()` 读 `spec.request.prompt`/`spec.request.agentOptions`，而引擎发的是**扁平** spec（`prompt`/`agentOptions` 在顶层，`dsh-workflow-ptc/lib/index.js:330-346`）→ 真实运行 role 解析为空、route 恒 `inherit` → 台账分组为空 → `reclassifyNullCollapses` 一条不改。`test/engine-harness.ts` 的假 `startActivation` 恰好要 `request.request.prompt`，把这个差异挡住了 |
+| 根因 2（未修） | 读 `dsh-subagent/lib/index.js:1229-1250` | spawn（in-process）子代理的 `SubagentResult` 只有 `{output, stopReason, structured}`，**没有 `diagnostic`**（`diagnostic` 只由 external provider 产出）→ 真机上只能得到 `stopReason=error`，`childFailureClass` 只能给 `unknown`，分辨不出超时/鉴权/传输 |
+| 附带 | 实测 | 即使根因 1 修好，交付里「仍未完成（来自报告）」那行仍是旧文案：`report.incomplete[].reason` 与 `failure.reason` 不逐字相同，`repairText` 的 `includes()` 匹配不上（只改到 `errors`/`task.error`） |
+| 修后门禁 | `npm run ci` | **exit 0：95 files / 1772 tests PASS**（新增一例钉住扁平 spec 的 role/attempt/route），`verify:lib` byte-identical |
+| 结论 | — | **不发 0.13.26**：CHANGELOG `[Unreleased]` 里"超时报超时 / 密钥被拒报不可用 / 记忆归档带死因"与真机实测不符（实测文案是 `the child run ended \`error\``）。修法留在 `release/0.13.26`（未推送、未打 tag） |
+
+**为什么单测全绿而真机不生效（`CONFIRMED`）**：`test/engine-harness.ts` 的假子代理 seam 仿的是"嵌套 `request`"形状，
+而真引擎发扁平形状；19 例都在假 seam 上跑，所以 `role` 永远解析成功、`diagnostic` 永远有值。这类"harness 与真 seam 形状不一致"
+只能由真机 soak 抓出来——本轮正是它的价值。
+
+
 
 | state | command | result |
 | --- | --- | --- |

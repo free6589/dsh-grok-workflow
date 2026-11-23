@@ -155,8 +155,45 @@ describe('the engine seam records what each child settled as', () => {
     })
   })
 
-  it('captures nothing to repair when every child finishes cleanly', async () => {
+  /**
+   * The spec-shape case. The published engine builds the activation spec flat
+   * (`prompt`, `agentOptions` at the top level). Reading only a nested
+   * `request.prompt` made the title empty and the route `inherit` on every real
+   * run, which left the ledger with no role to group by — the repair then never
+   * fired in production even though these unit cases were green. So the harness
+   * now sends the flat shape and this case pins what the seam reads out of it.
+   */
+  it('reads the role, the attempt and the route out of the flat spec', async () => {
     const cfg = config()
+    const harness = createEngineHarness(call => roleOfCall(call) === 'worker'
+      ? { output: [{ type: 'text' as const, text: '' }], stopReason: 'error', diagnostic: 'the child run timed out after 1200000 ms' }
+      : { structured: execution('done') })
+    try {
+      const request = buildWorkflowRequest('Ship the verified result', [task('a')], cfg)
+      const outcomes = childOutcomeLog(harness.ctx as never)
+      const engine = teamWorkflowEngine(harness.ctx as never, { warn() {} })
+      const mark = outcomes.mark()
+      const run = engine.start({
+        script: WORKFLOW_SCRIPT,
+        meta: { name: '任务团队', description: 'flat spec' },
+        args: request.args,
+        parent: { session: { header: {}, id: 'flat-spec-parent' } } as never,
+        maxTotalAgents: maxTotalAgentsFor(1, cfg.maxRetries, routeBudgetFor(cfg)),
+      })
+      await run.result
+      await run.dispose()
+      const worker = outcomes.since(mark).find(entry => entry.role === 'worker')
+      expect(worker, 'the seam recorded no worker outcome, so the title was not read').toBeDefined()
+      expect(worker!.attempt).toBe(1)
+      expect(worker!.route).toBe('w1')
+      expect(worker!.stopReason).toBe('error')
+      expect(String(worker!.diagnostic)).toContain('timed out')
+    } finally {
+      await harness.dispose()
+    }
+  })
+
+  it('captures nothing to repair when every child finishes cleanly', async () => {    const cfg = config()
     const objective = 'Ship the verified result'
     const harness = createEngineHarness(call => {
       const role = roleOfCall(call)
