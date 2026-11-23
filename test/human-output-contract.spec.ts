@@ -370,8 +370,9 @@ describe('人话优先：COMPLETED 与 PARTIAL 都以人话开头', () => {
     expect(visible).toContain(HUMAN_DONE_TAIL)
     // The plain sentence carries the run's own conclusion, not a template only.
     expect(visible).toContain('新加坡本周多雨，出行请带伞。')
-    // ...and the other language, because a guessed language can be wrong.
-    expect(visible).toContain('Answer:')
+    // One language, the request's (round-075): the mirror is gone, so the reader is
+    // not handed the same answer twice and the model is not asked to pick a half.
+    expect(visible).not.toContain('Answer:')
   })
 
   it('opens a PARTIAL run with the plain summary too, with the honest count', async () => {
@@ -386,7 +387,7 @@ describe('人话优先：COMPLETED 与 PARTIAL 都以人话开头', () => {
     expect(visible).toContain(HUMAN_PARTLY)
     // The honest count lives in the tail, not up front.
     expect(visible).toContain('项可用')
-    expect(visible).toContain('Answer:')
+    expect(visible).not.toContain('Answer:')
     // The caveat a reader needs is stated in the human block's own words.
     expect(visible).toContain('酒店价格未取得，预算建议可能偏差')
   })
@@ -401,7 +402,8 @@ describe('人话优先：COMPLETED 与 PARTIAL 都以人话开头', () => {
     const visible = between(text)
 
     expect(visible).toContain(HUMAN_FAILED)
-    expect(visible).toContain('This run did not finish')
+    // A failure keeps the verbatim contract, in the request's own language only.
+    expect(visible).not.toContain('This run did not finish')
     expect(visible).not.toContain(HUMAN_DONE_TAIL)
     expect(visible).not.toContain('That is the conclusion; details are in the ledger.')
     // The measured cause is still the reader's to see.
@@ -479,8 +481,9 @@ describe('机器台账：永远折叠，不进可见块（T4 固定输出）', (
     const visible = between(text)
 
     expect(visible).not.toContain('Confirmed evidence:')
-    // The human block carries the conclusion, not the ledger.
-    expect(visible).toContain('Answer:')
+    // The human block carries the conclusion, not the ledger — in one language.
+    expect(visible).toContain('答案：')
+    expect(visible).not.toContain('Answer:')
     // The folded copy stays for carry-over.
     expect(text).toContain(LEDGER_GUARD)
   })

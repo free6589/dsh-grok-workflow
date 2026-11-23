@@ -549,13 +549,18 @@ describe('relay/in-turn 文本：可见块与人话块一致，台账折叠在�
     expect(visible).not.toContain('src/script.ts')
   })
 
-  it('switches the relay instruction from verbatim to paraphrase when the ledger travels (Q11 b)', () => {
+  it('asks for a rewrite by default, and still forbids machine words when the ledger travels (Q11 b)', () => {
     const preambleOf = (text: string): string => text.slice(0, text.indexOf(REPORT_BEGIN))
-    // The human block is human text: reproducing it word for word is exactly right.
+    // Round-075: the block is material, not wording. Reproducing it word for word
+    // is what made the delivered answer the digest of the answer — so the default
+    // instruction is a rewrite against the user's own request.
     const off = preambleOf(relayText(completedReport()))
-    expect(off).toContain('Reply with those lines exactly as given')
-    // A ledger is machine text: the same instruction is what produced `code=` and
-    // half sentences in the reply, so it is replaced by the paraphrase contract.
+    expect(off).not.toContain('Reply with those lines exactly as given')
+    expect(off).toContain('in your own words')
+    expect(off).toContain('never print a machine field name')
+    expect(off).toContain('code=')
+    // With the ledger inside the markers the contract stays a paraphrase, and it
+    // names the machine words the reply may never carry.
     const on = preambleOf(relayText(completedReport(), undefined, { showDiagnostics: true }))
     expect(on).not.toContain('Reply with those lines exactly as given')
     expect(on).toContain('in your own words')
@@ -566,6 +571,7 @@ describe('relay/in-turn 文本：可见块与人话块一致，台账折叠在�
     const failed = failureReport(OBJECTIVE, config, 'Plan', 'planner unavailable')
     expect(preambleOf(relayText(failed, undefined, { showDiagnostics: true })))
       .toContain('never describe this as success')
+    expect(preambleOf(relayText(failed))).toContain('exactly as given')
   })
 
   it('folds the ledger for a PARTIAL run too, and keeps it parseable for carry-over', () => {

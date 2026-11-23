@@ -2,23 +2,31 @@
  * Answer text produced by the gate.
  *
  * The host cannot verify what the main model says, so the gate sends a result it
- * has already validated and asks for a verbatim reproduction between markers
- * (measured to be reproduced exactly in DSH 0.2.1-rc.2, single sample). Failure
- * reports take the same path: a failed workflow must never look like an answer.
+ * has already validated and tells the model what to do with it between markers.
+ * That instruction is not the same for every report: a failure must be reproduced
+ * word for word (a paraphrase is free to soften, and a failed workflow must never
+ * look like an answer), while a finished run carries the *material* for an answer
+ * and the model rewrites it against the request the user actually made.
  *
  * Two blocks travel in one message, and by default only one of them is
  * user-visible (Q11(c)):
  *
  * - **by default, between the markers** the delivery layer's human block alone
- *   (`src/delivery/index.ts`: what was done, what came of it, what is next, in
- *   both languages). The machine ledger — `code=`, `src/file.ts:12`, `ledger`,
- *   the field labels — is folded into the internal block below the markers.
+ *   (`src/delivery/index.ts`: the run's own answer — its whole summary — what came
+ *   of it, where the deliverable is, what is next, and the caveats worth knowing),
+ *   in the reader's language. The machine ledger — `code=`, `src/file.ts:12`,
+ *   `ledger`, the field labels — is folded into the internal block below the
+ *   markers.
+ * - **the instruction is a rewrite** ({@link REWRITE_PREAMBLE}): answer the user's
+ *   request in your own words, name where the deliverable is and how to open it,
+ *   keep every number and path exact, print no field name. The block is source
+ *   material — its `答案：`/`下一步：`/`交付物：` labels are its own scaffolding, and a
+ *   reply that echoed them would be the ledger read aloud all over again.
  * - **with `showDiagnostics` on, between the markers** the human block *and* the
- *   machine ledger, and the preamble switches from "reproduce these lines
- *   exactly" to "restate the conclusion in human words, keep every number and
- *   path exact, never print a machine field name". That is the whole of Q11:
- *   a verbatim instruction over machine text is what produced a reply full of
- *   `RESUME code=none …` and half-cut English sentences.
+ *   machine ledger, and the preamble switches to the diagnostics paraphrase rule
+ *   that keeps every number and path exact while forbidding a machine field name.
+ *   That is the whole of Q11: a verbatim instruction over machine text is what
+ *   produced a reply full of `RESUME code=none …` and half-cut English sentences.
  * - **below the closing marker**, under an explicit internal guard, the durable
  *   copy of the ledger. It is not part of the reply: the preamble forbids
  *   quoting it. It stays in the message because that is the durable copy
@@ -53,7 +61,7 @@ export interface RelayOptions {
     showDiagnostics?: boolean;
     /** Compose the human block at all. Default on; `false` is the raw-report opt-out. */
     humanSummary?: boolean;
-    /** Reader's language; picks which block comes first. Default `zh`. */
+    /** Reader's language: the block is written in it, and only in it. Default `zh`. */
     lang?: string;
 }
 /**
@@ -87,9 +95,9 @@ export declare function acceptedEnterText(body: string): string;
  * Build the message text for in-turn delivery (strategy `in-turn`).
  *
  * Wording is deliberately identical to {@link relayText}: the contract with the
- * main model (reproduce the validated result, add no claims) does not depend on
- * *when* the message arrives, only on the fact that the model composes the final
- * reply. Keeping one wording keeps the t24 measurement applicable.
+ * main model (answer the request from the validated material, add no claim the
+ * material does not carry) does not depend on *when* the message arrives, only on
+ * the fact that the model composes the final reply.
  *
  * @param report - a validated report, or an explicit failure report.
  * @param header - front-desk lines shown above the human block.

@@ -90,7 +90,25 @@ export declare function diagnosticsEnabled(value?: DiagnosticsSwitch): boolean;
 export declare function statusTail(report: WorkflowReport, verified: number, total: number, lang: DeliveryLang): string;
 /** Remove near-duplicate bilingual halves: keep `lang`'s half when it carries the sentence. */
 export declare function dedupeBilingual(text: string, lang: DeliveryLang): string;
-/** The run's own answer, first: one plain half-sentence that stands on its own. */
+/**
+ * The run's own answer: the whole summary, its paragraphs kept.
+ *
+ * The synthesizer already wrote the answer; taking only its first sentence threw
+ * away the rest of what it established (the reported defect: a 200-character
+ * narrative reduced to one line). So every line of the summary travels, guarded
+ * the same way a single sentence was, bounded by {@link MAX_ANSWER_LEAD_CHARS} and
+ * deduplicated against a bilingual mirror — the block's job is to hand the reader
+ * the answer, not to pre-digest it.
+ *
+ * Lines are the unit, never sentences: the summary is a paragraph per section and
+ * splitting it into sentences cut at the `.` inside `weekly-report.md`
+ * (CONFIRMED — the rejoin then read `weekly-report. md`, and the deliverable the
+ * block had just named stopped matching its own keep-list).
+ *
+ * @param report - validated report.
+ * @param lang - language whose half of a bilingual mirror is kept.
+ * @returns the answer, or an honest stand-in when the summary is empty.
+ */
 export declare function answerLead(report: WorkflowReport, lang: DeliveryLang): string;
 /**
  * Split one bilingual pair's character budget between its two blocks.

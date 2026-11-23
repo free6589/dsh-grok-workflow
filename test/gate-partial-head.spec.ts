@@ -326,7 +326,9 @@ describe('a FAILED answer leads with a human conclusion, never with a success cl
     expect(text).toContain('下一步：')
     // The infrastructure advice, not the "your task was bad" advice.
     expect(text).toContain('这次卡在外部服务或时限上')
-    expect(text).toContain('This was an external service or deadline problem')
+    // One language, the request's (round-075): the English mirror is gone, so the
+    // reply is not the same sentence twice.
+    expect(text).not.toContain('This was an external service or deadline problem')
     // Never the success tail.
     expect(text).not.toContain('以上是结论；明细已记入台账。')
     // The ledger is still there for anyone who wants it.

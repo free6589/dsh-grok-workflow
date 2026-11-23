@@ -5,6 +5,16 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Changed / 变更
+
+- **The final answer is written for you, not read off the ledger / 结论是写给你看的，不是把台账念一遍** —
+  A finished run used to arrive as a 200-character status strip and only its first sentence, with `答案：` / `下一步：` labels and the same paragraph mirrored in Chinese and English. The delivery now carries the run's whole summary, names what was achieved and where the deliverable is (its path is no longer stripped out of the block), and asks the answering model to rewrite that material against the question you actually asked — in your language only. A failed run still hands over its wording verbatim: a paraphrase is free to soften, and a failure that reads like an answer is worse than no answer.
+  / 以前跑完收到的是一条 200 字左右的台账摘要，而且只有第一句，外面还套着「答案：」「下一步：」这些标签，同一段话中英各来一遍。现在交出去的原料是整个结论、做成了什么、以及东西放在哪里（交付物路径不再被当成机器细节删掉），并要求作答的模型按你真正问的问题把这份原料重写成一句话说得清的回答——只用你说的一种语言。失败仍然是逐字转达：改写有软化的自由，而一个读起来像答案的失败比没有答案更糟。
+
+- **The synthesizer may write 结果 / 怎么用 / 注意, and it rewrites the caveats itself / 汇总可以写「结果/怎么用/注意」三段，注意事项由它自己写** —
+  The narrative was capped at 200 characters with no headings and no lists, and the report's open questions were pasted under it word for word — so the answer read like a status line followed by the machine's own notes. It may now use those three sections (no other headings, no lists, no markdown), the narrative bound follows the answer's size, and the open items are rewritten in its own words under the caveat section. The gate's requirement changed with it: a narrative with open items and no caveat section is rejected, while one that says them in its own words is no longer rejected for not quoting the report. When no draft passes, the deterministic summary still states the caveats plainly.
+  / 以前结语被限死在 200 字、不许标题不许列表，而报告里那几条待确认事项又被原样贴在它下面——于是答案读起来像一行状态栏加机器的批注。现在可以用「结果：」「怎么用：」「注意：」这三段（别的标题、列表、Markdown 仍然不行），长度上限跟着答案的大小走，待确认事项由它用自己的话写进注意段。门卫的要求也跟着换了：有待确认事项却少了注意段会被打回，但用自己的话说明白、没有照抄报告原文的，不再被判错。所有草稿都没过时，确定性摘要仍会把注意事项老实写出来。
+
 ## [0.13.24] - 2026-11-24
 
 ### Fixed / 修复

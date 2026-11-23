@@ -1,3 +1,19 @@
+Last updated: 2026-11-24 01:50 +08:00（**分支 `fix/final-answer-rewrite`：最终答案从"逐字复述台账"改成"给料 + 重写"，`CONFIRMED` 未合流** —
+用户诉求：跑完拿到的是一段电报体、而且只取了第一句。改四处（都只在本分支）：
+① `src/answer.ts` 默认 relay 换 `REWRITE_PREAMBLE`（按用户原问题重写、说清交付物在哪怎么打开、
+禁台账标签/字段名），失败态仍逐字（改写会软化失败）；
+② `src/delivery/index.ts` 的 `answerLead` 吃整段 summary（上界 zh 700 / en 1400 字）不再是第一句，
+完成态补「做成了：…」+「交付物：<路径>」，`MACHINE_DETAIL` 对交付物 locator 开显式例外（占位符进出），
+其余路径照旧删；
+③ 默认单语：`relayText` 传 `bilingual: false`，跟随 `opts.lang`（用户请求语言）；
+④ `src/script.ts` 的 synthesizer 笼子放宽：允许「结果：/怎么用：/注意：」三段（禁别的标题、禁列表、禁 Markdown），
+叙事上界 700 字 / 300 词，**caveats 由它重写**——`layeredNotesBlock` 不再原文贴 uncertainties，
+门禁把"每条原句必须出现"换成"必须有 caveat 段"（`hasCaveatSection`，check + verify 两侧都查）。
+验证：`npx vitest run` → **93 files / 1744 tests PASS**（含新增 `test/final-answer-rewrite.spec.ts` 15 例，
+先红后绿）；`npx tsc -p tsconfig.json --noEmit` exit 0；`npx oxlint src test` 0 errors（35 warnings 皆既有）；
+`npm run build` + `npm run verify:lib` byte-identical（229 files）。真机 soak NOT_RUN（本分支只做离线契约 + 全量单测）。
+证据与逐条口径见 `VALIDATION.md` 首条、`DECISIONS.md` D-115、`HANDOFF.md` 首条。）
+
 Last updated: 2026-11-24 01:30 +08:00（**已发版 `0.13.24`：三路合流（队长拆法绑定 + 首轮消息立刻可见 + 确认单次消费），隔离真机 soak PASS，`CONFIRMED`** —
 三路各自从 `main` `63cc1db`（0.13.23）开出，`--no-ff` 依次合入 `release/0.13.24`：`fix/captain-approve` `00fc203` →
 `fix/gate-route-msgvis` `f831fca` → `docs/user-soak-fork-profile` `57eadb9`。冲突 5 处（`src/gate.ts` ×4 + `test/captain-confirm.spec.ts` 导入）

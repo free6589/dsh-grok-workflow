@@ -249,10 +249,16 @@ describe('layered synthesis: constrained polish and factual guardrails', () => {
     expect(summary).toContain('the third-party API rate is unverified')
   })
 
-  it('keeps the open items visible even when the polish itself passes', async () => {
+  it('keeps the open items visible — as the synthesizer rewrote them, not as the report pasted them', async () => {
+    // Round-075: the appendix no longer re-prints the report's uncertainties. The
+    // synthesizer carries them in its own 注意 section, and the gate requires that
+    // section instead of the report's wording, so a passing polish still cannot
+    // hide an open item.
     const plan = [task('a')]
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (roleOf(options.label) === 'synthesizer') return { summary: '任务 a 已完成，证据已核验。' }
+      if (roleOf(options.label) === 'synthesizer') {
+        return { summary: '任务 a 已完成，证据已核验。\n注意：第三方接口的费率还没有核实，补齐后金额可能微调。' }
+      }
       if (roleOf(options.label) === 'worker') {
         return execution('did it', { uncertainties: ['the third-party API rate is unverified'] })
       }
@@ -267,8 +273,11 @@ describe('layered synthesis: constrained polish and factual guardrails', () => {
     expect(run.report.synthesis.error).toBeUndefined()
     const summary = run.report.synthesis.summary ?? ''
     expect(summary).toContain('任务 a 已完成')
-    expect(summary).toContain('待确认（来自报告）')
-    expect(summary).toContain('the third-party API rate is unverified')
+    expect(summary).toContain('注意：第三方接口的费率还没有核实')
+    // Rewritten, not pasted: the report's own sentence is not carried over, and the
+    // appendix writes facts (open tasks, the test ledger) rather than the caveat.
+    expect(summary).not.toContain('the third-party API rate is unverified')
+    expect(summary).not.toContain('待确认（来自报告）')
   })
 
   it('uses the deterministic fallback when the model path fails on every route', async () => {
