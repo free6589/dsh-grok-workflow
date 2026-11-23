@@ -156,15 +156,23 @@ async function deliver(
   ctx.engine.shape = shape
   const agent = new FakeAgent()
   apply(ctx as never, { grokDefault: 'on', ...overrides })
-  const messages = [userMessage(request)]
-  const decision = await ctx.preStep()(
-    { agent, messages, turn: 1, step: 1, signal: new AbortController().signal },
-    async () => ({ kind: 'enter', messages }),
-  ) as { kind: string; messages?: UserMessage[] }
-  expect(decision.kind).toBe('enter')
-  const texts = (decision.messages ?? []).map(textOf)
-  expect(texts.length).toBeGreaterThan(0)
-  return texts[texts.length - 1]!
+  const send = async (text: string, turn: number): Promise<string> => {
+    const messages = [userMessage(text)]
+    const decision = await ctx.preStep()(
+      { agent, messages, turn, step: 1, signal: new AbortController().signal },
+      async () => ({ kind: 'enter', messages }),
+    ) as { kind: string; messages?: UserMessage[] }
+    expect(decision.kind).toBe('enter')
+    const texts = (decision.messages ?? []).map(textOf)
+    expect(texts.length).toBeGreaterThan(0)
+    return texts[texts.length - 1]!
+  }
+  const first = await send(request, 1)
+  // Round-071: the front desk's team path states the split before dispatching, so
+  // the report shape under test arrives after the approval. `full` mode has no
+  // front desk and therefore no confirmation round.
+  if (!(first.includes('队长先报拆法') || first.includes('The captain states the split'))) return first
+  return send('确认', 2)
 }
 
 const TEAM_ZH = '帮我重构 run.ts 的超时逻辑，并补上回归测试'

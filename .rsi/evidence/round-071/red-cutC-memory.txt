@@ -1,0 +1,57 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/captain-pack
+
+ ❯ test/captain-memory.spec.ts (8 tests | 2 failed) 129ms
+     ✓ puts the two new sheets in the ledgers own directory 2ms
+     ✓ reads nothing as "no memory" instead of throwing 2ms
+     ✓ remembers a standing preference, redacted and idempotent 110ms
+     ✓ writes one retrospective per round and refuses a duplicate run id 1ms
+     ✓ bounds every sheet when reading, keeping the newest lines 1ms
+     × renders the three sheets as one labelled brief 6ms
+     × remembers a preference and reads it back 4ms
+     ✓ refuses an empty profile entry with a usage error 1ms
+ ✓ test/captain-plan.spec.ts (8 tests) 133ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/captain-memory.spec.ts > captain memory: three sheets beside the ledger > renders the three sheets as one labelled brief
+AssertionError: expected '' to contain 'CAPTAIN MEMORY'
+
+- Expected
++ Received
+
+- CAPTAIN MEMORY
+
+ ❯ test/captain-memory.spec.ts:90:19
+     88|     appendCaptainExperience({ runId: 'run-7', status: 'completed', sum…
+     89|     const brief = captainBrief(readCaptainMemory({ dir }))
+     90|     expect(brief).toContain('CAPTAIN MEMORY')
+       |                   ^
+     91|     expect(brief).toContain('USER PROFILE')
+     92|     expect(brief).toContain('EXPERIENCE')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/captain-memory.spec.ts > captain memory CLI > remembers a preference and reads it back
+AssertionError: expected 'captain memory: empty (/tmp/captain-m…' to contain 'USER PROFILE'
+
+Expected: "USER PROFILE"
+Received: "captain memory: empty (/tmp/captain-memory-nfntE4)"
+
+ ❯ test/captain-memory.spec.ts:111:36
+    109|     expect(profile.out.join('\n')).toContain('用户喜欢先看结论')
+    110|     const captain = run(['captain', '--dir', dir])
+    111|     expect(captain.out.join('\n')).toContain('USER PROFILE')
+       |                                    ^
+    112|   })
+    113|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  2 failed | 14 passed (16)
+   Start at  22:25:46
+   Duration  1.15s (transform 390ms, setup 0ms, import 467ms, tests 262ms, environment 0ms)
+
+cutC_red_exit=1

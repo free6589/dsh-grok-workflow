@@ -31,6 +31,7 @@ import { redactError } from '../redact.js'
 import type { WorkflowReport } from '../types.js'
 import type { ArchiveEntry, ArchiveKind, ArchiveOptions } from './archive.js'
 import { appendArchiveEntry, appendSupersedeEntry, readArchive, supersessionMap } from './archive.js'
+import { appendCaptainExperience } from '../captain-memory.js'
 
 /** Warning sink; the recorder never throws, so this is its only channel. */
 export interface ArchiveLogger {
@@ -521,11 +522,23 @@ export function createMemoryArchiver(options: ArchiveRecorderOptions): MemoryArc
         summary: input.cause === undefined ? input.summary : `${input.summary} (cause: ${input.cause})`,
         ...input.evidence === undefined ? {} : { evidence: input.evidence },
       }, archiveOptions()).written
-      // Round 70: a round that carried earlier unfinished work through leaves a
-      // correction behind, so a later session does not read a dead `cancelled`
-      // round as the latest verdict on work this round finished. Contained like
-      // every other write here: a refused disk costs nothing but the link.
-      if (written) supersedeEarlierRound(input)
+      if (written) {
+        // Round 70: a round that carried earlier unfinished work through leaves a
+        // correction behind, so a later session does not read a dead `cancelled`
+        // round as the latest verdict on work this round finished. Contained like
+        // every other write here: a refused disk costs nothing but the link.
+        supersedeEarlierRound(input)
+        // The third sheet (round-071): one retrospective line per round, written
+        // right after the round entry it belongs to. Same rule as the archive — it
+        // never affects the run, so a refused write costs nothing but the line.
+        appendCaptainExperience({
+          runId: input.runId,
+          ...input.status === undefined ? {} : { status: input.status },
+          objective: input.objective,
+          summary: input.summary,
+          ...input.evidence === undefined ? {} : { evidence: input.evidence },
+        }, archiveOptions())
+      }
       return written
     },
     dispose() {

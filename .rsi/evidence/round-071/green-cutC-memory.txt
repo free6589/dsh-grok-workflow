@@ -1,0 +1,12 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/captain-pack
+
+ ✓ test/captain-memory.spec.ts (8 tests) 133ms
+ ✓ test/captain-plan.spec.ts (8 tests) 145ms
+
+ Test Files  2 passed (2)
+      Tests  16 passed (16)
+   Start at  22:25:48
+   Duration  1.01s (transform 380ms, setup 0ms, import 467ms, tests 279ms, environment 0ms)
+
+cutC_green_exit=0

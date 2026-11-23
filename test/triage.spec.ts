@@ -549,15 +549,21 @@ describe('t52 front desk: each tier behaves as promised', () => {
     expect(text).toContain('只派了一个工人')
   })
 
-  it('runs the whole workflow for a complex request and greets the user', async () => {
+  it('runs the whole workflow for a complex request after the captain split is confirmed', async () => {
     const ctx = new FakeContext()
-    const text = await route(ctx, new FakeAgent(), '帮我重构 run.ts 的超时逻辑，并补上回归测试')
-    // Two starts: the live first answer (Front desk, label 首答) and the team run.
+    const agent = new FakeAgent()
+    // Round-071: the team tier states the split first (one cheap preview call) and
+    // dispatches only after the user confirms. Nothing runs before that answer.
+    const asked = await route(ctx, agent, '帮我重构 run.ts 的超时逻辑，并补上回归测试')
+    expect(asked).toContain('档位：团队档')
+    expect(asked).toContain('队长先报拆法')
+    expect(ctx.engine.startCalls.filter(call => call.meta.name !== 'Front desk')).toHaveLength(0)
+    const text = await route(ctx, agent, '确认')
+    // First start is the split preview (Front desk); the team run follows it.
     expect(ctx.engine.startCalls).toHaveLength(2)
     // The team tier uses the workflow script, not the one-call script.
     expect(ctx.engine.startCalls[1]!.meta.name).toMatch(/^任务团队/)
-    expect(text).toContain('档位：团队档')
-    expect(text).not.toContain('收到！团队开工中')
+    expect(text).toContain('队长确认')
     expect(text).toContain('Grok workflow:')
   })
 
@@ -603,12 +609,16 @@ describe('t52 front desk: each tier behaves as promised', () => {
     expect(script).not.toContain('Request:\n简单，')
   })
 
-  it('upgrades to the team when the message asks for it', async () => {
+  it('upgrades to the team when the message asks for it, after a split confirmation', async () => {
     const ctx = new FakeContext()
-    const text = await route(ctx, new FakeAgent(), '用团队帮我改个 typo')
-    // First start is the live first answer; the team run follows it.
+    const agent = new FakeAgent()
+    const asked = await route(ctx, agent, '用团队帮我改个 typo')
+    expect(asked).toContain('你的消息里点名了团队')
+    expect(asked).toContain('队长先报拆法')
+    const text = await route(ctx, agent, '开干')
+    // First start is the split preview; the team run follows the approval.
     expect(ctx.engine.startCalls[1]!.meta.name).toMatch(/^任务团队/)
-    expect(text).toContain('你的消息里点名了团队')
+    expect(text).toContain('队长确认')
   })
 
   it('retries once with a structured answer when the plain call returns nothing', async () => {

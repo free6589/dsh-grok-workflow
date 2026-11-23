@@ -1,0 +1,11 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/captain-pack
+
+ ✓ test/captain-plan.spec.ts (8 tests | 7 skipped) 64ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 7 skipped (8)
+   Start at  22:25:08
+   Duration  813ms (transform 558ms, setup 0ms, import 619ms, tests 64ms, environment 0ms)
+
+cutA_green_exit=0

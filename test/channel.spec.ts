@@ -514,6 +514,10 @@ describe('team tier: the same channel under the front desk', () => {
     const first = [message('帮我拆成几步：先查三家报价，再逐项核验，最后写成一页对比表，并把每一步的验收条件列清楚，同时说明风险和未确认的部分')]
     const opening = await within(ctx.preStep()(payload(agent, first), passesThrough(first)))
     expect(opening).toMatchObject({ kind: 'enter' })
+    // Round-071: the team tier confirms the split first; the run starts on approval.
+    const confirm = [message('确认')]
+    const approved = await within(ctx.preStep()(payload(agent, confirm, 2), passesThrough(confirm)))
+    expect(approved).toMatchObject({ kind: 'enter' })
     await waitFor(() => ctx.engine.startCalls.some(call => call.meta.name !== 'Front desk'), 'the run started')
 
     const second = [message('再加一条：把价格单位统一成人民币')]

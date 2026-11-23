@@ -641,6 +641,13 @@ export interface RunWorkflowOptions {
    */
   steeringToken?: string
   /**
+   * The captain's three sheets (round-071), compiled and bounded by
+   * `src/captain-memory.ts`. The planner and the boundary planner read it as
+   * context; absent/empty on a first round, which keeps the request payload
+   * byte-identical to the pre-memory one.
+   */
+  captainBrief?: string
+  /**
    * Filesystem access for the broken-run resume scan (see
    * `findResumableCheckpoint` in `src/checkpoint/wiring.ts`). Absent in
    * production: the real checkpoint directory is scanned. Tests pass an empty
@@ -956,6 +963,8 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
     // caller that opened the channel owns closing it, so this function never leaks a
     // channel on an early return (cap refusal, pre-start cancellation).
     options.steeringToken,
+    // Round-071: what the captain remembers about this user and this history.
+    options.captainBrief,
   )
 
   const timeoutController = new AbortController()

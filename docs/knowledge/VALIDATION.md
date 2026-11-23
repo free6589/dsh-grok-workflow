@@ -1,3 +1,24 @@
+## round-071 — 队长三件套（拆排/前台确认/三叠纸）= 未提交，工作树 `captain-pack` — 2026-11-23 (`CONFIRMED`)
+
+| state | command | result |
+| --- | --- | --- |
+| 基线 | `git -C .agents/worktrees/fix-synth-resubmit log --oneline -1` | `cda5d4e docs(memory): record 0.13.22 …`（`main` 尖端） |
+| 本工作树 | `git branch --show-current` / `git worktree list` | `captain-pack`（自 `main` `cda5d4e` 开） |
+| 拆排・旧码 | 临时把 `runWaves(..., plan.onFailure === 'stop')` 改成 `false`，`npx vitest run test/captain-plan.spec.ts -t 'honours a captain stop'` | **FAIL / exit 1**（下一波照跑）→ `.rsi/evidence/round-071/red-cutA-stop.txt` |
+| 拆排・新码 | 还原后同命令 | **PASS / exit 0** → `green-cutA-stop.txt` |
+| 前台确认・旧码 | 临时把两处确认分支改成 `if (false)`，`npx vitest run test/captain-confirm.spec.ts` | **5 failed / 1 passed / exit 1**（保留的 1 条是 full 模式"不确认"）→ `red-cutB-confirm.txt` |
+| 前台确认・新码 | 还原后同命令 | **6 passed / exit 0** → `green-cutB-confirm.txt` |
+| 三叠纸・旧码 | 临时让 `captainBrief()` 恒返空，`npx vitest run test/captain-memory.spec.ts test/captain-plan.spec.ts` | **2 failed / 14 passed / exit 1** → `red-cutC-memory.txt` |
+| 三叠纸・新码 | 还原后同命令 | **16 passed / exit 0** → `green-cutC-memory.txt` |
+| 构建 | `npm run build` | **exit 0**（client bundle 303813 bytes）→ `build.txt` |
+| 门禁 | `npm run ci`（typecheck + lint + verify:lib + test） | **exit 0：90 files / 1678 tests PASS** → `ci.txt`（基线 87/1656） |
+| 单文件复核 | `npx vitest run test/captain-confirm.spec.ts`（两次） | **6 passed** 两次（第一次全量跑时曾超时一次，已把等待改成 10 s 并带 warnings 诊断） |
+| 未执行 | 真机隔离 soak | `NOT_RUN`（本轮只要求 build+ci，不发布） |
+
+**说明**：`verify:lib` 比对的是 **HEAD** 的 src/lib 对（`scripts/verify-lib.mjs` 用 `git archive HEAD` 在工作树之外构建），
+不覆盖未提交的工作树；本轮 `lib/` 已由 `npm run build` 重生成（`git status` 可见 `lib/captain*.js` 四个新文件），
+合并提交时必须把 `lib/` 与 `src/` 一起提交。
+
 ## 发版 `0.13.22` — composer 工作流开关 500 mode/internal 修复（soak PASS，已发布） — 2026-11-23 (`CONFIRMED`)
 
 | state | command | result |

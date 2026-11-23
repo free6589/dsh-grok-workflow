@@ -1,3 +1,16 @@
+Last updated: 2026-11-23 22:35 +08:00（**round-071 队长三件套已落地，未提交、未推送（分支 `captain-pack`），`CONFIRMED`** —
+三件同分支：①拆排交给模型——`planPrompt()` 改队长宪章、计划新增 `onFailure: continue|stop`
+（`normalizePlan` 归一，非法值=continue）、`runWaves` 在波边界执行"停"（`captainStopResult`）；
+replan 通道本来就在（默认开），只在 `replanPrompt()` 补"停/改"一句。②前台确认——新增 `src/captain.ts`，
+gate 的 `pendingCaptains`（同 10 分钟 TTL）接在交互后台与阻塞两条路径，批准/明确改法才派活，
+其它消息作废；`/grok` 完整形状与"前台问完选团队"不重复问。③三叠纸——新增 `src/captain-memory.ts`
+（`profile.md` / `experience.md` 与台账同目录），recorder 每轮结算写一条复盘（runId 去重），
+gate 组 brief → `args.captain` → planner/replan 提示词；记忆 CLI 增 `captain`/`profile`/`profile add`/`experience`。
+红绿：每件各一条"旧码红、新码绿"（`.rsi/evidence/round-071/red-cut*.txt` / `green-cut*.txt`）；
+`npm run build` exit 0；`npm run ci` exit 0（**90 文件 / 1678 测试 PASS**，基线 87/1656）。
+缺口：预览是独立轻调用，正式跑仍重新规划；画像只能显式写入（不自动蒸馏）；真机 soak `NOT_RUN`。
+`verify:lib` 以 HEAD 为输入，不覆盖未提交的 lib——提交时需再跑一次并连同 `lib/` 一起提交。）
+
 Last updated: 2026-11-23 21:10 +08:00（**已发版 `0.13.22`：composer 工作流开关 500 修复，`CONFIRMED`** —
 用户现象：工具行 workflow 总开关红字"模式服务没有回应：cannot get property sessions without inject"，开关打不开。
 根因：`src/mode-surface.ts` `serviceOf()` 用属性读取取 `sessions`；真编排只注入 `webServer`+`connection`，

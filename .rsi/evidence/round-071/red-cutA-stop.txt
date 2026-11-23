@@ -1,0 +1,41 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/captain-pack
+
+ ❯ test/captain-plan.spec.ts (8 tests | 1 failed | 7 skipped) 70ms
+     × honours a captain stop: the wave after a failed task is never dispatched 69ms
+     ↓ keeps the pre-round-071 behaviour when the captain says continue
+     ↓ treats an unusable onFailure value as continue instead of rejecting the plan
+     ↓ carries the captain charter and the continue/stop field, not the removed hard rule
+     ↓ shows the captain memory to the planner only when the host passed it
+     ↓ reads a bare approval as approval and an edit as an edit
+     ↓ keeps the original request when folding an amendment in
+     ↓ asks for a split in the user's language and bounds the preview
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/captain-plan.spec.ts > captain plan: the model decides the split, the order and continue/stop > honours a captain stop: the wave after a failed task is never dispatched
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/captain-plan.spec.ts:55:69
+     53|     const workerPhases = made.filter(call => roleOf(call.label) === 'w…
+     54|     // The captain's decision is what kept wave 2 from running: no wor…
+     55|     expect(workerPhases.some(phase => String(phase).includes('b'))).to…
+       |                                                                     ^
+     56|     // Both plan rows exist, and the one that never started says why.
+     57|     expect(report.tasks.map(row => row.status)).toEqual(['failed', 'bl…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 7 skipped (8)
+   Start at  22:25:06
+   Duration  565ms (transform 305ms, setup 0ms, import 362ms, tests 70ms, environment 0ms)
+
+cutA_red_exit=1

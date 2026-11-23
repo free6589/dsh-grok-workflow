@@ -1492,3 +1492,130 @@ round 33 那次把 1.23 ms 抬到 7.86 ms 的代价没有被再放大：新增�
 3. **汇总门的判定**：`src/script.ts` 的 `reviewSummaryDraft` = `checkSummaryDraft` + `verifySummaryDraft`，
    纯确定性；成功时写 `synthesis.review = 'check=pass verify=pass drafts=N'`，失败时按阶段写
    `check=fail/verify=fail` 并照旧让确定性叙述接管；`src/report.ts` 归一化该字段并渲染 `Summary review:` 行。
+
+## 2026-11-23 · round-071 立项：队长三件套（拆排交给模型 / 前台确认 / 三叠纸记忆）
+
+**口径**：本轮只做三件（拆排、前台化、三叠纸），一件一分支内落（同分支 `captain-pack`，自 `main` 尖端
+`cda5d4e` 开）；门卫（`src/gate.ts` 分类/准入/台账）、检查（`verify`/`supervisor`/`report` 校验）、
+台账（`docs`/checkpoint/记录）一律不动。证据记 `.rsi/evidence/round-071/`。
+
+### 1）AI 队长替代脚本拆排：模型定拆法、顺序、继续还是停
+
+**现状（`CONFIRMED`，读源码）**
+
+- 拆任务与定顺序的硬规则写在脚本提示词里：`src/script.ts:1412` `planPrompt()` 列出"最多 maxTasks 个任务"、
+  "必须按 waves 返回"、"不许为拆而拆"、"拆不动就返回恰好一个任务"。这是提示词层的硬约束，脚本侧
+  `normalizePlan()`（`src/script.ts:1198`）另有形状门卫（id/依赖/波次/预算），门卫本轮保留。
+- "判继续还是停"在脚本里是硬编码的：某个任务失败后脚本**总是**继续跑后面的波次，依赖它的任务由
+  `blockedResult()`（`src/script.ts:2837`）标 blocked，其余照跑。也就是说"停不停"不是模型的决定。
+- 中途改计划的通道**已经存在且默认开**：`DEFAULT_REPLAN = true`（`src/config.ts:161`），
+  `openSteering()`（`src/gate.ts:1591`）在每轮开队列，脚本在波边界 `requestReplan()`（`src/script.ts:3159`）
+  让 planner 子代理拉取排队消息并合并（`replanPrompt()` `src/script.ts:3116`，规则在 `src/replan.ts`）。
+  → **本件缺的不是通道，是"拆排/停/改"的决定权仍在脚本手里。**
+
+**切口（最小）**
+
+- `planPrompt()` 改成队长宪章：拆几个、顺序、要不要拆、失败后继续还是停，由模型现场决定；
+  形状与预算上限原样保留（门卫不动）。文案不再给"恰好一个任务"这类硬口令。
+- 计划新增根字段 `onFailure: 'continue' | 'stop'`（`PLAN_SCHEMA` + `normalizePlan` 归一，非法值落回
+  `continue`）：模型说停，脚本在波边界把剩余任务标 `blocked`（新增 `captainStopResult()`，理由写明"队长停"),
+  不再硬跑。默认 `continue` 保持旧行为，故既有用例不应变化。
+- `replanPrompt()` 增加一句：边界也是队长"停/改"的入口（可用 remove 清掉剩余任务并说明理由），
+  继续复用既有通道，不新建通道。
+
+**红绿计划**：新用例（`test/captain-plan.spec.ts`）：①planner 返回 `onFailure:'stop'` 且首波任务失败 →
+第二波不再起子调用、以 blocked 行落报告、`status=partial`（旧码：第二波照跑 → 红）；②prompt 断言含队长
+宪章与 `onFailure`、不含已删的"恰好一个任务"口令；③`onFailure` 非法值不炸、按 continue 跑（门卫不变）。
+
+### 2）队长前台化：分流后先确认拆法，中途插话改计划
+
+**现状（`CONFIRMED`）**
+
+- 前台 `classifyTriage()`（`src/triage.ts:733` 起）把消息分成 chat/fast/team/ask，team 档直接
+  `runTeam()`（`src/gate.ts:1082`），**用户看到方案是在跑完之后**；`ask` 档的"确认"语义（`TRIAGE_TIER`
+  里 en 名就是 `confirm`）已有一次性 pending 机制（`src/gate.ts:798` `pendingAsks`、`takePending`）。
+- 跑中插话走 `src/channel.ts` + `src/steering.ts`（停/并入活计划），与 `replan` 开关同源，本轮不动。
+
+**切口（最小）**
+
+- 新增 `src/captain.ts`（纯函数，无 I/O）：`captainAnswer()`（approve/amend/other 三分类，整句匹配，
+  防"确认，再加一个"被当批准）、`captainPreviewPrompt()`（一次轻调用让队长报拆法）、`captainAskText()`、
+  `amendRequest()`、批准/作废/降级文案（中英）。
+- gate 复用 `pendingAsks` 的形状加一张 `pendingCaptains`（同 10 分钟 TTL）：team 档在派活前先跑一次
+  `runSingleCall`（label `captain-preview`）报拆法并问一句；下条消息如果是"确认/开干"→ 按原请求派活，
+  是明确改法（改成/不要/换成…）→ 把原请求 + 改法一起交给 `runTeam`；其它消息→ 确认作废、按新消息正常分流。
+  两条快路不确认：`/grok` 会话强制 full（`sessionShape === 'full'`）与"前台问完你选团队"那条
+  （`tier.reason === 'pending-team'`，连问两遍是坏体验）。开关不新增配置键：前台化只属于 `triage` 模式。
+- 插话不改代码：既有 channel 通道直接承接（本轮用既有用例证明它还在，不新增第二套）。
+
+**红绿计划**：`test/captain-confirm.spec.ts`：①team 消息→只出确认问题、不启动 workflow（旧码：直接起跑 → 红）；
+②回"确认"→用原请求起跑；③回"改成先写测试"→起跑请求同时含原请求与改法；④其它消息→确认作废并正常分流；
+⑤`mode:'full'` 与 `pending-team` 不确认（旧行为保持）。
+
+### 3）队长记忆三叠纸：短期进度 / 长期画像 / 经验一条
+
+**现状（`CONFIRMED`）**
+
+- 短期进度台账已有：`src/memory/archive.ts` 的 `archive.jsonl`（`archiveDir()` `:141`，
+  `recentArchiveDigest()` `:378`），recorder 每轮结算即追加（`src/memory/recorder.ts:457`）。
+- 没有"用户画像"和"经验"两页纸：`src/memory/` 只有 archive/recorder/cli，无 profile/experience 文件。
+
+**切口（最小）**
+
+- 新增 `src/captain-memory.ts`：在台账同目录新建 `profile.md`（长期画像）与 `experience.md`（经验），
+  读时封顶 + 去密钥（复用 `redactSecrets`），写时失败不抛（记忆不得卡主任务）。
+  `captainBrief()` 把三叠纸拼成一段（进度取 `recentArchiveDigest` 最近 5 条）。
+- 经验自动落：recorder 的 `round()` 写完 archive 后追加一条复盘（每轮恰好一条，按 runId 去重）。
+- 画像写入面：`rememberCaptainProfile()` + 记忆 CLI 新命令（`captain` 打印三叠纸 / `profile add` 记一条），
+  不自动从对话里抽取（抽取要靠模型判"什么值得长期记"，本轮不做，记为缺口）。
+- 队长开场先读：gate 起跑前组 `captainBrief()` → `runWorkflow({captainBrief})` → `buildWorkflowRequest`
+  的 `args.captain` → 脚本 `captainSection()` 进 `planPrompt()` 与 `replanPrompt()`（封顶 2400 字符）。
+  没有记忆时整段不出现，payload 与旧版逐字节相同。
+
+**红绿计划**：`test/captain-memory.spec.ts`：①画像/经验写入后读回、去密钥、封顶；②`captainBrief` 三叠纸齐全、
+空记忆返回空串；③同一 runId 只写一条经验；④CLI `profile add` + `captain` 可读回。
+`test/captain-plan.spec.ts` ⑤：`args.captain` 存在时 planner 提示词含三叠纸，不存在时不含（旧 payload 不变）。
+
+### 测量口径（本轮如何证明）
+
+- `npm run build` 与 `npm run ci`（typecheck/lint/verify:lib/test）exit 0，测试数不少于基线 1656/87。
+- 每件至少一条"旧码红、新码绿"的行为用例；红证据用 `git stash`/临时改动不可靠，改用
+  `test` 里同一用例先跑旧实现（记录命令与输出）再跑新实现，两条日志落 `.rsi/evidence/round-071/`。
+- 真机 soak 本轮 `NOT_RUN`（任务只要求 build+ci；AGENTS 的隔离 soak 属发版前置，本轮不发布）。
+
+**已知缺口（HYPOTHESIS，待本轮结果确认）**：确认环节的"拆法预览"是一次独立轻调用，正式跑仍由脚本内
+planner 重新规划（两次规划）；若要"预览即计划"需把结构化计划从 gate 传进 run（改 `runWorkflow` 入参语义），
+本轮不做，写进报告。
+
+### round-071 结果（`CONFIRMED`，2026-11-23）
+
+三件均落地在 `captain-pack`（自 `main` `cda5d4e` 开的工作树），门卫/检查/台账未改签名与判定。
+
+1. **拆排交给模型**：`planPrompt()`（`src/script.ts:1446` 起）改为队长宪章；`PLAN_SCHEMA` 增加
+   `onFailure`（`src/script.ts:1631`），`normalizePlan()` 归一（非 `stop` 一律 `continue`），
+   `runWaves(..., stopOnFailure)`（`src/script.ts:3233`）在波边界执行"停"，新增
+   `captainStopResult()`（`src/script.ts:2895`）。红/绿：把调用点改成 `false` 后
+   `honours a captain stop` 用例 FAIL（exit 1），还原后 PASS（exit 0）——
+   `.rsi/evidence/round-071/red-cutA-stop.txt` / `green-cutA-stop.txt`。
+   replan 通道无缺口：`DEFAULT_REPLAN = true`、`openSteering()`、`requestReplan()` 原样接上，
+   只在 `replanPrompt()` 增加"边界也是停/改的入口"一句。
+2. **前台确认**：`src/captain.ts`（纯函数）+ gate 的 `pendingCaptains`（与前台提问同 10 分钟 TTL），
+   两条路径都接：交互后台 `answerTeamInteractive`（确认后仍后台跑）与阻塞 `produceAnswer`。
+   红/绿：把两处确认分支改成 `if (false)` → 5/6 用例 FAIL（exit 1），还原后 6/6 PASS（exit 0）——
+   `.rsi/evidence/round-071/red-cutB-confirm.txt` / `green-cutB-confirm.txt`。
+3. **三叠纸**：`src/captain-memory.ts`（画像/经验/进度，台账同目录），recorder 每轮结算追加一条复盘
+   （按 runId 去重），gate 组 `captainBrief()` 经 `runWorkflow({captainBrief})` →
+   `args.captain` → `planPrompt()`/`replanPrompt()`；记忆 CLI 增 `captain`/`profile`/`profile add`/`experience`。
+   红/绿：把 `captainBrief` 改成恒返空 → 2/16 用例 FAIL（exit 1），还原后 16/16 PASS（exit 0）——
+   `.rsi/evidence/round-071/red-cutC-memory.txt` / `green-cutC-memory.txt`。
+
+**门禁**：`npm run build` exit 0（`build.txt`）；`npm run ci` exit 0（`ci.txt`：90 文件 / 1678 测试 PASS，
+基线 87/1656，+3 文件 +22 测试）。**注意**：`verify:lib` 以 HEAD 为输入比对 HEAD 的 src/lib 对
+（`scripts/verify-lib.mjs` 用 `git archive HEAD`），未提交工作树的 lib 不在它的判定范围——本轮
+`lib/` 由 `npm run build` 重新生成并由 `git status` 可见，但"提交时 src/lib 成对"仍需提交时再看一次。
+
+**缺口（如实记）**：
+- 确认轮的"拆法预览"是一次独立轻调用，正式跑仍由脚本内 planner 重新规划（两次规划）。要"预览即计划"
+  需把结构化计划从 gate 传进 `runWorkflow`，属于改入参语义，本轮不做。
+- 画像目前只能由操作者/使用者显式写入（记忆 CLI），不从对话自动蒸馏"什么值得长期记"。
+- 真机隔离 soak `NOT_RUN`（本轮只要求 build+ci，且不发布）。
