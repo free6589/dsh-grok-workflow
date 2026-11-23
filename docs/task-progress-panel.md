@@ -271,3 +271,24 @@ surface renders.
   no real-GUI screenshot of the new panel exists. The unit tests above fold the recorded events
   with the same rules the stock component uses, but they are not a substitute for a screenshot and
   are not presented as one.
+
+## Cross-stage connectors: one rail for the whole band (2026-11-23)
+
+The operator's 2026-11-21 request was "进度页跨阶段的线太多，合并成一根" — the band
+looked like a wiring diagram because every stage drew its own elbow and its own vertical
+run down the gutter. What ships now:
+
+- each stage keeps its **own ring drop** (down from its state ring), its **own lane run**
+  under the spine, and the task card keeps its **own short stub** into the gutter, so a
+  reader can still tell which rows belong to which node;
+- the band shares **one lane y** (`PROGRESS_WIRE_LANE_GAP`) and **one channel x**
+  (`PROGRESS_WIRE_CHANNEL_X`), and the vertical run is drawn **once**, as a single
+  `kind: 'rail'` path from the shared lane down to the deepest card;
+- connectors still never carry a state colour: the ring, the pill and the card's edge say
+  what state the row is in, and a coloured wire would be a second, competing claim.
+
+The trade-off is the point of the change: two stages no longer have separate verticals to
+tell them apart, so ownership is read from each node's drop and each card's stub. That is
+what "合并成一根" costs, and it is asserted: `test/progress-connector.spec.ts` pins one
+`rail` path per band, the shared lane y and the shared channel x, and that the rail's
+vertical run never enters a card.
