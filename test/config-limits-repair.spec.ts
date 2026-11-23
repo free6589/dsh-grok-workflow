@@ -197,13 +197,14 @@ describe('LIMIT_CAPS: one clamp table for every user-configurable numeric cap (B
     expect(takeLimitOverruns()).toEqual([])
   })
 
-  it('rejects every T4-removed key as unknown (R-06拒载), all 23', () => {
+  it('rejects every T4-removed key as removed (R-06拒载), all 23', () => {
     // T4 slim-down: the 23 removed keys are no longer clamped or defaulted — a
     // patch that still carries one is refused instead of silently repaired.
     // (`timeoutMs` left this list when it became configurable again.)
     expect(REMOVED_CONFIG_KEYS).toHaveLength(23)
     for (const key of REMOVED_CONFIG_KEYS) {
-      expect(() => resolveConfig({ [key]: 1 } as never)).toThrow(/unknown configuration key/)
+      expect(() => resolveConfig({ [key]: 1 } as never))
+        .toThrow(new RegExp(`removed configuration key "${key}"`))
       // The repair path leaves them alone too: not its table, not its business.
       expect(repairLimitOverruns({ [key]: 1 } as never).warnings).toEqual([])
     }
@@ -220,7 +221,7 @@ describe('LIMIT_CAPS: one clamp table for every user-configurable numeric cap (B
       const { repaired, warnings } = repairLimitOverruns(raw as never)
       expect(repaired).toEqual(raw)
       expect(warnings).toEqual([])
-      expect(() => resolveConfig(repaired)).toThrow(/unknown configuration key/)
+      expect(() => resolveConfig(repaired)).toThrow(/removed configuration key/)
     }
     expect(takeLimitOverruns()).toEqual([])
     // The live table is untouched: a real overrun still clamps and loads.

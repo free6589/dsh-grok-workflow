@@ -191,7 +191,7 @@ describe('A6: the documented concurrency and retry envelope has not been widened
   it('refuses a caller-supplied retry count: retries are not a configuration key at all', () => {
     // Fixed at 1 (`FIXED_MAX_RETRIES`), so there is no key to widen: the loader
     // rejects the name outright instead of silently ignoring a wider value.
-    expect(() => resolveConfig({ maxRetries: 5 } as never)).toThrow(/unknown configuration key "maxRetries"/)
+    expect(() => resolveConfig({ maxRetries: 5 } as never)).toThrow(/removed configuration key "maxRetries"/)
   })
 
   it('clamps an over-limit script payload to 100 / 3 rather than trusting it', async () => {

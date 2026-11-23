@@ -1,0 +1,183 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/rsi-round-61
+
+ ❯ test/config-limits-repair.spec.ts (25 tests | 2 failed) 244ms
+     ✓ clamps a stored overrun to its cap with one bilingual warning per field 4ms
+     ✓ clamps in the schema the host validates before apply() — the layer that died 3ms
+     ✓ keeps the schema fail-closed for everything that is not an overrun (R-06) 1ms
+     ✓ leaves a legal value untouched and says nothing 0ms
+     ✓ clamps only the field that overruns 0ms
+     ✓ leaves a below-minimum or non-numeric value to the validator (R-06) 0ms
+     ✓ clamps each listed limit in the schema, records one note, and repairs the same number 4ms
+     ✓ keeps the documented envelope and reads every cap off HARD_LIMITS 1ms
+     × rejects every T4-removed key as removed (R-06拒载), all 23 6ms
+     × does not clamp a removed numeric key to a cap it cannot deliver (round 40) 1ms
+     ✓ leaves the schema note and the schema sentence, so one set covers both layers 0ms
+     ✓ does not record a note for a limit it only passes over 0ms
+     ✓ activates on a stored overrun, warns once, and runs at the cap 5ms
+     ✓ announces the schema-clamped overrun the host parsed before apply() 2ms
+     ✓ contrast: the schema clamps while the programmatic resolver still throws (R-06) 1ms
+     ✓ repairs both defect kinds in one load instead of needing two restarts 1ms
+     ✓ still throws at load when the repaired shape hides a defect it may not touch 0ms
+     ✓ activates on a stored 8 and hands the plugin 8 (under the 100 cap, T6) 101ms
+     ✓ clamps a stored 120 to the 100 cap at the host layer 53ms
+     ✓ control: the pre-B07 schema still fails the fiber before apply() 51ms
+     ✓ finds a live value above the hard maximum and ignores a legal one 0ms
+     ✓ reads the stored user layer, not the clamped projected value (B01) 0ms
+     ✓ shows one yellow line per overrun, naming the saved value and the cap 4ms
+     ✓ drops the banner once the saved value is legal 1ms
+     ✓ carries the notice in both languages, not as a key 0ms
+ ❯ test/config.spec.ts (49 tests | 3 failed) 116ms
+     ✓ refuses an unknown key instead of silently dropping it 5ms
+     ✓ refuses an unknown key one level down instead of silently dropping it (round 35) 4ms
+     ✓ refuses a `roles` value that is not an object instead of loading five empty chains (round 37) 1ms
+     × rejects every removed key as removed (R-06), with the migration named 7ms
+     × names a removed switching key as removed, keeps typo hints for the rest (round 61) 1ms
+     ✓ refuses a configuration written for a newer version 0ms
+     ✓ normalizes a bare model id shorthand into a route (migration) 0ms
+     ✓ treats an empty chain as inherit rather than an error 0ms
+     ✓ refuses a model repeated inside one chain 0ms
+     ✓ refuses an empty model, an over-long id and a too-long chain 1ms
+     ✓ refuses a non-string model/provider with the key and shape named (round 38) 0ms
+     ✓ takes guardianModel as one route only: a chain or array is refused (Q8) 1ms
+     ✓ treats a blank guardianModel model as unconfigured and refuses non-string fields (round 53) 0ms
+     ✓ refuses an unknown guardianModel field with the key named (round 53) 0ms
+     × refuses a removed switching policy key as removed (R-06) 1ms
+     ✓ fills every documented default through the schema 1ms
+     ✓ validates the four repeat-run keys and defaults a loop off and bounded 2ms
+     ✓ carries bilingual metadata on the four repeat-run keys, agreeing with the envelope 3ms
+     ✓ fixes the removed retry count at 1 and the synthesis default at layered 0ms
+     ✓ gates the workflow behind the per-session grok-mode default, off by default 1ms
+     ✓ refuses an unknown grok-mode default on the direct-construction path 1ms
+     ✓ names grokDefault in the one-line effective-configuration signature 0ms
+     ✓ defaults the mid-run replan switch on, carries it through the schema, and states it bilingually 2ms
+     ✓ fails on a provider the runtime does not have 0ms
+     ✓ fails on a provider the runtime does not have for the supervisor chain 1ms
+     ✓ fails on a model the provider enumerates but does not declare 0ms
+     ✓ checks every routed role, the supervisor included 1ms
+     ✓ notes instead of failing when the runtime cannot judge the route 0ms
+     ✓ notes an all-blank supervisor chain, never fails it 0ms
+     ✓ reports the generated settings page for this plugin 3ms
+     ✓ matches the plain Config schema by uid when no volatile rebound happened 1ms
+     ✓ keeps the generated script clamps identical to HARD_LIMITS (single source) 0ms
+     ✓ pins the documented run limits: default 10/1, hard maximum 100/3 0ms
+     ✓ applies the documented defaults inside the script, without swallowing an explicit 0 57ms
+     ✓ degrades quietly on a runtime without a settings service 0ms
+     ✓ uses the built-in switching policy (T4: switchOn removed, always built-in) 3ms
+     ✓ keeps a 429 on its route when the operator unticks the switch (Sec.3-2) 2ms
+     ✓ budgets an empty plan exactly like a missing one (t27/F3) 0ms
+     ✓ bounds the run ledger by recordLimit and writes nothing at 0 2ms
+     ✓ names the deadline and every role chain, with "inherit" for an unset role 0ms
+     ✓ shows the chains in order, so a fallback is visible without a run 0ms
+     ✓ travels into the workflow request, so the report can state the deadline 0ms
+     ✓ keeps the task verified and carries the notes into the report 2ms
+     ✓ still fails when the same verifier marks a criterion unmet 3ms
+     ✓ still fails when the verifier verdict is fail, notes or not 3ms
+     ✓ defaults to unlimited (0) and carries that value into the request and the log line 0ms
+     ✓ accepts any non-negative integer, including 0 for unlimited 0ms
+     ✓ fails closed on a negative, fractional or non-numeric deadline (R-06) 0ms
+     ✓ refuses the same values in the schema, so a profile patch cannot store one 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/config-limits-repair.spec.ts > LIMIT_CAPS: one clamp table for every user-configurable numeric cap (B02, T4) > rejects every T4-removed key as removed (R-06拒载), all 23
+AssertionError: expected [Function] to throw error matching /removed configuration key "enforceGat…/ but got 'unknown configuration key "enforceGat…'
+
+- Expected:
+/removed configuration key "enforceGate"/
+
++ Received:
+"unknown configuration key \"enforceGate\"; accepted keys: toolName, mode, grokDefault, roles, guardianModel, synthesis, maxConcurrency, maxTasks, timeoutMs, childTimeoutMs, replan, switchOnRateLimit, loopEnabled, loopMaxRounds, loopFailStreak, loopIntervalMin, iterateIntervalMin, iterateTemplate, configVersion"
+
+ ❯ test/config-limits-repair.spec.ts:207:10
+    205|     for (const key of REMOVED_CONFIG_KEYS) {
+    206|       expect(() => resolveConfig({ [key]: 1 } as never))
+    207|         .toThrow(new RegExp(`removed configuration key "${key}"`))
+       |          ^
+    208|       // The repair path leaves them alone too: not its table, not its…
+    209|       expect(repairLimitOverruns({ [key]: 1 } as never).warnings).toEq…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  test/config-limits-repair.spec.ts > LIMIT_CAPS: one clamp table for every user-configurable numeric cap (B02, T4) > does not clamp a removed numeric key to a cap it cannot deliver (round 40)
+AssertionError: expected [Function] to throw error matching /removed configuration key/ but got 'unknown configuration key "maxRetries…'
+
+- Expected:
+/removed configuration key/
+
++ Received:
+"unknown configuration key \"maxRetries\"; accepted keys: toolName, mode, grokDefault, roles, guardianModel, synthesis, maxConcurrency, maxTasks, timeoutMs, childTimeoutMs, replan, switchOnRateLimit, loopEnabled, loopMaxRounds, loopFailStreak, loopIntervalMin, iterateIntervalMin, iterateTemplate, configVersion"
+
+ ❯ test/config-limits-repair.spec.ts:224:45
+    222|       expect(repaired).toEqual(raw)
+    223|       expect(warnings).toEqual([])
+    224|       expect(() => resolveConfig(repaired)).toThrow(/removed configura…
+       |                                             ^
+    225|     }
+    226|     expect(takeLimitOverruns()).toEqual([])
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  test/config.spec.ts > configuration surface > rejects every removed key as removed (R-06), with the migration named
+AssertionError: expected [Function] to throw error matching /removed configuration key "enforceGat…/ but got 'unknown configuration key "enforceGat…'
+
+- Expected:
+/removed configuration key "enforceGate"/
+
++ Received:
+"unknown configuration key \"enforceGate\"; accepted keys: toolName, mode, grokDefault, roles, guardianModel, synthesis, maxConcurrency, maxTasks, timeoutMs, childTimeoutMs, replan, switchOnRateLimit, loopEnabled, loopMaxRounds, loopFailStreak, loopIntervalMin, iterateIntervalMin, iterateTemplate, configVersion"
+
+ ❯ test/config.spec.ts:132:10
+    130|     for (const key of REMOVED_CONFIG_KEYS) {
+    131|       expect(() => resolveConfig({ [key]: 1 } as never))
+    132|         .toThrow(new RegExp(`removed configuration key "${key}"`))
+       |          ^
+    133|     }
+    134|     // Spot checks: the typo suggestion still works for surviving keys.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  test/config.spec.ts > configuration surface > names a removed switching key as removed, keeps typo hints for the rest (round 61)
+AssertionError: expected [Function] to throw error matching /removed configuration key "switchOn"/ but got 'unknown configuration key "switchOn" …'
+
+- Expected:
+/removed configuration key "switchOn"/
+
++ Received:
+"unknown configuration key \"switchOn\" (did you mean \"switchOnRateLimit\"?); accepted keys: toolName, mode, grokDefault, roles, guardianModel, synthesis, maxConcurrency, maxTasks, timeoutMs, childTimeoutMs, replan, switchOnRateLimit, loopEnabled, loopMaxRounds, loopFailStreak, loopIntervalMin, iterateIntervalMin, iterateTemplate, configVersion"
+
+ ❯ test/config.spec.ts:143:8
+    141|     // the did-you-mean hint — the removed check must not swallow it.
+    142|     expect(() => resolveConfig({ switchOn: ['timeout'] } as never))
+    143|       .toThrow(/removed configuration key "switchOn"/)
+       |        ^
+    144|     expect(() => resolveConfig({ maxConcurreny: 2 } as never))
+    145|       .toThrow(/did you mean "maxConcurrency"/)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  test/config.spec.ts > configuration surface > refuses a removed switching policy key as removed (R-06)
+AssertionError: expected [Function] to throw error matching /removed configuration key "switchOn"/ but got 'unknown configuration key "switchOn" …'
+
+- Expected:
+/removed configuration key "switchOn"/
+
++ Received:
+"unknown configuration key \"switchOn\" (did you mean \"switchOnRateLimit\"?); accepted keys: toolName, mode, grokDefault, roles, guardianModel, synthesis, maxConcurrency, maxTasks, timeoutMs, childTimeoutMs, replan, switchOnRateLimit, loopEnabled, loopMaxRounds, loopFailStreak, loopIntervalMin, iterateIntervalMin, iterateTemplate, configVersion"
+
+ ❯ test/config.spec.ts:229:8
+    227|     // T4: `switchOn` is fixed to the built-in policy (empty); a store…
+    228|     expect(() => resolveConfig({ switchOn: ['timeout'] } as never))
+    229|       .toThrow(/removed configuration key "switchOn"/)
+       |        ^
+    230|   })
+    231|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  5 failed | 69 passed (74)
+   Start at  18:34:15
+   Duration  2.20s (transform 1.44s, setup 0ms, import 1.62s, tests 360ms, environment 0ms)
+

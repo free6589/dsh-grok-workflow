@@ -115,10 +115,10 @@ describe('configuration surface', () => {
       .toThrow(/roles\.worker must be an array of routes/)
   })
 
-  it('rejects every removed key as unknown (R-06), with the migration named', () => {
+  it('rejects every removed key as removed (R-06), with the migration named', () => {
     // The surface keeps exactly 18 keys (nine plus childTimeoutMs, the mid-run
     // replan switch, the four repeat-run keys, the two self-iteration keys, and the
-    // Q8 guardianModel single route); the other 23 are unknown now.
+    // Q8 guardianModel single route); the other 23 are removed now.
     expect(CONFIG_KEYS).toEqual([
       'toolName', 'mode', 'grokDefault', 'roles', 'guardianModel', 'synthesis',
       'maxConcurrency', 'maxTasks', 'timeoutMs', 'childTimeoutMs', 'replan', 'switchOnRateLimit',
@@ -128,10 +128,21 @@ describe('configuration surface', () => {
     ])
     expect(REMOVED_CONFIG_KEYS).toHaveLength(23)
     for (const key of REMOVED_CONFIG_KEYS) {
-      expect(() => resolveConfig({ [key]: 1 } as never)).toThrow(/unknown configuration key/)
+      expect(() => resolveConfig({ [key]: 1 } as never))
+        .toThrow(new RegExp(`removed configuration key "${key}"`))
     }
     // Spot checks: the typo suggestion still works for surviving keys.
     expect(() => resolveConfig({ maxConcurreny: 2 } as never)).toThrow(/did you mean "maxConcurrency"/)
+  })
+
+  it('names a removed switching key as removed, keeps typo hints for the rest (round 61)', () => {
+    // `switchOn` was deleted by the T4 slim-down: the holder of an old patch
+    // learns why the row stopped loading. A near-miss of a live key still gets
+    // the did-you-mean hint — the removed check must not swallow it.
+    expect(() => resolveConfig({ switchOn: ['timeout'] } as never))
+      .toThrow(/removed configuration key "switchOn"/)
+    expect(() => resolveConfig({ maxConcurreny: 2 } as never))
+      .toThrow(/did you mean "maxConcurrency"/)
   })
 
   it('refuses a configuration written for a newer version', () => {
@@ -212,10 +223,10 @@ describe('configuration surface', () => {
       .toThrow(/unknown configuration key "guardianModel\.maxInFlight"/)
   })
 
-  it('refuses a removed switching policy key as unknown (R-06)', () => {
-    // T4: `switchOn` is fixed to the built-in policy (empty); a stored value is unknown.
+  it('refuses a removed switching policy key as removed (R-06)', () => {
+    // T4: `switchOn` is fixed to the built-in policy (empty); a stored value is removed.
     expect(() => resolveConfig({ switchOn: ['timeout'] } as never))
-      .toThrow(/unknown configuration key "switchOn"/)
+      .toThrow(/removed configuration key "switchOn"/)
   })
 
   it('fills every documented default through the schema', () => {

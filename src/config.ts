@@ -713,8 +713,15 @@ function closestKey(key: string, accepted: readonly string[]): string | undefine
  */
 export function assertKnownKeys(config: Record<string, unknown>): void {
   const known = new Set<string>(CONFIG_KEYS)
+  const removed = new Set<string>(REMOVED_CONFIG_KEYS)
   for (const key of Object.keys(config)) {
     if (known.has(key)) continue
+    if (removed.has(key)) {
+      throw new Error(
+        `removed configuration key "${key}": it was removed in an earlier release and is no longer accepted; ` +
+        `delete it from your patch`,
+      )
+    }
     const suggestion = closestKey(key, CONFIG_KEYS)
     throw new Error(
       `unknown configuration key "${key}"${suggestion === undefined ? '' : ` (did you mean "${suggestion}"?)`}; ` +

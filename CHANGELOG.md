@@ -7,6 +7,10 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ### Fixed / 修复
 
+- **A removed key now says it was removed / 已删的键会自报"删了"** —
+  A patch carrying a removed key only heard "unknown", with no hint the key once existed and was deleted. Removed keys now refuse with their name and the fix (delete it from the patch); genuine typos still get the did-you-mean hint.
+  / 带着已删键的补丁以前只听到"未知"，不知道这个键曾经存在还被删了。现在已删键自报名并给解法（从补丁里删掉）；真拼错的还是给纠错提示。
+
 - **The READMEs stop listing removed keys as settable / 说明书不再把已删的键写成可配值** —
   Both READMEs listed `switchOn=[]` and the gate switch as fixed values; all five keys were removed and a stored value is now rejected as unknown. The row now names each removed key with its removal noted, so nobody copies a dead value into a patch.
   / 两份说明书都把 `switchOn=[]` 和闸门开关写成固定值，但这五个键早删了，存了会被当未知键拒绝。现在改成点名已删，照抄也不会抄到死值。
