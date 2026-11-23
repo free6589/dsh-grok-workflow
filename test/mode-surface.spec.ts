@@ -250,6 +250,9 @@ describe('switch route refusals', () => {
     )
     expect(written.status).toBe(405)
     expect(written.json).toMatchObject({ ok: false, code: 'mode/method' })
+    // RFC 9110: a 405 names the methods the resource does accept. Without it the
+    // answer is the same unexplained 405 the operator reported.
+    expect(written.response.headers['allow']).toBe('GET, POST')
     expect(readModeRecord(target)).toBeUndefined()
 
     const warned: string[] = []
@@ -260,6 +263,7 @@ describe('switch route refusals', () => {
     )
     expect(put.status).toBe(405)
     expect(put.json).toMatchObject({ ok: false, code: 'mode/method' })
+    expect(put.response.headers['allow']).toBe('GET, POST')
     // The refused request itself is recorded: an unexplained 405 was the reported bug.
     expect(warned.some(message => message.includes('PUT'))).toBe(true)
   })
