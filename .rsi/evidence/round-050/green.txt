@@ -1,0 +1,10 @@
+$ npx vitest run test/waves.spec.ts  (GREEN: new src/waves.ts + new regression it)
+
+
+ ✓ test/waves.spec.ts (28 tests) 245ms
+
+ Test Files  1 passed (1)
+      Tests  28 passed (28)
+   Start at  16:10:47
+   Duration  931ms (transform 518ms, setup 0ms, import 570ms, tests 245ms, environment 0ms)
+

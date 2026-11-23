@@ -7,6 +7,10 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ### Fixed / 修复
 
+- **The single-wave reason uses the same path rule as the scheduler / 单波原因与调度用同一套路径规则** —
+  The report side lowercased nothing and never resolved `..`, so `SRC/A` vs `src/a` read as independent and `a/../b` vs `b` read as independent, while the scheduler serialized the first pair and merged the second. The report now normalizes through the scheduler's own rule, so the sentence names the same cause the run acted on.
+  / 报告侧原来不分大小写也不消 `..`，`SRC/A` 对 `src/a` 判成独立、`a/../b` 对 `b` 判成独立，而调度侧一个串行一个合并。现在报告走调度同一套归一，写出来的原因和实际跑的一致。
+
 - **One guardian sweep reads each heartbeat once and judges independent of order / 守护单轮扫描只读一次心跳，判定不再随顺序翻转** —
   One sweep read every file heartbeat twice and judged children in insertion order while progressively raising the run-silence baseline, so an early child never saw a later child's fresh beat and the signal flipped with order. The sweep now snapshots every beat and the global baseline first, then judges without calling any reader; each source is read once per child.
   / 以前单轮扫描把每个文件心跳读两遍，还边判边抬基线，先判的孩子看不到后孩子的 fresh 心跳，结论随插入顺序翻转。现在先把所有心跳和全局基线快照好，再统一判定不再调读数器；每种心跳每轮每孩子只读一次。

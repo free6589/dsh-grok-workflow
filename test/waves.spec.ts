@@ -445,6 +445,19 @@ describe('A5: a single-wave plan says why, and a small job is not split', () => 
     expect(planWaveReason(overlapping, 1, 'en')).toContain('same paths')
   })
 
+  it('matches the scheduler on case and dot-dot normalization', () => {
+    const cased = [
+      { writesPaths: ['SRC/A'], dependsOn: [] as string[] },
+      { writesPaths: ['src/a'], dependsOn: [] as string[] },
+    ]
+    const dotted = [
+      { writesPaths: ['a/../b'], dependsOn: [] as string[] },
+      { writesPaths: ['b'], dependsOn: [] as string[] },
+    ]
+    expect(singleWaveCause(cased, 1)).toBe('write-overlap')
+    expect(singleWaveCause(dotted, 1)).toBe('write-overlap')
+  })
+
   it('says nothing about waves when the plan really has more than one', () => {
     const tasks = [
       { writesPaths: ['a'], dependsOn: [] as string[] },

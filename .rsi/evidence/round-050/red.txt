@@ -1,0 +1,30 @@
+$ npx vitest run test/waves.spec.ts  (RED: old src/waves.ts + new regression it)
+
+
+Expected: "write-overlap"
+Received: "planned"
+
+ ❯ test/waves.spec.ts:457:39
+    455|       { writesPaths: ['b'], dependsOn: [] as string[] },
+    456|     ]
+    457|     expect(singleWaveCause(cased, 1)).toBe('write-overlap')
+       |                                       ^
+    458|     expect(singleWaveCause(dotted, 1)).toBe('write-overlap')
+    459|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 27 passed (28)
+   Start at  16:09:24
+   Duration  784ms (transform 361ms, setup 0ms, import 414ms, tests 252ms, environment 0ms)
+
+=== RED/GREEN contrast (stash src/waves.ts, old code vs new code) ===
+$ git stash push -- src/waves.ts   # old code only, new test kept
+$ npx vitest run test/waves.spec.ts -t "matches the scheduler"
+-> 1 failed | 27 skipped  (OLD/red: expected write-overlap, got planned)
+
+$ git stash pop   # new code restored
+$ npx vitest run test/waves.spec.ts -t "matches the scheduler"
+-> 1 passed | 27 skipped  (NEW/green)
