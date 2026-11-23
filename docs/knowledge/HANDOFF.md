@@ -1,3 +1,24 @@
+## 2026-11-24 — `fix/null-collapse-t1`：子代理死因回填（`CONFIRMED` 未合流，真机 soak `NOT_RUN`）
+
+- **From:** T1 修复子代理 · **To:** 合流方 / 下一轮接手者
+- **分支**：`fix/null-collapse-t1`，worktree `.agents/worktrees/fix-null-collapse-t1`，从 `main` `6b0eb62`（0.13.25）开出。
+  共享脏树（detached `a6103ad` + 40 余处他人未提交改动）未动。
+- **改了什么**：`src/child-outcomes.ts`（新，有界台账 + 分类 + 回填规则）、`src/team-engine.ts`（在既有
+  `startActivation` 装饰器上记终态，新增 `childOutcomeLog`/`childOutcomeCause`）、`src/run.ts`（取 mark、报告
+  校验后回填、归档接 `childCause`）、`src/report.ts` + `src/types.ts`（`cancelled` 成为合法失败类）、
+  `src/script.ts`（guest `classifyFailureText` 加 401/403/forbidden 一条）、`src/memory/recorder.ts`（兜底文案带死因）、
+  `test/null-collapse.spec.ts`（新，19 例）+ `test/engine-harness.ts`（`ChildAnswer` 支持 `diagnostic`）。
+- **门禁**：`npm run ci` exit 0（95 files / 1771 tests）；`lib/` 与 `src/` 同一提交。
+- **合流方要做的**：
+  1. 真机隔离 soak（用户视角，fork 在用 profile，绝不碰 live）：至少跑到一次"某个子代理死掉"的 run，
+     确认交付的答案与台账里那句原因说的是 timeout/鉴权而不是"没交结构化结果"。本分支 `NOT_RUN` 的原因就是这一条。
+  2. 合流冲突预判：`docs/knowledge/{STATE,VALIDATION,DECISIONS,HANDOFF,RESEARCH}.md` 与 `CHANGELOG.md`
+     各留两边；`lib/*` 由 `npm run build` 重建后取 ours 再重建。
+- **别顺手改的**：`gate.ts` / `captain*` / `answer.ts` / delivery 拼装属其他 lane；`report.ts` 只动了失败类白名单
+  一个词。`src/script.ts` 只加了一条正则。
+- **仍然成立的老问题**：403/超时子代理还会花掉一次同次尝试补交（脚本看不见死因）。要彻底解决见
+  `DECISIONS.md` D-116 的 B1/B2/B3——**本轮只登记备选，没有实现**。
+
 ## 2026-11-24 — 已发版 `0.13.25`：判定角色补交 + 最终答案重写 + 派发心跳规则（`CONFIRMED`）
 
 - **From:** 合并发版子代理（本会话）· **To:** 下一轮接手者

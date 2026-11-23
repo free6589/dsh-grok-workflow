@@ -1,3 +1,30 @@
+## 未合流 `fix/null-collapse-t1` —— 子代理死因不再被写成格式错（T1，`CONFIRMED`） — 2026-11-24
+
+| state | command | result |
+| --- | --- | --- |
+| 基线与工作树 | `git worktree add -b fix/null-collapse-t1 .agents/worktrees/fix-null-collapse-t1 main` | 从 `main` `6b0eb62`（0.13.25）开出，独立 worktree/分支；共享脏树（detached `a6103ad`，40+ 处未提交改动 = 他人 lane）**一行未动** |
+| 红（新用例对旧代码） | `npx vitest run test/null-collapse.spec.ts` | **4 failed / 1 passed**（原文 `.rsi/evidence/null-collapse-t1/red-null-collapse.txt`）（`format-error` 期望为 `timeout`/`model-unavailable`/`cancelled`；原因句只有 `worker returned no valid structured result (...)`)；唯一通过的是 prose-only 那条——它本来就必须保持 `format-error` 且仍触发同次补交 |
+| 绿（实现后） | `npx vitest run test/null-collapse.spec.ts` | **19 passed**（`…/green-null-collapse.txt`）（4 种子终态 + 台账取证 + 无死因→不改写 + 双表一致性 22 条消息 + 歧义不改写 + planner 行 + 台账上界 + 归档兜底文案） |
+| 全量 | `npx vitest run` | **95 files / 1771 tests PASS**（原 1771 中新增 19） |
+| 静态门禁 | `npm run build`；`npm run typecheck`；`npm run lint` | build：`tsc -p tsconfig.build.json` + client bundle 303813 B；typecheck 干净；lint **0 errors / 35 warnings**（全部既有，新文件 0 warning） |
+| 全量门禁 | `npm run ci` | **exit 0：95 files / 1771 tests PASS**；`verify:lib` byte-identical（源与 `lib/` 同提交） |
+| 真机 soak | — | `NOT_RUN`：按派发约定留给合流方（本分支不发布、不碰 live profile） |
+
+**根因（`CONFIRMED`）**：引擎 guest 的 `agent()` 对 `stopReason !== 'completed'` 与"`completed` 但 `structured`
+缺失"都 `return null`，宿主 `childResult()` 又只转发 `{output, stopReason, structured?}`，把
+`SubagentResult.diagnostic` 丢掉。脚本于是只有一种写法：`format-error` + `returned no valid structured result`。
+agent-99 全量扫描（3691 次子调用 / 21 run）：530 次传输、鉴权、超时被写成格式错，真格式错 25 次。
+
+**修法（不改引擎、不改脚本路由）**：`src/team-engine.ts` 的 twin 在 `subagents.startActivation` 上记每条子代理的
+真实终态（`stopReason` + `diagnostic` + `childId` + 从提示词首行解析的 role/attempt + route）进
+`src/child-outcomes.ts` 的有界台账；`src/run.ts` 在报告通过校验后、脱敏前用 `reclassifyNullCollapses` 只回填
+"无歧义"的 null 塌陷行（同 role/attempt 死因唯一，且同组没有真的 prose-only 子代理），并同步 `incomplete`/
+`errors`/`task.error`/`plan.error` 里的同一句文案；`cancelled` 成为合法失败类；401/403/forbidden 在 guest 与宿主
+两张表里都归 `model-unavailable`（由用例从 `WORKFLOW_SCRIPT` 抠出 guest 函数逐条比对钉死）；归档兜底文案带上真实死因。
+
+**已知边界（不是遗漏，是设计）**：回填只改报告。403 子代理仍会花掉一次同次尝试补交、仍会走完路由链——
+"403 不烧链路"在行为上仍不成立；真要不烧，需要让脚本看见死因（`DECISIONS.md` D-116 的 B1/B2/B3 备选，未实现）。
+
 ## 已发版 0.13.25 判定角色补交 + 最终答案重写 + 派发心跳规则 — 2026-11-24 (`CONFIRMED`)
 
 | state | command | result |

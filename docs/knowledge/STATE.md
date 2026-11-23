@@ -1,3 +1,17 @@
+Last updated: 2026-11-24 03:10 +08:00（**T1 null 语义塌陷：报告不再把"子代理死了"写成格式错，`CONFIRMED` 未合流** —
+分支 `fix/null-collapse-t1`（worktree `.agents/worktrees/fix-null-collapse-t1`，从 `main` `6b0eb62` 开出，一任务一分支；
+共享脏树 detached `a6103ad` 未动）。引擎 guest 把 `stopReason !== 'completed'` 和"`completed` 但没交结构化结果"
+都折成 `null`，宿主 `childResult()` 又丢掉 `diagnostic`，所以 `src/script.ts` 的 `callRole` 只能一律写
+`format-error`（agent-99：3691 次子调用里 530 次传输/鉴权/超时被写成格式错，真格式错 25 次）。
+修法全在插件侧：twin 的 `startActivation` 记每条子代理真实终态进有界台账（`src/child-outcomes.ts`），
+`src/run.ts` 在报告校验后、脱敏前按"无歧义"规则回填 class/reason/category，连带改掉 `incomplete`/`errors` 里的
+同一句文案；新增失败类 `cancelled`；401/403 归 `model-unavailable`（guest 与宿主两张表由用例钉成一张）；
+归档兜底文案带真实死因。门禁：`npx vitest run` **95 files / 1771 tests PASS**（新增 `test/null-collapse.spec.ts`
+19 例，红 4 failed/1 passed → 绿 19），`npm run ci` **exit 0**，typecheck 干净，lint 0 errors / 35 warnings（全既有），
+`verify:lib` byte-identical。真机 soak `NOT_RUN`（留给合流方）。**已知边界**：回填只改报告，403 子代理仍会花掉
+一次同次尝试补交、仍走完路由链——"不烧链路"要等让脚本看见死因的结构性第二步（`DECISIONS.md` D-116 B1/B2/B3
+只登记未实现）。详见 VALIDATION 首条。）
+
 Last updated: 2026-11-24 02:30 +08:00（**已发版 `0.13.25`：三路合流（判定角色补交 + 最终答案重写 + 派发心跳规则），隔离真机 soak PASS，`CONFIRMED`** —
 三路各自从 `main` `7f626f5`（0.13.24）开出，`--no-ff` 依次合入 `release/0.13.25`：`fix/verifier-supervisor-resubmit`
 `f5b74e4`+`73c9067` → `fix/final-answer-rewrite` `4393514` → `docs/heartbeat-ledger` `4231c00`（先 rebase 到 `main`
