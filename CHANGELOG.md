@@ -5,6 +5,22 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Added / 新增
+
+- **The captain asks before it dispatches / 队长先报拆法，确认后才派活** —
+  In the front-desk (triage) mode a team message now gets one confirmation round: the captain states the split it intends to use, in a short preview, and the work is dispatched only after you approve. Replying "confirm" runs the plan as stated; saying what to change ("改成先写测试") runs the original request with your change folded in; any other message voids the confirmation and is routed on its own. `/grok` (full shape) and the answer to the front desk's own quick-or-team question skip the round. Mid-run messages still join the live plan through the existing channel.
+  / 前台（分流）模式下，团队档消息现在多一轮确认：队长先把准备采用的拆法简要报出来，你确认后才派活。回「确认」就按报的拆法跑；直接说要改什么（例如「改成先写测试」），就在原请求上带着你的改动跑；其它消息则作废这次确认，按新消息单独分流。`/grok`（完整形状）和"前台问完你选团队"那一条不重复问。跑中插话仍然走现有通道并入活计划。
+
+- **The captain remembers three sheets / 队长记忆三叠纸** —
+  Beside the durable round ledger the plugin now keeps a long-term user profile (`profile.md`) and one retrospective line per round (`experience.md`), and the captain reads all three (profile, experience, recent progress) before planning. A round's retrospective is written when the round settles, exactly once. The same sheets are readable and the profile writable from the memory CLI (`captain`, `profile`, `profile add <text>`, `experience`). Nothing is written into a live home by the plugin itself beyond that ledger directory, and no credential is ever stored (every line is redacted before it is written).
+  / 在原有的轮次台账旁边，插件现在多记两页纸：长期用户画像（`profile.md`）和每轮一条复盘（`experience.md`）。队长规划前会把三叠一起读——画像、经验、最近的进度。每轮结束自动写一条复盘，恰好一条。同一套纸可以用记忆命令行读取，画像还可以追加（`captain`、`profile`、`profile add <text>`、`experience`）。除了这个台账目录，插件不往任何在用家目录里写东西；任何一行落盘前都先脱敏，不存凭据。
+
+### Changed / 变更
+
+- **The model decides the split, the order and whether to keep going / 拆几个、什么顺序、失败后停不停，由模型现场定** —
+  The planner prompt no longer prescribes decomposition ("split into at most N", "return exactly one task when you cannot split"); it is a captain charter: the model decides how many tasks the objective honestly needs, their order, and whether continuing after a failed task is worth it. The shape limits (task count, sizes, wave ceiling) stay exactly where they were — they are the gate, not the plan. A plan may now carry `onFailure: "stop"`: the wave after a failed task is not dispatched, and every task that did not run is reported as a stopped row with the reason. Unset or unreadable values keep the old "keep going" behaviour, so no existing plan changes meaning.
+  / 规划提示词不再规定怎么拆（"最多拆 N 个""拆不动就返回恰好一个任务"），改成一份队长宪章：拆几个任务、什么顺序、某项没过验收后还值不值得继续，都由模型现场决定。形状上限（任务数、各字段长度、波次上限）原样保留——那是门卫，不是计划。现在计划可以带 `onFailure: "stop"`：某波有任务没过验收，下一波就不发车，没跑的任务会以"队长叫停"的 blocked 行如实上报。不填或填了看不懂的值，仍是旧的"继续跑"，既有计划的含义不变。
+
 ## [0.13.22] - 2026-11-24
 
 ### Fixed / 修复

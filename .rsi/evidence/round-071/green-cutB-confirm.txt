@@ -1,0 +1,11 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/captain-pack
+
+ ✓ test/captain-confirm.spec.ts (6 tests) 374ms
+
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+   Start at  22:25:32
+   Duration  1.31s (transform 689ms, setup 0ms, import 818ms, tests 374ms, environment 0ms)
+
+cutB_green_exit=0

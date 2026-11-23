@@ -80,6 +80,13 @@ export interface GateDeps {
      */
     memoryDocRoots?: readonly string[];
     /**
+     * The captain's three sheets (round-071), compiled when the gate composes one
+     * round. Defaults to reading the ledger's own directory (`src/captain-memory.ts`:
+     * profile, experience, recent progress); a test or an embedding passes a function
+     * so the payload never depends on the developer's own `~/.dsh` memory.
+     */
+    captainBrief?: () => string;
+    /**
      * Loop brakes for a Host heartbeat delivery.
      *
      * Omitted means "no driver is wired": a heartbeat still passes as

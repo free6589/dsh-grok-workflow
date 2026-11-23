@@ -83,6 +83,15 @@ as `args` JSON data. No user text is interpolated into code.
 
 ### Plan
 
+The plan is the captain's call (round-071): the planner prompt states the shape
+limits (task count, field sizes, wave ceiling) as a gate and leaves the split, the
+order and the continue/stop policy to the model. A plan may carry
+`onFailure: "continue" | "stop"`; `stop` ends the run after a wave with an
+unverified task, reporting every task that did not run as a stopped row. Unset or
+unknown values read as `continue`, which is the pre-round-071 behaviour. Mid-run
+plan changes go through the existing boundary channel (`src/replan.ts`,
+`src/steering.ts`), which is on by default (`replan`).
+
 The planner returns object-rooted structured output:
 
 - `id`, `title`, `objective`, `expectedOutput`
@@ -325,6 +334,20 @@ user message ──► agent/pre-step ──► classify
   in-flight run (`run.cancel` + `commitCancelled`) and restarts narrowed
   (`carriedPendingRequest` / `resumedTarget`); V1 offers no subtask-level
   redirect.
+- **The team tier confirms the split before dispatching (round-071).** The front
+  desk decides *how much* a message costs; the captain decides *what the work
+  becomes*. Before any child runs, the gate spends one cheap call (`captain-preview`)
+  asking the planner for a short split, states it to the user, and records a pending
+  confirmation (`src/captain.ts`, `pendingCaptains` in `src/gate.ts`, ten-minute TTL).
+  The next message is read against that entry: an unmistakable approval dispatches
+  the request as previewed, an explicit edit dispatches the original request with the
+  change folded in (`amendRequest`), and anything else voids the entry and is routed
+  on its own. Two paths skip the round by design — a session whose `/grok` record
+  forces the full shape, and the message that just answered the front desk's own
+  quick-or-team question. Mid-run messages are unchanged: they still join the live
+  plan through `src/channel.ts` / `src/steering.ts`.
+  The preview is advisory: the dispatched run plans again, and the gap is recorded
+  in `docs/knowledge/RESEARCH.md` (round-071).
 - **The gate reads the live configuration** on every decision (holders, see the
   settings section), so an edit applies to the next message while an in-flight
   run keeps its snapshot; an invalid edit refuses that message with its reason

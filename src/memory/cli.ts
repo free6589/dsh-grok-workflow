@@ -24,6 +24,7 @@
 import { pathToFileURL } from 'node:url'
 import { archiveDir, archiveFile, readArchive, recentArchiveDigest } from './archive.js'
 import type { ArchiveKind } from './archive.js'
+import { captainBrief, readCaptainMemory, rememberCaptainProfile } from '../captain-memory.js'
 
 /** Where the CLI writes; injectable so a test can capture the output. */
 export interface ArchiveCliIo {
@@ -38,6 +39,10 @@ const USAGE = [
   'commands:',
   '  recent                 print the newest archive entries (default)',
   '  path                   print the archive directory and file',
+  '  captain                print the captain memory brief (three sheets)',
+  '  profile                print the long-term user profile sheet',
+  '  profile add <text>     remember one standing preference or rule',
+  '  experience             print the experience sheet (one line per round)',
   '',
   'options:',
   '  --limit <n>            entries to print (default 20)',
@@ -91,6 +96,21 @@ function parseArgs(argv: readonly string[]): {
   }
 }
 
+/** Words of one `profile add <text>` command, with option pairs left out. */
+function addTextOf(rest: readonly string[]): string {
+  const words: string[] = []
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!
+    if (arg === '--dir' || arg === '--limit' || arg === '--kinds') {
+      index += 1
+      continue
+    }
+    if (arg.startsWith('--')) continue
+    words.push(arg)
+  }
+  return words.join(' ').trim()
+}
+
 /**
  * Run the archive CLI.
  * @param argv - arguments after the script name.
@@ -107,6 +127,35 @@ export function runArchiveCli(argv: readonly string[], io: ArchiveCliIo = {
   }
   const parsed = parseArgs(argv)
   const dirOptions = parsed.dir === undefined ? {} : { dir: parsed.dir }
+  // The captain's sheets (round-071): same directory as the ledger, so one reader
+  // answers "what does the captain remember" without a live session.
+  if (argv[0] === 'captain') {
+    const brief = captainBrief(readCaptainMemory(dirOptions))
+    io.out(brief === '' ? `captain memory: empty (${archiveDir(dirOptions)})` : brief)
+    return 0
+  }
+  if (argv[0] === 'profile' && argv[1] === 'add') {
+    const text = addTextOf(argv.slice(2))
+    if (text === '') {
+      io.err('usage: node lib/memory/cli.js profile add <text>')
+      return 2
+    }
+    const written = rememberCaptainProfile(text, dirOptions)
+    io.out(written
+      ? `remembered: ${text}`
+      : 'not written: the text was empty, already remembered, or the memory directory is not writable')
+    return 0
+  }
+  if (argv[0] === 'profile') {
+    const sheets = readCaptainMemory(dirOptions)
+    io.out(sheets.profile === '' ? `profile: empty (${archiveDir(dirOptions)})` : sheets.profile)
+    return 0
+  }
+  if (argv[0] === 'experience') {
+    const sheets = readCaptainMemory(dirOptions)
+    io.out(sheets.experience === '' ? `experience: empty (${archiveDir(dirOptions)})` : sheets.experience)
+    return 0
+  }
   if (parsed.command === 'path') {
     io.out(`dir:  ${archiveDir(dirOptions)}`)
     io.out(`file: ${archiveFile(dirOptions)}`)

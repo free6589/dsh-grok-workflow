@@ -146,5 +146,5 @@ export declare function routeBudgetFor(config: ResolvedConfig): RouteBudget;
  * without one the formula is byte-identical to the pre-guardian one.
  */
 export declare function maxTotalAgentsFor(tasks: number, retries: number, budget?: RouteBudget, replans?: number): number;
-export declare function buildWorkflowRequest(objective: string, tasks: NormalizedTask[] | undefined, config: ResolvedConfig, namingLanguage?: NamingLanguage, carryover?: string, busyRoutes?: string[], inheritance?: string, replanToken?: string): WorkflowRequestPayload;
+export declare function buildWorkflowRequest(objective: string, tasks: NormalizedTask[] | undefined, config: ResolvedConfig, namingLanguage?: NamingLanguage, carryover?: string, busyRoutes?: string[], inheritance?: string, replanToken?: string, captainBrief?: string): WorkflowRequestPayload;
 //# sourceMappingURL=script.d.ts.map

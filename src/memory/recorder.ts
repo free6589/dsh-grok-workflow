@@ -31,6 +31,7 @@ import { redactError } from '../redact.js'
 import type { WorkflowReport } from '../types.js'
 import type { ArchiveKind, ArchiveOptions } from './archive.js'
 import { appendArchiveEntry } from './archive.js'
+import { appendCaptainExperience } from '../captain-memory.js'
 
 /** Warning sink; the recorder never throws, so this is its only channel. */
 export interface ArchiveLogger {
@@ -459,7 +460,7 @@ export function createMemoryArchiver(options: ArchiveRecorderOptions): MemoryArc
       if (roundsWritten.has(input.runId)) return false
       roundsWritten.add(input.runId)
       const atMs = now()
-      return appendArchiveEntry({
+      const written = appendArchiveEntry({
         v: 1,
         id: `run:${input.runId}`,
         kind: 'round',
@@ -474,6 +475,19 @@ export function createMemoryArchiver(options: ArchiveRecorderOptions): MemoryArc
         summary: input.cause === undefined ? input.summary : `${input.summary} (cause: ${input.cause})`,
         ...input.evidence === undefined ? {} : { evidence: input.evidence },
       }, archiveOptions()).written
+      // The third sheet (round-071): one retrospective line per round, written
+      // right after the round entry it belongs to. Same rule as the archive — it
+      // never affects the run, so a refused write costs nothing but the line.
+      if (written) {
+        appendCaptainExperience({
+          runId: input.runId,
+          ...input.status === undefined ? {} : { status: input.status },
+          objective: input.objective,
+          summary: input.summary,
+          ...input.evidence === undefined ? {} : { evidence: input.evidence },
+        }, archiveOptions())
+      }
+      return written
     },
     dispose() {
       disposed = true

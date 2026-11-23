@@ -1,3 +1,24 @@
+## 2026-11-23 — round-071 队长三件套：同分支落地、未提交（`CONFIRMED`）
+
+- **From:** 队长三件套子代理（captain-pack）· **To:** lead / 下一轮接手者
+- **任务口径**：只做三件（拆排、前台化、三叠纸），门卫/检查/台账不动；不碰保命/体验档；不提交不推送。
+  基线：main `cda5d4e`（0.13.22 已发版）；工作树 `.agents/worktrees/captain-pack`（分支 `captain-pack`）。
+- **改了什么（源码）**：`src/script.ts`（planner 宪章、`onFailure`、`captainStopResult`、`runWaves` 停、
+  replan 提示词、`args.captain` 与 `boundedCaptain`）、`src/gate.ts`（`pendingCaptains`、两条路径的确认轮、
+  `deps.captainBrief`、runTeam 传 brief）、`src/run.ts`（`captainBrief` 入参）、
+  `src/memory/recorder.ts`（每轮一条复盘）、`src/memory/cli.ts`（四个新命令）、
+  新文件 `src/captain.ts`（确认语义/预览/改法/文案，纯函数）与 `src/captain-memory.ts`（三叠纸读写，永不抛）。
+- **验证（本人执行）**：`npm run build` exit 0；`npm run ci` exit 0（90 文件 / 1678 测试 PASS）；
+  三件各自红/绿见 `.rsi/evidence/round-071/`（red-cutA/red-cutB/red-cutC 与对应 green）。
+  改旧行为处：`test/triage.spec.ts` 两条团队档用例、`test/gate-partial-head.spec.ts` 的 `deliver`
+  助手、`test/channel.spec.ts` 的跑中插话用例——都只是先补一步"确认"，断言未放宽。
+- **没做/已知缺口**：确认轮的拆法预览是独立轻调用，正式跑仍由脚本内 planner 重新规划（两次规划）；
+  用户画像目前只能由操作者用记忆 CLI 显式写入，不从对话自动蒸馏；真机隔离 soak `NOT_RUN`（本轮不发布）。
+  `npm run verify:lib` 以 HEAD 为输入（`git archive HEAD`），**不覆盖未提交工作树**；
+  合并提交前请重跑 `npm run build` 并连同 `lib/` 一起提交（新增 `lib/captain*.js` 四个文件已在工作树生成）。
+- **下一步（若 lead 决定合流）**：在 main 系工作树复核 diff → `npm run ci` → 连 `lib/` 一起提交 →
+  按需补一次隔离真机 soak（确认轮 + 停 + 三叠纸各看一眼）→ 再决定是否记进 `[Unreleased]` 发版。
+
 ## 2026-11-23 — 已发版 `0.13.22`：composer 工作流开关又能打开（`CONFIRMED`）
 
 - **From:** 修复+验证+发版子代理（agent-83）· **To:** lead / 下一轮接手者

@@ -1,0 +1,89 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/captain-pack
+
+ ❯ test/captain-confirm.spec.ts (6 tests | 5 failed) 10598ms
+     × states the split and asks once, without starting a run 165ms
+     × dispatches the original request when the user approves 5074ms
+     × carries an explicit change into the dispatched request 126ms
+     × voids an unanswered confirmation and routes the new message on its own 71ms
+     × does not ask when the session forced the full shape 5037ms
+     ✓ does not ask twice when the front desk question was just answered 122ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/captain-confirm.spec.ts > captain foreground: the split is confirmed before any work is dispatched > states the split and asks once, without starting a run
+AssertionError: expected '档位：团队档 — 因为：目标里有多步工序或交付物，需要规划、执行与复核。\…' to contain '队长先报拆法'
+
+- Expected
++ Received
+
+- 队长先报拆法
++ 档位：团队档 — 因为：目标里有多步工序或交付物，需要规划、执行与复核。
++
++ 任务一：读现有代码；任务二：写回归测试。某项没过验收我会停下来说明。
+
+ ❯ test/captain-confirm.spec.ts:168:18
+    166|     const agent = new FakeAgent()
+    167|     const text = await say(ctx, agent, '帮我重构 run.ts 的超时逻辑，并补上回归测试')
+    168|     expect(text).toContain('队长先报拆法')
+       |                  ^
+    169|     expect(text).toContain('任务一：读现有代码')
+    170|     expect(text).toContain('确认')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  test/captain-confirm.spec.ts > captain foreground: the split is confirmed before any work is dispatched > dispatches the original request when the user approves
+ FAIL  test/captain-confirm.spec.ts > captain foreground: the split is confirmed before any work is dispatched > does not ask when the session forced the full shape
+Error: background team run not started yet
+ ❯ vi.waitFor.timeout test/captain-confirm.spec.ts:159:46
+    157| async function waitForDispatch(ctx: FakeContext, count = 1): Promise<v…
+    158|   await vi.waitFor(() => {
+    159|     if (ctx.dispatches.length < count) throw new Error('background tea…
+       |                                              ^
+    160|   }, { timeout: 5_000 })
+    161| }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  test/captain-confirm.spec.ts > captain foreground: the split is confirmed before any work is dispatched > carries an explicit change into the dispatched request
+AssertionError: expected [ { …(6) }, { …(6) } ] to have a length of 1 but got 2
+
+- Expected
++ Received
+
+- 1
++ 2
+
+ ❯ test/captain-confirm.spec.ts:195:28
+    193|     await say(ctx, agent, '改成先写回归测试')
+    194|     await waitForDispatch(ctx)
+    195|     expect(ctx.dispatches).toHaveLength(1)
+       |                            ^
+    196|     const objective = String((ctx.dispatches[0]!.args as { objective: …
+    197|     expect(objective).toContain('帮我重构 run.ts 的超时逻辑')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  test/captain-confirm.spec.ts > captain foreground: the split is confirmed before any work is dispatched > voids an unanswered confirmation and routes the new message on its own
+AssertionError: expected '已收到，并入了正在跑的这一轮（待并入 1 条）。已经开跑的部分不会被打断，…' to contain '上一个拆法确认没有回答'
+
+Expected: "上一个拆法确认没有回答"
+Received: "已收到，并入了正在跑的这一轮（待并入 1 条）。已经开跑的部分不会被打断，已完成、已验证的成果不会重做：规划器会在下一个波边界把这条要求合并进还没开始的任务。要立刻停，回一句「停」即可。"
+
+ ❯ test/captain-confirm.spec.ts:207:18
+    205|     await say(ctx, agent, '帮我重构 run.ts 的超时逻辑，并补上回归测试')
+    206|     const text = await say(ctx, agent, '你好')
+    207|     expect(text).toContain('上一个拆法确认没有回答')
+       |                  ^
+    208|     expect(ctx.dispatches).toHaveLength(0)
+    209|     // The consumed confirmation cannot be answered later: this "确认" i…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 1 passed (6)
+   Start at  22:25:19
+   Duration  11.97s (transform 1.05s, setup 0ms, import 1.18s, tests 10.60s, environment 0ms)
+
+cutB_red_exit=1
