@@ -2859,3 +2859,27 @@ Issue #1 状态评论 issuecomment-6927842856。
   `NOT_RUN`（不动运行中实例，按 AGENTS.md §5）。
 - **分支**：`rsi/sec2-03-mode-get`、`rsi/sec3-01-single-rail` 已合入 `main`，判定日期 2026-11-24 前删除。
 - **下一步**：① 操作员对 Sec.2-7 + Sec.3-2/3/4/5 各给一句"做 / 不做"；② 决定是否发版把这两条改动推出去。
+
+## 2026-11-23 · 手工清单 12 项（第 2 轮）逐项结果与分支台账
+
+| # | 项（原话标题） | 结果 | 分支 / 提交 |
+|---|---|---|---|
+| Sec.2-1 | 运行时限默认还是 60 分钟，我要的是不限时 | MERGED（补钉子；默认 0 早在 `1591665`） | `rsi/sec2-01-timeout-default` → `a3f57c5` |
+| Sec.2-2 | 主会话应该永远能插话，但现在默认关着 | MERGED（默认改成开） | `rsi/sec2-02-replan-default` → `28c0dd2` |
+| Sec.2-3 | workflow 总开关一按就报 405 | MERGED（405 补 `Allow`；GET 读取在 `5dc0512`） | `rsi/sec2-03-mode-allow` → `994f71e` |
+| Sec.2-4 | 设置页没有一键升级按钮 | MERGED（结论行 + 明说页面不能装；一键装仍需宿主能力，见分歧 D3） | `rsi/sec2-04-upgrade-verdict` → `1d5ef41` |
+| Sec.2-5 | 进度页的「回答」格子永远是空的 | MERGED（设计文档改六段脊椎 + 守卫；删格在 `1591665`） | `rsi/sec2-05-answer-cell-doc` → `8531ac1` |
+| Sec.2-6 | 断点续跑只做了一半 | MERGED（`resumeCarryover` 抽取+用例；接线在 `1591665`） | `rsi/sec2-06-resume-carryover` → `c7df2ce` |
+| Sec.2-7 | 宿主证据收集那一阶段，根本没开工 | **SKIPPED / `BLOCKED`**（源文件要求先拍板；D-112 有第一刀设计） | `rsi/sec2-07-host-evidence` → `70f9307` |
+| Sec.3-1 | 进度页跨阶段的线太多，合并成一根 | MERGED（连线文档；实现在 `adc7fb4`） | `rsi/sec3-01-rail-doc` → `96ad5f2` |
+| Sec.3-2 | 模型失败换人时加 429 之类的勾选框 | MERGED（`switchOnRateLimit` 新键 + 设置页勾选框） | `rsi/sec3-02-switch-on-rate-limit` → `cd88e4b` |
+| Sec.3-3 | 汇总环节也要「检查 + 复核」 | MERGED（判定进报告 `synthesis.review`） | `rsi/sec3-03-summary-review` → `504bcf3` |
+| Sec.3-4 | 开插件后的答案要和不开插件时长得一样 | MERGED（证据 + 三步比对规程；观感判定 `NOT_RUN`） | `rsi/sec3-04-answer-parity` → `23820e2` |
+| Sec.3-5 | 查清那次绘画任务为什么失败 | MERGED（范围结论：不在本仓库；继续查 `BLOCKED`） | `rsi/sec3-05-image-scope` → `a68a372` |
+
+- **分支**：上面 12 条 `rsi/*` 分支**已全部合入 `main` 但保留在本地**供复核，判定删除日期 **2026-11-24**
+  （合完未删是为让复核者能逐项看分支内容；超期即删）。
+- **未 push**：本地 `main` 领先 `origin/main` 14 个提交（12 项 + 文档批次），远端看不到任何一项；
+  未发版、未打 tag、未 npm publish。
+- **下一步**：① 操作员对 Sec.2-7 给一句"做 / 不做"（D-112 已备好第一刀）；② Sec.3-4 按
+  `docs/knowledge/evidence/answer-parity-2026-11-23.md` 第 2 节做一次并排比对；③ 决定是否发版把这批推出去。

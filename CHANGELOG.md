@@ -3445,3 +3445,34 @@ nothing in this section restates a change that `0.2.0` already shipped.
 - 限制任务输入和报告大小，并对模型可见的诊断信息中的常见凭据格式进行脱敏。
 - 将 GitHub Issue 内容视为不可信输入，并限制监控脚本唤醒进程可继承的凭据环境变量。
 - 在 CI 中检查已提交的 `lib/` 构建产物，避免过期编译文件在测试通过后被错误打包。
+
+### Changed / 变更
+
+- **The main session joins a live run by default / 主会话默认就能并入正在跑的这一轮** — *[manual item Sec.2-2]*
+  A message typed while a run is working is answered at once and folded into that run's remaining waves instead of waiting for the next round. The switch stays on the settings page, so turning it off gives every message its own round again. The cost is bounded: one planner-route call per wave boundary, at most four per run, and only when a message actually arrives mid-run.
+  / 跑中发来的消息现在默认立刻得到回执，并并入这一轮剩下的波次，而不是等到下一轮。设置页仍保留那个开关，关掉就回到"每条消息各起一轮"。代价是有界的：每个波边界一次规划调用，每轮至多四次，而且只在跑中真的来了消息时才花。
+
+- **The settings page says whether an upgrade is needed / 设置页直接说要不要升级** — *[manual item Sec.2-4]*
+  The version card used to print two numbers and leave the comparison to the reader. It now states the verdict (on the latest release, or a newer one is available) and says plainly that the page cannot run system commands, so the upgrade is the copyable install line run in a terminal.
+  / 版本卡以前只并排显示两个号码，比不比由读者自己看。现在它直接给出结论（已是最新 / 有新版可装），并明说这一页不能替你执行系统命令——升级就是把那行可复制的安装命令贴到终端里跑。
+
+### Added / 新增
+
+- **A 429 checkbox for model failover / 换模型时 429 有了勾选框** — *[manual item Sec.3-2]*
+  `switchOnRateLimit` (default on) decides whether a rate-limited route advances to the next model in the chain. On, the built-in policy applies. Off, the six other failure classes still fail over, the 429 keeps its route and the task's bounded retry decides — the right trade when the next model costs much more than waiting.
+  / 新增 `switchOnRateLimit`（默认打开）：限流（429）时是否换到链上的下一个模型。打开即内置策略；关掉后其余六个失败类别照旧换人，429 留在原路由交给任务的有界重试——当下一个模型明显更贵时这才是对的取舍。
+
+- **The report states that the summary was checked and reviewed / 报告写明汇总过了检查与复核** — *[manual item Sec.3-3]*
+  A model-written summary always passed two gates (a guardrail check, then an independent verification), but nothing said so. The run report now carries a `Summary review:` line naming each stage's verdict and the draft count, so a checked summary is no longer indistinguishable from a single-shot one.
+  / 模型写的那段结语一直要过两道门（先护栏检查、再独立复核），但报告里看不到。现在报告多一行 `Summary review:`，写明每一关的判定和用了几稿——"检查过"和"只汇总了一次"从此分得开。
+
+### Fixed / 修复
+
+- **A refused mode-route request names the methods it accepts / 被拒的总开关请求会写明允许的方法** — *[manual item Sec.2-3]*
+  A 405 from the switch route now carries an `Allow: GET, POST` header, so a client or a proxy log can tell what the route does accept instead of seeing an unexplained status. The method gate and the header read the same list, so they cannot drift.
+  / 总开关路由的 405 现在带 `Allow: GET, POST`，客户端或代理日志不用解析响应体就知道它接受什么方法，不至于只看到一个没头没尾的状态码。方法判断和这个响应头读的是同一张表，不会各说各话。
+
+### Docs / 文档
+
+- The progress-panel design document now states the six-stage spine (the permanently-empty `回答` cell was removed) and, separately, the single-rail connector with the ownership trade-off it costs — both pinned by tests (`test/progress-tab.spec.ts`, `test/progress-connector.spec.ts`). Answer-parity and drawing-task scope gained evidence notes under `docs/knowledge/evidence/`.
+  / 进度页设计文档改成六段脊椎（永远空的"回答"格已删除），并另加一节说明"一根公共轨"的连线模型以及它换来的归属代价——两处都有测试钉住（`test/progress-tab.spec.ts`、`test/progress-connector.spec.ts`）。答案长相一致与绘画任务范围各补了一份证据说明，放在 `docs/knowledge/evidence/`。
