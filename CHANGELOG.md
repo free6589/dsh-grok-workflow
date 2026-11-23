@@ -3,7 +3,7 @@
 Notable user-facing changes are recorded here in English and Simplified Chinese.
 用户可见的功能和修复会在这里以英文和简体中文记录。
 
-## [Unreleased]
+## [0.13.23] - 2026-11-23
 
 ### Added / 新增
 
@@ -20,6 +20,36 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 - **The model decides the split, the order and whether to keep going / 拆几个、什么顺序、失败后停不停，由模型现场定** —
   The planner prompt no longer prescribes decomposition ("split into at most N", "return exactly one task when you cannot split"); it is a captain charter: the model decides how many tasks the objective honestly needs, their order, and whether continuing after a failed task is worth it. The shape limits (task count, sizes, wave ceiling) stay exactly where they were — they are the gate, not the plan. A plan may now carry `onFailure: "stop"`: the wave after a failed task is not dispatched, and every task that did not run is reported as a stopped row with the reason. Unset or unreadable values keep the old "keep going" behaviour, so no existing plan changes meaning.
   / 规划提示词不再规定怎么拆（"最多拆 N 个""拆不动就返回恰好一个任务"），改成一份队长宪章：拆几个任务、什么顺序、某项没过验收后还值不值得继续，都由模型现场决定。形状上限（任务数、各字段长度、波次上限）原样保留——那是门卫，不是计划。现在计划可以带 `onFailure: "stop"`：某波有任务没过验收，下一波就不发车，没跑的任务会以"队长叫停"的 blocked 行如实上报。不填或填了看不懂的值，仍是旧的"继续跑"，既有计划的含义不变。
+
+- **A reload waits for the child call it was about to kill / 重载不再秒杀正在跑的子代理** —
+  Disabling or upgrading the plugin used to cancel every live run on the disposer's first line, so a ten-minute child call died 200 ms before it would have reported. The unload now closes the door, waits while any subagent call is still open (up to 45 s, and it needs 1.5 s of quiet before it believes nothing is left), and only then cancels what is still running. A run that finishes inside that window keeps its own result instead of being stamped cancelled, the session notice says how long it waited and what was still open, and a shutdown signal skips the window entirely.
+  / 关掉插件或升级它时，以前在收尾第一行就把所有在跑的活儿取消，于是跑十分钟的子代理在差 200 毫秒就交结果时被杀掉。现在卸载先关门、再有子代理在跑就等（最多 45 秒，且要静默 1.5 秒才认为真没活儿了），最后只取消还活着的。窗口内自己跑完的轮次保留自己的结果，不再被盖成"已取消"；会话里的通知会写等了几秒、还剩几个没交；进程收到关停信号则完全跳过这段等待。
+
+- **A cut run keeps the body of what ran / 被砍断的轮次不再交白卷** —
+  A run cut before any report existed (unload, deadline, refused result) wrote no task rows and no subagent rows, so the file said nothing about the children that had plainly run, and the next run was told there was nothing to re-drive. Those calls are now recorded as the engine announced them — child id, the task name the call carried, the role and attempt its own label names — and never as anything stronger than the outcome supports: a call that merely completed is not marked verified, so it stays on the re-drive list instead of being skipped.
+  / 任何报告都还没产出就被砍断的轮次（卸载、超时、结果被拒），以前不写任务行也不写子代理行，等于对明明跑过的子代理一言不发，下一轮被告知"没有可接着做的事"。现在这些调用按引擎当时播报的样子记下来——子代理 id、这次调用自带的阶段名、它自己的标签点名的角色与第几次尝试——并且绝不写得比结果更硬：只是"完成"的调用不会被标成已验收，因此留在重跑清单里，而不是被跳过。
+
+- **`/grok status` answers "what happened to my run" / `/grok status` 回答"我那轮到底怎样了"** —
+  A new switch word on the existing command: `/grok status` writes nothing and reports the last run — its state and why it stopped, what the guard saw, whether a checkpoint can be resumed (with its path), and which tasks are unfinished. It reads the session's own journal plus the newest readable checkpoint file, so it still answers after the process that ran the work is gone. `/grok [on|off]` behaves exactly as before.
+  / 原有命令多了一个词：`/grok status` 什么都不写，只报最近一轮——现在什么状态、为什么停下、守卫看到了什么、有没有能接着跑的恢复点（带路径）、哪些任务没做完。它读的是会话自己的日志加上最新的可读恢复点文件，所以干活的那个进程早没了也答得上来。`/grok [on|off]` 行为一字未变。
+
+- **The guard's verdict is in the answer, not only in the panel / 守卫结论进了答案正文** —
+  The liveness guard watches child calls and never cancels the workflow, and until now its findings only reached the progress panel, so a reader could not tell a watched run from an unwatched one. Every delivered block, the machine ledger and the rendered report now end with one fixed line: the findings, that no subagent was terminated, and who ended the round — including "nobody cancelled this round" when it finished on its own.
+  / 守卫一直盯着子代理、从不取消工作流，但它的发现只出现在进度面板，于是读者分不清"有人看着"和"没人看着"。现在交付块、机器台账、渲染报告都以一行固定结论收尾：几条发现、没有终止任何子代理、这一轮是谁取消的——自己跑完的就说"本轮无人取消"。
+
+- **A checkpoint names the calls it cut / 恢复点记下被砍断时还在跑的调用** —
+  The unload checkpoint only listed settled subagent calls, so "what was running and where had it got to" lived and died with the process. The file now carries an `inFlight` section (call number, child id, the last step the host actually observed), and `/grok status` prints it. Left out entirely when nothing was in flight, so an ordinary run's file is unchanged.
+  / 卸载时写的恢复点以前只列已经收尾的子代理，"当时在跑什么、跑到哪一步"跟着进程一起消失。现在文件里多一节 `inFlight`（第几次调用、子代理 id、宿主真实看到的最后一步），`/grok status` 会把它念出来。没有在跑的就不写这一节，普通轮次的文件因此一字未变。
+
+- **The round ledger can be corrected without rewriting it / 轮次台账可以更正，但不必改旧账** —
+  A round that dies cancelled stayed on the ledger as the latest verdict on that work even after a later round finished it. Writing a correction used to mean editing the old row, which an append-only ledger must not do. A round that carries earlier unfinished work through now appends one `superseded: A was carried through by B` entry, and both `memory recent` and the digest mark the old round with `superseded by: B`. A failed round supersedes nothing — it repeats it.
+  / 一轮以"取消"收场，后来另一轮把活干完了，台账里那条旧的仍然是"最新结论"。想更正就得改旧行，可只增不改的台账不能这么干。现在把旧活接着做完的那一轮会追加一条 `superseded: A 被 B 接过`，`memory recent` 和摘要都会在旧行上标 `superseded by: B`。失败的一轮不算接过——它只是重来一遍。
+
+### Fixed / 修复
+
+- **A stopped run no longer calls "zero tasks" a clean sweep / 停下的一轮不再把"零个任务"说成全部做完** —
+  A run cut before the plan produced anything said "已经做完 0 项，没有剩下的。" / "All 0 item(s) were finished, with nothing left over.", which reads as success over no work at all. Found by the isolated soak: the tally now has three cases, and zero is its own — nothing had produced a result yet. The same sentence also ran its English clauses together ("…not a manual stop.All 1 item(s)…"), so the parts are now separated. Both are pinned by tests.
+  / 计划还没产出任何东西就被砍断的一轮，会说"已经做完 0 项，没有剩下的。"——读起来像零活儿全过。这是隔离真机 soak 发现的：战果统计现在分三种情况，零个就是零个，说"还没跑出任何一项任务的结果"。同一句英文的三个分句以前连在一起（"…not a manual stop.All 1 item(s)…"），现在分开了。两条都补了用例钉住。
 
 ## [0.13.22] - 2026-11-24
 

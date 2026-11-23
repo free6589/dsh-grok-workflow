@@ -1,0 +1,107 @@
+round 072 — 五路合流后的隔离真机 soak（0.13.23 候选）
+================================================================================
+日期 / date: 2026-11-23（Asia/Singapore，23:00 前后）
+基线 / base: `main` `cda5d4e`（= 0.13.22 发布提交）；合流提交见本文件 §0
+合流内容 / merged: 保命3（重启自愈行为测试，仅 test）、保命1（卸载排水）、保命2（留全尸：没报告也记子代理行）、
+  体验档 5 条（`/grok status`、停下说人话、守卫结论行、在飞子代理入恢复点、台账可更正）、队长三件套
+  （拆法确认、队长宪章 `onFailure`、记忆三叠纸）。
+构建 / build: `npm run build` exit 0；`npm run ci` exit 0（92 files / 1715 tests；后来补 2 条文案用例后 26 条
+  体验档用例仍全绿，最终计数见 VALIDATION.md）。
+
+隔离 / isolation
+- 未写 live `~/.dsh`（只读：copy `profiles/headless` 到 scratch）；未重启、未触碰现行实例（web profile 未动）。
+- scratch home: `<worktree>/.tmp/soak072/dsh-home`（`DSH_HOME` 指向它，profile `headless`，由
+  `node scripts/clone-profile.mjs --src ~/.dsh/profiles/headless --home … --name headless` 克隆，4/4 parity）。
+- scratch 工作目录: `<worktree>/.tmp/soak072/work1`。跑完整个 `.tmp/soak072` 已删除（见 §5）。
+- 网关: 本机 `http://127.0.0.1:18088/openai/v1`（公网网关不用）。
+- 模型: 唯一路由 `bifrost-completions` / `wb/cn:deepseek-v4.1-flash`，planner / worker / verifier /
+  synthesizer 四角色同路由；`agent-default-model` 同路由。**未使用 runanywhere 作 planner。**
+- 凭据: 仅经 `set -a; . ~/.dsh/bifrost.env; set +a` 注入；overlay 里只写 `apiKeyEnv: BIFROST_VIRTUAL_KEY`；
+  本文件、overlay、日志、命令历史中都不含任何密钥值（已 grep 复核，见 §6）。
+- 插件装载: overlay `- insert: [{id: grok-workflow, name: file://<worktree>/lib/index.js, config: {mode: full, …}}]`
+  ——装载的是本轮合流构建产物，不是 live 仓库副本。
+
+§0 合流顺序 / merge order（`--no-ff`，每个都跑了相关 spec）
+  1. fix/lifeline3-resume-scan   → 冲突 0（仅 test/checkpoint-engine-wire.spec.ts +3 用例）
+  2. fix/dispose-drain           → 冲突 0
+  3. fix/checkpoint-lifeline-tasks → 冲突 2（均为 `lib/checkpoint/wiring.*.map` 源映射）→ 取 ours 后 `npm run build` 重建
+  4. feat/exp-pack-070           → 冲突 src/checkpoint/wiring.ts（工作区状态 + 观察行 + 在飞行两套字段并存）
+     + lib 源映射；noteAgent 手工合：payload 从事件第二参数取（引擎真实形状），既写「观察行」也写「在飞行表」
+  5. captain-pack                → 冲突 src/memory/recorder.ts（归档轮次写完后既写更正链接也写经验行）+ lib 源映射
+  合流中修正 1 处行为：exp-pack 的 agent 事件字段原本从第一参数（run info）读，实际引擎把它放在第二参数
+  （`emitWorkflowEvent('workflow/agent-start', info, agent)`，`WorkflowAgentInfo`）；合并后统一按真实形状读，
+  该 spec 的替身载荷改为真实两参数形状（断言不变）。
+
+§1 真机 headless 双任务 workflow
+命令形式 / command shape:
+  DSH_HOME=<scratch>/dsh-home dsh --profile headless --patch <scratch>/soak.patch.yml "<two-task prompt>"
+退出码 / exit code: 0
+落盘 / written files（逐字节核验）:
+  8 bytes  one/alpha.txt  sha256 e583bee0c3c0a0275cbd49c7c1523d9d686e487801c8de75be8d4882027d3cae  content "alpha-ok"
+  7 bytes  two/beta.txt   sha256 57da01d58b43bb515eb1ce9439de2b1f79b482cc4cb45fe2c8b56c9804470049  content "beta-ok"
+运行记录 / run record（插件 memory ledger 原文，`dsh-home/memory/grok-workflow/archive.jsonl`）:
+  run:05a2c261-9e4b-48ee-a3e3-8f8a4f6fab9e | round | completed |
+  "status completed · verified 2/2 task(s) · confirmed 10 criterion/criteria · answer: 约定的两份文件都已按预期生成并通过独立核验…"
+恢复点 / checkpoint（同一 run，真实落盘文件）:
+  checkpoint-05a2c261-9e4b-48ee-a3e3-8f8a4f6fab9e-226ea5d9.json
+  run.status=completed · name=任务团队 · sessionId=session-761c7789-b4e5-4d66-a8aa-64fc02e96bf8
+  tasks=task-a-alpha:verified/1, task-b-beta:verified/1 · agents=7 · plan.source=planner · taskCount=2
+  watchdog={"cancelled":false,"deadlineHit":false,"deadlineMs":7200000}
+队长记忆三叠纸（第 5 路的真实落盘）:
+  dsh-home/memory/grok-workflow/experience.md 已有 1 行：
+  "- 2026-11-23 · completed · objective: Current request: Run a two-task workflow here. … → status completed · verified 2/2 …"
+
+§2 三处新功能（都读的是构建产物 `lib/`，不是源码或替身）
+(1) `/grok status` 可读 —— 真实 journal（47 事件）灌进真 `Session`，调 `lib/command.js` 的真 handler：
+  命令: `/grok status`  → kind=success
+  --- answer ---
+  Grok workflow status:
+  - Toggle: never set in this session
+  - Last run: 任务团队 (05a2c261-9e4b-48ee-a3e3-8f8a4f6fab9e)
+  - State: finished on its own terms
+  - Guard: 0 finding(s); it never terminated a subagent
+  - Resumable checkpoint: completed at 2026-11-23T14:57:53.209Z (<scratch>/dsh-home/checkpoints/grok-workflow/checkpoint-05a2c261-….json)
+  - Unfinished: none; every recorded task verified
+  - To continue: send the same request again; the next run starts from this checkpoint.
+
+(2) 失败文案含卸载说明 —— 两段，都是构建产物里的真实文案：
+  a) 真机那一轮交付块尾部（`run1.log` 原文，中英双段）:
+     守卫：0 条发现，未终止任何子代理；本轮无人取消（正常跑完）。
+     Guard: 0 finding(s), no subagent was terminated; nobody cancelled this round (it finished on its own).
+  b) 卸载当场写进会话的停跑说明（真 `disposeActiveState` + 真 guardian；只有引擎是永不 settle 的替身边界）:
+     "[grok-workflow] The plugin was unloaded while this session had 1 workflow run in flight, so that work was
+      cancelled. Cause: the plugin was unloaded inside a running process (a settings toggle, a reload or an
+      upgrade); the host does not disclose which, and the disposal call path is recorded in this session for
+      whoever asks. Before cancelling, it waited 402ms for 1 subagent call(s) in flight (1 were still open when
+      the window closed). This notice is written once, at unload time. …"
+     dispose record: {"waitedMs":402,"openAtStart":1,"openAtEnd":1,"runsSettled":0,"deadlineHit":true}
+     日志: "…disposing with 1 active and 0 starting run(s) (…); waited 402ms for 1 in-flight subagent call(s)
+           (1 still open, 0 run(s) settled inside the window); the remaining runs are cancelled…"
+  c) 停下报告的人读文案（交付层真实输出，zh）:
+     答案：这次没能给出可用结论。
+     下一步：这次是插件在运行中被卸载（或升级）才停的，不是超时，也不是你手动停的。这次还没跑出任何一项任务的
+     结果。原样再发一次就接着跑，已经做好的不会重做。
+     守卫：2 条发现，未终止任何子代理；本轮由插件卸载取消。
+
+(3) 守卫结论行存在 —— 见 (2a) 真机交付块末行、(2c) 探针输出；另机器台账末两行:
+     Stop: This run was stopped because the plugin was unloaded (or upgraded) while it was running —
+     not a timeout, and not a manual stop. No task had produced a result yet. Sending the same request again
+     picks up from here; work already finished is not redone.
+     Guard: 2 finding(s), no subagent was terminated; cancelled by the plugin unload.
+     （只从报告本身渲染时，`guardOf(report)` + `guardLine()` 给出同一行：
+      守卫：2 条发现，未终止任何子代理；本轮由插件卸载取消。）
+
+§4 soak 结论 / verdict
+  soak PASS：真机双任务 workflow 完成（status completed，2/2 verified，10 criterion），两文件逐字节符合；
+  `/grok status` 在真 run 上可读（run 状态 / 守卫 / 可续跑恢复点 / 未完成清单全部来自真实 journal+文件）；
+  卸载说明与守卫结论行都来自构建产物的真实文案。soak 顺带发现并修掉一处文案缺陷：
+  「0 项任务」曾被说成"全部做完、没有剩下"，且英文三句连在一起无分隔（见 §5 修复提交）。
+
+§5 本次 soak 触发的修复 / fix found by this soak
+  修复提交: fix(delivery): a stopped run with no task rows does not claim a clean sweep
+  `stopNarration` 的 tally 现在区分三种情况（total=0 / left=0 / 其它），英文三段之间加分隔；
+  新增 2 条用例钉住（含「不得出现『已经做完 0 项』」与「不得出现 `stop.All`」）。
+
+§6 清理 / cleanup
+  `<worktree>/.tmp/soak072` 全目录已删除（scratch home + 工作目录 + overlay + 探针脚本 + decompressed journal）；
+  live `~/.dsh` 全程只读；无残留进程/端口；无密钥写入任何文件（overlay、日志、探针源码 grep 均无 key 值）。
