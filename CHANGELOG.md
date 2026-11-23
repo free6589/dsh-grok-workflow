@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.21] - 2026-11-23
+
 ### Fixed / 修复
 
 - **A fallback run that verified everything names its degraded plan / 降级跑完全部验证会自报降级** —
