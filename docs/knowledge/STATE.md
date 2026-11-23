@@ -1,3 +1,23 @@
+Last updated: 2026-11-23 23:1x +08:00（**已发版 `0.13.23`：五路合流（保命 3 条 + 体验档 5 条 + 队长三件套），
+隔离真机 soak PASS，`CONFIRMED`** — 五路各自在 `cda5d4e` 开出、`--no-ff` 依次合入 main 系 worktree
+`.agents/worktrees/fix-synth-resubmit`：`fix/lifeline3-resume-scan`（仅 test）→ `fix/dispose-drain`（卸载排水）→
+`fix/checkpoint-lifeline-tasks`（没报告也记子代理行）→ `feat/exp-pack-070`（体验档）→ `captain-pack`（队长三件套）。
+冲突共 3 处需要人判：`src/checkpoint/wiring.ts`（工作区状态 × 观察行 × 在飞行表）与
+`src/memory/recorder.ts`（归档后既写更正链接又写经验行）——按"功能都要保留"手工合；
+另 5 处只是 `lib/**/*.map` 源映射，取 ours 后 `npm run build` 重建。合流中修一处**载荷形状**：
+exp-pack 原从 `workflow/agent-start` 第一参数读 `seq/label/phase/childId`，真实形状是第二参数
+（`WorkflowAgentInfo`，见 `emitWorkflowEvent('workflow/agent-start', info, agent)`），合并后统一按真实形状读，
+该 spec 替身改为两参数（断言未放宽）。`npm run ci` exit 0（**92 文件 / 1717 测试 PASS**；
+`verify:lib` 在 `c4eaffa` byte-identical，229 文件）。
+真机隔离 soak **PASS**（scratch `DSH_HOME` + `file://<worktree>/lib/index.js` overlay + 本机网关
+`127.0.0.1:18088`，四角色同路由 `wb/cn:deepseek-v4.1-flash`）：双任务 workflow `status completed · verified 2/2`、
+10 criterion，两文件字节/sha 精确；`/grok status` 在真实 journal + 真实恢复点上答出 run 状态/守卫/可续跑/未完成；
+卸载通知（"waited 402ms for 1 subagent call(s) in flight"）与停下文案、守卫结论行都出自构建产物。
+soak 顺带抓出一处文案缺陷并修掉（0 任务被说成"全部做完"、英文三句无分隔），补 2 条用例。
+发版：prepare `c4eaffa` → push main → tag `v0.13.23` → push tag → 远端 Release run `45202988977` **success**，
+Release `v0.13.23` 已发布（asset `dsh-grok-workflow-0.13.23.tgz`，860889 bytes，sha256 `ed7a7e55…`）。
+证据：`.rsi/evidence/round-072/soak.txt`（脱敏，仅模型名）、`docs/knowledge/VALIDATION.md` 的 0.13.23 表。）
+
 Last updated: 2026-11-23 22:35 +08:00（**round-071 队长三件套已落地，未提交、未推送（分支 `captain-pack`），`CONFIRMED`** —
 三件同分支：①拆排交给模型——`planPrompt()` 改队长宪章、计划新增 `onFailure: continue|stop`
 （`normalizePlan` 归一，非法值=continue）、`runWaves` 在波边界执行"停"（`captainStopResult`）；

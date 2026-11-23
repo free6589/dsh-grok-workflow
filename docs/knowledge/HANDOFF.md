@@ -1,3 +1,30 @@
+## 2026-11-23 — 已发版 `0.13.23`：五路合流（保命 1/2/3 + 体验档 5 条 + 队长三件套）+ 隔离真机 soak PASS（`CONFIRMED`）
+
+- **From:** 合并+验证+发版子代理（merge-release）· **To:** lead / 下一轮接手者
+- **合流顺序（`--no-ff`，每合一路跑相关 spec）**：`fix/lifeline3-resume-scan`（仅 test，+4 用例）
+  → `fix/dispose-drain`（`src/{run,config,guardian,index,records,checkpoint/wiring}.ts` + `test/unload-drain.spec.ts`）
+  → `fix/checkpoint-lifeline-tasks`（`src/checkpoint/wiring.ts` 观察行）→ `feat/exp-pack-070`（体验档）
+  → `captain-pack`（队长三件套）。五路原本都未提交，先各自提交（`baafd25`/`a3a41fb`/`92f5506`/`e776057`/`5c9aa06`）再合。
+- **冲突处理（以"功能都要保留"为原则）**：3 处需人判——
+  ① `src/checkpoint/wiring.ts`：`noteAgent` 同时维护「观察行」(`children`) 与「在飞行表」(`live`)，
+  `snapshot()` 的 `agents` 走观察行（无报告时）并叠加 `...liveInFlight()`；
+  ② `src/memory/recorder.ts`：归档轮次写完后既 `supersedeEarlierRound()` 又 `appendCaptainExperience()`；
+  ③ 另有 5 处 `lib/**/*.map`：取 ours 后 `npm run build` 重建（提交的 `lib/` 与 `src/` 一致由 `verify:lib` 证明）。
+- **合流时发现并修的载荷形状偏差**：exp-pack 的 `noteAgent` 从 `workflow/agent-start` 第一参数读
+  `seq/label/phase/childId`，真实 payload 在第二参数（`WorkflowAgentInfo`）。合并后统一读第二参数，
+  该 spec 的替身改成真实两参数形状；断言不变。**这是"在飞子代理"在生产里能否真生效的关键**，
+  只跑单路测试不会暴露（单路测试跟着错形状写）。
+- **soak 抓出的文案缺陷（已修，`2e52498`）**：0 任务被说成"已经做完 0 项，没有剩下的"（读着像全部做完），
+  英文三段无分隔（`…manual stop.All 1 item(s)…`）。`stopNarration` 现在三态（total=0 / left=0 / 其它）+ 分隔符，
+  补 2 条用例（`test/experience-pack.spec.ts`）。
+- **门禁**：`npm run ci` exit 0（92 文件 / 1717 测试；`verify:lib` 在 `c4eaffa` byte-identical，229 文件）。
+- **发版**：`c4eaffa` → push main → tag `v0.13.23` → push tag → Release run `45202988977` **success**
+  → Release `v0.13.23` 已发布（asset `dsh-grok-workflow-0.13.23.tgz`，860889 bytes，sha256 `ed7a7e55…`）。
+- **已知缺口（下轮可做）**：确认轮的拆法预览是独立轻调用，正式跑仍重新规划（两次规划）；
+  用户画像只能显式写入、不从对话蒸馏；`dsh` 的 session journal 是**多帧 zstd**，
+  `zstdDecompressSync` 只解第一帧（本轮探针按帧魔数切分才读出 47 事件）——以后写 session 阅读器要记住这点。
+- **临时物清理**：五个分支 worktree 与分支已删（见 `docs/knowledge/VALIDATION.md` 0.13.23 表末行）。
+
 ## 2026-11-23 — round-071 队长三件套：同分支落地、未提交（`CONFIRMED`）
 
 - **From:** 队长三件套子代理（captain-pack）· **To:** lead / 下一轮接手者

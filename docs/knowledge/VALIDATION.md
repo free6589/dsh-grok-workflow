@@ -1,3 +1,37 @@
+## 发版 `0.13.23` — 五路合流 + 隔离真机 soak（已发布） — 2026-11-23 (`CONFIRMED`)
+
+| state | command | result |
+| --- | --- | --- |
+| 基线 | `git log --oneline -1`（main 系 worktree `.agents/worktrees/fix-synth-resubmit`） | `cda5d4e docs(memory): record 0.13.22 …`；`origin/main` 同值 |
+| 五路提交 | 各 worktree 内 `git add -A && git commit` | `baafd25`(lifeline3) `a3a41fb`(drain) `92f5506`(checkpoint body) `e776057`(experience) `5c9aa06`(captain) |
+| 合 1 | `git merge --no-ff fix/lifeline3-resume-scan` | 冲突 0；`npx vitest run test/checkpoint-engine-wire.spec.ts` → **6 passed** |
+| 合 2 | `git merge --no-ff fix/dispose-drain` | 冲突 0；`npx vitest run test/unload-drain.spec.ts test/checkpoint-wiring.spec.ts test/plugin-lifecycle.spec.ts` → **65 passed** |
+| 合 3 | `git merge --no-ff fix/checkpoint-lifeline-tasks` | 冲突 2（`lib/checkpoint/wiring.{d.ts,js}.map`）→ 取 ours + `npm run build`；`npx vitest run test/checkpoint-{wiring,engine-wire}.spec.ts test/unload-drain.spec.ts` → **55 passed** |
+| 合 4 | `git merge --no-ff feat/exp-pack-070` | 冲突 `src/checkpoint/wiring.ts`（人判：观察行 + 在飞行表并存）+ lib 源映射；`npx vitest run test/experience-pack.spec.ts test/checkpoint-wiring.spec.ts test/checkpoint-engine-wire.spec.ts` → **74 passed** |
+| 合 5 | `git merge --no-ff captain-pack` | 冲突 `src/memory/recorder.ts`（人判：更正链接 + 经验行并存）+ lib 源映射；`npx vitest run test/captain-*.spec.ts test/triage.spec.ts test/channel.spec.ts test/gate-partial-head.spec.ts test/memory-archive.spec.ts` → **141 passed** |
+| 全量门禁（合流后） | `npm run ci` | **exit 0：92 files / 1715 tests PASS** |
+| soak 抓出的文案缺陷 | `npx vitest run test/experience-pack.spec.ts`（修前红/修后绿） | 修前 **25 passed / 1 failed**（`已经做完 0 项` 与英文无分隔）；修后 **26 passed**；提交 `2e52498` |
+| 真机隔离 soak・§1 | `DSH_HOME=.tmp/soak072/dsh-home dsh --profile headless --patch .tmp/soak072/soak.patch.yml "<two-task prompt>"` | **exit 0**；run record `status completed · verified 2/2 task(s) · confirmed 10 criterion/criteria`；`one/alpha.txt` 8B sha256 `e583bee0…`、`two/beta.txt` 7B sha256 `57da01d5…`；恢复点 `run.status=completed`、`tasks=task-a-alpha:verified, task-b-beta:verified`、`agents=7`、`plan.source=planner`、`inFlight=null`；`experience.md` 已有 1 行复盘（第 5 路真实落盘） |
+| 真机隔离 soak・§2 | `DSH_HOME=… node status-probe.mjs`（真 journal 多帧 zstd 解出 47 事件 → 真 `Session` → `lib/command.js` 真 handler） | `/grok status` → `kind=success`，答出 run id/状态/守卫/可续跑恢复点路径/未完成清单 |
+| 真机隔离 soak・§3 | `DSH_HOME=… node unload-probe.mjs`（真 `disposeActiveState` + 真 guardian；只有引擎是永不 settle 的替身边界） | 会话通知原文含 `Before cancelling, it waited 402ms for 1 subagent call(s) in flight (1 were still open when the window closed)`；dispose record `{"waitedMs":402,"openAtStart":1,"openAtEnd":1,"runsSettled":0,"deadlineHit":true}`；停下文案含"插件在运行中被卸载（或升级）…原样再发一次就接着跑"；守卫行 `守卫：2 条发现，未终止任何子代理；本轮由插件卸载取消。` |
+| 真机那一轮的守卫行 | `grep '守卫：' .tmp/soak072/run1.log` | `守卫：0 条发现，未终止任何子代理；本轮无人取消（正常跑完）。`（英文同段） |
+| 密钥卫生 | `grep -rlF "$BIFROST_VIRTUAL_KEY" .tmp/soak072 .rsi/evidence/round-072` | **0 个文件**（overlay 只写 `apiKeyEnv`；证据只记模型名） |
+| 发版门禁 | `npm run ci`（`c4eaffa`） | **exit 0：92 files / 1717 tests PASS**；`verify:lib` → `lib/ at c4eaffa is the build of src/ at c4eaffa (229 files, byte-identical)` |
+| 推送 | `git push origin main` / `git tag -a v0.13.23` / `git push origin v0.13.23` | main `cda5d4e..c4eaffa`；tag 指向 `c4eaffa` |
+| 远端 | `gh run watch 45202988977 --exit-status` | **exit 0 / success**：Release run 完成 |
+| 远端 | `gh release view v0.13.23` | `isDraft=false`、`isPrerelease=false`；asset `dsh-grok-workflow-0.13.23.tgz`（860889 bytes，`state=uploaded`，sha256 `ed7a7e55…`） |
+| 清理 | `git worktree remove` × 6 / `git branch -D` × 5 / `rm -rf .tmp/soak072` | 五个分支 worktree 与分支、soak scratch 全删；`git status --short` 无遗留 |
+
+**说明**
+- 合流中修了一处**生产会静默失效**的载荷形状偏差：exp-pack 从 `workflow/agent-start` 的第一参数读
+  `seq/label/phase/childId`，真实 payload 在第二参数（`WorkflowAgentInfo`）。单路测试跟着错形状写，所以全绿；
+  合并后统一读第二参数，"在飞子代理"才会在真机生效（本轮 soak 的 `stats.inFlight` 与 `inFlight` 行由此而来）。
+- soak 的 §2/§3 读的是构建产物 `lib/`，不是源码；只有引擎/网关之外的模型调用是真机。§1 是全真（真网关、真模型、
+  真插件、真文件），证据 `.rsi/evidence/round-072/soak.txt`。
+- `dsh` 的 `session.v4.jsonl.zstd` 是**多帧** zstd（本轮 14 帧，32KB）；`zstdDecompressSync` 只解第一帧，
+  按帧魔数 `28 B5 2F FD` 切分后逐帧解才拿到全部 47 个事件。
+- 0.13.22 的 CHANGELOG 日期写的是 `2026-11-24`，本轮按真实本地日期写 `2026-11-23`；版本顺序由测试保证，不受影响。
+
 ## round-071 — 队长三件套（拆排/前台确认/三叠纸）= 未提交，工作树 `captain-pack` — 2026-11-23 (`CONFIRMED`)
 
 | state | command | result |
