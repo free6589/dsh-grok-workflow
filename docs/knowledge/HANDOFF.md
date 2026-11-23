@@ -1,3 +1,14 @@
+## 2026-11-23 — round-63 已合流 main 未发版：插件标记单一定位（`CONFIRMED`，soak BLOCKED）
+
+- **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
+- **做了什么**：三处硬编码标记字符串各自为政，改名即散伙。全改引已有常量（import 图亲验无环）；
+  +1 钉死字面量回归；`npm run ci` exit 0（87/1655）；lead 独立验 grep + 全量门禁。
+- **真机**：BLOCKED（网关 502，未伪造）。本次不发版。
+- **合流**：`rsi/round-63`（`d745573`）已 `--no-ff` 合入 main 系 worktree（合流 `895fb00`）；
+  `rsi/round-63` 分支可 24h 内删除。`CHANGELOG [Unreleased]` 中英文已记 17 条待发。
+- **下轮**：开新找 bug 面。
+  网关恢复后给 round-47~63 补一次 soak 再发 `0.13.21`。
+
 ## 2026-11-23 — round-62 已合流 main 未发版：摘要轮内丢行自报（`CONFIRMED`，soak BLOCKED）
 
 - **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者

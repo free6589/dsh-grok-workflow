@@ -1,3 +1,14 @@
+## round-63 插件标记单一定位（soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
+
+| state | command | result |
+| --- | --- | --- |
+| worktree rsi-round-63 `d745573`（main `7b410f0` + 本轮 1 提交） | `grep -rn "'grok-workflow'" src/` 前后对比（子代理 + lead 独立确认） | 硬编码 3 处 → 0 处（import 图亲验无循环；provider 语义与类型声明未动） |
+| 同上（新码） | `npm run ci`（lead 独立） | **exit 0：87 files / 1655 tests PASS**（+1 常量钉死回归）；typecheck 干净；lint 0 errors；`verify:lib` byte-identical |
+| 隔离 soak | 网关探针 | **BLOCKED**：网关 502/401（无凭证），未伪造 |
+
+**Changed:** `src/carryover.ts` + `src/history.ts` + `src/run.ts`（引用已有常量）+ `test/gate.spec.ts`（+1 钉死字面量）+ `lib/` 重建 + `CHANGELOG [Unreleased]` 中英双语 + `.rsi/evidence/round-063/`。纯引用统一无行为变化。
+**Honest boundary:** 真机 BLOCKED，不发版；`[Unreleased]` 已攒 17 条待发。
+
 ## round-62 摘要轮内丢行自报（soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
 
 | state | command | result |
