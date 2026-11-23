@@ -1,3 +1,16 @@
+## round-43 机器台账补 blocked 原因行 — 2026-11-23 (`CONFIRMED`，未发版)
+
+| state | command | result |
+| --- | --- | --- |
+| worktree rsi-round-43 `8c06f9e`（main `e27d0b6` + 本轮 1 提交） | `npx vitest run test/delivery.spec.ts -t "blocked task reason"`（旧码 stash） | **1 failed / 18 skipped**：新用例红（账本无 blocked 原因行） |
+| 同上（新码） | `npx vitest run test/delivery.spec.ts` | **19 passed** |
+| 同上（新码） | `npm run ci` | **exit 0：85 files / 1635 tests PASS**；typecheck 干净；lint 0 errors（30 warnings 既有）；`verify:lib` byte-identical（217 文件） |
+| 同上 | lead 独立红绿复验（stash→旧码红→pop→新码绿→全量门禁） | **复现成立**；`lib/delivery/index.js` 为同改动编译产物；证据目录无真密钥 |
+
+**Changed:** `src/delivery/index.ts`（machineLedger `failed` → `failed || blocked` + 对齐注释）+ `test/delivery.spec.ts`（+1 blocked 原因行回归，含与 renderReport 逐行一致断言）+ `lib/` 重建 + `CHANGELOG [Unreleased]` 中英双语 + `.rsi/evidence/round-043/`。
+**Root cause:** 同一 report 两种方言：正式报告对 blocked 打原因行，机器台账只对 failed 打，存档丢"没跑成"和上游原因；category 取法两侧本来就一致（blocked 无分类），只需放宽状态条件。
+**Honest boundary:** 真机 GUI 手点 NOT_RUN；未发版（`[Unreleased]` 攒版）。
+
 ## round-42 Slack 令牌全系前缀脱敏补齐 — 2026-11-23 (`CONFIRMED`，未发版)
 
 | state | command | result |

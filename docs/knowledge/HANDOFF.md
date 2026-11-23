@@ -1,3 +1,15 @@
+## 2026-11-23 — round-43 已合流 main 未发版：机器台账补 blocked 原因行（`CONFIRMED`）
+
+- **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
+- **做了什么**：报告面第 1 条。`renderReport` 对 blocked 打原因行，`machineLedger` 只对 failed 打，
+  存档丢"没跑成"和上游原因。放宽 machineLedger 状态条件 + 1 例回归（含与正式报告逐行一致断言）；
+  `npm run ci` exit 0（85/1635）；lead 独立红绿复验成立。
+- **合流**：`rsi/round-43`（`8c06f9e`）已 `--no-ff` 合入 main 系 worktree（合流 `51ec2bb`）；
+  `rsi/round-43` 分支可 24h 内删除。`CHANGELOG [Unreleased]` 中英文已记，攒版待发。
+- **未做（下轮池）**：报告面分节 slice 静默丢/尾部裸 slice/账本吞错/resume 浅拷贝；
+  并发面 hung 波死等/guardian 双心跳与顺序相关/路径归一分歧/超时常量过期；配置面 Cookie JSON 漏/
+  guardianModel 空白与未知键/gate 无钩子 fail-open。真机 GUI 手点 NOT_RUN。
+
 ## 2026-11-23 — round-42 已合流 main 未发版：Slack 令牌全系前缀脱敏（`CONFIRMED`）
 
 - **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者

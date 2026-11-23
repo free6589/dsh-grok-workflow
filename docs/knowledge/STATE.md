@@ -1,3 +1,7 @@
+Last updated: 2026-11-23 12:45 +08:00（**round-43 已合流 main 未发版：机器台账补 blocked 原因行，`CONFIRMED`** —
+合流提交 `51ec2bb`（main `e27d0b6` + `8c06f9e`）；`npm run ci` exit 0（85 文件 / 1635 测试 PASS，+1 blocked 回归），
+lint 0 errors，`verify:lib` 217 文件 byte-identical。`CHANGELOG [Unreleased]` 中英文已记，攒版待发。）
+
 Last updated: 2026-11-23 12:30 +08:00（**round-42 已合流 main 未发版：Slack 令牌全系前缀脱敏补齐，`CONFIRMED`** —
 合流提交 `b5ec52e`（main `d525fb2` + `e9fd908`）；`npm run ci` exit 0（85 文件 / 1634 测试 PASS，+1 全前缀回归），
 lint 0 errors，`verify:lib` 217 文件 byte-identical。`CHANGELOG [Unreleased]` 中英文已记，攒版待发。
