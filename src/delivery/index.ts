@@ -178,9 +178,9 @@ export function diagnosticsEnabled(value?: DiagnosticsSwitch): boolean {
  * `String#slice` counts code units, so a cut that lands between the two halves of
  * an astral character (an emoji in a task title, a rare CJK ideograph) leaves a
  * lone surrogate behind, which renders as a replacement box. Every human-block
- * clamp cuts through here for that reason. The ledger's own {@link MAX_LEDGER_CHARS}
- * clamp does not, and is pooled: reaching 8,000 characters needs a report this
- * validator cannot produce, so there is no measured shape to pin it with yet.
+ * clamp cuts through here for that reason, and the ledger's own
+ * {@link MAX_LEDGER_CHARS} clamp falls back to it when the cut has no line
+ * boundary to stop at.
  */
 function cutCodeUnits(text: string, max: number): string {
   if (max <= 0) return ''
@@ -906,11 +906,28 @@ function failureCounts(report: WorkflowReport): { category: string, count: numbe
 }
 
 /**
+ * The truncation marker appended when the ledger exceeds its budget.
+ *
+ * One dialect across the shared report surface: `renderReport` in
+ * `src/report.ts` ends an overlong canonical report with exactly this marker,
+ * so the trimmed ledger below does not invent a second one.
+ */
+const LEDGER_TRUNCATED_MARKER = '[output truncated; see the canonical structured result for full details]'
+
+/**
  * Build the full machine ledger.
  *
  * Only ever reached through an explicit diagnostics switch. It keeps every id,
  * route and attempt a maintainer needs, under the same field labels
  * `src/report.ts` renders, so the two views describe one report in one dialect.
+ *
+ * When the ledger outgrows {@link MAX_LEDGER_CHARS}, the tail is cut at the
+ * last line boundary so the cut never strands a reader mid-line, and the cut
+ * is fenced through {@link cutCodeUnits} so a surrogate pair (an emoji at the
+ * cut, a rare CJK ideograph) is never split into a replacement box. A body with
+ * no line break to stop at in the last 8,000 characters keeps the straight
+ * code-unit cut. The surviving head ends with the same truncation marker
+ * `renderReport` uses, so a clipped ledger says so in the one shared wording.
  *
  * @param report - validated report.
  * @returns the ledger text, bounded by {@link MAX_LEDGER_CHARS}.
@@ -1008,7 +1025,11 @@ export function machineLedger(report: WorkflowReport): string {
     }
   }
   const text = lines.join('\n')
-  return text.length <= MAX_LEDGER_CHARS ? text : `${text.slice(0, MAX_LEDGER_CHARS - 1)}…`
+  if (text.length <= MAX_LEDGER_CHARS) return text
+  const window = text.slice(0, MAX_LEDGER_CHARS)
+  const newline = window.lastIndexOf('\n')
+  const head = cutCodeUnits(newline < 0 ? window : window.slice(0, newline), MAX_LEDGER_CHARS)
+  return `${head}\n${LEDGER_TRUNCATED_MARKER}`
 }
 
 /**

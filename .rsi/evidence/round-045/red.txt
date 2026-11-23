@@ -1,0 +1,53 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/rsi-round-45
+
+ ❯ test/delivery.spec.ts (20 tests | 1 failed | 19 skipped) 14ms
+     ↓ names what was done, what came of it and what is next, in both languages
+     ↓ drops the shell command, the digest and the absolute path a report quoted
+     ↓ never words a failure as success
+     ↓ leads with the language that was asked for, and mirrors the other one
+     ↓ is absent from the delivery until the switch is on
+     ↓ reads a live settings holder, and degrades to hidden when it throws
+     ↓ names the supervisor chain in the ledger, in report order (R8-ledger)
+     ↓ counts only unrecovered failures, exactly like the canonical report (round 26)
+     ↓ names a configured supervisor chain, in the documented execution order
+     ↓ labels the synthesis mode once, under a label the failure note does not own
+     ↓ prints the blocked task reason line, exactly like the canonical report (round 43)
+     × clips an overlong ledger at a line boundary with the shared truncation marker (round 45) 12ms
+     ↓ keeps every ledger label out of the visible block and folds the ledger below the marker
+     ↓ shows the machine ledger inside the markers only when diagnostics are on (Q11 c)
+     ↓ keeps the incident machine tokens out of the visible block (Q11)
+     ↓ switches the relay instruction from verbatim to paraphrase when the ledger travels (Q11 b)
+     ↓ folds the ledger for a PARTIAL run too, and keeps it parseable for carry-over
+     ↓ delivers one wording for in-turn and relay
+     ↓ ignores the removed humanSummary opt-out: the human block is always on (T4)
+     ↓ tells the model not to print the markers or quote the folded ledger
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/delivery.spec.ts > 机器台账：每一行说清一件已经发生的事 > clips an overlong ledger at a line boundary with the shared truncation marker (round 45)
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/delivery.spec.ts:466:37
+    464|     const ledger = machineLedger(mk([verifiedTask, failedTask('b'), fa…
+    465|     expect(ledger).not.toContain('�')
+    466|     expect(ledger.endsWith(MARKER)).toBe(true)
+       |                                     ^
+    467|     expect(ledger.length).toBeLessThanOrEqual(8_000 + MARKER.length + …
+    468|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 19 skipped (20)
+   Start at  13:34:23
+   Duration  442ms (transform 237ms, setup 0ms, import 297ms, tests 14ms, environment 0ms)
+
+exit=1

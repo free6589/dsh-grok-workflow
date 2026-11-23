@@ -7,6 +7,10 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ### Fixed / 修复
 
+- **An overlong machine ledger ends at a whole line with the shared marker / 超长机器台账在整行处收尾并用统一标记** —
+  The ledger tail was a bare UTF-16 slice at exactly 8,000 characters with a one-character marker the canonical report never uses: the cut could land mid-line, and a cut inside an emoji left a replacement box. The ledger now ends at the last line boundary inside the budget, fences the cut through the surrogate-safe cutter, and carries the same truncation marker the canonical report uses.
+  / 机器台账超长时原来是裸切 8000 字加一个省略号，正式报告从不用这个标记：切口可落在行中，切进 emoji 会留下乱码框。现在台账在预算内最后一个整行处收尾，切口走防乱码切割，并带上与正式报告同一句截断标记。
+
 - **Truncated report rows say how many more / 报告截断处写明还剩几行** —
   Both report dialects silently dropped every confirmed/incomplete row past the first 12, so a reader mistook a cut list for a complete one. The first 12 rows still render, followed by one `- … +N more` marker line naming the remainder.
   / 两版报告超过 12 条的已确认/未完成行会静默丢失，读者会把砍过的清单当成完整的。现在前 12 条照常显示，后面加一行 `- … +N more` 写明还剩几行。
