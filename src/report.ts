@@ -774,6 +774,7 @@ export function assertWorkflowReport(value: unknown, objective: string, config: 
       mode: synthesisMode,
       ...synthesisRoot.error === undefined ? {} : { error: string(synthesisRoot.error, 'synthesis.error') },
       ...synthesisRoot.summary === undefined ? {} : { summary: string(synthesisRoot.summary, 'synthesis.summary') },
+      ...synthesisRoot.review === undefined ? {} : { review: string(synthesisRoot.review, 'synthesis.review') },
     },
     objective: string(root.objective, 'objective'),
     plan: {
@@ -983,6 +984,11 @@ export function renderReport(report: WorkflowReport, opts?: RenderReportOptions)
   if (report.synthesis.summary !== undefined) {
     lines.push('Final answer:')
     lines.push(oneLine(report.synthesis.summary, 2_000))
+  }
+  if (report.synthesis.review !== undefined) {
+    // Sec.3-3: the gate's verdict, so "checked + reviewed" is readable rather
+    // than assumed from the absence of a rejection.
+    lines.push(`Summary review: ${oneLine(report.synthesis.review, 240)}`)
   }
   if (report.synthesis.error !== undefined) {
     lines.push(`Synthesis: model narrative unavailable (${oneLine(report.synthesis.error, 300)}); the report above is complete`)

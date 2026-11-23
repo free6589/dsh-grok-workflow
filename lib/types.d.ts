@@ -470,6 +470,15 @@ export interface WorkflowReport {
         mode: SynthesisMode;
         error?: string;
         summary?: string;
+        /**
+         * The summary gate's own record, when a model draft was produced.
+         *
+         * Manual item Sec.3-3 ("汇总环节也要「检查 + 复核」，不能只汇总一次"): the two
+         * gates always ran, but nothing said so, so a reader could not tell a checked
+         * summary from a single-shot one. The line names each stage's verdict and how
+         * many drafts it took, e.g. `check=pass verify=pass drafts=1`.
+         */
+        review?: string;
     };
     limits: {
         maxConcurrency: number;
