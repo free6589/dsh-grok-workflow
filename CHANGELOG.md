@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.19] - 2026-11-23
+
 ### Fixed / 修复
 
 - **An overlong machine ledger ends at a whole line with the shared marker / 超长机器台账在整行处收尾并用统一标记** —
