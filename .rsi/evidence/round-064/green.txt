@@ -1,0 +1,10 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/rsi-round-64
+
+ ✓ test/delivery-human-block.spec.ts (46 tests | 45 skipped) 8ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 45 skipped (46)
+   Start at  19:15:58
+   Duration  1.13s (transform 916ms, setup 0ms, import 992ms, tests 8ms, environment 0ms)
+

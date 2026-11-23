@@ -7,6 +7,10 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ### Fixed / 修复
 
+- **A fallback run that verified everything names its degraded plan / 降级跑完全部验证会自报降级** —
+  A partial run with every task verified used to say "0 not done", which read as a clean run while the status said partial. It now says all items are usable but the plan ran degraded, so the reader knows why the status is not completed.
+  / 以前部分完成但全验过会说"0 项没做成"，读着像全过了，可状态却是部分完成。现在明说"全可用、但计划是降级后跑完的"，读者知道为啥不是完成。
+
 - **The plugin source marker lives in one place / 插件来源标记只剩一处定义** —
   Three files hardcoded the same marker string while one constant already owned it, so renaming the marker would have silently split the gate, the history filter and the carry-over filter. All three now reference the constant, which is pinned by a test.
   / 三个文件各写一遍同样的标记字符串，明明已有常量拥有它；改名会悄悄拆散门禁、历史过滤和摘要过滤。现在三处都引用常量，常量被测试钉死。

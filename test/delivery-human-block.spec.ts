@@ -20,10 +20,12 @@
  */
 import { describe, expect, it } from 'vitest'
 import { LEDGER_GUARD, REPORT_BEGIN, REPORT_END, relayText } from '../src/answer.js'
-import { deliverReport, humanConclusion, LEDGER_UNAVAILABLE, machineLedger, pairCaps } from '../src/delivery/index.js'
+import { deliverReport, humanConclusion, LEDGER_UNAVAILABLE, machineLedger, pairCaps, statusTail } from '../src/delivery/index.js'
 import { resolveConfig, FIXED_MAX_RETRIES} from '../src/config.js'
+import { TASK_LIMITS } from '../src/input.js'
 import { assertWorkflowReport } from '../src/report.js'
 import { maxTotalAgentsFor, routeBudgetFor } from '../src/script.js'
+import { splitObjective } from '../src/shards.js'
 import type { RoleName, WorkflowReport } from '../src/types.js'
 import { execution, failingVerification, task, verification } from './fixtures.js'
 
@@ -855,5 +857,95 @@ describe('Q11: a truncated reason stops where a sentence stops, never inside a w
     // the ASCII colon, so this case must not pin the full-width one.
     expect(line).toBe('- Hotel price check: The supplier endpoint returned malformed rows.')
     expect(line).not.toContain('…')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Round 64: a fallback partial that verified everything used to close with
+// `0 项没做成` and never mention the degraded plan — which reads as a clean
+// run even though the status is partial because the plan itself degraded.
+// The tail now names the degraded plan; a genuinely unfinished partial keeps
+// the old count sentence byte for byte.
+// ---------------------------------------------------------------------------
+
+describe('round 64: the tail of a fully-verified fallback partial names the degraded plan', () => {
+  /** A legal PARTIAL report whose fallback plan verified all three segments. */
+  function fallbackAllVerified(): WorkflowReport {
+    const fbLimits = { maxConcurrency: 2, maxTasks: 6 } as const
+    const fbConfig = resolveConfig(fbLimits)
+    const fbObjective = 'x'.repeat(8_001)
+    const segments = splitObjective(fbObjective, TASK_LIMITS.taskTextChars)
+    if (segments.length !== 3) throw new Error(`round-64 fixture needs 3 segments, got ${segments.length}`)
+    const ids = ['a', 'b', 'c']
+    const planTasks = segments.map((segment, index) => ({
+      ...task(ids[index]!, [`seg ${index + 1} checked`]),
+      title: `Seg ${index + 1}`,
+      objective: segment,
+    }))
+    const checked = planTasks.map(planTask => verification(planTask))
+    return assertWorkflowReport({
+      schemaVersion: 'grok-workflow/v1', status: 'partial', objective: fbObjective,
+      plan: { source: 'fallback', tasks: planTasks, error: 'planner failed: unavailable' },
+      tasks: planTasks.map((planTask, index) => ({
+        ...planTask,
+        status: 'verified' as const,
+        attempts: [{ attempt: 1, execution: execution('segment done'), verification: checked[index]!, passed: true, error: '' }],
+        error: '',
+      })),
+      confirmed: planTasks.map((planTask, index) => ({
+        taskId: planTask.id,
+        criterion: `seg ${index + 1} checked`,
+        evidence: checked[index]!.criteria[0]!.evidence,
+      })),
+      incomplete: [],
+      errors: [{ phase: 'Plan', message: 'planner failed: unavailable' }],
+      uncertainties: [],
+      limits: { ...fbLimits, maxRetries: FIXED_MAX_RETRIES, maxTotalAgents: maxTotalAgentsFor(3, FIXED_MAX_RETRIES, routeBudgetFor(fbConfig)) },
+    }, fbObjective, fbConfig)
+  }
+
+  /** A legal PARTIAL report with two verified tasks and one failed task. */
+  function twoOfThree(): WorkflowReport {
+    const ok1 = task('a', ['Weather checked'])
+    const ok2 = { ...task('c', ['Bus checked']), title: 'Bus' }
+    const bad = { ...task('b', ['Hotel checked']), title: 'Hotel' }
+    const checked1 = verification(ok1)
+    const checked2 = verification(ok2)
+    const reason = 'price source unreachable'
+    return assertWorkflowReport({
+      schemaVersion: 'grok-workflow/v1', status: 'partial', objective: OBJECTIVE,
+      plan: { source: 'caller', tasks: [ok1, bad, ok2], error: '' },
+      tasks: [
+        { ...ok1, status: 'verified', attempts: [{ attempt: 1, execution: execution('ok'), verification: checked1, passed: true, error: '' }], error: '' },
+        { ...bad, status: 'failed', attempts: [{ attempt: 1, execution: execution('', { status: 'failed' }), verification: failingVerification(bad, reason), passed: false, error: reason }], error: reason },
+        { ...ok2, status: 'verified', attempts: [{ attempt: 1, execution: execution('ok'), verification: checked2, passed: true, error: '' }], error: '' },
+      ],
+      confirmed: [
+        { taskId: 'a', criterion: 'Weather checked', evidence: checked1.criteria[0]!.evidence },
+        { taskId: 'c', criterion: 'Bus checked', evidence: checked2.criteria[0]!.evidence },
+      ],
+      incomplete: [{ taskId: 'b', reason, category: 'infrastructure' as const }],
+      errors: [],
+      uncertainties: [],
+      limits: { ...LIMITS, maxRetries: WIRE_RETRIES, maxTotalAgents: maxTotalAgentsFor(3, FIXED_MAX_RETRIES, routeBudgetFor(config)) },
+    }, OBJECTIVE, config)
+  }
+
+  it('names the degraded plan at 3/3 and keeps the old count sentence at 2/3', () => {
+    const full = fallbackAllVerified()
+    const verifiedCount = full.tasks.filter(entry => entry.status === 'verified').length
+    expect(verifiedCount).toBe(3)
+    const zh = statusTail(full, verifiedCount, full.tasks.length, 'zh')
+    const en = statusTail(full, verifiedCount, full.tasks.length, 'en')
+    expect(zh).toContain('降级')
+    expect(zh).toContain('3 项全可用')
+    expect(zh).not.toContain('0 项没做成')
+    expect(en).toContain('degraded')
+    expect(en).toContain('all 3 usable')
+    expect(en).not.toContain('0 not done')
+
+    const part = twoOfThree()
+    expect(statusTail(part, 2, 3, 'zh')).toBe('以上是结论（3 项里 2 项可用，1 项没做成）；明细已记入台账。')
+    expect(statusTail(part, 2, 3, 'en')).toBe('That is the conclusion (2 of 3 usable, 1 not done); details are in the ledger.')
   })
 })

@@ -1,0 +1,25 @@
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/delivery-human-block.spec.ts > round 64: the tail of a fully-verified fallback partial names the degraded plan > names the degraded plan at 3/3 and keeps the old count sentence at 2/3
+AssertionError: expected '以上是结论（3 项里 3 项可用，0 项没做成）；明细已记入台账。' to contain '降级'
+
+Expected: "降级"
+Received: "以上是结论（3 项里 3 项可用，0 项没做成）；明细已记入台账。"
+
+ ❯ test/delivery-human-block.spec.ts:940:16
+    938|     const zh = statusTail(full, verifiedCount, full.tasks.length, 'zh')
+    939|     const en = statusTail(full, verifiedCount, full.tasks.length, 'en')
+    940|     expect(zh).toContain('降级')
+       |                ^
+    941|     expect(zh).toContain('3 项全可用')
+    942|     expect(zh).not.toContain('0 项没做成')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 45 skipped (46)
+   Start at  19:15:44
+   Duration  1.15s (transform 952ms, setup 0ms, import 1.01s, tests 12ms, environment 0ms)
+
