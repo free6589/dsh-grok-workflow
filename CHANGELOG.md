@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.24] - 2026-11-24
+
 ### Fixed / 修复
 
 - **The first message of a session is visible while the team works / 第一句话不用等整轮就能看见** —
@@ -14,6 +16,10 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 - **A split confirmation is answered once, and never after it expired / 拆法确认只答一次，过期了不会照跑** —
   Three ways one confirmation could go wrong are closed: an expired question could still dispatch the plan it named, a full per-session queue left a record claiming a background run that never happened, and on the full shape the answer word itself ("确认") could become the objective of a whole run while the plan it answered was dropped. The confirmation is now consumed once, with its ten-minute lifetime, before any path reads it; a message that is not an answer voids it and is routed on its own; and it is queued before it is recorded, so no accounting describes work that did not start.
   / 一个确认以前有三处会走歪：过期的确认照样能把它点的计划派出去；每会话队列满时留下了"已在后台跑"的假账；完整形状下这次回答的字（"确认"）本身可能变成一整轮的目标，而它确认的计划被丢了。现在确认只在任何路径读取之前被取走一次、带十分钟时限；不是回答的消息就作废它并按新消息单独分流；先排队成功再记账，于是没有一笔账在描述没开始的活。
+
+- **An approval runs the split you read, not a new one / 你确认的那套拆法就是真正跑的那套** —
+  The confirmation said the split was stated before any work was dispatched, and then the run received only the bare original request, so the planner was free to re-split it: you approved one split and paid for another. The dispatched request now carries the split you read as a bound beside the original words ("plan the tasks it names instead of re-splitting the request"), and a request that changes the split still goes through the amendment path. When the preview call failed there is no split to keep, so the request goes unchanged — nothing was shown, so nothing is claimed as approved. A stack of polite words ("好，可以" / "确认。开干") now answers the question too, while a sentence with content ("行，那你先看看这个文件") is still not an answer.
+  / 确认环节说的是"先报拆法、再派活"，可真正派出去的只有原话，规划器仍可随意重拆：你确认了一套，付钱的是另一套。现在派发的请求会把你看过的那套拆法作为约束附在原话后面（"按它点名的任务规划，不要重拆"），而明确要改拆法的消息仍走修改那条路。预览调用失败时没有拆法可留，就原样派发——什么都没报出来，就不能声称你确认过什么。一串客气话（「好，可以」「确认。开干」）现在也算确认，但带内容的话（「行，那你先看看这个文件」）依然不算回答。
 
 ## [0.13.23] - 2026-11-23
 

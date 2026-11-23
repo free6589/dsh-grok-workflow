@@ -1,0 +1,61 @@
+round 074 — 三路合流后的隔离真机 soak（0.13.24 候选，用户视角）
+================================================================================
+日期 / date: 2026-11-24（Asia/Singapore，00:30–01:00）
+基线 / base: `main` `63cc1db`（= 0.13.23 发布提交）
+合流 / merged（`--no-ff`，按序）:
+  1. `fix/captain-approve`  `00fc203` —— 队长派活绑定"用户看过的那套拆法"（`approvedRequest`）+ 客气话叠词算确认 + 预览失败文案
+  2. `fix/gate-route-msgvis` `f831fca` —— 首轮消息立即可见（`answerBehindUnpublished`）+ 确认单次消费（TTL/入队顺序/通道让路/void 文案）
+  3. `docs/user-soak-fork-profile` `57eadb9` —— AGENTS §3 用户视角 soak 默认 fork 在用 web profile
+合流冲突 5 处（`src/gate.ts` ×4、`test/captain-confirm.spec.ts` 导入 ×1）+ `lib/gate.*` 源映射；两边功能都保留（见 merge commit 说明与 VALIDATION 首条）。
+
+隔离 / isolation
+- **未写 live `~/.dsh`**：只读 `cp`（`scripts/clone-profile.mjs`，4/5 文件 parity、1 行凭据按设计脱敏、5 个 link 重指、0 悬空依赖）；
+  live 家目录全程只读（沙箱内写 live 会被内核拒绝，实测 `dsh web --help` 在无 DSH_HOME 时直接 EROFS，未产生任何文件）。
+- **未重启、未触碰线上实例**：线上 web 仍在 `100.111.111.88:3080`；本轮另起 `127.0.0.1:3183`，独立 `DSH_HOME` 与独立 `HOME`。
+- scratch: `<worktree>/.tmp/soak-01324/`（`dsh-home` + `home` + `work1` + `chrome`），跑完整目录删除。
+- 模型: 唯一路由 provider `bifrost-soak`（`api: openai-completions`，`baseURL http://127.0.0.1:18088/openai/v1`，
+  `apiKeyEnv BIFROST_VIRTUAL_KEY`），模型 **`wb/cn:deepseek-v4.1-flash`**；planner/worker/verifier/synthesizer/guardian
+  与 `agent-default-model` 同路由。网关 `/models` 实测枚举该 id（165 个 id 中 `wb/cn:deepseek-v4.1-flash` 在列）。
+- 凭据: 仅 `set -a; . ~/.dsh/bifrost.env; set +a` 注入环境；overlay 只写 `apiKeyEnv` 名；本轮 txt/png/overlay/日志均无 key 值。
+- 装载 / install: **构建产物装进 fork 出来的 profile**（`node_modules/dsh-grok-workflow/` 的 `lib/`、`package.json`、
+  `cordis.patch.yml` 由本 worktree 覆盖；`lib/gate.js` 含 `answerBehindUnpublished` 2 处），配置行仍用 profile 自己的
+  `id: grok-workflow / name: dsh-grok-workflow`，只由 overlay 改 `mode`、`roles`、`guardianModel`。
+
+§1 队长确认可用（triage 档，`mode: triage` + `grokDefault: on`）—— `PASS`
+浏览器（headless Chromium + CDP，用户在 GUI 里发消息）实测：
+- 00:51:57 发「分别回答两个问题，各写一句话，只回答不要创建或修改任何文件：1) 为什么单元测试不应该依赖网络；2) 什么是幂等。」
+  → 消息立刻出现在对话里（`00:51` 时间戳），其下是「正在分析请求 / 深度求索中」。
+- 前台判「团队档」（"因为目标中有多步工序或交付物，需要规划、执行和复核"），队长报拆法：
+  「任务一：用一句话说明单元测试不应依赖网络的原因。／任务二：用一句话说明幂等的含义。／若任一任务验证未通过，就停下来并说明原因，不继续推进。」
+  并问「确认请回「确认」或「开干」；要改拆法直接说」。**此时未派任何活**（1 个子智能体＝前台）。
+- 00:52:29 回「确认」→ 立刻出现「队长确认：按上面报告的拆分方式分配任务。」，随后后台跑起来。
+- **派发出去的目标里带着用户看过的那套拆法**（会话投影原文，逐字）:
+    Current request:
+    分别回答两个问题，各写一句话，只回答不要创建或修改任何文件：…
+    USER APPROVED THIS SPLIT (the user confirmed exactly this split before any work was dispatched; plan the tasks it names instead of re-splitting the request):
+    - 任务一：用一句话说明单元测试不应依赖网络的原因。
+    - 任务二：用一句话说明幂等的含义。
+    - 任一任务验证未通过时，就停下来并说明原因，不继续推进。
+  （0.13.23 这里只有 `Current request` 一段，拆法被丢掉。）
+- 收尾：台账 round 行 `status completed · verified 2/2 task(s) · confirmed 8 criterion/criteria`，两问各一句话作答；
+  报告自带"保护检查：0 条发现，未终止任何子代理；本轮无人取消"。
+- 截图：`round-074/approve-t6s.png`（确认后 6 秒：回执 + 正在跑）。
+
+§2 首轮消息立即可见（full 形状，`mode: full` + `grokDefault: on`，新会话新 surface）—— `PASS`
+`session-ea28b24e` 场景复测（该会话即 `mode: full` + `grokDefault: on`、用户首句为不完整短句、整轮只跑不显字）：
+- 00:55:56 在新会话发「我想。。」（与 ea28b24e 首句同形状）→ **t+5s 已在对话里看到原话**（`00:55` 时间戳），
+  下方是「正在分析请求 / 深度求索中，用时 5 秒」；t+6s 这一轮 7 秒完成并给出回答。
+- 00:57:14 再开一个新会话发两句任务（分两步回答，禁止写文件）→ **t+8s 原话已在对话里**、其下仍是「正在分析请求 /
+  深度求索中，用时 8 秒」，t+16s 该轮完成。两次都是"字先出现、活在后头跑"，不是等整轮。
+- 截图：`round-074/first-turn-t16s.png`（`我想。。` 这一轮）、`round-074/first-turn-long-t24s.png`（两句任务那一轮）。
+- 诚实边界：这两轮都跑得快（7–11 秒），"字先出现"的证据是运行中（t+5s / t+8s）截图与文字快照，不是长跑逐秒录像；
+  0.13.23 的坏法是"整轮零消息"，本轮同一形状下没有复现。
+
+§3 结论 / verdict
+soak **PASS**（用户视角，构建产物 + 真网关 + 真模型）：队长确认可用（报拆法 → 确认 → 派活，派出去的目标带 `USER APPROVED THIS SPLIT`），
+首轮消息在完整形状的新会话里立即可见（两次），ea28b24e 的"空转一轮"未复现。两处均取“运行中”时刻的 GUI 实况，
+不是等结果出来再倒推。
+
+§4 清理 / cleanup
+`<worktree>/.tmp/soak-01324/` 整目录删除（fork 出的 dsh-home、独立 HOME、chromium profile、overlay、日志、cookie jar）；
+隔离实例与 headless Chromium 已停；live `~/.dsh` 与线上 3080 实例全程只读/未触碰；无密钥写入任何文件。
