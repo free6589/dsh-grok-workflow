@@ -1,0 +1,26 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/rsi-round-56
+
+ ❯ test/board-reader.spec.ts (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/board-reader.spec.ts [ test/board-reader.spec.ts ]
+Error: Cannot find module './board-reader.js' imported from /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/rsi-round-56/src/dispatcher/dispatcher.ts
+ ❯ src/dispatcher/dispatcher.ts:41:1
+     39|   type DispatcherResumeResult,
+     40| } from './session.js'
+     41| import { boardReader } from './board-reader.js'
+       | ^
+     42|
+     43| export type {
+ ❯ test/board-reader.spec.ts:13:1
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  17:25:39
+   Duration  481ms (transform 341ms, setup 0ms, import 0ms, tests 0ms, environment 0ms)
+

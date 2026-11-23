@@ -38,6 +38,7 @@ import {
   type DispatcherBoardFile,
   type DispatcherResumeResult,
 } from './session.js'
+import { boardReader } from './board-reader.js'
 
 export type {
   DispatcherBoardFile,
@@ -50,7 +51,7 @@ export type {
   DispatcherTask,
   TaskReader,
 }
-export { DISPATCHER_OPS, decideIntent, decideRawIntent, DispatcherSession }
+export { DISPATCHER_OPS, decideIntent, decideRawIntent, DispatcherSession, boardReader }
 
 /**
  * Open a dispatcher session.

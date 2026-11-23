@@ -7,6 +7,10 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ### Fixed / 修复
 
+- **The board plugs into the dispatcher through a small read adapter / 板子通过小转接头插进调度** —
+  The adapter turns the store's not-found throw into an empty read and translates the two status words the dispatcher never had (`in_progress` → started, `failed` → stuck with its reason); every other store error keeps throwing. The session still owns its own board — swapping it onto the durable store is the next step.
+  / 转接头把板子的"查无"抛错翻成空读，并翻译调度原来没有的两个状态（进行中→已开始，失败→卡住且带上原因）；其它板错照样抛。会话暂时还管自己的板，换持久板是下一步。
+
 - **The task board answers presence checks and the docking note tells the truth / 任务板支持存在检查，对接注释不再撒谎** —
   The docking note claimed the store already satisfied the reader (`get`/`has`), but the board had no `has` and its `get` throws instead of returning empty. The board now answers `has` without throwing, and the note states the remaining gap honestly: pointing the session at the store still needs a small adapter that turns the not-found throw into an empty read (next round's work).
   / 对接注释说板子已经满足读数器，但板子连 `has` 都没有，`get` 还是抛错而非返回空。现在板子支持不抛错的存在检查，注释也说实话：把会话指过去还差一个把抛错转成空读的小适配器（下轮做）。

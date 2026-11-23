@@ -22,8 +22,9 @@
  */
 import { DISPATCHER_OPS, decideIntent, decideRawIntent, type DispatcherDecision, type DispatcherIntent, type DispatcherLifecycle, type DispatcherOp, type DispatcherRefusalCode, type DispatcherTask, type TaskReader } from './policy.js';
 import { DispatcherSession, type DispatcherBoardFile, type DispatcherResumeResult } from './session.js';
+import { boardReader } from './board-reader.js';
 export type { DispatcherBoardFile, DispatcherDecision, DispatcherIntent, DispatcherLifecycle, DispatcherOp, DispatcherRefusalCode, DispatcherResumeResult, DispatcherTask, TaskReader, };
-export { DISPATCHER_OPS, decideIntent, decideRawIntent, DispatcherSession };
+export { DISPATCHER_OPS, decideIntent, decideRawIntent, DispatcherSession, boardReader };
 /**
  * Open a dispatcher session.
  *
