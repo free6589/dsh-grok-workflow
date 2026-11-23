@@ -5,7 +5,11 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
-## [0.13.27] - 2026-11-24
+## [0.13.28] - 2026-11-24
+
+
+> `v0.13.27` is tagged but published no release: its test gate failed on the runner (a timing-sensitive assertion in the new dead-route case), so the fix is test-only and ships here.
+> `v0.13.27` 有标签但没发布：它的门禁在远端跑挂了（新增死路由用例里有一条对时序敏感的断言），所以修的是用例，随这一版一起发。
 
 ### Changed / 变更
 
