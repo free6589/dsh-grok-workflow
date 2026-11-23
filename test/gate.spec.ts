@@ -763,7 +763,7 @@ describe('mandatory entry gate', () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
     applyWith(ctx)
-    const session = Session.create('sess-records' as never)
+    const session = realSession('sess-records')
     const agent = new FakeAgent({ session })
     // In-turn enters the step on settle: hold the promise, autoRun settles it.
     const recordedP = ctx.preStep()(payload(agent, [userMessage('recorded')]), passingNext([]))
@@ -979,9 +979,21 @@ describe('heartbeat classification (classifyPreStep)', () => {
 
 /* -------------------------------------------------------------- in-turn -- */
 
-/** Session that exposes its plugin records, for ledger/record assertions. */
+/**
+ * Session that exposes its plugin records, for ledger/record assertions.
+ *
+ * The host head is committed first, exactly as the loop does before it writes a
+ * step's messages: `in-turn` may only publish a claimed batch onto an established
+ * surface (writing one ahead of the `system/message` head takes surface position 0
+ * and bricks the stored log — see `commitClaimed`). Every `in-turn` case in this
+ * file is about what happens around a run on such a session; the *first* turn of a
+ * brand-new session, where the publish is impossible, has its own case
+ * (`the first message of a fresh session is visible without waiting`).
+ */
 function realSession(id: string): Session {
-  return Session.create(id as never)
+  const session = Session.create(id as never)
+  commitHead(session)
+  return session
 }
 
 function recordsOf(session: Session, type: string): unknown[] {
@@ -1030,10 +1042,12 @@ describe('in-turn delivery (default strategy)', () => {
     expect(agent.whenIdle).not.toHaveBeenCalled()
   })
 
-  it('renders the first user message while the run is still in flight (P0-5)', async () => {
+  it('renders the first user message without waiting for the run (P0-5)', async () => {
     const ctx = new FakeContext()
     apply(ctx as never, { mode: 'full', grokDefault: 'on' })
-    const session = realSession('sess-in-turn-first-message')
+    // A brand-new session: no host head yet, so the gate may not publish (that
+    // write would take surface position 0 and brick the stored log — 0.13.14).
+    const session = Session.create('sess-in-turn-first-message' as never)
     const agent = new FakeAgent({ session })
     const typed = '第一条消息：先把我说的话显示出来'
     /** Durable `user/message` events, i.e. what the GUI transcript renders. */
@@ -1041,26 +1055,32 @@ describe('in-turn delivery (default strategy)', () => {
       .filter(event => (event as { type?: string }).type === 'user/message')
       .map(event => textOf((event as { data: UserMessage }).data))
 
-    let settled = false
-    const pending = ctx.preStep()(payload(agent, [userMessage(typed)]), passingNext([]))
-      .then((decision: unknown) => { settled = true; return decision })
-    await waitFor(() => ctx.engine.startCalls.length === 1)
-
-    // Headless turn-1 session: the gate must NOT pre-publish (it would take
-    // surface position 0 ahead of the system head and corrupt the stored
-    // log). The batch rides the decision; the durability the old P0-5 case
-    // pinned now comes from the loop commit (head → message → report).
-    expect(settled).toBe(false)
+    const decision = await ctx.preStep()(payload(agent, [userMessage(typed)]), passingNext([])) as {
+      kind: string
+      messages: UserMessage[]
+    }
+    // Visible now, not after the run: the decision carries the words alone, so the
+    // loop opens the step immediately (0.13.24). Before, the turn stayed open for
+    // the whole run and the transcript held no `user/message` at all.
+    expect(decision.kind).toBe('enter')
+    expect(decision.messages.map(message => textOf(message))).toEqual([typed])
+    // Nothing was appended ahead of the head: the loop is the only writer.
     expect(surfaced()).toEqual([])
 
-    ctx.engine.runs[0]!.complete(report())
-    const decision = await pending as { kind: string; messages: UserMessage[] }
-    expect(decision.kind).toBe('enter')
-    // The decision carries batch + answer; commit writes head → message → report.
-    expect(decision.messages.map(message => textOf(message)).join('\n')).toContain(typed)
-    commitDecision(session, decision)
-    expect(answerOf(decision)).toContain(REPORT_BEGIN)
-    expect(surfaced()).toEqual([typed, expect.stringContaining(REPORT_BEGIN) as unknown as string])
+    // The report is the next turn's message, exactly like every other deferred
+    // answer: the run happens behind the words the user can now see.
+    await waitFor(() => ctx.engine.startCalls.length === 1)
+    const request = ctx.engine.startCalls[0]!
+    const result = await runWorkflowScript(request.script, request.args as Record<string, unknown>, async (_prompt, options) => {
+      if (roleOf(options.label) === 'planner') return { tasks: [callerTask('a')] }
+      if (roleOf(options.label) === 'worker') return execution('work done')
+      return verification(task('a'))
+    })
+    ctx.engine.runs[0]!.complete(result.report)
+    await waitFor(() => agent.followups.length === 1)
+    const delivered = textOf(agent.followups[0]!)
+    expect(delivered).toContain(REPORT_BEGIN)
+    expect(delivered).toContain('COMPLETED')
   })
 
   it('enters a failure report when the run failed, so the user is never left without output', async () => {
@@ -1087,15 +1107,20 @@ describe('in-turn delivery (default strategy)', () => {
   it('enters a notice when the workflow cannot start at all', async () => {
     const ctx = new FakeContext()
     apply(ctx as never, { mode: 'full', grokDefault: 'on' })
-    const agent = new FakeAgent({ session: realSession('sess-in-turn-busy') })
+    const session = realSession('sess-in-turn-busy')
+    const agent = new FakeAgent({ session })
     ctx.engine.startError = new Error('already has 2 active run(s)')
     const decision = await ctx.preStep()(payload(agent, [userMessage('run the workflow')]), passingNext([])) as {
       kind: string
       messages: UserMessage[]
     }
     expect(decision.kind).toBe('enter')
-    // Headless turn 1: no pre-publish — the decision carries batch + notice.
-    expect(decision.messages.map(message => textOf(message)).join('\n')).toContain('run the workflow')
+    // The host head exists, so the gate published the batch itself (P0-5): the
+    // decision carries the notice, and the user's words are already in the
+    // transcript exactly once.
+    expect(decision.messages.map(message => textOf(message)).join('\n')).not.toContain('run the workflow')
+    expect(session.ownEvents().filter(event => (event as { type?: string }).type === 'user/message')
+      .map(event => textOf((event as { data: UserMessage }).data))).toContain('run the workflow')
     const text = answerOf(decision)
     expect(text).toContain('no workflow result exists')
     expect(text).toContain('2 active run(s)')

@@ -3,6 +3,18 @@
 Notable user-facing changes are recorded here in English and Simplified Chinese.
 用户可见的功能和修复会在这里以英文和简体中文记录。
 
+## [Unreleased]
+
+### Fixed / 修复
+
+- **The first message of a session is visible while the team works / 第一句话不用等整轮就能看见** —
+  On a fresh session the gate could not publish the message ahead of the run (writing it before the host's first surface node would brick the stored log), and the workflow held the turn open, so the whole round carried no message at all: the composer looked broken and a reload lost what was typed. A first-turn message in the full shape now goes in immediately — the words open the step, the team runs behind them — and the report arrives as its own message, exactly like every other deferred answer. Nothing is written ahead of the host head, so the position-0 rule is unchanged.
+  / 新会话的第一句话以前只能等整轮跑完才出现：门卫不能抢在宿主第一行之前把消息写进日志（那样会把存档写坏），而工作流又一直占着这一轮，于是一整轮里一条消息都没有——输入框像坏了，刷新一下刚打的字也没了。现在完整形状下的第一句话会立刻进对话：原话先把这一轮开起来，团队在后面跑，结论作为单独一条消息送到，和其它延后回答完全一致。仍然不抢宿主第一行的位置，防砖规则一字未改。
+
+- **A split confirmation is answered once, and never after it expired / 拆法确认只答一次，过期了不会照跑** —
+  Three ways one confirmation could go wrong are closed: an expired question could still dispatch the plan it named, a full per-session queue left a record claiming a background run that never happened, and on the full shape the answer word itself ("确认") could become the objective of a whole run while the plan it answered was dropped. The confirmation is now consumed once, with its ten-minute lifetime, before any path reads it; a message that is not an answer voids it and is routed on its own; and it is queued before it is recorded, so no accounting describes work that did not start.
+  / 一个确认以前有三处会走歪：过期的确认照样能把它点的计划派出去；每会话队列满时留下了"已在后台跑"的假账；完整形状下这次回答的字（"确认"）本身可能变成一整轮的目标，而它确认的计划被丢了。现在确认只在任何路径读取之前被取走一次、带十分钟时限；不是回答的消息就作废它并按新消息单独分流；先排队成功再记账，于是没有一笔账在描述没开始的活。
+
 ## [0.13.23] - 2026-11-23
 
 ### Added / 新增

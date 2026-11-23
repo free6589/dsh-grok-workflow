@@ -5,7 +5,9 @@ import { join } from 'node:path'
 import type { WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import { Session } from '@deepseek-ai/dsh-session'
 import { apply } from '../src/index.js'
+import { setMode } from '../src/mode.js'
 import { callerTask, execution, task, verification } from './fixtures.js'
 import { runWorkflowScript, roleOf } from './helpers.js'
 
@@ -94,9 +96,13 @@ class FakeSession {
 
 class FakeAgent {
   readonly followups: UserMessage[] = []
-  readonly session = new FakeSession()
+  readonly session: FakeSession | Session
   readonly followup = vi.fn((message: UserMessage) => { this.followups.push(message) })
   readonly whenIdle = vi.fn(async () => {})
+
+  constructor(session?: FakeSession | Session) {
+    this.session = session ?? new FakeSession()
+  }
 }
 
 class FakeContext {
@@ -233,5 +239,64 @@ describe('captain foreground: the split is confirmed before any work is dispatch
     await waitForDispatch(ctx)
     expect(ctx.dispatches).toHaveLength(1)
     expect(text).not.toContain('队长先报拆法')
+  })
+
+  it('voids an expired confirmation instead of dispatching the plan it names', async () => {
+    const ctx = new FakeContext()
+    const agent = new FakeAgent()
+    await say(ctx, agent, '帮我重构 run.ts 的超时逻辑，并补上回归测试')
+    // Eleven minutes later the question is stale: the approval must not dispatch it.
+    // The interactive path used to read the entry without the TTL, so this exact
+    // message started the plan it was told had expired.
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 11 * 60_000)
+    let text = ''
+    try {
+      text = await say(ctx, agent, '确认')
+    } finally {
+      clock.mockRestore()
+    }
+    expect(text).toContain('已过期')
+    expect(ctx.dispatches).toHaveLength(0)
+  })
+
+  it('never hands the full shape the confirmation word as its objective', async () => {
+    const ctx = new FakeContext()
+    // A real session, so the `/grok on` record the full shape reads can be written.
+    const session = Session.create('sess-captain-full' as never)
+    const agent = new FakeAgent(session)
+    await say(ctx, agent, '帮我重构 run.ts 的超时逻辑，并补上回归测试')
+    // The user switched the whole workflow on after the captain asked, so the answer
+    // arrives on the shape with no front desk. It must dispatch what it confirms.
+    expect(setMode(session, {
+      v: 1, enabled: true, turn: 1, setBy: 'command:/grok', workflowMode: 'full',
+    }).ok).toBe(true)
+    const text = await say(ctx, agent, '确认')
+    await waitForDispatch(ctx)
+    expect(ctx.dispatches).toHaveLength(1)
+    const objective = String((ctx.dispatches[0]!.args as { objective: string }).objective)
+    expect(objective).toContain('帮我重构 run.ts 的超时逻辑')
+    expect(objective.trim()).not.toBe('确认')
+    expect(text).toContain('队长确认')
+  })
+
+  it('states an expired confirmation on the full shape instead of running it', async () => {
+    const ctx = new FakeContext()
+    const session = Session.create('sess-captain-full-expired' as never)
+    const agent = new FakeAgent(session)
+    await say(ctx, agent, '帮我重构 run.ts 的超时逻辑，并补上回归测试')
+    expect(setMode(session, {
+      v: 1, enabled: true, turn: 1, setBy: 'command:/grok', workflowMode: 'full',
+    }).ok).toBe(true)
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 11 * 60_000)
+    let text = ''
+    try {
+      text = await say(ctx, agent, '确认')
+    } finally {
+      clock.mockRestore()
+    }
+    // The void note is the whole answer: no run and no "确认" objective.
+    expect(text).toContain('已过期')
+    await new Promise(resolve => setTimeout(resolve, 20))
+    expect(ctx.dispatches).toHaveLength(0)
   })
 })

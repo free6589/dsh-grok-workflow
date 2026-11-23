@@ -1,3 +1,16 @@
+## round-073 `fix/gate-route-msgvis` — 首轮可见 + 队长确认一次性消费（未合流，`CONFIRMED`） — 2026-11-24
+
+| state | command | result |
+| --- | --- | --- |
+| 基线与工作树 | `git -C <repo> worktree add -b fix/gate-route-msgvis .agents/worktrees/fix-gate-msgvis main` | 从 `63cc1db`（0.13.23）开出；共享工作树当时是 detached `a6103ad`（0.13.14，没有 `src/captain.ts`），`main` 已被 `.agents/worktrees/fix-synth-resubmit` 占用，因此不在共享树切分支、不动他人未提交改动 |
+| 红（新用例对旧码） | `git checkout -- src/gate.ts && npx vitest run test/captain-confirm.spec.ts test/channel.spec.ts test/grok-on-ingress.spec.ts` | **5 failed**；证据 `.rsi/evidence/round-073/red-gate-route-msgvis.txt`（含 4 条新用例 + `gate.spec.ts` 的 P0-5 重写用例，旧码红、新码绿） |
+| 绿（相关 spec） | `npx vitest run test/gate.spec.ts test/captain-confirm.spec.ts test/channel.spec.ts test/gate-partial-head.spec.ts test/grok-on-ingress.spec.ts test/triage.spec.ts` | **163 passed** |
+| 受影响的旧行为用例 | `npx vitest run test/phase1-dialogue.spec.ts test/objective-limit.spec.ts test/reliability.spec.ts test/gate.spec.ts` | 旧码把"首轮 `full` 形状阻塞在轮内"钉死；改为"有宿主 head 的会话仍阻塞发布（`headed()` 夹具）＋首轮新契约单测"后全绿。`phase1` 的 `headed()` 需 `step/end` 关闭那一步，否则 `appendAssistantInStep` 把终端写成 assistant 行 |
+| 全量门禁 | `npm run ci` | **exit 0：92 files / 1722 tests PASS**（subset 三次重复：`test/channel.spec.ts` 5×42 全绿、`test/captain-confirm.spec.ts` 4×9 全绿） |
+| 顺手修的测试竞态 | `npx vitest run test/channel.spec.ts -t A4` | 旧码 3 次里 1 次红（`steeringForSession` 在"下一轮刚开始"瞬间还在），新码改为等待频道关闭；**不是本次行为改动引起**，属既有竞态 |
+| lib 同步 | `npm run build` | `tsc -p tsconfig.build.json` + client bundle 303813 B；`lib/` 随提交一起进 |
+| 真机 soak | — | `NOT_RUN`（本轮不发布；离线上门禁 + 单测为准） |
+
 ## 发版 `0.13.23` — 五路合流 + 隔离真机 soak（已发布） — 2026-11-23 (`CONFIRMED`)
 
 | state | command | result |

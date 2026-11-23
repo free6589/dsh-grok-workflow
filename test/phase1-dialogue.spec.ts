@@ -157,6 +157,25 @@ function session(id: string): Session {
   return Session.create(id as never)
 }
 
+/**
+ * A live session past its first step, so `in-turn` may publish the batch itself.
+ *
+ * The gate publishes a claimed batch ahead of the run only onto an established
+ * surface (writing one before the host's `system/message` head takes surface
+ * position 0 and bricks the stored log — see `commitClaimed`). A brand-new
+ * session's first turn therefore answers with the words alone and runs the team
+ * behind them (0.13.24, pinned in `test/gate.spec.ts`); the cases that are about a
+ * run inside its turn use this session, where the publish-then-wait contract holds.
+ */
+function headed(id: string): Session {
+  const live = Session.create(id as never)
+  commitHead(live)
+  // The step that wrote the head is over: the session is mid-conversation, so the
+  // gate may publish onto its surface but must not treat the step as still open.
+  live.append('step/end', { turn: 1, step: 1 })
+  return live
+}
+
 function userMessage(text: string): UserMessage {
   return createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } as never }) as UserMessage
 }
@@ -328,16 +347,16 @@ describe('P0-1: the user’s own message survives in the transcript', () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
     apply(ctx as never, { mode: 'full', grokDefault: 'on' })
-    const live = session('sess-p01-in-turn')
+    const live = headed('sess-p01-in-turn')
     const agent = new FakeAgent(live)
     const claimed = [userMessage('把登录接口改成 JWT 校验')]
 
     const decision = await ctx.preStep()(payload(agent, claimed), nextWith(claimed)) as Decision
-    // Headless turn-1 session: the gate must NOT pre-publish (it would take
-    // surface position 0 ahead of the system head and corrupt the stored
-    // log), so the batch rides the decision and `commit` writes head first.
-    expect(live.ownEvents().filter(event => (event as { type?: string }).type === 'user/message')).toHaveLength(0)
-    expect((decision.messages ?? []).map(textOf)).toContain('把登录接口改成 JWT 校验')
+    // The host head exists, so the gate publishes the batch itself before the run
+    // (P0-5): the words are in the transcript while the workflow works, exactly
+    // once, and the decision carries only the report for this step.
+    expect(live.ownEvents().filter(event => (event as { type?: string }).type === 'user/message')).toHaveLength(1)
+    expect((decision.messages ?? []).map(textOf)).not.toContain('把登录接口改成 JWT 校验')
     commit(live, decision)
 
     const derived = derivedTexts(live)
@@ -348,8 +367,9 @@ describe('P0-1: the user’s own message survives in the transcript', () => {
     const last = derived[derived.length - 1]!
     expect(last).toContain(REPORT_BEGIN)
     expect(last).toContain(REPORT_END)
-    // The entered step carries batch + report …
-    expect((decision.messages ?? []).map(textOf)).toContain('把登录接口改成 JWT 校验')
+    // The entered step carries the report; the batch was published by the gate, so
+    // it must not ride the decision a second time.
+    expect((decision.messages ?? []).map(textOf)).not.toContain('把登录接口改成 JWT 校验')
     expect(textOf(decision.messages![decision.messages!.length - 1]!)).toBe(last)
     assertReopenable(live)
   })
@@ -377,7 +397,7 @@ describe('P0-1: the user’s own message survives in the transcript', () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
     apply(ctx as never, { mode: 'full', grokDefault: 'on' })
-    const live = session('sess-p01-reload')
+    const live = headed('sess-p01-reload')
     const agent = new FakeAgent(live)
     const claimed = [userMessage('重放后仍然要看到我这句话')]
 
@@ -397,17 +417,17 @@ describe('P0-1: the user’s own message survives in the transcript', () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
     apply(ctx as never, { mode: 'full', grokDefault: 'on' })
-    const live = session('sess-p01-relay')
+    const live = headed('sess-p01-relay')
     const agent = new FakeAgent(live)
     const claimed = [userMessage('in-turn 也要留下原话')]
 
     const decision = await ctx.preStep()(payload(agent, claimed), nextWith(claimed)) as Decision
     // T4: only `in-turn` survives — the turn stays open, the run settles, and
-    // the decision carries the claimed message plus the answer (no followup).
-    // Headless turn 1: nothing is pre-published; the commit writes head first.
+    // the answer enters the same step (no followup). The batch was published by the
+    // gate first (the host head exists), so the decision carries the answer alone.
     expect(decision.kind).toBe('enter')
-    expect(texts(live)).toEqual([])
-    expect((decision.messages ?? []).map(textOf)).toContain('in-turn 也要留下原话')
+    expect(texts(live)).toEqual(['in-turn 也要留下原话'])
+    expect((decision.messages ?? []).map(textOf)).not.toContain('in-turn 也要留下原话')
     commit(live, decision)
     const afterRelay = texts(live)
     expect(afterRelay[0]).toBe('in-turn 也要留下原话')
@@ -420,18 +440,18 @@ describe('P0-1: the user’s own message survives in the transcript', () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
     apply(ctx as never, { mode: 'full', grokDefault: 'on' })
-    const live = session('sess-p01-append')
+    const live = headed('sess-p01-append')
     const agent = new FakeAgent(live)
     const claimed = [userMessage('append 也要留下原话')]
 
-    // In-turn never pre-publishes on a headless turn-1 session: the decision
-    // carries the claimed words, then the report answer; the loop commit
-    // writes head → message → report.
+    // In-turn publishes the batch onto the established surface, then enters the
+    // report for the same step: words and answer both end up in the durable log,
+    // each once.
     const decision = await ctx.preStep()(payload(agent, claimed), nextWith(claimed)) as Decision
     expect(decision.kind).toBe('enter')
-    expect(texts(live)).toEqual([])
+    expect(texts(live)).toEqual(['append 也要留下原话'])
     const carried = (decision.messages ?? []).map(textOf)
-    expect(carried).toContain('append 也要留下原话')
+    expect(carried).not.toContain('append 也要留下原话')
     expect(carried[carried.length - 1]).toContain('COMPLETED')
     commit(live, decision)
     assertReopenable(live)
@@ -735,7 +755,7 @@ describe('P0-3: every internal error leaves a user-visible terminal state', () =
   it('never prints a secret that the failure carried', async () => {
     const ctx = new FakeContext()
     apply(ctx as never, { mode: 'full', grokDefault: 'on' })
-    const live = session('sess-p03-secret')
+    const live = headed('sess-p03-secret')
     const agent = new FakeAgent(live)
     ctx.engine.startError = new Error('auth failed: api_key=sk-live-9f8e7d6c5b4a3210')
     const decision = await ctx.preStep()(payload(agent, [userMessage('跑一下工作流')]), nextWith([])) as Decision
@@ -752,7 +772,7 @@ describe('P0-3: every internal error leaves a user-visible terminal state', () =
     const ctx = new FakeContext()
     apply(ctx as never, { mode: 'full', grokDefault: 'on' })
     ctx.engine.startError = new Error('engine refused')
-    const live = session('sess-p03-reentry')
+    const live = headed('sess-p03-reentry')
     const agent = new FakeAgent(live)
     const handler = vi.fn(ctx.preStep())
 
@@ -770,7 +790,7 @@ describe('P0-3: every internal error leaves a user-visible terminal state', () =
     const ctx = new FakeContext()
     apply(ctx as never, { mode: 'full', grokDefault: 'on' })
     ctx.engine.hang = true
-    const live = session('sess-p03-abort')
+    const live = headed('sess-p03-abort')
     const agent = new FakeAgent(live)
     const controller = new AbortController()
     const pending = ctx.preStep()(payload(agent, [userMessage('中途停止')], controller.signal), nextWith([]))
@@ -1006,7 +1026,7 @@ describe('P0-4: a cancelled turn keeps the message and states the terminal', () 
     const ctx = new FakeContext()
     ctx.engine.hang = true
     apply(ctx as never, { mode: 'full', grokDefault: 'on' })
-    const live = session('sess-p04-keep-mid')
+    const live = headed('sess-p04-keep-mid')
     const agent = new FakeAgent(live)
     const claimed = [userMessage('把这个表格整理成周报')]
     const controller = new AbortController()
@@ -1018,11 +1038,10 @@ describe('P0-4: a cancelled turn keeps the message and states the terminal', () 
 
     // Nothing can be entered into a cancelled turn: the decision must be a rejection.
     expect(decision.kind).toBe('reject')
-    // Headless turn-1 cancel: the batch is NOT appended (it would take surface
-    // position 0 and brick the session on the next turn's system head), so the
-    // transcript carries no user row — but the terminal record states why, and
-    // the delivery record keeps the batch routable for the retry.
-    expect(live.ownEvents().filter(event => event.type === 'user/message')).toHaveLength(0)
+    // The host head exists, so the gate published the batch before the run: the
+    // typed words survive exactly once, and the terminal record states why the
+    // round stopped (the delivery record keeps it routable for the retry).
+    expect(live.ownEvents().filter(event => event.type === 'user/message')).toHaveLength(1)
     // A cancelled turn has no open step, so the terminal is *not* an assistant row:
     // an unpaired `assistant/message` is what made every later token-meter replay
     // throw, which is how `/compact` started failing. It is kept as a record.
@@ -1043,7 +1062,7 @@ describe('P0-4: a cancelled turn keeps the message and states the terminal', () 
     const config = { mode: 'full' as const, grokDefault: 'on' as const, maxConcurrency: 2, maxTasks: 2 }
     const limitsConfig = resolveConfig(config)
     apply(ctx as never, config)
-    const live = session('sess-p1-cancel-partial-report')
+    const live = headed('sess-p1-cancel-partial-report')
     const agent = new FakeAgent(live)
     const request = '完成两个任务'
     const objective = 'Current request:\n' + request
@@ -1105,10 +1124,10 @@ describe('P0-4: a cancelled turn keeps the message and states the terminal', () 
     const decision = await pending
 
     expect(decision.kind).toBe('reject')
-    // Headless turn-1 cancel: no user row is appended (position-0 rule), so the
-    // transcript carries no user words — but the terminal record states why,
-    // and the verified work is still stated there.
-    expect(live.ownEvents().filter(event => event.type === 'user/message')).toHaveLength(0)
+    // The host head exists, so the gate published the batch before the run: the
+    // typed words survive once, and the terminal record states why the round
+    // stopped and what work was kept.
+    expect(live.ownEvents().filter(event => event.type === 'user/message')).toHaveLength(1)
     expect(live.ownEvents().filter(event => event.type === 'assistant/message')).toHaveLength(0)
     const all = terminalTexts(live).join('\n')
     // Round 28: the cancelled terminal states the kept report as a human

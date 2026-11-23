@@ -30,7 +30,7 @@ import {
   composeCarriedRequest, composeIntentText, idleStopNote, steerReceipt, stopNote,
 } from '../src/channel.js'
 import { setMode } from '../src/mode.js'
-import { steeringForSession } from '../src/steering.js'
+import { closeSteering, openSteering, steeringForSession } from '../src/steering.js'
 import { execution, task, verification } from './fixtures.js'
 import { roleOf, runWorkflowScript } from './helpers.js'
 
@@ -427,8 +427,14 @@ describe('A1/A2/A5: a mid-run message is acknowledged at once and costs nothing 
     expect(carried).toContain('[channel]')
     // The previous objective is carried as context, not as a demand to redo.
     expect(carried).toContain('do not redo it')
-    // The queue is closed, so the carried round starts from a clean channel.
-    expect(steeringForSession('sess-channel-carry')).toBeUndefined()
+    // The queue is closed, so the carried round starts from a clean channel. The
+    // carried round opens and closes its own channel as it settles, so the queue
+    // being gone is what is awaited (asserting it at the instant the round starts
+    // raced its own lifetime — the flake this replaces).
+    await waitFor(
+      () => steeringForSession('sess-channel-carry') === undefined,
+      'the channel closed',
+    )
   })
 
   it('A1: the conclusion of the round is delivered into the same session', async () => {
@@ -530,5 +536,46 @@ describe('team tier: the same channel under the front desk', () => {
     // The run in flight is untouched.
     const workflowRun = ctx.engine.runs.find(run => run.meta.name !== 'Front desk')
     expect(workflowRun?.cancel).not.toHaveBeenCalled()
+  })
+})
+
+describe('a split confirmation is not a demand for the plan in flight', () => {
+  it('lets the normal path consume it instead of queueing "确认" into the live run', async () => {
+    const ctx = new FakeContext()
+    applyWith(ctx, { mode: 'triage' })
+    const session = Session.create('sess-channel-captain' as never)
+    setMode(session, { v: 1, enabled: true, turn: 1, setBy: 'command:/grok', workflowMode: 'triage' })
+    const agent = new FakeAgent(session)
+    // Same long wording as above: the front desk routes it to the team tier, so the
+    // captain asks for the split and nothing is dispatched yet.
+    const first = [message('帮我拆成几步：先查三家报价，再逐项核验，最后写成一页对比表，并把每一步的验收条件列清楚，同时说明风险和未确认的部分')]
+    const opening = await within(ctx.preStep()(payload(agent, first), passesThrough(first)))
+    expect(opening).toMatchObject({ kind: 'enter' })
+
+    // A run of this session holds the channel open (that is exactly what the real
+    // `runChannelRound` registers), while the captain's question is still pending.
+    const live = openSteering('sess-channel-captain')
+    try {
+      const confirm = [message('确认')]
+      const decided = await within(ctx.preStep()(payload(agent, confirm, 2), passesThrough(confirm)))
+      expect(decided).toMatchObject({ kind: 'enter' })
+
+      // Nothing was pushed into the live plan: "确认" is an answer to the captain,
+      // not work to merge, and a demand would both lose the confirmation and spend
+      // the run on one word.
+      expect(steeringForSession('sess-channel-captain')!.take().intents).toHaveLength(0)
+      // It dispatched the plan it confirms instead.
+      await waitFor(
+        () => ctx.engine.startCalls.some(call => call.meta.name !== 'Front desk'),
+        'the confirmed run started',
+      )
+      const text = (decided as { messages: { content: { text?: string }[] }[] }).messages
+        .flatMap(item => item.content)
+        .map(block => block.text ?? '')
+        .join('\n')
+      expect(text).toContain('队长确认')
+    } finally {
+      closeSteering(live.token)
+    }
   })
 })

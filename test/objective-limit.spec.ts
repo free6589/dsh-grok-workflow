@@ -256,6 +256,11 @@ describe('objective limit — gate entry path', () => {
       const decision = await ctx.preStep()(payload(agent, [userMessage('x'.repeat(chars))]), passingNext([])) as { kind: string }
 
       expect(decision.kind).toBe('enter')
+      // A fresh session's first turn answers with the words alone and runs the team
+      // behind them (0.13.24), so the run reaches the engine a microtask later.
+      await vi.waitFor(() => {
+        if (ctx.engine.startCalls.length === 0) throw new Error('the run did not start')
+      })
       expect(ctx.engine.startCalls).toHaveLength(1)
       const objective = String((ctx.engine.startCalls[0]!.args as { objective: string }).objective)
       expect(objective.length).toBeLessThanOrEqual(OBJECTIVE_LIMIT)

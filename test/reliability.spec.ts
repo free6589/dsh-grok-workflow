@@ -525,6 +525,10 @@ describe('reliability: wiring the live configuration and the category vocabulary
     const target = session('sess-scope')
     const payload = stepPayload(agentOf(target), [userMessage('scope check')])
     await ctx.preStep(payload, passThrough([]))
+    // A fresh session's first turn answers at once and runs the team behind the
+    // words (0.13.24): admission is still exactly one run, it just starts on the
+    // background path instead of holding the step open.
+    await vi.waitFor(() => { if (ctx.engine.startCalls.length === 0) throw new Error('no run') })
     expect(ctx.engine.startCalls).toHaveLength(1)
   })
 

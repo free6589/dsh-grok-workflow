@@ -334,6 +334,50 @@ describe('/grok on keeps message ingress open', () => {
     })
   })
 
+  it('shows the first message of a fresh session before the run finishes (deployment `full`)', async () => {
+    const ctx = new FakeContext()
+    // The deployment shape a user actually runs: `mode: full` with the plugin default
+    // on and no per-session `/grok` record. It has no front desk, and its first turn
+    // has no host head yet — the two facts that used to leave the whole run invisible.
+    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
+    const session = Session.create('sess-full-first-visible' as never)
+    const agent = new FakeAgent(session)
+    const loop = new MiniLoop(ctx.preStep()).attach(agent, session)
+
+    loop.send(userMessage('audit the release pipeline'))
+    await vi.waitFor(() => {
+      if (ctx.engine.startCalls.length === 0) throw new Error('the team run did not start')
+    })
+    // The engine is still working (it never settles on its own) and the words are
+    // already in the transcript: no `step/start` gap, no empty turn.
+    await vi.waitFor(() => {
+      if (!transcript(session).includes('audit the release pipeline')) {
+        throw new Error('the first message is still invisible while the run works')
+      }
+    })
+    // Exactly one commit — the words — and the gate itself wrote nothing ahead of the
+    // host head (0.13.14): the loop's own commit is what made them visible.
+    expect(loop.committed).toHaveLength(1)
+    expect(agent.followups).toHaveLength(0)
+
+    // The report is the next turn's message, with the objective it actually ran.
+    const request = ctx.engine.startCalls[0]!
+    const result = await runWorkflowScript(request.script, request.args as Record<string, unknown>, async (_prompt, options) => {
+      if (roleOf(options.label) === 'planner') return { tasks: [task('a')] }
+      if (roleOf(options.label) === 'worker') return execution('work done')
+      return verification(task('a'))
+    })
+    ctx.engine.runs[0]!.complete(result.report)
+    await vi.waitFor(() => {
+      if (agent.followups.length === 0) throw new Error('the report was not delivered')
+    })
+    const text = (agent.followups.at(-1)!.content as { type: string; text?: string }[])
+      .map(part => part.text ?? '')
+      .join('')
+    expect(text).toContain('audit the release pipeline')
+    expect(text).toContain('COMPLETED')
+  })
+
   it('keeps the configured concurrency envelope untouched', () => {
     // The ingress fix must not become a way to raise the team's fan-out: the
     // default stays the documented 10, the hard maximum stays 100, and the
