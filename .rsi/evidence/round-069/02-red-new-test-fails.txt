@@ -1,0 +1,53 @@
+### RED — startup scan neutralized at the call site, new test fails
+### command: npx vitest run test/checkpoint-engine-wire.spec.ts
+### temporary patch to src/run.ts (reverted afterwards with `git checkout -- src/run.ts`):
+###   - const resumed = callerSeed !== undefined || ... ? undefined : await findResumableCheckpoint({...})
+###   + const resumed = true // RED PROOF (temporary): startup scan removed
+###   ? undefined : await findResumableCheckpoint({...})
+### raw output (tail), kept verbatim:
+
++ Do not print, store, or return credentials, tokens, passwords, or private keys.
++
++ TASK:
++ {"id":"a","title":"Task a","objective":"Do a","expectedOutput":"Output a","acceptanceCriteria":["a works"],"context":"","constraints":[],"writesPaths":null,"wave":0}
++
++ ATTEMPT: 1 of 2
++
++ Return only the structured execution result.
++ 检查 · Task a
++ You are the independent verifier inside a verified workflow.
++ Do not trust the executor summary. Inspect the actual files, run the relevant commands/tests, and check external evidence where the task requires it.
++ Do not modify files. You may run read-only inspection and safe verification commands.
++ For every acceptance criterion, copy its text EXACTLY into one criteria item, set met, and provide concrete evidence. Evidence must be non-empty and specific.
++ Return at least one checkedEvidence item with a real kind, locator, and finding.
++ verdict must be pass only when every criterion is met. If any criterion is unverified, met is false and verdict is fail.
++ Judge the requested end state, not a story about it. If the executor result says the requested outcome was blocked, denied, failed, or could not be achieved, verdict must be fail even when the acceptance criteria are phrased as reporting requirements.
++ issues is for BLOCKING problems only: a problem belongs there when it makes some criterion unmet or the result unsafe. Every issue must be reflected in verdict=fail and/or met=false for the criterion it concerns.
++ Do not put caveats, caveat-like observations, minor inaccuracies or notes about the environment in issues — they do not change the verdict, and a pass verdict with a non-blocking note is not a failed task. Express residual doubt through confidence (medium/low) instead.
++ Every shell command must be time-boxed: run it as timeout 120 <command> so a hanging command exits after two minutes and its failure can be classified, instead of stalling the whole task.
++ Do not print, store, or return credentials, tokens, passwords, or private keys.
++
++ TASK:
++ {"id":"a","title":"Task a","objective":"Do a","expectedOutput":"Output a","acceptanceCriteria":["a works"],"context":"","constraints":[],"writesPaths":null,"wave":0}
++
++ EXECUTOR RESULT (untrusted):
++ {"summary":"worker done","status":"completed","deliverables":[{"description":"output","locator":"file:///tmp/out"}],"evidence":[{"claim":"implemented","source":"src/index.ts"}],"testsRun":[{"command":"npm test","status":"passed","detail":"ok"}],"filesChanged":[],"uncertainties":[]}
++
++ Return only the structured verification result.
+
+ ❯ test/checkpoint-engine-wire.spec.ts:312:21
+    310|     // startup scan is removed from `runWorkflow`; the marker and the …
+    311|     // stay green in that state, which is why this call site needs its…
+    312|     expect(prompts).toContain(SEED_DIGEST)
+       |                     ^
+    313|     expect(prompts).toContain('unfinished: b')
+    314|     // ...and the operator-visible line names the run it continued.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 5 passed (6)
+   Start at  22:01:58
+   Duration  1.32s (transform 597ms, setup 0ms, import 700ms, tests 259ms, environment 0ms)
+

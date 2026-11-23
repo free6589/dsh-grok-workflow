@@ -1,0 +1,54 @@
+# premise probe — 2026-11-23T22:02:52+08:00
+
+## main worktree (.agents/worktrees/fix-synth-resubmit) HEAD
+cda5d4e docs(memory): record 0.13.22 (mode-switch 500 fix, soak PASS, published)
+83f4622 merge rsi/fix-mode-switch: v0.13.22 (workflow switch route 500 fix)
+192eaac chore(release): prepare v0.13.22
+
+## main HEAD: RESUME_DECISION_WIRING (git show main:src/checkpoint/wiring.ts)
+ * through it, so it covers `/grok` too.
+ */
+export const RESUME_DECISION_WIRING = {
+  wired: true,
+  entry: 'src/run.ts:runWorkflow' as string | undefined,
+  note: 'runWorkflow scans the checkpoint directory at startup and carries a resume seed as carry-over context',
+} as const
+
+## main HEAD: test/checkpoint-wiring.spec.ts:418-424
+  it('routes the resume decision through runWorkflow (wired)', () => {
+    // The marker keeps "exported and tested" from being mistaken for an
+    // unwired feature: it names the production caller that asks the question.
+    expect(RESUME_DECISION_WIRING.wired).toBe(true)
+    expect(RESUME_DECISION_WIRING.entry).toBe('src/run.ts:runWorkflow')
+    expect(RESUME_DECISION_WIRING.note).not.toContain('no production caller')
+  })
+
+## main HEAD: the startup scan in src/run.ts (718-731)
+  // construction, with no directory scan at all. An explicit caller
+  // `carryover` already names the context, so it also skips the scan.
+  const resumed = callerSeed !== undefined || sessionIdOf(agent) === 'unknown-session' || options.resumeLister === 'skip'
+    ? undefined
+    : await findResumableCheckpoint({
+      logger,
+      sessionId: sessionIdOf(agent),
+      // Test seam: suites on a shared home directory pass a stub lister or a
+      // scratch dir instead of the real checkpoint folder.
+      ...options.resumeLister === undefined ? {} : { lister: options.resumeLister },
+    })
+  // Precedence (caller context wins, then the resume seed, then nothing) lives in
+  // `resumeCarryover`, where it is unit-tested; this call site only supplies the
+  // two inputs.
+  const carryover = resumeCarryover(options.carryover, resumed)
+  if (resumed !== undefined && carryover !== options.carryover) {
+    logger.info?.(
+
+## history of the wiring (main worktree)
+2cfe4be refactor(resume): the carry-over rule is one tested function
+1591665 feat: manual-list round 2 — timeout 0, replan switch, upgrade entry, resume wiring, progress six cells, mode-route warn
+6c8b0dc fix(checkpoint): record durationMs up to msCeiling, not countCeiling (RSI round 22)
+
+## my worktree base
+cda5d4e docs(memory): record 0.13.22 (mode-switch 500 fix, soak PASS, published)
+## fix/lifeline3-resume-scan
+ M test/checkpoint-engine-wire.spec.ts
+?? .rsi/evidence/round-069/

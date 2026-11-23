@@ -19,14 +19,14 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Session } from '@deepseek-ai/dsh-session'
 import { resolveConfig } from '../src/config.js'
-import { HOST_ROLES, resumeDecision } from '../src/checkpoint/wiring.js'
+import { HOST_ROLES, checkpointFile, resumeDecision } from '../src/checkpoint/wiring.js'
 import type { WorkflowCheckpoint } from '../src/checkpoint/schema.js'
-import { readCheckpoint } from '../src/checkpoint/writer.js'
+import { readCheckpoint, writeCheckpoint } from '../src/checkpoint/writer.js'
 import { createActiveState, runWorkflow } from '../src/run.js'
-import type { WorkflowLogger } from '../src/run.js'
+import type { RunOutcome, WorkflowLogger } from '../src/run.js'
 import type { NormalizedTask } from '../src/types.js'
 import { createEngineHarness } from './engine-harness.js'
-import type { EngineHarness } from './engine-harness.js'
+import type { ChildCall, EngineHarness } from './engine-harness.js'
 
 /* ------------------------------------------------------------------ harness -- */
 
@@ -187,5 +187,189 @@ describe('engine wiring writes real checkpoints', () => {
     expect(decision.seed.length).toBeGreaterThan(0)
     // eslint-disable-next-line no-console -- the smoke note quotes this line
     console.log(`[smoke] status=failed file=${file} resume=${decision.action} unfinished=${decision.unfinished.join(',')}`)
+  })
+})
+
+/* --------------------------------------- 3. startup resume scan (end to end) -- */
+
+/*
+ * Restart self-heal, driven through the real `runWorkflow`.
+ *
+ * The two halves — the directory scan (`findResumableCheckpoint`) and the
+ * carry-over composition (`resumeCarryover`) — are unit-tested in
+ * `test/checkpoint-wiring.spec.ts`, and that spec also pins the
+ * `RESUME_DECISION_WIRING` marker. None of that fails if the startup scan is
+ * deleted from `runWorkflow`: the marker is a constant, and the unit tests call
+ * the helpers directly. Only a run that sees the leftover's seed in its own
+ * child prompts proves the call site is alive, which is what these four cases
+ * pin:
+ *
+ * - a `cancelled` checkpoint of this session seeds the next run (its unfinished
+ *   task ids and its context), while the old file stays byte-identical — a
+ *   re-drive from recorded facts, never an engine-state restore;
+ * - a `running` checkpoint young enough to be live answers `wait`, so it seeds
+ *   nothing: starting a second run over work another process may hold is the
+ *   direction that must stay closed;
+ * - another session's crash seeds nothing;
+ * - an explicit caller `carryover` outranks the seed.
+ *
+ * Boundary as above: real engine, real writer, scripted subagent provider, a
+ * scratch checkpoint directory, no model call.
+ */
+
+/** A checkpoint directory of this test's own: the suite's shared one holds other files. */
+async function scratchCheckpointDir(): Promise<string> {
+  const created = await mkdtemp(join(tmpdir(), 'checkpoint-resume-e2e-'))
+  scratchDirs.push(created)
+  return created
+}
+
+const SEED_DIGEST = 'SEED-DIGEST-7c1e'
+const CALLER_CONTEXT = 'CALLER-CONTEXT-5b'
+const E2E_SESSION = 'sess-resume-e2e'
+
+/** Write one leftover checkpoint into `dir` and hand back its recorded checksum. */
+async function leftover(
+  dir: string,
+  input: {
+    runId: string
+    status: 'cancelled' | 'running'
+    sessionId: string
+    updatedAtMs: number
+  },
+): Promise<{ file: string, checksum: string }> {
+  const file = checkpointFile(input.runId, { dir })
+  const written = await writeCheckpoint(file, {
+    run: { runId: input.runId, objective: 'finish the parser', status: input.status, sessionId: input.sessionId },
+    plan: { source: 'planner', tasks: [] },
+    tasks: [
+      { id: 'a', title: 'Task a', status: 'verified', attempts: 1 },
+      { id: 'b', title: 'Task b', status: 'pending', attempts: 1 },
+    ],
+    time: { startedAtMs: input.updatedAtMs - 60_000, updatedAtMs: input.updatedAtMs },
+    minContext: { objective: 'finish the parser', digest: SEED_DIGEST },
+  })
+  return { file, checksum: written.checksum }
+}
+
+/**
+ * Run one real workflow with the checkpoint directory pointed at `dir`, so both
+ * the startup scan and the recorder see the same leftover.
+ */
+async function runWithLeftover(options: {
+  dir: string
+  objective: string
+  callerCarryover?: string
+}): Promise<{ outcome: RunOutcome, children: ChildCall[], prompts: string, infos: string[] }> {
+  const previous = process.env.GROK_WORKFLOW_CHECKPOINT_DIR
+  process.env.GROK_WORKFLOW_CHECKPOINT_DIR = options.dir
+  try {
+    const engine = createEngineHarness(call => (call.prompt.includes('You are the execution agent')
+      ? { structured: execution }
+      : { structured: verification(true) }))
+    harnesses.push(engine)
+    const infos: string[] = []
+    const outcome = await runWorkflow({
+      ctx: engine.ctx as never,
+      config: resolveConfig({ maxConcurrency: 1, maxTasks: 6 } as never),
+      state: createActiveState(),
+      logger: { warn: () => {}, info: (message: string) => { infos.push(message) } },
+      agent: { session: Session.create(E2E_SESSION as never) } as never,
+      objective: options.objective,
+      callerTasks: [task],
+      ...options.callerCarryover === undefined ? {} : { carryover: options.callerCarryover },
+      failureMode: 'report',
+    })
+    return {
+      outcome,
+      children: engine.children,
+      prompts: engine.children.map(child => child.prompt).join('\n'),
+      infos,
+    }
+  } finally {
+    if (previous === undefined) delete process.env.GROK_WORKFLOW_CHECKPOINT_DIR
+    else process.env.GROK_WORKFLOW_CHECKPOINT_DIR = previous
+  }
+}
+
+describe('startup resume scan (restart self-heal)', () => {
+  it('carries this session\'s cancelled checkpoint into the next run', async () => {
+    const dir = await scratchCheckpointDir()
+    const { checksum } = await leftover(dir, {
+      runId: 'run-crashed-1',
+      status: 'cancelled',
+      sessionId: E2E_SESSION,
+      updatedAtMs: Date.now() - 600_000,
+    })
+
+    const { outcome, children, prompts, infos } = await runWithLeftover({ dir, objective: 'finish the parser' })
+    expect(outcome.ok).toBe(true)
+    expect(children.length).toBe(2)
+
+    // The seed reached the children. This is the assertion that dies when the
+    // startup scan is removed from `runWorkflow`; the marker and the unit halves
+    // stay green in that state, which is why this call site needs its own test.
+    expect(prompts).toContain(SEED_DIGEST)
+    expect(prompts).toContain('unfinished: b')
+    // ...and the operator-visible line names the run it continued.
+    expect(infos.some(line => line.includes('grok-workflow resume: continuing run-crashed-1'))).toBe(true)
+
+    // A new run was started beside the old file, and that file was not rewritten:
+    // no engine state was restored, and nothing was claimed to have been.
+    const files = (await readdir(dir)).filter(name => name.startsWith('checkpoint-') && name.endsWith('.json'))
+    expect(files.length).toBe(2)
+    const untouched = await readCheckpoint(checkpointFile('run-crashed-1', { dir }))
+    expect(untouched.run.runId).toBe('run-crashed-1')
+    expect(untouched.run.status).toBe('cancelled')
+    expect(untouched.integrity?.checksum).toBe(checksum)
+  })
+
+  it('starts fresh when the leftover may still be live', async () => {
+    const dir = await scratchCheckpointDir()
+    // Written now with status `running`: `resumeDecision` answers `wait` (below
+    // the staleness bound), and a `wait` must never seed a second run.
+    await leftover(dir, {
+      runId: 'run-still-live',
+      status: 'running',
+      sessionId: E2E_SESSION,
+      updatedAtMs: Date.now(),
+    })
+
+    const { outcome, prompts } = await runWithLeftover({ dir, objective: 'finish the parser' })
+    expect(outcome.ok).toBe(true)
+    expect(prompts).not.toContain(SEED_DIGEST)
+  })
+
+  it('does not inherit another session\'s crash', async () => {
+    const dir = await scratchCheckpointDir()
+    await leftover(dir, {
+      runId: 'run-other-chat',
+      status: 'cancelled',
+      sessionId: 'sess-someone-else',
+      updatedAtMs: Date.now() - 600_000,
+    })
+
+    const { outcome, prompts } = await runWithLeftover({ dir, objective: 'finish the parser' })
+    expect(outcome.ok).toBe(true)
+    expect(prompts).not.toContain(SEED_DIGEST)
+  })
+
+  it('lets an explicit caller carry-over outrank the leftover', async () => {
+    const dir = await scratchCheckpointDir()
+    await leftover(dir, {
+      runId: 'run-crashed-2',
+      status: 'cancelled',
+      sessionId: E2E_SESSION,
+      updatedAtMs: Date.now() - 600_000,
+    })
+
+    const { outcome, prompts } = await runWithLeftover({
+      dir,
+      objective: 'finish the parser',
+      callerCarryover: CALLER_CONTEXT,
+    })
+    expect(outcome.ok).toBe(true)
+    expect(prompts).toContain(CALLER_CONTEXT)
+    expect(prompts).not.toContain(SEED_DIGEST)
   })
 })
