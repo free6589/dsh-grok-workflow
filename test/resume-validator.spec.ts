@@ -277,6 +277,19 @@ describe('safe restore policy', () => {
     expect(success?.reason).toContain('self-report')
   })
 
+  it('deep-copies evidence items so mutating the plan cannot alias the validated checkpoint', () => {
+    const doc = reseal(taskWith({ id: 't-1', seq: 1, status: 'completed', evidence: [{ kind: 'file', ref: 'a', note: 'n' }] }))
+    const validated = validateResumeCheckpoint(doc)
+    expect(validated.ok).toBe(true)
+    if (!validated.ok) return
+    const plan = planRestore(validated)
+    const preserved = plan.tasks[0]?.preserve.evidence[0]
+    expect(preserved).toBeDefined()
+    if (!preserved) return
+    preserved.ref = 'mutated'
+    expect(validated.checkpoint.tasks[0]?.evidence?.[0]?.ref).toBe('a')
+  })
+
   it('orders decisions by seq, counts actions, and flags replan where needed', () => {
     const decision = evaluateResumeCheckpoint(SEALED)
     expect(decision.restorable).toBe(true)
