@@ -2823,3 +2823,39 @@ Issue #1 状态评论 issuecomment-6927842856。
 - **装机（`CONFIRMED`，dsh 未重启）**：`dsh plugin --profile web add github:free6589/dsh-grok-workflow#v0.13.9` exit 0（10.5s）；装机 `0.13.9`（lock tarball `c93b2bf`），`lib/` 与仓库逐字节一致（含 observe 三态 `progress-tab.js:259`）。
 - **双审**：agent-4 三侧一致干净（详见 D-101；低严重遗留：`run.ts` rescue executor `throw` 与注释不符，后轮动）；agent-3 隔离 profile 实测 PASS（Loader 工具+prompt、settings 投影、gate off/on、web boot 无 pending、observe fold 定向）。真机一句话端到端 NOT_RUN（无模型凭证）；`curl` 直调 settings describe NOT_RUN（实例走 WS mux+cookie，非真实通道）。
 - **收尾**：scratch profile（gw-isolated-verify/gw-web-verify）+ `.tmp/dsh-gw-verify` + `/tmp` 探针目录已删；`git status` 仅剩既有 untracked（`.rsi/evidence/*`、`sg-weather.html` 等，并发轮产物，本轮未动）。本地无源码改动、无需发版 `v0.13.10`。
+
+## 2026-11-23 — 手工清单 12 项顺序执行第 1 轮：合 2 项（`CONFIRMED`）+ 6 项记账跳过
+
+- **From:** 本轮执行代理（agent-35）· **To:** 下一轮接手者 / 操作员
+- **基线（`CONFIRMED`）**：`main` = `e4e03e9`（0.13.18），开工前整树 `npm run ci` exit 0：85 文件 / 1617 测试 PASS
+  （日志 `.rsi/evidence/rsi-seq-12/logs/ci-baseline-main.log`）。全程在 `main` 的干净工作树
+  `.agents/worktrees/fix-synth-resubmit` 里干活，**主检出（detached `a6103ad` + 既有未提交改动）一行没动**。
+- **逐项结果（12 项，一项一分支，合前 ci 必须 exit 0）**：
+
+| # | 项 | 结果 | 依据 |
+|---|---|---|---|
+| Sec.2-1 | 运行时限默认 60 分钟 → 0 | 前轮已合（`1591665`），本轮复验 | `src/config.ts:113` `DEFAULT_TIMEOUT_MS = 0`；`test/timeout-config.spec.ts:119` |
+| Sec.2-2 | 主会话可插话：默认开或给开关 | 前轮已合（`1591665`），按"给开关"分支收口 | `src/client/index.js` `replan` 布尔键 + 设置页开关行；默认仍 false（分歧已记） |
+| Sec.2-3 | 总开关一按报 405 | **本轮新合** `5dc0512` | 见下方"405 两个新成因" |
+| Sec.2-4 | 设置页一键升级按钮 | 前轮已合（`1591665`） | 版本/最新/命令卡片 + `test/update-entry.spec.ts` 4 例 |
+| Sec.2-5 | 进度页"回答"格永远空 | 前轮已合（`1591665`，按"删格"分支收口） | `PROGRESS_STAGES` 六格无 answer；源码注释写明没有事件能填它 |
+| Sec.2-6 | 断点续跑没接上 | 前轮已合（`1591665`） | `RESUME_DECISION_WIRING.wired = true`（`src/checkpoint/wiring.ts:221`），生产调用 `wiring.ts:485` |
+| Sec.2-7 | 宿主证据收集阶段没开工 | **跳过（BLOCKED：待拍板）** | 源文件原话"先确认这一阶段还要不要做"；仓库确无 `src/evidence*`。见 D-111 |
+| Sec.3-1 | 进度页跨阶段的线太多，合并成一根 | **本轮新合** `adc7fb4` | 一条公共弯道 + 一条公共轨，`test/progress-connector.spec.ts` 新增多组共享轨用例 |
+| Sec.3-2 | 模型失败换人时加 429 勾选框 | 跳过（待拍板） | `triageModel` 整套已移除，需求是否成立源文件自己要求重新确认；见 D-111 |
+| Sec.3-3 | 汇总也要"检查 + 复核"，不只汇总一次 | 跳过（待拍板） | 三轮汇总门已在（`src/script.ts` `reviewSummaryDraft`：check + 独立 verify，纯确定性）；**没走**配置里的 verifier/supervisor 模型角色。要不要改成走角色是成本/真值来源的取舍，见 D-111 |
+| Sec.3-4 | 开插件后答案要和不开时长得一样 | 跳过（待拍板） | 源文件"是否还觉得不一样要你再验一次"——只有操作员能判；人工比对 `NOT_RUN` |
+| Sec.3-5 | 查清那次绘画任务为什么失败 | 跳过（范围外） | 本插件无图像功能，失败不在本仓库；是否继续查由操作员定 |
+
+- **405 的两个新成因（`CONFIRMED` 从源码读出，`HYPOTHESIS` 之于操作员那次具体触发）**：
+  (a) 路由挂载用了 `inject(['webServer','connection','sessions'])`，三个服务缺一就不挂；0.13.16 只补了
+  `webServer` 缺失的告警，**会话服务晚到或只经 `ctx.get('sessions')` 可达**的编排仍会什么都不挂，
+  浏览器的 POST 落到宿主 fallback —— 正是"空包体 405、不带插件说明"的样子。现在改成
+  `inject(['webServer','connection'])` + 按请求现取会话服务，取不到回 `503 mode/unavailable`（不再是 404）。
+  (b) 读请求现在也吃 `GET ?action=status&sessionId=…`（用 GET 写一律 405），被拒的方法连方法名和 URL 一起
+  `logger.warn`，客户端遇到读取 405 会改用 GET 重试一次并点名"方法被拒"。操作员那一次到底是代理拦 POST
+  还是路由没挂，仍无现场日志可判（`HYPOTHESIS`），但两种情形现在都能自证。
+- **没做的**：未发版、未打 tag、未 push（本地 `main` 领先 `origin/main` 2 个 merge 提交）；真机 GUI 点开关
+  `NOT_RUN`（不动运行中实例，按 AGENTS.md §5）。
+- **分支**：`rsi/sec2-03-mode-get`、`rsi/sec3-01-single-rail` 已合入 `main`，判定日期 2026-11-24 前删除。
+- **下一步**：① 操作员对 Sec.2-7 + Sec.3-2/3/4/5 各给一句"做 / 不做"；② 决定是否发版把这两条改动推出去。

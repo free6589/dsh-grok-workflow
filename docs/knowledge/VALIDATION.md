@@ -5579,3 +5579,26 @@ toolName/configVersion = 页面 16）；`test/client.spec.ts` ProgressBundle 补
 - **野生活动提醒**：本轮工作树里三番出现未提交的 `src/gate.ts` surface-head 半成品
   （`surfaceHasHead` + `test/phase1-dialogue.spec.ts` 大段），无提交无文档归属，已原样存
   `.tmp/keep-stray*.patch` 未提交——疑似并发会话正在写，请归属方认领，勿当成本轮改动。
+
+## 2026-11-23 — 手工清单 12 项顺序执行第 1 轮（ci 日志与逐项判定）
+
+- **执行环境**：仓库 `/home/fish/projects_mine/dsh-grok-workflow`；工作树
+  `/home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/fix-synth-resubmit`（`main` 干净检出，自带 `node_modules`）；
+  Node 26.8.1 / npm；真机 GUI 与运行中实例**未触碰**（AGENTS.md §5）。
+- **基线 `CONFIRMED`**：`npm run ci` → `Test Files 85 passed (85) / Tests 1617 passed (1617)`，`EXIT=0`
+  （`.rsi/evidence/rsi-seq-12/logs/ci-baseline-main.log`）。
+- **Sec.2-3 `CONFIRMED`**：分支 `rsi/sec2-03-mode-get`（自 `main` `e4e03e9`）→ `npm run ci` exit 0，
+  `85 passed / 1622 passed`（`.rsi/evidence/rsi-seq-12/logs/ci-sec2-03-mode-get.log`）→ 合入 `main` `5dc0512`。
+- **Sec.3-1 `CONFIRMED`**：分支 `rsi/sec3-01-single-rail` → 首次 ci **红**（`test/client.spec.ts:2622` 仍断言 2 条连线，
+  实际 3 条：trunk/branch/rail），改断言为三种 kind 后重跑 exit 0，`85 passed / 1623 passed`
+  （`.rsi/evidence/rsi-seq-12/logs/ci-sec3-01-single-rail.log`）→ 合入 `main` `adc7fb4`。
+- **合完的 `main` `CONFIRMED`**：`npm run ci` exit 0，`85 passed / 1623 passed`
+  （`.rsi/evidence/rsi-seq-12/logs/ci-main-merged.log`），且 `verify:lib` 报
+  "lib/ at adc7fb4 is the build of src/ at adc7fb4 (217 files, byte-identical)"，说明两条分支的 `lib/client.js`
+  文本合并没有留下过期产物。
+- **前轮已合 5 项的复验方式**：基线全绿 + 逐项读源码/测试定点确认（`NOT_RUN` 的部分写在各条里：
+  真机点击开关 `NOT_RUN`；操作员"答案长相"人工并排比对 `NOT_RUN`）。
+- **跳过项 `BLOCKED`**：Sec.2-7、Sec.3-2/3/4/5 —— 理由与建议见 `DECISIONS.md` D-111 与
+  `.rsi/evidence/rsi-seq-12/REPORT.md` 的分歧日志。
+- **既有未提交工作未被本轮触碰**：主检出仍在 detached `a6103ad`，其 37 个已改文件与 `.rsi/evidence/**` 等等价保留；
+  本轮所有提交都在工作树里、都在 `main` 上。

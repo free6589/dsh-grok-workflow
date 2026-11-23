@@ -3,6 +3,20 @@
 Notable user-facing changes are recorded here in English and Simplified Chinese.
 用户可见的功能和修复会在这里以英文和简体中文记录。
 
+## [Unreleased]
+
+### Fixed / 修复
+
+- **The workflow switch answers over GET, and a store that arrives late no longer blanks it / 总开关改用 GET 也答，晚到的会话服务不再把开关变空白** —
+  Two more causes of the reported `HTTP 405` are closed on the plugin side. The route used to require `webServer` + `connection` + `sessions` all at mount time; a composition that reaches the live-session store later (or only through `ctx.get('sessions')`) mounted nothing, so the browser's POST fell through to the Host and came back as an empty-body 405 with no plugin sentence attached. The store is now resolved per request, a composition with no store answers `503 mode/unavailable` instead of a misleading missing-session 404, a read is also accepted over `GET ?action=status&sessionId=…` (a write over GET is refused with 405), and a refused method is logged with the method and URL that produced it. The switch retries one refused read over GET and names the refused method instead of reporting the route as silent, so a proxy that only allows GET costs a round-trip instead of the button's state.
+  / 报过的 `HTTP 405` 又在插件侧关掉两个成因。以前路由挂载时必须同时具备 `webServer` + `connection` + `sessions` 三个服务：某些编排里会话服务晚到或只能通过 `ctx.get('sessions')` 拿到，于是路由根本没挂上，浏览器的 POST 落到宿主 fallback，回一个空包体 405、不带任何插件侧说明。现在会话服务改成按请求现取；确实没有会话服务时回 `503 mode/unavailable`，不再误报"没有这个会话"的 404；读取也可以用 `GET ?action=status&sessionId=…`（用 GET 写会被 405 拒绝）；被拒的方法会连方法和 URL 一起写进日志。开关遇到读取被拒会自动改用 GET 重试一次，并在彻底失败时点名"方法被拒"，不再只说"服务没回应"——只放行 GET 的代理从此只多花一次往返，不会让开关一直空着。
+
+### Added / 新增
+
+- **The progress page draws one rail instead of one cross-stage run per stage / 进度页跨阶段的线合并成一根** —
+  On the 2026-11-21 request ("too many cross-stage lines, merge them into one"), the band's wires now share a single elbow lane and a single channel: every owner still drops from its own ring and keeps its own card stubs, but the vertical run is drawn once as one rail that reaches the deepest card, instead of one lane plus one channel per owner. The band's top margin follows the one lane, so the cards keep their left edge and the gutter width is unchanged.
+  / 按 2026-11-21 的诉求（"跨阶段的线太多，合并成一根"），进度带里的连线现在共用一条弯道和一条竖槽：每个环节照旧从自己的圆点往下接、照旧保留各自的卡片短线，但竖线只画一次、成为一根连到最深那张卡的公共轨，不再每个环节各占一条弯道加一条竖槽。带子的上边距跟着这一条弯道走，卡片的左边距和整条槽宽都没变。
+
 ## [0.13.18] - 2026-11-23
 
 ### Fixed / 修复

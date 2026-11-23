@@ -2614,3 +2614,54 @@ spine 为空，pre-fix 形状会进脊柱。
 3. 交接契约固定四行（结论/证据指针/未决问题/下一步），证据必须带可复验指针（路径 + checksum/行号），裸文字自述打回；`src/report.ts` 只做增量 append，不动主流程。
 - **Alternatives rejected:** (a) 复用 checkpoint 当任务板——checkpoint 是运行快照语义，无 CAS/依赖/不可变约束，硬套会污染恢复语义；(b) gate 里直接写调度逻辑——gate 已够复杂，独立模块可测，大管家以后常驻化也有地方放；(c) 契约放宽允许空未决问题——"无未决"本身也是一条有效信息，显式写 `none` 比空着更诚实。
 - **Evidence:** `test/taskboard.spec.ts` 13 例 + 独立复验（依赖阻塞/CAS 冲突/重启恢复）；`test/dispatcher.spec.ts` 11 例；`test/handoff.spec.ts` 15 例（缺字段/裸文字打回）。
+
+## D-109 · 405 的插件侧第二成因：挂载靠三个服务、读请求只能 POST
+
+- **时间**：2026-11-23 · **状态**：`CONFIRMED`（源码与测试）· **来源**：`manual-sessions-unfinished.md` Sec.2-3
+- **问题**：设置页总开关按一下就报"模式服务没有回应：the mode route answered HTTP 405"。0.13.16 只补了
+  "缺 webServer 就打 warn"，没解决另两种同样静默的情形。
+- **读到的源码事实（`CONFIRMED`）**：`src/mode-surface.ts` 的 `installModeRoute` 用
+  `inject(['webServer','connection','sessions'])` —— 三个服务同时可用才回调，缺一个就整条路由不挂；
+  该回调里 `handleModeRoute` 对非 POST 一律 `ModeError('mode/method','POST only')` → 405；
+  客户端 `parseModePayload` 只有在响应体带 `error` 时才显示服务端那句，空包体 405 就退化成
+  "the mode route answered HTTP 405"。所以"空包体 405"必然来自**不是本插件**的应答（宿主 fallback）。
+- **选定的做法**：挂载只要求 `webServer` + `connection`；会话服务改成按请求 `resolveSessions()`（先 `ctx['sessions']`，
+  再 `ctx.get('sessions')`），取不到回 `503 mode/unavailable`。读请求同时接受
+  `GET ?action=status&sessionId=…`（写一律拒绝，URL 不留状态变更）；被拒的方法带方法名与 URL 记 warn。
+  客户端：读取遇 405 用 GET 重试一次，失败时用 `mode/method` 码并点名"方法被拒"。
+- **没选的替代**：① 让客户端只发 GET（写就得靠别的通道，且状态变更进 URL 会留下 prefetch 触发的风险）；
+  ② 改宿主让它接住未知路由（AGENTS.md §4/§5 禁止碰核心）；③ 给插件加第二个状态存储（会破坏"只有一条真相"）。
+- **验证**：`test/mode-surface.spec.ts` 24 例（含"GET 读成功"、"GET 写被拒 405"、"PUT 被拒且 warn 带方法名"、
+  "没有 sessions 服务但 `get('sessions')` 可达时仍挂载并读成功"、"完全没有会话服务回 503"）；
+  `test/client.spec.ts` 新增两例（405 后 GET 重试成功；两路都被拒时报 `mode/method` 且写不重试）。
+- **仍然未知（`HYPOTHESIS`）**：操作员当时那一次究竟是"路由没挂"还是"前置代理只放行 GET"，现场无日志可判。
+
+## D-110 · 进度页跨阶段连线：一条公共弯道 + 一根公共轨（按 2026-11-21 原话收口）
+
+- **时间**：2026-11-23 · **状态**：`CONFIRMED`（源码与测试）· **来源**：`manual-sessions-unfinished.md` Sec.3-1
+- **原话**："进度页跨阶段的线太多，合并成一根"。当时只看了效果图，没有开工。
+- **做法**：`measureProgressWires` 保留每个环节自己的圆点下垂段与每张卡的短接线，但把
+  "每环节一条弯道 + 一条竖槽"改成整带共用一条弯道与一条竖槽，竖线只画一次、成为一根连到最深卡片的 `rail`。
+  卡片左边距、槽宽、状态色（连线永远不带状态色）全部不变。
+- **代价**：两个环节共用竖槽后，肉眼靠"线在哪一条槽"分辨归属不再可能——归属改由各自的圆点下垂段和卡片短线承载。
+  这是原话要求的直接结果，已记入分歧日志供操作员复核。
+- **验证**：`test/progress-connector.spec.ts` 19 例，新增"两个环节只画一根轨、共用同一弯道与同一竖槽"；
+  `test/client.spec.ts` 连线中性用例改为断言 `['trunk','branch','rail']`。
+
+## D-111 · Sec.2-7 与 Sec.3-2/3/4/5：本轮记账不实现（待操作员一句话）
+
+- **时间**：2026-11-23 · **状态**：Sec.2-7 `BLOCKED`（待拍板）；Sec.3-2/3/4/5 `BLOCKED`（待拍板/越界）
+- **口径**：本轮任务允许"严格按原话执行并记分歧"，但源文件对这五项写的不是"去做"，是"要不要做/要不要重新确认/你定"。
+  在操作员没有给一句话之前硬做，等于替操作员拍板——尤其 Sec.3-3 会改变汇总的**真值来源**（从确定性检查改成
+  模型角色复核），成本与误拒后果都要人认。
+- **逐项**：
+  - Sec.2-7 宿主证据收集：仓库确无 `src/evidence*`（`CONFIRMED`）。建议第一刀做成"一份去密钥的宿主事实快照
+    （插件版本/宿主版本/运行时/生效配置摘要/本轮任务数）随报告一起落盘"，接进 `renderReport` 的可选段，
+    不新建独立通道。等一句话即可开工。
+  - Sec.3-2 429 勾选框：`triageModel` 整套已被移除（`CONFIRMED`，`src/triage.ts` 只剩命名/角色解析）。
+    需求描述的是被删掉的那套机制，原样实现等于复活已删的架构；要不要以"角色链失败后的显式换人条件"重做需拍板。
+  - Sec.3-3 汇总走检查/复核角色：现状是 `src/script.ts` `reviewSummaryDraft`（check + 独立 verify，纯确定性，
+    失败回退确定性叙述而绝不回退模型文本）。改成走配置的 verifier/supervisor 模型角色会花额度、并把
+    "假通过"的风险重新引入模型自评；要么确认现状即满足原意，要么明确"要模型角色复核"再改。
+  - Sec.3-4 答案长相一致：只有操作员能判，需要一次开/不开插件的人工并排比对（`NOT_RUN`）。
+  - Sec.3-5 绘画任务失败：本插件无图像功能（`CONFIRMED`），失败不在本仓库；继续查需要操作员授权范围。

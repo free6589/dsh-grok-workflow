@@ -2074,3 +2074,20 @@ git fetch 恢复。`dsh plugin --profile web add github:free6589/dsh-grok-workfl
 agent-3 隔离 profile 实测（Loader 注册工具+prompt、settings 投影 14 字段、gate off放行/on接管、
 web 模板 boot 无 pending、observe fold 定向 PASS）。本地无源码改动、无需发版。scratch profile 与
 `.tmp/dsh-gw-verify` 已清。详情见 D-101。）
+
+
+Last updated: 2026-11-23 09:10 +08:00（**手工清单 12 项顺序执行（第 1 轮）/ RSI 顺序跑批，`CONFIRMED`** —
+源文件 `manual-sessions-unfinished.md`（工作区根，未纳入版本库）：第二节 7 件 + 第三节 5 件，严格按顺序、
+一项一分支、合前 `npm run ci` 必须 exit 0。本轮开工前先把 `main`（`e4e03e9`，0.13.18）整树跑了一遍
+`npm run ci`：85 文件 / 1617 测试 PASS，exit 0 —— 这就是"前轮已合项"的绿灯基线（日志 `.rsi/evidence/rsi-seq-12/logs/ci-baseline-main.log`）。
+**已合（前轮）4 项复验通过**：Sec.2-1 `DEFAULT_TIMEOUT_MS = 0`（`src/config.ts:113`，`test/timeout-config.spec.ts:119`
+断言 `resolveConfig({}).timeoutMs === 0`）；Sec.2-4 设置页版本/升级入口（`test/update-entry.spec.ts` 4 例）；
+Sec.2-5 进度页不再有"回答"格（`PROGRESS_STAGES` 只有 start/plan/execute/verify/synthesize/end，源码注释明写
+"no `回答` event can ever reach this track"）；Sec.2-6 续跑接线（`RESUME_DECISION_WIRING.wired = true`，
+`src/checkpoint/wiring.ts:221`，生产入口在 `wiring.ts:485` 调 `resumeDecision`）；Sec.2-2 replan 可见开关
+（`src/client/index.js` 的 `loop` 组布尔键 + 设置页行，默认仍 false）。**本轮新合 2 项**：
+Sec.2-3 405 路由（merge `5dc0512`，分支 `rsi/sec2-03-mode-get`）、Sec.3-1 进度页连线合并成一根
+（merge `adc7fb4`，分支 `rsi/sec3-01-single-rail`），两项各自 ci exit 0，合完 `main` 再跑一次 exit 0（85/1623 PASS）。
+**跳过 6 项并记账**：Sec.2-7 宿主证据收集（源文件自己要求"先确认这一阶段还要不要做"，是拍板项而非实现项，
+见 D-111）；Sec.3-2/3/4/5 四项源文件都写明"是否成立要重新确认 / 要你再验一次 / 你定"（见 D-111 与分歧日志）。
+两条 `rsi/*` 分支已合入 `main`，未 push（本地 `main` 领先 `origin/main` 2 个 merge 提交）。）

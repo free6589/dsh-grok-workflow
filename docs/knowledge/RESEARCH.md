@@ -1467,3 +1467,16 @@ round 33 那次把 1.23 ms 抬到 7.86 ms 的代价没有被再放大：新增�
 - **克隆的机器级副作用**（`CONFIRMED`）：`mcp-serena` 写 `~/.serena/logs/<date>`、`mcp-mobile-phone` 写
   `~/.local/share/phone-use/state.json`，沙箱内 8 条 `Read-only file system`；应用仍能服务，
   但日志被 traceback 淹没。home 级 patch（`$DSH_HOME/cordis.patch.yml`）按 entry id 关掉即可。
+
+- **总开关路由的挂载条件是三个服务同时在场**（`CONFIRMED`，2026-11-23）：`src/mode-surface.ts`
+  `installModeRoute` 原来 `inject(['webServer','connection','sessions'])`；Cordis 的 `inject` 只在**全部**依赖可用时
+  回调，所以任一服务缺失/晚到，路由就完全不挂，浏览器的 `POST /grok-workflow/mode` 落到宿主 fallback
+  （空包体 405）。同目录的 `src/loop-surface.ts` 只要求 `['webServer','connection']`，这是两处不一致的根源。
+  改法：`inject(['webServer','connection'])` + 按请求 `resolveSessions()`（`ctx['sessions']` 或 `ctx.get('sessions')`）。
+- **`GET` 是这个路由上唯一的第二种合法方法**（`CONFIRMED`）：读走 `?action=status&sessionId=…`，写一律 405，
+  否则一个 `<img>`/prefetch 就能改状态。被拒的方法会 `logger.warn` 出 `方法 + URL`，这是把"莫名的 405"
+  变成可诊断事件的最小成本。
+- **进度页连线的"归属"原来靠槽位，现在靠下垂段 + 卡片短线**（`CONFIRMED`）：`measureProgressWires` 改成
+  一条公共弯道（`PROGRESS_WIRE_LANE_GAP`）与一条公共竖槽（`PROGRESS_WIRE_CHANNEL_X`），竖线只画一次
+  （`kind: 'rail'`）；原来每环节各一条弯道/竖槽的常量
+  （`PROGRESS_WIRE_CHANNEL_STEP` / `PROGRESS_WIRE_CHANNEL_INNER` / `PROGRESS_WIRE_LANE_STEP`）随之删除。
