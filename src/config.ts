@@ -404,6 +404,13 @@ export const ROLE_KEYS = ['planner', 'worker', 'verifier', 'synthesizer', 'super
 /** The keys one route object may carry; `maxInFlight` is the per-route lane ceiling. */
 export const ROUTE_KEYS = ['provider', 'model', 'maxInFlight'] as const
 
+/**
+ * The keys the single `guardianModel` route may carry: the same pair as a
+ * chain route, minus the lane ceiling (an adjudicator has no chain to yield
+ * in, so `maxInFlight` would be read and then silently dropped).
+ */
+const GUARDIAN_MODEL_KEYS = ['provider', 'model'] as const
+
 /** Every key removed by the T4 slim-down; a patch that still carries one is rejected (R-06). */
 export const REMOVED_CONFIG_KEYS = [
   'enforceGate',
@@ -721,6 +728,7 @@ export function assertKnownKeys(config: Record<string, unknown>): void {
     )
   }
   assertKnownNestedKeys(roles)
+  assertKnownGuardianKeys(config.guardianModel)
 }
 
 /**
@@ -772,6 +780,29 @@ function assertKnownNestedKeys(roles: unknown): void {
         )
       }
     }
+  }
+}
+
+/**
+ * Reject an unknown field inside the single `guardianModel` route.
+ *
+ * A misspelt field would otherwise be read past: `resolveConfig` only picks
+ * `provider` and `model`, so anything else loads successfully and then never
+ * takes effect — the silent-ignore failure this check exists to prevent.
+ * @param guardian - the raw `guardianModel` value.
+ * @throws If it is an object carrying a key outside `provider`/`model`.
+ */
+function assertKnownGuardianKeys(guardian: unknown): void {
+  if (guardian === undefined || guardian === null) return
+  if (typeof guardian !== 'object' || Array.isArray(guardian)) return
+  for (const key of Object.keys(guardian as Record<string, unknown>)) {
+    if ((GUARDIAN_MODEL_KEYS as readonly string[]).includes(key)) continue
+    const suggestion = closestKey(key, GUARDIAN_MODEL_KEYS)
+    throw new Error(
+      `unknown configuration key "guardianModel.${key}"` +
+      `${suggestion === undefined ? '' : ` (did you mean "${suggestion}"?)`}; ` +
+      `accepted guardianModel keys: ${GUARDIAN_MODEL_KEYS.join(', ')}`,
+    )
   }
 }
 
@@ -1052,6 +1083,9 @@ export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
   // own failure wording (the key is `guardianModel`, not `roles.<role>`). An
   // absent key, a null, or a route with a blank model all read as "no guardian",
   // so an untouched settings page stays byte-identical to the pre-guardian one.
+  // Round 53: fail closed like the roles chain — a non-string field is refused
+  // with its shape named, both fields are trimmed, and a model that trims to
+  // empty means "unconfigured" (a provider with no model is not half a route).
   const guardianRaw: unknown = (config as { guardianModel?: unknown }).guardianModel
   let guardianModel: ModelRoute | undefined
   if (guardianRaw !== undefined && guardianRaw !== null) {
@@ -1059,8 +1093,14 @@ export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
       throw new Error(`guardianModel must be a single route object {provider?, model}, got ${describeShape(guardianRaw)}`)
     }
     const route = guardianRaw as { provider?: unknown, model?: unknown }
-    const provider = route.provider === undefined || route.provider === null ? '' : String(route.provider)
-    const model = route.model === undefined || route.model === null ? '' : String(route.model)
+    if (route.provider !== undefined && route.provider !== null && typeof route.provider !== 'string') {
+      throw new Error(`guardianModel.provider must be a provider id string, got ${typeof route.provider}`)
+    }
+    if (route.model !== undefined && route.model !== null && typeof route.model !== 'string') {
+      throw new Error(`guardianModel.model must be a model id string, got ${typeof route.model}`)
+    }
+    const provider = (route.provider as string | undefined ?? '').trim()
+    const model = (route.model as string | undefined ?? '').trim()
     if (provider.length > HARD_LIMITS.routeChars || model.length > HARD_LIMITS.routeChars) {
       throw new Error(`guardianModel route fields are limited to ${HARD_LIMITS.routeChars} characters`)
     }

@@ -7,6 +7,10 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ### Fixed / 修复
 
+- **The guardian route refuses blanks, wrong types and unknown fields / 守护路由拒收空白、错类型与未知字段** —
+  A blank model loaded as configured, a non-string field was stringified silently, and an extra field was read past and dropped. Like the role chains, non-string fields are now refused with their shape named, both fields are trimmed, a model that trims to empty means unconfigured, and an unknown field names itself with the accepted keys.
+  / 空白模型会被当成已配置、非字符串字段被悄悄转字符串、多余字段读过就丢。现在和角色链一样：非字符串直接拒收并点名类型，两字段都去空格，空格模型视为未配置，未知字段自报名并给出合法键。
+
 - **Flat cookie credentials are redacted too / 扁平 Cookie 凭证也脱敏** —
   Only the `Cookie:` header form was redacted; the JSON key form (`{"cookie":"…"}`) and the bare form (`cookie=…`) leaked verbatim, even though a cookie value is a session credential by itself. The key tables now name `cookie` next to `session`, so all three shapes redact; ordinary prose about cookies is untouched.
   / 以前只有 `Cookie:` 头形会脱敏，JSON 键形和裸 `cookie=` 会原样漏掉——Cookie 值本身就是会话凭证。现在键表里加上 `cookie`，三种形状都脱敏；聊 Cookie 的普通文字不受影响。

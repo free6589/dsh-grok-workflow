@@ -191,6 +191,27 @@ describe('configuration surface', () => {
     expect(resolveConfig({}).guardianModel).toBeUndefined()
   })
 
+  it('treats a blank guardianModel model as unconfigured and refuses non-string fields (round 53)', () => {
+    // Fail closed like the roles chain: fields are trimmed, a model that trims
+    // to empty means "no guardian" (never half a route), and a non-string field
+    // is refused with its shape named instead of coerced via String().
+    expect(resolveConfig({ guardianModel: { provider: 'p', model: '   ' } } as never).guardianModel)
+      .toBeUndefined()
+    expect(resolveConfig({ guardianModel: { model: '  ' } } as never).guardianModel)
+      .toBeUndefined()
+    expect(() => resolveConfig({ guardianModel: { model: 42 } } as never))
+      .toThrow(/guardianModel\.model must be a model id string, got number/)
+    expect(() => resolveConfig({ guardianModel: { provider: {}, model: 'm' } } as never))
+      .toThrow(/guardianModel\.provider must be a provider id string, got object/)
+  })
+
+  it('refuses an unknown guardianModel field with the key named (round 53)', () => {
+    // resolveConfig only reads provider/model, so anything else would load and
+    // then never take effect — refuse it like the roles nested-key check.
+    expect(() => resolveConfig({ guardianModel: { model: 'm', maxInFlight: 2 } } as never))
+      .toThrow(/unknown configuration key "guardianModel\.maxInFlight"/)
+  })
+
   it('refuses a removed switching policy key as unknown (R-06)', () => {
     // T4: `switchOn` is fixed to the built-in policy (empty); a stored value is unknown.
     expect(() => resolveConfig({ switchOn: ['timeout'] } as never))
