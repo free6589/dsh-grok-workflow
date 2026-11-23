@@ -1,3 +1,21 @@
+Last updated: 2026-11-24 02:30 +08:00（**已发版 `0.13.25`：三路合流（判定角色补交 + 最终答案重写 + 派发心跳规则），隔离真机 soak PASS，`CONFIRMED`** —
+三路各自从 `main` `7f626f5`（0.13.24）开出，`--no-ff` 依次合入 `release/0.13.25`：`fix/verifier-supervisor-resubmit`
+`f5b74e4`+`73c9067` → `fix/final-answer-rewrite` `4393514` → `docs/heartbeat-ledger` `4231c00`（先 rebase 到 `main`
+成为 `be88c36`，只动 `AGENTS.md`）。冲突 6 处：`CHANGELOG.md` + 三份记忆档（两边都留）、`lib/script.d.ts.map` 与
+`lib/script.js.map`（取 ours 后 `npm run build` 重建）；**`src/script.ts` 自动合并且两边功能都在**——判定角色的补交
+在 `3583`/`3652` 两个调用点，汇总补交 `2827`/`2845`，答案侧 `REWRITE_PREAMBLE` + `answerLead` 整段 summary。
+本地门禁：`npm run ci` **exit 0（94 文件 / 1752 测试 PASS**；typecheck 干净；lint 0 errors；`verify:lib` byte-identical）。
+发版：prepare `dafda5c` → push main → annotated tag `v0.13.25` → push tag → 远端 Release run `45238308272`
+**success**，GitHub Release `v0.13.25` 已发布；CI on main `45238299713` **Node 22 与 Node 24 双绿**（0.13.24
+事后补的那条 flake 修有效）。
+真机隔离 soak **PASS**（`scripts/clone-profile.mjs` fork 在用 web profile，parity 5/5，独立 `DSH_HOME` 与独立 `HOME`，
+headless Chromium + 原生 CDP 当用户在 GUI 里打字；本机网关 `wb/cn:deepseek-v4.1-flash`）：交付出去的答案是
+两段中文散文、单语、无 `答案：`/`下一步：` 标签，**交付物那条真实绝对路径写对了并说清怎么打开**
+（`…/work1/hello.md`，`hello. md` 拆句缺陷未复现）；透明代理记录到真模型请求里命中 `quoteRule` 与
+`rewritePreamble`，即新提示词契约确实发出去了。**未覆盖**：判定角色补交在真机上的自然触发（三轮 soak 的判定
+都一次解析成功），证据仍取 `test/verifier-resubmit.spec.ts` 8 例（真脚本 + 真引擎，只替身模型边界）。
+证据：`.rsi/evidence/round-076/soak.txt` + 三张 GUI 截图、`docs/knowledge/VALIDATION.md` 的 0.13.25 表。）
+
 Last updated: 2026-11-24 01:35 +08:00（**判定角色的引号错误不再让整件事重做，`CONFIRMED` 未合流** —
 分支 `fix/verifier-supervisor-resubmit`（worktree `.agents/worktrees/fix-verifier-supervisor-resubmit`，从 `main`
 `7f626f5` 开出）：session-6cd6053d 的检查/复核子代理 structured_output 里有未转义英文双引号 → 宿主返回 `null`

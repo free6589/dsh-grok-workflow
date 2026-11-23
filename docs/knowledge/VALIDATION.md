@@ -1,3 +1,17 @@
+## 已发版 0.13.25 判定角色补交 + 最终答案重写 + 派发心跳规则 — 2026-11-24 (`CONFIRMED`)
+
+| state | command | result |
+| --- | --- | --- |
+| 合流 `release/0.13.25`（`fix/verifier-supervisor-resubmit` ⊕ `fix/final-answer-rewrite` ⊕ `docs/heartbeat-ledger`） | `git merge --no-ff` ×3 | 冲突 6 处（`CHANGELOG.md`、`STATE/HANDOFF/VALIDATION` 各 1、`lib/script.d.ts.map`、`lib/script.js.map`）；`src/script.ts` **自动合并**，两边功能都在（补交调用点 3583/3652、汇总补交 2827/2845、`REWRITE_PREAMBLE`+整段 `answerLead`） |
+| 合流后重建 | `npm run build` | `tsc -p tsconfig.build.json` + client bundle 303813 B；`lib/` 随提交进 |
+| 两个新分支的用例单独跑 | `npx vitest run test/verifier-resubmit.spec.ts test/final-answer-rewrite.spec.ts` | **2 files / 23 tests PASS**（补交 8 + 答案重写 15） |
+| 发版提交 `dafda5c` | `npm run ci` | **exit 0：94 files / 1752 tests PASS**；typecheck 干净；lint 0 errors；`verify:lib` byte-identical |
+| 版本一致性（教训） | `npm run ci` 第一次 **exit 1**：`test/docs-version.spec.ts` 报 published 标签列表 90 unique / 91 项 | 根因是全局替换 `0.13.24`→`0.13.25` 把刚插进列表的 `v0.13.24` 也改掉，出现两个 `v0.13.25`；修法是列表尾改成 `v0.13.23`, `v0.13.24` and `v0.13.25` 后**再**替换其余提及；重跑 `test/docs-version.spec.ts`+`test/client.spec.ts` 137 passed，全量 `npm run ci` exit 0 |
+| 真机隔离 soak（用户视角） | 见 `.rsi/evidence/round-076/soak.txt`（`clone-profile.mjs` fork 的 web profile + 独立 `DSH_HOME`/`HOME` + 本机网关 `wb/cn:deepseek-v4.1-flash`，headless Chromium + CDP 在 GUI 里发消息） | **PASS**：①两问各一段中文散文、单语、无 `答案：`/`下一步：` 标签，台账三行 `plan 1 task` → worker → `verdict pass · 5 criteria`；②带交付物的一轮把真实绝对路径 `…/work1/hello.md` 写对并说清两种打开方式（`hello. md` 拆句缺陷未复现），落盘内容核对一致；③透明代理日志里 verifier 请求命中 `quoteRule=True`、答案侧请求命中 `rewritePreamble=True` |
+| 真机 soak 未覆盖项 | 故障注入（改 verifier 首个流式 tool_call 参数为坏 JSON） | `NOT_RUN`：verifier 是多轮工具调用子代理（单次调用先跑 478 次 `bash`），结构化结论在更后面的 HTTP 轮次，注入窗口未命中；补交路径证据仍取 `test/verifier-resubmit.spec.ts` 8 例（红 7 → 绿 8，真脚本+真引擎，仅替换模型边界） |
+| 远端 | Release workflow `45238308272`（tag `v0.13.25` → `dafda5c`） | **success**；GitHub Release `v0.13.25` 已发布 |
+| 远端 | CI on main `45238299713`（`dafda5c`） | **Node 22 success / Node 24 success**（0.13.24 事后补的 `closeAllSteering()` flake 修有效，本轮未复现） |
+
 ## round-075 `fix/verifier-supervisor-resubmit` — 判定角色同次尝试补交（未合流，`CONFIRMED`） — 2026-11-24
 
 | state | command | result |

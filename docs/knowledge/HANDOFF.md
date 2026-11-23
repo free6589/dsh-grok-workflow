@@ -1,3 +1,31 @@
+## 2026-11-24 — 已发版 `0.13.25`：判定角色补交 + 最终答案重写 + 派发心跳规则（`CONFIRMED`）
+
+- **From:** 合并发版子代理（本会话）· **To:** 下一轮接手者
+- **发了什么**：prepare `dafda5c` 已推，annotated tag `v0.13.25` 已推；远端 Release run `45238308272` success，
+  GitHub Release `v0.13.25` 已发布（https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.25）。
+  本地 `npm run ci` exit 0：94 files / 1752 tests、typecheck 干净、lint 0 errors、`verify:lib` byte-identical。
+  CI on main `45238299713` Node 22/24 双绿。
+- **合流**：`release/0.13.25` 从 `main` `7f626f5` 开出，`--no-ff` 三路——`fix/verifier-supervisor-resubmit`
+  `f5b74e4`+`73c9067`、`fix/final-answer-rewrite` `4393514`、`docs/heartbeat-ledger`（rebase 到 main 后 `be88c36`）。
+  `src/script.ts` **自动合并**且两边功能都在；冲突只在 `CHANGELOG.md`/三份记忆档（两边都留）与两张 `lib` 源映射
+  （取 ours 后重建）。合流后 `lib/` 由 `npm run build` 重建，随 prepare 提交一起进。
+- **真机 soak（用户视角）**：fork 在用 web profile（`scripts/clone-profile.mjs`，parity 5/5、凭据按设计脱敏），
+  构建产物装进 fork 的 `node_modules/dsh-grok-workflow`，独立 `DSH_HOME` + 独立 `HOME`，监听 `127.0.0.1:3185/3186`，
+  headless Chromium + 原生 CDP 在 GUI 里发消息。三件事得到用户视角证据：①答案是人话（单语、无台账标签）；
+  ②**交付物路径写对了**（`…/work1/hello.md`，并说清两种打开方式）——这条是分支里唯一没有离线证据的 HYPOTHESIS，
+  本轮变成 CONFIRMED；③透明代理（`127.0.0.1:18099` → 真网关）记录到 verifier 请求命中新提示词的
+  `quoteRule` 与答案侧 `rewritePreamble`，说明契约在真模型请求里生效。见 `.rsi/evidence/round-076/soak.txt`。
+- **没覆盖（诚实记）**：判定角色补交在真机上的**自然触发** `NOT_RUN`——三轮 soak 的判定都一次解析成功，没赶上
+  没转义双引号的运气；试过写故障注入（改 verifier 首个流式 tool_call 的参数），但 verifier 是"多轮工具调用"的
+  子代理（一次调用里先跑 478 次 `bash`），结构化结论落在更后面的 HTTP 轮次，注入窗口没能在本轮窗口内可靠命中。
+  该分支的证据仍取单测 8 例（红 7 → 绿 8）。
+- **分支收尾**：`fix/verifier-supervisor-resubmit`、`fix/final-answer-rewrite`、`docs/heartbeat-ledger`、
+  `release/0.13.25` 四个 worktree 与三个分支已删（`be88c36` 是 rebase 后的新 HEAD，旧 `4231c00` 已作废）。
+  仍在的旧 worktree（`rsi/*`、`team-dispatch-v1`、`fix-progress-task-number-first`、`feat/live-steering`）不属本轮，未动。
+- **共享主工作树提醒**：`/home/fish/projects_mine/dsh-grok-workflow` 仍是 **detached `a6103ad`（0.13.14）且带 40+ 处
+  未提交改动**（相对 `main` 差 380 文件）。本轮全程在 `.agents/worktrees/release-01325` 里做，没碰过它；下一轮
+  若要用共享树，先决定那些改动是丢弃还是另立分支，别直接在上面切分支。
+
 ## 2026-11-24 — round-075 分支 `fix/verifier-supervisor-resubmit`：判定角色同次尝试补交（未合流，`CONFIRMED`）
 
 - **From:** 修复子代理B1 · **To:** lead / 合流者
