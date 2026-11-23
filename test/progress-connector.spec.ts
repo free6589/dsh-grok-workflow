@@ -461,19 +461,22 @@ describe('client progress tab: fixed left gutter + elbow wires', () => {
     }
   }
 
-  it('unwinds one group as ring -> lane -> channel -> card stub, inside the gutter', () => {
+  it('unwinds one group as ring -> lane -> one shared rail -> card stub, inside the gutter', () => {
     const wires = progress.measureWires(stubFlow())
     expect(wires.depth).toBeGreaterThanOrEqual(0)
-    expect(wires.paths).toHaveLength(2)
-    const [trunk, stub] = wires.paths
+    // Ring drop, the card's stub, and the one rail the whole band shares.
+    expect(wires.paths).toHaveLength(3)
+    const [trunk, stub, rail] = wires.paths
     expect(trunk!.kind).toBe('trunk')
     expect(trunk!.owner).toBe('stage:execute')
-    // Down from the ring (x=446, spine bottom 88), one lane leftwards under the
-    // spine, then down the group's own channel in the gutter to the card's height.
-    expect(trunk!.points).toEqual([[446, 88], [446, 92], [18, 92], [18, 180]])
+    // Down from the ring (x=446, spine bottom 88), one lane leftwards under the spine,
+    // then into the shared channel in the gutter.
+    expect(trunk!.points).toEqual([[446, 88], [446, 92], [18, 92]])
     expect(stub!.kind).toBe('branch')
     expect(stub!.points).toEqual([[18, 180], [40, 180]])
-    // The gutter legs stay left of the cards: the channel's vertical run and
+    expect(rail!.kind).toBe('rail')
+    expect(rail!.points).toEqual([[18, 92], [18, 180]])
+    // The gutter legs stay left of the cards: the rail's vertical run and
     // every stub never enter a card. The ring drop (first leg) and the lane run
     // (second leg) travel from the owner's ring to the gutter by design — the
     // lane lives under the spine (y=92, above the cards at y=140+), so neither
@@ -484,10 +487,60 @@ describe('client progress tab: fixed left gutter + elbow wires', () => {
     expect(laneY).toBe(92)
     const channelX = (trunk!.points[2] as [number, number])[0]
     expect(channelX).toBe(18)
-    expect(stub!.points).toEqual([[18, 180], [40, 180]])
-    const channelLeg = trunk!.points.slice(2)
-    for (const [x] of channelLeg) expect(x).toBeLessThanOrEqual(40)
+    expect((trunk!.points[2] as [number, number])[0]).toBeLessThanOrEqual(40)
+    expect((rail!.points[0] as [number, number])[0]).toBeLessThanOrEqual(40)
+    expect(rail!.owner).toBe('rail')
   })
+
+  it('draws one rail for every owner instead of one run per stage', () => {
+    // Two owners, cards at two heights: the request behind this rule was that the
+    // cross-stage lines outnumbered the stages. They now share one lane and one rail.
+    const wires = progress.measureWires(twoGroupFlow())
+    const trunks = wires.paths.filter(path => path.kind === 'trunk')
+    const rails = wires.paths.filter(path => path.kind === 'rail')
+    const stubs = wires.paths.filter(path => path.kind === 'branch')
+    expect(trunks.map(path => path.owner)).toEqual(['stage:execute', 'stage:verify'])
+    expect(stubs).toHaveLength(2)
+    expect(rails).toHaveLength(1)
+    // Both owners land on the same lane and the same channel, and the single rail
+    // reaches the deeper of the two cards.
+    const laneYs = new Set(trunks.map(path => (path.points[1] as [number, number])[1]))
+    const channelXs = new Set(trunks.map(path => (path.points[2] as [number, number])[0]))
+    expect([...laneYs]).toEqual([92])
+    expect([...channelXs]).toEqual([18])
+    expect(rails[0]!.points).toEqual([[18, 92], [18, 240]])
+  })
+
+  /**
+   * Two owner groups on a laid-out stub, so the shared rail is observable: `execute`
+   * hangs one card at y=180, `verify` hangs one at y=320, rings at x=446 and x=952.
+   */
+  function twoGroupFlow(): FlowStub {
+    const card = (owner: string, id: string, top: number) => ({
+      getAttribute: (name: string) => (name === 'data-owner' ? owner : name === 'data-gw-progress-task' ? id : 'doing'),
+      getBoundingClientRect: () => ({ top, left: 40, height: 80, width: 700 }),
+    })
+    const cards = [card('stage:execute', 'phase:任务 1', 160), card('stage:verify', 'phase:检查 1', 300)]
+    const track = {
+      getBoundingClientRect: () => ({ top: 100, bottom: 188, left: 0, width: 1440, height: 88 }),
+    }
+    return {
+      querySelectorAll: (selector: string) => (selector === '[data-gw-progress-task]' ? cards : []),
+      querySelector: (selector: string) => {
+        if (selector === '[data-gw-progress-track]') return track as never
+        if (selector.startsWith('.gw-progress-track')) {
+          const ring = {
+            getBoundingClientRect: () => (selector.includes('stage:verify')
+              ? { left: 938, width: 28 }
+              : { left: 432, width: 28 }),
+          }
+          return { querySelector: () => ring, getBoundingClientRect: () => ({}) } as never
+        }
+        return null
+      },
+      getBoundingClientRect: () => ({ top: 100, left: 0, width: 1440, height: 500 }),
+    }
+  }
 
   it('degrades to a plain list without layout instead of inventing coordinates', () => {
     expect(progress.measureWires(null)).toEqual({ width: 0, height: 0, depth: 0, paths: [] })

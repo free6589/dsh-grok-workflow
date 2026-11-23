@@ -2619,7 +2619,8 @@ describe('client progress tab: red is the current state, not the history', () =>
       getBoundingClientRect: () => ({ top: 100, left: 0, width: 1440, height: 500 }),
     } as never)
     // A failed owner still measures to the same geometry: status never reaches the line.
-    expect(wires.paths).toHaveLength(2)
+    // One ring drop, one card stub, and the band's single shared rail.
+    expect(wires.paths.map(path => path.kind)).toEqual(['trunk', 'branch', 'rail'])
     for (const path of wires.paths) {
       expect('tone' in path).toBe(false)
       expect('style' in path).toBe(false)
