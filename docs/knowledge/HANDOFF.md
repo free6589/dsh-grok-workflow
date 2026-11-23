@@ -16,7 +16,9 @@
   `1 + 2*(2*2) + 2` / `1 + 0 + 2*(2*3) + 2`；`test/engine-contract.spec.ts` 的 `maxTotalAgents: 7`
   改为 `taskCap()`（按插件自己的构造器推导，避免下次再留死数字）。
 - **验证**：红 `7 failed / 1 passed`（旧脚本，证据 `.rsi/evidence/round-075/red-verifier-resubmit.txt`）→
-  绿 `8 passed`；全量 `npx vitest run` **93 files / 1737 tests PASS**；typecheck exit 0；lint 0 errors。
+  绿 `8 passed`；`npm run ci` **exit 0：93 files / 1737 tests PASS、typecheck 干净、lint 0 errors / 35 warnings
+  （全部既有）、`verify:lib` byte-identical（229 files）**。提交 `f5b74e4`（`src/script.ts` + `lib/` + 两个 spec +
+  CHANGELOG + 三份记忆档），**仅本地分支，未推远端**（等 lead 合流；推或不推都不影响 tag/发版）。
 - **未做**：真机隔离 soak `NOT_RUN`（本轮不发布）；未改 `docs/ARCHITECTURE.md` 的上限描述（公式仍是同一构造器，
   只是每尝试块 ×2）。合流时若要保守，可只取 `script.ts` + 两个 spec 改动，`maxTotalAgentsFor` 的 ×2 与
   `routing.spec`/`engine-contract.spec` 必须同进同出。

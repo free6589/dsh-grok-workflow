@@ -7,7 +7,8 @@
 | 绿（新用例） | `npx vitest run test/verifier-resubmit.spec.ts` | **8 passed** |
 | 受影响的既有口径 | `npx vitest run test/routing.spec.ts test/engine-contract.spec.ts` | 两个 spec 钉了旧上限算术（`7` / `1 + 1*2*2 + 2`）；改为按 `maxTotalAgentsFor` 推导（`taskCap()`）与注释后的新算术（11 / 15），语义未变 |
 | 全量 | `npx vitest run` | **93 files / 1737 tests PASS** |
-| 静态门禁 | `npm run typecheck`；`npm run lint`；`npm run build` | typecheck exit 0；lint **0 errors / 37 warnings**（既有 warning，未新增；新 spec 0 warning）；`lib/` 与 client bundle 303813 B 重建 |
+| 静态门禁 | `npm run typecheck`；`npm run lint`；`npm run build` | typecheck exit 0；lint **0 errors / 35 warnings**（全部既有，新 spec 0 warning）；`lib/` 与 client bundle 303813 B 重建 |
+| 全量门禁（已提交 `f5b74e4`） | `npm run ci` | **exit 0：93 files / 1737 tests PASS**；typecheck 干净；lint 0 errors；`verify:lib` **byte-identical（229 files）** |
 
 **根因（`CONFIRMED`，session-6cd6053d）**：检查/复核子代理的 structured_output 里混入未转义的英文双引号，
 宿主解析失败返回 `null`；`callRole` 把 `null` 记成 `format-error` 后立刻换路，链路只有一条时整次尝试即失败。

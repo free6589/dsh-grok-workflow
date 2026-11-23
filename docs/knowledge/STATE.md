@@ -5,7 +5,8 @@ Last updated: 2026-11-24 01:35 +08:00（**判定角色的引号错误不再让�
 （同样一次、不花 retry）；提示词与结果结构加引号/800 字规范；空结构原因点名角色、`structured_output` 与
 `Expected ','` 归 format-error；`maxTotalAgentsFor` 的每尝试块 ×2 以容纳补交。门禁：`npx vitest run`
 **93 files / 1737 tests PASS**（新增 `test/verifier-resubmit.spec.ts` 8 例，红→绿证据
-`.rsi/evidence/round-075/red-verifier-resubmit.txt`），typecheck exit 0，lint 0 errors，`lib/` 同提交重建。
+`.rsi/evidence/round-075/red-verifier-resubmit.txt`），`npm run ci` **exit 0**，typecheck 干净，lint 0 errors /
+35 warnings（全部既有），`verify:lib` byte-identical（229 files），`lib/` 与 `src/` 同提交 `f5b74e4`。
 真机 soak `NOT_RUN`（本轮不发布）。详见 VALIDATION 首条。）
 
 Last updated: 2026-11-24 01:30 +08:00（**已发版 `0.13.24`：三路合流（队长拆法绑定 + 首轮消息立刻可见 + 确认单次消费），隔离真机 soak PASS，`CONFIRMED`** —
