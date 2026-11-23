@@ -131,7 +131,7 @@ export function planRestore(validated: ResumeCheckpointOk): RestorePlan {
       ? {
           outputs: [...(task.outputs ?? [])],
           files: [...(task.files ?? [])],
-          evidence: [...(task.evidence ?? [])],
+          evidence: (task.evidence ?? []).map(item => ({ ...item })),
         }
       : { outputs: [], files: [], evidence: [] }
     return {

@@ -5,6 +5,12 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Fixed / 修复
+
+- **Restored evidence no longer aliases the checkpoint / 恢复的证据不再与检查点串改** —
+  The restore plan shallow-copied the evidence array but shared its items, so editing a restored citation rewrote the validated checkpoint behind it. Evidence items are now copied per item; outputs/files stay as they were (plain strings need no deeper copy).
+  / 恢复计划只拷了证据数组没拷里面的条目，改恢复后的引用会串改已校验的检查点。现在每条证据单独拷一份；输出和文件本来就是纯文字，保持原样。
+
 ## [0.13.20] - 2026-11-23
 
 ### Fixed / 修复

@@ -1,0 +1,49 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/rsi-round-47
+
+ ❯ test/resume-validator.spec.ts (20 tests | 1 failed | 19 skipped) 10ms
+     ↓ accepts a well-formed sealed checkpoint carrying every restore status
+     ↓ accepts the same document from raw JSON text
+     ↓ refuses a document sealed with a foreign format version (version-mismatch, with both versions in the reason)
+     ↓ refuses an older version the same way
+     ↓ refuses corruption: invalid, truncated, or non-object documents
+     ↓ refuses corruption: wrong envelope kind and missing version or digest
+     ↓ refuses corruption when the document no longer matches its integrity digest
+     ↓ refuses corruption with a record path for malformed task records
+     ↓ refuses a conflict when a record claims an unknown status
+     ↓ refuses conflicts: duplicate task id and duplicate seq
+     ↓ refuses a conflict when the checkpoint belongs to a different run
+     ↓ produces a stable digest and survives a JSON round-trip
+     ↓ retains completed, interrupted, failed, gated and evidence-incomplete — never success
+     ↓ maps every restore status to its action and retention flag
+     ↓ preserves outputs, files and evidence verbatim for retained tasks, and nothing for success
+     × deep-copies evidence items so mutating the plan cannot alias the validated checkpoint 8ms
+     ↓ orders decisions by seq, counts actions, and flags replan where needed
+     ↓ requires no replan when everything is completed or gated, including an empty journal
+     ↓ fails closed: no plan is ever produced for a refused checkpoint
+     ↓ builds and validates a checkpoint end to end through the barrel export
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/resume-validator.spec.ts > safe restore policy > deep-copies evidence items so mutating the plan cannot alias the validated checkpoint
+AssertionError: expected 'mutated' to be 'a' // Object.is equality
+
+Expected: "a"
+Received: "mutated"
+
+ ❯ test/resume-validator.spec.ts:290:63
+    288|     if (!preserved) return
+    289|     preserved.ref = 'mutated'
+    290|     expect(validated.checkpoint.tasks[0]?.evidence?.[0]?.ref).toBe('a')
+       |                                                               ^
+    291|   })
+    292|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 19 skipped (20)
+   Start at  14:41:43
+   Duration  203ms (transform 53ms, setup 0ms, import 73ms, tests 10ms, environment 0ms)
+

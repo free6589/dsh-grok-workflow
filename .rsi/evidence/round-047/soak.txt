@@ -1,0 +1,84 @@
+RSI round 47 — isolated live-chain soak (2026-11-23, Asia/Singapore)
+工作目录基线 / baseline: worktree .agents/worktrees/rsi-round-47 @ 2d20628 (rsi/round-47)
+含 round-47 改动 / includes: planRestore evidence deep-copy (lib/resume/policy.js + test), CHANGELOG 已记
+DSH: 0.2.2-rc.3 (dsh --version)
+
+隔离 / isolation
+- DSH_HOME=<worktree>/.tmp/soak-47/home（gitignored，.tmp/ 整目录忽略）
+- live 家目录 ~/.dsh 全程只读检查、未写入；未重启/未触碰现行实例
+- 全程无 web 实例（仅用 headless，用完即退，无残留监听端口）
+
+步骤 / steps (all with DSH_HOME=<scratch>)
+1. 建 profile: dsh --profile grok-soak-47 --from-default-profile headless --dump-config
+   -> 建成。workflow-ptc 行存在且 config provider=spawn（未 disabled）；subagent spawn/fork 提供者在位。
+2. 装插件: dsh plugin --profile grok-soak-47 add <worktree 路径>
+   -> exit 0（link 安装）。--dump-config 含 `grok-workflow` 行；已装包 version=0.13.20；
+      bundles=["@deepseek-ai/dsh-base","@deepseek-ai/dsh-headless","dsh-grok-workflow"]。
+3. 模型链路探针 / model-route probe:
+   dsh --profile grok-soak-47 headless 'Say exactly: SOAK-PROBE-OK'
+   -> exit 1, stderr: dsh: MISSING_CREDENTIAL: llm-deepseek: no API key for provider
+      route "deepseek-official"; store DEEPSEEK_API_KEY through the credentials
+      service (the web Models page writes it), or export DEEPSEEK_API_KEY in the
+      launching environment（stdout 为空）
+4. 最小真实工作流 / minimal real workflow:
+   dsh --profile grok-soak-47 headless 'Use the grok_workflow tool with objective
+   "List the two smallest prime numbers" and no subtasks.'
+   -> exit 1, 同上 MISSING_CREDENTIAL（stdout 为空）。未伪造任何 COMPLETED。
+
+凭证说明 / credentials: 本环境仅做布尔存在性检查（变量名），未读取、未回显任何值；
+隔离家目录无凭证；未从其他 profile 拷贝密钥（LOCAL-TESTING 禁止事项）。
+
+清理 / cleanup: scratch 家目录 <worktree>/.tmp/soak-47（含 home/ 与 logs/ 原始输出）已整体删除；
+live 家目录未动；无残留进程/端口；无提交、无 push、无改版本。
+
+结论 / verdict: BLOCKED —— 插件安装与 profile 组合链路通（grok-workflow 行 + bundle 层正确），
+但隔离环境无可用模型额度（MISSING_CREDENTIAL），未能跑出 COMPLETED。
+恢复深拷逻辑以单测钉死（见 round-047/ci.txt, green.txt），真机链路待有额度后重跑。
+Verdict: BLOCKED — plugin install + profile composition verified; no usable model
+credential in this environment, so no COMPLETED run observed; nothing fabricated.
+
+证据 / evidence: 本文件 .rsi/evidence/round-047/soak.txt（脱敏，无密钥/token/cookie）。
+原始日志曾存 gitignored 的 .tmp/soak-47/logs/，已随 scratch 删除。
+AGENTS.md §5: 无密钥落盘、无 live 写入、无实例重启、无审批绕过。
+
+---
+
+第二试 / trial 2 (2026-11-23, Asia/Singapore)
+工作目录基线 / baseline: worktree .agents/worktrees/rsi-round-47 @ 2d20628 (rsi/round-47)，与第一试同基线
+DSH: 0.2.2-rc.3 (dsh --version)
+
+隔离 / isolation
+- DSH_HOME=<worktree>/.tmp/soak-47b（git check-ignore 确认 .tmp/ 整目录忽略）
+- live ~/.dsh/profiles/web 仅 cp -a 只读拷贝；拷贝前后 live 目录 mtime 未变；未重启/未触碰现行实例
+- 未起 web 实例；本次起过的 dsh 进程事后 ps 确认无残留
+
+步骤 / steps (all with DSH_HOME=<scratch>)
+1. 建 fork: mkdir -p <scratch>/profiles + cp -a live web -> <scratch>/profiles/soak-47b -> COPY_OK。
+2. 装插件: dsh plugin --profile soak-47b add <worktree 路径> -> exit 0（link 安装，
+   dsh-grok-workflow + dsh-system-prompt-design 两行 link）。
+   --dump-config 含非注释行 `id: grok-workflow`（grok-workflow 大小写不敏感共 33 处，
+   含注释）；已装包 version=0.13.20；link 目标指回 worktree。
+3. 模型链路 PONG 预检 / model-route probe（只做存在性检查，未读/未显任何密钥值）:
+   POST https://models.fyrali.com/openai/v1/chat/completions，模型名
+   opencode-go/muse-spark-1.3-contributor 与 tokenrhythm/glm-5.3-flash 各一次
+   -> 均为 HTTP=502 空回包（0 字节）。GET / 与 GET /openai/v1/models 同样 502
+  （server 头为 Caddy），属网关侧无可用服务，非本 fork 配置问题。
+   存在性：BIFROST_VIRTUAL_KEY 已设置（仅记有/无）；~/.dsh/bifrost.env 存在
+   （63 字节，mode 600，仅记大小与权限）。
+   注：`dsh --profile soak-47b headless ...` 不适用——fork 的是 web 模板
+   （--help 显示为 serve 浏览器 UI），一次误语法尝试 exit 1 属用法错误，
+   未发起任何模型调用；故以网关直连 PONG 为有效预检。
+4. 最小真实工作流 / minimal real workflow: NOT_RUN —— 预检无可用额度，
+   按任务要求不跑、不伪造任何 COMPLETED。
+
+清理 / cleanup: scratch 家目录 <worktree>/.tmp/soak-47b 已整体删除；
+live 家目录未动；无残留进程；无提交、无 push、无改版本。
+
+结论 / verdict（第二试）: BLOCKED —— 插件安装与 profile 组合链路通
+（grok-workflow 行 + version 0.13.20 + link 目标正确），但 bifrost 网关
+连续 502 空回包，无可用模型额度，未能跑出 COMPLETED；与第一试 BLOCKED 一致。
+Verdict trial 2: BLOCKED — plugin install + profile composition verified;
+gateway HTTP 502 with empty body, so no COMPLETED run observed; nothing fabricated.
+
+证据 / evidence: 本文件 .rsi/evidence/round-047/soak.txt（脱敏，无密钥/token/cookie）。
+AGENTS.md §5: 仅布尔存在性检查，无密钥落盘、无 live 写入、无实例重启、无审批绕过。
