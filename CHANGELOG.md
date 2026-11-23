@@ -7,6 +7,10 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ### Fixed / 修复
 
+- **The task board answers presence checks and the docking note tells the truth / 任务板支持存在检查，对接注释不再撒谎** —
+  The docking note claimed the store already satisfied the reader (`get`/`has`), but the board had no `has` and its `get` throws instead of returning empty. The board now answers `has` without throwing, and the note states the remaining gap honestly: pointing the session at the store still needs a small adapter that turns the not-found throw into an empty read (next round's work).
+  / 对接注释说板子已经满足读数器，但板子连 `has` 都没有，`get` 还是抛错而非返回空。现在板子支持不抛错的存在检查，注释也说实话：把会话指过去还差一个把抛错转成空读的小适配器（下轮做）。
+
 - **A runtime without the pre-step hook fails the load instead of degrading silently / 没有前置钩子的环境加载即报错，不再悄悄降级** —
   The gate claimed to fail closed but a runtime without `agent/pre-step` only warned and let the main model answer directly. The missing hook now fails the load loudly with its reason, so a broken composition surfaces at install time instead of running unguarded.
   / 门上写着"关不住就拦"，但没钩子的环境只警告一句就放行，主模型直接作答。现在缺钩子就加载报错点名原因，坏编排在装机时就暴露，不会裸奔。

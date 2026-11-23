@@ -115,6 +115,21 @@ describe('taskboard CRUD and schema v1', () => {
     const selfDep = await board.create({ id: 't', title: 'T', blocked_by: ['t'] }).catch((cause: unknown) => cause)
     expect(isTaskboardError(selfDep, 'invalid-input')).toBe(true)
   })
+
+  it('has reports presence by id and agrees with get', async () => {
+    const board = await freshBoard('has')
+    await board.create({ id: 'task-1', title: 'Present' })
+    expect(board.has('task-1')).toBe(true)
+    expect(board.get('task-1').id).toBe('task-1')
+    expect(board.has('ghost')).toBe(false)
+    let missing: unknown
+    try {
+      board.get('ghost')
+    } catch (cause) {
+      missing = cause
+    }
+    expect(isTaskboardError(missing, 'not-found')).toBe(true)
+  })
 })
 
 /* ------------------------------------------------------------------ CAS -- */

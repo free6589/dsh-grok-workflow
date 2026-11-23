@@ -1,0 +1,39 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/rsi-round-55
+
+ ❯ test/taskboard.spec.ts (14 tests | 1 failed | 13 skipped) 11ms
+     ↓ creates a pending unowned row at version 1 and persists status/owner/deps/version
+     ↓ rejects a duplicate task id
+     ↓ walks the full state machine, including blocked requeue to pending
+     ↓ treats completed rows as immutable
+     ↓ rejects unknown ids and bad input
+     × has reports presence by id and agrees with get 7ms
+     ↓ applies only on a matching expectedVersion and reports both versions on conflict
+     ↓ serializes two handles that race on the same row: one wins, one conflicts, reload recovers
+     ↓ reopening the same directory recovers status/owner/dependencies/version
+     ↓ opens empty when no store exists and refuses a checksum-tampered store
+     ↓ blocks claim while a predecessor is unfinished and releases it when done
+     ↓ names every unmet predecessor, including missing ids
+     ↓ assign and setDependencies re-check the wiring
+     ↓ failed rows requeue to pending and keep their dependency gate
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/taskboard.spec.ts > taskboard CRUD and schema v1 > has reports presence by id and agrees with get
+TypeError: board.has is not a function
+ ❯ test/taskboard.spec.ts:122:18
+    120|     const board = await freshBoard('has')
+    121|     await board.create({ id: 'task-1', title: 'Present' })
+    122|     expect(board.has('task-1')).toBe(true)
+       |                  ^
+    123|     expect(board.get('task-1').id).toBe('task-1')
+    124|     expect(board.has('ghost')).toBe(false)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 13 skipped (14)
+   Start at  17:17:14
+   Duration  704ms (transform 346ms, setup 0ms, import 367ms, tests 11ms, environment 0ms)
+

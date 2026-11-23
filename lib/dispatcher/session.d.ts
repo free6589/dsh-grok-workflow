@@ -11,11 +11,13 @@
  * effect and on `stop()`. `resume()` reads that file back, so a restarted L1
  * steward picks up exactly the board it left behind.
  *
- * Task-8 docking point: when `src/taskboard/` lands, its store already
- * satisfies `TaskReader` (it has `get`/`has` by task id). Point this session
- * at that store — replace the in-memory `Map` below with the task-8 store and
- * keep the `decideIntent` → `applyEffect` order unchanged. Until then this
- * file is self-contained and touches no other module.
+ * Task-8 docking point: the `src/taskboard/` store now has `has`/`get` by
+ * task id, but its `get` throws `TaskboardError('not-found')` for a missing
+ * id while `TaskReader` wants `get` to return `undefined`. Pointing this
+ * session at that store therefore still needs a small adapter that catches
+ * the not-found throw and returns `undefined` instead (next round's work —
+ * only the adapter, not a change to the store's throw contract). Until then
+ * this file is self-contained and touches no other module.
  */
 import { type DispatcherDecision, type DispatcherIntent, type DispatcherTask, type TaskReader } from './policy.js';
 /** On-disk shape of the persisted board. Versioned for future migrations. */
