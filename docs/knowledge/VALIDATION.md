@@ -1,3 +1,15 @@
+## round-57 会话换上持久板（soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
+
+| state | command | result |
+| --- | --- | --- |
+| worktree rsi-round-57 `9dc7624`（main `8f8f8f3` + 本轮 1 提交） | 旧码跑新 spec（子代理红） | **1 failed / 2 passed**：`store.jsonl` 断言失败（旧码只有 `board.json`） |
+| 同上（新码） | `npx vitest run test/dispatcher-board.spec.ts test/dispatcher.spec.ts test/board-reader.spec.ts test/taskboard.spec.ts`（lead 独立） | **30 passed** |
+| 同上（新码） | `npm run ci`（lead 独立） | **exit 0：87 files / 1651 tests PASS**；typecheck 干净；lint 0 errors；`verify:lib` byte-identical |
+| 隔离 soak | 网关探针 | **BLOCKED**：网关 502 无额度，未伪造 |
+
+**Changed:** `src/dispatcher/session.ts`（内存 Map + 自制 JSON 退役，持 TaskBoard 经适配器读；handle 全 async 懒开；真相落板、无列字段内存随行并写明）+ `board-reader.ts`（holder 参数）+ `dispatcher.ts`（转发 async）+ `test/dispatcher-board.spec.ts`（+3）+ `test/dispatcher.spec.ts`（调用 async 化，断言未动）+ `lib/` 重建 + `CHANGELOG [Unreleased]` 中英双语 + `.rsi/evidence/round-057/`。未动 policy 判定/store 契约。
+**Honest boundary:** 真机 BLOCKED，不发版；`[Unreleased]` 已攒 11 条待发。对接三步走完（`has`→适配器→换板）。
+
 ## round-56 板子转读数器适配器（soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
 
 | state | command | result |

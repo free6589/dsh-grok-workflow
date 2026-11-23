@@ -1,3 +1,8 @@
+Last updated: 2026-11-23 18:00 +08:00（**round-57 已合流 main 未发版：会话换上持久板，`CONFIRMED`，soak BLOCKED** —
+合流提交 `42b1b01`（main `8f8f8f3` + `9dc7624`）；`npm run ci` exit 0（87 文件 / 1651 测试 PASS，+3 换板回归）。
+真机 BLOCKED（网关 502，未伪造）；`CHANGELOG [Unreleased]` 中英文已记 11 条待发，不发版；
+dispatcher↔taskboard 对接三步走完。）
+
 Last updated: 2026-11-23 17:28 +08:00（**round-56 已合流 main 未发版：板子转读数器适配器，`CONFIRMED`，soak BLOCKED** —
 合流提交 `1c223b3`（main `ac2851a` + `764dfe4`）；`npm run ci` exit 0（86 文件 / 1648 测试 PASS，+2 适配器回归）。
 真机 BLOCKED（网关 502，未伪造）；`CHANGELOG [Unreleased]` 中英文已记 10 条待发，不发版；

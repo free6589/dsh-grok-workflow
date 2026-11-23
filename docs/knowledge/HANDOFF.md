@@ -1,3 +1,16 @@
+## 2026-11-23 — round-57 已合流 main 未发版：会话换上持久板（`CONFIRMED`，soak BLOCKED）
+
+- **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
+- **做了什么**：dispatcher↔taskboard 对接第 3 步（收官）。会话内存表 + 自制 JSON 退役，
+  换持持久板经适配器读；handle 全 async 懒开（无遗漏路径）；真相落板、无列字段内存随行并写明，
+  不悄悄丢字段；+3 换板回归；`npm run ci` exit 0（87/1651）；lead 独立红绿复验成立。
+  未动 policy 判定/store 契约。
+- **真机**：BLOCKED（网关 502，未伪造）。本次不发版。
+- **合流**：`rsi/round-57`（`9dc7624`）已 `--no-ff` 合入 main 系 worktree（合流 `42b1b01`）；
+  `rsi/round-57` 分支可 24h 内删除。`CHANGELOG [Unreleased]` 中英文已记 11 条待发。
+- **下轮**：开新方向（gate/调度调用方 async 化评估，或 research 新找 bug 面）。
+  网关恢复后给 round-47~57 补一次 soak 再发 `0.13.21`。
+
 ## 2026-11-23 — round-56 已合流 main 未发版：板子转读数器适配器（`CONFIRMED`，soak BLOCKED）
 
 - **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
