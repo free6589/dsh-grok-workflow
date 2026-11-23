@@ -1,0 +1,21 @@
+=== round-60 AFTER (no edit made — STOPPED per step-3: spec would go red, awaiting lead) ===
+
+--- git status ---
+## rsi/round-60
+?? .rsi/evidence/round-060/
+
+--- README.md:252 (unchanged) ---
+Everything else is fixed inside the plugin and no longer accepted: `maxRetries=1`, `maxActiveRuns=2` per session and `maxActiveRunsTotal=8` per process, `historyTurns=20` / `historyChars=20000`, `maxQueuedMessages=4`, `recordLimit=256`, `answerStrategy=in-turn`, `triageClassifier=rules`, `triageAsk`, `triageModel` unset, `triageFollowupAsFast`, `instantReceipt`, `humanSummary`, `showDiagnostics=false`, `recordRuns`, `showProgress`, `switchOn=[]` (built-in policy), `subagentProvider` unset, and the gate (`enforceGate`/`gateRequired`/`gateScope`/`gatePreset`) is always on.
+
+--- README.zh-CN.md:241 (unchanged) ---
+其余一律固化在插件内部、不再接受：`maxRetries=1`、`maxActiveRuns=2`（每会话） / `maxActiveRunsTotal=8`（每进程）、`historyTurns=20` / `historyChars=20000`、`maxQueuedMessages=4`、`recordLimit=256`、`answerStrategy=in-turn`、`triageClassifier=rules`、`triageAsk`、`triageModel` 未设、`triageFollowupAsFast`、`instantReceipt`、`humanSummary`、`showDiagnostics=false`、`recordRuns`、`showProgress`、`switchOn=[]`（内置策略）、`subagentProvider` 未设，闸门（`enforceGate`/`gateRequired`/`gateScope`/`gatePreset`）恒开。
+
+--- backtick mentions still present ---
+README.md:117:- The gate is **always installed** in `0.10.0` (the former `enforceGate` switch was removed) and inspects every *user* message. Whether a message is *worked on* is a second switch: the per-session toggle, whose config default `grokDefault` is `off` — until `/grok` turns it on for that session, a message passes through to the model as ordinary chat (`reason: mode-off`). Messages from other sources — user-question replies, team messages, webhooks, schedules, subagent prompts — are never claimed, and an empty batch passes through.
+README.md:121:- To keep only the `grok_workflow` tool and skip interception entirely, leave `grokDefault` at `off` and never run `/grok on`. A deployment that must never degrade silently gets a warning (not a silent pass) when this runtime exposes no `agent/pre-step` hook; `0.10.0` has no `gateRequired` key left to promote that to a load error.
+README.md:241:| `switchOnRateLimit` | `true` | `true` \| `false` | Whether a rate-limited (429) route advances to the next model in the chain. On, the built-in policy applies and a 429 falls through like any transport failure. Off, only the six other classes advance: the 429 keeps its route and the task's bounded retry decides, which is the right trade when the next model costs much more than waiting |
+README.md:252:Everything else is fixed inside the plugin and no longer accepted: `maxRetries=1`, `maxActiveRuns=2` per session and `maxActiveRunsTotal=8` per process, `historyTurns=20` / `historyChars=20000`, `maxQueuedMessages=4`, `recordLimit=256`, `answerStrategy=in-turn`, `triageClassifier=rules`, `triageAsk`, `triageModel` unset, `triageFollowupAsFast`, `instantReceipt`, `humanSummary`, `showDiagnostics=false`, `recordRuns`, `showProgress`, `switchOn=[]` (built-in policy), `subagentProvider` unset, and the gate (`enforceGate`/`gateRequired`/`gateScope`/`gatePreset`) is always on.
+README.zh-CN.md:112:- `0.10.0` 起闸门**恒开**（原先的 `enforceGate` 开关已删除），会检查每一条**用户**消息。但“是否真的动手做”是第二个开关：会话级开关的配置默认值 `grokDefault` 是 `off` —— 在那个会话里发过 `/grok` 之前，消息按普通聊天交给模型（`reason: mode-off`）。其它来源的消息——用户问题回复、团队消息、webhook、定时任务、子代理提示词——从不认领；空批直接放行。
+README.zh-CN.md:116:- 想只保留 `grok_workflow` 工具、完全不拦截，就让 `grokDefault` 保持 `off` 且不要发 `/grok on`。要求“绝不静默降级”的部署会看到“运行时没有 `agent/pre-step` 钩子”的警告（不是静默放行）；`0.10.0` 已没有 `gateRequired` 键可以把它升成载入错误。
+README.zh-CN.md:230:| `switchOnRateLimit` | `true` | `true` \| `false` | 限流（429）时是否换到链上的下一个模型。打开即内置策略：429 与其它传输类失败一样往下换。关掉后只有其余六个类别换人，429 留在原路由、由任务的有界重试决定——当下一个模型明显更贵时这是对的取舍 |
+README.zh-CN.md:241:其余一律固化在插件内部、不再接受：`maxRetries=1`、`maxActiveRuns=2`（每会话） / `maxActiveRunsTotal=8`（每进程）、`historyTurns=20` / `historyChars=20000`、`maxQueuedMessages=4`、`recordLimit=256`、`answerStrategy=in-turn`、`triageClassifier=rules`、`triageAsk`、`triageModel` 未设、`triageFollowupAsFast`、`instantReceipt`、`humanSummary`、`showDiagnostics=false`、`recordRuns`、`showProgress`、`switchOn=[]`（内置策略）、`subagentProvider` 未设，闸门（`enforceGate`/`gateRequired`/`gateScope`/`gatePreset`）恒开。

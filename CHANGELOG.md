@@ -7,6 +7,10 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ### Fixed / 修复
 
+- **The READMEs stop listing removed keys as settable / 说明书不再把已删的键写成可配值** —
+  Both READMEs listed `switchOn=[]` and the gate switch as fixed values; all five keys were removed and a stored value is now rejected as unknown. The row now names each removed key with its removal noted, so nobody copies a dead value into a patch.
+  / 两份说明书都把 `switchOn=[]` 和闸门开关写成固定值，但这五个键早删了，存了会被当未知键拒绝。现在改成点名已删，照抄也不会抄到死值。
+
 - **Two stale comments now tell the truth about the gate / 两处过期注释改说实话** —
   Two comments still described the removed gate switch (`returns false`, `decide whether the gate exists`); the gate always runs since round-54 and a hookless runtime fails the load. Comments corrected; no behavior changes.
   / 两处注释还写着已删除的开关（"返回否"、"决定门在不在"）；门从 round-54 起常开，无钩子就加载报错。注释改对；行为不变。
