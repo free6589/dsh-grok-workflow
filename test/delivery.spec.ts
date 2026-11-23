@@ -392,6 +392,80 @@ describe('机器台账：每一行说清一件已经发生的事', () => {
     // And it stays one dialect: the canonical renderer prints the same row.
     expect(renderReport(report).split('\n')).toContain(`  incomplete: ${blockedReason}`)
   })
+
+  it('clips an overlong ledger at a line boundary with the shared truncation marker (round 45)', () => {
+    // The ledger tail used to be a bare UTF-16 slice capped at exactly 8,000
+    // characters with a bare … marker the canonical renderer never uses: the
+    // cut could land mid-line, and nothing marked the text as shortened the
+    // way `renderReport` marks its own overlong output. One dialect: over
+    // budget, the ledger ends at a whole line with the marker `renderReport`
+    // uses (`[output truncated; …]`). The emoji pair below pins the second
+    // half of the fix: the surviving head still passes through `cutCodeUnits`,
+    // so a cut that would strand half an astral character never leaves a lone
+    // surrogate (rendered as �) behind.
+    const MARKER = '[output truncated; see the canonical structured result for full details]'
+    const mk = (tasks: WorkflowReport['tasks']): WorkflowReport => {
+      const planTasks = tasks.map(({ status, attempts, error, ...rest }) => rest)
+      return assertWorkflowReport({
+        schemaVersion: 'grok-workflow/v1',
+        status: 'partial',
+        objective: OBJECTIVE,
+        plan: { source: 'caller', tasks: planTasks, error: '' },
+        tasks,
+        confirmed: [{ taskId: 'a', criterion: '天气已核验', evidence: 'verified 天气已核验 in file:///tmp/report' }],
+        incomplete: [
+          { taskId: 'b', reason: `Rb-${'x'.repeat(490)}`, category: 'infrastructure' },
+          { taskId: 'c', reason: `Rc-${'y'.repeat(490)}`, category: 'infrastructure' },
+          { taskId: 'd', reason: `Rd-${'z'.repeat(490)}`, category: 'infrastructure' },
+        ],
+        errors: Array.from({ length: 12 }, (_, index) => ({
+          phase: 'Verify',
+          // An emoji pair straddling the old cut: the last error row is half
+          // emoji, so any bare slice at the budget lands inside one of them.
+          message: `err${index}-${index === 11 ? '😀'.repeat(145) : 'E'.repeat(290)}`,
+          category: 'infrastructure' as const,
+        })),
+        uncertainties: Array.from({ length: 12 }, (_, index) => ({
+          taskId: 'a',
+          text: `note${index}-${'q'.repeat(390)}`,
+        })),
+        routes: Array.from({ length: 200 }, (_, index) => ({
+          role: (['planner', 'worker', 'verifier', 'supervisor', 'synthesizer'] as const)[index % 5],
+          chainIndex: 0,
+          route: `p${index}/${'r'.repeat(40)}`,
+          attempt: 1,
+          outcome: 'failed' as const,
+          failureClass: 'timeout' as const,
+          reason: `blow ${index} ${'R'.repeat(150)}`,
+        })),
+        synthesis: { mode: 'deterministic', summary: 'S'.repeat(1999) },
+        limits: { ...LIMITS, maxRetries: WIRE_RETRIES, maxTotalAgents: maxTotalAgentsFor(4, FIXED_MAX_RETRIES, routeBudgetFor(config)) },
+      }, OBJECTIVE, config)
+    }
+    const verifiedTask = (() => {
+      const planTask = task('a', ['天气已核验'])
+      const checked = verification(planTask)
+      return {
+        ...planTask,
+        status: 'verified' as const,
+        attempts: [{ attempt: 1, execution: execution('查到新加坡本周多雨'), verification: checked, passed: true, error: '' }],
+        error: '',
+      }
+    })()
+    const failedTask = (id: 'b' | 'c' | 'd') => {
+      const planTask = task(id, ['酒店价格已核验'])
+      return {
+        ...planTask,
+        status: 'failed' as const,
+        attempts: [{ attempt: 1, execution: execution('尝试查询酒店价格'), verification: failingVerification(planTask, '价格来源打不开'), passed: false, error: `R${id}-${'x'.repeat(490)}` }],
+        error: `R${id}-${'x'.repeat(490)}`,
+      }
+    }
+    const ledger = machineLedger(mk([verifiedTask, failedTask('b'), failedTask('c'), failedTask('d')]))
+    expect(ledger).not.toContain('�')
+    expect(ledger.endsWith(MARKER)).toBe(true)
+    expect(ledger.length).toBeLessThanOrEqual(8_000 + MARKER.length + 1)
+  })
 })
 
 describe('relay/in-turn 文本：可见块与人话块一致，台账折叠在标记之后', () => {

@@ -124,6 +124,14 @@ export declare function humanConclusion(report: WorkflowReport, opts?: {
  * route and attempt a maintainer needs, under the same field labels
  * `src/report.ts` renders, so the two views describe one report in one dialect.
  *
+ * When the ledger outgrows {@link MAX_LEDGER_CHARS}, the tail is cut at the
+ * last line boundary so the cut never strands a reader mid-line, and the cut
+ * is fenced through {@link cutCodeUnits} so a surrogate pair (an emoji at the
+ * cut, a rare CJK ideograph) is never split into a replacement box. A body with
+ * no line break to stop at in the last 8,000 characters keeps the straight
+ * code-unit cut. The surviving head ends with the same truncation marker
+ * `renderReport` uses, so a clipped ledger says so in the one shared wording.
+ *
  * @param report - validated report.
  * @returns the ledger text, bounded by {@link MAX_LEDGER_CHARS}.
  */

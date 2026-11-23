@@ -1,0 +1,90 @@
+# soak.txt — rsi/round-45 真机 soak 证据（脱敏）
+
+结论：soak PASS（有额度的真模型，最小真实工作流通了；截断标记逻辑在真机可达链路已验证）。
+
+## 环境（隔离，live 未碰）
+
+- 基线：worktree `/home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/rsi-round-45`，
+  分支 `rsi/round-45`（round-45 改动：machineLedger 尾部行边界 + 防乱码 + 统一截断标记）。
+- 隔离家目录：`<worktree>/.tmp/soak-45/home`（gitignored，`.tmp/`），
+  profile `grok-soak-45` 由 headless 模板新建；headless 模板自带 `workflow-ptc`
+ （`provider: spawn`，启用状态），未改 live `~/.dsh`（`ls ~/.dsh/profiles | grep soak`
+  无命中；全程未重启/未触碰现行实例端口）。
+- 插件安装：`DSH_HOME=<scratch> dsh plugin --profile grok-soak-45 add <worktree>`，
+  `dsh.profile.bundles` = `["@deepseek-ai/dsh-base","@deepseek-ai/dsh-headless","dsh-grok-workflow"]`；
+  `--dump-config` 含 `- id: grok-workflow / name: dsh-grok-workflow` 行。
+- 模型补丁：`<worktree>/.tmp/soak-45/soak-model.patch.yml`（本证据目录外，仅 scratch），
+  provider `bifrost-completions` → `http://127.0.0.1:18088/openai/v1`，
+  模型 `wb/cn:deepseek-v4.1-flash`，凭据只来自环境变量（存在性检查通过，
+  值未读取、未落盘）。
+- 端口：headless 进程按需起止，无常驻监听；live 实例端口全程未动。
+
+## 真模型预检（有额度，非 BLOCKED）
+
+- `wb/cn:deepseek-v4.1-flash` 经本机网关 `chat/completions` 实发 `PONG`
+ （`max_tokens: 5`），返回 `content: PONG`。
+- 备用 `opencode-go/muse-spark-1.3-contributor` 同样返回首个 stream chunk（含
+  `routing_info.provider: opencode-go`），有额度。
+
+## 最小真实工作流（1–2 个简单任务，真模型）
+
+命令形（凭据只来自环境，值不入库）：
+
+```sh
+DSH_HOME=<scratch>/home dsh --profile grok-soak-45 \
+  --patch <scratch>/soak-model.patch.yml headless --json "<prompt>"
+```
+
+prompt：caller 计划双任务 —— (alpha) 在当前目录写 `alpha.txt`，
+内容恰为 8 字节 `ALPHA_OK` 无尾换行并报字节数；(beta) 跑 `expr 17 + 25` 报 stdout；
+要求真实命令证据，COMPLETED 报告收尾。
+
+结果（`exit=0`，33 个 `--json` 事件，脱敏后全文在 scratch `.tmp/`，已清）：
+
+- `tool_call[grok_workflow]` 1 次（depth-0 root 代发；depth-1 子代理直调被 harness
+  拒绝，见下）→ `tool_result status: completed`，报告头：
+  `Grok workflow: COMPLETED / Plan: caller; 2 task(s); 2 verified`。
+- alpha verified（2 attempts）：`wc -c < alpha.txt` → `8`；
+  `od -An -tx1` → `41 4c 50 48 41 5f 4f 4b`，尾字节 `4b`（K，非 0a）；
+  md5 与 `printf 'ALPHA_OK'` 一致。独立复验通过（`od -An -c` = `A L P H A _ O K`，
+  `wc -c` = 8）。
+- beta verified（1 attempt）：`expr 17 + 25` → stdout `42`，`exit=0`；
+  独立复验 `od -c` = `4 2 \n`。独立复验通过（本机 `expr 17 + 25` = 42）。
+- 归档：scratch 内 `memory/grok-workflow/archive.jsonl` 累计 19 行，
+  本轮 round 条目 `run:1a7a0a1a… status completed · verified 2/2 · confirmed 5`，
+  含 5 条真实证据引用（`wc`/`od`/`stat`/`md5`/`expr`）。
+- 附带观察（非 BLOCKED，不影响结论）：`mode: full` + `grokDefault: on` 时，
+  纯寒暄 `Reply with exactly: MODEL_OK` 会被 gate 认领进工作流并按“无执行产物”
+  判失败（`report-invalid`，round `d7625f74… status failed`）；这是 gate 按设计
+  工作的表现（寒暄不是可验证任务），改用 caller 双任务 prompt 即 COMPLETED。
+  另：`grok_workflow` 在 delegation-depth-1 子代理处被 harness 拒绝，
+  root depth-0 代发成功（round `27d85124…` 记录了该 failed 尝试，
+  `harness rejects grok_workflow calls from a delegation-depth-1 subagent`）。
+
+## round-45 截断标记逻辑（真机可达性）
+
+- 本轮工作流ledger 未超 8000 字符（小任务如预期不触发截断），故真机侧验证的是
+  “插件加载 → 报告产出 → ledger/归档链路通”，截断分支本身用同份已构建产物
+  `lib/delivery/index.js`（`MAX_LEDGER_CHARS = 8_000`，含本轮改动）在本机直接调用验证：
+- 40 长任务合成 report → `machineLedger()` 返回 `len=8026`，尾部恰为
+  `\n[output truncated; see the canonical structured result for full details]`，
+  `endsWithMarker=true`，截断头止于整行边界（`…\nConfirmed evidence:`），无半行、
+  无乱码（防 surrogate-split 的 `cutCodeUnits` 路径与源码一致）。
+- 标记文本与 `renderReport` 共用同一常量 `LEDGER_TRUNCATED_MARKER`（源码
+  `src/delivery/index.ts` + 构建产物 `lib/delivery/index.js:848` 双侧确认），
+  无第二种措辞。
+
+## 清理
+
+- `alpha.txt`（8 字节，`ALPHA_OK` 无尾换行）曾落在 main repo workspace 根
+  `/home/fish/projects_mine/dsh-grok-workflow/alpha.txt` —— 系任务指定的写入位置；
+  验收并独立复验后已由本子代理删除（`od`/`wc` 双重确认后清理），主工作树无残留。
+- scratch 家目录与 `.tmp` 输出在证据拷出后删除（本证据文件是唯一落盘结论），无残留监听进程（headless 按次起止），未提交、未推送、未改版本。
+
+## 一句话
+
+soak PASS —— 隔离 headless 实例 + 工作树插件 + 有额度真模型
+（`wb/cn:deepseek-v4.1-flash`）跑通 caller 双任务（`alpha.txt` 8 字节落盘，
+`expr 17 + 25` = 42），`grok_workflow` COMPLETED 2/2 verified；
+round-45 统一截断标记在同构建产物上可达（超限 ledger 以整行边界收尾于同一标记）。
+证据：本文件（`.rsi/evidence/round-045/soak.txt`）。
