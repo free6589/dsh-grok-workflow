@@ -386,13 +386,13 @@ describe('client settings page bundle', () => {
     // hand-written bundle — the pin is what keeps them from drifting).
     expect(defs.get('iterateIntervalMin')?.def).toBe(DEFAULT_ITERATE_INTERVAL_MIN)
     expect(defs.get('iterateTemplate')?.def).toBe(DEFAULT_ITERATE_TEMPLATE)
-    // A loop and a mid-run replan are opt-in: the page's switches start off,
-    // like the schema defaults.
+    // The loop is opt-in; the mid-run replan is on by default (Sec.2-2), so the
+    // page's two switches no longer start in the same position.
     expect(defs.get('loopEnabled')?.def).toBe(false)
     // The replan row is the same boolean-switch shape as loopEnabled.
-    expect(defs.get('replan')).toMatchObject({ kind: 'boolean', group: 'loop', def: false })
+    expect(defs.get('replan')).toMatchObject({ kind: 'boolean', group: 'loop', def: true })
     expect(defs.get('replan')?.def).toBe(DEFAULT_REPLAN)
-    expect(DEFAULT_REPLAN).toBe(false)
+    expect(DEFAULT_REPLAN).toBe(true)
     expect(DEFAULT_MAX_CONCURRENCY).toBe(10)
     expect(DEFAULT_MAX_TASKS).toBe(10)
     expect(DEFAULT_LOOP_MAX_ROUNDS).toBe(10)

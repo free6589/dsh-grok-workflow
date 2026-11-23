@@ -137,16 +137,20 @@ export declare const FIXED_MAX_RETRIES = 1;
 /** Default maximum tasks per run. */
 export declare const DEFAULT_MAX_TASKS = 10;
 /**
- * Mid-run replan switch (default off): a message sent while a run is working is
+ * Mid-run replan switch (default on): a message sent while a run is working is
  * answered at once and joins that run at the next wave boundary instead of
  * starting a second round.
  *
- * Off by default because every boundary spends one planner-route call (at most
- * `min(waves, 4)` per run): joining a run spends quota, so it is opt-in, never
- * assumed. Quoted here once so the schema, `resolveConfig`, the settings page
- * and the docs cannot disagree about what "unset" means.
+ * On by default because the main session must always be able to talk: with it
+ * off, a message typed during a run only opens the next round, which is the
+ * "one workflow blocks the conversation" complaint (manual item Sec.2-2). The
+ * cost is bounded — one planner-route call per boundary, at most
+ * `min(waves, 4)` per run, and only when a message actually arrives mid-run —
+ * and the settings page keeps a visible switch for turning it off. Quoted here
+ * once so the schema, `resolveConfig`, the settings page and the docs cannot
+ * disagree about what "unset" means.
  */
-export declare const DEFAULT_REPLAN = false;
+export declare const DEFAULT_REPLAN = true;
 /**
  * Defaults of the repeat-run surface (`loopEnabled` / `loopMaxRounds` /
  * `loopFailStreak` / `loopIntervalMin`).

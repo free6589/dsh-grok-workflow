@@ -145,16 +145,20 @@ export const FIXED_MAX_RETRIES = 1
 export const DEFAULT_MAX_TASKS = 10
 
 /**
- * Mid-run replan switch (default off): a message sent while a run is working is
+ * Mid-run replan switch (default on): a message sent while a run is working is
  * answered at once and joins that run at the next wave boundary instead of
  * starting a second round.
  *
- * Off by default because every boundary spends one planner-route call (at most
- * `min(waves, 4)` per run): joining a run spends quota, so it is opt-in, never
- * assumed. Quoted here once so the schema, `resolveConfig`, the settings page
- * and the docs cannot disagree about what "unset" means.
+ * On by default because the main session must always be able to talk: with it
+ * off, a message typed during a run only opens the next round, which is the
+ * "one workflow blocks the conversation" complaint (manual item Sec.2-2). The
+ * cost is bounded — one planner-route call per boundary, at most
+ * `min(waves, 4)` per run, and only when a message actually arrives mid-run —
+ * and the settings page keeps a visible switch for turning it off. Quoted here
+ * once so the schema, `resolveConfig`, the settings page and the docs cannot
+ * disagree about what "unset" means.
  */
-export const DEFAULT_REPLAN = false
+export const DEFAULT_REPLAN = true
 
 /**
  * Defaults of the repeat-run surface (`loopEnabled` / `loopMaxRounds` /
@@ -534,7 +538,7 @@ export const Config = z.object({
   // other switch, so a host rendering the schema without this plugin's client
   // states the same contract.
   replan: z.boolean().default(DEFAULT_REPLAN)
-    .description('Off by default: a message sent while a run is working starts its own round; on, it is answered at once and joins the live plan at the next wave boundary (settled work is never redone). 默认关闭：跑中发来的消息另起一轮；打开后立刻回执并在下个波边界并入活计划（已验证的成果不重跑）')
+    .description('On by default: a message sent while a run is working is answered at once and joins the live plan at the next wave boundary (settled work is never redone); off, it starts its own round. 默认打开：跑中发来的消息立刻回执并在下个波边界并入活计划（已验证的成果不重跑）；关掉后另起一轮')
     .volatile(),
   // Repeat-run surface. The four keys are accepted, validated and editable here so
   // the loop service has one place to read them from; the defaults keep a loop off,

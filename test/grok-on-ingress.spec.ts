@@ -297,7 +297,11 @@ describe('/grok on keeps message ingress open', () => {
 
   it('a saturated queue keeps the blocking path instead of promising a background run', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'triage', grokDefault: 'off' })
+    // The queue is the path a message takes when it may not join a live run, so
+    // this case pins it with mid-run replan off (Sec.2-2 made it the default on;
+    // with it on the message is answered and merged instead of queued, which is
+    // covered by test/channel.spec.ts).
+    apply(ctx as never, { mode: 'triage', grokDefault: 'off', replan: false })
     const session = Session.create('sess-grok-on-saturated' as never)
     const agent = new FakeAgent(session)
     grokOn(session)
