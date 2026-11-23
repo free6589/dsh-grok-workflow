@@ -33,6 +33,15 @@ import type { WorkflowLogger } from './run.js'
 /** Exact Host route of the composer switch. */
 export const MODE_ROUTE_PATH = '/grok-workflow/mode'
 
+/**
+ * Methods this route answers.
+ *
+ * Reads travel over GET (`?action=status`), writes over POST (`{action:"set"}`).
+ * Kept as one list so the `Allow` header on a 405, the method gate below and the
+ * client's retry cannot drift apart.
+ */
+export const MODE_ROUTE_METHODS: readonly string[] = ['GET', 'POST']
+
 /** Largest browser body this route accepts; the switch sends two short fields. */
 const MAX_BODY_BYTES = 64 * 1024
 
@@ -323,7 +332,7 @@ export async function handleModeRoute(
       throw new ModeError('mode/unavailable', 'this Host has no live-session store, so the switch cannot read a session')
     }
     const method = (req.method ?? 'GET').toUpperCase()
-    if (method !== 'POST' && method !== 'GET') {
+    if (!MODE_ROUTE_METHODS.includes(method)) {
       // Name the method and the URL being refused: the operator's report was an
       // unexplained `HTTP 405`, and the request that produced it is the one fact no
       // later investigation can recover, so it is written down here instead.
@@ -364,7 +373,13 @@ export async function handleModeRoute(
       return
     }
     if (error instanceof ModeError) {
-      sendJson(res, statusForModeCode(error.code), { ok: false, code: error.code, error: error.message })
+      const status = statusForModeCode(error.code)
+      // RFC 9110 requires a 405 to name the methods the resource does accept.
+      // The operator's report was an unexplained 405; the body already says how to
+      // read and write, and the header states it where a client (or a proxy log)
+      // reads it without parsing the payload.
+      if (status === 405) res.setHeader('allow', MODE_ROUTE_METHODS.join(', '))
+      sendJson(res, status, { ok: false, code: error.code, error: error.message })
       return
     }
     sendJson(res, 500, { ok: false, code: 'mode/internal', error: redactError(error) })

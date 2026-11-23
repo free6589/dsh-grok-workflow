@@ -27,6 +27,14 @@ import type { Session } from '@deepseek-ai/dsh-session';
 import type { WorkflowLogger } from './run.js';
 /** Exact Host route of the composer switch. */
 export declare const MODE_ROUTE_PATH = "/grok-workflow/mode";
+/**
+ * Methods this route answers.
+ *
+ * Reads travel over GET (`?action=status`), writes over POST (`{action:"set"}`).
+ * Kept as one list so the `Allow` header on a 405, the method gate below and the
+ * client's retry cannot drift apart.
+ */
+export declare const MODE_ROUTE_METHODS: readonly string[];
 /** Stable failure codes this route answers with. */
 export type ModeErrorCode = 'mode/method' | 'mode/body' | 'mode/action' | 'mode/enabled' | 'mode/request' | 'mode/session' | 'mode/unavailable' | 'mode/config' | 'mode/write' | 'mode/internal';
 /** One stated refusal; the HTTP status is derived from the code, never guessed. */
