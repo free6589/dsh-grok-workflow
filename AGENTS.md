@@ -44,6 +44,12 @@ Never write a claim as confirmed when only reasoning or a plan supports it.
   built plugin there, and run one real workflow end to end with a live model.
   Never write the live home or restart the running instance for this; delete the
   scratch home afterwards.
+- User-perspective soak defaults to forking the live web profile: fork the
+  current web profile into an isolated home, install the built plugin there,
+  then operate from the user's viewpoint (send messages, check echo/visibility,
+  confirm the captain preview, switch modes) instead of only a backend API soak.
+  Never touch the live `~/.dsh` or restart the running instance; delete the
+  scratch afterwards.
 - Keep scratch output out of the tree: use `.tmp/` (gitignored), never the repo
   root, `docs/`, or `src/` for probes, dumps, or screenshots. Prefer a
   single-run `mktemp -d` and remove it when done.
