@@ -7,6 +7,10 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ### Fixed / 修复
 
+- **The plugin source marker lives in one place / 插件来源标记只剩一处定义** —
+  Three files hardcoded the same marker string while one constant already owned it, so renaming the marker would have silently split the gate, the history filter and the carry-over filter. All three now reference the constant, which is pinned by a test.
+  / 三个文件各写一遍同样的标记字符串，明明已有常量拥有它；改名会悄悄拆散门禁、历史过滤和摘要过滤。现在三处都引用常量，常量被测试钉死。
+
 - **A digest that drops rows inside a round now says so / 摘要轮内丢行会自报** —
   Only wholly dropped rounds were named; lines dropped inside a kept round vanished silently, so a reader mistook a budgeted digest for a complete one. Each kept round now ends with its own `+N more` marker when rows were cut, with the same overflow accounting as the round-level marker.
   / 以前只有整轮被丢才点名，轮内被吞的行悄悄没了，读摘要的人会把"预算内"当"完整"。现在每轮末尾自报吞了几行，记账方式和整轮标记一致。

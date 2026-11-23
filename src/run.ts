@@ -39,6 +39,7 @@ import {
 } from './records.js'
 import type { DisposeRecord, DisposeRunInfo } from './records.js'
 import { archiveRoundNow, createMemoryArchiver, memberFromEnd, memberFromStart, roundArchiveEvidence, roundArchiveSummary } from './memory/recorder.js'
+import { RELAY_SOURCE_KIND } from './answer.js'
 import { redactDeep, redactError, redactSecrets } from './redact.js'
 import type { FailureCategory, FinalStatus, IncompleteItem, NormalizedTask, ResolvedConfig, RoleName, WorkflowReport } from './types.js'
 
@@ -988,7 +989,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
               type: 'text',
               text: `Guardian recovery notice (your task is still running; do not abandon or restart active work): ${guidance}`,
             }],
-            source: { kind: 'grok-workflow' },
+            source: { kind: RELAY_SOURCE_KIND },
           })]
           const delivered = subagents.sendMessage(agent, childId, content as never, { signal: combined.signal } as never)
           if (delivered !== undefined && typeof (delivered as Promise<unknown>).catch === 'function') {
