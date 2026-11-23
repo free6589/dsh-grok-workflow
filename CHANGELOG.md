@@ -7,6 +7,10 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ### Fixed / 修复
 
+- **The machine ledger keeps the blocked task's reason / 机器台账不再丢 blocked 任务的原因** —
+  `renderReport` printed the `incomplete` reason for both failed and blocked tasks, but the machine ledger only printed it for failed ones, so the durable copy lost "did not run" and the upstream cause for every blocked task. The ledger now prints the same line for blocked tasks, with no invented category.
+  / 正式报告对失败和被堵住的任务都会写 `incomplete` 原因行，但机器台账只给失败任务写，被堵住的任务在存档里丢了"没跑成"和上游原因。现在台账对被堵住的任务写同一行，不编造分类。
+
 - **Slack token redaction covers every token family / Slack 令牌脱敏覆盖全系前缀** —
   The `slack-token` rule only matched five prefixes (`xoxb/p/a/r/s`), so newer families such as `xoxc`/`xoxd`/`xoxo` leaked verbatim into reports and prompts. It now matches any single lowercase letter after `xox`. Ordinary prose without a token shape is untouched.
   / `slack-token` 规则原来只认五个前缀（`xoxb/p/a/r/s`），`xoxc`/`xoxd`/`xoxo` 等新前缀会原样漏进报告和提示词。现在 `xox` 后面任何一个小写字母都认，没有令牌形状的普通文字不受影响。

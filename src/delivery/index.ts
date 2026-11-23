@@ -932,7 +932,9 @@ export function machineLedger(report: WorkflowReport): string {
   for (const task of report.tasks) {
     const attempts = task.attempts.length
     lines.push(`- ${task.id}: ${task.status} (${attempts} attempt${attempts === 1 ? '' : 's'}) — ${oneLine(task.title, 160)}`)
-    if (task.status === 'failed') {
+    // A blocked task reports the same evidence line a failed one does ("did not
+    // run" is not a pass), mirroring `renderReport` in `src/report.ts`.
+    if (task.status === 'failed' || task.status === 'blocked') {
       const category = report.incomplete.find(item => item.taskId === task.id)?.category
       lines.push(`  incomplete${category === undefined ? '' : ` (${category})`}: ${oneLine(task.error || task.expectedOutput, 500)}`)
     }

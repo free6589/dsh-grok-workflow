@@ -337,6 +337,61 @@ describe('机器台账：每一行说清一件已经发生的事', () => {
     expect(machineLedger(base).split('\n').filter(line => line.startsWith('Synthesis')))
       .toEqual(['Synthesis mode: deterministic'])
   })
+
+  it('prints the blocked task reason line, exactly like the canonical report (round 43)', () => {
+    // Round 43: `renderReport` printed the blocked row's `incomplete` reason but
+    // the machine ledger dropped it — the durable copy lost "did not run" and
+    // the upstream cause. One report, one dialect: the ledger prints the same
+    // line for a blocked task as for a failed one, with no invented category
+    // (a blocked task is "did not run", never a classified failure).
+    const ok = task('a', ['天气已核验'])
+    const blockedTask = task('b', ['代码已生成'])
+    const blockedReason = 'blocked: upstream task a did not verify, so this task did not run (no attempt taken, no retry spent)'
+    const report = assertWorkflowReport({
+      schemaVersion: 'grok-workflow/v1',
+      status: 'failed',
+      objective: OBJECTIVE,
+      plan: { source: 'caller', tasks: [ok, blockedTask], error: '' },
+      tasks: [
+        {
+          ...ok,
+          status: 'failed',
+          attempts: [{
+            attempt: 1,
+            execution: execution('尝试查询天气'),
+            verification: failingVerification(ok, '天气来源打不开'),
+            passed: false,
+            error: '天气来源打不开',
+          }],
+          error: '天气来源打不开',
+        },
+        {
+          ...blockedTask,
+          status: 'blocked',
+          attempts: [{ attempt: 1, execution: null, verification: null, passed: false, error: blockedReason }],
+          error: blockedReason,
+        },
+      ],
+      confirmed: [],
+      incomplete: [
+        { taskId: 'a', reason: '天气来源打不开', category: 'infrastructure' },
+        { taskId: 'b', reason: blockedReason },
+      ],
+      errors: [
+        { phase: 'Verify', message: '天气来源打不开', category: 'infrastructure' },
+        { phase: 'Blocked', message: `b: ${blockedReason}` },
+      ],
+      uncertainties: [{ taskId: 'b', text: '代码未生成，下游建议可能偏差' }],
+      synthesis: { mode: 'deterministic', summary: '天气未取得；代码未生成。' },
+      limits: { ...LIMITS, maxRetries: WIRE_RETRIES, maxTotalAgents: maxTotalAgentsFor(2, FIXED_MAX_RETRIES, routeBudgetFor(config)) },
+    }, OBJECTIVE, config)
+    const ledger = machineLedger(report)
+    // The blocked row keeps its reason line, with no invented category.
+    expect(ledger).toContain('- b: blocked (1 attempt)')
+    expect(ledger).toContain(`  incomplete: ${blockedReason}`)
+    // And it stays one dialect: the canonical renderer prints the same row.
+    expect(renderReport(report).split('\n')).toContain(`  incomplete: ${blockedReason}`)
+  })
 })
 
 describe('relay/in-turn 文本：可见块与人话块一致，台账折叠在标记之后', () => {

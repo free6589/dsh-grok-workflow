@@ -1,0 +1,8 @@
+
+ ✓ test/delivery.spec.ts (19 tests) 131ms
+
+ Test Files  1 passed (1)
+      Tests  19 passed (19)
+   Start at  12:40:12
+   Duration  939ms (transform 231ms, setup 0ms, import 289ms, tests 131ms, environment 0ms)
+

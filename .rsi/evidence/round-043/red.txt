@@ -1,0 +1,6 @@
+ ❯ test/delivery.spec.ts (19 tests | 1 failed | 18 skipped) 13ms
+     × prints the blocked task reason line, exactly like the canonical report (round 43) 11ms
+AssertionError: expected 'Grok workflow: FAILED\nObjective: 查一下…' to contain '  incomplete: blocked: upstream task …'
++ - a: failed (1 attempt) — Task a
+ Test Files  1 failed (1)
+      Tests  1 failed | 18 skipped (19)

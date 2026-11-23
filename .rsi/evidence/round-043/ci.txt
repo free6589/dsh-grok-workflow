@@ -1,0 +1,6 @@
+== npm run ci (exit 0) ==
+typecheck: tsc --noEmit clean
+Found 30 warnings and 0 errors.
+lib/ at e27d0b6 is the build of src/ at e27d0b6 (217 files, byte-identical)
+ Test Files  85 passed (85)
+      Tests  1635 passed (1635)
