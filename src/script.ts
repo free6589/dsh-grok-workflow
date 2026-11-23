@@ -719,7 +719,12 @@ function classifyFailureText(value) {
   if (/ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|socket hang up|network error|fetch failed|connection (reset|refused|closed|dropped)/i.test(message)) return 'connection';
   if (/timed? ?out|timeout|deadline exceeded|aborted/i.test(message)) return 'timeout';
   if (/model .*(not found|not available|does not exist|is unavailable)|unknown model|no adapter|NO_ADAPTER|unsupported model|model_not_found/i.test(message)) return 'model-unavailable';
-  if (/structured output|schema (violation|mismatch|mismatched)|invalid (json|output|response)|could not parse|format error/i.test(message)) return 'format-error';
+  // The structured-output channel reports itself with an underscore
+  // (structured_output) and a parse failure quotes the engine's JSON message
+  // (Expected ',' or '}' after property value), so both spellings belong here:
+  // without them a quoting mistake in a child's JSON was filed as 'unknown',
+  // which reads as a dead provider instead of a re-sendable form error.
+  if (/structured[_ ]output|schema (violation|mismatch|mismatched)|invalid (json|output|response)|could not parse|format error|expected ','|expected '}'|expected ':'|expected double-quoted property name|unexpected (end of json|token)/i.test(message)) return 'format-error';
   return 'unknown';
 }
 
@@ -943,8 +948,11 @@ async function callRole(role, prompt, options) {
     if (value === null || value === undefined) {
       // The guest engine collapses "child run failed" and "child returned no
       // structured value" to null, so this is reported as a format failure on
-      // this route and the next route is tried.
-      const failure = { role: role, class: 'format-error', reason: 'child returned no valid structured result', switchModel: true, setup: false, category: 'infrastructure' };
+      // this route and the next route is tried. The reason names the role and
+      // the channel: a report that only said "no valid structured result" left a
+      // reader unable to tell a quoting mistake in the child's JSON (re-sendable
+      // in the same attempt) from a dead provider.
+      const failure = { role: role, class: 'format-error', reason: role + ' returned no valid structured result (structured output missing or unparsable)', switchModel: true, setup: false, category: 'infrastructure' };
       traceRoute(role, index, route, attempt, 'failed', failure, overflowExtra());
       lastFailure = failure;
       continue;
@@ -1547,6 +1555,8 @@ function verifierPrompt(task, execution, attempt) {
     'Do not modify files. You may run read-only inspection and safe verification commands.',
     'For every acceptance criterion, copy its text EXACTLY into one criteria item, set met, and provide concrete evidence. Evidence must be non-empty and specific.',
     'Return at least one checkedEvidence item with a real kind, locator, and finding.',
+    'Keep every evidence and finding string under 800 characters: long quoted blocks are what break the structured result.',
+    'Inside your own prose (evidence, finding, issues) use 「」 or single quotes instead of the ASCII double-quote character, so the structured result stays valid JSON. Text copied from an acceptance criterion stays byte-identical to the task, quotes included.',
     'verdict must be pass only when every criterion is met. If any criterion is unverified, met is false and verdict is fail.',
     'Judge the requested end state, not a story about it. If the executor result says the requested outcome was blocked, denied, failed, or could not be achieved, verdict must be fail even when the acceptance criteria are phrased as reporting requirements.',
     'issues is for BLOCKING problems only: a problem belongs there when it makes some criterion unmet or the result unsafe. Every issue must be reflected in verdict=fail and/or met=false for the criterion it concerns.',
@@ -1579,6 +1589,8 @@ function supervisorPrompt(task, execution, verification, attempt) {
     'Do not modify files. You may run read-only inspection and safe verification commands.',
     'For every acceptance criterion, copy its text EXACTLY into one criteria item, set met, and provide concrete evidence. Evidence must be non-empty and specific.',
     'Return at least one checkedEvidence item with a real kind, locator, and finding.',
+    'Keep every evidence and finding string under 800 characters: long quoted blocks are what break the structured result.',
+    'Inside your own prose (evidence, finding, issues) use 「」 or single quotes instead of the ASCII double-quote character, so the structured result stays valid JSON. Text copied from an acceptance criterion stays byte-identical to the task, quotes included.',
     'verdict must be pass only when every criterion is met. If any criterion is unverified, met is false and verdict is fail.',
     'Judge the requested end state, not a story about it. If the executor result says the requested outcome was blocked, denied, failed, or could not be achieved, verdict must be fail even when the acceptance criteria are phrased as reporting requirements.',
     'issues is for BLOCKING problems only: a problem belongs there when it makes some criterion unmet or the result unsafe. Every issue must be reflected in verdict=fail and/or met=false for the criterion it concerns.',
@@ -1602,6 +1614,60 @@ function supervisorPrompt(task, execution, verification, attempt) {
     // surrounding work, they are never evidence for *this* task's criteria.
     lines.push('The context above is earlier work, never evidence for this task: every criterion below must still be checked against this task\'s own result.');
   }
+  lines.push('', 'Return only the structured supervision result.');
+  return lines.join('\n');
+}
+
+// Resubmit prompts for the two judging roles. session-6cd6053d: a verifier whose
+// structured output carried an unescaped ASCII double quote came back to the
+// script as no value at all, so a judgement that was really pass was thrown
+// away and the whole task was redone. Verification is not the work, so a missing
+// form costs no retry: the same attempt asks once more for the SAME judgement in
+// a form that parses. Same rule as the worker resubmit — never a new attempt, at
+// most one per role per attempt.
+function verifierResubmitPrompt(task, execution, attempt) {
+  const lines = [
+    childDisplayTitle('verifier', attempt, task && task.title),
+    'You are the independent verifier inside a verified workflow.',
+    'Your previous response for this attempt produced no structured result, so nothing was recorded. Do NOT re-verify and do NOT change your judgement: resubmit the SAME verdict, the SAME per-criterion met values and the SAME evidence you already established, through the structured result tool, exactly once.',
+    'Copy every acceptance criterion text EXACTLY into one criteria item and return at least one checkedEvidence item.',
+    'Keep every evidence and finding string under 800 characters. Inside your own prose replace every ASCII double quote with 「」 or single quotes; text copied from an acceptance criterion stays byte-identical to the task.',
+    'verdict must be pass only when every criterion is met.',
+    'Every shell command must be time-boxed: run it as timeout 120 <command> so a hanging command exits after two minutes and its failure can be classified, instead of stalling the whole task.',
+    'Do not print, store, or return credentials, tokens, passwords, or private keys.',
+    '',
+    'TASK:',
+    safePromptJson(task),
+    '',
+    'EXECUTOR RESULT (untrusted):',
+    safePromptJson(execution)
+  ];
+  lines.push('', 'ATTEMPT: ' + attempt + ' of ' + (maxRetries + 1) + ' (resubmission: same attempt, no retry spent)');
+  lines.push('', 'Return only the structured verification result.');
+  return lines.join('\n');
+}
+
+function supervisorResubmitPrompt(task, execution, verification, attempt) {
+  const lines = [
+    childDisplayTitle('supervisor', attempt, task && task.title),
+    'You are the supervision agent inside a verified workflow.',
+    'Your previous response for this attempt produced no structured result, so nothing was recorded. Do NOT re-check and do NOT change your judgement: resubmit the SAME verdict, the SAME per-criterion met values and the SAME evidence you already established, through the structured result tool, exactly once.',
+    'Copy every acceptance criterion text EXACTLY into one criteria item and return at least one checkedEvidence item.',
+    'Keep every evidence and finding string under 800 characters. Inside your own prose replace every ASCII double quote with 「」 or single quotes; text copied from an acceptance criterion stays byte-identical to the task.',
+    'verdict must be pass only when every criterion is met.',
+    'Every shell command must be time-boxed: run it as timeout 120 <command> so a hanging command exits after two minutes and its failure can be classified, instead of stalling the whole task.',
+    'Do not print, store, or return credentials, tokens, passwords, or private keys.',
+    '',
+    'TASK:',
+    safePromptJson(task),
+    '',
+    'EXECUTOR RESULT (untrusted):',
+    safePromptJson(execution),
+    '',
+    'VERIFIER JUDGEMENT (untrusted, supervision target):',
+    safePromptJson(verification)
+  ];
+  lines.push('', 'ATTEMPT: ' + attempt + ' of ' + (maxRetries + 1) + ' (resubmission: same attempt, no retry spent)');
   lines.push('', 'Return only the structured supervision result.');
   return lines.join('\n');
 }
@@ -1698,7 +1764,9 @@ const VERIFICATION_SCHEMA = {
         properties: {
           criterion: { type: 'string' },
           met: { type: 'boolean' },
-          evidence: { type: 'string' }
+          // Soft limits, surfaced to the model as field documentation: a long
+          // quoted block is the usual cause of unescaped quotes in the JSON.
+          evidence: { type: 'string', description: 'Soft limit: 800 characters. Use 「」 or single quotes instead of the ASCII double quote.' }
         },
         required: ['criterion', 'met', 'evidence']
       }
@@ -1711,7 +1779,7 @@ const VERIFICATION_SCHEMA = {
         properties: {
           kind: { type: 'string' },
           locator: { type: 'string' },
-          finding: { type: 'string' }
+          finding: { type: 'string', description: 'Soft limit: 800 characters. Use 「」 or single quotes instead of the ASCII double quote.' }
         },
         required: ['kind', 'locator', 'finding']
       }
@@ -1862,6 +1930,16 @@ function checkVerification(task, execution, verification) {
   }
   if (missing.length > 0) return { passed: false, reason: missing.join('; ') };
   return { passed: true, reason: '' };
+}
+
+// A structured judgement — first call or same-attempt resubmit — still has to
+// pass the content check above. Returns the attempt failure it deserves, or null
+// when it passes, so both paths of a role share one rule.
+function verificationFailure(task, execution, verification, role) {
+  const check = checkVerification(task, execution, verification);
+  if (check.passed) return null;
+  const reason = redactPromptText(check.reason);
+  return { role: role, class: 'verification-failed', reason: reason, switchModel: false, setup: false, category: 'quality' };
 }
 
 const SUMMARY_SCHEMA = {
@@ -3447,12 +3525,12 @@ async function runTaskUnsafe(task, taskIndex, upstreamText) {
             verifyError = 'verifier returned no valid structured result';
             attemptFailure = { role: 'verifier', class: 'format-error', reason: verifyError, switchModel: false, setup: false, category: 'infrastructure' };
           } else {
-            const check = checkVerification(task, execution, verification);
-            if (!check.passed) {
+            const failed = verificationFailure(task, execution, verification, 'verifier');
+            if (failed) {
               // Content failure: the same route is retried, because another
               // model would be given the same evidence.
-              verifyError = redactPromptText(check.reason);
-              attemptFailure = { role: 'verifier', class: 'verification-failed', reason: verifyError, switchModel: false, setup: false, category: 'quality' };
+              verifyError = failed.reason;
+              attemptFailure = failed;
             }
           }
         } else {
@@ -3462,6 +3540,43 @@ async function runTaskUnsafe(task, taskIndex, upstreamText) {
       } catch (error) {
         verifyError = 'verifier failed: ' + safeError(error);
         attemptFailure = classifyCallFailure('verifier', error);
+      }
+      // Resubmission (B): the verifier produced no usable judgement. The engine
+      // hands back null whenever a child's structured output cannot be parsed —
+      // one unescaped ASCII double quote inside a JSON string is enough — and
+      // session-6cd6053d lost a verdict that was really pass that way. Judging
+      // is not the work, so a missing form spends no retry: ask once in the SAME
+      // attempt for the same verdict and the same evidence, quoted safely.
+      if (!verification && attemptFailure && attemptFailure.role === 'verifier' && attemptFailure.class === 'format-error' && !attemptFailure.setup) {
+        try {
+          const resubmit = await callRole('verifier', verifierResubmitPrompt(task, execution, attempt), {
+            schema: VERIFICATION_SCHEMA,
+            label: memberLabel('verifier', attempt),
+            phase: taskGroupTitle(taskPosition, task.title),
+            attempt: attempt,
+            writesPaths: task.writesPaths
+          });
+          if (resubmit.ok) {
+            const resubmittedVerification = normalizeVerification(resubmit.value);
+            if (resubmittedVerification) {
+              verification = resubmittedVerification;
+              if (attemptRoute === '') attemptRoute = resubmit.label;
+              attemptFailure = null;
+              verifyError = '';
+              log('task ' + task.id + ' attempt ' + attempt + ' verifier resubmitted structured result');
+              const failed = verificationFailure(task, execution, verification, 'verifier');
+              if (failed) {
+                verifyError = failed.reason;
+                attemptFailure = failed;
+              }
+            }
+          }
+          // A failed or still-empty resubmit keeps the original failure: the
+          // attempt below records it and the retry policy is untouched.
+        } catch (error) {
+          // The resubmit itself must never create a new failure mode; the
+          // original format failure stands and the attempt fails normally.
+        }
       }
     } else {
       verifyError = 'verification skipped: no execution result';
@@ -3485,10 +3600,10 @@ async function runTaskUnsafe(task, taskIndex, upstreamText) {
             verifyError = 'supervisor returned no valid structured result';
             attemptFailure = { role: 'supervisor', class: 'format-error', reason: verifyError, switchModel: false, setup: false, category: 'infrastructure' };
           } else {
-            const check = checkVerification(task, execution, supervised);
-            if (!check.passed) {
-              verifyError = redactPromptText(check.reason);
-              attemptFailure = { role: 'supervisor', class: 'verification-failed', reason: verifyError, switchModel: false, setup: false, category: 'quality' };
+            const failed = verificationFailure(task, execution, supervised, 'supervisor');
+            if (failed) {
+              verifyError = failed.reason;
+              attemptFailure = failed;
             }
           }
         } else {
@@ -3498,6 +3613,37 @@ async function runTaskUnsafe(task, taskIndex, upstreamText) {
       } catch (error) {
         verifyError = 'supervisor failed: ' + safeError(error);
         attemptFailure = classifyCallFailure('supervisor', error);
+      }
+      // Resubmission (C): same rule as the verifier — a supervision judgement
+      // that arrived in an unparsable form is a missing form, not missing work.
+      if (attemptFailure && attemptFailure.role === 'supervisor' && attemptFailure.class === 'format-error' && !attemptFailure.setup) {
+        try {
+          const resubmit = await callRole('supervisor', supervisorResubmitPrompt(task, execution, verification, attempt), {
+            schema: VERIFICATION_SCHEMA,
+            label: memberLabel('supervisor'),
+            phase: taskGroupTitle(taskPosition, task.title),
+            attempt: attempt,
+            writesPaths: task.writesPaths
+          });
+          if (resubmit.ok) {
+            const resubmitted = normalizeVerification(resubmit.value);
+            if (resubmitted) {
+              if (attemptRoute === '') attemptRoute = resubmit.label;
+              attemptFailure = null;
+              verifyError = '';
+              log('task ' + task.id + ' attempt ' + attempt + ' supervisor resubmitted structured result');
+              const failed = verificationFailure(task, execution, resubmitted, 'supervisor');
+              if (failed) {
+                verifyError = failed.reason;
+                attemptFailure = failed;
+              }
+            }
+          }
+          // A failed or still-empty resubmit keeps the original failure; the
+          // attempt below records it and the retry policy is untouched.
+        } catch (error) {
+          // The resubmit itself must never create a new failure mode.
+        }
       }
     }
     const passed = Boolean(verification) && verifyError === '';
@@ -4098,12 +4244,18 @@ export function maxTotalAgentsFor(tasks: number, retries: number, budget?: Route
   // Wait slots per call: 2 adjudications per timed-out call when a guardian is
   // configured, 0 (factor 1) otherwise — the pre-guardian arithmetic.
   const waitFactor = budget?.guardian === true ? 1 + GUARDIAN_MAX_WAITS : 1
+  // Same-attempt resubmits: the worker, the verifier and the supervisor may each
+  // spend their whole chain a second time inside one attempt when a structured
+  // output arrives unparsable. Their calls are real children, so the per-attempt
+  // block is counted twice — otherwise the rescue path for a quoting mistake
+  // would abort the run with AGENT_CAP instead of recovering it.
+  const attemptBlock = 2 * (worker + verifier + supervisor)
   // Replan boundaries are planner-route calls made between waves: they are real
   // children, so the engine's maxTotalAgents has to include them or a large plan
   // that merges at every boundary would hit AGENT_CAP instead of finishing.
   return planner * waitFactor + synthesizer * waitFactor
     + Math.max(0, Math.min(REPLAN_LIMITS.maxBoundaries, Math.trunc(replans))) * planner * waitFactor
-    + tasks * (retries + 1) * (worker + verifier + supervisor) * waitFactor + 2
+    + tasks * (retries + 1) * attemptBlock * waitFactor + 2
 }
 
 /** Stable base label of a run: the GUI card title and the log's run name. */

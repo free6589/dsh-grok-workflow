@@ -1,3 +1,28 @@
+## 2026-11-24 — round-075 分支 `fix/verifier-supervisor-resubmit`：判定角色同次尝试补交（未合流，`CONFIRMED`）
+
+- **From:** 修复子代理B1 · **To:** lead / 合流者
+- **分支与基线**：`.agents/worktrees/fix-verifier-supervisor-resubmit`（分支 `fix/verifier-supervisor-resubmit`，
+  从 `main` `7f626f5`/0.13.24 开出）。共享工作树当时 detached `a6103ad` 且带他人 40+ 处未提交改动，**未动**。
+- **改了什么（只 `src/script.ts` + 测试/文档）**：新增 `verifierResubmitPrompt()`、`supervisorResubmitPrompt()`、
+  `verificationFailure()`；`runTaskUnsafe` 里给 verifier/supervisor 各加一段"同次尝试内补交一次"（镜像 worker
+  的 `resubmitPrompt` 分支：仅在 `format-error` 且非 setup 时触发，一次为限，失败保留原失败）；`verifierPrompt` /
+  `supervisorPrompt` 加"英文双引号写「」或单引号、每条证据/发现 800 字内"；`VERIFICATION_SCHEMA` 的
+  `evidence`/`finding` 加同名软上限 `description`；`callRole` 的 `null` 分支 reason 改为
+  `"<role> returned no valid structured result (structured output missing or unparsable)"`；
+  `classifyFailureText` 补 `structured_output` 与 `Expected ','` / `Expected '}'` 等 JSON 解析模式；
+  `maxTotalAgentsFor` 的每尝试块按 ×2 计（首次调用 + 补交各一次整链），否则补交会撞 `AGENT_CAP`。
+  **没碰** `src/gate.ts` 队长块、`src/delivery*` / 答案面（属另一 lane）。
+- **口径变动（会影响测试）**：`maxTotalAgentsFor` 变大——`test/routing.spec.ts` 的上限算术改为
+  `1 + 2*(2*2) + 2` / `1 + 0 + 2*(2*3) + 2`；`test/engine-contract.spec.ts` 的 `maxTotalAgents: 7`
+  改为 `taskCap()`（按插件自己的构造器推导，避免下次再留死数字）。
+- **验证**：红 `7 failed / 1 passed`（旧脚本，证据 `.rsi/evidence/round-075/red-verifier-resubmit.txt`）→
+  绿 `8 passed`；`npm run ci` **exit 0：93 files / 1737 tests PASS、typecheck 干净、lint 0 errors / 35 warnings
+  （全部既有）、`verify:lib` byte-identical（229 files）**。提交 `f5b74e4`（`src/script.ts` + `lib/` + 两个 spec +
+  CHANGELOG + 三份记忆档），**仅本地分支，未推远端**（等 lead 合流；推或不推都不影响 tag/发版）。
+- **未做**：真机隔离 soak `NOT_RUN`（本轮不发布）；未改 `docs/ARCHITECTURE.md` 的上限描述（公式仍是同一构造器，
+  只是每尝试块 ×2）。合流时若要保守，可只取 `script.ts` + 两个 spec 改动，`maxTotalAgentsFor` 的 ×2 与
+  `routing.spec`/`engine-contract.spec` 必须同进同出。
+
 ## 2026-11-24 — 已发版 `0.13.24`：队长拆法绑定 + 首轮可见 + 确认单次消费（`CONFIRMED`）
 
 - **From:** 合并发版子代理（本会话）· **To:** 下一轮接手者

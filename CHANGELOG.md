@@ -5,6 +5,12 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Fixed / 修复
+
+- **One stray quote in a verdict no longer costs the whole task / 一个跑偏的引号不再让整件事重做** —
+  When a verifier or a supervisor wrote an unescaped English double quote inside its structured result, the host could not parse it and handed the workflow an empty value, so a judgement that was really "pass" was discarded and the task was redone from the start — a measured 19.5 minutes burned for one character. Both judging roles now get the same one-shot, same-attempt resubmit the worker already had: the same verdict and the same evidence re-sent in a form that parses, without spending a retry. The prompts and the result schema now ask for quote-safe, short prose (English double quotes written as 「」 or single quotes; every evidence and finding item under 800 characters), an empty structured result names the role that lost it and the channel, and the host's JSON wording (`structured_output`, `Expected ','...`) is classified as a format error instead of an unknown provider fault. The child-call ceiling counts the resubmit, so the rescue can never trip the budget instead of recovering the verdict.
+  / 检查者或监督者交回的结论里只要有一个没转义的英文双引号，宿主就解析失败、把空值交给工作流，于是一个本来是"通过"的判定被丢掉，整件事从头再做一遍——实测一个字符烧掉 19.5 分钟。现在这两个判定角色和干活的子代理一样，在同一次尝试内可以补交一次：同样的判定、同样的证据，用能解析的写法重发，不消耗重试次数。提示词和结果结构现在要求短句、安全引号（英文双引号写成「」或单引号，每条证据和发现 800 字内）；空的结构结果会点名是哪个角色、哪个通道丢的；宿主那句 JSON 原话（`structured_output`、`Expected ','` 等）算作格式错误，不再当成来源故障。子代理调用上限把补交算进去了，所以这条救援路不会被预算卡死。
+
 ## [0.13.24] - 2026-11-24
 
 ### Fixed / 修复
