@@ -1,3 +1,15 @@
+## round-62 摘要轮内丢行自报（soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
+
+| state | command | result |
+| --- | --- | --- |
+| worktree rsi-round-62 `597ae18`（main `b9fb34d` + 本轮 1 提交） | `npx vitest run test/carryover.spec.ts`（旧码 stash，lead 独立） | **1 failed / 21 passed**：新用例红（旧码无标记） |
+| 同上（新码） | `npx vitest run test/carryover.spec.ts`（lead 独立） | **22 passed** |
+| 同上（新码） | `npm run ci`（lead 独立） | **exit 0：87 files / 1654 tests PASS**；typecheck 干净；lint 0 errors；`verify:lib` byte-identical |
+| 隔离 soak | 网关探针 | **BLOCKED**：网关 502/401（无凭证），未伪造 |
+
+**Changed:** `src/carryover.ts`（`section` 计吞行数 + 轮末 `+N more` 标记，溢出记账与整轮标记一致）+ `test/carryover.spec.ts`（+1 轮内标记回归）+ `lib/` 重建 + `CHANGELOG [Unreleased]` 中英双语 + `.rsi/evidence/round-062/`。
+**Honest boundary:** 真机 BLOCKED，不发版；`[Unreleased]` 已攒 16 条待发。
+
 ## round-61 已删键专属报错（soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
 
 | state | command | result |

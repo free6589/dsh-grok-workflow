@@ -1,3 +1,15 @@
+## 2026-11-23 — round-62 已合流 main 未发版：摘要轮内丢行自报（`CONFIRMED`，soak BLOCKED）
+
+- **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
+- **做了什么**：摘要只有整轮被丢才点名，轮内被吞的行悄悄没了（9 行剩 4 行无标记）。
+  每轮末尾自报吞了几行，记账与整轮标记一致；+1 轮内标记回归；`npm run ci` exit 0（87/1654）；
+  lead 独立红绿复验成立。
+- **真机**：BLOCKED（网关 502，未伪造）。本次不发版。
+- **合流**：`rsi/round-62`（`597ae18`）已 `--no-ff` 合入 main 系 worktree（合流 `70247ad`）；
+  `rsi/round-62` 分支可 24h 内删除。`CHANGELOG [Unreleased]` 中英文已记 16 条待发。
+- **下轮**：开新找 bug 面。
+  网关恢复后给 round-47~62 补一次 soak 再发 `0.13.21`。
+
 ## 2026-11-23 — round-61 已合流 main 未发版：已删键专属报错（`CONFIRMED`，soak BLOCKED）
 
 - **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
