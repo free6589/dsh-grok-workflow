@@ -319,11 +319,15 @@ describe('a child that died is not reported as a format error', () => {
 
   it('reports a timed-out child as a timeout, not a format error', async () => {
     const { report, rewritten } = await runSeed('timeout')
-    expect(rewritten).toBeGreaterThan(0)
+    // Nothing left to repair here: a transport death is refused at the seam with
+    // its class, so the script wrote the cause itself (D-120 修法二). The repair
+    // keeps the classes the host must not turn into a routing decision.
+    expect(rewritten).toBe(0)
     const attempt = report.tasks[0]?.attempts[0]
     expect(attempt?.failure?.class).toBe('timeout')
     expect(attempt?.failure?.category).toBe('infrastructure')
     expect(attempt?.failure?.reason).not.toContain('no valid structured result')
+    expect(report.routes.filter(entry => entry.failureClass === 'format-error')).toEqual([])
   })
 
   it('reports a 403 child as model-unavailable, not a re-sendable format error', async () => {

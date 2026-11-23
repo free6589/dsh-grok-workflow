@@ -29,7 +29,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Config } from '@deepseek-ai/dsh-workflow-ptc'
 import type { WorkflowEngine } from '@deepseek-ai/dsh-workflow'
 import type { ChildOutcome, ChildOutcomeLog, ChildTerminal } from './child-outcomes.js'
-import { childStopPhrase, createChildOutcomeLog, emptyChildOutcomeLog, roleOfChildTitle } from './child-outcomes.js'
+import { childDeathRejection, childStopPhrase, createChildOutcomeLog, emptyChildOutcomeLog, roleOfChildTitle } from './child-outcomes.js'
 import { sessionPosition, sessionVerdict } from './child-evidence.js'
 
 /** Code points a derived child label may occupy — the guest's own defaultLabel rule. */
@@ -193,6 +193,31 @@ function promptTitle(spec: ActivationSpecView): string {
 }
 
 /**
+ * The terminal facts one child settlement carries, in the ledger's vocabulary.
+ *
+ * Two readers need them — the ledger (what the report is repaired from) and the
+ * refusal (what the guest is told, so it can stop preferring a dead route) — and
+ * they must not disagree about the same settlement, so they read it here once.
+ * The provider's words are not on the result for an in-process child, so the
+ * child's own session is where the failure is found (`sessionVerdict`).
+ * @param settled - what the activation's `result` resolved with.
+ * @param session - the child's live session, captured at start.
+ * @param position - the session's event position at start.
+ * @returns The terminal facts, never throwing.
+ */
+function terminalFacts(settled: unknown, session: unknown, position: number | undefined): ChildTerminal {
+  const stopReason = field(settled, 'stopReason') ?? 'completed'
+  const engineDiagnostic = field(settled, 'diagnostic')
+  const verdict = stopReason === 'completed' ? undefined : sessionVerdict(session, position)
+  const detail = engineDiagnostic ?? verdict?.failure?.message
+  return {
+    stopReason,
+    ...detail === undefined ? {} : { diagnostic: detail },
+    ...verdict?.failure?.code === undefined ? {} : { code: verdict.failure.code },
+  }
+}
+
+/**
  * Observe one child activation's terminal state into the log.
  *
  * This is the half of the null-collapse seam the plugin can see: the engine's
@@ -244,17 +269,7 @@ function observeActivation(
       }
     }
     void (result as Promise<unknown>).then(
-      settled => {
-        const stopReason = field(settled, 'stopReason') ?? 'completed'
-        const engineDiagnostic = field(settled, 'diagnostic')
-        const verdict = stopReason === 'completed' ? undefined : sessionVerdict(session, position)
-        const detail = engineDiagnostic ?? verdict?.failure?.message
-        record({
-          stopReason,
-          ...detail === undefined ? {} : { diagnostic: detail },
-          ...verdict?.failure?.code === undefined ? {} : { code: verdict.failure.code },
-        })
-      },
+      settled => { record(terminalFacts(settled, session, position)) },
       (error: unknown) => {
         // The seam's infrastructure rejection: the run handle itself failed, so the
         // child never produced a stop reason. Its message is the only cause there is.
@@ -264,6 +279,60 @@ function observeActivation(
   } catch {
     // Observation is a diagnostic, never a run input: a receipt this seam cannot
     // read costs the evidence, not the child.
+  }
+}
+
+/**
+ * Refuse a child's result when its death is evidence about the route.
+ *
+ * Why this exists (D-120 修法二): the guest only ever sees `null` for a child that
+ * did not finish cleanly, so a provider 5xx, a dropped connection and a 429 all
+ * arrive as one `format-error` — a class the dead-route table refuses to count,
+ * because a genuine format gap is the child's form and not the transport. The
+ * table therefore stayed empty on real runs while the child sessions said `503`
+ * in so many words. The host cannot rewrite the report into a routing decision
+ * (`reclassifyNullCollapses` runs after the last call), so the one honest channel
+ * left is the rejection: the activation's `result` is replaced with a promise
+ * that fails with {@link childDeathRejection}'s line, which the engine renders
+ * into the guest's `AGENT_RESULT` error and `src/script.ts` reads back.
+ *
+ * Scope is deliberate and narrow. Only the four transport families are refused —
+ * a refused key, a cancellation and a real format gap keep the null shape, so the
+ * report repair still owns them and no route is blamed for the child's form. The
+ * receipt is otherwise the engine's own: every other property, `dispose`
+ * included, is forwarded unchanged, and a settlement that resolves normally is
+ * passed through untouched.
+ * @param receipt - what `startActivation` returned.
+ * @param spec - the activation spec the engine built (before the label rewrite).
+ * @param lookupSession - resolves a child session id to its live session object.
+ * @returns The receipt the engine should keep, or the original when it cannot be read.
+ */
+function refusedReceipt<T>(receipt: T, spec: ActivationSpecView, lookupSession: SessionLookup): T {
+  try {
+    const activation = (receipt === null || typeof receipt !== 'object' ? undefined : receipt) as ActivationReceipt | undefined
+    const result = activation?.result
+    if (result === null || typeof result !== 'object' || typeof (result as PromiseLike<unknown>).then !== 'function') return receipt
+    const childId = field(activation, 'childId')
+    const session = childId === undefined ? undefined : lookupSession(childId)
+    const position = sessionPosition(session)
+    const guarded = Promise.resolve(result as PromiseLike<unknown>).then(settled => {
+      const rejection = childDeathRejection(terminalFacts(settled, session, position))
+      if (rejection !== undefined) throw new Error(rejection)
+      return settled
+    })
+    // The engine's own consumer may be the only one; a refusal nobody awaited
+    // must not become an unhandled rejection of the host process.
+    guarded.catch(() => {})
+    return new Proxy(activation as object, {
+      get(target, property, receiver) {
+        if (property === 'result') return guarded
+        return Reflect.get(target, property, receiver)
+      },
+    }) as T
+  } catch {
+    // A receipt this seam cannot read keeps the engine's own promise: a routing
+    // improvement is never worth breaking a child run.
+    return receipt
   }
 }
 
@@ -293,7 +362,8 @@ function sessionLookupFor(resolveService: (name: string) => unknown): SessionLoo
 
 /**
  * A view of the subagent seam whose `startActivation` rewrites each child's
- * label and records the child's terminal state; every other member reaches the
+ * label, records the child's terminal state, and refuses a transport death so the
+ * guest can stop preferring that route (D-120). Every other member reaches the
  * real service. The real service object is never mutated.
  */
 function labeledSubagents(subagents: object, outcomes: ChildOutcomeLog, lookupSession: SessionLookup): object {
@@ -303,8 +373,10 @@ function labeledSubagents(subagents: object, outcomes: ChildOutcomeLog, lookupSe
         const start = Reflect.get(target, property, receiver) as StartActivation
         return async (spec: ActivationSpecView) => {
           const receipt = await start.call(target, rewriteActivationLabel(spec))
+          // Recorded from the engine's own receipt, and refused on a *copy*: the
+          // ledger needs the settlement even when the guest is told it failed.
           observeActivation(outcomes, spec, receipt, lookupSession)
-          return receipt
+          return refusedReceipt(receipt, spec, lookupSession)
         }
       }
       return Reflect.get(target, property, receiver)

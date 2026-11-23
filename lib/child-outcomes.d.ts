@@ -43,6 +43,28 @@ export declare const CHILD_CAUSE_CHARS = 200;
 /** The guest's null-collapse reason, as `src/script.ts` writes it. */
 export declare const NULL_COLLAPSE_REASON = "no valid structured result";
 /**
+ * The prefix the twin engine's refusal carries into the guest's `agent()` error.
+ *
+ * The engine's guest returns `null` for a child that did not finish cleanly, and
+ * nothing else about that child crosses the worker boundary: `childResult()`
+ * projects `{output, stopReason, structured}`. So a rejection is the only channel
+ * the host has left for "this route's provider answered 503 twice" — the message
+ * the engine renders into that rejection is what the guest can read. The script
+ * parses the same marker back out of it (`src/script.ts` `childDeathCause`, pinned
+ * equal by `test/dead-routes.spec.ts`).
+ */
+export declare const CHILD_DEATH_MARKER = "CHILD_DEATH:";
+/**
+ * The transport families a child's death may be blamed on the route for.
+ *
+ * Mirrors `ROUTE_HEALTH_FAMILIES` in `src/script.ts` for the classes the host may
+ * forward (pinned equal by `test/dead-routes.spec.ts`). Everything else keeps the
+ * null shape it had: a refused key, a cancelled run and a genuine format gap are
+ * not evidence that another route would do better, and the report repair
+ * (`reclassifyNullCollapses`) remains the only path that names them.
+ */
+export declare const CHILD_DEATH_FAMILIES: readonly FailureClass[];
+/**
  * What this module says about a child that died with nothing in its log to name
  * the cause. It is deliberately a statement about the record, not about the child:
  * the old wording named a missing form ("no valid structured result"), which read
@@ -134,6 +156,20 @@ export declare function childFailureClass(outcome: ChildTerminal): FailureClass;
  * @returns The class that text names, or `unknown`.
  */
 export declare function classifyChildFailureText(value: unknown): FailureClass;
+/**
+ * The rejection message for a child whose death the route may be blamed for, or
+ * `undefined` when the null shape must stand.
+ *
+ * A route that keeps dying is worth skipping, but the script can only skip what
+ * it can see. This is the one fact the host can put in front of it: the class the
+ * child's own settlement named, in a message the guest parses. It is deliberately
+ * narrow — a `completed` child that never submitted is a real format gap, a
+ * refusal is a key, and a cancellation is not the route's fault — so those keep
+ * arriving as `null` and keep being repaired in the report instead.
+ * @param outcome - the child's terminal state.
+ * @returns The one-line rejection message, or `undefined` to leave the null.
+ */
+export declare function childDeathRejection(outcome: ChildTerminal): string | undefined;
 /** Who has to fix a failure of this class (mirrors `failureCategory` in the script). */
 export declare function categoryForFailureClass(failureClass: FailureClass): FailureCategory;
 /**

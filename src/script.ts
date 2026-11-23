@@ -428,9 +428,38 @@ function childTimeoutFailure(role) {
     // A hung call is not evidence that another model would answer: the task
     // retries with new wording, so the chain stops here instead of advancing.
     switchModel: false,
+    // It *is* evidence about this route, though (D-120): the wait was paid once
+    // and the route has shown it may hang again, so it moves behind the live
+    // routes for the rest of the run. That is a separate decision from
+    // switchModel, which is why it is declared here instead of inferred there.
+    routeHealth: 'timeout',
     setup: false,
     category: 'infrastructure'
   };
+}
+
+// A child that died on the far side of the engine — a provider 5xx, a dropped
+// connection, a 429 — does not come back as a null any more. The host seam
+// refuses that activation's own result with this marker, because the cause it
+// names is what the child's session recorded and the script has no other
+// channel to read it (D-120 修法二). Only the route-health families are marked,
+// so a cancelled run, a refused key or a real format gap keep the null shape
+// they had.
+const CHILD_DEATH_MARKER = 'CHILD_DEATH:';
+
+// The class a death marker names, or null when the text carries none the host
+// is allowed to send. Parsing (rather than trusting a field) because the engine
+// re-wraps the rejection into its own AGENT_RESULT message, so what arrives here
+// is a sentence — and a class outside the table must never be read out of it.
+function childDeathCause(error) {
+  const message = safeError(error);
+  const at = message.indexOf(CHILD_DEATH_MARKER);
+  if (at === -1) return null;
+  const rest = message.slice(at + CHILD_DEATH_MARKER.length);
+  const cut = rest.indexOf(':');
+  const named = (cut === -1 ? rest : rest.slice(0, cut)).trim();
+  if (ROUTE_HEALTH_FAMILIES[named] !== 1) return null;
+  return { class: named, cause: cut === -1 ? '' : rest.slice(cut + 1).trim() };
 }
 const suppliedTasks = args && Array.isArray(args.tasks) ? args.tasks : null;
 // Switching policy (阶段5): an empty list means the built-in rule — every
@@ -772,15 +801,33 @@ function failureCategory(failureClass, code) {
 function classifyCallFailure(role, error) {
   const code = failureCode(error);
   const message = safeError(error);
+  // A child that died of a transport failure on the far side of the engine: the
+  // host seam refused this activation's result and named the class, because the
+  // cause it carries is the child session's own and the null the engine used to
+  // return cannot skip a dead route (D-120 修法二). The class is the host's, not
+  // a reading of the sentence, so the reason keeps the provider's words.
+  const death = childDeathCause(error);
+  if (death !== null) {
+    const advances = switchOn.length === 0 ? true : switchOn.indexOf(death.class) !== -1;
+    return {
+      role: role,
+      class: death.class,
+      reason: routeReason(role + ' call produced no result: ' + (death.cause === '' ? 'the child run ended abnormally' : death.cause)),
+      switchModel: advances,
+      routeHealth: routeHealthFamilyOf(death.class, advances),
+      setup: false,
+      category: 'infrastructure'
+    };
+  }
   // Budget and configuration faults are not model faults: another model cannot
   // fix them, and retrying would hide a broken setup or a runaway script. They
   // are marked "setup" so the caller stops retrying — but they are never
   // rethrown: a broken setup must still yield a failure report (G-4).
   if (code === 'AGENT_CAP') {
-    return { role: role, class: 'budget-exhausted', reason: routeReason(message), switchModel: false, setup: true, category: 'configuration' };
+    return { role: role, class: 'budget-exhausted', reason: routeReason(message), switchModel: false, routeHealth: '', setup: true, category: 'configuration' };
   }
   if (code === 'UNSUPPORTED_OPTION' || code === 'INVALID_ARGUMENT' || code === 'UNSUPPORTED_SCHEMA' || code === 'SCRIPT_PARSE' || code === 'ITEM_CAP') {
-    return { role: role, class: 'unknown', reason: routeReason(message), switchModel: false, setup: true, category: 'configuration' };
+    return { role: role, class: 'unknown', reason: routeReason(message), switchModel: false, routeHealth: '', setup: true, category: 'configuration' };
   }
   if (code === 'AGENT_START') {
     return {
@@ -788,16 +835,19 @@ function classifyCallFailure(role, error) {
       class: 'agent-start-failed',
       reason: routeReason(message),
       switchModel: switchOn.length === 0 ? true : switchOn.indexOf('agent-start-failed') !== -1,
+      routeHealth: '',
       setup: false,
       category: 'infrastructure'
     };
   }
   const failureClass = classifyFailureText(message);
+  const advances = switchOn.length === 0 ? true : switchOn.indexOf(failureClass) !== -1;
   return {
     role: role,
     class: failureClass,
     reason: routeReason(message),
-    switchModel: switchOn.length === 0 ? true : switchOn.indexOf(failureClass) !== -1,
+    switchModel: advances,
+    routeHealth: routeHealthFamilyOf(failureClass, advances),
     setup: false,
     category: failureCategory(failureClass, code)
   };
@@ -825,8 +875,9 @@ const routeTrail = [];
 // rate-limit stays in the table but follows the operator's 429 switch
 // (switchOn): when the switch says a 429 keeps its route, the task retries the
 // same route on the next attempt, so a 429 says "busy right now", not "this
-// route is dead" — and switchModel is exactly that gate, so it is read here
-// rather than duplicated.
+// route is dead". Every failure that belongs here says so itself, in its own
+// routeHealth field — see routeHealthFamilyOf below for why switchModel is
+// not the gate.
 const ROUTE_HEALTH_LIMITS = { streak: 2, routes: 16 };
 const ROUTE_HEALTH_FAMILIES = { timeout: 1, connection: 1, 'server-error': 1, 'rate-limit': 1 };
 // label -> { family, streak }: consecutive counted failures, no answer between.
@@ -836,11 +887,26 @@ const routeHealth = {};
 const deadRouteOrder = [];
 const deadRoutes = {};
 
+// Whether a failure is *evidence about the route* for a family that counts.
+// This is a decision of its own and not a reading of switchModel (D-120): the
+// two questions differ. switchModel answers "does this task move to another
+// route right now?"; route health answers "should this route go last for the
+// rest of the run?". A hung call answers yes to the second and no to the first,
+// and reading switchModel here therefore lost every timeout the run ever saw —
+// measured on the real engine: 8 timeout rows, an empty table. Only the 429
+// still follows the operator's switch (D-119: a 429 the switch keeps on its
+// route says "busy right now", not "this route is dead").
+function routeHealthFamilyOf(failureClass, switchModel) {
+  if (ROUTE_HEALTH_FAMILIES[failureClass] !== 1) return '';
+  if (failureClass === 'rate-limit' && switchModel !== true) return '';
+  return failureClass;
+}
+
 function routeHealthFamily(failure) {
   try {
     if (!failure) return '';
-    if (ROUTE_HEALTH_FAMILIES[failure.class] !== 1) return '';
-    return failure.switchModel === true ? failure.class : '';
+    const declared = failure.routeHealth;
+    return ROUTE_HEALTH_FAMILIES[declared] === 1 ? declared : '';
   } catch (_) { return ''; }
 }
 
@@ -1073,7 +1139,12 @@ async function callRole(role, prompt, options) {
       // the channel: a report that only said "no valid structured result" left a
       // reader unable to tell a quoting mistake in the child's JSON (re-sendable
       // in the same attempt) from a dead provider.
-      const failure = { role: role, class: 'format-error', reason: role + ' returned no valid structured result (structured output missing or unparsable)', switchModel: true, setup: false, category: 'infrastructure' };
+      //
+      // A death the host could name never reaches here (D-120 修法二): it is
+      // refused with a CHILD_DEATH marker instead. So a null that still arrives
+      // is either a real format gap or a death with no recorded cause, and it
+      // says nothing about the route — which is why it declares no routeHealth.
+      const failure = { role: role, class: 'format-error', reason: role + ' returned no valid structured result (structured output missing or unparsable)', switchModel: true, routeHealth: '', setup: false, category: 'infrastructure' };
       traceRoute(role, index, route, attempt, 'failed', failure, overflowExtra(), taskId);
       noteRouteFailure(route, failure);
       lastFailure = failure;

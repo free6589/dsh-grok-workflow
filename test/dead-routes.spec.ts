@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest'
+import { CHILD_DEATH_FAMILIES, CHILD_DEATH_MARKER, childDeathRejection } from '../src/child-outcomes.js'
 import { resolveConfig } from '../src/config.js'
 import { deliverReport } from '../src/delivery/index.js'
+import { parseMemberLabel } from '../src/naming.js'
 import { assertWorkflowReport, renderReport } from '../src/report.js'
-import { WORKFLOW_SCRIPT } from '../src/script.js'
+import { buildWorkflowRequest, WORKFLOW_SCRIPT } from '../src/script.js'
+import { teamWorkflowEngine } from '../src/team-engine.js'
 import type { WorkflowReport } from '../src/types.js'
+import { createEngineHarness, type ChildAnswer, type ChildCall } from './engine-harness.js'
 import { execution, task, verification } from './fixtures.js'
 import { roleOf, runWorkflowScript, taskFromPrompt, type ScriptAgent } from './helpers.js'
 
@@ -384,5 +388,191 @@ describe('dead routes: rendered only as a diagnostic, never in a reader’s answ
     // Diagnostics on: the ledger may carry machine material, the answer may not.
     const ledgerView = deliverReport(report, { diagnostics: true })
     expect(ledgerView.human).not.toContain('Dead routes:')
+  })
+})
+
+/**
+ * The shapes the *real* engine produces, which the table above cannot see.
+ *
+ * D-120: every earlier case here throws from the agent seam, so it exercises
+ * "how the table books a failure the script already classified". On a real run
+ * the engine folds a dead child into `null` and the child's own session is the
+ * only place its cause exists — so with the table's old gate
+ * (`class === family && switchModel === true`) no real path could ever enter it,
+ * and the soak found an empty table with 5 dead 503 calls and 8 dead hangs in
+ * the log.
+ *
+ * These cases drive the real engine over the harness provider and the plugin's
+ * own twin (the seam production uses), so what is asserted is the engine's shape:
+ * the child settles with a real `stopReason`, its session carries the provider's
+ * words, and the guest only ever sees what the engine hands it.
+ */
+describe('dead routes: the shape the real engine produces', () => {
+  /** A configuration whose worker chain is one dead route and one live one. */
+  function realConfig(overrides: Record<string, unknown> = {}) {
+    return resolveConfig({
+      maxConcurrency: 1,
+      maxTasks: 6,
+      childTimeoutMs: 7_200_000,
+      roles: { worker: [{ model: 'w1' }, { model: 'w2' }] },
+      ...overrides,
+    })
+  }
+
+  /**
+   * Run the real script over the real engine and the plugin's twin seam.
+   *
+   * `answer` decides what each child settles as; the twin is the one production
+   * uses (`src/team-engine.ts`), built over the harness's own engine so the
+   * child terminals are the engine's real ones.
+   */
+  async function runReal(
+    answer: (call: ChildCall) => ChildAnswer,
+    config: ReturnType<typeof resolveConfig>,
+    tasks = [task('a'), task('b'), task('c')],
+  ): Promise<{ report: WorkflowReport, children: ChildCall[] }> {
+    const harness = createEngineHarness(async call => answer(call))
+    try {
+      const payload = buildWorkflowRequest(OBJECTIVE, tasks, config)
+      const engine = teamWorkflowEngine(harness.ctx as never, { warn() {} })
+      const run = engine.start({
+        script: payload.script,
+        meta: { name: '任务团队', description: 'dead-route twin run' },
+        args: payload.args,
+        parent: { session: { header: {}, id: 'dead-route-parent' } } as never,
+        maxTotalAgents: payload.maxTotalAgents,
+      })
+      const result = await run.result
+      await run.dispose()
+      expect(result.stopReason).toBe('completed')
+      return { report: assertWorkflowReport(result.value, OBJECTIVE, config), children: harness.children }
+    } finally {
+      await harness.dispose()
+    }
+  }
+
+  /**
+   * The role a child belongs to, read the way the panel reads it.
+   *
+   * The twin rewrites each activation's label from the prompt's first line
+   * (`执行 · Task a`), so the role has to come off the prompt title — the raw
+   * `call.label` is both the wrong string and, under the twin, the title itself.
+   */
+  function roleOfCall(call: { prompt: string }): string {
+    const head = call.prompt.split('\n')[0]!.trim().split('·')[0]!.trim()
+    return parseMemberLabel(head, 'zh')?.role ?? ''
+  }
+
+  /** Worker calls in placement order, by the model each was asked for. */
+  function workerModels(children: ChildCall[]): string[] {
+    return children.filter(call => roleOfCall(call) === 'worker').map(call => call.model ?? 'inherit')
+  }
+
+  it('counts a 503 the engine collapsed to null, because the child session named it', async () => {
+    const { report, children } = await runReal(call => {
+      const role = roleOfCall(call)
+      if (role === 'worker') {
+        // The in-process death, in the shape the published runtime produces: no
+        // `diagnostic` on the result, the provider's words only in the session.
+        if (call.model === 'w1') {
+          return {
+            output: [{ type: 'text' as const, text: '' }],
+            stopReason: 'error',
+            sessionFailure: { message: '503: {"message":"service unavailable"}', code: 'HTTP_503', status: 503 },
+          }
+        }
+        return { structured: execution('done') }
+      }
+      if (role === 'verifier') return { structured: verification(taskFromPrompt(call.prompt)) }
+      return { structured: { summary: 'ok' } }
+    }, realConfig())
+    // Two dead calls are enough: the route is behind the live one from task 3 on,
+    // which is the whole cost the table exists to save.
+    expect(report.deadRoutes).toEqual([{ route: 'w1', class: 'server-error', streak: 2 }])
+    expect(workerModels(children)).toEqual(['w1', 'w2', 'w1', 'w2', 'w2'])
+    // The row says what the provider said, not "no valid structured result".
+    const dead = report.routes.filter(entry => entry.failureClass === 'server-error')
+    expect(dead).toHaveLength(2)
+    expect(dead.every(entry => entry.reason?.includes('503'))).toBe(true)
+    expect(report.routes.filter(entry => entry.failureClass === 'format-error')).toEqual([])
+  })
+
+  it('counts a call that hung, even though a hang does not switch models', async () => {
+    const hang = new Promise<never>(() => {})
+    const { report, children } = await runReal(call => {
+      const role = roleOfCall(call)
+      if (role === 'worker') {
+        if (call.model === 'w1') return { gate: hang }
+        return { structured: execution('done') }
+      }
+      if (role === 'verifier') return { structured: verification(taskFromPrompt(call.prompt)) }
+      return { structured: { summary: 'ok' } }
+    }, realConfig({ childTimeoutMs: 1000 }), [task('a'), task('b')])
+    // The budget is the script's own (no engine timer): a loser is settled as a
+    // timeout, the task retries with new wording, and the route that hung is
+    // demoted at the second one.
+    expect(report.deadRoutes).toEqual([{ route: 'w1', class: 'timeout', streak: 2 }])
+    // task a: both attempts hang on the first route and fail; task b (a dead route
+    // is placed last) reaches the live one.
+    expect(workerModels(children)).toEqual(['w1', 'w1', 'w2'])
+  })
+
+  it('still leaves a child that finished without submitting alone', async () => {
+    const { report } = await runReal(call => {
+      const role = roleOfCall(call)
+      if (role === 'worker') {
+        // The genuine format gap: the child ran to completion and only talked.
+        return { output: [{ type: 'text' as const, text: 'I did the work.' }], stopReason: 'completed' }
+      }
+      if (role === 'verifier') return { structured: verification(taskFromPrompt(call.prompt)) }
+      return { structured: { summary: 'ok' } }
+    }, realConfig())
+    expect(report.deadRoutes).toBeUndefined()
+    expect(report.routes.some(entry => entry.failureClass === 'format-error')).toBe(true)
+  })
+
+  it('still refuses to blame a route for a refused key', async () => {
+    const { report } = await runReal(call => {
+      const role = roleOfCall(call)
+      if (role === 'worker') {
+        if (call.model === 'w1') {
+          return {
+            output: [{ type: 'text' as const, text: '' }],
+            stopReason: 'error',
+            sessionFailure: { message: '401: {"message":"virtual key is required."}', code: 'AUTH', status: 401 },
+          }
+        }
+        return { structured: execution('done') }
+      }
+      if (role === 'verifier') return { structured: verification(taskFromPrompt(call.prompt)) }
+      return { structured: { summary: 'ok' } }
+    }, realConfig())
+    expect(report.deadRoutes).toBeUndefined()
+  })
+})
+
+describe('dead routes: the host side of the channel it opens', () => {
+  it('refuses only the four transport families, and names the provider in the line', () => {
+    expect(CHILD_DEATH_FAMILIES).toEqual(['timeout', 'connection', 'server-error', 'rate-limit'])
+    expect(childDeathRejection({ stopReason: 'error', diagnostic: '503 service unavailable' }))
+      .toBe(`${CHILD_DEATH_MARKER} server-error: the child run ended abnormally (503 service unavailable)`)
+    expect(childDeathRejection({ stopReason: 'error', diagnostic: 'ECONNRESET while reading' })).toContain('connection:')
+    expect(childDeathRejection({ stopReason: 'error', code: 'RATE_LIMIT' })).toContain('rate-limit:')
+    expect(childDeathRejection({ stopReason: 'error', code: 'TIMEOUT' })).toContain('timeout:')
+    // Everything else keeps the null shape it had.
+    expect(childDeathRejection({ stopReason: 'completed' })).toBeUndefined()
+    expect(childDeathRejection({ stopReason: 'aborted' })).toBeUndefined()
+    expect(childDeathRejection({ stopReason: 'error', code: 'AUTH' })).toBeUndefined()
+    expect(childDeathRejection({ stopReason: 'error', diagnostic: 'the child run ended `error`' })).toBeUndefined()
+  })
+
+  it('pins the marker and the family table on both sides of the seam', () => {
+    // The script parses the marker out of a sentence; the host writes it. A rename
+    // on one side would silently stop the channel without failing anything else.
+    expect(WORKFLOW_SCRIPT).toContain(`'${CHILD_DEATH_MARKER}'`)
+    const table = /const ROUTE_HEALTH_FAMILIES = \{([^}]*)\};/.exec(WORKFLOW_SCRIPT)
+    expect(table, 'the script no longer declares ROUTE_HEALTH_FAMILIES').not.toBeNull()
+    const keys = [...table![1]!.matchAll(/'?([a-z-]+)'?:\s*1/g)].map(match => match[1])
+    expect(keys).toEqual([...CHILD_DEATH_FAMILIES])
   })
 })
