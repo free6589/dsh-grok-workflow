@@ -6,7 +6,6 @@ import { assertWorkflowReport } from '../src/report.js'
 import { buildWorkflowRequest, WORKFLOW_SCRIPT } from '../src/script.js'
 import {
   CHILD_TIMEOUT_MAX_MS,
-  CHILD_TIMEOUT_MS,
   COMMAND_TIMEOUT_SECONDS,
   DEFAULT_CHILD_TIMEOUT_MS,
   GUARDIAN_ADJUDICATION_MS,

@@ -1,0 +1,10 @@
+docs/knowledge/DECISIONS.md:2323:3. `src/run.ts` 只在 `config.guardianModel` 已配时传入 `CHILD_TIMEOUT_MS`。
+docs/knowledge/DECISIONS.md:2450:`src/timeout.ts` `CHILD_TIMEOUT_MS=600_000`（脚本竞速回退）、脚本镜像 `return 600000` /
+docs/knowledge/DECISIONS.md:2467:   `config.childTimeoutMs` 替代写死的 `CHILD_TIMEOUT_MS`（`src/run.ts`）。
+docs/knowledge/HANDOFF.md:291:  10 分钟：`CHILD_TIMEOUT_MS`、`childTimeoutCapMs`、脚本镜像。D-097 只修抢跑没修预算本身。
+docs/knowledge/HANDOFF.md:294:  `childTimeoutCapMs` 三处 7.2M）；`CHILD_TIMEOUT_MS` 留作旧报告 `0` 豁免锚点。详见 D-102。
+docs/knowledge/VALIDATION.md:251:**Honest boundary:** `CHILD_TIMEOUT_MS=600_000` 不再是任何人的默认值，仅是旧报告 `0` 豁免的锚点；
+docs/knowledge/VALIDATION.md:378:wait 窗口）+ `src/run.ts`（配了 `guardianModel` 才传 `CHILD_TIMEOUT_MS`）+ `test/timeout.spec.ts`（+1 例）
+docs/knowledge/evidence/release-tag-check-2026-11-22/changelog-unreleased.diff:40:+  (`CHILD_TIMEOUT_MS` in `src/timeout.ts`), and the configured `timeoutMs` for the whole run —
+docs/knowledge/evidence/release-tag-check-2026-11-22/changelog-unreleased.diff:44:+  （写在子代理自己的提示词里）、单次任务调用 600000 毫秒（`src/timeout.ts` 的 `CHILD_TIMEOUT_MS`）、
+docs/knowledge/evidence/wave2-runtime-2026-11-22/ACCEPTANCE.md:49:   Default carried as `args.childTimeoutMs = CHILD_TIMEOUT_MS` (600000,
