@@ -1,3 +1,15 @@
+## round-49 守护单轮单快照（soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
+
+| state | command | result |
+| --- | --- | --- |
+| worktree rsi-round-49 `af2c09c`（main `8eefaac` + 本轮 1 提交） | `npx vitest run test/guardian.spec.ts -t "insertion order"`（旧码 stash） | **1 failed / 28 skipped**：新用例红（file reader 调 3 次非 2 次） |
+| 同上（新码） | `npx vitest run test/guardian.spec.ts` | **29 passed** |
+| 同上（新码） | `npm run ci`（lead 独立） | **exit 0：85 files / 1641 tests PASS**；typecheck 干净；lint 0 errors；`verify:lib` byte-identical |
+| 隔离 soak | headless 新 profile + 真模型 | **BLOCKED**：插件链路通；`MISSING_CREDENTIAL`/网关 502 无额度，未跑出 COMPLETED，未伪造 |
+
+**Changed:** `src/guardian.ts`（check 双遍→单快照：每 reader 每 child 每轮一次，全局基线一次算完，判定零读数；`lastFileActivityMs` 语义不变）+ `test/guardian.spec.ts`（+1 顺序无关回归）+ `lib/` 重建 + `CHANGELOG [Unreleased]` 中英双语 + `.rsi/evidence/round-049/`。
+**Honest boundary:** 真机 BLOCKED，不发版；`[Unreleased]` 已攒 3 条待发。
+
 ## round-48 无定时器 hung 调用兜底（soak BLOCKED） — 2026-11-23 (`CONFIRMED`，未发版)
 
 | state | command | result |

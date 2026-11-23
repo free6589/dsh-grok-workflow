@@ -1,3 +1,7 @@
+Last updated: 2026-11-23 15:55 +08:00（**round-49 已合流 main 未发版：守护单轮单快照，`CONFIRMED`，soak BLOCKED** —
+合流提交 `80bc9ab`（main `8eefaac` + `af2c09c`）；`npm run ci` exit 0（85 文件 / 1641 测试 PASS，+1 顺序无关回归）。
+真机 BLOCKED（网关 502/无额度，未伪造）；`CHANGELOG [Unreleased]` 中英文已记 3 条待发，不发版。）
+
 Last updated: 2026-11-23 15:45 +08:00（**round-48 已合流 main 未发版：无定时器 hung 兜底，`CONFIRMED`，soak BLOCKED** —
 合流提交 `3284778`（main `974a3f6` + `bca1613`）；`npm run ci` exit 0（85 文件 / 1640 测试 PASS，+1 真无定时器回归；
 worktree 空依赖软链后 `verify:lib` 通过）。真机 BLOCKED（网关 502/无额度，未伪造）；

@@ -1,3 +1,15 @@
+## 2026-11-23 — round-49 已合流 main 未发版：守护单轮单快照（`CONFIRMED`，soak BLOCKED）
+
+- **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
+- **做了什么**：并发面第 2 条。单轮扫描读两遍文件心跳（2N）且边判边抬基线，结论随插入顺序翻转。
+  改为先快照所有心跳与全局基线、再统一判定零读数；`lastFileActivityMs` 语义不变。
+  +1 顺序无关回归；`npm run ci` exit 0（85/1641）；lead 独立红绿复验成立。
+- **真机**：BLOCKED（插件链路通；无额度/网关 502，未伪造）。本次不发版。
+- **合流**：`rsi/round-49`（`af2c09c`）已 `--no-ff` 合入 main 系 worktree（合流 `80bc9ab`）；
+  `rsi/round-49` 分支可 24h 内删除。`CHANGELOG [Unreleased]` 中英文已记 3 条待发。
+- **未做（下轮池）**：并发面路径归一/超时常量；配置面 Cookie JSON/
+  guardianModel 空白与未知键/gate 无钩子。网关恢复后给 round-47/48/49 补 soak 再发版。
+
 ## 2026-11-23 — round-48 已合流 main 未发版：无定时器 hung 兜底（`CONFIRMED`，soak BLOCKED）
 
 - **From:** 本会话（lead，持续 RSI 自动迭代）· **To:** 下一轮接手者
