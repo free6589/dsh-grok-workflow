@@ -150,6 +150,14 @@ describe('both READMEs quote the fixed caps from the constants', () => {
     'README.zh-CN.md': readFileSync(new URL('../README.zh-CN.md', import.meta.url), 'utf8'),
   }
 
+  it('states the unlimited run deadline in both READMEs', () => {
+    // Manual item Sec.2-1: the operator's "不限时" is a default, so both READMEs
+    // must say the default is 0 (unlimited) — a table that ever drifted back to
+    // 60 minutes would be the same complaint the item exists to close.
+    expect(readmes['README.md']).toContain('| `timeoutMs` | `0` (unlimited)')
+    expect(readmes['README.zh-CN.md']).toContain('| `timeoutMs` | `0`（不限时）')
+  })
+
   it('keeps every fixed cap in step with src/config.ts', () => {
     const facts = [
       `maxRetries=${FIXED_MAX_RETRIES}`,
