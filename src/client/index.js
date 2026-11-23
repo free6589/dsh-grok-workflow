@@ -4595,6 +4595,40 @@ window.__ModuleLoader__.load({
     }
 
     /**
+     * GET one Host route with query parameters and read the answer.
+     *
+     * Only the switch's read uses it: the route accepts `?action=status&sessionId=…`,
+     * so a middle box that refuses POST cannot leave the button permanently blank.
+     * Same fence and same never-throws contract as {@link postRoute}.
+     * @param routePath - the Host's exact path.
+     * @param params - query parameters to append.
+     * @param fetchImpl - fetch to use; defaults to the page's own. Tests pass a fake.
+     * @returns `{ status, payload }`, or `{ failure }` when there was no answer at all.
+     */
+    async function getRoute(routePath, params, fetchImpl) {
+      const send = fetchImpl !== undefined ? fetchImpl : (typeof fetch === 'function' ? fetch : undefined)
+      if (typeof send !== 'function') {
+        return { failure: 'this page has no fetch to reach the Host with' }
+      }
+      const query = Object.entries(params)
+        .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
+        .join('&')
+      let response
+      try {
+        response = await send(`${routeUrl(routePath)}?${query}`, { method: 'GET', credentials: 'include' })
+      } catch (error) {
+        return { failure: error && error.message ? error.message : String(error) }
+      }
+      let payload
+      try {
+        payload = await response.json()
+      } catch {
+        payload = undefined
+      }
+      return { status: response.status, payload }
+    }
+
+    /**
      * Build one composer-tool-row heartbeat switch.
      *
      * The two switches differ in exactly four facts — the route path, the registration
@@ -4869,8 +4903,10 @@ window.__ModuleLoader__.load({
       }
       // A 403 is the composition's fence saying this request carried no accepted user
       // credential — the same refusal `/grok` itself would not need, because a command
-      // always runs inside a user turn.
-      const refused = status === 403 ? 'mode/session' : 'mode/internal'
+      // always runs inside a user turn. A 405 with no code is the method being refused
+      // somewhere in front of this route: that has its own sentence and its own code,
+      // because "the route did not answer" sent the operator looking in the wrong place.
+      const refused = status === 403 ? 'mode/session' : status === 405 ? 'mode/method' : 'mode/internal'
       if (!isObject) return { ok: false, code: refused, error: answered }
       const code = typeof payload.code === 'string' && payload.code !== '' ? payload.code : refused
       const error = typeof payload.error === 'string' && payload.error !== '' ? payload.error : answered
@@ -4882,6 +4918,17 @@ window.__ModuleLoader__.load({
       const answered = await postRoute(MODE_ROUTE_PATH, body, fetchImpl)
       if (answered.failure !== undefined) {
         return { ok: false, code: 'mode/transport', error: answered.failure }
+      }
+      // A refused method on a read is worth one retry over GET: the route reads that way
+      // too, so a middle box that refuses POST costs the button a round-trip instead of
+      // its state. A write is never retried — the POST is the only way to move the switch.
+      if (answered.status === 405 && body.action === 'status') {
+        const retried = await getRoute(
+          MODE_ROUTE_PATH,
+          { action: 'status', sessionId: body.sessionId },
+          fetchImpl,
+        )
+        if (retried.failure === undefined) return parseModePayload(retried.payload, retried.status)
       }
       return parseModePayload(answered.payload, answered.status)
     }

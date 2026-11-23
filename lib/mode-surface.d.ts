@@ -15,8 +15,9 @@
  * `src/gate.ts` (`isModeEnabled(session, grokDefault === 'on')`). The default is
  * therefore never restated here or in the button; both ask this route.
  *
- * Like `src/loop-surface.ts`, the route is optional in a composition (only mounted
- * when `webServer` + `connection` + `sessions` exist) and sits behind the same
+ * Like `src/loop-surface.ts`, the route is optional in a composition (mounted when
+ * `webServer` + `connection` exist; the live-session store is resolved per request, so
+ * a store that mounts later cannot leave the switch unanswered) and sits behind the same
  * trust fence: `connection.requestRejection` is the Host/Origin + browser-auth
  * check DSH's shipped routes use, so a cross-site or unauthenticated request is
  * refused before any state is touched.
@@ -67,6 +68,14 @@ export interface ModeRouteDeps {
     /** Live-session lookup; absent in a composition without the store. */
     readonly sessions?: ModeSessionStore | undefined;
     /**
+     * Live-session lookup resolved per request, when the store is a service that may
+     * arrive after this route mounted. Preferred over {@link sessions} when both are
+     * given, so a route never answers from a snapshot of a service that has since
+     * been replaced; `undefined` means "the composition has no store right now" and
+     * is answered as `mode/unavailable` (503), never as a missing session (404).
+     */
+    readonly resolveSessions?: (() => ModeSessionStore | undefined) | undefined;
+    /**
      * The effective default with no record: the same rule the gate applies, read live.
      * Kept a function so a settings edit reaches the next request.
      */
@@ -116,6 +125,8 @@ export interface ModeHostContext {
     readonly webServer?: ModeWebServer | undefined;
     readonly connection?: ModeConnection | undefined;
     readonly sessions?: ModeSessionStore | undefined;
+    /** Cordis service lookup, the second way a mounted service is reachable. */
+    readonly get?: ((name: string) => unknown) | undefined;
     readonly inject?: unknown;
     readonly effect?: (installer: () => undefined | (() => unknown)) => unknown;
 }
@@ -139,8 +150,10 @@ export declare function installModeRoute(options: InstallModeRouteOptions): void
  * Answer one browser request.
  *
  * Body: `{ action: 'status' | 'set', sessionId, enabled? }`. `status` only reads;
- * `set` writes and answers the read-back. Deliberately no GET form, so a status
- * read and a toggle share one body shape and the button has one code path.
+ * `set` writes and answers the read-back. A read is also accepted over `GET`
+ * (`?action=status&sessionId=…`), because the switch is the one control that must keep
+ * answering when a proxy or a browser refuses to POST; a write over `GET` is refused,
+ * since a URL is not a place to keep a state change.
  *
  * Exported as the production-path test seam: the tests drive this exact handler
  * with a real `IncomingMessage`-shaped stream, so a hand-mocked success cannot
