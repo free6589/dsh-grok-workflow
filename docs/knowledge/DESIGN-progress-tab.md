@@ -63,8 +63,10 @@
 ### 4.1 实现回填：两条绑定通道（2026-11-18，RSI round 9）
 
 上面 §4 描述的是早期模板脊椎；**实际发布**的脊椎是
-`起点 → 规划 → 执行 → 检查 → 汇总 → 回答 → 终点`（`PROGRESS_STAGES`，`src/progress-tab.ts`），
-计划任务节点插在 `执行` 与 `检查` 之间。逐条事实：
+`起点 → 规划 → 执行 → 检查 → 汇总 → 终点`（`PROGRESS_STAGES`，`src/progress-tab.ts`），
+计划任务节点插在 `执行` 与 `检查` 之间。原先第七格「回答」已删除（manual item Sec.2-5）：
+最终答案由 gate 在整轮结束后直接交付，从不经过 workflow 子调用，所以没有任何事件能填这一格。
+逐条事实：
 
 - **通道一（phase）**：`agent-start` 的 `phase` 命中阶段 token 时，行聚合进该阶段节点。
   CJK token 按子串匹配，拉丁 token 必须落在词边界上（`ui` 不命中 `build`）。
@@ -353,7 +355,7 @@ Phase 2（失败重试）暂不做。本节记录实际改动。
 
 ### 15.1 现状复述（CONFIRMED）
 
-- 轨道 = `PROGRESS_STAGES` 七段固定脊椎（`src/progress-tab.ts:181`），未命中任何阶段的
+- 轨道 = `PROGRESS_STAGES` 六段固定脊椎（`src/progress-tab.ts:181`），未命中任何阶段的
   `phase` 追加为独立节点，插在 `执行` 与 `检查` 之间（§4.1）。
 - 渲染 = 单行 `flex` 等分：段内 28 px 状态环 + label（ellipsis）+ 一行 meta，段间 18 px
   连接线（`src/client/index.js:3359` 起）。展开的分支面板在轨道**下方**（§14）。
