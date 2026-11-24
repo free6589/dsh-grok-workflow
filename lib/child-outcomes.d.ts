@@ -55,13 +55,16 @@ export declare const NULL_COLLAPSE_REASON = "no valid structured result";
  */
 export declare const CHILD_DEATH_MARKER = "CHILD_DEATH:";
 /**
- * The transport families a child's death may be blamed on the route for.
+ * The families a child's death may be forwarded to the script for.
  *
- * Mirrors `ROUTE_HEALTH_FAMILIES` in `src/script.ts` for the classes the host may
- * forward (pinned equal by `test/dead-routes.spec.ts`). Everything else keeps the
- * null shape it had: a refused key, a cancelled run and a genuine format gap are
- * not evidence that another route would do better, and the report repair
- * (`reclassifyNullCollapses`) remains the only path that names them.
+ * Mirrors the guest's own read-back gate (`CHILD_DEATH_FAMILIES` in `src/script.ts`,
+ * pinned equal by `test/dead-routes.spec.ts`). It is not the dead-route table: the
+ * script counts only the four transport families (`ROUTE_HEALTH_FAMILIES`), so a
+ * refused key advances the route chain and is never written down as a dead route —
+ * what that needs is a key, not another route. Everything else keeps the null shape
+ * it had: a cancelled run and a genuine format gap are not evidence about the route,
+ * and the report repair (`reclassifyNullCollapses`) remains the only path that names
+ * them.
  */
 export declare const CHILD_DEATH_FAMILIES: readonly FailureClass[];
 /**
@@ -163,9 +166,11 @@ export declare function classifyChildFailureText(value: unknown): FailureClass;
  * A route that keeps dying is worth skipping, but the script can only skip what
  * it can see. This is the one fact the host can put in front of it: the class the
  * child's own settlement named, in a message the guest parses. It is deliberately
- * narrow — a `completed` child that never submitted is a real format gap, a
- * refusal is a key, and a cancellation is not the route's fault — so those keep
- * arriving as `null` and keep being repaired in the report instead.
+ * narrow — a `completed` child that never submitted is a real format gap and a
+ * cancellation is not the route's fault, so those keep arriving as `null` and keep
+ * being repaired in the report instead. A refused key travels too, as
+ * `model-unavailable`: the script has to stop resubmitting a call the gateway will
+ * refuse identically, but its bookkeeping never counts that class as a dead route.
  * @param outcome - the child's terminal state.
  * @returns The one-line rejection message, or `undefined` to leave the null.
  */

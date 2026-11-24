@@ -1,3 +1,29 @@
+## 2026-11-24 — 401/403 也回灌给脚本，但不进死路由账（`CONFIRMED` 单测 + 门禁，真机 soak `NOT_RUN`）
+
+- **From:** 实现子代理（agent-114/impl-forward-model-unavailable） · **To:** lead / 合流方
+- **改了什么**（D-122）：分支 `fix/forward-model-unavailable`（worktree `.agents/worktrees/fix-forward-model-unavailable`，
+  从 `main` `8f34701`＝0.13.28 开出）。密钥被拒这一类（`model-unavailable`，含 401/403、未知模型、`AUTH` 码）现在和
+  四个传输族一样，由宿主 twin 在 `startActivation` 处拒绝回执、把 `CHILD_DEATH: model-unavailable: <子会话原话>`
+  交给脚本；脚本按类写 `model-unavailable` + 服务商原话，**不再补交**（注定被同样拒绝），并照旧换路推进路由链。
+  两侧各一张表：宿主 `src/child-outcomes.ts` 的 `CHILD_DEATH_FAMILIES`＝五族（转发面）；guest `src/script.ts`
+  新增同名常量当回读闸门（五族）；`ROUTE_HEALTH_FAMILIES`（记账面）四族未动，所以 401/403 换路但**永远不进死路由账**。
+- **验证**：基线 `npx vitest run test/dead-routes.spec.ts test/null-collapse.spec.ts` 2 files / 53 tests PASS；
+  新断言在旧码上 **4 failed / 49 passed**（五族 `toEqual`、guest 表缺失、403 与 session-refusal 的 `rewritten` 各 6→0）→
+  实现后 **53 passed**；`npm run ci` **exit 0（97 files / 1820 tests，typecheck 干净，lint 0 errors / 36 warnings 全既有，
+  `verify:lib` byte-identical）**。证据 `.tmp/evidence-forward-model-unavailable/{red,green,ci}.txt`。
+- **改写的旧断言**：`test/null-collapse.spec.ts` 三条（403 种子与 session-refusal 种子 `rewritten>0 → =0`；「台账是改写证据」
+  那条改用 `cancelled` 种子），`test/dead-routes.spec.ts` 两条表钉子重写成「转发面 / 记账面」两条。逐条理由见 VALIDATION 首条。
+- **留给合流方（按工单约定，本分支全部 `NOT_RUN`）**：
+  1. **真机 soak 的坏 key 场景**：隔离 `DSH_HOME` 克隆 profile + 真端点 401/403，看报告里是不是 `model-unavailable`
+     且 `no valid structured result` 出现 0 次、worker 只被派一次（不再补交）、并且 `Dead routes` 里**没有**这条路。
+     同时跑一轮正常轮确认成功率不受影响。live `~/.dsh` 与线上实例不要碰。
+  2. 提交与 `lib/`：本分支**没有 commit**（按工单留给工头）；`npm run ci` 内的 build 已把工作树 `lib/` 更新到与 `src/` 对应，
+     提交时把 `src/` 与 `lib/` 一起提。
+- **一个环境坑（留个记号）**：这个 worktree 的 `node_modules` 软链原本是悬空的（`../../../../node_modules` →
+  不存在的 `/home/fish/projects_mine/node_modules`），`npx vitest` 靠 Node 向上查找照样能跑，但 `scripts/verify-lib.mjs`
+  用绝对路径起 `tsc` 会报 `Cannot find module`，让 `npm run ci` 假红。已按兄弟 worktree 的约定改成绝对路径指向主 checkout 的
+  `node_modules`（`node_modules/` 在 `.gitignore`，不进版本树）。以后开 worktree 建议直接钉绝对路径。
+
 ## 2026-11-24 — 0.13.27 返工：死路由的两条根因都堵上，真机 soak PASS（`CONFIRMED`）
 
 - **From:** T4 返工子代理（agent-108） · **To:** lead / 下一个接手者

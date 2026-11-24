@@ -20,8 +20,9 @@ import { roleOf, runWorkflowScript, taskFromPrompt, type ScriptAgent } from './h
  * timeout, when the route hangs instead of refusing) on a route that had
  * already shown it cannot answer. The table is deliberately narrow — only the
  * four families where "try this again" is a reasonable thing to think about
- * count, and a credential refusal is not one of them (the next call would be
- * refused identically, and the fix is a key, not a route).
+ * count, and a credential refusal is not one of them: that death does reach the
+ * script (it must stop resubmitting it), but the next call would be refused
+ * identically, so the fix is a key, not a route.
  */
 
 const OBJECTIVE = 'Ship the verified result'
@@ -560,27 +561,47 @@ describe('dead routes: the shape the real engine produces', () => {
 })
 
 describe('dead routes: the host side of the channel it opens', () => {
-  it('refuses only the four transport families, and names the provider in the line', () => {
-    expect(CHILD_DEATH_FAMILIES).toEqual(['timeout', 'connection', 'server-error', 'rate-limit'])
+  it('forwards five families — every class the script may act on, key refusals included', () => {
+    // This table answers one question only: may the host put this death in front of
+    // the script? It is *not* the bookkeeping gate — a refused key belongs here
+    // (the script must stop resubmitting and move on) and nowhere near the
+    // dead-route table (the next call would be refused identically).
+    expect(CHILD_DEATH_FAMILIES).toEqual(['timeout', 'connection', 'server-error', 'rate-limit', 'model-unavailable'])
     expect(childDeathRejection({ stopReason: 'error', diagnostic: '503 service unavailable' }))
       .toBe(`${CHILD_DEATH_MARKER} server-error: the child run ended abnormally (503 service unavailable)`)
     expect(childDeathRejection({ stopReason: 'error', diagnostic: 'ECONNRESET while reading' })).toContain('connection:')
     expect(childDeathRejection({ stopReason: 'error', code: 'RATE_LIMIT' })).toContain('rate-limit:')
     expect(childDeathRejection({ stopReason: 'error', code: 'TIMEOUT' })).toContain('timeout:')
-    // Everything else keeps the null shape it had.
+    // A credential refusal travels too: by the provider's code, or out of its own
+    // words when the code is the only thing the session recorded.
+    expect(childDeathRejection({ stopReason: 'error', code: 'AUTH' })).toContain('model-unavailable:')
+    expect(childDeathRejection({ stopReason: 'error', diagnostic: '403 Forbidden' })).toContain('model-unavailable:')
+    // Everything the script cannot act on keeps the null shape it had.
     expect(childDeathRejection({ stopReason: 'completed' })).toBeUndefined()
     expect(childDeathRejection({ stopReason: 'aborted' })).toBeUndefined()
-    expect(childDeathRejection({ stopReason: 'error', code: 'AUTH' })).toBeUndefined()
     expect(childDeathRejection({ stopReason: 'error', diagnostic: 'the child run ended `error`' })).toBeUndefined()
   })
 
-  it('pins the marker and the family table on both sides of the seam', () => {
+  it('pins the marker and both guest tables: five forwarded, four counted', () => {
+    // Two tables, two questions. `CHILD_DEATH_FAMILIES` is the read-back gate: which
+    // deaths the script accepts from the marker. `ROUTE_HEALTH_FAMILIES` is the
+    // bookkeeping gate: which deaths say "this route should go last". They differ by
+    // exactly one class on purpose.
+    const COUNTED = ['timeout', 'connection', 'server-error', 'rate-limit']
     // The script parses the marker out of a sentence; the host writes it. A rename
     // on one side would silently stop the channel without failing anything else.
     expect(WORKFLOW_SCRIPT).toContain(`'${CHILD_DEATH_MARKER}'`)
-    const table = /const ROUTE_HEALTH_FAMILIES = \{([^}]*)\};/.exec(WORKFLOW_SCRIPT)
-    expect(table, 'the script no longer declares ROUTE_HEALTH_FAMILIES').not.toBeNull()
-    const keys = [...table![1]!.matchAll(/'?([a-z-]+)'?:\s*1/g)].map(match => match[1])
-    expect(keys).toEqual([...CHILD_DEATH_FAMILIES])
+    const forwarded = /const CHILD_DEATH_FAMILIES = \{([^}]*)\};/.exec(WORKFLOW_SCRIPT)
+    expect(forwarded, 'the script no longer declares CHILD_DEATH_FAMILIES').not.toBeNull()
+    const forwardedKeys = [...forwarded![1]!.matchAll(/'?([a-z-]+)'?:\s*1/g)].map(match => match[1])
+    expect(forwardedKeys).toEqual([...CHILD_DEATH_FAMILIES])
+    const counted = /const ROUTE_HEALTH_FAMILIES = \{([^}]*)\};/.exec(WORKFLOW_SCRIPT)
+    expect(counted, 'the script no longer declares ROUTE_HEALTH_FAMILIES').not.toBeNull()
+    const countedKeys = [...counted![1]!.matchAll(/'?([a-z-]+)'?:\s*1/g)].map(match => match[1])
+    expect(countedKeys).toEqual(COUNTED)
+    // Forwarding a death is a decision about this call; counting it is a decision
+    // about the route. A refused key moves the task to another route without ever
+    // being written down as a dead route.
+    expect([...CHILD_DEATH_FAMILIES].filter(family => !COUNTED.includes(family))).toEqual(['model-unavailable'])
   })
 })

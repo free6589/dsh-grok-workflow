@@ -5,6 +5,12 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Fixed / 修复
+
+- **A refused key is reported as a refused key, and no longer pays a pointless resend / 密钥被拒就写成密钥被拒，不再白补交一次** —
+  When the gateway refused a child with 401 or 403, the run recorded it as a formatting mistake and the report only corrected that wording after the last call — and before that, the task had already paid one same-attempt resubmit that the same key was going to refuse again. A refusal (401/403, an unknown model) now travels to the running workflow the same way a transport death does, carrying the provider's own words, so the attempt ends where it should: the task moves on with the real cause on the row, and there is no resend. It still never marks the route as down — a refused key needs a key, not a different route, so the dead-route table keeps its four transport families and this class is deliberately not one of them. A cancellation and a real format gap are untouched: they keep their one free resubmit.
+  / 网关用 401 或 403 拒绝子代理时，这一轮过去把它写成「格式不对」，而且报告要等最后一次调用之后才把措辞改回来——在那之前，任务已经为它白付了一次同次补交，而同一个密钥照样会被再拒一次。现在这类拒绝（401/403、模型不存在）和传输层死因走同一条路回到正在跑的工作流，并带着服务商自己的原话，于是这次尝试停在该停的地方：任务换路往下走，失败行写的是真因，也不会再补交。它仍然不会把那条路由记成「这条路挂了」——密钥被拒要的是换 key，不是换路，所以死路由表仍然只收四个传输族，这一类是故意不收的。被取消和真正的格式错一点没动：它们仍然保留那一次免费补交。
+
 ## [0.13.28] - 2026-11-24
 
 

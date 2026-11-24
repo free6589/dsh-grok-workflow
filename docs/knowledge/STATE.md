@@ -1,3 +1,13 @@
+Last updated: 2026-11-24 08:44 +08:00（**401/403 也回灌给脚本了，但它不把路由记成死路，`CONFIRMED`（单测 + 门禁），未发版、未合流** —
+分支 `fix/forward-model-unavailable`（worktree `.agents/worktrees/fix-forward-model-unavailable`，从 `main` `8f34701`＝0.13.28 开出；
+共享脏树 `a6103ad` 一行未动）。之前只有四个传输族的死因会带着 `CHILD_DEATH: <class>: <原话>` 回到脚本，密钥被拒（401/403、
+未知模型，代码里的 `AUTH` 都归 `model-unavailable`）仍旧被写成「格式不对」，而且脚本还会为它白补交一次。现在两侧各一张表：
+宿主 `CHILD_DEATH_FAMILIES` = 五族（转发面，多一个 `model-unavailable`），guest 新增同名常量当回读闸门（同样五族），而
+`ROUTE_HEALTH_FAMILIES`（记账面）保持四族——所以密钥被拒会换路、永远不会被记成死路（换 key 才是解法）。代价：401/403 不再补交，
+路由台账那一行由脚本自己按类写、宿主不再事后改写。门禁：`npm run ci` exit 0（**97 files / 1820 tests**，typecheck 干净、
+lint 0 errors / 36 warnings 全既有、`verify:lib` byte-identical）；新断言在旧码上 4 红 → 修后 53 绿。隔离真机 soak（坏 key 场景）
+`NOT_RUN`，留给合流方。取舍与被改写的三条旧断言见 D-122 与 VALIDATION 首条。）
+
 Last updated: 2026-11-24 07:20 +08:00（**0.13.27 返工：死路由在真机上真的进表了，`CONFIRMED`（单测 + 真机 soak），待发版** —
 上一轮合流 soak 判 FAIL 的两条根因都堵上了（D-121）。① 记账不再拿 `switchModel` 当闸门，挂死的路用专用
 `routeHealth:'timeout'` 进表（`switchModel` 仍为 false，任务仍改写措辞重试）；② 5xx/断连/429 的死因由宿主 twin

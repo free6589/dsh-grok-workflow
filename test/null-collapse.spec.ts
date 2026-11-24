@@ -186,10 +186,12 @@ function resubmits(calls: ChildCall[]): ChildCall[] {
 }
 
 describe('the engine seam records what each child settled as', () => {
-  it('captures the stop reason and the diagnostic of a refused child', () => {
-    return runSeed('forbidden').then(({ outcomes, rewritten }) => {
+  it('captures the stop reason and the diagnostic of a cancelled child', () => {
+    return runSeed('cancelled').then(({ outcomes, rewritten }) => {
       // The ledger is the evidence the repair rests on: without a recorded death
-      // the report could only be rewritten by guessing.
+      // the report could only be rewritten by guessing. A cancellation is the death
+      // the host still leaves as a null — a refused key now travels across the seam
+      // as its own class — so this is the case that still proves the rewrite path.
       expect(outcomes).toBeGreaterThan(0)
       expect(rewritten).toBeGreaterThan(0)
     })
@@ -331,15 +333,22 @@ describe('a child that died is not reported as a format error', () => {
   })
 
   it('reports a 403 child as model-unavailable, not a re-sendable format error', async () => {
-    const { report, rewritten } = await runSeed('forbidden')
-    expect(rewritten).toBeGreaterThan(0)
+    const { report, calls, rewritten } = await runSeed('forbidden')
+    // The seam refused this activation's result with the class the child's own
+    // session named, so the script wrote the row itself: the host repair has
+    // nothing left to rewrite.
+    expect(rewritten).toBe(0)
     const attempt = report.tasks[0]?.attempts[0]
     expect(attempt?.failure?.class).toBe('model-unavailable')
     expect(attempt?.failure?.category).toBe('infrastructure')
+    expect(attempt?.failure?.reason).not.toContain('no valid structured result')
     // The route trail is the record a maintainer reads: no route may claim a
     // format error for a child the provider refused to serve.
     expect(report.routes.filter(entry => entry.failureClass === 'format-error')).toEqual([])
     expect(report.routes.some(entry => entry.failureClass === 'model-unavailable')).toBe(true)
+    // A refused key is not a missing form: there is nothing to hand back, so the
+    // attempt ends here instead of paying a second identical refusal.
+    expect(resubmits(calls)).toHaveLength(0)
   })
 
   /**
@@ -352,7 +361,10 @@ describe('a child that died is not reported as a format error', () => {
    */
   it('names the provider failure the child session recorded, with no diagnostic on the result', async () => {
     const { report, rewritten } = await runSeed('session-refusal')
-    expect(rewritten).toBeGreaterThan(0)
+    // The code and the provider's words the session recorded now travel across the
+    // seam, so the report is written by the script, in its own class — the host
+    // repair has nothing to rewrite.
+    expect(rewritten).toBe(0)
     const failure = report.tasks[0]?.attempts[0]?.failure
     expect(failure?.class).toBe('model-unavailable')
     expect(failure?.category).toBe('infrastructure')

@@ -2941,3 +2941,42 @@ spine 为空，pre-fix 形状会进脊柱。
 - **教训（写进下一轮的规矩）：** 诊断行只在 `renderReport(..., {showDiagnostics:true})` 里出现，而 `showDiagnostics` 是
   T4 定死的 false；取证时必须用**只翻可见性**的 lib 副本（本轮：`renderReport(value)` → `renderReport(value,{showDiagnostics:true})`，
   一处），并把「路由逻辑用的是真 lib」这一点在记录里写清。运行本身用未改动的 `lib/` 复跑一遍即可交叉验证。
+
+## D-122 · model-unavailable（401/403）也回灌给脚本，但不进死路由账（2026-11-24）
+
+- **Status:** `CONFIRMED`（读码 + 单测：新断言在旧码上 4 红，改后 53 绿）；真机 soak `NOT_RUN`（留给合流方）
+- **Date:** 2026-11-24
+- **来源:** 本分支 `fix/forward-model-unavailable`（worktree `.agents/worktrees/fix-forward-model-unavailable`，
+  从 `main` `8f34701`＝0.13.28 开出；共享脏树 `a6103ad` 一行未动）
+- **问题（`CONFIRMED`）:** 0.13.27/0.13.28 只把四个传输族的死因回灌给脚本（宿主 `childDeathRejection()` 抛
+  `CHILD_DEATH: <class>: <子会话原话>`，guest `childDeathCause()` 读回），`model-unavailable`（401/403/未知模型，
+  `AUTH` 等码都归它）仍旧走老口径：seam 不转发 → guest 写 `format-error` + 「returned no valid structured result」→
+  宿主 `reclassifyNullCollapses` 事后改写散文。于是**当次尝试**里脚本已经把一次「同次补交」花在一个注定被同样拒绝的
+  重发上，而报告也要等 run 收尾才说对。
+- **决定（两侧各一张表，回答两个不同的问题）:**
+  1. 宿主 `src/child-outcomes.ts` 的 `CHILD_DEATH_FAMILIES`（转发面）= 五族，末尾加 `model-unavailable` 并保持既有顺序；
+     `childDeathRejection()` 用它决定要不要拒绝这条激活回执。
+  2. guest `src/script.ts` 新增 `CHILD_DEATH_FAMILIES`（回读闸门，同样五族），`childDeathCause()` 改用它判定；
+     `ROUTE_HEALTH_FAMILIES`（记账面）**保持四族一字不动**。
+  3. `routeHealthFamilyOf('model-unavailable', …)` 因为不在记账表里自然返回 `''`，所以 401/403 不会把路由记成死路；
+     `advances` 仍按 `switchOn`（默认空 = 换路），与旧的 `format-error` 路径一样推进路由链。
+- **为什么密钥被拒不记死账:** 换 key 才是解法，换路只是让这一轮别在同一个 key 上再撞一次。把它写进死路由表会把
+  「要改的是密钥」这件事藏起来（D-119 ③ 的否决原样保留），而且那张表的语义是「这条路今天不通」——被拒的密钥
+  并没有说这条路的服务商不通。
+- **代价（三处，如实记）:**
+  1. 401/403 不再触发同次补交：脚本按类走进换路分支，省下那一次注定被同样拒绝的调用。
+  2. 路由台账那一行现在由**脚本自己**按类写（`model-unavailable` + 服务商原话），宿主 `reclassifyNullCollapses`
+     对它无事可改（`rewritten === 0`）——与 D-121 改写 timeout 种子是同一种「同一格证据换到它该在的那一层」。
+  3. 取消（`aborted`）与真格式错（答完没交结构化结果）仍然走 `null` → `format-error` → 宿主事后改写；
+     D-120「格式错算不算这条路的问题」那条否决不变。
+- **被这条改动改写的旧断言（逐条理由见 VALIDATION 首条）:** `test/null-collapse.spec.ts` 的
+  `runSeed('forbidden')` 与 `runSeed('session-refusal')` 两条原本断言「宿主改写了 >0 行」（实测 6），
+  现在是 `rewritten === 0` + 「脚本已按类写、路由行里没有 format-error、`resubmits()` 为 0」；
+  `captures the stop reason and the diagnostic of a refused child` 原来拿 403 当「台账是改写证据」的样本，
+  现在改用 `cancelled` 种子（`stopReason` + `diagnostic` 都在、仍由宿主改写）。这不是放宽标准：
+  每一格都换成了更靠前的证据，而不是删掉断言。
+- **钉法:** `test/dead-routes.spec.ts` 把两张表各自钉一遍——宿主五族 `toEqual`；guest 的
+  `const CHILD_DEATH_FAMILIES` 键序等于五族、`const ROUTE_HEALTH_FAMILIES` 键序等于四族，并断言两表
+  只差一个类（五族减去四族 = `['model-unavailable']`）。两条用例的标题分别写明「转发面」与「记账面」。
+- **Consequences:** 401/403 在报告与路由台账里立刻是真因，且不再白烧一次补交；死路由表仍是四族，
+  「一条路被记成死路」的门槛没有变。任何调这两张表的提交必须同时改上面这两条钉子。
