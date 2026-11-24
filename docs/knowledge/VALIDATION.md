@@ -6622,3 +6622,31 @@ toolName/configVersion = 页面 16）；`test/client.spec.ts` ProgressBundle 补
 **Changed：** `src/taskboard/store.ts`（每次改动静默持独占锁：重读 → 按磁盘版本 CAS → 落盘；废弃锁按 `lockStaleMs` 清掉）、`src/taskboard/types.ts`（`TASKBOARD_LOCK`/`TASKBOARD_LOCK_FILE`/`TaskboardOptions`）、`src/taskboard/paths.ts`（新增：`taskboardDir`/`taskboardFile`/`openDefaultTaskboard`，三级解析同 `checkpointDir`）、`src/taskboard/index.ts`、`test/taskboard.spec.ts`、`test/fixtures/taskboard/writer.mjs`（真实子进程，导入 `lib/` 产物）、`vitest.config.ts`（`GROK_WORKFLOW_TASKBOARD_DIR` 指向 tmp）、`docs/ARCHITECTURE.md`（任务板章节：位置/行格式/认领协议/崩溃恢复/上限/证据/边界）、`CHANGELOG.md`。
 **行为变更：** 旧 `taskboard.spec.ts` 的同任务竞态用例断言"两个写者都成功、文件留最后一个"——那正是丢更新缺陷；现改为"恰好一个赢家、输家 `version-conflict`，重开后归属与赢家一致"。
 **Honest boundary：** 提交时刻（`f4cce3d`）本 worktree 仍被另一条 lane 占用，故 `npm run ci` 未作为单条命令执行，而是按其步骤分步跑（typecheck / lint / 全仓 vitest / 复刻 verify:lib），四步全绿；该 lane 随后自行提交了 `14f4e35`（dispatcher），两者同分支先后落地、互不改对方文件。仍未单独观测到的只有"单次 `npm run ci` 调用"的退出码本身。锁为单文件系统内的咨询锁（不防恶意绕过、不保证网络盘语义）；rename 后的目录 fsync 是尽力而为，掉电仍可能丢最后一次写——两条都写进架构文档的边界节。
+
+## 0.13.31 发布：合流、两处门禁、标签、推送与远端两条流水线 — 2026-11-24 (`CONFIRMED`)
+
+下面每一行都是本轮在主检出 `/home/fish/projects_mine/dsh-grok-workflow` 里真跑过的命令与真读到的结果；没跑的写 `NOT_RUN`。
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 合流 | `git merge --no-ff team-dispatch-v1 -m "merge: task board durability — claim lock, arrival order, addressing"` | **无冲突**，merge `dc69c6e`（`0b686da` 是 `369d6e3` 的直系后代；48 文件 / +2185 / −202） |
+| 门禁（首次，只 bump 了三处） | `npm run ci` | **EXIT=1**：`docs-version.spec.ts` 5 例 + `docs-config-keys.spec.ts` 1 例 + `update-entry.spec.ts` 1 例红，**3 files / 7 tests failed，1859 passed（1866）**——守卫要求 README／`docs/LOCAL-TESTING.md`／客户端 `PLUGIN_VERSION` 跟着版本走 |
+| 门禁（补完版本声明、未提交） | `npm run ci` | **EXIT=0**：oxlint **36 warnings / 0 errors**；`verify:lib` → `lib/ at dc69c6e is the build of src/ at dc69c6e (241 files, byte-identical)`；vitest **100 files / 1866 tests PASS**（130.72 s） |
+| 门禁（发版提交 `d0c1383` 上，这条才是被 tag 的树） | `npm run ci` | **EXIT=0**：oxlint **36 warnings / 0 errors**；`verify:lib` → `lib/ at d0c1383 is the build of src/ at d0c1383 (241 files, byte-identical)`；vitest **100 files / 1866 tests PASS** |
+| 标签 | `git tag -a v0.13.31 -m "v0.13.31"`；`git cat-file -t v0.13.31`；`git rev-parse v0.13.31^{}` | `tag`；标签对象 `c8339cf837f58ace96d1297f8ffd74b83a9d3d90`，剥皮 **`d0c1383`**（= 发版提交，非新建提交） |
+| 推送 | `git push origin main`；`git push origin v0.13.31` | 各 exit 0，**无 force**：`369d6e3..d0c1383  main -> main`、`* [new tag] v0.13.31 -> v0.13.31` |
+| 远端 CI | `gh run watch 45363402329 --exit-status` | **success**（2m21s） |
+| 远端 Release | `gh run watch 45363426210 --exit-status` | **success**（2m39s），所有步骤 ✓（含 `git diff --exit-code -- lib/` 与 `npm pack --dry-run`） |
+| GitHub Release | `gh release view v0.13.31 --json tagName,name,isDraft,isPrerelease,assets` | title **`Grok Workflow for DSH v0.13.31`**，非 draft、非 pre-release；资产 **`dsh-grok-workflow-0.13.31.tgz`，928474 B**，sha256 `59ddc3a107bc8b12cda4e68abfcc6f2f760426c8a7fa48b5a62097680adc7d23` |
+| live profile | — | **NOT_RUN / 故意跳过**：操作员红线「不碰 live」——`~/.dsh` 一行未动，未升级、未重载、未重启，AGENTS §11 自动升级不执行；live profile 现装版本未核对 |
+
+**CHANGELOG 手术的等价性（程序化比对，不是目测）：** 拿 merge 提交 `dc69c6e` 的 `CHANGELOG.md` 与改后逐行比——
+已发布历史 `before[8..3726] == after[48..3766]`（**3719 行完全相同**）、搬走的条目 `before[3734..3770] == after[10..46]`
+（**37 行逐字节相同**）、staging 标题与三句 framed 说明以及 `*unreleased*` 字样全部消失、`## [Unreleased]` 仍在第 6 行且为空。
+对基线 `369d6e3` 的差分 `git diff 369d6e3..HEAD --numstat -- CHANGELOG.md` → **40 / 0**（只有新增，没有删除）——这条才证明
+已发布的段一条没被改写；对 merge 提交的 **40 增 / 44 删** 全部落在「`[Unreleased]` 之后」与「文件末尾的 staging 块」两处。
+远端 Release 的发布说明正是从 `## [0.13.31] - 2026-11-24` 段抽出来的，说明升格后的锚点能被发版脚本接住。
+
+**Honest boundary：** 真机 soak 本轮**没有重跑**，复用的是分支上已通过的那次（隔离 `DSH_HOME`、真模型跑到
+`run.status=completed`、`write-a:verified read-b:verified`、`TEAM_OK` 与 `TEAM_B_OK\nA_SEEN=TEAM_OK` 真写出来）；
+本轮新跑的证据面是合流、两处门禁、标签、推送与远端两条流水线。live profile 是否已装 `0.13.31` **未核对**——红线不允许碰 live。

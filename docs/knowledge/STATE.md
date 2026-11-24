@@ -2566,3 +2566,15 @@ Last updated: 2026-11-23 08:16 +08:00（**任务板持久化加固，未发版�
 `verify:lib` **NOT_RUN**：本 worktree 被并行 lane 占用，其 `src/dispatcher`/`src/handoff`/`src/report`/`src/delivery`
 编辑中途（`tsc --noEmit` 在这些文件红），门禁需等其落地后整仓重跑。行为变更：旧竞态用例"两个写者都成功"改为
 "恰好一个赢家"。主链 plan → execute → verify → retry → synthesize 未动。）
+
+Last updated: 2026-11-24 17:22 +08:00（**0.13.31 已发布：任务板持久化加固随 `team-dispatch-v1` 合入 `main` 并发版，`CONFIRMED`** —
+`team-dispatch-v1` 以 `--no-ff` 合入（merge `dc69c6e`，无冲突），发版提交 `d0c1383`，注解标签 `v0.13.31`（标签对象
+`c8339cf` → 剥皮 `d0c1383`）。`CHANGELOG.md` 里那条被 rebase 追到文件末尾的 staging 块（`## Task board durability - 2026-11-23 …`）
+整块剪出、升格成 `## [0.13.31] - 2026-11-24`，落在 `## [Unreleased]`（第 6 行）之后、`## [0.13.30]`（第 48 行）之前；条目原文
+一字未改，只挪位置，`## [Unreleased]` 仍保留且为空。对基线 `369d6e3` 的 `CHANGELOG.md` 差分是 **40 增 / 0 删**——已发布历史
+一个字符都没动。本次只发两个增量：认领锁 + 磁盘 CAS（`df89a95`）、到达顺序 + 全路径寻址（`4f25f15`）。
+本地门禁在发版提交 `d0c1383` 上 `npm run ci` **EXIT=0**：oxlint **36 warnings / 0 errors**、`verify:lib` **241 文件逐字节一致**、
+vitest **100 files / 1866 tests PASS**。远端 CI `45363402329` **success**（2m21s）、Release `45363426210` **success**（2m39s），
+GitHub Release `Grok Workflow for DSH v0.13.31` 带 `dsh-grok-workflow-0.13.31.tgz`（928474 B）。跨进程证据：`main` 已发布
+`lib/` 起 12 进程各认领各一行连跑 3 次 → 12/12 报成功但盘上只活 5 / 6 / 7 行；合入后 3 次 → 12/12 全活。按操作员红线「不碰 live」，
+`~/.dsh` 一行未动、未升级未重载未重启，AGENTS §11 自动升级**故意跳过**；live profile 现装哪一版**未核对**。）

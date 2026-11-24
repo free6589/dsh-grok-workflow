@@ -3960,3 +3960,28 @@ Issue #1 状态评论 issuecomment-6927842856。
   编辑中途，`tsc --noEmit` 在这些文件红），所以 **全仓 `npm run ci` 与 `verify:lib` 未跑**；两条 lane 都落地后必须整仓
   重跑门禁再发版。锁是单文件系统内的咨询锁；多机共享板、网络盘 `O_EXCL` 语义不在支持范围。
 - **未做**：dispatcher 与任务板的存储合流（`TaskReader` 接口仍是唯一对接点）；引擎不读板；L3 小组长。
+
+## 2026-11-24 — 0.13.31 发布收口：任务板持久化加固已合入并发版
+
+- **From:** 发版（merge-and-release）· **To:** 下一个接手的人
+- **结果**：`team-dispatch-v1` 已以 `--no-ff` 合入 `main`（merge `dc69c6e`，无冲突），发版提交 `d0c1383`，注解标签 `v0.13.31`；
+  `main` 与标签都已推送（`369d6e3..d0c1383 main -> main`、`* [new tag] v0.13.31`，无 force）。远端 CI `45363402329` success、
+  Release `45363426210` success，GitHub Release **`Grok Workflow for DSH v0.13.31`** 带资产
+  **`dsh-grok-workflow-0.13.31.tgz`（928474 B）**。
+- **发了什么**（两个增量，用户能感觉到的部分）：
+  1. **认领锁 + 磁盘 CAS**（`df89a95`）——同一个任务不会再被两个 worker 同时认领，不同行并发认领也不互相冲掉；
+     持锁进程被杀留下的锁按 5 s 失效窗口清掉，崩溃不会把板卡死。
+  2. **到达顺序 + 全路径寻址**（`4f25f15`）——待办队列跨重启按创建顺序交出（每行自带到达号，在锁内分配并随行落盘）；
+     寻址从裸名改成全路径，记清谁建的、结果回给谁；阻塞原因在被改派时清掉。
+- **跨进程证据**：`main` 已发布的 `lib/` 起 12 个进程各认领各一行、连跑 3 次 → 12/12 都报成功但盘上只活 **5 / 6 / 7 行**
+  （丢 4–7 行）；合入后同样 3 次 → **12/12 进程成功且 12/12 行全活**。FIFO 探针：`main` 重开后 `list()` 是 id 序
+  `a,b,task-10,task-9`、到达序丢失且无 `arrival()`；合入后 `list()` 契约不变、`arrival()` 回到 `task-10,task-9,b,a`。
+- **发版时比清单多改的四类文件**：除了 `package.json`/`package-lock.json`/`CHANGELOG.md`，还必须同步版本声明
+  `README.md`、`README.zh-CN.md`、`docs/LOCAL-TESTING.md` 与 `src/client/index.js`（并重建 `lib/client.js`）——仓库的
+  docs/version 守卫生效（`test/docs-version.spec.ts` 5 例 + `test/docs-config-keys.spec.ts` 1 例 + `test/update-entry.spec.ts`
+  1 例），不跟着 bump 就红；这与历次 `chore(release): prepare vX.Y.Z` 改的是同一批文件。
+- **红线**：全程未碰 `~/.dsh`，未升级、未重载、未重启运行中的实例；AGENTS §11 自动升级按「不碰 live」**跳过**，
+  live profile 仍是上一版。
+- **待办**：① `team-dispatch-v1` 分支与它的 worktree 仍在本地（已合、可删；按 §5 应在 24 h 内删掉）；
+  ② 升级 live profile 到 `v0.13.31`（需要操作员放行）；③ 两条边界仍成立：板锁只在单文件系统内是咨询锁、`seq` 只表达
+  创建顺序不表达优先级（见 `VALIDATION.md` 与 `docs/ARCHITECTURE.md` 任务板章节）。
