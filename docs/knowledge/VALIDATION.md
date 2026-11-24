@@ -1,3 +1,47 @@
+## model-unavailable（401/403）也回灌给脚本、但不进死路由账：单测红 4 → 绿 53 + 门禁 exit 0，真机 soak 留给合流方 — 2026-11-24（实现子代理 agent-114/impl-forward-model-unavailable）
+
+| state | command | result |
+| --- | --- | --- |
+| 分支 | `fix/forward-model-unavailable`（worktree `.agents/worktrees/fix-forward-model-unavailable`，从 `main` `8f34701`＝0.13.28 开出；共享脏树 `a6103ad` 一行未动） | `CONFIRMED` |
+| 基线（改动前） | `npx vitest run test/dead-routes.spec.ts test/null-collapse.spec.ts` | **2 files / 53 tests PASS**（与工单给的基线一致） |
+| 新用例先红 | 同上（只改 `test/`，`src/` 未动） | **4 failed / 49 passed（53）**：① 宿主五族 `toEqual` 缺 `model-unavailable`；② guest `const CHILD_DEATH_FAMILIES` 还不存在（regex 为 null）；③ `runSeed('forbidden')` 的 `rewritten` 是 **6**、期望 **0**；④ `runSeed('session-refusal')` 同样 6、期望 0。证据 `.tmp/evidence-forward-model-unavailable/red.txt` |
+| 实现后绿 | 同上 | **2 files / 53 tests PASS**，证据 `.tmp/evidence-forward-model-unavailable/green.txt`。`resubmits(calls)` 在 403 种子上实测为 **0**（断言按真机形状写，不是猜的） |
+| 全量 | `npm run ci` | **exit 0：97 files / 1820 tests PASS**，typecheck 干净，lint **0 errors / 36 warnings（与基线同数，无新增）**，`verify:lib` 见下一行。日志 `.tmp/evidence-forward-model-unavailable/ci.txt` |
+| 库产物 | `npm run verify:lib` | `lib/ at 8f34701 is the build of src/ at 8f34701 (237 files, byte-identical)`（该脚本校验的是 **HEAD** 的 src/lib 配对，所以证明的是基线提交自洽；工作树里的 `lib/` 由 `npm run ci` 内的 `npm run build` 重建，`git status` 里只有被改的那三个源文件对应的产物） |
+| 改动面 | `src/child-outcomes.ts`（`CHILD_DEATH_FAMILIES` 加第五族）、`src/script.ts`（新增 guest `CHILD_DEATH_FAMILIES`，`childDeathCause()` 改用它会判定，`ROUTE_HEALTH_FAMILIES` 不动）、`src/team-engine.ts`（`refusedReceipt()` 文档段改口径，逻辑零改动） | `CONFIRMED` |
+| 别的用例有没有被牵动 | `npm run ci` 全量 1820 例 | **一条都没红** —— 除下面列出的三条旧断言外，没有任何用例假设「401/403 走 `format-error` + 宿主改写」 |
+| 真机 soak（坏 key 场景 + 正常轮） | 隔离 `DSH_HOME` 克隆 profile、真端点 401/403 | **`NOT_RUN`**（按工单留给合流方；本分支不碰 live、不跑真机） |
+
+**被改写的旧断言（逐条，均为「同一格证据换到更前面的一层」，不是删断言）**
+
+1. `test/null-collapse.spec.ts` · `reports a 403 child as model-unavailable, not a re-sendable format error`（`runSeed('forbidden')`）：
+   `expect(rewritten).toBeGreaterThan(0)`（实测 6）→ `expect(rewritten).toBe(0)`；并补三条更强的断言——failure class 是
+   `model-unavailable`、category `infrastructure`、reason 不含 `no valid structured result`；路由行里没有 `format-error`；
+   `resubmits(calls)` 为 0（密钥被拒不再补交）。理由：seam 现在把 code + 原话转发给脚本，脚本自己按类写，
+   宿主 `reclassifyNullCollapses` 无事可改，与 D-121 改写 timeout 种子同理。
+2. `test/null-collapse.spec.ts` · `names the provider failure the child session recorded, with no diagnostic on the result`
+   （`runSeed('session-refusal')`）：`rewritten > 0` → `toBe(0)`；reason 含 `virtual key is required`、class/category、
+   路由行无 `format-error` 三条原样保留。
+3. `test/null-collapse.spec.ts` · `captures the stop reason and the diagnostic of a refused child` → 改名
+   `… of a cancelled child`，种子 `runSeed('forbidden')` → `runSeed('cancelled')`，断言（`outcomes > 0`、`rewritten > 0`）不变。
+   理由：这条验的是「台账是改写的证据」，403 不再走改写后必须换一个仍会被宿主改写的死因；`session-attempt-only`、
+   `dead-unknown`、`cancelled`、`prose-only` 四条一字未动。
+4. `test/dead-routes.spec.ts` 的两条表钉子重写（原 `refuses only the four transport families…` 与
+   `pins the marker and the family table on both sides of the seam`）：第一条改成宿主转发面五族 `toEqual` +
+   `AUTH` / `403 Forbidden` 都要含 `model-unavailable:`，仍然为 `undefined` 的只剩 `completed`、`aborted`、
+   以及无代码无语义的 `{stopReason:'error', diagnostic:'the child run ended \`error\`'}`（class 为 `unknown`）；
+   第二条同时抠 guest 的 `CHILD_DEATH_FAMILIES`（五族）与 `ROUTE_HEALTH_FAMILIES`（四族），并断言两表只差一个类。
+   理由：原来那条把「宿主转发面」和「脚本记账面」当成一张表钉，现在两者语义不同，必须各自钉。
+
+**一处环境问题（`CONFIRMED`，与本改动无关，但会挡住 `verify:lib`）**：这个 worktree 的 `node_modules`
+原本是指向 `../../../../node_modules`（即 `/home/fish/projects_mine/node_modules`，不存在）的**悬空软链**；
+Node 的模块解析会向上走到主 checkout 的 `node_modules`，所以 `npx vitest` 照样能跑，但 `scripts/verify-lib.mjs`
+第 55 行用绝对路径 `join(root,'node_modules','typescript','bin','tsc')` 去起编译器，于是报
+`Cannot find module '/tmp/verify-lib-…/node_modules/typescript/bin/tsc'` 并让 `npm run ci` 以 exit 1 结束。
+修法：把该软链按兄弟 worktree 的约定重指为绝对路径 `/home/fish/projects_mine/dsh-grok-workflow/node_modules`
+（`node_modules/` 在 `.gitignore` 第一行，不进版本树、不出现在 `git status`）。修好后 `verify:lib` 通过。
+下一个在这台机器上开 worktree 的人会撞到同一处，值得在开 worktree 的脚本里钉成绝对路径。
+
 ## 判定腿同 attempt 补打（第二刀）— 2026-11-24（包工头 A / agent-113，分支 `feat/leg-retry`，未合流）
 
 | state | command | result |

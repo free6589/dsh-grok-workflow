@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { resolveConfig } from '../src/config.js'
 import { assertWorkflowReport } from '../src/report.js'
-import { buildWorkflowRequest, maxTotalAgentsFor, routeBudgetFor, WORKFLOW_SCRIPT } from '../src/script.js'
+import { buildWorkflowRequest, maxTotalAgentsFor, PLANNER_LEG_CALLS, routeBudgetFor, WORKFLOW_SCRIPT } from '../src/script.js'
 import type { NormalizedTask } from '../src/types.js'
 import { execution, failingVerification, task, verification } from './fixtures.js'
 import { roleOf, runWorkflowScript, type ScriptAgent } from './helpers.js'
@@ -256,14 +256,19 @@ describe('the child cap pays for the third walk of a judge leg', () => {
     // transport re-fire + form resubmit (3).
     const plainBlock = 2 * plainBudget.worker + 3 * (plainBudget.verifier + plainBudget.supervisor)
     expect(plainBlock).toBe(5)
-    // planner + synthesizer + 1 task * 2 attempts * block + 2
-    expect(maxTotalAgentsFor(1, 1, plainBudget)).toBe(plainBudget.planner + plainBudget.synthesizer + 2 * plainBlock + 2)
+    // The merged cap also counts the planning leg at its worst case — three
+    // walks per planner route (first ask, same-call form resubmit, route re-fire)
+    // — because those rescue calls are real children too.
+    // planner leg + synthesizer + 1 task * 2 attempts * block + 2
+    expect(maxTotalAgentsFor(1, 1, plainBudget))
+      .toBe(PLANNER_LEG_CALLS * plainBudget.planner + plainBudget.synthesizer + 2 * plainBlock + 2)
 
     const routedBudget = routeBudgetFor(config({ roles: { worker: [{ model: 'w1' }, { model: 'w2' }] } }))
     expect(routedBudget.worker).toBe(2)
     const routedBlock = 2 * routedBudget.worker + 3 * (routedBudget.verifier + routedBudget.supervisor)
     expect(routedBlock).toBe(7)
-    expect(maxTotalAgentsFor(1, 1, routedBudget)).toBe(routedBudget.planner + routedBudget.synthesizer + 2 * routedBlock + 2)
+    expect(maxTotalAgentsFor(1, 1, routedBudget))
+      .toBe(PLANNER_LEG_CALLS * routedBudget.planner + routedBudget.synthesizer + 2 * routedBlock + 2)
     // The pre-re-fire block (2 * everyone) under-sized a judge leg by one call;
     // that missing walk is exactly the re-fire this feature adds.
     expect(maxTotalAgentsFor(1, 1, routedBudget) - maxTotalAgentsFor(1, 1, plainBudget)).toBe(4)

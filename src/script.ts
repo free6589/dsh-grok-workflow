@@ -452,13 +452,20 @@ function childTimeoutFailure(role) {
 }
 
 // A child that died on the far side of the engine — a provider 5xx, a dropped
-// connection, a 429 — does not come back as a null any more. The host seam
-// refuses that activation's own result with this marker, because the cause it
-// names is what the child's session recorded and the script has no other
-// channel to read it (D-120 修法二). Only the route-health families are marked,
-// so a cancelled run, a refused key or a real format gap keep the null shape
-// they had.
+// connection, a 429, a refused key — does not come back as a null any more. The
+// host seam refuses that activation's own result with this marker, because the
+// cause it names is what the child's session recorded and the script has no other
+// channel to read it (D-120 修法二). The gate below is deliberately wider than the
+// route-health table: five classes travel, and a cancelled run or a real format gap
+// keeps the null shape it had.
 const CHILD_DEATH_MARKER = 'CHILD_DEATH:';
+
+// The classes the host may mark and this script reads back. One more than
+// ROUTE_HEALTH_FAMILIES below, and the difference is the whole point: forwarding a
+// death is a decision about the call in hand (a refused key must stop the resubmit),
+// counting it is a decision about the route (a refused key is a key). Both tables
+// are pinned by test/dead-routes.spec.ts.
+const CHILD_DEATH_FAMILIES = { timeout: 1, connection: 1, 'server-error': 1, 'rate-limit': 1, 'model-unavailable': 1 };
 
 // The class a death marker names, or null when the text carries none the host
 // is allowed to send. Parsing (rather than trusting a field) because the engine
@@ -471,7 +478,7 @@ function childDeathCause(error) {
   const rest = message.slice(at + CHILD_DEATH_MARKER.length);
   const cut = rest.indexOf(':');
   const named = (cut === -1 ? rest : rest.slice(0, cut)).trim();
-  if (ROUTE_HEALTH_FAMILIES[named] !== 1) return null;
+  if (CHILD_DEATH_FAMILIES[named] !== 1) return null;
   return { class: named, cause: cut === -1 ? '' : rest.slice(cut + 1).trim() };
 }
 const suppliedTasks = args && Array.isArray(args.tasks) ? args.tasks : null;
@@ -814,11 +821,12 @@ function failureCategory(failureClass, code) {
 function classifyCallFailure(role, error) {
   const code = failureCode(error);
   const message = safeError(error);
-  // A child that died of a transport failure on the far side of the engine: the
-  // host seam refused this activation's result and named the class, because the
-  // cause it carries is the child session's own and the null the engine used to
-  // return cannot skip a dead route (D-120 修法二). The class is the host's, not
-  // a reading of the sentence, so the reason keeps the provider's words.
+  // A child that died on the far side of the engine — a transport failure or a
+  // refused key: the host seam refused this activation's result and named the
+  // class, because the cause it carries is the child session's own and the null the
+  // engine used to return cannot skip a dead route or stop a resubmit (D-120 修法二).
+  // The class is the host's, not a reading of the sentence, so the reason keeps the
+  // provider's words.
   const death = childDeathCause(error);
   if (death !== null) {
     const advances = switchOn.length === 0 ? true : switchOn.indexOf(death.class) !== -1;

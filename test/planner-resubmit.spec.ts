@@ -242,10 +242,12 @@ describe('planner rescue: the child cap pays for the rescue', () => {
     const retries = 1
     expect(PLANNER_LEG_CALLS).toBe(3)
     // planner 2 routes * 3 walks (ask, form resubmit, route re-fire)
-    //   + 3 tasks * 2 attempts * twice * (1 worker + 1 verifier)
+    //   + 3 tasks * 2 attempts * the per-attempt block, which the merged cap
+    //     counts as the honest walks (2 * worker + 3 * (verifier + supervisor))
     //   + 2 slack
+    const block = 2 * budget.worker + 3 * (budget.verifier + budget.supervisor)
     expect(maxTotalAgentsFor(tasks, retries, budget))
-      .toBe(PLANNER_LEG_CALLS * budget.planner + tasks * (retries + 1) * 2 * (budget.worker + budget.verifier + budget.supervisor) + 2)
+      .toBe(PLANNER_LEG_CALLS * budget.planner + tasks * (retries + 1) * block + 2)
   })
 
   it('keeps a recovered leg inside the walks the cap pays for', async () => {
