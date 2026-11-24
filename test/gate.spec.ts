@@ -26,7 +26,10 @@ function applyWith(ctx: unknown, overrides: Record<string, unknown> = {}): void 
   // `grokDefault: 'on'` on purpose as well: these tests are about *admitted*
   // batches, and the default-off toggle passes everything through as normal chat
   // (pinned in `grok mode toggle (classifyPreStep)` below).
-  apply(ctx as never, { mode: 'full', grokDefault: 'on', ...overrides })
+  // `legacyGate: true` because the front desk is opt-in since M3.2: this file tests
+  // the gate itself, so it has to ask for it. A default load registers only the
+  // narrow heartbeat listener, and `preStep()` would have nothing to dispatch to.
+  apply(ctx as never, { legacyGate: true, mode: 'full', grokDefault: 'on', ...overrides })
 }
 
 /* ------------------------------------------------------------------ engine -- */
@@ -519,7 +522,7 @@ describe('mandatory entry gate', () => {
     expect(ctx.engine.startCalls).toHaveLength(0)
   })
 
-  it('fails closed with a load-time error when the hook is missing (gate always on, T4)', () => {
+  it('fails closed with a load-time error when the hook is missing (T4)', () => {
     const ctx = new FakeContext()
     // A runtime that exposes everything except the pre-step registration hook.
     const withoutHook = new Proxy(ctx, {
@@ -529,7 +532,7 @@ describe('mandatory entry gate', () => {
     // of degrading to a warning while the main model answers directly.
     // Round-59: documents the installGate fail-closed doc fix (throws, never
     // returns false); the error text below is the contract this pins.
-    expect(() => apply(withoutHook as never, {})).toThrow(/agent\/pre-step is unavailable/)
+    expect(() => apply(withoutHook as never, { legacyGate: true })).toThrow(/agent\/pre-step is unavailable/)
   })
 
   it('writes a redacted routing ledger when a route switched during the run', async () => {
@@ -767,7 +770,7 @@ describe('mandatory entry gate', () => {
       // Not `applyWith`: this case installs the gate directly. `grokDefault: 'on'`
       // for the same reason `applyWith` sets it — an off session passes the batch
       // through as normal chat, and this case is about an *admitted* batch.
-      apply(ctx as never, { mode: 'full', grokDefault: 'on' })
+      apply(ctx as never, { legacyGate: true, mode: 'full', grokDefault: 'on' })
       const agent = new FakeAgent({ session: realSession(`sess-limit-${chars}`) })
       const decision = await ctx.preStep()(
         payload(agent, [userMessage('x'.repeat(chars))]),
@@ -846,8 +849,9 @@ describe('mandatory entry gate', () => {
     expect(ctx.warnings.some(warning => warning.includes('gate classification failed'))).toBe(true)
   })
 
-  // T4: enforceGate removed — the gate is always on and always registers.
-  it('always registers the gate (mandatory entry cannot be disabled, T4)', async () => {
+  // T4 removed `enforceGate`; M3.2 made the registration itself opt-in. Once a
+  // profile asks for it (`legacyGate: true`), nothing inside the gate can drop it.
+  it('registers exactly one pre-step handler once a profile opts in (T4)', async () => {
     const ctx = new FakeContext()
     applyWith(ctx)
     expect(ctx.handlers.has('agent/pre-step')).toBe(true)
@@ -872,8 +876,8 @@ describe('mandatory entry gate', () => {
     expect(ctx.engine.startCalls).toHaveLength(0)
   })
 
-  // T4: the gate is always on for every session (gateScope/gatePreset removed).
-  it('admits every session regardless of preset (gate always on, T4)', async () => {
+  // T4 removed gateScope/gatePreset: no session is out of scope for an opted-in gate.
+  it('admits every session regardless of preset (gateScope/gatePreset removed, T4)', async () => {
     const ctx = new FakeContext()
     applyWith(ctx)
     ctx.engine.autoRun = true
@@ -944,8 +948,8 @@ describe('grok mode toggle (classifyPreStep)', () => {
       .toEqual({ kind: 'pass', reason: 'empty-batch' })
     const subagent = new FakeAgent({ header: { origin: 'subagent', delegationDepth: 1 } })
     expect(classifyPreStep({ config }, batch(subagent))).toEqual({ kind: 'pass', reason: 'subagent' })
-    // T4: gateScope/gatePreset removed — the gate is always on, so a session in
-    // another preset is admitted, not passed as out-of-scope.
+    // T4: gateScope/gatePreset removed — a session in another preset is admitted
+    // by the classifier, not passed as out-of-scope.
     const outside = new FakeAgent({ session: new FakeSession({ header: { agentPreset: 'other-preset' } }) })
     const scoped = resolveConfig({ grokDefault: 'on' })
     expect(classifyPreStep({ config: scoped }, batch(outside))).toMatchObject({ kind: 'admit' })
@@ -1004,8 +1008,10 @@ function textOf(message: UserMessage): string {
 describe('heartbeat classification (classifyPreStep)', () => {
   // Round 17 live evidence: DSH 0.2.2 wraps the stored loop prompt in its own
   // framing — `[SCHEDULE REMINDER] … reminder_prompt_json: "<stored prompt>"` —
-  // so the marker is embedded, never leading. The gate must still route the
-  // delivery into the heartbeat branch instead of the generic pass-through.
+  // so the marker is embedded, never leading. Since M3.2 the gate does not route a
+  // beat at all (the narrow listener owns it and is installed outermost), so what
+  // is pinned here is the other half: a beat that does reach this classifier is
+  // still read as "not a user request" rather than admitted as one.
   const framedHeartbeat = (prompt: string): UserMessage =>
     createUserMessage({
       content: [{
@@ -1017,7 +1023,7 @@ describe('heartbeat classification (classifyPreStep)', () => {
       source: { kind: 'schedule' } as never,
     }) as unknown as UserMessage
 
-  it('routes a framed heartbeat into the heartbeat branch, not the pass-through', () => {
+  it('passes a framed heartbeat as non-user-source, never as a request', () => {
     const config = resolveConfig({ grokDefault: 'on' })
     const agent = new FakeAgent()
     const message = framedHeartbeat('[grok-workflow loop] Loop heartbeat: the previous round has ended.')
@@ -1025,9 +1031,11 @@ describe('heartbeat classification (classifyPreStep)', () => {
       { config },
       payload(agent, [message]) as unknown as PreStepPayload,
     )
-    // No loop service composed: the continuation reason still proves the
-    // heartbeat branch was entered (the pass-through would say non-user-source).
-    expect(verdict).toEqual({ kind: 'pass', reason: 'loop-continuation' })
+    // M3.2 deleted the heartbeat branch. The narrow listener
+    // (`src/heartbeat-listen.ts`) reviews the brakes and is installed before this
+    // gate, so a beat that reaches here has already been answered: the gate must not
+    // charge it or admit it a second time, and `loop-continuation` would mean it did.
+    expect(verdict).toEqual({ kind: 'pass', reason: 'non-user-source' })
   })
 
   it('still passes a schedule delivery without the marker as non-user-source', () => {
@@ -1073,7 +1081,7 @@ describe('in-turn delivery (default strategy)', () => {
     const ctx = new FakeContext()
     // Default strategy under test; the tier stays `full` so the message really
     // starts a run (the front desk is covered in triage.spec.ts).
-    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'full', grokDefault: 'on' })
     const live = realSession('sess-in-turn')
     const agent = new FakeAgent({ session: live })
     let settled = false
@@ -1109,7 +1117,7 @@ describe('in-turn delivery (default strategy)', () => {
 
   it('renders the first user message without waiting for the run (P0-5)', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'full', grokDefault: 'on' })
     // A brand-new session: no host head yet, so the gate may not publish (that
     // write would take surface position 0 and brick the stored log — 0.13.14).
     const session = Session.create('sess-in-turn-first-message' as never)
@@ -1150,7 +1158,7 @@ describe('in-turn delivery (default strategy)', () => {
 
   it('enters a failure report when the run failed, so the user is never left without output', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'full', grokDefault: 'on' })
     const session = realSession('sess-in-turn-failed')
     const agent = new FakeAgent({ session })
     const pending = ctx.preStep()(payload(agent, [userMessage('run the workflow')]), passingNext([]))
@@ -1171,7 +1179,7 @@ describe('in-turn delivery (default strategy)', () => {
 
   it('enters a notice when the workflow cannot start at all', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'full', grokDefault: 'on' })
     const session = realSession('sess-in-turn-busy')
     const agent = new FakeAgent({ session })
     ctx.engine.startError = new Error('already has 2 active run(s)')
@@ -1194,7 +1202,7 @@ describe('in-turn delivery (default strategy)', () => {
 
   it('refuses an over-long message in the same turn instead of staying silent', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'full', grokDefault: 'on' })
     const agent = new FakeAgent({ session: realSession('sess-in-turn-long') })
     const decision = await ctx.preStep()(payload(agent, [userMessage('x'.repeat(32_001))]), passingNext([])) as {
       kind: string
@@ -1209,7 +1217,7 @@ describe('in-turn delivery (default strategy)', () => {
 
   it('rejects instead of entering when the turn is already aborted', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'full', grokDefault: 'on' })
     const agent = new FakeAgent({ session: realSession('sess-in-turn-aborted') })
     const controller = new AbortController()
     controller.abort()
@@ -1220,7 +1228,7 @@ describe('in-turn delivery (default strategy)', () => {
 
   it('stops waiting when the turn aborts mid-run and does not hang', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'full', grokDefault: 'on' })
     const agent = new FakeAgent({ session: realSession('sess-in-turn-cancel') })
     const controller = new AbortController()
     const pending = ctx.preStep()(
@@ -1254,7 +1262,7 @@ describe('in-turn delivery (default strategy)', () => {
 
   it('answers when the plugin is unloaded mid-run', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'full', grokDefault: 'on' })
     const agent = new FakeAgent({ session: realSession('sess-in-turn-unload') })
     const pending = ctx.preStep()(payload(agent, [userMessage('run the workflow')]), passingNext([]))
     await waitFor(() => ctx.engine.runs.length === 1)
@@ -1271,7 +1279,7 @@ describe('in-turn delivery (default strategy)', () => {
 
   it('writes no routing ledger when the engine failed before a report existed', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'full', grokDefault: 'on' })
     const session = realSession('sess-in-turn-no-ledger')
     const agent = new FakeAgent({ session })
     const pending = ctx.preStep()(payload(agent, [userMessage('run the workflow')]), passingNext([]))

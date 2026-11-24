@@ -329,6 +329,11 @@ languages) that disables Save; only a legal combination may be written.
 
 ## Mandatory entry (the gate)
 
+The front desk is **opt-in since M3.2** (`legacyGate: true`). The default `agent/pre-step`
+chain carries only the narrow heartbeat listener, so a user message reaches the model as it
+is and no workflow starts unless a profile asks for this gate. Everything below describes
+what the gate does once it is registered.
+
 ```
 user message ──► agent/pre-step ──► classify
                                      ├─ not ours (subagent, non-user source, empty batch, out of scope, already routed) ──► pass through
@@ -574,39 +579,43 @@ else:
 - it appends to `heartbeats.jsonl` only — never a verdict (a heartbeat is not a judgement),
   never a `blocks.jsonl` version (20 version slots per block, and an hourly beat would retire
   a real block), and it stops at `HEARTBEAT_OBSERVATION_LIMIT` (200 lines) with one warning;
-- it is installed before `installGate`, so it is the outermost listener and a heartbeat the
-  gate itself refuses is still observed.
+- it is installed before `installGate`, so it sees a beat the front desk would only pass on;
+  a beat the narrow listener stopped never reaches it, and that is intended — a stopped beat is
+  recorded once, by the listener that stopped it.
 
-#### The second narrow listener, and who owns a beat
+#### One brake owner, and three registrations
 
-M3 adds a second listener on the same `agent/pre-step` chain, `installHeartbeatListen`
-(`src/heartbeat-listen.ts`), and a load-time switch that decides which of the two shapes a
-process runs. The two shapes never coexist as decision-makers:
+Since M3.2 the narrow listener, `installHeartbeatListen` (`src/heartbeat-listen.ts`), is the
+only thing that decides a heartbeat's fate, and `src/index.ts` installs it **unconditionally** —
+outside the `blockIntake` switch. Tying it to the intake would leave a profile with the intake
+off and no brake owner at all: a loop the brakes stopped would keep running with nobody left to
+stop it. The registrations, in the order they go on the chain:
 
-| shape | registered | who decides a heartbeat | what is written |
+| registration | installed when | decides a heartbeat? | what it writes about one |
 | --- | --- | --- | --- |
-| `legacyGate: true` (**the default**) | the intake observer, the narrow listener with `ownsRouting: false`, and `installGate` | the old front desk (`installGate`'s heartbeat branch) | `heartbeats.jsonl` only when the session has an open block; the narrow listener adds one `observed` line to `heartbeats-listen.jsonl`, also only with an open block |
-| `legacyGate: false` | the narrow listener with `ownsRouting: true`, and the block tools | the narrow listener, which runs `reviewHeartbeat` and answers `reject` itself | `heartbeats-listen.jsonl` only, with `continued` or `stopped` + the brake code; `heartbeats.jsonl` does not exist because the intake observer is not registered |
+| the narrow heartbeat listener | always | yes — runs `reviewHeartbeat`, charges the round, or answers `reject` | `heartbeats-listen.jsonl`: `continued`, or `stopped` + the brake code |
+| the intake's own observer (`installHeartbeatBrakes`) | `blockIntake: true` | no — it observes the beat after the decision | `heartbeats.jsonl`: which blocks this beat found open |
+| the old front desk (`installGate`) | `legacyGate: true` (off by default) | no — a beat falls through its source filter to `pass / non-user-source` | nothing about a beat |
 
-Three properties make that table hold by construction rather than by convention:
+So the default load (both switches off) carries exactly one `agent/pre-step` listener, the
+intake adds the second, and the front desk is only ever the third. Three properties make that
+hold by construction rather than by convention:
 
-- **One read of the switch.** `src/index.ts` reads `legacyGate` once into `ownsHeartbeatRouting`
-  and both the listener's mode and the gate's registration branch on that same value, so a load
-  cannot end up with two owners or none.
+- **One owner, installed outermost.** The narrow listener goes in before the intake observer and
+  before the front desk, and it answers `reject` without calling `next()`. A beat it stops
+  therefore reaches neither of the others: the front desk cannot be the place a loop is stopped
+  any more, and a second review cannot charge the same round twice.
 - **One definition of the review.** `isHeartbeatMessage` and `reviewHeartbeat` live in
-  `src/heartbeat-listen.ts` and the gate imports them; the gate's `classifyHeartbeat` only maps
-  the answer onto its own classification. Two copies of the rule is how the two shapes would
-  drift apart.
+  `src/heartbeat-listen.ts`. The front desk imports neither: `classifyPreStep` has no heartbeat
+  branch, so a beat it sees is just "not a user request" and nothing is charged there.
 - **Two files, one writer each.** `heartbeats.jsonl` answers "which blocks did this beat find
-  open"; `heartbeats-listen.jsonl` answers "what did this beat do". Writing both into one file
-  would put two lines under one beat and make the count unanswerable, which is why the observing
-  shape writes the second file and the owning shape drops the first observer entirely.
+  open"; `heartbeats-listen.jsonl` answers "what did this beat do". One file would put two lines
+  under one beat and make the count unanswerable, so each file has exactly one writer and neither
+  writes the other's.
 
-What a beat does when it is stopped is the same in both shapes — the brakes are the same brakes
-and the code is the same `loop/*` token — but only the owning shape records the verdict in
-`heartbeats-listen.jsonl`. A real-machine soak on 2026-11-25 observed exactly that: the same
-scheduled delivery was stopped by `loop/stop-file` in both shapes, and only the `legacyGate: false`
-process left a line behind (`docs/knowledge/evidence/m3-1-2026-11-25/`).
+`observed` is the third outcome the listener used to write in M3.1, when it only watched the
+front desk. It is still read — `readHeartbeatListenObservations` returns those lines, so an
+existing file stays readable — and it is never written again.
 
 ### What this desk does not do
 

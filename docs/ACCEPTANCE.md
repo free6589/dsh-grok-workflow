@@ -2,6 +2,8 @@
 
 Legend: PASS = actually executed and observed; FAIL = executed and failed;
 `NOT_RUN` = not executed; `BLOCKED` = cannot execute in current environment.
+`PASS (opt-in)` = executed and observed, but only with an explicit profile
+setting; it is not the default behaviour.
 
 ## Functional acceptance
 
@@ -37,7 +39,7 @@ Legend: PASS = actually executed and observed; FAIL = executed and failed;
 
 | # | Scenario | Status | Evidence |
 |---|---|---|---|
-| S1 | Mandatory entry: greeting, simple question and follow-up all run the full workflow | PASS | `test/gate.spec.ts`; real headless `scripts/e2e-headless-in-turn.sh`. |
+| S1 | Mandatory entry (opt-in since 2026-11-25): greeting, simple question and follow-up all run the full workflow | PASS (opt-in) | Historical: `test/gate.spec.ts`; real headless `scripts/e2e-headless-in-turn.sh`. **Corrected 2026-11-25 (M3.2):** the mandatory entry is no longer the default. The old front desk registers only when a profile sets `legacyGate: true`, and the default shape answers a plain message directly — real-machine soak scenario 1 recorded 0 `source.kind=grok-workflow` relay messages and the user's text verbatim in the log (`docs/knowledge/VALIDATION.md`, 2026-11-25). |
 | S2 | Answer delivered in the same turn (in-turn strategy) | PASS | `test/gate.spec.ts` in-turn suite (9 cases). |
 | S3 | Refusal and failure paths are explicit (no silent answer, no zero-output) | PASS | `test/gate.spec.ts`; `E2E_EXPECT=refusal` real headless run. |
 | S4 | Per-role model selection reaches child activation | PASS | `test/routing.spec.ts`; `test/engine-contract.spec.ts`. |

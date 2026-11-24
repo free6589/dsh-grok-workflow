@@ -218,20 +218,21 @@ export declare const DEFAULT_LOOP_ENABLED = false;
  */
 export declare const DEFAULT_BLOCK_INTAKE = false;
 /**
- * Whether the old front desk (`installGate`) is registered as it always was.
+ * Whether the old front desk (`installGate`) is registered at all.
  *
- * On by default, because the pre-M3 tree is the shape every existing profile
- * already runs: the gate decides every top-level batch and the loop's brakes run
- * inside its heartbeat branch. Off skips that registration entirely — no listener,
- * no delivery decision of its own — so the narrow heartbeat listener is the only
- * thing left on `agent/pre-step`. It is a switch, not a tunable: a profile that
- * leaves it on keeps the old chain byte for byte.
+ * Off by default (M3.2): the front desk is not registered, so the narrow heartbeat
+ * listener (`src/heartbeat-listen.ts`) is the only `agent/pre-step` listener a profile
+ * gets, and the only owner of a beat's fate. On is an explicit opt-in for the old
+ * shape — the front desk registers and decides ordinary user messages again — but it
+ * never decides a heartbeat: `classifyPreStep` passes a beat through as
+ * `non-user-source`, and the narrow listener, which is outermost, has already
+ * answered it.
  *
  * Plain, not `volatile()`, for the same reason as {@link DEFAULT_BLOCK_INTAKE}: a
  * registration cannot appear or disappear without a reload, so projecting it onto
  * the settings page would promise a live edit that a reload alone can honor.
  */
-export declare const DEFAULT_LEGACY_GATE = true;
+export declare const DEFAULT_LEGACY_GATE = false;
 export declare const DEFAULT_LOOP_MAX_ROUNDS = 10;
 export declare const DEFAULT_LOOP_FAIL_STREAK = 3;
 /**

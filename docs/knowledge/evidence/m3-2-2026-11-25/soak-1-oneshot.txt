@@ -1,0 +1,85 @@
+M3.2 soak scenario 1 — one-shot, user perspective, web (2026-11-25)
+
+Build under test: feat/m3-switch @ 2137afc (version 0.13.34), installed into the
+scratch profile m32 (link to .tmp/wt-m3-switch).
+Home:   .tmp/m3-soak-2/dsh-home   (DSH_HOME; live ~/.dsh untouched, read-only)
+Profile config: blockIntake: true, legacyGate ABSENT (so the M3.2 default of
+"do not intercept" is the one in force). Model routes were re-pointed from
+agent2api to bifrost-responses/opencode-go/muse-spark-1.3-contributor because
+the clone carries no agent2api credential — see soak-all.txt, "model routes".
+Instance: 127.0.0.1:3311 (own port; live instances on 3080/3065/3086/3109 were
+not touched). Boot line: `dsh web: http://127.0.0.1:3311/?token=<REDACTED>`
+Boot log: 162 lines, `pending` / `did not activate` lines: 0.
+
+Driver: a real Chromium (playwright, executable /usr/bin/chromium) opened the
+GUI, clicked the sidebar "新会话", typed the message into the chat composer and
+pressed Enter. No API shortcut was used.
+
+--- message A: an ordinary question, triage answered it directly --------------
+
+Sent:   用一句话回答：1 加到 10 等于多少，并说明你怎么算的。
+Session: session-7ac9cca9-9117-4408-a740-a143d46e80f3
+
+Extracted from the session log (zstd -dc session.v4.jsonl.zstd):
+  seq  9  user/message   source.kind=user :: 用一句话回答：1 加到 10 等于多少，并说明你怎么算的。
+  seq 18  assistant/message :: 1加到10等于55，是用等差数列求和公式(1+10)×10÷2算出来的。
+  seq 20  turn/end       reason={"kind": "completed"}
+
+  grok-workflow relay messages (source.kind=grok-workflow): 0
+  grok_workflow tool calls: 0
+  $DSH_HOME/taskboards/grok-workflow/: does not exist
+
+What this pins: the user's message reached the model untouched — it appears
+verbatim at seq 9 with source.kind=user, and no front-desk relay message was
+inserted. The old gate is gone from the default chain.
+What it also shows: triage answered a one-line arithmetic question directly, so
+this message started ZERO workflows. That is triage behaviour, not a miss of
+the "not intercepted" claim; the run-count claim needed message B.
+
+--- message B: a message that should start exactly one workflow ---------------
+
+Sent:   请用 grok_workflow 工具跑一个最小的工作流任务：把 1 到 10 相加，让 worker 算、
+        verifier 独立核对，最后告诉我结论和验证结果。
+Session: session-2c5cbf33-3032-48ab-9f09-70442c0b089d
+
+Extracted from the session log:
+  seq  9  user/message   source.kind=user :: 请用 grok_workflow 工具跑一个最小的工作流任务…
+  seq 17  assistant/message :: 用工作流来算 1 到 10 求和并独立验算——正在启动。
+          + tool call grok_workflow {objective, tasks:[…]}
+  seq 19  tool-workflow/run-start   {"runId":"e70f4af9-ea5b-4028-b07b-ae92329e2f99",
+                                     "name":"任务团队 · 2 个任务"}
+  seq 48  tool-workflow/summary-final {"runId":"e70f4af9-…","draft":3}
+  seq 50  tool-workflow/run-end     {"runId":"e70f4af9-…","stopReason":"completed"}
+  seq 51  tool/result :: "Grok workflow: COMPLETED
+            Objective: 把 1 到 10 相加…
+            Plan: caller; 2 task(s); 2 verified
+            - task-1: verified (1 attempt) — 求和计算
+            - task-2: verified (1 attempt) — 独立验证"
+  seq 56  turn/end  reason={"kind": "completed"}
+
+  Event counts in this session: tool/call 1, tool-workflow/run-start 1,
+  tool-workflow/run-end 1, tool-workflow/agent-start 9, tool-workflow/agent-end 9.
+  grok-workflow relay messages (source.kind=grok-workflow): 0
+
+Assistant's answer as rendered in the GUI:
+  已完成，用时 3分45秒
+  工作流已完成（grok_workflow: COMPLETED），结论如下：
+  结论：1 到 10 相加 = 55
+  计算过程：1+2+...+10 = 55，公式 (1+10)×10÷2 = 55
+  验证结果：通过 ✅
+  Task 1「求和计算」：verified，执行器给出明确数值 55，独立复算（公式 + 累加）均为 55
+  Task 2「独立验证」：verified，独立用 sum(range(1,11))=55 与高斯公式 10*11//2=55 各算一次…
+  检查者核验：通过 2、失败 0、未运行 0
+  (UI also showed "9 个子智能体", "1 轮 2 步", 65.7K tok)
+
+--- labels --------------------------------------------------------------------
+
+CONFIRMED  A plain user message is not intercepted: no source.kind=grok-workflow
+           relay message in either session (0 / 0), and the message text is
+           present verbatim as a user message.
+CONFIRMED  The user's message reached the model untouched (seq 9, source.kind=user;
+           the answer at seq 18 is a model answer, not a front-desk rewrite).
+CONFIRMED  Exactly one workflow run: one grok_workflow tool call, one runId
+           (e70f4af9-…), one run-start, one run-end.
+CONFIRMED  The run's outcome: COMPLETED, 2 tasks verified, 9 child agents.
+NOT_RUN    Nothing in this scenario.

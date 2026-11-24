@@ -277,7 +277,7 @@ async function dispatchBehind(ctx: FakeContext, loop: MiniLoop, text: string): P
 describe('full mode, first turn: answer first, verify behind it', () => {
   it('enters the live first answer, says the report follows, and starts one real run', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'triage', grokDefault: 'off' })
+    apply(ctx as never, { legacyGate: true, mode: 'triage', grokDefault: 'off' })
     const session = Session.create('sess-answer-first' as never)
     const agent = new FakeAgent(session)
     grokOn(session)
@@ -329,7 +329,7 @@ describe('full mode, first turn: answer first, verify behind it', () => {
     it(`a first answer that ${failure === 'throw' ? 'throws' : 'comes back empty'} falls back by saying so, and the run still starts`, async () => {
       const ctx = new FakeContext()
       ctx.engine.frontDesk = failure
-      apply(ctx as never, { mode: 'triage', grokDefault: 'off' })
+      apply(ctx as never, { legacyGate: true, mode: 'triage', grokDefault: 'off' })
       const session = Session.create(`sess-answer-first-${failure}` as never)
       const agent = new FakeAgent(session)
       grokOn(session)

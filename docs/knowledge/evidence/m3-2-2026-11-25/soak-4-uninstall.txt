@@ -1,0 +1,87 @@
+M3.2 soak scenario 4 — uninstall, no residue (2026-11-25)
+
+Build: feat/m3-switch @ 2137afc (0.13.34). Home: .tmp/m3-soak-2/dsh-home.
+Profile m32 (the web clone used by scenario 1). Live ~/.dsh untouched.
+
+--- before: what the profile offered ----------------------------------------
+
+From the scenario-1 session's request/header, the model was offered 8 grok tools:
+  grok_accept_block, grok_block_status, grok_close_block, grok_open_block,
+  grok_replan_intents, grok_steer, grok_stop, grok_workflow
+Bundle row present: dsh.profile.bundles contained "dsh-grok-workflow"
+(21 bundles), dependencies contained it too.
+
+--- the command -------------------------------------------------------------
+
+  $ DSH_HOME=<scratch>/dsh-home dsh plugin --profile m32 remove dsh-grok-workflow
+  EXIT=0
+  ...
+  dependencies:
+  - dsh-grok-workflow link:/home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-m3-switch
+  Done in 1.6s using pnpm v12.4.2
+
+--- the bundle row is gone --------------------------------------------------
+
+  dsh.profile.bundles.length        20   (was 21)
+  bundles.includes('dsh-grok-workflow')   false
+  dependencies['dsh-grok-workflow']       absent
+
+One piece of on-disk residue survives, recorded rather than hidden: pnpm left the
+symlink `node_modules/dsh-grok-workflow -> ../../../../../wt-m3-switch` in the
+profile. It still resolves. It is inert because the bundle row that mounts it is
+gone — the boot and tool-list evidence below is what proves that.
+
+--- boot again --------------------------------------------------------------
+
+  $ dsh --profile m32 --host 127.0.0.1 --port 3311 --no-open
+  boot line: dsh web: http://127.0.0.1:3311/?token=<REDACTED>
+  `pending` / `did not activate` lines: 0
+  no line mentioning grok in the boot log
+
+--- no block tool is offered ------------------------------------------------
+
+A plain message was sent through the GUI: "用一句话说明 3 加 4 等于多少。"
+Session session-03678281-9189-450a-939e-fb0dff7f189a:
+
+  request/header grok tools: NONE        (was 8)
+  request/header total tool names: 87
+  assistant/message :: 3 加 4 等于 7。
+  GUI: 已完成，用时 8秒
+  tool-workflow/run-start: 0
+  grok-workflow relay messages: 0
+
+--- no new ledger or heartbeat line -----------------------------------------
+
+  $DSH_HOME/taskboards/:                 absent (unchanged)
+  heartbeats*.jsonl anywhere under home: none
+  checkpoints/grok-workflow/:            4 files, unchanged (no new checkpoint)
+  memory/grok-workflow/archive.jsonl:    mtime 07:01:42 — unchanged by the
+                                         post-uninstall message (sent 07:05)
+
+--- no background work survives --------------------------------------------
+
+  The pre-uninstall web instance was stopped before removal (port 3311 was free
+  when `dsh plugin remove` ran). After the post-uninstall boot, `ps -eo pid,cmd |
+  grep "profile m32"` shows only that web instance — no orphaned workflow child,
+  no loop, no scheduler entry. The plugin's own unload path was not exercised by
+  a live unload in this scenario: the instance was already stopped when the
+  bundle row was removed, so "no background work survives" is observed on a
+  cold start, not on a hot unload.
+
+--- a plain message still gets an ordinary answer ---------------------------
+
+  CONFIRMED: "3 加 4 等于 7。" — answered in 8 s, no workflow, no relay, no
+  grok tool in the tool list.
+
+--- labels -------------------------------------------------------------------
+
+CONFIRMED  The bundle row is gone (bundles 21 → 20, dependency removed).
+CONFIRMED  No block tool is offered (8 → 0 grok tools in request/header).
+CONFIRMED  No new ledger line and no heartbeat line is written.
+CONFIRMED  A plain message still gets an ordinary answer.
+CONFIRMED  No background work survives the uninstall (cold start; the instance
+           had been stopped first).
+CONFIRMED  Residue that DOES survive: the node_modules symlink. Inert, but it is
+           there and is reported as such.
+NOT_RUN    Hot unload of a live instance (plugin removed while it is running) —
+           not exercised, by choice, to avoid a live reload of the soak instance.

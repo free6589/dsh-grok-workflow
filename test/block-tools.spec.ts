@@ -1,5 +1,5 @@
 /**
- * The five block tools, driven through the real registry.
+ * The six block tools, driven through the real registry.
  *
  * What is real here: `apply()`, the cordis context, `ToolRuntime` (so the tools are
  * fetched from the registry the runtime would serve), the real `Session` (the approval
@@ -9,6 +9,11 @@
  *
  * The suite is organised the way a caller meets the surface: preview, start (and every
  * way a start is refused), claim, hand in, read back, steer.
+ *
+ * Admission is live (M3.2): every tool reads the session's own mode record and refuses
+ * a session that never turned grok mode on with `mode-off`. So the harness session here
+ * opts in the same way `/grok on` does — one `setMode` write, not a weakened predicate —
+ * and the last case pins the refusal for a session that has no record.
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -24,6 +29,7 @@ import { Session } from '@deepseek-ai/dsh-session'
 import { apply } from '../src/index.js'
 import { previewBlocks, resetPreviews } from '../src/block/index.js'
 import { BLOCK_TOOL_NAMES } from '../src/block/tools.js'
+import { setMode } from '../src/mode.js'
 import { closeAllSteering, openSteering, pullSteering } from '../src/steering.js'
 import { delay } from './helpers.js'
 
@@ -146,12 +152,21 @@ async function mount(): Promise<Mounted> {
   return { ctx, engine }
 }
 
-/** A session with a head, so it is a real conversation. */
+/**
+ * A session with a head, so it is a real conversation — and with grok mode on.
+ *
+ * The intake refuses a session that never turned the mode on (`mode-off`), and these
+ * cases are about the tools, not about admission: so the harness session writes the
+ * same durable record `/grok on` writes. `grokDefault: 'off'` in the mount is the
+ * deployment default and is deliberately not an admission — the session's own record is.
+ */
 function headed(id: string): Session {
   const live = Session.create(id as never)
   live.append('step/start', { turn: 1, step: 1 })
   live.append('system/message', { turn: 1, step: 1, message: createSystemMessage('test head') }, { surfaceOp: 'append' })
   live.append('step/end', { turn: 1, step: 1 })
+  const optedIn = setMode(live, { v: 1, enabled: true, turn: 1, setBy: 'command:/grok', workflowMode: 'full' })
+  if (!optedIn.ok) throw new Error(`the harness session could not opt into grok mode: ${optedIn.reason ?? 'unknown'}`)
   return live
 }
 
@@ -792,5 +807,38 @@ describe('grok_steer and grok_stop: only a workflow block has a channel', () => 
     const stopped = await call(mounted, BLOCK_TOOL_NAMES.stop, { block_id: started['block_id'] }, live)
     expect(stopped['stopped']).toBe(false)
     expect(String(stopped['reason'])).toContain('run_id')
+  })
+})
+
+describe('admission: a session that never turned grok mode on cannot use the intake', () => {
+  /** A real conversation that never wrote a mode record — the pre-`/grok on` session. */
+  function headedWithoutMode(id: string): Session {
+    const live = Session.create(id as never)
+    live.append('step/start', { turn: 1, step: 1 })
+    live.append('system/message', { turn: 1, step: 1, message: createSystemMessage('test head') }, { surfaceOp: 'append' })
+    live.append('step/end', { turn: 1, step: 1 })
+    return live
+  }
+
+  it('refuses with mode-off before it reads the ledger, and the same call passes once the session opts in', async () => {
+    const mounted = await mount()
+    const stranger = headedWithoutMode('sess-no-mode')
+    // `grokDefault: 'off'` is the deployment default; admission reads the session's own
+    // record, so neither a default nor a stale tool call can open work in this session.
+    await expect(call(mounted, BLOCK_TOOL_NAMES.open, {
+      mode: 'preview',
+      objective: '把接单台子的账本读出来',
+      blocks: BLOCKS,
+    }, stranger)).rejects.toMatchObject({ code: 'mode-off', message: expect.stringContaining('mode-off') })
+    await expect(call(mounted, BLOCK_TOOL_NAMES.status, {}, stranger))
+      .rejects.toMatchObject({ code: 'mode-off' })
+    // Refused at the door: nothing landed in the ledger for either call.
+    expect(ledgerLines()).toHaveLength(0)
+
+    // The very same call, one `/grok on` record later, gets past admission.
+    const optedIn = headed('sess-mode-on')
+    const previewed = await preview(mounted, optedIn)
+    expect(String(previewed['preview_id'])).toMatch(/^bp-/)
+    expect(ledgerLines(), 'a preview still writes nothing').toHaveLength(0)
   })
 })

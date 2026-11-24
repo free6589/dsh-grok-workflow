@@ -1,3 +1,71 @@
+## M3.2 默认不拦截、刹车单主人、准入生效（`feat/m3-switch`）— 2026-11-25 (`CONFIRMED`)
+
+下面每一行都写清命令、环境与结果；没跑的写 `NOT_RUN`，被环境挡住的写 `BLOCKED`。分支 `feat/m3-switch`（worktree `.tmp/wt-m3-switch`），
+基线 `main` 尖端 `7b25890`，分支尖端 **`7f172ae`**。门禁与 soak 分别由包工头和 soak 工人跑出来；**收口轮只做只读复核**
+（`git diff` / `git show` / `grep` / `sed` / 读 `.tmp/ci-m3-2.log` 与六份证据原文），外加跑文档守卫 spec；
+**没有重跑 `npm run ci`，也没有重跑 soak**。**修正轮（第二轮记忆收口）**在分支尖端移到 `7f172ae` 之后做了三件事：
+把这一条改成 `7f172ae` 的读数、把「记忆提交把分支弄红」这条回归逐行记进来、并按 `AGENTS.md` §3 在**自己的文档改完之后**重跑全量套件
+（因为文档本身是门禁的输入，见下面的回归行）。
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 分支、基线、HEAD | `git status --short --branch`；`git log --oneline -8`（worktree） | `## feat/m3-switch`，代码尖端 **`7f172ae`**（修正轮的记忆提交紧随其后，只动 `docs/knowledge/` 与 `CHANGELOG.md`），基线 `7b25890`；八条提交 `9fdcb6e` → `94727b9` → `ad28f17` → `2137afc` → `7bcbd00` → `295cfd2`（记忆收口）→ `082add6`（修复）→ `7f172ae`（`lib/` 重建）。**`CONFIRMED`** |
+| 提交面 | `git diff --stat 7b25890 7f172ae`；按目录 `git diff --numstat … -- src` / `test` / `lib` / `docs README.md README.zh-CN.md` / `CHANGELOG.md` | **69 文件 / +2536 −1044**：`src` 7 文件 +152 −222、`test` 21 文件 +865 −494、`lib/` 24 文件 +227 −287、`docs` 与两个 README 16 文件 +1269 −29（含 8 个证据文件）、`CHANGELOG.md` 1 文件 +23 −12。**`CONFIRMED`** |
+| 默认值三处（源码事实） | `grep -n "DEFAULT_LEGACY_GATE" src/config.ts`；`grep -n "BLOCK_ADMISSION_ENFORCED" src/user-source.ts`；`grep -rn "classifyHeartbeat\|loop-stop" src/` | `src/config.ts:250 export const DEFAULT_LEGACY_GATE = false`；`src/user-source.ts:83 export const BLOCK_ADMISSION_ENFORCED = true`；`classifyHeartbeat` 与 `loop-stop` 在 `src/` 里**零命中**（全删）。**`CONFIRMED`** |
+| 注册顺序（源码事实） | `sed -n '417,470p' src/index.ts` | `installHeartbeatListen({ … enabled: true … })` 在 `if (config.blockIntake === true)` **之前**、无条件；接单台分支里才是 `installHeartbeatBrakes` + `registerBlockTools`；`if (config.legacyGate === true)` 最后。默认（两开关都关）= 链上恰好一个监听。**`CONFIRMED`** |
+| 红：权威 intake spec 打在基线上 | 一次性 `git archive 7b25890` 解包到 `.tmp/m3-2-red`（不是仓库根），`node_modules` 软链自父 checkout，只拷本分支的 `test/m3-intake.spec.ts`；`cd .tmp/m3-2-red && TMPDIR=$PWD/.tmp npx vitest run test/m3-intake.spec.ts` | **EXIT=1**：`Test Files 1 failed (1)` / `Tests 15 failed \| 3 passed (18)`。15 条全是行为红：准入仍失效、六个工具照样作答、`legacyGate` 缺省仍 on、写 `observed` 而不是 `continued`、pre-M3.2 的注册矩阵、闸门仍在分类一拍心跳（`expected "pass" reason "non-user-source"` 实收 `"loop-continuation"`）。spec 里每个 import 在基线上都能解析，**整份 transcript 没有 "cannot find module"**。原文 `docs/knowledge/evidence/m3-2-2026-11-25/red-spec-on-baseline.out`。**`CONFIRMED`** |
+| 绿：五个 spec（两半合起来） | `TMPDIR=$PWD/.tmp npx vitest run test/m3-intake.spec.ts test/block-tools.spec.ts test/block-ledger.spec.ts test/block-preview.spec.ts test/block-supervisor.spec.ts` | **EXIT=0**：`Test Files 5 passed (5)` / `Tests 174 passed (174)`（逐文件 18 / 23 / 20 / 93 / 20），13.99 s。被测树用另一名工人五个源文件的 sha256 钉在 transcript 里。原文 `green-spec.out`。**`CONFIRMED`** |
+| 门禁 #1（全量，包工头跑） | `TMPDIR=$PWD/.tmp npm run ci`（**`7f172ae`** 的树） | **exit 0**（包工头的记录；日志本身只打印那四行）：`Test Files 112 passed (112)`、`Tests 2149 passed (2149)`、`Found 36 warnings and 0 errors.`、**`lib/ at 7f172ae is the build of src/ at 7f172ae (301 files, byte-identical)`**。**`CONFIRMED`** |
+| 门禁 #2（`verify:lib` 单跑） | `npm run verify:lib` | **exit 0**，同一行原文：`lib/ at 7f172ae is the build of src/ at 7f172ae (301 files, byte-identical)`。**`CONFIRMED`** |
+| typecheck | `npm run typecheck` | **exit 0**。**`CONFIRMED`** |
+| **回归：症状** | `TMPDIR=$PWD/.tmp npx vitest run test/phase1-dialogue.spec.ts`（`295cfd2` 之上，`src`/`test`/`lib` 与上一次全绿时逐字节相同） | **`B04` 与 `B08` 红**：`keeps an earlier unanswered request when a second question arrives (B04)` 与 `cuts the resumed request to the objective budget instead of refusing the run (B08)`。两次全量门禁之间 `git diff` 只有 `docs/` 下的记忆文件，**没有一行源码或测试变化**。**`CONFIRMED`** |
+| **回归：原因** | 读 `src/gate.ts:1100-1125`、`src/triage.ts` 的 `RECALL_LIMITS` 与 `recallFromPrior`；`grep -n minTokens src/triage.ts` | 闸门在问之前会先「查材料」：把消息的锚点拿到会话历史、前几轮摘要与 `docs/knowledge/*.md` 每份前 **2 400** 字符（`RECALL_LIMITS.fileChars`）里找，`recallFromPrior` 要 **`minTokens: 2`** 个不同锚点才算命中。`HANDOFF.md` 的新条目把 `B04` 那条测试消息的**两个**锚点（`把那`、`顺手`）写进了自己的窗口，命中成立 → 档位从「问」翻成「快手档／已回忆」→ 待答的问题被作废，`B04` 的第二次请求没有被带走。**`CONFIRMED`** |
+| **回归：基线为什么是绿的** | 用字符窗口逐份复核三个提交的顶层 `docs/knowledge/*.md`：`git show <c>:<file>` 取前 **2 400 字符**，数两个锚点 | `7b25890` 与 `2137afc`：`HANDOFF.md` 窗口里 `顺手` **1**、`把那` **0**（`SPEC-grok-workflow-v1.md` 也只有 `顺手` 1）；`295cfd2`：`HANDOFF.md` 窗口变成 `顺手` **1** + `把那` **1** = 命中。**同一份源码，两种结果，差别只在磁盘上的笔记**——而且 `recallFromPrior` 要求两个锚点落在**同一个** source 里，所以两份文件各一个锚点也不会命中。**`CONFIRMED`**（本轮实测复核） |
+| **回归：修法** | `git show 082add6 -- src/gate.ts` | 加一条显式规则：`const mayAnswerFromMaterial = live === undefined`，`if (lookup.kind === 'hit' && mayAnswerFromMaterial)`——**问题还开着时，命中不得改写档位**；查照跑（`miss` 那支的「查了哪里、缺什么」一字未变），只有命中被拒。**`CONFIRMED`** |
+| **回归：钉住它，且不依赖本仓库的笔记** | `test/phase1-dialogue.spec.ts` 新增 `keeps the question open even when the look-up would answer the new message`：`mkdtempSync` 造一个 scratch 知识目录、用 `GROK_WORKFLOW_KNOWLEDGE_DIRS` 指过去，里面放两个锚点，再走「问 → 第二次含糊请求 → 再问」 | 去掉那道闸 → **3 条用例失败**（新增这条 + `B04` + `B08`）；装上 → 全绿。用例把「记忆内容」换成受控输入，所以以后谁改 `docs/knowledge/` 都不会让它假绿。**`CONFIRMED`**（变异结果来自 `082add6` 的提交说明与门禁读数） |
+| 全量套件（修正轮自己跑，文档改完之后） | `TMPDIR=$PWD/.tmp npx vitest run`（`7f172ae` + 本轮文档改动，worktree） | **EXIT=0**：`Test Files 112 passed (112)` / `Tests 2149 passed (2149)`，199.07 s。**先跑的是内容敏感的那四个 spec**（`phase1-dialogue` / `gate` / `triage` / `triage-recall` → `4 files / 166 tests PASS`，其中 `B04`、`B08` 都在），再跑全量。**`CONFIRMED`** |
+| 14 个前台 spec 显式 opt in | `git show --stat --oneline ad28f17` | 14 文件 / +103 −88，全是 `test/` 下的 spec（`gate`、`triage`、`composition`、`phase1-dialogue`、`reliability`、`channel`、`captain-confirm`、`full-escape`、`full-behind-first-answer`、`gate-partial-head`、`grok-on-ingress`、`human-output-contract`、`objective-limit`、`triage-recall`）。**`CONFIRMED`** |
+| soak 环境（隔离、真机、真模型） | `node scripts/clone-profile.mjs --src ~/.dsh/profiles/web --home .tmp/m3-soak-2/dsh-home --name m32 --force`；`dsh plugin --profile m32 add <worktree>`；端口 **3311**；DSH **0.2.2-rc.3** / Node **v26.8.1** | clone `files 7699 -> 7699`、`parity 5/5 equal after redaction`、`credentials redacted: 1 line(s)`；装的是 `link:` 到本 worktree，版本读回 **`0.13.34`**；配置里 `blockIntake: true`、`legacyGate` **故意缺席**（缺席才是被测的默认）。**`CONFIRMED`** |
+| soak 期间线上没被碰 | `stat` 前后两次比 `~/.dsh` 与 `~/.dsh/profiles/web`；`ss -ltn`；`ps` | `/home/fish/.dsh` 前后都是 `size=1548 mtime=1795362020`，`profiles/web` 都是 `size=196 mtime=1795530213`；线上 3080/3065/3086/3109 未被碰；soak 自己的实例经 job controller 停掉，3311 释放。**`CONFIRMED`** |
+| 场景 ① 一次点击（真 Chromium 开 GUI） | playwright + `/usr/bin/chromium` 打开 `127.0.0.1:3311`，点侧栏「新会话」、在 composer 里打字回车；再发一条显式要工作流的消息 | 普通消息：`seq 9 user/message source.kind=user` 原话、`seq 18 assistant/message` 真答、`seq 20 turn/end completed`，**中继 0 条**、`grok_workflow` 调用 0 次、`taskboards/` 不存在。显式消息：`tool/call` 1、`run-start` 1、`run-end` 1（`stopReason:"completed"`）、`agent-start/end` 各 9、`COMPLETED` + 2 tasks verified。原文 `soak-1-oneshot.txt`。**`CONFIRMED`** |
+| 场景 ② headless（端到端一次真运行） | 任务书那条 `dsh --profile m32 headless '<objective>'`；改用同配置同 build 的兄弟 profile `m32h`（只换 app bundle 为 `dsh-headless`） | 字面命令 **EXIT=1**：`error: too many arguments. Expected 0 arguments but got 2: headless, …`（偏差如实记）；`m32h` **EXIT=0**，工作流自己报 `COMPLETED`，账本行落盘。原文 `soak-2-headless.txt`。**`CONFIRMED`**（含偏差） |
+| 场景 ③ 重启 / 续跑 | 起一次足够长的运行 → job controller kill（`synthesize` 阶段）→ 三种重启各自实测 | kill 前 checkpoint：`status running`、`stages … synthesize:running`、10 任务全 `running`、0 verified、attempts 合计 **10**。① `--session-id` 采纳同一会话 → **EXIT=1 `BLOCKED`**（见下条）。② 只重启 profile → 4 次 tool/call、**0 条 `tool-workflow` 事件**，模型改从 `memory/grok-workflow/archive.jsonl` 作答，被 kill 的 checkpoint 一字未动。③ 明确要求续跑 → 新 run `318dd0e8`：`run-start` 1 / `run-end 1`（`completed`）、1 个任务、1 verified、attempts **1**；被 kill 的 `344793b2` 仍是 `running` / 0 verified / attempts **10 → 10**，没有被重复计费。原文 `soak-3-restart-resume.txt`。**`CONFIRMED`** |
+| 场景 ③ 的 `BLOCKED` 是真机发现，不是本块回归 | `dsh --profile m32h --session-id session-e630bafb-… '继续刚才被中断的工作流。'` | **EXIT=1**：`session "…" contains event type "tool-workflow/guardian-start" (seq 19) unknown to this harness and not marked ignorable; refusing to interpret the log`。该事件来自 `891b8a2`（`feat(progress): add fresh Guardian monitor lane (#46)`），**先于本块**；`src/run.ts` 用 `session.append` 写它且没标 ignorable，所以在这台 harness 上，跑过工作流的会话无法被 `--session-id` 重新采纳。如实记成限制，没有绕过。**`BLOCKED`** |
+| 场景 ④ 卸载 | `dsh plugin --profile m32 remove dsh-grok-workflow`（EXIT=0，pnpm v12.4.2）→ 重启 → 发一条普通消息 | `bundles.length` **21 → 20**、依赖项消失；`request/header` 里 grok 工具 **8 → 0**（总工具名 87）；普通消息仍被作答（`3 加 4 等于 7。`，8 秒）；`tool-workflow/run-start` 0、中继 0；`taskboards/` 仍不存在、无任何 `heartbeats*.jsonl`、checkpoint 4 个未变、`archive.jsonl` mtime 未变；`ps` 里没有孤儿工作流子进程。原文 `soak-4-uninstall.txt`。**`CONFIRMED`** |
+| 场景 ④ 的残留 | 同一轮 `find` / 读 profile | pnpm 留下了 `node_modules/dsh-grok-workflow -> …/wt-m3-switch` 软链，仍能解析；因为挂它的 bundle 行已消失所以是惰性的——但它是**存在**的，照实记。**`CONFIRMED`** |
+| 准入在真机上生效（claim B） | `dsh --profile m32h '请立刻调用 grok_open_block 工具开一个块…'` | **EXIT=0**，会话日志里 `tool/call name=grok_open_block` 后紧跟 `tool/result isError=true`：`Error: mode-off: 这个会话的 grok 模式没打开，接单台不接单。…`；`mode-off` 在会话日志出现 1 次，`taskboards/` 仍未创建（拒绝发生在读账本之前）。**`CONFIRMED`** |
+| 心跳在真机上由窄监听裁决（claim A） | — | **`NOT_RUN`**：四个场景都没开块，`$DSH_HOME/taskboards/` 在整个 soak 结束后根本不存在，`heartbeats-listen.jsonl` 与 `heartbeats.jsonl` 都没写过。缺席与「只在有 open block 时才写」的设计一致，但一致不是证据，所以标 `NOT_RUN`。 |
+| 热卸载（运行中移除插件） | — | **`NOT_RUN`**：先把实例停掉再移除 bundle 行，所以「无后台存活」是在冷启动上观察到的。 |
+| 模型路由的适配 | clone 里没有 `agent2api` 凭据，默认聊天模型报 `MISSING_CREDENTIAL`；所有路由改指 `bifrost-responses/opencode-go/muse-spark-1.3-contributor`，先用一条最小请求验活 | 验活 `HTTP=200 time=1.64s`。没有从线上 home 拷任何凭据、也没有读。只换「谁回答」，不动四条场景要测的东西。**`CONFIRMED`** |
+| 文档守卫（修正轮，四个 spec） | `TMPDIR=$PWD/.tmp npx vitest run test/docs-architecture-version.spec.ts test/i18n-parity.spec.ts test/docs-version.spec.ts test/docs-config-keys.spec.ts` | **EXIT=0**：`Test Files 4 passed (4)` / `Tests 30 passed (30)`（`docs-architecture-version` 3、`i18n-parity` 6、`docs-version` 8、`docs-config-keys` 13）。**`CONFIRMED`** |
+| 未发版 / 未 push / 未打 tag | `git tag --points-at HEAD`；`node -p "require('./package.json').version"`；`git status --short --branch` | 没有 tag 指向本分支提交，`package.json` 仍是 **`0.13.34`**；没有 `git push`、没有合 `main`、没有改版本号。**`CONFIRMED`** |
+
+**Changed（本块的提交面）：** 五条提交，**63 文件 / +2287 −1027**——`src` 7 文件（`config` / `index` / `gate` / `heartbeat-listen` /
+`user-source` / `types` / `block/tools`）、`test` 21 文件、`lib/` 24 文件（`npm run build` 重建）、`docs` 与两个 README 11 文件
+（含 8 个证据文件）。
+
+**Honest boundary（逐条）：**
+1. **心跳的真机结论是 `NOT_RUN`，不是 `CONFIRMED`。** 「窄监听是唯一刹车主人」这条结论在源码、单测与 M3.1 的真机先例上都站得住，
+   但**这一轮没有任何一拍心跳真的被送到过窄监听**——四个场景都没开块，两个心跳文件从头到尾没被创建。别把「设计上应该写」读成「真机上写过」。
+2. **`--session-id` 那条 `BLOCKED` 是先于本块的 harness 限制**（`891b8a2` 的 `tool-workflow/guardian-start` 事件）。它意味着
+   「重启后采纳同一会话」这件事在这台机器上**没能演示**；被演示的是「重启后新起一次运行、靠插件播的 seed 接上」，这是设计里 resume 的语义，
+   但它不等于引擎级恢复。
+3. **pnpm 的软链残留是真的**：卸载后 `node_modules/dsh-grok-workflow` 还在。它惰性（挂它的行没了），但「卸载后磁盘上什么都没留」
+   这句话不成立，所以照实写。
+4. **clone 里没有 `agent2api` 的凭据**，所以四条场景的所有路由都被改指
+   `bifrost-responses/opencode-go/muse-spark-1.3-contributor`（先验活 200 / 1.64 s）。这只改变「谁回答」，不改变被测的四件事
+   （是否拦截、运行次数、准入、卸载）；但它确实不是线上 profile 的原样模型配置。
+5. **场景 ② 没跑任务书那条字面命令**：`dsh --profile m32 headless '<objective>'` 在本机 exit 1（`too many arguments`）。
+   换的是同配置、同 build、只换 app bundle 的兄弟 profile。
+6. **门禁的 `exit 0` 来自包工头的记录，日志本身不打印退出码**；`7f172ae` 那次逐字可见的是 `112 / 2149`、
+   `36 warnings and 0 errors`、`lib/ at 7f172ae … (301 files, byte-identical)` 四行。门禁跑在分支尖端 **`7f172ae`** 上，
+   之后没有提交，所以没有源码行落在门禁之外。
+7. **收口轮没有重跑 `npm run ci`，也没有重跑 soak**：只读了 `.tmp/ci-m3-2.log`、六份证据原文，并跑了文档守卫 spec。
+   **修正轮自己跑了全量套件**（`npx vitest run` → `112 / 2149`），但那是 `vitest` 全量，不是 `npm run ci`（没跑 lint 与 `verify:lib`）。
+8. **回归的「变异结果 = 3 条失败」是转述，不是我自己做的变异**：它来自 `082add6` 的提交说明与那次门禁读数，我没有把闸拆掉重跑。
+   症状（`B04`/`B08` 红）、原因（两个锚点 + `minTokens: 2`）与「基线为什么绿」是我读源码、读 diff、并按字符窗口逐份数锚点复核的
+   （见上面那三行）；「拆掉闸会红三条」这一步是转述。
+
 ## 问题卡片的确认：两个新用例、一个共用判断、提交后门禁（`fix/question-card-approval`）— 2026-11-25 (`CONFIRMED`)
 
 下面每一行都写清命令、环境与结果；没跑的写 `NOT_RUN`。分支 `fix/question-card-approval`（worktree

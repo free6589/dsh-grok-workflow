@@ -203,7 +203,7 @@ function newContext(overrides: Record<string, unknown> = {}): FakeContext {
   // `grokDefault: 'on'` on purpose: grok mode is a per-session toggle whose
   // default is `off`, and an off session passes every batch through as normal
   // chat (`mode-off`). These tests are about *admitted* batches, so they opt in.
-  apply(ctx as never, { mode: 'full', grokDefault: 'on', ...overrides })
+  apply(ctx as never, { legacyGate: true, mode: 'full', grokDefault: 'on', ...overrides })
   return ctx
 }
 

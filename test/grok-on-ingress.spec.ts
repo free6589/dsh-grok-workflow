@@ -283,7 +283,7 @@ describe('/grok on keeps message ingress open', () => {
 
   it('dispatches the next message while the team run is still in flight', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'triage', grokDefault: 'off' })
+    apply(ctx as never, { legacyGate: true, mode: 'triage', grokDefault: 'off' })
     const session = Session.create('sess-grok-on' as never)
     const agent = new FakeAgent(session)
     grokOn(session)
@@ -311,7 +311,7 @@ describe('/grok on keeps message ingress open', () => {
 
   it('still runs the full team for the message and delivers the report afterwards', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'triage', grokDefault: 'off' })
+    apply(ctx as never, { legacyGate: true, mode: 'triage', grokDefault: 'off' })
     const session = Session.create('sess-grok-on-report' as never)
     const agent = new FakeAgent(session)
     grokOn(session)
@@ -347,7 +347,7 @@ describe('/grok on keeps message ingress open', () => {
 
   it('leaves /grok off untouched: the message passes straight through, no run', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'triage', grokDefault: 'off' })
+    apply(ctx as never, { legacyGate: true, mode: 'triage', grokDefault: 'off' })
     const session = Session.create('sess-grok-off' as never)
     const agent = new FakeAgent(session)
     const loop = new MiniLoop(ctx.preStep()).attach(agent, session)
@@ -364,7 +364,7 @@ describe('/grok on keeps message ingress open', () => {
     // this case pins it with mid-run replan off (Sec.2-2 made it the default on;
     // with it on the message is answered and merged instead of queued, which is
     // covered by test/channel.spec.ts).
-    apply(ctx as never, { mode: 'triage', grokDefault: 'off', replan: false })
+    apply(ctx as never, { legacyGate: true, mode: 'triage', grokDefault: 'off', replan: false })
     const session = Session.create('sess-grok-on-saturated' as never)
     const agent = new FakeAgent(session)
     grokOn(session)
@@ -412,7 +412,7 @@ describe('/grok on keeps message ingress open', () => {
     // The deployment shape a user actually runs: `mode: full` with the plugin default
     // on and no per-session `/grok` record. It has no front desk, and its first turn
     // has no host head yet — the two facts that used to leave the whole run invisible.
-    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'full', grokDefault: 'on' })
     const session = Session.create('sess-full-first-visible' as never)
     const agent = new FakeAgent(session)
     const loop = new MiniLoop(ctx.preStep()).attach(agent, session)

@@ -309,6 +309,9 @@ async function mount(overrides: Record<string, unknown> = {}): Promise<Mounted> 
     apply(inner: Context) { inner.provide('workflowEngine', engine) },
   } as never, {} as never)
   apply(ctx as never, {
+    // `legacyGate: true` because every case here reads the front desk's own
+    // decision; since M3.2 that registration is opt-in.
+    legacyGate: true,
     // `full` keeps every message on the team path (the front desk has its own
     // suite). T4 in-turn: `full` also skips the interactive first-answer branch,
     // so one workflow run maps to one engine run — the 1:1 the `deliver`

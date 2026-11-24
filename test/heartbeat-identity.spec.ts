@@ -11,17 +11,19 @@
  * silently steering one heartbeat into the other's handler.
  *
  * What is real: the shipped constants (`LOOP_*` and `ITERATE_*`), `isLoopHeartbeat` /
- * `isLoopSlot` / `isLoopTask`, the real `classifyPreStep` dispatcher, and two real
- * `createLoopService` instances — the same wiring `src/index.ts` builds. What is a
- * boundary fake: DSH's Schedule service (a durable Host service this bundle cannot
- * start in CI) and the brake port, which is a spy here precisely because the property
- * under test is *not being called*.
+ * `isLoopSlot` / `isLoopTask`, the real `classifyPreStep` dispatcher, the real narrow
+ * heartbeat listener (`src/heartbeat-listen.ts`, the only thing that decides a beat
+ * since M3.2), and two real `createLoopService` instances — the same wiring
+ * `src/index.ts` builds. What is a boundary fake: DSH's Schedule service (a durable Host
+ * service this bundle cannot start in CI) and the brake port, which is a spy here
+ * precisely because the property under test is *not being called*.
  *
  * What a unit test cannot answer — whether the Host really fires a delivery, and what
  * the operator's Automation UI shows — is `NOT_RUN` here and stated as such in
  * `docs/knowledge/HEARTBEATS.md`.
  */
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
@@ -30,6 +32,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { resolveConfig } from '../src/config.js'
 import { classifyPreStep } from '../src/gate.js'
 import type { PreStepPayload } from '../src/gate.js'
+import { installHeartbeatListen } from '../src/heartbeat-listen.js'
 import {
   ITERATE_ROUTE_PATH,
   ITERATE_TASK_TITLE,
@@ -90,6 +93,35 @@ function brakePort(verdict: { kind: 'continue' } | { kind: 'stop'; code: string;
     admit: vi.fn(),
     stop: vi.fn(async () => {}),
   }
+}
+
+/**
+ * The narrow listener, installed on a bare context so a case can call it directly.
+ *
+ * It is the one thing that decides a heartbeat's fate (M3.2), so the identity question
+ * is asked of it too: a delivery carrying the *other* heartbeat's marker must never
+ * reach `review`. The observation directory is a throwaway, so no case writes to a real
+ * ledger.
+ * @param loop - the brake port (a spy here).
+ * @returns the registered `agent/pre-step` handler.
+ */
+function listenHandler(loop: unknown): (payload: unknown, next: () => Promise<unknown>) => Promise<unknown> {
+  let listener: unknown
+  const ctx = {
+    on: (event: string, registered: unknown) => {
+      if (event === 'agent/pre-step') listener = registered
+      return () => {}
+    },
+  }
+  installHeartbeatListen({
+    ctx,
+    logger: { warn: () => {} },
+    enabled: true,
+    loop: loop as never,
+    config: resolveConfig({ grokDefault: 'on' }),
+    options: { dir: mkdtempSync(join(tmpdir(), 'heartbeat-identity-')) },
+  })
+  return listener as (payload: unknown, next: () => Promise<unknown>) => Promise<unknown>
 }
 
 /** One Schedule row; only the fields this plugin reads. */
@@ -191,55 +223,52 @@ describe('the two heartbeats have identities that cannot be confused', () => {
 
 describe('the dispatcher routes a delivery to exactly one handler', () => {
   const config = resolveConfig({ grokDefault: 'on' })
-  const classify = (loop: unknown, message: UserMessage) =>
-    classifyPreStep({ config, loop } as never, { agent: agentOf(), messages: [message], turn: 1, step: 1 } as unknown as PreStepPayload)
+  const classify = (message: UserMessage) =>
+    classifyPreStep({ config }, { agent: agentOf(), messages: [message], turn: 1, step: 1 } as unknown as PreStepPayload)
 
   it('sends an Iterate delivery through the non-user pass, never into the Loop handler', () => {
-    const loop = brakePort()
-    const verdict = classify(loop, delivery(iterateHeartbeatPrompt()))
+    const verdict = classify(delivery(iterateHeartbeatPrompt()))
     // The generic pass is the *only* correct destination: it starts no run and charges
     // no round. `loop-continuation` here would mean the RSI turn was billed to the loop.
     expect(verdict).toEqual({ kind: 'pass', reason: 'non-user-source' })
-    expect(loop.review).not.toHaveBeenCalled()
-    expect(loop.admit).not.toHaveBeenCalled()
-    expect(loop.stop).not.toHaveBeenCalled()
   })
 
-  it('sends a Loop delivery into the Loop handler, and charges exactly one round', () => {
-    const loop = brakePort()
-    const verdict = classify(loop, delivery(defaultLoopPrompt(3)))
-    expect(verdict).toEqual({ kind: 'pass', reason: 'loop-continuation' })
-    expect(loop.review).toHaveBeenCalledTimes(1)
-    expect(loop.admit).toHaveBeenCalledTimes(1)
+  it('sends a Loop delivery through the same non-user pass, and charges nothing', () => {
+    // M3.2: the front desk stopped routing heartbeats. A beat it sees is not a request
+    // and not its business — the narrow listener, installed outermost, has already
+    // answered it, so no brake is consulted and no round is spent here.
+    expect(classify(delivery(defaultLoopPrompt(3)))).toEqual({ kind: 'pass', reason: 'non-user-source' })
   })
 
   it('treats a user message that pastes the Loop marker as an ordinary request', () => {
     // The marker alone is not identity: a person can type it. Only the pair
-    // (`source.kind === 'schedule'` *and* the marker) enters the Loop handler, so a
-    // pasted marker must still be admitted as the request it is.
-    const loop = brakePort()
+    // (`source.kind === 'schedule'` *and* the marker) is a heartbeat, so a pasted marker
+    // must still be admitted as the request it is.
     const pasted = createUserMessage({
       content: [{ type: 'text', text: `${LOOP_PROMPT_PREFIX} Loop heartbeat: continue` }],
       source: { kind: 'user' } as never,
     }) as unknown as UserMessage
-    expect(classify(loop, pasted)).toMatchObject({ kind: 'admit' })
-    expect(loop.review).not.toHaveBeenCalled()
-    expect(loop.admit).not.toHaveBeenCalled()
+    expect(classify(pasted)).toMatchObject({ kind: 'admit' })
   })
 
-  it('cannot let an Iterate delivery trip a Loop brake and delete the loop row', () => {
+  it('lets the narrow listener stop a Loop delivery the gate would only pass', async () => {
     // A brake verdict that would stop the loop is the sharpest probe available: if the
     // Iterate prompt reached `review`, this delivery would spend the loop's row.
     const loop = brakePort({ kind: 'stop', code: 'loop/stop-file', detail: 'stop marker exists' })
-    expect(classify(loop, delivery(iterateHeartbeatPrompt()))).toEqual({ kind: 'pass', reason: 'non-user-source' })
+    const handler = listenHandler(loop)
+    const next = vi.fn(async () => ({ kind: 'enter' as const, messages: [] }))
+    const beat = (prompt: string): unknown => ({ agent: agentOf(), messages: [delivery(prompt)] })
+
+    // The Iterate delivery is not a beat to this listener: passed, never reviewed.
+    expect(await handler(beat(iterateHeartbeatPrompt()), next)).toEqual({ kind: 'enter', messages: [] })
     expect(loop.review).not.toHaveBeenCalled()
     expect(loop.stop).not.toHaveBeenCalled()
-    // The positive control: the same brake does stop a real Loop delivery. Policy is
-    // the caller's half — `classifyPreStep` returns the verdict and the gate's handler
-    // is what deletes the row — so the verdict is what this level can honestly assert.
-    expect(classify(loop, delivery(defaultLoopPrompt(3)))).toMatchObject({ kind: 'loop-stop' })
+    // The positive control: the same brake stops a real Loop delivery, and the refusal
+    // is the listener's — the gate answers the very same batch with a plain pass.
+    expect(await handler(beat(defaultLoopPrompt(3)), next)).toEqual({ kind: 'reject' })
     expect(loop.review).toHaveBeenCalledTimes(1)
-    expect(loop.admit).not.toHaveBeenCalled()
+    expect(loop.stop).toHaveBeenCalledWith({ sessionId: 'session-a', code: 'loop/stop-file', detail: 'stop marker exists' })
+    expect(classify(delivery(defaultLoopPrompt(3)))).toEqual({ kind: 'pass', reason: 'non-user-source' })
   })
 })
 

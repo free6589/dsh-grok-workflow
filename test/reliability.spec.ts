@@ -184,7 +184,7 @@ describe('reliability: cancellation and deadlines', () => {
   it('reports a deliberate stop as cancelled instead of blaming configuration', async () => {
     const ctx = new FakeContext()
     ctx.engine.hang = true
-    apply(ctx as never, { maxConcurrency: 1})
+    apply(ctx as never, { legacyGate: true, maxConcurrency: 1})
     const controller = new AbortController()
     const pending = ctx.tool!.execute({ objective: 'do the thing', tasks: [callerTask('a')] }, exec(controller.signal))
     await vi.waitFor(() => { if (ctx.engine.runs.length === 0) throw new Error('run did not start') })
@@ -287,7 +287,7 @@ describe('reliability: concurrency and duplicate start', () => {
     const ctx = new FakeContext()
     // Duplicate suppression is about the gate's durable record, not about the
     // front desk: run the pre-t52 rule so the message really starts a workflow.
-    apply(ctx as never, { maxConcurrency: 1, mode: 'full', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, maxConcurrency: 1, mode: 'full', grokDefault: 'on' })
     const target = session('sess-duplicate')
     const messages = [userMessage('do the thing')]
     await ctx.preStep(stepPayload(agentOf(target), messages), passThrough(messages as never))
@@ -305,7 +305,7 @@ describe('reliability: concurrency and duplicate start', () => {
 describe('reliability: recursion, context and secrets', () => {
   it('refuses the tool from a subagent so a workflow cannot nest', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { maxConcurrency: 1 })
+    apply(ctx as never, { legacyGate: true, maxConcurrency: 1 })
     await expect(ctx.tool!.execute({ objective: 'nested' }, exec(undefined, 2)))
       .rejects.toThrow(/cannot be invoked from a subagent/)
   })
@@ -387,7 +387,7 @@ describe('reliability: unload and reload', () => {
   it('cancels in-flight runs and refuses new work when the plugin unloads', async () => {
     const ctx = new FakeContext()
     ctx.engine.hang = true
-    apply(ctx as never, { maxConcurrency: 1 })
+    apply(ctx as never, { legacyGate: true, maxConcurrency: 1 })
     const pending = ctx.tool!.execute({ objective: 'do the thing', tasks: [callerTask('a')] }, exec())
     await vi.waitFor(() => { if (ctx.engine.runs.length === 0) throw new Error('run did not start') })
     await ctx.dispose()
@@ -400,13 +400,13 @@ describe('reliability: unload and reload', () => {
     const ctx = new FakeContext()
     // `mode: 'full'`: this test measures the mount/reload lifecycle, and its short
     // messages would otherwise be answered by the front desk instead of the team.
-    apply(ctx as never, { maxConcurrency: 1, mode: 'full', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, maxConcurrency: 1, mode: 'full', grokDefault: 'on' })
     const target = session('sess-reload')
     await ctx.preStep(stepPayload(agentOf(target), [userMessage('first')]), passThrough([]))
     await vi.waitFor(() => { if (ctx.engine.startCalls.length === 0) throw new Error('no run') })
     await ctx.dispose()
     // A fresh mount on the same context object admits a new message again.
-    apply(ctx as never, { maxConcurrency: 1, mode: 'full', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, maxConcurrency: 1, mode: 'full', grokDefault: 'on' })
     await ctx.preStep(stepPayload(agentOf(target), [userMessage('second message')]), passThrough([]))
     await vi.waitFor(() => { if (ctx.engine.startCalls.length < 2) throw new Error('reload did not admit') })
     expect(ctx.engine.startCalls).toHaveLength(2)
@@ -424,7 +424,7 @@ describe('reliability: run records', () => {
       const ctx = new FakeContext()
       // Two routes, and the first worker call fails: a switch worth recording.
       ctx.engine.failFirstWorker = true
-      apply(ctx as never, { maxConcurrency: 1, roles: { worker: [{ model: 'w1' }, { model: 'w2' }] } })
+      apply(ctx as never, { legacyGate: true, maxConcurrency: 1, roles: { worker: [{ model: 'w1' }, { model: 'w2' }] } })
       const target = session('sess-records-true')
       await ctx.tool!.execute({ objective: 'do the thing', tasks: [callerTask('a')] }, { ...exec(), agent: agentOf(target) })
       return ledgerOf(target)
@@ -450,7 +450,7 @@ describe('reliability: run records', () => {
 
   it('records the delivery outcome so a restart cannot re-route the message', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { maxConcurrency: 1, mode: 'full', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, maxConcurrency: 1, mode: 'full', grokDefault: 'on' })
     const target = session('sess-delivery')
     await ctx.preStep(stepPayload(agentOf(target), [userMessage('do the thing')]), passThrough([]))
     await vi.waitFor(() => { if (ctx.engine.startCalls.length === 0) throw new Error('no run') })
@@ -512,12 +512,13 @@ describe('reliability: live configuration and diagnostics', () => {
 })
 
 describe('reliability: wiring the live configuration and the category vocabulary', () => {
-  it('applies no live gate scope edit: the gate is always on (T4)', async () => {
+  it('applies no live gate scope edit: an opted-in gate admits every session (T4)', async () => {
     // T4 removed gateScope/gatePreset: every session is admitted, no scope edit
     // exists. This pins the fail-open replacement — an out-of-preset session
-    // runs instead of passing through.
+    // runs instead of passing through — for a profile that asks for the desk.
     const ctx = new FakeContext()
     apply(ctx as never, {
+      legacyGate: true,
       maxConcurrency: 1,
       mode: 'full',
       grokDefault: 'on',
@@ -535,7 +536,7 @@ describe('reliability: wiring the live configuration and the category vocabulary
   it('uses the live configuration for a tool call, not the load-time snapshot (F3)', async () => {
     let maxTasks = 1
     const ctx = new FakeContext()
-    apply(ctx as never, { maxConcurrency: 1, maxTasks: { get: () => maxTasks } } as never)
+    apply(ctx as never, { legacyGate: true, maxConcurrency: 1, maxTasks: { get: () => maxTasks } } as never)
     // Two tasks against a load-time snapshot of maxTasks=1 would be refused; the
     // live reader is raised first, so the call is accepted.
     maxTasks = 3
@@ -554,6 +555,7 @@ describe('reliability: wiring the live configuration and the category vocabulary
     let workerModel = 'old-model'
     const ctx = new FakeContext()
     apply(ctx as never, {
+      legacyGate: true,
       mode: 'full',
       grokDefault: 'on',
       maxConcurrency: 1,

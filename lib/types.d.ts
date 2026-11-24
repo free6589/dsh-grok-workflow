@@ -225,10 +225,11 @@ export interface GrokWorkflowConfig {
      */
     blockIntake?: boolean;
     /**
-     * Whether the old front desk (`installGate`) is registered. On by default and
-     * on means the pre-M3 chain; off skips that registration entirely, leaving the
-     * narrow heartbeat listener as the only `agent/pre-step` listener. Load-time for
-     * the same reason as `blockIntake`: a registration cannot be flipped live.
+     * Whether the old front desk (`installGate`) is registered. Off by default: the
+     * narrow heartbeat listener is the only `agent/pre-step` listener and the one owner
+     * of a beat. On is an explicit opt-in that registers the front desk for user-message
+     * routing only — never for heartbeats. Load-time for the same reason as
+     * `blockIntake`: a registration cannot be flipped live.
      */
     legacyGate?: boolean;
 }
@@ -294,9 +295,9 @@ export interface ResolvedConfig {
      */
     blockIntake: boolean;
     /**
-     * Old front desk switch. Load-time: on registers `installGate` exactly as before,
-     * off registers nothing from it, so the narrow heartbeat listener is the only
-     * listener left on the chain.
+     * Old front desk switch. Load-time. Off (the default) registers nothing from it, so
+     * the narrow heartbeat listener is the only listener on the chain; on registers
+     * `installGate` for user-message routing, never for heartbeats.
      */
     legacyGate: boolean;
     configVersion: number;

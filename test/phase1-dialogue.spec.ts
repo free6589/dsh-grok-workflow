@@ -8,6 +8,9 @@
  * never GUI evidence.
  */
 
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
@@ -371,7 +374,7 @@ describe('P0-1: the user’s own message survives in the transcript', () => {
   it('publishes the claimed message, then the report, once each, in that order', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
-    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'full', grokDefault: 'on' })
     const live = headed('sess-p01-in-turn')
     const agent = new FakeAgent(live)
     const claimed = [userMessage('把登录接口改成 JWT 校验')]
@@ -401,7 +404,7 @@ describe('P0-1: the user’s own message survives in the transcript', () => {
 
   it('keeps the original message when the message is refused before any run', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'full', grokDefault: 'on' })
     const live = session('sess-p01-refusal')
     const agent = new FakeAgent(live)
     // One character past the workflow objective limit (32000 since PR #25), which is
@@ -421,7 +424,7 @@ describe('P0-1: the user’s own message survives in the transcript', () => {
   it('survives a reload: the transcript replays the original message then the report', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
-    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'full', grokDefault: 'on' })
     const live = headed('sess-p01-reload')
     const agent = new FakeAgent(live)
     const claimed = [userMessage('重放后仍然要看到我这句话')]
@@ -441,7 +444,7 @@ describe('P0-1: the user’s own message survives in the transcript', () => {
   it('in-turn: the claimed message is entered with the answer in the same step (T4)', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
-    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'full', grokDefault: 'on' })
     const live = headed('sess-p01-relay')
     const agent = new FakeAgent(live)
     const claimed = [userMessage('in-turn 也要留下原话')]
@@ -464,7 +467,7 @@ describe('P0-1: the user’s own message survives in the transcript', () => {
   it('in-turn: the original message and the report are both in the durable log (T4)', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
-    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'full', grokDefault: 'on' })
     const live = headed('sess-p01-append')
     const agent = new FakeAgent(live)
     const claimed = [userMessage('append 也要留下原话')]
@@ -484,7 +487,7 @@ describe('P0-1: the user’s own message survives in the transcript', () => {
 
   it('a downstream refusal is not claimed, so the batch stays routable', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'full', grokDefault: 'on' })
     const live = session('sess-p01-downstream')
     const agent = new FakeAgent(live)
     const claimed = [userMessage('downstream says no')]
@@ -520,7 +523,7 @@ async function askThenAnswer(options: {
 describe('P0-2: a confirmation answer keeps the original request', () => {
   it('asks before running when the request is ambiguous', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'triage', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'triage', grokDefault: 'on' })
     const live = session('sess-p02-ask')
     const agent = new FakeAgent(live)
     const decision = await ctx.preStep()(payload(agent, [userMessage('改一下那个')]), nextWith([])) as Decision
@@ -532,7 +535,7 @@ describe('P0-2: a confirmation answer keeps the original request', () => {
   it('hands the quick worker the original request together with the choice', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
-    apply(ctx as never, { mode: 'triage', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'triage', grokDefault: 'on' })
     const live = session('sess-p02-fast')
     const { answered } = await askThenAnswer({ ctx, live, ambiguous: '改一下那个', answer: '简单' })
 
@@ -552,7 +555,7 @@ describe('P0-2: a confirmation answer keeps the original request', () => {
   it('hands the team the original request together with the choice', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
-    apply(ctx as never, { mode: 'triage', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'triage', grokDefault: 'on' })
     const live = session('sess-p02-team')
     const { answered, agent } = await askThenAnswer({ ctx, live, ambiguous: '改一下那个', answer: '团队' })
 
@@ -572,7 +575,7 @@ describe('P0-2: a confirmation answer keeps the original request', () => {
 
   it('states that the confirmation expired instead of guessing the task', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'triage', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'triage', grokDefault: 'on' })
     const live = session('sess-p02-expired')
     const agent = new FakeAgent(live)
     await ctx.preStep()(payload(agent, [userMessage('改一下那个')]), nextWith([]))
@@ -589,13 +592,13 @@ describe('P0-2: a confirmation answer keeps the original request', () => {
 
   it('starts nothing when the pending question was lost by a reload', async () => {
     const first = new FakeContext()
-    apply(first as never, { mode: 'triage', grokDefault: 'on' })
+    apply(first as never, { legacyGate: true, mode: 'triage', grokDefault: 'on' })
     const live = session('sess-p02-reload')
     await first.preStep()(payload(new FakeAgent(live), [userMessage('改一下那个')]), nextWith([]))
 
     // A fresh plugin instance is what a reload gives you: the Map is gone.
     const second = new FakeContext()
-    apply(second as never, { mode: 'triage', grokDefault: 'on' })
+    apply(second as never, { legacyGate: true, mode: 'triage', grokDefault: 'on' })
     const decision = await second.preStep()(
       payload(new FakeAgent(live), [userMessage('简单')]),
       nextWith([]),
@@ -607,7 +610,7 @@ describe('P0-2: a confirmation answer keeps the original request', () => {
   it('never lets another session answer this session’s question', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
-    apply(ctx as never, { mode: 'triage', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'triage', grokDefault: 'on' })
     const one = session('sess-p02-one')
     const two = session('sess-p02-two')
     await ctx.preStep()(payload(new FakeAgent(one), [userMessage('改一下那个')]), nextWith([]))
@@ -628,7 +631,7 @@ describe('P0-2: a confirmation answer keeps the original request', () => {
   it('consumes a pending question once, so a repeated answer cannot start a second run', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
-    apply(ctx as never, { mode: 'triage', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'triage', grokDefault: 'on' })
     const live = session('sess-p02-once')
     const agent = new FakeAgent(live)
     await ctx.preStep()(payload(agent, [userMessage('改一下那个')]), nextWith([]))
@@ -646,7 +649,7 @@ describe('P0-2: a confirmation answer keeps the original request', () => {
   it('says the question is void when the user answers something else', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
-    apply(ctx as never, { mode: 'triage', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'triage', grokDefault: 'on' })
     const live = session('sess-p02-unused')
     const agent = new FakeAgent(live)
     await ctx.preStep()(payload(agent, [userMessage('改一下那个')]), nextWith([]))
@@ -660,7 +663,7 @@ describe('P0-2: a confirmation answer keeps the original request', () => {
   it('keeps an earlier unanswered request when a second question arrives (B04)', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
-    apply(ctx as never, { mode: 'triage', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'triage', grokDefault: 'on' })
     const live = session('sess-b04-carry')
     const agent = new FakeAgent(live)
     await ctx.preStep()(payload(agent, [userMessage('改一下那个')]), nextWith([]))
@@ -685,10 +688,41 @@ describe('P0-2: a confirmation answer keeps the original request', () => {
     expect(answerOf(answered)).toContain('档位：团队档')
   })
 
+  it('keeps the question open even when the look-up would answer the new message', async () => {
+    // The look-up pass (v0.5) answers a vague follow-up from the conversation, the
+    // earlier rounds or the memory files on disk. While a question is open it must not:
+    // the second vague message is a new request, and answering it from memory would drop
+    // the request the user was asked about (P0-2). The material below carries two of
+    // that message's own anchors — exactly what a hit needs — so this case fails the
+    // moment the open question stops outranking the look-up, whatever the repository's
+    // own memory files happen to say that day.
+    const root = mkdtempSync(join(tmpdir(), 'p02-recall-'))
+    writeFileSync(join(root, 'STATE.md'), '本轮先顺手把 把那个 也过一遍，再回头处理别的事。\n', 'utf8')
+    const previous = process.env['GROK_WORKFLOW_KNOWLEDGE_DIRS']
+    process.env['GROK_WORKFLOW_KNOWLEDGE_DIRS'] = root
+    try {
+      const ctx = new FakeContext()
+      ctx.engine.autoRun = true
+      apply(ctx as never, { legacyGate: true, mode: 'triage', grokDefault: 'on' })
+      const live = session('sess-b04-recall')
+      const agent = new FakeAgent(live)
+      await ctx.preStep()(payload(agent, [userMessage('改一下那个')]), nextWith([]))
+
+      const second = await ctx.preStep()(payload(agent, [userMessage('把那个也顺手弄一下')]), nextWith([])) as Decision
+
+      expect(answerOf(second)).toContain('简单 / 团队')
+      expect(answerOf(second)).not.toContain('快手档')
+      expect(ctx.engine.startCalls).toHaveLength(0)
+    } finally {
+      if (previous === undefined) delete process.env['GROK_WORKFLOW_KNOWLEDGE_DIRS']
+      else process.env['GROK_WORKFLOW_KNOWLEDGE_DIRS'] = previous
+    }
+  })
+
   it('cuts the resumed request to the objective budget instead of refusing the run (B08)', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
-    apply(ctx as never, { mode: 'triage', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'triage', grokDefault: 'on' })
     const live = session('sess-b08-budget')
     const agent = new FakeAgent(live)
     await ctx.preStep()(payload(agent, [userMessage('改一下那个')]), nextWith([]))
@@ -723,7 +757,7 @@ describe('P0-2: a confirmation answer keeps the original request', () => {
 describe('P0-3: every internal error leaves a user-visible terminal state', () => {
   it('answers a classification failure instead of an empty turn', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'full', grokDefault: 'on' })
     const exploding = {
       id: 'sess-p03-explode',
       header: {},
@@ -745,7 +779,7 @@ describe('P0-3: every internal error leaves a user-visible terminal state', () =
 
   it('answers when answering in-turn throws, and keeps the claimed message', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'full', grokDefault: 'on' })
     const live = session('sess-p03-throw')
     const agent = new FakeAgent(live)
     // A batch classification can read but whose gate entry cannot be built: this is
@@ -770,7 +804,7 @@ describe('P0-3: every internal error leaves a user-visible terminal state', () =
 
   it('states a quick-tier failure and never celebrates it', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'triage', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'triage', grokDefault: 'on' })
     ctx.engine.startError = new Error('provider unreachable')
     const live = session('sess-p03-fast')
     const agent = new FakeAgent(live)
@@ -786,7 +820,7 @@ describe('P0-3: every internal error leaves a user-visible terminal state', () =
 
   it('never prints a secret that the failure carried', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'full', grokDefault: 'on' })
     const live = headed('sess-p03-secret')
     const agent = new FakeAgent(live)
     ctx.engine.startError = new Error('auth failed: api_key=sk-live-9f8e7d6c5b4a3210')
@@ -802,7 +836,7 @@ describe('P0-3: every internal error leaves a user-visible terminal state', () =
 
   it('does not re-enter the gate or start a second workflow to report an error', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'full', grokDefault: 'on' })
     ctx.engine.startError = new Error('engine refused')
     const live = headed('sess-p03-reentry')
     const agent = new FakeAgent(live)
@@ -820,7 +854,7 @@ describe('P0-3: every internal error leaves a user-visible terminal state', () =
 
   it('tells a cancellation apart from a provider failure', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'full', grokDefault: 'on' })
     ctx.engine.hang = true
     const live = headed('sess-p03-abort')
     const agent = new FakeAgent(live)
@@ -1057,7 +1091,7 @@ describe('P0-4: a cancelled turn keeps the message and states the terminal', () 
   it('keeps the typed message once and writes the cancelled terminal when the run is stopped', async () => {
     const ctx = new FakeContext()
     ctx.engine.hang = true
-    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'full', grokDefault: 'on' })
     const live = headed('sess-p04-keep-mid')
     const agent = new FakeAgent(live)
     const claimed = [userMessage('把这个表格整理成周报')]
@@ -1091,7 +1125,7 @@ describe('P0-4: a cancelled turn keeps the message and states the terminal', () 
 
   it('writes verified partial work into the cancelled transcript', async () => {
     const ctx = new FakeContext()
-    const config = { mode: 'full' as const, grokDefault: 'on' as const, maxConcurrency: 2, maxTasks: 2 }
+    const config = { legacyGate: true, mode: 'full' as const, grokDefault: 'on' as const, maxConcurrency: 2, maxTasks: 2 }
     const limitsConfig = resolveConfig(config)
     apply(ctx as never, config)
     const live = headed('sess-p1-cancel-partial-report')
@@ -1182,7 +1216,7 @@ describe('P0-4: a cancelled turn keeps the message and states the terminal', () 
 
   it('keeps the message and states the terminal when the signal was already aborted', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'full', grokDefault: 'on' })
     const live = session('sess-p04-keep-pre')
     const agent = new FakeAgent(live)
     const claimed = [userMessage('把登录接口改成 JWT 校验')]
@@ -1212,7 +1246,7 @@ describe('P1: front-desk calls share the plugin lifecycle', () => {
   it('cancels and disposes a running quick-worker call when the plugin unloads', async () => {
     const ctx = new FakeContext()
     ctx.engine.hang = true
-    apply(ctx as never, { mode: 'triage', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'triage', grokDefault: 'on' })
     const live = session('sess-p1-quick-unload')
     const agent = new FakeAgent(live)
     const claimed = [userMessage('run npm test')]
@@ -1239,7 +1273,7 @@ describe('P1: front-desk calls share the plugin lifecycle', () => {
     const ctx = new FakeContext()
     let release!: () => void
     ctx.engine.startGate = new Promise(resolve => { release = resolve })
-    apply(ctx as never, { mode: 'triage', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'triage', grokDefault: 'on' })
     const live = session('sess-p1-quick-start-unload')
     const agent = new FakeAgent(live)
     const claimed = [userMessage('run npm test')]
@@ -1265,7 +1299,7 @@ describe('B18: the hybrid classifier states its own reason', () => {
   it('states the rules verdict with no model call (hybrid removed, T4)', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
-    apply(ctx as never, { mode: 'triage', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'triage', grokDefault: 'on' })
     const live = session('sess-b18-hybrid')
     const agent = new FakeAgent(live)
     const decision = await ctx.preStep()(payload(agent, [userMessage('改一下那个')]), nextWith([])) as Decision
@@ -1301,7 +1335,7 @@ describe('surface head: the plugin never takes position 0', () => {
   it('leaves the claimed batch to enter.messages on a headless turn-1 session', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
-    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'full', grokDefault: 'on' })
     const live = session('sess-head-turn1')
     const agent = new FakeAgent(live)
     const claimed = [userMessage('首轮消息不应抢占 surface 头')]
@@ -1319,7 +1353,7 @@ describe('surface head: the plugin never takes position 0', () => {
   it('publishes mid-run on an established surface (turn 2)', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoRun = true
-    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'full', grokDefault: 'on' })
     const live = session('sess-head-turn2')
     const agent = new FakeAgent(live)
     const claimed = [userMessage('次轮消息仍可提前可见')]
@@ -1337,7 +1371,7 @@ describe('surface head: the plugin never takes position 0', () => {
 
   it('a rejected turn-1 batch degrades to enter.messages, never to a headless append', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'full', grokDefault: 'on' })
     const live = session('sess-head-turn1-reject')
     const agent = new FakeAgent(live)
     const controller = new AbortController()
