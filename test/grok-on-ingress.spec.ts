@@ -34,9 +34,11 @@ class FakeRun {
   readonly meta: WorkflowStartRequest['meta']
   readonly dispose = vi.fn(async () => {})
   readonly result: Promise<EngineResult>
+  /** True once the run settled; a second settle is a no-op, never a double resolve. */
+  settled = false
   private settle!: (value: EngineResult) => void
   readonly cancel = vi.fn(() => {
-    this.settle({ value: null, stopReason: 'cancelled', agentsStarted: 0 })
+    this.settleRun({ value: null, stopReason: 'cancelled', agentsStarted: 0 })
   })
 
   constructor(request: WorkflowStartRequest) {
@@ -45,7 +47,13 @@ class FakeRun {
   }
 
   complete(value: unknown): void {
-    this.settle({ value, stopReason: 'completed', agentsStarted: 2 })
+    this.settleRun({ value, stopReason: 'completed', agentsStarted: 2 })
+  }
+
+  private settleRun(value: EngineResult): void {
+    if (this.settled) return
+    this.settled = true
+    this.settle(value)
   }
 }
 
@@ -287,7 +295,10 @@ describe('/grok on keeps message ingress open', () => {
     await vi.waitFor(() => {
       if (ctx.engine.teamRuns.length === 0) throw new Error('the team run did not start')
     })
-    expect(ctx.engine.runs.at(-1)!.cancel).toBeDefined()
+    // By identity, not by position: the front-desk call is a run too.
+    const inFlight = ctx.engine.runs.filter(run => run.meta.name !== FRONT_DESK_RUN)
+    expect(inFlight).toHaveLength(1)
+    expect(inFlight[0]!.cancel).toBeDefined()
 
     await send(loop, 'also check the lexer')
     await delay(60)
@@ -321,7 +332,11 @@ describe('/grok on keeps message ingress open', () => {
     expect(String((ctx.engine.teamRuns[0]!.args as { objective?: string }).objective)).toContain('USER APPROVED THIS SPLIT')
     expect(HARD_LIMITS.maxConcurrency).toBe(100)
 
-    ctx.engine.runs.at(-1)!.complete(report())
+    // By identity again: the report belongs to the round, not to whichever run the
+    // engine happened to start last.
+    const round = ctx.engine.runs.filter(run => run.meta.name !== FRONT_DESK_RUN)
+    expect(round).toHaveLength(1)
+    round[0]!.complete(report())
     await vi.waitFor(() => {
       if (agent.followups.length === 0) throw new Error('the report was not delivered')
     })
@@ -372,12 +387,19 @@ describe('/grok on keeps message ingress open', () => {
       if (ctx.engine.teamRuns.length < 2) throw new Error(`only ${ctx.engine.teamRuns.length} runs started`)
     })
 
-    // Settle the blocking run so its step closes and the test leaves nothing pending.
+    // Settle the blocking run so its step closes. Which run the engine started last is
+    // a scheduling fact — the queued rounds and the blocking one are separate enqueues,
+    // so no index names the blocking run — therefore this settles by *state*: every run
+    // still open, in bounded rounds, and settling a queued round lets the queue advance
+    // one slot. The assertion is still "the blocking step closed", and it fails by name.
     const committedBefore = loop.committed.length
-    ctx.engine.runs.at(-1)!.complete(report())
-    await vi.waitFor(() => {
-      if (loop.committed.length <= committedBefore) throw new Error('the blocking step never settled')
-    })
+    let closed = false
+    for (let round = 0; round < FIXED_MAX_QUEUED_MESSAGES + 3 && !closed; round += 1) {
+      for (const run of ctx.engine.runs) if (!run.settled) run.complete(report())
+      await delay(50)
+      closed = loop.committed.length > committedBefore
+    }
+    expect(closed, 'the blocking step never settled').toBe(true)
   })
 
   it('shows the first message of a fresh session before the run finishes (deployment `full`)', async () => {
