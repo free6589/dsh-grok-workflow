@@ -1,3 +1,22 @@
+Last updated: 2026-11-24 22:20 +08:00（**重复调用带序号名 + 终稿标「（定稿）」+ replan 交卷改「调工具 + 同棒补交」** —
+worktree `.agents/worktrees/fix-naming-resubmit`，分支 `fix/naming-resubmit`，基线 `main` 尖端 `1f70103`（`0.13.32`），
+本轮提交见 `HANDOFF.md` 顶部（一条，含 `src/`、`test/`、`lib/`、`CHANGELOG.md`、`docs/`）。三件事都是用户拍的：
+①汇总多稿 `汇总·第1稿/第2稿/第3稿`（同一稿的 resubmit 仍是同一号）②规划腿 `规划（第1次）/（第2次）…`（开场 + 每个波边界）
+③replan 提示词不再写「Answer with the structured result only」，改成明确要调结构化结果工具，并在 `format-error` 时同棒补交一次。
+当天追加的第四条：过门那一稿在进度 Tab 标 `汇总·第N稿（定稿）`，走**新事件** `tool-workflow/summary-final`（载荷 `{runId, draft}`），
+聊天面板不做（引擎对 `agent-start` 只 append 一行、`agent-end` 只按 seq 改状态、从不改 label）——这是拍板前提，不是本轮限制。
+名字仍只有 `src/naming.ts` 一个真源，`namingSource()` 的 guest 副本同步加了 `plannerCallLabel` / `synthesisDraftLabel` /
+`SYNTHESIS_FINAL_MARK`，`test/naming.spec.ts` 的一致性矩阵已覆盖；`parseMemberLabel` 新旧名字都认（含未来 `（定稿）` 后缀）；
+`roleOfChildTitle` 改成先试整行再试 `·` 头。两份角色表（`src/progress-tab.ts` / `src/client/index.js`）各补 `规划` / `汇总`。
+新真机用例 `test/naming-sequence.spec.ts`（6 条，`createEngineHarness` + `teamWorkflowEngine` + `settledWithin`）；
+先红后绿：首轮 **11 failed / 187 passed（198）** 覆盖 4 个文件，实现后全绿。包工头复核三条已落地：①replan 同棒补交
+**进** `maxTotalAgentsFor()`（边界项 = `maxBoundaries × 2 × planner × waitFactor`，钉子见 planner-resubmit 的 cap 用例）
+②「同一稿两行」只标 `order` 最大的那一行（两份折叠各一条用例）③文档里「补交吃 +2 余量、未进算式」的说法已作废。
+门禁（本轮实测；提交与 sha 见 `HANDOFF.md` 顶部，回填 sha 前后只动过记忆文件）`npm run ci` **exit 0**：typecheck 干净、oxlint **36 warnings / 0 errors**、
+`verify:lib` **245 files byte-identical**、vitest **102 files / 1929 tests PASS**。
+`DECISIONS.md` 记 **D-131**（含被否决的「一稿/定稿二名制」「拆活/问改两名」「只改提示词不加兜底」「硬解析纯文本 JSON」与原因）；
+`VALIDATION.md`、`HANDOFF.md` 同日各一条。没合流、没发版、没碰 `~/.dsh`；主检出一行未动。）
+
 Last updated: 2026-11-24 19:45 +08:00（**两条无计时器探针改由探针持钟：远端 Node 24 那次红转绿；同包清掉 `team-dispatch-v1` 分支与 worktree；`feat/audit-layer` 记为 D-130 取半记录；三条 `backup/wip` 写死 2026-11-27 删除日** —
 worktree `.agents/worktrees/fix-timeout-probe-settle`，分支 `fix/timeout-probe-settle`，基线 `main` 尖端 `ca65df8`（`0.13.32`），代码提交 **`141dccd`**
 只含 `test/timeout.spec.ts`（+19 / −8）。病是 `c1ebdf3` 记过的同一条：两条用例等的是无计时器 realm 的结算，钟却是 runner 的——

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { resolveConfig } from '../src/config.js'
+import { REPLAN_LIMITS } from '../src/replan.js'
 import { parseMemberLabel } from '../src/naming.js'
 import { assertWorkflowReport } from '../src/report.js'
 import { PLANNER_LEG_CALLS, buildWorkflowRequest, maxTotalAgentsFor, routeBudgetFor } from '../src/script.js'
@@ -253,6 +254,17 @@ describe('planner rescue: the child cap pays for the rescue', () => {
     const block = 2 * budget.worker + 3 * (budget.verifier + budget.supervisor)
     expect(maxTotalAgentsFor(tasks, retries, budget))
       .toBe(PLANNER_LEG_CALLS * budget.planner + tasks * (retries + 1) * block + 2)
+  })
+
+  it('pays two boundary calls for every replan, because a boundary can ask twice', () => {
+    const budget = routeBudgetFor(resolveConfig({ roles: { planner: [{ model: 'p1' }] } }))
+    const replans = REPLAN_LIMITS.maxBoundaries
+    const without = maxTotalAgentsFor(2, 0, budget)
+    const withReplans = maxTotalAgentsFor(2, 0, budget, replans)
+    // The boundary term is two walks per boundary: the first ask plus the
+    // same-boundary resubmit a form gap costs. Both are real children, so a cap that
+    // paid one walk would kill the run with AGENT_CAP exactly when it recovered.
+    expect(withReplans - without).toBe(replans * 2 * budget.planner)
   })
 
   it('keeps a recovered leg inside the walks the cap pays for', async () => {

@@ -3273,3 +3273,55 @@ spine 为空，pre-fix 形状会进脊柱。
   与 D-126 的语义谁取代谁，本轮没有立场；③ **没 rebase**（`behind=500`，rebase 后冲突面可能变，6 个路径只是当前 `main` 上的读数）。
 - **Consequences:** 这条记录的用处是「别再重新盘一遍库存」——ahead/behind、diffstat、冲突路径已经量过；它也明确挡掉「顺手合了它」这种动作。
   下一轮做它时，起点是 rebase 到当时尖端 + 跑它的 417 行用例 + 对 D-126 做取舍，而不是从「这分支是干什么的」重新开始。
+
+## D-131 · 用户可见名字：重复的调用带序号、终稿单独标「（定稿）」、replan 交卷改「调工具」+ 同棒补交（2026-11-24）
+
+- **Status:** 已落地（`CONFIRMED`：`npm run ci` 在 `fix/naming-resubmit` 上 exit 0，见 `VALIDATION.md` 同日条目）。
+- **Date:** 2026-11-24
+- **背景（实测）:** 同一次 run 里两处「同名不同次」的调用在进度板上分不清：
+  1. 汇总门最多写 `SUMMARY_MAX_ATTEMPTS = 3` 稿（首稿 + 两次重写），每稿还各有一次同稿 `summaryResubmitPrompt` 补交，
+     但所有汇总调用的 `agent()` label 与提示词首行都是 `汇总助手`；
+  2. 规划腿开场拆活一次、每个波边界 replan 一次，两次的 label 都是 `规划助手`，而 replan 提示词首行是 `REPLAN: …`
+     （所以真机上行名连角色都认不出来）。`src/team-engine.ts` 的 `rewriteActivationLabel` 只从提示词首行生成行名，
+     `agent()` 的 `label` 选项被 guest 丢掉——**行名与提示词首行必须同源同串**，这是这条决策的硬约束。
+  3. replan 提示词末行是 `Answer with the structured result only: {...}`，而本运行时只在子代理**调用结构化结果工具**时
+     才拿得到值。按字面理解的子代理纯文本交卷 → 引擎给 null → `format-error` → 边界被记为拒绝、刚并进计划的新需求白丢，
+     而整棒 replan 的开销已经花了。
+- **Decision（三条）:**
+  1. **汇总多稿用序号名**：`汇总·第1稿`…`汇总·第N稿`（en `Summarize · draft N`）；同一稿的补交仍是同一号。
+     真机只在 `review.ok` 那一刻知道「哪一稿是交卷的那一稿」，所以**另发一条可选事件** `tool-workflow/summary-final`
+     （载荷 `{runId, draft}`），由 `src/progress-tab.ts` 的折叠与 `src/client/index.js` 的手写折叠各自认它，把该行改写成
+     `汇总·第N稿（定稿）`。旧流（没有这条事件）渲染结果一字不变；重复/乱序/指向不存在的稿号都幂等。
+  2. **规划两棒统一叫「第N次」**：开场 `规划（第1次）`，波边界 `规划（第2次）`、`规划（第3次）`…（en `Plan (call N)`）。
+     新增独立的 `plannerCallLabel()` / `synthesisDraftLabel()`，**不改** `memberLabel()`——它仍是提示词正文与散文里的
+     角色名（`规划助手` / `汇总助手`），序号只属于「行」。
+  3. **replan 交卷**：提示词改成明确「调用结构化结果工具交卷、只调一次、纯文本等于没交」并给出
+     `{"action":"none"|"apply",…}` 形状；兜底是 `requestReplan` 收到 `format-error`（且非 setup）时在**同一棒**用
+     「补交提示词」重问一次（与 worker / 汇总稿的 resubmit 同形：不重做分析、不花 retry 预算、`log()` 记账），
+     补交也失败则照原逻辑拒绝、计划字节不变。**不伪造纯文本 JSON 解析**：`callRole(..., {schema})` 的纯文本答案拿不到结构化值。
+- **被否决的替代方案:**
+  1. **「一稿 / 定稿」二名制**（首稿叫 `汇总`、交卷那稿叫 `定稿`）：名字里不携带稿号，重写一次就分不清是第几稿；
+     而且「交卷」只有过门那一刻才知道，事后改行在聊天面板做不到（面板对 `agent-start` append 一行、`agent-end` 只按
+     `seq` 改状态、从不改 label），硬要改就得改引擎事件形状。用了「序号 + 可选事件 + 折叠时标注」，聊天面板不动。
+  2. **「拆活 / 问改」两名制**（开场规划与边界 replan 用两个不同名字）：同一棒内会连着出现「拆活、拆活（补交）、
+     问改、问改（补交）」，读者仍不知道是第几个边界；而且 replan 的补交与首问是同一棒，换名字会让同一次调用看起来像两次。
+     统一成「第N次」后，序号与波边界一一对应：`规划（第1次）→ 波1 → 规划（第2次）→ 波2 → 规划（第3次）`。
+  3. **只改提示词、不加兜底**：实测口径下「子代理照样可能纯文本」不是假设——planning 腿早有同棒 resubmit（A 走廊），
+     worker/verifier/supervisor 也各有；replan 唯独没有，等于把一次措辞误解变成一次边界白费。所以两者都做。
+  4. **把纯文本答案硬解析成 JSON 当结构化结果**：`callRole` 的 `schema` 通道拿不到纯文本，伪造解析等于绕过引擎契约、
+     也让 `format-error` 这条诊断失效。改成「同棒补交」既不伪造，也不花 retry。
+- **附带（同轮、有据可查的两处小改）:**
+  - `model` 策略分支以前不写 `report.synthesis.review`，只有 layered 写。宿主标注只认 `check=pass verify=pass`，
+    所以 model 跑会永远标不出终稿。已在 model 的 `review.ok` 分支写同形机器串（`check=pass verify=pass drafts=N`），
+    并把 `test/routing.spec.ts` 里那条 `toEqual({mode, summary})` 的旧断言改成带 `review` 的新形状。机器串格式与
+    `synthesis.review` 的 schema 都没变（它是可选字段），只是 model 跑现在也会带上它。
+  - 报告侧只有**一份英文 ledger**（`renderReport` 没有 lang 参数，`Summary review:` 两语共用这一行），所以
+    「中英各一版」在真机上没有第二个入口可加：只在那一行后补 ` · final: draft N`，未新开中文渲染入口。
+- **Consequences:** 名字的单一真源仍是 `src/naming.ts`；`namingSource()` 生成的 guest 副本同步加了
+  `plannerCallLabel` / `synthesisDraftLabel` / `SYNTHESIS_FINAL_MARK`，`test/naming.spec.ts` 的 host↔guest 一致性矩阵覆盖它们。
+  `parseMemberLabel` 既认新名字（含未来 `（定稿）` 后缀）也照旧认 `规划助手` / `汇总助手`；`roleOfChildTitle` 先试整行再试
+  `·` 之前的头，否则 `汇总·第1稿` 会被拆成认不出的 `汇总`。`src/progress-tab.ts` 与 `src/client/index.js` 两份角色表都补了
+  `规划` / `汇总` 两个词。边界的补交是**真子代理**，**已经进算式**：`maxTotalAgentsFor()` 的边界项按「每个边界 2 次
+  调用（首问 + 同棒补交）× 规划链路 × guardian 因子」计，`test/planner-resubmit.spec.ts` 有一条只钉这两项之差的用例
+  （带 replan 的 cap 减不带 replan 的 cap = `maxBoundaries × 2 × planner`）。理由与 `PLANNER_LEG_CALLS` 同一条：
+  引擎的 AGENT_CAP 是 fatal，少算一次真调用就会在刚好救回来的那一刻杀掉整次 run。

@@ -738,6 +738,119 @@ describe('progress tab: honest numbers', () => {
   })
 })
 
+describe('progress tab: the numbered names a run repeats', () => {
+  it('binds 规划（第N次） to the plan stage, one row per call', () => {
+    const track = trackOf([
+      member(1, '规划', 'completed', { label: '规划（第1次）' }),
+      member(2, '规划 · 波 1 边界', 'completed', { label: '规划（第2次）' }),
+      member(3, '规划 · 波 2 边界', 'completed', { label: '规划（第3次）' }),
+    ], 'completed')
+    const plan = stageNode(track, 'plan')
+    expect(plan.members.map((row) => row.label)).toEqual(['规划（第1次）', '规划（第2次）', '规划（第3次）'])
+    expect(plan.state).toBe('done')
+  })
+
+  it('binds 汇总·第N稿 to the synthesize stage as two rows in two units', () => {
+    // Two drafts share the phase (`汇总`) and differ only by their name, so the
+    // name is the whole of what keeps them apart. Draft 1 failing and draft 2
+    // completing must not read as "the same call recovered".
+    const track = trackOf([
+      member(1, '汇总', 'failed', { label: '汇总·第1稿' }),
+      member(2, '汇总', 'completed', { label: '汇总·第2稿' }),
+    ], 'completed')
+    const synthesize = stageNode(track, 'synthesize')
+    expect(synthesize.members.map((row) => row.label)).toEqual(['汇总·第1稿', '汇总·第2稿'])
+    expect(recoveredFailureSeqs(synthesize.members).size).toBe(0)
+    expect(currentFailureCount(synthesize.members)).toBe(1)
+
+    // The bare name still folds as one unit, exactly as before: two `汇总助手` rows
+    // are one call's two attempts, so the later completion does clear the earlier
+    // failure. The numbered names are what changed, not the unit rule.
+    const legacy = trackOf([
+      member(1, '汇总', 'failed', { label: '汇总助手' }),
+      member(2, '汇总', 'completed', { label: '汇总助手' }),
+    ], 'completed')
+    const legacySynthesize = stageNode(legacy, 'synthesize')
+    expect(recoveredFailureSeqs(legacySynthesize.members).size).toBe(1)
+    expect(currentFailureCount(legacySynthesize.members)).toBe(0)
+  })
+
+  it('marks the summary draft the gate shipped, and only that draft', () => {
+    const [run] = foldProgressRuns([
+      rec('tool-workflow/run-start', { runId: 'r', name: '任务团队' }, 1),
+      rec('tool-workflow/agent-start', { runId: 'r', seq: 1, label: '汇总·第1稿', phase: '汇总', childId: 'c1' }, 2),
+      rec('tool-workflow/agent-end', { runId: 'r', seq: 1, outcome: 'completed' }, 3),
+      rec('tool-workflow/agent-start', { runId: 'r', seq: 2, label: '汇总·第2稿', phase: '汇总', childId: 'c2' }, 4),
+      rec('tool-workflow/summary-final', { runId: 'r', draft: 2 }, 5),
+      rec('tool-workflow/agent-end', { runId: 'r', seq: 2, outcome: 'completed' }, 6),
+      rec('tool-workflow/run-end', { runId: 'r', stopReason: 'completed' }, 7),
+    ])
+    expect(run!.members.map((row) => row.label)).toEqual(['汇总·第1稿', '汇总·第2稿（定稿）'])
+    expect(run!.summaryFinalDraft).toBe(2)
+    // Both drafts stay on the synthesize stage, as two rows.
+    expect(stageNode(deriveTrack(run!, { labelFor }), 'synthesize').members.map((row) => row.label))
+      .toEqual(['汇总·第1稿', '汇总·第2稿（定稿）'])
+  })
+
+  it('marks only the row that landed when one draft was asked twice', () => {
+    // A draft that prose-answered first and was asked once more in the same draft
+    // carries two rows with the same name; the earlier one recorded nothing, so only
+    // the later one is 「定稿」 and a reader never sees two final rows.
+    const [run] = foldProgressRuns([
+      rec('tool-workflow/run-start', { runId: 'r', name: '任务团队' }, 1),
+      rec('tool-workflow/agent-start', { runId: 'r', seq: 1, label: '汇总·第1稿', phase: '汇总', childId: 'c1' }, 2),
+      rec('tool-workflow/agent-end', { runId: 'r', seq: 1, outcome: 'completed' }, 3),
+      rec('tool-workflow/agent-start', { runId: 'r', seq: 2, label: '汇总·第1稿', phase: '汇总', childId: 'c2' }, 4),
+      rec('tool-workflow/agent-end', { runId: 'r', seq: 2, outcome: 'completed' }, 5),
+      rec('tool-workflow/summary-final', { runId: 'r', draft: 1 }, 6),
+      rec('tool-workflow/run-end', { runId: 'r', stopReason: 'completed' }, 7),
+    ])
+    expect(run!.members.map((row) => row.label)).toEqual(['汇总·第1稿', '汇总·第1稿（定稿）'])
+    expect(run!.members.filter((row) => row.label.includes('定稿'))).toHaveLength(1)
+  })
+
+  it('stays idempotent and order-insensitive, and never invents a mark', () => {
+    const events = (extra: ProgressEventRecord[]): ProgressEventRecord[] => [
+      rec('tool-workflow/run-start', { runId: 'r', name: '任务团队' }, 1),
+      ...extra,
+      rec('tool-workflow/agent-start', { runId: 'r', seq: 1, label: '汇总·第1稿', phase: '汇总', childId: 'c1' }, 4),
+      rec('tool-workflow/agent-start', { runId: 'r', seq: 2, label: '汇总·第2稿', phase: '汇总', childId: 'c2' }, 5),
+      rec('tool-workflow/run-end', { runId: 'r', stopReason: 'completed' }, 6),
+    ]
+    // Arriving before the rows it names, twice, and once for a draft that never ran:
+    // the mark lands once, on draft 2, and nothing else moves.
+    const [before] = foldProgressRuns(events([
+      rec('tool-workflow/summary-final', { runId: 'r', draft: 2 }, 2),
+      rec('tool-workflow/summary-final', { runId: 'r', draft: 2 }, 3),
+      rec('tool-workflow/summary-final', { runId: 'r', draft: 9 }, 3),
+    ]))
+    expect(before!.members.map((row) => row.label)).toEqual(['汇总·第1稿', '汇总·第2稿（定稿）'])
+    expect(before!.summaryFinalDraft).toBe(2)
+    // A stream with no such event renders exactly what it always did.
+    const [none] = foldProgressRuns(events([]))
+    expect(none!.members.map((row) => row.label)).toEqual(['汇总·第1稿', '汇总·第2稿'])
+    expect(none!.summaryFinalDraft).toBeUndefined()
+    // A payload that names no draft is not a fact.
+    const [junk] = foldProgressRuns(events([
+      rec('tool-workflow/summary-final', { runId: 'r', draft: 'two' }, 2),
+      rec('tool-workflow/summary-final', { runId: 'r', draft: 0 }, 3),
+    ]))
+    expect(junk!.summaryFinalDraft).toBeUndefined()
+    expect(junk!.members.map((row) => row.label)).toEqual(['汇总·第1稿', '汇总·第2稿'])
+  })
+
+  it('names the right stage from a numbered label when the phase is a task group', () => {
+    // The role table is only consulted for rows whose phase names a plan task, so
+    // this is the case that proves the new words reached it.
+    const track = trackOf([
+      member(1, '任务 1 · Task a', 'completed', { label: '规划（第1次）' }),
+      member(2, '任务 1 · Task a', 'completed', { label: '汇总·第2稿' }),
+    ], 'completed')
+    expect(stageNode(track, 'plan').evidence.map((row) => row.label)).toEqual(['规划（第1次）'])
+    expect(stageNode(track, 'synthesize').evidence.map((row) => row.label)).toEqual(['汇总·第2稿'])
+  })
+})
+
 /**
  * The design document's "released spine" claim, pinned to the code.
  *

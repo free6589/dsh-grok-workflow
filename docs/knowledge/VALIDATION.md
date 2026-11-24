@@ -1,3 +1,63 @@
+## 重复调用带序号名、终稿「（定稿）」标记、replan 交卷改「调工具 + 同棒补交」— 2026-11-24
+
+分支 `fix/naming-resubmit`（worktree `.agents/worktrees/fix-naming-resubmit`），基线 `main` 尖端 `1f70103`（`0.13.32`）。
+每行都是本轮真跑的命令与真读到的结果；没跑的一律写 `NOT_RUN`。
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 先红（用例先写、实现未动） | `npx vitest run test/naming-sequence.spec.ts test/naming.spec.ts test/progress-tab.spec.ts test/client.spec.ts`（Node 26.8.1，worktree） | **红**：`Test Files 4 failed (4)`、`Tests 11 failed \| 187 passed (198)`。逐条失败原因是本轮要的行为：`plannerCallLabel is not defined`（guest 副本还没有它们）、`parseMemberLabel('规划（第1次）')` → `undefined`、`汇总·第2稿` 认不出角色、`规划（第1次）` 没落进 `规划` 阶段、`summary-final` 折叠还没实现 |
+| 后绿（实现完） | 同上命令 | **绿**：`4 files / 198 tests PASS` |
+| 真机形状新用例 | `npx vitest run test/naming-sequence.spec.ts` | **绿 6/6**：两稿汇总行名 `汇总·第1稿 / 汇总·第1稿 / 汇总·第2稿`（第二个是同一稿的 resubmit）+ `parseMemberLabel` 反解；进阶规划 `规划（第1次）/（第2次）/（第3次）` 且行名=提示词首行；replan 提示词不含 `structured result only` 且明确要调工具；边界纯文本 → 同棒补交 → `plan.version` 2、`addedTaskIds ['d']`；两次都不交 → `decision rejected`、`waves [['a'],['b']]` 原样 |
+| 全量（未提交，HEAD 仍是 `1f70103`） | `npm run ci`（`TMPDIR=$PWD/.tmp`，Node 26.8.1） | **exit 0**：typecheck 干净；`oxlint src test` → `Found 36 warnings and 0 errors`；`verify:lib` → `lib/ at 1f70103 is the build of src/ at 1f70103 (245 files, byte-identical)`（**注意：这一步校验的是 HEAD，本轮的 lib/ 还在工作树里，所以它在提交前只能证明基线自洽**）；vitest **102 files / 1927 tests PASS**（125.35 s；提交前树，缺包工头复核新增的两条用例） |
+| 提交后门禁 | `npm run ci`（提交后跑过多次；几次之间只改了本文件的措辞与 sha，`src/`、`test/`、`lib/` 一再未动） | **每次都 exit 0**：typecheck 干净；`oxlint` **36 warnings / 0 errors**；`verify:lib` → `lib/ at <当次 HEAD> is the build of src/ at <当次 HEAD> (245 files, byte-identical)`；vitest **102 files / 1929 tests PASS**（125.53 s / 125.90 s / 123.5 s 三次同数） |
+| 单独 `verify:lib`（提交后） | `npm run verify:lib` | **exit 0**，`lib/ at <当次 HEAD> is the build of src/ at <当次 HEAD> (245 files, byte-identical)`（打印过 `2dcb236`） |
+| lint | `npm run lint`（ci 内） | `Found 36 warnings and 0 errors`（171 文件，全是既有告警，与本轮基线一致） |
+| 工作树清洁 | `git status --short` | 只有本轮改动的 `src/`、`test/`、`lib/`、`CHANGELOG.md`、`docs/`；`.tmp/` 里的门禁日志与临时目录在收尾时删除 |
+
+**新增/改动的用例（名字照原文）：**
+`test/naming-sequence.spec.ts`（新文件，6 条真机形状）：`labels the drafts 汇总·第1稿 and 汇总·第2稿, and keeps the resubmit on its own draft`、
+`says nothing about a final draft when the gate never passed one`、`numbers the opening plan 1 and each wave boundary after it`、
+`asks for the tool call, not for "the structured result only"`、`resubmits the same boundary once when the child prose-answered, and the merge lands`、
+`refuses the merge and leaves the plan untouched when neither answer submits`；
+`test/naming.spec.ts`：`numbers the planning leg and the summary drafts, in both languages`、`reads the numbered names back, and keeps reading the old ones`；
+`test/progress-tab.spec.ts`：`binds 规划（第N次） to the plan stage, one row per call`、`binds 汇总·第N稿 to the synthesize stage as two rows in two units`、
+`marks the summary draft the gate shipped, and only that draft`、`marks only the row that landed when one draft was asked twice`、
+`stays idempotent and order-insensitive, and never invents a mark`、`names the right stage from a numbered label when the phase is a task group`；
+`test/client.spec.ts`：`keeps a numbered planning leg and two numbered drafts on their own stages`、`marks the summary draft the gate shipped, and only that draft`；
+`test/progress.spec.ts`：`writes the shipped summary draft as its own event, and only for an announced run`、
+`records which summary draft the run shipped, and nothing when no draft passed`；
+`test/planner-resubmit.spec.ts`：`pays two boundary calls for every replan, because a boundary can ask twice`；
+`test/report.spec.ts`：扩充 `carries the summary gate's verdict into the report (Sec.3-3)`（`· final: draft N` 与 `shippedSummaryDraft` 的四条边界）。
+
+**Changed（用户可见效果）：**
+1. 汇总多稿带号：`汇总·第1稿` / `第2稿` / `第3稿`（en `Summarize · draft N`），同一稿的补交仍是同一号 → 进度板上第一次能分清第几稿。
+2. 规划腿带号：开场 `规划（第1次）`、波边界 `规划（第2次）`、`（第3次）`（en `Plan (call N)`）→ 板上第一次能分清开场与第几个边界。
+3. 过门那一稿标 `汇总·第N稿（定稿）`（en `(final)`），只写在**通过检查 + 独立复核**的那一稿上；没过门、走确定性回退都不标。
+4. replan 交卷不再被措辞坑掉：提示词明确要调结构化结果工具，纯文本时同棒补交一次；补交也失败则照旧拒绝、计划不动。
+5. 报告 ledger 的 `Summary review:` 行尾补 ` · final: draft N`（机器串未动）。
+
+**Honest boundary：**
+1. `model` 策略分支以前不写 `synthesis.review`，本轮补写同形机器串（否则 model 跑永远标不出终稿）；这不是 schema 变更（可选字段），
+   但确实改了 model 跑的报告内容，`test/routing.spec.ts` 的旧断言随之更新。
+2. 报告侧只有英文 ledger（`renderReport()` 无 lang 参数），「中英各一版」没有第二个入口：只补了英文那一行，**未新开中文渲染入口**。
+3. 聊天面板**不做**「（定稿）」：引擎对 `agent-start` 只 append 一行、`agent-end` 只按 `seq` 改状态、从不改 label，事后改行做不到；
+   标记只在插件自己的进度 Tab 与报告文本里。这是拍板时已知前提。
+4. 边界补交是**真子代理**，已按「每边界两问」计入 `maxTotalAgentsFor()`（边界项 = `maxBoundaries × 2 × planner × guardian 因子`），
+   钉子 `test/planner-resubmit.spec.ts > pays two boundary calls for every replan`（带 replan 的 cap 减不带 replan 的 cap
+   = `maxBoundaries × 2 × planner`）。
+5. `test/gate.spec.ts > never retries a refused batch on its own` 在本轮**第一次**全量跑里红过一次（`vi.waitFor` 时序抖动），
+   单跑该文件 54/54 绿、随后两次全量各 1927/1927 与 1929/1929 绿；**未改该文件**，按抖动记，不主张已修。
+6. worktree 里 `scripts/verify-lib.mjs` 需要完整 `node_modules`：本轮把 worktree 的 `node_modules` 换成指向主检出的符号链接
+   （该目录本就在 `.gitignore` 里，没有进提交），否则 scratch 构建拿不到 `typescript` / `@types/node` / `@deepseek-ai/*`。
+
+**复核意见落地（同一提交内，包工头 2026-11-24 三条）：**
+1. **replan 同棒补交进预算算式**：`maxTotalAgentsFor()` 的边界项改成 `maxBoundaries × 2 × planner × waitFactor`（每边界两问：
+   首问 + 同棒补交），钉子 `test/planner-resubmit.spec.ts > pays two boundary calls for every replan, because a boundary can ask twice`
+   （带 replan 的 cap 减不带 replan 的 cap = `REPLAN_LIMITS.maxBoundaries × 2 × planner`）。原先「吃 `+2` 余量、未进算式」的说法已作废。
+2. **一稿两行只标落地那行**：`markFinalDraft` / `progressMarkFinalDraft` 从「按 label 全等逐个标」改成「按稿号取下 `order` 最大的那一行」，
+   两份折叠各一条用例：`test/progress-tab.spec.ts > marks only the row that landed when one draft was asked twice`、
+   `test/client.spec.ts > marks the summary draft the gate shipped, and only that draft`（同一稿「首问 + 补交」两行只出一个「（定稿）」，且是后一行）。
+
 ## 两条无计时器探针改由探针持钟：远端 Node 24 的红转绿（本地红 `NOT_RUN`）— 2026-11-24（提交 `141dccd`；门禁与远端数字由包工头实测，本地红/绿数字由本轮执行手实测）
 
 这一条只改 `test/timeout.spec.ts` 两条用例的等待形状：`races on Atomics.waitAsync where no setTimeout exists` 与

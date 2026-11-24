@@ -1144,6 +1144,24 @@ export interface RenderReportOptions {
  * is true (default false). Final answer / Confirmed evidence / task rows /
  * Incomplete always render.
  */
+/**
+ * The draft number a *passing* summary review names, read off the script's own string.
+ *
+ * One reader for both the ledger line and the host (`src/run.ts` marks that draft's
+ * progress row), so the two cannot disagree about which draft was shipped. Only
+ * `check=pass verify=pass` counts: a rejected draft, and the deterministic fallback
+ * (which records no verdict at all), are not shipped drafts.
+ * @param review - `report.synthesis.review`, or anything.
+ * @returns the 1-based draft number, or undefined when nothing passed.
+ */
+export function shippedSummaryDraft(review: unknown): number | undefined {
+  if (typeof review !== 'string') return undefined
+  const match = /(?:^|\s)check=pass\s+verify=pass\s+drafts=(\d+)/.exec(review)
+  if (match === null) return undefined
+  const draft = Number(match[1])
+  return Number.isInteger(draft) && draft >= 1 ? draft : undefined
+}
+
 export function renderReport(report: WorkflowReport, opts?: RenderReportOptions): string {
   const verified = report.tasks.filter(task => task.status === 'verified').length
   const lines: string[] = [
@@ -1211,8 +1229,11 @@ export function renderReport(report: WorkflowReport, opts?: RenderReportOptions)
   }
   if (report.synthesis.review !== undefined) {
     // Sec.3-3: the gate's verdict, so "checked + reviewed" is readable rather
-    // than assumed from the absence of a rejection.
-    lines.push(`Summary review: ${oneLine(report.synthesis.review, 240)}`)
+    // than assumed from the absence of a rejection. The shipped-draft number rides
+    // on the same line: the machine string stays exactly as the script wrote it, and
+    // the reader learns which draft the answer came from in the same breath.
+    const shipped = shippedSummaryDraft(report.synthesis.review)
+    lines.push(`Summary review: ${oneLine(report.synthesis.review, 240)}${shipped === undefined ? '' : ` · final: draft ${shipped}`}`)
   }
   if (report.synthesis.error !== undefined) {
     lines.push(`Synthesis: model narrative unavailable (${oneLine(report.synthesis.error, 300)}); the report above is complete`)

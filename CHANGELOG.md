@@ -5,6 +5,44 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Changed / 变更
+
+- **A repeated call now says which one it is: `规划（第1次）`, `汇总·第2稿`, and `（定稿）` on the draft that shipped /
+  重复的调用现在会说明是第几次：`规划（第1次）`、`汇总·第2稿`，以及真正交卷那一稿的「（定稿）」** —
+  The progress board used to give every planning call and every summary draft the same name, so a run that
+  planned once at the start and again at a wave boundary showed two identical "规划助手" rows, and a summary
+  the reviewer sent back for a rewrite showed two identical "汇总助手" rows. Each call now carries its own
+  number — the opening plan is `规划（第1次）` and a boundary replan continues `规划（第2次）`, `规划（第3次）` —
+  and each draft is `汇总·第1稿`, `汇总·第2稿`; a resubmit of the same call keeps the same number, because it is
+  the same call. Once the summary check and the independent review have accepted a draft, that one row is
+  marked `（定稿）` so a reader can tell the draft the answer came from from the drafts that were rejected; a
+  run that never passed a draft, and a run that fell back to the plain built-in narrative, carry no mark at
+  all. The report's summary line names the same draft (`final: draft 2`) without changing the machine string
+  the plugin reads, and the names are still written in both languages from the one table.
+  / 进度板以前给每一次规划、每一稿汇总同一个名字：开场规划一次、波边界再规划一次，板上就是两条一模一样的
+  「规划助手」；汇总被审查打回重写，也是两条一模一样的「汇总助手」。现在每次调用带自己的编号——开场是
+  `规划（第1次）`，边界再规划接着 `规划（第2次）`、`规划（第3次）`；每一稿是 `汇总·第1稿`、`汇总·第2稿`。同一次
+  调用的补交仍用同一个号，因为它就是同一次。某一稿真的通过了汇总检查与独立复核，那一行才标「（定稿）」，读者
+  因此能分清「交卷的那一稿」和被退回的稿子；一稿都没通过、或退回内置确定性结语的运行，一律不标。报告的摘要行
+  会写同一个稿号（`final: draft 2`），插件读的机器串一个字没改，两种语言仍出自同一张表。
+
+### Fixed / 修复
+
+- **A mid-run replan can no longer be lost to a wording trap / 中途改计划不会再因为一句话白费** —
+  The boundary replan prompt used to end with "Answer with the structured result only", while this runtime
+  records a structured result only when the child calls the result tool. A child that read the sentence
+  literally answered in prose, nothing was recorded, the boundary was counted as refused, and the new demand
+  it had just folded in was thrown away with the plan left untouched. The prompt now says outright that the
+  tool call is what counts and gives the shape to submit; and if a boundary call still comes back without a
+  structured result, the same boundary asks once more for the decision it already made — the same rescue the
+  worker and the summary draft already had — without spending a retry or opening a new boundary. If that
+  second ask comes back empty too, the merge is refused exactly as before and the plan is untouched.
+  / 边界再规划的提示词以前最后一句是「只回答结构化结果」，而这套运行时只有在子代理真的调用结果工具时才记录
+  结构化结果。照着这句话理解的子代理就只用正文回答，什么也没被记录，这个边界被算成「拒绝」，它刚刚并进计划的
+  新需求随计划一起被丢掉，计划原样不动。现在提示词直说「要调用工具提交」并给出提交的形状；万一某个边界调用还是
+  只回了正文，同一个边界会再问一次、要它把已经做出的决定交上来——执行代理和汇总稿早就有这条补交通道——既不花
+  重试额度，也不开新边界。补交也交不上，就照旧拒绝，计划一行不动。
+
 ## [0.13.32] - 2026-11-24
 
 ### Added / 新增

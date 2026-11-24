@@ -8,8 +8,10 @@ import {
   namingSource,
   parseMemberLabel,
   phaseLabel,
+  plannerCallLabel,
   resolveNamingLanguage,
   runTitle,
+  synthesisDraftLabel,
   taskGroupTitle,
   taskVerdictText,
   truncateTaskTitle,
@@ -34,8 +36,13 @@ function guestFormatters(language: 'zh' | 'en'): {
   taskGroupTitle: (index: number, title: unknown) => string
   memberLabel: (role: string, attempt: number) => string
   phaseLabel: (kind: string) => string
+  plannerCallLabel: (call: number) => string
+  synthesisDraftLabel: (draft: number, final?: boolean) => string
 } {
-  const factory = new Function('args', `${namingSource()}\nreturn { taskGroupTitle, memberLabel, phaseLabel }`)
+  const factory = new Function(
+    'args',
+    `${namingSource()}\nreturn { taskGroupTitle, memberLabel, phaseLabel, plannerCallLabel, synthesisDraftLabel }`,
+  )
   return factory({ naming: { language } }) as never
 }
 
@@ -137,7 +144,7 @@ describe('P1-1 / P1-3: what a member row says', () => {
       expect(call.label).not.toContain('-a')
       expect(call.label).not.toContain('grok-')
     }
-    expect(run.calls.map(call => call.label)).toContain('规划助手')
+    expect(run.calls.map(call => call.label)).toContain(plannerCallLabel(1))
   })
 
   it('keeps the internal identifiers in the data layer', async () => {
@@ -158,6 +165,47 @@ describe('P1-1 / P1-3: what a member row says', () => {
     expect(run.report.tasks[0]!.id).toBe('a')
     expect(run.report.tasks[0]!.attempts[0]!.attempt).toBe(1)
     expect(run.report.routes.map(entry => entry.role)).toEqual(['worker', 'verifier'])
+    expect(parseMemberLabel('执行（尝试 2）')).toEqual({ role: 'worker', attempt: 2 })
+  })
+})
+
+describe('names a run repeats carry their number', () => {
+  it('numbers the planning leg and the summary drafts, in both languages', () => {
+    expect(plannerCallLabel(1)).toBe('规划（第1次）')
+    expect(plannerCallLabel(2)).toBe('规划（第2次）')
+    expect(plannerCallLabel(1, 'en')).toBe('Plan (call 1)')
+    expect(synthesisDraftLabel(1)).toBe('汇总·第1稿')
+    expect(synthesisDraftLabel(3)).toBe('汇总·第3稿')
+    expect(synthesisDraftLabel(2, 'en')).toBe('Summarize · draft 2')
+    // A missing or nonsense number reads as the first call, never as `NaN`.
+    expect(plannerCallLabel(0)).toBe('规划（第1次）')
+    expect(synthesisDraftLabel(Number.NaN)).toBe('汇总·第1稿')
+    // `memberLabel` stays the bare role name: it is what the prompts and the copy
+    // call a role, and the number belongs to the row, not to the role.
+    expect(memberLabel('planner', 1)).toBe('规划助手')
+    expect(memberLabel('synthesizer', 1)).toBe('汇总助手')
+    // The shipped draft is marked only when the caller says so, and the mark is the
+    // table's, so the panel and the parser read the same string.
+    expect(synthesisDraftLabel(2, 'zh', true)).toBe('汇总·第2稿（定稿）')
+    expect(synthesisDraftLabel(2, 'en', true)).toBe('Summarize · draft 2 (final)')
+    expect(parseMemberLabel(synthesisDraftLabel(2, 'zh', true))).toEqual({ role: 'synthesizer', attempt: 1 })
+    expect(parseMemberLabel(synthesisDraftLabel(2, 'en', true), 'en')).toEqual({ role: 'synthesizer', attempt: 1 })
+  })
+
+  it('reads the numbered names back, and keeps reading the old ones', () => {
+    expect(parseMemberLabel('规划（第1次）')).toEqual({ role: 'planner', attempt: 1 })
+    expect(parseMemberLabel('规划（第3次）')).toEqual({ role: 'planner', attempt: 1 })
+    expect(parseMemberLabel('Plan (call 2)', 'en')).toEqual({ role: 'planner', attempt: 1 })
+    expect(parseMemberLabel('汇总·第1稿')).toEqual({ role: 'synthesizer', attempt: 1 })
+    expect(parseMemberLabel('汇总·第2稿')).toEqual({ role: 'synthesizer', attempt: 1 })
+    expect(parseMemberLabel('Summarize · draft 3', 'en')).toEqual({ role: 'synthesizer', attempt: 1 })
+    // The 「（定稿）」 marker is not implemented yet; a label that carries one must
+    // still parse, so it can land later without breaking the panel's reading.
+    expect(parseMemberLabel('汇总·第2稿（定稿）')).toEqual({ role: 'synthesizer', attempt: 1 })
+    // The bare names every run still uses — and every history row still holds —
+    // keep parsing exactly as they did.
+    expect(parseMemberLabel('规划助手')).toEqual({ role: 'planner', attempt: 1 })
+    expect(parseMemberLabel('汇总助手')).toEqual({ role: 'synthesizer', attempt: 1 })
     expect(parseMemberLabel('执行（尝试 2）')).toEqual({ role: 'worker', attempt: 2 })
   })
 })
@@ -299,6 +347,15 @@ describe('the guest copy matches the host copy', () => {
       }
       for (const kind of ['plan', 'execute', 'verify', 'synthesize', 'answer'] as const) {
         expect(guest.phaseLabel(kind)).toBe(phaseLabel(kind, language))
+      }
+      // The numbered names are the same single source as the bare ones: a call the
+      // run repeats carries its number, and the two realms must agree on it.
+      for (const call of [0, 1, 2, 3, 9]) {
+        expect(guest.plannerCallLabel(call)).toBe(plannerCallLabel(call, language))
+      }
+      for (const draft of [0, 1, 2, 3, 9]) {
+        expect(guest.synthesisDraftLabel(draft)).toBe(synthesisDraftLabel(draft, language))
+        expect(guest.synthesisDraftLabel(draft, true)).toBe(synthesisDraftLabel(draft, language, true))
       }
     }
     // `args.naming.language` is what selects the table inside the script realm.
