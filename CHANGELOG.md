@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.33] - 2026-11-24
+
 ### Added / 新增
 
 - **A run that did not finish now comes back with its complete machine record attached / 没跑完的一轮，
