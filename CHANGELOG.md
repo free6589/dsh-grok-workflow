@@ -5,6 +5,27 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Fixed / 修复
+
+- **Saying yes through a question card now counts as your approval / 点问题卡片说「确认」现在算你批准了** — When a
+  block is ordered, you can approve it by clicking a question card instead of typing the word. The Host delivers that
+  answer as a different kind of message, and both the block start and the gate only looked for a typed turn: the start
+  refused with "no message after the preview contains the approval word" even though you had just clicked yes, and the
+  gate logged your answer as an unrecognised source with nothing naming it. Both now share one definition of "the
+  user's own words": a card answer counts for a block only when the question it answers was asked after the preview (a
+  reply to an older question, or to a call that was never asked, approves nothing), and only the labels you picked are
+  read — never the model's own question text that travels in the same payload. This applies where the Host's ask tool runs
+  in its timed mode, which is what makes a card answer arrive as a message of yours at all; in the default blocking mode
+  the answer is a tool result inside the same turn and never becomes a message. A card answer still does **not** start a
+  turn by itself; that is unchanged and is a product decision, not an oversight. / 开一单活时，你可以点问题卡片说「确认」
+  而不用自己打字。宿主把这种回答当成另一种消息送进来，而开工检查和门禁都只认「用户亲手打的那句话」：于是哪怕你刚点过
+  确认，开工还是被拒成「预览之后没有一条消息包含确认词」；门禁则把你的回答记成认不出来的来源，一个字都没说明它是什么。
+  现在两边共用同一个「用户自己说的话」的定义：卡片答案只有在**它回答的那个问题是在预览之后问的**才算数（答的是更早
+  的问题、或者那个调用根本没问过，都不算），而且只读你选中的标签——绝不读同一份数据里模型自己写的问题
+  文字。这条只在宿主的提问工具跑在**限时模式**时成立（只有那种模式才会让卡片答案变成一条「你的消息」）；默认的
+  阻塞模式下，答案是同一回合里的工具结果，永远不会变成消息。卡片答案仍然**不会**自己开启一轮对话；这一点没变，
+  它是产品决定，不是漏掉。
+
 ## [0.13.34] - 2026-11-25
 
 ### Added / 新增

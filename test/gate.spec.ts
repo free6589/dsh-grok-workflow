@@ -237,6 +237,29 @@ function payloadAt(
 }
 
 /**
+ * A question-card answer, shaped exactly as the Host logs it.
+ *
+ * `source.kind` is `user-question-reply` and the single text part is the whole
+ * answer batch as JSON — question text included, which is why the gate must
+ * treat it as a nod and never read it as a request.
+ */
+function cardAnswerMessage(selected: string[] = ['确认'], callId = 'call-card-1'): UserMessage {
+  return createUserMessage({
+    content: [{
+      type: 'text',
+      text: JSON.stringify({
+        kind: 'answer_to_pending_question',
+        tool: 'ask_user_question',
+        callId,
+        questions: [{ id: 'q1', question: '这一单可以开工吗？', options: [{ label: '确认' }, { label: '再看看' }] }],
+        answers: [{ id: 'q1', selected }],
+      }),
+    }],
+    source: { kind: 'user-question-reply', callId, outcome: 'answered' } as never,
+  }) as UserMessage
+}
+
+/**
  * Replay one `enter` decision the way `AgentLoop.step()` does: the loop first
  * appends `step/start` and the projected `system/message` head, then every
  * non-runtime-context message as `user/message`. Replaying the head keeps the
@@ -926,6 +949,48 @@ describe('grok mode toggle (classifyPreStep)', () => {
     const outside = new FakeAgent({ session: new FakeSession({ header: { agentPreset: 'other-preset' } }) })
     const scoped = resolveConfig({ grokDefault: 'on' })
     expect(classifyPreStep({ config: scoped }, batch(outside))).toMatchObject({ kind: 'admit' })
+  })
+})
+
+/**
+ * A question-card answer is a nod, not a turn (D-137).
+ *
+ * The Host logs an answered card as a `user/message` whose source is
+ * `user-question-reply`, so a gate that only knows `user` swallows it as a
+ * foreign source. It has to be named — while still admitting nothing new and
+ * leaving the batch's key and request untouched.
+ */
+describe('question-card answers (classifyPreStep)', () => {
+  const config = resolveConfig({ grokDefault: 'on' })
+
+  it('names the card answer as a nod, admits nothing on its own, and leaves the batch key alone', () => {
+    const only = classifyPreStep(
+      { config },
+      payload(new FakeAgent(), [cardAnswerMessage()]) as unknown as PreStepPayload,
+    )
+    // A nod, not a request: named instead of swallowed, and no run.
+    expect(only).toEqual({ kind: 'pass', reason: 'question-reply' })
+    // A genuinely foreign batch keeps the old label.
+    expect(classifyPreStep(
+      { config },
+      payload(new FakeAgent(), [userMessage('context', 'runtime-context')]) as unknown as PreStepPayload,
+    )).toEqual({ kind: 'pass', reason: 'non-user-source' })
+
+    const typed = userMessage('do the thing')
+    const mixed = classifyPreStep(
+      { config },
+      payload(new FakeAgent(), [typed, cardAnswerMessage()]) as unknown as PreStepPayload,
+    )
+    const plain = classifyPreStep(
+      { config },
+      payload(new FakeAgent(), [typed]) as unknown as PreStepPayload,
+    )
+    expect(mixed.kind).toBe('admit')
+    expect(plain.kind).toBe('admit')
+    if (mixed.kind !== 'admit' || plain.kind !== 'admit') throw new Error('both batches must be admitted')
+    // Dedupe invariance: the card answer contributes neither text nor id.
+    expect(mixed.key).toBe(plain.key)
+    expect(mixed.request).toBe(plain.request)
   })
 })
 
