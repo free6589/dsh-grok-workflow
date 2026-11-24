@@ -195,24 +195,35 @@ class FakeRun {
  * team-tier test does not spend a minute waiting for a tier receipt.
  */
 class FakeEngine {
+  /**
+   * Team rounds, in order. The `full` shape now spends one front-desk call before a
+   * round (its first answer), and the real engine hands that call back as a run too —
+   * but it is a model call, not a round, so it is counted in {@link frontDeskCalls}
+   * instead: a case that says "one run started" keeps meaning one plan→execute→verify
+   * round. Nothing is dropped — a case that wants to know how often the front desk was
+   * asked reads `frontDeskCalls`.
+   */
   readonly startCalls: WorkflowStartRequest[] = []
+  /** Front-desk single calls (`src/run.ts` `TRIAGE_RUN_LABEL`), in order. */
+  readonly frontDeskCalls: WorkflowStartRequest[] = []
   readonly runs: FakeRun[] = []
 
+  autoRun = false
+
   async start(request: WorkflowStartRequest): Promise<FakeRun> {
-    this.startCalls.push(request)
     const run = new FakeRun(request)
-    this.runs.push(run)
     request.signal?.addEventListener('abort', () => run.cancel('signal aborted'), { once: true })
     if (request.meta.name === 'Front desk') {
+      this.frontDeskCalls.push(request)
       // Cheap tiers: resolve immediately with no reply (the gate falls back).
       queueMicrotask(() => run.complete(null))
-    } else if (this.autoRun) {
-      void this.finish(run, request)
+      return run
     }
+    this.startCalls.push(request)
+    this.runs.push(run)
+    if (this.autoRun) void this.finish(run, request)
     return run
   }
-
-  autoRun = false
 
   private async finish(run: FakeRun, request: WorkflowStartRequest): Promise<void> {
     const tasks = [(request.args as { tasks?: unknown }).tasks].flat().filter(Boolean)
