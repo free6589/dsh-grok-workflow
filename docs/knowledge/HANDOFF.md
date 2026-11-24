@@ -4001,12 +4001,22 @@ Issue #1 状态评论 issuecomment-6927842856。
   对 `v0.13.31` 的 100 文件 / 1866 测试基线是 +1 文件 / +44 测试。
 - **真机 soak（`CONFIRMED`）**：隔离 fork 的 live `web` profile + 真 Chromium，一次点击把 profile 从 0.13.30 装到
   0.13.31，回执与读盘结果都逐字存档；页面全程没有文档请求（没有 reload）。
-- **两条 lane 交回之后落地的两处微修**（派单要求记下来；树里能核的正是这两处，**先后时序在树里不可核**）：
-  1. **卡片显示/复制的命令跟随宿主的 `update.command`，而不是继续用页面里冻结的静态那一行。** 理由写在 `UpdateCard`
-     的注释里：一个冻结在 `#v0.13.31` 的静态行，旁边写着「0.13.32 可用」，复制粘贴装下去的是**旧**版本——正是这个按钮
-     存在的意义所在。没有宿主答案时（首绘、socket 断了、宿主没答或答了空串）静态基线逐字节照旧显示。
-  2. **卡片的「已装版本」按能知道的顺序取**：安装读回 → 回滚恢复到的版本 → 宿主读到的当前版本 → 本构建自带版本。理由同样
-     写在注释里：否则卡片会在「已装 0.13.31，最新 0.13.32」旁边说「你已是最新」，或者回滚之后仍然显示装歪的那个版本。
+- **两条 lane 各自交回之后、由 foreman 追加的两处微修**（派单要求记下来；树里能核的正是这两处，**先后时序在树里不可核**）。
+  两处都是 foreman 在收到该 lane 自己的报告之后才提的，所以**两条 lane 的报告里都没有它们**：
+  1. **微修 A（宿主，`src/update-surface.ts` 的 `installCommand()`）：复制粘贴那一行补上 `--profile <profile>`**，形状与设置页
+     那张卡打印的那一行一致。缺这个 flag 时，粘下去装进的是「碰巧是默认」的那个 profile，而不是操作员正在看的那个——正是
+     这张卡存在要防的那个错。`<profile>` 保持字面占位：这条路由不知道、也不许猜浏览器那头是哪个 profile 名。可核位置：
+     `installCommand()` 正上方的文档注释，以及 `test/update-surface.spec.ts` 里 GET status 那条命令断言中的
+     `toContain('--profile <profile>')`（用例「reports the installed version, the newest release and the exact command」）。
+  2. **微修 B（客户端，`UpdateCard`）：命令的显示、正文那句里的插值、复制到剪贴板，三处都取宿主的 `update.command`**
+     （宿主答过时），没有答案才退回静态的 `UPDATE_COMMAND`——一个冻结的静态行会让读者复制到更旧的那个发布。没有宿主答案时
+     （首绘、socket 断了、宿主没答或答了空串）静态基线逐字节照旧。可核位置：`src/client/index.js` 里
+     `const command = known !== undefined && typeof known.command === 'string' && known.command !== '' ? known.command : UPDATE_COMMAND`
+     一行，以及 `test/update-entry.spec.ts` 的两例「prints, interpolates and copies the command the Host named, not the stale
+     bundled one」/「keeps the static command byte for byte when no Host answer ever lands」。
+- **实现细节（不属于上面那两处微修，是卡片原本实现的一部分）**：卡片的「已装版本」按能知道的顺序取——安装读回 → 回滚恢复到的
+  版本 → 宿主读到的当前版本 → 本构建自带版本；正文那句与结论都跟着它走。理由同样写在注释里：否则卡片会在「已装 0.13.31，
+  最新 0.13.32」旁边说「你已是最新」，或者回滚之后仍然显示装歪的那个版本。
 - **留给下一手的事**：
   1. **合流只在主代理做**（AGENTS §10）。合流时请注意 `CHANGELOG.md`：本条只加在 `## [Unreleased]`，没有版本号、没有
      发版标题、没有日期——发版那一步才 bump。
