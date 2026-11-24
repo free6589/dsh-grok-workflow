@@ -11,6 +11,7 @@ import { renderHandoffSection } from './handoff/render.js'
 import { maxTotalAgentsFor, routeBudgetFor } from './script.js'
 import { shardCountFor, splitObjective } from './shards.js'
 import { planWaveReason, WAVE_LIMIT } from './waves.js'
+import { renderAuditTrail } from './report-audit.js'
 
 const STATUSES: readonly FinalStatus[] = ['completed', 'partial', 'failed']
 /** The three task terminal states (thin design §1). */
@@ -1135,6 +1136,18 @@ export interface RenderReportOptions {
   guard?: GuardConclusion
   /** Child calls still running when the run stopped (resume hint detail). */
   inFlight?: number
+  /**
+   * Attach the complete technical audit trail (`src/report-audit.ts`) as the
+   * report's tail, after the guard line.
+   *
+   * Off by default, and deliberately so: this view is parsed back by
+   * `src/carryover.ts` and asserted by many suites, so the default text has to
+   * stay exactly what it is. The base view keeps its own `MAX_RENDER_CHARS`
+   * bound; the attached section carries its own `AUDIT_MAX_CHARS` bound, so
+   * "the answer was truncated" and "the record was truncated" stay two
+   * different, separately readable facts.
+   */
+  auditTrail?: boolean
 }
 
 /** Render a concise model-facing view; the canonical JSON remains available to PTC.
@@ -1320,9 +1333,13 @@ export function renderReport(report: WorkflowReport, opts?: RenderReportOptions)
   const guard = opts?.guard ?? guardOf(report)
   if (guard !== undefined) lines.push(guardLine(guard, 'en'))
   const text = lines.join('\n')
-  return text.length <= MAX_RENDER_CHARS
+  const view = text.length <= MAX_RENDER_CHARS
     ? text
     : `${text.slice(0, MAX_RENDER_CHARS)}\n[output truncated; see the canonical structured result for full details]`
+  // The audit trail is the report's tail: appended after the guard line, after
+  // everything the answer renders, and bounded on its own (D-132). The answer
+  // half is byte-identical whether or not it is attached.
+  return opts?.auditTrail === true ? `${view}\n\n${renderAuditTrail(report)}` : view
 }
 
 function oneLine(value: string, max: number): string {

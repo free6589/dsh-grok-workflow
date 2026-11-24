@@ -1,0 +1,14 @@
+Call the grok_workflow tool exactly once, with exactly one caller-supplied task and no planner. Do not do the work yourself and do not invent a different task.
+
+Use these arguments verbatim:
+objective: "Soak: an unsatisfiable acceptance criterion"
+tasks:
+  - id: "impossible"
+    title: "Prove the impossible date"
+    objective: "Produce evidence that today is simultaneously Monday and not Monday."
+    expectedOutput: "One sentence naming today's weekday."
+    acceptanceCriteria: ["The observed evidence proves that today is Monday and also that today is not Monday."]
+    context: "This criterion is unsatisfiable by construction. Never fabricate evidence."
+    writesPaths: []
+
+When the tool returns, print only the report status word (completed, partial, or failed) on the last line.

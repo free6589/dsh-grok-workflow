@@ -3328,3 +3328,44 @@ spine 为空，pre-fix 形状会进脊柱。
     `test/channel.spec.ts` 6 条（前台那次调用单独记账成 `frontDeskCalls`，`startCalls` 仍只数整轮；
     `expect(started).toMatchObject({kind:'enter'})` 换成先等拆法出去、再断一次整轮）。
   - 一次 `/grok on` 下的真任务现在固定多花一次调用（拆法预览），点头后还多花一次（首答）——换来的是用户在回合里就能读到人话。
+
+## D-132 · 审计层入口 = 报告尾部的**可选段**：默认视图一个字节不动，只有「没跑完」的那一轮把全量记录接在后面（2026-11-24）
+
+- **Status:** `CONFIRMED`（`npm run ci` 在 `feat/audit-render-half` 上 EXIT=0；真机隔离 soak 两跑都按此语义落地）
+- **Date:** 2026-11-24
+- **Decision:** `feat/audit-layer`（`7626233`，ahead 1 / behind 503）只取两件东西——`src/report-audit.ts` 与
+  `test/report-audit.spec.ts`——并把它接到报告层的**尾部**，作为可选段：
+  1. `RenderReportOptions.auditTrail?: boolean`，**默认关**。为真时 `renderReport` 先照旧算出 base view（含
+     `MAX_RENDER_CHARS` 截断），再在**守卫行之后**接 `\n\n` + `renderAuditTrail(report)`。base view 的截断只管 base
+     view，审计段自带 `AUDIT_MAX_CHARS` 上限。
+  2. `src/index.ts` 的 PTC 工具 `render` 路径传 `auditTrail: report.status !== 'completed'`——**没跑完的一轮**回来时
+     带着完整机器记录，**跑完的一轮**文字与今天逐字节相同。
+  3. `renderAuditTrail` 保持导出，作为任何其它调用方的按需直接入口。
+- **为什么（默认输出必须是恒等的）:** 这份文本被 `src/carryover.ts` 反向解析成跨轮摘要，并被大量用例逐字断言。任何
+  「把全量记录塞进默认视图」的做法都会同时改掉摘要源与断言面——那是另一个决定，不该由这一刀顺手做掉。
+- **被否决的替代方案:**
+  1. **设置页开关。** 说得通，但只为一个显示便利就要新增一个配置键 + 客户端 UI + `docs-config-keys` 守卫的三件套；
+     而且它把「你有没有权限看自己的记录」变成了一个配置问题。显示便利不值得一次 schema 变更。
+  2. **在用户可见的中转里接（`src/answer.ts` / `src/delivery/`）。** 那条路径正被 D-126 的报告↔账本对账契约钉着
+     （两个视图各自渲染同一行形状），再塞一段机器记录进去等于把对账面弄脏，且中转消息的长度预算本来就不是给记录用的。
+  3. **直接合 `feat/audit-layer` 整条分支。** 分支的另一半是「默认视图改成人类答案、机器账本挪到 `showDiagnostics`
+     后面」，与本包无关；`main` 自 0.13.30 起在报告层做过 D-126 那一路改动，`src/report.ts` 正面冲突（D-130 已实测
+     6 个冲突路径）。整条合会把两个各自成立的决定硬拼在一起。
+- **Consequences:**
+  - **没跑完的一轮，文本会长很多。** 真机 soak 里一条 `failed` 报告的工具结果从 **2 691 字**（答案半）涨到
+    **24 792 字**（整条消息），审计段占 22 101 字。这是有意的：跑失败的人需要全量记录；但它也意味着**失败轮次的
+    上下文成本显著上升**，长跑失败时尤其明显（上限 96 000 字，触到上限会以一行「已截断 + 指向结构化结果」收尾）。
+  - **跑完的一轮零变化**：`auditTrail` 缺省/`false` 时 `renderReport` 的返回值与改前逐字节相同。除用例钉住
+    `renderReport(r) === renderReport(r, {auditTrail:false})` 之外，本包还把基线提交 `1f70103` 的 `lib/` 当第二个模块
+    实例做了一次真正的老新对照：completed / partial / `failureReport` 三种报告 × 「无选项 / `showDiagnostics` / 带 guard」
+    = **10 次比较、0 处差异**（`.rsi/evidence/audit-render-half-2026-11-24/default-view-parity.out`）。
+  - **`test/human-output-contract.spec.ts` 的 T4 断言被收窄**（唯一一条既有用例改动）：它原本断言「工具视图不带任何
+    机器词条」，现在断言的锚点仍是这句话，但**只针对答案半**——审计段被切成单独一半，并被断言为「带标题、带收尾句的
+    独立段落」。语义没变（答案里仍然一个内部词条都没有），变的是「工具视图 == 答案」这个前提：它不再成立，这是本决定
+    的正面后果。
+  - **分支另一半仍留在 `feat/audit-layer` 上，等待另一次决定**（默认视图是否翻成人类答案）。本包没有、也不该顺手
+    决定它；那条分支的 `HANDOFF.md` 判定日期顺延到下一次合流动作，而不是这次。
+  - **校验器会丢掉 `plan.tasks[].dependsOn` / `wave`**（见 `RESEARCH.md` 同日条），所以「全量记录」里这两项在生产
+    报告上恒为空——渲染器已经支持，缺的是校验器那一步；本包不改判定语义，故只记录。
+
+（合流时由 D-131 重编为 D-132：`feat/full-escape` 的决策块占住 D-131，本节顺延为 D-132。）

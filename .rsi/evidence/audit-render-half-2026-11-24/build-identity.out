@@ -1,0 +1,19 @@
+# Build identity, measured 2026-11-24T20:47:00+08:00
+fe7f9ff2322d7c7bc2a74539dff5fe93c1a35dcb74ba03f81b6ca57904734cfb  /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/feat-audit-render-half/.tmp/soak-audit/dsh-grok-workflow-0.13.32.tgz
+06c21cbb028096c09970564dce769b114d3b7a5cb818c63471e878681263eba6  lib/index.js
+bf590225f350577e98b87f5a9648a770d375f44bfa92edfa4997c0249a64f80a  lib/client.js
+06c21cbb028096c09970564dce769b114d3b7a5cb818c63471e878681263eba6  /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/feat-audit-render-half/.tmp/soak-audit/dsh-home/profiles/web/node_modules/dsh-grok-workflow/lib/index.js
+bf590225f350577e98b87f5a9648a770d375f44bfa92edfa4997c0249a64f80a  /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/feat-audit-render-half/.tmp/soak-audit/dsh-home/profiles/web/node_modules/dsh-grok-workflow/lib/client.js
+06c21cbb028096c09970564dce769b114d3b7a5cb818c63471e878681263eba6  /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/feat-audit-render-half/.tmp/soak-audit/dsh-home/profiles/headless-soak/node_modules/dsh-grok-workflow/lib/index.js
+
+# auditTrail present in the wired entry (grep -c)
+lib/index.js:1
+/home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/feat-audit-render-half/.tmp/soak-audit/dsh-home/profiles/web/node_modules/dsh-grok-workflow/lib/index.js:1
+/home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/feat-audit-render-half/.tmp/soak-audit/dsh-home/profiles/headless-soak/node_modules/dsh-grok-workflow/lib/index.js:1
+
+# control: the released 0.13.32 build that ran first (no wiring)
+(not kept; see README §6)
+
+# installed version read-back
+web version=0.13.32 spec=file:/home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/feat-audit-render-half/.tmp/soak-audit/dsh-grok-workflow-0.13.32.tgz
+headless-soak version=0.13.32 spec=file:/home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/feat-audit-render-half/.tmp/soak-audit/dsh-grok-workflow-0.13.32.tgz

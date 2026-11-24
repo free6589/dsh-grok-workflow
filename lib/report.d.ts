@@ -112,6 +112,18 @@ export interface RenderReportOptions {
     guard?: GuardConclusion;
     /** Child calls still running when the run stopped (resume hint detail). */
     inFlight?: number;
+    /**
+     * Attach the complete technical audit trail (`src/report-audit.ts`) as the
+     * report's tail, after the guard line.
+     *
+     * Off by default, and deliberately so: this view is parsed back by
+     * `src/carryover.ts` and asserted by many suites, so the default text has to
+     * stay exactly what it is. The base view keeps its own `MAX_RENDER_CHARS`
+     * bound; the attached section carries its own `AUDIT_MAX_CHARS` bound, so
+     * "the answer was truncated" and "the record was truncated" stay two
+     * different, separately readable facts.
+     */
+    auditTrail?: boolean;
 }
 /** Render a concise model-facing view; the canonical JSON remains available to PTC.
  *

@@ -1,3 +1,39 @@
+## 2026-11-24 — 报告尾部审计层（`feat/audit-render-half`）：没跑完的一轮带全量机器记录，默认视图一个字节不动
+
+- **From:** 执行手（`agent-132/impl-audit-render`）· **To:** 合流者 / 操作员
+- **树与基线**：worktree `.agents/worktrees/feat-audit-render-half`，分支 `feat/audit-render-half`，基线 `main` 尖端
+  **`1f70103`**（版本 `0.13.32`）。两个本地提交：**`4502748`**（`feat(report)`：`src/report-audit.ts` 新增、
+  `src/report.ts` 的可选 `auditTrail`、`src/index.ts` 的接线、`test/report-audit.spec.ts` 新增 13 例、
+  `test/human-output-contract.spec.ts` 的 T4 断言收窄、重建的 `lib/`、`CHANGELOG.md` 的 `[Unreleased]`）与**承载本节的
+  docs 提交**（知识文档 + `.rsi/evidence/audit-render-half-2026-11-24/`）。**未 push、未打 tag、未合流、未发版**，
+  `package.json` 仍是 `0.13.32`。
+- **做了什么（`CONFIRMED`）**：`feat/audit-layer`（`7626233`）只取 `src/report-audit.ts` 与 `test/report-audit.spec.ts`
+  两件东西，按 `0.13.32` 的 `types.ts` 改写（waves / replans / version / deadRoutes / `limits.childTimeoutMs` /
+  `synthesis.review` / `supervisor` 链路 / attempt 的 `resubmitted`、`judgeRetried` 全部进记录），接到报告层的**尾部**：
+  `RenderReportOptions.auditTrail` 默认关；`src/index.ts` 只在 `report.status !== 'completed'` 时带上。决定与三个被否决的
+  替代方案见 **D-132**。
+- **门禁**：`npm run ci` 在提交 `4502748` 上 **EXIT=0** — oxlint **36 warnings / 0 errors**、
+  `verify:lib` **249 文件逐字节一致**、vitest **102 文件 / 1923 测试 PASS**。对 `feat/update-button` 那轮基线
+  （101 / 1910、`lib` 245）是 **+1 文件 / +13 测试 / lib +4**。
+- **真机隔离 soak（`CONFIRMED`）**：`~/.dsh/profiles/web` 的字节副本（只读源）+ 本构建的 **tarball 安装**（版本读回
+  `0.13.32`，`lib/index.js` sha256 与 worktree 构建一致 `06c21cbb…d2590`）。一跑**不可满足**的任务：报告状态 **`failed`**，
+  工具结果 **24 792 字**（答案半 2 691 字 + 审计段 22 101 字），含 `Technical audit trail` 与 `Audit trail complete.`；
+  一跑能答的问题：状态 `completed`，**1 276 字，不带审计段**。同一 prompt 打**发布版** `0.13.32` 的对照跑也是 `failed`、
+  **不带**审计段（2 628 字）——同一台机、同一模型，差别只在构建。证据
+  `.rsi/evidence/audit-render-half-2026-11-24/`（`README.md` 有清单与边界）。
+- **一条既有用例被收窄（唯一一条）**：`test/human-output-contract.spec.ts` 的 T4 断言原本说「工具视图不带任何机器词条」，
+  现在断言的是「**答案半**不带机器词条，审计段是带标题、带收尾的独立段落」。语义没变，变的是「工具视图 == 答案」这个前提；
+  理由与后果在 D-132。若要回到「失败轮次也不带」，只需去掉 `src/index.ts` 里那个 `auditTrail` 参数，模块仍可按需调用。
+- **留给下一手的事**：
+  1. **合流只在主代理做**（AGENTS §10）。`CHANGELOG.md` 那条只在 `## [Unreleased]`，没 bump 版本。
+  2. **`feat/audit-layer` 的另一半仍等决定**：把默认视图翻成人类答案属于另一刀，本包没动它（D-130 → D-132）。
+  3. **live profile 一行未动**：soak 用的是复制出来的隔离 home；本轮没升级、没重载、没重启，§11 自动升级仍按操作员红线跳过。
+     soak 时 live `web` profile 里读到的插件版本是 **`0.13.32`（发布版）**，不是本分支构建。
+  4. **本分支判定日期 2026-11-26**：合流即删（合完 24 h 内）；不合就删分支。`feat/*` 不许长期挂着。
+- **边界**：web 外壳**没有**被这一跑覆盖（web app 不收 prompt，且不许起第二个长驻服务；跑的是同一个 scratch home 里的
+  headless 外壳 + 同一份已安装包）；跑用的是 overlay 里的插件配置（`mode: full`、五角色指向本机网关），不是 live profile
+  自己的链路；审计段只保证不复现 carryover 解析的行形状，不保证 section 正文不被追加（详见证据目录 README §4）。
+
 ## 2026-11-24 — 完整流程（`/grok on`）补了一张前台：闲聊与单点事实直答、真任务先问再跑、首答在队轮前面
 
 - **From:** 收尾手（`agent-133/docs-writer`）· **To:** 合流者 / 操作员

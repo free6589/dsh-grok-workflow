@@ -242,9 +242,16 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
         // T4: diagnostics always off — the relay text carries the human block,
         // the PTC render path renders the same report without the ledger.
         void readConfig
+        // D-132: a run that did not complete comes back with its complete
+        // machine record attached (`src/report-audit.ts`), so the caller of a
+        // failed or partial run holds every field the record captured. A
+        // completed run's text stays exactly what it is today — the audit tail
+        // is an addition for the reader who has something to investigate, not
+        // a new shape for every answer.
+        const report = value as unknown as WorkflowReport
         return [{
           type: 'text' as const,
-          text: renderReport(value as unknown as WorkflowReport),
+          text: renderReport(report, { auditTrail: report.status !== 'completed' }),
         }]
       },
     },

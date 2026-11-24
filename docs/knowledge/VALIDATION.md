@@ -6827,3 +6827,48 @@ soak 用的浏览器是系统 Chromium 155.0.8059.84，由 Playwright 驱动。�
 
 **证据：** `.rsi/evidence/update-button-soak-2026-11-24/README.md`（build 两个 sha256、环境、逐步命令、四相表、装后读盘、
 边界与清单）。
+
+## 报告尾部审计层（`feat/audit-render-half`）：红绿、门禁、真机 soak — 2026-11-24 (`CONFIRMED`，未发版)
+
+环境：worktree `.agents/worktrees/feat-audit-render-half`（分支 `feat/audit-render-half`，基线 `main` `1f70103`，
+版本 `0.13.32`）；Node **v26.8.1** / npm **11.19.0**；soak 用的是本机网关 `http://127.0.0.1:18088/openai/v1` 上的真模型
+`agent2api/deepseek-v4.1-flash`。证据目录 `.rsi/evidence/audit-render-half-2026-11-24/`（`README.md` 是清单与边界）。
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 红一 | `npx vitest run test/report-audit.spec.ts`（模块还不存在） | **exit 1**，`Test Files 1 failed`、`Tests no tests`，逐字 `Error: Cannot find module '../src/report-audit.js' imported from …test/report-audit.spec.ts`（`red-1-module-missing.out`） |
+| 红二 | 同上（模块已加、`renderReport` 还没有 `auditTrail`、`src/index.ts` 未接线） | **exit 1**，`Tests 10 failed \| 3 passed (13)`——**红的正好是那十条要求「记录必须被接上/取得回来」的用例**（计划来源与拆分、limits + 五条链路 + 全量调用轨迹、每次尝试的载荷、全量证据集、`renderAuditTrail` 直接入口、不复现 carry-over 行形状、失败报告、截断标记、尾部拼接、宿主入口按状态附加）；过的三条恰好是「什么都没变」的哨兵（`cannot mutate the record it renders`、`keeps the carry-over contract intact in both views`、`adds nothing at all unless the caller asks for it`）——也就是说整个渲染契约是红的，而不只是三例（`red-2-entry-missing.out`：第 19 行 `Failed Tests 10`、第 635 行 `Tests 10 failed \| 3 passed (13)`，10 个 `×` / 3 个 `✓`） |
+| 绿 | `npx vitest run test/report-audit.spec.ts` | **exit 0**，`Test Files 1 passed (1)`、`Tests 13 passed (13)`（`green-spec-13.out`） |
+| 受影响的另一套 | `npx vitest run test/human-output-contract.spec.ts test/report-audit.spec.ts` | **exit 0**，`2 passed (2)`、`Tests 23 passed (23)`（`scoped-two-specs.out`） |
+| 门禁（提交前） | `npm run ci`（工作树，`HEAD` = `1f70103` + 未提交改动） | **EXIT=0**：oxlint `Found 36 warnings and 0 errors.`；`verify:lib` → `lib/ at 1f70103 is the build of src/ at 1f70103 (245 files, byte-identical)`；vitest **`Test Files 102 passed (102)` / `Tests 1923 passed (1923)`**（`ci-before-commit.out`） |
+| 门禁（提交后） | `npm run ci`（`HEAD` = `4502748`） | **EXIT=0**：`Found 36 warnings and 0 errors.`；`lib/ at 4502748 is the build of src/ at 4502748 (249 files, byte-identical)`；**`102 files / 1923 tests` PASS**（`ci-after-commit.out`） |
+| 基线对照 | 本文件 2026-11-24 的 `feat/update-button` 条 | **101 文件 / 1910 测试**、`lib` 245 → 本轮 **+1 文件 / +13 测试 / lib +4** |
+| 默认视图逐字节对照 | `node .rsi/evidence/audit-render-half-2026-11-24/default-view-parity.mjs $PWD 1f70103` | **exit 0，COMPARISONS 10 DIFFS 0**：把基线提交 `1f70103` 的 `lib/` 导出到 gitignore 的 `.tmp/oldtree` 当第二个模块实例，用两套校验器各建同一份报告（completed / partial / `failureReport`），在「无选项 / `showDiagnostics` / 带 guard」三种调用下比较 `renderReport` 输出——10 次全等；另加 `renderReport(r) === renderReport(r, {auditTrail:false})` 两种形状（`default-view-parity.out`） |
+| 第一次门禁是红的 | `npm run ci`（首跑） | **EXIT=1**：1 例失败 —— `test/human-output-contract.spec.ts > 机器台账：永远折叠 … > renders the registered tool view without the ledger (T4 fixed)`，逐字 `expected … not to contain 'skipped busy'`。原因是失败轮次的工具视图现在带审计段。**没有假装它没发生**：收窄该断言（答案半 + 独立段落）后重跑全绿，理由记在 D-132 |
+| soak 建 home | `cp -a /home/fish/.dsh/profiles/web <scratch>/dsh-home/profiles/web`（只读源，97 MB） | exit 0；scratch 自己的 `HOME`/`npm-cache`/`pnpm-store` 都在 `.tmp/soak-audit/` 内 |
+| soak 打包 | `npm_config_cache=<scratch>/npm-cache npm pack --pack-destination <scratch>`（**在 worktree 里**） | `dsh-grok-workflow-0.13.32.tgz`，sha256 `fe7f9ff2…34cfb`；包内 `lib/index.js` sha256 = worktree `lib/index.js` = `06c21cbb…d2590`；`grep -c auditTrail` = 1（`build-identity.out`） |
+| soak 安装（web） | `DSH_HOME=<scratch>/dsh-home dsh plugin --profile web add file:<scratch>/…tgz` | **INSTALL_EXIT=0**；依赖读成 `file:…/dsh-grok-workflow-0.13.32.tgz`，版本读回 **`0.13.32`**，装进去的 `lib/index.js`/`lib/client.js` sha256 与 worktree 构建逐字节一致（`install-web-profile.out`、`version-readback.out`） |
+| soak 安装（headless-soak） | 同上，`--profile headless-soak`（由 `--from-default-profile headless` 生成） | **INSTALL_EXIT=0**，版本 `0.13.32`，sha256 同上（`install-headless-soak-profile.out`） |
+| soak 一跑（不可满足） | `./run.sh overlay-soak.yml prompt-failing.txt run-failing.out` → `timeout 1200 dsh --profile headless-soak --patch overlay-soak.yml "<prompt>"` | **exit=1 elapsed=905s**；报告状态 **`FAILED`**（模型自己最后一行也是 `failed`）；工具结果 **24 792 字**（答案半 2 691 + 审计段 22 101），含 `Technical audit trail` 与 **`Audit trail complete.`**（`soak-run-failing.out`、`tool-result-failing.txt`） |
+| soak 二跑（能答） | `./run.sh overlay-soak.yml prompt-completed.txt run-completed.out` | **exit=0 elapsed=260s**；报告状态 **`COMPLETED`**；工具结果 **1 276 字**，**不含** `Technical audit trail`，末行仍是守卫行（`soak-run-completed.out`、`tool-result-completed.txt`） |
+| soak 对照（发布版构建） | 同一 prompt、同一 harness，跑的是**误打包的发布版** `0.13.32`（`lib/index.js` `bebf2a06…`） | 报告 `FAILED`，2 628 字，**不含**审计段（`tool-result-failing-control-released-build.txt`）。同一台机、同一模型，差别只在构建——这条同时证明该 soak 能区分两个构建 |
+| web 外壳 | `dsh --profile web "say hi"`（scratch home） | **BLOCKED 按设计**：`error: too many arguments. Expected 0 arguments but got 1: say hi.`。因此 soak 的两跑用的是同一个 scratch home 里的 headless 外壳（同一份已安装包），web 外壳本身 **NOT_RUN** |
+| live `~/.dsh` | `dsh --profile web --help`（未设 `DSH_HOME`，即对着 live home） | **NOT_RUN / 被文件系统挡住**：`EROFS: read-only file system, open '/home/fish/.dsh/profiles/web/cordis.yml'`。本轮对 live home **一行未写**、未重载、未重启；soak 时 live `web` profile 里的插件版本读作 `0.13.32`（发布版） |
+| 发版 / 推送 / 合流 | — | **NOT_RUN**：未打 tag、未 push、未合流、未 npm publish；`package.json` 仍 `0.13.32` |
+
+**Changed：** `src/report-audit.ts`（新增，281 行：clip/section/callTrail/deadRoute/execution/verification/attempt/task/
+planTask/replan + `renderAuditTrail`，`AUDIT_MAX_CHARS = 96 000`）、`src/report.ts`（+19/−10：`auditTrail` 选项与尾部拼接）、
+`src/index.ts`（+9/−4：PTC `render` 按状态决定是否附审计段）、`test/report-audit.spec.ts`（新增 13 例）、
+`test/human-output-contract.spec.ts`（+22/−8：`splitAuditTail` + T4 断言收窄）、`lib/report-audit.*`（4 个新产物）、
+`lib/report.*`、`lib/index.*`、`CHANGELOG.md` 的 `[Unreleased]`（中英）、`docs/ARCHITECTURE.md` 新增一节、
+`docs/knowledge/{DECISIONS,RESEARCH,STATE,HANDOFF,VALIDATION}.md`、`.rsi/evidence/audit-render-half-2026-11-24/`。
+
+**Honest boundary（逐条）：**
+1. **web 外壳没被覆盖**（见上表最后三行）：跑的是 headless 外壳 + 同一份已安装包，`render` 路径与外壳无关，但「浏览器里长什么样」本轮 `NOT_RUN`。
+2. **跑用的插件配置是 overlay 的**（`mode: full`、五角色指向本机网关），不是 live profile 自己的链路——live 链路指向只在 live home 里才有钥匙的 provider。
+3. **失败轮次的文本成本是真涨的**：2 691 → 24 792 字（单任务）。长跑失败会逼近 96 000 字上限并以截断行收尾；截断标记只有单元用例覆盖，没有真机 96 KB 跑。
+4. **carry-over 只保证行形状安全，不保证 section 正文不被追加**：`parseReportRound` 会把 `- ` 行继续塞进它上方最后一个已知 section（上限 6 行）。当前接线里审计段进不了 digest（只解析插件自己写入的 relay 消息），但若将来有人把审计文本放进 relay 消息，那个 section 会变脏。用例钉的是「两端解析出的标量与任务行相同」「不出现被参数化的行形状」。
+5. **`plan.tasks[].dependsOn` / `wave` 在当前生产报告里恒为空**：校验器逐字段重建 `plan.tasks` 时把这两个字段丢掉；渲染器支持，只是没有输入。修它是校验器（判定语义）的事，本包不碰。
+6. **一条既有用例被收窄**（门禁首红那条）。回到旧语义只需去掉 `src/index.ts` 里的 `auditTrail` 参数，模块仍可按需调用。
+
+**证据：** `.rsi/evidence/audit-render-half-2026-11-24/README.md`（构建 sha256、环境、逐步命令、两跑结果、对照跑、边界与文件清单）。

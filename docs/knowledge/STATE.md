@@ -2687,3 +2687,20 @@ fork 的 live `web` profile，真 Chromium，真 GitHub fetch + 真 pnpm）：�
 `0.13.31`——装上去的是那个标签的树，不是"当天解析到什么算什么"。证据目录 `.rsi/evidence/update-button-soak-2026-11-24/`。**红线**：live `~/.dsh` 一行未写、未重载、未重启
 （soak 用的是从它复制出来的隔离 home）；**未发版、未打 tag、未 push、未合流**，分支只在本地，`package.json` 仍 0.13.31，
 `[Unreleased]` 里记了这条用户可见变化。）
+
+Last updated: 2026-11-24 21:00 +08:00（**报告尾部审计层：没跑完的一轮带全量机器记录，默认视图零变化，`CONFIRMED`，未发版** —
+分支 `feat/audit-render-half`（自 `main` `1f70103` 开），两个本地提交：`4502748`（feat）+ 承载知识文档与证据的 docs 提交。
+`feat/audit-layer`（`7626233`）只取 `src/report-audit.ts` 与 `test/report-audit.spec.ts` 两件，按 `0.13.32` 的 `types.ts`
+改写后接到报告层**尾部**：`RenderReportOptions.auditTrail` 默认关，为真时 `renderReport` 先算 base view（含它自己的
+8000 字上限）再在守卫行之后接 `\n\n` + `renderAuditTrail(report)`；`src/index.ts` 的 PTC `render` 只在
+`report.status !== 'completed'` 时带上。决定、三个被否决的替代方案与后果见 **D-132**；分支的另一半（默认视图翻成人类答案）
+**没取**，留在 `feat/audit-layer` 上等另一次决定。**门禁**：`npm run ci` 在 `4502748` 上 **EXIT=0** — oxlint 36 warnings /
+0 errors、`verify:lib` 249 文件逐字节一致、vitest **102 文件 / 1923 测试 PASS**（对 `feat/update-button` 的 101 / 1910
+基线是 +1 文件 / +13 测试；`lib` 245 → 249）。**红先绿后**：`test/report-audit.spec.ts` 先红两次（模块缺失 → 选项/入口缺失），
+实现后 13/13 绿；唯一既有用例改动是 `test/human-output-contract.spec.ts` 的 T4 断言收窄（答案半不带机器词条，审计段是
+独立带标题段落）。**真机隔离 soak**（复制 live `web` profile 的 scratch home + tarball 安装，版本读回 `0.13.32`、
+`lib/index.js` sha256 与 worktree 构建一致）：不可满足任务 **`failed`**，工具结果 24 792 字并含
+`Technical audit trail` + `Audit trail complete.`；能答的问题 **`completed`**，1 276 字**不带**审计段；同 prompt 打发布版
+构建的对照跑也是 `failed` 但**不带**审计段。证据 `.rsi/evidence/audit-render-half-2026-11-24/`。**红线**：live `~/.dsh`
+一行未写（本进程对它是只读的，`dsh --profile web` 直接 EROFS）、未重载、未重启；**未 push、未打 tag、未合流、未发版**，
+`package.json` 仍 0.13.32。分支判定日期 2026-11-26。）

@@ -208,6 +208,35 @@ Status rules:
   a mix of verified and failed tasks.
 - `failed` when no task is verified.
 
+## Report view: answer by default, full record on demand
+
+`renderReport` (`src/report.ts`) renders the concise, reader-facing view. The
+complete machine record lives in the validated report object itself; the display
+layer prints all of it only when asked.
+
+- **One module, one entry point.** `renderAuditTrail(report)`
+  (`src/report-audit.ts`) is the only renderer of the full record: plan
+  provenance and splits, the wave partition, the boundary ledger, limits and all
+  five chains, every recorded child call, synthesis (mode, summary, error,
+  review), stop cause and guard settlement, then per task every attempt with its
+  executor payload (deliverables, evidence, tests, files, uncertainties) and its
+  verifier payload (criteria, checked evidence, commands, issues), and finally
+  dead routes, confirmed evidence, incomplete items, errors and uncertainties.
+- **Attached, not duplicated.** `renderReport(report, { auditTrail: true })`
+  appends that text as the report's tail, after the guard line; the tool entry
+  (`src/index.ts`) asks for it exactly when `report.status !== 'completed'`, so a
+  completed run's text is byte-identical to what it always was.
+- **Two independent bounds.** The answer keeps `MAX_RENDER_CHARS`; the trail
+  keeps `AUDIT_MAX_CHARS` and, when it fires, ends with a line naming the bound
+  and pointing at the structured result instead of cutting silently.
+- **Pure read.** Rendering never mutates the record and never writes a second
+  copy: the structured result stays canonical (see D-132).
+- **Carry-over safe by shape.** The trail never emits a line matching the
+  prefixes `src/carryover.ts` parses (`Grok workflow: …`, `Objective:`,
+  `Confirmed evidence:`, `Incomplete:`, `Uncertainties:`, `Final answer:`, and
+  `- id: status (N attempts) — title`), so appending it cannot fabricate a
+  section or a task row in the cross-round digest.
+
 ## Lifecycle and cancellation
 
 - The tool passes `exec.signal` to the workflow engine and also maps a

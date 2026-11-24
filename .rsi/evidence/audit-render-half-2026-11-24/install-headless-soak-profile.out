@@ -1,0 +1,7 @@
+? Verifying lockfile against supply-chain policies (4 entries)...
+✓ Lockfile passes supply-chain policies (4 entries in 471ms)
+Packages: +4
+++++
+Progress: resolved 4, reused 4, downloaded 0, added 4, done
+[WARN] Issues with peer dependencies found. Run "pnpm peers check" to list them.
+Done in 780ms using pnpm v12.4.2
