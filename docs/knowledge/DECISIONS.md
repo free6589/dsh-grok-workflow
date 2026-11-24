@@ -3512,3 +3512,33 @@ spine 为空，pre-fix 形状会进脊柱。
   （`latestById`、`findBlockBySplit`、`openBlockIds`），新增读路径必须照办，否则会读到旧版本的状态。上限集中在一个常量
   `BLOCK_INTAKE_LIMITS`（3 块 / 10 分钟预览 TTL / 20 个活预览 / 20 版 / 200 条心跳），改口径只改一处。
   未发版：本轮不动 `package.json`、不打 tag、不推 `main`。
+
+## D-136 · 监工走哪条路由留在 profile 里：`src` 不给路由兜底，空链就是继承会话路由（2026-11-25，未发版）
+
+- **Status:** `CONFIRMED`（真机实测：把 `roles.supervisor` 从隔离 profile 里删掉后，判决行写 `route:"inherit"`、`judged:true`、`outcome:"pass"`；
+  同一份账本里还有一条模型路由上的 `judged:true` `pass` 与一条模型自己产的 `veto`。证据
+  `.rsi/evidence/supervisor-soak-2026-11-25/{soak.txt,ledger-extract.txt}`）
+- **Date:** 2026-11-25
+- **Context:** 上一轮（M2）的 soak 里独立模型监工一次都没在真机跑通：profile 钉死的监工路由
+  `agent2api/deepseek-v4.1-flash` 需要 `AGENT2API_API_KEY`，这台机器上没有，于是那次 `pass` 带 `judged:false` + `not_judged`。
+  问题因此变成二选一：让 `src` 在钉死的路由不可用时自己找一条退路，还是让「用哪条路由」继续留在 profile 里、由部署的人负责？
+  这一轮先把「空链到底会发生什么」量出来，再定口径。
+- **Decision:** 监工角色链保持 `src` 现状不变——默认 `[]`（`src/config.ts:685`），空链在
+  `src/supervisor/verdict.ts:222` 塌成一次无路由调用（`input.routes.length === 0 ? [{}] : [...input.routes]`），
+  引擎把「没有 provider/model」读成**继承会话的路由**，与其它角色完全一致。这不是推断：删掉链之后判决行写
+  `route:"inherit"`、`judged:true`、`outcome:"pass"`。**所以一个 profile 的钉死监工路由没有凭据时，修法是把 profile 指向一条能用的路由
+  （或干脆把链留空），不是往 `src` 里加兜底。**
+- **Alternatives rejected:**
+  1. **让 `src` 在钉死路由失败时回落到会话路由**：那「监工跑在你配的那条路由上」这句话就不再成立，一条死路由会被悄悄绕过、
+     永远没人发现；而「继承」已经是空链的显式写法，想要继承就留空。
+  2. **要求部署方必须有 `AGENT2API_API_KEY`**：那是一条机器的能力，不是一个代码决定；写进要求会把所有没有这个 provider 的部署挡在门外。
+  3. **在插件的配置默认值里塞一条能用的路由**：把一个操作员的 provider 烤进产品，别人的 profile 拿到一条自己没凭据的默认值——
+     正是本轮要解决的那种坏形状。
+  4. **直接改线上 profile 的 `roles.supervisor`**：越出这一支的范围，而且动的是线上 home（`~/.dsh` 只读、实例不能重载重启）；
+     真要改也该由操作员在自己那一侧改。
+- **Consequences:** `judged` 是算出来的：`rowToWrite.route !== 'deterministic'`（`src/supervisor/index.ts:132`），
+  所以 **`judged:true` 单独一条不说明模型判得好**——监工调用失败也是 `judged:true`，判决行写 `outcome:"veto"` + 理由 `监工调用失败`。
+  **`pass` + `judged:true` 这一对**才只能来自被解析的模型答案（`parseSupervisorAnswer`），验收要钉这一对。
+  另一面：监工用散文答对、没调 `structured_output` 时会被记成「没交答案」（soak.txt 的 F3），这条未修，属于行为面而不是路由面；
+  它不影响本决定——无论走哪条路由，解析面都是同一个。空链继承也因此不是「免费」的：它把「监工跑在哪」这件事的责任明确交给了
+  profile，出问题时要先看 profile，而不是先怀疑插件。
