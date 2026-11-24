@@ -67,6 +67,7 @@ const LEDGER_LABELS = [
   'Incomplete:',
   'Final answer:',
   'Uncertainties:',
+  'Child budget:',
 ] as const
 
 /** The marker a COMPLETED run's human block opens with (answer-first). */

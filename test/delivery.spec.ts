@@ -43,6 +43,7 @@ const LEDGER_LABELS = [
   'Final answer:',
   'Model routes:',
   'Deadline:',
+  'Child budget:',
   'Errors:',
 ] as const
 
@@ -465,6 +466,63 @@ describe('机器台账：每一行说清一件已经发生的事', () => {
     expect(ledger).not.toContain('�')
     expect(ledger.endsWith(MARKER)).toBe(true)
     expect(ledger.length).toBeLessThanOrEqual(8_000 + MARKER.length + 1)
+  })
+
+  it('keeps the stop sentence and the guard line when the body overflows the cap (D-126)', () => {
+    // The clamp cut from the end, so an overlong ledger lost exactly the two closing
+    // lines — who stopped the run and what the watchdog saw — which is the tail a
+    // reader opens the ledger for. The trailer is reserved before the body is cut.
+    const MARKER = '[output truncated; see the canonical structured result for full details]'
+    const ok = task('a', ['天气已核验'])
+    const checked = verification(ok)
+    const verifiedTask = {
+      ...ok,
+      status: 'verified' as const,
+      attempts: [{ attempt: 1, execution: execution('查到新加坡本周多雨'), verification: checked, passed: true, error: '' }],
+      error: '',
+    }
+    const failedRows = (['b', 'c', 'd'] as const).map((id) => {
+      const planned = task(id, ['酒店价格已核验'])
+      const reason = `R${id}-${'x'.repeat(490)}`
+      return {
+        ...planned,
+        status: 'failed' as const,
+        attempts: [{
+          attempt: 1,
+          execution: execution('尝试查询酒店价格', { status: 'failed' }),
+          verification: failingVerification(planned, '价格来源打不开'),
+          passed: false,
+          error: reason,
+        }],
+        error: reason,
+      }
+    })
+    const report = assertWorkflowReport({
+      schemaVersion: 'grok-workflow/v1',
+      status: 'partial',
+      objective: OBJECTIVE,
+      plan: { source: 'caller', tasks: [verifiedTask, ...failedRows].map(({ status: _status, attempts: _attempts, error: _error, ...planTask }) => planTask), error: '' },
+      tasks: [verifiedTask, ...failedRows],
+      confirmed: [{ taskId: 'a', criterion: '天气已核验', evidence: checked.criteria[0]!.evidence }],
+      incomplete: failedRows.map(row => ({ taskId: row.id, reason: row.error, category: 'infrastructure' as const })),
+      uncertainties: [],
+      errors: Array.from({ length: 12 }, (_, index) => ({
+        phase: 'Verify',
+        message: `err${index}-${'E'.repeat(495)}`,
+        category: 'infrastructure' as const,
+      })),
+      stop: { cause: 'deadline' },
+      guard: { findings: 2, terminated: 0 },
+      synthesis: { mode: 'deterministic', summary: 'S'.repeat(1_999) },
+      limits: { ...LIMITS, maxRetries: WIRE_RETRIES, maxTotalAgents: maxTotalAgentsFor(4, FIXED_MAX_RETRIES, routeBudgetFor(config)) },
+    }, OBJECTIVE, config)
+    const ledger = machineLedger(report)
+    // The body is clipped; the closing lines still arrive, after the marker.
+    expect(ledger).toContain(MARKER)
+    expect(ledger.indexOf(MARKER)).toBeLessThan(ledger.indexOf('Stop: '))
+    expect(ledger).toContain('Stop: This run was stopped automatically when its time limit ran out')
+    expect(ledger.endsWith('Guard: 2 finding(s), no subagent was terminated; cancelled by the deadline.')).toBe(true)
+    expect(ledger.length).toBeLessThanOrEqual(8_000)
   })
 })
 
