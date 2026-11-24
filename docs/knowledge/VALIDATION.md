@@ -1,3 +1,11 @@
+## 远端 CI 的既有抖动：`phase1-dialogue` 与 `triage` 三条对时序敏感的用例（不是本轮改动引起）— 2026-11-24
+
+| state | command | result |
+| --- | --- | --- |
+| 触发 | `9756d74`（只改 `docs/knowledge/` 三份记忆）推 `main` 后 `CI` `45292786406` | **FAIL**：`test/phase1-dialogue.spec.ts:324`（condition not met）、`:612`（期望「没有待回答的分流问题」，实际是「已收到，并入了正在跑的这一轮…」）、`test/triage.spec.ts:491`（`background report not delivered yet`） |
+| 判定 | `gh run rerun 45292786406 --failed` | **success** —— 同一份树、同一套用例重跑即绿；且只有文档改动的提交不可能改变这三条的行为 |
+| 结论 | —— | **既有抖动**：这三条对 runner 的调度延迟敏感（后台交付/分流状态的时间窗）。本轮不改它们（不在范围内），但记下来：远端偶发红先看这三条，再看是不是真回归。同一批用例在 `45292347165`（`8f34701`）上是绿的 |
+
 ## 0.13.28 已发：同一处修法，`v0.13.27` 只留标签没发（门禁在远端挂了一条时序断言）— 2026-11-24
 
 | state | command | result |
