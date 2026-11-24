@@ -5,6 +5,12 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Fixed / 修复
+
+- **A judge that died of a bad route no longer makes the worker do the job again / 判定那一步死于坏路时，不再让干活的那一步重做一遍** —
+  When the verifier (or the supervisor) never answered because the route carrying it timed out, dropped the connection, answered 5xx, or answered a 429 that the switch policy moves off, the attempt used to fail and the retry re-ran the WORKER — the expensive leg — even though the work was still there and only the verdict was missing. The run now asks that same judging leg once more inside the same attempt, with the executor result unchanged, so a verdict that never arrived costs one judge call instead of a full redo: no retry is spent, no extra attempt row appears, and the worker's result stays. The gate is the run's own "this route is dead" evidence; a missing structured result keeps its one free form resubmit and is not treated as a death, a judge that actually said "fail" is an answer and is never re-asked, a setup fault still stops the attempt, and a 429 counts only when the switch policy says a rate-limited route should move on — a 429 the switch keeps on its route means "busy now" and stays a plain retry. The attempt row now records when this rescue happened, and the child-call ceiling pays for the extra walk (a worker at most 2 calls per attempt, each judging leg at most 3), with the load-time backstop raised from 600 to 1000 calls per task so every legal chain combination still loads.
+  / 检查者（或监督者）那条路超时、连接被断开、回 5xx，或者回了一个「按勾选框策略该换人」的 429 时，它根本没给出判定；过去这一次尝试就算失败，重试会把**干活的那一步**（最贵的那一步）整个重跑一遍——而活是好的，缺的只是一个判定。现在这一轮会在同一次尝试里，把同一个判定步骤再问一次，执行结果原样不动：一个没到手的判定只花一次判定调用，而不是一次全量重做——不消耗重试次数、不多出一条尝试记录、干活的结果留着。闸门用的是这一轮自己的「这条路死了」证据；「没交结构化结果」仍然保留它那一次免费补交、不算死亡；真的判了「不通过」的那是答案、不会再问；配置/预算类的硬故障仍然直接停；429 只在勾选框说「限流就换人」时才算——勾选框把这条件路留着时，429 的意思是「现在忙」，仍然只是普通重试。尝试记录里会写明发生过这条救援，子代理调用上限也把多出来的一趟算进去了（干活的最多 2 趟、每个判定最多 3 趟），载入期的总闸从 600 抬到 1000，所以任何合法链路组合都仍然装得上。
+
 ## [0.13.28] - 2026-11-24
 
 

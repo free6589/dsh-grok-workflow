@@ -1,3 +1,25 @@
+## 2026-11-24 — 判定腿同 attempt 补打（第二刀）：只交整块，真机 soak 交给合流方
+
+- **From:** 包工头 A（agent-113，两个干活子代理：机制 `/agent-113/judge-leg-mech`、预算 `/agent-113/judge-leg-budget`）
+  · **To:** lead / 合流方
+- **分支:** `feat/leg-retry`，worktree `.agents/worktrees/feat-leg-retry`，基线 `main` `8f34701`（0.13.28）。
+  共享脏树 detached `a6103ad` 一行未动；规划腿 `feat/planner-resubmit`（另一 agent）未合、未碰；本刀**没有**复制规划腿的
+  `avoid`/`spent` 路由回避机制，两刀在 `callRole` 上没有文本冲突面。
+- **做了什么**（D-122）：判定腿（verifier/supervisor）死于传输时，同 attempt 只补打这条腿一次、保留 worker 结果；
+  `judgeRetried: true` 标记 + 报告白名单；预算 `attemptBlock = 2×worker + 3×(verifier+supervisor)`、
+  `callsPerAttempt` 同走法、`maxAttemptsPerTask` 600 → 1000；`test/judge-leg-retry.spec.ts` 新 8 例；
+  `test/verifier-resubmit.spec.ts` 里钉「不补打」的旧用例翻成钉新契约（worker 每次尝试只打一次那条前提被显式断言）。
+- **验证（`CONFIRMED`，命令与数字见 `VALIDATION.md` 首条）:** `npm run ci` exit 0（**98 files / 1828 tests**），
+  `verify:lib` byte-identical（237 files），`lib/` 已一并提交；红证据在实现前留痕（新用例 5 failed、预算两钉 2 failed）。
+- **没做的（明确留给合流方）:** ① **真机 soak**（隔离 `DSH_HOME` + 真模型跑一条真实 run，看两次判定调用是否真的救回判定、
+  worker 是否真的没重跑）；② 未合 `main`、未发版、未打 tag、未 push；③ 未碰 live `~/.dsh`、未重启运行中实例。
+- **合流方要一起改的两处旧文档（本刀已顺手改第一处）:** `docs/knowledge/WORKFLOW-DESIGN.md` 的预算公式已改成
+  `(retries+1) × (2×|worker| + 3×(|verifier|+|supervisor|)) ≤ 1000`；`docs/knowledge/DECISIONS.md` 里 D-056 记的
+  「`maxAttemptsPerTask` 400→600」是当年那条决定的**历史记录**，按惯例不改写历史，由 D-122 承接新值。
+- **分支判定日期:** 合入后 24h 内删 `feat/leg-retry`（AGENTS.md §5）。
+- **下一步:** 合流方先跑真机 soak，再决定与 `feat/planner-resubmit` 的合流顺序（两刀各自独立，谁先都不阻塞）；
+  合完一起跑一次 `npm run ci` 与 `verify:lib`。
+
 ## 2026-11-24 — 0.13.27 返工：死路由的两条根因都堵上，真机 soak PASS（`CONFIRMED`）
 
 - **From:** T4 返工子代理（agent-108） · **To:** lead / 下一个接手者

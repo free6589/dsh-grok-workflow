@@ -1,3 +1,15 @@
+Last updated: 2026-11-24 09:05 +08:00（**判定腿同 attempt 补打（第二刀）：`CONFIRMED`（单测 + 全量门禁），未合流、未发版** —
+分支 `feat/leg-retry`（worktree `.agents/worktrees/feat-leg-retry`，从 `main` `8f34701`＝0.13.28 开出；共享脏树 detached
+`a6103ad` 一行未动；规划腿 `feat/planner-resubmit` 未合、未碰）。verifier/supervisor **死于传输**（timeout / connection /
+server-error / 勾选框允许换人的 429）时，同一次 attempt 内只补打这条腿一次、保留 worker 已产出的执行结果：不新增 attempt 行、
+不花重试额度、不重跑最贵的 worker。`format-error` 仍归既有补交通道（一次尝试一次补交），`verification-failed`（判定自己说了 no）
+不补打，`setup` 硬故障仍直接停。attempt 记录加 `judgeRetried: true`（`src/report.ts` 白名单同步放行）。预算同步抬：
+`attemptBlock = 2×worker + 3×(verifier+supervisor)`、载入期 `callsPerAttempt` 同走法、`HARD_LIMITS.maxAttemptsPerTask`
+**600 → 1000**（最坏合法 50+50+50 链路 800/task，不抬会被载入期总闸拒掉）。门禁：`npm run ci` **exit 0：98 files / 1828 tests**
+（基线 97/1820 → +1 文件 +8 用例），typecheck 0 错，lint 0 errors / 36 warnings（全既有），`verify:lib` byte-identical（237 files），
+`lib/` 一并提交。**真机 soak 留给合流方（`NOT_RUN`）**：本刀未碰 live `~/.dsh`、未重启运行中实例、未发版、未 push。取舍见 D-122，
+验证表见 `VALIDATION.md` 首条，交接见 `HANDOFF.md` 首条。）
+
 Last updated: 2026-11-24 07:20 +08:00（**0.13.27 返工：死路由在真机上真的进表了，`CONFIRMED`（单测 + 真机 soak），待发版** —
 上一轮合流 soak 判 FAIL 的两条根因都堵上了（D-121）。① 记账不再拿 `switchModel` 当闸门，挂死的路用专用
 `routeHealth:'timeout'` 进表（`switchModel` 仍为 false，任务仍改写措辞重试）；② 5xx/断连/429 的死因由宿主 twin
