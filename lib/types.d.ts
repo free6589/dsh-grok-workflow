@@ -437,6 +437,16 @@ export interface AttemptReport {
     route?: string;
     /** True when this attempt's execution arrived via the same-attempt resubmit (A), not a fresh retry. */
     resubmitted?: boolean;
+    /**
+     * True when a judging leg (verifier or supervisor) was re-fired inside this
+     * attempt after it died of a transport failure (timeout, connection,
+     * server-error, or the rate-limit family the switch policy counts), so the
+     * retry policy never had to re-run the worker.
+     *
+     * Set whatever the re-fire answered: `passed` says how the attempt ended and
+     * `failure` carries a re-fire that was lost as well.
+     */
+    judgeRetried?: boolean;
     /** Classified failure of this attempt, when it failed. */
     failure?: AttemptFailure;
     error?: string;

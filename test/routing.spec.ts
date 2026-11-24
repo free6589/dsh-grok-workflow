@@ -71,13 +71,15 @@ describe('per-role routing configuration', () => {
 
   it('keeps an extreme call backstop above the worst legal combination', () => {
     // Worst legal case: 50 worker + 50 verifier + 50 supervisor routes with
-    // FIXED_MAX_RETRIES=1 → (50 + 50 + 50) calls/attempt x 2 attempts = 300
-    // calls per task. The backstop (T6-owned) sits at 600, so every legal
-    // combination loads with headroom; the backstop only fires if a future
-    // limit widens without revisiting it.
+    // FIXED_MAX_RETRIES=1. A worker walk is at most 2 calls (first call + form
+    // resubmit) and a judge walk at most 3 (first call + transport re-fire +
+    // form resubmit), so one attempt costs 2 * 50 + 3 * (50 + 50) = 400 calls
+    // and two attempts cost 800 per task. The backstop (T6-owned) sits at
+    // 1000, so every legal combination loads with headroom; the backstop only
+    // fires if a future limit widens without revisiting it.
     const long = Array.from({ length: 50 }, (_unused, index) => ({ model: `m${index}` }))
     expect(resolveConfig({ roles: { worker: long, verifier: long, supervisor: long } }).maxRetries).toBe(FIXED_MAX_RETRIES)
-    expect(HARD_LIMITS.maxAttemptsPerTask).toBe(600)
+    expect(HARD_LIMITS.maxAttemptsPerTask).toBe(1000)
     // Ordinary combinations always pass: 3+3 chains with the fixed 1 retry.
     const chain = [{ model: 'a' }, { model: 'b' }, { model: 'c' }]
     expect(resolveConfig({ roles: { worker: chain, verifier: chain } }).maxRetries).toBe(FIXED_MAX_RETRIES)
@@ -104,11 +106,16 @@ describe('per-role routing configuration', () => {
   it('derives the child cap from the effective chains, not from attempts alone', () => {
     const plain = resolveConfig({})
     const routed = resolveConfig({ roles: roles([{ model: 'a' }, { model: 'b' }], [{ model: 'c' }]) })
-    // planner 1 + 1 task * 2 attempts * twice (first call + same-attempt
-    // resubmit) * (1 worker + 1 verifier) + 2
-    expect(maxTotalAgentsFor(1, 1, routeBudgetFor(plain))).toBe(1 + 2 * (2 * 2) + 2)
-    // planner 1 + synth 0 + 1 task * 2 attempts * twice * (2 worker + 1 verifier) + 2
-    expect(maxTotalAgentsFor(1, 1, routeBudgetFor(routed))).toBe(1 + 0 + 2 * (2 * 3) + 2)
+    // The per-attempt block counts the honest walks rather than assuming one
+    // call per route: a worker is walked at most twice (first call + form
+    // resubmit) and a judge leg at most three times (first call + transport
+    // re-fire + form resubmit), so block = 2 * worker + 3 * (verifier +
+    // supervisor) — 5 for plain (2 * 1 + 3 * (1 + 0)), 7 for routed
+    // (2 * 2 + 3 * (1 + 0)).
+    // planner 1 + 1 task * 2 attempts * 5-call block + 2
+    expect(maxTotalAgentsFor(1, 1, routeBudgetFor(plain))).toBe(1 + 2 * (2 * 1 + 3 * 1) + 2)
+    // planner 1 + synth 0 + 1 task * 2 attempts * 7-call block + 2
+    expect(maxTotalAgentsFor(1, 1, routeBudgetFor(routed))).toBe(1 + 0 + 2 * (2 * 2 + 3 * 1) + 2)
   })
 })
 

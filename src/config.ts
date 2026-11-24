@@ -46,7 +46,7 @@ export const HARD_LIMITS = {
    */
   deadRoute: { threshold: 2, routes: 16 },
   /** Extreme backstop on child calls charged against one task (worker + verifier + supervisor). */
-  maxAttemptsPerTask: 600,
+  maxAttemptsPerTask: 1000,
   /**
    * Repeat-run envelope (`loopMaxRounds` / `loopFailStreak`). Every round is one
    * full workflow run charged against provider quota, so these two numbers are the
@@ -1095,12 +1095,17 @@ export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
     supervisor: resolveChain('supervisor', config.roles?.supervisor),
   }
   // Fixed retry count (T4): the budget backstop below is checked against
-  // FIXED_MAX_RETRIES, not a user value. The worst legal combination is
-  // (worker chain + verifier chain + supervisor chain) x (1 + 1) = (50 + 50 + 50)
-  // x 2 = 200 (`test/routing.spec.ts`) — so equality still loads and only a
-  // chain widened without revisiting it can trip the guard.
+  // FIXED_MAX_RETRIES, not a user value. The per-attempt count is the honest
+  // worst case, because a route inside one attempt is not walked once: a worker
+  // is called at most twice (first call, form resubmit) and a judge leg at most
+  // three times (first call, transport re-fire, form resubmit), so the worst
+  // legal combination of 50 worker + 50 verifier + 50 supervisor routes costs
+  // 2 * 50 + 3 * (50 + 50) = 400 child calls per attempt, and two attempts cost
+  // 800 per task (`test/routing.spec.ts`). The backstop at 1000 therefore keeps
+  // every legal combination loading with headroom; only a chain widened without
+  // revisiting the worst case can trip the guard.
   const maxRetries = FIXED_MAX_RETRIES
-  const callsPerAttempt = Math.max(1, roles.worker.length) + Math.max(1, roles.verifier.length) + roles.supervisor.length
+  const callsPerAttempt = 2 * Math.max(1, roles.worker.length) + 3 * Math.max(1, roles.verifier.length) + 3 * roles.supervisor.length
   const attemptsPerTask = maxRetries + 1
   if (callsPerAttempt * attemptsPerTask > HARD_LIMITS.maxAttemptsPerTask) {
     throw new Error(

@@ -87,21 +87,39 @@ describe('verifier same-attempt resubmit (B1)', () => {
     expect(() => assertWorkflowReport(run.report, 'Ship the verified result', config())).not.toThrow()
   })
 
-  it('does not resubmit a verifier transport failure', async () => {
+  it('re-fires a verifier transport failure in the same attempt instead of failing the attempt', async () => {
+    // The second cut for a judging leg (test/judge-leg-retry.spec.ts). A 503 is
+    // a transport death: it declares route evidence, so the verifier is asked once
+    // more inside the SAME attempt instead of the retry policy re-running the
+    // worker — whose execution result is still the work that was done. Only the
+    // missing FORM case above is corridor B; a died route is this one.
     let verifierCalls = 0
+    let workerCalls = 0
     const agent: ScriptAgent = async (_prompt, options) => {
-      if (roleOf(options.label) === 'worker') return execution('did the work')
+      if (roleOf(options.label) === 'worker') {
+        workerCalls += 1
+        return execution('did the work')
+      }
       if (roleOf(options.label) === 'verifier') {
         verifierCalls += 1
+        // The re-fire dies the same way, so the attempt keeps the transport class
+        // and the fixed retry policy runs (1 retry: 2 attempts).
         throw Object.assign(new Error('503 Service Unavailable'), { code: 'AGENT_RESULT', fatal: true })
       }
       throw new Error(`unexpected label ${options.label}`)
     }
     const run = await runWorkflowScript(WORKFLOW_SCRIPT, args({ roles: { verifier: [{ model: 'v1' }] } }), agent)
     expect(run.report.status).toBe('failed')
-    // One call per attempt, no resubmit (fixed retry policy: 2 attempts).
-    expect(verifierCalls).toBe(2)
-    expect(run.report.tasks[0]?.attempts[0]?.failure?.class).toBe('server-error')
+    expect(run.report.tasks[0]?.attempts).toHaveLength(2)
+    for (const attempt of run.report.tasks[0]?.attempts ?? []) {
+      // First call + one re-fire per attempt, whatever the re-fire returned.
+      expect(attempt.judgeRetried).toBe(true)
+      expect(attempt.failure?.class).toBe('server-error')
+    }
+    // Two attempts x two verifier calls, and the worker is paid once per attempt:
+    // that is the property this case exists to protect.
+    expect(verifierCalls).toBe(4)
+    expect(workerCalls).toBe(2)
   })
 
   it('carries the quote and length rules in the verifier prompt and the schema', async () => {

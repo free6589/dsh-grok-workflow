@@ -52,7 +52,7 @@ export declare const HARD_LIMITS: {
         readonly routes: 16;
     };
     /** Extreme backstop on child calls charged against one task (worker + verifier + supervisor). */
-    readonly maxAttemptsPerTask: 600;
+    readonly maxAttemptsPerTask: 1000;
     /**
      * Repeat-run envelope (`loopMaxRounds` / `loopFailStreak`). Every round is one
      * full workflow run charged against provider quota, so these two numbers are the
