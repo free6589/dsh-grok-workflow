@@ -1,3 +1,32 @@
+## 2026-11-24 — 0.13.33 发布收口：三件功能出去，两条远端流水线一次绿
+
+- **From:** 发版收口（`agent-137/memory-closeout`）· **To:** 下一个接手的人
+- **结果**：`release/0.13.33` 三条分支按序并入后合 `main`，merge **`24d517e`**，发版提交 `26628c2`，注解标签 `v0.13.33`（标签对象 `fadbd6e`，
+  打在 `24d517e` 上）；`main` 与标签都已推送（`1f70103..24d517e  main -> main`、`* [new tag] v0.13.33`，无 force）。远端 `Release`
+  **45429377745** success，GitHub Release **`Grok Workflow for DSH v0.13.33`** 带资产 **`dsh-grok-workflow-0.13.33.tgz`（967628 B）**，
+  `2026-11-24T15:49:11Z` 发布；远端 `CI` **45429371302** 的 `Node 22` 与 `Node 24` 都 success。**两条 run 都是第一次尝试就绿，没有 `--failed` 重跑。**
+- **发了什么**（用户能感觉到的部分）：① 完整流程（`/grok on`）多了一张前台——寒暄与单个事实不再付整队钱，先给答案再在背后验，
+  逃生口只认会话记录、先问必须先能后送；② 没跑完的一轮（`partial` / `failed`）在报告尾部带上「Technical audit trail」全量机器记录，
+  跑完的一轮默认视图一个字节不动；③ 重复的调用带序号（`规划（第2次）`），终稿单独标「（定稿）」，replan 交卷改成调工具 + 同棒补交。
+- **决策号重编**：三条分支各自都新增了一个 `## D-131`，按合入顺序重编为 D-131（`feat/full-escape`）/ D-132（`feat/audit-render-half`）/
+  D-133（`fix/naming-resubmit`），全仓引用一并对齐，`.rsi/evidence/` 历史证据未改。处理口径本身写成 **D-134**。
+- **门禁**：合流树 `e425295` 上 `TMPDIR=$PWD/.tmp npm run ci` **exit 0**（**105 files / 1954 tests PASS**、lint **`Found 36 warnings and 0 errors.`**、
+  `verify:lib` **249 files byte-identical**）；发版树 `26628c2` 干净树再跑一次 **exit 0**（同 105 文件 / 1954 例，
+  `lib/ at 26628c2 is the build of src/ at 26628c2 (249 files, byte-identical)`，loadavg 1.68）。1954 = 基线 1910 + 12 + 13 + 19，逐项相等。
+- **抖动（照实说，没修）**：合流过程中两路门禁并发跑时红过两条——`test/objective-limit.spec.ts` 一条（满载下 30 s 超时，单跑 17/17 绿 ×3）、
+  `test/full-behind-first-answer.spec.ts` 一条（`vi.waitFor` 默认 1 000 ms，负载下红，单跑 5/5 绿）。最终两次门禁（合流树、发版树）都
+  **一次跑绿、零重跑**，远端两条 run 一条抖动都没撞上。**没有改断言、没抬 `testTimeout`、没跳用例。**
+- **soak 复用的口径（照实说）**：**本版没有重跑合并后的整体 soak**（`NOT_RUN`）。三块各自的真机证据在
+  `.rsi/evidence/full-escape-2026-11-24/` 与 `.rsi/evidence/audit-render-half-2026-11-24/`。能让它成立的论证是：合流没有改产品代码
+  （`src/report.ts` 由 `ort` 自动合并、两条路径都在），发版提交只改版本常量、两个 README / `CHANGELOG` 与随构建走的 `lib/client.js`，
+  而版本常量正是 `test/docs-version.spec.ts` 与 `test/docs-config-keys.spec.ts` 钉住的，两例都在两次全量门禁里过了。
+  这是**理由**，不是又跑了一遍真机。
+- **红线**：全程未碰 `~/.dsh`，未升级、未重载、未重启运行中的实例；未动 tag（没重打、没移动、没删除）、未 force push、未改写已推历史。
+- **待办**：① 升级 live profile 到 `v0.13.33` 需要操作员执行 `dsh plugin --profile web add github:free6589/dsh-grok-workflow#v0.13.33`
+  （钉 tag）并把版本读回成 `0.13.33`；② `feat/audit-layer`（`7626233`，D-130 取半记录，未合）还在，需要先做一次真功能评估 + rebase
+  再决定合/删；③ 三条 `backup/wip-2026-11-24-*`（`de7ba6a` live-steering、`292a4ae` team-dispatch-v1、`b91ff17` progress-task-number-first）
+  写死删除日 **2026-11-27**，到期删掉，别再往后挪；④ 那两条负载敏感用例仍是既有抖动，红了先看是不是满载，别为此改断言或抬 `testTimeout`。
+
 ## 2026-11-24 — 合流 `release/0.13.33`：三条分支按序并入、决策号重编 D-131/D-132/D-133、全量门禁最终 exit 0
 
 - **From:** 合流手（`agent-137/merge-train`）· **To:** 发版那一块 / 操作员

@@ -1,3 +1,48 @@
+## 0.13.33 发布：合流、门禁、标签、推送、远端两条流水线（两条 run 一次绿、零重跑，soak 未重跑）— 2026-11-24 (`CONFIRMED`)
+
+下面每一行都是发版那一轮在主检出 `/home/fish/projects_mine/dsh-grok-workflow` 里真跑过的命令与真读到的结果；没跑的写 `NOT_RUN`。
+收口轮（写这一条的那一轮）用只读 `git` / `gh` 复核了这些行：合流父子关系、标签对象与剥皮、`ls-remote` 回读、两条 run 的 job 与步骤、Release 资产、
+分支与 worktree 现状、`DECISIONS.md` 的编号、`src/report.ts` 两条路径。**门禁与 soak 的读数没有在收口轮重跑**——收口那一提交只动记忆文件。
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 基线 | `git rev-list --left-right --count 1f70103...4da42c2` | 左 **0** / 右 **1**：本地 `main` 比 `origin/main`（`1f70103`）领先 1 条 `4da42c2`（`docs(spec): adopt grok-workflow v1 spec as accepted baseline`），此前未推。**`CONFIRMED`** |
+| 合流 1（零冲突） | `git merge --no-ff feat/full-escape`（`release/0.13.33`，从 `4da42c2` 开出） | merge **`cfe8873`**，**零冲突**（该分支自 `1f70103` 开出，两边文件面不相交）；分支门禁 **103 files / 1922 tests PASS**。**`CONFIRMED`** |
+| 合流 2 | `git merge --no-ff feat/audit-render-half` | merge **`f572eee`**，**3 个冲突**（`CHANGELOG.md`、`docs/knowledge/DECISIONS.md`、`docs/knowledge/HANDOFF.md`），全取并集；分支门禁 **102 files / 1923 tests PASS**。**`CONFIRMED`** |
+| 合流 3 | `git merge --no-ff fix/naming-resubmit` | merge **`c5b504d`**，**7 个冲突**（`CHANGELOG.md`、`docs/knowledge/{DECISIONS,HANDOFF,STATE,VALIDATION}.md`、`lib/report.d.ts.map`、`lib/report.js.map`），全取并集或重建覆盖；分支门禁 **102 files / 1929 tests PASS**。**`CONFIRMED`** |
+| 唯一两边都改的产品文件 | `grep -n "renderAuditTrail\|auditTrail" src/report.ts`；`grep -n "shippedSummaryDraft\|final: draft" src/report.ts`（收口轮只读复核） | `src/report.ts` 由 `ort` **自动合并、一行没手改**，两条路径都在：审计尾段 `:14` import、`:1150` 选项、`:1363` 拼接；终稿 `:1170` `shippedSummaryDraft()`、`:1248-1249` `Summary review: … · final: draft N`。**`CONFIRMED`** |
+| 决策号重编 | `grep -n "^## D-1[23][0-9]" docs/knowledge/DECISIONS.md`（收口轮复核） | 三条分支各自新增的 `## D-131` 按合入顺序重编为 **D-131**（`:3277`，`feat/full-escape` 保留）/ **D-132**（`:3332`）/ **D-133**（`:3373`）；两条被重编的条目末尾各有一句括注（`:3371`、`:3425`）。收口轮计数（排除 `.rsi/`）：`D-131` **17** 处、`D-132` **26** 处、`D-133` **14** 处，各自指向自己的块。`.rsi/evidence/` 未改。**`CONFIRMED`** |
+| 合流后门禁 | `TMPDIR=$PWD/.tmp npm run ci`（合流树 `e425295`） | **exit 0**：vitest **`105 files / 1954 tests PASS`**；`oxlint src test` → **`Found 36 warnings and 0 errors.`**；`verify:lib` → **`249 files, byte-identical`**。1954 = 基线 **1910** + **12**（`feat/full-escape`）+ **13**（`feat/audit-render-half`）+ **19**（`fix/naming-resubmit`），逐项相等。**`CONFIRMED`** |
+| 合流树 ≡ 记忆树 | `git diff --stat e425295 0645a7a`（收口轮复核） | 只差 `docs/knowledge/{HANDOFF,STATE,VALIDATION}.md`（+20 −13），`src/`、`test/`、`lib/` 一个字节没变 → 上面那次门禁读数对 `0645a7a` 同样成立。**`CONFIRMED`** |
+| 发版提交 | `git show --stat 26628c2` | `chore(release): prepare v0.13.33`，**8 files / +22 −20**（与 `0.13.32` 的 `97687ce` 同构）：`package.json`(1/1)、`package-lock.json`(2/2)、`src/client/index.js`(2/2)、`lib/client.js`(2/2)、`CHANGELOG.md`(2/0)、`docs/LOCAL-TESTING.md`(3/3)、`README.md`(5/5)、`README.zh-CN.md`(5/5)。`CHANGELOG.md` 只加 `## [0.13.33] - 2026-11-24` 标题 + 空行，条目一字未改，`[Unreleased]` 留空 |
+| 发版树门禁 | `TMPDIR=$PWD/.tmp npm run ci`（干净树，`HEAD` = `26628c2`） | **exit 0**（只跑一次）：lint **`36 warnings / 0 errors`**；`verify:lib` → **`lib/ at 26628c2 is the build of src/ at 26628c2 (249 files, byte-identical)`**；vitest **`105 files / 1954 tests PASS`**（loadavg **1.68**）。**`CONFIRMED`** |
+| 合 `main` | `git merge --no-ff release/0.13.33 -m "merge: the full-shape front desk, the report's audit tail, and numbered call names"`；`git rev-list --parents -n1 24d517e` | merge **`24d517e`**，父 **`4da42c2`** + **`26628c2`**。**`CONFIRMED`** |
+| `main` 树 = 发版树 | `git diff --stat 26628c2 24d517e`（收口轮复核；`release/0.13.33` 已删，改用第二父比） | **输出为空**，两棵树完全相同——`git diff --stat main release/0.13.33` 当时也是空。**`CONFIRMED`** |
+| 标签 | `git tag -a v0.13.33 -m "v0.13.33 — a greeting no longer pays for the whole team, a run that did not finish carries its machine record, and a repeated call says which one it is"` 打在 `24d517e`；`git cat-file -t v0.13.33`；`git rev-parse v0.13.33 v0.13.33^{}` | `tag`（附注）；对象 **`fadbd6e195c6d8e49aca3a3f4d07d9632ab67d5f`**，剥皮 **`24d517e4f4290468733239c0e140adbfaa387710`**（= merge 提交，不是新建提交）。**`CONFIRMED`** |
+| 推送 | `git push origin main`；`git push origin v0.13.33`；`git ls-remote origin refs/heads/main refs/tags/v0.13.33` | 各 exit 0，**无 force**：`1f70103..24d517e  main -> main`、`* [new tag] v0.13.33 -> v0.13.33`；远端回读 `24d517e4f4290468733239c0e140adbfaa387710  refs/heads/main`、`fadbd6e195c6d8e49aca3a3f4d07d9632ab67d5f  refs/tags/v0.13.33`。**`CONFIRMED`** |
+| 远端 `Release` | `gh run view 45429377745 --json status,conclusion,jobs`（event `push`，headBranch `v0.13.33`） | **success / completed**。唯一 job **`Validate and publish v0.13.33`** **success**，`15:46:29Z → 15:49:15Z` = **2 分 46 秒**，16 个步骤全绿（`Test` 15:46:50Z → 15:49:07Z；`Verify tag commit is on main`、`Verify committed build artifacts`、`Verify no untracked build artifacts`、`Verify tag, package version, and changelog` 都 success）。**第一次尝试就绿，未重跑。** **`CONFIRMED`** |
+| GitHub Release | `gh release view v0.13.33 --json url,name,assets` | <https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.33>，name **`Grok Workflow for DSH v0.13.33`**，`isDraft=false`、`isPrerelease=false`，`publishedAt` **2026-11-24T15:49:11Z**（＝本地 23:49:11 +08:00）；资产 **`dsh-grok-workflow-0.13.33.tgz` = 967628 B**（`state=uploaded`，`sha256:165f25433401f1b1cacea73a1e76c9be2e270e27beb605e7d92952734f92b8af`）。**`CONFIRMED`** |
+| 远端 `CI` | `gh run view 45429371302 --json status,conclusion,jobs`（main push） | **success / completed**。`Node 22` **success** `15:46:27Z → 15:49:01Z` = **2 分 34 秒**；`Node 24` **success** `15:46:27Z → 15:48:53Z` = **2 分 26 秒**；两个 job 的 typecheck / lint / build / `git diff --exit-code -- lib/` / `npm test` / `npm pack --dry-run` 全绿。**第一次尝试就绿，未重跑。** **`CONFIRMED`** |
+| 抖动（合流期，已复绿，未修） | `npx vitest run test/objective-limit.spec.ts`（单跑 ×3）；`npx vitest run test/full-behind-first-answer.spec.ts`（单跑） | 两路门禁并发跑时红过两条：`test/objective-limit.spec.ts` 一条（满载下 30 s 超时，单跑 **17/17 绿 ×3**）、`test/full-behind-first-answer.spec.ts` 一条（`vi.waitFor` 默认 1 000 ms，负载下红，单跑 **5/5 绿**）。**既有负载敏感抖动，没有修**；最终两次门禁都一次绿、零重跑，远端两条 run 一条都没撞上。读数来自合流轮，收口轮未重跑 |
+| 合并后整体 soak | — | **`NOT_RUN`**（本版没有重跑合并后的整体 soak，不写成「已重跑」） |
+| soak 证据（复用，未重跑） | `.rsi/evidence/full-escape-2026-11-24/`、`.rsi/evidence/audit-render-half-2026-11-24/` | 三块各自的真机证据在案。复用它的理由是「合流没改产品代码（`src/report.ts` 由 `ort` 自动合并）+ 发版提交只改版本常量、两个 README / `CHANGELOG` 与随构建走的 `lib/client.js`」，而版本常量正是 `test/docs-version.spec.ts` 与 `test/docs-config-keys.spec.ts` 钉住的，两例都在两次全量门禁里过了 |
+| 收尾 | `git worktree remove …` ×4；`git branch -d …` ×5；`git worktree list`；`git branch -vv`（收口轮复核） | 四个 worktree（`feat-full-escape`、`feat-audit-render-half`、`fix-naming-resubmit`、`fix-timeout-probe-settle`）移除、五条已合分支用 `-d` 删掉（未用 `-D`；前三条 `ahead=0`、`fix/timeout-probe-settle` 也是 0、`release/0.13.33` 曾在 `26628c2`）。现在 `git worktree list` 只剩 `/home/fish/projects_mine/dsh-grok-workflow 24d517e [main]`；分支只剩 `main` 与**故意没动**的 `feat/audit-layer`（`7626233`）与三条 `backup/wip-2026-11-24-*`（`de7ba6a`、`292a4ae`、`b91ff17`，写死删除日 2026-11-27）。**`CONFIRMED`** |
+| live profile | `dsh plugin --profile web add github:free6589/dsh-grok-workflow#v0.13.33` | **`BLOCKED`（本侧）**：AGENTS §11 自动升级**没有执行**——包工头与收口手的沙箱都是 `workspace-write`，`~/.dsh` 不在可写范围且审批提示被关掉；没有写入、没有重载、没有重启。这一条留给操作员执行，并在执行后把版本读回成 `0.13.33` |
+
+**Changed（本版随出去的代码面）：** `feat/full-escape` 的前台（逃生口 + 先问先能后送 + 首答盖在接单回执前）、`feat/audit-render-half` 的报告审计尾段
+（`src/report-audit.ts` 与 `src/report.ts` 的可选拼接）、`fix/naming-resubmit` 的带序号调用名 / 终稿标记 / replan 交底，外加 `lib/` 同一次构建的产物、
+`CHANGELOG.md` 的 `## [0.13.33]` 段与 `DECISIONS.md` 的 D-131 / D-132 / D-133 / D-134。发版提交只动版本声明与 changelog 锚点（见上表 diffstat）。
+
+**Honest boundary（逐条，别单独主张被它们限定的东西）：**
+1. **合并后的整体 soak 没有重跑**（`NOT_RUN`）：用的是三块各自分支上的真机证据。能让它成立的论证是「合流没改产品代码 + 发版提交只改版本常量」，
+   这是**理由**，不是又跑了一遍真机；所以本版关于「装得上 / 跑得通」的结论建立在分支各自的 soak 与两次全量门禁上。
+2. **收口轮没有重跑门禁**：表里两次门禁的读数来自发版轮那两次实跑；收口轮只用只读 `git` 复核了「读数所对应的树」（`e425295` ≡ `0645a7a` 除三个记忆文件、
+   `26628c2` ≡ `24d517e` 整棵树）。收口这一提交是纯文档，所以没有为它再跑 `npm run ci`。
+3. **那两条抖动只做了「来源判定 + 复跑」，没有把根因收窄**：`objective-limit.spec.ts` 与 `full-behind-first-answer.spec.ts` 的负载敏感是**在案既有**，
+   本轮没有插桩、没有受控复现；「不是合流回归」的依据是「单跑全绿 + 最终两次门禁一次绿 + 两条远端 run 一次绿」。
+4. **live profile 未升级**（`BLOCKED`）：这一侧的沙箱写不到工作区以外，这台机器上正在跑的那份插件仍是旧版本。
+5. **`feat/audit-layer` 与三条 `backup/*` 故意没动**：前者只有 D-130 的取半记录（功能评估 `NOT_RUN`），后者写死删除日 2026-11-27；本轮没有替它们做决定。
+
 ## 合流 `release/0.13.33`：三条分支按序并入、决策号重编、全量门禁最终 exit 0（中间红过一次负载敏感的新用例）— 2026-11-24（门禁四次：`c5b504d` 绿 → `62643da` 红一条 → `62643da` 绿 → `e425295` 绿，最后一次是本文件所记录的树；那次红判定为负载敏感抖动；未重跑 soak）
 
 这一条记的是**合流**这一块：三条待合分支按派单固定顺序并入 `release/0.13.33`，解冲突、重建 `lib/`、重编决策号、跑一次全量门禁。
