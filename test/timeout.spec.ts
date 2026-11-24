@@ -19,7 +19,7 @@ import {
   timeoutTierAt,
 } from '../src/timeout.js'
 import { execution, task, verification } from './fixtures.js'
-import { roleOf, runWorkflowScript, taskFromPrompt, type ScriptAgent } from './helpers.js'
+import { roleOf, runWorkflowScript, settledWithin, taskFromPrompt, type ScriptAgent } from './helpers.js'
 
 /**
  * A child that never answers on its own — but releases the process on exit.
@@ -224,12 +224,19 @@ describe('the timer the engine realm really has', () => {
     // What every ECMAScript realm does have, and what the race uses instead.
     expect(vm.runInContext('typeof Atomics.waitAsync', bare)).toBe('function')
     expect(vm.runInContext('typeof SharedArrayBuffer', bare)).toBe('function')
-    // The wait resolves by timeout without blocking the realm.
-    const outcome = await vm.runInContext(`(async () => {
+    // The wait resolves by timeout without blocking the realm. The vitest worker
+    // can sleep through a realm-level settle (test/helpers.ts `settledWithin`),
+    // so this probe holds its own clock and fails as itself inside its own budget
+    // instead of as the runner's kill.
+    const outcome = await settledWithin(
+      vm.runInContext(`(async () => {
       const cell = new Int32Array(new SharedArrayBuffer(4))
       const ticket = Atomics.waitAsync(cell, 0, 0, 20)
       return ticket.async ? await ticket.value : ticket.value
-    })()`, bare) as string
+    })()`, bare),
+      15_000,
+      'the bare-realm Atomics wait',
+    ) as string
     expect(outcome).toBe('timed-out')
   })
 })
@@ -504,10 +511,14 @@ describe('the generated script enforces the child budget', () => {
     }
     const { args: runArgs, config: runConfig } = oneSecondBudget()
     const startedAt = Date.now()
-    const run = await runWorkflowScript(
-      noTimerScript,
-      { ...runArgs },
-      agent,
+    // The fallback settles on the host clock, and the worker can sleep through
+    // that settle (test/helpers.ts `settledWithin`), so the probe holds its own
+    // clock: the case fails as its own named condition inside 15 s rather than
+    // as the runner's kill.
+    const run = await settledWithin(
+      runWorkflowScript(noTimerScript, { ...runArgs }, agent),
+      15_000,
+      'the no-timer fallback run',
     )
     const elapsed = Date.now() - startedAt
     expect(workerCalls).toBe(2)

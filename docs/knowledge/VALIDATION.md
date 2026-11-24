@@ -1,3 +1,36 @@
+## 两条无计时器探针改由探针持钟：远端 Node 24 的红转绿（本地红 `NOT_RUN`）— 2026-11-24（提交 `141dccd`；门禁与远端数字由包工头实测，本地红/绿数字由本轮执行手实测）
+
+这一条只改 `test/timeout.spec.ts` 两条用例的等待形状：`races on Atomics.waitAsync where no setTimeout exists` 与
+`settles a hung call within budget in a realm with no timer at all`，都从裸 `await` 换成 `test/helpers.ts` 的
+`settledWithin(promise, 15_000, <具名>)`。动机是 `c1ebdf3` 那条既有诊断：等的是无计时器 realm 的结算，钟却是 runner 的。
+下面每一行都是真跑过的命令与真读到的结果；本地打不出红的写法全部写 `NOT_RUN`，没有编造。
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 远端红（这是本条的起点，`CONFIRMED`，引用包工头实测） | CI run **45378449742**（`main` `ca65df8`） | **Node 22 绿 / Node 24 红**，逐字 `FAIL test/timeout.spec.ts > the timer the engine realm really has > races on Atomics.waitAsync where no setTimeout exists`、`Error: Test timed out in 30000ms.`、`Tests 1 failed \| 1909 passed (1910)` |
+| 本地修前复现 | 8 种打法，逐行相加 **102** 次执行（Node 26.8.1 与 `mise exec node@22.23.4`；含 18/24 个 busy 循环、整文件、全量套件、`--pool=threads`） | **`NOT_RUN`——0 红**。逐条见下表和 `HANDOFF.md` 顶部同节；早先口头报的「118 次」是误算，以 102 为准 |
+| 本地修前 8 种打法 | ①单条兜底 ×20 ②单条 Atomics ×20 ③18 busy + 兜底 ×10 ④24 busy + 整文件 ×6 ⑤24 busy + Atomics（Node 22）×10 ⑥24 busy + 兜底（Node 22）×10 + Node 22 整文件 ×3 ⑦`npx vitest run` 全量 ×3 ⑧24 busy + `--pool=threads` 两条各 ×10 | **102 次全绿**：兜底 1063–1215 ms、Atomics 约 40 ms、整文件 14.6–16.8 s、全量 123–128 s；loadavg 峰 **27.80**。**没有红可贴** |
+| 修后（24 个 busy 循环下，两条各 15 次） | `npx vitest run test/timeout.spec.ts -t '…'` ×30 | **30/30 绿**：Atomics 53–69 ms、兜底 **1211–1572 ms**（仍是预算驱动，不是靠 15 s 兜底）；loadavg 27.80 |
+| 修后整文件 | `npx vitest run test/timeout.spec.ts` ×5 | **5/5 绿**，22 passed，12.66–13.10 s |
+| 修后 `--pool=forks` | `npx vitest run test/timeout.spec.ts --pool=forks` ×1 | **绿**，22 passed，12.71 s |
+| 修后 Node 22 | `mise exec node@22.23.4 -- npx vitest run test/timeout.spec.ts` ×3 | **3/3 绿**，22 passed，12.80–15.67 s |
+| 具名失败真的会触发（变异实测） | 临时把 Atomics 用例的入参换成 `new Promise<string>(() => {})` 后单跑 | **红成它自己**：`Error: the bare-realm Atomics wait did not settle within 15000 ms`，栈指 `test/helpers.ts:141`，`tests 15.01s`、整轮 15.78 s——不是 runner 的 30 s。跑完按 sha256 `859d39d…` 还原 |
+| typecheck / lint（本地，`141dccd`） | `npm run typecheck`；`npm run lint` | typecheck rc=0；lint **36 warnings / 0 errors**（171 文件，全既有，与基线一致） |
+| 全量门禁（包工头实测） | `npm run ci`（`141dccd`） | **exit 0**：typecheck 干净；lint **36 warnings / 0 errors**；`verify:lib` → `lib/ at 141dccd is the build of src/ at 141dccd (245 files, byte-identical)`；vitest **101 files / 1910 tests PASS**，**122.98 s** |
+| 远端双绿（包工头实测） | **PR #48** <https://github.com/free6589/dsh-grok-workflow/pull/48>，run **45385807284** | **Node 22 pass 2m12s / Node 24 pass 2m29s**，两段各自 `Test Files 101 passed (101)` ⇒ `main` 上那次 Node 24 红**已转绿** |
+
+**Changed：** 只 `test/timeout.spec.ts`（+19 / −8）：`./helpers.js` 的 import 加 `settledWithin`；两条用例的 `await` 包进
+`settledWithin(…, 15_000, 'the bare-realm Atomics wait' / 'the no-timer fallback run')`，其余逐字未动。`src/`、`lib/`、`scripts/`、
+`package.json`、`CHANGELOG.md`、版本号、`vitest.config.ts` 一行未动。
+
+**Honest boundary（逐条，别单独主张被它们限定的东西）：**
+1. **本地修前红 `NOT_RUN`**：102 次执行 0 红，所以本地**不能**声称「修掉了这条抖动」；本地能说的只有「修后同口径仍绿、且多了一个更早的具名界」。
+2. **Node 24 本机 `NOT_RUN`**：这台机器只有 Node 26.8.1 与 22.23.4；「Node 24 红转绿」的唯一证据是远端 run `45385807284` 的那一段。
+3. **`settledWithin` 只在循环醒来时校验预算**（既有形状，本轮未动）：把兜底用例的探针预算临时改成 600 ms 仍绿（1064 ms）说明 20 ms tick
+   也会被 sleep 吞掉；15 s 因此是「醒来时的界」，不是硬实时界。
+4. **断言、用例 `20_000`、`testTimeout: 30_000`、skip/only、`vitest.config.ts`、`noTimerScript` 的两处文本破坏全部未动**——这一条是收紧而不是放宽。
+5. 全量 `npm run ci` 本轮由**包工头**跑（1 次，exit 0）；执行手没有重跑全量门禁，本地只跑了上表里那些定向命令。
+
 ## 0.13.32 发布：合流无冲突、门禁、标签、推送、远端两条流水线，以及 Node 24 的一次既有探针红 — 2026-11-24 (`CONFIRMED`)
 
 下面每一行都是发版那一轮在主检出 `/home/fish/projects_mine/dsh-grok-workflow` 里真跑过的命令与真读到的结果；没跑的写 `NOT_RUN`。

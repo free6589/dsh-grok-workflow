@@ -1,3 +1,25 @@
+Last updated: 2026-11-24 19:45 +08:00（**两条无计时器探针改由探针持钟：远端 Node 24 那次红转绿；同包清掉 `team-dispatch-v1` 分支与 worktree；`feat/audit-layer` 记为 D-130 取半记录；三条 `backup/wip` 写死 2026-11-27 删除日** —
+worktree `.agents/worktrees/fix-timeout-probe-settle`，分支 `fix/timeout-probe-settle`，基线 `main` 尖端 `ca65df8`（`0.13.32`），代码提交 **`141dccd`**
+只含 `test/timeout.spec.ts`（+19 / −8）。病是 `c1ebdf3` 记过的同一条：两条用例等的是无计时器 realm 的结算，钟却是 runner 的——
+远端 CI run **45378449742**（`main` `ca65df8`）里 **Node 24 红**（`races on Atomics.waitAsync where no setTimeout exists`，
+`Error: Test timed out in 30000ms.`，`Tests 1 failed | 1909 passed (1910)`），Node 22 绿。修法是让等待自己持钟：
+`settledWithin(…, 15_000, <具名>)`，不落地就抛 `<what> did not settle within 15000 ms`——**收紧不是放宽**，断言、用例 `20_000`、
+`testTimeout: 30_000`、skip/only、`vitest.config.ts`、`noTimerScript` 的文本破坏全没动，`src/`/`lib/`/版本号一行未动。
+本地修前红 **`NOT_RUN`**：8 种打法逐行相加 **102** 次执行 **0 红**（自然单条各 20、18/24 个 busy 循环下的单条与整文件、Node 22.23.4、
+全量套件 3 次、`--pool=threads` 20 次），所以本地只能证「修后同口径仍绿」；**Node 24 本机 `NOT_RUN`**，它的证据只来自远端。
+修后本地：24 个 busy 循环下两条各 15 次 → **30/30 绿**（Atomics 53–69 ms、兜底 1211–1572 ms，仍是预算驱动）；整文件 5/5；`--pool=forks` 1/1；
+Node 22.23.4 整文件 3/3；typecheck 干净、lint **36 warnings / 0 errors**。门禁（包工头实测）`npm run ci` 在 `141dccd` 上 **exit 0**：
+`verify:lib` **245 files byte-identical**、vitest **101 files / 1910 tests PASS**（122.98 s）。远端 **PR #48** run **45385807284**
+**Node 22 pass 2m12s / Node 24 pass 2m29s**，两段各自 `Test Files 101 passed (101)` ⇒ `main` 上那次 Node 24 红**已转绿**。
+同包清账：`team-dispatch-v1` 删前 `ahead=0 / behind=11`、尖端 `0b686da`（经 `dc69c6e` 进 `main`）、worktree `git status --porcelain` 0 行，
+`git worktree remove` + `git branch -d` 成功（**口径修正**：派单说「已合超 24 h」不实，尖端 16:49、合流 17:01，距删除约 2 小时；
+安全依据是 ahead=0 + 工作树干净 + 内容在 `main` 里）。三条 `backup/wip-2026-11-24-*`（`de7ba6a` ahead=1、`292a4ae` ahead=4、`b91ff17` ahead=1，
+创建于 16:01–16:02）保留并**写死删除日 2026-11-27**，任一提前合入或判无价值则当天即删；对应补丁在 `.session-stage/patches/`（gitignore，不是跨机器真源）。
+`feat/audit-layer` 本轮**不合**，只按「取半记录」进 `DECISIONS.md` D-130：git 侧实测 `CONFIRMED`（`7626233`、ahead=1 / behind=500、
+12 files +996/−94、`merge-tree` 6 个冲突路径），功能评估 `NOT_RUN`（没跑它的 417 行用例、没 rebase）。本包已推 `origin/fix/timeout-probe-settle`
+并开 **PR #48**（run **45385807284** 双绿），**没合流、没发版**，
+主检出与 `~/.dsh` 一行未动。）
+
 Last updated: 2026-11-24 18:48 +08:00（**已发版 `0.13.32`：设置页的升级按钮装进了产品，`CONFIRMED`（本地门禁 exit 0 + 远端 Release 绿 + GitHub Release 已发布；远端 CI 首次一条既有探针红、`--failed` 重跑后双绿）** —
 基线 `main` 尖端 `c6a3611`（＝`origin/main`），分支 `feat/update-button`（worktree `.agents/worktrees/feat-update-button`）3 条领先 / 0 条落后：
 `git rev-list --left-right --count main...feat/update-button` → 左 `0` / 右 `3`，三条是 `c951dbf` feat(update) 设置页升级按钮、`a0bed98` 与 `09a21c2` docs(memory)。
