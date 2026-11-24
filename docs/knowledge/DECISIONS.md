@@ -3445,3 +3445,70 @@ spine 为空，pre-fix 形状会进脊柱。
 - **Consequences:** 「谁先合谁留号」是一条可以照抄的口径，下次三条分支再撞号按同一规则办，不需要重新讨论。
   代价是**合流顺序变成了决策号的一部分**——中途调整合入顺序，已改好的号要跟着再改一遍，所以派单里固定顺序是必要的、不是随意的。
   重编后的全仓复核命令是 `grep -rn "D-131\|D-132\|D-133" --include=*.md --include=*.ts --include=*.js .`。
+
+## D-135 · 接单台子的账本只追加、指纹只认用户批的那单活、心跳单独记账（2026-11-25，未发版）
+
+- **Status:** `CONFIRMED`（六个新 spec 共 174 例：五个 162 例在两次 `TMPDIR=$PWD/.tmp npm run ci` 的 exit 0 里跑过，
+  第六个 `block-flag-baseline` 12 例在它落地后单跑绿——它落地晚于那两次门禁，合起来的树的全量门禁是 `NOT_RUN`；
+  真机隔离 soak `PASS`——账本 3 行是同一个块的 v1→v2→v3、判决 3 行 `veto/veto/pass`，证据在
+  `.rsi/evidence/block-intake-2026-11-25/soak.txt` 与 `ledger-extract.txt`）
+- **Date:** 2026-11-25
+- **Context:** 分支 `feat/block-intake`（worktree `.agents/worktrees/feat-block-intake`，基线 `main` 尖端 `9b55d2d`）新增
+  `src/block/` 8 个文件与 `src/supervisor/` 3 个文件：一条「用户批准一份切分 → 块落到账本 → 交工时被判」的窄通道。
+  它要在三件互相拉扯的事上同时成立：① 事后能读出「谁在什么时候批了什么、谁否了什么」，重启也不丢；② 用户批的那单活
+  必须可指纹化，任何真实改动都要被 `startBlock` 抓住；③ 一个块的生命周期跨回合，唯一的时钟是宿主的心跳投递，
+  而心跳既不是判决也不是进度。下面八条是这条通道的口径，每条都写清被否掉的是什么。
+- **Decision:**
+  1. **判决账只追加、块行追加式版本化。** `verdicts.jsonl` 一行一次判决，模块里没有 update/delete 路径
+     （`src/block/store.ts` 只导出 `appendVerdictRow` / `readVerdictRows`），同一 `evidenceHash` 重交不写第二行，
+     直接回上一条并标 `evidenceUnchanged: true`（`src/supervisor/index.ts:111-123`）；`blocks.jsonl` 一个块一行一版，
+     重开同一行只追加 `version + 1`，而 `version` 由写者算（`上一版 + 1`）：调用方报的号不连续就 `invalid`，
+     超过 `versionsPerBlock`（20）就 `version-limit`。soak 实测 3 行 = 同一 `id` 的 v1→v2→v3（`open` / `open` /
+     `accepted`），判决 3 行 `veto/veto/pass`，没有一行被就地改写过。
+  2. **`verify` 不进 `splitHash`。** 指纹只对归一化后的 `{objective, blocks, constraints, nonGoals}` 取 sha-256
+     （`normalizeSplit` → `splitHashOf`，`src/block/preview.ts:276-302`）；监工开关挂在行上（`BlockRow.verify?`），
+     与指纹并排、不在指纹里。指纹回答的是「这是用户批的那单活吗」，监工开关是**执行策略**；折进去会让「用户把监工关了」
+     被 `startBlock` 读成「用户改了单子」，从而以 `split-changed` 拒绝一份没人改过的预览。
+  3. **第三个文件 `heartbeats.jsonl`。** 心跳观测既不写 `verdicts.jsonl`（判决是对活儿的判断，心跳不是），也不占
+     `blocks.jsonl` 的版本槽（一个块 20 个槽，按源码注释「心跳至少隔一小时一次」的口径，一小时一记会把真块在 20 小时后
+     顶退休），所以单独一个只追加文件，上限 `HEARTBEAT_OBSERVATION_LIMIT = 200` 行，到顶只 `warn` 一次、不再写
+     （`src/block/brakes.ts:37-47`、`:213-219`）。soak 那轮该文件不存在——没有心跳投递，这是预期形状。
+  4. **`block_id` 是行 id，块内用可选 `block` 选中。** `startBlock` 回的是**行** id，一行最多 3 块；所以 `accept` /
+     `close` / `status` / `steer` / `stop` 都收一个可选 `block`（`blk-2` 或标题），省略时取第一个仍 `open` 的块
+     （`blockOf()`，`src/block/tools.ts:144-166`）。两个概念不压成一个参数：`block_id` 若做成块级 id，账本行和工具参数
+     就对不上；块内不给选择器，「一单三块」在第二次调用时无从指认。
+  5. **账本不加锁，这是显式边界不是遗漏。** `src/taskboard/store.ts` 用 `O_EXCL` 锁，块账本不抄：写者是单写者
+     （一个会话的工具层），`startBlock` 的 `(session, splitHash)` 幂等让重试根本不追加；两个进程同时追加会各自读到
+     同一个「最后一版」，第二次 rename 赢、第一行丢。这段写在模块头（`src/block/store.ts:35-42`）。
+  6. **`blockIntake` 是载入期开关、不做 `volatile()`。** 工具只注册一次（`src/index.ts:425`
+     `if (config.blockIntake === true)`），投影到设置页会承诺一个「保存即生效」而实际要重载的实时编辑，所以
+     `src/settings.ts:375` 把它和 `toolName` / `configVersion` 一起从投影里滤掉——键从 19 到 20，页面字段从 16 到 17。
+     代价写在明处：它只能写 profile patch，不出现在设置页。
+  7. **`override` 只覆盖「范围」类否决。** `scopeOnly = checks.failures.every(f => f.criterion === SCOPE_CRITERION)`
+     （`SCOPE_CRITERION = '范围 ⊆ 批准'`），只有**全部**失败项都是范围、且调用方给了 `override`，才继续往下走
+     （`src/supervisor/index.ts:150-152`）；其余五条确定性检查（计划覆盖、证据非空、产物可解析、依赖悬空、交接四行）
+     与模型否决都不可覆盖。范围是「人在范围上拍板」这一件事；其余是事实性记账，人能授权，不能让不存在的文件存在。
+  8. **心跳窄监听先算决策再记观测。** cordis 的 `agent/pre-step` 是 waterfall，handler 返回 `undefined` 会把整条链的
+     决策丢掉，所以实现是 `const decision = await next()` → 观测（失败只 `warn`，不抛）→ `return decision`
+     （`src/block/brakes.ts:223-234`）；`enabled !== true` 时**一个监听都不装**，不是装了再早退（`:198`）。
+     `test/block-flag.spec.ts` 8 例钉住「决策与基线逐字节相同」。监听装在 `installGate` **之前**，因此是链上最外层：
+     闸门自己拒掉的那次心跳它也记得到，而它返回的决策原样不动。
+- **Alternatives rejected:**
+  1. **判决行就地更新成最新状态**：被覆盖的那条否决会消失，而否决恰恰是审计要查的那条；soak 里 attempt 2 的「监工调用
+     失败」若被 attempt 3 的 `pass` 覆盖，事后就看不出「这一块曾经因为环境缺 key 而没被独立判过」。
+  2. **同一份证据重判写第二行**：白烧一次监工调用，`attempt` 号也失去「换过几份证据」的含义。现在第二条明确回
+     `evidence-unchanged`，调用方知道是同一份证据被重交，不是又被否了一次。
+  3. **`blocks.jsonl` 每块一行、就地覆盖**：丢掉「第几版是 accepted」，20 版上限也无处可算（上限是数行数，不是数字段）。
+  4. **心跳写进 `verdicts.jsonl`，或占 `blocks.jsonl` 的版本槽**：前者让判决文件里混进非判决，后者让真块被心跳顶退休。
+  5. **`verify` 折进 `splitHash`**：见决定 2，关监工会被读成改单子。
+  6. **账本抄 taskboard 那把 `O_EXCL` 锁**：单写者路径上的第二套锁语义；真要多写者部署，正确做法是照抄 taskboard 的锁，
+     而不是在这里发明一套，现在加锁只是把「还没到的并发」提前付费。
+  7. **`blockIntake` 做成 `volatile()` 实时开关**：注册面做不到——工具注册不能热插拔，做成实时开关等于让设置页承诺一件
+     只有重载才成立的事。
+  8. **让 `override` 覆盖任意否决**：等于把确定性检查降级成建议。`override` 连同 `who` / `why` 记进判决行
+     （`VerdictRow.override`），事后读得出「这次是谁把范围放过去的」。
+- **Consequences:** 读侧宽容、写侧严格：坏行/被手改的行跳过并记进 `skipped`（行号、原因、前 200 字符），不合法的新行在
+  落盘前拒绝，`rowHash` 是这条线的检测手段。追加式版本化让「一个块」在文件里是 N 行，读侧三处都按 `version` 取最新
+  （`latestById`、`findBlockBySplit`、`openBlockIds`），新增读路径必须照办，否则会读到旧版本的状态。上限集中在一个常量
+  `BLOCK_INTAKE_LIMITS`（3 块 / 10 分钟预览 TTL / 20 个活预览 / 20 版 / 200 条心跳），改口径只改一处。
+  未发版：本轮不动 `package.json`、不打 tag、不推 `main`。

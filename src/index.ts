@@ -7,6 +7,8 @@ import { DEFAULT_ITERATE_TEMPLATE, FIXED_HISTORY_CHARS, FIXED_HISTORY_TURNS, FIX
 import { describeSurface, validateRoutes } from './settings.js'
 import { carryoverBounds, carryoverForSession } from './carryover.js'
 import { registerGrokCommand } from './command.js'
+import { installHeartbeatBrakes } from './block/brakes.js'
+import { registerBlockTools } from './block/tools.js'
 import { installGate } from './gate.js'
 import { ITERATE_TASK_TITLE, createLoopService, loopPolicyFromConfig, scheduleServiceOf } from './loop.js'
 import { installLoop } from './loop-surface.js'
@@ -409,6 +411,21 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
   // repository's own release tag, so the browser can never name a package; the route is
   // mounted inside `effect`, so an unload withdraws it with the rest of the surface.
   installUpdateRoute({ ctx: ctx as unknown as UpdateHostContext, logger })
+
+  // Block intake (接单台子): a load-time switch, read from the load-time snapshot
+  // because both halves are registrations — the five tools and one listener — and a
+  // registration cannot appear without a reload. Off registers **nothing**: no tool
+  // name and no `agent/pre-step` listener, which is what makes "off is the pre-feature
+  // tree" a testable claim instead of a promise (`test/block-flag.spec.ts`).
+  //
+  // The observer is installed *before* the gate so it is the outermost listener in the
+  // chain: it then still records a heartbeat the gate refuses (a tripped brake answers
+  // `reject` without calling `next()`), and because it returns the decision `next()`
+  // produced, the gate's answer is untouched by construction.
+  if (config.blockIntake === true) {
+    installHeartbeatBrakes({ ctx, logger, enabled: true })
+    registerBlockTools({ ctx, logger, readConfig, state })
+  }
 
   // T4: the gate is always on (enforceGate removed) — every top-level user
   // message passes the front desk.

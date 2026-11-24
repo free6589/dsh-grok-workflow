@@ -202,6 +202,21 @@ export declare const FIXED_SWITCH_ON_WITHOUT_RATE_LIMIT: Array<'server-error' | 
  * cannot disagree about what "unset" means.
  */
 export declare const DEFAULT_LOOP_ENABLED = false;
+/**
+ * Whether the block intake (接单台子) is mounted at all.
+ *
+ * Off by default, and off means *inert*: `src/index.ts` registers none of the five
+ * `grok_*block*` tools and installs no extra `agent/pre-step` listener, so a
+ * profile that never asked for the feature keeps the pre-block surface and the
+ * pre-block delivery decisions byte for byte. On registers the five tools plus one
+ * narrow heartbeat observer; it never changes a routing decision.
+ *
+ * Plain, not `volatile()`: this is a load-time switch (the tools it gates are
+ * registered once, at `apply()`), so projecting it onto the settings page would
+ * promise a live edit that a reload alone can honor. `toolName` and
+ * `configVersion` are plain for the same reason.
+ */
+export declare const DEFAULT_BLOCK_INTAKE = false;
 export declare const DEFAULT_LOOP_MAX_ROUNDS = 10;
 export declare const DEFAULT_LOOP_FAIL_STREAK = 3;
 /**
@@ -298,14 +313,14 @@ export declare const DEFAULT_MAX_ACTIVE_RUNS_TOTAL = 8;
 export declare const CONFIG_VERSION = 1;
 /**
  * Every top-level key the configuration accepts, in schema order.
- * Eighteen keys in the accepted surface; sixteen of them reach the settings
- * page (`toolName` and `configVersion` are plain, not volatile, so the runtime
- * projection drops them — pinned in `test/settings-projection.spec.ts`).
+ * Twenty keys in the accepted surface; seventeen of them reach the settings
+ * page (`toolName`, `blockIntake` and `configVersion` are plain, not volatile,
+ * so the runtime projection drops them — pinned in `test/settings-projection.spec.ts`).
  * Kept explicit so an unknown key can be rejected instead of silently dropped:
  * a typo that is silently ignored looks exactly like a setting that "does not
  * work", which is the failure mode the settings surface must not have.
  */
-export declare const CONFIG_KEYS: readonly ["toolName", "mode", "grokDefault", "roles", "guardianModel", "synthesis", "maxConcurrency", "maxTasks", "timeoutMs", "childTimeoutMs", "replan", "switchOnRateLimit", "loopEnabled", "loopMaxRounds", "loopFailStreak", "loopIntervalMin", "iterateIntervalMin", "iterateTemplate", "configVersion"];
+export declare const CONFIG_KEYS: readonly ["toolName", "mode", "grokDefault", "roles", "guardianModel", "synthesis", "maxConcurrency", "maxTasks", "timeoutMs", "childTimeoutMs", "replan", "switchOnRateLimit", "loopEnabled", "loopMaxRounds", "loopFailStreak", "loopIntervalMin", "iterateIntervalMin", "iterateTemplate", "blockIntake", "configVersion"];
 /**
  * The role names a configuration may route, in the order `resolveConfig` builds them.
  *
@@ -372,6 +387,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     loopIntervalMin: z<number, number, "volatile-defined">;
     iterateIntervalMin: z<number, number, "volatile-defined">;
     iterateTemplate: z<string, string, "volatile-defined">;
+    blockIntake: z<boolean, boolean, "defined">;
     roles: z<NoInfer<Schemastery.ObjectS<NoInfer<{
         planner: z<({
             provider?: string | null;
@@ -490,6 +506,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     loopIntervalMin: z<number, number, "volatile-defined">;
     iterateIntervalMin: z<number, number, "volatile-defined">;
     iterateTemplate: z<string, string, "volatile-defined">;
+    blockIntake: z<boolean, boolean, "defined">;
     roles: z<NoInfer<Schemastery.ObjectS<NoInfer<{
         planner: z<({
             provider?: string | null;

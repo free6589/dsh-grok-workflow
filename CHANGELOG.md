@@ -5,6 +5,49 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.34] - 2026-11-25
+
+### Added / 新增
+
+- **A block intake: the split you approve is written down, and handing it in is judged / 接单台子：你点头的那份切分会被
+  写下来，交工时有人判** — Off by default. When `blockIntake` is on, a task can be ordered as one approved split of up
+  to three blocks. The split is shown to you first (titles, objectives, deliverables, acceptance items, write scopes,
+  dependencies) and nothing is written until a user message repeats the approval word you were asked for; a start
+  carrying a different split, or one whose approval word never appears in a message, is refused with the reason instead
+  of starting work. An approved split becomes a ledger row under `$DSH_HOME/taskboards/grok-workflow/` and every later
+  change is a new appended version of the same row, never an edit — the file itself is the record of who accepted what,
+  and when. Six tools drive it: order a block, claim one, hand one in, read one back, steer it, stop it. Handing a block
+  in runs six deterministic checks first (every acceptance item answered by a task, real evidence text, declared
+  artifacts present, every written path inside the approved scope, no dangling dependency, a four-line handoff) and only
+  then asks an independent supervisor for a per-criterion verdict; the verdict is `pass` or `veto` with named reasons,
+  written to its own append-only ledger, and re-submitting the same evidence returns the verdict already on file instead
+  of writing a second one. A heartbeat that reaches a session still holding an open block is recorded as an observation
+  in a third file — never as a verdict, and never as a version of a block. With the switch off, not one tool and not one
+  listener is registered, so a profile that leaves it off keeps exactly the surface and the delivery decisions it had.
+  / 默认关闭。打开 `blockIntake` 之后，一个任务可以按「一份你批准过的切分」下成最多三块。切分先给你看（标题、目标、
+  交付物、验收条目、写范围、依赖），在你发出一条逐字包含确认词的消息之前什么都不写；提交时切分变了、或者确认词压根
+  没在消息里出现，都会被连原因一起拒掉，而不是先干起来。批准过的切分落成 `$DSH_HOME/taskboards/grok-workflow/`
+  下的一行账本，之后每次变化都是同一行的**新追加版本**、绝不就地改——文件本身就是「谁在什么时候批了什么」的记录。
+  驱动它的是六个工具：出单、认领、交工、回读、改方向、停下。交工时先跑六条确定性检查（每条验收都有任务认领、证据
+  是真文字、声明的产物确实在、写过的路径都在批准范围内、没有悬空依赖、交接正好四行），全过之后才问一位独立监工逐条
+  判断；判决只有 `pass` 或 `veto`，附具名理由，写进自己的只追加账本，同一份证据重交会回已有判决而不是再写一条。
+  送到「还欠着活」的会话的心跳，记在第三个文件里当观测——既不当判决，也不占块的一个版本。开关关掉时一个工具都不
+  注册、一个监听都不装，没要这个功能的档案保持原有工具面与原有投递决策。
+
+### Changed / 变更
+
+- **The configuration surface grows from nineteen keys to twenty / 配置面从十九个键变成二十个** — The new key is
+  `blockIntake`, default `false`. It is a load-time switch, not a live one: the tools and the listener are registered
+  once, when the plugin loads, so it is deliberately not projected onto the settings page — editing it there would
+  promise an immediate effect that only a reload can deliver. Set it in the profile's `cordis.patch.yml`; a patch
+  carrying it on an older build is refused at load with the accepted-key list, which now ends `… iterateTemplate,
+  blockIntake, configVersion`. Everything else about the configuration surface is unchanged: the same nineteen keys
+  keep their names, defaults and limits.
+  / 新键是 `blockIntake`，默认 `false`。它是**载入期**开关、不是实时开关：工具与监听在插件载入时注册一次，所以它
+  故意不投影到设置页——在那儿改会承诺一个只有重载才生效的「立即生效」。请在 profile 的 `cordis.patch.yml` 里写它；
+  带着这个键的旧构建补丁会在载入时被连可接受键列表一起拒掉，那个列表现在以 `… iterateTemplate, blockIntake,
+  configVersion` 结尾。配置面其余部分不变：原来那十九个键的名字、默认值与上限照旧。
+
 ## [0.13.33] - 2026-11-24
 
 ### Added / 新增

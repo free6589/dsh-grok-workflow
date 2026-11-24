@@ -43,10 +43,10 @@ release.
 
 Configuration keys and their hard limits are listed in the
 [README configuration table](../README.md#configuration-reference).
-The plugin accepts exactly nineteen keys (`toolName`, `mode`, `grokDefault`, `roles`,
+The plugin accepts exactly twenty keys (`toolName`, `mode`, `grokDefault`, `roles`,
 `guardianModel`, `synthesis`, `maxConcurrency`, `maxTasks`, `timeoutMs`, `childTimeoutMs`, `replan`, `switchOnRateLimit`, `loopEnabled`,
 `loopMaxRounds`, `loopFailStreak`, `loopIntervalMin`, `iterateIntervalMin`,
-`iterateTemplate`, `configVersion`);
+`iterateTemplate`, `blockIntake`, `configVersion`);
 everything else is fixed inside the plugin (`maxRetries=1`,
 `maxActiveRuns=2` per session / `8` per process) and a patch that still carries
 a removed key is rejected at load. `timeoutMs` defaults to `0` (unlimited);
@@ -74,7 +74,7 @@ Verified activation, step by step (anyone can repeat it):
 dsh --profile grok-workflow-dev --from-default-profile web
 
 # 2. install the packed plugin (adds the dependency AND the bundle row)
-dsh plugin --profile grok-workflow-dev add ./dsh-grok-workflow-0.13.33.tgz
+dsh plugin --profile grok-workflow-dev add ./dsh-grok-workflow-0.13.34.tgz
 
 # 3. re-enable a workflow provider in the profile patch
 #    <profile>/cordis.patch.yml:
@@ -102,7 +102,7 @@ line — no `pending` row and no `did not activate` warning — and a settings p
 namespaces, one of them `grok-workflow` with `autoGenerate: true`. The model-backed message
 was not run: see "Real-model smoke" for the `MISSING_CREDENTIAL` line.
 
-Three traps that cost real time in t32 (all reproduced):
+Traps that cost real time (all reproduced):
 
 - **A stale install.** `dsh plugin add` with the *same* `file:` tarball path is a
   pnpm no-op: the profile keeps the previously installed contents (the manifest
@@ -123,6 +123,22 @@ Three traps that cost real time in t32 (all reproduced):
   `@deepseek-ai/dsh-subagent-spawn-in-process` / `-fork-in-process`). Setting it to
   an LLM provider id (`bifrost-completions`, …) makes every run fail closed with
   `no subagent provider registered for "<id>"`.
+- **A symlinked plugin root does not load correctly — copy the build in instead.** Pointing
+  `<profile>/node_modules/dsh-grok-workflow` at the checkout makes Node resolve the *real*
+  path, so the plugin loads the checkout's own dev copies of `@deepseek-ai/*` (`0.2.1-rc.2`)
+  instead of the host's (`0.2.2-rc.3`). Those are two different `Session` classes, and the
+  first session write fails with
+  `Grok workflow toggle not changed: Receiver must be an instance of class Session.`
+  (V8 refusing a private-field access inside `appendPluginRecord`). A package-shaped
+  directory whose `lib/` and `package.json` are symlinks fails the same way, because `lib`
+  is still a symlink. Copy the build into the profile — `lib/`, `package.json`,
+  `cordis.patch.yml`, README/CHANGELOG/LICENSE, `docs/*.md` — which is the shape a real
+  `dsh plugin add` install has: no `@deepseek-ai` packages under the installed package.
+  Check the copy is the same build rather than a stale one:
+  `sha256sum <profile>/node_modules/dsh-grok-workflow/lib/index.js` must equal the worktree's
+  `lib/index.js`, and `node -p "require('<profile>/node_modules/dsh-grok-workflow/package.json').version"`
+  must read back the version you built. Reproduced on `0.2.2-rc.3` (M2 block-intake soak,
+  2026-11-25; evidence `.rsi/evidence/block-intake-2026-11-25/soak.txt` §7).
 
 The settings page in the Web GUI writes into the **profile's `cordis.patch.yml`**
 (the settings document lives there): after saving a field you can see the value in
@@ -143,8 +159,8 @@ cp "$DSH_HOME/profiles/<name>/cordis.patch.yml" \
 # 2. install the packed plugin. A *new path* every time: `dsh plugin add` with the same
 #    `file:` spec is a pnpm no-op, so an unchanged path can silently keep the old contents.
 DEST="/tmp/install-$(date +%s%N)"      # a spec this profile has never been given
-mkdir -p "$DEST" && cp dsh-grok-workflow-0.13.33.tgz "$DEST/"
-dsh plugin --profile <name> add "$DEST/dsh-grok-workflow-0.13.33.tgz"
+mkdir -p "$DEST" && cp dsh-grok-workflow-0.13.34.tgz "$DEST/"
+dsh plugin --profile <name> add "$DEST/dsh-grok-workflow-0.13.34.tgz"
 
 # 3. verify the installed bytes, not the pack
 node -p "require('$DSH_HOME/profiles/<name>/node_modules/dsh-grok-workflow/package.json').version"

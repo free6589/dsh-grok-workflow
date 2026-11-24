@@ -45,10 +45,10 @@ dsh --profile grok-workflow-dev --from-default-profile headless --dump-config
 Then install the plugin:
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.13.33
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.13.34
 ```
 
-> `#v0.13.33` is the current release. Pin the tag you actually want; omitting it follows `main`, which is not a release. Do not run `--from-default-profile` after `plugin add`: it replaces the profile and removes the plugin you just installed.
+> `#v0.13.34` is the current release. Pin the tag you actually want; omitting it follows `main`, which is not a release. Do not run `--from-default-profile` after `plugin add`: it replaces the profile and removes the plugin you just installed.
 
 Then restart the profile so DSH loads the new plugin:
 
@@ -208,7 +208,7 @@ supervisor keeps that job (fail-only after verification).
 
 ## Configuration reference
 
-Configuration belongs to the profile's `cordis.patch.yml` (or a `--patch` overlay), under the bundle row. The surface is exactly nineteen keys (`timeoutMs` joined in `0.11.0`, `childTimeoutMs` joined now, the rate-limit switch, the four `loop*` keys with the repeat-run settings, the two `iterate*` keys with the self-iteration heartbeat, and `guardianModel` the single stall-judge route); anything else is rejected at load, so a stale patch fails loudly instead of looking like a setting that does nothing:
+Configuration belongs to the profile's `cordis.patch.yml` (or a `--patch` overlay), under the bundle row. The surface is exactly twenty keys (`timeoutMs` joined in `0.11.0`, `childTimeoutMs` joined now, the rate-limit switch, the four `loop*` keys with the repeat-run settings, the two `iterate*` keys with the self-iteration heartbeat, `guardianModel` the single stall-judge route, and `blockIntake` the block-intake switch); anything else is rejected at load, so a stale patch fails loudly instead of looking like a setting that does nothing:
 
 ```yaml
 - id: grok-workflow
@@ -245,6 +245,7 @@ Configuration belongs to the profile's `cordis.patch.yml` (or a `--patch` overla
 | `loopIntervalMin` | `0` (`0` = the loop's floor) | `10080` (seven days) | Minutes between rounds. The effective wait is never below one worst-case round or 60 minutes, so `0` means "as soon as a round can finish", not "immediately" |
 | `iterateIntervalMin` | `0` (`0` = the heartbeat's floor) | `10080` (seven days) | Minutes between self-iteration heartbeats. Same floor semantics as `loopIntervalMin`: never below one worst-case round or 60 minutes |
 | `iterateTemplate` | built-in default, `docs/iterate-template.md` | at most 4000 characters | The whole prompt stored in the `RSI heartbeat` Schedule task when the Self-iterate switch arms one. Whitespace-only falls back to the built-in default. The shipped default is the round prompt in `docs/iterate-template.md` (POOL-first topic selection, R1–R6, triple review, four brakes, forbidden zones), and `test/iterate-template.spec.ts` keeps the file and the constant byte-identical. Edited in the settings page's *Self-iteration* group and persisted per profile; it carries no routing marker, so editing it never changes gate routing |
+| `blockIntake` | `false` | `true` \| `false` | Mounts the block intake: the six `grok_*block*`/`grok_steer`/`grok_stop` tools, the supervisor that judges a finished block, and one narrow `agent/pre-step` observer that records a Host heartbeat when the session has an open block. It is a load-time switch (the tools are registered once, at load) and it is not projected to the settings page for that reason. Off registers nothing at all and installs no listener, so a profile that leaves it off keeps the surface and the delivery decisions it had before the feature existed. It never changes a routing decision: the observer passes every decision through unchanged |
 | `configVersion` | `1` | `1` | Configuration surface version |
 
 The four `loop*` keys configure the repeat-run surface. When a session's loop is opened, the loop service reads `loopMaxRounds`, `loopFailStreak` and `loopIntervalMin` at open time and stores them in a durable Schedule rule; without a composed Schedule service the keys are stored and every message still runs once. `loopEnabled` is the deployment default for an automatic driver and is not read yet — opening a loop stays an explicit user action ([Repeat runs](#repeat-runs-the-loop-heartbeat)). `loopIntervalMin` is a wait, not a budget: it can only raise the loop's floor, and `loopFailStreak` travels into the heartbeat text as guidance because the Host records delivery, not round success.
@@ -349,13 +350,13 @@ The plugin reuses DSH's workflow engine and subagents. It does not replace DSH's
 
 ## Versions and release notes
 
-The package version in this repository is `0.13.33`. Install or roll back to an exact release with a tag suffix:
+The package version in this repository is `0.13.34`. Install or roll back to an exact release with a tag suffix:
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.13.33
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.13.34
 ```
 
-Use only a tag that exists on GitHub. Published: `v0.1.0`, `v0.2.0`, `v0.2.1`, `v0.2.2`, `v0.2.3`, `v0.2.4`, `v0.2.5`, `v0.2.6`, `v0.2.7`, `v0.3.0`, `v0.4.0`, `v0.5.0`, `v0.5.1`, `v0.6.0`, `v0.7.0`, `v0.8.0`, `v0.9.0`, `v0.9.1`, `v0.9.2`, `v0.9.3`, `v0.9.4`, `v0.10.0`, `v0.10.1`, `v0.10.2`, `v0.11.0`, `v0.11.1`, `v0.11.2`, `v0.11.3`, `v0.11.4`, `v0.11.5`, `v0.11.6`, `v0.11.7`, `v0.11.8`, `v0.11.9`, `v0.11.10`, `v0.11.11`, `v0.11.12`, `v0.11.13`, `v0.11.14`, `v0.11.15`, `v0.11.16`, `v0.11.17`, `v0.11.18`, `v0.11.19`, `v0.11.20`, `v0.11.21`, `v0.12.0`, `v0.12.1`, `v0.12.2`, `v0.12.3`, `v0.12.4`, `v0.12.5`, `v0.12.6`, `v0.12.7`, `v0.12.8`, `v0.12.9`, `v0.12.10`, `v0.12.11`, `v0.12.12`, `v0.12.13`, `v0.12.14`, `v0.12.15`, `v0.12.16`, `v0.12.18`, `v0.12.19`, `v0.13.0`, `v0.13.1`, `v0.13.2`, `v0.13.3`, `v0.13.4`, `v0.13.5`, `v0.13.6`, `v0.13.7`, `v0.13.8`, `v0.13.9`, `v0.13.10`, `v0.13.11`, `v0.13.12`, `v0.13.13`, `v0.13.14`, `v0.13.15`, `v0.13.16`, `v0.13.17`, `v0.13.18`, `v0.13.19`, `v0.13.20`, `v0.13.21`, `v0.13.22`, `v0.13.23`, `v0.13.24`, `v0.13.25`, `v0.13.26`, `v0.13.28`, `v0.13.29`, `v0.13.30`, `v0.13.31`, `v0.13.32` and `v0.13.33`. The unpinned command follows `main` and does not pin a release. `v0.2.0-rc.1` also exists on GitHub but is not a release: it predates the release workflow and its `package.json` still declares `0.1.0`. The `v0.13.27` tag is not a release either: its test gate failed on the runner, so nothing was published from it and `v0.13.28` carries the same change. The `v0.11.14` tag is not a release either: its committed `lib/` was built from an earlier `src/`, so the release workflow stopped at its artifact check and never published it. Install the `v0.11.15` pin above; that tag is left in place only because published tags are immutable. See the [changelog](CHANGELOG.md) and the [release guide](docs/RELEASING.md) for the versioning and rollback rules.
+Use only a tag that exists on GitHub. Published: `v0.1.0`, `v0.2.0`, `v0.2.1`, `v0.2.2`, `v0.2.3`, `v0.2.4`, `v0.2.5`, `v0.2.6`, `v0.2.7`, `v0.3.0`, `v0.4.0`, `v0.5.0`, `v0.5.1`, `v0.6.0`, `v0.7.0`, `v0.8.0`, `v0.9.0`, `v0.9.1`, `v0.9.2`, `v0.9.3`, `v0.9.4`, `v0.10.0`, `v0.10.1`, `v0.10.2`, `v0.11.0`, `v0.11.1`, `v0.11.2`, `v0.11.3`, `v0.11.4`, `v0.11.5`, `v0.11.6`, `v0.11.7`, `v0.11.8`, `v0.11.9`, `v0.11.10`, `v0.11.11`, `v0.11.12`, `v0.11.13`, `v0.11.14`, `v0.11.15`, `v0.11.16`, `v0.11.17`, `v0.11.18`, `v0.11.19`, `v0.11.20`, `v0.11.21`, `v0.12.0`, `v0.12.1`, `v0.12.2`, `v0.12.3`, `v0.12.4`, `v0.12.5`, `v0.12.6`, `v0.12.7`, `v0.12.8`, `v0.12.9`, `v0.12.10`, `v0.12.11`, `v0.12.12`, `v0.12.13`, `v0.12.14`, `v0.12.15`, `v0.12.16`, `v0.12.18`, `v0.12.19`, `v0.13.0`, `v0.13.1`, `v0.13.2`, `v0.13.3`, `v0.13.4`, `v0.13.5`, `v0.13.6`, `v0.13.7`, `v0.13.8`, `v0.13.9`, `v0.13.10`, `v0.13.11`, `v0.13.12`, `v0.13.13`, `v0.13.14`, `v0.13.15`, `v0.13.16`, `v0.13.17`, `v0.13.18`, `v0.13.19`, `v0.13.20`, `v0.13.21`, `v0.13.22`, `v0.13.23`, `v0.13.24`, `v0.13.25`, `v0.13.26`, `v0.13.28`, `v0.13.29`, `v0.13.30`, `v0.13.31`, `v0.13.32`, `v0.13.33` and `v0.13.34`. The unpinned command follows `main` and does not pin a release. `v0.2.0-rc.1` also exists on GitHub but is not a release: it predates the release workflow and its `package.json` still declares `0.1.0`. The `v0.13.27` tag is not a release either: its test gate failed on the runner, so nothing was published from it and `v0.13.28` carries the same change. The `v0.11.14` tag is not a release either: its committed `lib/` was built from an earlier `src/`, so the release workflow stopped at its artifact check and never published it. Install the `v0.11.15` pin above; that tag is left in place only because published tags are immutable. See the [changelog](CHANGELOG.md) and the [release guide](docs/RELEASING.md) for the versioning and rollback rules.
 
 ## Testing and development
 
