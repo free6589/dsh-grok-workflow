@@ -8,6 +8,9 @@
  * never GUI evidence.
  */
 
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
@@ -683,6 +686,37 @@ describe('P0-2: a confirmation answer keeps the original request', () => {
     expect(request).toContain('改一下那个')
     expect(request).toContain('把那个也顺手弄一下')
     expect(answerOf(answered)).toContain('档位：团队档')
+  })
+
+  it('keeps the question open even when the look-up would answer the new message', async () => {
+    // The look-up pass (v0.5) answers a vague follow-up from the conversation, the
+    // earlier rounds or the memory files on disk. While a question is open it must not:
+    // the second vague message is a new request, and answering it from memory would drop
+    // the request the user was asked about (P0-2). The material below carries two of
+    // that message's own anchors — exactly what a hit needs — so this case fails the
+    // moment the open question stops outranking the look-up, whatever the repository's
+    // own memory files happen to say that day.
+    const root = mkdtempSync(join(tmpdir(), 'p02-recall-'))
+    writeFileSync(join(root, 'STATE.md'), '本轮先顺手把 把那个 也过一遍，再回头处理别的事。\n', 'utf8')
+    const previous = process.env['GROK_WORKFLOW_KNOWLEDGE_DIRS']
+    process.env['GROK_WORKFLOW_KNOWLEDGE_DIRS'] = root
+    try {
+      const ctx = new FakeContext()
+      ctx.engine.autoRun = true
+      apply(ctx as never, { legacyGate: true, mode: 'triage', grokDefault: 'on' })
+      const live = session('sess-b04-recall')
+      const agent = new FakeAgent(live)
+      await ctx.preStep()(payload(agent, [userMessage('改一下那个')]), nextWith([]))
+
+      const second = await ctx.preStep()(payload(agent, [userMessage('把那个也顺手弄一下')]), nextWith([])) as Decision
+
+      expect(answerOf(second)).toContain('简单 / 团队')
+      expect(answerOf(second)).not.toContain('快手档')
+      expect(ctx.engine.startCalls).toHaveLength(0)
+    } finally {
+      if (previous === undefined) delete process.env['GROK_WORKFLOW_KNOWLEDGE_DIRS']
+      else process.env['GROK_WORKFLOW_KNOWLEDGE_DIRS'] = previous
+    }
   })
 
   it('cuts the resumed request to the objective budget instead of refusing the run (B08)', async () => {
