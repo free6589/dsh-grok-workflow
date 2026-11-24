@@ -23,7 +23,7 @@ import { apply } from '../src/index.js'
 import { setMode } from '../src/mode.js'
 import { DEFAULT_MAX_CONCURRENCY, FIXED_MAX_QUEUED_MESSAGES, HARD_LIMITS, resolveConfig } from '../src/config.js'
 import { execution, task, verification } from './fixtures.js'
-import { delay, runWorkflowScript, roleOf } from './helpers.js'
+import { delay, landedWithin, runWorkflowScript, roleOf } from './helpers.js'
 
 /* ------------------------------------------------------------------ engine -- */
 
@@ -387,19 +387,24 @@ describe('/grok on keeps message ingress open', () => {
       if (ctx.engine.teamRuns.length < 2) throw new Error(`only ${ctx.engine.teamRuns.length} runs started`)
     })
 
-    // Settle the blocking run so its step closes. Which run the engine started last is
-    // a scheduling fact — the queued rounds and the blocking one are separate enqueues,
-    // so no index names the blocking run — therefore this settles by *state*: every run
-    // still open, in bounded rounds, and settling a queued round lets the queue advance
-    // one slot. The assertion is still "the blocking step closed", and it fails by name.
+    // Settle the blocking run so its step closes.
+    //
+    // Which run the engine started last is a scheduling fact — the queued rounds and the
+    // blocking one are separate enqueues — so no index names the blocking run; every run
+    // still open is settled instead, and settling a queued round lets the queue advance a
+    // slot. The wait then belongs to the step's *landing*, not to the settle: after its run
+    // resolves the step still delivers and commits over several hops, which on a loaded
+    // machine is far more than a few polls. `landedWithin` owns that clock (a ref'd timer
+    // the worker cannot sleep through) and fails by name; the old fixed budget of
+    // `FIXED_MAX_QUEUED_MESSAGES + 3` × 50 ms was that missing time, measured on an idle box.
     const committedBefore = loop.committed.length
     let closed = false
-    for (let round = 0; round < FIXED_MAX_QUEUED_MESSAGES + 3 && !closed; round += 1) {
+    await landedWithin(() => {
       for (const run of ctx.engine.runs) if (!run.settled) run.complete(report())
-      await delay(50)
       closed = loop.committed.length > committedBefore
-    }
-    expect(closed, 'the blocking step never settled').toBe(true)
+      return closed
+    }, 15_000, 'the blocking step')
+    expect(closed).toBe(true)
   })
 
   it('shows the first message of a fresh session before the run finishes (deployment `full`)', async () => {
