@@ -1,0 +1,12 @@
+load started: 12 spinners; loadavg=17.59 24.57 26.00
+run 1: green loadavg=22.58 24.46 25.84
+run 2: green loadavg=24.28 24.43 25.69
+run 3: green loadavg=25.66 24.82 25.72
+run 4: green loadavg=25.05 24.84 25.64
+run 5: green loadavg=24.89 24.86 25.59
+run 6: green loadavg=25.57 25.13 25.62
+run 7: green loadavg=25.41 25.21 25.61
+run 8: green loadavg=27.02 25.79 25.78
+run 9: green loadavg=26.01 25.74 25.76
+run 10: green loadavg=26.43 25.88 25.80
+RED 0 / 10

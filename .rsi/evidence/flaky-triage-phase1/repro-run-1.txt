@@ -1,0 +1,85 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-flaky-triage-phase1
+
+(node:63) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGTERM listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGINT listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:63) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGHUP listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+ ✓ test/triage.spec.ts (43 tests) 63088ms
+     ✓ a session /grok record forces the full workflow even when the deployment uses the front desk  710ms
+     ✓ answers a greeting directly, without starting the team or a call  5008ms
+     ✓ answers "what can you do" instead of deflecting it  5008ms
+     ✓ answers a simple task with one worker and says so  5010ms
+     ✓ runs the whole workflow for a complex request after the captain split is confirmed  5373ms
+     ✓ asks one question instead of guessing, and remembers the answer  16140ms
+     ✓ hands the worker the answered request and the new work in the same message (B05)  10215ms
+     ✓ upgrades to the team when the message asks for it, after a split confirmation  5112ms
+     ✓ retries once with a structured answer when the plain call returns nothing  5008ms
+     ✓ states a failed cheap call instead of silently upgrading it  5004ms
+     ✓ keeps the pre-t52 text when the front desk is off  332ms
+(node:74) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGTERM listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:74) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGINT listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:74) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGHUP listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+ ❯ test/phase1-dialogue.spec.ts (36 tests | 1 failed) 7447ms
+     ✓ publishes the claimed message, then the report, once each, in that order  584ms
+     ✓ keeps the original message when the message is refused before any run 8ms
+     ✓ survives a reload: the transcript replays the original message then the report  382ms
+     ✓ in-turn: the claimed message is entered with the answer in the same step (T4) 142ms
+     ✓ in-turn: the original message and the report are both in the durable log (T4) 215ms
+     ✓ a downstream refusal is not claimed, so the batch stays routable 13ms
+     ✓ asks before running when the request is ambiguous 139ms
+     ✓ hands the quick worker the original request together with the choice 91ms
+     ✓ hands the team the original request together with the choice  567ms
+     ✓ states that the confirmation expired instead of guessing the task 133ms
+     ✓ starts nothing when the pending question was lost by a reload 132ms
+     ✓ never lets another session answer this session’s question 214ms
+     × consumes a pending question once, so a repeated answer cannot start a second run 451ms
+     ✓ says the question is void when the user answers something else 157ms
+     ✓ keeps an earlier unanswered request when a second question arrives (B04)  563ms
+     ✓ cuts the resumed request to the objective budget instead of refusing the run (B08)  590ms
+     ✓ answers a classification failure instead of an empty turn 6ms
+     ✓ answers when answering in-turn throws, and keeps the claimed message 4ms
+     ✓ states a quick-tier failure and never celebrates it 2ms
+     ✓ never prints a secret that the failure carried 17ms
+     ✓ does not re-enter the gate or start a second workflow to report an error 14ms
+     ✓ tells a cancellation apart from a provider failure 232ms
+     ✓ launches nothing when the signal is already aborted 11ms
+     ✓ cancels the running engine once and reports the stop, without a retry  304ms
+     ✓ keeps the tasks that had already been verified when the run is stopped 256ms
+     ✓ turns a deadline into its own terminal state (regression, T4 fixed deadline) 165ms
+     ✓ names an unload as an unload, not as a caller cancellation 186ms
+     ✓ keeps the typed message once and writes the cancelled terminal when the run is stopped 174ms
+     ✓ writes verified partial work into the cancelled transcript  1077ms
+     ✓ keeps the message and states the terminal when the signal was already aborted 21ms
+     ✓ cancels and disposes a running quick-worker call when the plugin unloads 80ms
+     ✓ returns from quick-worker startup on unload and disposes a run that arrives late 110ms
+     ✓ states the rules verdict with no model call (hybrid removed, T4) 133ms
+     ✓ leaves the claimed batch to enter.messages on a headless turn-1 session 5ms
+     ✓ publishes mid-run on an established surface (turn 2) 260ms
+     ✓ a rejected turn-1 batch degrades to enter.messages, never to a headless append 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/phase1-dialogue.spec.ts > P0-2: a confirmation answer keeps the original request > consumes a pending question once, so a repeated answer cannot start a second run
+AssertionError: expected '已收到，并入了正在跑的这一轮（待并入 1 条）。已经开跑的部分不会被打断，…' to contain '没有待回答的分流问题'
+
+Expected: "没有待回答的分流问题"
+Received: "已收到，并入了正在跑的这一轮（待并入 1 条）。已经开跑的部分不会被打断，已完成、已验证的成果不会重做：规划器会在下一个波边界把这条要求合并进还没开始的任务。要立刻停，回一句「停」即可。"
+
+ ❯ test/phase1-dialogue.spec.ts:612:29
+    610|
+    611|     const again = await ctx.preStep()(payload(agent, [userMessage('团队'…
+    612|     expect(answerOf(again)).toContain('没有待回答的分流问题')
+       |                             ^
+    613|     expect(ctx.engine.startCalls).toHaveLength(2)
+    614|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 failed | 78 passed (79)
+   Start at  12:12:38
+   Duration  74.32s (transform 1.65s, setup 0ms, import 2.64s, tests 70.53s, environment 0ms)
+
