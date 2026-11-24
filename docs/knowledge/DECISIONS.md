@@ -3089,3 +3089,60 @@ spine 为空，pre-fix 形状会进脊柱。
   3. 抬全局 `maxTotalAgents` 的魔数兜住——cap 是公式算出来的，抬魔数只会掩盖下一次同样的冲突。
 - **Consequences:** 同一个 run 的 cap 比任何单条分支都大（plain 13 → 15、routed 17 → 19，量级不变）；任何再动
   `maxTotalAgentsFor` 或 `PLANNER_LEG_CALLS` 的提交，必须同时改这三条用例，否则它们会先红——这正是它们的作用。
+
+## D-126 · 诊断块由两个视图各自渲染：D-119 ④「不再抄一遍」被取代，溢出拆两块、错误行带类别、截断预留尾巴（2026-11-24）
+
+- **Status:** `CONFIRMED`（`test/report-ledger-parity.spec.ts` 8 例 + `test/delivery.spec.ts` 新增一条截断用例；
+  红灯 8 条落在旧码上（含「`Stop:` 整行被切掉」与「4 块 vs 8 块」），修后 8 文件 / 195 例全绿；
+  `npm run ci` 与 `verify:lib` 均 exit 0。真机 soak `NOT_RUN`——本刀只动呈现层，无引擎/路由/判定语义变化）。
+- **Date:** 2026-11-24
+- **来源:** 现场反馈（运维同时打开两个视图做诊断，对不上）+ 本轮实现。分支 `fix/ledger-report-parity`
+  （worktree `.tmp/wt-ledger-parity`，从 `main` `ff7fb97` 开出，一任务一分支）。
+- **背景:** 同一份 `WorkflowReport` 有两个机器视图：`renderReport(report, { showDiagnostics: true })`（工具界面）
+  与 `machineLedger(report)`（交付层在诊断开关打开时带的那份）。两边的措辞此前只靠 `LEDGER_LABELS` / `MIDLINE_LABELS`
+  对齐，块本身各写一遍，于是漂移成四件事：
+  1. 台账**没有** `Dead routes` 块（D-119 ④ 明确把这块只放进 `report.ts`）；
+  2. 台账**没有** `Child budget:` 行，于是「子代理挂住」和「整轮时限到了」在台账里分不开；
+  3. 台账把「这一轮自己满载」与「另一个 run 说这条忙」并进一个 `Route overflows (a lane was full …)`，
+     行文本是 `w1 skipped full; queued 40 ms`；报告是两个标题、`skipped full w1 (waited 40 ms)`；
+  4. 同一个 error 在报告里是 `- Verify: …`（丢了类别）、在台账里是 `- Verify (infrastructure): …`（留类别，正文封顶 300）。
+- **Decision:**
+  1. **诊断块由两个视图各自渲染，措辞与行文本逐字节相同**：`machineLedger` 现在自己渲染
+     `Dead routes (two consecutive transport failures; live routes are tried first):` 块（不切片——报告不切，长度由下面的封顶兜）、
+     `Child budget: … ms per call (the run stops waiting on one call after this long)` 行（紧贴 `Deadline:` 之后）、
+     以及报告的两个溢出标题（`Route overflows (full lane yielded, not failures):` / `Route overflows (cross-run hint):`，
+     各行 `skipped full …` / `skipped busy …`，等待后缀 ` (waited N ms)` 只在 `queuedMs > 0` 时出现，每块同样 `slice(0, 12)`）。
+     标签表仍然保留（人话块的清理闸门靠它），但它不再是「两个视图怎么对齐」的唯一手段。
+  2. **错误行两边同一形状：**`- ${phase}${category === undefined ? '' : ` (${category})`}: ${oneLine(message, 500)}`。
+     报告**补上类别**，台账的正文上限从 300 抬到 500，于是同一行在两边逐字节相同。
+  3. **只排队、没点名任何道的路由条目不再出行。**台账过去写 `- worker attempt 2 via w1: no lane named; queued 5 ms`，
+     报告从来不显示它（报告只收 `skippedBusy` 非空的条目）。对账就是这个目的，所以丢掉这一行，台账不再为它编一行。
+  4. **截断预留尾巴。**`MAX_LEDGER_CHARS = 8_000` 与标记常量不动，但 `Stop:` 叙事行与守卫行先组成 trailer，
+     正文 + trailer 超预算时先按 `8000 - trailer 长度 - 标记长度 - 1` 算出空间，用 `cutCodeUnits` 在最后一个换行处切正文，
+     再接标记、再接 trailer。旧写法从尾部整段切，超长台账**正好丢掉收尾那两行**（谁停的、守卫看到了什么）。
+     无 trailer 时输出仍是 `head\n<marker>`（head ≤ 8000），`test/delivery.spec.ts` 原有的截断用例一字未改。
+- **取代 D-119 ④ 的哪一句:** D-119 ④ 写「交付层只登记标签（`LEDGER_LABELS` / `MIDLINE_LABELS` 加 `Dead routes`），
+  **没有**在 `machineLedger` 里再加一遍同样的块——那是设计稿明确的范围（诊断行只在 `report.ts`），而台账与报告视图的
+  措辞现在靠标签表对齐」。**这一句作废**，理由是它要保护的「一份真值」在标签表方案下并不成立：标签表能对齐
+  「哪些词不许进人话块」，但一个字也管不住块的**存在性、顺序和行文本**，所以现场看到的是「报告有、台账没有」。
+  重复渲染两块**同一形状**的代码，代价是两处要一起改（`test/report-ledger-parity.spec.ts` 把这条约束钉成用例：
+  任何一边多一块、少一块、换个行文本，逐块对账立刻红）；收益是运维同时打开的两个视图对得上。D-119 ④ 的其余三条
+  （排最后而不删、满载落死路由、429 跟开关）与死路由的记账规则全部不变。
+- **Evidence:** `src/delivery/index.ts`（`machineLedger` 的诊断块与 trailer）、`src/report.ts`（errors 行补类别）、
+  `test/report-ledger-parity.spec.ts`（一份带全部诊断事实的报告：五个角色的路由、两条预算、一次失败换路、
+  一次本地满载、一次跨 run 提示、两条死路由、带类别与不带类别的两条 error、stop + guard、6 行任务；逐块对账 +
+  「健康报告两边都不出现这些标题」的镜像用例 + 回声用例）、`test/delivery.spec.ts`（截断保留收尾两行）、
+  `test/delivery-human-block.spec.ts` / `test/human-output-contract.spec.ts`（标签表补 `Child budget:`）。
+- **Alternatives rejected:**
+  1. **只补台账缺的两块，溢出保持一个标题。**两个标题的差异是语义（这一轮自己的上限 vs 另一个 run 的大致提示），
+     并成一个就是让读者自己猜；而且报告不会跟着改，对账用例仍然红。
+  2. **让 `renderReport` 去掉类别去迎合台账。**类别是「服务商挂了」和「活没干好」的分界，删掉它等于把报告降级；
+     台账那边抬上限才是不丢信息的改法。
+  3. **保留 `no lane named` 行、给报告也加一行。**那会在报告里凭空造一条「没有道被跳过」的记录，
+     而报告是读者/解析器的主要视图（`src/carryover.ts` 回读它）；静默丢一行比新增一种行安全。
+  4. **截断改成从中间切。**台账的头部（状态、任务行）和尾部（谁停的、守卫）都是读者要的，中间才可弃；
+     但中间切需要新的标记措辞，而「预留 trailer」用现有标记就够，且不动已钉住的截断用例。
+- **Consequences:** 台账与报告的诊断块从此必须一起改——`test/report-ledger-parity.spec.ts` 会让任何单边改动先红；
+  台账在同样的 8,000 字预算下正文略短（约 56 字的标记预留），换来收尾两行必然存在；`Dead routes` 块不切片，
+  但 `deadRoutes` 已由宿主按 `HARD_LIMITS.deadRoute.routes` 封顶，报告侧同理。任何再动诊断块措辞的提交，
+  必须同时改这条用例，否则它会先红——这正是它的作用。

@@ -5,6 +5,12 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Fixed / 修复
+
+- **One report's two diagnostics views now say the same thing / 同一份报告的两个诊断视图现在说同一句话** —
+  Ops opens two machine views of one report while diagnosing: the diagnostics block the tool surface prints, and the machine ledger a delivery carries when that switch is on. They had drifted apart. The ledger showed no dead routes and no per-call child budget at all, it merged this run's own full lane with another run's busy hint under one heading, and the same error read as two different rows because only one view kept the failure category. The ledger now renders the report's own blocks: a dead-route block naming the route, the transport family and the streak; the child-budget line, so a hung child can be told apart from the run's own deadline; two separate overflow headings, one for this run's cap and one for another live run's approximate hint; and error rows that keep the category and the same message bound in both views. A routing entry that recorded only a wait and named no lane is no longer printed as `no lane named`: the report never showed it, and the ledger no longer invents a row for it. The ledger's own length clamp also stopped eating its tail: the closing lines (why the run stopped, and what the watchdog saw) are reserved before an overlong body is cut, so they survive the truncation instead of being the first thing lost. Both new labels are scrubbed from the human answer like every other ledger label.
+  / 诊断一份报告时，运维会同时打开两个机器视图：工具界面打印的诊断块，以及交付里打开开关后带的机器台账。这两个视图跑偏了——台账里根本没有死路由，也没有每次子调用的预算，还把「这一轮自己满载」和「另一个 run 说这条忙」并成一个标题，同一条错误在两边读出来是两行不同的字（只有一边留着失败类别）。现在台账渲染的就是报告自己的块：死路由块（写明哪条路、死于哪类传输故障、连续几次）、子调用预算行（这样「子代理挂住」和「整轮时限到了」才区分得开）、两个分开的溢出标题（一个是这一轮自己的上限，一个是另一个在跑的 run 给的大致提示）、以及两边都保留类别和同样长度上限的错误行。只记了等待时间、没点名任何道的路由条目不再印成 `no lane named`：报告从来不显示它，台账也不再为它编一行。台账自己的长度上限也不再吃掉尾巴：收尾那两行（为什么停的、守卫看到了什么）在切掉超长正文之前就预留好了，所以它们不会被截断吞掉。这两个新标签和人话答案里其它台账标签一样会被清理掉。
+
 ## [0.13.29] - 2026-11-24
 
 ### Fixed / 修复

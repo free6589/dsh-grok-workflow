@@ -142,6 +142,7 @@ const LEDGER_LABELS = [
   'Final answer:',
   'Model routes:',
   'Deadline:',
+  'Child budget:',
   'Route switches:',
   'Route overflows',
   'Dead routes',
@@ -173,6 +174,7 @@ const MIDLINE_LABELS = [
   '进度节点在旁',
   'Model routes',
   'Deadline',
+  'Child budget',
 ] as const
 
 /**
@@ -1100,15 +1102,21 @@ const LEDGER_TRUNCATED_MARKER = '[output truncated; see the canonical structured
  *
  * Only ever reached through an explicit diagnostics switch. It keeps every id,
  * route and attempt a maintainer needs, under the same field labels
- * `src/report.ts` renders, so the two views describe one report in one dialect.
+ * `src/report.ts` renders, so the two views describe one report in one dialect —
+ * and since D-126 that means the diagnostics blocks themselves are rendered the
+ * same way, not just labelled the same way: dead routes, the per-call child
+ * budget, the two overflow blocks and the error rows are byte-identical to the
+ * report's.
  *
  * When the ledger outgrows {@link MAX_LEDGER_CHARS}, the tail is cut at the
  * last line boundary so the cut never strands a reader mid-line, and the cut
  * is fenced through {@link cutCodeUnits} so a surrogate pair (an emoji at the
  * cut, a rare CJK ideograph) is never split into a replacement box. A body with
- * no line break to stop at in the last 8,000 characters keeps the straight
- * code-unit cut. The surviving head ends with the same truncation marker
- * `renderReport` uses, so a clipped ledger says so in the one shared wording.
+ * no line break to stop at in the surviving window keeps the straight
+ * code-unit cut. The closing lines (the stop sentence and the guard line) are
+ * reserved before the body is cut, so a clipped ledger keeps them, and the
+ * surviving head ends with the same truncation marker `renderReport` uses, so a
+ * clipped ledger says so in the one shared wording.
  *
  * @param report - validated report.
  * @returns the ledger text, bounded by {@link MAX_LEDGER_CHARS}.
@@ -1182,6 +1190,13 @@ export function machineLedger(report: WorkflowReport, opts: { guard?: GuardConcl
   if (report.limits.timeoutMs !== undefined) {
     lines.push(`Deadline: ${report.limits.timeoutMs} ms per run (enforced by the plugin)`)
   }
+  // The deadline says when the run gives up, the child budget says when one call is
+  // abandoned. The report has always rendered both and the ledger only the first, so
+  // an operator who opened the ledger could not tell a hung child from a run deadline
+  // (D-126).
+  if (report.limits.childTimeoutMs !== undefined) {
+    lines.push(`Child budget: ${report.limits.childTimeoutMs} ms per call (the run stops waiting on one call after this long)`)
+  }
   const routeFailures = report.routes.filter(entry => entry.outcome === 'failed')
   if (routeFailures.length > 0) {
     lines.push('Route switches:')
@@ -1189,35 +1204,72 @@ export function machineLedger(report: WorkflowReport, opts: { guard?: GuardConcl
       lines.push(`- ${entry.role} attempt ${entry.attempt} via ${entry.route}: ${entry.failureClass ?? 'unknown'} — ${oneLine(entry.reason ?? '', 200)}`)
     }
   }
-  const overflows = report.routes.filter(entry => (entry.skippedBusy?.length ?? 0) > 0 || (entry.queuedMs ?? 0) > 0)
-  if (overflows.length > 0) {
-    lines.push('Route overflows (a lane was full when the call was placed; not a failure):')
-    for (const entry of overflows.slice(0, 12)) {
-      const skipped = entry.skippedBusy ?? []
-      const full = skipped.length === 0 ? 'no lane named' : `${skipped.join(', ')} skipped full`
-      const waited = entry.queuedMs === undefined ? '' : `; queued ${entry.queuedMs} ms`
-      lines.push(`- ${entry.role} attempt ${entry.attempt} via ${entry.route}: ${full}${waited}`)
+  // Dead routes, in the report's own words (D-126). D-119 ④ deliberately kept this
+  // block in `src/report.ts` only and leaned on the label table to hold the two
+  // views' wording together; the field showed what that costs — the ledger had no
+  // dead-route block at all, and the two views are read side by side while
+  // diagnosing. One report, one block, rendered by both.
+  if (report.deadRoutes !== undefined && report.deadRoutes.length > 0) {
+    lines.push('Dead routes (two consecutive transport failures; live routes are tried first):')
+    for (const entry of report.deadRoutes) {
+      lines.push(`- ${entry.route}: ${entry.class} (${entry.streak} in a row)`)
+    }
+  }
+  // Overflow is not failure and never renders above: a full lane yields to the next
+  // route instead of failing. The two headings are the report's (`src/report.ts`),
+  // row for row: this run's own full lane and another live run's busy hint are
+  // different facts, and one heading for both made the reader guess which they had.
+  // A routing entry that carries only `queuedMs` names no lane; the report never
+  // showed it, so the ledger drops it instead of printing `no lane named` (D-126).
+  const overflows = report.routes.filter(entry => entry.skippedBusy !== undefined && entry.skippedBusy.length > 0)
+  const hintOverflows = overflows.filter(entry => entry.skippedBusy!.some(label => label.includes('(cross-run hint)')))
+  const localOverflows = overflows.filter(entry => !entry.skippedBusy!.some(label => label.includes('(cross-run hint)')))
+  if (localOverflows.length > 0) {
+    lines.push('Route overflows (full lane yielded, not failures):')
+    for (const entry of localOverflows.slice(0, 12)) {
+      const skipped = entry.skippedBusy!.join(', ')
+      const waited = entry.queuedMs !== undefined && entry.queuedMs > 0 ? ` (waited ${entry.queuedMs} ms)` : ''
+      lines.push(`- ${entry.role} attempt ${entry.attempt} via ${entry.route}: skipped full ${skipped}${waited}`)
+    }
+  }
+  if (hintOverflows.length > 0) {
+    lines.push('Route overflows (cross-run hint):')
+    for (const entry of hintOverflows.slice(0, 12)) {
+      const skipped = entry.skippedBusy!.join(', ')
+      const waited = entry.queuedMs !== undefined && entry.queuedMs > 0 ? ` (waited ${entry.queuedMs} ms)` : ''
+      lines.push(`- ${entry.role} attempt ${entry.attempt} via ${entry.route}: skipped busy ${skipped}${waited}`)
     }
   }
   if (report.errors.length > 0) {
     lines.push('Errors:')
     for (const entry of report.errors.slice(0, 12)) {
-      lines.push(`- ${entry.phase}${entry.category === undefined ? '' : ` (${entry.category})`}: ${oneLine(entry.message, 300)}`)
+      lines.push(`- ${entry.phase}${entry.category === undefined ? '' : ` (${entry.category})`}: ${oneLine(entry.message, 500)}`)
     }
   }
   // Round 70: the stopped-run sentence and the fixed guard line close the ledger
   // too. The ledger is the machine view of the same run, and a reader who opened
   // it is exactly the one asking "who killed it, and did the watchdog do anything".
+  // They are composed as a trailer rather than appended to the body (D-126): the
+  // clamp below cuts from the end, so a ledger that outgrew its budget used to lose
+  // exactly these two lines — the run's status and the watchdog's account.
+  const trailer: string[] = []
   const narration = stopNarration(report, 'en', opts.inFlight)
-  if (narration !== undefined) lines.push(`Stop: ${narration}`)
+  if (narration !== undefined) trailer.push(`Stop: ${narration}`)
   const settled = opts.guard ?? guardOf(report)
-  if (settled !== undefined) lines.push(guardLine(settled, 'en'))
-  const text = lines.join('\n')
+  if (settled !== undefined) trailer.push(guardLine(settled, 'en'))
+  const body = lines.join('\n')
+  const tail = trailer.length === 0 ? '' : `\n${trailer.join('\n')}`
+  const text = `${body}${tail}`
   if (text.length <= MAX_LEDGER_CHARS) return text
-  const window = text.slice(0, MAX_LEDGER_CHARS)
+  // Reserve the trailer (and the marker plus its newline) before cutting the body, so
+  // the surviving text plus its closing lines still fits the budget. The cut still
+  // stops at the last whole line inside the room, and still passes through
+  // `cutCodeUnits`, so a surrogate pair at the cut is never split.
+  const room = MAX_LEDGER_CHARS - LEDGER_TRUNCATED_MARKER.length - 1 - tail.length
+  const window = cutCodeUnits(body, Math.max(0, room))
   const newline = window.lastIndexOf('\n')
-  const head = cutCodeUnits(newline < 0 ? window : window.slice(0, newline), MAX_LEDGER_CHARS)
-  return `${head}\n${LEDGER_TRUNCATED_MARKER}`
+  const head = newline < 0 ? window : window.slice(0, newline)
+  return `${head}\n${LEDGER_TRUNCATED_MARKER}${tail}`
 }
 
 /**
