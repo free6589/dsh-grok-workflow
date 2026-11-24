@@ -1,3 +1,55 @@
+## 0.13.34 发布：合流、两次全量门禁、标签、推送、远端两条 run（零冲突、零重跑，soak 未重跑）— 2026-11-25 (`CONFIRMED`)
+
+下面每一行都是发版那一轮在主检出 `/home/fish/projects_mine/dsh-grok-workflow` 里真跑过的命令与真读到的结果；没跑的写 `NOT_RUN`。
+收口轮（写这一条的这一轮）用只读 `git` / `grep` 复核了：提交链、发版提交的文件面与行数、`CHANGELOG.md` 的标题位置、标签对象
+与剥皮、`v0.13.34^{}:package.json`、配置面的键数与投影、以及两条观察的可核位置。**门禁读数与远端两条 run 没有在收口轮重跑**——
+收口这一提交只动记忆文件。
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 提交链 | `git log --oneline -5`（主检出，收口轮只读复核） | `92097d9`（feat）→ `88f1e12`（docs memory）→ `fe32b26`（merge 进 release）→ `3c5d388`（prep）→ `d01da81`（merge 进 `main`）。`feat/block-intake` 基线 = `main` 尖端 **`9b55d2d`**。**`CONFIRMED`** |
+| 合流 1（零冲突） | `git merge --no-ff feat/block-intake`（`release/0.13.34`，从 `9b55d2d` 开出） | merge **`fe32b26`**「merge: the block intake — a durable block ledger, six tools, and an independent supervisor」，**零冲突**（分支正基于 main 的尖端），无冲突解法、无决策号重编，`D-135` 原样不动。**`CONFIRMED`** |
+| 门禁 #1 | `TMPDIR=$PWD/.tmp npm run ci`（整棵树，`fe32b26`） | **EXIT=0**：vitest **`111 files / 2128 tests PASS`**（196–202 s）；oxlint → **`Found 36 warnings and 0 errors.`**（193 文件）；`verify:lib` → **`lib/ at fe32b26 is the build of src/ at fe32b26 (293 files, byte-identical)`**。**`CONFIRMED`** |
+| 基线读数与增量 | 同命令在 `main` 的 `9b55d2d` 上 | 基线 **105 files / 1954 tests** ⇒ 本轮 **+6 文件 / +174 例**；`105+6=111`、`1954+174=2128`，逐项相等。六个新 spec：`block-ledger` **20**、`block-preview` **93**、`block-tools` **21**、`block-supervisor` **20**、`block-flag` **8**、`block-flag-baseline` **12**。**`CONFIRMED`** |
+| 发版提交 | `git show --stat 3c5d388` | `chore(release): prepare v0.13.34`，**8 files / +22 −20**，与 `26628c2`（0.13.33 的 prep）同构：`CHANGELOG.md`(2/0)、`README.md`(5/5)、`README.zh-CN.md`(5/5)、`docs/LOCAL-TESTING.md`(3/3)、`lib/client.js`(2/2)、`package-lock.json`(2/2)、`package.json`(1/1)、`src/client/index.js`(2/2)。**`CONFIRMED`** |
+| changelog 位置 | `head -12 CHANGELOG.md`（收口轮只读复核） | `## [0.13.34] - 2026-11-25` 在第 **8** 行（索引 7），紧接 `## [Unreleased]`（第 6 行，仍存在且为空）；发版工作流抽取的那一段 **43 行**；中英条目原文一个字没改。**`CONFIRMED`** |
+| 门禁 #2 | `TMPDIR=$PWD/.tmp npm run ci`（`3c5d388`） | **EXIT=0**：vitest `111 files / 2128 tests`、oxlint 36/0、`verify:lib` → **`lib/ at 3c5d388 is the build of src/ at 3c5d388 (293 files, byte-identical)`**。**独立跑了两次**（发版 lane 与包工头各跑一遍全量，两次都 exit 0）。**`CONFIRMED`** |
+| 针对性守卫 | 与门禁分开单跑（`3c5d388`） | **6 files / 79 tests PASS**：`docs-version` 8 + `docs-config-keys` 13 + `docs-architecture-version` 3 + `update-entry` 20 + `update-surface` 29 + `i18n-parity` 6。**`CONFIRMED`** |
+| 合 `main` | `git merge --no-ff release/0.13.34`；`git diff --stat release/0.13.34 main` | merge **`d01da81`**「… shipped as 0.13.34」；差分为**空**，即 main 的树与被门禁的那个发版提交逐字节相同。**`CONFIRMED`**（差分是在两条分支删除之前读的） |
+| 标签 | `git cat-file -t v0.13.34`；`git rev-parse v0.13.34^{}`；`git show v0.13.34^{}:package.json`（收口轮只读复核） | `tag`（注解标签，非轻量）；剥皮 **`d01da81`**；`package.json` 读到 `"version": "0.13.34"`。**`CONFIRMED`** |
+| 推送（无 force） | `git push`（`main` + 标签） | `9b55d2d..d01da81  main -> main`；`* [new tag] v0.13.34 -> v0.13.34`。**`CONFIRMED`** |
+| 远端两条 run | `gh run view 45451899750`；`gh run view 45451905147` | CI **success**（main，headSha `d01da81`）；Release **success**（tag `v0.13.34`，headSha `d01da81`，创建 2026-11-24T17:44:35Z → 更新 17:47:33Z）。**`CONFIRMED`** |
+| GitHub Release | `gh release view v0.13.34` | **`Grok Workflow for DSH v0.13.34`**，https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.34 ，资产 **`dsh-grok-workflow-0.13.34.tgz`（1025707 B）**，sha256 `7ece8829b4563176e65a37cc8a13e0b0f1baea11c63ecb3b6b1bedd76184d581`，非 draft、非 prerelease。**`CONFIRMED`** |
+| README 里新加的旧版本条目 | `gh release view v0.13.33`（发版前） | `v0.13.33` 已发布在册，资产 `dsh-grok-workflow-0.13.33.tgz`（967628 B）⇒ 本次 prep 在 README 已发布清单里新加的 `v0.13.33` 是真话。**`CONFIRMED`** |
+| 配置面 | `grep -n "blockIntake" src/settings.ts`；`src/config.ts` 键表计数（收口轮只读复核） | 键 **19 → 20**（新增 `blockIntake`，默认 `false`）；`blockIntake` 是装载期开关，**故意不投影**到设置页——`src/settings.ts:375` 的 `projected` 显式排除 `toolName`/`configVersion`/`blockIntake`，页面字段 **17**。**`CONFIRMED`** |
+| 回归钉 | `test/block-flag-baseline.spec.ts` + 夹具 `test/fixtures/block-flag-baseline.json`（99477 B） | 对基线 `9b55d2d` 上生成的决策**逐字节**比对，钉的是「`blockIntake: false` 复现出功能之前那棵树」，不是「两次装载互相一致」。**`CONFIRMED`** |
+| 清理 | `git worktree remove .agents/worktrees/feat-block-intake`；`git branch -d feat/block-intake release/0.13.34` | worktree 已删（当时干净、无未提交改动）；两条分支（原 `88f1e12` / `3c5d388`）在合并检查通过后删掉。**`CONFIRMED`** |
+| 两条未修的观察（可核位置） | `grep -n "five tools" src/config.ts src/index.ts`；`git show 9b55d2d:docs/knowledge/DECISIONS.md \| grep -n "^## D-05[01]"` | ① 注释与字段描述串写「the five tools / 五个工具」（`src/config.ts:226`、`:671`、`:679`；`src/index.ts:416`），实际注册**六个**（`BLOCK_TOOL_NAMES` 六项、注册日志行打六项，README/CHANGELOG/真机工具清单都写六个）——只错在文字，无行为影响；② `## D-050`（`:899`、`:934`）与 `## D-051`（`:916`、`:956`）重复标题在本次合并**之前**就有，非本轮引入。两条都**只记录、不修**。**`CONFIRMED`** |
+| live profile | — | **`NOT_RUN`**：`~/.dsh` 一行未动、未升级、未重载、未重启；AGENTS §11 自动升级按操作员红线「不碰 core」**故意跳过**；live 现装版本这一轮**没有重新探**，最后一次只读探针（2026-11-24）读到 `0.13.29` |
+| DSH 核心检出 / 已发布标签 | — | 核心检出未动；没有 force-push；`v0.13.34` 是新标签，`v0.13.33` 及更早的一个没移动。**`CONFIRMED`** |
+| 真机 soak（重跑） | — | **`NOT_RUN`**（本次是合流发版，不是重测）。接单台子的 soak 证据仍在 `.rsi/evidence/block-intake-2026-11-25/` |
+
+**Changed（本轮的提交面）：** 四个提交——`fe32b26`（合流）、`3c5d388`（发版 prep）、`d01da81`（合入 `main`）、以及本次记忆收口
+提交（只动 `docs/knowledge/{STATE,HANDOFF,VALIDATION}.md`）。产品代码是接单台子原本的改动，合流本身**没有手改一行产品代码**，
+也没有解任何冲突；`lib/` 全部由 `src/` 重建（293 文件）。
+
+**Honest boundary（逐条）：**
+1. **门禁与远端读数都不是收口轮跑出来的**：`111 files / 2128 tests`、oxlint 36/0、`verify:lib` 293 文件、两条 run 的 success，
+   都是发版那一轮的实跑结果；收口轮只做了只读复核（`git log`、`git show --stat`、`git cat-file`、`git rev-parse`、
+   `head CHANGELOG.md`、几条 `grep`），**没有重跑 `npm run ci`，也没有重跑 soak**。
+2. **`d01da81` 上没有单独跑门禁**：它的树与 `3c5d388` 逐字节相同（`git diff --stat` 为空），所以门禁 #2 的读数对 `d01da81`
+   的树同样成立；这是从「树相同」推出来的，不是在 `d01da81` 上重跑的读数。
+3. **live profile 的已装版本是 `NOT_RUN`**：这一轮没有探。任何「live 现在跑 0.13.34」的说法都超出这条边界；本文件能引用的
+   只有 2026-11-24 那次只读探针的 `0.13.29`。
+4. **接单台子的四条缺口原样成立**，不挡这次发版，但不能读成已关：独立**模型**监工真机一次都没验过（隔离 soak 缺
+   `AGENT2API_API_KEY`，那次 `veto` 是监工调用失败产出的）；soak 里一条 `pass` 是 `judged:false`；多块切分、会写文件的块、
+   `judged:true` 的 `pass` 三块真机未触达（`NOT_RUN`，只有单测覆盖）；composer 总开关那条显示观察仍是 `HYPOTHESIS`。
+5. **配置面「19 → 20 键、页面字段 17」的代码面是 M2 轮读的**：本轮只核了 `src/settings.ts:375` 显式排除 `blockIntake` 与键数
+   20，没有重读 `src/config.ts` 的整张表。
+6. **两条观察是记录，不是修复**：注释/描述串说「五个工具」而实际六个；`DECISIONS.md` 的 `D-050`/`D-051` 重复标题早于本次
+   合并。两者都保持原样。
+7. **`git diff --stat release/0.13.34 main` 为空这一条不可再复核**：两条分支已删，只能引用删除之前的读数。
+
 ## M2「接单台子」：两次全量门禁 exit 0、新 spec 174 例、真机隔离 soak PASS（模型监工真机未验）— 2026-11-25 (`CONFIRMED`)
 
 分支 `feat/block-intake`（worktree `.agents/worktrees/feat-block-intake`，基线 `main` 尖端 `9b55d2d`）。

@@ -2861,3 +2861,52 @@ Last updated: 2026-11-24 21:00 +08:00（**报告尾部审计层：没跑完的�
 构建的对照跑也是 `failed` 但**不带**审计段。证据 `.rsi/evidence/audit-render-half-2026-11-24/`。**红线**：live `~/.dsh`
 一行未写（本进程对它是只读的，`dsh --profile web` 直接 EROFS）、未重载、未重启；**未 push、未打 tag、未合流、未发版**，
 `package.json` 仍 0.13.32。分支判定日期 2026-11-26。）
+
+Last updated: 2026-11-25 01:49 +08:00（**0.13.34 已发布：接单台子随 `feat/block-intake` 合入 `main`，两次全量门禁都 exit 0，`CONFIRMED`** —
+`feat/block-intake`（`92097d9` 功能 + `88f1e12` 记忆，基线 `main` 尖端 `9b55d2d`）以 `--no-ff` 合入从 `9b55d2d` 开出的
+`release/0.13.34`，merge **`fe32b26`**「merge: the block intake — a durable block ledger, six tools, and an independent
+supervisor」，**零冲突**——分支正基于 main 的尖端，所以没有冲突要解，也没有任何决策号重编，`D-135` 原样不动。门禁 #1 在
+`fe32b26` 整棵树 `TMPDIR=$PWD/.tmp npm run ci` **EXIT=0**：vitest **`111 files / 2128 tests PASS`**（196–202 s）、oxlint
+**`Found 36 warnings and 0 errors.`**（193 文件）、`verify:lib` → **`lib/ at fe32b26 is the build of src/ at fe32b26 (293
+files, byte-identical)`**。基线算术：`main` 在 `9b55d2d` 是 **105 文件 / 1954 测试**，本轮 **+6 文件 / +174 测试**（六个新
+block spec：`block-ledger` 20、`block-preview` 93、`block-tools` 21、`block-supervisor` 20、`block-flag` 8、
+`block-flag-baseline` 12），`105+6=111`、`1954+174=2128`，两边逐项相等。发版提交 `3c5d388`「chore(release): prepare
+v0.13.34」**8 文件 / +22 −20**，文件面与行数形状同 `26628c2`（0.13.33 那次 prep）：`CHANGELOG.md`、`README.md`、
+`README.zh-CN.md`、`docs/LOCAL-TESTING.md`、`lib/client.js`、`package-lock.json`、`package.json`、`src/client/index.js`。
+`CHANGELOG.md` 里 `## [0.13.34] - 2026-11-25` 插在 `## [Unreleased]` 之后（第 8 行，索引 7），`[Unreleased]` 仍在且为空，
+发版工作流抽取的那一段 **43 行**，中英条目原文一个字没改。门禁 #2 在 `3c5d388` **EXIT=0**（vitest `111 files / 2128
+tests`、oxlint 36/0、`verify:lib` → `lib/ at 3c5d388 is the build of src/ at 3c5d388 (293 files, byte-identical)`），
+**独立跑了两次**（发版 lane 与包工头各跑一遍全量，两次都 exit 0）；针对性守卫另单跑 `docs-version` 8 + `docs-config-keys`
+13 + `docs-architecture-version` 3 + `update-entry` 20 + `update-surface` 29 + `i18n-parity` 6 = **6 文件 / 79 测试
+PASS**。合 `main` 得 **`d01da81`**「merge: the block intake — a durable block ledger, six tools, and an independent
+supervisor, shipped as 0.13.34」，`git diff --stat release/0.13.34 main` 为空，即 main 的树与被门禁的那个发版提交逐字节
+相同。注解标签 `v0.13.34` → 标签对象 → 剥皮 `d01da81`，`git show v0.13.34^{}:package.json` 读到 `0.13.34`。推送无
+force：`9b55d2d..d01da81  main -> main`、`* [new tag] v0.13.34 -> v0.13.34`。远端 CI run **`45451899750` success**
+（main，headSha `d01da81`）、Release run **`45451905147` success**（tag `v0.13.34`，headSha `d01da81`，创建
+2026-11-24T17:44:35Z → 更新 17:47:33Z）。GitHub Release **`Grok Workflow for DSH v0.13.34`**
+（https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.34），资产
+**`dsh-grok-workflow-0.13.34.tgz`（1025707 B）**，sha256
+`7ece8829b4563176e65a37cc8a13e0b0f1baea11c63ecb3b6b1bedd76184d581`，非 draft、非 prerelease。`v0.13.33` 在发版前已确认
+在册（资产 `dsh-grok-workflow-0.13.33.tgz`，967628 B），所以 README 已发布清单里新加的 `v0.13.33` 是真话。用户能感觉到
+的变化：接单台子**默认关**（`blockIntake: false`），打开后一单任务可以按一份用户点头的切分最多拆三块，切分先预览、在
+用户发消息复述批准词之前一个字都不写盘；批准后的切分成为 `$DSH_HOME/taskboards/grok-workflow/` 下的追加式账本行（每次
+变化都是新追加的版本，从不就地改写）；六个工具驱动它（`grok_open_block`、`grok_accept_block`、`grok_close_block`、
+`grok_block_status`、`grok_steer`、`grok_stop`）；交卷跑六项确定性检查，再向独立监工要逐条 `pass`/`veto` 判决、写进
+自己的追加式账本，同样的证据回来时给的是账上已有的那个判决；心跳观察写第三个文件，既不当判决也不当块的版本。开关关着
+时，不注册任何工具、也不挂任何监听。配置面 **19 → 20 键**，`blockIntake` 是装载期开关、故意不投影到设置页（页面字段
+**17**）。回归钉：`test/block-flag-baseline.spec.ts` 加夹具 `test/fixtures/block-flag-baseline.json`（99477 B）逐字节比对
+基线 `9b55d2d` 上生成的决策，所以「关掉就复现出功能之前那棵树」是查过的说法。）
+
+补记（2026-11-25 01:49，`CONFIRMED`）：**live profile `~/.dsh` 一行未动** —— 未升级、未重载、未重启，AGENTS §11 的自动升级
+按操作员红线「不碰 core」**故意跳过**（本轮也只能写仓库内部）；live profile 现装哪一版**这一轮没有重新探**（`NOT_RUN`），
+最后一次只读探针（2026-11-24）读到的仍是 `0.13.29`。DSH 核心检出未动；没有 force-push，没有移动任何已发布的标签
+（`v0.13.34` 是新标签，`v0.13.33` 及更早的一个没碰）。接单台子那边**还没关的缺口照旧成立**（不挡这次发版，但不能读成已
+关）：独立**模型**监工在真机上一次都没验过（隔离 soak 缺 `AGENT2API_API_KEY`，那次尝试的 `veto` 是监工调用失败产出的）；
+soak 里有一条 `pass` 是 `judged:false`；多块切分、会写文件的块、`judged:true` 的 `pass` 三块真机未触达（`NOT_RUN`，只有
+单测覆盖）；composer 总开关那条显示观察仍是 `HYPOTHESIS`。清理已做：worktree `.agents/worktrees/feat-block-intake` 已删
+（当时干净、无未提交改动），`feat/block-intake`（原 `88f1e12`）与 `release/0.13.34`（原 `3c5d388`）在合并检查通过后用
+`git branch -d` 删掉。两条本轮看到、**故意没修**的观察（记成观察，不是已关的缺陷）：① `src/config.ts` 两处注释 + 一处字段
+描述串（`:226`、`:671`、`:679`）与 `src/index.ts` 一处注释（`:416`）写「the five tools / 五个工具」，实际注册六个
+（`BLOCK_TOOL_NAMES` 列六项、注册日志行打六项，README、CHANGELOG 与真机工具清单都写六个）——只错在文字，行为无影响；
+② `docs/knowledge/DECISIONS.md` 里 `## D-050`、`## D-051` 两个重复标题在本次合并**之前**就有（在 `9b55d2d` 上核过：
+`:899`/`:934` 与 `:916`/`:956`），不是这里引入的，也没有修。

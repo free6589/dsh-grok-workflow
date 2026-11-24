@@ -4370,3 +4370,51 @@ Issue #1 状态评论 issuecomment-6927842856。
 - **边界（不要读成更强的结论）**：soak 的起点版本是按手摆的（manifest 改成 0.13.30）；开发构建自己的 `latest` 相在浏览器里
   看不见（装完页面上的卡是新构建的），那一段只由单元用例覆盖；`.tmp/soak-update/` 保留给 foreman 清理，本轮没有删它、
   也没有往里加东西。
+
+## 2026-11-25 — 0.13.34 发布收口：接单台子合入 `main`，两次门禁 exit 0，标签与两条远端 run 都绿（`CONFIRMED`）
+
+- **From:** 发版（merge-and-release）· **To:** 下一个接手的人
+- **结果**：`feat/block-intake`（`92097d9` 功能 + `88f1e12` 记忆，基线 `main` 尖端 `9b55d2d`）以 `--no-ff` 合入从 `9b55d2d`
+  开出的 `release/0.13.34`，merge **`fe32b26`**，**零冲突**——分支正基于 main 的尖端，所以没有冲突要解，也没有任何决策号
+  重编，`D-135` 原样不动。发版提交 `3c5d388`「chore(release): prepare v0.13.34」（8 文件 / +22 −20，形状同 `26628c2`），
+  再合入 `main` 得 **`d01da81`**「… shipped as 0.13.34」；注解标签 `v0.13.34`（标签对象 → 剥皮 `d01da81`），`main` 与标签
+  都已推送（`9b55d2d..d01da81  main -> main`、`* [new tag] v0.13.34 -> v0.13.34`，无 force）。远端 CI **`45451899750`
+  success**（main，headSha `d01da81`）、Release **`45451905147` success**（tag `v0.13.34`，17:44:35Z → 17:47:33Z），
+  GitHub Release **`Grok Workflow for DSH v0.13.34`** 带资产 **`dsh-grok-workflow-0.13.34.tgz`（1025707 B）**，sha256
+  `7ece8829b4563176e65a37cc8a13e0b0f1baea11c63ecb3b6b1bedd76184d581`，非 draft、非 prerelease。
+- **发了什么**（用户能感觉到的部分）：
+  1. **接单台子（默认关，`blockIntake: false`）**——打开后一单任务可以按一份用户点头的切分最多拆三块；切分先预览，在用户
+     发消息复述批准词之前一个字都不写盘；批准后的切分成为 `$DSH_HOME/taskboards/grok-workflow/` 下的追加式账本行，每次变化
+     都是新追加的版本，从不就地改写。
+  2. **六个工具**——`grok_open_block`、`grok_accept_block`、`grok_close_block`、`grok_block_status`、`grok_steer`、
+     `grok_stop`。开关关着时，不注册任何工具、也不挂任何监听。
+  3. **交卷要过独立监工**——六项确定性检查跑完，再向独立监工要逐条 `pass`/`veto` 判决，写进它自己的追加式账本；同样的证据
+     回来时给的是账上已有的那个判决；心跳观察写第三个文件，既不当判决也不当块的版本。
+  4. **配置面 19 → 20 键**——新增 `blockIntake`，装载期开关，**故意不投影**到设置页（页面字段仍是 17）。
+  5. **回归钉**——`test/block-flag-baseline.spec.ts` 加夹具 `test/fixtures/block-flag-baseline.json`（99477 B），对基线
+     `9b55d2d` 上生成的决策逐字节比对，所以「关掉就复现出功能之前那棵树」是查过的说法，不是推断。
+- **门禁（`CONFIRMED`）**：门禁 #1 在 `fe32b26` 整棵树 `TMPDIR=$PWD/.tmp npm run ci` **EXIT=0**——vitest **`111 files /
+  2128 tests PASS`**（196–202 s）、oxlint **`Found 36 warnings and 0 errors.`**（193 文件）、`verify:lib` →
+  `lib/ at fe32b26 is the build of src/ at fe32b26 (293 files, byte-identical)`。门禁 #2 在 `3c5d388` 同样 **EXIT=0**，
+  **独立跑两次**（发版 lane 与包工头各一遍全量）。基线算术：`main` 在 `9b55d2d` 是 105 文件 / 1954 测试，本轮 +6 文件 /
+  +174 测试（`block-ledger` 20、`block-preview` 93、`block-tools` 21、`block-supervisor` 20、`block-flag` 8、
+  `block-flag-baseline` 12），`105+6=111`、`1954+174=2128` 逐项相等。另有针对性守卫单跑 6 文件 / 79 例 PASS
+  （`docs-version` 8 + `docs-config-keys` 13 + `docs-architecture-version` 3 + `update-entry` 20 + `update-surface` 29 +
+  `i18n-parity` 6）。`CHANGELOG.md` 里 `## [0.13.34] - 2026-11-25` 紧接 `## [Unreleased]`（第 8 行），`[Unreleased]` 仍在且
+  为空，抽取段 43 行，中英条目原文未改。
+- **发版时比清单多改的四类文件**：除了 `package.json`/`package-lock.json`/`CHANGELOG.md`，还要同步 `README.md`、
+  `README.zh-CN.md`、`docs/LOCAL-TESTING.md` 与 `src/client/index.js`（并重建 `lib/client.js`）——与历次
+  `chore(release): prepare vX.Y.Z` 改的是同一批 8 个文件、同一行数形状（这次 +22 / −20）。
+- **红线**：全程未碰 `~/.dsh`——未升级、未重载、未重启；AGENTS §11 自动升级按操作员红线「不碰 core」**故意跳过**，且本轮只能
+  写仓库内部。DSH 核心检出未动；没有 force-push，没有移动任何已发布的标签（`v0.13.34` 是新标签，`v0.13.33` 及更早的一个
+  没碰）。live profile 现装哪一版**这一轮没有重新探**（`NOT_RUN`），最后一次只读探针（2026-11-24）读到 `0.13.29`。
+- **清理**：worktree `.agents/worktrees/feat-block-intake` 已删（当时干净、无未提交改动）；`feat/block-intake`（原
+  `88f1e12`）与 `release/0.13.34`（原 `3c5d388`）在合并检查通过后用 `git branch -d` 删掉。
+- **待办**：① 接单台子还有四条缺口没关，别读成已关——独立**模型**监工真机上一次都没验过（隔离 soak 缺
+  `AGENT2API_API_KEY`，那次 `veto` 是监工调用失败产出的）、soak 里一条 `pass` 是 `judged:false`、多块切分/会写文件的块/
+  `judged:true` 的 `pass` 三块真机未触达（`NOT_RUN`，只有单测覆盖）、composer 总开关那条显示观察仍是 `HYPOTHESIS`；
+  ② 升级 live profile 到 `v0.13.34`（需要操作员放行，本轮按红线跳过）；③ 两条**只记录、不修**的观察：
+  `src/config.ts`（`:226`、`:671`、`:679`）与 `src/index.ts`（`:416`）写「the five tools / 五个工具」而实际注册六个
+  （`BLOCK_TOOL_NAMES` 六项、注册日志打六项、README/CHANGELOG/真机工具清单都写六个，只错在文字）；
+  `docs/knowledge/DECISIONS.md` 的 `## D-050`、`## D-051` 重复标题在本次合并**之前**就有（在 `9b55d2d` 上核过），非本轮
+  引入。
