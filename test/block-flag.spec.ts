@@ -523,7 +523,10 @@ describe('the heartbeat observer records a beat and changes no decision', () => 
     const off = await mount('false')
     const offDecision = await dispatch(off, new FakeAgent(headed(sessionId)), messages)
     const on = await mount('true')
-    expect(listenerCount(on.ctx), 'on adds one listener, never replaces one').toBe(2)
+    // Three listeners, never a replacement: the gate, the intake's own heartbeat
+    // observer, and (M3.1) the narrow heartbeat listener that records what the beat
+    // did in its own file.
+    expect(listenerCount(on.ctx), 'on adds two listeners, never replaces one').toBe(3)
     const onDecision = await dispatch(on, new FakeAgent(headed(sessionId)), messages)
 
     // The decision is the same object shape and the same bytes: the observer passes the

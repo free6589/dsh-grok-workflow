@@ -10,6 +10,8 @@ import { registerGrokCommand } from './command.js'
 import { installHeartbeatBrakes } from './block/brakes.js'
 import { registerBlockTools } from './block/tools.js'
 import { installGate } from './gate.js'
+import { installHeartbeatListen } from './heartbeat-listen.js'
+import { createLoopBrakes } from './loop-brakes.js'
 import { ITERATE_TASK_TITLE, createLoopService, loopPolicyFromConfig, scheduleServiceOf } from './loop.js'
 import { installLoop } from './loop-surface.js'
 import type { LoopHostContext } from './loop-surface.js'
@@ -413,28 +415,59 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
   installUpdateRoute({ ctx: ctx as unknown as UpdateHostContext, logger })
 
   // Block intake (接单台子): a load-time switch, read from the load-time snapshot
-  // because both halves are registrations — the six tools and one listener — and a
+  // because every half is a registration — the six tools and the listeners — and a
   // registration cannot appear without a reload. Off registers **nothing**: no tool
   // name and no `agent/pre-step` listener, which is what makes "off is the pre-feature
   // tree" a testable claim instead of a promise (`test/block-flag.spec.ts`).
   //
-  // The observer is installed *before* the gate so it is the outermost listener in the
-  // chain: it then still records a heartbeat the gate refuses (a tripped brake answers
-  // `reject` without calling `next()`), and because it returns the decision `next()`
-  // produced, the gate's answer is untouched by construction.
+  // `legacyGate: false` is the shape where the front desk is not registered at all, so
+  // the narrow heartbeat listener is what decides a beat's fate. Exactly one of the two
+  // shapes owns routing in any load: this flag is read once, here, and both branches
+  // below agree on it.
+  const ownsHeartbeatRouting = config.legacyGate === false
   if (config.blockIntake === true) {
-    installHeartbeatBrakes({ ctx, logger, enabled: true })
+    // The narrow listener is installed *before* the gate (and before the intake's own
+    // observer) so it is the outermost listener in the chain: the gate refuses a
+    // tripped heartbeat with `reject` without calling `next()`, so a listener inside it
+    // would never see that beat.
+    installHeartbeatListen({
+      ctx,
+      logger,
+      enabled: true,
+      ownsRouting: ownsHeartbeatRouting,
+      config,
+      readConfig,
+      // The port is built here only for the shape that reviews; the observing shape
+      // holds no brakes at all, so it can neither charge nor stop a round.
+      ...ownsHeartbeatRouting
+        ? {
+            loop: createLoopBrakes({
+              schedule: () => scheduleServiceOf(ctx as unknown as { get?: (name: string) => unknown }),
+              logger,
+              disposed: () => state.disposed,
+            }),
+          }
+        : {},
+    })
+    // The intake's own observer records which blocks a beat found open, and it only
+    // exists while the front desk does: with the gate gone, the narrow listener is the
+    // one that records the beat, and two writers per beat is the double-write the file
+    // split exists to prevent.
+    if (!ownsHeartbeatRouting) installHeartbeatBrakes({ ctx, logger, enabled: true })
     registerBlockTools({ ctx, logger, readConfig, state })
   }
 
-  // T4: the gate is always on (enforceGate removed) — every top-level user
-  // message passes the front desk.
-  installGate({
-    ctx,
-    config,
-    state,
-    logger,
-    readConfig,
-    lastGoodConfig: () => reader.lastGood(),
-  })
+  // T4: the gate is always on (enforceGate removed) — every top-level user message
+  // passes the front desk — unless `legacyGate: false` asks for the M3 shape, where the
+  // front desk is not registered at all and a user message reaches the model as it is.
+  if (!ownsHeartbeatRouting) {
+    installGate({
+      ctx,
+      config,
+      state,
+      logger,
+      readConfig,
+      lastGoodConfig: () => reader.lastGood(),
+    })
+  }
 }

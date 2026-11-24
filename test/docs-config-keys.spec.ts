@@ -51,6 +51,7 @@ describe('README documents exactly the configuration surface the code accepts', 
       18: { en: 'eighteen', zh: '十八个' },
       19: { en: 'nineteen', zh: '十九个' },
       20: { en: 'twenty', zh: '二十个' },
+      21: { en: 'twenty-one', zh: '二十一个' },
     }
     const expected = words[CONFIG_KEYS.length]
     expect(expected, 'add the spelled-out form for the new key count').toBeDefined()
@@ -112,7 +113,7 @@ describe('docs/LOCAL-TESTING.md agrees with the code', () => {
   const local = readFileSync(new URL('../docs/LOCAL-TESTING.md', import.meta.url), 'utf8')
 
   it('names every accepted key and states the count the code enforces', () => {
-    const words: Record<number, string> = { 13: 'thirteen', 15: 'fifteen', 16: 'sixteen', 17: 'seventeen', 18: 'eighteen', 19: 'nineteen', 20: 'twenty' }
+    const words: Record<number, string> = { 13: 'thirteen', 15: 'fifteen', 16: 'sixteen', 17: 'seventeen', 18: 'eighteen', 19: 'nineteen', 20: 'twenty', 21: 'twenty-one' }
     const spelled = words[CONFIG_KEYS.length]
     expect(spelled, 'add the spelled-out form for the new key count').toBeDefined()
     expect(local).toContain(`exactly ${spelled} keys`)

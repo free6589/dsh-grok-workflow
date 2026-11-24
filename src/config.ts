@@ -232,6 +232,21 @@ export const DEFAULT_LOOP_ENABLED = false
  * `configVersion` are plain for the same reason.
  */
 export const DEFAULT_BLOCK_INTAKE = false
+/**
+ * Whether the old front desk (`installGate`) is registered as it always was.
+ *
+ * On by default, because the pre-M3 tree is the shape every existing profile
+ * already runs: the gate decides every top-level batch and the loop's brakes run
+ * inside its heartbeat branch. Off skips that registration entirely — no listener,
+ * no delivery decision of its own — so the narrow heartbeat listener is the only
+ * thing left on `agent/pre-step`. It is a switch, not a tunable: a profile that
+ * leaves it on keeps the old chain byte for byte.
+ *
+ * Plain, not `volatile()`, for the same reason as {@link DEFAULT_BLOCK_INTAKE}: a
+ * registration cannot appear or disappear without a reload, so projecting it onto
+ * the settings page would promise a live edit that a reload alone can honor.
+ */
+export const DEFAULT_LEGACY_GATE = true
 export const DEFAULT_LOOP_MAX_ROUNDS = 10
 export const DEFAULT_LOOP_FAIL_STREAK = 3
 /**
@@ -404,9 +419,10 @@ export const CONFIG_VERSION = 1
 
 /**
  * Every top-level key the configuration accepts, in schema order.
- * Twenty keys in the accepted surface; seventeen of them reach the settings
- * page (`toolName`, `blockIntake` and `configVersion` are plain, not volatile,
- * so the runtime projection drops them — pinned in `test/settings-projection.spec.ts`).
+ * Twenty-one keys in the accepted surface; seventeen of them reach the settings
+ * page (`toolName`, `blockIntake`, `legacyGate` and `configVersion` are plain, not
+ * volatile, so the runtime projection drops them — pinned in
+ * `test/settings-projection.spec.ts`).
  * Kept explicit so an unknown key can be rejected instead of silently dropped:
  * a typo that is silently ignored looks exactly like a setting that "does not
  * work", which is the failure mode the settings surface must not have.
@@ -431,6 +447,7 @@ export const CONFIG_KEYS = [
   'iterateIntervalMin',
   'iterateTemplate',
   'blockIntake',
+  'legacyGate',
   'configVersion',
 ] as const
 
@@ -677,6 +694,13 @@ export const Config = z.object({
   // promise.
   blockIntake: z.boolean().default(DEFAULT_BLOCK_INTAKE)
     .description('Off by default: the block intake (its six tools and its supervisor) is registered only when this is on. 默认关闭：打开后才注册接单台的六个工具与监工'),
+  // The old front desk (T4's `installGate`) is the default shape of the tree, so
+  // this key exists to keep it *switchable off*, not to tune it. Load-time, like
+  // `blockIntake`: the gate is one `agent/pre-step` registration and a registration
+  // cannot be added or withdrawn without a reload. Off is only meaningful together
+  // with the narrow heartbeat listener, which is the one thing left to route a beat.
+  legacyGate: z.boolean().default(DEFAULT_LEGACY_GATE)
+    .description('On by default: the old front desk is registered as it always was. Off skips that registration entirely and leaves only the narrow heartbeat listener. 默认开启：旧闸门原样注册；关掉则整段不注册，只留窄心跳监听'),
   roles: z.object({
     planner: z.array(z.object({ provider: z.string().default(''), model: z.string(), maxInFlight: z.natural().min(HARD_LIMITS.routeInFlight.min).max(HARD_LIMITS.routeInFlight.max) })).default([]),
     worker: z.array(z.object({ provider: z.string().default(''), model: z.string(), maxInFlight: z.natural().min(HARD_LIMITS.routeInFlight.min).max(HARD_LIMITS.routeInFlight.max) })).default([]),
@@ -1213,6 +1237,14 @@ export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
   if (typeof blockIntake !== 'boolean') {
     throw new Error(`blockIntake must be true or false, got "${String(blockIntakeRaw)}"`)
   }
+  // The old front desk's switch, checked the same way and for the same reason: a
+  // string that reads as truthy would silently skip the registration the profile
+  // asked to keep, which is the one thing this key must never do by accident.
+  const legacyGateRaw: unknown = (config as { legacyGate?: unknown }).legacyGate
+  const legacyGate = legacyGateRaw === undefined ? DEFAULT_LEGACY_GATE : legacyGateRaw
+  if (typeof legacyGate !== 'boolean') {
+    throw new Error(`legacyGate must be true or false, got "${String(legacyGateRaw)}"`)
+  }
   // Self-iteration template (R-06): a string within the same bound the loop prompt
   // has; whitespace-only is legal and falls back to the built-in default at open
   // time, so a half-finished edit cannot arm an empty heartbeat.
@@ -1258,6 +1290,7 @@ export function resolveConfig(config: GrokWorkflowConfig = {}): ResolvedConfig {
     iterateIntervalMin: integer('iterateIntervalMin', config.iterateIntervalMin ?? DEFAULT_ITERATE_INTERVAL_MIN, 0, HARD_LIMITS.iterateIntervalMin),
     iterateTemplate,
     blockIntake,
+    legacyGate,
     configVersion,
   }
 }
@@ -1360,6 +1393,7 @@ export function describeResolvedConfig(config: ResolvedConfig): string {
     `grokDefault=${config.grokDefault}`,
     `synthesis=${config.synthesis}${config.synthesisRepaired === true ? ' (repaired)' : ''}`,
     `blockIntake=${config.blockIntake === true ? 'on' : 'off'}`,
+    `legacyGate=${config.legacyGate === true ? 'on' : 'off'}`,
     `roles=planner:${role('planner')} worker:${role('worker')} verifier:${role('verifier')} synthesizer:${role('synthesizer')} supervisor:${role('supervisor')}`,
   ].join(' ')
 }

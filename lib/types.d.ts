@@ -224,6 +224,13 @@ export interface GrokWorkflowConfig {
      * listener are never registered — so it cannot be a `volatile()` field.
      */
     blockIntake?: boolean;
+    /**
+     * Whether the old front desk (`installGate`) is registered. On by default and
+     * on means the pre-M3 chain; off skips that registration entirely, leaving the
+     * narrow heartbeat listener as the only `agent/pre-step` listener. Load-time for
+     * the same reason as `blockIntake`: a registration cannot be flipped live.
+     */
+    legacyGate?: boolean;
 }
 /** Fully resolved configuration. Everything not listed here is a fixed internal value. */
 export interface ResolvedConfig {
@@ -286,6 +293,12 @@ export interface ResolvedConfig {
      * listener are never registered — so it is not a `volatile()` field.
      */
     blockIntake: boolean;
+    /**
+     * Old front desk switch. Load-time: on registers `installGate` exactly as before,
+     * off registers nothing from it, so the narrow heartbeat listener is the only
+     * listener left on the chain.
+     */
+    legacyGate: boolean;
     configVersion: number;
 }
 /** One evidence item confirmed by a verifier. */
