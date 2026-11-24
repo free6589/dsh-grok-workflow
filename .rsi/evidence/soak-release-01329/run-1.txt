@@ -1,0 +1,25 @@
+dsh: reasoning:
+The user asks me to call grok_workflow once with the exact objective. Then paste the full returned text verbatim.
+
+Note: this is a test/soak run. I just call it once.
+
+The objective must be exactly: 「17+25 等于多少？给出算式和一步验算。」 — the text inside the brackets.
+
+Let me call it.
+(node:11) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+Grok workflow: COMPLETED
+Objective: 17+25 等于多少？给出算式和一步验算。
+Plan: planner; 1 task(s); 1 verified
+Wave reason: Single wave because the objective is one indivisible unit: splitting it would only add a hand-off.
+- arith-1: verified (1 attempt) — 计算 17+25，给出算式并做一步验算
+Confirmed evidence:
+- arith-1: 回答中明确出现算式 “17 + 25 = 42”，且结果为 42 → 执行结果 deliverable 正文第一行为「17 + 25 = 42」，与 shell 实测 echo $((17+25)) 输出 17+25=42 完全一致。
+- arith-1: 回答包含恰好一步可读的验算算式，其计算结果与 42 相符（如 42 - 25 = 17 或 25 + 17 = 42） → 第二行给出唯一一步验算「验算：42 - 25 = 17，与被加数 17 一致，结果正确。」；独立命令 echo $((42-25)) 输出 42-25=17，回推结果 17 正是原被加数，与 42 相符。未堆叠第二种验算。
+- arith-1: 验算步骤的数字与算式自洽，不存在自相矛盾或错误结论 → 实测 17+25=42、42-25=17、25+17=42 三个值互相对得上；正文数字 17、25、42 无矛盾，未出现 32、52 等错误结果。
+- arith-1: 回答使用中文，结论置于最前，整体简洁（不超过 5 行） → 正文仅 2 行（用 printf 复现并 wc -l 计得 2 行）；第一行即结论算式，第二行为中文验算说明，无代码块、无表格、无长篇解释。
+Final answer:
+结果：这道加法题的答案已经给出并且站得住脚：正文第一行直接写结论，即十七加二十五等于四十二；第二行只用一步减法回推来验算，从四十二减二十五得到十七，正好回到原来的被加数，因此结论成立。三处数字互相对得上，没有出现自相矛盾的中间值，也没有堆叠第二种验算。回答用中文写成，结论放在最前面，整篇只有两行，干净利落。 怎么用：这份回答可以直接作为最终答复交付给提问的人。以后要复核时，只需要看第一行的结论算式和第二行那一步减法验算是否彼此吻合，吻合就可以放心采用，不必再另找工具重算。 注意：本轮的全部任务都已完成，没有留下没做完的部分。核验方面，独立核验方判定这次结果成立，并且给出了较高的把握。需要留意的是，执行方对自己是怎么算出这些数字的那段说明属于自我陈述，并没有被独立复核过，因此只能当作过程描述，不能当成已经证实的事实。 报告附注（以下为报告事实，摘要不改写）： 命令与测试——检查者核验：通过 3、失败 0、未运行 0；执行者自报：通过 1、失败 0、未运行 0。
+Summary review: check=pass verify=pass drafts=1
+Guard: 0 finding(s), no subagent was terminated; nobody cancelled this round (it finished on its own).
+exit=0 elapsed=157s overlay=/home/fish/projects_mine/dsh-grok-workflow/.tmp/soak-01329/scenario-1.yml prompt=/home/fish/projects_mine/dsh-grok-workflow/.tmp/soak-01329/prompt-1.txt

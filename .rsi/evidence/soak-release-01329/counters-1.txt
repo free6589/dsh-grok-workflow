@@ -1,0 +1,7 @@
+port|model                                  requests  detail
+18491|soak/hang-always                            1  hang=1 hang-opened=1 hang-closed=0
+18493|soak/judge-live                             2  proxy=2 200=2
+18493|soak/plan-live                              1  proxy=1 200=1
+18493|soak/sup-live                               2  proxy=2 200=2
+18493|soak/synth-live                             1  proxy=1 200=1
+18493|soak/work-live                              2  proxy=2 200=2

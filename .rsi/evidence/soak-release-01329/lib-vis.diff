@@ -1,0 +1,25 @@
+--- ../wt-rel-0.13.29/lib/index.js	2026-11-24 09:17:54.030495446 +0800
++++ lib-vis/index.js	2026-11-24 09:42:23.616502214 +0800
+@@ -215,7 +215,7 @@
+                 void readConfig;
+                 return [{
+                         type: 'text',
+-                        text: renderReport(value),
++                        text: renderReport(value, { showDiagnostics: true }),
+                     }];
+             },
+         },
+--- ../wt-rel-0.13.29/lib/report.js	2026-11-24 09:17:53.914494859 +0800
++++ lib-vis/report.js	2026-11-24 09:42:23.618922011 +0800
+@@ -1076,6 +1076,11 @@
+             lines.push(`Wave ${wave + 1}/${report.plan.waves.length}:`);
+         }
+         lines.push(`- ${task.id}: ${task.status} (${attempts} attempt${attempts === 1 ? '' : 's'}) — ${oneLine(task.title, 160)}`);
++// SOAK-ONLY ADDITION (visibility, not behaviour): the canonical report carries
++// per-attempt flags the default renderer never prints.
++for (const [index, row] of (task.attempts ?? []).entries()) {
++  lines.push(`  attempt ${index + 1} flags: route=${row.route ?? '?'} passed=${row.passed} resubmitted=${row.resubmitted === true} judgeRetried=${row.judgeRetried === true} failure=${row.failure === undefined || row.failure === null ? 'none' : `${row.failure.class}/${row.failure.category}`}`);
++}
+         // A blocked task reports the same evidence line a failed one does: "did not run"
+         // is not a pass, and its reason names the upstream task that stopped it.
+         if (task.status === 'failed' || task.status === 'blocked') {

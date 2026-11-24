@@ -1,0 +1,3 @@
+port|model                                  requests  detail
+18492|soak/auth-bad                               2  auth401=2 401=2
+18493|soak/synth-live                             1  proxy=1 200=1

@@ -3057,3 +3057,35 @@ spine 为空，pre-fix 形状会进脊柱。
   只差一个类（五族减去四族 = `['model-unavailable']`）。两条用例的标题分别写明「转发面」与「记账面」。
 - **Consequences:** 401/403 在报告与路由台账里立刻是真因，且不再白烧一次补交；死路由表仍是四族，
   「一条路被记成死路」的门槛没有变。任何调这两张表的提交必须同时改上面这两条钉子。
+
+## D-125 · 合流期预算对账：两条救援各自的容量都保留，钉旧算式的三条用例改成钉合成后的算式（2026-11-24）
+
+- **Status:** `CONFIRMED`（真引擎用例 + 全量门禁 exit 0；真机 soak 三场景 PASS）
+- **Date:** 2026-11-24
+- **背景:** 0.13.29 把两条各自加宽子调用上限的分支合到同一条 release 上——D-122 给规划腿加了两次救援问法
+  （`PLANNER_LEG_CALLS = 3` 次走链），D-123 给判定腿加了同 attempt 补打（每 attempt `2*worker + 3*(verifier+supervisor)`）。
+  两条改的是 `maxTotalAgentsFor` 的不同项，但落点相邻，合流时 `attemptBlock` 那一段直接冲突。
+- **Decision:** 两项**都保留**，谁也不许为了「合成一个数」被丢掉，因为它们是两条不同救援的真实子调用：
+  ```
+  planLeg      = PLANNER_LEG_CALLS * planner          // 每 attempt 之前，规划腿最坏 3 趟
+  attemptBlock = 2 * worker + 3 * (verifier + supervisor)
+  maxTotalAgentsFor = planLeg * waitFactor + synthesizer * waitFactor
+                    + replans * planner * waitFactor
+                    + tasks * (retries + 1) * attemptBlock * waitFactor + 2
+  ```
+  载入期总闸 `HARD_LIMITS.maxAttemptsPerTask = 1000`（D-123）只算任务级的 worker/判定调用，规划腿按 run 级 cap 计，
+  两者不重复、不互相抵消。
+- **被这条决定改掉的三条用例（钉的是旧算式，必须跟着行为走，行为不动）:**
+  1. `test/routing.spec.ts` —— cap 用例改成合成后的数字：plain `3 + 2*(2*1 + 3*1) + 2 = 15`、routed `3 + 0 + 2*(2*2 + 3*1) + 2 = 19`；
+  2. `test/planner-resubmit.spec.ts` —— 仍钉「规划腿按 `PLANNER_LEG_CALLS` 计」，但每 attempt 的块改为 `2*w + 3*(v+s)`（期望 38，原 32）；
+  3. `test/judge-leg-retry.spec.ts` —— cap 用例的规划项改为 `PLANNER_LEG_CALLS * planner`（期望 15/19，原 13/17）；
+     它存在的性质没变：块仍从 5 抬到 7，routed−plain 仍为 4。
+- **Evidence:** `src/script.ts`（`maxTotalAgentsFor` 的两项并存）、`test/routing.spec.ts`、`test/planner-resubmit.spec.ts`、
+  `test/judge-leg-retry.spec.ts`、`test/planner-resubmit.spec.ts > keeps a recovered leg inside the walks the cap pays for`
+  （真引擎：被救回的规划腿确实落在 cap 之内，不会以 `budget-exhausted` 收场）；真机 soak 三场景 PASS（`.rsi/evidence/soak-release-01329/`）。
+- **Alternatives rejected:**
+  1. 取两者较大值（`2*worker + 3*(v+s)` 已盖住规划腿）——错的：两项计价对象不同，盖住任务块不等于盖住规划腿的 3 趟；
+  2. 只留规划项、把判定块退回 `2*(w+v+s)`——等于把 D-123 的补打从预算里删掉，补打会在救回时以 `AGENT_CAP` 掐断；
+  3. 抬全局 `maxTotalAgents` 的魔数兜住——cap 是公式算出来的，抬魔数只会掩盖下一次同样的冲突。
+- **Consequences:** 同一个 run 的 cap 比任何单条分支都大（plain 13 → 15、routed 17 → 19，量级不变）；任何再动
+  `maxTotalAgentsFor` 或 `PLANNER_LEG_CALLS` 的提交，必须同时改这三条用例，否则它们会先红——这正是它们的作用。

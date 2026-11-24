@@ -1,0 +1,16 @@
+(node:12) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+Grok workflow: FAILED
+Objective: 算出 1000-378 并写出一行可复核的验算。
+Plan: caller; 1 task(s); 0 verified
+Wave reason: Single wave because the objective is one indivisible unit: splitting it would only add a hand-off.
+Failures: 2 infrastructure
+- task-1: failed (2 attempts) — 1000-378 的结论与验算
+  incomplete (infrastructure): worker failed on every route: [model-unavailable] worker call produced no result: the child run ended abnormally (401: {"message":"Incorrect API key provided: the virtual key presented to this provider was refused (soak fake provider, 401)","type":"i
+Incomplete:
+- task-1 (infrastructure): worker failed on every route: [model-unavailable] worker call produced no result: the child run ended abnormally (401: {"message":"Incorrect API key provided: the virtual key presented to this provider was refused (soak fake provider, 401)","type":"i
+Final answer:
+结果： 这次运行没有通过。唯一一项任务失败，独立核验环节没有留下任何核验记录，所以没有任何一项被确认通过。执行这项任务的子运行在尝试的每条通道上都被中断，提供方以凭据被拒为由拒绝继续，始终没有产出结果，属于基础设施层面的故障。 怎么用： 这份结果目前不可用，请不要据此做后续判断或对外说明。需要先排除访问凭据方面的问题，换一条可用的通道重新执行，并让独立核验环节留下记录，再决定是否可以采信。 注意： 那一项任务在所有通道上都没有产出结果，属于未完成、也未获核验的部分。 除此之外没有任何文件、命令或结果被列出，因此没有更多可汇报的内容。 报告附注（以下为报告事实，摘要不改写）： 仍未完成（来自报告）： - 任务 task-1：worker failed on every route: [model-unavailable] worker call produced no result: the child run ended abnormally (401: {"message":"Incorrect API key provided: …
+Summary review: check=pass verify=pass drafts=1
+Guard: 0 finding(s), no subagent was terminated; nobody cancelled this round (it finished on its own).
+exit=0 elapsed=21s overlay=/home/fish/projects_mine/dsh-grok-workflow/.tmp/soak-01329/scenario-3.yml prompt=/home/fish/projects_mine/dsh-grok-workflow/.tmp/soak-01329/prompt-3.txt

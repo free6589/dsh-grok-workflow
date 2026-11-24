@@ -1,0 +1,13 @@
+# Merge gate OK — release/0.13.29
+
+- Release head: `aebe65a7a75c12be194ad1adf74003edffd0f910` (`aebe65a`, branch `release/0.13.29`)
+- Worktree: `/home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-rel-0.13.29`
+- `npm run ci` (typecheck && lint && verify:lib && test): **exit 0**
+  - typecheck: clean, 0 errors
+  - lint: 0 errors / 36 warnings (all pre-existing)
+  - verify:lib: byte-identical, 237 files (lib at aebe65a is the build of src at aebe65a)
+  - vitest: **99 files / 1837 tests passed**, duration 128.05s
+- `git status --short`: no lines (tree clean)
+- `lib/` committed at HEAD is the build of the merged `src/` — safe to soak against.
+
+GO — build is green, the real-machine soak can start.

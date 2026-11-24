@@ -1,3 +1,35 @@
+## 2026-11-24 — 0.13.29 备好发版：三处救援在同一条跑里都成立（合流 + 真机 soak 皆绿，待打 tag）
+
+- **From:** 合流方（agent-116/merger） · **To:** 发版方 / 下一个接手者
+- **本版发了什么**（逐条原文见 `CHANGELOG.md` 的 `## [0.13.29] - 2026-11-24`，三条都在同一个 `### Fixed / 修复` 下）：
+  ① 规划腿不再因为一次格式错或一次传输死就退化成兜底——同次重交 + 换路重打（`PLANNER_LEG_CALLS = 3`，D-122）；
+  ② 判定腿（verifier/supervisor）死于传输时在同一次 attempt 内补打这条腿一次，不重跑最贵的 worker（`judgeRetried`，D-123）；
+  ③ 401/403 的密钥被拒带着服务商原话回到脚本、按真因写进报告，且仍然不进死路由表（D-124）。两处预算同时抬，对账见 D-125。
+- **合流与门禁**：五次 `git merge --no-ff`（`34681ae` → `a8fd9ba` → `7287ee4` → `4193245` → `aebe65a`），随后一个
+  `chore(release): prepare v0.13.29` 提交做版本、CHANGELOG、记忆与证据。版本被钉在**四处**，四处都要动：
+  `package.json` + `package-lock.json`、`CHANGELOG.md`、`docs/LOCAL-TESTING.md` 的 tarball 名、以及设置页的
+  `PLUGIN_VERSION`/`UPDATE_LATEST`（`src/client/index.js`，`lib/client.js` 随 `npm run build` 重建）——
+  只改前两处会在 `docs-config-keys.spec.ts` 与 `update-entry.spec.ts` 上红（本轮实际发生过一次）。`npm run ci` **exit 0**：typecheck 干净、
+  lint **0 errors / 36 warnings**（全既有）、`verify:lib` byte-identical（237 files）、vitest **99 files / 1837 tests**。
+  合流 + 准备期间 `npm run ci` 共 12 次，其中 **6 次**红在挂死探针的 30 s 超时上（每次只红 1 条；`dead-routes.spec.ts > counts a call that hung …`、
+  `planner-resubmit.spec.ts > keeps a recovered leg …`）。**这是既有抖动，不是本版引入**：把 `2141071`（已发的 0.13.28）
+  整棵树解到 scratch 单跑同一个 `dead-routes.spec.ts`，**6/12 红**；HEAD 同一文件 **6/15 红**，红法相同。未改断言、未抬超时。
+  **发版方注意**：远端 runner 若在这条上红，先 `gh run rerun --failed`（`v0.13.27` 就是这样红的），别为此动断言或 `testTimeout`；
+  收窄这两条挂死探针（改成「按报告断言 + 有界等待」）是后续单独一刀，已记在 `VALIDATION.md`。
+- **真机 soak**：三场景 PASS，证据 `.rsi/evidence/soak-release-01329/`（README、三份场景、网关日志与按路由计数、
+  overlay、prompt、checkpoint、`lib-vis.diff`）。三条判据各自的那一行、以及全部缺口，见 `VALIDATION.md` 前两条。
+- **上一版 handoff 留下、本轮仍未动的两件小事**：① 挂死轮的 soak 仍只证到「进表 + 排后」，「第 3 条任务起不打它」
+  是在 503 轮上取到的，本轮的 503 端点没有演练；② `src/delivery/index.ts` 的 `machineLedger` 与 `report.renderReport`
+  仍是两份并列诊断视图，`Dead routes` 只在后者。
+- **本版的缺口（要主张就带上）**：`showDiagnostics` 硬关 → `judgeRetried`/`Dead routes` 在出厂构建里不渲染
+  （flags 读自只改渲染的副本，主跑在未改动的构建上）；`maxRetries` 固定 1 → 只能说「每个 attempt 一次派发」；
+  `grokDefault: off`；`wb/cn:deepseek-v4.1-flash` 整段 503，用 `wb/global:…` 同网关同密钥替代；未演练 503 降级、
+  supervisor 侧补打、`[auth401, live]` 混合链。
+- **分支与发版**：五条来源分支（`feat/planner-resubmit`、`feat/leg-retry`、`fix/forward-model-unavailable`、
+  `docs/operator-tone`、`docs/foreman-autoupgrade`）已全部合入 `release/0.13.29`，按 §5 可在 24h 内删除；
+  `release/0.13.29` 按 §7 五步走（本地 `ci` 已绿 → 打 `v0.13.29` → push `main` → push tag → 盯 Release），
+  发完合并进 `main` 并删除。远端 CI/Release 的 run id 与发布结果要 push 之后才存在，落在随后的跟进 docs 提交里。
+
 ## 2026-11-24 — 401/403 也回灌给脚本，但不进死路由账（`CONFIRMED` 单测 + 门禁，真机 soak `NOT_RUN`）
 
 - **From:** 实现子代理（agent-114/impl-forward-model-unavailable） · **To:** lead / 合流方

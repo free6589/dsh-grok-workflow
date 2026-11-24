@@ -1,0 +1,6 @@
+port|model                                  requests  detail
+18493|soak/judge-live                            12  proxy=12 200=12
+18493|soak/plan-live                              2  proxy=2 200=2
+18493|soak/sup-live                               3  proxy=3 200=3
+18493|soak/synth-live                             2  proxy=2 200=2
+18493|soak/work-live                              4  proxy=4 200=4

@@ -1,3 +1,25 @@
+Last updated: 2026-11-24 10:05 +08:00（**已备好发版 `0.13.29`：三处救援在同一条跑里都成立，`CONFIRMED`（真机 soak 三场景 PASS + 本地门禁 exit 0）** —
+本提交是 `chore(release): prepare v0.13.29`（版本 0.13.28 → 0.13.29，CHANGELOG 的三条 `Fixed` 从 `[Unreleased]` 移入
+`## [0.13.29] - 2026-11-24`，`[Unreleased]` 留空）。五条来源分支按序合入 `release/0.13.29`（`2141071` →
+`34681ae` planner → `a8fd9ba` judge → `7287ee4` key → `4193245` AGENTS §9 → `aebe65a` AGENTS §10/§11）。
+版本不是只改一处：`package.json` + `package-lock.json`、`CHANGELOG.md`、`docs/LOCAL-TESTING.md` 的 tarball 名、
+设置页的 `PLUGIN_VERSION`/`UPDATE_LATEST`（`src/client/index.js`，`lib/client.js` 随构建重建）四处必须同步，
+漏一处 `docs-config-keys.spec.ts`/`update-entry.spec.ts` 就红。三处救援：① 规划腿不再因为一次格式错或一次传输死就退化成兜底（同次重交 + 换路重打，`PLANNER_LEG_CALLS = 3`，D-122）；
+② 判定腿（verifier/supervisor）死于传输时在同一次 attempt 内补打这条腿一次，不重跑最贵的 worker（`judgeRetried`，D-123）；
+③ 401/403 的密钥被拒带着服务商原话回到脚本、按真因写进报告，且仍然不进死路由表（D-124）。合流期两条预算同时抬，
+对账见 D-125。本地门禁 `npm run ci` **exit 0**：typecheck 干净、lint **0 errors / 36 warnings**（全既有）、
+`verify:lib` byte-identical（237 files）、vitest **99 files / 1837 tests PASS**（128.05 s）。合流 + 发版准备期间 `npm run ci` 共跑 **12 次：6 次**被挂死探针的 30 s 超时打红（每次只红 1 条），5 次绿，1 次因版本
+钉在四处而红（已修）
+（`dead-routes.spec.ts > counts a call that hung …`、`planner-resubmit.spec.ts > keeps a recovered leg …`）。**这不是本版引入的**，
+已测过：把 `2141071`（已发的 0.13.28）整棵树解到 scratch 里，同一个 `dead-routes.spec.ts` 单跑 **6/12 红**；HEAD 上同一文件
+单跑 **6/15 红**——同一个 30 s 挂死，基线一样。两次全量红的额外墙钟就是这两次 30 s 超时本身（tests 段 130–161 s vs 绿轮 ~103 s）。
+**没有**改断言、没有抬 `testTimeout`、没有跳过用例；门禁跑到绿为止（数字见上）。**发版风险**：远端 runner 若在这条上红，
+先 `gh run rerun --failed`（`v0.13.27` 就是这样红的），不要为此改断言或抬 `testTimeout`；这两条挂死探针的收窄是后续单独一刀。真机 soak（隔离 `DSH_HOME` + 假端点 + 本机网关，`maxConcurrency: 1`、`childTimeoutMs: 90000`）
+三场景 PASS，证据 `.rsi/evidence/soak-release-01329/`：规划腿换路重打（死路只付 1 次、`Plan: planner`）、判定腿补打
+（worker 1 行、verifier 同行 2 行、`judgeRetried=true`）、被拒密钥（每 attempt 1 次请求、`model-unavailable` 带
+服务商原话、报告无 `Dead routes`）。**远端 CI/Release 的 run id 与发布结果不在本提交里**：它们要 push 之后才存在，
+落在随后的跟进 docs 提交。本轮未 push、未打 tag、未发版，按 §7 由发版方接手。）
+
 Last updated: 2026-11-24 08:44 +08:00（**401/403 也回灌给脚本了，但它不把路由记成死路，`CONFIRMED`（单测 + 门禁），未发版、未合流** —
 分支 `fix/forward-model-unavailable`（worktree `.agents/worktrees/fix-forward-model-unavailable`，从 `main` `8f34701`＝0.13.28 开出；
 共享脏树 `a6103ad` 一行未动）。之前只有四个传输族的死因会带着 `CHILD_DEATH: <class>: <原话>` 回到脚本，密钥被拒（401/403、

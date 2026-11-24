@@ -1,3 +1,41 @@
+## release/0.13.29 合流门禁：五分支按序合入，两次全量复跑皆绿（一次全量红如实记录）— 2026-11-24（合流方 agent-116/merger）
+
+| state | command | result |
+| --- | --- | --- |
+| 五次 `git merge --no-ff` | worktree `.tmp/wt-rel-0.13.29`，分支 `release/0.13.29`，基线 `2141071`（0.13.28） | `34681ae`(planner) → `a8fd9ba`(judge) → `7287ee4`(key) → `4193245`(AGENTS §9) → `aebe65a`(AGENTS §10–11)；无 unmerged path、无冲突标记、无 `*.orig`/`*.rej`/`*.bak` |
+| 手工解冲突 | `src/script.ts`、`test/routing.spec.ts`、`CHANGELOG.md`、`docs/knowledge/{DECISIONS,STATE,HANDOFF,VALIDATION}.md`、`lib/*.map` | 两处预算同时保留：`attemptBlock = 2*worker + 3*(verifier+supervisor)` **和** `planLeg = PLANNER_LEG_CALLS * planner`（D-125）；`lib/` 一律由 `npm run build` 重建，`verify:lib` 在三个合流点 `34681ae`/`a8fd9ba`/`7287ee4` 与 HEAD 全部 byte-identical |
+| 门禁（绿） | `npm run ci`（HEAD `aebe65a`） | **exit 0**：typecheck 0 错；lint **0 errors / 36 warnings**（全既有）；`verify:lib` byte-identical（**237 files**）；vitest **99 files / 1837 tests PASS**，128.05 s |
+| 门禁（一次全量红，环境） | 同一 HEAD 再跑一次 `npm run ci` | **exit 1**：2 条 30 000 ms 超时 —— `test/dead-routes.spec.ts > counts a call that hung, even though a hang does not switch models`、`test/planner-resubmit.spec.ts > keeps a recovered leg inside the walks the cap pays for`。两条都是 `gate: new Promise(() => {})` 挂死探针，绿时分别是 2 012 ms / 1 009 ms；红轮 tests 段 161 s vs 绿轮 103 s（宿主 6 核、load ≈4.8） |
+| 复跑 | 再两次全量（`npm run ci`、`npx vitest run`） | **两次皆绿**（99 files / 1837 tests）；两条挂死用例单跑 **3/3 绿** |
+| 挂死探针的复现率（这是**既有**抖动，不是本版引入） | 同一份 `test/dead-routes.spec.ts` 单跑循环 | 基线 `2141071`（已发的 0.13.28，`git archive` 到 scratch 里跑）：**6/12 红**；合流后的树（`aebe65a` 与 `b21ffa2`）：**6/15 红**，红法相同——`counts a call that hung …` 以 `Test timed out in 30000ms` 停住（脚本自己声明的 1 s 子调用预算偶发没有结算它），`planner-resubmit.spec.ts > keeps a recovered leg …` 是同一形状。全量 `npm run ci` 本轮共跑 12 次：**6 次**红在这两条挂死探针上（每次只红 1 条），5 次绿，1 次因版本钉在四处而红（已修）。红轮的额外墙钟正是那 30 s 超时本身（130–161 s vs 绿轮 ~103–128 s）。**结论：基线一样红，本版没有加重；门禁跑到绿为止（第 4 次全量 `exit 0`），未改断言、未抬 `testTimeout`、未跳过** |
+| 挂死探针的收窄（未做，留后续） | —— | **NOT_RUN**：两条用例该改成「按报告断言 + 有界等待」（本仓库 0.13.27 已经为同一形状改过一次），属于后续单独一刀，不在发版准备的范围 |
+| 发版准备自身的红（已修） | `npm run ci`（工作树带版本 0.13.29 + CHANGELOG） | **exit 1**：`docs-config-keys.spec.ts`「LOCAL-TESTING.md 把 tarball 名钉在包版本上」与 `update-entry.spec.ts`「设置页版本 = 包版本」——版本被钉在**四处**，只改 `package.json`/`package-lock.json` 不够：`docs/LOCAL-TESTING.md`（3 处 `dsh-grok-workflow-0.13.29.tgz`）与 `src/client/index.js` 的 `PLUGIN_VERSION`/`UPDATE_LATEST`（`lib/client.js` 随之重建，见该文件注释「release task bumps it with package.json」） |
+| 发版准备后的门禁（绿） | `npm run ci`（同一工作树，含上面四处版本 + 证据目录） | **exit 0**：typecheck 0 错；lint **0 errors / 36 warnings**；`verify:lib` byte-identical；vitest **99 files / 1837 tests PASS**，127.66 s |
+| 没有做的事 | —— | 没有放宽任何断言、没有抬超时、没有跳过用例；行数与基线对得上：`97/1820` → `+8`（`judge-leg-retry`）→ `+9`（`planner-resubmit`）= **99/1837** |
+| 结论 | —— | **CONFIRMED**（命令、环境、数字都在上表）；唯一未定的只是那两条用例在极端负载下的耗时，与本版改动无关（同一形状在本仓库有前例） |
+
+## release/0.13.29 真机 soak：三处救援各一条场景，三场景 PASS — 2026-11-24（合流方 agent-116/merger；证据 `.rsi/evidence/soak-release-01329/`）
+
+图纸（rig，取自证据目录 README）：隔离 `DSH_HOME`（`scripts/clone-profile.mjs` 克隆 `headless`，凭据 0 行）+ `HOME` scratch +
+假端点 `gateway.mjs`（18491 挂死 / 18492 恒 401 / 18493 转发到本机网关）+ 插件行指向 worktree 的 `lib/index.js` @ `aebe65a`；
+`mode: full`、`maxConcurrency: 1`、`childTimeoutMs: 90000`、`loopEnabled: false`。live `~/.dsh` 与 3080 实例全程未动，
+密钥只进进程环境、未打印未复制。
+
+| 判据 | 形状 | 派发 / 每路请求（自己的网关计数器，不是子代理自述） | 证明它的那一行 | 结论 |
+| --- | --- | --- | --- | --- |
+| 规划腿死于传输 → 换路重打，不降级 | planner 链 = [挂死端点, 活路由]；objective 不含 caller tasks | `18491/soak/hang-always` **1**（hang，从不回）；`18493/soak/plan-live` **1**（200，3 205 ms，与挂死相隔 93 s） | `Plan: planner; 1 task(s); 1 verified`；无 `Plan failure:`；全文无 `fallback`（`grep -c -i fallback` = 0）；checkpoint：`planner attempt 0 failed timeout` → `planner attempt 0 ok` | **PASS** |
+| 判定腿死于传输 → 同 attempt 补打，worker 不重跑 | 单个 caller task；verifier 链 = 一条「第 1 次挂死、第 2 次起转发」的路由 | `soak/work-live` 2 次模型调用，但 checkpoint 里 **`worker attempt 1` 只有 1 行**（无 `attempt 2`、无第二行 `attempt 1`）；`soak/judge-hang`：**hang 1 + proxy 2**（补打 92 s 后回、2 346 ms） | `- task-1: verified (1 attempt)`；可见性副本 `attempt 1 flags: route=soak-pool/soak/work-live passed=true resubmitted=false judgeRetried=true failure=none`；`Route switches:` 只有一条 `verifier attempt 1 … timeout` | **PASS** |
+| 被拒密钥每 attempt 派发一次、写成真因、不进死路由表 | worker 链 = 只有 401 端点 | `18492/soak/auth-bad` **2**（两个 attempt 各 1 次，相隔 346 ms，同 attempt 内没有第二次） | `worker attempt 1 failed model-unavailable` + `worker attempt 2 failed model-unavailable`；`incomplete (infrastructure): worker failed on every route: [model-unavailable] … 401: {"message":"Incorrect API key provided …","code":"invalid_api_key"}`；报告**完全没有** `Dead routes` 段 | **PASS** |
+
+**soak 自己写下的缺口，原文照收（详见 `.rsi/evidence/soak-release-01329/README.md`「Honest gaps」）:**
+
+- **(a) 上游模型替换**：任务书里的 `wb/cn:deepseek-v4.1-flash` 整段会话都返回 `503 no_healthy_account`，三场景改用**同网关、同密钥**的 `wb/global:deepseek-v4.1-flash`。
+- **(b) `grokDefault: off`**：`on` 会让 intake 门自己起一条并发 run，按路由计数就无法归因；所以每场景一条 run、一套计数。
+- **(c) 没有「只调用一次」这件事**：`maxRetries` 是已移除键、固定为 1，所以主张的是「**每个 attempt 一次派发**」（2 attempts = 2 次调用、同 attempt 零补交），不是总共一次。
+- **(d) 可见性辅助**：`judgeRetried` 与 `Dead routes` 是规范字段但出厂渲染器不打印（`FIXED_SHOW_DIAGNOSTICS` 硬关）；flags 只在「只改渲染」的 `lib-vis` 副本上读，**主跑都在未改动的构建上**，路由/重试/预算/报告决策 byte-identical（整份差异见 `lib-vis.diff`）。
+- **(e) 未演练**：503 死路由降级、supervisor 侧补打、`[auth401, live]` 混合链——目录里没有任何主张依赖它们。
+- **(f) 门禁的 mtime 条件不成立**：`lib/index.js`（09:17:54）比 marker（09:20:58）**旧** 3 分钟，因为 `ci` 里先 `build` 后写 marker；按提交身份（同 sha、干净树、`verify:lib` byte-identical）认定满足，如实记在这里。
+
 ## model-unavailable（401/403）也回灌给脚本、但不进死路由账：单测红 4 → 绿 53 + 门禁 exit 0，真机 soak 留给合流方 — 2026-11-24（实现子代理 agent-114/impl-forward-model-unavailable）
 
 | state | command | result |

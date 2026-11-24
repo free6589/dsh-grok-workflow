@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.29] - 2026-11-24
+
 ### Fixed / 修复
 
 - **A plan is asked for again instead of being given up on / 计划不再因为一次格式错或一次 503 就降级** —
