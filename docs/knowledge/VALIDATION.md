@@ -1,3 +1,83 @@
+## 后台轮只等到「开跑」就断言：改成等它落地（`test/` only，`src/`、`lib/` 未动）— 2026-11-24（提交 `a210b08`；数字由修者与验收方分别实测）
+
+**症状（`CONFIRMED`）：** 两条 spec 在负载下红成一句**像产品 bug 的话**，而不是红在它们要钉的事实上 ——
+前台该给的答案位置出现了插话回执 `已收到，并入了正在跑的这一轮（待并入 1 条）…`。
+
+- `test/phase1-dialogue.spec.ts > P0-2: a confirmation answer keeps the original request > consumes a pending question once, so a repeated answer cannot start a second run`：
+  修者 `LOAD=16 N=15` 单跑该文件 **15/15 红**（这条每次 410–1060 ms），逐字
+  `AssertionError: expected '已收到，并入了正在跑的这一轮（待并入 1 条）…' to contain '没有待回答的分流问题'`；
+  再把它所在 describe 用 `LOAD=24 N=8` 单挑，**8/8 红**，还是同一条。
+- `test/triage.spec.ts`：修者单跑该文件 `LOAD=12 N=8` **0/8 红**（这条要两个文件一起压才现形）；验收方 10 次混合跑里有 **1 次**红
+  （`repro-run-7-triage.log`），红的是 4 条：`runs the whole workflow for a complex request after the captain split is confirmed`、
+  `asks one question instead of guessing, and remembers the answer`、`hands the worker the answered request and the new work in the same message (B05)`、
+  `upgrades to the team when the message asks for it, after a split confirmation`。
+
+**工单说 phase1-dialogue 有两条抖，实测只有一条（`CONFIRMED`）：** 33 个负载样本（15 次整文件 + 8 次 describe 单挑，逐次记录）里
+**只有上面那一条**红过，没有第二个不同的用例。另外四个 `P0-2` 用例（`hands the team…`、`never lets another session answer…`、
+`keeps an earlier unanswered request… (B04)`、`cuts the resumed request… (B08)`）等的是**同一个缝**，所以一并改了 —— 这是「按机制改」，
+不是「找到了第二条」。
+
+**机制（`CONFIRMED`，靠测量不靠推理）：** 「开跑」不等于「落地」。
+- 两个文件都在后台轮**开始**时就断言：`phase1-dialogue` 等 `startCalls.length === 2`（一条用例等的是 vitest 默认 **1 000 ms** 的
+  `vi.waitFor(() => agent.followups.length === 1)`）；`triage.spec.ts` 的 `route()` 用同样的 1 000 ms `vi.waitFor` 判断「后台报告到了」。
+- 闸门为整轮留着这条会话的插话通道，直到**报告投递之后**才在 `runChannelRound` 的 `finally` 里关掉（`src/gate.ts`）。落在这段窗口里的消息
+  不是新的请求，会被并进正在跑的那一轮 —— 回执就是上面那句。
+- `triage.spec.ts` 的级联是**实测出来的跨用例泄漏**，不是推理：该文件第一次红是 `Error: background report not delivered yet`
+  （1 000 ms 预算到期），此时那一轮还活着；用例结束后它的通道没关，而该文件里**每个 `FakeAgent` 共用会话 id `sess-triage`**，
+  插话通道又是按会话挂的 —— 于是后面三条用例的消息被并进上一条用例的轮里，队列计数依次涨成 `待并入 1 条` → `2 条` → `3 条`
+  （正是每条被并进去的消息），四条连续红。
+- 落地本身很快（`CONFIRMED`，修者在 scratch 副本里给 `roundLanded` 打点）：9 个负载样本落地耗时 **22–545 ms**，所以 15 000 ms 是约 30 倍余量。
+
+**`HYPOTHESIS`（明确标为假设）：** 有一次被污染的自测跑里，一个后台轮**超过 15 000 ms** 仍未落地（当时 loadavg 32，因为修者自己的
+变异副本 vitest 与压测脚本同时在跑）。那条尾巴**没有**归因出来：既可能是算子被饿死（`c1ebdf3` 记的那类延迟任务不被服务），也可能只是
+CPU 争抢。不自称知道。
+
+**修法（`CONFIRMED`）：** 只在测试侧，断言、`testTimeout`、`skip`/`only`、配置、`package.json` 一律没动，`src/`、`lib/`、`scripts/` 一行未动：
+
+- `test/helpers.ts` 新增 `landedWithin(condition, ms, what)` —— `settledWithin`（`c1ebdf3`）的姊妹函数：等全程持一个 ref 住的 timer
+  （同一个理由：worker 循环手上得有探针自己的时钟活），以探针自己的 **15 000 ms** 为界，超界抛具名失败 `"<what> did not land within 15000 ms"`。
+- `test/phase1-dialogue.spec.ts`：一个 spec 内的 `landed(agent, live, what)`，等的是落地两半 —— 该轮的**报告已在 `agent.followups`**，
+  且**这条会话的插话通道已消失**（`steeringForSession`）—— 替换全部五处「等开跑」。
+- `test/triage.spec.ts`：`route()` 里两处 `vi.waitFor(… followups …)` 换成一个 `roundLanded(agent, seen, what)`，同样两半，
+  于是一条用例不会在自己那轮还在插话时结束。
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 修前（验收方，同一台机、同一 harness） | `LOAD=12 N=10 ./.tmp/repro.sh`（两个文件） | **10/10 红**，loadavg 19–28 |
+| 修前（修者） | `LOAD=16 N=15` `test/phase1-dialogue.spec.ts` 单跑 | **15/15 红**，全是 `consumes a pending question once…` 一条 |
+| 修前（修者） | `LOAD=24 N=8` 该文件、`-t 'P0-2: a confirmation answer keeps the original request'` | **8/8 红**，同一条 |
+| 修前（修者） | `LOAD=12 N=8` `test/triage.spec.ts` 单跑 | **0/8 红**（该文件要两个文件一起压才现形） |
+| 修后（修者，机上无别的活） | `LOAD=12 N=10 ./.tmp/repro.sh` | **RED 0 / 10**，loadavg 22.58 → 26.43 |
+| 修后（修者） | `LOAD=16 N=5` 同两文件 | **RED 0 / 5** |
+| 修后（验收方） | `LOAD=12 N=10 ./.tmp/repro.sh` | **RED 0 / 10**，loadavg 9.2 → 14.4 —— 这一档**低于**修前 19–28 的负载带，不能单独当 A/B |
+| 修后（验收方） | `LOAD=20 N=6` 同两文件 | **RED 0 / 6**，loadavg 20.0 → 21.9 —— 落在修前那把 19–28 的带里，这才是对 10/10 红的有效 A/B |
+| 修后（修者） | `npx vitest run` 两个文件（空载） | **79 passed（2 files）**；最慢两条墙钟与修前一致（`asks one question…` 15 789 ms、`hands the worker…` 10 110 ms，修前负载日志是 15 773 / 10 175 ms）—— 等落地没有把成本抬高 |
+| 断言仍然会咬（scratch 副本，未提交、已删除） | ① `takePending` 不再删条目 → phase1 `consumes a pending question once…` | 红在 `toContain('没有待回答的分流问题')`，1 835 ms |
+| 同上 | ② `resumedRequest` 的确认句丢掉 `用户选择团队模式` → phase1 `hands the team…` | 红在 `toContain('用户选择团队模式')`，822 ms |
+| 同上 | ③ `captainAnswer` 永不批准 → triage `runs the whole workflow…` | 红在 `toHaveLength(2)`（实得 1），10 417 ms |
+| 同上 | ④ 歧义档改成直接升级团队 → triage `asks one question…` | 红在 `toHaveLength(0)`（实得 1），5 619 ms |
+| 变异没咬的一条（照实记） | ⑤ `resumedTarget` 引空原请求 → phase1 `hands the team…` | **没红**：`改一下那个` 也在转发过去的会话里，所以那条用例断言的是「这轮实际开跑时的请求」，不是拼接历史的全部文本 |
+| 失败成自己（修者） | 让后台轮永不投递（`deliverRelay` 不调 `agent.followup`） | phase1：`Error: the round the confirmation started did not land within 15000 ms`，**15 430 ms**；triage 路径：`Error: the report of the background round did not land within 15000 ms`，**20 220 ms**（5 s 路径判别窗 + 15 s）—— 两条都在 30 s 内，都不是 `Test timed out in 30000ms` |
+| 门禁（修者，`4a2f7fd` + 工作树） | `npm run ci` | **exit 0**：99 files / 1837 tests PASS，typecheck 干净，lint **0 errors / 36 warnings**，`verify:lib` → `lib/ at 4a2f7fd is the build of src/ at 4a2f7fd (237 files, byte-identical)` |
+| 门禁（验收方，交付提交 `a210b08`） | `npm run ci`（loadavg 3.46 起跑，119.54 s） | **exit 0**：99 files / 1837 tests PASS；`npm run typecheck` exit 0；`npm run lint` **36 warnings / 0 errors**；`npm run verify:lib` → `lib/ at a210b08 is the build of src/ at a210b08 (237 files, byte-identical)` |
+| 工作树 | `git status --short`（两个提交之后） | 只有 `.rsi/evidence/flaky-triage-phase1/`（本次随文档一并提交），无 `*.log` / `*.tgz` / `*.bak` / `*.orig` / `*~` 残留 |
+
+**证据：** `.rsi/evidence/flaky-triage-phase1/` —— `README.md` 与 `repro-run-1.log`、`repro-run-7-triage.log` 是修前的原始样本
+（这两份 `.log` 是**本地**证据：本仓库 `.gitignore` 第 8 行 `*.log`，全库没有任何 `.log` 被跟踪，所以它们随载体留在工作树里、不进版本树，
+与本文件此前引用过的其它 `logs/*.log` 同例）；`after-fix-harness-load12-n10.txt`、`after-targeted-run-1..5.txt` 是修后（修者）的原始日志，
+已随本次文档提交；`after-fix-README.md` 是修后一页汇总（含变异与「失败成自己」的逐条输出）。
+
+**缺口（照实写）：**
+
+- **Node 22 / Node 24 矩阵 `NOT_RUN`**：这次没在别的 Node 版本上跑，矩阵那一半没有本地证据。
+- **真机 soak `NOT_RUN`，且它证明不了这个 diff**：`src/` 一行未动，产品行为按定义不变 —— 装一遍真机只能证明「没装坏」，
+  证明不了「等落地」这件事。所以这次没有做隔离 `DSH_HOME` 的端到端跑，不把它写成已验证。
+- **triage `route()` 里那个 5 000 ms 的「后台轮有没有起」判别窗没有动**：它决定的是这条消息走了哪条路，不是断言的那条缝；
+  每次实测都判对了。它仍然是 vitest 的时钟，若哪天在更狠的负载下误判，红法会是文本断言而不是本节的具名条件。
+- **`triage.spec.ts` 共用会话 id `sess-triage` 没改**：改 id 会把「上一轮的轮漏到下一条用例」这件事**藏起来**；这次的修法是让轮落地
+  （draining），不是把通道隔开。哪天有人把这条 id 拆开的动机，应该来自产品语义，不是来自一条抖的用例。
+- **上面那条 `HYPOTHESIS`**：超过 15 s 才落地的那一次没有归因（自测机被自己的变异跑污染，loadavg 32）。
+
 ## 挂死探针不再和 runner 的 30 s 抢：预算送不达时由探针自己持钟结算（`test/` only，`src/`、`lib/` 未动）— 2026-11-24（提交 `c1ebdf3`；数字由修者与合流方分别实测）
 
 **症状（`CONFIRMED`）:** 两条用例以 vitest 的 30 000 ms 超时收场，而不是以它们要证的事实收场 ——

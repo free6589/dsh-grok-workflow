@@ -1,3 +1,34 @@
+## 2026-11-24 — 负载敏感的两条 spec 收口：等后台轮落地，不等它开跑（`test/` only，`CONFIRMED`）
+
+- **From:** 修者（agent-118/fixer 派出的实现代理） · **To:** 下一个碰这两条 spec 的人 / 发版方
+- **分支与提交：** 分支 `fix/flaky-triage-phase1`（worktree `.tmp/wt-flaky-triage-phase1`，从 `main` `4a2f7fd` 开出）；
+  `a210b08` = test-only 修法，随后一个 `docs(memory)` 提交 = 本节与 `VALIDATION.md` 首条、证据目录。**未 push、未合、未发版**，
+  共享脏树 `/home/fish/projects_mine/dsh-grok-workflow` 一行没动。
+- **修的是什么（一句话）：** 用例在后台轮**开始**时就断言，而闸门为整轮留着这条会话的插话通道、直到报告投递之后才关（`src/gate.ts` 的
+  `runChannelRound` 的 `finally`）—— 落在这个窗口里的消息不会走前台，会被并进正在跑的轮，回一句
+  `已收到，并入了正在跑的这一轮（待并入 1 条）…`。所以红出来的是「像产品 bug 的话」，不是用例要钉的事实。
+- **数字：** 修前修者 `LOAD=16 N=15` 单跑 `test/phase1-dialogue.spec.ts` **15/15 红**（只有
+  `P0-2 … consumes a pending question once, so a repeated answer cannot start a second run` 一条），验收方修前同 harness `LOAD=12 N=10` **10/10 红**；
+  修后双方各 `LOAD=12 N=10` **0/10**（验收方那档 loadavg 9.2→14.4 低于修前带，另有 `LOAD=20 N=6` **0/6** 落在修前 19–28 带里才是有效 A/B）。
+  门禁 `npm run ci` 双方各一次 **exit 0**（99 files / 1837 tests、lint 0 errors / 36 warnings、`verify:lib` byte-identical 237 files）。
+- **动过的文件：** `test/helpers.ts`（新增 `landedWithin`）、`test/phase1-dialogue.spec.ts`、`test/triage.spec.ts`；文档三件（本节所在的
+  `HANDOFF.md`、`VALIDATION.md` 首条、`STATE.md` 顶部）与证据目录 `.rsi/evidence/flaky-triage-phase1/`。`src/`、`lib/`、`scripts/`、
+  `vitest.config.ts`、`package.json` 一行未动 —— 所以**没有版本号、没有发版**。
+- **再动这两条 spec 之前必须知道的四件事：**
+  1. **缝是「开跑 vs 落地」。** `engine.startCalls.length === 2`、`vi.waitFor(() => agent.followups.length === n)` 都只说明轮**开始了**。
+     要断言「前台会处理这条消息」或「报告已到」，等的是落地两半：报告在 `agent.followups` 里，**并且** `steeringForSession(sessionId)`
+     已经返回 `undefined`。两个 spec 各有一个本地帮助函数（`landed` / `roundLanded`）就是这两半，别在用例里再手写「等开跑」。
+  2. **`test/helpers.ts` 的 `landedWithin(condition, ms, what)` 是探针自己持钟**（`settledWithin` 的姊妹，`c1ebdf3`）：全程持一个 ref 住的
+     timer、以 15 000 ms 为界、超界抛 `"<what> did not land within 15000 ms"`。**不要**把它换回 `vi.waitFor`（默认 1 000 ms 就是原来的病根），
+     也不要抬 runner 的 `testTimeout`。
+  3. **`test/triage.spec.ts` 里每个 `FakeAgent` 共用会话 id `sess-triage`**，而插话通道是按会话挂的 —— 一条用例结束时轮还没落地，
+     它就会去插话**下一条用例**的消息。这次是让轮落地（draining）来修，**没有**把 id 拆开；拆 id 会把这种泄漏藏起来，要拆得先有产品语义上的理由。
+  4. `triage.spec.ts` 的 `route()` 里还有一个 **5 000 ms 的「后台轮有没有起」判别窗**（vitest 时钟，故意没动）：它只决定这条消息走了哪条路，
+     不是断言的那条缝。若哪天它在更狠的负载下误判，红法会是文本断言，而不是上面那条具名条件 —— 那时再动它。
+- **缺口（照实写）：** Node 22 / Node 24 矩阵 `NOT_RUN`；真机 soak `NOT_RUN`，且因为 `src/` 未动它证明不了这个 diff；
+  一次超过 15 000 ms 才落地的尾巴**没有归因**（自测机被自己的变异跑污染，loadavg 32），在 `VALIDATION.md` 里标为 `HYPOTHESIS`。
+- **下一步：** 合入走 PR（`fix/flaky-triage-phase1` → `main`），合前 `npm run ci` 必须 exit 0；这批不需要发版 —— 它只改测试与记忆。
+
 ## 2026-11-24 — 0.13.29 备好发版：三处救援在同一条跑里都成立（合流 + 真机 soak 皆绿，待打 tag）
 
 - **From:** 合流方（agent-116/merger） · **To:** 发版方 / 下一个接手者

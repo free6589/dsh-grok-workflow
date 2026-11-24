@@ -1,3 +1,20 @@
+Last updated: 2026-11-24 14:20 +08:00（**两条负载敏感 spec 改成等后台轮「落地」再断言，`test/` only，`CONFIRMED`（修者与验收方各自实测），未发版、未 push** —
+分支 `fix/flaky-triage-phase1`，两个提交：`a210b08`（test-only 修法）+ 随后一个 `docs(memory)`。抖的是「开跑 ≠ 落地」这条缝：
+`phase1-dialogue.spec.ts` 等 `startCalls.length === 2`、`triage.spec.ts` 的 `route()` 用 vitest 默认 1 000 ms 的 `vi.waitFor` 等 `agent.followups`，
+而闸门为整轮留着这条会话的插话通道、直到报告投递之后才在 `runChannelRound` 的 `finally` 关掉（`src/gate.ts`），于是窗口里到的消息被并进正在跑的轮 ——
+前台该给答案的位置出现了 `已收到，并入了正在跑的这一轮（待并入 1 条）…`。修前：修者 `LOAD=16 N=15` 单跑 `phase1-dialogue` **15/15 红**
+（只有 `P0-2 … consumes a pending question once…` 一条，33 个负载样本里没有第二条；另外四个 `P0-2` 用例等的是同一个缝，一并改了），
+`LOAD=12 N=8` 单跑 `triage` **0/8 红**（要两个文件一起压才现形；验收方 10 次混合跑里 1 次红，4 条，级联来自共用会话 id `sess-triage`、
+队列计数 `1 条 → 2 条 → 3 条`），验收方修前同 harness **10/10 红**（loadavg 19–28）。修法只在测试侧：`test/helpers.ts` 新增
+`landedWithin(condition, ms, what)`（`settledWithin` 的姊妹，持 ref 住的 timer、以 15 000 ms 为界、具名失败
+`"<what> did not land within 15000 ms"`），两个 spec 各一个本地等待（报告已投递 **且** 插话通道已消失）替换全部「等开跑」的站点；
+断言、`testTimeout`、`skip`/`only`、配置、`package.json` 一律没动。修后：修者 `LOAD=12 N=10` **0/10**（loadavg 22.6→26.4）、
+`LOAD=16 N=5` **0/5**；验收方 `LOAD=12 N=10` **0/10**（loadavg 9.2→14.4，低于修前那档，不能单独当 A/B）、
+`LOAD=20 N=6` **0/6**（loadavg 20.0→21.9，落在修前带里，是有效 A/B）。门禁 `npm run ci` 双方各一次 **exit 0**：
+99 files / 1837 tests、lint 0 errors / 36 warnings、`verify:lib` 在 `4a2f7fd`（修者）与 `a210b08`（验收方）都 byte-identical（237 files）。
+**`src/`、`lib/` 一行未动**，所以没有版本号变动、没有发版、没有 CHANGELOG 条目；机制、变异测试、`HYPOTHESIS`（一次超 15 s 未落地的尾巴没归因）
+与缺口（Node 22/24 `NOT_RUN`；真机 soak `NOT_RUN` 且证明不了这个 diff）见 `VALIDATION.md` 首条，证据 `.rsi/evidence/flaky-triage-phase1/`。）
+
 Last updated: 2026-11-24 10:05 +08:00（**已备好发版 `0.13.29`：三处救援在同一条跑里都成立，`CONFIRMED`（真机 soak 三场景 PASS + 本地门禁 exit 0）** —
 本提交是 `chore(release): prepare v0.13.29`（版本 0.13.28 → 0.13.29，CHANGELOG 的三条 `Fixed` 从 `[Unreleased]` 移入
 `## [0.13.29] - 2026-11-24`，`[Unreleased]` 留空）。五条来源分支按序合入 `release/0.13.29`（`2141071` →
