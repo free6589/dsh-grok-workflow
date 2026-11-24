@@ -5,11 +5,23 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.30] - 2026-11-24
+
 ### Fixed / 修复
 
 - **One report's two diagnostics views now say the same thing / 同一份报告的两个诊断视图现在说同一句话** —
   Ops opens two machine views of one report while diagnosing: the diagnostics block the tool surface prints, and the machine ledger a delivery carries when that switch is on. They had drifted apart. The ledger showed no dead routes and no per-call child budget at all, it merged this run's own full lane with another run's busy hint under one heading, and the same error read as two different rows because only one view kept the failure category. The ledger now renders the report's own blocks: a dead-route block naming the route, the transport family and the streak; the child-budget line, so a hung child can be told apart from the run's own deadline; two separate overflow headings, one for this run's cap and one for another live run's approximate hint; and error rows that keep the category and the same message bound in both views. A routing entry that recorded only a wait and named no lane is no longer printed as `no lane named`: the report never showed it, and the ledger no longer invents a row for it. The ledger's own length clamp also stopped eating its tail: the closing lines (why the run stopped, and what the watchdog saw) are reserved before an overlong body is cut, so they survive the truncation instead of being the first thing lost. Both new labels are scrubbed from the human answer like every other ledger label.
   / 诊断一份报告时，运维会同时打开两个机器视图：工具界面打印的诊断块，以及交付里打开开关后带的机器台账。这两个视图跑偏了——台账里根本没有死路由，也没有每次子调用的预算，还把「这一轮自己满载」和「另一个 run 说这条忙」并成一个标题，同一条错误在两边读出来是两行不同的字（只有一边留着失败类别）。现在台账渲染的就是报告自己的块：死路由块（写明哪条路、死于哪类传输故障、连续几次）、子调用预算行（这样「子代理挂住」和「整轮时限到了」才区分得开）、两个分开的溢出标题（一个是这一轮自己的上限，一个是另一个在跑的 run 给的大致提示）、以及两边都保留类别和同样长度上限的错误行。只记了等待时间、没点名任何道的路由条目不再印成 `no lane named`：报告从来不显示它，台账也不再为它编一行。台账自己的长度上限也不再吃掉尾巴：收尾那两行（为什么停的、守卫看到了什么）在切掉超长正文之前就预留好了，所以它们不会被截断吞掉。这两个新标签和人话答案里其它台账标签一样会被清理掉。
+
+### Verification and gate / 验证与门禁
+
+- **The release gate stopped failing on a busy machine / 发版门禁不再因为机器忙就红** —
+  Two gate cases failed intermittently under load: both asserted the moment the background round *started*, while the gate keeps that session's message channel open until the report is actually delivered — so a message arriving inside that window joined the running round instead of being answered by the front desk, and the case failed with a receipt a user would read as a product bug. Both now wait for the round to *land* (report in, channel gone) through a helper that holds its own timer and fails by name after 15 seconds, instead of the 1-second default that was the real fault. Measured before: 15 of 15 runs red on a loaded machine, 10 of 10 for the second case; after: 0 of 10 and 0 of 6 at comparable load. No assertion, timeout, skip or configuration changed, and no plugin behaviour changed — this is the gate, not the product.
+  / 门禁里有两条用例在机器有负载时是间歇性红的：两条都在后台轮「刚开始」的时候就断言，而闸门为整轮留着这条会话的插话通道、直到报告真的投递之后才关——落在这段窗口里的消息不会走前台，会被并进正在跑的那一轮，于是用例红出来一句用户会读成产品故障的回执。现在两条都等这一轮「落地」（报告已到、通道已消失），用的帮助函数自己持钟、超 15 秒报具名失败，而不是原来那个 1 秒默认值——那个默认值才是病根。修前实测：负载下 15 次跑 15 次红，第二条用例 10 次跑 10 次红；修后在可比负载下 0 红（10 次、6 次）。断言、超时、跳过、配置一律没动，插件行为一点没变——动的是门禁，不是产品。
+
+- **Measured on a real run: a route that hangs costs one call, and later tasks never pay for it again / 真机复核：挂住的路只按次数付钱，后面的事不再为它买单** —
+  Before shipping, a five-task run was measured on an isolated home against a route that accepts the request and then never answers, placed ahead of two live routes. The hung route was called three times in the whole run: twice by the first task (its own two attempts), and never again by tasks two through five, which all landed on a live route. Every hung call was settled by the run's own 45-second child budget (44.65–44.93 s at the endpoint, the remainder being the child's own startup) — never left open, never closed by another watchdog. The third call is the transport layer re-sending the first attempt's orphaned request 300 s later, byte-for-byte the same body: that is the provider's client asking again, not this plugin. Two independent rounds produced the same shape. Evidence: `.rsi/evidence/soak-hang-shape-2026-11-24/`.
+  / 发版前在一个隔离的家里跑了五个任务的真实轮次，把一条「收下请求就永远不答」的路排在两条活路前面。整轮里那条挂死路只被调用了三次：第一次是任务 1 自己的两次尝试，任务 2 到 5 一次都没打它、全部落在活路；每次挂死的调用都由这一轮自己的 45 秒子调用预算结算（端点侧 44.65–44.93 秒，差额是子代理自己的启动开销），不是永不结算、也不是被别的看门狗收掉。第三次是传输层在 300 秒后把任务 1 那次尝试遗留的孤儿请求原样重发了一次（请求体字节数完全相同）——再问一次的是服务商那边的客户端，不是本插件。两轮独立复现，形状完全一致。证据在 `.rsi/evidence/soak-hang-shape-2026-11-24/`。
 
 ## [0.13.29] - 2026-11-24
 
