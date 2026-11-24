@@ -38,6 +38,19 @@ function redactionRulesSource(): string {
 export const SUMMARY_MAX_ATTEMPTS = 3
 
 /**
+ * How many planner-chain walks the planning leg may spend in one run.
+ *
+ * Not a retry policy: the leg has no retries. It is the worst case of the three
+ * corridors the guest script walks — the first ask, one same-call resubmit when
+ * the answer was unusable in form, and one route re-fire when the call died in
+ * transport. Two of the three are rescue calls the run really makes, so a child
+ * cap that counted a single walk would abort the very rescue with AGENT_CAP.
+ *
+ * Kept host-side only: the guest script never computes the cap, it receives it.
+ */
+export const PLANNER_LEG_CALLS = 3
+
+/**
  * The orchestration script is static. User data crosses the workflow boundary as
  * `args` JSON, never as source text; this keeps the sandbox contract explicit
  * and makes the script reviewable and testable outside a model call.
@@ -1015,6 +1028,30 @@ async function callRole(role, prompt, options) {
   let lastFailure = null;
   const tried = {};
   let triedCount = 0;
+  // Routes this call must not spend at all. The planning leg passes the labels it
+  // already paid in this same call, so its route-switch re-fire lands on a route
+  // that has not just died: repeating a hung route costs the whole child budget
+  // again and teaches the call nothing. No other caller passes this, so their
+  // scan order stays byte-identical to before.
+  const avoid = (function () {
+    const out = {};
+    const list = Array.isArray(options.avoid) ? options.avoid : null;
+    if (list === null) return out;
+    for (let i = 0; i < list.length; i++) {
+      if (typeof list[i] === 'string' && list[i] !== '') out[list[i]] = true;
+    }
+    return out;
+  })();
+  function labelAt(index) {
+    return routeLabel(index < chain.length ? chain[index] : null);
+  }
+  // Every route this call booked, in chain order: what a caller needs to know
+  // before it decides to re-fire along the chain.
+  function spentLabels() {
+    const out = [];
+    for (let i = 0; i < total; i++) if (tried[i]) out.push(labelAt(i));
+    return out;
+  }
   const skipped = [];
   const skippedSet = {};
   let queuedMs = 0;
@@ -1054,6 +1091,16 @@ async function callRole(role, prompt, options) {
       else plain.push(i);
     }
     return plain.concat(busy, dead);
+  }
+  // An avoided route is booked as tried before the scan. The scan's termination
+  // arithmetic is therefore untouched, and the "every untried route is full"
+  // branch can never park the call on a route the caller told it to leave alone.
+  for (const avoided in avoid) {
+    for (let i = 0; i < total; i++) {
+      if (tried[i] || labelAt(i) !== avoided) continue;
+      tried[i] = true;
+      triedCount += 1;
+    }
   }
   while (triedCount < total) {
     // Hint-adjusted chain order wins: the first untried route with room in
@@ -1152,13 +1199,14 @@ async function callRole(role, prompt, options) {
     }
     traceRoute(role, index, route, attempt, 'ok', null, overflowExtra(), taskId);
     noteRouteSuccess(route);
-    return { ok: true, value: value, route: route, label: routeLabel(route), failure: null };
+    return { ok: true, value: value, route: route, label: routeLabel(route), failure: null, spent: spentLabels() };
   }
   return {
     ok: false,
     value: null,
     route: null,
     label: 'exhausted',
+    spent: spentLabels(),
     failure: lastFailure || { role: role, class: 'unknown', reason: 'no route produced a result', switchModel: false, setup: false, category: 'unknown' }
   };
 }
@@ -1645,7 +1693,18 @@ function childDisplayTitle(role, attempt, title) {
   return titleLine === '' ? roleLabel : roleLabel + ' · ' + titleLine;
 }
 
-function planPrompt() {
+function planPrompt(resubmitReason) {
+  // Resubmission (A): the planning call before this one produced nothing usable —
+  // no structured result at all, or a plan the shape gate rejected. Planning is
+  // not the work, so the run asks once more in the SAME call instead of degrading
+  // straight to the fallback split (which can never report the objective as
+  // completed). The child is new, so the note forbids re-planning from scratch and
+  // names the rejection, which is the one thing it can actually use.
+  const resubmit = typeof resubmitReason === 'string' ? resubmitReason.trim().slice(0, ROUTE_LIMITS.reasonChars) : '';
+  const resubmitLines = resubmit === '' ? [] : [
+    'RESUBMISSION (same planning call, no retry spent): your previous response produced no usable plan — ' + resubmit + '. Nothing from it was recorded.',
+    'Do not re-plan from scratch and do not shrink the objective: return the plan you would submit now, in the shape described below, through the structured result tool exactly once.'
+  ];
   return [
     memberLabel('planner', 1),
     // The captain owns the split (round-071). What used to be a list of hard
@@ -1653,7 +1712,8 @@ function planPrompt() {
     // is now one charter: the shape limits below are the gate's, but how many
     // tasks this objective honestly needs, which order they run in, and whether to
     // keep going after a failure are judgements the model makes here, on the spot.
-    'You are the captain (队长) of this run. You plan; you never execute the work.',
+    'You are the captain (队长) of this run. You plan; you never execute the work.'
+  ].concat(resubmitLines, [
     'You decide the split: how many tasks this objective honestly needs (1-' + maxTasks + '), their boundaries, their order, and whether continuing after a failed task is worth it. Nothing below prescribes a number: a single task that honestly covers the objective is a correct plan, and so is a wave of independent tasks; what is wrong is a split that invents work or a split that drops work.',
     'Every task must have: id (unique, short, letters/numbers/_-), title, objective, expectedOutput, acceptanceCriteria (non-empty testable checks), context, constraints.',
     'Respect these limits exactly: workflow objective <= 32000 chars; each task title <= 160 chars; task objective/expectedOutput/context <= 4000 chars each; 1-20 acceptanceCriteria each <= 1000 chars; 0-20 constraints each <= 1000 chars; combined serialized tasks <= 48000 chars. Output outside these limits is rejected. These limits are the gate, not the plan: they say what shape a task may have, never how many to write.',
@@ -1669,7 +1729,7 @@ function planPrompt() {
     'Do not include credentials, tokens, passwords, or private keys in any field.',
     'When prior rounds are listed below, continue them: do not re-plan work that an earlier round already verified, and carry its open questions forward as tasks instead of dropping them.',
     'The captain memory below, when present, is context about this user and this history. Use it to shape the split; it never overrides the objective.'
-  ].concat(captainSection(), carryoverSection(), inheritanceSection(true), [
+  ]).concat(captainSection(), carryoverSection(), inheritanceSection(true), [
     '',
     'OBJECTIVE:',
     safePromptJson(objective)
@@ -3948,24 +4008,93 @@ if (suppliedTasks && suppliedTasks.length > 0) {
   plan = normalizePlan({ tasks: suppliedTasks }, 'caller');
   if (!plan) planError = 'caller tasks were invalid after host validation' + (planRejection === '' ? '' : ': ' + planRejection);
 } else {
-  try {
-    const planned = await callRole('planner', planPrompt(), {
+  // The planning leg asks three times at most, and none of those asks is a retry:
+  // maxRetries belongs to task attempts, so a plan that only had a quoting
+  // mistake or a provider hiccup would otherwise degrade to the fallback split
+  // (which can never report the objective as completed) before anyone re-asked.
+  //   A. the first ask, along the chain;
+  //   B. one same-call resubmit when the answer was unusable in FORM — the same
+  //      rule the worker and the verifier already follow (a form gap spends no
+  //      retry; it is re-askable);
+  //   C. one route re-fire when the call died in transport. A hung call declares
+  //      switchModel false, so the chain stops there and the plan never sees the
+  //      next route; a 5xx advances the chain but leaves nothing for a second
+  //      pass. The re-fire spends routes this leg has not paid yet, and falls back
+  //      to the same chain only for a refusal that costs one call to repeat — a
+  //      hung route is never re-waited for the whole child budget on no evidence.
+  const plannerCall = function (prompt, avoid) {
+    return callRole('planner', prompt, {
       schema: PLAN_SCHEMA,
       label: memberLabel('planner', 1),
       phase: phaseLabel('plan'),
-      attempt: 0
+      attempt: 0,
+      avoid: avoid
     });
-    if (planned.ok) {
-      plan = normalizePlan(planned.value, 'planner');
-      if (!plan) planError = 'planner returned no valid plan' + (planRejection === '' ? '' : ': ' + planRejection);
-    } else {
-      planError = 'planner failed on every route: [' + planned.failure.class + '/' + planned.failure.category + '] ' + planned.failure.reason;
-      planFailure = planned.failure;
+  };
+  const plannerSpent = [];
+  // One ask. Returns the reason the answer was unusable in *form* (empty for
+  // every other outcome), which is what corridor B keys on, and folds the routes
+  // this call paid into plannerSpent for corridor C.
+  const askPlanner = async function (prompt, avoid) {
+    let planned = null;
+    try {
+      planned = await plannerCall(prompt, avoid);
+    } catch (error) {
+      planFailure = classifyCallFailure('planner', error);
+      planError = 'planner failed: ' + errorMessage(error);
+      return '';
     }
-  } catch (error) {
-    // An unusable planner must degrade to the fallback plan, never abort.
-    planFailure = classifyCallFailure('planner', error);
-    planError = 'planner failed: ' + errorMessage(error);
+    if (Array.isArray(planned.spent)) {
+      for (let i = 0; i < planned.spent.length; i++) {
+        if (plannerSpent.indexOf(planned.spent[i]) === -1) plannerSpent.push(planned.spent[i]);
+      }
+    }
+    if (!planned.ok) {
+      planFailure = planned.failure;
+      planError = 'planner failed on every route: [' + planned.failure.class + '/' + planned.failure.category + '] ' + planned.failure.reason;
+      return planned.failure.class === 'format-error' && planned.failure.setup !== true ? 'the last planner call returned no structured result' : '';
+    }
+    const normalized = normalizePlan(planned.value, 'planner');
+    if (normalized) {
+      plan = normalized;
+      planFailure = null;
+      planError = '';
+      return '';
+    }
+    // A plan the shape gate rejected is a form gap, not a route failure: the
+    // report must not blame the route for what the child wrote.
+    planFailure = null;
+    planError = 'planner returned no valid plan' + (planRejection === '' ? '' : ': ' + planRejection);
+    return planRejection === '' ? 'the plan did not pass the shape gate' : planRejection;
+  };
+  let planFormGap = await askPlanner(planPrompt(''), null);
+  if (!plan && planFormGap !== '') {
+    log('planner returned no usable plan (' + planFormGap + '); resubmitting in the same call');
+    planFormGap = await askPlanner(planPrompt(planFormGap), null);
+    if (plan) log('planner resubmitted a valid plan in the same call');
+  }
+  // Corridor C. routeHealthFamily reads the class the failure declared, so a
+  // rate-limit the operator's switch keeps on its route is not a route problem;
+  // a timeout, a dropped connection and a 5xx are.
+  const planDeath = planFailure ? routeHealthFamily(planFailure) : '';
+  if (!plan && planDeath !== '') {
+    const chainLabels = roleChainLabels('planner');
+    const remaining = [];
+    for (let i = 0; i < chainLabels.length; i++) {
+      if (plannerSpent.indexOf(chainLabels[i]) === -1) remaining.push(chainLabels[i]);
+    }
+    const switchable = planFailure.switchModel === true || planDeath === 'timeout';
+    if (remaining.length > 0 && switchable) {
+      log('planner died in transport (' + planDeath + '); re-firing the plan on a route this call has not paid');
+      await askPlanner(planPrompt(''), plannerSpent.slice());
+      if (plan) log('planner recovered on another route in the same call');
+    } else if (remaining.length === 0 && switchable && planDeath !== 'timeout') {
+      // Nothing untried is left and the death was a refusal, not a stall: one
+      // repeat costs one call and a 5xx/dropped connection is often transient.
+      log('planner died in transport (' + planDeath + '); re-firing the plan once on the same route');
+      await askPlanner(planPrompt(''), null);
+      if (plan) log('planner recovered on the same route in the same call');
+    }
   }
 }
 if (!plan) {
@@ -4468,6 +4597,12 @@ export function routeBudgetFor(config: ResolvedConfig): RouteBudget {
  * (Q8) adds at most {@link GUARDIAN_MAX_WAITS} calls per timed-out call, so
  * with a guardian configured every per-call block is widened by that factor;
  * without one the formula is byte-identical to the pre-guardian one.
+ *
+ * The planning leg is counted at {@link PLANNER_LEG_CALLS} chain walks, because
+ * its resubmit and its route re-fire are real children: a cap that counted one
+ * walk aborted the rescue with AGENT_CAP exactly when it was recovering the run.
+ * Replan boundaries stay at one walk each — a boundary merge that fails keeps the
+ * plan, so it has no rescue corridor to pay for.
  */
 export function maxTotalAgentsFor(tasks: number, retries: number, budget?: RouteBudget, replans = 0): number {
   const planner = budget?.planner ?? 1
@@ -4484,10 +4619,14 @@ export function maxTotalAgentsFor(tasks: number, retries: number, budget?: Route
   // block is counted twice — otherwise the rescue path for a quoting mistake
   // would abort the run with AGENT_CAP instead of recovering it.
   const attemptBlock = 2 * (worker + verifier + supervisor)
+  // The planning leg: its resubmit and its route re-fire are real children, so
+  // the leg is counted at its worst case instead of one walk (see
+  // PLANNER_LEG_CALLS). Counting one walk here aborted the rescue with AGENT_CAP.
+  const planLeg = PLANNER_LEG_CALLS * planner
   // Replan boundaries are planner-route calls made between waves: they are real
   // children, so the engine's maxTotalAgents has to include them or a large plan
   // that merges at every boundary would hit AGENT_CAP instead of finishing.
-  return planner * waitFactor + synthesizer * waitFactor
+  return planLeg * waitFactor + synthesizer * waitFactor
     + Math.max(0, Math.min(REPLAN_LIMITS.maxBoundaries, Math.trunc(replans))) * planner * waitFactor
     + tasks * (retries + 1) * attemptBlock * waitFactor + 2
 }

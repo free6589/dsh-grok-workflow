@@ -5,6 +5,13 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Fixed / 修复
+
+- **A plan is asked for again instead of being given up on / 计划不再因为一次格式错或一次 503 就降级** —
+  A planning call that came back without a usable plan used to end the run's split immediately: the run degraded to the structural fallback, which can never report the objective as completed, so a child that answered with prose instead of a structured result, or a planning route that refused or hung, cost the whole round its plan. Planning now asks twice more, and neither ask is a retry. A form gap (no structured result, or a plan the shape gate rejects) is re-asked once in the same planning call — the rule the worker and the verifier already followed — with the rejection named in the prompt. A transport death (timeout, dropped connection, a 5xx, a 429 the switch does not keep on its route) re-fires the plan once, on a route this call has not paid for yet: the route that hung is not waited on twice, and with nothing left to try a refusal is repeated once while a hang goes straight to the fallback. The child-call budget now counts those two rescue calls, so a rescued run cannot be aborted at the moment it recovers.
+  / 规划调用没有可用计划时，过去整个计划当场作废：整轮退化成结构性兜底，而兜底计划永远不可能报告目标已完成——所以子代理答完只说了话、计划过不了形状闸门、或者规划那条路由拒绝/挂死，代价都是整轮没有计划。现在规划会多问两次，两次都不算重试：格式错（没有结构化结果，或计划过不了形状闸门）在同一次规划调用里重交一次（执行与检查两条腿早就这么做），提示词里写明被拒原因；传输死（超时、连接断开、服务商 5xx、勾选框没留住的 429）换路重打一次，只落在这一腿还没付过的路由上——挂死的那条不会被等第二次，路都试完了遇到拒绝会原路再打一次，遇到挂死才直接落兜底。子调用预算把这两次补救也算进去了，所以被救回的一轮不会在最关键的时刻因为预算上限被掐断。
+
+
 ## [0.13.28] - 2026-11-24
 
 

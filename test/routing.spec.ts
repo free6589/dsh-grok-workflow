@@ -104,11 +104,13 @@ describe('per-role routing configuration', () => {
   it('derives the child cap from the effective chains, not from attempts alone', () => {
     const plain = resolveConfig({})
     const routed = resolveConfig({ roles: roles([{ model: 'a' }, { model: 'b' }], [{ model: 'c' }]) })
-    // planner 1 + 1 task * 2 attempts * twice (first call + same-attempt
+    // planner leg: up to three walks (the first ask, one same-call form resubmit,
+    // one route re-fire) + 1 task * 2 attempts * twice (first call + same-attempt
     // resubmit) * (1 worker + 1 verifier) + 2
-    expect(maxTotalAgentsFor(1, 1, routeBudgetFor(plain))).toBe(1 + 2 * (2 * 2) + 2)
-    // planner 1 + synth 0 + 1 task * 2 attempts * twice * (2 worker + 1 verifier) + 2
-    expect(maxTotalAgentsFor(1, 1, routeBudgetFor(routed))).toBe(1 + 0 + 2 * (2 * 3) + 2)
+    expect(maxTotalAgentsFor(1, 1, routeBudgetFor(plain))).toBe(3 + 2 * (2 * 2) + 2)
+    // planner leg (3, one route) + synth 0 + 1 task * 2 attempts * twice * (2
+    // worker + 1 verifier) + 2
+    expect(maxTotalAgentsFor(1, 1, routeBudgetFor(routed))).toBe(3 + 0 + 2 * (2 * 3) + 2)
   })
 })
 

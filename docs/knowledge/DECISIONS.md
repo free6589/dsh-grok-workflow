@@ -2941,3 +2941,36 @@ spine 为空，pre-fix 形状会进脊柱。
 - **教训（写进下一轮的规矩）：** 诊断行只在 `renderReport(..., {showDiagnostics:true})` 里出现，而 `showDiagnostics` 是
   T4 定死的 false；取证时必须用**只翻可见性**的 lib 副本（本轮：`renderReport(value)` → `renderReport(value,{showDiagnostics:true})`，
   一处），并把「路由逻辑用的是真 lib」这一点在记录里写清。运行本身用未改动的 `lib/` 复跑一遍即可交叉验证。
+
+## D-122 · 规划腿补两次问法（同次重交 + 换路重打）与预算同步抬（2026-11-24）
+
+- **Status:** ① `CONFIRMED`（真引擎形状用例：旧码 7 红 → 修后 9 绿）；② 真机 soak `NOT_RUN`（留给合流方）。
+- **来源:** 立项A 第一刀，规划腿子代理（agent-110），基线 `2141071`，分支 `feat/planner-resubmit`；
+  证据见 `VALIDATION.md` 首条。
+- **事实（改前）：** 规划腿只有一次问法。`callRole` 在 `format-error` 上会走完整条链，但一旦链走完（或挂死让链断在第一条），
+  脚本立刻 `fallbackPlan()`（`src/script.ts` 规划腿）。而 fallback 计划**永远不可能报告目标已完成**（`src/report.ts` 拒它），
+  所以「子代理答完只说了话 / 引号写坏」和「规划那条路 503 或挂死」这两种与规划质量无关的事故，代价都是整轮降级。
+  worker 与 verifier 早已有同次重交（`resubmitPrompt` / `verifierResubmitPrompt`），规划腿是最后一个缺口。
+- **决定一（A：格式错同次重交）：** 规划调用没有可用结果时——引擎给 `null`（没有结构化结果），或计划过不了形状闸门
+  （`planRejection` 非空）——在**同一次调用内**再问一次，label/phase/attempt 全部不变（面板上仍是一个规划成员），
+  重交 prompt 带上被拒原因（那是第二个子代理唯一能用的信息），并禁止从零重规划。一次为限。
+- **决定二（C：传输死换路重打）：** 传输类死亡（`timeout`/`connection`/`server-error`/`rate-limit`）后再打一次。
+  **换路**是真的换路：`callRole` 新增 `options.avoid` 与返回值 `spent`，这一腿把已经付过的路由标签传回去，
+  重打只落在还没被问过的路上——挂死的那条不会被重等（一次挂死等待已经付过一次，D-120 的成本理由照旧）。
+  一条路都不剩时：死因是**拒绝**（5xx/断连，一次调用很便宜也常常是瞬时）才原路重打一次，死因是**挂死**就不重打、
+  直接落 fallback（再等一个完整子调用预算换不到任何新信息）。同样一次为限。
+- **`rate-limit` 仍跟操作员勾选框：** `switchOnRateLimit` 关掉时那条路由不进入重打走廊（脚本给 `routeHealth: ''`），
+  与 D-119「429 是现在忙，不是这条路死了」一致。
+- **决定三（预算同步抬）：** `maxTotalAgentsFor` 的规划项按 `PLANNER_LEG_CALLS = 3` 次走链计。两次补救都是**真实子调用**，
+  只算一次走链的 cap 会在救回正发生的时候以 `AGENT_CAP` 掐断（`budget-exhausted` 是 setup 类，会直接停链）。
+  波边界的 replan 仍按一次走链计：它失败保留原计划，没有救回走廊要付。
+- **否决的备选：**
+  1. **只做 A、不做 C**：挂死（最常见的真实故障）仍然一次就落 fallback，等于把本刀的重点丢掉。
+  2. **把 `childTimeoutFailure` 的 `switchModel` 打开**：那是 D-120 已经否掉的改法，会改变**任务**的重试语义
+     （任务从「改措辞重试同一路由」变成「先换路由」）；本刀只要规划腿换一次路，不动任务。
+  3. **在 `callRole` 里给所有角色统一的同次重交**：worker/verifier 已有各自成形的重交语义（worker 禁止重做已完成的工作、
+     verifier 要求同一裁决同一证据），通用化会改掉它们的失败计数与报告文案。
+  4. **预算不抬，靠引擎默认 `maxTotalAgents` 兜底**：宿主下发的 cap 就是本插件算的那个数，兜不住自己。
+- **代价：** 一次 run 最多多两次规划调用（每次最多走完一条链）；挂死且无别的路可走时不额外等待。
+- **教训（与 D-118/D-120 同源）：** 依赖「某类失败会带着某个形状抵达」的改动，必须配**真引擎**用例：本刀的 9 条用例走
+  `createEngineHarness` + 本插件 twin，失败形状是引擎真给的（答完没交结构化、`CHILD_DEATH` 拒绝、脚本自己的预算结算）。
