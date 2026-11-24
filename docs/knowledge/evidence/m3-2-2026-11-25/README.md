@@ -1,6 +1,7 @@
 # M3.2 真机 soak 证据（2026-11-25）
 
 验收对象：`feat/m3-switch` 尖端 **`2137afc`**（`9fdcb6e` → `94727b9` → `ad28f17` → `2137afc`，`lib/` 已重建并提交，版本 `0.13.34`）。
+四条 soak 与红/绿 spec 都是打在这份构建上的；本目录自身由紧随其后的证据提交 **`7bcbd00`** 落盘（只加文件，不动源码）。
 环境：Node **v26.8.1** / DSH **0.2.2-rc.3**；worktree `.tmp/wt-m3-switch`；scratch home `.tmp/m3-soak-2/dsh-home`（`DSH_HOME`），端口 **3311**。
 口径：`AGENTS.md` §2 的四个状态词（`CONFIRMED` / `HYPOTHESIS` / `NOT_RUN` / `BLOCKED`）。每条结论都能回指本目录里的一个文件。
 
@@ -13,7 +14,19 @@
 | `soak-2-headless.txt` | `dsh --profile m32h '<objective>'` 的原文、exit 0、工作流自己的报告、会话日志里的 run 行；**并记录任务书里那条命令在本机 exit 1 的原文** | headless 端到端一次真实运行（`CONFIRMED`）；账本行（`CONFIRMED`）；命令偏差如实记录 |
 | `soak-3-restart-resume.txt` | 运行中 kill（synthesize 阶段）、kill 前 checkpoint 读数（10 任务 / 0 verified / attempts 10）、三种重启各自的实测结果 | 中途 kill（`CONFIRMED`）；未重复计费（`CONFIRMED`）；重启带插件生成的 resume seed（`CONFIRMED`）；引擎不恢复运行状态（`CONFIRMED`）；`--session-id` 采纳被拒（`BLOCKED`） |
 | `soak-4-uninstall.txt` | `dsh plugin --profile m32 remove`、bundle 行 21→20、重启后工具清单 8→0、普通消息仍正常作答、无新账本/心跳行、残留软链 | 卸载无残留（`CONFIRMED` ×5）；热卸载 `NOT_RUN` |
-| `red-spec-on-baseline.out` / `green-spec.out` | 本块另一半交付的红/绿 spec 原文（本次 soak 未改动） | 单元层的红绿 |
+| `red-spec-on-baseline.out` | 重写后的 `test/m3-intake.spec.ts` 打在基线 `7b25890` 的一次性 `git archive` 解包上：命令、`EXIT=1`、`15 failed \| 3 passed (18)` 与 15 条失败原文，外加「为什么这是对的红」的说明（每个 import 在基线上都解析，整份 transcript 没有 "cannot find module"） | **红在正确的理由上**（`CONFIRMED`）：准入仍失效、六个工具照样作答、`legacyGate` 缺省仍 on、写 `observed` 而不是 `continued`、pre-M3.2 的注册矩阵、闸门仍在分类一拍心跳 |
+| `green-spec.out` | 本分支上五个 spec 的原文：`EXIT=0`、`5 files / 174 tests passed`（`m3-intake` 18 / `block-tools` 23 / `block-ledger` 20 / `block-preview` 93 / `block-supervisor` 20），以及被测树里另一名工人五个源文件的 sha256 | **两半合起来是绿的**（`CONFIRMED`）；绿的那次被测树可回查 |
+
+## 记忆引用
+
+本目录被以下三处引用，读哪一条都能落到具体文件：
+
+- `docs/knowledge/STATE.md` 顶部 **2026-11-25 07:12（M3.2）** 条——分支/提交/文件数、四句改动、红→绿、门禁原文、soak 四句、两条边界。
+- `docs/knowledge/VALIDATION.md` 的 **M3.2** 条——逐行的命令、环境与结果，四条场景的标签，外加七条 `Honest boundary`。
+- `docs/knowledge/HANDOFF.md` 顶部 **M3.2** 条——这一支是什么、已经证实了什么、下一步（M3.3 翻 `blockIntake`）与三件会踩的事。
+
+配套的决策记录是 `DECISIONS.md` 的 **`D-139`**（旧前台降级为显式 opt-in、窄监听无条件安装、接单台观测器照常注册）。
+
 
 ## 结论与状态
 

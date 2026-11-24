@@ -1,3 +1,32 @@
+## 2026-11-25 — M3.2 验收通过（`feat/m3-switch`）：下一步把 `blockIntake` 默认翻 `true`（M3.3）
+
+- **From:** 记忆收口（`agent-145/memory-writer`）· **To:** 接 M3.3 的人
+- **这一支是什么**：分支 `feat/m3-switch`（worktree `.tmp/wt-m3-switch`，基线 `main` 尖端 `7b25890`）上五条提交
+  **`9fdcb6e`**（准入接线 + 权威 intake spec）、**`94727b9`**（默认翻转、闸门剥掉心跳路由、窄监听成为唯一主人）、
+  **`ad28f17`**（14 个前台 spec 显式 opt in）、**`2137afc`**（`lib/` 重建）、**`7bcbd00`**（soak 证据），
+  **63 文件 / +2287 −1027**。**未发版、未 push、未合 `main`**，`package.json` 仍是 `0.13.34`。验收结论见 `STATE.md` 顶部与
+  `VALIDATION.md` 的 2026-11-25 条；证据在 `docs/knowledge/evidence/m3-2-2026-11-25/`。
+- **已经证实的**：默认载入不注册旧前台，普通消息直达模型（真机上 `source.kind=grok-workflow` 中继 0 条、用户原话逐字在日志里）；
+  显式要求跑工作流时恰好一次运行（`run-start` 1 / `run-end` 1、`stopReason: completed`、2 个任务 verified）；
+  六个块工具对没开 grok 模式的会话以 `mode-off` 拒绝（真机工具结果原文 `isError=true`）；卸载后 bundle 行 21 → 20、
+  工具清单 8 → 0、无新账本行、普通消息仍作答。单元层：`npm run ci` **112 文件 / 2148 例**全过，
+  `lib/ at 2137afc is the build of src/ at 2137afc (301 files, byte-identical)`。
+- **下一步（M3.3）：把 `blockIntake` 默认翻 `true`**——就一处默认值，**不要在这一支顺手翻**。翻之前先补一条用例：
+  `legacyGate: false` + `blockIntake: false` 这个组合在真机上**仍然没人跑过**（`NOT_RUN`）。M3.2 已经把「窄监听无条件安装」
+  这条洞堵上了（源码里它现在在 `blockIntake` 分支之外），但「堵上了」是读源码 + 单测的结论，不是真机读数；翻默认值会让
+  「两个开关都关」从默认形状变成非默认形状，那时候再补就晚了。
+- **三件会踩的事**：
+  1. **接单台的观测器只在「该会话有 open block」时才写 `heartbeats.jsonl`**，所以空文件（甚至整个 `taskboards/` 不存在）
+     是设计，不是失败。想在真机上看到行，先让模型真开一块、再让一拍心跳真的送到。
+  2. **默认形状现在既没有前台也没有接单台**：一次默认载入里 `agent/pre-step` 只有一个监听（窄心跳监听），
+     插件默认对外的面就是工作流工具加刹车。要旧前台得显式写 `legacyGate: true`，要块工具得显式写 `blockIntake: true`；
+     两个都是载入期开关，改完要重启。
+  3. **分支决定日期顺延**：上一版给的 `2026-12-09` 延长到 **M3.3 结束**。到那天要么合进 `main`、要么 rebase 后继续、
+     要么删掉（`AGENTS.md` §5）。
+- **一条要如实说的话**：M3.2 派单引用的设计文档 §3.1 用例清单**不在本仓库里**。所以本轮那份「权威 intake spec」的五个分组，
+  是它的**意图被写下来的版本**，写在 spec 头部注释里，不是从一份现存文档抄来的。下一个改这块的人把那五个分组当事实来源，
+  别再去找一份不存在的 §3.1；三个由此拍下的判断记在 `DECISIONS.md` 的 `D-139`。
+
 ## 2026-11-25 — M3.1 验收通过（`feat/m3-narrow-listen`）：下一步把 review/stop 所有权正式移过来（M3.2）
 
 - **From:** 独立验收（`agent-144/m3-verify`）· **To:** 接 M3.2 的人

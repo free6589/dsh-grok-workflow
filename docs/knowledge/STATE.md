@@ -1,3 +1,39 @@
+Last updated: 2026-11-25 07:12 +08:00（**M3.2「默认不拦截 + 刹车只有一个主人 + 准入生效」：独立验收通过，`CONFIRMED`；未发版、未 push、未合 `main`** —
+分支 **`feat/m3-switch`**，worktree `.tmp/wt-m3-switch`，基线 `main` 尖端 **`7b25890`**，五条提交 **`9fdcb6e`**
+（准入接线 + 权威 intake spec）、**`94727b9`**（默认翻转、闸门剥掉心跳路由、监听成为唯一主人）、**`ad28f17`**（14 个前台 spec 显式 opt in）、
+**`2137afc`**（`lib/` 重建）、**`7bcbd00`**（soak 证据），合计 **63 文件 / +2287 −1027**（`src` 7 文件 +142 −220、
+`test` 21 文件 +831 −494、`lib/` 24 文件 +217 −285、`docs` 与两个 README 11 文件 +1097 −28，其中 8 个是证据文件）。
+版本仍 **`0.13.34`**。
+**做了什么（四句）**：① `DEFAULT_LEGACY_GATE` 改成 `false`——默认载入不注册旧前台，普通用户消息不再被拦截；
+② 闸门彻底不再路由心跳（`classifyHeartbeat`、它里面的 `isHeartbeatMessage` 调用、`installGate` 的刹车口、
+`Classification` 的 `loop-stop` 与对应 handler 全删），`installHeartbeatListen` 去掉 `ownsRouting` 与 `observeOnly` 并
+**无条件安装**（放在 `blockIntake` 分支之外），所以接单台关掉时刹车仍有主人；③ `BLOCK_ADMISSION_ENFORCED = true`，
+六个块工具对没有 `/grok on` 记录的会话以 `mode-off` 拒绝；④ `legacyGate: true` 作为显式 opt-in 保留，只把旧前台装回来管
+用户消息路由。
+**红→绿（独立跑，不信实现者自报）**：重写后的 intake spec 放进 `git archive 7b25890` 的一次性解包 → **exit 1**，
+`15 failed | 3 passed (18)`，15 条全是行为红（准入仍失效、六个工具照样作答、`legacyGate` 缺省仍 on、写 `observed` 而不是
+`continued`、pre-M3.2 的注册矩阵、闸门仍在分类一拍心跳），**整份 transcript 没有一处 "cannot find module"**
+（`red-spec-on-baseline.out`）；分支上同一批五个 spec → **5 files / 174 tests PASS**（`m3-intake` 18、`block-tools` 23、
+`block-ledger` 20、`block-preview` 93、`block-supervisor` 20），绿的那次把另一名工人源文件的 sha256 钉在 transcript 里
+（`green-spec.out`）。
+**门禁（包工头重跑两次）**：`TMPDIR=$PWD/.tmp npm run ci` → **exit 0**，`Test Files 112 passed (112)` /
+`Tests 2148 passed (2148)`、`Found 36 warnings and 0 errors.`、
+`lib/ at 2137afc is the build of src/ at 2137afc (301 files, byte-identical)`；单独 `npm run verify:lib` → exit 0、同一行原文；
+`npm run typecheck` → exit 0。
+**真机 soak（DSH 0.2.2-rc.3、Node v26.8.1、scratch home、自有端口 3311、live `~/.dsh` 前后 size 与 mtime 完全一致、未写入）**：① 真 Chromium 在 GUI 上，
+一条普通消息被直接作答、`source.kind=grok-workflow` 中继 **0** 条且用户原话逐字在日志里，显式要求跑工作流则**恰好一次**运行
+（`run-start` 1 / `run-end` 1、`stopReason: completed`、2 个任务 verified）；② headless——任务书那条字面命令被拒
+（`too many arguments`），同配置的兄弟 profile `dsh-headless` 跑完一次真工作流到 `COMPLETED`；③ 重启/续跑——在 `synthesize` 里 kill，
+checkpoint `running`、10 次尝试，采纳同一会话的重启被一条**先于本块**的 harness 拒收挡住（未知事件
+`tool-workflow/guardian-start`，来自 `891b8a2`，不是 M3.2 回归），能继续的那次起了插件自己播 resume seed 的运行、只带 1 个任务、
+attempts 10 → 10、没有被重复计费，被 kill 的 checkpoint 老老实实留在 `running`；④ 卸载——bundle 行 21 → 20、
+请求头里的 grok 工具 **8 → 0**、普通消息仍被作答、没有新账本行也没有心跳行、没有存活的后台活，一处残留如实记下
+（pnpm 留下了 `node_modules/dsh-grok-workflow` 软链）。真机上的准入 **`CONFIRMED`**（`grok_open_block` 返回 `isError=true`、
+`mode-off: …`）。
+**两条边界**：窄监听在真机上的心跳行 **`NOT_RUN`**（四个场景都没开块，所以一拍都没送到；所有权这条结论靠单测与 M3.1 的真机先例），
+运行中热卸载 **`NOT_RUN`**（先把实例停了）。
+**证据**：`docs/knowledge/evidence/m3-2-2026-11-25/`（红/绿 spec 原文、`soak-all.txt` 与四条 soak transcript、README 的场景表）。
+
 Last updated: 2026-11-25 05:15 +08:00（**M3.1「窄心跳监听 + legacyGate + 准入判断」：独立验收通过，`CONFIRMED`；未发版、未 push、未合 `main`** —
 分支 **`feat/m3-narrow-listen`**，worktree `.tmp/wt-m3-narrow-listen`，基线 `main` 尖端 **`35326c7`**，实现提交 **`d546666`**
 （`feat(intake): the narrow heartbeat listener, legacyGate and the admission predicate`），**45 文件 / +1807 −163**

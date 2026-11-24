@@ -3635,3 +3635,38 @@ spine 为空，pre-fix 形状会进脊柱。
   真机上已确认两形状的可观测差异：形状 A 普通消息被旧前台接单（会话日志 1 条 `source.kind = "grok-workflow"` 中继）、
   账本目录不被创建；形状 B 中继 0 条、消息直达模型，心跳由窄监听裁决并写下
   `{"outcome":"stopped","code":"loop/stop-file"}`，且 `heartbeats.jsonl` 不存在。
+
+## D-139 · 设计文档 §3.1 不在仓库里：旧前台降级为显式 opt-in、窄监听无条件安装、接单台观测器照常注册（三个当场拍下的判断）（2026-11-25，未发版）
+
+- **Status:** `CONFIRMED`（源码 + 单测 + 真机读数三者一致：`DEFAULT_LEGACY_GATE = false`（`src/config.ts:250`）、
+  `BLOCK_ADMISSION_ENFORCED = true`（`src/user-source.ts:83`）、`installHeartbeatListen` 在 `src/index.ts` 里位于
+  `if (config.blockIntake === true)` 之前且 `enabled: true`；`npm run ci` **exit 0**、`112 files / 2148 tests`、
+  `lib/ at 2137afc is the build of src/ at 2137afc (301 files, byte-identical)`；真机上普通消息 0 条中继、
+  块工具以 `mode-off` 拒绝。详见 `VALIDATION.md` 2026-11-25 条与 `docs/knowledge/evidence/m3-2-2026-11-25/`）
+- **Date:** 2026-11-25
+- **Context:** M3.2 要把心跳 review/stop 的所有权正式移到窄监听、同时把准入常量翻成生效。派单引用了设计文档的 §3.1 用例清单，
+  但**那份设计文档不在本仓库里**：仓库里没有任何文件写着 §3.1 该列哪些用例。于是有三处没有现成文字可依，包工头当场拍下，
+  这里把三处连同被否掉的那条路一起记下来——否则下一个人只能从结果反推理由，或者以为「本来就这么定的」。
+- **Decision（三条，各自附被否掉的替代）：**
+  1. **旧前台不删，降级成显式 `legacyGate: true` 的 opt-in。** 默认 `false`，默认载入一个监听都不注册它；打开时它只负责用户消息路由，
+     绝不裁决心跳。**否掉「直接把 `installGate` 删掉」**：删掉是不可逆的一步，而默认值已经做到「不拦截」——用户看到的行为一样，
+     但保留 opt-in 就保留了一个可回退的形状（某个档案还想让前台接单、或者哪天要对照旧行为，写一个键就行）。最小的可逆改动优先于最彻底的改动。
+  2. **窄监听无条件安装，放在 `blockIntake` 分支之外，而不是继续留在里面。** 因为接单台关掉的那个形状（现在成了默认形状）否则
+     **一个刹车主人都没有**：一拍心跳到了，没人复核、没人 `reject`，被刹车停过的循环会继续跑。这正是上一版 `HANDOFF.md` 点名的那条
+    没测过的洞（`legacyGate: false` + `blockIntake: false`）。**否掉「继续留在 `blockIntake` 里、等 M3.3 再说」**：
+    那等于让默认形状在 M3.2 到 M3.3 之间带一个已知的刹车缺口，而修它的代价只是把这个安装调用挪出 `if`。
+  3. **接单台自己的观测器只要接单台开着就照常注册，不再沿用 D-138 的「拥有裁决权的形状把它丢掉」。** 现在两个文件各有唯一写者：
+     窄监听写 `heartbeats-listen.jsonl`（这一拍**做了什么**），接单台观测器写 `heartbeats.jsonl`（这一拍**发现哪几个块还开着**）。
+     一拍在两个文件里各一行，所以「到了几拍」和「这一拍干了什么」都还答得出来。**否掉 D-138 那条**：如果拥有裁决权的形状丢掉观测器，
+     那么接单台开着、旧前台关着（也就是 M3.3 之后的默认形状）时 `heartbeats.jsonl` 永远不会被写，
+     「这一拍还欠哪几个块」就变成一个没有答案的问题——而它正是接单台存在的理由之一。
+- **Consequences:**
+  - **每一个装旧前台的 spec 都必须显式 opt in**：`ad28f17` 一次改了 **14 个文件**（`test/` 下 14 个 spec，+103 −88）。
+    以后新写前台相关的用例，默认形状里没有前台，忘写这个键就是用例静默不测东西。
+  - **`Classification` 的 `loop-stop` 跟着它的 handler 一起删掉了**：闸门不再分类心跳，那个枚举值没有生产者，留着就是一段
+    永远走不到的代码和一个会误导人的类型。`src/` 里 `classifyHeartbeat` / `loop-stop` 现在零命中。
+  - `legacyGate` 与 `blockIntake` 都是载入期开关：改完要重启，且都不投影到设置页。
+  - 真机上默认形状的可观测差异已确认：普通消息 `source.kind=grok-workflow` 中继 0 条、原话逐字进日志、模型真答；
+    块工具对没开模式的会话以 `mode-off` 拒绝。
+  - 仍有一条没人跑过的组合：`legacyGate: false` + `blockIntake: false` 在真机上 `NOT_RUN`（源码与单测说它有刹车主人）。
+    M3.3 翻 `blockIntake` 默认值之前先补这条用例。
