@@ -66,9 +66,21 @@ d01528d2f9db9ce622cdfb2720495bf13077a7a9eac24d0fb7b4358c3fa00385  .rsi/evidence/
 | 团队派发 v1 | `/home/fish/projects_mine/dsh-grok-workflow/.session-stage/patches/team-dispatch-v1-2026-11-24.patch` | **192596** | `backup/wip-2026-11-24-team-dispatch-v1` | `292a4ae` | `af75712` | 同上，另加逐字节相同 |
 | 运行中插话 | `/home/fish/projects_mine/dsh-grok-workflow/.session-stage/patches/live-steering-2026-11-24.patch` | **286000** | `backup/wip-2026-11-24-live-steering` | `de7ba6a` | `f849f06` | 同上，另加逐字节相同 |
 
-- **对当前 `main` 不能干净落地**：`git apply --check` exit 1。三个 base 落后 `main` 190–224 个提交，冲突文件分别为
-  **5 / 7 / 8** 个、冲突标记 **5 / 9 / 13** 处。这是**已知且被接受的事实，不是阻断条件**——本包对归档定的可恢复性判据是
-  「补丁落回它自己的 base 后 tree 精确复现」，该判据已满足。
+- **对当前 `main` 不能干净落地**：两条命令给的是两组不同的数，原来那行把它们混挂在 `--check` 名下是错的，这里分开写（都在 `8204e47` 上各复跑 3 次，三次一致）：
+  - `git apply --check`，退出码 **1**，报 **9 / 9 / 8** 个文件 `patch does not apply`——这是**逐文件落不上**的数（progress 9 个文件挂满、
+    team-dispatch 15 个里挂 9 个、live-steering 17 个里挂 8 个）。
+  - `git apply --3way --check`，退出码 **0**，逐文件报 `Applied patch to … with conflicts`：**5 / 7 / 8** 个文件带冲突；
+    在一次性 worktree（`main` = `8204e47`）里真 `git apply --3way` 后数 `^<<<<<<<`，冲突标记 **5 / 9 / 13** 处。
+    → 「冲突文件 5/7/8、冲突标记 5/9/13」出自 `--3way`，不是 `--check`。
+  - 三个 base 落后 `main` **223 / 192 / 226** 个提交（同一提交 `8204e47` 上量的，按上表顺序；每加一个提交这个数各自 +1，复跑请以当时 HEAD 为准）。
+    这是**已知且被接受的事实，不是阻断条件**——本包对归档定的可恢复性判据是「补丁落回它自己的 base 后 tree 精确复现」，该判据已满足。
+- **三处悬空活的真实体量口径**（`git diff --numstat <备份分支>^ <备份分支>` 复算，本轮实测，供下一轮对账）：
+  - `progress-task-number-first`（`b91ff17`）：9 文件 **+65/−8**（`src` +16/−3、`test` +23/−0、`lib` 生成物 +26/−5）。
+  - `team-dispatch-v1`（`292a4ae`）：15 文件 **+313/−62**（`src` +83/−28、`test` +131/−0、`lib` +99/−34）。
+  - `live-steering`（`de7ba6a`）：17 文件 **+1348/−27**；其中手写 `src`+`test` 合计 **+805/−12**（`src/steer.ts` +237、
+    `test/live-steering.spec.ts` +372），`lib/` 重建产物 +517/−15，另含 `CHANGELOG.md` +8、`AGENTS.md` +18。
+  - 一句话别记错账：原始派单里那个 **「+417」不属于这三处任何一处**——它恰好等于 `feat/audit-layer` 的 `test/report-audit.spec.ts`
+    行数（417，实测），是派单侧串台。判别归档完整性不靠行数，靠「补丁落回各自 base 后 tree 精确复现」。
 - **要落 `main` 需另开 rebase 包**。本包**不 rebase**：rebase 必然动 `src/`/`test/`/`lib/`，与本包的零产品改动硬约束冲突。
 - **一行补丁事故（照实记）**：progress 补丁一度被误清空（0 字节）。处置是从备份提交 `b91ff17` **重新导出**，最终 **75374 B**。
   判定它可用不是靠字节数，而是靠上面那条 **tree 相等**。
@@ -78,6 +90,7 @@ d01528d2f9db9ce622cdfb2720495bf13077a7a9eac24d0fb7b4358c3fa00385  .rsi/evidence/
 - `team-dispatch-v1`（ahead=3 / behind=190，47 文件 +1992/−268，含 `test/taskboard.spec.ts`、`test/dispatcher.spec.ts` 新用例）→ **合**：rebase 到当前 main 后合入，唯一带完整测试的真实功能；本包不执行（会造成产品改动），脏活已落 `backup/wip-2026-11-24-team-dispatch-v1`。
   - 本轮实测：`ahead=3` / `behind=**191**`（差的那 1 个就是本包自己的证据提交 `3a2faa0`），47 文件 +1992/−268 与派单一致；
     `test/taskboard.spec.ts`、`test/dispatcher.spec.ts` 都在改动清单里，另含 `vitest.config.ts` 与 `test/fixtures/taskboard/writer.mjs`。
+    → 口径：`191` 是**在证据提交 `3a2faa0` 上量的**；到本包最终 HEAD `8204e47` 已是 **192**，以后每加一个提交还会再 +1，复跑请以当时 HEAD 为准。
   - 该分支的 setup 记录 `.rsi/evidence/branch/team-dispatch-v1-setup-2026-11-23.md` **已随本包进库**（见下节「卫生」），
     下一个人 rebase 时按它复现环境。
 - `rsi/redrive-13`（ahead=7 / behind=155，30 文件）→ **删**：证据绑旧树、405 断言 main 已具备；归档在 `.session-stage/patches/redrive-13-2026-11-24/` 与 `.session-stage/archive/redrive-13-evidence-2026-11-24.tar.gz`。
@@ -93,7 +106,8 @@ d01528d2f9db9ce622cdfb2720495bf13077a7a9eac24d0fb7b4358c3fa00385  .rsi/evidence/
     且格式是 `CONFLICT (content): Merge conflict in <path>` 一行一条路径。所以本轮改用**冲突路径数**作为冲突规模的口径，这是可核对的。
   - 冲突之所以这么小：分支只有 1 个提交（`7626233`），而 `main` 自 merge-base 起把 `src/report.ts` 改了 **+450/−15**——
     改动集中在同两个文件，但 git 仍能自动合并其余部分。
-  - 照实标注：本轮实测 `behind=**482**`（派单写 481，差的同样是本包那个证据提交）。
+  - 照实标注：本轮实测 `behind=**482**`（派单写 481，差的同样是本包那个证据提交）。→ 口径同上：`482` 是**在证据提交 `3a2faa0` 上量的**，
+    到最终 HEAD `8204e47` 已是 **483**，以后每加一个提交还会再 +1，复跑请以当时 HEAD 为准。
 
 ### 4. 卫生：什么进了库、什么退役了、旧盘点逐条复核
 
