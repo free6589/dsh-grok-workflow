@@ -4489,8 +4489,23 @@ Issue #1 状态评论 issuecomment-6927842856。
 - **红线**：live `~/.dsh` 一行未写、未重载、未重启（本轮只写仓库内部与 `.tmp/`）；DSH 核心检出未动；未 push、未打 tag、
   未发版、未改 `package.json`（仍 `0.13.34`）；配置面仍 20 键、设置页仍 17 字段（本轮没有新增配置键）；没有削弱
   `isApproveAnswer()`、`startBlock` 的其它检查或门禁的准入路径。
-- **待办 / 没做的**：① 真机 soak `NOT_RUN`——卡片路径本轮只有单测覆盖；上一轮 M2 的真机观察（卡片答案不算用户消息）是
-  这条缺陷的现场来源，修完之后**没有**再在真机上点一次卡片复核；② 跨预览边界答卡片（预览前开卡、预览后点确认）仍被拒，
-  这是刻意取舍（见 D-137 的残余风险①），要改得先定「旧问题的答案算不算这一单的批准」；③ 账本里卡片批准的
-  `approval.quote` 是选中的标签而非一句打字的话（D-137 残余风险②），读账本要连 `kind` 一起看；④ 合并前确认
-  `docs/knowledge/DECISIONS.md` 的 `D-137` 是最后一号（本轮取号时 `D-136` 是最后一条）。
+- **真机 soak（`CONFIRMED`）**：隔离克隆（`.tmp/soak-card/dsh-home`，profile `web-clone`，端口 3203，线上 3080 未碰）装
+  `a926cd6` 的构建，真模型 `bifrost-responses/opencode-go/muse-spark-1.3-contributor`。修复后：seq 20 预览
+  （`bp-afeb8fa2…`、`split_hash 27ed61c0…`）→ seq 25 `ask_user_question`（「确认」/「再看看」）→ seq 26
+  `{"pending":true}` → `userQuestions/answer` 返回 `true` → seq 34 一条 `source.kind='user-question-reply'` 的
+  `user/message` → seq 36 `start` → seq 37 **`block_id 3c688ff2-9053-4f47-a1fd-4b04fa32a045`、`status:"open"`**，
+  `blocks.jsonl` 一行、`approval.quote = "确认"`。**对照**（同一份克隆/profile/脚本，只换插件为 `4803f42` 构建）：
+  模型行为一模一样，seq 37 被拒成 `approval-required: 预览之后没有一条消息逐字包含「确认」`，账本没有新增行。证据
+  `.rsi/evidence/card-approval-soak-2026-11-25/soak.txt`。**两条驱动面事实（证据文件 §4）**：F1 `userQuestions/answer`
+  只对 `continued` 问题有效，还开着的卡片只能由接住 waterfall 的客户端回答、没有 HTTP 路由；F2 宿主 `tool-ask-user`
+  默认 **legacy**（阻塞、无窗口），只有 `mode: timed` 才会产生 `pending` → `continued` → `user-question-reply`
+  这条路径，**所以这条修复覆盖的是 timed 卡片，默认配置下卡片答案只是同回合的工具结果**。soak 档案因此把提问工具
+  改成 `mode: timed, timeout: 20`（顶层 `- id: tool-ask-user` 覆盖不动预设行，生效的是 `- id: preset-standard`
+  + `config.plugins` 整份覆盖）。
+- **待办 / 没做的**：① 真浏览器点一张**还开着**的卡片 `NOT_RUN`（那条路径的答案不会变成回复消息，测不到本次修复；
+  要覆盖它得再开一轮 Chromium）；② 跨预览边界答卡片（预览前开卡、预览后点确认）仍被拒，这是刻意取舍（见 D-137 的
+  残余风险①），要改得先定「旧问题的答案算不算这一单的批准」；③ 账本里卡片批准的 `approval.quote` 是选中的标签而非
+  一句打字的话（D-137 残余风险②），读账本要连 `kind` 一起看；④ 合并前确认 `docs/knowledge/DECISIONS.md` 的 `D-137`
+  是最后一号（本轮取号时 `D-136` 是最后一条）；⑤ **F2 值得一次产品决定**：如果希望「点卡片 = 批准」在默认配置下也
+  成立，要么把 `tool-ask-user` 默认改成 timed，要么让 `startBlock` 也读同回合的提问工具结果——两者都超出本分支，
+  本轮只记录、没改。

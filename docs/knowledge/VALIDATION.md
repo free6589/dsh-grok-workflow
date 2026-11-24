@@ -1,8 +1,8 @@
 ## 问题卡片的确认：两个新用例、一个共用判断、提交后门禁（`fix/question-card-approval`）— 2026-11-25 (`CONFIRMED`)
 
 下面每一行都写清命令、环境与结果；没跑的写 `NOT_RUN`。分支 `fix/question-card-approval`（worktree
-`.worktrees/fix-question-card-approval`），基线 `main` 尖端 `4803f42`，功能提交 **`a926cd6`**（记忆提交紧随其后，只动
-`docs/knowledge/` 与 `CHANGELOG.md`）。所有命令都在该 worktree 根目录跑，临时件一律落在 `.tmp/`（gitignored）。
+`.worktrees/fix-question-card-approval`），基线 `main` 尖端 `4803f42`，功能提交 **`a926cd6`**，其后一个记忆提交（`docs/knowledge/` + `CHANGELOG.md`），
+再一个真机 soak 的提交（`.rsi/evidence/card-approval-soak-2026-11-25/` + 这三个文档）。所有命令都在该 worktree 根目录跑，临时件一律落在 `.tmp/`（gitignored）。
 
 | state | command（环境） | result |
 | --- | --- | --- |
@@ -20,9 +20,15 @@
 | 卡片消息的真实形状（来源事实） | 只读 `@deepseek-ai/dsh-user-questions/src/index.ts`、`src/projection.ts`、`@deepseek-ai/dsh-session/src/types.ts`（本机安装的 DSH 包） | `answer()` 造 `source: { kind: 'user-question-reply', callId, outcome: 'answered' }` + 一个 JSON 文本段（`kind: 'answer_to_pending_question'`、`tool: 'ask_user_question'`、`questions`、`answers`）；`'tool/call'` 形状 `{ turn, step, callId, name, arguments }`（`arguments` 是 JSON 字符串）；每条事件由 `createAppendEvent` 盖 `time: Date.now()`。**`CONFIRMED`**（写进 `docs/knowledge/RESEARCH.md` 的 2026-11-25 条） |
 | 文档守卫 | `TMPDIR=$PWD/.tmp npx vitest run test/docs-version.spec.ts test/docs-config-keys.spec.ts test/docs-architecture-version.spec.ts test/i18n-parity.spec.ts`（写完文档后、提交前） | **EXIT=0**：`Test Files 4 passed (4)` / `Tests 30 passed (30)`（`docs-version` 8、`docs-config-keys` 13、`docs-architecture-version` 3、`i18n-parity` 6）。日志 `.tmp/docs-guards.log`。**`CONFIRMED`** |
 | 配置面未动 | `node -p "require('./package.json').version"`；全量门禁里的 `test/config.spec.ts` 与 `test/settings-projection.spec.ts` | 版本 **`0.13.34`**（未改）；20 键 / 设置页 17 字段由那两个 spec 在门禁 #3 里通过，本轮没有新增配置键。**`CONFIRMED`** |
-| 未 push / 未打 tag | `git tag --points-at HEAD`；`git status --short --branch` | 无 tag 指向 `a926cd6`；本轮没有执行任何 `git push`、没有打 tag、没有合 `main`。**`CONFIRMED`** |
-| live `~/.dsh` | — | **`NOT_RUN`**：没有探它的版本、没有读它的文件；本轮对它的写操作是零（红线要求不写、不重载、不重启）。 |
-| 真机 soak（隔离 profile 点一次卡片） | — | **`NOT_RUN`**：卡片路径本轮只有单测覆盖；上一轮 M2 的真机观察是这条缺陷的现场来源，修完之后没有在真机上复核。 |
+| 未 push / 未打 tag | `git tag --points-at HEAD`；`git status --short --branch` | 没有任何 tag 指向本分支的提交；本轮没有执行任何 `git push`、没有打 tag、没有合 `main`、没有改 `package.json`。**`CONFIRMED`** |
+| 真机 soak：隔离 profile、真模型、卡片答案真的开了块（修复后） | `node scripts/clone-profile.mjs --src ~/.dsh/profiles/web --home <wt>/.tmp/soak-card/dsh-home --name web-clone`；`dsh --profile web-clone --host 127.0.0.1 --port 3203 --no-open`（`DSH_HOME`/`HOME` 都在 `.tmp/soak-card/`）；驱动脚本 `node .tmp/soak-card/drive.mjs .tmp/soak-card/boot5.log run-fix3`（GUI 自己的 HTTP API + `userQuestions/answer`） | `PASS`。模型 seq 20 预览（`bp-afeb8fa2…`、`split_hash 27ed61c0…`）、seq 25 用 `ask_user_question` 问「确认」/「再看看」、seq 26 拿到 `{"pending":true}`、`userQuestions/answer` → `true`、seq 34 一条 `source.kind='user-question-reply'` 的 `user/message`、seq 36 `start`、seq 37 **`block_id 3c688ff2-9053-4f47-a1fd-4b04fa32a045`，`status:"open"`**；`blocks.jsonl` 一行，`approval.quote = "确认"`。证据 `.rsi/evidence/card-approval-soak-2026-11-25/soak.txt`。**`CONFIRMED`** |
+| 真机 soak 对照：同一个动作打在修复前的构建上 | 同一份克隆/profile/脚本，插件目录换成 `git archive 4803f42` 构建的那份（`lib/gate.js` `9a6b54c3…`、无 `lib/user-source.js`）；`node .tmp/soak-card/drive.mjs .tmp/soak-card/boot6.log run-prefix` | 模型行为相同（seq 25 问、seq 26 pending、seq 34 同形状的卡片答案、seq 36 `start`），seq 37 被拒：**`Error: approval-required: 预览之后没有一条消息逐字包含「确认」，不能开工`**；`blocks.jsonl` 仍是 1 行（没有写盘）。**`CONFIRMED`** |
+| soak 激活三项 | `grep -nE "pending\|did not activate" boot5.log`；`POST /api/settings/describe`；读修复后那一轮会话的 `request/header`（seq 15） | 启动 34 行、抱怨 0 行；`namespaces: 24`、`grok-workflow` 在、`blockIntake` **不在**投影里（17 个字段）；`tools: 101` 且六个块工具全在；`ask_user_question` 参数是 `['questions','timeout']`（timed 变体）。**`CONFIRMED`** |
+| soak 期间线上没被碰 | `stat -c '%Y %y' ~/.dsh ~/.dsh/profiles ~/.dsh/profiles/web`（前后各一次，`diff` 两份读数）；`touch /home/fish/.dsh/.soak-write-probe`；`curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3080/` | 三个目录 mtime **逐秒相同**（`1795362020` / `1795337986` / `1795530213`）；写探针 → **`Read-only file system`**；线上 `3080` 前后都是 **`401`**；线上实例未重载、未重启（只停过 soak 自己的后台任务）。**`CONFIRMED`** |
+| soak 的构建身份 | `sha256sum lib/{gate.js,block/tools.js,user-source.js}`；`find <clone>/node_modules/dsh-grok-workflow -type l`；`node -p "require('<clone>/node_modules/dsh-grok-workflow/package.json').version"` | 修复后 `e9de01e0…` / `0cc6394a…` / `75f39ec8…`，修复前 `9a6b54c3…` / `38e1fd7e…` 且**没有** `user-source.js`；`lib/index.js` 两边逐字节相同（`b4923afe…`），所以身份钉在真正改动的三个文件上；插件目录无符号链接；版本读回 `0.13.34`。**`CONFIRMED`** |
+| live `~/.dsh` 的版本 | — | **`NOT_RUN`**：没有探、没有读；本轮对它的写操作是零（红线要求不写、不重载、不重启）。 |
+| 真浏览器点一张**还开着**的卡片 | — | **`NOT_RUN`**：还开着的卡片只能由接住 waterfall 的客户端回答，没有 HTTP 路由；而那条路径的答案只是工具结果、不会变成 `user-question-reply`，测不到本次修复（详见证据文件 §4 的 F1）。 |
+| 密钥存在性的直接读取 | — | **`NOT_RUN`**：本沙箱每次 bash 调用各有 PID 命名空间，看不到 soak 进程的 `/proc/<pid>/environ`；间接证据是真模型答了话。 |
 
 ## 接单台子收口：七处文字、`lib/` 重建、提交后门禁、模型监工真机 soak（`fix/supervisor-soak-evidence`）— 2026-11-25 (`CONFIRMED`)
 

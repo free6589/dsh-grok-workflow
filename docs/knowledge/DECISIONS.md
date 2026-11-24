@@ -131,7 +131,7 @@ Each entry records the decision, evidence, alternatives, and status.
 - U-5 严格模式成本：用户接受每消息完整工作流的延迟与调用开销。
 - U-6 设置：YAML/配置层先行；带模型下拉的链编辑器（client module）= Phase 9 backlog。
 - U-7 强制范围：preset 作用域（gateScope/gatePreset 白名单），非全进程。
-- U-8 拦截面：维持 source.kind='user' 边界并显式文档化（不扩拦 user-question-reply/team-message/webhook/schedule 等）。
+- U-8 拦截面：维持 source.kind='user' 边界并显式文档化（不扩拦 user-question-reply/team-message/webhook/schedule 等）——这条边界**没有变**；D-137 只是让卡片答案在门禁里被**点名**成一次 `question-reply` 直通，它仍然不算请求、不启动任何一轮。
 - U-9 时长体感：维持 timeoutMs 默认（30 分钟）；流式进度提示入 backlog。
 
 ## D-010 — 夜间自主执行与发布纪律（用户 2026-10-26 授权）
@@ -3551,7 +3551,9 @@ spine 为空，pre-fix 形状会进脊柱。
   `npx vitest run test/block-tools.spec.ts test/gate.spec.ts` → **`2 文件 / 77 测试 PASS`**，全量门禁在功能提交
   `a926cd6` 上 `TMPDIR=$PWD/.tmp npm run ci` **EXIT=0**：vitest **111 文件 / 2130 测试 PASS**、oxlint
   **`Found 36 warnings and 0 errors.`**、`verify:lib` → `lib/ at a926cd6 is the build of src/ at a926cd6 (297 files,
-  byte-identical)`）
+  byte-identical)`；真机隔离 soak **PASS**——卡片答案真的开了一块 `3c688ff2…`（`approval.quote = "确认"`），
+  同一动作打在修复前的构建上被拒成 `approval-required`，证据
+  `.rsi/evidence/card-approval-soak-2026-11-25/soak.txt`）
 - **Date:** 2026-11-25
 - **Context:** 用户用问题卡片点头时，宿主记下的是一条 `source.kind === 'user-question-reply'` 的 `user/message`
   （真实形状与事件字段见 RESEARCH 的 2026-11-25 条）。两处代码只认 `'user'`：`src/block/tools.ts` 的

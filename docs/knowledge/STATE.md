@@ -2984,3 +2984,26 @@ PASS**（对 `4803f42` 的 2128 是 **+2 测试**，文件数不变）、oxlint 
 移到 `.tmp/worktree-node-modules-cache/`、把 `node_modules` 软链到主检出的 `node_modules`（两边本来就靠父目录解析共用
 依赖），之后的全量门禁都 exit 0——`a926cd6` 那次是权威读数，另有一次跑在后来被 amend 掉的 `63e1010` 上
 （`111 文件 / 2130 测试`，同样 exit 0）。这条只影响本 worktree 的运行环境，不是产品改动。）
+
+补记（2026-11-25 04:05，`CONFIRMED`）：**真机 soak 跑通了——卡片答案真的开了一块。** 隔离克隆
+（`.tmp/soak-card/dsh-home`，profile `web-clone`，端口 3203，线上 3080 全程未碰）里装 `a926cd6` 的构建
+（`lib/gate.js e9de01e0…`、`lib/block/tools.js 0cc6394a…`、`lib/user-source.js` 在，插件目录无符号链接，
+版本读回 `0.13.34`），真模型 `bifrost-responses/opencode-go/muse-spark-1.3-contributor`：seq 20 预览
+（`bp-afeb8fa2…`、`split_hash 27ed61c0…`）、seq 25 `ask_user_question` 问「确认」/「再看看」、seq 26 拿到
+`{"pending":true}`、宿主自己的 `userQuestions/answer` 第 1 次就 `true`、seq 34 一条
+`source.kind='user-question-reply'` 的 `user/message`、seq 36 `start`、seq 37 **`block_id
+3c688ff2-9053-4f47-a1fd-4b04fa32a045`、`status:"open"`**，`blocks.jsonl` 一行且 `approval.quote = "确认"`。
+**对照**：同一份克隆/profile/脚本，只把插件换成 `4803f42` 构建的那份，模型行为一模一样，seq 37 被拒成
+`approval-required: 预览之后没有一条消息逐字包含「确认」`，账本没有新增行——「同一个动作，修复前拒、修复后开」
+是查过的。**这一轮最重要的发现（F2，写进证据文件 §4）**：宿主 `tool-ask-user` 默认是 **legacy**（阻塞、
+只认前台客户端），只有 `mode: timed` 才会在窗口过期后把结果写成 `{pending:true}`、让问题变 `continued`，
+答案才会以 `user-question-reply` 的 `user/message` 进会话；**默认配置下卡片答案只是同回合的工具结果，永远不会
+变成「用户消息」**，所以这条修复覆盖的是 timed 卡片（或任何窗口过期后仍可答的卡片）。soak 档案因此把提问工具
+改成 `mode: timed, timeout: 20`（顶层 `- id: tool-ask-user` 覆盖不动预设里的那一行，生效的是
+`- id: preset-standard` + `config.plugins` 整份覆盖）。第二条发现（F1）：`userQuestions/answer` 只对
+`continued` 问题有效，还开着的卡片只能由接住 waterfall 的客户端回答，没有 HTTP 路由可答。证据
+`.rsi/evidence/card-approval-soak-2026-11-25/soak.txt`（含逐字账本行）。**没跑**：真浏览器点一张还开着的卡片
+（`NOT_RUN`，那条路径的答案不会变成回复消息）、跨预览边界答卡片与 `custom` 匹配（`NOT_RUN`，只有单测）。
+**红线**：`~/.dsh` 三个目录 mtime 前后逐秒相同、写探针 `Read-only file system`、线上 3080 前后都是 401；
+未 push、未打 tag、未发版，`package.json` 仍 `0.13.34`。清理：`.tmp/soak-card` 整棵（含克隆 home 与两份
+tarball）跑完即删，仓库里只留证据文件。
