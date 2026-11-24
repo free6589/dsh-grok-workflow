@@ -205,10 +205,10 @@ export declare const DEFAULT_LOOP_ENABLED = false;
 /**
  * Whether the block intake (接单台子) is mounted at all.
  *
- * Off by default, and off means *inert*: `src/index.ts` registers none of the five
+ * Off by default, and off means *inert*: `src/index.ts` registers none of the six
  * `grok_*block*` tools and installs no extra `agent/pre-step` listener, so a
  * profile that never asked for the feature keeps the pre-block surface and the
- * pre-block delivery decisions byte for byte. On registers the five tools plus one
+ * pre-block delivery decisions byte for byte. On registers the six tools plus one
  * narrow heartbeat observer; it never changes a routing decision.
  *
  * Plain, not `volatile()`: this is a load-time switch (the tools it gates are

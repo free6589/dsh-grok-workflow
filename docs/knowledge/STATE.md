@@ -1,3 +1,46 @@
+Last updated: 2026-11-25 02:37 +08:00（**接单台子收口：注释里的「五个工具」改成「六个」（七处，不是六处）、`lib/` 重建、提交后全量门禁 exit 0，独立模型监工在真机隔离 soak 上第一次真判出结果，`CONFIRMED`；未发版、未 push、未合 `main`** —
+分支 **`fix/supervisor-soak-evidence`**，worktree `.agents/worktrees/fix-supervisor-soak-evidence`，基线 `main` 尖端 **`6501012`**
+（`docs(memory): close out the 0.13.34 release — merge, both gates, tag, and both remote runs`）；本轮唯一一条工作提交 **`49377e8`**
+「fix(block): say six tools, not five, and land the model-supervisor soak evidence」，**12 文件 / +876 −18**：七个源文件行
+（`src/config.ts` 8、`src/index.ts` 2、`src/types.ts` 4）+ 六个 `lib/` 产物（`config.d.ts` / `config.js` / `config.js.map` /
+`index.js` / `index.js.map` / `types.d.ts`）+ 三份证据（`.rsi/evidence/supervisor-soak-2026-11-25/` 下的 `soak.txt`、
+`ledger-extract.txt`、`text-gate.txt`）。
+**文字订正：七处，不是派单最初说的六处。** `src/config.ts:223`、`:226`、`:671`、`:679`、`src/index.ts:416`、`src/types.ts:237`、`:300`，
+每处只换一个词（`five`→`six`、`五个`→`六个`）；`git diff --stat 6501012 49377e8 -- src/` → **3 文件 / 7 增 7 删**，一行一个词，
+没有重排、没有动别的字。第七处 `:223` 是包工头追加批准的：它与 `:226` 在**同一段 doc comment** 里，留着就会让那段话四行后自相矛盾。
+`lib/` 由 `npm run build` 重建（`lib/client.js` 未变——浏览器包不带这些注释）。**按派单留在范围外、仍写「five」的四处**：
+`src/block/tools.ts:2`、`test/block-tools.spec.ts:2`、`test/block-flag.spec.ts:50`、`:52`。
+**门禁：提交后那一次才是覆盖本轮改动的那一次。** `TMPDIR=$PWD/.tmp npm run ci` 在 **`49377e8`** 上 **EXIT=0**（日志 `.tmp/ci-foreman.log`）：
+vitest **`111 files / 2128 tests PASS`**（183.97 s）、oxlint **`Found 36 warnings and 0 errors.`**、`verify:lib` →
+**`lib/ at 49377e8 is the build of src/ at 49377e8 (293 files, byte-identical)`**。
+**先前那两次不算覆盖**：`.tmp/ci-text-gate.log` 与 `.tmp/ci-text-gate-2.log` 的读数形状一样（111 / 2128、36 warnings / 0 errors），
+但 `verify:lib` 都写 `lib/ at 6501012 is the build of src/ at 6501012 (293 files, byte-identical)`——它比的是 **HEAD 的 `src` 与 HEAD 的 `lib`**，
+当时什么都没提交，所以那两次比的是旧 `lib/`，**没有覆盖重建后的 `lib/`**。
+**真机隔离 soak（模型监工那条腿第一次真跑通）：`PASS`。** 从线上 `web` profile 克隆到 `.tmp/soak-sup/`（独立 `DSH_HOME` + 独立 `HOME`；
+克隆 7699 文件、parity 5/5、1 行凭据按设计脱敏），实例在 `127.0.0.1:3199`，真 `dsh` 0.2.2-rc.3、真模型
+`bifrost-responses` / `opencode-go/muse-spark-1.3-contributor`（`reasoningEffort: high`）；线上 `3080` 只做 `curl` 读状态（前后都是 `401`），
+`~/.dsh` 零写入（三个目录 `stat` 前后 mtime 逐秒相同，`touch ~/.dsh/…` → `Read-only file system`），线上实例未重载未重启。
+两份交付物都拿到：`f9d91ee7` attempt 2 与 `6da4687d` attempt 1 各一条 **`judged:true` 的 `pass`**（`route` 都是那条模型路由，`criteria` 全 `met:true`，
+证据是交接原话）；`eda27615` attempt 2 一条**模型自己产的 `veto`**，`criteria [met:true, met:false]`，理由是监工自己的话
+「监工认为这条验收没有被交接里的证据满足」——同一份交接先过了全部六条确定性检查，所以那行**不是** `deterministic`。
+加时赛把 `roles.supervisor` 从克隆 profile 里删掉、同一端口重启后再开一单：`7466943e` attempt 1 的判决行写 **`route:"inherit"`** + `judged:true` + `outcome:"pass"`，
+**「空链=继承会话路由」从假设变成实测**。账本在 `.tmp/soak-sup/dsh-home/taskboards/grok-workflow/`：`verdicts.jsonl` **6 行**
+（`deterministic` veto → 模型 pass → 模型 pass → 监工调用失败 veto → 模型 veto → `inherit` pass），`blocks.jsonl` **11 行** = 四个块的版本（3/3/2/3），
+`approval.quote` 每行都是用户那条纯文本 `确认`；原始行在 `ledger-extract.txt`，七条发现（F1–F7）的全文在 `soak.txt` §7。
+**三条要带进产品的发现**：
+① **F2（`CONFIRMED`）——闸门开着时四行交接不会变成判决回合，所以「开块流程」与「闸门」按现状互斥。** 闸门没有删掉用户消息
+（消息还在会话里，模型读得到），它把消息从 inbox 拿走、自己派一个 worker 作答、再叫模型「只把标记之间的文字原样回给用户，不要自己回答，也不要调工具」；
+`grok_open_block` 的**预览**能漏过去（run A 里模型没听话、照样调了），但**关单**漏不过去，所以块流程必须在 `/grok off` 下跑。
+② **F3（`CONFIRMED`）——监工用散文答对、没有调 `structured_output` 时，宿主按「没交答案」处理，块被判成 `监工调用失败` 的 `veto`。**
+`parseSupervisorAnswer` 其实能解析 JSON **字符串**（`tryJson`，带围栏或不带），但引擎只在 schema 工具被调用时才交出值，那条解析路径走不到；
+`eda27615` attempt 1 就这样丢了一次真判断，attempt 2 换了措辞重交才拿到真判决。
+③ **F1（本轮已订正）——「`/grok` 在 composer 里调不动」是传输方式造成的假象，不是产品缺陷。** run A 用 `POST /api/session/prompt` 发的是**消息**，
+命令层不跑，所以那句被闸门当普通聊天处理（`triaged-chat`）；run B 用真 Chromium 把 `/grok on` 打进 composer 再回车，
+`command/run` → `plugin:grok-workflow/mode` → `command/done` 三次都齐（seq 4–6 / 7–9 / 12–14）。
+**本段按名字取代 0.13.34 收口那段的两条「故意没修」观察之一**：那段记的是「`src/config.ts` 的 `:226`、`:671`、`:679` 与 `src/index.ts:416`
+写『the five tools / 五个工具』，实际注册六个」——本轮把它关掉了，而且关的范围比当时记的大（`src/types.ts:237`、`:300` 当时没被点名，
+`:223` 是包工头追加的）。另一条（`DECISIONS.md` 的 `D-050`/`D-051` 重复标题）**不在本轮范围，仍未修**。
+
 Last updated: 2026-11-25 01:15 +08:00（**M2「接单台子」：代码写完、门禁两次全绿、真机隔离 soak `PASS`，`CONFIRMED`（两次 `TMPDIR=$PWD/.tmp npm run ci` 都 exit 0，最后一次 **`110 files / 2116 tests PASS`**，lint **`Found 36 warnings and 0 errors.`**；soak 四步走完、账本 3 行 v1→v2→v3、判决 3 行 `veto/veto/pass` 全部落盘）；**未发版、未 push、未合 `main`**）—
 分支 **`feat/block-intake`**，worktree `/home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/feat-block-intake`，
 基线是 `main` 尖端 **`9b55d2d`**（`docs(memory): close out the 0.13.33 release — merge, gate, tag, and both remote runs`）；

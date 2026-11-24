@@ -413,7 +413,7 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
   installUpdateRoute({ ctx: ctx as unknown as UpdateHostContext, logger })
 
   // Block intake (接单台子): a load-time switch, read from the load-time snapshot
-  // because both halves are registrations — the five tools and one listener — and a
+  // because both halves are registrations — the six tools and one listener — and a
   // registration cannot appear without a reload. Off registers **nothing**: no tool
   // name and no `agent/pre-step` listener, which is what makes "off is the pre-feature
   // tree" a testable claim instead of a promise (`test/block-flag.spec.ts`).
