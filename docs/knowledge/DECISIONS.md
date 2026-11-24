@@ -3194,3 +3194,57 @@ spine 为空，pre-fix 形状会进脊柱。
   台账在同样的 8,000 字预算下正文略短（约 56 字的标记预留），换来收尾两行必然存在；`Dead routes` 块不切片，
   但 `deadRoutes` 已由宿主按 `HARD_LIMITS.deadRoute.routes` 封顶，报告侧同理。任何再动诊断块措辞的提交，
   必须同时改这条用例，否则它会先红——这正是它的作用。
+
+## D-129 · 升级按钮走宿主路由：装什么由宿主按本仓库的发布形状自己拼，成功只认读盘回执，失败或装歪就回滚（2026-11-24）
+
+- **Status:** `CONFIRMED`（`test/update-surface.spec.ts` 29 例 + `test/update-entry.spec.ts` 20 例；`npm run ci` 在
+  `c951dbf` 上 EXIT=0 = 101 文件 / 1910 测试；真机 soak 一次完整跑通并留下逐字回执与读盘结果）
+- **Date:** 2026-11-24
+- **来源:** 设置页升级卡此前只能「说出最新版本 + 给一条命令让人贴到终端」，操作员要的是「按钮自己装」。分支
+  `feat/update-button`（worktree `.agents/worktrees/feat-update-button`，自 `main` `c6a3611` 开出），功能提交 `c951dbf`。
+  两条 lane 各自先红后绿（宿主：模块缺失红 → 29/29；客户端：12 失败 / 5 通过 → 全绿）——这组红绿数是两条 lane 当轮的
+  记录，**树里无法复现**，能复现的是上面那条全量门禁与下面列的文件。
+- **Decision:**
+  1. **升级按钮骑在宿主路由上**，不在浏览器里想办法：新增 `src/update-surface.ts`，`GET|POST
+     /grok-workflow/update`（`UPDATE_ROUTE_PATH`）。挂载形状照抄 `src/mode-surface.ts`——`ctx.inject(['webServer',
+     'connection'])`、注册写在 `child.effect` 里（卸载即撤路由，不留下一个「装进了一个已经没装本插件的 profile」的按钮）、
+     信任闸先走 `connection.requestRejection`、`handleUpdateRoute` 导出当测试缝、`serviceOf` 走 isolate 保护的服务查表。
+     读走 `GET ?action=status`，装走 `POST {action:'install',tag}`。
+  2. **装什么由宿主自己拼，浏览器永远不能指定包。** spec 只在宿主侧生成（`releaseSpec()` →
+     `github:free6589/dsh-grok-workflow#v<x.y.z>`）；请求体只要带任何 `spec` 一类字段就拒（`update/spec`），tag 必须匹配
+     `RELEASE_TAG_PATTERN`（严格 `vX.Y.Z`、无前导零），**并且**必须出现在注入的探测从 GitHub 读到的发布标签里
+     （`v9.9.9` → `update/unknown-tag`），还必须是严格新于已装版本（`update/not-newer`）。`inspect()` 只看 git spec 的
+     形状（见 `RESEARCH.md`），所以「这个标签是不是真的发布过」只能靠标签清单来判——探测就是这么来的。
+  3. **写盘用 `saveExact` + `expected`，成功只认读盘回执。** `installBundle(spec, {saveExact:true,
+     expected:{name:'dsh-grok-workflow', version:<去掉 v 的 tag>}})`：管理器自己的事务守卫会在「装完这个包不在/版本不对，
+     或者顺手改了别的直接依赖」时回滚并把这次安装判成 `unexpected-package`。回执里的 `to` **不是**请求里那个版本，而是
+     事后 `listBundles()` 读回来的版本——装成功与否只由这一次读盘决定。
+  4. **失败或装歪就退回装前那个 spec，回执只说第二次读盘能证明的事。** 回滚用装前那一行的 `source`（没有就用那条版本
+     的发布 spec；开发链接这种没有标签可退的，直接报「没回滚」，不猜一个版本去装），回滚后再读一次盘，只有读回来真的等于
+     装前版本才写 `rolledBack:true` + `restored`，否则就是 `rolledBack:false`。错误码到状态码是定死的表：
+     方法 405（带 `allow`）、包体 400/413、action 400、spec 400、tag 400、unknown-tag 409、not-newer 409、
+     current/discover/unavailable 503、install/readback 502、internal 500。
+  5. **不自动升级，不静默刷新。** 页面打开时不发任何 GET/POST；一次点击一次 POST，安装中再点是无操作；装完只把
+     「刷新页面新版本才生效」写出来，页面自己绝不 reload、不跳转。静态的 `PLUGIN_VERSION`/`UPDATE_LATEST` 与可复制那一行
+     保留为基线（没有路由的合流里读者拿到的就是它），但宿主答过之后，三处命令文本一律换成宿主的 `update.command`。
+- **被否决的替代方案:**
+  1. **让浏览器把 spec 发上来。** 那是把一个可以装任意包的入口开到网页上（CSRF/社工点一下就装别人的包）；宿主自己拼
+     spec 是这条路由唯一能收窄的地方。
+  2. **信 `installBundle` 的 resolve。** 解析成功不等于 profile 上真的是那个版本（npm 别名、意外满足的范围、另一个
+     直接依赖被顺手改动）；`expected` 让管理器自己回滚，读盘让回执说真话，两者都要。
+  3. **装完自动刷新页面。** 刷新会打断读者正在看的东西，也可能把一个还在跑的任务页刷掉；而且「新构建何时生效」是宿主
+     装载的事，不是这一页能保证的。说清楚比替人决定好。
+  4. **有更新就自动装（不用点）。** 装包会改 profile、会联网、会动依赖；把这件事做成不需要人按的动作，等于让一次
+     背景请求决定环境状态。开关式自动升级是另一条产品决定，本轮不做。
+  5. **静态常量继续当唯一真值。** 冻结在页面里的那一行会过期：当页面说「有 0.13.32」而命令还写着 `#v0.13.31` 时，
+     复制粘贴装的是**旧**版本——正是这个按钮要终结的那个错误。
+- **Evidence:** `src/update-surface.ts`（spec/标签/回滚/错误码全在这里）、`src/index.ts`（`installUpdateRoute` 紧跟
+  `installModeRoute`）、`src/client/index.js` 的 `UpdateCard`（四相 + 命令跟随宿主 + 挂载不发请求）、
+  `test/update-surface.spec.ts`（29 例）、`test/update-entry.spec.ts`（5 → 20 例）、
+  `.rsi/evidence/update-button-soak-2026-11-24/`（真机 soak：一次点击把隔离 profile 从 0.13.30 装到
+  0.13.31，两个路由回执逐字存档、装后从盘上读回 `github:free6589/dsh-grok-workflow#v0.13.31` 与 `0.13.31`）、
+  `docs/knowledge/VALIDATION.md`（同日条目）。
+- **Consequences:** 装一次需要网络 + 一个真的发布过的标签，所以「离线也能升级」不存在，只能退化成那句命令；
+  没有插件管理器的合流不再报错，而是 `canInstall:false` + `reason:'update/unavailable'` + 可复制命令；没有 `webServer`
+  就不注册任何东西并告警；连 `ctx.inject` 都没有时整块静默。卡片的命令从此跟着宿主的答案走——任何只改静态常量、以为
+  那行就是「页面上显示的命令」的改动都会读错。

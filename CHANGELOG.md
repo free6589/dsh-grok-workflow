@@ -5,6 +5,33 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Added / 新增
+
+- **The settings page can now check and install the newest release itself / 设置页现在能自己检查并安装最新版本** —
+  The version card used to name the newest release and then hand the reader a command to paste into a
+  terminal; it could not act on its own answer. It now can: one button checks, and if a strictly newer
+  published release exists and this plugin host is able to install, the same button installs it in place,
+  through the plugin manager's own channel. The card has four states — checking, installing, up to date,
+  and failed — and a failed install shows what failed and offers to read again rather than repeating the
+  same request blindly. The installation is pinned to the release's exact tag (never `latest`, a branch,
+  or a range), the version shown afterwards is the one read back from the profile rather than the one that
+  was requested, and an install that fails or lands on a different version is rolled back to what was
+  there before, with the answer saying only what a second read-back proves. The page cannot name the
+  package it installs and cannot install anything that is not a published release of this repository:
+  only a release tag this repository actually publishes, strictly newer than what is installed, is
+  accepted. Nothing installs by itself — no check and no install runs when the page opens — and nothing
+  reloads: the card says outright that a refresh is what activates the new build, and the copyable command
+  stays there for anyone who would rather run it by hand, following the host's reading of the newest
+  release rather than a version frozen into the shipped page.
+  / 版本卡以前只会说出最新版本，再给一条命令让你自己贴进终端——它没法按自己给的答案动手。现在可以了：一个按钮做检查，
+  如果确实有更新的已发布版本、且这台宿主能装，同一个按钮就地在插件管理器自己的通道里装上。卡片有四个状态——检查中、
+  安装中、已是最新、失败——装失败会写清失败原因并给「重新读取」，而不是盲目重发同一个请求。安装钉在那一版的发布标签上
+  （不用 `latest`、不用分支、不用范围），装完显示的版本是从 profile 里读回来的那一个，不是请求里写的那个；装失败、或
+  装成了别的版本，会回滚到装之前的样子，回执只说第二次读盘能证明的事。页面既不能自己指定要装哪个包，也装不了不是本仓库
+  发布版的东西：只接受本仓库真的发布过、且严格新于当前已装版本的发布标签。它不会自己装——页面打开时既不检查也不安装
+  ——也不会自己刷新：卡片会直说「刷新页面新版本才生效」，可复制的命令仍然留在那儿给愿意手跑的人，并且跟随宿主读到的最新
+  版本，不再跟着页面里写死的那一版走。
+
 ## [0.13.31] - 2026-11-24
 
 ### Fixed / 修复

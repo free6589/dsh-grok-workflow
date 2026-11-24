@@ -1,0 +1,14 @@
+# Isolated-soak overlay (2026-11-24, update-button soak).
+# The profile under test is a byte copy of the live `web` profile. Its own layer
+# spawns three stdio MCP clients that reach shared services outside the scratch
+# home (the lingshu memory bridge, the phone, serena's LSP). The soak only needs
+# the web shell, the plugin manager and this plugin, so those three are switched
+# off here instead of editing the copied layer: one overlay, no fork surgery.
+- id: mcp-lingshu-shared
+  disabled: true
+- id: mcp-mobile-phone
+  disabled: true
+- id: mcp-serena
+  disabled: true
+- id: layerfs-host
+  disabled: true
