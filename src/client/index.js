@@ -453,6 +453,14 @@ window.__ModuleLoader__.load({
       'update.state.latest': 'You are on the latest release.',
       'update.state.newer': 'A newer release is available: {target}.',
       'update.terminal': 'This page cannot run system commands — paste the command above into a terminal to finish the upgrade.',
+      // The button's own states. The seven lines above are the baseline the page can
+      // always show; these are only reachable through an answer from the Host route.
+      'update.check': 'Check for a newer release',
+      'update.install': 'Install {target}',
+      'update.installing': 'Installing…',
+      'update.refresh': 'Refresh this page to activate the new build.',
+      'update.unavailable': 'This Host cannot run the install for you — use the command above.',
+      'update.failed': 'The upgrade did not go through: {message}',
     }
 
     const ZH = {
@@ -683,6 +691,13 @@ window.__ModuleLoader__.load({
       'update.state.latest': '已是最新版本。',
       'update.state.newer': '有新版本可装：{target}。',
       'update.terminal': '本页不能替你执行系统命令——把上面的命令贴到终端里跑一次，才算装好。',
+      // 按钮自己的几种状态；上面七条是不问任何人也始终能显示的底稿，下面这些只由宿主路由的回答触达。
+      'update.check': '检查有没有新版本',
+      'update.install': '安装 {target}',
+      'update.installing': '正在安装…',
+      'update.refresh': '新版本要等这个页面刷新之后才生效。',
+      'update.unavailable': '这个宿主装不了——用上面的命令装。',
+      'update.failed': '升级没成：{message}',
     }
 
     /** Shipped locales, in the order the locale plugin registers them. */
@@ -1490,22 +1505,81 @@ window.__ModuleLoader__.load({
       return null
     }
     /**
-     * The version/upgrade card: current installed version vs newest release.
+     * The version/upgrade card: installed version, newest release, and the one button
+     * that can actually move it.
      *
-     * Read-only on purpose — it shows two facts and one copyable command that
-     * reuses the existing install channel (`dsh plugin add`, i.e. the `plugin
-     * add` semantics the README documents). It never phones home: the latest
-     * release is the static `UPDATE_LATEST`, refreshed by a release round.
-     * @param props - `{ t }`, the guarded translator for the active language.
+     * The static `PLUGIN_VERSION` / `UPDATE_LATEST` pair plus the copyable command stay the
+     * honest baseline: they are what this page knows without asking anyone, they are what a
+     * reader gets in a composition with no update route at all, and they never go away.
+     * Once the Host has answered, its `update.command` replaces the frozen baseline in all
+     * three places the command appears (the body sentence, the command line, the copy
+     * button) — a static line pointing at `#v0.13.31` next to "0.13.32 is available" would
+     * install the older release, which is the mistake this button exists to end.
+     * The button adds a Host answer on top — `src/update-surface.ts` is the only place a
+     * browser click can reach an install, because `dsh plugin add` is a system command this
+     * page cannot run.
+     *
+     * Four phases, each rendered as `data-gw-update-phase`:
+     *
+     * - `check` — the resting state. The primary button reads the route
+     *   (`data-action="update-check"`); once the answer says a strictly newer release is
+     *   available *and* this Host can install, the same button becomes
+     *   `data-action="update-install"` and names the target. A Host that answers
+     *   `canInstall: false` keeps the copy line and says so instead of offering a button.
+     * - `installing` — one POST in flight; the primary button is disabled, and the copy
+     *   line stays visible because that is the fallback if the click never finishes.
+     * - `latest` — nothing newer, or an install whose read-back equals the target. The
+     *   card shows the read-back version and says that a page refresh is what activates the
+     *   build. It never reloads or navigates: that is the reader's decision.
+     * - `failed` — the failure sentence with the code as an attribute, and the read again.
+     *
+     * Nothing runs on mount: no GET, no POST on first paint. A failed install is retried
+     * from a fresh read, never by re-posting the same request blindly.
+     * @param props - `{ t }`, the guarded translator, plus an optional `updateFetch` (tests
+     *   pass a fake; production uses the page's own fetch).
      */
     function UpdateCard(props) {
       const { t } = props
+      const fetchImpl = typeof props.updateFetch === 'function'
+        ? props.updateFetch
+        : (typeof fetch === 'function' ? fetch.bind(undefined) : undefined)
       const [copied, setCopied] = useState(false)
+      /**
+       * The card's one state cell.
+       *
+       * `status` (the last Host answer) survives a failure on purpose: the numbers on
+       * screen should not vanish because a later call went wrong. `checking` is a read in
+       * flight inside the `check` phase; `installed` is what an install read back and
+       * `restored` is the version a rollback put back.
+       */
+      const [state, setState] = useState(() => ({
+        phase: 'check',
+        status: undefined,
+        checking: false,
+        installed: undefined,
+        restored: undefined,
+        code: undefined,
+        error: undefined,
+      }))
+      const known = state.status
+      /**
+       * The one command line the card prints, copies and interpolates.
+       *
+       * The Host answers `update.command` in exactly the shape of `UPDATE_COMMAND`, built
+       * from the release it just named. Preferring it is the whole point: a build frozen on
+       * 0.13.31 that is told 0.13.32 is out would otherwise hand the reader a `#v0.13.31`
+       * line next to a "0.13.32 is available" verdict, and copying it installs the older
+       * release. With no answer — first paint, a dead socket, a Host that sends nothing or
+       * sends an empty string — the static baseline is still byte for byte what is shown.
+       */
+      const command = known !== undefined && typeof known.command === 'string' && known.command !== ''
+        ? known.command
+        : UPDATE_COMMAND
       const copy = () => {
         try {
           const done = () => setCopied(true)
           if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-            Promise.resolve(navigator.clipboard.writeText(UPDATE_COMMAND)).then(done, done)
+            Promise.resolve(navigator.clipboard.writeText(command)).then(done, done)
           } else {
             done()
           }
@@ -1513,16 +1587,143 @@ window.__ModuleLoader__.load({
           setCopied(true)
         }
       }
-      return h('div', { style: styles.card, 'data-gw-update': `${PLUGIN_VERSION}:${UPDATE_LATEST}` },
+      // What is on disk, in the order the page can know it: an install's read-back, the
+      // version a rollback restored, the Host's own reading, and only then the version this
+      // build shipped as. The body sentence and the verdict both follow it, so the card
+      // cannot say "installed 0.13.31, latest 0.13.32" next to "you are on the latest".
+      const readback = state.installed !== undefined
+        ? state.installed.to
+        : (state.restored !== undefined && state.restored !== null
+          ? state.restored
+          : (known !== undefined && known.current !== null ? known.current : PLUGIN_VERSION))
+      const target = known !== undefined && known.latest !== null ? known.latest : UPDATE_LATEST
+      const newer = isNewerVersion(target, readback)
+      const canInstall = known !== undefined && known.canInstall === true && newer
+
+      /** Paint one status answer, or the reason there is none. */
+      const applyStatus = (result) => {
+        if (result.ok !== true) {
+          setState((live) => ({ ...live, phase: 'failed', checking: false, code: result.code, error: result.error }))
+          return
+        }
+        const update = result.update
+        const latest = update.latest !== null ? update.latest : UPDATE_LATEST
+        const installedNow = update.current !== null ? update.current : PLUGIN_VERSION
+        setState({
+          // "Nothing newer" is the Host's verdict and is shown as such; a newer release
+          // this Host cannot install stays in `check`, where the note explains why.
+          phase: isNewerVersion(latest, installedNow) ? 'check' : 'latest',
+          status: update,
+          checking: false,
+          installed: undefined,
+          restored: undefined,
+          code: undefined,
+          error: undefined,
+        })
+      }
+
+      /** Read the route and repaint. The only thing that ever calls {@link checkUpdate}. */
+      const runCheck = () => {
+        setState((live) => ({ ...live, phase: 'check', checking: true, code: undefined, error: undefined }))
+        void checkUpdate(fetchImpl).then(applyStatus)
+      }
+
+      /** One install, pinned to the release on screen. */
+      const install = () => {
+        // One POST per click: a second press while the first is in flight is a no-op, not
+        // a second install, even in a carrier that still delivers the event.
+        if (state.phase !== 'check' || !canInstall) return
+        const wanted = target
+        setState((live) => ({ ...live, phase: 'installing', checking: false, code: undefined, error: undefined }))
+        void installUpdate(`v${wanted}`, fetchImpl).then((result) => {
+          if (result.ok !== true) {
+            setState((live) => ({
+              ...live,
+              phase: 'failed',
+              code: result.code,
+              error: result.error,
+              restored: result.restored,
+            }))
+            return
+          }
+          setState((live) => ({
+            ...live,
+            // `latest` is a claim about the disk, so it is only made when the read-back
+            // equals the tag that was asked for. Any other number stays in `check` with
+            // that number on screen, and the next press reads the Host again.
+            phase: result.installed.to === wanted ? 'latest' : 'check',
+            installed: result.installed,
+            code: undefined,
+            error: undefined,
+          }))
+        })
+      }
+
+      const primary = state.phase === 'installing'
+        ? h('button', {
+          type: 'button', style: styles.primary, disabled: true, onClick: install,
+          'data-action': 'update-install', 'data-gw-update-busy': true,
+        }, t('update.installing'))
+        : state.phase === 'latest'
+          ? h('button', {
+            type: 'button', style: styles.button, disabled: true, 'data-action': 'update-check',
+          }, t('update.state.latest'))
+          : state.phase === 'check' && canInstall
+            ? h('button', {
+              type: 'button', style: styles.primary, disabled: state.checking === true, onClick: install,
+              'data-action': 'update-install',
+            }, t('update.install', { target }))
+            // `check` before anything was asked, and `failed` on the way back in: both read
+            // the route, and neither installs anything.
+            : h('button', {
+              type: 'button', style: styles.button, disabled: state.checking === true, onClick: runCheck,
+              'data-action': 'update-check',
+            }, t('update.check'))
+
+      return h('div', {
+        style: styles.card,
+        'data-gw-update': `${PLUGIN_VERSION}:${UPDATE_LATEST}`,
+        'data-gw-update-phase': state.phase,
+        'data-gw-update-can-install': canInstall ? 'yes' : 'no',
+      },
         h('h3', { style: styles.groupTitle }, t('update.title')),
-        h('p', { style: styles.hint }, t('update.body', { current: PLUGIN_VERSION, target: UPDATE_LATEST, command: UPDATE_COMMAND })),
-        h('p', { style: styles.mono, 'data-gw-update-command': true }, UPDATE_COMMAND),
-        h('p',
-          { style: styles.hint, 'data-gw-update-state': UPDATE_UP_TO_DATE ? 'latest' : 'newer' },
-          UPDATE_UP_TO_DATE ? t('update.state.latest') : t('update.state.newer', { target: UPDATE_LATEST })),
+        h('p', { style: styles.hint }, t('update.body', { current: readback, target, command })),
+        h('p', { style: styles.mono, 'data-gw-update-command': true }, command),
+        // The verdict is suppressed in `failed`: "you are on the latest release" printed
+        // next to "we could not ask" is a contradiction a reader cannot resolve.
+        state.phase === 'failed'
+          ? null
+          : h('p',
+            { style: styles.hint, 'data-gw-update-state': newer ? 'newer' : 'latest' },
+            newer ? t('update.state.newer', { target }) : t('update.state.latest')),
+        // Degraded mode: a newer release exists but this Host cannot install it (no plugin
+        // manager, or it cannot read the installed row). The reason rides along as an
+        // attribute so the sentence stays one sentence.
+        known !== undefined && known.canInstall !== true && newer
+          ? h('p',
+            {
+              style: styles.warn,
+              'data-gw-update-unavailable': true,
+              'data-gw-update-reason': known.reason === undefined ? 'update/unavailable' : known.reason,
+            },
+            t('update.unavailable'))
+          : null,
+        state.phase === 'latest'
+          ? h('p', { style: styles.hint, 'data-gw-update-refresh': true }, t('update.refresh'))
+          : null,
+        state.phase === 'failed'
+          ? h('p',
+            {
+              style: styles.error,
+              'data-gw-update-error': state.error === undefined ? '' : String(state.error),
+              'data-gw-update-error-code': state.code === undefined ? 'update/response' : String(state.code),
+            },
+            t('update.failed', { message: state.error === undefined ? '?' : String(state.error) }))
+          : null,
         h('p', { style: styles.hint, 'data-gw-update-terminal': true }, t('update.terminal')),
         h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' } },
-          h('span', { style: styles.hint }, `${t('update.current')}: ${PLUGIN_VERSION}`),
+          h('span', { style: styles.hint, 'data-gw-update-current': readback }, `${t('update.current')}: ${readback}`),
+          primary,
           h('button', { type: 'button', style: styles.button, onClick: copy, 'data-action': 'update-copy' }, t('update.copy'))))
     }
 
@@ -4555,6 +4756,11 @@ window.__ModuleLoader__.load({
     // `src/gate.ts` already honors. One truth source, two callers — the switch here and
     // the command there — so no second `masterEnabled` field is invented anywhere.
     const MODE_ROUTE_PATH = '/grok-workflow/mode'
+    // The upgrade card's two verbs ride a Host route (`src/update-surface.ts`): a browser
+    // click cannot run `dsh plugin`, so the Host does the install and this bundle only
+    // asks — `GET ?action=status` to read, `POST {action:'install', tag}` to move. Same
+    // fence, same never-throws transport as the switches below.
+    const UPDATE_ROUTE_PATH = '/grok-workflow/update'
     const LOOP_SWITCH_ORDER = 90
     const ITERATE_SWITCH_ORDER = 91
     const MODE_SWITCH_ORDER = 92
@@ -4667,6 +4873,161 @@ window.__ModuleLoader__.load({
         payload = undefined
       }
       return { status: response.status, payload }
+    }
+
+    // ─── The upgrade card's route calls ─────────────────────────────────────────
+    //
+    // `src/update-surface.ts` answers two verbs on {@link UPDATE_ROUTE_PATH}: a status read
+    // (installed version, newest known release, whether this Host can install at all) and
+    // an install for one exact tag. The page normalises both answers into one shape so the
+    // card never has to look at an HTTP status, and so every silence — no `fetch`, a dead
+    // socket, a body that is not JSON — comes back as a *stated* code instead of a thrown
+    // exception. The precedent is `parseModePayload`: a refusal that arrives with a code is
+    // reported with that code, and a refusal that arrives without one gets this page's own.
+
+    /**
+     * Whether `candidate` is a strictly newer release than `installed`.
+     *
+     * Both sides are `X.Y.Z`, the shape `PLUGIN_VERSION` / `UPDATE_LATEST` and the route
+     * all use. A value that is not a version is never treated as an upgrade, so a Host that
+     * answers nonsense cannot make the card offer an install for it.
+     * @param candidate - the release that might be newer.
+     * @param installed - what is installed now.
+     * @returns true only when `candidate` is strictly greater.
+     */
+    function isNewerVersion(candidate, installed) {
+      const parts = (value) => {
+        if (typeof value !== 'string') return undefined
+        const pieces = value.split(/[.+-]/)
+        if (pieces.length < 3) return undefined
+        const numbers = []
+        for (let at = 0; at < 3; at += 1) {
+          const number = Number.parseInt(pieces[at], 10)
+          if (!Number.isFinite(number)) return undefined
+          numbers.push(number)
+        }
+        return numbers
+      }
+      const next = parts(candidate)
+      const now = parts(installed)
+      if (next === undefined || now === undefined) return false
+      for (let at = 0; at < 3; at += 1) {
+        if (next[at] > now[at]) return true
+        if (next[at] < now[at]) return false
+      }
+      return false
+    }
+
+    /**
+     * One version field of a status answer, or null when the Host has no opinion.
+     * @param value - the field as it arrived.
+     * @returns the version string, or null.
+     */
+    function updateVersion(value) {
+      return typeof value === 'string' && /^\d+\.\d+\.\d+/.test(value) ? value : null
+    }
+
+    /**
+     * Read one status answer's `update` block, keeping every unknown as "unknown".
+     *
+     * A field the Host did not send is *not* filled in from this page's constants here —
+     * the card decides how to fall back, because the difference between "the Host says
+     * 0.13.31" and "this page was built as 0.13.31" is the difference between a fact and a
+     * baseline.
+     * @param update - the `update` block, if any.
+     * @returns the normalised block, or undefined when the answer carried none.
+     */
+    function readStatusUpdate(update) {
+      if (update === null || typeof update !== 'object' || Array.isArray(update)) return undefined
+      return {
+        current: updateVersion(update.current),
+        latest: updateVersion(update.latest),
+        latestSource: update.latestSource === 'remote' ? 'remote' : 'none',
+        canInstall: update.canInstall === true,
+        reason: typeof update.reason === 'string' && update.reason !== '' ? update.reason : undefined,
+        command: typeof update.command === 'string' ? update.command : '',
+      }
+    }
+
+    /**
+     * Read one refused answer into the card's vocabulary.
+     *
+     * A 403 is the composition's fence (the request carried no accepted user credential);
+     * a 405 is the method refused somewhere in front of the route. Both have their own
+     * code, because "the route did not answer" would send the reader looking in the wrong
+     * place.
+     * @param payload - the parsed body, if any.
+     * @param status - HTTP status of the answer.
+     * @returns the stated failure.
+     */
+    function parseUpdateFailure(payload, status) {
+      const answered = `the update route answered HTTP ${String(status)}`
+      const refused = status === 403 ? 'update/user-only' : status === 405 ? 'update/method' : 'update/response'
+      const isObject = payload !== null && typeof payload === 'object' && !Array.isArray(payload)
+      if (!isObject) return { ok: false, code: refused, error: answered }
+      const code = typeof payload.code === 'string' && payload.code !== '' ? payload.code : refused
+      const error = typeof payload.error === 'string' && payload.error !== '' ? payload.error : answered
+      return { ok: false, code, error }
+    }
+
+    /**
+     * Read the update status without writing anything.
+     * @param fetchImpl - fetch to use; defaults to the page's own. Tests pass a fake.
+     * @returns `{ ok: true, update }`, or `{ ok: false, code, error }` — never a throw.
+     */
+    async function checkUpdate(fetchImpl) {
+      const answered = await getRoute(UPDATE_ROUTE_PATH, { action: 'status' }, fetchImpl)
+      if (answered.failure !== undefined) return { ok: false, code: 'update/transport', error: answered.failure }
+      const payload = answered.payload
+      const isObject = payload !== null && typeof payload === 'object' && !Array.isArray(payload)
+      if (isObject && payload.ok === true) {
+        const update = readStatusUpdate(payload.update)
+        if (update !== undefined) return { ok: true, update }
+        return { ok: false, code: 'update/response', error: 'the update route answered without a status block' }
+      }
+      return parseUpdateFailure(payload, answered.status)
+    }
+
+    /**
+     * Ask the Host to install one exact tag.
+     *
+     * The tag is built here (`v` + the version the card is offering) rather than taken
+     * from the status answer, so the install is pinned to the release the reader saw on
+     * screen and never to "whatever resolves today".
+     * @param tag - the exact tag, e.g. `v0.13.32`.
+     * @param fetchImpl - fetch to use; defaults to the page's own. Tests pass a fake.
+     * @returns `{ ok: true, installed }`, or `{ ok: false, code, error, rolledBack, restored }`.
+     */
+    async function installUpdate(tag, fetchImpl) {
+      const answered = await postRoute(UPDATE_ROUTE_PATH, { action: 'install', tag }, fetchImpl)
+      if (answered.failure !== undefined) {
+        return { ok: false, code: 'update/transport', error: answered.failure, rolledBack: false, restored: undefined }
+      }
+      const payload = answered.payload
+      const isObject = payload !== null && typeof payload === 'object' && !Array.isArray(payload)
+      if (isObject && payload.ok === true) {
+        const installed = payload.installed
+        // `to` is what the Host read back from the installed row, not what it asked for:
+        // without it the card could not tell an install that landed from one that did not.
+        if (installed !== null && typeof installed === 'object' && typeof installed.to === 'string' && installed.to !== '') {
+          return {
+            ok: true,
+            installed: {
+              from: updateVersion(installed.from),
+              to: installed.to,
+              spec: typeof installed.spec === 'string' ? installed.spec : '',
+              saveExact: installed.saveExact === true,
+            },
+          }
+        }
+        return { ok: false, code: 'update/response', error: 'the update route answered without a read-back version', rolledBack: false, restored: undefined }
+      }
+      const failure = parseUpdateFailure(payload, answered.status)
+      return {
+        ...failure,
+        rolledBack: isObject && payload.rolledBack === true,
+        restored: isObject ? updateVersion(payload.restored) : null,
+      }
     }
 
     /**
@@ -5451,6 +5812,9 @@ window.__ModuleLoader__.load({
       validate, formatError, fieldLabel, opsFor, draftOf, resolveNamespace, translate, translator, activeLocale,
       comboWarn, emptyCapWarn, limitOverrunWarn, EnumField, ROLE_ORDER, UpdateCard,
       PLUGIN_VERSION, UPDATE_LATEST, UPDATE_COMMAND,
+      // The upgrade card's route verbs, so `test/update-entry.spec.ts` drives the same
+      // normalisation the button does instead of a copy of it.
+      UPDATE_ROUTE_PATH, checkUpdate, installUpdate, isNewerVersion,
     }
     exports.GROK_WORKFLOW_UPDATE = {
       version: PLUGIN_VERSION,
