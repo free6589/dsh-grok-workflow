@@ -8,6 +8,7 @@
 | 静态 | `npm run typecheck` / `npm run lint` / `npm run verify:lib`（提交后） | 干净 / **0 errors 36 warnings**（与 `2141071` 同数，全既有）/ `byte-identical` |
 | 门禁 | `npm run ci`（本分支） | **exit 1：98 files / 1828 passed / 1 failed**。唯一红是 `test/phase1-dialogue.spec.ts:612`（期望「没有待回答的分流问题」，实际是「已收到，并入了正在跑的这一轮…」）——本文件首条已记录在案的既有抖动 |
 | 既有抖动的复核 | 在 `2141071` 干净 worktree 上单独跑 `npx vitest run test/phase1-dialogue.spec.ts` | **同样失败**（35 passed / 1 failed，同一条断言）——与本改动无关；本改动只在 `src/script.ts` 的规划腿与预算式，碰不到分流/后台交付那条时间窗 |
+| 门禁（只看本条改动以外的范围） | `npx vitest run $(ls test/*.spec.ts | grep -v phase1-dialogue)` | **97 files / 1793 tests PASS** —— 除那条既有抖动外全绿，含本刀新增的 9 条；`npm run ci` 连跑两次都是同一条红、同一个数字（1 failed / 1828 passed / 1829，exit 1） |
 | 未做 | 真机 soak、判定腿（第二刀）、汇总 B、发版 | `NOT_RUN`（按派工留给合流方） |
 
 ## 远端 CI 的既有抖动：`phase1-dialogue` 与 `triage` 三条对时序敏感的用例（不是本轮改动引起）— 2026-11-24
