@@ -18,7 +18,16 @@ Last updated: 2026-11-24 10:05 +08:00（**已备好发版 `0.13.29`：三处救�
 三场景 PASS，证据 `.rsi/evidence/soak-release-01329/`：规划腿换路重打（死路只付 1 次、`Plan: planner`）、判定腿补打
 （worker 1 行、verifier 同行 2 行、`judgeRetried=true`）、被拒密钥（每 attempt 1 次请求、`model-unavailable` 带
 服务商原话、报告无 `Dead routes`）。**远端 CI/Release 的 run id 与发布结果不在本提交里**：它们要 push 之后才存在，
-落在随后的跟进 docs 提交。本轮未 push、未打 tag、未发版，按 §7 由发版方接手。）
+落在随后的跟进 docs 提交。
+本版另带第二笔提交（`c1ebdf3`，test-only，`src/`、`lib/` 一行未动）：两条挂死探针（`dead-routes` 的「counts a call that hung」
+与 `planner-resubmit` 的「keeps a recovered leg」）在 vitest worker 里偶发不上结算 —— guest realm 没有 `setTimeout`，脚本的
+子调用预算由 `Atomics.waitAsync` 送，那个延迟任务会一直不被服务，整次跑于是只剩 runner 的 30 s 超时能收尾（`f803b48` 上两文件
+连跑 **4/10 红**、逐字 `Test timed out in 30000ms`；更早样本 1/6）。修法是换「谁持钟」：`test/helpers.ts` 的
+`settledWithin(promise, ms, what)` 在等待期间保持一个 ref 住的 timer，以探针自己的 **15 000 ms** 为界、超界报
+`"<what> did not settle within 15000 ms"`，断言/超时/`skip`/`only`/配置一律没动；修后两文件连跑 15 次全绿、交付树上再 3 次绿，
+预算仍由脚本结算（挂死例 2 025 ms、救回例 1 012 ms）。**值得在打 tag 前做，就因为它正是 `v0.13.27` 远端挂掉的那一条**：
+留着它，发版门禁就是在抛硬币。机制、A/B、变异测试与缺口见 `VALIDATION.md` 首条（Node 24 `NOT_RUN`；产品侧无 timer 的预算路径
+`NOT_RUN`，要靠真机 soak）。本轮未 push、未打 tag、未发版，按 §7 由发版方接手。）
 
 Last updated: 2026-11-24 08:44 +08:00（**401/403 也回灌给脚本了，但它不把路由记成死路，`CONFIRMED`（单测 + 门禁），未发版、未合流** —
 分支 `fix/forward-model-unavailable`（worktree `.agents/worktrees/fix-forward-model-unavailable`，从 `main` `8f34701`＝0.13.28 开出；

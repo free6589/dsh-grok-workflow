@@ -1,3 +1,43 @@
+## 挂死探针不再和 runner 的 30 s 抢：预算送不达时由探针自己持钟结算（`test/` only，`src/`、`lib/` 未动）— 2026-11-24（提交 `c1ebdf3`；数字由修者与合流方分别实测）
+
+**症状（`CONFIRMED`）:** 两条用例以 vitest 的 30 000 ms 超时收场，而不是以它们要证的事实收场 ——
+`test/dead-routes.spec.ts > counts a call that hung, even though a hang does not switch models` 与
+`test/planner-resubmit.spec.ts > keeps a recovered leg inside the walks the cap pays for`。在干净的 release-prep 树
+（`f803b48`）上，这两个文件连跑 10 次有 **4 次**红，逐字 `Test timed out in 30000ms`；更早的样本是同一棵树上 **1/6**。
+`v0.13.27` 的远端门禁栽的就是这一条。
+
+**机制（`CONFIRMED`，靠测量不靠推理）:** 引擎的脚本 realm 是由空对象搭出来的，没有 `setTimeout`，所以脚本的子调用预算用的是
+`Atomics.waitAsync`。在 vitest worker 里，那个延迟任务可以**一直不被服务**：挂死的调用已经派出去了，然后什么都不再发生 ——
+预算不落地、不重试、不出结果 —— 能结束这次等待的只剩 runner 自己的超时（把同一份副本的界分别设成 45 s 和 600 s，它就精确死在
+45 s 和 600 s 上）。这个原语本身是好的：隔离下 30/30 顺序绿，按引擎 guest 形状 90/90 绿，最差迟到 2 ms。同一段场景代码做 A/B：
+只加日志、不持有探针自己的 timer 的副本 **3/6 红**；同一份副本加上一个探针自己持有的 host timer 后 **4/4 绿** —— 说明结算依赖
+worker 循环「手上还有探针自己的时钟活要干」。
+
+**`HYPOTHESIS`（明确标为假设）:** 这个延迟任务为什么会被一直搁置，背后的 V8/libuv 规则**没有**定位出来；不声称知道。
+
+**修法（`CONFIRMED`）:** 只在测试侧。`test/helpers.ts` 新增 `settledWithin(promise, ms, what)`：等待期间保持一个 ref 住的
+timer，让循环一直醒着；同时以探针自己的 **15 000 ms** 为界，超界就抛具名失败 `"<what> did not settle within 15000 ms"` ——
+于是一个永远不落地的预算仍然让这条用例失败，但失败成它自己，而不是失败成一次性 runner 超时。两个 spec 的 `runReal` 其余部分一字未动；
+断言、超时、`skip`/`only`、配置全都没碰，`src/` 与 `lib/` 一行未动。
+
+| state | command | result |
+| --- | --- | --- |
+| 修前（同一棵树 `f803b48`） | 这两个文件连跑 10 次 | **4 次红**，逐字 `Test timed out in 30000ms`（更早样本 **1/6**） |
+| 修后 | 同两文件连跑 15 次 | **15 次全绿**（每次 33 passed） |
+| 修后（交付树 `c1ebdf3`） | 再跑 3 次 | **3 次全绿** |
+| 结算仍由预算给出（不是靠 15 s 兜底） | 单跑这两条用例 | 挂死例 **2 025 ms**（付两个 1 s 预算）、救回例 **1 012 ms**（付一个 1 s 预算）—— 都远小于 15 s 界 |
+| 用例仍然有意义（变异副本） | 把 `streak: 2→3`、w1 计数 `2→3` 后重跑 | **2 024 ms 红**，红的是真断言差异，不是超时 |
+| 全量门禁 | `npm run ci` ×2（`f803b48`） | **两次 exit 0**：99 files / 1837 tests、typecheck 干净、lint 36 warnings / 0 errors、`verify:lib` byte-identical |
+| Node 22 | `22.23.4` 上跑同两文件 | **4/4 绿** |
+
+**缺口（照实写）:**
+
+- **Node 24 `NOT_RUN`**：本机没装 Node 24，远端矩阵的另一半没有本地证据。
+- **产品侧无 timer 的预算路径 `NOT_RUN`**：这次**故意没有改** `src/` —— 一次真实运行会不会落进同样的「延迟任务不被服务」状态，
+  要用真机 soak 才答得上，单测答不了。
+- 这两条用例此前在本文件里记的两行（「门禁跑到绿为止、未改断言」与「收窄留后续一刀」）由本节收口；收口方式是上面的
+  `settledWithin`（换谁持钟），不是放宽断言。
+
 ## release/0.13.29 合流门禁：五分支按序合入，两次全量复跑皆绿（一次全量红如实记录）— 2026-11-24（合流方 agent-116/merger）
 
 | state | command | result |
@@ -8,7 +48,7 @@
 | 门禁（一次全量红，环境） | 同一 HEAD 再跑一次 `npm run ci` | **exit 1**：2 条 30 000 ms 超时 —— `test/dead-routes.spec.ts > counts a call that hung, even though a hang does not switch models`、`test/planner-resubmit.spec.ts > keeps a recovered leg inside the walks the cap pays for`。两条都是 `gate: new Promise(() => {})` 挂死探针，绿时分别是 2 012 ms / 1 009 ms；红轮 tests 段 161 s vs 绿轮 103 s（宿主 6 核、load ≈4.8） |
 | 复跑 | 再两次全量（`npm run ci`、`npx vitest run`） | **两次皆绿**（99 files / 1837 tests）；两条挂死用例单跑 **3/3 绿** |
 | 挂死探针的复现率（这是**既有**抖动，不是本版引入） | 同一份 `test/dead-routes.spec.ts` 单跑循环 | 基线 `2141071`（已发的 0.13.28，`git archive` 到 scratch 里跑）：**6/12 红**；合流后的树（`aebe65a` 与 `b21ffa2`）：**6/15 红**，红法相同——`counts a call that hung …` 以 `Test timed out in 30000ms` 停住（脚本自己声明的 1 s 子调用预算偶发没有结算它），`planner-resubmit.spec.ts > keeps a recovered leg …` 是同一形状。全量 `npm run ci` 本轮共跑 12 次：**6 次**红在这两条挂死探针上（每次只红 1 条），5 次绿，1 次因版本钉在四处而红（已修）。红轮的额外墙钟正是那 30 s 超时本身（130–161 s vs 绿轮 ~103–128 s）。**结论：基线一样红，本版没有加重；门禁跑到绿为止（第 4 次全量 `exit 0`），未改断言、未抬 `testTimeout`、未跳过** |
-| 挂死探针的收窄（未做，留后续） | —— | **NOT_RUN**：两条用例该改成「按报告断言 + 有界等待」（本仓库 0.13.27 已经为同一形状改过一次），属于后续单独一刀，不在发版准备的范围 |
+| 挂死探针的收窄（后续一刀，已收） | —— | **已完成**：提交 `c1ebdf3`（test-only）改成由探针自己持钟结算，机制、A/B、变异测试与缺口见本文件**首条**；这一行写的是当时的计划，不改写 |
 | 发版准备自身的红（已修） | `npm run ci`（工作树带版本 0.13.29 + CHANGELOG） | **exit 1**：`docs-config-keys.spec.ts`「LOCAL-TESTING.md 把 tarball 名钉在包版本上」与 `update-entry.spec.ts`「设置页版本 = 包版本」——版本被钉在**四处**，只改 `package.json`/`package-lock.json` 不够：`docs/LOCAL-TESTING.md`（3 处 `dsh-grok-workflow-0.13.29.tgz`）与 `src/client/index.js` 的 `PLUGIN_VERSION`/`UPDATE_LATEST`（`lib/client.js` 随之重建，见该文件注释「release task bumps it with package.json」） |
 | 发版准备后的门禁（绿） | `npm run ci`（同一工作树，含上面四处版本 + 证据目录） | **exit 0**：typecheck 0 错；lint **0 errors / 36 warnings**；`verify:lib` byte-identical；vitest **99 files / 1837 tests PASS**，127.66 s |
 | 没有做的事 | —— | 没有放宽任何断言、没有抬超时、没有跳过用例；行数与基线对得上：`97/1820` → `+8`（`judge-leg-retry`）→ `+9`（`planner-resubmit`）= **99/1837** |

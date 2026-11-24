@@ -16,6 +16,9 @@
   整棵树解到 scratch 单跑同一个 `dead-routes.spec.ts`，**6/12 红**；HEAD 同一文件 **6/15 红**，红法相同。未改断言、未抬超时。
   **发版方注意**：远端 runner 若在这条上红，先 `gh run rerun --failed`（`v0.13.27` 就是这样红的），别为此动断言或 `testTimeout`；
   收窄这两条挂死探针（改成「按报告断言 + 有界等待」）是后续单独一刀，已记在 `VALIDATION.md`。
+- **挂死探针已收（`c1ebdf3`，test-only，`src/`/`lib/` 一行未动）**：那两条偶发 30 s 超时的用例改成由探针自己持钟结算
+  （`test/helpers.ts` 的 `settledWithin`，15 000 ms 具名失败；修前两文件连跑 4/10 红 → 修后 15 连绿 + 交付树 3 绿，
+  预算仍由脚本结算）。机制、A/B 与缺口（Node 24、产品侧无 timer 路径均 `NOT_RUN`）见 `VALIDATION.md` 首条。
 - **真机 soak**：三场景 PASS，证据 `.rsi/evidence/soak-release-01329/`（README、三份场景、网关日志与按路由计数、
   overlay、prompt、checkpoint、`lib-vis.diff`）。三条判据各自的那一行、以及全部缺口，见 `VALIDATION.md` 前两条。
 - **上一版 handoff 留下、本轮仍未动的两件小事**：① 挂死轮的 soak 仍只证到「进表 + 排后」，「第 3 条任务起不打它」
