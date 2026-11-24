@@ -25,9 +25,12 @@ import type { RoleName } from './types.js'
  *   stable for the run and unique even when two tasks share a title (the stock
  *   fold keys a group by the whole phase string, so identical titles never merge).
  * - A member is `执行` / `检查` / `规划助手` / `汇总助手`, with `（尝试 2）` appended
- *   from the second attempt on. Provider-fallback suffixes (`-r1`), internal task
- *   ids and run ids never appear: the fallback route stays in the report's
- *   `routes` trail, and the internal task id stays in the report's task rows.
+ *   from the second attempt on. A leg the run walks more than once carries its
+ *   number in the row instead of a bare role word: `规划（第1次）` at the start and
+ *   `规划（第2次）` at the first wave boundary, `汇总·第1稿` / `汇总·第2稿` for the
+ *   summary gate's drafts. Provider-fallback suffixes (`-r1`), internal task ids
+ *   and run ids never appear: the fallback route stays in the report's `routes`
+ *   trail, and the internal task id stays in the report's task rows.
  * - Titles longer than {@link TASK_TITLE_DISPLAY_LIMIT} code points are truncated
  *   for the group header; the complete title is still in the report.
  */
@@ -65,6 +68,10 @@ interface NamingCopy {
   readonly taskGroup: string
   /** Attempt suffix template, appended from attempt 2 on. */
   readonly attempt: string
+  /** Numbered title of one planning call; `{n}` is the 1-based call of the leg. */
+  readonly plannerCall: string
+  /** Numbered title of one summary draft; `{n}` is the 1-based draft number. */
+  readonly synthesisDraft: string
   /** Phase narration titles used by the guest script's `phase()` calls. */
   readonly phases: Record<'plan' | 'execute' | 'verify' | 'synthesize' | 'answer', string>
   /** Task-count suffix of the run title; `{n}` is the known task total. */
@@ -102,6 +109,8 @@ export const NAMING_COPY: Record<NamingLanguage, NamingCopy> = {
     roles: { planner: '规划助手', worker: '执行', verifier: '检查', supervisor: '复核', synthesizer: '汇总助手' },
     taskGroup: '任务 {index} · {title}',
     attempt: '{role}（尝试 {n}）',
+    plannerCall: '规划（第{n}次）',
+    synthesisDraft: '汇总·第{n}稿',
     phases: { plan: '规划', execute: '执行', verify: '检查', synthesize: '汇总', answer: '回答' },
     tasks: '{n} 个任务',
     callSubjects: {
@@ -133,6 +142,8 @@ export const NAMING_COPY: Record<NamingLanguage, NamingCopy> = {
     roles: { planner: 'Planner', worker: 'Execute', verifier: 'Check', supervisor: 'Reviewer', synthesizer: 'Summarizer' },
     taskGroup: 'Task {index} · {title}',
     attempt: '{role} (attempt {n})',
+    plannerCall: 'Plan (call {n})',
+    synthesisDraft: 'Summarize · draft {n}',
     phases: { plan: 'Plan', execute: 'Execute', verify: 'Verify', synthesize: 'Synthesize', answer: 'Answer' },
     tasks: '{n} tasks',
     callSubjects: {
@@ -284,6 +295,74 @@ export function memberLabel(role: RoleName, attempt: number = 0, language: Namin
 }
 
 /**
+ * The suffix the draft a run actually ships carries.
+ *
+ * The marker is only ever added to the row of the draft that **passed** the summary
+ * gate; a draft the gate rejected, and a run that fell back to the deterministic
+ * narrative, never carry it. So the suffix states a fact the gate decided — not
+ * "the last draft written", which can be a rejected one.
+ */
+export const SYNTHESIS_FINAL_MARK: Record<NamingLanguage, string> = { zh: '（定稿）', en: ' (final)' }
+
+/**
+ * Build the row title for one planning call.
+ *
+ * A run walks the planning leg more than once — the opening split, then one call
+ * at each wave boundary that may fold a new demand into the remaining waves — so
+ * the row carries which call it was. `1` is the opening plan; a boundary call is
+ * numbered after it. The same string is the child prompt's first line, because the
+ * panel derives a child's durable label from that line (`src/team-engine.ts`), and
+ * the two must never disagree.
+ * @param call - 1-based call number of the planning leg.
+ * @param language - copy language.
+ * @returns the member label recorded for that child call.
+ */
+export function plannerCallLabel(call: number, language: NamingLanguage = 'zh'): string {
+  const copy = NAMING_COPY[language]
+  const position = Number.isFinite(call) && call > 1 ? Math.trunc(call) : 1
+  return fill(copy.plannerCall, { n: String(position) })
+}
+
+/**
+ * Build the row title for one summary draft.
+ *
+ * The summary gate writes at most `SUMMARY_MAX_ATTEMPTS` drafts (a first draft and
+ * bounded rewrites), and each draft may need its own same-call resubmit — which is
+ * the *same* draft, so it keeps the same number. Without the number every draft
+ * read `汇总助手` and a reader could not tell draft 1 from draft 2.
+ * @param draft - 1-based draft number.
+ * @param language - copy language.
+ * @param final - whether this is the draft the run ships (the one that passed the
+ *   gate). See {@link SYNTHESIS_FINAL_MARK}.
+ * @returns the member label recorded for that child call.
+ */
+export function synthesisDraftLabel(draft: number, language: NamingLanguage = 'zh', final = false): string {
+  const copy = NAMING_COPY[language]
+  const position = Number.isFinite(draft) && draft > 1 ? Math.trunc(draft) : 1
+  return fill(copy.synthesisDraft, { n: String(position) }) + (final ? SYNTHESIS_FINAL_MARK[language] : '')
+}
+
+/**
+ * A numbered name as a matcher: `{n}` becomes the captured number, and one trailing
+ * bracketed word is allowed and ignored.
+ *
+ * The trailing group is the seam for the undecided final-draft marker: once it
+ * exists, `汇总·第2稿（定稿）` must still parse to the same role and draft, so the
+ * parser accepts it before the wording is even chosen.
+ * @param template - a copy template carrying `{n}`.
+ * @returns the anchored matcher.
+ */
+function numberedNamePattern(template: string): RegExp {
+  const NUM = '\u0000'
+  const escaped = template
+    .replace(/\{n\}/g, NUM)
+    .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    .split(NUM)
+    .join('(\\d+)')
+  return new RegExp('^' + escaped + '(?:\\s*[（(][^（()）]*[)）])?$')
+}
+
+/**
  * Read one role back out of a user-visible member label.
  *
  * This is the plugin's own inverse of {@link memberLabel}: tests use it to decide
@@ -301,11 +380,21 @@ export function parseMemberLabel(
   if (typeof label !== 'string') return undefined
   const copy = NAMING_COPY[language]
   const roles: RoleName[] = ['planner', 'worker', 'verifier', 'supervisor', 'synthesizer']
+  // The two legs a run walks more than once name their call instead of their role,
+  // so `规划（第2次）` and `汇总·第2稿` are read here rather than by the attempt
+  // suffix below. The bare names stay first, because every history row and every
+  // single-call leg still reads `规划助手` / `汇总助手`.
+  const numbered: Partial<Record<RoleName, readonly RegExp[]>> = {
+    planner: [numberedNamePattern(copy.plannerCall)],
+    synthesizer: [numberedNamePattern(copy.synthesisDraft)],
+  }
   for (const role of roles) {
     const base = copy.roles[role]
-    if (label !== base && !label.startsWith(base)) continue
+    if (label === base) return { role, attempt: 1 }
+    const patterns = numbered[role]
+    if (patterns !== undefined && patterns.some(pattern => pattern.test(label))) return { role, attempt: 1 }
+    if (!label.startsWith(base)) continue
     const rest = label.slice(base.length)
-    if (rest === '') return { role, attempt: 1 }
     // Build the attempt pattern from the *copy*, not from a hand-written regex: the
     // number is a placeholder so it survives the escaping pass below.
     const DIGITS = '\u0000'
@@ -423,7 +512,8 @@ export function unphasedLabel(language: NamingLanguage = 'zh'): string {
  * The guest script cannot import host code, so this is generated from the single
  * table above — the same pattern `redactionRulesSource()` uses for redaction
  * rules. The emitted helpers must stay byte-for-byte equivalent to
- * {@link truncateTaskTitle}, {@link taskGroupTitle} and {@link memberLabel};
+ * {@link truncateTaskTitle}, {@link taskGroupTitle}, {@link memberLabel},
+ * {@link plannerCallLabel} and {@link synthesisDraftLabel};
  * `test/naming.spec.ts` evaluates the source and compares the output.
  * @returns the source to interpolate into `WORKFLOW_SCRIPT`.
  */
@@ -437,6 +527,7 @@ const NAMING_LANGUAGE = (function (value) {
 const NAMING = NAMING_COPY[NAMING_LANGUAGE];
 const NAMING_TITLE_LIMIT = ${TASK_TITLE_DISPLAY_LIMIT};
 const NAMING_ELLIPSIS = ${JSON.stringify(TITLE_ELLIPSIS)};
+const NAMING_FINAL_MARK = ${JSON.stringify(SYNTHESIS_FINAL_MARK)};
 
 function namingFill(template, values) {
   return template.replace(/\\{([a-zA-Z]+)\\}/g, function (match, key) {
@@ -467,6 +558,17 @@ function memberLabel(role, attempt) {
   if (count <= 1) return base;
   if (role === 'planner' || role === 'synthesizer') return base;
   return namingFill(NAMING.attempt, { role: base, n: String(count) });
+}
+
+function plannerCallLabel(call) {
+  const position = typeof call === 'number' && isFinite(call) && call > 1 ? Math.trunc(call) : 1;
+  return namingFill(NAMING.plannerCall, { n: String(position) });
+}
+
+function synthesisDraftLabel(draft, final) {
+  const position = typeof draft === 'number' && isFinite(draft) && draft > 1 ? Math.trunc(draft) : 1;
+  return namingFill(NAMING.synthesisDraft, { n: String(position) })
+    + (final === true ? NAMING_FINAL_MARK[NAMING_LANGUAGE] : '');
 }
 
 function phaseLabel(kind) {

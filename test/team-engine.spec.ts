@@ -160,7 +160,10 @@ describe('every workflow child prompt opens with its display title', () => {
     }, scriptedAgent('zh'))
     const planner = calls.filter(call => roleOf(call.label) === 'planner')
     expect(planner).toHaveLength(1)
-    expect(firstLine(planner[0]!.prompt)).toBe('规划助手')
+    // One source, one string: the opening plan call's name is the same one the
+    // prompt opens with, so the panel's row and the child's title cannot drift.
+    expect(firstLine(planner[0]!.prompt)).toBe('规划（第1次）')
+    expect(planner[0]!.label).toBe('规划（第1次）')
     const workers = calls.filter(call => roleOf(call.label) === 'worker')
     // Q10(a): worker prompts open with `角色 · 任务标题`, not the bare task
     // title — the panel derives the row label from this first line.
@@ -180,7 +183,8 @@ describe('every workflow child prompt opens with its display title', () => {
       naming: { language: 'en' },
     }, scriptedAgent('en'))
     const planner = calls.filter(call => roleOf(call.label, 'en') === 'planner')
-    expect(firstLine(planner[0]!.prompt)).toBe('Planner')
+    expect(firstLine(planner[0]!.prompt)).toBe('Plan (call 1)')
+    expect(planner[0]!.label).toBe('Plan (call 1)')
     const verifiers = calls.filter(call => roleOf(call.label, 'en') === 'verifier')
     expect(verifiers.map(call => firstLine(call.prompt))).toEqual(['Check · Task a', 'Check · Task b'])
   })

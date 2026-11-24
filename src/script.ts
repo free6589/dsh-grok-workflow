@@ -1731,7 +1731,10 @@ function planPrompt(resubmitReason) {
     'Do not re-plan from scratch and do not shrink the objective: return the plan you would submit now, in the shape described below, through the structured result tool exactly once.'
   ];
   return [
-    memberLabel('planner', 1),
+    // The panel derives a child's row label from its prompt's first line, so the
+    // opening plan's numbered name is the first line and the label option the
+    // script hands agent() carries the same string (see plannerCallLabel).
+    plannerCallLabel(1),
     // The captain owns the split (round-071). What used to be a list of hard
     // instructions ("split into at most N", "return exactly one task when unsure")
     // is now one charter: the shape limits below are the gate's, but how many
@@ -2244,7 +2247,7 @@ const SUMMARY_SCHEMA = {
   }
 };
 
-function synthesizerPrompt(status, verifiedCount, total, confirmed, incomplete, uncertainties, review) {
+function synthesizerPrompt(status, verifiedCount, total, confirmed, incomplete, uncertainties, review, draft) {
   const digest = [];
   digest.push('Status: ' + status);
   digest.push('Verified tasks: ' + verifiedCount + '/' + total);
@@ -2267,7 +2270,8 @@ function synthesizerPrompt(status, verifiedCount, total, confirmed, incomplete, 
     }
   }
   const parts = [
-    memberLabel('synthesizer', 1),
+    // The row's name is the draft's number: the gate may write more than one.
+    synthesisDraftLabel(draft),
     'You write the final answer narrative for a completed workflow run.',
     'Use ONLY the data below. Do not add facts, files, or results that are not listed.',
     'If something is incomplete or uncertain, say so plainly; never claim it succeeded.',
@@ -3052,10 +3056,10 @@ function polishGuardrail(text, facts, corpus) {
 }
 
 /** The constrained polish prompt (layer 2): language follows the run's naming. */
-function layeredPolishPrompt(digest, review) {
+function layeredPolishPrompt(digest, review, draft) {
   const zh = NAMING_LANGUAGE !== 'en';
   const parts = [
-    memberLabel('synthesizer', 1),
+    synthesisDraftLabel(draft),
     zh
       ? '你为一次已完成核验的工作流运行撰写最终结语的润色稿。DATA 是唯一事实来源。'
       : 'You write the polished final narrative for a verified workflow run. DATA below is the only source of fact.',
@@ -3100,18 +3104,23 @@ function layeredPolishPrompt(digest, review) {
  * short submit call instead of losing the whole polish to a format error.
  */
 async function requestSummaryDraft(prompt, attempt) {
+  // The draft number is the row's identity: the attempt index is 0-based, so the
+  // first draft reads 汇总·第1稿 and a rewrite reads the next number. The same
+  // string is the prompt's first line, so the panel's label and the child's own
+  // title cannot disagree.
+  const label = synthesisDraftLabel(attempt + 1);
   try {
     const call = await callRole('synthesizer', prompt, {
       schema: SUMMARY_SCHEMA,
-      label: memberLabel('synthesizer', 1),
+      label: label,
       phase: phaseLabel('synthesize'),
       attempt: attempt
     });
     if (!call.ok) {
       if (call.failure && call.failure.class === 'format-error' && !call.failure.setup) {
-        const resubmit = await callRole('synthesizer', summaryResubmitPrompt(prompt), {
+        const resubmit = await callRole('synthesizer', summaryResubmitPrompt(prompt, attempt + 1), {
           schema: SUMMARY_SCHEMA,
-          label: memberLabel('synthesizer', 1),
+          label: label,
           phase: phaseLabel('synthesize'),
           attempt: attempt
         });
@@ -3127,9 +3136,9 @@ async function requestSummaryDraft(prompt, attempt) {
     }
     const normalized = normalizeSummary(call.value);
     if (!normalized) {
-      const resubmit = await callRole('synthesizer', summaryResubmitPrompt(prompt), {
+      const resubmit = await callRole('synthesizer', summaryResubmitPrompt(prompt, attempt + 1), {
         schema: SUMMARY_SCHEMA,
-        label: memberLabel('synthesizer', 1),
+        label: label,
         phase: phaseLabel('synthesize'),
         attempt: attempt
       });
@@ -3154,10 +3163,12 @@ async function requestSummaryDraft(prompt, attempt) {
  * recorded. Same attempt, spending no retry budget: the narrative is already
  * written, only the tool call is missing — submit it now, do not rewrite.
  */
-function summaryResubmitPrompt(prompt) {
+function summaryResubmitPrompt(prompt, draft) {
   const zh = NAMING_LANGUAGE !== 'en';
   const lines = [
-    memberLabel('synthesizer', 1),
+    // Same draft, same number: a resubmit is the form the first call failed to
+    // submit, never a new draft.
+    synthesisDraftLabel(draft),
     zh
       ? '你上一条回复没有提交结构化结果，所以没有记录。不用重写润色稿，直接用结构化结果工具提交同一份稿子即可，只调用一次。'
       : 'Your previous response produced no structured result, so nothing was recorded. Do not rewrite the narrative: submit the same draft through the structured result tool now, exactly once.'
@@ -3507,8 +3518,12 @@ function replanBoundaryPhase(boundary) {
 // The child is the only channel that can read the host queue (the realm cannot), so
 // its prompt carries the run token and names the pull tool; everything else it
 // needs — what already settled, what has not started — is in the prompt.
-function replanPrompt(boundary, remaining, settled, version) {
+function replanPrompt(boundary, remaining, settled, version, label) {
   const lines = [];
+  // The panel lifts a child's row label off its prompt's first line, so the
+  // boundary call's numbered name opens the prompt — the REPLAN explanation that
+  // used to be line one follows it.
+  lines.push(label);
   lines.push('REPLAN: the plan for this run is already executing. You are the same captain that wrote it, and this boundary is yours: fold any new demand into the tasks that have NOT started yet, re-order or drop the remainder when it is now the wrong work, and stop the rest when continuing would only burn budget on top of a task that did not pass.');
   lines.push('');
   lines.push('RUN TOKEN: ' + (replanChannel === null ? '' : replanChannel.token));
@@ -3544,8 +3559,33 @@ function replanPrompt(boundary, remaining, settled, version) {
   lines.push('- If the queued demands need no plan change, answer {"action":"none","reason":"<why>"}. Do not spend edits on restating work that is already planned.');
   lines.push('- To stop the rest of the plan, remove the unstarted tasks that are no longer worth running and say why in "reason"; the tasks you leave in place still run. Settled work is never undone either way.');
   lines.push('');
-  lines.push('Answer with the structured result only: {"action":"none"|"apply","reason":"...","edits":[...],"order":[[...]]}.');
+  // The engine records a structured result only when the child calls the tool: a
+  // prompt that says "answer with the structured result only" asks the child for
+  // something this runtime cannot collect, and the boundary then loses a merge it
+  // had already decided on. So the closing line names the tool call.
+  lines.push('SUBMIT: call the structured result tool exactly once with {"action":"none"|"apply","reason":"...","edits":[...],"order":[[...]]}. A plain-text reply is not a result: without that tool call nothing is recorded and this boundary changes nothing.');
   return lines.concat(captainSection()).join('\n');
+}
+
+// Resubmit prompt for a boundary that produced no structured result.
+//
+// Same rule as the worker's and the summary's resubmit: the same call asks once
+// more, spending no retry budget and opening no new boundary. The child is new (the
+// engine cannot resume a child session), so the original prompt is reprinted below
+// and the note forbids re-planning the run from scratch — the decision, not the
+// analysis, is what is missing.
+function replanResubmitPrompt(prompt, boundary, label) {
+  const lines = [
+    label,
+    'RESUBMISSION (same boundary call, no retry spent): your previous response produced no structured result, so nothing was recorded and the plan is exactly as it was.',
+    'Do not re-plan the run from scratch and do not widen the demands: read the queue this boundary names (once), decide, and submit the decision through the structured result tool exactly once. The shape is {"action":"none"|"apply","reason":"...","edits":[...],"order":[[...]]}.',
+    'A plain-text reply is not a result: without that tool call this boundary is recorded as refused and the plan does not move.'
+  ];
+  if (prompt) {
+    lines.push('', 'ORIGINAL PROMPT (same rules apply):');
+    lines.push(prompt);
+  }
+  return lines.join('\n');
 }
 
 // One boundary. Returns a merge outcome (never throws): a failed or refused replan
@@ -3553,16 +3593,38 @@ function replanPrompt(boundary, remaining, settled, version) {
 async function requestReplan(boundary, remaining, settled, version) {
   if (replanChannel === null) return null;
   if (boundary >= REPLAN_MAX_BOUNDARIES) return null;
-  let answer = null;
-  try {
-    const result = await callRole('planner', replanPrompt(boundary, remaining, settled, version), {
+  // The opening plan is call 1, so the first boundary is call 2. One string feeds
+  // both the prompt's first line and the label option the script hands agent().
+  const label = plannerCallLabel(boundary + 2);
+  const prompt = replanPrompt(boundary, remaining, settled, version, label);
+  const ask = function (text) {
+    return callRole('planner', text, {
       schema: REPLAN_SCHEMA,
-      label: memberLabel('planner', 1),
+      label: label,
       phase: replanBoundaryPhase(boundary),
       attempt: 0
     });
+  };
+  let answer = null;
+  try {
+    const result = await ask(prompt);
     if (result.ok) answer = normalizeReplanAnswer(result.value);
-    else answer = { ok: false, reason: 'replan call failed on every route: [' + result.failure.class + '] ' + result.failure.reason };
+    else if (result.failure && result.failure.class === 'format-error' && !result.failure.setup) {
+      // Form gap, not a dead route (the same corridor the worker and the summary
+      // use): one resubmit in this same boundary call, no retry budget spent. A
+      // child that prose-answered already has the decision; only the tool call is
+      // missing. If this one fails too, the merge is refused as it always was.
+      log('replan returned no structured result; resubmitting in the same boundary call');
+      const resubmit = await ask(replanResubmitPrompt(prompt, boundary, label));
+      if (resubmit.ok) {
+        answer = normalizeReplanAnswer(resubmit.value);
+        if (answer.ok) log('replan resubmitted a structured answer in the same boundary call');
+      } else {
+        answer = { ok: false, reason: 'replan call failed on every route: [' + resubmit.failure.class + '] ' + resubmit.failure.reason };
+      }
+    } else {
+      answer = { ok: false, reason: 'replan call failed on every route: [' + result.failure.class + '] ' + result.failure.reason };
+    }
   } catch (error) {
     answer = { ok: false, reason: 'replan call could not run: ' + safeError(error) };
   }
@@ -4150,7 +4212,7 @@ if (suppliedTasks && suppliedTasks.length > 0) {
   const plannerCall = function (prompt, avoid) {
     return callRole('planner', prompt, {
       schema: PLAN_SCHEMA,
-      label: memberLabel('planner', 1),
+      label: plannerCallLabel(1),
       phase: phaseLabel('plan'),
       attempt: 0,
       avoid: avoid
@@ -4388,7 +4450,7 @@ if (synthesisPolicy === 'layered' && humanSummary) {
   let drafts = 0;
   let review = null;
   if (polishAttempted) {
-    const first = await requestSummaryDraft(layeredPolishPrompt(digest), 0);
+    const first = await requestSummaryDraft(layeredPolishPrompt(digest, undefined, 1), 0);
     draft = first.text;
     if (draft === '') synthesisError = first.error + '; the deterministic summary is used';
   }
@@ -4400,11 +4462,15 @@ if (synthesisPolicy === 'layered' && humanSummary) {
       synthesisSummary = composed;
       synthesisSource = 'polish';
       synthesisReview = 'check=pass verify=pass drafts=' + drafts;
+      // Machine-readable marker for the draft the run actually ships: the host
+      // reads it off the report and the progress journal marks that one row. A
+      // rejected draft and the deterministic fallback never reach here.
+      log('gw-summary-final ' + drafts);
       break;
     }
     if (drafts >= SUMMARY_MAX_ATTEMPTS) break;
     const rewrite = await requestSummaryDraft(
-      layeredPolishPrompt(digest, { draft: draft, stage: review.stage, reason: review.reason }),
+      layeredPolishPrompt(digest, { draft: draft, stage: review.stage, reason: review.reason }, drafts + 1),
       drafts
     );
     if (rewrite.text === '') {
@@ -4461,7 +4527,7 @@ if (synthesisPolicy === 'layered' && humanSummary) {
   let drafts = 0;
   let review = null;
   const first = await requestSummaryDraft(
-    synthesizerPrompt(status, verifiedCount, results.length, confirmed, incomplete, uncertainties),
+    synthesizerPrompt(status, verifiedCount, results.length, confirmed, incomplete, uncertainties, undefined, 1),
     0
   );
   draft = first.text;
@@ -4472,6 +4538,11 @@ if (synthesisPolicy === 'layered' && humanSummary) {
     if (review.ok) {
       synthesisSummary = draft;
       synthesisSource = 'model';
+      // The plain policy records the same gate verdict the layered one does: the
+      // gate really ran both steps, and the host reads this string to mark the
+      // shipped draft.
+      synthesisReview = 'check=pass verify=pass drafts=' + drafts;
+      log('gw-summary-final ' + drafts);
       break;
     }
     if (drafts >= SUMMARY_MAX_ATTEMPTS) break;
@@ -4480,7 +4551,7 @@ if (synthesisPolicy === 'layered' && humanSummary) {
         draft: draft,
         stage: review.stage,
         reason: review.reason
-      }),
+      }, drafts + 1),
       drafts
     );
     if (rewrite.text === '') {
@@ -4726,8 +4797,11 @@ export function routeBudgetFor(config: ResolvedConfig): RouteBudget {
  * The planning leg is counted at {@link PLANNER_LEG_CALLS} chain walks, because
  * its resubmit and its route re-fire are real children: a cap that counted one
  * walk aborted the rescue with AGENT_CAP exactly when it was recovering the run.
- * Replan boundaries stay at one walk each — a boundary merge that fails keeps the
- * plan, so it has no rescue corridor to pay for.
+ * Replan boundaries are counted at two walks each: a boundary asks once, and a
+ * first answer that came back without a structured result is asked once more in the
+ * same boundary (the same corridor the worker and the summary draft have). Both are
+ * real children, so a cap that counted one walk would abort the run with AGENT_CAP
+ * exactly when the resubmit was recovering the merge.
  */
 export function maxTotalAgentsFor(tasks: number, retries: number, budget?: RouteBudget, replans = 0): number {
   const planner = budget?.planner ?? 1
@@ -4751,9 +4825,14 @@ export function maxTotalAgentsFor(tasks: number, retries: number, budget?: Route
   const planLeg = PLANNER_LEG_CALLS * planner
   // Replan boundaries are planner-route calls made between waves: they are real
   // children, so the engine's maxTotalAgents has to include them or a large plan
-  // that merges at every boundary would hit AGENT_CAP instead of finishing.
+  // that merges at every boundary would hit AGENT_CAP instead of finishing. Each
+  // boundary is counted at two walks (first ask + same-boundary resubmit), because a
+  // boundary that prose-answered really does call the planner twice — the same rule
+  // the worker and the summary draft already follow, and the same reason
+  // PLANNER_LEG_CALLS counts its own rescue instead of one walk.
+  const boundaryCalls = 2
   return planLeg * waitFactor + synthesizer * waitFactor
-    + Math.max(0, Math.min(REPLAN_LIMITS.maxBoundaries, Math.trunc(replans))) * planner * waitFactor
+    + Math.max(0, Math.min(REPLAN_LIMITS.maxBoundaries, Math.trunc(replans))) * boundaryCalls * planner * waitFactor
     + tasks * (retries + 1) * attemptBlock * waitFactor + 2
 }
 

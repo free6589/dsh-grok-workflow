@@ -209,7 +209,13 @@ export declare function childFailureReason(role: string, outcome: ChildTerminal)
  * @returns How many structured rows were rewritten.
  */
 export declare function reclassifyNullCollapses(report: WorkflowReport, outcomes: readonly ChildOutcome[]): number;
-/** Re-exported so a caller can name the role of a title line the same way here. */
+/**
+ * Re-exported so a caller can name the role of a title line the same way here.
+ *
+ * A task child's title is `角色 · 任务标题`, so the head before the separator is the
+ * role — but a numbered summary draft is `汇总·第1稿`, where the separator is part of
+ * the name. The whole line is therefore tried first and the head second.
+ */
 export declare function roleOfChildTitle(title: string): {
     role: RoleName;
     attempt: number;

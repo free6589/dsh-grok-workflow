@@ -3,8 +3,10 @@
  *
  * The tab renders the four `tool-workflow/*` session events this plugin's own recorder
  * writes (`src/records.ts`, `createWorkflowProgressRecorder`) as one horizontal track of
- * stage nodes, plus the optional `tool-workflow/stage-detail` payload when a stream carries
- * one. This module is the fold, the state precedence, the percentage and the detail
+ * stage nodes, plus the two optional payloads a stream may carry:
+ * `tool-workflow/stage-detail` (field values) and `tool-workflow/summary-final` (which
+ * summary draft the run actually shipped). Both only ever *add* to what a stream
+ * without them renders. This module is the fold, the state precedence, the percentage and the detail
  * provenance, with no React, no DOM, no clock and no estimate, so every rule the browser
  * half applies can be tested here; `src/client/index.js` carries the same rules as
  * hand-written JavaScript (the host serves that bundle verbatim, so it cannot import this
@@ -28,6 +30,8 @@
  *   (`recoveredFailureSeqs`). Red therefore means "still broken now", never "was broken".
  */
 
+import { NAMING_LANGUAGES, synthesisDraftLabel } from './naming.js'
+
 /** The seven progress and Guardian lifecycle events the tab folds; other events are ignored. */
 export const PROGRESS_EVENT_TYPES = [
   'tool-workflow/run-start',
@@ -49,6 +53,17 @@ export const PROGRESS_EVENT_TYPES = [
  * of being ignored — the detail ladder's level 1 is a real read path, not a placeholder.
  */
 export const PROGRESS_DETAIL_EVENT_TYPE = 'tool-workflow/stage-detail'
+
+/**
+ * The optional event that names the summary draft the run shipped, on purpose apart
+ * from {@link PROGRESS_EVENT_TYPES}.
+ *
+ * A chat row's label is fixed at `agent-start` (the panel only ever matches an
+ * `agent-end` to it by `seq`), so "this draft is the final one" cannot be said by
+ * renaming a row after the fact: it arrives as its own fact, written once the gate
+ * has passed a draft. A stream without it renders exactly what it rendered before.
+ */
+export const PROGRESS_SUMMARY_FINAL_EVENT_TYPE = 'tool-workflow/summary-final'
 
 /** Registered conversation target of the progress view (namespaced so a collision throws). */
 export const PROGRESS_VIEW_TARGET = 'grok-progress'
@@ -174,6 +189,14 @@ export interface ProgressRunFacts {
   guardian?: ProgressGuardianFacts
   /** Level-1 detail payloads the stream carried for this run, in arrival order. */
   details: ProgressStageDetailFact[]
+  /**
+   * Draft number that passed the summary gate, when the stream said so.
+   *
+   * The row it names already carries the mark in its label (see
+   * {@link PROGRESS_SUMMARY_FINAL_EVENT_TYPE}); the number stays here so a caller can
+   * tell "no final draft was recorded" from "draft 1 was final".
+   */
+  summaryFinalDraft?: number
 }
 
 /** One spine stage of the track, in render order. */
@@ -426,6 +449,7 @@ export function foldProgressRuns(records: readonly ProgressEventRecord[]): Progr
     settlements: Map<number, string>
     details: ProgressStageDetailFact[]
     guardian?: ProgressGuardianFacts
+    summaryFinalDraft?: number
   }
   const drafts = new Map<string, Draft>()
   let index = 0
@@ -456,7 +480,8 @@ export function foldProgressRuns(records: readonly ProgressEventRecord[]): Progr
     const data = asRecord(record.data) ?? {}
     const runId = typeof data['runId'] === 'string' ? data['runId'] : undefined
     const isDetail = record.type === PROGRESS_DETAIL_EVENT_TYPE
-    if (!isDetail && !(PROGRESS_EVENT_TYPES as readonly string[]).includes(record.type)) continue
+    const isSummaryFinal = record.type === PROGRESS_SUMMARY_FINAL_EVENT_TYPE
+    if (!isDetail && !isSummaryFinal && !(PROGRESS_EVENT_TYPES as readonly string[]).includes(record.type)) continue
     if (runId === undefined) continue
     if (record.type === 'tool-workflow/run-start') continue
     const draft = drafts.get(runId)
@@ -474,6 +499,14 @@ export function foldProgressRuns(records: readonly ProgressEventRecord[]): Progr
         ...phase === undefined ? {} : { phase },
         ...coordinationText === undefined ? {} : { coordinationText },
       })
+      continue
+    }
+    if (isSummaryFinal) {
+      // First valid claim wins: a duplicate is a no-op, and a later (different)
+      // claim cannot move the mark off the draft that actually shipped.
+      const draftNumber = Number(data['draft'])
+      if (!Number.isFinite(draftNumber) || Math.trunc(draftNumber) < 1) continue
+      if (draft.summaryFinalDraft === undefined) draft.summaryFinalDraft = Math.trunc(draftNumber)
       continue
     }
     if (record.type === 'tool-workflow/guardian-start') {
@@ -551,6 +584,7 @@ export function foldProgressRuns(records: readonly ProgressEventRecord[]): Progr
       // not a row (a row means a child call that started).
       if (member !== undefined) member.outcome = outcome
     }
+    if (draft.summaryFinalDraft !== undefined) markFinalDraft(draft.members.values(), draft.summaryFinalDraft)
     const members = draft.order.map((memberSeq) => draft.members.get(memberSeq)).filter((member): member is ProgressMemberFact => member !== undefined)
     runs.push({
       runId: draft.runId,
@@ -562,9 +596,40 @@ export function foldProgressRuns(records: readonly ProgressEventRecord[]): Progr
       ...draft.startedAt === undefined ? {} : { startedAt: draft.startedAt },
       ...draft.endedAt === undefined ? {} : { endedAt: draft.endedAt },
       ...draft.stopReason === undefined ? {} : { stopReason: draft.stopReason },
+      ...draft.summaryFinalDraft === undefined ? {} : { summaryFinalDraft: draft.summaryFinalDraft },
     })
   }
   return runs.sort((left, right) => left.anchorSeq - right.anchorSeq)
+}
+
+/**
+ * Mark the row of the summary draft the run shipped.
+ *
+ * The rows are recognised by their own numbered name in either shipped language
+ * (`汇总·第2稿` / `Summarize · draft 2`) and the mark is the naming table's, so the
+ * two cannot disagree about what "final" looks like.
+ *
+ * That draft can have **two** rows: the first call and its same-draft resubmit (a
+ * call that answered in prose and was asked once more). Only the later one lands —
+ * the earlier row recorded nothing — so only the row with the highest `order` is
+ * marked, and a reader never sees two "final" rows for one draft. A duplicate event,
+ * an event that arrives before its rows, and a stream with no such event at all all
+ * render exactly what they rendered before.
+ * @param members - every folded row of the run.
+ * @param draft - 1-based draft number the gate shipped.
+ */
+function markFinalDraft(members: Iterable<ProgressMemberFact>, draft: number): void {
+  for (const language of NAMING_LANGUAGES) {
+    const name = synthesisDraftLabel(draft, language)
+    let landed: ProgressMemberFact | undefined
+    for (const member of members) {
+      if (member.label !== name) continue
+      if (landed === undefined || member.order > landed.order) landed = member
+    }
+    if (landed === undefined) continue
+    landed.label = synthesisDraftLabel(draft, language, true)
+    return
+  }
 }
 
 /**
@@ -776,10 +841,13 @@ export function stageForPhase(phase: string): ProgressStageDefinition | undefine
  * substring inside its own title.
  */
 const STAGE_ROLE_LABELS: Readonly<Record<string, readonly string[]>> = {
-  plan: ['规划助手', 'planner'],
+  // `规划` / `汇总` cover the numbered names a repeated leg carries
+  // (`规划（第2次）`, `汇总·第2稿`); the bare role words still cover every
+  // single-call leg and every history row.
+  plan: ['规划助手', '规划', 'planner'],
   execute: ['执行', 'execute', 'worker'],
   verify: ['检查', '核验', 'verify', 'check', 'verifier'],
-  synthesize: ['汇总助手', 'summarize', 'synthesizer'],
+  synthesize: ['汇总助手', '汇总', 'summarize', 'synthesizer'],
 }
 
 /** The first spine stage whose role label names it, if a label names one. */

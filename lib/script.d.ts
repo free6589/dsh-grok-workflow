@@ -160,8 +160,11 @@ export declare function routeBudgetFor(config: ResolvedConfig): RouteBudget;
  * The planning leg is counted at {@link PLANNER_LEG_CALLS} chain walks, because
  * its resubmit and its route re-fire are real children: a cap that counted one
  * walk aborted the rescue with AGENT_CAP exactly when it was recovering the run.
- * Replan boundaries stay at one walk each — a boundary merge that fails keeps the
- * plan, so it has no rescue corridor to pay for.
+ * Replan boundaries are counted at two walks each: a boundary asks once, and a
+ * first answer that came back without a structured result is asked once more in the
+ * same boundary (the same corridor the worker and the summary draft have). Both are
+ * real children, so a cap that counted one walk would abort the run with AGENT_CAP
+ * exactly when the resubmit was recovering the merge.
  */
 export declare function maxTotalAgentsFor(tasks: number, retries: number, budget?: RouteBudget, replans?: number): number;
 export declare function buildWorkflowRequest(objective: string, tasks: NormalizedTask[] | undefined, config: ResolvedConfig, namingLanguage?: NamingLanguage, carryover?: string, busyRoutes?: string[], inheritance?: string, replanToken?: string, captainBrief?: string): WorkflowRequestPayload;

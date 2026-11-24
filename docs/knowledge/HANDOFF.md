@@ -1,3 +1,46 @@
+## 2026-11-24 — 重复调用带序号名、终稿标「（定稿）」、replan 交卷改「调工具 + 同棒补交」
+
+- **From:** 执行手（`agent-136/naming-worker`）· **To:** 合流者 / 操作员
+- **树与基线**：worktree `.agents/worktrees/fix-naming-resubmit`，分支 `fix/naming-resubmit`，基线 `main` 尖端 `1f70103`
+  （版本仍 `0.13.32`）。**本轮未合流、未发版、未打 tag、未 push、未碰 `~/.dsh`**，主检出一行未动。
+- **本轮提交（两条，`git log --oneline main..HEAD` 自证）**：
+  1. **`a335388`** — 代码 + 测试 + 重建 `lib/` + `CHANGELOG.md` + 记忆三件（`STATE.md` / `HANDOFF.md` / `VALIDATION.md`）
+     + `DECISIONS.md` D-133。这是唯一的产品改动提交，`npm run ci` 与 `verify:lib` 的结论都属于它。
+  2. 其后一条**只改 docs/ 记忆的订正提交**（把记忆里被 amend 掉的中间 sha 换成 `a335388`、删掉 sha 占位写法）——
+     没有动 `src/`、`test/`、`lib/`，因此不重跑全量 ci。两条都只在本分支，没 push、没合流、没 bump 版本、没打 tag。
+- **包工头复核三条（同一条提交内已改完）**：①replan 同棒补交**进**预算算式（边界项 `maxBoundaries × 2 × planner × waitFactor`，
+  钉子 `test/planner-resubmit.spec.ts > pays two boundary calls for every replan, because a boundary can ask twice`）
+  ②一稿两行只标 `order` 最大的落地行（`test/progress-tab.spec.ts > marks only the row that landed when one draft was asked twice`、
+  同形用例在 `test/client.spec.ts`）③ci 真实数字已回填、D-133 的 `规划规划（第1次）` 笔误已改、
+  「补交吃 +2 余量 / cap 收紧会 setup 失败」两条说法已删除（修完不成立）。
+- **用户拍板的三件事，全部落地（`CONFIRMED`，真机形状用例）**：
+  1. 汇总多稿 `汇总·第1稿` … `汇总·第N稿`（en `Summarize · draft N`）；同一稿的 resubmit 仍是同一号。
+  2. 规划腿 `规划（第1次）`（开场）+ `规划（第2次）/（第3次）…`（每个波边界）；`memberLabel()` 未改，序号只属于「行」，
+     提示词首行与 `agent()` 的 `label` 由同一个 `plannerCallLabel()` 产出（真机行名就是提示词首行）。
+  3. replan 提示词去掉「Answer with the structured result only」，改成「调用结构化结果工具、只调一次、纯文本等于没交」+ 形状说明；
+     `requestReplan` 收 `format-error`（非 setup）时同棒补交一次（`log()` 记账、不花 retry、不开新边界），补交也失败则照旧拒绝、计划字节不变。
+- **同日追加（同轮第 4 条，也是用户拍的）**：过门那一稿标 `汇总·第N稿（定稿）`。只在 **layered 与 model 两个 `review.ok` 分支**写
+  `log('gw-summary-final N')`；宿主 `src/run.ts` 读 `report.synthesis.review`（只认 `check=pass verify=pass`）→
+  `recorder.summaryFinal(runId, draft)` 写新事件 `tool-workflow/summary-final` `{runId, draft}`；两份折叠（`src/progress-tab.ts` +
+  `src/client/index.js`）各自认它、把那一行改写成「（定稿）」。现有四个事件形状一个没改；旧流/重复/乱序/指向不存在的稿号都幂等。
+  报告侧在 `Summary review:` 行尾补 ` · final: draft N`，**机器串与 schema 未动**。
+- **两处事实订正（照实写，别被下一轮当成漏做）**：
+  1. `model` 策略分支以前不写 `synthesis.review`，宿主的 `check=pass verify=pass` 闸门在 model 跑上永远不成立 → 已在 model 的
+     `review.ok` 分支补写同形机器串，并把 `test/routing.spec.ts` 那条 `toEqual({mode, summary})` 的旧断言改成带 `review` 的新形状。
+  2. 报告侧只有**一份英文 ledger**（`renderReport()` 没有 lang 参数），「中英各一版」在真机上没有第二个入口可加：
+     只补了英文那一行的 ` · final: draft N`，未新开中文渲染入口。若确实要中文版，需要另开一个中文渲染入口，请拍板。
+- **门禁（本轮实测）**：见 `VALIDATION.md` 同日条目（`npm run ci` exit 0：typecheck 干净、oxlint 36 warnings / 0 errors、
+  `verify:lib` 245 files byte-identical、vitest 102 files / **1929** tests PASS）。
+- **留给下一棒的注意点**：
+  1. **replan 补交是「真子代理」，已按每边界两问计入 `maxTotalAgentsFor()`**（边界项 = `maxBoundaries × 2 × planner ×
+     guardian 因子`），钉子见 `test/planner-resubmit.spec.ts > pays two boundary calls for every replan`。
+     下一轮若再给边界加调用，记得同步改这个 2。
+  2. **`verify:lib` 在 worktree 里需要能解析完整 `node_modules`**：本轮把 worktree 的 `node_modules` 换成指向主检出
+     `node_modules` 的符号链接（`node_modules` 本就在 `.gitignore` 里），否则 `scripts/verify-lib.mjs` 的 scratch 构建拿不到
+     `typescript` / `@types/node` / `@deepseek-ai/*`。
+  3. replay 时若看到 `test/gate.spec.ts > never retries a refused batch on its own` 偶发红：本轮全量跑第一次红过一次，
+     单跑该文件与随后两次全量都绿（`vi.waitFor` 的时序抖动），与本轮改动无关，别把它按成本次回归。
+
 ## 2026-11-24 — 报告尾部审计层（`feat/audit-render-half`）：没跑完的一轮带全量机器记录，默认视图一个字节不动
 
 - **From:** 执行手（`agent-132/impl-audit-render`）· **To:** 合流者 / 操作员

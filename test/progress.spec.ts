@@ -27,6 +27,7 @@ import {
   PROGRESS_AGENT_START,
   PROGRESS_RUN_END,
   PROGRESS_RUN_START,
+  PROGRESS_SUMMARY_FINAL,
 } from '../src/records.js'
 import { createActiveState, runWorkflow } from '../src/run.js'
 import { runTitle } from '../src/naming.js'
@@ -71,6 +72,24 @@ describe('progress recorder: payload contract', () => {
         data: { runId: 'run-1', seq: 2, label: '执行', phase: '任务 1 · 修复登录接口', childId: 'child-2' },
       },
       { type: PROGRESS_AGENT_END, data: { runId: 'run-1', seq: 2, outcome: 'completed' } },
+      { type: PROGRESS_RUN_END, data: { runId: 'run-1', stopReason: 'completed' } },
+    ])
+  })
+
+  it('writes the shipped summary draft as its own event, and only for an announced run', () => {
+    // A chat row's label is fixed at `agent-start`, so "this draft is the final one"
+    // has to arrive as its own fact. The payload carries the run and the draft and
+    // nothing else; the existing four shapes stay byte-identical.
+    const target = new FakeSession()
+    const recorder = createWorkflowProgressRecorder(target as unknown as SessionType, loggerWith([]))
+    recorder.runStart({ id: 'run-1', meta: { name: '任务团队' } })
+    recorder.summaryFinal('run-1', 2)
+    recorder.summaryFinal('not-ours', 3)
+    recorder.summaryFinal('run-1', Number.NaN)
+    recorder.runEnd('run-1', 'completed')
+    expect(target.writes).toEqual([
+      { type: PROGRESS_RUN_START, data: { runId: 'run-1', name: '任务团队' } },
+      { type: PROGRESS_SUMMARY_FINAL, data: { runId: 'run-1', draft: 2 } },
       { type: PROGRESS_RUN_END, data: { runId: 'run-1', stopReason: 'completed' } },
     ])
   })
@@ -315,6 +334,55 @@ describe('progress wiring: the real engine writes what the panel folds', () => {
     expect(events[0]!.type).toBe(PROGRESS_RUN_START)
     expect(events.at(-1)).toMatchObject({ type: PROGRESS_RUN_END, data: { stopReason: 'cancelled' } })
     expect(foldLikeTheGui(events)?.status).toBe('cancelled')
+  })
+
+  it('records which summary draft the run shipped, and nothing when no draft passed', async () => {
+    // The host half of the 「（定稿）」 mark: the script logs the passing draft, the
+    // report carries the same verdict, and this is the event the panel folds. A run
+    // with no synthesizer route passes no draft and writes no such event.
+    const writing = harness(call => {
+      if (call.prompt.includes('You are the execution agent')) return { structured: executionResult }
+      if (call.prompt.includes('DATA:')) return { structured: { summary: '任务 a 已完成，证据已核验。' } }
+      return { structured: verificationResult(taskFromPrompt(call.prompt)) }
+    })
+    const session = Session.create('sess-progress-final' as never)
+    const outcome = await runWorkflow({
+      ctx: writing.ctx as never,
+      config: resolveConfig({ maxConcurrency: 1, maxTasks: 6, roles: { synthesizer: [{ model: 'writer' }] } }),
+      state: createActiveState(),
+      logger: loggerWith([]),
+      agent: { session } as never,
+      objective: 'Ship the verified result',
+      callerTasks: [taskA],
+      failureMode: 'report',
+    })
+    expect(outcome.ok).toBe(true)
+    expect(outcome.report.synthesis.review).toBe('check=pass verify=pass drafts=1')
+    // The session's event union is DSH's own; this plugin's optional event is read
+    // the same way `progressEvents` reads the four, through a string comparison.
+    const records = session.ownEvents() as unknown as { type: string, data: unknown }[]
+    const finals = records
+      .filter(event => event.type === PROGRESS_SUMMARY_FINAL)
+      .map(event => event.data as Record<string, unknown>)
+    expect(finals).toEqual([{ runId: expect.any(String), draft: 1 }])
+
+    const silent = harness(call => (call.prompt.includes('You are the execution agent')
+      ? { structured: executionResult }
+      : { structured: verificationResult(taskFromPrompt(call.prompt)) }))
+    const quiet = Session.create('sess-progress-final-none' as never)
+    const none = await runWorkflow({
+      ctx: silent.ctx as never,
+      config: config(),
+      state: createActiveState(),
+      logger: loggerWith([]),
+      agent: { session: quiet } as never,
+      objective: 'Ship the verified result',
+      callerTasks: [taskA],
+      failureMode: 'report',
+    })
+    expect(none.ok).toBe(true)
+    const quietRecords = quiet.ownEvents() as unknown as { type: string }[]
+    expect(quietRecords.some(event => event.type === PROGRESS_SUMMARY_FINAL)).toBe(false)
   })
 
   it('leaves the workflow intact when the session refuses every progress append', async () => {

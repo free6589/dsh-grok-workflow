@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_CHILD_TIMEOUT_MS, DEFAULT_ITERATE_INTERVAL_MIN, DEFAULT_ITERATE_TEMPLATE, DEFAULT_LOOP_FAIL_STREAK, DEFAULT_LOOP_INTERVAL_MIN, DEFAULT_LOOP_MAX_ROUNDS, DEFAULT_MAX_CONCURRENCY, DEFAULT_MAX_TASKS, DEFAULT_REPLAN, DEFAULT_TIMEOUT_MS, HARD_LIMITS, SWITCHABLE_CLASSES } from '../src/config.js'
 import { ITERATE_ROUTE_PATH, ITERATE_TASK_TITLE, LOOP_ROUTE_PATH, LOOP_TASK_TITLE, LOOP_TOOL_NAME, createLoopService, loopPolicyFromConfig } from '../src/loop.js'
 import { createLoopTool, dispatchIterateAction, handleLoopRoute } from '../src/loop-surface.js'
+import { synthesisDraftLabel } from '../src/naming.js'
 import { Session as SessionClass } from '@deepseek-ai/dsh-session'
 import { readModeRecord } from '../src/mode.js'
 import { handleModeRoute, MODE_ROUTE_PATH as CORE_MODE_ROUTE_PATH } from '../src/mode-surface.js'
@@ -215,6 +216,8 @@ type ProgressRun = {
   startedAt?: number
   endedAt?: number
   stopReason?: string
+  /** Draft number the summary gate shipped, when the stream said so. */
+  summaryFinalDraft?: number
 }
 
 type ProgressNode = {
@@ -1971,6 +1974,75 @@ describe('client progress tab: the fold and the five states', () => {
     expect(stage(track, 'execute').members).toEqual([])
     expect(track.nodes.find((node) => node.key === 'phase:任务 7 · 合并为干净可并发执行计划')?.kind).toBe('extra')
     expect(track.nodes.filter((node) => node.kind === 'extra')).toHaveLength(1)
+  })
+
+  it('keeps a numbered planning leg and two numbered drafts on their own stages', () => {
+    // The browser half carries its own copy of the role-label table, so the new
+    // numbered names are asserted here as well as in the typed fold: a name the
+    // page cannot read lands as a stage row of its own instead of on `规划`/`汇总`.
+    const plan = trackOf([
+      progressMember(1, '规划', 'completed', { label: '规划（第1次）' }),
+      progressMember(2, '规划 · 波 1 边界', 'completed', { label: '规划（第2次）' }),
+    ], 'completed')
+    expect(stage(plan, 'plan').members.map((row) => row.label)).toEqual(['规划（第1次）', '规划（第2次）'])
+
+    const drafts = trackOf([
+      progressMember(1, '汇总', 'failed', { label: '汇总·第1稿' }),
+      progressMember(2, '汇总', 'completed', { label: '汇总·第2稿' }),
+    ], 'completed')
+    expect(stage(drafts, 'synthesize').members.map((row) => row.label)).toEqual(['汇总·第1稿', '汇总·第2稿'])
+    expect(progress.recoveredFailures(stage(drafts, 'synthesize').members).size).toBe(0)
+    expect(progress.currentFailureCount(stage(drafts, 'synthesize').members)).toBe(1)
+
+    // The role table only speaks for rows whose phase names a plan task; that case
+    // is where a missing word would hide.
+    const evidence = trackOf([
+      progressMember(1, '任务 1 · 读代码', 'completed', { label: '规划（第1次）' }),
+      progressMember(2, '任务 1 · 读代码', 'completed', { label: '汇总·第2稿' }),
+    ], 'completed')
+    expect(stage(evidence, 'plan').evidence.map((row) => row.label)).toEqual(['规划（第1次）'])
+    expect(stage(evidence, 'synthesize').evidence.map((row) => row.label)).toEqual(['汇总·第2稿'])
+  })
+
+  it('marks the summary draft the gate shipped, and only that draft', () => {
+    // Mirror of the typed fold: the mark is the naming table's string, arriving as
+    // its own event because a chat row's label cannot be rewritten after the fact.
+    const events = progress.fold([
+      rec('tool-workflow/run-start', { runId: 'r', name: '任务团队' }, 1),
+      rec('tool-workflow/agent-start', { runId: 'r', seq: 1, label: '汇总·第1稿', phase: '汇总', childId: 'c1' }, 2),
+      rec('tool-workflow/agent-start', { runId: 'r', seq: 2, label: '汇总·第2稿', phase: '汇总', childId: 'c2' }, 3),
+      // Before the settlement, twice, and once for a draft that never ran.
+      rec('tool-workflow/summary-final', { runId: 'r', draft: 2 }, 4),
+      rec('tool-workflow/summary-final', { runId: 'r', draft: 2 }, 5),
+      rec('tool-workflow/summary-final', { runId: 'r', draft: 9 }, 5),
+      rec('tool-workflow/agent-end', { runId: 'r', seq: 2, outcome: 'completed' }, 6),
+      rec('tool-workflow/run-end', { runId: 'r', stopReason: 'completed' }, 7),
+    ])
+    expect(events).toHaveLength(1)
+    expect(events[0]!.members.map((row: ProgressMember) => row.label)).toEqual(['汇总·第1稿', '汇总·第2稿（定稿）'])
+    expect(events[0]!.summaryFinalDraft).toBe(2)
+    // The same string the typed half produces, so the two copies cannot drift.
+    expect(events[0]!.members[1]!.label).toBe(synthesisDraftLabel(2, 'zh', true))
+
+    // One draft asked twice (first call + its resubmit) has two rows and only the
+    // later one landed: exactly one 「定稿」, and it is the second row.
+    const twice = progress.fold([
+      rec('tool-workflow/run-start', { runId: 'r', name: '任务团队' }, 1),
+      rec('tool-workflow/agent-start', { runId: 'r', seq: 1, label: '汇总·第1稿', phase: '汇总', childId: 'c1' }, 2),
+      rec('tool-workflow/agent-start', { runId: 'r', seq: 2, label: '汇总·第1稿', phase: '汇总', childId: 'c2' }, 3),
+      rec('tool-workflow/summary-final', { runId: 'r', draft: 1 }, 4),
+      rec('tool-workflow/run-end', { runId: 'r', stopReason: 'completed' }, 5),
+    ])
+    expect(twice[0]!.members.map((row: ProgressMember) => row.label)).toEqual(['汇总·第1稿', '汇总·第1稿（定稿）'])
+    expect(twice[0]!.members.filter((row: ProgressMember) => row.label.includes('定稿'))).toHaveLength(1)
+    // A stream without the event renders exactly what it rendered before.
+    const plain = progress.fold([
+      rec('tool-workflow/run-start', { runId: 'r', name: '任务团队' }, 1),
+      rec('tool-workflow/agent-start', { runId: 'r', seq: 2, label: '汇总·第2稿', phase: '汇总', childId: 'c2' }, 3),
+      rec('tool-workflow/run-end', { runId: 'r', stopReason: 'completed' }, 7),
+    ])
+    expect(plain[0]!.members.map((row: ProgressMember) => row.label)).toEqual(['汇总·第2稿'])
+    expect(plain[0]!.summaryFinalDraft).toBeUndefined()
   })
 
   it('mirrors the role-label evidence, so execute and verify are not rendered as never reported', () => {
