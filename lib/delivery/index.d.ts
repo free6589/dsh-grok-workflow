@@ -154,15 +154,21 @@ export declare function humanConclusion(report: WorkflowReport, opts?: {
  *
  * Only ever reached through an explicit diagnostics switch. It keeps every id,
  * route and attempt a maintainer needs, under the same field labels
- * `src/report.ts` renders, so the two views describe one report in one dialect.
+ * `src/report.ts` renders, so the two views describe one report in one dialect —
+ * and since D-126 that means the diagnostics blocks themselves are rendered the
+ * same way, not just labelled the same way: dead routes, the per-call child
+ * budget, the two overflow blocks and the error rows are byte-identical to the
+ * report's.
  *
  * When the ledger outgrows {@link MAX_LEDGER_CHARS}, the tail is cut at the
  * last line boundary so the cut never strands a reader mid-line, and the cut
  * is fenced through {@link cutCodeUnits} so a surrogate pair (an emoji at the
  * cut, a rare CJK ideograph) is never split into a replacement box. A body with
- * no line break to stop at in the last 8,000 characters keeps the straight
- * code-unit cut. The surviving head ends with the same truncation marker
- * `renderReport` uses, so a clipped ledger says so in the one shared wording.
+ * no line break to stop at in the surviving window keeps the straight
+ * code-unit cut. The closing lines (the stop sentence and the guard line) are
+ * reserved before the body is cut, so a clipped ledger keeps them, and the
+ * surviving head ends with the same truncation marker `renderReport` uses, so a
+ * clipped ledger says so in the one shared wording.
  *
  * @param report - validated report.
  * @returns the ledger text, bounded by {@link MAX_LEDGER_CHARS}.
