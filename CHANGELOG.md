@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.34] - 2026-11-25
+
 ### Added / 新增
 
 - **A block intake: the split you approve is written down, and handing it in is judged / 接单台子：你点头的那份切分会被
