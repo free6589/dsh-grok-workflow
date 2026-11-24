@@ -9,7 +9,7 @@ import { teamWorkflowEngine } from '../src/team-engine.js'
 import type { WorkflowReport } from '../src/types.js'
 import { createEngineHarness, type ChildAnswer, type ChildCall } from './engine-harness.js'
 import { execution, task, verification } from './fixtures.js'
-import { roleOf, runWorkflowScript, taskFromPrompt, type ScriptAgent } from './helpers.js'
+import { roleOf, runWorkflowScript, settledWithin, taskFromPrompt, type ScriptAgent } from './helpers.js'
 
 /**
  * Dead routes: a route that fails the same *transport* family twice in a row is
@@ -26,6 +26,9 @@ import { roleOf, runWorkflowScript, taskFromPrompt, type ScriptAgent } from './h
  */
 
 const OBJECTIVE = 'Ship the verified result'
+
+/** The probe's own bound on a run's settle (the child budget here is 1 s). */
+const SETTLE_BUDGET_MS = 15_000
 
 function args(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -443,7 +446,10 @@ describe('dead routes: the shape the real engine produces', () => {
         parent: { session: { header: {}, id: 'dead-route-parent' } } as never,
         maxTotalAgents: payload.maxTotalAgents,
       })
-      const result = await run.result
+      // The probe owns the wait: a case that hangs a child is proved by the
+      // script's own budget, and letting vitest's timeout be the settle means a
+      // late budget reports "Test timed out" instead of the fact under test.
+      const result = await settledWithin(run.result, SETTLE_BUDGET_MS, 'the dead-route twin run')
       await run.dispose()
       expect(result.stopReason).toBe('completed')
       return { report: assertWorkflowReport(result.value, OBJECTIVE, config), children: harness.children }

@@ -7,7 +7,7 @@ import { teamWorkflowEngine } from '../src/team-engine.js'
 import type { NormalizedTask, WorkflowReport } from '../src/types.js'
 import { createEngineHarness, type ChildAnswer, type ChildCall } from './engine-harness.js'
 import { execution, task, verification } from './fixtures.js'
-import { taskFromPrompt } from './helpers.js'
+import { settledWithin, taskFromPrompt } from './helpers.js'
 
 /**
  * The planning leg's rescue corridors.
@@ -30,6 +30,9 @@ import { taskFromPrompt } from './helpers.js'
  */
 
 const OBJECTIVE = 'Ship the verified result'
+
+/** The probe's own bound on a run's settle (the child budget here is 1 s). */
+const SETTLE_BUDGET_MS = 15_000
 
 function config(overrides: Record<string, unknown> = {}): ReturnType<typeof resolveConfig> {
   return resolveConfig({ maxConcurrency: 1, maxTasks: 4, childTimeoutMs: 7_200_000, ...overrides })
@@ -71,7 +74,9 @@ async function runReal(
       parent: { session: { header: {}, id: 'planner-rescue-parent' } } as never,
       maxTotalAgents: payload.maxTotalAgents,
     })
-    const result = await run.result
+    // Same rule as the dead-route twin: the probe owns the clock, so a budget
+    // that lands late fails inside this helper instead of as a runner timeout.
+    const result = await settledWithin(run.result, SETTLE_BUDGET_MS, 'the planner twin run')
     await run.dispose()
     return {
       report: assertWorkflowReport(result.value, OBJECTIVE, cfg),

@@ -104,6 +104,49 @@ export function indexOfPhase(phase: string | undefined): number {
 }
 
 /**
+ * Await a run's result with the probe's own clock, not the test runner's.
+ *
+ * A case that hangs a child is proved by the *script's* child budget, and in the
+ * engine's realm that budget is armed with `Atomics.waitAsync`: the sandbox is
+ * built from an empty object, so it has no `setTimeout`, and the script falls
+ * back to the timer every ECMAScript realm carries. That wait is a platform
+ * delayed task, and a worker loop that has nothing else to do can leave it
+ * unserviced for a long time — measured here, in this harness, as a run that
+ * never settles at all: the hung call is placed, its budget never lands, no
+ * retry is placed, and the only thing left to end the wait is vitest's own
+ * 30 s kill. The reporter then prints "Test timed out" instead of the fact the
+ * case exists to prove.
+ *
+ * Awaiting through here keeps a ref'd timer armed for the whole wait, so the
+ * loop keeps waking while the budget is pending, and the wait is bounded by
+ * this call instead of the runner: a settle that still does not arrive fails the
+ * case with the named condition inside the probe's own budget. Nothing about the
+ * child, the script or the assertion changes — only who owns the clock.
+ *
+ * @param promise - the run's result promise (or any settle being observed).
+ * @param ms - the probe's own budget for that settle.
+ * @param what - what is being awaited, for the failure message.
+ * @returns the settled value; rethrows the settle's own error.
+ */
+export async function settledWithin<T>(promise: Promise<T>, ms: number, what: string): Promise<T> {
+  const state: { done: boolean, value?: T, error?: unknown, failed: boolean } = { done: false, failed: false }
+  // The handlers never rethrow, so this chain cannot become an unhandled
+  // rejection once the wait is abandoned.
+  const tracked = promise.then(
+    value => { state.done = true; state.value = value },
+    error => { state.done = true; state.failed = true; state.error = error },
+  )
+  const deadline = Date.now() + ms
+  while (!state.done) {
+    if (Date.now() >= deadline) throw new Error(`${what} did not settle within ${ms} ms`)
+    await new Promise(resolve => setTimeout(resolve, 20))
+  }
+  await tracked
+  if (state.failed) throw state.error
+  return state.value as T
+}
+
+/**
  * The fixture task id a member belongs to.
  *
  * Fixture titles are `Task <id>` (`test/fixtures.ts`), and the group header carries
