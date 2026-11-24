@@ -1,3 +1,164 @@
+## 2026-11-24 — 清包：19 条已合分支删完、三处悬空活双份落盘、三条未合分支各有结论（`CONFIRMED`，纯文档 + 证据，`src/test/lib` 一行未动）
+
+- **From:** 执行手（`agent-124/debt-finisher`） · **To:** 下一个接手者 / 操作员
+- **基线**：`main` 尖端 `6b3ed39`（= `origin/main`），版本 `0.13.30`，tag `v0.13.30`。
+- **本包的性质**：只做清理与归档。`src/`、`test/`、`lib/` **一行未改**；没建 tag；没改 `package.json`/`package-lock.json`；
+  **没跑 `npm run ci`（无源码改动，`NOT_RUN`）**；没碰 `~/.dsh`、没重启任何服务；没 force-push、没改写共享历史；`.rsi/STOP` 未动。
+  临时产物只在 `.tmp/`（gitignored），归档件在 `.session-stage/`（gitignored 但**真实落盘**）。
+
+### 1. 删单：19 条已合分支（`CONFIRMED`，逐条先核 ahead=0 再 `git branch -d`，全程没用 `-D`）
+
+每条删除前都跑了 `git rev-list --count main..<b>`，输出**全部为 0**；随后 `git branch -d`（**不是 `-D`**）全部成功，
+git 自己回显 `Deleted branch … (was <tip>)`。tip 与删除前 ahead 值一一对应如下：
+
+| # | 分支 = tip | 删前 `main..<b>` | 删法 |
+|---|---|---|---|
+| 1 | `feat/live-steering` = `3b793ac` | 0 | `-d` |
+| 2 | `fix/null-collapse-t1` = `81e6b59` | 0 | `-d` |
+| 3 | `fix-progress-task-number-first` = `b61ff66` | 0 | `-d` |
+| 4 | `fix/session-surface-head-6` = `a6103ad` | 0 | `-d` |
+| 5 | `rsi/round2-docs` = `1a16d2f` | 0 | `-d` |
+| 6 | `rsi/round-42` = `e9fd908` | 0 | `-d` |
+| 7 | `rsi/sec2-01-timeout-default` = `22ab037` | 0 | `-d` |
+| 8 | `rsi/sec2-02-replan-default` = `f996cc8` | 0 | `-d` |
+| 9 | `rsi/sec2-03-mode-allow` = `be6abed` | 0 | `-d` |
+| 10 | `rsi/sec2-04-upgrade-verdict` = `81f6c5a` | 0 | `-d` |
+| 11 | `rsi/sec2-05-answer-cell-doc` = `ae72f7d` | 0 | `-d` |
+| 12 | `rsi/sec2-06-resume-carryover` = `2cfe4be` | 0 | `-d` |
+| 13 | `rsi/sec2-07-host-evidence` = `b1230e1` | 0 | `-d` |
+| 14 | `rsi/sec3-01-rail-doc` = `0f9f2e3` | 0 | `-d` |
+| 15 | `rsi/sec3-02-switch-on-rate-limit` = `7305f17` | 0 | `-d` |
+| 16 | `rsi/sec3-03-summary-review` = `b225446` | 0 | `-d` |
+| 17 | `rsi/sec3-04-answer-parity` = `d947a92` | 0 | `-d` |
+| 18 | `rsi/sec3-05-image-scope` = `943bb86` | 0 | `-d` |
+| 19 | `rsi/soak-65` = `9047f72` | 0 | `-d` |
+
+**连带移除的 worktree（5 个，其中 2 个用了 `--force`）**：
+
+| worktree 路径 | 分支 | 结果 | 依据 |
+|---|---|---|---|
+| `.agents/worktrees/fix-progress-task-number-first` | `fix-progress-task-number-first` | 普通 `remove`，一次成功 | 工作树干净 |
+| `.tmp/wt-steer` | `feat/live-steering` | 普通 `remove`，一次成功 | 工作树干净 |
+| `.agents/worktrees/rsi-redrive-13` | `rsi/redrive-13` | 普通 `remove`，一次成功 | 工作树干净；且在此之前归档件已落盘校验 |
+| `.agents/worktrees/fix-null-collapse-t1` | `fix/null-collapse-t1` | 先被拒（`contains modified or untracked files`），`--force` 成功 | 唯一脏的是一个未跟踪目录 `.rsi/evidence/null-collapse-t1/`；删前已在主树按 sha256 复核这两个文件**逐字节相同**（见下） |
+| `.agents/worktrees/rsi-soak-65` | `rsi/soak-65` | 同样先被拒，`--force` 成功 | 同上，对象是 `.rsi/evidence/round-065/soak.txt` |
+
+`--force` 的两份依据（删前实测，主树里的副本非空且 sha256 与后删的 worktree 内完全一致）：
+
+```text
+75313c48bba5a22447f63382e9c41671057f64d2a5ab63683c31f2e87ef163b4  .rsi/evidence/null-collapse-t1/green-null-collapse.txt
+d01528d2f9db9ce622cdfb2720495bf13077a7a9eac24d0fb7b4358c3fa00385  .rsi/evidence/null-collapse-t1/red-null-collapse.txt
+0ca437a9ff7d195cf401a9e300ab3cb2f793a99a646319e80cd7d69f768dd1c6  .rsi/evidence/round-065/soak.txt
+```
+
+（口径修正：派单里写 `.rsi/evidence/round-065/` 是「3 文件？按实际」。**实际是 1 个文件** `soak.txt`；两份 null-collapse 取证是 2 个文件，
+两者合计 3 个，删 worktree 前核的就是这 3 个。）
+
+**`rsi/redrive-13` 用 `-D`（本包唯一一处）**：`ahead=7`，所以 `-d` 按定义必然拒删。删除**之前**归档件已落盘并校验非空，见下节。
+
+### 2. 三处悬空活：落在各自 base 上 tree 精确复现，对当前 `main` 不能干净落地（`CONFIRMED`）
+
+三份补丁与三个备份提交（**绝对路径**，字节数为本轮实测）：
+
+| 活 | 补丁绝对路径 | 字节 | 备份分支 | 备份提交 | tree | 复现判据 |
+|---|---|---|---|---|---|---|
+| 进度页任务号优先 | `/home/fish/projects_mine/dsh-grok-workflow/.session-stage/patches/progress-task-number-first-2026-11-24.patch` | **75374** | `backup/wip-2026-11-24-progress-task-number-first` | `b91ff17` | `e5c9471` | 在各自 base 上 `git apply` → `git add -A` → `git write-tree`，与备份提交 tree sha **完全相同** |
+| 团队派发 v1 | `/home/fish/projects_mine/dsh-grok-workflow/.session-stage/patches/team-dispatch-v1-2026-11-24.patch` | **192596** | `backup/wip-2026-11-24-team-dispatch-v1` | `292a4ae` | `af75712` | 同上，另加逐字节相同 |
+| 运行中插话 | `/home/fish/projects_mine/dsh-grok-workflow/.session-stage/patches/live-steering-2026-11-24.patch` | **286000** | `backup/wip-2026-11-24-live-steering` | `de7ba6a` | `f849f06` | 同上，另加逐字节相同 |
+
+- **对当前 `main` 不能干净落地**：`git apply --check` exit 1。三个 base 落后 `main` 190–224 个提交，冲突文件分别为
+  **5 / 7 / 8** 个、冲突标记 **5 / 9 / 13** 处。这是**已知且被接受的事实，不是阻断条件**——本包对归档定的可恢复性判据是
+  「补丁落回它自己的 base 后 tree 精确复现」，该判据已满足。
+- **要落 `main` 需另开 rebase 包**。本包**不 rebase**：rebase 必然动 `src/`/`test/`/`lib/`，与本包的零产品改动硬约束冲突。
+- **一行补丁事故（照实记）**：progress 补丁一度被误清空（0 字节）。处置是从备份提交 `b91ff17` **重新导出**，最终 **75374 B**。
+  判定它可用不是靠字节数，而是靠上面那条 **tree 相等**。
+
+### 3. 三条未合分支的结论（原样，作为下一步的行动指令）
+
+- `team-dispatch-v1`（ahead=3 / behind=190，47 文件 +1992/−268，含 `test/taskboard.spec.ts`、`test/dispatcher.spec.ts` 新用例）→ **合**：rebase 到当前 main 后合入，唯一带完整测试的真实功能；本包不执行（会造成产品改动），脏活已落 `backup/wip-2026-11-24-team-dispatch-v1`。
+  - 本轮实测：`ahead=3` / `behind=**191**`（差的那 1 个就是本包自己的证据提交 `3a2faa0`），47 文件 +1992/−268 与派单一致；
+    `test/taskboard.spec.ts`、`test/dispatcher.spec.ts` 都在改动清单里，另含 `vitest.config.ts` 与 `test/fixtures/taskboard/writer.mjs`。
+  - 该分支的 setup 记录 `.rsi/evidence/branch/team-dispatch-v1-setup-2026-11-23.md` **已随本包进库**（见下节「卫生」），
+    下一个人 rebase 时按它复现环境。
+- `rsi/redrive-13`（ahead=7 / behind=155，30 文件）→ **删**：证据绑旧树、405 断言 main 已具备；归档在 `.session-stage/patches/redrive-13-2026-11-24/` 与 `.session-stage/archive/redrive-13-evidence-2026-11-24.tar.gz`。
+  - 本包已执行删除（`-D`）。归档件的可恢复性**已用决定性方法证明**，不是"文件还在"：tarball `gzip -t` 通过、解包得 **24** 个文件
+    ＝分支 `.rsi/evidence/rsi_redrive` 下文件数 24，逐文件 `git show rsi/redrive-13:<path> | cmp -` 比对 **24/24 一致、0 处不同**。
+  - 该分支自己的 `README.md`（退役说明）在 `.session-stage/patches/redrive-13-2026-11-24/README.md`。
+- `feat/audit-layer`（ahead=1 / behind=481，996 行含 417 行 `test/report-audit.spec.ts`；`src/report.ts` 已被 0.13.30 的诊断对齐改写）→ **rebase 后再评估合**：不删（删了真丢功能），也不直接合（和新报告层冲突）；能跑就跑一次冲突规模（如 `git merge-tree --write-tree main feat/audit-layer | grep -c '^<<<<<<<'` 之类），跑不动写 NOT_RUN 及原因。
+  - **跑了**，结论是**冲突很小、值得 rebase**：`git merge-tree --write-tree --messages main feat/audit-layer` → exit 1，冲突路径 **6 个**：
+    `src/report.ts`、`test/phase1-dialogue.spec.ts`，加它们的 4 个生成物 `lib/report.{js,d.ts,js.map,d.ts.map}`。
+    也就是说**真正要人去合的只有 2 个手写文件**，`lib/` 那 4 个 `npm run build` 重生成即可。
+  - 关于派单里那条 `grep -c '^<<<<<<<'`：**该命令在本 git 版本上输出 0，不能当"无冲突"的证据**。原因已查明：`merge-tree --write-tree`
+    的树转储列的是冲突**暂存项**（stage 1/2/3）而不是统一 diff 的冲突标记，标记只出现在 `--messages` 的 stderr 消息段里、
+    且格式是 `CONFLICT (content): Merge conflict in <path>` 一行一条路径。所以本轮改用**冲突路径数**作为冲突规模的口径，这是可核对的。
+  - 冲突之所以这么小：分支只有 1 个提交（`7626233`），而 `main` 自 merge-base 起把 `src/report.ts` 改了 **+450/−15**——
+    改动集中在同两个文件，但 git 仍能自动合并其余部分。
+  - 照实标注：本轮实测 `behind=**482**`（派单写 481，差的同样是本包那个证据提交）。
+
+### 4. 卫生：什么进了库、什么退役了、旧盘点逐条复核
+
+**进库（随本包提交 `3a2faa0`，23 个文件 / +2095 行，无 `src|test|lib`）**——判据是"被 tracked 文档按路径引用"，逐条用
+`git grep --fixed-strings` 复核过，不是照抄：
+
+| 进库条目 | 引用它的 tracked 文档（实测） |
+|---|---|
+| `.rsi/evidence/round-065/` | `docs/knowledge/{HANDOFF,STATE,VALIDATION}.md` |
+| `.rsi/evidence/null-collapse-t1/` | `docs/knowledge/VALIDATION.md` |
+| `.rsi/evidence/spine-parity-2026-11-21*` | `.rsi/evidence/fixed-gutter-2026-11-22.md`、`docs/knowledge/evidence/baseline-inventory-2026-11-22/BASELINE.md` |
+| `.rsi/evidence/red-semantics-2026-11-22*` | `docs/knowledge/DESIGN-progress-tab.md` |
+| `docs/knowledge/evidence/midrun-channel-steering-2026-11-22/` | `docs/knowledge/{DECISIONS,HANDOFF,STATE}.md`、`docs/knowledge/DESIGN-midrun-channel-steering.md` |
+| `docs/knowledge/evidence/branch-cleanup-2026-11-22/` | `docs/knowledge/STATE.md` |
+| `.rsi/evidence/branch/team-dispatch-v1-setup-2026-11-23.md` | **原本 0 引用**；本包在 §3 的 `team-dispatch-v1` 结论里显式引用了它，所以它落地后是有主引用的，不是新增垃圾 |
+| `.rsi/evidence/progress-card-q10b-2026-11-22.{json,md,-harness.html}` | `.rsi/evidence/src-lib-deadcode-2026-11-22.md:253`（按路径点名）。**这条与派单不一致**：派单把它列在退役侧，但退役会让那条 tracked 引用悬空，所以按本包判据改判进库 |
+
+**退役（13 项，**没有 `rm`**，全部原样移走）**：根是 `.session-stage/archive/evidence-retired-2026-11-24/`，
+清单与逐条大小写在 **`.session-stage/archive/evidence-retired-2026-11-24/MANIFEST.md`**（保持仓库相对路径原样，回滚 = 反向 `mv`）。
+
+| 原路径 → 新路径（新 = 归档根 + 原路径） | 大小 |
+|---|---|
+| `.rsi/evidence/baseline` → `…/.rsi/evidence/baseline` | 128K |
+| `.rsi/evidence/bughunt` → `…/.rsi/evidence/bughunt` | 24K |
+| `.rsi/evidence/dsh-diag-2026-11-22.md` → `…/.rsi/evidence/dsh-diag-2026-11-22.md` | 20K |
+| `.rsi/evidence/fs-diag-2026-11-22` → `…/.rsi/evidence/fs-diag-2026-11-22` | 44K |
+| `.rsi/evidence/nyc-current-2026-11-22` → `…/.rsi/evidence/nyc-current-2026-11-22` | 132K |
+| `.rsi/evidence/nyc-style-2026-11-22` → `…/.rsi/evidence/nyc-style-2026-11-22` | 1.5M |
+| `.rsi/evidence/perf` → `…/.rsi/evidence/perf` | 24K |
+| `.rsi/evidence/pnpm-diagnosis-2026-11-22.md` → `…/.rsi/evidence/pnpm-diagnosis-2026-11-22.md` | 12K |
+| `.rsi/evidence/rsi-guard-2026-11-22.md` → `…/.rsi/evidence/rsi-guard-2026-11-22.md` | 16K |
+| `.rsi/evidence/rsi_redrive` → `…/.rsi/evidence/rsi_redrive` | 616K |
+| `.rsi/evidence/sg-weather-2026-11-22` → `…/.rsi/evidence/sg-weather-2026-11-22` | 612K |
+| `.rsi/evidence/upgrade` → `…/.rsi/evidence/upgrade` | 40K |
+| `docs/knowledge/evidence/session-mlang-c537e178` → `…/docs/knowledge/evidence/session-mlang-c537e178` | 44K |
+
+理由（逐条同一句）：**无 tracked 文档按路径引用**。移完后 `git status --short` **没有任何 tracked 文件被删**（已核）。
+口径提醒：派单里 `.rsi/evidence/branch` 那两处"命中"其实是 `.rsi/evidence/branch-cleanup-2026-11-22/DELETED.shas` 的**前缀误匹配**，
+那个文件本来就是 tracked 的，无需处理。
+
+**`manual-sessions-unfinished.md` 第二节 6 件「未完成」，在当前 `main` 上逐条复核**（自己 read/grep，没照抄任何人的结论）：
+
+| # | 旧盘点的说法 | 当前状态 | 证据（`文件:行`） |
+|---|---|---|---|
+| ① | 运行时限默认还是 60 分钟 | **已关闭** | `src/config.ts:124` `export const DEFAULT_TIMEOUT_MS = 0`（同处注释：`0` 表示不限时，且"is now the default as well, because the operator chose unbounded runs over a fixed 60-minute cap"）；`src/config.ts:598` schema 默认也走它 |
+| ② | 主会话插话默认 false，设置页没开关 | **已关闭** | `src/config.ts:172` `export const DEFAULT_REPLAN = true`；设置页开关 `src/client/index.js:146` `{ key: 'replan', group: 'loop', kind: 'boolean', def: true }`，渲染在 `src/client/index.js:1818`；文案「默认打开」在 `src/client/index.js:491`。附注：`src/types.ts:196` 的注释仍写 "`false` by default"——**陈旧注释**，行为已是 true（本包不改源码，只记在这里） |
+| ③ | 总开关一按就报 405，没修 | **已关闭** | 服务端给 405 加 `Allow`：`src/mode-surface.ts:400`；被拒请求记 `method` + `URL`：`src/mode-surface.ts:359`；前端写只发 `POST`：`src/client/index.js:4621`；读改走 `GET ?action=status&sessionId=…` 兜底：`src/client/index.js:4649`（`getRoute`）/`:4659`。**残余**：`main` 自己的用例只断言日志里出现 `PUT`，没断言 URL 那半条；那半条断言在 `rsi/redrive-13` 的 7 行 spec patch 里，已归档，可随时捡回 |
+| ④ | 设置页没有一键升级按钮 | **已关闭（入口成立），但照实说不是"一键"** | `src/client/index.js:198` `const UPDATE_LATEST = '0.13.30'`；更新卡 `UpdateCard` 在 `src/client/index.js:1501`，显示「当前版本 vs 最新」+ 一条可复制命令 + 复制按钮，标记 `data-gw-update`/`data-gw-update-state`。代码注释明写 **"Read-only on purpose"**，所以它给的是「复制命令」，不是点一下自动升级——原话要的是按钮，这一半仍可争 |
+| ⑤ | 进度页「回答」格子永远是空的 | **已关闭（按删除该格子关闭）** | `src/progress-tab.ts:210` `PROGRESS_STAGES` 现为**六段**：`start`/`plan`/`execute`/`verify`/`synthesize`/`end`，**没有 `answer`**；客户端同构在 `src/client/index.js:2430`。理由写在 `src/progress-tab.ts:205`：最终答案由 gate（`relayText`）交付、永不是 workflow 子调用，「the spine does not list a stage no event can fill」。这正是 `rsi/sec2-05-answer-cell-doc` 的结论「六段不是七段」 |
+| ⑥ | 断点续跑只做了一半，`wired: false` | **已关闭** | `src/checkpoint/wiring.ts:298` `wired: true`、`entry: 'src/run.ts:runWorkflow'`；`findResumableCheckpoint` 真被调用：`src/run.ts:936`（`import` 在 `src/run.ts:27`） |
+
+结论：旧盘点里这 6 件**全部已关闭**（④ 是"入口有了、不是真一键"这一处口径差异，照实标出）。原文件**退役不删**：
+`manual-sessions-unfinished.md` → `.session-stage/archive/manual-sessions-unfinished-2026-11-23.md`（133 行，10133 B，未入库）。
+
+**收尾分支表**：只剩 `main` + `team-dispatch-v1` + `feat/audit-layer` + 三条 `backup/wip-2026-11-24-*`；
+worktree 只剩主树 + `.agents/worktrees/team-dispatch-v1`。
+
+### 5. 本包没做的（照实列，别当成已收）
+
+1. **没跑 `npm run ci`（`NOT_RUN`）**：本包 `src/`、`test/`、`lib/` 一行未改，没有可验证的代码改动。
+2. **没发版、没建 tag、没动版本号**：`package.json`/`package-lock.json` 未改。
+3. **没碰 live**：没读没写 `~/.dsh`，没重启任何服务。
+4. **没 rebase 三份补丁**：要落当前 `main` 得另开 rebase 包（见 §2）。
+5. **`team-dispatch-v1` 没合、`feat/audit-layer` 没合**：都会造成产品改动，超出本包范围（见 §3）。
+
 ## 2026-11-24 — 0.13.30 已发：同一份报告的两个机器视图说上同一句话，门禁不再因为机器忙就红（`CONFIRMED`，CI + Release 双绿）
 
 - **From:** 发版方（包工头 agent-122 / foreman） · **To:** 下一个接手者 / 操作员
