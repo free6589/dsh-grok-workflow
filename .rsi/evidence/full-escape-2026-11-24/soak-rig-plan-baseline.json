@@ -1,0 +1,30 @@
+[
+  { "type": "fresh", "label": "A-fresh-session", "shot": true },
+  { "type": "baseline" },
+  {
+    "type": "send",
+    "label": "A0-grok-on",
+    "text": "/grok on",
+    "timeoutMs": 120000,
+    "quietMs": 6000
+  },
+  {
+    "type": "send",
+    "label": "A1-weather",
+    "text": "今天天气怎么样？",
+    "timeoutMs": 300000,
+    "quietMs": 25000
+  },
+  {
+    "type": "snapshot",
+    "label": "A1-weather-after"
+  },
+  {
+    "type": "send",
+    "label": "A2-hello",
+    "text": "你好呀",
+    "timeoutMs": 300000,
+    "quietMs": 25000
+  },
+  { "type": "snapshot", "label": "A2-hello-after" }
+]

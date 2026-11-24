@@ -1,0 +1,7 @@
+[
+  { "type": "fresh", "label": "B1-fresh-session" },
+  { "type": "baseline" },
+  { "type": "send", "label": "B1-0-grok-on", "text": "/grok on", "timeoutMs": 30000, "quietMs": 6000 },
+  { "type": "send", "label": "B1-1-weather", "text": "今天天气怎么样？", "timeoutMs": 300000, "quietMs": 25000 },
+  { "type": "snapshot", "label": "B1-2-after" }
+]

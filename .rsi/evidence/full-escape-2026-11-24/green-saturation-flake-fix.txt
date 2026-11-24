@@ -1,0 +1,49 @@
+# GREEN — saturation case after settling by state (commit 62f540f)
+# date: 2026-11-24 20:47 +08:00
+
+## full suite x3 (npx vitest run)
+run1: Test Files 103 passed (103) / Tests 1922 passed (1922) — 139.31s
+run2: Test Files 103 passed (103) / Tests 1922 passed (1922) — 136.66s
+run3: Test Files 103 passed (103) / Tests 1922 passed (1922) — 134.34s
+
+## this file alone x20 (npx vitest run test/grok-on-ingress.spec.ts)
+pass=20 fail=0 (each Tests 6 passed (6))
+
+## this file x8 under 8 busy loops on 6 cores (nproc=6)
+pass=8 fail=0 (durations 4.44s–6.29s)
+
+## typecheck / lint
+npx tsc -p tsconfig.json --noEmit -> exit 0
+npx oxlint src test -> 36 warnings, 0 errors
+
+## red source (foreman, full ci on 21f3616+8f40be1)
+FAIL test/grok-on-ingress.spec.ts > /grok on keeps message ingress open > a saturated queue keeps the blocking path instead of promising a background run
+Error: the blocking step never settled  (Tests 1 failed | 1921 passed (1922))
+local reproduction: NOT achieved (3 full runs + 20 single + 8 loaded, all green).
+
+## 2026-11-24 21:10 — 第二次修（负载下的口径，commit 见下）
+
+红的现象（foreman 在 62f540f 上跑 ci，同时另有 agent 跑真 dsh web + Chromium + 网关）：
+FAIL test/grok-on-ingress.spec.ts > a saturated queue keeps the blocking path ...
+AssertionError: the blocking step never settled: expected false to be true
+Tests 1 failed | 1921 passed (1922)   Duration 180.51s
+
+原因（这一版的）：收尾窗口是 `FIXED_MAX_QUEUED_MESSAGES + 3` 轮 × 50 ms ≈ 350 ms。
+run 结算之后，阻塞那一步还要走回执/提交好几跳，满载时远超 350 ms —— 症状是「结算了但 committed 没长」。
+
+修法：换成 helpers 的 `landedWithin(cond, 15_000, 'the blocking step')`（自带 ref'd 计时器、20 ms 轮询、超时按名失败），
+条件仍是「阻塞那一步已提交」，轮询里每轮把所有尚未结算的 run 结算掉（`FakeRun.settled` 保证不双 resolve）。
+断言未放宽：dispatched 长度、receipts === FIXED_MAX_QUEUED_MESSAGES、teamRuns >= 2、closed 为真；testTimeout/skip/only 未动。
+
+### 负载下实测（nproc=6，16 个 `while :; do :; done`，loadavg 21 → 31）
+
+单文件 ×8（loadavg 4.6 → 22.9 爬升中）：
+  Tests 6 passed (6)  — 9.22s / 10.17s / 9.65s / 12.10s / 10.14s / 9.54s / 9.11s / 11.27s
+  pass=8 fail=0
+
+全量 `npx vitest run` ×2（loadavg 21.42 / 30.68）：
+  run1: Test Files 103 passed (103) / Tests 1922 passed (1922) — 371.07s
+  run2: Test Files 103 passed (103) / Tests 1922 passed (1922) — 398.08s
+
+tsc: `npx tsc -p tsconfig.json --noEmit` → exit 0
+lint: `npx oxlint src test` → 36 warnings / 0 errors

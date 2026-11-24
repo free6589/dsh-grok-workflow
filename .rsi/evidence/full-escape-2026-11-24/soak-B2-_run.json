@@ -1,0 +1,61 @@
+{
+  "startedAt": "2026-11-24T13:01:55.180Z",
+  "finishedAt": "2026-11-24T13:05:37.333Z",
+  "appUrl": "http://127.0.0.1:3199",
+  "composer": {
+    "found": true,
+    "tag": "DIV",
+    "sel": "[role=\"textbox\"]",
+    "count": 1
+  },
+  "results": [
+    {
+      "label": "B2-0-grok-on",
+      "type": "send",
+      "text": "/grok on",
+      "settled": true,
+      "grew": true,
+      "elapsedMs": 8190,
+      "beforeChars": 205,
+      "afterChars": 216,
+      "deltaChars": 11
+    },
+    {
+      "label": "B2-1-task",
+      "type": "send",
+      "text": "把这个仓库的 README 全面重写一遍，然后跑测试，再整理一份变更清单",
+      "settled": true,
+      "grew": true,
+      "elapsedMs": 72352,
+      "beforeChars": 216,
+      "afterChars": 594,
+      "deltaChars": 378
+    },
+    {
+      "label": "B2-2-ask",
+      "type": "snapshot",
+      "chars": 594
+    },
+    {
+      "label": "B2-3-confirm",
+      "type": "send",
+      "text": "确认",
+      "settled": true,
+      "grew": true,
+      "elapsedMs": 92462,
+      "beforeChars": 594,
+      "afterChars": 877,
+      "deltaChars": 283
+    },
+    {
+      "label": "B2-4-confirmed",
+      "type": "snapshot",
+      "chars": 877
+    },
+    {
+      "label": "B2-5-later",
+      "type": "snapshot",
+      "chars": 877
+    }
+  ]
+}

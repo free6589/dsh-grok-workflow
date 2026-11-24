@@ -1,0 +1,15 @@
+# 出处：`git archive 597b444`（answer-face 两个提交）隔离副本 .tmp/isol，不含 gate-escape 任何改动。
+# 命令：npx vitest run test/channel.spec.ts test/full-behind-first-answer.spec.ts test/human-output-contract.spec.ts → exit 0
+
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/feat-full-escape/.tmp/isol
+
+ ✓ test/channel.spec.ts (42 tests) 1110ms
+ ✓ test/full-behind-first-answer.spec.ts (4 tests) 381ms
+ ✓ test/human-output-contract.spec.ts (10 tests) 511ms
+
+ Test Files  3 passed (3)
+      Tests  56 passed (56)
+   Start at  20:21:48
+   Duration  3.76s (transform 815ms, setup 0ms, import 1.19s, tests 2.00s, environment 0ms)
+

@@ -1,0 +1,40 @@
+{
+  "startedAt": "2026-11-24T12:59:36.148Z",
+  "finishedAt": "2026-11-24T13:00:34.458Z",
+  "appUrl": "http://127.0.0.1:3199",
+  "composer": {
+    "found": true,
+    "tag": "DIV",
+    "sel": "[role=\"textbox\"]",
+    "count": 1
+  },
+  "results": [
+    {
+      "label": "B3-0-grok-on",
+      "type": "send",
+      "text": "/grok on",
+      "settled": true,
+      "grew": true,
+      "elapsedMs": 8299,
+      "beforeChars": 202,
+      "afterChars": 213,
+      "deltaChars": 11
+    },
+    {
+      "label": "B3-1-hello",
+      "type": "send",
+      "text": "你好呀",
+      "settled": true,
+      "grew": true,
+      "elapsedMs": 46777,
+      "beforeChars": 213,
+      "afterChars": 428,
+      "deltaChars": 215
+    },
+    {
+      "label": "B3-2-after",
+      "type": "snapshot",
+      "chars": 428
+    }
+  ]
+}

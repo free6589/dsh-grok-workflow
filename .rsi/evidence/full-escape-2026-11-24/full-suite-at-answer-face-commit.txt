@@ -1,0 +1,352 @@
+# 出处：`git archive 86c0fa2`（我的提交）隔离副本 .tmp/commit-check，不含 gate-escape 任何改动，node_modules 软链到工作树。
+# 命令：npx vitest run  → exit 1
+
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/feat-full-escape/.tmp/commit-check
+
+stderr | test/client.spec.ts > client settings page: reading, failure and retry > keeps still reading, read failed and not served as three different pages
+[grok-workflow] no settings namespace projects this plugin's fields: the row is disabled, renamed with an unreadable projection, or did not activate (see docs/LOCAL-TESTING.md#enable). The Grok workflow page cannot appear until it does.
+
+ ✓ test/client.spec.ts (129 tests) 295ms
+(node:52) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGTERM listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:52) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGINT listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:52) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGHUP listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+ ✓ test/phase1-dialogue.spec.ts (36 tests) 1602ms
+ ✓ test/checkpoint-wiring.spec.ts (44 tests) 177ms
+ ✓ test/config.spec.ts (49 tests) 116ms
+ ✓ test/delivery-human-block.spec.ts (46 tests) 1213ms
+     ✓ stays inside the cap for every knob, in both language orders  583ms
+ ✓ test/redact.spec.ts (47 tests) 114ms
+(node:95) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGTERM listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:95) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGINT listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:95) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGHUP listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+ ❯ test/triage.spec.ts (43 tests | 1 failed) 60683ms
+     ✓ routes greetings and acknowledgements to the direct tier 3ms
+     ✓ routes one concrete action to the quick tier 7ms
+     ✓ routes multi-part work and deliverables to the team 1ms
+     ✓ asks instead of guessing when the target is only pointed at 0ms
+     ✓ lets the user force the team from inside the message 0ms
+     ✓ reads the answer to its own question before any other rule 2ms
+     ✓ keeps the pre-t52 rule when the front desk is off 0ms
+     ✓ bounds the concrete scan so a 32k paste cannot stall the front desk 7ms
+     ✓ scans at most the first 4096 characters for signals 7ms
+     ✓ is pure: no clock, no I/O, same text in the same verdict out 0ms
+     ✓ detects the language from the message 0ms
+     ✓ states tier and reason in the message language 0ms
+     ✓ tells the user which tier answered 0ms
+     ✓ never answers a question from the greeting template (t53 F1) 0ms
+     ✓ routes short two-step instructions to the team (t53 F1) 0ms
+     ✓ answers a pointer that carries a path instead of asking about it (t53 F1) 1ms
+     ✓ does not crash on a bare choice word with no question waiting (t53 F1) 1ms
+     ✓ treats a trailing 几 and its measure words as a question (t56 N3) 0ms
+     ✓ counts a 顿号 list and 并+回滚 as sequencing (t56 N3) 0ms
+     ✓ counts a full-width comma list as sequencing too 0ms
+     ✓ does not read a 顿号 list inside a question as sequencing 0ms
+     ✓ recognises an English yes/no question without a question mark (t56 N3) 0ms
+     ✓ recognises A不A / A没A, 还是 and 谁 as question shapes (t58 L3) 1ms
+     ✓ has a canned answer for every chat bucket 1ms
+     ✓ asks the single child for exactly its tier 0ms
+     × a session /grok record forces the full workflow even when the deployment uses the front desk 220ms
+     ✓ answers a greeting directly, without starting the team or a call  5002ms
+     ✓ answers "what can you do" instead of deflecting it  5001ms
+     ✓ answers a simple task with one worker and says so  5002ms
+     ✓ runs the whole workflow for a complex request after the captain split is confirmed  5056ms
+     ✓ asks one question instead of guessing, and remembers the answer  15181ms
+     ✓ hands the worker the answered request and the new work in the same message (B05)  10044ms
+     ✓ upgrades to the team when the message asks for it, after a split confirmation  5123ms
+     ✓ retries once with a structured answer when the plain call returns nothing  5002ms
+     ✓ states a failed cheap call instead of silently upgrading it  5002ms
+     ✓ keeps the pre-t52 text when the front desk is off 10ms
+     ✓ resumes the original request and names the choice in the worker text 0ms
+     ✓ resumes the original request for the team tier too, in the message language 0ms
+     ✓ states an expired or void question instead of guessing the task 0ms
+     ✓ reads the whole message before calling it an answer 0ms
+     ✓ keeps the choice, the original request and the new work in the worker text 0ms
+     ✓ adds no new work section when the message is only the answer 0ms
+     ✓ keeps the team choice and the new work together, in the message language 0ms
+ ✓ test/progress-tab.spec.ts (42 tests) 22ms
+ ✓ test/loop.spec.ts (35 tests) 74ms
+ ✓ test/report.spec.ts (45 tests) 25ms
+ ✓ test/delivery.spec.ts (21 tests) 129ms
+ ✓ test/config-limits-repair.spec.ts (25 tests) 245ms
+(node:141) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/null-collapse.spec.ts (29 tests) 225ms
+ ✓ test/checkpoint-schema.spec.ts (38 tests) 1300ms
+     ✓ bounds the payload by the file bound minus the integrity record  608ms
+ ✓ test/update-entry.spec.ts (20 tests) 163ms
+ ✓ test/orchestrator.spec.ts (26 tests) 232ms
+ ✓ test/update-surface.spec.ts (29 tests) 72ms
+(node:196) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/memory-archive.spec.ts (21 tests) 469ms
+(node:231) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/dead-routes.spec.ts (24 tests) 2232ms
+     ✓ counts a call that hung, even though a hang does not switch models  2017ms
+ ✓ test/reliability.spec.ts (25 tests) 668ms
+ ✓ test/taskboard.spec.ts (26 tests) 713ms
+     ✓ recovers a real board after a writer process is SIGKILLed mid-mutation  314ms
+ ✓ test/mode-surface.spec.ts (24 tests) 70ms
+ ✓ test/timeout.spec.ts (22 tests) 12149ms
+     ✓ settles a hung call as a timeout and retries the task instead of failing the run  1063ms
+     ✓ extends a stalled call once the guardian says wait, and the child still wins  2506ms
+     ✓ kills the stalled call when the guardian says kill, and the task still retries  1004ms
+     ✓ stops granting waits at the run deadline without asking the guardian again (rule B)  3004ms
+     ✓ broadcasts a rescue line when the guardian says rescue, and grants the slice  2505ms
+     ✓ fails a stalled call straight to retry when no guardian is configured  1004ms
+     ✓ settles a hung call within budget in a realm with no timer at all  1011ms
+ ✓ test/progress-connector.spec.ts (19 tests) 23ms
+ ✓ test/iterate-plan.spec.ts (21 tests) 394ms
+ ❯ test/channel.spec.ts (42 tests | 6 failed) 6539ms
+     ✓ treats 停 as a stop 2ms
+     ✓ treats 停吧 as a stop 0ms
+     ✓ treats 停一下。 as a stop 0ms
+     ✓ treats 请停下来 as a stop 0ms
+     ✓ treats 别做了 as a stop 0ms
+     ✓ treats 取消 as a stop 0ms
+     ✓ treats 算了 as a stop 0ms
+     ✓ treats stop as a stop 0ms
+     ✓ treats Stop it as a stop 0ms
+     ✓ treats cancel the run as a stop 0ms
+     ✓ treats 再加一个任务：补一版 README as a demand to forward 0ms
+     ✓ treats 改成 C 方案 as a demand to forward 0ms
+     ✓ treats 停止旧的缓存策略（这是新任务） as a demand to forward 0ms
+     ✓ treats 为什么任务 2 是红的 as a demand to forward 0ms
+     ✓ treats 怎么还没跑完？ as a demand to forward 0ms
+     ✓ treats 顺便把测试也补上 as a demand to forward 0ms
+     ✓ treats 停一下之前先把日志存下来，然后继续做第 3 个任务，再把结论发我 as a demand to forward 0ms
+     ✓ never reads a question as a stop, even when it contains a stop word 0ms
+     ✓ keeps a task description that contains a stop character a task 0ms
+     ✓ bounds the stop form by length so a long sentence is not an imperative 0ms
+     ✓ names the marker that decided it, for the ledger 0ms
+     ✓ keeps the demand whole and marks the context as context 0ms
+     ✓ never truncates the demand away, even with a full context 0ms
+     ✓ stays within the intent budget 0ms
+     ✓ omits the context block when there is no conversation yet 0ms
+     ✓ carries the previous objective and the demand in one bounded request 0ms
+     ✓ states an unknown previous objective instead of inventing one 0ms
+     ✓ keeps the demand when the budget is tight, cutting the previous objective first 0ms
+     ✓ the receipt names the merge point, not a new run 0ms
+     ✓ the stop terminal claims no completion and keeps verified work 0ms
+     ✓ an idle stop says nothing was started 0ms
+     ✓ the carried round says why it is one round later 0ms
+     ✓ ledger outcomes are stable strings 1ms
+     × answers the receipt while the run is still live, and leaves the run alone 1159ms
+     × A3: queues the demand for the planner together with the conversation 1045ms
+     × A4: a demand that never reached a boundary opens the next round 1044ms
+     × A1: the conclusion of the round is delivered into the same session 1043ms
+     × cancels the live run and starts nothing 1043ms
+     ✓ answers a bare stop with nothing running instead of admitting it as a task 2ms
+     × still acknowledges at once (the background admission is not the channel) and starts one round 1042ms
+     ✓ acknowledges a mid-run demand into the live plan instead of a second round 99ms
+     ✓ lets the normal path consume it instead of queueing "确认" into the live run 54ms
+(node:410) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGTERM listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:410) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGINT listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:410) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGHUP listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+ ✓ test/gate.spec.ts (54 tests) 1566ms
+ ✓ test/guardian.spec.ts (29 tests) 157ms
+(node:432) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/experience-pack.spec.ts (26 tests) 182ms
+ ✓ test/loop-surface.spec.ts (21 tests) 101ms
+ ✓ test/triage-recall.spec.ts (28 tests) 142ms
+ ✓ test/routing.spec.ts (25 tests) 170ms
+ ✓ test/loop-brakes.spec.ts (35 tests) 69ms
+ ✓ test/waves.spec.ts (28 tests) 251ms
+ ✓ test/human-output-contract.spec.ts (10 tests) 510ms
+ ✓ test/lifecycle-disposal.spec.ts (15 tests) 253ms
+ ✓ test/command.spec.ts (26 tests) 143ms
+ ✓ test/synthesis-guardrails.spec.ts (18 tests) 163ms
+ ✓ test/panel-links.spec.ts (16 tests) 14ms
+ ✓ test/carryover.spec.ts (22 tests) 131ms
+ ✓ test/gate-partial-head.spec.ts (14 tests) 339ms
+ ✓ test/objective-limit.spec.ts (17 tests) 413ms
+(node:551) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/failure-paths.spec.ts (15 tests) 152ms
+ ✓ test/plugin-lifecycle.spec.ts (19 tests) 951ms
+ ✓ test/recovery-kill-restart.spec.ts (3 tests) 161ms
+ ✓ test/heartbeat-identity.spec.ts (16 tests) 67ms
+ ✓ test/report-ledger-parity.spec.ts (8 tests) 16ms
+(node:616) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/progress.spec.ts (12 tests) 306ms
+ ❯ test/grok-on-ingress.spec.ts (6 tests | 3 failed) 1430ms
+     × dispatches the next message while the team run is still in flight 167ms
+     × still runs the full team for the message and delivers the report afterwards 56ms
+     ✓ leaves /grok off untouched: the message passes straight through, no run 32ms
+     × a saturated queue keeps the blocking path instead of promising a background run 1002ms
+     ✓ shows the first message of a fresh session before the run finishes (deployment `full`) 170ms
+     ✓ keeps the configured concurrency envelope untouched 1ms
+(node:642) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGTERM listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:642) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGINT listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:642) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGHUP listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+ ✓ test/captain-confirm.spec.ts (16 tests) 620ms
+ ✓ test/inheritance.spec.ts (19 tests) 138ms
+ ✓ test/loop-runtime-wiring.spec.ts (5 tests) 225ms
+(node:671) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+stdout | test/checkpoint-engine-wire.spec.ts > engine wiring writes real checkpoints > records a verified run with no extra child calls from the resume scan
+[smoke] status=completed file=/tmp/dsh-grok-workflow-test-checkpoints/checkpoint-fa82f378-2b91-48de-b1c3-0420e2b396b1-347b177c.json resume=none reason=the run already completed, so re-driving it would redo verified work
+
+stdout | test/checkpoint-engine-wire.spec.ts > engine wiring writes real checkpoints > records a rejected run and answers the resume question with what to re-drive
+[smoke] status=failed file=/tmp/dsh-grok-workflow-test-checkpoints/checkpoint-52e7ba58-d5c6-4d3c-ad19-47519d8a68d1-c13b449f.json resume=resume unfinished=a
+
+ ✓ test/checkpoint-engine-wire.spec.ts (6 tests) 341ms
+ ✓ test/dispatcher.spec.ts (19 tests) 45ms
+ ✓ test/naming.spec.ts (16 tests) 84ms
+ ✓ test/resume-validator.spec.ts (20 tests) 15ms
+ ✓ test/full-behind-first-answer.spec.ts (4 tests) 505ms
+ ✓ test/route-concurrency.spec.ts (15 tests) 205ms
+ ✓ test/composition.spec.ts (9 tests) 264ms
+ ✓ test/final-answer-rewrite.spec.ts (15 tests) 140ms
+ ✓ test/recovery-artifacts.spec.ts (9 tests) 74ms
+ ✓ test/progress-hint-absent.spec.ts (6 tests) 15ms
+ ✓ test/timeout-config.spec.ts (12 tests) 374ms
+ ✓ test/judge-leg-retry.spec.ts (8 tests) 89ms
+(node:785) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/planner-resubmit.spec.ts (9 tests) 3228ms
+     ✓ re-fires on a route this call has not paid when the planner hangs  1015ms
+     ✓ does not re-wait a hung route when the chain has nothing else to try  1014ms
+     ✓ keeps a recovered leg inside the walks the cap pays for  1016ms
+ ✓ test/heartbeat-guard.spec.ts (15 tests) 1078ms
+     ✓ resumes with the next round number when the report and ledger agree  377ms
+(node:1355) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/engine-contract.spec.ts (15 tests) 144ms
+ ✓ test/replan.spec.ts (17 tests) 84ms
+ ✓ test/fallback-shards.spec.ts (16 tests) 255ms
+ ✓ test/paths.spec.ts (18 tests) 183ms
+ ✓ test/verifier-resubmit.spec.ts (8 tests) 98ms
+ ✓ test/unload-drain.spec.ts (5 tests) 212ms
+ ✓ test/iterate.spec.ts (9 tests) 12ms
+ ✓ test/compact-step-pairing.spec.ts (7 tests) 67ms
+ ✓ test/wave4-acceptance.spec.ts (8 tests) 148ms
+ ✓ test/mode.spec.ts (18 tests) 13ms
+ ✓ test/issue-watch.spec.ts (2 tests) 296ms
+(node:1628) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/team-engine.spec.ts (12 tests) 92ms
+ ✓ test/handoff.spec.ts (15 tests) 11ms
+ ✓ test/profile-clone.spec.ts (6 tests) 367ms
+ ✓ test/docs-config-keys.spec.ts (13 tests) 17ms
+ ✓ test/captain-plan.spec.ts (8 tests) 125ms
+ ✓ test/i18n-parity.spec.ts (6 tests) 8ms
+ ✓ test/config-synthesis-fallback.spec.ts (8 tests) 15ms
+ ✓ test/checkpoint-bound.spec.ts (5 tests) 1563ms
+     ✓ measures the integrity record and derives the payload ceiling from it  677ms
+     ✓ refuses one payload byte above the ceiling as too large  570ms
+ ✓ test/input.spec.ts (13 tests) 12ms
+ ✓ test/child-evidence.spec.ts (15 tests) 8ms
+ ✓ test/loader.spec.ts (3 tests) 157ms
+ ✓ test/intake.spec.ts (14 tests) 7ms
+ ✓ test/history.spec.ts (16 tests) 64ms
+ ✓ test/captain-memory.spec.ts (8 tests) 111ms
+ ✓ test/docs-version.spec.ts (8 tests) 12ms
+ ✓ test/upstream.spec.ts (8 tests) 7ms
+ ✓ test/settings-projection.spec.ts (4 tests) 175ms
+ ✓ test/dispatcher-board.spec.ts (4 tests) 32ms
+ ✓ test/iterate-template.spec.ts (7 tests) 6ms
+ ✓ test/rsi-ledger.spec.ts (5 tests) 12ms
+ ✓ test/criterion.spec.ts (5 tests) 9ms
+ ✓ test/docs-architecture-version.spec.ts (3 tests) 6ms
+ ✓ test/records-redaction.spec.ts (4 tests) 62ms
+ ✓ test/board-reader.spec.ts (2 tests) 22ms
+ ✓ test/triage-followup.spec.ts (5 tests) 11ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 10 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/channel.spec.ts > A1/A2/A5: a mid-run message is acknowledged at once and costs nothing in flight > answers the receipt while the run is still live, and leaves the run alone
+ FAIL  test/channel.spec.ts > A1/A2/A5: a mid-run message is acknowledged at once and costs nothing in flight > A3: queues the demand for the planner together with the conversation
+ FAIL  test/channel.spec.ts > A1/A2/A5: a mid-run message is acknowledged at once and costs nothing in flight > A4: a demand that never reached a boundary opens the next round
+ FAIL  test/channel.spec.ts > A1/A2/A5: a mid-run message is acknowledged at once and costs nothing in flight > A1: the conclusion of the round is delivered into the same session
+ FAIL  test/channel.spec.ts > explicit stop: the one message that may cancel > cancels the live run and starts nothing
+ FAIL  test/channel.spec.ts > `replan` off: the channel is inert and the old path is unchanged > still acknowledges at once (the background admission is not the channel) and starts one round
+Error: the run started
+ ❯ test/channel.spec.ts:326:29
+    324| async function waitFor(predicate: () => boolean, label = 'condition'):…
+    325|   await vi.waitFor(() => {
+    326|     if (!predicate()) throw new Error(label)
+       |                             ^
+    327|   })
+    328| }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/10]⎯
+
+ FAIL  test/grok-on-ingress.spec.ts > /grok on keeps message ingress open > dispatches the next message while the team run is still in flight
+AssertionError: expected [ 'refactor the parser' ] to include 'also check the lexer'
+ ❯ test/grok-on-ingress.spec.ts:252:29
+    250|     // Before the fix the first step is still open, so the second mess…
+    251|     // even dispatched: the user sees nothing and the composer looks b…
+    252|     expect(loop.dispatched).toContain('also check the lexer')
+       |                             ^
+    253|     expect(transcript(session)).toContain('also check the lexer')
+    254|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/10]⎯
+
+ FAIL  test/grok-on-ingress.spec.ts > /grok on keeps message ingress open > still runs the full team for the message and delivers the report afterwards
+AssertionError: expected {} to match object { Object (objective, maxConcurrency) }
+
+- Expected
++ Received
+
+- {
+-   "maxConcurrency": 10,
+-   "objective": StringContaining "audit the release pipeline",
+- }
++ {}
+
+ ❯ test/grok-on-ingress.spec.ts:270:44
+    268|     // `full` mode keeps its promise: the run happens for every messag…
+    269|     // configured concurrency bound (default 10, hard maximum 100).
+    270|     expect(ctx.engine.startCalls[0]!.args).toMatchObject({
+       |                                            ^
+    271|       objective: expect.stringContaining('audit the release pipeline'),
+    272|       maxConcurrency: DEFAULT_MAX_CONCURRENCY,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/10]⎯
+
+ FAIL  test/grok-on-ingress.spec.ts > /grok on keeps message ingress open > a saturated queue keeps the blocking path instead of promising a background run
+Error: message 1 was not dispatched
+ ❯ test/grok-on-ingress.spec.ts:315:55
+    313|       loop.send(userMessage(`queued message ${index}`))
+    314|       await vi.waitFor(() => {
+    315|         if (loop.dispatched.length < index + 1) throw new Error(`messa…
+       |                                                       ^
+    316|       })
+    317|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/10]⎯
+
+ FAIL  test/triage.spec.ts > t52 front desk: each tier behaves as promised > a session /grok record forces the full workflow even when the deployment uses the front desk
+AssertionError: expected [ { …(6) }, { …(6) } ] to have a length of 1 but got 2
+
+- Expected
++ Received
+
+- 1
++ 2
+
+ ❯ test/triage.spec.ts:545:35
+    543|     const text = await route(ctx, agent, '你好')
+    544|     expect(text).not.toContain('档位：')
+    545|     expect(ctx.engine.startCalls).toHaveLength(1)
+       |                                   ^
+    546|   })
+    547|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/10]⎯
+
+
+ Test Files  3 failed | 99 passed (102)
+      Tests  10 failed | 1904 passed (1914)
+   Start at  20:16:51
+   Duration  130.97s (transform 2.79s, setup 0ms, import 9.83s, tests 109.49s, environment 11ms)
+

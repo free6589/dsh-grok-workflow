@@ -1,0 +1,7 @@
+[
+  { "type": "fresh", "label": "B3-fresh-session" },
+  { "type": "baseline" },
+  { "type": "send", "label": "B3-0-grok-on", "text": "/grok on", "timeoutMs": 30000, "quietMs": 6000 },
+  { "type": "send", "label": "B3-1-hello", "text": "你好呀", "timeoutMs": 240000, "quietMs": 20000 },
+  { "type": "snapshot", "label": "B3-2-after" }
+]

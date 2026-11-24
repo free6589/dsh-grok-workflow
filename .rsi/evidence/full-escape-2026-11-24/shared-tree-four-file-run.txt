@@ -1,0 +1,80 @@
+# 出处：共享工作树（我的两个提交 + gate-escape 未提交的 src/gate.ts、src/triage.ts、test/grok-on-ingress.spec.ts、test/triage.spec.ts）。
+# 命令：npx vitest run test/full-behind-first-answer.spec.ts test/human-output-contract.spec.ts test/channel.spec.ts test/grok-on-ingress.spec.ts → exit 1
+# 我的两份文件与 human-output-contract、grok-on-ingress 全绿；channel 6 条红 = escape 在 /grok on 上先问拆法，队轮要等「确认」才起（不是计数问题，已另有切面补丁）。
+
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/feat-full-escape
+
+ ❯ test/channel.spec.ts (42 tests | 6 failed) 6528ms
+     ✓ treats 停 as a stop 2ms
+     ✓ treats 停吧 as a stop 0ms
+     ✓ treats 停一下。 as a stop 0ms
+     ✓ treats 请停下来 as a stop 0ms
+     ✓ treats 别做了 as a stop 0ms
+     ✓ treats 取消 as a stop 0ms
+     ✓ treats 算了 as a stop 0ms
+     ✓ treats stop as a stop 0ms
+     ✓ treats Stop it as a stop 0ms
+     ✓ treats cancel the run as a stop 0ms
+     ✓ treats 再加一个任务：补一版 README as a demand to forward 0ms
+     ✓ treats 改成 C 方案 as a demand to forward 0ms
+     ✓ treats 停止旧的缓存策略（这是新任务） as a demand to forward 0ms
+     ✓ treats 为什么任务 2 是红的 as a demand to forward 0ms
+     ✓ treats 怎么还没跑完？ as a demand to forward 0ms
+     ✓ treats 顺便把测试也补上 as a demand to forward 0ms
+     ✓ treats 停一下之前先把日志存下来，然后继续做第 3 个任务，再把结论发我 as a demand to forward 0ms
+     ✓ never reads a question as a stop, even when it contains a stop word 0ms
+     ✓ keeps a task description that contains a stop character a task 0ms
+     ✓ bounds the stop form by length so a long sentence is not an imperative 0ms
+     ✓ names the marker that decided it, for the ledger 0ms
+     ✓ keeps the demand whole and marks the context as context 0ms
+     ✓ never truncates the demand away, even with a full context 0ms
+     ✓ stays within the intent budget 0ms
+     ✓ omits the context block when there is no conversation yet 0ms
+     ✓ carries the previous objective and the demand in one bounded request 0ms
+     ✓ states an unknown previous objective instead of inventing one 0ms
+     ✓ keeps the demand when the budget is tight, cutting the previous objective first 0ms
+     ✓ the receipt names the merge point, not a new run 0ms
+     ✓ the stop terminal claims no completion and keeps verified work 0ms
+     ✓ an idle stop says nothing was started 0ms
+     ✓ the carried round says why it is one round later 0ms
+     ✓ ledger outcomes are stable strings 1ms
+     × answers the receipt while the run is still live, and leaves the run alone 1155ms
+     × A3: queues the demand for the planner together with the conversation 1043ms
+     × A4: a demand that never reached a boundary opens the next round 1042ms
+     × A1: the conclusion of the round is delivered into the same session 1043ms
+     × cancels the live run and starts nothing 1043ms
+     ✓ answers a bare stop with nothing running instead of admitting it as a task 2ms
+     × still acknowledges at once (the background admission is not the channel) and starts one round 1041ms
+     ✓ acknowledges a mid-run demand into the live plan instead of a second round 96ms
+     ✓ lets the normal path consume it instead of queueing "确认" into the live run 52ms
+ ✓ test/grok-on-ingress.spec.ts (6 tests) 929ms
+     ✓ a saturated queue keeps the blocking path instead of promising a background run  357ms
+ ✓ test/human-output-contract.spec.ts (10 tests) 501ms
+ ✓ test/full-behind-first-answer.spec.ts (4 tests) 488ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/channel.spec.ts > A1/A2/A5: a mid-run message is acknowledged at once and costs nothing in flight > answers the receipt while the run is still live, and leaves the run alone
+ FAIL  test/channel.spec.ts > A1/A2/A5: a mid-run message is acknowledged at once and costs nothing in flight > A3: queues the demand for the planner together with the conversation
+ FAIL  test/channel.spec.ts > A1/A2/A5: a mid-run message is acknowledged at once and costs nothing in flight > A4: a demand that never reached a boundary opens the next round
+ FAIL  test/channel.spec.ts > A1/A2/A5: a mid-run message is acknowledged at once and costs nothing in flight > A1: the conclusion of the round is delivered into the same session
+ FAIL  test/channel.spec.ts > explicit stop: the one message that may cancel > cancels the live run and starts nothing
+ FAIL  test/channel.spec.ts > `replan` off: the channel is inert and the old path is unchanged > still acknowledges at once (the background admission is not the channel) and starts one round
+Error: the run started
+ ❯ test/channel.spec.ts:337:29
+    335| async function waitFor(predicate: () => boolean, label = 'condition'):…
+    336|   await vi.waitFor(() => {
+    337|     if (!predicate()) throw new Error(label)
+       |                             ^
+    338|   })
+    339| }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+
+ Test Files  1 failed | 3 passed (4)
+      Tests  6 failed | 56 passed (62)
+   Start at  20:22:19
+   Duration  10.40s (transform 1.01s, setup 0ms, import 1.51s, tests 8.45s, environment 0ms)
+

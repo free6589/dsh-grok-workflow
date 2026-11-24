@@ -1,0 +1,2 @@
+session-7b0d1b78-3495-44c1-9829-ac95fcf55191 | born=2026-11-24 12:56:15 run-start=0 agent-start=0 tool-calls=0 grok-mode=1 | parent=- | 今天天气怎么样？
+243c6762-d6c5-451e-9214-16aa3af36e05 | born=2026-11-24 12:56:25 run-start=0 agent-start=0 tool-calls=0 grok-mode=0 | parent=session-7b0d1b78-3495-44c1-9829-ac95fcf55191 | 快速执行 You are the single
