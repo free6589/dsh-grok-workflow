@@ -1,0 +1,177 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-flaky-triage-phase1
+
+(node:453) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGTERM listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:453) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGINT listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:453) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGHUP listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+ ❯ test/phase1-dialogue.spec.ts (36 tests | 1 failed) 9605ms
+     ✓ publishes the claimed message, then the report, once each, in that order  716ms
+     ✓ keeps the original message when the message is refused before any run 10ms
+     ✓ survives a reload: the transcript replays the original message then the report 282ms
+     ✓ in-turn: the claimed message is entered with the answer in the same step (T4) 289ms
+     ✓ in-turn: the original message and the report are both in the durable log (T4) 288ms
+     ✓ a downstream refusal is not claimed, so the batch stays routable 10ms
+     ✓ asks before running when the request is ambiguous 146ms
+     ✓ hands the quick worker the original request together with the choice 145ms
+     ✓ hands the team the original request together with the choice  561ms
+     ✓ states that the confirmation expired instead of guessing the task 296ms
+     ✓ starts nothing when the pending question was lost by a reload 251ms
+     ✓ never lets another session answer this session’s question  679ms
+     × consumes a pending question once, so a repeated answer cannot start a second run 775ms
+     ✓ says the question is void when the user answers something else 246ms
+     ✓ keeps an earlier unanswered request when a second question arrives (B04)  786ms
+     ✓ cuts the resumed request to the objective budget instead of refusing the run (B08)  818ms
+     ✓ answers a classification failure instead of an empty turn 1ms
+     ✓ answers when answering in-turn throws, and keeps the claimed message 6ms
+     ✓ states a quick-tier failure and never celebrates it 7ms
+     ✓ never prints a secret that the failure carried 52ms
+     ✓ does not re-enter the gate or start a second workflow to report an error 17ms
+     ✓ tells a cancellation apart from a provider failure 283ms
+     ✓ launches nothing when the signal is already aborted 9ms
+     ✓ cancels the running engine once and reports the stop, without a retry 280ms
+     ✓ keeps the tasks that had already been verified when the run is stopped 163ms
+     ✓ turns a deadline into its own terminal state (regression, T4 fixed deadline)  324ms
+     ✓ names an unload as an unload, not as a caller cancellation  1091ms
+     ✓ keeps the typed message once and writes the cancelled terminal when the run is stopped 275ms
+     ✓ writes verified partial work into the cancelled transcript 143ms
+     ✓ keeps the message and states the terminal when the signal was already aborted 2ms
+     ✓ cancels and disposes a running quick-worker call when the plugin unloads 65ms
+     ✓ returns from quick-worker startup on unload and disposes a run that arrives late 102ms
+     ✓ states the rules verdict with no model call (hybrid removed, T4) 204ms
+     ✓ leaves the claimed batch to enter.messages on a headless turn-1 session 14ms
+     ✓ publishes mid-run on an established surface (turn 2) 248ms
+     ✓ a rejected turn-1 batch degrades to enter.messages, never to a headless append 6ms
+(node:464) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGTERM listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:464) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGINT listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:464) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGHUP listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+ ❯ test/triage.spec.ts (43 tests | 4 failed) 48050ms
+     ✓ routes greetings and acknowledgements to the direct tier 22ms
+     ✓ routes one concrete action to the quick tier 44ms
+     ✓ routes multi-part work and deliverables to the team 1ms
+     ✓ asks instead of guessing when the target is only pointed at 5ms
+     ✓ lets the user force the team from inside the message 1ms
+     ✓ reads the answer to its own question before any other rule 9ms
+     ✓ keeps the pre-t52 rule when the front desk is off 3ms
+     ✓ bounds the concrete scan so a 32k paste cannot stall the front desk 32ms
+     ✓ scans at most the first 4096 characters for signals 35ms
+     ✓ is pure: no clock, no I/O, same text in the same verdict out 6ms
+     ✓ detects the language from the message 0ms
+     ✓ states tier and reason in the message language 0ms
+     ✓ tells the user which tier answered 0ms
+     ✓ never answers a question from the greeting template (t53 F1) 6ms
+     ✓ routes short two-step instructions to the team (t53 F1) 1ms
+     ✓ answers a pointer that carries a path instead of asking about it (t53 F1) 1ms
+     ✓ does not crash on a bare choice word with no question waiting (t53 F1) 5ms
+     ✓ treats a trailing 几 and its measure words as a question (t56 N3) 1ms
+     ✓ counts a 顿号 list and 并+回滚 as sequencing (t56 N3) 0ms
+     ✓ counts a full-width comma list as sequencing too 0ms
+     ✓ does not read a 顿号 list inside a question as sequencing 0ms
+     ✓ recognises an English yes/no question without a question mark (t56 N3) 1ms
+     ✓ recognises A不A / A没A, 还是 and 谁 as question shapes (t58 L3) 1ms
+     ✓ has a canned answer for every chat bucket 6ms
+     ✓ asks the single child for exactly its tier 1ms
+     ✓ a session /grok record forces the full workflow even when the deployment uses the front desk  899ms
+     ✓ answers a greeting directly, without starting the team or a call  5012ms
+     ✓ answers "what can you do" instead of deflecting it  5008ms
+     ✓ answers a simple task with one worker and says so  5035ms
+     × runs the whole workflow for a complex request after the captain split is confirmed 6097ms
+     × asks one question instead of guessing, and remembers the answer 5185ms
+     × hands the worker the answered request and the new work in the same message (B05) 5192ms
+     × upgrades to the team when the message asks for it, after a split confirmation 5154ms
+     ✓ retries once with a structured answer when the plain call returns nothing  5007ms
+     ✓ states a failed cheap call instead of silently upgrading it  5005ms
+     ✓ keeps the pre-t52 text when the front desk is off 254ms
+     ✓ resumes the original request and names the choice in the worker text 1ms
+     ✓ resumes the original request for the team tier too, in the message language 4ms
+     ✓ states an expired or void question instead of guessing the task 1ms
+     ✓ reads the whole message before calling it an answer 1ms
+     ✓ keeps the choice, the original request and the new work in the worker text 3ms
+     ✓ adds no new work section when the message is only the answer 0ms
+     ✓ keeps the team choice and the new work together, in the message language 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/phase1-dialogue.spec.ts > P0-2: a confirmation answer keeps the original request > consumes a pending question once, so a repeated answer cannot start a second run
+AssertionError: expected '已收到，并入了正在跑的这一轮（待并入 1 条）。已经开跑的部分不会被打断，…' to contain '没有待回答的分流问题'
+
+Expected: "没有待回答的分流问题"
+Received: "已收到，并入了正在跑的这一轮（待并入 1 条）。已经开跑的部分不会被打断，已完成、已验证的成果不会重做：规划器会在下一个波边界把这条要求合并进还没开始的任务。要立刻停，回一句「停」即可。"
+
+ ❯ test/phase1-dialogue.spec.ts:612:29
+    610|
+    611|     const again = await ctx.preStep()(payload(agent, [userMessage('团队'…
+    612|     expect(answerOf(again)).toContain('没有待回答的分流问题')
+       |                             ^
+    613|     expect(ctx.engine.startCalls).toHaveLength(2)
+    614|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  test/triage.spec.ts > t52 front desk: each tier behaves as promised > runs the whole workflow for a complex request after the captain split is confirmed
+Error: background report not delivered yet
+ ❯ test/triage.spec.ts:491:49
+    489|   if (!enteredHasReport && ctx.engine.startCalls.some(call => call.met…
+    490|     await vi.waitFor(() => {
+    491|       if (agent.followups.length <= seen) throw new Error('background …
+       |                                                 ^
+    492|     })
+    493|     const content = agent.followups[agent.followups.length - 1]!.conte…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  test/triage.spec.ts > t52 front desk: each tier behaves as promised > asks one question instead of guessing, and remembers the answer
+AssertionError: expected '把这个弄一下已收到，并入了正在跑的这一轮（待并入 1 条）。已经开跑的部分…' to contain '档位：确认档'
+
+Expected: "档位：确认档"
+Received: "把这个弄一下已收到，并入了正在跑的这一轮（待并入 1 条）。已经开跑的部分不会被打断，已完成、已验证的成果不会重做：规划器会在下一个波边界把这条要求合并进还没开始的任务。要立刻停，回一句「停」即可。"
+
+ ❯ test/triage.spec.ts:575:19
+    573|     const asked = await route(ctx, agent, '把这个弄一下')
+    574|     expect(ctx.engine.startCalls).toHaveLength(0)
+    575|     expect(asked).toContain('档位：确认档')
+       |                   ^
+    576|     expect(asked).toContain('这个要动用团队吗？可回复：简单 / 团队')
+    577|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  test/triage.spec.ts > t52 front desk: each tier behaves as promised > hands the worker the answered request and the new work in the same message (B05)
+AssertionError: expected '把这个弄一下已收到，并入了正在跑的这一轮（待并入 2 条）。已经开跑的部分…' to contain '档位：确认档'
+
+Expected: "档位：确认档"
+Received: "把这个弄一下已收到，并入了正在跑的这一轮（待并入 2 条）。已经开跑的部分不会被打断，已完成、已验证的成果不会重做：规划器会在下一个波边界把这条要求合并进还没开始的任务。要立刻停，回一句「停」即可。"
+
+ ❯ test/triage.spec.ts:598:19
+    596|     const agent = new FakeAgent()
+    597|     const asked = await route(ctx, agent, '把这个弄一下')
+    598|     expect(asked).toContain('档位：确认档')
+       |                   ^
+    599|     ctx.engine.reply = 'done'
+    600|     const answered = await route(ctx, agent, '简单，另外帮我看下 log')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  test/triage.spec.ts > t52 front desk: each tier behaves as promised > upgrades to the team when the message asks for it, after a split confirmation
+AssertionError: expected '用团队帮我改个 typo已收到，并入了正在跑的这一轮（待并入 3 条）。已…' to contain '你的消息里点名了团队'
+
+Expected: "你的消息里点名了团队"
+Received: "用团队帮我改个 typo已收到，并入了正在跑的这一轮（待并入 3 条）。已经开跑的部分不会被打断，已完成、已验证的成果不会重做：规划器会在下一个波边界把这条要求合并进还没开始的任务。要立刻停，回一句「停」即可。"
+
+ ❯ test/triage.spec.ts:616:19
+    614|     const agent = new FakeAgent()
+    615|     const asked = await route(ctx, agent, '用团队帮我改个 typo')
+    616|     expect(asked).toContain('你的消息里点名了团队')
+       |                   ^
+    617|     expect(asked).toContain('队长先报拆法')
+    618|     const text = await route(ctx, agent, '开干')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  5 failed | 74 passed (79)
+   Start at  12:21:42
+   Duration  66.19s (transform 6.00s, setup 0ms, import 7.42s, tests 57.65s, environment 5ms)
+

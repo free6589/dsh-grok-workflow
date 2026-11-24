@@ -8,7 +8,7 @@
   `AssertionError: expected '已收到，并入了正在跑的这一轮（待并入 1 条）…' to contain '没有待回答的分流问题'`；
   再把它所在 describe 用 `LOAD=24 N=8` 单挑，**8/8 红**，还是同一条。
 - `test/triage.spec.ts`：修者单跑该文件 `LOAD=12 N=8` **0/8 红**（这条要两个文件一起压才现形）；验收方 10 次混合跑里有 **1 次**红
-  （`repro-run-7-triage.log`），红的是 4 条：`runs the whole workflow for a complex request after the captain split is confirmed`、
+  （`repro-run-7-triage.txt`），红的是 4 条：`runs the whole workflow for a complex request after the captain split is confirmed`、
   `asks one question instead of guessing, and remembers the answer`、`hands the worker the answered request and the new work in the same message (B05)`、
   `upgrades to the team when the message asks for it, after a split confirmation`。
 
@@ -60,12 +60,13 @@ CPU 争抢。不自称知道。
 | 失败成自己（修者） | 让后台轮永不投递（`deliverRelay` 不调 `agent.followup`） | phase1：`Error: the round the confirmation started did not land within 15000 ms`，**15 430 ms**；triage 路径：`Error: the report of the background round did not land within 15000 ms`，**20 220 ms**（5 s 路径判别窗 + 15 s）—— 两条都在 30 s 内，都不是 `Test timed out in 30000ms` |
 | 门禁（修者，`4a2f7fd` + 工作树） | `npm run ci` | **exit 0**：99 files / 1837 tests PASS，typecheck 干净，lint **0 errors / 36 warnings**，`verify:lib` → `lib/ at 4a2f7fd is the build of src/ at 4a2f7fd (237 files, byte-identical)` |
 | 门禁（验收方，交付提交 `a210b08`） | `npm run ci`（loadavg 3.46 起跑，119.54 s） | **exit 0**：99 files / 1837 tests PASS；`npm run typecheck` exit 0；`npm run lint` **36 warnings / 0 errors**；`npm run verify:lib` → `lib/ at a210b08 is the build of src/ at a210b08 (237 files, byte-identical)` |
-| 工作树 | `git status --short`（两个提交之后） | 只有 `.rsi/evidence/flaky-triage-phase1/`（本次随文档一并提交），无 `*.log` / `*.tgz` / `*.bak` / `*.orig` / `*~` 残留 |
+| 工作树 | `git status --short --branch`（证据与文档提交之后） | 只有分支行 `## fix/flaky-triage-phase1`：证据目录已全部入库，无 `*.log` / `*.tgz` / `*.bak` / `*.orig` / `*~` 残留、无被忽略的副本 |
 
-**证据：** `.rsi/evidence/flaky-triage-phase1/` —— `README.md` 与 `repro-run-1.log`、`repro-run-7-triage.log` 是修前的原始样本
-（这两份 `.log` 是**本地**证据：本仓库 `.gitignore` 第 8 行 `*.log`，全库没有任何 `.log` 被跟踪，所以它们随载体留在工作树里、不进版本树，
-与本文件此前引用过的其它 `logs/*.log` 同例）；`after-fix-harness-load12-n10.txt`、`after-targeted-run-1..5.txt` 是修后（修者）的原始日志，
-已随本次文档提交；`after-fix-README.md` 是修后一页汇总（含变异与「失败成自己」的逐条输出）。
+**证据：** `.rsi/evidence/flaky-triage-phase1/`，全部**已跟踪**（`6755474` 与随后的 `docs(evidence)` 提交）：
+`README.md` 与 `repro-run-1.txt`、`repro-run-7-triage.txt` 是修前的原始样本 —— 本仓库 `.gitignore` 第 8 行是 `*.log`，
+所以这两份以**逐字节相同的 `.txt`** 入库（`cmp` 与原 `.log` 一致，`md5` 分别是 `43d825ba…` / `26fea61a…`），原 `.log` 已从工作树删除，
+不在被忽略的状态里留副本；`after-fix-harness-load12-n10.txt`、`after-targeted-run-1..5.txt` 是修后（修者）的原始日志；
+`after-fix-README.md` 是修后一页汇总（含变异与「失败成自己」的逐条输出）。这份文件里所有样本引用都点得到实际文件。
 
 **缺口（照实写）：**
 

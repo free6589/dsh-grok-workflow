@@ -9,11 +9,12 @@ worktree; nothing here is inferred from the code alone.
   (12 bash spinners + `TMPDIR=$PWD/.tmp npx vitest run test/phase1-dialogue.spec.ts test/triage.spec.ts`),
   run with **nothing else on the box**: `RED 0 / 10`, loadavg 22.58 → 26.43.
 - `after-targeted-run-1..5.txt` — `LOAD=16 N=5` over the same two files: `RED 0 / 5`.
-- The two pre-fix samples (`repro-run-1.log`, `repro-run-7-triage.log`) are the
-  lead's and stay **untracked**: `*.log` is gitignored repo-wide and no `.log`
-  file is tracked anywhere in this repository. They live here, locally.
-- `repro-run-1.log`, `repro-run-7-triage.log` — the lead's pre-fix samples
-  (unchanged, and untracked: see the note on `*.log` above).
+- `repro-run-1.txt`, `repro-run-7-triage.txt` — the lead's two pre-fix samples,
+  **tracked**: `*.log` is gitignored repo-wide (`.gitignore:8`) and no `.log`
+  file is tracked anywhere in this repository, so the same bytes are committed
+  as `.txt` (`cmp` against the originals is clean; md5 `43d825ba…` /
+  `26fea61a…`), and the `.log` originals were deleted from the worktree so no
+  ignored copy is left inside a tracked directory.
 
 ## Pre-fix, measured here (same box, same harness)
 
@@ -25,7 +26,7 @@ worktree; nothing here is inferred from the code alone.
 
 No second *distinct* red case was observed in `phase1-dialogue.spec.ts` (33
 loaded samples, one per run + 8 targeted). The four `triage.spec.ts` cases in
-`repro-run-7-triage.log` were reproduced as one cause: the first red there is
+`repro-run-7-triage.txt` were reproduced as one cause: the first red there is
 `Error: background report not delivered yet` (vitest's 1 000 ms `vi.waitFor`),
 and the round it left running then steered the next three cases' messages —
 `待并入 1 条` → `2 条` → `3 条`, the queue count rising as each steered message
