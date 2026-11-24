@@ -444,12 +444,25 @@ export function recordRouting(
  * effect was child sessions appearing. The recorder below reproduces the in-tree
  * one — same four types, same field shapes — and `test/records.spec.ts` pins the
  * shapes, so a DSH upgrade that renames a field fails a test instead of silently
- * emptying the panel.
+ * emptying the panel. {@link PROGRESS_SUMMARY_FINAL} is the one addition, and it
+ * is optional by construction: a reader that has never heard of it ignores it.
  */
 export const PROGRESS_RUN_START = 'tool-workflow/run-start'
 export const PROGRESS_AGENT_START = 'tool-workflow/agent-start'
 export const PROGRESS_AGENT_END = 'tool-workflow/agent-end'
 export const PROGRESS_RUN_END = 'tool-workflow/run-end'
+
+/**
+ * The optional event that names the summary draft the run actually ships.
+ *
+ * Not a lifecycle event: it announces no call and settles nothing, so a stream
+ * without it renders exactly what it rendered before. It exists because a child's
+ * row cannot be renamed after the fact (the chat panel folds `agent-start` into a
+ * row and only ever matches `agent-end` to it by `seq`), so "this draft is the
+ * final one" has to arrive as its own fact — which the gate only learns once it
+ * has passed a draft.
+ */
+export const PROGRESS_SUMMARY_FINAL = 'tool-workflow/summary-final'
 
 /** Payload of {@link PROGRESS_RUN_START} (`ToolWorkflowRunStartData`). */
 export interface ProgressRunStart {
@@ -477,6 +490,13 @@ export interface ProgressAgentEnd {
 export interface ProgressRunEnd {
   runId: string
   stopReason: WorkflowStopReason
+}
+
+/** Payload of {@link PROGRESS_SUMMARY_FINAL}: which summary draft is the shipped one. */
+export interface ProgressSummaryFinal {
+  runId: string
+  /** 1-based draft number that passed the summary gate. */
+  draft: number
 }
 
 /**
@@ -538,6 +558,8 @@ export interface WorkflowProgressRecorder {
   agentEnd(runId: string, member: ProgressMemberEnd): void
   /** Close the node with its terminal status. */
   runEnd(runId: string, stopReason: WorkflowStopReason): void
+  /** Mark which summary draft the run shipped (the one that passed the gate). */
+  summaryFinal(runId: string, draft: number): void
   /** Stop recording and drop any buffered events. */
   dispose(): void
 }
@@ -582,8 +604,8 @@ interface RawAppend {
  * 3. **Concurrent and recursive runs stay independent.** State is per recorder,
  *    and one recorder owns exactly one run.
  *
- * The four `tool-workflow/*` types are declared by `@deepseek-ai/dsh-tool-workflow`'s
- * own module augmentation. This package deliberately does not depend on that
+ * The four lifecycle `tool-workflow/*` types are declared by
+ * `@deepseek-ai/dsh-tool-workflow`'s own module augmentation. This package deliberately does not depend on that
  * package (it would drag the tool layer into the plugin's dependency tree just to
  * borrow four type names), so the append is issued through a narrow local
  * interface and the payload shapes are pinned by tests instead.
@@ -685,6 +707,15 @@ export function createWorkflowProgressRecorder(
       if (target === undefined) return
       append(target, PROGRESS_RUN_END, { runId, stopReason })
       owned.delete(runId)
+    },
+    summaryFinal(runId, draft) {
+      if (disposed) return
+      const target = owned.get(runId)
+      // Same rule as `run-end`: only a run this recorder announced gains a fact.
+      if (target === undefined) return
+      const position = Number.isFinite(draft) ? Math.trunc(draft) : 0
+      if (position < 1) return
+      if (!append(target, PROGRESS_SUMMARY_FINAL, { runId, draft: position })) owned.delete(runId)
     },
     dispose() {
       disposed = true

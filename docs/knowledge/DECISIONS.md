@@ -3273,3 +3273,153 @@ spine 为空，pre-fix 形状会进脊柱。
   与 D-126 的语义谁取代谁，本轮没有立场；③ **没 rebase**（`behind=500`，rebase 后冲突面可能变，6 个路径只是当前 `main` 上的读数）。
 - **Consequences:** 这条记录的用处是「别再重新盘一遍库存」——ahead/behind、diffstat、冲突路径已经量过；它也明确挡掉「顺手合了它」这种动作。
   下一轮做它时，起点是 rebase 到当时尖端 + 跑它的 417 行用例 + 对 D-126 做取舍，而不是从「这分支是干什么的」重新开始。
+
+## D-131 · 完整流程（`/grok on`）补一张前台：逃生口只认会话记录、先问必须先能后送、首答盖在接单回执前面（2026-11-24，未发版）
+
+- **Status:** `CONFIRMED`（`test/full-escape.spec.ts` 5 例、`test/full-behind-first-answer.spec.ts` 4 例，两例在基线副本上
+  分别 4 红 1 绿 / 4 红；门禁 `TMPDIR=$PWD/.tmp npm run ci` 在 `24f2f35` 上 exit 0 = 103 文件 / 1922 测试；真机 soak 两相
+  四场景，见 `.rsi/evidence/full-escape-2026-11-24/soak.md`）
+- **Date:** 2026-11-24
+- **来源:** `/grok on` 的既有契约是「每条消息都在回合内跑完整套流程」，用户读到的只有一句接单模板：问候也付一个规划助手、
+  一个工人、一个核验者，「今天天气怎么样？」拿到的是「已接单：这条消息正在按整套流程（拆解 → 执行 → 核验）运行。…」，
+  真正的话要等后面那条。相 A 在基线 `1f70103` 上逐字复现了这个形状（主会话 `run-start=1 agent-start=3 guardian-start=1`，
+  裂出规划/执行/核验三个子会话）。分支 `feat/full-escape`（worktree `.agents/worktrees/feat-full-escape`，自 `main`
+  `1f70103` 开出），功能提交 `86c0fa2` 首答＋前言、`597b444` channel 记账、`21f3616` 逃生口、`8f40be1` 重建 `lib/`、
+  `62f540f` 与 `24f2f35` 只动门禁用例。
+- **Decision:**
+  1. **逃生口只认会话记录。** 判据是 `readModeRecord(agent.session)?.workflowMode === 'full'`——只有 `/grok on` 会写这条记录，
+     也就只有用户亲手打开形态时才有前台（`fullFrontDeskEscape`：`chat` 模板直答、`fast` 一次 `quick-worker`、
+     `team` 先报拆法）。部署级 `limits.mode === 'full'`**一个字节都不走这条路**：那是「一轮跑完」的既有契约，被
+     `gate` / `phase1` / `reliability` / `human-output-contract` 等用例钉着（`src/gate.ts` 的注释自己记着「17 条 gate 用例
+     钉着它」）。要做的是**收窄产品行为**，不是改那些钉子。
+  2. **「先问」必须先能后送。** `team` 档要报拆法、等用户点头才起队轮，所以 `fullFrontDeskEscape` 在派拆法之前先过
+     `canBackgroundDeliver(agent)`（`whenIdle`、`followup` 都是函数且会话在，任一不满足即 `false`）：不满足就返回
+     `undefined`，交回原来的阻塞路径。一次性/headless 运行没有后续回合，问了没人答，任务会被那句问话吞掉。
+  3. **首答盖在接单回执前面。** `answerFullBehind` 先用一次 `first-answer` 轻量调用写下这一两句人答，再拼
+     `[注, 首答, acceptedReceipt(lang)]` 用 `acceptedEnterText` 送进回合；`ACCEPTED_PREAMBLE` 随之从「已接单、别自己答」
+     改成「已经先答过、别在它上面再造一个答案」（保留了「不重答、不调工具、标记内逐字照抄」这三条约束），
+     `acceptedReceipt` 的措辞也跟着改：它现在说的是「上面这一两句是先答」，而不是「这条消息正在跑」。首答那次调用与队轮
+     解耦——慢、失败、空回都只落到模板兜底（`firstAnswerFallback`），绝不把队轮推回回合里。
+- **被否决的替代方案:**
+  1. **让部署级 `mode: 'full'` 也走前台。** 会顺手改掉「每条消息都在回合内跑完」这个既有契约，而钉它的是别的用例组；
+     一次为了体验的修复不该连带重写别人的钉子。要改那个形状，是另一条决定。
+  2. **一次性/headless 也先问。** 没有后续回合可读「确认」，用户看不到问句也答不了，任务等于被吞——比「多花一次队轮」坏得多。
+  3. **继续用「接单模板 + 让主模型别自己答」。** 用户读到的还是一条禁言回执；这正是相 A 复现的那个病。
+  4. **队轮仍在回合内跑完再答（旧 `in-turn`）。** 回合被整个跑动占住，期间用户发的消息被领取后不派发，转写看着像坏了
+     ——`/grok off` 能过、`/grok on` 不能，正是用户报的那个对照。
+  5. **首答那次调用失败就把队轮拉回回合里跑。** 一次慢/失败的轻量调用会拖住整轮；失败就照实写模板兜底，队轮照旧在后台。
+  6. **在 `full` 的 `chat`/`fast` 档加档位行。** `full` 从来没有档位行，前台也不该给它加一句（`triage` 形状才有）。
+- **Evidence:** `src/gate.ts`（`fullFrontDeskEscape` 五个 `outcome`：`full-escape-chat` / `full-escape-fast` /
+  `full-escape-failed` / `full-escape-ask` / `full-escape-ask-fallback`；`answerFullBehind`；`canBackgroundDeliver`；
+  `acceptedReceipt`）、`src/triage.ts`（`escape` 输入：只丢 `mode-full` 硬覆盖，规则链不动）、
+  `src/answer.ts`（`ACCEPTED_PREAMBLE`、`acceptedEnterText`）、
+  `test/full-escape.spec.ts`（5 例：基线副本上 4 红 1 绿，唯一绿的是「部署级 `full` 立刻起队轮」——它本来就该绿）、
+  `test/full-behind-first-answer.spec.ts`（4 例，基线副本上 4/4 红）、
+  `.rsi/evidence/full-escape-2026-11-24/soak.md`（真机两相四场景）、`docs/knowledge/VALIDATION.md` 同日条目。
+- **Consequences:**
+  - **`/grok on` 下的「直答」不一定零子智能体。** 闲聊是模板直答（B3：零子会话、零工具、零队轮），单个问题是**一个零工具
+    调用的轻量工人**代答（B1 实测如此，回答自己括注「只派了一个工人」）。周报里写「零子智能体」只对闲聊成立。
+  - **回合结束得早，结论是另一条消息。** 任何「等这一回合完成就当作拿到结论」的调用方（脚本、自动化、上游编排）在
+    `/grok on` 下都会读到首答而不是结论；要结论得等后台那条，且它**可能纠正**首答。
+  - **被有意改动的既有钉子**（行为断言本身没放宽，改的是「一轮怎么被打开」）：`test/triage.spec.ts` 1 条
+    （`/grok` 记录强制完整流程那条改用真任务并把标记从档位行换成「队长先报拆法」，仍然断言只发生一次调用）、
+    `test/grok-on-ingress.spec.ts` 3 条（`dispatches the next message…`、`still runs the full team…`、
+    `a saturated queue keeps the blocking path…`：都先发真任务、等拆法、回「确认」，队轮计数改看 `teamRuns`）、
+    `test/channel.spec.ts` 6 条（前台那次调用单独记账成 `frontDeskCalls`，`startCalls` 仍只数整轮；
+    `expect(started).toMatchObject({kind:'enter'})` 换成先等拆法出去、再断一次整轮）。
+  - 一次 `/grok on` 下的真任务现在固定多花一次调用（拆法预览），点头后还多花一次（首答）——换来的是用户在回合里就能读到人话。
+
+## D-132 · 审计层入口 = 报告尾部的**可选段**：默认视图一个字节不动，只有「没跑完」的那一轮把全量记录接在后面（2026-11-24）
+
+- **Status:** `CONFIRMED`（`npm run ci` 在 `feat/audit-render-half` 上 EXIT=0；真机隔离 soak 两跑都按此语义落地）
+- **Date:** 2026-11-24
+- **Decision:** `feat/audit-layer`（`7626233`，ahead 1 / behind 503）只取两件东西——`src/report-audit.ts` 与
+  `test/report-audit.spec.ts`——并把它接到报告层的**尾部**，作为可选段：
+  1. `RenderReportOptions.auditTrail?: boolean`，**默认关**。为真时 `renderReport` 先照旧算出 base view（含
+     `MAX_RENDER_CHARS` 截断），再在**守卫行之后**接 `\n\n` + `renderAuditTrail(report)`。base view 的截断只管 base
+     view，审计段自带 `AUDIT_MAX_CHARS` 上限。
+  2. `src/index.ts` 的 PTC 工具 `render` 路径传 `auditTrail: report.status !== 'completed'`——**没跑完的一轮**回来时
+     带着完整机器记录，**跑完的一轮**文字与今天逐字节相同。
+  3. `renderAuditTrail` 保持导出，作为任何其它调用方的按需直接入口。
+- **为什么（默认输出必须是恒等的）:** 这份文本被 `src/carryover.ts` 反向解析成跨轮摘要，并被大量用例逐字断言。任何
+  「把全量记录塞进默认视图」的做法都会同时改掉摘要源与断言面——那是另一个决定，不该由这一刀顺手做掉。
+- **被否决的替代方案:**
+  1. **设置页开关。** 说得通，但只为一个显示便利就要新增一个配置键 + 客户端 UI + `docs-config-keys` 守卫的三件套；
+     而且它把「你有没有权限看自己的记录」变成了一个配置问题。显示便利不值得一次 schema 变更。
+  2. **在用户可见的中转里接（`src/answer.ts` / `src/delivery/`）。** 那条路径正被 D-126 的报告↔账本对账契约钉着
+     （两个视图各自渲染同一行形状），再塞一段机器记录进去等于把对账面弄脏，且中转消息的长度预算本来就不是给记录用的。
+  3. **直接合 `feat/audit-layer` 整条分支。** 分支的另一半是「默认视图改成人类答案、机器账本挪到 `showDiagnostics`
+     后面」，与本包无关；`main` 自 0.13.30 起在报告层做过 D-126 那一路改动，`src/report.ts` 正面冲突（D-130 已实测
+     6 个冲突路径）。整条合会把两个各自成立的决定硬拼在一起。
+- **Consequences:**
+  - **没跑完的一轮，文本会长很多。** 真机 soak 里一条 `failed` 报告的工具结果从 **2 691 字**（答案半）涨到
+    **24 792 字**（整条消息），审计段占 22 101 字。这是有意的：跑失败的人需要全量记录；但它也意味着**失败轮次的
+    上下文成本显著上升**，长跑失败时尤其明显（上限 96 000 字，触到上限会以一行「已截断 + 指向结构化结果」收尾）。
+  - **跑完的一轮零变化**：`auditTrail` 缺省/`false` 时 `renderReport` 的返回值与改前逐字节相同。除用例钉住
+    `renderReport(r) === renderReport(r, {auditTrail:false})` 之外，本包还把基线提交 `1f70103` 的 `lib/` 当第二个模块
+    实例做了一次真正的老新对照：completed / partial / `failureReport` 三种报告 × 「无选项 / `showDiagnostics` / 带 guard」
+    = **10 次比较、0 处差异**（`.rsi/evidence/audit-render-half-2026-11-24/default-view-parity.out`）。
+  - **`test/human-output-contract.spec.ts` 的 T4 断言被收窄**（唯一一条既有用例改动）：它原本断言「工具视图不带任何
+    机器词条」，现在断言的锚点仍是这句话，但**只针对答案半**——审计段被切成单独一半，并被断言为「带标题、带收尾句的
+    独立段落」。语义没变（答案里仍然一个内部词条都没有），变的是「工具视图 == 答案」这个前提：它不再成立，这是本决定
+    的正面后果。
+  - **分支另一半仍留在 `feat/audit-layer` 上，等待另一次决定**（默认视图是否翻成人类答案）。本包没有、也不该顺手
+    决定它；那条分支的 `HANDOFF.md` 判定日期顺延到下一次合流动作，而不是这次。
+  - **校验器会丢掉 `plan.tasks[].dependsOn` / `wave`**（见 `RESEARCH.md` 同日条），所以「全量记录」里这两项在生产
+    报告上恒为空——渲染器已经支持，缺的是校验器那一步；本包不改判定语义，故只记录。
+
+（合流时由 D-131 重编为 D-132：`feat/full-escape` 的决策块占住 D-131，本节顺延为 D-132。）
+
+## D-133 · 用户可见名字：重复的调用带序号、终稿单独标「（定稿）」、replan 交卷改「调工具」+ 同棒补交（2026-11-24）
+
+- **Status:** 已落地（`CONFIRMED`：`npm run ci` 在 `fix/naming-resubmit` 上 exit 0，见 `VALIDATION.md` 同日条目）。
+- **Date:** 2026-11-24
+- **背景（实测）:** 同一次 run 里两处「同名不同次」的调用在进度板上分不清：
+  1. 汇总门最多写 `SUMMARY_MAX_ATTEMPTS = 3` 稿（首稿 + 两次重写），每稿还各有一次同稿 `summaryResubmitPrompt` 补交，
+     但所有汇总调用的 `agent()` label 与提示词首行都是 `汇总助手`；
+  2. 规划腿开场拆活一次、每个波边界 replan 一次，两次的 label 都是 `规划助手`，而 replan 提示词首行是 `REPLAN: …`
+     （所以真机上行名连角色都认不出来）。`src/team-engine.ts` 的 `rewriteActivationLabel` 只从提示词首行生成行名，
+     `agent()` 的 `label` 选项被 guest 丢掉——**行名与提示词首行必须同源同串**，这是这条决策的硬约束。
+  3. replan 提示词末行是 `Answer with the structured result only: {...}`，而本运行时只在子代理**调用结构化结果工具**时
+     才拿得到值。按字面理解的子代理纯文本交卷 → 引擎给 null → `format-error` → 边界被记为拒绝、刚并进计划的新需求白丢，
+     而整棒 replan 的开销已经花了。
+- **Decision（三条）:**
+  1. **汇总多稿用序号名**：`汇总·第1稿`…`汇总·第N稿`（en `Summarize · draft N`）；同一稿的补交仍是同一号。
+     真机只在 `review.ok` 那一刻知道「哪一稿是交卷的那一稿」，所以**另发一条可选事件** `tool-workflow/summary-final`
+     （载荷 `{runId, draft}`），由 `src/progress-tab.ts` 的折叠与 `src/client/index.js` 的手写折叠各自认它，把该行改写成
+     `汇总·第N稿（定稿）`。旧流（没有这条事件）渲染结果一字不变；重复/乱序/指向不存在的稿号都幂等。
+  2. **规划两棒统一叫「第N次」**：开场 `规划（第1次）`，波边界 `规划（第2次）`、`规划（第3次）`…（en `Plan (call N)`）。
+     新增独立的 `plannerCallLabel()` / `synthesisDraftLabel()`，**不改** `memberLabel()`——它仍是提示词正文与散文里的
+     角色名（`规划助手` / `汇总助手`），序号只属于「行」。
+  3. **replan 交卷**：提示词改成明确「调用结构化结果工具交卷、只调一次、纯文本等于没交」并给出
+     `{"action":"none"|"apply",…}` 形状；兜底是 `requestReplan` 收到 `format-error`（且非 setup）时在**同一棒**用
+     「补交提示词」重问一次（与 worker / 汇总稿的 resubmit 同形：不重做分析、不花 retry 预算、`log()` 记账），
+     补交也失败则照原逻辑拒绝、计划字节不变。**不伪造纯文本 JSON 解析**：`callRole(..., {schema})` 的纯文本答案拿不到结构化值。
+- **被否决的替代方案:**
+  1. **「一稿 / 定稿」二名制**（首稿叫 `汇总`、交卷那稿叫 `定稿`）：名字里不携带稿号，重写一次就分不清是第几稿；
+     而且「交卷」只有过门那一刻才知道，事后改行在聊天面板做不到（面板对 `agent-start` append 一行、`agent-end` 只按
+     `seq` 改状态、从不改 label），硬要改就得改引擎事件形状。用了「序号 + 可选事件 + 折叠时标注」，聊天面板不动。
+  2. **「拆活 / 问改」两名制**（开场规划与边界 replan 用两个不同名字）：同一棒内会连着出现「拆活、拆活（补交）、
+     问改、问改（补交）」，读者仍不知道是第几个边界；而且 replan 的补交与首问是同一棒，换名字会让同一次调用看起来像两次。
+     统一成「第N次」后，序号与波边界一一对应：`规划（第1次）→ 波1 → 规划（第2次）→ 波2 → 规划（第3次）`。
+  3. **只改提示词、不加兜底**：实测口径下「子代理照样可能纯文本」不是假设——planning 腿早有同棒 resubmit（A 走廊），
+     worker/verifier/supervisor 也各有；replan 唯独没有，等于把一次措辞误解变成一次边界白费。所以两者都做。
+  4. **把纯文本答案硬解析成 JSON 当结构化结果**：`callRole` 的 `schema` 通道拿不到纯文本，伪造解析等于绕过引擎契约、
+     也让 `format-error` 这条诊断失效。改成「同棒补交」既不伪造，也不花 retry。
+- **附带（同轮、有据可查的两处小改）:**
+  - `model` 策略分支以前不写 `report.synthesis.review`，只有 layered 写。宿主标注只认 `check=pass verify=pass`，
+    所以 model 跑会永远标不出终稿。已在 model 的 `review.ok` 分支写同形机器串（`check=pass verify=pass drafts=N`），
+    并把 `test/routing.spec.ts` 里那条 `toEqual({mode, summary})` 的旧断言改成带 `review` 的新形状。机器串格式与
+    `synthesis.review` 的 schema 都没变（它是可选字段），只是 model 跑现在也会带上它。
+  - 报告侧只有**一份英文 ledger**（`renderReport` 没有 lang 参数，`Summary review:` 两语共用这一行），所以
+    「中英各一版」在真机上没有第二个入口可加：只在那一行后补 ` · final: draft N`，未新开中文渲染入口。
+- **Consequences:** 名字的单一真源仍是 `src/naming.ts`；`namingSource()` 生成的 guest 副本同步加了
+  `plannerCallLabel` / `synthesisDraftLabel` / `SYNTHESIS_FINAL_MARK`，`test/naming.spec.ts` 的 host↔guest 一致性矩阵覆盖它们。
+  `parseMemberLabel` 既认新名字（含未来 `（定稿）` 后缀）也照旧认 `规划助手` / `汇总助手`；`roleOfChildTitle` 先试整行再试
+  `·` 之前的头，否则 `汇总·第1稿` 会被拆成认不出的 `汇总`。`src/progress-tab.ts` 与 `src/client/index.js` 两份角色表都补了
+  `规划` / `汇总` 两个词。边界的补交是**真子代理**，**已经进算式**：`maxTotalAgentsFor()` 的边界项按「每个边界 2 次
+  调用（首问 + 同棒补交）× 规划链路 × guardian 因子」计，`test/planner-resubmit.spec.ts` 有一条只钉这两项之差的用例
+  （带 replan 的 cap 减不带 replan 的 cap = `maxBoundaries × 2 × planner`）。理由与 `PLANNER_LEG_CALLS` 同一条：
+  引擎的 AGENT_CAP 是 fatal，少算一次真调用就会在刚好救回来的那一刻杀掉整次 run。
+
+（合流时由 D-131 重编为 D-133：`feat/full-escape` 的决策块占住 D-131、`feat/audit-render-half` 占住 D-132，本节顺延为 D-133。）

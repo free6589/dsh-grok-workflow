@@ -3,8 +3,10 @@
  *
  * The tab renders the four `tool-workflow/*` session events this plugin's own recorder
  * writes (`src/records.ts`, `createWorkflowProgressRecorder`) as one horizontal track of
- * stage nodes, plus the optional `tool-workflow/stage-detail` payload when a stream carries
- * one. This module is the fold, the state precedence, the percentage and the detail
+ * stage nodes, plus the two optional payloads a stream may carry:
+ * `tool-workflow/stage-detail` (field values) and `tool-workflow/summary-final` (which
+ * summary draft the run actually shipped). Both only ever *add* to what a stream
+ * without them renders. This module is the fold, the state precedence, the percentage and the detail
  * provenance, with no React, no DOM, no clock and no estimate, so every rule the browser
  * half applies can be tested here; `src/client/index.js` carries the same rules as
  * hand-written JavaScript (the host serves that bundle verbatim, so it cannot import this
@@ -39,6 +41,16 @@ export declare const PROGRESS_EVENT_TYPES: readonly ["tool-workflow/run-start", 
  * of being ignored — the detail ladder's level 1 is a real read path, not a placeholder.
  */
 export declare const PROGRESS_DETAIL_EVENT_TYPE = "tool-workflow/stage-detail";
+/**
+ * The optional event that names the summary draft the run shipped, on purpose apart
+ * from {@link PROGRESS_EVENT_TYPES}.
+ *
+ * A chat row's label is fixed at `agent-start` (the panel only ever matches an
+ * `agent-end` to it by `seq`), so "this draft is the final one" cannot be said by
+ * renaming a row after the fact: it arrives as its own fact, written once the gate
+ * has passed a draft. A stream without it renders exactly what it rendered before.
+ */
+export declare const PROGRESS_SUMMARY_FINAL_EVENT_TYPE = "tool-workflow/summary-final";
 /** Registered conversation target of the progress view (namespaced so a collision throws). */
 export declare const PROGRESS_VIEW_TARGET = "grok-progress";
 /** Conversation node kind owned by the tab (namespaced for the same reason). */
@@ -115,6 +127,14 @@ export interface ProgressRunFacts {
     guardian?: ProgressGuardianFacts;
     /** Level-1 detail payloads the stream carried for this run, in arrival order. */
     details: ProgressStageDetailFact[];
+    /**
+     * Draft number that passed the summary gate, when the stream said so.
+     *
+     * The row it names already carries the mark in its label (see
+     * {@link PROGRESS_SUMMARY_FINAL_EVENT_TYPE}); the number stays here so a caller can
+     * tell "no final draft was recorded" from "draft 1 was final".
+     */
+    summaryFinalDraft?: number;
 }
 /** One spine stage of the track, in render order. */
 export interface ProgressStageDefinition {

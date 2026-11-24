@@ -1,0 +1,53 @@
+{
+  "startedAt": "2026-11-24T12:48:02.314Z",
+  "finishedAt": "2026-11-24T12:52:44.879Z",
+  "appUrl": "http://127.0.0.1:3199",
+  "composer": {
+    "found": true,
+    "tag": "DIV",
+    "sel": "[role=\"textbox\"]",
+    "count": 1
+  },
+  "results": [
+    {
+      "label": "A0-grok-on",
+      "type": "send",
+      "text": "/grok on",
+      "settled": false,
+      "elapsedMs": 120890,
+      "beforeChars": 195,
+      "afterChars": 195,
+      "deltaChars": 0
+    },
+    {
+      "label": "A1-weather",
+      "type": "send",
+      "text": "今天天气怎么样？",
+      "settled": true,
+      "elapsedMs": 92955,
+      "beforeChars": 195,
+      "afterChars": 456,
+      "deltaChars": 261
+    },
+    {
+      "label": "A1-weather-after",
+      "type": "snapshot",
+      "chars": 456
+    },
+    {
+      "label": "A2-hello",
+      "type": "send",
+      "text": "你好呀",
+      "settled": true,
+      "elapsedMs": 65908,
+      "beforeChars": 456,
+      "afterChars": 552,
+      "deltaChars": 96
+    },
+    {
+      "label": "A2-hello-after",
+      "type": "snapshot",
+      "chars": 552
+    }
+  ]
+}

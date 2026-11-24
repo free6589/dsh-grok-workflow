@@ -1,0 +1,638 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/feat-audit-render-half
+
+ ❯ test/report-audit.spec.ts (13 tests | 10 failed) 144ms
+     × renders the plan provenance and the splits 13ms
+     × renders limits, chains and the full call trail including successful calls 4ms
+     × renders every attempt with outcomes, judgments, evidence and tests 1ms
+     × renders the whole evidence set without the twelve-row slice 1ms
+     × renderAuditTrail is available as the direct on-demand entry point 3ms
+     ✓ cannot mutate the record it renders 1ms
+     ✓ keeps the carry-over contract intact in both views 95ms
+     × never lets the audit trail re-trigger a carry-over section or the answer line 2ms
+     × renders the complete failure record on demand 1ms
+     × marks the bound and points at the record when the trail exceeds its cap 9ms
+     ✓ adds nothing at all unless the caller asks for it 1ms
+     × appends the section after the guard line, as the report tail 1ms
+     × the host tool attaches the trail for a non-completed run and not for a completed one 10ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 10 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/report-audit.spec.ts > audit trail: the complete record is retrievable on demand > renders the plan provenance and the splits
+AssertionError: expected 'Grok workflow: PARTIAL\nObjective: Sh…' to contain 'Status: PARTIAL'
+
+- Expected
++ Received
+
+- Status: PARTIAL
++ Grok workflow: PARTIAL
++ Objective: Ship the verified result
++ Plan: planner; 2 task(s); 1 verified
++ Failures: 1 quality
++ Plan failure: format-error (quality)
++ Wave 1/2:
++ - a: verified (2 attempts) — Task a
++ Wave 2/2:
++ - b: failed (1 attempt) — Task b
++   incomplete (quality): verification failed
++ Confirmed evidence:
++ - a: c01 → verified c01
++ - a: c02 → verified c02
++ - a: c03 → verified c03
++ - a: c04 → verified c04
++ - a: c05 → verified c05
++ - a: c06 → verified c06
++ - a: c07 → verified c07
++ - a: c08 → verified c08
++ - a: c09 → verified c09
++ - a: c10 → verified c10
++ - a: c11 → verified c11
++ - a: c12 → verified c12
++ - … +2 more (see the canonical structured result)
++ Incomplete:
++ - b (quality): verification failed for b
++ Final answer:
++ The retry loop drops 0.42% of requests.
++ Summary review: check=pass verify=pass drafts=1
++ Synthesis: model narrative unavailable (synthesizer refused); the report above is complete
++ Uncertainties:
++ - a: measured on one host only
++ - b: benchmark data unverified
+
+ ❯ test/report-audit.spec.ts:269:18
+    267|   it('renders the plan provenance and the splits', () => {
+    268|     const text = audited()
+    269|     expect(text).toContain('Status: PARTIAL')
+       |                  ^
+    270|     expect(text).toContain('Objective (full): Ship the verified result…
+    271|     expect(text).toContain('Plan: source=planner; tasks=2; waves=2; ve…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/10]⎯
+
+ FAIL  test/report-audit.spec.ts > audit trail: the complete record is retrievable on demand > renders limits, chains and the full call trail including successful calls
+AssertionError: expected 'Grok workflow: PARTIAL\nObjective: Sh…' to contain 'Limits: maxConcurrency=2; maxRetries=…'
+
+- Expected
++ Received
+
+- Limits: maxConcurrency=2; maxRetries=1; maxTasks=6; maxTotalAgents=
++ Grok workflow: PARTIAL
++ Objective: Ship the verified result
++ Plan: planner; 2 task(s); 1 verified
++ Failures: 1 quality
++ Plan failure: format-error (quality)
++ Wave 1/2:
++ - a: verified (2 attempts) — Task a
++ Wave 2/2:
++ - b: failed (1 attempt) — Task b
++   incomplete (quality): verification failed
++ Confirmed evidence:
++ - a: c01 → verified c01
++ - a: c02 → verified c02
++ - a: c03 → verified c03
++ - a: c04 → verified c04
++ - a: c05 → verified c05
++ - a: c06 → verified c06
++ - a: c07 → verified c07
++ - a: c08 → verified c08
++ - a: c09 → verified c09
++ - a: c10 → verified c10
++ - a: c11 → verified c11
++ - a: c12 → verified c12
++ - … +2 more (see the canonical structured result)
++ Incomplete:
++ - b (quality): verification failed for b
++ Final answer:
++ The retry loop drops 0.42% of requests.
++ Summary review: check=pass verify=pass drafts=1
++ Synthesis: model narrative unavailable (synthesizer refused); the report above is complete
++ Uncertainties:
++ - a: measured on one host only
++ - b: benchmark data unverified
+
+ ❯ test/report-audit.spec.ts:289:18
+    287|   it('renders limits, chains and the full call trail including success…
+    288|     const text = audited()
+    289|     expect(text).toContain(`Limits: maxConcurrency=2; maxRetries=${con…
+       |                  ^
+    290|     expect(text).toContain(`deadline=${config.timeoutMs} ms`)
+    291|     // t47 put the child stall budget on the record; the trail names i…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/10]⎯
+
+ FAIL  test/report-audit.spec.ts > audit trail: the complete record is retrievable on demand > renders every attempt with outcomes, judgments, evidence and tests
+AssertionError: expected 'Grok workflow: PARTIAL\nObjective: Sh…' to contain 'Tasks (2):'
+
+- Expected
++ Received
+
+- Tasks (2):
++ Grok workflow: PARTIAL
++ Objective: Ship the verified result
++ Plan: planner; 2 task(s); 1 verified
++ Failures: 1 quality
++ Plan failure: format-error (quality)
++ Wave 1/2:
++ - a: verified (2 attempts) — Task a
++ Wave 2/2:
++ - b: failed (1 attempt) — Task b
++   incomplete (quality): verification failed
++ Confirmed evidence:
++ - a: c01 → verified c01
++ - a: c02 → verified c02
++ - a: c03 → verified c03
++ - a: c04 → verified c04
++ - a: c05 → verified c05
++ - a: c06 → verified c06
++ - a: c07 → verified c07
++ - a: c08 → verified c08
++ - a: c09 → verified c09
++ - a: c10 → verified c10
++ - a: c11 → verified c11
++ - a: c12 → verified c12
++ - … +2 more (see the canonical structured result)
++ Incomplete:
++ - b (quality): verification failed for b
++ Final answer:
++ The retry loop drops 0.42% of requests.
++ Summary review: check=pass verify=pass drafts=1
++ Synthesis: model narrative unavailable (synthesizer refused); the report above is complete
++ Uncertainties:
++ - a: measured on one host only
++ - b: benchmark data unverified
+
+ ❯ test/report-audit.spec.ts:307:18
+    305|   it('renders every attempt with outcomes, judgments, evidence and tes…
+    306|     const text = audited()
+    307|     expect(text).toContain('Tasks (2):')
+       |                  ^
+    308|     expect(text).toContain('Task a — Task a — VERIFIED')
+    309|     expect(text).toContain('  Task objective: Do a')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/10]⎯
+
+ FAIL  test/report-audit.spec.ts > audit trail: the complete record is retrievable on demand > renders the whole evidence set without the twelve-row slice
+AssertionError: expected 'Grok workflow: PARTIAL\nObjective: Sh…' to contain 'Confirmed evidence (14):'
+
+- Expected
++ Received
+
+- Confirmed evidence (14):
++ Grok workflow: PARTIAL
++ Objective: Ship the verified result
++ Plan: planner; 2 task(s); 1 verified
++ Failures: 1 quality
++ Plan failure: format-error (quality)
++ Wave 1/2:
++ - a: verified (2 attempts) — Task a
++ Wave 2/2:
++ - b: failed (1 attempt) — Task b
++   incomplete (quality): verification failed
++ Confirmed evidence:
++ - a: c01 → verified c01
++ - a: c02 → verified c02
++ - a: c03 → verified c03
++ - a: c04 → verified c04
++ - a: c05 → verified c05
++ - a: c06 → verified c06
++ - a: c07 → verified c07
++ - a: c08 → verified c08
++ - a: c09 → verified c09
++ - a: c10 → verified c10
++ - a: c11 → verified c11
++ - a: c12 → verified c12
++ - … +2 more (see the canonical structured result)
++ Incomplete:
++ - b (quality): verification failed for b
++ Final answer:
++ The retry loop drops 0.42% of requests.
++ Summary review: check=pass verify=pass drafts=1
++ Synthesis: model narrative unavailable (synthesizer refused); the report above is complete
++ Uncertainties:
++ - a: measured on one host only
++ - b: benchmark data unverified
+
+ ❯ test/report-audit.spec.ts:347:18
+    345|   it('renders the whole evidence set without the twelve-row slice', ()…
+    346|     const text = audited()
+    347|     expect(text).toContain('Confirmed evidence (14):')
+       |                  ^
+    348|     // The record half carries all 14 rows; the answer above it keeps …
+    349|     const auditPart = text.slice(text.indexOf('Technical audit trail'))
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/10]⎯
+
+ FAIL  test/report-audit.spec.ts > audit trail: the complete record is retrievable on demand > renderAuditTrail is available as the direct on-demand entry point
+AssertionError: expected 'd' to be 'Technical audit trail (complete machi…' // Object.is equality
+
+- Expected
++ Received
+
+- Technical audit trail (complete machine record; display-only copy — hiding this section never deletes the validated report it renders):
+- Status: PARTIAL
+- Objective (full): Ship the verified result
+- Schema: grok-workflow/v1
+- Plan: source=planner; tasks=2; waves=2; version=2; planning error=planner refused the objective
+- Plan failure: format-error (quality) — planner payload was not valid JSON
+- Plan splits (2):
+- - plan task a "Task a": objective=Do a; expected output=Output a
+-   criteria: c01 | c02 | c03 | c04 | c05 | c06 | c07 | c08 | c09 | c10 | c11 | c12 | c13 | c14; context=shared fixture context; constraints=no network; writes paths=src/retry.ts; origin goal=goal-1
+- - plan task b "Task b": objective=Do b; expected output=Output b
+-   criteria: b works; writes paths=none declared
+- Plan waves (2):
+- - wave 1: a
+- - wave 2: b
+- Plan replans (1):
+- - version 2 at wave 1 — applied — a new demand arrived — added: b — updated: none — removed: none — reordered: no
+- Limits: maxConcurrency=2; maxRetries=1; maxTasks=6; maxTotalAgents=37; child budget=7200000 ms
+- Chains: planner=p1/m1; worker=p1/w1; verifier=p1/v1; supervisor=inherit; synthesizer=inherit
+- Calls (3 recorded child calls, in order):
+- - worker chain 0 attempt 1 via p1/w1 — failed rate-limit — 429 Too Many Requests — queued 120 ms — skipped busy: p1/w2 (cross-run hint)
+- - worker chain 0 attempt 2 via p1/w1 — ok
+- - verifier chain 0 attempt 1 via p1/v1 — ok
+- Synthesis: mode=model; summary=The retry loop drops 0.42% of requests.; error=synthesizer refused; review=check=pass verify=pass drafts=1
+- Tasks (2):
+- Task a — Task a — VERIFIED
+-   Task objective: Do a
+-   Expected output: Output a
+-   Acceptance criteria (14): c01 | c02 | c03 | c04 | c05 | c06 | c07 | c08 | c09 | c10 | c11 | c12 | c13 | c14
+-   Context: shared fixture context
+-   Constraints: no network
+-   Writes paths: src/retry.ts
+-   Origin goal: goal-1
+-   Attempt 1 — route p1/w1 — not passed
+-     Execution: partial — first cut
+-   Failure: rate-limit (infrastructure) — 429 Too Many Requests
+-   Attempt error: 429 Too Many Requests
+-   Attempt 2 — route p1/w1 — passed
+-     Execution: completed — rewrote the retry loop
+-       Deliverables (1):
+-       - the retry loop → src/retry.ts
+-       Evidence (1):
+-       - implemented the loop ← src/retry.ts
+-       Tests (1):
+-       - [passed] npm test — ok
+-       Files changed (1):
+-       - src/retry.ts
+-       Execution uncertainties (1):
+-       - loop timing varies by host
+-     Verification: pass — confidence high
+-       Criteria (14):
+-       - [met] c01 → verified c01
+-       - [met] c02 → verified c02
+-       - [met] c03 → verified c03
+-       - [met] c04 → verified c04
+-       - [met] c05 → verified c05
+-       - [met] c06 → verified c06
+-       - [met] c07 → verified c07
+-       - [met] c08 → verified c08
+-       - [met] c09 → verified c09
+-       - [met] c10 → verified c10
+-       - [met] c11 → verified c11
+-       - [met] c12 → verified c12
+-       - [met] c13 → verified c13
+-       - [met] c14 → verified c14
+-       Checked evidence (1):
+-       - file src/retry.ts — observed the loop
+-       Commands (1):
+-       - [passed] npm test — ok
+-       Issues (1):
+-       - route 1 rate-limited once
+- Task b — Task b — FAILED
+-   Task objective: Do b
+-   Expected output: Output b
+-   Acceptance criteria (1): b works
+-   Writes paths: none declared
+-   Task error: verification failed
+-   Attempt 1 — not passed
+-     Verification: fail — confidence low
+-       Criteria (1):
+-       - [not met] b works → no evidence for b works
+-       Checked evidence (1):
+-       - test npm test — no assertion for b works
+-       Commands (1):
+-       - [not_run] npm test
+-       Issues (1):
+-       - no evidence for b works
+-   Failure: verification-failed (quality) — verifier rejected the attempt
+-   Attempt error: verification failed
+- Dead routes (1):
+- - p1/w9: timeout (2 in a row)
+- Confirmed evidence (14):
+- - a: c01 → verified c01
+- - a: c02 → verified c02
+- - a: c03 → verified c03
+- - a: c04 → verified c04
+- - a: c05 → verified c05
+- - a: c06 → verified c06
+- - a: c07 → verified c07
+- - a: c08 → verified c08
+- - a: c09 → verified c09
+- - a: c10 → verified c10
+- - a: c11 → verified c11
+- - a: c12 → verified c12
+- - a: c13 → verified c13
+- - a: c14 → verified c14
+- Incomplete (1):
+- - b (quality): verification failed for b
+- Errors (1):
+- - worker: route 1 exhausted (infrastructure)
+- Uncertainties (2):
+- - a: measured on one host only
+- - b: benchmark data unverified
+- Audit trail complete.
++ d
+
+ ❯ test/report-audit.spec.ts:367:71
+    365|     // Same bytes as the appended section: one renderer, two entries.
+    366|     const appended = renderReport(validatedRich(), { auditTrail: true …
+    367|     expect(appended.slice(appended.indexOf('Technical audit trail'))).…
+       |                                                                       ^
+    368|   })
+    369| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/10]⎯
+
+ FAIL  test/report-audit.spec.ts > audit trail: hiding is display-only, never deletion > never lets the audit trail re-trigger a carry-over section or the answer line
+AssertionError: expected 'Grok workflow: PARTIAL\nObjective: Sh…' to contain 'Confirmed evidence (14):'
+
+- Expected
++ Received
+
+- Confirmed evidence (14):
++ Grok workflow: PARTIAL
++ Objective: Ship the verified result
++ Plan: planner; 2 task(s); 1 verified
++ Failures: 1 quality
++ Plan failure: format-error (quality)
++ Wave 1/2:
++ - a: verified (2 attempts) — Task a
++ Wave 2/2:
++ - b: failed (1 attempt) — Task b
++   incomplete (quality): verification failed
++ Confirmed evidence:
++ - a: c01 → verified c01
++ - a: c02 → verified c02
++ - a: c03 → verified c03
++ - a: c04 → verified c04
++ - a: c05 → verified c05
++ - a: c06 → verified c06
++ - a: c07 → verified c07
++ - a: c08 → verified c08
++ - a: c09 → verified c09
++ - a: c10 → verified c10
++ - a: c11 → verified c11
++ - a: c12 → verified c12
++ - … +2 more (see the canonical structured result)
++ Incomplete:
++ - b (quality): verification failed for b
++ Final answer:
++ The retry loop drops 0.42% of requests.
++ Summary review: check=pass verify=pass drafts=1
++ Synthesis: model narrative unavailable (synthesizer refused); the report above is complete
++ Uncertainties:
++ - a: measured on one host only
++ - b: benchmark data unverified
+
+ ❯ test/report-audit.spec.ts:409:18
+    407|     expect((text.match(/^Final answer:$/gm) ?? []).length).toBe(1)
+    408|     // The trail's sections differ from the parsed headers by their co…
+    409|     expect(text).toContain('Confirmed evidence (14):')
+       |                  ^
+    410|     expect((text.match(/^Confirmed evidence:$/gm) ?? []).length).toBe(…
+    411|     expect((text.match(/^Incomplete:$/gm) ?? []).length).toBe(1)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/10]⎯
+
+ FAIL  test/report-audit.spec.ts > audit trail: failure reports are auditable too > renders the complete failure record on demand
+AssertionError: expected 'Grok workflow: FAILED\nObjective: Shi…' to contain 'Status: FAILED'
+
+- Expected
++ Received
+
+- Status: FAILED
++ Grok workflow: FAILED
++ Objective: Ship the verified result
++ Plan: unavailable; 0 task(s); 0 verified
++ Wave reason: Single wave because the objective is one indivisible unit: splitting it would only add a hand-off.
++ Failures: 1 infrastructure
++ Incomplete:
++ - workflow (infrastructure): the deadline fired
+
+ ❯ test/report-audit.spec.ts:430:18
+    428|     const failed = failureReport(OBJECTIVE, configured, 'Timeout', 'th…
+    429|     const text = renderReport(failed, { auditTrail: true })
+    430|     expect(text).toContain('Status: FAILED')
+       |                  ^
+    431|     expect(text).toContain('Plan: source=unavailable; tasks=0; plannin…
+    432|     expect(text).toContain('Chains: planner=inherit; worker=bifrost-co…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/10]⎯
+
+ FAIL  test/report-audit.spec.ts > audit trail: a truncated trail says so instead of cutting silently > marks the bound and points at the record when the trail exceeds its cap
+AssertionError: expected '' to contain 'audit trail truncated at'
+
+- Expected
++ Received
+
+- audit trail truncated at
+
+ ❯ test/report-audit.spec.ts:519:42
+    517|     // The section is still whole on its own: the base answer is not w…
+    518|     // out of it, the trail is.
+    519|     expect(attached.slice(plain.length)).toContain('audit trail trunca…
+       |                                          ^
+    520|   })
+    521| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/10]⎯
+
+ FAIL  test/report-audit.spec.ts > audit trail: the entry — off by default, attached at the tail on demand > appends the section after the guard line, as the report tail
+AssertionError: expected '' to be '\n\nTechnical audit trail (complete m…' // Object.is equality
+
+- Expected
++ Received
+
+-
+-
+- Technical audit trail (complete machine record; display-only copy — hiding this section never deletes the validated report it renders):
+- Status: PARTIAL
+- Objective (full): Ship the verified result
+- Schema: grok-workflow/v1
+- Plan: source=planner; tasks=2; waves=2; version=2; planning error=planner refused the objective
+- Plan failure: format-error (quality) — planner payload was not valid JSON
+- Plan splits (2):
+- - plan task a "Task a": objective=Do a; expected output=Output a
+-   criteria: c01 | c02 | c03 | c04 | c05 | c06 | c07 | c08 | c09 | c10 | c11 | c12 | c13 | c14; context=shared fixture context; constraints=no network; writes paths=src/retry.ts; origin goal=goal-1
+- - plan task b "Task b": objective=Do b; expected output=Output b
+-   criteria: b works; writes paths=none declared
+- Plan waves (2):
+- - wave 1: a
+- - wave 2: b
+- Plan replans (1):
+- - version 2 at wave 1 — applied — a new demand arrived — added: b — updated: none — removed: none — reordered: no
+- Limits: maxConcurrency=2; maxRetries=1; maxTasks=6; maxTotalAgents=37; child budget=7200000 ms
+- Chains: planner=p1/m1; worker=p1/w1; verifier=p1/v1; supervisor=inherit; synthesizer=inherit
+- Calls (3 recorded child calls, in order):
+- - worker chain 0 attempt 1 via p1/w1 — failed rate-limit — 429 Too Many Requests — queued 120 ms — skipped busy: p1/w2 (cross-run hint)
+- - worker chain 0 attempt 2 via p1/w1 — ok
+- - verifier chain 0 attempt 1 via p1/v1 — ok
+- Synthesis: mode=model; summary=The retry loop drops 0.42% of requests.; error=synthesizer refused; review=check=pass verify=pass drafts=1
+- Tasks (2):
+- Task a — Task a — VERIFIED
+-   Task objective: Do a
+-   Expected output: Output a
+-   Acceptance criteria (14): c01 | c02 | c03 | c04 | c05 | c06 | c07 | c08 | c09 | c10 | c11 | c12 | c13 | c14
+-   Context: shared fixture context
+-   Constraints: no network
+-   Writes paths: src/retry.ts
+-   Origin goal: goal-1
+-   Attempt 1 — route p1/w1 — not passed
+-     Execution: partial — first cut
+-   Failure: rate-limit (infrastructure) — 429 Too Many Requests
+-   Attempt error: 429 Too Many Requests
+-   Attempt 2 — route p1/w1 — passed
+-     Execution: completed — rewrote the retry loop
+-       Deliverables (1):
+-       - the retry loop → src/retry.ts
+-       Evidence (1):
+-       - implemented the loop ← src/retry.ts
+-       Tests (1):
+-       - [passed] npm test — ok
+-       Files changed (1):
+-       - src/retry.ts
+-       Execution uncertainties (1):
+-       - loop timing varies by host
+-     Verification: pass — confidence high
+-       Criteria (14):
+-       - [met] c01 → verified c01
+-       - [met] c02 → verified c02
+-       - [met] c03 → verified c03
+-       - [met] c04 → verified c04
+-       - [met] c05 → verified c05
+-       - [met] c06 → verified c06
+-       - [met] c07 → verified c07
+-       - [met] c08 → verified c08
+-       - [met] c09 → verified c09
+-       - [met] c10 → verified c10
+-       - [met] c11 → verified c11
+-       - [met] c12 → verified c12
+-       - [met] c13 → verified c13
+-       - [met] c14 → verified c14
+-       Checked evidence (1):
+-       - file src/retry.ts — observed the loop
+-       Commands (1):
+-       - [passed] npm test — ok
+-       Issues (1):
+-       - route 1 rate-limited once
+- Task b — Task b — FAILED
+-   Task objective: Do b
+-   Expected output: Output b
+-   Acceptance criteria (1): b works
+-   Writes paths: none declared
+-   Task error: verification failed
+-   Attempt 1 — not passed
+-     Verification: fail — confidence low
+-       Criteria (1):
+-       - [not met] b works → no evidence for b works
+-       Checked evidence (1):
+-       - test npm test — no assertion for b works
+-       Commands (1):
+-       - [not_run] npm test
+-       Issues (1):
+-       - no evidence for b works
+-   Failure: verification-failed (quality) — verifier rejected the attempt
+-   Attempt error: verification failed
+- Dead routes (1):
+- - p1/w9: timeout (2 in a row)
+- Confirmed evidence (14):
+- - a: c01 → verified c01
+- - a: c02 → verified c02
+- - a: c03 → verified c03
+- - a: c04 → verified c04
+- - a: c05 → verified c05
+- - a: c06 → verified c06
+- - a: c07 → verified c07
+- - a: c08 → verified c08
+- - a: c09 → verified c09
+- - a: c10 → verified c10
+- - a: c11 → verified c11
+- - a: c12 → verified c12
+- - a: c13 → verified c13
+- - a: c14 → verified c14
+- Incomplete (1):
+- - b (quality): verification failed for b
+- Errors (1):
+- - worker: route 1 exhausted (infrastructure)
+- Uncertainties (2):
+- - a: measured on one host only
+- - b: benchmark data unverified
+- Audit trail complete.
+
+ ❯ test/report-audit.spec.ts:544:38
+    542|     expect(plain.endsWith(guardText)).toBe(true)
+    543|     expect(text.startsWith(plain)).toBe(true)
+    544|     expect(text.slice(plain.length)).toBe(`\n\n${renderAuditTrail(reco…
+       |                                      ^
+    545|     expect(text.endsWith('Audit trail complete.')).toBe(true)
+    546|     expect(text.indexOf('Technical audit trail')).toBeGreaterThan(text…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/10]⎯
+
+ FAIL  test/report-audit.spec.ts > audit trail: the entry — off by default, attached at the tail on demand > the host tool attaches the trail for a non-completed run and not for a completed one
+AssertionError: expected 'Grok workflow: PARTIAL\nObjective: Sh…' to contain 'Technical audit trail'
+
+- Expected
++ Received
+
+- Technical audit trail
++ Grok workflow: PARTIAL
++ Objective: Ship the verified result
++ Plan: planner; 2 task(s); 1 verified
++ Failures: 1 quality
++ Plan failure: format-error (quality)
++ Wave 1/2:
++ - a: verified (2 attempts) — Task a
++ Wave 2/2:
++ - b: failed (1 attempt) — Task b
++   incomplete (quality): verification failed
++ Confirmed evidence:
++ - a: c01 → verified c01
++ - a: c02 → verified c02
++ - a: c03 → verified c03
++ - a: c04 → verified c04
++ - a: c05 → verified c05
++ - a: c06 → verified c06
++ - a: c07 → verified c07
++ - a: c08 → verified c08
++ - a: c09 → verified c09
++ - a: c10 → verified c10
++ - a: c11 → verified c11
++ - a: c12 → verified c12
++ - … +2 more (see the canonical structured result)
++ Incomplete:
++ - b (quality): verification failed for b
++ Final answer:
++ The retry loop drops 0.42% of requests.
++ Summary review: check=pass verify=pass drafts=1
++ Synthesis: model narrative unavailable (synthesizer refused); the report above is complete
++ Uncertainties:
++ - a: measured on one host only
++ - b: benchmark data unverified
+
+ ❯ test/report-audit.spec.ts:571:37
+    569|     }
+    570|     // A run that did not complete comes back with the complete record…
+    571|     expect(render(validatedRich())).toContain('Technical audit trail')
+       |                                     ^
+    572|     expect(render(validatedRich())).toContain('Audit trail complete.')
+    573|     // A completed run's text is exactly what it is today.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/10]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  10 failed | 3 passed (13)
+   Start at  20:04:27
+   Duration  1.35s (transform 952ms, setup 0ms, import 1.08s, tests 144ms, environment 0ms)
+

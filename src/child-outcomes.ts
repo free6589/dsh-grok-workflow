@@ -596,8 +596,17 @@ function repairAnswerNotes(
   return changed ? lines.join('\n') : exact
 }
 
-/** Re-exported so a caller can name the role of a title line the same way here. */
+/**
+ * Re-exported so a caller can name the role of a title line the same way here.
+ *
+ * A task child's title is `角色 · 任务标题`, so the head before the separator is the
+ * role — but a numbered summary draft is `汇总·第1稿`, where the separator is part of
+ * the name. The whole line is therefore tried first and the head second.
+ */
 export function roleOfChildTitle(title: string): { role: RoleName, attempt: number } | undefined {
   const head = title.split('·')[0]?.trim() ?? ''
-  return parseMemberLabel(head, 'zh') ?? parseMemberLabel(head, 'en')
+  return parseMemberLabel(title.trim(), 'zh')
+    ?? parseMemberLabel(title.trim(), 'en')
+    ?? parseMemberLabel(head, 'zh')
+    ?? parseMemberLabel(head, 'en')
 }

@@ -195,24 +195,35 @@ class FakeRun {
  * team-tier test does not spend a minute waiting for a tier receipt.
  */
 class FakeEngine {
+  /**
+   * Team rounds, in order. The `full` shape now spends one front-desk call before a
+   * round (its first answer), and the real engine hands that call back as a run too —
+   * but it is a model call, not a round, so it is counted in {@link frontDeskCalls}
+   * instead: a case that says "one run started" keeps meaning one plan→execute→verify
+   * round. Nothing is dropped — a case that wants to know how often the front desk was
+   * asked reads `frontDeskCalls`.
+   */
   readonly startCalls: WorkflowStartRequest[] = []
+  /** Front-desk single calls (`src/run.ts` `TRIAGE_RUN_LABEL`), in order. */
+  readonly frontDeskCalls: WorkflowStartRequest[] = []
   readonly runs: FakeRun[] = []
 
+  autoRun = false
+
   async start(request: WorkflowStartRequest): Promise<FakeRun> {
-    this.startCalls.push(request)
     const run = new FakeRun(request)
-    this.runs.push(run)
     request.signal?.addEventListener('abort', () => run.cancel('signal aborted'), { once: true })
     if (request.meta.name === 'Front desk') {
+      this.frontDeskCalls.push(request)
       // Cheap tiers: resolve immediately with no reply (the gate falls back).
       queueMicrotask(() => run.complete(null))
-    } else if (this.autoRun) {
-      void this.finish(run, request)
+      return run
     }
+    this.startCalls.push(request)
+    this.runs.push(run)
+    if (this.autoRun) void this.finish(run, request)
     return run
   }
-
-  autoRun = false
 
   private async finish(run: FakeRun, request: WorkflowStartRequest): Promise<void> {
     const tasks = [(request.args as { tasks?: unknown }).tasks].flat().filter(Boolean)
@@ -342,6 +353,35 @@ function applyWith(ctx: FakeContext, overrides: Record<string, unknown> = {}): v
   apply(ctx as never, { mode: 'full', grokDefault: 'on', replan: true, ...overrides })
 }
 
+/**
+ * A real task: several steps and a deliverable, so the shape routes it to the team.
+ *
+ * Small talk and single facts answer from the front desk since the escape hatch, and
+ * a round needs a task — these cases are about what happens *during* one.
+ */
+const TEAM_TASK = '查一下三家报价并核验，然后把结果写成一页对比表'
+
+/**
+ * Open one live round the way `/grok on` does now: the task first (the split question
+ * is what comes back, nothing runs), then the confirmation that dispatches it.
+ *
+ * Round-071 made the candidate state the split before dispatch; the escape hatch
+ * extended that to the `full` shape, so every round in this file is opened by a task
+ * and its confirmation rather than by a bare message. The round itself — and every
+ * channel behaviour pinned below — is unchanged.
+ */
+async function startRound(ctx: FakeContext, agent: FakeAgent, task = TEAM_TASK): Promise<void> {
+  const first = [message(task)]
+  const question = await within(ctx.preStep()(payload(agent, first), passesThrough(first)))
+  expect(question).toMatchObject({ kind: 'enter' })
+  // The preview call retries once with a structured answer when the first reply is
+  // empty, so the shape may ask the front desk twice for one question.
+  await waitFor(() => ctx.engine.frontDeskCalls.length >= 1, 'the split question went out')
+  const confirm = [message('确认')]
+  await within(ctx.preStep()(payload(agent, confirm, 2), passesThrough(confirm)))
+  await waitFor(() => ctx.engine.startCalls.length === 1, 'the run started')
+}
+
 /* ------------------------------------------------------------------ tests -- */
 
 describe('A1/A2/A5: a mid-run message is acknowledged at once and costs nothing in flight', () => {
@@ -349,15 +389,12 @@ describe('A1/A2/A5: a mid-run message is acknowledged at once and costs nothing 
     const ctx = new FakeContext()
     applyWith(ctx)
     const agent = new FakeAgent(fullModeSession('sess-channel-ack'))
-    const first = [message('查一下三家报价并核验')]
-    const started = await within(ctx.preStep()(payload(agent, first), passesThrough(first)))
-    expect(started).toMatchObject({ kind: 'enter' })
-    await waitFor(() => ctx.engine.startCalls.length === 1, 'the run started')
+    await startRound(ctx, agent)
 
     // The run is deliberately left unsettled: if the gate awaited it, this call
     // would never return and `within` would fail instead of passing.
     const second = [message('再加一个任务：写成一页对比表')]
-    const decision = await within(ctx.preStep()(payload(agent, second, 2), passesThrough(second)))
+    const decision = await within(ctx.preStep()(payload(agent, second, 3), passesThrough(second)))
 
     expect(decision).toMatchObject({ kind: 'enter' })
     const text = (decision as { messages: { content: { text?: string }[] }[] }).messages
@@ -378,12 +415,10 @@ describe('A1/A2/A5: a mid-run message is acknowledged at once and costs nothing 
     const ctx = new FakeContext()
     applyWith(ctx)
     const agent = new FakeAgent(fullModeSession('sess-channel-forward'))
-    const first = [message('查一下三家报价并核验')]
-    await within(ctx.preStep()(payload(agent, first), passesThrough(first)))
-    await waitFor(() => ctx.engine.startCalls.length === 1, 'the run started')
+    await startRound(ctx, agent)
 
     const second = [message('再加上第四家的报价')]
-    await within(ctx.preStep()(payload(agent, second, 2), passesThrough(second)))
+    await within(ctx.preStep()(payload(agent, second, 3), passesThrough(second)))
 
     const queue = steeringForSession('sess-channel-forward')
     expect(queue).toBeDefined()
@@ -401,12 +436,10 @@ describe('A1/A2/A5: a mid-run message is acknowledged at once and costs nothing 
     const ctx = new FakeContext()
     applyWith(ctx)
     const agent = new FakeAgent(fullModeSession('sess-channel-carry'))
-    const first = [message('查一下三家报价并核验')]
-    await within(ctx.preStep()(payload(agent, first), passesThrough(first)))
-    await waitFor(() => ctx.engine.startCalls.length === 1, 'the run started')
+    await startRound(ctx, agent)
 
     const second = [message('再加一个任务：写成一页对比表')]
-    await within(ctx.preStep()(payload(agent, second, 2), passesThrough(second)))
+    await within(ctx.preStep()(payload(agent, second, 3), passesThrough(second)))
 
     // The run ends before any boundary pulled the demand.
     ctx.engine.autoRun = true
@@ -441,9 +474,7 @@ describe('A1/A2/A5: a mid-run message is acknowledged at once and costs nothing 
     const ctx = new FakeContext()
     applyWith(ctx)
     const agent = new FakeAgent(fullModeSession('sess-channel-deliver'))
-    const first = [message('查一下三家报价并核验')]
-    await within(ctx.preStep()(payload(agent, first), passesThrough(first)))
-    await waitFor(() => ctx.engine.startCalls.length === 1, 'the run started')
+    await startRound(ctx, agent)
 
     ctx.engine.autoRun = true
     ctx.engine.runs[0]!.complete({
@@ -468,12 +499,10 @@ describe('explicit stop: the one message that may cancel', () => {
     const ctx = new FakeContext()
     applyWith(ctx)
     const agent = new FakeAgent(fullModeSession('sess-channel-stop'))
-    const first = [message('查一下三家报价并核验')]
-    await within(ctx.preStep()(payload(agent, first), passesThrough(first)))
-    await waitFor(() => ctx.engine.startCalls.length === 1, 'the run started')
+    await startRound(ctx, agent)
 
     const stop = [message('停')]
-    const decision = await within(ctx.preStep()(payload(agent, stop, 2), passesThrough(stop)))
+    const decision = await within(ctx.preStep()(payload(agent, stop, 3), passesThrough(stop)))
 
     expect(decision).toMatchObject({ kind: 'enter' })
     expect(ctx.engine.runs[0]!.cancel).toHaveBeenCalledWith(STEER_CANCEL_REASON)
@@ -502,9 +531,7 @@ describe('`replan` off: the channel is inert and the old path is unchanged', () 
     const ctx = new FakeContext()
     applyWith(ctx, { replan: false })
     const agent = new FakeAgent(fullModeSession('sess-channel-off'))
-    const first = [message('查一下三家报价并核验')]
-    await within(ctx.preStep()(payload(agent, first), passesThrough(first)))
-    await waitFor(() => ctx.engine.startCalls.length === 1, 'the run started')
+    await startRound(ctx, agent)
     expect(steeringForSession('sess-channel-off')).toBeUndefined()
   })
 })

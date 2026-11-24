@@ -1,0 +1,40 @@
+{
+  "startedAt": "2026-11-24T12:56:15.729Z",
+  "finishedAt": "2026-11-24T12:57:58.836Z",
+  "appUrl": "http://127.0.0.1:3199",
+  "composer": {
+    "found": true,
+    "tag": "DIV",
+    "sel": "[contenteditable=\"true\"]",
+    "count": 1
+  },
+  "results": [
+    {
+      "label": "B1-0-grok-on",
+      "type": "send",
+      "text": "/grok on",
+      "settled": true,
+      "grew": false,
+      "elapsedMs": 6664,
+      "beforeChars": 204,
+      "afterChars": 204,
+      "deltaChars": 0
+    },
+    {
+      "label": "B1-1-weather",
+      "type": "send",
+      "text": "今天天气怎么样？",
+      "settled": true,
+      "grew": true,
+      "elapsedMs": 93528,
+      "beforeChars": 204,
+      "afterChars": 510,
+      "deltaChars": 306
+    },
+    {
+      "label": "B1-2-after",
+      "type": "snapshot",
+      "chars": 510
+    }
+  ]
+}

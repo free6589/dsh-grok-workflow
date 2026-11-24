@@ -81,6 +81,20 @@ export interface TriageInput extends TriagePolicy {
      * states what is missing next to the question.
      */
     prior?: RecallResult;
+    /**
+     * Escape hatch for the `full` shape (the shape `/grok on` writes).
+     *
+     * `mode: 'full'` means "every message gets the whole workflow", and that rule
+     * outranks every other signal — which is why a greeting cost a plan, a worker and
+     * a verifier. With `escape` the shape stops hard-overriding the rules: the message
+     * is classified exactly as a `triage` message, so small talk answers from a
+     * template and a single fact costs one worker. The front desk still may not ask
+     * "quick or team?" on this shape (the user already chose the full workflow), so an
+     * `ask` verdict settles as the team instead of a question.
+     *
+     * Omitted (or `false`), the rule above is the pre-escape behaviour, byte for byte.
+     */
+    escape?: boolean;
 }
 /** One classification. */
 export interface TriageVerdict {
@@ -294,7 +308,10 @@ export declare function recallFromPrior(input: {
  * Decide the tier of one message.
  *
  * Order of authority, highest first: `full` mode, the answer to a previous
- * question, an explicit escalation, small talk, then the signal balance.
+ * question, an explicit escalation, small talk, then the signal balance. A `full`
+ * shape that carries {@link TriageInput.escape} drops only the first of those: the
+ * rest of the chain decides, and a question the rules cannot settle becomes the
+ * team instead of being asked.
  *
  * @param input - message plus policy.
  * @returns the verdict, with a machine reason and a human sentence.

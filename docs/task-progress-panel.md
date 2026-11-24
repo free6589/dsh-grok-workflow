@@ -54,10 +54,13 @@ Every user-visible string comes from one table, `src/naming.ts`:
 | run title, count unknown | `任务团队` | `Task team` |
 | run title, 3 tasks | `任务团队 · 3 个任务` | `Task team · 3 tasks` |
 | planner row | `规划助手` | `Planner` |
+| planner row, numbered call | `规划（第1次）` … `规划（第N次）` | `Plan (call 1)` … |
 | worker row | `执行` | `Execute` |
 | worker row, second attempt | `执行（尝试 2）` | `Execute (attempt 2)` |
 | verifier row | `检查` | `Check` |
 | synthesizer row | `汇总助手` | `Summarizer` |
+| synthesizer row, numbered draft | `汇总·第1稿` … `汇总·第N稿` | `Summarize · draft 1` … |
+| the draft that shipped | `汇总·第N稿（定稿）` | `Summarize · draft N (final)` |
 | task group | `任务 1 · <标题>` | `Task 1 · <title>` |
 | phases | `规划` / `执行` / `检查` / `汇总` | `Plan` / `Execute` / `Verify` / `Synthesize` |
 | a finished call (never a verdict) | `执行代理已结束` / `检查调用已结束` | `Execute agent ended` / `Check call ended` |

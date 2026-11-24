@@ -1,3 +1,194 @@
+## 2026-11-24 — 合流 `release/0.13.33`：三条分支按序并入、决策号重编 D-131/D-132/D-133、全量门禁最终 exit 0
+
+- **From:** 合流手（`agent-137/merge-train`）· **To:** 发版那一块 / 操作员
+- **树与基线**：主检出 `/home/fish/projects_mine/dsh-grok-workflow`（没有新建 worktree），从 `main` 尖端 **`4da42c2`**
+  （`docs(spec): adopt grok-workflow v1 spec as accepted baseline`，比 `origin/main` 领先 1 条）开出 `release/0.13.33`。
+  三次 `git merge --no-ff` 按派单固定顺序执行，尖端 **`c5b504d`**：
+
+| # | 分支 | merge 提交 | subject | 冲突 |
+|---|---|---|---|---|
+| 1 | `feat/full-escape` | **`cfe8873`** | `merge: the full-shape front desk — escape hatch, ask-before-send, and the first answer in the turn` | **零冲突** |
+| 2 | `feat/audit-render-half` | **`f572eee`** | `merge: the audit trail as the report's optional tail for runs that did not finish` | 3 |
+| 3 | `fix/naming-resubmit` | **`c5b504d`** | `merge: numbered call names, the shipped draft mark, and a replan that submits through the tool` | 7 |
+
+- **为什么第一次零冲突**：`feat/full-escape` 自 `1f70103` 开出，而 `main` 在它之后只多了一条 `4da42c2`（只加一份 spec 文档），
+  两边的文件面不相交，`ort` 直接合上。
+- **`src/report.ts` 是唯一两边都改的产品文件**（分支 2 与分支 3）：`ort` 自动合并成功，**没有手改一行**。合并后实测两条路径都在——
+  审计层：`import { renderAuditTrail }`（第 14 行）、`RenderReportOptions.auditTrail?: boolean`（1150）、
+  `opts?.auditTrail === true ? `${view}\n\n${renderAuditTrail(report)}` : view`（1363）；终稿稿号：`shippedSummaryDraft()`
+  （1170）、`Summary review: … · final: draft N`（1248–1249）。**一个功能都没丢**。
+- **`lib/` 一行没手改**：解完 `src/` 冲突后 `npm run build` 从 `src/` 重建（client bundle 325771 B），`verify:lib` 报
+  `lib/ at c5b504d is the build of src/ at c5b504d (249 files, byte-identical)`。`lib/report.d.ts.map` 与 `lib/report.js.map`
+  两个冲突随便取一侧后由重建覆盖（`git checkout --ours` → `npm run build` → 提交重建结果）。
+- **冲突清单与解法（10 个路径，全部只动文档与生成物）**：
+  - `CHANGELOG.md`（第 2、3 次都冲突）：`[Unreleased]` 取并集，按语义归成 `### Added / 新增`（1 条 = 审计层）、
+    `### Changed / 变更`（5 条 = 前台 4 条 + 编号 1 条）、`### Fixed / 修复`（1 条 = replan 交底）。中英双语原文照搬，一句没重写。
+  - `docs/knowledge/DECISIONS.md`（第 2、3 次都冲突）：三条 D-131 全部保留成独立条目，按合入顺序排成 D-131 / D-132 / D-133。
+  - `docs/knowledge/HANDOFF.md`（第 2、3 次都冲突）：新的在上（`fix/naming-resubmit` → `feat/audit-render-half` → `feat/full-escape`），
+    各节原样，没压缩。
+  - `docs/knowledge/STATE.md`、`docs/knowledge/VALIDATION.md`（第 3 次冲突）：同上，新的在上；分支 2 那两块本来就是文件尾追加，
+    合流后仍在文件尾，**没有搬家**。
+  - `lib/report.d.ts.map`、`lib/report.js.map`：取一侧 + 重建覆盖。
+- **决策号撞号重编（三条分支各自都新增了一个 `## D-131`，`main` 现有最大是 D-130）**：`feat/full-escape` 保留 **D-131**；
+  `feat/audit-render-half` 改 **D-132**（11 处引用逐条按语义改：`docs/ARCHITECTURE.md:233`、`HANDOFF` 3 处、`STATE` 1 处、
+  `VALIDATION` 1 处、`src/index.ts`、`src/report.ts`、`test/human-output-contract.spec.ts` 2 处、`test/report-audit.spec.ts`；
+  `lib/` 由重建带出）；`fix/naming-resubmit` 改 **D-133**（3 处：`HANDOFF` 2、`STATE` 1）。两条被重编的条目末尾各加一句括注
+  「（合流时由 D-131 重编为 D-132／D-133）」，`.rsi/evidence/` 下的历史证据**一字未改**（那是当时的记录）。
+  复核命令 `grep -rn "D-131\|D-132\|D-133" --include=*.md --include=*.ts --include=*.js .`：剩下的 7 处 `D-131` 全指分支 1 那一块
+  （或那两句括注），`D-132` 13 处、`D-133` 5 处各自指向自己的块。
+- **门禁（`CONFIRMED`，`TMPDIR=$PWD/.tmp npm run ci`，本轮四次）**：`c5b504d` **exit 0**（105 文件 / 1954 例，187.88 s）→
+  `62643da` **exit 1**（`Tests 1 failed | 1953 passed (1954)`，173.46 s，一条负载敏感的新用例）→ `62643da` **exit 0**
+  （182.98 s，loadavg 2.41）→ **`e425295` exit 0**（105 文件 / 1954 例，203.36 s，**这是最终那次**）。四次的 lint 都是
+  **`Found 36 warnings and 0 errors.`**、`verify:lib` 都是 **249 files byte-identical**（sha 随 HEAD 变）。对数：101 文件 / 1910 例（基线）+ 2 文件 12 例（分支 1）+ 1 文件 13 例（分支 2）+
+  1 文件 19 例（分支 3）= **105 / 1954**，与实测逐项相等。
+- **中间那次红：判定为负载敏感抖动，不是合流回归（`CONFIRMED`）**：`test/full-behind-first-answer.spec.ts > enters the live
+  first answer, says the report follows, and starts one real run`，逐字 `Error: the report was not delivered as its own message`，
+  停在 `vi.waitFor`（vitest 默认 **1 000 ms**）。依据四条：① 单跑 **5/5 绿**；② 24 个 busy 循环下 **3/3 红**（loadavg 25.07），
+  3 条用例全红在 `vi.waitFor`（`the report was not delivered as its own message` / `the team run did not start`），**没有一条是
+  内容断言**；③ 合流没碰这条路径——`renderReport` 只被 PTC `render` 工具调用（`src/index.ts:254`），投递路径用的是 `src/delivery/`
+  自己的渲染器；④ 该用例的报告 `status: 'completed'`，`auditTrail` 本来就关。**处理：只记录，不修**——按「既有抖动按原样记录、
+  不放宽断言」，断言、`testTimeout`、`vitest.config.ts`、skip/only 一处未动，重跑即绿。它**不严格跟 loadavg 走**：最终那次绿在
+  loadavg **16.01**、红的那次机器也不闲——是 1 s 墙钟竞态，重负载下更容易撞上，不是重负载才撞上。**留给发版那一块注意**：
+  它的等待是 vitest 默认 1 s，与 `feat/full-escape` 自己修过的饱和队列用例（改成 15 s 具名界）同族，但本轮不替分支作者改。
+  另一组在案的既有抖动（`test/gate.spec.ts > never retries a refused batch on its own`、`test/timeout.spec.ts` 两条无计时器探针）
+  四次都绿。
+- **缺口（照实写）**：① 门禁四次里**有一次红过一条**，判定为负载敏感抖动（依据见上一条），最终那次 exit 0；四次之间**没有任何产品代码变化**，所以它证明的是「同一棵产品树能跑绿」，不是「抖动已被排除」——**它还会再红**；
+  ② **没跑真机 soak**——三条分支各自的 soak 证据都在 `.rsi/evidence/` 里，本轮是合流不是重测，合流后没有重跑（派单未要求）；
+  ③ 远端 Node 22/24 矩阵 **`NOT_RUN`**（没 push）。
+- **下一步（发版那一块）**：`package.json` 仍是 `0.13.32`；`[Unreleased]` 里现有 7 条（Added 1 / Changed 5 / Fixed 1）要原文搬进新的
+  `## [0.13.33]` 段；打 tag 前先跑一次 `npm run ci`；三条已合分支（`feat/full-escape`、`feat/audit-render-half`、`fix/naming-resubmit`）
+  与它们的 worktree 都还在，按 AGENTS §5「合并后 24 h 内删」收尾。
+
+## 2026-11-24 — 重复调用带序号名、终稿标「（定稿）」、replan 交卷改「调工具 + 同棒补交」
+
+- **From:** 执行手（`agent-136/naming-worker`）· **To:** 合流者 / 操作员
+- **树与基线**：worktree `.agents/worktrees/fix-naming-resubmit`，分支 `fix/naming-resubmit`，基线 `main` 尖端 `1f70103`
+  （版本仍 `0.13.32`）。**本轮未合流、未发版、未打 tag、未 push、未碰 `~/.dsh`**，主检出一行未动。
+- **本轮提交（两条，`git log --oneline main..HEAD` 自证）**：
+  1. **`a335388`** — 代码 + 测试 + 重建 `lib/` + `CHANGELOG.md` + 记忆三件（`STATE.md` / `HANDOFF.md` / `VALIDATION.md`）
+     + `DECISIONS.md` D-133。这是唯一的产品改动提交，`npm run ci` 与 `verify:lib` 的结论都属于它。
+  2. 其后一条**只改 docs/ 记忆的订正提交**（把记忆里被 amend 掉的中间 sha 换成 `a335388`、删掉 sha 占位写法）——
+     没有动 `src/`、`test/`、`lib/`，因此不重跑全量 ci。两条都只在本分支，没 push、没合流、没 bump 版本、没打 tag。
+- **包工头复核三条（同一条提交内已改完）**：①replan 同棒补交**进**预算算式（边界项 `maxBoundaries × 2 × planner × waitFactor`，
+  钉子 `test/planner-resubmit.spec.ts > pays two boundary calls for every replan, because a boundary can ask twice`）
+  ②一稿两行只标 `order` 最大的落地行（`test/progress-tab.spec.ts > marks only the row that landed when one draft was asked twice`、
+  同形用例在 `test/client.spec.ts`）③ci 真实数字已回填、D-133 的 `规划规划（第1次）` 笔误已改、
+  「补交吃 +2 余量 / cap 收紧会 setup 失败」两条说法已删除（修完不成立）。
+- **用户拍板的三件事，全部落地（`CONFIRMED`，真机形状用例）**：
+  1. 汇总多稿 `汇总·第1稿` … `汇总·第N稿`（en `Summarize · draft N`）；同一稿的 resubmit 仍是同一号。
+  2. 规划腿 `规划（第1次）`（开场）+ `规划（第2次）/（第3次）…`（每个波边界）；`memberLabel()` 未改，序号只属于「行」，
+     提示词首行与 `agent()` 的 `label` 由同一个 `plannerCallLabel()` 产出（真机行名就是提示词首行）。
+  3. replan 提示词去掉「Answer with the structured result only」，改成「调用结构化结果工具、只调一次、纯文本等于没交」+ 形状说明；
+     `requestReplan` 收 `format-error`（非 setup）时同棒补交一次（`log()` 记账、不花 retry、不开新边界），补交也失败则照旧拒绝、计划字节不变。
+- **同日追加（同轮第 4 条，也是用户拍的）**：过门那一稿标 `汇总·第N稿（定稿）`。只在 **layered 与 model 两个 `review.ok` 分支**写
+  `log('gw-summary-final N')`；宿主 `src/run.ts` 读 `report.synthesis.review`（只认 `check=pass verify=pass`）→
+  `recorder.summaryFinal(runId, draft)` 写新事件 `tool-workflow/summary-final` `{runId, draft}`；两份折叠（`src/progress-tab.ts` +
+  `src/client/index.js`）各自认它、把那一行改写成「（定稿）」。现有四个事件形状一个没改；旧流/重复/乱序/指向不存在的稿号都幂等。
+  报告侧在 `Summary review:` 行尾补 ` · final: draft N`，**机器串与 schema 未动**。
+- **两处事实订正（照实写，别被下一轮当成漏做）**：
+  1. `model` 策略分支以前不写 `synthesis.review`，宿主的 `check=pass verify=pass` 闸门在 model 跑上永远不成立 → 已在 model 的
+     `review.ok` 分支补写同形机器串，并把 `test/routing.spec.ts` 那条 `toEqual({mode, summary})` 的旧断言改成带 `review` 的新形状。
+  2. 报告侧只有**一份英文 ledger**（`renderReport()` 没有 lang 参数），「中英各一版」在真机上没有第二个入口可加：
+     只补了英文那一行的 ` · final: draft N`，未新开中文渲染入口。若确实要中文版，需要另开一个中文渲染入口，请拍板。
+- **门禁（本轮实测）**：见 `VALIDATION.md` 同日条目（`npm run ci` exit 0：typecheck 干净、oxlint 36 warnings / 0 errors、
+  `verify:lib` 245 files byte-identical、vitest 102 files / **1929** tests PASS）。
+- **留给下一棒的注意点**：
+  1. **replan 补交是「真子代理」，已按每边界两问计入 `maxTotalAgentsFor()`**（边界项 = `maxBoundaries × 2 × planner ×
+     guardian 因子`），钉子见 `test/planner-resubmit.spec.ts > pays two boundary calls for every replan`。
+     下一轮若再给边界加调用，记得同步改这个 2。
+  2. **`verify:lib` 在 worktree 里需要能解析完整 `node_modules`**：本轮把 worktree 的 `node_modules` 换成指向主检出
+     `node_modules` 的符号链接（`node_modules` 本就在 `.gitignore` 里），否则 `scripts/verify-lib.mjs` 的 scratch 构建拿不到
+     `typescript` / `@types/node` / `@deepseek-ai/*`。
+  3. replay 时若看到 `test/gate.spec.ts > never retries a refused batch on its own` 偶发红：本轮全量跑第一次红过一次，
+     单跑该文件与随后两次全量都绿（`vi.waitFor` 的时序抖动），与本轮改动无关，别把它按成本次回归。
+
+## 2026-11-24 — 报告尾部审计层（`feat/audit-render-half`）：没跑完的一轮带全量机器记录，默认视图一个字节不动
+
+- **From:** 执行手（`agent-132/impl-audit-render`）· **To:** 合流者 / 操作员
+- **树与基线**：worktree `.agents/worktrees/feat-audit-render-half`，分支 `feat/audit-render-half`，基线 `main` 尖端
+  **`1f70103`**（版本 `0.13.32`）。两个本地提交：**`4502748`**（`feat(report)`：`src/report-audit.ts` 新增、
+  `src/report.ts` 的可选 `auditTrail`、`src/index.ts` 的接线、`test/report-audit.spec.ts` 新增 13 例、
+  `test/human-output-contract.spec.ts` 的 T4 断言收窄、重建的 `lib/`、`CHANGELOG.md` 的 `[Unreleased]`）与**承载本节的
+  docs 提交**（知识文档 + `.rsi/evidence/audit-render-half-2026-11-24/`）。**未 push、未打 tag、未合流、未发版**，
+  `package.json` 仍是 `0.13.32`。
+- **做了什么（`CONFIRMED`）**：`feat/audit-layer`（`7626233`）只取 `src/report-audit.ts` 与 `test/report-audit.spec.ts`
+  两件东西，按 `0.13.32` 的 `types.ts` 改写（waves / replans / version / deadRoutes / `limits.childTimeoutMs` /
+  `synthesis.review` / `supervisor` 链路 / attempt 的 `resubmitted`、`judgeRetried` 全部进记录），接到报告层的**尾部**：
+  `RenderReportOptions.auditTrail` 默认关；`src/index.ts` 只在 `report.status !== 'completed'` 时带上。决定与三个被否决的
+  替代方案见 **D-132**。
+- **门禁**：`npm run ci` 在提交 `4502748` 上 **EXIT=0** — oxlint **36 warnings / 0 errors**、
+  `verify:lib` **249 文件逐字节一致**、vitest **102 文件 / 1923 测试 PASS**。对 `feat/update-button` 那轮基线
+  （101 / 1910、`lib` 245）是 **+1 文件 / +13 测试 / lib +4**。
+- **真机隔离 soak（`CONFIRMED`）**：`~/.dsh/profiles/web` 的字节副本（只读源）+ 本构建的 **tarball 安装**（版本读回
+  `0.13.32`，`lib/index.js` sha256 与 worktree 构建一致 `06c21cbb…d2590`）。一跑**不可满足**的任务：报告状态 **`failed`**，
+  工具结果 **24 792 字**（答案半 2 691 字 + 审计段 22 101 字），含 `Technical audit trail` 与 `Audit trail complete.`；
+  一跑能答的问题：状态 `completed`，**1 276 字，不带审计段**。同一 prompt 打**发布版** `0.13.32` 的对照跑也是 `failed`、
+  **不带**审计段（2 628 字）——同一台机、同一模型，差别只在构建。证据
+  `.rsi/evidence/audit-render-half-2026-11-24/`（`README.md` 有清单与边界）。
+- **一条既有用例被收窄（唯一一条）**：`test/human-output-contract.spec.ts` 的 T4 断言原本说「工具视图不带任何机器词条」，
+  现在断言的是「**答案半**不带机器词条，审计段是带标题、带收尾的独立段落」。语义没变，变的是「工具视图 == 答案」这个前提；
+  理由与后果在 D-132。若要回到「失败轮次也不带」，只需去掉 `src/index.ts` 里那个 `auditTrail` 参数，模块仍可按需调用。
+- **留给下一手的事**：
+  1. **合流只在主代理做**（AGENTS §10）。`CHANGELOG.md` 那条只在 `## [Unreleased]`，没 bump 版本。
+  2. **`feat/audit-layer` 的另一半仍等决定**：把默认视图翻成人类答案属于另一刀，本包没动它（D-130 → D-132）。
+  3. **live profile 一行未动**：soak 用的是复制出来的隔离 home；本轮没升级、没重载、没重启，§11 自动升级仍按操作员红线跳过。
+     soak 时 live `web` profile 里读到的插件版本是 **`0.13.32`（发布版）**，不是本分支构建。
+  4. **本分支判定日期 2026-11-26**：合流即删（合完 24 h 内）；不合就删分支。`feat/*` 不许长期挂着。
+- **边界**：web 外壳**没有**被这一跑覆盖（web app 不收 prompt，且不许起第二个长驻服务；跑的是同一个 scratch home 里的
+  headless 外壳 + 同一份已安装包）；跑用的是 overlay 里的插件配置（`mode: full`、五角色指向本机网关），不是 live profile
+  自己的链路；审计段只保证不复现 carryover 解析的行形状，不保证 section 正文不被追加（详见证据目录 README §4）。
+
+## 2026-11-24 — 完整流程（`/grok on`）补了一张前台：闲聊与单点事实直答、真任务先问再跑、首答在队轮前面
+
+- **From:** 收尾手（`agent-133/docs-writer`）· **To:** 合流者 / 操作员
+- **树与基线**：worktree `.agents/worktrees/feat-full-escape`，分支 `feat/full-escape`，基线 `main` 尖端 **`1f70103`**
+  （版本 `0.13.32`）。六条提交：`86c0fa2` 首答＋前言 → `597b444` channel 把前台调用单独记账 → `21f3616` 逃生口
+  → `8f40be1` 重建 `lib/` → `62f540f` 按状态结算 → `24f2f35` 收尾换时间预算；两条 docs 提交（证据、记忆）跟在后面。
+  主检出 `/home/fish/projects_mine/dsh-grok-workflow` 只做过一次动作：把 soak 证据搬走、删掉它那份未跟踪拷贝；
+  其余一行未动。`package.json`、`cordis.patch.yml`、版本号未动；**没合流、没发版、没 push、没升 live profile**。
+- **改了什么（产品面）**：`src/gate.ts`（+195：`fullFrontDeskEscape` 的 `chat`/`fast`/`team` 三条路与五个 `outcome`
+  （`full-escape-chat` / `full-escape-fast` / `full-escape-failed` / `full-escape-ask` / `full-escape-ask-fallback`）、
+  `answerFullBehind`（先写首答、起队轮、回执拼 `[注, 首答, acceptedReceipt]`）、`canBackgroundDeliver`、`acceptedReceipt`）、
+  `src/triage.ts`（+26：`escape` 输入只丢 `mode-full` 硬覆盖，规则链不动）、`src/answer.ts`（`ACCEPTED_PREAMBLE` 与
+  `acceptedEnterText` 的措辞改成「已经先答过、别在它上面再造一个答案」）、`lib/`（`8f40be1` 同一次构建的产物）。
+  行为：`/grok on` + 闲聊 → 模板直答、零 run；+ 单点事实 → 一次 `quick-worker`、零 run；+ 真任务 → 先报拆法
+  （`full-escape-ask`）、零 run，回「确认」后起队轮并先给首答。部署级 `mode:'full'`（无会话记录）三条路逐字节照旧。
+  取舍与被否掉的替代方案见 `DECISIONS.md` **D-131**。
+- **用例**：新增 `test/full-escape.spec.ts`（5 例，基线副本上 **4 红 1 绿**）与 `test/full-behind-first-answer.spec.ts`
+  （4 例，基线副本上 **4/4 红**）。
+- **怎么复核**（会话里直接可跑；本机 Node 26.8.1，`nproc=6`）：
+  1. `TMPDIR=$PWD/.tmp npm run ci` —— 期望 **exit 0**、lint `Found 36 warnings and 0 errors`（173 文件）、
+     `verify:lib` 报 `lib/ at <sha> is the build of src/ at <sha> (245 files, byte-identical)`、vitest
+     **103 files / 1922 tests**（`24f2f35` 上是 172.72 s）。
+  2. 只验前台三条路：`npx vitest run test/full-escape.spec.ts test/full-behind-first-answer.spec.ts test/triage.spec.ts
+     test/channel.spec.ts test/grok-on-ingress.spec.ts test/human-output-contract.spec.ts test/phase1-dialogue.spec.ts`。
+  3. 反证（这条曾经红过）：`npx vitest run test/grok-on-ingress.spec.ts` 连着跑几遍，再在机器有负载时跑一遍——
+     那条饱和队列用例现在等的是 15 s 的具名 `landedWithin` 界，不是 350 ms 的轮数预算。
+- **证据在哪**：`.rsi/evidence/full-escape-2026-11-24/`（**97 个文件 = 12 个执行手证据 + 85 个 `soak-` 真机证据**）。
+  读 `soak.md` 就够：§0 结论表、§2 两个构建的指纹、§3 相 A 逐字、§4 相 B 三场景、§5 收尾实测、§6 缺口、§7 归档与构建归属。
+  这 85 个文件原本写在主检出的未跟踪目录里，收尾时逐文件 `cmp` **85/85 一致**、`diff -r` 无差异之后才搬进来并删掉主检出那一份
+  （主检出 `git status --short` 已回到空）；搬之前那 12 个文件没被覆盖、也没被删。入库的是 **94 个**：`soak-B1/B2/B3-drive.log`
+  三个被 `.gitignore` 的 `*.log` 规则挡住（仓库从没跟踪过任何 `.log`），收尾没有用 `-f` 硬加——它们的每步耗时已经逐条落在
+  已入库的 `soak-B?_run.json` 里，见 `soak.md` §7。
+- **被有意改的既有钉子（3 个文件 / 10 条用例；行为断言本身没放宽）**：
+
+| 文件 | 条数 | 改的是什么 | 为什么 |
+|---|---|---|---|
+| `test/triage.spec.ts` | 1 | 「会话 `/grok` 记录强制完整流程」那条：输入换成真任务，标记从「没有档位行」换成「队长先报拆法」；仍然断言只发生 **一次** 调用，并断言那次调用的 `meta.name` 是 `Front desk` | 旧契约是 `/grok on` 下每条消息立即起跑，标记落在「没有 `triage` 的档位行」上；新契约下完整流程自己的第一动作是报拆法 |
+| `test/grok-on-ingress.spec.ts` | 3 | `dispatches the next message while the team run is still in flight`、`still runs the full team for the message and delivers the report afterwards`、`a saturated queue keeps the blocking path instead of promising a background run`：都先发真任务、等拆法出去、回「确认」；队轮计数改成 `teamRuns`（过滤掉 `Front desk` 那次调用） | 同一条旧契约：以前发一条就起队轮，现在要点过头才起。改的是「一轮怎么被打开」，断言照旧（`dispatched` 长度、`receipts` 数、`closed` 为真、团队轮数 ≥ 2 都没放宽） |
+| `test/channel.spec.ts` | 6 | 把前台那次调用单独记账成 `FakeEngine.frontDeskCalls`，`startCalls` 仍只数整轮；`expect(started).toMatchObject({kind:'enter'})` 换成「先等拆法出去、再断一次整轮」 | 完整流程现在在整轮之前先花一次模型调用；那条调用在真引擎里也会回成一个 run，所以必须分开记，否则「一次 run」这句话就说不清了。断言没有放宽，也没有丢字段 |
+
+- **缺口（照实写）**：① 门禁只在 `24f2f35` 上绿过**一次**，前面两个提交各红过一次（同一条饱和队列用例），
+  本地 20 + 8 + 3 次执行、loadavg 推到 31 都没复现，所以「修掉了这条抖动」在本地**无法证明**；
+  ② 相 A 的后台报告没等落地（切构建前还没送达），那一相「后台真起了 workflow」靠的是会话日志事件计数与三个子会话的工具调用；
+  ③ B2/B3 的「先问」「三层齐全」靠读 GUI 正文逐字判，只有「队轮在点头之后才起」做成了硬证据（`seq25` → `seq29` → `seq37`）；
+  ④ B1 的直答是**一个零工具调用的轻量工人**代答，不是零子智能体（零子会话只有 B3 成立）；
+  ⑤ 模型用的是 `agent2api/deepseek-v4.1-flash`，不是任务点名的 `wb/cn:deepseek-v4.1-flash`（当时连续 6 次 503）；
+  ⑥ 3080「没重启」只有间接证据（端口仍在听、仍 401、`~/.dsh/profiles` 零写入），沙箱 `--unshare-pid` 读不到它的 pid；
+  ⑦ 远端 Node 22/24 矩阵 `NOT_RUN`（没 push）。
+- **下一步**：合流由主代理做（本包不合、不发版）。若要合，先跑一遍上面的 `npm run ci` 再合；合流后把 `[Unreleased]`
+  那四条（英文 + 中文）带进发版段。若还要收口那条饱和用例，判据只看「在真负载下连着跑不再红」，不要为它改断言或抬 `testTimeout`。
+
 ## 2026-11-24 — 两条无计时器探针改由探针持钟：远端 Node 24 红转绿、`team-dispatch-v1` 清干净、`feat/audit-layer` 取半记
 
 - **From:** 执行手（`agent-130/worker-timeout`）· **To:** 合流者 / 操作员

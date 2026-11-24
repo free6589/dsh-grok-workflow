@@ -1,0 +1,88 @@
+# RED — spec only, product untouched (pristine `git archive HEAD` copy at 1f70103 in .tmp/red, this spec dropped in unmodified)
+# command: npx vitest run test/full-behind-first-answer.spec.ts   → exit 1
+
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/feat-full-escape/.tmp/red
+
+ ❯ test/full-behind-first-answer.spec.ts (4 tests | 4 failed) 185ms
+     × enters the live first answer, says the report follows, and starts one real run 77ms
+     × a first answer that throws falls back by saying so, and the run still starts 53ms
+     × a first answer that comes back empty falls back by saying so, and the run still starts 52ms
+     × the entered preamble states the answer came first and the report may correct it 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/full-behind-first-answer.spec.ts > full mode, first turn: answer first, verify behind it > enters the live first answer, says the report follows, and starts one real run
+AssertionError: expected '帮我查一下三家报价，然后给结论\nThe mandatory workfl…' to contain '这两句是先答，团队正在后台核验。'
+
+- Expected
++ Received
+
+- 这两句是先答，团队正在后台核验。
++ 帮我查一下三家报价，然后给结论
++ The mandatory workflow gate accepted this message and started the team workflow in the background. The report arrives later as its own message. Reply with the text between the markers exactly as given: keep every line, print no marker line, add nothing before or after it, do not answer the request yourself, and do not call any tool.
++
++ <<<GROK-WORKFLOW-REPORT>>>
++ 已接单：这条消息正在按整套流程（拆解 → 执行 → 核验）运行。跑完会单独发一条结论给你；期间可以继续发消息，新消息会排在这次之后各自开工。
++ <<<END-GROK-WORKFLOW-REPORT>>>
+
+ ❯ test/full-behind-first-answer.spec.ts:291:18
+    289|     // The whole point of the fix: the turn carries words a person can…
+    290|     // a template that says the message was received.
+    291|     expect(text).toContain(FIRST_ANSWER)
+       |                  ^
+    292|     expect(text).toContain('已接单')
+    293|     // ...and it says the team verifies that answer behind the turn, t…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  test/full-behind-first-answer.spec.ts > full mode, first turn: answer first, verify behind it > a first answer that throws falls back by saying so, and the run still starts
+ FAIL  test/full-behind-first-answer.spec.ts > full mode, first turn: answer first, verify behind it > a first answer that comes back empty falls back by saying so, and the run still starts
+AssertionError: expected '把发布流程的报错整理一下\nThe mandatory workflow …' to contain '首答是模板兜底'
+
+- Expected
++ Received
+
+- 首答是模板兜底
++ 把发布流程的报错整理一下
++ The mandatory workflow gate accepted this message and started the team workflow in the background. The report arrives later as its own message. Reply with the text between the markers exactly as given: keep every line, print no marker line, add nothing before or after it, do not answer the request yourself, and do not call any tool.
++
++ <<<GROK-WORKFLOW-REPORT>>>
++ 已接单：这条消息正在按整套流程（拆解 → 执行 → 核验）运行。跑完会单独发一条结论给你；期间可以继续发消息，新消息会排在这次之后各自开工。
++ <<<END-GROK-WORKFLOW-REPORT>>>
+
+ ❯ test/full-behind-first-answer.spec.ts:342:20
+    340|       const text = transcript(session)
+    341|       // The fallback states what it is: no silent template, no fake l…
+    342|       expect(text).toContain('首答是模板兜底')
+       |                    ^
+    343|       expect(text).toContain('轻量模型没回')
+    344|       expect(text).not.toContain(FIRST_ANSWER)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  test/full-behind-first-answer.spec.ts > full mode, first turn: answer first, verify behind it > the entered preamble states the answer came first and the report may correct it
+AssertionError: expected 'The mandatory workflow gate accepted …' to match /one or two sentences/
+
+- Expected:
+/one or two sentences/
+
++ Received:
+"The mandatory workflow gate accepted this message and started the team workflow in the background. The report arrives later as its own message. Reply with the text between the markers exactly as given: keep every line, print no marker line, add nothing before or after it, do not answer the request yourself, and do not call any tool."
+
+ ❯ test/full-behind-first-answer.spec.ts:359:19
+    357|     // The first paragraph is the contract: answered first, verified b…
+    358|     // later as its own message, and it may correct what was said.
+    359|     expect(first).toMatch(/one or two sentences/)
+       |                   ^
+    360|     expect(first).toMatch(/verif/i)
+    361|     expect(first).toContain('The report arrives as its own message')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed (4)
+   Start at  20:07:00
+   Duration  1.18s (transform 745ms, setup 0ms, import 877ms, tests 185ms, environment 0ms)
+

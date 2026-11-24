@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { FIXED_TIMEOUT_MS, resolveConfig } from '../src/config.js'
 import { machineLedger } from '../src/delivery/index.js'
-import { assertWorkflowReport, failureReport, renderReport } from '../src/report.js'
+import { assertWorkflowReport, failureReport, renderReport, shippedSummaryDraft } from '../src/report.js'
 import { maxTotalAgentsFor, routeBudgetFor } from '../src/script.js'
 
 const config = resolveConfig({ maxConcurrency: 2, maxTasks: 6 })
@@ -144,11 +144,21 @@ describe('workflow report semantic contract', () => {
     const withReview = { ...report(), synthesis: { mode: 'model', summary: 'ship it', review: 'check=pass verify=pass drafts=1' } }
     const accepted = assertWorkflowReport(withReview, OBJECTIVE, config)
     expect(accepted.synthesis.review).toBe('check=pass verify=pass drafts=1')
-    expect(renderReport(accepted)).toContain('Summary review: check=pass verify=pass drafts=1')
+    // The machine string is untouched; the ledger adds which draft shipped, on the
+    // same line, so a reader learns it without a second heading.
+    expect(renderReport(accepted)).toContain('Summary review: check=pass verify=pass drafts=1 · final: draft 1')
+    // Only a passing verdict names a shipped draft: the host uses this to mark the
+    // panel row, so a rejected draft must read as "no final draft".
+    expect(shippedSummaryDraft('check=pass verify=pass drafts=2')).toBe(2)
+    expect(shippedSummaryDraft('check=fail verify=pass drafts=3')).toBeUndefined()
+    expect(shippedSummaryDraft('check=pass verify=fail drafts=3')).toBeUndefined()
+    expect(shippedSummaryDraft('drafts=3')).toBeUndefined()
+    expect(shippedSummaryDraft(undefined)).toBeUndefined()
     // A rejected draft keeps its reason and its stage verdict in one line.
     const rejected = { ...report({ status: 'completed' }), synthesis: { mode: 'model', summary: 'ship it', review: 'check=fail verify=pass drafts=3' } }
     expect(renderReport(assertWorkflowReport(rejected, OBJECTIVE, config)))
       .toContain('Summary review: check=fail verify=pass drafts=3')
+    expect(renderReport(assertWorkflowReport(rejected, OBJECTIVE, config))).not.toContain('final: draft')
     // A non-string is refused, like every other report field.
     expect(() => assertWorkflowReport(
       { ...report(), synthesis: { mode: 'model', review: 7 } } as never, OBJECTIVE, config,

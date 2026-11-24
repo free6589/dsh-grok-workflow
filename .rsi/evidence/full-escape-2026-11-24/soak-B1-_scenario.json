@@ -1,0 +1,5 @@
+{"name":"B1","plan":"/home/fish/projects_mine/dsh-grok-workflow/.tmp/soak-full-escape/plan-B1.json","startedAt":"2026-11-24T20:56:13+08:00","finishedAt":"2026-11-24T20:57:58+08:00",
+ "port":3199,"overlay":"/home/fish/projects_mine/dsh-grok-workflow/.tmp/soak-full-escape/overlay-phaseB.yml","driveExit":0,
+ "newSessions":2,
+ "workflowRunStarts":0
+0}

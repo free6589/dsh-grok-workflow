@@ -1666,3 +1666,11 @@ Source: `dsh` 0.2.2-rc.3 装机内的 `@deepseek-ai/dsh-plugin-manager` 0.2.2-rc
   `reason:'update/unavailable'`，只给可复制的命令，不报错。
 - **边界**：以上都是本机 0.2.2-rc.3 的读码结论；升级 DSH 后 `expected` 的判定细节（哪些算"改了别的直接依赖"）与
   `BundleInfo.source` 的规范化方式都可能变，动这两处前要重读那份 `types.d.ts`。
+
+## 报告层：全量记录的显示面（2026-11-24，`CONFIRMED`，只读读码 + 真机 soak）
+
+- **`renderReport` 的尾段是唯一悬挂点**：`src/report.ts` 在算出 base view（含它自己的 8000 字上限与截断行）之后才决定要不要接审计段，所以「答案被截断」与「记录被截断」是两个各自可读的事实，不是同一个上限的两种表述。
+- **校验器会丢掉 `NormalizedTask.dependsOn` / `wave`**：`assertWorkflowReport` 逐字段重建 `plan.tasks`，只保留 id/title/objective/expectedOutput/acceptanceCriteria/context/constraints/writesPaths/originGoalId，因此**经过校验的报告里这两个字段永远是空的**。`renderAuditTrail` 仍然在记录携带时把它们印出来（类型允许），但今天的生产路径不会出现；要修的是校验器，不是渲染器（本包不改判定语义）。
+- **`maxRetries` 已不是配置键**（`src/config.ts` 的 removed 列表，值固定 `FIXED_MAX_RETRIES = 1`）：任何 `resolveConfig({maxRetries: …})` 的旧写法会直接抛「removed configuration key」。
+- **`parseReportRound` 的 section 状态按行推进，不会在下一个未知标题处复位**：追加在报告尾巴上的 `- ` 行会继续落进它上方最后一个已知 section（`Uncertainties:` 等，受 `itemsPerSection = 6` 截断）。本包的审计段因此只保证「不复现被解析的行形状」（签名行、`Objective:`、三个 section 头、`Final answer:`、`- id: status (N attempts) — title`），**不保证 section 正文不被追加**——当前接线里它进不了 digest（`parseReportRound` 只吃插件自己写入的 relay 消息，PTC 工具结果不是这类消息），但若将来有人把审计文本塞进 relay 消息，digest 的 section 会变脏。
+- **会话记录能验证工具结果**：DSH 把 PTC 工具结果按渲染后的文本存进 `tool/result` 事件（`data.message.content[].text`），因此「跑完的一轮不带审计段、没跑完的一轮带」可以在会话文件里逐字复核。会话文件是**多帧 zstd**，`node:zlib.zstdDecompressSync` 只解第一帧（会给出一个只有几百字节的假象）；要么用 `zstd -dc`，要么走流式解压。

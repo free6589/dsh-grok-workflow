@@ -227,11 +227,13 @@ export declare function collectRecallSources(session: Session | undefined, roots
  */
 export declare function classifyPreStep(deps: Pick<GateDeps, 'config' | 'readConfig' | 'loop'>, payload: PreStepPayload): Classification;
 /**
- * The receipt a `full`-mode turn shows when the team runs behind it.
+ * The receipt a `full`-mode turn shows beside the first answer.
  *
- * It is the whole user-visible content of that turn, so it has to say three
- * things without them: the message was accepted (not answered), the report comes
- * as its own message, and sending more meanwhile is expected rather than lost.
+ * The turn is not only a receipt any more: the one or two sentences above it are
+ * the answer, so this line must not read as if nothing had been said yet. It says
+ * what those sentences are (a first answer), that the team is verifying them in the
+ * background, that the conclusion comes as its own message and may correct them,
+ * and that sending more meanwhile is expected rather than lost.
  *
  * @param lang - the message's language.
  * @returns one short paragraph, never empty.

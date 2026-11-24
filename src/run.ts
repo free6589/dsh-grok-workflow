@@ -29,7 +29,7 @@ import { createRunGuardian, guardianChildBudgetMs, openRunGuardianChildren, unlo
 import type { FileHeartbeat, GuardianSettlement, SessionHeartbeat } from './guardian.js'
 import { deliverReport } from './delivery/index.js'
 import type { DeliveryView } from './delivery/index.js'
-import { assertWorkflowReport, failureReport, guardOf } from './report.js'
+import { assertWorkflowReport, failureReport, guardOf, shippedSummaryDraft } from './report.js'
 import {
   appendUnloadNotice,
   callSiteFrames,
@@ -1562,6 +1562,11 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
         if (repaired > 0) logger.warn(`null-collapse repair: ${repaired} report row(s) rewritten with the child's real failure cause`)
         const report = settle(redactDeep(validated))
         reportStatus = report.status
+        // The one row the panel may call final: the draft that passed the gate. The
+        // recorder writes it as its own event, because a chat row's label cannot be
+        // rewritten after `agent-start`.
+        const finalDraft = shippedSummaryDraft(report.synthesis.review)
+        if (run !== undefined && finalDraft !== undefined) progress?.summaryFinal(run.id, finalDraft)
         // The ledger is plugin-owned state: the deterministic report is the truth,
         // the record survives for diagnostics and for the next run's audit trail.
         // Run records are a configuration switch: a user who does not want the
@@ -1609,6 +1614,8 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<RunOutco
         // stop killed, not children that mis-formatted their answer.
         reclassifyNullCollapses(kept, childOutcomes.since(childOutcomeMark))
         const report = settle(kept, cause)
+        const keptDraft = shippedSummaryDraft(report.synthesis.review)
+        if (run !== undefined && keptDraft !== undefined) progress?.summaryFinal(run.id, keptDraft)
         lastReport = report
         lastCause = cause
         return { report, ok: false, cause, delivery: deliver(report) }

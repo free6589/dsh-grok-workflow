@@ -1,0 +1,10 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/feat-audit-render-half
+
+ ✓ test/report-audit.spec.ts (13 tests) 144ms
+
+ Test Files  1 passed (1)
+      Tests  13 passed (13)
+   Start at  20:06:59
+   Duration  1.58s (transform 1.16s, setup 0ms, import 1.29s, tests 144ms, environment 0ms)
+

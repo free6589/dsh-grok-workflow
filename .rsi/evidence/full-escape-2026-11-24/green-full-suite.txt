@@ -1,0 +1,10 @@
+# GREEN — whole suite after the escape (103 files)
+# command: npx vitest run
+# date: 2026-11-24 20:34 +08:00
+
+
+ Test Files  103 passed (103)
+      Tests  1922 passed (1922)
+   Start at  20:30:31
+   Duration  129.59s (transform 2.34s, setup 0ms, import 9.18s, tests 108.53s, environment 11ms)
+

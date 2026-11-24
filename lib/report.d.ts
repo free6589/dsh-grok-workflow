@@ -112,6 +112,18 @@ export interface RenderReportOptions {
     guard?: GuardConclusion;
     /** Child calls still running when the run stopped (resume hint detail). */
     inFlight?: number;
+    /**
+     * Attach the complete technical audit trail (`src/report-audit.ts`) as the
+     * report's tail, after the guard line.
+     *
+     * Off by default, and deliberately so: this view is parsed back by
+     * `src/carryover.ts` and asserted by many suites, so the default text has to
+     * stay exactly what it is. The base view keeps its own `MAX_RENDER_CHARS`
+     * bound; the attached section carries its own `AUDIT_MAX_CHARS` bound, so
+     * "the answer was truncated" and "the record was truncated" stay two
+     * different, separately readable facts.
+     */
+    auditTrail?: boolean;
 }
 /** Render a concise model-facing view; the canonical JSON remains available to PTC.
  *
@@ -120,5 +132,16 @@ export interface RenderReportOptions {
  * is true (default false). Final answer / Confirmed evidence / task rows /
  * Incomplete always render.
  */
+/**
+ * The draft number a *passing* summary review names, read off the script's own string.
+ *
+ * One reader for both the ledger line and the host (`src/run.ts` marks that draft's
+ * progress row), so the two cannot disagree about which draft was shipped. Only
+ * `check=pass verify=pass` counts: a rejected draft, and the deterministic fallback
+ * (which records no verdict at all), are not shipped drafts.
+ * @param review - `report.synthesis.review`, or anything.
+ * @returns the 1-based draft number, or undefined when nothing passed.
+ */
+export declare function shippedSummaryDraft(review: unknown): number | undefined;
 export declare function renderReport(report: WorkflowReport, opts?: RenderReportOptions): string;
 //# sourceMappingURL=report.d.ts.map

@@ -1,0 +1,11 @@
+[
+  { "type": "fresh", "label": "B2-fresh-session" },
+  { "type": "baseline" },
+  { "type": "send", "label": "B2-0-grok-on", "text": "/grok on", "timeoutMs": 30000, "quietMs": 6000 },
+  { "type": "send", "label": "B2-1-task", "text": "把这个仓库的 README 全面重写一遍，然后跑测试，再整理一份变更清单", "timeoutMs": 300000, "quietMs": 25000 },
+  { "type": "snapshot", "label": "B2-2-ask" },
+  { "type": "send", "label": "B2-3-confirm", "text": "确认", "timeoutMs": 300000, "quietMs": 30000 },
+  { "type": "snapshot", "label": "B2-4-confirmed" },
+  { "type": "sleep", "ms": 45000 },
+  { "type": "snapshot", "label": "B2-5-later" }
+]

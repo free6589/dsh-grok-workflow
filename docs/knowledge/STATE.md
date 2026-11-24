@@ -1,3 +1,75 @@
+Last updated: 2026-11-24 23:30 +08:00（**合流 `release/0.13.33`：三条分支按序并入、决策号重编为 D-131 / D-132 / D-133、全量门禁最终 exit 0（中间红过一次负载敏感的新用例），`CONFIRMED`；未发版、未打 tag、未 push、未删分支/worktree** —
+从 `main` 尖端 `4da42c2` 开出 `release/0.13.33`，三次 `git merge --no-ff` 按序并入 **`feat/full-escape`**（merge `cfe8873`，**零冲突**）、
+**`feat/audit-render-half`**（merge `f572eee`，3 个冲突）、**`fix/naming-resubmit`**（merge `c5b504d`，7 个冲突）；尖端 `c5b504d`。
+`src/report.ts` 是唯一两边都改的产品文件：合并后 `auditTrail`（`src/report.ts:1150` 选项、`:1363` 尾部拼接、`import { renderAuditTrail }`）
+与 `shippedSummaryDraft`（`:1170`）+ `Summary review: … · final: draft N`（`:1248-1249`）**两条路径都在**，自动合并干净、没有手改产品代码。
+`lib/` 一律由 `src/` 重建（`npm run build`），`verify:lib` 报 **249 文件逐字节一致**。冲突全在文档与 `lib/*.map`：`CHANGELOG.md` 的
+`[Unreleased]` 按语义归成 `### Added`（1 条，审计层）/ `### Changed`（5 条，前台 4 + 编号 1）/ `### Fixed`（1 条，replan 交底），
+中英原文照搬；`docs/knowledge/{STATE,HANDOFF,VALIDATION}.md` 取并集（HANDOFF/STATE/VALIDATION 新的在上，`feat/audit-render-half`
+那份 STATE/VALIDATION 块本来就是文件尾追加，保持原样）；`lib/report.d.ts.map` 与 `lib/report.js.map` 随便取一侧后重建覆盖。
+**决策号撞号已重编**：`feat/full-escape` 保留 **D-131**（5 处引用未动），`feat/audit-render-half` 改 **D-132**（11 处引用：
+`docs/ARCHITECTURE.md` 1、`HANDOFF` 3、`STATE` 1、`VALIDATION` 1、`src/index.ts` 1、`src/report.ts` 1、`test/human-output-contract.spec.ts` 2、
+`test/report-audit.spec.ts` 1），`fix/naming-resubmit` 改 **D-133**（3 处：`HANDOFF` 2、`STATE` 1）；两条被重编的条目末尾各加了一句
+「（合流时由 D-131 重编为 D-13x）」的括注，`.rsi/evidence/` 下的历史证据一字未改。**门禁**（`TMPDIR=$PWD/.tmp npm run ci`）本轮跑**四次**：`c5b504d` **exit 0**（105 文件 / 1954 例，187.88 s）→ `62643da` **exit 1**
+（105 文件，`Tests 1 failed | 1953 passed (1954)`，173.46 s）→ `62643da` **exit 0**（182.98 s，loadavg 2.41）→ **`e425295` exit 0**
+（105 文件 / 1954 例，203.36 s，**这是最终那次，也是本段所记录的树**）。四次的 lint 都是 **`Found 36 warnings and 0 errors.`**、
+`verify:lib` 都是 **249 files byte-identical**（sha 随 HEAD 变）。
+**中间那次红是一条负载敏感的新用例，不是合流回归**：`test/full-behind-first-answer.spec.ts > enters the live first answer…`，逐字
+`Error: the report was not delivered as its own message`，停在 `vi.waitFor`（vitest 默认 1 000 ms）。判定依据四条：单跑 **5/5 绿**；
+24 个 busy 循环下 **3/3 红**（3 条用例全红在 `vi.waitFor`，**没有一条是内容断言**）；`renderReport` 只被 PTC `render` 工具调用
+（`src/index.ts:254`）、投递路径用 `src/delivery/` 自己的渲染器；该用例的报告 `status: 'completed'`，`auditTrail` 本来就关。
+**断言、`testTimeout`、`vitest.config.ts`、skip/only 一律未动**——按「既有抖动按原样记录、不放宽断言」只记录。
+它**不严格跟 loadavg 走**：红的那次与最终绿的那次（loadavg **16.01**）机器都不闲，说明这是一个 1 s 墙钟竞态，重负载下更容易撞上、
+不是重负载才撞上。本段写入后只再改过三个记忆文档，`src/`、`test/`、`lib/`、`package.json` 一行未动，所以 `verify:lib` 那行的 sha
+会随 HEAD 前进，但被校验的那对 `src/`↔`lib/` 逐字节关系不变。
+对数：基线 101 文件 / 1910 例 + 分支1 的 2 文件 12 例 + 分支2 的 1 文件 13 例 + 分支3 的 1 文件 19 例 = **105 / 1954**，与实测逐项相等。
+另一组在案的既有抖动（`test/gate.spec.ts` 的 refused-batch、`test/timeout.spec.ts` 两条无计时器探针）三次都绿。
+**没做的（留给发版那一块）**：`package.json` 仍 `0.13.32`、`[Unreleased]` 未搬进发版段、未打 tag、未 push、未删三条分支与 worktree、
+`~/.dsh` 一行未写、未重载、未重启。
+
+Last updated: 2026-11-24 22:20 +08:00（**重复调用带序号名 + 终稿标「（定稿）」+ replan 交卷改「调工具 + 同棒补交」** —
+worktree `.agents/worktrees/fix-naming-resubmit`，分支 `fix/naming-resubmit`，基线 `main` 尖端 `1f70103`（`0.13.32`），
+本轮提交见 `HANDOFF.md` 顶部（一条，含 `src/`、`test/`、`lib/`、`CHANGELOG.md`、`docs/`）。三件事都是用户拍的：
+①汇总多稿 `汇总·第1稿/第2稿/第3稿`（同一稿的 resubmit 仍是同一号）②规划腿 `规划（第1次）/（第2次）…`（开场 + 每个波边界）
+③replan 提示词不再写「Answer with the structured result only」，改成明确要调结构化结果工具，并在 `format-error` 时同棒补交一次。
+当天追加的第四条：过门那一稿在进度 Tab 标 `汇总·第N稿（定稿）`，走**新事件** `tool-workflow/summary-final`（载荷 `{runId, draft}`），
+聊天面板不做（引擎对 `agent-start` 只 append 一行、`agent-end` 只按 seq 改状态、从不改 label）——这是拍板前提，不是本轮限制。
+名字仍只有 `src/naming.ts` 一个真源，`namingSource()` 的 guest 副本同步加了 `plannerCallLabel` / `synthesisDraftLabel` /
+`SYNTHESIS_FINAL_MARK`，`test/naming.spec.ts` 的一致性矩阵已覆盖；`parseMemberLabel` 新旧名字都认（含未来 `（定稿）` 后缀）；
+`roleOfChildTitle` 改成先试整行再试 `·` 头。两份角色表（`src/progress-tab.ts` / `src/client/index.js`）各补 `规划` / `汇总`。
+新真机用例 `test/naming-sequence.spec.ts`（6 条，`createEngineHarness` + `teamWorkflowEngine` + `settledWithin`）；
+先红后绿：首轮 **11 failed / 187 passed（198）** 覆盖 4 个文件，实现后全绿。包工头复核三条已落地：①replan 同棒补交
+**进** `maxTotalAgentsFor()`（边界项 = `maxBoundaries × 2 × planner × waitFactor`，钉子见 planner-resubmit 的 cap 用例）
+②「同一稿两行」只标 `order` 最大的那一行（两份折叠各一条用例）③文档里「补交吃 +2 余量、未进算式」的说法已作废。
+门禁（本轮实测；提交与 sha 见 `HANDOFF.md` 顶部，回填 sha 前后只动过记忆文件）`npm run ci` **exit 0**：typecheck 干净、oxlint **36 warnings / 0 errors**、
+`verify:lib` **245 files byte-identical**、vitest **102 files / 1929 tests PASS**。
+`DECISIONS.md` 记 **D-133**（含被否决的「一稿/定稿二名制」「拆活/问改两名」「只改提示词不加兜底」「硬解析纯文本 JSON」与原因）；
+`VALIDATION.md`、`HANDOFF.md` 同日各一条。没合流、没发版、没碰 `~/.dsh`；主检出一行未动。）
+
+Last updated: 2026-11-24 21:34 +08:00（**完整流程（`/grok on`）补了一张前台：闲聊与单点事实直答、真任务先问再跑、首答在队轮前面；门禁在 `24f2f35` 上 exit 0，真机 soak 两相四场景全过，`CONFIRMED`** —
+worktree `.agents/worktrees/feat-full-escape`，分支 `feat/full-escape`，基线 `main` 尖端 `1f70103`（`0.13.32`），本包六条提交：
+`86c0fa2` 首答＋前言 → `597b444` channel 把前台调用单独记账 → `21f3616` 逃生口 → `8f40be1` 重建 `lib/` → `62f540f` 按状态结算
+→ `24f2f35` 收尾换时间预算。产品面只动 `src/gate.ts`、`src/triage.ts`、`src/answer.ts` 与同一次构建的 `lib/`；
+`package.json`、`cordis.patch.yml`、版本号一行未动。
+`/grok on` 之下三条路：闲聊 → chat 模板直答、零 run；单点事实 → 一次 `quick-worker` 直答、零 run；真任务 → 先报拆法
+（`full-escape-ask`）、零 run，回「确认」后由 `answerFullBehind` 起队轮并先给首答 +「已接单：上面这一两句是先答…」。
+部署级 `mode:'full'`（没有会话记录）三条路逐字节照旧——逃生口只认会话记录 `workflowMode:'full'`（D-131）。
+门禁 `TMPDIR=$PWD/.tmp npm run ci` 在 `24f2f35` 上 **exit 0**：typecheck 干净；lint `Found 36 warnings and 0 errors`（173 文件）；
+`verify:lib` → `lib/ at 24f2f35 is the build of src/ at 24f2f35 (245 files, byte-identical)`；vitest **103 files / 1922 tests PASS**（172.72 s）。
+**这条门禁在前面两个提交上各红过一次**（`8f40be1`、`62f540f`，都是 `test/grok-on-ingress.spec.ts` 那条饱和队列用例的
+「the blocking step never settled」／`expected false to be true`，`1 failed | 1921 passed`）；执行手在 loadavg 31 下也没能复现，
+最后把「有界轮数 × 50 ms」的收尾预算换成 `landedWithin(…, 15_000, 'the blocking step')`——按状态结算所有未结算的 run，不依赖 `at(-1)`，
+断言未放宽。用例红→绿：`test/full-escape.spec.ts` 在基线副本上 **4 红 1 绿**、`test/full-behind-first-answer.spec.ts` 在基线副本上 **4/4 红**。
+真机 soak 两相四场景（证据 `.rsi/evidence/full-escape-2026-11-24/soak.md`）：相 A 在基线 `1f70103` 上复现旧行为（回合只有禁言模板，
+`run-start=1 agent-start=3 guardian-start=1`，裂出规划/执行/核验三个子会话，worker 真跑 `curl open-meteo`、`curl wttr.in`、`web_search`）；
+相 B 三场景 PASS（B1 天气直答、`run-start=0 agent-start=0`，但**派了一个零工具调用的轻量工人**，不是零子智能体；
+B2 `seq25` 问 → `seq29` turn=2「确认」→ `seq37` 才 `run-start`，回执三层齐全；B3 闲聊直答、零子会话零工具）。
+缺口照实：相 A 的后台报告没等落地；B2/B3 部分判据靠读 GUI 正文 + 会话序号；模型用的是 `agent2api/deepseek-v4.1-flash`
+（点名的 `wb/cn:deepseek-v4.1-flash` 当时连续 6 次 503）；3080「没重启」只有间接证据（端口仍在听、仍 401、`~/.dsh/profiles` 零写入）。
+soak 证据的 85 个 `soak-` 前缀文件已在收尾时逐字节核对后从主检出搬进本分支（其中 3 个 `soak-B?-drive.log` 被 `.gitignore`
+的 `*.log` 挡住、未入库，耗时数字另有入库的 `soak-B?_run.json` 覆盖），主检出那一份已删、它那边 `git status --short` 回到空。
+**没合流、没发版、没 push、没升 live profile**；远端 Node 22/24 矩阵 `NOT_RUN`。）
+
 Last updated: 2026-11-24 19:45 +08:00（**两条无计时器探针改由探针持钟：远端 Node 24 那次红转绿；同包清掉 `team-dispatch-v1` 分支与 worktree；`feat/audit-layer` 记为 D-130 取半记录；三条 `backup/wip` 写死 2026-11-27 删除日** —
 worktree `.agents/worktrees/fix-timeout-probe-settle`，分支 `fix/timeout-probe-settle`，基线 `main` 尖端 `ca65df8`（`0.13.32`），代码提交 **`141dccd`**
 只含 `test/timeout.spec.ts`（+19 / −8）。病是 `c1ebdf3` 记过的同一条：两条用例等的是无计时器 realm 的结算，钟却是 runner 的——
@@ -2663,3 +2735,20 @@ fork 的 live `web` profile，真 Chromium，真 GitHub fetch + 真 pnpm）：�
 `0.13.31`——装上去的是那个标签的树，不是"当天解析到什么算什么"。证据目录 `.rsi/evidence/update-button-soak-2026-11-24/`。**红线**：live `~/.dsh` 一行未写、未重载、未重启
 （soak 用的是从它复制出来的隔离 home）；**未发版、未打 tag、未 push、未合流**，分支只在本地，`package.json` 仍 0.13.31，
 `[Unreleased]` 里记了这条用户可见变化。）
+
+Last updated: 2026-11-24 21:00 +08:00（**报告尾部审计层：没跑完的一轮带全量机器记录，默认视图零变化，`CONFIRMED`，未发版** —
+分支 `feat/audit-render-half`（自 `main` `1f70103` 开），两个本地提交：`4502748`（feat）+ 承载知识文档与证据的 docs 提交。
+`feat/audit-layer`（`7626233`）只取 `src/report-audit.ts` 与 `test/report-audit.spec.ts` 两件，按 `0.13.32` 的 `types.ts`
+改写后接到报告层**尾部**：`RenderReportOptions.auditTrail` 默认关，为真时 `renderReport` 先算 base view（含它自己的
+8000 字上限）再在守卫行之后接 `\n\n` + `renderAuditTrail(report)`；`src/index.ts` 的 PTC `render` 只在
+`report.status !== 'completed'` 时带上。决定、三个被否决的替代方案与后果见 **D-132**；分支的另一半（默认视图翻成人类答案）
+**没取**，留在 `feat/audit-layer` 上等另一次决定。**门禁**：`npm run ci` 在 `4502748` 上 **EXIT=0** — oxlint 36 warnings /
+0 errors、`verify:lib` 249 文件逐字节一致、vitest **102 文件 / 1923 测试 PASS**（对 `feat/update-button` 的 101 / 1910
+基线是 +1 文件 / +13 测试；`lib` 245 → 249）。**红先绿后**：`test/report-audit.spec.ts` 先红两次（模块缺失 → 选项/入口缺失），
+实现后 13/13 绿；唯一既有用例改动是 `test/human-output-contract.spec.ts` 的 T4 断言收窄（答案半不带机器词条，审计段是
+独立带标题段落）。**真机隔离 soak**（复制 live `web` profile 的 scratch home + tarball 安装，版本读回 `0.13.32`、
+`lib/index.js` sha256 与 worktree 构建一致）：不可满足任务 **`failed`**，工具结果 24 792 字并含
+`Technical audit trail` + `Audit trail complete.`；能答的问题 **`completed`**，1 276 字**不带**审计段；同 prompt 打发布版
+构建的对照跑也是 `failed` 但**不带**审计段。证据 `.rsi/evidence/audit-render-half-2026-11-24/`。**红线**：live `~/.dsh`
+一行未写（本进程对它是只读的，`dsh --profile web` 直接 EROFS）、未重载、未重启；**未 push、未打 tag、未合流、未发版**，
+`package.json` 仍 0.13.32。分支判定日期 2026-11-26。）

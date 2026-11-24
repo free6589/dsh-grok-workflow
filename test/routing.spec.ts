@@ -151,7 +151,7 @@ describe('generated script routing', () => {
       return verification(task('a'))
     }
     await runWorkflowScript(WORKFLOW_SCRIPT, args({ tasks: null, roles: roles([], [], [{ provider: 'pp', model: 'pl' }]) }), planning)
-    expect(plannerModels[0]).toBe('规划助手:pp/pl')
+    expect(plannerModels[0]).toBe('规划（第1次）:pp/pl')
   })
 
   it('inherits the run route when no chain is configured', async () => {
@@ -371,7 +371,10 @@ describe('generated script routing', () => {
     const routed = args({ roles: roles([], [], [], [{ model: 'writer' }]), synthesis: 'model' })
     const run = await runWorkflowScript(WORKFLOW_SCRIPT, routed, agent)
     expect(synthesizerCalls).toBe(1)
-    expect(run.report.synthesis).toEqual({ mode: 'model', summary })
+    // The plain policy records the same gate verdict the layered one does: the gate
+    // really ran both steps, and the host reads this string to mark the draft the
+    // run shipped (`src/run.ts` shippedSummaryDraft).
+    expect(run.report.synthesis).toEqual({ mode: 'model', summary, review: 'check=pass verify=pass drafts=1' })
     expect(run.report.status).toBe('completed')
     expect(run.report.confirmed).toHaveLength(1)
 
