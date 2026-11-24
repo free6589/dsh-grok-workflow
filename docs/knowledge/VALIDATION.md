@@ -9,8 +9,8 @@
 | 后绿（实现完） | 同上命令 | **绿**：`4 files / 198 tests PASS` |
 | 真机形状新用例 | `npx vitest run test/naming-sequence.spec.ts` | **绿 6/6**：两稿汇总行名 `汇总·第1稿 / 汇总·第1稿 / 汇总·第2稿`（第二个是同一稿的 resubmit）+ `parseMemberLabel` 反解；进阶规划 `规划（第1次）/（第2次）/（第3次）` 且行名=提示词首行；replan 提示词不含 `structured result only` 且明确要调工具；边界纯文本 → 同棒补交 → `plan.version` 2、`addedTaskIds ['d']`；两次都不交 → `decision rejected`、`waves [['a'],['b']]` 原样 |
 | 全量（未提交，HEAD 仍是 `1f70103`） | `npm run ci`（`TMPDIR=$PWD/.tmp`，Node 26.8.1） | **exit 0**：typecheck 干净；`oxlint src test` → `Found 36 warnings and 0 errors`；`verify:lib` → `lib/ at 1f70103 is the build of src/ at 1f70103 (245 files, byte-identical)`（**注意：这一步校验的是 HEAD，本轮的 lib/ 还在工作树里，所以它在提交前只能证明基线自洽**）；vitest **102 files / 1927 tests PASS**（125.35 s；提交前树，缺包工头复核新增的两条用例） |
-| 提交后门禁 | `npm run ci`（提交后跑过多次；几次之间只改了本文件的措辞与 sha，`src/`、`test/`、`lib/` 一再未动） | **每次都 exit 0**：typecheck 干净；`oxlint` **36 warnings / 0 errors**；`verify:lib` → `lib/ at <当次 HEAD> is the build of src/ at <当次 HEAD> (245 files, byte-identical)`；vitest **102 files / 1929 tests PASS**（125.53 s / 125.90 s / 123.5 s 三次同数） |
-| 单独 `verify:lib`（提交后） | `npm run verify:lib` | **exit 0**，`lib/ at <当次 HEAD> is the build of src/ at <当次 HEAD> (245 files, byte-identical)`（打印过 `2dcb236`） |
+| 提交后门禁 | `npm run ci`（代码提交 `a335388`） | **exit 0**：typecheck 干净；`oxlint` **36 warnings / 0 errors**；`verify:lib` → `lib/ at a335388 is the build of src/ at a335388 (245 files, byte-identical)`；vitest **102 files / 1929 tests PASS** |
+| 单独 `verify:lib`（提交后） | `npm run verify:lib`（`a335388`） | **exit 0**，`lib/ at a335388 is the build of src/ at a335388 (245 files, byte-identical)` |
 | lint | `npm run lint`（ci 内） | `Found 36 warnings and 0 errors`（171 文件，全是既有告警，与本轮基线一致） |
 | 工作树清洁 | `git status --short` | 只有本轮改动的 `src/`、`test/`、`lib/`、`CHANGELOG.md`、`docs/`；`.tmp/` 里的门禁日志与临时目录在收尾时删除 |
 

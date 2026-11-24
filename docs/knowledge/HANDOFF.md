@@ -3,8 +3,11 @@
 - **From:** 执行手（`agent-136/naming-worker`）· **To:** 合流者 / 操作员
 - **树与基线**：worktree `.agents/worktrees/fix-naming-resubmit`，分支 `fix/naming-resubmit`，基线 `main` 尖端 `1f70103`
   （版本仍 `0.13.32`）。**本轮未合流、未发版、未打 tag、未 push、未碰 `~/.dsh`**，主检出一行未动。
-- **本轮提交（一条，`git log -1 --format=%h` 自证；写记忆时是 `cb17bd3`，之后只回填了记忆文件里的 sha 与计数）**：代码 + 测试 + 重建 `lib/` + `CHANGELOG.md` + 记忆三件（`STATE.md` / `HANDOFF.md` / `VALIDATION.md`）
-  + `DECISIONS.md` D-131。只改本分支，没 push、没合流、没 bump 版本、没打 tag。
+- **本轮提交（两条，`git log --oneline main..HEAD` 自证）**：
+  1. **`a335388`** — 代码 + 测试 + 重建 `lib/` + `CHANGELOG.md` + 记忆三件（`STATE.md` / `HANDOFF.md` / `VALIDATION.md`）
+     + `DECISIONS.md` D-131。这是唯一的产品改动提交，`npm run ci` 与 `verify:lib` 的结论都属于它。
+  2. 其后一条**只改 docs/ 记忆的订正提交**（把记忆里被 amend 掉的中间 sha 换成 `a335388`、删掉 sha 占位写法）——
+     没有动 `src/`、`test/`、`lib/`，因此不重跑全量 ci。两条都只在本分支，没 push、没合流、没 bump 版本、没打 tag。
 - **包工头复核三条（同一条提交内已改完）**：①replan 同棒补交**进**预算算式（边界项 `maxBoundaries × 2 × planner × waitFactor`，
   钉子 `test/planner-resubmit.spec.ts > pays two boundary calls for every replan, because a boundary can ask twice`）
   ②一稿两行只标 `order` 最大的落地行（`test/progress-tab.spec.ts > marks only the row that landed when one draft was asked twice`、
