@@ -1,3 +1,42 @@
+## 0.13.32 发布：合流无冲突、门禁、标签、推送、远端两条流水线，以及 Node 24 的一次既有探针红 — 2026-11-24 (`CONFIRMED`)
+
+下面每一行都是发版那一轮在主检出 `/home/fish/projects_mine/dsh-grok-workflow` 里真跑过的命令与真读到的结果；没跑的写 `NOT_RUN`。
+合流、标签、推送与两条远端流水线的读数，在随后的记忆收口轮又用 `git` / `gh` 只读复核过一遍（复核跑的就是表里那几条命令）；
+门禁与 soak 的读数**没有**在收口轮重跑——收口那一提交只动三个记忆文件。
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 合流（无冲突） | `git rev-list --left-right --count main...feat/update-button`（`main` = `c6a3611`） | 左 **0** / 右 **3**：分支 3 条领先、0 条落后（`c951dbf` feat(update)、`a0bed98` 与 `09a21c2` docs(memory)）。**`CONFIRMED`** |
+| 合流（快进） | 从 `c6a3611` 开 `release/0.13.32` → `git merge --ff-only feat/update-button` | **快进到 `09a21c2`，无需解冲突**——分支本来就从当前尖端切出，计划里的冲突处理是**空操作**。**`CONFIRMED`** |
+| 发版提交 | `git show --stat 97687ce` = `chore(release): prepare v0.13.32` | **8 files / +22 −20**：`package.json`(1/1)、`package-lock.json`(2/2)、`src/client/index.js`(2/2)、`lib/client.js`(2/2)、`CHANGELOG.md`(2/0)、`docs/LOCAL-TESTING.md`(3/3)、`README.md`(5/5)、`README.zh-CN.md`(5/5)。版本在两处客户端常量（`PLUGIN_VERSION`、`UPDATE_LATEST`）与 `package*.json` 同步，`lib/client.js` 随构建重建 |
+| 本地门禁 | `TMPDIR=$PWD/.tmp npm run ci`（发版树，`HEAD` = `97687ce`） | **exit 0**（本轮只跑 **1 次**）：typecheck 干净；`oxlint src test` → **`Found 36 warnings and 0 errors.`**（171 个文件，全部既有）；`verify:lib` → `lib/ at 97687ce is the build of src/ at 97687ce (245 files, byte-identical)`；vitest → **101 files / 1910 tests PASS**（160.97 s）。**`CONFIRMED`** |
+| 发版树 = 合流树 | `git diff --stat 3a9f7bd 97687ce`（收口轮复核；`97687ce` 是 merge 的第二父，也就是 `release/0.13.32` 的尖端） | **输出为空**，两棵树完全相同——所以「门禁跑在 `97687ce`」与「tag 打在 `3a9f7bd`」是同一棵树的两次读数。**`CONFIRMED`** |
+| 真机 soak（重跑） | — | **`NOT_RUN`**（本轮没有重跑）。理由照实写：合流是快进、合流那一刻产品代码一行未变；之后唯一的产品代码改动是 `src/client/index.js` 的两个版本常量（重建进 `lib/client.js`），而这两个常量正是 `test/update-entry.spec.ts` 与 `test/docs-config-keys.spec.ts` 钉住的，两例都在上面的全量门禁里过了 |
+| soak 证据（复用，三跑两过） | 目录 `.rsi/evidence/update-button-soak-2026-11-24/`（`run1-result.json`、`run2.out`、`run2-click.err`、`run3.out`、`run3-result.json`、四张相屏幕截图、harness 与两次安装日志） | **run3 PASS**：真 GitHub fetch + 真 pnpm + 真 profile 写入，0.13.30 → 0.13.31，读回 `INSTALLED_VERSION=0.13.31`、`PROFILE_SPEC="github:free6589/dsh-grok-workflow#v0.13.31"`；**run1 同形**：四相齐全，但没留读盘那一行；**run2 红在 harness**：新构建替换页面时元素句柄已脱离（`run2-click.err`），不是产品失败，盘上仍读到 `INSTALLED_VERSION=0.13.31` |
+| 标签 | `git tag -a v0.13.32 -m "v0.13.32 — the settings page can install its own update"` 打在 `3a9f7bd`；`git cat-file -t v0.13.32`；`git rev-parse v0.13.32^{}` | `tag`（附注）；标签对象 **`53ac1e4529d3f3e0d6a2a0e6977eab0df39fc645`**，剥皮 **`3a9f7bd`**（= merge 提交，不是新建提交）。**`CONFIRMED`** |
+| 推送 | `git push origin main`；`git push origin v0.13.32`；`git ls-remote --tags origin v0.13.32` | 各 exit 0，**无 force**：`c6a3611..3a9f7bd  main -> main`、`* [new tag] v0.13.32 -> v0.13.32`；远端回读 `53ac1e4529d3f3e0d6a2a0e6977eab0df39fc645  refs/tags/v0.13.32`。**`CONFIRMED`** |
+| 远端 `Release` | run **45376772379**（event `push`，headBranch `v0.13.32`） | **success / completed**。**`CONFIRMED`** |
+| GitHub Release | `gh release view v0.13.32 --json …` | title **`Grok Workflow for DSH v0.13.32`**，非 draft、非 pre-release，`publishedAt` **2026-11-24T10:41:30Z**；资产 **`dsh-grok-workflow-0.13.32.tgz` = 947276 B**（`state=uploaded`）。发布说明从 `## [0.13.32] - 2026-11-24` 段抽出 → 搬移后的锚点被发版脚本接住了。**`CONFIRMED`** |
+| 远端 `CI`（首次） | run **45376766890** 第 1 次尝试（main push） | **failure**：只有 `Node 24` 这一 job 的 `Run npm test` 挂，**恰好一条**用例 —— `test/timeout.spec.ts > the timer the engine realm really has > races on Atomics.waitAsync where no setTimeout exists`，`Error: Test timed out in 30000ms`，`Test Files 1 failed \| 100 passed (101)`；它前面每一步都绿（typecheck、lint、build、`git diff --exit-code -- lib/`）。同一次尝试的 `Node 22` **success**。**`CONFIRMED`**（逐字取自该 job 的步骤日志） |
+| 探针来源（是不是本版引入的） | `git log --oneline -1 -- test/timeout.spec.ts`；`git log --oneline c6a3611..3a9f7bd -- test/timeout.spec.ts src/timeout.ts` | 最后一次改动是 **`d7f8df6`**（`src/timeout.ts` 同一个提交）；本版区间对这两个文件**输出为空**，即 `0.13.32` 一条都没碰过它们。与在案的 vitest realm 等待器抖动**同族**：guest realm 没有 `setTimeout`，`Atomics.waitAsync` 的等待器不被服务，只有 runner 的 30 s 超时能收尾 → **既有、非本版引入**。**`CONFIRMED`** |
+| 远端 `CI`（重跑） | `gh run rerun 45376766890 --failed` | 没改断言、没抬 `testTimeout`、没跳过任何用例；重跑后 `Node 22` 与 `Node 24` 都 **success**，run **completed / success**（`attempt=2`）。**`CONFIRMED`** |
+| 收尾 | `git worktree remove .agents/worktrees/feat-update-button`；`git branch -d feat/update-button`（曾在 `09a21c2`）；`git branch -d release/0.13.32`（曾在 `97687ce`）；`git status --short --branch` | worktree 移除、两条已合分支用 `-d` 删掉（未用 `-D`）；工作树 `## main...origin/main`，干净。`.agents/worktrees/team-dispatch-v1`（分支**未合**）故意没动。**`CONFIRMED`** |
+| live profile | `dsh plugin --profile web add github:free6589/dsh-grok-workflow#v0.13.32` | **`BLOCKED`（本侧）**：AGENTS §11 自动升级**没有执行**——包工头的沙箱是 `workspace-write`，`~/.dsh` 不在可写范围且审批提示被关掉；没有写入、没有重载、没有重启。这一条留给操作员执行，并在执行后把版本读回成 `0.13.32` |
+
+**Changed（本版随出去的代码面）：** `src/update-surface.ts`（新增，802 行）、`src/index.ts`（+8）、`src/client/index.js`（396 改动行）、
+`test/update-surface.spec.ts`（新增，752 行）、`test/update-entry.spec.ts`（+549）、`lib/`（同一次构建的产物）、`DECISIONS.md` D-129、
+证据 `.rsi/evidence/update-button-soak-2026-11-24/`。发版提交只动版本声明与 changelog 锚点（见上表 diffstat）。
+
+**Honest boundary（逐条，别单独主张被它们限定的东西）：**
+1. **真机 soak 没有为 0.13.32 重跑**：用的是分支上那三跑里通过的那两份（run3、run1）。能让它成立的论证是「合流是快进 + 之后只改了两个版本常量」，
+   这是**理由**，不是又跑了一遍真机；所以本版关于「装得上」的结论建立在 0.13.31 那次真装 + 门禁里两条钉版本的用例上。
+2. **门禁只跑了一次**（`97687ce`，exit 0），没有重复或加压跑；本条记的是那一次的读数。
+3. **那条 `timeout.spec.ts` 的红只做了「来源核查 + 重跑」**：确认本版没碰过这两个文件、确认同族抖动在案，但没有在这一轮把根因进一步收窄
+   （没有复现、没有插桩）；「既有」这个判断的依据是提交区间为空 + 同族症状在案，而不是一次受控复现。
+4. **live profile 未升级**（`BLOCKED`）：包工头这一侧的沙箱写不到工作区以外，这台机器上正在跑的那份插件仍是旧版本。
+5. **收口的这一提交是纯文档**：只动 `docs/knowledge/{STATE,HANDOFF,VALIDATION}.md`，所以没有为它重跑 `npm run ci`；`src/`、`test/`、`lib/`、
+   `package.json`、`CHANGELOG.md`、两个 README 与 tag 状态一行未动。
+
 ## `team-dispatch-v1` rebase 到 `main` `369d6e3`：冲突按功能解、全仓门禁 exit 0、跨进程差分实测 — 2026-11-24 (`CONFIRMED`)
 
 下面每一行都是本轮在 worktree `.agents/worktrees/team-dispatch-v1` 里真跑过的命令与真读到的结果；没跑的写 `NOT_RUN`。

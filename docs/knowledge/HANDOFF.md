@@ -1,3 +1,30 @@
+## 2026-11-24 — 0.13.32 发布收口：设置页升级按钮已合入并发版
+
+- **From:** 发版（merge-and-release）· **To:** 下一个接手的人
+- **结果**：`feat/update-button` 已以 `--no-ff` 合入 `main`（merge `3a9f7bd`，无冲突），发版提交 `97687ce`，注解标签 `v0.13.32`（标签对象 `53ac1e4`，
+  打在 `3a9f7bd` 上）；`main` 与标签都已推送（`c6a3611..3a9f7bd  main -> main`、`* [new tag] v0.13.32`，无 force）。远端 Release `45376772379`
+  success，GitHub Release **`Grok Workflow for DSH v0.13.32`** 带资产 **`dsh-grok-workflow-0.13.32.tgz`（947276 B）**；CI `45376766890` 首次
+  一条既有探针红、`--failed` 重跑后双绿。
+- **合流是快进、不是解冲突**：`git rev-list --left-right --count main...feat/update-button` → 左 `0` / 右 `3`，分支从 `c6a3611` 切出，
+  `git merge --ff-only` 直接到 `09a21c2`；计划里的解冲突一步因此是空操作，合流那一刻没有任何一行产品代码变化。
+- **发了什么**（用户能感觉到的部分）：设置页的版本卡不再只是「说出最新版本 + 给一条命令」，而是一个按钮真能装——一次点击是一次检查加一次安装，
+  页面不 reload；装什么由宿主按本仓库的发布形状自己拼，成功只认读盘回执，失败或装歪就回滚。决策与被否掉的替代方案见 `DECISIONS.md` D-129。
+- **门禁**：`TMPDIR=$PWD/.tmp npm run ci` 在发版树 `97687ce` 上 **exit 0**（只跑一次）——typecheck 干净、`oxlint src test` **36 warnings / 0 errors**
+  （171 文件，全既有）、`verify:lib` 245 文件逐字节一致、vitest **101 文件 / 1910 测试 PASS**（160.97 s）。对 `v0.13.31` 的 100 文件 / 1866 测试基线是
+  **+1 文件 / +44 测试**。
+- **soak 复用的口径（照实说）**：真机 soak 没有重跑，依据是快进合流没改产品代码，之后唯一的产品代码改动是两个版本常量（重建进客户端包），
+  而它们正是 `test/update-entry.spec.ts` 与 `test/docs-config-keys.spec.ts` 钉住的。`.rsi/evidence/update-button-soak-2026-11-24/` 三跑两过：
+  run3 经真 GitHub fetch + 真 pnpm + 真 profile 写入把 0.13.30 装到 0.13.31，并读回 `INSTALLED_VERSION=0.13.31` 与钉死的 spec；run1 四相同形
+  但没留读盘那一行；run2 红在 harness（新构建替换页面时元素句柄脱离），不是产品，盘上仍读到 `0.13.31`。
+- **远端 CI 的那一次红**：`45376766890` 首次只有 `Node 24` 的 `Run npm test` 挂，恰好一条 `test/timeout.spec.ts` 的 `Atomics.waitAsync` 探针
+  （`Error: Test timed out in 30000ms`，`Test Files 1 failed | 100 passed (101)`），它前面每一步全绿；同一次尝试的 `Node 22` 与 Release 自己的
+  `npm test` 都绿。本版没碰这两个文件（`c6a3611..3a9f7bd` 对 `test/timeout.spec.ts`、`src/timeout.ts` 为空，后者最后一次改动是 `d7f8df6`），
+  与在案的 realm 等待器抖动同族。按既有政策只做 `gh run rerun --failed`，没有改断言、没抬 `testTimeout`、没跳过。
+- **红线**：全程未碰 `~/.dsh`，未升级、未重载、未重启运行中的实例；AGENTS §11 自动升级因沙箱写不到工作区以外而**没有执行**（`BLOCKED`）。
+- **待办**：① 升级 live profile 到 `v0.13.32` 需要操作员执行 `dsh plugin --profile web add github:free6589/dsh-grok-workflow#v0.13.32`
+  （钉 tag）并把版本读回成 `0.13.32`；② `.agents/worktrees/team-dispatch-v1` 与 `team-dispatch-v1`、`feat/audit-layer` 等未合分支仍在，
+  本包故意没动；③ 远端仍可能在那条 realm 探针上红一次，先 `gh run rerun --failed`，不要为此改断言或抬 `testTimeout`。
+
 ## 2026-11-24 — `team-dispatch-v1` rebase 到 main 尖端：3 条重放 + 2 条收尾，全仓门禁 `exit 0`（`CONFIRMED`，待合流判定）
 
 - **From:** 执行手（`agent-125/rebase-ci`） · **To:** 合流者 / 操作员

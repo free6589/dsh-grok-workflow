@@ -1,3 +1,40 @@
+Last updated: 2026-11-24 18:48 +08:00（**已发版 `0.13.32`：设置页的升级按钮装进了产品，`CONFIRMED`（本地门禁 exit 0 + 远端 Release 绿 + GitHub Release 已发布；远端 CI 首次一条既有探针红、`--failed` 重跑后双绿）** —
+基线 `main` 尖端 `c6a3611`（＝`origin/main`），分支 `feat/update-button`（worktree `.agents/worktrees/feat-update-button`）3 条领先 / 0 条落后：
+`git rev-list --left-right --count main...feat/update-button` → 左 `0` / 右 `3`，三条是 `c951dbf` feat(update) 设置页升级按钮、`a0bed98` 与 `09a21c2` docs(memory)。
+从 `c6a3611` 开出 `release/0.13.32` 后 `git merge --ff-only feat/update-button` **快进到 `09a21c2`，没有用到解冲突那一步**——分支本来就是从当前尖端切出来的，
+所以计划里的冲突处理是空操作。功能体：`src/update-surface.ts`（新增，802 行）、`src/index.ts`（+8）、`src/client/index.js`（396 改动行）、
+`test/update-surface.spec.ts`（新增，752 行）、`test/update-entry.spec.ts`（+549）、证据 `.rsi/evidence/update-button-soak-2026-11-24/`、`DECISIONS.md` D-129。
+发版提交 `97687ce` = `chore(release): prepare v0.13.32`，8 files / +22 −20：`package.json`、`package-lock.json`（2 处）、`src/client/index.js`
+（`PLUGIN_VERSION` + `UPDATE_LATEST`）、重建的 `lib/client.js`、`docs/LOCAL-TESTING.md`（3 个 tarball 名）、`README.md` 与 `README.zh-CN.md`
+（安装钉、声明版本、“current release” 说明、已发布 tag 列表收到 `v0.13.32`）、`CHANGELOG.md`（分支的 `[Unreleased]` 条目原文搬到新的
+`## [0.13.32] - 2026-11-24` 下，`[Unreleased]` 留空）。残留的 `0.13.31` 字样都是正当历史：`## [0.13.31]` 标题、两个 README 的 tag 列表、
+客户端包里把 0.13.31/0.13.32 当「陈旧构建 vs 更新发布」举例的注释散文。
+本地门禁 `TMPDIR=$PWD/.tmp npm run ci` 在发版树 `97687ce` 上 **exit 0**（只跑一次）：typecheck 干净、`oxlint src test` →
+`Found 36 warnings and 0 errors`（171 文件，全是既有）、`verify:lib` → `lib/ at 97687ce is the build of src/ at 97687ce (245 files, byte-identical)`、
+vitest **101 files / 1910 tests PASS**（160.97 s）。真机 soak **没有重跑**，照实说：合流是快进，合流那一刻没有一行产品代码变化；
+之后唯一的产品代码改动是 `src/client/index.js` 的两个版本常量（重建进 `lib/client.js`），而这两个常量正是 `test/update-entry.spec.ts` 与
+`test/docs-config-keys.spec.ts` 钉住的。soak 证据三跑两过：run3（`run3.out`、`run3-result.json`、四张相屏幕截图）经真 GitHub fetch + 真 pnpm +
+真 profile 写入把 0.13.30 装到 0.13.31，并读回 `INSTALLED_VERSION=0.13.31` / `PROFILE_SPEC="github:free6589/dsh-grok-workflow#v0.13.31"`；
+run1（`run1-result.json`）四相同形、没留读盘那一行；run2 红在 harness（新构建替换页面时元素句柄已脱离）而不是产品，盘上仍读到 `INSTALLED_VERSION=0.13.31`。
+合流与发版：`git merge --no-ff release/0.13.32 -m "merge: settings-page upgrade button — one click checks and installs the newest release"` → merge 提交
+`3a9f7bd`，`git diff --stat main release/0.13.32` **空**（两棵树完全相同）；附注 tag `v0.13.32` 打在 `3a9f7bd`，标签对象 `53ac1e4`，message
+`v0.13.32 — the settings page can install its own update`；推送无 force：`c6a3611..3a9f7bd  main -> main`、`* [new tag] v0.13.32 -> v0.13.32`，
+`git ls-remote --tags origin v0.13.32` → `53ac1e4529d3f3e0d6a2a0e6977eab0df39fc645  refs/tags/v0.13.32`。
+远端 `Release` run **45376772379**（event push，headBranch `v0.13.32`）**success**：已发布 <https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.32>，
+标题 `Grok Workflow for DSH v0.13.32`，资产 `dsh-grok-workflow-0.13.32.tgz` = **947276 bytes**，`2026-11-24T10:41:30Z` 发布；发布说明是从
+`## [0.13.32] - 2026-11-24` 段抽出来的，说明升格后的锚点被接住了。远端 `CI` run **45376766890**（main push）首次**红**：只有 `Node 24` 的
+`Run npm test` 挂，恰好一条 `test/timeout.spec.ts > the timer the engine realm really has > races on Atomics.waitAsync where no setTimeout exists`
+（`Error: Test timed out in 30000ms`，`Test Files 1 failed | 100 passed (101)`），它前面每一步全绿（typecheck、lint、build、`git diff --exit-code -- lib/`）；
+同一次尝试的 `Node 22` 绿，Release 自己跑的 `npm test`（Node 22）也绿。来源核查：`git log --oneline -1 -- test/timeout.spec.ts` → `d7f8df6`；
+`git log --oneline c6a3611..3a9f7bd -- test/timeout.spec.ts src/timeout.ts` → **空**，本版没碰过这两个文件——与在案的 vitest realm 等待器抖动同族
+（guest realm 没有 `setTimeout`，`Atomics.waitAsync` 的等待器不被服务，只有 runner 的 30 s 超时能收尾），既有、非本版引入。按既有政策只做了
+`gh run rerun 45376766890 --failed`（没改断言、没抬 `testTimeout`、没跳过），两个 job 都 **success**，run **completed/success**。
+收尾：`git worktree remove .agents/worktrees/feat-update-button`；`git branch -d feat/update-button`（曾在 `09a21c2`）与
+`git branch -d release/0.13.32`（曾在 `97687ce`）；`git status --short --branch` → `## main...origin/main`，树干净；
+`.agents/worktrees/team-dispatch-v1`（未合分支）故意没动。**本侧没有升 live profile（`BLOCKED`）**：AGENTS §11 没有执行——包工头的沙箱只能写到
+工作区（`workspace-write`），`~/.dsh` 不可写、审批提示被关掉，所以一行未写、未重载、未重启；留给操作员
+`dsh plugin --profile web add github:free6589/dsh-grok-workflow#v0.13.32`（钉 tag）并把版本读回成 `0.13.32`。）
+
 Last updated: 2026-11-24 16:50 +08:00（**`team-dispatch-v1` 已 rebase 到 `main` `369d6e3`：认领锁与到达顺序保住、旧 `board.json` 未复活，全仓门禁 `exit 0`，`CONFIRMED`** —
 3 条提交重放（`df89a95` taskboard 锁 + 磁盘 CAS → `4f25f15` dispatcher 队列/寻址 → `1fddad2` 记忆），另加两条收尾（`77d05f8` 重建 `lib/`、本轮记忆提交）。口径是「保留 main 的新架构、只搬真新增」：`src/dispatcher/session.ts`、`dispatcher.ts` 整份取 main（分支那份自带 `board.json` 的会话被 main `9dc7624` 的 `TaskBoard`/`boardReader`/`decideIntent` 取代，复活它会重新引入第二个板文件），`policy.ts` 取分支（main 从未改过该文件），`src/taskboard/store.ts` 由三方合并自动同时保住 main 的 `has()` 与分支的锁。分支的「到达顺序」按 main 的结构重做：`TaskRecord.seq`（落盘、锁内取 `max+1`）+ `TaskBoard.arrival()` + `DispatcherSession.pending()` + `resume().pending`，没搬分支那份 v2 板文件。门禁 `npm run ci` **exit 0**：typecheck 干净、oxlint **0 errors / 36 warnings**、`verify:lib` **241 files byte-identical**、vitest **100 files / 1866 tests PASS**。新增用例 21 例（taskboard 13 例、其中 1 例替换 main 旧的竞态断言；dispatcher 8 例）。跨进程差分实测：main `lib` 12 个进程各认领各一行 → 12/12 都报成功，盘上只活 5 / 6 / 7 行（连跑 3 次，丢 4–7 行）；rebase 后 3 次都 12/12 全活。FIFO 探针：main 重开后 `list()` 是 id 序、到达序丢失；rebase 后 `list()` 不变、`arrival()` 回到创建序。未合流、未 push、未打 tag、未碰 `~/.dsh`；主检出工作树一行未动；探针只在 `.tmp/` 且已删。）
 
