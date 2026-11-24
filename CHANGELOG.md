@@ -5,6 +5,43 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Changed / 变更
+
+- **`/grok on` no longer sends a greeting through the whole team / `/grok on` 不再让一句问候走整套团队** —
+  Turning `/grok on` used to mean every message paid for the whole plan → execute → verify run, so
+  "今天天气怎么样？" or "你好呀" came back as a receipt saying the message had been accepted, with the
+  actual words arriving later. Small talk and a single question now get an answer in the turn itself:
+  small talk is answered outright and nothing is started, and one question is answered by a single cheap
+  worker rather than a team. Real work still gets the team.
+  / 打开完整流程以前等于每条消息都付一整套「拆解 → 执行 → 核验」的钱，所以一句「今天天气怎么样？」或「你好呀」拿到的是
+  「已接单」回执，真正的话要等后面那条。现在闲聊与单个问题都在这一回合里直接给答案：闲聊由模板直答、什么都不启动，
+  单个问题交给一个轻量工人代答、不开团队。真活仍然开团队。
+
+- **A real task is split out loud first and only runs once you agree / 真任务先把拆法报出来，你点头才开跑** —
+  With `/grok on`, a real task now comes back as the captain's split: what will be delivered,
+  item by item, plus what to reply if you want a different split. Nothing runs until you answer
+  「确认」 or 「开干」; changing the split is just as good an answer, and until then the only thing spent
+  is the split preview.
+  / 完整流程之下，真任务现在先回一份队长的拆法：逐条说明会交付什么，以及想换拆法时该怎么回。你不回「确认」或「开干」
+  就什么都不跑；直接改拆法也一样算答复，而在你答复之前，花掉的只有这一次拆法预览。
+
+- **The first turn answers in one or two sentences, and the team verifies behind it / 第一回合先给一两句人答，
+  团队在它背后核验** — A run no longer leaves the turn holding a "working on it" template: the sentence you
+  read first is a real first answer, written from your request, and the team works behind that turn. The
+  conclusion arrives later as its own message and may correct what the first answer said — the receipt
+  says so in plain words, along with the fact that anything you type meanwhile starts its own run behind
+  this one instead of being swallowed.
+  / 开跑之后，这一回合不再只挂着「正在跑」的模板：你最先读到的那一两句是真正的首答，是按你的原话写的，团队在它背后干活。
+  结论稍后作为单独一条消息送达，并且**可能纠正**首答的说法——回执会用平常话把这点讲清楚，也会说明你在这期间继续发消息
+  不会被吞，而是排在这次之后各自开工。
+
+- **A profile that runs the whole workflow for every message keeps doing exactly that / 部署级就设定「每条消息都跑完整流程」的配置完全不受影响** —
+  Only the `/grok on` switch is affected. A profile configured to run the full workflow for every message,
+  with no `/grok on` to turn it on or off, keeps its old behaviour exactly: every message still runs to
+  completion inside its own turn.
+  / 受影响的只有 `/grok on` 这个开关。如果整个部署就被设定成「每条消息都跑完整流程」、没有 `/grok on` 可以开关，那行为
+  逐字节照旧：每条消息仍然在它自己那一回合里跑完。
+
 ## [0.13.32] - 2026-11-24
 
 ### Added / 新增

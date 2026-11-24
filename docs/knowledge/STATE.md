@@ -1,3 +1,27 @@
+Last updated: 2026-11-24 21:34 +08:00（**完整流程（`/grok on`）补了一张前台：闲聊与单点事实直答、真任务先问再跑、首答在队轮前面；门禁在 `24f2f35` 上 exit 0，真机 soak 两相四场景全过，`CONFIRMED`** —
+worktree `.agents/worktrees/feat-full-escape`，分支 `feat/full-escape`，基线 `main` 尖端 `1f70103`（`0.13.32`），本包六条提交：
+`86c0fa2` 首答＋前言 → `597b444` channel 把前台调用单独记账 → `21f3616` 逃生口 → `8f40be1` 重建 `lib/` → `62f540f` 按状态结算
+→ `24f2f35` 收尾换时间预算。产品面只动 `src/gate.ts`、`src/triage.ts`、`src/answer.ts` 与同一次构建的 `lib/`；
+`package.json`、`cordis.patch.yml`、版本号一行未动。
+`/grok on` 之下三条路：闲聊 → chat 模板直答、零 run；单点事实 → 一次 `quick-worker` 直答、零 run；真任务 → 先报拆法
+（`full-escape-ask`）、零 run，回「确认」后由 `answerFullBehind` 起队轮并先给首答 +「已接单：上面这一两句是先答…」。
+部署级 `mode:'full'`（没有会话记录）三条路逐字节照旧——逃生口只认会话记录 `workflowMode:'full'`（D-131）。
+门禁 `TMPDIR=$PWD/.tmp npm run ci` 在 `24f2f35` 上 **exit 0**：typecheck 干净；lint `Found 36 warnings and 0 errors`（173 文件）；
+`verify:lib` → `lib/ at 24f2f35 is the build of src/ at 24f2f35 (245 files, byte-identical)`；vitest **103 files / 1922 tests PASS**（172.72 s）。
+**这条门禁在前面两个提交上各红过一次**（`8f40be1`、`62f540f`，都是 `test/grok-on-ingress.spec.ts` 那条饱和队列用例的
+「the blocking step never settled」／`expected false to be true`，`1 failed | 1921 passed`）；执行手在 loadavg 31 下也没能复现，
+最后把「有界轮数 × 50 ms」的收尾预算换成 `landedWithin(…, 15_000, 'the blocking step')`——按状态结算所有未结算的 run，不依赖 `at(-1)`，
+断言未放宽。用例红→绿：`test/full-escape.spec.ts` 在基线副本上 **4 红 1 绿**、`test/full-behind-first-answer.spec.ts` 在基线副本上 **4/4 红**。
+真机 soak 两相四场景（证据 `.rsi/evidence/full-escape-2026-11-24/soak.md`）：相 A 在基线 `1f70103` 上复现旧行为（回合只有禁言模板，
+`run-start=1 agent-start=3 guardian-start=1`，裂出规划/执行/核验三个子会话，worker 真跑 `curl open-meteo`、`curl wttr.in`、`web_search`）；
+相 B 三场景 PASS（B1 天气直答、`run-start=0 agent-start=0`，但**派了一个零工具调用的轻量工人**，不是零子智能体；
+B2 `seq25` 问 → `seq29` turn=2「确认」→ `seq37` 才 `run-start`，回执三层齐全；B3 闲聊直答、零子会话零工具）。
+缺口照实：相 A 的后台报告没等落地；B2/B3 部分判据靠读 GUI 正文 + 会话序号；模型用的是 `agent2api/deepseek-v4.1-flash`
+（点名的 `wb/cn:deepseek-v4.1-flash` 当时连续 6 次 503）；3080「没重启」只有间接证据（端口仍在听、仍 401、`~/.dsh/profiles` 零写入）。
+soak 证据的 85 个 `soak-` 前缀文件已在收尾时逐字节核对后从主检出搬进本分支（其中 3 个 `soak-B?-drive.log` 被 `.gitignore`
+的 `*.log` 挡住、未入库，耗时数字另有入库的 `soak-B?_run.json` 覆盖），主检出那一份已删、它那边 `git status --short` 回到空。
+**没合流、没发版、没 push、没升 live profile**；远端 Node 22/24 矩阵 `NOT_RUN`。）
+
 Last updated: 2026-11-24 19:45 +08:00（**两条无计时器探针改由探针持钟：远端 Node 24 那次红转绿；同包清掉 `team-dispatch-v1` 分支与 worktree；`feat/audit-layer` 记为 D-130 取半记录；三条 `backup/wip` 写死 2026-11-27 删除日** —
 worktree `.agents/worktrees/fix-timeout-probe-settle`，分支 `fix/timeout-probe-settle`，基线 `main` 尖端 `ca65df8`（`0.13.32`），代码提交 **`141dccd`**
 只含 `test/timeout.spec.ts`（+19 / −8）。病是 `c1ebdf3` 记过的同一条：两条用例等的是无计时器 realm 的结算，钟却是 runner 的——
