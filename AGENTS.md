@@ -200,3 +200,49 @@ remote agent can see local-only commits.
 11. 主代理派发子代理后必须登记 agent_id、任务、预期产出与截止时间；正常情况靠 DSH 原生 completion notification 唤醒，不轮询。
 
 12. 兜底心跳：超截止时间未收到完成通知，主代理主动查询一次任务状态；活着继续等，失败/丢失只重派失败块，不重启已完成部分。
+
+## 10. Foreman layer
+
+Multi-agent work runs inside a foreman layer. The foreman is a delegated agent
+that owns one work block end to end; it is the only interface the main agent
+talks to for that block.
+
+- The main agent dispatches to the foreman and receives from the foreman. It
+  does not manage the foreman's children directly; the foreman splits the block
+  into subagents itself and owns their assignment, steering, and collection.
+- The foreman distributes work and accepts results. It does not write code
+  itself — no edits to source, tests, docs, or artifacts. When a piece needs
+  hands, the foreman delegates it to a subagent and reviews the returned
+  evidence.
+- The foreman returns one whole, verifiable deliverable: the complete block,
+  with the commands run and their results, not a progress log or a fragment a
+  reviewer would have to finish.
+- Merging happens only at the main agent. The foreman never merges into another
+  block's work, never touches a branch it was not given, and never integrates
+  two blocks on its own. The main agent collects finished blocks, cross-checks
+  them, and owns the final integration.
+- The deadline and heartbeat rules above apply to the foreman unchanged: it
+  registers the subagents it spawns, waits on completion notifications rather
+  than polling, and on a missed deadline the main agent checks the foreman once
+  and re-dispatches only the failed part.
+
+## 11. Auto-upgrade after a release
+
+A successful release is not finished until the live profile runs the released
+tag.
+
+- After every release succeeds (tag pushed and the remote Release run is green),
+  the main agent upgrades `dsh-grok-workflow` in the live profile to that new
+  tag on its own. This step needs no further operator confirmation; the release
+  instruction already authorizes it.
+- Pin the upgrade to the exact tag or a file reference to the released build —
+  never a floating range, `latest`, or a branch name. The installed version must
+  read back as the released version, not "whatever resolves today".
+- The upgrade touches only the plugin row. It must not modify other profile
+  rows, unrelated settings, or the profile's layout, and it must not restart or
+  otherwise disrupt the running instance beyond what the documented plugin
+  mount requires.
+- If the upgrade fails or the version does not read back as the released tag,
+  roll the plugin row back to its previous pinned value and report the failure
+  and the restored version. Never leave the live profile on a half-applied or
+  unverified plugin state.
