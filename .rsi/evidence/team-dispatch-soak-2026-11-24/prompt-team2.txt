@@ -1,0 +1,8 @@
+Use the grok_workflow tool to run exactly two tasks, then stop.
+
+Task 1 (id "write-a"): write the file team_a.txt in the current working directory with the exact content TEAM_OK using a real shell command.
+Task 2 (id "read-b"): after task 1 has run, read team_a.txt and write team_b.txt in the current working directory containing the two lines TEAM_B_OK and A_SEEN=<whatever team_a.txt contained>.
+
+The tool contract says caller-supplied tasks must not depend on each other, so do not invent a dependency field: instead make task 2's objective and context state that team_a.txt must already contain TEAM_OK, and check that it did before writing. If the tool rejects the plan, fall back to an objective that names both tasks and the order.
+
+Both tasks must be real shell commands that really touch the filesystem. When the workflow finishes, print one line per task with its status, then print the exact bytes of both files.

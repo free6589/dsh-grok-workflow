@@ -21,6 +21,8 @@
 **Changed：** `src/taskboard/{types,store,index}.ts`（+`seq` 到达标记与 `arrival()`、认领锁、`paths.ts` 新文件）、`src/taskboard/paths.ts`（新增）、`src/dispatcher/{policy,session,dispatcher}.ts`（+全路径寻址、`creator`/`resultRecipient`、`pending()`/`resume().pending`）、`test/taskboard.spec.ts`、`test/dispatcher.spec.ts`、`test/dispatcher-board.spec.ts`、`test/fixtures/taskboard/writer.mjs`（新增）、`vitest.config.ts`（`GROK_WORKFLOW_TASKBOARD_DIR` 指向 tmp）、`lib/` 重建、`docs/ARCHITECTURE.md`（任务板章节）、`CHANGELOG.md`、`docs/knowledge/{STATE,HANDOFF,DECISIONS}.md`。
 **Honest boundary：** 真机 soak `NOT_RUN`；未合流、未 push、未发版；锁仍是单文件系统内的咨询锁（不防恶意绕过、网络盘 `O_EXCL`/rename 语义不保证），rename 后的目录 fsync 仍是尽力而为；`seq` 只覆盖「创建顺序」，不表达优先级。跨进程差分用的是 **main 已提交的 `lib/` 产物**（`git archive` 取出，未在 main 检出里构建），所以它验证的是「已发布代码 vs rebase 后代码」，不是「main `src` 未构建形态」。
 
+**真机 soak 的原始记录（补档 2026-11-24）：** 上面那条 `NOT_RUN` 之后又跑了一轮隔离 soak，原始件存 `.rsi/evidence/team-dispatch-soak-2026-11-24/`（README + 转写 + overlay + prompt + 三个探针 + 两个 work 文件 + 两个 checkpoint，`.tmp/soak-td/` 已删）——`exit=0 elapsed=519s`，`run.status=completed`，`write-a:verified read-b:verified`，挂的 build `lib/index.js` sha256 `3e014bd1…` 与合流树同一份；那一轮只证明派发链路端到端跑通，任务板与派发器**没**挂进插件运行时（`lib/index.js` 里 `taskboard` 命中 0 次），模块靠直连探针证明：认领差分 v0.13.30 的板 12/12 子进程报 OK 而盘上只活 1 行、rebase 后 12/12 全活（各 3/3），到达序 v0.13.30 只有 id 序且无 `arrival()`、rebase 后 `arrival()` 给创建序。
+
 ## 0.13.30 门禁与发版：本地一次全绿、远端 CI + Release 双绿 — 2026-11-24
 
 发版提交 `10af79b` = `chore(release): prepare v0.13.30`（8 files / +32 −20，基线 `4f616d1` ＝ `origin/main`）。下面每一行都是量过的，
