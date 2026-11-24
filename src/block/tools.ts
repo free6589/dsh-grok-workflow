@@ -45,7 +45,7 @@ import type {
 } from './index.js'
 import { heartbeatsFile, readHeartbeatObservations } from './brakes.js'
 import { runBlockSupervisor } from '../supervisor/index.js'
-import { isQuestionReplySource, isUserAuthoredSource, startsTurn } from '../user-source.js'
+import { canAcceptBlock, isQuestionReplySource, isUserAuthoredSource, startsTurn } from '../user-source.js'
 import { steeringForSession } from '../steering.js'
 import type { ActiveState } from '../run.js'
 import type { ResolvedConfig } from '../types.js'
@@ -73,6 +73,7 @@ const NEXT_STEP: Record<string, string> = {
   'split-changed': '切分在预览之后改过；用新的 split_hash 重新出单，不要沿用旧的',
   'preview-expired': '预览已经过期；重新出单，再让用户点头',
   'version-limit': '这一块已经写满版本上限；换一个新的切分（新的 preview），不要继续追加',
+  'mode-off': '这个会话没有打开 grok 模式；先让用户打开模式，再调接单台的工具',
   'invalid': '按提示改掉不合法的字段，再提交一次',
 }
 
@@ -109,6 +110,19 @@ function sessionIdOf(agent: Agent): string {
   const text = id === undefined ? '' : String(id)
   if (text === '') throw new BlockToolError('invalid', '这个 agent 没有会话 id，账本无法归属')
   return text
+}
+
+/**
+ * The one admission check every block tool runs before it touches the ledger.
+ *
+ * M3.1 wires the call and leaves the answer at "yes": `canAcceptBlock` returns true
+ * until M3.2 flips its phase switch, so this cannot change an answer today. What it
+ * buys is the place the rule lives — once, for all six tools, instead of a check
+ * each tool would have to remember.
+ */
+function admit(agent: Agent): void {
+  if (canAcceptBlock(agent.session as Session | undefined)) return
+  throw new BlockToolError('mode-off', '这个会话的 grok 模式没打开，接单台不接单')
 }
 
 /** Text of one message, as the user typed it. */
@@ -411,6 +425,7 @@ export function registerBlockTools(deps: BlockToolDeps): void {
     async execute(args, exec: ToolRunContext) {
       alive()
       const agent = agentOf(exec)
+      admit(agent)
       const sessionId = sessionIdOf(agent)
       const mode = String(args.mode ?? '')
       if (mode === 'preview') {
@@ -453,6 +468,10 @@ export function registerBlockTools(deps: BlockToolDeps): void {
       const preview = previewById(previewId)
       const since = preview?.createdAtMs ?? 0
       const messagesAfterPreview = userMessagesSince(agent.session as Session | undefined, since)
+      // Repeated here on purpose: this is the branch that commissions work (it writes
+      // the approved split and hands back the dispatch envelope), so M3.2 will read the
+      // rule at the moment work is ordered, not only when the tool was entered.
+      admit(agent)
       try {
         const started = await startBlock({
           sessionId,
@@ -501,7 +520,7 @@ export function registerBlockTools(deps: BlockToolDeps): void {
     isConcurrencySafe: () => false,
     async execute(args, exec: ToolRunContext) {
       alive()
-      agentOf(exec)
+      admit(agentOf(exec))
       const blockId = String(args.block_id ?? '').trim()
       if (blockId === '') throw new BlockToolError('invalid', 'accept 需要 block_id')
       const row = await getBlockRow(blockId).catch(refuse)
@@ -585,6 +604,7 @@ export function registerBlockTools(deps: BlockToolDeps): void {
     async execute(args, exec: ToolRunContext) {
       alive()
       const agent = agentOf(exec)
+      admit(agent)
       const blockId = String(args.block_id ?? '').trim()
       if (blockId === '') throw new BlockToolError('invalid', 'close 需要 block_id')
       const handoff = String(args.handoff ?? '')
@@ -670,6 +690,7 @@ export function registerBlockTools(deps: BlockToolDeps): void {
     async execute(args, exec: ToolRunContext) {
       alive()
       const agent = agentOf(exec)
+      admit(agent)
       const blockId = String(args.block_id ?? '').trim()
       const options = { dir: dir() }
       const read = await readBlockRows(options).catch(refuse)
@@ -756,6 +777,7 @@ export function registerBlockTools(deps: BlockToolDeps): void {
     async execute(args, exec: ToolRunContext) {
       alive()
       const agent = agentOf(exec)
+      admit(agent)
       const blockId = String(args.block_id ?? '').trim()
       const text = String(args.text ?? '').trim()
       if (blockId === '') throw new BlockToolError('invalid', 'steer 需要 block_id')
@@ -792,7 +814,7 @@ export function registerBlockTools(deps: BlockToolDeps): void {
     isConcurrencySafe: () => false,
     async execute(args, exec: ToolRunContext) {
       alive()
-      agentOf(exec)
+      admit(agentOf(exec))
       const blockId = String(args.block_id ?? '').trim()
       if (blockId === '') throw new BlockToolError('invalid', 'stop 需要 block_id')
       const row = await getBlockRow(blockId).catch(refuse)

@@ -3593,3 +3593,45 @@ spine 为空，pre-fix 形状会进脊柱。
   不会静默开工；④ payload 解析不出 `answers` 时按约定回落到原文，这种退化 payload 里模型的问题文字仍可能命中批准词，
   但真实卡片每条问题都必须带一条答案（宿主侧校验），所以只在坏数据下成立，接受了。未发版：不动 `package.json`、
   不打 tag、不 push。
+
+## D-138 · `legacyGate` 分阶段：默认并存只观测、关掉旧门窄监听接管；双写拆文件；四条测试按 `blockIntake`（2026-11-25，未发版）
+
+- **Status:** `CONFIRMED`（独立验收：`npx vitest run test/m3-intake.spec.ts` → **10 passed**；基线 `35326c7` 一次性拷贝上同一 spec →
+  `Cannot find module '../src/heartbeat-listen.js'`、`Tests no tests`；两次变异各咬住 1 / 2 条；`npm run ci` **EXIT=0**
+  `112 files / 2140 tests`、`verify:lib` → `lib/ at d546666 is the build of src/ at d546666 (301 files, byte-identical)`；
+  真机隔离双形状见 VALIDATION 2026-11-25 条与 `docs/knowledge/evidence/m3-1-2026-11-25/soak-dual-shape.txt`）
+- **Date:** 2026-11-25
+- **Context:** 接单台（M2）只会在「该会话有 open block」时记一拍心跳，而**谁能停掉一拍心跳**一直只有一个答案：旧闸门
+  `installGate` 的心跳分支。M3 要把 review/stop 的所有权正式移到接单台，但如果一步就换主人，任何还在跑旧链的档案都会
+  在升级瞬间失去刹车或双份扣费。所以要一个能**并存、可回退、且默认不变**的分阶段形状。
+- **Decision（四条，一起构成形状）：**
+  1. **`legacyGate` 默认 `true` = 并存只观测。** 新窄监听 `installHeartbeatListen({ ownsRouting: false })` 装在最外层
+     （`installGate` 之前），算完决策原样返回、只写一行 `observed`；决策字节不变，旧前台继续接单。`legacyGate: false` 时
+     `installGate` **整段不注册**，同一个监听以 `ownsRouting: true` 装上，成为链上唯一能 stop 一拍的东西。`src/index.ts`
+     只读一次这个键，两个分支共用一个 `ownsHeartbeatRouting`，所以「一次载入里恰好一个主人」是结构性的，不靠约定。
+  2. **双写拆文件。** 窄监听写 `heartbeats-listen.jsonl`（这一拍**做了什么**：`observed`/`continued`/`stopped` + 刹车码），
+     接单台继续写 `heartbeats.jsonl`（这一拍**发现哪几个块还开着**）。一拍两行同文件会让「到了几拍」这个问题无法回答，
+     所以文件必须分开；并且拥有裁决权的形状里接单台观测器**不注册**（`if (!ownsHeartbeatRouting) installHeartbeatBrakes(...)`），
+     避免同一拍被两个写者各记一次。
+  3. **`BLOCK_ADMISSION_ENFORCED = false`：规则先写、先钉、先接线，但还不判。** 六个块工具入口都调 `admit()`，
+     `canAcceptBlock` 当前恒返回 `true`，所以今天不可能改变任何答案；真正的规则单独导出成 `canAcceptBlockWhenEnforced`
+     并用两条用例钉住，好让规则能在它有权限拒绝之前被审阅。M3.2 只翻这一个常量。
+  4. **四条测试按 `blockIntake` 而不是按 `legacyGate` 分组。** 「关掉就什么都不注册」的哨兵用例（`registers nothing new when the intake is off`）
+     与其余用例的开关是 `blockIntake`（窄监听只在接单台打开时存在），`legacyGate` 只决定**同一批监听里谁拥有裁决权**。
+     混用两个键写用例，会让「off 就是 pre-feature 那棵树」这句话失去可测性。
+- **Alternatives considered / rejected：**
+  - **一步切换（M3.1 直接让窄监听接管、删掉闸门的心跳分支）**——否决：旧档案升级即换主人，刹车语义在同一版本内跳变，
+    回退只能靠重装旧构建；也没有一个版本能观察到「两套规则对同一拍给出同一答案」。
+  - **两个监听同时裁决、靠去重避免双扣**——否决：`loop.admit()` 是**先扣后跑**的（`reviewHeartbeat` 在 turn 之前 charge），
+    两个裁决者就是两次扣费；去重表是新状态，而它要解决的是「本来就不该有两个主人」。
+  - **窄监听沿用 `heartbeats.jsonl`（少一个文件）**——否决：一拍两行，行数与拍数不再一一对应，
+    「有几拍到了还欠工的会话」变成不可回答的问题；而且接单台的账本会被一个不归它管的写者污染。
+  - **`legacyGate` 做成 `volatile()` 上设置页**——否决：它控制的是 `agent/pre-step` 注册，注册不能热插拔；
+    投影到设置页等于承诺一次热编辑，而只有 reload 才能兑现。
+  - **准入判断写在六个工具各自的入口里（不上提成常量）**——否决：M3.2 翻开关时要在六个地方同时改对，
+    正是「同一个字面量写两遍」那类缺陷（D-137）的翻版。
+- **Consequences:** 默认行为零变化（`legacyGate` 缺省 on，链上仍是 pre-M3 那棵树 + 一个只读观测器）；想验证新形状的档案
+  显式写 `legacyGate: false` 并重启；M3.2 把 review/stop 所有权正式移过来，M3.3 再把 `blockIntake` 默认翻 `true`。
+  真机上已确认两形状的可观测差异：形状 A 普通消息被旧前台接单（会话日志 1 条 `source.kind = "grok-workflow"` 中继）、
+  账本目录不被创建；形状 B 中继 0 条、消息直达模型，心跳由窄监听裁决并写下
+  `{"outcome":"stopped","code":"loop/stop-file"}`，且 `heartbeats.jsonl` 不存在。

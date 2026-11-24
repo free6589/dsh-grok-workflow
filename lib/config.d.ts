@@ -217,6 +217,21 @@ export declare const DEFAULT_LOOP_ENABLED = false;
  * `configVersion` are plain for the same reason.
  */
 export declare const DEFAULT_BLOCK_INTAKE = false;
+/**
+ * Whether the old front desk (`installGate`) is registered as it always was.
+ *
+ * On by default, because the pre-M3 tree is the shape every existing profile
+ * already runs: the gate decides every top-level batch and the loop's brakes run
+ * inside its heartbeat branch. Off skips that registration entirely — no listener,
+ * no delivery decision of its own — so the narrow heartbeat listener is the only
+ * thing left on `agent/pre-step`. It is a switch, not a tunable: a profile that
+ * leaves it on keeps the old chain byte for byte.
+ *
+ * Plain, not `volatile()`, for the same reason as {@link DEFAULT_BLOCK_INTAKE}: a
+ * registration cannot appear or disappear without a reload, so projecting it onto
+ * the settings page would promise a live edit that a reload alone can honor.
+ */
+export declare const DEFAULT_LEGACY_GATE = true;
 export declare const DEFAULT_LOOP_MAX_ROUNDS = 10;
 export declare const DEFAULT_LOOP_FAIL_STREAK = 3;
 /**
@@ -313,14 +328,15 @@ export declare const DEFAULT_MAX_ACTIVE_RUNS_TOTAL = 8;
 export declare const CONFIG_VERSION = 1;
 /**
  * Every top-level key the configuration accepts, in schema order.
- * Twenty keys in the accepted surface; seventeen of them reach the settings
- * page (`toolName`, `blockIntake` and `configVersion` are plain, not volatile,
- * so the runtime projection drops them — pinned in `test/settings-projection.spec.ts`).
+ * Twenty-one keys in the accepted surface; seventeen of them reach the settings
+ * page (`toolName`, `blockIntake`, `legacyGate` and `configVersion` are plain, not
+ * volatile, so the runtime projection drops them — pinned in
+ * `test/settings-projection.spec.ts`).
  * Kept explicit so an unknown key can be rejected instead of silently dropped:
  * a typo that is silently ignored looks exactly like a setting that "does not
  * work", which is the failure mode the settings surface must not have.
  */
-export declare const CONFIG_KEYS: readonly ["toolName", "mode", "grokDefault", "roles", "guardianModel", "synthesis", "maxConcurrency", "maxTasks", "timeoutMs", "childTimeoutMs", "replan", "switchOnRateLimit", "loopEnabled", "loopMaxRounds", "loopFailStreak", "loopIntervalMin", "iterateIntervalMin", "iterateTemplate", "blockIntake", "configVersion"];
+export declare const CONFIG_KEYS: readonly ["toolName", "mode", "grokDefault", "roles", "guardianModel", "synthesis", "maxConcurrency", "maxTasks", "timeoutMs", "childTimeoutMs", "replan", "switchOnRateLimit", "loopEnabled", "loopMaxRounds", "loopFailStreak", "loopIntervalMin", "iterateIntervalMin", "iterateTemplate", "blockIntake", "legacyGate", "configVersion"];
 /**
  * The role names a configuration may route, in the order `resolveConfig` builds them.
  *
@@ -388,6 +404,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     iterateIntervalMin: z<number, number, "volatile-defined">;
     iterateTemplate: z<string, string, "volatile-defined">;
     blockIntake: z<boolean, boolean, "defined">;
+    legacyGate: z<boolean, boolean, "defined">;
     roles: z<NoInfer<Schemastery.ObjectS<NoInfer<{
         planner: z<({
             provider?: string | null;
@@ -507,6 +524,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     iterateIntervalMin: z<number, number, "volatile-defined">;
     iterateTemplate: z<string, string, "volatile-defined">;
     blockIntake: z<boolean, boolean, "defined">;
+    legacyGate: z<boolean, boolean, "defined">;
     roles: z<NoInfer<Schemastery.ObjectS<NoInfer<{
         planner: z<({
             provider?: string | null;

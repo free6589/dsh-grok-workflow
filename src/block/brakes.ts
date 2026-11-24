@@ -122,11 +122,13 @@ function appendObservation(observation: HeartbeatObservation, options: BlockLedg
  * The open blocks of one session, by row id.
  *
  * "Open" is read from the newest version of each row, exactly like `getBlockRow`:
- * a later version that closes a block must not keep it open here.
+ * a later version that closes a block must not keep it open here. Exported because
+ * the narrow heartbeat listener (`src/heartbeat-listen.ts`) asks the same question —
+ * one definition, so the two observers cannot disagree about what "owes work" means.
  * @param sessionId - the session the heartbeat arrived in.
  * @param options - ledger directory.
  */
-async function openBlockIds(sessionId: string, options: BlockLedgerOptions): Promise<string[]> {
+export async function openBlockIds(sessionId: string, options: BlockLedgerOptions): Promise<string[]> {
   const rows = await readBlockRows(options)
   const newest = new Map<string, (typeof rows)[number]>()
   for (const row of rows) {

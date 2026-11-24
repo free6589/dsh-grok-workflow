@@ -57,6 +57,7 @@ import {
 } from './channel.js'
 import { humanConclusion } from './delivery/index.js'
 import { collectHistory, composeObjective, renderHistory } from './history.js'
+import { isHeartbeatMessage, reviewHeartbeat } from './heartbeat-listen.js'
 import { TASK_LIMITS } from './input.js'
 import { inspectPrompt, refuseOversizePrompt } from './intake.js'
 import { isModeEnabled, readModeRecord } from './mode.js'
@@ -79,7 +80,7 @@ import {
 } from './captain.js'
 import { captainBrief, readCaptainMemory } from './captain-memory.js'
 import { runSingleCall, runWorkflow } from './run.js'
-import { isLoopHeartbeat, scheduleServiceOf } from './loop.js'
+import { scheduleServiceOf } from './loop.js'
 import { createLoopBrakes } from './loop-brakes.js'
 import type { LoopBrakeCode, LoopBrakePort } from './loop-brakes.js'
 import {
@@ -552,21 +553,12 @@ export function classifyPreStep(
 }
 
 /**
- * True when this message is a loop heartbeat delivered by the Host.
- *
- * Two facts have to agree: the delivery source (`schedule`) and the ownership marker
- * this plugin writes into every prompt it creates. Either alone is spoofable — a user
- * can paste the marker, and a scheduled reminder can carry arbitrary text — so the pair
- * is what identifies the heartbeat.
- */
-function isHeartbeatMessage(message: UserMessage): boolean {
-  const source = message.source as { kind?: unknown } | undefined
-  if (source?.kind !== 'schedule') return false
-  return isLoopHeartbeat(textOf(message))
-}
-
-/**
  * Route one heartbeat: continuation, or a stop that spends nothing.
+ *
+ * The rule itself lives in `src/heartbeat-listen.ts` (`reviewHeartbeat`), because the
+ * narrow listener runs the same review when the gate is switched off — one definition,
+ * so the two shapes cannot drift. This function only maps that answer onto the gate's
+ * own classification, byte for byte as the branch it replaced.
  *
  * The continuation branch starts **no** run — the heartbeat turn is the session's own
  * ordinary turn — so `maxConcurrency` and `maxRetries` are untouched by construction;
@@ -578,27 +570,16 @@ function classifyHeartbeat(
   deps: Pick<GateDeps, 'config' | 'readConfig' | 'loop'>,
   payload: PreStepPayload,
 ): Classification {
-  const session = sessionOf(payload.agent)
-  // A delegated child never owns a loop: Schedule targets the session the user opened,
-  // so a heartbeat here is a mis-targeted delivery, and charging it would put the
-  // parent's accounting into the child's log.
-  const header = session?.header
-  if (header?.origin === 'subagent' || (header?.delegationDepth ?? 0) > 0) return { kind: 'pass', reason: 'subagent' }
-  const agentId = agentIdOf(payload.agent)
-  if (deps.loop === undefined) return { kind: 'pass', reason: 'loop-continuation' }
-  const input = {
-    sessionId: agentId,
-    session,
-    config: readScope(deps),
-  }
-  const verdict = deps.loop.review(input)
-  if (verdict.kind === 'stop') {
-    return { kind: 'loop-stop', agentId, code: verdict.code, detail: verdict.detail }
-  }
-  // Charged before the turn runs: an admitted round consumes a slot and may already
-  // have spent quota even if the turn then crashes.
-  deps.loop.admit(input)
-  return { kind: 'pass', reason: 'loop-continuation' }
+  const review = reviewHeartbeat({
+    loop: deps.loop,
+    payload,
+    // Lazily read, like the branch this replaced: with no brake port the review
+    // returns before it needs a configuration.
+    config: () => readScope(deps),
+  })
+  return review.kind === 'stop'
+    ? { kind: 'loop-stop', agentId: review.agentId, code: review.code, detail: review.detail }
+    : { kind: 'pass', reason: review.reason }
 }
 
 /**

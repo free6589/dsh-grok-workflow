@@ -43,10 +43,10 @@ release.
 
 Configuration keys and their hard limits are listed in the
 [README configuration table](../README.md#configuration-reference).
-The plugin accepts exactly twenty keys (`toolName`, `mode`, `grokDefault`, `roles`,
+The plugin accepts exactly twenty-one keys (`toolName`, `mode`, `grokDefault`, `roles`,
 `guardianModel`, `synthesis`, `maxConcurrency`, `maxTasks`, `timeoutMs`, `childTimeoutMs`, `replan`, `switchOnRateLimit`, `loopEnabled`,
 `loopMaxRounds`, `loopFailStreak`, `loopIntervalMin`, `iterateIntervalMin`,
-`iterateTemplate`, `blockIntake`, `configVersion`);
+`iterateTemplate`, `blockIntake`, `legacyGate`, `configVersion`);
 everything else is fixed inside the plugin (`maxRetries=1`,
 `maxActiveRuns=2` per session / `8` per process) and a patch that still carries
 a removed key is rejected at load. `timeoutMs` defaults to `0` (unlimited);

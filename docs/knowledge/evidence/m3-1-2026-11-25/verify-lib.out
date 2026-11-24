@@ -1,0 +1,6 @@
+
+> dsh-grok-workflow@0.13.34 verify:lib
+> node scripts/verify-lib.mjs
+
+client bundle: 325771 bytes → lib/client.js
+lib/ at d546666 is the build of src/ at d546666 (301 files, byte-identical)

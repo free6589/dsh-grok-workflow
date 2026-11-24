@@ -1,0 +1,42 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-m3-narrow-listen/.tmp/red-baseline-35326c7
+
+ ❯ test/m3-intake.spec.ts (10 tests | 1 failed) 323ms
+     ✓ answers yes for every session while the phase switch is off 5ms
+     ✓ pins the rule the switch will enforce 2ms
+     ✓ registers nothing new when the intake is off 114ms
+     × observes one beat into its own file while the old gate keeps deciding 106ms
+     ✓ writes nothing for a beat in a session that owes no work 13ms
+     ✓ writes nothing for a user message 37ms
+     ✓ survives a batch it cannot read, in both shapes, and writes nothing 31ms
+     ✓ registers the narrow listener only, and lets a user message through untouched 6ms
+     ✓ reviews the brakes itself, and a stopped beat is refused with no turn 4ms
+     ✓ continues a beat the brakes allow, and records that it did 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/m3-intake.spec.ts > the narrow heartbeat listener observes without deciding > observes one beat into its own file while the old gate keeps deciding
+AssertionError: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ test/m3-intake.spec.ts:257:22
+    255|     expect(JSON.stringify(onDecision)).toBe(JSON.stringify(offDecision…
+    256|     const observed = readHeartbeatListenObservations({ dir: ledger })
+    257|     expect(observed).toHaveLength(1)
+       |                      ^
+    258|     expect(observed[0]!.sessionId).toBe(sessionId)
+    259|     expect(observed[0]!.outcome).toBe('observed')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 9 passed (10)
+   Start at  04:45:47
+   Duration  1.46s (transform 809ms, setup 0ms, import 964ms, tests 323ms, environment 0ms)
+
