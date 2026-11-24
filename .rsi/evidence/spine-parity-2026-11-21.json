@@ -1,0 +1,480 @@
+{
+  "generatedAt": "2026-11-21T11:58:27.533Z",
+  "bundle": {
+    "path": "lib/client.js",
+    "sha256": "96c6b191a3cbd35a73bcb3694182db3ebbfd614b3290110c71a565ddab473cc6",
+    "identicalToSource": true
+  },
+  "mockup": {
+    "path": "docs/knowledge/evidence/progress-tab-mockup-2026-11-21/flow.html",
+    "labels1440": [
+      "起点",
+      "规划",
+      "执行",
+      "检查",
+      "汇总",
+      "回答",
+      "终点"
+    ],
+    "labels760": [
+      "起点",
+      "规划",
+      "执行",
+      "检查",
+      "汇总",
+      "回答",
+      "终点"
+    ],
+    "rects1440": [
+      {
+        "left": 20,
+        "top": 155,
+        "width": 184.7,
+        "height": 74
+      },
+      {
+        "left": 222.7,
+        "top": 155,
+        "width": 184.72,
+        "height": 74
+      },
+      {
+        "left": 425.42,
+        "top": 155,
+        "width": 184.7,
+        "height": 74
+      },
+      {
+        "left": 628.13,
+        "top": 155,
+        "width": 184.72,
+        "height": 74
+      },
+      {
+        "left": 830.84,
+        "top": 155,
+        "width": 184.72,
+        "height": 74
+      },
+      {
+        "left": 1033.56,
+        "top": 155,
+        "width": 184.72,
+        "height": 74
+      },
+      {
+        "left": 1236.28,
+        "top": 155,
+        "width": 183.72,
+        "height": 74
+      }
+    ],
+    "track1440": {
+      "left": 0,
+      "top": 143,
+      "width": 1440,
+      "height": 92
+    },
+    "bandGap1440": 18,
+    "singleRowAllWidths": true
+  },
+  "ui": {
+    "labels1440": [
+      "起点",
+      "规划",
+      "执行",
+      "检查",
+      "汇总",
+      "回答",
+      "终点"
+    ],
+    "keys1440": [
+      "stage:start",
+      "stage:plan",
+      "stage:execute",
+      "stage:verify",
+      "stage:synthesize",
+      "stage:answer",
+      "stage:end"
+    ],
+    "rects1440": [
+      {
+        "left": 12,
+        "top": 84.8,
+        "width": 187,
+        "height": 74
+      },
+      {
+        "left": 217,
+        "top": 84.8,
+        "width": 187,
+        "height": 74
+      },
+      {
+        "left": 422,
+        "top": 84.8,
+        "width": 187,
+        "height": 74
+      },
+      {
+        "left": 627,
+        "top": 84.8,
+        "width": 187,
+        "height": 74
+      },
+      {
+        "left": 832,
+        "top": 84.8,
+        "width": 187,
+        "height": 74
+      },
+      {
+        "left": 1037,
+        "top": 84.8,
+        "width": 187,
+        "height": 74
+      },
+      {
+        "left": 1242,
+        "top": 84.8,
+        "width": 186,
+        "height": 74
+      }
+    ],
+    "track1440": {
+      "left": 0,
+      "top": 74.8,
+      "width": 1440,
+      "height": 88
+    },
+    "singleRow1440": true,
+    "spineBottom1440": 162.8,
+    "bandTop1440": 174.8,
+    "bandGap1440": 12,
+    "labels760": [
+      "起点",
+      "规划",
+      "执行",
+      "检查",
+      "汇总",
+      "回答",
+      "终点"
+    ],
+    "rects760": [
+      {
+        "left": 12,
+        "top": 84.8,
+        "width": 89.84,
+        "height": 119
+      },
+      {
+        "left": 119.84,
+        "top": 84.8,
+        "width": 89.86,
+        "height": 119
+      },
+      {
+        "left": 227.7,
+        "top": 84.8,
+        "width": 89.86,
+        "height": 119
+      },
+      {
+        "left": 335.56,
+        "top": 84.8,
+        "width": 89.86,
+        "height": 119
+      },
+      {
+        "left": 443.42,
+        "top": 84.8,
+        "width": 89.86,
+        "height": 119
+      },
+      {
+        "left": 551.28,
+        "top": 84.8,
+        "width": 89.86,
+        "height": 119
+      },
+      {
+        "left": 659.14,
+        "top": 84.8,
+        "width": 88.86,
+        "height": 119
+      }
+    ],
+    "track760": {
+      "left": 0,
+      "top": 74.8,
+      "width": 760,
+      "height": 133
+    },
+    "singleRow760": true,
+    "spineBottom760": 207.8,
+    "bandTop760": 219.8,
+    "bandGap760": 12,
+    "viewportSweep": null,
+    "containerSweep": [
+      {
+        "containerWidth": 1440,
+        "spineCount": 7,
+        "singleRow": true,
+        "flexDirection": "row",
+        "overflow": false,
+        "spineBottom": 162.8,
+        "bandTop": 174.8,
+        "bandGap": 12
+      },
+      {
+        "containerWidth": 1280,
+        "spineCount": 7,
+        "singleRow": true,
+        "flexDirection": "row",
+        "overflow": false,
+        "spineBottom": 501.59,
+        "bandTop": 513.59,
+        "bandGap": 12
+      },
+      {
+        "containerWidth": 1024,
+        "spineCount": 7,
+        "singleRow": true,
+        "flexDirection": "row",
+        "overflow": false,
+        "spineBottom": 862.39,
+        "bandTop": 874.39,
+        "bandGap": 12
+      },
+      {
+        "containerWidth": 800,
+        "spineCount": 7,
+        "singleRow": true,
+        "flexDirection": "row",
+        "overflow": false,
+        "spineBottom": 1246.19,
+        "bandTop": 1258.19,
+        "bandGap": 12
+      },
+      {
+        "containerWidth": 760,
+        "spineCount": 7,
+        "singleRow": true,
+        "flexDirection": "row",
+        "overflow": false,
+        "spineBottom": 1629.98,
+        "bandTop": 1641.98,
+        "bandGap": 12
+      },
+      {
+        "containerWidth": 759,
+        "spineCount": 7,
+        "singleRow": true,
+        "flexDirection": "row",
+        "overflow": false,
+        "spineBottom": 2013.78,
+        "bandTop": 2025.78,
+        "bandGap": 12
+      },
+      {
+        "containerWidth": 600,
+        "spineCount": 7,
+        "singleRow": true,
+        "flexDirection": "row",
+        "overflow": false,
+        "spineBottom": 2397.58,
+        "bandTop": 2409.58,
+        "bandGap": 12
+      },
+      {
+        "containerWidth": 420,
+        "spineCount": 7,
+        "singleRow": true,
+        "flexDirection": "row",
+        "overflow": false,
+        "spineBottom": 2809.38,
+        "bandTop": 2821.38,
+        "bandGap": 12
+      }
+    ],
+    "planHeavy": {
+      "spineCount": 7,
+      "labels": [
+        "起点",
+        "规划",
+        "执行",
+        "检查",
+        "汇总",
+        "回答",
+        "终点"
+      ],
+      "cards": 12,
+      "singleRow": true,
+      "trunks": 1,
+      "branches": 12,
+      "overflow": false
+    },
+    "planHeavy760": {
+      "spineCount": 7,
+      "cards": 12,
+      "singleRow": true,
+      "trunks": 1,
+      "branches": 12
+    }
+  },
+  "checks": {
+    "labelEquality1440": true,
+    "labelEquality760": true,
+    "spineCountIsSeven": true,
+    "singleRow1440": true,
+    "singleRow760": true,
+    "flexRow1440": "row",
+    "flexRow760": "row",
+    "noOverflow1440": true,
+    "noOverflow760": true,
+    "bandBelowSpine1440": true,
+    "bandBelowSpine760": true,
+    "singleRowAt481": true,
+    "stackedAt480": true
+  },
+  "narrowViewports": {
+    "stacked": [
+      {
+        "innerWidth": 480,
+        "spineCount": 7,
+        "singleRow": false,
+        "flexDirection": "column",
+        "distinctTops": [
+          85,
+          182,
+          279,
+          410,
+          507,
+          604,
+          701
+        ],
+        "labels": [
+          "起点",
+          "规划",
+          "执行",
+          "检查",
+          "汇总",
+          "回答",
+          "终点"
+        ]
+      },
+      {
+        "innerWidth": 460,
+        "spineCount": 7,
+        "singleRow": false,
+        "flexDirection": "column",
+        "distinctTops": [
+          85,
+          182,
+          279,
+          410,
+          507,
+          604,
+          701
+        ],
+        "labels": [
+          "起点",
+          "规划",
+          "执行",
+          "检查",
+          "汇总",
+          "回答",
+          "终点"
+        ]
+      },
+      {
+        "innerWidth": 420,
+        "spineCount": 7,
+        "singleRow": false,
+        "flexDirection": "column",
+        "distinctTops": [
+          85,
+          182,
+          279,
+          410,
+          507,
+          604,
+          701
+        ],
+        "labels": [
+          "起点",
+          "规划",
+          "执行",
+          "检查",
+          "汇总",
+          "回答",
+          "终点"
+        ]
+      },
+      {
+        "innerWidth": 360,
+        "spineCount": 7,
+        "singleRow": false,
+        "flexDirection": "column",
+        "distinctTops": [
+          85,
+          182,
+          279,
+          410,
+          507,
+          604,
+          701
+        ],
+        "labels": [
+          "起点",
+          "规划",
+          "执行",
+          "检查",
+          "汇总",
+          "回答",
+          "终点"
+        ]
+      }
+    ],
+    "boundary": [
+      {
+        "innerWidth": 520,
+        "singleRow": true,
+        "flexDirection": "row",
+        "distinctTops": [
+          85
+        ]
+      },
+      {
+        "innerWidth": 500,
+        "singleRow": true,
+        "flexDirection": "row",
+        "distinctTops": [
+          85
+        ]
+      },
+      {
+        "innerWidth": 481,
+        "singleRow": true,
+        "flexDirection": "row",
+        "distinctTops": [
+          85
+        ]
+      },
+      {
+        "innerWidth": 480,
+        "singleRow": false,
+        "flexDirection": "column",
+        "distinctTops": [
+          85,
+          182,
+          279,
+          410,
+          507,
+          604,
+          701
+        ]
+      }
+    ]
+  }
+}

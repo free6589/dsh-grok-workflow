@@ -1,0 +1,31 @@
+# gate.ts: a new message during a live run cancels it (redirect-on-new-message)
+      // serialized, so a newer message cancels/redirects through the same queue.
+      const entry = entryOf(admit, payload)
+      // Redirect-on-new-message (existing machinery, no new bus): if a newer
+      // message for the same session arrives while this run is queued/running,
+      // it cancels the in-flight run via the shared ActiveState (active run's
+      // cancel + dispose, then commitCancelled + cancelledText lands the
+      // terminal), and the narrowed rerun is composed with
+      // carriedPendingRequest / resumedTarget (whole-round cancel + narrow
+      // restart; V1 does no subtask-level directed cancel). alreadyRouted
+      // stays the double-run guard. See handle()/answerInTurn abort paths and
+      // run.ts disposeActiveState for the cancel side.
+      record(agent, entry, 'started', 'admitted-team-background')
+      const accepted = enqueue(admit.agentId, async () => {
+        const lateHistory = collectHistory(
+          sessionOf(agent),
+          { turns: FIXED_HISTORY_TURNS, chars: FIXED_HISTORY_CHARS },
+          entry.messageIds,
+        )
+        await deliverAndRecord(agent, entry, await runTeam(agent, target, undefined, lateHistory, tier.lang))
+
+# gate.ts: carried pending request composition
+   * @returns one request text for the shared pending entry.
+   */
+  const carriedPendingRequest = (older: string, newer: string): string => {
+    const joined = `${older}\n${newer}`
+    if (joined.length <= TASK_LIMITS.objectiveChars) return joined
+    const room = TASK_LIMITS.objectiveChars - newer.length - '…\n'.length
+    // `room <= 0` means the newest message alone already fills the budget; it is
+    // the one that must survive, and it is admitted only at or below the limit.
+    return room <= 0 ? newer : `${older.slice(0, room)}…\n${newer}`

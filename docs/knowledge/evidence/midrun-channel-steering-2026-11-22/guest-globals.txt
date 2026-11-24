@@ -1,0 +1,6 @@
+# guest realm globals (dsh-workflow-ptc WORKFLOW_GUEST_SOURCE, lib/index.js line 12 is one bundled string)
+$ grep -o "const globals = {[^}]*}" node_modules/@deepseek-ai/dsh-workflow-ptc/lib/index.js
+const globals = {\n			agent: (prompt, opts) => this.contain(this.agent(prompt, opts)),\n			parallel: (thunks) => this.contain(this.parallel(thunks)),\n			pipeline: (items, ...stages) => this.contain(this.pipeline(items, stages)),\n			phase: (title) => {\n				this.phase(title);\n			}
+
+$ grep -o "vm.createContext({}" node_modules/@deepseek-ai/dsh-workflow-ptc/lib/index.js | head -2
+vm.createContext({}, { name: `workflow:${meta.name}` })

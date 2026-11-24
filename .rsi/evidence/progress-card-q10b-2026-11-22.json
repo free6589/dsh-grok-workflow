@@ -1,0 +1,140 @@
+{
+ "measurements": [
+  {
+   "width": 1440,
+   "cards": [
+    {
+     "key": "phase:任务 1 · 把认证中间件的每个 provider 统一到同一个时钟上再重跑全部用例",
+     "nameText": "任务 1 · 把认证中间件的每个 provider 统一到同一个时钟上再重跑全部用例",
+     "nameLength": 42,
+     "nameHasEllipsisChar": false,
+     "nameRect": {
+      "width": 806.11,
+      "height": 16.19
+     },
+     "nameScrollWidth": 806,
+     "nameClientWidth": 806,
+     "nameClipped": false,
+     "textOverflow": "clip",
+     "whiteSpace": "normal",
+     "lineHeight": "16.2px",
+     "cardHeight": 40,
+     "cardOverflowsHorizontally": false,
+     "metaText": "3.0 s"
+    },
+    {
+     "key": "phase:任务 2 · 运行中的那一行",
+     "nameText": "任务 2 · 运行中的那一行",
+     "nameLength": 14,
+     "nameHasEllipsisChar": false,
+     "nameRect": {
+      "width": 806.11,
+      "height": 16.19
+     },
+     "nameScrollWidth": 806,
+     "nameClientWidth": 806,
+     "nameClipped": false,
+     "textOverflow": "clip",
+     "whiteSpace": "normal",
+     "lineHeight": "16.2px",
+     "cardHeight": 40,
+     "cardOverflowsHorizontally": false,
+     "metaText": "5.0 s"
+    }
+   ],
+   "cardCount": 2,
+   "pills": 2
+  },
+  {
+   "width": 760,
+   "cards": [
+    {
+     "key": "phase:任务 1 · 把认证中间件的每个 provider 统一到同一个时钟上再重跑全部用例",
+     "nameText": "任务 1 · 把认证中间件的每个 provider 统一到同一个时钟上再重跑全部用例",
+     "nameLength": 42,
+     "nameHasEllipsisChar": false,
+     "nameRect": {
+      "width": 320.11,
+      "height": 32.38
+     },
+     "nameScrollWidth": 320,
+     "nameClientWidth": 320,
+     "nameClipped": false,
+     "textOverflow": "clip",
+     "whiteSpace": "normal",
+     "lineHeight": "16.2px",
+     "cardHeight": 46.38,
+     "cardOverflowsHorizontally": false,
+     "metaText": "3.0 s"
+    },
+    {
+     "key": "phase:任务 2 · 运行中的那一行",
+     "nameText": "任务 2 · 运行中的那一行",
+     "nameLength": 14,
+     "nameHasEllipsisChar": false,
+     "nameRect": {
+      "width": 320.11,
+      "height": 16.19
+     },
+     "nameScrollWidth": 320,
+     "nameClientWidth": 320,
+     "nameClipped": false,
+     "textOverflow": "clip",
+     "whiteSpace": "normal",
+     "lineHeight": "16.2px",
+     "cardHeight": 40,
+     "cardOverflowsHorizontally": false,
+     "metaText": "5.0 s"
+    }
+   ],
+   "cardCount": 2,
+   "pills": 2
+  },
+  {
+   "width": 420,
+   "cards": [
+    {
+     "key": "phase:任务 1 · 把认证中间件的每个 provider 统一到同一个时钟上再重跑全部用例",
+     "nameText": "任务 1 · 把认证中间件的每个 provider 统一到同一个时钟上再重跑全部用例",
+     "nameLength": 42,
+     "nameHasEllipsisChar": false,
+     "nameRect": {
+      "width": 142.11,
+      "height": 48.56
+     },
+     "nameScrollWidth": 142,
+     "nameClientWidth": 142,
+     "nameClipped": false,
+     "textOverflow": "clip",
+     "whiteSpace": "normal",
+     "lineHeight": "16.2px",
+     "cardHeight": 90.56,
+     "cardOverflowsHorizontally": false,
+     "metaText": "3.0 s"
+    },
+    {
+     "key": "phase:任务 2 · 运行中的那一行",
+     "nameText": "任务 2 · 运行中的那一行",
+     "nameLength": 14,
+     "nameHasEllipsisChar": false,
+     "nameRect": {
+      "width": 142.11,
+      "height": 16.19
+     },
+     "nameScrollWidth": 142,
+     "nameClientWidth": 142,
+     "nameClipped": false,
+     "textOverflow": "clip",
+     "whiteSpace": "normal",
+     "lineHeight": "16.2px",
+     "cardHeight": 62,
+     "cardOverflowsHorizontally": false,
+     "metaText": "5.1 s"
+    }
+   ],
+   "cardCount": 2,
+   "pills": 2
+  }
+ ],
+ "cssLength": 9807
+}

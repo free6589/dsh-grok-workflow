@@ -1,0 +1,17 @@
+# script.ts: realm has only agent/parallel/pipeline/phase/log/args (no timer, no fs)
+// phase/log/args (measured against @deepseek-ai/dsh-workflow-ptc's
+// WorkflowExecution), so setTimeout is absent in a real run — but every ECMAScript
+// realm carries Atomics.waitAsync, which resolves to 'timed-out' after N ms without
+// blocking the thread. That is the timer a real run uses:
+//
+//   - setTimeout/clearTimeout where they exist (unit harnesses, a future engine
+//     that injects them): preferred, cancellable, unref'd so it cannot hold the
+//     process open.
+
+# script.ts: wave scheduler (settlement-triggered advance)
+async function runWaves(waves, positions, limit) {
+  const settled = {};
+  for (let w = 0; w < waves.length; w++) {
+    const wave = waves[w];
+    const runnable = [];
+    const upstreamById = {};

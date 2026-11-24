@@ -1,0 +1,30 @@
+# args are cloned at run start (host mutation cannot reach a running script)
+$ sed -n "636,642p" node_modules/@deepseek-ai/dsh-workflow-ptc/lib/index.js
+		const init = {
+			meta,
+			body: request.script,
+			...request.args !== void 0 ? { args: structuredClone(request.args) } : {},
+			limits
+		};
+		const runCtx = this.ctx;
+
+# only whole-run cancel (no per-child handle)
+	* @param reason - Human-readable cancellation cause; the first request wins.
+	*/
+	cancel(reason = "workflow cancelled") {
+		if (this.terminal || this.cancelReason !== void 0) return;
+		this.cancelReason = reason;
+		this.controller.abort(reason);
+		for (const record of this.children.values()) this.disposeChild(record);
+	}
+	/**
+	* Cancel unfinished work and await the program and child cleanup.
+	* @returns One shared completion promise for repeated disposal calls.
+	*/
+	dispose() {
+		this.cancel("workflow disposed");
+		this.disposed ??= this.result.then(() => {});
+		return this.disposed;
+	}
+	requireActive() {
+		this.controller.signal.throwIfAborted();

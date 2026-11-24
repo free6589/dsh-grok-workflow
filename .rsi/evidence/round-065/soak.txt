@@ -1,0 +1,176 @@
+# soak-65 真机 soak 记录（worktree rsi-soak-65 @ 9047f72，分支 rsi/soak-65）
+
+结论：**BLOCKED**（插件 + 网关 + 落盘链路全通；caller 双任务被 gate 合并为 1 个 task，
+planner 在本机网关模型上稳定 format-error，report status 只能到 PARTIAL，达不到
+2 verified / COMPLETED。不是产品 PASS 态。）
+
+> 凭据说明：key 取法为 shell 里 `set -a; . ~/.dsh/bifrost.env; set +a` 后用
+> `$BIFROST_VIRTUAL_KEY`，只做存在性使用。本文件不含任何 key 值。
+
+## 1. 基线（CONFIRMED）
+- worktree：`.agents/worktrees/rsi-soak-65`，`git worktree add --detach … 9047f72` 后
+  `checkout -b rsi/soak-65`。HEAD = 9047f72（与基线一致）。
+- `package.json` version = 0.13.20；CHANGELOG `[Unreleased]` = 18 条。
+- node_modules：软链 `node_modules -> /home/fish/projects_mine/dsh-grok-workflow/node_modules`
+ （与 rsi-round-65 / fix-progress-task-number-first 同做法）。
+- `dsh --version` = 0.2.2-rc.3。live `~/.dsh` 全程未写、现行实例未重启。
+
+## 2. 隔离家目录与 profile（CONFIRMED）
+- scratch 家目录：`<worktree>/.tmp/soak-65/home`（`.tmp/` gitignored，`git check-ignore` 确认）。
+- profile 名：`grok-soak-65`，首建用 `dsh plugin --profile … add <worktree>`。
+  - 首次安装的 profile 只有 `dsh-base` bundles（无 headless app），`headless` 参数无响应
+    （600s 超时、零字节输出，EXIT:124）——此为本轮踩到的坑。
+  - 重建：`dsh --profile grok-soak-65 --from-default-profile headless` 再
+    `dsh plugin --profile grok-soak-65 add <worktree>`。
+- 安装后 `package.json` bundles = `["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-headless",
+  "dsh-grok-workflow"]`（CONFIRMED）。
+- `--dump-config` 确认含 `# == dsh-grok-workflow / - id: grok-workflow`，
+  行数 102 个 `- id:`，workflow-ptc provider=spawn、subagent-spawn-in-process
+  providerName=spawn 均在位（CONFIRMED，dump 片段见 §6）。
+
+## 3. 网关模型列表（只记名，不记 key）
+- `GET http://127.0.0.1:18088/v1/models` + BIFROST_VIRTUAL_KEY 鉴权 → **HTTP 200**，
+  total 166（CONFIRMED）。
+- 选用便宜模型：`runanywhere/deepseek-v4.1-flash`（列表中存在；`wb/cn:deepseek-v4.1-flash`
+  亦在列，本轮选用 runanywhere 路由）。
+- 模型补丁只放 scratch（`<worktree>/.tmp/soak-65/soak-model.patch.yml`，随清理删除，
+  永不提交）：provider `soak65-local` → `http://127.0.0.1:18088/openai/v1`，
+  `apiKeyEnv: BIFROST_VIRTUAL_KEY`，`agent-default-model` + grok-workflow 三链
+  （planner/worker/verifier）均指该模型。注意：初版带 `reasoning: low` 被网关拒
+  （`This model does not support the value given for 'reasoning_effort'`），删 reasoning
+  键后通过。
+
+## 4. 最小预检：chat/completions PONG（CONFIRMED）
+- `POST http://127.0.0.1:18088/openai/v1/chat/completions`
+  `{"model":"runanywhere/deepseek-v4.1-flash","messages":[{"role":"user","content":"Reply with exactly: PONG"}],"max_tokens":5}`
+  → **HTTP 200**，`choices[0].message.content = "PONG"`（finish_reason stop）。
+- 同模型经 `dsh headless "Reply with exactly: PONG"`（scratch profile + patch）→ EXIT 0，
+  ledger `run:be49c79…` status **completed**，1/1 verified，2 criteria confirmed。
+
+## 5. 真实双任务工作流（核心结论：BLOCKED）
+目标（caller，双任务）：当前目录写 `soak65-alpha.txt`（内容 `ALPHA65_OK`）+
+`soak65-beta.txt`（内容 `BETA65_OK`），读回逐字节核验。
+
+### 5a. triage 模式（默认 `mode: triage`）
+- prompt 含 "Use the grok workflow … two tasks" → gate 前台直答，无 tool_call/tool_result
+  事件（`tool events: 0`），只落 `Front desk / 任务团队 failed: no subagent provider
+  registered for "spawn"`（ledger run:85c19761、run:a2759ede、run:6eb851d6 均为 failed）。
+- 自然措辞 prompt（无 grok 字样）→ 前台 quick/team 档直接写文件+核验，
+  `tool events: 0`（run:d27c1cb0 front-desk PASS），**未经过 grok_workflow 引擎**。
+  文件虽对（10/9 字节，sha 对上），但不算"工作流 verified"。
+- 结论：triage 下本 prompt 形到不了真正的 caller 双任务执行。
+
+### 5b. full 模式（`mode: full`，本轮最终形态）
+- 命令：`DSH_HOME=<scratch>/home dsh --profile grok-soak-65 --patch <scratch>/soak-model.patch.yml headless --json "<prompt>"`，EXIT 0。
+- gate 报告行：`Grok workflow: PARTIAL`（中文"部分完成；1/1 项任务已由独立检查核验"）。
+- ledger `run:aad44912-0ce0-4751-b14c-ede5dbfb25f2`（session-1fe8f283…）：
+  - planner（seq 1 规划助手）**failed**：`child 1 settled as failed; its transcript
+    carried neither assistant text nor a structured submission`；round 汇总
+    `planner failed on every route: [format-error/infrastructure] child returned
+    no valid structured result`。
+  - worker（seq 2 执行）**completed**，evidence：`sha256sum` 双文件与
+    `printf '%s' … | sha256sum` 一致、od -c 字节精确、wc -c 10/9、无尾换行。
+  - verifier（seq 3 检查）**completed**：`verdict pass · 1 criterion/criteria checked`。
+  - round status：**partial**，`verified 1/1 task(s)`——planner 把双文件目标规划成
+    **1 个 task**（`Complete the objective`），不是 prompt 要的 2 tasks。
+- 落盘（本轮 workdir 内实测，清理前）：`soak65-alpha.txt` = `ALPHA65_OK`（10 字节，
+  sha256 `3b0f5b23…6d4d7e1`），`soak65-beta.txt` = `BETA65_OK`（9 字节，
+  sha256 `ad622421…0bd3b56ac`），`od -c`/`cmp`/`cat` 读回一致。文件证据与 ledger
+  evidence 互认。
+- 因此：**两任务各自 verified：否**（单 task 合并）；**report status：PARTIAL**
+ （非 COMPLETED）；**文件落盘：是**（双文件字节精确）。
+
+### 失败点定位（断在哪一步）
+`planner failed on every route: [format-error] child returned no valid structured result`
+—— planner 子代理在本机网关 `runanywhere/deepseek-v4.1-flash` 上连续 3 轮
+（run:d253…、run:d27c…、run:2048…、run:6fe2…、run:aad4…）同样失败，而 worker/verifier
+同一模型同一网关一次即过 + PONG 单任务 COMPLETED 同模型可过。planning 结构化输出
+与该模型路由的兼容问题，非落盘/网关/安装问题。
+
+## 6. dump-config 关键片段（CONFIRMED）
+```
+# == dsh-grok-workflow, patched by .../soak-model.patch.yml
+- id: grok-workflow
+  name: dsh-grok-workflow
+  config:
+    toolName: grok
+    mode: full
+    grokDefault: 'on'
+    synthesis: layered
+    maxConcurrency: 4
+    maxTasks: 8
+    roles:
+      planner:
+        - provider: soak65-local
+          model: runanywhere/deepseek-v4.1-flash
+```
+（worker/verifier 同；supervisor/synthesizer 为空；disabled: false。）
+
+## 7. 清理（CONFIRMED）
+- scratch 家目录 `<worktree>/.tmp/soak-65/home` 已删除（`.tmp/` gitignored，不入库）。
+- 证据仅此文件：`<worktree>/.rsi/evidence/round-065/soak.txt`。
+- worktree 状态：分支 `rsi/soak-65`，HEAD 9047f72，`git status --short` 仅本证据文件
+  未跟踪（写证据时）；未提交、未推送（按任务要求）。
+
+## 8. 给 lead 的判定建议
+- 本轮 soak = **BLOCKED**：不是 FAIL（链路全通、文件字节精确、verifier 独立 pass），
+  也不是 PASS（planner format-error 跨 5 轮稳定复现，report 只能 PARTIAL，且双任务
+  被合并为单 task）。
+- 下一步（非本轮范围）：换 planner 路由模型（如 `wb/cn:deepseek-v4.1-flash` 或
+  `wb/cn:glm-5.3-flash`）重跑 full 模式，看 planner format-error 是否消失；
+  或查 planner structured-output schema 与该网关路由的兼容性。
+
+## 9. planner 换路由复跑（soak-65b，HEAD 9047f72 未变）
+
+> 凭据说明：key 取法为 shell 里 `set -a; . ~/.dsh/bifrost.env; set +a` 后用
+> `$BIFROST_VIRTUAL_KEY`（`apiKeyEnv` 名），本文件不含任何 key 值。
+> 命令形如 `DSH_HOME=<worktree>/.tmp/soak-65b/home dsh --profile grok-soak-65b
+> --patch <worktree>/.tmp/soak-65b/soak-model-X.patch.yml headless --json "<prompt>"`，
+> workdir 为各轮独立子目录。补丁/家目录/产物均在 `.tmp/`（gitignored），已删。
+
+### 9.0 前置（CONFIRMED）
+- 网关 `GET /v1/models` HTTP 200，total 165；`wb/cn:deepseek-v4.1-flash`、
+  `wb/cn:glm-5.3-flash`、`runanywhere/deepseek-v4.1-flash` 均在列。
+- scratch 家目录 `<worktree>/.tmp/soak-65b/home`（`git check-ignore` 确认忽略），
+  profile `grok-soak-65b`（`--from-default-profile headless` 后装插件）。
+- 补丁只放 provider `soak65-local`（`http://127.0.0.1:18088/openai/v1`，
+  `apiKeyEnv: BIFROST_VIRTUAL_KEY`，无 `reasoning` 键），`--dump-config` 确认
+  grok-workflow roles 按各轮声明生效。
+
+### 9.1 A 轮：planner=wb/cn:deepseek-v4.1-flash，其余三链=runanywhere/deepseek-v4.1-flash
+- EXIT：0。
+- gate 报告行原文：`Grok workflow: COMPLETED`（`Plan: planner; 1 task(s); 1 verified`，
+  `- soak65-files: verified (1 attempt)`）。
+- ledger（session-b545f610…，run 3018452d…，`stopReason: completed`）：
+  planner（seq 1）**completed**（`structured_output` 一次即过，无重试）；
+  worker（seq 2）**completed**；verifier（seq 3）**completed**（`verdict pass`，
+  9 criteria 全 met）；synthesizer（seq 4）**completed**。
+- planner 失败原文：无。本轮 planner 无 format-error，首轮
+  `planner failed on every route: [format-error] child returned no valid structured result`
+  **未复现、已消失**。
+- report status：COMPLETED（中英双语结论一致：双文件 10/9 字节、无结尾换行、
+  逐字节一致、独立核验通过）。
+- 落盘（workA）：`soak65-alpha.txt` = `ALPHA65_OK`（10 字节，
+  sha256 `3b0f5b23…6d4d7e1`，与 `printf '%s'` 一致）；`soak65-beta.txt` = `BETA65_OK`
+  （9 字节，sha256 `ad622421…0bd3b56ac`，一致）；`od -c`/`cmp MATCH`/`cat -A` 均精确，
+  末字节 0x4b（'K'）。
+- 备注：planner 仍把 caller 双任务规划为 **1 个 task**（`soak65-files`，单 wave），
+  与首轮同形；变化的只是 planner 本次一次过、report 升为 COMPLETED。
+
+### 9.2 B 轮：未执行（NOT_RUN）
+- 触发条件为"A 仍 format-error"；A 轮 planner 一次过、无 format-error，故 B 轮
+  （planner 换 wb/cn glm 路由）按任务指令不再需要，未跑。
+
+### 9.3 清理（CONFIRMED）
+- scratch 家目录 `<worktree>/.tmp/soak-65b/home` 已删除；workA/workB 产物、
+  补丁、prompt、run 日志随 `.tmp/soak-65b/` 一并删除（`.tmp/` gitignored）。
+- 本文件为唯一新增证据；未提交、未推送。
+
+### 9.4 结论
+- A 轮结论：planner 换 `wb/cn:deepseek-v4.1-flash` 后 **format-error 消失**，
+  planner/worker/verifier/synthesizer 四段全 completed，report **COMPLETED**，
+  双文件字节/sha 精确。首轮 BLOCKED 的直接原因是 planner 路由
+  `runanywhere/deepseek-v4.1-flash` 的结构化输出兼容问题，与落盘/网关/安装无关。
+- B 轮结论：未跑（A 已过，触发条件不成立）。
+- 文件落盘：精确（10/9 字节，sha 对上，无尾换行）。
+- 证据路径：`.rsi/evidence/round-065/soak.txt` §9（本节）。

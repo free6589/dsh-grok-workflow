@@ -1,0 +1,31 @@
+# RED — test/null-collapse.spec.ts against the plugin BEFORE the fix
+# state: worktree fix/null-collapse-t1, src/ unchanged from main 6b0eb62,
+#        test/null-collapse.spec.ts (the four seeded cases) the only added file.
+# command: npx vitest run test/null-collapse.spec.ts
+# result: 4 failed | 1 passed (5)
+
+FAIL  > a child that died is not reported as a format error > reports a timed-out child as a timeout, not a format error
+AssertionError: expected 'format-error' to be 'timeout'
+Expected: "timeout"
+Received: "format-error"
+
+FAIL  > a child that died is not reported as a format error > reports a 403 child as model-unavailable, not a re-sendable format error
+AssertionError: expected 'format-error' to be 'model-unavailable'
+Expected: "model-unavailable"
+Received: "format-error"
+
+FAIL  > a child that died is not reported as a format error > reports a cancelled child as cancelled
+AssertionError: expected 'format-error' to be 'cancelled'
+Expected: "cancelled"
+Received: "format-error"
+
+FAIL  > the seeded death reaches the report with its own words > names the cause instead of the missing form
+AssertionError: expected 'worker returned no valid structured r…' to match /403|not authorized|refused/i
++ Received:
+"worker returned no valid structured result (structured output missing or unparsable)"
+
+PASS  > keeps format-error for a child that finished without submitting, and still resubmits
+  (the prose-only case must stay a format error and keep its one free resubmit)
+
+Test Files  1 failed (1)
+     Tests  4 failed | 1 passed (5)

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head><meta charset="utf-8"><title>spine parity — narrow viewport via iframe</title>
+<style>html,body{margin:0;padding:0;font:12px/1.4 monospace}iframe{border:1px solid #ccc;display:block;margin:8px 0}</style>
+</head>
+<body>
+<div id="frames"></div>
+<pre id="results">PENDING</pre>
+<script>
+// headless Chrome clamps the window to 500 CSS px, so a narrow viewport has to come
+// from a sized iframe. --allow-file-access-from-files makes the child same-origin,
+// which is what lets this page read the child's own measurements.
+(function () {
+  var widths = [520, 500, 481, 480]
+  var out = []
+  var pending = widths.length
+  widths.forEach(function (width) {
+    var frame = document.createElement('iframe')
+    frame.width = width
+    frame.height = 1400
+    frame.src = 'spine-parity-2026-11-21-harness.html?w=' + width
+    frame.addEventListener('load', function () {
+      try {
+        var measurements = frame.contentWindow.__MEASUREMENTS
+        var first = measurements[0]
+        out.push({
+          iframeWidth: width,
+          innerWidth: frame.contentWindow.innerWidth,
+          spineCount: first.spineCount,
+          labels: first.labels,
+          singleRow: first.singleRow,
+          distinctTops: first.distinctTops,
+          flexDirection: first.flexDirection,
+          segRects: first.segRects,
+          horizontalOverflow: first.horizontalOverflow,
+          spineBottom: first.spineBottom,
+          bandTop: first.bandTop,
+        })
+      } catch (error) {
+        out.push({ iframeWidth: width, error: String(error) })
+      }
+      pending -= 1
+      if (pending === 0) {
+        out.sort(function (a, b) { return b.iframeWidth - a.iframeWidth })
+        document.getElementById('results').textContent = 'JSON_START' + JSON.stringify({ narrow: out }) + 'JSON_END'
+        document.title = 'done'
+      }
+    })
+    document.getElementById('frames').appendChild(frame)
+  })
+})()
+</script>
+</body>
+</html>

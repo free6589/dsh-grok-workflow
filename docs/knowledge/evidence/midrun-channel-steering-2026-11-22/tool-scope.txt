@@ -1,0 +1,28 @@
+# plugin tool registration + subagent refusal guard
+        throw new Error(`${config.toolName} requires a calling agent (exec.agent was undefined)`)
+      }
+      const sessionHeader = agent.session?.header
+      const delegationDepth = sessionHeader?.delegationDepth ?? 0
+      if (sessionHeader?.origin === 'subagent' || delegationDepth > 0) {
+        throw new Error(`${config.toolName} cannot be invoked from a subagent (delegation depth ${delegationDepth})`)
+      }
+      if (state.disposed) {
+        throw new Error(`${config.toolName} is unavailable: plugin has been unloaded`)
+      }
+      if (exec.signal.aborted) {
+...
+  })
+
+  ctx.tools.register(tool)
+
+
+# child tool scope: restricted only when a toolFilter is supplied
+		name: "deployment:persona-prefix",
+		order: childCtx.systemPrompt.getSectionOrder("DEPLOYMENT_PERSONA_PREFIX"),
+		text: composition.persona
+	});
+	if (composition.toolFilter !== void 0) childCtx.tools.restrict(composition.toolFilter);
+}
+/**
+* Capture the permission state to seed into one delegation. Call synchronously before
+* the child start's first await: a later parent switch belongs to the

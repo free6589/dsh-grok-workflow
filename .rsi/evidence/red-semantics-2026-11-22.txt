@@ -1,0 +1,37 @@
+
+=== recovered (task 2 failed once, then passed) ===
+BEFORE (rule: any row ever failed)
+  task-2 card state         : failed
+  spine execute state       : failed
+  settle bar red segments   : 1
+AFTER (rule: red = still broken now)
+  task-2 card state         : done
+  task-2 card chain         : execute=done check=done review=pending
+  spine execute state       : done
+  current failures (execute): 0
+  recovered rows (execute)  : [2]
+  settle bar segments       : ok=4 retried=1
+  rendered card data-state  : done
+  rendered row pills        : 2:failed 3:done 4:done
+  spine failure badge       : (none)
+
+=== still broken (task 2 failed both attempts) ===
+BEFORE (rule: any row ever failed)
+  task-2 card state         : failed
+  spine execute state       : failed
+  settle bar red segments   : 2
+AFTER (rule: red = still broken now)
+  task-2 card state         : failed
+  task-2 card chain         : execute=failed check=pending review=pending
+  spine execute state       : failed
+  current failures (execute): 2
+  recovered rows (execute)  : []
+  settle bar segments       : ok=2 bad=2
+  rendered card data-state  : failed
+  rendered row pills        : 2:failed 3:failed
+  spine failure badge       : (none)
+
+=== longitudinal wires (owner is failed) ===
+  path keys                : kind+owner+card+points | kind+owner+card+points
+  tone present on a path   : false
+  CSS wire rules           : .gw-progress-wires { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }  ||  .gw-progress-wire { fill: none; stroke: var(--dsw-alias-border-l2, currentColor); stroke-width: 2; }  ||  .gw-progress-wire-head { stroke: none; fill: var(--dsw-alias-border-l2, currentColor); }
