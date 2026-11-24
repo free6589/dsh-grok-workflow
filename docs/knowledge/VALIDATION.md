@@ -1,3 +1,45 @@
+## 合流 `release/0.13.33`：三条分支按序并入、决策号重编、全量门禁最终 exit 0（中间红过一次负载敏感的新用例）— 2026-11-24（门禁四次：`c5b504d` 绿 → `62643da` 红一条 → `62643da` 绿 → `e425295` 绿，最后一次是本文件所记录的树；那次红判定为负载敏感抖动；未重跑 soak）
+
+这一条记的是**合流**这一块：三条待合分支按派单固定顺序并入 `release/0.13.33`，解冲突、重建 `lib/`、重编决策号、跑一次全量门禁。
+下面每一行都是本轮在主检出 `/home/fish/projects_mine/dsh-grok-workflow` 里真跑过的命令与真读到的结果；没跑过的写 `NOT_RUN`。
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 合流起点 | `git status --short --branch`；`git rev-parse HEAD` | `## main...origin/main [ahead 1]`，树干净（无未跟踪垃圾，`.tmp/` 与 `.agents/` 是 gitignore）；`HEAD` = **`4da42c2`** |
+| 开分支 | `git checkout -b release/0.13.33 4da42c2` | exit 0，`## release/0.13.33`，无新 worktree |
+| 合 1 | `git merge --no-ff -m "merge: the full-shape front desk — …" feat/full-escape` | **`Merge made by the 'ort' strategy.`，零冲突**，119 files / +5179 −131；merge 提交 **`cfe8873`** |
+| 合 2 | `git merge --no-ff -m "merge: the audit trail as the report's optional tail …" feat/audit-render-half` | **3 个冲突**：`CHANGELOG.md`、`docs/knowledge/DECISIONS.md`、`docs/knowledge/HANDOFF.md`；`src/report.ts`、`src/index.ts`、`STATE.md`、`VALIDATION.md` **自动合并**；merge 提交 **`f572eee`** |
+| 合 2 后 `verify:lib` | `npm run verify:lib`（`HEAD` = `f572eee`） | `lib/ at f572eee is the build of src/ at f572eee (249 files, byte-identical)` |
+| 合 2 后定向用例 | `TMPDIR=$PWD/.tmp npx vitest run test/report-audit.spec.ts test/report.spec.ts test/human-output-contract.spec.ts test/full-escape.spec.ts test/full-behind-first-answer.spec.ts` | **5 文件 / 77 例全绿**（5.52 s）——审计层与前台两块的用例在中间态就是绿的 |
+| 合 3 | `git merge --no-ff -m "merge: numbered call names …" fix/naming-resubmit` | **7 个冲突**：`CHANGELOG.md`、`docs/knowledge/{DECISIONS,HANDOFF,STATE,VALIDATION}.md`、`lib/report.d.ts.map`、`lib/report.js.map`；**`src/report.ts` 自动合并**；merge 提交 **`c5b504d`** |
+| `src/report.ts` 两条路径都在（这是本轮唯一的产品合并风险点） | `grep -n "auditTrail\|renderAuditTrail\|shippedSummaryDraft\|final: draft" src/report.ts` | **都在**：`import { renderAuditTrail }`(14)、`auditTrail?: boolean`(1150)、尾部拼接(1363)、`shippedSummaryDraft()`(1170)、`Summary review: … · final: draft N`(1248–1249)。**没有手改** |
+| `lib/` 重建 | `npm run build` | exit 0；`client bundle: 325771 bytes → lib/client.js`。`lib/report.d.ts.map` / `lib/report.js.map` 的冲突先 `git checkout --ours` 再由重建覆盖 |
+| 残留冲突标记 | `grep -rn "^<<<<<<<\|^=======$\|^>>>>>>>" src test docs CHANGELOG.md lib` | **输出为空** |
+| 决策号复核 | `grep -rn "D-131\|D-132\|D-133" --include=*.md --include=*.ts --include=*.js .` | 剩 7 处 `D-131` 全指 `feat/full-escape` 那一块（含两句重编括注）；`D-132` 13 处、`D-133` 5 处各自指向自己的块；`lib/` 里只有重建带出的 `D-132`（`lib/index.js:217`、`lib/report.js:1248`） |
+| **全量门禁（合流尖端那次）** | `TMPDIR=$PWD/.tmp npm run ci`（`HEAD` = `c5b504d`） | **exit 0**：typecheck 干净；`oxlint src test` → **`Found 36 warnings and 0 errors.`**；`verify:lib` → `lib/ at c5b504d is the build of src/ at c5b504d (249 files, byte-identical)`；vitest **`Test Files 105 passed (105)` / `Tests 1954 passed (1954)`**，**187.88 s**（transform 2.56 s / import 9.87 s / tests 165.38 s / environment 12 ms） |
+| **全量门禁（记忆提交后，第一次）** | `TMPDIR=$PWD/.tmp npm run ci`（`HEAD` = `62643da`） | **exit 1**：`Test Files 1 failed \| 104 passed (105)`、`Tests 1 failed \| 1953 passed (1954)`，173.46 s。唯一失败：`test/full-behind-first-answer.spec.ts > full mode, first turn: answer first, verify behind it > enters the live first answer, says the report follows, and starts one real run`，逐字 `Error: the report was not delivered as its own message`，停在 `test/full-behind-first-answer.spec.ts:323` 的 `vi.waitFor`（vitest 默认 1 000 ms）。typecheck、lint、`verify:lib`（`lib/ at 62643da … (249 files, byte-identical)`）三步都绿 |
+| **全量门禁（记忆提交后，第二次）** | 同一条命令（`HEAD` = `62643da`，loadavg 2.41） | **exit 0**：typecheck 干净；`oxlint src test` → **`Found 36 warnings and 0 errors.`**；`verify:lib` → `lib/ at 62643da is the build of src/ at 62643da (249 files, byte-identical)`；vitest **`Test Files 105 passed (105)` / `Tests 1954 passed (1954)`**，**182.98 s**（transform 3.60 s / import 11.56 s / tests 157.41 s / environment 15 ms） |
+| **全量门禁（最终那次，本文件所记录的树）** | 同一条命令（`HEAD` = **`e425295`**，loadavg **16.01**） | **exit 0**：typecheck 干净；`oxlint src test` → **`Found 36 warnings and 0 errors.`**；`verify:lib` → `lib/ at e425295 is the build of src/ at e425295 (249 files, byte-identical)`；vitest **`Test Files 105 passed (105)` / `Tests 1954 passed (1954)`**，**203.36 s**（transform 13.19 s / import 21.62 s / tests 167.94 s / environment 12 ms）。**注意 loadavg 16.01 也绿**：这条抖动不严格跟负载走 |
+| 那条红是回归还是抖动 | ① `npx vitest run test/full-behind-first-answer.spec.ts` ×5（静机）；② 24 个 busy 循环下同一条 ×3（loadavg 25.07） | ① **5/5 绿**（4 passed / 4 passed / 4 passed / 4 passed / 4 passed）；② **3/3 红**（`1 failed \| 3 passed`、`1 failed \| 3 passed`、`3 failed \| 1 passed`），全部停在 `vi.waitFor`：`Error: the report was not delivered as its own message`（`:323`）与 `Error: the team run did not start (warnings: …)`（`:272`）——**没有一条是内容断言失败**。⇒ **负载敏感的等待，不是合流回归** |
+| 合流有没有碰这条路径 | `grep -rn "renderReport" src/`；该用例的 `reportOf()` | `renderReport` 只被 PTC `render` 工具调用（`src/index.ts:254`，且带 `auditTrail: report.status !== 'completed'`）；投递路径用 `src/delivery/` 自己的渲染器，不经过 `renderReport`；用例报告 `status: 'completed'` ⇒ 审计段本来就关。**合流与这条红无关** |
+| 处理 | — | **只记录，不修**：断言、`testTimeout`（`30_000`）、`vitest.config.ts`、skip/only 一处未动；按「既有抖动按原样记录、不放宽断言」执行。留一句给发版那一块：这条等待是 vitest 默认 1 s，与 `feat/full-escape` 自己把饱和队列用例换成 15 s 具名界的那条同族，但本轮不替分支作者改 |
+| 对数核对 | 101 文件 / 1910 例（基线 `main`）+ 2 文件 12 例（`feat/full-escape`）+ 1 文件 13 例（`feat/audit-render-half`）+ 1 文件 19 例（`fix/naming-resubmit`） | **105 / 1954**，与实测**逐项相等**；新增 spec 文件正好 4 个（`full-escape`、`full-behind-first-answer`、`report-audit`、`naming-sequence`） |
+| 在案的既有抖动有没有打出来 | 四次全量门禁 | **没有**。`test/gate.spec.ts > never retries a refused batch on its own` 与 `test/timeout.spec.ts` 两条无计时器探针三次都绿 |
+| 真机 soak（重跑） | — | **`NOT_RUN`**（派单未要求）。三条分支各自的 soak 证据仍在 `.rsi/evidence/{full-escape,audit-render-half}-2026-11-24/`，本轮只做合流 |
+| 发版 / tag / push / 删分支 / live profile | — | **`NOT_RUN`（有意不做）**：`package.json` 仍 `0.13.32`、未打 tag、未 push、三条分支与 worktree 都还在、`~/.dsh` 一行未写、未重载、未重启 |
+
+**Changed（本轮的提交面）：** 三个 merge 提交（`cfe8873`、`f572eee`、`c5b504d`）。产品代码只有三条分支原本的改动，合流本身**没有手改一行产品代码**；
+`lib/` 全部由 `src/` 重建；文档面是 `CHANGELOG.md` 的 `[Unreleased]` 并集（Added 1 / Changed 5 / Fixed 1）、
+`docs/knowledge/{DECISIONS,HANDOFF,STATE,VALIDATION}.md` 的并集与决策号重编、`docs/ARCHITECTURE.md` 的 D-131→D-132。
+
+**Honest boundary（逐条）：**
+1. **门禁四次，其中一次红过一条**（`62643da`，`test/full-behind-first-answer.spec.ts` 的 `vi.waitFor` 1 s 超时）。判定为负载敏感抖动，依据是「静机 5/5 绿 + 24 busy 循环 3/3 红且全停在 `vi.waitFor`、无内容断言失败 + 合流未碰该路径」。**但这只是判定，不是修复**：这条等待仍然是 1 s，它还会再红。它也**不严格跟 loadavg 走**——最终那次绿在 loadavg **16.01**，红的那次机器同样不闲。
+2. **没有重跑真机 soak**：三条分支的 soak 各在自己的证据目录里，本轮是合流不是重测。
+3. **远端矩阵 `NOT_RUN`**（没 push），Node 22/24 的绿只来自那三条分支各自的远端记录。
+4. **`src/report.ts` 的 `renderReport` 上方多了一段游离的 JSDoc**（`feat/naming-resubmit` 自带：它把 `shippedSummaryDraft` 插在
+   `renderReport` 的文档注释与函数声明之间）。这是**分支原有形状、不是本轮解冲突造成的**，不影响编译与行为，本轮没有顺手改它。
+5. **最终那次（`e425295`）跑完之后只改过三个记忆文档**（`docs/knowledge/{STATE,HANDOFF,VALIDATION}.md`，即本段），`src/`、`test/`、`lib/`、`package.json` 一行未动——所以 `verify:lib` 那行报的 sha 会随 HEAD 前进，而被校验的那对 `src/`↔`lib/` 逐字节关系不变。
+
 ## 重复调用带序号名、终稿「（定稿）」标记、replan 交卷改「调工具 + 同棒补交」— 2026-11-24
 
 分支 `fix/naming-resubmit`（worktree `.agents/worktrees/fix-naming-resubmit`），基线 `main` 尖端 `1f70103`（`0.13.32`）。

@@ -1,3 +1,64 @@
+## 2026-11-24 — 合流 `release/0.13.33`：三条分支按序并入、决策号重编 D-131/D-132/D-133、全量门禁最终 exit 0
+
+- **From:** 合流手（`agent-137/merge-train`）· **To:** 发版那一块 / 操作员
+- **树与基线**：主检出 `/home/fish/projects_mine/dsh-grok-workflow`（没有新建 worktree），从 `main` 尖端 **`4da42c2`**
+  （`docs(spec): adopt grok-workflow v1 spec as accepted baseline`，比 `origin/main` 领先 1 条）开出 `release/0.13.33`。
+  三次 `git merge --no-ff` 按派单固定顺序执行，尖端 **`c5b504d`**：
+
+| # | 分支 | merge 提交 | subject | 冲突 |
+|---|---|---|---|---|
+| 1 | `feat/full-escape` | **`cfe8873`** | `merge: the full-shape front desk — escape hatch, ask-before-send, and the first answer in the turn` | **零冲突** |
+| 2 | `feat/audit-render-half` | **`f572eee`** | `merge: the audit trail as the report's optional tail for runs that did not finish` | 3 |
+| 3 | `fix/naming-resubmit` | **`c5b504d`** | `merge: numbered call names, the shipped draft mark, and a replan that submits through the tool` | 7 |
+
+- **为什么第一次零冲突**：`feat/full-escape` 自 `1f70103` 开出，而 `main` 在它之后只多了一条 `4da42c2`（只加一份 spec 文档），
+  两边的文件面不相交，`ort` 直接合上。
+- **`src/report.ts` 是唯一两边都改的产品文件**（分支 2 与分支 3）：`ort` 自动合并成功，**没有手改一行**。合并后实测两条路径都在——
+  审计层：`import { renderAuditTrail }`（第 14 行）、`RenderReportOptions.auditTrail?: boolean`（1150）、
+  `opts?.auditTrail === true ? `${view}\n\n${renderAuditTrail(report)}` : view`（1363）；终稿稿号：`shippedSummaryDraft()`
+  （1170）、`Summary review: … · final: draft N`（1248–1249）。**一个功能都没丢**。
+- **`lib/` 一行没手改**：解完 `src/` 冲突后 `npm run build` 从 `src/` 重建（client bundle 325771 B），`verify:lib` 报
+  `lib/ at c5b504d is the build of src/ at c5b504d (249 files, byte-identical)`。`lib/report.d.ts.map` 与 `lib/report.js.map`
+  两个冲突随便取一侧后由重建覆盖（`git checkout --ours` → `npm run build` → 提交重建结果）。
+- **冲突清单与解法（10 个路径，全部只动文档与生成物）**：
+  - `CHANGELOG.md`（第 2、3 次都冲突）：`[Unreleased]` 取并集，按语义归成 `### Added / 新增`（1 条 = 审计层）、
+    `### Changed / 变更`（5 条 = 前台 4 条 + 编号 1 条）、`### Fixed / 修复`（1 条 = replan 交底）。中英双语原文照搬，一句没重写。
+  - `docs/knowledge/DECISIONS.md`（第 2、3 次都冲突）：三条 D-131 全部保留成独立条目，按合入顺序排成 D-131 / D-132 / D-133。
+  - `docs/knowledge/HANDOFF.md`（第 2、3 次都冲突）：新的在上（`fix/naming-resubmit` → `feat/audit-render-half` → `feat/full-escape`），
+    各节原样，没压缩。
+  - `docs/knowledge/STATE.md`、`docs/knowledge/VALIDATION.md`（第 3 次冲突）：同上，新的在上；分支 2 那两块本来就是文件尾追加，
+    合流后仍在文件尾，**没有搬家**。
+  - `lib/report.d.ts.map`、`lib/report.js.map`：取一侧 + 重建覆盖。
+- **决策号撞号重编（三条分支各自都新增了一个 `## D-131`，`main` 现有最大是 D-130）**：`feat/full-escape` 保留 **D-131**；
+  `feat/audit-render-half` 改 **D-132**（11 处引用逐条按语义改：`docs/ARCHITECTURE.md:233`、`HANDOFF` 3 处、`STATE` 1 处、
+  `VALIDATION` 1 处、`src/index.ts`、`src/report.ts`、`test/human-output-contract.spec.ts` 2 处、`test/report-audit.spec.ts`；
+  `lib/` 由重建带出）；`fix/naming-resubmit` 改 **D-133**（3 处：`HANDOFF` 2、`STATE` 1）。两条被重编的条目末尾各加一句括注
+  「（合流时由 D-131 重编为 D-132／D-133）」，`.rsi/evidence/` 下的历史证据**一字未改**（那是当时的记录）。
+  复核命令 `grep -rn "D-131\|D-132\|D-133" --include=*.md --include=*.ts --include=*.js .`：剩下的 7 处 `D-131` 全指分支 1 那一块
+  （或那两句括注），`D-132` 13 处、`D-133` 5 处各自指向自己的块。
+- **门禁（`CONFIRMED`，`TMPDIR=$PWD/.tmp npm run ci`，本轮四次）**：`c5b504d` **exit 0**（105 文件 / 1954 例，187.88 s）→
+  `62643da` **exit 1**（`Tests 1 failed | 1953 passed (1954)`，173.46 s，一条负载敏感的新用例）→ `62643da` **exit 0**
+  （182.98 s，loadavg 2.41）→ **`e425295` exit 0**（105 文件 / 1954 例，203.36 s，**这是最终那次**）。四次的 lint 都是
+  **`Found 36 warnings and 0 errors.`**、`verify:lib` 都是 **249 files byte-identical**（sha 随 HEAD 变）。对数：101 文件 / 1910 例（基线）+ 2 文件 12 例（分支 1）+ 1 文件 13 例（分支 2）+
+  1 文件 19 例（分支 3）= **105 / 1954**，与实测逐项相等。
+- **中间那次红：判定为负载敏感抖动，不是合流回归（`CONFIRMED`）**：`test/full-behind-first-answer.spec.ts > enters the live
+  first answer, says the report follows, and starts one real run`，逐字 `Error: the report was not delivered as its own message`，
+  停在 `vi.waitFor`（vitest 默认 **1 000 ms**）。依据四条：① 单跑 **5/5 绿**；② 24 个 busy 循环下 **3/3 红**（loadavg 25.07），
+  3 条用例全红在 `vi.waitFor`（`the report was not delivered as its own message` / `the team run did not start`），**没有一条是
+  内容断言**；③ 合流没碰这条路径——`renderReport` 只被 PTC `render` 工具调用（`src/index.ts:254`），投递路径用的是 `src/delivery/`
+  自己的渲染器；④ 该用例的报告 `status: 'completed'`，`auditTrail` 本来就关。**处理：只记录，不修**——按「既有抖动按原样记录、
+  不放宽断言」，断言、`testTimeout`、`vitest.config.ts`、skip/only 一处未动，重跑即绿。它**不严格跟 loadavg 走**：最终那次绿在
+  loadavg **16.01**、红的那次机器也不闲——是 1 s 墙钟竞态，重负载下更容易撞上，不是重负载才撞上。**留给发版那一块注意**：
+  它的等待是 vitest 默认 1 s，与 `feat/full-escape` 自己修过的饱和队列用例（改成 15 s 具名界）同族，但本轮不替分支作者改。
+  另一组在案的既有抖动（`test/gate.spec.ts > never retries a refused batch on its own`、`test/timeout.spec.ts` 两条无计时器探针）
+  四次都绿。
+- **缺口（照实写）**：① 门禁四次里**有一次红过一条**，判定为负载敏感抖动（依据见上一条），最终那次 exit 0；四次之间**没有任何产品代码变化**，所以它证明的是「同一棵产品树能跑绿」，不是「抖动已被排除」——**它还会再红**；
+  ② **没跑真机 soak**——三条分支各自的 soak 证据都在 `.rsi/evidence/` 里，本轮是合流不是重测，合流后没有重跑（派单未要求）；
+  ③ 远端 Node 22/24 矩阵 **`NOT_RUN`**（没 push）。
+- **下一步（发版那一块）**：`package.json` 仍是 `0.13.32`；`[Unreleased]` 里现有 7 条（Added 1 / Changed 5 / Fixed 1）要原文搬进新的
+  `## [0.13.33]` 段；打 tag 前先跑一次 `npm run ci`；三条已合分支（`feat/full-escape`、`feat/audit-render-half`、`fix/naming-resubmit`）
+  与它们的 worktree 都还在，按 AGENTS §5「合并后 24 h 内删」收尾。
+
 ## 2026-11-24 — 重复调用带序号名、终稿标「（定稿）」、replan 交卷改「调工具 + 同棒补交」
 
 - **From:** 执行手（`agent-136/naming-worker`）· **To:** 合流者 / 操作员
