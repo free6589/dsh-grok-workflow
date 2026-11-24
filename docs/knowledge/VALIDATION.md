@@ -1,3 +1,43 @@
+## 0.13.30 门禁与发版：本地一次全绿、远端 CI + Release 双绿 — 2026-11-24
+
+发版提交 `10af79b` = `chore(release): prepare v0.13.30`（8 files / +32 −20，基线 `4f616d1` ＝ `origin/main`）。下面每一行都是量过的，
+命令与 run id 逐字给出，没有「按推理应当绿」的条目。
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 本地门禁 | `TMPDIR=$PWD/.tmp npm run ci`（发版树） | **exit 0** —— typecheck 干净、oxlint **0 errors / 36 warnings**（全既有）、`verify:lib` byte-identical **237 files**、vitest **100 files / 1846 tests PASS**（150.39 s）。**`CONFIRMED`**。本轮只跑 **1 次**（0.13.29 那轮 12 次里 6 次红在挂死探针 30 s 超时上；那两条的修法 `a210b08` 已在本版里） |
+| `verify:lib` 的口径（必须照实说） | 同一行门禁输出 | 本地这一行报的是 **HEAD 那棵树**（`lib/ at 4f616d1 …`），因为跑门禁时工作区还带着未提交的版本改动；管发版的是 Release workflow 在**打了 tag 的提交**上跑的 `git diff --exit-code -- lib/`，它在远端过了。**`CONFIRMED`**（两边都看得到，别把本地那一行当成「tag 提交上的字节比对」） |
+| tag + push | `git tag -a v0.13.30`（附注 tag，message `v0.13.30 — one report's two machine views agree, on a gate that stopped failing on a busy machine`）→ push tag；`main` push `4f616d1..10af79b` | 已 push，`main` 与 `origin/main` 都在 `10af79b`。**`CONFIRMED`** |
+| 远端 `CI` | run **45349629702**（main push，event `push`） | **success**。**`CONFIRMED`** |
+| 远端 `Release` | run **45349634592**（tag push，event `push`，headBranch `v0.13.30`） | **success**；已发布 <https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.30>，资产 `dsh-grok-workflow-0.13.30.tgz` = **917 321 bytes**。**`CONFIRMED`** |
+| 挂死形状取证（本版随出去的第三条） | 目录 `.rsi/evidence/soak-hang-shape-2026-11-24/`（README 308 行 + 两轮原始日志 + `analyze-*.txt` + `baseline.txt`），**只出证据、不出代码** | **PASS**：五个任务的真机一轮里挂死路整轮被调用 **3 次**（任务 1 自己的两次尝试；任务 2–5 一次没打它），每次挂死调用都由这一轮自己的 45 s 子调用预算结算（端点侧 **44.65–44.93 s**），第 3 次是传输层 300 s 后把第一次尝试遗留的孤儿请求原样重发（请求体字节数相同），**两轮独立复现形状一致**。**`CONFIRMED`**（口径与缺口见下一张表） |
+| 收尾（worktree / 分支 / 标记） | `git worktree remove` ×2（只删已合并且干净的：`feat/dead-routes` `0113211`、`release/0.13.27` `2141071`）；`git checkout -- .rsi/STOP` | 两个 worktree 连分支删掉；另 **6 个**故意没动（带未提交的活或未合分支）；`.rsi/STOP`（tracked，`Operator stop — RSI self-iteration halted 2026-11-21`）此前被某个会话在工作树里删掉、没有提交解释，这次复原，操作员的停止继续有效。**`CONFIRMED`** |
+| live profile | `dsh plugin --profile web add github:free6589/dsh-grok-workflow#v0.13.30` | **`BLOCKED`（本侧）**：包工头的沙箱写不到工作区以外，`~/.dsh` 不在可写范围。这一条**没有**做，留给操作员执行，并在执行后读回版本确实是 `0.13.30` |
+
+### 取证目录 `.rsi/evidence/soak-hang-shape-2026-11-24/`：现在已提交，它的 PASS 建立在什么上
+
+准备发版时这个目录还是**未跟踪**的（「记忆未归档」）；随本次归档一起提交，所以下一个人按路径就能打开它。它的 `PASS` 只建立在下面这些
+读数上，**不**建立在推理上（基线：`git rev-parse HEAD` = `4f616d1f6c4177854f17ad7baa12021fc542c5ca`；`lib/index.js` blob
+`0bd502ba2e8086dbc976a6d7655c1f877f7a0eed`、sha256 `3e014bd1f8f469ed66be92a832f6b417d12967a1706c5f6732df2a1d98b190a3`、20 683 bytes）：
+
+| 它要说的事 | 依据（可核对的读数） | state |
+| --- | --- | --- |
+| 这一轮是五个真任务，没塌成兜底 | 报告行 `Plan: caller; 5 task(s); 4 verified`；checkpoint `plan.source = "caller"`、`taskCount = 5`；两轮 `grep -c 'model=soak/plan-live' gateway.log` = **0**（planner 腿一次没跑） | **`CONFIRMED`** |
+| 挂死路整轮只被调用 3 次，任务尝试占 2 次、全归任务 1 | 逐条 completion 行：t1 attempt 1 `07:04:06.929`、attempt 2 `07:04:52.210`；t2–t5 各 1 attempt 全落活路；第 3 次 `07:09:07.468`。第二轮（可见性翻转）同形：`07:14:37.025`、`07:15:22.233`、`07:19:37.493` | **`CONFIRMED`** |
+| 第 3 次不是任务尝试，是传输层重发 | 请求体字节数 #1 = **43694**、#2 = 43963、#3 = **43694**（#3 与 #1 完全相同）；#1 打开到 #3 打开相距 **300 539 ms**；t1 attempt 1 的子会话在 `07:09:06.927` 记 `llm/retry`、`07:09:07.454` 记 `llm/retry-started`，**14 ms 后**假网关接到 #3 | **`CONFIRMED`** |
+| 每次挂死调用都被这一轮自己的 45 s 预算结算，不是永不结算、也不是别的看门狗收的 | 用两头可观测事件夹（子会话 `turn/start` ≤ arm 时刻、下一子会话 `turn/start` > fire 时刻）：轮 1 #1 **44 917–44 929 ms**、#2 **≤ 44 648 ms**、轮 2 #1 **44 887–44 900 ms**、#2 **≤ 44 705 ms**，预算 `childTimeoutMs = 45000`；checkpoint `watchdog = {"cancelled":false,"deadlineHit":false,"deadlineMs":1800000}`、`Guard: 0 finding(s)`（没配 guardian，所以没有 300 s 宽限插进来） | **`CONFIRMED`** |
+| 真机走的是哪条时钟路径 | `realm-probe.txt`：`hasHostTimer = false`、`sleepCell != null = true`、`canRaceCalls = true` → 走 `Atomics.waitAsync` 延迟分支；`raceChildCall` 的 `if (!canRaceCalls)` 那一支永远不进，无计时器兜底 `watchNoTimer` **在本机真机不可达**。旁证：200 ms 的 `Atomics.waitAsync` 只花 0.49 ms user + 0.14 ms sys CPU（真自旋会钉住一个核） | **`CONFIRMED`** |
+| 台账那几行原文 | `run-2-vis.txt` 里 `Child budget: 45000 ms per call`、`Route switches` 两行、`Dead routes` 一行（`soak-hang/soak/hang-always: timeout (2 in a row)`），与网关日志的 2 次任务尝试逐条对得上。**来源是一份单行翻转的 `lib/` 副本**（shipped build 把 `showDiagnostics` 钉成 `false` 且在 `REMOVED_CONFIG_KEYS` 里，patch 带不进去）；shipped build 那轮才是计数与结算时延的主证据，副本那轮只提供渲染文本，diff 全量 2 行 | **`CONFIRMED`**（来源限制照实写） |
+
+五个必须跟着这个 `PASS` 一起走的缺口（别单独主张任何一条被它们限定的东西）：① 活路用的是 `wb/global:deepseek-v4.1-flash`，
+简报指的 `wb/cn:…` 本机实时探测是 `503 no_healthy_account`（同网关、同 key、同模型 id，只换路由组）；② `Dead routes` 原文行只能从
+可见性翻转的副本渲出，正式构建不打印；③ 「每轮挂死路被调用几次」在真机上会被 undici 的 300 s headers 超时抬高 **1 次**，所以
+「按 completion 行计数」与「按任务归因计数」不再是一比一；④ t1 是 **failed** 而不是 verified（`switchModel=false`，两次尝试都不换路，
+`maxRetries` 固定 1，用完就没了）——挂死形状下第一个任务拿不到结论，这一点和 503 形状（5/5 验过）不能混着说；
+⑤ 没测到的形状：401 端口、`dead503` 模式、三条以上路由的链、配了 `guardianModel` 之后的 300 s 宽限、运行级 deadline 真的到期——
+本轮一个都没碰，目录里也没有任何结论依赖它们。另：报告渲染行写「the **1 minute** child budget」是 `Math.round(45000/60000) = 1`
+的结果，准确数字只在 `Child budget: 45000 ms per call` 那一行，本文件一律用 45000。
+
 ## 后台轮只等到「开跑」就断言：改成等它落地（`test/` only，`src/`、`lib/` 未动）— 2026-11-24（提交 `a210b08`；数字由修者与验收方分别实测）
 
 **症状（`CONFIRMED`）：** 两条 spec 在负载下红成一句**像产品 bug 的话**，而不是红在它们要钉的事实上 ——

@@ -1,0 +1,4 @@
+=== upstream health probe, 2026-11-24T15:21:57+08:00 ===
+model=wb/cn:deepseek-v4.1-flash http=503 body={"is_bifrost_error":false,"status_code":503,"error":{"type":"api_error","code":"no_healthy_account","message":"all accounts are temporarily unavailable, please retry later"},"extra
+model=wb/global:deepseek-v4.1-flash http=200 body={"id":"77f11cc289b02b00d010caf057ee5b19","choices":[{"index":0,"finish_reason":"length","logprobs":null,"message":{"role":"assistant","content":"Hi! How can I help you today?\n\nI 
+key present: yes

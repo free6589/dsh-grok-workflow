@@ -1,3 +1,47 @@
+## 2026-11-24 — 0.13.30 已发：同一份报告的两个机器视图说上同一句话，门禁不再因为机器忙就红（`CONFIRMED`，CI + Release 双绿）
+
+- **From:** 发版方（包工头 agent-122 / foreman） · **To:** 下一个接手者 / 操作员
+- **本版发了什么**（逐条原文见 `CHANGELOG.md` 的 `## [0.13.30] - 2026-11-24`，下面 ①② 在 `### Fixed / 修复`，③ 在
+  `### Verification and gate / 验证与门禁`）：
+  ① **对齐那一刀**——机器台账现在渲染报告自己的诊断块（死路由写明哪条路、哪类传输故障、连续几次；每次子调用的预算行；
+  两个分开的溢出标题，一个是本轮自己的上限、一个是另一个在跑的 run 给的大致提示；错误行保留类别且两边同一条消息；
+  只记了等待、没点名的路由条目不再印成 `no lane named`；收尾那两行走截断前预留，不再被长度上限吃掉），于是同一份报告的两个视图
+  不再各说一句话；② **抖动那一刀**——两条负载敏感的门禁用例改成等后台轮**落地**（`landedWithin`，探针自己持 ref 住的 15 000 ms
+  timer、具名失败）而不是等它**开跑**；test-only，`src/`、`lib/` 一行未动，所以它动的是门禁、不是产品；③ **挂死形状取证**——
+  只出证据不出代码，目录 `.rsi/evidence/soak-hang-shape-2026-11-24/`：五个任务的真机一轮里挂死路整轮被调用 **3 次**（任务 1 自己的
+  两次尝试；任务 2–5 一次都没打它），每次挂死调用都由这一轮自己的 45 s 子调用预算结算（端点侧 44.65–44.93 s），第 3 次是传输层
+  300 s 后把第一次尝试遗留的孤儿请求原样重发（请求体字节数相同），两轮独立复现形状一致。
+- **发版事实（`CONFIRMED`）**：基线 `main` 尖端 `4f616d1`（`merge: ledger and report diagnostics parity`）＝`origin/main`；
+  发版提交 `10af79b` = `chore(release): prepare v0.13.30`（8 files / +32 −20）；版本四处都动（`package.json` +
+  `package-lock.json` 2 处、`docs/LOCAL-TESTING.md` 的打包产物名 3 处、`src/client/index.js` 的
+  `PLUGIN_VERSION`/`UPDATE_LATEST` 并 `npm run build` 重建 `lib/client.js`），两个 README 的声明版本/两条安装钉/散文
+  `#vX.Y.Z`/发布 tag 列表同时收到 `v0.13.30`。本地门禁 `TMPDIR=$PWD/.tmp npm run ci` **exit 0**：typecheck 干净、oxlint
+  **0 errors / 36 warnings**（全既有）、`verify:lib` byte-identical **237 files**、vitest **100 files / 1846 tests PASS**
+  （150.39 s）；本轮**只跑一次**（0.13.29 那轮 12 次里有 6 次红在挂死探针上，那两条的修法 `a210b08` 已在本版里）。
+  口径要照实说：本地 `verify:lib` 那行报的是 HEAD 树（`lib/ at 4f616d1 …`），因为跑门禁时工作区还带着未提交的版本改动；
+  管发版的是 Release workflow 在打了 tag 的提交上跑的 `git diff --exit-code -- lib/`，它在远端过了。附注 tag `v0.13.30`
+  （message `v0.13.30 — one report's two machine views agree, on a gate that stopped failing on a busy machine`）已 push，
+  `main` push `4f616d1..10af79b`；远端 `CI` **45349629702** success、`Release` **45349634592** success，已发布
+  <https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.30>，资产 `dsh-grok-workflow-0.13.30.tgz`（917 321 bytes）。
+- **本次归档做了什么**：只动三份记忆（本节所在的 `HANDOFF.md`、`VALIDATION.md` 首条、`STATE.md` 顶部），外加把准备发版时还
+  未跟踪的取证目录 `.rsi/evidence/soak-hang-shape-2026-11-24/` 一起提交（它此前是「记忆未归档」的状态，现在 `VALIDATION.md`
+  首条指向它，下一个读者能按路径找到）。源码、测试、`CHANGELOG.md`、`package.json`/`package-lock.json` 一行未动；
+  没提交别的、没打新 tag、没跑 `npm run ci`。
+- **还开着的（照实列，别当成已收）**：
+  1. **六个 worktree 没动**，因为带未提交的活或未合的分支：`.agents/worktrees/fix-null-collapse-t1`（已合，1 条脏）、
+     `.agents/worktrees/fix-progress-task-number-first`（已合，9 条脏）、`.agents/worktrees/rsi-soak-65`（已合，1 条脏）、
+     `.agents/worktrees/rsi-redrive-13`（分支**未合**，干净）、`.agents/worktrees/team-dispatch-v1`（分支**未合**，15 条脏）、
+     `.tmp/wt-steer`（已合，17 条脏）。只删掉了两个已合并且干净的：`feat/dead-routes`（`0113211`）、`release/0.13.27`（`2141071`），
+     连分支一起删。下一个接手者要么把脏活收进提交、要么明确丢弃，别直接 `git worktree remove --force`。
+  2. **十二条已合的 `rsi/sec2-*` / `rsi/sec3-*` 分支还在，且已经过了 2026-11-24 的删除日**（§5：合了 24h 内删，留着就是垃圾）。
+     另有三条未合分支仍在：`rsi/redrive-13`、`team-dispatch-v1`、`feat/audit-layer` —— 这三条按 §5 要有结论：合、rebase、还是删。
+  3. **live profile 本侧没升（`BLOCKED`）**：包工头的沙箱写不到工作区以外，`~/.dsh` 不在可写范围里。把 live profile 钉到
+     `v0.13.30` 这件事留给操作员，命令就是下面这一条；钉完要读回版本确实是 `0.13.30`，不是「今天解析到什么算什么」。
+- **要交给操作员的一条命令**：
+  `dsh plugin --profile web add github:free6589/dsh-grok-workflow#v0.13.30`
+- **`.rsi/STOP` 复原了**：那份 tracked 的 `Operator stop — RSI self-iteration halted 2026-11-21` 此前被某个会话在工作树里删掉、
+  没有提交解释它，这次 `git checkout -- .rsi/STOP` 放回去，操作员记录的停止继续有效——动手前先看它，别把 RSI 自迭代重新点起来。
+
 ## 2026-11-24 — 负载敏感的两条 spec 收口：等后台轮落地，不等它开跑（`test/` only，`CONFIRMED`）
 
 - **From:** 修者（agent-118/fixer 派出的实现代理） · **To:** 下一个碰这两条 spec 的人 / 发版方

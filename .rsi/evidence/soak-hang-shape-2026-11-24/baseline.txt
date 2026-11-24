@@ -1,0 +1,8 @@
+date: 2026-11-24T15:21:57+08:00
+git rev-parse HEAD: 4f616d1f6c4177854f17ad7baa12021fc542c5ca
+git rev-parse HEAD:lib/index.js: 0bd502ba2e8086dbc976a6d7655c1f877f7a0eed
+sha256 lib/index.js: 3e014bd1f8f469ed66be92a832f6b417d12967a1706c5f6732df2a1d98b190a3  lib/index.js
+lib/index.js stat: 20683 bytes, mtime 2026-11-24 14:51:07.222574033 +0800
+git status --short line count: 31
+node: v26.8.1
+dsh: 0.2.2-rc.3

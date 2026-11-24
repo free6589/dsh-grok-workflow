@@ -1,0 +1,66 @@
+gateway log : .rsi/evidence/soak-hang-shape-2026-11-24/gateway.log
+dsh home    : .tmp/soak-hang/dsh-home
+T0          : 2026-11-24T07:03:46.998Z (1795503826998)
+childTimeoutMs = 45000
+
+=== hang-route completion requests (ground truth: one line each) ===
+  #1 soak/hang-always opened T+  19931ms (07:04:06.929) bytes=43694
+  #2 soak/hang-always opened T+  65212ms (07:04:52.210) bytes=43963
+  #3 soak/hang-always opened T+ 320470ms (07:09:07.468) bytes=43694
+  TOTAL hang-route requests: 3
+
+=== proxy-route completions (the live route, per model) ===
+  soak/work-live         9 calls  first T+ 115060ms  last T+ 281327ms  dur 3257..10157 ms
+  soak/judge-live        8 calls  first T+ 125309ms  last T+ 293101ms  dur 3130..9127 ms
+  soak/sup-live         11 calls  first T+ 137396ms  last T+ 323359ms  dur 2644..11229 ms
+  soak/synth-live        1 calls  first T+ 331574ms  last T+ 331574ms  dur 3489..3489 ms
+
+=== child turns (who was running when) ===
+  只调用一次 grok_workflow 工具，参数严格如下（不要自己 turn/start T+      0ms (07:03:46.998)
+                             turn/end   T+ 354348ms (07:09:41.346) completed
+  执行 · 17+25                 turn/start T+  19848ms (07:04:06.846)
+                             turn/end   T+ 343064ms (07:09:30.062) aborted/parent
+                             llm/retry #1 (["normal",5,["EMPTY_RESPONSE","RATE_LIMIT","SERVER","TIMEOUT","TRANSPORT"],500,10000,0.1])  T+ 319929ms (07:09:06.927)
+                             llm/retry-started #1  T+ 320456ms (07:09:07.454)
+  执行（尝试 2） · 17+25           turn/start T+  64860ms (07:04:51.858)
+                             turn/end   T+ 343065ms (07:09:30.063) aborted/parent
+  执行 · 144 的平方根              turn/start T+ 109905ms (07:05:36.903)
+                             turn/end   T+ 121363ms (07:05:48.361) completed
+  检查 · 144 的平方根              turn/start T+ 121529ms (07:05:48.527)
+                             turn/end   T+ 131601ms (07:05:58.599) completed
+  复核 · 144 的平方根              turn/start T+ 131770ms (07:05:58.768)
+                             turn/end   T+ 164259ms (07:06:31.257) completed
+  执行 · 1000-378              turn/start T+ 164427ms (07:06:31.425)
+                             turn/end   T+ 179230ms (07:06:46.228) completed
+  检查 · 1000-378              turn/start T+ 179373ms (07:06:46.371)
+                             turn/end   T+ 196591ms (07:07:03.589) completed
+  复核 · 1000-378              turn/start T+ 196773ms (07:07:03.771)
+                             turn/end   T+ 209218ms (07:07:16.216) completed
+  执行 · 13×7                  turn/start T+ 209396ms (07:07:16.394)
+                             turn/end   T+ 233115ms (07:07:40.113) completed
+  检查 · 13×7                  turn/start T+ 233260ms (07:07:40.258)
+                             turn/end   T+ 245308ms (07:07:52.306) completed
+  复核 · 13×7                  turn/start T+ 245465ms (07:07:52.463)
+                             turn/end   T+ 269535ms (07:08:16.533) completed
+  执行 · 2 的 10 次方             turn/start T+ 269685ms (07:08:16.683)
+                             turn/end   T+ 283719ms (07:08:30.717) completed
+  检查 · 2 的 10 次方             turn/start T+ 283859ms (07:08:30.857)
+                             turn/end   T+ 297249ms (07:08:44.247) completed
+  复核 · 2 的 10 次方             turn/start T+ 297575ms (07:08:44.573)
+                             turn/end   T+ 327801ms (07:09:14.799) completed
+  汇总助手                       turn/start T+ 327826ms (07:09:14.824)
+                             turn/end   T+ 342828ms (07:09:29.826) completed
+
+=== attribution: which turn made which hang request, and the settlement bracket ===
+  #1 opened 07:04:06.929 bytes=43694
+      owner turn : 执行 · 17+25 started 07:04:06.846
+      next turn  : 07:04:51.858  => 44929 ms after the request; budget 45000 ms => AT the budget
+  #2 opened 07:04:52.210 bytes=43963
+      owner turn : 执行（尝试 2） · 17+25 started 07:04:51.858
+      next turn  : 07:05:36.903  => 44693 ms after the request; budget 45000 ms => AT the budget
+  #3 opened 07:09:07.468 bytes=43694
+      owner turn : 执行 · 17+25 started 07:04:06.846 — via llm/retry-started at 07:09:07.454 (14 ms before this socket)
+      next turn  : 07:09:14.824  => NO plugin budget is waiting on this socket — it is the transport layer re-sending a call the script already settled at 07:04:06.846 + 45000 ms; it stayed open until the run tore the child down (owner turn/end 07:09:30.062, aborted/parent)
+
+=== byte-identical request bodies (transport re-sends) ===
+  #3 (07:09:07.468) has the same body as #1 (07:04:06.929): 43694 bytes, 300539 ms apart

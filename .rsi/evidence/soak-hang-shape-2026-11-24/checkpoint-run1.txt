@@ -1,0 +1,58 @@
+checkpoint file: checkpoint-d0132702-d465-4717-adf1-7046d420b710-a31429e3.json
+version: "grok-workflow.checkpoint/v1"
+run: {"name":"任务团队 · 5 个任务","objective":"把下面五道小题分别当成五个相互独立的任务来完成，每题给出结论并附可复核的验算。","runId":"d0132702-d465-4717-adf1-7046d420b710","sessionId":"session-6463e754-fe58-48bb-8788-4a5b0cb67403","status":"partial"}
+plan.source: caller  plan.taskCount: 5
+plan.tasks: [{"id":"t1","title":"17+25","writesPaths":null},{"id":"t2","title":"144 的平方根","writesPaths":null},{"id":"t3","title":"1000-378","writesPaths":null},{"id":"t4","title":"13×7","writesPaths":null},{"id":"t5","title":"2 的 10 次方","writesPaths":null}]
+limits: {"maxConcurrency":1,"maxRetries":1,"maxTasks":10,"timeoutMs":1800000}
+watchdog: {"cancelled":false,"deadlineHit":false,"deadlineMs":1800000}
+stages: [{"endedAtMs":1795503846839,"phase":"plan","startedAtMs":1795503846739,"status":"completed"},{"endedAtMs":1795504154820,"phase":"execute","startedAtMs":1795503846839,"status":"completed"},{"endedAtMs":1795504170286,"phase":"synthesize","startedAtMs":1795504154820,"status":"completed"}]
+tasks: [
+ {
+  "attempts": 2,
+  "error": "worker failed on every route: [timeout] worker call exceeded the 1 minute child budget and was settled as a timeout; retry with a smaller step",
+  "id": "t1",
+  "status": "failed",
+  "title": "17+25"
+ },
+ {
+  "attempts": 1,
+  "id": "t2",
+  "status": "verified",
+  "title": "144 的平方根"
+ },
+ {
+  "attempts": 1,
+  "id": "t3",
+  "status": "verified",
+  "title": "1000-378"
+ },
+ {
+  "attempts": 1,
+  "id": "t4",
+  "status": "verified",
+  "title": "13×7"
+ },
+ {
+  "attempts": 1,
+  "id": "t5",
+  "status": "verified",
+  "title": "2 的 10 次方"
+ }
+]
+agents (15):
+  worker | attempt=1 | failed | soak-hang/soak/hang-always | timeout
+  worker | attempt=2 | failed | soak-hang/soak/hang-always | timeout
+  worker | attempt=1 | ok | soak-pool/soak/work-live | 
+  verifier | attempt=1 | ok | soak-pool/soak/judge-live | 
+  supervisor | attempt=1 | ok | soak-pool/soak/sup-live | 
+  worker | attempt=1 | ok | soak-pool/soak/work-live | 
+  verifier | attempt=1 | ok | soak-pool/soak/judge-live | 
+  supervisor | attempt=1 | ok | soak-pool/soak/sup-live | 
+  worker | attempt=1 | ok | soak-pool/soak/work-live | 
+  verifier | attempt=1 | ok | soak-pool/soak/judge-live | 
+  supervisor | attempt=1 | ok | soak-pool/soak/sup-live | 
+  worker | attempt=1 | ok | soak-pool/soak/work-live | 
+  verifier | attempt=1 | ok | soak-pool/soak/judge-live | 
+  supervisor | attempt=1 | ok | soak-pool/soak/sup-live | 
+  synthesizer | attempt=0 | ok | soak-pool/soak/synth-live | 
+integrity: {"algorithm":"sha256","bytes":6745,"checksum":"58903c9868689894fba8f75361e7a17e684d25cc1b6539e6190238fcb93e7901"}

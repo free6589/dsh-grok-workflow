@@ -1,0 +1,19 @@
+guest realm (vm.createContext({}) + the six injected names):
+  setTimeout = "undefined"
+  clearTimeout = "undefined"
+  setInterval = "undefined"
+  SharedArrayBuffer = "function"
+  Atomics = "object"
+  waitAsync = "function"
+  Date_now = "function"
+  hasHostTimer = false
+  hasSleepCell = true
+
+hasHostTimer    = false
+sleepCell != null = true
+canRaceCalls    = true
+=> afterDelay() uses the Atomics.waitAsync branch; watchNoTimer() (the no-timer fallback) is UNREACHABLE in a real run.
+
+Atomics.waitAsync(200ms): result="timed-out" wall=200ms cpu_user=0.49ms cpu_sys=0.14ms
+=> a real 200ms wait at ~0 CPU: not a spin.
+note: the wait promise does NOT ref the event loop (a keepalive timer was needed here); a real run always has ref'd child work pending.

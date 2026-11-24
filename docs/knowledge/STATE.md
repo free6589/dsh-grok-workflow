@@ -1,3 +1,36 @@
+Last updated: 2026-11-24 16:05 +08:00（**已发版 `0.13.30`：同一份报告的两个机器视图说上同一句话，门禁不再因为机器忙就红，`CONFIRMED`（本地门禁 exit 0 + 远端 CI/Release 双绿 + GitHub Release 已发布）** —
+基线 `main` 尖端 `4f616d1`（`merge: ledger and report diagnostics parity`）＝`origin/main`，合流分支已经并进去了；发版提交 `10af79b`
+= `chore(release): prepare v0.13.30`，8 files / +32 −20（`CHANGELOG.md`、`README.md`、`README.zh-CN.md`、`docs/LOCAL-TESTING.md`、
+`lib/client.js`、`package-lock.json`、`package.json`、`src/client/index.js`）。本版三件：① **两条机器视图对齐**——台账现在渲染报告
+自己的诊断块（死路由、每次子调用的预算、两个分开的溢出标题、错误行保留类别、收尾两行在截断之前预留），于是同一份报告的两个视图
+不再各说一句话；② **门禁不再因为机器忙就红**——两条负载敏感用例改成等后台轮「落地」（`landedWithin`，探针自己持 ref 住的
+15 000 ms timer）而不是等它「开跑」，test-only，`src/`、`lib/` 一行未动，动的是门禁不是产品（修法在 `a210b08`，已随本版出去）；
+③ **挂死形状取证**——只出证据不出代码，`.rsi/evidence/soak-hang-shape-2026-11-24/` 记的是五个任务的真机一轮：挂死路整轮被调用
+**3 次**（任务 1 自己两次尝试；任务 2–5 一次没打它，全落在活路），每次挂死调用都由这一轮自己的 45 s 子调用预算结算（端点侧
+44.65–44.93 s，差额是子代理自己的启动开销），第 3 次是传输层 300 s 后把第一次尝试遗留的孤儿请求原样重发（请求体字节数相同），
+两轮独立复现形状一致。版本被钉在**四处**，四处都动了：`package.json` + `package-lock.json`（2 处）、`docs/LOCAL-TESTING.md`
+的打包产物名（3 处）、`src/client/index.js` 的 `PLUGIN_VERSION`/`UPDATE_LATEST`（`lib/client.js` 随 `npm run build` 重建）；
+两个 README 也一起走（声明版本、两条安装钉、散文里的 `#vX.Y.Z`、发布 tag 列表收到 `v0.13.30`）。本地门禁
+`TMPDIR=$PWD/.tmp npm run ci` 在发版树上 **exit 0**：typecheck 干净、oxlint **0 errors / 36 warnings**（全既有）、
+`verify:lib` byte-identical **237 files**、vitest **100 files / 1846 tests PASS**（150.39 s）；本轮 `npm run ci` 只跑**一次**
+（0.13.29 那轮跑了 12 次、其中 6 次红在挂死探针的 30 s 超时上——那些探针的修法 `a210b08` 就在本版里）。一句要照实说的口径：
+本地 `verify:lib` 那行报的是 HEAD 那棵树（`lib/ at 4f616d1 …`），因为跑门禁时工作区还带着未提交的版本改动；真正管发版的那条是
+Release workflow 在**打了 tag 的提交**上跑的 `git diff --exit-code -- lib/`，它在远端过了。打的是**附注** tag `v0.13.30`，message
+`v0.13.30 — one report's two machine views agree, on a gate that stopped failing on a busy machine`，已 push；`main` push
+`4f616d1..10af79b`。远端两条 run 都 **success**：`CI` **45349629702**（main push）、`Release` **45349634592**（tag push），
+已发布 <https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.30>，资产 `dsh-grok-workflow-0.13.30.tgz`
+（917 321 bytes）。取证目录 `.rsi/evidence/soak-hang-shape-2026-11-24/` 在准备发版时还是未跟踪的（「记忆未归档」），
+**已随本次归档一起提交**，`VALIDATION.md` 首条指向它。收尾：两个已合并且干净的 worktree 连分支删掉
+（`feat/dead-routes` 在 `0113211`、`release/0.13.27` 在 `2141071`）；另**六个**没敢动（带未提交的活或未合的分支）：
+`.agents/worktrees/fix-null-collapse-t1`（已合，1 条脏）、`.agents/worktrees/fix-progress-task-number-first`（已合，9）、
+`.agents/worktrees/rsi-soak-65`（已合，1）、`.agents/worktrees/rsi-redrive-13`（分支**未合**，干净）、
+`.agents/worktrees/team-dispatch-v1`（分支**未合**，15 脏）、`.tmp/wt-steer`（已合，17 脏）；`rsi/redrive-13`、
+`team-dispatch-v1`、`feat/audit-layer` 仍是未合分支，十二条已合的 `rsi/sec2-*`/`rsi/sec3-*` 还在、且已经过了 2026-11-24 的删除日。
+`.rsi/STOP`（tracked，`Operator stop — RSI self-iteration halted 2026-11-21`）此前被某个会话在工作树里删掉、没有提交解释，
+这次 `git checkout -- .rsi/STOP` 复原，操作员记录的停止仍然有效。**本侧没有升 live profile（`BLOCKED`）**：包工头的沙箱写不到
+工作区以外，把 live profile 钉到 `v0.13.30` 留给操作员，
+`dsh plugin --profile web add github:free6589/dsh-grok-workflow#v0.13.30`。）
+
 Last updated: 2026-11-24 14:20 +08:00（**两条负载敏感 spec 改成等后台轮「落地」再断言，`test/` only，`CONFIRMED`（修者与验收方各自实测），未发版、未 push** —
 分支 `fix/flaky-triage-phase1`，两个提交：`a210b08`（test-only 修法）+ 随后一个 `docs(memory)`。抖的是「开跑 ≠ 落地」这条缝：
 `phase1-dialogue.spec.ts` 等 `startCalls.length === 2`、`triage.spec.ts` 的 `route()` 用 vitest 默认 1 000 ms 的 `vi.waitFor` 等 `agent.followups`，
