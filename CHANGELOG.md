@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.32] - 2026-11-24
+
 ### Added / 新增
 
 - **The settings page can now check and install the newest release itself / 设置页现在能自己检查并安装最新版本** —
