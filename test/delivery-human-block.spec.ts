@@ -192,7 +192,7 @@ describe('B10: the guard is anchored, not removed', () => {
     const human = humanConclusion(report, { lang: 'zh' })
     // A label is a label where a label can be: at the start of a line. Every line
     // the run composed for its reader is checked, and none of them is a ledger row.
-    const labels = ['Grok workflow:', 'Objective:', 'Plan:', 'Failures:', 'Plan failure:', 'Confirmed evidence:', 'Incomplete:', 'Final answer:', 'Model routes:', 'Deadline:', 'Route switches:', 'Route overflows', 'Errors:', 'Uncertainties:', 'Synthesis:']
+    const labels = ['Grok workflow:', 'Objective:', 'Plan:', 'Failures:', 'Plan failure:', 'Confirmed evidence:', 'Incomplete:', 'Final answer:', 'Model routes:', 'Deadline:', 'Child budget:', 'Route switches:', 'Route overflows', 'Errors:', 'Uncertainties:', 'Synthesis:']
     for (const line of human.split('\n')) {
       for (const label of labels) expect(line.startsWith(label), `${label} | ${line}`).toBe(false)
     }
