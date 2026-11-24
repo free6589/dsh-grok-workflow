@@ -15,6 +15,11 @@
  * gate claiming: a task whose predecessors are not all `completed` cannot
  * start. The board persists every row (id/owner/status/version/dependencies)
  * to `store.jsonl` so a reopen of the same directory recovers all of it.
+ *
+ * Order: the store file is written sorted by id, so the file order is not the
+ * arrival order. Every row therefore carries its own `seq` (see `TaskRecord`),
+ * which is what a queue reads: pending rows come out in the order they were
+ * created, before and after a restart alike.
  */
 /** Lifecycle states (dsh-agent-team: pending → in_progress → completed). */
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'blocked';
@@ -77,6 +82,18 @@ export interface TaskRecord {
     blocked_by: string[];
     /** CAS token: starts at 1, +1 per mutation. */
     version: number;
+    /**
+     * Arrival order on this board: 1 for the first row created, +1 per create,
+     * never reused. Assigned under the claim lock from the highest `seq` on
+     * disk, so arrival order survives a restart — the row order in the store
+     * file does not (rows are persisted sorted by id).
+     *
+     * Absent on rows written before the field existed. `load()` stamps those
+     * from the file position (which was the only order such a store had), and
+     * the next persist writes the stamps back, so a legacy store upgrades
+     * without losing or reordering a queue.
+     */
+    seq?: number | undefined;
     /** ISO-8601 creation time. */
     createdAt: string;
     /** ISO-8601 time of the latest mutation. */

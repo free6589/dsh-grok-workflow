@@ -106,6 +106,15 @@ export declare class TaskBoard {
     /** List every row, sorted by id. Each entry is a copy. */
     list(): TaskRecord[];
     /**
+     * List every row in arrival order (`seq`, then id), each entry a copy.
+     *
+     * WHY a second order: `list()` is sorted by id for a deterministic read,
+     * but a queue is ordered by arrival. `seq` is persisted on the row, so this
+     * order is the same before and after a restart — which the file order is
+     * not, because rows are written sorted by id.
+     */
+    arrival(): TaskRecord[];
+    /**
      * Create one `pending`, unowned row. The id must be globally unique on
      * this board — across handles and restarts, because the duplicate check
      * runs against the store under the lock; a duplicate fails with
@@ -153,6 +162,18 @@ export declare class TaskBoard {
     /** Remove a lock left by a crashed writer; false while it is still young. */
     private clearAbandonedLock;
     private load;
+    /**
+     * Stamp `seq` onto rows that were written before the arrival marker existed.
+     *
+     * WHY the file position: a store written by an older build has no arrival
+     * numbers, and its file order (sorted by id) is the only order it ever had —
+     * so keeping that order and letting new rows follow it is the only way to
+     * upgrade without silently reordering a queue. The stamps are in memory
+     * until the next persist writes them, which is the upgrade itself.
+     */
+    private stampLegacyArrival;
+    /** Next arrival number: one past the highest on the board (1 for a new board). */
+    private nextSeq;
     /**
      * Serialize the whole board (one checksummed JSON object per line) and
      * swap it over `store.jsonl` atomically: hidden `*.tmp` write, fsync,
