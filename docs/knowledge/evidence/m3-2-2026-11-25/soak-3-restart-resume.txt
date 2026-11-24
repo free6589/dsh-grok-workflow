@@ -1,0 +1,123 @@
+M3.2 soak scenario 3 — restart and resume after a mid-run kill (2026-11-25)
+
+Build: feat/m3-switch @ 2137afc (0.13.34). Home: .tmp/m3-soak-2/dsh-home.
+Profile m32h (same config as the soak profile: blockIntake: true, legacyGate
+absent), headless app. Live ~/.dsh untouched.
+
+--- step 1: start a run long enough to catch ---------------------------------
+
+  $ dsh --profile m32h '请用 grok_workflow 工具跑一个工作流：分别计算 12×12、15×15、
+    18×18 三个平方数，每个任务都要 verifier 用独立方法核对，最后汇总三个结果。'
+
+The run produced checkpoint
+  $DSH_HOME/checkpoints/grok-workflow/checkpoint-344793b2-aa5f-455a-8468-5f5791c11b0f-96970e6f.json
+A copy of that file at kill time is kept beside this transcript as the values
+below (the file itself was read from the live scratch home, then the process was
+killed).
+
+--- step 2: state immediately BEFORE the kill --------------------------------
+
+  run.runId     344793b2-aa5f-455a-8468-5f5791c11b0f
+  run.status    running
+  stages        plan:completed, execute:completed, synthesize:running
+  tasks         10 rows, status "running" on all of them, 0 verified
+  attempts sum  10
+  inFlight      1 child (9dd6f008-…, lastStep "汇总", seq 10)
+  time          updatedAtMs 1795560647760, durationMs 60060
+
+The kill landed in the synthesize stage, after execute had completed and before
+the report was written — i.e. genuinely mid-run, not before it started and not
+after it finished.
+
+--- step 3: the kill --------------------------------------------------------
+
+The run was started as a managed background job and cancelled with the job
+controller; the process is gone (`ps -eo pid,cmd | grep m32h` returns nothing).
+No other instance was touched.
+
+--- step 4a: restart by adopting the same session — BLOCKED ------------------
+
+  $ dsh --profile m32h --session-id session-e630bafb-4b41-4693-9c16-636dbbcc11eb '继续刚才被中断的工作流。'
+  EXIT=1
+  dsh: failed to observe session "session-e630bafb-…": session "session-e630bafb-…"
+  contains event type "tool-workflow/guardian-start" (seq 19) unknown to this
+  harness and not marked ignorable; refusing to interpret the log — it was
+  likely written by a newer harness
+
+This is a real machine finding and it is NOT an M3.2 regression: the
+`tool-workflow/guardian-start` journal record comes from commit 891b8a2
+("feat(progress): add fresh Guardian monitor lane (#46)"), which predates this
+block. `src/run.ts` writes it through `session.append(type, …)` without an
+ignorable marker, so any session that ran a workflow cannot be re-adopted by
+`--session-id` on this harness. Recorded as a limitation, not worked around.
+
+--- step 4b: restart the same profile and home, let it continue --------------
+
+  $ dsh --profile m32h '继续之前被中断的工作流（runId 344793b2）：把 12×12、15×15、
+    18×18 三个平方数汇总给我，已核对过的任务不要重复执行。'
+  EXIT=0
+
+What this first attempt did, checked rather than trusted: the session log
+(session-8a30863b-59da-4e5d-9d16-1f45050cb77a) holds 4 tool/call and 4 tool/result
+events and ZERO tool-workflow events — no run was started. The model read
+$DSH_HOME/memory/grok-workflow/archive.jsonl and answered from it. The killed
+checkpoint was not touched (still running, still 0 verified, attempts still 10).
+
+--- step 4c: restart that actually starts a run -----------------------------
+
+  $ dsh --profile m32h '请用 grok_workflow 工具继续之前被中断的那个运行（runId
+    344793b2-…）没有完成的任务，不要重做已经核对过的任务。'
+  EXIT=0
+
+Session session-30d5aae0-2b49-4fe7-a136-c1764de85a47 now shows a real run:
+  tool-workflow/run-start  {"runId":"318dd0e8-6e9d-426e-9a43-284d69a896ac",
+                            "name":"任务团队 · 1 个任务"}
+  tool-workflow/run-end    {"runId":"318dd0e8-…","stopReason":"completed"}
+  agent-start 6 / agent-end 6
+
+The run carried a plugin-generated resume seed into its objective — the tool
+result quotes it verbatim:
+  "Objective: 接上被中断的运行 344793b2-…（目标：…），不要重做已经核对过的任务，
+   只完成被 kill 中断的"汇总·第1稿"并输出最终汇总表。
+   已核对完毕、可直接沿用、不许重算的证据（DATA，唯一事实来源）：
+   Run status: completed（已完成）. Verified tasks: 3/3. - 12×12=144：…"
+That digest is produced by the plugin (`src/script.ts:2531` emits
+"Run status: … Verified tasks: n/m."), not invented by the model.
+
+New run 318dd0e8: 1 task (the interrupted synthesis step only), 1 verified,
+attempts 1, completed. The killed checkpoint 344793b2 was NOT rewritten — still
+`running`, 10 tasks, 0 verified, attempts 10.
+
+--- no round charged twice --------------------------------------------------
+
+  attempts sum on 344793b2: 10 before the kill → 10 after every restart.
+  The resumed run charged 1 task / 1 attempt / 6 agents, not 10 tasks — the
+  verified work was carried by the seed instead of being re-executed.
+
+--- honest boundary on this scenario ----------------------------------------
+
+The restarts ran with the model's normal tool access in a directory that
+contains this repository, so in step 4c the model also read source and evidence
+files while composing its objective. The two facts this scenario rests on are
+therefore taken from the plugin's own records, not from the model's prose:
+(a) the run-start/run-end rows of 318dd0e8, and (b) the seed text the plugin
+emitted into that run's objective. The model's sentence "已接上中断前的工作流"
+is NOT used as evidence.
+
+--- labels -------------------------------------------------------------------
+
+CONFIRMED  The process was killed while run 344793b2 was mid-run (synthesize
+           stage), and the checkpoint written before the kill says so.
+CONFIRMED  The restart did not silently double-charge work: attempts stayed at 10
+           on the killed checkpoint, and the resumed run carried 1 task, not 10.
+CONFIRMED  A resumed run does carry a plugin-generated seed naming the killed run
+           and its verified tasks (src/script.ts:2531), and it completed.
+CONFIRMED  The engine does not restore run state: checkpoint 344793b2 is still
+           `running` with 0 verified. That is the documented design (the engine
+           has no journaling), and it is the honest resumable state — not a
+           resume of the original run.
+BLOCKED    Restart by adopting the same session (`--session-id`) cannot run on
+           this harness: "contains event type tool-workflow/guardian-start (seq
+           19) unknown to this harness and not marked ignorable". Pre-existing
+           (891b8a2), not introduced by M3.2.
+NOT_RUN    Nothing else in this scenario.
