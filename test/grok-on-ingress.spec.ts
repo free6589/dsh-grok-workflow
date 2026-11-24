@@ -49,17 +49,40 @@ class FakeRun {
   }
 }
 
-/** Engine whose runs stay in flight until the test settles them (`hang`). */
+/** Conceptual split the `/grok on` shape asks the user to approve first. */
+const CAPTAIN_PREVIEW = '任务 1 · 把解析器重构成小块\n任务 2 · 补上回归测试'
+
+/** Run name of one front-desk call (`src/run.ts` TRIAGE_RUN_LABEL). */
+const FRONT_DESK_RUN = 'Front desk'
+
+/** Engine whose team runs stay in flight until the test settles them (`hang`). */
 class FakeEngine {
   readonly startCalls: WorkflowStartRequest[] = []
   readonly runs: FakeRun[] = []
   autoRun = false
+
+  /** Whole workflow runs, i.e. the plan→execute→verify round a case waits for. */
+  get teamRuns(): WorkflowStartRequest[] {
+    return this.startCalls.filter(request => request.meta.name !== FRONT_DESK_RUN)
+  }
 
   async start(request: WorkflowStartRequest): Promise<FakeRun> {
     this.startCalls.push(request)
     const run = new FakeRun(request)
     this.runs.push(run)
     request.signal?.addEventListener('abort', () => run.cancel(), { once: true })
+    // A front-desk call is one child, not the run a case is holding open: it always
+    // settles. Since the escape hatch, `/grok on` uses it for the split question.
+    if (request.meta.name === FRONT_DESK_RUN) {
+      const single = await runWorkflowScript(request.script, request.args as Record<string, unknown>, async (_prompt, options) => {
+        if (options.label === 'captain-preview') return CAPTAIN_PREVIEW
+        if (options.label === 'quick-worker') return 'quick answer'
+        if (options.label === 'first-answer') return '听懂了，正在按你说的查。'
+        throw new Error(`unexpected label ${options.label}`)
+      })
+      run.complete(single.report)
+      return run
+    }
     if (this.autoRun) {
       const plan = [(request.args as { tasks?: unknown }).tasks].flat().filter(Boolean)
       const tasks = plan.length > 0 ? plan as ReturnType<typeof task>[] : [task('a')]
@@ -229,6 +252,27 @@ function transcript(session: Session): string {
 /* -------------------------------------------------------------------- tests -- */
 
 describe('/grok on keeps message ingress open', () => {
+  /** A real task: the shape states the split before anything runs. */
+  const TASK = '把解析器重构成小块，然后补上回归测试并跑一遍'
+
+  /** Send one message and wait until the loop dispatched it (the handler may run on). */
+  const send = async (loop: MiniLoop, text: string): Promise<void> => {
+    const before = loop.dispatched.length
+    loop.send(userMessage(text))
+    await vi.waitFor(() => {
+      if (loop.dispatched.length <= before) throw new Error(`"${text}" was not dispatched`)
+    })
+  }
+
+  /** Answer the split question the shape asks, so the run it named starts. */
+  const approve = async (loop: MiniLoop, ctx: FakeContext, task: string): Promise<void> => {
+    await send(loop, task)
+    await vi.waitFor(() => {
+      if (!transcript(loop.session).includes('队长先报拆法')) throw new Error('the split question did not go out')
+    })
+    await send(loop, '确认')
+  }
+
   it('dispatches the next message while the team run is still in flight', async () => {
     const ctx = new FakeContext()
     apply(ctx as never, { mode: 'triage', grokDefault: 'off' })
@@ -237,17 +281,18 @@ describe('/grok on keeps message ingress open', () => {
     grokOn(session)
     const loop = new MiniLoop(ctx.preStep()).attach(agent, session)
 
-    loop.send(userMessage('refactor the parser'))
+    // `/grok on` asks before it runs, so the run starts on the confirmation.
+    await approve(loop, ctx, TASK)
     // The run is in flight and stays there: the engine never settles on its own.
     await vi.waitFor(() => {
-      if (ctx.engine.startCalls.length === 0) throw new Error('the team run did not start')
+      if (ctx.engine.teamRuns.length === 0) throw new Error('the team run did not start')
     })
-    expect(ctx.engine.runs[0]!.cancel).toBeDefined()
+    expect(ctx.engine.runs.at(-1)!.cancel).toBeDefined()
 
-    loop.send(userMessage('also check the lexer'))
+    await send(loop, 'also check the lexer')
     await delay(60)
 
-    // Before the fix the first step is still open, so the second message is not
+    // Before the ingress fix the first step is still open, so the second message is not
     // even dispatched: the user sees nothing and the composer looks broken.
     expect(loop.dispatched).toContain('also check the lexer')
     expect(transcript(session)).toContain('also check the lexer')
@@ -261,25 +306,28 @@ describe('/grok on keeps message ingress open', () => {
     grokOn(session)
     const loop = new MiniLoop(ctx.preStep()).attach(agent, session)
 
-    loop.send(userMessage('audit the release pipeline'))
+    const task = '审计发布流水线并补一份检查清单，然后跑一遍'
+    await approve(loop, ctx, task)
     await vi.waitFor(() => {
-      if (ctx.engine.startCalls.length === 0) throw new Error('the team run did not start')
+      if (ctx.engine.teamRuns.length === 0) throw new Error('the team run did not start')
     })
-    // `full` mode keeps its promise: the run happens for every message, with the
-    // configured concurrency bound (default 10, hard maximum 100).
-    expect(ctx.engine.startCalls[0]!.args).toMatchObject({
-      objective: expect.stringContaining('audit the release pipeline'),
+    // `full` mode keeps its promise: the run happens, with the configured concurrency
+    // bound (default 10, hard maximum 100), and it carries what the user asked for —
+    // together with the split they approved.
+    expect(ctx.engine.teamRuns[0]!.args).toMatchObject({
+      objective: expect.stringContaining('审计发布流水线'),
       maxConcurrency: DEFAULT_MAX_CONCURRENCY,
     })
+    expect(String((ctx.engine.teamRuns[0]!.args as { objective?: string }).objective)).toContain('USER APPROVED THIS SPLIT')
     expect(HARD_LIMITS.maxConcurrency).toBe(100)
 
-    ctx.engine.runs[0]!.complete(report())
+    ctx.engine.runs.at(-1)!.complete(report())
     await vi.waitFor(() => {
       if (agent.followups.length === 0) throw new Error('the report was not delivered')
     })
     const delivered = agent.followups.at(-1)!
     const text = (delivered.content as { type: string; text?: string }[]).map(part => part.text ?? '').join('')
-    expect(text).toContain('audit the release pipeline')
+    expect(text).toContain('审计发布流水线')
   })
 
   it('leaves /grok off untouched: the message passes straight through, no run', async () => {
@@ -307,23 +355,21 @@ describe('/grok on keeps message ingress open', () => {
     grokOn(session)
     const loop = new MiniLoop(ctx.preStep()).attach(agent, session)
 
-    // One message per batch — the loop dispatches a batch at a time — so the per-agent
-    // queue fills up instead of the messages arriving together.
+    // Since the escape hatch, one queued run costs a task plus its confirmation. One
+    // message per batch (the loop dispatches a batch at a time), so the pairs fill the
+    // per-agent queue one slot at a time instead of arriving together.
     for (let index = 0; index < FIXED_MAX_QUEUED_MESSAGES + 1; index += 1) {
-      loop.send(userMessage(`queued message ${index}`))
-      await vi.waitFor(() => {
-        if (loop.dispatched.length < index + 1) throw new Error(`message ${index} was not dispatched`)
-      })
+      await approve(loop, ctx, `先读 config-${index}.ts，然后补上回归测试并跑一遍`)
     }
 
-    // The queue is full, so the last message takes the blocking path: its step waits on
-    // its own run, and no receipt claims a background run that was never queued.
-    expect(loop.dispatched).toHaveLength(FIXED_MAX_QUEUED_MESSAGES + 1)
+    // The queue is full, so the last confirmation takes the blocking path: its step
+    // waits on its own run, and no receipt claims a background run that was never queued.
+    expect(loop.dispatched).toHaveLength((FIXED_MAX_QUEUED_MESSAGES + 1) * 2)
     const receipts = transcript(session).split('The report arrives as its own message').length - 1
     expect(receipts).toBe(FIXED_MAX_QUEUED_MESSAGES)
     // One queued run is executing (the queue is serialized per agent) plus the blocking one.
     await vi.waitFor(() => {
-      if (ctx.engine.startCalls.length < 2) throw new Error(`only ${ctx.engine.startCalls.length} runs started`)
+      if (ctx.engine.teamRuns.length < 2) throw new Error(`only ${ctx.engine.teamRuns.length} runs started`)
     })
 
     // Settle the blocking run so its step closes and the test leaves nothing pending.

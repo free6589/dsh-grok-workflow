@@ -949,6 +949,118 @@ export function installGate(deps: GateDeps): boolean {
   }
 
   /**
+   * The front desk the `full` shape does not have (escape hatch).
+   *
+   * `full` means "every message gets the whole workflow", and the gate honoured that
+   * literally: a greeting paid for a planner, a worker and a verifier, and the user
+   * read a receipt instead of an answer. This helper makes one decision the shape is
+   * allowed to make — should this message run at all? — and returns `undefined` for
+   * "yes, run it", so the caller's existing path stays the one that runs.
+   *
+   * - `chat` — the template answers; no run.
+   * - `fast` — one `quick-worker` call answers; no workflow run, and a failed call
+   *   is stated as a notice instead of being upgraded into the team.
+   * - `team` — only where a later turn exists to read the confirmation: the captain
+   *   states its split and nothing runs until the user agrees.
+   *
+   * Only the session record (`/grok on`) takes this path. A deployment-level
+   * `mode: 'full'` is the documented contract "every message runs", with no `/grok on`
+   * to switch it off and the gate tests pinned to it: it stays byte for byte, and so
+   * does an agent with no later turn, where the split question would swallow the task
+   * nobody is left to answer.
+   *
+   * The caller that already consumed the captain's pending confirmation must not ask
+   * again: this helper never reads that map, and `captainConsumed` short-circuits it.
+   *
+   * @param agent - owning agent (session record, background delivery, engine route).
+   * @param request - the user original.
+   * @param history - bounded history snapshot; `undefined` reads it here.
+   * @param signal - the step's cancellation signal.
+   * @param captainConsumed - the caller already took the captain's pending answer.
+   * @returns the whole answer, or `undefined` when the existing path owns the message.
+   */
+  const fullFrontDeskEscape = async (
+    agent: Agent,
+    request: string,
+    history: string | undefined,
+    signal?: AbortSignal,
+    captainConsumed = false,
+  ): Promise<Answer | undefined> => {
+    try {
+      if (captainConsumed) return undefined
+      const limits = safe()
+      // The session record is the whole condition: `/grok on` writes
+      // `workflowMode: 'full'`, and that record only exists where the user asked for
+      // the shape by hand. `limits.mode` — the deployment default — deliberately does
+      // not reach here: "every message runs" is that shape's contract, and it is not
+      // the shape this escape is for.
+      if (readModeRecord(agent.session)?.workflowMode !== 'full') return undefined
+      const snapshot = history
+        ?? collectHistory(sessionOf(agent), { turns: FIXED_HISTORY_TURNS, chars: FIXED_HISTORY_CHARS })
+      const tier = classifyTriage({
+        text: request,
+        mode: 'full',
+        escape: true,
+        ask: false,
+        pending: false,
+        historyNonEmpty: snapshot.trim() !== '',
+        followupAsFast: FIXED_TRIAGE_FOLLOWUP_AS_FAST,
+      })
+      if (tier.tier === 'chat') {
+        // No tier line: `full` never showed one, and the escape does not add it.
+        return {
+          kind: 'direct',
+          text: [chatReply(tier, request), '', tierNote(tier)].filter(line => line !== '').join('\n'),
+          outcome: 'full-escape-chat',
+        }
+      }
+      if (tier.tier === 'fast') {
+        const call = await runSingleCall({
+          ctx, config: limits, state, logger, agent,
+          prompt: singleCallPrompt(tier, request, false, firstAnswerContext(sessionOf(agent), snapshot)),
+          label: 'quick-worker',
+          ...signal === undefined ? {} : { signals: [signal] },
+        })
+        if (!call.ok) {
+          // State the failure; the tier's promise is one call, so a failure may not
+          // become the ten-minute team run the user did not ask for.
+          return {
+            kind: 'notice',
+            reason: `this looked like a single question, so one quick worker was asked: the quick tier could not answer: ${call.reason}`,
+            outcome: 'full-escape-failed',
+          }
+        }
+        return {
+          kind: 'direct',
+          text: [call.text, '', tierNote(tier)].filter(line => line !== '').join('\n'),
+          outcome: 'full-escape-fast',
+        }
+      }
+      // `team`: the run is what this message really wants, but on `/grok on` the split
+      // is stated first — the promise the shape made is the workflow, not a plan the
+      // user never saw. Without a later turn there is nobody to read the confirmation,
+      // so that agent keeps its run.
+      if (!canBackgroundDeliver(agent)) return undefined
+      const preview = await runSingleCall({
+        ctx, config: limits, state, logger, agent,
+        prompt: captainPreviewPrompt(request),
+        label: 'captain-preview',
+        ...signal === undefined ? {} : { signals: [signal] },
+      })
+      const previewText = preview.ok ? sanitizeFirstAnswer(preview.text) : ''
+      askCaptain(agentIdOf(agent), request, tier.lang, previewText)
+      return {
+        kind: 'direct',
+        text: captainAskText(tier.lang, previewText === '' ? captainPreviewFallback(tier.lang) : previewText),
+        outcome: preview.ok ? 'full-escape-ask' : 'full-escape-ask-fallback',
+      }
+    } catch (error) {
+      logger.warn(`the full-shape front desk declined, keeping the full path: ${redactError(error)}`)
+      return undefined
+    }
+  }
+
+  /**
    * Run the workflow for one admitted batch and produce its answer.
    *
    * Composes the objective here, not at admission: a queued follow-up must see
@@ -971,6 +1083,18 @@ export function installGate(deps: GateDeps): boolean {
     // answered from a template (t59 finding).
     const sessionShape = readModeRecord(agent.session)?.workflowMode
     const effectiveMode = sessionShape ?? limits.mode
+    // The front desk the `/grok on` shape did not have (escape hatch): a greeting
+    // answers from a template and a single fact costs one quick worker, instead of
+    // every message paying for plan, execution and verification. The condition is the
+    // session record alone — a deployment-level `mode: 'full'` keeps its own contract
+    // ("the run happens inside the turn") byte for byte. `captainPending` means the
+    // caller already consumed a confirmation for this message: that one is an answer
+    // to a question, not a message to classify, and the `full` branch below dispatches
+    // it; the escape must not ask a second question about it.
+    if (sessionShape === 'full' && captainPending === undefined) {
+      const escaped = await fullFrontDeskEscape(agent, request, history, signal)
+      if (escaped !== undefined) return escaped
+    }
     // Front desk (t52, plan C): the tier is decided per message, before any run
     // starts, and the decision is part of the answer text. `full` keeps the
     // pre-t52 behaviour byte for byte: no tier line, no greeting, no cheap call.
@@ -2252,6 +2376,21 @@ export function installGate(deps: GateDeps): boolean {
       enterAfter, surfaced, signal, ...captainPending === undefined ? {} : { captainPending },
     })
     if (interactive !== undefined) return interactive
+    // The `/grok on` shape's front desk (escape hatch): `chat` and single facts answer
+    // here instead of paying for a plan, and a real task gets one split question
+    // before anything runs. The condition is the session record alone, so a
+    // deployment-level `mode: 'full'` keeps its own path byte for byte. A confirmation
+    // already consumed above means this message is the answer to that question, so the
+    // escape stands aside and `answerFullBehind` below dispatches what it named.
+    if (readModeRecord(agent.session)?.workflowMode === 'full') {
+      const frontDesk = await fullFrontDeskEscape(
+        agent, verdict.request, history, signal, captainPending !== undefined,
+      )
+      if (frontDesk !== undefined) {
+        record(agent, entry, frontDesk.kind === 'notice' ? 'failed' : 'delivered', frontDesk.outcome)
+        return enterAfter(base, answerText(frontDesk, true), surfaced)
+      }
+    }
     // `full` (what `/grok on` selects) on the same kind of agent: accept the
     // message, run the team behind it, deliver the report as its own message.
     // Everything else (agent without followup/whenIdle — one-shot, headless)
