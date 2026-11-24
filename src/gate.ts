@@ -597,11 +597,13 @@ function classifyHeartbeat(
 }
 
 /**
- * The receipt a `full`-mode turn shows when the team runs behind it.
+ * The receipt a `full`-mode turn shows beside the first answer.
  *
- * It is the whole user-visible content of that turn, so it has to say three
- * things without them: the message was accepted (not answered), the report comes
- * as its own message, and sending more meanwhile is expected rather than lost.
+ * The turn is not only a receipt any more: the one or two sentences above it are
+ * the answer, so this line must not read as if nothing had been said yet. It says
+ * what those sentences are (a first answer), that the team is verifying them in the
+ * background, that the conclusion comes as its own message and may correct them,
+ * and that sending more meanwhile is expected rather than lost.
  *
  * @param lang - the message's language.
  * @returns one short paragraph, never empty.
@@ -609,13 +611,13 @@ function classifyHeartbeat(
 export function acceptedReceipt(lang: TriageLang): string {
   if (lang === 'en') {
     return [
-      'Accepted. This message is running the full plan → execute → verify workflow now.',
-      'The report arrives as its own message when the run finishes; you can keep sending meanwhile, and a new message starts its own run behind this one.',
+      'Accepted. The sentences above are a first answer; the team is now verifying them behind this turn (plan → execute → verify).',
+      'Its conclusion arrives as its own message and may correct that first answer; you can keep sending meanwhile, and a new message starts its own run behind this one.',
     ].join(' ')
   }
   return [
-    '已接单：这条消息正在按整套流程（拆解 → 执行 → 核验）运行。',
-    '跑完会单独发一条结论给你；期间可以继续发消息，新消息会排在这次之后各自开工。',
+    '已接单：上面这一两句是先答，团队正在后台按拆解 → 执行 → 核验核实它。',
+    '核验结论稍后单独发一条给你，可能纠正上面的说法；期间可以继续发消息，新消息会排在这次之后各自开工。',
   ].join('')
 }
 
@@ -1931,8 +1933,10 @@ export function installGate(deps: GateDeps): boolean {
    * messages through, which is exactly the reported contrast.
    *
    * This is the same admission the triage team path uses, minus the tier: `full`
-   * has no front desk, so there is no tier line and no cheap first answer — the
-   * receipt says what was accepted and that the report follows. The run keeps its
+   * has no front desk and no tier line, but it spends the same one cheap call, so
+   * the turn answers the message in one or two sentences instead of only stating
+   * that it was accepted — the team then verifies that answer behind the turn and
+   * its report follows as its own message. The run keeps its
    * own bounds (`maxConcurrency`, `maxActiveRuns`, `maxRetries`) because it is the
    * same `runTeam`/`runWorkflow`; only the turn stops waiting for it.
    *
@@ -1994,6 +1998,36 @@ export function installGate(deps: GateDeps): boolean {
           }
         }
       }
+      // The first answer, on the shape that used to spend no cheap call at all: the
+      // only thing this turn could say was the receipt, a muted "accepted, running
+      // the plan" template the model read back verbatim. It is written live from the
+      // approved objective and the message language — never from `admit.request`, so
+      // a captain-approved rewrite answers the plan that actually runs — and from the
+      // same bounded context the front desk reads. The snapshot is taken here and
+      // without this batch, so the answer cannot read itself back; the queued closure
+      // below still reads its own later one.
+      //
+      // The call is decoupled from the run on purpose: a slow, failed or empty call
+      // never holds the run back and never pushes it into the turn — the entered line
+      // is then the template fallback, which says plainly that it is one.
+      const firstHistory = collectHistory(
+        sessionOf(agent),
+        { turns: FIXED_HISTORY_TURNS, chars: FIXED_HISTORY_CHARS },
+        entry.messageIds,
+      )
+      const context = firstAnswerContext(sessionOf(agent), firstHistory)
+      let firstText = ''
+      try {
+        const call = await runSingleCall({
+          ctx, config: safe(), state, logger, agent,
+          prompt: firstAnswerPrompt(objective, context, runLang),
+          label: 'first-answer',
+        })
+        if (call.ok) firstText = sanitizeFirstAnswer(call.text)
+      } catch {
+        firstText = ''
+      }
+      const firstLine = firstText.trim() === '' ? firstAnswerFallback(runLang, objective) : firstText
       const accepted = enqueue(admit.agentId, async () => {
         // Read history late and without this batch: a queued message must see the
         // answer the previous run just delivered, and must not read itself back.
@@ -2010,7 +2044,7 @@ export function installGate(deps: GateDeps): boolean {
       // record behind claiming a background run that never happened.
       if (!accepted) return undefined
       record(agent, entry, 'started', 'admitted-full-background')
-      const receipt = [note, acceptedReceipt(lang)].filter(part => part !== '').join('\n\n')
+      const receipt = [note, firstLine, acceptedReceipt(runLang)].filter(part => part !== '').join('\n\n')
       return opts.enterAfter(base, acceptedEnterText(receipt), opts.surfaced)
     } catch (error) {
       logger.warn(`full-mode admission failed, falling back to in-turn: ${redactError(error)}`)

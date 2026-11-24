@@ -227,28 +227,30 @@ export function frontDeskText(body: string): string {
 }
 
 /**
- * Instruction preamble for an accepted message whose team run is in flight.
+ * Instruction preamble for an accepted message the gate already answered first.
  *
- * It says the opposite of {@link FRONT_DESK_PREAMBLE}: a workflow *was* started
- * and the real answer arrives later as its own message, so the main model hands
- * over the receipt and must not answer the request from its own head in the
- * meantime — that answer would land above the report and contradict it.
+ * It keeps the contract of {@link FRONT_DESK_PREAMBLE} — hand the text over, do not
+ * re-answer, no tools — but the reason is different: the gate has already answered
+ * this message itself, in one or two sentences, so the main model must not produce a
+ * second answer on top of it. The team is verifying that first answer behind the
+ * turn, and its report arrives later as its own message and may correct it; nothing
+ * here claims the verification already happened.
  */
 const ACCEPTED_PREAMBLE = [
-  'The mandatory workflow gate accepted this message and started the team workflow in the background.',
-  'The report arrives later as its own message. Reply with the text between the markers exactly as given:',
-  'keep every line, print no marker line, add nothing before or after it,',
-  'do not answer the request yourself, and do not call any tool.',
+  'The mandatory workflow gate answered this message itself first, in one or two sentences, and started the team workflow in the background.',
+  'The team is verifying that first answer behind this turn. The report arrives as its own message and may correct what that first answer said.',
+  'Reply with the text between the markers exactly as given: keep every line, print no marker line,',
+  'add nothing before or after it, do not answer the request yourself, and do not call any tool.',
 ].join(' ')
 
 /**
- * Build the message text for an acceptance receipt (`full` mode, interactive run).
+ * Build the message text for a turn the gate answered first (`full` mode, interactive run).
  *
  * `full` used to hold the open step for the whole run, which made every message
- * typed meanwhile invisible until the run ended. The receipt is what the turn
- * shows instead, so the debt is stated rather than hidden.
+ * typed meanwhile invisible until the run ended. The turn now shows the first answer
+ * and its receipt, so the debt is stated rather than hidden.
  *
- * @param body - the receipt line: what was accepted and what happens next.
+ * @param body - the receipt: the first answer, then what happens next.
  * @returns the enter text, bounded by markers.
  */
 export function acceptedEnterText(body: string): string {
