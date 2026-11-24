@@ -1025,8 +1025,9 @@ FAIL**.
 
 **Gate scope boundary (V-3).** The gate polices `agent/pre-step` batches that carry at
 least one message whose `source.kind === 'user'`. Covered: CLI, Web GUI, headless (all
-produce `user`-kind messages). **Not covered by design**: `user-question-reply`,
-`team-message`, `webhook`, `schedule` and any other producer kind, subagent steps
+produce `user`-kind messages). **Not covered by design**: `user-question-reply` (named as a
+`question-reply` pass since D-137, still never admitted as a request), `team-message`,
+`webhook`, `schedule` and any other producer kind, subagent steps
 (`header.origin === 'subagent'` or `delegationDepth > 0`), tool continuations (empty batch),
 and sessions outside `gatePreset` when `gateScope === 'preset'`. Widening this is **U-8**.
 

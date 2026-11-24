@@ -1,0 +1,233 @@
+# 问题卡片确认的隔离 soak — 2026-11-25（真机、真模型、卡片答案真的开了块）
+
+结论：**PASS。** 在隔离 profile 里，模型先 `grok_open_block` 预览、再用 `ask_user_question` 问出
+「确认」/「再看看」两个选项；卡片在**前台窗口过期后仍然可答**，我通过宿主自己的
+`userQuestions/answer` 回答「确认」，答案以一条 `source.kind = 'user-question-reply'` 的 `user/message`
+进入会话；模型随即调 `grok_open_block` 的 `start`，**块真的开了**，`blocks.jsonl` 落下
+`approval.quote = "确认"` 的一行。同一个脚本、同一份 profile，换成**修复前**的构建（`4803f42`）重跑，
+同一步 `start` 被拒：`approval-required: 预览之后没有一条消息逐字包含「确认」`。这就是这次要证明的那件事。
+
+一切都在本机、本次会话里观察到；没有任何一条来自计划、源码推断或子代理自报。访问令牌、cookie、
+`BIFROST_VIRTUAL_KEY` 的值一个都没有写进本文件（只写「存在」）。
+
+---
+
+## 1. 被测对象
+
+    worktree   /home/fish/projects_mine/dsh-grok-workflow/.worktrees/fix-question-card-approval
+    branch     fix/question-card-approval（基线 main 尖端 4803f42）
+    功能提交   a926cd6   fix(block): count a question-card answer as the user's nod
+    记忆提交   6e16447   docs(memory): record the card-approval fix, … D-137
+    version    0.13.34   （$ node -p "require('./package.json').version"）
+
+构建身份。注意 `lib/index.js` 在修复前后**逐字节相同**（修复落在 `gate.js` / `block/tools.js` 与新的
+`user-source.js`，入口文件没变），所以这次不拿 `index.js` 当指纹，改拿真正改动的三个文件：
+
+    $ sha256sum lib/gate.js lib/block/tools.js lib/user-source.js          # 修复后的构建（a926cd6）
+    e9de01e03124e29aac69e5c8bac51f8236e36565f422a2ff87e81fd602f9504d  lib/gate.js
+    0cc6394afae16f18ddafb251e36424b1826c2ff0e3097b0fd44796bc9d00c69d  lib/block/tools.js
+    75f39ec898d1e5167b2b364e41d079d3b14aaeb01d77990517de84b980948e79  lib/user-source.js
+
+    $ sha256sum .tmp/soak-card/prefix-src/lib/gate.js .tmp/soak-card/prefix-src/lib/block/tools.js
+    9a6b54c3d1c4064e43e9aaa58d2223cf432d1b23b8f0c45f9e55aa3830aa79ba  …/prefix-src/lib/gate.js
+    38e1fd7ecbae5e0ce0cf97e0ad2cd5e6c0dd67cedd04ab3e09f0daab743b93f1  …/prefix-src/lib/block/tools.js
+    $ ls .tmp/soak-card/prefix-src/lib/user-source.js
+    ls: cannot access '…/lib/user-source.js': No such file or directory
+
+`prefix-src` 是 `git archive 4803f42 | tar -x` 解出来的修复前树，在同一个 worktree 里用同一份
+`node_modules` 跑 `npm run build`（exit 0，`client bundle: 325771 bytes → lib/client.js`）。
+
+安装形态：`npm pack`（`--cache .tmp/npm-cache`，因为 `~/.npm` 在本沙箱里是只读的）→ 解到克隆的
+`node_modules/dsh-grok-workflow`（`--strip-components=1`）。**没有符号链接**：
+`find <clone>/node_modules/dsh-grok-workflow -type l` → 0 行（`docs/LOCAL-TESTING.md` 说软链的插件根挂不上）。
+版本读回 `0.13.34`。修复后那份 tarball 1029862 B，修复前 1025705 B。
+
+## 2. 隔离
+
+    DSH_HOME   <worktree>/.tmp/soak-card/dsh-home
+    HOME       <worktree>/.tmp/soak-card/home
+    profile    web-clone（scripts/clone-profile.mjs 从 ~/.dsh/profiles/web 克隆）
+    port       127.0.0.1:3203（线上 3080 全程没有被访问过一次）
+
+    $ node scripts/clone-profile.mjs --src ~/.dsh/profiles/web \
+        --home <worktree>/.tmp/soak-card/dsh-home --name web-clone
+    clone-profile: ok — …/profiles/web-clone
+      files 7699 -> 7699 (88444883 bytes)
+      links 5 (relinked 2, already dangling in the source 1)
+      parity 5/5 equal after redaction
+      dependencies 17 declared, 0 unresolved (8/21 bundles from the installation)
+      credentials redacted: 1 line(s) in 1 file(s); vendored fixtures: 4 file(s)
+
+启动（托管后台任务，自己的 DSH_HOME 与 HOME）：
+
+    DSH_HOME=<abs>/.tmp/soak-card/dsh-home HOME=<abs>/.tmp/soak-card/home \
+      bash -c 'set -a; . /home/fish/.config/environment.d/grok-api-keys.conf; set +a; \
+               exec /home/fish/.local/bin/dsh --profile web-clone --host 127.0.0.1 --port 3203 --no-open'
+
+密钥只进 soak 进程的环境变量：没有复制进克隆、没有写进任何文件、没有打印。存在性没有直接读
+（`/proc` 在每次 bash 调用的 PID 命名空间里看不到该进程，`NOT_RUN`）；间接证据是真模型答了话（下面的
+`assistant/message` 与工具调用都是模型产的）。`AGENT2API_API_KEY` 在这台机器上不存在，没有被发明。
+
+克隆 profile 改动的四行（都是 soak 档案的配置，不是产品改动）：
+
+```yaml
+# 1) 接单台子打开
+   grokDefault: on  ->  grokDefault: off      # 门禁关掉：这一轮要模型自己按顺序做，不要工作流接管
+   blockIntake: true                          # 新增，装载期开关
+# 2) 默认模型钉到有凭据的路由（线上默认 agent2api/spark-x2.6-low 在这台机器没有 key）
+   provider: agent2api / model: spark-x2.6-low
+   -> provider: bifrost-responses / model: opencode-go/muse-spark-1.3-contributor
+# 3) Host 的提问工具改成 timed 模式（见 §4 的 F2：不这样改，卡片答案永远不会变成 user-question-reply）
+   - id: preset-standard
+     config:
+       id: standard
+       order: 1
+       plugins: [ …bundle 里 standard 预设的整份 plugins 列表，只有 tool-ask-user 一项不同… ]
+   - id: tool-ask-user
+     config: { mode: timed, timeout: 20 }
+```
+
+`cordis.patch.yml` 21592 → 21710 → … → 最终 782 行（多了预设覆盖）。线上 profile 一个字节没动。
+
+### `~/.dsh` 没有被写
+
+    before  $ stat -c '%Y %y' ~/.dsh ~/.dsh/profiles ~/.dsh/profiles/web
+            1795362020 2026-11-22 23:40:20  ~/.dsh
+            1795337986 2026-11-22 16:59:46  ~/.dsh/profiles
+            1795530213 2026-11-24 22:23:33  ~/.dsh/profiles/web
+    after   identical，三个都逐秒相同（diff 两份读数 → 无差异）
+    $ touch /home/fish/.dsh/.soak-write-probe
+    touch: cannot touch '/home/fish/.dsh/.soak-write-probe': Read-only file system
+    $ curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3080/
+    401        （线上服务未认证时的正常答复，前后都是 401）
+
+线上实例没有被重载、重启或杀掉；被停掉的只有本 soak 自己的后台任务（换构建时重启了三次）。
+
+## 3. 激活 — 四项
+
+**(1) 启动输出没有抱怨。** 每次启动 34 行；`grep -nE "pending|did not activate" boot*.log` → 0 行。
+（这个 DSH 版本不逐插件打印激活横幅，所以这条只是「没有任何东西抱怨」。）
+
+**(2) `POST /api/settings/describe` 里有这个命名空间。**
+
+    namespaces: 24
+    grok-workflow present: true
+    value keys: childTimeoutMs, grokDefault, guardianModel, iterateIntervalMin, iterateTemplate,
+                loopEnabled, loopFailStreak, loopIntervalMin, loopMaxRounds, maxConcurrency,
+                maxTasks, mode, replan, roles, switchOnRateLimit, synthesis, timeoutMs   (17 个字段)
+    mode: triage   grokDefault: off
+    blockIntake in value: false        （故意不投影，见 D-135 第 6 条）
+    roles keys: planner, supervisor, synthesizer, verifier, worker
+    roles.supervisor: [{"provider":"agent2api","model":"deepseek-v4.1-flash"}]
+
+**(3) 真会话的 `request/header` 带着六个块工具。** seq 15：`tools: 101`，
+`grok_open_block` / `grok_accept_block` / `grok_close_block` / `grok_block_status` / `grok_steer` /
+`grok_stop` 全部 true（`grok_workflow` 也在）。因为 `registerBlockTools` 只在 `config.blockIntake === true`
+时跑，这也证明开关在装载期生效了。
+
+**(4) 提问工具确实是 timed 变体。** 同一份 `request/header` 里 `ask_user_question` 的参数是
+`['questions', 'timeout']`（legacy 变体只有 `['questions']`）。这是本轮跑通的前提，见 F2。
+
+## 4. 怎么驱动的，以及两个驱动方式上的事实（下一个人会踩同样的坑）
+
+驱动方式：GUI 自己的 HTTP API（与上一轮 soak §4.0 同一条路），带浏览器会话 cookie：
+
+    GET  /?token=<redacted>                        -> 303 + HttpOnly cookie
+    POST /api/session/create    {"request":{"cwd":…}}
+    POST /api/session/selectModel {"request":{"sessionId","provider","model","reasoningEffort"}}
+    POST /api/session/prompt    {"request":{"requestId","sessionId","mode":"queue","content":[{"type":"text","text":…}]}}
+    POST /api/userQuestions/answer {"agentId","callId","answer":{"answers":[{"id":"q1","selected":["确认"]}]}}
+
+信封形状（这一轮试出来的，写下来省下一个人二十分钟）：`POST /api/<namespace>/<method>`，body 是
+`{"type":"client-request","rpcId":"…","method":"<namespace>/<method>","payload":{"args":{…}}}`。
+直接 POST 参数对象会被拒成 `Remote payload must contain exactly one plain-object args field`。
+
+**F1（驱动面事实，不是产品缺陷）**：`userQuestions/answer` 只对 `state === 'continued'` 的问题有效，
+否则返回 `false`。**前台窗口还开着的卡片**只能由真正接住 `user-questions/request` waterfall 的客户端
+（Web GUI 里的浏览器）回答——没有任何 HTTP 路由可以回答一张还开着的卡片。第一版驱动在卡片刚出现时
+就调 `answer`，拿到 `false`，于是空等了十分钟（`run-fix`/`run-fix2` 两个会话就是这么废掉的）。
+
+**F2（模式面事实，决定了这个 bug 什么时候才会出现）**：Host 的 `tool-ask-user` 默认是 **legacy**
+（阻塞、只认前台客户端，没有超时窗口），只有 `mode: timed` 才会在窗口过期后把工具结果写成
+`{pending:true, callId}`，问题随之变成 `continued`，之后的答案才会以
+`user-question-reply` 的 `user/message` 形式进入会话。**换句话说：在默认配置下，卡片答案永远不会变成
+「用户消息」，它只是同一个回合里的一个工具结果**——那条路径既不需要也不受本次修复影响。本次修复覆盖
+的是 timed 卡片（或任何窗口过期后仍可答的卡片）。soak 档案因此把提问工具改成 `mode: timed, timeout: 20`；
+顶层的 `- id: tool-ask-user` 覆盖**改不动**预设里的那一行（试过，`request/header` 仍是
+`['questions']`），能生效的是 `- id: preset-standard` + `config.plugins` 整份覆盖（bundle 里
+standard 预设的 plugins 列表原样抄过来，只改 `tool-ask-user` 一项）。
+
+## 5. 走一遍：修复后的构建（session `session-d19500fb-6856-4eab-ab86-6acac9691a27`）
+
+| seq | 事件 | 内容 |
+| --- | --- | --- |
+| 15 | `request/header` | tools 101；六个块工具齐；`ask_user_question` 参数 `['questions','timeout']` |
+| 20 | `tool/call grok_open_block` | `mode:"preview"`，一块「卡片验收」，`writesPaths: []`，`execution:"workflow"` |
+| 21 | `tool/result` | `preview_id bp-afeb8fa2-3cea-4351-a649-3b13c5b12ffb`，`split_hash 27ed61c08efe8d9031a0b23dc46bb3f735b16632c593070a87c6e13742bcfece` |
+| 25 | `tool/call ask_user_question` | `callId call_01a20f19d9c575989fed8e536fc4c4b0\|fc_01a20f19d9c575989fed8e536fc4c4b0`，`questions [{id:"q1", question:"这一单可以开工吗？", options:[{"label":"确认"},{"label":"再看看"}]}]` |
+| 26 | `tool/result` | `{"pending":true,"callId":…,"message":"No answer batch arrived before the timeout. …"}` — 前台窗口过期，卡片仍可答 |
+| — | `userQuestions/answer` | 第 1 次尝试就返回 `true`（答案 `{answers:[{id:"q1",selected:["确认"]}]}`） |
+| 34 | `user/message` | `source={"kind":"user-question-reply","callId":…,"outcome":"answered"}`，正文是 `{"kind":"answer_to_pending_question","tool":"ask_user_question",…}` |
+| 36 | `tool/call grok_open_block` | `mode:"start"`，`approval {"kind":"user","quote":"确认"}`，`preview_id`/`split_hash` 同上 |
+| 37 | `tool/result` | `{"block_id":"3c688ff2-9053-4f47-a1fd-4b04fa32a045","status":"open","ledger_path":"…/taskboards/grok-workflow/blocks.jsonl","dispatch_envelope":"派单 1 块：blk-1「卡片验收…","reused":false,"waited_for_run":false}` |
+| 42 | `turn/end` | `{"turn":1,"reason":{"kind":"completed"}}` |
+
+账本（一行，逐字；`blocks.jsonl` 只有这一行）：
+
+```json
+{"v":1,"id":"3c688ff2-9053-4f47-a1fd-4b04fa32a045","sessionId":"session-d19500fb-6856-4eab-ab86-6acac9691a27","objective":"验证问题卡片的确认能让这一块开工","splitHash":"27ed61c08efe8d9031a0b23dc46bb3f735b16632c593070a87c6e13742bcfece","approval":{"kind":"user","quote":"确认","at":"2026-11-24T19:48:30.224Z"},"blocks":[{"id":"blk-1","title":"卡片验收","objective":"验证问题卡片的确认能让这一块开工","deliverable":"一句结论","acceptance":["卡片确认被记成批准","账本里有一行"],"writesPaths":[],"dependsOn":[],"execution":"workflow","status":"open","tasks":[]}],"version":1,"createdAt":"2026-11-24T19:48:30.224Z","updatedAt":"2026-11-24T19:48:30.224Z","rowHash":"548a27244332b24275ef9221377a9d01febac924ae22a63556e7196aa3809549"}
+```
+
+（整行逐字，没有省略任何字段；这一行里没有密钥。）
+
+## 6. 对照：修复前的构建（session `session-744d3a73-ce93-4471-b3d3-48b8b0154d49`）
+
+同一个克隆、同一份 profile、同一个脚本，只把插件目录换成 `4803f42` 构建的那份（§1 的三个 sha 与
+`user-source.js` 缺席即证据）。模型的行为一模一样：
+
+| seq | 事件 | 内容 |
+| --- | --- | --- |
+| 25 | `tool/call ask_user_question` | `callId call_01a20f1b952671e29d9e87f4fe9b9ba7\|…`，同样两个选项 |
+| 26 | `tool/result` | 同样 `{"pending":true,…}` |
+| — | `userQuestions/answer` | `true`（同一张 continued 卡片） |
+| 34 | `user/message` | 同样 `source.kind = 'user-question-reply'` |
+| 36 | `tool/call grok_open_block` | 同样 `mode:"start"`、`approval.quote:"确认"` |
+| 37 | `tool/result` | **`Error: approval-required: 预览之后没有一条消息逐字包含「确认」，不能开工。下一步：让用户先回一句逐字包含预览里那句话的确认，再提交一次`** |
+| 42 | `turn/end` | `{"turn":1,"reason":{"kind":"completed"}}` |
+
+`blocks.jsonl` 仍是 **1 行**——对照那一单没有写盘。**同一个动作，修复前拒、修复后开**，这就是本次
+soak 的结论。
+
+## 7. 什么 CONFIRMED，什么没跑
+
+**CONFIRMED（本次会话里亲眼看到的）：**
+
+1. 真机、真模型：模型预览了一块（`bp-afeb8fa2…`）、用 `ask_user_question` 问出「确认」/「再看看」。
+2. 卡片答案真的以 `source.kind = 'user-question-reply'` 的 `user/message` 进入会话（seq 34）。
+3. 修复后 `grok_open_block` 的 `start` **开了块**：`3c688ff2-9053-4f47-a1fd-4b04fa32a045`，
+   `blocks.jsonl` 一行，`approval.quote = "确认"`。
+4. 修复前同一个动作被拒：`approval-required`，账本没有新增行。
+5. 激活三项：命名空间在、`blockIntake` 不投影、六个块工具在（tools 101）、提问工具是 timed 变体。
+6. `~/.dsh` 没有被写：三个 mtime 逐秒相同、写探针 EROFS、线上 3080 前后都是 401。
+7. 卡片答案这一侧的行为与单测预测一致：没有任何意外差异需要上报。
+
+**NOT_RUN：**
+
+1. **真实浏览器的点击**（`NOT_RUN`）：本轮用宿主自己的 `userQuestions/answer` 回答 continued 卡片，
+   没有开 Chromium 去点一张还开着的卡片。理由写在 F1：还开着的卡片没有 HTTP 路由可答，而那条路径的
+   答案只是工具结果、不会变成 `user-question-reply`，测不到本次修复。要覆盖它得再开一轮浏览器。
+2. 卡片在**前台窗口内**被点（`NOT_RUN`，同上）。
+3. 跨预览边界答卡片（预览前开卡、预览后点确认）在真机上（`NOT_RUN`；单测里有用例 (a)）。
+4. `custom` 文本参与逐字匹配（`NOT_RUN`；单测覆盖）。
+5. 插件设置页 / 插件卡片（`NOT_RUN`；与本轮无关，上一轮已确认过同一血统）。
+6. 密钥存在性的直接读取（`NOT_RUN`；本沙箱的 PID 命名空间看不到该进程）。
+
+## 8. 产物
+
+    .rsi/evidence/card-approval-soak-2026-11-25/soak.txt   本文件
+    .tmp/soak-card/run-fix3.txt / .json                    修复后那一轮的逐条转录
+    .tmp/soak-card/run-prefix.txt / .json                  对照那一轮的逐条转录
+    .tmp/soak-card/boot5.log / boot6.log                   两次启动（token 已按 <redacted> 处理）
+    .tmp/soak-card/dsh-home/taskboards/grok-workflow/blocks.jsonl   账本一行
+
+`.tmp/` 下的东西是 gitignored 的临时件，跑完即删；仓库里只留本文件。
