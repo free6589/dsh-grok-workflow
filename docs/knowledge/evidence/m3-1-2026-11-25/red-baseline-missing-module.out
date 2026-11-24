@@ -1,0 +1,25 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-m3-narrow-listen/.tmp/red-baseline-35326c7
+
+ ❯ test/m3-intake.spec.ts (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/m3-intake.spec.ts [ test/m3-intake.spec.ts ]
+Error: Cannot find module '../src/heartbeat-listen.js' imported from /home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-m3-narrow-listen/.tmp/red-baseline-35326c7/test/m3-intake.spec.ts
+ ❯ test/m3-intake.spec.ts:40:1
+     38| import { BLOCK_LEDGER_VERSION, appendBlockRow } from '../src/block/ind…
+     39| import { HEARTBEATS_FILE } from '../src/block/brakes.js'
+     40| import { HEARTBEATS_LISTEN_FILE, installHeartbeatListen, isHeartbeatMe…
+       | ^
+     41| import { resolveConfig } from '../src/config.js'
+     42| import { LOOP_PROMPT_PREFIX } from '../src/loop.js'
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  04:45:29
+   Duration  1.75s (transform 1.46s, setup 0ms, import 0ms, tests 0ms, environment 0ms)
+

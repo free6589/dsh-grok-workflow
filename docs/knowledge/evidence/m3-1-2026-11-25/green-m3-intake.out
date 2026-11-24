@@ -1,0 +1,19 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-m3-narrow-listen
+
+ ✓ test/m3-intake.spec.ts > canAcceptBlock is written, and deliberately not enforced yet > answers yes for every session while the phase switch is off 5ms
+ ✓ test/m3-intake.spec.ts > canAcceptBlock is written, and deliberately not enforced yet > pins the rule the switch will enforce 2ms
+ ✓ test/m3-intake.spec.ts > the narrow heartbeat listener observes without deciding > registers nothing new when the intake is off 153ms
+ ✓ test/m3-intake.spec.ts > the narrow heartbeat listener observes without deciding > observes one beat into its own file while the old gate keeps deciding 104ms
+ ✓ test/m3-intake.spec.ts > the narrow heartbeat listener observes without deciding > writes nothing for a beat in a session that owes no work 8ms
+ ✓ test/m3-intake.spec.ts > the narrow heartbeat listener observes without deciding > writes nothing for a user message 76ms
+ ✓ test/m3-intake.spec.ts > the narrow heartbeat listener observes without deciding > survives a batch it cannot read, in both shapes, and writes nothing 134ms
+ ✓ test/m3-intake.spec.ts > legacyGate: false leaves the narrow listener alone on the chain > registers the narrow listener only, and lets a user message through untouched 10ms
+ ✓ test/m3-intake.spec.ts > legacyGate: false leaves the narrow listener alone on the chain > reviews the brakes itself, and a stopped beat is refused with no turn 3ms
+ ✓ test/m3-intake.spec.ts > legacyGate: false leaves the narrow listener alone on the chain > continues a beat the brakes allow, and records that it did 2ms
+
+ Test Files  1 passed (1)
+      Tests  10 passed (10)
+   Start at  04:44:51
+   Duration  1.65s (transform 870ms, setup 0ms, import 1.02s, tests 501ms, environment 0ms)
+

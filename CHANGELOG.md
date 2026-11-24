@@ -5,6 +5,22 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Added / 新增
+
+- **A switch for the old front desk, and a heartbeat listener that can stand on its own / 多了一个旧前台的开关，和一个能独立接管的心跳监听**
+  — Nothing changes unless you ask for it: the old front desk stays on by default and your messages are handled exactly as before. A new
+  profile setting, `legacyGate`, lets you turn that desk off; when you do, your ordinary messages go straight to the model with nothing
+  in between, and the one thing that still keeps an eye on scheduled heartbeats is the block intake's own listener — which now reviews
+  the same brakes and can stop a beat by itself. Each shape writes its own small record of what happened to a beat, so the two never
+  write over each other, and the intake's record of "which blocks does this beat still owe" is left alone. It is a setting you change and
+  then restart, not a live toggle. Separately, the block tools now all check one shared "may this session use the intake at all" rule;
+  that rule answers yes for every session in this build, so no answer changes today — it is there so the check has one home when it does.
+  / 不改就不会变：旧前台默认仍然开着，你的消息还是照旧被它处理。新的档案设置 `legacyGate` 可以把这个前台关掉；关掉之后，你的普通消息
+  直接到模型、中间不再有人接，唯一还盯着定时心跳的是接单台自己的那个监听——它现在会复核同一套刹车，也能自己停掉一拍。两种状态各写各的
+  小记录，互不覆盖；「这一拍还欠哪几个块」那份记录在关掉前台时不再写，因为写它的那个观测器跟着一起不注册。这个开关改完要重启才生效，
+  不是热开关。另外，接单台的几个工具现在共用一个「这个会话到底能不能用接单台」的判断；这一版里它对每个会话都回答「可以」，所以今天的
+  行为一点没变——把它放在这里，是为了等它真能拒绝时只有一个地方要改。
+
 ### Fixed / 修复
 
 - **Saying yes through a question card now counts as your approval / 点问题卡片说「确认」现在算你批准了** — When a

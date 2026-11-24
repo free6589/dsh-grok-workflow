@@ -1,0 +1,60 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-m3-narrow-listen/.tmp/red-baseline-35326c7
+
+ ❯ test/m3-intake.spec.ts (10 tests | 2 failed) 713ms
+     ✓ answers yes for every session while the phase switch is off 5ms
+     ✓ pins the rule the switch will enforce 2ms
+     ✓ registers nothing new when the intake is off 275ms
+     ✓ observes one beat into its own file while the old gate keeps deciding 129ms
+     ✓ writes nothing for a beat in a session that owes no work 8ms
+     ✓ writes nothing for a user message 132ms
+     ✓ survives a batch it cannot read, in both shapes, and writes nothing 134ms
+     ✓ registers the narrow listener only, and lets a user message through untouched 8ms
+     × reviews the brakes itself, and a stopped beat is refused with no turn 7ms
+     × continues a beat the brakes allow, and records that it did 7ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/m3-intake.spec.ts > legacyGate: false leaves the narrow listener alone on the chain > reviews the brakes itself, and a stopped beat is refused with no turn
+AssertionError: expected 'enter' to be 'reject' // Object.is equality
+
+Expected: "reject"
+Received: "enter"
+
+ ❯ test/m3-intake.spec.ts:375:27
+    373|       async () => { nextCalls += 1; return { kind: 'enter', messages: …
+    374|     ) as Decision
+    375|     expect(decision.kind).toBe('reject')
+       |                           ^
+    376|     expect(nextCalls, 'a stopped beat must not open a turn').toBe(0)
+    377|     expect(stops).toEqual([{ sessionId: 'sess-m3-stop', code: 'loop/da…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/m3-intake.spec.ts > legacyGate: false leaves the narrow listener alone on the chain > continues a beat the brakes allow, and records that it did
+AssertionError: expected [] to deeply equal [ 'sess-m3-continue' ]
+
+- Expected
++ Received
+
+- [
+-   "sess-m3-continue",
+- ]
++ []
+
+ ❯ test/m3-intake.spec.ts:409:22
+    407|     expect(decision.kind).toBe('enter')
+    408|     expect(nextCalls).toBe(1)
+    409|     expect(admitted).toEqual(['sess-m3-continue'])
+       |                      ^
+    410|     const observed = readHeartbeatListenObservations({ dir: ledger })
+    411|     expect(observed).toHaveLength(1)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 8 passed (10)
+   Start at  04:46:23
+   Duration  2.09s (transform 788ms, setup 0ms, import 942ms, tests 713ms, environment 0ms)
+

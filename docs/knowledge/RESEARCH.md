@@ -1695,3 +1695,27 @@ Source: `dsh` 0.2.2-rc.3 装机内的 `@deepseek-ai/dsh-plugin-manager` 0.2.2-rc
   自己的 `time` 只说明用户什么时候点的，不说明问题什么时候问的。
 - **工具名**：`ask_user_question`（宿主侧常量 `ASK_USER_QUESTION_TOOL`）。本插件用同一个字面量在 `src/block/tools.ts`
   里挑 `tool/call` 事件，没有第二份名字表。
+
+## 2026-11-25 · 真机上一拍心跳长什么样，以及 `logger.info` 在 DSH 0.2.2-rc.3 里去哪了（`CONFIRMED`，真机观察）
+
+验收 M3.1 时在 scratch home（`DSH_HOME=.tmp/m3-soak/dsh-home`，实例 `127.0.0.1:3299`）上让宿主真的投递了几拍心跳，
+下面四条都是那次观察到的，不是推断。
+
+- **一拍心跳的原文形状**：`source.kind === 'schedule'`，文本是
+  `[SCHEDULE REMINDER]\nThis is a scheduled message from the user\nschedule_id_json: "<id>"\noccurrence_at: <ISO>\nreminder_prompt_json: "<prompt>"`。
+  所以 `isLoopHeartbeat` 的两条判据在真机上是对的：`reminder_prompt_json: "[grok-workflow loop]` 这个内嵌 JSON 前缀能命中
+  （`src/loop.ts` 的 `trimmed.includes(...)` 分支），而「文本以 `[grok-workflow loop]` 开头」那条分支在真实投递里走不到——
+  提示词被包进了 `reminder_prompt_json` 而不是放在开头。
+- **建一条 Schedule 会先送来一条不是心跳的 `schedule` 消息**：`POST /api/schedule/create` 之后，同一个 session 立刻收到
+  `[SCHEDULE CHANGE]\nA scheduled task involving this session was changed outside this session. …change: created…`，
+  它的 `source.kind` **也是 `'schedule'`**，但文本里没有 loop 标记。也就是说「来源是 schedule」单独不足以判定心跳，
+  必须两个事实同时成立——这正是 `isHeartbeatMessage` 现在的写法；任何只用来源判定的实现都会把这条变更通知当成一拍。
+- **`logger.info` 不出现在 stdout**：`src/index.ts` 的 `configuration in effect: … legacyGate=on …` 与 `settings surface: …`
+  都是 `logger.info`，而 DSH 0.2.2-rc.3 的 boot stdout 里这两行**都不出现**（整份 518 行日志只有 MCP 子进程的 stderr 噪声
+  加一条 `dsh web: http://…`）。cordis 的 `LoggerService` 默认只挂一个写内存环（`bufferSize = 1e3`）的 exporter，没有控制台
+  exporter。**验收含义**：以后不要用「日志里没有这行」推断某个载入期开关没生效；要么看行为，要么用 `--dump-config` 看
+  patch 层，要么在进程内读 buffer。
+- **`.rsi/STOP` 会让这个仓库里任何真心跳都被 `loop/stop-file` 停掉**：`loopStopFile()` 的默认值是 `join(process.cwd(), '.rsi/STOP')`，
+  而本仓库带着一个被追踪的 `.rsi/STOP`（2026-11-21 停自迭代时留下的）。所以在这棵树上跑真机心跳 soak，刹车结果必然
+  `loop/stop-file`——**这不是缺陷，也不是「刹车允许」路径的覆盖**；要观察 `continued` 得换一个 cwd，或者设
+  `GROK_WORKFLOW_STOP_FILE`（`LOOP_STOP_ENV`）指到别处。

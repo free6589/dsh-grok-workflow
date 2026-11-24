@@ -1,3 +1,33 @@
+## 2026-11-25 — M3.1 验收通过（`feat/m3-narrow-listen`）：下一步把 review/stop 所有权正式移过来（M3.2）
+
+- **From:** 独立验收（`agent-144/m3-verify`）· **To:** 接 M3.2 的人
+- **这一支是什么**：分支 `feat/m3-narrow-listen`（worktree `.tmp/wt-m3-narrow-listen`，基线 `main` 尖端 `35326c7`）上只有一条实现提交
+  **`d546666`**，**45 文件 / +1807 −163**（`src test docs` 两个 README 是 16 文件 / +1030 −77，其余是 `lib/` 重建）。**未发版、未 push、未合 `main`**，
+  `package.json` 仍是 `0.13.34`。验收结论见 `STATE.md` 顶部与 `VALIDATION.md` 的 2026-11-25 条；证据在
+  `docs/knowledge/evidence/m3-1-2026-11-25/`。
+- **已经证实的**：`legacyGate` 默认 on 时旧前台照旧接单、窄监听只旁观；`legacyGate: false` 时旧闸门整段不注册，窄监听接管心跳裁决。
+  真机上两种形状都**正常激活**（24 个设置命名空间、`autoGenerate: true`、boot 无 `pending`／`did not activate`），差异可观测：
+  形状 A 的普通消息被旧前台接单（会话日志 1 条 `source.kind = "grok-workflow"` 中继）、形状 B 中继 0 条且消息直达模型真答；
+  形状 B 的心跳由窄监听裁决并写下 `heartbeats-listen.jsonl` 一行 `{"outcome":"stopped","code":"loop/stop-file"}`，而
+  `heartbeats.jsonl` 不存在（拥有裁决权的形状里接单台观测器不注册，没有双写）。
+- **下一步（M3.2）**：
+  1. **把 review/stop 的所有权正式移到窄监听**：删掉 `src/gate.ts` 的心跳分支（`classifyHeartbeat` 与 `isHeartbeatMessage` 的
+     门禁侧调用），让 `installHeartbeatListen({ ownsRouting: true })` 成为唯一裁决者；`reviewHeartbeat` 已经是两边共用的一份定义，
+     搬动时不要再复制第二份（D-138 的第 1 条）。
+  2. **翻 `canAcceptBlock` 的 `BLOCK_ADMISSION_ENFORCED`**（`src/user-source.ts`）——六个块工具入口的 `admit()` 已经全部接好，
+     只差这一个常量；规则本身由 `canAcceptBlockWhenEnforced` 与两条用例钉着，翻之前先读那两条。
+  3. **`blockIntake` 默认翻 `true` 是 M3.3**，不是 M3.2；别顺手一起翻，否则「off 就是 pre-feature 那棵树」这条可测性会一起消失。
+- **三件会踩的事**：
+  1. **形状 A 的观测文件是空的，这是设计不是缺陷。** 两个观测器都要求「该会话有 open block」才写（`observeOnly` 里
+     `openBlockIds(...).length > 0`、`installHeartbeatBrakes` 里 `if (open.length === 0) return`）。想在真机上看到 `observed` 行，
+     必须先让模型真的开一块（`grok_open_block` + 用户点头），再让心跳到。
+  2. **`legacyGate: false` + `blockIntake: false` 这个组合没人测过**（`HYPOTHESIS`）：按 `src/index.ts` 的读法，那时链上一个监听都不注册
+     ——窄监听整段在 `if (config.blockIntake === true)` 里。M3.3 翻默认值之前先把这个组合钉一条用例，否则「关掉接单台」会连心跳刹车一起关掉。
+  3. **`configuration in effect: … legacyGate=on` 这行在真机日志里看不到**：它是 `logger.info`，DSH 0.2.2-rc.3 不导出 info 到 stdout
+     （同一份 boot 日志里 `settings surface:` 也不出现）。别把它当成「没生效」的证据；要看行为（旧前台是否接单）。
+- **分支决定日期：`2026-12-09`**（两周内）。到那天这条分支要么合进 `main`、要么 rebase 后继续、要么删掉；M3.2 在同一支上继续则把日期顺延到 M3.2 结束。
+  理由：`feat/*` 长活分支必须带一个决定日期（`AGENTS.md` §5）。
+
 ## 2026-11-25 — 接单台子收口：七处文字改完、`lib/` 重建、模型监工在真机上第一次真判（`fix/supervisor-soak-evidence`）
 
 - **From:** 记忆收口（`agent-141/docs-memory`）· **To:** 下一个接手接单台子的人
