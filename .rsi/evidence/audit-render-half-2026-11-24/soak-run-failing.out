@@ -1,0 +1,14 @@
+(node:14) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+dsh: reasoning:
+The user wants me to call grok_workflow exactly once with the given arguments. Then print only the report status word on the last line.
+
+Let me do that.
+dsh: reasoning:
+The report status is FAILED, which corresponds to "failed". The user wants me to print only the report status word on the last line.
+
+Should I print anything else? "print only the report status word (completed, partial, or failed) on the last line." So the last line should be "failed". I'll give a brief plain-language note then the status word? It says "print only the report status word on the last line" — the last line must be just the word. I'll add a short line before it, acceptable.
+
+Actually "print only" — safest: just output "failed". But some context may help. The instruction: print only the report status word (completed, partial, or failed) on the last line. I'll keep a minimal message and end with failed. To be safe, just the word.
+failed
+exit=1 elapsed=905s overlay=/home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/feat-audit-render-half/.tmp/soak-audit/overlay-soak.yml prompt=/home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/feat-audit-render-half/.tmp/soak-audit/prompt-failing.txt out=run-failing.out

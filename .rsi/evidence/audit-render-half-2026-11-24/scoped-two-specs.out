@@ -1,0 +1,11 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/feat-audit-render-half
+
+ ✓ test/human-output-contract.spec.ts (10 tests) 458ms
+ ✓ test/report-audit.spec.ts (13 tests) 133ms
+
+ Test Files  2 passed (2)
+      Tests  23 passed (23)
+   Start at  20:10:26
+   Duration  2.03s (transform 951ms, setup 0ms, import 1.21s, tests 591ms, environment 0ms)
+
