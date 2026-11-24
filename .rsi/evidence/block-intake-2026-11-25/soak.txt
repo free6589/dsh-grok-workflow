@@ -1,0 +1,377 @@
+# block-intake soak — 2026-11-25 (M2 「接单台子」 grey release, user perspective)
+
+Status: **PASS** — one install deviation, two environment-caused gaps, three behavioural
+findings (all in §7). Everything below was observed on this machine in this session;
+nothing is inferred from a plan or from a child agent's self-report.
+
+Machine: this host, real Chromium (`/usr/bin/chromium`, Chrome 155.0.8059.84), real
+`dsh` 0.2.2-rc.3 (`/home/fish/.local/bin/dsh`), real live model
+(`bifrost-responses` / `opencode-go/muse-spark-1.3-contributor`).
+
+---
+
+## 1. What was under test
+
+Branch `feat/block-intake` in
+`.agents/worktrees/feat-block-intake`, built `lib/` already present:
+
+    $ node -e 'console.log(require("./package.json").version, require("./package.json").main)'
+    0.13.33 lib/index.js
+    $ grep -c registerBlockTools lib/index.js
+    2
+
+The built `lib/` has mtime 2026-11-25 00:35:53 (written by a build in this shared worktree
+at the start of the session) and did not change afterwards: the `lib/index.js` copied into
+the soak profile is byte-identical to the worktree's at report time
+(sha256 `4f362620eec94af3744901aea1afa66111bcf985d6746ba0b34d54dbf7280cac` on both sides).
+
+The grey release has to show, from the user's chair and with `/grok off`:
+
+1. chat still answers normally and is **not** taken over by the workflow;
+2. `grok_open_block` can open a block (preview → confirm → `block_id`);
+3. `grok_close_block` settles a verdict (pass or veto + reasons);
+4. the verdict and the block land on disk in the task board.
+
+## 2. Isolated instance
+
+Forked profile (made before this session by `scripts/clone-profile.mjs`, parity 5/5):
+
+    .tmp/soak-m2/dsh-home/profiles/web-clone
+
+Plugin mounted from this worktree's build. Boot command (run as a managed background
+job so it survives between shells; the sandbox kills stray children otherwise):
+
+    DSH_HOME=<abs>/.tmp/soak-m2/dsh-home HOME=<abs>/.tmp/soak-m2/home \
+      /home/fish/.local/bin/dsh --profile web-clone --host 127.0.0.1 --port 3197 --no-open
+
+Config change, exactly one line added to the `grok-workflow` row (nothing else touched):
+
+    - id: grok-workflow
+      name: dsh-grok-workflow
+      config:
+        mode: triage
+        grokDefault: on
+    +   blockIntake: true
+        maxConcurrency: 20
+        ...
+    $ wc -c cordis.patch.yml          # 21614 bytes; +22 = the added line
+    $ grep -c blockIntake cordis.patch.yml
+    1
+
+`grokDefault` stayed `on` on purpose: the thing under test is what a user gets after
+`/grok off`, not a profile that already ships off.
+
+## 3. Activation — four checks (docs/LOCAL-TESTING.md, "Enable")
+
+**(1) Boot output: no pending row, no "did not activate".**
+
+    $ grep -nE "pending|did not activate" .tmp/soak-m2/logs/boot.log
+    NONE
+    $ grep -c "dsh web: http" .tmp/soak-m2/logs/boot.log
+    1
+
+The boot log is 36 lines and its only product line is
+`dsh web: http://127.0.0.1:3197/?token=<redacted>`. There are no per-plugin
+activation lines at all in this DSH version, so this check is "nothing complained",
+not "the plugin printed a banner".
+
+One honest qualification: the **browser** console (not the server log) carries
+`web boot: warning: 1 entry did not activate @deepseek-ai/dsh-client-ui-account-notifications:
+pending (waiting for service: accountUi)`. That is a client UI plugin, unrelated to
+`grok-workflow`; it appears on every boot of this forked profile.
+
+**(2) `POST /api/settings/describe` has the namespace with `autoGenerate: true`.**
+
+    POST /api/settings/describe  {"type":"client-request","rpcId":…,"method":"settings/describe","payload":{"args":{}}}
+    http:200
+    namespaces: 24
+    grok-workflow autoGenerate: true
+    value.mode: triage | grokDefault: on
+    blockIntake present in projection: false
+
+`blockIntake` is deliberately not projected onto the settings page (src/settings.ts:375),
+so its absence here is expected and is **not** evidence that it is off — see (4), which is.
+
+**(3) Settings/plugins page shows the `Grok workflow` card.**
+
+Driven in Chromium: 插件 → 内置插件配置. Card text read back verbatim:
+
+    Grok workflow
+    定 Grok 下多大的力气：一个总开关，五条角色链，几个上限，还有要不要自动接着跑。
+
+Screenshot `.tmp/soak-m2/logs/s09-plugins-card-run4.png`
+(sha256 7144f404ef59adb42c06683df0ef5047f78bdf128a7c5cb4629209ff0b417308).
+
+**(4) A real session's `request/header.header.tools` carries the six block tools.**
+
+Taken from the session's own log (`request/header` record, seq 33 and seq 17):
+
+    tool count: 101
+    grok_open_block   : YES
+    grok_accept_block : YES
+    grok_close_block  : YES
+    grok_block_status : YES
+    grok_steer        : YES
+    grok_stop         : YES
+
+Both `request/header` records in this session (seq 17 and seq 33) read `tools: 101`,
+with all six block tools among them. This is the strongest form of the check: the tools
+were actually offered to the model in real turns, and the model then called four of them
+(`grok_open_block`, `grok_block_status`, `grok_accept_block`, `grok_close_block`). Because `registerBlockTools`
+runs only under `if (config.blockIntake === true)` (src/index.ts:425), this also proves
+the flag took effect at load time.
+
+## 4. User-perspective walkthrough
+
+One session, `session-34732c80-5a60-4d17-9fe2-2b5df45aa091`, Chromium headless + raw
+CDP. Model: `bifrost-responses` / `opencode-go/muse-spark-1.3-contributor`.
+
+### (a) `/grok off`
+
+Sent as a command from the composer. Session log:
+
+    seq 4  command/run  {"name":"grok","args":" off"}
+    seq 5  plugin:grok-workflow/mode  {"v":1,"enabled":false,"turn":0,"setBy":"command:/grok off"}
+    seq 6  command/done {"kind":"success","text":"Grok workflow OFF — normal chat."}
+
+That is the only mode record in the whole session (167 records); nothing re-wrote it
+during any later turn.
+
+### (b) Chat — a plain question must stay plain
+
+Sent: `用一句话说说今天适合做什么`.
+
+    seq 35 assistant/message  "今天适合放慢脚步，整理手头的小事，给自己留一点轻松的空隙。"
+    seq 37 turn/end  {"kind":"completed"}
+
+No 「已接单」 receipt, no `grok_workflow` run, no block row created by that turn. The
+turn's tool list was offered (101 tools) but the model called nothing.
+
+### (c) Open a block
+
+Sent: `帮我开一单：把 README 的安装步骤改写成三句中文，验收是三条都在、不超过 120 字`
+
+Model called `grok_open_block {mode:"preview", …}` (seq 44). Tool result (seq 45), verbatim
+excerpt:
+
+    preview_id : bp-8c228783-29b8-41d4-99b2-f0e7a9d56b9e
+    split_hash : 8c3ad6066e4c2cac19e1d71825d13460f11329f92e78f8c620e09d3f6732e339
+    render     : 接单预览：把 README 的安装步骤改写成三句中文，验收是三条都在、不超过 120 字
+                 这一单切成 1 块。
+                 [1] README安装步骤改写（foreman 包工头）
+                   目标：把 README 的安装步骤改写成三句中文
+                   交付物：改写后的三句中文安装步骤
+                   验收：
+                     - 改写后为三句中文
+                     - 原安装步骤三条都在
+                     - 总字数不超过120字
+                   写范围：（没声明） 依赖：无
+                 需要你留意：第 1 块没有声明写范围（writesPaths 为空），并行时可能和别人撞文件
+                 回复『确认』开工；要改就直接说改哪一块。
+    requires_user_approval : true
+
+The preview carries the block title, objective, deliverable, acceptance list and the
+「回复『确认』开工」 line — all four elements the task asked for.
+
+Confirmation round 1 — **failed, and this is a real finding.** The model asked for the
+confirmation through `ask_user_question`, so I answered in that card (提交「确认」). The
+card's answer is not a user *message*, and the block gate scans user messages:
+
+    grok_open_block {"mode":"start","approval":{"kind":"user","quote":"确认"}, …}
+    -> Error: approval-required: 预览之后没有一条消息逐字包含「确认」，不能开工。
+
+Confirmation round 2 — sent as a plain chat message `确认`; the model retried:
+
+    grok_open_block {mode:"start", approval:{kind:"user", quote:"确认"}, preview_id:bp-8c228783…, split_hash:8c3ad606…}
+    -> {"block_id":"fdf2a16f-f90d-4149-8b2c-9d3752f690c2",
+        "status":"open",
+        "ledger_path":"…/.tmp/soak-m2/dsh-home/taskboards/grok-workflow/blocks.jsonl",
+        "dispatch_envelope":"派单 1 块：blk-1「README安装步骤改写」foreman（不写文件，无依赖）。",
+        "reused":false,"waited_for_run":false}
+
+Follow-ups the model made on its own: `grok_block_status` → `status: open`;
+`grok_accept_block` → `plan_id: plan-96d76e11`, still `open`. The block then really ran
+work (a foreman child session `1af88891-c7ef-4ce4-af03-0a992807704c` appeared, and the
+turn used grep/read on README).
+
+### (d) Hand off and settle a verdict
+
+I sent a four-item handoff (做了什么 / 证据 / 产物路径 / 未完成风险) as a chat message. The
+model called `grok_close_block` four times; the ledger kept three verdicts:
+
+| call seq | attempt | outcome | route | reason headline |
+|---|---|---|---|---|
+| 127 | 1 | veto | deterministic | 5 reasons: three acceptance criteria unclaimed by any task; handoff line 2 empty; handoff not four lines |
+| 132 | 2 | veto | agent2api/deepseek-v4.1-flash | 监工调用失败：两次尝试都没有拿到可解析的逐条判断 |
+| 146 | 2 (re-read) | veto | — | same attempt-2 verdict returned again, no new row |
+| 159 | 3 | **pass** | deterministic | `criteria: all met`, `block_status: accepted` |
+
+Final close result (seq 160), verbatim excerpt:
+
+    {"block_id":"fdf2a16f-f90d-4149-8b2c-9d3752f690c2",
+     "outcome":"pass","reasons":[],
+     "criteria":[{"text":"改写后为三句中文","met":true,"evidence":["未过监工：按调用方要求跳过（verify.blockSupervisor=false）"]}, …],
+     "attempt":3,
+     "judged":false,"not_judged":"本次未过监工（verify.blockSupervisor=false）",
+     "warnings":["这一块批准的范围是「不写文件」，没有产物要查"],
+     "block_status":"accepted"}
+
+The pass is honest about itself: `judged:false` because the model-backed judge was
+skipped by the caller, and the block's own warning says there was nothing on disk to check.
+
+User-visible result of the whole run (screenshot
+`.tmp/soak-m2/logs/s08-final.png`, sha256 5d81ff845b00627ea4f471f613dd06a07fe1bebbe0e3cd3028826964057083a0):
+the three-sentence rewrite, my four-item handoff bubble, and the model's closing
+「交工了，这一单算完。」, with the session header showing 3 subagents used.
+
+## 5. Disk verification (the hardest evidence)
+
+`<DSH_HOME>` = `.tmp/soak-m2/dsh-home`; ledger dir `taskboards/grok-workflow/`.
+
+    $ wc -l blocks.jsonl verdicts.jsonl
+       3 blocks.jsonl
+       3 verdicts.jsonl
+
+`blocks.jsonl` is **append-only, one row per version of a block** — 3 rows, all the same
+`id`, `version` 1 → 2 → 3. It is *one block*, not three:
+
+| row | version | blocks[0].status | updatedAt |
+|---|---|---|---|
+| 0 | 1 | open | 2026-11-24T16:58:33.502Z |
+| 1 | 2 | open | 2026-11-24T16:58:52.372Z |
+| 2 | 3 | **accepted** | 2026-11-24T17:01:02.959Z |
+
+Field assertions (identical on all three rows):
+
+    id        = fdf2a16f-f90d-4149-8b2c-9d3752f690c2
+    splitHash = 8c3ad6066e4c2cac19e1d71825d13460f11329f92e78f8c620e09d3f6732e339
+                len 64, /^[0-9a-f]{64}$/ = true
+    approval  = kind=user  quote="确认"  at=2026-11-24T16:58:33.502Z
+    blocks[0] = title README安装步骤改写, execution foreman, acceptance 3 items,
+                writesPaths [], dependsOn []
+
+`approval.quote` is `确认` — the exact phrase I sent as a user message, byte for byte.
+
+`verdicts.jsonl` — 3 rows, every one `by = plugin:block-supervisor`:
+
+    attempt 1  outcome veto  route deterministic                          reasons 5
+    attempt 2  outcome veto  route agent2api/deepseek-v4.1-flash          reasons 1 (监工调用失败)
+    attempt 3  outcome pass  route deterministic                          reasons 0, criteria all true
+
+Line counts against observed actions: 1 preview + 2 start attempts (1 refused, 1 accepted)
++ 1 accept + 3 status reads produced exactly 3 block versions; 4 close calls produced
+3 verdict rows (the 4th call returned the attempt-2 verdict again instead of judging).
+No `heartbeats.jsonl` was written — the file simply does not exist in this directory.
+
+Redacted extract of both files: `ledger-extract.txt` in this directory (field names and
+short values only; long prose truncated).
+
+## 6. Isolation: the live instance and `~/.dsh` were not written
+
+- The soak instance ran on `127.0.0.1:3197` with `DSH_HOME` and `HOME` inside
+  `.tmp/soak-m2/`. The live service on `100.111.111.88:3080` / `127.0.0.1:3080` was
+  never addressed, restarted, reloaded or killed; it still answers `HTTP 401` (its
+  normal unauthenticated reply) after the soak.
+- `~/.dsh` mtime before the session: `1795362020` = 2026-11-22 23:40:20; after:
+  identical (`stat -c '%Y %y'`). No file was created or changed under
+  `~/.dsh/profiles`.
+- Writes to the live home are structurally impossible from this session's sandbox, and
+  that was measured rather than assumed:
+
+      $ touch /home/fish/.dsh/.soak-write-probe
+      touch: cannot touch '/home/fish/.dsh/.soak-write-probe': Read-only file system
+
+  The soak instance's own log shows the same wall for anything outside the workspace:
+  `[fsutil] append_jsonl 写失败 … /home/fish/agent-memory/_heartbeat.jsonl: OSError: [Errno 30] Read-only file system`.
+- Files that did change under `~/.dsh` during the window are the live server's own
+  session projection cache (`storages/session_projcache/sessions/*.json`) — written by
+  the running live instance that serves the GUI, not by this soak.
+- No credentials were printed. The instance's own web token appears only as
+  `<redacted>` here; the plugin's provider keys were passed through the environment
+  (sourced from this machine's `~/.config/environment.d/grok-api-keys.conf`) and never
+  echoed.
+
+## 7. Failures, deviations, and what was not reached
+
+**Deviation 1 — the plugin is a copied build, not a symlink to the worktree.**
+The task said to symlink `node_modules/dsh-grok-workflow` at the worktree root. That
+breaks the plugin: Node resolves the symlink's real path, so the plugin loads the
+*repo's dev copies* of `@deepseek-ai/*` (0.2.1-rc.2) instead of the host's (0.2.2-rc.3),
+and `/grok off` answered:
+
+    Grok workflow toggle not changed: Receiver must be an instance of class Session. In this session no toggle was recorded.
+
+(That message is V8 refusing a private-field access — `appendPluginRecord` calls
+`session.#appendRecord`.) A package-shaped directory of symlinks to `lib/` and
+`package.json` failed the same way, because `lib` was still a symlink. The fix was to
+**copy** the worktree's build into the profile (`lib/`, `package.json`,
+`cordis.patch.yml`, README/CHANGELOG/LICENSE, `docs/*.md`) with no local
+`@deepseek-ai` — which is exactly the shape a real `dsh plugin add` install has
+(the profile's own `.pnpm` contains zero `@deepseek-ai` packages). Verified the copy is
+the same build: `sha256sum lib/index.js` matches the worktree byte for byte
+(`4f362620eec94af3744901aea1afa66111bcf985d6746ba0b34d54dbf7280cac`), version reads
+back `0.13.33`, `registerBlockTools` present. After that `/grok off` succeeded.
+*This is worth a line in LOCAL-TESTING.md: "symlink the plugin root" is a trap.*
+
+**Gap 2 — the model-backed supervisor could not run.** Its route is
+`agent2api/deepseek-v4.1-flash` and that provider resolves `AGENT2API_API_KEY`, which
+this isolated home does not have. Verdict attempt 2 says so and refuses to pass:
+
+    监工调用失败：两次尝试都没有拿到可解析的逐条判断，这次不算通过
+
+The deterministic gate still judged (attempts 1 and 3), so the verdict path is exercised
+end to end; the *independent model judge* is not. The pass therefore carries
+`judged:false`.
+
+**Gap 3 — the first model route could not authenticate.** `GLM 5.3 Flash (tokenrhythm)`
+answered `403 IDENTITY_VERIFICATION_REQUIRED 请先完成实名认证后继续使用` (AUTH). The chat
+turn was retried on `muse-spark-1.3(oc)` and completed. That failed turn is still in the
+session log (turn 1, `turn/end {kind:error}`) — it is visible in the screenshots as
+「本轮运行失败 API 密钥无效」.
+
+**Finding 4 — the confirmation card does not count as approval.** Answering
+`ask_user_question` with 「确认」 is not a user message, so `grok_open_block(mode:"start")`
+is refused with `approval-required`. The user has to type a plain message. A model that
+politely uses `ask_user_question` for the confirmation gets bounced once. This is
+reproducible and, as far as this soak can tell, not documented.
+
+**Finding 5 — the handoff must be four *lines*, not four labels on one line.** The first
+veto (attempt 1) fired on
+`交接必须正好四行（做了什么 / 证据 / 没做 / 下一步），每行都要有内容` and
+`交接的第二行（证据）为空或太短`. A single-line "做了什么：… / 证据：… / 没做：… / 下一步：…"
+handoff is parsed as one line and vetoed. Re-sending it with newlines passed.
+
+**Observation 6 — the composer's `workflow总开关` is not a trustworthy read of the session
+toggle.** Right after `/grok off` it showed 关; after the next turn it showed
+`开 · 全员模式` again, while the session log still had exactly one mode record,
+`enabled:false`. The durable state and the gate's behaviour both say off; the switch's
+label appears to fall back to the profile default (`grokDefault: on`). Not chased
+further — reported because a user would read that switch as the session state.
+
+**Not reached:** no `pass` with `judged:true` (needs `AGENT2API_API_KEY`); no block that
+writes files (this block was approved as "不写文件", so the supervisor's own warning
+`这一块批准的范围是「不写文件」，没有产物要查` applies); no multi-block split (the task was
+a one-block split, so `splitHash` and the `blocks[]` array were exercised with one entry).
+
+## 8. Artifacts
+
+This directory: `soak.txt`, `ledger-extract.txt`.
+Raw run (gitignored scratch, `.tmp/soak-m2/`, deleted after the foreman confirms the copy):
+
+    logs/boot.log                     boot output of the final run (36 lines)
+    logs/boot-run1.log, boot-run2.log, boot-run3.log   earlier boots (install experiments)
+    logs/s01-boot.png                 app on 3197, workflow总开关 开
+    logs/s02-plugins-grok-card.png    Grok workflow card (run 1)
+    logs/s03-composer.png             composer before a model was chosen
+    logs/s04-model.png                model picker
+    logs/s05-after-grokoff.png        switch showing 关 right after /grok off
+    logs/s06-picker.png               model menu
+    logs/s07-question-card.png        ask_user_question confirmation card + preview
+    logs/s08-final.png                deliverable, four-item handoff, 交工了
+    logs/s09-plugins-card-run4.png    Grok workflow card on the final run
+    logs/describe-run4.json           POST /api/settings/describe result
+    logs/.token, .cookies             instance token (redacted in this file)
+    cdp.mjs, drive.mjs, tail-session.mjs, make-extract.mjs   the drivers used
+
+Screenshots are listed with sha256 in the report so a reader can tell them apart even
+after the scratch is gone.

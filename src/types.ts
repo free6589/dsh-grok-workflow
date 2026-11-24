@@ -232,6 +232,12 @@ export interface GrokWorkflowConfig {
    * bound the loop prompt has.
    */
   iterateTemplate?: string
+  /**
+   * Block intake (接单台子) switch. A load-time switch, not a live one: off means
+   * the feature does not exist in this load — the five tools and the heartbeat
+   * listener are never registered — so it cannot be a `volatile()` field.
+   */
+  blockIntake?: boolean
 }
 
 /** Fully resolved configuration. Everything not listed here is a fixed internal value. */
@@ -289,6 +295,12 @@ export interface ResolvedConfig {
   iterateIntervalMin: number
   /** Self-iteration heartbeat prompt template, resolved to a bounded string. */
   iterateTemplate: string
+  /**
+   * Block intake (接单台子) switch. A load-time switch, not a live one: off means
+   * the feature does not exist in this load — the five tools and the heartbeat
+   * listener are never registered — so it is not a `volatile()` field.
+   */
+  blockIntake: boolean
   configVersion: number
 }
 

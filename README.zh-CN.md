@@ -197,7 +197,7 @@ DSH 启动后，直接提问即可：
 
 ## 配置参考
 
-配置写在 profile 的 `cordis.patch.yml`（或 `--patch` 覆盖层）里，位于 bundle 行下。`0.11.0` 起配置面为九个（新增 `timeoutMs`），现在为十九个（新增单次调用预算 `childTimeoutMs`、限流换人开关、四个 `loop*` 续跑键、两个 `iterate*` 自迭代键与守卫判停单路由 `guardianModel`）；其它键在载入时直接被拒绝——旧补丁会明确报错，而不是变成"设了也不生效"：
+配置写在 profile 的 `cordis.patch.yml`（或 `--patch` 覆盖层）里，位于 bundle 行下。`0.11.0` 起配置面为九个（新增 `timeoutMs`），现在为二十个（新增单次调用预算 `childTimeoutMs`、限流换人开关、四个 `loop*` 续跑键、两个 `iterate*` 自迭代键、守卫判停单路由 `guardianModel` 与接单台开关 `blockIntake`）；其它键在载入时直接被拒绝——旧补丁会明确报错，而不是变成"设了也不生效"：
 
 ```yaml
 - id: grok-workflow
@@ -234,6 +234,7 @@ DSH 启动后，直接提问即可：
 | `loopIntervalMin` | `0`（`0` = 用循环自己的下限） | `10080`（七天） | 两轮之间的分钟数。实际等待不会低于一轮最坏耗时、也不低于 60 分钟，所以 `0` 是「上一轮跑完就接上」，不是「立刻开始」 |
 | `iterateIntervalMin` | `0`（`0` = 用心跳自己的下限） | `10080`（七天） | 自迭代心跳之间的分钟数，下限语义与 `loopIntervalMin` 相同：不低于一轮最坏耗时、也不低于 60 分钟 |
 | `iterateTemplate` | 内置默认，即 `docs/iterate-template.md` | 最多 4000 字符 | 「自迭代」开关武装心跳时，存进 `RSI heartbeat` 调度任务的整段提示词。纯空白回退到内置默认。内置默认就是 `docs/iterate-template.md` 里的轮次提示词（POOL 优先选题、R1–R6、三重评审、四道刹车、禁区），`test/iterate-template.spec.ts` 保证文件与常量逐字节一致。在设置页「自迭代」分组的文本框里编辑、随档案保存；不带路由标记，编辑它不会改变门禁路由 |
+| `blockIntake` | `false` | `true` \| `false` | 是否挂上接单台：六个 `grok_*block*`/`grok_steer`/`grok_stop` 工具、判一个块交工的监工，以及一个只在会话有未交工块时记一笔心跳的窄 `agent/pre-step` 观测。它是载入期开关（工具在载入时注册一次），因此不投影到设置页。关掉时一个工具都不注册、一个监听都不装，没要这个功能的档案保持原有工具面与原有投递决策。它不改变任何路由决策：观测把决策原样传下去 |
 | `configVersion` | `1` | `1` | 配置面版本 |
 
 四个 `loop*` 键配置续跑面。会话的循环打开时，续跑服务读取 `loopMaxRounds`、`loopFailStreak`、`loopIntervalMin`，写进一条持久 Schedule 规则；Host 没有装配 Schedule 服务时，这些键只是存下来，一条消息仍然只跑一次。`loopEnabled` 是自动驱动的部署默认值，目前还没被读取——打开循环始终是用户自己的显式动作（见[自动接着跑](#自动接着跑循环心跳)）。`loopIntervalMin` 是等待，不是预算：它只能把循环的下限抬高；`loopFailStreak` 会写进心跳文案当提示，因为 Host 记录的是投递，不是单轮成败。
