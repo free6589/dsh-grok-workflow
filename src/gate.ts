@@ -94,6 +94,7 @@ import {
   unusedAskNote, RECALL_LIMITS,
 } from './triage.js'
 import type { PendingAsk, RecallHit, RecallMiss, RecallSource, TriageLang, TriageVerdict } from './triage.js'
+import { isQuestionReplySource, startsTurn } from './user-source.js'
 import type { ResolvedConfig, WorkflowReport } from './types.js'
 
 /** Payload shape of one `agent/pre-step` dispatch. */
@@ -520,12 +521,16 @@ export function classifyPreStep(
   // `non-user-source` and let the turn run with no stop condition at all.
   const heartbeat = messages.find(message => isHeartbeatMessage(message))
   if (heartbeat !== undefined) return classifyHeartbeat(deps, payload)
-  const userMessages = messages.filter(message => {
-    const source = message.source as { kind?: unknown } | undefined
-    return source?.kind === 'user'
-  })
+  const userMessages = messages.filter(message => startsTurn(message.source))
   // Context, notices and this plugin's own relay report: never a user request.
-  if (userMessages.length === 0) return { kind: 'pass', reason: 'non-user-source' }
+  // A question-card answer is the user's nod, not a request, so it never starts a
+  // turn by itself (D-137) — but it is named rather than swallowed as
+  // `non-user-source`, because a bare foreign-source label hides the one message
+  // the user actually sent.
+  if (userMessages.length === 0) {
+    const answered = messages.some(message => isQuestionReplySource(message.source))
+    return { kind: 'pass', reason: answered ? 'question-reply' : 'non-user-source' }
+  }
   const agent = payload.agent
   const session = sessionOf(agent)
   const header = session?.header
@@ -2449,8 +2454,10 @@ export function installGate(deps: GateDeps): boolean {
   const classificationFailure = (payload: PreStepPayload, reason: string): PreStepDecision => {
     let userClaimed = false
     try {
+      // A real user turn, not a question-card answer: a card answer is a nod and
+      // cannot be refused as if it were a request (D-137).
       userClaimed = (Array.isArray(payload.messages) ? payload.messages : [])
-        .some(message => (message.source as { kind?: unknown } | undefined)?.kind === 'user')
+        .some(message => startsTurn(message.source))
     } catch {
       userClaimed = false
     }

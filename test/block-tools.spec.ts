@@ -161,6 +161,48 @@ function say(live: Session, text: string): void {
   live.append('user/message', message, { surfaceOp: 'append' })
 }
 
+/**
+ * Log an `ask_user_question` call the way the tool layer does.
+ *
+ * The call id is what a card answer names, and its `time` is what proves the
+ * question was asked *after* a preview.
+ */
+function ask(live: Session, callId: string, question = '这一单可以开工吗？'): void {
+  live.append('tool/call', {
+    turn: 1,
+    step: 1,
+    callId: callId as never,
+    name: 'ask_user_question',
+    arguments: JSON.stringify({
+      questions: [{ id: 'q1', question, options: [{ label: '确认' }, { label: '再看看' }] }],
+    }),
+  })
+}
+
+/**
+ * Log a question-card answer, payload and all.
+ *
+ * The Host writes the whole batch as one JSON text part — question text
+ * included — under `source.kind: 'user-question-reply'`; only `selected` /
+ * `custom` are the user's own words.
+ */
+function cardAnswer(live: Session, callId: string, selected: string[], question = '这一单可以开工吗？'): void {
+  const message = createUserMessage({
+    content: [{
+      type: 'text',
+      text: JSON.stringify({
+        kind: 'answer_to_pending_question',
+        tool: 'ask_user_question',
+        callId,
+        questions: [{ id: 'q1', question, options: [{ label: '确认' }, { label: '再看看' }] }],
+        answers: [{ id: 'q1', selected }],
+      }),
+    }],
+    source: { kind: 'user-question-reply', callId, outcome: 'answered' } as never,
+  }) as UserMessage
+  live.append('user/message', message, { surfaceOp: 'append' })
+}
+
 /** The `exec` a tool call receives. */
 function execOf(live: Session): unknown {
   return { agent: { session: live }, signal: new AbortController().signal }
@@ -376,6 +418,58 @@ describe('grok_open_block: preview writes nothing and start records the approved
       .rejects.toMatchObject({ code: 'invalid' })
     await expect(call(mounted, BLOCK_TOOL_NAMES.open, { mode: 'preview', objective: '', blocks: [] }, live))
       .rejects.toMatchObject({ code: 'invalid' })
+  })
+
+  it('counts a card answer only for a question asked after the preview, and only for what the user picked', async () => {
+    const mounted = await mount()
+    const startArgs = (previewed: Record<string, unknown>): Record<string, unknown> => ({
+      mode: 'start',
+      preview_id: previewed['preview_id'],
+      split_hash: previewed['split_hash'],
+      approval: { kind: 'user', quote: '确认' },
+    })
+
+    // Asked after the preview, answered 确认: the nod opens the block.
+    const asked = headed('sess-card-asked')
+    const previewed = await preview(mounted, asked)
+    await delay(5)
+    ask(asked, 'call-after-preview')
+    cardAnswer(asked, 'call-after-preview', ['确认'])
+    const started = await call(mounted, BLOCK_TOOL_NAMES.open, startArgs(previewed), asked)
+    expect(String(started['block_id'])).toMatch(/^[0-9a-f-]{36}$/)
+    expect(started['waited_for_run']).toBe(false)
+    expect(ledgerLines()).toHaveLength(1)
+
+    // (a) The question was asked before the preview: answering it is not a nod for this split.
+    const early = headed('sess-card-early')
+    ask(early, 'call-before-preview')
+    await delay(5)
+    const earlyPreview = await preview(mounted, early)
+    await delay(5)
+    cardAnswer(early, 'call-before-preview', ['确认'])
+    await expect(call(mounted, BLOCK_TOOL_NAMES.open, startArgs(earlyPreview), early))
+      .rejects.toMatchObject({ code: 'approval-required' })
+    expect(ledgerLines()).toHaveLength(1)
+
+    // (b) A reply whose call id was never asked — even with another question open in the same window.
+    const unasked = headed('sess-card-unasked')
+    const unaskedPreview = await preview(mounted, unasked)
+    await delay(5)
+    ask(unasked, 'call-that-was-asked')
+    cardAnswer(unasked, 'call-never-asked', ['确认'])
+    await expect(call(mounted, BLOCK_TOOL_NAMES.open, startArgs(unaskedPreview), unasked))
+      .rejects.toMatchObject({ code: 'approval-required' })
+    expect(ledgerLines()).toHaveLength(1)
+
+    // (c) 确认 in the question text only: the model's own words must not be the approval.
+    const quoted = headed('sess-card-quoted')
+    const quotedPreview = await preview(mounted, quoted)
+    await delay(5)
+    ask(quoted, 'call-quoted', '用户说了「确认」吗？')
+    cardAnswer(quoted, 'call-quoted', ['再看看'], '用户说了「确认」吗？')
+    await expect(call(mounted, BLOCK_TOOL_NAMES.open, startArgs(quotedPreview), quoted))
+      .rejects.toMatchObject({ code: 'approval-required' })
+    expect(ledgerLines()).toHaveLength(1)
   })
 })
 
