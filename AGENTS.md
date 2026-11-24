@@ -166,6 +166,13 @@ remote agent can see local-only commits.
   into plain words first.
 - Use everyday analogies, never jargon.
 - Answer yes/no questions with "yes" or "no" first, then explain. Never circle.
+- Plain language is a hard rule, not a matter of taste: always everyday words,
+  conclusion first, and no file paths, line numbers, function names, raw error
+  text, or internals. Translate any technical term into plain words before
+  using it.
+- Every user-facing message — a report, a verdict, a confirmation, a failure
+  note — must pass the plain-language gate: a non-programmer can read it and
+  act on it without having to ask what it means.
 
 
 【主代理与子代理异步协作规则】
