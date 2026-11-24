@@ -10,7 +10,8 @@ import {
   singleCallPrompt, tierNote, triageLine, triageSignals, TRIAGE_LIMITS, resumedRequest, expiredAskNote, unusedAskNote,
 } from '../src/triage.js'
 import { callerTask, execution, task, verification } from './fixtures.js'
-import {runWorkflowScript, roleOf} from './helpers.js'
+import { steeringForSession } from '../src/steering.js'
+import {landedWithin, runWorkflowScript, roleOf} from './helpers.js'
 
 /* ------------------------------------------------------------- classifier -- */
 
@@ -438,6 +439,36 @@ function userMessage(text: string): UserMessage {
   return createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } as never }) as UserMessage
 }
 
+/**
+ * Wait for the round behind a message to land, not merely to start.
+ *
+ * `route` used vitest's default 1 000 ms budget to watch for the report of a background
+ * admission. That budget is not the round's own clock: the admission starts behind real
+ * filesystem IO (the broken-run resume scan) and then runs a whole workflow script, so
+ * under load the report arrives after the budget lapses and the case ends with its round
+ * still working. The gate keeps the session's steering channel open for the round's whole
+ * life (`src/gate.ts` `runChannelRound` closes it in its `finally`, after the report has
+ * been delivered), and every `FakeAgent` in this file shares the session id `sess-triage`
+ * — so the next case's message was folded into the previous case's run
+ * (`已收到，并入了正在跑的这一轮…`, pending 1 → 2 → 3 across four cases) instead of reaching
+ * the front desk, and four cases went red on a receipt where a tier answer belongs.
+ *
+ * Both halves of the landing are watched here, on the probe's own clock: the report is in
+ * `agent.followups`, and this session's channel is gone. A round that never lands fails
+ * the case as this named condition, well inside the runner's 30 s kill.
+ *
+ * @param agent - the agent the round delivers its report into.
+ * @param seen - how many followups the case had already seen before this message.
+ * @param what - what is being awaited, for the failure message.
+ */
+async function roundLanded(agent: FakeAgent, seen: number, what: string): Promise<void> {
+  await landedWithin(
+    () => agent.followups.length > seen && steeringForSession(agent.session.id) === undefined,
+    15_000,
+    what,
+  )
+}
+
 /** Deliver one message through the gate and return the text the plugin delivered. */
 async function route(
   ctx: FakeContext,
@@ -487,18 +518,14 @@ async function route(
       .catch(() => {})
   }
   if (!enteredHasReport && ctx.engine.startCalls.some(call => call.meta.name !== 'Front desk')) {
-    await vi.waitFor(() => {
-      if (agent.followups.length <= seen) throw new Error('background report not delivered yet')
-    })
+    await roundLanded(agent, seen, 'the report of the background round')
     const content = agent.followups[agent.followups.length - 1]!.content as { type: string, text?: string }[]
     // Both halves: the entered first answer carries the tier line, the
     // background followup carries the final report.
     return [entered, content.map(block => block.text ?? '').join('')].filter(part => part.trim() !== '').join('\n')
   }
   if (decision.kind === 'enter' && entered.trim() !== '') return entered
-  await vi.waitFor(() => {
-    if (agent.followups.length <= seen) throw new Error('no answer delivered')
-  })
+  await roundLanded(agent, seen, 'the answer this message was owed')
   const content = agent.followups[agent.followups.length - 1]!.content as { type: string, text?: string }[]
   return content.map(block => block.text ?? '').join('')
 }
