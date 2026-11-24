@@ -1,3 +1,42 @@
+## 2026-11-25 — M2「接单台子」：代码全绿、真机 soak PASS，交接给下一个改这段代码的人
+
+- **From:** 记忆收口（`agent-138/docs-memory`）· **To:** 下一个接手 `feat/block-intake` 的人
+- **这一支的现状**：分支 `feat/block-intake`（worktree `.agents/worktrees/feat-block-intake`，基线 `main` 尖端 `9b55d2d`）
+  上新增 `src/block/` 8 文件 + `src/supervisor/` 3 文件 + 6 个测试 spec（174 例：五个 162 例 + `block-flag-baseline` 12 例，
+  外加夹具 `test/fixtures/block-flag-baseline.json`），改了 `src/config.ts`、`src/types.ts`、`src/index.ts`、`src/settings.ts`
+  与两个 README / `docs/LOCAL-TESTING.md`，`lib/**` 已重建。门禁 `TMPDIR=$PWD/.tmp npm run ci` **两次 exit 0**
+  （最后一次 **`110 files / 2116 tests PASS`**、lint **`36 warnings / 0 errors`**）——那次读数的树**还没有**第六个 spec，
+  它落地之后合起来的树没有重跑全量门禁（`NOT_RUN`，由包工头补）。**未发版、未打 tag、未 push、未合 `main`**，
+  `package.json` 仍是 `0.13.33`。
+- **先看这三个地方，别从工具层读起**：
+  1. `src/block/preview.ts`（`startBlock`，`:464-559`）——**幂等先于四道校验**：先按 `(session, splitHash)` 查账本，
+     命中就 `reused: true` 返回、一版都不追加；没命中才依次判「预览存在 → 未过期 → `split_hash` 逐字节相同 →
+     预览之后有一条用户消息逐字包含 `approval.quote` → `approved === true`」。顺序是用户的故事（你没看过 > 看过但变了 >
+     改了但没点头），改动这个顺序就是改用户读到的报错。
+  2. `src/supervisor/index.ts:102-179`——**先确定性、后模型**：六条确定性检查（计划覆盖 / 证据非空 / 产物可解析 /
+     范围 ⊆ 批准 / 依赖悬空 / 交接四行）在 `runDeterministicChecks()` 里，失败直接写 `route: "deterministic"` 的 `veto`，
+     **零模型调用**；只有全过（或被 `override` 放行的范围否决）才走到 `callBlockSupervisor()`。想让某个检查变成模型判断，
+     先读 `src/supervisor/checks.ts` 头注释里那张「为什么不能交给模型」的表。
+  3. `src/block/brakes.ts`——唯一的 `agent/pre-step` 监听。三条硬约束：off 时**一个监听都不装**；决策先算
+     （`await next()`）再记观测，返回的决策与基线逐字节相同；只写 `heartbeats.jsonl`，不碰 `verdicts.jsonl`、
+     不占 `blocks.jsonl` 的版本槽。改动这里等于改动全插件最外层的决策链。
+- **soak 的四个缺口，先补哪一个：缺口二（模型监工真机未验）**。理由：确定性闸门在真机上真判了两次 `veto`，
+  但**独立模型裁决一次都没在真机跑通过**——路由 `agent2api/deepseek-v4.1-flash` 缺 `AGENT2API_API_KEY`，隔离 home 里没有，
+  所以那次 `pass` 带 `judged:false` + `not_judged`，只有单测里的 fake engine 覆盖过。补法是给隔离 home 配一把可用的
+  监工 key（或在 soak 里显式换一条有凭据的路由），跑出一次 `judged:true` 的 `pass` 与一次模型 `veto`。
+  其余三条按序排在它后面：缺口一（软链插件根会挂，已写进 `docs/LOCAL-TESTING.md`，属于安装姿势、不是产品缺陷）、
+  缺口三（首个模型路由 403 实名认证，环境问题）、缺口四（`ask_user_question` 的答案不算用户消息、交接必须正好四行，
+  两条都记成 M3 候选行为改进，不是本轮的 bug）。
+- **决策日：`2026-12-02`**。按 `AGENTS.md` §5，长期实验分支（`feat/*`）到期前必须做出选择——合 `main`、rebase 重开、
+  或删掉。到那天之前需要决定的其实是「模型监工真机未验」这条能不能带着走：能，就在 `VALIDATION.md` 里把它写成
+  已知边界并合；不能，就先补缺口二再合。**到期没决定就按删除处理，别把日期往后挪。**
+- **口径都记在哪**：八条取舍在 `DECISIONS.md` 的 **D-135**（只追加账本、`verify` 不进 `splitHash`、第三个文件
+  `heartbeats.jsonl`、`block_id` 是行 id、账本不加锁、`blockIntake` 是载入期开关、`override` 只覆盖范围否决、
+  心跳先算决策再记观测）；命令与读数在 `VALIDATION.md` 顶部那一节；架构形状在 `docs/ARCHITECTURE.md` 的
+  `## Block intake (接单台子)`。
+- **红线**：全程未碰 `~/.dsh`、未重载未重启线上实例；soak 用的是克隆出来的隔离 home（`127.0.0.1:3197`），
+  线上 `100.111.111.88:3080` 一次都没被访问；本轮没有 `git add` / `commit` / `push`。
+
 ## 2026-11-24 — 0.13.33 发布收口：三件功能出去，两条远端流水线一次绿
 
 - **From:** 发版收口（`agent-137/memory-closeout`）· **To:** 下一个接手的人

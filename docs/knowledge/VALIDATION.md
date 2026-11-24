@@ -1,3 +1,54 @@
+## M2「接单台子」：两次全量门禁 exit 0、新 spec 174 例、真机隔离 soak PASS（模型监工真机未验）— 2026-11-25 (`CONFIRMED`)
+
+分支 `feat/block-intake`（worktree `.agents/worktrees/feat-block-intake`，基线 `main` 尖端 `9b55d2d`）。
+**下面每一行都写清命令、环境与结果；没跑的写 `NOT_RUN`，没验到的写 `HYPOTHESIS`。**
+两次全量门禁与真机 soak 是 M2 这一轮在这棵树里真跑出来的读数（由包工头转述进本文件）；
+收口这一轮只做了只读复核 + 新 spec 单跑：`git status`、文件行数、`.tmp/red-block-*.txt`、
+`.rsi/evidence/block-intake-2026-11-25/{soak,ledger-extract}.txt`，**没有重跑 `npm run ci`，也没有重跑 soak**。
+**一个时间点要说清**：那两次全量门禁的读数（`110 files / 2116 tests`）是在 `test/block-flag-baseline.spec.ts`
+落地**之前**的树上取的；那个 spec 与它的夹具在收口这一轮期间才写盘（01:12–01:13），所以现在这棵树是
+**111 个 spec 文件**、两个新 spec 单跑分别是 162 例与 12 例（都绿）。**合起来的那棵树的全量门禁是 `NOT_RUN`**，
+由包工头在提交前后跑，读数以那次实跑为准。
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 分支与基线 | `git status --short --branch`；`git log --oneline -1`（worktree） | `## feat/block-intake`；HEAD = **`9b55d2d`**（基线未动）。未跟踪：`src/block/`、`src/supervisor/`、五个 `test/block-*.spec.ts`、`lib/block/`、`lib/supervisor/`、`.rsi/evidence/block-intake-2026-11-25/`；已改 9 个既有文件 + `lib/**`。**`CONFIRMED`** |
+| 全量门禁（第一次） | `TMPDIR=$PWD/.tmp npm run ci`（整棵树，M2 期间） | **exit 0**。**`CONFIRMED`**（读数见下一行；两次都是同一形状） |
+| 全量门禁（第二次，收口前最后一次） | 同上 | **exit 0**：vitest **`110 files / 2116 tests PASS`**；`oxlint src test` → **`Found 36 warnings and 0 errors.`**；`verify:lib` → **`lib/ at 9b55d2d is the build of src/ at 9b55d2d (249 files, byte-identical)`**。**`CONFIRMED`** |
+| 基线读数与增量 | 同命令在 `9b55d2d` 上 | 基线 **`105 files / 1954 tests`** ⇒ 本轮 **+5 文件 / +162 例**；`1954 + 162 = 2116`、`105 + 5 = 110`，逐项相等。**`CONFIRMED`** |
+| lint 零新增 | `npm run lint` | **`Found 36 warnings and 0 errors.`**，与基线同量（36/0），本轮零新增 warning。**`CONFIRMED`** |
+| 五个新 spec（收口轮实跑） | `TMPDIR=$PWD/.tmp npx vitest run test/block-ledger.spec.ts test/block-preview.spec.ts test/block-tools.spec.ts test/block-supervisor.spec.ts test/block-flag.spec.ts` | **5 files / 162 tests PASS**，13.49 s。逐文件：`block-ledger` **20**、`block-preview` **93**、`block-tools` **21**、`block-supervisor` **20**、`block-flag` **8**。**`CONFIRMED`** |
+| 第六个新 spec（收口轮实跑，落地晚于那两次门禁） | `TMPDIR=$PWD/.tmp npx vitest run test/block-flag-baseline.spec.ts` | **1 file / 12 tests PASS**，3.87 s。它拿 `test/fixtures/block-flag-baseline.json`（99477 B，由基线 `9b55d2d` 的源码跑同一批八个载荷生成、`id` 归一化）逐字节比对决策，所以钉的是「`blockIntake: false` 复现出功能之前那棵树」，而不是「两次装载互相一致」。**`CONFIRMED`** |
+| 合起来的树跑全量门禁 | `TMPDIR=$PWD/.tmp npm run ci`（含第六个 spec 的树） | **`NOT_RUN`**：收口这一轮没跑，由包工头在提交前后跑；文件数会从 110 变 111、例数从 2116 变 2128 的量级，**以实跑读数为准** |
+| 红→绿（模块级） | `head .tmp/red-block-*.txt`（收口轮只读复核） | 四个 spec 在基线上的红是模块不存在：`Error: Cannot find module '../src/block/index.js'`（`block-supervisor`、`block-tools`、`block-flag`、`block-ledger` 各自的 `Failed Suites`）。**`CONFIRMED`** |
+| 红→绿（行为级） | 同上；`.tmp/red-block-flag-loader.txt`、`.tmp/red-block-preview.txt` | ① 基线载入器逐字拒绝新键：`unknown configuration key "blockIntake"; accepted keys: …`（到 `configVersion` 为止，不含 `blockIntake`）；② `block-preview` 在基线树上 **89 例全红**（现在 93 例）。**`CONFIRMED`** |
+| `verify:lib`（本轮读数，按字面读） | `npm run verify:lib` | 报 `lib/ at 9b55d2d is the build of src/ at 9b55d2d (249 files, byte-identical)`——它比的是 **HEAD 的 `src` 与 HEAD 的 `lib`**，249 文件说明的是「基线仍然一致」，**没有覆盖**本轮新增的 `lib/block/**` 与 `lib/supervisor/**`。**`CONFIRMED`（读数）/ 覆盖范围有缺口（如实记）** |
+| `verify:lib`（提交后 293 文件） | `npm run verify:lib`（在包含新增 `lib/block/**`、`lib/supervisor/**` 的提交上） | **`NOT_RUN`**：本文件这一版还没提交，复验由包工头在提交后补；预期读数 `293 files, byte-identical`，未跑之前不写成已验 |
+| soak 环境（隔离） | `scripts/clone-profile.mjs`（从线上 `web` profile 克隆）→ `DSH_HOME=.tmp/soak-m2/dsh-home HOME=.tmp/soak-m2/home dsh --profile web-clone --host 127.0.0.1 --port 3197 --no-open` | 克隆 **7699 文件**、parity **5/5**、**1 行凭据按设计脱敏**；实例在 `127.0.0.1:3197`；线上 `100.111.111.88:3080` 全程未碰；`~/.dsh` 零写入（`touch /home/fish/.dsh/.soak-write-probe` → `Read-only file system`，`stat` 前后 mtime 相同）。**`CONFIRMED`** |
+| soak 四项激活核对 | 见 `.rsi/evidence/block-intake-2026-11-25/soak.txt` §3 | ① boot 日志无 `pending`、无 `did not activate`；② `POST /api/settings/describe` → 24 个 namespace，其中 `grok-workflow` 带 `autoGenerate: true`，`blockIntake` 不在投影里（设计如此，见 `src/settings.ts:375`）；③ 插件页读到 `Grok workflow` 卡片；④ 会话 `request/header` 两次都是 **`tools: 101`**，六个块工具（`grok_open_block` / `grok_accept_block` / `grok_close_block` / `grok_block_status` / `grok_steer` / `grok_stop`）全在。**`CONFIRMED`** |
+| soak 用户四步 | 见 soak.txt §4 | `/grok off`（写入 `enabled:false`，全会话唯一一条 mode 记录）→ 普通聊天（无接单回执、无后台 run）→ `grok_open_block` 预览（`split_hash 8c3ad606…`）+ 纯文本「确认」后 `mode:start` 拿到 `block_id` → `grok_close_block` 三次判决 **`veto` / `veto` / `pass`**，块走到 `accepted`。**`CONFIRMED`** |
+| soak 落盘（最硬的证据） | `wc -l blocks.jsonl verdicts.jsonl`；`ledger-extract.txt` | `blocks.jsonl` **3 行 = 同一个 `id` 的 v1→v2→v3**（`open` / `open` / `accepted`，追加式版本化、无就地改写）；`splitHash` 64 位小写十六进制；`approval` = `kind: user`、`quote: "确认"`（与用户原话逐字一致）；`verdicts.jsonl` **3 行** `veto/veto/pass`，`by: plugin:block-supervisor`，`route` 依次 `deterministic` / `agent2api/deepseek-v4.1-flash` / `deterministic`。4 次 `close` 调用只产生 3 行（第 4 次回的是 attempt 2 的原判决，没写新行）。**`CONFIRMED`** |
+| soak 缺口一：软链插件根会挂 | 真机（隔离 home，软链 `node_modules/dsh-grok-workflow` → worktree） | **`CONFIRMED`**：`/grok off` 报 `Grok workflow toggle not changed: Receiver must be an instance of class Session.`——Node 解析真实路径后加载仓库自带的 `@deepseek-ai/*` 0.2.1-rc.2，与宿主 0.2.2-rc.3 不是同一个 `Session` 类。改成把构建产物**拷进** profile（真实 `dsh plugin add` 的形态）后正常；拷进去的 `lib/index.js` 与 worktree 逐字节相同（sha256 `4f362620eec94af3744901aea1afa66111bcf985d6746ba0b34d54dbf7280cac`）。已写进 `docs/LOCAL-TESTING.md` 的 trap 清单 |
+| soak 缺口二：模型监工真机未验 | 真机（同一隔离 home） | **`NOT_RUN`**：路由 `agent2api/deepseek-v4.1-flash` 缺 `AGENT2API_API_KEY`，隔离 home 里没有，所以 attempt 2 是「监工调用失败：两次尝试都没有拿到可解析的逐条判断」的 `veto`，最终那次 `pass` 带 **`judged:false`** + `not_judged`。**确定性闸门真判了**（attempt 1 与 3），**独立模型裁决在真机上一次都没验到**；单测里由 fake engine 覆盖。这是下一轮必须先补的一条 |
+| soak 缺口三：首个模型路由 403 | 真机（同一隔离 home） | **`CONFIRMED`（现象）**：`GLM 5.3 Flash (tokenrhythm)` 返回 `403 IDENTITY_VERIFICATION_REQUIRED 请先完成实名认证后继续使用`；聊天改用 `muse-spark-1.3(oc)` 后完成。失败的那一回合留在会话里（`turn/end {kind:error}`），截图里显示为「本轮运行失败 API 密钥无效」。环境问题，不是本轮的代码缺陷 |
+| soak 缺口四：两条行为发现 | 真机（同一隔离 home） | **`CONFIRMED`（两条都可复现）**：① 模型用 `ask_user_question` 卡片收确认时，用户点「提交」的答案**不算用户消息**，`grok_open_block(mode:"start")` 以 `approval-required` 被拒，必须另发一条纯文本「确认」；② 交接必须**正好四行**，写成一行用「/」分隔会被 `veto`（`交接必须正好四行（做了什么 / 证据 / 没做 / 下一步），每行都要有内容` + `交接的第二行（证据）为空或太短`）。两条都记成 **M3 候选**，不是本轮的 bug |
+| soak 未触达的三块 | 见 soak.txt §7 "Not reached" | **`NOT_RUN`**：没有一次 `judged:true` 的 `pass`（缺 `AGENT2API_API_KEY`）；没有一个会写文件的块（这单批准为「不写文件」，所以监工自己的 warning `这一块批准的范围是「不写文件」，没有产物要查` 成立）；没有多块切分（这单是 1 块，`blocks[]` 只被 1 个元素走过） |
+| 疑点：composer 总开关显示 | 真机（同一隔离 home） | **`HYPOTHESIS`**：`/grok off` 后开关显示「关」，下一回合又显示「开 · 全员模式」，而会话账本里始终只有一条 `enabled:false`；疑似回落到 profile 默认值（`grokDefault: on`）。**本轮未深挖**，与本轮改动无关 |
+| 未发版 / 未 push / 未合 `main` | `git log --oneline -1`；`git status --short --branch` | HEAD 仍是 **`9b55d2d`**；`package.json` 仍是 `0.13.33`；没有 `git add` / `commit` / `push`，没有打 tag，没有合 `main`，没有删分支/worktree。**`CONFIRMED`** |
+
+**Changed（本块随出去的代码面）：** `src/block/`（8 文件：`types` / `paths` / `store` / `preview` / `approval` / `index` / `tools` / `brakes`）、
+`src/supervisor/`（3 文件：`index` / `checks` / `verdict`）、`src/config.ts` 的 `blockIntake` 键（默认 `false`）、`src/index.ts` 的
+条件注册、`src/settings.ts` 的投影过滤（页面字段 16→17）、两个 README 与 `docs/LOCAL-TESTING.md` 的配置面（键 19→20），
+外加 `lib/` 同一次构建的产物。
+
+**Honest boundary（逐条，别单独主张被它们限定的东西）：**
+1. **收口轮没有重跑全量门禁，也没有重跑 soak**：两次 `ci` 与 soak 的读数是 M2 那一轮的实跑结果；收口轮实跑的只有五个新 spec（162 例）。
+2. **`verify:lib` 的 249 文件不是「本轮已验」**：它比的是 HEAD 的 `src` 与 HEAD 的 `lib`，而本轮新增的 `lib/block/**`、`lib/supervisor/**` 还没进 HEAD；提交后的 293 文件复验是 `NOT_RUN`。
+3. **独立模型裁决在真机上 `NOT_RUN`**：确定性闸门有真机证据，模型监工只有单测证据。任何「监工在真机上会判」的说法都超出这条边界。
+4. **一条 `pass` 是 `judged:false` 的 `pass`**：它是「确定性检查全过、按调用方要求跳过模型」的通过，不是「独立监工认可」的通过。
+5. **多块切分、写文件块、`judged:true` 的 `pass` 三块未触达**（`NOT_RUN`），`blocks[]` 的多元素形状只有单测覆盖。
+6. **composer 开关那条是 `HYPOTHESIS`**：现象可复现（soak 截图 s05/s08），归因没有验证。
+
 ## 0.13.33 发布：合流、门禁、标签、推送、远端两条流水线（两条 run 一次绿、零重跑，soak 未重跑）— 2026-11-24 (`CONFIRMED`)
 
 下面每一行都是发版那一轮在主检出 `/home/fish/projects_mine/dsh-grok-workflow` 里真跑过的命令与真读到的结果；没跑的写 `NOT_RUN`。

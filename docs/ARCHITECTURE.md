@@ -454,6 +454,140 @@ can inflate the serialized plan past the budget without adding a character of
 work. The run reports `partial` with `planning.source: "fallback"` and the
 planner error.
 
+## Block intake (接单台子)
+
+`src/block/` and `src/supervisor/` implement an optional intake desk: one user-approved split
+of an objective into 1–3 blocks, a ledger recording what was approved and what was judged,
+and a narrow observer for the one clock a block has. It is off unless `blockIntake` is
+`true`. It is **not** part of the gate: the front desk in `## Mandatory entry (the gate)`
+decides whether a message runs a workflow, while the intake desk is a set of tools the model
+calls — no message is claimed, no run is started, and no delivery decision changes because
+this feature exists.
+
+### Location
+
+One directory, three append-only files, resolved by the same three-step rule as the task
+board and the checkpoint recorder (explicit `dir` → `GROK_WORKFLOW_BLOCK_LEDGER_DIR` →
+`$DSH_HOME`, else `~/.dsh`, + `taskboards/grok-workflow`):
+
+| file | one line is | written by |
+| --- | --- | --- |
+| `blocks.jsonl` | one **version** of one intake row | `appendBlockRow` only |
+| `verdicts.jsonl` | one supervisor verdict | `appendVerdictRow` only |
+| `heartbeats.jsonl` | one observed heartbeat | the `agent/pre-step` observer only |
+
+Nothing rewrites a line. A row that changes is appended again with `version + 1`, and the
+earlier versions stay byte-identical, so "who accepted what, when" survives every restart.
+The writer owns the version (`previous + 1`) and refuses a caller that reports any other
+number, which is what makes the 20-version cap a checkable bound instead of a convention.
+Each file is written through the task board's recipe — current body plus the new line into a
+hidden `*.tmp`, `fsync`, then `rename` — so a reader never sees a half-written file.
+
+### Row shape
+
+A `blocks.jsonl` line carries `v: 1`, a random row `id`, `sessionId`, `objective`,
+`splitHash`, `approval` (`kind`, verbatim `quote`, `at`, optional `sourceMessageId`),
+`blocks[]`, optional `verify`, `version`, `createdAt`, `updatedAt` and `rowHash`. Each block
+holds `id` (`blk-1`.., unique inside the row only), `title`, `objective`, `deliverable`,
+`acceptance[]`, `writesPaths[]`, `dependsOn[]` (sibling titles), `execution`
+(`foreman` | `workflow`), optional `owner`, `status` (`open` | `vetoed` | `accepted`),
+`tasks[]`, and the `planId` / `runId` / `checkpoint` ids the caller reported.
+
+`splitHash` is the sha-256 of the canonical JSON of the **normalized** split (objective,
+blocks, constraints, non-goals; trimmed text, no blank entries, write paths normalized), so
+two previews of the same split hash identically and any real edit changes the hash. `verify`
+is deliberately outside it: the hash answers "is this the work the user approved?", and the
+supervisor switch is an execution policy. Folding it in would make "the user turned the
+judge off" read as "the user changed the order", and `startBlock` would refuse a preview
+nobody edited. The switch still survives on the row (`BlockRow.verify`), beside the
+fingerprint rather than inside it.
+
+`rowHash` is the sha-256 of the row's own canonical JSON without `rowHash`; the write path
+validates it and the read path re-derives it, so a hand-edited or torn line is detectable.
+Reads skip a bad line into `skipped` (line number, reason, first 200 characters) instead of
+failing the whole ledger; writes refuse before a byte lands.
+
+### Starting a block: idempotency first, then four checks
+
+`grok_open_block` has two modes. `preview` is pure: it computes the text the user reads,
+remembers it in memory for `previewTtlMs` (ten minutes), and writes nothing — a preview is a
+question, not a decision. `start` is the only writer here, and it looks the split up by
+`(sessionId, splitHash)` **before** validating anything: a split already in the ledger is
+returned with `reused: true` and appends no line, so a retry after a crash, after the
+preview expired, or after the plugin restarted still hands back the block that exists.
+
+Only for a split that is new do the four checks run, in this order, because the order is the
+user's story:
+
+| # | check | refusal code |
+| --- | --- | --- |
+| 1 | the preview exists in this session | `not-found` |
+| 2 | it has not expired | `preview-expired` |
+| 3 | the submitted `splitHash` is byte-identical to the preview's | `split-changed` |
+| 4 | one message after the preview contains `approval.quote` verbatim | `approval-required` |
+
+and then `approved === true`, else `not-approval`. "You never saw this" outranks "you saw it
+but it changed", which outranks "you changed it but did not say yes", so a caller that gets
+`approval-required` knows the words are missing rather than that the split moved underneath
+it. Check 4 is also why a confirmation collected through an `ask_user_question` card does not
+count: the card's answer is not a user message, and the user has to type one.
+
+### Handing in: deterministic first, the model only for judgement
+
+`grok_close_block` runs six checks before the supervisor is asked anything
+(`src/supervisor/checks.ts`), because a model asked these questions answers them plausibly
+instead of correctly: every acceptance item is claimed by a task or a handoff line; the
+evidence line is real text, not blanks; declared artifacts exist and their pointers parse;
+every written path is inside the approved scope; `dependsOn` names a sibling that is really
+accepted; and the handoff carries its four non-empty lines (做了什么 / 证据 / 没做 / 下一步 —
+four lines, not four labels on one line). A failure here writes a `veto` with
+`route: "deterministic"` and spends **zero** model calls.
+
+The supervisor returns one of two outcomes — `pass` or `veto` — with per-criterion
+`met`/`evidence` and named reasons. There is no third state: a judge call that cannot be
+parsed after two attempts becomes a `veto` that says so, never a silent pass, and the same
+evidence resubmitted returns the verdict already on file instead of writing a second line. A
+veto changes nothing but the verdict row; a pass appends a new block version with the block
+`accepted`.
+
+`override` is the one human escape hatch and it covers the scope criterion only: a veto is
+overridable when *every* failing reason is `范围 ⊆ 批准`, and the overruling is recorded in
+the verdict row (`who`, `why`). The other five checks and a model veto are not overridable —
+a person can authorise a wider scope, not make a missing file exist.
+
+### The heartbeat observer
+
+A block outlives a turn, and the only clock the host gives this plugin is the heartbeat
+delivery it already schedules. `installHeartbeatBrakes` observes that delivery and nothing
+else:
+
+- with the switch off it registers **no listener at all** — not one that returns early — so
+  the `agent/pre-step` chain is exactly the chain the profile had before the module existed;
+- the handler computes the decision first (`const decision = await next()`), then records the
+  observation, then returns that same object. A failure in the observation is warned about
+  and swallowed, so a full disk cannot refuse a turn. Returning `undefined` from a cordis
+  waterfall handler would drop the whole chain's decision, which is why the order is not
+  negotiable; `test/block-flag.spec.ts` pins the decision bytes against a load that never
+  heard of the key;
+- it appends to `heartbeats.jsonl` only — never a verdict (a heartbeat is not a judgement),
+  never a `blocks.jsonl` version (20 version slots per block, and an hourly beat would retire
+  a real block), and it stops at `HEARTBEAT_OBSERVATION_LIMIT` (200 lines) with one warning;
+- it is installed before `installGate`, so it is the outermost listener and a heartbeat the
+  gate itself refuses is still observed.
+
+### What this desk does not do
+
+- It takes no lock. The writer is one session's tool layer and the `(session, splitHash)`
+  idempotency means a retry does not append; two processes appending at the same instant
+  would race, and a multi-writer deployment needs the task board's lock rather than a second
+  one invented here.
+- It does not run the work. `grok_accept_block` returns the split, the write scope and the
+  plan id; dispatching a foreman or a workflow script is the caller's step, and the ledger
+  records only the ids it was handed.
+- It does not project onto the settings page. `blockIntake` is read at load time because both
+  halves are registrations (six tools and one listener), and a registration cannot appear
+  without a reload.
+
 ## Non-interference
 
 When the bundle is not installed or its row is disabled:
