@@ -2578,3 +2578,8 @@ vitest **100 files / 1866 tests PASS**。远端 CI `45363402329` **success**（2
 GitHub Release `Grok Workflow for DSH v0.13.31` 带 `dsh-grok-workflow-0.13.31.tgz`（928474 B）。跨进程证据：`main` 已发布
 `lib/` 起 12 进程各认领各一行连跑 3 次 → 12/12 报成功但盘上只活 5 / 6 / 7 行；合入后 3 次 → 12/12 全活。按操作员红线「不碰 live」，
 `~/.dsh` 一行未动、未升级未重载未重启，AGENTS §11 自动升级**故意跳过**；live profile 现装哪一版**未核对**。）
+
+补记（2026-11-24 17:24，`CONFIRMED`，**只读探针**）：上面写的「live profile 现装哪一版未核对」已被一次只读检查替掉——
+`~/.dsh` 目录 mtime 仍是 **2026-11-22 23:40:20**（本轮任何时刻都不等于今天），live 的 `web` profile 里
+`node_modules/dsh-grok-workflow/package.json` 读到 **`0.13.29`**（另有四个历史验证 profile 分别停在 0.12.9 / 0.8.0 / 0.8.0 / 0.12.19）。
+也就是说 `0.13.30` 与 `0.13.31` 都没有装进 live——§11 自动升级在上一轮同样没有执行、本轮按红线继续跳过。没有任何写入、重载或重启。

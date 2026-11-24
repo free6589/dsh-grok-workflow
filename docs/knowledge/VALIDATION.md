@@ -6650,3 +6650,9 @@ toolName/configVersion = 页面 16）；`test/client.spec.ts` ProgressBundle 补
 **Honest boundary：** 真机 soak 本轮**没有重跑**，复用的是分支上已通过的那次（隔离 `DSH_HOME`、真模型跑到
 `run.status=completed`、`write-a:verified read-b:verified`、`TEAM_OK` 与 `TEAM_B_OK\nA_SEEN=TEAM_OK` 真写出来）；
 本轮新跑的证据面是合流、两处门禁、标签、推送与远端两条流水线。live profile 是否已装 `0.13.31` **未核对**——红线不允许碰 live。
+
+**补记（2026-11-24 17:24，只读探针，`CONFIRMED`）：** 上表 `live profile` 一行的「未核对」用一次只读检查补上——
+`stat /home/fish/.dsh` → mtime **2026-11-22 23:40:20 +0800**（早于本会话两天，可证本轮没有写它）；
+`~/.dsh/profiles/*/node_modules/dsh-grok-workflow/package.json` 逐个读版本 → live 的 **`web` 是 `0.13.29`**，
+`loopfix-verify` 0.12.9、`v080verify` 0.8.0、`web.bak` 0.8.0、`web-verify2` 0.12.19。结论：`0.13.30` 和 `0.13.31`
+都**没有**装进 live，AGENTS §11 在上一轮与本轮都未执行（本轮按操作员红线「不碰 live」主动跳过）。只读，未写入、未重载、未重启。
