@@ -1,3 +1,16 @@
+## 2026-11-24 — `team-dispatch-v1` rebase 到 main 尖端：3 条重放 + 2 条收尾，全仓门禁 `exit 0`（`CONFIRMED`，待合流判定）
+
+- **From:** 执行手（`agent-125/rebase-ci`） · **To:** 合流者 / 操作员
+- **基线**：`main` 尖端 `369d6e3`（= `origin/main`），版本 `0.13.30`，tag `v0.13.30` 在。分支原尖端 `7d86bc4`（merge-base `e4e03e9`，落后 193 条）。worktree 仍是 `.agents/worktrees/team-dispatch-v1`，未动主检出。
+- **结果**：rebase 完成、未 abort；分支新尖端见 `git log`（3 条重放 + `chore(build)` 重建 `lib/` + 本轮记忆）。**没 push、没打 tag、没删任何分支或 ref**（`backup/wip-2026-11-24-*` 三条原样在）。
+- **冲突口径**：`src/**` 一律保留 main 的新架构（`TaskBoard` + `boardReader` + `decideIntent` + 异步会话），只搬分支的真新增。分支自己那份 `board.json` 会话实现**没有**复活：它的能力已由 main `9dc7624`（dispatcher 跑在持久 TaskBoard 上）覆盖，复活的唯一后果是第二个板文件。
+- **搬进来的真新增**：① 认领锁（`TASKBOARD_LOCK` / `.store.jsonl.lock` / `withLock` / 陈旧锁接管，锁内「重读 → 按磁盘版本 CAS → 落盘」）；② 到达顺序（`TaskRecord.seq` + `TaskBoard.arrival()` + `DispatcherSession.pending()` + `resume().pending`；旧账本没有 `seq` 的行按文件序补盖，不重排、不丢）；③ 全路径寻址（`isFullSubagentPath` / `isAddressPath` / `invalid:bad-address`，owner 必须形如 `lead/worker-1`）；④ `creator` + `resultRecipient`（结果只回创建者，改派不改收件人）；⑤ 位置解析 `src/taskboard/paths.ts`（`taskboardDir` / `taskboardFile` / `openDefaultTaskboard`）。
+- **判定 main 已覆盖、只留护栏没搬实现的**：改派时清掉陈旧 block reason——main 的 `requeue`（`store.ts`）先把 blocked/failed 送回 `pending`，适配器 `mapStatus` 对 `pending` 只回 `{status}`（`board-reader.ts`），读面自然没有 `blockedReason`；把分支那条用例照搬到 main 现有实现上**直接 PASS**，因此留作 `test/dispatcher.spec.ts` 的护栏而非新代码。`createDispatcherSession(dir)` 现有即清 `store.jsonl` 是 main 明写的产品决定（「接旧状态用 `resume()`，不要用 `start()`」），本轮**未**擅自改。
+- **门禁**：`npm run ci` → **exit 0**，**100 files / 1866 tests PASS**，typecheck 干净，oxlint **0 errors / 36 warnings**（全既有），`verify:lib` **241 files byte-identical**。
+- **跨进程差分（自己复跑的实测，不引用他人结论）**：12 个 node 进程同时各认领各的一行；main 的产物（`git archive main lib/taskboard` 取出，未构建）三次分别只活 5 / 6 / 7 行，而 12 个进程都报成功；rebase 后的 `lib/` 三次都 12/12 全活。FIFO 探针：main 重开后 `list()` 回到 id 序（`a,b,task-10,task-9`），到达序不可恢复；rebase 后 `list()` 同前（main 契约不变），`arrival()` 给出 `task-10,task-9,b,a`。
+- **未做**：没合流 `main`、没 push、没发版；没跑真机 soak（本轮只到单测 + 门禁）；handoff / report / delivery 三个面一行未动；L3 小组长与引擎读板仍未接。
+- **合流建议**：建议合，但请按「两条真缺陷 + 一条能力」来看待，而不是当一个新特性——锁修的是跨进程丢更新（实测可复现），`seq` 补的是重启后队列乱序，寻址/creator 是策略加固。若嫌提交面大，可只 cherry-pick 锁与 `seq` 两组改动 + 各自用例。
+
 ## 2026-11-24 — 清包：19 条已合分支删完、三处悬空活双份落盘、三条未合分支各有结论（`CONFIRMED`，纯文档 + 证据，`src/test/lib` 一行未动）
 
 - **From:** 执行手（`agent-124/debt-finisher`） · **To:** 下一个接手者 / 操作员
@@ -3940,7 +3953,7 @@ Issue #1 状态评论 issuecomment-6927842856。
   落盘」，直接修掉两处丢更新：同一任务被两个句柄同时认领（旧实现两边都成功、文件只留一个归属）、不同行并发认领互相
   冲掉。新增 `src/taskboard/paths.ts` 三级位置解析（`GROK_WORKFLOW_TASKBOARD_DIR` → `$DSH_HOME` +
   `taskboards/grok-workflow`），落盘位置/行格式/认领协议/崩溃恢复规则写进 `docs/ARCHITECTURE.md` 任务板章节，
-  决策落 D-109。
+  决策落 D-127（分支上的编号是 D-109，`main` 已占用 109/110，rebase 时顺延）。
 - **测试**：`test/taskboard.spec.ts` 23 例连跑 3 次 PASS；新增真实崩溃恢复（SIGKILL 子进程 `test/fixtures/taskboard/writer.mjs`、
   持锁进程被杀、活锁超时、撕裂账本、中断写 tmp、跨重启 id/CAS）与位置解析用例。`lib/taskboard/*` 已重建（含新 `paths.*`）。
 - **必须知道**：本 worktree 当时被另一条 lane 并行占用（`src/dispatcher`/`src/handoff`/`src/report`/`src/delivery`

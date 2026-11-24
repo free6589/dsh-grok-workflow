@@ -1,3 +1,26 @@
+## `team-dispatch-v1` rebase 到 `main` `369d6e3`：冲突按功能解、全仓门禁 exit 0、跨进程差分实测 — 2026-11-24 (`CONFIRMED`)
+
+下面每一行都是本轮在 worktree `.agents/worktrees/team-dispatch-v1` 里真跑过的命令与真读到的结果；没跑的写 `NOT_RUN`。
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| rebase | `git rebase main`（worktree，分支原尖端 `7d86bc4`，`main` = `369d6e3`） | **完成、未 abort**：3 条重放（`df89a95` / `4f25f15` / `1fddad2`）+ 2 条收尾（`chore(build)` 重建 `lib/`、本轮记忆） |
+| 全仓门禁 | `npm run ci`（worktree，`typecheck && lint && verify:lib && npm test`） | **exit 0**：typecheck 干净；oxlint **Found 36 warnings and 0 errors**（全既有）；`verify:lib` → `lib/ at 77d05f8 is the build of src/ at 77d05f8 (241 files, byte-identical)`；vitest **100 files / 1866 tests PASS**（121.31 s） |
+| 受影响四个套件（逐例名） | `npx vitest run test/taskboard.spec.ts test/dispatcher.spec.ts test/dispatcher-board.spec.ts test/board-reader.spec.ts --reporter=verbose` | **51 passed (51)**，含本分支带来的 21 例新用例（逐条名字见下方「新增用例」） |
+| 跨进程认领差分（main 基线） | `node .tmp/probe/run.mjs main <git archive main lib/taskboard>/index.js`（12 个子进程同时各认领各的一行，连跑 3 次） | **12/12 子进程报 OK，盘上只活 5 / 6 / 7 行**——丢更新可复现，与分支所述一致 |
+| 跨进程认领差分（rebase 后） | 同上，`<worktree>/lib/taskboard/index.js`（连跑 3 次） | **12/12 子进程 OK，12/12 行全活** |
+| FIFO 探针（main 基线） | `node .tmp/probe/fifo.mjs main <main lib>`（依序创建 `task-10,9,b,a` 后重开） | 重开后 `list()` = `a,b,task-10,task-9`（id 序），**到达序丢失**，且无 `arrival()` |
+| FIFO 探针（rebase 后） | 同上，`<worktree>/lib` | `list()` 仍是 id 序（main 契约不变），`arrival()` = `task-10,task-9,b,a`，**到达序跨重启保住** |
+| 主检出是否被碰 | `git -C /home/fish/projects_mine/dsh-grok-workflow status --short --branch` | `## main...origin/main`，**无改动**；HEAD 仍 `369d6e3` |
+| 真机 soak | — | **NOT_RUN**（本轮范围到单测 + 门禁，未装隔离 profile） |
+
+**新增用例（21 例，名字照抄 verbose 输出）：** taskboard —— `two handles claiming the same row: exactly one wins, the other conflicts`（替换 main 原来断言「两个写者都成功」的旧竞态用例，那正是丢更新缺陷）、`concurrent claims on different rows keep both rows (no lost update)`、`keeps arrival order across a restart, which id order does not`、`opens a store written without arrival numbers without reordering it, and appends new rows after`、`an interrupted write leaves the last committed store authoritative and its temp file inert`、`refuses a torn store instead of silently dropping the torn row`、`recovers a real board after a writer process is SIGKILLed mid-mutation`、`breaks a lock left by a process killed while holding it`、`keeps a fresh lock respected and fails the mutation when the wait runs out`、`keeps task ids unique across a restart`、`guards a claim after restart with the version that is actually stored`、`resolves explicit dir, then the env override, then $DSH_HOME/taskboards`、`openDefaultTaskboard writes store.jsonl into the resolved directory`；dispatcher —— `resume restores every pending task in arrival order, losing none`、`refuses to rewrite a corrupt store instead of guessing (fail closed)`、`refuses a bare name and a malformed path, accepts a full path`、`records the creator and sends results to the creator, not the owner`、`clears the stale block reason when a blocked task is reassigned`、`refuses every execution or judgment operation a worker or verifier owns`、`changes nothing when it refuses a completed task or a verdict write`、`never writes a verdict when recording or reassigning a task`。
+
+**为让新行为成立而改的 main 既有测试（只改调用的 owner 字面量，没删用例）：** `test/dispatcher.spec.ts` 与 `test/dispatcher-board.spec.ts` 里 `agent-8 / agent-9 / agent-a` → `lead/agent-8 / lead/agent-9 / lead/agent-a`——全路径寻址生效后裸名会被 `invalid:bad-address` 拒，这 5 例原本按裸名书写。
+
+**Changed：** `src/taskboard/{types,store,index}.ts`（+`seq` 到达标记与 `arrival()`、认领锁、`paths.ts` 新文件）、`src/taskboard/paths.ts`（新增）、`src/dispatcher/{policy,session,dispatcher}.ts`（+全路径寻址、`creator`/`resultRecipient`、`pending()`/`resume().pending`）、`test/taskboard.spec.ts`、`test/dispatcher.spec.ts`、`test/dispatcher-board.spec.ts`、`test/fixtures/taskboard/writer.mjs`（新增）、`vitest.config.ts`（`GROK_WORKFLOW_TASKBOARD_DIR` 指向 tmp）、`lib/` 重建、`docs/ARCHITECTURE.md`（任务板章节）、`CHANGELOG.md`、`docs/knowledge/{STATE,HANDOFF,DECISIONS}.md`。
+**Honest boundary：** 真机 soak `NOT_RUN`；未合流、未 push、未发版；锁仍是单文件系统内的咨询锁（不防恶意绕过、网络盘 `O_EXCL`/rename 语义不保证），rename 后的目录 fsync 仍是尽力而为；`seq` 只覆盖「创建顺序」，不表达优先级。跨进程差分用的是 **main 已提交的 `lib/` 产物**（`git archive` 取出，未在 main 检出里构建），所以它验证的是「已发布代码 vs rebase 后代码」，不是「main `src` 未构建形态」。
+
 ## 0.13.30 门禁与发版：本地一次全绿、远端 CI + Release 双绿 — 2026-11-24
 
 发版提交 `10af79b` = `chore(release): prepare v0.13.30`（8 files / +32 −20，基线 `4f616d1` ＝ `origin/main`）。下面每一行都是量过的，

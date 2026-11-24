@@ -3758,3 +3758,13 @@ staged for the next release.
   / `taskboardDir()`/`taskboardFile()` 按「调用方显式目录 → `GROK_WORKFLOW_TASKBOARD_DIR` →
   `$DSH_HOME`（否则 `~/.dsh`）+ `taskboards/grok-workflow`」三级规则定位任务板目录，跟存档记录器同一套
   规则，目录里只有一个 `store.jsonl`。架构文档把路径、行格式、认领协议与崩溃恢复规则集中写清。
+
+- **The pending queue keeps its order across a restart / 待办队列的顺序跨重启保留** —
+  Rows are written sorted by id, so reopening a board used to hand back the queue in id order: `task-10` ahead of
+  `task-9`, `b` ahead of `a`. Every row now carries its own arrival number, assigned under the claim lock and
+  persisted with the row, so a restarted dispatcher lists pending work in the order it was created. A store
+  written before the field existed opens unchanged and takes the numbers from its file order — no reordering,
+  no lost rows.
+  / 落盘时行是按 id 排序写的，所以重开一个板会把队列按 id 序交回来：`task-10` 排在 `task-9` 前面、`b` 排在 `a`
+  前面。现在每一行自带到达号，在认领锁内分配并随行落盘，重启后的大管家仍按创建顺序交出待办。更早写的账本没有这个
+  字段也能直接打开，按文件序补上编号——不重排、不丢行。
