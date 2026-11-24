@@ -1,3 +1,60 @@
+## 接单台子收口：七处文字、`lib/` 重建、提交后门禁、模型监工真机 soak（`fix/supervisor-soak-evidence`）— 2026-11-25 (`CONFIRMED`)
+
+下面每一行都写清命令、环境与结果；没跑的写 `NOT_RUN`，只到推理的写 `HYPOTHESIS`。门禁与 soak 的读数分别由文字工人、soak 那一轮
+和包工头跑出来；**收口轮（写这一条的这一轮）只做只读复核**：`git diff` / `git show` / `sha256sum` / `grep` / `sed`，加读 `.tmp/` 下那三份
+门禁日志，**没有重跑 `npm run ci`，也没有重跑 soak**。分支 `fix/supervisor-soak-evidence`（worktree `.agents/worktrees/fix-supervisor-soak-evidence`），
+基线 `main` 尖端 `6501012`，工作提交 `49377e8`。
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 分支与基线 | `git status --short --branch`；`git rev-parse HEAD`；`git log --oneline -1`（worktree） | `## fix/supervisor-soak-evidence`，HEAD **`49377e8`**（工作提交，读时即尖端；记忆收口提交随后追加，只动 `docs/knowledge/`），基线 `main` 尖端 **`6501012`**；工作树干净（`git status --short` 空）。**`CONFIRMED`** |
+| 七行源码差分 | `git diff --stat 6501012 49377e8 -- src/`；`git diff 6501012 49377e8 -- src/`（收口轮只读复核） | **3 文件 / 7 增 7 删**：`src/config.ts` 8（4/4）、`src/index.ts` 2（1/1）、`src/types.ts` 4（2/2）；逐行看只换了 `five`→`six`、`五个`→`六个` 一个词，没有重排。**`CONFIRMED`** |
+| 七处位置 | `grep -n` / `sed -n`（收口轮只读复核 `49377e8` 的树） | `src/config.ts:223`（`none of the six`）、`:226`（`registers the six tools`）、`:671`（`its six tools`）、`:679`（`its six tools … 六个工具`）；`src/index.ts:416`（`the six tools and one listener`）；`src/types.ts:237`、`:300`（`the six tools and the heartbeat`）。第七处 `:223` 与 `:226` 在同一段 doc comment 里。**`CONFIRMED`** |
+| 范围外仍写「five」 | `grep -n "five" src/block/tools.ts test/block-tools.spec.ts test/block-flag.spec.ts`（收口轮只读复核） | `src/block/tools.ts:2`、`test/block-tools.spec.ts:2`、`test/block-flag.spec.ts:50`、`:52` 四处按派单**没动**（`:403` 的「five pass-through turns」数的是回合，不是工具）。**`CONFIRMED`** |
+| 重建 `lib/` | `TMPDIR=$PWD/.tmp npm run build`（worktree，提交前） | exit 0；`client bundle: 325771 bytes → lib/client.js`；`lib/client.js` **未变**（浏览器包不带这些注释）；`git diff --stat` 面 = 6 个 `lib/` 文件 + 3 个 `src/` 文件，18 增 18 删。读数见 `text-gate.txt` §3。**`CONFIRMED`** |
+| 门禁（权威那次，提交后） | `TMPDIR=$PWD/.tmp npm run ci`（整棵树，**`49377e8`**；日志 `.tmp/ci-foreman.log`） | **EXIT=0**：vitest **`111 files / 2128 tests PASS`**（183.97 s）；oxlint **`Found 36 warnings and 0 errors.`**；`verify:lib` → **`lib/ at 49377e8 is the build of src/ at 49377e8 (293 files, byte-identical)`**。**`CONFIRMED`** |
+| 先前两次门禁（不覆盖本轮改动） | 同命令（`6501012` 的树，提交前两次；日志 `.tmp/ci-text-gate.log`、`.tmp/ci-text-gate-2.log`） | 两次都 exit 0，vitest 同为 `111 files / 2128 tests`、oxlint 36/0，但 `verify:lib` 写 **`lib/ at 6501012 is the build of src/ at 6501012 (293 files, byte-identical)`**——它比的是 HEAD 的 `src` 与 HEAD 的 `lib`，当时什么都没提交，所以那两次比的是旧 `lib/`，**没有覆盖重建后的 `lib/`**。**`CONFIRMED`** |
+| 装进隔离 profile 的是哪一份构建 | `sha256sum lib/index.js`；`git show 49377e8:lib/index.js \| sha256sum`；`git show 6501012:lib/index.js \| sha256sum`（收口轮只读复核） | 工作树 **`b4923afe440773ac…`** = `49377e8` 提交的 **`b4923afe440773ac…`**（相同）= soak 装进克隆的那一份；`6501012` 提交的是 **`4f362620eec94af…`**（0.13.34 发出去的那份）。所以 soak 跑的是**本轮提交的 `lib/index.js`**，不是发出去的那份。**`CONFIRMED`** |
+| soak 隔离（克隆） | `node scripts/clone-profile.mjs --src ~/.dsh/profiles/web --home <worktree>/.tmp/soak-sup/dsh-home --name web-clone` | `files 7699 -> 7699 (88444883 bytes)`、`links 5 (relinked 2, already dangling 1)`、**`parity 5/5 equal after redaction`**、`dependencies 17 declared, 0 unresolved`、`credentials redacted: 1 line(s) in 1 file(s)`；run B 的克隆同样六行。**`CONFIRMED`** |
+| soak 隔离（线上没被碰） | `stat -c '%Y %y' ~/.dsh ~/.dsh/profiles ~/.dsh/profiles/web`（前后各一次）；`touch /home/fish/.dsh/.soak-write-probe`；`curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3080/`（前后各一次） | 三个目录 mtime 前后**逐秒相同**（`1795362020` / `1795337986` / `1795530213`）；`touch` → **`Read-only file system`**；线上 `3080` 前后都是 **`401`**；线上实例未重载未重启（只停过 soak 自己的后台 job）。**`CONFIRMED`** |
+| soak 的安装形态 | `sha256sum <clone>/node_modules/dsh-grok-workflow/lib/index.js`；`node -p "require('<clone>/…/package.json').version"`；`find <clone>/node_modules/dsh-grok-workflow -type l`；`grep -c registerBlockTools lib/index.js` | 与 worktree 逐字节相同（`b4923afe…`）；版本读回 **`0.13.34`**；**没有任何符号链接**（软链插件根会挂，见 `docs/LOCAL-TESTING.md`）；`registerBlockTools` 出现 **2** 次。嵌套 `@deepseek-ai` 只有 `cosmokit` / `schemastery` 两个运行时依赖。**`CONFIRMED`** |
+| soak 激活核对 | `grep -nE "pending\|did not activate" logs/boot.log`；`POST /api/settings/describe`；会话 `request/header`（run A，`127.0.0.1:3199`） | ① boot 日志（35 行 / 加时赛 34 行）里 `pending`、`did not activate` **都没有**；② 24 个 namespace，`grok-workflow` 在，`blockIntake` 故意不在投影里，`roles.supervisor` 投影出那条模型路由（删链后投影成 `[]`）；③ `tools: 101`，六个块工具全在（`grok_open_block` / `accept` / `close` / `status` / `steer` / `stop`），也证明 `blockIntake: true` 在载入期生效。**`CONFIRMED`（①②③）** |
+| 判决行：模型 `pass` | 读 `<DSH_HOME>/taskboards/grok-workflow/verdicts.jsonl`（run A，隔离 home） | `f9d91ee7` attempt 2 **`outcome:"pass"`**、`judged:true`、`route:"bifrost-responses/opencode-go/muse-spark-1.3-contributor"`、`criteria` 三条全 `met:true`、`reasons:[]`；`6da4687d` attempt 1 同形状（两条 `met:true`，证据是交接原话）。**`CONFIRMED`** |
+| 判决行：模型 `veto` | 同上 | `eda27615` attempt 2 **`outcome:"veto"`**、`judged:true`、同一条路由、`criteria [met:true, met:false]`，`why` 是监工自己的话「监工认为这条验收没有被交接里的证据满足」；块仍 `open`（否决只写判决行）。**`CONFIRMED`** |
+| 判决行：`route:"inherit"` | 同上（删掉克隆 profile 里 `roles.supervisor` 两行，同端口重启后再开一单） | `7466943e` attempt 1 **`outcome:"pass"`**、`judged:true`、**`route:"inherit"`**；`roles.supervisor` 投影为 `[]`。**`CONFIRMED`** |
+| 账本落盘 | `ls -l taskboards/grok-workflow/`；`wc -l *.jsonl` | `verdicts.jsonl` **6 行**（6 行全是 `by: plugin:block-supervisor`）、`blocks.jsonl` **11 行** = 四个块的版本（3/3/2/3）；`approval` 每行都是 `kind: user`、`quote: "确认"`。原始行在 `ledger-extract.txt`。**`CONFIRMED`** |
+| `/grok on` composer 复测（run B） | 真 Chromium 155.0.8059.84，`--headless=new --remote-debugging-port=9333`，raw CDP 打字 + `Enter`（`127.0.0.1:3201`） | `/grok on` → `command/run`（seq 4）→ `plugin:grok-workflow/mode {enabled:true, setBy:"command:/grok"}`（seq 5）→ `command/done {kind:"success"}`（seq 6）；`/grok off` seq 7–9（`setBy:"command:/grok off"`）；再 `/grok on` seq 12–14。**`CONFIRMED`** |
+| F1 的订正 | 同一轮：run A 用 `POST /api/session/prompt` 发同一句 | run A 里那句被当普通消息处理（`outcome: triaged-chat`，seq 9；`/grok status` seq 30），**命令层不跑**——这是传输差异，不是产品缺陷；早先那版报告据此写的「用户关不掉闸门」已删除，回归 `HYPOTHESIS` 一并删除。**`CONFIRMED`（订正后）** |
+| 七条发现（F1–F7） | 读 `.rsi/evidence/supervisor-soak-2026-11-25/soak.txt` §7 | F1（已订正）、F2（闸门与块流程互斥）、F3（散文答对被记成没答）、F4（`judged:true` 只等于「非确定性路由」）、F5（模型会自己关单）、F6（未申报的写盘对监工不可见）、F7（实例会改写自己所在的 profile）。记忆里只复述 F1/F2/F3，其余四条留在证据文件。**`CONFIRMED`** |
+| 缺口：真浏览器插件页 | — | **`NOT_RUN`**：两轮都没打开「插件 → 内置插件配置」；run B 虽开了真 Chromium，直接去了 composer |
+| 缺口：会写文件的块 | — | **`NOT_RUN`**：四个块全批准为「不写文件」（`writesPaths: []`），产物与范围检查只走到「没东西可查」那条分支 |
+| 缺口：`ask_user_question` 确认 | — | **`NOT_RUN`**：本轮故意没重复；M2 的发现（卡片答案不算用户消息）原样成立 |
+| 缺口：多块切分与 `dependsOn` | — | **`NOT_RUN`**：`blocks[]` 一直只有一个元素，`dependsOn` 一直 `[]` |
+| 未发版 / 未 push / 未合 `main` | `git log --oneline -1`；`git status --short --branch`；`node -p "require('./package.json').version"`（收口轮） | 分支尖端是工作提交 **`49377e8`**（记忆收口提交紧随其后，只动 `docs/knowledge/` 的四个文件），`package.json` 仍是 **`0.13.34`**；没打 tag、没 push、没合 `main`、没删分支/worktree。**`CONFIRMED`** |
+
+**Changed（本轮的提交面）：** 一条工作提交 `49377e8`，**12 文件 / +876 −18**：七个源文件行（3 文件 / 7 增 7 删，每行一个词）、
+六个 `lib/` 产物（`npm run build` 重建，`lib/client.js` 未变）、三份证据文件（`soak.txt` 608 行、`ledger-extract.txt` 33 行、
+`text-gate.txt` 217 行）。记忆收口这一提交只动 `docs/knowledge/{STATE,HANDOFF,VALIDATION,DECISIONS}.md`。
+
+**Honest boundary（逐条）：**
+1. **门禁读数不是收口轮跑出来的**：`49377e8` 那次是包工头提交后跑的，我只读了 `.tmp/ci-foreman.log`——`111 files / 2128 tests`、
+   `Found 36 warnings and 0 errors.`、`lib/ at 49377e8 … (293 files, byte-identical)` 三行逐字可见；**`EXIT=0` 来自包工头的记录，
+   日志本身不打印退出码**。收口轮没有重跑 `npm run ci`，也没有重跑 soak。
+2. **`verify:lib` 只能按字面读**：它比的是 HEAD 的 `src` 与 HEAD 的 `lib`。所以只有提交后那次（`lib/ at 49377e8`）覆盖本轮重建的 `lib/`；
+   先前两次写 `6501012`，覆盖的是旧 `lib/`——那两次的 `111 / 2128`、`36 warnings` 本身有效，但**不能**用来证明新 `lib/` 一致。
+3. **隔离 profile 里的 `lib/` 未必整目录都等于 `49377e8`**：`lib/index.js` 逐字节相同（`b4923afe…`），但若当时整目录拷过去，
+   `lib/config.js` / `lib/config.d.ts` 会落后第 7 处那条注释（`text-gate.txt` §6 自己提的 caveat）。行为差为零（注释与类型），
+   但「隔离 profile 每个字节都等于 `49377e8`」这句话不成立，除非重新拷那两个文件。
+4. **soak 是本轮之前跑的，收口轮没有重跑**：`lib/index.js` 的 sha 相同只能证明「跑的是同一份 `lib/index.js`」，
+   不能证明「在 `49377e8` 这个提交上又跑了一遍真机」。七处改动都是注释与字段描述串，这是「行为不变」的论证，不是又跑一遍。
+5. **`judged:true` 不等于模型判得好（F4）**：它是 `rowToWrite.route !== 'deterministic'`（`src/supervisor/index.ts:132`），
+   监工调用失败也带 `judged:true`（判决行 3，`outcome:"veto"` + 理由 `监工调用失败`）。能当验收的是 **`pass` + `judged:true`** 这一对。
+6. **F3 的稳定性是 `HYPOTHESIS`**：6 次监工调用里撞了 2 次，同一份交接连撞两次、换措辞后一次过——像采样，但 n=6，不足以说稳定。
+7. **F1 是订正过的结论**：早先那版报告说「`/grok on` 到不了命令层、用户关不掉闸门」，那句已删；留下的是「`POST /api/session/prompt`
+   不是命令路径」这个传输事实。同理，F2 的机制句也重写过（闸门**没有**删用户消息），结论不变。
+8. **四条缺口仍是 `NOT_RUN`**（插件页、会写文件的块、`ask_user_question`、多块/`dependsOn`），不能读成已覆盖。
+9. **本轮没有发版**：`package.json` 仍是 `0.13.34`、没有 tag、没有 push、没有合 `main`；`~/.dsh` 与线上实例一行未动（soak 那轮也一样）。
+
 ## 0.13.34 发布：合流、两次全量门禁、标签、推送、远端两条 run（零冲突、零重跑，soak 未重跑）— 2026-11-25 (`CONFIRMED`)
 
 下面每一行都是发版那一轮在主检出 `/home/fish/projects_mine/dsh-grok-workflow` 里真跑过的命令与真读到的结果；没跑的写 `NOT_RUN`。

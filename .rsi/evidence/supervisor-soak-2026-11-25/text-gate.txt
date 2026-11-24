@@ -1,0 +1,217 @@
+TEXT GATE — "five tools" -> "six tools" (block intake registers six)
+=====================================================================
+
+Worktree: /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/fix-supervisor-soak-evidence
+Branch:   fix/supervisor-soak-evidence
+HEAD:     6501012 (unchanged; nothing committed)
+Date:     2026-11-25
+
+Reason: the block intake registers SIX tools — grok_open_block, grok_accept_block,
+grok_close_block, grok_block_status, grok_steer, grok_stop — but the source still
+said five.
+
+SEVEN places, not six. The first round fixed the six named in the dispatch. The
+seventh, src/config.ts:223, was then authorised by the foreman and fixed too,
+because it is the same class of error in the SAME doc comment as item 2 and left
+that comment contradicting itself four lines later.
+
+Scope: only the number word changed (five -> six, 五个 -> 六个). No line was
+reflowed, no other word altered. No test file was touched.
+
+
+1. THE SEVEN BEFORE/AFTER LINES
+-------------------------------
+
+1) src/config.ts:223   (added in round 2 on the foreman's instruction)
+   - * Off by default, and off means *inert*: `src/index.ts` registers none of the five
+   + * Off by default, and off means *inert*: `src/index.ts` registers none of the six
+
+2) src/config.ts:226
+   - * pre-block delivery decisions byte for byte. On registers the five tools plus one
+   + * pre-block delivery decisions byte for byte. On registers the six tools plus one
+
+3) src/config.ts:671
+   -  // Block intake (接单台子): the durable block ledger, its five tools and the
+   +  // Block intake (接单台子): the durable block ledger, its six tools and the
+
+4) src/config.ts:679  (English "five" and Chinese 五个 both changed)
+   -    .description('Off by default: the block intake (its five tools and its supervisor) is registered only when this is on. 默认关闭：打开后才注册接单台的五个工具与监工'),
+   +    .description('Off by default: the block intake (its six tools and its supervisor) is registered only when this is on. 默认关闭：打开后才注册接单台的六个工具与监工'),
+
+5) src/index.ts:416
+   -  // because both halves are registrations — the five tools and one listener — and a
+   +  // because both halves are registrations — the six tools and one listener — and a
+
+6) src/types.ts:237
+   -   * the feature does not exist in this load — the five tools and the heartbeat
+   +   * the feature does not exist in this load — the six tools and the heartbeat
+
+7) src/types.ts:300
+   -   * the feature does not exist in this load — the five tools and the heartbeat
+   +   * the feature does not exist in this load — the six tools and the heartbeat
+
+No "five" and no 五个 remains in src/config.ts, src/index.ts or src/types.ts for the
+block tool count. Two unrelated "five" mentions survive in those files and are
+correct: src/config.ts:759 and src/types.ts:103, both about ROLES and empty chains,
+not block tools.
+
+
+2. GIT DIFF --STAT OF THE SOURCE FILES
+--------------------------------------
+
+$ git diff --stat -- src/
+ src/config.ts | 8 ++++----
+ src/index.ts  | 2 +-
+ src/types.ts  | 4 ++--
+ 3 files changed, 7 insertions(+), 7 deletions(-)
+
+(7 insertions / 7 deletions = exactly one word per line, seven lines.)
+
+
+3. REBUILT lib/ (committed artifact, part of the deliverable)
+-------------------------------------------------------------
+
+$ TMPDIR=$PWD/.tmp npm run build
+ > tsc -p tsconfig.build.json && node scripts/build-client.mjs
+ client bundle: 325771 bytes → lib/client.js
+ exit 0
+
+$ git diff --stat
+ lib/config.d.ts   | 4 ++--
+ lib/config.js     | 8 ++++----
+ lib/config.js.map | 2 +-
+ lib/index.js      | 2 +-
+ lib/index.js.map  | 2 +-
+ lib/types.d.ts    | 4 ++--
+ src/config.ts     | 8 ++++----
+ src/index.ts      | 2 +-
+ src/types.ts      | 4 ++--
+ 9 files changed, 18 insertions(+), 18 deletions(-)
+
+lib/client.js was NOT modified (the browser bundle does not carry these comments).
+
+Correction to an earlier draft of this file: it claimed the .map files changed
+because "regenerated sourcemaps embed the source text". That is wrong — these maps
+carry no sourcesContent (verified: keys are version, file, sourceRoot, sources,
+names, mappings only). The maps differ from HEAD by a handful of VLQ characters
+(3 of 11505 in lib/index.js.map, 6 of 30020 in lib/config.js.map), i.e. small
+source-column deltas, not embedded text. A rebuild is idempotent: the second
+rebuild left both maps byte-identical to the first, so the map delta is a one-time
+regeneration, not something the round-2 comment edit caused.
+
+
+4. THE FULL GATE
+----------------
+
+Exact command line, run from the worktree root:
+
+  $ TMPDIR=$PWD/.tmp npm run ci
+
+Exit code: 0
+
+It expands to: npm run typecheck && npm run lint && npm run verify:lib && npm test
+
+The three readings (this is the run AFTER the round-2 edit):
+
+  vitest      Test Files  111 passed (111)
+              Tests       2128 passed (2128)
+              Duration    178.31s
+
+  oxlint      Found 36 warnings and 0 errors.
+
+  verify:lib  lib/ at 6501012 is the build of src/ at 6501012 (293 files, byte-identical)
+
+All three match the stated baseline on main @ 6501012 (111 files / 2128 tests,
+36 warnings / 0 errors, 293 files byte-identical). verify:lib names 6501012, which
+is this branch's HEAD.
+
+`npm run verify:lib` was also run on its own between the rebuild and the full gate:
+
+  $ TMPDIR=$PWD/.tmp npm run verify:lib
+  lib/ at 6501012 is the build of src/ at 6501012 (293 files, byte-identical)
+  exit 0
+
+No test was adjusted, in either round: no test pins the changed description string,
+so nothing failed.
+
+Full log: .tmp/ci-text-gate-2.log (round 2). Round 1's log is .tmp/ci-text-gate.log.
+Both are gitignored scratch.
+
+
+5. LEFT ALONE ON PURPOSE (out of scope)
+---------------------------------------
+
+Still saying "five" for the block tool count, by instruction — these stay untouched:
+
+  src/block/tools.ts:2        * The five block tools, registered only when `blockIntake` is on.
+  test/block-tools.spec.ts:2  * The five block tools, driven through the real registry.
+  test/block-flag.spec.ts:50  * Six names, five tools: `grok_steer` and `grok_stop` are the two halves of one
+  test/block-flag.spec.ts:52  * as "the five tools".
+
+  (test/block-flag.spec.ts:403 says "five pass-through turns" — that counts turns,
+  not tools, and is unrelated to this change.)
+
+src/config.ts:223 was originally left in this list. The foreman then ruled it in
+scope: same class of error, same doc comment as src/config.ts:226, and leaving it
+made that paragraph contradict itself. It is now fixed and appears as item 1 above.
+
+
+6. lib/index.js sha256 — IS THE INSTALLED BUILD STILL THE SAME BUILD?
+--------------------------------------------------------------------
+
+A concurrent worker installed the current lib/index.js into an isolated profile and
+keyed its evidence to that sha. Question: did the round-2 edit change it?
+
+  lib/index.js sha256, before the round-2 edit: b4923afe440773acb0e07f403c5c2c2639baf94f2c47beed9268d162312da833
+  lib/index.js sha256, after  the round-2 edit: b4923afe440773acb0e07f403c5c2c2639baf94f2c47beed9268d162312da833
+  lib/index.js sha256, after the full npm run ci:  b4923afe440773acb0e07f403c5c2c2639baf94f2c47beed9268d162312da833
+
+UNCHANGED. lib/index.js is byte-identical before and after. The reason is
+structural: the round-2 word lives in src/config.ts, and config.ts compiles into
+lib/config.js and lib/config.d.ts — index.ts was not touched, so its emitted JS and
+its sourcemap did not move either. The installed build is still the same build the
+worker keyed its evidence to.
+
+For completeness, the files that DID change in round 2 (all from the same
+src/config.ts comment word):
+
+  lib/config.js      19ce39c0eac73bad395933665d0cc1dd2b3fb4f58f1f17636c6e5b860dc59d70
+                  -> dda1253959f0fc940938c87ba6028b0707e1a610795bd19b2dec930b896a865d
+  lib/config.d.ts    7a86b930e549fc10625939b0db96cebb83c4bc913bf484d5be32e3ea9f8159da
+                  -> c0d96ace7fcca53cad9f0cef42cb7235b55296723aeb07db73f91f4817c1a19e
+
+Caveat worth stating plainly: if the isolated profile installed the whole lib/
+directory rather than only lib/index.js, then lib/config.js and lib/config.d.ts in
+that profile are now one comment behind. The behavioural delta is nil — in
+lib/config.js the round-2 change is a comment line only (the .description() string
+changed in round 1, before the worker installed) — and lib/config.d.ts is types
+only. If the worker's evidence needs the exact current tree, those two files are the
+ones to re-copy; lib/index.js needs nothing.
+
+Reference point: HEAD's committed lib/index.js is
+4f362620eec94af3744901aea1afa66111bcf985d6746ba0b34d54dbf7280cac, which differs
+from the working tree's b4923afe… because round 1 changed src/index.ts:416 and the
+comment is emitted into the JS. That delta predates the worker's install.
+
+
+7. GIT STATUS --SHORT
+---------------------
+
+$ git status --short
+ M lib/config.d.ts
+ M lib/config.js
+ M lib/config.js.map
+ M lib/index.js
+ M lib/index.js.map
+ M lib/types.d.ts
+ M src/config.ts
+ M src/index.ts
+ M src/types.ts
+?? .rsi/evidence/supervisor-soak-2026-11-25/
+
+The single untracked entry is this evidence directory, which is itself the intended
+addition (it also holds the soak worker's soak.txt). No untracked scratch files.
+
+No commit, no push, no tag, no checkout/stash/reset was run; branch main and the
+live ~/.dsh instance were not touched. Scratch (CI logs, hash snapshots, the
+HEAD sourcemap copies) lives in .tmp/, which is gitignored.

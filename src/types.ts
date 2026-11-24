@@ -234,7 +234,7 @@ export interface GrokWorkflowConfig {
   iterateTemplate?: string
   /**
    * Block intake (接单台子) switch. A load-time switch, not a live one: off means
-   * the feature does not exist in this load — the five tools and the heartbeat
+   * the feature does not exist in this load — the six tools and the heartbeat
    * listener are never registered — so it cannot be a `volatile()` field.
    */
   blockIntake?: boolean
@@ -297,7 +297,7 @@ export interface ResolvedConfig {
   iterateTemplate: string
   /**
    * Block intake (接单台子) switch. A load-time switch, not a live one: off means
-   * the feature does not exist in this load — the five tools and the heartbeat
+   * the feature does not exist in this load — the six tools and the heartbeat
    * listener are never registered — so it is not a `volatile()` field.
    */
   blockIntake: boolean

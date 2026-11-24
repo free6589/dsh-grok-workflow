@@ -1,3 +1,38 @@
+## 2026-11-25 — 接单台子收口：七处文字改完、`lib/` 重建、模型监工在真机上第一次真判（`fix/supervisor-soak-evidence`）
+
+- **From:** 记忆收口（`agent-141/docs-memory`）· **To:** 下一个接手接单台子的人
+- **这一支是什么**：分支 `fix/supervisor-soak-evidence`（worktree `.agents/worktrees/fix-supervisor-soak-evidence`，基线 `main` 尖端
+  `6501012`）上只有一条工作提交 **`49377e8`**，**12 文件 / +876 −18**，两半：① 七处注释/字段描述串把「五个工具」改成「六个」
+  （`src/config.ts:223`、`:226`、`:671`、`:679`、`src/index.ts:416`、`src/types.ts:237`、`:300`，每处一个词），`lib/` 由 `npm run build` 重建；
+  ② 证据包 `.rsi/evidence/supervisor-soak-2026-11-25/`（`soak.txt` 608 行 + `ledger-extract.txt` 33 行 + `text-gate.txt` 217 行）。
+  提交后 `TMPDIR=$PWD/.tmp npm run ci` **EXIT=0**：vitest **`111 files / 2128 tests PASS`**、oxlint **`Found 36 warnings and 0 errors.`**、
+  `verify:lib` → **`lib/ at 49377e8 is the build of src/ at 49377e8 (293 files, byte-identical)`**（`verify:lib` 只比 HEAD 的 `src` 与 HEAD 的 `lib`，
+  所以**只有提交后那一次**覆盖重建的 `lib/`）。**未发版、未 push、未合 `main`**，`package.json` 仍是 `0.13.34`。
+- **已经证实的**：独立模型监工在真机上真跑通了——`judged:true` 的 `pass` 两条（`f9d91ee7` attempt 2、`6da4687d` attempt 1，`route` 都是
+  `bifrost-responses/opencode-go/muse-spark-1.3-contributor`）；模型自己产的 `veto` 一条（`eda27615` attempt 2，`criteria [met:true, met:false]`，
+  理由是监工自己的话）；`roles.supervisor` 删掉后判决行写 `route:"inherit"` + `judged:true` + `pass`（`7466943e`）。
+  **还没证的**：下面「剩余缺口」四条 `NOT_RUN`；F3 那条「散文答对算没答」是 `CONFIRMED` 的现象，但「它是采样抖动还是稳定行为」仍是
+  `HYPOTHESIS`（6 次监工调用里撞了 2 次，n=6）。
+- **三件下一个 agent 一定会踩的事**：
+  1. **F2：闸门与块流程按现状互斥。** 闸门开着时，四行交接被闸门自己接走（它把消息从 inbox 拿走、派自己的 worker 答、再叫模型原样转述、
+     不许调工具），所以交接永远不成一个判决回合、`grok_close_block` 不会被调；跑块流程必须先 `/grok off`。用户消息**没有**被删除——
+     它还在会话里、模型读得到，上一版报告把这一点写反过。
+  2. **F3：用散文答对的监工被记成「没交答案」。** 宿主只在监工调了 `structured_output` 时才拿到值，`parseSupervisorAnswer` 的
+     JSON-字符串兜底（`tryJson`，带围栏或不带）因此走不到，块被写成 `监工调用失败` 的 `veto`。要动这个方向，先读 `src/supervisor/verdict.ts`
+     的调用面与引擎的 schema 工具契约，别只改解析函数。
+  3. **`judged:true` 的意思是「不是确定性路由」，不是「模型判得好」。** 它是 `rowToWrite.route !== 'deterministic'`
+     （`src/supervisor/index.ts:132`），监工调用失败也是 `judged:true`（`outcome:"veto"` + 理由 `监工调用失败`）。
+     **`pass` + `judged:true` 这一对**才只能来自被解析的模型答案——验收要钉这一对，不要只钉 `judged:true`。
+- **决策号：`D-136`**（`DECISIONS.md` 末尾）。口径：监工角色链保持 `src` 现状——默认 `[]`（`src/config.ts:685`），空链在
+  `src/supervisor/verdict.ts:222`（`input.routes.length === 0 ? [{}] : [...input.routes]`）塌成一次无路由调用，引擎读成「继承会话路由」。
+  所以某个 profile 钉死的监工路由没有凭据时，修法是**把 profile 指向一条能用的路由（或干脆留空链）**，不是往 `src` 里加兜底。
+- **剩余缺口（`NOT_RUN`，与 soak.txt §6 一致）**：① 真浏览器里的插件页卡片/设置页（两轮走的是 GUI 的 HTTP API；run B 虽然开了真 Chromium，
+  但直接去了 composer）；② 一个**在自己批准范围里写文件**的块（四个块全是「不写文件」，产物与范围检查只走到「没东西可查」那条分支）；
+  ③ `ask_user_question` 卡片收确认（M2 的发现仍在，本轮故意没重复）；④ 多块切分（`blocks[]` 一直只有一个元素）与 `dependsOn`。
+- **红线**：全程未碰 `~/.dsh`（`touch` 实测 `Read-only file system`，三个目录 mtime 前后逐秒相同），未重载未重启线上实例，
+  线上 `3080` 只做 `curl` 读状态（前后都是 `401`）；soak 的 web token 在证据里只以 `<redacted>` 出现；本轮两条提交：工作提交 `49377e8`
+  （源码七行 + `lib/` 重建 + 三份证据）与紧随其后的记忆收口提交（只动 `docs/knowledge/` 的四个文件）；**没有 push、没有打 tag、没有合 `main`**。
+
 ## 2026-11-25 — M2「接单台子」：代码全绿、真机 soak PASS，交接给下一个改这段代码的人
 
 - **From:** 记忆收口（`agent-138/docs-memory`）· **To:** 下一个接手 `feat/block-intake` 的人
