@@ -1,0 +1,39 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-flaky-triage-phase1
+
+(node:67) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGTERM listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:67) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGINT listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:67) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGHUP listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+ ✓ test/triage.spec.ts (43 tests) 63097ms
+     ✓ a session /grok record forces the full workflow even when the deployment uses the front desk  933ms
+     ✓ answers a greeting directly, without starting the team or a call  5016ms
+     ✓ answers "what can you do" instead of deflecting it  5005ms
+     ✓ answers a simple task with one worker and says so  5016ms
+     ✓ runs the whole workflow for a complex request after the captain split is confirmed  5138ms
+     ✓ asks one question instead of guessing, and remembers the answer  16026ms
+     ✓ hands the worker the answered request and the new work in the same message (B05)  10300ms
+     ✓ upgrades to the team when the message asks for it, after a split confirmation  5257ms
+     ✓ retries once with a structured answer when the plain call returns nothing  5014ms
+     ✓ states a failed cheap call instead of silently upgrading it  5006ms
+(node:78) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGTERM listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:78) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGINT listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:78) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGHUP listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+ ✓ test/phase1-dialogue.spec.ts (36 tests) 9175ms
+     ✓ publishes the claimed message, then the report, once each, in that order  922ms
+     ✓ hands the team the original request together with the choice  777ms
+     ✓ never lets another session answer this session’s question  521ms
+     ✓ consumes a pending question once, so a repeated answer cannot start a second run  341ms
+     ✓ keeps an earlier unanswered request when a second question arrives (B04)  770ms
+     ✓ cuts the resumed request to the objective budget instead of refusing the run (B08)  1237ms
+     ✓ tells a cancellation apart from a provider failure  329ms
+     ✓ keeps the tasks that had already been verified when the run is stopped  430ms
+     ✓ turns a deadline into its own terminal state (regression, T4 fixed deadline)  456ms
+     ✓ keeps the typed message once and writes the cancelled terminal when the run is stopped  344ms
+
+ Test Files  2 passed (2)
+      Tests  79 passed (79)
+   Start at  13:33:36
+   Duration  83.86s (transform 9.40s, setup 0ms, import 10.73s, tests 72.27s, environment 0ms)
+

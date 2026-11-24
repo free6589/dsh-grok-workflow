@@ -20,8 +20,9 @@ import { parseMemberLabel } from '../src/naming.js'
 import { DELIVERY_RECORD, TERMINAL_RECORD } from '../src/records.js'
 import { createActiveState, runWorkflow } from '../src/run.js'
 import { maxTotalAgentsFor, routeBudgetFor } from '../src/script.js'
+import { steeringForSession } from '../src/steering.js'
 import { callerTask, execution, task, verification } from './fixtures.js'
-import { runWorkflowScript } from './helpers.js'
+import { landedWithin, runWorkflowScript } from './helpers.js'
 
 /* ------------------------------------------------------------------ engine -- */
 
@@ -325,6 +326,30 @@ async function waitFor(predicate: () => boolean): Promise<void> {
   })
 }
 
+/**
+ * Wait for the round a batch admitted in the background to land, not merely to start.
+ *
+ * `startCalls.length === 2` says only that the background task began. The gate keeps
+ * this session's steering channel open for the whole round and closes it in
+ * `runChannelRound`'s `finally`, after the report has been delivered — so a message sent
+ * inside that window is folded into the live run (`已收到，并入了正在跑的这一轮…`) instead
+ * of being routed by the front desk, and the report the case is waiting for is not in
+ * `agent.followups` yet. Both halves of the landing are observed here, on the probe's own
+ * clock, so a round that never lands fails as this condition rather than as one of the
+ * two receipts the assertion would otherwise read.
+ *
+ * @param agent - the agent the round delivers its report into.
+ * @param live - the session the round belongs to (its channel is the landing marker).
+ * @param what - what is being awaited, for the failure message.
+ */
+async function landed(agent: FakeAgent, live: Session, what: string): Promise<void> {
+  await landedWithin(
+    () => agent.followups.length > 0 && steeringForSession(String(live.id)) === undefined,
+    15_000,
+    what,
+  )
+}
+
 afterEach(() => {
   vi.useRealTimers()
 })
@@ -531,8 +556,10 @@ describe('P0-2: a confirmation answer keeps the original request', () => {
     const live = session('sess-p02-team')
     const { answered, agent } = await askThenAnswer({ ctx, live, ambiguous: '改一下那个', answer: '团队' })
 
-    // Two starts: the live first answer, then the background team run.
-    await waitFor(() => ctx.engine.startCalls.length === 2)
+    // Two starts: the live first answer, then the background team run — and the wait is
+    // for that round to land, because the objective below is the request it was actually
+    // started with and the report only exists once the round is over.
+    await landed(agent, live, 'the report of the background round')
     const objective = String((ctx.engine.startCalls[1]!.args as { objective?: string }).objective ?? '')
     expect(objective).toContain('改一下那个')
     expect(objective).toContain('用户选择团队模式')
@@ -540,7 +567,6 @@ describe('P0-2: a confirmation answer keeps the original request', () => {
     expect(answered).toContain('档位：团队档')
     expect(answered).not.toContain('收到！团队开工中')
     // …the report lands in the background turn.
-    await waitFor(() => agent.followups.length === 1)
     expect(textOf(agent.followups[0]!)).toContain('COMPLETED')
   })
 
@@ -592,8 +618,9 @@ describe('P0-2: a confirmation answer keeps the original request', () => {
     expect(ctx.engine.startCalls).toHaveLength(0)
 
     // ...and session one can still answer its own question.
-    const own = await ctx.preStep()(payload(new FakeAgent(one), [userMessage('团队')]), nextWith([])) as Decision
-    await waitFor(() => ctx.engine.startCalls.length === 2)
+    const ownAgent = new FakeAgent(one)
+    const own = await ctx.preStep()(payload(ownAgent, [userMessage('团队')]), nextWith([])) as Decision
+    await landed(ownAgent, one, 'the round the confirmation started')
     expect(String((ctx.engine.startCalls[1]!.args as { objective?: string }).objective)).toContain('改一下那个')
     expect(answerOf(own)).toContain('档位：团队档')
   })
@@ -606,7 +633,10 @@ describe('P0-2: a confirmation answer keeps the original request', () => {
     const agent = new FakeAgent(live)
     await ctx.preStep()(payload(agent, [userMessage('改一下那个')]), nextWith([]))
     await ctx.preStep()(payload(agent, [userMessage('团队')]), nextWith([]))
-    await waitFor(() => ctx.engine.startCalls.length === 2)
+    // The repeated answer is read as "nothing is pending" only once the round the first
+    // answer started is over: while it is still working, this session has a live steering
+    // channel and the message would be folded into that run instead.
+    await landed(agent, live, 'the round the confirmation started')
 
     const again = await ctx.preStep()(payload(agent, [userMessage('团队')]), nextWith([])) as Decision
     expect(answerOf(again)).toContain('没有待回答的分流问题')
@@ -641,7 +671,9 @@ describe('P0-2: a confirmation answer keeps the original request', () => {
 
     const answered = await ctx.preStep()(payload(agent, [userMessage('团队')]), nextWith([])) as Decision
 
-    await waitFor(() => ctx.engine.startCalls.length === 2)
+    // The request below is the one the run was started with, so the round has to exist:
+    // wait for it to land rather than for it to be started.
+    await landed(agent, live, 'the round the confirmation started')
     const objective = String((ctx.engine.startCalls[1]!.args as { objective?: string }).objective ?? '')
     // The forwarded conversation already names both messages, so the assertion has
     // to look at the request the run was actually started with — the composed
@@ -670,7 +702,7 @@ describe('P0-2: a confirmation answer keeps the original request', () => {
 
     const answered = await ctx.preStep()(payload(agent, [userMessage('团队')]), nextWith([])) as Decision
 
-    await waitFor(() => ctx.engine.startCalls.length === 2)
+    await landed(agent, live, 'the round the confirmation started')
     const objective = String((ctx.engine.startCalls[1]!.args as { objective?: string }).objective ?? '')
     const request = objective.slice(objective.indexOf('原始任务：'))
     expect(objective.length).toBeLessThanOrEqual(32_000)
