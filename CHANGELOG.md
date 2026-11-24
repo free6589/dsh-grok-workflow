@@ -34,6 +34,13 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ### Fixed / 修复
 
+- **While a question is open, your next vague message carries the earlier request / 问题还开着时，你下一句含糊的话会带上先前那条请求** —
+  When the plugin has asked you which gear to use and you answer with something vague, it could previously satisfy that reply from what it
+  already had on hand and quietly drop the request you were being asked about. Now the open question wins: the look-up still runs, but
+  while a question is waiting it cannot answer in your place, so this turn asks again and carries both requests, and the answer you finally
+  give answers both. / 插件问过你要用哪一档、而你回了一句含糊的话时，它以前可能拿手上已有的东西直接答这句，把刚才那条还没答的请求
+  悄悄丢掉。现在开着的问句优先：查找照旧会做，但只要还有问题等着你回答，它就不能替你把这句话答掉——这一轮会再问一次、把两条请求
+  一起带上，你最后给的那个答案同时回答两条。
 - **Saying yes through a question card now counts as your approval / 点问题卡片说「确认」现在算你批准了** — When a
   block is ordered, you can approve it by clicking a question card instead of typing the word. The Host delivers that
   answer as a different kind of message, and both the block start and the gate only looked for a typed turn: the start

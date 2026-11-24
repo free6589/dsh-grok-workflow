@@ -2,6 +2,9 @@
 
 验收对象：`feat/m3-switch` 尖端 **`2137afc`**（`9fdcb6e` → `94727b9` → `ad28f17` → `2137afc`，`lib/` 已重建并提交，版本 `0.13.34`）。
 四条 soak 与红/绿 spec 都是打在这份构建上的；本目录自身由紧随其后的证据提交 **`7bcbd00`** 落盘（只加文件，不动源码）。
+**分支尖端此后移到 `7f172ae`**（`295cfd2` 记忆收口 → `082add6` 修复 → `7f172ae` 重建 `lib/`）：那次修复动的是 triage 里
+「开着的问句压过查材料」那条路，而四条场景跑的是 `legacyGate` 缺省的形状、旧前台根本没注册，所以**本目录的读数早于那次修复，
+也不受它影响**——别把本目录当成修复后的构建证据。
 环境：Node **v26.8.1** / DSH **0.2.2-rc.3**；worktree `.tmp/wt-m3-switch`；scratch home `.tmp/m3-soak-2/dsh-home`（`DSH_HOME`），端口 **3311**。
 口径：`AGENTS.md` §2 的四个状态词（`CONFIRMED` / `HYPOTHESIS` / `NOT_RUN` / `BLOCKED`）。每条结论都能回指本目录里的一个文件。
 
