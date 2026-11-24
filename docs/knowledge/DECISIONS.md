@@ -3248,3 +3248,28 @@ spine 为空，pre-fix 形状会进脊柱。
   没有插件管理器的合流不再报错，而是 `canInstall:false` + `reason:'update/unavailable'` + 可复制命令；没有 `webServer`
   就不注册任何东西并告警；连 `ctx.inject` 都没有时整块静默。卡片的命令从此跟着宿主的答案走——任何只改静态常量、以为
   那行就是「页面上显示的命令」的改动都会读错。
+
+## D-130 · `feat/audit-layer` 本轮不合：**取半记录**——git 冲突是实测的，功能评估没做（2026-11-24）
+
+- **Status:** **取半（half-recorded）** —— 只有 git 侧实测是 `CONFIRMED`；**功能评估 `NOT_RUN`**（没跑它的用例、没读实现细节、
+  没做 rebase）。本节刻意取半：只记**决定**与**实测**两半，不把一次库存测量写成一次评审。
+- **Date:** 2026-11-24
+- **Decision:** `feat/audit-layer` 本轮**不合**，也不删，保持原样待在本地；下一轮要不要合，先做完功能评估与 rebase 再决定。
+- **实测（`CONFIRMED`，包工头本轮现跑，三条命令都只读）:**
+  - 尖端 **`7626233`**（2026-11-12 00:40:06 +0800），`git rev-list --left-right --count main...feat/audit-layer` → 左 **500** / 右 **1**
+    （`main` 独有 500 条、分支独有 1 条 ⇒ 分支 **ahead=1 / behind=500**；这一行由写记忆的这轮用同一命令只读复核过，左右两数是 `main` 在前）。
+  - `git diff --stat main...feat/audit-layer` → **12 files / +996 −94**：`src/report-audit.ts` **+208（新增文件）**、
+    `src/report.ts` **88 行改动**、`test/report-audit.spec.ts` **+417（新增文件）**、`test/phase1-dialogue.spec.ts` **10 行**，
+    其余是 `lib/` 生成物。
+  - `git merge-tree --write-tree --messages main feat/audit-layer` → **exit=1**，冲突路径 **6 个**：手写 2 个
+    （`src/report.ts`、`test/phase1-dialogue.spec.ts`）+ `lib/` 生成物 4 个（`report.d.ts`、`report.d.ts.map`、`report.js`、`report.js.map`）。
+- **被否决的替代方案:**
+  1. **直接合。** `main` 自 `0.13.30` 起在报告层做过诊断对齐（D-126 那一路：两个视图各自渲染、溢出拆块、错误行带类别、截断预留尾巴），
+     分支恰好也改 `src/report.ts`——冲突就落在这一层，直接合会把两条各自成立的语义硬拼在一起；而且本包是 timeout 探针那一包的尾巴，
+     **没有产品改动授权**，不该顺手把一个产品面合进来。
+  2. **删。** 分支带的是真功能（`src/report-audit.ts` 208 行 + 417 行用例），删掉等于真丢东西；`ahead=1` 说明它只有一条提交，
+     留着不占维护成本。
+- **缺口（照实写）:** ① 它的用例**没跑**（`test/report-audit.spec.ts` 一条都没执行）；② **没做功能评估**——那份 audit 层到底该不该进产品、
+  与 D-126 的语义谁取代谁，本轮没有立场；③ **没 rebase**（`behind=500`，rebase 后冲突面可能变，6 个路径只是当前 `main` 上的读数）。
+- **Consequences:** 这条记录的用处是「别再重新盘一遍库存」——ahead/behind、diffstat、冲突路径已经量过；它也明确挡掉「顺手合了它」这种动作。
+  下一轮做它时，起点是 rebase 到当时尖端 + 跑它的 417 行用例 + 对 D-126 做取舍，而不是从「这分支是干什么的」重新开始。

@@ -1,3 +1,60 @@
+## 2026-11-24 — 两条无计时器探针改由探针持钟：远端 Node 24 红转绿、`team-dispatch-v1` 清干净、`feat/audit-layer` 取半记
+
+- **From:** 执行手（`agent-130/worker-timeout`）· **To:** 合流者 / 操作员
+- **树与基线**：worktree `.agents/worktrees/fix-timeout-probe-settle`，分支 `fix/timeout-probe-settle`，基线 `main` 尖端 `ca65df8`
+  （版本 `0.13.32`），本轮唯一代码提交 **`141dccd`**（只含 `test/timeout.spec.ts`，+19 / −8）。主检出一行未动；代码提交与本轮这条 docs 提交
+  都在该分支上、**已推 `origin/fix/timeout-probe-settle` 并开 PR #48**；**没合流、没发版**，
+  `src/`、`lib/`、`scripts/`、`package.json`、`CHANGELOG.md`、版本号全部未动。
+- **远端那条红（`CONFIRMED`，引用包工头实测，不是本轮自己跑的）**：CI run **45378449742**（`main` `ca65df8`）**Node 22 绿 / Node 24 红**，
+  逐字 `FAIL test/timeout.spec.ts > the timer the engine realm really has > races on Atomics.waitAsync where no setTimeout exists`、
+  `Error: Test timed out in 30000ms.`、`Tests 1 failed | 1909 passed (1910)`。它与 `c1ebdf3` 记的同族：等的是无计时器 realm 的结算，
+  钟却是 runner 的。
+- **本地修前红：`NOT_RUN`**。8 种打法逐行相加 **102** 次执行、**0 红**（早先口头报的「118 次」是误算，以本表为准）：
+
+| # | 打法（环境） | 次数 | 结果 |
+|---|---|---|---|
+| 1 | 自然单条 `-t 'settles a hung call within budget in a realm with no timer at all'`（Node 26.8.1） | 20 | 20 绿，1063–1078 ms |
+| 2 | 自然单条 `-t 'races on Atomics.waitAsync where no setTimeout exists'` | 20 | 20 绿，约 40 ms |
+| 3 | 18 个 busy 循环 + 打法 1 | 10 | 10 绿，1106–1215 ms；loadavg 12.85 |
+| 4 | 24 个 busy 循环 + 整文件 `npx vitest run test/timeout.spec.ts` | 6 | 6 绿（22 passed），14.6–16.8 s；loadavg 24.08 |
+| 5 | 24 个 busy 循环 + 打法 2，`mise exec node@22.23.4 -- …` | 10 | 10 绿，33–49 ms；loadavg 25.37 |
+| 6 | 24 个 busy 循环 + 打法 1（Node 22），另 Node 22 整文件 | 10 + 3 | 13 绿；loadavg 26.82 |
+| 7 | 全量套件 `npx vitest run`（101 文件 / 1910 测试，Node 26，最接近 CI 形状） | 3 | 3 绿，123–128 s |
+| 8 | 24 个 busy 循环 + `--pool=threads`，两条各 10 | 20 | 20 绿 |
+
+  本地红一次都没打出来，所以**没有**「红的逐字输出」可贴；远端那次红是唯一事实，两者必须分开读。
+- **修法（`CONFIRMED`，test-only）**：两条用例的等待从 runner 的钟换成本次等待自己的钟——`test/helpers.ts` 已有的
+  `settledWithin(promise, ms, what)`，预算 **15 000 ms**，具名条件是 `'the bare-realm Atomics wait'` 与 `'the no-timer fallback run'`；
+  等待期间持一个 ref 住的 timer，15 s 不落地就抛 `<what> did not settle within 15000 ms`。**断言一条没动**（`workerCalls === 2`、两条
+  failure 断言、`status === 'completed'`、`elapsed < 15_000`、`assertWorkflowReport`），用例的 `20_000`、`testTimeout: 30_000`、
+  skip/only、`vitest.config.ts`、`noTimerScript` 的两处文本破坏全部原样。**是收紧不是放宽**：多了一个比 runner 更早、且指向具体用例的界。
+- **修后本地数字（`CONFIRMED`，同一台机器）**：24 个 busy 循环下两条各 15 次 → **30/30 绿**（Atomics 53–69 ms、兜底 **1211–1572 ms**，
+  仍是预算驱动而不是靠 15 s 兜底）；整文件 5/5 绿（22 passed，12.66–13.10 s）；`--pool=forks` 1/1 绿（12.71 s）；
+  `mise exec node@22.23.4` 整文件 3/3 绿（12.80–15.67 s）；`npm run typecheck` 干净，`npm run lint` **36 warnings / 0 errors**（全既有）。
+  变异实测：把 Atomics 用例的入参换成永不落地的 promise → `Error: the bare-realm Atomics wait did not settle within 15000 ms`，
+  `tests 15.01s`（失败成它自己，不是 runner 的 30 s），随后按 sha256 `859d39d…` 还原。
+- **门禁（包工头实测，`CONFIRMED`）**：`npm run ci` 在 `141dccd` 上 **exit 0** —— typecheck 干净；lint **36 warnings / 0 errors**；
+  `verify:lib` → `lib/ at 141dccd is the build of src/ at 141dccd (245 files, byte-identical)`；vitest **101 files / 1910 tests PASS**，**122.98 s**。
+- **远端（包工头实测，`CONFIRMED`）**：**PR #48** <https://github.com/free6589/dsh-grok-workflow/pull/48>，run **45385807284**，
+  **Node 22 pass 2m12s / Node 24 pass 2m29s**，两段各自 `Test Files 101 passed (101)` ⇒ `main` 上那次 Node 24 红已转绿。
+- **缺口（照实写）**：① 本地修前红 `NOT_RUN`——8 种打法 0 红，所以本地只能证明「修后同口径仍绿」，不能证明「修好了抖动」，判据只能是远端矩阵；
+  ② **Node 24 本机 `NOT_RUN`**（没装），它的证据只来自远端两段；③ `settledWithin` 只在循环醒来时校验预算（既有形状，本轮未动）——
+  实测把兜底用例的探针预算临时改成 600 ms 仍绿（1064 ms），说明 20 ms tick 本身也会被 sleep 吞掉；这不影响「不落地就具名失败」，但别把 15 s 读成硬实时界。
+- **下一步**：合入由主代理做（本包不合不发版）；合入后若要收口这条抖动，只认远端 Node 24 的复跑结果，不要为它改断言或抬 `testTimeout`。
+
+### 分支账目（2026-11-24，包工头本轮实测）
+
+| 分支 / worktree | 实测 | 处理与依据 | 恢复方式 |
+|---|---|---|---|
+| `team-dispatch-v1` + `.agents/worktrees/team-dispatch-v1` | 删前 `ahead=0 / behind=11`；尖端 **`0b686da`**（2026-11-24 16:49:40 +0800）；经 **`dc69c6e`**（17:01:40，0.13.31 合流提交）进 `main`；worktree `git status --porcelain` **0 行** | `git worktree remove` 后 `git branch -d`（`Deleted branch team-dispatch-v1 (was 0b686da)`），时间 2026-11-24 19:05 前后。**口径修正**：派单里「已合超 24 h」不实——尖端 16:49、合流 17:01，距删除只有约 **2 小时**；删除仍然安全，依据是 ahead=0（尖端是 `main` 的祖先）+ 工作树干净 + 内容在 `main` 历史里，**不是**时间 | `git branch team-dispatch-v1 0b686da`（该提交仍在 `main` 历史上，不需要 reflog） |
+| `backup/wip-2026-11-24-live-steering` | tip `de7ba6a`，`ahead=1`；创建于 2026-11-24 16:01–16:02 | 保留，**删除日写死 2026-11-27**（创建日 +72 h） | —— |
+| `backup/wip-2026-11-24-team-dispatch-v1` | tip `292a4ae`，`ahead=4`；同上时段创建 | 保留，**删除日 2026-11-27** | —— |
+| `backup/wip-2026-11-24-progress-task-number-first` | tip `b91ff17`，`ahead=1`；同上时段创建 | 保留，**删除日 2026-11-27** | —— |
+
+三条 `backup/wip` 的条件：任一条在 2026-11-27 前合入 `main` 或被判为无价值，**当天即删**，不必等到删除日。对应补丁在
+`.session-stage/patches/{live-steering,team-dispatch-v1,progress-task-number-first}-2026-11-24.patch`——`.session-stage/` 是 gitignore，
+**不是跨机器真源，别写成备份**；要跨机器留存得自己另存。`feat/audit-layer` 本轮也未动，评估见 `DECISIONS.md` D-130（取半记录）。
+
 ## 2026-11-24 — 0.13.32 发布收口：设置页升级按钮已合入并发版
 
 - **From:** 发版（merge-and-release）· **To:** 下一个接手的人
