@@ -1,0 +1,404 @@
+M3.2 red: the authoritative intake spec run against the baseline (7b25890)
+
+Tree:      a one-off extraction of `git archive 7b25890` into `.tmp/m3-2-red`
+           (never the repository root), with `node_modules` symlinked from the
+           parent checkout and this branch's `test/m3-intake.spec.ts` copied in.
+           Nothing else from this branch was present — the source under test is
+           the baseline's own `src/`.
+Command:   cd .tmp/m3-2-red && TMPDIR=$PWD/.tmp npx vitest run test/m3-intake.spec.ts
+Exit:      1
+Result:    15 failed | 3 passed (18)
+
+Why this is red for the right reasons, not for a missing module: every import in
+the spec resolves on the baseline (`installHeartbeatListen`, `classifyPreStep`,
+`BLOCK_ADMISSION_ENFORCED`, the six tool names, the two file constants), so there
+is no "cannot find module" anywhere in the transcript. The 15 failures are the
+five product claims failing one by one:
+
+- admission is still inert (`BLOCK_ADMISSION_ENFORCED` false, and the rule and
+  the switch disagree);
+- the six tools still answer a session with no mode record instead of refusing;
+- `legacyGate` still defaults on, so the default chain is not the narrow
+  listener alone, a stopped beat is not rejected by it, a continued beat is
+  never charged, a user message is rewritten by the gate, a malformed batch is
+  rejected by the gate, and neither the end-to-end stop nor the listen-file line
+  exists;
+- the observing shape still writes `observed` where the owning shape writes
+  `continued`, and the intake-off load writes no listen line at all;
+- registration is still the pre-M3.2 matrix (on adds two listeners, the gate is
+  not an addition at all), and the gate's classifier still routes a heartbeat as
+  `loop-continuation`.
+
+The three that pass are the three that do not depend on the flip: "yes for an
+enabled record" (true either way while the switch is off), the static six-name
+coverage check, and "the same six calls get past admission" (which passes
+trivially when nothing is enforced).
+
+The transcript below is the command's stdout+stderr verbatim.
+
+--- transcript ---
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.tmp/m3-2-red
+
+ ❯ test/m3-intake.spec.ts (18 tests | 15 failed) 898ms
+     × answers no for every session that did not opt in 18ms
+     ✓ answers yes for an enabled record, in both workflow shapes 5ms
+     × keeps the rule and the phase switch separable 3ms
+     ✓ covers all six registered names, not a sample 1ms
+     × refuses every one of them with mode-off when the session has no mode record 100ms
+     ✓ lets the same six calls past admission once the session carries a /grok on record 17ms
+     × leaves exactly one agent/pre-step listener on the default configuration 1ms
+     × answers a stopped beat with reject, opens no turn, stops the loop once, and records the code 8ms
+     × continues a beat the brakes allow, calls next() once and charges one round 3ms
+     × stops a real beat end to end through the composed chain, with the real brake port 9ms
+     × leaves a user message untouched 19ms
+     × survives a batch it cannot read, and writes nothing for it 7ms
+     × writes one line to each file for one beat while the intake is on 156ms
+     × never creates the intake file when the intake is off 228ms
+     × registers no intake listener and no block tool when the intake is off — and the narrow listener still exists 278ms
+     × adds the intake observer — and nothing else — when the intake is on 22ms
+     × adds the gate when legacyGate is true 13ms
+     × never lets a heartbeat reach the gate's decision, even with the gate registered 1ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 15 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/m3-intake.spec.ts > 1. admission is live > answers no for every session that did not opt in
+AssertionError: M3.2 turns the rule on: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/m3-intake.spec.ts:264:64
+    262| describe('1. admission is live', () => {
+    263|   it('answers no for every session that did not opt in', () => {
+    264|     expect(BLOCK_ADMISSION_ENFORCED, 'M3.2 turns the rule on').toBe(tr…
+       |                                                                ^
+    265|     // No session at all, and a real session that never wrote a record.
+    266|     expect(canAcceptBlock(undefined)).toBe(false)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/15]⎯
+
+ FAIL  test/m3-intake.spec.ts > 1. admission is live > keeps the rule and the phase switch separable
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/m3-intake.spec.ts:297:51
+    295|     expect(setMode(cases[2]!, { v: 1, enabled: false, turn: 1, setBy: …
+    296|     for (const session of cases) {
+    297|       expect(canAcceptBlockWhenEnforced(session)).toBe(canAcceptBlock(…
+       |                                                   ^
+    298|     }
+    299|     expect(canAcceptBlockWhenEnforced(undefined)).toBe(canAcceptBlock(…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/15]⎯
+
+ FAIL  test/m3-intake.spec.ts > 2. every block tool reads the admission rule > refuses every one of them with mode-off when the session has no mode record
+AssertionError: promise resolved "{ …(6) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "expires_at": "2026-11-24T21:53:16.218Z",
++   "preview_id": "bp-ac0e660d-0875-4605-a3e9-dfe76c0af8be",
++   "render": "接单预览：把账本读出来
++ 这一单切成 1 块。
++
++ [1] 读账本（foreman 包工头）
++   目标：读
++   交付物：一段结论
++   验收：
++     - 读完了
++   写范围：（没声明）
++   依赖：无
++
++ 需要你留意：
++   - 第 1 块「读账本」没有声明写范围（writesPaths 为空），并行时可能和别人撞文件
++
++ 回复『确认』开工；要改就直接说改哪一块。",
++   "requires_user_approval": true,
++   "split_hash": "1289ef5f84fc696b464204ebd2fc6e58632e88477c6c76b35292ee4e52271ffd",
++   "warnings": [
++     "第 1 块「读账本」没有声明写范围（writesPaths 为空），并行时可能和别人撞文件",
++   ],
+  }
+
+ ❯ test/m3-intake.spec.ts:329:100
+    327|     const stranger = headed('sess-tools-no-mode')
+    328|     for (const [name, args] of Object.entries(MINIMAL)) {
+    329|       await expect(call(ctx, name, args, stranger), `${name} must refu…
+       |                                                                                                    ^
+    330|         .rejects.toMatchObject({ code: 'mode-off' })
+    331|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/15]⎯
+
+ FAIL  test/m3-intake.spec.ts > 3. the narrow listener is the only brake owner > leaves exactly one agent/pre-step listener on the default configuration
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/m3-intake.spec.ts:383:42
+    381|     // The default is the new shape: the intake is still off (M3.3) an…
+    382|     // so the narrow listener is the whole chain.
+    383|     expect(resolveConfig({}).legacyGate).toBe(false)
+       |                                          ^
+    384|     expect(resolveConfig({}).blockIntake).toBe(false)
+    385|     const ctx = await mount()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/15]⎯
+
+ FAIL  test/m3-intake.spec.ts > 3. the narrow listener is the only brake owner > answers a stopped beat with reject, opens no turn, stops the loop once, and records the code
+AssertionError: expected 'enter' to be 'reject' // Object.is equality
+
+Expected: "reject"
+Received: "enter"
+
+ ❯ test/m3-intake.spec.ts:402:27
+    400|     })
+    401|     const { decision, nextCalls } = await dispatch(ctx, new FakeAgent(…
+    402|     expect(decision.kind).toBe('reject')
+       |                           ^
+    403|     expect(nextCalls, 'a stopped beat must not open a turn').toBe(0)
+    404|     expect(brakes.reviewed, 'one beat, one review').toBe(1)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/15]⎯
+
+ FAIL  test/m3-intake.spec.ts > 3. the narrow listener is the only brake owner > continues a beat the brakes allow, calls next() once and charges one round
+AssertionError: expected [] to deeply equal [ 'sess-beat-continue' ]
+
+- Expected
++ Received
+
+- [
+-   "sess-beat-continue",
+- ]
++ []
+
+ ❯ test/m3-intake.spec.ts:426:29
+    424|     expect(decision.kind).toBe('enter')
+    425|     expect(nextCalls).toBe(1)
+    426|     expect(brakes.admitted).toEqual(['sess-beat-continue'])
+       |                             ^
+    427|     expect(brakes.stops).toEqual([])
+    428|     const recorded = readHeartbeatListenObservations({ dir: ledger })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/15]⎯
+
+ FAIL  test/m3-intake.spec.ts > 3. the narrow listener is the only brake owner > stops a real beat end to end through the composed chain, with the real brake port
+AssertionError: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ test/m3-intake.spec.ts:444:22
+    442|     expect(nextCalls).toBe(0)
+    443|     const recorded = readHeartbeatListenObservations({ dir: ledger })
+    444|     expect(recorded).toHaveLength(1)
+       |                      ^
+    445|     expect(recorded[0]).toMatchObject({ sessionId: 'sess-beat-real-sto…
+    446|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/15]⎯
+
+ FAIL  test/m3-intake.spec.ts > 3. the narrow listener is the only brake owner > leaves a user message untouched
+AssertionError: expected [ { content: [ { …(2) } ], …(3) } ] to be [ { content: [ { …(2) } ], …(3) } ] // Object.is equality
+
+- Expected
++ Received
+
+  [
+    {
+      "content": [
+        {
+-         "text": "把账本读出来，写一句结论",
++         "text": "The mandatory workflow gate refused this message, so no workflow result exists. Reply with the text between the markers exactly as given: print no marker line, add nothing before or after it, do not attempt the request yourself, and do not call any tool.
++
++ <<<GROK-WORKFLOW-REPORT>>>
++ The mandatory workflow gate refused this message and no workflow result exists.
++ Reason: m3-intake.spec.ts must not start a workflow run
++ Nothing was executed and no direct answer is available by design.
++ <<<END-GROK-WORKFLOW-REPORT>>>",
+          "type": "text",
+        },
+      ],
+-     "id": "c7444d0d-f9e2-4a3c-81bb-35e1c516debe",
++     "id": "e6e00a3e-a01e-47ea-bbb7-677264b45520",
+      "role": "user",
+      "source": {
+-       "kind": "user",
++       "kind": "grok-workflow",
+      },
+    },
+  ]
+
+ ❯ test/m3-intake.spec.ts:453:31
+    451|     const { decision, nextCalls } = await dispatch(ctx, new FakeAgent(…
+    452|     expect(decision.kind).toBe('enter')
+    453|     expect(decision.messages).toBe(messages)
+       |                               ^
+    454|     expect(nextCalls).toBe(1)
+    455|     expect(readHeartbeatListenObservations({ dir: ledger })).toHaveLen…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/15]⎯
+
+ FAIL  test/m3-intake.spec.ts > 3. the narrow listener is the only brake owner > survives a batch it cannot read, and writes nothing for it
+AssertionError: expected 'reject' to be 'enter' // Object.is equality
+
+Expected: "enter"
+Received: "reject"
+
+ ❯ test/m3-intake.spec.ts:468:27
+    466|     const messages = [null as never]
+    467|     const { decision, nextCalls } = await dispatch(ctx, new FakeAgent(…
+    468|     expect(decision.kind).toBe('enter')
+       |                           ^
+    469|     expect(decision.messages).toBe(messages)
+    470|     expect(nextCalls).toBe(1)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/15]⎯
+
+ FAIL  test/m3-intake.spec.ts > 4. two files, one writer each > writes one line to each file for one beat while the intake is on
+AssertionError: expected { Object (v, kind, ...) } to match object { sessionId: 'sess-files-on', …(1) }
+(3 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "outcome": "continued",
++   "outcome": "observed",
+    "sessionId": "sess-files-on",
+  }
+
+ ❯ test/m3-intake.spec.ts:491:25
+    489|     const recorded = readHeartbeatListenObservations({ dir: ledger })
+    490|     expect(recorded).toHaveLength(1)
+    491|     expect(recorded[0]).toMatchObject({ sessionId, outcome: 'continued…
+       |                         ^
+    492|   })
+    493|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/15]⎯
+
+ FAIL  test/m3-intake.spec.ts > 4. two files, one writer each > never creates the intake file when the intake is off
+AssertionError: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ test/m3-intake.spec.ts:502:22
+    500|     expect(existsSync(join(ledger, HEARTBEATS_FILE)), 'no intake obser…
+    501|     const recorded = readHeartbeatListenObservations({ dir: ledger })
+    502|     expect(recorded).toHaveLength(1)
+       |                      ^
+    503|     expect(recorded[0]).toMatchObject({ sessionId, outcome: 'continued…
+    504|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/15]⎯
+
+ FAIL  test/m3-intake.spec.ts > 5. registration > registers no intake listener and no block tool when the intake is off — and the narrow listener still exists
+AssertionError: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ test/m3-intake.spec.ts:520:62
+    518|     await openBlockFor(sessionId)
+    519|     await dispatch(ctx, new FakeAgent(headed(sessionId)), [heartbeat()…
+    520|     expect(readHeartbeatListenObservations({ dir: ledger })).toHaveLen…
+       |                                                              ^
+    521|   })
+    522|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/15]⎯
+
+ FAIL  test/m3-intake.spec.ts > 5. registration > adds the intake observer — and nothing else — when the intake is on
+AssertionError: exactly one more listener: expected 2 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 2
+
+ ❯ test/m3-intake.spec.ts:526:81
+    524|     const off = await mount({ blockIntake: false })
+    525|     const on = await mount({ blockIntake: true })
+    526|     expect(listenerCount(on) - listenerCount(off), 'exactly one more l…
+       |                                                                                 ^
+    527|     // The added one is the intake observer: its file appears for a be…
+    528|     const sessionId = 'sess-reg-on'
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/15]⎯
+
+ FAIL  test/m3-intake.spec.ts > 5. registration > adds the gate when legacyGate is true
+AssertionError: the gate is the only addition: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ test/m3-intake.spec.ts:537:95
+    535|     const without = await mount()
+    536|     const withGate = await mount({ legacyGate: true })
+    537|     expect(listenerCount(withGate) - listenerCount(without), 'the gate…
+       |                                                                                               ^
+    538|   })
+    539|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/15]⎯
+
+ FAIL  test/m3-intake.spec.ts > 5. registration > never lets a heartbeat reach the gate's decision, even with the gate registered
+AssertionError: expected { kind: 'pass', …(1) } to deeply equal { kind: 'pass', …(1) }
+
+- Expected
++ Received
+
+  {
+    "kind": "pass",
+-   "reason": "non-user-source",
++   "reason": "loop-continuation",
+  }
+
+ ❯ test/m3-intake.spec.ts:554:21
+    552|       } as never,
+    553|     )
+    554|     expect(verdict).toEqual({ kind: 'pass', reason: 'non-user-source' …
+       |                     ^
+    555|
+    556|     // And on the composed chain: a stopped beat is refused before the…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/15]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  15 failed | 3 passed (18)
+   Start at  05:43:14
+   Duration  2.81s (transform 1.36s, setup 0ms, import 1.58s, tests 898ms, environment 0ms)
+
