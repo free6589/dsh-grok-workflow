@@ -15,6 +15,11 @@
  * - modifying a `running` task (`forbidden:running-immutable`);
  * - writing the verifier's `verdict` in any way (`forbidden:verdict-immutable`).
  *
+ * Addressing: an `owner` is a worker, so it must be a full subagent path
+ * (`lead/worker-1`); a bare name is refused (`invalid:bad-address`). A
+ * `creator` may be the tree root (`lead`) or any deeper path. Results return
+ * to the creator only (`resultRecipient`) — never to the dispatcher.
+ *
  * This module is a pure decision layer: `decideIntent`/`decideRawIntent` read
  * through a minimal `TaskReader` and return a decision plus an effect. They
  * perform no IO and call no engine, so the gate can import them without
@@ -29,15 +34,30 @@ export interface DispatcherTask {
     id: string;
     title: string;
     status: DispatcherLifecycle;
+    /** Full subagent path of the agent expected to do the work (e.g. `lead/worker-1`). */
     owner?: string;
+    /**
+     * Full subagent path of the agent that asked for the task. Worker results go
+     * back to this address only, never to the dispatcher and never to the user.
+     */
+    creator?: string;
     objective?: string;
     blockedReason?: string;
+    /** Arrival order on the board; assigned by the session, never by the policy. */
+    queueSeq?: number;
     /**
      * Owned by the verifier. The dispatcher must never write this field —
      * any intent carrying it is refused with `forbidden:verdict-immutable`.
      */
     verdict?: 'pass' | 'fail';
 }
+/**
+ * A patch may delete an optional field by carrying `undefined` explicitly
+ * (`exactOptionalPropertyTypes` otherwise forbids the delete-on-reassign).
+ */
+export type DispatcherTaskPatch = {
+    [K in keyof DispatcherTask]?: DispatcherTask[K] | undefined;
+};
 /** Minimal read surface a decision needs. Task-8's store satisfies this. */
 export interface TaskReader {
     get(id: string): DispatcherTask | undefined;
@@ -50,6 +70,7 @@ export type DispatcherIntent = {
     title: string;
     objective?: string;
     owner?: string;
+    creator?: string;
 } | {
     op: 'update-pending';
     id: string;
@@ -72,10 +93,10 @@ export type DispatcherEffect = {
 } | {
     kind: 'patch';
     id: string;
-    patch: Partial<DispatcherTask>;
+    patch: DispatcherTaskPatch;
 };
 /** Every way a decision can be refused. */
-export type DispatcherRefusalCode = 'forbidden:completed-immutable' | 'forbidden:running-immutable' | 'forbidden:verdict-immutable' | 'invalid:unknown-op' | 'invalid:task-missing' | 'invalid:duplicate-id' | 'invalid:not-pending' | 'invalid:bad-intent' | 'invalid:session-inactive';
+export type DispatcherRefusalCode = 'forbidden:completed-immutable' | 'forbidden:running-immutable' | 'forbidden:verdict-immutable' | 'invalid:unknown-op' | 'invalid:task-missing' | 'invalid:duplicate-id' | 'invalid:not-pending' | 'invalid:bad-intent' | 'invalid:bad-address' | 'invalid:session-inactive';
 /** Outcome of one intent: either an effect to apply, or an explicit refusal. */
 export type DispatcherDecision = {
     ok: true;
@@ -91,6 +112,23 @@ export type DispatcherDecision = {
 };
 /** All four whitelisted operation names, in one place. */
 export declare const DISPATCHER_OPS: readonly DispatcherOp[];
+/**
+ * True when `value` is a routable path from the tree root (`lead` or
+ * `lead/worker-1`). Used for the creator, which may be the root itself.
+ */
+export declare function isAddressPath(value: string): boolean;
+/**
+ * True when `value` is a full subagent path (`lead/worker-1`), not a display
+ * name (`worker-1`). A bare name cannot be routed as a worker: two agents in
+ * different subtrees can share it, so the dispatcher only records routable
+ * execution addresses.
+ */
+export declare function isFullSubagentPath(value: string): boolean;
+/**
+ * Where a finished task's result belongs: the creator only. The owner is the
+ * execution address and may change on reassignment; the creator never does.
+ */
+export declare function resultRecipient(task: DispatcherTask): string | undefined;
 /**
  * Decide one typed intent against the current board.
  *

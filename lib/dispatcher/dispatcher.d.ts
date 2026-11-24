@@ -25,11 +25,11 @@
  * four-operation whitelist with an explicit, user-readable error, so the
  * gate only needs to state the returned `message`.
  */
-import { DISPATCHER_OPS, decideIntent, decideRawIntent, type DispatcherDecision, type DispatcherIntent, type DispatcherLifecycle, type DispatcherOp, type DispatcherRefusalCode, type DispatcherTask, type TaskReader } from './policy.js';
+import { DISPATCHER_OPS, decideIntent, decideRawIntent, isAddressPath, isFullSubagentPath, resultRecipient, type DispatcherDecision, type DispatcherIntent, type DispatcherLifecycle, type DispatcherOp, type DispatcherRefusalCode, type DispatcherTask, type DispatcherTaskPatch, type TaskReader } from './policy.js';
 import { DispatcherSession, type DispatcherResumeResult } from './session.js';
 import { boardReader } from './board-reader.js';
-export type { DispatcherDecision, DispatcherIntent, DispatcherLifecycle, DispatcherOp, DispatcherRefusalCode, DispatcherResumeResult, DispatcherTask, TaskReader, };
-export { DISPATCHER_OPS, decideIntent, decideRawIntent, DispatcherSession, boardReader };
+export type { DispatcherDecision, DispatcherIntent, DispatcherLifecycle, DispatcherOp, DispatcherRefusalCode, DispatcherResumeResult, DispatcherTask, DispatcherTaskPatch, TaskReader, };
+export { DISPATCHER_OPS, decideIntent, decideRawIntent, DispatcherSession, boardReader, isAddressPath, isFullSubagentPath, resultRecipient, };
 /**
  * Open a dispatcher session.
  *

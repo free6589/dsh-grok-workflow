@@ -2605,6 +2605,54 @@ test/composition.spec.ts` → 128 PASS。全量 `npm run ci` 与真机 GUI 手�
 真机隔离 soak（见 VALIDATION）：live headless 跑出同形状 phase，fold 后任务 7 成卡、
 spine 为空，pre-fix 形状会进脊柱。
 
+## D-128 — 到达顺序写在行上（`TaskRecord.seq`），不再靠文件序；旧账本按文件序补盖（2026-11-24，未发版）
+
+- **Status:** CONFIRMED
+- **Date:** 2026-11-24
+- **Decision:** 任务板每行带一个到达号 `seq`：`create` 时在认领锁内取「盘上最大值 + 1」，落盘保存；队列读
+  `TaskBoard.arrival()`（按 `seq`，同号再按 id），调度器的待办队列读 `DispatcherSession.pending()`，`resume()`
+  额外回 `pending`（队列长度）。`list()` 保持 id 序不动。旧账本（没有 `seq` 的行）在读取时按**文件序**补盖，下一次
+  落盘写回，等价于一次就地升级，不重排、不丢行。
+- **Why:** 落盘时行是**按 id 排序**写的，所以文件序不是到达序。用 id 序当队列序会真的排错队（`task-10` 排在
+  `task-9` 前、`b` 排在 `a` 前），而且这个错误在重启后才显形——正是「重启后队列顺序变了」这一类最难查的偏差。
+  把序号写在行上，顺序就随行一起持久化，重启前后同一个队列。
+- **Alternatives considered:**
+  1. 用 `createdAt` 排序：时间戳只有毫秒精度，同一毫秒创建的两行无法定序，测试里连建三行就会撞上（否）。
+  2. 改落盘顺序按到达序写：等于让文件序承担语义，而 `list()` 的 id 序是既有契约，两套顺序会互相污染（否）。
+  3. 恢复分支原来的 `board.json` v2（自带 `queueSeq`）：那是与 `store.jsonl` 并行的第二个板文件，正是 main 在
+     `9dc7624` 里拆掉的东西（否）。
+  4. 不做：调度器现在还没有真正消费队列的调用方，但「重启后顺序变了」是可观测行为，留缺陷等消费方接入时再修更贵（否）。
+- **Consequences:** 行多一个可选字段，行格式向后兼容（老行没有 `seq` 也能读、能升级）。到达号只在 `create` 时分配、
+  永不复用，删行不会回收（`max + 1` 取自盘上现存最大值，删掉最大值那行后，下一个新行可能复用该号——同号时按 id
+  定序，行为仍确定）。**`seq` 只表达创建顺序，不表达优先级**；要优先级得另加字段，不要复用 `seq`。
+- **Evidence:** `test/taskboard.spec.ts` 的 `keeps arrival order across a restart, which id order does not`、
+  `opens a store written without arrival numbers without reordering it, and appends new rows after`；
+  `test/dispatcher.spec.ts` 的 `resume restores every pending task in arrival order, losing none`；
+  跨进程/FIFO 探针实测见 `VALIDATION.md` 2026-11-24 条目（main 产物重开后回到 id 序，rebase 后 `arrival()` 回到创建序）。
+
+## D-127 — 任务板的 CAS 必须对着磁盘校验，改动期间持独占锁；结构性冲突之外不做分布式协调（2026-11-23，未发版）
+
+- **Status:** CONFIRMED
+- **Date:** 2026-11-23
+- **Decision:** `src/taskboard/` 的每次改动（create/claim/assign/setDependencies/complete/fail/block/requeue）都在
+  独占锁文件 `<dir>/.store.jsonl.lock` 内执行「重读账本 → 按磁盘版本做比较交换 → 落盘」。CAS 的比对对象是磁盘上的
+  行，不是句柄里可能过期的内存副本。
+- **Why:** 旧实现按内存整份重写 `store.jsonl`：两个句柄读到同一版本后各自认领同一行，两边都返回成功，文件只留最后
+  一个归属（同任务双认领）；同时认领不同行时会互相冲掉（丢更新）。对「调度真相」层来说这是致命缺陷——认领协议存在
+  的意义就是防止两个 worker 抢到同一件事。
+- **Alternatives considered:**
+  1. 只加锁不重读：锁内仍用旧内存副本，跨进程丢更新依旧存在（否）。
+  2. 改成 append-only 单行追加日志（`O_APPEND` 小于 PIPE_BUF 的写近似原子）：不丢更新且无需锁，但要改行格式与
+     读取语义（按 id 取最后一条），与已发布的 v1 行格式和「原子整体替换」文档冲突，且无法在锁内同时保证
+     「重复 id」「依赖前置」这类跨行不变式（否，留作后续演进）。
+  3. 引入真正的分布式协调（租约服务、文件系统 flock）：超出单机插件范围，网络盘语义不可控（否）。
+- **Consequences:** 每次改动多一次读盘 + 一次锁的 open/unlink；板最多 1024 行、1 MB，代价可忽略。锁是单文件系统内的
+  咨询锁，不防恶意绕过；`O_EXCL`/rename 语义在网络盘上不保证，多机共享板不在支持范围。持锁进程被杀留下的锁按
+  `lockStaleMs`（默认 5 s）判废弃并清掉，因此崩溃不会永久卡死板（代价：真并发下最长等 5 s 才接管）。
+- **Evidence:** `test/taskboard.spec.ts`（rebase 到 `main` 后 26 例：同任务双句柄单赢家、不同行不互相冲掉、SIGKILL 子进程恢复、
+  持锁进程被杀后锁清掉、活锁尊重到超时、撕裂账本拒读、中断写 tmp inert、跨重启 id 唯一与 CAS 守卫、位置解析、到达顺序）；
+  `docs/ARCHITECTURE.md` 任务板章节；`docs/knowledge/VALIDATION.md` 2026-11-23 条目。
+
 ## D-108 — 团队调度层三件套：任务板真相 + 大管家白名单 + 交接契约四行（2026-11-23，未发版）
 
 - **Status:** CONFIRMED（本轮三 lane 落地，85 文件 / 1617 测试 PASS，独立复验通过）

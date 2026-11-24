@@ -15,6 +15,11 @@
  * gate claiming: a task whose predecessors are not all `completed` cannot
  * start. The board persists every row (id/owner/status/version/dependencies)
  * to `store.jsonl` so a reopen of the same directory recovers all of it.
+ *
+ * Order: the store file is written sorted by id, so the file order is not the
+ * arrival order. Every row therefore carries its own `seq` (see `TaskRecord`),
+ * which is what a queue reads: pending rows come out in the order they were
+ * created, before and after a restart alike.
  */
 /** Lifecycle states (dsh-agent-team: pending → in_progress → completed). */
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'blocked';
@@ -22,6 +27,30 @@ export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'b
 export declare const TASKBOARD_SCHEMA: "grok-workflow.taskboard/v1";
 /** Store file name inside the board directory. */
 export declare const TASKBOARD_STORE_FILE: "store.jsonl";
+/**
+ * Cross-process claim lock: every mutation takes an exclusive lock file for
+ * the duration of re-read → apply → persist, so two workers cannot both
+ * observe the same version and both write. A crashed holder leaves the lock
+ * behind; an unreleased lock older than `defaultStaleMs` is treated as
+ * abandoned and removed by the next writer.
+ */
+export declare const TASKBOARD_LOCK: {
+    /** How long a writer waits for the lock before failing with `io`. */
+    readonly defaultTimeoutMs: 5000;
+    /** Age after which an unreleased lock is considered abandoned. */
+    readonly defaultStaleMs: 5000;
+    /** Delay between lock attempts while another writer holds it. */
+    readonly retryMs: 4;
+};
+/** Lock file name inside the board directory (one per board). */
+export declare const TASKBOARD_LOCK_FILE: ".store.jsonl.lock";
+/** Per-board tunables; the defaults are the documented policy. */
+export interface TaskboardOptions {
+    /** Milliseconds to wait for the claim lock; defaults to {@link TASKBOARD_LOCK}. */
+    lockTimeoutMs?: number | undefined;
+    /** Milliseconds before an unreleased lock is abandoned; defaults to {@link TASKBOARD_LOCK}. */
+    lockStaleMs?: number | undefined;
+}
 /** Structural ceilings so one row cannot grow the store without limit. */
 export declare const TASKBOARD_LIMITS: {
     /** Maximum whole-file size read or written. */
@@ -53,6 +82,18 @@ export interface TaskRecord {
     blocked_by: string[];
     /** CAS token: starts at 1, +1 per mutation. */
     version: number;
+    /**
+     * Arrival order on this board: 1 for the first row created, +1 per create,
+     * never reused. Assigned under the claim lock from the highest `seq` on
+     * disk, so arrival order survives a restart — the row order in the store
+     * file does not (rows are persisted sorted by id).
+     *
+     * Absent on rows written before the field existed. `load()` stamps those
+     * from the file position (which was the only order such a store had), and
+     * the next persist writes the stamps back, so a legacy store upgrades
+     * without losing or reordering a queue.
+     */
+    seq?: number | undefined;
     /** ISO-8601 creation time. */
     createdAt: string;
     /** ISO-8601 time of the latest mutation. */

@@ -1,3 +1,26 @@
+## `team-dispatch-v1` rebase 到 `main` `369d6e3`：冲突按功能解、全仓门禁 exit 0、跨进程差分实测 — 2026-11-24 (`CONFIRMED`)
+
+下面每一行都是本轮在 worktree `.agents/worktrees/team-dispatch-v1` 里真跑过的命令与真读到的结果；没跑的写 `NOT_RUN`。
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| rebase | `git rebase main`（worktree，分支原尖端 `7d86bc4`，`main` = `369d6e3`） | **完成、未 abort**：3 条重放（`df89a95` / `4f25f15` / `1fddad2`）+ 2 条收尾（`chore(build)` 重建 `lib/`、本轮记忆） |
+| 全仓门禁 | `npm run ci`（worktree，`typecheck && lint && verify:lib && npm test`） | **exit 0**：typecheck 干净；oxlint **Found 36 warnings and 0 errors**（全既有）；`verify:lib` → `lib/ at 77d05f8 is the build of src/ at 77d05f8 (241 files, byte-identical)`；vitest **100 files / 1866 tests PASS**（121.31 s） |
+| 受影响四个套件（逐例名） | `npx vitest run test/taskboard.spec.ts test/dispatcher.spec.ts test/dispatcher-board.spec.ts test/board-reader.spec.ts --reporter=verbose` | **51 passed (51)**，含本分支带来的 21 例新用例（逐条名字见下方「新增用例」） |
+| 跨进程认领差分（main 基线） | `node .tmp/probe/run.mjs main <git archive main lib/taskboard>/index.js`（12 个子进程同时各认领各的一行，连跑 3 次） | **12/12 子进程报 OK，盘上只活 5 / 6 / 7 行**——丢更新可复现，与分支所述一致 |
+| 跨进程认领差分（rebase 后） | 同上，`<worktree>/lib/taskboard/index.js`（连跑 3 次） | **12/12 子进程 OK，12/12 行全活** |
+| FIFO 探针（main 基线） | `node .tmp/probe/fifo.mjs main <main lib>`（依序创建 `task-10,9,b,a` 后重开） | 重开后 `list()` = `a,b,task-10,task-9`（id 序），**到达序丢失**，且无 `arrival()` |
+| FIFO 探针（rebase 后） | 同上，`<worktree>/lib` | `list()` 仍是 id 序（main 契约不变），`arrival()` = `task-10,task-9,b,a`，**到达序跨重启保住** |
+| 主检出是否被碰 | `git -C /home/fish/projects_mine/dsh-grok-workflow status --short --branch` | `## main...origin/main`，**无改动**；HEAD 仍 `369d6e3` |
+| 真机 soak | — | **NOT_RUN**（本轮范围到单测 + 门禁，未装隔离 profile） |
+
+**新增用例（21 例，名字照抄 verbose 输出）：** taskboard —— `two handles claiming the same row: exactly one wins, the other conflicts`（替换 main 原来断言「两个写者都成功」的旧竞态用例，那正是丢更新缺陷）、`concurrent claims on different rows keep both rows (no lost update)`、`keeps arrival order across a restart, which id order does not`、`opens a store written without arrival numbers without reordering it, and appends new rows after`、`an interrupted write leaves the last committed store authoritative and its temp file inert`、`refuses a torn store instead of silently dropping the torn row`、`recovers a real board after a writer process is SIGKILLed mid-mutation`、`breaks a lock left by a process killed while holding it`、`keeps a fresh lock respected and fails the mutation when the wait runs out`、`keeps task ids unique across a restart`、`guards a claim after restart with the version that is actually stored`、`resolves explicit dir, then the env override, then $DSH_HOME/taskboards`、`openDefaultTaskboard writes store.jsonl into the resolved directory`；dispatcher —— `resume restores every pending task in arrival order, losing none`、`refuses to rewrite a corrupt store instead of guessing (fail closed)`、`refuses a bare name and a malformed path, accepts a full path`、`records the creator and sends results to the creator, not the owner`、`clears the stale block reason when a blocked task is reassigned`、`refuses every execution or judgment operation a worker or verifier owns`、`changes nothing when it refuses a completed task or a verdict write`、`never writes a verdict when recording or reassigning a task`。
+
+**为让新行为成立而改的 main 既有测试（只改调用的 owner 字面量，没删用例）：** `test/dispatcher.spec.ts` 与 `test/dispatcher-board.spec.ts` 里 `agent-8 / agent-9 / agent-a` → `lead/agent-8 / lead/agent-9 / lead/agent-a`——全路径寻址生效后裸名会被 `invalid:bad-address` 拒，这 5 例原本按裸名书写。
+
+**Changed：** `src/taskboard/{types,store,index}.ts`（+`seq` 到达标记与 `arrival()`、认领锁、`paths.ts` 新文件）、`src/taskboard/paths.ts`（新增）、`src/dispatcher/{policy,session,dispatcher}.ts`（+全路径寻址、`creator`/`resultRecipient`、`pending()`/`resume().pending`）、`test/taskboard.spec.ts`、`test/dispatcher.spec.ts`、`test/dispatcher-board.spec.ts`、`test/fixtures/taskboard/writer.mjs`（新增）、`vitest.config.ts`（`GROK_WORKFLOW_TASKBOARD_DIR` 指向 tmp）、`lib/` 重建、`docs/ARCHITECTURE.md`（任务板章节）、`CHANGELOG.md`、`docs/knowledge/{STATE,HANDOFF,DECISIONS}.md`。
+**Honest boundary：** 真机 soak `NOT_RUN`；未合流、未 push、未发版；锁仍是单文件系统内的咨询锁（不防恶意绕过、网络盘 `O_EXCL`/rename 语义不保证），rename 后的目录 fsync 仍是尽力而为；`seq` 只覆盖「创建顺序」，不表达优先级。跨进程差分用的是 **main 已提交的 `lib/` 产物**（`git archive` 取出，未在 main 检出里构建），所以它验证的是「已发布代码 vs rebase 后代码」，不是「main `src` 未构建形态」。
+
 ## 0.13.30 门禁与发版：本地一次全绿、远端 CI + Release 双绿 — 2026-11-24
 
 发版提交 `10af79b` = `chore(release): prepare v0.13.30`（8 files / +32 −20，基线 `4f616d1` ＝ `origin/main`）。下面每一行都是量过的，
@@ -6581,3 +6604,21 @@ toolName/configVersion = 页面 16）；`test/client.spec.ts` ProgressBundle 补
 - **证据文件**：`docs/knowledge/evidence/answer-parity-2026-11-23.md`（Sec.3-4）、
   `docs/knowledge/evidence/image-task-scope-2026-11-23.md`（Sec.3-5）、
   `.rsi/evidence/rsi-seq-12/ROUND2.md`（12 项逐条 + 分支台账 + 分歧日志）。
+
+<!-- Carried over from branch `team-dispatch-v1` by its rebase onto main: the text below is that branch's own record of the work. Where it says "未发版" / "NOT_RUN" it describes the tree it was written in, not main; the rebased branch ran the full gate — see the `team-dispatch-v1` rebase entry at the top of this file. -->
+
+## 任务板持久化加固：磁盘 CAS + 认领锁 + 崩溃恢复用例 — 2026-11-23 (`CONFIRMED`，未发版)
+
+| state | command | result |
+| --- | --- | --- |
+| worktree `team-dispatch-v1`（共享，另有 lane 在改 dispatcher/handoff） | `npx vitest run test/taskboard.spec.ts` | **23 tests PASS**（原 13 + 新增 10：同任务双句柄单赢家/不同行不互相冲掉/中断写留下 inert tmp/撕裂账本拒读/SIGKILL 真进程恢复/持锁进程被杀后锁清掉/活锁尊重到超时/跨重启 id 唯一/跨重启 CAS 守卫/位置解析 2 例）；连续跑 3 次结果一致 |
+| 同上 | `npx tsc -p .tmp/tsconfig.taskboard.json`（范围：`src/taskboard/**` + `test/taskboard.spec.ts`） | **exit 0** |
+| 同上 | `npx tsc -p .tmp/tsconfig.taskboard-build.json`（`rootDir ../src`、`outDir ../lib`，仅 taskboard） | **exit 0**，重建 `lib/taskboard/*`（含新增 `paths.*`），未触碰其他 lib 产物 |
+| 同上 | `npx tsc -p tsconfig.json --noEmit`（全仓，另一 lane 落地后） | **exit 0** |
+| 同上 | `npx vitest run`（全仓） | **85 files / 1649 tests PASS**（含本任务 taskboard 23 例；首次全仓跑时 `test/channel.spec.ts` A4 用例在并行 lane 同时构建/跑测的负载下红过 1 次，随后单跑 4/4 PASS、基线提交 `e4e03e9` 单跑 3/3 PASS——判定为负载型既有 flake，与本提交无关） |
+| 同上 | `npm run lint` | **0 errors**（30 warnings，均为既有未用符号类告警） |
+| 同上 | 复刻 `verify:lib` 流程（`git archive HEAD` → 临时目录 build → `diff -r` 已提交 `lib`） | **byte-identical**（0 行差异）。注：`npm run verify:lib` 本身在本 worktree **跑不了**——它把 `<worktree>/node_modules` 软链进临时目录，而 worktree 无自己的 `node_modules`（typescript 从主检出解析），属环境限制，与本提交无关 |
+
+**Changed：** `src/taskboard/store.ts`（每次改动静默持独占锁：重读 → 按磁盘版本 CAS → 落盘；废弃锁按 `lockStaleMs` 清掉）、`src/taskboard/types.ts`（`TASKBOARD_LOCK`/`TASKBOARD_LOCK_FILE`/`TaskboardOptions`）、`src/taskboard/paths.ts`（新增：`taskboardDir`/`taskboardFile`/`openDefaultTaskboard`，三级解析同 `checkpointDir`）、`src/taskboard/index.ts`、`test/taskboard.spec.ts`、`test/fixtures/taskboard/writer.mjs`（真实子进程，导入 `lib/` 产物）、`vitest.config.ts`（`GROK_WORKFLOW_TASKBOARD_DIR` 指向 tmp）、`docs/ARCHITECTURE.md`（任务板章节：位置/行格式/认领协议/崩溃恢复/上限/证据/边界）、`CHANGELOG.md`。
+**行为变更：** 旧 `taskboard.spec.ts` 的同任务竞态用例断言"两个写者都成功、文件留最后一个"——那正是丢更新缺陷；现改为"恰好一个赢家、输家 `version-conflict`，重开后归属与赢家一致"。
+**Honest boundary：** 提交时刻（`f4cce3d`）本 worktree 仍被另一条 lane 占用，故 `npm run ci` 未作为单条命令执行，而是按其步骤分步跑（typecheck / lint / 全仓 vitest / 复刻 verify:lib），四步全绿；该 lane 随后自行提交了 `14f4e35`（dispatcher），两者同分支先后落地、互不改对方文件。仍未单独观测到的只有"单次 `npm run ci` 调用"的退出码本身。锁为单文件系统内的咨询锁（不防恶意绕过、不保证网络盘语义）；rename 后的目录 fsync 是尽力而为，掉电仍可能丢最后一次写——两条都写进架构文档的边界节。

@@ -12,6 +12,14 @@
  *   stored version still matches, and a mismatch fails with
  *   `TaskboardError('version-conflict')` carrying both versions. There is no
  *   last-writer-wins anywhere.
+ * - The guard is checked against the file, not against a stale in-memory
+ *   copy: each mutation takes the board's exclusive lock file, re-reads
+ *   `store.jsonl`, checks the row against what is on disk, applies the
+ *   change, and persists. Two workers that read the same version therefore
+ *   cannot both win — the loser sees `version-conflict` — and concurrent
+ *   claims on different rows cannot erase each other (a whole-file rewrite
+ *   without the lock could). `get`/`list` still serve the last loaded
+ *   snapshot; a read-only observer calls `reload()` to see other writers.
  * - State machine: `pending → in_progress → completed | failed | blocked`;
  *   `blocked → pending` requeues a task; `failed → pending` retries it;
  *   `completed` rows are immutable and reject every mutation.
@@ -30,6 +38,15 @@
  * then renamed over `store.jsonl`. A reader therefore never sees a
  * half-written store, and a failed write leaves the previous store intact.
  * Lines whose checksum no longer matches are refused on open.
+ *
+ * Crash recovery, concretely: a process killed between the `*.tmp` write and
+ * the rename leaves the previous `store.jsonl` authoritative and one hidden
+ * temporary file behind, which no reader ever opens. A process killed while
+ * holding the claim lock leaves the lock file behind; the next writer treats
+ * an unreleased lock older than `lockStaleMs` (default 5 s) as abandoned,
+ * removes it, and proceeds. A store whose last line was torn by a
+ * non-atomic writer is refused with `TaskboardError('integrity')` rather
+ * than silently dropped.
  */
 
 import { createHash, randomBytes } from 'node:crypto'
@@ -38,15 +55,18 @@ import { basename, dirname, join } from 'node:path'
 import {
   assertTaskRecord,
   TASKBOARD_LIMITS,
+  TASKBOARD_LOCK,
+  TASKBOARD_LOCK_FILE,
   TASKBOARD_SCHEMA,
   TASKBOARD_STORE_FILE,
   type CloseOptions,
   type CreateTaskInput,
+  type TaskboardOptions,
   type TaskRecord,
 } from './types.js'
 
-export type { CloseOptions, CreateTaskInput, TaskRecord, TaskStatus } from './types.js'
-export { TASKBOARD_LIMITS, TASKBOARD_SCHEMA, TASKBOARD_STORE_FILE } from './types.js'
+export type { CloseOptions, CreateTaskInput, TaskRecord, TaskStatus, TaskboardOptions } from './types.js'
+export { TASKBOARD_LIMITS, TASKBOARD_LOCK, TASKBOARD_LOCK_FILE, TASKBOARD_SCHEMA, TASKBOARD_STORE_FILE } from './types.js'
 export { assertTaskRecord } from './types.js'
 
 /** Machine-readable failure reasons; every method throws only these. */
@@ -189,23 +209,29 @@ function parseLine(line: string, lineNo: number): TaskRecord {
 
 /**
  * One durable board: one directory, one `store.jsonl`, every mutation
- * persisted before it returns. Use `openTaskboard` to create or reopen;
- * every instance holds its own in-memory copy, so concurrent handles to
- * the same directory must re-read (via `reload`) to observe each other.
+ * persisted before it returns. Every mutation re-reads the store under the
+ * board's exclusive lock, so two handles (in one process or several) can
+ * never both win the same claim and cannot drop each other's rows.
  */
 export class TaskBoard {
   private readonly dir: string
   private readonly file: string
+  private readonly lockFile: string
+  private readonly lockTimeoutMs: number
+  private readonly lockStaleMs: number
   private readonly tasks = new Map<string, TaskRecord>()
 
-  private constructor(dir: string) {
+  private constructor(dir: string, options: TaskboardOptions) {
     this.dir = dir
     this.file = join(dir, TASKBOARD_STORE_FILE)
+    this.lockFile = join(dir, TASKBOARD_LOCK_FILE)
+    this.lockTimeoutMs = checkLockMs('lockTimeoutMs', options.lockTimeoutMs, TASKBOARD_LOCK.defaultTimeoutMs)
+    this.lockStaleMs = checkLockMs('lockStaleMs', options.lockStaleMs, TASKBOARD_LOCK.defaultStaleMs)
   }
 
   /** Open the board at `dir`, creating it (empty) when no store exists. */
-  static async open(dir: string): Promise<TaskBoard> {
-    const board = new TaskBoard(dir)
+  static async open(dir: string, options: TaskboardOptions = {}): Promise<TaskBoard> {
+    const board = new TaskBoard(dir, options)
     await board.load()
     return board
   }
@@ -220,7 +246,11 @@ export class TaskBoard {
     return this.tasks.size
   }
 
-  /** Re-read `store.jsonl`, discarding unpersisted local state. */
+  /**
+   * Re-read `store.jsonl` so this handle's `get`/`list` see rows another
+   * handle wrote. Mutations already re-read under the lock; this is for
+   * read-only observers.
+   */
   async reload(): Promise<void> {
     await this.load()
   }
@@ -243,8 +273,28 @@ export class TaskBoard {
   }
 
   /**
+   * List every row in arrival order (`seq`, then id), each entry a copy.
+   *
+   * WHY a second order: `list()` is sorted by id for a deterministic read,
+   * but a queue is ordered by arrival. `seq` is persisted on the row, so this
+   * order is the same before and after a restart — which the file order is
+   * not, because rows are written sorted by id.
+   */
+  arrival(): TaskRecord[] {
+    return [...this.tasks.values()]
+      .sort((left, right) => {
+        const delta = (left.seq ?? Number.MAX_SAFE_INTEGER) - (right.seq ?? Number.MAX_SAFE_INTEGER)
+        if (delta !== 0) return delta
+        return left.id < right.id ? -1 : 1
+      })
+      .map(clone)
+  }
+
+  /**
    * Create one `pending`, unowned row. The id must be globally unique on
-   * this board; a duplicate fails with `duplicate-id` and changes nothing.
+   * this board — across handles and restarts, because the duplicate check
+   * runs against the store under the lock; a duplicate fails with
+   * `duplicate-id` and changes nothing.
    */
   async create(input: CreateTaskInput): Promise<TaskRecord> {
     checkId(input.id)
@@ -253,32 +303,38 @@ export class TaskBoard {
     if (blockedBy.includes(input.id)) {
       throw new TaskboardError('invalid-input', `task ${input.id} cannot depend on itself`)
     }
-    if (this.tasks.has(input.id)) {
-      throw new TaskboardError('duplicate-id', `task id already exists: ${input.id}`)
-    }
-    if (this.tasks.size + 1 > TASKBOARD_LIMITS.maxTasks) {
-      throw new TaskboardError('too-large', `board holds at most ${TASKBOARD_LIMITS.maxTasks} tasks`)
-    }
-    const stamped = nowIso()
-    const task: TaskRecord = {
-      id: input.id,
-      title: input.title,
-      status: 'pending',
-      owner: null,
-      blocked_by: blockedBy,
-      version: 1,
-      createdAt: stamped,
-      updatedAt: stamped,
-      detail: null,
-    }
-    this.tasks.set(task.id, task)
-    try {
-      await this.persist()
-    } catch (error) {
-      this.tasks.delete(task.id)
-      throw error
-    }
-    return clone(task)
+    return this.withLock(async () => {
+      await this.load()
+      if (this.tasks.has(input.id)) {
+        throw new TaskboardError('duplicate-id', `task id already exists: ${input.id}`)
+      }
+      if (this.tasks.size + 1 > TASKBOARD_LIMITS.maxTasks) {
+        throw new TaskboardError('too-large', `board holds at most ${TASKBOARD_LIMITS.maxTasks} tasks`)
+      }
+      const stamped = nowIso()
+      const task: TaskRecord = {
+        id: input.id,
+        title: input.title,
+        status: 'pending',
+        owner: null,
+        blocked_by: blockedBy,
+        version: 1,
+        // Arrival number, taken from what is on disk under the lock, so two
+        // creators (in this process or another) cannot draw the same one.
+        seq: this.nextSeq(),
+        createdAt: stamped,
+        updatedAt: stamped,
+        detail: null,
+      }
+      this.tasks.set(task.id, task)
+      try {
+        await this.persist()
+      } catch (error) {
+        this.tasks.delete(task.id)
+        throw error
+      }
+      return clone(task)
+    })
   }
 
   /**
@@ -419,27 +475,86 @@ export class TaskBoard {
     expectedVersion: number | undefined,
     next: (task: TaskRecord) => TaskRecord,
   ): Promise<TaskRecord> {
-    const current = this.tasks.get(id)
-    if (current === undefined) throw new TaskboardError('not-found', `unknown task: ${id}`)
-    if (current.status === 'completed') {
-      throw new TaskboardError('immutable', `task ${id} is completed and cannot change`)
+    return this.withLock(async () => {
+      await this.load()
+      const current = this.tasks.get(id)
+      if (current === undefined) throw new TaskboardError('not-found', `unknown task: ${id}`)
+      if (current.status === 'completed') {
+        throw new TaskboardError('immutable', `task ${id} is completed and cannot change`)
+      }
+      if (expectedVersion !== undefined && current.version !== expectedVersion) {
+        throw new TaskboardError(
+          'version-conflict',
+          `task ${id} changed underneath you: expected version ${expectedVersion}, stored version ${current.version}`,
+          { expectedVersion, actualVersion: current.version },
+        )
+      }
+      const updated: TaskRecord = { ...next(current), version: current.version + 1, updatedAt: nowIso() }
+      this.tasks.set(id, updated)
+      try {
+        await this.persist()
+      } catch (error) {
+        this.tasks.set(id, current)
+        throw error
+      }
+      return clone(updated)
+    })
+  }
+
+  /**
+   * Run `work` holding the board's exclusive lock file, releasing it on every
+   * path including a throw. The lock is what makes the read → check → write
+   * sequence atomic across handles and processes; without it a whole-file
+   * rewrite from two writers would silently drop one of them.
+   */
+  private async withLock<T>(work: () => Promise<T>): Promise<T> {
+    await mkdir(this.dir, { recursive: true })
+    const deadline = Date.now() + this.lockTimeoutMs
+    for (;;) {
+      let acquired = false
+      try {
+        const handle = await open(this.lockFile, 'wx')
+        try {
+          await handle.writeFile(`${process.pid}\n`, 'utf8')
+        } finally {
+          await handle.close()
+        }
+        acquired = true
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException)?.code
+        if (code !== 'EEXIST') {
+          throw new TaskboardError('io', `taskboard lock failed: ${describe(error)}`)
+        }
+        if (await this.clearAbandonedLock()) continue
+        if (Date.now() >= deadline) {
+          throw new TaskboardError(
+            'io',
+            `taskboard is held by another writer for longer than ${this.lockTimeoutMs} ms: ${this.lockFile}`,
+          )
+        }
+        await sleep(TASKBOARD_LOCK.retryMs)
+      }
+      if (!acquired) continue
+      try {
+        return await work()
+      } finally {
+        await rm(this.lockFile, { force: true }).catch(() => undefined)
+      }
     }
-    if (expectedVersion !== undefined && current.version !== expectedVersion) {
-      throw new TaskboardError(
-        'version-conflict',
-        `task ${id} changed underneath you: expected version ${expectedVersion}, stored version ${current.version}`,
-        { expectedVersion, actualVersion: current.version },
-      )
-    }
-    const updated: TaskRecord = { ...next(current), version: current.version + 1, updatedAt: nowIso() }
-    this.tasks.set(id, updated)
+  }
+
+  /** Remove a lock left by a crashed writer; false while it is still young. */
+  private async clearAbandonedLock(): Promise<boolean> {
     try {
-      await this.persist()
+      const info = await stat(this.lockFile)
+      if (Date.now() - info.mtimeMs < this.lockStaleMs) return false
+      await rm(this.lockFile, { force: true })
+      return true
     } catch (error) {
-      this.tasks.set(id, current)
-      throw error
+      // Vanished between the failed open and this stat: the lock is already gone.
+      if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') return true
+      throw new TaskboardError('io', `taskboard lock check failed: ${describe(error)}`)
     }
-    return clone(updated)
   }
 
   private async load(): Promise<void> {
@@ -479,6 +594,34 @@ export class TaskBoard {
     }
     this.tasks.clear()
     for (const [id, task] of next) this.tasks.set(id, task)
+    this.stampLegacyArrival()
+  }
+
+  /**
+   * Stamp `seq` onto rows that were written before the arrival marker existed.
+   *
+   * WHY the file position: a store written by an older build has no arrival
+   * numbers, and its file order (sorted by id) is the only order it ever had —
+   * so keeping that order and letting new rows follow it is the only way to
+   * upgrade without silently reordering a queue. The stamps are in memory
+   * until the next persist writes them, which is the upgrade itself.
+   */
+  private stampLegacyArrival(): void {
+    if (![...this.tasks.values()].some((task) => task.seq === undefined)) return
+    let index = 0
+    for (const [id, task] of this.tasks) {
+      index += 1
+      this.tasks.set(id, { ...task, seq: task.seq ?? index })
+    }
+  }
+
+  /** Next arrival number: one past the highest on the board (1 for a new board). */
+  private nextSeq(): number {
+    let highest = 0
+    for (const task of this.tasks.values()) {
+      if (task.seq !== undefined && task.seq > highest) highest = task.seq
+    }
+    return highest + 1
   }
 
   /**
@@ -534,8 +677,21 @@ export class TaskBoard {
 }
 
 /** Open (or create) the board at `dir`. Reopening recovers every row. */
-export async function openTaskboard(dir: string): Promise<TaskBoard> {
-  return TaskBoard.open(dir)
+export async function openTaskboard(dir: string, options: TaskboardOptions = {}): Promise<TaskBoard> {
+  return TaskBoard.open(dir, options)
+}
+
+/** Clamp and validate one lock tunable; a bad value is refused, not defaulted. */
+function checkLockMs(name: string, value: number | undefined, fallback: number): number {
+  if (value === undefined) return fallback
+  if (!Number.isFinite(value) || value < 0) {
+    throw new TaskboardError('invalid-input', `${name} must be a non-negative number of milliseconds`)
+  }
+  return value
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 function describe(error: unknown): string {

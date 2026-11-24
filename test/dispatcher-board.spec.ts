@@ -4,7 +4,7 @@
  * Three cases only: creates land in `store.jsonl` (never `board.json`) and
  * survive a reload; missing ids read as `undefined` through the adapter;
  * a mark-blocked reason survives a reload via the board `detail`.
- * All fixtures are fake (t1/t9/ghost/agent-a); tmp dirs only.
+ * All fixtures are fake (t1/t9/ghost/lead/agent-a); tmp dirs only.
  */
 import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -36,7 +36,7 @@ describe('DispatcherSession on the TaskBoard store', () => {
       op: 'create',
       id: 't1',
       title: 'Fake persist me',
-      owner: 'agent-a',
+      owner: 'lead/agent-a',
       objective: 'fake objective',
     })
     expect(created.ok).toBe(true)
@@ -53,7 +53,7 @@ describe('DispatcherSession on the TaskBoard store', () => {
       id: 't1',
       title: 'Fake persist me',
       status: 'pending',
-      owner: 'agent-a',
+      owner: 'lead/agent-a',
     })
 
     // A second session resumes the same truth.
@@ -64,7 +64,7 @@ describe('DispatcherSession on the TaskBoard store', () => {
       id: 't1',
       title: 'Fake persist me',
       status: 'pending',
-      owner: 'agent-a',
+      owner: 'lead/agent-a',
     })
   })
 
@@ -114,7 +114,7 @@ describe('DispatcherSession on the TaskBoard store', () => {
       op: 'create',
       id: 't1',
       title: 'Fake staged',
-      owner: 'agent-a',
+      owner: 'lead/agent-a',
       objective: 'fake objective',
     })).ok).toBe(true)
     await session.stop()
@@ -127,7 +127,7 @@ describe('DispatcherSession on the TaskBoard store', () => {
       id: 't1',
       title: 'Fake staged',
       status: 'pending',
-      owner: 'agent-a',
+      owner: 'lead/agent-a',
     })
   })
 })

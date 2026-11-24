@@ -675,6 +675,102 @@ by tests). The UX commitments an integration inherits:
    `src/redact.ts` (`src/checkpoint/schema.ts:33`), which is also what makes a checkpoint
    safe to attach to an Issue.
 
+## Task board (durable scheduling truth / 调度真相)
+
+Status (since **0.13.18**): `src/taskboard/` is the durable truth layer for two-level team
+management — the upper level (dispatcher/lead) creates rows with dependency wiring, workers move
+them through the state machine, and the file on disk, never memory, decides who owns what. It is
+additive: the main chain (plan → execute → verify → retry → synthesize) never reads the board and
+is unchanged, and nothing opens a board unless a caller asks for one. The L1 dispatcher docks on it
+through the `TaskReader` interface (`get`/`has`/`list`) that `board-reader.ts` adapts from a
+`TaskBoard`; its session persists to the same `store.jsonl`, so there is one durable store rather
+than two parallel board files (see the honest boundary below).
+
+### Location / 位置
+
+- One board is one directory holding exactly one store file: `store.jsonl`. Rows are one
+  checksummed JSON object per line; there is no second file a reader has to know about.
+- `taskboardDir()` (`src/taskboard/paths.ts`) resolves, in order: an explicit `dir` from the
+  caller, `GROK_WORKFLOW_TASKBOARD_DIR`, then `$DSH_HOME` (else `~/.dsh`) +
+  `taskboards/grok-workflow`. `taskboardFile()` appends `store.jsonl`, and
+  `openDefaultTaskboard()` opens that location. This is deliberately the same three-step shape
+  as `checkpointDir()` and `archiveDir()`, so tests and e2e lanes redirect the board without a
+  configuration key and never write into a real operator home.
+- The claim lock is `<dir>/.store.jsonl.lock`: created with `O_EXCL` for the duration of one
+  mutation and removed afterwards. It is host state, not configuration — there is no setting for
+  either path.
+
+### Row schema v1 / 行格式
+
+`schema = grok-workflow.taskboard/v1` (`TASKBOARD_SCHEMA`), rewritten as a whole on every
+mutation. One row carries: `id` (unique on the board, enforced against the store at create
+time), `title`, `status` (`pending` → `in_progress` → `completed` | `failed` | `blocked`),
+`owner` (or `null`), `blocked_by` (predecessor ids), `version` (starts at 1, +1 per mutation),
+`createdAt`, `updatedAt`, `detail`. `assertTaskRecord` refuses any other shape on read, and each
+line carries a sha-256 over its canonical payload, so a forged or truncated row fails with
+`TaskboardError('integrity')` instead of being loaded.
+
+### Claim protocol / 认领协议
+
+- Every mutation runs under the board lock: **re-read the store → check → apply → persist**. The
+  CAS guard is therefore checked against the file, not against a stale in-memory copy. Two
+  workers that both read version *n* cannot both win: one gets `version-conflict` carrying both
+  versions. Claims on different rows cannot erase each other, which a whole-file rewrite without
+  the lock would allow.
+- `claim` moves `pending → in_progress` and assigns `owner`; it refuses while any `blocked_by`
+  predecessor is missing or not `completed` (`dependency-blocked`, naming every unmet id).
+  `assign` sets an owner without starting the row. `complete` requires `in_progress`.
+  `failed`/`blocked` rows `requeue` to `pending` (owner cleared) and re-check dependencies on
+  the next claim. A `completed` row is immutable and refuses every mutation.
+- `get`/`list` serve the last loaded snapshot; a read-only observer calls `reload()` to see rows
+  another handle wrote.
+
+### Durability and crash recovery / 落盘与崩溃恢复
+
+- Writes are atomic: the serialized board goes to a hidden `*.tmp` file in the board directory,
+  is fsynced, and only then renamed over `store.jsonl`. A reader never sees a half-written store,
+  and a failed write leaves the previous store intact.
+- A process killed between the temp write and the rename leaves the previous store authoritative
+  and one hidden temp file behind; no reader ever opens it, and it is inert forever after.
+- A process killed while holding the lock leaves the lock behind. The next writer treats an
+  unreleased lock older than `lockStaleMs` (default 5 s) as abandoned, removes it, and proceeds;
+  a younger lock is respected and the mutation waits up to `lockTimeoutMs` (default 5 s) before
+  failing with `io`. Both knobs are per-board `TaskboardOptions`, so a test can shorten them.
+- A store whose line was torn by a non-atomic writer is refused (`integrity`) rather than
+  silently dropping the row.
+
+### Limits / 上限
+
+| Bound | Value |
+|---|---|
+| whole store (writer **and** reader) | 1,048,576 B |
+| tasks per board | 1,024 |
+| task id / title / owner | 200 / 600 / 200 chars |
+| dependency ids per task | 64 |
+| failure/block detail | 2,000 chars |
+
+### Proof / 证据
+
+`test/taskboard.spec.ts` covers schema and CRUD, the full state machine, `completed`
+immutability, duplicate ids, dependency gating, CAS conflicts with both versions reported, the
+two-handle same-row race (exactly one winner), concurrent claims on different rows (no lost
+update), restart recovery, and crash recovery: a real `node` child SIGKILLed mid-mutation
+(`test/fixtures/taskboard/writer.mjs`), a worker killed while holding the lock, an abandoned lock
+broken by the stale window, a fresh lock respected until the wait runs out, orphan `*.tmp` files,
+a torn store, duplicate ids across a restart, and a stale CAS guard across a restart. The location
+tests pin the three-step resolution and `store.jsonl` placement.
+
+### Honest boundary / 已知边界
+
+- Not wired: the engine does not read the board, and no run is driven from it. The L1 dispatcher
+  does reach it (its session holds a `TaskBoard` through `boardReader`), so the docking is done
+  for the dispatcher only; L3 and the engine remain out of scope.
+- The lock is advisory within one filesystem. It does not defend against a hostile writer that
+  ignores it, nor against a network filesystem whose `O_EXCL`/rename semantics differ; a
+  multi-host board is out of scope.
+- The post-rename directory fsync is best-effort (some platforms refuse to open a directory), so
+  a power loss immediately after a successful mutation can still lose that last write.
+
 ## Credential redaction (`src/redact.ts`)
 
 One ordered rule table, applied to every model-facing report, diagnostic, checkpoint field,

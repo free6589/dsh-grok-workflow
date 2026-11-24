@@ -3724,3 +3724,47 @@ nothing in this section restates a change that `0.2.0` already shipped.
 
 - The progress-panel design document now states the six-stage spine (the permanently-empty `回答` cell was removed) and, separately, the single-rail connector with the ownership trade-off it costs — both pinned by tests (`test/progress-tab.spec.ts`, `test/progress-connector.spec.ts`). Answer-parity and drawing-task scope gained evidence notes under `docs/knowledge/evidence/`.
   / 进度页设计文档改成六段脊椎（永远空的"回答"格已删除），并另加一节说明"一根公共轨"的连线模型以及它换来的归属代价——两处都有测试钉住（`test/progress-tab.spec.ts`、`test/progress-connector.spec.ts`）。答案长相一致与绘画任务范围各补了一份证据说明，放在 `docs/knowledge/evidence/`。
+
+## Task board durability - 2026-11-23 (unreleased; carried from branch `team-dispatch-v1`)
+
+The branch record, appended by the rebase so main's released history above stays exactly as it was.
+The task board itself shipped in **0.13.18**; these two entries are the durability hardening on top of it,
+staged for the next release.
+
+### Fixed / 修复
+
+- **Two workers can no longer both claim the same task / 同一个任务不会再被两个 worker 同时认领** —
+  The durable board rewrote `store.jsonl` from memory on every mutation, so two handles that read
+  version *n* and both claimed the same row both "succeeded" and the last write silently kept one
+  owner; concurrent claims on different rows could also drop each other. Every mutation now takes
+  the board's exclusive lock file, re-reads the store, checks the compare-and-swap guard against
+  the file, applies, and persists — exactly one claimer wins, the loser gets a version conflict
+  naming both versions, and no row is lost. A writer killed while holding the lock leaves it
+  behind; a lock older than the stale window (5 s) is treated as abandoned and removed, so a
+  crash never wedges the board.
+  / 任务板以前每次改动都按内存整份重写 `store.jsonl`：两个句柄读到同一版本后各自认领同一行，两边都"成功"，
+  后写的静默覆盖前一个归属；两个 worker 同时认领不同行也会互相冲掉。现在每次改动都先拿任务板的独占锁文件、
+  重读账本、按磁盘上的版本做比较交换、再落盘——认领只有一个赢家，输的一方拿到带两个版本号的冲突错误，
+  也不会有行被吞。持锁进程被杀会留下锁文件；超过失效窗口（5 秒）的锁按废弃处理并被清掉，崩溃不会把板卡死。
+
+### Added / 新增
+
+- **The task board's file location is now explicit and documented / 任务板的落盘位置变成显式且可查的** —
+  `taskboardDir()`/`taskboardFile()` resolve the board directory as explicit `dir` →
+  `GROK_WORKFLOW_TASKBOARD_DIR` → `$DSH_HOME` (else `~/.dsh`) + `taskboards/grok-workflow`, the
+  same three-step rule the checkpoint recorder uses, and `store.jsonl` is the single file inside
+  it. The architecture document now states the path, the row schema, the claim protocol and the
+  crash-recovery rules in one place.
+  / `taskboardDir()`/`taskboardFile()` 按「调用方显式目录 → `GROK_WORKFLOW_TASKBOARD_DIR` →
+  `$DSH_HOME`（否则 `~/.dsh`）+ `taskboards/grok-workflow`」三级规则定位任务板目录，跟存档记录器同一套
+  规则，目录里只有一个 `store.jsonl`。架构文档把路径、行格式、认领协议与崩溃恢复规则集中写清。
+
+- **The pending queue keeps its order across a restart / 待办队列的顺序跨重启保留** —
+  Rows are written sorted by id, so reopening a board used to hand back the queue in id order: `task-10` ahead of
+  `task-9`, `b` ahead of `a`. Every row now carries its own arrival number, assigned under the claim lock and
+  persisted with the row, so a restarted dispatcher lists pending work in the order it was created. A store
+  written before the field existed opens unchanged and takes the numbers from its file order — no reordering,
+  no lost rows.
+  / 落盘时行是按 id 排序写的，所以重开一个板会把队列按 id 序交回来：`task-10` 排在 `task-9` 前面、`b` 排在 `a`
+  前面。现在每一行自带到达号，在认领锁内分配并随行落盘，重启后的大管家仍按创建顺序交出待办。更早写的账本没有这个
+  字段也能直接打开，按文件序补上编号——不重排、不丢行。

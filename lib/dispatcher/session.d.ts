@@ -46,6 +46,13 @@
  * - `create` with an empty-string owner stays unowned: the board requires a
  *   non-empty owner and the policy does not refuse it, so collapsing (not
  *   throwing) keeps the allowed intent truthful.
+ * - `creator` (who asked for the task, vs `owner` who executes it) has no
+ *   board column either, so it rides the same overlay. Results are routed
+ *   with `resultRecipient`, which prefers the creator: an owner changes on
+ *   reassignment, the creator never does.
+ * - Queue order is the board's `seq`, not the store file order: `list()` is
+ *   sorted by id for a stable read while `pending()` is FIFO, and both
+ *   survive a restart because `seq` is persisted on the row.
  *
  * Lifecycle: `start()` opens fresh (clears the overlay; directory sessions
  * also remove a stale `store.jsonl` so the next open starts empty — same net
@@ -64,6 +71,11 @@ export interface DispatcherResumeResult {
     restored: boolean;
     /** Number of tasks on the board after resume. */
     tasks: number;
+    /**
+     * Number of `pending` rows after resume, i.e. the length of the restored
+     * queue. Same order as {@link DispatcherSession.pending}.
+     */
+    pending: number;
     /** Where the board persists (undefined for memory-only sessions). */
     path?: string;
 }
@@ -100,6 +112,16 @@ export declare class DispatcherSession implements TaskReader {
      * the overlay is re-recorded.
      */
     list(): DispatcherTask[];
+    /**
+     * The pending queue in arrival order.
+     *
+     * WHY this order and not `list()`'s: a queue is FIFO. The arrival number is
+     * on the board row (`TaskRecord.seq`), so a resumed session hands back the
+     * same order it left behind — which the store file order cannot, because
+     * rows are persisted sorted by id. Overlay fields apply here exactly as in
+     * `list()`.
+     */
+    pending(): DispatcherTask[];
     /**
      * Open the session with an empty board.
      *

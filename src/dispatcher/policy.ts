@@ -15,6 +15,11 @@
  * - modifying a `running` task (`forbidden:running-immutable`);
  * - writing the verifier's `verdict` in any way (`forbidden:verdict-immutable`).
  *
+ * Addressing: an `owner` is a worker, so it must be a full subagent path
+ * (`lead/worker-1`); a bare name is refused (`invalid:bad-address`). A
+ * `creator` may be the tree root (`lead`) or any deeper path. Results return
+ * to the creator only (`resultRecipient`) — never to the dispatcher.
+ *
  * This module is a pure decision layer: `decideIntent`/`decideRawIntent` read
  * through a minimal `TaskReader` and return a decision plus an effect. They
  * perform no IO and call no engine, so the gate can import them without
@@ -32,14 +37,30 @@ export interface DispatcherTask {
   id: string
   title: string
   status: DispatcherLifecycle
+  /** Full subagent path of the agent expected to do the work (e.g. `lead/worker-1`). */
   owner?: string
+  /**
+   * Full subagent path of the agent that asked for the task. Worker results go
+   * back to this address only, never to the dispatcher and never to the user.
+   */
+  creator?: string
   objective?: string
   blockedReason?: string
+  /** Arrival order on the board; assigned by the session, never by the policy. */
+  queueSeq?: number
   /**
    * Owned by the verifier. The dispatcher must never write this field —
    * any intent carrying it is refused with `forbidden:verdict-immutable`.
    */
   verdict?: 'pass' | 'fail'
+}
+
+/**
+ * A patch may delete an optional field by carrying `undefined` explicitly
+ * (`exactOptionalPropertyTypes` otherwise forbids the delete-on-reassign).
+ */
+export type DispatcherTaskPatch = {
+  [K in keyof DispatcherTask]?: DispatcherTask[K] | undefined
 }
 
 /** Minimal read surface a decision needs. Task-8's store satisfies this. */
@@ -50,7 +71,14 @@ export interface TaskReader {
 
 /** Typed intent for each whitelisted operation. */
 export type DispatcherIntent =
-  | { op: 'create'; id: string; title: string; objective?: string; owner?: string }
+  | {
+      op: 'create'
+      id: string
+      title: string
+      objective?: string
+      owner?: string
+      creator?: string
+    }
   | { op: 'update-pending'; id: string; title?: string; objective?: string }
   | { op: 'reassign'; id: string; owner: string; reason?: string }
   | { op: 'mark-blocked'; id: string; reason: string }
@@ -58,7 +86,7 @@ export type DispatcherIntent =
 /** What an allowed decision asks the store to do. */
 export type DispatcherEffect =
   | { kind: 'insert'; task: DispatcherTask }
-  | { kind: 'patch'; id: string; patch: Partial<DispatcherTask> }
+  | { kind: 'patch'; id: string; patch: DispatcherTaskPatch }
 
 /** Every way a decision can be refused. */
 export type DispatcherRefusalCode =
@@ -70,6 +98,7 @@ export type DispatcherRefusalCode =
   | 'invalid:duplicate-id'
   | 'invalid:not-pending'
   | 'invalid:bad-intent'
+  | 'invalid:bad-address'
   | 'invalid:session-inactive'
 
 /** Outcome of one intent: either an effect to apply, or an explicit refusal. */
@@ -84,6 +113,47 @@ export const DISPATCHER_OPS: readonly DispatcherOp[] = [
   'reassign',
   'mark-blocked',
 ]
+
+const ADDRESS_MAX_CHARS = 200
+const ADDRESS_SEGMENT_MAX_CHARS = 64
+const ADDRESS_SEGMENT = /^[a-z0-9][a-z0-9-]*$/
+
+function isPathWithDepth(value: string, minSegments: number): boolean {
+  if (value.length === 0 || value.length > ADDRESS_MAX_CHARS) return false
+  const segments = value.split('/')
+  return (
+    segments.length >= minSegments &&
+    segments.every(
+      segment => segment.length > 0 && segment.length <= ADDRESS_SEGMENT_MAX_CHARS && ADDRESS_SEGMENT.test(segment),
+    )
+  )
+}
+
+/**
+ * True when `value` is a routable path from the tree root (`lead` or
+ * `lead/worker-1`). Used for the creator, which may be the root itself.
+ */
+export function isAddressPath(value: string): boolean {
+  return isPathWithDepth(value, 1)
+}
+
+/**
+ * True when `value` is a full subagent path (`lead/worker-1`), not a display
+ * name (`worker-1`). A bare name cannot be routed as a worker: two agents in
+ * different subtrees can share it, so the dispatcher only records routable
+ * execution addresses.
+ */
+export function isFullSubagentPath(value: string): boolean {
+  return isPathWithDepth(value, 2)
+}
+
+/**
+ * Where a finished task's result belongs: the creator only. The owner is the
+ * execution address and may change on reassignment; the creator never does.
+ */
+export function resultRecipient(task: DispatcherTask): string | undefined {
+  return task.creator ?? task.owner
+}
 
 function refusal(
   op: string,
@@ -142,6 +212,20 @@ function verdictRefusal(op: string, id?: string): DispatcherDecision {
   )
 }
 
+function addressRefusal(
+  op: string,
+  field: 'owner' | 'creator',
+  value: string,
+  id?: string,
+): DispatcherDecision {
+  return refusal(
+    op,
+    'invalid:bad-address',
+    `dispatcher refused ${op}${id === undefined ? '' : ` on task "${id}"`}: ${field} "${value}" is not a full subagent path (要写全路径，例如 lead/worker-1)`,
+    id,
+  )
+}
+
 /**
  * Decide one typed intent against the current board.
  *
@@ -162,6 +246,12 @@ export function decideIntent(read: TaskReader, intent: DispatcherIntent): Dispat
       if (read.has(intent.id)) {
         return refusal(intent.op, 'invalid:duplicate-id', `dispatcher refused create: task "${intent.id}" already exists`, intent.id)
       }
+      if (intent.owner !== undefined && !isFullSubagentPath(intent.owner)) {
+        return addressRefusal(intent.op, 'owner', intent.owner, intent.id)
+      }
+      if (intent.creator !== undefined && !isAddressPath(intent.creator)) {
+        return addressRefusal(intent.op, 'creator', intent.creator, intent.id)
+      }
       return {
         ok: true,
         op: 'create',
@@ -174,6 +264,7 @@ export function decideIntent(read: TaskReader, intent: DispatcherIntent): Dispat
             status: 'pending',
             ...(intent.objective === undefined ? {} : { objective: intent.objective }),
             ...(intent.owner === undefined ? {} : { owner: intent.owner }),
+            ...(intent.creator === undefined ? {} : { creator: intent.creator }),
           },
         },
       }
@@ -212,18 +303,17 @@ export function decideIntent(read: TaskReader, intent: DispatcherIntent): Dispat
       }
       if (current.status === 'completed') return completedRefusal(intent.op, intent.id)
       if (current.status === 'running') return runningRefusal(intent.op, intent.id)
-      if (intent.owner.trim() === '') {
-        return refusal(intent.op, 'invalid:bad-intent', `dispatcher refused reassign on task "${intent.id}": owner must be non-empty`, intent.id)
+      if (!isFullSubagentPath(intent.owner)) {
+        return addressRefusal(intent.op, 'owner', intent.owner, intent.id)
       }
       // Reclaim: a blocked task handed to a new owner goes back to pending for
-      // a fresh attempt; the old block reason is cleared (the decision, not the
-      // history, carries why — history lives on the persisted board).
-      // `blockedReason` is rebuilt without the key rather than assigned
-      // `undefined`: `exactOptionalPropertyTypes` forbids explicit undefined.
-      const patch: Partial<DispatcherTask> = { owner: intent.owner }
+      // a fresh attempt; the old block reason is cleared. The patch carries
+      // `undefined` explicitly (allowed by `DispatcherTaskPatch`) so the
+      // session deletes the stale key instead of leaving it behind.
+      const patch: DispatcherTaskPatch = { owner: intent.owner }
       if (current.status === 'blocked') {
         patch.status = 'pending'
-        delete patch.blockedReason
+        patch.blockedReason = undefined
       }
       return { ok: true, op: 'reassign', id: intent.id, effect: { kind: 'patch', id: intent.id, patch } }
     }
@@ -286,6 +376,7 @@ export function decideRawIntent(read: TaskReader, raw: Record<string, unknown>):
         title,
         ...(text('objective') === undefined ? {} : { objective: text('objective') as string }),
         ...(text('owner') === undefined ? {} : { owner: text('owner') as string }),
+        ...(text('creator') === undefined ? {} : { creator: text('creator') as string }),
       })
     }
     case 'update-pending':
