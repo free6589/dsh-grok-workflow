@@ -1674,3 +1674,24 @@ Source: `dsh` 0.2.2-rc.3 装机内的 `@deepseek-ai/dsh-plugin-manager` 0.2.2-rc
 - **`maxRetries` 已不是配置键**（`src/config.ts` 的 removed 列表，值固定 `FIXED_MAX_RETRIES = 1`）：任何 `resolveConfig({maxRetries: …})` 的旧写法会直接抛「removed configuration key」。
 - **`parseReportRound` 的 section 状态按行推进，不会在下一个未知标题处复位**：追加在报告尾巴上的 `- ` 行会继续落进它上方最后一个已知 section（`Uncertainties:` 等，受 `itemsPerSection = 6` 截断）。本包的审计段因此只保证「不复现被解析的行形状」（签名行、`Objective:`、三个 section 头、`Final answer:`、`- id: status (N attempts) — title`），**不保证 section 正文不被追加**——当前接线里它进不了 digest（`parseReportRound` 只吃插件自己写入的 relay 消息，PTC 工具结果不是这类消息），但若将来有人把审计文本塞进 relay 消息，digest 的 section 会变脏。
 - **会话记录能验证工具结果**：DSH 把 PTC 工具结果按渲染后的文本存进 `tool/result` 事件（`data.message.content[].text`），因此「跑完的一轮不带审计段、没跑完的一轮带」可以在会话文件里逐字复核。会话文件是**多帧 zstd**，`node:zlib.zstdDecompressSync` 只解第一帧（会给出一个只有几百字节的假象）；要么用 `zstd -dc`，要么走流式解压。
+
+## 2026-11-25 · 问题卡片的答案是哪种消息，以及「这张卡是哪个调用问的」怎么查（`CONFIRMED`，读已安装 DSH 检出）
+
+来源：`@deepseek-ai/dsh-user-questions`（随本机 DSH 安装分发，`src/index.ts`、`src/projection.ts`）。这些是
+`source.kind` 与事件形状的一手事实，本插件两个面（门禁、接单台子）的判断都建立在它们之上。
+
+- **答案消息的形状**：`UserQuestionService.answer()` 造的是
+  `createUserMessage({ source: { kind: 'user-question-reply', callId, outcome: 'answered' }, content: [{ type: 'text',
+  text: JSON.stringify({ kind: 'answer_to_pending_question', tool: 'ask_user_question', callId, questions, answers }) }]
+  })`，然后 `agent.steer(message)` 送进 agent。`answers` 是 `[{ id, selected: string[], custom?: string }]`，每个问题
+  一条；`questions` 是**模型自己写的问题文字**，和答案同在一个 payload 里。
+- **`source.kind` 不是 `'user'`**：所以任何 `kind === 'user'` 的过滤器都看不见它。这是「点卡片确认」在接单台子上
+  曾经完全无效、在门禁上被记成 `non-user-source` 的直接原因（修法与取舍见 **D-137**）。
+- **哪个调用问的这张卡**：投影层只认 `tool/call` 事件，条件是 `event.data.name === 'ask_user_question'`，`callId` 就是
+  `event.data.callId`（`projection.ts` 的 `case 'tool/call'`）。`SessionEventMap` 里 `'tool/call'` 的形状是
+  `{ turn, step, callId, name, arguments }`，其中 `arguments` 是 JSON **字符串**。
+- **时间戳**：每条 session 事件都由 `Session` 的 `createAppendEvent` 盖上 `time: Date.now()`（`src/index.ts:540-544`），
+  所以 `tool/call` 事件自带毫秒时间；「这张卡是不是在预览之后问的」只能拿这个时间与预览的 `createdAtMs` 比——答案消息
+  自己的 `time` 只说明用户什么时候点的，不说明问题什么时候问的。
+- **工具名**：`ask_user_question`（宿主侧常量 `ASK_USER_QUESTION_TOOL`）。本插件用同一个字面量在 `src/block/tools.ts`
+  里挑 `tool/call` 事件，没有第二份名字表。

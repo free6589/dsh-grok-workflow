@@ -3542,3 +3542,52 @@ spine 为空，pre-fix 形状会进脊柱。
   另一面：监工用散文答对、没调 `structured_output` 时会被记成「没交答案」（soak.txt 的 F3），这条未修，属于行为面而不是路由面；
   它不影响本决定——无论走哪条路由，解析面都是同一个。空链继承也因此不是「免费」的：它把「监工跑在哪」这件事的责任明确交给了
   profile，出问题时要先看 profile，而不是先怀疑插件。
+
+## D-137 · 问题卡片的答案是「点头」不是「一轮对话」：门禁与接单台子共用一个来源判断（2026-11-25，未发版）
+
+- **Status:** `CONFIRMED`（两个新 spec 先红后绿——红时的失败分别是
+  `approval-required: 预览之后没有一条消息逐字包含「确认」，不能开工` 与
+  `expected { kind: 'pass', reason: 'question-reply' } / received 'non-user-source'`；实现后定向
+  `npx vitest run test/block-tools.spec.ts test/gate.spec.ts` → **`2 文件 / 77 测试 PASS`**，全量门禁在功能提交
+  `a926cd6` 上 `TMPDIR=$PWD/.tmp npm run ci` **EXIT=0**：vitest **111 文件 / 2130 测试 PASS**、oxlint
+  **`Found 36 warnings and 0 errors.`**、`verify:lib` → `lib/ at a926cd6 is the build of src/ at a926cd6 (297 files,
+  byte-identical)`）
+- **Date:** 2026-11-25
+- **Context:** 用户用问题卡片点头时，宿主记下的是一条 `source.kind === 'user-question-reply'` 的 `user/message`
+  （真实形状与事件字段见 RESEARCH 的 2026-11-25 条）。两处代码只认 `'user'`：`src/block/tools.ts` 的
+  `userMessagesSince()` 把卡片答案滤掉，于是 `startBlock` 的第 4 道检查永远找不到批准词——「点卡片确认」在接单台子上
+  是死的，每次都拒成 `approval-required`；`src/gate.ts` 的 `classifyPreStep()` 把同一条消息记成 `non-user-source`，
+  一个字都没说明它是用户发的。同一个字面量写了两遍，这正是它们能同时错、又没人发现的原因。
+- **Decision:**
+  1. **一个模块定义唯一口径。** 新文件 `src/user-source.ts` 导出 `QUESTION_REPLY_SOURCE_KIND`
+     （`'user-question-reply'`）、`isUserAuthoredSource()`（`user` 或卡片）、`isQuestionReplySource()`（只卡片）、
+     `startsTurn()`（只 `user`）。门禁与接单台子都从这里 import，字面量不再有第二份；该模块没有依赖，`src/gate.ts`
+     不从 `src/block/` import 任何东西。四个导出都有调用方：`userMessagesSince()` 先用 `isUserAuthoredSource()` 过一遍
+     （「两种都算用户说的话」这条规则落在这里），再按 `startsTurn()` / `isQuestionReplySource()` 分支。
+  2. **卡片答案是点头，不自己开一轮对话。** `startsTurn()` 只对 `user` 为真，这就是那条产品决定：卡片答案默认不启动
+     任何工作流，只在「用户说了什么」这一面被看见。要改它是产品决定，得有自己的一条记录，不能当代码整理顺手改掉。
+  3. **接单台子这一侧，卡片答案在两个限制下才算数。** 它 `source.callId` 指向的 `ask_user_question` `tool/call`
+     事件必须在**预览之后**记进会话（该事件自己的 `time` 比预览的 `createdAtMs` 晚）；答的是预览之前问的问题、或者
+     callId 压根没被问过，都不算。算数时返回的文本只是用户选的 `selected` 标签加 `custom` 文本，不是整包 JSON。
+  4. **门禁这一侧只改「叫法」，不改「准入」。** 没有 `user` 消息、但有卡片答案时返回
+     `{kind:'pass', reason:'question-reply'}`；真正外来的来源仍是 `non-user-source`；心跳分支的顺序、`deliveryKey`
+     与 `request` 的输入一个字没动，所以既有的纯用户批次决策与键逐字节相同（新用例用同一条用户消息做两次分类，
+     钉住 `key` 与 `request` 相等）。`classificationFailure` 仍要求一条真 `user` 消息——卡片答案不能被当成
+     「用户请求」来拒绝。
+- **Alternatives rejected:**
+  1. **把门禁放宽成「卡片答案也起一轮」**：点一下卡片就等于发了一条指令，用户没打字却看到一整轮工作流跑起来；这与
+     `startsTurn()` 的语义冲突，也超出修这个 bug 的范围。
+  2. **拿整包 JSON 去做逐字匹配**：payload 里带着模型自己写的问题文字，一句「用户说了「确认」吗？」就能让批准词自己
+     出现，等于把模型的话当成用户的许可。新用例 (c) 专门钉这一条。
+  3. **两处各自判断、不共用模块**：这正是缺陷的成因——两个 `kind === 'user'` 各写一遍，谁都不知道对方漏了哪一类。
+  4. **只按「预览之后收到过一张卡片」判断、不比对 callId**：答的是上一个问题的卡片会变成这一单的批准；用例 (a)(b)
+     钉住这个边界（问题问在预览之前、callId 没被问过）。
+- **Consequences:** 读侧多了一个可解释的标签 `question-reply`，事后从会话里能看出「这轮没跑工作流，是因为用户只点了
+  一张卡片」。残余风险四条，都写在这里而不是留给下一个人发现：① 跨预览边界答的卡片仍被拒——用户在预览之前打开卡片、
+  预览之后才点确认，`tool/call` 早于预览，于是这单仍要用户再打一句（这是刻意的，宁可多问一句，也不把旧问题的答案当成
+  这一单的批准）；② 卡片批准写进账本的 `approval.quote` 是用户选中的标签（例如「确认」），不是一句打字的话，所以账本
+  里这一类批准看起来比手打的那类短，事后读账本要按 `kind` 一起看；③ 卡片答案的可用性依赖 `tool/call` 事件留在会话里
+  且带数值 `time`——会话被裁剪、或宿主不再记这条事件时，卡片批准会退回 `approval-required`，好在这是响亮且具名的失败，
+  不会静默开工；④ payload 解析不出 `answers` 时按约定回落到原文，这种退化 payload 里模型的问题文字仍可能命中批准词，
+  但真实卡片每条问题都必须带一条答案（宿主侧校验），所以只在坏数据下成立，接受了。未发版：不动 `package.json`、
+  不打 tag、不 push。

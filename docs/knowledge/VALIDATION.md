@@ -1,3 +1,29 @@
+## 问题卡片的确认：两个新用例、一个共用判断、提交后门禁（`fix/question-card-approval`）— 2026-11-25 (`CONFIRMED`)
+
+下面每一行都写清命令、环境与结果；没跑的写 `NOT_RUN`。分支 `fix/question-card-approval`（worktree
+`.worktrees/fix-question-card-approval`），基线 `main` 尖端 `4803f42`，功能提交 **`a926cd6`**（记忆提交紧随其后，只动
+`docs/knowledge/` 与 `CHANGELOG.md`）。所有命令都在该 worktree 根目录跑，临时件一律落在 `.tmp/`（gitignored）。
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 分支、基线、HEAD | `git status --short --branch`；`git log --oneline -1`（worktree） | `## fix/question-card-approval`，HEAD **`a926cd6`**（功能提交），基线 `4803f42`。**`CONFIRMED`** |
+| 功能提交面 | `git show --stat --oneline a926cd6`；`git diff --stat 4803f42 HEAD` | **15 文件 / +553 −30**：3 个 `src/`（`user-source.ts` 新、`gate.ts`、`block/tools.ts`）、2 个 spec、10 个 `lib/` 产物（`user-source.*` 四个是新增）。**`CONFIRMED`** |
+| 红：两个新用例（实现前） | `TMPDIR=$PWD/.tmp npx vitest run test/block-tools.spec.ts test/gate.spec.ts`（树 = `4803f42` + 两个新 spec，`src/` 未改） | **EXIT=1**：`Test Files 2 failed (2)` / `Tests 2 failed \| 75 passed (77)`。失败原文：`BlockToolError: approval-required: 预览之后没有一条消息逐字包含「确认」，不能开工`（`test/block-tools.spec.ts` 第一段「点卡片确认应当开工」）与 `AssertionError: expected { kind: 'pass', …(1) } to deeply equal { kind: 'pass', …(1) }` / `- "reason": "question-reply"` `+ "reason": "non-user-source"`（`test/gate.spec.ts`）。日志 `.tmp/red-targeted.log`。**`CONFIRMED`** |
+| 绿：定向（实现后，最终树） | `TMPDIR=$PWD/.tmp npx vitest run test/block-tools.spec.ts test/gate.spec.ts` | **EXIT=0**：`Test Files 2 passed (2)` / `Tests 77 passed (77)`（`block-tools` **22**、`gate` **55**；两文件基线是 21 / 54）。日志 `.tmp/green-targeted-2.log`。**`CONFIRMED`** |
+| 构建 `lib/` | `TMPDIR=$PWD/.tmp npm run build`（worktree，提交前） | **EXIT=0**；`client bundle: 325771 bytes → lib/client.js`（与上一版逐字节相同）；`git status --short` 的 `lib/` 面 = 6 个改动 + 4 个新增。日志 `.tmp/build-2.log`。**`CONFIRMED`** |
+| 门禁 #1（被环境挡住） | `TMPDIR=$PWD/.tmp npm run ci`（`63e1010`，worktree） | **EXIT=1**，停在 `verify:lib`：`Error: Cannot find module '<worktree>/.tmp/verify-lib-59H3FS/node_modules/typescript/bin/tsc'`。原因：本 worktree 的 `node_modules/` 只有一份 vitest 缓存、没有 `typescript`，而 `scripts/verify-lib.mjs` 把 `root/node_modules` 软链进它的 scratch 目录。typecheck 与 lint 已过（`Found 36 warnings and 0 errors.`，194 文件）。日志 `.tmp/ci-1.log`。**`CONFIRMED`** |
+| 环境修法（不是产品改动） | `find node_modules -mindepth 1`；`mv node_modules .tmp/worktree-node-modules-cache`；`ln -s ../../node_modules node_modules`；`ls node_modules/typescript/bin/tsc` | 原目录只有 `node_modules/.vite/vitest/…`；改完后 `node_modules -> ../../node_modules`，`tsc` 路径存在。**`CONFIRMED`** |
+| 门禁 #2（被 amend 掉的那个提交） | 同上（`63e1010`） | **EXIT=0**：vitest `111 files / 2130 tests`、oxlint 36/0、`verify:lib` → `lib/ at 63e1010 is the build of src/ at 63e1010 (297 files, byte-identical)`。该提交随后被 amend 成 `a926cd6`（补 `isUserAuthoredSource` 的调用方），所以这次读数**不覆盖最终树**。日志 `.tmp/ci-2.log`。**`CONFIRMED`（已被 #3 取代）** |
+| 门禁 #3（权威那次，最终树） | `TMPDIR=$PWD/.tmp npm run ci`（`a926cd6`，整棵树） | **EXIT=0**：vitest **`111 files / 2130 tests PASS`**（178.47 s）、oxlint **`Found 36 warnings and 0 errors.`**（194 文件）、`verify:lib` → **`lib/ at a926cd6 is the build of src/ at a926cd6 (297 files, byte-identical)`**。对基线 `4803f42` 的 2128 测试是 **+2**，文件数不变（111）。日志 `.tmp/ci-3.log`。**`CONFIRMED`** |
+| 三个导出都有调用方（评审要求） | `grep -rn "isUserAuthoredSource\|isQuestionReplySource\|startsTurn" src test`（去掉 `src/user-source.ts` 自身） | 8 处：`src/block/tools.ts` 4 处（import + 三个判断，`isUserAuthoredSource()` 是过滤的第一步）、`src/gate.ts` 4 处（import + 三个判断）。没有无调用方的导出。**`CONFIRMED`** |
+| 门禁不 import 接单台子 | `grep -n "from './block" src/gate.ts` | 无输出（exit 1）。`src/gate.ts` 只从 `./user-source.js` 取判断。**`CONFIRMED`** |
+| 卡片消息的真实形状（来源事实） | 只读 `@deepseek-ai/dsh-user-questions/src/index.ts`、`src/projection.ts`、`@deepseek-ai/dsh-session/src/types.ts`（本机安装的 DSH 包） | `answer()` 造 `source: { kind: 'user-question-reply', callId, outcome: 'answered' }` + 一个 JSON 文本段（`kind: 'answer_to_pending_question'`、`tool: 'ask_user_question'`、`questions`、`answers`）；`'tool/call'` 形状 `{ turn, step, callId, name, arguments }`（`arguments` 是 JSON 字符串）；每条事件由 `createAppendEvent` 盖 `time: Date.now()`。**`CONFIRMED`**（写进 `docs/knowledge/RESEARCH.md` 的 2026-11-25 条） |
+| 文档守卫 | `TMPDIR=$PWD/.tmp npx vitest run test/docs-version.spec.ts test/docs-config-keys.spec.ts test/docs-architecture-version.spec.ts test/i18n-parity.spec.ts`（写完文档后、提交前） | **EXIT=0**：`Test Files 4 passed (4)` / `Tests 30 passed (30)`（`docs-version` 8、`docs-config-keys` 13、`docs-architecture-version` 3、`i18n-parity` 6）。日志 `.tmp/docs-guards.log`。**`CONFIRMED`** |
+| 配置面未动 | `node -p "require('./package.json').version"`；全量门禁里的 `test/config.spec.ts` 与 `test/settings-projection.spec.ts` | 版本 **`0.13.34`**（未改）；20 键 / 设置页 17 字段由那两个 spec 在门禁 #3 里通过，本轮没有新增配置键。**`CONFIRMED`** |
+| 未 push / 未打 tag | `git tag --points-at HEAD`；`git status --short --branch` | 无 tag 指向 `a926cd6`；本轮没有执行任何 `git push`、没有打 tag、没有合 `main`。**`CONFIRMED`** |
+| live `~/.dsh` | — | **`NOT_RUN`**：没有探它的版本、没有读它的文件；本轮对它的写操作是零（红线要求不写、不重载、不重启）。 |
+| 真机 soak（隔离 profile 点一次卡片） | — | **`NOT_RUN`**：卡片路径本轮只有单测覆盖；上一轮 M2 的真机观察是这条缺陷的现场来源，修完之后没有在真机上复核。 |
+
 ## 接单台子收口：七处文字、`lib/` 重建、提交后门禁、模型监工真机 soak（`fix/supervisor-soak-evidence`）— 2026-11-25 (`CONFIRMED`)
 
 下面每一行都写清命令、环境与结果；没跑的写 `NOT_RUN`，只到推理的写 `HYPOTHESIS`。门禁与 soak 的读数分别由文字工人、soak 那一轮

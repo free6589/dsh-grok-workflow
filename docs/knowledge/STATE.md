@@ -2953,3 +2953,34 @@ soak 里有一条 `pass` 是 `judged:false`；多块切分、会写文件的块�
 （`BLOCK_TOOL_NAMES` 列六项、注册日志行打六项，README、CHANGELOG 与真机工具清单都写六个）——只错在文字，行为无影响；
 ② `docs/knowledge/DECISIONS.md` 里 `## D-050`、`## D-051` 两个重复标题在本次合并**之前**就有（在 `9b55d2d` 上核过：
 `:899`/`:934` 与 `:916`/`:956`），不是这里引入的，也没有修。
+
+Last updated: 2026-11-25 03:10 +08:00（**问题卡片的确认在接单台子上不再无效：门禁与接单台子共用一个来源判断，`CONFIRMED`** —
+分支 `fix/question-card-approval`（worktree `.worktrees/fix-question-card-approval`，基线 `main` 尖端 `4803f42`），功能提交
+**`a926cd6`**「fix(block): count a question-card answer as the user's nod」**15 文件 / +553 −30**（3 个 `src/` 文件、2 个
+spec、10 个 `lib/` 产物，其中 `src/user-source.ts` 与它的 4 个产物是新文件），记忆提交只动 `docs/knowledge/` 与
+`CHANGELOG.md`。**缺陷**：宿主把「点问题卡片」记成 `source.kind === 'user-question-reply'` 的 `user/message`，而
+`src/block/tools.ts` 的 `userMessagesSince()` 与 `src/gate.ts` 的 `classifyPreStep()` 都只认 `'user'`——于是卡片批准在
+接单台子上每次都拒成 `approval-required`（`startBlock` 第 4 道检查找不到批准词），在门禁上被记成 `non-user-source`，
+一个字都没说明它是用户发的。**修法**：新模块 `src/user-source.ts` 定义唯一口径（`QUESTION_REPLY_SOURCE_KIND`、
+`isUserAuthoredSource`、`isQuestionReplySource`、`startsTurn`，四个导出都有调用方），`startsTurn()` 只对 `user` 为真
+= 那条产品决定「卡片答案是点头，不自己开一轮」（**D-137**）；接单台子这一侧卡片答案只在两个限制下算数——它
+`callId` 指向的 `ask_user_question` `tool/call` 事件必须在预览之后记进会话，且返回的文本只是 `selected` + `custom`
+标签、不是整包 JSON（否则 payload 里模型自己写的问题文字就能让批准词自己出现）；门禁这一侧只改叫法不改准入——只有卡片
+时返回 `{kind:'pass', reason:'question-reply'}`，外来来源仍是 `non-user-source`，心跳分支顺序与 `deliveryKey` /
+`request` 输入一个字没动（新用例用同一条用户消息做两次分类，钉住 `key` 与 `request` 相等），`classificationFailure`
+仍要求真 `user` 消息。**红先绿后**：两个新 spec 先红，失败原文分别是
+`approval-required: 预览之后没有一条消息逐字包含「确认」，不能开工` 与
+`expected { kind: 'pass', reason: 'question-reply' } / received 'non-user-source'`；实现后定向
+`npx vitest run test/block-tools.spec.ts test/gate.spec.ts` → **`2 文件 / 77 测试 PASS`**（`block-tools` 21→22、
+`gate` 54→55）。**门禁**：`TMPDIR=$PWD/.tmp npm run ci` 在 `a926cd6` 上 **EXIT=0**——vitest **111 文件 / 2130 测试
+PASS**（对 `4803f42` 的 2128 是 **+2 测试**，文件数不变）、oxlint **`Found 36 warnings and 0 errors.`**（194 文件）、
+`verify:lib` → **`lib/ at a926cd6 is the build of src/ at a926cd6 (297 files, byte-identical)`**（293 → 297，四个新
+`lib/user-source.*`）。`npm run build` 的 `client bundle: 325771 bytes → lib/client.js` 与上一版逐字节相同（浏览器包不带
+这半边）。**红线**：live `~/.dsh` 一行未写、未重载、未重启；未 push、未打 tag、未发版，`package.json` 仍 `0.13.34`；
+配置面仍是 20 键、设置页仍是 17 字段（本轮没有新增配置键）。**没做的**：真机 soak（`NOT_RUN`）——卡片路径本轮只有单测
+覆盖，上一轮 M2 的真机观察（卡片答案不算用户消息）仍是这条缺陷的现场来源；跨预览边界答卡片、`custom` 文本参与匹配这两条
+只有推理与单测，没有真机读数。**环境注记**：本 worktree 原来的 `node_modules/` 只有一份 vitest 缓存、没有 `typescript`，
+`verify:lib` 的 scratch 目录把 `root/node_modules` 软链进去后找不到 `tsc`（第一次 `npm run ci` 因此 EXIT=1）；已把那份缓存
+移到 `.tmp/worktree-node-modules-cache/`、把 `node_modules` 软链到主检出的 `node_modules`（两边本来就靠父目录解析共用
+依赖），之后的全量门禁都 exit 0——`a926cd6` 那次是权威读数，另有一次跑在后来被 amend 掉的 `63e1010` 上
+（`111 文件 / 2130 测试`，同样 exit 0）。这条只影响本 worktree 的运行环境，不是产品改动。）

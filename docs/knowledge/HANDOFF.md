@@ -4453,3 +4453,44 @@ Issue #1 状态评论 issuecomment-6927842856。
   （`BLOCK_TOOL_NAMES` 六项、注册日志打六项、README/CHANGELOG/真机工具清单都写六个，只错在文字）；
   `docs/knowledge/DECISIONS.md` 的 `## D-050`、`## D-051` 重复标题在本次合并**之前**就有（在 `9b55d2d` 上核过），非本轮
   引入。
+
+## 2026-11-25 — 问题卡片的确认：门禁与接单台子共用一个来源判断（`fix/question-card-approval`）
+
+- **From:** 修卡片批准的那一轮 · **To:** 下一个接手的人
+- **Branch / commits:** `fix/question-card-approval`，worktree `.worktrees/fix-question-card-approval`，基线 `main` 尖端
+  `4803f42`；功能提交 **`a926cd6`**「fix(block): count a question-card answer as the user's nod」（15 文件 /
+  **+553 −30**：`src/user-source.ts`、`src/gate.ts`、`src/block/tools.ts`、两个 spec、10 个 `lib/` 产物），记忆提交紧随
+  其后，只动 `docs/knowledge/` 与 `CHANGELOG.md`。未 push、未打 tag、未合 `main`。
+- **做了什么**：宿主把「点问题卡片」记成 `source.kind === 'user-question-reply'` 的 `user/message`，而两个面都只认
+  `'user'`，于是卡片批准在接单台子上每次都拒成 `approval-required`、在门禁上被记成 `non-user-source`。现在两边共用
+  `src/user-source.ts` 的四个导出（`QUESTION_REPLY_SOURCE_KIND`、`isUserAuthoredSource`、`isQuestionReplySource`、
+  `startsTurn`，全部有调用方）：接单台子这一侧，卡片答案只在「它 `callId` 指向的 `ask_user_question` `tool/call`
+  事件记在预览之后」且「只取 `selected` / `custom` 标签、不取整包 JSON」两个限制下才算数；门禁这一侧只改叫法——
+  只有卡片时返回 `{kind:'pass', reason:'question-reply'}`，准入路径、心跳分支顺序、`deliveryKey` / `request` 输入一个字
+  没动（新用例用同一条用户消息做两次分类，钉住 `key` 与 `request` 相等），`classificationFailure` 仍要求真 `user` 消息。
+  `startsTurn()` 只对 `user` 为真 = 那条产品决定：**卡片答案是点头，不自己开一轮**（**D-137**）。
+- **红先绿后（`CONFIRMED`）**：两个新 spec 先红，命令 `TMPDIR=$PWD/.tmp npx vitest run test/block-tools.spec.ts
+  test/gate.spec.ts` → `Test Files 2 failed (2)` / `Tests 2 failed | 75 passed (77)`，失败原文：
+  `BlockToolError: approval-required: 预览之后没有一条消息逐字包含「确认」，不能开工`（接单台子，第一段「点卡片确认应当
+  开工」就红）与 `expected { kind: 'pass', reason: 'question-reply' } / received 'non-user-source'`（门禁）。实现后同一条
+  命令 → **`2 文件 / 77 测试 PASS`**（`block-tools` 21→22、`gate` 54→55）。红日志在 `.tmp/red-targeted.log`，绿日志在
+  `.tmp/green-targeted-2.log`（都是 gitignored 的临时件，不随提交走）。
+- **门禁读数（`CONFIRMED`，权威那次）**：`TMPDIR=$PWD/.tmp npm run ci` 在 `a926cd6` 整棵树 **EXIT=0**——vitest
+  **`111 files / 2130 tests PASS`**（178.47 s；对基线 `4803f42` 的 2128 是 **+2 测试**、文件数不变）、oxlint
+  **`Found 36 warnings and 0 errors.`**（194 文件）、`verify:lib` → **`lib/ at a926cd6 is the build of src/ at a926cd6
+  (297 files, byte-identical)`**（293 → 297，四个新 `lib/user-source.*`）。日志 `.tmp/ci-3.log`。`npm run build` 的
+  `client bundle: 325771 bytes → lib/client.js` 与上一版逐字节相同。
+- **环境注记（不是产品改动）**：本 worktree 原来的 `node_modules/` 只有一份 vitest 缓存、没有 `typescript`，而
+  `verify:lib` 把 `root/node_modules` 软链进它的 scratch 目录后要跑 `node_modules/typescript/bin/tsc`——第一次
+  `npm run ci` 因此在 `verify:lib` 这一步 **EXIT=1**（`MODULE_NOT_FOUND`，日志 `.tmp/ci-1.log`），typecheck 与 lint 已过。
+  修法是把那份缓存移到 `.tmp/worktree-node-modules-cache/`、把 `node_modules` 软链到主检出的 `node_modules`（两边本来
+  就靠父目录解析共用同一份依赖），之后门禁 exit 0。下一个人在新 worktree 里跑门禁，先看 `ls node_modules/typescript`
+  是否存在。
+- **红线**：live `~/.dsh` 一行未写、未重载、未重启（本轮只写仓库内部与 `.tmp/`）；DSH 核心检出未动；未 push、未打 tag、
+  未发版、未改 `package.json`（仍 `0.13.34`）；配置面仍 20 键、设置页仍 17 字段（本轮没有新增配置键）；没有削弱
+  `isApproveAnswer()`、`startBlock` 的其它检查或门禁的准入路径。
+- **待办 / 没做的**：① 真机 soak `NOT_RUN`——卡片路径本轮只有单测覆盖；上一轮 M2 的真机观察（卡片答案不算用户消息）是
+  这条缺陷的现场来源，修完之后**没有**再在真机上点一次卡片复核；② 跨预览边界答卡片（预览前开卡、预览后点确认）仍被拒，
+  这是刻意取舍（见 D-137 的残余风险①），要改得先定「旧问题的答案算不算这一单的批准」；③ 账本里卡片批准的
+  `approval.quote` 是选中的标签而非一句打字的话（D-137 残余风险②），读账本要连 `kind` 一起看；④ 合并前确认
+  `docs/knowledge/DECISIONS.md` 的 `D-137` 是最后一号（本轮取号时 `D-136` 是最后一条）。

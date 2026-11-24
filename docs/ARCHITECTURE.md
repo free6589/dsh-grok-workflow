@@ -529,8 +529,10 @@ user's story:
 and then `approved === true`, else `not-approval`. "You never saw this" outranks "you saw it
 but it changed", which outranks "you changed it but did not say yes", so a caller that gets
 `approval-required` knows the words are missing rather than that the split moved underneath
-it. Check 4 is also why a confirmation collected through an `ask_user_question` card does not
-count: the card's answer is not a user message, and the user has to type one.
+it. Check 4 reads two kinds of message as the user's own words: a typed turn, and a
+question-card answer — the card only when the `ask_user_question` call it names was logged
+after the preview, and then only for the labels the user picked, never the model's question
+text in the same payload (`src/user-source.ts`, D-137).
 
 ### Handing in: deterministic first, the model only for judgement
 
