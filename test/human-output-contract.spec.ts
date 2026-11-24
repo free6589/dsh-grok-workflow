@@ -93,6 +93,16 @@ function between(text: string): string {
   return text.slice(start + REPORT_BEGIN.length, end)
 }
 
+/**
+ * Split a rendered view into its answer half and its audit tail (D-131).
+ *
+ * @returns `[answer, trail]`; `trail` is undefined when the view carries no tail.
+ */
+function splitAuditTail(text: string): [string, string | undefined] {
+  const at = text.indexOf('Technical audit trail')
+  return at < 0 ? [text, undefined] : [text.slice(0, at), text.slice(at)]
+}
+
 /* ----------------------------------------------------------------- fixtures -- */
 
 /** A legal COMPLETED report: one verified task, its evidence confirmed. */
@@ -468,8 +478,16 @@ describe('机器台账：永远折叠，不进可见块（T4 固定输出）', (
     const report = partialReport()
 
     const off = renderThroughTool(mounted, report)
-    for (const term of INTERNAL_TERMS) expect(off).not.toContain(term)
-    expect(off).toContain('Grok workflow: PARTIAL')
+    // D-131: the tool path attaches the complete machine record to a run that did
+    // not complete, as its own clearly-labelled tail. T4's contract is that the
+    // *answer* carries no internal term — so the assertion is scoped to the answer
+    // half, and the tail is asserted to be exactly that: a separate, named section.
+    const [answer, trail] = splitAuditTail(off)
+    for (const term of INTERNAL_TERMS) expect(answer).not.toContain(term)
+    expect(answer).toContain('Grok workflow: PARTIAL')
+    expect(trail).toBeDefined()
+    expect(trail!).toContain('Technical audit trail')
+    expect(trail!).toContain('Audit trail complete.')
   })
 
   it('keeps the ledger folded even for a full delivery (T4 fixed)', async () => {

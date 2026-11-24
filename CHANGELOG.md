@@ -5,6 +5,32 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Added / 新增
+
+- **A run that did not finish now comes back with its complete machine record attached / 没跑完的一轮，
+  回来时会带着完整的机器记录** — The report a caller receives has always been the readable answer: status,
+  objective, what was confirmed, what was left open, and the final answer. Everything else the run captured —
+  which plan it used and how it split the work, the wave partition, every attempt with its outcome, the
+  verifier's per-criterion judgments and the evidence it looked at, the test commands that ran, the full
+  trail of child calls and the routes they used, the dead routes, the limits in force and the chains
+  configured for all five roles — was in the structured record but never in the text a reader ends up
+  holding. Now it is: when a run ends `partial` or `failed`, the answer is followed by a section titled
+  "Technical audit trail" that prints that record in full, and ends with "Audit trail complete." so a
+  reader can tell a whole record from a cut one. A run that completes is unchanged, byte for byte — the
+  trail is an addition for the reader who has something to investigate, not a new shape for every answer.
+  The trail is a bounded copy, never the record itself: the structured result stays canonical, and a
+  record too large for one message ends with a line naming the bound and pointing at that result instead
+  of stopping silently. Nothing is stored twice and nothing new is written anywhere.
+  / 调用方收到的那份报告一直是「人能读的答案」：状态、目标、确认了什么、还有什么没做完、以及最终答复。
+  这一轮跑出来的其余东西——用的是哪种计划、怎么切的活、分了几波、每一次尝试的结果、核验者对每条验收
+  条件的判断和它看的证据、跑过的测试命令、完整的子调用轨迹与所用路由、失效路由、生效的上限、五个角色
+  各自配置的链路——都在结构化记录里，却从来不在读者手上那份文字里。现在有了：一轮以 `partial` 或
+  `failed` 结束时，答案后面会跟一段标题为「Technical audit trail」的内容，把这份记录完整印出来，并以
+  「Audit trail complete.」收尾，读的人能分清「完整」和「被截断」。跑完的一轮，一个字节都不变——这段
+  记录是给「有东西要查」的人加的，不是给每个答案换形状。它始终是有界的副本，不是记录本身：结构化结果
+  仍是权威，记录大到一条消息装不下时，结尾那行会写清上限并指向那份结构化结果，而不是无声地断掉。
+  没有任何东西被存第二遍，也没有任何位置被新写。
+
 ## [0.13.32] - 2026-11-24
 
 ### Added / 新增
