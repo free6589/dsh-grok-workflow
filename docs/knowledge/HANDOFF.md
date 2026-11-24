@@ -1,3 +1,54 @@
+## 2026-11-24 — 完整流程（`/grok on`）补了一张前台：闲聊与单点事实直答、真任务先问再跑、首答在队轮前面
+
+- **From:** 收尾手（`agent-133/docs-writer`）· **To:** 合流者 / 操作员
+- **树与基线**：worktree `.agents/worktrees/feat-full-escape`，分支 `feat/full-escape`，基线 `main` 尖端 **`1f70103`**
+  （版本 `0.13.32`）。六条提交：`86c0fa2` 首答＋前言 → `597b444` channel 把前台调用单独记账 → `21f3616` 逃生口
+  → `8f40be1` 重建 `lib/` → `62f540f` 按状态结算 → `24f2f35` 收尾换时间预算；两条 docs 提交（证据、记忆）跟在后面。
+  主检出 `/home/fish/projects_mine/dsh-grok-workflow` 只做过一次动作：把 soak 证据搬走、删掉它那份未跟踪拷贝；
+  其余一行未动。`package.json`、`cordis.patch.yml`、版本号未动；**没合流、没发版、没 push、没升 live profile**。
+- **改了什么（产品面）**：`src/gate.ts`（+195：`fullFrontDeskEscape` 的 `chat`/`fast`/`team` 三条路与五个 `outcome`
+  （`full-escape-chat` / `full-escape-fast` / `full-escape-failed` / `full-escape-ask` / `full-escape-ask-fallback`）、
+  `answerFullBehind`（先写首答、起队轮、回执拼 `[注, 首答, acceptedReceipt]`）、`canBackgroundDeliver`、`acceptedReceipt`）、
+  `src/triage.ts`（+26：`escape` 输入只丢 `mode-full` 硬覆盖，规则链不动）、`src/answer.ts`（`ACCEPTED_PREAMBLE` 与
+  `acceptedEnterText` 的措辞改成「已经先答过、别在它上面再造一个答案」）、`lib/`（`8f40be1` 同一次构建的产物）。
+  行为：`/grok on` + 闲聊 → 模板直答、零 run；+ 单点事实 → 一次 `quick-worker`、零 run；+ 真任务 → 先报拆法
+  （`full-escape-ask`）、零 run，回「确认」后起队轮并先给首答。部署级 `mode:'full'`（无会话记录）三条路逐字节照旧。
+  取舍与被否掉的替代方案见 `DECISIONS.md` **D-131**。
+- **用例**：新增 `test/full-escape.spec.ts`（5 例，基线副本上 **4 红 1 绿**）与 `test/full-behind-first-answer.spec.ts`
+  （4 例，基线副本上 **4/4 红**）。
+- **怎么复核**（会话里直接可跑；本机 Node 26.8.1，`nproc=6`）：
+  1. `TMPDIR=$PWD/.tmp npm run ci` —— 期望 **exit 0**、lint `Found 36 warnings and 0 errors`（173 文件）、
+     `verify:lib` 报 `lib/ at <sha> is the build of src/ at <sha> (245 files, byte-identical)`、vitest
+     **103 files / 1922 tests**（`24f2f35` 上是 172.72 s）。
+  2. 只验前台三条路：`npx vitest run test/full-escape.spec.ts test/full-behind-first-answer.spec.ts test/triage.spec.ts
+     test/channel.spec.ts test/grok-on-ingress.spec.ts test/human-output-contract.spec.ts test/phase1-dialogue.spec.ts`。
+  3. 反证（这条曾经红过）：`npx vitest run test/grok-on-ingress.spec.ts` 连着跑几遍，再在机器有负载时跑一遍——
+     那条饱和队列用例现在等的是 15 s 的具名 `landedWithin` 界，不是 350 ms 的轮数预算。
+- **证据在哪**：`.rsi/evidence/full-escape-2026-11-24/`（**97 个文件 = 12 个执行手证据 + 85 个 `soak-` 真机证据**）。
+  读 `soak.md` 就够：§0 结论表、§2 两个构建的指纹、§3 相 A 逐字、§4 相 B 三场景、§5 收尾实测、§6 缺口、§7 归档与构建归属。
+  这 85 个文件原本写在主检出的未跟踪目录里，收尾时逐文件 `cmp` **85/85 一致**、`diff -r` 无差异之后才搬进来并删掉主检出那一份
+  （主检出 `git status --short` 已回到空）；搬之前那 12 个文件没被覆盖、也没被删。入库的是 **94 个**：`soak-B1/B2/B3-drive.log`
+  三个被 `.gitignore` 的 `*.log` 规则挡住（仓库从没跟踪过任何 `.log`），收尾没有用 `-f` 硬加——它们的每步耗时已经逐条落在
+  已入库的 `soak-B?_run.json` 里，见 `soak.md` §7。
+- **被有意改的既有钉子（3 个文件 / 10 条用例；行为断言本身没放宽）**：
+
+| 文件 | 条数 | 改的是什么 | 为什么 |
+|---|---|---|---|
+| `test/triage.spec.ts` | 1 | 「会话 `/grok` 记录强制完整流程」那条：输入换成真任务，标记从「没有档位行」换成「队长先报拆法」；仍然断言只发生 **一次** 调用，并断言那次调用的 `meta.name` 是 `Front desk` | 旧契约是 `/grok on` 下每条消息立即起跑，标记落在「没有 `triage` 的档位行」上；新契约下完整流程自己的第一动作是报拆法 |
+| `test/grok-on-ingress.spec.ts` | 3 | `dispatches the next message while the team run is still in flight`、`still runs the full team for the message and delivers the report afterwards`、`a saturated queue keeps the blocking path instead of promising a background run`：都先发真任务、等拆法出去、回「确认」；队轮计数改成 `teamRuns`（过滤掉 `Front desk` 那次调用） | 同一条旧契约：以前发一条就起队轮，现在要点过头才起。改的是「一轮怎么被打开」，断言照旧（`dispatched` 长度、`receipts` 数、`closed` 为真、团队轮数 ≥ 2 都没放宽） |
+| `test/channel.spec.ts` | 6 | 把前台那次调用单独记账成 `FakeEngine.frontDeskCalls`，`startCalls` 仍只数整轮；`expect(started).toMatchObject({kind:'enter'})` 换成「先等拆法出去、再断一次整轮」 | 完整流程现在在整轮之前先花一次模型调用；那条调用在真引擎里也会回成一个 run，所以必须分开记，否则「一次 run」这句话就说不清了。断言没有放宽，也没有丢字段 |
+
+- **缺口（照实写）**：① 门禁只在 `24f2f35` 上绿过**一次**，前面两个提交各红过一次（同一条饱和队列用例），
+  本地 20 + 8 + 3 次执行、loadavg 推到 31 都没复现，所以「修掉了这条抖动」在本地**无法证明**；
+  ② 相 A 的后台报告没等落地（切构建前还没送达），那一相「后台真起了 workflow」靠的是会话日志事件计数与三个子会话的工具调用；
+  ③ B2/B3 的「先问」「三层齐全」靠读 GUI 正文逐字判，只有「队轮在点头之后才起」做成了硬证据（`seq25` → `seq29` → `seq37`）；
+  ④ B1 的直答是**一个零工具调用的轻量工人**代答，不是零子智能体（零子会话只有 B3 成立）；
+  ⑤ 模型用的是 `agent2api/deepseek-v4.1-flash`，不是任务点名的 `wb/cn:deepseek-v4.1-flash`（当时连续 6 次 503）；
+  ⑥ 3080「没重启」只有间接证据（端口仍在听、仍 401、`~/.dsh/profiles` 零写入），沙箱 `--unshare-pid` 读不到它的 pid；
+  ⑦ 远端 Node 22/24 矩阵 `NOT_RUN`（没 push）。
+- **下一步**：合流由主代理做（本包不合、不发版）。若要合，先跑一遍上面的 `npm run ci` 再合；合流后把 `[Unreleased]`
+  那四条（英文 + 中文）带进发版段。若还要收口那条饱和用例，判据只看「在真负载下连着跑不再红」，不要为它改断言或抬 `testTimeout`。
+
 ## 2026-11-24 — 两条无计时器探针改由探针持钟：远端 Node 24 红转绿、`team-dispatch-v1` 清干净、`feat/audit-layer` 取半记
 
 - **From:** 执行手（`agent-130/worker-timeout`）· **To:** 合流者 / 操作员

@@ -3273,3 +3273,58 @@ spine 为空，pre-fix 形状会进脊柱。
   与 D-126 的语义谁取代谁，本轮没有立场；③ **没 rebase**（`behind=500`，rebase 后冲突面可能变，6 个路径只是当前 `main` 上的读数）。
 - **Consequences:** 这条记录的用处是「别再重新盘一遍库存」——ahead/behind、diffstat、冲突路径已经量过；它也明确挡掉「顺手合了它」这种动作。
   下一轮做它时，起点是 rebase 到当时尖端 + 跑它的 417 行用例 + 对 D-126 做取舍，而不是从「这分支是干什么的」重新开始。
+
+## D-131 · 完整流程（`/grok on`）补一张前台：逃生口只认会话记录、先问必须先能后送、首答盖在接单回执前面（2026-11-24，未发版）
+
+- **Status:** `CONFIRMED`（`test/full-escape.spec.ts` 5 例、`test/full-behind-first-answer.spec.ts` 4 例，两例在基线副本上
+  分别 4 红 1 绿 / 4 红；门禁 `TMPDIR=$PWD/.tmp npm run ci` 在 `24f2f35` 上 exit 0 = 103 文件 / 1922 测试；真机 soak 两相
+  四场景，见 `.rsi/evidence/full-escape-2026-11-24/soak.md`）
+- **Date:** 2026-11-24
+- **来源:** `/grok on` 的既有契约是「每条消息都在回合内跑完整套流程」，用户读到的只有一句接单模板：问候也付一个规划助手、
+  一个工人、一个核验者，「今天天气怎么样？」拿到的是「已接单：这条消息正在按整套流程（拆解 → 执行 → 核验）运行。…」，
+  真正的话要等后面那条。相 A 在基线 `1f70103` 上逐字复现了这个形状（主会话 `run-start=1 agent-start=3 guardian-start=1`，
+  裂出规划/执行/核验三个子会话）。分支 `feat/full-escape`（worktree `.agents/worktrees/feat-full-escape`，自 `main`
+  `1f70103` 开出），功能提交 `86c0fa2` 首答＋前言、`597b444` channel 记账、`21f3616` 逃生口、`8f40be1` 重建 `lib/`、
+  `62f540f` 与 `24f2f35` 只动门禁用例。
+- **Decision:**
+  1. **逃生口只认会话记录。** 判据是 `readModeRecord(agent.session)?.workflowMode === 'full'`——只有 `/grok on` 会写这条记录，
+     也就只有用户亲手打开形态时才有前台（`fullFrontDeskEscape`：`chat` 模板直答、`fast` 一次 `quick-worker`、
+     `team` 先报拆法）。部署级 `limits.mode === 'full'`**一个字节都不走这条路**：那是「一轮跑完」的既有契约，被
+     `gate` / `phase1` / `reliability` / `human-output-contract` 等用例钉着（`src/gate.ts` 的注释自己记着「17 条 gate 用例
+     钉着它」）。要做的是**收窄产品行为**，不是改那些钉子。
+  2. **「先问」必须先能后送。** `team` 档要报拆法、等用户点头才起队轮，所以 `fullFrontDeskEscape` 在派拆法之前先过
+     `canBackgroundDeliver(agent)`（`whenIdle`、`followup` 都是函数且会话在，任一不满足即 `false`）：不满足就返回
+     `undefined`，交回原来的阻塞路径。一次性/headless 运行没有后续回合，问了没人答，任务会被那句问话吞掉。
+  3. **首答盖在接单回执前面。** `answerFullBehind` 先用一次 `first-answer` 轻量调用写下这一两句人答，再拼
+     `[注, 首答, acceptedReceipt(lang)]` 用 `acceptedEnterText` 送进回合；`ACCEPTED_PREAMBLE` 随之从「已接单、别自己答」
+     改成「已经先答过、别在它上面再造一个答案」（保留了「不重答、不调工具、标记内逐字照抄」这三条约束），
+     `acceptedReceipt` 的措辞也跟着改：它现在说的是「上面这一两句是先答」，而不是「这条消息正在跑」。首答那次调用与队轮
+     解耦——慢、失败、空回都只落到模板兜底（`firstAnswerFallback`），绝不把队轮推回回合里。
+- **被否决的替代方案:**
+  1. **让部署级 `mode: 'full'` 也走前台。** 会顺手改掉「每条消息都在回合内跑完」这个既有契约，而钉它的是别的用例组；
+     一次为了体验的修复不该连带重写别人的钉子。要改那个形状，是另一条决定。
+  2. **一次性/headless 也先问。** 没有后续回合可读「确认」，用户看不到问句也答不了，任务等于被吞——比「多花一次队轮」坏得多。
+  3. **继续用「接单模板 + 让主模型别自己答」。** 用户读到的还是一条禁言回执；这正是相 A 复现的那个病。
+  4. **队轮仍在回合内跑完再答（旧 `in-turn`）。** 回合被整个跑动占住，期间用户发的消息被领取后不派发，转写看着像坏了
+     ——`/grok off` 能过、`/grok on` 不能，正是用户报的那个对照。
+  5. **首答那次调用失败就把队轮拉回回合里跑。** 一次慢/失败的轻量调用会拖住整轮；失败就照实写模板兜底，队轮照旧在后台。
+  6. **在 `full` 的 `chat`/`fast` 档加档位行。** `full` 从来没有档位行，前台也不该给它加一句（`triage` 形状才有）。
+- **Evidence:** `src/gate.ts`（`fullFrontDeskEscape` 五个 `outcome`：`full-escape-chat` / `full-escape-fast` /
+  `full-escape-failed` / `full-escape-ask` / `full-escape-ask-fallback`；`answerFullBehind`；`canBackgroundDeliver`；
+  `acceptedReceipt`）、`src/triage.ts`（`escape` 输入：只丢 `mode-full` 硬覆盖，规则链不动）、
+  `src/answer.ts`（`ACCEPTED_PREAMBLE`、`acceptedEnterText`）、
+  `test/full-escape.spec.ts`（5 例：基线副本上 4 红 1 绿，唯一绿的是「部署级 `full` 立刻起队轮」——它本来就该绿）、
+  `test/full-behind-first-answer.spec.ts`（4 例，基线副本上 4/4 红）、
+  `.rsi/evidence/full-escape-2026-11-24/soak.md`（真机两相四场景）、`docs/knowledge/VALIDATION.md` 同日条目。
+- **Consequences:**
+  - **`/grok on` 下的「直答」不一定零子智能体。** 闲聊是模板直答（B3：零子会话、零工具、零队轮），单个问题是**一个零工具
+    调用的轻量工人**代答（B1 实测如此，回答自己括注「只派了一个工人」）。周报里写「零子智能体」只对闲聊成立。
+  - **回合结束得早，结论是另一条消息。** 任何「等这一回合完成就当作拿到结论」的调用方（脚本、自动化、上游编排）在
+    `/grok on` 下都会读到首答而不是结论；要结论得等后台那条，且它**可能纠正**首答。
+  - **被有意改动的既有钉子**（行为断言本身没放宽，改的是「一轮怎么被打开」）：`test/triage.spec.ts` 1 条
+    （`/grok` 记录强制完整流程那条改用真任务并把标记从档位行换成「队长先报拆法」，仍然断言只发生一次调用）、
+    `test/grok-on-ingress.spec.ts` 3 条（`dispatches the next message…`、`still runs the full team…`、
+    `a saturated queue keeps the blocking path…`：都先发真任务、等拆法、回「确认」，队轮计数改看 `teamRuns`）、
+    `test/channel.spec.ts` 6 条（前台那次调用单独记账成 `frontDeskCalls`，`startCalls` 仍只数整轮；
+    `expect(started).toMatchObject({kind:'enter'})` 换成先等拆法出去、再断一次整轮）。
+  - 一次 `/grok on` 下的真任务现在固定多花一次调用（拆法预览），点头后还多花一次（首答）——换来的是用户在回合里就能读到人话。

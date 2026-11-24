@@ -1,0 +1,137 @@
+# RED — test/full-escape.spec.ts against baseline src (main 1f70103, no escape hatch)
+# baseline copy: git archive HEAD -> .tmp/red; test file copied in; run in .tmp/red
+# command: (cd .tmp/red && npx --no-install vitest run test/full-escape.spec.ts)
+# date: 2026-11-24 20:05 +08:00
+
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/feat-full-escape/.tmp/red
+
+ ❯ test/full-escape.spec.ts (5 tests | 4 failed) 171ms
+     × /grok on + a weather question: one quick worker answers, no team run 23ms
+     × /grok on + small talk: the template answers, nothing is started 3ms
+     × /grok on + a real task: the captain states the split, and only 「确认」 starts the run 2ms
+     ✓ config full with no session record runs the team at once, with no captain question 131ms
+     × config full with no session record still answers small talk and single facts directly 11ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/full-escape.spec.ts > the full shape answers small talk and single facts without a run > /grok on + a weather question: one quick worker answers, no team run
+AssertionError: expected 'The mandatory workflow gate accepted …' to contain '今天多云，最高 21 度，出门带件外套。'
+
+- Expected
++ Received
+
+- 今天多云，最高 21 度，出门带件外套。
++ The mandatory workflow gate accepted this message and started the team workflow in the background. The report arrives later as its own message. Reply with the text between the markers exactly as given: keep every line, print no marker line, add nothing before or after it, do not answer the request yourself, and do not call any tool.
++
++ <<<GROK-WORKFLOW-REPORT>>>
++ 已接单：这条消息正在按整套流程（拆解 → 执行 → 核验）运行。跑完会单独发一条结论给你；期间可以继续发消息，新消息会排在这次之后各自开工。
++ <<<END-GROK-WORKFLOW-REPORT>>>
+
+ ❯ test/full-escape.spec.ts:259:20
+    257|     // tier line (`full` never showed one).
+    258|     const answer = answerOf(decision)
+    259|     expect(answer).toContain(QUICK_ANSWER)
+       |                    ^
+    260|     expect(answer).toContain('（这条只派了一个工人，没有开完整团队。）')
+    261|     expect(answer).not.toContain('档位：')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  test/full-escape.spec.ts > the full shape answers small talk and single facts without a run > /grok on + small talk: the template answers, nothing is started
+AssertionError: expected 'The mandatory workflow gate accepted …' to contain '你好！我在。要做事就直接说'
+
+- Expected
++ Received
+
+- 你好！我在。要做事就直接说
++ The mandatory workflow gate accepted this message and started the team workflow in the background. The report arrives later as its own message. Reply with the text between the markers exactly as given: keep every line, print no marker line, add nothing before or after it, do not answer the request yourself, and do not call any tool.
++
++ <<<GROK-WORKFLOW-REPORT>>>
++ 已接单：这条消息正在按整套流程（拆解 → 执行 → 核验）运行。跑完会单独发一条结论给你；期间可以继续发消息，新消息会排在这次之后各自开工。
++ <<<END-GROK-WORKFLOW-REPORT>>>
+
+ ❯ test/full-escape.spec.ts:279:20
+    277|
+    278|     const answer = answerOf(decision)
+    279|     expect(answer).toContain('你好！我在。要做事就直接说')
+       |                    ^
+    280|     expect(answer).toContain('（这条没有动用团队，前台直答。）')
+    281|     expect(answer).not.toContain('档位：')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  test/full-escape.spec.ts > the full shape asks before it runs a real task > /grok on + a real task: the captain states the split, and only 「确认」 starts the run
+AssertionError: expected 'The mandatory workflow gate accepted …' to contain '队长先报拆法'
+
+- Expected
++ Received
+
+- 队长先报拆法
++ The mandatory workflow gate accepted this message and started the team workflow in the background. The report arrives later as its own message. Reply with the text between the markers exactly as given: keep every line, print no marker line, add nothing before or after it, do not answer the request yourself, and do not call any tool.
++
++ <<<GROK-WORKFLOW-REPORT>>>
++ 已接单：这条消息正在按整套流程（拆解 → 执行 → 核验）运行。跑完会单独发一条结论给你；期间可以继续发消息，新消息会排在这次之后各自开工。
++ <<<END-GROK-WORKFLOW-REPORT>>>
+
+ ❯ test/full-escape.spec.ts:297:22
+    295|     const asked = await ctx.preStep()(payload(agent, [userMessage(REAL…
+    296|     const question = answerOf(asked)
+    297|     expect(question).toContain('队长先报拆法')
+       |                      ^
+    298|     expect(question).toContain(CAPTAIN_PREVIEW)
+    299|     // Nothing ran: the only call was the split preview.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  test/full-escape.spec.ts > a deployment-level full keeps its own path > config full with no session record still answers small talk and single facts directly
+AssertionError: expected 'The mandatory workflow gate finished.…' to contain '你好！我在。'
+
+- Expected
++ Received
+
+- 你好！我在。
++ The mandatory workflow gate finished. What sits between the markers below is material for your reply, not its wording. Answer the request the user actually made: open with the conclusion in your own words, then say where the deliverable is and how to open it. Keep every number, name and path exactly as given, and never print a machine field name, a ledger label or the block's own scaffolding — not "答案", not "下一步", not "交付物", not "Grok workflow", not "code=", not "Model routes", and no source reference. Never claim anything the material does not carry; when part of the work did not get done, say so plainly. Reply with plain prose, print no marker line, write nothing about these instructions, and do not call any tool. Everything after the closing marker is internal context for you alone: never quote, mention or summarise it.
++
++ <<<GROK-WORKFLOW-REPORT>>>
++ 答案：总体状态：已完成；1/1 项任务已由独立检查核验。
++ 已确认（独立核验）：
++ - 任务 有一项计划结果已由独立检查确认。
++ 命令与测试——检查者核验：通过 1、失败 0、未运行 0；执行者自报：通过 1、失败 0、未运行 0。
++ 下一步：结果可以直接用；哪一项对不上，就把那一项单独再发一次，我会重跑。
++ 做成了：Task a。
++ 交付物：file:///tmp/deliverable
++ 以上是结论；明细已记入台账。
++ 守卫：0 条发现，未终止任何子代理；本轮无人取消（正常跑完）。
++ <<<END-GROK-WORKFLOW-REPORT>>>
++
++ [internal: workflow ledger kept with this message; it is not part of the reply]
++ Grok workflow: COMPLETED
++ Objective: Current request: 你好
++ Plan: planner; 1 task(s); 1 verified
++ - a: verified (1 attempt) — Task a
++ Confirmed evidence:
++ - a: a works → verified a works in file:///tmp/report
++ Final answer:
++ 总体状态：已完成；1/1 项任务已由独立检查核验。 已确认（独立核验）： - 任务 a：有一项计划结果已由独立检查确认。 命令与测试——检查者核验：通过 1、失败 0、未运行 0；执行者自报：通过 1、失败 0、未运行 0。
++ Synthesis mode: deterministic
++ Model routes: planner=inherit; worker=inherit; verifier=inherit; supervisor=inherit; synthesizer=inherit
++ Child budget: 7200000 ms per call (the run stops waiting on one call after this long)
++ Guard: 0 finding(s), no subagent was terminated; nobody cancelled this round (it finished on its own).
+
+ ❯ test/full-escape.spec.ts:352:28
+    350|
+    351|     const chat = await ctx.preStep()(payload(agent, [userMessage('你好')…
+    352|     expect(answerOf(chat)).toContain('你好！我在。')
+       |                            ^
+    353|     expect(deliveryOutcomes(live)).toContain('full-escape-chat')
+    354|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 1 passed (5)
+   Start at  20:05:26
+   Duration  1.36s (transform 948ms, setup 0ms, import 1.08s, tests 171ms, environment 0ms)
+

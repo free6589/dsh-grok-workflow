@@ -117,6 +117,42 @@ describe('t52 front desk: the classifier is cheap, deterministic and explainable
   })
 })
 
+describe('the full shape has an escape hatch that keeps the rule chain', () => {
+  // `escape` drops only the `mode-full` hard override: the message is classified as
+  // a `triage` message would be, and a question the rules cannot settle becomes the
+  // team instead of being asked (the `full` shape has no front desk to ask through).
+  const escaped = (text: string, extra: { ask?: boolean } = {}) =>
+    classifyTriage({ text, mode: 'full', escape: true, ask: extra.ask ?? false, pending: false })
+
+  it('keeps the pre-t52 answer when the flag is absent or false', () => {
+    for (const input of [
+      { text: '你好', mode: 'full' as const, ask: true },
+      { text: '你好', mode: 'full' as const, ask: true, escape: false },
+    ]) {
+      expect(classifyTriage(input)).toMatchObject({ tier: 'team', reason: 'mode-full' })
+    }
+  })
+
+  it('routes small talk and single facts the way the rules always did', () => {
+    expect(escaped('你好')).toMatchObject({ tier: 'chat', reason: 'small-talk' })
+    expect(escaped('今天天气怎么样？')).toMatchObject({ tier: 'fast', reason: 'question' })
+    expect(escaped('算一下 5×6 等于多少，只回答数字').tier).toBe('fast')
+    // Real work still earns the team: the escape is not a downgrade of the shape.
+    expect(escaped('帮我重构 run.ts 的超时逻辑，并补上回归测试').tier).toBe('team')
+    expect(escaped('用团队把 typo 改掉').reason).toBe('forced-team')
+  })
+
+  it('never asks on the full shape: an unresolved message is the team', () => {
+    // `ask: true` would be a question under `triage`; on the full shape there is no
+    // front desk to answer it, so the same message escalates instead.
+    expect(classifyTriage({ text: '改一下那个', mode: 'full', escape: true, ask: true, pending: false }).tier).toBe('team')
+    expect(classifyTriage({ text: '改一下那个', mode: 'triage', ask: true, pending: false }).tier).toBe('ask')
+    // A bare choice with no question waiting keeps its own answer (stale-choice),
+    // never a team: the escape must not start a run nobody asked for.
+    expect(escaped('简单')).toMatchObject({ tier: 'chat', reason: 'stale-choice' })
+  })
+})
+
 describe('t52 front desk: wording is bilingual and states the tier', () => {
   it('detects the language from the message', () => {
     expect(detectLanguage('你好')).toBe('zh')
@@ -534,15 +570,21 @@ describe('t52 front desk: each tier behaves as promised', () => {
   it('a session /grok record forces the full workflow even when the deployment uses the front desk', async () => {
     // t59: `/grok` promises the full plan -> execute -> verify workflow. The
     // deployment's `mode: triage` must not quietly answer from a template instead.
+    // The distinguishing mark after the escape hatch is the shape itself: no tier
+    // line (the triage front desk did not answer this session), and the full shape's
+    // own first move — the captain states the split before anything runs.
     const ctx = new FakeContext()
     const agent = new FakeAgent()
     const session = Session.create('sess-triage-grok-full' as never)
     setMode(session, { v: 1, enabled: true, turn: 1, setBy: 'command:/grok', workflowMode: 'full' })
     Object.defineProperty(agent, 'session', { value: session })
     ctx.engine.reply = 'done'
-    const text = await route(ctx, agent, '你好')
+    const text = await route(ctx, agent, '帮我重构 run.ts 的超时逻辑，并补上回归测试')
     expect(text).not.toContain('档位：')
+    expect(text).toContain('队长先报拆法')
+    // Nothing ran before the user agreed; the only call was the split preview.
     expect(ctx.engine.startCalls).toHaveLength(1)
+    expect(ctx.engine.startCalls[0]!.meta.name).toBe('Front desk')
   })
 
   it('answers a greeting directly, without starting the team or a call', async () => {

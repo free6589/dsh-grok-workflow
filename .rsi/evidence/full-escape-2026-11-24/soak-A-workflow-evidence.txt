@@ -1,0 +1,5 @@
+== session session-1b949320-3def-4d11-b5df-656a1e8a59f5 (今天天气怎么样？)
+      1 "type":"tool-workflow/agent-end"
+      3 "type":"tool-workflow/agent-start"
+      1 "type":"tool-workflow/guardian-start"
+      1 "type":"tool-workflow/run-start"

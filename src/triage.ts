@@ -85,6 +85,20 @@ export interface TriageInput extends TriagePolicy {
    * states what is missing next to the question.
    */
   prior?: RecallResult
+  /**
+   * Escape hatch for the `full` shape (the shape `/grok on` writes).
+   *
+   * `mode: 'full'` means "every message gets the whole workflow", and that rule
+   * outranks every other signal — which is why a greeting cost a plan, a worker and
+   * a verifier. With `escape` the shape stops hard-overriding the rules: the message
+   * is classified exactly as a `triage` message, so small talk answers from a
+   * template and a single fact costs one worker. The front desk still may not ask
+   * "quick or team?" on this shape (the user already chose the full workflow), so an
+   * `ask` verdict settles as the team instead of a question.
+   *
+   * Omitted (or `false`), the rule above is the pre-escape behaviour, byte for byte.
+   */
+  escape?: boolean
 }
 
 /** One classification. */
@@ -704,7 +718,10 @@ const TIER_LABEL: Record<TriageTier, { zh: string, en: string }> = {
  * Decide the tier of one message.
  *
  * Order of authority, highest first: `full` mode, the answer to a previous
- * question, an explicit escalation, small talk, then the signal balance.
+ * question, an explicit escalation, small talk, then the signal balance. A `full`
+ * shape that carries {@link TriageInput.escape} drops only the first of those: the
+ * rest of the chain decides, and a question the rules cannot settle becomes the
+ * team instead of being asked.
  *
  * @param input - message plus policy.
  * @returns the verdict, with a machine reason and a human sentence.
@@ -712,14 +729,17 @@ const TIER_LABEL: Record<TriageTier, { zh: string, en: string }> = {
 export function classifyTriage(input: TriageInput): TriageVerdict {
   const text = input.text.trim()
   const lang = detectLanguage(text)
+  const escaped = input.mode === 'full' && input.escape === true
   const verdict = (tier: TriageTier, reason: string, greeting = false): TriageVerdict => ({
-    tier,
+    // The escape hatch has no front desk to ask through, so an `ask` verdict
+    // settles as the team; the rule that produced it keeps its own reason.
+    tier: escaped && tier === 'ask' ? 'team' : tier,
     reason,
     detail: (DETAIL[reason] ?? AMBIGUOUS)[lang],
     lang,
     greeting,
   })
-  if (input.mode === 'full') return verdict('team', 'mode-full')
+  if (input.mode === 'full' && !escaped) return verdict('team', 'mode-full')
   // Look before asking ({@link recallFromPrior}): a message the rules cannot
   // separate is not necessarily one the session cannot answer. When the gate's
   // look-up pass found the material, the question becomes an answer — tier

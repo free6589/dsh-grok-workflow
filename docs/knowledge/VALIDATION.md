@@ -1,3 +1,50 @@
+## 完整流程（`/grok on`）补一张前台：门禁两次红、一次绿，真机两相四场景 — 2026-11-24（提交 `24f2f35`；门禁与 soak 读数由执行轮实测，收尾轮只搬证据、写记忆，未重跑）
+
+这一条是 `feat/full-escape` 分支的收尾记录：`/grok on` 之下，闲聊与单个问题不再为整套队轮买单，真任务先报拆法、点头才起队轮，
+起跑后第一回合先给一两句人答、团队在它背后核验（取舍见 `DECISIONS.md` D-131）。下表每一行都是执行轮真跑过的命令与真读到的结果，
+逐字照抄；**收尾轮没有重跑门禁**，它只做了证据搬家（`cmp` / `diff -r` 逐文件核对）与记忆文档——表里唯一由收尾轮现跑的是
+「证据搬家」那一行。没跑过的写 `NOT_RUN`。
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 门禁（绿，本轮唯一一次 exit 0） | `TMPDIR=$PWD/.tmp npm run ci`（worktree `.agents/worktrees/feat-full-escape`，`HEAD` = `24f2f35`） | **exit 0**：typecheck 干净；`oxlint src test` → **`Found 36 warnings and 0 errors`**（173 文件）；`verify:lib` → **`lib/ at 24f2f35 is the build of src/ at 24f2f35 (245 files, byte-identical)`**；vitest → **103 files / 1922 tests PASS**（**172.72 s**）。**`CONFIRMED`** |
+| 门禁插曲①（红） | 同一条 `npm run ci`，跑在 `8f40be1` 上 | **红**：`test/grok-on-ingress.spec.ts > /grok on keeps message ingress open > a saturated queue keeps the blocking path instead of promising a background run`，`Error: the blocking step never settled`，`Tests 1 failed \| 1921 passed (1922)`。**`CONFIRMED`**（执行手存档，见证据目录 `green-saturation-flake-fix.txt` 的「red source」段） |
+| 门禁插曲②（红） | 同一条 `npm run ci`，跑在 `62f540f` 上（同一台机器同时在跑真 `dsh web` + Chromium + 网关） | **红**：同一条用例，`AssertionError: the blocking step never settled: expected false to be true`，`Tests 1 failed \| 1921 passed (1922)`，`Duration 180.51s`。**`CONFIRMED`** |
+| 这条例外本地能不能复现 | 单文件 ×20、8 个 busy 循环下 ×8、全量 `npx vitest run` ×3（Node 26.8.1，`nproc=6`） | **`NOT_RUN`——一次都没红**：20/20、8/8、3/3 全绿；后来把负载推到 **loadavg 31** 仍然绿。所以「复现」这件事本地拿不到证据，只有上面两次门禁里的事实 |
+| 修法 | `test/grok-on-ingress.spec.ts`（`62f540f` 先按状态结算，`24f2f35` 换时间预算） | 收尾窗口原来是「有界轮数 × 50 ms」≈ **350 ms**：run 结算之后阻塞那一步还要走回执/提交好几跳，满载时远超它（症状是「结算了但 committed 没长」）。换成 `landedWithin(cond, 15_000, 'the blocking step')`：自带 ref 住的计时器、20 ms 轮询、超时按名失败；轮询里**每轮把所有尚未结算的 run 都结算掉**（`FakeRun.settled` 防双 resolve），不再依赖 `at(-1)`。**断言未放宽**：`dispatched` 长度、`receipts === FIXED_MAX_QUEUED_MESSAGES`、`teamRuns >= 2`、`closed` 为真；`testTimeout`、skip/only 未动 |
+| 修后（负载下） | 单文件 ×8（loadavg 4.6 → 22.9 爬升中）、全量 ×2（loadavg **21.42** / **30.68**） | 单文件 **8/8 绿**（9.11 s / 9.22 s / 9.54 s / 9.65 s / 10.14 s / 10.17 s / 11.27 s / 12.10 s）；全量 **103 files / 1922 tests PASS** 各一次（**371.07 s** / **398.08 s**）。**`CONFIRMED`** |
+| 红→绿：逃生口 | `test/full-escape.spec.ts` **5 例**跑在 `git archive 1f70103` 的副本上（`.tmp/red`，只把该 spec 拷进去） | **4 红 1 绿**——红的是「天气（一个轻量工人代答、无队轮）」「闲聊（模板直答、什么都不起）」「真任务（先报拆法、只有『确认』才起跑）」以及当时那版里的「部署级 `full` 也直答」；绿的是「部署级 `full` 立刻起队轮」（它本来就该绿）。**`CONFIRMED`**（`red-gate-escape.txt`） |
+| 红→绿：首答 | `test/full-behind-first-answer.spec.ts` **4 例**跑在基线副本上 | **4/4 红**，逐字 `AssertionError: expected '帮我查一下三家报价，然后给结论\nThe mandatory workfl…' to contain '这两句是先答，团队正在后台核验。'`。**`CONFIRMED`**（`red-answer-first-2003-baseline-spec-run1.txt`、`red-answer-first.txt`） |
+| 隔离验证（answer-face 改动单独一份） | `npx vitest run test/full-behind-first-answer.spec.ts test/human-output-contract.spec.ts`（基线副本 + 只加 answer-face 改动，不含逃生口） | **2 files / 14 tests PASS**（4.53 s）。**`CONFIRMED`** |
+| 隔离验证（`git archive 597b444`） | `npx vitest run test/channel.spec.ts test/full-behind-first-answer.spec.ts test/human-output-contract.spec.ts` | **3 files / 56 tests PASS**（3.76 s）。**`CONFIRMED`** |
+| 验收集（改了钉子的那几个文件同跑） | `npx vitest run test/full-escape.spec.ts test/triage.spec.ts test/channel.spec.ts test/grok-on-ingress.spec.ts test/human-output-contract.spec.ts test/phase1-dialogue.spec.ts` | **6 files / 145 tests PASS**（72.78 s），其中 `channel` 42 例、`grok-on-ingress` 6 例全绿。**`CONFIRMED`** |
+| 全量（相 B 构建） | `npx vitest run` | **103 files / 1922 tests PASS**（129.59 s）。**`CONFIRMED`** |
+| 真机 soak 相 A（基线 `1f70103`） | rig + fork profile + 真模型，端口 `3199` / CDP `9223`（`.rsi/evidence/full-escape-2026-11-24/soak.md` §3） | **旧行为复现**：回合里只有「已接单：这条消息正在按整套流程（拆解 → 执行 → 核验）运行。…」；会话日志 `run-start=1 agent-start=3 guardian-start=1`，裂出规划/执行/核验三个子会话，worker 真跑 `curl open-meteo`、`curl wttr.in`、`web_search`。**`CONFIRMED`** |
+| 真机 soak 相 B（`feat/full-escape` 构建） | 同一套 rig、同一 profile、同一模型 | **三场景 PASS**：B1 天气直答（`run-start=0 agent-start=0`，但派了一个零工具调用的轻量工人）；B2 真任务 `seq25` 先问拆法 → `seq29` turn=2「确认」→ `seq37` 才 `run-start`，回执三层齐全；B3 闲聊直答、**零子会话零工具**。**`CONFIRMED`** |
+| 模型（偏离任务点名） | 点名 `wb/cn:deepseek-v4.1-flash` 连测 6 次 | 6 次全 `503 {"code":"no_healthy_account"}`；改用同一网关、同一 `/models` 目录里连测 3 次全 200 的 **`agent2api/deepseek-v4.1-flash`**，两相都用它。对照仍干净，但**严格说不是点名的那个 id** |
+| 线上实例未动 | `curl -s -o /dev/null -w '%{http_code}' http://100.111.111.88:3080/`；`find ~/.dsh/profiles -newermt '2026-11-24 20:25' -type f`；`ss -ltnH \| grep -E ':3199\|:9223'` | `401`（仍是活实例）；live profile **零写入**；soak 只绑过 `127.0.0.1:3199` 与 `127.0.0.1:9223`。「没重启」只有**间接**证据（端口仍在听 + 仍 401 + 零写入），给不出进程启动时间未变的直接读数 |
+| 证据搬家（收尾轮现跑） | `cmp` 逐文件 + `diff -r`（主检出 `.rsi/evidence/full-escape-2026-11-24/` → worktree 同一目录） | **85/85 逐字节一致**、`diff -r` 无差异后才删主检出那一份；主检出 `git status --short` 回到空，worktree 目录 **97 个文件 = 85 + 12**。**`CONFIRMED`** |
+| 合流 / 发版 / push / live profile / Node 22·24 矩阵 | — | **`NOT_RUN`**（本包不合、不发版、不 push、不升 live profile；远端 Node 22/24 两段矩阵要等推上去才有） |
+
+**Changed（本分支的产品面）：** `src/gate.ts`（+195 行：`fullFrontDeskEscape`、`answerFullBehind`、`canBackgroundDeliver`、
+`acceptedReceipt`）、`src/triage.ts`（+26 行：`escape` 输入只丢 `mode-full` 硬覆盖）、`src/answer.ts`（`ACCEPTED_PREAMBLE` 与
+`acceptedEnterText` 的措辞）、`lib/`（`8f40be1` 同一次构建的产物），用例 `test/full-escape.spec.ts`（新增 5 例）、
+`test/full-behind-first-answer.spec.ts`（新增 4 例），以及被有意改动的三处既有钉子（`triage` 1 条、`grok-on-ingress` 3 条、
+`channel` 6 条，逐条见 `HANDOFF.md` 顶部同节与 D-131）。`package.json`、`cordis.patch.yml`、版本号一行未动。
+
+**Honest boundary（逐条，别单独主张被它们限定的东西）：**
+1. **门禁只在 `24f2f35` 上绿过一次**，而它前面两个提交（`8f40be1`、`62f540f`）各红过一次——那次红不是产品失败，
+   是一条负载敏感的用例把 350 ms 的收尾预算当成够用；修法只动用例的等待形状，断言没放宽。
+2. **那两次红本地一次也没复现**（20 + 8 + 3 次执行、loadavg 推到 31 都绿），所以「修掉了这条例外」在本地**无法证明**，
+   能证明的只有「修后同口径仍绿、且多了一个 15 s 的具名界」。
+3. **相 A 的后台报告没等落地**：切构建前那条「跑完会单独发一条结论」还没送达，所以「后台真起了一套 workflow」的证据是
+   会话日志里的事件计数与三个子会话的实际工具调用，不是那篇报告文本。
+4. **B2/B3 的部分判据靠读 GUI 正文**：「先问」「三层意思」是逐字判的，没有做语义断言；「队轮在点头之后才起」另用会话
+   事件序号做成了硬证据（`seq25` → `seq29` → `seq37`）。
+5. **B1 的「直答」不是「零子智能体」**：这一轮派了一个零工具调用的轻量工人代答，回答自己也括注了。零子会话只有 B3（闲聊）成立。
+6. **「3080 没重启」只是间接证据**：沙箱 `--unshare-pid`，`ss -ltnp` 拿不到 3080 的 pid。
+7. **模型不是任务点名的那个 id**（见上表），两相一致，但严格说存在偏离。
+
 ## 两条无计时器探针改由探针持钟：远端 Node 24 的红转绿（本地红 `NOT_RUN`）— 2026-11-24（提交 `141dccd`；门禁与远端数字由包工头实测，本地红/绿数字由本轮执行手实测）
 
 这一条只改 `test/timeout.spec.ts` 两条用例的等待形状：`races on Atomics.waitAsync where no setTimeout exists` 与

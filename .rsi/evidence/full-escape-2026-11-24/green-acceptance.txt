@@ -1,0 +1,16 @@
+# GREEN — the six channel.spec cases after the front-desk escape (acceptance set)
+# command: npx vitest run test/full-escape.spec.ts test/triage.spec.ts test/channel.spec.ts test/grok-on-ingress.spec.ts test/human-output-contract.spec.ts test/phase1-dialogue.spec.ts
+# date: 2026-11-24 20:31 +08:00
+
+ ✓ test/channel.spec.ts (42 tests) 1114ms
+ ✓ test/grok-on-ingress.spec.ts (6 tests) 978ms
+     ✓ dispatches the next message while the team run is still in flight  320ms
+     ✓ a saturated queue keeps the blocking path instead of promising a background run  358ms
+ ✓ test/human-output-contract.spec.ts (10 tests) 507ms
+ ✓ test/full-escape.spec.ts (5 tests) 363ms
+
+ Test Files  6 passed (6)
+      Tests  145 passed (145)
+   Start at  20:29:06
+   Duration  72.78s (transform 1.07s, setup 0ms, import 1.81s, tests 70.16s, environment 1ms)
+
