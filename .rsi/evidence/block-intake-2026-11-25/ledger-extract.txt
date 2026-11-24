@@ -1,0 +1,102 @@
+REDACTED LEDGER EXTRACT — block-intake soak, 2026-11-25
+Source: <DSH_HOME>/taskboards/grok-workflow/{blocks,verdicts}.jsonl
+Long free text (objective / handoff / render / why) is truncated; no other value is altered.
+
+=== blocks.jsonl — 3 row(s) ===
+row 0
+  v            = 1
+  id           = fdf2a16f-f90d-4149-8b2c-9d3752f690c2
+  sessionId    = session-34732c80-5a60-4d…
+  objective    = 把 README 的安装步骤改写成三句中文，验收是三条都在、不超过 120 字
+  splitHash    = 8c3ad6066e4c2cac19e1d71825d13460f11329f92e78f8c620e09d3f6732e339  (len 64, /^[0-9a-f]{64}$/ = true)
+  approval     = kind=user quote="确认" at=2026-11-24T16:58:33.502Z
+  version      = 1
+  createdAt    = 2026-11-24T16:58:33.502Z
+  updatedAt    = 2026-11-24T16:58:33.502Z
+  rowHash      = cdd779c65e54de1e… (len 64)
+  blocks[0]    title=README安装步骤改写 status=open execution=foreman
+               objective=把 README 的安装步骤改写成三句中文
+               acceptance(3)=改写后为三句中文 | 原安装步骤三条都在 | 总字数不超过120字
+               writesPaths=[] dependsOn=[]
+
+row 1
+  v            = 1
+  id           = fdf2a16f-f90d-4149-8b2c-9d3752f690c2
+  sessionId    = session-34732c80-5a60-4d…
+  objective    = 把 README 的安装步骤改写成三句中文，验收是三条都在、不超过 120 字
+  splitHash    = 8c3ad6066e4c2cac19e1d71825d13460f11329f92e78f8c620e09d3f6732e339  (len 64, /^[0-9a-f]{64}$/ = true)
+  approval     = kind=user quote="确认" at=2026-11-24T16:58:33.502Z
+  version      = 2
+  createdAt    = 2026-11-24T16:58:33.502Z
+  updatedAt    = 2026-11-24T16:58:52.372Z
+  rowHash      = 5953c493e1f07edc… (len 64)
+  blocks[0]    title=README安装步骤改写 status=open execution=foreman
+               objective=把 README 的安装步骤改写成三句中文
+               acceptance(3)=改写后为三句中文 | 原安装步骤三条都在 | 总字数不超过120字
+               writesPaths=[] dependsOn=[]
+
+row 2
+  v            = 1
+  id           = fdf2a16f-f90d-4149-8b2c-9d3752f690c2
+  sessionId    = session-34732c80-5a60-4d…
+  objective    = 把 README 的安装步骤改写成三句中文，验收是三条都在、不超过 120 字
+  splitHash    = 8c3ad6066e4c2cac19e1d71825d13460f11329f92e78f8c620e09d3f6732e339  (len 64, /^[0-9a-f]{64}$/ = true)
+  approval     = kind=user quote="确认" at=2026-11-24T16:58:33.502Z
+  version      = 3
+  createdAt    = 2026-11-24T16:58:33.502Z
+  updatedAt    = 2026-11-24T17:01:02.959Z
+  rowHash      = 0cf25d5b589b7d30… (len 64)
+  blocks[0]    title=README安装步骤改写 status=accepted execution=foreman
+               objective=把 README 的安装步骤改写成三句中文
+               acceptance(3)=改写后为三句中文 | 原安装步骤三条都在 | 总字数不超过120字
+               writesPaths=[] dependsOn=[]
+
+=== verdicts.jsonl — 3 row(s) ===
+row 0
+  v            = 1
+  verdictId    = 6f719937-ed12-4c52-8778-…
+  blockId      = fdf2a16f-f90d-4149-8b2c-9d3752f690c2
+  attempt      = 1
+  kind         = supervisor
+  at           = 2026-11-24T16:59:49.630Z
+  by           = plugin:block-supervisor
+  route        = "deterministic"
+  evidenceHash = 6e8b8fc87e6a12ef… (len 64)
+  outcome      = veto
+  criteria(3) = 改写后为三句中文=>false | 原安装步骤三条都在=>false | 总字数不超过120字=>false
+  reasons(5)
+    [0] criterion=改写后为三句中文 why=这条验收没有任何任务认领，交接里也没有对着它的一行
+    [1] criterion=原安装步骤三条都在 why=这条验收没有任何任务认领，交接里也没有对着它的一行
+    [2] criterion=总字数不超过120字 why=这条验收没有任何任务认领，交接里也没有对着它的一行
+    [3] criterion=证据 why=交接的第二行（证据）为空或太短，空证据不算证据
+    [4] criterion=交接四行 why=交接必须正好四行（做了什么 / 证据 / 没做 / 下一步），每行都要有内容
+
+row 1
+  v            = 1
+  verdictId    = 4b3a8f3c-0599-4ab5-885e-…
+  blockId      = fdf2a16f-f90d-4149-8b2c-9d3752f690c2
+  attempt      = 2
+  kind         = supervisor
+  at           = 2026-11-24T16:59:59.001Z
+  by           = plugin:block-supervisor
+  route        = "agent2api/deepseek-v4.1-flash"
+  evidenceHash = c7586dee8d8a4355… (len 64)
+  outcome      = veto
+  criteria(3) = 改写后为三句中文=>false | 原安装步骤三条都在=>false | 总字数不超过120字=>false
+  reasons(1)
+    [0] criterion=监工 why=监工调用失败：两次尝试都没有拿到可解析的逐条判断，这次不算通过
+
+row 2
+  v            = 1
+  verdictId    = c297f478-7354-4b39-b53d-…
+  blockId      = fdf2a16f-f90d-4149-8b2c-9d3752f690c2
+  attempt      = 3
+  kind         = supervisor
+  at           = 2026-11-24T17:01:02.753Z
+  by           = plugin:block-supervisor
+  route        = "deterministic"
+  evidenceHash = 02330fc8943df274… (len 64)
+  outcome      = pass
+  criteria(3) = 改写后为三句中文=>true | 原安装步骤三条都在=>true | 总字数不超过120字=>true
+  reasons(0)
+

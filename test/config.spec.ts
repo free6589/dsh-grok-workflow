@@ -116,14 +116,15 @@ describe('configuration surface', () => {
   })
 
   it('rejects every removed key as removed (R-06), with the migration named', () => {
-    // The surface keeps exactly 18 keys (nine plus childTimeoutMs, the mid-run
-    // replan switch, the four repeat-run keys, the two self-iteration keys, and the
-    // Q8 guardianModel single route); the other 23 are removed now.
+    // The surface keeps exactly 20 keys (nine plus childTimeoutMs, the mid-run
+    // replan switch, the four repeat-run keys, the two self-iteration keys, the
+    // Q8 guardianModel single route, and the block-intake switch); the other 23
+    // are removed now.
     expect(CONFIG_KEYS).toEqual([
       'toolName', 'mode', 'grokDefault', 'roles', 'guardianModel', 'synthesis',
       'maxConcurrency', 'maxTasks', 'timeoutMs', 'childTimeoutMs', 'replan', 'switchOnRateLimit',
       'loopEnabled', 'loopMaxRounds', 'loopFailStreak', 'loopIntervalMin',
-      'iterateIntervalMin', 'iterateTemplate',
+      'iterateIntervalMin', 'iterateTemplate', 'blockIntake',
       'configVersion',
     ])
     expect(REMOVED_CONFIG_KEYS).toHaveLength(23)
