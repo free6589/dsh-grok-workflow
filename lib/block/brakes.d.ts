@@ -59,6 +59,17 @@ export declare function heartbeatsFile(options?: BlockLedgerOptions): string;
  * @returns The observations in file order.
  */
 export declare function readHeartbeatObservations(options?: BlockLedgerOptions): HeartbeatObservation[];
+/**
+ * The open blocks of one session, by row id.
+ *
+ * "Open" is read from the newest version of each row, exactly like `getBlockRow`:
+ * a later version that closes a block must not keep it open here. Exported because
+ * the narrow heartbeat listener (`src/heartbeat-listen.ts`) asks the same question —
+ * one definition, so the two observers cannot disagree about what "owes work" means.
+ * @param sessionId - the session the heartbeat arrived in.
+ * @param options - ledger directory.
+ */
+export declare function openBlockIds(sessionId: string, options: BlockLedgerOptions): Promise<string[]>;
 /** Dependencies of the observer. */
 export interface HeartbeatBrakeInput {
     /**

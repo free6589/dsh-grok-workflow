@@ -7211,3 +7211,56 @@ planTask/replan + `renderAuditTrail`，`AUDIT_MAX_CHARS = 96 000`）、`src/repo
 6. **一条既有用例被收窄**（门禁首红那条）。回到旧语义只需去掉 `src/index.ts` 里的 `auditTrail` 参数，模块仍可按需调用。
 
 **证据：** `.rsi/evidence/audit-render-half-2026-11-24/README.md`（构建 sha256、环境、逐步命令、两跑结果、对照跑、边界与文件清单）。
+
+## M3.1 窄心跳监听 + `legacyGate` + 准入判断（`feat/m3-narrow-listen`）：独立验收（红/绿/变异/门禁/双形状） — 2026-11-25 (`CONFIRMED`，未发版)
+
+环境：worktree `.tmp/wt-m3-narrow-listen`（分支 `feat/m3-narrow-listen`，基线 `main` `35326c7`，实现提交 `d546666`，
+版本 `0.13.34`）；Node **v26.8.1** / npm **11.19.0**；DSH **0.2.2-rc.3**；`node_modules` 是软链。
+soak 用 scratch home `.tmp/m3-soak/dsh-home`（`node scripts/clone-profile.mjs --src ~/.dsh/profiles/web`），
+自有端口 `127.0.0.1:3299`（live 在 3080/3065/3086/3109，未触碰）。证据目录 `docs/knowledge/evidence/m3-1-2026-11-25/`。
+本轮的每一条都是验收者自己跑出来的，实现者的自报没有被当作证据。
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 范围 | `git log --oneline 35326c7..HEAD`、`git diff --stat 35326c7..HEAD` | 单条提交 `d546666`；**45 文件 / +1807 −163**，其中 `src test docs README.md README.zh-CN.md` = **16 文件 / +1030 −77**，其余 29 个是 `lib/` 重建产物；`git diff --name-status` 里没有 `.tmp`／scratch／`.rsi` 夹带 |
+| 秘密扫描 | `git diff 35326c7..HEAD -- src test docs README.md README.zh-CN.md` 上跑 `sk-`／`ghp_`／`github_pat_`／`AKIA`／`PRIVATE KEY`／`xox[abprs]-` 与内网地址正则 | **0 命中**（`grep -c` 输出 `0`）；diff 里没有 `token=`、`password=`、`api_key=` 字面量 |
+| 红 | `npx vitest run test/m3-intake.spec.ts`（基线 `35326c7` 的 `git archive` 一次性拷贝 + 原样放入本 spec） | **exit 1**，`Test Files 1 failed (1)`、`Tests no tests`，逐字 `Error: Cannot find module '../src/heartbeat-listen.js' imported from …/test/m3-intake.spec.ts`（`red-baseline-missing-module.out`） |
+| 绿 | `npx vitest run test/m3-intake.spec.ts`（本分支） | **exit 0**，`Test Files 1 passed (1)`、**`Tests 10 passed (10)`**；十条名字见 `green-m3-intake.out`（准入判断 2 条：`answers yes for every session while the phase switch is off`、`pins the rule the switch will enforce`；只观测形状 5 条：`registers nothing new when the intake is off`、`observes one beat into its own file while the old gate keeps deciding`、`writes nothing for a beat in a session that owes no work`、`writes nothing for a user message`、`survives a batch it cannot read, in both shapes, and writes nothing`；接管形状 3 条：`registers the narrow listener only, and lets a user message through untouched`、`reviews the brakes itself, and a stopped beat is refused with no turn`、`continues a beat the brakes allow, and records that it did`） |
+| 变异一 | 同一拷贝里把 `observeOnly` 的观测写入去掉（`tryRecord(sessionId, 'observed')` → `void sessionId`） | **exit 1**，`Tests 1 failed \| 9 passed (10)`；失败原文 `FAIL … observes one beat into its own file while the old gate keeps deciding` / `AssertionError: expected [] to have a length of 1 but got +0`（`test/m3-intake.spec.ts:257`）（`mutation-no-observation.out`） |
+| 变异二 | 同一拷贝里把 `ownsRouting` 恒为 false（`on('agent/pre-step', observeOnly)`） | **exit 1**，`Tests 2 failed \| 8 passed (10)`；两条失败原文 `expected "reject"` / `received "enter"`（`:375`）与 `expected [] to deeply equal [ 'sess-m3-continue' ]`（`:409`）（`mutation-owns-routing-false.out`） |
+| 门禁 | `npm run ci`（`HEAD` = `d546666`，工作树干净） | **EXIT=0**：oxlint `Found 36 warnings and 0 errors.`；`verify:lib` → `lib/ at d546666 is the build of src/ at d546666 (301 files, byte-identical)`；vitest **`Test Files 112 passed (112)` / `Tests 2140 passed (2140)`**（`ci.out`） |
+| 门禁单跑 | `npm run verify:lib` | **exit 0**，逐字 `client bundle: 325771 bytes → lib/client.js` / `lib/ at d546666 is the build of src/ at d546666 (301 files, byte-identical)`（`verify-lib.out`） |
+| soak 建 home | `node scripts/clone-profile.mjs --src ~/.dsh/profiles/web --home .tmp/m3-soak/dsh-home --name web-clone --force` | exit 0；`files 7699 -> 7699 (88444883 bytes)`、`links 5 (relinked 2, already dangling in the source 1)`、`parity 5/5 equal after redaction`、`dependencies 17 declared, 0 unresolved (8/21 bundles from the installation)`、`credentials redacted: 1 line(s) in 1 file(s)`（`soak-clone-profile.out`） |
+| soak 装插件 | `DSH_HOME=<scratch> dsh plugin --profile web-clone add "$PWD"` | **EXIT=0**；`dependencies["dsh-grok-workflow"] = "link:/home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-m3-narrow-listen"`，`node_modules/dsh-grok-workflow` 是同一路径的软链，读回版本 **`0.13.34`** = 本 worktree `package.json`；`dsh --profile web-clone --dump-config` 里那一行带着本轮的 `blockIntake: true`／`legacyGate: false`，证明读的是这份构建 |
+| 形状 A（`legacyGate` 缺省 on，`blockIntake: true`） | `dsh --profile web-clone --host 127.0.0.1 --port 3299 --no-open` | **激活 `CONFIRMED`**：boot 只有 `dsh web: http://127.0.0.1:3299/?token=<redacted>` 一条产品行，`pending` / `did not activate` **0 行**；`POST /api/settings/describe` → 24 个命名空间、`grok-workflow` 在、`autoGenerate: true`、`value.mode = triage`（`shapeA-boot-lines.txt`、`shapeA-settings-describe.txt`） |
+| 形状 A 普通消息 | `POST /api/session/prompt`（`用一句话说你好`，模型 `bifrost-responses/opencode-go/muse-spark-1.3-contributor`） | **旧前台接单 `CONFIRMED`**：会话 `session-d641de78…` 里有 **1 条** `source.kind = "grok-workflow"` 的中继消息（`The front desk of the mandatory workflow gate handled this message without starting the team…`，档位直答档），随后 `assistant/message` 与 `turn/end completed`（`shapeA-session-extract.txt`） |
+| 形状 A 心跳 | `POST /api/schedule/create`（prompt 以 `[grok-workflow loop]` 开头，`after_seconds: 12`，target 同一 session） | 投递成立：会话日志出现 `[SCHEDULE REMINDER] … reminder_prompt_json: "[grok-workflow loop] …"`，`turn/start` → `turn/end reason {"kind":"blocked"}`——**裁决由旧闸门做**；刹车是 `loop/stop-file`（仓库里 `.rsi/STOP` 在）。账本目录 `.tmp/m3-soak/dsh-home/taskboards/grok-workflow/` **不存在**：两个观测器都只在「该会话有 open block」时才写（`observeOnly` 的 `openBlockIds(...).length > 0`、`installHeartbeatBrakes` 的 `if (open.length === 0) return`），本 soak 没开块，所以两文件都空——设计行为，不是失败 |
+| 形状 B（`legacyGate: false` + `blockIntake: true`，同一 profile 同一份构建） | 同端口重启 | **仍激活 `CONFIRMED`**：boot 同样只有 URL 一行、`pending`/`did not activate` 0 行；describe 同样 24 个命名空间、`grok-workflow` `autoGenerate: true`（`shapeB-boot-lines.txt`、`shapeB-settings-describe.txt`） |
+| 形状 B 普通消息 | 同一条 `用一句话说你好` | **不再被前台接单 `CONFIRMED`**：`source.kind = "grok-workflow"` 中继消息 **0 条**；用户消息 seq 13 直达模型，`assistant/message` 真答 `你好！`，`turn/end completed`（`shapeB-session-extract.txt`） |
+| 形状 B 心跳 | 同样的 Schedule 投递 | **窄监听接管 `CONFIRMED`**：`taskboards/grok-workflow/heartbeats-listen.jsonl` 出现 1 行，原文 `{"at":"2026-11-24T21:09:33.688Z","code":"loop/stop-file","kind":"heartbeat-listen","outcome":"stopped","sessionId":"session-dff86a82…","v":1}`；同一目录下 `heartbeats.jsonl` **不存在**——拥有裁决权的形状里接单台观测器不注册，没有双写（`shapeB-heartbeats-listen.jsonl`） |
+| 模型可用性 | 形状 B 的普通消息 + 形状 A 的 gate triage 调用 | 两条都真出话：gate 的中继文案是模型产物，形状 B 答出 `你好！`。另一条路线不可用并如实记录：`bifrost-completions/agnes-3.0-flash` 首字 **180s 超时**，会话日志逐字 `首字超时：180 秒内没有收到模型的任何输出`（`code: TIMEOUT`）随后 `llm/retry`；属上游网关，**没有被当作任何形状的证据** |
+| `legacyGate=on` 的日志行 | 形状 A 的 boot 日志全文搜 `configuration in effect` / `settings surface` / `legacyGate=` | **NOT_OBSERVED**：这三行都是 `logger.info`，DSH 0.2.2-rc.3 不把 info 导出到 stdout（同一份日志里连 `settings surface:` 也不出现，而它同样是 info）。改用行为证据顶替：旧前台确实接单了（上面那 1 条中继） |
+| 收尾 | `ss -ltn \| grep :3299`、`rm -rf .tmp/m3-soak`、`stat ~/.dsh` | 自起实例已停（无 3299 监听）；scratch home 已删；`~/.dsh` 的 `Modify:` 前后都是 **`2026-11-22 23:40:20.274932030 +0800`**（`stat-dsh-before.txt` / `stat-dsh-after.txt`），本轮对 live **一行未写**、未重载、未重启 |
+| 发版 / 推送 / 合并 | — | **NOT_RUN**：未打 tag、未 push、未合 `main`、未 npm publish；`package.json` 仍是 `0.13.34` |
+
+**Changed（本轮验收者的改动，只有记忆与证据）：** `docs/knowledge/evidence/m3-1-2026-11-25/`（新增）、`STATE.md`、`DECISIONS.md`（D-138）、
+`VALIDATION.md`（本条）、`HANDOFF.md`、`RESEARCH.md`、`docs/ARCHITECTURE.md`、`CHANGELOG.md`。**`src/` 与 `test/` 一个字未改。**
+
+**Honest boundary（逐条）：**
+1. **`legacyGate=on` 没有日志字面证据**（见上表倒数第三行）。这行是 `logger.info`，本机 DSH 版本不导出 info；替代证据是行为
+   （旧前台接单了），它比一行日志更强，但两者不是同一个东西。
+2. **形状 A 的观测文件是空的，且这是设计而不是覆盖。** 两个观测器都要求「该会话有 open block」才写；本轮 soak 没有开块
+   （开块要模型真的调 `grok_open_block`），所以形状 A 只能说「窄监听在、且没写决策」，不能说「它在有 open block 时写了 `observed`」。
+   那一条由 `test/m3-intake.spec.ts` 的 `observes one beat into its own file…` 钉住，不是真机覆盖。
+3. **两种形状停掉心跳的原因都是 `loop/stop-file`**（仓库里 `.rsi/STOP` 在），所以本轮没有观察到「刹车允许 → `continued`」的真机路径；
+   `continued` 只有单元用例覆盖。
+4. **`legacyGate: false` + `blockIntake: false` 这个组合没有测。** 按 `src/index.ts` 的读法，那时链上一个监听都不注册
+   （窄监听在 `if (config.blockIntake === true)` 里），这是**读源码得出的判断，未在真机验证**（`HYPOTHESIS`）。
+5. **浏览器视角 `NOT_RUN`。** 本轮全部通过 RPC（`/api/session/*`、`/api/schedule/*`、`/api/settings/describe`）驱动，
+   没有开 Chromium 看页面渲染；「设置页长什么样」不在本轮范围。
+6. **`link:` 安装形态与 LOCAL-TESTING 的告警不一致，但本轮没出问题。** LOCAL-TESTING 记着「软链插件根会加载到 checkout 自己的
+   `@deepseek-ai` 开发副本（0.2.1-rc.2）而宿主是 0.2.2-rc.3，导致 `Session` 类不匹配」，本轮 `dsh plugin add "$PWD"` 装的就是
+   `link:`，而插件**正常激活、真会话也写成功了**。差别在依赖解析路径（本 worktree 的 `node_modules` 是软链到仓库根），
+   这一点**没有查到底**，标 `HYPOTHESIS`，不影响本轮结论。
+
+**证据：** `docs/knowledge/evidence/m3-1-2026-11-25/`（`README.md` 是清单与边界）。

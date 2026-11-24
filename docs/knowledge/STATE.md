@@ -1,3 +1,39 @@
+Last updated: 2026-11-25 05:15 +08:00（**M3.1「窄心跳监听 + legacyGate + 准入判断」：独立验收通过，`CONFIRMED`；未发版、未 push、未合 `main`** —
+分支 **`feat/m3-narrow-listen`**，worktree `.tmp/wt-m3-narrow-listen`，基线 `main` 尖端 **`35326c7`**，实现提交 **`d546666`**
+（`feat(intake): the narrow heartbeat listener, legacyGate and the admission predicate`），**45 文件 / +1807 −163**
+（其中 `src/` + `test/` + `docs/` + 两个 README 是 **16 文件 / +1030 −77**，其余 29 个是 `lib/` 重建产物）。
+**做了什么**：① 新增 `src/heartbeat-listen.ts`（398 行）——接单台自己的第二个 `agent/pre-step` 监听，`ownsRouting: false` 时只观测
+（算出决策先 `await next()`，再把同一个对象原样返回，然后写一行 `observed`），`ownsRouting: true` 时才自己复核刹车、自己 `reject`；
+观测写自己的 `heartbeats-listen.jsonl`，绝不碰接单台的 `heartbeats.jsonl`／`verdicts.jsonl`／`blocks.jsonl`。② `isHeartbeatMessage` 与
+`reviewHeartbeat` 从 `src/gate.ts` 搬到这个模块，门禁改成 import 它们——一份定义，两种形状不会漂。③ `src/index.ts` 读一次
+`legacyGate`，两种形状互斥：`legacyGate: false` 时整段不注册 `installGate`，且不注册接单台自己的观测器（避免一拍两写）。
+④ `src/user-source.ts` 新增 `BLOCK_ADMISSION_ENFORCED = false` 与 `canAcceptBlock` / `canAcceptBlockWhenEnforced`，六个块工具在入口
+（`accept`/`stop` 两处是**入参解析之前**就调）都接上 `admit()`，当前恒为「可以」，M3.2 只翻一个常量。⑤ 配置面二十 → **二十一**键
+（`legacyGate` 默认 `true`，载入期，不投影到设置页）。
+**红→绿（自己跑，不信实现者自报）**：基线 `35326c7` 的一次性拷贝里放同一个 spec → **exit 1**，
+`Error: Cannot find module '../src/heartbeat-listen.js' imported from …test/m3-intake.spec.ts`，`Tests no tests`；
+把本分支 `src/` 放进去 → **10 passed**；两次变异都咬住了：去掉 `observeOnly` 的观测写入 → **1 failed | 9 passed**
+（`expected [] to have a length of 1 but got +0`，第 257 行），把 `ownsRouting` 恒为 false → **2 failed | 8 passed**
+（`expected "reject" received "enter"`、`expected [] to deeply equal [ 'sess-m3-continue' ]`）。
+**门禁**：`npm run ci` **EXIT=0**——oxlint `Found 36 warnings and 0 errors.`、`verify:lib` →
+`lib/ at d546666 is the build of src/ at d546666 (301 files, byte-identical)`、vitest **`112 files / 2140 tests PASS`**；
+单独再跑一次 `npm run verify:lib` 同样 exit 0、同一行原文。
+**真机隔离双形状（DSH 0.2.2-rc.3，scratch home，自有端口 3299，live 一行未写）**：同一份克隆 profile、同一份装进去的构建
+（`link:` 到本 worktree，版本读回 `0.13.34`），只差一个键。**形状 A（`legacyGate` 缺省 on）**：插件激活（24 个设置命名空间、
+`grok-workflow` `autoGenerate: true`、boot 无 `pending`／`did not activate`）；普通用户消息**被旧前台接单**——会话日志里出现 1 条
+`source.kind = "grok-workflow"` 的中继消息（`The front desk of the mandatory workflow gate handled this message…`，档位直答档）；
+真 Schedule 心跳投递后 `turn/end reason blocked`（刹车 `loop/stop-file`，因为仓库里 `.rsi/STOP` 在），账本目录**根本没被创建**——
+两个观测器都只在「有 open block」时才写，本 soak 没开块，所以两文件都空，这是设计行为。**形状 B（`legacyGate: false` + `blockIntake: true`）**：
+插件**仍然激活**（同样 24 个命名空间、`autoGenerate: true`）；同一条普通用户消息**不再被前台接单**——`grok-workflow` 中继消息 **0 条**，
+用户消息直达模型、assistant 真答 `你好！`；同一拍心跳由窄监听接管，`heartbeats-listen.jsonl` 出现 1 行原文
+`{"code":"loop/stop-file","kind":"heartbeat-listen","outcome":"stopped",…}`，而 `heartbeats.jsonl` **不存在**（拥有裁决权的形状里接单台观测器不注册，
+没有双写）。模型路由可用（`bifrost-responses/opencode-go/muse-spark-1.3-contributor`）；另一条 `bifrost-completions/agnes-3.0-flash`
+首字 180s 超时（`TIMEOUT`），属上游网关，没有被当作任何形状的证据。
+**未达项**：`configuration in effect: … legacyGate=on` 这行是 `logger.info`，DSH 0.2.2-rc.3 不把 info 导出到 stdout（整份 boot 日志里
+`settings surface:` 那行同样不出现），所以「日志里 legacyGate=on」按字面 **NOT_OBSERVED**，改用行为证据（旧前台确实接单了）顶替。
+**证据**：`docs/knowledge/evidence/m3-1-2026-11-25/`（绿/红/两次变异/ci/verify:lib 原文、双形状 boot 行与设置投影、两份会话抽取、
+`heartbeats-listen.jsonl` 原文、`soak-dual-shape.txt` 全过程）。
+
 Last updated: 2026-11-25 02:37 +08:00（**接单台子收口：注释里的「五个工具」改成「六个」（七处，不是六处）、`lib/` 重建、提交后全量门禁 exit 0，独立模型监工在真机隔离 soak 上第一次真判出结果，`CONFIRMED`；未发版、未 push、未合 `main`** —
 分支 **`fix/supervisor-soak-evidence`**，worktree `.agents/worktrees/fix-supervisor-soak-evidence`，基线 `main` 尖端 **`6501012`**
 （`docs(memory): close out the 0.13.34 release — merge, both gates, tag, and both remote runs`）；本轮唯一一条工作提交 **`49377e8`**

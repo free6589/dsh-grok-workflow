@@ -1,0 +1,52 @@
+M3.1 真机隔离双形状 soak —— 2026-11-25，DSH 0.2.2-rc.3，Node v26.8.1
+scratch home: .tmp/m3-soak/dsh-home（DSH_HOME，live ~/.dsh 只读，一行未写）
+profile: web-clone（node scripts/clone-profile.mjs --src ~/.dsh/profiles/web --home .tmp/m3-soak/dsh-home --name web-clone --force）
+插件: dsh plugin --profile web-clone add <worktree>  →  dependencies["dsh-grok-workflow"] = "link:/home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-m3-narrow-listen"
+     读回 package.json version = 0.13.34（= 本 worktree package.json）
+实例: 127.0.0.1:3299（自有端口；live 实例在 3080/3065/3086/3109，未触碰）
+
+两种形状只差一个键：blockIntake: true 两者都开；legacyGate 缺省(on) vs legacyGate: false。
+
+=== 形状 A：legacyGate 默认（on） ===
+boot: dsh web: http://127.0.0.1:3299/?token=<redacted>
+      "pending" / "did not activate" 行数 = 0
+settings/describe: namespaces 24，grok-workflow 存在，autoGenerate true，mode triage
+普通用户消息（"用一句话说你好"）：
+  session-d641de78-29af-452c-8818-7b286ac11bc8 的会话日志里有 1 条 source.kind = "grok-workflow" 的中继消息：
+    "The front desk of the mandatory workflow gate handled this message without starting the team. ... <<<GROK-WORKFLOW-REPORT>>> 档位：直答档 ... 你好！我在。..."
+  → 旧前台接单了（CONFIRMED）
+心跳（真 Schedule 投递，prompt 以 [grok-workflow loop] 开头，12s 后投递）：
+  会话日志 seq 26 = [SCHEDULE REMINDER] 投递，seq 27 turn/start，seq 29 turn/end reason blocked
+  → 心跳的裁决由旧闸门做（CONFIRMED）
+账本文件：.tmp/m3-soak/dsh-home/taskboards/grok-workflow/ 不存在
+  → heartbeats-listen.jsonl 与 heartbeats.jsonl 都没写。原因在源码里是明确的：
+     两个观测器都只在「该会话有 open block」时才写（observeOnly 里 openBlockIds(...).length > 0；
+     installHeartbeatBrakes 里 if (open.length === 0) return）。本 soak 没有开块，所以两文件都空。
+     这是设计行为，不是失败；同时它说明形状 A 里窄监听只是旁观、不写决策。
+
+=== 形状 B：legacyGate: false（+ blockIntake: true） ===
+boot: dsh web: http://127.0.0.1:3299/?token=<redacted>
+      "pending" / "did not activate" 行数 = 0
+settings/describe: namespaces 24，grok-workflow 存在，autoGenerate true，mode triage
+  → 关掉旧闸门后插件仍激活（CONFIRMED）
+普通用户消息（同一条 "用一句话说你好"）：
+  session-dff86a82-f2e8-48b8-b807-028c627b5bb8 的会话日志里 source.kind = "grok-workflow" 的中继消息 = 0 条
+  用户消息 seq 13 直达模型，assistant/message seq 22 = "你好！"，turn/end completed
+  → 用户消息不再被前台接单，直通模型（CONFIRMED）
+心跳（同样的 Schedule 投递）：
+  .tmp/m3-soak/dsh-home/taskboards/grok-workflow/heartbeats-listen.jsonl 出现 1 行（原文）：
+  {"at":"2026-11-24T21:09:33.688Z","code":"loop/stop-file","kind":"heartbeat-listen","outcome":"stopped","sessionId":"session-dff86a82-f2e8-48b8-b807-028c627b5bb8","v":1}
+  → 窄监听接管了心跳裁决，并且真的停掉了这一拍（刹车码 loop/stop-file）（CONFIRMED）
+  heartbeats.jsonl（接单台自己的观测）不存在
+  → 拥有裁决权的形状里，接单台观测器不注册（src/index.ts 里 if (!ownsHeartbeatRouting) installHeartbeatBrakes(...)），
+     所以没有双写（CONFIRMED）
+
+=== 模型可用性 ===
+gate 的 triage 调用成功（形状 A 的中继文案是模型产物）；形状 B 的普通消息由
+bifrost-responses / opencode-go/muse-spark-1.3-contributor 真答出 "你好！"。
+另有一条路线不可用，如实记录：bifrost-completions / agnes-3.0-flash 首字 180s 超时，
+会话日志 seq 20 原文 "首字超时：180 秒内没有收到模型的任何输出"（code TIMEOUT），随后 llm/retry。
+该超时属于上游网关，与本插件无关，也没有被用来当作任何形状的证据。
+
+=== 收尾 ===
+自起实例已停（ss -ltn 无 3299）；scratch home 已删；live ~/.dsh mtime 未变（见 stat-dsh-before/after.txt）。

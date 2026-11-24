@@ -12,8 +12,14 @@
  * from drifting apart again (D-137).
  *
  * This module has no dependencies on purpose: the gate must not import from
- * `src/block/`, and the block tools must be able to read the same rule.
+ * `src/block/`, and the block tools must be able to read the same rule. The one
+ * import it has, `src/mode.ts`, is the same leaf rule (a plugin record read off
+ * the session) and keeps that property: nothing here reaches into the gate or the
+ * intake.
  */
+
+import type { Session } from '@deepseek-ai/dsh-session'
+import { readModeRecord } from './mode.js'
 
 /** The source kind the Host stamps on an answered question card. */
 export const QUESTION_REPLY_SOURCE_KIND = 'user-question-reply'
@@ -61,4 +67,48 @@ export function isQuestionReplySource(source: Source): boolean {
  */
 export function startsTurn(source: Source): boolean {
   return source?.kind === 'user'
+}
+
+/**
+ * Whether this build enforces the block intake's admission rule.
+ *
+ * M3.1 lands the rule and its call sites and leaves them inert: the six block tools
+ * call {@link canAcceptBlock} at every entry, the answer is `true`, and no decision
+ * moves. M3.2 flips this one constant, and every call site starts reading the
+ * session's own mode record — which is the whole point of putting the switch here
+ * instead of at six call sites.
+ */
+export const BLOCK_ADMISSION_ENFORCED = false
+
+/**
+ * Whether a session may use the block tools at all.
+ *
+ * The rule, once enforced, is "the session opted into grok mode": a block is work
+ * the user approved, so a session that never turned the mode on (or turned it off
+ * again) must not be able to open one through a stale tool call. The record is read
+ * from the session log, not from the deployment default, because the toggle is
+ * per-session durable state (`src/mode.ts`).
+ * @param session - the calling session, when the tool call carries one.
+ * @returns true while {@link BLOCK_ADMISSION_ENFORCED} is false, otherwise the rule.
+ */
+export function canAcceptBlock(session: Session | undefined): boolean {
+  if (!BLOCK_ADMISSION_ENFORCED) return true
+  return canAcceptBlockWhenEnforced(session)
+}
+
+/**
+ * The real admission rule, exported so it can be pinned before it is live.
+ *
+ * `workflowMode` is narrowed to `string` before the comparison because the record's
+ * union does not carry `'off'` yet: a build that ever writes one is dropped by
+ * `isModeRecord` today, and this guard is what keeps the answer `false` either way
+ * — an explicit "off" is never an admission.
+ * @param session - the calling session, when the tool call carries one.
+ * @returns true only for a record that is enabled and not explicitly off.
+ */
+export function canAcceptBlockWhenEnforced(session: Session | undefined): boolean {
+  const record = readModeRecord(session)
+  if (record === undefined || record.enabled !== true) return false
+  const mode: string | undefined = record.workflowMode
+  return mode !== 'off'
 }

@@ -1,0 +1,8 @@
+# shape B POST /api/settings/describe
+namespaces: 24
+grok-workflow present: True
+autoGenerate: True
+value.mode: triage  value.grokDefault: on
+legacyGate in projection: False  (plain key, deliberately not projected)
+blockIntake in projection: False  (plain key, deliberately not projected)
+projected field count: 17

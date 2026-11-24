@@ -577,6 +577,37 @@ else:
 - it is installed before `installGate`, so it is the outermost listener and a heartbeat the
   gate itself refuses is still observed.
 
+#### The second narrow listener, and who owns a beat
+
+M3 adds a second listener on the same `agent/pre-step` chain, `installHeartbeatListen`
+(`src/heartbeat-listen.ts`), and a load-time switch that decides which of the two shapes a
+process runs. The two shapes never coexist as decision-makers:
+
+| shape | registered | who decides a heartbeat | what is written |
+| --- | --- | --- | --- |
+| `legacyGate: true` (**the default**) | the intake observer, the narrow listener with `ownsRouting: false`, and `installGate` | the old front desk (`installGate`'s heartbeat branch) | `heartbeats.jsonl` only when the session has an open block; the narrow listener adds one `observed` line to `heartbeats-listen.jsonl`, also only with an open block |
+| `legacyGate: false` | the narrow listener with `ownsRouting: true`, and the block tools | the narrow listener, which runs `reviewHeartbeat` and answers `reject` itself | `heartbeats-listen.jsonl` only, with `continued` or `stopped` + the brake code; `heartbeats.jsonl` does not exist because the intake observer is not registered |
+
+Three properties make that table hold by construction rather than by convention:
+
+- **One read of the switch.** `src/index.ts` reads `legacyGate` once into `ownsHeartbeatRouting`
+  and both the listener's mode and the gate's registration branch on that same value, so a load
+  cannot end up with two owners or none.
+- **One definition of the review.** `isHeartbeatMessage` and `reviewHeartbeat` live in
+  `src/heartbeat-listen.ts` and the gate imports them; the gate's `classifyHeartbeat` only maps
+  the answer onto its own classification. Two copies of the rule is how the two shapes would
+  drift apart.
+- **Two files, one writer each.** `heartbeats.jsonl` answers "which blocks did this beat find
+  open"; `heartbeats-listen.jsonl` answers "what did this beat do". Writing both into one file
+  would put two lines under one beat and make the count unanswerable, which is why the observing
+  shape writes the second file and the owning shape drops the first observer entirely.
+
+What a beat does when it is stopped is the same in both shapes — the brakes are the same brakes
+and the code is the same `loop/*` token — but only the owning shape records the verdict in
+`heartbeats-listen.jsonl`. A real-machine soak on 2026-11-25 observed exactly that: the same
+scheduled delivery was stopped by `loop/stop-file` in both shapes, and only the `legacyGate: false`
+process left a line behind (`docs/knowledge/evidence/m3-1-2026-11-25/`).
+
 ### What this desk does not do
 
 - It takes no lock. The writer is one session's tool layer and the `(session, splitHash)`
