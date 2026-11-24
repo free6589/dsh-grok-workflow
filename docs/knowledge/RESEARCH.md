@@ -1638,3 +1638,31 @@ Source: `node_modules/@deepseek-ai/dsh-workflow-ptc/lib/index.js`（0.2.1-rc.2�
   只是**事后**才可观测（脚本那一轮已经过去）。
 - 本轮据此选择的修法是"宿主后置回填"（见 `DECISIONS.md` D-116）：报告、答案与记忆归档按真实死因改写，
   不改脚本的路由/重试决定——因为那个决定已经被一个无法解释的 `null` 做完了。
+
+## 2026-11-24 · 升级按钮依赖的插件管理器 API：`installBundle` 的 `expected` 守卫、`listBundles` 回读、`inspect()` 只看形状（`CONFIRMED`）
+
+Source: `dsh` 0.2.2-rc.3 装机内的 `@deepseek-ai/dsh-plugin-manager` 0.2.2-rc.3 ——
+`node_modules/@deepseek-ai/dsh-plugin-manager/lib/types/types.d.ts`（`InstallBundleOptions`、`BundleInfo`、
+`PluginSpecInspection`、`ChangeResult.unmet`）、`lib/types/index.d.ts`（`installBundle` / `listBundles` / `inspect` 的
+契约注释）、`lib/types/operations.js`（`unexpected-package` 的四处判定）。插件侧的使用面见 `src/update-surface.ts`
+的结构化接口 `UpdatePluginManager`（不 import 它的类型图，字段逐个校验）。
+
+- **`installBundle(spec, options)`**：`options` 是 `{enabled?, saveExact?, requestId?, approvedBuilds?, registry?,
+  expected?}`。`saveExact` 存不带范围的版本号；`requestId` 是取消/续查的句柄（`cancelInstall` / `waitForInstall`）；
+  `registry` 是**先问**的那个 registry。
+- **`expected: {name, version}` 是管理器自己的事务守卫**，也是本插件唯一敢说"装成了"的依据之一：装完这个包不在、或
+  在别的版本、或这次安装顺手加了/改了别的直接依赖 → 管理器**先回滚 profile 文件与模块**再让 bundle 装载，并以
+  `unexpected-package` 失败（包没声明 bundle → `not-bundle`）。失败会被 `ChangeResult.unmet` 标出来。
+- **`listBundles()` 是回读面**：`BundleInfo` 带 `name` / `version` / `source`（profile 依赖的 pnpm spec，本地路径已绝对化、
+  http(s) 里的用户信息已去掉）/ `installed`（profile 是否声明了这个依赖）/ `availability` / `enabled` / `rows` 等。所以
+  "现在到底装的是哪一版"只能从这一行读，不能从刚才那次 install 的入参推。
+- **`inspect(spec)` 对 git / tarball spec 只回答**形状**：`PluginSpecInspection.status === 'accepted'` 时 `kind: 'git'`、
+  `bundle: null`、**没有 `name` / `version`**，注释原话是 "only the form for a git or tarball spec, whose package is known
+  once pnpm has fetched it"。因此"`#v9.9.9` 这个标签到底发没过"**不可能**由 `inspect()` 判——必须先拿一份真实的标签清单
+  来比。这就是 `src/update-surface.ts` 里那套发布标签探测（`discoverReleaseTags`，默认一次有超时的 GitHub tags 读）存在
+  的原因，也是 `update/unknown-tag` 这个码的来源。
+- **服务可见性**：插件管理器是这条路由要的宿主服务之一，且可能**晚于路由挂载**才到位。所以 `UpdateRouteDeps` 用
+  `resolvePluginManager()` 按请求现取（比构造时抓一个实例优先），取不到就退化：`canInstall:false`、
+  `reason:'update/unavailable'`，只给可复制的命令，不报错。
+- **边界**：以上都是本机 0.2.2-rc.3 的读码结论；升级 DSH 后 `expected` 的判定细节（哪些算"改了别的直接依赖"）与
+  `BundleInfo.source` 的规范化方式都可能变，动这两处前要重读那份 `types.d.ts`。

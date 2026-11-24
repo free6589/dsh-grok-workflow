@@ -6658,3 +6658,53 @@ toolName/configVersion = 页面 16）；`test/client.spec.ts` ProgressBundle 补
 `~/.dsh/profiles/*/node_modules/dsh-grok-workflow/package.json` 逐个读版本 → live 的 **`web` 是 `0.13.29`**，
 `loopfix-verify` 0.12.9、`v080verify` 0.8.0、`web.bak` 0.8.0、`web-verify2` 0.12.19。结论：`0.13.30` 和 `0.13.31`
 都**没有**装进 live，AGENTS §11 在上一轮与本轮都未执行（本轮按操作员红线「不碰 live」主动跳过）。只读，未写入、未重载、未重启。
+
+## 设置页升级按钮：门禁 + 两个 spec + 真机 soak — 2026-11-24 (`CONFIRMED`，未发版)
+
+环境：工作树 `/home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/feat-update-button`（分支 `feat/update-button`，
+`HEAD` = `c951dbf`，自 `main` `c6a3611`）；本轮 shell 的 Node v26.8.1 / npm 11.19.0（`ci.out` 自身不记录运行时版本）；
+soak 用的浏览器是系统 Chromium 155.0.8059.84，由 Playwright 驱动。证据目录
+`.rsi/evidence/update-button-soak-2026-11-24/`（`README.md` 有完整清单）。
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 门禁 | `npm run ci`（本工作树，`HEAD` = `c951dbf`） | **EXIT=0**：`oxlint src test` → `Found 36 warnings and 0 errors.`；`verify:lib` → `lib/ at c951dbf is the build of src/ at c951dbf (245 files, byte-identical)`；`vitest` → **`Test Files 101 passed (101)` / `Tests 1910 passed (1910)`**（123.29 s）。日志 `.rsi/evidence/update-button-soak-2026-11-24/ci.out`（= `.tmp/ci-1.log` 原件；仓库 `.gitignore` 全仓忽略 `*.log`，故存档用 `.out` 后缀） |
+| 基线对照 | `v0.13.31` 发版轮的同一条门禁（见本文件 2026-11-24 0.13.31 条） | **100 文件 / 1866 测试**，故本分支 **+1 文件 / +44 测试** |
+| 宿主 spec | `npm run ci` 内的 `test/update-surface.spec.ts` | **29 tests PASS**（新增文件；假插件管理器 / 假探测 / 假请求响应流，无网络、无真装、无计时器） |
+| 客户端 spec | `npm run ci` 内的 `test/update-entry.spec.ts` | **20 tests PASS**（原 5 例 → 20 例） |
+| 红绿（两条 lane 当轮） | 宿主：先让模块缺失跑一次 → 红；客户端：先让旧卡跑新用例 | 宿主「模块缺失红 → 29/29」、客户端「12 failed / 5 passed → 全绿」。**这是两条 lane 当时的记录，树里没有日志，本轮无法复核**；可复核的是上面那条全量门禁 |
+| soak 装配 | `./prepare_soak.sh`（`.tmp/soak-update/`） | `npm pack` → `dsh-grok-workflow-0.13.31.tgz`；`DSH_HOME=<scratch>/dsh-home dsh plugin --profile web add file:…tgz` **exit 0**（`prepare-install.out`）；随后仅把该副本的 manifest 版本按手改成 `0.13.30`，因为只有 profile 真的旧于最新发布标签，卡片才会给出安装按钮 |
+| soak 起实例 | `./run_soak.sh 18332 run3` | 自己的 `HOME` / pnpm store / npm cache 都在 `.tmp/soak-update/` 内；`dsh --profile web --patch overlay-soak.yml --no-open --host 127.0.0.1 --port 18332`；overlay 只关四行（三个 stdio MCP 客户端 + `layerfs-host`），理由写在它自己的注释里 |
+| soak 状态读 | 真 Chromium 里点「检查」→ `GET /grok-workflow/update?action=status` | **200**，正文逐字：`{"ok":true,"action":"status","update":{"current":"0.13.30","latest":"0.13.31","latestSource":"remote","canInstall":true,"command":"dsh plugin --profile <profile> add github:free6589/dsh-grok-workflow#v0.13.31"}}` |
+| soak 安装 | 点「安装 0.13.31」→ `POST /grok-workflow/update` | **200**，正文逐字：`{"ok":true,"action":"install","installed":{"from":"0.13.30","to":"0.13.31","spec":"github:free6589/dsh-grok-workflow#v0.13.31","saveExact":true}}`；真 GitHub fetch + 真 pnpm + 真 profile 写入 |
+| soak 卡片四相 | `run3-result.json` 的 `states` | `opened`：`phase=check`、`canInstall=no`、「已装 0.13.31，最新发布 0.13.31 … 已是最新版本」；`after-check`：`phase=check`、`canInstall=yes`、「已装 0.13.30，最新发布 0.13.31 … 有新版本可装：0.13.31」、主按钮 `update-install`「安装 0.13.31」；`clicked-install`：`phase=installing`、按钮 `disabled` + `data-gw-update-busy="true"`「正在安装…」；`settled`：`data-gw-update-phase` **已消失**（`phase` 为 null），文字回到「已是最新版本」 |
+| soak 请求日志 | 同上 `requests` / `responses` | 整轮只有两条：`GET …/update?action=status`、`POST …/update`；**没有任何文档请求**，即页面从未 reload |
+| soak 装后读盘 | `run_soak.sh` 末尾用 node 读 profile | `PROFILE_SPEC="github:free6589/dsh-grok-workflow#v0.13.31"`、`INSTALLED_VERSION=0.13.31`（`run3.out`）；同一 profile 的 `pnpm-lock.yaml` 解析到 `codeload.github.com/free6589/dsh-grok-workflow/tar.gz/d0c1383e…`（= `v0.13.31` 发版提交）。**装前那一行本身没有存成文件**（只在隔离 harness 的输出里见过），所以存档证据覆盖的是装后那一态；但「装前是浮动 spec」这件事有在案：live `web` profile 的依赖就是这个不带 tag/commit 的 `github:free6589/dsh-grok-workflow`（2026-11-24 只读执行 `node -p "JSON.stringify(require('/home/fish/.dsh/profiles/web/package.json').dependencies['dsh-grok-workflow'])"`，输出 `"github:free6589/dsh-grok-workflow"`），soak 的 scratch home 正是该 profile 的副本，且隔离 harness 在装 tarball 之前的 pre-fixture dry run 逐字打印过 `PROFILE_SPEC="github:free6589/dsh-grok-workflow"`；装完之后同一字段才读成 `github:free6589/dsh-grok-workflow#v0.13.31`，即按钮产出的钉死形式 |
+| soak 第二跑 | `./run_soak.sh 18330 run1` | 同形：四相齐全（`check`/`check`/`installing`/settled），请求日志同样只有一条 GET + 一条 POST（`run1-result.json`；这一版 harness 没记 `responses`，也没存 `run1.out`，故它自己的读盘行**未留档**） |
+| soak 第三跑 | `./run_soak.sh 18331 run2` | **harness 失败、不是产品失败**：卡片被新装上的构建在页面里替换，元素句柄在换手读到即抛 `ElementHandle.is_disabled: Element is not attached to the DOM`（`run2-click.err`）。修的是 harness 的取卡容错；该跑虽丢了截图，盘上仍读到 `INSTALLED_VERSION=0.13.31`（`run2.out`） |
+| 装后代码身份 | `read-only`：读 scratch profile 里 `node_modules/dsh-grok-workflow` | `lib/index.js` sha256 **`3e014bd1…b190a3`**、manifest `0.13.31` —— 已是**发布版**的字节，不再是本分支开发构建（开发构建 `lib/index.js` = `bebf2a06…6d2590`、`lib/client.js` = `20ea78f6…5b4b36`，在本工作树用 `sha256sum` 当场量过） |
+| 事前对照 | `git show c6a3611:src/client/index.js \| grep -c update-install` | **0** —— 上一版的卡片根本没有任何安装动作，所以本轮的对照是「无按钮/无路由 → 一次点击一次 POST 真装」这一整段，而不是新旧两份代码的差分 |
+| live profile | `stat /home/fish/.dsh`；读 `~/.dsh/profiles/web/node_modules/dsh-grok-workflow/package.json`（只读） | **NOT_RUN / 故意跳过升级**：操作员红线「不碰 live」——`~/.dsh` 一行未写、未重载、未重启，`stat` 的 mtime 仍是 **2026-11-22 23:40:20**（早于本轮两天）；live 的 `web` profile 里读到的插件版本仍是 **`0.13.29`**。soak 用的是从它**复制**出来的隔离 home（`.tmp/soak-update/dsh-home`），实例跑在 127.0.0.1 的自有端口上、每跑完一次就杀掉 |
+| 发版 / 推送 / 合流 | — | **NOT_RUN**：未打 tag、未 push、未合流、未 npm publish；分支只在本地，`package.json` 与 `src/client/index.js` 的版本仍是 `0.13.31` |
+
+**Changed：** `src/update-surface.ts`（新增，802 行：路由、宿主侧 spec、标签校验/探测、安装、读盘回执、回滚、错误码到状态码）、
+`src/index.ts`（+8 行：`installUpdateRoute({ctx, logger})` 紧跟 `installModeRoute`，三行注释说明为什么）、
+`src/client/index.js`（`UpdateCard` 重写成四相；命令在宿主答过后跟随 `update.command`；挂载不发请求；一次点击一次 POST）、
+`lib/`（同一次构建的产物）、`test/update-surface.spec.ts`（新增 29 例）、`test/update-entry.spec.ts`（5 → 20 例）、
+`CHANGELOG.md` 的 `[Unreleased]` 一条（中英）、`docs/knowledge/*` 与 `.rsi/evidence/update-button-soak-2026-11-24/`。
+
+**Honest boundary（逐条）：**
+1. **soak 的起点是手工摆的**：装进去的那份副本的 manifest 版本被按手改成 `0.13.30`，因为卡片只在 profile 真的旧于最新
+   发布标签时才给安装按钮。装的过程是真的（真 GitHub fetch、真 pnpm、真 profile 写入），**起点版本是人摆的**。
+2. **开发构建自己的 `latest` 相在浏览器里看不到**：安装一落地，正在跑的构建就被换掉，settle 下来的是**新装上的那版构建**的
+   卡（所以 `settled` 里 `data-gw-update-phase` 消失了）。开发构建的 `latest` 相（nothing newer / 读回等于目标）由
+   `test/update-surface.spec.ts` 与 `test/update-entry.spec.ts` 覆盖，**不是这次 soak 证明的**。
+3. **fork 里有既有的无关残留**：scratch profile 带着 `dsh-system-prompt-design` 的 `link:` 依赖指向 scratch home 之外
+   （见 `prepare-install.out`），捕获的 console 里还有一条 `@deepseek-ai/dsh-client-ui-account-notifications: pending
+   (waiting for service: accountUi)`。两者都是被复制的 live profile 自带的，与本功能无关，也不经过这条路由。
+4. **两条 lane 的红跑数字无法复核**（见上表），本轮只复核了全量门禁、两个 spec 的用例数、以及 soak 的全部原始回执。
+5. **凭证**：本目录不含任何密钥值；两份捕获文件与 `run3.out`/`run2.out` 里 scratch 实例自己的 `?token=` 已替换成
+   `<redacted-scratch-token>`，其余一字未改。
+
+**证据：** `.rsi/evidence/update-button-soak-2026-11-24/README.md`（build 两个 sha256、环境、逐步命令、四相表、装后读盘、
+边界与清单）。

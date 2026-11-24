@@ -3985,3 +3985,45 @@ Issue #1 状态评论 issuecomment-6927842856。
 - **待办**：① `team-dispatch-v1` 分支与它的 worktree 仍在本地（已合、可删；按 §5 应在 24 h 内删掉）；
   ② 升级 live profile 到 `v0.13.31`（需要操作员放行）；③ 两条边界仍成立：板锁只在单文件系统内是咨询锁、`seq` 只表达
   创建顺序不表达优先级（见 `VALIDATION.md` 与 `docs/ARCHITECTURE.md` 任务板章节）。
+
+## 2026-11-24 — 设置页升级按钮：分支做完、门禁绿、真机装成功，等主代理合流（`CONFIRMED`）
+
+- **From:** 记忆收口（本工作树的 memory-writer）· **To:** 主代理 / 下一个接手的人
+- **分支与提交**：`feat/update-button`，自 `main` `c6a3611` 开出，一个功能提交 `c951dbf`「feat(update): a working upgrade
+  button on the settings page」+ 本条记忆提交。worktree 在 `.agents/worktrees/feat-update-button`。**分支只在本地**：
+  未 push、未合流、未打 tag、未发版。
+- **做成了什么**：设置页的版本卡从「说出最新版本 + 给一条命令」变成「一个按钮真能装」。宿主路由
+  `GET|POST /grok-workflow/update` 负责读状态与安装，装什么由宿主按本仓库的发布形状自己拼；页面四相（检查中 / 安装中 /
+  已是最新 / 失败），挂载不发请求、一次点击一次 POST、页面永不 reload。决策与被否掉的替代方案见 `DECISIONS.md` D-129，
+  逐条证据见 `VALIDATION.md` 同日条与 `.rsi/evidence/update-button-soak-2026-11-24/`。
+- **门禁（`CONFIRMED`）**：`npm run ci` 在 `c951dbf` 上 **EXIT=0** —— oxlint 36 warnings / 0 errors、`verify:lib` 245 文件
+  逐字节一致、vitest **101 文件 / 1910 测试 PASS**（`test/update-surface.spec.ts` 29 例、`test/update-entry.spec.ts` 20 例）。
+  对 `v0.13.31` 的 100 文件 / 1866 测试基线是 +1 文件 / +44 测试。
+- **真机 soak（`CONFIRMED`）**：隔离 fork 的 live `web` profile + 真 Chromium，一次点击把 profile 从 0.13.30 装到
+  0.13.31，回执与读盘结果都逐字存档；页面全程没有文档请求（没有 reload）。
+- **两条 lane 各自交回之后、由 foreman 追加的两处微修**（派单要求记下来；树里能核的正是这两处，**先后时序在树里不可核**）。
+  两处都是 foreman 在收到该 lane 自己的报告之后才提的，所以**两条 lane 的报告里都没有它们**：
+  1. **微修 A（宿主，`src/update-surface.ts` 的 `installCommand()`）：复制粘贴那一行补上 `--profile <profile>`**，形状与设置页
+     那张卡打印的那一行一致。缺这个 flag 时，粘下去装进的是「碰巧是默认」的那个 profile，而不是操作员正在看的那个——正是
+     这张卡存在要防的那个错。`<profile>` 保持字面占位：这条路由不知道、也不许猜浏览器那头是哪个 profile 名。可核位置：
+     `installCommand()` 正上方的文档注释，以及 `test/update-surface.spec.ts` 里 GET status 那条命令断言中的
+     `toContain('--profile <profile>')`（用例「reports the installed version, the newest release and the exact command」）。
+  2. **微修 B（客户端，`UpdateCard`）：命令的显示、正文那句里的插值、复制到剪贴板，三处都取宿主的 `update.command`**
+     （宿主答过时），没有答案才退回静态的 `UPDATE_COMMAND`——一个冻结的静态行会让读者复制到更旧的那个发布。没有宿主答案时
+     （首绘、socket 断了、宿主没答或答了空串）静态基线逐字节照旧。可核位置：`src/client/index.js` 里
+     `const command = known !== undefined && typeof known.command === 'string' && known.command !== '' ? known.command : UPDATE_COMMAND`
+     一行，以及 `test/update-entry.spec.ts` 的两例「prints, interpolates and copies the command the Host named, not the stale
+     bundled one」/「keeps the static command byte for byte when no Host answer ever lands」。
+- **实现细节（不属于上面那两处微修，是卡片原本实现的一部分）**：卡片的「已装版本」按能知道的顺序取——安装读回 → 回滚恢复到的
+  版本 → 宿主读到的当前版本 → 本构建自带版本；正文那句与结论都跟着它走。理由同样写在注释里：否则卡片会在「已装 0.13.31，
+  最新 0.13.32」旁边说「你已是最新」，或者回滚之后仍然显示装歪的那个版本。
+- **留给下一手的事**：
+  1. **合流只在主代理做**（AGENTS §10）。合流时请注意 `CHANGELOG.md`：本条只加在 `## [Unreleased]`，没有版本号、没有
+     发版标题、没有日期——发版那一步才 bump。
+  2. **live profile 仍跑 `0.13.29`**（上一轮的只读探针读数），本轮**故意没动**：未升级、未重载、未重启，AGENTS §11 的
+     自动升级按操作员红线「不碰 live」跳过。合流发版之后要不要升 live，等操作员放行。
+  3. **没有请求发版**：`package.json` 与客户端版本常量仍是 `0.13.31`，`[Unreleased]` 里这条是给下一次发版用的。
+  4. **分支判定日期 2026-11-26**：合流即删（按 §5，合完 24 h 内）；不合就删分支。`feat/*` 不许长期挂着。
+- **边界（不要读成更强的结论）**：soak 的起点版本是按手摆的（manifest 改成 0.13.30）；开发构建自己的 `latest` 相在浏览器里
+  看不见（装完页面上的卡是新构建的），那一段只由单元用例覆盖；`.tmp/soak-update/` 保留给 foreman 清理，本轮没有删它、
+  也没有往里加东西。

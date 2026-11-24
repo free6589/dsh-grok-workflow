@@ -21,6 +21,8 @@ import { redactError } from './redact.js'
 import { createActiveState, disposeActiveState, runWorkflow } from './run.js'
 import type { ActiveState } from './run.js'
 import type { GrokWorkflowConfig, ResolvedConfig, TaskInput, WorkflowReport } from './types.js'
+import { installUpdateRoute } from './update-surface.js'
+import type { UpdateHostContext } from './update-surface.js'
 
 export { Config, HARD_LIMITS } from './config.js'
 export { GrokWorkflowInputError } from './input.js'
@@ -394,6 +396,12 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
     },
     logger,
   })
+
+  // The settings card's upgrade button needs a Host verb: a browser cannot run the
+  // `dsh plugin add` line the card prints. The install spec is built host-side from this
+  // repository's own release tag, so the browser can never name a package; the route is
+  // mounted inside `effect`, so an unload withdraws it with the rest of the surface.
+  installUpdateRoute({ ctx: ctx as unknown as UpdateHostContext, logger })
 
   // T4: the gate is always on (enforceGate removed) — every top-level user
   // message passes the front desk.

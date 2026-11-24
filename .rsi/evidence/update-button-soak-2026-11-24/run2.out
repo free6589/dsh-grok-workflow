@@ -1,0 +1,10 @@
+INSTANCE=http://127.0.0.1:18331/?token=<redacted-scratch-token>
+CLICK_EXIT=1
+playwright._impl._errors.Error: ElementHandle.is_disabled: Element is not attached to the DOM
+Call log:
+  - waiting for locator(":scope")
+    - locator resolved to <button disabled type="button" data-gw-update-busy="true" data-action="update-install">正在安装…</button>
+
+PROFILE_SPEC="github:free6589/dsh-grok-workflow#v0.13.31"
+INSTALLED_VERSION=0.13.31
+CARD=

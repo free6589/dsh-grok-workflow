@@ -1,0 +1,41 @@
+INSTANCE=http://127.0.0.1:18332/?token=<redacted-scratch-token>
+CLICK_EXIT=0
+PROFILE_SPEC="github:free6589/dsh-grok-workflow#v0.13.31"
+INSTALLED_VERSION=0.13.31
+CARD={
+ "url": "http://127.0.0.1:18332/?token=<redacted-scratch-token>",
+ "states": [
+  {
+   "step": "opened",
+   "card": {
+    "phase": "check",
+    "data": {
+     "gwUpdate": "0.13.31:0.13.31",
+     "gwUpdatePhase": "check",
+     "gwUpdateCanInstall": "no"
+    },
+    "text": "插件版本\n\n已装 0.13.31，最新发布 0.13.31。升级命令：dsh plugin --profile <profile> add github:free6589/dsh-grok-workflow#v0.13.31\n\ndsh plugin --profile <profile> add github:free6589/dsh-grok-workflow#v0.13.31\n\n已是最新版本。\n\n本页不能替你执行系统命令——把上面的命令贴到终端里跑一次，才算装好。\n\n已装版本: 0.13.31\n检查有没有新版本\n复制命令",
+    "buttons": [
+     {
+      "action": "update-check",
+      "text": "检查有没有新版本",
+      "disabled": false
+     },
+     {
+      "action": "update-copy",
+      "text": "复制命令",
+      "disabled": false
+     }
+    ]
+   }
+  },
+  {
+   "step": "after-check",
+   "card": {
+    "phase": "check",
+    "data": {
+     "gwUpdate": "0.13.31:0.13.31",
+     "gwUpdatePhase": "check",
+     "gwUpdateCanInstall": "yes"
+    },
+    "text": "插件版本\n\n已装 0.13.30，�

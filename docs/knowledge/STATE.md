@@ -2583,3 +2583,24 @@ GitHub Release `Grok Workflow for DSH v0.13.31` 带 `dsh-grok-workflow-0.13.31.t
 `~/.dsh` 目录 mtime 仍是 **2026-11-22 23:40:20**（本轮任何时刻都不等于今天），live 的 `web` profile 里
 `node_modules/dsh-grok-workflow/package.json` 读到 **`0.13.29`**（另有四个历史验证 profile 分别停在 0.12.9 / 0.8.0 / 0.8.0 / 0.12.19）。
 也就是说 `0.13.30` 与 `0.13.31` 都没有装进 live——§11 自动升级在上一轮同样没有执行、本轮按红线继续跳过。没有任何写入、重载或重启。
+
+Last updated: 2026-11-24 18:30 +08:00（**设置页升级按钮做出来了：一次点击在隔离 profile 里真装上最新发布版，`CONFIRMED`，未发版** —
+分支 `feat/update-button`（自 `main` `c6a3611` 开），一个功能提交 `c951dbf`「feat(update): a working upgrade button on the
+settings page」。**宿主**：新增 `src/update-surface.ts`（`GET|POST /grok-workflow/update`），挂载形状照抄 `src/mode-surface.ts`
+（`inject(['webServer','connection'])`、注册进 `child.effect`、信任闸走 `connection.requestRejection`、`handleUpdateRoute`
+当测试缝）；装什么只在宿主侧拼（`github:free6589/dsh-grok-workflow#vX.Y.Z`），浏览器带 `spec` 一律拒，tag 必须匹配严格
+`vX.Y.Z`、必须在本仓库真发布过的标签清单里、必须严格新于已装版本；写盘用 `installBundle(spec,{saveExact:true,expected})`，
+回执里的 `to` 是读回来的版本，失败或装歪回滚到装前 spec 并只说第二次读盘能证明的事。**客户端**：`UpdateCard` 四相
+（`check`/`installing`/`latest`/`failed`）以 `data-gw-update-phase` 渲染，挂载不发任何请求、一次点击一次 POST、页面永不
+reload（只说「刷新页面新版本才生效」）。**门禁**：`npm run ci` 在 `c951dbf` 上 **EXIT=0** — oxlint 36 warnings / 0 errors、
+`verify:lib` 245 文件逐字节一致、vitest **101 文件 / 1910 测试 PASS**（含 `test/update-surface.spec.ts` 29 例、
+`test/update-entry.spec.ts` 20 例）；对 `v0.13.31` 的 100 文件 / 1866 测试基线是 **+1 文件 / +44 测试**。**真机 soak**（隔离
+fork 的 live `web` profile，真 Chromium，真 GitHub fetch + 真 pnpm）：卡片打开时 `phase=check` 说「已是最新」，点「检查」
+后 `canInstall` 变 yes 并给出「安装 0.13.31」，点下去 `phase=installing` 且按钮 disabled，落地后页面**没有**任何文档请求
+（无 reload）；一次 GET + 一次 POST，回执逐字为 `{"ok":true,"action":"install","installed":{"from":"0.13.30","to":"0.13.31",
+"spec":"github:free6589/dsh-grok-workflow#v0.13.31","saveExact":true}}`，装后盘上 `package.json` 的依赖正好是
+`github:free6589/dsh-grok-workflow#v0.13.31`，而 `pnpm-lock.yaml` 里解析到的是
+`codeload…/tar.gz/d0c1383e91efb0440463a3e9482ef93490b3eb7c`（= `v0.13.31` 的发版提交，见上一条），`node_modules` 里读到
+`0.13.31`——装上去的是那个标签的树，不是"当天解析到什么算什么"。证据目录 `.rsi/evidence/update-button-soak-2026-11-24/`。**红线**：live `~/.dsh` 一行未写、未重载、未重启
+（soak 用的是从它复制出来的隔离 home）；**未发版、未打 tag、未 push、未合流**，分支只在本地，`package.json` 仍 0.13.31，
+`[Unreleased]` 里记了这条用户可见变化。）

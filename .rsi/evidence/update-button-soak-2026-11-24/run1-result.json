@@ -1,0 +1,101 @@
+{
+ "url": "http://127.0.0.1:18330/?token=<redacted-scratch-token>",
+ "states": [
+  {
+   "step": "opened",
+   "card": {
+    "phase": "check",
+    "data": {
+     "gwUpdate": "0.13.31:0.13.31",
+     "gwUpdatePhase": "check",
+     "gwUpdateCanInstall": "no"
+    },
+    "text": "插件版本\n\n已装 0.13.31，最新发布 0.13.31。升级命令：dsh plugin --profile <profile> add github:free6589/dsh-grok-workflow#v0.13.31\n\ndsh plugin --profile <profile> add github:free6589/dsh-grok-workflow#v0.13.31\n\n已是最新版本。\n\n本页不能替你执行系统命令——把上面的命令贴到终端里跑一次，才算装好。\n\n已装版本: 0.13.31\n检查有没有新版本\n复制命令",
+    "buttons": [
+     {
+      "action": "update-check",
+      "text": "检查有没有新版本",
+      "disabled": false
+     },
+     {
+      "action": "update-copy",
+      "text": "复制命令",
+      "disabled": false
+     }
+    ]
+   }
+  },
+  {
+   "step": "after-check",
+   "card": {
+    "phase": "check",
+    "data": {
+     "gwUpdate": "0.13.31:0.13.31",
+     "gwUpdatePhase": "check",
+     "gwUpdateCanInstall": "yes"
+    },
+    "text": "插件版本\n\n已装 0.13.30，最新发布 0.13.31。升级命令：dsh plugin --profile <profile> add github:free6589/dsh-grok-workflow#v0.13.31\n\ndsh plugin --profile <profile> add github:free6589/dsh-grok-workflow#v0.13.31\n\n有新版本可装：0.13.31。\n\n本页不能替你执行系统命令——把上面的命令贴到终端里跑一次，才算装好。\n\n已装版本: 0.13.30\n安装 0.13.31\n复制命令",
+    "buttons": [
+     {
+      "action": "update-install",
+      "text": "安装 0.13.31",
+      "disabled": false
+     },
+     {
+      "action": "update-copy",
+      "text": "复制命令",
+      "disabled": false
+     }
+    ]
+   }
+  },
+  {
+   "step": "clicked-install",
+   "card": {
+    "phase": "installing",
+    "data": {
+     "gwUpdate": "0.13.31:0.13.31",
+     "gwUpdatePhase": "installing",
+     "gwUpdateCanInstall": "yes"
+    },
+    "text": "插件版本\n\n已装 0.13.30，最新发布 0.13.31。升级命令：dsh plugin --profile <profile> add github:free6589/dsh-grok-workflow#v0.13.31\n\ndsh plugin --profile <profile> add github:free6589/dsh-grok-workflow#v0.13.31\n\n有新版本可装：0.13.31。\n\n本页不能替你执行系统命令——把上面的命令贴到终端里跑一次，才算装好。\n\n已装版本: 0.13.30\n正在安装…\n复制命令",
+    "buttons": [
+     {
+      "action": "update-install",
+      "text": "正在安装…",
+      "disabled": true
+     },
+     {
+      "action": "update-copy",
+      "text": "复制命令",
+      "disabled": false
+     }
+    ]
+   }
+  },
+  {
+   "step": "settled",
+   "card": {
+    "phase": null,
+    "data": {
+     "gwUpdate": "0.13.31:0.13.31"
+    },
+    "text": "插件版本\n\n已装 0.13.31，最新发布 0.13.31。升级命令：dsh plugin --profile <profile> add github:free6589/dsh-grok-workflow#v0.13.31\n\ndsh plugin --profile <profile> add github:free6589/dsh-grok-workflow#v0.13.31\n\n已是最新版本。\n\n本页不能替你执行系统命令——把上面的命令贴到终端里跑一次，才算装好。\n\n已装版本: 0.13.31\n复制命令",
+    "buttons": [
+     {
+      "action": "update-copy",
+      "text": "复制命令",
+      "disabled": false
+     }
+    ]
+   }
+  }
+ ],
+ "console": [
+  "warning: web boot: warning: 1 entry did not activate\n@deepseek-ai/dsh-client-ui-account-notifications: pending (waiting for service: accountUi)"
+ ],
+ "requests": [
+  "GET http://127.0.0.1:18330/grok-workflow/update?action=status",
+  "POST http://127.0.0.1:18330/grok-workflow/update"
+ ]
+}
