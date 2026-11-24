@@ -11,6 +11,18 @@ import type { FailureClass, ModelRoute, NormalizedTask, ResolvedConfig, RoleName
  */
 export declare const SUMMARY_MAX_ATTEMPTS = 3;
 /**
+ * How many planner-chain walks the planning leg may spend in one run.
+ *
+ * Not a retry policy: the leg has no retries. It is the worst case of the three
+ * corridors the guest script walks — the first ask, one same-call resubmit when
+ * the answer was unusable in form, and one route re-fire when the call died in
+ * transport. Two of the three are rescue calls the run really makes, so a child
+ * cap that counted a single walk would abort the very rescue with AGENT_CAP.
+ *
+ * Kept host-side only: the guest script never computes the cap, it receives it.
+ */
+export declare const PLANNER_LEG_CALLS = 3;
+/**
  * The orchestration script is static. User data crosses the workflow boundary as
  * `args` JSON, never as source text; this keeps the sandbox contract explicit
  * and makes the script reviewable and testable outside a model call.
@@ -144,6 +156,12 @@ export declare function routeBudgetFor(config: ResolvedConfig): RouteBudget;
  * (Q8) adds at most {@link GUARDIAN_MAX_WAITS} calls per timed-out call, so
  * with a guardian configured every per-call block is widened by that factor;
  * without one the formula is byte-identical to the pre-guardian one.
+ *
+ * The planning leg is counted at {@link PLANNER_LEG_CALLS} chain walks, because
+ * its resubmit and its route re-fire are real children: a cap that counted one
+ * walk aborted the rescue with AGENT_CAP exactly when it was recovering the run.
+ * Replan boundaries stay at one walk each — a boundary merge that fails keeps the
+ * plan, so it has no rescue corridor to pay for.
  */
 export declare function maxTotalAgentsFor(tasks: number, retries: number, budget?: RouteBudget, replans?: number): number;
 export declare function buildWorkflowRequest(objective: string, tasks: NormalizedTask[] | undefined, config: ResolvedConfig, namingLanguage?: NamingLanguage, carryover?: string, busyRoutes?: string[], inheritance?: string, replanToken?: string, captainBrief?: string): WorkflowRequestPayload;

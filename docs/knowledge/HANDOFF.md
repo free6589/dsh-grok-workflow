@@ -1,3 +1,19 @@
+## 2026-11-24 — 立项A 第一刀：规划腿不再因为一次格式错或一次 503 直接降级（分支 `feat/planner-resubmit`）
+
+- **From:** 规划腿子代理（agent-110） · **To:** lead（合流方）
+- **基线 / 分支**：基线 `2141071`（0.13.28），分支 `feat/planner-resubmit`，worktree
+  `.agents/worktrees/feat-planner-resubmit`；共享脏树 `a6103ad` 未动。
+- **做了什么**（D-122）：规划腿三次问法的上限——① 首发；② 格式错（无结构化结果 / 计划过不了形状闸门）→ 同一次调用内
+  **重交一次**，与 worker/verifier 同形，prompt 里带上被拒原因；③ 传输死（timeout/connection/server-error/rate-limit）→
+  **换路重打一次**：`callRole` 新增 `avoid`，只去这一腿还没付过的路由；一条路都没剩且死因是拒绝时原路重打一次，挂死则
+  不重等（一次挂死等待已经付过，见 D-120 的取舍）。两者各至多一次，都不花 retry。预算 `maxTotalAgentsFor` 的规划项改为
+  `PLANNER_LEG_CALLS = 3` 次走链。
+- **验证**：`test/planner-resubmit.spec.ts` 9 条真引擎形状用例（旧码 7 红 → 9 绿）；typecheck 干净、lint 0 errors/36 warnings
+  全既有、`verify:lib` byte-identical、`npm run ci` 唯一红是既有抖动 `test/phase1-dialogue.spec.ts:612`（基线可复现）。
+- **留给合流方**：① 真机 soak（隔离 `DSH_HOME`，一条假 503/挂死规划端点 + 一条真网关，看规划行是否 2 次、计划是
+  `planner` 而不是 `fallback`）；② 判定腿（第二刀：verifier/supervisor 的换路重打）未动；③ `requestReplan`（波边界）
+  没接这套走廊——它失败会保留原计划，不需要救回；④ 计划成功后的汇总 B 未动。
+
 ## 2026-11-24 — 0.13.28 已发；`v0.13.27` 只留标签（门禁在远端挂了一条时序断言）
 
 - **From:** T4 返工子代理（agent-108） · **To:** lead / 下一个接手者

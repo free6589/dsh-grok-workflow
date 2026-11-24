@@ -1,3 +1,12 @@
+Last updated: 2026-11-24 08:40 +08:00（**立项A 第一刀：规划腿不再因为一次格式错或一次 503 直接降级，`CONFIRMED`（真引擎用例），未发版** —
+分支 `feat/planner-resubmit`（基线 `2141071`，0.13.28；共享脏树 `a6103ad` 未动）。规划腿现在有三次问法的上限，都不算 retry：
+① 首发；② 格式错（没有结构化结果，或计划过不了形状闸门）→ 同一次调用内重交一次（与 worker/verifier 同形，prompt 里写明
+被拒原因）；③ 传输死（timeout/connection/server-error/rate-limit）→ 换路重打一次——`callRole` 新增 `avoid`，只去这一腿
+还没付过的路由；一条路都没剩且死因是拒绝时原路重打一次，挂死则不重等（贵的是等待，不是调用）。`maxTotalAgentsFor` 的
+规划项按 `PLANNER_LEG_CALLS = 3` 计，否则救回会在中途被 AGENT_CAP 掐死。新用例 9 条走真引擎 + twin（旧码 7 红 → 9 绿）。
+门禁：typecheck 干净、lint 0 errors / 36 warnings（全既有）、`verify:lib` byte-identical、`npm run ci` 唯一红是既有抖动
+`test/phase1-dialogue.spec.ts:612`（基线 `2141071` 单独跑同一文件同样失败）。真机 soak、判定腿第二刀、汇总 B、发版均未做。）
+
 Last updated: 2026-11-24 08:00 +08:00（**已发版 `0.13.28`：死路由在真机上真的进表了，`CONFIRMED`** —
 发版提交 `8f34701`（返工 `cd0c909` → 合流 `78c1907` → 用例修 `0113211` → 发版准备）+ tag `v0.13.28` 已推；
 远端 `CI` `45292347165` success、`Release` `45292352796` success，已发布 asset `dsh-grok-workflow-0.13.28.tgz`
