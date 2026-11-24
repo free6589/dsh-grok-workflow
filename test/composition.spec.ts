@@ -9,7 +9,9 @@
  *
  * - the ordering, `prepend` placement and "a listener that does not call `next()`
  *   vetoes the chain" semantics are cordis's own, not a test double;
- * - the gate is the plugin's real listener, registered by the real `apply()`.
+ * - the gate is the plugin's real listener, registered by the real `apply()` because
+ *   this file's mount opts in (`legacyGate: true`; since M3.2 the front desk is not
+ *   part of a default load).
  *
  * What it proves: no in-tree listener can turn a rejected user batch into a
  * model request, and the only ways this gate is starved are the two known
@@ -112,7 +114,7 @@ function harness(options: HarnessOptions = {}): ComposedHarness {
     // `grokDefault: 'on'`: these suites are about admitted batches and the
     // reject veto's composition; the default-off toggle passes messages through
     // as normal chat (pinned in gate.spec.ts).
-    apply(shim as never, { mode: 'full', grokDefault: 'on'})
+    apply(shim as never, { legacyGate: true, mode: 'full', grokDefault: 'on'})
   }
 
   if (options.gatePlacement === 'first') installGate()

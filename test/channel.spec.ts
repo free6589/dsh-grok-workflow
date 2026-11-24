@@ -350,7 +350,7 @@ async function within<T>(promise: Promise<T>, ms = 2_000): Promise<T> {
 }
 
 function applyWith(ctx: FakeContext, overrides: Record<string, unknown> = {}): void {
-  apply(ctx as never, { mode: 'full', grokDefault: 'on', replan: true, ...overrides })
+  apply(ctx as never, { legacyGate: true, mode: 'full', grokDefault: 'on', replan: true, ...overrides })
 }
 
 /**

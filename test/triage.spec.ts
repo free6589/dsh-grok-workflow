@@ -517,7 +517,7 @@ async function route(
   // `grokDefault: 'on'`: these tests are about admitted batches and the front
   // desk; the default-off toggle passes messages through as normal chat (pinned
   // in gate.spec.ts).
-  if (ctx.handlers.size === 0) apply(ctx as never, { grokDefault: 'on', ...overrides })
+  if (ctx.handlers.size === 0) apply(ctx as never, { legacyGate: true, grokDefault: 'on', ...overrides })
   const messages = [userMessage(text)]
   // T4: only `in-turn` survives — the gate enters the answer in the same step
   // instead of delivering it as a followup, so read the entered step message.

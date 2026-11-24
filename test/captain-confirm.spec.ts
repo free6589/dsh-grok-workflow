@@ -157,7 +157,7 @@ function userMessage(text: string): UserMessage {
  * wait-for-team helper would cost five seconds per case.
  */
 async function say(ctx: FakeContext, agent: FakeAgent, text: string, overrides: Record<string, unknown> = {}): Promise<string> {
-  if (ctx.handlers.size === 0) apply(ctx as never, { grokDefault: 'on', ...overrides })
+  if (ctx.handlers.size === 0) apply(ctx as never, { legacyGate: true, grokDefault: 'on', ...overrides })
   const messages = [userMessage(text)]
   const decision = await ctx.preStep()(
     { agent, messages, turn: 1, step: 1, signal: new AbortController().signal },

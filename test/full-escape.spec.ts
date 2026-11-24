@@ -246,7 +246,7 @@ function objectiveOf(request: WorkflowStartRequest): string {
 describe('the full shape answers small talk and single facts without a run', () => {
   it('/grok on + a weather question: one quick worker answers, no team run', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'triage', grokDefault: 'off' })
+    apply(ctx as never, { legacyGate: true, mode: 'triage', grokDefault: 'off' })
     const live = headed('sess-escape-fast')
     grokOn(live)
     const agent = new FakeAgent(live)
@@ -268,7 +268,7 @@ describe('the full shape answers small talk and single facts without a run', () 
 
   it('/grok on + small talk: the template answers, nothing is started', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'triage', grokDefault: 'off' })
+    apply(ctx as never, { legacyGate: true, mode: 'triage', grokDefault: 'off' })
     const live = headed('sess-escape-chat')
     grokOn(live)
     const agent = new FakeAgent(live)
@@ -287,7 +287,7 @@ describe('the full shape answers small talk and single facts without a run', () 
 describe('the full shape asks before it runs a real task', () => {
   it('/grok on + a real task: the captain states the split, and only 「确认」 starts the run', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'triage', grokDefault: 'off' })
+    apply(ctx as never, { legacyGate: true, mode: 'triage', grokDefault: 'off' })
     const live = headed('sess-escape-ask')
     grokOn(live)
     const agent = new FakeAgent(live)
@@ -325,7 +325,7 @@ describe('a deployment-level full keeps its own path', () => {
   it('config full with no session record runs the team at once, with no captain question', async () => {
     const ctx = new FakeContext()
     ctx.engine.autoTeam = true
-    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'full', grokDefault: 'on' })
     const live = headed('sess-config-full-task')
     const agent = new FakeAgent(live)
 
@@ -347,7 +347,7 @@ describe('a deployment-level full keeps its own path', () => {
     // run it always had — `test/gate.spec.ts` is fifty cases built on it.
     const ctx = new FakeContext()
     ctx.engine.autoTeam = true
-    apply(ctx as never, { mode: 'full', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'full', grokDefault: 'on' })
     const live = headed('sess-config-full-chat')
     const agent = new FakeAgent(live)
 
