@@ -2974,3 +2974,47 @@ spine 为空，pre-fix 形状会进脊柱。
 - **代价：** 一次 run 最多多两次规划调用（每次最多走完一条链）；挂死且无别的路可走时不额外等待。
 - **教训（与 D-118/D-120 同源）：** 依赖「某类失败会带着某个形状抵达」的改动，必须配**真引擎**用例：本刀的 9 条用例走
   `createEngineHarness` + 本插件 twin，失败形状是引擎真给的（答完没交结构化、`CHILD_DEATH` 拒绝、脚本自己的预算结算）。
+
+## D-123 · 判定腿同 attempt 补打：verifier/supervisor 死于传输错时只重打这条腿，不重跑 worker（2026-11-24）
+
+- **Status:** CONFIRMED（代码 + 单测；真机 soak 留给合流方，`NOT_RUN`）
+- **Date:** 2026-11-24
+- **Decision:** 判定腿（verifier / supervisor）**死于非格式错**时——该次调用在传输上死掉，没给出任何判定——
+  在同一次 attempt 内**只补打这条腿一次**，保留 worker 已产出的执行结果；不新增 attempt 行、不消耗重试额度、
+  不改重试策略。attempt 记录新增可选标记 `judgeRetried: true`（「这次尝试花过一次判定补打」，说事实不说成败；
+  成败仍由 `passed` 与 `failure` 表达）。预算同步抬：
+  - 脚本 `attemptBlock` 从 `2 × (worker + verifier + supervisor)` 改为 `2 × worker + 3 × (verifier + supervisor)`；
+  - 载入期 `callsPerAttempt` 从 `max(1,worker) + max(1,verifier) + supervisor` 改为 `2×max(1,worker) + 3×max(1,verifier) + 3×supervisor`；
+  - `HARD_LIMITS.maxAttemptsPerTask` 600 → 1000（最坏合法组合 50+50+50 路由：`2×50 + 3×(50+50) = 400` 次/attempt × 2 attempts = **800** 次/task，1000 留余量）。
+- **闸门（复用 D-120/D-121 的既有词汇，不新造类）：** 只认 `judgeLegTransportDeath(failure, role)` ——
+  `failure.role` 是该腿、`class ∉ {format-error, verification-failed}`、`setup !== true`、且 `routeHealthFamily(failure) !== ''`
+  （失败自己声明的路由证据：`timeout` / `connection` / `server-error` / `rate-limit`）。
+  - **为什么排除 format-error：** 那是补交通道（B/C，D-054 一脉）的本职，一次尝试只给一次补交，不能因为改叫「补打」就多要一次。
+  - **为什么排除 `verification-failed`：** 判定说了「不通过」，那是答案，不是死亡；再问同一个判定只会得到同一个 no。
+  - **为什么排除 `setup`：** `AGENT_CAP`／schema／option 类硬故障按定义会重复，烧掉剩余尝试只会多付钱。
+  - **429 的取舍：** 沿用 D-119/D-121 —— 勾选框说「限流就换人」时 429 算路由证据（可补打，补打有可能落在别的活路上）；
+    勾选框把 429 留在原路时它声明不了路由证据，因此不补打，仍由任务改写措辞重试。这不是新规矩，是复用同一条声明。
+- **顺序即预算：** 补打放在 B/C 之前。所以「补打回来了但不是可解析的结构化结果」会记成 `format-error`，
+  随后 B/C 仍可再打一次 —— 每条判定腿每 attempt **最多 3 次调用**（首打 + 传输补打 + 格式补交），预算按 3 计入。
+  把补打挪到 B/C 之后会让第三趟不可达，预算那一行就变成谎话。
+- **Reason:** 判定腿死在传输上时，活是好的、缺的只是一个判定，而现有路径让这次 attempt 失败、重试把**最贵的 worker**
+  整条重跑。判定调用比重跑 worker 便宜一个量级；这就是 D-054 的原意（便宜的最短路径重试）在判定腿上的镜像。
+- **Alternatives rejected:**
+  - 维持现状（失败 → 重试重跑 worker）：为一个没到手的判定付一次全量重做；
+  - engine 续原 child 会话（`agent()` 无此通道，D-054 已否决，无新证据）；
+  - 429 无条件补打：与 D-119/D-121 的「勾选框关掉时 429 = 现在忙」直接冲突；
+  - 补打放到 B/C 之后（第三趟不可达、预算撒谎）；
+  - 只抬 `maxTotalAgents` 不抬 `maxAttemptsPerTask`：50+50+50 的合法链路会被载入期总闸拒掉（实测 800 > 600）。
+- **Consequences / 已知风险（都写进 VALIDATION）：**
+  1. 单路由且真的挂死的链上，一次 attempt 会花 2 次判定调用（首打 + 补打）才判失败；换来的是 worker 不重跑。
+  2. 死路由表要连续两次（streak 2）才降级，所以同 attempt 内的补打仍可能打到刚死的那条路（与 B/C 同形，不是新问题）。
+  3. 补打是**新子代理**、不是续会话，判定要重新检一遍现场 —— 这是「便宜一个量级」不是「免费」。
+- **被这条改动翻掉的一处旧钉子：** `test/verifier-resubmit.spec.ts` 里「不补打 verifier 传输失败」那条用例钉的是
+  **本特性的缺席**（`verifierCalls === 2`）。本刀把它改成钉新契约（每次尝试首打 + 一次补打 = 2，`maxRetries` 1 时共 4，
+  且 worker 每次尝试只打一次），不是放宽标准。
+- **Evidence:** `src/script.ts`（`judgeLegTransportDeath` + 两条补打走廊 + 两个 `*ResubmitPrompt` 的 `routeDeath` 参数 +
+  `maxTotalAgentsFor` 的 `attemptBlock`）、`src/types.ts`（`AttemptReport.judgeRetried`）、`src/report.ts`（白名单）、
+  `src/config.ts`（`maxAttemptsPerTask` 1000、`callsPerAttempt` 2/3 走法）、
+  `test/judge-leg-retry.spec.ts`（新，8 例）、`test/routing.spec.ts`（预算两钉）、`test/verifier-resubmit.spec.ts`（翻钉）。
+- **来源:** 包工头 A（agent-113）第二刀，分支 `feat/leg-retry`（worktree `.agents/worktrees/feat-leg-retry`，基线 `main` `8f34701`）；
+  规划腿在第一刀（`feat/planner-resubmit`，另一 agent），两刀互不越界：本刀没有复制规划腿的 `avoid`/`spent` 路由回避机制。

@@ -377,8 +377,11 @@ returns `reject` and the run is cancelled on the same signal.
 - Classification is a whitelist with a fail-closed default: an unrecognised failure is
   reported as `unknown` and never becomes a success (R-14: prepare-phase failures never
   reach `agent/request-error`, so the script is the only place that can see them).
-- Budget: `(retries+1) × (|worker|+|verifier|) ≤ HARD_LIMITS.maxAttemptsPerTask (6)` is
-  enforced at load, and `maxTotalAgents` is derived from the effective chains
+- Budget: `(retries+1) × (2×|worker| + 3×(|verifier|+|supervisor|)) ≤ HARD_LIMITS.maxAttemptsPerTask (1000)`
+  is enforced at load (the walks are honest, not one call per route: a worker is
+  called at most twice per attempt — the call and its form resubmit — and each
+  judging leg at most three times — the call, a transport re-fire and a form
+  resubmit, D-123), and `maxTotalAgents` is derived from the effective chains
   (`routeBudgetFor` + `maxTotalAgentsFor`); without that, a run would abort mid-flight with
   `AGENT_CAP` the first time a fallback route is used.
 - Records: one redacted `plugin:grok-workflow/routing` ledger per run (switches and

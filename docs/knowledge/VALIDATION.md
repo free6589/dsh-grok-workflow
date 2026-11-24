@@ -1,3 +1,38 @@
+## 判定腿同 attempt 补打（第二刀）— 2026-11-24（包工头 A / agent-113，分支 `feat/leg-retry`，未合流）
+
+| state | command | result |
+| --- | --- | --- |
+| 分支形状 | worktree `.agents/worktrees/feat-leg-retry`，`feat/leg-retry` 从 `main` `8f34701`（0.13.28）开出；共享脏树 detached `a6103ad` 一行未动；规划腿 `feat/planner-resubmit` 未合、未碰 | `CONFIRMED` |
+| 基线（改动前，同一 worktree） | `npm run ci` | **exit 0：97 files / 1820 tests PASS** |
+| 新用例先红（机制，实现前） | `npx vitest run test/judge-leg-retry.spec.ts` | **5 failed / 3 passed（8）**：a/c/g/h 与 timeout 例红（`attempts` 长度 2 而不是 1、`judgeRetried` undefined、`status` failed、`maxTotalAgentsFor` 11 而不是 13）；3 条「不该补打」的负面例本就绿（它们钉的是现状） |
+| 预算钉子先红（实现前） | `npx vitest run test/routing.spec.ts` | **2 failed / 23 passed（25）**：`expected 600 to be 1000`、`expected 11 to be 13` |
+| 新用例后绿 | `npx vitest run test/judge-leg-retry.spec.ts` | **1 file / 8 tests PASS** |
+| 相邻套件后绿 | `npx vitest run test/judge-leg-retry.spec.ts test/verifier-resubmit.spec.ts test/failure-paths.spec.ts test/null-collapse.spec.ts test/orchestrator.spec.ts test/report.spec.ts test/dead-routes.spec.ts` | **7 files / 155 tests PASS** |
+| 预算套件后绿 | `npx vitest run test/routing.spec.ts` + `test/config.spec.ts test/config-limits-repair.spec.ts test/docs-architecture-version.spec.ts test/docs-config-keys.spec.ts` | **25 / 25** 与 **4 files / 90 tests PASS** |
+| 类型 | `npx tsc -p tsconfig.json --noEmit` | **exit 0**（改动前后各一次，两次都干净） |
+| 全量门禁 | `npm run build` → `npm run ci` | **exit 0：98 files / 1828 tests PASS**（+1 文件 +8 用例＝本轮新增）；typecheck 0 错；lint **0 errors / 36 warnings（全既有）**；**`verify:lib` byte-identical（237 files）** |
+| lib 一并提交 | `npm run build` 产物 `lib/{config,report,script,types}.*` 共 19 个文件 | `CONFIRMED`（`verify:lib` 复跑仍 exit 0） |
+| 真机 soak（隔离 `DSH_HOME` + 真模型跑一条真实 run） | — | **`NOT_RUN`：按任务分工留给合流方**（本刀不碰 live `~/.dsh`、不重启运行中实例、不发版、不 push） |
+
+**这一刀改的语义（细节见 D-123）：** 判定腿（verifier/supervisor）**死于传输**（`timeout` / `connection` / `server-error` /
+勾选框允许换人的 `rate-limit`）时，同一次 attempt 内只补打这条腿一次、保留 worker 结果；`format-error` 仍归既有补交通道、
+`verification-failed`（判定自己说了 no）不补打、`setup` 硬故障仍直接停。attempt 记录加 `judgeRetried: true`
+（`src/report.ts` 白名单也一并放行，否则交付那一层会把这个字段丢掉——新用例里专门钉了这条往返）。
+
+**预算同步抬（这是本刀容易漏的那一半）：** 每 attempt 的最坏调用数从 `2×(w+v+s)` 变成 `2×w + 3×(v+s)`
+（worker 2 趟＝首打 + 格式补交；每个判定 3 趟＝首打 + 传输补打 + 格式补交）；
+载入期 `callsPerAttempt` 同步改成同一组走法，`HARD_LIMITS.maxAttemptsPerTask` **600 → 1000**
+（最坏合法链路 50+50+50：`2×50+3×(50+50)=400`/attempt × 2 attempts = **800**/task；若不抬，这条合法链路会被载入期总闸直接拒掉——
+`test/routing.spec.ts` 两钉跟着改，`test/judge-leg-retry.spec.ts` 另有一钉从 `routeBudgetFor` 反算 block，避免只钉魔数）。
+
+**被这条改动翻掉的旧钉子（不是放宽）：** `test/verifier-resubmit.spec.ts` 原有一条钉「verifier 传输失败**不**补打」
+（`verifierCalls === 2`）——那正是本特性的缺席。改成钉新契约：`maxRetries` 1 时共 4 次判定调用（每次尝试首打 + 一次补打）、
+**worker 每次尝试只打一次**、两条 attempt 都带 `judgeRetried` 且 `failure.class === 'server-error'`。
+
+**独立交叉核对（包工头自己做，不只信子代理自述）：** 逐行读 diff（两条走廊位置在 B/C 之前，所以「补打回来还是不能解析」
+会落成 `format-error` 由 B/C 再打一次＝第三趟，与预算 3 一致）；读新用例 8 条与其断言；改前改后各跑一次全量门禁与
+`verify:lib`；确认 `git status` 只剩预期文件。
+
 ## 立项A 第一刀：规划腿的三条走廊（同次重交 / 换路重打）与预算同步抬 — 2026-11-24（规划腿子代理 agent-110，分支 `feat/planner-resubmit`）
 
 | state | command | result |

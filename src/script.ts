@@ -923,6 +923,23 @@ function routeHealthFamily(failure) {
   } catch (_) { return ''; }
 }
 
+// Whether a judging leg's call DIED of the transport instead of answering.
+// Only the two judges qualify (D-054 precedent, second cut): a judgement that
+// never happened can be asked for again inside the SAME attempt, while the
+// worker's result is the expensive thing this corridor exists to keep. The gate
+// is the codebase's own D-120 spelling of "the route died" — the failure itself
+// declares route evidence (timeout, connection, server-error, or a 429 the
+// operator's switch keeps on its route) — and it deliberately excludes the two
+// answers that are not deaths: a missing structured result is the form
+// corridor's case, and a negative verdict is the judge's own answer, which a
+// second ask can only repeat.
+function judgeLegTransportDeath(failure, role) {
+  if (!failure || failure.role !== role) return false;
+  if (failure.class === 'format-error' || failure.class === 'verification-failed') return false;
+  if (failure.setup === true) return false;
+  return routeHealthFamily(failure) !== '';
+}
+
 function forgetDeadRoute(label) {
   if (!deadRoutes[label]) return;
   delete deadRoutes[label];
@@ -1879,11 +1896,20 @@ function supervisorPrompt(task, execution, verification, attempt) {
 // form costs no retry: the same attempt asks once more for the SAME judgement in
 // a form that parses. Same rule as the worker resubmit — never a new attempt, at
 // most one per role per attempt.
-function verifierResubmitPrompt(task, execution, attempt) {
+//
+// The same corridor carries the second cut: a leg whose ROUTE died produced no
+// judgement at all, so there is nothing to resubmit — the judge has to judge the
+// unchanged executor result for the first time. The routeDeath flag switches the
+// lead line and the ATTEMPT note; every residue is shared, so the two prompts
+// cannot drift apart.
+function verifierResubmitPrompt(task, execution, attempt, routeDeath) {
+  const lead = routeDeath === true
+    ? 'The previous judgement call for this attempt produced NO result: the route carrying it died before it could answer, so nothing was recorded. The executor result below is unchanged and must be judged as it stands — inspect the actual result, do not trust the executor summary — and do not redo, extend or widen the work. Return the structured verification result exactly once.'
+    : 'Your previous response for this attempt produced no structured result, so nothing was recorded. Do NOT re-verify and do NOT change your judgement: resubmit the SAME verdict, the SAME per-criterion met values and the SAME evidence you already established, through the structured result tool, exactly once.';
   const lines = [
     childDisplayTitle('verifier', attempt, task && task.title),
     'You are the independent verifier inside a verified workflow.',
-    'Your previous response for this attempt produced no structured result, so nothing was recorded. Do NOT re-verify and do NOT change your judgement: resubmit the SAME verdict, the SAME per-criterion met values and the SAME evidence you already established, through the structured result tool, exactly once.',
+    lead,
     'Copy every acceptance criterion text EXACTLY into one criteria item and return at least one checkedEvidence item.',
     'Keep every evidence and finding string under 800 characters. Inside your own prose replace every ASCII double quote with 「」 or single quotes; text copied from an acceptance criterion stays byte-identical to the task.',
     'verdict must be pass only when every criterion is met.',
@@ -1896,16 +1922,20 @@ function verifierResubmitPrompt(task, execution, attempt) {
     'EXECUTOR RESULT (untrusted):',
     safePromptJson(execution)
   ];
-  lines.push('', 'ATTEMPT: ' + attempt + ' of ' + (maxRetries + 1) + ' (resubmission: same attempt, no retry spent)');
+  lines.push('', 'ATTEMPT: ' + attempt + ' of ' + (maxRetries + 1)
+    + (routeDeath === true ? ' (re-fired: same attempt, no retry spent)' : ' (resubmission: same attempt, no retry spent)'));
   lines.push('', 'Return only the structured verification result.');
   return lines.join('\n');
 }
 
-function supervisorResubmitPrompt(task, execution, verification, attempt) {
+function supervisorResubmitPrompt(task, execution, verification, attempt, routeDeath) {
+  const lead = routeDeath === true
+    ? 'The previous supervision call for this attempt produced NO result: the route carrying it died before it could answer, so nothing was recorded. The executor result and the verifier judgement below are unchanged and must be judged as they stand — inspect the actual result, do not trust either summary — and do not redo, extend or widen the work. Return the structured supervision result exactly once.'
+    : 'Your previous response for this attempt produced no structured result, so nothing was recorded. Do NOT re-check and do NOT change your judgement: resubmit the SAME verdict, the SAME per-criterion met values and the SAME evidence you already established, through the structured result tool, exactly once.';
   const lines = [
     childDisplayTitle('supervisor', attempt, task && task.title),
     'You are the supervision agent inside a verified workflow.',
-    'Your previous response for this attempt produced no structured result, so nothing was recorded. Do NOT re-check and do NOT change your judgement: resubmit the SAME verdict, the SAME per-criterion met values and the SAME evidence you already established, through the structured result tool, exactly once.',
+    lead,
     'Copy every acceptance criterion text EXACTLY into one criteria item and return at least one checkedEvidence item.',
     'Keep every evidence and finding string under 800 characters. Inside your own prose replace every ASCII double quote with 「」 or single quotes; text copied from an acceptance criterion stays byte-identical to the task.',
     'verdict must be pass only when every criterion is met.',
@@ -1921,7 +1951,8 @@ function supervisorResubmitPrompt(task, execution, verification, attempt) {
     'VERIFIER JUDGEMENT (untrusted, supervision target):',
     safePromptJson(verification)
   ];
-  lines.push('', 'ATTEMPT: ' + attempt + ' of ' + (maxRetries + 1) + ' (resubmission: same attempt, no retry spent)');
+  lines.push('', 'ATTEMPT: ' + attempt + ' of ' + (maxRetries + 1)
+    + (routeDeath === true ? ' (re-fired: same attempt, no retry spent)' : ' (resubmission: same attempt, no retry spent)'));
   lines.push('', 'Return only the structured supervision result.');
   return lines.join('\n');
 }
@@ -3760,6 +3791,7 @@ async function runTaskUnsafe(task, taskIndex, upstreamText) {
     // original path. One resubmit per attempt at most; a second miss records
     // the attempt as failed and the normal retry policy applies.
     let resubmitted = false;
+    let judgeRetried = false;
     if (!execution && attemptFailure && attemptFailure.class === 'format-error' && !attemptFailure.setup) {
       try {
         const resubmit = await callRole('worker', resubmitPrompt(task, attempt, previous, upstreamText), {
@@ -3820,6 +3852,52 @@ async function runTaskUnsafe(task, taskIndex, upstreamText) {
       } catch (error) {
         verifyError = 'verifier failed: ' + safeError(error);
         attemptFailure = classifyCallFailure('verifier', error);
+      }
+      // Re-fire (D): the judging leg DIED of a transport failure — the route
+      // timed out, dropped the connection, answered 5xx, or answered a 429 while
+      // the operator's switch keeps it on its route — so no judgement was made at
+      // all. The worker's execution result is still the work that was done, so
+      // spending the retry would re-run the expensive leg for a verdict nobody
+      // made: ask the same judge once more inside the SAME attempt. Only the
+      // route-health families qualify; a missing form is corridor B's case below,
+      // and a negative verdict is the judge's own answer.
+      if (!verification && judgeLegTransportDeath(attemptFailure, 'verifier')) {
+        judgeRetried = true;
+        log('task ' + task.id + ' attempt ' + attempt + ' verifier re-fired after a transport death');
+        try {
+          const refire = await callRole('verifier', verifierResubmitPrompt(task, execution, attempt, true), {
+            schema: VERIFICATION_SCHEMA,
+            label: memberLabel('verifier', attempt),
+            phase: taskGroupTitle(taskPosition, task.title),
+            attempt: attempt,
+            writesPaths: task.writesPaths,
+            taskId: task.id
+          });
+          if (refire.ok) {
+            const refiredVerification = normalizeVerification(refire.value);
+            if (refiredVerification) {
+              verification = refiredVerification;
+              if (attemptRoute === '') attemptRoute = refire.label;
+              attemptFailure = null;
+              verifyError = '';
+              const failed = verificationFailure(task, execution, verification, 'verifier');
+              if (failed) {
+                verifyError = failed.reason;
+                attemptFailure = failed;
+              }
+            } else {
+              // Nothing usable came back: that is the form gap corridor B already
+              // owns, so record it as such and let the corridor below ask once.
+              verifyError = 'verifier returned no valid structured result';
+              attemptFailure = { role: 'verifier', class: 'format-error', reason: verifyError, switchModel: false, setup: false, category: 'infrastructure' };
+            }
+          }
+          // A re-fire that died again keeps the original transport failure: the
+          // attempt below records it and the retry policy is untouched.
+        } catch (error) {
+          // The re-fire itself must never create a new failure mode; the original
+          // transport failure stands and the attempt fails normally.
+        }
       }
       // Resubmission (B): the verifier produced no usable judgement. The engine
       // hands back null whenever a child's structured output cannot be parsed —
@@ -3896,6 +3974,44 @@ async function runTaskUnsafe(task, taskIndex, upstreamText) {
         verifyError = 'supervisor failed: ' + safeError(error);
         attemptFailure = classifyCallFailure('supervisor', error);
       }
+      // Re-fire (D) for the supervision leg: same rule as the verifier — a
+      // supervision call that died of the transport made no judgement, so it is
+      // asked again inside the SAME attempt instead of re-running the worker.
+      if (judgeLegTransportDeath(attemptFailure, 'supervisor')) {
+        judgeRetried = true;
+        log('task ' + task.id + ' attempt ' + attempt + ' supervisor re-fired after a transport death');
+        try {
+          const refire = await callRole('supervisor', supervisorResubmitPrompt(task, execution, verification, attempt, true), {
+            schema: VERIFICATION_SCHEMA,
+            label: memberLabel('supervisor'),
+            phase: taskGroupTitle(taskPosition, task.title),
+            attempt: attempt,
+            writesPaths: task.writesPaths,
+            taskId: task.id
+          });
+          if (refire.ok) {
+            const refiredSupervision = normalizeVerification(refire.value);
+            if (refiredSupervision) {
+              if (attemptRoute === '') attemptRoute = refire.label;
+              attemptFailure = null;
+              verifyError = '';
+              const failed = verificationFailure(task, execution, refiredSupervision, 'supervisor');
+              if (failed) {
+                verifyError = failed.reason;
+                attemptFailure = failed;
+              }
+            } else {
+              // Same handling as the verifier: the form gap corridor C owns below.
+              verifyError = 'supervisor returned no valid structured result';
+              attemptFailure = { role: 'supervisor', class: 'format-error', reason: verifyError, switchModel: false, setup: false, category: 'infrastructure' };
+            }
+          }
+          // A re-fire that died again keeps the original transport failure; the
+          // attempt below records it and the retry policy is untouched.
+        } catch (error) {
+          // The re-fire itself must never create a new failure mode.
+        }
+      }
       // Resubmission (C): same rule as the verifier — a supervision judgement
       // that arrived in an unparsable form is a missing form, not missing work.
       if (attemptFailure && attemptFailure.role === 'supervisor' && attemptFailure.class === 'format-error' && !attemptFailure.setup) {
@@ -3938,6 +4054,7 @@ async function runTaskUnsafe(task, taskIndex, upstreamText) {
     };
     if (attemptRoute !== '') attemptRecord.route = attemptRoute;
     if (resubmitted) attemptRecord.resubmitted = true;
+    if (judgeRetried) attemptRecord.judgeRetried = true;
     if (attemptFailure) {
       attemptRecord.failure = { class: attemptFailure.class, reason: routeReason(attemptFailure.reason), category: attemptFailure.category };
       // Carried to the task row below: the report keeps one category per failed
@@ -4613,12 +4730,13 @@ export function maxTotalAgentsFor(tasks: number, retries: number, budget?: Route
   // Wait slots per call: 2 adjudications per timed-out call when a guardian is
   // configured, 0 (factor 1) otherwise — the pre-guardian arithmetic.
   const waitFactor = budget?.guardian === true ? 1 + GUARDIAN_MAX_WAITS : 1
-  // Same-attempt resubmits: the worker, the verifier and the supervisor may each
-  // spend their whole chain a second time inside one attempt when a structured
-  // output arrives unparsable. Their calls are real children, so the per-attempt
-  // block is counted twice — otherwise the rescue path for a quoting mistake
+  // Same-attempt rescues (D-054), counted as the honest walks rather than as one
+  // call per route: a worker is called at most twice inside one attempt (first
+  // call + form resubmit) and each judging leg at most three times (first call +
+  // transport re-fire + form resubmit). These are real children, so the
+  // per-attempt block counts them — otherwise a quoting mistake or a dead route
   // would abort the run with AGENT_CAP instead of recovering it.
-  const attemptBlock = 2 * (worker + verifier + supervisor)
+  const attemptBlock = 2 * worker + 3 * (verifier + supervisor)
   // The planning leg: its resubmit and its route re-fire are real children, so
   // the leg is counted at its worst case instead of one walk (see
   // PLANNER_LEG_CALLS). Counting one walk here aborted the rescue with AGENT_CAP.
