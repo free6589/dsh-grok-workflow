@@ -1,0 +1,16 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.worktrees/feat-inbox-steering
+
+ ✓ test/update-entry.spec.ts (20 tests) 151ms
+ ✓ test/update-surface.spec.ts (29 tests) 72ms
+ ✓ test/docs-config-keys.spec.ts (14 tests) 17ms
+ ✓ test/docs-version.spec.ts (8 tests) 11ms
+ ✓ test/i18n-parity.spec.ts (8 tests) 12ms
+ ✓ test/docs-architecture-version.spec.ts (3 tests) 6ms
+
+ Test Files  6 passed (6)
+      Tests  82 passed (82)
+   Start at  02:30:28
+   Duration  1.59s (transform 517ms, setup 0ms, import 633ms, tests 269ms, environment 1ms)
+
+EXIT=0

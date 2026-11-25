@@ -1,3 +1,42 @@
+## 跑中插话的入口（`feat/inbox-steering`）：宿主那条 `agent/inbox/inserted` 在工具调用**跑着**的时候就发，插件据此把话排进那次运行的队列，真机上边界子真的取到了；**`replan` 关掉仍什么也不排**；块内 `typecheck` / `lint` / 6 份 spec 绿、红有记录 — 2026-11-26 (`CONFIRMED`)
+
+**这一轮的问题**：`D-161` 把活通道接回 `runWorkflow` 之后，管道通了却没有活的调用方（`grok_workflow` 占着那一轮、
+子代理被守卫拒绝、GUI 把话存在客户端排队条里）。要拍板的两条路，先做探针再决定。
+
+**探针（`CONFIRMED`，隔离档案 + 真模型 + CDP 装置 + 一个只做记录的探针 bundle）**：根会话里 `tool/call grok_workflow`
+（seq 18）与 `agent/inbox/spliced` **target=`next-step`**（seq 29）之间**没有** `tool/result` —— 也就是工具调用还在跑的时候，
+跑中打的那句话被放进了同一轮的下一步；探针 bundle 同时记到 `inserted`（`sourceKind=user`，18:21:28.586Z）。
+第一次探针运行同一形状（seq 19 → seq 33，`tool/result` 在 seq 71 才出现）。**结论：甲可行，没有改判乙。**
+另一条读数：工作流喂给**子代理**的提示词 `sourceKind` 也是 `user`，所以「user 角色」不是真人的判据，会话键是第二道闸。
+
+**块内门禁（`CONFIRMED`）**：`npx tsc -p tsconfig.json --noEmit` `EXIT=0`；`npx oxlint src test`
+`Found 15 warnings and 0 errors.` / `184 files` / `EXIT=0`（与基线同数）；定向 6 份 spec
+`test/steering-inbox.spec.ts test/replan.spec.ts test/block-tools.spec.ts test/plugin-lifecycle.spec.ts test/composition.spec.ts test/lifecycle-disposal.spec.ts`
+→ **`Test Files 6 passed (6)` / `Tests 100 passed (100)`**；`npm run build` `client bundle: 348559 bytes`；
+**红**：把 `installSteeringInbox` 换成空实现、只跑新 spec → **`14 failed (14)`**（恢复后 `14 passed`）。
+转录在 `.rsi/evidence/inbox-steering-2026-11-26/`（`gate-*.out`、`red-before-fix.out`）。全量 `npm run ci` **`NOT_RUN`**（§12，留给发版）。
+
+**真机（`CONFIRMED`，隔离档案 `inboxprobe`、端口 3461、live 3080 全程没碰）**：装本轮 `npm pack` 的包
+（`sha256(lib/steering-inbox.js)` = `8dbce218…685b`，与工作树逐字节相同），一次真模型的三波运行里跑中打一句话并按 Ctrl+Enter：
+边界子（`规划（第2次）· 波 1 边界`，session `364132ca`）的 `grok_replan_intents`（token `steer-mwwg8rzu-1`）**返回非空**：
+`{"intents":[{"id":"steer-mwwg8rzu-1-1","text":"再加一条要求：最后额外报一个 CHANGELOG.md 与 README.md 行数的差值。","atMs":1795630888586}],"dropped":0}`
+—— `atMs` 与探针那条 `inserted` 同一毫秒。**投递链通了。**
+
+**没落地的那一步（照实记）**：这次运行的**计划没有被改**。边界子把要求转成 `structured_output {"action":"apply", edits:[…]}`，
+但 `add` 编辑把字段写在编辑层、没有 `task` 体 → 宿主按 `replan edit 1 adds a task with no body` 拒绝
+（`src/script.ts:3484-3492` 的既有规则，与本轮改动无关）；运行本身 **`COMPLETED`**（3 任务 / 3 波 / 全部 `verified`），
+报告里没有「差值」那条。那条要求随后**按普通一轮被回答**（18:26:14 `claimed`，02:26 回复给出 `4263 − 396 = 3867`），
+正是 `CHANGELOG` 里写明的「并入之后仍另起一轮」。**所以这一轮证明的是「投递」，不是「合并成功」** —— 合并成不成取决于边界子
+给出的请求形状，那是既有行为。
+
+**一处装置上的坑（下次别踩）**：同一个版本号的 `file:` tgz 直接再 `add`，pnpm 会复用它上一次的解包（装出来的 `lib/` 里没有
+`steering-inbox.js`）；先 `remove` 再 `add` 才拿到新字节。
+
+**红线（实测）**：`~/.dsh` `2026-11-25 23:14:14`、`~/.dsh/profiles` `2026-11-22 16:59:46`、
+`~/.dsh/profiles/web` 与 `cordis.patch.yml` `2026-11-25 23:04:40`、`.credentials.yaml` `2026-11-14 22:47`
+（全在本会话之前，前后同值）；写探测 `Read-only file system`；live 3080 前后都是 **401**，没重启没重载没 kill；
+scratch（293 MB）跑完整棵删除；没有读、没有打印、没有写任何密钥值。
+
 ## 跑中插话接线接回（`fix/steering-reconnect`）：`openSteering()` 的调用链回到 `runWorkflow`，块内 `typecheck` / `lint` / 6 份 spec 绿、红有记录、真机上两道波边界真的叫了边界子并用新令牌调了拉取工具；**跑中并入本身 `NOT_RUN`（形状上仍没有活调用方，见 `D-161`）** — 2026-11-26 (`CONFIRMED`)
 
 这一轮只回答一个问题：M3.3 删前台时一起带走的 `openSteering()` 接线接回去以后，在真机上是不是真的活了。

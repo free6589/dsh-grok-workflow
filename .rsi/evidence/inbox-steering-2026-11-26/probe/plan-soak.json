@@ -1,0 +1,10 @@
+[
+ {"type":"fresh","label":"fresh"},
+ {"type":"send","label":"w1-task","timeoutMs":22000,"quietMs":1500,"shot":true,
+  "text":"用 grok_workflow 跑一个三波的小活：目标「分别数三个文件的行数」。三个任务各数一个文件的行数，文件在 /home/fish/projects_mine/dsh-grok-workflow 下，分别是 AGENTS.md、README.md、CHANGELOG.md；每个任务只读自己那个文件，回答行数与前三个二级标题。三步要串成三波依赖：第二步依赖第一步，第三步依赖第二步。不要传 tasks 参数，让插件自己规划。"},
+ {"type":"sleep","ms":30000},
+ {"type":"snapshot","label":"w2-running","shot":true},
+ {"type":"steer","label":"w3-steer","text":"再加一条要求：最后额外报一个 CHANGELOG.md 与 README.md 行数的差值。","beforeKeyMs":1000,"afterKeyMs":8000},
+ {"type":"snapshot","label":"w4-afterkey","shot":true},
+ {"type":"settle","label":"w5-done","timeoutMs":1500000,"quietMs":30000,"shot":true}
+]

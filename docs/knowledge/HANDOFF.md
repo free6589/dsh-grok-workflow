@@ -1,3 +1,32 @@
+## 2026-11-26 — `feat/inbox-steering`：跑中插话有了活的入口（订宿主的 `agent/inbox/inserted`、白名单只认真人、按会话入队）；真机上话真的走到了边界拉取工具，**但计划没被改**（边界子的请求形状被既有规则拒）；未合 `main`、未 push、未发版
+
+- **From:** 包工头（`agent-184`）· **To:** 下一个接手者 / 拍板的人
+- **这一轮是什么**：`D-161` 的 Consequences 说管道通了、但没有任何角色能在跑中把话塞进队列。本轮先做探针（15 分钟那一档），
+  通了才动手，选择的是**甲**（宿主侧消息入口），不是乙（调度子代理跑 workflow）。
+- **身份**：分支 **`feat/inbox-steering`**，从 `main` 尖端 **`4584b8d`** 开出（worktree `.worktrees/feat-inbox-steering`）。
+  改动面：新增 `src/steering-inbox.ts`、`src/index.ts` 加 `ctx.effect(() => installSteeringInbox({ctx, logger}))` 与一行 import、
+  新增 `test/steering-inbox.spec.ts`（14 例）、重建 `lib/`、`CHANGELOG` 的 `[Unreleased]` 一条（中英）、`D-162`、
+  本轮的 `STATE` / `VALIDATION` / `HANDOFF`。**没有动 `run.ts` / `steering.ts` / `block/**` / 配置键。**
+- **探针结论（`CONFIRMED`）**：**发**。根会话里 `tool/call grok_workflow` 与 `agent/inbox/spliced`（target `next-step`）
+  之间没有 `tool/result`，探针 bundle 同时记到 `inserted`（`sourceKind=user`）。两次运行同形状（一次 `tool/result` 在
+  十几次事件之后才出现）。**关键陷阱**：工作流喂给子代理的提示词 `source.kind` 也是 `user`，所以只能靠**会话键** + 白名单
+  过滤，光看 `role` 会把引擎自己的提示词当成用户要求。
+- **块内门禁**：`tsc EXIT=0`、`oxlint 15/0/184 files`、定向 6 份 spec `100 passed`、`build 348559 bytes`；红：空实现 → `14 failed`；
+  全量 `npm run ci` `NOT_RUN`。转录与真机读数在 `.rsi/evidence/inbox-steering-2026-11-26/`。
+- **真机读数要分开看（重要）**：**投递通了** —— 边界子 `grok_replan_intents` 返回
+  `{"intents":[{"id":"steer-mwwg8rzu-1-1",…,"atMs":1795630888586}],"dropped":0}`，`atMs` 与 `inserted` 同一毫秒。
+  **合并没成** —— 边界子的 `structured_output` 里那条 `add` 编辑把字段写在编辑层、没有 `task` 体，
+  被 `src/script.ts:3484-3492` 的既有规则拒成 `replan edit 1 adds a task with no body`；运行 `COMPLETED`（3 任务/3 波全 verified），
+  那条要求随后按普通一轮被回答。**下一块若要「并入真的改了计划」，要动的是边界子的请求形状或那条归一化规则的措辞
+  （`REPLAN_SCHEMA` 的说明），不是本轮的投递链。**
+- **给下一个人的四条**：① 合之前先想清楚「并入之后仍另起一轮」是不是想要的产品行为（现在是，`CHANGELOG` 写明了）；
+  ② `replan` 关掉仍然什么也不排，别再加第三颗开关（`D-162` 的 rejected 里写了为什么）；
+  ③ 真机装置在 `.rsi/evidence/inbox-steering-2026-11-26/probe/`（`drive.mjs` 加了 `steer` 步骤 + 按键前抓图，
+  `extract.mjs` 把「splice 落在调用当中」从 session 日志里抽出来）；④ **同版本号 `file:` tgz 再 `add` 会被 pnpm 复用旧解包**，
+  先 `remove` 再 `add`。
+
+---
+
 ## 2026-11-26 — `fix/steering-reconnect`：跑中插话的接线接回 `runWorkflow`（开队列 + 传令牌 + `finally` 关），真机上两道波边界真的叫了边界子并用新令牌调了拉取工具；**跑中并入本身仍没有活调用方（`D-161`）**，未合 `main`、未 push、未发版
 
 - **From:** 包工头（`agent-181`）· **To:** 下一个接手者 / 拍板的人
