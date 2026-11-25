@@ -1,3 +1,58 @@
+## 开关文案改成「工作流开关 / 开」、把「命令写入后不刷新」这条旧疑点结案（`fix/composer-label`）— 2026-11-25 (`CONFIRMED`)
+
+下面每一行都写清命令、环境与结果；没跑的写 `NOT_RUN`，被环境挡住的写 `BLOCKED`。分支 `fix/composer-label`（worktree
+`.tmp/wt-composer-label`，Node v26.8.1），基线 `main` 尖端 **`424ed99`**，功能提交 **`2f218d0`**（3 文件 / +31 −17）。
+**门禁由包工头跑**；**定向测试由收口轮自己重跑**（同一棵树、同一条命令），读数一致。证据逐字摘录在
+`.rsi/evidence/composer-label-2026-11-25/README.md`。
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 分支、基线、提交 | `git status --short --branch`；`git log --oneline -3`；`git show --stat --format="" 2f218d0`；`git show --numstat --format="" 2f218d0`（worktree） | `## fix/composer-label`；`2f218d0` → `424ed99`；**3 文件 / +31 −17**：`src/client/index.js` 4/4、`lib/client.js` 4/4、`test/client.spec.ts` +23 −9。版本仍 **`0.13.35`**。**`CONFIRMED`** |
+| 改了哪四条文案（前 → 后） | `grep -n "mode.switch" src/client/index.js`；`git show 2f218d0 -- src/client/index.js` | EN `mode.switch.label` **`Workflow` → `Workflow switch`**、EN `mode.switch.on` **`On · full crew` → `On`**；ZH `mode.switch.label` **`workflow总开关` → `工作流开关`**、ZH `mode.switch.on` **`开 · 全员模式` → `开`**。理由：`full crew` / `全员模式` 是旧前台那一档的名字，旧前台在 0.13.35 已整条链删除。**`CONFIRMED`** |
+| 没动的键 | 同上（八个 `mode.switch.*` 键逐个核） | `aria` / `off` / `reading` / `busy` / `noSession` / `failed` **六个键一字未改**（两个语言都是）。**`CONFIRMED`** |
+| 为什么测试必须跟着改 | 读 `src/client/index.js:5304-5308`（状态词的取值）与新文案 | 中文状态词从 `开 · 全员模式` 缩成单字 **`开`**，新标签 `工作流开关` **本身含 `开`**——原来「整行文本包含状态词」的断言在**关着**的时候也会命中标签里的那个 `开`，退化成**永真**。**`CONFIRMED`**（这是「不修就会假绿」的判断依据，不是推断） |
+| 改法：读状态行元素 | `grep -n "data-mode-note" src/client/index.js`；`grep -n "noteText\|noteIn\|data-mode-note" test/client.spec.ts` | 渲染侧 `src/client/index.js:5395` 就是 `'data-mode-note': state.phase`，文字由 `modeSwitchText` 给；测试侧新增 `noteIn` / `noteText` 两个帮手（`test/client.spec.ts:920-921`），**7 处** `toContain` → `toBe`：`:3252`、`:3259`、`:3274`、`:3324`、`:3440`、`:3446`、`:3452`；负向那条「关着时不许出现开的文案」也改成量状态行（`:3277-3280`）。**`CONFIRMED`** |
+| 两条防塌陷守卫 | `git show 2f218d0 -- test/client.spec.ts` | 钉死中文标签的那条字面量改成 `工作流开关`（`:3373`），并新增 `label ≠ on`、`on ≠ off` 两条（`:3376-3377`）：任何一个塌了，状态断言会在两种状态下同时为真。**`CONFIRMED`** |
+| 定向测试（收口轮自己跑） | `TMPDIR=$PWD/.tmp npx vitest run test/client.spec.ts test/i18n-parity.spec.ts` | **EXIT=0**：`Test Files 2 passed (2)` / **`Tests 138 passed (138)`**（`client` **132**、`i18n-parity` **6**），`Duration 939ms`。**0 skipped / 0 todo。`CONFIRMED`** |
+| 六个文档守卫（收口轮自己跑，**两次：改完 `CHANGELOG.md` 之后、改完 `README.zh-CN.md` 之后**） | `TMPDIR=$PWD/.tmp npx vitest run test/docs-version.spec.ts test/update-entry.spec.ts test/update-surface.spec.ts test/docs-config-keys.spec.ts test/i18n-parity.spec.ts test/docs-architecture-version.spec.ts` | 两次都 **EXIT=0**：`Test Files 6 passed (6)` / **`Tests 79 passed (79)`**（`update-entry` 20、`update-surface` 29、`docs-config-keys` 13、`docs-version` 8、`i18n-parity` 6、`docs-architecture-version` 3）；第一次 `Duration 1.42s`、第二次 `Duration 1.22s`。`docs-version` 读 `CHANGELOG.md`（本轮新加的那条 `### Changed / 变更`）、`docs-config-keys` 读两个 README（本轮那处措辞改动），两次改动都落在被核的范围里。**`CONFIRMED`** |
+| 用例总数没变 | 上面那一行与全量门禁 | 全量门禁是 **1832** 例（与基线同数，门禁读数在下面）；本轮**没增删一条用例**，只收紧 7 处断言、加 2 条守卫。**`CONFIRMED`** |
+| 构建体积与差额 | 门禁输出里的 `client bundle` 行；`git show 424ed99:lib/client.js \| wc -c` | 现在 **`client bundle: 321607 bytes`**；基线提交的 `lib/client.js` 是 **321631 bytes**，**差 24 字节**，就是四条文案变短（`Workflow` → `Workflow switch` 之类）。**`CONFIRMED`** |
+| 门禁（全量，包工头跑，`2f218d0` 的树） | `TMPDIR=$PWD/.tmp npm run ci`（输出 `.tmp/ci.out`，末行 `EXIT=0`） | **EXIT=0**：`Test Files 98 passed (98)`、**`Tests 1832 passed (1832)`**、`Duration 93.03s (transform 2.45s, setup 0ms, import 7.88s, tests 74.22s, environment 10ms)`、**`Found 15 warnings and 0 errors.`**（`Finished in 87ms on 177 files with 96 rules using 6 threads.`）、**`lib/ at 2f218d0 is the build of src/ at 2f218d0 (281 files, byte-identical)`**、`client bundle: 321607 bytes → lib/client.js`。**`CONFIRMED`** |
+| 只验提交，不验工作树 | `scripts/verify-lib.mjs` 的行为 | `verify:lib` 拿提交对提交比：工作树里 `lib/` 换了却还没提交时，它会说**旧提交**自洽。所以本条只引用 `2f218d0` 那一行读数，**不引用更早的 `424ed99` 输出**。`git status --short` 干净，`src`/`test`/`lib` 三件在同一个提交里。**`CONFIRMED`** |
+| 旧文案在代码里清干净了 | `grep -rn "full crew\|全员模式\|workflow总开关" src/ test/` | **0 命中（exit 1）**——改动前后 `src/` 与 `test/` 都没有这三串。**`CONFIRMED`** |
+| 用户文档里的旧叫法一并改了 | `grep -rn "full crew\|全员模式\|workflow总开关" --include='*.md' .`（排除 `node_modules`、`.tmp`）；`git diff --numstat README.zh-CN.md` | 改前 `README.zh-CN.md:248` 写着「**再接一个「workflow总开关」。**」（英文 `README.md` 本来就叫 `The workflow switch`）。本轮**顺手改掉**：`**再接一个「workflow总开关」。**` → `**再接一个「工作流开关」。**`，**+1 −1**，只动这一处措辞；同段「挂载时读一次 / 会话没有记录时显示 `grokDefault` / 关闭三重提示」的描述**一字未改**（那些仍然是真话），英文 README 未动。改后两个 README 里这三串**都不再出现**；剩下的命中都在**引述旧值**的地方——`CHANGELOG.md` 的变更说明、本目录证据文件的前后对照、`docs/knowledge/*` 的历史记录（后者**按「写下时为真」保留**）。**`CONFIRMED`** |
+| 真机环境（隔离克隆） | `node scripts/clone-profile.mjs` → `.tmp/soak-label/dsh-home`（`DSH_HOME`） | profile 名 **`web-clone`**，**7699 文件**、parity **5/5**、**1 行凭据按设计脱敏**（`cordis.patch.yml:379`，`openai-style-key`）；端口 **3321**；克隆里已移除的键 `mode: triage` 删掉再起；插件用**拷进 profile 的构建产物**（不是软链——软链会挂，`docs/LOCAL-TESTING.md` 的 trap 清单）；`grokDefault: on`（克隆内 `cordis.patch.yml:563`，与 live 一致）；headless Chromium（Playwright，`/usr/bin/chromium`，1500×1000）。**live `~/.dsh` 一行未写、3080 未碰。`CONFIRMED`** |
+| 复现读数①：命令写了记录，已挂载的开关不刷新 | `.tmp/soak-label/probe1.json`（41 次快照 + `/grok-workflow/mode` 全量请求/响应） | 挂载读一次：`{"ok":true,"action":"status","mode":{"enabled":true,"source":"default","setBy":null,"turn":null,"workflowMode":null,"fallback":true}}` → 显示 `workflow总开关 \| 开 · 全员模式`。打字 `/grok off` 回车后会话里出现 `grok / Grok workflow OFF — normal chat.`，会话日志里**只有一条** mode 记录 `{"v":1,"enabled":false,"turn":0,"setBy":"command:/grok off"}`（seq **5**、`ignorable:true`）。但**整个观察窗加下一回合，`/grok-workflow/mode` 只有挂载时那 1 次请求**（`modeCalls` 长度 2 = 1 请求 + 1 响应），**41 次快照全部**停在 `开 · 全员模式`（initial、after-off+2…+40s 二十条、after-next-turn+2…+40s 二十条）。**`CONFIRMED`** |
+| 复现读数②：看到的「回开」是另一个会话 | `.tmp/soak-label/probe2.json`（3 次请求 + 13 次快照） | reload 后前端打开的是**另一个新建空会话** `session-f259f6a0-…`（那时 `user/message` 计数 **0**），读到 `source:"default"` → `开 · 全员模式`；点回 `session-2abe70e6-…` 后重挂载读一次 → `{"enabled":false,"source":"record","setBy":"command:/grok off","turn":0,"workflowMode":null,"fallback":true}` → `关`，之后 10 次快照都是 `关`。**没有一次对「有记录的会话」读回 `source:"default"`。`CONFIRMED`** |
+| 复现读数③：新文案（换成本轮构建，同一隔离实例重启） | `.tmp/soak-label/probe3.json`（3 次请求 + 5 次快照 + `checks`） | 新会话挂载 → `工作流开关 \| 开`；点开关 → POST `{"action":"set","sessionId":"session-f259f6a0-…","enabled":false}` → 响应 `{"ok":true,"action":"set","mode":{"enabled":false,"source":"record","setBy":"switch:mode","turn":0,"workflowMode":null,"fallback":true}}` → `工作流开关 \| 关`；再发一回合**仍 `关`**；reload（新会话）**仍 `关`**；打开旧会话**仍 `关`**（读到 `source:"record"`）。`checks`：`no-full-crew: true`、`label-and-state: "工作流开关 \| 关"`。**`CONFIRMED`** |
+| 两次装的不是同一份构建 | `sha256sum`（本 worktree 的 `lib/client.js`、克隆里装进去的 `lib/client.js`、主检出的 `lib/client.js`） | 本轮构建 **`4ce107e1901a44e6ef327245de28680c5d9305d436f289c2dd30c47fb3b98d09`**，与克隆里装的那份**逐字节相同**；主检出（`main` @ `424ed99`，0.13.35）那份是 **`1455d91e832be8cbced740275078e70747d5d320a2485406e9582f750e102808`**（含 `workflow总开关`、不含 `工作流开关`），与 probe1/2 快照里的旧文案一致。**`CONFIRMED`** |
+| 定性：不是回落，是「一次性读取 + 命令写入后不刷新」 | 上三行读数交叉 | 同一个有记录的会话，reload 前、reload 后、下一回合**三次**读到的都是 `source:"record", enabled:false`，与账本逐字一致——**记录权威在 route 一侧是对的**。「回开」是开关挂在了另一个**没有记录**的会话上，那里 `grokDefault: on` 就是宿主的诚实答案。真正的客户端缺陷是**挂载时读一次、命令写入后不刷新**（没有轮询、没有事件订阅）；**点击会刷新**（写响应回填状态），**打字不会**。**`CONFIRMED`** |
+| 订正一条旧疑点 | `VALIDATION.md:410`（2026-11-24 那条「疑点：composer 总开关显示」，`HYPOTHESIS`） | 那条原文**不回改**（一条记忆是「写下时为真」）；**它记的「疑似回落到 profile 默认值」由本节结案并订正**：没有观察到任何一次「对有记录的会话读回默认值」，回落不成立；现象由两件事合成——挂在另一个空会话上 + 命令写入后不刷新。**`CONFIRMED`** |
+| 模型回合 | 隔离克隆里的会话日志（`sessions/*/session-*/session.v4.jsonl.zstd`，`zstdcat` 可读） | **`NOT_RUN`**：克隆按设计把 `AGENT2API_API_KEY` 脱敏掉了，每次发消息都是 `MISSING_CREDENTIAL` 的 `turn/end {kind:error}`，页面显示「本轮运行失败」。读数覆盖的是「发出一条消息、开一回合」这一层，**模型回答本身没验**。 |
+| 打字后开关变关（复核旧记录） | probe1 / probe2 读数 | **没能复现**：按读数，打字 `/grok off` **不会**让已挂载的开关变关；观察到的「关」只来自**点击**，或 reload / 切会话后的**重新挂载**。旧记忆里「`/grok off` 后开关显示关」这半句，本轮**没有拿到支撑读数**。**`CONFIRMED`（就「本轮未复现」这件事本身）** |
+| 「命令后不刷新」本轮不修 | —— | **`NOT_RUN`（有意不修）**：一次改动只做一件事；真机读数先把现象与成因分开；修法（订阅 `session/event` 或写响应回填）需要另一次决定，判据见 `DECISIONS.md` 的 **`D-149`**。 |
+| live profile / 线上实例 | `~/.dsh` 未写、3080 未重启 | **全程未碰**：`~/.dsh/profiles/web/cordis.patch.yml:563` 那条 `mode: triage` **仍在**（`mode`/`legacyGate` 是移除键，先升级会让那一行拒绝激活）。真机只在隔离 home + 端口 3321 上做。**`CONFIRMED`** |
+| 发版 / push / tag / 版本号 / PR | `git status --short --branch`；`git log --oneline -1` | **`NOT_RUN`**：没有 `git push`、没有打 tag、没有改版本号（`package.json` 仍是 **`0.13.35`**）、没有创建 PR、没有合 `main`。 |
+
+**记忆侧这一轮动了什么：** `docs/knowledge/STATE.md`（顶部新条目）、`docs/knowledge/VALIDATION.md`（本条）、
+`docs/knowledge/HANDOFF.md`（顶部新条目）、`docs/knowledge/DECISIONS.md`（新增 **`D-149`**）、`CHANGELOG.md` 的 `[Unreleased]`
+下新增 `### Changed / 变更` 一条（中英双语），以及 `.rsi/evidence/composer-label-2026-11-25/README.md`。
+**`src/`、`test/`、`lib/`、`docs/` 下除清单外的文件本轮一个字也没有写**——那三处代码/测试/产物的改动在 `2f218d0` 里，
+是包工头那一轮的，不是收口轮的；`README.zh-CN.md:248` 那句旧叫法**本轮顺手改成「工作流开关」**（+1 −1，只动那一处措辞，同段描述一字未改），
+英文 `README.md` 未动。
+
+**Honest boundary（逐条）：**
+1. **门禁不是收口轮跑的**：`npm run ci`、`npm run build`、`verify:lib` 与 `client bundle` 的字节数都来自包工头在 `2f218d0` 上的记录
+   （输出 `.tmp/ci.out`，末行 `EXIT=0`）；收口轮自己重跑的是那一批定向测试（`client` + `i18n-parity`，138 例），读数一致。
+2. **`npm run build` 收口轮 `NOT_RUN`**：会写 `lib/` 并与包工头的构建抢产物；`321607 bytes` 因此是转述，差额那一半（基线 321631）是我自己
+   `git show 424ed99:lib/client.js | wc -c` 量的。
+3. **模型回合 `NOT_RUN`**：隔离克隆缺 `AGENT2API_API_KEY`，只验到「发出消息、开一回合」。
+4. **两条现象是分开记的，不要合并**：①「命令写入后不刷新」是**已确认的客户端缺陷**（`CONFIRMED`，本轮不修）；②「开关短暂显示回开」
+   **不是回落**，是挂在另一个空会话上（`CONFIRMED`）。把 ② 当成 ① 的后果，会把修法指向 route 一侧，那是错的方向。
+5. **scratch 是临时的**：`.tmp/soak-label/` 全部在 `.tmp/`（gitignored）下，收尾时由包工头删；**引用的是 `.rsi/evidence/` 里逐字摘录的那份**，
+   删掉 scratch 不会让本节的读数失去出处。
+6. **`docs/knowledge` 仍不受任何测试守卫**（M3.4 那轮逐件核过六件守卫的读文件清单）：改记忆不会让测试变红，也不会被机器抓住与代码不一致。
+
 ## M3.4 死代码收尾：删掉 0.13.35 遗留的一批零引用导出、改写 12 个够到它们的 spec、门禁通过（`fix/m3-dead-code`）— 2026-11-25 (`CONFIRMED`)
 
 下面每一行都写清命令、环境与结果；没跑的写 `NOT_RUN`，被环境挡住的写 `BLOCKED`。分支 `fix/m3-dead-code`（worktree

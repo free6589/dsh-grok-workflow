@@ -1,3 +1,52 @@
+Last updated: 2026-11-25 11:22 +08:00（**对话框底部那个开关改文案：「全员模式」这个词随旧前台一起没了，现在开就是开、关就是关，标签叫「工作流开关 / Workflow switch」；门禁 EXIT=0；真机读数不是「回落」，而是两件事叠加——开关挂在另一个没有记录的空会话上 + 命令写入后已挂载的开关不刷新，`CONFIRMED`；未发版、未 push、未合 `main`，版本仍 `0.13.35`** —
+分支 **`fix/composer-label`**，worktree `.tmp/wt-composer-label`，基线 `main` 尖端 **`424ed99`**，功能提交 **`2f218d0`**
+（`fix(client): say the workflow switch plainly, without the deleted full-crew mode`，**3 文件 / +31 −17**：`src/client/index.js` 4/4、
+`lib/client.js` 4/4、`test/client.spec.ts` +23 −9），文档提交待包工头做。
+**改的是四条文案（`mode.switch.*` 八个键里只动 `label` 与 `on`，两个语言各一对，其余六个一字未动）**：EN `label` `Workflow` → **`Workflow switch`**、
+EN `on` `On · full crew` → **`On`**；ZH `label` `workflow总开关` → **`工作流开关`**、ZH `on` `开 · 全员模式` → **`开`**。理由是旧文案在指一个已经删掉的东西：
+「全员模式 / full crew」是旧前台那一档的叫法，0.13.35 把旧前台整条链删了，开关却还挂着那个名字。
+**测试面为什么跟着改（这一轮唯一有技术含量的地方）**：中文状态词从「开 · 全员模式」缩成一个字 `开`，而新标签 `工作流开关` 自己就含 `开`——原来那 7 处
+「整行文本 `toContain`（包含）状态词」的断言会因此**永远为真**（关着的时候整行里也有 `开` 字），成了绿得没意义的守卫。改法是读**状态行那个元素**
+（`data-mode-note`，`src/client/index.js` 里挂的就是 `state.phase`，文字由 `modeSwitchText` 给）并对它 `toBe` 相等：新增两个小帮手
+`noteIn` / `noteText`（`test/client.spec.ts:920-921`），7 处 `toContain` → `toBe`（`:3252`、`:3259`、`:3274`、`:3324`、`:3440`、`:3446`、`:3452`），
+那条「关着时整行不许出现开的文案」的负向断言（`:3277-3280`）也改成量状态行；钉死中文标签的那条字面量改成 `工作流开关`（`:3373`），
+另加两条**防塌陷守卫**：`label ≠ on`、`on ≠ off`（`:3376-3377`）——任何一个塌了，状态检查都会在两种状态下同时为真，那是假绿。
+**读数（定向，收口轮自己在 `2f218d0` 的树上重跑，`CONFIRMED`）**：`TMPDIR=$PWD/.tmp npx vitest run test/client.spec.ts test/i18n-parity.spec.ts`
+→ **EXIT=0，`2 files / 138 tests PASS`**（`client` 132、`i18n-parity` 6），`Duration 939ms`。用例总数与基线一样（**1832**，全量门禁读数），
+本轮**没增删一条用例**，只把 7 处断言收紧、加两条守卫。
+**门禁（包工头在 `2f218d0` 的树上跑，`CONFIRMED`）**：`TMPDIR=$PWD/.tmp npm run ci` → **EXIT=0**：`Test Files 98 passed (98)` /
+`Tests 1832 passed (1832)` / `Duration 93.03s (transform 2.45s, setup 0ms, import 7.88s, tests 74.22s, environment 10ms)`、
+`Found 15 warnings and 0 errors.`（177 文件 / 96 规则，与 0.13.35 那 15 条相同，没有新增）、
+`lib/ at 2f218d0 is the build of src/ at 2f218d0 (281 files, byte-identical)`、`client bundle: 321607 bytes`。
+**体积差额对得上**：基线 `424ed99` 提交的 `lib/client.js` 是 **321631 bytes**（`git show 424ed99:lib/client.js | wc -c`），
+现在 **321607**，**差 24 字节**，就是四条文案变短。
+**这一轮最值钱的是复现，结论把一条旧 `HYPOTHESIS` 结案了，而且方向与原来记的相反（`CONFIRMED`）**：环境是 `node scripts/clone-profile.mjs`
+把 live `web` profile 克隆到 scratch `.tmp/soak-label/dsh-home`（profile 名 `web-clone`，**7699 文件**、parity **5/5**、
+**1 行凭据按设计脱敏**），端口 **3321**，线上 3080 与 `~/.dsh` **全程未碰**；克隆里那条已移除的键 `mode: triage` 删掉，插件用**拷进 profile 的构建产物**
+（不是软链——软链会挂，`docs/LOCAL-TESTING.md` 的 trap 清单里记着），克隆里 `grokDefault: on`（与 live 一致）；用 headless Chromium（Playwright）真操作
+并抓 `/grok-workflow/mode` 的每条请求与响应。三条读数：
+① **打字 `/grok off` 写了记录，但已挂载的开关不会刷新**——会话里确实出现 `grok / Grok workflow OFF — normal chat.`，会话日志里**只有一条** mode 记录
+`{"v":1,"enabled":false,"turn":0,"setBy":"command:/grok off"}`（seq 5，`ignorable:true`，落盘可读）；但整个 90 秒观察窗加下一回合
+`/grok-workflow/mode` **一共只有挂载时那 1 次请求**，41 次快照全部停在 `workflow总开关 | 开 · 全员模式`。**它只在挂载时读一次，没有轮询、没有事件订阅**。
+② **看到的「回开」是两个会话，不是同一个开关来回跳**——reload 后前端打开的是**另一个新建的空会话**（`session-f259f6a0-…`，那时 `user/message` 计数为 0），
+它没有记录，宿主诚实地答 `source:"default"`，于是显示默认的开；点回上一条对话（`session-2abe70e6-…`）后重挂载读一次
+→ `{"enabled":false,"source":"record","setBy":"command:/grok off",…,"fallback":true}` → `关`，下一回合仍是 `关`。
+③ **记录权威（route 一侧是对的）**：同一个有记录的会话，reload 前、reload 后、下一回合三次读到的都是 `source:"record", enabled:false`，与账本逐字一致；
+**没有任何一次对「有记录的会话」读回 `source:"default"`**——所以这**不是回落 bug**，旧 `VALIDATION.md:410` 那条「疑似回落到 profile 默认值」
+（写下时为真的记录，不回改）由本轮订正为「一次性读取 + 命令写入后不刷新，叠加开关挂在另一个空会话上」。真正存在的客户端缺陷是前一半，
+方向也相反：**点击会刷新（写响应回填状态），打字不会**。
+**新文案的真机核对（换成本轮构建后重启同一隔离实例，`CONFIRMED`）**：新会话挂载 → `工作流开关 | 开`；点开关 → POST `{"action":"set","enabled":false}`
+→ 响应 `{"enabled":false,"source":"record","setBy":"switch:mode",…}` → `工作流开关 | 关`；再发一回合、reload 之后仍然 `关`（读到 `source:"record"`）；
+整页文本不再出现 `全员模式` / `full crew`（检查为 `true`）。两次装的构建不是同一份：probe1/2 跑的是主检出 0.13.35 的 `lib/client.js`
+（`1455d91e…`，含 `workflow总开关`、不含 `工作流开关`，与那两次快照里的旧文案对得上），probe3 重装后是**本轮构建** `4ce107e1…`
+（与本 worktree 的 `lib/client.js` 逐字节相同）。
+**没做的 / 如实记**：**模型回合 `NOT_RUN`**——隔离克隆把 `AGENT2API_API_KEY` 脱敏掉了，每次发消息都是 `MISSING_CREDENTIAL` 的 `turn/end error`，
+读数覆盖的是「发出一条消息、开一回合」这一层，模型回答本身没验；**「命令后不刷新」本轮只记录不修**（见 `D-149`）；用户文档已跟上新叫法——
+`README.zh-CN.md:248` 那句 `workflow总开关` 本轮**一并改成「工作流开关」**（只动这一处措辞，同段「挂载时读一次 / 会话没有记录时显示 `grokDefault` /
+关闭三重提示」的描述一字未改，那些仍然是真话；英文 `README.md` 本来就叫 `The workflow switch`，没动），改后六个文档守卫
+**6 files / 79 tests PASS**；没有 push、没有打 tag、没有改版本号
+（`package.json` 仍是 `0.13.35`）、没有创建 PR；`~/.dsh` 一行未写、未重载、未重启，`~/.dsh/profiles/web/cordis.patch.yml:563` 那条 `mode: triage` 仍在。
+
 Last updated: 2026-11-25 10:55 +08:00（**M3.4 死代码收尾：把 0.13.35 遗留的一批零引用导出删掉，并改写 12 个够到它们的 spec；门禁通过，`CONFIRMED`；未发版、未 push、未合 `main`，版本仍 `0.13.35`** —
 分支 **`fix/m3-dead-code`**，worktree `.tmp/wt-m3-dead-code`，基线 `main` 尖端 **`dde5b09`**，两条提交：**`d484229`**
 （`refactor(m3.4): delete the dead exports the 0.13.35 sweep left behind`，`src/` **13 文件 / +17 −691**，加 `lib/` 重建
