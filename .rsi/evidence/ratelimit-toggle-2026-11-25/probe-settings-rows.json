@@ -1,0 +1,110 @@
+{
+ "instance": {
+  "transport": "headless Chromium (/usr/bin/chromium) via Playwright, viewport 1500x1000",
+  "dsh_home": ".tmp/soak-ratelimit/fresh-home (scratch, deleted after the run)",
+  "profile": "web-clone (fresh from the shipped web template, then `dsh plugin add` of the packed build)",
+  "port": 3327,
+  "installed_version_read_back": "0.13.36",
+  "sha256_client_js": "f9408813d6312cecf1996a23245966ea7ce09a152a029f6d5311fe379f7f7ad0",
+  "sha256_index_js": "d7db20f2d242d2d592206a9bc518eb4754793f296c1ee7f71bb7bfbd42d26932",
+  "model_turn": "NOT_RUN (the isolated profile carries no credentials by design)"
+ },
+ "readings": {
+  "en_default": {
+   "present": true,
+   "title": "Switch model on 429",
+   "rowText": "Switch model on 429\nOn",
+   "stateWord": "",
+   "ariaChecked": "true",
+   "hint": "On by default: a rate-limited (429) route advances to the next model in the chain. Off: only the other failure classes advance, and a 429 keeps the route for the task retry."
+  },
+  "zh_after_save": {
+   "present": true,
+   "title": "限流（429）时换模型",
+   "rowText": "限流（429）时换模型\n关",
+   "ariaChecked": "false",
+   "hint": "默认打开：限流（429）时换到链上的下一个模型。关掉后只有其它失败类别换人，429 留在原路由交给任务重试。",
+   "locale": "zh-CN"
+  },
+  "en_after_flip": {
+   "present": true,
+   "title": "Switch model on 429",
+   "rowText": "Switch model on 429\nOff",
+   "stateWord": "",
+   "ariaChecked": "false",
+   "hint": "On by default: a rate-limited (429) route advances to the next model in the chain. Off: only the other failure classes advance, and a 429 keeps the route for the task retry."
+  },
+  "en_after_save": {
+   "present": true,
+   "title": "Switch model on 429",
+   "rowText": "Switch model on 429\nOff",
+   "stateWord": "",
+   "ariaChecked": "false",
+   "hint": "On by default: a rate-limited (429) route advances to the next model in the chain. Off: only the other failure classes advance, and a 429 keeps the route for the task retry."
+  },
+  "en_after_reload": {
+   "present": true,
+   "title": "Switch model on 429",
+   "rowText": "Switch model on 429\nOff",
+   "stateWord": "",
+   "ariaChecked": "false",
+   "hint": "On by default: a rate-limited (429) route advances to the next model in the chain. Off: only the other failure classes advance, and a 429 keeps the route for the task retry.",
+   "locale": "en"
+  }
+ },
+ "save": {
+  "button": "Save",
+  "mutate_request": [
+   {
+    "method": "POST",
+    "path": "/api/settings/mutate",
+    "post": "{\"type\":\"client-request\",\"rpcId\":\"2fd10b60-8d7a-4ebc-87ce-5e0dc8108678\",\"method\":\"settings/mutate\",\"payload\":{\"args\":{\"ns\":\"grok-workflow\",\"ops\":[{\"op\":\"set\",\"path\":[\"switchOnRateLimit\"],\"value\":false}],\"expectedRevision\":0}}}"
+   }
+  ],
+  "profile_patch_row_after_save": [
+   "- id: grok-workflow",
+   "  name: dsh-grok-workflow",
+   "  config:",
+   "    switchOnRateLimit: false",
+   "- id: locale"
+  ]
+ },
+ "settings_requests": [
+  {
+   "method": "POST",
+   "path": "/api/settings/describe",
+   "post": "{\"type\":\"client-request\",\"rpcId\":\"d7a51321-ab7a-41cf-8cb1-12cfe18d6d76\",\"method\":\"settings/describe\",\"payload\":{\"args\":{}}}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/settings/describe",
+   "post": "{\"type\":\"client-request\",\"rpcId\":\"582b891c-7620-4924-9d85-2ae5d3ab3fda\",\"method\":\"settings/describe\",\"payload\":{\"args\":{}}}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/settings/mutate",
+   "post": "{\"type\":\"client-request\",\"rpcId\":\"2fd10b60-8d7a-4ebc-87ce-5e0dc8108678\",\"method\":\"settings/mutate\",\"payload\":{\"args\":{\"ns\":\"grok-workflow\",\"ops\":[{\"op\":\"set\",\"path\":[\"switchOnRateLimit\"],\"value\":false}],\"expectedRevision\":0}}}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/settings/describe",
+   "post": "{\"type\":\"client-request\",\"rpcId\":\"7369a73f-f283-4e21-ae33-ddaa5199193b\",\"method\":\"settings/describe\",\"payload\":{\"args\":{}}}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/settings/describe",
+   "post": "{\"type\":\"client-request\",\"rpcId\":\"bd635b63-dea4-429a-ba72-7983815de4d9\",\"method\":\"settings/describe\",\"payload\":{\"args\":{}}}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/settings/describe",
+   "post": "{\"type\":\"client-request\",\"rpcId\":\"90cad65c-aa56-4cad-b645-83aa12c324b1\",\"method\":\"settings/describe\",\"payload\":{\"args\":{}}}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/settings/describe",
+   "post": "{\"type\":\"client-request\",\"rpcId\":\"5842d327-9775-40dc-b280-be3d34d81b67\",\"method\":\"settings/describe\",\"payload\":{\"args\":{}}}"
+  }
+ ],
+ "page_errors": []
+}

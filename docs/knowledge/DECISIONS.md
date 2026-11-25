@@ -4124,3 +4124,38 @@ spine 为空，pre-fix 形状会进脊柱。
     不要为此新增读取点。
   - 仍有余账（见 `HANDOFF.md` 同日条「故意没改」）：FIELDS 注释、`src/index.ts`/`src/mode-surface.ts` 的 “master switch” 散文、
     `page.intro`/`group.limits` 的「下多大力气」框、`switchOnRateLimit` 渲染不出来。
+
+## D-153 · 429 开关的控件放哪儿、状态词为什么复用、总守卫为什么全量遍历（2026-11-25，未发版）
+
+- **Status:** `CONFIRMED`（`534b867`：`src/client/index.js` 21/1、`test/client.spec.ts` 99/0、`lib/client.js` 21/1；
+  `TMPDIR=$PWD/.tmp npm run ci` → **EXIT=0**（`98 files / 1845 tests`、`15 warnings / 0 errors`、
+  `lib/ at 534b867 is the build of src/ at 534b867 (281 files, byte-identical)`、`lib/client.js` 330313 → **331626** 字节）；
+  中英两语言的真实读数与保存落盘见 `VALIDATION.md` 同日条与 `.rsi/evidence/ratelimit-toggle-2026-11-25/`）
+- **Date:** 2026-11-25
+- **Context:** `switchOnRateLimit` 是 `FIELDS` 里 14 个声明字段中**唯一**有文案（`field.switchOnRateLimit` / `.hint`，中英各一条）
+  和 schema 行、却**没有任何控件**的一个：读者能读到它存在，却改不了它。缺口的来源不是漏写文案，而是漏画控件——
+  所以三件事需要拍板：控件放哪一张卡的哪个位置、开关的状态词从哪儿来、以及用什么守卫让下一个同类缺口不能再悄悄混过去。
+- **Decision:**
+  1. **位置**：「谁来干」（`group.roles`）那张卡里，**Guardian 那一行之后、五条角色链之前**。理由：这是一条**策略**开关，
+     和守卫一样是「怎么派活」的前提，而不是某条链的细节；五条角色链很长，把它放在链后面意味着读者要先滚过五条链才看得到它，
+     而它恰恰是调链之前要决定的东西。
+  2. **状态词复用现有 On/Off**：`Toggle` 的 label 用 `option.replan.on` / `option.replan.off`（两种语言都只是「开 / 关」），
+     **不新增 `option.switchOnRateLimit.*`**。理由：页面每种语言已经有一份 On/Off 文案，新增两条就是把同一句话写第二遍；
+     而且本轮的规定就是**不加任何新文案键**（只用现有那四个键：中英各一个 label、中英各一个 hint）。代码里在控件旁边留了一行注释
+     说明为什么复用，免得下一个人以为这是漏了名字。
+  3. **总守卫按 `GROK_WORKFLOW_FIELDS` 全量遍历**，不点名这个键：字段计数（14）看不见「声明了但没画」，点名只能抓住这一回；
+     遍历字段表则对**下一个**同类缺口同样生效——每个 key 都必须在页面上有一个 `data-field` 行、且它的 label 真的渲染出来。
+     为了让这条守卫对 14 个 key 真的走全，`GuardianModelRow` 的卡上补了 `data-field="guardianModel"`（原先只有 `data-gw-guardian`）。
+- **Alternatives considered / rejected:**
+  - **把开关放进「自动接着干」（`group.loop`）那一组**，和 `replan`/`loopEnabled` 并排。否决：那一组的三条是「跑起来之后怎么续」，
+    而 429 换模型是**失败类别**上的策略；放进 loop 组会让读者以为它只在续跑时生效。
+  - **新增 `option.switchOnRateLimit.on/off` 两条文案**，让每个字段的状态词自成一套。否决：本轮规定不加键，且那两条与 `replan` 的
+    On/Off 逐字相同，等于把同一句话维护三份（`replan` / `loopEnabled` / 新字段）。
+  - **总守卫只检查「字段数 == 控件数」**。否决：数量相等也允许「一个字段画两次、另一个一次没画」，抓不住本轮的缺口形态；
+    必须按键遍历。
+- **Consequences:**
+  - 页面上 14 个声明字段现在 14 个都有控件；`switchOnRateLimit` 的默认值仍是 `true`，`src/config.ts` 与 schema 未动，
+    行为零变化——本轮只补控件。
+  - 以后新增字段若忘了画控件，`test/client.spec.ts` 的「每个声明字段都必须有控件」会在两种语言下各红一次，而不是等读者发现。
+  - 复用状态词这件事有代价：状态词不带字段名，屏幕阅读器听到的是「开/关」+ 行 label，这是与 `replan`/`loopEnabled` 一致的既有形状，
+    本轮按一致性选择它，不单独发明。
