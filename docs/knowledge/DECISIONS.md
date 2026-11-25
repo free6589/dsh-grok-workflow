@@ -3980,3 +3980,67 @@ spine 为空，pre-fix 形状会进脊柱。
   - 「命令写入后不刷新」现在是一条**有读数、有成因、有两条候选修法**的待办，而不是一句传闻。下一个人不必重新做那 90 秒的探针，
     读 `VALIDATION.md` 同日条与 `.rsi/evidence/composer-label-2026-11-25/` 即可。
   - 判据可复用：**改文案要顺手问一句「这些字还在描述现在吗」**；**一个断言在两种状态下都为真时，它就不是断言**——短词化最容易踩这一脚。
+
+## D-150 · `/grok off` 打字写入后已挂载开关不刷新：选订阅会话事件窗口，否决写响应回填（2026-11-25，未发版）
+
+- **Status:** `CONFIRMED`（`8b32e5e` + `ded1df6`；`TMPDIR=$PWD/.tmp npm run ci` 在 `ded1df6` 的树上 **EXIT=0**，98 文件 / **1838** 例 /
+  `Found 15 warnings and 0 errors.` / `lib/ at ded1df6 is the build of src/ at ded1df6 (281 files, byte-identical)` /
+  `client bundle: 329354 bytes`；定向 `npx vitest run test/client.spec.ts test/i18n-parity.spec.ts` → 2 files / **144** 例通过；
+  **真机前后对照已做**：改前 20 秒 20 次快照全停在「开」、只有挂载 1 次请求；改后两次打字各在 **+0.5 秒**自动变、静默 15 秒 0 次新请求。
+  逐行读数见 `VALIDATION.md` 同日条，证据在 `.rsi/evidence/switch-refresh-2026-11-25/`）
+- **Date:** 2026-11-25
+- **Context:** `D-149` 把「打字 `/grok off` 之后对话框底部那个开关不刷新」记成了一条**有读数、有成因、有两条候选修法**的待办，并且刻意
+  没在改文案的评审里顺手选掉。这一轮的对象只有这一条：开关挂载时读一次、之后不再看会话，所以**点击会刷新**（写响应回填状态）、
+  **打字不会**（命令在宿主的一个回合里写记录，浏览器当前没有任何入口能收到那次写的响应）。起点是干净的：`src/client/index.js` 的
+  `ModeSwitch` 只在自己那个 `useEffect` 里 `readNow()` 一次；宿主侧 `src/mode.ts` 落盘的是
+  `plugin:grok-workflow/mode`（`{type, seq, time, data, ignorable: true}`）；客户端侧已经在 `apply()` 里用
+  `ctx.inject(['uiConversation','sessions'], …)` 拿过 `sessions` 面（进度 Tab 用），`sessions.binding(id).eventSource`
+  的 `getSnapshot()` + `subscribe()` 就是那条会话事件窗口。
+- **Decision:**
+  1. **走订阅那条路（`D-149` 的候选 ①）**：开关在会话的 `eventSource` 上订阅，**只在窗口里出现一条 seq 比已记账更大的
+     `plugin:grok-workflow/mode` 记录时**，才向 `/grok-workflow/mode` 发一次 `status` 读，并把该 seq 记下来 —— 同一 seq 只读一次。
+     判据是**影响面**：①只动客户端那一份 bundle，路由、host、动作列表、答案形状**零改动**；②要给命令路径的宿主回合新增一条到浏览器的
+     通道，那是**新机制**（新通道、新协议、新的失败模式），而这一轮要修的只是一个显示滞后。
+  2. **复用已有的注入，不新增必需依赖**：`sessions` 面仍然由 `apply()` 里那一次 `ctx.inject(['uiConversation','sessions'], …)` 提供，
+     同一次注入喂两个读者（进度 Tab 与开关）。面是**可选、后到**的：缺面、`binding` 不存在、`binding` 答不出会话、窗口没有
+     `getSnapshot`/`subscribe` —— 四种情况都**静默退化**（开关照旧挂载、照旧读、照旧能点，只是不自动刷新），**不报错、不 pending、
+     不挡挂载**。晚到的那份面由一个小集合（`modeSessionWaiters`）兜住：挂载早于注入解析的开关在面落地时补订阅一次，
+     所以订阅不取决于注入顺序。
+  3. **背景重读失败不落失败态**：读成功才 `setState`；读失败（拒绝或传输断）**保持上一次已知状态与它那一行**。用户什么都没做，
+     不该被一条错误吓到——这与「点击被拒绝时保留最后已知状态 + 说明为什么」是两个不同的场景，那条不动。
+  4. **退订干净**：卸载与 `sessionId` 变化都走同一个 `useEffect` 清理（`alive=false`、从 waiter 集合摘掉、`stop()` 退订）；
+     卸载后到达的读答案不 `setState`（沿用原有的 `alive()` 守卫）。
+  5. **不动既有行为，也不动文案**：挂载读一次、点击写并回填、失败态点击重读、无会话相 `no-session`、拒绝写保留最后已知状态 + 失败行，
+     全部保持；`mode.switch.*` 八个键一字未改。路由与 host 一行未碰——`src/` 里除 `src/client/index.js` 外没有改动。
+- **Alternatives considered / rejected:**
+  - **让命令路径的写响应回填到已挂载的开关（`D-149` 的候选 ②）。** 否决：命令跑在宿主的**一个回合**里，浏览器当前没有任何入口能收到那次写的
+    响应。要做这件事就得新增一条 host→浏览器的通道，那是协议与机制层面的新增，而 ① 在同一个 bundle 里就能完成。**留作以后若真需要
+    「宿主主动推」时的方向，不作为本轮的修法。**
+  - **加一个定时器（每 N 秒读一次）。** 否决：那是把一个已知不需要轮询的开关变成轮询，代价是永远在跑的请求与一个永远在响的噪声源；
+    真机读数里「静默 15 秒 0 次新请求」正是这条边界。
+  - **每条会话事件都读一次。** 否决：那等于把轮询搬到事件上——一次普通回合会产生几十条 `assistant/*`、`tool/*`、`step/*` 事件，
+    读的次数与「用户是否改了开关」无关。改成「出现本插件的记录、且 seq 是新的」才读，读的次数就只与写入次数相关（真机：两次写入各 1 次）。
+  - **把 `sessions` 变成必需注入。** 否决：那会让整个 bundle 在没有该服务的组合里 pending，而 DSH 把 pending 记成启动失败；
+    一个开关的自动刷新绝不值得拿插件的启动去换。缺面时「只是不自动刷新」是正确取舍。
+  - **订阅 `uiConversation` 那边的视图快照而不是 `sessions.binding(id).eventSource`。** 否决：进度 Tab 用 `uiConversation` 是因为它要的是
+    折叠后的轨道快照；这里要的是**原始记录**（这条 mode 记录不属于任何会话视图），`sessions` 面的窗口才是它的出处。
+  - **背景重读失败时显示失败行（与点击拒绝一致）。** 否决：点击拒绝时用户刚做了一个动作，需要知道「你这一下没生效」；后台重读失败时
+    用户什么都没做，弹出错误只会让人以为开关坏了。两种场景，两种处置。
+  - **为了消掉 lint 警告而把「遍历快照」改成直接遍历活集合。** 否决：派发期间有监听者退订时，直接遍历会漏掉后面的监听者。
+    `[...listeners]` → `Array.from(listeners)` 保留快照语义，只是不触发 `unicorn(no-useless-spread)`（`ded1df6`）。
+- **Consequences:**
+  - 打字 `/grok on|off` 之后已挂载的开关在 **+0.5 秒**内自己变（真机，两次）；不打字、不点、不刷新，且**没有任何定时器**。
+  - 客户端这条路的**前提已在真机上证实**：`plugin:grok-workflow/mode` 记录确实出现在 `/api/remote.mux` 的帧里（seq 5 / 27 / 30），
+    `ignorable: true` 只挡模型一侧。**不再是 `HYPOTHESIS`。**
+  - **残留一条（已量到，`CONFIRMED`）**：**冷加载会多读一次** `status`（挂载读 t=1.67s、历史 follow 帧 t=1.69s 才到，订阅时窗口还是空的，
+    于是那条「本来就在历史里」的记录被当成新记录又读一次）。后果只是每次加载多一个几十字节的 POST，状态收敛正确。所以措辞是
+    「同一 seq 只读一次；**例外**是冷加载时历史记录晚于订阅到达」。
+  - **`binding()` 只对被客户端 materialize 的会话返回**（`ClientSessions.binding(id)` 是一次 scope 查表）。真机上 composer 挂的那个会话一直被
+    conversation 侧 retain，所以成立；若某组合里没有，则静默不自动刷新（不是错误）。
+  - 挂载读与订阅建立之间的毫秒级窗口在**理论上**可能漏掉一次写入（先读完、记录写入、订阅才建立，基线把它算作已知）。**本轮没观测到**，
+    标 `HYPOTHESIS`。
+  - 用例从 **1832** 增到 **1838**（`test/client.spec.ts` 132 → 138）：核心刷新、同 seq 不重读、无记录不多读、后台失败静默、缺面回归、
+    卸载即退订，六条都驱动**真实组件挂载**（`mountSwitch` + 假 `{getSnapshot, subscribe}` 从 `MODE_SWITCH.offerSessions` 注入，
+    与 `apply` 同一个门，不是测试专用 prop）。
+  - 判据可复用：**修一个「显示落后」的缺陷，先问「两边共享的事实是什么」**——这一轮的答案是会话日志本身；找到它，就不用新开一条通道。
+    另外：**「事件驱动」不等于「每条事件都读」**，否则只是换了个名字的轮询。

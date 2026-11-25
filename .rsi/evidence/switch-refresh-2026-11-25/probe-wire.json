@@ -1,0 +1,23 @@
+{
+ "ws": [
+  "ws://127.0.0.1:3321/api/remote.mux",
+  "ws://127.0.0.1:3321/api/bus/ws"
+ ],
+ "hits": [
+  {
+   "t": 1.68,
+   "url": "ws://127.0.0.1:3321/api/remote.mux",
+   "snippet": ":{\"commandId\":\"cmd-983104db-1\",\"name\":\"grok\",\"args\":\" off\",\"source\":{\"kind\":\"user\"}}}},{\"type\":\"event\",\"event\":{\"type\":\"plugin:grok-workflow/mode\",\"seq\":5,\"time\":1795578135682,\"data\":{\"v\":1,\"enabled\":false,\"turn\":0,\"setBy\":\"command:/grok off\"},\"ignorable\":true}},{\"type\":\"event\",\"event\":{\"type\":\"command/done\",\"seq\":6,\"time\":1795578135684,\""
+  },
+  {
+   "t": 6.12,
+   "url": "ws://127.0.0.1:3321/api/remote.mux",
+   "snippet": "{\"type\":\"item\",\"streamId\":\"f5ff737b-0c15-41a8-b732-b2a4abe5a2f8\",\"value\":{\"type\":\"event\",\"event\":{\"type\":\"plugin:grok-workflow/mode\",\"seq\":27,\"time\":1795579011398,\"data\":{\"v\":1,\"enabled\":true,\"turn\":0,\"setBy\":\"command:/grok\",\"workflowMode\":\"full\"},\"ignorable\":true}}}"
+  },
+  {
+   "t": 11.52,
+   "url": "ws://127.0.0.1:3321/api/remote.mux",
+   "snippet": "{\"type\":\"item\",\"streamId\":\"f5ff737b-0c15-41a8-b732-b2a4abe5a2f8\",\"value\":{\"type\":\"event\",\"event\":{\"type\":\"plugin:grok-workflow/mode\",\"seq\":30,\"time\":1795579016800,\"data\":{\"v\":1,\"enabled\":false,\"turn\":0,\"setBy\":\"command:/grok off\"},\"ignorable\":true}}}"
+  }
+ ]
+}

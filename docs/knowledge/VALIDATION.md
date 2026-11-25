@@ -1,3 +1,50 @@
+## 打字 `/grok on|off` 之后已挂载的开关自己刷新（`fix/switch-refresh`）— 2026-11-25 (`CONFIRMED`)
+
+下面每一行都写清命令、环境与结果；没跑的写 `NOT_RUN`，被环境挡住的写 `BLOCKED`。分支 `fix/switch-refresh`（worktree
+`.tmp/wt-switch-refresh`，Node v26.8.1），基线 `main` 尖端 **`84efda0`**，两个功能/测试提交 **`8b32e5e`**（3 文件：`lib/client.js`
+143/0、`src/client/index.js` 143/0、`test/client.spec.ts` 230/1）与 **`ded1df6`**（1 文件：`test/client.spec.ts` 3/1）。
+**门禁与真机由包工头跑**；证据逐字摘录在 `.rsi/evidence/switch-refresh-2026-11-25/README.md`。
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 分支、基线、提交 | `git status --short --branch`；`git log --oneline -3`；`git show --numstat --format= HEAD`（worktree） | `## fix/switch-refresh`；`ded1df6` → `8b32e5e` → `84efda0`；`8b32e5e` = `143/0 lib/client.js`、`143/0 src/client/index.js`、`230/1 test/client.spec.ts`；`ded1df6` = `3/1 test/client.spec.ts`。版本仍 **`0.13.35`**。**`CONFIRMED`** |
+| 修的是什么 | 读 `src/client/index.js` 的 `ModeSwitch`（旧版只有挂载那一次 `readNow()`）与 `src/mode.ts` 的 `MODE_RECORD` | 旧行为：挂载读一次、点击写并回填、**打字写入后不刷新**（`D-149` 记的那条）。新行为：`sessions.binding(id).eventSource` 上订阅，**只在窗口里出现 seq 更新的 `plugin:grok-workflow/mode` 记录时**向 `/grok-workflow/mode` 发一次 `status`，同一 seq 只读一次。**`CONFIRMED`** |
+| 影响面：只动客户端一份 bundle | `git show --numstat --format= 8b32e5e` | 路由 `MODE_ROUTE_PATH`、动作列表 `MODE_ACTIONS`、答案形状 `parseModePayload` **一行未改**；`src/` 除 `src/client/index.js` 外无改动；host 与协议零改动。**`CONFIRMED`** |
+| 没有新增必需依赖 | `grep -n "ctx.inject(" src/client/index.js` | `sessions` 面仍由已有的 `ctx.inject(['uiConversation','sessions'], …)` 提供，同一次注入喂两个读者（进度 Tab + 开关）；无面时只调用 `offerModeSessions(undefined)`，不产生依赖。**`CONFIRMED`** |
+| 没有定时器 / 没有轮询 | `git diff src/client/index.js`（新代码段） | 新增段里没有 `setInterval` / `setTimeout` / `requestAnimationFrame`；读请求只由两个入口触发——挂载、以及「新 seq 的 mode 记录」。真机静默 15 秒 0 次新请求可交叉验证。**`CONFIRMED`** |
+| 定向测试（代码轮自己跑，`8b32e5e` 树上） | `TMPDIR=$PWD/.tmp npx vitest run test/client.spec.ts test/i18n-parity.spec.ts` | **EXIT=0**：`Test Files 2 passed (2)` / **`Tests 144 passed (144)`**（`client` **138**、`i18n-parity` 6）。基线是 `client` 132 + `i18n-parity` 6 = **138**，本轮 **+6** 条用例。**`CONFIRMED`** |
+| 六条新用例（都驱动真实组件挂载） | `TMPDIR=$PWD/.tmp npx vitest run test/client.spec.ts` | ① 核心：挂载读 `enabled:true`，窗口推进出现 `enabled:false` 记录 → 自动发一次读 → `aria-checked` / `data-mode-lamp` / `data-mode-note` 三处都变，无点击；② 同一 seq 重发不再读（更大的新 seq 才再读一次）；③ 只有 `assistant/*` 等事件推进时读请求数不变；④ 后台重读失败保持已知状态、无失败文案；⑤ 无 `sessions` 面 / `binding` 答不出会话时照旧挂载、不抛错；⑥ 卸载后退订（监听数 1 → 0，之后记录不再触发读）。**`CONFIRMED`** |
+| 用例不是假绿（反向验证） | 临时把「取面」改成 `modeEventWindow(undefined, sessionId)`（＝旧行为）后重跑 `test/client.spec.ts` | `Tests 5 failed | 133 passed (138)`：失败的正是核心刷新、同 seq、后台失败、卸载退订那四条与配套断言；两条「缺面 / 无记录不多读」按设计仍通过（它们断言的是**不存在**）。改动已还原。**`CONFIRMED`** |
+| lint 警告数与基线持平 | `npx oxlint src test` | **`Found 15 warnings and 0 errors.`**（177 文件 / 96 规则），与基线同数。`8b32e5e` 曾把它抬到 16（`unicorn(no-useless-spread)`，`test/client.spec.ts` 里 `[...listeners]`），`ded1df6` 改成 `Array.from(listeners)` 消掉且保留「先取快照再派发」的语义。**`CONFIRMED`** |
+| 构建体积 | 门禁输出里的 `client bundle` 行；`git show 84efda0:lib/client.js \| wc -c` | 现在 **`client bundle: 329354 bytes`**；基线提交 `84efda0` 是 **321607**，**+7747 字节**就是订阅那一段。**`CONFIRMED`** |
+| 门禁（全量，包工头跑，**代码提交 `ded1df6` 的树**） | `TMPDIR=$PWD/.tmp npm run ci`（输出 `.tmp/wt-switch-refresh/.tmp/ci-code.out`，末行 `EXIT=0`） | **EXIT=0**：`Test Files 98 passed (98)`、**`Tests 1838 passed (1838)`**（基线 1832 + 本轮 6）、`Duration 97.52s (transform 2.75s, setup 0ms, import 8.18s, tests 78.36s, environment 11ms)`、**`Found 15 warnings and 0 errors.`**、**`lib/ at ded1df6 is the build of src/ at ded1df6 (281 files, byte-identical)`**、`client bundle: 329354 bytes → lib/client.js`。**`CONFIRMED`** |
+| 只验提交，不验工作树 | `scripts/verify-lib.mjs` 的行为 | `verify:lib` 拿提交对提交比：工作树里 `lib/` 换了却还没提交时它会说**旧提交**自洽。所以门禁那行只引用 `ded1df6` 的输出，不引用祖先提交的。**`CONFIRMED`** |
+| 真机环境（隔离克隆） | `node scripts/clone-profile.mjs` → `.tmp/soak-switch/dsh-home`（`DSH_HOME`） | profile 名 **`web-clone`**，**7699 文件**、parity **5/5**、**1 行凭据按设计脱敏**；端口 **3321**；克隆里已移除的键 `mode: triage` 删掉再起；插件用**拷进 profile 的构建产物**（不是软链），`sha256(lib/client.js)` = **`52cdace8586a174adc463c6e3d18fafc82dd4d48b330095d383141074c497790`**，与 worktree 的 `lib/client.js` **逐字节相同**；headless Chromium（`/usr/bin/chromium`，1500×1000）。**live `~/.dsh` 一行未写、3080 未碰。`CONFIRMED`** |
+| 改前读数：命令写了记录，已挂载的开关不刷新 | `.rsi/evidence/switch-refresh-2026-11-25/probe-baseline.json`（克隆里原本的 0.13.32 构建） | 挂载读一次 → `{"enabled":true,"source":"default","setBy":null,"turn":null,"workflowMode":null,"fallback":true}` → `workflow总开关 | 开 · 全员模式`。打字 `/grok off` 后 **20 秒 × 20 次快照全部停在「开」**（`calls` 恒为 1），`/grok-workflow/mode` **全程只有挂载那 1 次请求**，`mode_line_seen: false`。**`CONFIRMED`** |
+| 改后读数：两次打字各在 +0.5 秒自动变 | `.rsi/evidence/switch-refresh-2026-11-25/probe-fixed-flip.json` | 加载读到记录 `{"enabled":false,"source":"record","setBy":"command:/grok off",…}` → `工作流开关 | 关`；打字 `/grok on` → 记录写出后**开关自己**发一次 `status`（t=7.47）答复 `{"enabled":true,"source":"record","setBy":"command:/grok","workflowMode":"full"}` → **+0.5 秒**变 `开`（`checked=true`、灯 `on`）；打字 `/grok off` → 再一次自动 `status` 答复 `enabled:false` → **+0.5 秒**变 `关`。全程共 **4** 次请求（加载 2 + 两次写入各 1），**没有点击、没有 reload**；之后 **+15 秒静默窗 0 次新请求**（t=40.11 仍 `calls=4`）。**`CONFIRMED`** |
+| 客户端真的收得到那条记录 | `.rsi/evidence/switch-refresh-2026-11-25/probe-wire.json` | `ws://127.0.0.1:3321/api/remote.mux` 帧里命中三条 `plugin:grok-workflow/mode`（seq **5** / **27** / **30**，均带 `"ignorable":true`），例如 seq 5 的 `{"v":1,"enabled":false,"turn":0,"setBy":"command:/grok off"}`。**订阅路径的前提在真机成立，不再是 `HYPOTHESIS`。`CONFIRMED`** |
+| 残留：冷加载多读一次（**已量到**） | `.rsi/evidence/switch-refresh-2026-11-25/probe-load.json` | 一次冷加载：挂载读 `t=1.67s` → 历史 follow 帧 `t=1.69s`（其中带 seq 5 的 mode 记录）→ **`t=1.69s` 又一次 `status`**，相隔约 **20 ms**。成因：订阅建立时窗口还是空的（基线 `seen=undefined`），那条「本来就在历史里」的记录被当成新记录。后果只是每次加载多一个几十字节的 POST，状态收敛正确，**不是轮询**。措辞因此写成「同一 seq 只读一次；**例外**是冷加载时历史记录晚于订阅到达，会多读一次」。**`CONFIRMED`** |
+| 挂载读与订阅建立之间可能漏一次写入 | —— | **`HYPOTHESIS`**：先读完、记录写入、订阅才建立时，基线会把那条记录算成「已知」。真机未观测到（写入发生在用户打字时，订阅早在加载时就建立了）。 |
+| `binding()` 的边界 | `dsh-api-session-controller` 的 `ClientSessions.binding(id)`（一次 scope 查表） | 只对被客户端 materialize 的会话返回；真机上 composer 挂的会话一直被 conversation 侧 retain，所以成立；某组合里没有时**静默不自动刷新**（不是错误）。**`CONFIRMED`（源码）** |
+| 既有行为未改 | 读 `src/client/index.js` 的 `ModeSwitch` 与既有用例 | 挂载读一次、点击写并回填、失败态点击重读、无会话相 `no-session`、拒绝写保留最后已知状态 + 失败行，全部照旧；`mode.switch.*` 八个键**一字未改**（`i18n-parity` 6 例通过）。**`CONFIRMED`** |
+| 文档守卫（文档轮自己跑，**改完 `CHANGELOG.md` 与两个 README 之后**） | `TMPDIR=$PWD/.tmp npx vitest run test/docs-version.spec.ts test/docs-config-keys.spec.ts test/i18n-parity.spec.ts test/docs-architecture-version.spec.ts test/update-entry.spec.ts test/update-surface.spec.ts` | **EXIT=0**：`Test Files 6 passed (6)` / **`Tests 79 passed (79)`**（`update-entry` 20、`update-surface` 29、`docs-config-keys` 13、`docs-version` 8、`i18n-parity` 6、`docs-architecture-version` 3）。`docs-version` 读 `CHANGELOG.md`（本轮新增的 `### Fixed / 修复`），`docs-config-keys` 读两个 README（本轮那两句措辞）。**`CONFIRMED`** |
+| 模型回合 | 隔离克隆（按设计缺 `AGENT2API_API_KEY`） | **`NOT_RUN`**：本轮**没有发真实模型回合**——真机读数覆盖的是「页面加载 / 打字一条斜杠命令 / 观察开关」，命令本身不调模型，也不需要凭据。**模型回答这一层没验**（这是环境事实，不是失败）。 |
+| live profile / 线上实例 | `~/.dsh` 未写、3080 未重启 | **全程未碰**：真机只在隔离 home + 端口 3321 上做。**`CONFIRMED`** |
+| 发版 / push / tag / 版本号 / PR | `git status --short --branch`；`git log --oneline -1` | **`NOT_RUN`**：没有 `git push`、没有 tag、没有改版本号（`package.json` 仍是 **`0.13.35`**）、没有创建 PR、没有合 `main`。 |
+
+**记忆侧这一轮动了什么：** `CHANGELOG.md`（`[Unreleased]` 下新增 `### Fixed / 修复`，中英双语）、`README.md:262` 与
+`README.zh-CN.md:248` 各一处措辞、`docs/knowledge/DECISIONS.md`（新增 **`D-150`**）、本文件、`docs/knowledge/STATE.md`（顶部条目）、
+`docs/knowledge/HANDOFF.md`（顶部条目）、`.rsi/evidence/switch-refresh-2026-11-25/`（四个 probe JSON + README）。
+`src/`、`test/`、`lib/` **本轮一个字也没有写**——那三处在 `8b32e5e` / `ded1df6` 里。
+
+**Honest boundary（逐条）：**
+1. **门禁不是记忆轮跑的**：`npm run ci`、`client bundle` 字节数与 `verify:lib` 那行都来自包工头在 **`ded1df6`** 上的记录
+   （输出 `.tmp/wt-switch-refresh/.tmp/ci-code.out`，末行 `EXIT=0`）；记忆轮自己重跑的是六个文档守卫（79 例）。
+2. **真机也不是记忆轮跑的**：四条 probe 读数与 sha256 都是包工头在他的隔离克隆里量的，本文件与证据 README 是**逐字摘录**。
+3. **模型回合 `NOT_RUN`**：见上表对应行。
+4. **残留不要写成「无」**：冷加载多读一次是**已量到**的事实（`CONFIRMED`），「同一 seq 只读一次」这句必须带那个例外一起说。
+5. **`docs/knowledge` 仍不受任何测试守卫**：改记忆不会让测试变红，也不会被机器抓住与代码不一致。
+
 ## 开关文案改成「工作流开关 / 开」、把「命令写入后不刷新」这条旧疑点结案（`fix/composer-label`）— 2026-11-25 (`CONFIRMED`)
 
 下面每一行都写清命令、环境与结果；没跑的写 `NOT_RUN`，被环境挡住的写 `BLOCKED`。分支 `fix/composer-label`（worktree
