@@ -85,7 +85,7 @@ class FakeContext {
   readonly workflowEngine = this.engine
 
   // Real cordis Context always exposes `on`; these tool-path tests run on a
-  // runtime with the hook, so stub it (the hookless runtime is pinned in gate.spec.ts).
+  // runtime with the hook, so stub it (the hookless runtime is pinned in config.spec.ts).
   readonly on = (): (() => void) => () => {}
 
   effect(installer: () => () => Promise<void> | void): () => Promise<void> | void {

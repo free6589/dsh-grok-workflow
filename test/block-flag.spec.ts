@@ -1,36 +1,33 @@
 /**
- * `blockIntake: false` is the tree before the feature existed.
+ * `blockIntake` defaults to on, and `false` is the opt-out.
  *
- * The claim this file pins is narrow and testable: with the switch off, a load
- * registers **nothing** from the block intake and every `agent/pre-step` decision
- * is the one a load that never heard of the key produces. The second half is the
- * reason the switch is worth having — an operator who does not want a block ledger
- * must not pay for it with a different front desk.
+ * Three claims, one group each:
+ *
+ * 1. **Omitting the key and writing `true` are the same load.** Same tools, same
+ *    listeners, same decisions. A default that is a third shape would make every
+ *    deployment that says nothing a special case.
+ * 2. **`false` removes the intake and nothing else.** No block tool, no intake
+ *    observer — and the narrow heartbeat listener, which owns the brakes, is still
+ *    installed. That is the M3.2 hole this file keeps shut: the intake switch must
+ *    never be able to take the brake owner with it.
+ * 3. **The switch does not decide a user message.** The same batch, handed to all
+ *    three shapes, comes back as the same decision with the same objects. Since M3.3
+ *    there is no admission listener left in the chain, so "the intake is not a front
+ *    desk" is now a claim about absence rather than about behaviour.
  *
  * Boundary: the `Context`, `SystemPrompt`, `ToolRuntime` and `Session` are the real
- * host classes, `apply()` is the real entry point, and the workflow engine is a fake
- * that records every `start` and settles a team run with a scripted report — no model
- * is called. Every decision below is compared twice: once against a load that omits
- * the key (the pre-feature shape) and once against the pinned shape the case names.
- *
- * The batch is built once per case and handed to both loads, so both sides hold the
- * same message objects. The `id` on a message is minted by the host (and by
- * `createUserMessage` in this file), never by the block intake, so it cannot be part
- * of "the flag changed a decision": `stable()` folds every `id` to `<id>`. Where the
- * gate mints nothing, both sides already carry the same ids and the raw bytes are
- * compared directly; where it does mint a message (the refusal appends a notice) that
- * id is fresh per load, and the folded bytes are compared instead. `stable()` is not
- * equal to `raw()` in either branch — the payload's own messages carry ids — and
- * folding one removes no decision, because an id is identity, not content.
+ * host classes, `apply()` is the real entry point, and the workflow engine is a stub
+ * that throws if a run is ever started — no model is called, and no case may start
+ * work. Listener counts read cordis's own hook list, which is the only honest way to
+ * say "this load registered nothing extra".
  */
 
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
 import { ToolRuntime } from '@deepseek-ai/dsh-tools'
-import type { WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import { createSystemMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import { Session } from '@deepseek-ai/dsh-session'
@@ -38,14 +35,13 @@ import { apply } from '../src/index.js'
 import { BLOCK_LEDGER_VERSION, appendBlockRow } from '../src/block/index.js'
 import { HEARTBEATS_FILE, readHeartbeatObservations } from '../src/block/brakes.js'
 import { CONFIG_KEYS } from '../src/config.js'
+import { HEARTBEATS_LISTEN_FILE, readHeartbeatListenObservations } from '../src/heartbeat-listen.js'
 import { TASK_LIMITS } from '../src/input.js'
 import { LOOP_PROMPT_PREFIX } from '../src/loop.js'
 import { setMode } from '../src/mode.js'
-import { execution, task, verification } from './fixtures.js'
-import { roleOf, runWorkflowScript } from './helpers.js'
 
 /**
- * Every tool name the block intake registers when it is on.
+ * Every tool name the intake owns.
  *
  * Six names, five tools: `grok_steer` and `grok_stop` are the two halves of one
  * steering surface and are registered together, which is why the switch is described
@@ -60,92 +56,19 @@ const BLOCK_TOOL_NAMES = [
   'grok_stop',
 ] as const
 
-/** Run name of one front-desk call (`src/run.ts`: `TRIAGE_RUN_LABEL`). */
-const FRONT_DESK_RUN = 'Front desk'
+/** The two tools every load registers, whatever the intake switch says. */
+const ALWAYS_TOOLS = ['grok_workflow', 'grok_replan_intents'] as const
 
-/** The objective a normal case carries. */
+/** The objective a normal case carries; nothing here runs it. */
 const OBJECTIVE = '把接单台子的账本读出来，然后写一句结论'
-
-/* ------------------------------------------------------------------ engine -- */
-
-interface EngineResult { value: unknown; stopReason: string; agentsStarted: number }
-
-class FakeRun {
-  readonly id = 'run-block-flag'
-  readonly meta: WorkflowStartRequest['meta']
-  readonly dispose = vi.fn(async () => {})
-  readonly result: Promise<EngineResult>
-  private settle!: (value: EngineResult) => void
-  readonly cancel = vi.fn(() => {
-    this.settle({ value: null, stopReason: 'cancelled', agentsStarted: 0 })
-  })
-
-  constructor(request: WorkflowStartRequest) {
-    this.meta = request.meta
-    this.result = new Promise(resolve => { this.settle = resolve })
-  }
-
-  complete(value: unknown): void {
-    this.settle({ value, stopReason: 'completed', agentsStarted: 2 })
-  }
-}
-
-/**
- * Engine that settles every run with a scripted report.
- *
- * A case that has to reach `already-routed` needs one *completed* run first: the
- * gate records the delivery when the run it started ends, so a second dispatch of the
- * same batch is what the pass reason is about. Nothing here calls a model.
- */
-class FakeEngine {
-  readonly startCalls: WorkflowStartRequest[] = []
-  readonly runs: FakeRun[] = []
-
-  async start(request: WorkflowStartRequest): Promise<FakeRun> {
-    this.startCalls.push(request)
-    const run = new FakeRun(request)
-    this.runs.push(run)
-    request.signal?.addEventListener('abort', () => run.cancel(), { once: true })
-    if (request.meta.name === FRONT_DESK_RUN) {
-      // A front-desk call is one child; the block intake never changes this path, but
-      // the escape hatch can still ask for it, so it is answered rather than hung.
-      const single = await runWorkflowScript(
-        request.script,
-        request.args as Record<string, unknown>,
-        async (_prompt, options) => {
-          if (options.label === 'captain-preview') return '任务 1 · 读账本'
-          if (options.label === 'quick-worker') return '读完了。'
-          if (options.label === 'first-answer') return '先去读账本。'
-          throw new Error(`unexpected label ${options.label}`)
-        },
-      )
-      run.complete(single.report)
-      return run
-    }
-    const plan = [(request.args as { tasks?: unknown }).tasks].flat().filter(Boolean)
-    const tasks = plan.length > 0 ? plan as ReturnType<typeof task>[] : [task('a')]
-    const scripted = await runWorkflowScript(
-      request.script,
-      request.args as Record<string, unknown>,
-      async (_prompt, options) => {
-        if (roleOf(options.label) === 'planner') return { tasks }
-        if (roleOf(options.label) === 'worker') return execution('读完了账本')
-        if (roleOf(options.label) === 'verifier') return verification(tasks[0]!)
-        throw new Error(`unexpected label ${options.label}`)
-      },
-    )
-    run.complete(scripted.report)
-    return run
-  }
-}
 
 /* ------------------------------------------------------------------ agent -- */
 
-/** The slice of an agent the gate reads; `session` is the real host class. */
+/** The slice of an agent the listeners read; `session` is the real host class. */
 class FakeAgent {
   readonly followups: UserMessage[] = []
-  readonly followup = vi.fn((message: UserMessage) => { this.followups.push(message) })
-  readonly whenIdle = vi.fn(async () => {})
+  readonly followup = (message: UserMessage): void => { this.followups.push(message) }
+  readonly whenIdle = async (): Promise<void> => {}
 
   constructor(readonly session: Session) {}
 }
@@ -153,6 +76,18 @@ class FakeAgent {
 /* --------------------------------------------------------------- harness -- */
 
 const mountedContexts: Context[] = []
+
+/**
+ * Engine that refuses to run: no case in this file may start a workflow.
+ *
+ * `apply()` needs the service to exist, and every decision here is a routing decision,
+ * so a `start` would mean the file was measuring something else entirely.
+ */
+const noRunEngine = {
+  async start(): Promise<never> {
+    throw new Error('block-flag.spec.ts must not start a workflow run')
+  },
+}
 
 /**
  * Point the loop's operator-stop marker at a path that does not exist.
@@ -168,10 +103,10 @@ process.env['GROK_WORKFLOW_STOP_FILE'] = `${process.cwd()}/.tmp/block-flag/STOP-
 /**
  * One throwaway ledger directory for the whole file.
  *
- * Since M3.2 the narrow heartbeat listener is installed on every load and writes a line
- * per beat, so a mount that omitted this override would write into `$DSH_HOME`
- * (`~/.dsh` on a developer machine). The directory is set before the first mount, not
- * only in the observer cases, because the decision cases dispatch a heartbeat too.
+ * The narrow heartbeat listener is installed on every load and writes a line per beat,
+ * so a mount that omitted this override would write into `$DSH_HOME` (`~/.dsh` on a
+ * developer machine). The directory is set before the first mount, not only in the
+ * observer cases, because the decision cases dispatch a heartbeat too.
  */
 const previousLedgerDir = process.env['GROK_WORKFLOW_BLOCK_LEDGER_DIR']
 mkdirSync(join(process.cwd(), '.tmp'), { recursive: true })
@@ -192,13 +127,13 @@ afterAll(() => {
   try { rmSync(ledger, { recursive: true, force: true }) } catch { /* already gone */ }
 })
 
-interface Mounted { ctx: Context; engine: FakeEngine }
+interface Mounted { ctx: Context }
 
 /**
  * Mount the plugin on a real context.
  *
- * @param flag - `absent` omits the key entirely (the pre-feature load shape);
- *   `false`/`true` pass it explicitly.
+ * @param flag - `absent` omits the key entirely (the default load); `false`/`true`
+ *   pass it explicitly.
  * @param overrides - configuration overrides for the case.
  */
 async function mount(
@@ -208,24 +143,17 @@ async function mount(
   const ctx = new Context()
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
-  const engine = new FakeEngine()
   await ctx.plugin({
     name: 'stub-workflow-engine',
-    apply(inner: Context) { inner.provide('workflowEngine', engine) },
+    apply(inner: Context) { inner.provide('workflowEngine', noRunEngine) },
   } as never, {} as never)
   apply(ctx as never, {
-    mode: 'full',
     grokDefault: 'on',
-    // `legacyGate: true` on purpose: this file is about the *intake* switch, and every
-    // decision below is the front desk's. Since M3.2 the front desk is opt-in, so a mount
-    // that omitted it would have no admission decision to compare at all — both sides
-    // would be the narrow heartbeat listener passing the batch through.
-    legacyGate: true,
     ...flag === 'absent' ? {} : { blockIntake: flag === 'true' },
     ...overrides,
   })
   mountedContexts.push(ctx)
-  return { ctx, engine }
+  return { ctx }
 }
 
 /** The session a top-level conversation has: a head, so it is reopenable. */
@@ -272,42 +200,35 @@ async function dispatch(
 }
 
 /**
- * The decision as bytes, with the host's own message ids normalised.
+ * The decision as bytes.
  *
- * Ids are minted by the host (and by `createUserMessage` in this file), never by the
- * block intake, so they cannot be part of "the flag changed a decision". A case that
- * mints a message is compared with this fold; a case that mints none is compared with
- * `raw()`, because both loads then hold the same message objects and their ids already
- * match. The two functions return different strings either way: the payload's own
- * messages carry ids.
+ * Every payload below is built once per case and handed to every shape, so both sides
+ * hold the same message objects and the ids match by construction: no folding is
+ * needed, and none is done.
  */
-function stable(decision: Decision): string {
-  return JSON.stringify(decision, (key, value) => key === 'id' ? '<id>' : value)
-}
-
 function raw(decision: Decision): string {
   return JSON.stringify(decision)
+}
+
+/** How many `agent/pre-step` listeners this context holds (cordis's own list). */
+function listenerCount(ctx: Context): number {
+  const events = (ctx as unknown as { events: { _hooks: Record<string, unknown[]> } }).events
+  return (events._hooks['agent/pre-step'] ?? []).length
 }
 
 /* ------------------------------------------------------------------ cases -- */
 
 /**
- * One case: a session and the payload the gate will see.
+ * One case: a session and the payload the chain will see.
  *
- * `run` receives a fresh mount so it can also settle a run first (the
- * `already-routed` case), and returns the decision the off path must produce.
+ * These are the payload shapes that used to be the front desk's decision surface —
+ * an ordinary turn, a toggle-off session, a child session, a Host heartbeat, an
+ * over-long prompt, an empty batch, a plugin-source message. Every one of them is now
+ * a pass-through in every shape, which is the point: the switch has no opinion.
  */
 interface Case {
   name: string
   overrides?: Record<string, unknown>
-  /** True when the gate mints a message, i.e. the bytes carry a fresh host id. */
-  mints: boolean
-  /**
-   * The batch, built **once per case** and handed to both loads.
-   *
-   * Both mounts must see the same message objects, otherwise the comparison would be
-   * about two different ids rather than about two different loads.
-   */
   messages: () => UserMessage[]
   run: (mounted: Mounted, messages: UserMessage[]) => Promise<Decision>
 }
@@ -316,16 +237,11 @@ const CASES: Case[] = [
   {
     name: 'an ordinary user message with grok mode off is still an ordinary turn',
     overrides: { grokDefault: 'off' },
-    mints: false,
     messages: () => [userMessage(OBJECTIVE)],
-    run: async (mounted, messages) => {
-      const agent = new FakeAgent(headed('sess-flag-user'))
-      return await dispatch(mounted, agent, messages)
-    },
+    run: async (mounted, messages) => await dispatch(mounted, new FakeAgent(headed('sess-flag-user')), messages),
   },
   {
     name: 'a session whose /grok toggle is off keeps its pass-through turn',
-    mints: false,
     messages: () => [userMessage(OBJECTIVE)],
     run: async (mounted, messages) => {
       const session = headed('sess-flag-toggle')
@@ -334,116 +250,103 @@ const CASES: Case[] = [
     },
   },
   {
-    name: 'a delegated child session is never admitted',
-    mints: false,
+    name: 'a delegated child session is still an ordinary turn',
     messages: () => [userMessage(OBJECTIVE)],
     run: async (mounted, messages) => {
       const session = headed('sess-flag-subagent')
-      // A child's header carries the delegation depth; the gate reads it and passes.
+      // A child's header carries the delegation depth; nothing in the chain reads it
+      // any more, and the turn must survive it unchanged.
       Object.assign(session, { header: { origin: 'subagent', delegationDepth: 1 } })
       return await dispatch(mounted, new FakeAgent(session), messages)
     },
   },
   {
     name: 'a Host heartbeat stays a continuation, not a request',
-    mints: false,
     messages: () => [scheduleMessage(`${LOOP_PROMPT_PREFIX} round 2 of 10`)],
-    run: async (mounted, messages) => {
-      const agent = new FakeAgent(headed('sess-flag-heartbeat'))
-      return await dispatch(mounted, agent, messages)
-    },
+    run: async (mounted, messages) => await dispatch(mounted, new FakeAgent(headed('sess-flag-heartbeat')), messages),
   },
   {
-    name: 'a batch this session already routed passes instead of running twice',
-    mints: false,
-    messages: () => [userMessage(OBJECTIVE)],
-    run: async (mounted, messages) => {
-      const session = headed('sess-flag-routed')
-      const agent = new FakeAgent(session)
-      const first = await dispatch(mounted, agent, messages)
-      expect(first.kind).toBe('enter')
-      expect(mounted.engine.startCalls.length, 'the first dispatch must start one run').toBe(1)
-      // Same batch object, second dispatch: the gate must not pay for a second run.
-      return await dispatch(mounted, agent, messages, 2)
-    },
-  },
-  {
-    name: 'an over-long prompt is refused with the measured count',
-    mints: true,
+    name: 'an over-long prompt is handed on unchanged, not refused',
     messages: () => [userMessage('长'.repeat(TASK_LIMITS.objectiveChars + 1))],
-    run: async (mounted, messages) => {
-      const agent = new FakeAgent(headed('sess-flag-long'))
-      return await dispatch(mounted, agent, messages)
-    },
+    run: async (mounted, messages) => await dispatch(mounted, new FakeAgent(headed('sess-flag-long')), messages),
   },
   {
     name: 'an empty batch is a tool continuation, not a request',
-    mints: false,
     messages: () => [],
-    run: async (mounted, messages) => {
-      const agent = new FakeAgent(headed('sess-flag-empty'))
-      return await dispatch(mounted, agent, messages)
-    },
+    run: async (mounted, messages) => await dispatch(mounted, new FakeAgent(headed('sess-flag-empty')), messages),
   },
   {
     name: 'a plugin-source message is never read as a user request',
-    mints: false,
     messages: () => [systemMessage('runtime context')],
-    run: async (mounted, messages) => {
-      const agent = new FakeAgent(headed('sess-flag-context'))
-      return await dispatch(mounted, agent, messages)
-    },
+    run: async (mounted, messages) => await dispatch(mounted, new FakeAgent(headed('sess-flag-context')), messages),
   },
 ]
 
 /* ------------------------------------------------------------------ tests -- */
 
-describe('blockIntake: false is the pre-feature load, byte for byte', () => {
-  it('produces the same decision bytes as a load that never heard of the key', async () => {
+describe('a load that omits blockIntake is the same load as blockIntake: true', () => {
+  it('registers the same tools', async () => {
+    const absent = await mount('absent')
+    const explicit = await mount('true')
+    for (const name of [...ALWAYS_TOOLS, ...BLOCK_TOOL_NAMES]) {
+      expect(
+        explicit.ctx.tools.get(name) === undefined,
+        `${name}: the two loads must agree on whether it exists`,
+      ).toBe(absent.ctx.tools.get(name) === undefined)
+    }
+    // …and the shared answer is "present", so the loop above is not comparing two
+    // empty surfaces.
+    for (const name of [...ALWAYS_TOOLS, ...BLOCK_TOOL_NAMES]) {
+      expect(absent.ctx.tools.get(name), `${name} must be registered by default`).toBeDefined()
+    }
+  })
+
+  it('installs the same listeners', async () => {
+    const absent = await mount('absent')
+    const explicit = await mount('true')
+    // The narrow heartbeat listener plus the intake's own observer: the default load
+    // carries both, and the explicit opt-in adds nothing on top.
+    expect(listenerCount(absent.ctx)).toBe(2)
+    expect(listenerCount(explicit.ctx), 'the key must not change the chain').toBe(listenerCount(absent.ctx))
+  })
+
+  it('decides every payload the same way', async () => {
     for (const testCase of CASES) {
       const messages = testCase.messages()
       const before = await mount('absent', testCase.overrides)
-      const after = await mount('false', testCase.overrides)
+      const after = await mount('true', testCase.overrides)
       const baseline = await testCase.run(before, messages)
       const flagged = await testCase.run(after, messages)
-      // Both loads see the *same* message objects, so a case that mints no new message
-      // must match on the raw bytes — not merely "equal after stripping ids".
-      const bytes = testCase.mints ? stable : raw
-      expect(bytes(flagged), `${testCase.name}: the decision changed`).toBe(bytes(baseline))
+      expect(raw(flagged), `${testCase.name}: the decision changed`).toBe(raw(baseline))
     }
   })
+})
 
-  it('pins what each of those decisions actually is', async () => {
-    const mounted = await mount('false')
-    const userOff = await mount('false', { grokDefault: 'off' })
-    const decisions: string[] = []
-    for (const testCase of CASES) {
-      const target = testCase.overrides?.grokDefault === 'off' ? userOff : mounted
-      decisions.push(JSON.stringify(await testCase.run(target, testCase.messages())))
-    }
-    // The eight shapes, in CASES order: five pass-through turns that keep the batch
-    // exactly as the loop claimed it, one already-routed pass, one refusal that keeps
-    // the claimed message and appends one notice, and one empty-batch pass.
-    expect(decisions[0]).toContain('"kind":"enter"')
-    expect(decisions[0]).toContain(OBJECTIVE)
-    expect(decisions[1]).toContain(OBJECTIVE)
-    expect(decisions[2]).toContain(OBJECTIVE)
-    expect(decisions[3]).toContain(LOOP_PROMPT_PREFIX)
-    expect(decisions[4]).toContain(OBJECTIVE)
-    expect(decisions[5]).toContain(`${TASK_LIMITS.objectiveChars}`)
-    expect(decisions[6]).toBe('{"kind":"enter","messages":[]}')
-    expect(decisions[7]).toContain('runtime context')
-  })
-
-  it('registers none of the block tools', async () => {
+describe('blockIntake: false removes the intake and nothing else', () => {
+  it('registers none of the block tools and keeps the tools that were always there', async () => {
     const mounted = await mount('false')
     for (const name of BLOCK_TOOL_NAMES) {
       expect(mounted.ctx.tools.get(name), `${name} must not exist when the flag is off`).toBeUndefined()
     }
-    // The tools that were there before the feature are still there: "off" means the
-    // old surface, not an empty one.
-    expect(mounted.ctx.tools.get('grok_workflow')).toBeDefined()
-    expect(mounted.ctx.tools.get('grok_replan_intents')).toBeDefined()
+    for (const name of ALWAYS_TOOLS) {
+      expect(mounted.ctx.tools.get(name), `${name} is not part of the intake`).toBeDefined()
+    }
+  })
+
+  it('installs no intake observer but keeps the narrow heartbeat listener', async () => {
+    try { rmSync(join(ledger, HEARTBEATS_LISTEN_FILE), { force: true }) } catch { /* nothing to remove */ }
+    const off = await mount('false')
+    // One listener: the narrow heartbeat listener every load carries. The intake's own
+    // observer would be the second, and "off" is the claim that it is absent.
+    expect(listenerCount(off.ctx), 'off must not add a listener to the chain').toBe(1)
+    expect(listenerCount(off.ctx)).toBe(listenerCount((await mount('absent')).ctx) - 1)
+
+    // And the narrow listener is not merely counted: it still records the beat.
+    const sessionId = 'sess-brake-off'
+    await dispatch(off, new FakeAgent(headed(sessionId)), [scheduleMessage(`${LOOP_PROMPT_PREFIX} round 3`)])
+    const recorded = readHeartbeatListenObservations({ dir: ledger })
+    expect(recorded, 'the narrow listener writes its own line either way').toHaveLength(1)
+    expect(recorded[0]).toMatchObject({ sessionId, outcome: 'continued' })
   })
 
   it('accepts the switch as a real boolean and refuses anything else', async () => {
@@ -455,20 +358,34 @@ describe('blockIntake: false is the pre-feature load, byte for byte', () => {
   })
 })
 
+describe('the switch does not decide a user message', () => {
+  it('hands the same batch back unchanged in all three shapes', async () => {
+    const messages = [userMessage(OBJECTIVE)]
+    for (const flag of ['absent', 'true', 'false'] as const) {
+      const mounted = await mount(flag)
+      const decision = await dispatch(mounted, new FakeAgent(headed(`sess-shape-${flag}`)), messages)
+      expect(decision.kind, `${flag}: a user turn is entered`).toBe('enter')
+      // The very same array, not an equal copy: nothing in the chain rewrote or
+      // re-wrapped the batch.
+      expect(decision.messages, `${flag}: the batch must be the one the loop claimed`).toBe(messages)
+    }
+  })
+})
+
 /* ------------------------------------------------------- heartbeat observer -- */
 
 /**
  * The one listener the flag adds, and the two things it must never do.
  *
  * The observer's whole job is "record that the beat reached a session that still owes
- * work". So: with the flag off there is no listener and no file; with it on there is
- * one listener, one line, and the *same* decision bytes. Anything else — a changed
- * decision, a verdict line, a written block row — would be the observer doing work it
- * was not asked to do.
+ * work". So: with the flag off there is no observer and no file; with it on there is
+ * one more listener, one line, and the *same* decision bytes. Anything else — a
+ * changed decision, a verdict line, a written block row — would be the observer doing
+ * work it was not asked to do.
  */
 describe('the heartbeat observer records a beat and changes no decision', () => {
   beforeEach(() => {
-    for (const file of [HEARTBEATS_FILE, 'blocks.jsonl', 'verdicts.jsonl']) {
+    for (const file of [HEARTBEATS_FILE, HEARTBEATS_LISTEN_FILE, 'blocks.jsonl', 'verdicts.jsonl']) {
       try { rmSync(join(ledger, file), { force: true }) } catch { /* nothing to remove */ }
     }
   })
@@ -503,26 +420,15 @@ describe('the heartbeat observer records a beat and changes no decision', () => 
     return written.id
   }
 
-  /** How many `agent/pre-step` listeners this context holds (cordis's own list). */
-  function listenerCount(ctx: Context): number {
-    const events = (ctx as unknown as { events: { _hooks: Record<string, unknown[]> } }).events
-    return (events._hooks['agent/pre-step'] ?? []).length
-  }
-
-  it('adds no listener of its own when the flag is off', async () => {
+  it('adds no observation when the flag is off', async () => {
     const mounted = await mount('false')
-    // Two listeners, neither of them the intake's: the front desk (opted in by the mount)
-    // and the narrow heartbeat listener every load carries since M3.2. The intake's own
-    // observer would be the third, and "off" is the claim that it is absent.
-    expect(listenerCount(mounted.ctx), 'off must not add a listener to the chain').toBe(2)
-    expect(listenerCount(mounted.ctx)).toBe(listenerCount((await mount('absent')).ctx))
-    const sessionId = 'sess-brake-off'
+    const sessionId = 'sess-brake-off-file'
     await openBlockFor(sessionId)
     const before = readFileSync(join(ledger, 'blocks.jsonl'), 'utf8')
-    const agent = new FakeAgent(headed(sessionId))
-    const decision = await dispatch(mounted, agent, [scheduleMessage(`${LOOP_PROMPT_PREFIX} round 3`)])
+    const decision = await dispatch(mounted, new FakeAgent(headed(sessionId)), [scheduleMessage(`${LOOP_PROMPT_PREFIX} round 3`)])
     expect(decision.kind).toBe('enter')
-    // Not one byte written: no observation file, and the block ledger is untouched.
+    // Not one byte written by the intake: no observation file, and the block ledger is
+    // untouched.
     expect(existsSync(join(ledger, HEARTBEATS_FILE)), 'off must not create the observation file').toBe(false)
     expect(readFileSync(join(ledger, 'blocks.jsonl'), 'utf8')).toBe(before)
     expect(existsSync(join(ledger, 'verdicts.jsonl'))).toBe(false)
@@ -536,15 +442,14 @@ describe('the heartbeat observer records a beat and changes no decision', () => 
     const off = await mount('false')
     const offDecision = await dispatch(off, new FakeAgent(headed(sessionId)), messages)
     const on = await mount('true')
-    // Three listeners, never a replacement: the front desk (opted in by the mount), the
-    // intake's own heartbeat observer, and the narrow heartbeat listener that records
-    // what the beat did in its own file — and, since M3.2, decides the beat.
-    expect(listenerCount(on.ctx), 'on adds two listeners, never replaces one').toBe(3)
+    // Two listeners, never a replacement: the narrow heartbeat listener that decides
+    // the beat, and the intake's observer that records what it did.
+    expect(listenerCount(on.ctx), 'on adds one listener, never replaces one').toBe(2)
     const onDecision = await dispatch(on, new FakeAgent(headed(sessionId)), messages)
 
     // The decision is the same object shape and the same bytes: the observer passes the
-    // gate's answer through untouched.
-    expect(JSON.stringify(onDecision)).toBe(JSON.stringify(offDecision))
+    // chain's answer through untouched.
+    expect(raw(onDecision)).toBe(raw(offDecision))
     const observations = readHeartbeatObservations({ dir: ledger })
     expect(observations).toHaveLength(1)
     expect(observations[0]!.sessionId).toBe(sessionId)
@@ -556,8 +461,7 @@ describe('the heartbeat observer records a beat and changes no decision', () => 
 
   it('writes nothing for a beat in a session that owes no work', async () => {
     const on = await mount('true')
-    const agent = new FakeAgent(headed('sess-brake-nothing'))
-    await dispatch(on, agent, [scheduleMessage(`${LOOP_PROMPT_PREFIX} round 3`)])
+    await dispatch(on, new FakeAgent(headed('sess-brake-nothing')), [scheduleMessage(`${LOOP_PROMPT_PREFIX} round 3`)])
     expect(readHeartbeatObservations({ dir: ledger })).toHaveLength(0)
   })
 

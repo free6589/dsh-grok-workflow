@@ -125,7 +125,7 @@ describe('apply() load-time synthesis fallback (P1)', () => {
     })
     effect = (installer: () => unknown) => installer()
     // Real cordis Context always exposes `on`; these tool-path tests run on a
-    // runtime with the hook, so stub it (the hookless runtime is pinned in gate.spec.ts).
+    // runtime with the hook, so stub it (the hookless runtime is pinned in config.spec.ts).
     readonly on = (): (() => void) => () => {}
   }
 

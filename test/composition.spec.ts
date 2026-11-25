@@ -1,21 +1,22 @@
 /**
  * Layer 5 — composed `agent/pre-step` behaviour.
  *
- * The unit tests in `gate.spec.ts` drive this plugin's listener alone. A real
- * DSH profile dispatches `agent/pre-step` as a cordis waterfall through every
+ * A real DSH profile dispatches `agent/pre-step` as a cordis waterfall through every
  * in-tree listener, so this spec mounts the reproductions in
  * `composition-listeners.ts` on a **real cordis `Context`** together with this
  * plugin's real `apply()`, then dispatches through the real waterfall:
  *
  * - the ordering, `prepend` placement and "a listener that does not call `next()`
  *   vetoes the chain" semantics are cordis's own, not a test double;
- * - the gate is the plugin's real listener, registered by the real `apply()` because
- *   this file's mount opts in (`legacyGate: true`; since M3.2 the front desk is not
- *   part of a default load).
+ * - the plugin's listeners are registered by the real `apply()`, so what the chain
+ *   composes is the shipped registration, not a hand-installed stub. Since M3.3 that
+ *   is the narrow heartbeat listener plus the intake's observer — two listeners that
+ *   record a beat and decide nothing about a user batch.
  *
- * What it proves: no in-tree listener can turn a rejected user batch into a
- * model request, and the only ways this gate is starved are the two known
- * windows (archived sessions, and a goal round rejected by another listener).
+ * What it proves: the plugin's presence changes nothing about a user batch (the same
+ * decision with and without it, in either placement), no run starts from a message,
+ * and the two windows that starve it are unchanged (archived sessions, and a goal
+ * round rejected by another listener).
  */
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
@@ -61,13 +62,13 @@ interface ComposedHarness {
   followups: UserMessage[]
   dispatch: (payload: ComposedPayload) => Promise<ComposedDecision>
   innerCalls: () => number
-  /** Resolves once the gate has asked the engine to start, or throws on timeout. */
-  waitForStart: () => Promise<void>
 }
 
 interface HarnessOptions {
   /** `first` = registered before the in-tree listeners (outermost). */
-  gatePlacement?: 'first' | 'last'
+  pluginPlacement?: 'first' | 'last'
+  /** `false` mounts the in-tree composition alone, with no plugin. */
+  withPlugin?: boolean
   archived?: string[]
   sessions?: Map<string, ComposedAgent['session']>
   planModeActive?: boolean
@@ -93,7 +94,7 @@ function harness(options: HarnessOptions = {}): ComposedHarness {
     )
   }
 
-  const installGate = (): void => {
+  const installPlugin = (): void => {
     const shim = {
       on: (event: string, handler: unknown) => ctx.on(event as never, handler as never),
       effect: (installer: () => () => void) => {
@@ -105,19 +106,13 @@ function harness(options: HarnessOptions = {}): ComposedHarness {
       systemPrompt: { section: () => () => {}, getSectionOrder: () => 2600 },
       workflowEngine: engine,
     }
-    // T4: in-turn is the only delivery — the gate enters the step with the
-    // report instead of rejecting into a background relay (see test/gate.spec.ts
-    // for that path). These suites pin the entered decision and its composition
-    // with the in-tree listeners.
-    // `mode: 'full'` keeps the pre-t52 rule: these suites are about the gate's
-    // admission and its composition, and the front desk has its own file (triage.spec.ts).
-    // `grokDefault: 'on'`: these suites are about admitted batches and the
-    // reject veto's composition; the default-off toggle passes messages through
-    // as normal chat (pinned in gate.spec.ts).
-    apply(shim as never, { legacyGate: true, mode: 'full', grokDefault: 'on'})
+    // The real entry point: it registers the narrow heartbeat listener and, with
+    // the intake on by default, the intake's own observer. Neither decides a user
+    // batch, which is what the cases below measure.
+    apply(shim as never, { grokDefault: 'on' })
   }
 
-  if (options.gatePlacement === 'first') installGate()
+  if (options.withPlugin !== false && options.pluginPlacement === 'first') installPlugin()
   if (options.withInTree !== false) {
     for (const listener of inTreeListeners(effects, {
       ...options.archived === undefined ? {} : { archived: options.archived },
@@ -126,7 +121,7 @@ function harness(options: HarnessOptions = {}): ComposedHarness {
       ...options.listenerOrder === undefined ? {} : { listenerOrder: options.listenerOrder },
     })) register(listener)
   }
-  if (options.gatePlacement !== 'first') installGate()
+  if (options.withPlugin !== false && options.pluginPlacement !== 'first') installPlugin()
 
   return {
     ctx,
@@ -145,11 +140,6 @@ function harness(options: HarnessOptions = {}): ComposedHarness {
           return { kind: 'enter', messages: lastMessages } as ComposedDecision
         },
       ) as ComposedDecision
-    },
-    waitForStart: async () => {
-      await vi.waitFor(() => {
-        if (engine.startCalls.length === 0) throw new Error('the gate did not start a run')
-      }, { timeout: 2_000, interval: 5 })
     },
   }
 }
@@ -204,8 +194,31 @@ function payload(agent: ComposedAgentStub, messages: UserMessage[], turn = 1, st
 
 /* -------------------------------------------------------------------- tests -- */
 
+/**
+ * How many `agent/pre-step` listeners this context holds (cordis's own hook list).
+ * @param ctx - the mounted context.
+ * @returns the number of registered listeners.
+ */
+function listenerCount(ctx: Context): number {
+  const events = (ctx as unknown as { events: { _hooks: Record<string, unknown[]> } }).events
+  return (events._hooks['agent/pre-step'] ?? []).length
+}
+
+/**
+ * The decision as bytes with the host's own ids collapsed.
+ *
+ * The in-tree reproductions append their own context messages, each with a freshly
+ * minted id, so two runs of the same composition differ only in identity. Folding
+ * `id` is what lets "the plugin changed nothing" be compared across two harnesses.
+ * @param decision - one waterfall decision.
+ * @returns the decision as a stable string.
+ */
+function stable(decision: unknown): string {
+  return JSON.stringify(decision, (key, value) => key === 'id' ? '<id>' : value)
+}
+
 describe('composed pre-step waterfall', () => {
-  it('composes at least eight in-tree listeners besides the gate', () => {
+  it('composes at least eight in-tree listeners besides the plugin\'s two', () => {
     const listeners = inTreeListeners({ observed: [], appended: [], effects: [] })
     const packages = new Set(listeners.map(listener => listener.package))
     expect(listeners.length).toBeGreaterThanOrEqual(8)
@@ -221,37 +234,29 @@ describe('composed pre-step waterfall', () => {
       'dsh-time-context',
       'dsh-tmux-context',
     ]))
+    // The plugin's own two: the narrow heartbeat listener and the intake observer.
+    // Counted on a real context, so "the chain carries them" is the shipped wiring.
+    expect(listenerCount(harness().ctx)).toBe(listeners.length + 2)
+    expect(listenerCount(harness({ withPlugin: false }).ctx)).toBe(listeners.length)
   })
 
-  it('enters a user batch inside the full composition and issues no request (in-turn, T4)', async () => {
-    // T4: in-turn is the only delivery — the gate enters the step with the
-    // report instead of rejecting into a background relay. The built-in
-    // behaviour (the waterfall's terminal `enter`) still never runs for an
-    // admitted batch: the gate's in-turn decision answers the step itself.
-    const composed = harness()
-    const agent = userAgent()
-    const decision = await composed.dispatch(payload(agent, [message('please refactor the parser', 'user')]))
-    expect(decision.kind).toBe('enter')
-    // T4 in-turn: the gate enters the step with the report (it does not veto),
-    // so the waterfall terminal runs once with the entered messages — downstream
-    // listeners observe an `enter`, and still no model request originates there.
-    expect(composed.innerCalls()).toBe(1)
-    await composed.waitForStart()
-    expect(composed.engine.startCalls).toHaveLength(1)
-  })
+  it('changes nothing about a user batch, in either placement', async () => {
+    // The M3.3 claim, at the composition level: take the plugin out of the chain and
+    // the decision is the same one. A user batch is not admitted, not refused, not
+    // annotated — and no run starts from it.
+    const messages = [message('please refactor the parser', 'user')]
+    const without = harness({ withPlugin: false })
+    const expected = stable(await without.dispatch(payload(userAgent(), messages)))
+    expect(without.engine.startCalls).toEqual([])
 
-  it('stays entered when the gate is registered first (outermost) instead of last', async () => {
-    const composed = harness({ gatePlacement: 'first' })
-    const agent = userAgent()
-    const decision = await composed.dispatch(payload(agent, [message('please refactor the parser', 'user')]))
-    expect(decision.kind).toBe('enter')
-    expect(composed.innerCalls()).toBe(1)
-    await composed.waitForStart()
-    // Outermost: listeners below the gate still run on the entered decision
-    // (compaction records its pre-next side effect), but none of them vetoed:
-    // the gate's enter is what the waterfall carries.
-    expect(decision.kind).toBe('enter')
-    expect(composed.effects.observed.every(entry => entry.kind === 'enter')).toBe(true)
+    for (const pluginPlacement of ['first', 'last'] as const) {
+      const composed = harness({ pluginPlacement })
+      const decision = await composed.dispatch(payload(userAgent(), messages))
+      expect(stable(decision), `${pluginPlacement}: the decision changed`).toBe(expected)
+      expect(composed.innerCalls(), `${pluginPlacement}: the terminal runs once`).toBe(1)
+      expect(composed.effects.observed.every(entry => entry.kind === 'enter')).toBe(true)
+      expect(composed.engine.startCalls, `${pluginPlacement}: no run may start`).toEqual([])
+    }
   })
 
   it('is starved by the archived-session gate, which rejects without calling next', async () => {
@@ -261,10 +266,10 @@ describe('composed pre-step waterfall', () => {
     const decision = await composed.dispatch(payload(agent, [message('please refactor the parser', 'user')]))
     expect(decision).toEqual({ kind: 'reject' })
     expect(composed.innerCalls()).toBe(0)
-    // Documented window W1: the archived gate runs before this plugin and vetoes,
-    // so no workflow starts and no notice is delivered.
-    expect(composed.engine.startCalls).toEqual([])
+    // Window W1, unchanged by M3.3: the archived gate runs before this plugin and
+    // vetoes, so the plugin's listeners never see the batch.
     expect(composed.effects.effects.some(entry => entry.effect === 'reject-archived')).toBe(true)
+    expect(composed.engine.startCalls).toEqual([])
   })
 
   it('passes a goal round through, so the goal driver completes its round', async () => {
@@ -274,19 +279,16 @@ describe('composed pre-step waterfall', () => {
     expect(decision.kind).toBe('enter')
     expect(decision).toMatchObject({ startsRequestSeries: true })
     expect(composed.innerCalls()).toBe(1)
-    expect(composed.engine.startCalls).toEqual([])
     expect(composed.effects.effects.some(entry => entry.effect === 'goal-blocked')).toBe(false)
   })
 
   it('never rejects a goal round itself, so the goal driver keeps its round', async () => {
-    // The gate's admission predicate matches `source.kind === 'user'` only, and a
-    // goal round is `{kind:'goal', round>0}`. This is the load-bearing fact behind
-    // window W2: a goal round reaches the driver intact.
-    const composed = harness({ gatePlacement: 'first' })
+    // A goal round is `{kind:'goal', round>0}`: the plugin's listeners only ever look
+    // at a `schedule` source, so the round reaches the driver intact.
+    const composed = harness({ pluginPlacement: 'first' })
     const decision = await composed.dispatch(payload(userAgent(), [message('goal round 1 instruction', 'goal', { round: 1, goalId: 'g', revision: 1 })]))
     expect(decision.kind).toBe('enter')
     expect(composed.effects.effects.some(entry => entry.effect === 'goal-blocked')).toBe(false)
-    expect(composed.engine.startCalls).toEqual([])
   })
 
   it('shows that the goal-blocking branch depends on which listener rejects first', async () => {
@@ -303,7 +305,7 @@ describe('composed pre-step waterfall', () => {
     const archivedFirst = await outerArchived.dispatch(payload(userAgent({ id: archivedId }), [message('goal round 1', 'goal', { round: 1, goalId: 'g', revision: 1 })]))
     expect(archivedFirst).toEqual({ kind: 'reject' })
     expect(outerArchived.effects.effects.some(entry => entry.effect === 'goal-blocked')).toBe(false)
-    // Neither order starts a workflow: this plugin is starved in both.
+    // Neither order starts a workflow: this plugin starts none from a message at all.
     expect(outerDriver.engine.startCalls).toEqual([])
     expect(outerArchived.engine.startCalls).toEqual([])
   })
@@ -319,19 +321,18 @@ describe('composed pre-step waterfall', () => {
     expect(composed.engine.startCalls).toEqual([])
   })
 
-  it('keeps every appended message inside the entered decision in both placements (in-turn, T4)', async () => {
-    // T4: the admitted batch is entered with the report (not rejected), so
-    // post-processing listeners see an `enter` decision and may append context.
-    // What this pins: no listener resurrects the batch as a second user message
-    // and the gate's own report message is present exactly once.
-    for (const gatePlacement of ['first', 'last'] as const) {
-      const composed = harness({ gatePlacement })
-      const decision = await composed.dispatch(payload(userAgent(), [message('do the thing', 'user')]))
+  it('leaves the batch the loop claimed in the decision, in both placements', async () => {
+    // What is pinned: the plugin neither replaces nor re-wraps the claimed batch, and
+    // the messages other listeners append ride inside the entered decision rather
+    // than becoming a second turn.
+    for (const pluginPlacement of ['first', 'last'] as const) {
+      const composed = harness({ pluginPlacement })
+      const messages = [message('do the thing', 'user')]
+      const decision = await composed.dispatch(payload(userAgent(), messages))
       expect(decision.kind).toBe('enter')
-      await composed.waitForStart()
-      const texts = (decision as unknown as { messages: { content: { text?: string }[] }[] }).messages
-        .map(m => m.content.map(b => b.text ?? '').join(''))
-      expect(texts.some(t => t.includes('Grok workflow: FAILED'))).toBe(true)
+      const carried = (decision as unknown as { messages: UserMessage[] }).messages
+      expect(carried[0], `${pluginPlacement}: the claimed message leads`).toBe(messages[0])
+      expect(composed.engine.startCalls).toEqual([])
     }
   })
 })

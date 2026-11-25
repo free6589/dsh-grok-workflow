@@ -2,15 +2,15 @@
  * The workflow master switch's Host surface (`POST /grok-workflow/mode`).
  *
  * What this file owns, and why each assertion is here rather than in
- * `test/gate.spec.ts` or `test/command.spec.ts`:
- * - `src/mode.ts` owns the durable record (`test/mode.spec.ts`), the command owns
- *   the typed path and the gate owns the read (`mode-off`). Neither of those can
- *   prove the *button* path, which is a browser request with no acting Agent: this
- *   route must write the same record, answer the read-back, and report the live
- *   `grokDefault` fallback when no record exists.
- * - The gate integration case below is the one fact spanning two modules: a switch
- *   set off through this route is what `classifyPreStep` reads on the next message.
- *   That is the "no second source" acceptance in executable form.
+ * `test/command.spec.ts`:
+ * - `src/mode.ts` owns the durable record (`test/mode.spec.ts`) and the command owns
+ *   the typed path. Neither of those can prove the *button* path, which is a browser
+ *   request with no acting Agent: this route must write the same record, answer the
+ *   read-back, and report the live `grokDefault` fallback when no record exists.
+ * - The integration case below is the one fact spanning two modules: a switch set off
+ *   through this route is what the block intake's admission rule reads on the next
+ *   tool call. Since M3.3 deleted the front desk, that rule is the record's only
+ *   reader — which is the "no second source" acceptance in executable form.
  *
  * No model, no network, no timers: the request pair is a `Readable` plus a small
  * response recorder, and the session store is a map over real `Session` objects.
@@ -19,12 +19,9 @@ import { Readable } from 'node:stream'
 import { describe, expect, it } from 'vitest'
 import type { Session } from '@deepseek-ai/dsh-session'
 import { Session as SessionClass } from '@deepseek-ai/dsh-session'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import { grokCommand } from '../src/command.js'
-import { resolveConfig } from '../src/config.js'
-import { classifyPreStep } from '../src/gate.js'
 import { readModeRecord } from '../src/mode.js'
+import { canAcceptBlock } from '../src/user-source.js'
 import { handleModeRoute, installModeRoute, MODE_ROUTE_PATH } from '../src/mode-surface.js'
 import type { ModeHostContext, ModeRouteDeps, ModeState } from '../src/mode-surface.js'
 
@@ -540,37 +537,19 @@ describe('mounting the switch route', () => {
   })
 })
 
-/* ------------------------------------------------------- gate integration -- */
+/* ------------------------------------------------------ intake integration -- */
 
-describe('the gate reads the switch this route wrote', () => {
-  const userMessage = (text: string): UserMessage =>
-    createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } as never }) as UserMessage
-
-  const payload = (target: Session): never => ({
-    agent: { session: target },
-    messages: [userMessage('do the thing')],
-    turn: 1,
-    step: 1,
-    signal: new AbortController().signal,
-  }) as never
-
-  it('off through the route passes the next message; on admits it again', async () => {
+describe('the block intake reads the switch this route wrote', () => {
+  it('refuses a block after the route turns the session off, and accepts it again after on', async () => {
     const target = session()
-    const on = { config: resolveConfig({ grokDefault: 'on' }) }
-
-    // No record: the live grokDefault decides, exactly as before this feature.
-    expect(classifyPreStep(on, payload(target))).toMatchObject({ kind: 'admit' })
-
-    await call(deps([target], true), 'POST', { action: 'set', sessionId: SESSION, enabled: false })
-    expect(classifyPreStep(on, payload(target))).toEqual({ kind: 'pass', reason: 'mode-off' })
+    // No record: the intake refuses, whatever the deployment default says.
+    expect(canAcceptBlock(target), 'no record, no admission').toBe(false)
 
     await call(deps([target], true), 'POST', { action: 'set', sessionId: SESSION, enabled: true })
-    expect(classifyPreStep(on, payload(target))).toMatchObject({ kind: 'admit' })
+    expect(canAcceptBlock(target)).toBe(true)
 
-    // And the switch still wins over a deployment default in the other direction.
     await call(deps([target], true), 'POST', { action: 'set', sessionId: SESSION, enabled: false })
-    expect(classifyPreStep({ config: resolveConfig({ grokDefault: 'off' }) }, payload(target)))
-      .toEqual({ kind: 'pass', reason: 'mode-off' })
+    expect(canAcceptBlock(target), 'an explicit off is never an admission').toBe(false)
   })
 })
 

@@ -197,11 +197,12 @@ describe('LIMIT_CAPS: one clamp table for every user-configurable numeric cap (B
     expect(takeLimitOverruns()).toEqual([])
   })
 
-  it('rejects every T4-removed key as removed (R-06拒载), all 23', () => {
-    // T4 slim-down: the 23 removed keys are no longer clamped or defaulted — a
-    // patch that still carries one is refused instead of silently repaired.
-    // (`timeoutMs` left this list when it became configurable again.)
-    expect(REMOVED_CONFIG_KEYS).toHaveLength(23)
+  it('rejects every T4-removed key as removed (R-06拒载), all 25', () => {
+    // T4 slim-down plus M3.3: the 25 removed keys are no longer clamped or defaulted —
+    // a patch that still carries one is refused instead of silently repaired.
+    // (`timeoutMs` left this list when it became configurable again; `mode` and
+    // `legacyGate` joined it when the front desk was deleted.)
+    expect(REMOVED_CONFIG_KEYS).toHaveLength(25)
     for (const key of REMOVED_CONFIG_KEYS) {
       expect(() => resolveConfig({ [key]: 1 } as never))
         .toThrow(new RegExp(`removed configuration key "${key}"`))
@@ -283,7 +284,7 @@ class FakeCtx {
   })
   effect = (installer: () => unknown) => installer()
   // Real cordis Context always exposes `on`; these tool-path tests run on a
-  // runtime with the hook, so stub it (the hookless runtime is pinned in gate.spec.ts).
+  // runtime with the hook, so stub it (the hookless runtime is pinned in config.spec.ts).
   readonly on = (): (() => void) => () => {}
 }
 

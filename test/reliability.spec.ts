@@ -1,12 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Session, pluginRecordOf } from '@deepseek-ai/dsh-session'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
 import { apply } from '../src/index.js'
 import { Config, CONFIG_KEYS, createConfigReader, FIXED_TIMEOUT_MS, resolveConfig, snapshotConfig } from '../src/config.js'
-import { DELIVERY_RECORD, ROUTING_RECORD, recordRouting } from '../src/records.js'
+import { ROUTING_RECORD, recordRouting } from '../src/records.js'
 import { describeSurface } from '../src/settings.js'
-import { collectHistory, composeObjective, renderHistory } from '../src/history.js'
 import { assertWorkflowReport, failureReport, failureSummary, renderReport } from '../src/report.js'
 import { buildWorkflowRequest, WORKFLOW_SCRIPT } from '../src/script.js'
 import { createActiveState, runWorkflow } from '../src/run.js'
@@ -115,7 +113,14 @@ class FakeContext {
 
   readonly workflowEngine = this.engine
 
-  on(event: string, handler: (payload: unknown, next: () => Promise<unknown>) => Promise<unknown>): () => void {
+  /**
+   * Bound, like cordis's own `on`.
+   *
+   * `src/block/brakes.ts` reads `ctx.on` into a local and calls it, so a method that
+   * relied on its receiver would throw there; the real context binds its methods, and
+   * this double has to behave the same way.
+   */
+  readonly on = (event: string, handler: (payload: unknown, next: () => Promise<unknown>) => Promise<unknown>): (() => void) => {
     this.listeners.set(event, handler)
     return () => { this.listeners.delete(event) }
   }
@@ -155,18 +160,6 @@ function agentOf(target: Session): Record<string, unknown> {
   }
 }
 
-function userMessage(text: string): ReturnType<typeof createUserMessage> {
-  return createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } as never })
-}
-
-function stepPayload(agent: Record<string, unknown>, messages: unknown[], signal = new AbortController().signal): Record<string, unknown> {
-  return { agent, messages, turn: 1, step: 1, signal }
-}
-
-function passThrough(messages: unknown[]): () => Promise<unknown> {
-  return async () => ({ kind: 'enter', messages })
-}
-
 function exec(signal: AbortSignal = new AbortController().signal, delegationDepth = 0): Record<string, unknown> {
   return {
     agent: { session: { header: { delegationDepth } } },
@@ -184,7 +177,7 @@ describe('reliability: cancellation and deadlines', () => {
   it('reports a deliberate stop as cancelled instead of blaming configuration', async () => {
     const ctx = new FakeContext()
     ctx.engine.hang = true
-    apply(ctx as never, { legacyGate: true, maxConcurrency: 1})
+    apply(ctx as never, { maxConcurrency: 1})
     const controller = new AbortController()
     const pending = ctx.tool!.execute({ objective: 'do the thing', tasks: [callerTask('a')] }, exec(controller.signal))
     await vi.waitFor(() => { if (ctx.engine.runs.length === 0) throw new Error('run did not start') })
@@ -283,57 +276,14 @@ describe('reliability: concurrency and duplicate start', () => {
     expect(peak).toBeGreaterThan(1)
   })
 
-  it('starts one workflow per user message even when pre-step fires again', async () => {
-    const ctx = new FakeContext()
-    // Duplicate suppression is about the gate's durable record, not about the
-    // front desk: run the pre-t52 rule so the message really starts a workflow.
-    apply(ctx as never, { legacyGate: true, maxConcurrency: 1, mode: 'full', grokDefault: 'on' })
-    const target = session('sess-duplicate')
-    const messages = [userMessage('do the thing')]
-    await ctx.preStep(stepPayload(agentOf(target), messages), passThrough(messages as never))
-    await vi.waitFor(() => { if (ctx.engine.startCalls.length === 0) throw new Error('no run') })
-    await vi.waitFor(() => {
-      const routed = target.ownEvents().some(event => JSON.stringify(event).includes('delivered'))
-      if (!routed) throw new Error('delivery not recorded yet')
-    })
-    // Same batch again: the durable delivery record answers instead of a second run.
-    await ctx.preStep(stepPayload(agentOf(target), messages), passThrough(messages as never))
-    expect(ctx.engine.startCalls).toHaveLength(1)
-  })
 })
 
 describe('reliability: recursion, context and secrets', () => {
   it('refuses the tool from a subagent so a workflow cannot nest', async () => {
     const ctx = new FakeContext()
-    apply(ctx as never, { legacyGate: true, maxConcurrency: 1 })
+    apply(ctx as never, { maxConcurrency: 1 })
     await expect(ctx.tool!.execute({ objective: 'nested' }, exec(undefined, 2)))
       .rejects.toThrow(/cannot be invoked from a subagent/)
-  })
-
-  it('bounds forwarded context by turns, characters and the objective limit', () => {
-    const messages = Array.from({ length: 30 }, (_unused, index) => ({
-      role: index % 2 === 0 ? 'user' as const : 'assistant' as const,
-      content: [{ type: 'text' as const, text: `line ${index} ${'x'.repeat(400)}` }],
-    }))
-    const bounded = renderHistory(messages as never, { turns: 2, chars: 500 })
-    expect(bounded.length).toBeLessThanOrEqual(500)
-    // One message is truncated to the per-message cap, never the whole block dropped.
-    const long = renderHistory([{ role: 'user', content: [{ type: 'text', text: 'y'.repeat(5_000) }] }] as never, { turns: 1, chars: 8_000 })
-    expect(long.length).toBeLessThan(5_000)
-    expect(long.endsWith('…')).toBe(true)
-    const objective = composeObjective(bounded, 'now do this', 4_000)
-    expect(objective).toBeDefined()
-    expect((objective ?? '').length).toBeLessThanOrEqual(4_000)
-    expect(composeObjective(bounded, 'z'.repeat(5_000), 4_000)).toBeUndefined()
-    expect(collectHistory(undefined, { turns: 2, chars: 500 })).toBe('')
-  })
-
-  it('does not leak a partial secret at the history truncation boundary', () => {
-    const secret = 'CANARY-7f3a9c'
-    const message = 'x'.repeat(1_490) + ' token=' + secret
-    const rendered = renderHistory([{ role: 'user', content: [{ type: 'text', text: message }] }] as never, { turns: 1, chars: 8_000 })
-    expect(rendered).not.toContain('CAN')
-    expect(rendered.endsWith('…')).toBe(true)
   })
 
   it('keeps a secret out of the failure reason and the rendered answer', async () => {
@@ -387,7 +337,7 @@ describe('reliability: unload and reload', () => {
   it('cancels in-flight runs and refuses new work when the plugin unloads', async () => {
     const ctx = new FakeContext()
     ctx.engine.hang = true
-    apply(ctx as never, { legacyGate: true, maxConcurrency: 1 })
+    apply(ctx as never, { maxConcurrency: 1 })
     const pending = ctx.tool!.execute({ objective: 'do the thing', tasks: [callerTask('a')] }, exec())
     await vi.waitFor(() => { if (ctx.engine.runs.length === 0) throw new Error('run did not start') })
     await ctx.dispose()
@@ -398,17 +348,15 @@ describe('reliability: unload and reload', () => {
 
   it('starts clean after a reload instead of inheriting the old queue', async () => {
     const ctx = new FakeContext()
-    // `mode: 'full'`: this test measures the mount/reload lifecycle, and its short
-    // messages would otherwise be answered by the front desk instead of the team.
-    apply(ctx as never, { legacyGate: true, maxConcurrency: 1, mode: 'full', grokDefault: 'on' })
-    const target = session('sess-reload')
-    await ctx.preStep(stepPayload(agentOf(target), [userMessage('first')]), passThrough([]))
+    apply(ctx as never, { maxConcurrency: 1 })
+    await ctx.tool!.execute({ objective: 'first' }, exec())
     await vi.waitFor(() => { if (ctx.engine.startCalls.length === 0) throw new Error('no run') })
     await ctx.dispose()
-    // A fresh mount on the same context object admits a new message again.
-    apply(ctx as never, { legacyGate: true, maxConcurrency: 1, mode: 'full', grokDefault: 'on' })
-    await ctx.preStep(stepPayload(agentOf(target), [userMessage('second message')]), passThrough([]))
-    await vi.waitFor(() => { if (ctx.engine.startCalls.length < 2) throw new Error('reload did not admit') })
+    // A fresh mount on the same context object runs new work again, with no memory of
+    // the active state the previous mount held.
+    apply(ctx as never, { maxConcurrency: 1 })
+    await ctx.tool!.execute({ objective: 'second message' }, exec())
+    await vi.waitFor(() => { if (ctx.engine.startCalls.length < 2) throw new Error('reload did not run') })
     expect(ctx.engine.startCalls).toHaveLength(2)
   })
 })
@@ -424,7 +372,7 @@ describe('reliability: run records', () => {
       const ctx = new FakeContext()
       // Two routes, and the first worker call fails: a switch worth recording.
       ctx.engine.failFirstWorker = true
-      apply(ctx as never, { legacyGate: true, maxConcurrency: 1, roles: { worker: [{ model: 'w1' }, { model: 'w2' }] } })
+      apply(ctx as never, { maxConcurrency: 1, roles: { worker: [{ model: 'w1' }, { model: 'w2' }] } })
       const target = session('sess-records-true')
       await ctx.tool!.execute({ objective: 'do the thing', tasks: [callerTask('a')] }, { ...exec(), agent: agentOf(target) })
       return ledgerOf(target)
@@ -448,22 +396,6 @@ describe('reliability: run records', () => {
     expect(data.switches[0]).toMatchObject({ role: 'worker', chainIndex: 0, route: 'inherit', attempt: 1, outcome: 'failed' })
   })
 
-  it('records the delivery outcome so a restart cannot re-route the message', async () => {
-    const ctx = new FakeContext()
-    apply(ctx as never, { legacyGate: true, maxConcurrency: 1, mode: 'full', grokDefault: 'on' })
-    const target = session('sess-delivery')
-    await ctx.preStep(stepPayload(agentOf(target), [userMessage('do the thing')]), passThrough([]))
-    await vi.waitFor(() => { if (ctx.engine.startCalls.length === 0) throw new Error('no run') })
-    await vi.waitFor(() => {
-      const types = target.ownEvents().map(event => pluginRecordOf(event)).filter(record => record !== undefined).map(record => record.type)
-      if (!types.includes(DELIVERY_RECORD)) throw new Error('delivery record missing')
-    })
-    const outcomes = target.ownEvents()
-      .map(event => pluginRecordOf(event))
-      .filter(record => record !== undefined && record.type === DELIVERY_RECORD)
-      .map(record => (record!.data as { phase: string; outcome: string }))
-    expect(outcomes.some(entry => entry.phase === 'delivered' || entry.phase === 'started')).toBe(true)
-  })
 })
 
 describe('reliability: live configuration and diagnostics', () => {
@@ -506,37 +438,16 @@ describe('reliability: live configuration and diagnostics', () => {
     expect(described.level).toBe('info')
     expect(described.text).toContain('page auto-generated')
     expect(described.text).toContain('grok-workflow')
-    expect(described.text).toContain(`17 of ${CONFIG_KEYS.length} field(s) on the page`)
+    expect(described.text).toContain(`16 of ${CONFIG_KEYS.length} field(s) on the page`)
     expect(described.text).toContain('schema matches')
   })
 })
 
 describe('reliability: wiring the live configuration and the category vocabulary', () => {
-  it('applies no live gate scope edit: an opted-in gate admits every session (T4)', async () => {
-    // T4 removed gateScope/gatePreset: every session is admitted, no scope edit
-    // exists. This pins the fail-open replacement — an out-of-preset session
-    // runs instead of passing through — for a profile that asks for the desk.
-    const ctx = new FakeContext()
-    apply(ctx as never, {
-      legacyGate: true,
-      maxConcurrency: 1,
-      mode: 'full',
-      grokDefault: 'on',
-    } as never)
-    const target = session('sess-scope')
-    const payload = stepPayload(agentOf(target), [userMessage('scope check')])
-    await ctx.preStep(payload, passThrough([]))
-    // A fresh session's first turn answers at once and runs the team behind the
-    // words (0.13.24): admission is still exactly one run, it just starts on the
-    // background path instead of holding the step open.
-    await vi.waitFor(() => { if (ctx.engine.startCalls.length === 0) throw new Error('no run') })
-    expect(ctx.engine.startCalls).toHaveLength(1)
-  })
-
   it('uses the live configuration for a tool call, not the load-time snapshot (F3)', async () => {
     let maxTasks = 1
     const ctx = new FakeContext()
-    apply(ctx as never, { legacyGate: true, maxConcurrency: 1, maxTasks: { get: () => maxTasks } } as never)
+    apply(ctx as never, { maxConcurrency: 1, maxTasks: { get: () => maxTasks } } as never)
     // Two tasks against a load-time snapshot of maxTasks=1 would be refused; the
     // live reader is raised first, so the call is accepted.
     maxTasks = 3
@@ -547,25 +458,21 @@ describe('reliability: wiring the live configuration and the category vocabulary
     expect(report.tasks).toHaveLength(2)
   })
 
-  it('uses the live roles chain for a gated run, not the load-time snapshot', async () => {
+  it('uses the live roles chain for a tool-started run, not the load-time snapshot', async () => {
     // Regression for the user report "saved the worker chain, but the team run
-    // still used the old models": the gate read `safe()` for admission yet handed
-    // the load-time `config` to runWorkflow, so a saved roles edit reached
-    // admission and never reached the children.
+    // still used the old models": admission read `safe()` yet runWorkflow was handed
+    // the load-time `config`, so a saved roles edit never reached the children.
     let workerModel = 'old-model'
     const ctx = new FakeContext()
     apply(ctx as never, {
-      legacyGate: true,
-      mode: 'full',
-      grokDefault: 'on',
       maxConcurrency: 1,
       roles: { get: () => ({ worker: [{ model: workerModel }] }) },
     } as never)
-    // The settings save lands after load, before the next message: same holder,
-    // new value — exactly what a successful hot reload produces.
+    // The settings save lands after load, before the next call: same holder, new
+    // value — exactly what a successful hot reload produces.
     workerModel = 'wb/cn:deepseek-v4.1-flash'
     const target = session('sess-live-roles')
-    await ctx.preStep(stepPayload(agentOf(target), [userMessage('do the thing')]), passThrough([]))
+    await ctx.tool!.execute({ objective: 'do the thing', tasks: [callerTask('a')] }, { ...exec(), agent: agentOf(target) })
     await vi.waitFor(() => { if (ctx.engine.startCalls.length === 0) throw new Error('run did not start') })
     const args = ctx.engine.startCalls[0]!.args as { roles: { worker: { model: string }[] } }
     expect(args.roles.worker[0]!.model).toBe('wb/cn:deepseek-v4.1-flash')

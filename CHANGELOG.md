@@ -5,17 +5,22 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.35] - 2026-11-25
+
 ### Added / 新增
 
-- **A switch for the old front desk, and a heartbeat listener that can stand on its own / 多了一个旧前台的开关，和一个能独立接管的心跳监听**
-  — A profile setting, `legacyGate`, decides whether the old front desk is registered at all. It is off unless you write it; writing it puts
-  the desk back for your messages only, and it never has a say about a scheduled heartbeat. The plugin's own listener is what reviews the
-  brakes and can stop a beat by itself, and the two write separate small records of a beat — the listener's says what became of the beat,
-  the intake's says which blocks still owe work — so neither writes over the other. Both are settings you change and then restart, not live
-  toggles.
-  / 档案里多了一个 `legacyGate`：它决定旧前台要不要装，不写就是关着；写上它就只把你的消息交回前台，定时心跳不归它管。复核刹车、能自己
-  停掉一拍的是插件自己的那个监听；两边各写各的一小行记录——监听那行说这一拍怎么了，接单台那行说还欠哪几个块——互不覆盖。
-  这两个都是改完要重启的开关，不是热开关。
+- **The workflow settings are also a `Workflow` entry in the Host's Settings panel / 工作流设置同时成为宿主设置面板左列的「Workflow」一项** —
+  The same settings page that the Plugins card opens is now registered a second time in the Settings panel's left column, as a peer of
+  通用设置 / 模型 / 内置插件. One component, one data face, no page changes; the entry is named by the single word `Workflow` in both
+  languages, with no description line, and the Plugins card stays — one page, two ways in. / 插件卡片打开的那个设置页，现在同时注册到
+  宿主设置面板的左列，与「通用设置 / 模型 / 内置插件」平级。同一个组件、同一份数据面，页面本身没有改动；入口名两个语言都只有一个词
+  `Workflow`，不带说明文字；插件页的卡片保留——一个页面，两条进来。
+- **A heartbeat listener that can stand on its own / 一个能独立接管的心跳监听** — The plugin's own listener is what reviews the brakes and
+  can stop a beat by itself: one listener owns them on every load, installed even with the block intake switched off. It keeps its own
+  small record of a beat — what became of that beat — and never writes over the intake's record, which says which blocks still owe work.
+  It is installed when the plugin loads, not a live toggle.
+  / 复核刹车、能自己停掉一拍的是插件自己的那个监听：每次载入都只有这一个，接单台关着时也照样装上。它自己留一小行记录——这一拍
+  怎么了——绝不覆盖接单台那行「还欠哪几个块」。它在插件载入时安装，不是热开关。
 
 ### Changed / 变更
 
@@ -24,10 +29,10 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
   refusal messages alike. Nothing else moved: a block row still records `execution: "foreman"`, and the L1 dispatcher on the task board
   keeps its own name. / 把一块活拆给子代理、收结果、自己不写代码的那个角色，现在叫「调度」，工具说明、预览那一行和拒绝消息里都改了。
   其余没动：块账本里照样记 `execution: "foreman"`，任务板那一层的 L1 大管家还是它自己的名字。
-- **Your messages are no longer intercepted by default / 默认不再有人拦你的消息** — An ordinary message now goes straight to the model:
-  no front-desk reply is inserted, and what you typed reaches the model word for word. The old front desk is opt-in now — a profile has to
-  ask for it with `legacyGate: true`. / 普通一句话现在直接到模型：中间不再插一条前台的转述，你打的字逐字到达模型。
-  旧前台改成要你自己打开：档案里写 `legacyGate: true` 才会装回来。
+- **Your messages are no longer intercepted by default / 默认不再有人拦你的消息** — An ordinary message goes straight to the model: no
+  front-desk reply is inserted, and what you typed reaches the model word for word. The old front desk is gone, not merely switched off —
+  no profile can bring it back. / 普通一句话直接到模型：中间不再插一条前台的转述，你打的字逐字到达模型。旧前台是删掉了，不是改成
+  关着——没有档案能把它装回来。
 - **The block tools refuse a session that has not turned grok mode on / 没开 grok 模式的会话，块工具会拒绝** — Ordering a block in a
   session that never turned the mode on is now refused, with the reason and the next step in the refusal itself, instead of going ahead.
   Turn the mode on first. / 在没打开 grok 模式的会话里开块，现在会被拒绝，拒绝里就写着原因和下一步，而不是先干起来。
@@ -36,6 +41,29 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
   stop a beat is installed even when the block intake is switched off, so a scheduled loop the brakes have stopped stays stopped instead of
   running on with nobody left to stop it. / 复核刹车、能停掉一拍的监听，接单台关着时也会装上：被刹车停过的定时循环还是停着，
   不会变成没人管、接着跑。
+
+### Removed / 移除
+
+- **The old front desk is gone, together with the two keys that configured it — delete those keys before you upgrade, or the row will
+  not activate / 旧前台连同配置它的两个键一起删掉了——升级前先把那两个键删掉，不然那一行不会激活** — **Before installing this version,
+  open every `cordis.patch.yml` you carry and delete the `mode:` line and the `legacyGate:` line from the `grok-workflow` entry.** A
+  patch may carry only one of the two — many carry just `mode: triage`. If you do not, the plugin refuses to activate that row: it names
+  the key it found (`removed configuration key "mode": it was removed in an earlier release and is no longer accepted; delete it from
+  your patch`) and logs `1 entry did not activate`, so the symptom is "after upgrading, the workflow row did not activate" — the
+  workflow looks like it disappeared. The front desk (and the classifier, captain, channel and history modules behind it) no longer
+  exists: no profile can register it, and `legacyGate` / `mode` are removed keys, so no patch can turn it back on. With the desk gone the
+  intake is on by default (`blockIntake` defaults to `true`), so the six block tools appear on a default load; the config surface is
+  nineteen keys (sixteen on the settings page). The specs that covered the desk went with it — fourteen files, since their subject no
+  longer exists — and what replaces them is a byte-level pin: a default load leaves eight message shapes untouched, including an
+  over-long prompt, which is now handed on unchanged instead of being refused with a notice appended.
+  / **安装这个版本之前，把你手上的每一个 `cordis.patch.yml` 打开，删掉 `grok-workflow` 那一行下的 `mode:` 与 `legacyGate:`。**
+  补丁里可能只有其中一个——很多只写了 `mode: triage`。不删的话，插件会拒绝激活那一行：它点名找到的那个键
+  （`removed configuration key "mode": it was removed in an earlier release and is no longer accepted; delete it from your patch`），
+  日志写 `1 entry did not activate`，症状就是「升级之后工作流那一行没激活」——看起来像工作流不见了。旧前台（以及它背后的分流、
+  队长、通道、历史四个模块）整个删掉了：没有档案能再把它装回来，`legacyGate` 与 `mode` 成了移除键，也没有补丁能把它打开。
+  前台没了之后接单台默认就是开着的（`blockIntake` 缺省 `true`），六个块工具在默认载入里就会出现；配置面是十九个键
+  （设置页上十六个）。原先覆盖前台的测试跟着它一起走了——十四个文件，因为它们测的主题已经不存在——替代它的是一个逐字节的钉子：
+  默认载入对八种消息形状一个字都不改，其中包括一条超长提示词，现在它原样交出去，不再被拒绝、也不再被追加一段通告。
 
 ### Fixed / 修复
 

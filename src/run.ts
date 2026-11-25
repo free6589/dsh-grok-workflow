@@ -43,7 +43,7 @@ import type { DisposeDrain, DisposeRecord, DisposeRunInfo } from './records.js'
 import { archiveRoundNow, createMemoryArchiver, memberFromEnd, memberFromStart, roundArchiveEvidence, roundArchiveSummary } from './memory/recorder.js'
 import { RELAY_SOURCE_KIND } from './answer.js'
 import { redactDeep, redactError, redactSecrets } from './redact.js'
-import type { FailureCategory, FinalStatus, IncompleteItem, NormalizedTask, ResolvedConfig, RoleName, StopCause, WorkflowReport } from './types.js'
+import type { FailureCategory, FinalStatus, IncompleteItem, NormalizedTask, ResolvedConfig, StopCause, WorkflowReport } from './types.js'
 
 /** Minimal logger surface used by the runtime modules. */
 export interface WorkflowLogger {

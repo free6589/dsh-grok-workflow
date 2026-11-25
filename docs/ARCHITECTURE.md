@@ -2,12 +2,13 @@
 
 ## Goal
 
-`dsh-grok-workflow` adds two things to DSH, using only documented capabilities:
+`dsh-grok-workflow` adds one thing to DSH, using only documented capabilities:
 a model-facing tool, `grok_workflow`, that turns a complex objective into a
-bounded, verifiable multi-subagent workflow; and — since `0.2.0`, on by default —
-an **entry gate** on `agent/pre-step` that makes that workflow mandatory for user
-messages instead of opt-in. It does not implement a new agent loop, model
-adapter, sandbox, or subagent runtime.
+bounded, verifiable multi-subagent workflow, plus a block intake that lets the
+model commission that work in reviewed pieces. It does not implement a new agent
+loop, model adapter, sandbox, or subagent runtime, and since M3.3 it no longer
+puts anything in front of a user message: the entry gate that used to intercept
+every message was deleted with the front desk it belonged to.
 
 ## Reused DSH capabilities
 
@@ -310,16 +311,14 @@ unchanged with no warnings). `apply()` in `src/index.ts` calls
 raw config, run the repair, and re-resolve the repaired shape. The repaired
 shape must itself resolve cleanly before any warning is emitted — so a second,
 non-repairable defect behind the mismatch still fails hard. A repaired config
-activates normally (tool + gate + settings surface all start) and carries
+activates normally (tool, intake and settings surface all start) and carries
 `synthesisRepaired: true`, which `describeResolvedConfig()` renders as
 `synthesis=<mode> (repaired)` so the load log is self-proving. The same
 fallback runs on every later `readConfig()`, so a bad settings save repairs
-the same way. The run-time gate path (`gate.safe()` / `lastGood` in
-`src/gate.ts`) is untouched.
+the same way.
 
 Everything else is **irrecoverable** and still fails hard at load (R-06):
-unknown keys, `configVersion` out of range, `gateScope: preset` without a
-preset name, out-of-range numbers, malformed/duplicated/over-long chains,
+unknown keys, `configVersion` out of range, out-of-range numbers, malformed/duplicated/over-long chains,
 unknown providers, models the provider enumerates but does not declare,
 unknown `switchOn` classes, and budget-backstop violations. The settings page
 mirrors the recoverable pair client-side (`src/client/index.js` `validate()`):
@@ -327,113 +326,50 @@ chain non-empty + deterministic, or `model` + empty chain, is a red
 `error.synthesisChainUnused` / `error.synthesisChainMissing` finding (both
 languages) that disables Save; only a legal combination may be written.
 
-## Mandatory entry (the gate)
+## Message entry (the front desk was deleted in M3.3)
 
-The front desk is **opt-in since M3.2** (`legacyGate: true`). The default `agent/pre-step`
-chain carries only the narrow heartbeat listener, so a user message reaches the model as it
-is and no workflow starts unless a profile asks for this gate. Everything below describes
-what the gate does once it is registered.
+Status (since **0.13.35**): the `agent/pre-step` chain carries no admission decision at all.
+The old front desk is gone — `src/gate.ts` with its classifier, plus `src/triage.ts`,
+`src/captain.ts`, `src/channel.ts` and `src/history.ts` — and with it the two configuration
+keys that used to select its shape, `mode` and `legacyGate` (both are now removed keys).
 
-```
-user message ──► agent/pre-step ──► classify
-                                     ├─ not ours (subagent, non-user source, empty batch, out of scope, already routed) ──► pass through
-                                     ├─ unusable (empty text, over 32000 chars) ──► refuse out loud, nothing runs
-                                     └─ admit ──► run the workflow ──► deliver the validated report in this turn
-```
+What a user message meets on that chain:
 
-- **Classification is a whitelist** (`src/gate.ts`): only `source.kind === 'user'`
-  messages for the scoped agents are claimed. Subagent prompts, team messages,
-  webhooks, schedules, user-question replies and empty batches pass through — a
-  gate that claims everything would recurse.
-- **Claiming is recorded, not guessed.** A per-message delivery record is written
-  into the session, so a re-dispatched batch cannot start a second run and an
-  interrupted delivery is not silently re-run.
-- **Delivery is in-turn by default.** The turn stays open, the report is entered
-  as the step's message, and the main model finalises it in the same turn. The
-  alternatives (`relay`, `append`) deliver after the turn closes and therefore
-  need a long-lived surface.
-- **A triage-team message on an interactive surface speaks first, then works in
-  the background (`receipt-then-relay`).** The pre-step writes one live first
-  answer into the turn (one light model call over the `triageModel` route; the
-  information structure is fixed, the wording is composed fresh every time, and
-  a failed call degrades to a plainly-labelled template fallback), then admits
-  the workflow into the per-agent queue; the result is delivered by `relay`
-  when it settles and the progress board stays live meanwhile. Anything that
-  cannot deliver in the background — headless one-shot (no `followup` turn),
-  `full` mode, a full queue, or any throw inside the interactive path — falls
-  back to the blocking `in-turn` run, so the final answer is never lost. The
-  `answerStrategy` configured value is unchanged (`in-turn` default); what
-  changed is the triage-team walk on a surface that can deliver later.
-  Cancelling is whole-round: a new message for the same session cancels the
-  in-flight run (`run.cancel` + `commitCancelled`) and restarts narrowed
-  (`carriedPendingRequest` / `resumedTarget`); V1 offers no subtask-level
-  redirect.
-- **The team tier confirms the split before dispatching (round-071).** The front
-  desk decides *how much* a message costs; the captain decides *what the work
-  becomes*. Before any child runs, the gate spends one cheap call (`captain-preview`)
-  asking the planner for a short split, states it to the user, and records a pending
-  confirmation (`src/captain.ts`, `pendingCaptains` in `src/gate.ts`, ten-minute TTL).
-  The next message is read against that entry: an unmistakable approval dispatches
-  the request as previewed, an explicit edit dispatches the original request with the
-  change folded in (`amendRequest`), and anything else voids the entry and is routed
-  on its own. Two paths skip the round by design — a session whose `/grok` record
-  forces the full shape, and the message that just answered the front desk's own
-  quick-or-team question. Mid-run messages are unchanged: they still join the live
-  plan through `src/channel.ts` / `src/steering.ts`.
-  The preview is advisory: the dispatched run plans again, and the gap is recorded
-  in `docs/knowledge/RESEARCH.md` (round-071).
-  Round-072 closed three ways one confirmation could go wrong: the entry is
-  consumed exactly once per batch (`takeCaptainPending`, TTL applied) and the
-  consumed value is handed to every path, so an expired question can never dispatch
-  its plan; a message that is not an answer is voided *and* routed on its own by the
-  path that states the note, never silently dropped; and the batch is queued before
-  it is recorded, so a full queue leaves no delivery record for a run that never
-  started. The channel steps aside for a confirmation (`src/channel.ts`
-  `classifyChannelMessage` would read "确认" as a demand for the live plan), and the
-  full shape — which has no front desk — reads the same entry instead of handing the
-  word "确认" to the planner as the objective.
-- **The first turn of a session never waits for the run to be visible (0.13.24).**
-  A claimed batch may only be published once the host's first surface node exists
-  (`system/message` first, or the stored log can never be reopened), so on a fresh
-  session the gate cannot echo the message ahead of the run — and `in-turn` commits
-  it only when the step opens, i.e. after the workflow settles. A first-turn message
-  in the `full` shape therefore answers with the words alone
-  (`answerBehindUnpublished`): the loop opens the step and commits them at once, the
-  team runs behind them, and the report is delivered as its own message through the
-  same relay path every deferred answer uses. Nothing is written ahead of the host
-  head, so the position-0 rule is untouched; a session whose surface cannot be read,
-  and any shape with a front desk, keep the blocking path unchanged.
-- **The gate reads the live configuration** on every decision (holders, see the
-  settings section), so an edit applies to the next message while an in-flight
-  run keeps its snapshot; an invalid edit refuses that message with its reason
-  and delivery falls back to the last good snapshot.
-- **Failure modes are bounded:** the queue per agent is capped
-  (`maxQueuedMessages`), the run is bounded (`maxActiveRuns`, `timeoutMs`), and a
-  broken configuration is reported rather than swallowed.
+- **the narrow heartbeat listener** (`src/heartbeat-listen.ts`): it acts only on a
+  `source.kind === 'schedule'` delivery that also carries the Loop marker, and every other
+  batch goes straight to `next()`;
+- **the intake's own observer** (`installHeartbeatBrakes`), which records a beat *after* the
+  decision and never changes it.
+
+So a user message is never claimed, refused, shortened, annotated or routed: it reaches the
+model exactly as the loop claimed it. The gate's over-long and empty-text refusals went with
+it, and the 32,000-character bound now applies only where work is actually commissioned. The
+pass-through is pinned as bytes: `test/block-flag-baseline.spec.ts` dumps the decision for
+eight payload shapes from a default load, including a 32,001-character prompt that must arrive
+unchanged and with no notice appended.
+
+A workflow starts only from an explicit `grok_workflow` call (the model's, or the intake's).
+That is the whole entry surface.
 
 ### Objective length boundary
 
 The objective limit is defined once as `TASK_LIMITS.objectiveChars` (`32_000`)
 in `src/input.ts`, mirrored by the generated script in `src/script.ts`, and
-enforced on the gate path (`src/gate.ts`), the direct `grok_workflow` tool call
-(`src/index.ts`), and `composeObjective()` (`src/history.ts`).
+enforced on the two paths that commission work: the direct `grok_workflow` tool
+call (`src/index.ts`) and the fallback plan the script builds when planning
+fails.
 
-| User message length | Gate (`agent/pre-step`) | Direct tool call | Result |
-|---|---|---|---|
-| 4,000 characters | admit | accept | run starts; the whole message is kept |
-| 4,001 characters | admit | accept | run starts; the whole message is kept |
-| 32,000 characters | admit | accept | run starts; the `Current request:` label is dropped and no history is attached, so the objective is exactly 32,000 characters |
-| 32,001 characters | refuse | reject | no run starts; the refusal names the 32,000-character limit |
+| Objective length | Direct tool call | Result |
+|---|---|---|
+| 4,000 characters | accept | run starts; the objective is kept whole |
+| 4,001 characters | accept | run starts; the objective is kept whole |
+| 32,000 characters | accept | run starts; the objective is exactly 32,000 characters |
+| 32,001 characters | reject | no run starts; the refusal names the 32,000-character limit |
 
-Every length from 4,001 through 32,000 characters is admitted; 32,001 is the
-first refused length.
-
-`composeObjective()` never shortens the current message. It returns `undefined`
-only when the message itself exceeds the limit; when the 17-character
-`Current request:\n` label would push the composed objective over the limit, it
-returns the message unchanged instead of trimming it. Only the history block is
-truncated. `historyChars` (default 20,000, hard maximum 1,000,000) and
-`taskTextChars` (4,000 per task field) are unchanged.
+Every length from 4,001 through 32,000 characters is accepted; 32,001 is the
+first rejected length. A user *message* of any length is still delivered to the
+model untouched — the bound is on the objective a run is given, not on what a
+person may type.
 
 **Planner-failure fallback.** When planning fails, `fallbackPlan()` splits the
 whole objective into contiguous segments of at most `taskTextChars` characters;
@@ -463,11 +399,10 @@ planner error.
 
 `src/block/` and `src/supervisor/` implement an optional intake desk: one user-approved split
 of an objective into 1–3 blocks, a ledger recording what was approved and what was judged,
-and a narrow observer for the one clock a block has. It is off unless `blockIntake` is
-`true`. It is **not** part of the gate: the front desk in `## Mandatory entry (the gate)`
-decides whether a message runs a workflow, while the intake desk is a set of tools the model
-calls — no message is claimed, no run is started, and no delivery decision changes because
-this feature exists.
+and a narrow observer for the one clock a block has. It is on by default since M3.3
+(`blockIntake: true`); `false` is the opt-out. It claims no message: the intake desk is a set
+of tools the model calls, so no message is claimed, no run starts by itself, and no delivery
+decision changes because this feature exists.
 
 ### Location
 
@@ -579,9 +514,9 @@ else:
 - it appends to `heartbeats.jsonl` only — never a verdict (a heartbeat is not a judgement),
   never a `blocks.jsonl` version (20 version slots per block, and an hourly beat would retire
   a real block), and it stops at `HEARTBEAT_OBSERVATION_LIMIT` (200 lines) with one warning;
-- it is installed before `installGate`, so it sees a beat the front desk would only pass on;
-  a beat the narrow listener stopped never reaches it, and that is intended — a stopped beat is
-  recorded once, by the listener that stopped it.
+- it is installed *after* the narrow listener, so a beat the narrow listener stopped never
+  reaches it, and that is intended — a stopped beat is recorded once, by the listener that
+  stopped it.
 
 #### One brake owner, and three registrations
 
@@ -594,20 +529,18 @@ stop it. The registrations, in the order they go on the chain:
 | registration | installed when | decides a heartbeat? | what it writes about one |
 | --- | --- | --- | --- |
 | the narrow heartbeat listener | always | yes — runs `reviewHeartbeat`, charges the round, or answers `reject` | `heartbeats-listen.jsonl`: `continued`, or `stopped` + the brake code |
-| the intake's own observer (`installHeartbeatBrakes`) | `blockIntake: true` | no — it observes the beat after the decision | `heartbeats.jsonl`: which blocks this beat found open |
-| the old front desk (`installGate`) | `legacyGate: true` (off by default) | no — a beat falls through its source filter to `pass / non-user-source` | nothing about a beat |
+| the intake's own observer (`installHeartbeatBrakes`) | `blockIntake: true` (the default) | no — it observes the beat after the decision | `heartbeats.jsonl`: which blocks this beat found open |
 
-So the default load (both switches off) carries exactly one `agent/pre-step` listener, the
-intake adds the second, and the front desk is only ever the third. Three properties make that
-hold by construction rather than by convention:
+Two listeners, and since M3.3 no third. A default load carries both; `blockIntake: false`
+leaves exactly one, the narrow listener, which is why turning the intake off can never take
+the brake owner with it. Two properties make that hold by construction rather than by
+convention:
 
-- **One owner, installed outermost.** The narrow listener goes in before the intake observer and
-  before the front desk, and it answers `reject` without calling `next()`. A beat it stops
-  therefore reaches neither of the others: the front desk cannot be the place a loop is stopped
-  any more, and a second review cannot charge the same round twice.
+- **One owner, installed outermost.** The narrow listener goes in before the intake observer,
+  and it answers `reject` without calling `next()`. A beat it stops therefore never reaches the
+  observer, and a second review cannot charge the same round twice.
 - **One definition of the review.** `isHeartbeatMessage` and `reviewHeartbeat` live in
-  `src/heartbeat-listen.ts`. The front desk imports neither: `classifyPreStep` has no heartbeat
-  branch, so a beat it sees is just "not a user request" and nothing is charged there.
+  `src/heartbeat-listen.ts`, and nothing else on the chain reviews a beat.
 - **Two files, one writer each.** `heartbeats.jsonl` answers "which blocks did this beat find
   open"; `heartbeats-listen.jsonl` answers "what did this beat do". One file would put two lines
   under one beat and make the count unanswerable, so each file has exactly one writer and neither
@@ -671,7 +604,7 @@ Those must be run locally with a real DSH profile and are recorded separately
 as local runtime evidence.
 
 For the delivery path there is one local check worth running after any change to
-`answerStrategy`, the gate, or the DSH version:
+`answerStrategy` or the DSH version:
 
 ```bash
 npm run build
@@ -680,21 +613,15 @@ E2E_MODEL_PATCH=scripts/e2e-model-patch.yml scripts/e2e-headless-in-turn.sh
 
 It boots one real `dsh headless` turn with this plugin overlaid by file URL (nothing is
 installed into a profile) and fails unless the validated report actually reaches the user
-in that single turn. The `in-turn` timing itself needs no model and is covered in CI by
-the `in-turn delivery` suite in `test/gate.spec.ts`.
+in that single turn. The delivery contract itself needs no model and is covered in CI by
+`test/delivery.spec.ts`, `test/delivery-human-block.spec.ts` and
+`test/final-answer-rewrite.spec.ts`.
 
-Two variants are worth knowing:
-
-```bash
-# a message the gate refuses on purpose must be refused OUT LOUD, with no run
-E2E_EXPECT=refusal E2E_PROMPT="$(cat /tmp/over-32000-chars.txt)" \
-  E2E_MODEL_PATCH=scripts/e2e-model-patch.yml scripts/e2e-headless-in-turn.sh
-```
-
-`E2E_EXPECT=refusal` inverts the assertion: the refusal text (and its reason) must appear,
-and no `Grok workflow:` status line and no task lines may appear — the user sees why nothing
-ran instead of a silent no-op (V-2). The positive run is also the check that the real Loader
-hands `.volatile()` configuration over as holders and the plugin unwraps them (DESIGN E-40).
+The script still understands `E2E_EXPECT=refusal`, which inverted the assertion for the
+gate's over-long-message refusal. Since M3.3 no message is refused, so that variant describes
+a path the plugin no longer has: an over-long prompt is delivered to the model unchanged and
+`E2E_EXPECT=refusal` would fail. The positive run is also the check that the real Loader hands
+`.volatile()` configuration over as holders and the plugin unwraps them (DESIGN E-40).
 
 ## Checkpoint and resume (record + re-drive policy)
 
@@ -868,9 +795,8 @@ while the run lives, never deleted — the cost of retention is the user's disk)
 consumes the files** (`resumeDecision` has no production caller; `src/resume/` is imported only
 by tests). The UX commitments an integration inherits:
 
-1. A refused restore is spoken out loud with its reason and detail — the same rule the gate
-   already follows for refused messages (see `## Mandatory entry (the gate)`). Silence is not
-   an acceptable outcome for "we found a checkpoint but would not use it".
+1. A refused restore is spoken out loud with its reason and detail. Silence is not an
+   acceptable outcome for "we found a checkpoint but would not use it".
 2. Restore is never silent or automatic: a *plan* is the only thing the policy produces, and
    it names each task's action (`retain` / `redrive` / `reverify` / `replan`), so a reader can
    see what would be kept and what would run again.

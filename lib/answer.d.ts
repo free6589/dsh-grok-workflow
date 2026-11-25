@@ -1,9 +1,10 @@
 /**
- * Answer text produced by the gate.
+ * Report text as it is packaged and relayed.
  *
- * The host cannot verify what the main model says, so the gate sends a result it
- * has already validated and tells the model what to do with it between markers.
- * That instruction is not the same for every report: a failure must be reproduced
+ * The host cannot verify what the main model says, so {@link relayText} (and its
+ * in-turn alias {@link reportEnterText}) sends a result the run has already
+ * validated and tells the model what to do with it between markers. That
+ * instruction is not the same for every report: a failure must be reproduced
  * word for word (a paraphrase is free to soften, and a failed workflow must never
  * look like an answer), while a finished run carries the *material* for an answer
  * and the model rewrites it against the request the user actually made.
@@ -68,29 +69,12 @@ export interface RelayOptions {
  * Build the user-visible relay text for one report.
  *
  * @param report - a validated report, or an explicit failure report.
- * @param header - front-desk lines (tier line, greeting, notes) shown above the
- *   human block; they are user-visible content and ride inside the markers (t52).
+ * @param header - optional lines shown above the human block; they are
+ *   user-visible content and ride inside the markers.
  * @param opts - what to show (see {@link RelayOptions}).
  * @returns the relay message text.
  */
 export declare function relayText(report: WorkflowReport, header?: string, opts?: RelayOptions): string;
-/**
- * Build the message text for a front-desk answer (chat/fast/ask tiers).
- * @param body - the answer or question the front desk produced.
- * @returns the enter/relay text, bounded by markers.
- */
-export declare function frontDeskText(body: string): string;
-/**
- * Build the message text for a turn the gate answered first (`full` mode, interactive run).
- *
- * `full` used to hold the open step for the whole run, which made every message
- * typed meanwhile invisible until the run ended. The turn now shows the first answer
- * and its receipt, so the debt is stated rather than hidden.
- *
- * @param body - the receipt: the first answer, then what happens next.
- * @returns the enter text, bounded by markers.
- */
-export declare function acceptedEnterText(body: string): string;
 /**
  * Build the message text for in-turn delivery (strategy `in-turn`).
  *
@@ -100,25 +84,9 @@ export declare function acceptedEnterText(body: string): string;
  * the fact that the model composes the final reply.
  *
  * @param report - a validated report, or an explicit failure report.
- * @param header - front-desk lines shown above the human block.
+ * @param header - optional lines shown above the human block.
  * @param opts - what to show (see {@link RelayOptions}).
  * @returns the message text entered into the open step.
  */
 export declare function reportEnterText(report: WorkflowReport, header?: string, opts?: RelayOptions): string;
-/**
- * Build the message text for an in-turn notice (no run happened).
- *
- * @param reason - human-readable cause.
- * @returns the message text entered into the open step.
- */
-export declare function noticeEnterText(reason: string): string;
-/**
- * Build a short notice delivered when the workflow cannot even be started
- * (busy instance, queue full, unreadable request). The notice keeps the failure
- * explicit instead of letting the model answer on its own.
- *
- * @param reason - human-readable cause.
- * @returns the notice text.
- */
-export declare function noticeText(reason: string): string;
 //# sourceMappingURL=answer.d.ts.map

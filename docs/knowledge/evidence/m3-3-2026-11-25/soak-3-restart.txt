@@ -1,0 +1,44 @@
+M3.3 soak scenario 3 — kill mid-run, then restart (2026-11-25)
+
+Build: feat/m3-delete-gate @ 09aa1bd. Home: .tmp/m3-soak-3/dsh-home. Profile
+m33h (headless). Live ~/.dsh untouched.
+
+--- the run that was killed --------------------------------------------------
+
+  $ DSH_HOME=<scratch>/dsh-home dsh --profile m33h '请用 grok_workflow 工具跑一个
+    四任务工作流：任务1 计算 12×12；任务2 计算 13×13；任务3 计算 14×14；
+    任务4 把前三个结果相加。每个任务都要 worker 算、verifier 独立核对…'
+
+  checkpoint appeared after ~54 s:
+  checkpoint-59e1a2a2-4f61-49a8-81bc-2f4eaf1cc20b-d1ebe8dd.json
+    run.status running ; tasks 10 ; verified 0 ; running 10 ; attempts [1]
+
+  killed the process (SIGTERM through the job supervisor) mid-run.
+
+--- after the kill, before any restart ---------------------------------------
+
+  same file, re-read:
+    run.status running ; tasks 10 ; verified 0 ; running 10 ; attempts [1]
+
+  (the checkpoint was not rewritten into a fake terminal state, and no attempt
+   was charged twice)
+
+--- restart ------------------------------------------------------------------
+
+  $ DSH_HOME=<scratch>/dsh-home dsh --profile m33h '用 grok_workflow 跑最小工作流：
+    算 5 乘 6，worker 算、verifier 核对，给结论。'
+  EXIT=0
+
+  answer: 好，答案是 30。先算了一遍是 30，又换了个方法单独重算了一遍，也是 30。
+
+  a NEW checkpoint was written (checkpoint-6774507d-…, 08:58); the killed one
+  is unchanged on disk (running / 10 tasks / 0 verified / attempts 1).
+
+| claim                                                        | status    |
+|--------------------------------------------------------------|-----------|
+| the run can be killed mid-flight and leaves a checkpoint      | CONFIRMED |
+| the killed checkpoint stays `running` (no phantom completion) | CONFIRMED |
+| no duplicate attempt is charged by the kill                   | CONFIRMED |
+| a restart runs a fresh workflow to a correct answer           | CONFIRMED |
+| the engine resumes the killed run itself                      | NOT_RUN — the engine has no journal; `resume` is a new run seeded from the checkpoint, and this scenario did not request one |
+| `--session-id` adoption of a killed run                       | NOT_RUN — M3.2 recorded this as BLOCKED by an unrelated harness event (`tool-workflow/guardian-start`, commit 891b8a2); not retried here |

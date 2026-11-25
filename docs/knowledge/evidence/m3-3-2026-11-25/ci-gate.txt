@@ -1,0 +1,10 @@
+M3.3 gate — branch feat/m3-delete-gate, src+lib 09aa1bd, tests+docs d2d5115
+command: TMPDIR=$PWD/.tmp npm run ci   (Node v26.8.1, DSH 0.2.2-rc.3)
+EXIT=0
+
+Found 15 warnings and 0 errors.
+client bundle: 320233 bytes → lib/client.js
+lib/ at d2d5115 is the build of src/ at d2d5115 (281 files, byte-identical)
+client bundle: 320233 bytes → lib/client.js
+Test Files  98 passed (98)
+Tests  1850 passed (1850)
