@@ -1,0 +1,3 @@
+{"type":"command/run","seq":4,"time":1795578135681,"data":{"commandId":"cmd-983104db-1","name":"grok","args":" off","source":{"kind":"user"}}}
+{"type":"plugin:grok-workflow/mode","seq":5,"time":1795578135682,"data":{"v":1,"enabled":false,"turn":0,"setBy":"command:/grok off"},"ignorable":true}
+{"type":"command/done","seq":6,"time":1795578135684,"data":{"commandId":"cmd-983104db-1","kind":"success","text":"Grok workflow OFF — normal chat."}}

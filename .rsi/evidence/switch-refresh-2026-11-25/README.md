@@ -14,6 +14,7 @@ viewport 1500×1000）。**live `~/.dsh` 与 3080 上的实例全程未写、未
 | 文件（原始位置） | 是什么 | 支撑哪条结论 |
 | --- | --- | --- |
 | `probe-baseline.json`（原 `.tmp/soak-switch/probe-baseline.json`） | **改前**（克隆里原本装的 0.13.32 构建）：挂载读、打字 `/grok off`、**20 次**（20 秒）开关状态快照 + `/grok-workflow/mode` 全部请求与响应 + 整页文本 tail | ① 命令确实写了记录；② 已挂载的开关**不刷新**，20 秒内一次都没变；③ 全程只有挂载时那 **1** 次请求 |
+| `session-log-proof.jsonl`（原 `.tmp/soak-switch/session-log-proof.jsonl`） | 改前那次打字 `/grok off` 在克隆会话日志里的**三条连续事件**（`zstdcat` 读出的原文）：`command/run` seq **4** → `plugin:grok-workflow/mode` seq **5** → `command/done` seq **6** | ① 命令**确实跑了**、并且写了记录；② 记录内容是 `{"v":1,"enabled":false,"turn":0,"setBy":"command:/grok off"}`；③ 命令自己的回执是 `Grok workflow OFF — normal chat.` |
 | `probe-fixed-flip.json`（原 `.tmp/soak-switch/probe-fixed-flip.json`） | **改后**（本轮构建）：加载读回的记录、打字 `/grok on`、打字 `/grok off`、每次写入后按 0.5 秒采样，最后 **+15 秒静默窗**；全部请求与响应 | ① 两次打字都在 **+0.5 秒**内自动变；② 全程 `/grok-workflow/mode` **4** 次（加载 2 + 两次写入各 1）；③ 静默窗 **0** 次新请求 |
 | `probe-load.json`（原 `.tmp/soak-switch/probe-load.json`） | **改后**：一次冷加载的请求/帧时间轴（三条：挂载读、wire 里的 mode 记录、第二次读） | 残留：每次加载**多读一次** `status`；以及它的成因（历史 follow 帧晚于订阅到达） |
 | `probe-wire.json`（原 `.tmp/soak-switch/probe-wire.json`） | **改后**：`/api/remote.mux` websocket 帧里命中的三条 `plugin:grok-workflow/mode` 记录（seq **5** / **27** / **30**） | 客户端**真的收得到**这条记录——订阅路径的前提在真机上成立，不再是 `HYPOTHESIS` |
@@ -83,7 +84,7 @@ t= 7.6  after-off+1s   | workflow总开关 | 开 · 全员模式 | checked=true 
 t=26.6  after-off+20s  | workflow总开关 | 开 · 全员模式 | checked=true lamp=on calls=1
 ```
 
-`"mode_line_seen": false`：整页文本 tail 里也看不到任何状态变化。**`/grok-workflow/mode` 整个窗口只有挂载那 1 次请求。**
+`"mode_line_seen": false` 量的是**整页正文里有没有那行命令回执**——探针没抓到那行，**不是**「命令没跑」。命令确实跑了并写了记录，证据是同一会话日志里连续的三条事件（`session-log-proof.jsonl`）：`command/run` seq **4** → `plugin:grok-workflow/mode` seq **5** `{"v":1,"enabled":false,"turn":0,"setBy":"command:/grok off"}` → `command/done` seq **6** `"Grok workflow OFF — normal chat."`。这一节要读的是：**记录写了，开关没变**。`/grok-workflow/mode` 整个窗口只有挂载那 1 次请求。
 
 ### ② 改后：打字两次，两次都在 +0.5 秒内自动变（`probe-fixed-flip.json`）
 
