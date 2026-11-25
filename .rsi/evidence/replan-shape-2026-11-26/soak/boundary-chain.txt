@@ -1,0 +1,59 @@
+# The three boundary children of run a769e472, verbatim from their own session logs.
+# Root session names them 规划（第2次）/（第3次）/（第4次） with phase 规划 · 波 N 边界.
+# The criterion under test: the plan went to version 2 and the added task id is task-4.
+
+==============================================================================
+## boundary 1 (规划（第2次）· 波 1 边界)  (session 7a60703f-8017-43f6-a2da-52065a8372c7)
+
+--- the plan state it was handed ---
+CURRENT PLAN VERSION: 1
+BOUNDARY: wave 1 has settled; 2 wave(s) have not started.
+SETTLED TASKS (terminal: never change, never redo, their evidence is kept):
+- count-agents [undefined] 
+UNSTARTED TASKS (editable), by wave:
+wave 2: count-readme "统计 README.md 行数与标题" dependsOn count-agents
+wave 3: count-changelog "统计 CHANGELOG.md 行数与标题" dependsOn count-readme
+--- what it did ---
+CALL grok_replan_intents {"token":"steer-mwwi1v6s-1"}
+CALL structured_output {"action":"apply","edits":[{"action":"add","task":{"acceptanceCriteria":["差值等于 count-changelog 记录的行数减去 count-readme 记录的行数"],"dependsOn":["count-changelog"],"expectedOutput":"一行差值计算结果（CHANGELOG 行数减 README 行数及其结果）","id":"task-4","objective":"基于 count-readme 与 count-changelog 已统计的行数，计算 CHANGELOG.md 行数减去 README.md 行数的差值并在总结中报告","title":"报告 CHANGELOG 与 README 行数差值"}}],"reason":"the demand needs both counts, so it runs after count-changelog"}
+--- what came back ---
+RESULT {"intents":[{"id":"steer-mwwi1v6s-1-1","text":"再加一条要求：最后额外报一个 CHANGELOG.md 与 README.md 行数的差值。","atMs":1795633928748}],"dropped":0}
+RESULT Structured output recorded.
+
+==============================================================================
+## boundary 2 (规划（第3次）· 波 2 边界)  (session 1843bcfb-bf45-4002-8f30-1e84c4eb65aa)
+
+--- the plan state it was handed ---
+CURRENT PLAN VERSION: 2
+BOUNDARY: wave 2 has settled; 2 wave(s) have not started.
+SETTLED TASKS (terminal: never change, never redo, their evidence is kept):
+- count-agents [undefined] 
+- count-readme [undefined] 
+UNSTARTED TASKS (editable), by wave:
+wave 3: count-changelog "统计 CHANGELOG.md 行数与标题" dependsOn count-readme
+wave 4: task-4 "报告 CHANGELOG 与 README 行数差值" dependsOn count-changelog
+--- what it did ---
+CALL grok_replan_intents {"token":"steer-mwwi1v6s-1"}
+CALL structured_output {"action":"none","reason":"No queued demands; remaining tasks count-changelog and task-4 still match the original objective, so the plan is unchanged."}
+--- what came back ---
+RESULT {"intents":[],"dropped":0}
+RESULT Structured output recorded.
+
+==============================================================================
+## boundary 3 (规划（第4次）· 波 3 边界)  (session cb35333f-78d4-483e-a9ae-0ebfeda06fa6)
+
+--- the plan state it was handed ---
+CURRENT PLAN VERSION: 2
+BOUNDARY: wave 3 has settled; 1 wave(s) have not started.
+SETTLED TASKS (terminal: never change, never redo, their evidence is kept):
+- count-agents [undefined] 
+- count-readme [undefined] 
+- count-changelog [undefined] 
+UNSTARTED TASKS (editable), by wave:
+wave 4: task-4 "报告 CHANGELOG 与 README 行数差值" dependsOn count-changelog
+--- what it did ---
+CALL grok_replan_intents {"token":"steer-mwwi1v6s-1"}
+CALL structured_output {"action":"none","reason":"No queued demands at this boundary; remaining task-4 still needed to complete the plan."}
+--- what came back ---
+RESULT {"intents":[],"dropped":0}
+RESULT Structured output recorded.
