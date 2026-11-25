@@ -5499,3 +5499,35 @@ Issue #1 状态评论 issuecomment-6927842856。
   5. **分支判定日期 2026-11-26**：合流即删；`feat/*` 不许长期挂着。
   6. `~/.dsh/profiles/web` 的**目录** mtime 在 19:39–19:41 动过、内含 135 个新文件，不是本会话写的（写探针只读），
      成因 `HYPOTHESIS`（另一个会话的插件操作），值得下一个人顺手核一眼 live 到底被谁升过。
+
+## 2026-11-26 — 0.13.41 发布（main）
+
+- **From:** 记忆收口工（`agent-182/release-memory`）· **To:** 下一个接手的人
+- **发布的是哪一版**：跑中插话又能送进正在跑的那一轮——每一轮跑起来时给自己开一条活通道（跑中插话按会话找到它、
+  波边界那个规划子代理拿到本轮口令、运行结束关闭队列），跑中经 `grok_steer` 排进来的要求在下个波边界并进剩余计划，
+  已验证的成果不重做；最后一道边界之后才到的要求会在日志里记个计数，不凭空消失。**从 0.13.35 起没有任何东西开过这个队列**，
+  所以 `grok_steer` 一直答「这一块现在没有在跑的 workflow」，这一版修好。`replan` 开关语义不变（关掉仍是每条消息另起一轮）。
+- **发布身份**：发布提交 **`a64a50a`** `chore(release): prepare v0.13.41`（父 `d35af40`，8 文件 / +22 −20）→
+  `main` 以 `git merge --ff-only release/0.13.41` 前进，**`main` = `origin/main` = `a64a50a`**；
+  附注标签 **`v0.13.41`** 对象 `96dd9cc`、剥出 `a64a50a`（`tagger 2026-11-26 01:46:11 +0800`）。
+  远端 Release run **`45668227079`** `success`、CI run **`45668209937`** `success`。
+- **Release 链接**：https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.41 ——
+  非 draft、非 pre-release，唯一资产 `dsh-grok-workflow-0.13.41.tgz` = 976529 字节。
+- **门禁（`CONFIRMED`）**：`TMPDIR=$PWD/.tmp npm run ci` 在 `a64a50a` 的干净树上 `102 files / 1927 tests passed`、
+  `Duration 98.22s`、`15 warnings / 0 errors`（182 files / 96 rules）、`lib/ … (285 files, byte-identical)`、
+  `client bundle: 348559 bytes`。转录 `.rsi/evidence/release-0.13.41-2026-11-26/gate-a64a50a.out`（23312 字节）。
+- **用例数为什么是 1927 而不是 1923**：102 份 spec 一份没变，静态 `it(` `1848 → 1852`，多的 4 条全在
+  `test/replan.spec.ts`（`17 → 21`），参数化差额仍是 `+75`。**这 +4 不来自发布提交**——发布提交没碰任何 `test/` 文件，
+  它来自 `3778822 → d35af40` 那段修复自己。写记忆时别把因果按反。
+- **没做的（照实记）**：
+  1. **`AGENTS.md` §13 的 live 档案升级：`BLOCKED`。** 本会话文件策略 `workspace-write`，`~/.dsh` 在工作区之外，
+     写探测只会得到只读（`Read-only file system`）。**不要尝试写 `~/.dsh`，不要重启/重载 3080 上的实例**（除非操作员明确点头）。
+     live 现在装的是哪一版，本轮 `NOT_RUN`（读它也要进 `~/.dsh`）。
+  2. **真机 / 隔离档案 soak 本轮 `NOT_RUN`**：本次改动的真机读数由 `feat/steering-reconnect` 那一轮覆盖
+     （`.rsi/evidence/steering-reconnect-2026-11-26/`，六个状态的截图与逐字文本都在）。
+  3. **`d35af40` 上的门禁 `NOT_RUN`**：那一格的 `1927` 是推的（静态 1852 + 75），不是测的，标 `HYPOTHESIS`。
+- **两处别人的遗留，本轮仍然没碰**（`git status --short` 复核过）：`.gitignore` 是 **modified**、
+  `.rsi/evidence/progress-now/` 是**未跟踪**。没有暂存、没有提交、没有修改、没有回滚——它们属于别的会话。
+- **留给下一手最容易踩的两处口径**：① 这次的转录**末行是 `Duration`，没有 `GATE_EXIT=` 行**（上一轮 0.13.40 有），
+  退出码只有命令层面的读数，别写成「转录末行写着 EXIT=0」；② `release/0.13.41` 已用 `git branch -d` 删除，
+  `backup/*` 与所有 tag 都在，别把「本地只剩 main」理解成远端也被清了。

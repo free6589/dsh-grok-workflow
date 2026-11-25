@@ -3642,3 +3642,32 @@ Last updated: 2026-11-25 20:00 +08:00（**进度页重画成一页三态，`CONF
 `~/.dsh` / `~/.dsh/profiles` 前后同值、写探针 `Read-only file system`、3080 前后 401、live 仍装 `0.13.38`；未 push、未打 tag、
 未 bump、未发布。证据 `.rsi/evidence/progress-redesign-2026-11-25/`。**没跑**：未通过/已取消两态的真机截图、点按钮后输入框内容、
 窄屏真机截图（`NOT_RUN`，只有组件断言）。）
+
+Last updated: 2026-11-26 01:49 +08:00（**0.13.41 已发布：跑中插话又能送进正在跑的那一轮，`CONFIRMED`** — 发布提交
+**`a64a50a`** `chore(release): prepare v0.13.41`，父提交 `d35af40`，**8 文件 / +22 −20**（`CHANGELOG.md`、`README.md`、
+`README.zh-CN.md`、`docs/LOCAL-TESTING.md`、`lib/client.js`、`package-lock.json`、`package.json`、`src/client/index.js`），
+`src/` 与 `lib/` 只有 `PLUGIN_VERSION` / `UPDATE_LATEST` `'0.13.40'` → `'0.13.41'`（两份 blob 同为 `cf19891 → 4c4132d`，
+即仍逐字相同）；`main` 用 `git merge --ff-only release/0.13.41` 前进，**`main` = `origin/main` = `a64a50a`**，没有第二个合并提交。
+附注标签 **`v0.13.41`**，标签对象 **`96dd9cce3434734213eee281037ccca9ef605e57`**，剥出 **`a64a50a`**，
+`tagger 1795628771 +0800` = **2026-11-26 01:46:11 +0800**；已发布标签没被移动（`v0.13.40` 对象仍是 `14fef64`、
+`v0.13.39` `87a0e0e`、`v0.13.38` `2f3e548`、`v0.13.37` `235fa3e`，`git ls-remote --tags origin` 重读）。
+**发版门禁** `TMPDIR=$PWD/.tmp npm run ci` 在 `a64a50a` 的干净树上：`Test Files 102 passed (102)` / **`Tests 1927 passed (1927)`**、
+`Duration 98.22s`、lint `Found 15 warnings and 0 errors.`（`182 files`、`96 rules`）、
+`lib/ at a64a50a is the build of src/ at a64a50a (285 files, byte-identical)`、`client bundle: 348559 bytes`。
+**一处诚实边界**：这一份转录**末行是 `Duration`，没有 `GATE_EXIT=` 行**（`grep -c EXIT` = 0；上一轮 `0.13.40` 的转录末行确实
+有 `GATE_EXIT=0`），所以「跑完且全绿」有转录为证、「退出码 0」是执行方那条命令的读数，本轮没重跑门禁。
+**用例数为何从 0.13.40 的 `1923` 变成 `1927`（`CONFIRMED`）**：102 份 spec 一份没增没减，静态 `it(` 由 `1848` 涨到 `1852`，
+多的 4 条全在 **`test/replan.spec.ts`（`17 → 21`）**，参数化/循环差额仍是 `+75`（`block-preview 39→93`、`block-flag-baseline 7→14`、
+`objective-limit 6→12`、`fallback-shards 12→16`、`waves 24→28`），`1852 + 75 = 1927` 与门禁逐字对上；
+**这 +4 不是发布提交带来的**——`git diff --stat d35af40..a64a50a` 里没有任何 `test/` 文件，它落在 `3778822 → d35af40`
+那段「跑中插话」修复自己的提交族里（`git diff --stat 3778822..d35af40` 有 `test/replan.spec.ts | 157 ++++++++++-`），
+随版发布。**远端**：Release run **`45668227079`** `success`（`headSha a64a50a`，job `Validate and publish v0.13.41` 16 步全绿）、
+CI run **`45668209937`** `success`（`main` / `a64a50a`）；Release
+https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.41 ——`isDraft false`、`isPrerelease false`、
+`publishedAt 2026-11-25T17:47:46Z`、正文 23 行，唯一资产 **`dsh-grok-workflow-0.13.41.tgz` = 976529 字节**
+（`sha256:22a79233…0ecdee`），比上一版 **+2689**。**清理**：`release/0.13.41` 用 `git branch -d` 删了（只删这一个本地分支，
+没删远端分支、没删 `backup/*`、没删任何 tag），`git worktree list` 只剩主检出；`.gitignore`（modified）与
+`.rsi/evidence/progress-now/`（未跟踪）是别人的遗留，本轮仍然没碰。**没做成**：`AGENTS.md` §13 的 live 档案升级 `BLOCKED`
+（本会话 `workspace-write`、`~/.dsh` 在工作区外，写探测只会得到只读）——**没写、没重载、没重启** 3080 上的实例，live 装哪一版本轮 `NOT_RUN`；
+真机 soak 本轮也没跑（改动的真机读数由 `.rsi/evidence/steering-reconnect-2026-11-26/` 覆盖）。证据
+`.rsi/evidence/release-0.13.41-2026-11-26/`（`gate-a64a50a.out` 23312 字节、`sha256 9ad02f92…420da6`）。）
