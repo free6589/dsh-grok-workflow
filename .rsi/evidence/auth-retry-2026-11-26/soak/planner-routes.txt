@@ -1,0 +1,7 @@
+# the two planner children, and the route each was sent on
+
+3c5e12ae-71d7-49ee-afee-0e2b7572f9c2  route authprobe/opencode-go/muse-spark-1.3-contributor  (the provider refused this call: 401 virtual key is required)
+9d6359b2-fa09-4d1c-819a-aded0985af69  route authprobe/opencode-go/muse-spark-1.3-contributor  
+
+No child prompt in the run carries "RESUBMISSION", so the second planning ask
+is corridor C's refusal repeat, not the form-gap resubmit (corridor B).

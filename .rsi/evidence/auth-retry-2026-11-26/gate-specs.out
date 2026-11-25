@@ -1,0 +1,30 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.agents/worktrees/fix-auth-retry
+
+(node:102) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/planner-resubmit.spec.ts (12 tests) 3267ms
+     ✓ re-fires on a route this call has not paid when the planner hangs  1015ms
+     ✓ does not re-wait a hung route when the chain has nothing else to try  1012ms
+     ✓ keeps a recovered leg inside the walks the cap pays for  1012ms
+ ✓ test/judge-leg-retry.spec.ts (9 tests) 98ms
+(node:126) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/dead-routes.spec.ts (24 tests) 2247ms
+     ✓ counts a call that hung, even though a hang does not switch models  2024ms
+ ✓ test/waves.spec.ts (28 tests) 263ms
+(node:144) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/null-collapse.spec.ts (29 tests) 251ms
+ ✓ test/routing.spec.ts (25 tests) 179ms
+(node:173) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/failure-paths.spec.ts (15 tests) 154ms
+ ✓ test/verifier-resubmit.spec.ts (8 tests) 97ms
+ ✓ test/child-evidence.spec.ts (15 tests) 8ms
+
+ Test Files  9 passed (9)
+      Tests  165 passed (165)
+   Start at  04:09:26
+   Duration  8.75s (transform 532ms, setup 0ms, import 1.13s, tests 6.57s, environment 1ms)
+

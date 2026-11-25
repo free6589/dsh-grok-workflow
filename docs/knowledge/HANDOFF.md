@@ -1,3 +1,37 @@
+## 2026-11-26 — `fix/auth-retry`：钥匙被拒现在会在同一条路由上再问一次（判腿不再重跑干活那条腿、规划腿不再落兜底）；真机一次运行 `COMPLETED` 且同一条路由被再问一次；未合 `main`、未 push、未发版
+
+- **From:** 包工头（`agent-190`）· **To:** 下一个接手者
+- **这一轮是什么**：`D-120` 当年写下的判断是「拒 = 需要一把钥匙，不是另一条路由」，于是钥匙被拒**既不进死路表、也不走
+  任何重发走廊**。前半句仍然对，后半句这一轮改掉：拒常常只针对**这一次请求**（网关轮换上游凭据时对第一个请求回 401、
+  下一个就正常），而代价很贵——判腿记下「没有判」→ 整轮重试，干活那条腿为没人做过的判决重跑；规划腿落兜底切分，
+  兜底计划永远报不出 `completed`。
+- **身份**：分支 **`fix/auth-retry`**，从 `main` 尖端 **`7f0a47f`** 开出（worktree `.agents/worktrees/fix-auth-retry`）。
+  改动面：`src/script.ts`（新谓词 `refusalDeath`、`judgeLegTransportDeath` 改读它、判腿日志分两种死因、规划腿 C 走廊加
+  同路重问一次、三处注释）、`src/child-outcomes.ts`（注释一句）、`test/planner-resubmit.spec.ts` 10 → 12、
+  `test/judge-leg-retry.spec.ts` 8 → 9、`test/dead-routes.spec.ts`（注释）、重建 `lib/`、`CHANGELOG` 的 `[Unreleased]`
+  一条（英/中 + 升级须知）、`D-164`、`RESEARCH.md` 一条、`STATE` / `VALIDATION` 与本文件、证据目录。
+  **`ROUTE_HEALTH_FAMILIES` 一个字没动**：钥匙被拒仍然永远不进死路表。
+- **用户看到的一件事**：网关第一次用钥匙错误拒掉调用的那种运行会**照常跑完**，代价正好是一次额外子调用。
+- **块内门禁**：`tsc` 0、`oxlint 15 warnings / 0 errors / 184 files`、定向 9 份 spec **`165 passed`**、
+  `client bundle: 348559 bytes`（浏览器包没动）；红：`git stash push -- src` → **`3 failed / 18 passed`**；
+  全量 `npm run ci` `NOT_RUN`（§12）。
+- **真机读数（`CONFIRMED`）**：隔离档案 `authretry-clone`、规划腿独占一个「第一次 401、之后透传」的小代理 provider
+  （`authprobe` → `127.0.0.1:18190` → 真网关 `18088`）、端口 3455、headless Chromium + CDP 驱动。
+  运行 `818754a2…`：规划腿第一行 `attempt 1 / failed / model-unavailable`（理由逐字带 401），两个规划子会话
+  `seq 1 failed` → `seq 2 completed`、`request/context` 都是**同一条** `authprobe/opencode-go/muse-spark-1.3-contributor`，
+  小代理 `seq 1 → 401 injected`、`seq 2/3/4 → 200`，报告 `COMPLETED` / `Plan: planner; 2 task(s); 2 verified`。
+  证据 `.rsi/evidence/auth-retry-2026-11-26/`。
+- **下一个人的四条**：① **判腿那条走廊的真机没单独跑**（同一个谓词，单测覆盖）；要补就是在同一次隔离档案里让 verifier
+  第一次回 401、看 `judgeRetried` 与干活那条腿只跑一次。② **多路由链上的「同一条路由」按链序取最后一条**
+  （`plannerSpent` 是链序不是尝试序）：走链顺序被并发提示打乱时，重问落到的是「一条拒过的路由」而不一定是最后那条——
+  `D-164` 的 Consequences 里写了取舍。③ **按分类而不是按理由文本判定**，所以 `model-unavailable` 也包含「这条路由没有
+  这个模型」，那种情况会多花一次调用、学不到东西；想收窄只能等宿主把「钥匙」和「模型不存在」分成两类。
+  ④ `SETTLED TASKS` 每行仍读作 `- count-agents [undefined] `（上一轮记下的独立小活，本轮没动）。
+- **清理（已做完）**：scratch `.tmp/soak`（**283 MB**：档案克隆 + tgz + chromium 用户目录 + npm cache）与
+  `.npm-ci.log` 全部删除；`.tmp/` 只剩 `node-compile-cache`。worktree 与它的 `node_modules` 留着（分支未合）。
+
+---
+
 ## 2026-11-26 — `0.13.43` 已发布并收口：发布轮无代码改动、两次门禁 `GATE_EXIT=0`（`103 files / 1944 tests`）、`main` 快进、附注标签、两个远端 run 与 Release 资产都在；**live 档案升级仍 `BLOCKED`**
 
 - **From:** 发布包工头（`agent-188`）· **To:** 下一个接手者 / 能在本机写 `~/.dsh` 的人

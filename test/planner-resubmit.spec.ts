@@ -241,6 +241,63 @@ describe('planner rescue: one route re-fire for a transport death', () => {
   })
 })
 
+describe('planner rescue: one same-route repeat when the key is refused', () => {
+  it('re-asks the route that refused, and keeps the plan it gets back', async () => {
+    let planned = 0
+    const run = await runReal(call => {
+      const role = roleOfCall(call)
+      if (role === 'planner') {
+        planned += 1
+        // The shape a gateway gives a key it will not honour for one request: the
+        // first call is refused, the next one is served (D-164).
+        if (planned === 1) {
+          return {
+            sessionFailure: { message: '401: {"message":"virtual key is required."}', code: 'AUTH', status: 401 },
+            stopReason: 'error',
+          }
+        }
+        return { structured: { tasks: [task('a')] } }
+      }
+      if (role === 'worker') return { structured: execution('did the work') }
+      return { structured: verification(taskFromPrompt(call.prompt)) }
+    }, config({ roles: { planner: [{ model: 'p1' }] } }))
+
+    expect(run.stopReason).toBe('completed')
+    expect(run.report.plan.source).toBe('planner')
+    expect(run.report.status).toBe('completed')
+    const calls = plannerCalls(run.children)
+    // Same route, same planning call: a refusal is repeated, never routed around.
+    expect(calls.map(call => call.model)).toEqual(['p1', 'p1'])
+    // The repeat is not the form corridor: a refusal carries nothing to re-submit.
+    expect(calls[1]!.prompt).not.toContain('RESUBMISSION')
+    expect(run.events.some(event => event.includes('re-firing the plan once on the same route'))).toBe(true)
+    expect(run.events.some(event => event.includes('planner recovered on the same route in the same call'))).toBe(true)
+    // A refusal is never route evidence: the route keeps its place for the run.
+    expect(run.report.deadRoutes).toBeUndefined()
+  })
+
+  it('spends the repeat once, on the route that refused last, and still never kills it', async () => {
+    const run = await runReal(call => {
+      const role = roleOfCall(call)
+      if (role === 'planner') {
+        return { sessionFailure: { message: '403 Forbidden', code: 'AUTH', status: 403 }, stopReason: 'error' }
+      }
+      if (role === 'worker') return { structured: execution('did the work') }
+      return { structured: verification(taskFromPrompt(call.prompt)) }
+    }, config({ roles: { planner: [{ model: 'p1' }, { model: 'p2' }] } }))
+
+    expect(run.report.plan.source).toBe('fallback')
+    expect(run.report.plan.failure?.class).toBe('model-unavailable')
+    // First ask walks both routes; the repeat is aimed at the one that refused
+    // last, so it costs one child and never a second walk.
+    expect(plannerCalls(run.children).map(call => call.model)).toEqual(['p1', 'p2', 'p2'])
+    // Two consecutive refusals and still no dead route: a second failure cannot
+    // supply what a key needs, so the route is not written down as dead.
+    expect(run.report.deadRoutes).toBeUndefined()
+    expect(run.report.routes.filter(entry => entry.failureClass === 'model-unavailable')).toHaveLength(3)
+  })
+})
+
 describe('planner rescue: the child cap pays for the rescue', () => {
   it('counts three planning walks, because the rescue calls are real children', () => {
     const budget = routeBudgetFor(resolveConfig({ roles: { planner: [{ model: 'p1' }, { model: 'p2' }] } }))
