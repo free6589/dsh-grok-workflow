@@ -7,6 +7,7 @@ import {
   PROGRESS_NODE_KIND,
   PROGRESS_STAGES,
   PROGRESS_VIEW_TARGET,
+  deriveProgressStory,
   deriveTrack,
   detailFor,
   detailSourcesOf,
@@ -852,6 +853,188 @@ describe('progress tab: the numbered names a run repeats', () => {
 })
 
 /**
+ * The one-page story: the three screens (§19) as one pure derivation.
+ *
+ * `src/client/index.js` repeats this function as hand-written JavaScript, so every case
+ * here is also a fixture `test/client.spec.ts` renders. The rules are the contract's own
+ * (§19.2): the five chip states read the run's facts and never the plan size, a step is a
+ * plan task when the run declared any and one call otherwise, and the amber bar only
+ * speaks for a failure of the *current* step that no later attempt replaced.
+ */
+describe('progress tab: the one-page story', () => {
+  /**
+   * The recorder's own stream for one run.
+   *
+   * `run-start`, one start/settle pair per declared call, then the optional
+   * `summary-final` claim and `run-end` — exactly what `src/records.ts` writes, so the
+   * fixtures below exercise the fold (labels, the shipped-draft mark) instead of
+   * hand-building a run nobody recorded.
+   */
+  function streamOf(
+    calls: ReadonlyArray<readonly [number, string, string, (string | undefined)?]>,
+    options: { stopReason?: string, summaryFinal?: number } = {},
+  ): ProgressEventRecord[] {
+    const records: ProgressEventRecord[] = [
+      rec('tool-workflow/run-start', { runId: 'r-story', name: '任务团队 · 3 个任务' }, 1, 1_000),
+    ]
+    let at = 2
+    for (const [seq, label, phase, outcome] of calls) {
+      records.push(rec('tool-workflow/agent-start', { runId: 'r-story', seq, label, phase, childId: `child-${seq}` }, at, 1_000 + seq * 100))
+      at += 1
+      if (outcome === undefined) continue
+      records.push(rec('tool-workflow/agent-end', { runId: 'r-story', seq, outcome }, at, 1_500 + seq * 100))
+      at += 1
+    }
+    if (options.summaryFinal !== undefined) {
+      records.push(rec('tool-workflow/summary-final', { runId: 'r-story', draft: options.summaryFinal }, at))
+      at += 1
+    }
+    if (options.stopReason !== undefined) records.push(rec('tool-workflow/run-end', { runId: 'r-story', stopReason: options.stopReason }, at))
+    return records
+  }
+
+  /** The folded run and its story. */
+  function storyOf(events: ProgressEventRecord[]) {
+    const [run] = foldProgressRuns(events)
+    expect(run, 'the fixture must fold into one run').toBeDefined()
+    return deriveProgressStory(run!)
+  }
+
+  it('waiting: nothing declared yet — a planning headline, no steps, and the start button', () => {
+    const story = storyOf(streamOf([]))
+    expect(story.state).toBe('waiting')
+    expect(story.steps).toEqual([])
+    expect(story.total).toBe(0)
+    expect(story.at).toBe(0)
+    expect(story.now).toEqual({ titleKey: 'planning', title: '' })
+    expect(story.attempt).toBeUndefined()
+    expect(story.rest).toEqual([])
+    expect(story.log).toEqual([])
+    expect(story.final).toBeUndefined()
+    expect(story.dock).toBe('start')
+  })
+
+  it('running: one step per plan task, the first open one current, the ones after it named', () => {
+    const story = storyOf(streamOf([
+      [1, '规划助手', '规划', 'completed'],
+      [2, '执行', '任务 1 · 修复登录', 'completed'],
+      [3, '检查', '任务 1 · 修复登录', 'completed'],
+      [4, '执行', '任务 2 · 写文档'],
+      [5, '执行', '任务 3 · 补测试', 'completed'],
+    ]))
+    expect(story.state).toBe('running')
+    // A step is a plan task: its own phase header, its own position, its own chain.
+    expect(story.steps.map((step) => [step.key, step.number, step.title, step.state])).toEqual([
+      ['phase:任务 1 · 修复登录', 1, '任务 1 · 修复登录', 'done'],
+      ['phase:任务 2 · 写文档', 2, '任务 2 · 写文档', 'doing'],
+      ['phase:任务 3 · 补测试', 3, '任务 3 · 补测试', 'done'],
+    ])
+    expect(story.steps[0]!.chain.map((slot) => slot.key)).toEqual(['execute', 'check', 'review'])
+    expect(story.steps[0]!.members.map((row) => row.seq)).toEqual([2, 3])
+    expect(story.total).toBe(3)
+    expect(story.at).toBe(2)
+    // The headline is the current step's own title, verbatim: no re-numbering, no cut.
+    expect(story.now).toEqual({ title: '任务 2 · 写文档', role: '执行' })
+    expect(story.rest).toEqual(['任务 3 · 补测试'])
+    expect(story.log.map((row) => [row.seq, row.role, row.title, row.state])).toEqual([
+      [1, '规划助手', '规划', 'done'],
+      [2, '执行', '任务 1 · 修复登录', 'done'],
+      [3, '检查', '任务 1 · 修复登录', 'done'],
+      [4, '执行', '任务 2 · 写文档', 'doing'],
+      [5, '执行', '任务 3 · 补测试', 'done'],
+    ])
+    // Nothing is shipped yet, and a running page asks for no click.
+    expect(story.log.every((row) => row.shipped === undefined)).toBe(true)
+    expect(story.final).toBeUndefined()
+    expect(story.dock).toBe('quiet')
+  })
+
+  it('done: the whole plan passed — the finished headline, the shipped draft marked', () => {
+    const story = storyOf(streamOf([
+      [1, '规划助手', '规划', 'completed'],
+      [2, '执行', '任务 1 · 修复登录', 'completed'],
+      [3, '检查', '任务 1 · 修复登录', 'completed'],
+      [4, '汇总·第1稿', '汇总', 'completed'],
+    ], { summaryFinal: 1, stopReason: 'completed' }))
+    expect(story.state).toBe('done')
+    expect(story.steps.map((step) => [step.key, step.number, step.state])).toEqual([
+      ['phase:任务 1 · 修复登录', 1, 'done'],
+    ])
+    expect(story.total).toBe(1)
+    expect(story.at).toBe(1)
+    expect(story.now).toEqual({ titleKey: 'done', title: '' })
+    expect(story.now.role).toBeUndefined()
+    expect(story.rest).toEqual([])
+    // The shipped row keeps its own line and says so; no other line claims the mark, and
+    // the mark never leaks into the role the line is spoken as.
+    expect(story.log.map((row) => [row.seq, row.role, row.title, row.state, row.shipped === true])).toEqual([
+      [1, '规划助手', '规划', 'done', false],
+      [2, '执行', '任务 1 · 修复登录', 'done', false],
+      [3, '检查', '任务 1 · 修复登录', 'done', false],
+      [4, '汇总·第1稿', '汇总', 'done', true],
+    ])
+    expect(story.final?.draft).toBe(1)
+    expect(story.final?.label).toBe('汇总')
+    expect(story.final?.row).toBe(story.log[3])
+    expect(story.dock).toBe('accept')
+  })
+
+  it('failed: the amber bar counts the attempt of the unit that is still broken', () => {
+    const calls = [
+      [1, '执行', '任务 1 · 修复登录', 'completed'],
+      [2, '执行', '任务 2 · 写文档', 'failed'],
+      [3, '执行（尝试 2）', '任务 2 · 写文档', undefined],
+      [4, '执行', '任务 3 · 补测试', 'cancelled'],
+    ] as const
+    const running = storyOf(streamOf(calls))
+    expect(running.state).toBe('running')
+    expect(running.steps.map((step) => [step.number, step.state])).toEqual([[1, 'done'], [2, 'failed'], [3, 'cancelled']])
+    // No step is running, so the first broken one is the one the page is about.
+    expect(running.at).toBe(2)
+    expect(running.now).toEqual({ title: '任务 2 · 写文档', role: '执行' })
+    // Attempt 2 is the one still open: the bar says the second pass failed, not the first.
+    expect(running.attempt).toEqual({ n: 2, retrying: true })
+    // The steps after the current one keep their names, grey and unticked as they are.
+    expect(running.rest).toEqual(['任务 3 · 补测试'])
+
+    // The same stream once the run ends: the bar stops claiming a recheck is running.
+    const ended = storyOf(streamOf(calls, { stopReason: 'error' }))
+    expect(ended.state).toBe('failed')
+    expect(ended.at).toBe(2)
+    expect(ended.now.role).toBeUndefined()
+    expect(ended.attempt).toEqual({ n: 2, retrying: false })
+
+    // A failure a later attempt of the same unit replaced is history, not a bar.
+    const recovered = storyOf(streamOf([
+      [1, '执行', '任务 2 · 写文档', 'failed'],
+      [2, '执行（尝试 2）', '任务 2 · 写文档', 'completed'],
+      [3, '检查（尝试 2）', '任务 2 · 写文档', 'completed'],
+    ], { stopReason: 'completed' }))
+    expect(recovered.state).toBe('done')
+    expect(recovered.steps.map((step) => step.state)).toEqual(['done'])
+    expect(recovered.attempt).toBeUndefined()
+  })
+
+  it('falls back to one step per declared call when the run planned no tasks', () => {
+    // A single-call run declares no `任务 n · …` phase, so the track's total is the run's
+    // own declared rows — never a plan nobody announced.
+    const story = storyOf(streamOf([
+      [1, '规划助手', '规划', 'completed'],
+      [2, '执行', '执行', undefined],
+    ]))
+    expect(story.steps.map((step) => [step.key, step.number, step.title, step.state])).toEqual([
+      ['seq:1', undefined, '规划助手', 'done'],
+      ['seq:2', undefined, '执行', 'doing'],
+    ])
+    expect(story.steps.every((step) => step.chain.length === 0)).toBe(true)
+    expect(story.total).toBe(2)
+    expect(story.at).toBe(2)
+    expect(story.now.title).toBe('执行')
+    expect(story.dock).toBe('quiet')
+  })
+})
+
+/**
  * The design document's "released spine" claim, pinned to the code.
  *
  * Manual item Sec.2-5 removed the permanently-empty `回答` stage. The document kept
@@ -862,6 +1045,41 @@ describe('progress tab: the numbered names a run repeats', () => {
 describe('design document: the released spine matches PROGRESS_STAGES', () => {
   const doc = readFileSync(new URL('../docs/knowledge/DESIGN-progress-tab.md', import.meta.url), 'utf8')
 
+  /**
+   * The doc's own sections, so a dated record can be told from a live claim.
+   *
+   * §13 / §14 / §15 measured a spine that still had a seventh slot, and §19.0 keeps those
+   * numbers as measured (`§13 里的「7 个阶段空环」是 2026-11-15 当时的实测记录…不回改`).
+   * Rewriting a measurement to protect a guard would trade one wrong number for another,
+   * so the live claims are what gets pinned; the records stay as they were written.
+   */
+  const HISTORY_SECTIONS = ['13', '14', '15']
+  const sections = doc.split(/^## /m).slice(1).map((chunk) => {
+    const newline = chunk.indexOf('\n')
+    return { heading: newline === -1 ? chunk : chunk.slice(0, newline), body: newline === -1 ? '' : chunk.slice(newline + 1) }
+  })
+  const liveDoc = sections
+    .filter((section) => !HISTORY_SECTIONS.includes(/^(\d+)\./.exec(section.heading)?.[1] ?? ''))
+    .map((section) => section.body)
+    .join('\n')
+
+  /**
+   * The live prose, with the doc's own citations taken out.
+   *
+   * §19.0 has to be able to name the reading it corrected (`§13 里的「7 个阶段空环」`), so a
+   * quoted or code-spanned phrase is read as a citation here; what the doc asserts is the
+   * text outside those marks.
+   */
+  const liveProse = liveDoc.replace(/「[^」]*」/gu, '').replace(/`[^`\n]*`/gu, '')
+
+  /**
+   * A live sentence that puts the fixed count at seven: a number, a counter, and the noun
+   * it counts (`7 段固定脊`, `七个模板段`, `7 个阶段空环`). Anchoring on the noun is what lets
+   * §19.0's `六段，不是七段` stand: it names the wrong count to correct it, and names no
+   * segment of its own.
+   */
+  const SEVEN_CLAIM = /(?:七|7)\s*(?:段|个)\s*(?:固定)?\s*(?:脊|固定段|模板段|阶段(?:空环|名))/gu
+
   it('quotes the six-stage spine the code exports, with no answer stage', () => {
     const line = '`起点 → 规划 → 执行 → 检查 → 汇总 → 终点`'
     expect(doc, 'the released spine is not stated in the design document').toContain(line)
@@ -870,5 +1088,23 @@ describe('design document: the released spine matches PROGRESS_STAGES', () => {
     expect(doc).not.toContain('七段固定脊椎')
     // The quoted spine and the exported track describe the same number of nodes.
     expect(line.slice(1, -1).split(' → ')).toHaveLength(PROGRESS_STAGES.length)
+  })
+
+  it('no live sentence reads the fixed spine as seven stages again', () => {
+    expect([...liveProse.matchAll(SEVEN_CLAIM)].map((match) => match[0])).toEqual([])
+  })
+
+  it('states the spine’s stage count, and states it as PROGRESS_STAGES.length', () => {
+    // Every place the doc puts a number on the spine: `N 段固定脊` and `脊只有 N 段`.
+    // Chinese numerals are read too, because the doc writes both.
+    const normalized = liveDoc.replace(/七段/gu, '7 段').replace(/六段/gu, '6 段')
+    const stated = [
+      ...[...normalized.matchAll(/(\d+)\s*段\s*固定\s*脊/gu)].map((match) => Number(match[1])),
+      ...[...normalized.matchAll(/脊(?:只有|仍是|就是)\s*(\d+)\s*段/gu)].map((match) => Number(match[1])),
+      ...[...normalized.matchAll(/(?:恒|固定)\s*(\d+)\s*个/gu)].map((match) => Number(match[1])),
+    ]
+    // A guard that finds nothing proves nothing: the doc states the count more than once.
+    expect(stated.length).toBeGreaterThanOrEqual(2)
+    expect(stated).toEqual(stated.map(() => PROGRESS_STAGES.length))
   })
 })

@@ -435,7 +435,7 @@ section.gw-progress
   .gw-progress-head       标题 + 「已结算/已声明 · 百分比」（live region）
   .gw-progress-settle     结算条（按 outcome 分段，虚线 = 未结算）+ 图例；有运行就一直在
   .gw-progress-flow
-    ul.gw-progress-track  7 段固定脊（每段：环 + label + meta + 3px 耗时条）+ 6 条段间连接线
+    ul.gw-progress-track  6 段固定脊（每段：环 + label + meta + 3px 耗时条）+ 5 条段间连接线
     ul.gw-progress-tasks  任务带：每组行一张卡（卡 = 环 + 名称 + 已结算/耗时 + 行胶囊）
     svg.gw-progress-wires 实测的干线（每 owner 一条）+ 支线（每卡一条，带箭头）
 ```
