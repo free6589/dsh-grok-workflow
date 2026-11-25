@@ -3365,7 +3365,9 @@ describe('client composer tool row: the workflow switch (`/grok on|off` as a but
       push(entry: Record<string, unknown>) {
         const entries = [...snapshot.entries, entry]
         snapshot = { entries, hasMore: false, revision: snapshot.revision + 1, change: { kind: 'append', entries: [entry] } }
-        for (const listener of [...listeners]) listener()
+        // A snapshot, not the live set: a listener that unsubscribes while it runs must not
+        // take the listeners behind it out of this dispatch.
+        for (const listener of Array.from(listeners)) listener()
       },
       /** How many switches are currently following this window. */
       listeners,
