@@ -13,8 +13,10 @@ import {
   ROLE_KEYS,
   ROUTE_KEYS,
   describeResolvedConfig,
+  removedKeyWarning,
   resolveConfig,
   snapshotConfig,
+  takeRemovedKeys,
 } from '../src/config.js'
 import { declareSettingsSurface, describeSelf, describeSurface, validateRoutes } from '../src/settings.js'
 import { realSettingsDescriptor } from './settings-fixture.js'
@@ -116,7 +118,7 @@ describe('configuration surface', () => {
       .toThrow(/roles\.worker must be an array of routes/)
   })
 
-  it('rejects every removed key as removed (R-06), with the migration named', () => {
+  it('ignores every removed key and hands the load path its name (D-155)', () => {
     // The surface keeps exactly 19 keys (nine plus childTimeoutMs, the mid-run
     // replan switch, the four repeat-run keys, the two self-iteration keys, the
     // Q8 guardianModel single route and the block-intake switch); the other 25
@@ -131,19 +133,25 @@ describe('configuration surface', () => {
     ])
     expect(REMOVED_CONFIG_KEYS).toHaveLength(25)
     for (const key of REMOVED_CONFIG_KEYS) {
-      expect(() => resolveConfig({ [key]: 1 } as never))
-        .toThrow(new RegExp(`removed configuration key "${key}"`))
+      // D-155: a leftover removed key does not take the row down. It loads, contributes
+      // nothing, and is recorded so `apply()` can warn with its name in it.
+      expect(() => resolveConfig({ [key]: 1 } as never), key).not.toThrow()
+      expect(takeRemovedKeys(), key).toEqual([key])
+      expect(removedKeyWarning(key), key).toContain(`"${key}"`)
     }
-    // Spot checks: the typo suggestion still works for surviving keys.
+    // Spot checks: the typo suggestion still works for surviving keys — the removed-key
+    // exemption must not swallow the unknown-key refusal (R-06).
     expect(() => resolveConfig({ maxConcurreny: 2 } as never)).toThrow(/did you mean "maxConcurrency"/)
   })
 
-  it('names a removed switching key as removed, keeps typo hints for the rest (round 61)', () => {
-    // `switchOn` was deleted by the T4 slim-down: the holder of an old patch
-    // learns why the row stopped loading. A near-miss of a live key still gets
-    // the did-you-mean hint — the removed check must not swallow it.
-    expect(() => resolveConfig({ switchOn: ['timeout'] } as never))
-      .toThrow(/removed configuration key "switchOn"/)
+  it('names a removed switching key as ignored, keeps typo hints for the rest (round 61, D-155)', () => {
+    // `switchOn` was deleted by the T4 slim-down. The holder of an old patch now keeps a
+    // working row and is told the key was ignored — the built-in fallback policy applies.
+    // A near-miss of a live key still gets the did-you-mean refusal: the removed-key
+    // exemption must not swallow it.
+    expect(() => resolveConfig({ switchOn: ['timeout'] } as never)).not.toThrow()
+    expect(takeRemovedKeys()).toEqual(['switchOn'])
+    expect(removedKeyWarning('switchOn')).toContain('"switchOn"')
     expect(() => resolveConfig({ maxConcurreny: 2 } as never))
       .toThrow(/did you mean "maxConcurrency"/)
   })
@@ -226,10 +234,12 @@ describe('configuration surface', () => {
       .toThrow(/unknown configuration key "guardianModel\.maxInFlight"/)
   })
 
-  it('refuses a removed switching policy key as removed (R-06)', () => {
-    // T4: `switchOn` is fixed to the built-in policy (empty); a stored value is removed.
-    expect(() => resolveConfig({ switchOn: ['timeout'] } as never))
-      .toThrow(/removed configuration key "switchOn"/)
+  it('ignores a removed switching policy key and says so (D-155)', () => {
+    // T4: `switchOn` is fixed to the built-in policy (empty); a stored value is ignored,
+    // and the warning names the key so the reader knows the line does nothing.
+    expect(() => resolveConfig({ switchOn: ['timeout'] } as never)).not.toThrow()
+    expect(takeRemovedKeys()).toEqual(['switchOn'])
+    expect(removedKeyWarning('switchOn')).toMatch(/switchOn.*ignored|ignored.*switchOn/s)
   })
 
   it('fills every documented default through the schema', () => {
@@ -262,8 +272,11 @@ describe('configuration surface', () => {
     for (const key of ['mode', 'legacyGate']) {
       expect(REMOVED_CONFIG_KEYS).toContain(key)
       expect(CONFIG_KEYS).not.toContain(key)
-      expect(() => resolveConfig({ [key]: true } as never))
-        .toThrow(new RegExp(`removed configuration key "${key}"`))
+      // D-155: the leftover line loads and is reported by name, instead of removing the
+      // workflow from the interface of everyone who upgraded past M3.3.
+      expect(() => resolveConfig({ [key]: true } as never)).not.toThrow()
+      expect(takeRemovedKeys()).toEqual([key])
+      expect(removedKeyWarning(key)).toContain(`"${key}"`)
     }
     // The effective-configuration line still states the intake either way.
     expect(describeResolvedConfig(resolveConfig({}))).toContain('blockIntake=on')

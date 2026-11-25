@@ -5,7 +5,7 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import { Session } from '@deepseek-ai/dsh-session'
 import { describe, expect, it, vi } from 'vitest'
-import { HARD_LIMITS, resolveConfig } from '../src/config.js'
+import { HARD_LIMITS, resolveConfig, takeRemovedKeys } from '../src/config.js'
 import { installHeartbeatListen, readHeartbeatListenObservations } from '../src/heartbeat-listen.js'
 import { LOOP_PROMPT_PREFIX, LOOP_TASK_TITLE, loopPolicyFromConfig } from '../src/loop.js'
 import {
@@ -474,7 +474,11 @@ describe('the continuation path leaves the engine bounds exactly as configured',
     expect(HARD_LIMITS.maxConcurrency).toBe(100)
     expect(HARD_LIMITS.maxRetries).toBe(3)
     expect(() => config({ maxConcurrency: 101 })).toThrow(/maxConcurrency/)
-    expect(() => config({ maxRetries: 4 })).toThrow(/maxRetries/)
+    // `maxRetries` is a removed key (D-155): a stored 4 loads, is ignored, and the run
+    // keeps the fixed retry count, so no narrower bound can be widened through a patch.
+    takeRemovedKeys()
+    expect(config({ maxRetries: 4 }).maxRetries).toBe(1)
+    expect(takeRemovedKeys()).toEqual(['maxRetries'])
   })
 
   it('starts no run for a heartbeat, so it cannot widen concurrency or retries', async () => {

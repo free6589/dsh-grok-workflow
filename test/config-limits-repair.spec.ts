@@ -8,10 +8,12 @@ import {
   LIMIT_CAPS,
   REMOVED_CONFIG_KEYS,
   limitOverrunWarning,
+  removedKeyWarning,
   repairLimitOverruns,
   resolveConfig,
   snapshotConfig,
   takeLimitOverruns,
+  takeRemovedKeys,
 } from '../src/config.js'
 import { apply } from '../src/index.js'
 
@@ -20,7 +22,7 @@ import { apply } from '../src/index.js'
  * every case starts from a clean one: the assertions below are about its own input,
  * not about whatever an earlier case happened to parse.
  */
-beforeEach(() => { takeLimitOverruns() })
+beforeEach(() => { takeLimitOverruns(); takeRemovedKeys() })
 
 /** Plain values out of a parsed (volatile) config document. */
 const parsed = (raw: Record<string, unknown>): Record<string, unknown> =>
@@ -197,32 +199,39 @@ describe('LIMIT_CAPS: one clamp table for every user-configurable numeric cap (B
     expect(takeLimitOverruns()).toEqual([])
   })
 
-  it('rejects every T4-removed key as removed (R-06拒载), all 25', () => {
-    // T4 slim-down plus M3.3: the 25 removed keys are no longer clamped or defaulted —
-    // a patch that still carries one is refused instead of silently repaired.
+  it('ignores every removed key and names it, all 25 (D-155)', () => {
+    // T4 slim-down plus M3.3: the 25 removed keys are no longer clamped, defaulted or
+    // fatal — a patch that still carries one loads, the value does nothing, and the load
+    // path is handed the key so it can say which line to delete.
     // (`timeoutMs` left this list when it became configurable again; `mode` and
     // `legacyGate` joined it when the front desk was deleted.)
     expect(REMOVED_CONFIG_KEYS).toHaveLength(25)
     for (const key of REMOVED_CONFIG_KEYS) {
-      expect(() => resolveConfig({ [key]: 1 } as never))
-        .toThrow(new RegExp(`removed configuration key "${key}"`))
+      // Ignoring means ignoring: the document resolves exactly like one without the key.
+      // (`maxRetries` is the one removed name that is also a fixed field of the result, so
+      // an absence check would be the wrong instrument here.)
+      const resolved = resolveConfig({ [key]: 1 } as never)
+      expect(resolved, key).toEqual(resolveConfig({}))
+      expect(takeRemovedKeys(), key).toEqual([key])
+      expect(removedKeyWarning(key), key).toContain(`"${key}"`)
       // The repair path leaves them alone too: not its table, not its business.
       expect(repairLimitOverruns({ [key]: 1 } as never).warnings).toEqual([])
     }
     expect(takeLimitOverruns()).toEqual([])
+    expect(takeRemovedKeys()).toEqual([])
   })
 
-  it('does not clamp a removed numeric key to a cap it cannot deliver (round 40)', () => {
-    // The deleted LEGACY_LIMIT_CAPS branch clamped `maxRetries: 5` to 3 and
-    // `maxActiveRuns: 5` to 4 with a "takes effect as" warning, yet a config
-    // carrying either key still fails `resolveConfig` — the clamp saved
-    // nothing and the sentence lied about the enforced value. The repair now
-    // leaves removed keys untouched so the refusal names the real defect.
+  it('does not clamp a removed numeric key to a cap it cannot deliver (round 40, D-155)', () => {
+    // The deleted LEGACY_LIMIT_CAPS branch clamped `maxRetries: 5` to 3 with a
+    // "takes effect as" warning, which was a sentence about a key that no longer existed.
+    // The repair leaves removed keys untouched; the loader now ignores them and names
+    // them, so the honest statement is "this key does nothing", not a made-up cap.
     for (const raw of [{ maxRetries: 5 }, { maxActiveRuns: 5 }, { historyTurns: 1000001 }]) {
       const { repaired, warnings } = repairLimitOverruns(raw as never)
       expect(repaired).toEqual(raw)
       expect(warnings).toEqual([])
-      expect(() => resolveConfig(repaired)).toThrow(/removed configuration key/)
+      // An ignored key changes nothing about what the run reads.
+      expect(resolveConfig(repaired)).toEqual(resolveConfig({}))
     }
     expect(takeLimitOverruns()).toEqual([])
     // The live table is untouched: a real overrun still clamps and loads.
@@ -459,6 +468,7 @@ interface PageBundle {
   GROK_WORKFLOW_DICT: Record<string, Record<string, string>>
   GROK_WORKFLOW_INTERNALS: {
     limitOverrunWarn(value?: Record<string, unknown>): Array<{ key: string, live: number, cap: number }>
+    removedKeyWarn(entry?: Record<string, unknown>): string[]
     translate(locale: string, key: string, params?: Record<string, unknown>): string
     translator(locale: string): Translator
   }
@@ -500,13 +510,16 @@ function loadBundle(): PageBundle {
 }
 
 const bundle = loadBundle()
-const { limitOverrunWarn, translate, translator } = bundle.GROK_WORKFLOW_INTERNALS
+const { limitOverrunWarn, removedKeyWarn, translate, translator } = bundle.GROK_WORKFLOW_INTERNALS
 
 /** Register the page against a face holding one fixed settings document. */
-function renderWith(value: Record<string, unknown>): unknown {
+function renderWith(value: Record<string, unknown>, user?: Record<string, unknown>): unknown {
   const snapshot = {
     status: 'ready',
-    view: { writable: true, namespaces: [{ ns: 'grok-workflow', revision: 1, value }] },
+    view: {
+      writable: true,
+      namespaces: [{ ns: 'grok-workflow', revision: 1, value, ...user === undefined ? {} : { user } }],
+    },
     error: null,
   }
   const face = {
@@ -643,5 +656,54 @@ describe('client settings page: over-limit banner (B07, T5: only maxConcurrency/
       expect(dict['warn.limit.title']!.length).toBeGreaterThan(3)
       expect(dict['warn.limit.detail']!.length).toBeGreaterThan(3)
     }
+  })
+})
+
+/**
+ * D-155 page half: a stored document that still carries a removed key says so.
+ *
+ * The load log names the leftover key once, but a reader who never opens the log learns
+ * nothing from it — and the page is the only place the line can be deleted from. The
+ * banner reads the *stored* layer for the same reason the over-limit banner does: the
+ * schema drops a removed key before it reaches the effective value, so `value` never
+ * carries one.
+ */
+describe('client settings page: leftover removed-key banner (D-155)', () => {
+  it('finds a leftover in the stored document and ignores everything else', () => {
+    expect(removedKeyWarn({ value: { maxTasks: 10 }, user: { mode: 'triage', maxTasks: 10 } })).toEqual(['mode'])
+    expect(removedKeyWarn({ mode: 'triage', legacyGate: true })).toEqual(['mode', 'legacyGate'])
+    // A live key, a removed *value* on a live key, and an empty document say nothing.
+    expect(removedKeyWarn({ maxTasks: 10 })).toEqual([])
+    expect(removedKeyWarn(undefined)).toEqual([])
+  })
+
+  it('renders one line per leftover key, naming each one', () => {
+    const tree = renderWith({ maxTasks: 10, roles: {} }, { mode: 'triage', legacyGate: true, maxTasks: 10 })
+    const banner = walk(tree).find(element => element.props['data-warn'] === 'removed')
+    expect(banner).toBeDefined()
+    const keys = walk(banner).map(element => element.props['data-warn-key']).filter(Boolean)
+    expect(keys).toEqual(['mode', 'legacyGate'])
+    const copy = texts(banner).join('\n')
+    expect(copy).toContain(bundle.GROK_WORKFLOW_DICT['zh']!['warn.removed.title'])
+    expect(copy).toContain('mode')
+    expect(copy).toContain('legacyGate')
+  })
+
+  it('drops the banner once the stored document no longer carries the key', () => {
+    const tree = renderWith({ maxTasks: 10, roles: {}, mode: 'triage' })
+    // No `user` layer: the stored document is what `value` holds, leftovers included.
+    const banner = walk(tree).find(element => element.props['data-warn'] === 'removed')
+    expect(banner).toBeDefined()
+    const clean = renderWith({ maxTasks: 10, roles: {} })
+    expect(walk(clean).some(element => element.props['data-warn'] === 'removed')).toBe(false)
+  })
+
+  it('carries the sentence in both languages, not as a key', () => {
+    const english = translate('en', 'warn.removed.detail', { key: 'mode' })
+    const chinese = translator('zh')('warn.removed.detail', { key: 'mode' })
+    expect(english).not.toBe('warn.removed.detail')
+    expect(english).not.toBe(chinese)
+    expect(english).toContain('mode')
+    expect(chinese).toContain('mode')
   })
 })

@@ -323,13 +323,44 @@ fallback runs on every later `readConfig()`, so a bad settings save repairs
 the same way.
 
 Everything else is **irrecoverable** and still fails hard at load (R-06):
-unknown keys, `configVersion` out of range, out-of-range numbers, malformed/duplicated/over-long chains,
+unknown keys (including misspellings, with a closest-key suggestion),
+`configVersion` out of range, out-of-range numbers, malformed/duplicated/over-long chains,
 unknown providers, models the provider enumerates but does not declare,
-unknown `switchOn` classes, and budget-backstop violations. The settings page
+and budget-backstop violations. R-06 no longer covers a **removed** key: see
+D-155 below. The settings page
 mirrors the recoverable pair client-side (`src/client/index.js` `validate()`):
 chain non-empty + deterministic, or `model` + empty chain, is a red
 `error.synthesisChainUnused` / `error.synthesisChainMissing` finding (both
 languages) that disables Save; only a legal combination may be written.
+
+### Removed keys are ignored and named, not fatal (D-155)
+
+A key in `REMOVED_CONFIG_KEYS` (twenty-five: the T4 slim-down's twenty-three plus
+`mode` and `legacyGate` from M3.3) is **not** a load failure any more. The row
+activates, the stored value reaches nothing, and the leftover is named twice:
+
+| Half | Where | What a reader sees |
+|---|---|---|
+| Load log | `assertKnownKeys()` records the key in a module buffer; `apply()`'s `readConfig()` drains it through `takeRemovedKeys()` and logs `removedKeyWarning(key)` once per key per load | `configuration key "mode" was removed in an earlier release: its stored value is ignored, and the rest of the row loads normally (delete that line when convenient).` |
+| Settings page | `src/client/index.js` `removedKeyWarn(entry)` reads the **stored** document (`entry.user`; the schema drops a removed key from the effective `value`), renders one line per leftover key in a `data-warn="removed"` banner | `warn.removed.title` / `warn.removed.detail`, both languages, key named in the sentence |
+
+Mechanism notes, because both halves have a trap:
+
+- **Record, then announce.** The check runs inside `resolveConfig`, which the host
+  may reach before `apply()` and which has no logger; a read happens per message.
+  So the buffer is the announcement channel (same shape as the limit-overrun
+  buffer, B04), and `apply()` keeps a per-load `Set` so a patch that keeps the line
+  warns once, not once per message. `resolveConfig`'s result carries nothing for a
+  removed key: `resolveConfig({ mode: 'triage' })` deep-equals `resolveConfig({})`.
+- **The page cannot import the list.** `src/client/index.js` is a browser bundle
+  served verbatim, so it ships `GROK_WORKFLOW_REMOVED_KEYS`; `test/client.spec.ts`
+  pins it equal to `REMOVED_CONFIG_KEYS` in both directions.
+
+Nothing else about R-06 moved: a key this build never knew still fails the load
+with `unknown configuration key "…" (did you mean "…"?)`, and the nested levels
+(`roles.<unknown>`, `roles.<role>[i].<wrong field>`, `guardianModel.<wrong field>`)
+still throw with their full path. A removed key written *inside* a route object is
+a nested unknown and still throws.
 
 ## Message entry (the front desk was deleted in M3.3)
 

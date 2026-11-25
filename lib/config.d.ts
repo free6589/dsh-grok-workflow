@@ -326,13 +326,34 @@ export declare const ROLE_KEYS: readonly ["planner", "worker", "verifier", "synt
 /** The keys one route object may carry; `maxInFlight` is the per-route lane ceiling. */
 export declare const ROUTE_KEYS: readonly ["provider", "model", "maxInFlight"];
 /**
- * Every key this build no longer accepts; a patch that still carries one is rejected
- * (R-06).
+ * Every key this build no longer accepts. A patch that still carries one is *ignored*
+ * and told so (D-155), not refused: the value never reaches the resolved config, the
+ * load log names the key once, and the settings page names it again.
+ *
+ * Only removed keys are ignored. Unknown keys and misspellings still fail the load with
+ * a did-you-mean suggestion (R-06), so a typo cannot become a setting that does nothing.
  *
  * The first twenty-three went with the T4 slim-down; `mode` and `legacyGate` went with
  * M3.3, which deleted the old front desk and the routing mode it read.
  */
 export declare const REMOVED_CONFIG_KEYS: readonly ["enforceGate", "gateRequired", "gateScope", "gatePreset", "answerStrategy", "triageAsk", "triageModel", "triageClassifier", "triageFollowupAsFast", "instantReceipt", "humanSummary", "showDiagnostics", "historyTurns", "historyChars", "maxQueuedMessages", "maxRetries", "maxActiveRuns", "maxActiveRunsTotal", "subagentProvider", "switchOn", "recordRuns", "recordLimit", "showProgress", "mode", "legacyGate"];
+/**
+ * Drain the removed keys recorded since the last call.
+ *
+ * The caller announces each one once; nothing is announced twice by this module.
+ * @returns The distinct leftover keys, in the order the check first met them.
+ */
+export declare function takeRemovedKeys(): string[];
+/**
+ * The one sentence that names a leftover removed key, in both shipped languages.
+ *
+ * It has to say three things a reader holding an old patch needs: which key, that it was
+ * removed, and that the value is now doing nothing — "ignored" alone would read as "it
+ * still works, quietly".
+ * @param key - the removed key the patch still carries.
+ * @returns the warning line the plugin logs.
+ */
+export declare function removedKeyWarning(key: string): string;
 /** One stored limit the schema had to clamp, as the parse saw it. */
 export interface LimitOverrun {
     field: LimitField;
@@ -630,6 +651,11 @@ export type RouteInput = ModelRoute | string;
  * `config.roles?.planner`, which on a string, an array or `null` is `undefined` for every
  * role — five empty chains, a successful load, and no route configured at all. Absent
  * (`undefined`) stays legal; it is the documented "inherit the run's route".
+ *
+ * A key in {@link REMOVED_CONFIG_KEYS} is not a failure (D-155): it is recorded for the
+ * load path to announce and then ignored, because the person holding it did nothing
+ * wrong except keep a line the plugin deleted, and refusing the row took the workflow
+ * away from them. Everything else at every level still throws.
  * @param config - raw user configuration.
  * @throws If a key at any level is not part of the configuration surface, or if `roles`
  *   is present and is not an object.

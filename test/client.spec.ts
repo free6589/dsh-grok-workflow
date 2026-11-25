@@ -1,7 +1,7 @@
 import { createServer } from 'node:http'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_CHILD_TIMEOUT_MS, DEFAULT_ITERATE_INTERVAL_MIN, DEFAULT_ITERATE_TEMPLATE, DEFAULT_LOOP_FAIL_STREAK, DEFAULT_LOOP_INTERVAL_MIN, DEFAULT_LOOP_MAX_ROUNDS, DEFAULT_MAX_CONCURRENCY, DEFAULT_MAX_TASKS, DEFAULT_REPLAN, DEFAULT_TIMEOUT_MS, HARD_LIMITS } from '../src/config.js'
+import { DEFAULT_CHILD_TIMEOUT_MS, DEFAULT_ITERATE_INTERVAL_MIN, DEFAULT_ITERATE_TEMPLATE, DEFAULT_LOOP_FAIL_STREAK, DEFAULT_LOOP_INTERVAL_MIN, DEFAULT_LOOP_MAX_ROUNDS, DEFAULT_MAX_CONCURRENCY, DEFAULT_MAX_TASKS, DEFAULT_REPLAN, DEFAULT_TIMEOUT_MS, HARD_LIMITS, REMOVED_CONFIG_KEYS } from '../src/config.js'
 import { ITERATE_ROUTE_PATH, ITERATE_TASK_TITLE, LOOP_ROUTE_PATH, LOOP_TASK_TITLE, LOOP_TOOL_NAME, createLoopService, loopPolicyFromConfig } from '../src/loop.js'
 import { createLoopTool, dispatchIterateAction, handleLoopRoute } from '../src/loop-surface.js'
 import { synthesisDraftLabel } from '../src/naming.js'
@@ -36,6 +36,7 @@ interface Bundle {
   GROK_WORKFLOW_SWITCHABLE_CLASSES: string[]
   GROK_WORKFLOW_GROUPS: string[]
   GROK_WORKFLOW_LOCALES: string[]
+  GROK_WORKFLOW_REMOVED_KEYS: string[]
   GROK_WORKFLOW_CHAIN_LIMIT: number
   GROK_WORKFLOW_ROUTE_INFLIGHT_MIN: number
   GROK_WORKFLOW_ROUTE_INFLIGHT_MAX: number
@@ -425,6 +426,15 @@ describe('client settings page bundle', () => {
     expect(ROLE_ORDER).toEqual({ planner: 1, worker: 2, verifier: 3, supervisor: 4, synthesizer: 5 })
   })
 
+  it('carries exactly the removed-key list the config module enforces (D-155)', () => {
+    // The page cannot import `src/config.ts` (it is a browser bundle the host serves
+    // verbatim), so it ships a copy. The copy is only safe while it stays a copy: both
+    // directions are asserted, so a key removed in code cannot go unnamed on the page and
+    // a key the page names cannot outlive its removal.
+    expect([...bundle.GROK_WORKFLOW_REMOVED_KEYS].sort()).toEqual([...REMOVED_CONFIG_KEYS].sort())
+    expect(bundle.GROK_WORKFLOW_REMOVED_KEYS).toHaveLength(REMOVED_CONFIG_KEYS.length)
+  })
+
   it('ships lib/client.js byte-identical to the source (no stale bundle)', () => {
     const source = readFileSync(new URL('../src/client/index.js', import.meta.url), 'utf8')
     const built = readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8')
@@ -451,6 +461,32 @@ describe('client settings page: bilingual copy (t42)', () => {
     const zhKeys = Object.keys(bundle.GROK_WORKFLOW_DICT['zh']!).sort()
     const enKeys = Object.keys(bundle.GROK_WORKFLOW_DICT['en']!).sort()
     expect(zhKeys).toEqual(enKeys)
+  })
+
+  it('names a leftover removed key on the page, in both languages (D-155)', () => {
+    // The page half of the load warning: the reader is told which line to delete, in the
+    // language the page is in. A copy key that rendered the key id would be worse than no
+    // banner, so both are asserted as prose that carries the key name inside it.
+    const { removedKeyWarn } = bundle.GROK_WORKFLOW_INTERNALS as unknown as {
+      removedKeyWarn(entry?: Record<string, unknown>): string[]
+    }
+    // `user` is the document as stored (the schema drops removed keys from `value`).
+    expect(removedKeyWarn({ value: { maxTasks: 10 }, user: { mode: 'triage', maxTasks: 10 } })).toEqual(['mode'])
+    expect(removedKeyWarn({ mode: 'triage', legacyGate: true })).toEqual(['mode', 'legacyGate'])
+    expect(removedKeyWarn({ maxTasks: 10 })).toEqual([])
+    expect(removedKeyWarn(undefined)).toEqual([])
+    for (const locale of bundle.GROK_WORKFLOW_LOCALES) {
+      const dict = bundle.GROK_WORKFLOW_DICT[locale]!
+      expect(dict['warn.removed.title']!.length, locale).toBeGreaterThan(3)
+      expect(dict['warn.removed.detail']!.length, locale).toBeGreaterThan(3)
+    }
+    const sentence = (locale: string): string =>
+      bundle.GROK_WORKFLOW_INTERNALS.translate(locale, 'warn.removed.detail', { key: 'mode' })
+    expect(sentence('en')).not.toBe('warn.removed.detail')
+    expect(sentence('en')).toContain('mode')
+    expect(sentence('zh')).not.toBe('warn.removed.detail')
+    expect(sentence('zh')).toContain('mode')
+    expect(sentence('en')).not.toBe(sentence('zh'))
   })
 
   it('translates every key the page derives from data (fields, roles, groups)', () => {
