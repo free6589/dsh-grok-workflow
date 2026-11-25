@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.38] - 2026-11-25
+
 ### Changed / 变更
 
 - **An old key left in your profile no longer switches the workflow off / 档案里留着旧键，不再把工作流关掉** —
