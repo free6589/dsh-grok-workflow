@@ -100,17 +100,6 @@ export declare function refuseDiscardedCommandPrompt(arg: string): IntakeRefusal
  */
 export declare function isPromptShapedArgument(arg: string): boolean;
 /**
- * Classify one message against the intake budget.
- *
- * The two refusals this boundary owns: nothing to route, and a prompt over the
- * objective budget. A message that fits returns `undefined`, and the caller
- * routes it as before — the limit is a boundary, never a silent shortening.
- *
- * @param text - the message text the intake path is about to hand to the workflow.
- * @returns the refusal, or `undefined` when the prompt is within budget.
- */
-export declare function inspectPrompt(text: string): IntakeRefusal | undefined;
-/**
  * Assemble one task prompt from sections, and measure it against the budget.
  *
  * Rendering is deterministic and byte-stable: every section is a heading line

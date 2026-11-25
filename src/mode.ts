@@ -76,11 +76,6 @@ export function readModeRecord(session: Session | undefined): ModeRecord | undef
   return current
 }
 
-/** Whether grok mode is on, falling back when no record was written yet. */
-export function isModeEnabled(session: Session | undefined, fallback = false): boolean {
-  return readModeRecord(session)?.enabled ?? fallback
-}
-
 /** Outcome of one toggle write; `ok` is only ever reported for a readable record. */
 export interface SetModeResult {
   /** True when {@link readModeRecord} shows exactly the record that was asked for. */

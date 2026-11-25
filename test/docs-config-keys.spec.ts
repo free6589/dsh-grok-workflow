@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { load } from 'js-yaml'
 import { describe, expect, it } from 'vitest'
-import { CONFIG_KEYS, DEFAULT_TIMEOUT_MS, FIXED_HISTORY_CHARS, FIXED_HISTORY_TURNS, FIXED_MAX_ACTIVE_RUNS, FIXED_MAX_ACTIVE_RUNS_TOTAL, FIXED_MAX_QUEUED_MESSAGES, FIXED_MAX_RETRIES, FIXED_RECORD_LIMIT, REMOVED_CONFIG_KEYS, resolveConfig } from '../src/config.js'
+import { CONFIG_KEYS, DEFAULT_TIMEOUT_MS, FIXED_HISTORY_CHARS, FIXED_HISTORY_TURNS, FIXED_MAX_ACTIVE_RUNS, FIXED_MAX_ACTIVE_RUNS_TOTAL, FIXED_MAX_RETRIES, FIXED_RECORD_LIMIT, REMOVED_CONFIG_KEYS, resolveConfig } from '../src/config.js'
 
 /**
  * Configuration-surface docs guard (RSI round 3).
@@ -168,7 +168,6 @@ describe('both READMEs quote the fixed caps from the constants', () => {
       `maxActiveRunsTotal=${FIXED_MAX_ACTIVE_RUNS_TOTAL}`,
       `historyTurns=${FIXED_HISTORY_TURNS}`,
       `historyChars=${FIXED_HISTORY_CHARS}`,
-      `maxQueuedMessages=${FIXED_MAX_QUEUED_MESSAGES}`,
       `recordLimit=${FIXED_RECORD_LIMIT}`,
     ]
     for (const fact of facts) {

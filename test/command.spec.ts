@@ -23,7 +23,7 @@ import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import { grokCommand, GROK_USAGE_TEXT, registerGrokCommand } from '../src/command.js'
 import type { GrokCommandAgent, GrokCommandDefinition, GrokCommandResult } from '../src/command.js'
 import { apply } from '../src/index.js'
-import { isModeEnabled, readModeRecord, setMode } from '../src/mode.js'
+import { readModeRecord, setMode } from '../src/mode.js'
 import { isPromptShapedArgument } from '../src/intake.js'
 import { canAcceptBlock } from '../src/user-source.js'
 
@@ -81,29 +81,29 @@ describe('grok command handler (arg parsing → toggle state)', () => {
     const session = realSession('sess-cmd-empty')
     const result = invoke('', new FakeAgent(session))
     expect(result).toEqual({ kind: 'success', text: ON_TEXT })
-    expect(isModeEnabled(session)).toBe(true)
+    expect(readModeRecord(session)?.enabled).toBe(true)
   })
 
   it('enables the toggle for on (whitespace trimmed)', () => {
     const session = realSession('sess-cmd-on')
     const result = invoke('  on  ', new FakeAgent(session))
     expect(result).toEqual({ kind: 'success', text: ON_TEXT })
-    expect(isModeEnabled(session)).toBe(true)
+    expect(readModeRecord(session)?.enabled).toBe(true)
   })
 
   it('disables the toggle for off (whitespace trimmed)', () => {
     const session = realSession('sess-cmd-off')
     invoke('', new FakeAgent(session))
-    expect(isModeEnabled(session)).toBe(true)
+    expect(readModeRecord(session)?.enabled).toBe(true)
     const result = invoke('  off  ', new FakeAgent(session))
     expect(result).toEqual({ kind: 'success', text: OFF_TEXT })
-    expect(isModeEnabled(session)).toBe(false)
+    expect(readModeRecord(session)?.enabled).toBe(false)
   })
 
   it('leaves a fresh session off when off is the first command', () => {
     const session = realSession('sess-cmd-off-fresh')
     expect(invoke('off', new FakeAgent(session))).toEqual({ kind: 'success', text: OFF_TEXT })
-    expect(isModeEnabled(session)).toBe(false)
+    expect(readModeRecord(session)?.enabled).toBe(false)
   })
 
   it('returns a usage error and does not change the toggle for a bad arg', () => {
@@ -111,12 +111,12 @@ describe('grok command handler (arg parsing → toggle state)', () => {
     const on = realSession('sess-cmd-bad-on')
     setMode(on, { v: 1, enabled: true, turn: 1, setBy: 'command:/grok' })
     expect(invoke('maybe', new FakeAgent(on))).toEqual({ kind: 'error', text: GROK_USAGE_TEXT })
-    expect(isModeEnabled(on)).toBe(true)
+    expect(readModeRecord(on)?.enabled).toBe(true)
     // Toggle currently OFF: still untouched.
     const off = realSession('sess-cmd-bad-off')
     setMode(off, { v: 1, enabled: false, turn: 1, setBy: 'command:/grok off' })
     expect(invoke('on please', new FakeAgent(off))).toEqual({ kind: 'error', text: GROK_USAGE_TEXT })
-    expect(isModeEnabled(off)).toBe(false)
+    expect(readModeRecord(off)?.enabled).toBe(false)
     // Never written: a bad arg writes nothing at all.
     const fresh = realSession('sess-cmd-bad-fresh')
     expect(invoke('off now', new FakeAgent(fresh))).toEqual({ kind: 'error', text: GROK_USAGE_TEXT })
@@ -142,7 +142,7 @@ describe('grok command handler (case and whitespace tolerance)', () => {
     ON_VARIANTS.forEach((raw, index) => {
       const session = realSession(`sess-variant-on-${index}`)
       expect(invoke(raw, new FakeAgent(session)), `rawInput ${JSON.stringify(raw)}`).toEqual({ kind: 'success', text: ON_TEXT })
-      expect(isModeEnabled(session)).toBe(true)
+      expect(readModeRecord(session)?.enabled).toBe(true)
       expect(readModeRecord(session)?.setBy).toBe('command:/grok')
     })
   })
@@ -151,9 +151,9 @@ describe('grok command handler (case and whitespace tolerance)', () => {
     OFF_VARIANTS.forEach((raw, index) => {
       const session = realSession(`sess-variant-off-${index}`)
       invoke('on', new FakeAgent(session))
-      expect(isModeEnabled(session)).toBe(true)
+      expect(readModeRecord(session)?.enabled).toBe(true)
       expect(invoke(raw, new FakeAgent(session)), `rawInput ${JSON.stringify(raw)}`).toEqual({ kind: 'success', text: OFF_TEXT })
-      expect(isModeEnabled(session)).toBe(false)
+      expect(readModeRecord(session)?.enabled).toBe(false)
       expect(readModeRecord(session)?.setBy).toBe('command:/grok off')
     })
   })
@@ -165,7 +165,7 @@ describe('grok command handler (case and whitespace tolerance)', () => {
       const session = realSession(`sess-variant-bad-${raw.length}-${raw.charCodeAt(0)}`)
       invoke('on', new FakeAgent(session))
       expect(invoke(raw, new FakeAgent(session)), `rawInput ${JSON.stringify(raw)}`).toEqual({ kind: 'error', text: GROK_USAGE_TEXT })
-      expect(isModeEnabled(session)).toBe(true)
+      expect(readModeRecord(session)?.enabled).toBe(true)
     }
   })
 
@@ -282,7 +282,7 @@ describe('grok command handler (a write that does not land)', () => {
     const session = realSession('sess-cmd-stale')
     const agent = new FakeAgent(session)
     invoke('on', agent)
-    expect(isModeEnabled(session)).toBe(true)
+    expect(readModeRecord(session)?.enabled).toBe(true)
     // The log stops reflecting new writes: `/grok off` cannot land, so the
     // handler must report the state the readers still see (on), not "OFF".
     const staleLog = session.ownEvents()
@@ -333,7 +333,7 @@ describe('grok command handler (settled kind and text)', () => {
     expect(bad.text).toBe(GROK_USAGE_TEXT)
     // The grammar owns `on`/`off`/empty; anything else is usage — and the
     // toggle still reflects the last valid command (`on`).
-    expect(isModeEnabled(session)).toBe(true)
+    expect(readModeRecord(session)?.enabled).toBe(true)
   })
 })
 
@@ -440,7 +440,7 @@ describe('/grok registration (lazy commands mount)', () => {
     const session = realSession('sess-cmd-registered')
     expect(definition.handler({ agent: new FakeAgent(session), rawInput: '' }))
       .toEqual({ kind: 'success', text: ON_TEXT })
-    expect(isModeEnabled(session)).toBe(true)
+    expect(readModeRecord(session)?.enabled).toBe(true)
     await ctx.fiber.dispose()
   })
 

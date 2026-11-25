@@ -9,29 +9,8 @@
  */
 import type { Session } from '@deepseek-ai/dsh-session';
 import type { WorkflowAgentOutcome, WorkflowStopReason } from '@deepseek-ai/dsh-workflow';
-import type { UserMessage } from '@deepseek-ai/dsh-llm';
 import type { WorkflowLogger } from './run.js';
 import type { FinalStatus, RouteTrailEntry, RoleName, SynthesisMode } from './types.js';
-/** Record type owned by this plugin. */
-export declare const DELIVERY_RECORD = "plugin:grok-workflow/delivery";
-/** Phases a delivery passes through. */
-export type DeliveryPhase = 'started' | 'delivered' | 'failed';
-/** Payload stored for one gate delivery. */
-export interface DeliveryRecord {
-    /** Record schema version owned by this plugin. */
-    v: 1;
-    /** Deterministic delivery key; also the de-duplication identity. */
-    key: string;
-    /** Agent whose message batch was routed. */
-    agentId: string;
-    /** Clamped message ids of the claimed batch, in claim order. */
-    messageIds: string[];
-    phase: DeliveryPhase;
-    /** Turn that owned the claimed batch. */
-    turn: number;
-    /** Explicit outcome label for diagnostics (status or failure cause). */
-    outcome: string;
-}
 /**
  * Record type owned by this plugin: a turn terminal the transcript could not carry.
  *
@@ -203,40 +182,12 @@ declare module '@deepseek-ai/dsh-session' {
     interface PluginRecordMap {
         /** The model-route ledger written after a workflow run. */
         'plugin:grok-workflow/routing': RoutingRecord;
-        'plugin:grok-workflow/delivery': DeliveryRecord;
         /** One observation of this plugin being unloaded (t45, P0-1). */
         'plugin:grok-workflow/dispose': DisposeRecord;
         /** A turn terminal the transcript could not carry (no open step). */
         'plugin:grok-workflow/terminal': TerminalRecord;
     }
 }
-/**
- * Deterministic identity for one claimed batch.
- *
- * The key is derived from the agent and the exact claimed message ids, so a
- * replay of the same delivery (resume, fork, duplicate followup) recomputes the
- * same key without keeping any process-local state.
- */
-export declare function deliveryKey(agentId: string, messages: readonly Pick<UserMessage, 'id'>[]): string;
-/** Every delivery record this plugin committed to the session, oldest first. */
-export declare function readDeliveries(session: Session | undefined): DeliveryRecord[];
-/**
- * True when the batch was already routed by this plugin.
- *
- * `started` and `delivered` count: a run was launched for these exact messages,
- * so routing them again would start a second workflow for one user message.
- * `failed` does not count — a refusal that never launched a run (busy queue,
- * oversized message) must not become a permanent block on that message.
- */
-export declare function alreadyRouted(session: Session | undefined, key: string): boolean;
-/**
- * Append one delivery record.
- *
- * A record is durable plugin state, not a correctness dependency for the current
- * turn: when the session refuses the write we warn and continue, and the run
- * still happens (the gate never answers by itself).
- */
-export declare function recordDelivery(session: Session | undefined, record: DeliveryRecord, logger: WorkflowLogger): void;
 /**
  * Record the model-route ledger of one run.
  *
@@ -473,17 +424,6 @@ export declare function appendAssistantInStep(session: Session | undefined, text
  * @returns true when the record is in the session log.
  */
 export declare function recordTerminal(session: Session | undefined, text: string, logger: WorkflowLogger): boolean;
-/**
- * Append an instant team-tier receipt so the run never looks blank while in flight.
- *
- * The gate composes this row in `agent/pre-step`, which is dispatched *before* the
- * step begins, so in practice no step is open and the row is refused. The receipt
- * is kept as a call site (rather than deleted) because the step pairing — not the
- * wording — is what decides it: a runtime that dispatches the gate inside an open
- * step still gets the live row, and the progress panel is where a live row belongs
- * on a runtime that does not (pooled as follow-up work).
- */
-export declare function appendInstantReceipt(session: Session | undefined, text: string, logger: WorkflowLogger): boolean;
 /**
  * Write the one-shot interruption notice into the session whose run was cut.
  *

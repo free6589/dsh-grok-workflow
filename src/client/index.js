@@ -2513,7 +2513,7 @@ window.__ModuleLoader__.load({
      * `检查` / `汇总` (`phaseLabel`: plan, execute, verify, synthesize) —
      * plus the plan tasks the engine announces as `任务 n · 标题` (`taskGroupTitle`), which
      * are appended between `执行` and `检查` because that is where the workers run.
-     * The final answer is relayed in the turn's own message (`relayText`),
+     * The final answer is relayed in the turn's own message,
      * never as a workflow child call, so no `回答` event can ever reach this track —
      * the spine does not list a stage no event can fill.
      *
