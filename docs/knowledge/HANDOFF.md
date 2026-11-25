@@ -24,7 +24,9 @@
      建议甲：界面不说谎、不动准入语义，但要改用户可见的默认显示，得有决定号。
 - **下一步（按顺序）**：
   1. **拍板红二**（甲还是乙），定了之后按正常流程开分支改。
-  2. 收 `fix/grok-command-text`（改话术 + 守卫测试 + `[Unreleased]` 中英条目 + `npm run ci` exit 0），验过再合。
+  2. 收 `fix/grok-command-text`（`5c120b1` 改话术 + 守卫测试 + `[Unreleased]` 中英条目 + `lib/` 重建，`78c9091` 证据；
+     `npm run ci` 在 `78c9091` 上 **EXIT=0**、`98 files / 1839 tests`、`15 warnings / 0 errors`，`lib/` 逐字节一致——这些是它
+     跑的，我另外自己重跑了 `test/command.spec.ts`（`27 passed`）与 `scripts/verify-lib.mjs`（`byte-identical`））。验过再合。
   3. **操作者自己那一手还没做**：live 档案删 `mode:` 与 `legacyGate:` 两行 → 装 `v0.13.36` → 读回版本（顺序不能反）。
 - **三件会踩的事**：
   1. **隔离 home 没有 `AGENT2API_API_KEY`**：live 档案的 worker/verifier/supervisor/guardian 全指着 `agent2api`，

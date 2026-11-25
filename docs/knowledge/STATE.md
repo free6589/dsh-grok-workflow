@@ -3454,3 +3454,13 @@ headless 没把聊天面板点出来，0 console errors 是唯一读数）、默
 本进程对它只读（EROFS），成因 `HYPOTHESIS`（别的东西的临时条目），没有查到底；未 push、未打 tag、未发版、未合流，
 `package.json` 仍 `0.13.36`，`src/` `test/` `lib/` 一个字未改。证据 `.rsi/evidence/user-regression-2026-11-26/README.md`。
 红一另开分支 `fix/grok-command-text` 修，不混进本分支。）
+
+补记（2026-11-26 13:30，`CONFIRMED`）：**红一已经修好了，在另一条分支上。** `fix/grok-command-text`（worktree
+`.agents/worktrees/fix/command-text`，基线 `6e9bc56`）两个提交 `5c120b1`（fix，9 文件 / +24 −15，含 `lib/command.js`
+重建）+ `78c9091`（只加证据）。新话两句：`Grok workflow ON — the model may commission reviewed blocks of work in this
+session. Messages themselves are not turned into a workflow.`；`/grok off` 的答案、记录形状、路由、接单台准入都没动。
+**我自己复核过的**：`npx vitest run test/command.spec.ts` → `27 passed (27)`；`node scripts/verify-lib.mjs` →
+`lib/ at 78c9091 is the build of src/ at 78c9091 (281 files, byte-identical)`；全量门禁是它跑的 `npm run ci` **EXIT=0**
+（`98 files / 1839 tests`、`15 warnings / 0 errors`）。它顺手把两个 README 里「`grokDefault: on` 认领每条用户消息」改成实话
+（`on` 只是没有记录时会话报出来的回退值，本身不让接单台接活）——**这句改动把红二的矛盾写实了，而准入规则没动**。
+红二没修：开关认部署默认、接单台只认会话记录，两处设计撞在一起，修哪个都改用户可见行为，要决定号。
