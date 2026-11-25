@@ -1,0 +1,30 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-replan-shape
+
+(node:100) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/planner-resubmit.spec.ts (10 tests) 3218ms
+     ✓ re-fires on a route this call has not paid when the planner hangs  1010ms
+     ✓ does not re-wait a hung route when the chain has nothing else to try  1014ms
+     ✓ keeps a recovered leg inside the walks the cap pays for  1012ms
+ ✓ test/block-tools.spec.ts (23 tests) 3060ms
+     ✓ returns the same verdict for the same evidence instead of a second line  323ms
+     ✓ judges by default when the row carries no switch at all  350ms
+(node:126) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ test/naming-sequence.spec.ts (6 tests) 271ms
+ ✓ test/replan.spec.ts (24 tests) 169ms
+ ✓ test/report-audit.spec.ts (13 tests) 157ms
+ ✓ test/steering-inbox.spec.ts (14 tests) 138ms
+(node:168) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGTERM listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:168) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGINT listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:168) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 SIGHUP listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+ ✓ test/composition.spec.ts (8 tests) 49ms
+
+ Test Files  7 passed (7)
+      Tests  98 passed (98)
+   Start at  03:21:05
+   Duration  9.65s (transform 900ms, setup 0ms, import 1.68s, tests 7.06s, environment 1ms)
+
+SPECS_EXIT=0

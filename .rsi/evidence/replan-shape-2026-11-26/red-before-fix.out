@@ -1,0 +1,94 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-replan-shape
+
+ ❯ test/replan.spec.ts (24 tests | 3 failed) 177ms
+     ✓ adds a task as its own wave and keeps the plan version moving 3ms
+     ✓ updates and removes only unstarted tasks 1ms
+     ✓ refuses to touch a settled task, naming why 0ms
+     ✓ refuses to touch a running task: in-flight work continues 0ms
+     ✓ refuses a stale version instead of merging into the wrong plan 0ms
+     ✓ re-orders the remaining waves when the boundary says so 0ms
+     ✓ refuses an order that drops or invents a task 0ms
+     ✓ refuses a dependency that points at the same or a later wave 0ms
+     ✓ keeps the wave ceiling and the task ceiling enforced 0ms
+     ✓ emits the guest source and evaluates it to the same function 0ms
+     × reads a task body written beside "action" (a live boundary wrote one there) 6ms
+     ✓ hands every queued demand to the pull tool once 1ms
+     ✓ drops the oldest demand past the queue bound and counts it 0ms
+     ✓ answers an unknown token with an empty list instead of failing 0ms
+     ✓ closes the session channel with the run 0ms
+     ✓ closes only its own token, so an older run cannot unsteer a newer one 0ms
+     ✓ runs the merged task in the next wave and never re-runs settled work 68ms
+     ✓ continues on the old plan when the merge is refused, and says why 4ms
+     ✓ stays completely inert when the run carries no replan channel 3ms
+     × lifts a task body written beside "action" and runs the added task 4ms
+     × refuses the same answer for the content it never wrote, not for where it wrote it 4ms
+     ✓ hands the boundary planner the live token, then closes the queue with the run 72ms
+     ✓ keeps the payload byte-identical for a caller that asks for no channel 3ms
+     ✓ opens nothing when the live replan switch is off, even with a session named 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/replan.spec.ts > merge API: what a boundary may change > reads a task body written beside "action" (a live boundary wrote one there)
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/replan.spec.ts:209:24
+    207|     } as ReplanEdit & Record<string, unknown>
+    208|     const outcome = mergeReplan(state(), { version: 2, edits: [flat] })
+    209|     expect(outcome.ok).toBe(true)
+       |                        ^
+    210|     if (!outcome.ok) return
+    211|     expect(outcome.addedTaskIds).toEqual(['task-4'])
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  test/replan.spec.ts > script: a demand merged at a wave boundary does not restart the round > lifts a task body written beside "action" and runs the added task
+AssertionError: expected 1 to be 2 // Object.is equality
+
+- Expected
++ Received
+
+- 2
++ 1
+
+ ❯ test/replan.spec.ts:394:37
+    392|       ),
+    393|     )
+    394|     expect(run.report.plan.version).toBe(2)
+       |                                     ^
+    395|     expect(run.report.plan.replans?.[0]?.decision).toBe('applied')
+    396|     expect(run.report.plan.replans?.[0]?.addedTaskIds).toEqual(['task-…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  test/replan.spec.ts > script: a demand merged at a wave boundary does not restart the round > refuses the same answer for the content it never wrote, not for where it wrote it
+AssertionError: expected 'replan edit 1 adds a task with no body' not to match /no body/
+
+- Expected:
+/no body/
+
++ Received:
+"replan edit 1 adds a task with no body"
+
+ ❯ test/replan.spec.ts:423:34
+    421|     // The nesting was tolerated (no "no body"), and the refusal names…
+    422|     // missing: a task with no expected output and no criterion cannot…
+    423|     expect(decision?.reason).not.toMatch(/no body/)
+       |                                  ^
+    424|     expect(decision?.reason).toMatch(/missing or unusable: expectedOut…
+    425|     expect(run.report.status).toBe('completed')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 21 passed (24)
+   Start at  03:05:16
+   Duration  1.06s (transform 658ms, setup 0ms, import 762ms, tests 177ms, environment 0ms)
+

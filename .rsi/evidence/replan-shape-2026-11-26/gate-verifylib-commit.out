@@ -1,0 +1,3 @@
+client bundle: 348559 bytes → lib/client.js
+lib/ at 38d64bb is the build of src/ at 38d64bb (289 files, byte-identical)
+VERIFY_EXIT=0

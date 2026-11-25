@@ -1,3 +1,35 @@
+## 2026-11-26 — `fix/replan-shape`：边界子的请求单修好了——字段写在 `action` 旁边会被提到 `task` 里、缺字段照旧拒并点名；真机上 `plan.version` 1 → 2、`addedTaskIds` 含 `task-4`、`task-4` 真的跑完并验过；未合 `main`、未 push、未发版
+
+- **From:** 包工头（`agent-187`）· **To:** 下一个接手者
+- **这一轮是什么**：`D-162` 那一轮证明了投递链通了、合并没成。读数说得很清楚：边界子把任务字段写在编辑层、没写 `task` 体、
+  缺 `expectedOutput` 与 `acceptanceCriteria`、依赖还指向自己编的 `changelog_count`。本轮按那三条各修一处，
+  **不再猜**：形状写进 schema、嵌套层级两种都读、内容缺口照旧拒但点名。
+- **身份**：分支 **`fix/replan-shape`**，从 `main` 尖端 **`26b4bdd`** 开出（worktree `.tmp/wt-replan-shape`）。
+  改动面：`src/script.ts`（`REPLAN_SCHEMA` 三分支 `oneOf` + 字段说明、`replanEditBody()` / `replanMissingFields()`、
+  提示词两条规则 + 一条完整例子、重投提示一句）、`src/replan.ts`（合并器 `editBody()` 同容忍）、`test/replan.spec.ts` 21 → 24、
+  重建 `lib/`、`CHANGELOG` 的 `[Unreleased]` 一条、`D-163`、`RESEARCH.md` 一条、本轮的 `STATE` / `VALIDATION` / `HANDOFF` 与证据目录。
+  **没有动 `run.ts` / `steering*.ts` / 配置键 / 浏览器包**（`client bundle` 与基线同值 348559）。
+- **真机读数（`CONFIRMED`，`soak/boundary-chain.txt`）**：边界子这一次的 `structured_output` 是
+  `{"action":"apply","edits":[{"action":"add","task":{"id":"task-4",…,"dependsOn":["count-changelog"]}}]}` ——
+  体在 `task` 里、五个必填字段齐、依赖是计划里真有的 id；下一道边界子的提示词读作 `CURRENT PLAN VERSION: 2`
+  且 `wave 4` 出现 `task-4`；报告 `4 task(s); 4 verified`、`Wave 4/4: - task-4: verified (1 attempt)`。
+  **判据全中**：`plan.version = 2`、`addedTaskIds` 含 `task-4`。
+- **块内门禁**：`tsc` 0、`oxlint 15/0/184 files`、定向 7 份 spec **98 passed**、六份文档守卫 **82 passed**、
+  `npm run build` 348559 字节；红：`git stash push -- src` → **`3 failed / 21 passed`**；全量 `npm run ci` `NOT_RUN`。
+- **下一个人的四条**：① **`SETTLED TASKS` 那几行在真机提示词里读作 `- count-agents [undefined] `**（`statuses` 是
+  `Record<id, status>`，而 `replanPrompt` 按 `row.status` / `row.task.title` 读）——与本轮无关、本轮没修，
+  影响是边界子看不到已沉淀任务的状态与标题；要么改那行读取、要么把整行传进去，**这是一件独立的小活**。
+  ② 合并被拒之后**不会重投**（只有「没有结构化结果」才重投，不花重试额度）；要不要给合并拒绝也补一次同边界重投，是
+  要不要多花一次子调用的取舍，`D-163` 的 rejected 里写了理由。 ③ schema 里**不能写 `maxItems` / `anyOf` / `pattern`**
+  ——宿主只认 `type/oneOf/properties/required/additionalProperties/items/enum/const` ＋注解，写错会让整条边界变成
+  设置故障（子代理根本不起）；梗概见 `RESEARCH.md` 同日条目。 ④ 隔离档案里装包仍然是**先 `remove` 再 `add`**，
+  同版本 `file:` tgz 直接再 `add` 会被 pnpm 复用上一次的解包；本轮 `remove` 因为本来没装而报错，无害。
+- **清理（已做完）**：scratch `.tmp/soak`（**273 MB**：档案克隆 + tgz + chromium 用户目录 + npm cache）、`.tmp/probe`、
+  `.tmp/npm-cache`、`.tmp/npm-logs` 全部 `rm -rf`，`/tmp` 那份临时 `script.js` 也删了；worktree 与其 `node_modules` 留着
+  （分支未合，下一个接手者可能还要在这上面动）。
+
+---
+
 ## 2026-11-26 — `0.13.42` 已发布并收口：跑中插话（`feat/inbox-steering` 的那个功能）随版发出，发布提交 `651f3dd` 只抬版本字面量、门禁 `103 files / 1941 tests` 自带 `GATE_EXIT=0`、`main` 快进、附注标签、两个远端 run 与 Release 资产都在；**live 档案升级仍 `BLOCKED`（live 还停在 `0.13.39`，而且那一行是浮动的）**，**本地 `release/0.13.42` 已 `-d` 删除、两处空 worktree 目录已 `rmdir`**
 
 - **From:** 包工头（`agent-185` 派下的记忆收口轮）· **To:** 下一个接手者 / 能在本机写 `~/.dsh` 的人

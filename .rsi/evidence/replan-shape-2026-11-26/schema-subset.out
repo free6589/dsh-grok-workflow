@@ -1,0 +1,7 @@
+SCHEMA_SUBSET_OK; oneOf branches = 3
+EDIT_KEYS = type,additionalProperties,description,required,properties | type,additionalProperties,description,required,properties | type,additionalProperties,description,required,properties
+ADD_REQUIRED = ["action","task"] TASK_REQUIRED = ["id","title","objective","expectedOutput","acceptanceCriteria"]
+--- prompt rules/example present:
+- Every task field goes INSIDE "task": {"action":"add","task":{"id":"task-4","title":"...","objective":"...","expectedOutput":"...","acceptanceCriteria":["..."]}}. A body written beside "action" is li
+- "dependsOn" names task ids exactly as printed in this prompt (task-2, task-3) or ids of settled tasks — never a title, a nickname or an id the plan does not have: an unknown id is refused and the pl
+EXAMPLE (the demand is "also report the difference between the two line counts", the plan is version 1, task-1 has settled, task-2 and task-3 have not started in waves 2 and 3):
