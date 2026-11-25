@@ -315,7 +315,9 @@ describe('chat task list: wording and disclosure', () => {
     const expected: Record<string, string> = {
       running: '--dsw-alias-state-business-primary',
       completed: '--dsw-alias-state-success-primary',
-      failed: '--dsw-alias-state-error-primary',
+      // Amber, not red: the task card speaks the progress page's vocabulary (§19.2 /
+      // §19.6), where red never means "this task did not pass".
+      failed: '--dsw-alias-state-warn-primary',
       cancelled: '--dsw-alias-state-warn-primary',
       interrupted: '--dsw-alias-state-warn-primary',
     }

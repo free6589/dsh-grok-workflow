@@ -132,10 +132,13 @@ function spoken(node: unknown, out: string[] = []): string[] {
 /**
  * The wording family this page must not carry, one entry per form the rule names.
  *
- * The patterns are deliberately about *change promised after the fact*: a present-tense
- * reading of what a number counts, a slot that has not run yet, or a run that reported
- * nothing are different sentences and must stay allowed — deleting those would trade one
- * silence for another.
+ * The first seven patterns are about *change promised after the fact*. The last three are
+ * the other half of the same rule, added by the one-page redesign (§19.3): a gloss that
+ * tells the reader what a number or a gap *means* ("this is not a task verdict", "not
+ * reported in the events", "the state is derived") is an explanation standing where the
+ * figure should speak. A state word, a grey segment, or the amber bar says those things
+ * without a sentence, so the sentences went. What stays allowed is copy that *names* a
+ * state (`没过`, `取消`, `这一轮没有交卷稿`): naming is not explaining.
  */
 const FAMILY: ReadonlyArray<{ form: string, pattern: RegExp }> = [
   {
@@ -165,6 +168,23 @@ const FAMILY: ReadonlyArray<{ form: string, pattern: RegExp }> = [
   {
     form: 'the English equivalents',
     pattern: /(?:may|might|could|will)\s+(?:still\s+)?(?:change|vary|adjust|update|differ)|subject to change|for reference only|final results? (?:may|might) differ/,
+  },
+  // The one-page redesign (§19.3) deleted the explanation families below. They are read
+  // here as well as in `test/i18n-parity.spec.ts` because a *reading* of the figure is a
+  // sentence about the page, not a word of it: "this is not a task verdict" and "not
+  // reported in the events" both told the reader what to make of a number or a gap
+  // instead of letting the mark say it.
+  {
+    form: 'a count glossed as a verdict',
+    pattern: /(?:不是|并不代表|不等于|不代表)[^。；\n]{0,10}(?:任务通过|通过率|通过数)|not a task verdict|isn['’]?t a task verdict/iu,
+  },
+  {
+    form: 'a gap narrated as missing evidence',
+    pattern: /事件中没有报告|not reported in the events/iu,
+  },
+  {
+    form: 'a derived state explained instead of shown',
+    pattern: /状态是推导出来的|推导出来的，不是事件里写的|按阻塞显示|the state is derived|shown as blocked/iu,
   },
 ]
 
@@ -266,9 +286,16 @@ describe('progress page: the change explanation stays deleted', () => {
     expect(cardNames(before)).toEqual(['任务 1 · 搭建', '任务 2 · 收尾'])
     expect(cardNames(after)).toEqual(['任务 1 · 收尾', '任务 2 · 搭建'])
     // The only words that changed are the plan's own task names: no sentence arrived to
-    // explain the swap, and none left a "before → after" trace behind.
-    expect(addedText(visible(after), visible(before)).sort()).toEqual(['任务 1 · 收尾', '任务 2 · 搭建'].sort())
-    expect(addedText(visible(before), visible(after)).sort()).toEqual(['任务 1 · 搭建', '任务 2 · 收尾'].sort())
+    // explain the swap, and none left a "before → after" trace behind. Each changed name
+    // appears exactly **twice**, because the one-page redesign draws a task's title on two
+    // faces — one line in the step list, one line in 「经过」 (`ProgressPlan` and
+    // `ProgressLog`). The count is the guard: a third copy, a duplicate line, or any
+    // sentence about the re-plan still fails here, and so does a face that silently stops
+    // printing the title.
+    expect(addedText(visible(after), visible(before)).sort())
+      .toEqual(['任务 1 · 收尾', '任务 1 · 收尾', '任务 2 · 搭建', '任务 2 · 搭建'].sort())
+    expect(addedText(visible(before), visible(after)).sort())
+      .toEqual(['任务 1 · 搭建', '任务 1 · 搭建', '任务 2 · 收尾', '任务 2 · 收尾'].sort())
     expect([...visible(after), ...spoken(after)].filter((text) => forms(text).length > 0)).toEqual([])
   })
 

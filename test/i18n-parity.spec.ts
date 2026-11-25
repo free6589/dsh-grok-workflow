@@ -24,13 +24,7 @@ type Dicts = { zh: Dict, en: Dict }
 const PANEL_SCOPE_KEYS = ['member.empty', 'member.open', 'phase.empty', 'phase.unassigned', 'run.empty']
 
 /** Load the bundle the way the host does, with a stub React. */
-function loadBundle(): {
-  dict: Dicts
-  panel: Dicts
-  stages: string[]
-  stateKeys: string[]
-  detailFields: string[]
-} {
+function loadBundle(): { dict: Dicts, panel: Dicts } {
   let registration: { id: string, factory: (require: (id: string) => unknown) => Record<string, any> } | undefined
   const record = globalThis as unknown as { window?: { __ModuleLoader__?: { load(spec: never): void } } | undefined }
   const previous = record.window
@@ -49,13 +43,9 @@ function loadBundle(): {
     useSyncExternalStore: () => undefined,
   }
   const bundle = registration!.factory(() => react) as Record<string, any>
-  const progress = bundle['GROK_WORKFLOW_PROGRESS']
   return {
     dict: bundle['GROK_WORKFLOW_DICT'],
     panel: bundle['GROK_WORKFLOW_PANEL'].DICT,
-    stages: progress.stages.map((stage: { key: string }) => stage.key),
-    stateKeys: Object.values(progress.stateKey) as string[],
-    detailFields: progress.detailFields as string[],
   }
 }
 
@@ -66,6 +56,136 @@ function asymmetric(left: Dict, right: Dict): { leftOnly: string[], rightOnly: s
     rightOnly: Object.keys(right).filter((key) => !(key in left)).sort(),
   }
 }
+
+/**
+ * The one-page redesign's copy contract (`DESIGN-progress-tab.md` §19.3), key by key.
+ *
+ * The values are asserted verbatim, not just for presence: a key that exists with the
+ * wrong words is the same defect as a missing one — the page would say something nobody
+ * agreed to, in the language the operator reads.
+ */
+const REDESIGN_COPY: ReadonlyArray<readonly [key: string, zh: string, en: string]> = [
+  ['progress.chip.waiting', '等你点头', 'Waiting for you'],
+  ['progress.chip.running', '进行中', 'Running'],
+  ['progress.chip.done', '已完成', 'Done'],
+  ['progress.chip.failed', '未通过', 'Not passed'],
+  ['progress.chip.cancelled', '已取消', 'Cancelled'],
+  ['progress.now.label', '现在', 'Now'],
+  ['progress.now.planning', '正在拆活', 'Planning'],
+  ['progress.now.done', '做好了', 'Done'],
+  ['progress.now.suffix', '正在看', 'is checking'],
+  ['progress.now.allPassed', '{total} 步全过', 'All {total} steps passed'],
+  ['progress.now.step', '第 {at} 步，共 {total} 步', 'Step {at} of {total}'],
+  ['progress.steps.aria', '进度：第 {at} 步，共 {total} 步', 'Progress: step {at} of {total}'],
+  ['progress.flag.retrying', '第 {n} 遍没过，正在重看', 'Attempt {n} failed, rechecking'],
+  ['progress.flag.failed', '第 {n} 遍没过', 'Attempt {n} failed'],
+  ['progress.rest', '后面还有：{list}', 'Still to come: {list}'],
+  ['progress.plan.title', '要干的 {count} 件事', '{count} things to do'],
+  ['progress.plan.waiting', '等着', 'Waiting'],
+  ['progress.plan.running', '在做', 'Doing'],
+  ['progress.plan.done', '过了', 'Passed'],
+  ['progress.plan.failed', '没过', 'Not passed'],
+  ['progress.plan.cancelled', '没做', 'Cancelled'],
+  ['progress.log.title', '经过', 'History'],
+  ['progress.log.done', '做完', 'Did it'],
+  ['progress.log.passed', '过了', 'Passed'],
+  ['progress.log.reviewed', '通过', 'Approved'],
+  ['progress.log.running', '正在看', 'Checking'],
+  ['progress.log.failed', '没过', 'Not passed'],
+  ['progress.log.shipped', '交卷', 'Shipped'],
+  ['progress.log.cancelled', '取消', 'Cancelled'],
+  ['progress.final.title', '交卷', 'Handed in'],
+  ['progress.final.mark', '（定稿）', '(final)'],
+  ['progress.final.missing', '这一轮没有交卷稿', 'This run handed in no draft'],
+  ['progress.dock.start', '开工', 'Start'],
+  ['progress.dock.accept', '收下这版', 'Accept this version'],
+  ['progress.dock.hintStart', '要改就说一声，我重拆', "Say what to change and I'll re-plan"],
+  ['progress.dock.hintAccept', '不满意就说，我重做', "Say what's off and I'll redo it"],
+  ['progress.dock.quiet', '不用你说话，好了叫你', "Nothing needed from you; I'll call you"],
+  ['progress.dock.fill', '确认', 'yes'],
+  ['progress.dock.filled', '已填进输入框，按发送', 'Filled the box; press send'],
+]
+
+/**
+ * The keys §19.3 deletes, with the spellings of every wildcard expanded.
+ *
+ * Deleting a *family* is the point: `progress.stage.*` and `progress.state.*` were the
+ * spine's and the aggregate's words, and the spine left the page. A single survivor would
+ * be a slot reserved for a sentence the page no longer says, so both tables must lose all
+ * of them, and the prefix check below catches a clever rename that the list would miss.
+ */
+const REDESIGN_DELETED: readonly string[] = [
+  'progress.title',
+  'progress.aria',
+  'progress.percent',
+  'progress.percentHint',
+  'progress.unsettled',
+  'progress.stage.start',
+  'progress.stage.plan',
+  'progress.stage.execute',
+  'progress.stage.verify',
+  'progress.stage.synthesize',
+  'progress.stage.end',
+  'progress.extraHint',
+  'progress.state.pending',
+  'progress.state.doing',
+  'progress.state.done',
+  'progress.state.blocked',
+  'progress.state.cancelled',
+  'progress.state.failed',
+  'progress.derived.runEndedUnsettled',
+  'progress.derived.outcomeUnsettled',
+  'progress.notReported',
+  'progress.empty.body',
+  'progress.settle.aria',
+  'progress.settle.ok',
+  'progress.settle.bad',
+  'progress.settle.retried',
+  'progress.settle.warn',
+  'progress.settle.open',
+  'progress.settle.unsettled',
+  'progress.tasks.aria',
+  'progress.branch.settledOf',
+  'progress.branch.running',
+  'progress.branch.failedCount',
+  'progress.branch.evidenceRows',
+  'progress.evidenceHint',
+  'progress.chain.pendingHint',
+  'progress.source.stageDetail',
+  'progress.source.coordination',
+  'progress.source.notReported',
+  'progress.field.workCommit',
+  'progress.field.changes',
+  'progress.field.testsRun',
+  'progress.field.results',
+  'progress.field.localRuntimeVerified',
+  'progress.field.blockers',
+  'progress.field.nextAction',
+]
+
+/** The namespaces §19.3 deletes whole; no key may carry one of these prefixes. */
+const REDESIGN_DELETED_PREFIXES = [
+  'progress.stage.',
+  'progress.state.',
+  'progress.settle.',
+  'progress.source.',
+  'progress.field.',
+  'progress.branch.',
+  'progress.derived.',
+]
+
+/** The copy the redesign keeps, because the row capsule, the chain and the guardian stay. */
+const REDESIGN_KEPT: readonly string[] = [
+  'progress.empty.title',
+  'progress.member.open',
+  'progress.chain.execute',
+  'progress.chain.check',
+  'progress.chain.review',
+  'progress.unphased',
+  'progress.guardian.title',
+  'progress.guardian.active',
+  'progress.guardian.budget',
+]
 
 const bundle = loadBundle()
 
@@ -153,24 +273,46 @@ describe('client i18n: both locales carry every key the UI asks for', () => {
   })
 
   it('resolves every dynamic expansion the bundle can produce, in the table that consumes it', () => {
+    // The role words are the one family still built by concatenation (`role.${role}`);
+    // the spine's stage words, the aggregate's state words, the detail ladder's source
+    // and field keys and the two derived-state sentences all left with the spine and the
+    // detail card (§19.3), so demanding them here would demand copy the page deleted.
     const roles = ['planner', 'worker', 'verifier', 'supervisor', 'synthesizer']
-    const reasons = ['runEndedUnsettled', 'outcomeUnsettled']
-    const sources = ['notReported', 'stageDetail', 'coordination']
-    const pluginKeys = [
-      ...bundle.stages.map((key) => `progress.stage.${key}`),
-      ...bundle.stateKeys,
-      ...bundle.detailFields.map((key) => `progress.field.${key}`),
-      ...roles.map((role) => `role.${role}`),
-      ...reasons.map((reason) => `progress.derived.${reason}`),
-      ...sources.map((source) => `progress.source.${source}`),
-    ]
-    expect(bundle.stages.length).toBeGreaterThan(0)
-    expect(pluginKeys.length).toBeGreaterThan(20)
+    const pluginKeys = roles.map((role) => `role.${role}`)
+    expect(pluginKeys.length).toBeGreaterThan(4)
     const missing = pluginKeys.filter((key) => !(key in bundle.dict.zh) || !(key in bundle.dict.en))
     expect(missing).toEqual([])
 
     const panelKeys = ['running', 'completed', 'failed', 'cancelled', 'interrupted', 'unknown']
       .flatMap((status) => [`status.${status}`, `statusCount.${status}`])
     expect(panelKeys.filter((key) => !(key in bundle.panel.zh) || !(key in bundle.panel.en))).toEqual([])
+  })
+
+  it('carries every redesign key, word for word, in both languages', () => {
+    // The table is the contract (§19.3): a missing key renders as a bare identifier and a
+    // mistranslated one renders as a sentence nobody agreed to. Both are failures here.
+    expect(REDESIGN_COPY.length).toBeGreaterThanOrEqual(30)
+    for (const [key, zh, en] of REDESIGN_COPY) {
+      expect(bundle.dict.zh[key], `zh ${key}`).toBe(zh)
+      expect(bundle.dict.en[key], `en ${key}`).toBe(en)
+    }
+  })
+
+  it('deletes the whole removed family from both tables, and keeps the survivors', () => {
+    for (const key of REDESIGN_DELETED) {
+      expect(key in bundle.dict.zh, `zh ${key}`).toBe(false)
+      expect(key in bundle.dict.en, `en ${key}`).toBe(false)
+    }
+    // A family deleted wholesale may not leave a survivor under a new name: the prefix
+    // check is what catches a key the explicit list did not think of.
+    for (const prefix of REDESIGN_DELETED_PREFIXES) {
+      expect(Object.keys(bundle.dict.zh).filter((key) => key.startsWith(prefix)), prefix).toEqual([])
+      expect(Object.keys(bundle.dict.en).filter((key) => key.startsWith(prefix)), prefix).toEqual([])
+    }
+    // A deletion that took a survivor with it fails here, not on screen.
+    for (const key of REDESIGN_KEPT) {
+      expect(key in bundle.dict.zh, `zh ${key}`).toBe(true)
+      expect(key in bundle.dict.en, `en ${key}`).toBe(true)
+    }
   })
 })
