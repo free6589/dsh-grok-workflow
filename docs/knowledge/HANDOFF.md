@@ -1,4 +1,30 @@
-## 2026-11-26 — 用户视角回归跑完（隔离 fork + 已发布 `v0.13.36`）：**六项里五项通、两项红**，红一已另开分支修，红二等你拍板
+## 2026-11-25 — 设置页与 `/grok on` 的文案改说实话（`fix/settings-copy`，`05f9e2b`）：**改的是话，不是行为**；还欠着五处「总开关」旧账，都记在下面
+
+- **From:** 文案块（`agent-160` 派发的 `copy-hand`）· **To:** 操作者 / 下一个接手者
+- **这一轮是什么**：分支 `fix/settings-copy`（worktree `.worktrees/fix-settings-copy`，基线 `main` 尖端 `50dad03`），
+  一个产品提交 **`05f9e2b`**，其后一个只放证据与记忆的提交。行为零变化：`/grok off` 的答案、记录形状、读回检查**一字未改**；
+  `/grok on` 的启用分支仍是纯字符串、没有新增任何 config 读取。改的是：EN/ZH 五处文案 + 三处注释、`/grok on` 回执一句、
+  两个 README 的设置页段落、三个守卫 spec 与 `ON_TEXT`、重建的 `lib/client.js` 与 `lib/command.*`。
+- **现在页面上说的是什么**：第 1 组叫「会话默认」，字段叫「没打 `/grok` 时的默认」，状态行「开：没打过 `/grok` 的会话报这个」，
+  副行「只是报出来的默认值：要在这个会话里开可复核的块，还得这个会话自己打一句 `/grok`」；`/grok on` 回执补了
+  `as long as the block intake is switched on`；两个 README 删掉 `auto`/`full`，改成页面真实渲染的五组。
+- **门禁读数**：`TMPDIR=$PWD/.tmp npm run ci` → **EXIT=0**（`98 files / 1841 tests`、`15 warnings / 0 errors`、
+  `lib/ at 05f9e2b is the build of src/ at 05f9e2b (281 files, byte-identical)`、`lib/client.js` 329354 → **330313** 字节）。
+- **真机读数**：隔离克隆 live `web` 档案、自有端口 **3321**、同一个 headless 浏览器把前后两版逐字对读（改前
+  `开着：工作流工具可用` / 改后 `开：没打过 /grok 的会话报这个`），0 console errors。`/grok on` 回执在 GUI 里 **`NOT_RUN`**。
+  逐条见 `VALIDATION.md` 同日条与 `.rsi/evidence/settings-copy-2026-11-25/`。
+- **下一个接手的人必须知道**：`grokDefault` 只决定「没有 `/grok` 记录的会话**报什么**」，**从不接活**；能不能开可复核的块
+  读的是那个会话自己的记录（`canAcceptBlock()`，`src/user-source.ts`）加载入期 `blockIntake`。所以任何「开关一开就……」
+  的文案都是假话——改文案之前先读这两处。**红线**：`~/.dsh` 与 `~/.dsh/profiles` mtime 前后同值（2026-11-22 23:40:20 /
+  16:59:46）、写探针 `Read-only file system`、3080 → 401；未 push、未打 tag、未 bump、未 publish。
+- **这一轮看到、按分工故意没改的（逐条，都是观察，不是待修清单的承诺）**：
+  1. `src/client/index.js` 的 FIELDS 注释（`// Total switch (mock “总开关”) …`）仍把这颗开关叫 total switch。
+  2. `src/index.ts:391`、`src/mode-surface.ts:2`、`test/command.spec.ts` 的散文里仍写 “master switch”。
+  3. `page.intro` 与 `group.limits`（“How much effort” / “下多大力气”）还在用「下多大力气」的框。
+  4. `switchOnRateLimit` 仍有文案与 schema 行，但页面上**渲染不出来**（14 个声明字段里唯一没有控件的一个）。
+  5. `docs/knowledge/STATE.md` 里 2026-11-25 13:30 那条补记逐字引的是**上一版** `/grok on` 回执，现在缺了新的限定语。
+
+## 2026-11-25 — 用户视角回归跑完（隔离 fork + 已发布 `v0.13.36`）：**六项里五项通、两项红**，红一已另开分支修，红二等你拍板
 
 - **From:** 用户回归包工头（`agent-157`）· **To:** 操作者 / 下一个接手者
 - **这一轮是什么**：分支 `fix/user-regression`（worktree `.agents/worktrees/fix/user-regression`，基线 `main` 尖端 `6e9bc56`），
@@ -37,7 +63,7 @@
   3. **`~/.serena` 在本沙箱只读**，`serena` MCP 会报 `OSError: [Errno 30]`，与本轮结论无关，别当缺陷查。
 - **没跑的（`NOT_RUN`）**：真浏览器点那颗开关按钮（fork 的 web 落「生图」面板、隔离 home 的会话树在 UI 里是空的）、
   默认 legacy 配置下点卡片、设置页渲染、live 上升级、多块切分、心跳投递。
-- **证据**：`.rsi/evidence/user-regression-2026-11-26/README.md`（逐条逐字读数、红单、边界）。
+- **证据**：`.rsi/evidence/user-regression-2026-11-25/README.md`（逐条逐字读数、红单、边界）。
 
 ## 2026-11-25 — `0.13.36` 已发布并跑绿；下一个接手的先看这条：**升级前必须把档案里 `mode:` 与 `legacyGate:` 两行都删掉**，本机 live 档案还没升（`BLOCKED`，等操作者）
 

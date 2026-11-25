@@ -28,7 +28,7 @@ import { isPromptShapedArgument } from '../src/intake.js'
 import { canAcceptBlock } from '../src/user-source.js'
 
 /** Documented settle texts (also asserted verbatim below). */
-const ON_TEXT = 'Grok workflow ON — the model may commission reviewed blocks of work in this session. Messages themselves are not turned into a workflow.'
+const ON_TEXT = 'Grok workflow ON — the model may commission reviewed blocks of work in this session, as long as the block intake is switched on. Messages themselves are not turned into a workflow.'
 const OFF_TEXT = 'Grok workflow OFF — normal chat.'
 
 /**

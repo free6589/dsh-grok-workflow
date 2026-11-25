@@ -512,6 +512,29 @@ describe('client settings page: bilingual copy (t42)', () => {
     expect(translate('ja', 'action.save')).toBe('Save')
     expect(translate('en', 'no.such.key')).toBe('no.such.key')
   })
+
+  it('states the toggle as a reporting default, not a router', () => {
+    // 0.13.35 (M3.3) deleted the entry gate: nothing in front of a user message
+    // routes, claims or rewrites it. The switch only decides what a session with
+    // no `/grok` record reports, so every status line has to name `/grok` as the
+    // thing that decides — and the deleted routing claims must not come back.
+    const deletedClaims = [
+      'master switch', '总开关', 'one serious run', '认真干一次',
+      'go through the workflow', '复杂目标走工作流',
+      'Work hard by default', '默认下大力气',
+    ]
+    for (const locale of bundle.GROK_WORKFLOW_LOCALES) {
+      const dict = bundle.GROK_WORKFLOW_DICT[locale]!
+      for (const key of ['status.on', 'status.on.detail', 'status.off', 'status.off.detail']) {
+        expect(dict[key], `${locale} ${key} must name /grok`).toContain('/grok')
+      }
+      for (const [key, value] of Object.entries(dict)) {
+        for (const claim of deletedClaims) {
+          expect(value, `${locale} ${key} still claims "${claim}"`).not.toContain(claim)
+        }
+      }
+    }
+  })
 })
 
 describe('client settings page: wiring to the DSH locale service (t42)', () => {

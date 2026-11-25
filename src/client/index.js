@@ -220,24 +220,27 @@ window.__ModuleLoader__.load({
       'card.title': 'Grok workflow',
       // Left-column entry in the Host's own Settings panel (same page as the card).
       'section.label': 'Workflow',
-      'card.summary': 'Decide how hard Grok works: a master switch, five role chains, the limits, and whether it repeats.',
+      'card.summary': 'Defaults for the Grok workflow: what a session reports before /grok, five role chains, the limits, and whether it repeats.',
 
       'page.intro': 'How Grok works for you.',
 
-      // Live one-line status under the intro, derived from the current draft.
-      'status.off': 'Off — just chatting',
-      'status.off.detail': 'Grok answers directly, no helpers. Send /grok for one serious run.',
-      'status.on': 'On — the workflow tool is available',
-      'status.on.detail': 'Substantial objectives go through the workflow; small questions are answered directly.',
+      // Live one-line status under the intro, derived from the current draft. It
+      // states a reporting default, not a routing decision: `grokDefault` is the
+      // value a session with no `/grok` record reports, and only that session's
+      // own record lets the intake accept a block (src/user-source.ts).
+      'status.off': 'Off — what a session reports before /grok',
+      'status.off.detail': 'A session that has not run /grok reports this, and the block intake takes no work there: the model cannot open a reviewed block. Messages themselves never become a workflow.',
+      'status.on': 'On — what a session reports before /grok',
+      'status.on.detail': 'A reported default, nothing more: opening a reviewed block still needs the session to run /grok on itself.',
 
-      'group.mode': 'Master switch',
+      'group.mode': 'Session default',
       'group.limits': 'How much effort',
       'group.roles': 'Who does what',
       'group.loop': 'Repeat runs',
       'group.iterate': 'Self-iteration',
 
       // T5 visible-field labels only (no hints, no Danger, no read-only).
-      'field.grokDefault': 'Work hard by default',
+      'field.grokDefault': 'Default before /grok',
       'field.maxConcurrency': 'Jobs at once',
       'field.maxTasks': 'Splits per job',
       'field.timeoutMs': 'Run deadline (minutes)',
@@ -454,23 +457,25 @@ window.__ModuleLoader__.load({
     const ZH = {
       'card.title': 'Grok workflow',
       'section.label': 'Workflow',
-      'card.summary': '定 Grok 下多大的力气：一个总开关，五条角色链，几个上限，还有要不要自动接着跑。',
+      'card.summary': 'Grok 工作流的默认值：会话还没打 /grok 时报什么、五条角色链、几个上限，还有要不要自动接着跑。',
 
       'page.intro': 'Grok 怎么帮你干活，在这里定。',
 
-      'status.off': '关着：只聊天',
-      'status.off.detail': '问什么答什么，不派帮手。发 /grok 认真干一次。',
-      'status.on': '开着：工作流工具可用',
-      'status.on.detail': '复杂目标走工作流，小问题直接回答。',
+      // 状态行报的是一个默认值，不是一次路由决定：`grokDefault` 是还没打过
+      // `/grok` 的会话报出来的值，真正让接单台接活的是那个会话自己的记录。
+      'status.off': '关：没打过 /grok 的会话报这个',
+      'status.off.detail': '没打过 /grok 的会话报的就是这个，接单台在那里不接活：模型开不出可复核的块。消息本身永远不会变成工作流。',
+      'status.on': '开：没打过 /grok 的会话报这个',
+      'status.on.detail': '只是报出来的默认值：要在这个会话里开可复核的块，还得这个会话自己打一句 /grok。',
 
-      'group.mode': '总开关',
+      'group.mode': '会话默认',
       'group.limits': '下多大力气',
       'group.roles': '谁来干',
       'group.loop': '自动接着干',
       'group.iterate': '自迭代',
 
       // T5 visible-field labels only (no hints, no Danger, no read-only).
-      'field.grokDefault': '默认下大力气',
+      'field.grokDefault': '没打 /grok 时的默认',
       'field.maxConcurrency': '同时干几件',
       'field.maxTasks': '一次拆几件',
       'field.timeoutMs': '运行死线（分钟）',
@@ -1657,7 +1662,8 @@ window.__ModuleLoader__.load({
 
     /**
      * The live one-line status under the intro, derived from the current draft:
-     * off → plain chat; on → the workflow tool is available for this session.
+     * the value a session with no `/grok` record reports. It is a default, not a
+     * router — admitting a reviewed block stays the session's own record's job.
      * It follows the draft in real time and is never saved.
      */
     function StatusLine(props) {
@@ -1858,7 +1864,7 @@ window.__ModuleLoader__.load({
           h('p', { style: { ...styles.hint, margin: '0 0 12px', fontSize: '13px' } }, t('page.intro')),
           h(StatusLine, { draft, t }),
           progressNote),
-        // --- 1 · 总开关 ---
+        // --- 1 · 会话默认 (what a session reports before /grok) ---
         h('div', { style: styles.card },
           h('h3', { style: styles.groupTitle }, t('group.mode')),
           h(FieldRow, {

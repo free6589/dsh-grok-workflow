@@ -247,7 +247,7 @@ Two levels below the key list are checked the same way (since **0.12.10**): a ro
 
 Because the plugin exports its `Config`, DSH projects it into the standard settings surface automatically: the fields on that page are the fields this plugin reads — there is no second, decorative source of truth. Edits are live: an edit reaches the next message, and an invalid edit is refused with its reason while delivery keeps the last valid snapshot.
 
-The page shows five things and nothing else: the on/off switch, the mode (`auto`/`full`), the five role chains as "channel → model" dropdowns fed by the runtime's declared models, the four run limits (jobs at once, splits per job, run deadline, one-call budget), and the repeat-run group (its switch plus the three bounds: rounds, consecutive failures, minutes between rounds). No per-field explanations, no read-only area, no diagnostics panel.
+The page groups its fields in five sections and shows nothing else: the switch that decides what a session reports before `/grok` is used; the guardian and the five role chains as "channel → model" dropdowns fed by the runtime's declared models; the four run limits (jobs at once, splits per job, run deadline, one-call budget); the repeat-run group (its switch, the mid-run join, and the three bounds: rounds, consecutive failures, minutes between rounds); and the self-iteration group (interval and prompt template). The two budget fields carry a one-line hint each, the card at the bottom prints the `dsh plugin add` line for an upgrade, and there is no diagnostics panel.
 
 ### Repeat runs (the loop heartbeat)
 
