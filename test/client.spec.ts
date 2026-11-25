@@ -3186,15 +3186,25 @@ describe('client progress tab: the two-column body, open task rows and the folde
     // screen reader hears one list of two lines instead of two orphans.
     expect(detail.type).toBe('ol')
 
-    // One line per member of that step, in `seq` order, drawn by the history's own renderer:
-    // clock, role + task, the chain slot, the state word, and the capsule when it opens.
+    // One line per member of that step, in `seq` order, drawn by the history's own renderer.
+    // The row's header one line up already says the task and the gates, so the line says
+    // only what the header cannot: the moment, the gate, the result, and the entry — the
+    // gate as the chain chip, which *is* the role word, so the word is not printed twice.
     const lines = elementsOf(detail, 'data-gw-progress-log-row')
     expect(lines.map((line) => line.props['data-gw-progress-log-row'])).toEqual([2, 3])
     expect(lines.map((line) => line.props['data-state'])).toEqual(['done', 'done'])
     expect(lines.map(wordsOf)).toEqual([
-      `${clockOf(2)} 执行 任务 1 · 修复登录 执行 做完 打开子会话`,
-      `${clockOf(3)} 检查 任务 1 · 修复登录 检查 过了`,
+      `${clockOf(2)} 执行 做完 打开子会话`,
+      `${clockOf(3)} 检查 过了`,
     ])
+    // Neither the role nor the task title is said twice: the chip is the one word for the
+    // gate, and the title lives on the header above.
+    for (const line of lines) {
+      expect(elementsOf(line, 'data-gw-progress-log-name')).toHaveLength(0)
+      expect(elementsOf(line, 'data-gw-progress-log-role')).toHaveLength(0)
+      expect(elementsOf(line, 'data-gw-progress-task-chain')).toHaveLength(1)
+      expect(texts(line).filter((text) => text === '任务 1 · 修复登录')).toHaveLength(0)
+    }
     // The chain chip names the slot the row's role reached, with the chain's own word.
     const chips = elementsOf(detail, 'data-gw-progress-task-chain')
     expect(chips.map((chip) => chip.props['className'])).toEqual(['gw-progress-plan-chain', 'gw-progress-plan-chain'])
@@ -3230,9 +3240,11 @@ describe('client progress tab: the two-column body, open task rows and the folde
     const lines = elementsOf(detail, 'data-gw-progress-log-row')
     expect(lines.map((line) => line.props['data-gw-progress-log-row'])).toEqual([2, 3, 4])
     // The summary row shares the task's phase but speaks the 汇总 role: no slot, no chip,
-    // and the row is still there — the detail drops no declared line.
+    // and the row is still there — the detail drops no declared line. With no chip to stand
+    // in for it, the role word stays: the line never ends up wordless about who ran.
     expect(elementsOf(detail, 'data-gw-progress-task-chain')).toHaveLength(2)
-    expect(texts(lines[2]!).join(' ')).toBe(`${clockOf(4)} 汇总·第1稿 任务 1 · 修复登录 做完`)
+    expect(elementsOf(lines[2]!, 'data-gw-progress-log-role')).toHaveLength(1)
+    expect(texts(lines[2]!).join(' ')).toBe(`${clockOf(4)} 汇总·第1稿 做完`)
   })
 
   it('folds a history longer than six lines behind one toggle', () => {
