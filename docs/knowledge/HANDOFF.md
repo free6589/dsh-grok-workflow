@@ -1,4 +1,4 @@
-## 2026-11-26 — 用户视角回归跑完（隔离 fork + 已发布 `v0.13.36`）：**六项里五项通、两项红**，红一已另开分支修，红二等你拍板
+## 2026-11-25 — 用户视角回归跑完（隔离 fork + 已发布 `v0.13.36`）：**六项里五项通、两项红**，红一已另开分支修，红二等你拍板
 
 - **From:** 用户回归包工头（`agent-157`）· **To:** 操作者 / 下一个接手者
 - **这一轮是什么**：分支 `fix/user-regression`（worktree `.agents/worktrees/fix/user-regression`，基线 `main` 尖端 `6e9bc56`），
@@ -37,7 +37,7 @@
   3. **`~/.serena` 在本沙箱只读**，`serena` MCP 会报 `OSError: [Errno 30]`，与本轮结论无关，别当缺陷查。
 - **没跑的（`NOT_RUN`）**：真浏览器点那颗开关按钮（fork 的 web 落「生图」面板、隔离 home 的会话树在 UI 里是空的）、
   默认 legacy 配置下点卡片、设置页渲染、live 上升级、多块切分、心跳投递。
-- **证据**：`.rsi/evidence/user-regression-2026-11-26/README.md`（逐条逐字读数、红单、边界）。
+- **证据**：`.rsi/evidence/user-regression-2026-11-25/README.md`（逐条逐字读数、红单、边界）。
 
 ## 2026-11-25 — `0.13.36` 已发布并跑绿；下一个接手的先看这条：**升级前必须把档案里 `mode:` 与 `legacyGate:` 两行都删掉**，本机 live 档案还没升（`BLOCKED`，等操作者）
 

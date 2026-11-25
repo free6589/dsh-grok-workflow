@@ -3423,7 +3423,7 @@ PASS**（对 `4803f42` 的 2128 是 **+2 测试**，文件数不变）、oxlint 
 未 push、未打 tag、未发版，`package.json` 仍 `0.13.34`。清理：`.tmp/soak-card` 整棵（含克隆 home 与两份
 tarball）跑完即删，仓库里只留证据文件。
 
-Last updated: 2026-11-26 15:10 +08:00（**用户视角回归：隔离 fork 的 live web 档案 + 已发布 `v0.13.36` 固定标签，六项里五项通、两项红，`CONFIRMED`，本分支只放证据与记忆** — 分支
+Last updated: 2026-11-25 15:10 +08:00（**用户视角回归：隔离 fork 的 live web 档案 + 已发布 `v0.13.36` 固定标签，六项里五项通、两项红，`CONFIRMED`，本分支只放证据与记忆** — 分支
 `fix/user-regression`（worktree `.agents/worktrees/fix/user-regression`，基线 `main` 尖端 `6e9bc56`）。隔离：`clone-profile.mjs` 从
 `~/.dsh/profiles/web` 克隆成 `web-clone`（7720 文件 / 88 421 847 B、parity 5/5、0 未解析依赖、抹掉 1 行生图渠道密钥），删掉
 `mode: triage` 那一行（克隆里本来没有 `legacyGate:`），端口 **3311**，插件按固定标签装
@@ -3452,10 +3452,10 @@ headless 没把聊天面板点出来，0 console errors 是唯一读数）、默
 `Read-only file system`、线上 3080 前后都是 401、live 仍装 **0.13.35**（依赖仍浮动、锁解析到 `84efda0`）。一处要说准：
 `~/.dsh/profiles/web` 这个**目录**的 mtime 中段动过一次（12:09:52 → 13:16:10），但里面的文件没有一个晚于 12:09:50，
 本进程对它只读（EROFS），成因 `HYPOTHESIS`（别的东西的临时条目），没有查到底；未 push、未打 tag、未发版、未合流，
-`package.json` 仍 `0.13.36`，`src/` `test/` `lib/` 一个字未改。证据 `.rsi/evidence/user-regression-2026-11-26/README.md`。
+`package.json` 仍 `0.13.36`，`src/` `test/` `lib/` 一个字未改。证据 `.rsi/evidence/user-regression-2026-11-25/README.md`。
 红一另开分支 `fix/grok-command-text` 修，不混进本分支。）
 
-补记（2026-11-26 13:30，`CONFIRMED`）：**红一已经修好了，在另一条分支上。** `fix/grok-command-text`（worktree
+补记（2026-11-25 13:30，`CONFIRMED`）：**红一已经修好了，在另一条分支上。** `fix/grok-command-text`（worktree
 `.agents/worktrees/fix/command-text`，基线 `6e9bc56`）两个提交 `5c120b1`（fix，9 文件 / +24 −15，含 `lib/command.js`
 重建）+ `78c9091`（只加证据）。新话两句：`Grok workflow ON — the model may commission reviewed blocks of work in this
 session. Messages themselves are not turned into a workflow.`；`/grok off` 的答案、记录形状、路由、接单台准入都没动。

@@ -102,6 +102,23 @@ describe('README documents exactly the configuration surface the code accepts', 
 })
 
 /**
+ * The settings-page inventory is a promise too. 0.13.35 (M3.3) deleted the mode
+ * selector (`auto`/`full`) and `grokDefault` became the default a session reports
+ * before `/grok`, so a paragraph that still offers the selector sends the reader
+ * looking for a control the page does not render.
+ */
+describe('both READMEs describe the settings page the bundle renders', () => {
+  it('no longer promises the deleted mode selector or the old page inventory', () => {
+    for (const [name, text] of Object.entries(readmes)) {
+      expect(text.includes('`auto`/`full`'), `${name} still promises the deleted mode selector`).toBe(false)
+      for (const stale of ['shows five things and nothing else', '只显示五样东西']) {
+        expect(text.includes(stale), `${name} still describes the old page inventory`).toBe(false)
+      }
+    }
+  })
+})
+
+/**
  * `docs/LOCAL-TESTING.md` is the document an operator follows to install and run this
  * plugin, so every number in it is a promise the code has to keep. RSI round 6 audited
  * the paragraph against `src/config.ts`: the key count and the fixed caps were right,
