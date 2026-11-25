@@ -1,18 +1,13 @@
 /**
- * The intake's own listener on `agent/pre-step`.
+ * The heartbeat listener on `agent/pre-step` — the only brake owner since M3.2.
  *
- * Why a second listener at all: the old front desk (`src/gate.ts`) owns both the
- * admission decision and the loop's brakes, and a block's work outlives the turn that
- * started it. The only clock the Host gives this plugin is a scheduled delivery, so the
- * intake needs its own view of that delivery on its own registration — one that
- * survives the front desk being switched off (`legacyGate: false`).
- *
- * Why it coexists instead of taking over: every existing profile runs the old chain,
- * and "the beat reached a session that still owes work" is an observation, not a
- * decision. With `ownsRouting: false` the handler computes nothing, changes nothing and
- * appends one line. Only `ownsRouting: true` — the shape where `installGate` is not
- * registered at all — reviews the brakes itself, and then it is the single owner of a
- * heartbeat's fate. `src/index.ts` never installs both shapes in one load.
+ * Why its own listener at all: a block's work outlives the turn that started it, and the
+ * only clock the Host gives this plugin is a scheduled delivery. The old front desk
+ * (`src/gate.ts`) used to decide a beat's fate from inside its own branch; since M3.2 it
+ * does not route heartbeats at all, so this listener is what reviews the brakes, charges
+ * a round, or refuses the step. `src/index.ts` installs it unconditionally, outside the
+ * intake's own switch: a profile with the intake off must still have a brake owner, or a
+ * stopped loop would keep running with nobody left to stop it.
  *
  * Why its own file: `src/block/brakes.ts` already records a heartbeat, into
  * `heartbeats.jsonl`. Writing to the same name would put two lines under one beat and
@@ -20,9 +15,11 @@
  * `heartbeats-listen.jsonl` and never touches the intake's ledger, its verdicts or the
  * brakes' file.
  *
- * One beat, one line: the outcome says what the beat did (`observed` when this
- * listener only watched, `continued`/`stopped` when it routed), never two lines for one
- * delivery.
+ * One beat, one line: the outcome says what the beat did — `continued` when the brakes
+ * let it run, `stopped` plus the brake code when they did not. `observed` is read but
+ * never written: it is the shape this listener had while it only watched the old front
+ * desk (M3.1), and `readHeartbeatListenObservations` still returns those lines so an
+ * existing file stays readable.
  */
 import type { Session } from '@deepseek-ai/dsh-session';
 import type { BlockLedgerOptions } from './block/index.js';
@@ -74,11 +71,12 @@ export interface HeartbeatPayload {
  * Two facts have to agree: the delivery source (`schedule`) and the ownership marker
  * this plugin writes into every prompt it creates. Either alone is spoofable — a user
  * can paste the marker, and a scheduled reminder can carry arbitrary text — so the pair
- * is what identifies the heartbeat. Moved here from `src/gate.ts` so the two listeners
- * that can see a beat read one definition; the gate imports this one.
+ * is what identifies the heartbeat. Moved here from `src/gate.ts` in M3.1 so the two
+ * listeners that could then see a beat read one definition; since M3.2 the gate does not
+ * route a beat at all, so this is the one reader left.
  *
- * It runs on **every** pre-step batch now, not only inside the gate's heartbeat branch,
- * so a malformed element has to read as "not a heartbeat" instead of throwing: a null in
+ * It runs on **every** pre-step batch, not only inside a heartbeat branch, so a
+ * malformed element has to read as "not a heartbeat" instead of throwing: a null in
  * the array must not take a turn down.
  * @param message - one message of the batch; null and undefined are tolerated.
  * @returns true only for a scheduled delivery carrying this plugin's marker.
@@ -116,12 +114,13 @@ export interface HeartbeatReviewInput {
 /**
  * Review one heartbeat's brakes.
  *
- * The order is the contract and is copied from the gate's heartbeat branch: a delegated
- * child never owns a loop, a load without a driver can only continue, and a tripped
- * brake stops before anything is charged. The caller maps the answer onto its own
- * decision type, so this stays a pure function with no listener and no I/O.
+ * The order is the contract, inherited from the front desk's own heartbeat branch (M3.1)
+ * and now the only review on the chain: a delegated child never owns a loop, a load
+ * without a driver can only continue, and a tripped brake stops before anything is
+ * charged. This stays a pure function with no listener and no I/O, so the one thing that
+ * decides a beat's fate is testable without a Host.
  * @param input - the port, the payload and the configuration reader.
- * @returns `pass` with the gate's own reason label, or `stop` with the brake's code.
+ * @returns `pass` with the gate's old reason label, or `stop` with the brake's code.
  */
 export declare function reviewHeartbeat(input: HeartbeatReviewInput): HeartbeatReview;
 /** Dependencies of the listener. */
@@ -142,13 +141,12 @@ export interface HeartbeatListenInput {
     /** `true` installs the listener; anything else installs nothing at all. */
     enabled: boolean;
     /**
-     * `true` when the old front desk is not registered, so this listener owns the brakes.
+     * The brake port.
      *
-     * It is not a preference: with the gate gone there is no other place a heartbeat can
-     * be stopped, and with the gate present a second review would charge a round twice.
+     * Omitted means "no driver is wired": a beat can only continue and nothing is
+     * counted. `src/index.ts` always passes the real one, because this listener is the
+     * only place a heartbeat can be stopped.
      */
-    ownsRouting: boolean;
-    /** The brake port; required in the owning shape, unused otherwise. */
     loop?: LoopBrakePort | undefined;
     /** Load-time configuration, and the live reader the brakes fall back to. */
     config: ResolvedConfig;
@@ -165,7 +163,7 @@ export interface HeartbeatListenInput {
 /**
  * Install the intake's heartbeat listener.
  *
- * @param input - context, logger, the two switches and optional test seams.
+ * @param input - context, logger, the switch and optional test seams.
  * @returns The disposer cordis already owns; a no-op when the switch is off.
  */
 export declare function installHeartbeatListen(input: HeartbeatListenInput): () => void;

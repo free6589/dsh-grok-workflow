@@ -1,0 +1,57 @@
+M3.2 green: the five suites this half owns, on `feat/m3-switch`
+
+Branch:    feat/m3-switch, worktree .tmp/wt-m3-switch, baseline main @ 7b25890
+Command:   cd .tmp/wt-m3-switch && TMPDIR=$PWD/.tmp npx vitest run test/m3-intake.spec.ts test/block-tools.spec.ts test/block-ledger.spec.ts test/block-preview.spec.ts test/block-supervisor.spec.ts
+Exit:      0
+Result:    5 files / 174 tests passed
+
+What is green here is the two halves together: this half (admission enforced in
+`src/user-source.ts`, the six-tool refusal, the authoritative intake spec and the
+block-tool harnesses that opt their sessions in) and worker A's half (the
+`legacyGate` default flipped to off, the gate no longer routing heartbeats, the
+narrow listener without `ownsRouting`, and the unconditional installation in
+`src/index.ts`). The run was taken at 2026-11-25 05:51 +08:00; the working-tree
+state of A's files at that moment, as sha256 of the file contents, was:
+
+  src/gate.ts             e0b5458cb664aa363e059a01fc0cd4dab4c6a1ea91c052b0062f2c3930ffd228
+  src/index.ts            7d29596675dd8c604d847ff8c97c97c900ecd660bb6f2e2af13c79a9d5bca4d9
+  src/heartbeat-listen.ts b4726cbba605760475ac15016d8832f207cfafdc0bcf733a890e9cef97041cea
+  src/config.ts           905d77f6dcc2c2e9e4029da20cfef1656a18b582fd5ae500063bcdf061423a2b
+  src/types.ts            3790a30f894474d8c5ed1fb9733234b05a30c91870e54014b97158b05731f3b0
+
+Per-file counts in this run: test/m3-intake.spec.ts 18, test/block-tools.spec.ts
+23, test/block-ledger.spec.ts 20, test/block-preview.spec.ts 93,
+test/block-supervisor.spec.ts 20.
+
+Not run here, and deliberately so: `npm run build` / `npm run ci` / `verify:lib`.
+The `lib/` rebuild is the integration step after both halves are committed, and a
+full CI while the other worker's files were still being written would have been a
+reading of a moving tree.
+
+The transcript below is the command's stdout+stderr verbatim.
+
+--- transcript ---
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-m3-switch
+
+ ✓ test/block-tools.spec.ts (23 tests) 4547ms
+     ✓ starts a block once the user says yes in their own words, and does not wait for work  308ms
+     ✓ returns the plan id, the split, the scope and the progress  337ms
+     ✓ vetoes a three-line handoff without spending a model call  308ms
+     ✓ passes a complete handoff through the judge and accepts the block  475ms
+     ✓ returns the same verdict for the same evidence instead of a second line  584ms
+     ✓ keeps the judge off when the block was ordered that way, with no verify on close  384ms
+     ✓ judges by default when the row carries no switch at all  379ms
+     ✓ refuses a foreman block and names the way to reach it  460ms
+ ✓ test/block-supervisor.spec.ts (20 tests) 2903ms
+     ✓ treats a changed handoff as a new attempt  421ms
+ ✓ test/block-ledger.spec.ts (20 tests) 2134ms
+     ✓ 同一 id 写到第 20 版后，第 21 版报 version-limit 且账本仍是 20 行  882ms
+ ✓ test/block-preview.spec.ts (93 tests) 1724ms
+ ✓ test/m3-intake.spec.ts (18 tests) 814ms
+
+ Test Files  5 passed (5)
+      Tests  174 passed (174)
+   Start at  05:51:38
+   Duration  13.99s (transform 893ms, setup 0ms, import 1.29s, tests 12.12s, environment 1ms)
+

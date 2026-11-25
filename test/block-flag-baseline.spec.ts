@@ -23,7 +23,7 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
@@ -141,12 +141,28 @@ const mountedContexts: Context[] = []
 const previousStopFile = process.env['GROK_WORKFLOW_STOP_FILE']
 process.env['GROK_WORKFLOW_STOP_FILE'] = join(process.cwd(), '.tmp', 'block-flag-baseline', 'STOP-does-not-exist')
 
+/**
+ * A throwaway ledger directory for the whole file.
+ *
+ * Since M3.2 the narrow heartbeat listener is installed on every load and writes one line
+ * per beat, so without this override a mount that dispatches a heartbeat would write into
+ * `$DSH_HOME` (`~/.dsh` on a developer machine). The dump that produced the artifact
+ * wrote no ledger at all, and nothing here may either.
+ */
+const previousLedgerDir = process.env['GROK_WORKFLOW_BLOCK_LEDGER_DIR']
+mkdirSync(join(process.cwd(), '.tmp'), { recursive: true })
+const ledger = mkdtempSync(join(process.cwd(), '.tmp', 'block-flag-baseline-ledger-'))
+process.env['GROK_WORKFLOW_BLOCK_LEDGER_DIR'] = ledger
+
 afterAll(async () => {
   for (const ctx of mountedContexts.splice(0)) {
     try { await ctx.fiber.dispose() } catch { /* already disposed */ }
   }
   if (previousStopFile === undefined) delete process.env['GROK_WORKFLOW_STOP_FILE']
   else process.env['GROK_WORKFLOW_STOP_FILE'] = previousStopFile
+  if (previousLedgerDir === undefined) delete process.env['GROK_WORKFLOW_BLOCK_LEDGER_DIR']
+  else process.env['GROK_WORKFLOW_BLOCK_LEDGER_DIR'] = previousLedgerDir
+  try { rmSync(ledger, { recursive: true, force: true }) } catch { /* already gone */ }
 })
 
 interface Mounted { ctx: Context; engine: FakeEngine }
@@ -170,6 +186,12 @@ async function mount(overrides: Record<string, unknown> = {}): Promise<Mounted> 
     mode: 'full',
     grokDefault: 'on',
     blockIntake: false,
+    // `legacyGate: true` on purpose. The artifact is a dump of the *front desk's*
+    // decisions, and since M3.2 the front desk is opt-in: a load that omitted it would
+    // have no admission decision at all, and "the artifact still matches" would become
+    // trivially true. The claim this file pins is therefore "the front desk, when a
+    // profile asks for it, answers exactly as the pre-feature tree answered".
+    legacyGate: true,
     ...overrides,
   })
   mountedContexts.push(ctx)

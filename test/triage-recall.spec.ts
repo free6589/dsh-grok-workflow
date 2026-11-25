@@ -491,7 +491,7 @@ describe('the installed plugin keeps its ordinary front desk', () => {
     // `apply()` is the production install path (index.ts): the default root is the
     // workspace's docs/knowledge, and a greeting must never reach the look-up pass.
     const ctx = new FakeContext()
-    apply(ctx as never, { mode: 'triage', grokDefault: 'on' })
+    apply(ctx as never, { legacyGate: true, mode: 'triage', grokDefault: 'on' })
     const agent = new FakeAgent(Session.create('sess-recall-apply' as never))
     const text = await route(ctx, agent, '你好')
     expect(text).toContain('档位：直答档')

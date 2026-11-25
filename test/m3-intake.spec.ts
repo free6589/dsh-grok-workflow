@@ -1,45 +1,64 @@
 /**
- * M3.1: the intake's own heartbeat listener, and the switch that will enforce it.
+ * M3.2: admission is live, and the narrow listener is the only brake owner.
  *
- * Two things are pinned here, both of them about *shapes* rather than features:
+ * Five groups, one product claim each:
  *
- * 1. **The admission predicate exists and is inert.** `canAcceptBlock` answers "yes"
- *    for every session in this build; the rule it will enforce once M3.2 flips its
- *    phase switch is pinned separately (`canAcceptBlockWhenEnforced`), so the rule can
- *    be reviewed before it can refuse anything.
- * 2. **The narrow heartbeat listener observes and never decides — until it is the only
- *    listener left.** With the old front desk registered (the default) it computes
- *    nothing, changes no decision byte, and writes one line per beat into its own file.
- *    With `legacyGate: false` the gate is not registered at all, so the same listener
- *    owns the brake review and is the one thing that can stop a beat.
+ * 1. **Admission is live.** `BLOCK_ADMISSION_ENFORCED` is on, so `canAcceptBlock` reads
+ *    the session's own mode record: no record, `enabled: false`, or a hand-written
+ *    `workflowMode: 'off'` all answer "no"; an enabled record answers "yes" in both
+ *    shapes (`full`, `triage`).
+ * 2. **Every block tool reads it.** All six names in `BLOCK_TOOL_NAMES` refuse a session
+ *    with no mode record with the named `mode-off` refusal, and the same call gets past
+ *    admission once the session carries a `/grok on` record — the failure after that
+ *    point, if any, is a different one.
+ * 3. **The narrow listener is the only brake owner.** With the default configuration the
+ *    `agent/pre-step` chain holds exactly one listener; a stopped beat is answered
+ *    `reject` without opening a turn, stops the loop once, and records one `stopped`
+ *    line with the brake code; a continued beat calls `next()` and charges one round; a
+ *    user message is untouched; a batch it cannot read is total (no throw, no line).
+ * 4. **Two files, one writer each.** With the intake on, one beat writes one line to
+ *    `heartbeats.jsonl` (which blocks it found open) and one to
+ *    `heartbeats-listen.jsonl` (what it did). With the intake off, only the second file
+ *    exists and the first is never created.
+ * 5. **Registration.** The intake switch adds the observer and the six tools and nothing
+ *    else; the narrow listener is there either way; `legacyGate: true` adds the gate, and
+ *    a heartbeat still never reaches the gate's decision.
  *
- * Boundary: the `Context`, `SystemPrompt`, `ToolRuntime`, `Session` and `apply()` are
- * the real host classes; the workflow engine is a stub that throws if a run is ever
- * started, because no case here may spend a model call. The listener-count cases read
- * cordis's own `agent/pre-step` list, which is the only honest way to say "off
- * registers nothing".
+ * The design doc's §3.1 case list is not in this repository, so these five groups are
+ * written as its intent rather than as a transcription of it.
  *
- * The two files must stay apart: `heartbeats.jsonl` is the block intake's observation
- * (which blocks a beat found open) and `heartbeats-listen.jsonl` is this listener's
- * (what the beat did). One beat may appear in both — once — and in neither twice.
+ * Boundary: `Context`, `SystemPrompt`, `ToolRuntime`, `Session`, `apply()` and the
+ * `agent/pre-step` waterfall are the real host classes; the workflow engine is a stub
+ * that throws if a run is ever started, because no case here may spend a model call.
+ * Listener counts read cordis's own hook list, which is the only honest way to say "off
+ * registers nothing". The only stub inside the routing cases is the brake port, used
+ * where a count ("stopped once", "charged once") has to be observed rather than inferred;
+ * the end-to-end cases drive the real port the composition builds.
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
 import { ToolRuntime } from '@deepseek-ai/dsh-tools'
-import { Session } from '@deepseek-ai/dsh-session'
-import { appendPluginRecord } from '@deepseek-ai/dsh-session'
+import { Session, appendPluginRecord } from '@deepseek-ai/dsh-session'
 import { createSystemMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import { apply } from '../src/index.js'
-import { BLOCK_LEDGER_VERSION, appendBlockRow } from '../src/block/index.js'
+import { BLOCK_LEDGER_VERSION, appendBlockRow, resetPreviews } from '../src/block/index.js'
 import { HEARTBEATS_FILE } from '../src/block/brakes.js'
-import { HEARTBEATS_LISTEN_FILE, installHeartbeatListen, isHeartbeatMessage, readHeartbeatListenObservations } from '../src/heartbeat-listen.js'
+import { BLOCK_TOOL_NAMES } from '../src/block/tools.js'
+import {
+  HEARTBEATS_LISTEN_FILE,
+  installHeartbeatListen,
+  isHeartbeatMessage,
+  readHeartbeatListenObservations,
+} from '../src/heartbeat-listen.js'
+import { classifyPreStep } from '../src/gate.js'
 import { resolveConfig } from '../src/config.js'
 import { LOOP_PROMPT_PREFIX } from '../src/loop.js'
+import type { LoopBrakeInput, LoopBrakePort } from '../src/loop-brakes.js'
 import { MODE_RECORD, setMode } from '../src/mode.js'
 import { BLOCK_ADMISSION_ENFORCED, canAcceptBlock, canAcceptBlockWhenEnforced } from '../src/user-source.js'
 
@@ -48,7 +67,7 @@ const OBJECTIVE = '把账本读出来，写一句结论'
 
 /* ------------------------------------------------------------------ agent -- */
 
-/** The slice of an agent the listeners read; `session` is the real host class. */
+/** The slice of an agent the listeners and the tools read; `session` is the real class. */
 class FakeAgent {
   readonly followups: UserMessage[] = []
   readonly followup = (message: UserMessage): void => { this.followups.push(message) }
@@ -61,25 +80,39 @@ class FakeAgent {
 
 const mountedContexts: Context[] = []
 
-/**
- * Move the loop's operator-stop marker out of the way.
- *
- * A heartbeat's routing is decided by the loop brakes, and this checkout may carry a
- * real `.rsi/STOP`. These cases are about "did the beat reach the right listener",
- * not about whether this developer's marker exists.
- */
+/** One ledger for the whole file, emptied between cases. */
+let ledger = ''
+const previousLedgerDir = process.env['GROK_WORKFLOW_BLOCK_LEDGER_DIR']
 const previousStopFile = process.env['GROK_WORKFLOW_STOP_FILE']
-process.env['GROK_WORKFLOW_STOP_FILE'] = `${process.cwd()}/.tmp/m3-intake/STOP-does-not-exist`
+
+beforeAll(() => {
+  mkdirSync(join(process.cwd(), '.tmp'), { recursive: true })
+  ledger = mkdtempSync(join(process.cwd(), '.tmp', 'm3-2-'))
+  process.env['GROK_WORKFLOW_BLOCK_LEDGER_DIR'] = ledger
+})
+
+afterAll(() => {
+  if (previousLedgerDir === undefined) delete process.env['GROK_WORKFLOW_BLOCK_LEDGER_DIR']
+  else process.env['GROK_WORKFLOW_BLOCK_LEDGER_DIR'] = previousLedgerDir
+  if (previousStopFile === undefined) delete process.env['GROK_WORKFLOW_STOP_FILE']
+  else process.env['GROK_WORKFLOW_STOP_FILE'] = previousStopFile
+  try { rmSync(ledger, { recursive: true, force: true }) } catch { /* already gone */ }
+})
+
+beforeEach(() => {
+  resetPreviews()
+  for (const file of [HEARTBEATS_FILE, HEARTBEATS_LISTEN_FILE, 'blocks.jsonl', 'verdicts.jsonl']) {
+    try { rmSync(join(ledger, file), { force: true }) } catch { /* nothing to remove */ }
+  }
+  // This checkout may carry a real `.rsi/STOP`; the default for every case is "no marker",
+  // and the stop cases point the variable at a file they create themselves.
+  process.env['GROK_WORKFLOW_STOP_FILE'] = join(ledger, 'STOP-does-not-exist')
+})
 
 afterEach(async () => {
   for (const ctx of mountedContexts.splice(0)) {
     try { await ctx.fiber.dispose() } catch { /* already disposed */ }
   }
-})
-
-afterAll(() => {
-  if (previousStopFile === undefined) delete process.env['GROK_WORKFLOW_STOP_FILE']
-  else process.env['GROK_WORKFLOW_STOP_FILE'] = previousStopFile
 })
 
 /** Engine that refuses to run: no case in this file may start a workflow. */
@@ -91,6 +124,9 @@ const noRunEngine = {
 
 /**
  * Mount the plugin on a real context.
+ *
+ * No overrides means the shipped defaults, which is what group 3 calls "the default
+ * configuration": the intake off (`blockIntake` is M3.3) and `legacyGate` off (M3.2).
  * @param overrides - configuration overrides for the case.
  */
 async function mount(overrides: Record<string, unknown> = {}): Promise<Context> {
@@ -115,6 +151,14 @@ function headed(id: string): Session {
   return live
 }
 
+/** A headed session that opted into grok mode the way `/grok on` does. */
+function optedIn(id: string, workflowMode: 'full' | 'triage' = 'full'): Session {
+  const live = headed(id)
+  const written = setMode(live, { v: 1, enabled: true, turn: 1, setBy: 'command:/grok', workflowMode })
+  expect(written.ok, `the mode record must be readable back: ${written.reason ?? ''}`).toBe(true)
+  return live
+}
+
 function userMessage(text: string): UserMessage {
   return createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } as never }) as UserMessage
 }
@@ -123,15 +167,27 @@ function scheduleMessage(text: string): UserMessage {
   return createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'schedule' } as never }) as UserMessage
 }
 
+/** One Host heartbeat delivery, as the driver writes it. */
+function heartbeat(): UserMessage {
+  return scheduleMessage(`${LOOP_PROMPT_PREFIX} round 2`)
+}
+
 interface Decision { kind: string; messages?: UserMessage[]; reason?: string }
 
-/** Drive one payload through the real waterfall with a base callback. */
-async function dispatch(ctx: Context, agent: FakeAgent, messages: UserMessage[], turn = 1): Promise<Decision> {
-  return await ctx.waterfall(
+/** Drive one payload through the real waterfall with a base callback that counts. */
+async function dispatch(
+  ctx: Context,
+  agent: FakeAgent,
+  messages: UserMessage[],
+  turn = 1,
+): Promise<{ decision: Decision; nextCalls: number }> {
+  let nextCalls = 0
+  const decision = await ctx.waterfall(
     'agent/pre-step',
     { agent, messages, turn, step: 1, signal: new AbortController().signal } as never,
-    async () => ({ kind: 'enter', messages }),
+    async () => { nextCalls += 1; return { kind: 'enter', messages } },
   ) as Decision
+  return { decision, nextCalls }
 }
 
 /** How many `agent/pre-step` listeners this context holds (cordis's own list). */
@@ -140,275 +196,371 @@ function listenerCount(ctx: Context): number {
   return (events._hooks['agent/pre-step'] ?? []).length
 }
 
-/* -------------------------------------------------------------- predicate -- */
+/** The `exec` a tool call receives. */
+function execOf(live: Session): unknown {
+  return { agent: { session: live }, signal: new AbortController().signal }
+}
 
-describe('canAcceptBlock is written, and deliberately not enforced yet', () => {
-  it('answers yes for every session while the phase switch is off', () => {
-    expect(BLOCK_ADMISSION_ENFORCED, 'M3.1 must not change a single answer').toBe(false)
-    expect(canAcceptBlock(undefined)).toBe(true)
-    expect(canAcceptBlock(headed('sess-admit-none'))).toBe(true)
+/** Call one registered tool by name. */
+async function call(ctx: Context, name: string, args: Record<string, unknown>, live: Session): Promise<Record<string, unknown>> {
+  const tool = ctx.tools.get(name)
+  expect(tool, `${name} must be registered when the intake is on`).toBeDefined()
+  return await (tool as unknown as { execute(args: unknown, exec: unknown): Promise<Record<string, unknown>> })
+    .execute(args, execOf(live)) as Record<string, unknown>
+}
+
+/** What one tool call did: `ok`, or the refusal code it threw with. */
+async function outcomeOf(promise: Promise<unknown>): Promise<{ ok: boolean; code: string }> {
+  try {
+    await promise
+    return { ok: true, code: '' }
+  } catch (error) {
+    return { ok: false, code: String((error as { code?: unknown }).code ?? '') }
+  }
+}
+
+/** One accepted intake row for a session, written straight to the ledger. */
+async function openBlockFor(sessionId: string): Promise<void> {
+  const at = new Date().toISOString()
+  await appendBlockRow({
+    v: BLOCK_LEDGER_VERSION,
+    id: `row-${sessionId}`,
+    sessionId,
+    objective: '读账本',
+    splitHash: 'c'.repeat(64),
+    approval: { kind: 'user', quote: '确认', at },
+    blocks: [{
+      id: 'blk-1',
+      title: '读账本',
+      objective: '读',
+      deliverable: '一段结论',
+      acceptance: ['读完了'],
+      writesPaths: [],
+      dependsOn: [],
+      execution: 'workflow',
+      status: 'open',
+      tasks: [],
+    }],
+    version: 1,
+    createdAt: at,
+    updatedAt: at,
+    rowHash: '',
+  }, { dir: ledger })
+}
+
+/** The lines of one ledger file, or none when it was never created. */
+function linesOf(file: string): string[] {
+  try {
+    return readFileSync(join(ledger, file), 'utf8').split('\n').filter(line => line.trim() !== '')
+  } catch {
+    return []
+  }
+}
+
+/* -------------------------------------------------- 1. admission is live -- */
+
+describe('1. admission is live', () => {
+  it('answers no for every session that did not opt in', () => {
+    expect(BLOCK_ADMISSION_ENFORCED, 'M3.2 turns the rule on').toBe(true)
+    // No session at all, and a real session that never wrote a record.
+    expect(canAcceptBlock(undefined)).toBe(false)
+    expect(canAcceptBlock(headed('sess-admit-none'))).toBe(false)
+    // A written "off" — what `/grok off` leaves behind.
     const disabled = headed('sess-admit-disabled')
     expect(setMode(disabled, { v: 1, enabled: false, turn: 1, setBy: 'command:/grok' }).ok).toBe(true)
-    // Even a session that explicitly turned the mode off still gets a yes: the rule
-    // is written, the enforcement is M3.2's flip.
-    expect(canAcceptBlock(disabled)).toBe(true)
+    expect(canAcceptBlock(disabled)).toBe(false)
+    // An explicit "off" shape is written by hand: `setMode` refuses a record this build
+    // cannot read back, so only a future build can produce one. The reader drops it and
+    // the rule still says no — an "off" is never an admission.
+    const explicitOff = headed('sess-admit-explicit-off')
+    appendPluginRecord(explicitOff, MODE_RECORD, { v: 1, enabled: true, turn: 1, setBy: 'test', workflowMode: 'off' } as never)
+    expect(canAcceptBlock(explicitOff)).toBe(false)
   })
 
-  it('pins the rule the switch will enforce', () => {
-    // No session, and a session that never wrote a record: no admission.
-    expect(canAcceptBlockWhenEnforced(undefined)).toBe(false)
-    expect(canAcceptBlockWhenEnforced(headed('sess-rule-unset'))).toBe(false)
-    // A written "off" is not an admission either.
-    const disabled = headed('sess-rule-disabled')
-    expect(setMode(disabled, { v: 1, enabled: false, turn: 1, setBy: 'command:/grok' }).ok).toBe(true)
-    expect(canAcceptBlockWhenEnforced(disabled)).toBe(false)
-    // Both workflow shapes are admissions: the mode is on, and the shape only says
-    // how the work is routed, not whether the intake may take it.
-    const full = headed('sess-rule-full')
-    expect(setMode(full, { v: 1, enabled: true, turn: 1, setBy: 'command:/grok', workflowMode: 'full' }).ok).toBe(true)
-    expect(canAcceptBlockWhenEnforced(full)).toBe(true)
-    const triage = headed('sess-rule-triage')
-    expect(setMode(triage, { v: 1, enabled: true, turn: 1, setBy: 'command:/grok', workflowMode: 'triage' }).ok).toBe(true)
-    expect(canAcceptBlockWhenEnforced(triage)).toBe(true)
-    // An explicit `off` shape is written by hand: `setMode` refuses a record this
-    // build cannot read back, so only a future build can produce one. Today the
-    // reader drops it; the guard in the predicate is what keeps the answer false
-    // once the union grows.
-    const explicitOff = headed('sess-rule-explicit-off')
-    appendPluginRecord(explicitOff, MODE_RECORD, { v: 1, enabled: true, turn: 1, setBy: 'test', workflowMode: 'off' } as never)
-    expect(canAcceptBlockWhenEnforced(explicitOff)).toBe(false)
+  it('answers yes for an enabled record, in both workflow shapes', () => {
+    const full = optedIn('sess-admit-full', 'full')
+    expect(canAcceptBlock(full)).toBe(true)
+    const triage = optedIn('sess-admit-triage', 'triage')
+    expect(canAcceptBlock(triage)).toBe(true)
+    // The shape says how admitted work is routed, not whether the intake may take it.
+    const record = canAcceptBlockWhenEnforced(triage)
+    expect(record).toBe(true)
+  })
+
+  it('keeps the rule and the phase switch separable', () => {
+    // While enforcement is on the two agree; the rule is exported on its own so its
+    // boundaries can be reviewed without depending on the switch, and so the switch can
+    // be turned off without deleting the rule (D-138).
+    const cases: Session[] = [headed('sess-rule-none'), optedIn('sess-rule-on'), headed('sess-rule-off')]
+    expect(setMode(cases[2]!, { v: 1, enabled: false, turn: 1, setBy: 'command:/grok' }).ok).toBe(true)
+    for (const session of cases) {
+      expect(canAcceptBlockWhenEnforced(session)).toBe(canAcceptBlock(session))
+    }
+    expect(canAcceptBlockWhenEnforced(undefined)).toBe(canAcceptBlock(undefined))
   })
 })
 
-/* ---------------------------------------------------------------- intake -- */
+/* --------------------------------------------- 2. every block tool reads it -- */
 
-describe('the narrow heartbeat listener observes without deciding', () => {
-  let ledger = ''
-
-  beforeAll(() => {
-    mkdirSync(join(process.cwd(), '.tmp'), { recursive: true })
-    ledger = mkdtempSync(join(process.cwd(), '.tmp', 'm3-intake-'))
-    process.env['GROK_WORKFLOW_BLOCK_LEDGER_DIR'] = ledger
-  })
-
-  afterAll(() => {
-    try { rmSync(ledger, { recursive: true, force: true }) } catch { /* already gone */ }
-  })
-
-  beforeEach(() => {
-    for (const file of [HEARTBEATS_FILE, HEARTBEATS_LISTEN_FILE, 'blocks.jsonl', 'verdicts.jsonl']) {
-      try { rmSync(join(ledger, file), { force: true }) } catch { /* nothing to remove */ }
-    }
-  })
-
-  /** One accepted intake row for a session, written straight to the ledger. */
-  async function openBlockFor(sessionId: string): Promise<void> {
-    const at = new Date().toISOString()
-    await appendBlockRow({
-      v: BLOCK_LEDGER_VERSION,
-      id: `row-${sessionId}`,
-      sessionId,
-      objective: '读账本',
-      splitHash: 'c'.repeat(64),
-      approval: { kind: 'user', quote: '确认', at },
-      blocks: [{
-        id: 'blk-1',
-        title: '读账本',
-        objective: '读',
-        deliverable: '一段结论',
-        acceptance: ['读完了'],
-        writesPaths: [],
-        dependsOn: [],
-        execution: 'workflow',
-        status: 'open',
-        tasks: [],
-      }],
-      version: 1,
-      createdAt: at,
-      updatedAt: at,
-      rowHash: '',
-    }, { dir: ledger })
+describe('2. every block tool reads the admission rule', () => {
+  /** The smallest argument set each tool accepts, so admission is what answers. */
+  const MINIMAL: Record<string, Record<string, unknown>> = {
+    [BLOCK_TOOL_NAMES.open]: {
+      mode: 'preview',
+      objective: '把账本读出来',
+      blocks: [{ title: '读账本', objective: '读', deliverable: '一段结论', acceptance: ['读完了'] }],
+    },
+    [BLOCK_TOOL_NAMES.accept]: { block_id: 'blk-does-not-exist' },
+    [BLOCK_TOOL_NAMES.close]: { block_id: 'blk-does-not-exist', handoff: '做了什么：读了\n证据：一行\n没做：无\n下一步：交' },
+    [BLOCK_TOOL_NAMES.status]: {},
+    [BLOCK_TOOL_NAMES.steer]: { block_id: 'blk-does-not-exist', text: '换个方向' },
+    [BLOCK_TOOL_NAMES.stop]: { block_id: 'blk-does-not-exist' },
   }
 
-  it('registers nothing new when the intake is off', async () => {
-    const ctx = await mount({ blockIntake: false })
-    expect(listenerCount(ctx), 'off is the pre-intake chain: the gate alone').toBe(1)
-    const sessionId = 'sess-m3-off'
-    await openBlockFor(sessionId)
-    const decision = await dispatch(ctx, new FakeAgent(headed(sessionId)), [scheduleMessage(`${LOOP_PROMPT_PREFIX} round 2`)])
+  it('covers all six registered names, not a sample', () => {
+    expect(Object.keys(MINIMAL).sort()).toEqual(Object.values(BLOCK_TOOL_NAMES).sort())
+    expect(Object.keys(BLOCK_TOOL_NAMES)).toHaveLength(6)
+  })
+
+  it('refuses every one of them with mode-off when the session has no mode record', async () => {
+    const ctx = await mount({ blockIntake: true })
+    const stranger = headed('sess-tools-no-mode')
+    for (const [name, args] of Object.entries(MINIMAL)) {
+      await expect(call(ctx, name, args, stranger), `${name} must refuse a session with no record`)
+        .rejects.toMatchObject({ code: 'mode-off' })
+    }
+    // Nothing was opened, accepted, closed or steered by those six refusals.
+    expect(linesOf('blocks.jsonl')).toHaveLength(0)
+  })
+
+  it('lets the same six calls past admission once the session carries a /grok on record', async () => {
+    const ctx = await mount({ blockIntake: true })
+    const live = optedIn('sess-tools-mode-on')
+    for (const [name, args] of Object.entries(MINIMAL)) {
+      const outcome = await outcomeOf(call(ctx, name, args, live))
+      // Each of these still fails — there is no such block — but never at the door:
+      // `mode-off` is the one code that must not appear.
+      expect(outcome.code, `${name} must get past admission`).not.toBe('mode-off')
+      expect(outcome.ok || outcome.code === 'not-found' || outcome.code === 'invalid').toBe(true)
+    }
+    // `grok_block_status` has nothing to refuse, so it is the one call that succeeds.
+    const listed = await call(ctx, BLOCK_TOOL_NAMES.status, {}, live)
+    expect(listed['blocks']).toEqual([])
+  })
+})
+
+/** A brake port that records what was asked of it, so a count is observed rather than inferred. */
+function stubLoop(review: () => 'continue' | 'stop'): {
+  loop: LoopBrakePort
+  stops: { sessionId: string, code: string, detail: string }[]
+  admitted: string[]
+  reviewed: number
+} {
+  const state = {
+    stops: [] as { sessionId: string, code: string, detail: string }[],
+    admitted: [] as string[],
+    reviewed: 0,
+    loop: {
+      review: (_input: LoopBrakeInput) => {
+        state.reviewed += 1
+        return review() === 'stop'
+          ? { kind: 'stop' as const, code: 'loop/daily-cap' as const, detail: '今天已经跑满' }
+          : { kind: 'continue' as const }
+      },
+      admit: (input: LoopBrakeInput) => { state.admitted.push(input.sessionId) },
+      stop: async (input: { sessionId: string, code: string, detail: string }) => { state.stops.push(input) },
+    } satisfies LoopBrakePort,
+  }
+  return state
+}
+
+/* ------------------------- 3. the narrow listener is the only brake owner -- */
+
+describe('3. the narrow listener is the only brake owner', () => {
+  it('leaves exactly one agent/pre-step listener on the default configuration', async () => {
+    // The default is the new shape: the intake is still off (M3.3) and `legacyGate` is off,
+    // so the narrow listener is the whole chain.
+    expect(resolveConfig({}).legacyGate).toBe(false)
+    expect(resolveConfig({}).blockIntake).toBe(false)
+    const ctx = await mount()
+    expect(listenerCount(ctx), 'the narrow listener alone').toBe(1)
+  })
+
+  it('answers a stopped beat with reject, opens no turn, stops the loop once, and records the code', async () => {
+    const ctx = new Context()
+    mountedContexts.push(ctx)
+    const brakes = stubLoop(() => 'stop')
+    installHeartbeatListen({
+      ctx,
+      logger: { warn: () => {} },
+      enabled: true,
+      loop: brakes.loop,
+      config: resolveConfig({}),
+      options: { dir: ledger },
+    })
+    const { decision, nextCalls } = await dispatch(ctx, new FakeAgent(headed('sess-beat-stop')), [heartbeat()])
+    expect(decision.kind).toBe('reject')
+    expect(nextCalls, 'a stopped beat must not open a turn').toBe(0)
+    expect(brakes.reviewed, 'one beat, one review').toBe(1)
+    expect(brakes.stops).toEqual([{ sessionId: 'sess-beat-stop', code: 'loop/daily-cap', detail: '今天已经跑满' }])
+    const recorded = readHeartbeatListenObservations({ dir: ledger })
+    expect(recorded).toHaveLength(1)
+    expect(recorded[0]).toMatchObject({ sessionId: 'sess-beat-stop', outcome: 'stopped', code: 'loop/daily-cap' })
+  })
+
+  it('continues a beat the brakes allow, calls next() once and charges one round', async () => {
+    const ctx = new Context()
+    mountedContexts.push(ctx)
+    const brakes = stubLoop(() => 'continue')
+    installHeartbeatListen({
+      ctx,
+      logger: { warn: () => {} },
+      enabled: true,
+      loop: brakes.loop,
+      config: resolveConfig({}),
+      options: { dir: ledger },
+    })
+    const { decision, nextCalls } = await dispatch(ctx, new FakeAgent(headed('sess-beat-continue')), [heartbeat()])
     expect(decision.kind).toBe('enter')
-    expect(existsSync(join(ledger, HEARTBEATS_LISTEN_FILE)), 'off must not create the listen file').toBe(false)
+    expect(nextCalls).toBe(1)
+    expect(brakes.admitted).toEqual(['sess-beat-continue'])
+    expect(brakes.stops).toEqual([])
+    const recorded = readHeartbeatListenObservations({ dir: ledger })
+    expect(recorded).toHaveLength(1)
+    expect(recorded[0]).toMatchObject({ sessionId: 'sess-beat-continue', outcome: 'continued' })
+    expect(recorded[0]!.code).toBeUndefined()
   })
 
-  it('observes one beat into its own file while the old gate keeps deciding', async () => {
-    const sessionId = 'sess-m3-on'
-    await openBlockFor(sessionId)
-    const messages = [scheduleMessage(`${LOOP_PROMPT_PREFIX} round 2`)]
-
-    const off = await mount({ blockIntake: false })
-    const offDecision = await dispatch(off, new FakeAgent(headed(sessionId)), messages)
-    const on = await mount({ blockIntake: true })
-    expect(listenerCount(on), 'gate + intake observer + narrow listener').toBe(3)
-    const onDecision = await dispatch(on, new FakeAgent(headed(sessionId)), messages)
-
-    // Same objects in, same decision out: the listener observes, it does not decide.
-    expect(JSON.stringify(onDecision)).toBe(JSON.stringify(offDecision))
-    const observed = readHeartbeatListenObservations({ dir: ledger })
-    expect(observed).toHaveLength(1)
-    expect(observed[0]!.sessionId).toBe(sessionId)
-    expect(observed[0]!.outcome).toBe('observed')
-    // Both files hold the same single beat, once each: the intake's own observation
-    // (which blocks were open) and this listener's (what the beat did).
-    expect(readFileSync(join(ledger, HEARTBEATS_FILE), 'utf8').trim().split('\n')).toHaveLength(1)
+  it('stops a real beat end to end through the composed chain, with the real brake port', async () => {
+    // The real port, driven by the operator's stop marker: no stub anywhere in this case.
+    const marker = join(ledger, 'STOP')
+    writeFileSync(marker, '')
+    process.env['GROK_WORKFLOW_STOP_FILE'] = marker
+    const ctx = await mount()
+    const { decision, nextCalls } = await dispatch(ctx, new FakeAgent(headed('sess-beat-real-stop')), [heartbeat()])
+    expect(decision.kind).toBe('reject')
+    expect(nextCalls).toBe(0)
+    const recorded = readHeartbeatListenObservations({ dir: ledger })
+    expect(recorded).toHaveLength(1)
+    expect(recorded[0]).toMatchObject({ sessionId: 'sess-beat-real-stop', outcome: 'stopped', code: 'loop/stop-file' })
   })
 
-  it('writes nothing for a beat in a session that owes no work', async () => {
-    const ctx = await mount({ blockIntake: true })
-    await dispatch(ctx, new FakeAgent(headed('sess-m3-nothing')), [scheduleMessage(`${LOOP_PROMPT_PREFIX} round 2`)])
-    expect(readHeartbeatListenObservations({ dir: ledger })).toHaveLength(0)
-    expect(existsSync(join(ledger, HEARTBEATS_FILE))).toBe(false)
-  })
-
-  it('writes nothing for a user message', async () => {
-    const sessionId = 'sess-m3-user'
-    await openBlockFor(sessionId)
-    const ctx = await mount({ blockIntake: true })
-    await dispatch(ctx, new FakeAgent(headed(sessionId)), [userMessage(OBJECTIVE)])
+  it('leaves a user message untouched', async () => {
+    const ctx = await mount()
+    const messages = [userMessage(OBJECTIVE)]
+    const { decision, nextCalls } = await dispatch(ctx, new FakeAgent(headed('sess-beat-user')), messages)
+    expect(decision.kind).toBe('enter')
+    expect(decision.messages).toBe(messages)
+    expect(nextCalls).toBe(1)
     expect(readHeartbeatListenObservations({ dir: ledger })).toHaveLength(0)
   })
 
-  it('survives a batch it cannot read, in both shapes, and writes nothing', async () => {
-    const sessionId = 'sess-m3-malformed'
-    await openBlockFor(sessionId)
-    // A batch with an element that is not even an object. The listener now runs on every
-    // pre-step, so reading it must answer "not a heartbeat" instead of throwing: a
-    // listener that can take a turn down is worse than one that misses a beat.
-    const messages = [null as never]
-    // The predicate itself is total: the gate calls it on every message of every batch,
-    // so it may not throw on any input.
+  it('survives a batch it cannot read, and writes nothing for it', async () => {
+    // The listener runs on every pre-step now, so a null element has to read as "not a
+    // heartbeat" instead of taking the turn down.
     expect(isHeartbeatMessage(null)).toBe(false)
     expect(isHeartbeatMessage(undefined)).toBe(false)
     expect(isHeartbeatMessage({})).toBe(false)
 
-    // The shape where the listener is the only listener on the chain.
-    const owning = await mount({ blockIntake: true, legacyGate: false })
-    const decision = await dispatch(owning, new FakeAgent(headed(sessionId)), messages)
+    const ctx = await mount()
+    const messages = [null as never]
+    const { decision, nextCalls } = await dispatch(ctx, new FakeAgent(headed('sess-beat-malformed')), messages)
     expect(decision.kind).toBe('enter')
     expect(decision.messages).toBe(messages)
+    expect(nextCalls).toBe(1)
     expect(readHeartbeatListenObservations({ dir: ledger })).toHaveLength(0)
-
-    // And the observing shape, where the old gate still decides: the listener is not the
-    // one that breaks the batch.
-    const observing = new Context()
-    mountedContexts.push(observing)
-    installHeartbeatListen({
-      ctx: observing,
-      logger: { warn: () => {} },
-      enabled: true,
-      ownsRouting: false,
-      config: resolveConfig({}),
-      options: { dir: ledger },
-    })
-    const passed = await dispatch(observing, new FakeAgent(headed(sessionId)), messages)
-    expect(passed.kind).toBe('enter')
-    expect(passed.messages).toBe(messages)
-    expect(readHeartbeatListenObservations({ dir: ledger })).toHaveLength(0)
-    expect(existsSync(join(ledger, HEARTBEATS_FILE))).toBe(false)
   })
 })
 
-/* ------------------------------------------------------------ the switch -- */
+/* ---------------------------------------- 4. two files, one writer each -- */
 
-describe('legacyGate: false leaves the narrow listener alone on the chain', () => {
-  let ledger = ''
-
-  beforeAll(() => {
-    mkdirSync(join(process.cwd(), '.tmp'), { recursive: true })
-    ledger = mkdtempSync(join(process.cwd(), '.tmp', 'm3-legacy-off-'))
-    process.env['GROK_WORKFLOW_BLOCK_LEDGER_DIR'] = ledger
-  })
-
-  afterAll(() => {
-    try { rmSync(ledger, { recursive: true, force: true }) } catch { /* already gone */ }
-  })
-
-  beforeEach(() => {
-    for (const file of [HEARTBEATS_FILE, HEARTBEATS_LISTEN_FILE, 'blocks.jsonl', 'verdicts.jsonl']) {
-      try { rmSync(join(ledger, file), { force: true }) } catch { /* nothing to remove */ }
-    }
-  })
-
-  it('registers the narrow listener only, and lets a user message through untouched', async () => {
-    const ctx = await mount({ blockIntake: true, legacyGate: false })
-    expect(listenerCount(ctx), 'the old front desk must not be registered').toBe(1)
-    const messages = [userMessage(OBJECTIVE)]
-    const decision = await dispatch(ctx, new FakeAgent(headed('sess-m3-gate-off')), messages)
-    // No gate means no admission decision: the batch reaches the model as it is. That
-    // is the shape the switch exists for, not a regression.
+describe('4. two files, one writer each', () => {
+  it('writes one line to each file for one beat while the intake is on', async () => {
+    const sessionId = 'sess-files-on'
+    await openBlockFor(sessionId)
+    const ctx = await mount({ blockIntake: true })
+    const { decision } = await dispatch(ctx, new FakeAgent(headed(sessionId)), [heartbeat()])
     expect(decision.kind).toBe('enter')
-    expect(decision.messages).toBe(messages)
+    // The intake's observation answers "which blocks did this beat find open".
+    const opened = linesOf(HEARTBEATS_FILE)
+    expect(opened).toHaveLength(1)
+    expect(JSON.parse(opened[0]!)).toMatchObject({ kind: 'heartbeat', sessionId, blockIds: [`row-${sessionId}`] })
+    // This listener's own file answers "what did the beat do".
+    const recorded = readHeartbeatListenObservations({ dir: ledger })
+    expect(recorded).toHaveLength(1)
+    expect(recorded[0]).toMatchObject({ sessionId, outcome: 'continued' })
   })
 
-  it('reviews the brakes itself, and a stopped beat is refused with no turn', async () => {
-    const ctx = new Context()
-    mountedContexts.push(ctx)
-    const stops: { sessionId: string, code: string, detail: string }[] = []
-    const loop = {
-      review: () => ({ kind: 'stop' as const, code: 'loop/daily-cap' as const, detail: '今天已经跑满' }),
-      admit: () => {},
-      stop: async (input: { sessionId: string, code: string, detail: string }) => { stops.push(input) },
+  it('never creates the intake file when the intake is off', async () => {
+    const sessionId = 'sess-files-off'
+    await openBlockFor(sessionId)
+    const ctx = await mount({ blockIntake: false })
+    const { decision } = await dispatch(ctx, new FakeAgent(headed(sessionId)), [heartbeat()])
+    expect(decision.kind).toBe('enter')
+    expect(existsSync(join(ledger, HEARTBEATS_FILE)), 'no intake observer, no intake file').toBe(false)
+    const recorded = readHeartbeatListenObservations({ dir: ledger })
+    expect(recorded).toHaveLength(1)
+    expect(recorded[0]).toMatchObject({ sessionId, outcome: 'continued' })
+  })
+})
+
+/* ----------------------------------------------------- 5. registration -- */
+
+describe('5. registration', () => {
+  it('registers no intake listener and no block tool when the intake is off — and the narrow listener still exists', async () => {
+    const ctx = await mount({ blockIntake: false })
+    expect(listenerCount(ctx), 'the narrow listener is not part of the intake branch').toBe(1)
+    for (const name of Object.values(BLOCK_TOOL_NAMES)) {
+      expect(ctx.tools.get(name), `${name} must not be registered`).toBeUndefined()
     }
-    installHeartbeatListen({
-      ctx,
-      logger: { warn: () => {} },
-      enabled: true,
-      ownsRouting: true,
-      loop,
-      config: resolveConfig({}),
-    })
-    let nextCalls = 0
-    const decision = await ctx.waterfall(
-      'agent/pre-step',
-      { agent: new FakeAgent(headed('sess-m3-stop')), messages: [scheduleMessage(`${LOOP_PROMPT_PREFIX} round 4`)], turn: 1, step: 1, signal: new AbortController().signal } as never,
-      async () => { nextCalls += 1; return { kind: 'enter', messages: [] } },
-    ) as Decision
+    // The one listener on the chain is the narrow one: it is what records the beat.
+    const sessionId = 'sess-reg-off'
+    await openBlockFor(sessionId)
+    await dispatch(ctx, new FakeAgent(headed(sessionId)), [heartbeat()])
+    expect(readHeartbeatListenObservations({ dir: ledger })).toHaveLength(1)
+  })
+
+  it('adds the intake observer — and nothing else — when the intake is on', async () => {
+    const off = await mount({ blockIntake: false })
+    const on = await mount({ blockIntake: true })
+    expect(listenerCount(on) - listenerCount(off), 'exactly one more listener').toBe(1)
+    // The added one is the intake observer: its file appears for a beat that finds work.
+    const sessionId = 'sess-reg-on'
+    await openBlockFor(sessionId)
+    await dispatch(on, new FakeAgent(headed(sessionId)), [heartbeat()])
+    expect(linesOf(HEARTBEATS_FILE)).toHaveLength(1)
+  })
+
+  it('adds the gate when legacyGate is true', async () => {
+    const without = await mount()
+    const withGate = await mount({ legacyGate: true })
+    expect(listenerCount(withGate) - listenerCount(without), 'the gate is the only addition').toBe(1)
+  })
+
+  it('never lets a heartbeat reach the gate\'s decision, even with the gate registered', async () => {
+    // The gate's classifier is where a beat used to be routed. It takes no brake port any
+    // more and answers "not a user request", so a beat's fate is not its decision: no
+    // `loop-stop`, and no `loop-continuation` either.
+    const verdict = classifyPreStep(
+      { config: resolveConfig({}) },
+      {
+        agent: new FakeAgent(headed('sess-reg-gate')) as never,
+        messages: [heartbeat()],
+        turn: 1,
+        step: 1,
+        signal: new AbortController().signal,
+      } as never,
+    )
+    expect(verdict).toEqual({ kind: 'pass', reason: 'non-user-source' })
+
+    // And on the composed chain: a stopped beat is refused before the gate is reached,
+    // so the gate cannot be the thing that decided it.
+    const marker = join(ledger, 'STOP-gate-shape')
+    writeFileSync(marker, '')
+    process.env['GROK_WORKFLOW_STOP_FILE'] = marker
+    const withGate = await mount({ legacyGate: true })
+    const { decision, nextCalls } = await dispatch(withGate, new FakeAgent(headed('sess-reg-gate-stop')), [heartbeat()])
     expect(decision.kind).toBe('reject')
-    expect(nextCalls, 'a stopped beat must not open a turn').toBe(0)
-    expect(stops).toEqual([{ sessionId: 'sess-m3-stop', code: 'loop/daily-cap', detail: '今天已经跑满' }])
-    const observed = readHeartbeatListenObservations({ dir: ledger })
-    expect(observed).toHaveLength(1)
-    expect(observed[0]!.outcome).toBe('stopped')
-    expect(observed[0]!.code).toBe('loop/daily-cap')
-  })
-
-  it('continues a beat the brakes allow, and records that it did', async () => {
-    const ctx = new Context()
-    mountedContexts.push(ctx)
-    const admitted: string[] = []
-    const loop = {
-      review: () => ({ kind: 'continue' as const }),
-      admit: (input: { sessionId: string }) => { admitted.push(input.sessionId) },
-      stop: async () => {},
-    }
-    installHeartbeatListen({
-      ctx,
-      logger: { warn: () => {} },
-      enabled: true,
-      ownsRouting: true,
-      loop,
-      config: resolveConfig({}),
-    })
-    let nextCalls = 0
-    const decision = await ctx.waterfall(
-      'agent/pre-step',
-      { agent: new FakeAgent(headed('sess-m3-continue')), messages: [scheduleMessage(`${LOOP_PROMPT_PREFIX} round 5`)], turn: 1, step: 1, signal: new AbortController().signal } as never,
-      async () => { nextCalls += 1; return { kind: 'enter', messages: [] } },
-    ) as Decision
-    expect(decision.kind).toBe('enter')
-    expect(nextCalls).toBe(1)
-    expect(admitted).toEqual(['sess-m3-continue'])
-    const observed = readHeartbeatListenObservations({ dir: ledger })
-    expect(observed).toHaveLength(1)
-    expect(observed[0]!.outcome).toBe('continued')
+    expect(nextCalls, 'the narrow listener answers before the gate runs').toBe(0)
   })
 })

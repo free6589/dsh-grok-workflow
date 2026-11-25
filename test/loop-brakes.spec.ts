@@ -6,8 +6,9 @@ import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import { Session } from '@deepseek-ai/dsh-session'
 import { describe, expect, it, vi } from 'vitest'
 import { HARD_LIMITS, resolveConfig } from '../src/config.js'
-import { classifyPreStep, installGate } from '../src/gate.js'
-import type { GateDeps, PreStepPayload } from '../src/gate.js'
+import { classifyPreStep } from '../src/gate.js'
+import type { PreStepPayload } from '../src/gate.js'
+import { installHeartbeatListen, readHeartbeatListenObservations } from '../src/heartbeat-listen.js'
 import { LOOP_PROMPT_PREFIX, LOOP_TASK_TITLE, loopPolicyFromConfig } from '../src/loop.js'
 import {
   LOOP_ROUND_RECORD,
@@ -28,12 +29,16 @@ import { createActiveState } from '../src/run.js'
 import type { WorkflowLogger } from '../src/run.js'
 
 /**
- * The loop's finite brakes and the pre-step hook that applies them.
+ * The loop's finite brakes and the pre-step listener that applies them.
  *
  * A heartbeat is one Host Schedule delivery and the driver owns no timer, so these
  * tests pin the two things a timer would otherwise have guaranteed: that every stop
  * condition is evaluated on the delivery itself, and that a stopped heartbeat spends
  * nothing (a `reject`, not a turn).
+ *
+ * Since M3.2 the listener is the narrow one (`src/heartbeat-listen.ts`): the old front
+ * desk no longer routes a beat, so the cases that drive a stop install that listener
+ * rather than the gate.
  */
 
 const silent: WorkflowLogger = { warn: () => {}, info: () => {} }
@@ -259,7 +264,7 @@ describe('the accounting a brake reads is the session log', () => {
 
 /* -------------------------------------------------------------- the port -- */
 
-describe('the port the gate calls', () => {
+describe('the port the listener calls', () => {
   function port(options: { root?: string; disposed?: boolean; rows?: FakeRow[] } = {}) {
     const schedule = new FakeSchedule(options.rows ?? [])
     const brakes = createLoopBrakes({
@@ -299,56 +304,79 @@ describe('the port the gate calls', () => {
 
 /* --------------------------------------------------------- pre-step hook -- */
 
-describe('the pre-step hook routes a heartbeat instead of reading it as a request', () => {
-  it('classifies a schedule delivery as continuation, not as a user request', () => {
-    const verdict = classifyPreStep({ config: config() }, payloadFor(new LoopSession()))
-    expect(verdict).toEqual({ kind: 'pass', reason: 'loop-continuation' })
+describe('the narrow listener routes a heartbeat instead of reading it as a request', () => {
+  it('charges exactly one round and hands the step on', async () => {
+    const review = vi.fn(() => ({ kind: 'continue' as const }))
+    const admit = vi.fn()
+    const wired = listenForTest({ loop: stubPort({ review, admit }) })
+    const next = vi.fn(async () => ({ kind: 'enter' as const, messages: [] }))
+
+    const decision = await wired.handler(payloadFor(new LoopSession()), next)
+
+    expect(review).toHaveBeenCalledTimes(1)
+    expect(admit).toHaveBeenCalledTimes(1)
+    // The continuation decision is the session's own ordinary turn: the listener hands
+    // the step on and starts no run, whatever the workflow mode says.
+    expect(decision).toEqual({ kind: 'enter', messages: [] })
+    expect(next).toHaveBeenCalledTimes(1)
   })
 
-  it('never admits a heartbeat, even with the workflow mode on', () => {
-    const verdict = classifyPreStep({ config: config({ grokDefault: 'on' }) }, payloadFor(new LoopSession()))
-    expect(verdict.kind).toBe('pass')
-  })
-
-  it('leaves a user message that merely quotes the marker alone', () => {
-    const session = new LoopSession()
-    const message = text(`${LOOP_PROMPT_PREFIX} this is my own note`, 'user')
-    const verdict = classifyPreStep({ config: config() }, { agent: agentOf(session) as never, messages: [message], turn: 1, step: 1, signal: new AbortController().signal })
-    expect(verdict).toMatchObject({ kind: 'admit' })
-  })
-
-  it('never continues a loop inside a delegated child session', () => {
+  it('never continues a loop inside a delegated child session', async () => {
     const review = vi.fn(() => ({ kind: 'continue' as const }))
     const admit = vi.fn()
     const child = new LoopSession()
     // A child's header carries the delegation depth; a heartbeat there is mis-targeted.
     Object.assign(child, { header: { origin: 'subagent', delegationDepth: 1 } })
-    const verdict = classifyPreStep({ config: config(), loop: stubPort({ review, admit }) }, payloadFor(child))
-    expect(verdict).toEqual({ kind: 'pass', reason: 'subagent' })
+    const wired = listenForTest({ loop: stubPort({ review, admit }) })
+    const next = vi.fn(async () => ({ kind: 'enter' as const, messages: [] }))
+
+    const decision = await wired.handler(payloadFor(child), next)
+
+    expect(decision).toEqual({ kind: 'enter', messages: [] })
     expect(review).not.toHaveBeenCalled()
     expect(admit).not.toHaveBeenCalled()
   })
 
-  it('asks the brakes before letting the heartbeat continue', () => {
-    const review = vi.fn(() => ({ kind: 'continue' as const }))
-    const admit = vi.fn()
-    const verdict = classifyPreStep({ config: config(), loop: stubPort({ review, admit }) }, payloadFor(new LoopSession()))
-    expect(review).toHaveBeenCalledTimes(1)
-    expect(admit).toHaveBeenCalledTimes(1)
-    expect(verdict).toEqual({ kind: 'pass', reason: 'loop-continuation' })
-  })
-
-  it('reports the tripped brake instead of continuing', () => {
+  it('refuses the step when the brakes trip, and charges nothing', async () => {
     const review = vi.fn(() => ({ kind: 'stop' as const, code: 'loop/daily-cap' as const, detail: '24 rounds already ran today' }))
     const admit = vi.fn()
-    const verdict = classifyPreStep({ config: config(), loop: stubPort({ review, admit }) }, payloadFor(new LoopSession()))
-    expect(verdict).toMatchObject({ kind: 'loop-stop', code: 'loop/daily-cap', agentId: 'sess-loop' })
+    const stop = vi.fn(async () => {})
+    const wired = listenForTest({ loop: stubPort({ review, admit, stop }) })
+    const next = vi.fn(async () => ({ kind: 'enter' as const, messages: [] }))
+
+    const decision = await wired.handler(payloadFor(new LoopSession()), next)
+
+    expect(decision).toEqual({ kind: 'reject' })
     expect(admit).not.toHaveBeenCalled()
+    expect(next).not.toHaveBeenCalled()
+    // The row is deleted by the listener, not by the caller: the beat must not come back.
+    expect(stop).toHaveBeenCalledWith({ sessionId: 'sess-loop', code: 'loop/daily-cap', detail: '24 rounds already ran today' })
   })
 
-  it('still passes a heartbeat when no driver is wired, and counts nothing', () => {
-    const verdict = classifyPreStep({ config: config() }, payloadFor(new LoopSession()))
-    expect(verdict).toEqual({ kind: 'pass', reason: 'loop-continuation' })
+  it('still passes a heartbeat when no driver is wired, and counts nothing', async () => {
+    const wired = listenForTest()
+    // A real session, so "counts nothing" is read off the same log the brakes write.
+    const session = Session.create('sess-loop' as never)
+    const next = vi.fn(async () => ({ kind: 'enter' as const, messages: [] }))
+
+    const decision = await wired.handler(payloadFor(session), next)
+
+    expect(decision).toEqual({ kind: 'enter', messages: [] })
+    expect(next).toHaveBeenCalledTimes(1)
+    expect(readLoopRounds(session)).toHaveLength(0)
+    // A beat it let through is still recorded — as what it did, not as a decision.
+    expect(readHeartbeatListenObservations({ dir: wired.dir })).toMatchObject([
+      { sessionId: 'sess-loop', outcome: 'continued' },
+    ])
+  })
+
+  it('leaves a user message that merely quotes the marker to the gate', () => {
+    // The gate no longer routes heartbeats, but it still decides a user message: the
+    // marker alone is not a beat, because the delivery source has to agree with it.
+    const session = new LoopSession()
+    const message = text(`${LOOP_PROMPT_PREFIX} this is my own note`, 'user')
+    const verdict = classifyPreStep({ config: config() }, { agent: agentOf(session) as never, messages: [message], turn: 1, step: 1, signal: new AbortController().signal })
+    expect(verdict).toMatchObject({ kind: 'admit' })
   })
 })
 
@@ -359,7 +387,7 @@ describe('a tripped brake refuses the step and removes the driver', () => {
     writeFileSync(join(root, '.rsi', 'STOP'), 'operator pause\n')
     const schedule = new FakeSchedule([loopRow('sess-hooked')])
     const session = Session.create('sess-hooked' as never)
-    const wired = installForTest({ schedule, stopFile: () => join(root, '.rsi', 'STOP') })
+    const wired = listenForTest({ schedule, stopFile: () => join(root, '.rsi', 'STOP') })
     const next = vi.fn(async () => ({ kind: 'enter' as const, messages: [] }))
 
     const decision = await wired.handler(payloadFor(session), next)
@@ -372,7 +400,7 @@ describe('a tripped brake refuses the step and removes the driver', () => {
   it('lets a clean heartbeat through and charges it', async () => {
     const schedule = new FakeSchedule([loopRow('sess-clean')])
     const session = Session.create('sess-clean' as never)
-    const wired = installForTest({ schedule, stopFile: () => join(mkdtempSync(join(tmpdir(), 'loop-clean-')), 'STOP') })
+    const wired = listenForTest({ schedule, stopFile: () => join(mkdtempSync(join(tmpdir(), 'loop-clean-')), 'STOP') })
     const next = vi.fn(async () => ({ kind: 'enter' as const, messages: [] }))
 
     const decision = await wired.handler(payloadFor(session), next)
@@ -390,7 +418,7 @@ describe('a tripped brake refuses the step and removes the driver', () => {
       assistant: 0,
       rounds: [round({ sessionId: 'sess-fail', failureStreak: 2 })],
     })
-    const wired = installForTest({ schedule, stopFile: () => '/nonexistent/STOP' })
+    const wired = listenForTest({ schedule, stopFile: () => '/nonexistent/STOP' })
     const next = vi.fn(async () => ({ kind: 'enter' as const, messages: [] }))
 
     const decision = await wired.handler(payloadFor(session), next)
@@ -404,7 +432,7 @@ describe('an unloaded plugin cannot continue a loop', () => {
   it('rejects a heartbeat once the plugin is disposed, and deletes the row', async () => {
     const schedule = new FakeSchedule([loopRow('sess-unloaded')])
     const session = Session.create('sess-unloaded' as never)
-    const wired = installForTest({ schedule, stopFile: () => '/nonexistent/STOP' })
+    const wired = listenForTest({ schedule, stopFile: () => '/nonexistent/STOP' })
     wired.state.disposed = true
     const next = vi.fn(async () => ({ kind: 'enter' as const, messages: [] }))
 
@@ -430,13 +458,14 @@ describe('the continuation path leaves the engine bounds exactly as configured',
   it('starts no run for a heartbeat, so it cannot widen concurrency or retries', async () => {
     const schedule = new FakeSchedule([loopRow('sess-bounds')])
     const session = Session.create('sess-bounds' as never)
-    const wired = installForTest({ schedule, stopFile: () => '/nonexistent/STOP' })
+    const wired = listenForTest({ schedule, stopFile: () => '/nonexistent/STOP' })
     const next = vi.fn(async () => ({ kind: 'enter' as const, messages: [] }))
 
     const decision = await wired.handler(payloadFor(session), next)
 
-    // The continuation decision is the session's own ordinary turn: the gate hands the
-    // step to the next listener and starts no workflow, so neither bound can be widened.
+    // The continuation decision is the session's own ordinary turn: the listener hands
+    // the step to the next listener and starts no workflow, so neither bound can be
+    // widened.
     expect(decision).toEqual({ kind: 'enter', messages: [] })
     expect(next).toHaveBeenCalledTimes(1)
   })
@@ -522,44 +551,54 @@ function stubPort(overrides: Partial<LoopBrakePort> = {}): LoopBrakePort {
 }
 
 /**
- * Install the real gate over a minimal context and hand back its listener.
+ * Install the real narrow listener over a minimal context and hand back its handler.
  *
- * The brake port is the real one, with the stop-marker path and the clock injected so a
- * test does not depend on the repository's own `.rsi/STOP` or on wall time. Nothing else
- * is stubbed: the listener, the classification and the refusal are the shipped ones.
+ * Since M3.2 this listener is the only thing on the chain that decides a heartbeat's
+ * fate, so these cases drive it directly. A case that names a Schedule double and a
+ * stop-marker path gets the real brake port (clock and marker injected, so no test
+ * depends on the repository's own `.rsi/STOP` or on wall time); every other case gets a
+ * stub. Nothing else is stubbed: the review, the refusal, the deleted row and the
+ * recorded line are the shipped ones.
  */
-function installForTest(options: {
-  schedule: FakeSchedule
-  stopFile: () => string
-}): {
+function listenForTest(options: {
+  schedule?: FakeSchedule
+  stopFile?: () => string
+  loop?: LoopBrakePort
+  state?: ReturnType<typeof createActiveState>
+} = {}): {
   handler: (payload: PreStepPayload, next: () => Promise<unknown>) => Promise<unknown>
   state: ReturnType<typeof createActiveState>
+  dir: string
 } {
-  const state = createActiveState()
+  const state = options.state ?? createActiveState()
+  const loop = options.loop ?? (options.schedule === undefined
+    ? undefined
+    : createLoopBrakes({
+      schedule: () => options.schedule as never,
+      logger: silent,
+      stopFile: options.stopFile ?? (() => '/nonexistent/STOP'),
+      disposed: () => state.disposed,
+      now: () => NOW,
+    }))
+  const dir = mkdtempSync(join(tmpdir(), 'loop-listen-'))
   let listener: unknown
   const ctx = {
     on: (event: string, registered: unknown) => {
       if (event === 'agent/pre-step') listener = registered
       return () => {}
     },
-    get: (name: string) => name === 'schedule' ? options.schedule : undefined,
   }
-  const deps: GateDeps = {
+  installHeartbeatListen({
     ctx: ctx as never,
-    config: config(),
-    state,
     logger: silent,
-    loop: createLoopBrakes({
-      schedule: () => options.schedule as never,
-      logger: silent,
-      stopFile: options.stopFile,
-      disposed: () => state.disposed,
-      now: () => NOW,
-    }),
-  }
-  installGate(deps)
+    enabled: true,
+    ...loop === undefined ? {} : { loop },
+    config: config(),
+    options: { dir },
+  })
   return {
     handler: listener as (payload: PreStepPayload, next: () => Promise<unknown>) => Promise<unknown>,
     state,
+    dir,
   }
 }

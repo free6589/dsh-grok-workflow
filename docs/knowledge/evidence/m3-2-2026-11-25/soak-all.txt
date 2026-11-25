@@ -1,0 +1,176 @@
+M3.2 real-machine soak — setup, the two M3.2-specific claims, and the boundary
+2026-11-25, DSH 0.2.2-rc.3, Node v26.8.1
+
+Build under test: worktree .tmp/wt-m3-switch, branch feat/m3-switch, commits
+9fdcb6e → 94727b9 → ad28f17 → 2137afc, version 0.13.34, lib/ rebuilt and
+committed. (The foreman ran `npm run ci` = exit 0, 112 files / 2148 tests, and
+`npm run verify:lib` byte-identical; this soak re-ran neither and does not claim
+to have.)
+
+--- setup -------------------------------------------------------------------
+
+scratch home:  .tmp/m3-soak-2/dsh-home   (DSH_HOME for everything below)
+live home:     ~/.dsh — READ-ONLY, cloned out of, never written (proof below)
+port:          3311 (checked free with `ss -ltn` first; the live instances on
+               3080 / 3065 / 3086 / 3109 were never touched)
+
+1) clone the live web profile (run from the worktree so the repo's own script
+   and its refusals are the ones in play):
+
+   $ cd .tmp/wt-m3-switch && node scripts/clone-profile.mjs \
+       --src ~/.dsh/profiles/web --home .tmp/m3-soak-2/dsh-home --name m32 --force
+   clone-profile: ok — .tmp/m3-soak-2/dsh-home/profiles/m32
+     files 7699 -> 7699 (88444883 bytes)
+     links 5 (relinked 2, already dangling in the source 1)
+     parity 5/5 equal after redaction
+     dependencies 17 declared, 0 unresolved (8/21 bundles from the installation)
+     credentials redacted: 1 line(s) in 1 file(s); vendored fixtures: 4 file(s)
+
+2) install the build:
+
+   $ DSH_HOME=<scratch>/dsh-home dsh plugin --profile m32 add \
+       /home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-m3-switch
+   EXIT=0
+   dependencies:
+   + dsh-grok-workflow link:../../../../wt-m3-switch
+
+3) version read-back (both sides, so "what got installed" is not assumed):
+
+   installed (profile node_modules): 0.13.34
+   source worktree package.json:     0.13.34
+   link target resolves to:          /home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-m3-switch
+
+4) config keys in profiles/m32/cordis.patch.yml:
+
+   blockIntake: true      ← added, as the block requires
+   legacyGate             ← deliberately ABSENT (that absence is the point:
+                            M3.2's default is "do not intercept")
+
+   verified in the composed tree, not just the patch file:
+   $ dsh --profile m32 --dump-config | grep -n "blockIntake\|legacyGate"
+   2020:    blockIntake: true
+   (no legacyGate line at all — the key is absent, so the M3.2 default applies)
+
+--- model routes: an environment adaptation, stated plainly -----------------
+
+The clone carries no credential for the `agent2api` provider, and the live
+profile's default chat model was `agent2api/spark-x2.6-low`. The first attempt
+in scenario 1 therefore failed at the model boundary, not in the plugin:
+
+  MISSING_CREDENTIAL  llm-pi-ai: no credential for provider route "agent2api";
+  its profile resolves AGENT2API_API_KEY, which is not set …
+
+No credential was copied out of the live home and none was read. Instead every
+model route in the scratch profile was re-pointed at a provider the clone can
+authenticate (BIFROST_VIRTUAL_KEY is present in this environment):
+
+  agent-default-model          → bifrost-responses / opencode-go/muse-spark-1.3-contributor
+  roles.worker/verifier/
+    synthesizer/supervisor     → bifrost-responses / opencode-go/muse-spark-1.3-contributor
+  guardianModel                → bifrost-responses / opencode-go/muse-spark-1.3-contributor
+  (planner was already on that route)
+
+Route liveness was checked before relying on it:
+  $ curl -X POST http://127.0.0.1:18088/openai/v1/responses -d '{"model":
+    "opencode-go/muse-spark-1.3-contributor","input":"say OK",…}'
+  HTTP=200  time=1.64s
+
+This changes only which model answers; it touches nothing the four scenarios
+claim to measure (interception, run count, admission, heartbeat, uninstall).
+
+--- claim A: a heartbeat is decided by the narrow listener -------------------
+
+Status: NOT_RUN.
+
+What it would need on this machine: an OPEN BLOCK in a session (blockIntake is
+on, so the intake observer would be registered) plus a real heartbeat delivery
+to that session, then a read of
+$DSH_HOME/taskboards/grok-workflow/heartbeats-listen.jsonl for a `continued` or
+`stopped` line and of heartbeats.jsonl for its absence/presence.
+
+What actually happened: no scenario in this soak opened a block. The admission
+probe (claim B) was refused with `mode-off` before any block existed, and
+turning grok mode on, getting a user consent, opening a block and then waiting
+for a heartbeat did not fit the time box. So:
+  - $DSH_HOME/taskboards/ does not exist at all after every scenario;
+  - neither heartbeats-listen.jsonl nor heartbeats.jsonl was ever written.
+The absence is consistent with the design (both observers write only when a
+session has an open block), but consistency is not evidence, so this claim is
+NOT_RUN rather than CONFIRMED. It is the one part of the block this soak does
+not pin.
+
+--- claim B: admission is live (mode-off) -----------------------------------
+
+Status: CONFIRMED.
+
+A session that never turned grok mode on was asked, in its own words, to open a
+block:
+
+  $ DSH_HOME=<scratch>/dsh-home dsh --profile m32h \
+      '请立刻调用 grok_open_block 工具开一个块，目标是计算 2+2。必须真的调用这个工具，不要只解释。'
+  EXIT=0
+
+Session session-a70ea56a-1cfa-4c1c-a4f7-1c21a1f2b62c, extracted from the log:
+
+  tool/call   name=grok_open_block
+              arguments={"blocks":[{"acceptance":["计算结果为4"],"deliverable":…
+  tool/result isError=true
+              "Error: mode-off: 这个会话的 grok 模式没打开，接单台不接单。下一步：
+               这个会话没有打开 grok 模式；先让用户打开模式，再调接单台的工具"
+
+  mode-off occurrences in the session log: 1
+  $DSH_HOME/taskboards/: still absent — the refusal happens before any ledger read
+
+So the refusal is visible in the tool result itself, not inferred from the
+model's prose. The model's own summary ("没办成 … 咱们的分工开关没打开") is
+consistent but is not what this claim rests on.
+
+--- ~/.dsh was not written (stat before and after) ---------------------------
+
+  before (taken at session start, 06:26):
+    /home/fish/.dsh                size=1548  mtime=1795362020  2026-11-22 23:40:20.274932030 +0800
+    /home/fish/.dsh/profiles/web   size=196   mtime=1795530213  2026-11-24 22:23:33.297226652 +0800
+  after (taken at 07:24, after all four scenarios):
+    /home/fish/.dsh                size=1548  mtime=1795362020  2026-11-22 23:40:20.274932030 +0800
+    /home/fish/.dsh/profiles/web   size=196   mtime=1795530213  2026-11-24 22:23:33.297226652 +0800
+
+Identical size and identical mtime on both. CONFIRMED: the live home was not
+written.
+
+--- what was deleted / stopped ----------------------------------------------
+
+  - The web instance started for this soak (127.0.0.1:3311, three boots across
+    scenarios 1, 3 and 4) was stopped through the job controller; `ss -ltn`
+    shows 3311 free and `ps` shows no m32 / m32h process left.
+  - The whole scratch home .tmp/m3-soak-2 (including dsh-home, the profiles m32
+    and m32h, the session logs, checkpoints, and the driver scripts) was deleted
+    after the evidence was extracted.
+  - Nothing outside .tmp/ was created, and no live instance was restarted,
+    reloaded or killed.
+
+--- honest boundary --------------------------------------------------------
+
+- The four scenarios ran against a CLONE with re-pointed model routes (above).
+  That is the plugin's real code on a real harness with a real model, but it is
+  not the live profile's exact model configuration.
+- Scenario 2 did not run the literal command from the brief: `dsh --profile m32
+  headless '<objective>'` exits 1 with "too many arguments. Expected 0 arguments
+  but got 2: headless, …". The headless run used a sibling profile m32h with the
+  same config and build and only the app bundle swapped
+  (dsh-web-app → dsh-headless). The failure is recorded in soak-2-headless.txt.
+- Scenario 3 could not adopt the killed session at all: `--session-id` is
+  refused because the session journal contains `tool-workflow/guardian-start`,
+  an event type this harness treats as unknown and not ignorable. That is
+  pre-existing (commit 891b8a2), not an M3.2 change, and it is BLOCKED rather
+  than worked around. The resume that did happen is a new run carrying a
+  plugin-generated seed, not engine-level restore — which is what the design
+  says resume means.
+- Claim A (heartbeat) is NOT_RUN, as described above.
+- Scenario 4 did not exercise a hot unload (removing the plugin from a running
+  instance); the instance was stopped first. A node_modules symlink survives the
+  removal and is reported as residue.
+- No screenshots and no large dumps are kept: every file here is a command plus
+  the extracted lines that carry the claim.
+- No secrets: the web boot token appears nowhere in this directory (written as
+  <REDACTED>), no API key value appears, and the only addresses used are
+  127.0.0.1 and the provider proxy at 127.0.0.1:18088.

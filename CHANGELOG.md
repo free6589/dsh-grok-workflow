@@ -8,21 +8,39 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 ### Added / 新增
 
 - **A switch for the old front desk, and a heartbeat listener that can stand on its own / 多了一个旧前台的开关，和一个能独立接管的心跳监听**
-  — Nothing changes unless you ask for it: the old front desk stays on by default and your messages are handled exactly as before. A new
-  profile setting, `legacyGate`, lets you turn that desk off; when you do, your ordinary messages go straight to the model with nothing
-  in between, and the one thing that still keeps an eye on scheduled heartbeats is the block intake's own listener — which now reviews
-  the same brakes and can stop a beat by itself. Each shape writes its own small record of what happened to a beat, so the two never
-  write over each other, and the intake's record of "which blocks does this beat still owe" is left alone. It is a setting you change and
-  then restart, not a live toggle. Separately, the block tools now all check one shared "may this session use the intake at all" rule;
-  that rule answers yes for every session in this build, so no answer changes today — it is there so the check has one home when it does.
-  / 不改就不会变：旧前台默认仍然开着，你的消息还是照旧被它处理。新的档案设置 `legacyGate` 可以把这个前台关掉；关掉之后，你的普通消息
-  直接到模型、中间不再有人接，唯一还盯着定时心跳的是接单台自己的那个监听——它现在会复核同一套刹车，也能自己停掉一拍。两种状态各写各的
-  小记录，互不覆盖；「这一拍还欠哪几个块」那份记录在关掉前台时不再写，因为写它的那个观测器跟着一起不注册。这个开关改完要重启才生效，
-  不是热开关。另外，接单台的几个工具现在共用一个「这个会话到底能不能用接单台」的判断；这一版里它对每个会话都回答「可以」，所以今天的
-  行为一点没变——把它放在这里，是为了等它真能拒绝时只有一个地方要改。
+  — A profile setting, `legacyGate`, decides whether the old front desk is registered at all. It is off unless you write it; writing it puts
+  the desk back for your messages only, and it never has a say about a scheduled heartbeat. The plugin's own listener is what reviews the
+  brakes and can stop a beat by itself, and the two write separate small records of a beat — the listener's says what became of the beat,
+  the intake's says which blocks still owe work — so neither writes over the other. Both are settings you change and then restart, not live
+  toggles.
+  / 档案里多了一个 `legacyGate`：它决定旧前台要不要装，不写就是关着；写上它就只把你的消息交回前台，定时心跳不归它管。复核刹车、能自己
+  停掉一拍的是插件自己的那个监听；两边各写各的一小行记录——监听那行说这一拍怎么了，接单台那行说还欠哪几个块——互不覆盖。
+  这两个都是改完要重启的开关，不是热开关。
+
+### Changed / 变更
+
+- **Your messages are no longer intercepted by default / 默认不再有人拦你的消息** — An ordinary message now goes straight to the model:
+  no front-desk reply is inserted, and what you typed reaches the model word for word. The old front desk is opt-in now — a profile has to
+  ask for it with `legacyGate: true`. / 普通一句话现在直接到模型：中间不再插一条前台的转述，你打的字逐字到达模型。
+  旧前台改成要你自己打开：档案里写 `legacyGate: true` 才会装回来。
+- **The block tools refuse a session that has not turned grok mode on / 没开 grok 模式的会话，块工具会拒绝** — Ordering a block in a
+  session that never turned the mode on is now refused, with the reason and the next step in the refusal itself, instead of going ahead.
+  Turn the mode on first. / 在没打开 grok 模式的会话里开块，现在会被拒绝，拒绝里就写着原因和下一步，而不是先干起来。
+  先打开模式再开块。
+- **One listener owns the heartbeat brakes on every load / 每次载入都只有一个监听管刹车** — The listener that reviews the brakes and can
+  stop a beat is installed even when the block intake is switched off, so a scheduled loop the brakes have stopped stays stopped instead of
+  running on with nobody left to stop it. / 复核刹车、能停掉一拍的监听，接单台关着时也会装上：被刹车停过的定时循环还是停着，
+  不会变成没人管、接着跑。
 
 ### Fixed / 修复
 
+- **While a question is open, your next vague message carries the earlier request / 问题还开着时，你下一句含糊的话会带上先前那条请求** —
+  When the plugin has asked you which gear to use and you answer with something vague, it could previously satisfy that reply from what it
+  already had on hand and quietly drop the request you were being asked about. Now the open question wins: the look-up still runs, but
+  while a question is waiting it cannot answer in your place, so this turn asks again and carries both requests, and the answer you finally
+  give answers both. / 插件问过你要用哪一档、而你回了一句含糊的话时，它以前可能拿手上已有的东西直接答这句，把刚才那条还没答的请求
+  悄悄丢掉。现在开着的问句优先：查找照旧会做，但只要还有问题等着你回答，它就不能替你把这句话答掉——这一轮会再问一次、把两条请求
+  一起带上，你最后给的那个答案同时回答两条。
 - **Saying yes through a question card now counts as your approval / 点问题卡片说「确认」现在算你批准了** — When a
   block is ordered, you can approve it by clicking a question card instead of typing the word. The Host delivers that
   answer as a different kind of message, and both the block start and the gate only looked for a typed turn: the start

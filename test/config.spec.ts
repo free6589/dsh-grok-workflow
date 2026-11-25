@@ -3,6 +3,7 @@ import {
   CONFIG_KEYS,
   CONFIG_VERSION,
   Config,
+  DEFAULT_LEGACY_GATE,
   DEFAULT_MAX_CONCURRENCY,
   DEFAULT_REPLAN,
   DEFAULT_TIMEOUT_MS,
@@ -248,6 +249,24 @@ describe('configuration surface', () => {
       loopIntervalMin: 0,
       configVersion: CONFIG_VERSION,
     })
+  })
+
+  it('defaults the old front desk off, and keeps the key as an explicit opt-in', () => {
+    // M3.2: the front desk is not registered unless a profile asks for it. The key
+    // survives as that opt-in, so omitting it and writing `false` are the same shape and
+    // `true` is the only value that registers a listener.
+    expect(DEFAULT_LEGACY_GATE).toBe(false)
+    expect(resolveConfig({} as never).legacyGate).toBe(false)
+    expect(resolveConfig({ legacyGate: true } as never).legacyGate).toBe(true)
+    expect(snapshotConfig(Config({}))).toMatchObject({ legacyGate: false })
+    // Fail closed, like every other switch: a string that reads as truthy would silently
+    // register a listener the profile never asked for.
+    expect(() => resolveConfig({ legacyGate: 'on' } as never)).toThrow(/legacyGate must be true or false/)
+    // The key is part of the accepted surface, and the effective-configuration line still
+    // states it either way.
+    expect(CONFIG_KEYS).toContain('legacyGate')
+    expect(describeResolvedConfig(resolveConfig({}))).toContain('legacyGate=off')
+    expect(describeResolvedConfig(resolveConfig({ legacyGate: true } as never))).toContain('legacyGate=on')
   })
 
   it('validates the four repeat-run keys and defaults a loop off and bounded', () => {

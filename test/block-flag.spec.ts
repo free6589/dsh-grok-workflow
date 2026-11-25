@@ -24,7 +24,7 @@
  * folding one removes no decision, because an id is identity, not content.
  */
 
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
@@ -165,6 +165,19 @@ const mountedContexts: Context[] = []
 const previousStopFile = process.env['GROK_WORKFLOW_STOP_FILE']
 process.env['GROK_WORKFLOW_STOP_FILE'] = `${process.cwd()}/.tmp/block-flag/STOP-does-not-exist`
 
+/**
+ * One throwaway ledger directory for the whole file.
+ *
+ * Since M3.2 the narrow heartbeat listener is installed on every load and writes a line
+ * per beat, so a mount that omitted this override would write into `$DSH_HOME`
+ * (`~/.dsh` on a developer machine). The directory is set before the first mount, not
+ * only in the observer cases, because the decision cases dispatch a heartbeat too.
+ */
+const previousLedgerDir = process.env['GROK_WORKFLOW_BLOCK_LEDGER_DIR']
+mkdirSync(join(process.cwd(), '.tmp'), { recursive: true })
+const ledger = mkdtempSync(join(process.cwd(), '.tmp', 'block-flag-heartbeat-'))
+process.env['GROK_WORKFLOW_BLOCK_LEDGER_DIR'] = ledger
+
 afterEach(async () => {
   for (const ctx of mountedContexts.splice(0)) {
     try { await ctx.fiber.dispose() } catch { /* already disposed */ }
@@ -174,6 +187,9 @@ afterEach(async () => {
 afterAll(() => {
   if (previousStopFile === undefined) delete process.env['GROK_WORKFLOW_STOP_FILE']
   else process.env['GROK_WORKFLOW_STOP_FILE'] = previousStopFile
+  if (previousLedgerDir === undefined) delete process.env['GROK_WORKFLOW_BLOCK_LEDGER_DIR']
+  else process.env['GROK_WORKFLOW_BLOCK_LEDGER_DIR'] = previousLedgerDir
+  try { rmSync(ledger, { recursive: true, force: true }) } catch { /* already gone */ }
 })
 
 interface Mounted { ctx: Context; engine: FakeEngine }
@@ -200,6 +216,11 @@ async function mount(
   apply(ctx as never, {
     mode: 'full',
     grokDefault: 'on',
+    // `legacyGate: true` on purpose: this file is about the *intake* switch, and every
+    // decision below is the front desk's. Since M3.2 the front desk is opt-in, so a mount
+    // that omitted it would have no admission decision to compare at all — both sides
+    // would be the narrow heartbeat listener passing the batch through.
+    legacyGate: true,
     ...flag === 'absent' ? {} : { blockIntake: flag === 'true' },
     ...overrides,
   })
@@ -446,18 +467,6 @@ describe('blockIntake: false is the pre-feature load, byte for byte', () => {
  * was not asked to do.
  */
 describe('the heartbeat observer records a beat and changes no decision', () => {
-  let ledger = ''
-
-  beforeAll(() => {
-    mkdirSync(join(process.cwd(), '.tmp'), { recursive: true })
-    ledger = mkdtempSync(join(process.cwd(), '.tmp', 'block-flag-heartbeat-'))
-    process.env['GROK_WORKFLOW_BLOCK_LEDGER_DIR'] = ledger
-  })
-
-  afterAll(() => {
-    try { rmSync(ledger, { recursive: true, force: true }) } catch { /* already gone */ }
-  })
-
   beforeEach(() => {
     for (const file of [HEARTBEATS_FILE, 'blocks.jsonl', 'verdicts.jsonl']) {
       try { rmSync(join(ledger, file), { force: true }) } catch { /* nothing to remove */ }
@@ -500,9 +509,13 @@ describe('the heartbeat observer records a beat and changes no decision', () => 
     return (events._hooks['agent/pre-step'] ?? []).length
   }
 
-  it('registers no listener at all when the flag is off', async () => {
+  it('adds no listener of its own when the flag is off', async () => {
     const mounted = await mount('false')
-    expect(listenerCount(mounted.ctx), 'off must not add a listener to the chain').toBe(1)
+    // Two listeners, neither of them the intake's: the front desk (opted in by the mount)
+    // and the narrow heartbeat listener every load carries since M3.2. The intake's own
+    // observer would be the third, and "off" is the claim that it is absent.
+    expect(listenerCount(mounted.ctx), 'off must not add a listener to the chain').toBe(2)
+    expect(listenerCount(mounted.ctx)).toBe(listenerCount((await mount('absent')).ctx))
     const sessionId = 'sess-brake-off'
     await openBlockFor(sessionId)
     const before = readFileSync(join(ledger, 'blocks.jsonl'), 'utf8')
@@ -523,9 +536,9 @@ describe('the heartbeat observer records a beat and changes no decision', () => 
     const off = await mount('false')
     const offDecision = await dispatch(off, new FakeAgent(headed(sessionId)), messages)
     const on = await mount('true')
-    // Three listeners, never a replacement: the gate, the intake's own heartbeat
-    // observer, and (M3.1) the narrow heartbeat listener that records what the beat
-    // did in its own file.
+    // Three listeners, never a replacement: the front desk (opted in by the mount), the
+    // intake's own heartbeat observer, and the narrow heartbeat listener that records
+    // what the beat did in its own file — and, since M3.2, decides the beat.
     expect(listenerCount(on.ctx), 'on adds two listeners, never replaces one').toBe(3)
     const onDecision = await dispatch(on, new FakeAgent(headed(sessionId)), messages)
 

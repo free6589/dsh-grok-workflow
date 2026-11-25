@@ -1,0 +1,85 @@
+M3.2 soak scenario 2 — headless, one real end-to-end run (2026-11-25)
+
+Build under test: feat/m3-switch @ 2137afc (version 0.13.34).
+Home: .tmp/m3-soak-2/dsh-home   (DSH_HOME; live ~/.dsh untouched, read-only)
+Profile: m32h — a sibling of the soak profile m32 with the SAME config
+(blockIntake: true, legacyGate absent) and the SAME installed build, differing
+only in the app bundle: `@deepseek-ai/dsh-web-app` → `@deepseek-ai/dsh-headless`.
+Version read back in m32h: 0.13.34.
+
+Why a second profile: the command in the block brief,
+`dsh --profile m32 headless '<objective>'`, does not run on this machine — the
+profile already names its app, so `headless` is rejected as a positional arg.
+The exact failure, recorded rather than worked around silently:
+
+  $ dsh --profile m32 headless '请用 grok_workflow 工具跑一个最小工作流…'
+  EXIT=1
+  error: too many arguments. Expected 0 arguments but got 2: headless, 请用
+  grok_workflow 工具跑一个最小工作流….
+
+The headless run below is therefore the same build, same home, same plugin
+config, driven through the headless app entry instead.
+
+--- the command --------------------------------------------------------------
+
+  $ DSH_HOME=<scratch>/dsh-home dsh --profile m32h '请用 grok_workflow 工具跑一个
+    最小工作流：计算 17 乘以 23 等于多少，让 worker 算、verifier 独立核对，
+    最后给出结论和验证结果。'
+  EXIT=0
+
+--- the workflow's own report (stdout, verbatim) -----------------------------
+
+  结论先说：17 × 23 = 391。
+
+  已经按你说的分工流程跑完了：
+
+  1. 一个人先算：把 23 拆成 20 和 3，17×20=340，17×3=51，加起来 340+51=391，
+     还换了种拆法又对了一遍。
+
+  2. 另一个人独立去查：没照抄第一个人的数，自己重新拆开算，17×20=340，
+     17×3=51，加起来也是 391。
+
+  验证结果：两边都是 391，碰到一起了，这次验算算过关。
+
+--- the ledger rows it wrote -------------------------------------------------
+
+$DSH_HOME/taskboards/grok-workflow/ (the block board) was NOT created: a plain
+workflow run does not touch the block board, and this run used no block. The
+durable record of the run is the session log
+(sessions/--home-fish-projects_mine-dsh-grok-workflow-.tmp-m3-soak-2--/
+ session-36763ab8-78d6-4e60-a3a6-3b2308d9ad5f), extracted with
+`zstd -dc session.v4.jsonl.zstd`:
+
+  seq  7  user/message   source.kind=user :: 请用 grok_workflow 工具跑一个最小工作流…
+  seq 11  assistant/message + tool call grok_workflow
+  seq 18  tool-workflow/run-start  {"runId":"e346a31b-067d-4070-83a1-4b1ba20e75ee",
+                                    "name":"任务团队"}
+  seq 48  tool-workflow/summary-final
+  seq 49  tool-workflow/run-end    {"runId":"e346a31b-…","stopReason":"completed"}
+  seq 50  tool/result :: "Grok workflow: COMPLETED / Objective: 最小工作流验证：
+            计算 17 乘以 23 等于多少。要求：1) 由 worker 独立计算出结果…"
+  seq 51  turn/end  reason={"kind":"completed"}
+
+  Event counts: tool/call 1, tool-workflow/run-start 1, tool-workflow/run-end 1,
+  tool-workflow/agent-start 9, tool-workflow/agent-end 9, tool-workflow/guardian-start 1,
+  tool-workflow/guardian-end 1.
+  grok-workflow relay messages (source.kind=grok-workflow): 0
+
+--- stderr note --------------------------------------------------------------
+
+stderr carried unrelated sandbox noise, not plugin output: the local
+`agent-memory` and `mdcg` sidecars cannot write under the read-only scratch
+bind (`OSError: [Errno 30] Read-only file system: /home/fish/agent-memory/
+_heartbeat.jsonl`). Nothing in that noise comes from dsh-grok-workflow, and it
+did not affect the run (EXIT=0, workflow COMPLETED).
+
+--- labels -------------------------------------------------------------------
+
+CONFIRMED  The headless app ran one real workflow end to end without a browser
+           and exited 0.
+CONFIRMED  The workflow's own outcome: COMPLETED, runId e346a31b-…, 9 child
+           agents, verifier independently re-checked the result.
+CONFIRMED  The ledger rows: 1 run-start, 1 run-end, 1 tool call, 1 tool result
+           in the session log; the block board was correctly not touched.
+CONFIRMED  No interception in headless either: 0 grok-workflow relay messages.
+NOT_RUN    Nothing in this scenario.

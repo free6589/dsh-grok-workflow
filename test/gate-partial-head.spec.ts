@@ -155,7 +155,7 @@ async function deliver(
   const ctx = new FakeContext()
   ctx.engine.shape = shape
   const agent = new FakeAgent()
-  apply(ctx as never, { grokDefault: 'on', ...overrides })
+  apply(ctx as never, { legacyGate: true, grokDefault: 'on', ...overrides })
   const send = async (text: string, turn: number): Promise<string> => {
     const messages = [userMessage(text)]
     const decision = await ctx.preStep()(
