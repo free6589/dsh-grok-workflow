@@ -3555,6 +3555,44 @@ describe('client composer tool row: the workflow switch (`/grok on|off` as a but
     }
   })
 
+  it('follows a sessions face that arrives after the switch has already mounted', async () => {
+    const mode = modeSwitch()
+    const window = fakeEventWindow()
+    // The shipped order: the composer is registered while `apply`'s injection is still
+    // resolving, so the switch mounts before there is any face to subscribe to. That is the
+    // waiter path, and it is the branch a rework is most likely to break in silence.
+    mode.offerSessions(undefined)
+    const { posted, fetchImpl } = scriptedFetch([
+      { body: { ok: true, action: 'status', mode: { enabled: true } } },
+      { body: { ok: true, action: 'status', mode: { enabled: false } } },
+    ])
+    try {
+      const view = mountSwitch(mode.component, { sessionId: SESSION, t: translator('zh'), modeSend: fetchImpl }, 'mode')
+      const { tree } = await view.mount()
+      expect(toggleIn(tree).props['aria-checked']).toBe(true)
+      expect(window.listeners.size).toBe(0)
+
+      // The injection lands: the mounted switch is handed the face it did not have at mount.
+      mode.offerSessions(sessionsFace(window))
+      // The subscription is the assertion that matters: a screen that happens to change
+      // without a listener would pass a behavioural check while being wired to nothing.
+      expect(window.listeners.size).toBe(1)
+
+      window.push(modeEntry(11, false))
+      await view.settle()
+      const after = view.render()
+      expect(posted).toEqual([
+        { action: 'status', sessionId: SESSION },
+        { action: 'status', sessionId: SESSION },
+      ])
+      expect(toggleIn(after).props['aria-checked']).toBe(false)
+      expect(lampIn(after)).toBe('off')
+      expect(noteText(after)).toBe(zhDict['mode.switch.off'])
+    } finally {
+      mode.offerSessions(undefined)
+    }
+  })
+
   it('mounts in the tool row after the two heartbeats, with the namespace when one exists', () => {
     const mode = modeSwitch()
     const registered: Array<{ options: Record<string, unknown>, component: unknown }> = []
