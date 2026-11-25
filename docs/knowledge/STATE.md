@@ -3422,3 +3422,45 @@ PASS**（对 `4803f42` 的 2128 是 **+2 测试**，文件数不变）、oxlint 
 **红线**：`~/.dsh` 三个目录 mtime 前后逐秒相同、写探针 `Read-only file system`、线上 3080 前后都是 401；
 未 push、未打 tag、未发版，`package.json` 仍 `0.13.34`。清理：`.tmp/soak-card` 整棵（含克隆 home 与两份
 tarball）跑完即删，仓库里只留证据文件。
+
+Last updated: 2026-11-26 15:10 +08:00（**用户视角回归：隔离 fork 的 live web 档案 + 已发布 `v0.13.36` 固定标签，六项里五项通、两项红，`CONFIRMED`，本分支只放证据与记忆** — 分支
+`fix/user-regression`（worktree `.agents/worktrees/fix/user-regression`，基线 `main` 尖端 `6e9bc56`）。隔离：`clone-profile.mjs` 从
+`~/.dsh/profiles/web` 克隆成 `web-clone`（7720 文件 / 88 421 847 B、parity 5/5、0 未解析依赖、抹掉 1 行生图渠道密钥），删掉
+`mode: triage` 那一行（克隆里本来没有 `legacyGate:`），端口 **3311**，插件按固定标签装
+`github:free6589/dsh-grok-workflow#v0.13.36` → pnpm 解析到 `codeload…/26dc370…`（= 发版提交），版本读回 **0.13.36**。
+**为什么改角色路由**：本机 shell 没有 `AGENT2API_API_KEY`，live 档案的 worker/verifier/supervisor/guardian 全指着 `agent2api`；
+先把候选路由证活（`POST /openai/v1/responses` → **200**、6.4 s），再把五个角色 + guardianModel 钉到
+`bifrost-responses/opencode-go/muse-spark-1.3-contributor`；顺手证了一条死路由 `tokenrhythm/glm-5.3-flash` → **403
+IDENTITY_VERIFICATION_REQUIRED**，丢掉不写。为了让卡片答案变成「用户消息」，`preset-standard.plugins` 整份覆盖、只把
+`tool-ask-user` 改成 `mode: timed, timeout: 20`。**测到的**：激活三项（无 `pending`/`did not activate`、24 命名空间、
+`grok-workflow` 在且 `mode` 字段已不存在、`blockIntake` 不投影、`request/header` 96 工具、六个块工具齐）；开关（命令写记录、
+路由读回 `source:record`）；真任务（4 步 8 次真读盘，带文档节名）；跑中插话（seq 24 在 turn 1 里被 `agent/inbox/spliced`
+接住、turn 1 跑到 seq 145 才收尾、turn 2 原话读进去）；卡片点头（`pending:true` → `userQuestions/answer` 返回 **true** →
+`source.kind='user-question-reply'` 的 `user/message`）；预览→开工（`bp-211d7434…` / `3e9170ee…` → `block_id 50761193…`、
+`approval.quote="确认（开工）"`、`grok_accept_block`、派出 subagent、`notes.md` 真写出来）；**监工判决**
+（`outcome:pass`、**`judged:true`**、判决行 `route:"bifrost-responses/opencode-go/muse-spark-1.3-contributor"`、逐条验收各带证据；
+同一块再交一次 `evidenceUnchanged`、不写第二行）。**这一条补上了 0.13.34 那一轮挂着的缺口**——「独立模型监工在真机上
+一次都没验过」现在有了真机读数。**两条红**：① `src/command.ts:325` 的 `/grok on` 确认话仍承诺「every message now runs the
+full plan→execute→verify workflow」，而 0.13.36 里没有任何东西按这条记录导流（记录的读者只有 `/grok status` 文案、开关路由、
+`src/user-source.ts` 的准入），真机读数也对得上：`/grok on` 之后普通任务直接干活、无流水线；② 同一个会话里开关
+`GET /grok-workflow/mode?action=status` 返回 `enabled:true, source:default, fallback:true`（界面显示「开」），而
+`grok_open_block` 拒成 `mode-off: 这个会话的 grok 模式没打开，接单台不接单`——界面说开着、工具说关着，打一条 `/grok on`
+就消失，但没人会想到要打；两条修法（甲：开关没有记录时不要显示「开」；乙：准入承认部署默认）写进证据文件，**本轮没有动**，
+是产品决定。**边界**（`NOT_RUN`，照实列）：真浏览器点那颗开关按钮（fork 的 web 落「生图」面板、隔离 home 的会话树在 UI 里是空的，
+headless 没把聊天面板点出来，0 console errors 是唯一读数）、默认 legacy 配置下点卡片、设置页渲染、在 live 档案上升级、
+多块切分、心跳。**红线**：`~/.dsh` = 2026-11-22 23:40:20、`~/.dsh/profiles` = 2026-11-22 16:59:46（前后同值）、写探针
+`Read-only file system`、线上 3080 前后都是 401、live 仍装 **0.13.35**（依赖仍浮动、锁解析到 `84efda0`）。一处要说准：
+`~/.dsh/profiles/web` 这个**目录**的 mtime 中段动过一次（12:09:52 → 13:16:10），但里面的文件没有一个晚于 12:09:50，
+本进程对它只读（EROFS），成因 `HYPOTHESIS`（别的东西的临时条目），没有查到底；未 push、未打 tag、未发版、未合流，
+`package.json` 仍 `0.13.36`，`src/` `test/` `lib/` 一个字未改。证据 `.rsi/evidence/user-regression-2026-11-26/README.md`。
+红一另开分支 `fix/grok-command-text` 修，不混进本分支。）
+
+补记（2026-11-26 13:30，`CONFIRMED`）：**红一已经修好了，在另一条分支上。** `fix/grok-command-text`（worktree
+`.agents/worktrees/fix/command-text`，基线 `6e9bc56`）两个提交 `5c120b1`（fix，9 文件 / +24 −15，含 `lib/command.js`
+重建）+ `78c9091`（只加证据）。新话两句：`Grok workflow ON — the model may commission reviewed blocks of work in this
+session. Messages themselves are not turned into a workflow.`；`/grok off` 的答案、记录形状、路由、接单台准入都没动。
+**我自己复核过的**：`npx vitest run test/command.spec.ts` → `27 passed (27)`；`node scripts/verify-lib.mjs` →
+`lib/ at 78c9091 is the build of src/ at 78c9091 (281 files, byte-identical)`；全量门禁是它跑的 `npm run ci` **EXIT=0**
+（`98 files / 1839 tests`、`15 warnings / 0 errors`）。它顺手把两个 README 里「`grokDefault: on` 认领每条用户消息」改成实话
+（`on` 只是没有记录时会话报出来的回退值，本身不让接单台接活）——**这句改动把红二的矛盾写实了，而准入规则没动**。
+红二没修：开关认部署默认、接单台只认会话记录，两处设计撞在一起，修哪个都改用户可见行为，要决定号。
