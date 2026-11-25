@@ -91,8 +91,10 @@ interface ProgressBundle {
   viewOrder: number
   eventTypes: string[]
   stages: Array<{ key: string, tokens: string[], edge: boolean }>
-  stateColor: Record<string, string>
-  stateKey: Record<string, string>
+  chipKey: Record<string, string>
+  planKey: Record<string, string>
+  logStateKey: Record<string, string>
+  logRoleKey: Record<string, string>
   css: string
   component: (props: Record<string, unknown>) => unknown
   eventDefinition: Record<string, unknown>
@@ -2372,6 +2374,125 @@ describe('client progress tab: the one-page story (three screens)', () => {
       expect(copy).not.toContain('%')
       expect(copy).not.toMatch(/ETA|预计|通过率|剩余|大约/iu)
     }
+  })
+
+  /**
+   * The tab's own path, not the fold.
+   *
+   * Every other assertion in this file folds a whole event stream and hands the result to
+   * the component; a live session never does that. The shell feeds the tab's own view
+   * definition one event at a time — `match` decides whether the event reaches the tab at
+   * all, `update` folds it into the state, `buildViewNode` turns the state into the node
+   * the component reads. A field the fold knows and the view definition forgets is
+   * invisible to a fold-only test, and that is exactly how a shipped draft went missing:
+   * the card said 「这一轮没有交卷稿」 for a run whose recorder had written the claim.
+   */
+  describe("the shell's own path: match, update, buildViewNode", () => {
+    type Match = { id: string, role: string, event: Record<string, unknown> }
+    type ViewDefinition = {
+      kind: string
+      target: string
+      match(event: Record<string, unknown>): Match | null
+      start(context: Record<string, unknown>, match: Match): Record<string, unknown>
+      update(context: Record<string, unknown>, match: Match): Record<string, unknown>
+      buildViewNode(context: Record<string, unknown>): { data: ProgressRun } | null
+    }
+
+    /** One session's tab, driven the way `uiConversation` drives it. */
+    function shell() {
+      const face = progress.eventDefinition as unknown as ViewDefinition
+      let context: Record<string, unknown> = {}
+      return {
+        /** Feed one recorded event; `dropped` is what a type outside `eventTypes` gets. */
+        feed(event: Record<string, unknown>): 'start' | 'update' | 'dropped' {
+          const matched = face.match(event)
+          if (matched === null) return 'dropped'
+          // The shell hands `start`/`update` the match with the event attached; the tab's
+          // own `match` returns only the id and the role.
+          const match = { ...matched, event }
+          if (match.role === 'start') {
+            context = {
+              ...context,
+              key: 'k',
+              kind: face.kind,
+              id: match.id,
+              start: { event, location: { kind: 'unresolved' } },
+              state: face.start(context, match),
+            }
+            return 'start'
+          }
+          context = { ...context, state: face.update(context, match) }
+          return 'update'
+        },
+        run(): ProgressRun {
+          const node = face.buildViewNode(context)
+          expect(node, 'the tab must still build a node').not.toBeNull()
+          return node!.data
+        },
+        story(): ProgressStory {
+          return progress.deriveProgressStory(this.run())
+        },
+      }
+    }
+
+    it('carries the shipped draft from summary-final through the run-end that follows it', () => {
+      // The real order: the gate names a draft, then the run ends. `run-end` is the event
+      // that used to erase the mark, because the re-fold it triggers rebuilt the run from
+      // the members alone.
+      const events = streamOf(doneCalls, { summaryFinal: 1, stopReason: 'completed' })
+      const tab = shell()
+      const claimAt = events.findIndex((event) => event.type === 'tool-workflow/summary-final')
+      expect(claimAt, 'the fixture must carry the claim').toBeGreaterThan(0)
+      const fed: string[] = []
+      for (const event of events.slice(0, claimAt + 1)) fed.push(tab.feed(event))
+      // A dropped type is silent in production and fatal here: the tab never hears it.
+      expect(fed, 'no recorder event may be dropped by the tab').not.toContain('dropped')
+      expect(fed[fed.length - 1]).toBe('update')
+      // The state, the node's data and the story all have to carry it: the component only
+      // ever sees the node's data.
+      expect((tab as unknown as { run(): ProgressRun }).run().summaryFinalDraft).toBe(1)
+      expect(tab.story().final?.draft).toBe(1)
+      // …then the run closes, still in that order.
+      for (const event of events.slice(claimAt + 1)) fed.push(tab.feed(event))
+      expect(fed).not.toContain('dropped')
+      expect(tab.story().final?.draft, 'run-end must not forget the shipped draft').toBe(1)
+      expect(tab.story().state).toBe('done')
+      // And the page shows the card instead of the gap.
+      const page = pageOf(tab.run(), { fillDraft: () => true })
+      expect(textOf(page, 'data-gw-progress-final-name')).toBe('汇总·第1稿')
+      expect(pageTexts(page)).not.toContain(bundle.GROK_WORKFLOW_DICT['zh']!['progress.final.missing'])
+    })
+
+    it('keeps every recorder event type on the tab\'s own update list', () => {
+      // `match` reads exactly this list: a type missing from it reaches no tab at all.
+      const recorded = [
+        'tool-workflow/run-start',
+        'tool-workflow/agent-start',
+        'tool-workflow/agent-end',
+        'tool-workflow/summary-final',
+        'tool-workflow/guardian-start',
+        'tool-workflow/guardian-finding',
+        'tool-workflow/guardian-end',
+        'tool-workflow/run-end',
+      ]
+      for (const type of recorded) {
+        expect(progress.eventTypes, type).toContain(type)
+      }
+    })
+
+    it('reads only the three run fields the mirror needs, so no fourth can go missing', () => {
+      // The mirror is a hand-written copy: a field it reads but the shell never puts on the
+      // node is a field that silently reads `undefined` on a live session. The three are
+      // `members`, `stopReason` and `summaryFinalDraft` — and the node must carry all three.
+      const events = streamOf(doneCalls, { summaryFinal: 1, stopReason: 'completed' })
+      const tab = shell()
+      for (const event of events) tab.feed(event)
+      const data = tab.run() as unknown as Record<string, unknown>
+      expect(Object.keys(data)).toEqual(expect.arrayContaining(['members', 'stopReason', 'summaryFinalDraft']))
+      expect(data.summaryFinalDraft).toBe(1)
+      expect(data.stopReason).toBe('completed')
+      expect(Array.isArray(data.members)).toBe(true)
+    })
   })
 
   it('renders the empty state, and no dock, when the session has no run', () => {

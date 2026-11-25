@@ -2634,11 +2634,18 @@ window.__ModuleLoader__.load({
     /** View tab id, ordered after the stock chat (0) and trajectory (10). */
     const PROGRESS_VIEW_ID = 'grok-progress'
     const PROGRESS_VIEW_ORDER = 20
-    /** The seven progress and Guardian lifecycle events the tab folds; all others are ignored. */
+    /**
+     * The eight progress and Guardian lifecycle events the tab folds; all others are ignored.
+     *
+     * `summary-final` belongs on this list and not only in the fold's own special case: an
+     * event type the view definition does not match never reaches the tab, so a claim the
+     * recorder wrote would be dropped before any folding could see it.
+     */
     const PROGRESS_EVENT_TYPES = [
       'tool-workflow/run-start',
       'tool-workflow/agent-start',
       'tool-workflow/agent-end',
+      'tool-workflow/summary-final',
       'tool-workflow/guardian-start',
       'tool-workflow/guardian-finding',
       'tool-workflow/guardian-end',
@@ -4319,6 +4326,13 @@ window.__ModuleLoader__.load({
             type: 'tool-workflow/guardian-end',
             data: { runId: state.runId, cancelled: state.guardian.cancelled },
           }] : []),
+          // The shipped mark is replayed like the guardian's own events: without this line
+          // the re-fold below rebuilds the run from its members and the claim evaporates on
+          // the very next event — which is the `run-end` that always follows it.
+          ...(state.summaryFinalDraft === undefined ? [] : [{
+            type: 'tool-workflow/summary-final',
+            data: { runId: state.runId, draft: state.summaryFinalDraft },
+          }]),
           ...(state.stopReason === undefined ? [] : [{ type: 'tool-workflow/run-end', data: { runId: state.runId, stopReason: state.stopReason }, time: state.endedAt }]),
           { type: match.event.type, data: match.event.data, time: match.event.time },
         ]
@@ -4332,6 +4346,10 @@ window.__ModuleLoader__.load({
           startedAt: run.startedAt,
           endedAt: run.endedAt,
           stopReason: run.stopReason,
+          // Carried like the members and the stop reason: the state is re-folded from
+          // itself on every later event, so a field left here is a field the next
+          // `run-end` erases — which is what turned a shipped draft back into 「没有交稿」.
+          ...run.summaryFinalDraft === undefined ? {} : { summaryFinalDraft: run.summaryFinalDraft },
         }
       },
       buildViewNode: (context) => {
@@ -4355,6 +4373,7 @@ window.__ModuleLoader__.load({
             startedAt: state.startedAt,
             endedAt: state.endedAt,
             stopReason: state.stopReason,
+            summaryFinalDraft: state.summaryFinalDraft,
           },
         }
       },
