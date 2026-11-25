@@ -4159,3 +4159,55 @@ spine 为空，pre-fix 形状会进脊柱。
   - 以后新增字段若忘了画控件，`test/client.spec.ts` 的「每个声明字段都必须有控件」会在两种语言下各红一次，而不是等读者发现。
   - 复用状态词这件事有代价：状态词不带字段名，屏幕阅读器听到的是「开/关」+ 行 label，这是与 `replan`/`loopEnabled` 一致的既有形状，
     本轮按一致性选择它，不单独发明。
+
+## D-154 · 没有记录的会话，开关不显示「开」：选甲，理由是界面不该替接单台许诺 / 路由与准入一个字不改（2026-11-25，未发版）
+
+- **Status:** `CONFIRMED`（`57b5723`：`src/client/index.js` 39/9、`test/client.spec.ts` 80/3、`test/mode-surface.spec.ts` 83/0、
+  `lib/client.js` 39/9、两个 README 各 1/1，共 6 文件 / +243 −23；`TMPDIR=$PWD/.tmp npm run ci` → **EXIT=0**
+  （`98 files / 1849 tests`、`15 warnings / 0 errors`、`lib/ at … (281 files, byte-identical)`、`lib/client.js` 331626 → **333611** 字节）；
+  先红后绿：定向 4 failed | 168 passed → **172 passed**；真机（隔离克隆 + 打包安装，端口 3331）读数与 live 未碰的对照在
+  `VALIDATION.md` 同日条与 `.rsi/evidence/switch-default-state-2026-11-25/`）
+- **Date:** 2026-11-25
+- **Context:** `user-regression-2026-11-25` 的红二：同一个会话、同一时刻，`GET /grok-workflow/mode` 答
+  `{"enabled":true,"source":"default","fallback":true}` 而界面显示「开」，同一会话的 `grok_open_block` 却拒成
+  `mode-off: 这个会话的 grok 模式没打开，接单台不接单`；打一条 `/grok on` 就消失，但没人会想到要打。两边各自都讲得通：
+  开关画的是**有效值**（没有记录时等于部署默认 `grokDefault`），接单台只认**会话自己的记录**（部署默认不是这个会话决定接活）。
+  操作员已拍板**选甲**，本条只记录为什么是甲、改动边界在哪、以及由此产生的两处「故意不一致」。
+- **Decision:**
+  1. **开关报会话自己的记录，不报有效值。** `source === 'default'` ⇒ 新文案 `mode.switch.notOn`
+     （`Not on · not set yet` / `未开 · 还没设过`），**无论** `enabled` 是 true 还是 false——部署默认的两个方向都不是这个会话的决定。
+     `source === 'record'` 与 `source` 缺失（老宿主、既有 spec 传的 `{enabled:false}`）照旧走 `on`/`off`。
+  2. **视觉与点击跟文案同源。** 新增一个 `modeShownOn(mode)`（`mode !== undefined && enabled === true && source !== 'default'`），
+     文案、`aria-checked`、胶囊底色、指示灯、`flip()` 的 `next` **都**从它取。于是「未开」时点一下写的是
+     `{"action":"set","enabled":true}`（把这个会话真正打开），而不是像改动前那样把有效值取反写 `false`。
+     记录态（`source: 'record'`）的读、写、失败处置**一字未改**，包括「写失败保留上次已知状态 + 失败行」。
+  3. **路由、准入、块工具一个字不改。** `src/gate.ts`、`src/block/**`、`src/mode-surface.ts` 的答案形状与行为零改动：
+     它答的是「有效值 + 来源」，`/grok status` 与设置页读的就是它。
+  4. **文案跟着改实话。** 词典上方 EN/ZH 两段注释、`MODE_SWITCH` 的 JSDoc、两个 README 的「工作流开关」段落，原本都写着
+     「没有记录的会话显示部署默认 `grokDefault`」——现在写的是「显示未开/还没设过，默认值只由路由报给 `/grok status` 和设置页」。
+     不新增配置键、不新增依赖、不轮询、不动路由。
+- **Alternatives considered / rejected:**
+  - **乙：让准入承认部署默认（没有记录时按 `grokDefault` 走，显式 `off` 仍拒）。** 否决（操作员已拍板）：那是把
+    「每会话自选」这条产品意图削弱，要重开 M3.2 的决定，而且改的是**真正有后果**的那一侧——用户没点过的会话会开始接活。
+    甲改的只是屏幕上的字与一次点击的语义。
+  - **让两边「对齐」：路由不再答有效值，只答记录。** 否决：`/grok status`、设置页、`D-152` 那批文案都建在
+    「`grokDefault` 是这个会话会报什么」上；把路由改成只答记录，等于让部署默认在界面上完全消失，而它仍然决定新会话的行为。
+  - **`source: 'default'` 时显示「关」。** 否决：那是把一个**没人做过的决定**画成决定，用户会以为自己关过；而且它与显式
+    `off` 的状态词混在一起，看不出「要不要开」和「已经关了」的差别。`notOn` 存在的理由就是这两个词都不准确。
+  - **只改文案，不改胶囊/灯/点击。** 否决：文案说未开、胶囊是绿的就是换个谎——这正是本轮要消灭的那类不一致；而点击若仍按有效值取反，
+    「未开」点一下会写下 `enabled: false`，等于把部署默认固化成一条显式关闭。
+  - **顺手在设置页也显示「未开」。** 否决：设置页那行报的是 `grokDefault`（一组配置的当前值），不是某个会话的状态，改它会把两件事混起来
+    ——它上一轮（`D-152`）刚改成「没打过 `/grok` 的会话报这个」，那句话仍然准确。
+- **Consequences:**
+  - **开关与 `/grok status`/设置页从此可以显示不同的字，这是故意的。** 单测两边各钉一次：
+    `test/mode-surface.spec.ts` 的 divergence 用例（路由仍答 `{enabled:true, source:'default', fallback:true}`，显示侧是 `notOn`）
+    与 `test/client.spec.ts` 的反向钉住（`source:'default'` 的两种 `enabled` 都显示 `notOn`，且不等于 `on`/`off`）。
+    用例注释里写明「谁想把两边对齐，先读 D-154 与证据目录」。
+  - **点击语义变了**：在没有记录的会话上，一次点击是「从无记录变成显式开」，不是「把默认值取反」。真机读数：请求体
+    `{"action":"set","enabled":true}`、答复 `setBy:"switch:mode"`、开关立刻「开」。
+  - **第三个状态词进入词典**：`mode.switch.*` 从 8 个键变 9 个，中英都有、三者互不相同（`on ≠ off ≠ notOn`），
+    由既有的「两个语言键集相同、值不相同」守卫与新增的三条不相等断言一起钉住。
+  - **`grokDefault: on` 在开关上不再有可见效果**：它只影响路由答什么（`/grok status`、设置页）。这符合「部署默认不是这个会话的决定」，
+    但读者需要知道：**新会话一律显示未开，想接活点一下或打 `/grok on`**。
+  - 判据可复用：**一个开关画的是「有效值」还是「本会话的决定」，必须跟它旁边那条准入规则读同一份事实**；
+    两者可以合法地不同时，就要有一处写着「这是故意的」的用例，否则下一个接手的人会把它「修」回去。

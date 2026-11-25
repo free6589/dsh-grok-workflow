@@ -56,6 +56,18 @@
 （连同本轮那条 `docs(memory): close out 0.13.36 …` 提交）。**没有碰** `src/`、`lib/`、`test/`、`package.json`、`package-lock.json`、
 `CHANGELOG.md`、`README*`、`.gitignore`；没有建分支、没有建 worktree、没有 push、没有重发版本。
 
+**独立复核（包工头 `agent-164`，另一套 scratch、端口 3345/3347，`CONFIRMED`，他的读数不是我的）：**
+① **改前复现**（旧构建 = `main` `d34214b`，`link:` 装法，新会话 `session-67be5bcb-5bb3-42e9-8be5-88f5d1c5ef9a` 从没打过 `/grok`）：
+路由 `{"enabled":true,"source":"default","setBy":null,"turn":null,"workflowMode":null,"fallback":true}`，而开关渲染 `工作流开关 | 开`、
+`aria-checked=true`、`data-mode-lamp="on"`、note `开`——同一台机、同一份克隆、只换构建。
+② **改后三条**（`file:<scratch>/dsh-grok-workflow-0.13.36.tgz`，`VERSION=0.13.36`，`INSTALLED_client=edcd6983…` = worktree，
+`did not activate` 0 行）：(a) 新会话 `session-fd2b29c4-…` note `未开 · 还没设过` / `aria-checked=false` / `lamp="off"`，旁路路由仍是
+`{"enabled":true,"source":"default",…}`；(b) 同一输入框打 `/grok on` + 点「发送消息」→ 2 秒内 `开` / true / lamp on，重读
+`{"enabled":true,"source":"record","setBy":"command:/grok",…}`，会话日志 seq 4 `command/run {"name":"grok","args":" on"}` →
+seq 5 `plugin:grok-workflow/mode {…"enabled":true…"workflowMode":"full"}` → seq 6 `command/done {"kind":"success","text":"Grok workflow ON — …"}`；
+(c) `/grok off` → `关` / false / lamp off，答复 `{"enabled":false,"source":"record","setBy":"command:/grok off",…}`，seq 7/8/9 同形；
+全程 `console_errors: []`。这一组补的是**打字路径**（新会话显示未开 → 打 `/grok on` 后变开），我这一侧是「从『未开』点一下」与记录态打字。
+
 **Honest boundary（逐条）：**
 1. **门禁、推送、`verify:lib` 提交后那次重跑不是这一轮记录者执行的**：它们由发布执行方（包工头）在主检出上跑并报回读数，本条按 `CONFIRMED` 记录，
    但来源是那一方；这一轮记录者亲手跑的是六个文档守卫（79 例）、`git show --stat 26dc370`、标签解析、`gh run list`、`gh release view`、`git worktree list`、`git status --short`、版本读回。
@@ -7786,3 +7798,46 @@ Node **v26.8.1** / npm **11.19.0**；隔离 home `.tmp/soak-settings-copy/dsh-ho
 
 **证据：** `.rsi/evidence/settings-copy-2026-11-25/`（`README.md` 是逐条读数；`settings-before.png` /
 `settings-after.png` 两张 1280×720 真截图，sha256 见其 §3）。
+
+## 没有记录的会话不再显示「开」：显示与答案故意不一致（`fix/switch-default-state`，`57b5723`）— 2026-11-25 (`CONFIRMED`，未发版)
+
+分支 `fix/switch-default-state`（worktree `.tmp/wt-switch-default`，基线 `main` 尖端 **`d34214b`**），产品提交 **`57b5723`**
+（6 文件 / +243 −23）；驱动缺陷的原始读数在 `.rsi/evidence/user-regression-2026-11-25/README.md` §5 红二，决定号 `D-154`（选甲）。
+Node **v26.8.1** / npm **11.19.0**；DSH **0.2.2-rc.3**；隔离 home `.tmp/soak-switch-default/dsh-home`（profile `web-clone`，
+从 live `web` 克隆），**自有端口 `127.0.0.1:3331`**（live 在 3080，全程没有访问一次）。
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 门禁（改前，基线 `d34214b` 干净树） | `TMPDIR=$PWD/.tmp npm run ci` | **EXIT=0**；`Test Files 98 passed (98)` / `Tests 1845 passed (1845)`；`Found 15 warnings and 0 errors.`；`client bundle: 331626 bytes → lib/client.js`；`lib/ at d34214b is the build of src/ at d34214b (281 files, byte-identical)` |
+| 定向（先红） | `npx vitest run test/client.spec.ts test/mode-surface.spec.ts`（实现前） | **`Test Files 2 failed (2)` / `Tests 4 failed \| 168 passed (172)`**。四条失败：`zh: default on: expected '开' to be undefined`（`client.spec.ts:3799`）、`expected true to be false`（`:3838` 的 `aria-checked`）、`expected '关' to be undefined`（`:3908` 的 `noteText`）、`zh: unrecorded session shows the no-record word: expected '开' to be 'mode.switch.notOn'`（`mode-surface.spec.ts:233`） |
+| 定向（后绿） | 同一条命令（实现 + `npm run build` 之后） | **`Test Files 2 passed (2)` / `Tests 172 passed (172)`** |
+| 门禁（改后，**提交之后**跑的那一份） | `TMPDIR=$PWD/.tmp npm run ci`（跑在 `ee66a6c` 上） | **EXIT=0**；`98 files / 1849 tests`（**+4**）；`Found 15 warnings and 0 errors.`（未变）；`client bundle: 333611 bytes → lib/client.js`（**+1985**）；`lib/ at ee66a6c is the build of src/ at ee66a6c (281 files, byte-identical)`；Duration 87.96 s。提交**之前**在同一棵未提交的树上预跑过，读数一致（差别只在 `lib/ at …` 那行的 sha 写着当时的 HEAD `d34214b`）；那行 `lib/ at …` 里的 sha 是跑那一刻的 HEAD，此后每条**纯文档**提交都只会换掉那个 sha，`(281 files, byte-identical)` 与 `client bundle: 333611 bytes` 不变 |
+| 克隆 | `node scripts/clone-profile.mjs --src ~/.dsh/profiles/web --home .tmp/soak-switch-default/dsh-home --name web-clone --force` | exit 0；`files 7720 -> 7720 (88421847 bytes)`、`links 5 (relinked 2, already dangling in the source 1)`、`parity 5/5 equal after redaction`、`dependencies 17 declared, 0 unresolved`、`credentials redacted: 1 line(s) in 1 file(s)` |
+| 删旧键 | 克隆档案里删掉 `grok-workflow` 行的 `mode: triage`（第 563 行，只删这一行） | 删前 `grep -n "^\s*mode:\|legacyGate"` → 1 行；删后 **0 行** |
+| 装构建（打包，不是 `link:`） | `npm pack --pack-destination <scratch>` → `DSH_HOME=<scratch>/dsh-home dsh plugin --profile web-clone add file:<scratch>/dsh-grok-workflow-0.13.36.tgz` | `Done in 2.3s using pnpm`；依赖行 `file:…/dsh-grok-workflow-0.13.36.tgz`；版本读回 **`0.13.36`**；`readlink -f` 落在 profile 内（**真拷贝**）；`sha256(lib/client.js)` = `edcd69838c62c7b3d0a9ad8ff6755e30d0fd11b018b75090aab89d4c045cb0bb`，与 worktree 的 **逐字节相同** |
+| 工作区隔离 | 克隆档案 `storages/workspace.json` 那条工作区路径改成一次性 `/tmp/wtsw-work`（live 用户目录不动） | `~/Documents/deepseek-harness/default-workspace` mtime 前后都是 **2026-11-15 13:42:07**；`find … -newermt '2026-11-25 15:54'` **0 命中**；本题样本只有两条 `/grok` 命令与一次点击，没有模型回合 |
+| 起服 | `dsh --profile web-clone --no-open --host 127.0.0.1 --port 3331` | `dsh web: http://127.0.0.1:3331/?token=<redacted>`；`pending` / `did not activate` **0 行** |
+| ① 新会话（没打过 `/grok`） | headless chromium（`/usr/bin/chromium` + playwright python）→ 侧边栏 `新会话` | 开关 `data-mode-state="ready"`、`data-mode-note` = **`未开 · 还没设过`**、`aria-checked=false`、`data-mode-lamp="off"`；旁路路由答复 **`{"ok":true,"action":"status","mode":{"enabled":true,"source":"default","setBy":null,"turn":null,"workflowMode":null,"fallback":true}}`** |
+| ② 从「未开」点一下 | 点 `[data-mode-toggle]` | 请求体 **`{"action":"set","sessionId":"…","enabled":true}`**；答复 `{"enabled":true,"source":"record","setBy":"switch:mode","turn":0,"workflowMode":"full"}`；+2 秒内开关 `开` / `aria-checked=true` / `lamp=on` |
+| ③ 打字关 / 开 | 同一输入框 `/grok off`、`/grok on` 回车 | `/grok off` → `{"enabled":false,"source":"record","setBy":"command:/grok off"}`、开关 `关`；`/grok on` → `{"enabled":true,"source":"record","setBy":"command:/grok","workflowMode":"full"}`、开关 `开`；两次都在 +2 秒内 |
+| 客户端错误 | 全程 `console` / `pageerror` 监听 | `console_errors: []`、`page_errors: []` |
+| live 未碰 | `stat -c '%y' ~/.dsh ~/.dsh/profiles ~/.dsh/profiles/web`；`touch ~/.dsh/.switch-default-write-probe`；`curl 127.0.0.1:3080`；读 live 装版本 | `~/.dsh` = **2026-11-22 23:40:20**、`~/.dsh/profiles` = 2026-11-22 16:59:46、`~/.dsh/profiles/web` = 2026-11-25 13:16:10（三者本会话前后同值，最后一个早于本会话第一条命令）；写探针 **`Read-only file system`**；3080 前后都是 **401**；live 仍装 **`0.13.35`**。未 push、未打 tag、未 bump、未合流 |
+| 发布 / 推送 | — | **NOT_RUN**（未 push、未打 tag、未发布、未合流；`package.json` 仍 `0.13.36`） |
+
+**Changed（本轮改动）：** `src/client/index.js`（新键 `mode.switch.notOn`、`modeShownOn` 一处判据贯穿文案/pill/lamp/点击、
+三处注释改实话）、`test/client.spec.ts`（+3 例：反向钉住、记录态不动、渲染/点击；既有真路由用例的默认态期望改成 `notOn`）、
+`test/mode-surface.spec.ts`（+1 例：显示与答案故意不一致）、重建的 `lib/client.js`、两个 README 的「工作流开关」段落一段。
+`src/gate.ts`、`src/block/**`、`src/mode-surface.ts` **一个字未改**。
+
+**Honest boundary（逐条）：**
+1. **模型回合、点卡片、真任务、监工判决** `NOT_RUN`：本轮样本只需要两条命令与一次点击，跑模型回合与本改动无关。
+2. **另一个 scratch 会话（`session-ed1bbecc-…`）只留了摘录**：它的读数（记录态点击写 `enabled:true`）随 scratch 一起删了，
+   结论与 `probe-final.json` 的 ③④ 一致。
+3. **`link:` 安装形态在本轮是坏的，原因与改动无关**：软链让插件里的 `@deepseek-ai/dsh-session` 与宿主不是同一个模块实例，
+   `/grok on` 会答 `Grok workflow toggle not changed: Receiver must be an instance of class Session`。本轮改用 `npm pack` 的打包产物，
+   与前几轮真机证据同一种装法。
+4. **`~/.dsh/profiles/web` 目录 mtime = 2026-11-25 13:16:10**，早于本会话（15:39），不是本轮造成的。
+5. **`/grok on` 回执仍是英文**、界面是中文——中英混排是既有事实，红一那一轮只改真假，本轮不在范围内。
+
+**证据：** `.rsi/evidence/switch-default-state-2026-11-25/`（`README.md` 是逐条读数与边界，`probe-final.json` 是那一次的
+`/grok-workflow/mode` 全部请求/答复与开关 `data-*` 读数）。

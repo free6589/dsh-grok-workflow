@@ -1,0 +1,168 @@
+{
+ "routes": [
+  {
+   "phase": "request",
+   "method": "POST",
+   "post": "{\"action\":\"status\",\"sessionId\":\"session-1a3a3094-2a28-46b3-8d78-ca7013de6ca7\"}"
+  },
+  {
+   "phase": "response",
+   "status": 200,
+   "body": "{\"ok\":true,\"action\":\"status\",\"mode\":{\"enabled\":true,\"source\":\"default\",\"setBy\":null,\"turn\":null,\"workflowMode\":null,\"fallback\":true}}"
+  },
+  {
+   "phase": "request",
+   "method": "POST",
+   "post": "{\"action\":\"set\",\"sessionId\":\"session-1a3a3094-2a28-46b3-8d78-ca7013de6ca7\",\"enabled\":true}"
+  },
+  {
+   "phase": "request",
+   "method": "POST",
+   "post": "{\"action\":\"status\",\"sessionId\":\"session-1a3a3094-2a28-46b3-8d78-ca7013de6ca7\"}"
+  },
+  {
+   "phase": "response",
+   "status": 200,
+   "body": "{\"ok\":true,\"action\":\"set\",\"mode\":{\"enabled\":true,\"source\":\"record\",\"setBy\":\"switch:mode\",\"turn\":0,\"workflowMode\":\"full\",\"fallback\":true}}"
+  },
+  {
+   "phase": "response",
+   "status": 200,
+   "body": "{\"ok\":true,\"action\":\"status\",\"mode\":{\"enabled\":true,\"source\":\"record\",\"setBy\":\"switch:mode\",\"turn\":0,\"workflowMode\":\"full\",\"fallback\":true}}"
+  },
+  {
+   "phase": "request",
+   "method": "POST",
+   "post": "{\"action\":\"status\",\"sessionId\":\"session-1a3a3094-2a28-46b3-8d78-ca7013de6ca7\"}"
+  },
+  {
+   "phase": "response",
+   "status": 200,
+   "body": "{\"ok\":true,\"action\":\"status\",\"mode\":{\"enabled\":false,\"source\":\"record\",\"setBy\":\"command:/grok off\",\"turn\":0,\"workflowMode\":null,\"fallback\":true}}"
+  },
+  {
+   "phase": "request",
+   "method": "POST",
+   "post": "{\"action\":\"status\",\"sessionId\":\"session-1a3a3094-2a28-46b3-8d78-ca7013de6ca7\"}"
+  },
+  {
+   "phase": "response",
+   "status": 200,
+   "body": "{\"ok\":true,\"action\":\"status\",\"mode\":{\"enabled\":true,\"source\":\"record\",\"setBy\":\"command:/grok\",\"turn\":0,\"workflowMode\":\"full\",\"fallback\":true}}"
+  }
+ ],
+ "reads": [
+  {
+   "label": "1-fresh-session-no-record",
+   "t": 10.01,
+   "row_text": "工作流开关 | 未开 · 还没设过",
+   "state_attr": "ready",
+   "note_text": "未开 · 还没设过",
+   "note_attr": "ready",
+   "aria_checked": "false",
+   "lamp": "off",
+   "calls": 1
+  },
+  {
+   "label": "2-plus-2s-after-one-click",
+   "t": 12.07,
+   "row_text": "工作流开关 | 开",
+   "state_attr": "ready",
+   "note_text": "开",
+   "note_attr": "ready",
+   "aria_checked": "true",
+   "lamp": "on",
+   "calls": 3
+  },
+  {
+   "label": "2b-plus-4s-after-one-click",
+   "t": 14.6,
+   "row_text": "工作流开关 | 开",
+   "state_attr": "ready",
+   "note_text": "开",
+   "note_attr": "ready",
+   "aria_checked": "true",
+   "lamp": "on",
+   "calls": 3
+  },
+  {
+   "label": "3-plus-2s-after-grok-off",
+   "t": 16.8,
+   "row_text": "工作流开关 | 关",
+   "state_attr": "ready",
+   "note_text": "关",
+   "note_attr": "ready",
+   "aria_checked": "false",
+   "lamp": "off",
+   "calls": 4
+  },
+  {
+   "label": "4-plus-2s-after-grok-on",
+   "t": 18.97,
+   "row_text": "工作流开关 | 开",
+   "state_attr": "ready",
+   "note_text": "开",
+   "note_attr": "ready",
+   "aria_checked": "true",
+   "lamp": "on",
+   "calls": 5
+  }
+ ],
+ "console_errors": [],
+ "page_errors": [],
+ "one_fresh": {
+  "label": "1-fresh-session-no-record",
+  "t": 10.01,
+  "row_text": "工作流开关 | 未开 · 还没设过",
+  "state_attr": "ready",
+  "note_text": "未开 · 还没设过",
+  "note_attr": "ready",
+  "aria_checked": "false",
+  "lamp": "off",
+  "calls": 1
+ },
+ "two_clicked": {
+  "label": "2-plus-2s-after-one-click",
+  "t": 12.07,
+  "row_text": "工作流开关 | 开",
+  "state_attr": "ready",
+  "note_text": "开",
+  "note_attr": "ready",
+  "aria_checked": "true",
+  "lamp": "on",
+  "calls": 3
+ },
+ "two_settled": {
+  "label": "2b-plus-4s-after-one-click",
+  "t": 14.6,
+  "row_text": "工作流开关 | 开",
+  "state_attr": "ready",
+  "note_text": "开",
+  "note_attr": "ready",
+  "aria_checked": "true",
+  "lamp": "on",
+  "calls": 3
+ },
+ "three_off": {
+  "label": "3-plus-2s-after-grok-off",
+  "t": 16.8,
+  "row_text": "工作流开关 | 关",
+  "state_attr": "ready",
+  "note_text": "关",
+  "note_attr": "ready",
+  "aria_checked": "false",
+  "lamp": "off",
+  "calls": 4
+ },
+ "four_on": {
+  "label": "4-plus-2s-after-grok-on",
+  "t": 18.97,
+  "row_text": "工作流开关 | 开",
+  "state_attr": "ready",
+  "note_text": "开",
+  "note_attr": "ready",
+  "aria_checked": "true",
+  "lamp": "on",
+  "calls": 5
+ }
+}
