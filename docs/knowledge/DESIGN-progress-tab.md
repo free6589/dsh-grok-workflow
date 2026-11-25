@@ -368,7 +368,7 @@ Phase 2（失败重试）暂不做。本节记录实际改动。
 
 | # | 现象 | 证据 |
 | --- | --- | --- |
-| 1 | 任务节点一多，标签全被截断 | 截图 1506 px 宽、16 个节点，`任务 2…` 至 `任务 8…` 全部 ellipsis。根因是模板段（恒 7 个）与任务段（1..N 个，N 由计划决定）共用一条等分 `flex` |
+| 1 | 任务节点一多，标签全被截断 | 截图 1506 px 宽、16 个节点，`任务 2…` 至 `任务 8…` 全部 ellipsis。根因是模板段（恒 6 个）与任务段（1..N 个，N 由计划决定）共用一条等分 `flex` |
 | 2 | 并发不可见 | 工作流并发默认 10（`AGENTS.md` 架构不变量）；轨道是线性脊椎，两行并行与两行串行渲染完全相同 |
 | 3 | 耗时不可见 | 时间戳只进详情浮层（§7），轨道节点自身没有任何时间痕迹 |
 
@@ -440,8 +440,8 @@ section.gw-progress
     svg.gw-progress-wires 实测的干线（每 owner 一条）+ 支线（每卡一条，带箭头）
 ```
 
-- **脊只有 7 段。** `node.kind !== 'extra'` 才进脊；`任务 n · …` 这类计划任务进任务带。所以计划
-  任务再多，七个模板段也不会被挤窄（§15.2 的第 1 条盲点）。
+- **脊只有 6 段。** `node.kind !== 'extra'` 才进脊；`任务 n · …` 这类计划任务进任务带。所以计划
+  任务再多，六个模板段也不会被挤窄（§15.2 的第 1 条盲点）。
 - **任务带按 owner 挂线**：`data-owner` = `stage:execute`（计划任务，引擎在 `执行` 槽里宣告它）
   或该行 phase 点名的段。干线 x = 该段圆环中心 x，支线 y = 卡片中线 y，终点 = 卡片左边
   （`viewBox` 用 `.gw-progress-flow` 的相对坐标）。
@@ -492,3 +492,173 @@ section.gw-progress
 - **配色**：结算卡、任务卡和 Guardian 卡使用 DSH 语义 token 与 `color-mix()` 混合
   出轻量薄荷绿、浅青蓝表面，不固定浅色背景；暗色和高对比主题仍由宿主 token 决定。
   720px 以下总览上下堆叠，窄屏继续沿用既有脊线竖排和任务列表布局。
+
+## 19. 重画契约：一页三态（2026-11-25，`feat/progress-redesign`）
+
+本节是施工契约，不是回填。参照物是仓库根目录的三态设计稿（`.progress.html` 与
+`.progress-desktop.png`，gitignored 的本地稿）：**等你点头 / 进行中 / 已完成** 三屏。
+状态词汇同 `AGENTS.md`：`CONFIRMED` = 已在本机观测；本节里的「数据」列全部是对
+`src/progress-tab.ts` / `src/records.ts` 的 `CONFIRMED` 阅读结论，没有一条来自猜测。
+
+### 19.0 口径订正：六段，不是七段
+
+- `PROGRESS_STAGES`（`src/progress-tab.ts:233`）导出 **6** 条：`start / plan / execute /
+  verify / synthesize / end`，`test/progress-tab.spec.ts` 已逐键钉住。
+- 旧文本里的「七」是 0.11 时代第七格「回答」的残留：那一格在 §4.1 已删（没有事件能填它）。
+  §15.2 与 §17.1 的读数本轮改成 6；§13 里的「7 个阶段空环」是 2026-11-15 当时的实测记录，
+  属于历史，不回改。
+- 本轮之后**脊椎整体退场**（渲染层不再出现固定六段），但 `PROGRESS_STAGES` 仍是阶段绑定的
+  数据契约（phase / role label 命中它、Guardian 与 fold 仍用它），所以「6」这个数字继续由测试钉住。
+
+### 19.1 四区（本轮改动面）
+
+| 区 | 位置 | 现在是什么 | 改成什么 |
+| --- | --- | --- | --- |
+| 头部 | Tab 顶部 | 标题「任务进度」+ `3/4 · 75%` + 一句结算解释 | run 名（原样）+ 状态胶囊（五态）+「现在」主标题 + 一行小字 |
+| 轨道 | 头部下方 | 六段环 + 连接线 + 实测 SVG 干线 + 任务带 + 结算条 | 一条等分分段条（一步一段）+ 琥珀提示条 + 「后面还有」一行 + 步骤清单 |
+| 收尾 | 轨道下方 | 任务带 + Guardian 卡 | 「经过」逐行日志 + 「交卷」卡 + Guardian 卡（保留，仅换色） |
+| 聊天任务卡片 | `workflow-run` 节点 | 折叠区 + 每 phase 一段行 | 同一套状态词与颜色；行 = 角色 + 任务标题 + 状态词 + 打开胶囊 |
+
+### 19.2 状态与步骤（`CONFIRMED` 数据来源）
+
+- **胶囊五态**（读 run 事实，不读计划数）：`waiting` = 未结束且 `declared === 0`；
+  `running` = 未结束且 `declared > 0`；`done` = 已结束且 `stopReason === 'completed'`；
+  `cancelled` = 已结束且 `stopReason === 'cancelled'`；`failed` = 其余已结束。
+  `stopReason` 由 `src/records.ts` 按报告写，`completed` 已经等于「每个任务都核过」，不是「程序跑完了」。
+- **步骤（轨道分段）**：有计划任务（`kind === 'extra'` 且 `taskNumber` 有值、非 Guardian）时，
+  一步 = 一个计划任务，按 `taskNumber` 排；没有计划任务时（triage / 单调用 run），
+  一步 = 一行已声明的调用，按 `seq` 排。`total = steps.length`。
+  `at` = 第一个 `doing` 的步，否则第一个 `failed`，否则第一个未完成的步，否则 `total`。
+- **段色**：`done → 绿`、`doing → 蓝（流动）`、`failed → 琥珀`、其余 `灰`。**任何地方不出现红**。
+- **现在**：主标题 = 当前步的标题（计划任务标题原样，不截断不重编号）；没有步时写
+  `progress.now.planning`，已结束且全过时写 `progress.now.done`。小字 = 正在跑的那一行的角色 +
+  `progress.now.suffix`，已结束写 `progress.now.allPassed`，并附 `progress.now.step`。
+- **琥珀提示条**：仅当当前步存在未恢复的失败时出现，数字取该单元的尝试次数
+  （label 的 `（尝试 n）` 后缀，已有 `progressAttemptOf` 一类规则）。
+- **后面还有**：当前步之后的步标题，按顺序，`、` 连接；没有就整行不渲染。
+- **经过（日志）**：每行一条已声明调用，按 `seq`；时间取 `startedAt`，角色取 label（去掉尝试后缀，
+  沿用 `memberLabel` 的词），标题取 phase 原文（计划任务标题），状态词按角色：执行→做完、
+  检查→过了、复核→通过、汇总→交卷（若该行就是 `summary-final` 指定的稿）、失败→没过、未结算→正在看。
+  失败行与正在跑的行用琥珀 / 浅蓝底，其余行只用分隔线。
+- **交卷**：`summary-final` 的 `draft` → 第 n 篇汇总稿那一行（按 `seq` 第 n 个汇总角色行）。
+  卡片写「汇总·第 n 稿（定稿）」+ 打开胶囊；**事件里没有汇总正文**，所以卡片不显示正文（见 §19.8）。
+  没有 `summary-final` 时显示 `progress.final.missing`，不猜哪一稿是定稿。
+- **依赖既有派生**：`progressNodeState` / `recoveredFailureSeqs` / `PROGRESS_CHAIN` /
+  `progressTaskNumber` / `orderTaskCards` 全部继续用（§5.1 的「红只表示现在还是坏的」改成琥珀后语义不变）。
+
+### 19.3 文案表（施工以本表为准；中英同键，缺一即失败）
+
+| 键 | 中文 | English | 用在哪 |
+| --- | --- | --- | --- |
+| `progress.chip.waiting` | 等你点头 | Waiting for you | 头部胶囊 |
+| `progress.chip.running` | 进行中 | Running | 头部胶囊 |
+| `progress.chip.done` | 已完成 | Done | 头部胶囊 |
+| `progress.chip.failed` | 未通过 | Not passed | 头部胶囊（琥珀） |
+| `progress.chip.cancelled` | 已取消 | Cancelled | 头部胶囊（琥珀） |
+| `progress.now.label` | 现在 | Now | 小标题 |
+| `progress.now.planning` | 正在拆活 | Planning | 主标题（还没声明行） |
+| `progress.now.done` | 做好了 | Done | 主标题（已结束全过） |
+| `progress.now.suffix` | 正在看 | is checking | 小字：`{role}` + 本键 |
+| `progress.now.allPassed` | {total} 步全过 | All {total} steps passed | 小字（已结束） |
+| `progress.now.step` | 第 {at} 步，共 {total} 步 | Step {at} of {total} | 小字 |
+| `progress.steps.aria` | 进度：第 {at} 步，共 {total} 步 | Progress: step {at} of {total} | 轨道 `aria-label` |
+| `progress.flag.retrying` | 第 {n} 遍没过，正在重看 | Attempt {n} failed, rechecking | 琥珀条 |
+| `progress.flag.failed` | 第 {n} 遍没过 | Attempt {n} failed | 琥珀条（已结束） |
+| `progress.rest` | 后面还有：{list} | Still to come: {list} | 轨道下方一行 |
+| `progress.plan.title` | 要干的 {count} 件事 | {count} things to do | 步骤清单标题 |
+| `progress.plan.waiting` | 等着 | Waiting | 步骤状态词 |
+| `progress.plan.running` | 在做 | Doing | 步骤状态词 |
+| `progress.plan.done` | 过了 | Passed | 步骤状态词 |
+| `progress.plan.failed` | 没过 | Not passed | 步骤状态词（琥珀） |
+| `progress.plan.cancelled` | 没做 | Cancelled | 步骤状态词 |
+| `progress.log.title` | 经过 | History | 日志标题 |
+| `progress.log.done` | 做完 | Did it | 行状态词 |
+| `progress.log.passed` | 过了 | Passed | 行状态词 |
+| `progress.log.reviewed` | 通过 | Approved | 行状态词（复核） |
+| `progress.log.running` | 正在看 | Checking | 行状态词 |
+| `progress.log.failed` | 没过 | Not passed | 行状态词（琥珀） |
+| `progress.log.shipped` | 交卷 | Shipped | 行状态词（定稿） |
+| `progress.log.cancelled` | 取消 | Cancelled | 行状态词 |
+| `progress.final.title` | 交卷 | Handed in | 卡片区标题 |
+| `progress.final.mark` | （定稿） | (final) | 稿名后缀 |
+| `progress.final.missing` | 这一轮没有交卷稿 | This run handed in no draft | 无 `summary-final` |
+| `progress.dock.start` | 开工 | Start | 按钮（等你点头） |
+| `progress.dock.accept` | 收下这版 | Accept this version | 按钮（已完成） |
+| `progress.dock.hintStart` | 要改就说一声，我重拆 | Say what to change and I'll re-plan | 按钮下小字 |
+| `progress.dock.hintAccept` | 不满意就说，我重做 | Say what's off and I'll redo it | 按钮下小字 |
+| `progress.dock.quiet` | 不用你说话，好了叫你 | Nothing needed from you; I'll call you | 无按钮时那一行 |
+| `progress.dock.fill` | 确认 | yes | **填进输入框的那几个字**（§19.5） |
+| `progress.dock.filled` | 已填进输入框，按发送 | Filled the box; press send | 点完后的状态行（`aria-live`） |
+| `progress.member.open` | 打开子会话 | Open child session | 行胶囊（沿用） |
+| `progress.chain.execute` | 执行 | Execute | 任务内链（沿用） |
+| `progress.chain.check` | 检查 | Verify | 任务内链（沿用） |
+| `progress.chain.review` | 复核 | Review | 任务内链（沿用） |
+
+**删除的键**（两本字典一起删，`test/i18n-parity.spec.ts` 的键集必须两边同时少）：
+`progress.title`、`progress.aria`、`progress.percent`、`progress.percentHint`、`progress.unsettled`、
+`progress.stage.*`（六个）、`progress.extraHint`、`progress.state.*`（六个）、
+`progress.derived.runEndedUnsettled`、`progress.derived.outcomeUnsettled`、`progress.notReported`、
+`progress.empty.body`、`progress.settle.*`（六条）、`progress.tasks.aria`、`progress.branch.*`（四条）、
+`progress.evidenceHint`、`progress.chain.pendingHint`、`progress.source.*`、`progress.field.*`。
+`progress.empty.title`、`progress.guardian.*` 保留。
+
+### 19.4 按钮①：只填框，不代发（`CONFIRMED` 机制）
+
+- 机制：`conversation` 服务的输入门面。`services.sessions.binding(sessionId).ctx` 是会话作用域
+  上下文（`dsh-api-session-controller` 的 `SessionBinding.ctx`），
+  `conversation.input.for(binding.ctx).setDraft(progress.dock.fill)` 把字写进输入框。
+- **绝不调 `conversation.send`**：`send` 是「代用户发一条消息」，与「只填框」相反；本 Tab 也不写会话事件。
+- 词表对得上：`src/block/approval.ts` 的 `APPROVAL_ANSWERS` 收 `确认 / 开工 / 可以 / 同意 / 没问题`
+  与 `yes / ok / approve / go ahead / confirmed / proceed`；`progress.dock.fill` 取 `确认`（中）/ `yes`（英），
+  所以填完用户自己按发送就能过门禁。
+- 服务缺席时（组合里没有 `conversation`）：**不渲染按钮**，退回 `progress.dock.quiet` 那一行，
+  不假装填过。填失败（门面拒绝、编辑器锁定）时不显示 `progress.dock.filled`。
+- 按钮是页面上唯一的控件之一（另一个是行胶囊）；卡、段、日志行仍 inert（§16 的 Q2 不变）。
+
+### 19.5 视觉不变量（测试逐条钉住）
+
+- **颜色全走 token**：正文用 `--dsw-alias-label-primary/secondary`，边 `--dsw-alias-border-l2`，
+  底 `--dsw-alias-bg-layer-2`，绿 `--dsw-alias-state-success-primary`，蓝 `--dsw-alias-state-business-primary`，
+  琥珀 `--dsw-alias-state-warn-primary`，灰 `--dsw-alias-state-idle-primary`。
+  **进度页 CSS 里不出现 `--dsw-alias-state-error-primary`，不出现任何字面色值**（既有断言，继续钉）。
+- **无横向滚动**（`not.toContain('overflow-x: auto')` 继续钉）；轨道 `display: grid` 等分，
+  ≤480 px 转竖排（步骤清单本身就是竖排，轨道在窄屏可退化为一行数字，但不得溢出）。
+- **退场的 DOM**：`.gw-progress-track`、`.gw-progress-seg`、`.gw-progress-ring`、`.gw-progress-glyph`、
+  `.gw-progress-link`、`.gw-progress-wires`、`.gw-progress-overview`、`.gw-progress-settle*`、
+  `.gw-progress-detail*`、`--gw-zoom` 全部不再出现（`test/client.spec.ts` 逐条断言缺席）。
+- **新 DOM 钩子**（测试与真机都按这些找）：`[data-gw-progress-chip]`、`[data-gw-progress-now]`、
+  `[data-gw-progress-steps]`、`[data-gw-progress-step]`（带 `data-state`）、`[data-gw-progress-flag]`、
+  `[data-gw-progress-rest]`、`[data-gw-progress-plan]`、`[data-gw-progress-log]`、
+  `[data-gw-progress-log-row]`（带 `data-state`）、`[data-gw-progress-final]`、
+  `[data-gw-progress-dock]`、`[data-gw-progress-dock-fill]`。
+- **风格作用域**：所有规则以 `.gw-progress` 开头，`<style>` 随 Tab 卸载（既有做法）。
+
+### 19.6 聊天任务卡片
+
+- 保留既有 DOM 钩子（`data-workflow-run`、`data-run-title`、`data-run-status-text`、`data-phase-*`），
+  所以已有的外部读取不破；改的是词与色：状态词改用 §19.3 的五态词，失败行琥珀不红，
+  行 = 角色 + 任务标题 + 状态词 + 打开胶囊，去掉「N 行」解释句与空的「事件中没有报告」。
+- 卡片的「展开/收起」保留（它是惰性结构，不是解释）；行胶囊仍只在 `canOpen` 为真时出现。
+
+### 19.7 诚实边界（不做）
+
+1. **开工前的计划清单**：事件流里没有计划，只有已经声明过的调用。所以「等你点头」这一态的
+   清单只能列出声明过的任务；没声明的步不画、不猜，轨道总长就是已声明的步数。
+2. **交卷正文**：最终答案由 gate 在整轮结束后直接交付，不是子调用行，事件里没有它的文字；
+   交卷卡只写稿名与打开胶囊。
+3. **百分比 / ETA / 通过率**：一个新数字都不加，`declared/settled` 也不再当页首指标（改由步数与日志陈述）。
+4. **跨任务依赖箭头、run 历史条**：仍不做（§15.5、§17.4 不变）。
+
+### 19.8 守卫（先红后绿）
+
+- 文档口径：`test/progress-tab.spec.ts` 既有「六段」守卫保留，并新增两条：脊的段数陈述里
+  不得再出现七（本轮订正的两处句式）、以及任务带段数的陈述与 `PROGRESS_STAGES.length` 一致。
+- 文案：`test/i18n-parity.spec.ts` 键集对齐；新增一条：本表列出的新键在两本字典里都存在，
+  删除清单里的键两边都不存在。
+- 零说明：`test/progress-hint-absent.spec.ts` 的禁用族扩到本轮删掉的解释句（含 `percentHint` 的原文
+  「这不是任务通过数」/「not a task verdict」、`notReported` 的「事件中没有报告」、`derived` 的两句）。
+- 渲染：`test/client.spec.ts` 新增三态 fixture（等你点头 / 进行中 / 已完成）逐字断言胶囊、主标题、
+  小字、轨道分段数与 `data-state`、琥珀条、经过行、交卷卡、按钮文案；再加一条：点击按钮调用
+  `setDraft` 且**没有**调用 `send`（用手写替身门面断言调用记录）。
+- 模型：`test/progress-tab.spec.ts` 新增同一批 fixture 的 `deriveProgressStory` 断言（TS 与
+  `src/client/index.js` 的手写镜像双份，沿用 §11 的做法）。
