@@ -16,6 +16,10 @@
 装本轮 `npm pack` 的包，**另加一个只做记录、不改行为的探针 bundle**（`probe/inbox-probe-plugin.js`：订
 `agent/inbox/inserted` / `claimed` / `discarded` / `status`，逐行写 JSONL，绝不改任何载荷）。驱动是 CDP 装置
 （`probe/drive.mjs`，在上一轮的装置上加了 `steer` 步骤：写字 + **Ctrl+Enter**，并在按键前抓一次画面）。
+第一次探针尝试**没有读数、原因是环境**：克隆档案里的会话模型钉在 `agent2api`，而本机 shell 没有
+`AGENT2API_API_KEY`（凭据档案里那一条存在，值取不到），第一轮直接 `401 invalid_api_key`；把档案里的
+`agent-default-model` 与五个角色钉到 `bifrost-responses/opencode-go/muse-spark-1.3-contributor`（`bifrost.env`
+里的键在本机可用）之后才跑出下面的读数。这条只说装法，不改产品。
 
 **读数（两次运行一致，取跑得完整的那次）**：
 
@@ -74,7 +78,9 @@
 ## 4. `lib/` 与 `verify:lib`
 
 `verify-lib.mjs` 检查的是 **`HEAD`** 的 `src/`↔`lib/` 一对，所以工作树有未提交改动时它只会说 `4584b8d` 那对我没动过的文件
-是逐字节相同（285 files）。**真正覆盖本轮的是在提交之后跑的那一遍**：`gate-verifylib-commit.out`。
+是逐字节相同（285 files）。**真正覆盖本轮的是在提交之后跑的那一遍**：`gate-verifylib-commit.out` ——
+`lib/ at 96ef27e is the build of src/ at 96ef27e (289 files, byte-identical)`、`EXIT=0`。
+（`285 → 289` 是新增的 `src/steering-inbox.ts` 与它的 `.d.ts` / 两张 map。）
 
 ## 5. 这一轮没做的（`NOT_RUN` / 边界）
 
