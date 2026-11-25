@@ -1,16 +1,18 @@
-## `feat/progress-layout-detail`：两栏躯体 / Guardian 四块 / 任务行就地展开 / 经过折叠——门禁 `101 files / 1884 tests` 跑绿，warnings 仍 15；真机那半边 `NOT_RUN` — 2026-11-25 (`CONFIRMED`)
+## `feat/progress-layout-detail`：两栏躯体 / Guardian 四块 / 任务行就地展开 / 经过折叠——门禁 `101 files / 1884 tests` 跑绿、warnings 仍 15，隔离档案真机三态读数到手 — 2026-11-25 (`CONFIRMED`)
 
 这条记的是**一条还没合流的分支**：基线是 `main` 的 **`b0fbd20`**，尖端 **`d0c924a`**，中间 **5 颗提交**
 （`29291eb` 主体、`331f181` 详情容器 `div` → `ol`、`f14299c` 守卫、`08018bf` 一条详情行只说一次门、
 `d0c924a` 把这句话钉住）。**产品面只动浏览器包**，改动面 6 个文件（`src/client/index.js`、`lib/client.js` 与四个 spec）。
+真机那半边在隔离档案里跑完，产物归档在 **`.rsi/evidence/progress-layout-detail-2026-11-25/`**（25 个文件 / 1.4 MB）。
 下面每一行都写清命令、环境与结果；没跑的写 `NOT_RUN`，跑不起来的写 `BLOCKED`。
 **标注规则**：标 `包工头跑` 的行是执行方跑出来、本轮记录者**没有重跑**的读数（本轮做的是逐行核对转录）；
+标 `soak agent 跑` 的行是隔离档案上那次真机运行跑出来、本轮**读它归档的截图与逐字文本**的读数（本轮没有重跑那台浏览器）；
 标 `本轮自查` 的行是本轮亲手敲的命令。
 
 | state | command（environment） | result |
 | --- | --- | --- |
 | 基线算术（本轮自查） | `git archive b0fbd20 \| tar -x -C .tmp/base-count`，`ln -s <worktree>/node_modules`，`npx vitest run`；`git cat-file -s b0fbd20:lib/client.js` | **`100 files / 1855 tests`** 全过、`Duration 85.98s`；`lib/client.js` **334321** 字节。**基线不是抄口述，是本轮重跑的**。**`CONFIRMED`** |
-| 门禁（**包工头跑，本轮逐行核对转录**） | `TMPDIR=$PWD/.tmp npm run ci`（干净树 **`d0c924a`**；转录 `.tmp/gate-final.out`，**22429 字节**） | **`EXIT=0`**：`Found 15 warnings and 0 errors.`（162）、`client bundle: 347526 bytes → lib/client.js`（168）、`lib/ at d0c924a is the build of src/ at d0c924a (285 files, byte-identical)`（169）、`Test Files 101 passed (101)`（370）/ **`Tests 1884 passed (1884)`**（371）、`Duration 88.19s`（373）。全文 `FAIL` **0 行**。`npm run ci` 的顺序是 `typecheck → lint → verify:lib → test`，所以 tsc 与 oxlint 也被这一遍覆盖。**`CONFIRMED`** |
+| 门禁（**包工头跑，本轮逐行核对转录**） | `TMPDIR=$PWD/.tmp npm run ci`（干净树 **`d0c924a`**；转录 **`.rsi/evidence/progress-layout-detail-2026-11-25/gate-d0c924a.out`**，**22429 字节**，`sha256` `01df1e2cef8fcd81b0564e5104f3d1841ea9b651e8a78350c7287d50c20e0cc8`，与本轮读的那份 `.tmp` 原件 `cmp` 逐字节相同） | **`EXIT=0`**：`Found 15 warnings and 0 errors.`（162）、`client bundle: 347526 bytes → lib/client.js`（168）、`lib/ at d0c924a is the build of src/ at d0c924a (285 files, byte-identical)`（169）、`Test Files 101 passed (101)`（370）/ **`Tests 1884 passed (1884)`**（371）、`Duration 88.19s`（373）。全文 `FAIL` **0 行**。`npm run ci` 的顺序是 `typecheck → lint → verify:lib → test`，所以 tsc 与 oxlint 也被这一遍覆盖。**`CONFIRMED`** |
 | 尖端全套复跑（本轮自查） | `git archive d0c924a \| tar -x -C .tmp/tip2` + 软链 `node_modules`，`npx vitest run` | **`101 files / 1884 tests`** 全过、`Duration 90.88s`——与门禁同数，独立复现。**`CONFIRMED`** |
 | 逐文件用例数（本轮自查，两棵树各量一遍） | `npx vitest run <file>`（逐个跑，读 `Tests N passed`） | `test/client.spec.ts` **132 → 139**、`test/progress-hint-absent.spec.ts` **6 → 8**、`test/i18n-parity.spec.ts` **8 → 8**（表里多 3 行键）、新增 `test/progress-layout.spec.ts` **20**；`test/progress-tab.spec.ts` **57**、`test/progress-connector.spec.ts` **11** 一个没动。**7 + 2 + 20 = 29**，与总数 `1855 → 1884` 对得上。**`CONFIRMED`** |
 | `lib/` 就是 `src/` 的构建（本轮自查） | `git rev-parse d0c924a:lib/client.js d0c924a:src/client/index.js`；`git cat-file -s d0c924a:lib/client.js` | 两者是**同一个 blob** `e14880c51767c616aff2d9697e41a7ddb97e22c2`，**347526** 字节。与门禁那句 `(285 files, byte-identical)` 互为旁证。**`CONFIRMED`** |
@@ -18,7 +20,13 @@
 | 类型检查与 lint（本轮自查） | `npx tsc -p tsconfig.json --noEmit`（`git archive 08018bf` 的拷贝里）；`npx oxlint src/client/index.js test/client.spec.ts test/i18n-parity.spec.ts test/progress-layout.spec.ts` | `TSC_EXIT=0`；oxlint `Found 2 warnings and 0 errors.`（`Finished in 40ms on 4 files`）。`d0c924a` 上的这两个阶段由门禁那一遍覆盖。**`CONFIRMED`** |
 | `verify:lib` 在非检出拷贝里 | `node scripts/verify-lib.mjs`（`git archive 08018bf` 的拷贝里） | **`BLOCKED`**：`fatal: pathspec 'lib' did not match any files`（它不是 git 检出，脚本里的 `git archive HEAD lib` 跑不了），`VERIFY_EXIT=1`。这一项**只**由门禁那一遍覆盖（`285 files, byte-identical`）。**`CONFIRMED`（失败原因已读，不是猜）** |
 | 文档守卫（本轮自查，写完记忆后跑） | `TMPDIR=$PWD/.tmp npx vitest run test/docs-version.spec.ts test/docs-config-keys.spec.ts test/docs-architecture-version.spec.ts test/i18n-parity.spec.ts test/progress-hint-absent.spec.ts`；另跑 `test/progress-tab.spec.ts`（它读 `DESIGN-progress-tab.md`） | `5 files / 41 tests` 全过（`docs-version 8`、`docs-config-keys 14`、`docs-architecture-version 3`、`i18n-parity 8`、`progress-hint-absent 8`），`963ms`；`test/progress-tab.spec.ts` **57 条**全过——追加 §20 没有打翻「段数陈述」那条文档守卫。**`CONFIRMED`** |
-| 真机 / 浏览器（真实档案里点开一行、折叠一次、右列 720px 上下换列） | —— | **`NOT_RUN`**：读数随后续消息补记。**在它补上之前，这条分支不得写成「真机验过」。** |
+| 真机环境与安装身份（**soak agent 跑**；本轮读归档产物并自查拷贝一致） | Node **v26.8.1** / npm **11.19.0** / DSH **0.2.2-rc.3**；隔离 home `.tmp/soak-layout/dsh-home`、profile `web-clone`（`node scripts/clone-profile.mjs --src ~/.dsh/profiles/web`）、端口 **127.0.0.1:3371**；playwright 1.62 + `chromium_headless_shell-1248`，视口 **1500×1600**，poll **250 ms**。克隆读数：`files 7731 -> 7731 (88493399 bytes)`、`links 5 (relinked 2, already dangling in the source 1)`、`parity 5/5 equal after redaction`、`dependencies 17 declared, 0 unresolved`、`credentials redacted: 1 line(s) in 1 file(s)` | 两侧都是 `dsh plugin --profile web-clone add file:…tgz` 的真拷贝（装好的 `lib/client.js` 与包里同哈希）。**基线** `dsh-grok-workflow-0.13.39.tgz` = `28c5d8b4c7f7f0258be6205a3747bc28bfab04cf25eb327c914211d274bff88b`、版本读回 `0.13.39`、`sha256(lib/client.js)` = `38702aa1e50bb483ecdddeba0050632dc627b874eee05958c57f17071063fa6c`、**334321** 字节；**本分支** `dsh-grok-workflow-0.13.39-feat-progress-layout-detail.tgz` = `acf2476d08b6677ec8427a717c7e05526ca3306f8f0789f85005de7d680840d9`、版本读回 `0.13.39`、`sha256(lib/client.js)` = `5745b15c379d28e99d1536cefce90154d3ebcc5d9d5c7d2a9c7b991ab6fced3a`、**347526** 字节（= 门禁那棵树）。克隆只动了 soak 四类东西（删残留 `mode: triage`、五个角色 + `guardianModel` + 默认 agent 模型钉到 `bifrost-responses/opencode-go/muse-spark-1.3-contributor`、工作区重指、端口），产品代码与 schema 一个字没动；模型密钥只走进程环境（`apiKeyEnv: BIFROST_VIRTUAL_KEY`），未拷进 scratch。**`CONFIRMED`** |
+| 真机三态（**soak agent 跑**） | 同一脚本、同一份克隆档案、同一件事各跑一次真运行；轮询 250 ms | 相对发送的时刻——基线 **等你点头 9.19 s / 进行中 9.79 s / 已完成 197.83 s**（约 3m18s），本分支 **15.84 s / 16.22 s / 170.00 s**（约 2m50s）。两侧「已完成」页都写 `做好了` / `2 步全过`。**`CONFIRMED`** |
+| 真机前后钩子对照（完成态，`querySelectorAll(...).length`；**soak agent 跑**） | 同一探针在两棵构建上取数（`after-dom-notes.md` / `before-dom-notes.md`） | `[data-gw-progress-columns]` **0 → 1**；`main` / `side` **0/0 → 1/1**；`guardian` **1 → 1**；`guardian-blocks` **0 → 1**；`guardian-block` **0 → 4**（`status` / `budget` / `count` / `findings`）；`plan-toggle` **0 → 2**（`aria-expanded="false"`）；`task-detail` **0 → 0**，点开后 **1**；`log-toggle` **0 → 1**（`展开全部` / `收起`）；`log-row` **9 → 8**；`plan-row` **2 → 2**。**两条要照实记**：① **「等你点头」那一瞬 `guardian 0`、`columns 0`**（Guardian 事件还没写），所以「有 Guardian 才有两栏」在真机上正好对上（waiting 0/0，running 与 done 1/1）；② 本分支这一轮的完成页是 **8** 条历史行（基线那轮是 9 条）且照样出现折叠按钮——条数是这次运行自己的性质，不是页面的。**`CONFIRMED`** |
+| 真机：开一行 / 折历史 / 窄屏（**soak agent 跑**） | `after-detail-open.png` / `after-fold-open.png` / `after-narrow-720.png` + 同批 `.txt` | **开一行**：`aria-expanded` `false → true`、`aria-controls="gw-progress-task-detail-0"`、`task-detail` 0 → 1，行内三行逐字 **`21:38  执行  做完  打开子会话`** / **`21:38  检查  过了  打开子会话`** / **`21:38  复核  通过  打开子会话`**（即 `时刻 门词 结果词 [入口]`，每个门词只出现一次）。**折历史**：标签 `展开全部 → 收起`、`aria-expanded` `false → true`、`data-expanded` `false → true`、`max-height: 264px / overflow-y: auto` → `none / visible`、`id="gw-progress-log-list"`。**1500 px**：`grid-template-columns: 957px 240px`、gap 16 px、main 957 宽、side 240 在 x=1253、`scrollWidth 1500 = clientWidth`。**700 px**：单轨 `693px`、Guardian 落到历史下面（main y=233…937、side y=953）、`scrollWidth 700 = clientWidth 700`——没有横向滚动。**`CONFIRMED`** |
+| 真机控制台与红线（**soak agent 跑**；红线本轮自查读了归档 README） | 两侧整轮 `console.json`；`stat ~/.dsh ~/.dsh/profiles`；`touch ~/.dsh/.soak-probe`；`curl` 3080 / 3371 | 控制台两侧都是 `{"consoleErrors": [], "pageErrors": []}`。红线：`~/.dsh` `2026-11-22 23:40:20`、`~/.dsh/profiles` `2026-11-22 16:59:46` 全程未变；`touch ~/.dsh/.soak-probe` → `Read-only file system`；**3080 → 401（开跑前、收尾后都是 401）**；3371 → 401（隔离实例，收尾时关掉，之后端口空出）。scratch `.tmp/soak-layout/`（140 MB）整棵删除。**未 push、未打 tag、未 bump `package.json`、未 publish。** **`CONFIRMED`** |
+| 真机：仍然 `NOT_RUN` 的四条 | —— | ① **发送前的基线页面快照**（旧计划的 `00-pre-run`）：空会话里进度 Tab 要等第一条消息才挂载，所以「发送前的进度页」两侧都不存在，早期那两张在脚本定稿时被删、**没有补拍也没有冒充**；② **未通过 / 已取消**两态的真机截图：两侧这一轮都 `completed`；③ **点「开工 / 收下这版」后输入框里真出现批准词**：只验到按钮存在与文案，没点下去读框内容；④ **live 档案升级 / 重载 / 重启**：按红线 `NOT_RUN`。 |
+| 证据归档自查（本轮自查） | `find .rsi/evidence/progress-layout-detail-2026-11-25 -type f \| wc -l`；`du -sh`；`cmp .tmp/gate-final.out .rsi/…/gate-d0c924a.out`；`grep -rnE 'sk-[A-Za-z0-9]|token=\|Bearer \|apiKey\|API_KEY\|password\|secret'` | **25 个文件 / 1.4 MB**；`gate-d0c924a.out` 与 `.tmp` 原件 **`cmp` 逐字节相同**（22429 字节，`sha256 01df1e2c…0cc8`）；密钥扫描**无命中**（命中的全是钩子名 `task-detail-0`、prose 里的 `AGENT2API_API_KEY` 变量名、以及门禁转录里那条 lint 正则的源码——**没有任何 `sk-…` 字面量、没有任何 `Bearer <值>`、没有任何 `key=值`**）。**`CONFIRMED`** |
 
 **先红后绿（三轮，逐字）**
 
@@ -52,10 +60,12 @@
 - **三个新键在两本字典里都在**（详情 / Detail、展开全部 / Show all、收起 / Collapse），页面上用读者自己的语言说；
   展开后的页面上没有百分比、没有估算、没有通过率。
 
-**Changed（本轮改动）：** 只有记忆与变更日志——`docs/knowledge/DESIGN-progress-tab.md`（追加 §20）、
-`docs/knowledge/DECISIONS.md`（追加 `D-157`）、`docs/knowledge/STATE.md`（新的 `Last updated:` 头段）、
+**Changed（本轮改动）：** 记忆、变更日志与证据——`docs/knowledge/DESIGN-progress-tab.md`（追加 §20，含 §20.11 真机回填）、
+`docs/knowledge/DECISIONS.md`（追加 `D-157`，Status 改真机口径）、`docs/knowledge/STATE.md`（新的 `Last updated:` 头段）、
 `docs/knowledge/HANDOFF.md`（新一节 + 决定日期 `2026-12-09`）、`docs/knowledge/VALIDATION.md`（本节）、
-`CHANGELOG.md`（`## [Unreleased]` 一条）。**没有改 `src/`、`lib/`、`test/`、`.rsi/`**，也没有动版本号。
+`CHANGELOG.md`（`## [Unreleased]` 一条），以及**新增的证据目录**
+`.rsi/evidence/progress-layout-detail-2026-11-25/`（25 个文件 / 1.4 MB，原样归档，`gate-d0c924a.out` 未编辑）。
+**没有改 `src/`、`lib/`、`test/`**，也没有动版本号。
 
 **Honest boundary（逐条）：**
 
@@ -66,9 +76,14 @@
    而逐文件的 `client.spec.ts 121 → 139` 与 `progress-hint-absent 7 → 8` 两轮都与实测对不上；尖端实测是
    **`132 → 139`、`6 → 8`、`+29 例 / +13205 字节`**。记忆里写实测值。
 4. **`i18n-parity` 是「多 3 行键」不是「多 4 行」**：那 4 个 diff 添加行里有 1 行是注释。
-5. **真机那半边 `NOT_RUN`**：本节没有任何真实档案、真实浏览器、真实运行的读数，**一个字都没有编**。
+5. **真机读数不是本轮跑的**：那台浏览器是 soak agent 在隔离档案里开的，本轮**没有重开**——本轮读的是它归档的
+   截图、逐字文本、钩子计数与红线读数，另加自己做的拷贝一致性与密钥扫描。「真机验过」这句现在有出处，
+   但出处是**产物**，不是本轮亲手敲的一条命令。
 6. **「先红后绿」那三段引文是派单转来的捕获**（实现侧、两轮守卫），跑在已经收掉的树上；本轮**没有重跑那三次红**。
    本轮亲手确认的是绿的一侧：基线 `1855`、尖端 `1884`、文档守卫 `41`，以及转录里那几行门禁读数。
+7. **证据 README 把基线用例数写成 `1870`，实测是 `1855`**（本节「基线算术」那一行是本轮自己跑的 `100 files / 1855 tests`；
+   `1870` 是 `0.13.38` 那一版的数）。证据目录是原样归档，**本轮不改它**，只在这里点名，免得下一个人拿 `1870` 去对账。
+   同一条 README 里的 `334321` 字节与两侧 `sha256` 与本轮自查一致。
 
 **(以下为上一轮的记录，原样保留。)**
 

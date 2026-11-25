@@ -4314,7 +4314,9 @@ spine 为空，pre-fix 形状会进脊柱。
 ## D-157 · 进度页布局细化：Guardian 挪到右侧并拆成四块、任务行就地展开自己的调用、经过超过一屏折叠（2026-11-25，未发版）
 
 - **Status:** `CONFIRMED`（源码 `src/client/index.js`、`test/progress-layout.spec.ts` 的 20 条用例、门禁转录
-  `.tmp/gate-final.out` 都在本轮实读；**真机/浏览器那半边是 `NOT_RUN`**，读数随后续消息补）
+  `.rsi/evidence/progress-layout-detail-2026-11-25/gate-d0c924a.out` 都在本轮实读；**真机那半边也已跑过**——
+  隔离档案里两条构建各跑一次真实运行，三态、开行、折历史、700 px 单列、控制台与红线都有读数，
+  产物在同一个目录；仍然 `NOT_RUN` 的四条见 `VALIDATION.md`）
 - **Date:** 2026-11-25
 - **Decision:**
   1. **躯体分两栏，且只有记录到 Guardian 时才分。** `div.gw-progress-columns[data-gw-progress-columns]` 内
@@ -4340,7 +4342,7 @@ spine 为空，pre-fix 形状会进脊柱。
      `progress.log.less`（收起 / Collapse），中英两本字典与 `REDESIGN_COPY` 表同步；没有第四句解释。
 - **Evidence:**
   - 门禁 `TMPDIR=$PWD/.tmp npm run ci` 在 `d0c924a` 的干净树上（包工头跑，本轮逐行核对转录
-    `.tmp/gate-final.out`，22429 字节、0 行 `FAIL`）：`EXIT=0`、`Found 15 warnings and 0 errors.`、
+    `.rsi/evidence/progress-layout-detail-2026-11-25/gate-d0c924a.out`，22429 字节、0 行 `FAIL`）：`EXIT=0`、`Found 15 warnings and 0 errors.`、
     `client bundle: 347526 bytes → lib/client.js`、
     `lib/ at d0c924a is the build of src/ at d0c924a (285 files, byte-identical)`、
     `Test Files 101 passed (101)` / `Tests 1884 passed (1884)`、`Duration 88.19s`。
@@ -4367,6 +4369,20 @@ spine 为空，pre-fix 形状会进脊柱。
     详情是 `ol` 且 `id` 等于控件的 `aria-controls`、5 行时没有折叠按钮、`id=gw-progress-log-list` 与
     `data-expanded=false` 都在、两本字典都有那三个键、CSS 没有字面色值 / 没有 error token / 没有 `overflow-x: auto`、
     有 720px 单列规则与 264px 上限」。这条是包工头的读数（本轮没有重跑那遍探针），与上面的用例互为旁证。
+  - **真机（隔离档案，soak agent 跑，本轮读产物）**：Node v26.8.1 / npm 11.19.0 / DSH 0.2.2-rc.3，`web-clone`
+    克隆自 live `~/.dsh/profiles/web`（`files 7731 -> 7731`、`parity 5/5 equal after redaction`），端口 3371，
+    视口 1500×1600。两条构建都是 `dsh plugin add file:…tgz` 的**真拷贝**：基线 tgz
+    `28c5d8b4…ff88b` / `sha256(lib/client.js)` `38702aa1…063fa6c` / **334321** 字节，本分支 tgz
+    `acf2476d…840d9` / `5745b15c…ced3a` / **347526** 字节（= 门禁那棵树）。
+  - **真机三态与前后对照**：基线 等你点头 **9.19 s** / 进行中 **9.79 s** / 已完成 **197.83 s**，
+    本分支 **15.84 s / 16.22 s / 170.00 s**；完成态钩子 **columns 0 → 1**、`main`/`side` **0/0 → 1/1**、
+    **guardian-block 0 → 4**、**plan-toggle 0 → 2**、**log-toggle 0 → 1**、`task-detail` 0 → 0（点开后 1）、
+    `log-row` 9 → 8、`plan-row` 2 → 2。**「等你点头」那一瞬 `guardian 0`、`columns 0`**——「有 Guardian 才有两栏」
+    在真机上正好对上。**开一行**读作 `21:38 执行 做完 打开子会话` / `21:38 检查 过了 打开子会话` /
+    `21:38 复核 通过 打开子会话`；**折历史** `展开全部 → 收起`、`data-expanded` `false → true`、
+    `264px/auto → none/visible`；**700 px** 单轨 `693px`、Guardian 落到历史下面、`scrollWidth 700 = clientWidth 700`；
+    两侧控制台 `{"consoleErrors": [], "pageErrors": []}`；红线：`~/.dsh` 与 `~/.dsh/profiles` 的 mtime 全程未变、
+    `touch ~/.dsh/.soak-probe` → `Read-only file system`、3080 前后都是 401。
 - **Alternatives rejected:**
   - **Guardian 继续做「经过」下面的一张卡。** 否决：它是一条**边车**，与运行本身并列；放在日志下面，读者会把它当成
     这次运行的又一段（「之后还发生了什么」），而它说的其实是另一件事——监控还活着没有。
@@ -4391,4 +4407,7 @@ spine 为空，pre-fix 形状会进脊柱。
     一行一个门词、标题在行头 1 次而详情里 0 次、无门的那行留角色词且没有 chip，`+78` 行、2 条用例）。
     门禁是打在 `d0c924a` 上的那一遍，所以 `08018bf` 没有一次属于它自己的门禁读数——它被下一颗提交的守卫与
     同一遍门禁一起覆盖了。
-  - 真机/浏览器那半边（真实档案里点开一行、折叠一次、右列在 720px 上下换列）**`NOT_RUN`**，读数随后续消息补记。
+  - 真机那半边**已经跑过**（隔离档案、187 秒级的真实运行、两条构建各一次），读数与产物在
+    `.rsi/evidence/progress-layout-detail-2026-11-25/`；仍然 `NOT_RUN` 的只有四条：发送前的基线页面快照
+    （空会话不挂载进度 Tab）、未通过 / 已取消两态（两次都 `completed`）、点按钮后读输入框内容（只验了存在与文案）、
+    live 档案升级 / 重载 / 重启（红线）。

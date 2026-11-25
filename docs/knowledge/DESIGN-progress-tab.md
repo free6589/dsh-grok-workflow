@@ -697,7 +697,7 @@ file:…/dsh-grok-workflow-0.13.38.tgz`（版本读回 `0.13.38`，`sha256(lib/c
 躯体变成两栏，Guardian 从「标题 + 一条清单」变成四块瓦片，每颗计划任务行都能就地展开**它这一次任务**的调用，
 「经过」超过一屏时留一个字收放。本节全部是 `CONFIRMED`：源码 `src/client/index.js`（五颗提交之后与
 `lib/client.js` 逐字相同，blob `e14880c`，`347526` 字节），用例 `test/progress-layout.spec.ts` 的 20 条，
-门禁转录 `.tmp/gate-final.out`（`d0c924a`）。
+门禁转录 `.rsi/evidence/progress-layout-detail-2026-11-25/gate-d0c924a.out`（`d0c924a`）。
 
 一条边界先说清楚：**产品面只动了浏览器包**。`src/progress-tab.ts`、fold、`src/records.ts`、事件集，以及页面上
 每一个数字，一个字没改；`b0fbd20..d0c924a` 的改动面只有 6 个文件（`src/client/index.js`、`lib/client.js` 与四个 spec）。
@@ -837,3 +837,58 @@ section.gw-progress
 - §16 的 Q2（点卡片空白处什么都不发生）不变：按钮是按钮，行的空白处仍然什么都不做。
 - 段的等分、琥珀条、`data-state` 语义不变；折叠与展开不改任何状态词。
 - 新控件都不写会话事件、不发网络请求、不调 `conversation.send`（§19.4 的机制一个字没改）。
+
+### 20.11 真机回填（2026-11-25，隔离档案；`CONFIRMED`）
+
+产物全部在 `.rsi/evidence/progress-layout-detail-2026-11-25/`（25 个文件 / 1.4 MB）：截图、逐字 `innerText`、
+钩子计数、时间线、两侧控制台、门禁原始输出、以及写清每条读数出处的 `README.md`。**这台浏览器是 soak agent
+开的，本轮读的是产物**，不是本节作者亲手敲的。
+
+**环境与安装身份。** Node v26.8.1 / npm 11.19.0 / DSH 0.2.2-rc.3；`web-clone` 从 live `~/.dsh/profiles/web`
+克隆（`files 7731 -> 7731 (88493399 bytes)`、`links 5`、`parity 5/5 equal after redaction`、
+`dependencies 17 declared, 0 unresolved`、`credentials redacted: 1 line(s) in 1 file(s)`），端口 3371，
+playwright 1.62 + `chromium_headless_shell-1248`，视口 1500×1600，poll 250 ms。克隆只动 soak 四类东西
+（删残留 `mode: triage`、角色与模型钉到 `bifrost-responses/opencode-go/muse-spark-1.3-contributor`、
+工作区重指、端口），**产品代码与 schema 一个字没动**。两侧都是真安装：
+
+| 侧 | tgz `sha256` | 版本读回 | `sha256(lib/client.js)` | 字节 |
+| --- | --- | --- | --- | --- |
+| 基线 `b0fbd20` | `28c5d8b4c7f7f0258be6205a3747bc28bfab04cf25eb327c914211d274bff88b` | `0.13.39` | `38702aa1e50bb483ecdddeba0050632dc627b874eee05958c57f17071063fa6c` | 334321 |
+| 本分支（产品 `d0c924a`） | `acf2476d08b6677ec8427a717c7e05526ca3306f8f0789f85005de7d680840d9` | `0.13.39` | `5745b15c379d28e99d1536cefce90154d3ebcc5d9d5c7d2a9c7b991ab6fced3a` | **347526** |
+
+**三态与前后对照。** 同一脚本、同一份克隆档案各跑一次真运行：基线 等你点头 **9.19 s** / 进行中 **9.79 s** /
+已完成 **197.83 s**，本分支 **15.84 s / 16.22 s / 170.00 s**；两侧完成页都写 `做好了` / `2 步全过`。
+完成态钩子（`querySelectorAll(...).length`）：`columns` **0 → 1**、`main`/`side` **0/0 → 1/1**、
+`guardian` 1 → 1、`guardian-blocks` **0 → 1**、`guardian-block` **0 → 4**（`status`/`budget`/`count`/`findings`）、
+`plan-toggle` **0 → 2**、`log-toggle` **0 → 1**、`task-detail` 0 → 0（点开后 1）、`log-row` **9 → 8**、
+`plan-row` 2 → 2。四条主断言（columns / plan-toggle / log-toggle / guardian-block）在真机上全部成立。
+
+**两处必须照实记。** ① **「等你点头」那一瞬还没有 Guardian**（事件还没写），所以那时 `guardian 0`、`columns 0`——
+「有 Guardian 才有两栏」这条规则在真机上正好对上，而不是被真机推翻（running 与 done 都是 1/1）。
+② 本分支这一轮的完成页是 **8** 条历史行（基线那轮是 9 条）且照样出现折叠按钮：条数是**这次运行**自己的性质，
+不是页面的性质；6 行阈值与 8 行的关系也说明按钮按的是条数、不是高度。
+
+**开一行、折历史、窄屏。** 点第一行 `[data-gw-progress-plan-toggle]`：`aria-expanded` `false → true`、
+`aria-controls="gw-progress-task-detail-0"`、`task-detail` 0 → 1，行内三行逐字是
+
+```text
+21:38  执行  做完  打开子会话
+21:38  检查  过了  打开子会话
+21:38  复核  通过  打开子会话
+```
+
+也就是 §20.6 那条形状（`时刻 门词 结果词 [入口]`，每个门词只出现一次）。折叠：`展开全部 → 收起`、
+`aria-expanded` `false → true`、`data-expanded` `false → true`、
+`max-height: 264px / overflow-y: auto` → `none / visible`、`id="gw-progress-log-list"` 始终在。
+1500 px：`grid-template-columns: 957px 240px`、gap 16 px、main 957 宽、side 240 在 x=1253、
+`scrollWidth 1500 = clientWidth`。**700 px**：单轨 `693px`、Guardian 落到历史下面（main `y=233…937`、side `y=953`）、
+`scrollWidth 700 = clientWidth 700`——没有横向滚动。
+
+**控制台与红线。** 两侧整轮 `{"consoleErrors": [], "pageErrors": []}`。`~/.dsh` 与 `~/.dsh/profiles` 的 mtime
+全程未变（`2026-11-22 23:40:20` / `2026-11-22 16:59:46`）、`touch ~/.dsh/.soak-probe` →
+`Read-only file system`、3080 开跑前与收尾后都是 401、3371 只在实例活着时 401、scratch `.tmp/soak-layout/`
+（140 MB）整棵删除。未 push、未打 tag、未 bump、未 publish。
+
+**仍然 `NOT_RUN` 的四条**（不要升级成「验过」）：发送前的基线页面快照（空会话不挂载进度 Tab，两侧都没有，
+早期那两张被删掉、没有补拍）、未通过 / 已取消两态（两次运行都 `completed`）、点「开工 / 收下这版」之后读输入框里的字
+（只验到按钮存在与文案）、live 档案升级 / 重载 / 重启（红线）。
