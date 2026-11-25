@@ -1,0 +1,219 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.worktrees/feat-inbox-steering
+
+ ❯ test/steering-inbox.spec.ts (14 tests | 14 failed) 78ms
+     × queues one human message for the run that is working in that session 5ms
+     × drops the message when no run is working in that session 3ms
+     × drops a message that belongs to another session than the working one 0ms
+     × drops a message that is not a person speaking: another role, or injected context 1ms
+     × drops a scheduled delivery, which arrives as a user message too 0ms
+     × drops a card answer, which answers a question instead of asking for anything 0ms
+     × drops a message that carries no text at all 0ms
+     × queues one message once when the same message is moved into the running turn 1ms
+     × forgets an id only after the guard is full, so the bound is real 1ms
+     × removes its listener when the plugin unloads 3ms
+     × warns instead of throwing when queueing fails, so the turn still runs 1ms
+     × logs how many are pending and never what they say 0ms
+     × hands the message from the inbox to the boundary pull, and closes with the run 60ms
+     × queues nothing when the replan switch is off, whatever arrives 1ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 14 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/steering-inbox.spec.ts > the subscriber: what counts as a demand > queues one human message for the run that is working in that session
+TypeError: Cannot read properties of undefined (reading 'handler')
+ ❯ test/steering-inbox.spec.ts:83:18
+     81|     const { token } = openSteering(SESSION)
+     82|
+     83|     captured[0]!.handler(inserted(SESSION, human('also cover the edge …
+       |                  ^
+     84|
+     85|     expect(pullSteering(token).intents.map(intent => intent.text)).toE…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/14]⎯
+
+ FAIL  test/steering-inbox.spec.ts > the subscriber: what counts as a demand > drops the message when no run is working in that session
+AssertionError: expected [Function] to not throw an error but 'TypeError: Cannot read properties of …' was thrown
+
+- Expected:
+undefined
+
++ Received:
+"TypeError: Cannot read properties of undefined (reading 'handler')"
+
+ ❯ test/steering-inbox.spec.ts:95:79
+     93|
+     94|     // No queue: this is an ordinary turn, and nothing may start steer…
+     95|     expect(() => captured[0]!.handler(inserted(SESSION, human('hello')…
+       |                                                                               ^
+     96|     expect(steeringForSession(SESSION)).toBeUndefined()
+     97|     expect(warnings).toEqual([])
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/14]⎯
+
+ FAIL  test/steering-inbox.spec.ts > the subscriber: what counts as a demand > drops a message that belongs to another session than the working one
+TypeError: Cannot read properties of undefined (reading 'handler')
+ ❯ test/steering-inbox.spec.ts:106:18
+    104|     const { token } = openSteering(SESSION)
+    105|
+    106|     captured[0]!.handler(inserted('sess-elsewhere', human('give me a t…
+       |                  ^
+    107|
+    108|     expect(pullSteering(token).intents).toEqual([])
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/14]⎯
+
+ FAIL  test/steering-inbox.spec.ts > the subscriber: what counts as a demand > drops a message that is not a person speaking: another role, or injected context
+TypeError: Cannot read properties of undefined (reading 'handler')
+ ❯ test/steering-inbox.spec.ts:118:18
+    116|     const assistant = { ...human('I will handle it'), role: 'assistant…
+    117|
+    118|     captured[0]!.handler(inserted(SESSION, assistant))
+       |                  ^
+    119|     captured[0]!.handler(inserted(SESSION, fromProducer('runtime-conte…
+    120|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/14]⎯
+
+ FAIL  test/steering-inbox.spec.ts > the subscriber: what counts as a demand > drops a scheduled delivery, which arrives as a user message too
+TypeError: Cannot read properties of undefined (reading 'handler')
+ ❯ test/steering-inbox.spec.ts:132:18
+    130|     // A loop beat is a user-role message from the `schedule` producer…
+    131|     // repository's own clock, not the person talking.
+    132|     captured[0]!.handler(inserted(SESSION, fromProducer('schedule', 'R…
+       |                  ^
+    133|
+    134|     expect(pullSteering(token).intents).toEqual([])
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/14]⎯
+
+ FAIL  test/steering-inbox.spec.ts > the subscriber: what counts as a demand > drops a card answer, which answers a question instead of asking for anything
+TypeError: Cannot read properties of undefined (reading 'handler')
+ ❯ test/steering-inbox.spec.ts:143:18
+    141|     const { token } = openSteering(SESSION)
+    142|
+    143|     captured[0]!.handler(inserted(SESSION, fromProducer('user-question…
+       |                  ^
+    144|
+    145|     expect(pullSteering(token).intents).toEqual([])
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/14]⎯
+
+ FAIL  test/steering-inbox.spec.ts > the subscriber: what counts as a demand > drops a message that carries no text at all
+TypeError: Cannot read properties of undefined (reading 'handler')
+ ❯ test/steering-inbox.spec.ts:160:18
+    158|     const blank = human('   \n  ')
+    159|
+    160|     captured[0]!.handler(inserted(SESSION, imageOnly))
+       |                  ^
+    161|     captured[0]!.handler(inserted(SESSION, blank))
+    162|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/14]⎯
+
+ FAIL  test/steering-inbox.spec.ts > the subscriber: identity and lifetime > queues one message once when the same message is moved into the running turn
+TypeError: Cannot read properties of undefined (reading 'handler')
+ ❯ test/steering-inbox.spec.ts:179:18
+    177|     // Queued, then steered: the Host removes the pending message and …
+    178|     // same one into `next-step`, so the inbox announces it twice. One…
+    179|     captured[0]!.handler(inserted(SESSION, message))
+       |                  ^
+    180|     captured[0]!.handler(inserted(SESSION, message))
+    181|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/14]⎯
+
+ FAIL  test/steering-inbox.spec.ts > the subscriber: identity and lifetime > forgets an id only after the guard is full, so the bound is real
+TypeError: Cannot read properties of undefined (reading 'handler')
+ ❯ test/steering-inbox.spec.ts:192:18
+    190|     const message = human('one demand')
+    191|
+    192|     captured[0]!.handler(inserted(SESSION, message))
+       |                  ^
+    193|     // Filler ids carrying no text: they take a slot in the guard with…
+    194|     // the queue (which holds eight), so the assertion measures the gu…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/14]⎯
+
+ FAIL  test/steering-inbox.spec.ts > the subscriber: identity and lifetime > removes its listener when the plugin unloads
+AssertionError: expected [] to deeply equal [ 'agent/inbox/inserted' ]
+
+- Expected
++ Received
+
+- [
+-   "agent/inbox/inserted",
+- ]
++ []
+
+ ❯ test/steering-inbox.spec.ts:212:48
+    210|     const dispose = installSteeringInbox({ ctx, logger })
+    211|
+    212|     expect(captured.map(entry => entry.event)).toEqual([STEERING_INBOX…
+       |                                                ^
+    213|     dispose()
+    214|     expect(disposed).toEqual([STEERING_INBOX_EVENT])
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/14]⎯
+
+ FAIL  test/steering-inbox.spec.ts > the subscriber: identity and lifetime > warns instead of throwing when queueing fails, so the turn still runs
+AssertionError: expected [Function] to not throw an error but 'TypeError: Cannot read properties of …' was thrown
+
+- Expected:
+undefined
+
++ Received:
+"TypeError: Cannot read properties of undefined (reading 'handler')"
+
+ ❯ test/steering-inbox.spec.ts:232:83
+    230|     const { token } = openSteering(SESSION)
+    231|
+    232|     expect(() => captured[0]!.handler(inserted(SESSION, human('also do…
+       |                                                                                   ^
+    233|     expect(pullSteering(token).intents).toEqual([])
+    234|     expect(warnings.some(line => line.includes('could not queue a mess…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/14]⎯
+
+ FAIL  test/steering-inbox.spec.ts > the subscriber: identity and lifetime > logs how many are pending and never what they say
+TypeError: Cannot read properties of undefined (reading 'handler')
+ ❯ test/steering-inbox.spec.ts:244:18
+    242|     openSteering(SESSION)
+    243|
+    244|     captured[0]!.handler(inserted(SESSION, human('the customer passwor…
+       |                  ^
+    245|
+    246|     expect(infos).toHaveLength(1)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/14]⎯
+
+ FAIL  test/steering-inbox.spec.ts > wiring: the inbox feeds the run own channel, replan still decides > hands the message from the inbox to the boundary pull, and closes with the run
+TypeError: Cannot read properties of undefined (reading 'handler')
+ ❯ test/steering-inbox.spec.ts:342:18
+    340|     expect(replan?.tool).toBe(STEERING_TOOL_NAME)
+    341|
+    342|     captured[0]!.handler(inserted(SESSION, human('also cover the edge …
+       |                  ^
+    343|
+    344|     // The boundary child's one call takes the demand the person typed…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/14]⎯
+
+ FAIL  test/steering-inbox.spec.ts > wiring: the inbox feeds the run own channel, replan still decides > queues nothing when the replan switch is off, whatever arrives
+TypeError: Cannot read properties of undefined (reading 'handler')
+ ❯ test/steering-inbox.spec.ts:363:18
+    361|     expect('replan' in (request.args as Record<string, unknown>)).toBe…
+    362|
+    363|     captured[0]!.handler(inserted(SESSION, human('also cover the edge …
+       |                  ^
+    364|
+    365|     // No channel: the message is not queued anywhere, and no run is l…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/14]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  14 failed (14)
+   Start at  02:17:17
+   Duration  967ms (transform 625ms, setup 0ms, import 727ms, tests 78ms, environment 0ms)
+
+EXIT=1

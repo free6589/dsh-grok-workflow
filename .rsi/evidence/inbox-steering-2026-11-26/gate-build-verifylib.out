@@ -1,0 +1,9 @@
+
+> dsh-grok-workflow@0.13.41 build
+> tsc -p tsconfig.build.json && node scripts/build-client.mjs
+
+client bundle: 348559 bytes → lib/client.js
+BUILD_EXIT=0
+client bundle: 348559 bytes → lib/client.js
+lib/ at 4584b8d is the build of src/ at 4584b8d (285 files, byte-identical)
+VERIFY_EXIT=0

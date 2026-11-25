@@ -23,6 +23,7 @@ import { installShutdownProbe } from './records.js'
 import { normalizeCallerTasks, GrokWorkflowInputError, TASK_LIMITS } from './input.js'
 import { renderReport } from './report.js'
 import { STEERING_TOOL_NAME, closeAllSteering, pullSteering } from './steering.js'
+import { installSteeringInbox } from './steering-inbox.js'
 import { redactError } from './redact.js'
 import { createActiveState, disposeActiveState, runWorkflow } from './run.js'
 import type { ActiveState } from './run.js'
@@ -379,6 +380,13 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
     },
   })
   ctx.tools.register(replanTool)
+
+  // Mid-run steering entrance (D-162): the message that arrives while this session's
+  // workflow is working is queued for that run by the Host's own inbox event, not by the
+  // turn that is busy. It opens nothing — no live queue means the message is ignored —
+  // and it leaves the message itself in the inbox, so the same words are still answered
+  // as an ordinary turn afterwards. Disposed with the rest of the plugin surface.
+  ctx.effect(() => installSteeringInbox({ ctx, logger }))
 
   // Repeat-run driver (Host loop service). A loop is one durable Schedule rrule task
   // whose delivery target is the same session; this plugin owns no timer, so an open

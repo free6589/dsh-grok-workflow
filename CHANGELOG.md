@@ -5,6 +5,28 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Fixed / 修复
+
+- **A message typed while a run is working now joins that run / 跑中发出的那句话现在真的会并进正在跑的计划** —
+  Until now the channel was open and nobody could reach it: `grok_workflow` occupies the turn that calls it, so the next message in
+  that conversation waited for the turn to end, and `grok_steer` therefore always answered "this block has no workflow running".
+  The plugin now reads the Host's own inbox event — every message that enters a live conversation is announced the moment it is
+  spliced in, which is *while* the tool call is still running — and queues the text for the working run in that conversation. The
+  boundary planner then receives it with `grok_replan_intents` and merges it into the waves that have not run yet, so settled work
+  is not redone. Only a person's own prompt counts: scheduled beats, card answers, injected context, child-agent prompts and
+  anything this build does not recognise are ignored, and a conversation with no run working in it ignores the message completely.
+  **A merged message is still an ordinary message**: it stays in the conversation and is answered on its own round as well, so the
+  user sees both the plan absorbing the demand and a reply to it. Nothing else changed: the `replan` switch still decides whether a
+  channel exists at all, the queue is bounded as before, and a demand that arrives after the last boundary is counted in the log.
+  **Upgrade note: nothing to prepare — no key, schema, default or stored record changed.**
+  / 以前通道是开着的，却没有人够得着它：`grok_workflow` 占着发起它的那一轮，所以同一段对话里的下一条消息要等这一轮结束，
+  `grok_steer` 也就总回答「这一块现在没有在跑的 workflow」。现在插件读宿主自己的收信箱事件——任何一条进入活对话的消息在被放进去的那一刻
+  就会宣布，而那一刻工具调用还跑着——并把正文排进这段对话里正在跑的那一轮。波边界那个规划子代理随后用 `grok_replan_intents` 取走它，
+  并进还没跑的波次，已验证的成果不重做。只有真人自己的一句话算数：定时心跳、卡片答复、注入的上下文、子代理的提示词，以及这个版本不认识的
+  任何来源，一律不理；这段对话里没有在跑的东西，消息就完全不理。**并进去的那句话仍然是一条普通消息**：它留在对话里，还会另有自己的一轮回复，
+  所以用户既看到计划把它吸收进去、也看到对它的回答。其余没变：`replan` 开关仍然决定有没有通道，队列上限照旧，
+  最后一道边界之后才到的要求照样在日志里记个数。**升级须知：不用准备任何东西——没有键、schema、默认值或已存记录变化。**
+
 ## [0.13.41] - 2026-11-26
 
 ### Fixed / 修复
