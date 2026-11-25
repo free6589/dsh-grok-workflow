@@ -1,0 +1,15 @@
+== root conversation: session-5b59b101-8222-4199-b170-baf1294cbc6c
+seq 4  spliced  target=next-turn  removed=0  ["用 grok_workflow 跑一个三波的小活：目标「分别数三个文件的行数」。三个任务各数一个文件的行数，文件在 /h"]
+seq 6  spliced  target=next-turn  removed=1  []
+seq 19  tool/call  grok_workflow
+seq 33  spliced  target=next-step  removed=0  ["跑完再补一句：把三个行数加起来给我一个总数。"]
+seq 71  tool/result  
+seq 73  spliced  target=next-step  removed=1  []
+
+== inserted events recorded by the probe bundle (root conversation only)
+
+== boundary children that pulled demands
+8eefa609-c8b3-401a-a0fe-a2f7d8f29bb1  seq 17  arguments={"token":"steer-mwwfzzsj-1"}
+e6664464-8323-4774-bd69-b9d59e36ad34  seq 17  arguments={"token":"steer-mwwfzzsj-1"}
+364132ca-6285-478b-a5f5-32b7e42cb171  seq 17  arguments={"token":"steer-mwwg8rzu-1"}
+07e5b410-4b73-4e1a-814d-061952a5175a  seq 17  arguments={"token":"steer-mwwg8rzu-1"}

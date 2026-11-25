@@ -1,0 +1,5 @@
+# The boundary child's pull, verbatim (session 364132ca = 规划（第2次）· 波 1 边界)
+
+CALL seq 17 {"token":"steer-mwwg8rzu-1"}
+RESULT: {"intents":[{"id":"steer-mwwg8rzu-1-1","text":"再加一条要求：最后额外报一个 CHANGELOG.md 与 README.md 行数的差值。","atMs":1795630888586}],"dropped":0}
+MERGE REQUEST: {"action":"apply","edits":[{"action":"add","dependsOn":["changelog_count"],"id":"task-4","objective":"基于已统计的 README.md 与 CHANGELOG.md 行数，计算两者行数差值（CHANGELOG - README）并在最终报告中额外给出","title":"报告 CHANGELOG 与 README 行数差值"}],"reason":"新增差值报告需求依赖两文件的行数统计，将其作为依赖 changelog_count 的新收尾任务追加，不改动已沉淀任务。"}

@@ -4589,3 +4589,62 @@ spine 为空，pre-fix 形状会进脊柱。
   workflow 并把通道键到根会话。这一条留给下一个块拍板；本轮只把管道接回去，并把边界调用的代价写进 `CHANGELOG`。
 - **Evidence:** `test/replan.spec.ts` 17 → 21 条（+4：三条接线 + 一条「只关自己那格」）、
   `test/block-tools.spec.ts` 的「往真在跑的块里排一条」，真机读数见 `.rsi/evidence/steering-reconnect-2026-11-26/`。
+
+## D-162 · 跑中插话的入口在宿主（`agent/inbox/inserted`），不在调用方的轮；只认真人自己的一句话，并入之后那条消息仍另起一轮回复（2026-11-26，未发版）
+
+- **Date:** 2026-11-26
+- **Context:** `D-161` 把活通道接回了 `runWorkflow`（开队列 + 铸令牌 + `finally` 关），并在 Consequences 里写下
+  一条硬边界：**管道通了，但没有任何角色能在跑中往里塞话**。`grok_workflow` 是同步工具调用、调用它的那一轮被占着；
+  子代理被 `origin === 'subagent'` 守卫明令拒绝；GUI 里正在跑的时候打一句话，光标留在输入框里、提示
+  `Cmd/Ctrl+Enter 插话发送全部排队消息`，模型要等这一轮结束才看见。于是等着拍板的是两条路：甲、把宿主侧的消息入口
+  拿回来；乙、允许调度子代理跑 workflow 并把通道键到根会话。
+- **探针（先说读数，再说结论）：** 隔离档案（live web 档案的复制、`DSH_HOME` 指 scratch、端口 3461、live 3080 全程没碰）
+  里装本轮 `npm pack` 的包，再加一个只做记录、不改行为的探针 bundle（订 `agent/inbox/inserted` / `claimed` /
+  `discarded` / `status`，逐行写文件）。一次真模型的三波运行里，运行到 `深度求索中，用时 46 秒`、4 个子代理在跑时，
+  在输入框打一句话并按下 **Ctrl+Enter**：
+  - 探针记到 **`inserted`**，`sessionId` 是**根会话**、`sourceKind: "user"`、正文正是那句话（18:14:38）；
+  - 同会话的 session 日志里，seq **19** 是 `tool/call`（`grok_workflow`），seq **33** 是
+    `agent/inbox/spliced`，target 是 **`next-step`**，而这条 `tool/result` 到那一刻还没出现 —— 也就是**工具调用还在跑**时，
+    消息被放进了同一轮的下一步。
+  机制上这也对得上：`inserted` 由 `ReactLoopInbox.mutate()` 在 `session.append('agent/inbox/spliced')` 之后**同步** emit
+  （`dsh-agent-loop/lib/index.js:190-201`），所以「spliced 落在工具调用当中」⇔「事件在工具调用当中发过」。
+  **结论：甲可行，不需要改判乙。** 探针 bundle 与读数留在 `.rsi/evidence/inbox-steering-2026-11-26/`。
+- **Decision:**
+  1. **入口订宿主事件 `agent/inbox/inserted`，不开自己的通道。** 插件只读这条事件；`replan` 关掉（或这段会话没有在跑的
+     运行）时 `steeringForSession()` 是 `undefined`，消息原样落地、这一轮行为与改动前逐字相同。于是「有没有通道」仍然只由
+     `replan` 与「有没有 run」决定，第三颗开关不需要。
+  2. **只认真人自己的一句话：`role === 'user'` 且 `source.kind === 'user'`。** 这是白名单，不是黑名单：`schedule`（心跳）、
+     `user-question-reply`（卡片答复）、`runtime-context`、子代理自己的提示词，以及这个版本不认识的任何来源一律不理。
+     真机读数证明「user 角色」本身不够——工作流引擎喂给子代理的那些提示词正是 `sourceKind: "user"`（只是落在**别的**
+     会话里），所以会话键是第二道闸。卡片答复被特意排除：它回答的是插件自己问的问题，正文是一批答案，把它当成要求
+     并进计划等于替用户说了他没说的话。
+  3. **不动那条消息。** 不删、不改、不消费：它留在收信箱里，仍然按普通一轮被回复。所以并进计划的要求会**两处都出现**
+     （计划吸收了它 + 它自己那一轮的回答）——这是有意的，比「悄悄吞掉一条用户在对话里看得见的消息」好。
+     这一条写进了 `CHANGELOG` 的同一段。
+  4. **同一条消息只排一次。** 一条被排队的消息在「把它改成插话」时会被移除再插入（同一个 message id 两次 `inserted`），
+     所以按 id 记住最近 64 条（`STEERING_INBOX_SEEN`）；这是上限，不是会随对话增长的记忆。
+  5. **日志只记条数，不记正文**（承 `D-161` 收尾规则 5），并且监听器自己出的错只会变成一条 warning，绝不让它决定那一轮。
+- **Alternatives rejected:**
+  - **乙：允许调度子代理跑 workflow，把通道键到根会话。** 要走 `Session.header.parentSession` 往上找根，还要先拆掉
+    `origin === 'subagent'` 守卫——那守卫是防「子代理借着跑 workflow 再开一层无人监工的嵌套」。而探针证明甲不需要动任何
+    守卫，代价只是订一条已经在发的事件。
+  - **等 GUI 把「排队消息」变成默认插话（改客户端）。** 那要改 `dsh` 客户端的发送策略：`mode: 'steer'` 早就存在
+    （`dsh-api-session-controller/lib/index.js:932`），是**用户手势**（Ctrl+Enter）在决定用不用它；插件无权、也不该替用户
+    决定他的 Enter 键意味着什么。
+  - **轮询收信箱 / 定时读 session 日志。** 插件没有定时器额度（`D-161` 的形状），而且轮询会给每一轮加固定开销，
+    事件本来就已经在发了。
+  - **把 `user-question-reply` 也算作要求。** 见上：那是一批答案，不是一句要求。
+  - **加一颗 `steeringInbox` 开关。** 没有它也能关（`replan` 关掉就没有队列），多一颗开关只是多一处「界面上关着、
+    实际上还开着」的可能（`D-154` 的教训）。
+- **Consequences / 已知边界（照实记）：**
+  1. **并入之后那条消息仍会另起一轮**：用户会在计划里看到它被吸收、随后又收到一次针对它的普通回答。这是「不吞消息」的
+     代价，`CHANGELOG` 里已写明。
+  2. **只在边界发生合并**：话排进队列之后，要等下一次波边界（`grok_replan_intents`）才会进计划；只有一波的运行不会有
+     第二次边界，那条要求就只落成「下一轮普通消息」，日志里记一个未并进的条数。
+  3. **Ctrl+Enter 仍是用户的手势**：默认 Enter 在运行中仍然只把话放进客户端的排队条（`D-161` 的读数），插件读的是
+     「消息真的进了收信箱」这一刻，不猜用户的按键意图。
+  4. **子代理会话不参与**：键是调用方会话 id，子代理的提示词（哪怕 `sourceKind: "user"`）落在别的会话，够不着队列。
+- **Evidence:** `test/steering-inbox.spec.ts` 14 条（10 条订阅器白名单/身份/寿命 + 2 条接线：`replan` 开时消息能被
+  `grok_replan_intents` 取走、`replan` 关时什么也不排），红：把 `installSteeringInbox` 换成空实现 → **`14 failed`**
+  （`.rsi/evidence/inbox-steering-2026-11-26/red-before-fix.out`）。真机读数见同目录 `probe/`（探针 bundle、事件流、
+  根会话 splice 的 target 与 seq）。

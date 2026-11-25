@@ -1,0 +1,1 @@
+再加一条要求：最后额外报一个 CHANGELOG.md 与 README.md 行数的差值。
