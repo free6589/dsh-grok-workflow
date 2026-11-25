@@ -1,3 +1,59 @@
+## 2026-11-26 — `0.13.40` 已发布并收口：合流口径落地（「全部被拒」= 汇总节点转琥珀、理由在它展开的调用里）、发版门禁 `102 files / 1923 tests` 跑绿、附注标签、两个远端 run 与 Release 资产都在；**live 档案升级仍 `BLOCKED`（只能写工作区）**，**真机上没人见过那颗琥珀节点（`NOT_RUN`）**
+
+- **From:** 记忆收口（`memory-closeout`）· **To:** 包工头 / 下一个接手者
+- **这一轮是什么**：`release/0.13.40` 的**收尾轮**。上一轮（00:25）只把代码与六个文档合流到发布分支上，
+  这一轮把它**送出去**并留下读数：发布提交、标签、两个 run、Release、门禁转录、算术、清理。
+  产品的用户可见改动只有两条（都在 `CHANGELOG.md` 的 `## [0.13.40]` 里）：进度页就是一张流程图（`D-159` / `D-160`），
+  以及「汇总」节点会说清「为什么没交卷」（`D-158`）。
+- **发布身份（`CONFIRMED`，本轮自己读的）**：发布提交 **`3778822`** `chore(release): prepare v0.13.40`（**8 文件 / +37 −39**，
+  `src/` 与 `lib/` 只有 `PLUGIN_VERSION` / `UPDATE_LATEST` 那一对字面量，两份 blob 同为 `6e8def2 → cf19891`）；
+  父提交 `aaf8dfb`，`main` 是 `git merge --ff-only release/0.13.40` 前进的，所以 **`main` = `origin/main` = 门禁提交
+  = 标签剥出的提交 = `3778822`**；标签 **`v0.13.40`** 是附注标签（对象 **`14fef64`** → 剥出 `3778822`，
+  `tagger` **2026-11-26 00:37:54 +0800**）。**没有 force-push、没有移动任何已发布标签**
+  （`v0.13.37 → 34236f0`、`v0.13.38 → 8c9b028`、`v0.13.39 → 18e5463`，本轮 `git ls-remote --tags origin` 重读）。
+- **门禁**：**发版门禁只有一遍，就是它**——`TMPDIR=$PWD/.tmp npm run ci` 在 `3778822` 的干净树上 **`EXIT=0`**：
+  `15 warnings / 0 errors`（`182 files`）、`client bundle: 348559 bytes`、
+  `lib/ at 3778822 is the build of src/ at 3778822 (285 files, byte-identical)`、
+  **`Test Files 102 passed (102)` / `Tests 1923 passed (1923)`**、`Duration 95.59s`。转录归档在
+  **`.rsi/evidence/release-0.13.40-2026-11-26/gate-3778822.out`**（**22990 字节**、`sha256 3faf97bd…8382e`）。
+  块内那一遍（`tsc` 退出 0、`oxlint 15 warnings / 182 files`、定向 7 份 spec `282 passed`、`build 348559 bytes`、
+  `verify-lib` 在 `aaf8dfb` 上 `285 files, byte-identical`）是合流轮执行方的读数，**本轮没重跑**。
+- **算术（本轮自己从 git 对象数，不抄门禁）**：spec 文件 `db24351` **102** → `3778822` **102**
+  （`progress-layout.spec.ts` 删除、`progress-flow.spec.ts` 新增，一换一）；静态 `it(` **1828 → 1848**，
+  参数化 / 循环固定补 **+75**（只有 `block-preview 39→93`、`block-flag-baseline 7→14`、`objective-limit 6→12`、
+  `fallback-shards 12→16`、`waves 24→28` 五个文件运行时多于静态，其余 97 个相等），于是
+  `db24351` **1903（推得，`HYPOTHESIS`）** / `3778822` **1923（实测，与门禁同值 ✔）**；
+  逐文件 `client +9`、`progress-tab +15`、`hint-absent −1`、`layout −20`、`flow +17` = **+20**，两处增量互相对得上。
+  **一个坑写在这里**：不带词边界的 `grep -c 'it('` 会把 `wait(` / `submit(` 数进去，读出 1981 / 2000——
+  别用那个数去对门禁。
+- **远端（本轮 `gh` 重读，不是抄派单）**：Release run **`45656018189`**（`headBranch=v0.13.40`、sha `3778822`、**success**，
+  job `Validate and publish v0.13.40`）与 `main` 的 CI run **`45656011963`**（sha `3778822`、**success**）；
+  Release https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.40 ——名字 `Grok Workflow for DSH v0.13.40`、
+  `2026-11-25T16:39:37Z`、非 draft / 非 prerelease、target `main`、正文 **49 行**、唯一资产
+  **`dsh-grok-workflow-0.13.40.tgz` = 973840 字节**（上一版 962715，**+11125**），摘要 `sha256:c42c9924…533833`。
+- **合流口径要点检的两处（本轮点过）**：`src/progress-tab.ts:1182` 的 `ProgressFlowRejected` 与 `:1209` 的
+  `ProgressFlowNode.rejected?`；`src/client/index.js:4250` 的 `progressRejectedLines()` 生成三行
+  `li.gw-progress-node-rejected`（`drafts` / `stage` / `reason`），**只用既有 token、这两行没有字面色值**；
+  `gw-progress-final-rejected` 在 `src/` + `lib/` 里 **0 命中**（交卷卡确实不再存在）。
+  **口径写精确**：退场的是 `ProgressStory` 与 `deriveProgressStory`；**`ProgressStoryState` 还在**，它只是五态词表。
+- **清理（本轮实测）**：`git worktree list` 只剩主检出、`ls -d .tmp/wt-*` 无命中 → 两个发布 worktree 都已删除；
+  `git branch` 只剩 `* main` → 本地 `release/0.13.40` 与 `feat/progress-flowchart` 都已 `-d` 删掉。
+  `.gitignore`（modified）与 `.rsi/evidence/progress-now/`（未跟踪）**属于别的会话，本轮没碰**。
+- **`BLOCKED`**：`AGENTS.md` §13 的 live 档案升级**这一步仍没做成**，理由还是那一个——本会话 `workspace-write`、
+  `~/.dsh` 在工作区之外，写探测 `: > ~/.dsh/.merge-probe` 返回 `Read-only file system`（派单记录；本轮没重跑）。
+  **没写、没重载、没重启** 3080 上的实例；live 档案现读回哪一版本轮**没读**（读它也够不着）。
+  **下一个能做的人**：在有 `~/.dsh` 写权限的会话里把插件行钉到 `v0.13.40`（标签或文件引用，别用浮动范围），
+  读回版本必须是 `0.13.40`，只动插件那一行。
+- **`NOT_RUN`（照实写）**：① 这一轮没做真机 soak（派单只要求 typecheck + lint + 改到的 spec；流程图那半边由
+  `feat/progress-flowchart` 那一轮的真机读数覆盖，证据在 `.rsi/evidence/progress-flowchart-2026-11-25/`）；
+  ② **「每一稿都被退回」那颗琥珀节点在真机上仍然没人见过**——上一轮 `fix/synth-outcome` 的真机只见过通过态，
+  这一轮没上真机，它只有组件与模型用例覆盖。**下一个接手者若要补一条真机读数，就补这一条**（要在活模型上
+  连续撞穿闸门三次，抖动大、烧额度）。
+- **`DECISIONS.md` 本轮一个字没改**：`D-158` 下面那条「现状（合流后补记，2026-11-26）」已经把「三态卡片退场、
+  事实由汇总节点承载」写清了，再补一句就是重复。
+
+---
+
 ## 2026-11-26 — `release/0.13.40`：合流轮——`feat/progress-flowchart` 与 `main` 侧的 `fix/synth-outcome` 两轮内容并进同一条发布分支，16 文件冲突里六个文档按「流程图为主体、退回事实改成节点口径」解掉；**代码与测试由 `builder` 解，门禁 `NOT_RUN`、未提交、版本仍 `0.13.39`**
 
 - **From:** 文档收口（`docs`）· **To:** 包工头 / 下一个接手者
