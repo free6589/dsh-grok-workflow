@@ -7,7 +7,7 @@
   按 HANDOFF 上一条的要求**删掉 `mode:` 那一行**（克隆里本来没有 `legacyGate:`），端口 **3311**，插件装**固定标签**
   `github:free6589/dsh-grok-workflow#v0.13.36`（解析到 `codeload…/26dc370…`，版本读回 `0.13.36`），真模型
   `bifrost-responses/opencode-go/muse-spark-1.3-contributor`。live `~/.dsh` 一行未写（写探针 `Read-only file system`）、
-  3080 前后都是 401、live 仍装 `0.13.35`。
+  3080 前后都是 401、live 仍装 `0.13.35`；`~/.dsh/profiles/web` 目录 mtime 中段动过一次但里面文件没有晚于 12:09:50 的（见 VALIDATION 同日条）。
 - **五项通了**：开关（命令写、路由读回同一份记录）、真任务（4 步 8 次真读盘、答案带文档节名）、跑中插话（插话在 turn 1 里被
   排队、turn 1 跑完原话进 turn 2）、预览→开工（`bp-211d7434…` → `block_id 50761193…`、`approval.quote="确认（开工）"`、
   接单后派 subagent、文件真写出来）、**监工判决**（`pass` + **`judged:true`** + 判决行写着真路由名 + 逐条验收带证据）。

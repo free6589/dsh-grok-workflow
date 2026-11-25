@@ -3448,7 +3448,9 @@ full plan→execute→verify workflow」，而 0.13.36 里没有任何东西按�
 就消失，但没人会想到要打；两条修法（甲：开关没有记录时不要显示「开」；乙：准入承认部署默认）写进证据文件，**本轮没有动**，
 是产品决定。**边界**（`NOT_RUN`，照实列）：真浏览器点那颗开关按钮（fork 的 web 落「生图」面板、隔离 home 的会话树在 UI 里是空的，
 headless 没把聊天面板点出来，0 console errors 是唯一读数）、默认 legacy 配置下点卡片、设置页渲染、在 live 档案上升级、
-多块切分、心跳。**红线**：`~/.dsh` 三个目录 mtime 前后逐秒相同（`~/.dsh` = 2026-11-22 23:40:20）、写探针
-`Read-only file system`、线上 3080 前后都是 401、live 仍装 **0.13.35**；未 push、未打 tag、未发版、未合流，
+多块切分、心跳。**红线**：`~/.dsh` = 2026-11-22 23:40:20、`~/.dsh/profiles` = 2026-11-22 16:59:46（前后同值）、写探针
+`Read-only file system`、线上 3080 前后都是 401、live 仍装 **0.13.35**（依赖仍浮动、锁解析到 `84efda0`）。一处要说准：
+`~/.dsh/profiles/web` 这个**目录**的 mtime 中段动过一次（12:09:52 → 13:16:10），但里面的文件没有一个晚于 12:09:50，
+本进程对它只读（EROFS），成因 `HYPOTHESIS`（别的东西的临时条目），没有查到底；未 push、未打 tag、未发版、未合流，
 `package.json` 仍 `0.13.36`，`src/` `test/` `lib/` 一个字未改。证据 `.rsi/evidence/user-regression-2026-11-26/README.md`。
 红一另开分支 `fix/grok-command-text` 修，不混进本分支。）
