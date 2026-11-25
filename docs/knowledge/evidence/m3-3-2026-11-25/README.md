@@ -40,10 +40,12 @@ scratch home `.tmp/m3-soak-3/dsh-home`（`DSH_HOME`），端口 **3311**。
 
 本目录被以下四处引用，读哪一条都能落到具体文件：
 
-- `docs/knowledge/STATE.md` 顶部 **2026-11-25 09:15（M3.3）** 条——分支/提交/文件数、四句改动、测试面、门禁原文、soak 四句、迁移发现、边界、死代码清单。
+- `docs/knowledge/STATE.md` 顶部 **2026-11-25 09:30（M3.3）** 条——分支/提交/文件数、四句改动、测试面、门禁原文、soak 四句、迁移发现、边界、死代码清单。
 - `docs/knowledge/VALIDATION.md` 的 **M3.3** 条——逐行的命令、环境与结果，四条场景的标签，外加 `Honest boundary`。
 - `docs/knowledge/HANDOFF.md` 顶部 **M3.3** 条——这一支是什么、已经证实了什么、下一步（发版说明 + 死代码清理）与三件会踩的事。
 - `CHANGELOG.md` 的 `[Unreleased]` ——升级前要删旧键这条用户可见的迁移说明。
+- 设置落点（`468e30f`，同一个记忆块）的证据在 **`.rsi/evidence/m3-settings-section/`**（4 张 PNG + README）：设置面板左列的
+  `Workflow` 一项、整页表单、插件页卡片仍在；那份 README 里也记了同一条 `mode` 迁移发现。
 
 配套的决策记录是 `DECISIONS.md` 的 **`D-141`**（删 14 个 spec 的判据）、**`D-142`**（baseline 夹具重钉而不是删）、
 **`D-143`**（`answer.ts` 只删三块）、**`D-144`**（配置签名行删 `gate=on`）。

@@ -1738,3 +1738,27 @@ boot 日志的原文（`docs/knowledge/evidence/m3-3-2026-11-25/soak-all.txt`）
 
 验收含义：**「启动日志里 0 条 `did not activate`」是一条有意义的门禁读数**；反过来说，升级后如果看到这一行，先去看它点名的那一行
 配置，而不是怀疑模型或网络。
+
+## 2026-11-25 · 宿主的 `settings.section` 槽位：契约、渲染语义与那条可选的图标槽（`CONFIRMED`，读已安装 DSH 检出）
+
+设置落点（`468e30f`）把插件设置页第二次注册到宿主的 `settings.section` 槽位。下面每条都在**已安装 DSH 0.2.2-rc.3** 的检出里读原文核实
+（`node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-client-ui-settings/lib/types/client/contract/slots.d.ts` 与
+`dsh-cordis-client-runner/src/client/slot-catalog.ts:3803`），真机读数（`.rsi/evidence/m3-settings-section/`）只做交叉确认。
+
+- **槽位形状**：`kind: 'list'`、`scope: 'root'`，目录条目 `replaceRisk: 'none'`——纯增量，注册不会遮蔽任何自带 UI。
+  自带 occupant 只有五个（agent-presets / account / general / models / plugins）；文档原话「**a fresh id is added beside the shipped
+  entries, while reusing a shipped id puts you in THAT cell and replaces it**」。所以用新鲜 id（`grok-workflow`）是加一项，
+  复用自带 id 是改宿主导航。
+- **`label` 是每次投影重读的**：注册选项 `label` 接 `string | (() => string)`，doc 原话「A thunk is re-read on every projection」，
+  所以本地化文字跟随语言切换而**不需要重新注册**。本插件的实现正是一个 thunk 读 `section.label`；两个语言表必须同时带这个键
+  （`i18n-parity` 守卫钉着）。`order` 缺省 0，本插件用 60（与卡片一致）。
+- **owner 只递一个 `close`**（`SettingsSectionOwnerProps` 只有这一个字段，注释写明它是给「要从设置里彻底离开」的流程用的，
+  比如从 section 直接开一个会话）。section 的数据全部走自己的 inject 面——这正是「同一份 `inject`、两个入口」能成立的原因。
+- **`settings.section.icon` 是另一个独立的 `list` 槽位**（`inline: true`）：注册 id 必须等于目标 section 的 id， unmatched ids
+  永不渲染；图标行的 `label` 选项不显示；不注册时 shell 保留自己的默认图形。它在 **0.2.2-rc.3** 里存在；「更早版本有没有这条」
+  本轮没有查（`NOT_VERIFIED`），本插件也没有注册它。
+- **真机读数与契约一致**：左列实际出现 `Workflow`（通用设置 / 模型 / 内置插件 / 生图配置 / Agent 预设 / 按模型配置提示词 /
+  LLM 错误重试 / 会话修复 / **Workflow** / 打开配置文件），点进去是同一张整页表单——同一组件两个入口的行为可观测。
+
+验收含义：以后任何插件想进设置左列，照 `468e30f` 的形状抄即可——新鲜 id、thunk label、与已有入口共用组件与 inject、
+不注册 icon 槽。

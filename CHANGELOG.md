@@ -7,6 +7,12 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ### Added / 新增
 
+- **The workflow settings are also a `Workflow` entry in the Host's Settings panel / 工作流设置同时成为宿主设置面板左列的「Workflow」一项** —
+  The same settings page that the Plugins card opens is now registered a second time in the Settings panel's left column, as a peer of
+  通用设置 / 模型 / 内置插件. One component, one data face, no page changes; the entry is named by the single word `Workflow` in both
+  languages, with no description line, and the Plugins card stays — one page, two ways in. / 插件卡片打开的那个设置页，现在同时注册到
+  宿主设置面板的左列，与「通用设置 / 模型 / 内置插件」平级。同一个组件、同一份数据面，页面本身没有改动；入口名两个语言都只有一个词
+  `Workflow`，不带说明文字；插件页的卡片保留——一个页面，两条进来。
 - **A switch for the old front desk, and a heartbeat listener that can stand on its own / 多了一个旧前台的开关，和一个能独立接管的心跳监听**
   — A profile setting, `legacyGate`, decides whether the old front desk is registered at all. It is off unless you write it; writing it puts
   the desk back for your messages only, and it never has a say about a scheduled heartbeat. The plugin's own listener is what reviews the

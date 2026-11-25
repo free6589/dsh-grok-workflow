@@ -3800,3 +3800,35 @@ spine 为空，pre-fix 形状会进脊柱。
   - 以后加删配置键，**签名行要跟着改**：它是 `describeResolvedConfig` 里的一个字面量列表，不会因为键被删而自己消失。
   - 这条也是给下一轮的提醒：`src/dispatcher/*`、`src/records.ts`、`src/carryover.ts` 的注释里还写着「the gate」（`src/` 内
     `\bgate\b` 约 115 处，多数是这类注释）——注释不是行为，本轮不动；谁清理时别把它们当成活代码。
+
+## D-145 · 设置页落点选 `settings.section`、保留 `plugins.item` 卡片：一个页面、两个入口（2026-11-25，未发版）
+
+- **Status:** `CONFIRMED`（源码 `src/client/index.js` 的 `mountPage` 双注册 + `test/client.spec.ts` 新增断言 + 真机读数
+  （`.rsi/evidence/m3-settings-section/`：左列列出 `Workflow`、整页表单、卡片仍在）；宿主契约在**已安装 DSH** 里逐条核实，
+  见 `RESEARCH.md` 2026-11-25 第二条；`TMPDIR=$PWD/.tmp npm run ci` 在 `468e30f` 上 exit 0、98 文件 / 1851 例）
+- **Date:** 2026-11-25
+- **Context:** 用户拍板：插件的设置页要能在宿主设置面板的左列直接点进去，不能只藏在插件管理页的卡片后面。三个当场要定的事：
+  落点用宿主的 `settings.section` 槽位还是自己造一个独立页面；原来的 `plugins.item` 卡片删不删；入口叫什么、带不带说明文字。
+- **Decision:**
+  1. **落点用 `settings.section`**：`{ id: 'grok-workflow', order: 60, label: () => i18n.t('section.label') }`，注册**同一个**
+     `GrokWorkflowPage`、传**同一份** `inject`——设置面板左列是这张页面的另一个入口，不是第二张页面。`id` 用新鲜 id
+     （宿主文档明说复用自带 id 会替换那一格），`order: 60` 与卡片一致。
+  2. **`plugins.item` 卡片保留。** 卡片是「可发现」的路：找功能的人先看插件管理页；section 是「顺手可及」的路：已经在调设置的人
+     不用退出去再进来。两条路指向同一张页面、同一份数据面，不产生第二份状态。卸载时先撤 section 再撤卡片，顺序写死在
+     `mountPage` 返回的 disposer 里。
+  3. **标签只有单词 `Workflow`，中英同值，无描述、无图标**（`DICT` 两表各加 `'section.label': 'Workflow'`）。这是用户拍板的：
+     左列是一列平级的导航项，说明文字放不进那一行，图标宿主默认有兜底（`settings.section.icon` 不注册时 shell 用自己的图形）。
+- **Alternatives considered / rejected：**
+  - **自己造独立页面**（不复用 settings 外壳）。否决：导航、面板开合、本地化、布局这四件事宿主的外壳都已经做了
+    （`replaceRisk: 'none'` 的纯增量槽位就是为这个设计的）；重做一遍得到的是一个和宿主长得不一样的第二个设置入口，用户要学两次。
+  - **删掉卡片、只留 section。** 否决：删卡片要同时改 `test/client.spec.ts` 的卡片断言（3 处引用 `plugins.item`）与两个 README 的
+    卡片话术，换来的只是少一条「可发现」的路——插件管理页恰恰是「这个插件能干什么」的第一入口。零收益，纯漂移。
+  - **复用宿主自带的 id**（比如挤进 `plugins` 一格）。否决：宿主目录写明「reusing a shipped id puts you in THAT cell and replaces it」，
+    那是改宿主的导航，不是加自己的。
+  - **带说明文字。** 否决：见上第 3 条——用户拍板只要一个词。
+- **Consequences:**
+  - `client.spec` 的槽位计数从 5 变 **6**（四处），任务面板下标 1→2：以后再注册槽位，这些下标还要跟着挪。
+  - 本地化：`section.label` 是 thunk，每次投影重读，所以语言切换**不需要**重新注册（宿主目录的 doc 明说了这条语义）；两个语言表
+    必须同时带这个键——`i18n-parity` 守卫钉着。
+  - 升级路径不受影响，但**迁移前提变了**：live 档案还带着 `mode: triage`（`~/.dsh/profiles/web/cordis.patch.yml:563`），不删那两行
+    就升级，插件拒绝挂载、左列自然也不会有 `Workflow`——这是「升级完工作流不见了」的唯一原因。

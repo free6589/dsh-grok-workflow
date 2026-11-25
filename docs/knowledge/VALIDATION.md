@@ -39,6 +39,17 @@
 | 热卸载（运行中移除插件） | — | **`NOT_RUN`**：先停实例再移除 bundle 行，「无后台存活」是在冷启动上观察到的。 |
 | 四条 MCP 的 boot traceback | 读 `soak-all.txt` 的边界段 | serena / mdcg / phone / mobile 在沙箱里写不了家目录、boot 时打 traceback；**与本插件无关**，boot 继续、插件正常激活。**`CONFIRMED`** |
 | 发版 / 推送 / 合并 | — | **`NOT_RUN`**：未打 tag、未 push、未合 `main`、未 npm publish；`package.json` 仍是 `0.13.34`。 |
+| 设置落点（`468e30f` 源码事实） | `git show 468e30f -- src/client/index.js test/client.spec.ts`；`grep -n "settings.section" src/client/index.js`；`grep -c "section.label" src/client/index.js` | 同一个 `GrokWorkflowPage` **第二次**注册到 `settings.section`：`{ name: 'settings.section', id: ns, order: 60, label: () => i18n.t('section.label'), inject: options.inject }`，`inject` 与 `plugins.item` 卡片是**同一份**，卸载时先撤 section 再撤卡片；`DICT` 两表各加 `'section.label': 'Workflow'`（中英同值，`grep -c` = 3 处：EN、ZH、thunk 引用）。`test/client.spec.ts`：四处槽位计数 **5 → 6**、任务面板下标 1→2、新增一条断言（id/locale/order/label、component 与 inject 和卡片同一份）。**`CONFIRMED`** |
+| 宿主契约（收口轮读**已安装 DSH** 核实） | `node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-client-ui-settings/lib/types/client/contract/slots.d.ts`；`dsh-cordis-client-runner/src/client/slot-catalog.ts:3803` | `settings.section`：`kind: 'list'`、`scope: 'root'`；目录条目 `replaceRisk: 'none'`（纯增量）；occupants 只有五个自带 section（agent-presets / account / general / models / plugins），注册文档明说「**新鲜 id 加在旁边，复用自带 id 会替换那一格**」——本插件用的 `grok-workflow` 是新鲜 id；`label` 支持 `(() => string)`，thunk **每次投影重读**，本地化文字跟随语言切换而不用重新注册；owner 只递一个 `close`。`settings.section.icon` 是**另一个**独立的 `list` 槽位（id 必须等于目标 section 的 id，label 不显示，shell 自带图形兜底）。**`CONFIRMED`** |
+| 设置落点真机验证（`468e30f`） | 新 scratch home `.tmp/m3-settings-soak/dsh-home`（clone live web profile）、端口 **3317**、headless Chromium（Playwright） | 设置左列实际读出 `通用设置 / 模型 / 内置插件 / 生图配置 / Agent 预设 / 按模型配置提示词 / LLM 错误重试 / 会话修复 / **Workflow** / 打开配置文件`；点进 Workflow 渲染整页表单（总开关、五条角色链、14 个可见字段、模板 textarea），页脚是固定的 保存 / 放弃修改 / revision；Plugins 页卡片仍在。同一次读数又撞到同一条迁移发现：clone 带着同样的 `mode: triage`，首 boot 打出 `removed configuration key "mode" …` 并跳过该行，删掉后干净激活。live `~/.dsh` 与 3080/3065/3086/3109 未触碰，scratch 已删。证据 `.rsi/evidence/m3-settings-section/`（4 张 1500×1000 PNG + README，已随 `468e30f` 入库）。**`CONFIRMED`** |
+| 门禁在 `468e30f` 上重跑（dispatcher 跑） | `TMPDIR=$PWD/.tmp npm run ci`（`468e30f` 的树） | **exit 0**：`Test Files 98 passed (98)`、`Tests 1851 passed (1851)`（比 `d2d5115` 多 1 例 = `client.spec` 新增断言）、`Found 15 warnings and 0 errors.`、`lib/ at 468e30f is the build of src/ at 468e30f (281 files, byte-identical)`；client bundle 320233 → **321645** 字节。**`CONFIRMED`**（收口轮未重跑 ci） |
+| `verify:lib` 在 `468e30f` 上（收口轮自己跑） | `TMPDIR=$PWD/.tmp npm run verify:lib` | **exit 0**，原文 `lib/ at 468e30f is the build of src/ at 468e30f (281 files, byte-identical)`。**`CONFIRMED`** |
+| 四个文档守卫（补充轮自己跑） | `TMPDIR=$PWD/.tmp npx vitest run test/docs-version.spec.ts test/docs-config-keys.spec.ts test/docs-architecture-version.spec.ts test/i18n-parity.spec.ts` | **EXIT=0**：`Test Files 4 passed (4)` / `Tests 30 passed (30)`，743 ms。**`CONFIRMED`** |
+
+**补充轮（设置落点进记忆）改动：** `STATE.md`（提交清单补成四条 + 门禁读数补 `468e30f` 行 + 设置落点与真机读数）、
+`HANDOFF.md`（⚠️ 迁移提醒提到最上面 + 设置落点段）、`DECISIONS.md`（新增 `D-145`）、`RESEARCH.md`（宿主 `settings.section` 契约一条）、
+`VALIDATION.md`（上面六行）、`CHANGELOG.md` 的 `[Unreleased]` Added 条。**`src/`、`test/`、`lib/`、两个 README 本轮一个字也没有写**
+（`468e30f` 里那些改动是设置落点工人的，不是收口轮的）。
 
 **Changed（收口轮只动记忆与证据）：** `docs/knowledge/STATE.md`、`HANDOFF.md`、`DECISIONS.md`（新增 `D-141`–`D-144`）、`VALIDATION.md`（本条）、
 `docs/knowledge/evidence/m3-3-2026-11-25/README.md`（新增）、`CHANGELOG.md` 的 `[Unreleased]`（中英各一条）。

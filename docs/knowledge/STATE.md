@@ -1,10 +1,18 @@
-Last updated: 2026-11-25 09:15 +08:00（**M3.3「旧前台整条链删除 + 两个路由键移除 + `blockIntake` 默认打开」：独立验收通过，`CONFIRMED`；未发版、未 push、未合 `main`** —
-分支 **`feat/m3-delete-gate`**，worktree `.tmp/wt-m3-delete-gate`，基线 `main` 尖端 **`061693e`**，两条工作提交
+Last updated: 2026-11-25 09:30 +08:00（**M3.3「旧前台整条链删除 + 两个路由键移除 + `blockIntake` 默认打开 + 设置页成为宿主设置面板的 `Workflow` 一项」：独立验收通过，`CONFIRMED`；未发版、未 push、未合 `main`** —
+分支 **`feat/m3-delete-gate`**，worktree `.tmp/wt-m3-delete-gate`，基线 `main` 尖端 **`061693e`**，四条提交：
 **`09aa1bd`**（`refactor(m3.3): delete the old front desk chain`，**81 文件 / +248 −18277**：`src` 17 文件 +97 −4997、
-14 个前台 spec −7613、`lib/` 50 文件 +151 −5667）与 **`d2d5115`**（`test(m3.3): delete the front-desk specs, re-pin the baseline,
+14 个前台 spec −7613、`lib/` 50 文件 +151 −5667）、**`d2d5115`**（`test(m3.3): delete the front-desk specs, re-pin the baseline,
 sync the doc guards`，**28 文件 / +879 −1349**：20 个 spec 改写、baseline 夹具重钉、两个 README 与四份 docs、`package.json` 的
-`test:unit` 去掉两个已删文件名），合计 **109 文件 / +1127 −19626**（记忆提交紧随其后，只动 `docs/knowledge/` 与 `CHANGELOG.md`，
-不碰源码、测试与 `lib/`）。版本仍 **`0.13.34`**。
+`test:unit` 去掉两个已删文件名）、**`b2e70a5`**（记忆收口，只动 `docs/knowledge/` 与 `CHANGELOG.md`）、
+**`468e30f`**（`feat(settings): the page is also a Workflow section in the Host settings panel`，**11 文件 / +128 −29**：
+6 个代码/文档文件 +108 −29——`src/client/index.js` 与 `lib/client.js` 重建 37+8−8、`test/client.spec.ts` 30+10−10、两个 README 各 1+1−1、
+`docs/LOCAL-TESTING.md` 2+1−1——另 5 个是证据文件 `.rsi/evidence/m3-settings-section/` 下的 4 张 PNG + 1 份 README）。
+版本仍 **`0.13.34`**。
+**设置落点（`468e30f`，用户拍板）**：插件设置页**同时**注册到宿主的 `settings.section` 槽位——id `grok-workflow`（新鲜 id，不占用宿主
+自带五节的任何 id，所以是「旁边加一项」不是替换）、`order: 60`、`label` 是一个 thunk 读 `section.label`（中英两表都是单词 **`Workflow`**，
+无描述、无图标）；同一个 `GrokWorkflowPage` 组件、同一份 `inject`、`plugins.item` 的卡片**保留**（一个页面两个入口）；卸载时先撤 section
+再撤卡片。判据与被否掉的替代见 `D-145`；宿主槽位契约（`list`/`root`/`replaceRisk: 'none'`、label thunk 逐次投影、`settings.section.icon`
+是另一个独立槽位）见 `RESEARCH.md` 的 2026-11-25 第二条。
 **做了什么（四句）**：① 删掉旧前台整条链——`src/gate.ts`(2466) + `src/triage.ts`(1323) + `src/captain.ts`(261) +
 `src/channel.ts`(293) + `src/history.ts`(229) = **4572 行 5 文件**，`src/index.ts` 不再注册 `installGate`（`src/` 里 `installGate`
 零命中）；② `src/answer.ts` 314 → 222，删 `FRONT_DESK_PREAMBLE`/`frontDeskText`/`ACCEPTED_PREAMBLE`/`acceptedEnterText`/
@@ -25,8 +33,11 @@ sync the doc guards`，**28 文件 / +879 −1349**：20 个 spec 改写、basel
 **门禁（dispatcher 亲自跑，原文 `docs/knowledge/evidence/m3-3-2026-11-25/ci-gate.txt`）**：`TMPDIR=$PWD/.tmp npm run ci` →
 **exit 0**，`Test Files 98 passed (98)` / `Tests 1850 passed (1850)`、`Found 15 warnings and 0 errors.`、
 `lib/ at d2d5115 is the build of src/ at d2d5115 (281 files, byte-identical)`；`npm run typecheck` exit 0、`npm run lint` exit 0。
+**在 `468e30f` 上重跑：98 文件 / `Tests 1851 passed (1851)`（比上一条多 1 例，`client.spec` 新增的 `settings.section` 断言）/ 15 warnings、0 errors、
+`lib/ at 468e30f is the build of src/ at 468e30f (281 files, byte-identical)`**（client bundle 320233 → **321645** 字节——新槽位注册进 bundle）。
+收口轮自己重跑 `npm run verify:lib` → exit 0，原文 `lib/ at 468e30f is the build of src/ at 468e30f (281 files, byte-identical)`。
 `lib/` 重建后 **38 个顶层 js / 281 文件**，`gate|triage|captain|channel|history` 孤儿产物 **0**（`lib/captain-memory.*` 不是孤儿，
-它是活模块）。收口轮自己重跑 `npm run verify:lib` → exit 0、同一行原文。
+它是活模块）。
 **真机 soak（四条，全部 `CONFIRMED`；DSH 0.2.2-rc.3、Node v26.8.1、scratch home `.tmp/m3-soak-3/dsh-home`（clone 7699 文件 /
 parity 5/5 / 脱敏 1 行）、端口 3311、`~/.dsh` 前后 size `1548` mtime `1795362020` 完全一致）**：① GUI（真 Chromium headless
 跑真 web app）两条消息——普通消息 8 秒直答、`source.kind=user` 原文逐字、`grok-workflow` 中继 **0**、`tool-workflow/*` **0**；
@@ -37,8 +48,9 @@ parity 5/5 / 脱敏 1 行）、端口 3311、`~/.dsh` 前后 size `1548` mtime `
 工具 **87 / grok 0**、普通消息仍 7 秒作答、无 `taskboards/`、无新心跳行、checkpoint 未变（最新 08:58 早于 09:00 的卸载）。
 **一条迁移发现（已进 CHANGELOG 与 `HANDOFF.md`）**：clone 带着 live profile 的 `mode: triage`，第一次 boot 时插件**拒绝激活**
 并打出 `removed configuration key "mode": it was removed in an earlier release and is no longer accepted; delete it from your patch`
-（`assertKnownKeys` → `resolveConfig` → `readConfig` → `apply`）；删掉那一行后干净激活。**升级前必须从每个 `cordis.patch.yml`
-删掉 `mode` 与 `legacyGate`。**
+（`assertKnownKeys` → `resolveConfig` → `readConfig` → `apply`）；删掉那一行后干净激活。**live 档案的同款行还在**
+（`~/.dsh/profiles/web/cordis.patch.yml:563`，设置落点的真机读数再次撞到同一条，见下），所以**升级前必须先由操作者从
+`cordis.patch.yml` 删掉 `mode` 与 `legacyGate`**，否则升级后插件拒绝挂载——「工作流直接不出现」的唯一原因。
 **边界（如实记）**：GUI 用的是 headless Chromium 不是可见窗口；四条 MCP（serena/mdcg/phone/mobile）在沙箱里写不了家目录、
 boot 时有 traceback，与本插件无关；**热卸载 `NOT_RUN`**（先停实例再移除）；**引擎级恢复 `NOT_RUN`**（引擎无 journal，`resume`
 是新运行 + checkpoint seed；`--session-id` 采纳仍是 M3.2 记的 `BLOCKED`，未重试）；路由重指到
@@ -49,7 +61,13 @@ boot 时有 traceback，与本插件无关；**热卸载 `NOT_RUN`**（先停实
 `FIXED_MAX_QUEUED_MESSAGES`/`FIXED_TRIAGE_ASK`/`FIXED_TRIAGE_FOLLOWUP_AS_FAST`/`FIXED_GATE_ON`、`records.ts` 的
 `alreadyRouted`/`appendInstantReceipt`/`deliveryKey`/`recordDelivery`、`steering.ts` 的 `closeSteering`、`intake.ts` 的
 `inspectPrompt`、`SWITCHABLE_CLASSES`（测试在用）。
-**证据**：`docs/knowledge/evidence/m3-3-2026-11-25/`（`ci-gate.txt`、`soak-all.txt` 与四条 soak transcript、README 的场景表与结论表）。
+**设置落点的真机验证（新 scratch home `.tmp/m3-settings-soak/dsh-home`、端口 3317、headless Chromium，`CONFIRMED`）**：
+设置左列实际读出 `通用设置 / 模型 / 内置插件 / 生图配置 / Agent 预设 / 按模型配置提示词 / LLM 错误重试 / 会话修复 / **Workflow** /
+打开配置文件`；点进 Workflow 是整页表单（总开关、五条角色链、14 个可见字段、模板 textarea，页脚是固定的 保存 / 放弃修改 / revision）；
+Plugins 页卡片仍在。那次读数顺手又撞到同一条迁移发现（clone 带着同样的 `mode` 旧键、首 boot 拒绝激活、删行后干净激活）。
+live `~/.dsh` 与 3080/3065/3086/3109 未触碰，scratch 已删。
+**证据**：`docs/knowledge/evidence/m3-3-2026-11-25/`（`ci-gate.txt`、`soak-all.txt` 与四条 soak transcript、README 的场景表与结论表）
+与 `.rsi/evidence/m3-settings-section/`（4 张 1500×1000 PNG + 该目录的 README，已随 `468e30f` 入库）。
 
 Last updated: 2026-11-25 07:45 +08:00（**M3.2「默认不拦截 + 刹车只有一个主人 + 准入生效」：独立验收通过，`CONFIRMED`；未发版、未 push、未合 `main`** —
 分支 **`feat/m3-switch`**，worktree `.tmp/wt-m3-switch`，基线 `main` 尖端 **`7b25890`**，代码尖端 **`7f172ae`**

@@ -1,20 +1,33 @@
-## 2026-11-25 — M3.3 验收通过（`feat/m3-delete-gate`）：旧前台整条链已删，下一步是发版说明与死代码收尾
+## 2026-11-25 — M3.3 验收通过（`feat/m3-delete-gate`）：旧前台整条链已删、设置页进了宿主设置面板，下一步是发版说明与死代码收尾
 
 - **From:** 记忆收口（`agent-146/memory-writer`）· **To:** 接发版或 M3.4 的人
-- **这一支是什么**：分支 `feat/m3-delete-gate`（worktree `.tmp/wt-m3-delete-gate`，基线 `main` 尖端 `061693e`）上两条工作提交，
-  尖端 **`d2d5115`**：**`09aa1bd`**（删旧前台链，**81 文件 / +248 −18277**，含 14 个前台 spec 的删除与 `lib/` 重建）、
-  **`d2d5115`**（重钉 baseline 夹具、改写存活 spec、同步两个 README 与四份 docs，**28 文件 / +879 −1349**），合计
-  **109 文件 / +1127 −19626**。**未发版、未 push、未合 `main`**，`package.json` 仍是 `0.13.34`。验收结论见 `STATE.md` 顶部与
-  `VALIDATION.md` 的 M3.3 条；证据在 `docs/knowledge/evidence/m3-3-2026-11-25/`（六份文件 + README 的场景表与结论表）。
+- **⚠️ 升级前必须先删两行（最重要的一条，再说一遍）**：live 档案 `~/.dsh/profiles/web/cordis.patch.yml:563` 现在还写着 `mode: triage`。
+  `mode` 与 `legacyGate` 在本支里都是**移除键**：带着它们升级，插件会因 `removed configuration key "mode"` **拒绝挂载**——
+  表现就是「升级完了，工作流不见了」，这是唯一的原因。升级步骤的第一步必须是**操作者亲手删掉那两行**，然后才是装新包；
+  设置落点的真机读数（`.rsi/evidence/m3-settings-section/`）又撞到一次同款拒绝，证明这条不是纸面推断。`CHANGELOG.md` 的
+  `[Unreleased]` Removed 条已经写了同样的话。
+- **这一支是什么**：分支 `feat/m3-delete-gate`（worktree `.tmp/wt-m3-delete-gate`，基线 `main` 尖端 `061693e`）上四条提交，尖端
+  **`468e30f`**：**`09aa1bd`**（删旧前台链，**81 文件 / +248 −18277**，含 14 个前台 spec 的删除与 `lib/` 重建）、
+  **`d2d5115`**（重钉 baseline 夹具、改写存活 spec、同步两个 README 与四份 docs，**28 文件 / +879 −1349**）、
+  **`b2e70a5`**（记忆收口，只动 `docs/knowledge/` 与 `CHANGELOG.md`）、
+  **`468e30f`**（设置落点，**11 文件 / +128 −29**：6 个代码/文档文件 +108 −29 含 `lib/client.js` 重建，另 5 个是证据）。**未发版、
+  未 push、未合 `main`**，`package.json` 仍是 `0.13.34`。验收结论见 `STATE.md` 顶部与 `VALIDATION.md` 的 M3.3 条；证据在
+  `docs/knowledge/evidence/m3-3-2026-11-25/`（soak 与门禁）与 `.rsi/evidence/m3-settings-section/`（设置落点，4 张 PNG + README）。
 - **已经证实的**：默认载入对普通消息一个字都不改（八条 payload 逐字节相同，第 6 条超长目标从「2 条消息」变成 1 条）；
   真机上两条普通消息直答、`source.kind=grok-workflow` 中继 0 条、`tool-workflow/*` 0 条，连「今天天气怎么样？」这种旧前台必接的
   句子也直答（反问城市）；六个块工具在默认载入里就注册了（96 个工具 / 9 个 grok 工具）；headless 一次真运行 `EXIT=0`（17×23=391）；
   中途 kill 不改写 checkpoint（`running` / 10 任务 / 0 verified / attempts `[1]`，kill 前后一字未变）；卸载后 bundle 行 21→20、
-  工具 87 / grok 0、无新账本与心跳行、普通消息仍作答。单元层 `npm run ci` **98 文件 / 1850 例**全过，
-  `lib/ at d2d5115 is the build of src/ at d2d5115 (281 files, byte-identical)`（收口轮自己重跑 `verify:lib`，同一行原文）。
+  工具 87 / grok 0、无新账本与心跳行、普通消息仍作答。**设置页同时成为宿主设置面板左列的「Workflow」一项**（真机读数：左列
+  `… / 会话修复 / Workflow / 打开配置文件`，点进去是同一张整页表单，Plugins 页卡片仍在）；单元层 `npm run ci` 在
+  `468e30f` 上 **98 文件 / 1851 例**全过（比删前台那次多 1 例，`client.spec` 新增的 `settings.section` 断言），
+  `lib/ at 468e30f is the build of src/ at 468e30f (281 files, byte-identical)`（收口轮自己重跑 `verify:lib`，同一行原文）。
+- **设置落点（用户拍板，`468e30f`）**：同一张 `GrokWorkflowPage` **同时**注册到宿主的 `settings.section` 槽位（id `grok-workflow`、
+  `order: 60`、`label` 是 thunk 读 `section.label`——中英两表都只有单词 **`Workflow`**，无描述、无图标）与原来的 `plugins.item` 卡片；
+  一个页面两个入口，`inject` 是同一份，卸载时先撤 section 再撤卡片。取舍与被否掉的替代见 `D-145`；宿主槽位契约见 `RESEARCH.md`
+  的 2026-11-25 第二条。
 - **下一步**：
-  1. **发版说明必须写「先删旧键，再升级」。** `mode` 与 `legacyGate` 现在是**移除键**：任何还带着它们的 `cordis.patch.yml`
-     会让插件**拒绝激活**，真机上打的是 `removed configuration key "mode": … delete it from your patch`；这一行是被跳过，不是半装
+  1. **发版说明必须写「先删旧键，再升级」**（就是上面那条 ⚠️）：任何还带着 `mode`/`legacyGate` 的 `cordis.patch.yml` 会让插件
+     **拒绝激活**，真机上打的是 `removed configuration key "mode": … delete it from your patch`；这一行是被跳过，不是半装
      （日志写的是 `1 entry did not activate`，不是启动失败）。「那一行没激活时档案其余功能是否完全正常」本轮没有单独记录（`NOT_RUN`）。
      升级步骤里得把删键写成第一步，`CHANGELOG.md` 的 `[Unreleased]` 已经写了。
   2. **死代码可以单开一支清**：`relayText`/`reportEnterText`（`answer.ts`）、`runSingleCall` 三件套（`run.ts`，约 300 行）、
