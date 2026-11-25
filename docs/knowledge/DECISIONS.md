@@ -4231,11 +4231,18 @@ spine 为空，pre-fix 形状会进脊柱。
      value is ignored, and the rest of the row loads normally (delete that line when convenient). / 已忽略已删除的配置键
      "mode"：…`。`apply()` 的 `readConfig()` 像 `announceOverruns()` 那样播，并用一个 per-load `Set` 去重——
      每次消息都会重读，不去重就会每条消息刷一行。
-  3. **设置页再说一次，并点名到行。** `src/client/index.js` 的 `removedKeyWarn(entry)` 读**存下来的**文档
-     （`entry.user`；schema 已经把被删键从有效值 `value` 里丢掉了），每个残留键渲染一行，容器带
-     `data-warn="removed"`、每行带 `data-warn-key`，文案键 `warn.removed.title` / `warn.removed.detail` 中英各一套。
-     浏览器包不能 import `src/config.ts`，所以自带一份 `GROK_WORKFLOW_REMOVED_KEYS`，由 `test/client.spec.ts`
-     与 `REMOVED_CONFIG_KEYS` **逐项双向**钉死。
+  3. **设置页再说一次，且清单走插件自己的只读路由，不读设置文档。** 为什么不是「客户端扫 `entry.user`」：
+     `settings/describe` 发布的 `user` 是**宿主按 schema 投影**出来的（`@deepseek-ai/dsh-settings` 的 `projectForm`
+     只遍历 schema 的 `dict`），而被删键按定义**不在 schema 里**——实测同一份 `describe` 里 `user_keys` 只有 8 个、
+     `user_has_mode: false`。也就是说「扫 `entry.user`」是正确代码对着不存在的数据，永远不可能触发（这正是 `B01`
+     那个「看着像页面功能、其实没人看得到」的坑的第二次）。所以新增 `src/config-notices-surface.ts`：
+     `GET /grok-workflow/config-notices` 答 `{ok:true,notices:[{key,message}]}`，读的是 `apply()` 里那个
+     per-load `Set`（**只读不排空**，日志侧「一次一条」的去重原样保留）；挂载方式照 `src/mode-surface.ts`
+     （`inject(['webServer','connection'])` + `webServer.register({kind:'exact'})` + 注册包在 `child.effect` 里 +
+     拿不到 `webServer` 时 `warn` 一句而不是装载失败）。页面挂载时读一次，非空就渲染 `data-warn="removed"`
+     （每行 `data-warn-key`，文案 `warn.removed.title/detail` 中英各一套），空清单或请求失败**静默降级**。
+     浏览器包不能 import `src/config.ts`，所以自带一份 `GROK_WORKFLOW_REMOVED_KEYS`（既用于文案，也用于过滤路由答案），
+     由 `test/client.spec.ts` 与 `REMOVED_CONFIG_KEYS` **逐项双向**钉死。
   4. **R-06 的其余部分一个字不改。** 未知键仍抛 `unknown configuration key "…" (did you mean "…"?)`；嵌套层
      `roles.<未知名>`、`roles.<role>[i].<错字段>`、`guardianModel.<错字段>` 仍抛完整路径；被删键写在路由对象**里面**
      仍算嵌套未知键、仍抛。非法值、越界数字、预算背板、`configVersion` 全部照旧。
@@ -4261,7 +4268,10 @@ spine 为空，pre-fix 形状会进脊柱。
     25 键循环、`test/client.spec.ts` 的双向清单相等）就会自动覆盖它；忘记同步客户端清单会立刻红。
   - **警告走的是「记录 → 排空 → 播一次」的形状**，与 B04 的越界修复同构：schema 先于 `apply()` 跑且没有 logger，
     读又是每条消息一次。以后再加同类「容忍但要说」的配置问题，应复用这个形状而不是在检查里直接 log。
-  - **设置页读 `entry.user` 而不是 `entry.value`**：schema 已经把被删键丢掉，扫 `value` 永远扫不到——这与
-    B01 的限流横幅是同一个坑，两处注释都写明了。
+  - **设置页读不到设置文档里的被删键，这是宿主的事实，不是实现选择**：`user` 层按 schema 投影，被删键不在
+    schema 里。限流横幅（`warn.limit`）能用的原因不同——超限数字**本身**是 schema 字段、值原样透传；被删键没有字段，
+    所以两条提示的数据来源必须不同（一个读文档，一个走路由）。把这条差异写下来，免得下一个人「统一」成一种写法。
+  - **多一条只读路由面**：`GET /grok-workflow/config-notices` 是第三块插件路由（mode / update / notices），
+    复用同一套挂载与信任栅栏；它是只读、幂等、无主人后台任务的，卸载随 `child.effect` 释放。
   - **升级须知从此不再要求用户先手工改档案。** 0.13.36/0.13.37 的旧须知保留为历史，但本轮 `[Unreleased]` 的
     须知是「这次不用准备任何东西」。

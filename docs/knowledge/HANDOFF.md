@@ -11,12 +11,14 @@
   ① 档案里**本来就带着** `mode: triage`（`cordis.patch.yml:563`，来自 live），这一行**照常激活**（`did not activate` 0 行、
   `describe` 24 个命名空间含 `grok-workflow`、`autoGenerate: true`）；② 用安装件的 `apply()` 记录到警告原文并点名 `"mode"`、
   两次重读仍只有 1 行；④ 对照删掉那一行后警告消失、激活照旧。证据 `.rsi/evidence/removed-keys-warn-2026-11-25/`。
-- **`NOT_OBSERVED`（下一轮该干的第一件事）**：设置页那条提示在 DSH 0.2.2-rc.3 上**不可见**。实测原因不是代码没写，
-  而是宿主 `settings/describe` 的 `user` 层**已被按 schema 过滤**：`user_keys` 8 个、`user_has_mode: false`。页面的
-  `removedKeyWarn(entry)` 读 `entry.user`，取不到就没有可画的。**要它可见，需要插件自己开一条路由把残留键报给页面**
-  （照 `src/update-surface.ts` / `src/mode-surface.ts` 的形状：`webServer` + `connection` 注入、`connection.requestRejection` 信任栅栏、
-  GET 一个窄答案），客户端在页面挂载时读一次、失败就当没有。**本轮刻意没做**：那是新增一条宿主路由面，不属于「同一份名单换个播法」的范围。
-- **`NOT_RUN`**：真实模型回合 / 端到端工作流（本轮改的是载入期配置校验，真机样本只需激活 + 警告 + 对照，不写成跑过）。
+- **设置页那条提示：本轮已加、已可见。** 机制是插件自己的只读路由
+  （`src/config-notices-surface.ts`，`GET /grok-workflow/config-notices`，答 `{ok:true,notices:[{key,message}]}`），
+  挂载照 `src/mode-surface.ts`（`inject(['webServer','connection'])` + `webServer.register({kind:'exact'})` +
+  注册包在 `child.effect` 里 + 没有 `webServer` 时 `warn` 一句不炸）；清单读 `apply()` 的 per-load `Set`，**只读不排空**，
+  日志侧去重不动。页面挂载时读一次，非空渲染 `data-warn="removed"`，空/失败静默降级。真机读数：路由原文含 `"mode"`、
+  设置页提示可见（`.rsi/evidence/removed-keys-warn-2026-11-25/settings-page-with-notice.png`）、对照删掉 `mode:` 行后
+  `notices: []` 且页面无提示。**为什么不是扫 `entry.user`**：宿主 `projectForm` 只投影 schema 键，被删键不在其中（见 `D-155`）。
+- **`NOT_RUN`**：真实模型回合 / 端到端工作流（本轮改的是载入期配置校验与一条只读提示，真机样本只需激活 + 警告 + 提示 + 对照，不写成跑过）。
 - **红线**：live `~/.dsh` 未写、3080 未碰（本会话沙箱本身把 `~/.dsh` 挂只读，两次不带 `DSH_HOME` 的 `dsh --help` 被 `EROFS` 挡下）；
   未合 main、未 push、未打 tag、未发版，`package.json` 仍 `0.13.37`。
 
