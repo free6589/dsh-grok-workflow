@@ -1,0 +1,68 @@
+M3.3 soak scenario 4 — uninstall, no residue (2026-11-25)
+
+Build: feat/m3-delete-gate @ 09aa1bd. Home: .tmp/m3-soak-3/dsh-home. Profile
+m33 (the web clone). Live ~/.dsh untouched.
+
+--- before ------------------------------------------------------------------
+
+  dsh.profile.bundles.length            21
+  bundles includes dsh-grok-workflow    true
+  dependencies['dsh-grok-workflow']     link:…/.tmp/wt-m3-delete-gate
+
+--- the command -------------------------------------------------------------
+
+  $ DSH_HOME=<scratch>/dsh-home dsh plugin --profile m33 remove dsh-grok-workflow
+  EXIT=0
+  dependencies:
+  - dsh-grok-workflow link:/home/fish/projects_mine/dsh-grok-workflow/.tmp/wt-m3-delete-gate
+  Done in 1.4s using pnpm v12.4.2
+
+--- the bundle row is gone ---------------------------------------------------
+
+  dsh.profile.bundles.length            20   (was 21)
+  bundles.includes('dsh-grok-workflow') false
+  dependencies['dsh-grok-workflow']     absent
+
+--- boot again ---------------------------------------------------------------
+
+  $ dsh --profile m33 --host 127.0.0.1 --port 3311 --no-open
+  boot line: dsh web: http://127.0.0.1:3311/?token=<REDACTED>
+  "did not activate" lines: 0
+  no line mentioning grok in the boot log
+
+--- no grok tool is offered --------------------------------------------------
+
+A plain message was sent through the GUI: "用一句话说明 3 加 4 等于多少。"
+
+  request/header: total tools 87 ; grok tools NONE   (was 96 / 9)
+  assistant/message :: 3 加 4 等于 7。   GUI: 已完成，用时 7秒
+  source kinds: {user: 1, runtime-context: 1, skill-catalog: 1, time-context: 1}
+  grok-workflow relay messages: 0
+  tool-workflow/* events:       0
+
+The composer's workflow switch ("workflow总开关 开 · 全员模式") is gone from the
+UI in the post-uninstall session, which is the visible side of the same fact.
+
+--- no new ledger or heartbeat line -----------------------------------------
+
+  $DSH_HOME/taskboards/:                      absent (unchanged)
+  heartbeats*.jsonl under the home:           none newer than 30 minutes
+  $DSH_HOME/checkpoints/grok-workflow/:       unchanged (newest 08:58, before
+                                              the removal at ~09:00)
+
+--- no background work survives ---------------------------------------------
+
+The pre-removal web instance was stopped before `dsh plugin remove` ran (port
+3311 was free when the removal happened). After the post-removal boot only that
+one web instance is running. The plugin's own unload path was NOT exercised by a
+live unload: the instance was already stopped, so "no background work survives"
+is observed on a cold start.
+
+| claim                                                     | status    |
+|-----------------------------------------------------------|-----------|
+| the bundle row and the dependency disappear               | CONFIRMED |
+| the boot is clean (no "did not activate")                 | CONFIRMED |
+| zero grok tools are offered (87 total)                    | CONFIRMED |
+| a plain message is still answered (7 s)                   | CONFIRMED |
+| no taskboard, no heartbeat line, no new checkpoint        | CONFIRMED |
+| hot unload while a run is live                            | NOT_RUN   |

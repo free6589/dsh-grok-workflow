@@ -32,6 +32,26 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
   running on with nobody left to stop it. / 复核刹车、能停掉一拍的监听，接单台关着时也会装上：被刹车停过的定时循环还是停着，
   不会变成没人管、接着跑。
 
+### Removed / 移除
+
+- **The old front desk is gone, together with the two keys that configured it — delete those keys before you upgrade /
+  旧前台连同配置它的两个键一起删掉了——升级前先把那两个键删掉** — The front desk (and the classifier, captain, channel and history
+  modules behind it) no longer exists: no profile can register it, and `legacyGate` / `mode` are removed keys. **A patch that still
+  carries either one makes the plugin refuse to activate**, naming the key (`removed configuration key "mode": it was removed in an
+  earlier release and is no longer accepted; delete it from your patch`); that row is skipped rather than half-loaded, so the symptom is
+  "this one row did not activate". Remove those lines from every `cordis.patch.yml` first. With the desk gone the intake is on by
+  default (`blockIntake` defaults to `true`), so the six block tools appear on a default load; the config surface is nineteen keys
+  (sixteen on the settings page). The specs that covered the desk went with it — fourteen files, since their subject no longer exists —
+  and what replaces them is a byte-level pin: a default load leaves eight message shapes untouched, including an over-long prompt,
+  which is now handed on unchanged instead of being refused with a notice appended. / 旧前台（以及它背后的分流、队长、通道、历史四个模块）
+  整个删掉了：没有档案能再把它装回来，`legacyGate` 与 `mode` 成了移除键。**补丁里还带着其中任何一个，插件会直接拒绝激活**，并点名是哪个键
+  （`removed configuration key "mode": it was removed in an earlier release and is no longer accepted; delete it from your patch`）；
+  档案的这一行是被跳过、不是半装（日志写的是 `1 entry did not activate`），症状就是「这一行没激活」。升级前先从每个 `cordis.patch.yml`
+  里删掉那两行。前台没了之后接单台默认就是开着的
+  （`blockIntake` 缺省 `true`），六个块工具在默认载入里就会出现；配置面是十九个键（设置页上十六个）。原先覆盖前台的测试跟着它一起走了——
+  十四个文件，因为它们测的主题已经不存在——替代它的是一个逐字节的钉子：默认载入对八种消息形状一个字都不改，其中包括一条超长提示词，
+  现在它原样交出去，不再被拒绝、也不再被追加一段通告。
+
 ### Fixed / 修复
 
 - **While a question is open, your next vague message carries the earlier request / 问题还开着时，你下一句含糊的话会带上先前那条请求** —

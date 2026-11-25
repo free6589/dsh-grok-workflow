@@ -1719,3 +1719,22 @@ Source: `dsh` 0.2.2-rc.3 装机内的 `@deepseek-ai/dsh-plugin-manager` 0.2.2-rc
   而本仓库带着一个被追踪的 `.rsi/STOP`（2026-11-21 停自迭代时留下的）。所以在这棵树上跑真机心跳 soak，刹车结果必然
   `loop/stop-file`——**这不是缺陷，也不是「刹车允许」路径的覆盖**；要观察 `continued` 得换一个 cwd，或者设
   `GROK_WORKFLOW_STOP_FILE`（`LOOP_STOP_ENV`）指到别处。
+
+## 2026-11-25 · `apply()` 里抛错在真机上的形状：一条 `did not activate` 警告，插件被整行跳过（`CONFIRMED`，真机观察）
+
+M3.3 的 soak 上撞到的：clone 出来的 profile 还带着上一版的 `mode: triage`，插件在 `apply()` 里读配置时就抛了。下面三条是那次
+boot 日志的原文（`docs/knowledge/evidence/m3-3-2026-11-25/soak-all.txt`），不是推断。
+
+- **抛错的位置是载入期，不是首次调用。** 栈是 `assertKnownKeys (lib/config.js:719)` → `resolveConfig (lib/config.js:1053)` →
+  `readConfig (lib/index.js:62)` → `new apply (lib/index.js:106)`。也就是说「补丁里带着移除键」这件事在**激活时**就失败，
+  不会先激活、等到第一条消息才炸。设计含义：一个陈旧的补丁是可诊断的启动错误，不是运行期的谜。
+- **宿主对单行失败的处理是「警告 + 跳过该行」。** boot 打的是 `dsh: warning: 1 entry did not activate`，紧跟一行
+  `grok-workflow (dsh-grok-workflow): Error: removed configuration key "mode": …`——**点名到 bundle 行**，然后把这一行丢掉，
+  不是把整个进程拉倒。对比 `A17` 那条（客户端键控槽位冲突会让整页只剩错误屏）：**服务端插件的 `apply()` 抛错是行级隔离，
+  客户端注册冲突是页面级**，两者别混。
+- **修好之后 boot 干净、无警告**：删掉那一行配置再起，插件正常激活，`did not activate` 零行。
+- **`NOT_RUN`**：那一行没激活时，档案其余部分（其它插件、会话、GUI）是否完全正常，本轮没有单独记录——日志只证明了
+  「警告 + 跳过」，没有证明「其余一切照常」。要断言这一点，得在修好之前先发一条消息。
+
+验收含义：**「启动日志里 0 条 `did not activate`」是一条有意义的门禁读数**；反过来说，升级后如果看到这一行，先去看它点名的那一行
+配置，而不是怀疑模型或网络。

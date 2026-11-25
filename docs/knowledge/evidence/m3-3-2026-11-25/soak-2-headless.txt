@@ -1,0 +1,38 @@
+M3.3 soak scenario 2 — headless, one real end-to-end run (2026-11-25)
+
+Build: feat/m3-delete-gate @ 09aa1bd (0.13.34). Home: .tmp/m3-soak-3/dsh-home.
+Profile m33h — a sibling of the soak profile m33 with the SAME config and the
+SAME installed build, differing only in the app bundle:
+`@deepseek-ai/dsh-web-app` → `@deepseek-ai/dsh-headless` (bundles 21, one swap).
+
+Why a sibling profile: `dsh --profile m33 headless '<objective>'` is rejected on
+this machine (the profile already names its app, so `headless` is a stray
+positional). The headless run below is the same build, home, plugin config and
+routes, driven through the headless app entry instead.
+
+--- the command --------------------------------------------------------------
+
+  $ DSH_HOME=<scratch>/dsh-home dsh --profile m33h '请用 grok_workflow 工具跑一个
+    最小工作流：计算 17 乘以 23 等于多少，让 worker 算、verifier 独立核对，
+    最后给出结论和验证结果。'
+  EXIT=0
+
+--- the workflow's own answer (stdout, verbatim) -----------------------------
+
+  有结论了：17 乘以 23 等于 391。
+
+  为什么放心：先算了一遍，是 391；又换了另一种完全不同的算法单独重算了一遍，
+  也是 391，两边对上了。
+
+  验证通过，可以直接用这个数。
+
+--- ledger it wrote ----------------------------------------------------------
+
+$DSH_HOME/checkpoints/grok-workflow/checkpoint-ffc06009-…json (the run's own
+checkpoint). No taskboards/ directory: a plain workflow run uses no block.
+
+| claim                                              | status    |
+|----------------------------------------------------|-----------|
+| headless end-to-end run completes, exit 0           | CONFIRMED |
+| a real model answers through the workflow           | CONFIRMED |
+| worker + independent verifier both ran              | CONFIRMED |

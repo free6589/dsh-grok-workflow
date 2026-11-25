@@ -1,3 +1,56 @@
+Last updated: 2026-11-25 09:15 +08:00（**M3.3「旧前台整条链删除 + 两个路由键移除 + `blockIntake` 默认打开」：独立验收通过，`CONFIRMED`；未发版、未 push、未合 `main`** —
+分支 **`feat/m3-delete-gate`**，worktree `.tmp/wt-m3-delete-gate`，基线 `main` 尖端 **`061693e`**，两条工作提交
+**`09aa1bd`**（`refactor(m3.3): delete the old front desk chain`，**81 文件 / +248 −18277**：`src` 17 文件 +97 −4997、
+14 个前台 spec −7613、`lib/` 50 文件 +151 −5667）与 **`d2d5115`**（`test(m3.3): delete the front-desk specs, re-pin the baseline,
+sync the doc guards`，**28 文件 / +879 −1349**：20 个 spec 改写、baseline 夹具重钉、两个 README 与四份 docs、`package.json` 的
+`test:unit` 去掉两个已删文件名），合计 **109 文件 / +1127 −19626**（记忆提交紧随其后，只动 `docs/knowledge/` 与 `CHANGELOG.md`，
+不碰源码、测试与 `lib/`）。版本仍 **`0.13.34`**。
+**做了什么（四句）**：① 删掉旧前台整条链——`src/gate.ts`(2466) + `src/triage.ts`(1323) + `src/captain.ts`(261) +
+`src/channel.ts`(293) + `src/history.ts`(229) = **4572 行 5 文件**，`src/index.ts` 不再注册 `installGate`（`src/` 里 `installGate`
+零命中）；② `src/answer.ts` 314 → 222，删 `FRONT_DESK_PREAMBLE`/`frontDeskText`/`ACCEPTED_PREAMBLE`/`acceptedEnterText`/
+`NOTICE_PREAMBLE`/`noticeEnterText`/`noticeText`；③ `src/config.ts` 删 `mode` 与 `legacyGate` 两键（都进 `REMOVED_CONFIG_KEYS`，
+旧补丁拿到的是 `removed configuration key "X": … delete it from your patch` 而不是 `unknown`），`DEFAULT_BLOCK_INTAKE` 翻 `true`，
+配置面 **21→19 键、投影 17→16**，签名行同时去掉 `gate=on`/`mode=`/`legacyGate=` 三行（`describeResolvedConfig`）；④
+`src/client/index.js` 删 `modeCards()` 与只服务它的文案/样式（`status.triage*`/`status.full*` → `status.on`/`status.on.detail`，
+中英对称），另清 7 个删前台后零引用的符号：`ScalarField`、`ClassPicker`、`TriageModelPicker`、`enumRow`、`parseSingleRoute`、
+`resolveSwitchOn`、`run.ts` 的 `RoleName` import。
+**测试面**：**14 个 spec 整份删除**（`gate`、`triage`、`triage-recall`、`triage-followup`、`channel`、`captain-confirm`、
+`captain-plan`、`history`、`phase1-dialogue`、`grok-on-ingress`、`full-escape`、`full-behind-first-answer`、`gate-partial-head`、
+`human-output-contract`，判据是「主题随旧链一起消失」，见 `D-141`；派单说 6 个，实测 14 个）；**20 个 spec 改写**（`classifyPreStep`
+在 `test/` 与 `src/` 里零命中，全部换真 `ctx.waterfall`；`composition` 改成「有/无插件决策逐字节相同」；`objective-limit`
+删 gate 那条路保留 tool/fallback；`reliability`/`inheritance` 删 history 三函数那几组；`client.spec` 可见字段 15→14；
+另有 `test/helpers.ts` 与夹具）；`test/fixtures/block-flag-baseline.json` 重钉为 **`format: 2`**——钉的对象从「pre-feature 树」
+改成「删完后默认载入对八条 payload 一个字都不改」，第 6 条（超长目标）从 2 条消息（32001 用户 + 723 字 `grok-workflow` 通告）
+变成 **1 条**；反自证三条保留（改一字 / source 换 `plugin` / `blockIntake:true` 载入逐条等于默认），见 `D-142`。
+**门禁（dispatcher 亲自跑，原文 `docs/knowledge/evidence/m3-3-2026-11-25/ci-gate.txt`）**：`TMPDIR=$PWD/.tmp npm run ci` →
+**exit 0**，`Test Files 98 passed (98)` / `Tests 1850 passed (1850)`、`Found 15 warnings and 0 errors.`、
+`lib/ at d2d5115 is the build of src/ at d2d5115 (281 files, byte-identical)`；`npm run typecheck` exit 0、`npm run lint` exit 0。
+`lib/` 重建后 **38 个顶层 js / 281 文件**，`gate|triage|captain|channel|history` 孤儿产物 **0**（`lib/captain-memory.*` 不是孤儿，
+它是活模块）。收口轮自己重跑 `npm run verify:lib` → exit 0、同一行原文。
+**真机 soak（四条，全部 `CONFIRMED`；DSH 0.2.2-rc.3、Node v26.8.1、scratch home `.tmp/m3-soak-3/dsh-home`（clone 7699 文件 /
+parity 5/5 / 脱敏 1 行）、端口 3311、`~/.dsh` 前后 size `1548` mtime `1795362020` 完全一致）**：① GUI（真 Chromium headless
+跑真 web app）两条消息——普通消息 8 秒直答、`source.kind=user` 原文逐字、`grok-workflow` 中继 **0**、`tool-workflow/*` **0**；
+旧前台必接的典型句「今天天气怎么样？」也被直答（31 秒，反问城市），中继 0、运行 0；默认载入向模型提供 96 个工具、其中
+**9 个 grok 工具**（六个块工具默认注册了）；② headless（兄弟 profile `m33h`，只换 app bundle）→ `EXIT=0`，真跑出 17×23=391
+并独立验算；③ 中途 kill：checkpoint `running` / 10 任务 / 0 verified / attempts `[1]`，kill 后与重启后**一字未变**，重启起的是
+新运行（新 checkpoint），算出 5×6=30，`EXIT=0`；④ 卸载：bundle 行 **21→20**、依赖消失、boot 干净（0 条 `did not activate`）、
+工具 **87 / grok 0**、普通消息仍 7 秒作答、无 `taskboards/`、无新心跳行、checkpoint 未变（最新 08:58 早于 09:00 的卸载）。
+**一条迁移发现（已进 CHANGELOG 与 `HANDOFF.md`）**：clone 带着 live profile 的 `mode: triage`，第一次 boot 时插件**拒绝激活**
+并打出 `removed configuration key "mode": it was removed in an earlier release and is no longer accepted; delete it from your patch`
+（`assertKnownKeys` → `resolveConfig` → `readConfig` → `apply`）；删掉那一行后干净激活。**升级前必须从每个 `cordis.patch.yml`
+删掉 `mode` 与 `legacyGate`。**
+**边界（如实记）**：GUI 用的是 headless Chromium 不是可见窗口；四条 MCP（serena/mdcg/phone/mobile）在沙箱里写不了家目录、
+boot 时有 traceback，与本插件无关；**热卸载 `NOT_RUN`**（先停实例再移除）；**引擎级恢复 `NOT_RUN`**（引擎无 journal，`resume`
+是新运行 + checkpoint seed；`--session-id` 采纳仍是 M3.2 记的 `BLOCKED`，未重试）；路由重指到
+`bifrost-responses/opencode-go/muse-spark-1.3-contributor`（只换谁回答，不动被测行为），先用一条 200 验活。
+**按设计稿仍留在树上的死代码（下一轮候选，本轮不删，`D-143`）**：`relayText`/`reportEnterText`（`answer.ts`，src 内已无调用者，
+只有测试在调）、`runSingleCall`+`SingleCallOptions`+`SingleCallOutcome`（`run.ts` 约 300 行前台单调用机制，只剩
+`test/memory-archive.spec.ts` 在用）、`isModeEnabled`、`ConfigReader.lastGood()`（这两个也是只有测试在调）、`FIXED_INSTANT_RECEIPT`/
+`FIXED_MAX_QUEUED_MESSAGES`/`FIXED_TRIAGE_ASK`/`FIXED_TRIAGE_FOLLOWUP_AS_FAST`/`FIXED_GATE_ON`、`records.ts` 的
+`alreadyRouted`/`appendInstantReceipt`/`deliveryKey`/`recordDelivery`、`steering.ts` 的 `closeSteering`、`intake.ts` 的
+`inspectPrompt`、`SWITCHABLE_CLASSES`（测试在用）。
+**证据**：`docs/knowledge/evidence/m3-3-2026-11-25/`（`ci-gate.txt`、`soak-all.txt` 与四条 soak transcript、README 的场景表与结论表）。
+
 Last updated: 2026-11-25 07:45 +08:00（**M3.2「默认不拦截 + 刹车只有一个主人 + 准入生效」：独立验收通过，`CONFIRMED`；未发版、未 push、未合 `main`** —
 分支 **`feat/m3-switch`**，worktree `.tmp/wt-m3-switch`，基线 `main` 尖端 **`7b25890`**，代码尖端 **`7f172ae`**
 （本条记忆提交紧随其后，只动 `docs/knowledge/` 与 `CHANGELOG.md`，不碰源码、测试与 `lib/`），八条提交 **`9fdcb6e`**

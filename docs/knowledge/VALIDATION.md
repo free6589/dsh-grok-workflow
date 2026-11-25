@@ -1,3 +1,66 @@
+## M3.3 旧前台整条链删除、两个路由键移除、`blockIntake` 默认打开（`feat/m3-delete-gate`）— 2026-11-25 (`CONFIRMED`)
+
+下面每一行都写清命令、环境与结果；没跑的写 `NOT_RUN`，被环境挡住的写 `BLOCKED`。分支 `feat/m3-delete-gate`（worktree `.tmp/wt-m3-delete-gate`），
+基线 `main` 尖端 **`061693e`**，分支尖端 **`d2d5115`**。**门禁由 dispatcher 跑、四条 soak 由 soak 工人跑**；**收口轮做只读复核**
+（`git show` / `git diff --numstat` / `grep` / `find` / `wc` / `node -e` / 读六份证据原文），另外自己跑了 `npm run verify:lib`、
+四个文档守卫 spec 与 `test/memory-archive.spec.ts`；**没有重跑 `npm run ci`，也没有重跑 soak**。
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 分支、基线、HEAD | `git status --short --branch`；`git log --graph --oneline --parents -6`（worktree） | `## feat/m3-delete-gate`，两条工作提交 **`09aa1bd`** → **`d2d5115`**，基线 `061693e`；唯一未跟踪项是 `docs/knowledge/evidence/m3-3-2026-11-25/`（本轮新增的证据目录）。**`CONFIRMED`** |
+| 提交面（实测，与派单有偏差） | `git show --stat --numstat 09aa1bd` / `d2d5115`；`git diff --numstat 061693e d2d5115` | **`09aa1bd` 81 文件 / +248 −18277**（`src` 17 文件 +97 −4997、14 个前台 spec −7613、`lib/` 50 文件 +151 −5667）；**`d2d5115` 28 文件 / +879 −1349**（20 个 spec、`test/helpers.ts`、baseline 夹具、两个 README、四份 docs、`package.json`）；合计 **109 文件 / +1127 −19626**。**派单写 67 + 42 文件、−10664 + −8962，与实测不符**（合计一致，分摊不同）：测试删除与 `lib/` 重建都落在 `09aa1bd` 里，`d2d5115` 只动测试与文档。**`CONFIRMED`** |
+| 删除清单（源码事实） | `git show --numstat 09aa1bd -- src/` | `src/gate.ts` **2466** + `src/triage.ts` **1323** + `src/captain.ts` **261** + `src/channel.ts` **293** + `src/history.ts` **229** = **4572 行 / 5 文件**（派单写 4653，实测 4572，以 numstat 为准）。`grep -rn "installGate" src/` → **0**（不再注册）。**`CONFIRMED`** |
+| `answer.ts` 三块文案 | `wc -l src/answer.ts`；`git show 061693e:src/answer.ts \| wc -l`；`grep -c "FRONT_DESK_PREAMBLE\|frontDeskText\|ACCEPTED_PREAMBLE\|NOTICE_PREAMBLE" src/answer.ts` | **314 → 222**；四个符号在 `src/answer.ts` 里 **0** 命中（另三个 `acceptedEnterText`/`noticeEnterText`/`noticeText` 同批删除）。**`CONFIRMED`** |
+| 七个零引用符号 | `grep -rn "\bScalarField\b\|\bClassPicker\b\|\bTriageModelPicker\b\|\benumRow\b\|\bparseSingleRoute\b\|\bresolveSwitchOn\b" src/`；`grep -n RoleName src/run.ts` | 六个符号全 **0**，`src/run.ts` 的 `RoleName` import 也不在（`grep` 无输出）。**`CONFIRMED`** |
+| 配置面 19 / 投影 16 | `node -e` 数 `CONFIG_KEYS`；`sed -n '455,500p' src/config.ts`；`grep -n "DEFAULT_BLOCK_INTAKE" src/config.ts`；`sed -n '371,377p' src/settings.ts` | `CONFIG_KEYS` **19** 项；`REMOVED_CONFIG_KEYS` 末尾正是 `'mode'`、`'legacyGate'`（注释写明「`mode` 与 `legacyGate` 随 M3.3 走」）；`src/config.ts:234 export const DEFAULT_BLOCK_INTAKE = true`；投影 = 19 − 3（`toolName`/`configVersion`/`blockIntake`）= **16**。旧补丁的报错原文在 `assertKnownKeys`：`removed configuration key "${key}": … delete it from your patch`，与「`unknown configuration key` + did-you-mean」是两条不同分支。**`CONFIRMED`** |
+| 配置签名行 | `git show d2d5115 -- src/config.ts`；`grep -n "gate=" test/config.spec.ts` | `describeResolvedConfig` 删掉 **三行**：`'gate=on'`、`mode=${config.mode}`、`legacyGate=${…}`；保留 `blockIntake=on\|off`。`test/config.spec.ts` 里 `gate=` **0** 命中。**`CONFIRMED`** |
+| 客户端文案 | `grep -c "modeCards" src/client/index.js`；`grep -n "status.on" src/client/index.js` | `modeCards` **0**；`'status.on'` / `'status.on.detail'` 中英各一条（228/229 英文、460/461 中文），`status.triage*`/`status.full*` 已无。**`CONFIRMED`** |
+| `lib/` 重建 | `ls lib/*.js \| wc -l`；`find lib -type f \| wc -l`；`find lib -type f \( -name 'gate*' -o -name 'triage*' -o -name 'captain*' -o -name 'channel*' -o -name 'history*' \)` | **38** 个顶层 js / **281** 文件；孤儿产物 **0**——唯一命中的四个文件是 `lib/captain-memory.*`，它是 `src/captain-memory.ts` 的产物（活模块），不是孤儿。**`CONFIRMED`** |
+| `verify:lib`（收口轮自己跑） | `TMPDIR=$PWD/.tmp npm run verify:lib` | **exit 0**，原文 `lib/ at d2d5115 is the build of src/ at d2d5115 (281 files, byte-identical)`（脚本导出 HEAD 到临时目录重建再比，不碰工作树 `lib/`）。**`CONFIRMED`** |
+| 门禁（全量，dispatcher 跑，原文 `ci-gate.txt`） | `TMPDIR=$PWD/.tmp npm run ci`（Node v26.8.1 / DSH 0.2.2-rc.3） | **EXIT=0**：`Test Files 98 passed (98)`、`Tests 1850 passed (1850)`、`Found 15 warnings and 0 errors.`、`lib/ at d2d5115 is the build of src/ at d2d5115 (281 files, byte-identical)`、`client bundle: 320233 bytes → lib/client.js`。**`CONFIRMED`**（收口轮未重跑，只读原文） |
+| typecheck / lint（dispatcher 跑） | `npm run typecheck`；`npm run lint` | 两条都 **exit 0**（dispatcher 的记录）。**`CONFIRMED`**（收口轮未重跑） |
+| 14 个 spec 整份删除 | `git show --diff-filter=D --name-only 09aa1bd -- test/`；`git show --numstat --format="" 09aa1bd -- test/ \| awk` | 14 文件 / +0 **−7613**：`gate`(1398)、`phase1-dialogue`(1385)、`triage`(820)、`channel`(608)、`human-output-contract`(535)、`triage-recall`(500)、`grok-on-ingress`(464)、`gate-partial-head`(426)、`captain-confirm`(388)、`full-behind-first-answer`(375)、`full-escape`(362)、`captain-plan`(163)、`history`(130)、`triage-followup`(59)。**派单与 `d2d5115` 的提交说明都写 7 431，实测 7 613（差 182）**；判据见 `D-141`。**`CONFIRMED`** |
+| 20 个 spec 改写 | `git show --numstat --format="" d2d5115 -- test/` | 20 个 spec + `test/helpers.ts` + `test/fixtures/block-flag-baseline.json`（派单写「24 个 spec 改写」，实测 20 个 spec 文件）。`grep -rn "classifyPreStep" src/ test/` → **0**，`ctx.waterfall` 在 `test/` 里 **18** 处；`client.spec` 可见字段 **15 → 14**。**`CONFIRMED`** |
+| baseline 夹具重钉 | `python3 -c` 读 `test/fixtures/block-flag-baseline.json`；`grep -n` 读 `test/block-flag-baseline.spec.ts` | `format: 2`；`baseline` 字段原文 `m3.3: the default load after the front desk was deleted (re-pinned on the uncommitted tree; the pre-deletion baseline was 061693e)`；八条 `cases` 全部 `mints: false`，第 6 条 `an over-long prompt is handed on unchanged, not refused` 只有 **1** 条消息（原来是 32001 用户 + 723 字 `grok-workflow` 通告共 2 条）；反自证三条在 spec 里可见：改一字、`source` 换 `plugin`（411 行那条用例）、`blockIntake: true` 载入与默认逐条相同（428 行起）。**`CONFIRMED`** |
+| 文档守卫的输入 | `git show d2d5115 -- README.md README.zh-CN.md docs/ACCEPTANCE.md docs/LOCAL-TESTING.md docs/ARCHITECTURE.md package.json`；`sed -n '/\| registration \|/,+8p'`（改前/改后各一次） | README 双语 **21 → 19**（`exactly nineteen keys` / `十九个`）、removed 键清单加 `mode` 与 `legacyGate`、`blockIntake` 默认 `true`；`docs-config-keys` 的 `words` 表加 `19`；`docs/LOCAL-TESTING.md` 键清单 19；`docs/ACCEPTANCE.md` 的 **S1 标 SUPERSEDED（M3.3）**；`docs/ARCHITECTURE.md` 监听表 **3 行 → 2 行**（旧前台那行删掉）、超长目标表从 4 列（含 Gate 列）收成 3 列；`package.json` 的 `test:unit` 去掉 `test/gate.spec.ts` 与 `test/history.spec.ts` 两个文件名。**`CONFIRMED`** |
+| 四个文档守卫（收口轮自己跑） | `TMPDIR=$PWD/.tmp npx vitest run test/docs-version.spec.ts test/docs-config-keys.spec.ts test/docs-architecture-version.spec.ts test/i18n-parity.spec.ts` | **EXIT=0**：`Test Files 4 passed (4)` / `Tests 30 passed (30)`（`docs-config-keys` 13、`docs-version` 8、`i18n-parity` 6、`docs-architecture-version` 3），743 ms。**`CONFIRMED`** |
+| `memory-archive`（收口轮自己跑） | `TMPDIR=$PWD/.tmp npx vitest run test/memory-archive.spec.ts` | **EXIT=0**：`Test Files 1 passed (1)` / `Tests 21 passed (21)`，1.72 s——这是树内**最后一个** `runSingleCall` 的调用方（`D-143`）。**`CONFIRMED`** |
+| soak 环境（隔离、真机、真模型） | `node scripts/clone-profile.mjs --src ~/.dsh/profiles/web --home .tmp/m3-soak-3/dsh-home --name m33 --force`；`dsh plugin --profile m33 add <worktree>`；端口 **3311**；DSH **0.2.2-rc.3**（build `6b729fe`）/ Node **v26.8.1** | clone `files 7699 -> 7699`、`parity 5/5 equal after redaction`、`credentials redacted: 1 line(s)`；装的是 `link:` 到本 worktree，版本读回 **`0.13.34`**（两侧一致）。**`CONFIRMED`** |
+| soak 期间线上没被碰 | `stat -c '%s %Y' ~/.dsh` 前后两次 | 前后都是 **`1548 1795362020`**，完全一致；没有从线上 home 拷任何凭据、也没有读；线上 3080/3065/3086/3109 未被碰。**`CONFIRMED`** |
+| **迁移发现**（真机、`CONFIRMED`） | 第一次 boot（clone 带着 live profile 的 `mode: triage`） | `dsh: warning: 1 entry did not activate` + `grok-workflow (dsh-grok-workflow): Error: removed configuration key "mode": it was removed in an earlier release and is no longer accepted; delete it from your patch`，栈是 `assertKnownKeys` → `resolveConfig` → `readConfig` → `apply`；删掉那一行后干净激活、无警告。**升级前必须从每个 `cordis.patch.yml` 删掉 `mode` 与 `legacyGate`。** **`CONFIRMED`** |
+| 场景 ① GUI（真 Chromium headless 打真 web app） | Playwright + Chromium 打开 `127.0.0.1:3311`，两条消息：`用一句话说明 3 加 4 等于多少。` / `今天天气怎么样？` | 第一条 8 秒直答 `3 加 4 等于 7。`；`seq 9 user/message source.kind=user` 原话、`seq 18 assistant/message` 真答；第二条 31 秒直答并反问城市（`你想查哪个城市今天的天气？…`），`seq 9` 原话、`seq 17` 真答；两条都是 `grok-workflow` 中继 **0**、`tool-workflow/*` **0**；`request/header` **96** 个工具、其中 **9** 个 grok 工具（六个块工具默认注册）。原文 `soak-1-gui.txt`。**`CONFIRMED`** |
+| 场景 ② headless（端到端一次真运行） | `dsh --profile m33h '<objective>'`（兄弟 profile，只把 app bundle 换成 `dsh-headless`） | **EXIT=0**，工作流自己报 17×23=**391** 并换了另一种算法独立验算；checkpoint 落盘，无 `taskboards/`（普通运行不用块）。原文 `soak-2-headless.txt`。**`CONFIRMED`** |
+| 场景 ③ 中途 kill / 重启 | 四任务工作流 → job supervisor `SIGTERM` → 重读 checkpoint → 重启跑最小工作流 | kill 前 checkpoint `run.status running` / 10 任务 / 0 verified / running 10 / attempts `[1]`；kill 后**一字未变**（没有伪造终态、没有重复计费）；重启是**新运行**（新 checkpoint，08:58），算出 5×6=**30**、`EXIT=0`；被 kill 的那个仍 `running` / 0 verified / attempts `[1]`。原文 `soak-3-restart.txt`。**`CONFIRMED`** |
+| 场景 ④ 卸载 | `dsh plugin --profile m33 remove dsh-grok-workflow` → 重启 → 发普通消息 | bundle 行 **21 → 20**、依赖项消失；boot 干净（`did not activate` 0 行、日志无 grok 字样）；`request/header` 工具 **87**、grok **0**（原 96 / 9）；普通消息 7 秒作答 `3 加 4 等于 7。`；`taskboards/` 不存在、无新心跳行、checkpoint 未变（最新 08:58 早于 ~09:00 的卸载）。原文 `soak-4-uninstall.txt`。**`CONFIRMED`** |
+| 模型路由的适配 | clone 里没有 `agent2api` 凭据；所有路由改指 `bifrost-responses/opencode-go/muse-spark-1.3-contributor`，先用一条最小请求验活 | 验活 `HTTP=200 time=1.64s`。只换「谁回答」，不动四条场景要测的东西。**`CONFIRMED`** |
+| 可见浏览器窗口（不是 headless） | — | **`NOT_RUN`**：GUI 场景用的是 Playwright 的 Chromium（headless）；客户端 bundle、websocket 与会话日志都是真的，但「屏幕长什么样」不是本轮证据。 |
+| 引擎级恢复（被 kill 的运行自己接着跑） | — | **`NOT_RUN`**：引擎没有 journal，`resume` 的语义是「新运行 + checkpoint seed」；本轮没请求它，只证明了「重启起的是新运行」。 |
+| `--session-id` 采纳被 kill 的运行 | — | **`NOT_RUN`**：M3.2 记的是 `BLOCKED`（`tool-workflow/guardian-start` 不被本 harness 接受，先于本块，commit `891b8a2`），本轮未重试。 |
+| 热卸载（运行中移除插件） | — | **`NOT_RUN`**：先停实例再移除 bundle 行，「无后台存活」是在冷启动上观察到的。 |
+| 四条 MCP 的 boot traceback | 读 `soak-all.txt` 的边界段 | serena / mdcg / phone / mobile 在沙箱里写不了家目录、boot 时打 traceback；**与本插件无关**，boot 继续、插件正常激活。**`CONFIRMED`** |
+| 发版 / 推送 / 合并 | — | **`NOT_RUN`**：未打 tag、未 push、未合 `main`、未 npm publish；`package.json` 仍是 `0.13.34`。 |
+
+**Changed（收口轮只动记忆与证据）：** `docs/knowledge/STATE.md`、`HANDOFF.md`、`DECISIONS.md`（新增 `D-141`–`D-144`）、`VALIDATION.md`（本条）、
+`docs/knowledge/evidence/m3-3-2026-11-25/README.md`（新增）、`CHANGELOG.md` 的 `[Unreleased]`（中英各一条）。
+`docs/knowledge/RESEARCH.md` 加了一条真机观察（`apply()` 抛错的形状）。**本轮只写上面这几个文件**：`src/`、`test/`、`lib/`、
+两个 README、`docs/ARCHITECTURE.md`、`package.json` 本轮一个字也没有写（收口轮只跑 `verify:lib`、四个守卫与 `memory-archive`，
+这三条都不写工作树）。
+
+**Honest boundary（逐条）：**
+1. **两条提交的文件数与行数分摊与派单不符，记忆以 `git` 实测为准**（见上表第二行）。合计（109 文件 / +1127 −19626）与派单一致，
+   分摊不同：派单把 14 个 spec 的删除记在第二条提交上，实际它在 `09aa1bd` 里。
+2. **14 个 spec 的删除行数派单与提交说明都写 7 431，实测 7 613。** `git show --numstat 09aa1bd -- test/` 与逐文件
+   `git show 061693e:<file> | wc -l` 两种算法都得 7 613（差 182）。**提交说明不改**（不重写历史），以本条为准。
+3. **「24 个 spec 改写」实测是 20 个 spec 文件**，另加 `test/helpers.ts` 与 baseline 夹具，共 22 个文件。
+4. **门禁与 soak 不是收口轮跑的。** 我只读 `ci-gate.txt` 与五份 soak transcript，自己跑了 `verify:lib`、四个文档守卫与
+   `memory-archive`。`npm run ci` 与四条 soak **没有重跑**。
+5. **`typecheck` / `lint` 的 exit 0 来自 dispatcher 的记录**，本轮没有重跑这两条。
+6. **迁移发现只证明了「拒绝激活」这一条**：真机打出警告与错误原文，删掉那一行后干净激活；「那一行没激活时档案其余功能是否完全正常」
+   没有单独记录（`NOT_RUN`）。证据里另外两条 setup-only 失败（`roles.worker` 重复路由、子代理模型选择重复路由）是操作者改路由造成的，
+   不是插件缺陷，去重后清掉。
+7. **`lib/` 的孤儿扫描用 `captain*` 会误报**：`lib/captain-memory.*` 是活模块的产物。真正的孤儿是 `gate|triage|captain|channel|history`
+   这五个模块的产物，数下来是 0。
+
 ## M3.2 默认不拦截、刹车单主人、准入生效（`feat/m3-switch`）— 2026-11-25 (`CONFIRMED`)
 
 下面每一行都写清命令、环境与结果；没跑的写 `NOT_RUN`，被环境挡住的写 `BLOCKED`。分支 `feat/m3-switch`（worktree `.tmp/wt-m3-switch`），

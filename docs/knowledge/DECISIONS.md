@@ -3704,3 +3704,99 @@ spine 为空，pre-fix 形状会进脊柱。
   - 「查材料 vs 文档」在**没有问题开着**时仍然对内容敏感：这是设计（它就该从盘上答），不是缺陷；但它意味着
     一份新写的笔记可以让某条含糊消息从「问」变成「直接答」。写记忆的人要知道这一点。
   - `B04`/`B08` 恢复绿，且现在有两层保护：规则闸 + 受控用例。
+
+## D-141 · 删 14 个 spec 而不是派单说的 6 个：判据是「主题是否随旧链一起消失」（2026-11-25，未发版）
+
+- **Status:** `CONFIRMED`（`git show --diff-filter=D --name-only 09aa1bd -- test/` → 14 个文件名；`git show --numstat 09aa1bd -- test/`
+  → 14 文件 / +0 −7613；删完后的全量门禁 `TMPDIR=$PWD/.tmp npm run ci` → **98 文件 / 1850 例 PASS**（原文
+  `docs/knowledge/evidence/m3-3-2026-11-25/ci-gate.txt`），见 `VALIDATION.md` M3.3 条）
+- **Date:** 2026-11-25
+- **Context:** 派单写「删 6 个 spec」，但它同时要求「拿前台当夹具但主题还活着的改写」。这两件事按数量对不上：旧前台这条链被删掉的
+  是 5 个模块（`gate` / `triage` / `captain` / `channel` / `history`），围着它们写的 spec 远不止 6 个，而其中一部分
+  （`composition`、`objective-limit`、`reliability`、`inheritance`）只是**用前台当夹具**，主题（决策合成、预算、失败重试、配置继承）
+  还在。按文件数删会删错，按主题删才对。
+- **Decision:** 判据写死为**「这个文件测的主题是否随旧链一起消失」**：
+  1. **整份删除（14 个）**——只测前台/分流/中继/首答/通道/队长的文件：`gate`、`triage`、`triage-recall`、`triage-followup`、
+     `channel`、`captain-confirm`、`captain-plan`、`history`、`phase1-dialogue`、`grok-on-ingress`、`full-escape`、
+     `full-behind-first-answer`、`gate-partial-head`、`human-output-contract`。
+  2. **改写保留（20 个）**——主题还活着、只是拿前台当夹具或读它的配置键：`composition`（改成「有/无插件决策逐字节相同」）、
+     `objective-limit`（删 gate 那条路，保留 tool/fallback 两路）、`reliability` 与 `inheritance`（删 history 三函数那几组）、
+     `classifyPreStep` 的调用方全部换成真 `ctx.waterfall`、`client.spec` 可见字段 15→14、`config.spec` 去掉 `gate=on` 断言，
+     另有 `block-flag*`、`block-tools`、`command`、`config-limits-repair`、`config-synthesis-fallback`、`heartbeat-identity`、
+     `i18n-parity`、`loop-brakes`、`m3-intake`、`mode-surface`、`plugin-lifecycle`、`settings-projection`、`timeout-config`
+     与 `test/helpers.ts`、baseline 夹具。
+- **Alternatives considered / rejected：**
+  - **按派单的 6 个删。** 否决：剩下 8 个会 import 已删模块，整份套件连编译都过不去；为了留住它们要么把前台代码留下一部分
+    （等于没删），要么写一层空壳（等于把删除做成假删除）。
+  - **14 个全删、存活的也不改写。** 否决：那 20 个里有 6 个只是「夹具是前台」，主题（预算、合成、重试、继承、字段面）一个字都
+    没消失；删掉等于把与前台无关的覆盖一起丢掉。
+  - **把 `phase1-dialogue` 留下改写成「直答」用例。** 否决：它 1 385 行几乎全是档位/追问/召回的行为矩阵，那些档位已经不存在；
+    真正要钉的「默认载入不改消息」已经由 baseline 夹具的八条 payload 逐字节钉住（`D-142`），留一份改写版只会剩下一堆
+    `expect` 包着空断言。
+- **Consequences:**
+  - 套件从 112 文件降到 **98 文件**、2 149 例降到 **1 850 例**；降的全是随模块消失的覆盖，不是被削弱的覆盖。
+  - 判据可复用：以后再删模块，先问「文件测的主题还在不在」，不要按派单给的数字删。
+  - `docs/ACCEPTANCE.md` 的 S1 因此标 **SUPERSEDED（M3.3）**，证据行改成 baseline 夹具 + M3.2 真机读数，历史 `test/gate.spec.ts`
+    的引用如实注明「随模块一起走了」。
+
+## D-142 · `block-flag-baseline.json` 重钉而不是删：它现在钉的是 M3.3 的对外承诺（2026-11-25，未发版）
+
+- **Status:** `CONFIRMED`（`test/fixtures/block-flag-baseline.json` 的 `format: 2`、`baseline` 字段原文、八条 `cases`；
+  `npx vitest run test/block-flag-baseline.spec.ts` 在门禁里通过，见 `ci-gate.txt` 的 98/1850）
+- **Date:** 2026-11-25
+- **Context:** 这份夹具原先钉的是「pre-feature 那棵树的行为」——那时前台还在，一条超长目标会被拦下并追加一段 723 字的
+  `grok-workflow` 通告，所以第 6 条 payload 是 **2 条消息**。前台删掉之后，那个形状再也产不出来；如果照旧保留，它会变成一份
+  记录一个不存在行为的文物，而且会红。删掉它又会让「默认载入不拦任何消息」这条**本轮唯一的对外承诺**失去字节级证据。
+- **Decision:** **重钉，不删。** `format: 2`，`baseline` 字段写明「重钉时的基线 `061693e`，非重钉提交」（原文：
+  `m3.3: the default load after the front desk was deleted (re-pinned on the uncommitted tree; the pre-deletion baseline was 061693e)`）。
+  八条 payload 现在全部 `mints: false`（插件不追加任何消息），第 6 条从 2 条消息变成 **1 条**——「超长目标原样交出去，不拒绝」。
+  反自证三条保留：① 改一个字，字节必须不同；② `source` 从 `user` 换成 `plugin`，判定必须不同；③ 显式 `blockIntake: true`
+  载入的结果必须与默认载入**逐条字节相同**。
+- **Alternatives considered / rejected：**
+  - **删掉夹具，改写成一条普通断言。** 否决：那样只剩「默认载入不追加消息」的一句话，没有逐字节的八种形状，也没有反自证——
+    一个把 `bytes` 字段抄错的重钉照样能绿。
+  - **保留 `format: 1` 只改第 6 条。** 否决：`format` 是这份文件自己的版本号，钉的对象从「pre-feature 树」换成「删完后的默认载入」
+    是一次语义变更，不是一次数值订正；版本号不动，下一个人分不清自己看的是哪种基线。
+  - **改成钉「前台缺省关」的 M3.2 形状。** 否决：M3.2 的形状还有 `legacyGate: true` 这条路能翻回来，钉它等于钉一个可选项；
+    M3.3 之后前台不存在了，「默认载入」是唯一形状，钉它才是钉承诺。
+- **Consequences:**
+  - 这份夹具现在是 M3.3 的对外契约：谁把某条 payload 的判定改回「拦一下」，第 6 条会第一个红。
+  - `baseline` 字段里的 `061693e` 是**重钉时的基线**，不是重钉提交；读的人不要拿它当「这份文件由哪个提交引入」。
+  - 反自证三条是这份文件的一半价值：只钉正向、不钉「改了就红」的夹具，会在下一次重钉时静默失效。
+
+## D-143 · `answer.ts` 只删三块、不删 `relayText`：一次删除不拆成两次评审（2026-11-25，未发版）
+
+- **Status:** `CONFIRMED`（`src/answer.ts` 314 → 222 行；`relayText` 在 `src/` 里只剩定义与 `reportEnterText` 对它的调用，
+  `reportEnterText` 自身在 `src/` 零调用者，`test/` 里有 32 处引用；`npm run typecheck` exit 0 证明留下的符号仍自洽）
+- **Date:** 2026-11-25
+- **Context:** 删掉前台后，`answer.ts` 里三块文案常量与两个渲染函数（`FRONT_DESK_PREAMBLE`/`frontDeskText`/`ACCEPTED_PREAMBLE`/
+  `acceptedEnterText`/`NOTICE_PREAMBLE`/`noticeEnterText`/`noticeText`）失去全部调用者，删得干净。但 `relayText`/`reportEnterText`
+  是同一类死代码——`relayText` 在 `src/` 内已无调用者，`reportEnterText` 只被 `relayText` 之外的测试调用。派单的范围只写了三块。
+- **Decision:** **只删派单写的三块；`relayText`/`reportEnterText` 留下并列入下一轮候选。** 理由是评审成本：把它们一起删，
+  32 处测试引用要同轮改写（`test/delivery.spec.ts`、`test/delivery-human-block.spec.ts`、`test/final-answer-rewrite.spec.ts`
+  三个文件），这一支的 diff 就从「删前台」
+  变成「删前台 + 重写报告渲染的测试面」，两件事的判据不同、失败面也不同，混在一次评审里没人能分别判断。
+- **Alternatives considered / rejected：**
+  - **顺手一起删。** 否决：见上——一次删除拆成两次评审，第二次的判据（报告渲染还准不准）会被第一次的噪音盖住。
+  - **留着并加注释说「已废弃」。** 否决：注释不会让它停止被调用；要么删，要么留成下一轮明确的一条任务，不要留一块灰区。
+- **Consequences:**
+  - 树上有 20 个左右零引用的导出符号（清单在 `STATE.md` 顶部那条），是下一轮的单独立项，不是缺陷。
+  - 判据可复用：**「删掉的模块」与「因它失去调用者的模块」是两次删除**，各自的测试面要各自过一遍。
+
+## D-144 · 配置签名行删掉 `gate=on`（连同 `mode=`/`legacyGate=`）：一行谎报比没有这行更糟（2026-11-25，未发版）
+
+- **Status:** `CONFIRMED`（`git show d2d5115 -- src/config.ts` 的 `describeResolvedConfig` 差分：删 `'gate=on'`、`mode=${…}`、
+    `legacyGate=${…}` 三行；`test/config.spec.ts` 里 `gate=` 零命中；新签名仍带 `blockIntake=on|off`）
+- **Date:** 2026-11-25
+- **Context:** 载入时那行 `configuration in effect: …` 是给运维看的自证：它说什么在生效，就该真的是什么。`gate=on` 是硬编码
+  字符串——前台删掉之后它仍然照打，等于每次载入都宣称一个不存在的模块在跑。`mode=`/`legacyGate=` 同理会去读已经删掉的配置键。
+- **Decision:** 三行一起删。签名保留 `blockIntake=on|off`（这是现在真正决定默认形状的键），`test/config.spec.ts` 里针对
+  `gate=on` 的断言一并删掉，不留一条测谎言的用例。
+- **Alternatives considered / rejected：**
+  - **改成 `gate=off`。** 否决：那还是在报一个不存在的模块的状态；「off」暗示它可以被打开，而它已经没有开关了。
+  - **整行签名删掉。** 否决：这行是载入期唯一的自证（`logger.info` 不进 stdout，见 `RESEARCH.md` 的 2026-11-25 条，所以它只能
+    在进程内 buffer 里读），删掉会让「这次载入到底用了哪个形状」彻底没有答案。
+- **Consequences:**
+  - 以后加删配置键，**签名行要跟着改**：它是 `describeResolvedConfig` 里的一个字面量列表，不会因为键被删而自己消失。
+  - 这条也是给下一轮的提醒：`src/dispatcher/*`、`src/records.ts`、`src/carryover.ts` 的注释里还写着「the gate」（`src/` 内
+    `\bgate\b` 约 115 处，多数是这类注释）——注释不是行为，本轮不动；谁清理时别把它们当成活代码。
