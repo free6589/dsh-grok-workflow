@@ -1,3 +1,33 @@
+Last updated: 2026-11-25 12:16 +08:00（**这一支现在同时装了四件事：① 打字 `/grok off` 后已挂载的开关自己刷新（真机验过）；② 删掉四个零引用导出、并按拍板先给协议词汇补了载体；③ 两个 README 里那个没有出处的队列数字订正成写现状；④ `CHANGELOG.md` 补了旧键 `mode:` 的升级须知。运行行为零变化（除①之外），门禁由包工头跑，未发版、未 push、未合 `main`，版本仍 `0.13.35`** —
+分支 **`fix/switch-refresh`**，worktree `.tmp/wt-switch-refresh`，基线 `main` 尖端 **`84efda0`**。**完整提交清单（八条，最后一条是本轮文档提交）**：
+`8b32e5e` `fix(client): refresh the mounted workflow switch after a command writes the record`（3 文件：`lib/client.js` 143/0、
+`src/client/index.js` 143/0、`test/client.spec.ts` 230/1）→ `ded1df6` `test(client): keep the listener snapshot without tripping the spread lint`
+（1 文件 3/1）→ `266006b` `docs(switch-refresh): record the command-write refresh, its gate and the live soak`（文档 + 证据）→
+`144a9a1` `test(client): cover the sessions face that arrives after the switch mounts`（1 文件 38/0，第 7 条用例）→
+`3366248` `docs(switch-refresh): cite the session log for the pre-fix record write`（证据修正）→ `07b91d3`
+`docs(switch-refresh): close out the gate reading at the branch tip`（门禁读数对齐尖端 `3366248`、1839 例）→ `c5f40b7`
+`refactor(dead-code): drop the four zero-reference exports the front desk left behind`（`src/answer.ts` 0/14、`src/memory/recorder.ts` 0/22、
+`docs/ARCHITECTURE.md` 5/0、`lib/` 对应产物）→ 本轮 `docs(queue-limit): state the queue bound that exists, and flag the removed key before upgrading`。
+**① 开关刷新（`D-150`，`CONFIRMED`）**：挂载读一次 + 订阅会话事件窗口，**只在出现 seq 更新的 `plugin:grok-workflow/mode` 记录时**再读一次
+（同一 seq 只读一次；例外是冷加载历史晚于订阅到达会多读一次），无定时器、无轮询，后台读失败不落失败态，缺面静默退化。真机：改前 20 秒 20 次快照
+全停在「开」；改后两次打字各 **+0.5 秒**自动变，静默 15 秒 0 次新请求；`/api/remote.mux` 帧里确有那条记录。用例 132 → **139**。
+**② 四个零引用导出（`D-151`，`CONFIRMED`）**：`REPORT_BEGIN` / `REPORT_END` / `LEDGER_GUARD`（协议词汇，**先**在 `docs/ARCHITECTURE.md`
+补一条载体 bullet 说明「信封是历史词汇、当前无生产者、解析器只按分节签名读、容忍性由 `test/carryover.spec.ts` 的字面量用例钉着」，**再**删常量）
+与 `archiveRoundNow`（死代码，直接删）。有读者的 `RELAY_SOURCE_KIND`、`createMemoryArchiver`、`RoundArchiveInput`、`ArchiveRecorderOptions`、
+`roundArchiveEvidence` 一律未动；`src/` + `test/` 里这四个名字 **0 命中**。定向六个 spec **120 例通过**（`engine-contract` 15 例）、
+`oxlint` **15 warnings / 0 errors**、`lib/ at c5f40b7 is the build of src/ at c5f40b7 (281 files, byte-identical)`、`lib/client.js` 仍 **329354 字节**。
+**③ 队列数字（用户点名，`CONFIRMED`）**：两个 README 原本写着 `maxQueuedMessages=4`，而 `4` 的出处（旧常量）已被删——**全仓没有代码出处**，
+键本身早在 `REMOVED_CONFIG_KEYS` 里（`src/config.ts:471`，存了值会被当未知键拒绝）。改法：固定值清单里**删数字、保留键名并写明「已删除」**
+（`test/docs-config-keys.spec.ts` 有一条守卫要求每个移除键都在两个 README 里被提到——第一次整段删掉就被它抓红），正文那句改成写现状：
+一个 run 待处理的插入需求由**内部固定上限**封顶（`STEERING_LIMITS.maxQueued` = `REPLAN_LIMITS.maxIntents` = **8**），**不可配置**。
+`src/config.ts:10` 的 `HARD_LIMITS.maxQueuedMessages = 8` **零读者**，**本轮刻意没动**（下一轮决定）。
+**④ 升级须知（用户点名，`CONFIRMED`）**：`CHANGELOG.md` 的 `[Unreleased]` 下新增 `### Upgrade note / 升级须知`（中英双语）：升级**之前**
+打开 `<档案目录>/cordis.patch.yml`，把 `grok-workflow` 那一行下面写着 `mode:` 的那一行**整行删掉**、保存、再升级；原因是这个键在 0.13.35
+随旧前台一起删了，留着会让插件那一行**拒绝激活**、症状是工作流从界面消失（**记录与数据不丢**）；并写明「没有这一行就什么都不用做」与
+「我们**没有**替你改过任何档案」。**live `~/.dsh` 一行未读未写**，那一行由操作者亲手删。
+**六个文档守卫（本轮自己跑，`CONFIRMED`）**：`TMPDIR=$PWD/.tmp npx vitest run test/docs-version.spec.ts test/docs-config-keys.spec.ts
+test/i18n-parity.spec.ts test/docs-architecture-version.spec.ts test/update-entry.spec.ts test/update-surface.spec.ts` → **EXIT=0，6 files / 79 tests PASS**。
+
 Last updated: 2026-11-25 11:58 +08:00（**打字 `/grok off` 之后，对话框底部那个开关现在会自己跟着变了：不刷新、不点击、不轮询——它只在会话记录被写入时多读一次；真机改前 / 改后各量了一遍，`CONFIRMED`；残留一条「冷加载多读一次」；未发版、未 push、未合 `main`，版本仍 `0.13.35`** —
 分支 **`fix/switch-refresh`**，worktree `.tmp/wt-switch-refresh`，基线 `main` 尖端 **`84efda0`**，两个功能/测试提交 **`8b32e5e`**
 （`fix(client): refresh the mounted workflow switch after a command writes the record`，**3 文件**：`lib/client.js` 143/0、

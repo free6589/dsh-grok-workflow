@@ -1,3 +1,43 @@
+## 删掉四个零引用导出（先补协议载体）、订正队列上限的写法、补旧键升级须知（`fix/switch-refresh`）— 2026-11-25 (`CONFIRMED`)
+
+下面每一行都写清命令、环境与结果；没跑的写 `NOT_RUN`，被环境挡住的写 `BLOCKED`。分支 `fix/switch-refresh`（worktree
+`.tmp/wt-switch-refresh`，Node v26.8.1）。**这一轮只改文档与删掉死代码，运行行为零变化**：代码删除在 `c5f40b7`，
+两份 README / `CHANGELOG.md` / 记忆在本条对应的文档提交里；全量门禁由包工头跑。
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 删了哪四个符号 | `grep -rn "REPORT_BEGIN\|REPORT_END\|LEDGER_GUARD\|archiveRoundNow" src/ test/`（改前 / 改后） | 改前只有 `src/answer.ts` 的三行定义（`:47`、`:50`、`:58`）与 `src/memory/recorder.ts:674` 的定义，**没有任何读者**；改后 `src/` + `test/` **0 命中**。**`CONFIRMED`** |
+| 有读者的一律没动 | `grep -rn "RELAY_SOURCE_KIND\|createMemoryArchiver\|RoundArchiveInput\|ArchiveRecorderOptions\|roundArchiveEvidence" src/ test/` | `RELAY_SOURCE_KIND`：`src/carryover.ts:189`、`src/run.ts:1290`；`createMemoryArchiver`：`src/run.ts:43` 与 `test/experience-pack.spec.ts`、`test/memory-archive.spec.ts`、`test/null-collapse.spec.ts`；`RoundArchiveInput`：`MemoryArchiver.round()` 签名；`ArchiveRecorderOptions`：`createMemoryArchiver` 签名；`roundArchiveEvidence`：`src/run.ts:1659`。**全部保留。`CONFIRMED`** |
+| 先补载体再删 | `docs/ARCHITECTURE.md` 的「Report view: answer by default, full record on demand」一节 | 新增一条 bullet（**The report envelope is history, not a protocol.**）：两个 `<<<GROK-WORKFLOW-REPORT>>>` marker 在当前构建里**没有生产者**，`parseReportRound` 只按分节签名读（该节已列出那几个前缀），信封的**容忍性**由 `test/carryover.spec.ts` 那条**字面量**用例钉着。**载体先落，常量后删。`CONFIRMED`** |
+| 信封用例没改也过了 | `TMPDIR=$PWD/.tmp npx vitest run test/carryover.spec.ts` | `test/carryover.spec.ts` **22 例通过**，其中 `accepts the relay envelope (preamble and markers) around the report` 用的是**字面量**、不 import 常量——删常量后它照旧通过，也照旧钉着「信封被容忍」。**`CONFIRMED`** |
+| 提交与改动面 | `git show --numstat --format= c5f40b7` | `docs/ARCHITECTURE.md` 5/0；`src/answer.ts` 0/14；`src/memory/recorder.ts` 0/22；`lib/answer.js` 0/11、`lib/answer.d.ts` 0/11、`lib/memory/recorder.js` 0/18、`lib/memory/recorder.d.ts` 0/13 与四个 `.map` 各 1/1。**只有这三处源文件与 `lib/` 的对应产物。`CONFIRMED`** |
+| 定向测试（六个 spec） | `TMPDIR=$PWD/.tmp npx vitest run test/carryover.spec.ts test/memory-archive.spec.ts test/captain-memory.spec.ts test/experience-pack.spec.ts test/null-collapse.spec.ts test/engine-contract.spec.ts` | **EXIT=0**：`Test Files 6 passed (6)` / **`Tests 120 passed (120)`**。`test/memory.spec.ts` 并不存在，真实文件名是 `memory-archive.spec.ts` 与 `captain-memory.spec.ts`，两个都跑了；`engine-contract`（导出面守卫）**15 例**通过——删掉的导出没有任何地方还 import。**`CONFIRMED`** |
+| lint 与构建 | `npx oxlint src test`；`npm run verify:lib` | **`Found 15 warnings and 0 errors.`**（177 文件 / 96 规则，与基线同数）；**`lib/ at c5f40b7 is the build of src/ at c5f40b7 (281 files, byte-identical)`**；`client bundle: 329354 bytes → lib/client.js`——`lib/client.js` **字节数未变**（本轮不碰客户端）。**`CONFIRMED`** |
+| 队列上限：那个 `4` 没有出处 | `grep -rn "maxQueuedMessages" src/ test/ README.md README.zh-CN.md`（改前） | 代码里只有 `src/config.ts:10` 的 `HARD_LIMITS.maxQueuedMessages = 8`（**零读者**——键已在 `src/config.ts:471` 的 `REMOVED_CONFIG_KEYS` 里，clamp 永不发生）与 `:471` 的移除键名单本身；两个 README 写着 `maxQueuedMessages=4`，而 `4` 的出处（旧常量）已被删——**全仓没有代码出处**。**`CONFIRMED`** |
+| 真实存在的上限 | `src/steering.ts:24-32`、`src/replan.ts:29-37` | 一个 run 待处理的插入需求由 `STEERING_LIMITS.maxQueued` 封顶，它等于 `REPLAN_LIMITS.maxIntents` = **8**；**内部常量、不可配置**。这就是两个 README 现在写的那件事。**`CONFIRMED`** |
+| 两个 README 怎么改的（EN + ZH 同步） | `git diff README.md README.zh-CN.md` | 固定值清单：`maxQueuedMessages=4`, → **`maxQueuedMessages` removed (the queue cap is an internal constant, not a key),**（ZH：`maxQueuedMessages` 已删除（队列上限是内部常量，不是键））；正文那句「每个 agent 的等待队列由 `maxQueuedMessages` 封顶」→「一个 run 能给它边界规划器排队的插入需求，上限固化在插件内部（`STEERING_LIMITS.maxQueued` = `REPLAN_LIMITS.maxIntents` = 8）——没有对应的配置键」。**不把 8 写成用户可配的值。`CONFIRMED`** |
+| 整段删掉会被守卫抓住（本轮实测） | `TMPDIR=$PWD/.tmp npx vitest run test/docs-config-keys.spec.ts`（中途一次） | 第一次把 `maxQueuedMessages=4` 整段删掉后：`FAIL … names every removed key` /
+     `AssertionError: README.md never mentions the removed key maxQueuedMessages: expected false to be true`。守卫要的是**这个键存在过、现在不接受**这句话，
+     所以正确改法是**删数字、留键名**。改后该文件 13 例全过。**`CONFIRMED`** |
+| 升级须知写进 `CHANGELOG.md` | `git diff CHANGELOG.md` | `## [Unreleased]` 下新增 `### Upgrade note / 升级须知`（在 `### Fixed / 修复` 之后），中英双语：升级**之前**打开 `<档案目录>/cordis.patch.yml`，找到 `grok-workflow` 那一行，
+     把它下面写着 `mode:` 的那一行**整行删掉**、保存、再升级；原因（键在 0.13.35 随旧前台删除，留着会让那一行拒绝激活、工作流从界面消失，**记录与数据不丢**）；
+     并写明「没有 `mode:` 这一行就什么都不用做」与「我们**没有**替你改过任何档案」。**`CONFIRMED`** |
+| 六个文档守卫 | `TMPDIR=$PWD/.tmp npx vitest run test/docs-version.spec.ts test/docs-config-keys.spec.ts test/i18n-parity.spec.ts test/docs-architecture-version.spec.ts test/update-entry.spec.ts test/update-surface.spec.ts` | **EXIT=0**：`Test Files 6 passed (6)` / **`Tests 79 passed (79)`**（`update-entry` 20、`update-surface` 29、`docs-config-keys` 13、`docs-version` 8、`i18n-parity` 6、`docs-architecture-version` 3）。**`CONFIRMED`** |
+| 零读者残留（下一轮决定） | `src/config.ts:10` | `HARD_LIMITS.maxQueuedMessages = 8` **没有任何读者**（键已移除，clamp 永不发生）。本轮**刻意不动**：这是代码改动，与本轮「只改文档 + 删零读者导出」的边界不同批；记为 `HANDOFF.md` 的下一步。**`NOT_RUN`（有意跳过）** |
+| live 档案那一行 | —— | **`NOT_RUN`（有意不碰）**：`~/.dsh` 一行未读未写；`mode:` 那一行由操作者亲手删，本轮只在 `CHANGELOG.md` 里写清步骤。 |
+| 模型回合 / 真机 soak | —— | **`NOT_RUN`**：本轮不涉及运行时行为（删的是零读者导出、改的是文档与两个 README 的措辞），真机与全量门禁由包工头跑。 |
+
+**这一轮动了什么：** `src/answer.ts`（删三个 marker 导出）、`src/memory/recorder.ts`（删 `archiveRoundNow`）、`lib/` 对应产物
+（`npm run build`）、`docs/ARCHITECTURE.md`（一条载体 bullet）、`README.md` / `README.zh-CN.md`（队列上限那两处，EN/ZH 同步）、
+`CHANGELOG.md`（`### Upgrade note / 升级须知`）、`docs/knowledge/DECISIONS.md`（**`D-151`**）、本文件、`STATE.md`、`HANDOFF.md`。
+
+**Honest boundary（逐条）：**
+1. **全量门禁不是这一轮跑的**：`npm run ci` 由包工头跑；本轮自己跑的是六个定向 spec（120 例）与六个文档守卫（79 例），`verify:lib` 也在自己这边跑过（读数如上）。
+2. **`verify:lib` 那个老坑仍在**：本 worktree 的 `node_modules` 只有 vitest 缓存，脚本把**本 worktree 的** `node_modules` 软链进临时目录，
+   于是报找不到 `typescript`；解法是临时软链主检出、跑完还原（未动任何被跟踪文件）。
+3. **`maxQueuedMessages` 的零读者常量 `HARD_LIMITS.maxQueuedMessages = 8` 没有删**：见上表对应行的理由。
+4. **`docs/knowledge` 仍不受任何测试守卫**：改记忆不会让测试变红。
+
 ## 打字 `/grok on|off` 之后已挂载的开关自己刷新（`fix/switch-refresh`）— 2026-11-25 (`CONFIRMED`)
 
 下面每一行都写清命令、环境与结果；没跑的写 `NOT_RUN`，被环境挡住的写 `BLOCKED`。分支 `fix/switch-refresh`（worktree

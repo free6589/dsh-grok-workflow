@@ -4045,3 +4045,50 @@ spine 为空，pre-fix 形状会进脊柱。
     与 `apply` 同一个门，不是测试专用 prop）。
   - 判据可复用：**修一个「显示落后」的缺陷，先问「两边共享的事实是什么」**——这一轮的答案是会话日志本身；找到它，就不用新开一条通道。
     另外：**「事件驱动」不等于「每条事件都读」**，否则只是换了个名字的轮询。
+
+## D-151 · 四个零引用导出按拍板删掉：先补协议载体再删常量；队列上限改成写现状（2026-11-25，未发版）
+
+- **Status:** `CONFIRMED`（`c5f40b7`，`git show --numstat` 只有 `src/answer.ts` 0/14、`src/memory/recorder.ts` 0/22、
+  `docs/ARCHITECTURE.md` 5/0 与 `lib/` 里对应的 `.js`/`.d.ts`/`.map`；定向六个 spec → 6 files / **120** 例通过；
+  `npx oxlint src test` → **15 warnings / 0 errors**；`lib/ at c5f40b7 is the build of src/ at c5f40b7 (281 files, byte-identical)`；
+  `lib/client.js` 仍 **329354 字节**未变。逐行读数在 `VALIDATION.md` 同日条）
+- **Date:** 2026-11-25
+- **Context:** 0.13.35 删掉旧前台那一档之后，仓库里留了一批「还有定义、没有读者」的符号。`D-148` 立的规矩是「量的机制被删了，
+  测试就删掉，不重新指向一个长得像的帮手」，并留了一个待决定的问题：**一个导出如果曾经是 API，删除还是保留？** 这一轮操作者拍板：**删**。
+  四个符号分两类：
+  1. `src/answer.ts` 的 `REPORT_BEGIN` / `REPORT_END` / `LEDGER_GUARD`——报告信封的两个 marker 与台账起始行。`src/` 里除定义那三行之外
+     **没有任何引用**（`grep -rn "REPORT_BEGIN\|REPORT_END\|LEDGER_GUARD" src/` 只剩定义）。但它们是**协议词汇**，不是普通常量：
+     一旦删掉，仓库里就没有任何地方说明「这个信封是什么、还算不算协议」。
+  2. `src/memory/recorder.ts` 的 `archiveRoundNow`——「自己拥有一份结果、没有事件流可看的调用方」用的即时归档入口，那个调用方就是旧前台；
+     旧前台没了，它也就没有调用者。**这是死代码，不是协议。**
+- **Decision:**
+  1. **先补载体，再删常量。** 三个 marker 的载体是 `docs/ARCHITECTURE.md` 的「Report view」一节新增的一条 bullet：
+     **信封是历史词汇、当前没有生产者**；`parseReportRound` 只按分节签名读；信封的**容忍性**由 `test/carryover.spec.ts` 那条
+     字面量用例钉着（它不 import 常量，删常量后照旧通过、照旧钉着这件事）。补完载体再删，删代码就不会把这套词汇的定义一起抹掉。
+  2. **`archiveRoundNow` 直接删，不补载体。** 它没有对外含义，删了就是删了；连带它自己的 JSDoc（共 22 行）。
+  3. **有读者的一律不动**：`RELAY_SOURCE_KIND`（`src/carryover.ts:189`、`src/run.ts:1290`）、`createMemoryArchiver`
+     （`src/run.ts:43` 与三个测试文件）、`RoundArchiveInput`（`MemoryArchiver.round()` 的签名）、`ArchiveRecorderOptions`
+     （`createMemoryArchiver` 的签名）、`roundArchiveEvidence`（`src/run.ts:1659`）。
+  4. **同一条上下文里的队列数字一并订正（用户点名的另一件）**：两个 README 的固定值清单里写着 `maxQueuedMessages=4`，而 `4` 的出处
+     （旧常量）已经被删——**全仓没有代码出处**，而这个键本身早就在 `REMOVED_CONFIG_KEYS` 里（存了值会被当未知键拒绝）。
+     改法是**删数字、保留键名并写明「已删除」**，README 正文那句「每个 agent 的等待队列由 `maxQueuedMessages` 封顶」改成写现状：
+     一个 run 待处理的插入需求由**内部固定上限**封顶（`STEERING_LIMITS.maxQueued` = `REPLAN_LIMITS.maxIntents` = **8**），**不是可配项**。
+- **Alternatives considered / rejected:**
+  - **保留三个 marker，只加注释说明「历史词汇」。** 否决（操作者拍板）：零读者的导出在 `D-148` 之后就是负债；而且注释留在一个没人 import 的
+    文件角落里，比留在 `docs/ARCHITECTURE.md` 少一个读者。**载体放在文档里，代码里就不需要留墓碑。**
+  - **三个 marker 也直接删、不补载体。** 否决：它们是**协议词汇**，不是普通常量。删掉之后「信封被容忍」这件事就只剩一条测试用例可查，
+     `docs/ARCHITECTURE.md` 再不写一句，读者会以为解析器认 marker。**先补载体再删**这条是本条与「顺手清干净」的分界线。
+  - **`archiveRoundNow` 也补一句载体。** 否决：它没有对外含义，也没有协议语义，补载体只会给死代码留一个永久的地址。
+  - **为了 `maxQueuedMessages=4` 去改 `src/config.ts` 的 `HARD_LIMITS.maxQueuedMessages = 8`（零读者）。** 否决（本轮不做）：那是代码改动，
+    与本轮「只改文档」的边界冲突，而且删一个零读者常量要连带核 `HARD_LIMITS` 的其他读者与 `test/config.spec.ts` 的守卫。**记为下一轮的待决定项**
+    （见 `HANDOFF.md` 的下一步）。另外把 `8` 写成「用户可配的值」也是错的——它是内部常量，不可配置。
+  - **把 README 里 `maxQueuedMessages` 的提及整段删掉。** 否决（本轮实测撞到）：`test/docs-config-keys.spec.ts` 有一条守卫要求**每个
+    `REMOVED_CONFIG_KEYS` 里的键都在两个 README 里被提到**，删掉提及会让 `README.md never mentions the removed key maxQueuedMessages` 变红。
+    正确改法是**删数字、留键名、写明它是已删除的键**——守卫要的正是「这个键存在过、现在不接受了」这句话。
+- **Consequences:**
+  - `src/` + `test/` 里 `REPORT_BEGIN` / `REPORT_END` / `LEDGER_GUARD` / `archiveRoundNow` **0 命中**；`RELAY_SOURCE_KIND` 与
+    `createMemoryArchiver` 等读者仍在，行为零变化（`parseReportRound`、`carryover` 的分节解析、`run.ts` 的归档路径一行未改）。
+  - 两个 README 里不再有 `maxQueuedMessages=4` 这个没有出处的数字；读者能看到的是**真实存在的上限**（内部 8）与「不可配置」。
+  - `test/docs-config-keys.spec.ts` 的那条守卫**再次证明自己有用**：它抓到了「整段删掉」这个看起来更干净、实际是删掉事实的改法。
+  - 判据可复用：**删一个零读者符号之前，先问「它是协议还是实现」**——协议词汇要在文档里有载体才能删，实现细节删了就删了；
+    以及**文档里的数字必须有代码出处**，没有出处就删数字、留事实。

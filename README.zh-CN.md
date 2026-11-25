@@ -112,7 +112,7 @@ DSH 启动后，直接提问即可：
 - **没有任何监听器决定一条用户消息**（M3.3）。`agent/pre-step` 上只有窄心跳监听（只对带 Loop 标记的 `source.kind === 'schedule'` 投递动手）和接单台的观测（在决策之后记录一次心跳）。其它一切——打字的一轮、回答的问题卡、webhook、子代理提示词、空批——都原样交给模型。
 - 答案在**同一轮内**到达。`0.10.0` 只剩 `in-turn` 一种投递方式——它是唯一能在一次性进程中存活的策略，原来的 `relay`、`append` 已删除。
 - 插件不会启动的运行会**明确拒绝**并给出原因（`grok_workflow` 调用的目标超过 32,000 字符）。被拒绝的只是运行，不是**消息**。
-- 每次运行的路由换人记录在会话日志里（`recordRouting`）；每个 agent 的等待队列由 `maxQueuedMessages` 封顶。
+- 每次运行的路由换人记录在会话日志里（`recordRouting`）；一个 run 能给它边界规划器排队的插入需求，上限固化在插件内部（`STEERING_LIMITS.maxQueued`，就是 `REPLAN_LIMITS.maxIntents` 那个 8）——没有对应的配置键。
 - 想只留那两个常驻工具、完全不要接单台，就把 `blockIntake` 设为 `false`；窄心跳监听两种情况下都在，因为它是心跳唯一的裁决者。
 
 ### 目标长度上限
@@ -223,7 +223,7 @@ DSH 启动后，直接提问即可：
 
 四个 `loop*` 键配置续跑面。会话的循环打开时，续跑服务读取 `loopMaxRounds`、`loopFailStreak`、`loopIntervalMin`，写进一条持久 Schedule 规则；Host 没有装配 Schedule 服务时，这些键只是存下来，一条消息仍然只跑一次。`loopEnabled` 是自动驱动的部署默认值，目前还没被读取——打开循环始终是用户自己的显式动作（见[自动接着跑](#自动接着跑循环心跳)）。`loopIntervalMin` 是等待，不是预算：它只能把循环的下限抬高；`loopFailStreak` 会写进心跳文案当提示，因为 Host 记录的是投递，不是单轮成败。
 
-其余一律固化在插件内部、不再接受：`maxRetries=1`、`maxActiveRuns=2`（每会话） / `maxActiveRunsTotal=8`（每进程）、`historyTurns=20` / `historyChars=20000`、`maxQueuedMessages=4`、`recordLimit=256`、`answerStrategy=in-turn`、`triageClassifier=rules`、`triageAsk`、`triageModel` 未设、`triageFollowupAsFast`、`instantReceipt`、`humanSummary`、`showDiagnostics=false`、`recordRuns`、`showProgress`、`switchOn` 已删除（按内置备用策略生效，存了值会被当未知键拒绝）、`subagentProvider` 未设；消息闸门本身也没了：`enforceGate`/`gateRequired`/`gateScope`/`gatePreset` 更早那轮就删了，M3.3 又把最后两个路由键 `mode` 与 `legacyGate` 连同它们配置的前台一起删掉。
+其余一律固化在插件内部、不再接受：`maxRetries=1`、`maxActiveRuns=2`（每会话） / `maxActiveRunsTotal=8`（每进程）、`historyTurns=20` / `historyChars=20000`、`maxQueuedMessages` 已删除（队列上限是内部常量，不是键）、`recordLimit=256`、`answerStrategy=in-turn`、`triageClassifier=rules`、`triageAsk`、`triageModel` 未设、`triageFollowupAsFast`、`instantReceipt`、`humanSummary`、`showDiagnostics=false`、`recordRuns`、`showProgress`、`switchOn` 已删除（按内置备用策略生效，存了值会被当未知键拒绝）、`subagentProvider` 未设；消息闸门本身也没了：`enforceGate`/`gateRequired`/`gateScope`/`gatePreset` 更早那轮就删了，M3.3 又把最后两个路由键 `mode` 与 `legacyGate` 连同它们配置的前台一起删掉。
 
 **从 ≤0.9.4 迁移：** 把这些键从补丁里删掉。还带着它们会被当未知键拒绝，而被删的值没有替代项——按上面的固定值生效。
 

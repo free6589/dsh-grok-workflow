@@ -1,3 +1,34 @@
+## 2026-11-25 — 这一支装了两批：开关刷新修复 + 四个死导出删除，附带队列数字订正与升级须知（`fix/switch-refresh`，未发版）
+
+- **From:** 记忆收口（`agent-154/switch-refresh-worker`）· **To:** 操作者 / 下一个接手者
+- **这一支是什么**：分支 `fix/switch-refresh`（worktree `.tmp/wt-switch-refresh`），基线 `main` 尖端 **`84efda0`**。**完整提交清单（八条，最后一条是本轮文档提交）**：
+  `8b32e5e`（开关刷新：`src/client/index.js` 143、`lib/client.js` 143、`test/client.spec.ts` 230/1）、`ded1df6`（lint 快照写法，test 3/1）、
+  `266006b`（第一轮记忆 + 证据）、`144a9a1`（第 7 条用例：面后到，test 38/0）、`3366248`（证据补会话日志）、`07b91d3`（门禁读数对齐尖端 `3366248` / 1839 例）、
+  `c5f40b7`（删四个零引用导出 + `docs/ARCHITECTURE.md` 载体一句）、以及本轮
+  `docs(queue-limit): state the queue bound that exists, and flag the removed key before upgrading`。**未 push、未发版、未合 `main`**，`package.json` 仍是 **`0.13.35`**。
+- **这一支现在同时装了两件事（外加两处文档订正）**：
+  1. **开关刷新修复（`D-150`）**：打字 `/grok on|off` 之后，已挂载的开关自己读一次并重画（+0.5 秒，真机验过），不刷新、不点击、不轮询。
+  2. **四个零引用导出删掉（`D-151`）**：`REPORT_BEGIN` / `REPORT_END` / `LEDGER_GUARD`（协议词汇，先在 `docs/ARCHITECTURE.md` 补载体再删）与
+     `archiveRoundNow`（死代码，直接删）。有读者的 `RELAY_SOURCE_KIND`、`createMemoryArchiver`、`RoundArchiveInput`、`ArchiveRecorderOptions`、
+     `roundArchiveEvidence` 未动。行为零变化。
+  3. **队列数字订正**：两个 README 里的 `maxQueuedMessages=4` 没有代码出处，改成「该键已删除」+「真实上限是内部常量 8，不可配置」。
+  4. **升级须知**：`CHANGELOG.md` 新增 `### Upgrade note / 升级须知`，写清升级前删掉档案里那行 `mode:`（否则插件那行拒绝激活、工作流消失，数据不丢）。
+- **下一步（按顺序）**：
+  1. **下一轮可做：`HARD_LIMITS.maxQueuedMessages`（`src/config.ts:10` = 8）这个零读者残留的去留。** 键早在 `REMOVED_CONFIG_KEYS` 里，
+     clamp 永不发生，所以它现在只是一个数字；删它要连带核 `HARD_LIMITS` 的其他读者与 `test/config.spec.ts` 的守卫，属于一次代码改动，本轮刻意没做。
+  2. **发版时把 `[Unreleased]` 收进版本段**（照 `AGENTS.md` §7 五步）：`[Unreleased]` 下现在有 `### Fixed / 修复`、`### Upgrade note / 升级须知`、
+     以及更早的 `### Changed / 变更`、`### Removed / 移除` 四条。**升级须知必须保留**——它是这一版唯一一条「不做就会看起来像坏了」的操作。
+  3. **发版后的自动升级要停一手**：live 档案里那行 `mode:` 由操作者亲手删（本轮只在 `CHANGELOG.md` 写了步骤，**没有、也不会**去碰 `~/.dsh`）。
+- **三件会踩的事**：
+  1. **README 里删「已移除的键」必须留键名**：`test/docs-config-keys.spec.ts` 有一条守卫要求每个 `REMOVED_CONFIG_KEYS` 里的键都在两个 README 里被提到。
+     本轮第一次把 `maxQueuedMessages=4` 整段删掉就被它抓红（`README.md never mentions the removed key maxQueuedMessages`）——正确改法是**删数字、留键名、写明已删除**。
+  2. **删一个零读者符号之前先问「它是协议还是实现」**：协议词汇要在 `docs/` 里有载体才能删（`D-151` 的做法），实现细节删了就删了。反过来，
+     「协议另有载体」不等于「代码里可以留着墓碑」。
+  3. **`.tmp/` 的 worktree 里 `node_modules` 若是空目录，`npm run ci` 会在 `verify:lib` 阶段报找不到 `typescript`**；解法是临时把 worktree 的
+     `node_modules` 软链到主检出（跑完还原）。另外 `verify:lib` **只验提交、不验工作树**。
+- **一条要如实说的话**：本轮的代码改动（删四个导出）**没有真机 soak**——删的是零读者符号，运行行为不变，`engine-contract` 15 例就是导出面守卫；
+  全量门禁由包工头跑。
+
 ## 2026-11-25 — 打字 `/grok off` 之后已挂载的开关会自己刷新了（`fix/switch-refresh`，未发版）：下一步是评审「订阅 vs 回填」这条判据，以及那条冷加载残留要不要抠掉
 
 - **From:** 记忆收口（`agent-154/switch-refresh-worker`）· **To:** 操作者 / 下一个接手者
