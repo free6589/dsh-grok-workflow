@@ -183,7 +183,7 @@ DSH 启动后，直接提问即可：
 
 ## 配置参考
 
-配置写在 profile 的 `cordis.patch.yml`（或 `--patch` 覆盖层）里，位于 bundle 行下。`0.11.0` 起配置面为九个（新增 `timeoutMs`），现在为十九个（新增单次调用预算 `childTimeoutMs`、限流换人开关、四个 `loop*` 续跑键、两个 `iterate*` 自迭代键、守卫判停单路由 `guardianModel` 与默认打开的接单台开关 `blockIntake`）；其它键在载入时直接被拒绝——旧补丁会明确报错，而不是变成"设了也不生效"。M3.3 之前负责路由用户消息的两个键 `mode` 与 `legacyGate` 已移除：补丁里还带着它们会直接报 `removed configuration key`：
+配置写在 profile 的 `cordis.patch.yml`（或 `--patch` 覆盖层）里，位于 bundle 行下。`0.11.0` 起配置面为九个（新增 `timeoutMs`），现在为十九个（新增单次调用预算 `childTimeoutMs`、限流换人开关、四个 `loop*` 续跑键、两个 `iterate*` 自迭代键、守卫判停单路由 `guardianModel` 与默认打开的接单台开关 `blockIntake`）；本构建从来不认识的键在载入时直接被拒绝——拼错的键会明确报错，而不是变成"设了也不生效"。M3.3 之前负责路由用户消息的两个键 `mode` 与 `legacyGate` 已移除：补丁里还带着它们照样能载入，那一行会被忽略，载入日志与设置页都会点名是哪个键，方便你知道删哪一行。只有本构建从来不认识的键（拼错了）才会被拒绝，并给出建议：
 
 ```yaml
 - id: grok-workflow
@@ -223,9 +223,9 @@ DSH 启动后，直接提问即可：
 
 四个 `loop*` 键配置续跑面。会话的循环打开时，续跑服务读取 `loopMaxRounds`、`loopFailStreak`、`loopIntervalMin`，写进一条持久 Schedule 规则；Host 没有装配 Schedule 服务时，这些键只是存下来，一条消息仍然只跑一次。`loopEnabled` 是自动驱动的部署默认值，目前还没被读取——打开循环始终是用户自己的显式动作（见[自动接着跑](#自动接着跑循环心跳)）。`loopIntervalMin` 是等待，不是预算：它只能把循环的下限抬高；`loopFailStreak` 会写进心跳文案当提示，因为 Host 记录的是投递，不是单轮成败。
 
-其余一律固化在插件内部、不再接受：`maxRetries=1`、`maxActiveRuns=2`（每会话） / `maxActiveRunsTotal=8`（每进程）、`historyTurns=20` / `historyChars=20000`、`maxQueuedMessages` 已删除（队列上限是内部常量，不是键）、`recordLimit=256`、`answerStrategy=in-turn`、`triageClassifier=rules`、`triageAsk`、`triageModel` 未设、`triageFollowupAsFast`、`instantReceipt`、`humanSummary`、`showDiagnostics=false`、`recordRuns`、`showProgress`、`switchOn` 已删除（按内置备用策略生效，存了值会被当未知键拒绝）、`subagentProvider` 未设；消息闸门本身也没了：`enforceGate`/`gateRequired`/`gateScope`/`gatePreset` 更早那轮就删了，M3.3 又把最后两个路由键 `mode` 与 `legacyGate` 连同它们配置的前台一起删掉。
+其余一律固化在插件内部、不再接受：`maxRetries=1`、`maxActiveRuns=2`（每会话） / `maxActiveRunsTotal=8`（每进程）、`historyTurns=20` / `historyChars=20000`、`maxQueuedMessages` 已删除（队列上限是内部常量，不是键）、`recordLimit=256`、`answerStrategy=in-turn`、`triageClassifier=rules`、`triageAsk`、`triageModel` 未设、`triageFollowupAsFast`、`instantReceipt`、`humanSummary`、`showDiagnostics=false`、`recordRuns`、`showProgress`、`switchOn` 已删除（按内置备用策略生效，存了值会被忽略，并在载入日志里点名一次）、`subagentProvider` 未设；消息闸门本身也没了：`enforceGate`/`gateRequired`/`gateScope`/`gatePreset` 更早那轮就删了，M3.3 又把最后两个路由键 `mode` 与 `legacyGate` 连同它们配置的前台一起删掉。
 
-**从 ≤0.9.4 迁移：** 把这些键从补丁里删掉。还带着它们会被当未知键拒绝，而被删的值没有替代项——按上面的固定值生效。
+**从 ≤0.9.4 迁移：** 方便时把这些键从补丁里删掉。在删掉之前，还带着它们的补丁照样正常载入：残留的值什么都不做，载入日志与设置页会点名是哪个键。升级前不需要先删任何东西。被删的值没有替代项——按上面的固定值生效。
 
 键表下面还有两层按同样规则受检（自 **0.12.10** 起）：本构建不路由的角色名（如 `roles.reviewer`）与路由对象没有的字段（如把 `maxInFlight` 写成 `maxInflight`）都会带完整路径被拒绝。在这之前，这两层被丢掉的键会让补丁看着配好了，运行却当它不存在。
 
@@ -312,7 +312,7 @@ dsh plugin --profile grok-workflow-dev remove dsh-grok-workflow
 - **工具没出现：** 重启 profile，并确认它包含工作流引擎与子代理 provider。
 - **想把接单台的工具有关掉：** 把 `blockIntake` 设为 `false`。窄心跳监听两种情况下都在，它是心跳唯一的裁决者。
 - **消息被拒绝而不是被回答：** 原因会被打印（消息为空，或目标超过 32,000 字符）。没有执行任何工作，也不会自动重试。
-- **某个键在载入时被拒绝：** 错误信息会给出最接近的合法键。静默忽略是有意不提供的。
+- **某个键在载入时被拒绝：** 错误信息会给出最接近的合法键——拼错的键不能变成「设了也不生效」。静默忽略是有意不提供的。唯一的例外是本版本已经删掉的键：它会被忽略，而载入日志和设置页会点名是哪一行，所以不会有「一声不响地忽略」。
 - **DSH 版本不同：** 包声明的是 `engines.dsh: ">=0.2.1-rc.2 <0.3.0"`，bundle 是否载入由这个区间决定。DSH 评估该区间时**包含预发布版本**（正因如此 `0.2.2-rc.3` 才装得上）：`0.2.x` 的预发布版被接受，`0.3.0` 及以后被拒绝——但 `0.3.0` 的**预发布**版仍满足 `<0.3.0`，因此仍会载入。行为在 `0.2.1-rc.2` 上验证；在 `0.2.2-rc.3` 上该 bundle 可安装、能激活（行不再是 `pending`）并对外提供设置命名空间。
 - **想了解设计：** 见[架构说明](docs/ARCHITECTURE.md)、[设计知识库](docs/knowledge/WORKFLOW-DESIGN.md)与[验收清单](docs/ACCEPTANCE.md)。
 - **发现 Bug：** [提交 Issue](https://github.com/free6589/dsh-grok-workflow/issues)。

@@ -1,0 +1,53 @@
+{
+ "namespaces_total": 24,
+ "grok_workflow": {
+  "ns": "grok-workflow",
+  "autoGenerate": true,
+  "applies": "live",
+  "revision": 0,
+  "user_keys": [
+   "grokDefault",
+   "maxConcurrency",
+   "timeoutMs",
+   "loopEnabled",
+   "loopMaxRounds",
+   "loopFailStreak",
+   "roles",
+   "guardianModel"
+  ],
+  "value_keys": [
+   "grokDefault",
+   "maxConcurrency",
+   "maxTasks",
+   "timeoutMs",
+   "childTimeoutMs",
+   "replan",
+   "switchOnRateLimit",
+   "loopEnabled",
+   "loopMaxRounds",
+   "loopFailStreak",
+   "loopIntervalMin",
+   "iterateIntervalMin",
+   "iterateTemplate",
+   "roles",
+   "guardianModel",
+   "synthesis"
+  ],
+  "user_has_mode": false,
+  "value_has_mode": false,
+  "roles_worker": [
+   {
+    "provider": "agent2api",
+    "model": "deepseek-v4.1-flash"
+   },
+   {
+    "provider": "agent2api",
+    "model": "glm-5.3-flash"
+   }
+  ],
+  "guardianModel": {
+   "provider": "agent2api",
+   "model": "deepseek-v4.1-flash"
+  }
+ }
+}

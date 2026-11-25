@@ -150,9 +150,12 @@ export type SynthesisMode = 'deterministic' | 'model'
 /**
  * Plugin configuration (also the DSH Schemastery schema shape).
  *
- * The settings page exposes 16 keys. Every other former
- * key is rejected as an unknown key (R-06) and takes effect as a fixed
- * internal value (see FIXED_* in `src/config.ts`).
+ * The settings page exposes 16 keys. A **removed** key (the 25 in
+ * `REMOVED_CONFIG_KEYS`) is ignored and named once at load (D-155): the row activates,
+ * the stored value takes effect as the fixed internal value it always did (see FIXED_*
+ * in `src/config.ts`), and the load log plus the settings page say which line to delete.
+ * Only a key this build never knew — a misspelling — is rejected as an unknown key
+ * (R-06), with a closest-key suggestion.
  */
 export interface GrokWorkflowConfig {
   /** Model-facing tool name. */

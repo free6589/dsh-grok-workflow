@@ -6,11 +6,12 @@ import { CONFIG_KEYS, DEFAULT_TIMEOUT_MS, FIXED_HISTORY_CHARS, FIXED_HISTORY_TUR
 /**
  * Configuration-surface docs guard (RSI round 3).
  *
- * `src/config.ts` rejects a patch that carries a key it no longer accepts, naming the
- * key. If the READMEs never mention a removed key, the person holding an old patch has
- * no way to learn why the row stopped loading — that was true for `triageModel` and
- * `maxActiveRunsTotal`, both rejected and both undocumented. This spec makes the two
- * lists in the code the contract for what both READMEs must document.
+ * `src/config.ts` carries two lists: the keys it accepts, and the keys it removed. A
+ * removed key is no longer fatal (D-155) but it is still ignored, which is only
+ * actionable if the reader is told — the READMEs are where a patch holder learns both
+ * what the surface is and which old lines do nothing. This spec makes the two lists in
+ * the code the contract for what both READMEs must document, and pins the *behaviour*
+ * it documents: removed keys ignored and named, unknown keys refused with a suggestion.
  */
 
 const readme = (name: string) => readFileSync(new URL(`../${name}`, import.meta.url), 'utf8')
@@ -31,7 +32,7 @@ describe('README documents exactly the configuration surface the code accepts', 
     }
   })
 
-  it('names every removed key', () => {
+  it('names every removed key, and says they are ignored rather than fatal', () => {
     for (const [name, text] of Object.entries(readmes)) {
       for (const key of REMOVED_CONFIG_KEYS) {
         expect(
@@ -39,6 +40,12 @@ describe('README documents exactly the configuration surface the code accepts', 
           `${name} never mentions the removed key ${key}`,
         ).toBe(true)
       }
+      // The behaviour the list is about, stated in the file's own language (D-155).
+      const ignored = name === 'README.zh-CN.md' ? '忽略' : 'ignored'
+      expect(text, `${name} does not say a removed key is ignored`).toContain(ignored)
+      // ...and the old promise is gone: no README may still tell a reader that these
+      // keys refuse the row, because that is the sentence that cost a workflow.
+      expect(text, `${name} still promises a rejection for a removed key`).not.toContain('removed configuration key')
     }
   })
 

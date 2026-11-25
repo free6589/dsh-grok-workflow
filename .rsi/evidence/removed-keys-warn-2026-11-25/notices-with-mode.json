@@ -1,0 +1,1 @@
+{"ok":true,"notices":[{"key":"mode","message":"configuration key \"mode\" was removed in an earlier release: its stored value is ignored, and the rest of the row loads normally (delete that line when convenient). 已忽略已删除的配置键 \"mode\"：存的值不生效，这一行其余配置照常载入，方便时可把那一行删掉"}]}

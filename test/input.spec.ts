@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { HARD_LIMITS, resolveConfig, FIXED_MAX_RETRIES} from '../src/config.js'
+import { HARD_LIMITS, resolveConfig, FIXED_MAX_RETRIES, removedKeyWarning, takeRemovedKeys } from '../src/config.js'
 import { normalizeCallerTasks, TASK_LIMITS } from '../src/input.js'
 
 describe('caller task validation', () => {
@@ -155,8 +155,12 @@ describe('configuration limits', () => {
 
   it('rejects values above the hard cap', () => {
     expect(() => resolveConfig({ maxConcurrency: HARD_LIMITS.maxConcurrency + 1 })).toThrow(/maxConcurrency/)
-    // T4: maxRetries is fixed at 1 and not configurable; a stored value is removed (R-06).
-    expect(() => resolveConfig({ maxRetries: 2 } as never)).toThrow(/removed configuration key "maxRetries"/)
+    // T4: maxRetries is fixed at 1 and not configurable; the key is removed, so a stored
+    // value is ignored rather than fatal (D-155) and the load names it once.
+    expect(resolveConfig({ maxRetries: 2 } as never).maxRetries).toBe(FIXED_MAX_RETRIES)
+    expect(takeRemovedKeys()).toEqual(['maxRetries'])
+    expect(takeRemovedKeys()).toEqual([])
+    expect(removedKeyWarning('maxRetries')).toContain('maxRetries')
     expect(resolveConfig({} as never).maxRetries).toBe(FIXED_MAX_RETRIES)
     expect(() => resolveConfig({ maxTasks: HARD_LIMITS.maxTasks + 1 })).toThrow(/maxTasks/)
     expect(() => resolveConfig({ toolName: 'Bad Name' })).toThrow(/toolName/)

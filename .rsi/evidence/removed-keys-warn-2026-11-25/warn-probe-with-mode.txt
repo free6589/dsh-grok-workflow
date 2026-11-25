@@ -1,0 +1,15 @@
+config keys the host would hand over: mode, grokDefault, maxConcurrency, timeoutMs, loopEnabled, loopMaxRounds, loopFailStreak, roles, guardianModel
+
+[warn lines naming a removed key]
+configuration key "mode" was removed in an earlier release: its stored value is ignored, and the rest of the row loads normally (delete that line when convenient). 已忽略已删除的配置键 "mode"：存的值不生效，这一行其余配置照常载入，方便时可把那一行删掉
+
+count: 1
+tool registered: true
+
+after two more reads, warn lines naming a removed key: 1
+
+[every warn line]
+- configuration key "mode" was removed in an earlier release: its stored value is ignored, and the rest of the row loads normally (delete that
+- settings surface: none in this runtime (no settings service); configure through the profile patch
+- roles.worker has 2 routes but every maxInFlight is blank (= unlimited = never yields); only a capped route yields when full inside one workf
+- model routes were not validated: this runtime exposes no llm service

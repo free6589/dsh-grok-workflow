@@ -447,8 +447,12 @@ export const ROUTE_KEYS = ['provider', 'model', 'maxInFlight'] as const
 const GUARDIAN_MODEL_KEYS = ['provider', 'model'] as const
 
 /**
- * Every key this build no longer accepts; a patch that still carries one is rejected
- * (R-06).
+ * Every key this build no longer accepts. A patch that still carries one is *ignored*
+ * and told so (D-155), not refused: the value never reaches the resolved config, the
+ * load log names the key once, and the settings page names it again.
+ *
+ * Only removed keys are ignored. Unknown keys and misspellings still fail the load with
+ * a did-you-mean suggestion (R-06), so a typo cannot become a setting that does nothing.
  *
  * The first twenty-three went with the T4 slim-down; `mode` and `legacyGate` went with
  * M3.3, which deleted the old front desk and the routing mode it read.
@@ -482,6 +486,44 @@ export const REMOVED_CONFIG_KEYS = [
 ] as const
 
 const TOOL_NAME = /^[a-z][a-z0-9_]{1,40}$/
+
+/**
+ * Removed keys a patch still carried, waiting for the load path to announce them (D-155).
+ *
+ * A `Set`, so a document that carries the same leftover twice — or a config the host
+ * re-parses on every settings read — leaves one note per key. Recorded rather than
+ * logged for the same reason as {@link recordedOverruns}: the check runs inside
+ * `resolveConfig`, which the host calls before `apply()` and which has no logger, and a
+ * read happens per message, so logging here would repeat the line forever.
+ */
+const recordedRemovedKeys = new Set<string>()
+
+/**
+ * Drain the removed keys recorded since the last call.
+ *
+ * The caller announces each one once; nothing is announced twice by this module.
+ * @returns The distinct leftover keys, in the order the check first met them.
+ */
+export function takeRemovedKeys(): string[] {
+  const out = [...recordedRemovedKeys]
+  recordedRemovedKeys.clear()
+  return out
+}
+
+/**
+ * The one sentence that names a leftover removed key, in both shipped languages.
+ *
+ * It has to say three things a reader holding an old patch needs: which key, that it was
+ * removed, and that the value is now doing nothing — "ignored" alone would read as "it
+ * still works, quietly".
+ * @param key - the removed key the patch still carries.
+ * @returns the warning line the plugin logs.
+ */
+export function removedKeyWarning(key: string): string {
+  return `configuration key "${key}" was removed in an earlier release: its stored value is ignored, ` +
+    `and the rest of the row loads normally (delete that line when convenient). ` +
+    `已忽略已删除的配置键 "${key}"：存的值不生效，这一行其余配置照常载入，方便时可把那一行删掉`
+}
 
 /** One stored limit the schema had to clamp, as the parse saw it. */
 export interface LimitOverrun {
@@ -742,6 +784,11 @@ function closestKey(key: string, accepted: readonly string[]): string | undefine
  * `config.roles?.planner`, which on a string, an array or `null` is `undefined` for every
  * role — five empty chains, a successful load, and no route configured at all. Absent
  * (`undefined`) stays legal; it is the documented "inherit the run's route".
+ *
+ * A key in {@link REMOVED_CONFIG_KEYS} is not a failure (D-155): it is recorded for the
+ * load path to announce and then ignored, because the person holding it did nothing
+ * wrong except keep a line the plugin deleted, and refusing the row took the workflow
+ * away from them. Everything else at every level still throws.
  * @param config - raw user configuration.
  * @throws If a key at any level is not part of the configuration surface, or if `roles`
  *   is present and is not an object.
@@ -752,10 +799,8 @@ export function assertKnownKeys(config: Record<string, unknown>): void {
   for (const key of Object.keys(config)) {
     if (known.has(key)) continue
     if (removed.has(key)) {
-      throw new Error(
-        `removed configuration key "${key}": it was removed in an earlier release and is no longer accepted; ` +
-        `delete it from your patch`,
-      )
+      recordedRemovedKeys.add(key)
+      continue
     }
     const suggestion = closestKey(key, CONFIG_KEYS)
     throw new Error(

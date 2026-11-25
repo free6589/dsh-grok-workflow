@@ -1,7 +1,7 @@
 import { createServer } from 'node:http'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_CHILD_TIMEOUT_MS, DEFAULT_ITERATE_INTERVAL_MIN, DEFAULT_ITERATE_TEMPLATE, DEFAULT_LOOP_FAIL_STREAK, DEFAULT_LOOP_INTERVAL_MIN, DEFAULT_LOOP_MAX_ROUNDS, DEFAULT_MAX_CONCURRENCY, DEFAULT_MAX_TASKS, DEFAULT_REPLAN, DEFAULT_TIMEOUT_MS, HARD_LIMITS } from '../src/config.js'
+import { DEFAULT_CHILD_TIMEOUT_MS, DEFAULT_ITERATE_INTERVAL_MIN, DEFAULT_ITERATE_TEMPLATE, DEFAULT_LOOP_FAIL_STREAK, DEFAULT_LOOP_INTERVAL_MIN, DEFAULT_LOOP_MAX_ROUNDS, DEFAULT_MAX_CONCURRENCY, DEFAULT_MAX_TASKS, DEFAULT_REPLAN, DEFAULT_TIMEOUT_MS, HARD_LIMITS, REMOVED_CONFIG_KEYS } from '../src/config.js'
 import { ITERATE_ROUTE_PATH, ITERATE_TASK_TITLE, LOOP_ROUTE_PATH, LOOP_TASK_TITLE, LOOP_TOOL_NAME, createLoopService, loopPolicyFromConfig } from '../src/loop.js'
 import { createLoopTool, dispatchIterateAction, handleLoopRoute } from '../src/loop-surface.js'
 import { synthesisDraftLabel } from '../src/naming.js'
@@ -36,6 +36,7 @@ interface Bundle {
   GROK_WORKFLOW_SWITCHABLE_CLASSES: string[]
   GROK_WORKFLOW_GROUPS: string[]
   GROK_WORKFLOW_LOCALES: string[]
+  GROK_WORKFLOW_REMOVED_KEYS: string[]
   GROK_WORKFLOW_CHAIN_LIMIT: number
   GROK_WORKFLOW_ROUTE_INFLIGHT_MIN: number
   GROK_WORKFLOW_ROUTE_INFLIGHT_MAX: number
@@ -425,6 +426,15 @@ describe('client settings page bundle', () => {
     expect(ROLE_ORDER).toEqual({ planner: 1, worker: 2, verifier: 3, supervisor: 4, synthesizer: 5 })
   })
 
+  it('carries exactly the removed-key list the config module enforces (D-155)', () => {
+    // The page cannot import `src/config.ts` (it is a browser bundle the host serves
+    // verbatim), so it ships a copy. The copy is only safe while it stays a copy: both
+    // directions are asserted, so a key removed in code cannot go unnamed on the page and
+    // a key the page names cannot outlive its removal.
+    expect([...bundle.GROK_WORKFLOW_REMOVED_KEYS].sort()).toEqual([...REMOVED_CONFIG_KEYS].sort())
+    expect(bundle.GROK_WORKFLOW_REMOVED_KEYS).toHaveLength(REMOVED_CONFIG_KEYS.length)
+  })
+
   it('ships lib/client.js byte-identical to the source (no stale bundle)', () => {
     const source = readFileSync(new URL('../src/client/index.js', import.meta.url), 'utf8')
     const built = readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8')
@@ -451,6 +461,63 @@ describe('client settings page: bilingual copy (t42)', () => {
     const zhKeys = Object.keys(bundle.GROK_WORKFLOW_DICT['zh']!).sort()
     const enKeys = Object.keys(bundle.GROK_WORKFLOW_DICT['en']!).sort()
     expect(zhKeys).toEqual(enKeys)
+  })
+
+  it('reads the notice route into the keys this build names, in both languages (D-155)', () => {
+    // The page half of the load warning: the reader is told which line to delete, in the
+    // language the page is in. The list comes from the plugin's own route (the settings
+    // document cannot carry it — `projectForm` only walks the schema), and the sentence is
+    // composed on this side so a language switch re-renders it.
+    const { parseConfigNotices } = bundle.GROK_WORKFLOW_INTERNALS as unknown as {
+      parseConfigNotices(payload?: unknown): string[]
+    }
+    expect(parseConfigNotices({ ok: true, notices: [{ key: 'mode', message: 'x' }, { key: 'legacyGate', message: 'y' }] }))
+      .toEqual(['mode', 'legacyGate'])
+    // An empty list is "nothing to say", not an error.
+    expect(parseConfigNotices({ ok: true, notices: [] })).toEqual([])
+    // A key this build does not list as removed is dropped: the page decides what it names.
+    expect(parseConfigNotices({ ok: true, notices: [{ key: 'maxTasks' }, { key: 'mode' }] })).toEqual(['mode'])
+    // Malformed answers degrade to silence instead of throwing on a settings page.
+    expect(parseConfigNotices(undefined)).toEqual([])
+    expect(parseConfigNotices('nope')).toEqual([])
+    expect(parseConfigNotices({ ok: false, notices: [{ key: 'mode' }] })).toEqual([])
+    expect(parseConfigNotices({ ok: true, notices: 'mode' })).toEqual([])
+    for (const locale of bundle.GROK_WORKFLOW_LOCALES) {
+      const dict = bundle.GROK_WORKFLOW_DICT[locale]!
+      expect(dict['warn.removed.title']!.length, locale).toBeGreaterThan(3)
+      expect(dict['warn.removed.detail']!.length, locale).toBeGreaterThan(3)
+    }
+    const sentence = (locale: string): string =>
+      bundle.GROK_WORKFLOW_INTERNALS.translate(locale, 'warn.removed.detail', { key: 'mode' })
+    expect(sentence('en')).not.toBe('warn.removed.detail')
+    expect(sentence('en')).toContain('mode')
+    expect(sentence('zh')).not.toBe('warn.removed.detail')
+    expect(sentence('zh')).toContain('mode')
+    expect(sentence('en')).not.toBe(sentence('zh'))
+  })
+
+  it('fetches the notice route once, and stays silent when the Host has no answer (D-155)', async () => {
+    const { refreshConfigNotices, configNotices, CONFIG_NOTICES_ROUTE_PATH } = bundle.GROK_WORKFLOW_INTERNALS as unknown as {
+      refreshConfigNotices(fetchImpl?: unknown): Promise<string[]>
+      configNotices: { set(next: string[]): void, getSnapshot(): string[] }
+      CONFIG_NOTICES_ROUTE_PATH: string
+    }
+    const calls: string[] = []
+    const answering = async (url: string): Promise<unknown> => {
+      calls.push(url)
+      return { status: 200, json: async () => ({ ok: true, notices: [{ key: 'mode', message: 'ignored' }] }) }
+    }
+    configNotices.set([])
+    expect(await refreshConfigNotices(answering)).toEqual(['mode'])
+    expect(calls).toHaveLength(1)
+    expect(calls[0]).toContain(CONFIG_NOTICES_ROUTE_PATH)
+    // A transport failure is "no notice", not a page error: the list empties, nothing throws.
+    expect(await refreshConfigNotices(async () => { throw new Error('socket closed') })).toEqual([])
+    expect(configNotices.getSnapshot()).toEqual([])
+    // A 404 (an older Host with no such route) reads the same way.
+    expect(await refreshConfigNotices(async () => ({ status: 404, json: async () => ({}) }))).toEqual([])
+    // A page with no fetch at all degrades instead of throwing.
+    expect(await refreshConfigNotices(undefined)).toEqual([])
   })
 
   it('translates every key the page derives from data (fields, roles, groups)', () => {

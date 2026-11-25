@@ -5,6 +5,39 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Changed / 变更
+
+- **An old key left in your profile no longer switches the workflow off / 档案里留着旧键，不再把工作流关掉** —
+  Upgrading used to have one nasty edge: if your profile still carried a line the plugin had deleted (`mode: triage` was the
+  common one), the plugin refused to activate that row, and the workflow simply disappeared from the interface. It now loads
+  normally. The leftover line is ignored — it changes nothing — and you are told which one it was, once in the load log and
+  again as a short notice on the plugin's settings page (a yellow line right under the upgrade card, naming the key: delete it
+  whenever you feel like it, or leave it, it does nothing either way). A line the plugin never knew, such as a misspelling, is
+  still refused with a suggested correct spelling, because that kind of mistake would otherwise look like a setting that does
+  nothing. See D-155.
+  / 以前升级有一个坑：如果你的档案里还留着插件已经删掉的一行（最常见是 `mode: triage`），插件会拒绝激活那一行，工作流就从界面上
+  消失了。现在会正常载入：残留的那一行被忽略、什么都不改，同时会告诉你它是哪一个——载入日志里说一次，插件设置页上也提示一次
+  （升级卡片下面一条黄色提示，点名是哪个键；想删就随手删掉，不删也行，它什么都不做）。插件从来不认识的行（比如拼错了）还是会被拒绝，
+  并给出正确的写法，因为那种错误不拦下来，就会变成一个「设了也不生效」的开关。见 D-155。
+- **Allowed and removed keys are now two different things, in the docs and in the code / 文档和代码里，「接受的键」和「删掉的键」终于分开了** —
+  Both READMEs, the architecture note and the upgrade note used to describe a leftover removed key as "rejected as an unknown
+  key"; that sentence is gone, because it is no longer true. The behaviour now documented is the behaviour that runs: ignored,
+  named, and safe to delete.
+  / 两个 README、架构说明和升级须知以前都把残留的旧键说成「被当未知键拒绝」；这句话已经删掉，因为它不再成立。现在写的就是实际
+  行为：忽略、点名、随手可删。
+
+### Upgrade note / 升级须知
+
+- **Nothing to prepare this time — upgrade whenever you like / 这次升级前不用准备任何东西，想升就升** —
+  If your profile's patch file still carries a `mode:` line or a `legacyGate:` line under the `grok-workflow` entry, that is now
+  fine: the row activates normally, both lines are ignored, and the plugin names each leftover key once in its load log and
+  once in a short yellow notice on its settings page (Settings → Workflow), so you know exactly which line to delete. Delete it when convenient, or don't — nothing breaks and
+  nothing is lost either way. (Before this version those two leftovers refused the row, which is why the previous note asked you
+  to delete them first.) If neither line is present, there is nothing to do either.
+  / 如果你的档案补丁文件里，`grok-workflow` 那一行下面还写着 `mode:` 或 `legacyGate:`，现在没关系了：这一行会正常激活，两行都被
+  忽略，插件会在载入日志里说一次、在设置页（设置 → Workflow）上一条黄色提示里点名是哪一行，所以你知道该删哪个。方便时删掉就行，不删也可以——不会坏，
+  也不会丢东西。（在这个版本之前，这两行会让那一行拒绝激活，所以上一条升级须知才让你先删掉。）如果这两行本来就没有，同样什么都不用做。
+
 ## [0.13.37] - 2026-11-25
 
 ### Fixed / 修复

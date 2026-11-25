@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Session, pluginRecordOf } from '@deepseek-ai/dsh-session'
-import { FIXED_ANSWER_STRATEGY, FIXED_MAX_RETRIES, HARD_LIMITS, resolveConfig } from '../src/config.js'
+import { FIXED_ANSWER_STRATEGY, FIXED_MAX_RETRIES, HARD_LIMITS, removedKeyWarning, resolveConfig, takeRemovedKeys } from '../src/config.js'
 import { ROUTING_RECORD, recordRouting } from '../src/records.js'
 import { redactDeep } from '../src/redact.js'
 import { assertWorkflowReport } from '../src/report.js'
@@ -99,8 +99,13 @@ describe('per-role routing configuration', () => {
     // closes, which loses a relayed/apped answer (G-18/F9). `in-turn` is the only
     // behaviour now; the removed values are removed keys (R-06).
     expect(FIXED_ANSWER_STRATEGY).toBe('in-turn')
-    expect(() => resolveConfig({ answerStrategy: 'relay' } as never)).toThrow(/removed configuration key/)
-    expect(() => resolveConfig({ answerStrategy: 'append' } as never)).toThrow(/removed configuration key/)
+    // D-155: `answerStrategy` is a removed key, so a patch that still writes one of the
+    // deleted values loads with the fixed strategy and gets told which key was ignored.
+    takeRemovedKeys()
+    expect(resolveConfig({ answerStrategy: 'relay' } as never)).toBeDefined()
+    expect(resolveConfig({ answerStrategy: 'append' } as never)).toBeDefined()
+    expect(takeRemovedKeys()).toEqual(['answerStrategy'])
+    expect(removedKeyWarning('answerStrategy')).toContain('answerStrategy')
   })
 
   it('derives the child cap from the effective chains, not from attempts alone', () => {

@@ -1,7 +1,7 @@
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { describe, expect, it } from 'vitest'
 import { inheritanceForSession } from '../src/carryover.js'
-import { DEFAULT_MAX_CONCURRENCY, FIXED_MAX_RETRIES, HARD_LIMITS, resolveConfig } from '../src/config.js'
+import { DEFAULT_MAX_CONCURRENCY, FIXED_MAX_RETRIES, HARD_LIMITS, removedKeyWarning, resolveConfig, takeRemovedKeys } from '../src/config.js'
 import { renderReport } from '../src/report.js'
 import { buildWorkflowRequest, WORKFLOW_SCRIPT } from '../src/script.js'
 import { execution, failingVerification, verification } from './fixtures.js'
@@ -188,10 +188,14 @@ describe('A6: the documented concurrency and retry envelope has not been widened
     expect(() => resolveConfig({ maxConcurrency: HARD_LIMITS.maxConcurrency + 1 })).toThrow(/between 1 and 100/)
   })
 
-  it('refuses a caller-supplied retry count: retries are not a configuration key at all', () => {
-    // Fixed at 1 (`FIXED_MAX_RETRIES`), so there is no key to widen: the loader
-    // rejects the name outright instead of silently ignoring a wider value.
-    expect(() => resolveConfig({ maxRetries: 5 } as never)).toThrow(/removed configuration key "maxRetries"/)
+  it('ignores a caller-supplied retry count instead of widening it (D-155)', () => {
+    // Fixed at 1 (`FIXED_MAX_RETRIES`), so there is no key to widen. `maxRetries` is a
+    // removed key now: the stored number is ignored — the run still gets one retry — and
+    // the load log names the key so nobody thinks the wider value took effect.
+    takeRemovedKeys()
+    expect(resolveConfig({ maxRetries: 5 } as never).maxRetries).toBe(FIXED_MAX_RETRIES)
+    expect(takeRemovedKeys()).toEqual(['maxRetries'])
+    expect(removedKeyWarning('maxRetries')).toContain('maxRetries')
   })
 
   it('clamps an over-limit script payload to 100 / 3 rather than trusting it', async () => {

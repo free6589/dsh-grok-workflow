@@ -1,4 +1,7 @@
-Last updated: 2026-11-25 16:35 +08:00（**`0.13.37` 已经发出去了：两次本地门禁都 `EXIT=0`（`Test Files 98 passed (98)` / `Tests 1849 passed (1849)`、`Found 15 warnings and 0 errors.`、`client bundle: 333611 bytes → lib/client.js`），`main` 用 `--ff-only` 前进到发布提交 **`34236f0`**、附注标签 **`v0.13.37`** 剥出的正是它，远端 Release 工作流 run **`45577666102`** 与 `main` 上的 CI run **`45577662548`** 都是 success，GitHub Release 已发布、唯一资产 `dsh-grok-workflow-0.13.37.tgz` **947407 字节**；**唯一没做的是本机 live 档案升级**——档案第 563 行还留着被删掉的 `mode: triage`（没有 `legacyGate`），先删再升，否则 `grok-workflow` 那一行拒绝激活、工作流从界面消失，所以这一条记 **`BLOCKED`（等操作者动手），不是失败**；版本 `0.13.37`** —
+Last updated: 2026-11-25 18:12 +08:00（**`fix-removed-keys-warn` 分支上，`D-155` 把「被删键」从拒载改成忽略 + 点名：25 个键不再让整行不激活，载入日志点名一次、`resolveConfig` 不留任何值，未知键/拼错/非法值/越界数字照旧拒载；门禁 `EXIT=0`（`100 files / 1870 tests`、`15 warnings / 0 errors`、`client bundle: 340426 bytes`、`lib/ … (285 files, byte-identical)`）；隔离真机证明**档案留着 `mode: triage` 也照常激活**（`did not activate` 0 行、`describe` 24 个命名空间含 `grok-workflow`、`autoGenerate: true`），对照删掉那一行警告消失；**未合 main、未 push、未打 tag、未发版，版本仍 `0.13.37`**；设置页那条提示**本轮已可见**：新增插件自己的只读路由 `src/config-notices-surface.ts`（`GET /grok-workflow/config-notices`，清单读 per-load `Set`、只读不排空），页面挂载时读一次、非空渲染、失败静默；因为宿主 `describe` 的 `user` 层按 schema 投影，被删键根本不在其中——扫 `entry.user` 那版已废弃）— 
+
+（以下为上一轮 **0.13.37 发布收口** 的记录，原样保留。）
+
 分支 **`release/0.13.37`**（worktree `.tmp/wt-release-0.13.37`），从 `main` 尖端 **`d34214b`** 开出。**合流提交 `5c58afd`**
 `merge: a session with no mode record no longer shows the switch as on`：真 `--no-ff` 合并，父提交 **`d34214b` + `9d234c2`**
 （`fix/switch-default-state` 尖端），**零冲突**——特性分支严格领先于 `main`。身份证明：合并树 **`50d7eca335b182d548b8a8bdab02d3ba10dd4e00`**

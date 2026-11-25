@@ -3,7 +3,8 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
 import { DEFAULT_ITERATE_TEMPLATE, FIXED_HISTORY_CHARS, FIXED_HISTORY_TURNS, FIXED_UNLOAD_DRAIN_MS,
   FIXED_UNLOAD_DRAIN_QUIET_MS, FIXED_UNLOAD_DRAIN_STEP_MS, MAX_TIMER_DELAY_MS, createConfigReader, describeResolvedConfig,
-  limitOverrunWarning, repairLimitOverruns, repairSynthesisInconsistency, resolveConfig, snapshotConfig, takeLimitOverruns } from './config.js'
+  limitOverrunWarning, removedKeyWarning, repairLimitOverruns, repairSynthesisInconsistency, resolveConfig, snapshotConfig,
+  takeLimitOverruns, takeRemovedKeys } from './config.js'
 import { describeSurface, validateRoutes } from './settings.js'
 import { carryoverBounds, carryoverForSession } from './carryover.js'
 import { registerGrokCommand } from './command.js'
@@ -16,6 +17,8 @@ import { installLoop } from './loop-surface.js'
 import type { LoopHostContext } from './loop-surface.js'
 import { installModeRoute } from './mode-surface.js'
 import type { ModeHostContext } from './mode-surface.js'
+import { installConfigNoticesRoute } from './config-notices-surface.js'
+import type { ConfigNoticesHostContext } from './config-notices-surface.js'
 import { installShutdownProbe } from './records.js'
 import { normalizeCallerTasks, GrokWorkflowInputError, TASK_LIMITS } from './input.js'
 import { renderReport } from './report.js'
@@ -84,11 +87,28 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
       logger.warn(limitOverrunWarning(overrun))
     }
   }
+  // D-155: a patch that still carries a removed key (`mode`, `legacyGate`, …) loads, and
+  // its leftovers are named once instead of taking the row down with them. Same shape as
+  // the overruns above and for the same reason: the check runs inside `resolveConfig`,
+  // which the host may reach before `apply()` and which has no logger, and a read happens
+  // per message — so the buffer records, this drains, and the set keeps one line per key.
+  const announcedRemovedKeys = new Set<string>()
+  const announceRemovedKeys = (): void => {
+    for (const key of takeRemovedKeys()) {
+      if (announcedRemovedKeys.has(key)) continue
+      announcedRemovedKeys.add(key)
+      logger.warn(removedKeyWarning(key))
+    }
+  }
   let configSignature = ''
   const readConfig = (): ResolvedConfig => {
     announceOverruns()
     try {
       const next = reader.read()
+      // The leftover keys are recorded *by* this read (the check runs inside
+      // `resolveConfig`), so this drain sits after it, unlike the overruns' which the
+      // schema clamp fills before `apply()` is ever called.
+      announceRemovedKeys()
       const signature = describeResolvedConfig(next)
       if (signature !== configSignature) {
         configSignature = signature
@@ -112,6 +132,10 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
       // before any warning is emitted, otherwise the non-repairable error stays a
       // hard fail and no "repaired" line is ever logged for a config that cannot run.
       const fixed = resolveConfig(limits.repaired)
+      // `limits.repaired` still carries the leftover removed keys, so this resolve
+      // recorded them again: announce them here as well, or a config that needed a
+      // repair would keep its leftover note until some later read.
+      announceRemovedKeys()
       if (synthesis.warnings.length > 0) fixed.synthesisRepaired = true
       for (const warning of synthesis.warnings) logger.warn(warning)
       // The limit half is announced through the same set as the schema clamp (B04):
@@ -393,6 +417,17 @@ export function apply(ctx: Context, rawConfig: GrokWorkflowConfig = {}): void {
   // (`POST /grok-workflow/mode`) instead of a second store. `status` reports the
   // live `grokDefault` fallback, which is what a session with no record reads — the
   // default is stated once, never copied into the button.
+  // D-155, page half: the settings page cannot read a removed key out of
+  // `settings/describe` — the Host projects `user` through the namespace's schema, and a
+  // removed key is by definition not in it. So the list travels over the plugin's own
+  // read-only route, read off the same per-load set the load log drains (reading, never
+  // draining: the warning must still be announced once, whatever the page does).
+  installConfigNoticesRoute({
+    ctx: ctx as unknown as ConfigNoticesHostContext,
+    leftovers: () => [...announcedRemovedKeys],
+    logger,
+  })
+
   installModeRoute({
     ctx: ctx as unknown as ModeHostContext,
     fallback: () => {

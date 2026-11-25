@@ -1,3 +1,27 @@
+## 2026-11-25 — `fix-removed-keys-warn`：被删键改成「忽略 + 点名」（`D-155`），真机激活成立、设置页提示在这台宿主上不可见
+
+- **From:** 实现者（`agent-167/impl-removed-keys`）· **To:** 包工头（`agent-167`）/ 下一个接手者
+- **这一轮是什么**：特性轮。分支 `fix-removed-keys-warn`（worktree `.agents/worktrees/fix-removed-keys-warn`），基线 `main` 尖端 `c3d729f`。
+  产品改动：`REMOVED_CONFIG_KEYS` 的 25 个键不再拒载整行，改为**忽略 + 点名**（载入日志一次 + 设置页一条提示）；
+  未知键、拼错（did-you-mean）、`roles.<未知名>`、`roles.<role>[i].<错字段>`、`guardianModel.<错字段>`、非法值、越界数字**一个字都没放宽**。
+  决定与两条被否决的备选（继续拒载 / 静默丢弃）见 `DECISIONS.md` 的 `D-155`。
+- **门禁**：`TMPDIR=$PWD/.tmp npm run ci` → **EXIT=0**：`99 files / 1862 tests`（基线 98 / 1849，+1 文件 +13 例）、
+  `Found 15 warnings and 0 errors.`、`lib/ at c3d729f … (281 files, byte-identical)`、`client bundle: 333611 → 338664 bytes`。
+- **真机（隔离克隆 `.tmp/soak-removed-keys/dsh-home`，profile `web-clone`，端口 3331，`npm pack` 安装，读回 `0.13.37`）**：
+  ① 档案里**本来就带着** `mode: triage`（`cordis.patch.yml:563`，来自 live），这一行**照常激活**（`did not activate` 0 行、
+  `describe` 24 个命名空间含 `grok-workflow`、`autoGenerate: true`）；② 用安装件的 `apply()` 记录到警告原文并点名 `"mode"`、
+  两次重读仍只有 1 行；④ 对照删掉那一行后警告消失、激活照旧。证据 `.rsi/evidence/removed-keys-warn-2026-11-25/`。
+- **设置页那条提示：本轮已加、已可见。** 机制是插件自己的只读路由
+  （`src/config-notices-surface.ts`，`GET /grok-workflow/config-notices`，答 `{ok:true,notices:[{key,message}]}`），
+  挂载照 `src/mode-surface.ts`（`inject(['webServer','connection'])` + `webServer.register({kind:'exact'})` +
+  注册包在 `child.effect` 里 + 没有 `webServer` 时 `warn` 一句不炸）；清单读 `apply()` 的 per-load `Set`，**只读不排空**，
+  日志侧去重不动。页面挂载时读一次，非空渲染 `data-warn="removed"`，空/失败静默降级。真机读数：路由原文含 `"mode"`、
+  设置页提示可见（`.rsi/evidence/removed-keys-warn-2026-11-25/settings-page-with-notice.png`）、对照删掉 `mode:` 行后
+  `notices: []` 且页面无提示。**为什么不是扫 `entry.user`**：宿主 `projectForm` 只投影 schema 键，被删键不在其中（见 `D-155`）。
+- **`NOT_RUN`**：真实模型回合 / 端到端工作流（本轮改的是载入期配置校验与一条只读提示，真机样本只需激活 + 警告 + 提示 + 对照，不写成跑过）。
+- **红线**：live `~/.dsh` 未写、3080 未碰（本会话沙箱本身把 `~/.dsh` 挂只读，两次不带 `DSH_HOME` 的 `dsh --help` 被 `EROFS` 挡下）；
+  未合 main、未 push、未打 tag、未发版，`package.json` 仍 `0.13.37`。
+
 ## 2026-11-25 — `0.13.37` 已发布：两次门禁跑绿、标签与 GitHub Release 都在，live 档案升级按 `BLOCKED` 交给操作者
 
 - **From:** 记忆收口（`agent-165/memory-closeout`）· **To:** 操作者 / 下一个接手者
