@@ -34,12 +34,31 @@ interface ProgressMember {
   outcome?: string
 }
 
+/** One liveness intervention the Guardian recorded (a fact about the run, not a verdict). */
+interface ProgressGuardianFinding {
+  seq: number
+  label: string
+  signal: 'timeout' | 'heartbeat-loss'
+  action: 'rescue' | 'observe' | 'cancel-run'
+  reason: string
+  atMs?: number
+}
+
 interface ProgressRun {
   runId: string
   name: string
   anchorSeq: number
   members: ProgressMember[]
   stopReason?: string
+  /** Present only when the stream recorded a `guardian-start` for this run. */
+  guardian?: {
+    started: boolean
+    armed: boolean
+    budgetMs: number
+    ended: boolean
+    cancelled: boolean
+    findings: ProgressGuardianFinding[]
+  }
 }
 
 type Translator = (key: string, params?: Record<string, unknown>) => string
@@ -73,6 +92,56 @@ function loadBundle(): Bundle {
       return typeof type === 'function' ? (type as (value: Record<string, unknown>) => unknown)(element.props) : element
     },
     useState: (initial: unknown) => [typeof initial === 'function' ? (initial as () => unknown)() : initial, () => {}],
+    useEffect: () => {},
+    useMemo: (factory: () => unknown) => factory(),
+    useRef: (initial: unknown) => ({ current: initial === undefined ? null : initial }),
+    useSyncExternalStore: (_subscribe: unknown, getSnapshot: () => unknown) => getSnapshot(),
+  }
+  return registration!.factory((id) => {
+    if (id === 'react') return react
+    throw new Error(`the bundle must not require ${id} at load time`)
+  })
+}
+
+/** The hook cells of the render in progress: React keeps them across a re-render. */
+let rendering: { index: number, cells: unknown[] } | undefined
+
+/**
+ * The same bundle, with a hook set that remembers a cell.
+ *
+ * {@link loadBundle} answers `useState` with a no-op setter, which is enough for a tree
+ * rendered once. The page now has two controls that open something (a task row's toggle and
+ * the history's fold), so the tree that carries the new copy only exists after a click: this
+ * loader keeps the cells, and the caller re-renders.
+ * @returns the bundle whose `useState` survives a second render.
+ */
+function loadStatefulBundle(): Bundle {
+  let registration: { id: string, factory: (require: (id: string) => unknown) => Bundle } | undefined
+  const record = globalThis as unknown as { window?: { __ModuleLoader__?: { load(spec: never): void } } | undefined }
+  const previous = record.window
+  record.window = { __ModuleLoader__: { load: (spec) => { registration = spec } } }
+  try {
+    new Function(SOURCE)()
+  } finally {
+    record.window = previous
+  }
+  expect(registration?.id).toBe('dsh-grok-workflow')
+  const react = {
+    createElement: (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]): unknown => {
+      const element: Element = { type, props: props ?? {}, children: children.flat(Infinity) as unknown[] }
+      return typeof type === 'function' ? (type as (value: Record<string, unknown>) => unknown)(element.props) : element
+    },
+    useState: (initial: unknown) => {
+      const cells = rendering
+      const value = typeof initial === 'function' ? (initial as () => unknown)() : initial
+      // Outside a render there is no cell to keep, so the hook degrades to a constant.
+      if (cells === undefined) return [value, () => {}]
+      const at = cells.index++
+      if (at >= cells.cells.length) cells.cells[at] = value
+      return [cells.cells[at], (next: unknown) => {
+        cells.cells[at] = typeof next === 'function' ? (next as (value: unknown) => unknown)(cells.cells[at]) : next
+      }]
+    },
     useEffect: () => {},
     useMemo: (factory: () => unknown) => factory(),
     useRef: (initial: unknown) => ({ current: initial === undefined ? null : initial }),
@@ -347,5 +416,110 @@ describe('progress page: the change explanation stays deleted', () => {
       .filter(([, value]) => value.trim() === '')
       .map(([key]) => key)
     expect(blank).toEqual([])
+  })
+
+  /**
+   * The two surfaces the layout change added: an opened task row, and the Guardian's blocks.
+   *
+   * A row that opens is a place to put a sentence — "these are the calls this task made",
+   * "this line is the check", "what is not shown yet" — and the Guardian's tiles are places to
+   * put a reading of the monitor's own numbers. Neither may carry one: the row shows the
+   * calls, the tiles show the facts, and the words are the state words the table already has.
+   */
+  const stateful = loadStatefulBundle()
+
+  /** A run with a recorded Guardian and one task whose two calls can be opened. */
+  function guardedRun(): ProgressRun {
+    return {
+      runId: 'r-hint-guardian',
+      name: '任务团队',
+      anchorSeq: 1,
+      members: [
+        member(1, '规划', 'completed'),
+        member(2, '任务 1 · 搭建', 'completed'),
+        member(3, '任务 1 · 搭建', 'completed', '检查'),
+      ],
+      guardian: {
+        started: true,
+        armed: true,
+        budgetMs: 240_000,
+        ended: true,
+        cancelled: false,
+        findings: [{ seq: 2, label: '执行 · 任务 1 · 搭建', signal: 'timeout', action: 'rescue', reason: '子任务心跳停了', atMs: 60_000 }],
+      },
+    }
+  }
+
+  /** The tab again, with hook cells that survive the click that opens a task row. */
+  function clickablePage(run: ProgressRun): () => unknown {
+    const cells: unknown[] = []
+    const props = {
+      t,
+      progressT: t,
+      useGrokProgress: (select: (value: unknown) => unknown) => select({ runs: [run], activeRun: run }),
+    }
+    return () => {
+      const before = rendering
+      const local = { index: 0, cells }
+      rendering = local
+      try {
+        return stateful.GROK_WORKFLOW_PROGRESS.component(props)
+      } finally {
+        rendering = before
+      }
+    }
+  }
+
+  it('leaves it off an opened task row and the Guardian’s blocks', () => {
+    const render = clickablePage(guardedRun())
+    const toggles = walk(render()).filter((element) => element.props['data-gw-progress-plan-toggle'] === true)
+    expect(toggles, 'no task row can be opened').toHaveLength(1)
+    ;(toggles[0]!.props['onClick'] as () => void)()
+    const tree = render()
+
+    // The copy under test only exists once the tree really opened, so the two surfaces are
+    // asserted present before they are asserted clean: an empty screen would pass silently.
+    expect(walk(tree).filter((element) => Object.prototype.hasOwnProperty.call(element.props, 'data-gw-progress-task-detail'))).toHaveLength(1)
+    expect(walk(tree).filter((element) => element.props['data-gw-progress-guardian-block'] === 'findings')).toHaveLength(1)
+
+    expect([...visible(tree), ...spoken(tree)].filter((text) => forms(text).length > 0)).toEqual([])
+
+    // Neither may the new copy arrive as a veil: hidden text is shipped text.
+    const hidden = walk(tree).filter((element) => {
+      const style = element.props['style'] as Record<string, unknown> | undefined
+      if (style === undefined || style === null) return false
+      const veiled = style['display'] === 'none' || style['visibility'] === 'hidden' || style['opacity'] === 0 || style['opacity'] === '0'
+      return veiled && words(element).length > 0
+    })
+    expect(hidden).toEqual([])
+    const muzzled = walk(tree).filter((element) => element.props['aria-hidden'] === 'true' && words(element).length > 0)
+    expect(muzzled).toEqual([])
+  })
+
+  it('keeps the three new words free of every form', () => {
+    // The dictionary walk above reads every value of all four tables, so the three keys are
+    // already covered the moment they exist. This test names them, so the coverage is a
+    // stated fact and not an accident of that loop.
+    const keys = ['progress.task.detail', 'progress.log.more', 'progress.log.less']
+    for (const locale of ['zh', 'en']) {
+      const dict = bundle.GROK_WORKFLOW_DICT[locale]!
+      for (const key of keys) {
+        const value = dict[key]
+        expect(value, `${locale} ${key} is missing`).toBeTypeOf('string')
+        expect(value!.trim(), `${locale} ${key} is blank`).not.toBe('')
+        expect(forms(value!), `${locale} ${key} → ${value}`).toEqual([])
+      }
+    }
+    // And the whole progress namespace stays clean of the family, which is the half of the
+    // page a reader is most likely to be told a story about.
+    const offenders: string[] = []
+    for (const locale of ['zh', 'en']) {
+      for (const [key, value] of Object.entries(bundle.GROK_WORKFLOW_DICT[locale]!)) {
+        if (!key.startsWith('progress.')) continue
+        const matched = forms(value)
+        if (matched.length > 0) offenders.push(`${locale} ${key}: ${matched.join(', ')} → ${value}`)
+      }
+    }
+    expect(offenders).toEqual([])
   })
 })
