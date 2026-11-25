@@ -624,7 +624,7 @@ existing file stays readable — and it is never written again.
   would race, and a multi-writer deployment needs the task board's lock rather than a second
   one invented here.
 - It does not run the work. `grok_accept_block` returns the split, the write scope and the
-  plan id; dispatching a foreman or a workflow script is the caller's step, and the ledger
+  plan id; sending a block to a dispatcher or to a workflow script is the caller's step, and the ledger
   records only the ids it was handed.
 - It does not project onto the settings page. `blockIntake` is read at load time because both
   halves are registrations (six tools and one listener), and a registration cannot appear

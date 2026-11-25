@@ -1,7 +1,7 @@
 /**
  * The block intake's one listener: a narrow observer on `agent/pre-step`.
  *
- * Why it exists: a block's work continues across turns (a foreman dispatches it, a
+ * Why it exists: a block's work continues across turns (a dispatcher owns it, a
  * workflow runs it, a later turn closes it), and the only clock the Host gives this
  * plugin is the heartbeat delivery it already schedules for a loop. A block that is
  * waiting on a heartbeat has no other way to say "the beat arrived". So the intake

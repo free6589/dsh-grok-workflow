@@ -1,3 +1,17 @@
+## 2026-11-25 — 改名收口：那个角色现在叫「调度」（`fix/rename-foreman`，已合 `main`，未发版）
+
+- **From:** 改名子代理（`agent-149`）· **To:** 下一个接手者 / 操作员
+- **这一支是什么**：分支 `fix/rename-foreman`（worktree `.tmp/wt-rename-foreman`），基线 `main` 尖端 `061693e`，只改文字。
+  版本仍 `0.13.34`，**没有发版、没有打 tag**。决定与备选记在 `DECISIONS.md` 的 `D-141`，门禁读数在 `STATE.md` 顶部。
+- **改了什么（用户会看到的字）**：块预览的执行标签从 `foreman 包工头` 变成 `foreman 调度`（与 `workflow 工作流` 同形）；
+  `grok_steer_block` / `grok_stop_block` 的两条拒绝消息、四条工具说明里的措辞；`docs/knowledge/` 五份记忆文档、
+  `docs/ARCHITECTURE.md`、`AGENTS.md` §10 的层名（Foreman layer → Dispatcher layer）；`CHANGELOG.md` 的 `[Unreleased]` 中英双语一条。
+- **三件故意没动的**：① 账本与预览里的 `execution: "foreman"` 值——它是协议的一部分，改了旧 `blocks.jsonl` 行会被判非法；
+  ② `src/dispatcher/` 模块名（任务板那一层的 L1 大管家另有其名，英文散文里用 dispatcher 指角色、`L1 dispatcher` 指它）；
+  ③ 历史证据原文（`docs/knowledge/evidence/**`、`.rsi/evidence/**`、`.tmp/ci-foreman.log` 这类路径）——证据是逐字记录。
+- **给下一个人**：若要让账本值也换掉，那是一次迁移（读时接受 `foreman` 与 `dispatcher` 两个值、写时只写新值），不是一次改名；
+  在那之前，预览那一行会一直显示 `foreman 调度`，值与中文名并列是有意为之。
+
 ## 2026-11-25 — M3.2 验收通过（`feat/m3-switch`）：下一步把 `blockIntake` 默认翻 `true`（M3.3）
 
 - **From:** 记忆收口（`agent-145/memory-writer`）· **To:** 接 M3.3 的人
@@ -105,7 +119,7 @@
   外加夹具 `test/fixtures/block-flag-baseline.json`），改了 `src/config.ts`、`src/types.ts`、`src/index.ts`、`src/settings.ts`
   与两个 README / `docs/LOCAL-TESTING.md`，`lib/**` 已重建。门禁 `TMPDIR=$PWD/.tmp npm run ci` **两次 exit 0**
   （最后一次 **`110 files / 2116 tests PASS`**、lint **`36 warnings / 0 errors`**）——那次读数的树**还没有**第六个 spec，
-  它落地之后合起来的树没有重跑全量门禁（`NOT_RUN`，由包工头补）。**未发版、未打 tag、未 push、未合 `main`**，
+  它落地之后合起来的树没有重跑全量门禁（`NOT_RUN`，由调度补）。**未发版、未打 tag、未 push、未合 `main`**，
   `package.json` 仍是 `0.13.33`。
 - **先看这三个地方，别从工具层读起**：
   1. `src/block/preview.ts`（`startBlock`，`:464-559`）——**幂等先于四道校验**：先按 `(session, splitHash)` 查账本，
@@ -236,7 +250,7 @@
      + `DECISIONS.md` D-133。这是唯一的产品改动提交，`npm run ci` 与 `verify:lib` 的结论都属于它。
   2. 其后一条**只改 docs/ 记忆的订正提交**（把记忆里被 amend 掉的中间 sha 换成 `a335388`、删掉 sha 占位写法）——
      没有动 `src/`、`test/`、`lib/`，因此不重跑全量 ci。两条都只在本分支，没 push、没合流、没 bump 版本、没打 tag。
-- **包工头复核三条（同一条提交内已改完）**：①replan 同棒补交**进**预算算式（边界项 `maxBoundaries × 2 × planner × waitFactor`，
+- **调度复核三条（同一条提交内已改完）**：①replan 同棒补交**进**预算算式（边界项 `maxBoundaries × 2 × planner × waitFactor`，
   钉子 `test/planner-resubmit.spec.ts > pays two boundary calls for every replan, because a boundary can ask twice`）
   ②一稿两行只标 `order` 最大的落地行（`test/progress-tab.spec.ts > marks only the row that landed when one draft was asked twice`、
   同形用例在 `test/client.spec.ts`）③ci 真实数字已回填、D-133 的 `规划规划（第1次）` 笔误已改、
@@ -363,7 +377,7 @@
   （版本 `0.13.32`），本轮唯一代码提交 **`141dccd`**（只含 `test/timeout.spec.ts`，+19 / −8）。主检出一行未动；代码提交与本轮这条 docs 提交
   都在该分支上、**已推 `origin/fix/timeout-probe-settle` 并开 PR #48**；**没合流、没发版**，
   `src/`、`lib/`、`scripts/`、`package.json`、`CHANGELOG.md`、版本号全部未动。
-- **远端那条红（`CONFIRMED`，引用包工头实测，不是本轮自己跑的）**：CI run **45378449742**（`main` `ca65df8`）**Node 22 绿 / Node 24 红**，
+- **远端那条红（`CONFIRMED`，引用调度实测，不是本轮自己跑的）**：CI run **45378449742**（`main` `ca65df8`）**Node 22 绿 / Node 24 红**，
   逐字 `FAIL test/timeout.spec.ts > the timer the engine realm really has > races on Atomics.waitAsync where no setTimeout exists`、
   `Error: Test timed out in 30000ms.`、`Tests 1 failed | 1909 passed (1910)`。它与 `c1ebdf3` 记的同族：等的是无计时器 realm 的结算，
   钟却是 runner 的。
@@ -391,16 +405,16 @@
   `mise exec node@22.23.4` 整文件 3/3 绿（12.80–15.67 s）；`npm run typecheck` 干净，`npm run lint` **36 warnings / 0 errors**（全既有）。
   变异实测：把 Atomics 用例的入参换成永不落地的 promise → `Error: the bare-realm Atomics wait did not settle within 15000 ms`，
   `tests 15.01s`（失败成它自己，不是 runner 的 30 s），随后按 sha256 `859d39d…` 还原。
-- **门禁（包工头实测，`CONFIRMED`）**：`npm run ci` 在 `141dccd` 上 **exit 0** —— typecheck 干净；lint **36 warnings / 0 errors**；
+- **门禁（调度实测，`CONFIRMED`）**：`npm run ci` 在 `141dccd` 上 **exit 0** —— typecheck 干净；lint **36 warnings / 0 errors**；
   `verify:lib` → `lib/ at 141dccd is the build of src/ at 141dccd (245 files, byte-identical)`；vitest **101 files / 1910 tests PASS**，**122.98 s**。
-- **远端（包工头实测，`CONFIRMED`）**：**PR #48** <https://github.com/free6589/dsh-grok-workflow/pull/48>，run **45385807284**，
+- **远端（调度实测，`CONFIRMED`）**：**PR #48** <https://github.com/free6589/dsh-grok-workflow/pull/48>，run **45385807284**，
   **Node 22 pass 2m12s / Node 24 pass 2m29s**，两段各自 `Test Files 101 passed (101)` ⇒ `main` 上那次 Node 24 红已转绿。
 - **缺口（照实写）**：① 本地修前红 `NOT_RUN`——8 种打法 0 红，所以本地只能证明「修后同口径仍绿」，不能证明「修好了抖动」，判据只能是远端矩阵；
   ② **Node 24 本机 `NOT_RUN`**（没装），它的证据只来自远端两段；③ `settledWithin` 只在循环醒来时校验预算（既有形状，本轮未动）——
   实测把兜底用例的探针预算临时改成 600 ms 仍绿（1064 ms），说明 20 ms tick 本身也会被 sleep 吞掉；这不影响「不落地就具名失败」，但别把 15 s 读成硬实时界。
 - **下一步**：合入由主代理做（本包不合不发版）；合入后若要收口这条抖动，只认远端 Node 24 的复跑结果，不要为它改断言或抬 `testTimeout`。
 
-### 分支账目（2026-11-24，包工头本轮实测）
+### 分支账目（2026-11-24，调度本轮实测）
 
 | 分支 / worktree | 实测 | 处理与依据 | 恢复方式 |
 |---|---|---|---|
@@ -630,7 +644,7 @@ worktree 只剩主树 + `.agents/worktrees/team-dispatch-v1`。
 
 ## 2026-11-24 — 0.13.30 已发：同一份报告的两个机器视图说上同一句话，门禁不再因为机器忙就红（`CONFIRMED`，CI + Release 双绿）
 
-- **From:** 发版方（包工头 agent-122 / foreman） · **To:** 下一个接手者 / 操作员
+- **From:** 发版方（调度 agent-122 / dispatcher） · **To:** 下一个接手者 / 操作员
 - **本版发了什么**（逐条原文见 `CHANGELOG.md` 的 `## [0.13.30] - 2026-11-24`，下面 ①② 在 `### Fixed / 修复`，③ 在
   `### Verification and gate / 验证与门禁`）：
   ① **对齐那一刀**——机器台账现在渲染报告自己的诊断块（死路由写明哪条路、哪类传输故障、连续几次；每次子调用的预算行；
@@ -665,7 +679,7 @@ worktree 只剩主树 + `.agents/worktrees/team-dispatch-v1`。
      连分支一起删。下一个接手者要么把脏活收进提交、要么明确丢弃，别直接 `git worktree remove --force`。
   2. **十二条已合的 `rsi/sec2-*` / `rsi/sec3-*` 分支还在，且已经过了 2026-11-24 的删除日**（§5：合了 24h 内删，留着就是垃圾）。
      另有三条未合分支仍在：`rsi/redrive-13`、`team-dispatch-v1`、`feat/audit-layer` —— 这三条按 §5 要有结论：合、rebase、还是删。
-  3. **live profile 本侧没升（`BLOCKED`）**：包工头的沙箱写不到工作区以外，`~/.dsh` 不在可写范围里。把 live profile 钉到
+  3. **live profile 本侧没升（`BLOCKED`）**：调度的沙箱写不到工作区以外，`~/.dsh` 不在可写范围里。把 live profile 钉到
      `v0.13.30` 这件事留给操作员，命令就是下面这一条；钉完要读回版本确实是 `0.13.30`，不是「今天解析到什么算什么」。
 - **要交给操作员的一条命令**：
   `dsh plugin --profile web add github:free6589/dsh-grok-workflow#v0.13.30`
@@ -757,7 +771,7 @@ worktree 只剩主树 + `.agents/worktrees/team-dispatch-v1`。
   1. **真机 soak 的坏 key 场景**：隔离 `DSH_HOME` 克隆 profile + 真端点 401/403，看报告里是不是 `model-unavailable`
      且 `no valid structured result` 出现 0 次、worker 只被派一次（不再补交）、并且 `Dead routes` 里**没有**这条路。
      同时跑一轮正常轮确认成功率不受影响。live `~/.dsh` 与线上实例不要碰。
-  2. 提交与 `lib/`：本分支**没有 commit**（按工单留给工头）；`npm run ci` 内的 build 已把工作树 `lib/` 更新到与 `src/` 对应，
+  2. 提交与 `lib/`：本分支**没有 commit**（按工单留给调度）；`npm run ci` 内的 build 已把工作树 `lib/` 更新到与 `src/` 对应，
      提交时把 `src/` 与 `lib/` 一起提。
 - **一个环境坑（留个记号）**：这个 worktree 的 `node_modules` 软链原本是悬空的（`../../../../node_modules` →
   不存在的 `/home/fish/projects_mine/node_modules`），`npx vitest` 靠 Node 向上查找照样能跑，但 `scripts/verify-lib.mjs`
@@ -766,7 +780,7 @@ worktree 只剩主树 + `.agents/worktrees/team-dispatch-v1`。
 
 ## 2026-11-24 — 判定腿同 attempt 补打（第二刀）：只交整块，真机 soak 交给合流方
 
-- **From:** 包工头 A（agent-113，两个干活子代理：机制 `/agent-113/judge-leg-mech`、预算 `/agent-113/judge-leg-budget`）
+- **From:** 调度 A（agent-113，两个干活子代理：机制 `/agent-113/judge-leg-mech`、预算 `/agent-113/judge-leg-budget`）
   · **To:** lead / 合流方
 - **分支:** `feat/leg-retry`，worktree `.agents/worktrees/feat-leg-retry`，基线 `main` `8f34701`（0.13.28）。
   共享脏树 detached `a6103ad` 一行未动；规划腿 `feat/planner-resubmit`（另一 agent）未合、未碰；本刀**没有**复制规划腿的
@@ -4443,8 +4457,8 @@ Issue #1 状态评论 issuecomment-6927842856。
   对 `v0.13.31` 的 100 文件 / 1866 测试基线是 +1 文件 / +44 测试。
 - **真机 soak（`CONFIRMED`）**：隔离 fork 的 live `web` profile + 真 Chromium，一次点击把 profile 从 0.13.30 装到
   0.13.31，回执与读盘结果都逐字存档；页面全程没有文档请求（没有 reload）。
-- **两条 lane 各自交回之后、由 foreman 追加的两处微修**（派单要求记下来；树里能核的正是这两处，**先后时序在树里不可核**）。
-  两处都是 foreman 在收到该 lane 自己的报告之后才提的，所以**两条 lane 的报告里都没有它们**：
+- **两条 lane 各自交回之后、由 dispatcher（调度）追加的两处微修**（派单要求记下来；树里能核的正是这两处，**先后时序在树里不可核**）。
+  两处都是调度在收到该 lane 自己的报告之后才提的，所以**两条 lane 的报告里都没有它们**：
   1. **微修 A（宿主，`src/update-surface.ts` 的 `installCommand()`）：复制粘贴那一行补上 `--profile <profile>`**，形状与设置页
      那张卡打印的那一行一致。缺这个 flag 时，粘下去装进的是「碰巧是默认」的那个 profile，而不是操作员正在看的那个——正是
      这张卡存在要防的那个错。`<profile>` 保持字面占位：这条路由不知道、也不许猜浏览器那头是哪个 profile 名。可核位置：
@@ -4467,7 +4481,7 @@ Issue #1 状态评论 issuecomment-6927842856。
   3. **没有请求发版**：`package.json` 与客户端版本常量仍是 `0.13.31`，`[Unreleased]` 里这条是给下一次发版用的。
   4. **分支判定日期 2026-11-26**：合流即删（按 §5，合完 24 h 内）；不合就删分支。`feat/*` 不许长期挂着。
 - **边界（不要读成更强的结论）**：soak 的起点版本是按手摆的（manifest 改成 0.13.30）；开发构建自己的 `latest` 相在浏览器里
-  看不见（装完页面上的卡是新构建的），那一段只由单元用例覆盖；`.tmp/soak-update/` 保留给 foreman 清理，本轮没有删它、
+  看不见（装完页面上的卡是新构建的），那一段只由单元用例覆盖；`.tmp/soak-update/` 保留给调度清理，本轮没有删它、
   也没有往里加东西。
 
 ## 2026-11-25 — 0.13.34 发布收口：接单台子合入 `main`，两次门禁 exit 0，标签与两条远端 run 都绿（`CONFIRMED`）
@@ -4495,7 +4509,7 @@ Issue #1 状态评论 issuecomment-6927842856。
 - **门禁（`CONFIRMED`）**：门禁 #1 在 `fe32b26` 整棵树 `TMPDIR=$PWD/.tmp npm run ci` **EXIT=0**——vitest **`111 files /
   2128 tests PASS`**（196–202 s）、oxlint **`Found 36 warnings and 0 errors.`**（193 文件）、`verify:lib` →
   `lib/ at fe32b26 is the build of src/ at fe32b26 (293 files, byte-identical)`。门禁 #2 在 `3c5d388` 同样 **EXIT=0**，
-  **独立跑两次**（发版 lane 与包工头各一遍全量）。基线算术：`main` 在 `9b55d2d` 是 105 文件 / 1954 测试，本轮 +6 文件 /
+  **独立跑两次**（发版 lane 与调度各一遍全量）。基线算术：`main` 在 `9b55d2d` 是 105 文件 / 1954 测试，本轮 +6 文件 /
   +174 测试（`block-ledger` 20、`block-preview` 93、`block-tools` 21、`block-supervisor` 20、`block-flag` 8、
   `block-flag-baseline` 12），`105+6=111`、`1954+174=2128` 逐项相等。另有针对性守卫单跑 6 文件 / 79 例 PASS
   （`docs-version` 8 + `docs-config-keys` 13 + `docs-architecture-version` 3 + `update-entry` 20 + `update-surface` 29 +

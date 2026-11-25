@@ -561,7 +561,7 @@ describe('grok_close_block: bookkeeping first, the judge second', () => {
         '做了什么：读完了 blocks.jsonl 并写了结论',
         '证据：读完了 blocks.jsonl，有一行；结论：接单台子可以用了',
         '没做：没有跑真机 soak',
-        '下一步：等包工头验收',
+        '下一步：等调度验收',
       ].join('\n'),
       tasks: [{
         title: '读账本',
@@ -609,7 +609,7 @@ describe('grok_close_block: bookkeeping first, the judge second', () => {
         '做了什么：读完了 blocks.jsonl 并写了结论',
         '证据：读完了 blocks.jsonl，有一行；结论：接单台子可以用了',
         '没做：没有跑真机 soak',
-        '下一步：等包工头验收',
+        '下一步：等调度验收',
       ].join('\n'),
       tasks: [{ title: '读账本', acceptanceCriteria: ['账本里有一行', '结论写出来了'], writesPaths: ['src/block/tools.ts'] }],
     }
@@ -639,7 +639,7 @@ describe('grok_close_block: bookkeeping first, the judge second', () => {
         '做了什么：读完了 blocks.jsonl 并写了结论',
         '证据：读完了 blocks.jsonl，有一行；结论：接单台子可以用了',
         '没做：没有跑真机 soak',
-        '下一步：等包工头验收',
+        '下一步：等调度验收',
       ].join('\n'),
       tasks: [{ title: '读账本', acceptanceCriteria: ['账本里有一行', '结论写出来了'], writesPaths: ['src/block/tools.ts'] }],
       verify: { blockSupervisor: false },
@@ -669,7 +669,7 @@ describe('grok_close_block: bookkeeping first, the judge second', () => {
         '做了什么：读完了 blocks.jsonl 并写了结论',
         '证据：读完了 blocks.jsonl，有一行；结论：接单台子可以用了',
         '没做：没有跑真机 soak',
-        '下一步：等包工头验收',
+        '下一步：等调度验收',
       ].join('\n'),
       tasks: [{ title: '读账本', acceptanceCriteria: ['账本里有一行', '结论写出来了'], writesPaths: ['src/block/tools.ts'] }],
     }, live)
@@ -699,7 +699,7 @@ describe('grok_close_block: bookkeeping first, the judge second', () => {
         '做了什么：读完了 blocks.jsonl 并写了结论',
         '证据：读完了 blocks.jsonl，有一行；结论：接单台子可以用了',
         '没做：没有跑真机 soak',
-        '下一步：等包工头验收',
+        '下一步：等调度验收',
       ].join('\n'),
       tasks: [{ title: '读账本', acceptanceCriteria: ['账本里有一行', '结论写出来了'], writesPaths: ['src/block/tools.ts'] }],
     }, live)
@@ -741,7 +741,7 @@ describe('grok_block_status: reads the block back', () => {
 })
 
 describe('grok_steer and grok_stop: only a workflow block has a channel', () => {
-  it('refuses a foreman block and names the way to reach it', async () => {
+  it('refuses a dispatcher block and names the way to reach it', async () => {
     const mounted = await mount()
     const live = headed('sess-steer')
     const previewed = await preview(mounted, live)

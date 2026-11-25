@@ -3064,7 +3064,7 @@ spine 为空，pre-fix 形状会进脊柱。
   `maxTotalAgentsFor` 的 `attemptBlock`）、`src/types.ts`（`AttemptReport.judgeRetried`）、`src/report.ts`（白名单）、
   `src/config.ts`（`maxAttemptsPerTask` 1000、`callsPerAttempt` 2/3 走法）、
   `test/judge-leg-retry.spec.ts`（新，8 例）、`test/routing.spec.ts`（预算两钉）、`test/verifier-resubmit.spec.ts`（翻钉）。
-- **来源:** 包工头 A（agent-113）第二刀，分支 `feat/leg-retry`（worktree `.agents/worktrees/feat-leg-retry`，基线 `main` `8f34701`）；
+- **来源:** 调度 A（agent-113）第二刀，分支 `feat/leg-retry`（worktree `.agents/worktrees/feat-leg-retry`，基线 `main` `8f34701`）；
   规划腿在第一刀（`feat/planner-resubmit`，另一 agent），两刀互不越界：本刀没有复制规划腿的 `avoid`/`spent` 路由回避机制。
 
 ## D-124 · model-unavailable（401/403）也回灌给脚本，但不进死路由账（2026-11-24）
@@ -3255,7 +3255,7 @@ spine 为空，pre-fix 形状会进脊柱。
   没做 rebase）。本节刻意取半：只记**决定**与**实测**两半，不把一次库存测量写成一次评审。
 - **Date:** 2026-11-24
 - **Decision:** `feat/audit-layer` 本轮**不合**，也不删，保持原样待在本地；下一轮要不要合，先做完功能评估与 rebase 再决定。
-- **实测（`CONFIRMED`，包工头本轮现跑，三条命令都只读）:**
+- **实测（`CONFIRMED`，调度本轮现跑，三条命令都只读）:**
   - 尖端 **`7626233`**（2026-11-12 00:40:06 +0800），`git rev-list --left-right --count main...feat/audit-layer` → 左 **500** / 右 **1**
     （`main` 独有 500 条、分支独有 1 条 ⇒ 分支 **ahead=1 / behind=500**；这一行由写记忆的这轮用同一命令只读复核过，左右两数是 `main` 在前）。
   - `git diff --stat main...feat/audit-layer` → **12 files / +996 −94**：`src/report-audit.ts` **+208（新增文件）**、
@@ -3645,7 +3645,7 @@ spine 为空，pre-fix 形状会进脊柱。
   块工具以 `mode-off` 拒绝。详见 `VALIDATION.md` 2026-11-25 条与 `docs/knowledge/evidence/m3-2-2026-11-25/`）
 - **Date:** 2026-11-25
 - **Context:** M3.2 要把心跳 review/stop 的所有权正式移到窄监听、同时把准入常量翻成生效。派单引用了设计文档的 §3.1 用例清单，
-  但**那份设计文档不在本仓库里**：仓库里没有任何文件写着 §3.1 该列哪些用例。于是有三处没有现成文字可依，包工头当场拍下，
+  但**那份设计文档不在本仓库里**：仓库里没有任何文件写着 §3.1 该列哪些用例。于是有三处没有现成文字可依，调度当场拍下，
   这里把三处连同被否掉的那条路一起记下来——否则下一个人只能从结果反推理由，或者以为「本来就这么定的」。
 - **Decision（三条，各自附被否掉的替代）：**
   1. **旧前台不删，降级成显式 `legacyGate: true` 的 opt-in。** 默认 `false`，默认载入一个监听都不注册它；打开时它只负责用户消息路由，
@@ -3704,3 +3704,26 @@ spine 为空，pre-fix 形状会进脊柱。
   - 「查材料 vs 文档」在**没有问题开着**时仍然对内容敏感：这是设计（它就该从盘上答），不是缺陷；但它意味着
     一份新写的笔记可以让某条含糊消息从「问」变成「直接答」。写记忆的人要知道这一点。
   - `B04`/`B08` 恢复绿，且现在有两层保护：规则闸 + 受控用例。
+
+## D-141 · 角色改名「包工头」→「调度」：只动面向用户的字，`execution: "foreman"` 这个值不动（2026-11-25，未发版）
+
+- **Status:** `CONFIRMED`（操作员拍板；改动全是文字，门禁读数见 `STATE.md` 顶部与 `VALIDATION.md` 同日条）
+- **Date:** 2026-11-25
+- **Context:** 「包工头」是内部叫顺口的比喻，但它同时是工具说明、块预览那一行和三条拒绝消息里的**用户会看到的词**：
+  模型照着说明讲，用户就照着听到。操作员定下的词是「调度」——把一块活拆给子代理、收结果、自己不写代码的那个角色。
+- **Decision:** 面向用户的中文一律写「调度」：`src/block/preview.ts` 的执行标签（`foreman 调度`）、`src/block/tools.ts`
+  的两条拒绝消息与四条工具说明、`docs/knowledge/` 与 `docs/ARCHITECTURE.md`、`AGENTS.md` §10 的层名。
+  英文散文里用 **dispatcher**（`L1 dispatcher` 仍专指任务板那一层）。**三样东西不动**：① 账本与预览里的
+  `execution: "foreman"` 这个值（协议的一部分，改了老账本行会被判非法）；② `src/dispatcher/` 模块名；③ 历史证据
+  （`docs/knowledge/evidence/**`、`.rsi/evidence/**` 的原文与 `.tmp/ci-foreman.log` 这类路径）——证据是逐字记录，改字就是伪造。
+- **Alternatives considered / rejected:**
+  - **把值也改成 `dispatcher`。** 否决：`blocks.jsonl` 里已有 `foreman` 行，改值等于让旧账本在读取时变非法；
+    真要换得配一次迁移（读时接受两个值、写时只写新值），那不是一次改名的成本。而且会和 `src/dispatcher/`（L1 大管家）撞名。
+  - **英文用 `scheduler`。** 否决：波次调度已经占了这个词（`src/script.ts` 的 wave scheduler、`src/waves.ts`、`src/paths.ts`
+    的注释），再用它指角色会让「谁在调度」两义。
+  - **只改文档、不改工具说明。** 否决：模型读的是工具说明，它照着说明说「包工头」，用户听到的就还是旧词；
+    改名必须改到模型念出来的那一层。
+  - **连变量名、测试里的局部变量一起改。** 否决：`foreman` 在测试里是局部变量名与 fixture，不是用户会看到的字；
+    动它只增加回归面，换不来任何可读性。
+- **Consequences:** 块预览那一行现在是 `foreman 调度`（值 + 中文名并列），与 `workflow 工作流` 同一形状；读的人看到值不改会问为什么，
+  答案就在本条。以后若要彻底换值，需要一次账本迁移，而不是一次改名。

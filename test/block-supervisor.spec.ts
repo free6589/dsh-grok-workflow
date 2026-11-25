@@ -146,7 +146,7 @@ const GOOD_HANDOFF = [
   '做了什么：读完了 blocks.jsonl 并写了结论',
   '证据：读完了 blocks.jsonl，有一行；结论：接单台子可以用了',
   '没做：没有跑真机 soak',
-  '下一步：等包工头验收',
+  '下一步：等调度验收',
 ].join('\n')
 
 /** Every path this suite declares exists, so the artifact check is a stated fact. */
@@ -358,7 +358,7 @@ describe('the same evidence never earns a second verdict line', () => {
       ],
     }
     await judge({ engine })
-    const second = await judge({ engine, handoff: GOOD_HANDOFF.replace('下一步：等包工头验收', '下一步：补真机 soak') })
+    const second = await judge({ engine, handoff: GOOD_HANDOFF.replace('下一步：等调度验收', '下一步：补真机 soak') })
     expect(second.outcome.evidenceUnchanged).toBe(false)
     expect(second.outcome.verdict.attempt).toBe(2)
     expect(verdictLines()).toHaveLength(2)

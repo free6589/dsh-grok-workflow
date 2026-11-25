@@ -77,10 +77,10 @@ export interface BlockApproval {
 /** Lifecycle of one block inside an intake row. */
 export type BlockStatus = 'open' | 'vetoed' | 'accepted'
 
-/** How one block runs: the foreman dispatches it, or a workflow script does. */
+/** How one block runs: a dispatcher owns it, or a workflow script does. */
 export type BlockExecution = 'foreman' | 'workflow'
 
-/** One task the foreman (or the workflow) creates for a block. */
+/** One task the dispatcher (or the workflow) creates for a block. */
 export interface BlockTaskRow {
   id: string
   title: string
@@ -157,7 +157,7 @@ export interface BlockPreview {
   expiresAt: string
 }
 
-/** What `startBlock` hands back to the caller (and to the foreman). */
+/** What `startBlock` hands back to the caller (and to the dispatcher). */
 export interface BlockStartResult {
   blockId: string
   status: BlockStatus

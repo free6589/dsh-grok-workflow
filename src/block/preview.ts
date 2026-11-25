@@ -302,7 +302,7 @@ export function splitHashOf(split: BlockSplit): string {
 }
 
 function executionLabel(execution: BlockExecution): string {
-  return execution === 'workflow' ? 'workflow 工作流' : 'foreman 包工头'
+  return execution === 'workflow' ? 'workflow 工作流' : 'foreman 调度'
 }
 
 function collectWarnings(split: BlockSplit): string[] {
@@ -436,7 +436,7 @@ function rowStatus(row: BlockRow): BlockStatus {
 }
 
 /**
- * One plain-text line for the foreman: how many blocks, how each runs, what it
+ * One plain-text line for the dispatcher: how many blocks, how each runs, what it
  * writes, what it waits on. Deliberately not JSON — this is read by a person
  * before it is read by a machine.
  */
