@@ -131,6 +131,7 @@ describe('progress tab: the event contract', () => {
       'tool-workflow/agent-start',
       'tool-workflow/agent-end',
       'tool-workflow/summary-final',
+      'tool-workflow/summary-rejected',
       'tool-workflow/guardian-start',
       'tool-workflow/guardian-finding',
       'tool-workflow/guardian-end',
@@ -1025,9 +1026,8 @@ describe('progress tab: the one-page story', () => {
       [3, '检查', '任务 1 · 修复登录', 'done', false],
       [4, '汇总·第1稿', '汇总', 'done', true],
     ])
-    expect(story.final?.draft).toBe(1)
-    expect(story.final?.label).toBe('汇总')
-    expect(story.final?.row).toBe(story.log[3])
+    expect(story.final).toMatchObject({ kind: 'shipped', draft: 1, label: '汇总' })
+    expect(story.final?.kind === 'shipped' ? story.final.row : undefined).toBe(story.log[3])
     expect(story.dock).toBe('accept')
   })
 

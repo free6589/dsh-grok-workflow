@@ -892,3 +892,108 @@ playwright 1.62 + `chromium_headless_shell-1248`，视口 1500×1600，poll 250 
 **仍然 `NOT_RUN` 的四条**（不要升级成「验过」）：发送前的基线页面快照（空会话不挂载进度 Tab，两侧都没有，
 早期那两张被删掉、没有补拍）、未通过 / 已取消两态（两次运行都 `completed`）、点「开工 / 收下这版」之后读输入框里的字
 （只验到按钮存在与文案）、live 档案升级 / 重载 / 重启（红线）。
+
+## 21. 汇总结论的第三种状态：全被退回（2026-11-25，`fix/synth-outcome`）
+
+§19 的「交卷」只认识两态：通过的那一稿，或者一句「这一轮没有交卷稿」。第二种其实盖住了两件不同的事——
+**闸门一次都没判过草稿**，和**每一稿都被退回**。后者的原因此前根本没落进记录：分层策略写
+`check=fail verify=pass drafts=N` 却不带理由，`model` 策略连标记都不写，只剩 `synthesis.error` 的一段散文。
+本节记的是补上的第三个状态，以及它怎么从脚本的标记一路走到卡片。全部 `CONFIRMED`：源码
+`src/script.ts` / `src/report.ts` / `src/records.ts` / `src/run.ts` / `src/progress-tab.ts` / `src/client/index.js`，
+用例 `test/summary-outcome.spec.ts`（16 条）与 `test/client.spec.ts`、`test/report.spec.ts` 的改动，
+门禁转录 `.rsi/evidence/synth-outcome-2026-11-25/gate-5388f22.out`（`EXIT=0`，`102 files / 1903 tests`）。
+
+### 21.1 标记文法（`synthesis.review`，`CONFIRMED`）
+
+```text
+通过：  check=pass verify=pass drafts=N                 ← 与本节之前逐字相同
+退回：  check=fail verify=pass drafts=N reason=<一行>     ← 检查阶段没过的样子
+        check=pass verify=fail drafts=N reason=<一行>     ← 复核阶段没过的样子
+```
+
+- **`reason=` 排在最后**，它就是「剩下的整行」。所以理由里再出现 `drafts=3 reason=…` 这样的字面文本也不会
+  改变化解析——解析器从左往右取最左的那一组。
+- **理由是一行、有上限**：`summaryReviewReason()` 把控制字符（换行、制表、U+2028/2029）换成空格、空白折叠、
+  `clip(...,300)`。理由是**模型或护栏自己的文本**，不限长就能改写整条台账行。
+- **理由为空就不写 `reason=`**（保留旧的两段式标记）：一句「被退回但不说为什么」不是这次要发布的那个事实。
+- **一次只可能有一个阶段失败**：闸门在第一道失败处停下，所以 `check=fail verify=fail` 不是本插件会写的形状。
+- 两处写入点：分层策略（`synthesisSummary === '' && review !== null` 之后）与 plain `model` 策略的同名分支。
+  `review === null`（第一次请求就空手而归）与「确定性叙述自己也没过闸」两种情形**照旧不写标记**：
+  「一稿都没写出来」不是「每一稿都被退回」。
+
+### 21.2 读回（`src/report.ts`，`CONFIRMED`）
+
+`summaryGateOutcome(review)` 返回三选一：
+
+| 输入 | 返回 |
+| --- | --- |
+| `check=pass verify=pass drafts=N`（`N≥1`） | `{ kind: 'shipped', draft: N }` |
+| 恰好一段 `fail`、`drafts≥1`、`reason` 非空 | `{ kind: 'rejected', drafts, stage, reason }` |
+| 缺理由 / `drafts<1` / 两段同词 / 别的形状 / 非字符串 | `undefined` |
+
+`shippedSummaryDraft()` 一字未改，仍是「哪一稿真的交了」的唯一读法；台账行的后缀读的是**解析值**而不是被
+`oneLine(...,240)` 截过的那段字符串，否则理由掉进截断里就只剩「退回」两个字：
+
+```text
+Summary review: check=fail verify=pass drafts=3 reason=cites "x", which the report lacks · rejected: draft 3 (check: cites "x", which the report lacks)
+```
+
+退回的那一段是 ` · rejected: draft N (<stage>: <reason>)`，理由另限 160 字；通过时仍是 ` · final: draft N`。
+`synthesis.review` 在 schema 里就是 `string()`，**没有长度上限**，所以更长的标记不会开始让报告非法。
+
+### 21.3 事件（`src/records.ts`，`CONFIRMED`）
+
+| 项 | 值 |
+| --- | --- |
+| type | `tool-workflow/summary-rejected`（常量 `PROGRESS_SUMMARY_REJECTED`） |
+| payload | `{ runId, drafts, stage: 'check' \| 'verify', reason }` |
+| 记录规则 | 只给本 recorder 宣布过的 run 写（与 `summary-final` 同）；`drafts≥1`、`stage` 二选一、`reason` 去空白后非空且 ≤300；不满足就**丢掉这条事实**，append 被拒则把这个 run 从 owned 里删掉 |
+| 为什么另开一条事件 | 退回的运行**没有** final 稿；把结论塞进 `summary-final` 就得让 `draft` 一会儿是「第几稿」一会儿是「几稿」，读方要么猜要么自相矛盾。分成两个名字，旧读方看到一个没有 final 的运行，与今天渲染的一样 |
+
+写入点：`src/run.ts` 的完成路径与取消/保留路径各一支；`shippedSummaryDraft` 的调用保持不变，
+退回事件只在**没有**通过稿时才解析、才发。
+
+### 21.4 折叠与故事（`src/progress-tab.ts` 与 `src/client/index.js` 的镜像，`CONFIRMED`）
+
+- `ProgressRunFacts.summaryRejected?: { drafts, stage, reason }`；fold 与 `summary-final` 同样的「第一条有效声明
+  胜出」，`drafts<1` / 未知 stage / 空白理由一律丢。
+- 它是 `PROGRESS_EVENT_TYPES` 的成员（两半各一份，`test/progress-tab.spec.ts` 逐条比对），否则宿主根本不会把
+  这个事件递给 Tab。
+- `ProgressStory['final']` 变成判别式：
+
+```ts
+type ProgressStoryFinal =
+  | { kind: 'shipped', draft: number, label: string, row?: ProgressStoryLogRow }
+  | { kind: 'rejected', drafts: number, stage: 'check' | 'verify', reason: string }
+```
+
+  `undefined` 仍是「什么都没记录」，**不是**退回。**两种事实同时出现时通过优先**：recorder 不会写两条，
+  但手写的会话流可能，卡片不能否认一次真的交过稿。
+- 浏览器镜像把这条事实一起重放、一起带上节点（`update` 的重放列表与 `buildViewNode` 的 `data`），否则下一次
+  `run-end` 一重折就把它抹掉——「定稿」曾经就是这样丢的。
+
+### 21.5 卡片的三种形态（`CONFIRMED`）
+
+| 状态 | 渲染 | 钩子 |
+| --- | --- | --- |
+| 通过 | 今天的绿卡，逐字不变：名字 + `progress.final.mark` + 一个开子会话胶囊 | `data-gw-progress-final`、`-name`、`-mark` |
+| 全被退回 | 琥珀块，两句：几稿全被退回 + 最后不过的理由；没有名字、没有（定稿）、没有胶囊 | `data-gw-progress-final-rejected`（`data-state="failed"`）、`-rejected-drafts`、`-rejected-reason` |
+| 什么都没记录 | 今天那句 `progress.final.missing` | `data-gw-progress-final-missing` |
+
+琥珀用的是页面上既有的 `--dsw-alias-state-warn-primary`（与失败行、取消行同一个 token），**没有新的字面色值**。
+两条新文案（`REDESIGN_COPY` 逐字钉住，中英两本字典都在）：
+
+| key | zh | en |
+| --- | --- | --- |
+| `progress.final.rejected` | `第 {n} 稿全被退回` | `Every draft was rejected: {n}` |
+| `progress.final.rejectedReason` | `最后不过：{reason}` | `Last failure: {reason}` |
+
+### 21.6 不变量与仍然没验的（`CONFIRMED` / `NOT_RUN`）
+
+- **通过态的字符串与卡片逐字不变**：`check=pass verify=pass drafts=N`、` · final: draft N`、绿卡三件套。
+- **退回一句话也不进 `synthesis.error` 的替代位**：`error` 仍写它原来那句话，标记只多带理由，两者不互替。
+- **真机上的「三稿全被退回」是 `NOT_RUN`**：要在活模型上连续三次撞穿闸门，抖动大、烧额度。琥珀卡**没有人在真机
+  上见过**，它由组件用例与 CSS 保证。真机只验了通过态（完成页仍是 `汇总·第1稿` + `（定稿）` + 一个胶囊，
+  控制台空）。
+- **`check=pass verify=fail` 的写入端没有在活引擎上跑过**：解析端与渲染端有用例；写入端复用的是本节之前就存在的
+  阶段三元表达式，新增的只有理由后缀。

@@ -101,6 +101,9 @@ const REDESIGN_COPY: ReadonlyArray<readonly [key: string, zh: string, en: string
   ['progress.final.title', '交卷', 'Handed in'],
   ['progress.final.mark', '（定稿）', '(final)'],
   ['progress.final.missing', '这一轮没有交卷稿', 'This run handed in no draft'],
+  // The all-rejected card: how many drafts were turned back, and the last failure.
+  ['progress.final.rejected', '第 {n} 稿全被退回', 'Every draft was rejected: {n}'],
+  ['progress.final.rejectedReason', '最后不过：{reason}', 'Last failure: {reason}'],
   ['progress.dock.start', '开工', 'Start'],
   ['progress.dock.accept', '收下这版', 'Accept this version'],
   ['progress.dock.hintStart', '要改就说一声，我重拆', "Say what to change and I'll re-plan"],

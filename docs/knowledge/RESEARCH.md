@@ -1762,3 +1762,20 @@ boot 日志的原文（`docs/knowledge/evidence/m3-3-2026-11-25/soak-all.txt`）
 
 验收含义：以后任何插件想进设置左列，照 `468e30f` 的形状抄即可——新鲜 id、thunk label、与已有入口共用组件与 inject、
 不注册 icon 槽。
+
+## 2026-11-25 · `tool-workflow/summary-rejected` 与 `tool-workflow/summary-final` 并列存在，谁写谁折（`CONFIRMED`，读源码）
+
+汇总结论现在有两条事件，**一次运行只会出现其中一条**：
+
+| 事件 | 谁写 | 载荷 | 谁折 | 谁渲染 |
+| --- | --- | --- | --- | --- |
+| `tool-workflow/summary-final` | `src/records.ts` `createWorkflowProgressRecorder().summaryFinal()`，由 `src/run.ts` 在报告校验通过后调用（完成路径与取消/保留路径各一处） | `{ runId, draft }`（`draft ≥ 1`） | `src/progress-tab.ts` `foldProgressRuns()` → `ProgressRunFacts.summaryFinalDraft`；浏览器镜像 `src/client/index.js` `foldProgressEvents()` | 「交卷」绿卡 + 该稿那一行的「（定稿）」 |
+| `tool-workflow/summary-rejected` | 同一个 recorder 的 `summaryRejected()`，由同一处 `src/run.ts` 调用（**只在没有通过稿时**） | `{ runId, drafts, stage: 'check' \| 'verify', reason }` | 同一个 fold → `ProgressRunFacts.summaryRejected`；镜像里同一个 fold | 「交卷」琥珀块（`data-gw-progress-final-rejected`），不标任何行 |
+
+两条都在 `PROGRESS_EVENT_TYPES` 里（`src/progress-tab.ts` 与 `src/client/index.js` 各一份，`test/progress-tab.spec.ts`
+逐条比对）——不在名单里的事件会被宿主路由丢掉，页面永远收不到。两处 recorder 方法遵循同一套规则：
+只给本 recorder 宣布过的 run 写、载荷不合格就丢、append 被拒就把它从 owned 里删掉。
+
+读回入口在 `src/report.ts`：`shippedSummaryDraft(review)` 仍只认通过形式（既有调用方不变），
+`summaryGateOutcome(review)` 认两种结论并带出 stage 与理由。标记本身由 `src/script.ts` 的两处闸门写入：
+通过 `check=pass verify=pass drafts=N`，退回 `… drafts=N reason=<一行，≤300>`。

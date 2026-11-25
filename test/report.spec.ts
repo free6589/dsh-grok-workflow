@@ -154,11 +154,31 @@ describe('workflow report semantic contract', () => {
     expect(shippedSummaryDraft('check=pass verify=fail drafts=3')).toBeUndefined()
     expect(shippedSummaryDraft('drafts=3')).toBeUndefined()
     expect(shippedSummaryDraft(undefined)).toBeUndefined()
-    // A rejected draft keeps its reason and its stage verdict in one line.
-    const rejected = { ...report({ status: 'completed' }), synthesis: { mode: 'model', summary: 'ship it', review: 'check=fail verify=pass drafts=3' } }
+    // A rejected draft keeps its reason and its stage verdict in one line, and the ledger
+    // adds the same reading the host takes off it: which stage stopped the run and why.
+    const rejected = { ...report({ status: 'completed' }), synthesis: { mode: 'model', summary: 'ship it', review: 'check=fail verify=pass drafts=3 reason=cites "x", which the report lacks' } }
     expect(renderReport(assertWorkflowReport(rejected, OBJECTIVE, config)))
-      .toContain('Summary review: check=fail verify=pass drafts=3')
+      .toContain('Summary review: check=fail verify=pass drafts=3 reason=cites "x", which the report lacks · rejected: draft 3 (check: cites "x", which the report lacks)')
     expect(renderReport(assertWorkflowReport(rejected, OBJECTIVE, config))).not.toContain('final: draft')
+    // The verify stage reads the same way, and a marker without a reason states no
+    // outcome at all — so the ledger line stays exactly what it was.
+    const verifyRejected = { ...report(), synthesis: { mode: 'model', summary: 'ship it', review: 'check=pass verify=fail drafts=2 reason=the answer omits incomplete task b' } }
+    expect(renderReport(assertWorkflowReport(verifyRejected, OBJECTIVE, config)))
+      .toContain('· rejected: draft 2 (verify: the answer omits incomplete task b)')
+    const bare = { ...report(), synthesis: { mode: 'model', summary: 'ship it', review: 'check=fail verify=pass drafts=3' } }
+    expect(renderReport(assertWorkflowReport(bare, OBJECTIVE, config)))
+      .toContain('Summary review: check=fail verify=pass drafts=3')
+    expect(renderReport(assertWorkflowReport(bare, OBJECTIVE, config))).not.toContain('rejected:')
+    // A reason longer than the rendered review's own bound still reaches the suffix: the
+    // suffix reads the parsed reason, not the cut string.
+    const longReason = 'cites ' + 'something '.repeat(60) + 'tail-marker'
+    const bounded = { ...report(), synthesis: { mode: 'model', summary: 'ship it', review: `check=fail verify=pass drafts=2 reason=${longReason}` } }
+    const boundedLine = renderReport(assertWorkflowReport(bounded, OBJECTIVE, config))
+      .split('\n').find(line => line.startsWith('Summary review:')) ?? ''
+    expect(boundedLine).toContain('· rejected: draft 2 (check: cites')
+    // The review string itself is not length-capped by the schema: a longer marker is a
+    // longer marker, not an invalid report.
+    expect(assertWorkflowReport(bounded, OBJECTIVE, config).synthesis.review).toContain('tail-marker')
     // A non-string is refused, like every other report field.
     expect(() => assertWorkflowReport(
       { ...report(), synthesis: { mode: 'model', review: 7 } } as never, OBJECTIVE, config,

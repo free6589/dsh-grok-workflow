@@ -221,6 +221,8 @@ type ProgressRun = {
   stopReason?: string
   /** Draft number the summary gate shipped, when the stream said so. */
   summaryFinalDraft?: number
+  /** The gate's all-rejected verdict, when the stream said so. */
+  summaryRejected?: { drafts: number, stage: 'check' | 'verify', reason: string }
 }
 
 type ProgressNode = {
@@ -2037,7 +2039,7 @@ describe('client progress tab: the one-page story (three screens)', () => {
    * exercised by the same stream; only the clock is local (`STORY_BASE`), because it is
    * displayed.
    */
-  function streamOf(calls: readonly Call[], options: { stopReason?: string, summaryFinal?: number } = {}) {
+  function streamOf(calls: readonly Call[], options: { stopReason?: string, summaryFinal?: number, summaryRejected?: { drafts: number, stage: string, reason: string } } = {}) {
     const records: Array<Record<string, unknown>> = [
       rec('tool-workflow/run-start', { runId: 'r-story', name: '任务团队 · 3 个任务' }, 1, STORY_BASE - 60_000),
     ]
@@ -2053,12 +2055,16 @@ describe('client progress tab: the one-page story (three screens)', () => {
       records.push(rec('tool-workflow/summary-final', { runId: 'r-story', draft: options.summaryFinal }, at))
       at += 1
     }
+    if (options.summaryRejected !== undefined) {
+      records.push(rec('tool-workflow/summary-rejected', { runId: 'r-story', ...options.summaryRejected }, at))
+      at += 1
+    }
     if (options.stopReason !== undefined) records.push(rec('tool-workflow/run-end', { runId: 'r-story', stopReason: options.stopReason }, at))
     return records
   }
 
   /** The folded run of one fixture, and the story derived from it. */
-  function storyOf(calls: readonly Call[], options: { stopReason?: string, summaryFinal?: number } = {}) {
+  function storyOf(calls: readonly Call[], options: { stopReason?: string, summaryFinal?: number, summaryRejected?: { drafts: number, stage: string, reason: string } } = {}) {
     const runs = progress.fold(streamOf(calls, options))
     expect(runs, 'the fixture must fold into one run').toHaveLength(1)
     return { run: runs[0]!, story: progress.deriveProgressStory(runs[0]!) }
@@ -2277,8 +2283,7 @@ describe('client progress tab: the one-page story (three screens)', () => {
     expect(story.now.role).toBeUndefined()
     expect(story.attempt).toBeUndefined()
     expect(story.rest).toEqual([])
-    expect(story.final?.draft).toBe(1)
-    expect(story.final?.label).toBe('汇总')
+    expect(story.final).toMatchObject({ kind: 'shipped', draft: 1, label: '汇总' })
 
     const page = pageOf(run, { canOpen: (childId: string) => childId === 'child-4', fillDraft: () => true })
     expect(textOf(page, 'data-gw-progress-chip')).toBe('已完成')
@@ -2315,6 +2320,53 @@ describe('client progress tab: the one-page story (three screens)', () => {
     expect(textOf(page, 'data-gw-progress-dock-fill')).toBe('收下这版')
     expect(textOf(page, 'data-gw-progress-dock-hint')).toBe('不满意就说，我重做')
     expect(hooksOf(page, 'data-gw-progress-quiet')).toHaveLength(0)
+  })
+
+  it('rejected: 交卷 card says every draft was turned back, and what the last failure was', () => {
+    // The other half of the same slot: no draft shipped, and the record says why. The card
+    // is not the green one and carries no name, mark or open capsule — there is no row to
+    // open, because no draft was ever handed in.
+    const { run, story } = storyOf([
+      [1, '规划助手', '规划', 'completed'],
+      [2, '执行', '任务 1 · 修复登录', 'completed'],
+      [3, '汇总·第1稿', '汇总', 'completed'],
+      [4, '汇总·第2稿', '汇总', 'completed'],
+      [5, '汇总·第3稿', '汇总', 'completed'],
+    ], {
+      summaryRejected: { drafts: 3, stage: 'check', reason: 'cites "out/x.bin", which the verified report does not contain' },
+      stopReason: 'completed',
+    })
+    expect(story.final).toEqual({
+      kind: 'rejected',
+      drafts: 3,
+      stage: 'check',
+      reason: 'cites "out/x.bin", which the verified report does not contain',
+    })
+
+    const page = pageOf(run, { canOpen: () => true, fillDraft: () => true })
+    // The card states the count and the last failure, in the page's own words.
+    expect(textOf(page, 'data-gw-progress-final-title')).toBe('交卷')
+    expect(hooksOf(page, 'data-gw-progress-final-rejected')).toHaveLength(1)
+    expect(hookOf(page, 'data-gw-progress-final-rejected').props['data-state']).toBe('failed')
+    expect(textOf(page, 'data-gw-progress-final-rejected-drafts')).toBe('第 3 稿全被退回')
+    expect(textOf(page, 'data-gw-progress-final-rejected-reason'))
+      .toBe('最后不过：cites "out/x.bin", which the verified report does not contain')
+    // None of the shipped card's parts may appear: no name, no mark, no capsule.
+    expect(hooksOf(page, 'data-gw-progress-final')).toHaveLength(0)
+    expect(hooksOf(page, 'data-gw-progress-final-name')).toHaveLength(0)
+    expect(hooksOf(page, 'data-gw-progress-final-mark')).toHaveLength(0)
+    expect(hooksOf(page, 'data-gw-progress-final-missing')).toHaveLength(0)
+    expect(pageTexts(page)).not.toContain(bundle.GROK_WORKFLOW_DICT['zh']!['progress.final.missing'])
+  })
+
+  it('keeps the gap sentence for a run that recorded neither outcome', () => {
+    // "Nothing was recorded" is not "everything was rejected": the card must not invent a
+    // verdict for a run whose gate never wrote one.
+    const { run, story } = storyOf(doneCalls)
+    expect(story.final).toBeUndefined()
+    const page = pageOf(run, { fillDraft: () => true })
+    expect(hooksOf(page, 'data-gw-progress-final-rejected')).toHaveLength(0)
+    expect(textOf(page, 'data-gw-progress-final-missing')).toBe('这一轮没有交卷稿')
   })
 
   it('failed: 未通过 — the amber bar counts the attempt of the unit still broken', () => {
@@ -2450,16 +2502,47 @@ describe('client progress tab: the one-page story (three screens)', () => {
       // The state, the node's data and the story all have to carry it: the component only
       // ever sees the node's data.
       expect((tab as unknown as { run(): ProgressRun }).run().summaryFinalDraft).toBe(1)
-      expect(tab.story().final?.draft).toBe(1)
+      expect(tab.story().final).toMatchObject({ kind: 'shipped', draft: 1 })
       // …then the run closes, still in that order.
       for (const event of events.slice(claimAt + 1)) fed.push(tab.feed(event))
       expect(fed).not.toContain('dropped')
-      expect(tab.story().final?.draft, 'run-end must not forget the shipped draft').toBe(1)
+      expect(tab.story().final, 'run-end must not forget the shipped draft').toMatchObject({ kind: 'shipped', draft: 1 })
       expect(tab.story().state).toBe('done')
       // And the page shows the card instead of the gap.
       const page = pageOf(tab.run(), { fillDraft: () => true })
       expect(textOf(page, 'data-gw-progress-final-name')).toBe('汇总·第1稿')
       expect(pageTexts(page)).not.toContain(bundle.GROK_WORKFLOW_DICT['zh']!['progress.final.missing'])
+    })
+
+    it('carries the rejected verdict through the run-end that follows it', () => {
+      // The same eviction the shipped mark used to suffer: the state is re-folded from
+      // itself on every later event, so a field left off the node dies at `run-end`.
+      const events = streamOf([
+        [1, '规划助手', '规划', 'completed'],
+        [2, '汇总·第1稿', '汇总', 'completed'],
+      ], { summaryRejected: { drafts: 1, stage: 'verify', reason: 'the answer omits incomplete task b' }, stopReason: 'completed' })
+      const tab = shell()
+      const claimAt = events.findIndex((event) => event.type === 'tool-workflow/summary-rejected')
+      expect(claimAt, 'the fixture must carry the claim').toBeGreaterThan(0)
+      const fed: string[] = []
+      for (const event of events.slice(0, claimAt + 1)) fed.push(tab.feed(event))
+      expect(fed, 'no recorder event may be dropped by the tab').not.toContain('dropped')
+      expect((tab as unknown as { run(): ProgressRun }).run().summaryRejected).toEqual({
+        drafts: 1,
+        stage: 'verify',
+        reason: 'the answer omits incomplete task b',
+      })
+      for (const event of events.slice(claimAt + 1)) fed.push(tab.feed(event))
+      expect(fed).not.toContain('dropped')
+      expect(tab.story().final, 'run-end must not forget the rejected verdict').toEqual({
+        kind: 'rejected',
+        drafts: 1,
+        stage: 'verify',
+        reason: 'the answer omits incomplete task b',
+      })
+      const page = pageOf(tab.run(), { fillDraft: () => true })
+      expect(textOf(page, 'data-gw-progress-final-rejected-drafts')).toBe('第 1 稿全被退回')
+      expect(textOf(page, 'data-gw-progress-final-rejected-reason')).toBe('最后不过：the answer omits incomplete task b')
     })
 
     it('keeps every recorder event type on the tab\'s own update list', () => {
@@ -2469,6 +2552,7 @@ describe('client progress tab: the one-page story (three screens)', () => {
         'tool-workflow/agent-start',
         'tool-workflow/agent-end',
         'tool-workflow/summary-final',
+        'tool-workflow/summary-rejected',
         'tool-workflow/guardian-start',
         'tool-workflow/guardian-finding',
         'tool-workflow/guardian-end',

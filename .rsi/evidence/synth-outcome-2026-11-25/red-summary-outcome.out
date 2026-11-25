@@ -1,0 +1,233 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.worktrees/fix-synth-outcome
+
+(node:43) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ test/summary-outcome.spec.ts (16 tests | 13 failed) 221ms
+     × records every rejected draft in the layered policy together with the last reason 145ms
+     × records the same outcome in the plain model policy, which used to record nothing 22ms
+     ✓ keeps the shipped marker byte-identical in the plain model policy 21ms
+     ✓ writes no marker at all when no draft was ever produced 22ms
+     × reads the shipped form unchanged 1ms
+     × reads both rejected forms with their stage and reason 0ms
+     × is not confused by a reason that quotes the marker vocabulary 0ms
+     × refuses a marker that states no usable outcome 0ms
+     × writes the run, the count, the stage and the reason — and nothing else 1ms
+     × drops every payload that is not a rejection it can explain 0ms
+     × bounds the reason it writes 0ms
+     × drops the run when the session refuses the append, like the sibling recorders 0ms
+     × carries the verdict onto the run and into the story 2ms
+     × takes the first valid claim and refuses half-facts 1ms
+     × prefers a shipped draft when a stream somehow carries both facts 3ms
+     ✓ leaves a run with neither fact saying nothing at all 0ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 13 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/summary-outcome.spec.ts > the script records the gate outcome, not only the passing one > records every rejected draft in the layered policy together with the last reason
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/summary-outcome.spec.ts:94:74
+     92|     expect(run.report.synthesis.summary ?? '').toContain('任务 a')
+     93|     const review = run.report.synthesis.review ?? ''
+     94|     expect(review.startsWith('check=fail verify=pass drafts=3 reason='…
+       |                                                                          ^
+     95|     expect(review).not.toContain('\n')
+     96|     expect(review.length).toBeLessThanOrEqual('check=fail verify=pass …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/13]⎯
+
+ FAIL  test/summary-outcome.spec.ts > the script records the gate outcome, not only the passing one > records the same outcome in the plain model policy, which used to record nothing
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/summary-outcome.spec.ts:121:74
+    119|     expect(run.report.synthesis.summary).toBeUndefined()
+    120|     const review = run.report.synthesis.review ?? ''
+    121|     expect(review.startsWith('check=fail verify=pass drafts=3 reason='…
+       |                                                                          ^
+    122|     expect(summaryGateOutcome(review)).toMatchObject({ kind: 'rejected…
+    123|     expect(run.report.synthesis.error ?? '').toContain('no narrative i…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/13]⎯
+
+ FAIL  test/summary-outcome.spec.ts > summaryGateOutcome: the two outcomes one marker string can state > reads the shipped form unchanged
+TypeError: summaryGateOutcome is not a function
+ ❯ test/summary-outcome.spec.ts:153:12
+    151| describe('summaryGateOutcome: the two outcomes one marker string can s…
+    152|   it('reads the shipped form unchanged', () => {
+    153|     expect(summaryGateOutcome('check=pass verify=pass drafts=1')).toEq…
+       |            ^
+    154|     expect(summaryGateOutcome('check=pass verify=pass drafts=12')).toE…
+    155|     // A count of zero is not a draft, exactly as `shippedSummaryDraft…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/13]⎯
+
+ FAIL  test/summary-outcome.spec.ts > summaryGateOutcome: the two outcomes one marker string can state > reads both rejected forms with their stage and reason
+TypeError: summaryGateOutcome is not a function
+ ❯ test/summary-outcome.spec.ts:160:12
+    158|
+    159|   it('reads both rejected forms with their stage and reason', () => {
+    160|     expect(summaryGateOutcome('check=fail verify=pass drafts=3 reason=…
+       |            ^
+    161|       .toEqual({ kind: 'rejected', drafts: 3, stage: 'check', reason: …
+    162|     expect(summaryGateOutcome('check=pass verify=fail drafts=2 reason=…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/13]⎯
+
+ FAIL  test/summary-outcome.spec.ts > summaryGateOutcome: the two outcomes one marker string can state > is not confused by a reason that quotes the marker vocabulary
+TypeError: summaryGateOutcome is not a function
+ ❯ test/summary-outcome.spec.ts:169:12
+    167|     // The reason is the rest of the line, so a `drafts=` inside it st…
+    168|     const review = 'check=fail verify=pass drafts=3 reason=the draft r…
+    169|     expect(summaryGateOutcome(review)).toEqual({
+       |            ^
+    170|       kind: 'rejected',
+    171|       drafts: 3,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/13]⎯
+
+ FAIL  test/summary-outcome.spec.ts > summaryGateOutcome: the two outcomes one marker string can state > refuses a marker that states no usable outcome
+TypeError: summaryGateOutcome is not a function
+ ❯ test/summary-outcome.spec.ts:179:12
+    177|   it('refuses a marker that states no usable outcome', () => {
+    178|     // No reason: a rejection the reader cannot explain is not an outc…
+    179|     expect(summaryGateOutcome('check=fail verify=pass drafts=3')).toBe…
+       |            ^
+    180|     expect(summaryGateOutcome('check=fail verify=pass drafts=3 reason=…
+    181|     // No draft count, or a count below one.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/13]⎯
+
+ FAIL  test/summary-outcome.spec.ts > the recorder publishes a rejected outcome as its own fact > writes the run, the count, the stage and the reason — and nothing else
+TypeError: recorder.summaryRejected is not a function
+ ❯ test/summary-outcome.spec.ts:214:14
+    212|     const recorder = createWorkflowProgressRecorder(target as unknown …
+    213|     recorder.runStart({ id: 'run-1', meta: { name: '任务团队' } })
+    214|     recorder.summaryRejected('run-1', { drafts: 3, stage: 'check', rea…
+       |              ^
+    215|     recorder.runEnd('run-1', 'completed')
+    216|     expect(target.writes).toEqual([
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/13]⎯
+
+ FAIL  test/summary-outcome.spec.ts > the recorder publishes a rejected outcome as its own fact > drops every payload that is not a rejection it can explain
+TypeError: recorder.summaryRejected is not a function
+ ❯ test/summary-outcome.spec.ts:231:14
+    229|     recorder.runStart({ id: 'run-1', meta: { name: '任务团队' } })
+    230|     // Not our run, no draft judged, a stage outside the gate's two wo…
+    231|     recorder.summaryRejected('not-ours', { drafts: 3, stage: 'check', …
+       |              ^
+    232|     recorder.summaryRejected('run-1', { drafts: 0, stage: 'check', rea…
+    233|     recorder.summaryRejected('run-1', { drafts: Number.NaN, stage: 'ch…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/13]⎯
+
+ FAIL  test/summary-outcome.spec.ts > the recorder publishes a rejected outcome as its own fact > bounds the reason it writes
+TypeError: recorder.summaryRejected is not a function
+ ❯ test/summary-outcome.spec.ts:245:14
+    243|     const recorder = createWorkflowProgressRecorder(target as unknown …
+    244|     recorder.runStart({ id: 'run-1', meta: { name: '任务团队' } })
+    245|     recorder.summaryRejected('run-1', { drafts: 2, stage: 'verify', re…
+       |              ^
+    246|     const write = target.writes.find(candidate => candidate.type === P…
+    247|     expect(write).toBeDefined()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/13]⎯
+
+ FAIL  test/summary-outcome.spec.ts > the recorder publishes a rejected outcome as its own fact > drops the run when the session refuses the append, like the sibling recorders
+TypeError: recorder.summaryRejected is not a function
+ ❯ test/summary-outcome.spec.ts:257:14
+    255|     const recorder = createWorkflowProgressRecorder(target as unknown …
+    256|     recorder.runStart({ id: 'run-1', meta: { name: '任务团队' } })
+    257|     recorder.summaryRejected('run-1', { drafts: 2, stage: 'check', rea…
+       |              ^
+    258|     // The second fact is not attempted: the run is no longer this rec…
+    259|     recorder.summaryRejected('run-1', { drafts: 2, stage: 'check', rea…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/13]⎯
+
+ FAIL  test/summary-outcome.spec.ts > the fold and the story read the rejected outcome > carries the verdict onto the run and into the story
+AssertionError: expected undefined to deeply equal { drafts: 3, stage: 'check', …(1) }
+
+- Expected:
+{
+  "drafts": 3,
+  "reason": "cites \"x\"",
+  "stage": "check",
+}
+
++ Received:
+undefined
+
+ ❯ test/summary-outcome.spec.ts:281:34
+    279|   it('carries the verdict onto the run and into the story', () => {
+    280|     const [run] = foldProgressRuns(rejectedStream({ drafts: 3, stage: …
+    281|     expect(run!.summaryRejected).toEqual({ drafts: 3, stage: 'check', …
+       |                                  ^
+    282|     // A rejected run names no shipped draft: the mark never lands, an…
+    283|     // something else to say.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/13]⎯
+
+ FAIL  test/summary-outcome.spec.ts > the fold and the story read the rejected outcome > takes the first valid claim and refuses half-facts
+AssertionError: expected undefined to deeply equal { drafts: 2, stage: 'verify', …(1) }
+
+- Expected:
+{
+  "drafts": 2,
+  "reason": "the answer omits b",
+  "stage": "verify",
+}
+
++ Received:
+undefined
+
+ ❯ test/summary-outcome.spec.ts:292:36
+    290|   it('takes the first valid claim and refuses half-facts', () => {
+    291|     const [first] = foldProgressRuns(rejectedStream({ drafts: 2, stage…
+    292|     expect(first!.summaryRejected).toEqual({ drafts: 2, stage: 'verify…
+       |                                    ^
+    293|
+    294|     for (const payload of [
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/13]⎯
+
+ FAIL  test/summary-outcome.spec.ts > the fold and the story read the rejected outcome > prefers a shipped draft when a stream somehow carries both facts
+AssertionError: expected { draft: 1, label: '汇总', …(1) } to match object { kind: 'shipped', draft: 1 }
+(7 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "draft": 1,
+-   "kind": "shipped",
+  }
+
+ ❯ test/summary-outcome.spec.ts:314:25
+    312|     ])
+    313|     const story = deriveProgressStory(run!)
+    314|     expect(story.final).toMatchObject({ kind: 'shipped', draft: 1 })
+       |                         ^
+    315|   })
+    316|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/13]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  13 failed | 3 passed (16)
+   Start at  22:16:22
+   Duration  1.08s (transform 617ms, setup 0ms, import 716ms, tests 221ms, environment 0ms)
+

@@ -1,0 +1,686 @@
+
+ RUN  v4.1.12 /home/fish/projects_mine/dsh-grok-workflow/.worktrees/fix-synth-outcome/.tmp/red-baseline
+
+stderr | test/client.spec.ts > client settings page: reading, failure and retry > keeps still reading, read failed and not served as three different pages
+[grok-workflow] no settings namespace projects this plugin's fields: the row is disabled, renamed with an unreadable projection, or did not activate (see docs/LOCAL-TESTING.md#enable). The Grok workflow page cannot appear until it does.
+
+stderr | test/client.spec.ts > client progress tab: the button fills the box instead of sending > never claims the box was filled when the editor refuses
+[grok-workflow] the progress tab could not fill the input box (the editor is locked); the button reports nothing instead of claiming it did.
+
+ ❯ test/client.spec.ts (142 tests | 5 failed) 543ms
+     ✓ registers under the package id and asks only for real cordis services 2ms
+     ✓ renders the visible keys: 14 fields plus the 5 role chains 0ms
+     ✓ keeps the numeric bounds identical to HARD_LIMITS 1ms
+     ✓ keeps the numeric defaults identical to src/config.ts 2ms
+     ✓ keeps the per-route cap bounds identical to HARD_LIMITS 0ms
+     ✓ keeps the switchable-class export empty: switchOn is fixed since T4 0ms
+     ✓ covers the five T5 roles (supervisor added to the four documented ones) 0ms
+     ✓ numbers the role cards in execution order (supervise before summarize) 0ms
+     ✓ carries exactly the removed-key list the config module enforces (D-155) 1ms
+     ✓ ships lib/client.js byte-identical to the source (no stale bundle) 2ms
+     ✓ ships exactly the two locales DSH ships, both complete 13ms
+     ✓ carries the same key set in both languages (no half-translated dictionary) 1ms
+     ✓ reads the notice route into the keys this build names, in both languages (D-155) 1ms
+     ✓ fetches the notice route once, and stays silent when the Host has no answer (D-155) 2ms
+     ✓ translates every key the page derives from data (fields, roles, groups) 1ms
+     ✓ translates every validation finding in both languages, including the error keys in the code 2ms
+     ✓ renders role ids as localized names and interpolates every parameter 0ms
+     ✓ falls back to English for an unknown locale and to the key for an unknown entry 0ms
+     ✓ states the toggle as a reporting default, not a router 45ms
+     ✓ registers both dictionaries on the locale service under the plugin namespace 2ms
+     ✓ declares the locale namespace on the slot so the framework seats a live `t` 1ms
+     ✓ also mounts the same page as a Settings left-column section named Workflow 0ms
+     ✓ re-reads the active language for the card label instead of freezing it at boot 1ms
+     ✓ renders the card summary in the language the framework seat reports 0ms
+     ✓ keeps the page mountable in a composition without a locale service 1ms
+     ✓ never prints a key id when the seated `t` cannot resolve one 0ms
+     ✓ drops every registration on unbind instead of rebuilding them in a dead scope 1ms
+     ✓ lets the plugin disposer win when it runs first, and stays idempotent after that 0ms
+     ✓ keeps still reading, read failed and not served as three different pages 4ms
+     ✓ retries the mirror read through the face and shows the form once it answers 4ms
+     ✓ renders the repeat-run rows with their labels in both languages 2ms
+     ✓ renders the 429 switch with its label, state word and hint in both languages 2ms
+     ✓ draws a control for every declared field, in both languages 3ms
+     ✓ saves the 429 switch as exactly one set op through the face 5ms
+     ✓ reflects the stored 429 value instead of a fixed state 1ms
+     ✓ says what 0 means on the rows whose minimum is 0, in both languages 1ms
+     ✓ edits the run deadline in minutes and still saves milliseconds (Q9) 5ms
+     ✓ offers no retry when the composition has no way to re-read 0ms
+     ✓ renders no key id even when the seat answers every key with the key 6ms
+     ✓ colours the live status line through --dsw-alias tokens 3ms
+     ✓ seeds every field and all four chains from an absent value 1ms
+     ✓ carries the template textarea through draft → ops → save, like every other key 1ms
+     ✓ refuses a template over the prompt bound, in both languages 0ms
+     ✓ survives a non-object roles section instead of crashing the page 1ms
+     ✓ rejects a stored enum value outside the offered options 0ms
+     ✓ rejects a repeat-run switch that is not a real boolean 0ms
+     ✓ rejects a mid-run replan switch that is not a real boolean 1ms
+     ✓ keeps a chain the Host published and fills the roles the document omits 0ms
+     ✓ accepts the defaults and reports a numeric field outside its bounds 3ms
+     ✓ has no preset gate: a fresh draft always validates clean 0ms
+     ✓ bounds a chain at fifty routes and names the offending entry 1ms
+     ✓ treats two blank routes as unfinished rows, not duplicates (t32 regression) 0ms
+     ✓ rejects a duplicate route and a route without a model beyond the length limit 0ms
+     ✓ rejects a per-route cap outside 1..64 and accepts blank for unlimited 1ms
+     ✓ ships the per-route cap and number-unit copy in both languages 0ms
+     ✓ ignores a legacy switchOn value: it is fixed policy, not a page field 0ms
+     ✓ accepts a summarizer chain without any synthesis cross-check 0ms
+     ✓ sends only what changed, one path op per field and per role 0ms
+     ✓ never emits a path op for a structural key 0ms
+     ✓ binds to the shipped namespace id when the Host publishes it 0ms
+     ✓ follows a renamed Loader row instead of silently losing the page (t34 residual) 0ms
+     ✓ reports a missing namespace so the page can say why it is absent 0ms
+     ✓ warns (not blocks) when a chain has 2+ routes but every cap is blank 1ms
+     ✓ registers a namespaced view entry after chat and trajectory, without a priority 1ms
+     ✓ defaults to the chat tab: it never selects or pins itself 0ms
+     ✓ keeps the copy on the plugin namespace and declares it only with a locale face 0ms
+     ✓ degrades to no tab (with a stated reason) when the registries refuse it 1ms
+     ✓ keeps the tab out entirely without a uiConversation service, and the page says so 0ms
+     ✓ remounts on a locale change from the disposer, never leaving two tabs 0ms
+     ✓ resolves the target it registered and no other 0ms
+     ✓ mirrors the typed story field for field (the two copies cannot import each other) 4ms
+     ✓ waiting: 等你点头 — planning, no steps, and the start button 2ms
+     ✓ running: 进行中 — the step being worked, and the ones around it 3ms
+     × done: 已完成 — every step passed, the shipped draft named 15ms
+     × rejected: 交卷 card says every draft was turned back, and what the last failure was 3ms
+     ✓ keeps the gap sentence for a run that recorded neither outcome 1ms
+     ✓ failed: 未通过 — the amber bar counts the attempt of the unit still broken 3ms
+     ✓ adds no number the events did not report 2ms
+       × carries the shipped draft from summary-final through the run-end that follows it 2ms
+       × carries the rejected verdict through the run-end that follows it 1ms
+       × keeps every recorder event type on the tab's own update list 1ms
+       ✓ reads only the three run fields the mirror needs, so no fourth can go missing 1ms
+       ✓ steps only the do / check / review legs, and names the leg it is on 1ms
+       ✓ says it is still planning when nothing has run yet, not that it is on step 0 1ms
+       ✓ says the run is done when the synthesizer ends it, with no step to count 1ms
+       ✓ keeps the clock, the role + task and the word on one row 1ms
+       ✓ does not print a task name that is only the role said twice 1ms
+     ✓ renders the empty state, and no dock, when the session has no run 1ms
+     ✓ survives a damaged snapshot instead of throwing 1ms
+     ✓ returns the same snapshot object when nothing the page renders changed 1ms
+     ✓ writes the confirmation word into the session draft, and calls nothing else 1ms
+     ✓ renders no button at all when the composition has no conversation service 0ms
+     ✓ never claims the box was filled when the editor refuses 2ms
+     ✓ keeps the page inert apart from the button and the open capsule 1ms
+     ✓ shows recorded liveness state and rescue evidence without inventing a task verdict 1ms
+     ✓ renders an observe finding as observed, not as a run cancellation 0ms
+     ✓ renders no guardian card at all when the session recorded none 0ms
+     ✓ puts the guardian in a right column only when a guardian started 1ms
+     ✓ keeps a run without a guardian as the plain page: no wrapper, no empty column 1ms
+     ✓ draws the guardian as blocks: three tiles and a full-width findings block 2ms
+     ✓ opens one task row into its own lines, and closes it again 3ms
+     ✓ leaves the chain chip off a line whose role names no slot 1ms
+     ✓ folds a history longer than six lines behind one toggle 1ms
+     ✓ carries the grid, the stacking rule and the height cap in the stylesheet 2ms
+     ✓ pins the route and the action list to the Host, and the tool still refuses to open 4ms
+     ✓ keeps the self-iterate switch on its own route and its own slot 0ms
+     ✓ posts to the Host route with the browser credential and reads the answer back 0ms
+     ✓ reports a refusal as a refusal instead of a state change 0ms
+     ✓ mounts in the tool row beside the model selector only, additive, and with the namespace when one exists 0ms
+     ✓ never reaches for the model selector or any DOM outside its own row 1ms
+     ✓ carries its copy in both languages, and neither falls back to a key id 1ms
+     ✓ reads the loop on mount, and stays inert until it knows the state 7ms
+     ✓ opens on a click and closes on the next one, through the shared Host operation 16ms
+     ✓ says why a refused open did nothing, and does not flip anyway 10ms
+     ✓ reports a Host without a scheduler in its own words, and stays off 7ms
+     ✓ uses the page fetch on the production path, not loopSend itself 7ms
+     ✓ renders inert copy instead of a switch when there is no session 7ms
+     ✓ drives both switches through the real page fetch into the real routes and services 100ms
+     ✓ pins the route, the action list and the body shapes to the Host contract 3ms
+     ✓ refuses to report a state a body does not carry 2ms
+     ✓ falls back to a GET read when the POST is refused with 405 2ms
+     ✓ names the refused method when both the POST and the GET fallback are refused 2ms
+     ✓ reports a dead transport as a failure instead of a state change 4ms
+     ✓ reads on mount, stays inert until it knows, and repaints what the Host answered 15ms
+     ✓ says off three ways, and never leaves the on-copy on screen 6ms
+     ✓ keeps the last known state when the Host refuses the write 11ms
+     ✓ renders inert copy instead of a switch when there is no session 6ms
+     ✓ retries the read after a failed one instead of writing blind 11ms
+     ✓ repaints a mounted switch when a command writes the record, with no click and no poll 11ms
+     ✓ reads once per new record seq, and once only when the same seq comes back 20ms
+     ✓ reads nothing on a window that moves without this plugin's record 11ms
+     ✓ keeps the known state and says nothing when the background re-read fails 10ms
+     ✓ mounts and reads with no sessions face at all, and with a face that cannot bind 15ms
+     ✓ stops following the session once it unmounts 11ms
+     ✓ follows a sessions face that arrives after the switch has already mounted 11ms
+     ✓ mounts in the tool row after the two heartbeats, with the namespace when one exists 1ms
+     ✓ carries its copy in both languages, and neither falls back to a key id 2ms
+     ✓ never calls a session with no record on, in either language 1ms
+     ✓ keeps reading a written record as on or off, and a sourceless answer as before 1ms
+     ✓ paints the no-record state as not on, and one click turns the session on 11ms
+     ✓ never reaches for the DOM or a neighbour switch, and adds no stylesheet rule 1ms
+     ✓ writes the session record a click asks for, and paints only what the route read back 18ms
+(node:53) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ test/summary-outcome.spec.ts (16 tests | 13 failed) 235ms
+     × records every rejected draft in the layered policy together with the last reason 150ms
+     × records the same outcome in the plain model policy, which used to record nothing 28ms
+     ✓ keeps the shipped marker byte-identical in the plain model policy 23ms
+     ✓ writes no marker at all when no draft was ever produced 23ms
+     × reads the shipped form unchanged 1ms
+     × reads both rejected forms with their stage and reason 0ms
+     × is not confused by a reason that quotes the marker vocabulary 0ms
+     × refuses a marker that states no usable outcome 0ms
+     × writes the run, the count, the stage and the reason — and nothing else 1ms
+     × drops every payload that is not a rejection it can explain 0ms
+     × bounds the reason it writes 0ms
+     × drops the run when the session refuses the append, like the sibling recorders 0ms
+     × carries the verdict onto the run and into the story 2ms
+     × takes the first valid claim and refuses half-facts 1ms
+     × prefers a shipped draft when a stream somehow carries both facts 3ms
+     ✓ leaves a run with neither fact saying nothing at all 0ms
+ ❯ test/progress-tab.spec.ts (57 tests | 2 failed) 53ms
+     × folds the progress and Guardian event contract and namespaces its view target and node kind 10ms
+     ✓ keeps both copies of PROGRESS_EVENT_TYPES identical, entry for entry 10ms
+     ✓ folds the recorded stream into one run with its rows and settlement 1ms
+     ✓ is order-insensitive, idempotent and settles a row whose start arrives late 0ms
+     ✓ drops a settlement for a row nobody declared and a run nobody announced 0ms
+     ✓ keeps an observe finding as observed, not as a run cancellation 0ms
+     ✓ takes the newest run as the active one and prefers the still-open one on a tie 0ms
+     ✓ pending: a declared-but-unstarted stage, and the percentage stays absent 1ms
+     ✓ doing: an open run with an unsettled row 1ms
+     ✓ done: every row of the stage settled as completed 0ms
+     ✓ failed wins over every other state, including an unfinished row 1ms
+     ✓ blocked: derived from a run that ended over a row it never settled, and says why 0ms
+     ✓ blocked: an outcome that is neither completed nor cancelled is derived, not renamed 0ms
+     ✓ cancelled: keeps the engine’s own word instead of deriving one 0ms
+     ✓ an unfinished row on a still-open run is doing, never blocked 0ms
+     ✓ clears the card only when a later attempt of that same call completed 1ms
+     ✓ keeps the stage that ran the recovered task out of red, and the bar count at zero 0ms
+     ✓ keeps a failure red when the retry has not settled yet, and when it failed again 0ms
+     ✓ never lets another task’s success recover this task’s failure 0ms
+     ✓ treats a resubmit inside one attempt as recovered: same label, same attempt 0ms
+     ✓ binds the engine’s own phases to the spine and appends plan tasks as real nodes 1ms
+     ✓ binds a Latin token only on word boundaries, so a substring is not a stage 1ms
+     ✓ names no stage for the three words the old spine mis-read: ui, tag and sync 1ms
+     ✓ puts a numbered plan task mentioning a stage word on its own card, never on the spine 0ms
+     ✓ keys a plan-task node by its whole phase header, so two identical titles stay apart 0ms
+     ✓ gives an unphased row its own node rather than hiding it from the track 0ms
+     ✓ binds plan-task rows to the stage their role label names, so execute and verify are not "not reported" 1ms
+     ✓ derives the work stage from its evidence: failed when a task row failed, doing while one is open 0ms
+     ✓ keeps a stage’s own rows authoritative over its evidence 0ms
+     ✓ invents no evidence for a label that names no stage 0ms
+     ✓ binds the English role labels too, where the verifier is called Check 0ms
+     ✓ reports rows settled over rows declared, not a task verdict 0ms
+     ✓ prefers a stage-detail payload, then the coordination block, then reports nothing 1ms
+     ✓ reports the seven AGENTS.md facts in the order a reader needs them 0ms
+     ✓ degrades to seven not-reported rows when no source exists 0ms
+     ✓ accepts the AGENTS.md labelled block, fenced or bare, and rejects prose 1ms
+     ✓ accepts a nested coordination object and a JSON fence with two known fields 0ms
+     ✓ normalizes lists and numbers without inventing a value for an empty one 0ms
+     ✓ folds a stage-detail event onto the node whose phase it names, and feeds the ladder 1ms
+     ✓ uses a phase-less payload as the run-level fallback and lets an injected source win 0ms
+     ✓ ignores an empty payload instead of claiming a stage was measured and found blank 0ms
+     ✓ formats a duration only when both ends were recorded 0ms
+     ✓ binds 规划（第N次） to the plan stage, one row per call 0ms
+     ✓ binds 汇总·第N稿 to the synthesize stage as two rows in two units 0ms
+     ✓ marks the summary draft the gate shipped, and only that draft 1ms
+     ✓ marks only the row that landed when one draft was asked twice 0ms
+     ✓ stays idempotent and order-insensitive, and never invents a mark 1ms
+     ✓ names the right stage from a numbered label when the phase is a task group 0ms
+     ✓ waiting: nothing declared yet — a planning headline, no steps, and the start button 1ms
+     ✓ running: one step per plan task, the first open one current, the ones after it named 1ms
+     × done: the whole plan passed — the finished headline, the shipped draft marked 3ms
+     ✓ failed: the amber bar counts the attempt of the unit that is still broken 1ms
+     ✓ falls back to the work legs when the run planned no tasks 1ms
+     ✓ has no step while only the planner has been declared 1ms
+     ✓ quotes the six-stage spine the code exports, with no answer stage 0ms
+     ✓ no live sentence reads the fixed spine as seven stages again 0ms
+     ✓ states the spine’s stage count, and states it as PROGRESS_STAGES.length 1ms
+ ❯ test/report.spec.ts (45 tests | 1 failed) 40ms
+     ✓ accepts the canonical report 4ms
+     × carries the summary gate’s verdict into the report (Sec.3-3) 14ms
+     ✓ rejects a verified task with no acceptance criteria 1ms
+     ✓ rejects an attempt payload outside the closed execution union 0ms
+     ✓ rejects a verification verdict outside the closed union 0ms
+     ✓ rejects unknown confidence and command statuses 1ms
+     ✓ accepts the script normalization fallbacks for every closed union 0ms
+     ✓ rejects a passed attempt whose executor reported partial 0ms
+     ✓ rejects a passed attempt whose verifier verdict is fail 0ms
+     ✓ rejects a passed attempt with no checked evidence 0ms
+     ✓ rejects a verified change task whose execution left no artifact at all 1ms
+     ✓ accepts a summary-only answer task when the verifier checked it 1ms
+     ✓ rejects a change task whose only "artifact" is a not_run command 1ms
+     ✓ rejects passed attempts whose checked evidence entries are all empty 0ms
+     ✓ accepts a summary-only answer for a Chinese factual question 1ms
+     ✓ rejects a summary-only answer when the root objective asks for a change 1ms
+     ✓ rejects summary-only when the Chinese root objective asks for a change 0ms
+     ✓ does not grant the answer-only exemption to an ambiguous objective 0ms
+     ✓ rejects a passed attempt whose checked evidence is missing kind 0ms
+     ✓ rejects a passed attempt whose checked evidence is missing locator 0ms
+     ✓ rejects a passed attempt whose checked evidence is missing finding 0ms
+     ✓ rejects completed when a task result is failed 0ms
+     ✓ rejects confirmed evidence no verifier produced 0ms
+     ✓ rejects confirmed evidence whose criterion was never marked met 0ms
+     ✓ rejects confirmed evidence for an unknown task 0ms
+     ✓ matches confirmed evidence against a formatting-different verifier criterion 1ms
+     ✓ rejects more tasks than maxTasks 0ms
+     ✓ rejects duplicate task ids 0ms
+     ✓ rejects limits.maxTotalAgents outside the request builder window 1ms
+     ✓ rejects a partial report that does not account for its failed task 0ms
+     ✓ rejects a partial report whose failure reason is blank 0ms
+     ✓ rejects a partial report that lists the same failed task twice 0ms
+     ✓ still accepts a verified fallback plan as partial with no failed task 0ms
+     ✓ rejects a fallback plan whose tasks do not carry the request objective 0ms
+     ✓ keeps the ledger out of the default view (B plan) 0ms
+     ✓ prints Model routes with "inherit" when no chain was configured 0ms
+     ✓ prints the configured chains, in chain order, when they exist 0ms
+     ✓ carries the deadline the run actually ran under 0ms
+     ✓ carries an explicit deadline when the caller sets one 0ms
+     ✓ rejects a result that ran under a different deadline than the plugin enforces 0ms
+     ✓ names the configured chains in a failure report too, instead of all-empty 0ms
+     ✓ accepts a legacy result that does not mention a deadline 0ms
+     ✓ renders the failed attempt that caused the switch 1ms
+     ✓ says nothing about switches when every call succeeded 0ms
+     ✓ marks truncated confirmed/incomplete rows in both dialects instead of dropping them silently (round 44) 1ms
+ ❯ test/i18n-parity.spec.ts (8 tests | 1 failed) 18ms
+     ✓ reports a key that only one locale has, so the parity check can fail at all 2ms
+     ✓ keeps the plugin dictionary symmetric and non-trivial 1ms
+     ✓ keeps the panel dictionary symmetric, and is exactly what the panel-scope keys land in 1ms
+     ✓ resolves every literal `t('…')` key in the bundle source 1ms
+     ✓ resolves the keys built by concatenation and the tables that hold them 3ms
+     ✓ resolves every dynamic expansion the bundle can produce, in the table that consumes it 0ms
+     × carries every redesign key, word for word, in both languages 6ms
+     ✓ deletes the whole removed family from both tables, and keeps the survivors 2ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 22 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/client.spec.ts > client progress tab: the one-page story (three screens) > done: 已完成 — every step passed, the shipped draft named
+AssertionError: expected { draft: 1, label: '汇总', …(1) } to match object { kind: 'shipped', draft: 1, …(1) }
+(7 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "draft": 1,
+-   "kind": "shipped",
+    "label": "汇总",
+  }
+
+ ❯ test/client.spec.ts:2286:25
+    2284|     expect(story.attempt).toBeUndefined()
+    2285|     expect(story.rest).toEqual([])
+    2286|     expect(story.final).toMatchObject({ kind: 'shipped', draft: 1, lab…
+       |                         ^
+    2287|
+    2288|     const page = pageOf(run, { canOpen: (childId: string) => childId =…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/22]⎯
+
+ FAIL  test/client.spec.ts > client progress tab: the one-page story (three screens) > rejected: 交卷 card says every draft was turned back, and what the last failure was
+AssertionError: expected undefined to deeply equal { kind: 'rejected', drafts: 3, …(2) }
+
+- Expected:
+{
+  "drafts": 3,
+  "kind": "rejected",
+  "reason": "cites \"out/x.bin\", which the verified report does not contain",
+  "stage": "check",
+}
+
++ Received:
+undefined
+
+ ❯ test/client.spec.ts:2339:25
+    2337|       stopReason: 'completed',
+    2338|     })
+    2339|     expect(story.final).toEqual({
+       |                         ^
+    2340|       kind: 'rejected',
+    2341|       drafts: 3,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/22]⎯
+
+ FAIL  test/client.spec.ts > client progress tab: the one-page story (three screens) > the shell's own path: match, update, buildViewNode > carries the shipped draft from summary-final through the run-end that follows it
+AssertionError: expected { draft: 1, label: '汇总', …(1) } to match object { kind: 'shipped', draft: 1 }
+(8 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "draft": 1,
+-   "kind": "shipped",
+  }
+
+ ❯ test/client.spec.ts:2505:33
+    2503|       // ever sees the node's data.
+    2504|       expect((tab as unknown as { run(): ProgressRun }).run().summaryF…
+    2505|       expect(tab.story().final).toMatchObject({ kind: 'shipped', draft…
+       |                                 ^
+    2506|       // …then the run closes, still in that order.
+    2507|       for (const event of events.slice(claimAt + 1)) fed.push(tab.feed…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/22]⎯
+
+ FAIL  test/client.spec.ts > client progress tab: the one-page story (three screens) > the shell's own path: match, update, buildViewNode > carries the rejected verdict through the run-end that follows it
+AssertionError: no recorder event may be dropped by the tab: expected [ 'start', 'update', 'update', …(3) ] to not include 'dropped'
+ ❯ test/client.spec.ts:2529:70
+    2527|       const fed: string[] = []
+    2528|       for (const event of events.slice(0, claimAt + 1)) fed.push(tab.f…
+    2529|       expect(fed, 'no recorder event may be dropped by the tab').not.t…
+       |                                                                      ^
+    2530|       expect((tab as unknown as { run(): ProgressRun }).run().summaryR…
+    2531|         drafts: 1,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/22]⎯
+
+ FAIL  test/client.spec.ts > client progress tab: the one-page story (three screens) > the shell's own path: match, update, buildViewNode > keeps every recorder event type on the tab's own update list
+AssertionError: tool-workflow/summary-rejected: expected [ 'tool-workflow/run-start', …(7) ] to include 'tool-workflow/summary-rejected'
+ ❯ test/client.spec.ts:2562:43
+    2560|       ]
+    2561|       for (const type of recorded) {
+    2562|         expect(progress.eventTypes, type).toContain(type)
+       |                                           ^
+    2563|       }
+    2564|     })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/22]⎯
+
+ FAIL  test/i18n-parity.spec.ts > client i18n: both locales carry every key the UI asks for > carries every redesign key, word for word, in both languages
+AssertionError: zh progress.final.rejected: expected undefined to be '第 {n} 稿全被退回' // Object.is equality
+
+- Expected:
+"第 {n} 稿全被退回"
+
++ Received:
+undefined
+
+ ❯ test/i18n-parity.spec.ts:303:48
+    301|     expect(REDESIGN_COPY.length).toBeGreaterThanOrEqual(30)
+    302|     for (const [key, zh, en] of REDESIGN_COPY) {
+    303|       expect(bundle.dict.zh[key], `zh ${key}`).toBe(zh)
+       |                                                ^
+    304|       expect(bundle.dict.en[key], `en ${key}`).toBe(en)
+    305|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/22]⎯
+
+ FAIL  test/progress-tab.spec.ts > progress tab: the event contract > folds the progress and Guardian event contract and namespaces its view target and node kind
+AssertionError: expected [ 'tool-workflow/run-start', …(7) ] to deeply equal [ 'tool-workflow/run-start', …(8) ]
+
+- Expected
++ Received
+
+  [
+    "tool-workflow/run-start",
+    "tool-workflow/agent-start",
+    "tool-workflow/agent-end",
+    "tool-workflow/summary-final",
+-   "tool-workflow/summary-rejected",
+    "tool-workflow/guardian-start",
+    "tool-workflow/guardian-finding",
+    "tool-workflow/guardian-end",
+    "tool-workflow/run-end",
+  ]
+
+ ❯ test/progress-tab.spec.ts:129:34
+    127| describe('progress tab: the event contract', () => {
+    128|   it('folds the progress and Guardian event contract and namespaces it…
+    129|     expect(PROGRESS_EVENT_TYPES).toEqual([
+       |                                  ^
+    130|       'tool-workflow/run-start',
+    131|       'tool-workflow/agent-start',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/22]⎯
+
+ FAIL  test/progress-tab.spec.ts > progress tab: the one-page story > done: the whole plan passed — the finished headline, the shipped draft marked
+AssertionError: expected { draft: 1, label: '汇总', …(1) } to match object { kind: 'shipped', draft: 1, …(1) }
+(7 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "draft": 1,
+-   "kind": "shipped",
+    "label": "汇总",
+  }
+
+ ❯ test/progress-tab.spec.ts:1029:25
+    1027|       [4, '汇总·第1稿', '汇总', 'done', true],
+    1028|     ])
+    1029|     expect(story.final).toMatchObject({ kind: 'shipped', draft: 1, lab…
+       |                         ^
+    1030|     expect(story.final?.kind === 'shipped' ? story.final.row : undefin…
+    1031|     expect(story.dock).toBe('accept')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/22]⎯
+
+ FAIL  test/report.spec.ts > workflow report semantic contract > carries the summary gate’s verdict into the report (Sec.3-3)
+AssertionError: expected 'Grok workflow: COMPLETED\nObjective: …' to contain 'Summary review: check=fail verify=pas…'
+
+- Expected
++ Received
+
+- Summary review: check=fail verify=pass drafts=3 reason=cites "x", which the report lacks · rejected: draft 3 (check: cites "x", which the report lacks)
++ Grok workflow: COMPLETED
++ Objective: Ship the verified result
++ Plan: caller; 1 task(s); 1 verified
++ Wave reason: Single wave because the objective is one indivisible unit: splitting it would only add a hand-off.
++ - a: verified (1 attempt) — Task a
++ Confirmed evidence:
++ - a: a works → verified a works
++ Final answer:
++ ship it
++ Summary review: check=fail verify=pass drafts=3 reason=cites "x", which the report lacks
+
+ ❯ test/report.spec.ts:161:8
+    159|     const rejected = { ...report({ status: 'completed' }), synthesis: …
+    160|     expect(renderReport(assertWorkflowReport(rejected, OBJECTIVE, conf…
+    161|       .toContain('Summary review: check=fail verify=pass drafts=3 reas…
+       |        ^
+    162|     expect(renderReport(assertWorkflowReport(rejected, OBJECTIVE, conf…
+    163|     // The verify stage reads the same way, and a marker without a rea…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/22]⎯
+
+ FAIL  test/summary-outcome.spec.ts > the script records the gate outcome, not only the passing one > records every rejected draft in the layered policy together with the last reason
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/summary-outcome.spec.ts:94:74
+     92|     expect(run.report.synthesis.summary ?? '').toContain('任务 a')
+     93|     const review = run.report.synthesis.review ?? ''
+     94|     expect(review.startsWith('check=fail verify=pass drafts=3 reason='…
+       |                                                                          ^
+     95|     expect(review).not.toContain('\n')
+     96|     expect(review.length).toBeLessThanOrEqual('check=fail verify=pass …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/22]⎯
+
+ FAIL  test/summary-outcome.spec.ts > the script records the gate outcome, not only the passing one > records the same outcome in the plain model policy, which used to record nothing
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/summary-outcome.spec.ts:121:74
+    119|     expect(run.report.synthesis.summary).toBeUndefined()
+    120|     const review = run.report.synthesis.review ?? ''
+    121|     expect(review.startsWith('check=fail verify=pass drafts=3 reason='…
+       |                                                                          ^
+    122|     expect(summaryGateOutcome(review)).toMatchObject({ kind: 'rejected…
+    123|     expect(run.report.synthesis.error ?? '').toContain('no narrative i…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/22]⎯
+
+ FAIL  test/summary-outcome.spec.ts > summaryGateOutcome: the two outcomes one marker string can state > reads the shipped form unchanged
+TypeError: summaryGateOutcome is not a function
+ ❯ test/summary-outcome.spec.ts:153:12
+    151| describe('summaryGateOutcome: the two outcomes one marker string can s…
+    152|   it('reads the shipped form unchanged', () => {
+    153|     expect(summaryGateOutcome('check=pass verify=pass drafts=1')).toEq…
+       |            ^
+    154|     expect(summaryGateOutcome('check=pass verify=pass drafts=12')).toE…
+    155|     // A count of zero is not a draft, exactly as `shippedSummaryDraft…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/22]⎯
+
+ FAIL  test/summary-outcome.spec.ts > summaryGateOutcome: the two outcomes one marker string can state > reads both rejected forms with their stage and reason
+TypeError: summaryGateOutcome is not a function
+ ❯ test/summary-outcome.spec.ts:160:12
+    158|
+    159|   it('reads both rejected forms with their stage and reason', () => {
+    160|     expect(summaryGateOutcome('check=fail verify=pass drafts=3 reason=…
+       |            ^
+    161|       .toEqual({ kind: 'rejected', drafts: 3, stage: 'check', reason: …
+    162|     expect(summaryGateOutcome('check=pass verify=fail drafts=2 reason=…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/22]⎯
+
+ FAIL  test/summary-outcome.spec.ts > summaryGateOutcome: the two outcomes one marker string can state > is not confused by a reason that quotes the marker vocabulary
+TypeError: summaryGateOutcome is not a function
+ ❯ test/summary-outcome.spec.ts:169:12
+    167|     // The reason is the rest of the line, so a `drafts=` inside it st…
+    168|     const review = 'check=fail verify=pass drafts=3 reason=the draft r…
+    169|     expect(summaryGateOutcome(review)).toEqual({
+       |            ^
+    170|       kind: 'rejected',
+    171|       drafts: 3,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/22]⎯
+
+ FAIL  test/summary-outcome.spec.ts > summaryGateOutcome: the two outcomes one marker string can state > refuses a marker that states no usable outcome
+TypeError: summaryGateOutcome is not a function
+ ❯ test/summary-outcome.spec.ts:179:12
+    177|   it('refuses a marker that states no usable outcome', () => {
+    178|     // No reason: a rejection the reader cannot explain is not an outc…
+    179|     expect(summaryGateOutcome('check=fail verify=pass drafts=3')).toBe…
+       |            ^
+    180|     expect(summaryGateOutcome('check=fail verify=pass drafts=3 reason=…
+    181|     // No draft count, or a count below one.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/22]⎯
+
+ FAIL  test/summary-outcome.spec.ts > the recorder publishes a rejected outcome as its own fact > writes the run, the count, the stage and the reason — and nothing else
+TypeError: recorder.summaryRejected is not a function
+ ❯ test/summary-outcome.spec.ts:214:14
+    212|     const recorder = createWorkflowProgressRecorder(target as unknown …
+    213|     recorder.runStart({ id: 'run-1', meta: { name: '任务团队' } })
+    214|     recorder.summaryRejected('run-1', { drafts: 3, stage: 'check', rea…
+       |              ^
+    215|     recorder.runEnd('run-1', 'completed')
+    216|     expect(target.writes).toEqual([
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/22]⎯
+
+ FAIL  test/summary-outcome.spec.ts > the recorder publishes a rejected outcome as its own fact > drops every payload that is not a rejection it can explain
+TypeError: recorder.summaryRejected is not a function
+ ❯ test/summary-outcome.spec.ts:231:14
+    229|     recorder.runStart({ id: 'run-1', meta: { name: '任务团队' } })
+    230|     // Not our run, no draft judged, a stage outside the gate's two wo…
+    231|     recorder.summaryRejected('not-ours', { drafts: 3, stage: 'check', …
+       |              ^
+    232|     recorder.summaryRejected('run-1', { drafts: 0, stage: 'check', rea…
+    233|     recorder.summaryRejected('run-1', { drafts: Number.NaN, stage: 'ch…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/22]⎯
+
+ FAIL  test/summary-outcome.spec.ts > the recorder publishes a rejected outcome as its own fact > bounds the reason it writes
+TypeError: recorder.summaryRejected is not a function
+ ❯ test/summary-outcome.spec.ts:245:14
+    243|     const recorder = createWorkflowProgressRecorder(target as unknown …
+    244|     recorder.runStart({ id: 'run-1', meta: { name: '任务团队' } })
+    245|     recorder.summaryRejected('run-1', { drafts: 2, stage: 'verify', re…
+       |              ^
+    246|     const write = target.writes.find(candidate => candidate.type === P…
+    247|     expect(write).toBeDefined()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/22]⎯
+
+ FAIL  test/summary-outcome.spec.ts > the recorder publishes a rejected outcome as its own fact > drops the run when the session refuses the append, like the sibling recorders
+TypeError: recorder.summaryRejected is not a function
+ ❯ test/summary-outcome.spec.ts:257:14
+    255|     const recorder = createWorkflowProgressRecorder(target as unknown …
+    256|     recorder.runStart({ id: 'run-1', meta: { name: '任务团队' } })
+    257|     recorder.summaryRejected('run-1', { drafts: 2, stage: 'check', rea…
+       |              ^
+    258|     // The second fact is not attempted: the run is no longer this rec…
+    259|     recorder.summaryRejected('run-1', { drafts: 2, stage: 'check', rea…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/22]⎯
+
+ FAIL  test/summary-outcome.spec.ts > the fold and the story read the rejected outcome > carries the verdict onto the run and into the story
+AssertionError: expected undefined to deeply equal { drafts: 3, stage: 'check', …(1) }
+
+- Expected:
+{
+  "drafts": 3,
+  "reason": "cites \"x\"",
+  "stage": "check",
+}
+
++ Received:
+undefined
+
+ ❯ test/summary-outcome.spec.ts:281:34
+    279|   it('carries the verdict onto the run and into the story', () => {
+    280|     const [run] = foldProgressRuns(rejectedStream({ drafts: 3, stage: …
+    281|     expect(run!.summaryRejected).toEqual({ drafts: 3, stage: 'check', …
+       |                                  ^
+    282|     // A rejected run names no shipped draft: the mark never lands, an…
+    283|     // something else to say.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/22]⎯
+
+ FAIL  test/summary-outcome.spec.ts > the fold and the story read the rejected outcome > takes the first valid claim and refuses half-facts
+AssertionError: expected undefined to deeply equal { drafts: 2, stage: 'verify', …(1) }
+
+- Expected:
+{
+  "drafts": 2,
+  "reason": "the answer omits b",
+  "stage": "verify",
+}
+
++ Received:
+undefined
+
+ ❯ test/summary-outcome.spec.ts:292:36
+    290|   it('takes the first valid claim and refuses half-facts', () => {
+    291|     const [first] = foldProgressRuns(rejectedStream({ drafts: 2, stage…
+    292|     expect(first!.summaryRejected).toEqual({ drafts: 2, stage: 'verify…
+       |                                    ^
+    293|
+    294|     for (const payload of [
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/22]⎯
+
+ FAIL  test/summary-outcome.spec.ts > the fold and the story read the rejected outcome > prefers a shipped draft when a stream somehow carries both facts
+AssertionError: expected { draft: 1, label: '汇总', …(1) } to match object { kind: 'shipped', draft: 1 }
+(7 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "draft": 1,
+-   "kind": "shipped",
+  }
+
+ ❯ test/summary-outcome.spec.ts:314:25
+    312|     ])
+    313|     const story = deriveProgressStory(run!)
+    314|     expect(story.final).toMatchObject({ kind: 'shipped', draft: 1 })
+       |                         ^
+    315|   })
+    316|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/22]⎯
+
+
+ Test Files  5 failed (5)
+      Tests  22 failed | 246 passed (268)
+   Start at  22:46:41
+   Duration  4.17s (transform 1.38s, setup 0ms, import 1.83s, tests 889ms, environment 1ms)
+

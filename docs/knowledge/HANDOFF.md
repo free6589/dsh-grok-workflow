@@ -1,3 +1,57 @@
+## 2026-11-25 — `fix/synth-outcome`：汇总结论补上「全被退回 + 最后一次为什么不过」交付、跑绿、**真机验过通过态**，**未合 main、未 push、未发版**；本分支的决定日期是 **2026-11-26**
+
+- **From:** 实现 + 记忆收口（`agent-174/impl-synth-outcome`）· **To:** 操作者 / 下一个接手者
+- **这一轮是什么**：一条 `fix/*` 分支上的收尾，不是发布轮。分支从 `main` 尖端 **`57dcf04`** 长出，**四颗提交**：
+  `5388f22` 主体（脚本标记、读回、事件、折叠、卡片、文案、重建 `lib/` + 测试）、
+  `4f395c7` 证据（红/绿转录、门禁、真机读数与截图），紧随其后的
+  `docs(memory): record the all-rejected summary outcome and its evidence`（本文档、`CHANGELOG`，以及最终树门禁的转录），
+  再一颗 `docs(memory): correct the commit count and record the final-tree gate`（只改文字：把提交数与改动面改准、补上最终树门禁的转录）。
+  **后两颗在文档里不自指提交号**（一个提交写不出自己的 sha）。
+  **改动面分两段对账**：`57dcf04..5388f22` **36 个文件**（`src/` 六个——`script.ts`、`report.ts`、`records.ts`、
+  `run.ts`、`progress-tab.ts`、`client/index.js`；`lib/` 十九个构建产物；五个 spec；证据目录最初那一份 README 加四件产物）；
+  文档提交再加 **10 个新文件**（`CHANGELOG.md`、六个 `docs/knowledge/*`——`STATE` / `HANDOFF` / `VALIDATION` /
+  `DECISIONS` / `RESEARCH` / `DESIGN-progress-tab`、证据目录三份转录与红记录）并对上面那份 README 追加一节
+  （README 在总量里只算一次）。`57dcf04..HEAD` 合计 **46 个文件**，与 `git diff --stat 57dcf04..HEAD` 对得上。
+- **修的是什么**：闸门此前只记录「通过」——分层策略写 `check=fail verify=pass drafts=N` 却不带理由，
+  plain `model` 策略连标记都不写，只剩 `synthesis.error` 的一段散文；于是进度页对「这一轮没交卷」
+  只会说那句 `progress.final.missing`。现在 `synthesis.review` 带**结论**：通过仍是
+  `check=pass verify=pass drafts=N`（逐字未变），退回变成 `… drafts=N reason=<一行>`；读回是新函数
+  `summaryGateOutcome()`，事件是新的 `tool-workflow/summary-rejected`，卡片分成**三态**。
+- **用户能看到的**：交卷卡片不再只有「这一轮没有交卷稿」一句。每一稿都被退回时，它写成琥珀色两块——
+  「第 {n} 稿全被退回」和「最后不过：<理由>」，没有名字、没有（定稿）、没有胶囊；交过稿的运行与以前逐字一致。
+- **门禁与算术（`CONFIRMED`）**：`TMPDIR=$PWD/.tmp npm run ci` 跑了三遍、都是 **`EXIT=0`**——代码树 `5388f22`、证据提交 `4f395c7` 上的独立复核、文档提交 `6d8a98f` 的最终树——
+  `Found 15 warnings and 0 errors.`、`client bundle: 352002 bytes → lib/client.js`、
+  `lib/ at <sha> is the build of src/ at <sha> (285 files, byte-identical)`、**`102 files / 1903 tests`**；
+  `node scripts/verify-lib.mjs` 单独跑同句、exit 0；另一遍独立复核在 `4f395c7` 上同样 `EXIT=0`。
+  基线 `101 files / 1884 tests`（`57dcf04`，派单方 22:04 实测）→ **+1 文件 / +19 用例**，
+  `lib/client.js` **347526 → 352002** 字节。逐文件：`test/summary-outcome.spec.ts` 新增 16、
+  `test/client.spec.ts` +3、其余三个 spec 只改写既有断言。
+- **红的记录是事后的（照实说）**：第一份红 `red-summary-outcome.out` 是用 `git stash push -- src`
+  把源码退回基点后跑的（写作顺序是**先实现、后断言**）；随后补了一份基线整套跑
+  `red-baseline-suite.out`——`git archive 57dcf04` 的树上、五个被改的 spec 一起跑，**`22 failed / 246 passed`、
+  `5 files failed`**，覆盖了「既有 spec 的新期望在基点上确实是红的」。
+- **决定日期（`AGENTS.md` §5 对 `fix/*` 的要求：合并后 24 小时内删分支）：2026-11-26。**
+  那天之前二选一——合进 `main` 走发布，或者删掉这条分支。它是 3 条用户可见行为 + 19 条用例全绿的东西。
+- **真机那半边跑过一半，另一半是 `NOT_RUN`**：隔离档案（`web-clone`、端口 3391、真实模型）跑了一次真实运行，
+  完成页仍是**通过态**——`final-name` `汇总·第1稿`、`final-mark` `（定稿）`、胶囊 1、
+  `final-rejected`/`final-missing` **0/0**、控制台 `{"consoleErrors": [], "pageErrors": []}`。
+  **`NOT_RUN`：真机上的「三稿全被退回」**——要在活模型上连续三次撞穿闸门，抖动大、烧额度；
+  **没有人在真机上见过那张琥珀卡**，它只由组件用例与 CSS 保证。
+  另一条 `NOT_RUN`：`check=pass verify=fail` 的**写入端**没在活引擎上跑过（解析/渲染有用例）。
+- **live 档案的 observation（`HYPOTHESIS`，不是本会话干的）**：`~/.dsh` 目录 mtime 在窗口内走到 `22:28:12`，
+  `~/.dsh/profiles/web/package.json`（`22:06:12`）与 `node_modules`（`22:06:09`）也动过，
+  **live 档案里装着的插件现在读回 `0.13.39`**（上一份已发布记忆写 `0.13.38`）。本会话写不进 `~/.dsh`
+  （`touch ~/.dsh/.foreman-probe` → `Read-only file system`），所以这是会话之外的进程做的，**原因未查明**。
+  与插件安装真正相关的 `profiles/web/cordis.patch.yml` 停在 `19:27:31`，没被动过。
+- **给下一个人的三条操作提示**：① 证据在 **`.rsi/evidence/synth-outcome-2026-11-25/`**（README + 两份门禁转录
+  + 两份红 + 真机读数与截图 + 会话事件摘录），**引用归档那份，别引用 `.tmp/`**。② 权威数字只有三个地方：
+  `gate-6d8a98f.out`（最终树）、`gate-5388f22.out`（代码树）、`soak-readings-completed.json`（真机那一次），
+  外加 `gate-4f395c7-docs.out`（文档写入后、提交前那一遍；与最终树那一遍同数，两次读都真）；
+  记忆里的 `102 / 1903`、`352002`、`285 files` 都能从这三处回指。③ **`test/records.spec.ts` 不存在**——
+  记录器的既有用例在 `test/progress.spec.ts`，这一轮新增的记录器规则在 `test/summary-outcome.spec.ts`；
+  找「recorder 怎么写事件」别去翻一个不存在的文件。
+
+---
 ## 2026-11-25 — `feat/progress-layout-detail`：进度页布局细化（两栏躯体 / Guardian 四块 / 任务行就地展开 / 经过折叠）交付、跑绿、**隔离档案真机验过**，**未合 main、未 push、未发版**；本分支的决定日期是 **2026-12-09**
 
 - **From:** 记忆收口（`agent-173/memory`）· **To:** 操作者 / 下一个接手者

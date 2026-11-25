@@ -4411,3 +4411,56 @@ spine 为空，pre-fix 形状会进脊柱。
     `.rsi/evidence/progress-layout-detail-2026-11-25/`；仍然 `NOT_RUN` 的只有四条：发送前的基线页面快照
     （空会话不挂载进度 Tab）、未通过 / 已取消两态（两次都 `completed`）、点按钮后读输入框内容（只验了存在与文案）、
     live 档案升级 / 重载 / 重启（红线）。
+
+## D-158 · 汇总结论用「标记 + 独立事件 + 三态卡片」表达，而不是给 `summary-final` 加字段：退回的事实必须和通过的事实分开（2026-11-25，未发版）
+
+- **Status:** `CONFIRMED`（源码 `src/script.ts` / `src/report.ts` / `src/records.ts` / `src/run.ts` /
+  `src/progress-tab.ts` / `src/client/index.js` 本轮实读；用例 `test/summary-outcome.spec.ts` 16 条 +
+  `test/client.spec.ts`、`test/report.spec.ts` 的改写；门禁 `.rsi/evidence/synth-outcome-2026-11-25/gate-5388f22.out`
+  `EXIT=0`、`102 files / 1903 tests`；真机通过态读数在同一个目录，**退回态是 `NOT_RUN`**）
+- **Date:** 2026-11-25
+- **Context:** 闸门（draft → check → 独立 verify）只把**通过**的结论写进报告：分层策略在全部被退回时写
+  `check=fail verify=pass drafts=N` 却不带理由，plain `model` 策略连标记都不写，只剩 `synthesis.error` 的一段散文。
+  于是「这一轮没交卷」在进度页上只有一个读法——那句 `progress.final.missing`——读者看不出**是一次都没写出来**
+  还是**写了三稿全被退回**，更看不出最后一次卡在哪。
+- **Decision:**
+  1. **理由接在既有标记的尾部，不新开报告字段。** 通过仍是 `check=pass verify=pass drafts=N`（逐字不动，
+     `shippedSummaryDraft` 一个字没改），退回变成 `… drafts=N reason=<一行>`。`reason=` 排在最后、就是「剩下的整行」，
+     所以理由里出现 `drafts=` 也改不了最左那次解析；理由在**写入处**整形一次（控制字符→空格、空白折叠、≤300），
+     而不是让每个读方各截一次。不新开 `synthesis.outcome` 字段的理由：报告是给 `src/carryover.ts` 与多套用例
+     逐字读回去的视图，加一个字段就要同步改所有读者，而这条事实本来就长在同一个标记上。
+  2. **退回另开一条事件（`tool-workflow/summary-rejected`），不复用 `summary-final`。** 一次运行只会有其中一个事实；
+     塞进同一载荷就得让 `draft` 一会儿是「第几稿」一会儿是「几稿」，读方要么猜要么自相矛盾，而旧读方（没有这个
+     新事件的 Tab）现在仍把退回的运行渲染成「没有 final」，正是它本来该看到的。
+  3. **理由为空的退回事实被丢掉，不发布半截结论。** recorder 与读回都在理由空白时返回「没有这件事」：
+     「每一稿都被退回，但不告诉你为什么」比「没有任何结论」更坏——它看起来像已经解释过。
+  4. **折叠里通过压过退回。** recorder 不会两条都写，但手写的会话流可能；卡片不能否认一次真的交过稿，
+     所以有通过稿就用通过态，没有才用退回态。
+  5. **卡片三态，而不是给旧卡片加一句话。** 通过=今天的绿卡逐字（名字 +（定稿）+ 胶囊）；退回=琥珀块
+     （几稿全被退回 + 最后不过的理由，没有名字/（定稿）/胶囊——没有可开的行）；什么都没记录=原句。
+     把退回塞进绿卡会同时说「交卷了」和「没交卷」。
+- **Evidence:**
+  - 标记文法与整形：`src/script.ts` 两处站点 + `summaryReviewReason()`；`test/summary-outcome.spec.ts`
+    的四个引擎用例（分层退回、`model` 退回、`model` 通过逐字、无稿不写标记）。
+  - 读回：`src/report.ts` `summaryGateOutcome()` 与 6 条解析用例（含「理由里带 `drafts=`」「两段同词」「`drafts=0`」）。
+  - 事件：`src/records.ts` 的 `summaryRejected()` 与 4 条规则用例（非本 run、`drafts<1`、非法 stage、空白理由、
+    append 被拒后不再为这个 run 说话、理由截到 300）。
+  - 折叠与故事：`run.summaryRejected`、`ProgressStory.final` 判别式、通过优先；浏览器镜像连 `update` 重放与
+    `buildViewNode` 一起带（否则下一次 `run-end` 一重折就抹掉，与当年「定稿」丢失同一个坑）。
+  - 真机：完成页 `final-name` `汇总·第1稿` / `final-mark` `（定稿）` / `final-rejected` 0 / 控制台空——
+    **通过态回归过，退回态是 `NOT_RUN`**。
+- **Alternatives rejected:**
+  - **给 `summary-final` 的载荷加 `{ rejected: true, reason }`。** 否决：一个事件两种语义，`draft` 的含义会随
+    `rejected` 变，任何只认 `draft` 的读方都会把「3 稿」当成「第 3 稿」——正是这条改动要消灭的那种误读。
+  - **把结论写进插件自己的 run record（`recordRouting` 那类账本），不进 `tool-workflow/*` 事件流。** 否决：
+    进度 Tab 的输入只有会话事件；账本是诊断面，页面看不见。要页面说话就得走事件流。
+  - **只把理由写进 `synthesis.error`。** 否决：`error` 是散文，不是机器可读的结论；宿主没法从中取 stage 与
+    稿数，卡片也就只能照旧说一句「没有交卷稿」。而且 `error` 的句子已经在说别的（确定性叙述为什么顶上来）。
+  - **退回时不动卡片，只让 chip 变「未通过」。** 否决：chip 说的是运行状态，不是汇总结论；一个 0/2 的运行与一个
+    「活都做完了、只是稿子没过」的运行会显示成同一件事。
+- **Consequences:**
+  - `docs/knowledge/DESIGN-progress-tab.md` 追加 §21（标记文法、读回表、事件载荷、折叠字段、故事联合、三态卡片与钩子、
+    两条文案、通过优先的不变量、仍然 `NOT_RUN` 的两条）。
+  - 报告台账行的退回后缀读**解析值**而不是被 `oneLine(...,240)` 截过的字符串，否则理由掉进截断里就只剩「退回」。
+  - `synthesis.review` 仍是 schema 里的无上限 `string()`，长标记不会让报告非法（已用一条断言钉住 tail 保留）。
+  - 未验的边界留在证据里：`check=pass verify=fail` 的写入端没有活引擎读数（解析/渲染有）；真机没跑过退回态。
