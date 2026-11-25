@@ -1,18 +1,17 @@
 /**
- * The connector between two nodes, and the state glyph inside a node's ring.
+ * The progress page's shape and its colours: what the one-page redesign kept, and what it
+ * retired for good.
  *
- * Both are hand-written JavaScript in `src/client/index.js` (the host serves that bundle
- * verbatim, so it cannot be type-checked), and `test/client.spec.ts` renders the tab
- * without ever asserting either: the fill rule (`data-filled`) and the glyph table are
- * therefore pinned here, on the bundle the browser actually runs.
+ * The old page was two tracks: a fixed six-segment spine with a ring per segment, a
+ * hairline connector between the rings, a measured SVG wire layer that drew which stage
+ * owned which task card, and a settle bar that split the declared rows by outcome. The
+ * redesign (§19 of `DESIGN-progress-tab.md`) replaces all of it with one equal segment per
+ * step and an event log, so this file is where the retirement is pinned: a half-deleted
+ * structure would keep re-asserting the template nobody wants on screen any more.
  *
- * The two claims under test are the ones a reader relies on:
- *
- * - a connector is filled exactly when the track has *passed* the node on its left, which
- *   is the node's own `done` state — never "the run reached here", which the stream does
- *   not say;
- * - a node carries one glyph for its state, except when it aggregates more than one row,
- *   where the exact row count is the more checkable fact and replaces the glyph.
+ * The text of the three screens is `test/client.spec.ts`'s job. This file reads the
+ * stylesheet and the rendered tree, because both are hand-written JavaScript the host
+ * serves verbatim and neither can be type-checked.
  */
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
@@ -34,50 +33,12 @@ type ProgressRun = {
   anchorSeq: number
   members: ProgressMember[]
   stopReason?: string
-  guardian?: {
-    started: boolean
-    armed: boolean
-    budgetMs: number
-    ended: boolean
-    cancelled: boolean
-    findings: Array<{ seq: number, label: string, signal: 'timeout' | 'heartbeat-loss', action: 'cancel-run' | 'rescue' | 'observe', reason: string, atMs?: number }>
-  }
-}
-
-interface ProgressWirePath {
-  kind: string
-  owner: string
-  card?: string
-  points: Array<[number, number]>
-}
-
-interface ProgressWireSet {
-  width: number
-  height: number
-  depth: number
-  paths: ProgressWirePath[]
-}
-
-type FlowStub = {
-  querySelectorAll(selector: string): Array<{
-    getAttribute(name: string): string | null
-    getBoundingClientRect(): { top: number, left: number, height: number, width: number }
-  }>
-  querySelector(selector: string): {
-    getBoundingClientRect(): { top: number, bottom: number, left: number, width: number, height: number }
-    querySelector?(selector: string): { getBoundingClientRect(): { left: number, width: number } } | null
-    getAttribute?(name: string): string | null
-  } | null
-  getBoundingClientRect(): { top: number, width: number, height: number }
 }
 
 interface ProgressBundle {
   component: (props: Record<string, unknown>) => unknown
   stages: Array<{ key: string, tokens: string[], edge: boolean }>
-  stateGlyph: Record<string, string>
-  stateColor: Record<string, string>
   css: string
-  measureWires(flow: unknown): ProgressWireSet
 }
 
 interface Bundle {
@@ -88,9 +49,8 @@ interface Bundle {
 /**
  * Load the bundle the way the host does: register, then run the factory with a stub React.
  *
- * `useState` hands back the value it was given and a no-op setter, because every case here
- * asserts the first render; `useMemo` runs its factory and `useSyncExternalStore` reads the
- * face's snapshot, which is the whole surface the view touches.
+ * Every case here asserts one render, so `useState` hands back its initial value and a
+ * no-op setter, `useMemo` runs its factory, and `useSyncExternalStore` reads the face.
  */
 function loadBundle(): Bundle {
   const source = readFileSync(new URL('../src/client/index.js', import.meta.url), 'utf8')
@@ -139,33 +99,6 @@ function walk(node: unknown, out: Element[] = []): Element[] {
   return out
 }
 
-/** Every string of a stub tree, in document order. */
-function texts(node: unknown, out: string[] = []): string[] {
-  if (typeof node === 'string') {
-    out.push(node)
-    return out
-  }
-  if (node === null || node === undefined || typeof node !== 'object') return out
-  if (Array.isArray(node)) {
-    for (const child of node) texts(child, out)
-    return out
-  }
-  const element = node as Element
-  if ('children' in element) texts(element.children, out)
-  return out
-}
-
-function progressMember(seq: number, phase: string | undefined, outcome?: string): ProgressMember {
-  return {
-    seq,
-    label: `执行 ${seq}`,
-    childId: `child-${seq}`,
-    order: seq - 1,
-    ...phase === undefined ? {} : { phase },
-    ...outcome === undefined ? {} : { outcome },
-  }
-}
-
 /** Render one run and hand back its whole stub tree. */
 function renderRun(run: ProgressRun): unknown {
   return progress.component({
@@ -175,435 +108,207 @@ function renderRun(run: ProgressRun): unknown {
   })
 }
 
-/** The nodes and the connectors between them, in the order the track renders them. */
-function trackParts(run: ProgressRun): Element[] {
-  return walk(renderRun(run))
-    .filter((element) => element.props['data-gw-progress-node'] === true || element.props['data-gw-progress-link'] === true)
-}
-
-/** The ring glyph of one node, keyed as the track renders it (`stage:execute`). */
-function glyphOf(run: ProgressRun, nodeKey: string): Element | undefined {
-  const node = walk(renderRun(run)).find((element) => element.props['data-node-key'] === nodeKey)
-  if (node === undefined) return undefined
-  return walk(node).find((element) => {
-    const props = Object.keys(element.props)
-    return props.includes('data-gw-progress-glyph') || props.includes('data-gw-progress-count')
-  })
-}
-
-/**
- * Five rows over five spine stages, deliberately missing no state: `规划`/`执行` settled as
- * completed, `检查` failed, `汇总` cancelled, and the run still open so the unsettled
- * reality reads through the open end instead of a permanently empty cell.
- */
+/** The run every structural case renders: one plan task, two rows, one still running. */
 const run: ProgressRun = {
-  runId: 'run-connector',
-  name: '任务团队 · 5 行',
+  runId: 'run-shape',
+  name: '任务团队 · 2 个任务',
   anchorSeq: 1,
   members: [
-    progressMember(1, '规划', 'completed'),
-    progressMember(2, '执行', 'completed'),
-    progressMember(3, '执行', 'completed'),
-    progressMember(4, '检查', 'failed'),
-    progressMember(5, '汇总', 'cancelled'),
+    { seq: 1, label: '执行', childId: 'child-1', order: 0, phase: '任务 1 · 读代码', outcome: 'completed' },
+    { seq: 2, label: '检查', childId: 'child-2', order: 1, phase: '任务 1 · 读代码' },
   ],
 }
 
-describe('client progress tab: the connectors between nodes', () => {
-  it('renders one connector per adjacent pair, in render order', () => {
-    const parts = trackParts(run)
-    const connectors = parts.filter((part) => part.props['data-gw-progress-link'] === true)
-    const nodes = parts.filter((part) => part.props['data-gw-progress-node'] === true)
-    expect(nodes).toHaveLength(progress.stages.length)
-    expect(connectors).toHaveLength(nodes.length - 1)
-    // No leading or trailing stub: the track starts and ends on a node.
-    expect(parts[0]!.props['data-gw-progress-node']).toBe(true)
-    expect(parts[parts.length - 1]!.props['data-gw-progress-node']).toBe(true)
-    // The line is a decoration, so it is not in the accessibility tree.
-    expect(connectors.every((connector) => connector.props['aria-hidden'] === 'true')).toBe(true)
-    expect(connectors.every((connector) => texts(connector).length === 0)).toBe(true)
-  })
+/** One rule of the stylesheet, by its selector, or `undefined` when it is not there. */
+function ruleOf(selector: string): string | undefined {
+  return progress.css.split('\n').find((line) => line.trim().startsWith(`${selector} {`))
+}
 
-  it('fills a connector exactly where the track has passed the node on its left', () => {
-    const parts = trackParts(run)
-    const states = parts
-      .filter((part) => part.props['data-gw-progress-node'] === true)
-      .map((node) => String(node.props['data-state']))
-    expect(states).toEqual(['done', 'done', 'done', 'failed', 'cancelled', 'doing'])
-
-    // A connector belongs to the pair it sits in: its fill answer is the state of the node
-    // immediately before it, and `data-filled` is absent — not the string `false` — when
-    // the line is empty, which is the selector the stylesheet matches.
-    const fills: boolean[] = []
-    let previousState: string | undefined
-    for (const part of parts) {
-      if (part.props['data-gw-progress-node'] === true) {
-        previousState = String(part.props['data-state'])
-        continue
-      }
-      fills.push(part.props['data-filled'] === 'true')
-      expect(part.props['data-filled'], `after ${String(previousState)}`).toBe(previousState === 'done' ? 'true' : undefined)
-    }
-    // start/plan/execute are done; everything from `检查` on left the line empty, because a
-    // failed or cancelled node has not led anywhere: no stage ends permanently empty.
-    expect(fills).toEqual([true, true, true, false, false])
-  })
-
-  it('never fills a connector for a run that has done no work at all', () => {
-    const idle: ProgressRun = { runId: 'run-idle', name: '任务团队', anchorSeq: 1, members: [] }
-    const connectors = trackParts(idle).filter((part) => part.props['data-gw-progress-link'] === true)
-    // The start mark alone counts as passed, and nothing else: one filled line, then four
-    // empty ones — an empty track never reads as progress.
-    expect(connectors.map((connector) => connector.props['data-filled'])).toEqual(['true', undefined, undefined, undefined, undefined])
-  })
-})
-
-describe('client progress tab: the state glyph', () => {
-  it('carries one glyph per state, and none for a stage the stream never reported', () => {
-    expect(progress.stateGlyph).toEqual({
-      pending: '',
-      doing: '▸',
-      done: '✓',
-      blocked: '!',
-      cancelled: '×',
-      failed: '✕',
-    })
-    // Every non-pending glyph is a single visible character, so the 28px ring holds it.
-    for (const state of ['doing', 'done', 'blocked', 'cancelled', 'failed']) {
-      expect(progress.stateGlyph[state]!.length, state).toBe(1)
-    }
-  })
-
-  it('renders the glyph of the node’s own state, keyed by that state', () => {
-    const rendered: Array<[string, string]> = []
-    for (const [key, state] of [['stage:plan', 'done'], ['stage:verify', 'failed'], ['stage:synthesize', 'cancelled'], ['stage:end', 'doing']] as const) {
-      const glyph = glyphOf(run, key)
-      expect(glyph, key).toBeDefined()
-      expect(glyph!.props['data-gw-progress-glyph']).toBe(state)
-      expect(texts(glyph!)).toEqual([progress.stateGlyph[state]])
-      rendered.push([key, state])
-    }
-    expect(rendered).toHaveLength(4)
-    // A template stage with no row renders the empty glyph: the ring's idle border says
-    // "not reported", and no character claims otherwise.
-    const planless = glyphOf({ runId: 'r', name: '任务团队', anchorSeq: 1, members: [progressMember(1, '执行', 'completed')], stopReason: 'completed' }, 'stage:verify')
-    expect(planless!.props['data-gw-progress-glyph']).toBe('pending')
-    expect(texts(planless!)).toEqual([''])
-  })
-
-  it('shows the settled/declared count on the segment meta line, not a count glyph', () => {
-    const tree = renderRun(run)
-    const executeSeg = walk(tree).find((element) => element.props['data-node-key'] === 'stage:execute')!
-    // A+C: every segment ring carries its own state glyph; the count lives on the
-    // meta line (a fact a reader can check, next to the state words).
-    const glyph = glyphOf(run, 'stage:execute')!
-    expect(glyph!.props['data-gw-progress-glyph']).toBe('done')
-    const meta = walk(executeSeg).find((element) => element.props['data-gw-progress-meta'] === true)!
-    expect(texts(meta).join('')).toContain('2/2')
-    // No count attribute replaces the glyph anywhere.
-    for (const element of walk(tree)) {
-      expect(element.props['data-gw-progress-count']).toBeUndefined()
-    }
-    // One row keeps the glyph.
-    const verify = glyphOf(run, 'stage:verify')!
-    expect(verify.props['data-gw-progress-glyph']).toBe('failed')
-  })
-
-  it('rings a derived blocked node with the blocked glyph the tooltip explains', () => {
-    const blocked: ProgressRun = {
-      runId: 'run-blocked',
-      name: '任务团队',
-      anchorSeq: 1,
-      members: [progressMember(1, '执行')],
-      stopReason: 'error',
-    }
-    const execute = walk(renderRun(blocked)).find((element) => element.props['data-node-key'] === 'stage:execute')!
-    expect(execute.props['data-state']).toBe('blocked')
-    expect(execute.props['data-derived']).toBe('true')
-    const glyph = glyphOf(blocked, 'stage:execute')!
-    expect(glyph.props['data-gw-progress-glyph']).toBe('blocked')
-    expect(texts(glyph)).toEqual([progress.stateGlyph['blocked']])
-  })
-})
-
-describe('client progress tab: two tracks (fixed spine + task band)', () => {
-  /** The run every case below shows: a plan task with two rows, one still running. */
-  const taskRun: ProgressRun = {
-    runId: 'run-task',
-    name: '任务团队 · 2 个任务',
-    anchorSeq: 1,
-    members: [
-      { seq: 1, label: '执行', childId: 'child-1', order: 0, phase: '任务 1 · 读代码', outcome: 'completed' },
-      { seq: 2, label: '检查', childId: 'child-2', order: 1, phase: '任务 1 · 读代码', outcome: 'completed' },
-      { seq: 3, label: '执行', childId: 'child-3', order: 2, phase: '任务 2 · 补测试' },
-    ],
-  }
-
-  const runOf = (members: ProgressRun['members']): ProgressRun => ({
-    runId: 'run-under-test',
-    name: '任务团队',
-    anchorSeq: 1,
-    members,
-  })
-
-  it('keeps the spine at the six fixed stages, in one row, whatever the plan declares', () => {
-    const tree = walk(renderRun(taskRun))
-    const spine = tree.filter((element) => element.props['data-gw-progress-node'] === true)
-    expect(spine).toHaveLength(progress.stages.length)
-    expect(spine.map((node) => node.props['data-node-key'])).toEqual([
-      'stage:start', 'stage:plan', 'stage:execute', 'stage:verify', 'stage:synthesize', 'stage:end',
-    ])
-    // The plan tasks are cards in the band, never spine segments.
-    expect(spine.some((node) => String(node.props['data-node-key']).startsWith('phase:'))).toBe(false)
-    const tasks = tree.filter((element) => typeof element.props['data-gw-progress-task'] === 'string')
-    expect(tasks.map((card) => card.props['data-gw-progress-task'])).toEqual([
-      'phase:任务 1 · 读代码',
-      'phase:任务 2 · 补测试',
-    ])
-  })
-
-  it('hangs every card off the stage line that owns it', () => {
-    const tree = walk(renderRun(taskRun))
-    const cards = tree.filter((element) => typeof element.props['data-gw-progress-task'] === 'string')
-    // A plan task is announced in the execute slot: it joins the execute line.
-    for (const card of cards) expect(card.props['data-owner']).toBe('stage:execute')
-    // A row whose phase names a stage joins that stage's line instead.
-    const verifyOnly = walk(renderRun(runOf([
-      { seq: 1, label: '检查', childId: 'child-v', order: 0, phase: '检查', outcome: 'completed' },
-    ]))).filter((element) => typeof element.props['data-gw-progress-task'] === 'string')
-    expect(verifyOnly).toHaveLength(1)
-    expect(verifyOnly[0]!.props['data-owner']).toBe('stage:verify')
-  })
-
-  it('renders the cards below the spine, and the spine outside the band', () => {
-    const tree = walk(renderRun(taskRun))
-    const track = tree.find((element) => element.props['data-gw-progress-track'] === true)!
-    const band = tree.find((element) => element.props['data-gw-progress-tasks'] === true)!
-    expect(band).toBeDefined()
-    // The regression the two tracks exist for: a full-width card inside the horizontal
-    // flex line took its width out of the segments and crushed all six of them.
-    expect(walk(track.children).some((element) => element.props['data-gw-progress-task'] !== undefined)).toBe(false)
-    expect(walk(band.children).some((element) => element.props['data-gw-progress-node'] !== undefined)).toBe(false)
-  })
-
-  it('carries no jump-to-failure control, no branch panel and no +N collapse line', () => {
-    const tree = walk(renderRun(run))
-    expect(tree.some((element) => element.props['data-gw-progress-jump'] === true)).toBe(false)
-    expect(tree.some((element) => element.props['data-gw-progress-branch'] !== undefined)).toBe(false)
-    expect(tree.some((element) => element.props['data-gw-progress-more'] !== undefined)).toBe(false)
-  })
-
-  it('shows the fixed execute-check-review chain per card, pending when unreached', () => {
-    const tree = walk(renderRun(taskRun))
-    // Task 1 reached execute + check (pills with chain keys), review is a dashed pending capsule.
-    // Task 2 reached execute only (still running): check + review pending.
-    const chained = tree.filter((element) => element.props['data-gw-progress-chain'] !== undefined)
-    expect(chained.map((slot) => slot.props['data-gw-progress-chain'])).toEqual([
-      'execute', 'check', 'review', 'execute', 'check', 'review',
-    ])
-    expect(chained.map((slot) => slot.props['data-state'])).toEqual([
-      'done', 'done', 'pending', 'doing', 'pending', 'pending',
-    ])
-    // The pending capsules are placeholders (chain key, no pill seq); reached ones are pills.
-    const pending = chained.filter((slot) => slot.props['data-pending'] === 'true')
-    expect(pending.map((slot) => slot.props['data-gw-progress-chain'])).toEqual([
-      'review', 'check', 'review',
-    ])
-    // The arrow between two capsules names the capsule it points at.
-    const minis = tree.filter((element) => element.props['data-gw-progress-mini'] !== undefined)
-    expect(minis.map((mini) => [mini.props['data-gw-progress-mini'], mini.props['data-tone']]))
-      .toEqual([['check', 'ok'], ['review', 'pending'], ['check', 'pending'], ['review', 'pending']])
-  })
-})
-
-describe('client progress tab: fixed left gutter + elbow wires', () => {
-  it('keeps the band in one constant 40px gutter whatever stage owns a card', () => {
-    // The regression this pins: the indent used to be the right-most owner's ring
-    // centre + 30, so one row owned by a late stage pushed the whole band right.
-    expect(progress.css).toContain('.gw-progress-tasks { width: 100%')
-    expect(progress.css).toMatch(/\.gw-progress-tasks \{[^}]*padding: 0 12px 0 40px/)
-    expect(progress.css).not.toContain('--gw-wire-pad')
-    // The gutter leaves room only for the lane depth: cards never move sideways.
-    expect(progress.css).toMatch(/\.gw-progress-tasks \{[^}]*margin-top: calc\(12px \+ var\(--gw-wire-depth, 0px\)\)/)
-  })
-
-  it('hides the wires and drops the band back to 12px under 480px', () => {
-    expect(progress.css).toMatch(/@media \(max-width: 480px\)[\s\S]*\.gw-progress-wires \{ display: none/)
-    expect(progress.css).toMatch(/@media \(max-width: 480px\)[\s\S]*\.gw-progress-tasks \{[^}]*padding-left: 12px/)
-  })
-
+describe('client progress tab: the retired geometry is gone, not hidden', () => {
   /**
-   * One owner group on a laid-out stub: ring centre x=446, spine bottom y=88,
-   * the first (and only) group takes lane 0 / channel 18, one stub to the card.
+   * Every part of the old drawing, by the name it used.
+   *
+   * The list is spelled out rather than derived from one prefix, because the two retired
+   * halves are unrelated: a class name, a data hook, a CSS variable and a measurement
+   * constant. A survivor in any of them means part of the spine is still being built.
    */
-  function stubFlow(): FlowStub {
-    const card = {
-      getAttribute: (name: string) => (name === 'data-owner' ? 'stage:execute' : name === 'data-gw-progress-task' ? 'phase:任务 1' : 'doing'),
-      getBoundingClientRect: () => ({ top: 240, left: 40, height: 80, width: 1300 }),
-    }
-    const track = {
-      getBoundingClientRect: () => ({ top: 100, bottom: 188, left: 0, width: 1440, height: 88 }),
-    }
-    const ring = { getBoundingClientRect: () => ({ left: 432, width: 28 }) }
-    const segment = {
-      querySelector: () => ring,
-      getAttribute: () => 'doing',
-      getBoundingClientRect: () => ({}),
-    }
-    return {
-      querySelectorAll: (selector: string) => (selector === '[data-gw-progress-task]' ? [card] : []),
-      querySelector: (selector: string) => {
-        if (selector === '[data-gw-progress-track]') return track as never
-        if (selector.startsWith('.gw-progress-track')) return segment as never
-        return null
-      },
-      getBoundingClientRect: () => ({ top: 100, left: 0, width: 1440, height: 500 }),
-    }
-  }
+  const RETIRED_CLASSES = [
+    '.gw-progress-track',
+    '.gw-progress-seg',
+    '.gw-progress-ring',
+    '.gw-progress-glyph',
+    '.gw-progress-link',
+    '.gw-progress-wires',
+    '.gw-progress-wire',
+    '.gw-progress-overview',
+    '.gw-progress-settle',
+    '.gw-progress-detail',
+    '.gw-progress-tasks',
+    '.gw-progress-task',
+    '.gw-progress-pill',
+    '.gw-progress-mini',
+    '.gw-progress-badge',
+    '.gw-progress-dur',
+    '.gw-progress-meta',
+    '.gw-progress-subs',
+    '.gw-progress-flow',
+    '.gw-progress-percent',
+    '--gw-zoom',
+    '--gw-wire-depth',
+  ] as const
 
-  it('unwinds one group as ring -> lane -> one shared rail -> card stub, inside the gutter', () => {
-    const wires = progress.measureWires(stubFlow())
-    expect(wires.depth).toBeGreaterThanOrEqual(0)
-    // Ring drop, the card's stub, and the one rail the whole band shares.
-    expect(wires.paths).toHaveLength(3)
-    const [trunk, stub, rail] = wires.paths
-    expect(trunk!.kind).toBe('trunk')
-    expect(trunk!.owner).toBe('stage:execute')
-    // Down from the ring (x=446, spine bottom 88), one lane leftwards under the spine,
-    // then into the shared channel in the gutter.
-    expect(trunk!.points).toEqual([[446, 88], [446, 92], [18, 92]])
-    expect(stub!.kind).toBe('branch')
-    expect(stub!.points).toEqual([[18, 180], [40, 180]])
-    expect(rail!.kind).toBe('rail')
-    expect(rail!.points).toEqual([[18, 92], [18, 180]])
-    // The gutter legs stay left of the cards: the rail's vertical run and
-    // every stub never enter a card. The ring drop (first leg) and the lane run
-    // (second leg) travel from the owner's ring to the gutter by design — the
-    // lane lives under the spine (y=92, above the cards at y=140+), so neither
-    // leg runs through a card.
-    const ringX = (trunk!.points[0] as [number, number])[0]
-    expect(ringX).toBe(446)
-    const laneY = (trunk!.points[1] as [number, number])[1]
-    expect(laneY).toBe(92)
-    const channelX = (trunk!.points[2] as [number, number])[0]
-    expect(channelX).toBe(18)
-    expect((trunk!.points[2] as [number, number])[0]).toBeLessThanOrEqual(40)
-    expect((rail!.points[0] as [number, number])[0]).toBeLessThanOrEqual(40)
-    expect(rail!.owner).toBe('rail')
+  const RETIRED_HOOKS = [
+    'data-gw-progress-node',
+    'data-gw-progress-link',
+    'data-gw-progress-wires',
+    'data-gw-progress-wire',
+    'data-gw-progress-wire-branch',
+    'data-gw-progress-settle',
+    'data-gw-progress-settle-bar',
+    'data-gw-progress-settle-part',
+    'data-gw-progress-settle-legend',
+    'data-gw-progress-tasks',
+    'data-gw-progress-pill',
+    'data-gw-progress-chain',
+    'data-gw-progress-mini',
+    'data-gw-progress-faildot',
+    'data-gw-progress-failbadge',
+    'data-gw-progress-dur',
+    'data-gw-progress-meta',
+    'data-gw-progress-label',
+    'data-progress-percent',
+    'data-progress-zoom',
+  ] as const
+
+  it('styles none of the retired classes', () => {
+    for (const className of RETIRED_CLASSES) {
+      expect(progress.css, `the stylesheet still styles ${className}`).not.toContain(className)
+    }
   })
 
-  it('draws one rail for every owner instead of one run per stage', () => {
-    // Two owners, cards at two heights: the request behind this rule was that the
-    // cross-stage lines outnumbered the stages. They now share one lane and one rail.
-    const wires = progress.measureWires(twoGroupFlow())
-    const trunks = wires.paths.filter(path => path.kind === 'trunk')
-    const rails = wires.paths.filter(path => path.kind === 'rail')
-    const stubs = wires.paths.filter(path => path.kind === 'branch')
-    expect(trunks.map(path => path.owner)).toEqual(['stage:execute', 'stage:verify'])
-    expect(stubs).toHaveLength(2)
-    expect(rails).toHaveLength(1)
-    // Both owners land on the same lane and the same channel, and the single rail
-    // reaches the deeper of the two cards.
-    const laneYs = new Set(trunks.map(path => (path.points[1] as [number, number])[1]))
-    const channelXs = new Set(trunks.map(path => (path.points[2] as [number, number])[0]))
-    expect([...laneYs]).toEqual([92])
-    expect([...channelXs]).toEqual([18])
-    expect(rails[0]!.points).toEqual([[18, 92], [18, 240]])
-  })
-
-  /**
-   * Two owner groups on a laid-out stub, so the shared rail is observable: `execute`
-   * hangs one card at y=180, `verify` hangs one at y=320, rings at x=446 and x=952.
-   */
-  function twoGroupFlow(): FlowStub {
-    const card = (owner: string, id: string, top: number) => ({
-      getAttribute: (name: string) => (name === 'data-owner' ? owner : name === 'data-gw-progress-task' ? id : 'doing'),
-      getBoundingClientRect: () => ({ top, left: 40, height: 80, width: 700 }),
-    })
-    const cards = [card('stage:execute', 'phase:任务 1', 160), card('stage:verify', 'phase:检查 1', 300)]
-    const track = {
-      getBoundingClientRect: () => ({ top: 100, bottom: 188, left: 0, width: 1440, height: 88 }),
-    }
-    return {
-      querySelectorAll: (selector: string) => (selector === '[data-gw-progress-task]' ? cards : []),
-      querySelector: (selector: string) => {
-        if (selector === '[data-gw-progress-track]') return track as never
-        if (selector.startsWith('.gw-progress-track')) {
-          const ring = {
-            getBoundingClientRect: () => (selector.includes('stage:verify')
-              ? { left: 938, width: 28 }
-              : { left: 432, width: 28 }),
-          }
-          return { querySelector: () => ring, getBoundingClientRect: () => ({}) } as never
+  it('renders none of the retired classes or data hooks', () => {
+    const elements = walk(renderRun(run))
+    for (const element of elements) {
+      const className = element.props['className']
+      if (typeof className === 'string') {
+        for (const retired of RETIRED_CLASSES) {
+          expect(className, `${retired} is still rendered`).not.toContain(retired.replace(/^\./, ''))
         }
-        return null
-      },
-      getBoundingClientRect: () => ({ top: 100, left: 0, width: 1440, height: 500 }),
+      }
+      for (const hook of RETIRED_HOOKS) {
+        expect(Object.prototype.hasOwnProperty.call(element.props, hook), hook).toBe(false)
+      }
     }
-  }
+  })
 
-  it('degrades to a plain list without layout instead of inventing coordinates', () => {
-    expect(progress.measureWires(null)).toEqual({ width: 0, height: 0, depth: 0, paths: [] })
-    expect(progress.measureWires({})).toEqual({ width: 0, height: 0, depth: 0, paths: [] })
+  it('keeps no measurement, no zoom factor and no wire geometry in the source', () => {
+    // The wires were measured from the laid-out DOM, so their absence is a code fact as
+    // well as a DOM fact: a leftover measurement would keep reading a spine that is gone.
+    const source = readFileSync(new URL('../src/client/index.js', import.meta.url), 'utf8')
+    for (const gone of ['measureProgressWires', 'progressWireDraw', 'progressWireHead', 'PROGRESS_WIRE_PAD', 'PROGRESS_CARD_INDENT', 'progressSettleParts', 'PROGRESS_STATE_GLYPH']) {
+      expect(source, `${gone} is still shipped`).not.toContain(gone)
+    }
   })
 })
 
-describe('client progress tab: Guardian monitor side lane', () => {
-  it('shows recorded liveness state and rescue evidence without inventing a task verdict', () => {
-    const guardianRun: ProgressRun = {
-      ...run,
-      guardian: {
-        started: true,
-        armed: true,
-        budgetMs: 300_000,
-        ended: false,
-        cancelled: false,
-        findings: [{
-          seq: 3,
-          label: '执行 3',
-          signal: 'timeout',
-          action: 'rescue',
-          reason: 'workflow guardian rescued child with guidance',
-          atMs: 2_000,
-        }],
-      },
-    }
-    const tree = walk(renderRun(guardianRun))
-    const panel = tree.find((element) => element.props['data-gw-progress-guardian'] === true)
-    expect(panel).toBeDefined()
-    expect(panel!.props['data-state']).toBe('active')
-    const copy = texts(tree).join('\n')
-    expect(copy).toContain('Guardian 监控')
-    expect(copy).toContain('监控中')
-    expect(copy).toContain('已排队发送恢复指引')
-    expect(progress.css).toContain('.gw-progress-overview')
-    expect(progress.css).toContain('color-mix(in srgb, var(--dsw-alias-state-success-primary)')
+describe('client progress tab: one equal segment per step', () => {
+  it('lays the steps out as an equal grid, never as a scrolling row', () => {
+    const steps = ruleOf('.gw-progress-steps')
+    expect(steps, 'the step bar has no rule').toBeDefined()
+    expect(steps).toContain('display: grid')
+    expect(steps).toContain('grid-auto-flow: column')
+    expect(steps).toContain('grid-auto-columns: minmax(0, 1fr)')
+    expect(steps).toContain('gap:')
+    // A page that scrolls sideways is a page whose track did not fit.
+    expect(progress.css).not.toContain('overflow-x: auto')
+    expect(progress.css).not.toContain('scroll-snap-type')
   })
 
-  it('renders an observe finding as observed, not as a run cancellation', () => {
-    const observeRun: ProgressRun = {
-      ...run,
-      guardian: {
-        started: true,
-        armed: true,
-        budgetMs: 300_000,
-        ended: false,
-        cancelled: false,
-        findings: [{
-          seq: 3,
-          label: '执行 3',
-          signal: 'timeout',
-          action: 'observe',
-          reason: 'no child session available; left running',
-          atMs: 2_000,
-        }],
-      },
+  it('reads in the design’s order: the bar, the list, the history, then the dock', () => {
+    const hooks = walk(renderRun(run))
+      .map((element) => Object.keys(element.props).find((key) => key.startsWith('data-gw-progress-')))
+      .filter((hook): hook is string => hook !== undefined && hook !== 'data-gw-progress-css')
+    expect(hooks.indexOf('data-gw-progress-steps')).toBeGreaterThanOrEqual(0)
+    expect(hooks.indexOf('data-gw-progress-steps')).toBeLessThan(hooks.indexOf('data-gw-progress-plan'))
+    expect(hooks.indexOf('data-gw-progress-plan')).toBeLessThan(hooks.indexOf('data-gw-progress-log'))
+    expect(hooks.indexOf('data-gw-progress-log')).toBeLessThan(hooks.indexOf('data-gw-progress-final-section'))
+    expect(hooks.indexOf('data-gw-progress-final-section')).toBeLessThan(hooks.indexOf('data-gw-progress-dock'))
+  })
+
+  it('turns the bar and the rows vertical under 480px instead of overflowing', () => {
+    const narrow = progress.css.slice(progress.css.indexOf('@media (max-width: 480px)'))
+    expect(narrow, 'the narrow layout is gone').not.toBe('')
+    expect(narrow).toContain('flex-direction: column')
+    // The plan and the log are already vertical lists; what changes is the bar and the
+    // dock, which stack instead of sharing one line.
+    expect(narrow).toContain('.gw-progress-dock')
+  })
+
+  it('gives a segment one colour per story state, and never a red one', () => {
+    // Five story states, four colours: a cancelled and a not-started step are both "grey",
+    // because neither says anything about a failure, and a failure is amber.
+    const states: Array<[string, string]> = [
+      ['done', '--dsw-alias-state-success-primary'],
+      ['doing', '--dsw-alias-state-business-primary'],
+      ['failed', '--dsw-alias-state-warn-primary'],
+      ['blocked', '--dsw-alias-state-warn-primary'],
+      ['cancelled', '--dsw-alias-state-idle-primary'],
+      ['pending', '--dsw-alias-state-idle-primary'],
+    ]
+    for (const [state, token] of states) {
+      const rule = ruleOf(`.gw-progress-step[data-state="${state}"]`)
+      expect(rule, `no segment rule for ${state}`).toBeDefined()
+      expect(rule).toContain(token)
     }
-    const tree = walk(renderRun(observeRun))
-    const copy = texts(tree).join('\n')
-    expect(copy).toContain('已记录异常 · 继续运行')
-    expect(copy).not.toContain('已触发整轮取消')
-    const items = tree.filter((element) => element.props['data-action'] !== undefined)
-    expect(items.every((element) => element.props['data-action'] === 'observe')).toBe(true)
+    // The running segment is the only one that moves, and it is the only one that may.
+    expect(progress.css).toContain('.gw-progress-step[data-state="doing"]::after')
+    expect(progress.css).not.toContain('--dsw-alias-state-error-primary')
+  })
+
+  it('tones a history row by its own state, not by its position', () => {
+    // A failed line and a line still being read get a surface of their own; every other
+    // line is separated by a rule and nothing else.
+    expect(ruleOf('.gw-progress-log-row')).toBeDefined()
+    expect(ruleOf('.gw-progress-log-row[data-state="failed"]')).toContain('--dsw-alias-state-warn-primary')
+    expect(ruleOf('.gw-progress-log-row[data-state="doing"]')).toContain('--dsw-alias-state-business-primary')
+    // The other four states never reach the warning colour: `done` stays neutral, because
+    // a finished line is told by its word and its clock, not by a second green column.
+    for (const state of ['done', 'pending', 'cancelled', 'blocked']) {
+      const rule = ruleOf(`.gw-progress-log-row[data-state="${state}"]`)
+      if (rule === undefined) continue
+      expect(rule, state).not.toContain('--dsw-alias-state-warn-primary')
+    }
+  })
+
+  it('keeps the stylesheet scoped to .gw-progress, with no literal colour and no error token', () => {
+    const rules = progress.css.split('\n').filter((line) => line.includes('{') && !line.trim().startsWith('@'))
+    for (const rule of rules) expect(rule.trim().startsWith('.gw-progress')).toBe(true)
+    expect(progress.css).not.toContain('--dsw-alias-state-error-primary')
+    expect(progress.css).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
+    expect(progress.css).not.toMatch(/\brgba?\(/)
+    expect(progress.css).not.toMatch(/\bhsla?\(/)
+    expect(progress.css).toContain('var(--dsw-font-family-sans')
+  })
+
+  it('stops the flowing segment and the pulsing chip when motion is not wanted', () => {
+    // Motion is decoration: the state word already says "running".
+    const reduced = progress.css.slice(progress.css.indexOf('@media (prefers-reduced-motion: reduce)'))
+    expect(reduced, 'the reduced-motion block is gone').not.toBe('')
+    expect(reduced).toContain('animation: none')
+    expect(reduced).toContain('.gw-progress-step')
+    expect(reduced).toContain('.gw-progress-chip')
+    expect(progress.css).toContain('@keyframes gw-progress-sweep')
+    expect(progress.css).toContain('@keyframes gw-progress-pulse')
+  })
+})
+
+describe('client progress tab: the six-stage spine is still the data contract', () => {
+  it('exports the six stages the phase binding reads, without drawing them', () => {
+    // §19.0: the spine left the page, but `PROGRESS_STAGES` is still what binds a recorded
+    // phase to a role, and Guardian and the fold still read it. Losing a stage here would
+    // silently move rows off their roles.
+    expect(progress.stages.map((stage) => stage.key)).toEqual(['start', 'plan', 'execute', 'verify', 'synthesize', 'end'])
+    const elements = walk(renderRun(run))
+    expect(elements.some((element) => typeof element.props['data-node-key'] === 'string')).toBe(false)
   })
 })
