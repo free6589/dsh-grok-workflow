@@ -23,7 +23,7 @@ headless Chromium（`/usr/bin/chromium` + 本机 playwright）。
 | `warn-probe-without-mode.txt` | 同一探针、同一构建，只是档案里删掉了 `mode:` 行 | ④ 对照：警告消失，工具照旧注册 |
 | `boot-without-mode.excerpt.txt` | 删掉那一行后的真机启动摘录 | ④ 对照：激活照旧、无警告 |
 | `describe-without-mode.json` | 对照实例的 `settings/describe` 事实 | ④ 对照：命名空间与键集不变 |
-| `gate.out` | `TMPDIR=$PWD/.tmp npm run ci` 的完整转录（HEAD = 记忆提交 `092146e`；同样的树、只差随后那一行文档 amend） | **EXIT=0**：`99 files / 1862 tests`、`15 warnings / 0 errors`、`lib/ … (281 files, byte-identical)`、`client bundle: 338664 bytes` |
+| `gate.out` | `TMPDIR=$PWD/.tmp npm run ci` 的完整转录，**跑的是加路由之前那棵树**（`HEAD` 当时是记忆提交 `092146e`，`lib/ at 092146e … 281 files`） | **EXIT=0**：`99 files / 1862 tests`、`15 warnings / 0 errors`、`client bundle: 338664 bytes`。**最终树的权威读数不是这一份**：`100 files / 1870 tests`、`15 warnings / 0 errors`、`lib/ at 037b65e … (285 files, byte-identical)`、`client bundle: 340426 bytes`——那份由包工头独立复跑确认，转录未单独入库 |
 | `notices-with-mode.json` | `GET /grok-workflow/config-notices` 的响应原文（档案带 `mode: triage`） | ③ 路由点名 `mode` |
 | `settings-page-with-notice.png` | 真 Chromium：设置 → Workflow，底部黄色提示可见（1400×900） | ③ 页面真的把 `mode` 说出来 |
 | `notices-banner.png` | 那条提示的近照（560×78） | ③ 文案原文 |
@@ -44,7 +44,8 @@ scratch `.tmp/soak-removed-keys/`（克隆 home、tgz、探针、截图原图、
 ## 二、真机安装身份（`CONFIRMED`）
 
 ```
-$ node scripts/clone-profile.mjs --src ~/.dsh/profiles/web --home .tmp/soak-removed-keys/dsh-home \
+# 截图与路由读数来自第二次 soak（`.tmp/soak-notices/dsh-home`，端口 3333，装的是加完路由的构建）
+$ node scripts/clone-profile.mjs --src ~/.dsh/profiles/web --home .tmp/soak-notices/dsh-home \
     --name web-clone --force
 clone-profile: ok — …/profiles/web-clone
   files 7720 -> 7720 (88421847 bytes)
@@ -53,7 +54,7 @@ clone-profile: ok — …/profiles/web-clone
   dependencies 17 declared, 0 unresolved (8/21 bundles from the installation)
   credentials redacted: 1 line(s) in 1 file(s); vendored fixtures: 4 file(s)
 
-$ npm pack --pack-destination .tmp/soak-removed-keys      # → dsh-grok-workflow-0.13.37.tgz（158 files）
+$ npm pack --pack-destination .tmp/soak-notices            # → dsh-grok-workflow-0.13.37.tgz
 $ DSH_HOME=<scratch>/dsh-home dsh plugin --profile web-clone add \
     file:<scratch>/dsh-grok-workflow-0.13.37.tgz
 Done in 1.8s using pnpm v12.4.2
@@ -61,9 +62,13 @@ $ node -p "require('<clone>/node_modules/dsh-grok-workflow/package.json').versio
 0.13.37
 $ readlink -f <clone>/node_modules/dsh-grok-workflow     # 落在 profile 内 ⇒ 真拷贝，不是软链
 $ sha256sum <clone>/node_modules/dsh-grok-workflow/lib/client.js lib/client.js
-37298edb81e1afd6cea2be144abac2477938e93ca8e79e061246f2f585343ff5  <clone>/…/lib/client.js
-37298edb81e1afd6cea2be144abac2477938e93ca8e79e061246f2f585343ff5  lib/client.js
+f91c28f038f8869f2d7a623db6d6634e0400479b89ce433ec0e8ed4317577df8  <clone>/…/lib/client.js   # 340426 B
+f91c28f038f8869f2d7a623db6d6634e0400479b89ce433ec0e8ed4317577df8  lib/client.js
 ```
+
+第一次 soak（`.tmp/soak-removed-keys/dsh-home`，端口 3331）只做激活 / 警告 / 对照，**没有**截设置页，
+装的是**加路由之前**的构建，`lib/client.js` = `37298edb81e1afd6cea2be144abac2477938e93ca8e79e061246f2f585343ff5`——
+它不是最终构建，这里留一行只为说明两次 soak 装的不是同一份东西。
 
 克隆出来的档案里 `grok-workflow` 那一行**本来就带着** `mode: triage`（`cordis.patch.yml:563`，来自 live 档案），
 所以「档案留 mode 行」这个前提不是我造出来的——它是真实用户的现状。
