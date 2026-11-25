@@ -347,6 +347,27 @@ function brokenGuardedRun(): ProgressRun {
   }
 }
 
+/**
+ * One plan task whose second call is no gate.
+ *
+ * `memberLabel()` writes the chain's own verbs for the three gates, but a task may also hold
+ * a call that names no slot. That line has no chip to stand in for its role, so the word has
+ * to stay on it: a line with a clock and a result and nobody's name would say less than the
+ * one it replaces.
+ */
+function oddLegRun(): ProgressRun {
+  return {
+    runId: 'r-layout-odd',
+    name: '任务团队 · 1 个任务',
+    anchorSeq: 1,
+    members: [
+      member(1, '执行', '任务 1 · 建表', 'completed', 0),
+      member(2, '汇总助手', '任务 1 · 建表', 'completed', 1),
+    ],
+    details: [],
+  }
+}
+
 /** Eight history lines: four plan tasks, the last one still being checked. */
 function wideRun(): ProgressRun {
   return {
@@ -705,6 +726,63 @@ describe('client progress tab: a task row opens in place', () => {
     expect(collapsed.map((row) => attr(row, 'data-open'))).toEqual(['false', 'true'])
     expect(hooksOf(collapsed[0]!, 'data-gw-progress-task-detail')).toHaveLength(0)
     expect(hooksOf(collapsed[1]!, 'data-gw-progress-task-detail')).toHaveLength(1)
+  })
+
+  it('prints one gate word per opened line, and does not repeat the title above it', () => {
+    // The row's header already names the task and the gates it reached, and the role word a
+    // line would print *is* the chain's verb, so a line that printed both said the gate
+    // twice and the title a second time. The line is time · gate · result · [capsule], and
+    // nothing else.
+    const title = '任务 1 · 修复登录'
+    const render = pageOf(finishedRun(), 'zh', { canOpen: (childId: string) => childId === 'child-3' })
+    const closed = render()
+    clickToggle(closed, 'data-gw-progress-plan-toggle')
+    const page = render()
+    const row = hooksOf(page, 'data-gw-progress-plan-row')[0]!
+    const detail = hookOf(row, 'data-gw-progress-task-detail')
+    const lines = hooksOf(detail, 'data-gw-progress-log-row')
+    const execute = zh('progress.chain.execute')
+    const check = zh('progress.chain.check')
+
+    expect(lines.map((line) => textOf(line))).toEqual([
+      `${clockAt(BASE + 120_000)} ${execute} ${zh('progress.log.done')}`,
+      `${clockAt(BASE + 180_000)} ${check} ${zh('progress.log.passed')} ${zh('progress.member.open')}`,
+    ])
+    // The gate appears once per line: the chip stands in for the role, it does not sit
+    // beside it (`执行 执行`).
+    expect(lines.map((line) => texts(line).filter((text) => text === execute || text === check)))
+      .toEqual([[execute], [check]])
+    expect(lines.map((line) => hooksOf(line, 'data-gw-progress-log-role').length)).toEqual([0, 0])
+
+    // The title is on the row's own header once, and not in the lines under it.
+    expect(texts(row).filter((text) => text === title)).toHaveLength(1)
+    expect(texts(detail).filter((text) => text === title)).toHaveLength(0)
+    // Page-wide the title keeps the faces it already had — the row header here and one line
+    // per call in 「经过」 (two calls) — and the opened lines add none.
+    const titlesIn = (tree: unknown) => pageTexts(tree).filter((text) => text === title)
+    expect(titlesIn(closed), 'the row header and the two history lines').toHaveLength(3)
+    expect(titlesIn(page)).toEqual(titlesIn(closed))
+  })
+
+  it('keeps the word on a line whose role names no gate', () => {
+    // A task may hold a call that is no execute/check/review leg. There is no chip to stand
+    // in for it, so the role word stays: otherwise the line would carry a clock and a result
+    // and say nothing about who ran.
+    const render = pageOf(oddLegRun())
+    clickToggle(render(), 'data-gw-progress-plan-toggle')
+    const row = hooksOf(render(), 'data-gw-progress-plan-row')[0]!
+    const lines = hooksOf(hookOf(row, 'data-gw-progress-task-detail'), 'data-gw-progress-log-row')
+    expect(lines.map((line) => line.props['data-gw-progress-log-row'])).toEqual([1, 2])
+
+    // The line that names a gate still prints the chip, and the word only once.
+    expect(texts(lines[0]!)).toEqual([clockAt(BASE + 60_000), zh('progress.chain.execute'), zh('progress.log.done')])
+
+    const odd = lines[1]!
+    expect(hooksOf(odd, 'data-gw-progress-task-chain')).toHaveLength(0)
+    expect(textOf(hookOf(odd, 'data-gw-progress-log-role'))).toBe('汇总助手')
+    expect(textOf(odd)).toBe(`${clockAt(BASE + 120_000)} 汇总助手 ${zh('progress.log.done')}`)
+    // …and the title of the task it belongs to is still not repeated in the line.
+    expect(texts(odd).filter((text) => text === '任务 1 · 建表')).toHaveLength(0)
   })
 })
 
