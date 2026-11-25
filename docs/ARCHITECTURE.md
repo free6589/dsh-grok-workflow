@@ -237,6 +237,11 @@ layer prints all of it only when asked.
   `Confirmed evidence:`, `Incomplete:`, `Uncertainties:`, `Final answer:`, and
   `- id: status (N attempts) — title`), so appending it cannot fabricate a
   section or a task row in the cross-round digest.
+- **The report envelope is history, not a protocol.** The
+  `<<<GROK-WORKFLOW-REPORT>>>` markers this pipeline once wrapped the answer in
+  have no producer in the current build; `parseReportRound` reads sections by
+  their signatures (the prefixes above), and `test/carryover.spec.ts` keeps a
+  literal envelope case, so tolerance for one stays pinned without a constant.
 
 ## Lifecycle and cancellation
 

@@ -177,17 +177,4 @@ export declare function roundArchiveSummary(report: WorkflowReport | undefined, 
  * @returns Confirmed-evidence strings, bounded by the archive on write.
  */
 export declare function roundArchiveEvidence(report: WorkflowReport | undefined): string[];
-/**
- * Archive one settled round on the spot, for callers that own no event stream.
- *
- * The front-desk tier is one `agent()` call in its own run: it has
- * a result but no planner/verifier fan-out, so there is nothing to watch and the
- * round verdict is the whole record. Passing it through this helper keeps the rule
- * identical to the full path — the entry is written before the caller returns, not
- * at session exit.
- * @param input - the round's verdict.
- * @param options - archive directory, logger and clock.
- * @returns True when this call wrote the entry (false for a duplicate or a failure).
- */
-export declare function archiveRoundNow(input: RoundArchiveInput, options: ArchiveRecorderOptions): boolean;
 //# sourceMappingURL=recorder.d.ts.map
