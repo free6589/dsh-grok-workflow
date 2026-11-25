@@ -2,7 +2,8 @@ Last updated: 2026-11-25 11:58 +08:00（**打字 `/grok off` 之后，对话框�
 分支 **`fix/switch-refresh`**，worktree `.tmp/wt-switch-refresh`，基线 `main` 尖端 **`84efda0`**，两个功能/测试提交 **`8b32e5e`**
 （`fix(client): refresh the mounted workflow switch after a command writes the record`，**3 文件**：`lib/client.js` 143/0、
 `src/client/index.js` 143/0、`test/client.spec.ts` 230/1）与 **`ded1df6`**（`test(client): keep the listener snapshot without tripping the
-spread lint`，**1 文件**：`test/client.spec.ts` 3/1），其后再一条只写文档与证据的提交。
+spread lint`，**1 文件**：`test/client.spec.ts` 3/1），其后三条只写文档与证据的提交。**整支尖端 `3366248`**，五条提交：
+`8b32e5e`、`ded1df6`、`266006b`、`144a9a1`、`3366248`。
 **改的是什么（用户能看到的那一层）**：以前打字 `/grok off`，记录确实写进去了（工作流真的关了），慢的是屏幕——那个开关只在页面加载时读一次会话，
 之后不再看，所以它还写着「开」，得刷新页面或者点它一下才对。现在只要这条记录被写入，按钮就会被告知，并**自己再问一次**，
 **+0.5 秒**内就跟着变：不用刷新、不用点，后台也没有任何东西在定时跑；`/grok on` 同理。万一这次重读失败，开关保持它已经显示的状态，
@@ -13,15 +14,15 @@ spread lint`，**1 文件**：`test/client.spec.ts` 3/1），其后再一条只�
 面是**可选、后到**的（缺面 / 无 `binding` / 绑不到会话 / 窗口不完整，四种都静默退化，不报错、不 pending、不挡挂载），
 晚到的面由一个小集合兜住，所以订阅不取决于注入顺序。**路由、host、动作列表、答案形状零改动；没有新增必需依赖；没有定时器、没有轮询。**
 否决了候选 ②（让命令路径的写响应回填）——那要在宿主的一个回合里新增一条到浏览器的通道，是新机制。
-**读数（定向，代码轮自己在 `8b32e5e` 的树上跑，`CONFIRMED`）**：`TMPDIR=$PWD/.tmp npx vitest run test/client.spec.ts test/i18n-parity.spec.ts`
-→ **EXIT=0，`2 files / 144 tests PASS`**（`client` **138**、`i18n-parity` 6）；基线 132 + 6 + 6 = **138**，本轮 **+6** 条用例：
-核心刷新、同 seq 不重读、无记录不多读、后台失败静默、缺面回归、卸载即退订——六条都驱动**真实组件挂载**。反向验证：把「取面」临时改成旧行为后
+**读数（定向，代码轮自己在 `8b32e5e` / `144a9a1` 的树上跑，`CONFIRMED`）**：`TMPDIR=$PWD/.tmp npx vitest run test/client.spec.ts test/i18n-parity.spec.ts`
+→ **EXIT=0，`2 files / 145 tests PASS`**（`client` **139**、`i18n-parity` 6）；基线 132 + 6 + 6 = **138**，本轮 **+7** 条用例：
+核心刷新、同 seq 不重读、无记录不多读、后台失败静默、缺面回归、卸载即退订、**面在挂载后才到**——七条都驱动**真实组件挂载**。反向验证：把「取面」临时改成旧行为后
 重跑，`Tests 5 failed | 133 passed (138)`，失败的正是那四条会变的（两条「断言不存在」的按设计仍通过）。
-**门禁（包工头在 `ded1df6` 的树上跑，`CONFIRMED`）**：`TMPDIR=$PWD/.tmp npm run ci` → **EXIT=0**：`Test Files 98 passed (98)` /
-**`Tests 1838 passed (1838)`**（基线 1832 + 6）、`Duration 97.52s (transform 2.75s, setup 0ms, import 8.18s, tests 78.36s, environment 11ms)`、
+**门禁（包工头在整支尖端 `3366248` 的树上跑，`CONFIRMED`）**：`TMPDIR=$PWD/.tmp npm run ci` → **EXIT=0**：`Test Files 98 passed (98)` /
+**`Tests 1839 passed (1839)`**（基线 1832 + 7）、`Duration 94.89s (transform 3.30s, setup 0ms, import 8.69s, tests 75.41s, environment 11ms)`、
 **`Found 15 warnings and 0 errors.`**（回到基线 15——`8b32e5e` 曾把它抬到 16，`ded1df6` 用
 `[...listeners]` → `Array.from(listeners)` 消掉并保留「先取快照再派发」的语义）、
-`lib/ at ded1df6 is the build of src/ at ded1df6 (281 files, byte-identical)`、`client bundle: 329354 bytes`（基线提交 321607，**+7747**）。
+`lib/ at 3366248 is the build of src/ at 3366248 (281 files, byte-identical)`、`client bundle: 329354 bytes`（基线提交 321607，**+7747**）。
 **真机（包工头跑，隔离克隆，端口 3321，live `~/.dsh` 与 3080 全程未碰，`CONFIRMED`）**：环境是 `node scripts/clone-profile.mjs` →
 `.tmp/soak-switch/dsh-home`（profile `web-clone`，**7699 文件**、parity **5/5**、**1 行凭据按设计脱敏**），插件用**拷进 profile 的构建产物**
 （不是软链），`sha256(lib/client.js)` = `52cdace8…`，与本 worktree **逐字节相同**。**改前**（克隆里原本的 0.13.32 构建）：

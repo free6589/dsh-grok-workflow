@@ -3983,9 +3983,10 @@ spine 为空，pre-fix 形状会进脊柱。
 
 ## D-150 · `/grok off` 打字写入后已挂载开关不刷新：选订阅会话事件窗口，否决写响应回填（2026-11-25，未发版）
 
-- **Status:** `CONFIRMED`（`8b32e5e` + `ded1df6`；`TMPDIR=$PWD/.tmp npm run ci` 在 `ded1df6` 的树上 **EXIT=0**，98 文件 / **1838** 例 /
-  `Found 15 warnings and 0 errors.` / `lib/ at ded1df6 is the build of src/ at ded1df6 (281 files, byte-identical)` /
-  `client bundle: 329354 bytes`；定向 `npx vitest run test/client.spec.ts test/i18n-parity.spec.ts` → 2 files / **144** 例通过；
+- **Status:** `CONFIRMED`（`8b32e5e` + `ded1df6`；`TMPDIR=$PWD/.tmp npm run ci` 在 **`3366248`**（整支尖端）的树上 **EXIT=0**，
+  98 文件 / **1839** 例 / `Found 15 warnings and 0 errors.` /
+  `lib/ at 3366248 is the build of src/ at 3366248 (281 files, byte-identical)` /
+  `client bundle: 329354 bytes`；定向 `npx vitest run test/client.spec.ts test/i18n-parity.spec.ts` → 2 files / **145** 例通过；
   **真机前后对照已做**：改前 20 秒 20 次快照全停在「开」、只有挂载 1 次请求；改后两次打字各在 **+0.5 秒**自动变、静默 15 秒 0 次新请求。
   逐行读数见 `VALIDATION.md` 同日条，证据在 `.rsi/evidence/switch-refresh-2026-11-25/`）
 - **Date:** 2026-11-25
@@ -4039,8 +4040,8 @@ spine 为空，pre-fix 形状会进脊柱。
     conversation 侧 retain，所以成立；若某组合里没有，则静默不自动刷新（不是错误）。
   - 挂载读与订阅建立之间的毫秒级窗口在**理论上**可能漏掉一次写入（先读完、记录写入、订阅才建立，基线把它算作已知）。**本轮没观测到**，
     标 `HYPOTHESIS`。
-  - 用例从 **1832** 增到 **1838**（`test/client.spec.ts` 132 → 138）：核心刷新、同 seq 不重读、无记录不多读、后台失败静默、缺面回归、
-    卸载即退订，六条都驱动**真实组件挂载**（`mountSwitch` + 假 `{getSnapshot, subscribe}` 从 `MODE_SWITCH.offerSessions` 注入，
+  - 用例从 **1832** 增到 **1839**（`test/client.spec.ts` 132 → 139）：核心刷新、同 seq 不重读、无记录不多读、后台失败静默、缺面回归、
+    卸载即退订、**面在挂载后才到**，七条都驱动**真实组件挂载**（`mountSwitch` + 假 `{getSnapshot, subscribe}` 从 `MODE_SWITCH.offerSessions` 注入，
     与 `apply` 同一个门，不是测试专用 prop）。
   - 判据可复用：**修一个「显示落后」的缺陷，先问「两边共享的事实是什么」**——这一轮的答案是会话日志本身；找到它，就不用新开一条通道。
     另外：**「事件驱动」不等于「每条事件都读」**，否则只是换了个名字的轮询。

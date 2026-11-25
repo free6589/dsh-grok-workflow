@@ -5,17 +5,20 @@
   **`8b32e5e`**「`fix(client): refresh the mounted workflow switch after a command writes the record`」（**3 文件**：`lib/client.js` 143/0、
   `src/client/index.js` 143/0、`test/client.spec.ts` 230/1）与 **`ded1df6`**「`test(client): keep the listener snapshot without tripping the
   spread lint`」（**1 文件**：`test/client.spec.ts` 3/1），其后再一条**只写文档与证据**的提交（`CHANGELOG.md` + `README.md` +
-  `README.zh-CN.md` + `docs/knowledge/` 四份 + `.rsi/evidence/switch-refresh-2026-11-25/`）。
+  `README.zh-CN.md` + `docs/knowledge/` 四份 + `.rsi/evidence/switch-refresh-2026-11-25/`），以及其后两条只写文档/测试的提交
+  **`144a9a1`**「`test(client): cover the sessions face that arrives after the switch mounts`」（1 文件：`test/client.spec.ts` 38/0）与
+  **`3366248`**「`docs(switch-refresh): cite the session log for the pre-fix record write`」。**整支尖端 `3366248`**，五条提交：
+  `8b32e5e`、`ded1df6`、`266006b`、`144a9a1`、`3366248`。
   **未 push、未发版、未合 `main`、没有 PR**，`package.json` 仍是 **`0.13.35`**。
 - **用户能看到的变化**：以前打字 `/grok off` 关掉工作流，记录确实写进去了（工作流真的关了），但对话框底部那个开关还显示页面加载时读到的样子，
   得刷新页面或者点它一下才对。现在记录一写入，按钮就自己再读一次，**+0.5 秒**内跟着变：不用刷新、不用点，后台也没有任何东西在定时跑。
   `/grok on` 同理。重读失败时开关保持已经显示的状态，不弹错误。
 - **已经证实的（`CONFIRMED`）**：
-  1. **门禁**：`TMPDIR=$PWD/.tmp npm run ci` 在 **`ded1df6`** 的树上 **EXIT=0**——`98 files` / **`1838 tests`**（基线 1832 + 本轮 6）、
-     **`Found 15 warnings and 0 errors.`**（回到基线 15）、`lib/ at ded1df6 is the build of src/ at ded1df6 (281 files, byte-identical)`、
+  1. **门禁**：`TMPDIR=$PWD/.tmp npm run ci` 在**整支尖端 `3366248`** 的树上 **EXIT=0**——`98 files` / **`1839 tests`**（基线 1832 + 本轮 7）、
+     **`Found 15 warnings and 0 errors.`**（回到基线 15）、`lib/ at 3366248 is the build of src/ at 3366248 (281 files, byte-identical)`、
      `client bundle: 329354 bytes`（基线提交 321607，**+7747** 就是订阅那一段）。
-  2. **定向**：`npx vitest run test/client.spec.ts test/i18n-parity.spec.ts` → **2 files / 144 tests PASS**（`client` 132 → **138**）。
-     六条新用例都驱动真实组件挂载（核心刷新 / 同 seq 不重读 / 无记录不多读 / 后台失败静默 / 缺面回归 / 卸载即退订）。
+  2. **定向**：`npx vitest run test/client.spec.ts test/i18n-parity.spec.ts` → **2 files / 145 tests PASS**（`client` 132 → **139**）。
+     七条新用例都驱动真实组件挂载（核心刷新 / 同 seq 不重读 / 无记录不多读 / 后台失败静默 / 缺面回归 / 卸载即退订 / **面在挂载后才到**）。
      反向验证过：把「取面」改回旧行为，`5 failed / 133 passed`。
   3. **真机（隔离克隆，端口 3321，`~/.dsh` 与 3080 全程未碰）**：**改前** 20 秒 20 次快照全停在「开」、`/grok-workflow/mode` 只有挂载那 1 次；
      **改后** 打字 `/grok on` → **+0.5 秒**变开、打字 `/grok off` → **+0.5 秒**变关，全程 4 次请求，之后 **+15 秒静默窗 0 次**。
