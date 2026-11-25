@@ -1,0 +1,13 @@
+config keys the host would hand over: grokDefault, maxConcurrency, timeoutMs, loopEnabled, loopMaxRounds, loopFailStreak, roles, guardianModel
+
+[warn lines naming a removed key]
+
+count: 0
+tool registered: true
+
+after two more reads, warn lines naming a removed key: 0
+
+[every warn line]
+- settings surface: none in this runtime (no settings service); configure through the profile patch
+- roles.worker has 2 routes but every maxInFlight is blank (= unlimited = never yields); only a capped route yields when full inside one workf
+- model routes were not validated: this runtime exposes no llm service

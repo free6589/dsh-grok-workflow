@@ -1,0 +1,7 @@
+# trimmed excerpt of boot-with-mode.log (full log was 726 lines; the rest is MCP/host noise)
+# grep counts over the full log:
+#   'did not activate'  -> 0
+#   'pending'           -> 0
+#   'startup failed'    -> 0
+#   'removed configuration key' -> 0
+134:dsh web: http://127.0.0.1:3331/?token=<redacted>

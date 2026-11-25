@@ -4211,3 +4211,57 @@ spine 为空，pre-fix 形状会进脊柱。
     但读者需要知道：**新会话一律显示未开，想接活点一下或打 `/grok on`**。
   - 判据可复用：**一个开关画的是「有效值」还是「本会话的决定」，必须跟它旁边那条准入规则读同一份事实**；
     两者可以合法地不同时，就要有一处写着「这是故意的」的用例，否则下一个接手的人会把它「修」回去。
+
+## D-155 · 被删键从「拒载」改成「忽略 + 点名」：只为被删键推翻 R-06，未知键与拼错照旧拒绝（2026-11-25，未发版）
+
+- **Status:** `CONFIRMED`（源码与测试在本轮实测通过；真机隔离读数见 `VALIDATION.md` 同日条与
+  `.rsi/evidence/removed-keys-warn-2026-11-25/`）
+- **Date:** 2026-11-25
+- **Context:** R-06 的规则是「配置面之外的键一律拒载」。它对拼错的键是对的（一个被丢掉的键会让补丁看着配好了、
+  运行却当它不存在，这正是 `roles.reviewer`、`maxInflight` 那两条检查存在的理由），但对**已删键**用同一条规则是错的：
+  升级的人什么都没做错，只是档案里留着一行插件自己删掉的配置（最常见 `mode: triage`），而代价是**整行不激活、
+  工作流从界面上消失**。真机记录过两次（`m3-settings-section`、`m3-3-2026-11-25` 两个证据目录），
+  `0.13.36`/`0.13.37` 的升级须知因此要求用户先手工删两行——把插件自己的历史包袱变成用户的操作步骤。
+- **Decision:**
+  1. **`REMOVED_CONFIG_KEYS` 里的 25 个键不再抛错。** `assertKnownKeys` 遇到它们时把键记进模块内的
+     `recordedRemovedKeys`（`Set`）然后 `continue`；`resolveConfig` 的返回值不为它们保留任何东西
+     （`resolveConfig({ mode: 'triage' })` 与 `resolveConfig({})` 深度相等），所以「忽略」就是真的忽略。
+  2. **警告点名那个键，载入时只播一次。** `takeRemovedKeys()` 排空缓冲，`removedKeyWarning(key)` 是与
+     `limitOverrunWarning` 同形的中英双语一句：`configuration key "mode" was removed in an earlier release: its stored
+     value is ignored, and the rest of the row loads normally (delete that line when convenient). / 已忽略已删除的配置键
+     "mode"：…`。`apply()` 的 `readConfig()` 像 `announceOverruns()` 那样播，并用一个 per-load `Set` 去重——
+     每次消息都会重读，不去重就会每条消息刷一行。
+  3. **设置页再说一次，并点名到行。** `src/client/index.js` 的 `removedKeyWarn(entry)` 读**存下来的**文档
+     （`entry.user`；schema 已经把被删键从有效值 `value` 里丢掉了），每个残留键渲染一行，容器带
+     `data-warn="removed"`、每行带 `data-warn-key`，文案键 `warn.removed.title` / `warn.removed.detail` 中英各一套。
+     浏览器包不能 import `src/config.ts`，所以自带一份 `GROK_WORKFLOW_REMOVED_KEYS`，由 `test/client.spec.ts`
+     与 `REMOVED_CONFIG_KEYS` **逐项双向**钉死。
+  4. **R-06 的其余部分一个字不改。** 未知键仍抛 `unknown configuration key "…" (did you mean "…"?)`；嵌套层
+     `roles.<未知名>`、`roles.<role>[i].<错字段>`、`guardianModel.<错字段>` 仍抛完整路径；被删键写在路由对象**里面**
+     仍算嵌套未知键、仍抛。非法值、越界数字、预算背板、`configVersion` 全部照旧。
+  5. **文档与升级须知改成实话。** 两个 README、`docs/ARCHITECTURE.md`（R-06 那张清单）与 `CHANGELOG` 的
+     `[Unreleased]` 升级须知都改成「照常激活、旧键被忽略并点名、随手删掉即可」；历史段落的旧说法原样保留
+     （那是历史事实），只有本轮的行为说明改写。`test/docs-config-keys.spec.ts` 仍覆盖全部 25 个键，
+     语义改为「文档说明它们已被忽略」，并禁止 README 再出现 `removed configuration key` 那句旧承诺。
+- **Alternatives considered / rejected:**
+  - **继续拒载（保持 R-06 原样）。** 否决：代价落在没有犯错的人身上——一次常规升级让工作流从界面上消失，而修复入口
+    （设置页）恰恰随着那一行一起没了，必须先手工编辑档案。这正是 D-031 为 synthesis 不匹配已经破过一次例的
+    「可配置的错误不能拿走你用来修它的页面」。
+  - **静默丢弃、不提示。** 否决：那就变成 R-06 存在的理由本身——一个看着配好了、其实无效的键。用户会以为
+    `mode: triage` 还在起作用（甚至以为 `historyTurns: 100` 仍然生效），出问题时无从查起。忽略必须**说出来**，
+    而且要说出是哪个键，否则「你有旧键」这句话没法执行。
+  - **只警告不点名（「有若干已删除的键被忽略」）。** 否决：用户无法知道删哪一行；点名是这条警告唯一可执行的信息。
+  - **给被删键保留「兼容读」：把 `mode` 之类的值偷偷映射成新行为。** 否决：那些键对应的功能（前台、分流、旧闸门）
+    在本仓库里已经不存在（M3.3 删了 `src/gate.ts` 等），没有可映射的目标；假装兼容会让「删掉的功能」看起来还能配。
+  - **放宽到「所有未知键都忽略」。** 否决：那会把拼错（`maxConcurreny`）也变成静默无效，正是 R-06 要防的失败模式。
+    被删键与未知键的区别是**客观的**：一个在 `REMOVED_CONFIG_KEYS` 里有名字，另一个没有。
+- **Consequences:**
+  - **两套契约并存，且以「键是否在名单里」为界**：名单内 = 忽略 + 点名；名单外 = 拒载 + did-you-mean。
+    新增一个被删键只需要往 `REMOVED_CONFIG_KEYS` 加一项，两条守卫（`test/config-removed-keys.spec.ts` 的
+    25 键循环、`test/client.spec.ts` 的双向清单相等）就会自动覆盖它；忘记同步客户端清单会立刻红。
+  - **警告走的是「记录 → 排空 → 播一次」的形状**，与 B04 的越界修复同构：schema 先于 `apply()` 跑且没有 logger，
+    读又是每条消息一次。以后再加同类「容忍但要说」的配置问题，应复用这个形状而不是在检查里直接 log。
+  - **设置页读 `entry.user` 而不是 `entry.value`**：schema 已经把被删键丢掉，扫 `value` 永远扫不到——这与
+    B01 的限流横幅是同一个坑，两处注释都写明了。
+  - **升级须知从此不再要求用户先手工改档案。** 0.13.36/0.13.37 的旧须知保留为历史，但本轮 `[Unreleased]` 的
+    须知是「这次不用准备任何东西」。
