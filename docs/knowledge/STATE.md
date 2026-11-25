@@ -3464,3 +3464,17 @@ session. Messages themselves are not turned into a workflow.`；`/grok off` 的�
 （`98 files / 1839 tests`、`15 warnings / 0 errors`）。它顺手把两个 README 里「`grokDefault: on` 认领每条用户消息」改成实话
 （`on` 只是没有记录时会话报出来的回退值，本身不让接单台接活）——**这句改动把红二的矛盾写实了，而准入规则没动**。
 红二没修：开关认部署默认、接单台只认会话记录，两处设计撞在一起，修哪个都改用户可见行为，要决定号。
+
+Last updated: 2026-11-25 14:10 +08:00（**设置页与 `/grok on` 的文案改说实话，`CONFIRMED`，未发版、未改行为** — 分支
+`fix/settings-copy`（worktree `.worktrees/fix-settings-copy`，基线 `main` 尖端 `50dad03`），产品提交 **`05f9e2b`**。
+设置页第 1 组现在写「会话默认 / 没打 `/grok` 时的默认」，状态行写「开：没打过 `/grok` 的会话报这个」，副行写明
+「只是报出来的默认值……还得这个会话自己打一句 `/grok`」；`/grok on` 回执补了 `as long as the block intake is
+switched on`（纯字符串，无新增 config 读取）；两个 README 的设置页段落删掉 `auto`/`full` 模式选择器、改成页面真实
+渲染的五组。**门禁**：`TMPDIR=$PWD/.tmp npm run ci` → **EXIT=0**（`98 files / 1841 tests`、`15 warnings / 0 errors`、
+`lib/ at 05f9e2b is the build of src/ at 05f9e2b (281 files, byte-identical)`、`lib/client.js` 329354 → **330313 B**）。
+**隔离真机**：克隆 live `web` 档案（7720 文件 / 88 421 847 B、parity 5/5、0 未解析依赖、抹 1 行生图渠道密钥），端口 **3321**，
+同一个浏览器里前后两版逐字对读：改前 `开着：工作流工具可用` / `总开关` / `默认下大力气`，改后 `开：没打过 /grok 的会话报这个`
+/ `会话默认` / `没打 /grok 时的默认`（0 console errors）。**红线**：`~/.dsh` = 2026-11-22 23:40:20、
+`~/.dsh/profiles` = 2026-11-22 16:59:46（前后同值）、写探针 `Read-only file system`、3080 → 401、未 push / 未打 tag / 未 bump；
+`/grok on` 回执在 GUI 里 **`NOT_RUN`**（克隆落地页是生图工作台，新会话要先选模型）。证据
+`.rsi/evidence/settings-copy-2026-11-25/`。)
