@@ -1067,22 +1067,64 @@ describe('progress tab: the one-page story', () => {
     expect(recovered.attempt).toBeUndefined()
   })
 
-  it('falls back to one step per declared call when the run planned no tasks', () => {
-    // A single-call run declares no `任务 n · …` phase, so the track's total is the run's
-    // own declared rows — never a plan nobody announced.
+  it('falls back to the work legs when the run planned no tasks', () => {
+    // A triage / single-call run declares no `任务 n · …` phase, so the track steps through
+    // the calls that do the work: 执行 → 检查 → 复核. The planner and the synthesizer are the
+    // run's own two ends — one writes the plan, one writes the answer — so they are not
+    // "things to do": they keep their history lines and take no step (§19.2, §19.9).
     const story = storyOf(streamOf([
       [1, '规划助手', '规划', 'completed'],
-      [2, '执行', '执行', undefined],
+      [2, '执行', '执行', 'completed'],
+      [3, '检查', '检查', 'completed'],
+      [4, '复核', '复核', undefined],
     ]))
     expect(story.steps.map((step) => [step.key, step.number, step.title, step.state])).toEqual([
-      ['seq:1', undefined, '规划助手', 'done'],
-      ['seq:2', undefined, '执行', 'doing'],
+      ['seq:2', undefined, '执行', 'done'],
+      ['seq:3', undefined, '检查', 'done'],
+      ['seq:4', undefined, '复核', 'doing'],
     ])
     expect(story.steps.every((step) => step.chain.length === 0)).toBe(true)
-    expect(story.total).toBe(2)
-    expect(story.at).toBe(2)
-    expect(story.now.title).toBe('执行')
+    expect(story.total).toBe(3)
+    expect(story.at).toBe(3)
+    expect(story.now).toEqual({ title: '复核', role: '复核' })
+    // The planner is still a line of the history: a call that happened, just not a thing
+    // to do. Dropping it from the steps must not drop it from the page.
+    expect(story.log.map((row) => [row.seq, row.role, row.title, row.state])).toEqual([
+      [1, '规划助手', '规划', 'done'],
+      [2, '执行', '执行', 'done'],
+      [3, '检查', '检查', 'done'],
+      [4, '复核', '复核', 'doing'],
+    ])
     expect(story.dock).toBe('quiet')
+  })
+
+  it('has no step while only the planner has been declared', () => {
+    // The real-machine window that changed this contract: a run that has announced itself
+    // and declared its planner, nothing else. There is nothing to do yet, so the track is
+    // empty and the headline says the run is still turning the ask into steps — it must not
+    // invent a step out of the planner call, which is what shipped as 「第 1 步，共 1 步：
+    // 要干的 1 件事 · 规划 在做」.
+    const story = storyOf(streamOf([[1, '规划助手', '规划', 'completed']]))
+    expect(story.state).toBe('running')
+    expect(story.steps).toEqual([])
+    expect(story.total).toBe(0)
+    expect(story.at).toBe(0)
+    expect(story.now).toEqual({ titleKey: 'planning', title: '' })
+    expect(story.now.role).toBeUndefined()
+    expect(story.rest).toEqual([])
+    expect(story.attempt).toBeUndefined()
+    expect(story.dock).toBe('quiet')
+    // The planner is still in the history, which is where a leg that is not a step lives.
+    expect(story.log.map((row) => [row.seq, row.role, row.title])).toEqual([[1, '规划助手', '规划']])
+
+    // The same emptiness on a *finished* run keeps the finished headline: 「做好了」 is a
+    // fact about the run, while `planning` would claim it is still working.
+    const finished = storyOf(streamOf([[1, '汇总助手', '汇总', 'completed']], { stopReason: 'completed' }))
+    expect(finished.state).toBe('done')
+    expect(finished.steps).toEqual([])
+    expect(finished.total).toBe(0)
+    expect(finished.now).toEqual({ titleKey: 'done', title: '' })
+    expect(finished.dock).toBe('accept')
   })
 })
 

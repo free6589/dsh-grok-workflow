@@ -1315,15 +1315,26 @@ export function deriveProgressStory(run: ProgressRunFacts): ProgressStory {
         chain: node.chain ?? [],
         members: node.members,
       }))
-    // A call step's own `seq` is its identity: two calls can share one stage (`规划（第1次）`
-    // and `规划（第2次）`), so a node key would give two segments the same key.
-    : [...run.members].sort((left, right) => left.seq - right.seq).map((member) => ({
-        key: `seq:${member.seq}`,
-        title: storyRoleOf(member),
-        state: rowState(member),
-        chain: [],
-        members: [member],
-      }))
+    // A run that planned nothing steps through its **work legs**: the calls that do, check
+    // and review the work. The planner and the synthesizer are the run's own two ends — one
+    // writes the plan, one writes the answer — so they are not things to do, and counting
+    // them as steps shipped 「第 1 步，共 1 步：要干的 1 件事 · 规划 在做」 on a real run
+    // (§19.9). They keep their history lines; they take no step.
+    //
+    // The leg is read off the row's **label**, never its phase: a phase names the task, and
+    // the role word is what says which leg ran (`执行` / `检查` / `复核`, the same words the
+    // chain uses). A call step's own `seq` is its identity, because two calls can share one
+    // leg (`规划（第1次）` and `规划（第2次）`), so a node key would repeat.
+    : [...run.members]
+        .filter((member) => chainStageForLabel(member.label) !== undefined)
+        .sort((left, right) => left.seq - right.seq)
+        .map((member) => ({
+          key: `seq:${member.seq}`,
+          title: storyRoleOf(member),
+          state: rowState(member),
+          chain: [],
+          members: [member],
+        }))
   const total = steps.length
   const firstOf = (predicate: (step: ProgressStoryStep) => boolean): number => {
     const index = steps.findIndex(predicate)
@@ -1334,11 +1345,13 @@ export function deriveProgressStory(run: ProgressRunFacts): ProgressStory {
   const open = firstOf((step) => step.state !== 'done')
   const at = total === 0 ? 0 : doing !== -1 ? doing : failed !== -1 ? failed : open !== -1 ? open : total
   const current = at === 0 ? undefined : steps[at - 1]
-  const now: ProgressStory['now'] = state === 'waiting'
-    ? { titleKey: 'planning', title: '' }
-    : state === 'done'
-      ? { titleKey: 'done', title: '' }
-      : { title: current?.title ?? '' }
+  // The headline: a finished run says so, and a run with no step to name says it is still
+  // turning the ask into steps — waiting, running or broken, there is nothing else to say.
+  const now: ProgressStory['now'] = state === 'done'
+    ? { titleKey: 'done', title: '' }
+    : current === undefined
+      ? { titleKey: 'planning', title: '' }
+      : { title: current.title }
   if (state === 'running') {
     // The line a reader is waiting on: the current step's own open call, or — when the
     // current step is finished under a still-open run — the run's first unsettled one.
