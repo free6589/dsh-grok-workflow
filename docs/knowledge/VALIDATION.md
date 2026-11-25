@@ -1,3 +1,77 @@
+## `feat/progress-layout-detail`：两栏躯体 / Guardian 四块 / 任务行就地展开 / 经过折叠——门禁 `101 files / 1884 tests` 跑绿，warnings 仍 15；真机那半边 `NOT_RUN` — 2026-11-25 (`CONFIRMED`)
+
+这条记的是**一条还没合流的分支**：基线是 `main` 的 **`b0fbd20`**，尖端 **`d0c924a`**，中间 **5 颗提交**
+（`29291eb` 主体、`331f181` 详情容器 `div` → `ol`、`f14299c` 守卫、`08018bf` 一条详情行只说一次门、
+`d0c924a` 把这句话钉住）。**产品面只动浏览器包**，改动面 6 个文件（`src/client/index.js`、`lib/client.js` 与四个 spec）。
+下面每一行都写清命令、环境与结果；没跑的写 `NOT_RUN`，跑不起来的写 `BLOCKED`。
+**标注规则**：标 `包工头跑` 的行是执行方跑出来、本轮记录者**没有重跑**的读数（本轮做的是逐行核对转录）；
+标 `本轮自查` 的行是本轮亲手敲的命令。
+
+| state | command（environment） | result |
+| --- | --- | --- |
+| 基线算术（本轮自查） | `git archive b0fbd20 \| tar -x -C .tmp/base-count`，`ln -s <worktree>/node_modules`，`npx vitest run`；`git cat-file -s b0fbd20:lib/client.js` | **`100 files / 1855 tests`** 全过、`Duration 85.98s`；`lib/client.js` **334321** 字节。**基线不是抄口述，是本轮重跑的**。**`CONFIRMED`** |
+| 门禁（**包工头跑，本轮逐行核对转录**） | `TMPDIR=$PWD/.tmp npm run ci`（干净树 **`d0c924a`**；转录 `.tmp/gate-final.out`，**22429 字节**） | **`EXIT=0`**：`Found 15 warnings and 0 errors.`（162）、`client bundle: 347526 bytes → lib/client.js`（168）、`lib/ at d0c924a is the build of src/ at d0c924a (285 files, byte-identical)`（169）、`Test Files 101 passed (101)`（370）/ **`Tests 1884 passed (1884)`**（371）、`Duration 88.19s`（373）。全文 `FAIL` **0 行**。`npm run ci` 的顺序是 `typecheck → lint → verify:lib → test`，所以 tsc 与 oxlint 也被这一遍覆盖。**`CONFIRMED`** |
+| 尖端全套复跑（本轮自查） | `git archive d0c924a \| tar -x -C .tmp/tip2` + 软链 `node_modules`，`npx vitest run` | **`101 files / 1884 tests`** 全过、`Duration 90.88s`——与门禁同数，独立复现。**`CONFIRMED`** |
+| 逐文件用例数（本轮自查，两棵树各量一遍） | `npx vitest run <file>`（逐个跑，读 `Tests N passed`） | `test/client.spec.ts` **132 → 139**、`test/progress-hint-absent.spec.ts` **6 → 8**、`test/i18n-parity.spec.ts` **8 → 8**（表里多 3 行键）、新增 `test/progress-layout.spec.ts` **20**；`test/progress-tab.spec.ts` **57**、`test/progress-connector.spec.ts` **11** 一个没动。**7 + 2 + 20 = 29**，与总数 `1855 → 1884` 对得上。**`CONFIRMED`** |
+| `lib/` 就是 `src/` 的构建（本轮自查） | `git rev-parse d0c924a:lib/client.js d0c924a:src/client/index.js`；`git cat-file -s d0c924a:lib/client.js` | 两者是**同一个 blob** `e14880c51767c616aff2d9697e41a7ddb97e22c2`，**347526** 字节。与门禁那句 `(285 files, byte-identical)` 互为旁证。**`CONFIRMED`** |
+| 改动面（本轮自查） | `git diff b0fbd20..d0c924a --stat`；`git log --oneline b0fbd20..d0c924a` | **6 files changed, 1990 insertions(+), 137 deletions(-)**：`lib/client.js`、`src/client/index.js`、`test/client.spec.ts`、`test/i18n-parity.spec.ts`、`test/progress-hint-absent.spec.ts`、`test/progress-layout.spec.ts`。**`src/` 侧只有 `src/client/index.js`**，`src/progress-tab.ts` / `src/records.ts` 零改动。5 颗提交按上列顺序。**`CONFIRMED`** |
+| 类型检查与 lint（本轮自查） | `npx tsc -p tsconfig.json --noEmit`（`git archive 08018bf` 的拷贝里）；`npx oxlint src/client/index.js test/client.spec.ts test/i18n-parity.spec.ts test/progress-layout.spec.ts` | `TSC_EXIT=0`；oxlint `Found 2 warnings and 0 errors.`（`Finished in 40ms on 4 files`）。`d0c924a` 上的这两个阶段由门禁那一遍覆盖。**`CONFIRMED`** |
+| `verify:lib` 在非检出拷贝里 | `node scripts/verify-lib.mjs`（`git archive 08018bf` 的拷贝里） | **`BLOCKED`**：`fatal: pathspec 'lib' did not match any files`（它不是 git 检出，脚本里的 `git archive HEAD lib` 跑不了），`VERIFY_EXIT=1`。这一项**只**由门禁那一遍覆盖（`285 files, byte-identical`）。**`CONFIRMED`（失败原因已读，不是猜）** |
+| 文档守卫（本轮自查，写完记忆后跑） | `TMPDIR=$PWD/.tmp npx vitest run test/docs-version.spec.ts test/docs-config-keys.spec.ts test/docs-architecture-version.spec.ts test/i18n-parity.spec.ts test/progress-hint-absent.spec.ts`；另跑 `test/progress-tab.spec.ts`（它读 `DESIGN-progress-tab.md`） | `5 files / 41 tests` 全过（`docs-version 8`、`docs-config-keys 14`、`docs-architecture-version 3`、`i18n-parity 8`、`progress-hint-absent 8`），`963ms`；`test/progress-tab.spec.ts` **57 条**全过——追加 §20 没有打翻「段数陈述」那条文档守卫。**`CONFIRMED`** |
+| 真机 / 浏览器（真实档案里点开一行、折叠一次、右列 720px 上下换列） | —— | **`NOT_RUN`**：读数随后续消息补记。**在它补上之前，这条分支不得写成「真机验过」。** |
+
+**先红后绿（三轮，逐字）**
+
+1. **实现侧**（旧树，新 spec 已在）：`Test Files 1 failed (1)` / `Tests 6 failed | 1 passed | 132 skipped`——
+   `no element carries data-gw-progress-columns: expected undefined to be defined`、
+   `no element carries data-gw-progress-guardian-blocks: expected undefined to be defined`、
+   `expected [ undefined, undefined, …(6) ] to deeply equal [ 'false', 'false' ]`、
+   `expected undefined to be 'gw-progress-log-list'`、
+   `expected '.gw-progress { position: relative; bo…' to match /\.gw-progress-columns \{[^}]*display:…`。
+2. **守卫侧**（在 `git archive b0fbd20` 的干净树上、把新 spec 拷进去）：`Test Files 2 failed (2)` /
+   `Tests 18 failed | 8 passed (26)`——`the wrapper is missing, or drawn twice: expected [] to have a length of 1 but got +0`、
+   `no task row can be opened: expected [] to have a length of 1 but got +0`、
+   `zh progress.task.detail is missing: expected undefined to be type of 'string'`、
+   `the folded history has no cap: expected undefined to be defined`。
+3. **第二轮打磨**（`d0c924a` 的守卫，对着 `08018bf` 之前的树）：`Tests 2 failed | 18 passed (20)`——
+   `expected [ '8:04 执行 任务 1 · 修复登录 执行 做完', …(1) ] to deeply equal [ '8:04 执行 做完', '8:05 检查 过了 打开子会话' ]`、
+   `expected [ '8:03', '执行', '任务 1 · 建表', …(2) ] to deeply equal [ '8:03', '执行', '做完' ]`。
+
+**这些用例钉住了什么（读者面对的那几条）**
+
+- **两栏只在有 Guardian 时出现**，且左列顺序是 步骤清单 → 经过 → 交卷；没有 Guardian 时既无包裹层也无空列。
+- **Guardian 四块瓦片**：`status` / `budget` / `count` / `findings`，两两一行、findings 横跨两列，
+  findings 为空时写 `progress.guardian.empty` 而不是留白。
+- **几何**：右列 240px；≤720px 变单列；折叠上限 264px 且只作用在 `data-expanded="false"` 上（展开时才解除）；
+  CSS 里没有 `overflow-x: auto`，没有字面色值（`#hex` / `rgba()`），没有 `--dsw-alias-state-error-primary`。
+- **任务行默认全关**：`data-open` 全 `false`、`aria-expanded=false`、页面里没有详情块；点开一行后 `data-open="true"`、
+  `ol` 详情按 step key 挂上且 `id` 等于控件的 `aria-controls`；再点一次只收这一行，两行状态互不影响。
+- **详情行一行一份**：时刻、门词（一行一个，不重复）、结果词、能开时才有入口胶囊；无门的那行留角色词且没有 chip；
+  标题在行头出现 1 次、详情里 0 次；**历史行逐字与改造前相同，也不带胶囊**。
+- **折叠阈值**：5 行没有按钮，6 行整没有按钮，7 行才出现；`id=gw-progress-log-list` 与 `data-expanded` 始终在。
+- **三个新键在两本字典里都在**（详情 / Detail、展开全部 / Show all、收起 / Collapse），页面上用读者自己的语言说；
+  展开后的页面上没有百分比、没有估算、没有通过率。
+
+**Changed（本轮改动）：** 只有记忆与变更日志——`docs/knowledge/DESIGN-progress-tab.md`（追加 §20）、
+`docs/knowledge/DECISIONS.md`（追加 `D-157`）、`docs/knowledge/STATE.md`（新的 `Last updated:` 头段）、
+`docs/knowledge/HANDOFF.md`（新一节 + 决定日期 `2026-12-09`）、`docs/knowledge/VALIDATION.md`（本节）、
+`CHANGELOG.md`（`## [Unreleased]` 一条）。**没有改 `src/`、`lib/`、`test/`、`.rsi/`**，也没有动版本号。
+
+**Honest boundary（逐条）：**
+
+1. **门禁不是本轮跑的**：`EXIT=0` 是包工头的读数，本轮做的是**读转录 + 自己复跑一遍 vitest**。
+   复跑只覆盖测试，不覆盖 `typecheck` / `lint` / `verify:lib`。
+2. **`08018bf` 没有属于它自己的门禁**：门禁打在 `d0c924a` 上，`08018bf` 的行为被下一颗提交的守卫加上同一遍门禁一起覆盖。
+3. **口述读数比实测旧一版**：总数 `+27 例 / +12282 字节` 是 `f14299c` 那一轮的数（那之后又落了两颗提交），
+   而逐文件的 `client.spec.ts 121 → 139` 与 `progress-hint-absent 7 → 8` 两轮都与实测对不上；尖端实测是
+   **`132 → 139`、`6 → 8`、`+29 例 / +13205 字节`**。记忆里写实测值。
+4. **`i18n-parity` 是「多 3 行键」不是「多 4 行」**：那 4 个 diff 添加行里有 1 行是注释。
+5. **真机那半边 `NOT_RUN`**：本节没有任何真实档案、真实浏览器、真实运行的读数，**一个字都没有编**。
+6. **「先红后绿」那三段引文是派单转来的捕获**（实现侧、两轮守卫），跑在已经收掉的树上；本轮**没有重跑那三次红**。
+   本轮亲手确认的是绿的一侧：基线 `1855`、尖端 `1884`、文档守卫 `41`，以及转录里那几行门禁读数。
+
+**(以下为上一轮的记录，原样保留。)**
+
 ## `0.13.39` 发布收口：一个发布提交、一次门禁、快进 `main`、附注标签、两条远端 run、Release 与资产；live 档案升级 `BLOCKED` — 2026-11-25 (`CONFIRMED`)
 
 发布轮，不是代码轮。**这一轮没有合流任何东西**：产品改动在发布之前就已经全在 `main` 上了（`8c9b028` → `ed287e1`

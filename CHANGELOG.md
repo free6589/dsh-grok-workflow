@@ -5,6 +5,28 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Changed / 变更
+
+- **The progress page holds its shape while you read it: the guardian beside the page, a task's own calls under its row, a long history folded / 进度页读起来不再变形：Guardian 挪到页面右侧、任务行下面就是它自己的调用、太长的「经过」先收起来** —
+  Three layout changes, and nothing else: no new number, and the only new words are the three labels the two new controls
+  need. The guardian used to be one card under the history, which read as another chapter of the run; it is a side lane about
+  the run staying alive, so it now sits in a column beside the page — and that column exists only when the run actually
+  recorded a guardian, because an empty column promises something the page cannot deliver. Inside the lane the same facts are
+  four tiles: the monitor's state, the time budget, how many times it stepped in, and the interventions themselves (or one
+  sentence saying there were none) — every word of it is copy the lane already had. A task row is now something you can press:
+  the calls that task made appear under it, one line each, carrying the moment, the gate it reached, what came back, and the
+  way into that child session — while the row's own text stays exactly the words it said before, because the button adds a way
+  to look, not a word to read. And a 「经过」 longer than six lines keeps its height and offers 「展开全部」, which turns into
+  「收起」 once opened, so the button at the bottom of the page stays where you last saw it; no line is dropped and none is
+  summarized. See D-157.
+  / 三处布局改动，别的都没动：没有新数字，新词只有两颗新控件需要的三个标签。Guardian 以前是「经过」下面的一张卡，读起来像这次运行的又
+  一章；它其实是一条**边车**，说的是监控还活着没有，所以现在挪到页面右侧的一列里——而且只有这次运行真的记录了 Guardian 才分这一列，
+  因为空着的一列是在承诺这一页给不出的东西。这一列里的同一批事实改成四块：监控的状态、时间预算、它插过几次手，以及那几次干预本身
+  （一次都没有就写一句话）——每个字都是这一栏本来就有的文案。任务行现在按得动了：按一下，这个任务自己发出的调用就长在它下面，一行一条，
+  带时刻、带它走到哪一道门、带回来的结果、带进那个子会话的入口——行本身的文字一个字没变，因为按钮只多了一个「看的方式」，没有多一个
+  「要读的词」。另外「经过」超过六行时会保持高度，并给一个「展开全部」，点开变成「收起」，这样页面底部那颗按钮就还在你上次看到的地方；
+  一行都不丢，也一行都不概括。见 D-157。
+
 ## [0.13.39] - 2026-11-25
 
 ### Changed / 变更
