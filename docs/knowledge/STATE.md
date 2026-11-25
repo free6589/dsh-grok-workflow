@@ -12,7 +12,7 @@ Last updated: 2026-11-25 16:35 +08:00（**`0.13.37` 已经发出去了：两次�
 `git show v0.13.37^{}:package.json` 读 `0.13.37`；推送 `* [new tag] v0.13.37 -> v0.13.37`。**没有 force-push，也没有移动任何已发布标签**：
 `v0.13.35` 仍剥到 `ffbb6b0`、`v0.13.36` 仍剥到 `26dc370`（`git ls-remote --tags origin`，本轮重读过）。
 **门禁两次，都是 `TMPDIR=$PWD/.tmp npm run ci` 在发布 worktree 里跑（`CONFIRMED`，两份转录的逐字副本在
-`.rsi/evidence/release-0.13.37-2026-11-25/`——`gate-merge-5c58afd.log` 与 `gate-release-34236f0.log`，原件随发布 worktree 收尾）**：`5c58afd` 上 `EXIT=0`、`Found 15 warnings and 0 errors.`、`client bundle: 333611 bytes → lib/client.js`、
+`.rsi/evidence/release-0.13.37-2026-11-25/`——`gate-merge-5c58afd.out` 与 `gate-release-34236f0.out`，原件随发布 worktree 收尾）**：`5c58afd` 上 `EXIT=0`、`Found 15 warnings and 0 errors.`、`client bundle: 333611 bytes → lib/client.js`、
 `lib/ at 5c58afd is the build of src/ at 5c58afd (281 files, byte-identical)`、`Test Files 98 passed (98)` / **`Tests 1849 passed (1849)`**、
 `Duration 85.82s`；`34236f0` 上（包工头自己跑的那一遍，**这一遍就是发布门禁**）同样 `EXIT=0`、`15 warnings / 0 errors`、`333611 bytes`、
 `lib/ at 34236f0 is the build of src/ at 34236f0 (281 files, byte-identical)`、`98 files / 1849 tests`、

@@ -10,8 +10,8 @@
 
 | 文件 | 跑在哪棵树上 | 是什么 | 结论 |
 | --- | --- | --- | --- |
-| `gate-merge-5c58afd.log` | 合并提交 **`5c58afd`**（`merge: a session with no mode record no longer shows the switch as on`，父 `d34214b` + `9d234c2`） | 合流之后的**第一遍**门禁 | `EXIT=0`，`98 files / 1849 tests`，`15 warnings / 0 errors`，`333611` 字节，`lib/ at 5c58afd … byte-identical` |
-| `gate-release-34236f0.log` | 发布提交 **`34236f0`**（`chore(release): prepare v0.13.37`，8 文件 / +38 −20，树 `71ffdb66…`） | **发布门禁——这一遍才算数** | `EXIT=0`，同样 `98 files / 1849 tests`、`15 warnings / 0 errors`、`333611` 字节，`lib/ at 34236f0 … byte-identical` |
+| `gate-merge-5c58afd.out` | 合并提交 **`5c58afd`**（`merge: a session with no mode record no longer shows the switch as on`，父 `d34214b` + `9d234c2`） | 合流之后的**第一遍**门禁 | `EXIT=0`，`98 files / 1849 tests`，`15 warnings / 0 errors`，`333611` 字节，`lib/ at 5c58afd … byte-identical` |
+| `gate-release-34236f0.out` | 发布提交 **`34236f0`**（`chore(release): prepare v0.13.37`，8 文件 / +38 −20，树 `71ffdb66…`） | **发布门禁——这一遍才算数** | `EXIT=0`，同样 `98 files / 1849 tests`、`15 warnings / 0 errors`、`333611` 字节，`lib/ at 34236f0 … byte-identical` |
 
 两次的 cwd 都是 `.tmp/wt-release-0.13.37`，命令都是 `TMPDIR=$PWD/.tmp npm run ci`
 （即 `npm run typecheck && npm run lint && npm run verify:lib && npm test`）。
@@ -65,8 +65,8 @@ lib/ at 34236f0 is the build of src/ at 34236f0 (281 files, byte-identical)
 两份副本与源文件逐字节相同（拷贝完成后立刻比对，两个 sha256 各自相等）：
 
 ```
-51f8b524556cb4b803fc96461e80dc8377403675bc14706e4a91179bd86f17dd  ci-second.log            → gate-merge-5c58afd.log     (22105 字节)
-d539c03c8ce93f6e003ea6605c53b8cba8ac763caa5224864c8650e0756e2852  ci-release-34236f0.log   → gate-release-34236f0.log   (21907 字节)
+51f8b524556cb4b803fc96461e80dc8377403675bc14706e4a91179bd86f17dd  ci-second.log            → gate-merge-5c58afd.out     (22105 字节)
+d539c03c8ce93f6e003ea6605c53b8cba8ac763caa5224864c8650e0756e2852  ci-release-34236f0.log   → gate-release-34236f0.out   (21907 字节)
 ```
 
 日志里没有密钥：全文唯一的 `secret` 命中是 oxlint 密钥检测规则**自己的正则字面量**（lint 输出里那行 `pattern:`），
