@@ -256,6 +256,45 @@
 另开分支 `fix/grok-command-text`（从 `main` 尖端 `6e9bc56` 开），只改话术与守卫它的测试/文档，
 不动记录形状、不动路由、不动接单台准入。跑完在这里补：提交号、红/绿读数、`npm run ci` 的 tail。
 
-## 8. 补跑：工作流引擎（真跑 `grok_workflow`）
+## 8. 补跑：工作流引擎本身（真跑 `grok_workflow`，`CONFIRMED`）
 
-（读数在下面追加。）
+这一条是六项都记完之后补的，**单独列，不和六项混**：六项里的「真任务」是模型直接干活，这一条才是引擎。
+
+    会话   session-706442e2-8e4e-41c6-b8c1-580015d22f01（先打过 `/grok on`）
+    prompt 请用 grok_workflow 工具把这件事真跑一遍：统计 src/ 目录下每个 .ts 文件的行数，
+           给我行数最多的前五名（文件名+行数）。要真读文件，不要猜。
+
+跑出来的链条（会话事件逐条）：
+
+    seq 23  tool/call grok_workflow（objective 写全：覆盖 src/ 全部 .ts、行数含空行、不许猜）
+    seq 34  tool-workflow/agent-end   seq=3 outcome=completed
+    seq 36  tool-workflow/agent-start seq=4 label=复核  phase=任务 1 · 统计src下TS文件行数Top5
+    seq 39  tool-workflow/agent-start seq=5 label=汇总·第1稿
+    seq 42  tool-workflow/agent-start seq=6 label=汇总·第2稿
+    seq 45  tool-workflow/agent-start seq=7 label=汇总·第3稿
+    seq 47  tool-workflow/summary-final draft=3
+    seq 48  tool-workflow/guardian-end cancelled=false findingCount=0
+    seq 49  tool-workflow/run-end stopReason="completed"
+
+交卷内容（工具结果原文节选，1669 字）：
+
+    Grok workflow: COMPLETED
+    Plan: planner; 1 task(s); 1 verified
+    Wave reason: Single wave because the objective is one indivisible unit: splitting it would only add a hand-off.
+    Confirmed evidence:
+    - … 独立执行 find 枚举得 69 个，sort -u 后仍 69，uniq -d 无输出；执行者给出总数 69 一致
+    - … 用 wc -l 与 awk END NR 双口径复核；… delivery/index.ts 末字节 7d，awk 得 1331
+    - … 复核排序为 script.ts 5025、checkpoint/wiring.ts 1803、run.ts 1692、report.ts 1369、delivery/index.ts 1331
+    Summary review: check=pass verify=pass drafts=3 · final: draft 3
+    Guard: 0 finding(s), no subagent was terminated; nobody cancelled this round (it finished on its own).
+
+答案（用户最后看到的）：`src/` 下共 **69 个 .ts 文件**，前五名 `script.ts 5025`、`checkpoint/wiring.ts 1803`、
+`run.ts 1692`、`report.ts 1369`、`delivery/index.ts 1331`，并且**自己说明了一处口径差异**（`delivery/index.ts` 末尾缺换行符，
+`wc -l` 报 1330、按真实行数算 1331）。
+
+这一条为什么重要：**验收是独立跑出来的，不是执行者自报。** 复核那条子代理自己重跑了一遍 `find` + 双口径 `wc`/`awk`，
+发现并写下了「末尾缺换行符」这个真实边界，`drafts=3`（汇总改了三稿），`guardian 0 findings`，`stopReason=completed`。
+也就是说：「能不管它」这条要求，在这一条上是有读数的——没人盯着，它自己跑完、自己核、自己改、自己收。
+
+**边界**：这跑用的角色路由是 `bifrost-responses`（见 §2 第 2 条，本机没有 `agent2api` 的钥匙），
+所以它证明的是「引擎主链在这条路由上真跑通」，不证明 live 档案那一套 `agent2api` 路由在本机能跑。
