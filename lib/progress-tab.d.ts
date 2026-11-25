@@ -46,7 +46,7 @@
  * values to a node and never decides a state, so it is not a lifecycle event and does not
  * belong in the routing list ({@link PROGRESS_DETAIL_EVENT_TYPE}).
  */
-export declare const PROGRESS_EVENT_TYPES: readonly ["tool-workflow/run-start", "tool-workflow/agent-start", "tool-workflow/agent-end", "tool-workflow/summary-final", "tool-workflow/guardian-start", "tool-workflow/guardian-finding", "tool-workflow/guardian-end", "tool-workflow/run-end"];
+export declare const PROGRESS_EVENT_TYPES: readonly ["tool-workflow/run-start", "tool-workflow/agent-start", "tool-workflow/agent-end", "tool-workflow/summary-final", "tool-workflow/summary-rejected", "tool-workflow/guardian-start", "tool-workflow/guardian-finding", "tool-workflow/guardian-end", "tool-workflow/run-end"];
 /**
  * The optional detail payload, kept apart from {@link PROGRESS_EVENT_TYPES} on purpose.
  *
@@ -68,6 +68,16 @@ export declare const PROGRESS_DETAIL_EVENT_TYPE = "tool-workflow/stage-detail";
  * that landed. A stream without it renders exactly what it rendered before.
  */
 export declare const PROGRESS_SUMMARY_FINAL_EVENT_TYPE = "tool-workflow/summary-final";
+/**
+ * The event that says the gate rejected every draft, with the last stage that failed.
+ *
+ * The sibling of {@link PROGRESS_SUMMARY_FINAL_EVENT_TYPE} and never its alternative: a
+ * run either handed one draft in or handed none, so a stream carrying both is not ours
+ * (the fold still has to read one, see {@link deriveProgressStory}). A tab that has never
+ * heard of this event renders a rejected run exactly as it did before — as a run with no
+ * final draft — because the event only ever adds a reading of a gap it already saw.
+ */
+export declare const PROGRESS_SUMMARY_REJECTED_EVENT_TYPE = "tool-workflow/summary-rejected";
 /** Registered conversation target of the progress view (namespaced so a collision throws). */
 export declare const PROGRESS_VIEW_TARGET = "grok-progress";
 /** Conversation node kind owned by the tab (namespaced for the same reason). */
@@ -152,6 +162,18 @@ export interface ProgressRunFacts {
      * tell "no final draft was recorded" from "draft 1 was final".
      */
     summaryFinalDraft?: number;
+    /**
+     * The gate's all-rejected verdict, when the stream said so.
+     *
+     * The other half of the same story slot: "no final draft" and "every draft was
+     * rejected, at this stage, for this reason" are different readings of a run that
+     * handed in nothing, and only the second one lets the page say why.
+     */
+    summaryRejected?: {
+        drafts: number;
+        stage: 'check' | 'verify';
+        reason: string;
+    };
 }
 /** One spine stage of the track, in render order. */
 export interface ProgressStageDefinition {
@@ -515,14 +537,28 @@ export interface ProgressStory {
     /** The titles of the steps after the current one, consecutive repeats collapsed. */
     rest: string[];
     log: ProgressStoryLogRow[];
-    /** The shipped summary draft, when the stream named one and its own row exists. */
-    final?: {
-        draft: number;
-        label: string;
-        row?: ProgressStoryLogRow;
-    };
+    /**
+     * What the run handed in: the shipped draft, or the all-rejected verdict.
+     *
+     * Absent is its own fact — "nothing was recorded" — and it is not the same as a
+     * rejection: a run whose gate never judged a draft says exactly as little as one whose
+     * recorder never wrote a word.
+     */
+    final?: ProgressStoryFinal;
     dock: ProgressStoryDock;
 }
+/** The two ways a run ends its summary: one draft shipped, or every draft rejected. */
+export type ProgressStoryFinal = {
+    kind: 'shipped';
+    draft: number;
+    label: string;
+    row?: ProgressStoryLogRow;
+} | {
+    kind: 'rejected';
+    drafts: number;
+    stage: 'check' | 'verify';
+    reason: string;
+};
 /**
  * Derive the one-page story for one run (the pure half of the redesign, §19.2).
  *

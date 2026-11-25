@@ -746,6 +746,9 @@ const SYNTHESIS_NARRATIVE_WORDS = 300;
 // number is interpolated from the host constant so the chain budget and the
 // guest's own loop bound stay one value.
 const SUMMARY_MAX_ATTEMPTS = ${SUMMARY_MAX_ATTEMPTS};
+// One line of reason is all the review marker carries when every draft was rejected:
+// enough to say what stopped the gate, never enough to rewrite the ledger line.
+const SUMMARY_REVIEW_REASON_CHARS = 300;
 
 const ROUTE_FAILURE_CLASSES = {
   'rate-limit': 1,
@@ -2463,6 +2466,20 @@ function clip(value, max) {
   const code = raw.charCodeAt(cut - 1);
   if (code >= 0xd800 && code <= 0xdbff) cut -= 1;
   return raw.slice(0, cut) + '…';
+}
+
+/**
+ * The gate's last reason, flattened into the one line the review marker can carry.
+ *
+ * A control character would split (or corrupt) a field the host parses back off the
+ * marker, and an unbounded reason would let a provider's own diagnostic rewrite the
+ * whole ledger line, so the text is folded to a single bounded line here — once, where
+ * the marker is written, instead of in every reader.
+ */
+function summaryReviewReason(value) {
+  const raw = typeof value === 'string' ? value : '';
+  const flat = raw.replace(/[\u0000-\u001f\u007f\u2028\u2029]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return clip(flat, SUMMARY_REVIEW_REASON_CHARS);
 }
 
 function synthesisStatusWord(status) {
@@ -4479,9 +4496,18 @@ if (synthesisPolicy === 'layered' && humanSummary) {
     }
     draft = rewrite.text;
   }
+  // A null review is a different fact from "all drafts were rejected": no draft was ever
+  // produced (the first request came back empty), so there is nothing to reject and no
+  // marker is written. Only a gate that actually judged a draft leaves a verdict.
   if (synthesisSummary === '' && review !== null) {
+    // The outcome, not just the verdict: every draft was rejected, and the reason is the
+    // last one the gate gave. Without it the marker says "something failed" and nothing
+    // about what, so a reader of the report (and the progress card) cannot say why this
+    // run handed in nothing.
+    const gateReason = summaryReviewReason(review.reason);
     synthesisReview = 'check=' + (review.stage === 'check' ? 'fail' : 'pass') +
-      ' verify=' + (review.stage === 'verify' ? 'fail' : 'pass') + ' drafts=' + drafts;
+      ' verify=' + (review.stage === 'verify' ? 'fail' : 'pass') + ' drafts=' + drafts +
+      (gateReason === '' ? '' : ' reason=' + gateReason);
     synthesisError = 'polish rejected by the summary gate after ' + drafts + ' draft(s) (' +
       review.stage + (review.stage === 'check' ? ' guardrail' : ' verification') + ': ' + review.reason +
       '); the deterministic summary is used';
@@ -4561,6 +4587,13 @@ if (synthesisPolicy === 'layered' && humanSummary) {
     draft = rewrite.text;
   }
   if (synthesisSummary === '' && review !== null) {
+    // Same outcome the layered policy records: this policy has no deterministic narrative
+    // to fall back to, so all-rejected means nothing is shipped — and the report has to
+    // say so, with the last reason, instead of leaving only the synthesis error prose.
+    const gateReason = summaryReviewReason(review.reason);
+    synthesisReview = 'check=' + (review.stage === 'check' ? 'fail' : 'pass') +
+      ' verify=' + (review.stage === 'verify' ? 'fail' : 'pass') + ' drafts=' + drafts +
+      (gateReason === '' ? '' : ' reason=' + gateReason);
     synthesisError = 'polish rejected by the summary gate after ' + drafts + ' draft(s) (' +
       review.stage + (review.stage === 'check' ? ' guardrail' : ' verification') + ': ' + review.reason +
       '); no narrative is shipped';

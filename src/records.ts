@@ -368,6 +368,19 @@ export const PROGRESS_RUN_END = 'tool-workflow/run-end'
  */
 export const PROGRESS_SUMMARY_FINAL = 'tool-workflow/summary-final'
 
+/**
+ * The optional event that says the gate rejected every draft, and why.
+ *
+ * A separate event from {@link PROGRESS_SUMMARY_FINAL} because the two facts are never
+ * both true and are not two readings of one value: a rejected run has no "final" draft
+ * at all, so writing its verdict as a `summary-final` payload would either need a
+ * second `draft` meaning ("the count, not a winner") or a card that contradicts itself.
+ * Keeping them apart also means every reader that predates this event keeps rendering
+ * a rejected run exactly as it did — as a run that handed in nothing — instead of
+ * misreading a count as a winning draft number.
+ */
+export const PROGRESS_SUMMARY_REJECTED = 'tool-workflow/summary-rejected'
+
 /** Payload of {@link PROGRESS_RUN_START} (`ToolWorkflowRunStartData`). */
 export interface ProgressRunStart {
   runId: string
@@ -402,6 +415,20 @@ export interface ProgressSummaryFinal {
   /** 1-based draft number that passed the summary gate. */
   draft: number
 }
+
+/** Payload of {@link PROGRESS_SUMMARY_REJECTED}: the gate rejected every draft. */
+export interface ProgressSummaryRejected {
+  runId: string
+  /** How many drafts the gate judged and rejected (1-based count, never a winner). */
+  drafts: number
+  /** The last stage that failed, in the gate's own two words. */
+  stage: 'check' | 'verify'
+  /** That stage's reason, one bounded line. */
+  reason: string
+}
+
+/** The reason bound on {@link PROGRESS_SUMMARY_REJECTED}: the same one the marker uses. */
+export const PROGRESS_SUMMARY_REJECTED_REASON_CHARS = 300
 
 /**
  * The stop reason the GUI node is closed with, derived from the *task-level* result.
@@ -464,6 +491,8 @@ export interface WorkflowProgressRecorder {
   runEnd(runId: string, stopReason: WorkflowStopReason): void
   /** Mark which summary draft the run shipped (the one that passed the gate). */
   summaryFinal(runId: string, draft: number): void
+  /** Announce that every draft was rejected, with the last failing stage and its reason. */
+  summaryRejected(runId: string, rejected: { drafts: number, stage: 'check' | 'verify', reason: string }): void
   /** Stop recording and drop any buffered events. */
   dispose(): void
 }
@@ -620,6 +649,23 @@ export function createWorkflowProgressRecorder(
       const position = Number.isFinite(draft) ? Math.trunc(draft) : 0
       if (position < 1) return
       if (!append(target, PROGRESS_SUMMARY_FINAL, { runId, draft: position })) owned.delete(runId)
+    },
+    summaryRejected(runId, rejected) {
+      if (disposed) return
+      const target = owned.get(runId)
+      // Same rule as `summaryFinal`: no announced run, no fact.
+      if (target === undefined) return
+      const drafts = Number.isFinite(rejected.drafts) ? Math.trunc(rejected.drafts) : 0
+      if (drafts < 1) return
+      if (rejected.stage !== 'check' && rejected.stage !== 'verify') return
+      const reason = typeof rejected.reason === 'string' ? rejected.reason.trim() : ''
+      // A rejection with no reason is the half-fact this event exists to replace: drop it
+      // rather than claim "every draft was rejected, and we will not say why".
+      if (reason === '') return
+      const bounded = reason.length <= PROGRESS_SUMMARY_REJECTED_REASON_CHARS
+        ? reason
+        : reason.slice(0, PROGRESS_SUMMARY_REJECTED_REASON_CHARS)
+      if (!append(target, PROGRESS_SUMMARY_REJECTED, { runId, drafts, stage: rejected.stage, reason: bounded })) owned.delete(runId)
     },
     dispose() {
       disposed = true
