@@ -112,7 +112,7 @@ DSH 启动后，直接提问即可：
 - **没有任何监听器决定一条用户消息**（M3.3）。`agent/pre-step` 上只有窄心跳监听（只对带 Loop 标记的 `source.kind === 'schedule'` 投递动手）和接单台的观测（在决策之后记录一次心跳）。其它一切——打字的一轮、回答的问题卡、webhook、子代理提示词、空批——都原样交给模型。
 - 答案在**同一轮内**到达。`0.10.0` 只剩 `in-turn` 一种投递方式——它是唯一能在一次性进程中存活的策略，原来的 `relay`、`append` 已删除。
 - 插件不会启动的运行会**明确拒绝**并给出原因（`grok_workflow` 调用的目标超过 32,000 字符）。被拒绝的只是运行，不是**消息**。
-- 每次运行的路由换人记录在会话日志里（`recordRouting`）；每个 agent 的等待队列由 `maxQueuedMessages` 封顶。
+- 每次运行的路由换人记录在会话日志里（`recordRouting`）；一个 run 能给它边界规划器排队的插入需求，上限固化在插件内部（`STEERING_LIMITS.maxQueued`，就是 `REPLAN_LIMITS.maxIntents` 那个 8）——没有对应的配置键。
 - 想只留那两个常驻工具、完全不要接单台，就把 `blockIntake` 设为 `false`；窄心跳监听两种情况下都在，因为它是心跳唯一的裁决者。
 
 ### 目标长度上限
@@ -223,7 +223,7 @@ DSH 启动后，直接提问即可：
 
 四个 `loop*` 键配置续跑面。会话的循环打开时，续跑服务读取 `loopMaxRounds`、`loopFailStreak`、`loopIntervalMin`，写进一条持久 Schedule 规则；Host 没有装配 Schedule 服务时，这些键只是存下来，一条消息仍然只跑一次。`loopEnabled` 是自动驱动的部署默认值，目前还没被读取——打开循环始终是用户自己的显式动作（见[自动接着跑](#自动接着跑循环心跳)）。`loopIntervalMin` 是等待，不是预算：它只能把循环的下限抬高；`loopFailStreak` 会写进心跳文案当提示，因为 Host 记录的是投递，不是单轮成败。
 
-其余一律固化在插件内部、不再接受：`maxRetries=1`、`maxActiveRuns=2`（每会话） / `maxActiveRunsTotal=8`（每进程）、`historyTurns=20` / `historyChars=20000`、`maxQueuedMessages=4`、`recordLimit=256`、`answerStrategy=in-turn`、`triageClassifier=rules`、`triageAsk`、`triageModel` 未设、`triageFollowupAsFast`、`instantReceipt`、`humanSummary`、`showDiagnostics=false`、`recordRuns`、`showProgress`、`switchOn` 已删除（按内置备用策略生效，存了值会被当未知键拒绝）、`subagentProvider` 未设；消息闸门本身也没了：`enforceGate`/`gateRequired`/`gateScope`/`gatePreset` 更早那轮就删了，M3.3 又把最后两个路由键 `mode` 与 `legacyGate` 连同它们配置的前台一起删掉。
+其余一律固化在插件内部、不再接受：`maxRetries=1`、`maxActiveRuns=2`（每会话） / `maxActiveRunsTotal=8`（每进程）、`historyTurns=20` / `historyChars=20000`、`maxQueuedMessages` 已删除（队列上限是内部常量，不是键）、`recordLimit=256`、`answerStrategy=in-turn`、`triageClassifier=rules`、`triageAsk`、`triageModel` 未设、`triageFollowupAsFast`、`instantReceipt`、`humanSummary`、`showDiagnostics=false`、`recordRuns`、`showProgress`、`switchOn` 已删除（按内置备用策略生效，存了值会被当未知键拒绝）、`subagentProvider` 未设；消息闸门本身也没了：`enforceGate`/`gateRequired`/`gateScope`/`gatePreset` 更早那轮就删了，M3.3 又把最后两个路由键 `mode` 与 `legacyGate` 连同它们配置的前台一起删掉。
 
 **从 ≤0.9.4 迁移：** 把这些键从补丁里删掉。还带着它们会被当未知键拒绝，而被删的值没有替代项——按上面的固定值生效。
 
@@ -245,7 +245,7 @@ DSH 启动后，直接提问即可：
 
 **它旁边的「自迭代」开关。** 第二个 dock 开关，id `grok-workflow-iterate`，POST 到 `/grok-workflow/iterate`，驱动第二个服务实例——它的槽位是 `RSI heartbeat` 这个保留标题，所以两个开关永远不会创建、读取或删除对方的行。它的 `open` 不带 prompt 也不带间隔：存进去的提示词就是档案里的 `iterateTemplate`（在设置页「自迭代」分组的文本框编辑；纯空白回退内置默认），间隔下限是 `iterateIntervalMin`。`RSI heartbeat` 的投递是不带 Loop 标记的普通调度消息，所以窄监听不会动它——而且这一行刻意比插件活得久（它是仓库自己的节拍）；用同一个开关关掉，或走 DSH 自己的「自动化任务」删除。
 
-**再接一个「工作流开关」。** 第三个 dock 开关，id `grok-workflow-mode`，就是可点的 `/grok on|off`：POST 到 `/grok-workflow/mode`，body 是 `{"action":"status"|"set","sessionId":…,"enabled":…}`，读写的是会话自己的模式记录——斜杠命令写的那条 `plugin:grok-workflow/mode`，也是接单台准入规则读的那条，所以按钮和命令不会各说一套。挂载时读一次，界面只画路由回读出来的状态（宿主拒绝的写入保留上一状态并说明原因）；会话还没有记录时显示部署默认值 `grokDefault`，默认值不在 UI 里重述，也没有第二份开关存储。关闭有三重提示——文案、空心指示灯、熄灭的胶囊——灰色开关不会被读成「还在跑」。
+**再接一个「工作流开关」。** 第三个 dock 开关，id `grok-workflow-mode`，就是可点的 `/grok on|off`：POST 到 `/grok-workflow/mode`，body 是 `{"action":"status"|"set","sessionId":…,"enabled":…}`，读写的是会话自己的模式记录——斜杠命令写的那条 `plugin:grok-workflow/mode`，也是接单台准入规则读的那条，所以按钮和命令不会各说一套。挂载时读一次，之后只在会话记录被写入时（比如你打字 `/grok on` 或 `/grok off`）再读一次、不轮询，界面只画路由回读出来的状态（宿主拒绝的写入保留上一状态并说明原因）；会话还没有记录时显示部署默认值 `grokDefault`，默认值不在 UI 里重述，也没有第二份开关存储。关闭有三重提示——文案、空心指示灯、熄灭的胶囊——灰色开关不会被读成「还在跑」。
 
 打开一个循环是一次显式的浏览器请求：
 

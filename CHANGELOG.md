@@ -5,6 +5,31 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Fixed / 修复
+
+- **Turning the workflow off by typing `/grok off` now moves the switch at the bottom of the message box by itself / 打字关掉工作流，对话框底部那个开关现在会自己跟着变** —
+  The command was always writing the truth: it really did turn the workflow off for that session. What lagged was the screen. The switch had read the
+  session once when the page loaded and never looked again, so after `/grok off` it kept saying on until you reloaded the page or clicked it. Now it is
+  told when the session's record is written and asks once more, so it flips in about half a second — no reload, no click, and nothing running on a
+  timer in the background. `/grok on` behaves the same way. If that second read fails, the switch keeps the state it was already showing instead of
+  reporting an error you did nothing to cause.
+  / 以前用 `/grok off` 关掉工作流，记录其实一直写对了——工作流真的关了，慢的是屏幕。那个开关只在页面加载时读了一次会话，之后不再看，所以打完
+  `/grok off` 它还写着「开」，得刷新页面或者点它一下才对。现在只要这条记录被写入，按钮就会被告知，并自己再问一次，半秒左右就跟着变：不用刷新、
+  不用点，后台也没有任何东西在定时跑。`/grok on` 同理。万一这次重读失败，开关保持它已经显示的状态，不会弹出一条你没做错什么却要看的错误。
+
+### Upgrade note / 升级须知
+
+- **Delete the leftover `mode:` line from your profile before you upgrade / 升级前先把档案里那行 `mode:` 删掉** —
+  If your profile's patch file still carries a `mode:` line under the `grok-workflow` entry, the plugin will refuse to activate after the upgrade
+  and the workflow simply disappears from the interface. Nothing is lost — your settings and records are untouched — but you have to restart with
+  that line gone for the plugin to come back. So: **before** upgrading, open `<your profile directory>/cordis.patch.yml`, find the `grok-workflow`
+  entry, delete the whole `mode:` line beneath it, save, then upgrade. That key was removed together with the old front desk, so a stored value is
+  rejected as an unknown key. If there is no `mode:` line in your file, there is nothing to do. We have not edited anybody's profile for you.
+  / 如果你的档案补丁文件里，`grok-workflow` 那一行下面还写着 `mode:`，升级之后这一行会**拒绝激活**，症状就是工作流从界面上消失。什么都没丢——
+  设置和记录都还在——但必须把那行删掉再起，插件才会回来。做法：**升级之前**打开 `<你的档案目录>/cordis.patch.yml`，找到 `grok-workflow` 那一行，
+  把它下面写着 `mode:` 的那一行**整行删掉**，保存，然后升级。这个键在 0.13.35 就随旧前台一起删了，存着值会被当未知键拒绝。
+  如果你的文件里没有 `mode:` 这一行，什么都不用做。我们**没有**替你改过任何档案。
+
 ### Changed / 变更
 
 - **The switch at the bottom of the message box is now called the workflow switch, and says only on or off / 对话框底部那个开关现在就叫「工作流开关」，只说是开还是关** —

@@ -1,0 +1,21 @@
+[
+ {
+  "t": 1.67,
+  "kind": "req",
+  "url": "/grok-workflow/mode",
+  "method": "POST",
+  "post": "{\"action\":\"status\",\"sessionId\":\"session-b282ef61-3c60-4a61-a025-9fa1b4e8887c\"}"
+ },
+ {
+  "t": 1.69,
+  "kind": "wire-record",
+  "snippet": "r\"}}}},{\"type\":\"event\",\"event\":{\"type\":\"plugin:grok-workflow/mode\",\"seq\":5,\"time\":1795578135682,\"data\":{\"v\":1,\"enabled\":false,\"turn\":0,\"setBy\":\"command:/grok off\"},\"ignorable\":true"
+ },
+ {
+  "t": 1.69,
+  "kind": "req",
+  "url": "/grok-workflow/mode",
+  "method": "POST",
+  "post": "{\"action\":\"status\",\"sessionId\":\"session-b282ef61-3c60-4a61-a025-9fa1b4e8887c\"}"
+ }
+]
