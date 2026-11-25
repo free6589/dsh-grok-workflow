@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.39] - 2026-11-25
+
 ### Changed / 变更
 
 - **The progress tab is one page now: where you are, what is left, and what came back / 进度页变成一页：你在哪一步、还剩什么、交回来的是什么** —
@@ -33,6 +35,17 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
   gets no button at all rather than a button that would do nothing.
   / 「开工」和「收下这版」把批准词（`确认` / `yes`）填进输入框就停住。发送仍然是你自己的动作，而这个词正是工作流自己的批准检查认的那一个，
   所以按一下回车就行。组合里没有 conversation 服务时，页面不渲染按钮，而不是渲染一颗按了没反应的按钮。
+
+### Upgrade note / 升级须知
+
+- **Nothing to prepare — upgrade whenever you like / 这次升级前不用准备任何东西，想升就升** —
+  This version changes only what the progress tab draws and the words it uses: the tab is one page instead of a six-stage
+  spine, a failure is amber instead of red, and the two approval buttons fill the composer without sending it. No profile
+  key, no setting, no default and no stored record changes, so there is nothing to delete, add or reconfigure before
+  upgrading, and a profile that already runs 0.13.38 needs no preparation at all.
+  / 这个版本只改了进度页画什么、以及页面上写的字：进度页从一条六段脊椎变成一页，失败用琥珀色而不是红色，两个批准按钮只把批准词填进输入框、
+  不替你发送。档案里的键、设置、默认值和已经存下来的记录都没有改动，所以升级前没有任何东西要删、要加、要重配；
+  已经在跑 0.13.38 的档案什么都不用准备。
 
 ## [0.13.38] - 2026-11-25
 
