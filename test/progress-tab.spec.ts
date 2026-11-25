@@ -78,6 +78,46 @@ function trackOf(members: ProgressMemberFact[], stopReason?: string) {
   return deriveTrack(runFacts(members, stopReason), { labelFor })
 }
 
+/**
+ * The bundle's own copy of `PROGRESS_EVENT_TYPES`, read through the export the host serves.
+ *
+ * The name means two things at once — the events the fold recognises, and the routing
+ * whitelist that decides which events the tab is handed at all — so the two copies are one
+ * contract with two homes and no type can tie them together (`src/client/index.js` is served
+ * verbatim, so it cannot import the typed table). Reading the shipped export is what makes
+ * "they are the same list" checkable rather than a promise: when the bundle grew
+ * `tool-workflow/summary-final` and the typed copy did not, the shipped draft number was
+ * silently dropped and the 交卷 card said "no draft" for a run that had one.
+ */
+function clientEventTypes(): readonly string[] {
+  let registration: { id: string, factory: (require: (id: string) => unknown) => Record<string, any> } | undefined
+  const record = globalThis as unknown as { window?: { __ModuleLoader__?: { load(spec: never): void } } | undefined }
+  const previous = record.window
+  record.window = { __ModuleLoader__: { load: (spec) => { registration = spec } } }
+  try {
+    new Function(readFileSync(new URL('../src/client/index.js', import.meta.url), 'utf8'))()
+  } finally {
+    record.window = previous
+  }
+  expect(registration?.id).toBe('dsh-grok-workflow')
+  const react = {
+    createElement: () => null,
+    useState: (value: unknown) => [value, () => {}],
+    useEffect: () => {},
+    useMemo: (factory: () => unknown) => factory(),
+    useRef: (value: unknown) => ({ current: value }),
+    useSyncExternalStore: () => undefined,
+  }
+  const bundle = registration!.factory(() => react) as Record<string, any>
+  const progress = bundle['GROK_WORKFLOW_PROGRESS']
+  expect(progress, 'the bundle must export GROK_WORKFLOW_PROGRESS').toBeDefined()
+  // The bundle re-exports the constant under the progress bundle's own key (`eventTypes`);
+  // the name it is declared with is the name this guard compares against.
+  const shipped = progress.eventTypes
+  expect(shipped, 'the bundle must export its event list as eventTypes').toBeDefined()
+  return shipped as readonly string[]
+}
+
 function stageNode(track: ReturnType<typeof deriveTrack>, key: string) {
   const node = track.nodes.find((candidate) => candidate.key === `stage:${key}`)
   expect(node, key).toBeDefined()
@@ -90,6 +130,7 @@ describe('progress tab: the event contract', () => {
       'tool-workflow/run-start',
       'tool-workflow/agent-start',
       'tool-workflow/agent-end',
+      'tool-workflow/summary-final',
       'tool-workflow/guardian-start',
       'tool-workflow/guardian-finding',
       'tool-workflow/guardian-end',
@@ -111,6 +152,17 @@ describe('progress tab: the event contract', () => {
     // No `回答` stage: the final answer is delivered by the gate in the turn's own
     // message, never as a child call, so no event can ever fill it.
     expect(PROGRESS_STAGES.some((stage) => stage.key === 'answer')).toBe(false)
+  })
+
+  it('keeps both copies of PROGRESS_EVENT_TYPES identical, entry for entry', () => {
+    const typed = [...PROGRESS_EVENT_TYPES]
+    const shipped = [...clientEventTypes()]
+    // Entry for entry, order included: the typed copy is what the fold reads, the shipped
+    // one is what the host routes by, and an event present in only one of them either never
+    // arrives (routed away) or arrives and is ignored (folded away). Both failures are
+    // silent on screen, which is why this guard is a red test instead of a comment.
+    expect(shipped, `两份同名常量必须逐条相等，加事件要两边一起加 — src/progress-tab.ts PROGRESS_EVENT_TYPES = [${typed.join(', ')}]，src/client/index.js PROGRESS_EVENT_TYPES (GROK_WORKFLOW_PROGRESS.eventTypes) = [${shipped.join(', ')}]`)
+      .toEqual(typed)
   })
 
   it('folds the recorded stream into one run with its rows and settlement', () => {

@@ -32,11 +32,28 @@
 
 import { NAMING_LANGUAGES, SYNTHESIS_FINAL_MARK, synthesisDraftLabel } from './naming.js'
 
-/** The seven progress and Guardian lifecycle events the tab folds; other events are ignored. */
+/**
+ * The eight progress and Guardian lifecycle events the tab folds — and, in the bundle, the
+ * whitelist the host routes the tab by.
+ *
+ * One name, two homes, one list: this copy is what {@link foldProgressRuns} reads, and
+ * `src/client/index.js` carries the same constant (served verbatim, so it cannot import this
+ * table) where it serves both its mirror of the fold and the tab's event routing, which
+ * drops any event this list does not name. The two must agree entry for entry, and neither
+ * half can see the other: an event named only here is routed away before the fold ever sees
+ * it, an event named only there is handed over and silently ignored. Both failures are
+ * invisible on screen, so `test/progress-tab.spec.ts` compares the shipped list with this
+ * one and fails on a single missing or extra entry.
+ *
+ * `tool-workflow/stage-detail` is deliberately **not** here: it only ever *adds* field
+ * values to a node and never decides a state, so it is not a lifecycle event and does not
+ * belong in the routing list ({@link PROGRESS_DETAIL_EVENT_TYPE}).
+ */
 export const PROGRESS_EVENT_TYPES = [
   'tool-workflow/run-start',
   'tool-workflow/agent-start',
   'tool-workflow/agent-end',
+  'tool-workflow/summary-final',
   'tool-workflow/guardian-start',
   'tool-workflow/guardian-finding',
   'tool-workflow/guardian-end',
@@ -55,13 +72,14 @@ export const PROGRESS_EVENT_TYPES = [
 export const PROGRESS_DETAIL_EVENT_TYPE = 'tool-workflow/stage-detail'
 
 /**
- * The optional event that names the summary draft the run shipped, on purpose apart
- * from {@link PROGRESS_EVENT_TYPES}.
+ * The event that names the summary draft the run shipped.
  *
- * A chat row's label is fixed at `agent-start` (the panel only ever matches an
- * `agent-end` to it by `seq`), so "this draft is the final one" cannot be said by
- * renaming a row after the fact: it arrives as its own fact, written once the gate
- * has passed a draft. A stream without it renders exactly what it rendered before.
+ * It is a member of {@link PROGRESS_EVENT_TYPES} — a tab the host never hands the event to
+ * cannot mark the draft — but it is not a lifecycle step like the others: a chat row's label
+ * is fixed at `agent-start` (the panel only ever matches an `agent-end` to it by `seq`), so
+ * "this draft is the final one" cannot be said by renaming a row after the fact. It arrives
+ * as its own fact once the gate has passed a draft, and the fold settles it onto the row
+ * that landed. A stream without it renders exactly what it rendered before.
  */
 export const PROGRESS_SUMMARY_FINAL_EVENT_TYPE = 'tool-workflow/summary-final'
 
