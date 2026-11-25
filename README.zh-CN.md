@@ -78,7 +78,7 @@ dsh --profile grok-workflow-dev --dump-config | grep -A4 'grok-workflow'
 
 四条校验才能证明它真的激活了：启动日志没有 `pending (waiting for service: workflowEngine)`、`POST /api/settings/describe` 里出现 `grok-workflow` 命名空间、插件页出现 **Grok workflow** 卡片、真实会话的工具列表里有 `grok_workflow`。完整流程（包括如何把"在跑的实例"迁到新构建、哪一步需要你授权）见 [`docs/LOCAL-TESTING.md`](docs/LOCAL-TESTING.md#activate-in-an-existing-live-profile--needs-the-operators-authorisation)。
 
-**Grok workflow** 卡片就是设置页：八个标量设置、五条角色链（每角色最多 50 条）、以及显示为只读并给出原因的结构性字段；非法输入在到达 Host 之前就被拦下，保存后对下一条消息生效。
+设置 → 左列 **Workflow**（与「通用 / 模型 / 内置插件」平级）就是设置页；插件页仍保留同名 **Grok workflow** 卡片，点开是同一个页面。页面上是标量设置、五条角色链（每角色最多 50 条），以及显示为只读并给出原因的结构性字段；非法输入在到达 Host 之前就被拦下，保存后对下一条消息生效。
 
 
 ## 试一试

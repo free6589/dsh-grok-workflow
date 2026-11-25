@@ -218,6 +218,8 @@ window.__ModuleLoader__.load({
 
     const EN = {
       'card.title': 'Grok workflow',
+      // Left-column entry in the Host's own Settings panel (same page as the card).
+      'section.label': 'Workflow',
       'card.summary': 'Decide how hard Grok works: a master switch, five role chains, the limits, and whether it repeats.',
 
       'page.intro': 'How Grok works for you.',
@@ -451,6 +453,7 @@ window.__ModuleLoader__.load({
 
     const ZH = {
       'card.title': 'Grok workflow',
+      'section.label': 'Workflow',
       'card.summary': '定 Grok 下多大的力气：一个总开关，五条角色链，几个上限，还有要不要自动接着跑。',
 
       'page.intro': 'Grok 怎么帮你干活，在这里定。',
@@ -5456,12 +5459,21 @@ window.__ModuleLoader__.load({
     const inject = ['slots', 'configForms']
 
     /**
-     * Register the settings entry for one namespace.
+     * Register the settings entry for one namespace, in both places it belongs.
      *
-     * The plugin manager renders each `plugins.item` registration twice (card and
-     * detail page), so this is the only registration the bundle needs. It is bound
-     * to `ns` — the namespace that actually projects this plugin's fields, which is
-     * normally the shipped id and otherwise the renamed Loader row.
+     * Two registrations, one component:
+     *
+     * - `plugins.item` is the card in the Plugins page. The plugin manager renders it
+     *   twice (card and detail page), and it is the discoverable path: a reader looking
+     *   for "what does this plugin add" starts there.
+     * - `settings.section` is the left column of the Host's own Settings panel, a peer
+     *   of 通用 / 模型 / 内置插件, labelled `Workflow` in both languages. It renders the
+     *   same component as the whole page: it passes no `view`, so the `summary` branch
+     *   never runs, and it never reads `close`.
+     *
+     * Both are bound to `ns` — the namespace that actually projects this plugin's
+     * fields, which is normally the shipped id and otherwise the renamed Loader row —
+     * and both share one `inject`, so the page cannot see two different faces.
      *
      * `locale: NS` is added only when the composition really installs a locale face:
      * the renderer throws a `SlotAssemblyError` for an entry that declares a namespace
@@ -5471,7 +5483,7 @@ window.__ModuleLoader__.load({
      * @param ns - namespace to bind the page to.
      * @param i18n - live locale binding: `locale` is the service when present, `t` the
      *   translator the card label and the page fallback resolve through.
-     * @returns a disposer for the registration.
+     * @returns a disposer that unmounts both registrations.
      */
     function mountPage(ctx, face, ns, i18n) {
       const options = {
@@ -5492,8 +5504,25 @@ window.__ModuleLoader__.load({
           progressStatus: i18n.progress,
         }),
       }
-      if (i18n.locale !== undefined) options.locale = NS
-      return ctx.slots.inject('plugins.item', () => ctx.slots.register(options, GrokWorkflowPage))
+      // Same component, same inject, same id: the Settings left column is an entry point
+      // to this page, not a second page. `order: 60` matches the card's.
+      const section = {
+        name: 'settings.section',
+        id: ns,
+        order: 60,
+        label: () => i18n.t('section.label'),
+        inject: options.inject,
+      }
+      if (i18n.locale !== undefined) {
+        options.locale = NS
+        section.locale = NS
+      }
+      const disposeCard = ctx.slots.inject('plugins.item', () => ctx.slots.register(options, GrokWorkflowPage))
+      const disposeSection = ctx.slots.inject('settings.section', () => ctx.slots.register(section, GrokWorkflowPage))
+      return () => {
+        if (typeof disposeSection === 'function') disposeSection()
+        if (typeof disposeCard === 'function') disposeCard()
+      }
     }
 
     /**

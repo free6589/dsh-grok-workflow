@@ -613,9 +613,10 @@ describe('client settings page: wiring to the DSH locale service (t42)', () => {
     bundle.apply(ctx)
     // The page is mounted once before the locale service arrives and once after: only the
     // second registration survives, and it is the one carrying the namespace.
-    // Five live registrations: the settings page, the task panel renderer and the
-    // three composer tool-row switches (additive, registered last: loop, iterate, mode).
-    expect(live()).toHaveLength(5)
+    // Six live registrations: the Plugins card, the same page as a Settings left-column
+    // section, the task panel renderer and the three composer tool-row switches
+    // (additive, registered last: loop, iterate, mode).
+    expect(live()).toHaveLength(6)
     const byId = (id: string) => live().find((entry: { options: Record<string, unknown> }) => entry.options['id'] === id)
     expect(byId('grok-workflow-loop'), 'the loop switch is registered').toBeDefined()
     expect(byId('grok-workflow-iterate'), 'the self-iterate switch is registered').toBeDefined()
@@ -624,6 +625,24 @@ describe('client settings page: wiring to the DSH locale service (t42)', () => {
     expect(live()[0]!.options['locale']).toBe('grok-workflow')
     expect(typeof live()[0]!.options['label']).toBe('function')
     expect((live()[0]!.options['label'] as () => string)()).toBe('Grok workflow')
+  })
+
+  it('also mounts the same page as a Settings left-column section named Workflow', () => {
+    const locale = fakeLocale('zh')
+    const { ctx, live } = fakeContext(locale)
+    bundle.apply(ctx)
+    // Settings → left column: a peer of 通用 / 模型 / 内置插件. One component, two entry
+    // points — the card stays the discoverable one, the section is the direct one.
+    const section = live().find((entry: { options: Record<string, unknown> }) => entry.options['name'] === 'settings.section')
+    expect(section, 'the settings.section slot is registered').toBeDefined()
+    expect(section!.options['id']).toBe('grok-workflow')
+    expect(section!.options['locale']).toBe('grok-workflow')
+    expect(section!.options['order']).toBe(60)
+    expect((section!.options['label'] as () => string)()).toBe('Workflow')
+    const card = live().find((entry: { options: Record<string, unknown> }) => entry.options['name'] === 'plugins.item')!
+    expect(section!.component, 'one page, two entry points').toBe(card.component)
+    // Same inject function, so the page cannot be handed two different faces.
+    expect(section!.options['inject']).toBe(card.options['inject'])
   })
 
   it('re-reads the active language for the card label instead of freezing it at boot', () => {
@@ -655,13 +674,13 @@ describe('client settings page: wiring to the DSH locale service (t42)', () => {
     expect(() => bundle.apply(ctx)).not.toThrow()
     // No locale face ⇒ no `locale` option: the renderer throws a SlotAssemblyError for an
     // entry that names a namespace while no face is installed.
-    expect(live()).toHaveLength(5)
+    expect(live()).toHaveLength(6)
     expect(live()[0]!.options['locale']).toBeUndefined()
     expect(live()[1]!.options['locale']).toBeUndefined()
     // The task panel shadows the stock `workflow-run` renderer by priority (lowest renders);
     // same key at the same priority would fail the stock plugin's whole boot fiber.
-    expect(live()[1]!.options['key']).toBe('workflow-run')
-    expect(live()[1]!.options['priority']).toBe(-1)
+    expect(live()[2]!.options['key']).toBe('workflow-run')
+    expect(live()[2]!.options['priority']).toBe(-1)
     const component = live()[0]!.component as (props: Record<string, unknown>) => string
     expect(component({ view: 'summary' })).toBe(bundle.GROK_WORKFLOW_DICT['en']!['card.summary'])
     // The fallback translator still answers every key, so no page copy degrades to a key id.
@@ -683,9 +702,10 @@ describe('client settings page: wiring to the DSH locale service (t42)', () => {
     const locale = fakeLocale('zh')
     const { ctx, live, slots, disposers } = fakeContext(locale)
     bundle.apply(ctx)
-    // The settings page, the task-panel renderer and all three switches are mounted, and
-    // the `locale` fiber handed back exactly one disposer per injected scope it entered.
-    expect(live()).toHaveLength(5)
+    // Both settings entry points, the task-panel renderer and all three switches are
+    // mounted, and the `locale` fiber handed back exactly one disposer per injected scope
+    // it entered.
+    expect(live()).toHaveLength(6)
     expect(disposers).toHaveLength(2)
     const mounted = slots.length
     const unbind = disposers[0]!
@@ -710,7 +730,7 @@ describe('client settings page: wiring to the DSH locale service (t42)', () => {
     const { ctx, live, slots, disposers } = fakeContext(fakeLocale('zh'))
     const dispose = bundle.apply(ctx) as unknown as () => void
     const mounted = slots.length
-    expect(live()).toHaveLength(5)
+    expect(live()).toHaveLength(6)
     dispose()
     expect(live()).toHaveLength(0)
     expect(slots.length).toBe(mounted)

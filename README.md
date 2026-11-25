@@ -78,7 +78,7 @@ A healthy row includes `id: grok-workflow` and `name: dsh-grok-workflow`. At sta
 
 Four checks prove it is really active: the startup log has no `pending (waiting for service: workflowEngine)` line, `POST /api/settings/describe` lists the `grok-workflow` namespace, the Plugins page shows a **Grok workflow** card, and a real session's tool list contains `grok_workflow`. The full procedure — including how to move a running instance onto a new build, and which step needs your authorisation — is in [`docs/LOCAL-TESTING.md`](docs/LOCAL-TESTING.md#activate-in-an-existing-live-profile--needs-the-operators-authorisation).
 
-The **Grok workflow** card opens the settings page: eight scalar settings, the five role chains (up to 50 routes each), and the structural keys shown read-only with the reason. Invalid input is refused before it reaches the Host, and a save applies to the next message.
+Settings → **Workflow** (left column, next to General / Models / Built-in plugins) opens the settings page; the Plugins page keeps a same-named **Grok workflow** card that opens the same page. It carries the scalar settings, the five role chains (up to 50 routes each), and the structural keys shown read-only with the reason. Invalid input is refused before it reaches the Host, and a save applies to the next message.
 
 
 ## Try it
