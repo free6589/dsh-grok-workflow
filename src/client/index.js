@@ -416,13 +416,16 @@ window.__ModuleLoader__.load({
       'iterate.switch.failed': 'The self-iteration service did not answer: {message}',
 
       // --- The composer tool-row workflow switch (the `/grok on|off` toggle, third slot) ---
-      // Same record as the slash command (`plugin:grok-workflow/mode`), so the copy says
-      // what the session does, not what the deployment default is: an unrecorded session
-      // shows the Host's `grokDefault`, which the route reports.
+      // Same record as the slash command (`plugin:grok-workflow/mode`), so the copy reports
+      // what this session decided. A session with no record has decided nothing: the route
+      // still folds the deployment `grokDefault` into its answer, but the block intake does
+      // not, so the switch says "not set yet" instead of borrowing that default — the
+      // effective value belongs to `/grok status` and the settings page (D-154).
       'mode.switch.label': 'Workflow switch',
       'mode.switch.aria': 'Turn the grok workflow on or off for this session',
       'mode.switch.off': 'Off',
       'mode.switch.on': 'On',
+      'mode.switch.notOn': 'Not on · not set yet',
       'mode.switch.reading': 'Checking…',
       'mode.switch.busy': 'Working…',
       'mode.switch.noSession': 'No session to switch',
@@ -648,11 +651,14 @@ window.__ModuleLoader__.load({
       'iterate.switch.failed': '自迭代服务没有回应：{message}',
 
       // --- 对话框底部 workflow 总开关（第三格，与 `/grok on|off` 同一条记录） ---
-      // 文案说这个会话会怎么跑：没有记录的会话显示宿主 `grokDefault` 报回来的状态。
+      // 文案说这个会话自己定了什么。没有记录的会话什么都没定：路由仍会把部署默认
+      // `grokDefault` 折进它的答复，但接单台不认那个默认，所以开关说「还没设过」，
+      // 不借那个默认——有效值归 `/grok status` 和设置页报（D-154）。
       'mode.switch.label': '工作流开关',
       'mode.switch.aria': '为这个会话打开或关闭 grok 工作流',
       'mode.switch.off': '关',
       'mode.switch.on': '开',
+      'mode.switch.notOn': '未开 · 还没设过',
       'mode.switch.reading': '读取中…',
       'mode.switch.busy': '处理中…',
       'mode.switch.noSession': '还没有可切换的会话',
@@ -5257,8 +5263,10 @@ window.__ModuleLoader__.load({
      * `src/gate.ts` reads to decide whether a message is workflow work at all. The
      * switch therefore has no `open`/`close` pair and no interval: `set(true)` is
      * `/grok on`, `set(false)` is `/grok off`, and the copy reports the session's own
-     * state — for a session with no record yet that is the deployment's `grokDefault`,
-     * which the route answers with, so the UI never asserts a default of its own.
+     * record — a session with no record has decided nothing and says so ("not set yet"),
+     * even though the route still folds the deployment `grokDefault` into its answer for
+     * `/grok status` and the settings page. The intake reads the record only, so the
+     * switch must not repeat the default as if it were a decision (D-154).
      *
      * It is a browser surface for the same reason the heartbeats are: the record is the
      * user's toggle, and a tool call from an Agent would be a model switching its own
@@ -5329,13 +5337,32 @@ window.__ModuleLoader__.load({
       return sendMode({ action: 'set', sessionId, enabled }, fetchImpl)
     }
 
+    /**
+     * Whether the switch shows one mode answer as on.
+     *
+     * Only a record the session itself carries and switched on counts. A `source` of
+     * `'default'` is the route's way of saying "this session has no record; here is the
+     * deployment default it would fall back to" — the intake does not honour that default
+     * (`canAcceptBlock` reads the record), so neither does the pill, the lamp or the click.
+     * A missing `source` is an older answer about a record: read as before.
+     * @param mode - the `mode` object from one route answer, if any.
+     * @returns true when the switch may show this session as on.
+     */
+    function modeShownOn(mode) {
+      return mode !== undefined && mode.enabled === true && mode.source !== 'default'
+    }
+
     /** The one line under the workflow switch, for one state, in one language. */
     function modeSwitchText(t, state) {
       if (state.phase === 'reading') return t('mode.switch.reading')
       if (state.phase === 'busy') return t('mode.switch.busy')
       if (state.phase === 'no-session') return t('mode.switch.noSession')
       if (state.phase === 'failed') return modeFailureText(t, state.error)
-      return state.mode !== undefined && state.mode.enabled === true ? t('mode.switch.on') : t('mode.switch.off')
+      // No record yet is its own answer, in both directions of the deployment default:
+      // "not set yet" is what the session did, not "on" (what the default would allow) and
+      // not "off" (a decision nobody made).
+      if (state.mode !== undefined && state.mode.source === 'default') return t('mode.switch.notOn')
+      return modeShownOn(state.mode) ? t('mode.switch.on') : t('mode.switch.off')
     }
 
     /** One failure in the switch's words: the Host's own message is already redacted. */
@@ -5517,7 +5544,7 @@ window.__ModuleLoader__.load({
           readNow()
           return
         }
-        const next = !(state.mode !== undefined && state.mode.enabled === true)
+        const next = !modeShownOn(state.mode)
         setState((current) => ({ ...current, phase: 'busy' }))
         void setModeEnabled(sessionId, next, send1).then((result) => {
           setState(result.ok === true
@@ -5531,8 +5558,11 @@ window.__ModuleLoader__.load({
       // Host reported stays on screen (with the failure line beside it), so the pill never
       // swings to a value that was never persisted. `known` is false only when no read has
       // succeeded yet — then there is no lamp and the note is the failure itself.
+      // `enabledNow` is the same judgement as the state line, from the same helper: a pill
+      // lit green beside "not set yet" would be the lie this change removes, and the click
+      // reads its target from here too, so "not set yet" + one click means `set(true)`.
       const known = state.mode !== undefined
-      const enabledNow = known && state.mode.enabled === true
+      const enabledNow = modeShownOn(state.mode)
       const disabled = state.phase === 'reading' || state.phase === 'busy' || state.phase === 'no-session'
       return h('div', { style: styles.loopDock, 'data-mode-switch': 'grok-workflow-mode', 'data-mode-state': state.phase },
         h('span', { style: styles.loopLabel }, t('mode.switch.label')),

@@ -3766,11 +3766,87 @@ describe('client composer tool row: the workflow switch (`/grok on|off` as a but
     // makes a state check pass in both states, which is a green guard that proves nothing.
     expect(zhDict['mode.switch.label']).not.toBe(zhDict['mode.switch.on'])
     expect(zhDict['mode.switch.on']).not.toBe(zhDict['mode.switch.off'])
+    // The third state word — no record yet — has to be a word of its own in both languages,
+    // or "not set yet" would render as either of the two states it is neither of.
+    expect(zhDict['mode.switch.notOn'], 'zh notOn is not the on-word').not.toBe(zhDict['mode.switch.on'])
+    expect(zhDict['mode.switch.notOn'], 'zh notOn is not the off-word').not.toBe(zhDict['mode.switch.off'])
+    expect(enDict['mode.switch.notOn'], 'en notOn is not the on-word').not.toBe(enDict['mode.switch.on'])
+    expect(enDict['mode.switch.notOn'], 'en notOn is not the off-word').not.toBe(enDict['mode.switch.off'])
     const mode = modeSwitch()
     expect(mode.text(translator('zh'), { phase: 'ready', mode: { enabled: false } })).toBe(zhDict['mode.switch.off'])
     expect(mode.text(translator('en'), { phase: 'ready', mode: { enabled: false } })).toBe(enDict['mode.switch.off'])
     expect(mode.text(translator('zh'), { phase: 'ready', mode: { enabled: true } })).toBe(zhDict['mode.switch.on'])
     expect(mode.text(translator('en'), { phase: 'ready', mode: { enabled: true } })).toBe(enDict['mode.switch.on'])
+  })
+
+  /**
+   * The reverse pin for D-154: a session with no record says so, in both languages.
+   *
+   * The route folds the deployment default into what it answers (`source: 'default'`), and
+   * the intake refuses a block in the same session (`canAcceptBlock` reads the record, not
+   * the default). So a switch that read `enabled: true` as "on" was telling the person it
+   * was open for work the intake then refused. Both directions of the default are pinned:
+   * `grokDefault: on` and `grokDefault: off` are the *same* display state, because neither
+   * of them is a decision this session made.
+   */
+  it('never calls a session with no record on, in either language', () => {
+    const mode = modeSwitch()
+    const defaultOn = { enabled: true, source: 'default', setBy: null, turn: null, workflowMode: null, fallback: true }
+    const defaultOff = { enabled: false, source: 'default', setBy: null, turn: null, workflowMode: null, fallback: false }
+    const languages = [['zh', zhDict], ['en', enDict]] as const
+    for (const [locale, dict] of languages) {
+      const t = translator(locale)
+      expect(mode.text(t, { phase: 'ready', mode: defaultOn }), `${locale}: default on`).toBe(dict['mode.switch.notOn'])
+      expect(mode.text(t, { phase: 'ready', mode: defaultOff }), `${locale}: default off`).toBe(dict['mode.switch.notOn'])
+      // The default is not mixed up with a real state: it is neither the on-word nor the
+      // off-word, so the screen cannot claim the session decided anything it did not.
+      expect(mode.text(t, { phase: 'ready', mode: defaultOn })).not.toBe(dict['mode.switch.on'])
+      expect(mode.text(t, { phase: 'ready', mode: defaultOff })).not.toBe(dict['mode.switch.off'])
+    }
+  })
+
+  it('keeps reading a written record as on or off, and a sourceless answer as before', () => {
+    const mode = modeSwitch()
+    // A record is the session's own decision: the two words it has always had.
+    expect(mode.text(translator('zh'), { phase: 'ready', mode: { enabled: true, source: 'record' } })).toBe(zhDict['mode.switch.on'])
+    expect(mode.text(translator('en'), { phase: 'ready', mode: { enabled: true, source: 'record' } })).toBe(enDict['mode.switch.on'])
+    expect(mode.text(translator('zh'), { phase: 'ready', mode: { enabled: false, source: 'record' } })).toBe(zhDict['mode.switch.off'])
+    expect(mode.text(translator('en'), { phase: 'ready', mode: { enabled: false, source: 'record' } })).toBe(enDict['mode.switch.off'])
+    // An older Host answers the record without naming its `source`. That is the shape the
+    // button has always read, so it keeps reading it as the state it names.
+    expect(mode.text(translator('zh'), { phase: 'ready', mode: { enabled: false } })).toBe(zhDict['mode.switch.off'])
+    expect(mode.text(translator('en'), { phase: 'ready', mode: { enabled: true } })).toBe(enDict['mode.switch.on'])
+  })
+
+  it('paints the no-record state as not on, and one click turns the session on', async () => {
+    const mode = modeSwitch()
+    const { posted, fetchImpl } = scriptedFetch([
+      {
+        body: {
+          ok: true,
+          action: 'status',
+          mode: { enabled: true, source: 'default', setBy: null, turn: null, workflowMode: null, fallback: true },
+        },
+      },
+      { body: { ok: true, action: 'set', mode: { enabled: true, source: 'record', setBy: 'switch:mode', workflowMode: 'full' } } },
+    ])
+    const view = mountSwitch(mode.component, { sessionId: SESSION, t: translator('zh'), modeSend: fetchImpl }, 'mode')
+    const { tree } = await view.mount()
+
+    // Word, lamp and pill agree, and all three say the same thing: nothing was decided yet.
+    // A green pill next to "not set yet" would be the same lie in a different colour.
+    expect(toggleIn(tree).props['aria-checked']).toBe(false)
+    expect((toggleIn(tree).props['style'] as Record<string, unknown>)['background']).toBe('#d1d5db')
+    expect(lampIn(tree)).toBe('off')
+    expect(noteText(tree)).toBe(zhDict['mode.switch.notOn'])
+
+    // From there a click means "turn it on" — not "write the deployment default off",
+    // which is what flipping the route's effective value used to ask for.
+    const after = await view.click(tree)
+    expect(posted[1]).toEqual({ action: 'set', sessionId: SESSION, enabled: true })
+    expect(toggleIn(after).props['aria-checked']).toBe(true)
+    expect(noteText(after)).toBe(zhDict['mode.switch.on'])
+    expect(lampIn(after)).toBe('on')
   })
 
   it('never reaches for the DOM or a neighbour switch, and adds no stylesheet rule', () => {
@@ -3824,11 +3900,12 @@ describe('client composer tool row: the workflow switch against the real Host ro
 
       const view = mountSwitch(mode.component, { sessionId: SESSION, t: translator('zh') }, 'mode')
       const { tree } = await view.mount()
-      // No record: the fallback the route reported (`false`) is what renders, and nothing
-      // was written by a read.
+      // No record: the route answered the deployment default (`source: 'default'`), which
+      // this session never decided, so the switch says "not set yet" rather than either
+      // state word — and the read wrote nothing.
       expect(readModeRecord(session)).toBeUndefined()
       expect(toggleIn(tree).props['aria-checked']).toBe(false)
-      expect(noteText(tree)).toBe(zhDict['mode.switch.off'])
+      expect(noteText(tree)).toBe(zhDict['mode.switch.notOn'])
 
       const on = await view.click(tree)
       const written = readModeRecord(session)
