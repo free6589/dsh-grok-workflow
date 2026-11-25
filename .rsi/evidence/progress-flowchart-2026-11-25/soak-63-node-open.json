@@ -1,0 +1,24 @@
+{
+  "ariaExpanded": "true",
+  "callsAfter": 1,
+  "nodeKey": "flow:0:execute:1",
+  "rows": [
+    {
+      "seq": "1",
+      "state": "done",
+      "text": "0:01 执行 任务 1 · 写 notes.md 安装步骤 做完 打开子会话"
+    },
+    {
+      "seq": "2",
+      "state": "done",
+      "text": "0:01 执行 任务 2 · 写 test.txt hello 做完 打开子会话"
+    }
+  ],
+  "callsBefore": 0,
+  "togglesBefore": [
+    "false",
+    "false",
+    "false",
+    "false"
+  ]
+}

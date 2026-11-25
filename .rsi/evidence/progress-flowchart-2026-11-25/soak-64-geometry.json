@@ -1,0 +1,585 @@
+{
+  "geometry": [
+    {
+      "width": 1500,
+      "scrollWidth": 1500,
+      "clientWidth": 1500,
+      "innerWidth": 1500,
+      "nodesPerRow": [
+        6
+      ],
+      "rows": [
+        {
+          "y": 138,
+          "keys": [
+            "flow:start",
+            "flow:0:execute:1",
+            "flow:1:check:1",
+            "flow:2:review:1",
+            "flow:3:summarize:1",
+            "flow:end"
+          ]
+        }
+      ],
+      "nodeRect": [
+        {
+          "key": "flow:start",
+          "x": 284,
+          "y": 138,
+          "w": 73,
+          "h": 31
+        },
+        {
+          "key": "flow:0:execute:1",
+          "x": 369,
+          "y": 138,
+          "w": 427,
+          "h": 120
+        },
+        {
+          "key": "flow:1:check:1",
+          "x": 808,
+          "y": 138,
+          "w": 91,
+          "h": 31
+        },
+        {
+          "key": "flow:2:review:1",
+          "x": 911,
+          "y": 138,
+          "w": 91,
+          "h": 31
+        },
+        {
+          "key": "flow:3:summarize:1",
+          "x": 1014,
+          "y": 138,
+          "w": 125,
+          "h": 31
+        },
+        {
+          "key": "flow:end",
+          "x": 1151,
+          "y": 138,
+          "w": 73,
+          "h": 31
+        }
+      ],
+      "pathCount": 5,
+      "paths": [
+        {
+          "d": "M77 16 L89 16",
+          "x": 357,
+          "y": 154,
+          "w": 12,
+          "h": 0
+        },
+        {
+          "d": "M516 16 L528 16",
+          "x": 796,
+          "y": 154,
+          "w": 12,
+          "h": 0
+        },
+        {
+          "d": "M619 16 L631 16",
+          "x": 899,
+          "y": 154,
+          "w": 12,
+          "h": 0
+        },
+        {
+          "d": "M722 16 L734 16",
+          "x": 1002,
+          "y": 154,
+          "w": 12,
+          "h": 0
+        },
+        {
+          "d": "M859 16 L871 16",
+          "x": 1139,
+          "y": 154,
+          "w": 12,
+          "h": 0
+        }
+      ],
+      "nodesStyle": {
+        "display": "flex",
+        "flexWrap": "wrap",
+        "flexDirection": "row",
+        "gridTemplateColumns": "none"
+      }
+    },
+    {
+      "width": 900,
+      "scrollWidth": 900,
+      "clientWidth": 900,
+      "innerWidth": 900,
+      "nodesPerRow": [
+        4,
+        2
+      ],
+      "rows": [
+        {
+          "y": 138,
+          "keys": [
+            "flow:start",
+            "flow:0:execute:1",
+            "flow:1:check:1",
+            "flow:2:review:1"
+          ]
+        },
+        {
+          "y": 268,
+          "keys": [
+            "flow:3:summarize:1",
+            "flow:end"
+          ]
+        }
+      ],
+      "nodeRect": [
+        {
+          "key": "flow:start",
+          "x": 60,
+          "y": 138,
+          "w": 73,
+          "h": 31
+        },
+        {
+          "key": "flow:0:execute:1",
+          "x": 145,
+          "y": 138,
+          "w": 427,
+          "h": 120
+        },
+        {
+          "key": "flow:1:check:1",
+          "x": 584,
+          "y": 138,
+          "w": 91,
+          "h": 31
+        },
+        {
+          "key": "flow:2:review:1",
+          "x": 687,
+          "y": 138,
+          "w": 91,
+          "h": 31
+        },
+        {
+          "key": "flow:3:summarize:1",
+          "x": 60,
+          "y": 268,
+          "w": 125,
+          "h": 31
+        },
+        {
+          "key": "flow:end",
+          "x": 197,
+          "y": 268,
+          "w": 73,
+          "h": 31
+        }
+      ],
+      "pathCount": 4,
+      "paths": [
+        {
+          "d": "M77 16 L89 16",
+          "x": 133,
+          "y": 154,
+          "w": 12,
+          "h": 0
+        },
+        {
+          "d": "M516 16 L528 16",
+          "x": 572,
+          "y": 154,
+          "w": 12,
+          "h": 0
+        },
+        {
+          "d": "M619 16 L631 16",
+          "x": 675,
+          "y": 154,
+          "w": 12,
+          "h": 0
+        },
+        {
+          "d": "M129 146 L141 146",
+          "x": 185,
+          "y": 284,
+          "w": 12,
+          "h": 0
+        }
+      ],
+      "nodesStyle": {
+        "display": "flex",
+        "flexWrap": "wrap",
+        "flexDirection": "row",
+        "gridTemplateColumns": "none"
+      }
+    },
+    {
+      "width": 700,
+      "scrollWidth": 700,
+      "clientWidth": 700,
+      "innerWidth": 700,
+      "nodesPerRow": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "rows": [
+        {
+          "y": 138,
+          "keys": [
+            "flow:start"
+          ]
+        },
+        {
+          "y": 179,
+          "keys": [
+            "flow:0:execute:1"
+          ]
+        },
+        {
+          "y": 309,
+          "keys": [
+            "flow:1:check:1"
+          ]
+        },
+        {
+          "y": 350,
+          "keys": [
+            "flow:2:review:1"
+          ]
+        },
+        {
+          "y": 391,
+          "keys": [
+            "flow:3:summarize:1"
+          ]
+        },
+        {
+          "y": 432,
+          "keys": [
+            "flow:end"
+          ]
+        }
+      ],
+      "nodeRect": [
+        {
+          "key": "flow:start",
+          "x": 4,
+          "y": 138,
+          "w": 685,
+          "h": 31
+        },
+        {
+          "key": "flow:0:execute:1",
+          "x": 4,
+          "y": 179,
+          "w": 685,
+          "h": 120
+        },
+        {
+          "key": "flow:1:check:1",
+          "x": 4,
+          "y": 309,
+          "w": 685,
+          "h": 31
+        },
+        {
+          "key": "flow:2:review:1",
+          "x": 4,
+          "y": 350,
+          "w": 685,
+          "h": 31
+        },
+        {
+          "key": "flow:3:summarize:1",
+          "x": 4,
+          "y": 391,
+          "w": 685,
+          "h": 31
+        },
+        {
+          "key": "flow:end",
+          "x": 4,
+          "y": 432,
+          "w": 685,
+          "h": 31
+        }
+      ],
+      "pathCount": 5,
+      "paths": [
+        {
+          "d": "M347 31 L347 41",
+          "x": 347,
+          "y": 169,
+          "w": 0,
+          "h": 10
+        },
+        {
+          "d": "M347 161 L347 171",
+          "x": 347,
+          "y": 299,
+          "w": 0,
+          "h": 10
+        },
+        {
+          "d": "M347 202 L347 212",
+          "x": 347,
+          "y": 340,
+          "w": 0,
+          "h": 10
+        },
+        {
+          "d": "M347 243 L347 253",
+          "x": 347,
+          "y": 381,
+          "w": 0,
+          "h": 10
+        },
+        {
+          "d": "M347 284 L347 294",
+          "x": 347,
+          "y": 422,
+          "w": 0,
+          "h": 10
+        }
+      ],
+      "nodesStyle": {
+        "display": "flex",
+        "flexWrap": "wrap",
+        "flexDirection": "column",
+        "gridTemplateColumns": "none"
+      }
+    },
+    {
+      "width": 480,
+      "scrollWidth": 480,
+      "clientWidth": 480,
+      "innerWidth": 480,
+      "nodesPerRow": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "rows": [
+        {
+          "y": 138,
+          "keys": [
+            "flow:start"
+          ]
+        },
+        {
+          "y": 179,
+          "keys": [
+            "flow:0:execute:1"
+          ]
+        },
+        {
+          "y": 365,
+          "keys": [
+            "flow:1:check:1"
+          ]
+        },
+        {
+          "y": 406,
+          "keys": [
+            "flow:2:review:1"
+          ]
+        },
+        {
+          "y": 447,
+          "keys": [
+            "flow:3:summarize:1"
+          ]
+        },
+        {
+          "y": 488,
+          "keys": [
+            "flow:end"
+          ]
+        }
+      ],
+      "nodeRect": [
+        {
+          "key": "flow:start",
+          "x": 4,
+          "y": 138,
+          "w": 465,
+          "h": 31
+        },
+        {
+          "key": "flow:0:execute:1",
+          "x": 4,
+          "y": 179,
+          "w": 465,
+          "h": 176
+        },
+        {
+          "key": "flow:1:check:1",
+          "x": 4,
+          "y": 365,
+          "w": 465,
+          "h": 31
+        },
+        {
+          "key": "flow:2:review:1",
+          "x": 4,
+          "y": 406,
+          "w": 465,
+          "h": 31
+        },
+        {
+          "key": "flow:3:summarize:1",
+          "x": 4,
+          "y": 447,
+          "w": 465,
+          "h": 31
+        },
+        {
+          "key": "flow:end",
+          "x": 4,
+          "y": 488,
+          "w": 465,
+          "h": 31
+        }
+      ],
+      "pathCount": 5,
+      "paths": [
+        {
+          "d": "M237 31 L237 41",
+          "x": 237,
+          "y": 169,
+          "w": 0,
+          "h": 10
+        },
+        {
+          "d": "M237 217 L237 227",
+          "x": 237,
+          "y": 355,
+          "w": 0,
+          "h": 10
+        },
+        {
+          "d": "M237 258 L237 268",
+          "x": 237,
+          "y": 396,
+          "w": 0,
+          "h": 10
+        },
+        {
+          "d": "M237 299 L237 309",
+          "x": 237,
+          "y": 437,
+          "w": 0,
+          "h": 10
+        },
+        {
+          "d": "M237 340 L237 350",
+          "x": 237,
+          "y": 478,
+          "w": 0,
+          "h": 10
+        }
+      ],
+      "nodesStyle": {
+        "display": "flex",
+        "flexWrap": "wrap",
+        "flexDirection": "column",
+        "gridTemplateColumns": "none"
+      }
+    }
+  ],
+  "opened": {
+    "ariaExpanded": "true",
+    "callsAfter": 1,
+    "nodeKey": "flow:0:execute:1",
+    "rows": [
+      {
+        "seq": "1",
+        "state": "done",
+        "text": "0:01 执行 任务 1 · 写 notes.md 安装步骤 做完 打开子会话"
+      },
+      {
+        "seq": "2",
+        "state": "done",
+        "text": "0:01 执行 任务 2 · 写 test.txt hello 做完 打开子会话"
+      }
+    ],
+    "callsBefore": 0,
+    "togglesBefore": [
+      "false",
+      "false",
+      "false",
+      "false"
+    ]
+  },
+  "states": [
+    {
+      "name": "waiting",
+      "at": 1795622474372,
+      "rel": 11.66,
+      "hooks": {
+        "node": 2,
+        "doing": 0,
+        "ord": 0,
+        "toggle": 0,
+        "calls": 0,
+        "left": 1,
+        "wires": 1,
+        "guardian": 1,
+        "chip": "等你点头",
+        "leftText": "还剩 1 步 / 共 2 步"
+      },
+      "progressText": "任务团队 · 2 个任务\n等你点头\n起点\n终点\nGuardian 监控\n监控中\n子任务存活判断预算 · 7200 秒\n0 条处置记录\n\n暂无处置记录\n\n还剩 1 步 / 共 2 步\n\n开工"
+    },
+    {
+      "name": "running",
+      "at": 1795622474890,
+      "rel": 12.18,
+      "hooks": {
+        "node": 3,
+        "doing": 1,
+        "ord": 0,
+        "toggle": 1,
+        "calls": 0,
+        "left": 1,
+        "wires": 2,
+        "guardian": 1,
+        "chip": "进行中",
+        "leftText": "还剩 1 步 / 共 3 步"
+      },
+      "progressText": "任务团队 · 2 个任务\n进行中\n起点\n执行\n终点\nGuardian 监控\n监控中\n子任务存活判断预算 · 7200 秒\n0 条处置记录\n\n暂无处置记录\n\n还剩 1 步 / 共 3 步"
+    },
+    {
+      "name": "done",
+      "at": 1795622594365,
+      "rel": 131.65,
+      "hooks": {
+        "node": 6,
+        "doing": 0,
+        "ord": 1,
+        "toggle": 4,
+        "calls": 0,
+        "left": 1,
+        "wires": 5,
+        "guardian": 1,
+        "chip": "已完成",
+        "leftText": "还剩 0 步 / 共 6 步"
+      },
+      "progressText": "任务团队 · 2 个任务\n已完成\n起点\n执行\n检查\n复核\n汇总\n第 1 稿\n终点\nGuardian 监控\n监控结束\n子任务存活判断预算 · 7200 秒\n0 条处置记录\n\n暂无处置记录\n\n还剩 0 步 / 共 6 步\n\n收下这版"
+    }
+  ],
+  "consoleErrors": [],
+  "pageErrors": []
+}

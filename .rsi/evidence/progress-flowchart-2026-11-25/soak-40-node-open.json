@@ -1,0 +1,17 @@
+{
+  "ariaExpanded": "true",
+  "calls": 1,
+  "nodeKey": "flow:0:execute:1",
+  "rows": [
+    {
+      "seq": "1",
+      "state": "done",
+      "text": "23:48 执行 任务 1 · 写 notes.md 三行安装步骤 做完 打开子会话"
+    },
+    {
+      "seq": "2",
+      "state": "done",
+      "text": "23:48 执行 任务 2 · 写 test.txt 一行 hello 做完 打开子会话"
+    }
+  ]
+}

@@ -1,0 +1,62 @@
+{
+  "prompt": "用 grok_workflow 工具跑一个工作流：写 notes.md 三行安装步骤，再写 test.txt 一行 hello",
+  "sentAt": 1795622462712,
+  "states": [
+    {
+      "name": "waiting",
+      "at": 1795622474372,
+      "rel": 11.66,
+      "hooks": {
+        "node": 2,
+        "doing": 0,
+        "ord": 0,
+        "toggle": 0,
+        "calls": 0,
+        "left": 1,
+        "wires": 1,
+        "guardian": 1,
+        "chip": "等你点头",
+        "leftText": "还剩 1 步 / 共 2 步"
+      },
+      "progressText": "任务团队 · 2 个任务\n等你点头\n起点\n终点\nGuardian 监控\n监控中\n子任务存活判断预算 · 7200 秒\n0 条处置记录\n\n暂无处置记录\n\n还剩 1 步 / 共 2 步\n\n开工"
+    },
+    {
+      "name": "running",
+      "at": 1795622474890,
+      "rel": 12.18,
+      "hooks": {
+        "node": 3,
+        "doing": 1,
+        "ord": 0,
+        "toggle": 1,
+        "calls": 0,
+        "left": 1,
+        "wires": 2,
+        "guardian": 1,
+        "chip": "进行中",
+        "leftText": "还剩 1 步 / 共 3 步"
+      },
+      "progressText": "任务团队 · 2 个任务\n进行中\n起点\n执行\n终点\nGuardian 监控\n监控中\n子任务存活判断预算 · 7200 秒\n0 条处置记录\n\n暂无处置记录\n\n还剩 1 步 / 共 3 步"
+    },
+    {
+      "name": "done",
+      "at": 1795622594365,
+      "rel": 131.65,
+      "hooks": {
+        "node": 6,
+        "doing": 0,
+        "ord": 1,
+        "toggle": 4,
+        "calls": 0,
+        "left": 1,
+        "wires": 5,
+        "guardian": 1,
+        "chip": "已完成",
+        "leftText": "还剩 0 步 / 共 6 步"
+      },
+      "progressText": "任务团队 · 2 个任务\n已完成\n起点\n执行\n检查\n复核\n汇总\n第 1 稿\n终点\nGuardian 监控\n监控结束\n子任务存活判断预算 · 7200 秒\n0 条处置记录\n\n暂无处置记录\n\n还剩 0 步 / 共 6 步\n\n收下这版"
+    }
+  ],
+  "consoleErrors": [],
+  "pageErrors": []
+}

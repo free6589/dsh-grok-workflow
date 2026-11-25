@@ -73,6 +73,8 @@ interface Bundle {
     component: (props: Record<string, unknown>) => unknown
     css: string
     fold: (records: ReadonlyArray<Record<string, unknown>>) => ProgressRun[]
+    /** The wire layer's maths, driven with measured boxes so the geometry is testable. */
+    measureWires: (flow: unknown) => { width: number, height: number, paths: Array<Array<[number, number]>> }
     deriveProgressFlow: (run: ProgressRun) => {
       state: string
       nodes: Array<{ key: string, kind: string, ordinal: number, state: string }>
@@ -513,6 +515,69 @@ describe('client progress tab: the wires are measured, never invented', () => {
     for (const gone of ['progressWireDraw', 'progressWireHead', 'PROGRESS_WIRE_PAD', 'PROGRESS_CARD_INDENT']) {
       expect(SOURCE, `${gone} is still shipped`).not.toContain(gone)
     }
+  })
+
+  /**
+   * The wire maths, driven the way the page drives it: boxes in, segments out.
+   *
+   * `measureWires` reads nothing but `getBoundingClientRect`, so a stand-in flow is enough
+   * to pin the two shapes a reader is meant to see, and the shapes the page must not claim.
+   */
+  function boxes(rects: ReadonlyArray<{ x: number, y: number, w: number, h: number }>): { flow: unknown } {
+    const frame = { left: 0, top: 0, width: 1000, height: 400 }
+    return {
+      flow: {
+        querySelectorAll: () => rects.map((r) => ({
+          getBoundingClientRect: () => ({ left: r.x, top: r.y, width: r.w, height: r.h, right: r.x + r.w, bottom: r.y + r.h }),
+        })),
+        getBoundingClientRect: () => ({ ...frame, right: frame.width, bottom: frame.height }),
+      },
+    }
+  }
+
+  it('draws one line per neighbouring pair on a row, however tall one of them is', () => {
+    // Three nodes on one row, the middle one open and therefore three times as tall: the
+    // row is still a row, and a reader following it left to right must see both gaps drawn.
+    const even = loadBundle().GROK_WORKFLOW_PROGRESS.measureWires(boxes([
+      { x: 0, y: 0, w: 60, h: 30 },
+      { x: 70, y: 0, w: 60, h: 30 },
+      { x: 140, y: 0, w: 60, h: 30 },
+    ]).flow)
+    expect(even.paths).toHaveLength(2)
+    expect(even.paths[0]).toEqual([[60, 15], [70, 15]])
+
+    const mixed = loadBundle().GROK_WORKFLOW_PROGRESS.measureWires(boxes([
+      { x: 0, y: 0, w: 60, h: 30 },
+      { x: 70, y: 0, w: 200, h: 120 },
+      { x: 280, y: 0, w: 60, h: 30 },
+    ]).flow)
+    // Two lines, not one: the tall node is on the same row, so both gaps are drawn — and
+    // each runs at the middle of the span the pair actually shares.
+    expect(mixed.paths).toHaveLength(2)
+    expect(mixed.paths[0]).toEqual([[60, 15], [70, 15]])
+    expect(mixed.paths[1]).toEqual([[270, 15], [280, 15]])
+  })
+
+  it('draws nothing across a wrap, and one line down a column', () => {
+    // A wrapped row: two boxes on the first row, one that started the second row at the
+    // container's left edge. The pair that wrapped shares no vertical span, so no line
+    // claims a route the reader cannot follow.
+    const wrapped = loadBundle().GROK_WORKFLOW_PROGRESS.measureWires(boxes([
+      { x: 0, y: 0, w: 60, h: 30 },
+      { x: 70, y: 0, w: 400, h: 30 },
+      { x: 0, y: 40, w: 60, h: 30 },
+    ]).flow)
+    expect(wrapped.paths).toHaveLength(1)
+    expect(wrapped.paths[0]).toEqual([[60, 15], [70, 15]])
+
+    // A single column (the narrow layout): the one pair that stacked gets one line, laid
+    // between the boxes at the middle of the span they share.
+    const column = loadBundle().GROK_WORKFLOW_PROGRESS.measureWires(boxes([
+      { x: 0, y: 0, w: 300, h: 30 },
+      { x: 0, y: 40, w: 300, h: 30 },
+    ]).flow)
+    expect(column.paths).toHaveLength(1)
+    expect(column.paths[0]).toEqual([[150, 30], [150, 40]])
   })
 
   it('lays the layer over the flow without taking a click', () => {

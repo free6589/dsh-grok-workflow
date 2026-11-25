@@ -4057,6 +4057,13 @@ window.__ModuleLoader__.load({
      * and a vertical line between one node and the next when they stacked. A pair that
      * wrapped onto the next row belongs to neither, and a line across it would claim a route
      * the reader cannot see — so that pair gets no line at all.
+     *
+     * "On the same row" is read off the two boxes **overlapping vertically**, not off their
+     * middle lines: a node opens its calls and grows taller than its neighbours, and a row
+     * whose middle lines disagree is still one row a reader reads left to right. The same
+     * goes for the stacked pair, which overlaps horizontally instead. Requiring a shared
+     * span is also what keeps a wrap out: the row below starts at the container's left edge,
+     * so it overlaps nothing on the row above.
      * @param flow - the `.gw-progress-flow` element, when there is one.
      * @returns the measured wire set.
      */
@@ -4078,21 +4085,26 @@ window.__ModuleLoader__.load({
       for (let index = 0; index + 1 < rects.length; index += 1) {
         const from = rects[index]
         const to = rects[index + 1]
-        const fromMid = from.top + from.height / 2
-        const toMid = to.top + to.height / 2
-        if (to.left >= from.right - 0.5 && Math.abs(fromMid - toMid) < Math.min(from.height, to.height) / 2) {
+        // The pair shares a row when the two boxes overlap vertically, however unequal their
+        // heights are; the line then runs from the first box's right edge to the second's
+        // left, both at the shared middle of the overlap.
+        const overlapTop = Math.max(from.top, to.top)
+        const overlapBottom = Math.min(from.bottom, to.bottom)
+        if (to.left >= from.right - 0.5 && overlapBottom - overlapTop > 2) {
+          const mid = Math.round((overlapTop + overlapBottom) / 2 - frame.top)
           points.push([
-            [Math.round(from.right - frame.left), Math.round(fromMid - frame.top)],
-            [Math.round(to.left - frame.left), Math.round(toMid - frame.top)],
+            [Math.round(from.right - frame.left), mid],
+            [Math.round(to.left - frame.left), mid],
           ])
           continue
         }
-        const fromCentre = from.left + from.width / 2
-        const toCentre = to.left + to.width / 2
-        if (to.top >= from.bottom - 0.5 && Math.abs(fromCentre - toCentre) < Math.max(2, from.width / 3)) {
+        const overlapLeft = Math.max(from.left, to.left)
+        const overlapRight = Math.min(from.right, to.right)
+        if (to.top >= from.bottom - 0.5 && overlapRight - overlapLeft > 2) {
+          const mid = Math.round((overlapLeft + overlapRight) / 2 - frame.left)
           points.push([
-            [Math.round(fromCentre - frame.left), Math.round(from.bottom - frame.top)],
-            [Math.round(toCentre - frame.left), Math.round(to.top - frame.top)],
+            [mid, Math.round(from.bottom - frame.top)],
+            [mid, Math.round(to.top - frame.top)],
           ])
         }
       }
@@ -6156,6 +6168,7 @@ window.__ModuleLoader__.load({
       percent: progressPercent,
       deriveTrack: deriveProgressTrack,
       deriveProgressFlow,
+      measureWires: measureProgressFlowWires,
       detailFor: progressDetailFor,
       detailSources: progressDetailSources,
       detailField: progressDetailField,
