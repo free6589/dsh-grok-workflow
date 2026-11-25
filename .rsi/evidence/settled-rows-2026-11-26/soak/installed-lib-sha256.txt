@@ -1,0 +1,5 @@
+installed plugin: dsh-grok-workflow@0.13.44 (dsh plugin --profile settled-clone list)
+sha256 installed lib/script.js: 233d327e510490234b08e916cd5e57af8ae80d01a4fbf48517bd6599accc2e22
+sha256 worktree  lib/script.js: 233d327e510490234b08e916cd5e57af8ae80d01a4fbf48517bd6599accc2e22
+byte-identical: True
+installed size: 265049 bytes; worktree size: 265049 bytes

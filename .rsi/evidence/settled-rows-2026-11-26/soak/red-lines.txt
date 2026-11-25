@@ -1,0 +1,14 @@
+# live home and live instance, read before the soak (2026-11-26 ~04:46) and after it (~04:53)
+/home/fish/.dsh mtime 2026-11-25 23:14:14.025606767 +0800
+/home/fish/.dsh/profiles mtime 2026-11-22 16:59:46.687805286 +0800
+/home/fish/.dsh/profiles/web mtime 2026-11-25 23:04:40.915802661 +0800
+/home/fish/.dsh/profiles/web/cordis.patch.yml mtime 2026-11-25 23:04:40.804802112 +0800
+/home/fish/.dsh/.credentials.yaml mtime 2026-11-14 22:47:23.697798095 +0800
+
+write probe: : > ~/.dsh/.settled-rows-probe
+probe result: bash: /home/fish/.dsh/.settled-rows-probe: Read-only file system
+
+live 3080 before soak: HTTP 401
+live 3080 after soak:  HTTP 401
+
+scratch instance: DSH_HOME=<worktree>/.tmp/soak/dsh-home, profile settled-clone, port 3487 --host 127.0.0.1; live 3080 never started, reloaded or restarted by this session.
