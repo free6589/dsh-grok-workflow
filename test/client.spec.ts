@@ -3884,8 +3884,9 @@ describe('client composer tool row: the workflow switch against the real Host ro
       }
       return void handleModeRoute({
         sessions: { get: (id: string) => (id === SESSION ? session : undefined) },
-        // The deployment default: this session has no record yet, and the route (not the
-        // button) is what turns that into the state on screen.
+        // The deployment default: this session has no record yet. The route folds that into
+        // what it answers; the button then ignores it for the display, because this session
+        // never decided anything (D-154).
         fallback: () => false,
       }, req, res)
     })

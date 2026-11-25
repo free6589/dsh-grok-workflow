@@ -40,23 +40,24 @@ lib/ at d34214b is the build of src/ at d34214b (281 files, byte-identical)
 EXIT=0
 ```
 
-改后（**提交之后**跑的那一份，权威读数）：
+改后（**提交之后**跑的那一份，权威读数；`TMPDIR=$PWD/.tmp npm run ci`，跑在交付 HEAD **`58aabe6`** 上，
+这一遍由**包工头独立复核**用另一套命令执行环境跑的，与实现者那边的读数一致）：
 
 ```
 Found 15 warnings and 0 errors.
 client bundle: 333611 bytes → lib/client.js
-lib/ at ee66a6c is the build of src/ at ee66a6c (281 files, byte-identical)
+lib/ at 58aabe6 is the build of src/ at 58aabe6 (281 files, byte-identical)
+ client bundle: 333611 bytes → lib/client.js
  Test Files  98 passed (98)
       Tests  1849 passed (1849)
-   Duration  87.96s
 EXIT=0
 ```
 
-`lib/ at …` 那行里的 sha **是跑那一刻的 HEAD**，不是内容的指纹：这一格跑在文档与证据提交 `ee66a6c` 上；那条提交后来被
-`--amend` 过、并又追加了纯文档提交，所以今天在这个分支上重跑，会看到同一个结论配一个**不同的** sha
-（`node scripts/verify-lib.mjs` 在任何一次纯文档改动之后都只会换掉那一个 sha，`(281 files, byte-identical)` 与
-`client bundle: 333611 bytes → lib/client.js` 不变）。提交**之前**在同一棵未提交的树上也预跑过一遍，读数一致（同样
-`98 files / 1849 tests`、`15 warnings / 0 errors`、`333611` 字节），差别同样只在那个 sha 写着当时的 HEAD `d34214b`。
+**口径**：`lib/ at <sha>` 里的 sha **是跑那一刻的 HEAD**，不是内容指纹——本分支此后每加一条纯文档提交都只会换掉那个 sha，
+`(281 files, byte-identical)` 与 `client bundle: 333611 bytes` 不变，所以它不是一枚钉子。本节**只引用仍在分支历史里的 sha**：
+改后这一格是 `58aabe6`；提交**之前**实现者在同一棵未提交的树上预跑过一次（当时 HEAD 是基线 `d34214b`），读数一致
+（同样 `98 files / 1849 tests`、`15 warnings / 0 errors`、`333611` 字节），差别只在那一行的 sha。一份被 `--amend` 掉、
+已不在历史里的中间 sha 不作为任何读数的出处。
 
 用例 **1845 → 1849**（+4：`test/client.spec.ts` 三条 + `test/mode-surface.spec.ts` 一条），文件数 **98 → 98** 未变，
 oxlint **15 warnings / 0 errors** 未变，`lib/client.js` **331626 → 333611 字节（+1985）**。
