@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.45] - 2026-11-26
+
 ### Fixed / 修复
 
 - **The boundary planner now sees what already settled, with each verdict and title / 波边界那个规划子现在真的看得到已经沉淀的任务，连判决和标题一起** —
