@@ -3514,3 +3514,27 @@ switched on`（纯字符串，无新增 config 读取）；两个 README 的设�
 `~/.dsh/profiles` = 2026-11-22 16:59:46（前后同值）、写探针 `Read-only file system`、3080 → 401、未 push / 未打 tag / 未 bump；
 `/grok on` 回执在 GUI 里 **`NOT_RUN`**（克隆落地页是生图工作台，新会话要先选模型）。证据
 `.rsi/evidence/settings-copy-2026-11-25/`。)
+
+Last updated: 2026-11-25 16:10 +08:00（**红二修完：没有记录的会话，开关不再显示「开」，`CONFIRMED`，未发版、未合流** — 分支
+`fix/switch-default-state`（worktree `.tmp/wt-switch-default`，基线 `main` 尖端 `d34214b`），产品提交 **`57b5723`**
+（6 文件 / +243 −23），其后再一条只写文档与证据的提交。操作员拍板走**甲**：开关报**会话自己的记录**，没有记录就显示
+「未开 · 还没设过」（`mode-switch` 的第三个状态词 `mode.switch.notOn`，中英各一条）；`source: 'record'` 与 `source` 缺失仍走
+`开`/`关`。**视觉与点击同源**：一个 `modeShownOn(mode)` 同时喂文案、`aria-checked`、胶囊、指示灯与 `flip()`，于是「未开」时
+点一下写的是 `{"action":"set","enabled":true}`（把这个会话真正打开），不再是「把部署默认取反写成 `false`」；写失败保留上次状态
+那条路径一字未改。**路由、`/grok status`、设置页、`src/gate.ts`、`src/block/**`、`src/mode-surface.ts` 一个字未改**——两边
+从此可以显示不同的字，这是**故意的**（`D-154`），单测两处钉住（`test/mode-surface.spec.ts` 的 divergence 用例 +
+`test/client.spec.ts` 的反向钉住），用例注释写明「想对齐先读 D-154」。**门禁**：`TMPDIR=$PWD/.tmp npm run ci` → **EXIT=0**
+（改前基线 `d34214b`：`98 files / 1845 tests`；改后：`98 files / 1849 tests`、`Found 15 warnings and 0 errors.`（未变）、
+`lib/ … (281 files, byte-identical)`、`lib/client.js` 331626 → **333611** 字节）；先红后绿：定向 `4 failed | 168 passed (172)` →
+`172 passed (172)`。**隔离真机（用户视角，`CONFIRMED`）**：克隆 live `web` 档案（7720 文件 / 88 421 847 B、parity 5/5、
+抹 1 行生图渠道密钥）、删掉克隆里那行 `mode: triage`、`npm pack` 打包后 `dsh plugin add file:<tgz>`（**不是 `link:`**——软链会让
+插件里那份 `@deepseek-ai/dsh-session` 与宿主不是同一个模块实例，`/grok on` 会答 `Receiver must be an instance of class Session`，
+那是装法问题）、版本读回 `0.13.36`、`sha256(lib/client.js)` = `edcd6983…` 与 worktree 逐字节相同（真拷贝）、端口 **3331**、
+工作区指向一次性 `/tmp/wtsw-work`。读数：① 新会话开关 `未开 · 还没设过` / `aria-checked=false` / lamp off，而旁路路由答复
+**`{"enabled":true,"source":"default",…,"fallback":true}`**（界面与工具从此不再互相打脸）；② 从「未开」点一下 → 请求体
+`{"action":"set","enabled":true}`、答复 `setBy:"switch:mode"`、开关 `开`；③ `/grok off` → 关、`/grok on` → 开，各在 +2 秒内；
+全程 `console_errors: []` / `page_errors: []`。**红线**：`~/.dsh` = 2026-11-22 23:40:20、`~/.dsh/profiles` = 2026-11-22 16:59:46、
+`~/.dsh/profiles/web` = 2026-11-25 13:16:10（早于本会话，前后同值）、写探针 `Read-only file system`、3080 前后都是 401、
+live 仍装 `0.13.35`、真实工作区目录 `~/Documents/deepseek-harness/default-workspace` mtime 前后都是 2026-11-15 13:42:07；
+未 push、未打 tag、未 bump、未合流。scratch `.tmp/soak-switch-default`（105 MB）跑完整棵删除。证据
+`.rsi/evidence/switch-default-state-2026-11-25/`。**没跑**：模型回合、点卡片、真任务、监工判决（`NOT_RUN`，与本改动无关）。）

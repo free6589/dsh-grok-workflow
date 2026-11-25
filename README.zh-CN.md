@@ -245,7 +245,7 @@ DSH 启动后，直接提问即可：
 
 **它旁边的「自迭代」开关。** 第二个 dock 开关，id `grok-workflow-iterate`，POST 到 `/grok-workflow/iterate`，驱动第二个服务实例——它的槽位是 `RSI heartbeat` 这个保留标题，所以两个开关永远不会创建、读取或删除对方的行。它的 `open` 不带 prompt 也不带间隔：存进去的提示词就是档案里的 `iterateTemplate`（在设置页「自迭代」分组的文本框编辑；纯空白回退内置默认），间隔下限是 `iterateIntervalMin`。`RSI heartbeat` 的投递是不带 Loop 标记的普通调度消息，所以窄监听不会动它——而且这一行刻意比插件活得久（它是仓库自己的节拍）；用同一个开关关掉，或走 DSH 自己的「自动化任务」删除。
 
-**再接一个「工作流开关」。** 第三个 dock 开关，id `grok-workflow-mode`，就是可点的 `/grok on|off`：POST 到 `/grok-workflow/mode`，body 是 `{"action":"status"|"set","sessionId":…,"enabled":…}`，读写的是会话自己的模式记录——斜杠命令写的那条 `plugin:grok-workflow/mode`，也是接单台准入规则读的那条，所以按钮和命令不会各说一套。挂载时读一次，之后只在会话记录被写入时（比如你打字 `/grok on` 或 `/grok off`）再读一次、不轮询，界面只画路由回读出来的状态（宿主拒绝的写入保留上一状态并说明原因）；会话还没有记录时显示部署默认值 `grokDefault`，默认值不在 UI 里重述，也没有第二份开关存储。关闭有三重提示——文案、空心指示灯、熄灭的胶囊——灰色开关不会被读成「还在跑」。
+**再接一个「工作流开关」。** 第三个 dock 开关，id `grok-workflow-mode`，就是可点的 `/grok on|off`：POST 到 `/grok-workflow/mode`，body 是 `{"action":"status"|"set","sessionId":…,"enabled":…}`，读写的是会话自己的模式记录——斜杠命令写的那条 `plugin:grok-workflow/mode`，也是接单台准入规则读的那条，所以按钮和命令不会各说一套。挂载时读一次，之后只在会话记录被写入时（比如你打字 `/grok on` 或 `/grok off`）再读一次、不轮询，界面只画路由回读出来的状态（宿主拒绝的写入保留上一状态并说明原因）；会话还没有记录时显示「未开 · 还没设过」——那个会话什么都没定过，部署默认值 `grokDefault` 是路由报给 `/grok status` 和设置页看的，不是这颗按钮会去认领的状态。也没有第二份开关存储。关闭有三重提示——文案、空心指示灯、熄灭的胶囊——灰色开关不会被读成「还在跑」。
 
 打开一个循环是一次显式的浏览器请求：
 

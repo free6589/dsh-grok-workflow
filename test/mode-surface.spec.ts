@@ -16,6 +16,7 @@
  * response recorder, and the session store is a map over real `Session` objects.
  */
 import { Readable } from 'node:stream'
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import type { Session } from '@deepseek-ai/dsh-session'
 import { Session as SessionClass } from '@deepseek-ai/dsh-session'
@@ -150,6 +151,88 @@ describe('switch status: one record, and the live fallback when there is none', 
     const secondRead = await call(deps([first, second], true), 'POST', { action: 'status', sessionId: OTHER_SESSION })
     expect(modeOf(secondRead)).toMatchObject({ enabled: true, source: 'default' })
     expect(readModeRecord(second)).toBeUndefined()
+  })
+})
+
+/* ----------------------------------------------------- the browser's words -- */
+
+/**
+ * The switch's own copy, out of the shipped bundle, with no component rendered.
+ *
+ * The same `window.__ModuleLoader__` load the page does, plus a stub React: this file only
+ * asks `GROK_WORKFLOW_MODE.text` for one line, which is the function the button's state
+ * line calls. `test/client.spec.ts` owns everything else about that half of the bundle.
+ */
+function loadDisplayCopy(): { text: (t: (key: string) => string, state: Record<string, unknown>) => string, translate: (locale: string, key: string) => string } {
+  const source = readFileSync(new URL('../src/client/index.js', import.meta.url), 'utf8')
+  let registration: { id: string, factory: (require: (id: string) => unknown) => Record<string, any> } | undefined
+  const record = globalThis as unknown as { window?: { __ModuleLoader__?: { load(spec: never): void } } | undefined }
+  const previous = record.window
+  record.window = { __ModuleLoader__: { load: (spec) => { registration = spec } } }
+  try {
+    new Function(source)()
+  } finally {
+    record.window = previous
+  }
+  expect(registration?.id).toBe('dsh-grok-workflow')
+  const react = {
+    createElement: () => null,
+    useState: (value: unknown) => [value, () => {}],
+    useEffect: () => {},
+    useRef: (value: unknown) => ({ current: value }),
+    useMemo: (factory: () => unknown) => factory(),
+    useSyncExternalStore: () => undefined,
+  }
+  const bundle = registration!.factory((id) => {
+    if (id === 'react') return react
+    throw new Error(`the bundle must not require ${id} at load time`)
+  })
+  return {
+    text: bundle['GROK_WORKFLOW_MODE'].text,
+    translate: (locale, key) => bundle['GROK_WORKFLOW_INTERNALS'].translate(locale, key),
+  }
+}
+
+/**
+ * The one place this plugin's two surfaces are *supposed* to disagree.
+ *
+ * The route answers what is **effective** — the session's record, or the deployment default
+ * when the session has none, which is what `/grok status` and the settings page report. The
+ * button in the message box reports what **this session decided**, so a session that never
+ * ran `/grok` shows "not set yet" even while `grokDefault: on` makes the route answer
+ * `enabled: true`.
+ *
+ * That divergence is D-154 and it is the fix, not a bug: the block intake refuses a block in
+ * exactly that session (`canAcceptBlock` reads the record, never the default), so a switch
+ * reading "on" was promising work the intake then refused. Anything that makes the two
+ * sides "agree" here re-opens that defect — read
+ * `.rsi/evidence/switch-default-state-2026-11-25/` before touching it.
+ */
+describe('the switch and the route disagree on purpose: effective value vs the session\'s own record (D-154)', () => {
+  it('answers {enabled:true, source:"default"} and displays "not set yet" for one unrecorded session', async () => {
+    const target = session()
+    const answer = await call(deps([target], true), 'POST', { action: 'status', sessionId: SESSION })
+    expect(answer.status).toBe(200)
+    // The answer side, unchanged to the byte: the effective value plus where it came from.
+    expect(modeOf(answer)).toEqual({
+      enabled: true,
+      source: 'default',
+      setBy: null,
+      turn: null,
+      workflowMode: null,
+      fallback: true,
+    })
+    expect(readModeRecord(target)).toBeUndefined()
+
+    // The display side, from the shipped bundle: the same payload the browser receives,
+    // rendered as the switch's state line — and it does not say on.
+    const display = loadDisplayCopy()
+    for (const locale of ['zh', 'en']) {
+      const t = (key: string) => display.translate(locale, key)
+      const line = display.text(t, { phase: 'ready', mode: modeOf(answer) })
+      expect(line, `${locale}: unrecorded session shows the no-record word`).toBe(display.translate(locale, 'mode.switch.notOn'))
+      expect(line, `${locale}: and never the on-word`).not.toBe(display.translate(locale, 'mode.switch.on'))
+    }
   })
 })
 

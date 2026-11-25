@@ -1,3 +1,31 @@
+## 2026-11-25 — 红二修完：没有记录的会话，开关不再显示「开」（`fix/switch-default-state`，`57b5723`）：路由与接单台准入一个字没动
+
+- **From:** 实现手（`agent-164/impl-switch-default`）· **To:** 操作者 / 下一个接手者
+- **这一轮是什么**：分支 `fix/switch-default-state`（worktree `.tmp/wt-switch-default`，基线 `main` 尖端 **`d34214b`**），
+  一个产品提交 **`57b5723`** `fix(client): a session with no mode record no longer shows the switch as on`（6 文件 / +243 −23），
+  其后再一条只放文档与证据的提交。选了**甲**（`D-154`）：开关报会话自己的记录，没记录就显示「未开 · 还没设过」
+  （`mode.switch.notOn`，中英各一条），胶囊不绿、灯不亮、**点一下写 `enabled:true`**；记录态与「没有 `source` 的老答复」照旧走开/关。
+- **门禁与体积**：`TMPDIR=$PWD/.tmp npm run ci` → **EXIT=0**（改前基线 `98 files / 1845 tests` → 改后 `98 files / 1849 tests`、
+  `15 warnings / 0 errors`（未变）、`lib/ … (281 files, byte-identical)`、`lib/client.js` 331626 → **333611** 字节）；
+  定向先红后绿 `4 failed | 168 passed` → `172 passed`。逐行读数见 `VALIDATION.md` 同日条。
+- **真机读数**（隔离克隆 live `web` 档案、端口 **3331**、`npm pack` 打包安装、`sha256(lib/client.js) = edcd6983…` 与 worktree 逐字节相同）：
+  新会话 `未开 · 还没设过` / `aria-checked=false` / lamp off，而路由答 `{"enabled":true,"source":"default","fallback":true}`；
+  点一下 → `{"action":"set","enabled":true}` → `开`；`/grok off` → `关`、`/grok on` → `开`（各 +2 秒内、0 console errors）。
+  证据 `.rsi/evidence/switch-default-state-2026-11-25/`。
+- **下一个接手的人必须知道（三条，都是踩过的）**：
+  1. **开关与 `/grok status` / 设置页现在会显示不同的字，这是故意的**（`D-154`）。谁要「对齐」两边，先读决定号与
+     `test/mode-surface.spec.ts` 那个 divergence 用例——把它们对齐就会把红二放回来。
+  2. **装法要用打包产物，不要 `link:`**：软链会让插件里的 `@deepseek-ai/dsh-session` 与宿主不是同一个模块实例，
+     `/grok on` 会答 `Grok workflow toggle not changed: Receiver must be an instance of class Session`（与本改动无关，是装法问题）。
+     `npm pack --pack-destination <scratch>` → `dsh plugin add file:<tgz>`，再比对 profile 内 `lib/client.js` 的 sha256。
+  3. **克隆档案里那行 `mode: triage` 必须先删**（live 档案就有），否则 `grok-workflow` 整行拒绝激活、`/grok-workflow/mode` 全 404；
+     另外克隆的工作区指向 live 用户的真实目录，探针前把它改成一次性 `/tmp/…`（`TESTING.md` 规则 1/9）。
+- **这一轮看到、按分工故意没改的**：`/grok on` 回执仍是英文而界面是中文（中英混排是既有事实）；
+  `src/index.ts` / `test/command.spec.ts` 散文里的 “master switch”（`D-152` 那批余账）；`src/client/index.js` FIELDS 注释里的 “total switch”。
+- **红线**：`~/.dsh` = 2026-11-22 23:40:20、`~/.dsh/profiles` = 2026-11-22 16:59:46、`~/.dsh/profiles/web` = 2026-11-25 13:16:10
+  （早于本会话、前后同值）、写探针 `Read-only file system`、3080 前后都是 401、live 仍装 `0.13.35`；
+  未 push、未打 tag、未 bump、未合流，`package.json` 仍 `0.13.36`。
+
 ## 2026-11-25 — 429 开关那一行补上控件（`fix/ratelimit-toggle`，`534b867`）：14 个声明字段现在 14 个都有控件
 
 - **From:** 实现手（`agent-163/impl`）· **To:** 操作者 / 下一个接手者
