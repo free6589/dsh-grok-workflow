@@ -5,6 +5,8 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+## [0.13.43] - 2026-11-26
+
 ### Fixed / 修复
 
 - **A demand added while a run is working now joins the plan instead of being refused over how it was written / 跑中加进来的要求现在真的会并进计划，不再因为写法被拒** —
