@@ -33,6 +33,11 @@ Test Files  102 passed (102)
    Duration  86.59s (transform 3.01s, setup 0ms, import 9.21s, tests 65.16s, environment 11ms)
 ```
 
+文档相门禁 `gate-4f395c7-docs.out`（按跑的那棵树上的 HEAD 命名，所以文档提交号变了它也不失效）：这一遍跑在**未提交的文档树**上（HEAD 是本目录那条代码/证据链上的 `4f395c7`），
+所以转录里那句是 `lib/ at 4f395c7 is the build of src/ at 4f395c7 (285 files, byte-identical)`——
+`src/` 与 `lib/` 在这一轮一个字节没动，文档提交不改变构建产物；`102 files / 1903 tests` 与代码树同数，
+六个文档守卫都在这一遍里跑过。
+
 `node scripts/verify-lib.mjs` 单独再跑一次：`lib/ at 5388f22 is the build of src/ at 5388f22 (285 files, byte-identical)`，exit 0。
 
 用例数增量，逐文件（基线 101 文件 / 1884 用例，本分支 102 / 1903，差 +1 文件 / +19）：
@@ -64,6 +69,35 @@ AssertionError: expected false to be true          (model 策略退回标记)
 ```
 
 绿：`TMPDIR=$PWD/.tmp npx vitest run` → `Test Files 102 passed (102)` / `Tests 1903 passed (1903)` / `Duration 87.87s`。
+
+### 补充：基线整套红（`red-baseline-suite.out`）
+
+上一份红只跑了新 spec，且是**事后**用 `git stash push -- src` 造出来的（写作顺序是"先实现、后断言"，
+这里不改写这个事实）。为让红也覆盖**被改动的既有 spec**，另做一次独立基线跑：
+
+```
+git archive 57dcf04 | tar -x -C .tmp/red-baseline      # 基点树，node_modules 软链到 worktree
+cp test/{summary-outcome,client,report,progress-tab,i18n-parity}.spec.ts .tmp/red-baseline/test/
+TMPDIR=$PWD/.tmp npx vitest run test/summary-outcome.spec.ts test/client.spec.ts test/report.spec.ts test/progress-tab.spec.ts test/i18n-parity.spec.ts
+      Test Files  5 failed (5)
+      Tests  22 failed | 246 passed (268)
+```
+
+逐文件：`client.spec.ts` 5 项、`summary-outcome.spec.ts` 13 项、`progress-tab.spec.ts` 2 项、
+`report.spec.ts` 1 项、`i18n-parity.spec.ts` 1 项。两条最能说明问题：
+
+```
+FAIL  test/client.spec.ts > … > rejected: 交卷 card says every draft was turned back, and what the last failure was
+AssertionError: expected undefined to deeply equal { kind: 'rejected', drafts: 3, …(2) }
+
+FAIL  test/report.spec.ts > … > carries the summary gate's verdict into the report (Sec.3-3)
+AssertionError: expected 'Grok workflow: COMPLETED\nObjective: …' to contain
+  'Summary review: check=fail verify=pass drafts=3 reason=cites "x", which the report lacks · rejected: draft 3 (check: cites "x", which the report lacks)'
+```
+
+它比 stash 那份多证明两件事：既有 spec 的新期望（通过态判别式、事件清单、i18n 两条文案、台账后缀）
+在基点树上确实是红的，而且 `client.spec.ts` 的镜像/节点状态路径也在其中 —— 不是只有新文件会红。
+`.tmp/red-baseline` 用完即删。
 
 ## 4. 真机浸泡（`CONFIRMED`，一处 `NOT_RUN`）
 

@@ -7,6 +7,16 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ### Changed / 变更
 
+- **The 交卷 card says why nothing was handed in / 交卷卡片会说清「为什么没交卷」** —
+  When every summary draft is rejected, the progress page's 「交卷」 card now names how many drafts were turned back and
+  what the last failure was, in the run's own words, instead of only showing the generic "this run handed in no draft".
+  A run that did hand a draft in looks exactly as it did before, and a run that recorded neither still shows the same gap
+  sentence — the new block is the third state, not a replacement. The rejection is also recorded as its own progress
+  event, so the page can say it at all. See D-158.
+  / 汇总的每一稿都被退回时，进度页的「交卷」卡片现在会写明退回了几稿、最后一次卡在哪（用运行自己那句话），
+  而不是只给一句「这一轮没有交卷稿」；交过稿的运行与以前完全一样，什么都没记录时仍是原来那句——
+  新的一块是第三种状态，不是替换品。这条结论也作为独立的进度事件记录下来，页面才说得出这句话。见 D-158。
+
 - **The progress page holds its shape while you read it: the guardian beside the page, a task's own calls under its row, a long history folded / 进度页读起来不再变形：Guardian 挪到页面右侧、任务行下面就是它自己的调用、太长的「经过」先收起来** —
   Three layout changes, and nothing else: no new number, and the only new words are the three labels the two new controls
   need. The guardian used to be one card under the history, which read as another chapter of the run; it is a side lane about
