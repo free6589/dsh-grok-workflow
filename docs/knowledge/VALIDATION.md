@@ -1,3 +1,67 @@
+## `0.13.44` 发版收口：唯一一份门禁（发布树 `7cc4a90`）`GATE_EXIT=0`（`103 files / 1947 tests`），提交的 `lib/` 就是它自己 `src/` 的构建；附注标签、两个远端 run、Release 与资产都复核过；**live 档案升级 `BLOCKED`**、**真机 `NOT_RUN`** — 2026-11-26 (`CONFIRMED`)
+
+**这一轮是什么**：发版轮 + 收口轮，**没有改任何代码**。`0.13.44` 已经出去（tag 推了、Release 建了、资产在），
+本轮只写三份记忆 + 一份证据索引；**没有重跑门禁、没有跑任何 npm 脚本、没有碰 `src/` / `test/` / `lib/`**
+（`AGENTS.md` §12），所以**没有红可记**——这一版唯一的行为改动（钥匙被拒时在同一条路由上再问一次）的红/绿记录
+在功能轮 `fix/auth-retry` 那一条里（`git stash push -- src` → `3 failed / 18 passed`），见本文件下方。
+
+**命令与结果（`CONFIRMED`：包工头在发布 worktree 的干净树上跑，本轮只读转录与 `gh`，不重跑）**：
+
+| 命令 / 动作 | 环境 | 结果 | 出处 |
+| --- | --- | --- | --- |
+| `TMPDIR=$PWD/.tmp npm run ci` | worktree `.tmp/wt-release-0.13.44`、干净树（`status --short` 空）、`HEAD = 7cc4a90` | **`GATE_EXIT=0`**（唯一一份门禁） | `.rsi/evidence/release-0.13.44-2026-11-26/gate-release-7cc4a90.out` |
+| 抬版本之前的第二份门禁 | — | **`NOT_RUN`**：父提交 `649c4e4` 就是功能轮的合流尖端，那一轮已带自己的块内门禁 | `.rsi/evidence/auth-retry-2026-11-26/gate-*.out` |
+| 真机 soak | — | **`NOT_RUN`**：发版轮没有新行为可 soak | 行为证据 `.rsi/evidence/auth-retry-2026-11-26/` |
+| live 档案升级（`AGENTS.md` §13） | 本会话 `workspace-write`、`~/.dsh` 在工作区外 | **`BLOCKED`**：写探测 `: > ~/.dsh/.release-probe-0.13.44` 返回 `Read-only file system` | 本轮报告 |
+
+**转录指纹（本轮自己 `wc -lc` + `sha256sum` + `tail -1` 各读一次）**：**372 行 / 21960 字节**、
+`sha256 9af222b39e8a4a7174d700ecd3ec271c2365061cd90003bc95823259f5f8c41a`、末行 `GATE_EXIT=0`。
+读数：`Found 15 warnings and 0 errors.`（第 162 行）与 `Finished in 96ms on 184 files with 96 rules using 6 threads.`
+（第 163 行）、`client bundle: 348559 bytes → lib/client.js`（**第 168、178 行各一次、同值**）、
+`lib/ at 7cc4a90 is the build of src/ at 7cc4a90 (289 files, byte-identical)`（第 169 行）、
+**`Test Files 103 passed (103)`**（第 367 行）/ **`Tests 1947 passed (1947)`**（第 368 行）、
+`Duration 81.75s (transform 2.38s, setup 0ms, import 9.96s, tests 59.78s, environment 11ms)`（第 370 行）。
+脚本身份也印在转录里：第 2 / 6 / 10 行读作 `> dsh-grok-workflow@0.13.44 ci` / `… typecheck` / `… lint`，
+**跑门禁的那棵树里 `package.json` 已经是 `0.13.44`**。门禁之后 `git status --short` 只剩那两处别人的遗留，
+所以 **`verify:lib` 比对之后没有残留——提交的 `lib/` 就是提交的 `src/` 的构建**。
+
+**`grep -cE 'FAIL|failed'` = 2，两条都不是失败（逐行判读）**：
+
+| 行 | 原文片段 | 判读 |
+| --- | --- | --- |
+| 182 | `stderr \| test/client.spec.ts > client settings page: reading, failure and retry > keeps still reading, read failed and not served as three different pages` | 用例**标题**里的 `read failed`——这条用例本身就要分辨「还在读」「读失败」「没给」三页；第 188 行读作 `✓ test/client.spec.ts (151 tests) 467ms` |
+| 299 | `[smoke] status=failed file=…/.tmp/dsh-grok-workflow-test-checkpoints/checkpoint-db63f96f-…-17cdc6e5.json` | checkpoint 夹具**故意**造的「被拒的运行」那一例（同一条用例集上一例是 `status=completed`）；第 301 行读作 `✓ test/checkpoint-engine-wire.spec.ts (6 tests) 650ms` |
+
+**用例算术（本轮从 git 对象数过，与门禁同值）**：
+
+| 项 | 值 | 怎么数的 |
+| --- | --- | --- |
+| spec 文件 `649c4e4` → `7cc4a90` | **103 → 103** | `git ls-tree -r --name-only <sha> -- test \| grep -c '\.spec\.ts$'` |
+| 发布提交碰过的 `test/` 文件 | **0** | `git diff --name-only 649c4e4..7cc4a90 -- test \| wc -l` |
+| 用例 | `0.13.43` 门禁 **1944** → 本轮 **1947**（**+3**） | 两份门禁转录 |
+| 那 +3 的来源 | **`8dccf67`**：`test/planner-resubmit.spec.ts` 10 → 12、`test/judge-leg-retry.spec.ts` 8 → 9 | 带词边界的 `grep -cE '(^\|[^A-Za-z0-9_.$])it\('`，在 `8dccf67^` 与 `7cc4a90` 各数一次 |
+
+那 **+3 不随发版提交走**：它来自功能提交 `8dccf67`，发布提交之前就已经在 `main` 上；发布提交不碰任何 `test/` 文件。
+**别与 `0.13.43` 的 +3 混算**——那一笔是 `38d64bb` 的 `test/replan.spec.ts` 21 → 24，两笔不同的账。
+
+**`NOT_RUN`（真机 soak）**：发版轮没有新行为可 soak。这一版发出去的行为是 `fix/auth-retry` 那一轮在隔离档案里
+用真模型跑过的（运行 `818754a2-115b-409a-96a2-e1dbf93a3283`：规划腿 `seq 1 failed` → `seq 2 completed` 同一条路由、
+小代理 `seq 1 → 401 injected`、报告 `COMPLETED / Plan: planner; 2 task(s); 2 verified`），证据在
+`.rsi/evidence/auth-retry-2026-11-26/`。本轮也没跑门禁、没跑任何 npm 脚本。
+
+**`BLOCKED`（`AGENTS.md` §13 的 live 档案升级）**：**没做成**。本会话文件策略 `workspace-write`、`~/.dsh` 在工作区外，
+写探测 `: > ~/.dsh/.release-probe-0.13.44` 返回 **`Read-only file system`**，**没写、没重载、没重启** live 档案；
+live 档案现在装的是哪一版**本轮没读**（`NOT_RUN`，不猜）。下一个人（有写权限的）要做的：把 live 那条插件行钉到
+**确切的标签 `v0.13.44`**（绝不用浮动范围、`latest` 或分支名），把装好的版本读回来确认，读不回 `0.13.44` 就回滚那一行。
+
+**释放身份与远端读数（`CONFIRMED`，`git` / `gh` 重读）**：发布提交 `7cc4a90`（父 `649c4e4`，**单父**）、
+`8 文件 / +22 −20`、附注标签 `v0.13.44` 对象 `e1a00440…` → 剥出 `7cc4a90`、`tagger` `1795638186 +0800`；
+`main` = `origin/main` = `7cc4a90`；Release run **`45694469431`** success（单 job，约 1m28s）、
+CI run **`45694462916`** success；Release 正文 **21 行 / 2598 字节**、唯一资产 **`987079` 字节**（上一版 984828 → **+2251**）。
+`DECISIONS.md` **一个字没改**——这一版没有新决定（`D-164` 功能轮就写好了）。
+
+---
+
 ## `fix/auth-retry`：钥匙被拒给一次同路重发——块内门禁 `TSC_EXIT=0` / `15 warnings / 0 errors` / 定向 `9 files · 165 tests`，红 `3 failed / 18 passed`，真机一次运行 `COMPLETED` 且同一条路由被再问一次 — 2026-11-26 (`CONFIRMED`)
 
 **这一轮是什么**：`D-120` 当年故意留的那一条——钥匙被拒既不进死路表、也不走任何重发走廊——在本轮改掉一半：

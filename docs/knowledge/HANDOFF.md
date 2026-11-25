@@ -1,3 +1,55 @@
+## 2026-11-26 — `0.13.44` 已发布并收口：一个发布提交（8 文件 / +22 −20）、一份门禁 `GATE_EXIT=0`（`103 files / 1947 tests`）、`main` 单父前进（无合并提交）、附注标签、两个远端 run 与 Release 资产都在；**live 档案升级仍 `BLOCKED`**
+
+- **From:** 包工头（`agent-191`）· **To:** 下一个接手者 / 能在本机写 `~/.dsh` 的人
+- **这一轮是什么**：**发版轮 + 收口轮**，不写代码。`0.13.44` 已经出去（tag 推了、Release 建了、资产在）；
+  本轮只做三份记忆 + 一份证据，然后提交推送、清掉发布 worktree。**没有重跑门禁、没有跑任何 npm 脚本、
+  没有碰 `src/` / `test/` / `lib/`**（`AGENTS.md` §12），所以**没有红可记**。
+- **身份**：发布提交 **`7cc4a901f1081feb774092c0dd51accc29d58086`** `chore(release): prepare v0.13.44`，
+  父提交 **`649c4e4`**（**单父，发布提交不是合并**），**8 文件 / +22 −20**，全是版本字面量与清单尾巴：
+  `CHANGELOG.md` +2（只插入 `## [0.13.44] - 2026-11-26` 这一行标题，空的 `## [Unreleased]` 留空站在上面，
+  条目正文中英一字未改）、`README.md` 5/5、`README.zh-CN.md` 5/5、`docs/LOCAL-TESTING.md` 3/3、
+  `lib/client.js` 2/2、`package-lock.json` 2/2、`package.json` 1/1、`src/client/index.js` 2/2；
+  `src/` 与 `lib/` 的唯一改动是 `PLUGIN_VERSION` / `UPDATE_LATEST` `'0.13.43'` → `'0.13.44'`
+  （两个文件 `cmp` 逐字节相同、各 **348559 字节**）。**附注标签 `v0.13.44`** 对象
+  **`e1a00440e4205d42fd0665a20ee2a17dca3df6ce`** → 剥出 `7cc4a90`、消息 `Grok Workflow for DSH v0.13.44`、
+  `tagger` 时刻 **2026-11-26 04:23:06 +0800**（`1795638186 +0800`），标签上的 `package.json` 读 `0.13.44`。
+  **`main` = `origin/main` = 发布提交 = 标签剥出的提交 = `7cc4a90`**，**没有第二个合并提交、没有 force-push、
+  没有移动任何已发布标签**（本轮重读 `v0.13.40` `14fef64`/`3778822`、`v0.13.41` `96dd9cc`/`a64a50a`、
+  `v0.13.42` `98b9c45`/`651f3dd`、`v0.13.43` `e084e4b`/`549a579`，四条与开工前基线逐字一致）。
+  **一处历史褶皱照实记**：`main` 上有一对**内容相同**的合并提交 `7add053`（父 `7f0a47f` + `2055249`）与
+  `649c4e4`（父 `7f0a47f` + `7add053`），`git diff 7add053 649c4e4` 为空——第二颗是空合并，什么都没丢。
+- **用户看到的一件事**：网关第一次用钥匙错误拒掉调用的那种运行会**照常跑完**——被拒的调用在同一条路由上先重发一次
+  （两条判腿在同一次尝试里把裁判再问一遍，规划腿对准拒的那条路由再问一次计划，最多一次额外子调用），
+  而这条路**仍然不被记成死路**。升级须知是「不用准备任何东西」。**只有这一条**；`0.13.43` 那条（边界子请求单形状）
+  上一版就已经发出去了。
+- **门禁读数（一份，`CONFIRMED`）**：`TMPDIR=$PWD/.tmp npm run ci`、发布 worktree `.tmp/wt-release-0.13.44`
+  的干净树、`HEAD = 7cc4a90`、**`GATE_EXIT=0`**。转录
+  `.rsi/evidence/release-0.13.44-2026-11-26/gate-release-7cc4a90.out`（**372 行 / 21960 字节**、
+  `sha256 9af222b39e8a4a7174d700ecd3ec271c2365061cd90003bc95823259f5f8c41a`）。读数：
+  `Found 15 warnings and 0 errors.` + `Finished in 96ms on 184 files with 96 rules`、
+  `client bundle: 348559 bytes → lib/client.js`（第 168、178 行各一次、同值）、
+  `lib/ at 7cc4a90 is the build of src/ at 7cc4a90 (289 files, byte-identical)`、
+  **`Test Files 103 passed (103)` / `Tests 1947 passed (1947)`**、`Duration 81.75s`。
+  `grep -cE 'FAIL|failed'` 命中 2 条，**两条都不是失败**（用例标题里的 `read failed`、checkpoint 夹具故意造的
+  `[smoke] status=failed`，两个 spec 都是 ✓）。**没有第二份门禁**：父提交 `649c4e4` 就是功能轮的合流尖端，
+  那一轮已带自己的块内门禁（`.rsi/evidence/auth-retry-2026-11-26/`）。
+- **远端读数（`gh run view` 重读）**：Release run **`45694469431`**（`headBranch v0.13.44`、sha `7cc4a90`、
+  **success**、单 job `Validate and publish v0.13.44`、约 1m28s）、`main` 的 CI run **`45694462916`**（sha `7cc4a90`、
+  **success**）；GitHub Release https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.44
+  名字 `Grok Workflow for DSH v0.13.44`、`publishedAt 2026-11-25T20:24:43Z`、非 draft / 非 prerelease、target `main`、
+  正文 **21 行 / 2598 字节**、唯一资产 **`dsh-grok-workflow-0.13.44.tgz` = 987079 字节**（上一版 984828 → **+2251**）。
+- **`BLOCKED`（`AGENTS.md` §13 的 live 档案升级）**：**没做成**——本会话文件策略 `workspace-write`、`~/.dsh` 在工作区外，
+  写探测 `: > ~/.dsh/.release-probe-0.13.44` 返回 **`Read-only file system`**，**没写、没重载、没重启**；
+  live 档案现在装的是哪一版**本轮没读**（`NOT_RUN`，不猜）。**`NOT_RUN`** 还有一条：本轮没做真机 soak——
+  发版轮没有新行为可 soak，这里发出去的行为是 `fix/auth-retry` 那一轮在真机上验过的。
+- **下一步那一件事**：由**有写权限的人**把 live 那条插件行钉到**确切的标签 `v0.13.44`**（绝不用浮动范围、`latest`
+  或分支名），把装好的版本读回来确认；读不回 `0.13.44` 就回滚那一行——跑发布版时它必须读作 `0.13.44`。
+- **清理（推送成功后做）**：`git worktree remove .tmp/wt-release-0.13.44`、`git branch -d release/0.13.44`；
+  **远端分支一个不删**，本来就存在的三条 `backup/wip-2026-11-24-*` 与 `feat/audit-layer` 不许动。
+  `.gitignore`(modified) 与 `.rsi/evidence/progress-now/`(未跟踪) 是别人的遗留，没暂存、没提交。
+
+---
+
 ## 2026-11-26 — `fix/auth-retry`：钥匙被拒现在会在同一条路由上再问一次（判腿不再重跑干活那条腿、规划腿不再落兜底）；真机一次运行 `COMPLETED` 且同一条路由被再问一次；未合 `main`、未 push、未发版
 
 - **From:** 包工头（`agent-190`）· **To:** 下一个接手者
