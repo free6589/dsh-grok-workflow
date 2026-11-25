@@ -30,13 +30,30 @@
  *   (`recoveredFailureSeqs`). Red therefore means "still broken now", never "was broken".
  */
 
-import { NAMING_LANGUAGES, synthesisDraftLabel } from './naming.js'
+import { NAMING_LANGUAGES, SYNTHESIS_FINAL_MARK, synthesisDraftLabel } from './naming.js'
 
-/** The seven progress and Guardian lifecycle events the tab folds; other events are ignored. */
+/**
+ * The eight progress and Guardian lifecycle events the tab folds — and, in the bundle, the
+ * whitelist the host routes the tab by.
+ *
+ * One name, two homes, one list: this copy is what {@link foldProgressRuns} reads, and
+ * `src/client/index.js` carries the same constant (served verbatim, so it cannot import this
+ * table) where it serves both its mirror of the fold and the tab's event routing, which
+ * drops any event this list does not name. The two must agree entry for entry, and neither
+ * half can see the other: an event named only here is routed away before the fold ever sees
+ * it, an event named only there is handed over and silently ignored. Both failures are
+ * invisible on screen, so `test/progress-tab.spec.ts` compares the shipped list with this
+ * one and fails on a single missing or extra entry.
+ *
+ * `tool-workflow/stage-detail` is deliberately **not** here: it only ever *adds* field
+ * values to a node and never decides a state, so it is not a lifecycle event and does not
+ * belong in the routing list ({@link PROGRESS_DETAIL_EVENT_TYPE}).
+ */
 export const PROGRESS_EVENT_TYPES = [
   'tool-workflow/run-start',
   'tool-workflow/agent-start',
   'tool-workflow/agent-end',
+  'tool-workflow/summary-final',
   'tool-workflow/guardian-start',
   'tool-workflow/guardian-finding',
   'tool-workflow/guardian-end',
@@ -55,13 +72,14 @@ export const PROGRESS_EVENT_TYPES = [
 export const PROGRESS_DETAIL_EVENT_TYPE = 'tool-workflow/stage-detail'
 
 /**
- * The optional event that names the summary draft the run shipped, on purpose apart
- * from {@link PROGRESS_EVENT_TYPES}.
+ * The event that names the summary draft the run shipped.
  *
- * A chat row's label is fixed at `agent-start` (the panel only ever matches an
- * `agent-end` to it by `seq`), so "this draft is the final one" cannot be said by
- * renaming a row after the fact: it arrives as its own fact, written once the gate
- * has passed a draft. A stream without it renders exactly what it rendered before.
+ * It is a member of {@link PROGRESS_EVENT_TYPES} — a tab the host never hands the event to
+ * cannot mark the draft — but it is not a lifecycle step like the others: a chat row's label
+ * is fixed at `agent-start` (the panel only ever matches an `agent-end` to it by `seq`), so
+ * "this draft is the final one" cannot be said by renaming a row after the fact. It arrives
+ * as its own fact once the gate has passed a draft, and the fold settles it onto the row
+ * that landed. A stream without it renders exactly what it rendered before.
  */
 export const PROGRESS_SUMMARY_FINAL_EVENT_TYPE = 'tool-workflow/summary-final'
 
@@ -1103,6 +1121,290 @@ export function deriveTrack(run: ProgressRunFacts, options: DeriveOptions = {}):
     ...percent === undefined ? {} : { percent },
     ...run.stopReason === undefined ? {} : { stopReason: run.stopReason },
     ...runDetail === undefined ? {} : { stageDetail: runDetail },
+  }
+}
+
+/** The five words a run can be described by on the one-page story (the header chip). */
+export type ProgressStoryState = 'waiting' | 'running' | 'done' | 'failed' | 'cancelled'
+
+/** Which action the story's dock offers: start it, accept it, or leave the reader alone. */
+export type ProgressStoryDock = 'start' | 'accept' | 'quiet'
+
+/** One step of the story's track: a plan task, or one declared call. */
+export interface ProgressStoryStep {
+  /** Track node key it speaks for (`phase:任务 1 · 标题`), or `seq:<n>` for a call step. */
+  key: string
+  /** Plan-task position (`progressTaskNumber`); absent when the step is a declared call. */
+  number?: number
+  /** Plan-task phase header verbatim; a call step carries its role word. */
+  title: string
+  state: ProgressState
+  /** The task's Execute-Check-Review chain; empty for a call step. */
+  chain: ProgressChainSlot[]
+  members: ProgressMemberFact[]
+}
+
+/** One line of the story's history: a declared call, as the stream settled it. */
+export interface ProgressStoryLogRow {
+  seq: number
+  /** Session time of the call's `agent-start`, when the stream carried one. */
+  at?: number
+  /** The role the line is spoken as: the label without its attempt suffix or shipped mark. */
+  role: string
+  /** Exact phase header (the plan-task title), or the empty string when it named none. */
+  title: string
+  state: ProgressState
+  /** Set on the one row `summary-final` names: the draft that actually shipped. */
+  shipped?: true
+}
+
+/**
+ * One page of the story, in the three screens the redesign settles on.
+ *
+ * Everything here is derived from the run facts the fold already produced: no plan, no
+ * percentage, no estimate, and no reading of what the run "probably" did. `steps` is the
+ * track (one segment per step), `log` is the history under it, and `now` / `attempt` /
+ * `rest` are the three sentences above them.
+ */
+export interface ProgressStory {
+  state: ProgressStoryState
+  steps: ProgressStoryStep[]
+  /** 1-based current step; `0` when the run declared nothing to step through. */
+  at: number
+  total: number
+  /** The headline: the current step's title, or the two states that have no title. */
+  now: { titleKey?: 'planning' | 'done'; title: string; role?: string }
+  /** Present only while the current step carries a failure nothing later replaced. */
+  attempt?: { n: number; retrying: boolean }
+  /** The titles of the steps after the current one, consecutive repeats collapsed. */
+  rest: string[]
+  log: ProgressStoryLogRow[]
+  /** The shipped summary draft, when the stream named one and its own row exists. */
+  final?: { draft: number; label: string; row?: ProgressStoryLogRow }
+  dock: ProgressStoryDock
+}
+
+/**
+ * The state of one declared call: the row-level half of {@link nodeState}.
+ *
+ * A row is the smallest thing the stream settles, so its own state is its outcome and
+ * nothing else — an unsettled row is `doing` (`正在看`), and an outcome that is neither a
+ * completion, a cancellation nor a failure stays `blocked` rather than being renamed.
+ * @param member - one folded row.
+ * @returns the row's own state.
+ */
+function rowState(member: ProgressMemberFact): ProgressState {
+  if (member.outcome === undefined) return 'doing'
+  if (member.outcome === 'completed') return 'done'
+  if (member.outcome === 'cancelled') return 'cancelled'
+  if (member.outcome === 'failed') return 'failed'
+  return 'blocked'
+}
+
+/**
+ * The attempt number a label carries (`执行（尝试 2）` → 2, `执行` → 1).
+ * @param label - a recorded row label.
+ * @returns the 1-based attempt the label names.
+ */
+function attemptNumberOf(label: string | undefined): number {
+  const text = typeof label === 'string' ? label.trim() : ''
+  const match = /[（(][^（()）]*?(\d+)[^（()）]*[)）]$/u.exec(text)
+  if (match === null) return 1
+  const value = Number(match[1])
+  return Number.isInteger(value) && value > 0 ? value : 1
+}
+
+/**
+ * A label with its shipped-draft mark taken off.
+ *
+ * The mark says what the *row* is (the draft the gate shipped), not what role spoke, so it
+ * must not end up in the role column beside the `交卷` word that already says it.
+ * @param text - a label without its attempt suffix.
+ * @returns the label without a trailing draft mark.
+ */
+function withoutFinalMark(text: string): string {
+  for (const language of NAMING_LANGUAGES) {
+    const mark = SYNTHESIS_FINAL_MARK[language]
+    const bare = mark.trim()
+    for (const suffix of [mark, bare]) {
+      if (suffix === '' || !text.endsWith(suffix)) continue
+      return text.slice(0, text.length - suffix.length).trim()
+    }
+  }
+  return text
+}
+
+/**
+ * The role a log line is spoken as: `执行（尝试 2）` → `执行`, `汇总·第2稿（定稿）` → `汇总·第2稿`.
+ * @param member - one folded row.
+ * @returns the role word, without the retry suffix or the shipped mark.
+ */
+function storyRoleOf(member: ProgressMemberFact): string {
+  return withoutFinalMark(attemptBaseLabel(member.label))
+}
+
+/**
+ * The row `summary-final` names, read back off the rows the fold already marked.
+ *
+ * The fold writes the mark onto the row that landed (the highest `order` of that draft
+ * name, in whichever language the label was written), so matching the marked name is the
+ * same fact rather than a second guess at it. A stream whose rows were never marked — the
+ * bare draft name is all it carries — still names its row here.
+ * @param members - every folded row of the run.
+ * @param draft - 1-based draft number the gate shipped.
+ * @returns the row that carries the draft, or undefined when no row names it.
+ */
+function shippedDraftRow(members: readonly ProgressMemberFact[], draft: number): ProgressMemberFact | undefined {
+  const latestNamed = (name: string): ProgressMemberFact | undefined => {
+    let named: ProgressMemberFact | undefined
+    for (const member of members) {
+      if (member.label !== name) continue
+      if (named === undefined || member.order > named.order) named = member
+    }
+    return named
+  }
+  for (const language of NAMING_LANGUAGES) {
+    const marked = latestNamed(synthesisDraftLabel(draft, language, true))
+    if (marked !== undefined) return marked
+  }
+  for (const language of NAMING_LANGUAGES) {
+    const bare = latestNamed(synthesisDraftLabel(draft, language))
+    if (bare !== undefined) return bare
+  }
+  return undefined
+}
+
+/**
+ * Derive the one-page story for one run (the pure half of the redesign, §19.2).
+ *
+ * Three screens out of the same facts the track already reads:
+ *
+ * - **waiting** — the run is open and no call was declared; the page says it is planning,
+ *   and the track is empty because there is nothing to step through yet;
+ * - **running / failed / cancelled** — one step per declared thing, the current step
+ *   chosen by `doing` → `failed` → first unfinished → the last step;
+ * - **done** — every declared row passed, so the headline stops naming a step.
+ *
+ * A step is a **plan task** when the run declared any (`任务 n · 标题`, not the guardian
+ * card): those are the units a reader waits for. A run that planned nothing (a triage or
+ * single-call run) steps through its declared calls instead, so the track's length is
+ * always what the stream announced and never a plan nobody wrote down.
+ *
+ * @param run - folded run facts.
+ * @returns the story model.
+ */
+export function deriveProgressStory(run: ProgressRunFacts): ProgressStory {
+  const ended = run.stopReason !== undefined
+  const declared = run.members.length
+  const state: ProgressStoryState = !ended
+    ? (declared === 0 ? 'waiting' : 'running')
+    : run.stopReason === 'completed' ? 'done' : run.stopReason === 'cancelled' ? 'cancelled' : 'failed'
+  const track = deriveTrack(run)
+  // A plan task is a numbered extra node: the guardian call is a node of its own and not
+  // a step of the plan, so it stays in the history where its own card can speak for it.
+  const planNodes = track.nodes.filter(
+    (node): node is ProgressNodeModel & { taskNumber: number } =>
+      node.kind === 'extra' && node.taskNumber !== undefined && node.guardian !== true,
+  )
+  const steps: ProgressStoryStep[] = planNodes.length > 0
+    ? planNodes.map((node) => ({
+        key: node.key,
+        number: node.taskNumber,
+        title: node.label,
+        state: node.state,
+        chain: node.chain ?? [],
+        members: node.members,
+      }))
+    // A run that planned nothing steps through its **work legs**: the calls that do, check
+    // and review the work. The planner and the synthesizer are the run's own two ends — one
+    // writes the plan, one writes the answer — so they are not things to do, and counting
+    // them as steps shipped 「第 1 步，共 1 步：要干的 1 件事 · 规划 在做」 on a real run
+    // (§19.9). They keep their history lines; they take no step.
+    //
+    // The leg is read off the row's **label**, never its phase: a phase names the task, and
+    // the role word is what says which leg ran (`执行` / `检查` / `复核`, the same words the
+    // chain uses). A call step's own `seq` is its identity, because two calls can share one
+    // leg (`规划（第1次）` and `规划（第2次）`), so a node key would repeat.
+    : [...run.members]
+        .filter((member) => chainStageForLabel(member.label) !== undefined)
+        .sort((left, right) => left.seq - right.seq)
+        .map((member) => ({
+          key: `seq:${member.seq}`,
+          title: storyRoleOf(member),
+          state: rowState(member),
+          chain: [],
+          members: [member],
+        }))
+  const total = steps.length
+  const firstOf = (predicate: (step: ProgressStoryStep) => boolean): number => {
+    const index = steps.findIndex(predicate)
+    return index === -1 ? -1 : index + 1
+  }
+  const doing = firstOf((step) => step.state === 'doing')
+  const failed = firstOf((step) => step.state === 'failed')
+  const open = firstOf((step) => step.state !== 'done')
+  const at = total === 0 ? 0 : doing !== -1 ? doing : failed !== -1 ? failed : open !== -1 ? open : total
+  const current = at === 0 ? undefined : steps[at - 1]
+  // The headline: a finished run says so, and a run with no step to name says it is still
+  // turning the ask into steps — waiting, running or broken, there is nothing else to say.
+  const now: ProgressStory['now'] = state === 'done'
+    ? { titleKey: 'done', title: '' }
+    : current === undefined
+      ? { titleKey: 'planning', title: '' }
+      : { title: current.title }
+  if (state === 'running') {
+    // The line a reader is waiting on: the current step's own open call, or — when the
+    // current step is finished under a still-open run — the run's first unsettled one.
+    const running = (current?.members ?? []).find((member) => member.outcome === undefined)
+      ?? run.members.find((member) => member.outcome === undefined)
+    if (running !== undefined) now.role = storyRoleOf(running)
+  }
+  let attempt: ProgressStory['attempt']
+  if (current !== undefined) {
+    const recovered = recoveredFailureSeqs(current.members)
+    const broken = current.members.find((member) => member.outcome === 'failed' && !recovered.has(member.seq))
+    if (broken !== undefined) {
+      const unit = attemptUnitOf(broken)
+      let n = 1
+      for (const member of current.members) {
+        if (attemptUnitOf(member) !== unit) continue
+        n = Math.max(n, attemptNumberOf(member.label))
+      }
+      attempt = { n, retrying: !ended }
+    }
+  }
+  const rest: string[] = []
+  for (const step of steps.slice(at)) {
+    if (rest[rest.length - 1] === step.title) continue
+    rest.push(step.title)
+  }
+  const shipped = run.summaryFinalDraft === undefined ? undefined : shippedDraftRow(run.members, run.summaryFinalDraft)
+  const log: ProgressStoryLogRow[] = [...run.members]
+    .sort((left, right) => left.seq - right.seq)
+    .map((member): ProgressStoryLogRow => ({
+      seq: member.seq,
+      ...member.startedAt === undefined ? {} : { at: member.startedAt },
+      role: storyRoleOf(member),
+      title: member.phase ?? '',
+      state: rowState(member),
+      ...member === shipped ? { shipped: true as const } : {},
+    }))
+  const shippedLine = log.find((row) => shipped !== undefined && row.seq === shipped.seq)
+  const final = run.summaryFinalDraft === undefined || shippedLine === undefined
+    ? undefined
+    : { draft: run.summaryFinalDraft, label: shippedLine.title, row: shippedLine }
+  const dock: ProgressStoryDock = state === 'waiting' ? 'start' : state === 'done' ? 'accept' : 'quiet'
+  return {
+    state,
+    steps,
+    at,
+    total,
+    now,
+    ...attempt === undefined ? {} : { attempt },
+    rest,
+    log,
+    ...final === undefined ? {} : { final },
+    dock,
   }
 }
 

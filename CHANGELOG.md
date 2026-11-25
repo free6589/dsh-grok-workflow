@@ -5,6 +5,35 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Changed / 变更
+
+- **The progress tab is one page now: where you are, what is left, and what came back / 进度页变成一页：你在哪一步、还剩什么、交回来的是什么** —
+  The old tab drew a fixed six-stage spine (start, plan, execute, verify, summarize, end) with a percentage, a settle bar and a
+  task band hanging off it, so a run with many plan tasks squeezed every stage name into an ellipsis and two parallel calls looked
+  exactly like two sequential ones. It is replaced by a single page: the run's own name and a five-state chip at the top, a
+  「现在」 headline naming the step being worked on with one line of context under it, one segment per declared step (green done,
+  blue running, amber not passed, grey not started), an amber flag when the current step is being redone, a 「后面还有」 line, the
+  step list with each task's 执行 → 检查 → 复核 chain, a 「经过」 log with one line per call and its time, and a 「交卷」 card naming
+  the draft that shipped. The percentage, the settle bar and the spine are gone: they answered questions the page now answers in
+  words, and the spine is what hid the plan. See D-156.
+  / 旧进度页画的是一条固定六段脊椎（起点、规划、执行、检查、汇总、终点），旁边挂百分比、结算条和任务带；计划任务一多，每个阶段名都被压成省略号，
+  两条并行调用和两条串行调用看起来完全一样。现在换成单页：顶部是 run 自己的名字与五态胶囊，下面是「现在」主标题（正在做哪一步）加一行小字，
+  再下面一步一段的分段条（绿=做完、蓝=在做、琥珀=没过、灰=没开始）、当前步在重做时的琥珀提示条、「后面还有」一行、带每步 执行 → 检查 → 复核
+  链的步骤清单、「经过」逐行日志（每行一条调用与它的时间），以及写明交的哪一稿的「交卷」卡。百分比、结算条和脊椎都删掉了：它们回答的问题，
+  这一页现在用话说清楚；而脊椎正是把计划挡住的那个东西。见 D-156。
+- **Failure is amber, never red / 失败用琥珀，不用红** —
+  A task that did not pass used to paint the card, the stage segment, the settle bar and the vertical wire red — including wire
+  segments that pointed at tasks that had not run yet. Now only the line that actually failed is amber, and a failure that a later
+  attempt recovered stops tinting anything. The chat task card speaks the same five-state vocabulary as the tab it summarizes.
+  / 没过关的任务以前会把卡片、阶段段、结算条和纵向连线一起染红——连指向还没跑的任务的线也红。现在只有真正失败的那一行是琥珀色，
+  后面一次尝试已经翻案的失败不再给任何东西上色。聊天里的任务卡片与它汇总的那个 Tab 用同一套五态词。
+- **The button fills the box; it never sends for you / 按钮只填输入框，不替你发送** —
+  「开工」 and 「收下这版」 put the approval word (`确认` / `yes`) into the composer and stop there. Sending stays your action, and the
+  word is one the workflow's own approval check accepts, so one Enter is all it takes. A composition without the conversation service
+  gets no button at all rather than a button that would do nothing.
+  / 「开工」和「收下这版」把批准词（`确认` / `yes`）填进输入框就停住。发送仍然是你自己的动作，而这个词正是工作流自己的批准检查认的那一个，
+  所以按一下回车就行。组合里没有 conversation 服务时，页面不渲染按钮，而不是渲染一颗按了没反应的按钮。
+
 ## [0.13.38] - 2026-11-25
 
 ### Changed / 变更

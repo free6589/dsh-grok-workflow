@@ -5117,3 +5117,36 @@ Issue #1 状态评论 issuecomment-6927842856。
   是最后一号（本轮取号时 `D-136` 是最后一条）；⑤ **F2 值得一次产品决定**：如果希望「点卡片 = 批准」在默认配置下也
   成立，要么把 `tool-ask-user` 默认改成 timed，要么让 `startBlock` 也读同回合的提问工具结果——两者都超出本分支，
   本轮只记录、没改。
+
+## 2026-11-25 — 进度页重画：一页三态，六段脊退场，按钮只填框（`feat/progress-redesign`，未合流、未发版）
+
+- **From:** 进度页 UI 包工头（`agent-169`，两个 worker：取数映射 `data-map`、重画 `redraw`）· **To:** 下一个接手的人
+- **交付**：分支 `feat/progress-redesign`（worktree `.agents/worktrees/feat/progress-redesign`），基线 `main` 尖端 `ff5c5ec`，
+  交付 HEAD **`87f14e1`**（产品提交 `e85c35f`）。门禁 `TMPDIR=$PWD/.tmp npm run ci` **EXIT=0**（`100 files / 1855 tests`、`15 warnings / 0 errors`、
+  `lib/ at 87f14e1 … (285 files, byte-identical)`、`client bundle: 334321 bytes`）；基线同一命令 `100 files / 1870 tests`、
+  `340426 bytes`。用例 **−15**、字节 **−6105** 都是重画的形状（旧脊椎/环/连线/干线/结算条/详情弹层整族删掉）。
+- **用户能看到什么**：
+  1. **头部**：run 名 + 五态胶囊（等你点头 / 进行中 / 已完成 / 未通过 / 已取消）。
+  2. **现在**：「正在拆活」或当前步标题，小字「角色 正在看 · 第 n 步，共 N 步」。
+  3. **轨道**：一步一段的等分分段条（绿做完、蓝在做、琥珀没过、灰没开始）+ 琥珀重做提示 + 「后面还有」+ 步骤清单（每步带 执行 → 检查 → 复核 链）。
+  4. **经过**：一行一条调用（时间 / 角色 + 任务标题 / 状态词），失败行琥珀、正在跑的行浅蓝。
+  5. **交卷**：写明交的哪一稿 + 打开胶囊；没有 `summary-final` 时如实写「这一轮没有交卷稿」。
+  6. **底部**：「开工」/「收下这版」只把 `确认`（英 `yes`）填进输入框，**不代发**；无 conversation 服务时不渲染按钮。
+  7. **聊天任务卡片**：同一套五态词与琥珀色，行 = 角色 + 任务标题 + 状态词 + 打开胶囊。
+- **三条真机读数**：隔离克隆（`clone-profile.mjs`）+ 打包安装（版本 `0.13.38`，`sha256(lib/client.js)` = `4292bdf7…` 与工作树逐字相同）
+  + 真模型（`bifrost-responses/opencode-go/muse-spark-1.3-contributor`），端口 3361：等你点头、进行中（3 个计划任务并行）、
+  已完成（3 步全过 + 交卷卡 `汇总·第2稿（定稿）`），`consoleErrors: []`。截图与逐字文本
+  `.rsi/evidence/progress-redesign-2026-11-25/`。
+- **真机改掉的一处契约**：19:37 那轮把「规划」算成一步（「第 1 步，共 1 步 / 要干的 1 件事：规划」）。规划与汇总是 run
+  自己的两头，现在只出现在经过里；没有步时主标题写 `progress.now.planning`（§19.2/§19.9）。
+- **留给下一手的事**：
+  1. **合流只在主代理做**（AGENTS §10）。`CHANGELOG.md` 只加在 `## [Unreleased]`（中英各三条），没有版本号、没有发版标题。
+  2. **上游缺口**（`CONFIRMED`，本分支不修）：`src/report.ts:1170` 的 `shippedSummaryDraft()` 只认 review 里逐字出现的
+     `check=pass verify=pass drafts=N`，所以有些运行产出三稿也不写 `summary-final`，交卷卡只能是空的。修它要改报告格式。
+  3. **两份同名常量**（`PROGRESS_EVENT_TYPES`：TS 一份、客户端一份）现在由 `test/progress-tab.spec.ts` 逐条比对钉住；
+     加事件要两边一起加，`stage-detail` 仍只在 TS 那份的「补字段」语义里。
+  4. **没有的**：未通过/已取消两态的真机截图、点按钮后输入框内容的真机读数、窄屏真机截图（`NOT_RUN`，只有组件断言）；
+     live 档案没升级、没重载、没重启（红线）。
+  5. **分支判定日期 2026-11-26**：合流即删；`feat/*` 不许长期挂着。
+  6. `~/.dsh/profiles/web` 的**目录** mtime 在 19:39–19:41 动过、内含 135 个新文件，不是本会话写的（写探针只读），
+     成因 `HYPOTHESIS`（另一个会话的插件操作），值得下一个人顺手核一眼 live 到底被谁升过。

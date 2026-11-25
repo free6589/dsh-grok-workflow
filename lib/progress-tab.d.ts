@@ -29,8 +29,24 @@
  *   failure for the aggregate (card, segment, bar) while the failed row keeps its own mark
  *   (`recoveredFailureSeqs`). Red therefore means "still broken now", never "was broken".
  */
-/** The seven progress and Guardian lifecycle events the tab folds; other events are ignored. */
-export declare const PROGRESS_EVENT_TYPES: readonly ["tool-workflow/run-start", "tool-workflow/agent-start", "tool-workflow/agent-end", "tool-workflow/guardian-start", "tool-workflow/guardian-finding", "tool-workflow/guardian-end", "tool-workflow/run-end"];
+/**
+ * The eight progress and Guardian lifecycle events the tab folds — and, in the bundle, the
+ * whitelist the host routes the tab by.
+ *
+ * One name, two homes, one list: this copy is what {@link foldProgressRuns} reads, and
+ * `src/client/index.js` carries the same constant (served verbatim, so it cannot import this
+ * table) where it serves both its mirror of the fold and the tab's event routing, which
+ * drops any event this list does not name. The two must agree entry for entry, and neither
+ * half can see the other: an event named only here is routed away before the fold ever sees
+ * it, an event named only there is handed over and silently ignored. Both failures are
+ * invisible on screen, so `test/progress-tab.spec.ts` compares the shipped list with this
+ * one and fails on a single missing or extra entry.
+ *
+ * `tool-workflow/stage-detail` is deliberately **not** here: it only ever *adds* field
+ * values to a node and never decides a state, so it is not a lifecycle event and does not
+ * belong in the routing list ({@link PROGRESS_DETAIL_EVENT_TYPE}).
+ */
+export declare const PROGRESS_EVENT_TYPES: readonly ["tool-workflow/run-start", "tool-workflow/agent-start", "tool-workflow/agent-end", "tool-workflow/summary-final", "tool-workflow/guardian-start", "tool-workflow/guardian-finding", "tool-workflow/guardian-end", "tool-workflow/run-end"];
 /**
  * The optional detail payload, kept apart from {@link PROGRESS_EVENT_TYPES} on purpose.
  *
@@ -42,13 +58,14 @@ export declare const PROGRESS_EVENT_TYPES: readonly ["tool-workflow/run-start", 
  */
 export declare const PROGRESS_DETAIL_EVENT_TYPE = "tool-workflow/stage-detail";
 /**
- * The optional event that names the summary draft the run shipped, on purpose apart
- * from {@link PROGRESS_EVENT_TYPES}.
+ * The event that names the summary draft the run shipped.
  *
- * A chat row's label is fixed at `agent-start` (the panel only ever matches an
- * `agent-end` to it by `seq`), so "this draft is the final one" cannot be said by
- * renaming a row after the fact: it arrives as its own fact, written once the gate
- * has passed a draft. A stream without it renders exactly what it rendered before.
+ * It is a member of {@link PROGRESS_EVENT_TYPES} — a tab the host never hands the event to
+ * cannot mark the draft — but it is not a lifecycle step like the others: a chat row's label
+ * is fixed at `agent-start` (the panel only ever matches an `agent-end` to it by `seq`), so
+ * "this draft is the final one" cannot be said by renaming a row after the fact. It arrives
+ * as its own fact once the gate has passed a draft, and the fold settles it onto the row
+ * that landed. A stream without it renders exactly what it rendered before.
  */
 export declare const PROGRESS_SUMMARY_FINAL_EVENT_TYPE = "tool-workflow/summary-final";
 /** Registered conversation target of the progress view (namespaced so a collision throws). */
@@ -440,6 +457,92 @@ export declare function orderTaskCards<T extends ProgressTaskCardDraft>(cards: r
  * @returns the track model.
  */
 export declare function deriveTrack(run: ProgressRunFacts, options?: DeriveOptions): ProgressTrackModel;
+/** The five words a run can be described by on the one-page story (the header chip). */
+export type ProgressStoryState = 'waiting' | 'running' | 'done' | 'failed' | 'cancelled';
+/** Which action the story's dock offers: start it, accept it, or leave the reader alone. */
+export type ProgressStoryDock = 'start' | 'accept' | 'quiet';
+/** One step of the story's track: a plan task, or one declared call. */
+export interface ProgressStoryStep {
+    /** Track node key it speaks for (`phase:任务 1 · 标题`), or `seq:<n>` for a call step. */
+    key: string;
+    /** Plan-task position (`progressTaskNumber`); absent when the step is a declared call. */
+    number?: number;
+    /** Plan-task phase header verbatim; a call step carries its role word. */
+    title: string;
+    state: ProgressState;
+    /** The task's Execute-Check-Review chain; empty for a call step. */
+    chain: ProgressChainSlot[];
+    members: ProgressMemberFact[];
+}
+/** One line of the story's history: a declared call, as the stream settled it. */
+export interface ProgressStoryLogRow {
+    seq: number;
+    /** Session time of the call's `agent-start`, when the stream carried one. */
+    at?: number;
+    /** The role the line is spoken as: the label without its attempt suffix or shipped mark. */
+    role: string;
+    /** Exact phase header (the plan-task title), or the empty string when it named none. */
+    title: string;
+    state: ProgressState;
+    /** Set on the one row `summary-final` names: the draft that actually shipped. */
+    shipped?: true;
+}
+/**
+ * One page of the story, in the three screens the redesign settles on.
+ *
+ * Everything here is derived from the run facts the fold already produced: no plan, no
+ * percentage, no estimate, and no reading of what the run "probably" did. `steps` is the
+ * track (one segment per step), `log` is the history under it, and `now` / `attempt` /
+ * `rest` are the three sentences above them.
+ */
+export interface ProgressStory {
+    state: ProgressStoryState;
+    steps: ProgressStoryStep[];
+    /** 1-based current step; `0` when the run declared nothing to step through. */
+    at: number;
+    total: number;
+    /** The headline: the current step's title, or the two states that have no title. */
+    now: {
+        titleKey?: 'planning' | 'done';
+        title: string;
+        role?: string;
+    };
+    /** Present only while the current step carries a failure nothing later replaced. */
+    attempt?: {
+        n: number;
+        retrying: boolean;
+    };
+    /** The titles of the steps after the current one, consecutive repeats collapsed. */
+    rest: string[];
+    log: ProgressStoryLogRow[];
+    /** The shipped summary draft, when the stream named one and its own row exists. */
+    final?: {
+        draft: number;
+        label: string;
+        row?: ProgressStoryLogRow;
+    };
+    dock: ProgressStoryDock;
+}
+/**
+ * Derive the one-page story for one run (the pure half of the redesign, §19.2).
+ *
+ * Three screens out of the same facts the track already reads:
+ *
+ * - **waiting** — the run is open and no call was declared; the page says it is planning,
+ *   and the track is empty because there is nothing to step through yet;
+ * - **running / failed / cancelled** — one step per declared thing, the current step
+ *   chosen by `doing` → `failed` → first unfinished → the last step;
+ * - **done** — every declared row passed, so the headline stops naming a step.
+ *
+ * A step is a **plan task** when the run declared any (`任务 n · 标题`, not the guardian
+ * card): those are the units a reader waits for. A run that planned nothing (a triage or
+ * single-call run) steps through its declared calls instead, so the track's length is
+ * always what the stream announced and never a plan nobody wrote down.
+ *
+ * @param run - folded run facts.
+ * @returns the story model.
+ */
+export declare function deriveProgressStory(run: ProgressRunFacts): ProgressStory;
 /**
  * Parse a coordination block out of a stage's text.
  *
