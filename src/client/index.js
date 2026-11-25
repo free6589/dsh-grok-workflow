@@ -3563,9 +3563,17 @@ window.__ModuleLoader__.load({
           chain: Array.isArray(node.chain) ? node.chain : [],
           members: node.members,
         }))
-        // A call step's own `seq` is its identity: two calls can share one stage
-        // (`规划（第1次）` and `规划（第2次）`), so a node key would repeat.
-        : [...run.members].sort((left, right) => left.seq - right.seq).map((member) => ({
+        // A run that planned nothing steps through its **work legs**: the calls that do,
+        // check and review the work. The planner and the synthesizer are the run's own two
+        // ends — one writes the plan, one writes the answer — so they are not things to do
+        // and take no step; they keep their history lines (§19.9).
+        //
+        // The leg is read off the row's **label**, with the chain's own words, never off its
+        // phase: a phase names the task, and the role word is what says which leg ran.
+        : [...run.members]
+          .filter((member) => progressChainForLabel(typeof member.label === 'string' ? member.label : '') !== undefined)
+          .sort((left, right) => left.seq - right.seq)
+          .map((member) => ({
           key: `seq:${member.seq}`,
           title: progressStoryRole(member),
           state: progressRowState(member),
@@ -3582,11 +3590,14 @@ window.__ModuleLoader__.load({
       const open = firstOf((step) => step.state !== 'done')
       const at = total === 0 ? 0 : doing !== -1 ? doing : failed !== -1 ? failed : open !== -1 ? open : total
       const current = at === 0 ? undefined : steps[at - 1]
-      const now = state === 'waiting'
-        ? { titleKey: 'planning', title: '' }
-        : state === 'done'
-          ? { titleKey: 'done', title: '' }
-          : { title: current === undefined ? '' : current.title }
+      // The headline: a finished run says so; a run with no step to name says it is still
+      // turning the ask into steps — waiting, running or broken, there is nothing else to
+      // say; otherwise it names the step it is on.
+      const now = state === 'done'
+        ? { titleKey: 'done', title: '' }
+        : current === undefined
+          ? { titleKey: 'planning', title: '' }
+          : { title: current.title }
       if (state === 'running') {
         // The line a reader is waiting on: the current step's own open call, or — when the
         // current step is finished under a still-open run — the run's first unsettled one.
@@ -3824,7 +3835,8 @@ window.__ModuleLoader__.load({
       '.gw-progress-log-row { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; padding: 8px 6px; border-bottom: 1px solid var(--dsw-alias-border-l2, currentColor); }',
       '.gw-progress-log-row:last-child { border-bottom: 0; }',
       '.gw-progress-log-time { font-size: 11px; color: var(--dsw-alias-label-secondary, inherit); font-variant-numeric: tabular-nums; }',
-      '.gw-progress-log-role { font-size: 13px; font-weight: 600; }',
+      '.gw-progress-log-line { display: flex; align-items: baseline; gap: 6px; min-width: 0; }',
+      '.gw-progress-log-role { flex: none; font-size: 13px; font-weight: 600; }',
       '.gw-progress-log-name { min-width: 0; font-size: 13px; color: var(--dsw-alias-label-secondary, inherit); overflow-wrap: anywhere; }',
       '.gw-progress-log-word { flex: none; font-size: 12px; color: var(--dsw-alias-label-secondary, inherit); white-space: nowrap; }',
       '.gw-progress-log-row[data-state="done"] .gw-progress-log-word { color: var(--dsw-alias-state-success-primary); }',
@@ -4050,8 +4062,14 @@ window.__ModuleLoader__.load({
           },
           h('span', { className: 'gw-progress-log-time', 'data-gw-progress-log-time': true },
             typeof row.at === 'number' ? progressClockText(row.at) : ''),
-          h('span', { className: 'gw-progress-log-role', 'data-gw-progress-log-role': true }, row.role),
-          row.title === '' ? null : h('span', { className: 'gw-progress-log-name', 'data-gw-progress-log-name': true }, row.title),
+          h('span', { className: 'gw-progress-log-line', 'data-gw-progress-log-line': true },
+            h('span', { className: 'gw-progress-log-role', 'data-gw-progress-log-role': true }, row.role),
+            // The task name is the second half of the same sentence ("执行 · 收尾"); when the
+            // phase and the role are the same word — a run with no plan tasks logs
+            // `规划 规划` — printing it twice says nothing and widens the row.
+            row.title === '' || row.title === row.role
+              ? null
+              : h('span', { className: 'gw-progress-log-name', 'data-gw-progress-log-name': true }, row.title)),
           h('span', { className: 'gw-progress-log-word', 'data-gw-progress-log-word': true }, progressLogWord(row, t))))))
     }
 

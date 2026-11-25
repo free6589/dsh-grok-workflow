@@ -2494,6 +2494,149 @@ describe('client progress tab: the one-page story (three screens)', () => {
     })
   })
 
+  /**
+   * The two rules that only show up on a run with **no plan tasks** (§19.9).
+   *
+   * A run whose calls are its own legs — no `任务 n · 标题` phase anywhere — used to be
+   * stepped by every row, so the planner and the synthesizer became "things to do" and a
+   * real run shipped 「第 1 步，共 1 步：要干的 1 件事 · 规划 在做」. The steps are now the
+   * work legs only, read off each row's label with the chain's own words; the planner and
+   * the synthesizer keep their history lines and take no step.
+   *
+   * The three expectations below are the typed suite's own, copied verbatim.
+   */
+  describe('a run with no plan tasks: the work legs are the steps', () => {
+    /** One story, projected onto the fields the typed side pins. */
+    function projection(story: ProgressStory) {
+      return {
+        state: story.state,
+        at: story.at,
+        total: story.total,
+        now: story.now,
+        rest: story.rest,
+        dock: story.dock,
+        steps: story.steps.map((step) => ({ key: step.key, title: step.title, state: step.state })),
+        log: story.log.map((row) => ({ seq: row.seq, role: row.role, title: row.title, state: row.state })),
+      }
+    }
+
+    it('steps only the do / check / review legs, and names the leg it is on', () => {
+      // seq 4 is open: the review leg is the one being worked, and it is the headline.
+      const { story } = storyOf([
+        [1, '规划助手', '规划', 'completed'],
+        [2, '执行', '执行', 'completed'],
+        [3, '检查', '检查', 'completed'],
+        [4, '复核', '复核', undefined],
+      ])
+      expect(projection(story)).toEqual({
+        state: 'running',
+        at: 3,
+        total: 3,
+        now: { title: '复核', role: '复核' },
+        rest: [],
+        dock: 'quiet',
+        steps: [
+          { key: 'seq:2', title: '执行', state: 'done' },
+          { key: 'seq:3', title: '检查', state: 'done' },
+          { key: 'seq:4', title: '复核', state: 'doing' },
+        ],
+        log: [
+          { seq: 1, role: '规划助手', title: '规划', state: 'done' },
+          { seq: 2, role: '执行', title: '执行', state: 'done' },
+          { seq: 3, role: '检查', title: '检查', state: 'done' },
+          { seq: 4, role: '复核', title: '复核', state: 'doing' },
+        ],
+      })
+    })
+
+    it('says it is still planning when nothing has run yet, not that it is on step 0', () => {
+      const { story } = storyOf([[1, '规划助手', '规划', 'completed']])
+      expect(projection(story)).toEqual({
+        state: 'running',
+        at: 0,
+        total: 0,
+        now: { titleKey: 'planning', title: '' },
+        rest: [],
+        dock: 'quiet',
+        steps: [],
+        log: [{ seq: 1, role: '规划助手', title: '规划', state: 'done' }],
+      })
+    })
+
+    it('says the run is done when the synthesizer ends it, with no step to count', () => {
+      const { story } = storyOf([[1, '汇总助手', '汇总', 'completed']], { stopReason: 'completed' })
+      expect(projection(story)).toEqual({
+        state: 'done',
+        at: 0,
+        total: 0,
+        now: { titleKey: 'done', title: '' },
+        rest: [],
+        dock: 'accept',
+        steps: [],
+        log: [{ seq: 1, role: '汇总助手', title: '汇总', state: 'done' }],
+      })
+    })
+  })
+
+  /**
+   * One history line is one line (§19.5).
+   *
+   * The row is a three-column grid — clock, then role and task, then the state word — and a
+   * real session showed every line drawn twice: the task name was a fourth child of a
+   * three-column grid, so it took the word's column and pushed the word onto a second row,
+   * leaving a green 「做完」 hanging under the clock. The task name belongs in the middle
+   * cell beside the role, and a name identical to the role says nothing at all.
+   */
+  describe('one history line is one line', () => {
+    it('keeps the clock, the role + task and the word on one row', () => {
+      const { run, story } = storyOf(doneCalls, { summaryFinal: 1, stopReason: 'completed' })
+      const page = pageOf(run, { fillDraft: () => true })
+      const rows = hooksOf(page, 'data-gw-progress-log-row')
+      expect(rows).toHaveLength(story.log.length)
+      for (const row of rows) {
+        // Three cells and no fourth: the row's own children are clock, line, word.
+        const children = row.children as Element[]
+        expect(children.map((cell) => cell.props['data-gw-progress-log-time'] === true ? 'time'
+          : cell.props['data-gw-progress-log-line'] === true ? 'line'
+            : cell.props['data-gw-progress-log-word'] === true ? 'word'
+              : 'stray')).toEqual(['time', 'line', 'word'])
+        // The word is a sibling of the line, never a child of it: a word inside the middle
+        // cell would be the second row again.
+        const line = children[1]!
+        const words = (line.children as Element[]).filter((child) => child.props['data-gw-progress-log-word'] === true)
+        expect(words).toHaveLength(0)
+      }
+      // The role leads the middle cell, and a differing task name follows it.
+      const firstNamed = rows.find((row) => hooksOf(row, 'data-gw-progress-log-name').length === 1)!
+      const line = (firstNamed.children as Element[])[1]!
+      expect((line.children as Element[]).map((child) => child.props['data-gw-progress-log-role'] === true ? 'role' : 'name'))
+        .toEqual(['role', 'name'])
+    })
+
+    it('does not print a task name that is only the role said twice', () => {
+      // Every row of this run has `phase === role` (`执行 执行`), which is the shape a run
+      // with no plan tasks logs. The name is dropped; the role and the word stay.
+      const { run, story } = storyOf([
+        [1, '规划助手', '规划', 'completed'],
+        [2, '执行', '执行', 'completed'],
+        [3, '检查', '检查', 'completed'],
+      ])
+      expect(story.log.map((row) => [row.role, row.title])).toEqual([['规划助手', '规划'], ['执行', '执行'], ['检查', '检查']])
+      const page = pageOf(run)
+      const rows = hooksOf(page, 'data-gw-progress-log-row')
+      // 规划助手 ≠ 规划: that one still names its task.
+      expect(hooksOf(rows[0]!, 'data-gw-progress-log-name')).toHaveLength(1)
+      // 执行 === 执行 and 检查 === 检查: neither repeats itself.
+      for (const row of rows.slice(1)) {
+        expect(hooksOf(row, 'data-gw-progress-log-name')).toHaveLength(0)
+        const said = texts(row)
+        expect(said.filter((text) => text === '执行' || text === '检查')).toHaveLength(1)
+        // …and the state word is still there, so the drop cost no information.
+        expect(hooksOf(row, 'data-gw-progress-log-word')).toHaveLength(1)
+      }
+    })
+  })
+
   it('renders the empty state, and no dock, when the session has no run', () => {
     const page = pageOf(undefined)
     expect(hooksOf(page, 'data-progress-empty')).toHaveLength(1)
