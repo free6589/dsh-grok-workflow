@@ -42,7 +42,9 @@ credentials redacted: 1 line(s) in 1 file(s); vendored fixtures: 4 file(s)
 
 `gate-d0c924a.out`（22 429 字节，原样拷入，未编辑）：`EXIT=0`、
 `Test Files 101 passed (101)` / `Tests 1884 passed (1884)`、`client bundle: 347526 bytes → lib/client.js`、
-`lib/ at d0c924a … byte-identical`。基线 `Test Files 100 / Tests 1870`、bundle 334321 字节。
+`lib/ at d0c924a … byte-identical`。基线 `Test Files 100 / Tests 1855`、bundle 334321 字节
+（2026-11-25 订正：基线用例数此前记错了上一版的数，按 `git archive b0fbd20` 拷贝上的实测记，
+理由见 `docs/knowledge/VALIDATION.md` 同一节）。
 
 ## 3. 三态（同一会话、同一构建、一次真实运行）
 
