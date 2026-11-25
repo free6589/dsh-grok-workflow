@@ -1,3 +1,76 @@
+Last updated: 2026-11-25 12:16 +08:00（**这一支现在同时装了四件事：① 打字 `/grok off` 后已挂载的开关自己刷新（真机验过）；② 删掉四个零引用导出、并按拍板先给协议词汇补了载体；③ 两个 README 里那个没有出处的队列数字订正成写现状；④ `CHANGELOG.md` 补了旧键 `mode:` 的升级须知。运行行为零变化（除①之外），门禁由包工头跑，未发版、未 push、未合 `main`，版本仍 `0.13.35`** —
+分支 **`fix/switch-refresh`**，worktree `.tmp/wt-switch-refresh`，基线 `main` 尖端 **`84efda0`**。**完整提交清单（八条，最后一条是本轮文档提交）**：
+`8b32e5e` `fix(client): refresh the mounted workflow switch after a command writes the record`（3 文件：`lib/client.js` 143/0、
+`src/client/index.js` 143/0、`test/client.spec.ts` 230/1）→ `ded1df6` `test(client): keep the listener snapshot without tripping the spread lint`
+（1 文件 3/1）→ `266006b` `docs(switch-refresh): record the command-write refresh, its gate and the live soak`（文档 + 证据）→
+`144a9a1` `test(client): cover the sessions face that arrives after the switch mounts`（1 文件 38/0，第 7 条用例）→
+`3366248` `docs(switch-refresh): cite the session log for the pre-fix record write`（证据修正）→ `07b91d3`
+`docs(switch-refresh): close out the gate reading at the branch tip`（门禁读数对齐尖端 `3366248`、1839 例）→ `c5f40b7`
+`refactor(dead-code): drop the four zero-reference exports the front desk left behind`（`src/answer.ts` 0/14、`src/memory/recorder.ts` 0/22、
+`docs/ARCHITECTURE.md` 5/0、`lib/` 对应产物）→ 本轮 `docs(queue-limit): state the queue bound that exists, and flag the removed key before upgrading`。
+**① 开关刷新（`D-150`，`CONFIRMED`）**：挂载读一次 + 订阅会话事件窗口，**只在出现 seq 更新的 `plugin:grok-workflow/mode` 记录时**再读一次
+（同一 seq 只读一次；例外是冷加载历史晚于订阅到达会多读一次），无定时器、无轮询，后台读失败不落失败态，缺面静默退化。真机：改前 20 秒 20 次快照
+全停在「开」；改后两次打字各 **+0.5 秒**自动变，静默 15 秒 0 次新请求；`/api/remote.mux` 帧里确有那条记录。用例 132 → **139**。
+**② 四个零引用导出（`D-151`，`CONFIRMED`）**：`REPORT_BEGIN` / `REPORT_END` / `LEDGER_GUARD`（协议词汇，**先**在 `docs/ARCHITECTURE.md`
+补一条载体 bullet 说明「信封是历史词汇、当前无生产者、解析器只按分节签名读、容忍性由 `test/carryover.spec.ts` 的字面量用例钉着」，**再**删常量）
+与 `archiveRoundNow`（死代码，直接删）。有读者的 `RELAY_SOURCE_KIND`、`createMemoryArchiver`、`RoundArchiveInput`、`ArchiveRecorderOptions`、
+`roundArchiveEvidence` 一律未动；`src/` + `test/` 里这四个名字 **0 命中**。定向六个 spec **120 例通过**（`engine-contract` 15 例）、
+`oxlint` **15 warnings / 0 errors**、`lib/ at c5f40b7 is the build of src/ at c5f40b7 (281 files, byte-identical)`、`lib/client.js` 仍 **329354 字节**。
+**③ 队列数字（用户点名，`CONFIRMED`）**：两个 README 原本写着 `maxQueuedMessages=4`，而 `4` 的出处（旧常量）已被删——**全仓没有代码出处**，
+键本身早在 `REMOVED_CONFIG_KEYS` 里（`src/config.ts:471`，存了值会被当未知键拒绝）。改法：固定值清单里**删数字、保留键名并写明「已删除」**
+（`test/docs-config-keys.spec.ts` 有一条守卫要求每个移除键都在两个 README 里被提到——第一次整段删掉就被它抓红），正文那句改成写现状：
+一个 run 待处理的插入需求由**内部固定上限**封顶（`STEERING_LIMITS.maxQueued` = `REPLAN_LIMITS.maxIntents` = **8**），**不可配置**。
+`src/config.ts:10` 的 `HARD_LIMITS.maxQueuedMessages = 8` **零读者**，**本轮刻意没动**（下一轮决定）。
+**④ 升级须知（用户点名，`CONFIRMED`）**：`CHANGELOG.md` 的 `[Unreleased]` 下新增 `### Upgrade note / 升级须知`（中英双语）：升级**之前**
+打开 `<档案目录>/cordis.patch.yml`，把 `grok-workflow` 那一行下面写着 `mode:` 的那一行**整行删掉**、保存、再升级；原因是这个键在 0.13.35
+随旧前台一起删了，留着会让插件那一行**拒绝激活**、症状是工作流从界面消失（**记录与数据不丢**）；并写明「没有这一行就什么都不用做」与
+「我们**没有**替你改过任何档案」。**live `~/.dsh` 一行未读未写**，那一行由操作者亲手删。
+**六个文档守卫（本轮自己跑，`CONFIRMED`）**：`TMPDIR=$PWD/.tmp npx vitest run test/docs-version.spec.ts test/docs-config-keys.spec.ts
+test/i18n-parity.spec.ts test/docs-architecture-version.spec.ts test/update-entry.spec.ts test/update-surface.spec.ts` → **EXIT=0，6 files / 79 tests PASS**。
+
+Last updated: 2026-11-25 11:58 +08:00（**打字 `/grok off` 之后，对话框底部那个开关现在会自己跟着变了：不刷新、不点击、不轮询——它只在会话记录被写入时多读一次；真机改前 / 改后各量了一遍，`CONFIRMED`；残留一条「冷加载多读一次」；未发版、未 push、未合 `main`，版本仍 `0.13.35`** —
+分支 **`fix/switch-refresh`**，worktree `.tmp/wt-switch-refresh`，基线 `main` 尖端 **`84efda0`**，两个功能/测试提交 **`8b32e5e`**
+（`fix(client): refresh the mounted workflow switch after a command writes the record`，**3 文件**：`lib/client.js` 143/0、
+`src/client/index.js` 143/0、`test/client.spec.ts` 230/1）与 **`ded1df6`**（`test(client): keep the listener snapshot without tripping the
+spread lint`，**1 文件**：`test/client.spec.ts` 3/1），其后三条只写文档与证据的提交。**整支尖端 `3366248`**，五条提交：
+`8b32e5e`、`ded1df6`、`266006b`、`144a9a1`、`3366248`。
+**改的是什么（用户能看到的那一层）**：以前打字 `/grok off`，记录确实写进去了（工作流真的关了），慢的是屏幕——那个开关只在页面加载时读一次会话，
+之后不再看，所以它还写着「开」，得刷新页面或者点它一下才对。现在只要这条记录被写入，按钮就会被告知，并**自己再问一次**，
+**+0.5 秒**内就跟着变：不用刷新、不用点，后台也没有任何东西在定时跑；`/grok on` 同理。万一这次重读失败，开关保持它已经显示的状态，
+不会弹出一条你没做错什么却要看的错误。
+**怎么做到的（`D-150`，`CONFIRMED`）**：走 `D-149` 留的候选 ①——订阅会话事件窗口。`src/client/index.js` 里复用**已有的**
+`ctx.inject(['uiConversation','sessions'], …)` 拿 `sessions.binding(id).eventSource`（`getSnapshot()` + `subscribe()`），
+**只在窗口里出现 seq 更新的 `plugin:grok-workflow/mode` 记录时**才向 `/grok-workflow/mode` 发一次 `status`，同一 seq 只读一次；
+面是**可选、后到**的（缺面 / 无 `binding` / 绑不到会话 / 窗口不完整，四种都静默退化，不报错、不 pending、不挡挂载），
+晚到的面由一个小集合兜住，所以订阅不取决于注入顺序。**路由、host、动作列表、答案形状零改动；没有新增必需依赖；没有定时器、没有轮询。**
+否决了候选 ②（让命令路径的写响应回填）——那要在宿主的一个回合里新增一条到浏览器的通道，是新机制。
+**读数（定向，代码轮自己在 `8b32e5e` / `144a9a1` 的树上跑，`CONFIRMED`）**：`TMPDIR=$PWD/.tmp npx vitest run test/client.spec.ts test/i18n-parity.spec.ts`
+→ **EXIT=0，`2 files / 145 tests PASS`**（`client` **139**、`i18n-parity` 6）；基线 132 + 6 + 6 = **138**，本轮 **+7** 条用例：
+核心刷新、同 seq 不重读、无记录不多读、后台失败静默、缺面回归、卸载即退订、**面在挂载后才到**——七条都驱动**真实组件挂载**。反向验证：把「取面」临时改成旧行为后
+重跑，`Tests 5 failed | 133 passed (138)`，失败的正是那四条会变的（两条「断言不存在」的按设计仍通过）。
+**门禁（包工头在整支尖端 `3366248` 的树上跑，`CONFIRMED`）**：`TMPDIR=$PWD/.tmp npm run ci` → **EXIT=0**：`Test Files 98 passed (98)` /
+**`Tests 1839 passed (1839)`**（基线 1832 + 7）、`Duration 94.89s (transform 3.30s, setup 0ms, import 8.69s, tests 75.41s, environment 11ms)`、
+**`Found 15 warnings and 0 errors.`**（回到基线 15——`8b32e5e` 曾把它抬到 16，`ded1df6` 用
+`[...listeners]` → `Array.from(listeners)` 消掉并保留「先取快照再派发」的语义）、
+`lib/ at 3366248 is the build of src/ at 3366248 (281 files, byte-identical)`、`client bundle: 329354 bytes`（基线提交 321607，**+7747**）。
+**真机（包工头跑，隔离克隆，端口 3321，live `~/.dsh` 与 3080 全程未碰，`CONFIRMED`）**：环境是 `node scripts/clone-profile.mjs` →
+`.tmp/soak-switch/dsh-home`（profile `web-clone`，**7699 文件**、parity **5/5**、**1 行凭据按设计脱敏**），插件用**拷进 profile 的构建产物**
+（不是软链），`sha256(lib/client.js)` = `52cdace8…`，与本 worktree **逐字节相同**。**改前**（克隆里原本的 0.13.32 构建）：
+挂载读默认值 → `workflow总开关 | 开 · 全员模式`，打字 `/grok off` 后 **20 秒 × 20 次快照全部停在「开」**、`/grok-workflow/mode` **只有 1 次请求**。
+**改后**：加载读到记录 `{"enabled":false,"source":"record","setBy":"command:/grok off"…}` → `工作流开关 | 关`；打字 `/grok on` → 自动一次 `status`
+答复 `{"enabled":true,"source":"record","setBy":"command:/grok","workflowMode":"full"}` → **+0.5 秒**变 `开`；再打字 `/grok off` → 又一次自动
+`status` → **+0.5 秒**变 `关`；之后 **+15 秒静默窗 0 次新请求**（全程 4 次 = 加载 2 + 两次写入各 1）。**没有点击、没有 reload、没有定时器。**
+**前提在真机上成立**：`/api/remote.mux` 的 websocket 帧里就有 `plugin:grok-workflow/mode` 记录（seq **5 / 27 / 30**，`"ignorable":true`），
+`ignorable` 只挡模型一侧，不挡浏览器——这条不再是 `HYPOTHESIS`。证据在 `.rsi/evidence/switch-refresh-2026-11-25/`。
+**残留如实记**：**冷加载会多读一次** `status`（挂载读 t=1.67s、历史 follow 帧 t=1.69s 才到，订阅时窗口还是空的，那条「本来就在历史里」的记录被当成
+新记录又读一次，相隔约 20 ms）——后果只是每次加载多一个几十字节的 POST，状态收敛正确，**不是轮询**；所以措辞是「同一 seq 只读一次；
+**例外**是冷加载时历史记录晚于订阅到达」。另有两条边界：`binding()` 只对被客户端 materialize 的会话返回（真机上成立，没有时静默不刷新）；
+挂载读与订阅建立之间的毫秒级窗口理论上可能漏一次写入（**`HYPOTHESIS`**，未观测到）。
+**没做的**：**模型回合 `NOT_RUN`**（隔离克隆按设计缺 `AGENT2API_API_KEY`；本轮真机只覆盖「加载 / 打字一条斜杠命令 / 观察开关」，
+命令本身不调模型）；未发版（`package.json` 仍 **`0.13.35`**）、未 push、未合 `main`、没有 PR。用户文档那两句
+「挂载时读一次」本轮改成「挂载时读一次，之后只在会话记录被写入（比如打字 `/grok on|off`）时再读一次、不轮询」——`README.md:262` 与
+`README.zh-CN.md:248` 各一处；`README.zh-CN.md:244` 那是**另一个开关**（轮数/间隔那个 `grok-workflow-loop`），一个字没动。
+
 Last updated: 2026-11-25 11:22 +08:00（**对话框底部那个开关改文案：「全员模式」这个词随旧前台一起没了，现在开就是开、关就是关，标签叫「工作流开关 / Workflow switch」；门禁 EXIT=0；真机读数不是「回落」，而是两件事叠加——开关挂在另一个没有记录的空会话上 + 命令写入后已挂载的开关不刷新，`CONFIRMED`；未发版、未 push、未合 `main`，版本仍 `0.13.35`** —
 分支 **`fix/composer-label`**，worktree `.tmp/wt-composer-label`，基线 `main` 尖端 **`424ed99`**，功能提交 **`2f218d0`**
 （`fix(client): say the workflow switch plainly, without the deleted full-crew mode`，**3 文件 / +31 −17**：`src/client/index.js` 4/4、

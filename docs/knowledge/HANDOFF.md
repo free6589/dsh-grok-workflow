@@ -1,3 +1,82 @@
+## 2026-11-25 — 这一支装了两批：开关刷新修复 + 四个死导出删除，附带队列数字订正与升级须知（`fix/switch-refresh`，未发版）
+
+- **From:** 记忆收口（`agent-154/switch-refresh-worker`）· **To:** 操作者 / 下一个接手者
+- **这一支是什么**：分支 `fix/switch-refresh`（worktree `.tmp/wt-switch-refresh`），基线 `main` 尖端 **`84efda0`**。**完整提交清单（八条，最后一条是本轮文档提交）**：
+  `8b32e5e`（开关刷新：`src/client/index.js` 143、`lib/client.js` 143、`test/client.spec.ts` 230/1）、`ded1df6`（lint 快照写法，test 3/1）、
+  `266006b`（第一轮记忆 + 证据）、`144a9a1`（第 7 条用例：面后到，test 38/0）、`3366248`（证据补会话日志）、`07b91d3`（门禁读数对齐尖端 `3366248` / 1839 例）、
+  `c5f40b7`（删四个零引用导出 + `docs/ARCHITECTURE.md` 载体一句）、以及本轮
+  `docs(queue-limit): state the queue bound that exists, and flag the removed key before upgrading`。**未 push、未发版、未合 `main`**，`package.json` 仍是 **`0.13.35`**。
+- **这一支现在同时装了两件事（外加两处文档订正）**：
+  1. **开关刷新修复（`D-150`）**：打字 `/grok on|off` 之后，已挂载的开关自己读一次并重画（+0.5 秒，真机验过），不刷新、不点击、不轮询。
+  2. **四个零引用导出删掉（`D-151`）**：`REPORT_BEGIN` / `REPORT_END` / `LEDGER_GUARD`（协议词汇，先在 `docs/ARCHITECTURE.md` 补载体再删）与
+     `archiveRoundNow`（死代码，直接删）。有读者的 `RELAY_SOURCE_KIND`、`createMemoryArchiver`、`RoundArchiveInput`、`ArchiveRecorderOptions`、
+     `roundArchiveEvidence` 未动。行为零变化。
+  3. **队列数字订正**：两个 README 里的 `maxQueuedMessages=4` 没有代码出处，改成「该键已删除」+「真实上限是内部常量 8，不可配置」。
+  4. **升级须知**：`CHANGELOG.md` 新增 `### Upgrade note / 升级须知`，写清升级前删掉档案里那行 `mode:`（否则插件那行拒绝激活、工作流消失，数据不丢）。
+- **下一步（按顺序）**：
+  1. **下一轮可做：`HARD_LIMITS.maxQueuedMessages`（`src/config.ts:10` = 8）这个零读者残留的去留。** 键早在 `REMOVED_CONFIG_KEYS` 里，
+     clamp 永不发生，所以它现在只是一个数字；删它要连带核 `HARD_LIMITS` 的其他读者与 `test/config.spec.ts` 的守卫，属于一次代码改动，本轮刻意没做。
+  2. **发版时把 `[Unreleased]` 收进版本段**（照 `AGENTS.md` §7 五步）：`[Unreleased]` 下现在有 `### Fixed / 修复`、`### Upgrade note / 升级须知`、
+     以及更早的 `### Changed / 变更`、`### Removed / 移除` 四条。**升级须知必须保留**——它是这一版唯一一条「不做就会看起来像坏了」的操作。
+  3. **发版后的自动升级要停一手**：live 档案里那行 `mode:` 由操作者亲手删（本轮只在 `CHANGELOG.md` 写了步骤，**没有、也不会**去碰 `~/.dsh`）。
+- **三件会踩的事**：
+  1. **README 里删「已移除的键」必须留键名**：`test/docs-config-keys.spec.ts` 有一条守卫要求每个 `REMOVED_CONFIG_KEYS` 里的键都在两个 README 里被提到。
+     本轮第一次把 `maxQueuedMessages=4` 整段删掉就被它抓红（`README.md never mentions the removed key maxQueuedMessages`）——正确改法是**删数字、留键名、写明已删除**。
+  2. **删一个零读者符号之前先问「它是协议还是实现」**：协议词汇要在 `docs/` 里有载体才能删（`D-151` 的做法），实现细节删了就删了。反过来，
+     「协议另有载体」不等于「代码里可以留着墓碑」。
+  3. **`.tmp/` 的 worktree 里 `node_modules` 若是空目录，`npm run ci` 会在 `verify:lib` 阶段报找不到 `typescript`**；解法是临时把 worktree 的
+     `node_modules` 软链到主检出（跑完还原）。另外 `verify:lib` **只验提交、不验工作树**。
+- **一条要如实说的话**：本轮的代码改动（删四个导出）**没有真机 soak**——删的是零读者符号，运行行为不变，`engine-contract` 15 例就是导出面守卫；
+  全量门禁由包工头跑。
+
+## 2026-11-25 — 打字 `/grok off` 之后已挂载的开关会自己刷新了（`fix/switch-refresh`，未发版）：下一步是评审「订阅 vs 回填」这条判据，以及那条冷加载残留要不要抠掉
+
+- **From:** 记忆收口（`agent-154/switch-refresh-worker`）· **To:** 操作者 / 下一个接手者
+- **这一支是什么**：分支 `fix/switch-refresh`（worktree `.tmp/wt-switch-refresh`），基线 `main` 尖端 **`84efda0`**，两个功能/测试提交
+  **`8b32e5e`**「`fix(client): refresh the mounted workflow switch after a command writes the record`」（**3 文件**：`lib/client.js` 143/0、
+  `src/client/index.js` 143/0、`test/client.spec.ts` 230/1）与 **`ded1df6`**「`test(client): keep the listener snapshot without tripping the
+  spread lint`」（**1 文件**：`test/client.spec.ts` 3/1），其后再一条**只写文档与证据**的提交（`CHANGELOG.md` + `README.md` +
+  `README.zh-CN.md` + `docs/knowledge/` 四份 + `.rsi/evidence/switch-refresh-2026-11-25/`），以及其后两条只写文档/测试的提交
+  **`144a9a1`**「`test(client): cover the sessions face that arrives after the switch mounts`」（1 文件：`test/client.spec.ts` 38/0）与
+  **`3366248`**「`docs(switch-refresh): cite the session log for the pre-fix record write`」。**整支尖端 `3366248`**，五条提交：
+  `8b32e5e`、`ded1df6`、`266006b`、`144a9a1`、`3366248`。
+  **未 push、未发版、未合 `main`、没有 PR**，`package.json` 仍是 **`0.13.35`**。
+- **用户能看到的变化**：以前打字 `/grok off` 关掉工作流，记录确实写进去了（工作流真的关了），但对话框底部那个开关还显示页面加载时读到的样子，
+  得刷新页面或者点它一下才对。现在记录一写入，按钮就自己再读一次，**+0.5 秒**内跟着变：不用刷新、不用点，后台也没有任何东西在定时跑。
+  `/grok on` 同理。重读失败时开关保持已经显示的状态，不弹错误。
+- **已经证实的（`CONFIRMED`）**：
+  1. **门禁**：`TMPDIR=$PWD/.tmp npm run ci` 在**整支尖端 `3366248`** 的树上 **EXIT=0**——`98 files` / **`1839 tests`**（基线 1832 + 本轮 7）、
+     **`Found 15 warnings and 0 errors.`**（回到基线 15）、`lib/ at 3366248 is the build of src/ at 3366248 (281 files, byte-identical)`、
+     `client bundle: 329354 bytes`（基线提交 321607，**+7747** 就是订阅那一段）。
+  2. **定向**：`npx vitest run test/client.spec.ts test/i18n-parity.spec.ts` → **2 files / 145 tests PASS**（`client` 132 → **139**）。
+     七条新用例都驱动真实组件挂载（核心刷新 / 同 seq 不重读 / 无记录不多读 / 后台失败静默 / 缺面回归 / 卸载即退订 / **面在挂载后才到**）。
+     反向验证过：把「取面」改回旧行为，`5 failed / 133 passed`。
+  3. **真机（隔离克隆，端口 3321，`~/.dsh` 与 3080 全程未碰）**：**改前** 20 秒 20 次快照全停在「开」、`/grok-workflow/mode` 只有挂载那 1 次；
+     **改后** 打字 `/grok on` → **+0.5 秒**变开、打字 `/grok off` → **+0.5 秒**变关，全程 4 次请求，之后 **+15 秒静默窗 0 次**。
+  4. **前提在真机上成立**：`/api/remote.mux` 的 websocket 帧里就有 `plugin:grok-workflow/mode` 记录（seq 5 / 27 / 30，`ignorable:true`）——
+     「客户端收得到这条记录」不再是 `HYPOTHESIS`。逐行读数在 `VALIDATION.md` 同日条与 `.rsi/evidence/switch-refresh-2026-11-25/`。
+- **下一步（按顺序）**：
+  1. **合并前请评审这条判据**（`D-150`）：为什么选「订阅会话事件窗口」而不是「让命令路径的写响应回填」。一句话——②要在宿主的一个回合里新增
+     一条到浏览器的通道（新机制），而 ① 只动客户端一份 bundle，路由 / host / 协议零改动。若以后真的需要「宿主主动推」，②仍是方向，
+     但不是这一轮的修法。
+  2. **决定那条冷加载残留要不要抠掉**：每次页面加载会**多读一次** `status`（挂载读 t=1.67s、历史 follow 帧 t=1.69s 才到，订阅时窗口还是空的，
+     那条「本来就在历史里」的记录被当成新记录）。代价只是一个几十字节的 POST，状态收敛正确，**不是轮询**。要抠就得让基线知道「挂载读已经覆盖到哪个 seq」，
+     那是把 route 的答案形状扩一个字段——属于另一次决定，本轮刻意没做。
+  3. **未发版**：`package.json` 仍 **`0.13.35`**；`CHANGELOG.md` 的 `[Unreleased]` 下已经有一条 `### Fixed / 修复`（中英双语）等着被收进版本段。
+     发版照 `AGENTS.md` §7 的五步流程。
+- **三件会踩的事**：
+  1. **`.tmp/` 的 worktree 里 `node_modules` 若是空目录，`npm run ci` 会在 `verify:lib` 阶段报找不到 `typescript`**
+     （`Cannot find module '…/node_modules/typescript/bin/tsc'`）。原因是 `scripts/verify-lib.mjs` 把 **本 worktree 的** `node_modules`
+     软链进临时目录，而 git worktree 里那个目录只有 vitest 的 `.vite` 缓存。解法：把 worktree 的 `node_modules` 软链到主检出的同名目录再跑
+     （本轮就是这么跑通的），跑完还原。
+  2. **`verify:lib` 只验提交、不验工作树**：工作树里 `lib/` 换了却还没提交时，它会说**旧提交**自洽。引用时只认
+     `lib/ at <当前提交> is the build of src/ at <同一提交>` 那一行。
+  3. **「事件驱动」很容易被写成「每条事件都读」**：那只是换了个名字的轮询。本轮的判据是「出现本插件的记录**且** seq 比已记账的更大」——
+     用窗口里的 `seq` 去重，同一 seq 只读一次；`assistant/*`、`tool/*`、`step/*` 一概不触发。改这段代码时别退化成「订阅里直接 read」。
+- **一条要如实说的话**：**模型回合 `NOT_RUN`**——隔离克隆按设计缺 `AGENT2API_API_KEY`，本轮真机只覆盖「加载 / 打字一条斜杠命令 / 观察开关」，
+  命令本身不调模型，**模型回答这一层没验**（环境事实，不是失败）。另外两条边界也写在 `D-150` 里：`binding()` 只对被客户端 materialize 的会话
+  返回（没有时静默不刷新）；挂载读与订阅建立之间的毫秒级窗口理论上可能漏一次写入（`HYPOTHESIS`，未观测到）。
+
 ## 2026-11-25 — 对话框底部开关的文案改成「工作流开关 / 开」（`fix/composer-label`，未发版）：下一步是评审取词、决定「命令写入后不刷新」修不修（用户文档的旧叫法已在本轮一并改掉）
 
 - **From:** 记忆收口（`agent-153/memory-scribe`）· **To:** 操作者 / 下一个接手者
