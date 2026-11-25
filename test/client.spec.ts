@@ -3182,6 +3182,9 @@ describe('client progress tab: the two-column body, open task rows and the folde
     expect(detail.props['data-gw-progress-task-detail']).toBe('phase:任务 1 · 修复登录')
     expect(detail.props['id']).toBe('gw-progress-task-detail-0')
     expect(detail.props['className']).toBe('gw-progress-plan-detail')
+    // The lines below are list items, so the container is a list: valid nesting, and a
+    // screen reader hears one list of two lines instead of two orphans.
+    expect(detail.type).toBe('ol')
 
     // One line per member of that step, in `seq` order, drawn by the history's own renderer:
     // clock, role + task, the chain slot, the state word, and the capsule when it opens.
