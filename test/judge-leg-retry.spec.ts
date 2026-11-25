@@ -20,6 +20,10 @@ import { roleOf, runWorkflowScript, type ScriptAgent } from './helpers.js'
  * same-attempt corridors (format resubmit: `verifier-resubmit.spec.ts`) neither
  * widened nor replaced. A judge's own negative verdict is not this case — it is
  * its answer, and re-asking cannot change it.
+ *
+ * A refused key (`model-unavailable`) is the same shape of death and takes the
+ * same cut (D-164): the judgement never happened, the route keeps its place, and
+ * the gateway may serve the next request.
  */
 
 /** The classifier's reading of a 5xx coming back from a provider. */
@@ -108,6 +112,35 @@ describe('verifier leg: a transport death re-fires the judge, not the worker', (
     expect(workerCalls).toBe(1)
     expect(verifierCalls).toBe(2)
     expect(run.events).toContain('log:task a attempt 1 verifier re-fired after a transport death')
+  })
+
+  it('re-fires a judge whose route refused the key, and never marks that route dead', async () => {
+    const t = task('a')
+    let workerCalls = 0
+    let verifierCalls = 0
+    const agent: ScriptAgent = async (_prompt, options) => {
+      if (roleOf(options.label) === 'worker') {
+        workerCalls += 1
+        return execution('did the work')
+      }
+      if (roleOf(options.label) === 'verifier') {
+        verifierCalls += 1
+        // A refused key is no judgement at all: the gateway would not serve the
+        // call, so the judge is asked once more instead of the worker re-running.
+        if (verifierCalls === 1) throw new Error('401 invalid api key for this route')
+        return verification(t)
+      }
+      throw new Error(`unexpected label ${options.label}`)
+    }
+    const run = await runWorkflowScript(WORKFLOW_SCRIPT, args({ roles: { verifier: [{ model: 'v1' }] } }), agent)
+    expect(run.report.status).toBe('completed')
+    expect(run.report.tasks[0]?.attempts).toHaveLength(1)
+    expect(run.report.tasks[0]?.attempts[0]?.judgeRetried).toBe(true)
+    expect(workerCalls).toBe(1)
+    expect(verifierCalls).toBe(2)
+    expect(run.events).toContain('log:task a attempt 1 verifier re-fired after a refusal')
+    // D-164: a refusal is never route evidence — the route keeps its place.
+    expect(run.report.deadRoutes).toBeUndefined()
   })
 
   it('records the transport failure when the re-fire dies again, and the retry policy runs', async () => {
