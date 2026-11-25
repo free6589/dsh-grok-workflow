@@ -15,7 +15,7 @@
 ## 1. 一份门禁转录（`CONFIRMED`）
 
 **这一轮只有一份门禁，就是发布提交自带的那一份**：`TMPDIR=$PWD/.tmp npm run ci`、发布 worktree
-`.tmp/wt-release-0.13.45` 的干净树（`git -C .tmp/wt-release-0.13.45 status --short` 只剩两处别人的遗留）、
+`.tmp/wt-release-0.13.45` 的干净树（`git -C .tmp/wt-release-0.13.45 status --short` **空**：那两处别人的遗留只在主检出里）、
 `HEAD = 63793eb`、`GATE_EXIT=0`。
 
 **为什么只有一份**：父提交 **`e2ed221`** 就是功能轮的合流尖端——`fix/settled-rows` 那一轮已经带着自己的块内门禁

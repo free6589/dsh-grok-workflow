@@ -9,7 +9,7 @@
 
 | 命令 / 动作 | 环境 | 结果 | 出处 |
 | --- | --- | --- | --- |
-| `TMPDIR=$PWD/.tmp npm run ci` | worktree `.tmp/wt-release-0.13.45`、干净树（`status --short` 只剩两处别人的遗留）、`HEAD = 63793eb` | **`GATE_EXIT=0`**（唯一一份门禁） | `.rsi/evidence/release-0.13.45-2026-11-26/gate-release-63793eb.out` |
+| `TMPDIR=$PWD/.tmp npm run ci` | worktree `.tmp/wt-release-0.13.45`、干净树（`git status --short` **空**——那两处别人的遗留只在主检出里，不在这个 worktree 里）、`HEAD = 63793eb` | **`GATE_EXIT=0`**（唯一一份门禁） | `.rsi/evidence/release-0.13.45-2026-11-26/gate-release-63793eb.out` |
 | 抬版本之前的第二份门禁 | — | **`NOT_RUN`**：父提交 `e2ed221` 就是功能轮的合流尖端，那一轮已带自己的块内门禁 | `.rsi/evidence/settled-rows-2026-11-26/gate-*.out` |
 | 真机 soak | — | **`NOT_RUN`**：发版轮没有新行为可 soak | 行为证据 `.rsi/evidence/settled-rows-2026-11-26/` |
 | `wc -lc` + `sha256sum` + `tail -1`（转录身份） | 本轮 | **412 行 / 25328 字节**、`sha256 0649e838902ccd513ab6c8650fc6c51d6c1cc573bbc90199f0f94b45054fd0a0`、末行 `GATE_EXIT=0` | 同一份转录 |
@@ -29,7 +29,7 @@
 `lib/ at 63793eb is the build of src/ at 63793eb (289 files, byte-identical)`；第 407 行
 **`Test Files 103 passed (103)`**、第 408 行 **`Tests 1948 passed (1948)`**、第 410 行
 `Duration 147.60s (transform 2.83s, setup 0ms, import 10.05s, tests 125.49s, environment 11ms)`、第 412 行
-`GATE_EXIT=0`。门禁之后 `git status --short` 只剩那两处别人的遗留，所以 **`verify:lib` 比对之后没有残留——
+`GATE_EXIT=0`。门禁之前与门禁之后，这个 worktree 里的 `git status --short` 都是**空**的，所以 **`verify:lib` 比对之后没有残留——
 提交的 `lib/` 就是提交的 `src/` 的构建**（`63793eb` 的 `lib/client.js` 与 `src/client/index.js` 是同一个 blob
 `93b7562`、各 **348559 字节**）。
 
