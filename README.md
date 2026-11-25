@@ -13,7 +13,7 @@
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/License-MIT-blue.svg"></a>
 </p>
 
-**Grok Workflow for DSH** is an external plugin for [DeepSeek Harness (DSH)](https://github.com/deepseek-ai/deepseek-harness). It registers the `grok_workflow` tool the model can call directly, and an optional block intake that lets the model commission that work in reviewed pieces. Since `0.13.34` (M3.3) it puts **nothing** in front of a user message: the entry gate and the front desk it belonged to were deleted, so a message reaches the model exactly as you typed it.
+**Grok Workflow for DSH** is an external plugin for [DeepSeek Harness (DSH)](https://github.com/deepseek-ai/deepseek-harness). It registers the `grok_workflow` tool the model can call directly, and an optional block intake that lets the model commission that work in reviewed pieces. Since `0.13.35` (M3.3) it puts **nothing** in front of a user message: the entry gate and the front desk it belonged to were deleted, so a message reaches the model exactly as you typed it.
 
 The per-session toggle (`/grok on|off`; the config default `grokDefault: off` is the fallback it reports when a session has no record) governs one thing: whether the block intake's tools may accept work in that session. It never changes what happens to a message — a message is delivered either way.
 
@@ -25,7 +25,7 @@ You do not write a workflow script. Install the plugin, restart your profile, an
 
 | Requirement | What this plugin does |
 |---|---|
-| **Nothing in front of your messages** | Since `0.13.34` a user message is never claimed, refused, shortened or annotated: the only `agent/pre-step` listeners are the narrow heartbeat listener and the block intake's observer, and neither decides a user batch. `test/block-flag-baseline.spec.ts` pins that pass-through as bytes for eight payload shapes. |
+| **Nothing in front of your messages** | Since `0.13.35` a user message is never claimed, refused, shortened or annotated: the only `agent/pre-step` listeners are the narrow heartbeat listener and the block intake's observer, and neither decides a user batch. `test/block-flag-baseline.spec.ts` pins that pass-through as bytes for eight payload shapes. |
 | **Opt-in per session, honest about it** | `grokDefault: off` means a session chats normally until `/grok` turns the workflow on for it; `/grok off` turns it back. The switch word is matched after trimming and case-insensitively (`/grok ON`, `/grok  Off ` work); anything else answers with `/grok [on|off|status]` and leaves the toggle alone. `/grok status` writes nothing: it reports the last run — its state, why it stopped, what the guard saw, whether a checkpoint can be resumed, and which tasks are unfinished. A toggle that cannot be persisted is reported as a failure instead of being claimed. |
 | **Per-role model choice** | `roles.planner`, `roles.worker`, `roles.verifier`, `roles.synthesizer` each carry their own model. |
 | **Ordered fallback chains per role** | Up to 50 routes per role; a route-level failure advances that role's chain and the routes actually used are recorded in the report. |
@@ -45,10 +45,10 @@ dsh --profile grok-workflow-dev --from-default-profile headless --dump-config
 Then install the plugin:
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.13.34
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.13.35
 ```
 
-> `#v0.13.34` is the current release. Pin the tag you actually want; omitting it follows `main`, which is not a release. Do not run `--from-default-profile` after `plugin add`: it replaces the profile and removes the plugin you just installed.
+> `#v0.13.35` is the current release. Pin the tag you actually want; omitting it follows `main`, which is not a release. Do not run `--from-default-profile` after `plugin add`: it replaces the profile and removes the plugin you just installed.
 
 Then restart the profile so DSH loads the new plugin:
 
@@ -136,7 +136,7 @@ If planning fails, the fallback plan splits the whole objective into contiguous 
 
 Nothing. A message is delivered to the model as you wrote it, and the plugin's own listeners only
 look at scheduled heartbeats. There is no tier, no greeting, no first-line status and no refusal on
-the message path — those belonged to the front desk, which `0.13.34` (M3.3) deleted along with the
+the message path — those belonged to the front desk, which `0.13.35` (M3.3) deleted along with the
 `mode` and `legacyGate` keys that configured it.
 
 What remains is the tool surface:
@@ -337,13 +337,13 @@ The plugin reuses DSH's workflow engine and subagents. It does not replace DSH's
 
 ## Versions and release notes
 
-The package version in this repository is `0.13.34`. Install or roll back to an exact release with a tag suffix:
+The package version in this repository is `0.13.35`. Install or roll back to an exact release with a tag suffix:
 
 ```sh
-dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.13.34
+dsh plugin --profile grok-workflow-dev add github:free6589/dsh-grok-workflow#v0.13.35
 ```
 
-Use only a tag that exists on GitHub. Published: `v0.1.0`, `v0.2.0`, `v0.2.1`, `v0.2.2`, `v0.2.3`, `v0.2.4`, `v0.2.5`, `v0.2.6`, `v0.2.7`, `v0.3.0`, `v0.4.0`, `v0.5.0`, `v0.5.1`, `v0.6.0`, `v0.7.0`, `v0.8.0`, `v0.9.0`, `v0.9.1`, `v0.9.2`, `v0.9.3`, `v0.9.4`, `v0.10.0`, `v0.10.1`, `v0.10.2`, `v0.11.0`, `v0.11.1`, `v0.11.2`, `v0.11.3`, `v0.11.4`, `v0.11.5`, `v0.11.6`, `v0.11.7`, `v0.11.8`, `v0.11.9`, `v0.11.10`, `v0.11.11`, `v0.11.12`, `v0.11.13`, `v0.11.14`, `v0.11.15`, `v0.11.16`, `v0.11.17`, `v0.11.18`, `v0.11.19`, `v0.11.20`, `v0.11.21`, `v0.12.0`, `v0.12.1`, `v0.12.2`, `v0.12.3`, `v0.12.4`, `v0.12.5`, `v0.12.6`, `v0.12.7`, `v0.12.8`, `v0.12.9`, `v0.12.10`, `v0.12.11`, `v0.12.12`, `v0.12.13`, `v0.12.14`, `v0.12.15`, `v0.12.16`, `v0.12.18`, `v0.12.19`, `v0.13.0`, `v0.13.1`, `v0.13.2`, `v0.13.3`, `v0.13.4`, `v0.13.5`, `v0.13.6`, `v0.13.7`, `v0.13.8`, `v0.13.9`, `v0.13.10`, `v0.13.11`, `v0.13.12`, `v0.13.13`, `v0.13.14`, `v0.13.15`, `v0.13.16`, `v0.13.17`, `v0.13.18`, `v0.13.19`, `v0.13.20`, `v0.13.21`, `v0.13.22`, `v0.13.23`, `v0.13.24`, `v0.13.25`, `v0.13.26`, `v0.13.28`, `v0.13.29`, `v0.13.30`, `v0.13.31`, `v0.13.32`, `v0.13.33` and `v0.13.34`. The unpinned command follows `main` and does not pin a release. `v0.2.0-rc.1` also exists on GitHub but is not a release: it predates the release workflow and its `package.json` still declares `0.1.0`. The `v0.13.27` tag is not a release either: its test gate failed on the runner, so nothing was published from it and `v0.13.28` carries the same change. The `v0.11.14` tag is not a release either: its committed `lib/` was built from an earlier `src/`, so the release workflow stopped at its artifact check and never published it. Install the `v0.11.15` pin above; that tag is left in place only because published tags are immutable. See the [changelog](CHANGELOG.md) and the [release guide](docs/RELEASING.md) for the versioning and rollback rules.
+Use only a tag that exists on GitHub. Published: `v0.1.0`, `v0.2.0`, `v0.2.1`, `v0.2.2`, `v0.2.3`, `v0.2.4`, `v0.2.5`, `v0.2.6`, `v0.2.7`, `v0.3.0`, `v0.4.0`, `v0.5.0`, `v0.5.1`, `v0.6.0`, `v0.7.0`, `v0.8.0`, `v0.9.0`, `v0.9.1`, `v0.9.2`, `v0.9.3`, `v0.9.4`, `v0.10.0`, `v0.10.1`, `v0.10.2`, `v0.11.0`, `v0.11.1`, `v0.11.2`, `v0.11.3`, `v0.11.4`, `v0.11.5`, `v0.11.6`, `v0.11.7`, `v0.11.8`, `v0.11.9`, `v0.11.10`, `v0.11.11`, `v0.11.12`, `v0.11.13`, `v0.11.14`, `v0.11.15`, `v0.11.16`, `v0.11.17`, `v0.11.18`, `v0.11.19`, `v0.11.20`, `v0.11.21`, `v0.12.0`, `v0.12.1`, `v0.12.2`, `v0.12.3`, `v0.12.4`, `v0.12.5`, `v0.12.6`, `v0.12.7`, `v0.12.8`, `v0.12.9`, `v0.12.10`, `v0.12.11`, `v0.12.12`, `v0.12.13`, `v0.12.14`, `v0.12.15`, `v0.12.16`, `v0.12.18`, `v0.12.19`, `v0.13.0`, `v0.13.1`, `v0.13.2`, `v0.13.3`, `v0.13.4`, `v0.13.5`, `v0.13.6`, `v0.13.7`, `v0.13.8`, `v0.13.9`, `v0.13.10`, `v0.13.11`, `v0.13.12`, `v0.13.13`, `v0.13.14`, `v0.13.15`, `v0.13.16`, `v0.13.17`, `v0.13.18`, `v0.13.19`, `v0.13.20`, `v0.13.21`, `v0.13.22`, `v0.13.23`, `v0.13.24`, `v0.13.25`, `v0.13.26`, `v0.13.28`, `v0.13.29`, `v0.13.30`, `v0.13.31`, `v0.13.32`, `v0.13.33`, `v0.13.34` and `v0.13.35`. The unpinned command follows `main` and does not pin a release. `v0.2.0-rc.1` also exists on GitHub but is not a release: it predates the release workflow and its `package.json` still declares `0.1.0`. The `v0.13.27` tag is not a release either: its test gate failed on the runner, so nothing was published from it and `v0.13.28` carries the same change. The `v0.11.14` tag is not a release either: its committed `lib/` was built from an earlier `src/`, so the release workflow stopped at its artifact check and never published it. Install the `v0.11.15` pin above; that tag is left in place only because published tags are immutable. See the [changelog](CHANGELOG.md) and the [release guide](docs/RELEASING.md) for the versioning and rollback rules.
 
 ## Testing and development
 

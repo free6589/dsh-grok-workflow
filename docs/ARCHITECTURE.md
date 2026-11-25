@@ -328,7 +328,7 @@ languages) that disables Save; only a legal combination may be written.
 
 ## Message entry (the front desk was deleted in M3.3)
 
-Status (since **0.13.34**): the `agent/pre-step` chain carries no admission decision at all.
+Status (since **0.13.35**): the `agent/pre-step` chain carries no admission decision at all.
 The old front desk is gone — `src/gate.ts` with its classifier, plus `src/triage.ts`,
 `src/captain.ts`, `src/channel.ts` and `src/history.ts` — and with it the two configuration
 keys that used to select its shape, `mode` and `legacyGate` (both are now removed keys).
