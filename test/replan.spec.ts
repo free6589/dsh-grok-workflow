@@ -3,6 +3,7 @@ import { Session } from '@deepseek-ai/dsh-session'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type { WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
 import { resolveConfig } from '../src/config.js'
+import { parseMemberLabel } from '../src/naming.js'
 import { REPLAN_LIMITS, mergeReplan, replanMergeSource } from '../src/replan.js'
 import type { ReplanEdit, ReplanState } from '../src/replan.js'
 import { assertWorkflowReport } from '../src/report.js'
@@ -12,9 +13,11 @@ import { buildWorkflowRequest, WORKFLOW_SCRIPT } from '../src/script.js'
 import {
   STEERING_TOOL_NAME, SteeringQueue, closeAllSteering, closeSteering, openSteering, pullSteering, steeringForSession,
 } from '../src/steering.js'
-import type { NormalizedTask } from '../src/types.js'
+import { teamWorkflowEngine } from '../src/team-engine.js'
+import type { NormalizedTask, WorkflowReport } from '../src/types.js'
+import { createEngineHarness, type ChildAnswer, type ChildCall } from './engine-harness.js'
 import { execution, task, verification } from './fixtures.js'
-import { roleOf, runWorkflowScript, taskFromPrompt, type ScriptAgent } from './helpers.js'
+import { roleOf, runWorkflowScript, settledWithin, taskFromPrompt, type ScriptAgent } from './helpers.js'
 
 /**
  * Mid-run replan (L2): the planner behind a run accepts a new demand without
@@ -423,6 +426,73 @@ describe('script: a demand merged at a wave boundary does not restart the round'
     expect(decision?.reason).not.toMatch(/no body/)
     expect(decision?.reason).toMatch(/missing or unusable: expectedOutput, acceptanceCriteria/)
     expect(run.report.status).toBe('completed')
+    expect(run.report.tasks.map(row => row.status)).toEqual(['verified', 'verified'])
+  })
+})
+
+/**
+ * The boundary prompt is the only place a settled task is described to the child
+ * that edits the plan. Until 2026-11-26 the script handed `replanPrompt` a bare
+ * id → status map while the prompt reads `row.status` and `row.task.title`, so a
+ * live boundary read every settled line as `- count-agents [undefined] ` — the
+ * child could not see what had already passed, and its only evidence about the
+ * settled half of the plan was a blank. This case drives the real engine (script
+ * VM, twin, generated script) and pins the line the child actually reads.
+ */
+describe('script: the boundary prompt names what already settled', () => {
+  const OBJECTIVE = 'Ship the settled rows'
+
+  /** The role a child belongs to, read the way the panel reads it (prompt first line). */
+  function roleOfCall(call: { prompt: string }): string {
+    const head = call.prompt.split('\n')[0]!.trim()
+    return parseMemberLabel(head, 'zh')?.role
+      ?? parseMemberLabel(head.split('·')[0]!.trim(), 'zh')?.role
+      ?? ''
+  }
+
+  /** Run the generated script over the real engine and the plugin's twin. */
+  async function runReal(
+    answer: (call: ChildCall) => ChildAnswer,
+    cfg: ReturnType<typeof resolveConfig>,
+    token: string,
+  ): Promise<{ report: WorkflowReport, children: ChildCall[] }> {
+    const harness = createEngineHarness(async call => answer(call))
+    try {
+      const payload = buildWorkflowRequest(OBJECTIVE, undefined, cfg, 'zh', undefined, undefined, undefined, token)
+      const engine = teamWorkflowEngine(harness.ctx as never, { warn() {} })
+      const run = engine.start({
+        script: payload.script,
+        meta: { name: '任务团队', description: 'settled rows run' },
+        args: payload.args,
+        parent: { session: { header: {}, id: 'settled-rows-parent' } } as never,
+        maxTotalAgents: payload.maxTotalAgents,
+      })
+      const result = await settledWithin(run.result, 15_000, 'the settled rows twin run')
+      await run.dispose()
+      return { report: assertWorkflowReport(result.value, OBJECTIVE, cfg), children: harness.children }
+    } finally {
+      await harness.dispose()
+    }
+  }
+
+  it('prints each settled row with its verdict and its title, and no "undefined"', async () => {
+    const run = await runReal(call => {
+      const role = roleOfCall(call)
+      if (role === 'planner') {
+        if (call.prompt.includes('REPLAN:')) return { structured: { action: 'none', reason: 'nothing queued' } }
+        return { structured: { waves: [[planTask('a')], [planTask('b')]] } }
+      }
+      if (role === 'worker') return { structured: execution('did the work') }
+      return { structured: verification(taskFromPrompt(call.prompt)) }
+    }, config({ replan: true }), 'tok-settled')
+
+    const boundary = run.children.find(call => call.prompt.includes('REPLAN:'))
+    expect(boundary).toBeDefined()
+    // task `a` has already verified when the boundary asks, so the row the child
+    // reads carries both the verdict and the title the plan gave it.
+    const settledLine = boundary!.prompt.split('\n').find(line => line.startsWith('- a '))
+    expect(settledLine).toBe('- a [verified] Task a')
+    expect(boundary!.prompt).not.toContain('undefined')
     expect(run.report.tasks.map(row => row.status)).toEqual(['verified', 'verified'])
   })
 })
