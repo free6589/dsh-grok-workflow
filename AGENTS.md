@@ -226,7 +226,24 @@ talks to for that block.
   than polling, and on a missed deadline the main agent checks the dispatcher once
   and re-dispatches only the failed part.
 
-## 11. Auto-upgrade after a release
+## 12. Speed: keep the local gate light, let remote CI judge
+
+- Inside a feature block run only `typecheck + lint + the specs the block
+  touched`. The full `npm run ci` runs once, on the release commit.
+  Remote CI already runs the full gate on every push (Node 22 + 24);
+  do not re-run the full gate locally 2-3 times inside one block.
+- One isolated soak per block: clone once, install once, reuse the same
+  scratch home inside the block. Run only the states this change touches
+  (waiting / running / done pick what applies). Do not re-run the baseline
+  build for comparison unless the change touches routing or admission.
+- One evidence directory and one memory commit per block. Write the gate
+  numbers into the README at landing time; do not fix counts, SHAs, or
+  timestamps in follow-up commits.
+- Time split measured 2026-11-25 (5 merged blocks, 265 min total): gate 8%,
+  soak 42% (only ~10 min is real workflow runs; the rest is clone, pack,
+  install, serve, screenshot), writing + docs + rework 50%.
+
+## 13. Auto-upgrade after a release
 
 A successful release is not finished until the live profile runs the released
 tag.
