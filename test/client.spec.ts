@@ -163,6 +163,8 @@ interface ModeSwitchBundle {
   text: (t: Translator, state: Record<string, unknown>) => string
   failureText: (t: Translator, error: unknown) => string
   url: () => string
+  /** The injection door `apply` uses to hand the switch the sessions face. */
+  offerSessions: (face: unknown) => void
 }
 
 /**
@@ -871,6 +873,8 @@ function loadSwitchBundle(): LoopSwitchBundle {
 /** Render the switch, run its mount effect once, and re-render what React would show. */
 function mountSwitch(component: (props: Record<string, unknown>) => unknown, props: Record<string, unknown>, dataAttr = 'loop') {
   const render: SwitchRender = { cells: [], index: 0, effects: [] }
+  /** What the mount effects asked to be run on unmount. */
+  const cleanups: Array<() => unknown> = []
   const run = (): unknown => {
     render.index = 0
     render.effects = []
@@ -892,7 +896,10 @@ function mountSwitch(component: (props: Record<string, unknown>) => unknown, pro
       const first = run()
       const effects = render.effects.slice()
       render.effects = []
-      for (const effect of effects) await effect()
+      for (const effect of effects) {
+        const cleanup = await effect()
+        if (typeof cleanup === 'function') cleanups.push(cleanup as () => unknown)
+      }
       await settle()
       return { first, tree: run() }
     },
@@ -902,6 +909,14 @@ function mountSwitch(component: (props: Record<string, unknown>) => unknown, pro
       ;(button!.props['onClick'] as () => void)()
       await settle()
       return run()
+    },
+    /** Repaint from the cells already held, the way React does after a `setState`. */
+    render: run,
+    /** Flush the promises the last step started (a background read, a write). */
+    settle,
+    /** Unmount: run each mount effect's cleanup once, as React does. */
+    unmount() {
+      for (const cleanup of cleanups.splice(0)) cleanup()
     },
   }
 }
@@ -3322,6 +3337,220 @@ describe('client composer tool row: the workflow switch (`/grok on|off` as a but
     expect(posted[1]).toEqual({ action: 'status', sessionId: SESSION })
     expect(toggleIn(recovered).props['aria-checked']).toBe(false)
     expect(noteText(recovered)).toBe(zhDict['mode.switch.off'])
+  })
+
+  /**
+   * One session's `eventSource`, cut down to what the switch is allowed to use.
+   *
+   * The real face hands out `sessions.binding(id).eventSource`, an
+   * `ObservableSnapshot<SessionEventWindow>`: a snapshot and a synchronous listener list.
+   * This is that shape and nothing else, so the switch is driven through the door it uses in
+   * the page — not through a test-only prop.
+   */
+  function fakeEventWindow(initial: Array<Record<string, unknown>> = []) {
+    const listeners = new Set<() => void>()
+    let snapshot = {
+      entries: initial.slice(),
+      hasMore: false,
+      revision: 0,
+      change: { kind: 'replace', entries: initial.slice() },
+    }
+    return {
+      getSnapshot: () => snapshot,
+      subscribe: (listener: () => void) => {
+        listeners.add(listener)
+        return () => { listeners.delete(listener) }
+      },
+      /** Publish one more entry and wake the listeners, the way the controller's own does. */
+      push(entry: Record<string, unknown>) {
+        const entries = [...snapshot.entries, entry]
+        snapshot = { entries, hasMore: false, revision: snapshot.revision + 1, change: { kind: 'append', entries: [entry] } }
+        for (const listener of [...listeners]) listener()
+      },
+      /** How many switches are currently following this window. */
+      listeners,
+    }
+  }
+
+  /** One mode record as the browser's event window carries it — the shape `src/mode.ts` writes. */
+  function modeEntry(seq: number, enabled: boolean) {
+    return {
+      type: 'event',
+      event: {
+        type: 'plugin:grok-workflow/mode',
+        seq,
+        time: 1_700_000_000_000,
+        data: { v: 1, enabled, turn: 2, setBy: enabled ? 'command:/grok on' : 'command:/grok off' },
+        ignorable: true,
+      },
+    }
+  }
+
+  /** The sessions face as the switch sees it: a binding that resolves to one event window. */
+  function sessionsFace(window: unknown) {
+    return { binding: (id: string) => (id === SESSION ? { sessionId: id, eventSource: window } : undefined) }
+  }
+
+  it('repaints a mounted switch when a command writes the record, with no click and no poll', async () => {
+    const mode = modeSwitch()
+    const window = fakeEventWindow()
+    mode.offerSessions(sessionsFace(window))
+    const { posted, fetchImpl } = scriptedFetch([
+      { body: { ok: true, action: 'status', mode: { enabled: true, setBy: 'command:/grok on' } } },
+      { body: { ok: true, action: 'status', mode: { enabled: false, setBy: 'command:/grok off' } } },
+    ])
+    try {
+      const view = mountSwitch(mode.component, { sessionId: SESSION, t: translator('zh'), modeSend: fetchImpl }, 'mode')
+      const { tree } = await view.mount()
+      expect(toggleIn(tree).props['aria-checked']).toBe(true)
+      expect(lampIn(tree)).toBe('on')
+
+      // `/grok off` ran in the Host: the record lands in the session log, and the window is
+      // the one place this button can see a write it did not make.
+      window.push(modeEntry(6, false))
+      await view.settle()
+      const after = view.render()
+
+      // One read, and nobody clicked: the same status request the mount made, asked because
+      // the session said the record moved.
+      expect(posted).toEqual([
+        { action: 'status', sessionId: SESSION },
+        { action: 'status', sessionId: SESSION },
+      ])
+      expect(toggleIn(after).props['aria-checked']).toBe(false)
+      expect(lampIn(after)).toBe('off')
+      expect(noteText(after)).toBe(zhDict['mode.switch.off'])
+      expect(walk(after).find((element) => element.props['data-mode-state'] === 'ready')).toBeDefined()
+    } finally {
+      mode.offerSessions(undefined)
+    }
+  })
+
+  it('reads once per new record seq, and once only when the same seq comes back', async () => {
+    const mode = modeSwitch()
+    const window = fakeEventWindow()
+    mode.offerSessions(sessionsFace(window))
+    const { posted, fetchImpl } = scriptedFetch([
+      { body: { ok: true, action: 'status', mode: { enabled: true } } },
+      { body: { ok: true, action: 'status', mode: { enabled: false } } },
+      { body: { ok: true, action: 'status', mode: { enabled: true } } },
+    ])
+    try {
+      const view = mountSwitch(mode.component, { sessionId: SESSION, t: translator('zh'), modeSend: fetchImpl }, 'mode')
+      await view.mount()
+
+      window.push(modeEntry(6, false))
+      await view.settle()
+      expect(posted).toHaveLength(2)
+
+      // The same record again — a replayed window, a second page, a re-subscription. The seq
+      // is the identity, so this is the same news and it costs nothing.
+      window.push(modeEntry(6, false))
+      window.push(modeEntry(6, false))
+      await view.settle()
+      expect(posted).toHaveLength(2)
+
+      // A genuinely newer record is news again: one read for it, one only.
+      window.push(modeEntry(9, true))
+      await view.settle()
+      const after = view.render()
+      expect(posted).toHaveLength(3)
+      expect(toggleIn(after).props['aria-checked']).toBe(true)
+      expect(noteText(after)).toBe(zhDict['mode.switch.on'])
+    } finally {
+      mode.offerSessions(undefined)
+    }
+  })
+
+  it('reads nothing on a window that moves without this plugin\'s record', async () => {
+    const mode = modeSwitch()
+    const window = fakeEventWindow()
+    mode.offerSessions(sessionsFace(window))
+    const { posted, fetchImpl } = scriptedFetch([{ body: { ok: true, action: 'status', mode: { enabled: true } } }])
+    try {
+      const view = mountSwitch(mode.component, { sessionId: SESSION, t: translator('zh'), modeSend: fetchImpl }, 'mode')
+      await view.mount()
+      // A whole turn's worth of traffic, none of it ours: the switch is told, and stays put.
+      window.push({ type: 'event', event: { type: 'user/message', seq: 7, time: 1, data: {} } })
+      window.push({ type: 'event', event: { type: 'assistant/message', seq: 8, time: 2, data: {} } })
+      window.push({ type: 'transient', event: { type: 'assistant/live-chunk', seq: 8.5, time: 3, data: {} } })
+      window.push({ type: 'event', event: { type: 'turn/end', seq: 9, time: 4, data: {} } })
+      await view.settle()
+      const after = view.render()
+      // An event-driven re-read on every event would be a poll wearing a listener: one read
+      // on mount, and nothing else, until a mode record actually appears.
+      expect(posted).toEqual([{ action: 'status', sessionId: SESSION }])
+      expect(toggleIn(after).props['aria-checked']).toBe(true)
+    } finally {
+      mode.offerSessions(undefined)
+    }
+  })
+
+  it('keeps the known state and says nothing when the background re-read fails', async () => {
+    const mode = modeSwitch()
+    const window = fakeEventWindow()
+    mode.offerSessions(sessionsFace(window))
+    const { posted, fetchImpl } = scriptedFetch([
+      { body: { ok: true, action: 'status', mode: { enabled: true } } },
+      { throws: true },
+    ])
+    try {
+      const view = mountSwitch(mode.component, { sessionId: SESSION, t: translator('zh'), modeSend: fetchImpl }, 'mode')
+      const { tree } = await view.mount()
+      window.push(modeEntry(6, false))
+      await view.settle()
+      const after = view.render()
+
+      // The read did happen (one more), and it failed. The person at the keyboard asked for
+      // nothing, so the switch keeps the state it already knew and no failure line appears.
+      expect(posted).toHaveLength(2)
+      expect(toggleIn(after).props['aria-checked']).toBe(true)
+      expect(lampIn(after)).toBe('on')
+      expect(noteText(after)).toBe(zhDict['mode.switch.on'])
+      expect(walk(after).find((element) => element.props['data-mode-state'] === 'failed')).toBeUndefined()
+      expect(texts(after).join(' ')).not.toContain(translate('zh', 'mode.switch.failed', { message: 'socket closed' }))
+      expect(toggleIn(tree).props['aria-checked']).toBe(true)
+    } finally {
+      mode.offerSessions(undefined)
+    }
+  })
+
+  it('mounts and reads with no sessions face at all, and with a face that cannot bind', async () => {
+    const mode = modeSwitch()
+    for (const face of [undefined, {}, { binding: () => undefined }]) {
+      mode.offerSessions(face)
+      const { posted, fetchImpl } = scriptedFetch([{ body: { ok: true, action: 'status', mode: { enabled: true } } }])
+      const view = mountSwitch(mode.component, { sessionId: SESSION, t: translator('zh'), modeSend: fetchImpl }, 'mode')
+      const { tree } = await view.mount()
+      // The switch is complete without the face: it read, it shows what it read, it can be
+      // clicked. It simply cannot be told about somebody else's write.
+      expect(toggleIn(tree).props['aria-checked']).toBe(true)
+      expect(noteText(tree)).toBe(zhDict['mode.switch.on'])
+      expect(posted).toHaveLength(1)
+      view.unmount()
+    }
+    mode.offerSessions(undefined)
+  })
+
+  it('stops following the session once it unmounts', async () => {
+    const mode = modeSwitch()
+    const window = fakeEventWindow()
+    mode.offerSessions(sessionsFace(window))
+    const { posted, fetchImpl } = scriptedFetch([{ body: { ok: true, action: 'status', mode: { enabled: true } } }])
+    try {
+      const view = mountSwitch(mode.component, { sessionId: SESSION, t: translator('zh'), modeSend: fetchImpl }, 'mode')
+      await view.mount()
+      expect(window.listeners.size).toBe(1)
+      view.unmount()
+      // A record written after the switch is gone reaches nobody: the listener is dropped,
+      // and no read is fired from a component that no longer exists.
+      expect(window.listeners.size).toBe(0)
+      window.push(modeEntry(6, false))
+      await view.settle()
+      expect(posted).toHaveLength(1)
+    } finally {
+      mode.offerSessions(undefined)
+    }
   })
 
   it('mounts in the tool row after the two heartbeats, with the namespace when one exists', () => {
