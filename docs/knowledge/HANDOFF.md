@@ -1,3 +1,42 @@
+## 2026-11-26 — 用户视角回归跑完（隔离 fork + 已发布 `v0.13.36`）：**六项里五项通、两项红**，红一已另开分支修，红二等你拍板
+
+- **From:** 用户回归包工头（`agent-157`）· **To:** 操作者 / 下一个接手者
+- **这一轮是什么**：分支 `fix/user-regression`（worktree `.agents/worktrees/fix/user-regression`，基线 `main` 尖端 `6e9bc56`），
+  **只放证据与记忆**，产品代码一个字没改（`package.json` 仍 `0.13.36`）。
+- **怎么跑的（`CONFIRMED`）**：`clone-profile.mjs` 从 live `web` 档案克隆成隔离 home（7720 文件 / 88 421 847 B、parity 5/5），
+  按 HANDOFF 上一条的要求**删掉 `mode:` 那一行**（克隆里本来没有 `legacyGate:`），端口 **3311**，插件装**固定标签**
+  `github:free6589/dsh-grok-workflow#v0.13.36`（解析到 `codeload…/26dc370…`，版本读回 `0.13.36`），真模型
+  `bifrost-responses/opencode-go/muse-spark-1.3-contributor`。live `~/.dsh` 一行未写（写探针 `Read-only file system`）、
+  3080 前后都是 401、live 仍装 `0.13.35`。
+- **五项通了**：开关（命令写、路由读回同一份记录）、真任务（4 步 8 次真读盘、答案带文档节名）、跑中插话（插话在 turn 1 里被
+  排队、turn 1 跑完原话进 turn 2）、预览→开工（`bp-211d7434…` → `block_id 50761193…`、`approval.quote="确认（开工）"`、
+  接单后派 subagent、文件真写出来）、**监工判决**（`pass` + **`judged:true`** + 判决行写着真路由名 + 逐条验收带证据）。
+  卡片点头也通了，但**只在把宿主提问工具改成 `mode: timed` 之后**（默认 legacy 下卡片答案只是同回合工具结果，不可能算批准）。
+- **这一轮补上的缺口**：上一轮挂着的「独立**模型**监工在真机上一次都没验过」——现在有真机读数了（`judged:true`）。
+- **两条红（`CONFIRMED`）**：
+  1. **`/grok on` 的确认话在承诺一件 0.13.36 已经不做的事**：`src/command.ts:325` 说「every message now runs the full
+     plan→execute→verify workflow」，但记录的读者只有 `/grok status` 文案、开关路由、接单台准入三处；真机读数也对得上
+     （`/grok on` 之后普通任务直接干活、没有流水线）。**已另开分支 `fix/grok-command-text` 修，不混进本分支。**
+  2. **同一个会话里，开关说「开」、接单台说「没打开」**：`GET /grok-workflow/mode?action=status` 返回
+     `{"enabled":true,"source":"default","fallback":true}`（界面显示「开」），同一会话 `grok_open_block` 却拒成
+     `mode-off: 这个会话的 grok 模式没打开，接单台不接单`。打一条 `/grok on` 就消失，但没人会想到要打。
+     **这是产品决定，本轮没动**，两条修法写在证据文件 §5：甲（开关在没有记录时不要显示「开」）／乙（准入承认部署默认）。
+     建议甲：界面不说谎、不动准入语义，但要改用户可见的默认显示，得有决定号。
+- **下一步（按顺序）**：
+  1. **拍板红二**（甲还是乙），定了之后按正常流程开分支改。
+  2. 收 `fix/grok-command-text`（改话术 + 守卫测试 + `[Unreleased]` 中英条目 + `npm run ci` exit 0），验过再合。
+  3. **操作者自己那一手还没做**：live 档案删 `mode:` 与 `legacyGate:` 两行 → 装 `v0.13.36` → 读回版本（顺序不能反）。
+- **三件会踩的事**：
+  1. **隔离 home 没有 `AGENT2API_API_KEY`**：live 档案的 worker/verifier/supervisor/guardian 全指着 `agent2api`，
+     不钉到一条真能答的路由（本轮用的 `bifrost-responses`）连一次子调用都起不来；先证后钉（`/openai/v1/responses` → 200；
+     `tokenrhythm/glm-5.3-flash` → 403 实名认证，丢掉）。
+  2. **卡片要能被记成批准，必须 `tool-ask-user` 是 `timed`**：顶层 `- id: tool-ask-user` 改不动预设里的那一行，
+     要 `- id: preset-standard` + `config.plugins` 整份覆盖（本轮就是这么改的）。
+  3. **`~/.serena` 在本沙箱只读**，`serena` MCP 会报 `OSError: [Errno 30]`，与本轮结论无关，别当缺陷查。
+- **没跑的（`NOT_RUN`）**：真浏览器点那颗开关按钮（fork 的 web 落「生图」面板、隔离 home 的会话树在 UI 里是空的）、
+  默认 legacy 配置下点卡片、设置页渲染、live 上升级、多块切分、心跳投递。
+- **证据**：`.rsi/evidence/user-regression-2026-11-26/README.md`（逐条逐字读数、红单、边界）。
+
 ## 2026-11-25 — `0.13.36` 已发布并跑绿；下一个接手的先看这条：**升级前必须把档案里 `mode:` 与 `legacyGate:` 两行都删掉**，本机 live 档案还没升（`BLOCKED`，等操作者）
 
 - **From:** 记忆收口（`agent-155/release-memory`）· **To:** 操作者 / 下一个接手者

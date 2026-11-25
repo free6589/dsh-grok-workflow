@@ -7682,3 +7682,47 @@ soak 用 scratch home `.tmp/m3-soak/dsh-home`（`node scripts/clone-profile.mjs 
    这一点**没有查到底**，标 `HYPOTHESIS`，不影响本轮结论。
 
 **证据：** `docs/knowledge/evidence/m3-1-2026-11-25/`（`README.md` 是清单与边界）。
+
+## 用户视角回归：隔离 fork 的 live web 档案 + 已发布 `v0.13.36` 固定标签（`fix/user-regression`）— 2026-11-26 (`CONFIRMED`，未发版，未改产品)
+
+环境：worktree `.agents/worktrees/fix/user-regression`（分支 `fix/user-regression`，基线 `main` 尖端 `6e9bc56`）；
+Node **v26.8.1** / npm **11.19.0**；DSH **0.2.2-rc.3**；隔离 home `.tmp/user-regression/dsh-home`（profile `web-clone`），
+**自有端口 `127.0.0.1:3311`**（live 在 3080/3065/3086/3109，全程没有访问一次）；真模型
+`bifrost-responses/opencode-go/muse-spark-1.3-contributor`。本轮 `src/` `test/` `lib/` 一个字未改，跑的是**已发布标签**而不是本地构建。
+
+| state | command（环境） | result |
+| --- | --- | --- |
+| 克隆 | `node scripts/clone-profile.mjs --src ~/.dsh/profiles/web --home .tmp/user-regression/dsh-home --name web-clone --force` | exit 0；`files 7720 -> 7720 (88421847 bytes)`、`links 5 (relinked 2, already dangling in the source 1)`、`parity 5/5 equal after redaction`、`dependencies 17 declared, 0 unresolved`、`credentials redacted: 1 line(s) in 1 file(s)`（那行是 `cordis.patch.yml:379` 的 `openai-style-key`，生图渠道的串） |
+| 删 `mode:` | 克隆档案里删掉 `grok-workflow` 行的 `mode: triage` | `grep -n "^\s*mode:\|legacyGate" <clone>/cordis.patch.yml` → **0 行**（克隆本来没有 `legacyGate:`） |
+| 路由证活 | `POST http://127.0.0.1:18088/openai/v1/responses`（`opencode-go/muse-spark-1.3-contributor`，`max_output_tokens:32`） | **http=200 t=6.39s**；同一次探针里 `POST /openai/v1/chat/completions`（`tokenrhythm/glm-5.3-flash`）→ **403 `IDENTITY_VERIFICATION_REQUIRED`**，确认是死路由、没有写进档案 |
+| 钉角色 | 克隆档案五角色 + `guardianModel` → `bifrost-responses / opencode-go/muse-spark-1.3-contributor` | `settings/describe` 读回 `supervisor: [{"provider":"bifrost-responses","model":"opencode-go/muse-spark-1.3-contributor"}]`。理由是环境事实：本机 shell **没有** `AGENT2API_API_KEY`（`AGENT2API_API_KEY: MISSING`），live 档案的 worker/verifier/supervisor 全指着它 |
+| 卡片可答的前提 | `preset-standard.plugins` 整份覆盖，只把 `tool-ask-user` 改成 `config: {mode: timed, timeout: 20}` | `dsh --dump-config` 里读到 `mode: timed` / `timeout: 20`；真会话 `request/header` 的 `ask_user_question` 参数从 `['questions']` 变成 `['questions','timeout']` |
+| 装固定标签 | `DSH_HOME=<scratch> dsh plugin --profile web-clone add 'github:free6589/dsh-grok-workflow#v0.13.36' --save-exact` | **Done in 10.5s**；依赖 `github:free6589/dsh-grok-workflow#v0.13.36`，版本读回 **`0.13.36`**，`pnpm-lock.yaml` 解析到 `https://codeload.github.com/free6589/dsh-grok-workflow/tar.gz/26dc370e270150ddb3facf8653677a645038f87a`（= `chore(release): prepare v0.13.36` 那条提交） |
+| 激活三项 | `dsh --profile web-clone --host 127.0.0.1 --port 3311 --no-open`；`POST /api/settings/describe`；会话 `request/header` | boot 日志 222 行、`pending`/`did not activate` **0 行**；**24 个命名空间**、`grok-workflow` 在、`value` **16 字段**（`mode` 已不在）、`blockIntake projected: false`；`request/header` **tools=96**，`grok_open_block`/`grok_accept_block`/`grok_close_block`/`grok_block_status`/`grok_steer`/`grok_stop` 全在 |
+| S1 开关 | `commands/execute` 打 `/grok off`、`/grok on`、`/grok status`；`GET /grok-workflow/mode?action=status` | 初始 `{"enabled":true,"source":"default","fallback":true}` → `/grok off` 后 `{"enabled":false,"source":"record","setBy":"command:/grok off"}` → `/grok on` 后 `{"enabled":true,"source":"record","setBy":"command:/grok","workflowMode":"full"}` → `/grok status` 答 `- Toggle: on`。两条写路径读的是同一份记录 |
+| S2 真任务 | `POST /api/session/prompt`（读文档给三条带出处的测试要求） | turn 1 四步（`working_directory` → `glob docs/**/*.md` → 三次 `read` → 答案），8 次真工具调用；答案带文档与节名 |
+| S3 跑中插话 | 同一轮里 +12 s 再发一条（`session/prompt`，`mode: queue`） | **seq 24** `agent/inbox/spliced`（`target:"next-turn"`）落在 **turn 1 内**（turn 1 到 seq 145 才 `turn/end completed`）；seq 149 `user/message source={"kind":"user"}` 原话进入 turn 2。既没丢也没打断 |
+| S4 卡片点头 | `POST /api/userQuestions/answer`（`callId` 取自 `pending:true` 那条结果） | 卡片 `options:[确认（开工）/再看看（要改）]`；工具结果 `{"pending":true,…"No answer batch arrived before the timeout. This is pending, not a skipped answer."}`；`answer` → **`{"ok":true,"value":true}`**；seq 52 `user/message source={"kind":"user-question-reply","callId":"call_01a2111859bc…","outcome":"answered"}` |
+| S5 预览→开工 | 同一会话，模型 `grok_open_block` 两段 | 预览 `preview_id bp-211d7434-7ec2-40ef-9e3f-89c260c7954a`、`split_hash 3e9170ee…`；`start` 带 `approval {"kind":"user","quote":"确认（开工）"}` → **`block_id 50761193-4885-4a19-b83c-5a3078139d4b`**；随后 `grok_accept_block` 成功、`started subagent agent-1`、`notes.md` 真写出来；`blocks.jsonl` 两行，`approval.quote` 逐字 `确认（开工）` |
+| S6 监工判决 | `grok_close_block`（交接四行写全） | `{"outcome":"pass","judged":true,"warnings":[],"reasons":[]}`；`verdicts.jsonl` 一行：`route:"bifrost-responses/opencode-go/muse-spark-1.3-contributor"`、三条验收各 `met:true` 且各带证据、`by:"plugin:block-supervisor"`。**同一块再交一次 → `evidenceUnchanged`，判决行仍是 1 行** |
+| 红一 | `src/command.ts:325` + 真机读数 | `/grok on` 答 `Grok workflow ON — every message now runs the full plan→execute→verify workflow.`；但会话记录的读者只有 `/grok status` 文案、开关路由、`src/user-source.ts` 的准入，真机上 `/grok on` 之后普通任务**直接干活、没有流水线**。已另开分支 `fix/grok-command-text` 修 |
+| 红二 | 同一会话两面对读 | `GET /grok-workflow/mode?action=status` → `{"enabled":true,"source":"default","fallback":true}`（界面显示「开」）；同一会话 `grok_open_block` → `Error: mode-off: 这个会话的 grok 模式没打开，接单台不接单…`。两条修法写在证据文件，**本轮没动**（产品决定） |
+| 真浏览器 | `playwright-cli open http://127.0.0.1:3311/?token=…`（headless chromium 1246，装在 `.tmp` 内） | 打开成功、**0 console errors**；但页面落在「生图」面板，隔离 home 的会话树在 UI 里是空的（接口建的会话不进分组），聊天面板没点出来 → **开关按钮的渲染/点击 `NOT_RUN`** |
+| live 未碰 | `stat -c '%Y %y' ~/.dsh ~/.dsh/profiles ~/.dsh/profiles/web`；`touch ~/.dsh/.user-regression-write-probe`；`curl 127.0.0.1:3080`；读 live 装版本 | `~/.dsh` = **2026-11-22 23:40:20**（本轮前后同值）；写探针 **`Read-only file system`**；3080 前后都是 **401**；live 仍装 **`0.13.35`**。本轮对 live **一行未写**、未重载、未重启 |
+| 发版 / 推送 / 合流 | — | **NOT_RUN**：未打 tag、未 push、未合 `main`、未 npm publish；`package.json` 仍 `0.13.36` |
+
+**Changed（本轮改动，只有证据与记忆）：** `.rsi/evidence/user-regression-2026-11-26/README.md`、`STATE.md`、`VALIDATION.md`（本条）、
+`HANDOFF.md`。**`src/`、`test/`、`lib/` 一个字未改。**
+
+**Honest boundary（逐条）：**
+1. **真浏览器点开关按钮 `NOT_RUN`**（见上表）。`+0.5 秒自己刷新`那条只有 2026-11-25 那一轮的真 Chrome 读数，本轮没有复现；
+   本轮只证了「命令写记录 / 路由读回同一份记录」。
+2. **默认（legacy）配置下点卡片 `NOT_RUN`**：按上一轮 F2 的结论它不可能成为批准，本轮直接改用 `timed` 测批准那条；
+   「点了之后模型会要求用户再打一句确认」是从源码读出来的，不是本轮看到的。
+3. **角色路由被换过**（五角色 + guardian 全到 bifrost），因为隔离环境没有 `AGENT2API_API_KEY`。所以本轮的监工判决证明的是
+   「判决路径 + 一条真路由能出真判决」，不证明 `agent2api` 那条链在本机能用。
+4. **工作流引擎的那一跑**读数单独记在证据文件 §8；六项里的「真任务」是模型直接干活，不是流水线。
+5. **设置页渲染、live 上升级、多块切分、心跳** 四项 `NOT_RUN`（理由见证据文件 §6）。
+6. **本 worktree 的 `serena` MCP 起不来**（`~/.serena` 在本沙箱只读，`OSError: [Errno 30]`），与本轮结论无关，记一笔免得下一个人以为是自己搞坏的。
+
+**证据：** `.rsi/evidence/user-regression-2026-11-26/README.md`（含逐条逐字读数、红单与边界）。
