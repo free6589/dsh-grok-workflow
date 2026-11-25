@@ -1,3 +1,98 @@
+## `0.13.43` 发版收口：两次门禁（抬版本前的 `532d4cf` 与发布树 `549a579`）都是 `GATE_EXIT=0`（`103 files / 1944 tests`），发布提交里提交的 `lib/` 就是它自己 `src/` 的构建；附注标签、两个远端 run、Release 与资产都复核过；**live 档案升级 `BLOCKED`**、**真机 `NOT_RUN`** — 2026-11-26 (`CONFIRMED`)
+
+**这一轮是什么**：发版轮 + 收口轮，**没有任何代码改动**。`0.13.43` 已经出去（tag 推了、Release 建了、资产在），
+本轮只写三份记忆 + 一份证据索引；**没有重跑门禁、没有跑任何 npm 脚本、没有碰 `src/` / `test/` / `lib/`**
+（`AGENTS.md` §12），所以**没有红可记**。
+
+**命令（两次都一样，干净树）**：`TMPDIR=$PWD/.tmp npm run ci`。
+
+**门禁 #1——抬版本之前的树（`CONFIRMED`）**：在 **`532d4cf`** 上跑，证明改动在 bump 前就是绿的。
+转录 `.rsi/evidence/release-0.13.43-2026-11-26/gate-prerelease-532d4cf.out`（**396 行 / 23898 字节**、
+`sha256 44e7f893a8b2b6e1dc95398afc58a6e4c69027b77ddd1370e60572e19cf4ca1c`，末行 `GATE_EXIT=0`、
+`grep -c FAIL` = **0**）：
+
+```text
+Found 15 warnings and 0 errors.
+client bundle: 348559 bytes → lib/client.js
+lib/ at 532d4cf is the build of src/ at 532d4cf (289 files, byte-identical)
+ Test Files  103 passed (103)
+      Tests  1944 passed (1944)
+   Duration  102.56s (transform 3.63s, setup 0ms, import 10.43s, tests 79.26s, environment 12ms)
+GATE_EXIT=0
+```
+
+**门禁 #2——发布树（`CONFIRMED`）**：在 **`549a579`** 上跑，就是这一版真正的发版门禁。转录
+`.rsi/evidence/release-0.13.43-2026-11-26/gate-release-549a579.out`（**394 行 / 23572 字节**、
+`sha256 a67cd0390fd126a76ffc22ed6c6efae08eda1d3b6b0669c517ce2635541331cf`，末行 `GATE_EXIT=0`）：
+
+```text
+Found 15 warnings and 0 errors.
+client bundle: 348559 bytes → lib/client.js
+lib/ at 549a579 is the build of src/ at 549a579 (289 files, byte-identical)
+ Test Files  103 passed (103)
+      Tests  1944 passed (1944)
+   Duration  107.03s (transform 3.29s, setup 0ms, import 9.83s, tests 84.63s, environment 12ms)
+GATE_EXIT=0
+```
+
+**门禁 #2 之后 `git status --short` 只剩那两处遗留**（`.gitignore` modified、`.rsi/evidence/progress-now/` 未跟踪），
+也就是说 **`verify:lib` 比对之后没有残留**——**提交的 `lib/` 就是提交的 `src/` 的构建**（`289 files, byte-identical`）。
+
+**身份（`CONFIRMED`）**：发布提交 **`549a5790a03f1be67bb1c5b08803a1a940b1f37f`**
+`chore(release): prepare v0.13.43`，父提交 **`532d4cf`**，**8 文件 / +22 −20**——`CHANGELOG.md`(+2 −0)、
+`README.md`(5/5)、`README.zh-CN.md`(5/5)、`docs/LOCAL-TESTING.md`(3/3)、`lib/client.js`(2/2)、
+`package-lock.json`(2/2)、`package.json`(1/1)、`src/client/index.js`(2/2)。`src/` 与 `lib/` 的**唯一**改动是
+`PLUGIN_VERSION` / `UPDATE_LATEST` `'0.13.42'` → `'0.13.43'`（blob `f2f427d` → `5ecf0d8`，两份各 **348559 字节**，
+`cmp` 报逐字节相同）。`package.json` 与 `package-lock.json` 都读 `0.13.43`。**`main` 是直接 push 快进的**
+（`532d4cf..549a579  main -> main`，随后 `* [new tag]  v0.13.43 -> v0.13.43`），
+所以 **`main` = `origin/main` = 门禁提交 = 标签剥出的提交 = `549a579`**，没有第二个合并提交。
+
+**标签（`CONFIRMED`）**：`v0.13.43` 是附注标签，对象 **`e084e4b8ad0ae7acec5a7ccaf045fa09f27f5577`**、
+剥出 `549a579`、消息 `Grok Workflow for DSH v0.13.43`、`tagger` 时刻 **2026-11-26 03:33:33 +0800**
+（`1795635213 +0800`）；标签上的 `package.json` 读 `0.13.43`。**没有 force-push、没有移动已发布标签**——
+本轮自己重读 `git rev-parse v0.13.42^{} v0.13.41^{} v0.13.40^{}` → `651f3dd27873bcd9728001858e02bf77385af8ab`
+`a64a50a35457c7b9579f45a9a59ce1a4385567d0` `377882221018a53d0a17227183f7c84c78692e92`，
+`git for-each-ref` 的对象仍是 `14fef64` / `96dd9cc` / `98b9c45`。
+
+**算术（本轮自己从 git 对象数过）**：spec 文件 `git ls-tree -r --name-only <sha> -- test | grep -c '\.spec\.ts$'`
+→ `532d4cf` **103**、`549a579` **103**；发布提交不碰任何 `test/` 文件（`git diff --name-only 532d4cf..549a579 -- test | wc -l`
+= **0**）。用例 **1944 / 1944**，与两份转录同值 ✔。**仅供对照**：`0.13.42` 发的是 **`103 files / 1941 tests`**，
+那 **+3** 来自功能提交 **`38d64bb`**（`test/replan.spec.ts` 21 → 24），本轮之前就已经在 `main` 上，
+不随这次发版提交走。
+
+**两个远端 run（`CONFIRMED`，`gh run view` 重读，不是抄的）**：
+
+- Release run **`45686411703`**——`headBranch v0.13.43`、sha `549a579`、**conclusion `success`**、
+  单 job `Validate and publish v0.13.43`，https://github.com/free6589/dsh-grok-workflow/actions/runs/45686411703
+- CI run **`45686404326`**——`main`、sha `549a579`、**conclusion `success`**，
+  https://github.com/free6589/dsh-grok-workflow/actions/runs/45686404326
+
+两个都用 `gh run watch --exit-status` 盯过，**退出 0 各一次**。
+
+**GitHub Release（`CONFIRMED`）**：https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.43
+名字 `Grok Workflow for DSH v0.13.43`、`publishedAt 2026-11-25T19:35:15Z`、非 draft / 非 prerelease、target `main`、
+正文 **28 行**、唯一资产 **`dsh-grok-workflow-0.13.43.tgz` = 984828 字节**
+（上一版 `0.13.42` = 980976 → **+3852**），
+`digest sha256:8151ba209bf7243a739379767b53d56c438f28408730c46efab782101127c15b`。
+
+**用户拿到的只有一件事**：边界规划子代理的请求单形状写清楚了，写在 `action` 旁边的任务体会被提到 `task` 里，
+所以跑中加进来的要求这一次真的能并进计划；缺必填字段的体照旧拒，但拒绝语会点名缺哪几个。
+**口径要写准**：发版清单上列了两条（「边界请求形状」与「收件箱闸门」），**收件箱闸门不在 `0.13.43` 里——
+它 `0.13.42` 就已经发出去了**；`0.13.43` 只带请求形状这一条。
+
+**`NOT_RUN`**：① 本轮**没做真机 soak**——发版轮没有新行为可 soak，这里发出去的行为是 `fix/replan-shape`
+那一轮在真机上验过的（证据 `.rsi/evidence/replan-shape-2026-11-26/`）；② 本轮**没跑门禁、没跑任何 npm 脚本**。
+
+**`BLOCKED`**：`AGENTS.md` §13 的 live 档案升级**没做成**——本会话文件策略是 `workspace-write`、
+`~/.dsh` 在工作区外，写不进去，**没写、没重载、没重启** live 档案。**下一个有写权限的人要做的**：
+把 live 那条插件行钉到**确切的标签 `v0.13.43`**（绝不能用浮动范围），把装好的版本读回来确认，
+读不回 `0.13.43` 就回滚那一行——跑发布版时它必须读作 `0.13.43`。live 档案现在装的是哪一版本轮**没读**，不写。
+
+**本轮没碰的两处遗留**（属别的会话，未暂存、未提交）：`.gitignore`(modified) 与 `.rsi/evidence/progress-now/`(未跟踪)。
+
+**引用哪一份**：`.tmp/gate-*.out` 是随手副本、会被删掉，**引用归档的那两份**，逐条读数与 `sha256` 见
+[`.rsi/evidence/release-0.13.43-2026-11-26/README.md`](../../.rsi/evidence/release-0.13.43-2026-11-26/README.md)。
+
 ## 边界子的请求单（`fix/replan-shape`）：写在 `action` 旁边的任务字段被提到 `task` 里、缺的字段照旧拒绝并点名；真机上 `plan.version` 1 → 2、`addedTaskIds` 含 `task-4`、那条任务随后跑完并验过 — 2026-11-26 (`CONFIRMED`)
 
 **这一轮的问题**：上一轮真机证明投递链通了，但边界子给出的 `add` 编辑把字段写在编辑层、没有 `task` 体，

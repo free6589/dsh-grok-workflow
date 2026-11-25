@@ -1,3 +1,57 @@
+## 2026-11-26 — `0.13.43` 已发布并收口：发布轮无代码改动、两次门禁 `GATE_EXIT=0`（`103 files / 1944 tests`）、`main` 快进、附注标签、两个远端 run 与 Release 资产都在；**live 档案升级仍 `BLOCKED`**
+
+- **From:** 发布包工头（`agent-188`）· **To:** 下一个接手者 / 能在本机写 `~/.dsh` 的人
+- **这一轮是什么**：**发版轮 + 收口轮**，不写代码。`0.13.43` 已经出去（tag 推了、Release 建了、资产在），
+  本轮只做三份文档 + 一份证据：`STATE` / `HANDOFF` / `VALIDATION` 各加一条，新证据目录
+  `.rsi/evidence/release-0.13.43-2026-11-26/README.md`。**没有重跑门禁、没有跑任何 npm 脚本、没有碰
+  `src/` / `test/` / `lib/`**（`AGENTS.md` §12）；本轮**没有代码改动可记红**。
+- **身份**：发布提交 **`549a5790a03f1be67bb1c5b08803a1a940b1f37f`** `chore(release): prepare v0.13.43`，
+  父提交 **`532d4cf`**，**8 文件 / +22 −20**，全是版本字面量与清单尾巴（`src/` 与 `lib/` 只有
+  `PLUGIN_VERSION` / `UPDATE_LATEST` `'0.13.42'` → `'0.13.43'`，两份 blob 同为 `5ecf0d8`、各 **348559 字节**、
+  `cmp` 逐字节相同）。**附注标签 `v0.13.43`** 对象 **`e084e4b8ad0ae7acec5a7ccaf045fa09f27f5577`**、剥出 `549a579`、
+  消息 `Grok Workflow for DSH v0.13.43`、`tagger` 时刻 **2026-11-26 03:33:33 +0800**（`1795635213 +0800`）。
+  **`main` = `origin/main` = 门禁提交 = 标签剥出的提交 = `549a579`**（直接 push 快进 `532d4cf..549a579`，
+  **没有第二个合并提交**；本轮**没有建 worktree、也没有 worktree 要删**）。**没有 force-push、没有移动已发布标签**
+  （本轮重读 `v0.13.42^{}` → `651f3dd`、`v0.13.41^{}` → `a64a50a`、`v0.13.40^{}` → `3778822`）。
+  **一处偏差**：早几轮走 `release/0.13.4x` + `--ff-only`，这一轮直接提交在 `main` 上推，结果等价、少一条分支。
+- **两次门禁（`CONFIRMED`）**：门禁 #1 在抬版本之前的树 **`532d4cf`**（证明改动在 bump 前就是绿的）、
+  门禁 #2 在发布树 **`549a579`**，都是 `TMPDIR=$PWD/.tmp npm run ci`、干净树、`GATE_EXIT=0`：
+  `Found 15 warnings and 0 errors.`（184 文件、96 条规则）、`client bundle: 348559 bytes → lib/client.js`、
+  `lib/ at <sha> is the build of src/ at <sha> (289 files, byte-identical)`、
+  **`Test Files 103 passed (103)` / `Tests 1944 passed (1944)`**；`Duration` 分别 `102.56s` 与
+  `107.03s (transform 3.29s, setup 0ms, import 9.83s, tests 84.63s, environment 12ms)`。
+  门禁 #2 之后 `git status --short` 只剩那两处遗留 → **提交的 `lib/` 就是提交的 `src/` 的构建**。
+- **算术（本轮从 git 对象数过）**：spec 文件 `532d4cf` **103** → `549a579` **103**（发布提交不碰任何 `test/` 文件，
+  `git diff --name-only … -- test` = **0**），用例 **1944 / 1944**。**仅供对照**：`0.13.42` 发的是
+  `103 files / 1941 tests`，那 **+3** 来自功能提交 `38d64bb`（`test/replan.spec.ts` 21 → 24），本轮之前就已在 `main` 上。
+- **两个远端 run（`gh run view` 重读，不是抄的）**：Release run **`45686411703`**
+  （`headBranch v0.13.43`、sha `549a579`、**success**、单 job `Validate and publish v0.13.43`，
+  https://github.com/free6589/dsh-grok-workflow/actions/runs/45686411703 ）与 CI run **`45686404326`**
+  （`main`、sha `549a579`、**success**，https://github.com/free6589/dsh-grok-workflow/actions/runs/45686404326 ），
+  两个都用 `gh run watch --exit-status` 盯到退出 0。**Release** https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.43
+  名字 `Grok Workflow for DSH v0.13.43`、`publishedAt 2026-11-25T19:35:15Z`、非 draft / 非 prerelease、target `main`、
+  正文 **28 行**、唯一资产 **`dsh-grok-workflow-0.13.43.tgz` = 984828 字节**（上一版 `0.13.42` = 980976 → **+3852**），
+  `digest sha256:8151ba209bf7243a739379767b53d56c438f28408730c46efab782101127c15b`。
+- **用户拿到的只有一件事**：边界规划子代理的请求单形状写清楚了，写在 `action` 旁边的任务体会被提到 `task` 里，
+  所以跑中加进来的要求这一次真的能并进计划；缺必填字段的体照旧拒，但拒绝语会点名缺哪几个。
+  **口径要写准**：发版清单上列了两条（「边界请求形状」与「收件箱闸门」），**收件箱闸门不在 `0.13.43` 里——
+  它 `0.13.42` 就已经发出去了**；`0.13.43` 只带请求形状这一条。
+- **`BLOCKED`（这一条就是下一个人欠的活）**：`AGENTS.md` §13 的 live 档案升级**没做成**——本会话文件策略是
+  `workspace-write`、`~/.dsh` 在工作区外，写不进去，**没写、没重载、没重启** live 档案。
+  **下一个有写权限的人要做的**：把 live 那条插件行钉到**确切的标签 `v0.13.43`**（绝不能用浮动范围），
+  把装好的版本读回来确认，读不回 `0.13.43` 就回滚那一行——跑发布版时它必须读作 `0.13.43`。
+  live 档案**现在装的是哪一版，本轮没读**，所以不写。
+- **`NOT_RUN`**：本轮没做真机 soak——发版轮没有新行为可 soak；这里发出去的行为是 `fix/replan-shape`
+  那一轮在真机上验过的（证据 `.rsi/evidence/replan-shape-2026-11-26/`）。
+- **本轮没碰的两处遗留**（属别的会话，未暂存、未提交）：`.gitignore`(modified) 与
+  `.rsi/evidence/progress-now/`(未跟踪)。
+- **引用哪一份**：`.tmp/gate-*.out` 是随手副本、会被删掉，**引用归档的那两份**——
+  `.rsi/evidence/release-0.13.43-2026-11-26/gate-prerelease-532d4cf.out` 与
+  `…/gate-release-549a579.out`，逐条读数与 `sha256` 见
+  [`.rsi/evidence/release-0.13.43-2026-11-26/README.md`](../../.rsi/evidence/release-0.13.43-2026-11-26/README.md)。
+
+---
+
 ## 2026-11-26 — `fix/replan-shape`：边界子的请求单修好了——字段写在 `action` 旁边会被提到 `task` 里、缺字段照旧拒并点名；真机上 `plan.version` 1 → 2、`addedTaskIds` 含 `task-4`、`task-4` 真的跑完并验过；未合 `main`、未 push、未发版
 
 - **From:** 包工头（`agent-187`）· **To:** 下一个接手者
