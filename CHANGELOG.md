@@ -5,6 +5,11 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ## [Unreleased]
 
+### Fixed / 修复
+
+- **`/grok on` now says what it really does / `/grok on` 现在说的是实话** — The command used to answer that every message would run the full plan→execute→verify workflow, which nothing has done since `0.13.35`. It now says the truth in two short sentences: turning it on lets the model commission reviewed blocks of work in that session, and messages themselves are not turned into a workflow. The off answer, the stored record and the intake's own admission rule are unchanged.
+  / 以前 `/grok on` 会回答「每条消息现在都跑完整的 plan→execute→verify 工作流」，而从 `0.13.35` 起没有任何东西会这么做。现在它用两句短话说实话：打开之后，这个会话里模型可以把工作拆成可复核的块来下单；消息本身不会被变成一次工作流。关闭时的回答、存下来的记录，以及接单台自己的准入规则都没有改。
+
 ## [0.13.36] - 2026-11-25
 
 ### Fixed / 修复
