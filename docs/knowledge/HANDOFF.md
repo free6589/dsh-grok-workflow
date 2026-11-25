@@ -1,3 +1,39 @@
+## 2026-11-26 — `0.13.42` 已发布并收口：跑中插话（`feat/inbox-steering` 的那个功能）随版发出，发布提交 `651f3dd` 只抬版本字面量、门禁 `103 files / 1941 tests` 自带 `GATE_EXIT=0`、`main` 快进、附注标签、两个远端 run 与 Release 资产都在；**live 档案升级仍 `BLOCKED`（live 还停在 `0.13.39`，而且那一行是浮动的）**，**本地 `release/0.13.42` 已 `-d` 删除、两处空 worktree 目录已 `rmdir`**
+
+- **From:** 包工头（`agent-185` 派下的记忆收口轮）· **To:** 下一个接手者 / 能在本机写 `~/.dsh` 的人
+- **这一轮是什么**：**收口轮**，不写代码。`0.13.42` 已经出去（tag 推了、Release 建了、资产在），
+  本轮只做三件文档 + 一份证据：`STATE` / `HANDOFF` / `VALIDATION` 各加一条，新证据目录 `.rsi/evidence/release-0.13.42-2026-11-26/README.md`。
+  **没有重跑门禁、没有跑任何 npm 脚本、没有碰 `src/` / `test/` / `lib/`**（`AGENTS.md` §12）。
+- **身份**：发布提交 **`651f3dd`** `chore(release): prepare v0.13.42`，父提交 **`ec89b7c`**，**8 文件 / +22 −20**，
+  全是版本字面量与清单尾巴（`src/` 与 `lib/` 只有 `PLUGIN_VERSION` / `UPDATE_LATEST` `'0.13.41'` → `'0.13.42'`，
+  两份 blob 同 `f2f427d`）。`main` = `origin/main` = `651f3dd`（ff-only，无第二个合并提交）；
+  标签 `v0.13.42` 对象 **`98b9c45`**、剥出 `651f3dd`、tagger `2026-11-26 02:40:16 +0800`；`v0.13.41` 对象仍是 `96dd9cc`（没被移动）。
+- **这一版用户看到的一件事**：跑着的时候打一句话（Ctrl/⌘+Enter 插话），这句话真的会并进正在跑的计划
+  （插件订宿主的 `agent/inbox/inserted`、按会话与白名单只认人的原话、边界子用 `grok_replan_intents` 取走并进还没跑的波次）；
+  那句话**仍然按普通一轮被回复**，这一点 `CHANGELOG` 写明了，别再当 bug 修。
+- **门禁读数（`CONFIRMED`，转录在证据目录，本轮只核对不重跑）**：`GATE_EXIT=0` 在转录最后一行
+  （`gate-651f3dd.out`，396 行 / 23895 字节，`sha256 5f5dfc43…`）；`Test Files 103 passed (103)` / `Tests 1941 passed (1941)`、
+  `Duration 100.30s`、lint `15 warnings / 0 errors / 184 files`、`lib/ at 651f3dd … (289 files, byte-identical)`。
+  **算术**：静态 `it(` `1852 → 1866`，**+14 全在 `test/steering-inbox.spec.ts`**，随功能走、不随发版提交走
+  （`git diff --stat ec89b7c..651f3dd` 里没有 `test/` 文件）；`1866 + 75 = 1941`。
+- **远端**：Release run `45677540409`（`v0.13.42` / `651f3dd` / success，71 秒）；CI run `45677532418`（`main` / success）。
+  Release https://github.com/free6589/dsh-grok-workflow/releases/tag/v0.13.42 ，唯一资产 `dsh-grok-workflow-0.13.42.tgz` = **980976 字节**
+  （上一版 976529，**+4447**）。
+- **下一个人欠的活，只有一件，但它需要一台能写 `~/.dsh` 的机器**：`AGENTS.md` §13 的 live 档案升级**这一轮还是 `BLOCKED`**——
+  本会话 `workspace-write`、`~/.dsh` 在工作区外，写探测 `: > ~/.dsh/.release-probe` 得到 `Read-only file system`，**没写、没重载、没重启 3080**。
+  只读读数是：`~/.dsh` mtime `2026-11-25 23:14:14`、`~/.dsh/profiles` mtime `2026-11-22 16:59:46`、
+  **live 装着的插件仍读 `0.13.39`**、依赖行是浮动的 `"dsh-grok-workflow": "github:free6589/dsh-grok-workflow"`（**没有标签固定**）。
+  所以两件事是一件事：**升到 `0.13.42` 的同时把那一行钉成 `#v0.13.42`**（钉完要读回 `0.13.42` 才算数；读不回就退回原值并报出来）。
+  **不要**在不能写的会话里反复试探测，也不要在没有操作员点头的情况下重启那台实例。
+- **两处遗留仍然无主（不是我们的，本轮也没碰）**：`.gitignore` 是 modified、`.rsi/evidence/progress-now/` 是未跟踪。
+  谁认领谁处置——别顺手 `git add -A`。
+- **清理已经做完（不是遗留）**：本地 `release/0.13.42` 分支用 `git branch -d` 删了（报的是 `Deleted branch release/0.13.42 (was 651f3dd)`），
+  `git worktree list` 只剩主检出一处；两处空目录 `.agents/worktrees/feat` 与 `.worktrees/` 也用 `rmdir` 清掉了——
+  它们都不是注册过的 worktree（`.worktrees/` 只在 `.git/info/exclude` 里、`.agents/worktrees/` 忽略自己的内容），所以没有动到任何被跟踪的东西。
+  **刻意留着的是**三条 `backup/wip-2026-11-24-*` 与 `feat/audit-layer`；**没有删任何远端分支、没有删或移动任何 tag**。
+
+---
+
 ## 2026-11-26 — `feat/inbox-steering`：跑中插话有了活的入口（订宿主的 `agent/inbox/inserted`、白名单只认真人、按会话入队）；真机上话真的走到了边界拉取工具，**但计划没被改**（边界子的请求形状被既有规则拒）；未合 `main`、未 push、未发版
 
 - **From:** 包工头（`agent-184`）· **To:** 下一个接手者 / 拍板的人
