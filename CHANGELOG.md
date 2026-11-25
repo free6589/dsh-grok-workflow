@@ -7,25 +7,25 @@ Notable user-facing changes are recorded here in English and Simplified Chinese.
 
 ### Changed / 变更
 
-- **The progress page holds its shape while you read it: the guardian beside the page, a task's own calls under its row, a long history folded / 进度页读起来不再变形：Guardian 挪到页面右侧、任务行下面就是它自己的调用、太长的「经过」先收起来** —
-  Three layout changes, and nothing else: no new number, and the only new words are the three labels the two new controls
-  need. The guardian used to be one card under the history, which read as another chapter of the run; it is a side lane about
-  the run staying alive, so it now sits in a column beside the page — and that column exists only when the run actually
-  recorded a guardian, because an empty column promises something the page cannot deliver. Inside the lane the same facts are
-  four tiles: the monitor's state, the time budget, how many times it stepped in, and the interventions themselves (or one
-  sentence saying there were none) — every word of it is copy the lane already had. A task row is now something you can press:
-  the calls that task made appear under it, one line each, carrying the moment, the gate it reached, what came back, and the
-  way into that child session — while the row's own text stays exactly the words it said before, because the button adds a way
-  to look, not a word to read. And a 「经过」 longer than six lines keeps its height and offers 「展开全部」, which turns into
-  「收起」 once opened, so the button at the bottom of the page stays where you last saw it; no line is dropped and none is
-  summarized. See D-157.
-  / 三处布局改动，别的都没动：没有新数字，新词只有两颗新控件需要的三个标签。Guardian 以前是「经过」下面的一张卡，读起来像这次运行的又
-  一章；它其实是一条**边车**，说的是监控还活着没有，所以现在挪到页面右侧的一列里——而且只有这次运行真的记录了 Guardian 才分这一列，
-  因为空着的一列是在承诺这一页给不出的东西。这一列里的同一批事实改成四块：监控的状态、时间预算、它插过几次手，以及那几次干预本身
-  （一次都没有就写一句话）——每个字都是这一栏本来就有的文案。任务行现在按得动了：按一下，这个任务自己发出的调用就长在它下面，一行一条，
-  带时刻、带它走到哪一道门、带回来的结果、带进那个子会话的入口——行本身的文字一个字没变，因为按钮只多了一个「看的方式」，没有多一个
-  「要读的词」。另外「经过」超过六行时会保持高度，并给一个「展开全部」，点开变成「收起」，这样页面底部那颗按钮就还在你上次看到的地方；
-  一行都不丢，也一行都不概括。见 D-157。
+- **The progress page is one flow chart: every step a node, where it got to lit, what is left counted / 进度页就是一张流程图：每一步一个节点，走到哪一盏亮着，还剩几步写在一行里** —
+  The page used to ask a reader to assemble the run out of four neighbouring answers — a 「现在」 headline, an equal-segment bar, a
+  step list, a history — with the guardian in a second column. It is one figure now. From 起点 to 终点 each leg the run actually
+  recorded is a node (规划 / 执行 / 检查 / 复核 / 汇总), a leg it visited twice keeps one node per visit and says which visit it was,
+  the steps already passed are green, the one being worked on is lit, the ones still ahead are grey and dashed, and a leg that broke
+  is amber. Each node carries its own calls underneath, closed until you press it, one line each: the moment, the gate, what came
+  back, and the way into that child session. The line under the figure is the whole count — 还剩 N 步 / 共 M 步 — and there is no
+  explanatory sentence anywhere on the page. Under 720 px the figure stacks into one column. What went away with the four zones: the
+  「现在」 headline, the segment bar, the amber bar, 「后面还有」, the step list, the 「经过」 log and its fold, the 「交卷」 card, the
+  two columns, and the two hint lines under the dock. What stayed, word for word: the run name with its five-state chip, the
+  guardian panel, and the dock's two buttons that only fill the box. See D-158 and D-159. **Upgrade note: nothing to prepare — no
+  key, schema, default or stored record changed.**
+  / 这一页以前要读者从四个相邻的答案里自己拼出这次运行——「现在」主标题、一条等分分段条、一份步骤清单、一段「经过」——Guardian 还另占一列。
+  现在只有一张图：从「起点」到「终点」，这次运行真的记录过的每一条腿都是一个节点（规划 / 执行 / 检查 / 复核 / 汇总），去过的腿每去一次各占一个
+  节点并写明是第几次，已经过的是绿的，正在做的那颗亮着，还没到的灰着、虚线，断过的腿是琥珀色。每个节点下面挂它自己的那些调用，按一下才展开，
+  一行一条：时刻、哪道门、回来的结果、进那个子会话的入口。图下面那一行就是全部计数——「还剩 N 步 / 共 M 步」——页面上没有任何一句说明文字。
+  720 像素以下，图竖起来排成一列。跟着四区一起退场的：「现在」主标题、分段条、琥珀条、「后面还有」、步骤清单、「经过」及其折叠、「交卷」卡、
+  两栏、dock 下面那两句提示。一字未动保住的：运行名与五态胶囊、Guardian 那一块、dock 上只填框不代发的两颗按钮。见 D-158 与 D-159。
+  **升级须知：不用准备任何东西——没有键、schema、默认值或已存记录变化。**
 
 ## [0.13.39] - 2026-11-25
 

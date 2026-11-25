@@ -1,3 +1,54 @@
+## 2026-11-26 — `feat/progress-flowchart`：进度页从四区版改回一张可视化流程图（一步一节点 / 当前高亮 / 节点下挂行 / 底部计数），门禁跑绿，**隔离档案真机三态验过并修掉一个连线缺陷**，**未合 main、未 push、未发版**；本分支的决定日期是 **2026-12-10**
+
+- **From:** 包工头（`agent-177`，取数 `agent-177/data` + 重画 `agent-177/redraw`）· **To:** 操作者 / 下一个接手者
+- **这一轮是什么**：一条 **`feat/*` 分支**上的交付，不是发布轮。分支从 `main` 尖端 **`57dcf04`** 长出，
+  **两颗产品提交**：**`e998a00`**（模型 `deriveProgressFlow` + 浏览器包镜像 + 流程图渲染 + 全线重写的进度页样式 +
+  五个 spec + 证据）与 **`1eb7888`**（真机量出来的连线缺陷修复 + 两条几何用例 + 真机证据），
+  之后是记忆提交。改动面：`src/progress-tab.ts`、`src/client/index.js`、`lib/`（构建产物）、
+  `test/client.spec.ts`、`test/progress-tab.spec.ts`、`test/progress-connector.spec.ts`、
+  `test/progress-hint-absent.spec.ts`、`test/i18n-parity.spec.ts`、新增 `test/progress-flow.spec.ts`
+  （`test/progress-layout.spec.ts` 随四区版一起删除）。
+- **用户能看到的**：进度页就是一张图，从「起点」到「终点」，每条腿一个节点（规划 / 执行 / 检查 / 复核 / 汇总），
+  去过的腿每去一次各占一个节点（「第 2 次」「第 2 稿」），过了的绿、当前那颗亮着、未到的灰虚线、断过的琥珀；
+  节点下挂自己的调用，按一下才展开；底下只有一行「还剩 N 步 / 共 M 步」；**页面上没有一句说明文字**；
+  720 px 以下竖排。**退场**：「现在」主标题、分段条、琥珀提示条、「后面还有」、步骤清单、「经过」及折叠、
+  「交卷」卡、两栏、dock 下两句提示（19 个文案键一并删）。**保住**：运行名 + 五态胶囊、Guardian 那块、
+  dock 两颗按钮与「只填框不代发」。
+- **门禁与算术（`CONFIRMED`）**：`TMPDIR=$PWD/.tmp npm run ci` 在 **`e998a00`** 的干净树上 `EXIT=0`——
+  `Found 15 warnings and 0 errors.`、`client bundle: 340995 bytes → lib/client.js`、
+  `lib/ at e998a00 is the build of src/ at e998a00 (285 files, byte-identical)`、**`101 files / 1897 tests`**、`101.14s`。
+  基线是**本轮自己在独立 worktree `.tmp/wt-baseline`（`57dcf04`）上重跑的全套**：`EXIT=0`、`347526` 字节、
+  `101 files / 1884 tests`、`112.96s`。**`1eb7888` 之后定向复核**：六份 spec `258 passed`、`typecheck` 退出 0、
+  `oxlint 15 warnings / 0 errors`、`lib/client.js` 与 `src/client/index.js` 逐字节相同（`341814` 字节）。
+  逐文件：`client.spec.ts` **139 → 146**、`progress-tab.spec.ts` **57 → 69**、`progress-flow.spec.ts` **新增 17**、
+  `progress-layout.spec.ts` **20 → 删除**、`progress-hint-absent.spec.ts` **8 → 7**、
+  `progress-connector.spec.ts` **11 → 11**、`i18n-parity.spec.ts` **8 → 8**。
+- **一条必须记住的陷阱**：`verify:lib` 比对的是 **`HEAD` 的 `src/` 与 `HEAD` 的 `lib/`**，所以**工作树脏着跑它是空证明**
+  （本轮第一次跑就是这样：它报的是基线那对提交）。只有在提交之后、干净树上跑，那句 `byte-identical` 才算数。
+- **真机那半边真跑过，而且量出一个缺陷**：隔离档案（`flow-clone` 从 live web 档案克隆、`DSH_HOME` 指到 `.tmp/`、
+  端口 3373）里装真包跑一次真实运行——三态 **等你点头 11.66 s / 进行中 12.18 s / 已完成 131.65 s**；
+  已完成页逐字读作 `起点 执行 检查 复核 汇总 第 1 稿 终点` / `还剩 0 步 / 共 6 步` / `收下这版`；
+  开节点 `aria-expanded` false → true、`node-calls` 0 → 1；四个宽度 `scrollWidth === clientWidth` 全部成立。
+  **缺陷**：一开节点它比邻居高，判「同一行」原用中线距离，于是同一行相邻那条线被判成折行而不画——
+  1500 px 只画出 4/6 条、900 px 3/5 条。修法改成「两框垂直方向有重叠」（竖排改判水平重叠），
+  线的位置取重叠段中点；修完 1500 px 5/5、900 px 4/4（第 5 对真折行，不画）。这条是本轮唯一的代码返工，
+  也是「真机不是走过场」的证据。
+- **决定日期（`AGENTS.md` §5 要求 `feat/*` 有一个）：2026-12-10。** 那天之前二选一——**合进 `main` 并走发布流程**，
+  或者**删掉这条分支**。它是两颗产品提交、258 条定向用例全绿、真机三态验过的成品，不是草稿。
+- **没做的，以及为什么**：**没合 `main`、没 push、没打 tag、没 bump、没发版**（这一轮的边界就是交付分支）；
+  **live 档案例行没碰**——文件策略 `workspace-write`、`~/.dsh` 在工作区外、审批提示被禁用，写不进去；
+  3080 上的实例全程没动（旁证：误跑一次不带 `DSH_HOME` 的 `dsh web --help` 被 `EROFS` 直接拦住）。
+  仍然 `NOT_RUN` 的五条：`e998a00` 上的等你点头（那一版窗口没赶上）、失败/取消两态真机截图（两次运行都 `completed`）、
+  重启后打开旧会话（报 `no live session`，没有冒充读数）、点按钮后读输入框内容、与上一版布局的逐屏对照（按 §12 不重跑基线）。
+- **给下一个人的三条操作提示**：① 证据全在 `.rsi/evidence/progress-flowchart-2026-11-25/`，README 第 5 节是缺陷前后的
+  两套几何读数，别把 `soak-5*`（旧包）当成成品读数。② 真要动这张图，先读 `DESIGN-progress-tab.md` §21——
+  节点的分组规则（label 里第一个整数决定「第几次」）和「折行不画线」都是刻意的，改之前先看 §21.7 的两条已知边界。
+  ③ `progress.final.mark`（定稿）现在**留在字典里但没有读者**：定稿由那一行的角色词（`汇总·第2稿（定稿）`）说出，
+  不要再给它加一张卡。
+
+（以下为上一轮 **`feat/progress-layout-detail`** 的记录，原样保留：那条分支的四区版已被本轮取代——它从未合入 `main`，
+而 `main` 尖端 `57dcf04` 正是它的合流提交，所以本轮基线带着四区版。）
+
 ## 2026-11-25 — `feat/progress-layout-detail`：进度页布局细化（两栏躯体 / Guardian 四块 / 任务行就地展开 / 经过折叠）交付、跑绿、**隔离档案真机验过**，**未合 main、未 push、未发版**；本分支的决定日期是 **2026-12-09**
 
 - **From:** 记忆收口（`agent-173/memory`）· **To:** 操作者 / 下一个接手者

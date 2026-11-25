@@ -1,3 +1,42 @@
+## `feat/progress-flowchart`：进度页改回一张可视化流程图——门禁 `101 files / 1899 tests` 跑绿（`lib/` 与 `src/` 逐字节相同）、基线本轮自己重跑对照，隔离档案真机三态 + 四宽度 + 开节点读数到手，**真机还量出一个连线缺陷并修掉** — 2026-11-26 (`CONFIRMED`)
+
+这条记的是**一条还没合流的分支**：基线是 `main` 尖端 **`57dcf04`**，产品提交 **`e998a00`**（主体）与
+**`1eb7888`**（连线缺陷修复），之后是记忆提交。产品面动 `src/progress-tab.ts` 与 `src/client/index.js`
+（外加它们的构建产物 `lib/`），测试面六个 spec。真机那半边在隔离档案里跑完，产物归档在
+**`.rsi/evidence/progress-flowchart-2026-11-25/`**（2.1 MB，含缺陷前后的两套几何读数与前/后的包身份）。
+下面每一行都写清命令、环境与结果；没跑的写 `NOT_RUN`，跑不起来的写 `BLOCKED`。
+**标注规则**：标 `包工头跑` 的行是本轮执行方跑出来的原始转录（`gate-*.out` 归档后逐行可读）；
+标 `soak agent 跑` 的行是隔离档案上那次真机运行跑出来的读数（本轮读它归档的截图、逐字文本与几何 JSON）；
+标 `本轮自查` 的行是本轮亲手敲的命令。
+
+| state | command（environment） | result |
+| --- | --- | --- |
+| 基线全套（**本轮自查**，独立 worktree） | `git worktree add .tmp/wt-baseline --detach 57dcf04` + `npm ci` + `TMPDIR=$PWD/.tmp npm run ci` | **`EXIT=0`**：`Found 15 warnings and 0 errors.`、`client bundle: 347526 bytes → lib/client.js`、`lib/ at 57dcf04 is the build of src/ at 57dcf04 (285 files, byte-identical)`、`Test Files 101 passed (101)` / **`Tests 1884 passed (1884)`**、`Duration 112.96s`。**必须在这个 worktree 里跑**：先把 `git archive` 解到 `.tmp/` 下跑过一次，`oxlint` 报 `No files found to lint`（它把父仓库的 `.gitignore` 里的 `.tmp/` 当忽略规则）、`verify:lib` 报 `fatal: pathspec 'lib' did not match any files`——两个都不是产品问题，是「不在 git 检出里」。**`CONFIRMED`** |
+| 门禁 ①（**包工头跑**，`e998a00` 干净树；转录 `.rsi/evidence/progress-flowchart-2026-11-25/gate-e998a00.out`，23847 字节） | `TMPDIR=$PWD/.tmp npm run ci` | **`EXIT=0`**：`15 warnings / 0 errors`、`client bundle: 340995 bytes`、`lib/ at e998a00 is the build of src/ at e998a00 (285 files, byte-identical)`、`101 files / 1897 tests`、`101.14s`。**这一遍在修复之前**，所以只是簿记，不是最终的码。**`CONFIRMED`** |
+| 门禁 ②（**包工头跑**，`1eb7888` 的树，真机修复已提交之后；转录 `.rsi/evidence/progress-flowchart-2026-11-25/gate-1eb7888.out`，**24014 字节**，`sha256` `1780843e96b6c6b2…`） | 同上 | **`EXIT=0`**：`Found 15 warnings and 0 errors.`、`client bundle: 341814 bytes → lib/client.js`、**`lib/ at 1eb7888 is the build of src/ at 1eb7888 (285 files, byte-identical)`**、`Test Files 101 passed (101)` / **`Tests 1899 passed (1899)`**、`Duration 106.09s`；全文 `FAIL` **0 行**。**这才是覆盖最终代码的那一遍**。**`CONFIRMED`** |
+| 一条陷阱（**本轮自查**，两次都读到） | 看 `verify:lib` 报的是哪个 sha | 第一遍（工作树脏、`HEAD` 还是 `57dcf04`）报的是 `lib/ at 57dcf04 …`——**它比对的是 `HEAD` 的 `src/` 与 `HEAD` 的 `lib/`**，所以**脏树上跑它是空证明**。改成「先提交、再在干净树上跑」之后，报的才是 `1eb7888`。这一条写进 `HANDOFF.md`，别再踩。**`CONFIRMED`** |
+| 逐文件用例数（**本轮自查**，两棵树各量一遍） | `npx vitest run <六个 spec>`（读每个文件的 `(N tests)`） | 基线 **243**：`client 139`、`progress-tab 57`、`connector 11`、`layout 20`、`hint-absent 8`、`i18n 8`；尖端 **258**：`client 146`、`progress-tab 69`、`connector 11`、`progress-flow 17`、`hint-absent 7`、`i18n 8`。与总数 `1884 → 1899` 对得上（`+7 +12 +2 −5 −1 = +15`；`progress-flow` 17 条里有 2 条是修复时补的几何用例）。**`CONFIRMED`** |
+| 先红后绿（**两个施工者各留一份**） | 实现侧：把 `HEAD` 的浏览器包放回工作树、用最终版五份 spec 跑；取数侧：源码回退到 `57dcf04`、spec 定稿 | 实现侧 **`51 failed / 136 passed`**（`exit 1`）；取数侧 **`18 failed / 51 passed (69)`**（`exit 1`）。两份转录 `red-redraw.out`（542315 字节）、`red-data.out`（16766 字节）与各自的绿跑 `green-redraw.out` / `green-data.out` 都在证据目录里，开头三行是命令、`HEAD` sha 与时间。**`CONFIRMED`** |
+| 镜像与 TS 同构（**重画方跑，本轮读产物**） | `.rsi/evidence/progress-flowchart-2026-11-25/cross-check.mjs` 同时喂 `lib/progress-tab.js` 与浏览器镜像 | 10 组 fixture（等待 / 两波 + 双稿 / 两次规划 / 乱序声明 / 认不出腿 / Guardian / 重试中 / 结束带阻塞 / 取消 / 英文边界调用），比较 `state·at·total·remaining·final` 与每个节点的 `key·kind·ordinal·state·seq`：**`ALL SAME`**（`cross-check.out` 953 字节）。**`CONFIRMED`** |
+| `lib/` 就是 `src/` 的构建（**本轮自查**） | `cmp lib/client.js src/client/index.js`；`wc -c`；`sha256sum` | **逐字节相同**，各 **341814** 字节，`sha256` `5300934ee57109fb…4087c2`（= 真机装进去的那个包内哈希）。**`CONFIRMED`** |
+| 真机环境与安装身份（**soak agent 跑**；本轮读归档并自查哈希） | `node scripts/clone-profile.mjs --src ~/.dsh/profiles/web --home .tmp/soak-flow/dsh-home --name flow-clone`；端口 **127.0.0.1:3373**；playwright 1.62 + `chromium_headless_shell-1248` | `files 7734 -> 7734 (88511836 bytes)`、`links 5 (relinked 2, already dangling in the source 1)`、`parity 5/5 equal after redaction`、`dependencies 17 declared, 0 unresolved`、`credentials redacted: 1 line(s) in 1 file(s)`。包身份：`e998a00` tgz `d53c262e…346f6e` / 包内 `lib/client.js` `d954f6c2…059863` / **340995** 字节；修复后 tgz `edcc4354…4512e7` / `5300934e…4087c2` / **341814** 字节（= 尖端 `1eb7888` 的树），两侧版本读回 `0.13.39`，装好的 `node_modules/dsh-grok-workflow` `readlink -f` 落在档案自己里。**`e998a00` 的包可从 `git archive e998a00` 重打出同一个哈希**（soak 方复核过）。克隆只动 soak 四类东西（删残留 `mode: triage`、五个角色 + `guardianModel` + 默认 agent 模型钉到 `bifrost-responses/opencode-go/muse-spark-1.3-contributor`、工作区重指、端口）。**`CONFIRMED`** |
+| 真机三态（**soak agent 跑**） | 同一份克隆档案、同一句请求（**必须点出工具名** `用 grok_workflow 工具跑一个工作流：…`） | 相对发送：**等你点头 11.66 s**、**进行中 12.18 s**、**已完成 131.65 s**。页面逐字：等你点头 `任务团队 · 2 个任务` / `等你点头` / `起点` `终点` / `还剩 1 步 / 共 2 步` / `开工`；进行中 `起点` `执行` `终点` / `还剩 1 步 / 共 3 步`；已完成 `起点` `执行` `检查` `复核` `汇总` `第 1 稿` `终点` / `还剩 0 步 / 共 6 步` / `收下这版`。钩子计数 node **2 → 3 → 6**、doing **0 → 1 → 0**、ord **0 → 0 → 1**、toggle **0 → 1 → 4**、wires **1 → 2 → 5**、guardian 恒 1。运行真做完：`notes.md` 三行、`test.txt` 一行 `hello`。**`CONFIRMED`** |
+| 真机开节点（**soak agent 跑**） | 点 `执行` 那颗（`flow:0:execute:1`） | `aria-expanded` `false → true`、`[data-gw-progress-node-calls]` **0 → 1**；行内逐字 `0:01 执行 任务 1 · 写 notes.md 安装步骤 做完 打开子会话` / `0:01 执行 任务 2 · 写 test.txt hello 做完 打开子会话`。**`CONFIRMED`** |
+| 真机四宽度（**soak agent 跑**，节点开着量） | 1500 / 900 / 700 / 480，视口高 1600 | `scrollWidth === clientWidth` **四个都成立**；每行节点数 `[6]` / `[4,2]` / `[1,1,1,1,1,1]` / `[1,1,1,1,1,1]`；方向 row / row / **column** / **column**；连线 **5 / 4 / 5 / 5** 条。900 px 那一对真折行的**没有线**（不画假箭头）。**`CONFIRMED`** |
+| 真机量出的缺陷与修复（**soak agent 发现，修复由同一人做、包工头复核并提交**） | 同一页、同一颗节点开着量 `soak-50-geometry.json`（旧包） | 旧包 1500 px 每行 `[7]` 只画出 **4** 条线（应有 6）、900 px `[4,3]` 只画出 **3** 条（应有 5）：判「同一行」用的是两框中线距离，一开节点比邻居高四倍、中线偏了 44.5 px，于是同一行相邻的两条线被判成折行。修法：改成两框**垂直方向有重叠**（竖排改判水平重叠），线取重叠段中点；新增两条几何用例。修完 1500 **5/5**、900 **4/4**。`1eb7888` 定向复核：六份 spec **258 passed**、`typecheck` 退出 0、`oxlint 15 warnings / 0 errors`。**`CONFIRMED`** |
+| 真机控制台与红线（**soak agent 跑**；本轮读归档） | 两轮整页 `consoleErrors` / `pageErrors`；`stat ~/.dsh ~/.dsh/profiles`；`curl` 3080 / 3373；scratch 体积 | 控制台两轮都是 `[]` / `[]`。`~/.dsh` `2026-11-25 23:14:14.025606767`、`~/.dsh/profiles` `2026-11-22 16:59:46.687805286` **开跑前与收尾后逐字相同**；3080 前后都是 **401**；3373 只在该轮活着时 401、收尾关掉；**误跑的一次不带 `DSH_HOME` 的 `dsh web --help` 被写保护拦住**（`EROFS … /home/fish/.dsh/profiles/web/cordis.yml`），是「这个会话对 live home 只有读权限」的直接旁证。scratch `.tmp/soak-flow/`（186 MB）**整棵删除**。**未 push、未打 tag、未 bump、未 publish。** **`CONFIRMED`** |
+| 真机：仍然 `NOT_RUN` 的五条 | —— | ① **`e998a00` 上的「等你点头」**：那一版的窗口没赶上（页面 9.79 s 才第一次画出节点，那时已进行中），由修复版以 200 ms 轮询在 11.66 s 抓到，旧包不冒充；② **失败 / 取消两态**的真机截图：两包各自的运行都是 `completed`（组件用例覆盖）；③ **重启后打开旧会话**：换包重启后对那次被中断的会话报 `no live session`，进度 Tab 显示空态，**没有冒充读数**；④ **点「开工 / 收下这版」后输入框里的字**：只验到按钮存在与文案；⑤ **与上一版布局的逐屏对照**：按 `AGENTS.md` §12 不重跑基线。 |
+| 证据归档自查（**本轮自查**） | `du -sh .rsi/evidence/progress-flowchart-2026-11-25`；`ls`；`grep -rnE 'sk-[A-Za-z0-9]|Bearer |apiKey|API_KEY|password|secret'` | **2.1 MB**，25 个文件，单张 PNG 最大 128 KB；两份门禁转录（`gate-e998a00.out` 23847、`gate-1eb7888.out` 24014 字节）都是本轮 `.tmp/` 原件的逐字副本；密钥扫描**无命中**（命中的只有变量名 `BIFROST_VIRTUAL_KEY` / `AGENT2API_API_KEY` 与 lint 正则源码，**没有任何 `sk-…` 字面量、没有 `Bearer <值>`、没有 `key=值`**）。**`CONFIRMED`** |
+
+**两条照实记**
+
+1. **基线是我重跑的，不是抄上一版**：`.tmp/wt-baseline`（`57dcf04`）上 `101 files / 1884 tests`、
+   `347526` 字节、`15 warnings`、`112.96s`；与上一轮 `STATE` 里记的同一组数一致，所以本轮的分母成立。
+2. **`e998a00` 的门禁不是最终证据**：它在真机修复之前，覆盖的是「第一版代码」。最终的码是 `1eb7888`，
+   覆盖它的是同一条门禁在干净树上的第二遍（`1899 tests`、`341814` 字节、`byte-identical`），两遍转录都在证据目录里，
+   **别混用**。
+
+
 ## `feat/progress-layout-detail`：两栏躯体 / Guardian 四块 / 任务行就地展开 / 经过折叠——门禁 `101 files / 1884 tests` 跑绿、warnings 仍 15，隔离档案真机三态读数到手 — 2026-11-25 (`CONFIRMED`)
 
 这条记的是**一条还没合流的分支**：基线是 `main` 的 **`b0fbd20`**，尖端 **`d0c924a`**，中间 **5 颗提交**

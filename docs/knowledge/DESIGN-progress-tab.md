@@ -892,3 +892,110 @@ playwright 1.62 + `chromium_headless_shell-1248`，视口 1500×1600，poll 250 
 **仍然 `NOT_RUN` 的四条**（不要升级成「验过」）：发送前的基线页面快照（空会话不挂载进度 Tab，两侧都没有，
 早期那两张被删掉、没有补拍）、未通过 / 已取消两态（两次运行都 `completed`）、点「开工 / 收下这版」之后读输入框里的字
 （只验到按钮存在与文案）、live 档案升级 / 重载 / 重启（红线）。
+
+## 21. 流程图：一步一节点、当前高亮、底下挂行、底部计数（2026-11-25，`feat/progress-flowchart`）
+
+§19 定「说什么」，§20 定「怎么说」，本节把这两节一起换掉：操作者拍板**改回可视化流程图**——四区版退场。
+本节全部是 `CONFIRMED`：源码 `src/progress-tab.ts`（`deriveProgressFlow`）、`src/client/index.js`（镜像 + 渲染 + 样式）、
+五个 spec、门禁转录 `.rsi/evidence/progress-flowchart-2026-11-25/`，基线是 `main` 尖端 **`57dcf04`**。
+
+### 21.1 页面（`CONFIRMED`）
+
+```text
+section.gw-progress
+  style
+  header.gw-progress-bar      run 名 + 五态胶囊（钩子不变）
+  div.gw-progress-flow        流程图：svg.gw-progress-wires 实测连线 + ol.gw-progress-nodes
+    li.gw-progress-node       一个节点：圆点 + 腿词 + 角标 +（有行时）展开按钮 +（展开时）它自己的调用
+  aside.gw-progress-guardian  沿用（钩子、四块瓦片、词都没动）
+  footer.gw-progress-foot     还剩 N 步 / 共 M 步 + dock（只有按钮与 filled 行）
+```
+
+- **节点 = 一条腿的一次访问**：`起点 / 规划 / 执行 / 检查 / 复核 / 汇总 / 终点`。
+  两端是结构节点（`start` 恒 `done`；`end` 随 `stopReason`：未结束 `pending`、`completed` `done`、
+  `cancelled` `cancelled`、其余 `failed`）。中段五条腿由**调用自己的 label** 认出来，不看 `phase`（`phase` 是任务标题）。
+- **重复的腿各占一个节点**：同一腿连排且这一行 label 里没有数字（或数字等于已开那颗的序号）→ 并进前一颗；
+  否则按 label 里的**第一个整数**开新的一颗（`规划（第2次）` → 2、`汇总·第2稿` → 2、`执行（尝试 2）` → 2）。
+  于是「规划两次」是两颗节点，「汇总写过三稿」是三颗节点，「两个任务各跑一次执行」是一颗节点挂两行。
+- **角标**：`汇总` 每一颗都写「第 N 稿」；其余腿只有 `ordinal > 1` 才写「第 N 次」（一次就是常态，不给常态加字）。
+- **认不出腿的行不许丢**：挂到前一个节点；前面没有任何中段节点时挂到 `start`（所以 `start` 的 `members` 通常为空，
+  但不保证为空——宁可多一颗按钮，也不丢一条已声明的调用）。
+- **Guardian 那行不进图**：它有自己那一块监控。
+
+### 21.2 状态与当前（`CONFIRMED`）
+
+| 观感 | `data-state` | token |
+| --- | --- | --- |
+| 已过变绿 | `done` | `--dsw-alias-state-success-primary` |
+| 当前高亮（呼吸点 + 外描边） | `doing` | `--dsw-alias-state-business-primary` |
+| 未到置灰（虚线边、空心点） | `pending` | `--dsw-alias-state-idle-primary` |
+| 失败 / 阻塞 / 取消 = 琥珀 | `failed` / `blocked` / `cancelled` | `--dsw-alias-state-warn-primary` |
+
+中段节点的状态直接取 `nodeState(members, ended)`（既有函数：恢复过的失败不算、未结算算 doing、结束仍挂空算 blocked）。
+`at`（当前节点，1 基）：最早一条未结算调用所在的节点 → 否则未结束取 `end` → 否则第一颗 `failed`/`blocked` →
+否则 `total`；一条中段节点都没有且未结束时是 1。`remaining = total - at`，`total = nodes.length`（**含两端**）。
+高亮节点若本身是 `pending`，渲染成 `doing`；其余节点 `data-current="false"`。
+
+### 21.3 连线（`CONFIRMED`）
+
+- 渲染后**实测**：`measureProgressFlowWires()` 读 `.gw-progress-flow` 与每个 `[data-gw-progress-node]` 的 rect，
+  只画两种真实相邻——同一行左右相邻（横线：右缘中点 → 左缘中点）与上下相邻（竖线：下缘中点 → 上缘中点）。
+  **折到下一行的那一对不画线**：画了就是在主张一条读者看不见的路。
+- 每次渲染量一遍，`ResizeObserver`（有的话）+ `window.resize` 重画；测量结果与上次相同则不重渲（不会自己喂自己）。
+- 没有 layout 的宿主（桩渲染器、零宽列）量不到就一个 `path` 都不画，图退化成一条节点串——不报错、不占位。
+
+### 21.4 钩子（测试与真机都按这些找）
+
+| 钩子 | 挂在谁身上 | 取值 |
+| --- | --- | --- |
+| `data-gw-progress-flow` | `div.gw-progress-flow` | 测量与连线的坐标系 |
+| `data-gw-progress-wires` | `svg.gw-progress-wires` | `aria-hidden`；`path` 数 = 真实相邻对数 |
+| `data-gw-progress-nodes` | `ol.gw-progress-nodes` | 节点列表 |
+| `data-gw-progress-node` | `li.gw-progress-node` | 值 = 节点 `key`（`flow:start` / `flow:end` / `flow:<位置>:<kind>:<ordinal>`） |
+| `data-kind` / `data-state` / `data-ordinal` / `data-current` | 同上 | 七种 kind / 五种观感 / 0 或 N / `true`·`false` |
+| `data-gw-progress-node-word` | `span` | 腿词 |
+| `data-gw-progress-node-ord` | `span` | 角标，不写时不渲染元素 |
+| `data-gw-progress-node-toggle` | `button` | 仅该节点有行；`aria-expanded` + `aria-controls`；`title` = `progress.task.detail` |
+| `data-gw-progress-node-calls` | `ol` | 仅展开时；里面是既有行（`data-gw-progress-log-row` 等四个钩子） |
+| `data-gw-progress-left` | `p` | 还剩 N 步 / 共 M 步 |
+| 沿用 | `-bar` / `-run` / `-chip` / `-guardian*` / `-dock` / `-dock-fill` / `-filled` / `-open` | 一字未改 |
+
+**退场**（`test/progress-connector.spec.ts` 逐条钉住缺席：40 个退役类名 + 28 个退役钩子，样式表按规则选择器解析、
+源码按整属性名带边界匹配）：`now` / `eyebrow` / `headline` / `sub` / `steps` / `step` / `flag` / `rest` /
+`columns` / `main` / `side` / `plan*` / `log`（列表本体与标题、折叠按钮）/ `final*` / `dock-hint` / `quiet`。
+
+### 21.5 文案（`CONFIRMED`）
+
+新增 11 个键：`progress.flow.start/plan/execute/check/review/summarize/end`（起点/规划/执行/检查/复核/汇总/终点）、
+`progress.flow.visit`（第 {n} 次）、`progress.flow.draft`（第 {n} 稿）、
+`progress.flow.left`（还剩 {left} 步 / 共 {total} 步）、`progress.flow.aria`（进度流程图）。
+删除 19 个四区版键：`progress.now.*`（六）、`progress.steps.aria`、`progress.flag.*`（两）、`progress.rest`、
+`progress.plan.title`、`progress.log.title`、`progress.log.more`、`progress.log.less`、`progress.final.title`、
+`progress.final.missing`、`progress.dock.hintStart`、`progress.dock.hintAccept`、`progress.dock.quiet`。
+保留并仍在用的：`progress.chip.*`（头部）、`progress.plan.waiting/running/done/failed/cancelled`（节点的
+**无障碍状态词**，画面上不印）、`progress.log.*`（七个行状态词）、`progress.task.detail`、`progress.member.open`、
+`progress.dock.start/accept/fill/filled`、`progress.guardian.*`。`progress.final.mark`（定稿）留在字典里但**没有读者**——
+交卷卡退场后，哪一稿是定稿已由那一行的角色词（`汇总·第2稿（定稿）`）说出，不再另起一张卡。
+
+### 21.6 宽度（`CONFIRMED` 的断言口径）
+
+宽屏节点横排、折行；`max-width: 720px` 纵排成一列；`480px` 不溢出。
+**CSS 里没有 `overflow-x: auto`**（既有断言继续钉），也仍**没有字面色值**、没有 `--dsw-alias-state-error-primary`。
+新的 class 名里不含子串 `gw-progress-task`（那是退役指纹；链段 chip 的 class 是 `gw-progress-call-chain`，
+身份在 `data-gw-progress-task-chain` 钩子上）。
+
+### 21.7 取数口径（`CONFIRMED`，两条已知边界）
+
+1. **重试成功仍留一颗琥珀**：`执行（尝试 1）` 与 `执行（尝试 2）` 是两颗节点（各有各的访问），第一颗按自己的成员算
+   就是 `failed`，`recoveredFailureSeqs` 只在同一颗节点内部抵消失败。这是**故意的**：那颗节点上那一次真的没过，
+   抹掉它等于把「重试过」这件事藏起来；整轮 `completed` 与第二颗的绿都不受影响。
+2. **label 里的数字会被读成「第几次」**：取的是第一个整数。`naming.ts` 生成的角色词不会带任务号，
+   所以真实形状（`执行`、`执行（尝试 2）`、`规划（第N次）`、`汇总·第N稿（定稿）`）都读得对；将来若有标签形如
+   `执行 3`，会裂成第三颗执行节点——这是这条规则已知的代价，写在这里而不是留给下一个人踩。
+
+### 21.8 与 §19 / §20 的取代关系
+
+- §19 的五个区（头部 / 轨道 / 收尾 / 聊天卡）里，**头部与聊天卡保留**，轨道（现在的分段条）与收尾（经过、交卷、Guardian 的两栏）
+  **不再存在**；Guardian 那一段本身（§18 的能力、§20 的四块瓦片）**保留**，只是不再占第二列。
+- §20 的「任务行就地展开自己的调用」升级成「**节点**就地展开自己的调用」：同一条历史行渲染器，挂在节点下面。
+- §19.4 的按钮机制（只填框、不代发）一字未改；页面上仍然只有三类控件：dock 按钮、展开按钮、行胶囊。
