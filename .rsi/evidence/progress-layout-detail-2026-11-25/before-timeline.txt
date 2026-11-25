@@ -1,0 +1,14 @@
+session rows: ["新会话", "进行中", "你好，先打个招呼", "写 notes.md 三行安装步骤，再写", "写 notes.md 三行安装步骤，再写", "写 notes.md 三行安装步骤，再写"]
+session: untitled session selected
+mode switch: was=false now aria-checked=true note='开'
+pre-run: tabs=['普通生图', '素材库', '无限画布', '电商模式预览', '图片转 PPT'] mounted=False editor={'w': 809, 'h': 52}
+sent the work request at t=0 (the loop selects 进度 as soon as the strip mounts)
+t=  0.02s chip=None word=None steps=0 mounted=False active=['普通生图']
+t=  0.29s chip=None word=None steps=0 mounted=True active=['进度', '普通生图']
+t=  9.19s chip=waiting word='等你点头' steps=0 mounted=True active=['进度', '普通生图']
+CAPTURED waiting at t=9.19s (106 chars, steps=0) hooks={'columns': 0, 'guardian': 1, 'plan-toggle': 0, 'log-toggle': 0, 'task-detail': 0, 'plan-row': 0, 'log-row': 0}
+t=  9.79s chip=running word='进行中' steps=2 mounted=True active=['进度', '普通生图']
+CAPTURED running at t=9.79s (319 chars, steps=2) hooks={'columns': 0, 'guardian': 1, 'plan-toggle': 0, 'log-toggle': 0, 'task-detail': 0, 'plan-row': 2, 'log-row': 2}
+t=197.83s chip=done word='已完成' steps=2 mounted=True active=['进度', '普通生图']
+CAPTURED done at t=197.83s (484 chars, steps=2) hooks={'columns': 0, 'guardian': 1, 'plan-toggle': 0, 'log-toggle': 0, 'task-detail': 0, 'plan-row': 2, 'log-row': 9}
+final chip=done word='已完成' steps=2 hooks={'columns': 0, 'guardian': 1, 'plan-toggle': 0, 'log-toggle': 0, 'task-detail': 0, 'plan-row': 2, 'log-row': 9} active=['进度', '普通生图']
