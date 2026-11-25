@@ -1,0 +1,23 @@
+session rows: ["新会话", "用 grok_workflow 工具跑一个工作", "你好，先打个招呼", "你好，先打个招呼", "写 notes.md 三行安装步骤，再写", "写 notes.md 三行安装步骤，再写"]
+session: untitled session selected
+mode switch: was=false now aria-checked=true note='开'
+pre-run: tabs=['普通生图', '素材库', '无限画布', '电商模式预览', '图片转 PPT'] mounted=False editor={'x': 480, 'w': 809, 'h': 52}
+sent the work request at t=0 (the loop selects 进度 as soon as the strip mounts)
+t=  0.02s chip=None word=None steps=0 mounted=False active=['普通生图']
+    hooks={'columns': 0, 'main': 0, 'side': 0, 'guardian': 0, 'guardian-blocks': 0, 'guardian-block': 0, 'plan-toggle': 0, 'task-detail': 0, 'log-toggle': 0, 'log': 0, 'log-row': 0, 'plan-row': 0, 'chip': 0, 'steps': 0} layout={"columns": null, "sideBox": null, "logMaxHeight": null, "logOverflowY": null, "logExpanded": null, "logListId": null}
+t=  0.29s chip=None word=None steps=0 mounted=True active=['进度', '普通生图']
+    hooks={'columns': 0, 'main': 0, 'side': 0, 'guardian': 0, 'guardian-blocks': 0, 'guardian-block': 0, 'plan-toggle': 0, 'task-detail': 0, 'log-toggle': 0, 'log': 0, 'log-row': 0, 'plan-row': 0, 'chip': 0, 'steps': 0} layout={"columns": null, "sideBox": null, "logMaxHeight": null, "logOverflowY": null, "logExpanded": null, "logListId": null}
+t= 15.84s chip=waiting word='等你点头' steps=0 mounted=True active=['进度', '普通生图']
+    hooks={'columns': 0, 'main': 0, 'side': 0, 'guardian': 0, 'guardian-blocks': 0, 'guardian-block': 0, 'plan-toggle': 0, 'task-detail': 0, 'log-toggle': 0, 'log': 0, 'log-row': 0, 'plan-row': 0, 'chip': 1, 'steps': 0} layout={"columns": null, "sideBox": null, "logMaxHeight": null, "logOverflowY": null, "logExpanded": null, "logListId": null}
+CAPTURED waiting at t=15.84s (54 chars, steps=0) hooks={'columns': 0, 'main': 0, 'side': 0, 'guardian': 0, 'guardian-blocks': 0, 'guardian-block': 0, 'plan-toggle': 0, 'task-detail': 0, 'log-toggle': 0, 'log': 0, 'log-row': 0, 'plan-row': 0, 'chip': 1, 'steps': 0}
+t= 16.22s chip=running word='进行中' steps=2 mounted=True active=['进度', '普通生图']
+    hooks={'columns': 1, 'main': 1, 'side': 1, 'guardian': 1, 'guardian-blocks': 1, 'guardian-block': 4, 'plan-toggle': 2, 'task-detail': 0, 'log-toggle': 0, 'log': 1, 'log-row': 2, 'plan-row': 2, 'chip': 1, 'steps': 1} layout={"columns": "957px 240px", "sideBox": {"x": 1253, "w": 240, "h": 149}, "logMaxHeight": "264px", "logOverflowY": "auto", "logExpanded": "false", "logListId": "gw-progress-log-list"}
+CAPTURED running at t=16.22s (310 chars, steps=2) hooks={'columns': 1, 'main': 1, 'side': 1, 'guardian': 1, 'guardian-blocks': 1, 'guardian-block': 4, 'plan-toggle': 2, 'task-detail': 0, 'log-toggle': 0, 'log': 1, 'log-row': 2, 'plan-row': 2, 'chip': 1, 'steps': 1}
+t=170.00s chip=done word='已完成' steps=2 mounted=True active=['进度', '普通生图']
+    hooks={'columns': 1, 'main': 1, 'side': 1, 'guardian': 1, 'guardian-blocks': 1, 'guardian-block': 4, 'plan-toggle': 2, 'task-detail': 0, 'log-toggle': 1, 'log': 1, 'log-row': 8, 'plan-row': 2, 'chip': 1, 'steps': 1} layout={"columns": "957px 240px", "sideBox": {"x": 1253, "w": 240, "h": 149}, "logMaxHeight": "264px", "logOverflowY": "auto", "logExpanded": "false", "logListId": "gw-progress-log-list"}
+CAPTURED done at t=170.0s (458 chars, steps=2) hooks={'columns': 1, 'main': 1, 'side': 1, 'guardian': 1, 'guardian-blocks': 1, 'guardian-block': 4, 'plan-toggle': 2, 'task-detail': 0, 'log-toggle': 1, 'log': 1, 'log-row': 8, 'plan-row': 2, 'chip': 1, 'steps': 1}
+detail open: clicked (aria-expanded false -> false); task-detail=1 hooks={'columns': 1, 'main': 1, 'side': 1, 'guardian': 1, 'guardian-blocks': 1, 'guardian-block': 4, 'plan-toggle': 2, 'task-detail': 1, 'log-toggle': 1, 'log': 1, 'log-row': 11, 'plan-row': 2, 'chip': 1, 'steps': 1}
+detail lines: []
+fold: clicked; label '展开全部' -> '收起'; log-expanded=true hooks={'columns': 1, 'main': 1, 'side': 1, 'guardian': 1, 'guardian-blocks': 1, 'guardian-block': 4, 'plan-toggle': 2, 'task-detail': 1, 'log-toggle': 1, 'log': 1, 'log-row': 11, 'plan-row': 2, 'chip': 1, 'steps': 1}
+narrow 700: docScrollWidth=700 docClientWidth=700 hooks={'columns': 1, 'main': 1, 'side': 1, 'guardian': 1, 'guardian-blocks': 1, 'guardian-block': 4, 'plan-toggle': 2, 'task-detail': 1, 'log-toggle': 1, 'log': 1, 'log-row': 11, 'plan-row': 2, 'chip': 1, 'steps': 1}
+    columns=693px sideBox={'x': 0, 'w': 693, 'h': 149}

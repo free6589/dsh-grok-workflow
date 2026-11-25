@@ -690,3 +690,205 @@ file:…/dsh-grok-workflow-0.13.38.tgz`（版本读回 `0.13.38`，`sha256(lib/c
 **没有截到的一态**：`等你点头`（`declared === 0`）的窗口是 `run-start` 到第一条 `agent-start` 之间，
 真机上手点不到（D-156 已写明截不到就照实报 `NOT_RUN`）。这一态由组件用例覆盖（真实 DOM + 真实事件 fixture），
 不冒充真机读数。
+
+## 20. 布局细化：两栏躯体、Guardian 四块、任务行就地展开、经过折叠（2026-11-25，`feat/progress-layout-detail`）
+
+§19 定的是这一页**说什么**（五态胶囊、现在、分段条、步骤、经过、交卷、按钮）。本节记的是**同一页怎么说**：
+躯体变成两栏，Guardian 从「标题 + 一条清单」变成四块瓦片，每颗计划任务行都能就地展开**它这一次任务**的调用，
+「经过」超过一屏时留一个字收放。本节全部是 `CONFIRMED`：源码 `src/client/index.js`（五颗提交之后与
+`lib/client.js` 逐字相同，blob `e14880c`，`347526` 字节），用例 `test/progress-layout.spec.ts` 的 20 条，
+门禁转录 `.rsi/evidence/progress-layout-detail-2026-11-25/gate-d0c924a.out`（`d0c924a`）。
+
+一条边界先说清楚：**产品面只动了浏览器包**。`src/progress-tab.ts`、fold、`src/records.ts`、事件集，以及页面上
+每一个数字，一个字没改；`b0fbd20..d0c924a` 的改动面只有 6 个文件（`src/client/index.js`、`lib/client.js` 与四个 spec）。
+
+### 20.1 躯体结构（`CONFIRMED`）
+
+```text
+section.gw-progress
+  style
+  .gw-progress-head            头部：run 名 + 五态胶囊
+  .gw-progress-now             「现在」主标题 + 一行小字
+  .gw-progress-steps           等分分段条
+  .gw-progress-flag            琥珀条（仅当前步有未恢复的失败）
+  .gw-progress-rest            「后面还有」
+  div.gw-progress-columns      ← 只有 run.guardian.started === true 才渲染
+    div.gw-progress-main         左列：步骤清单 → 「经过」 → 「交卷」，按这个顺序
+    aside.gw-progress-side       右列：aside.gw-progress-guardian（沿用 data-state / aria-label）
+  .gw-progress-dock            底部按钮，或「不用你说话」那行
+```
+
+- **头部到「后面还有」都在网格之上，dock 在网格之下**。它们不参与分栏——两条小标题线不会被右列挤窄。
+- **没有 Guardian 就没有包裹层**：三个 section 直接是页面的流，既没有 `div.gw-progress-columns`，也没有一列空的
+  `aside`。空列是一句这一页兑不了的承诺（D-157）。
+- **Guardian 内部是四块瓦片**：`div.gw-progress-guardian-blocks[data-gw-progress-guardian-blocks]` 里
+  `div.gw-progress-guardian-block[data-gw-progress-guardian-block]` = `status` / `budget` / `count` / `findings`。
+  findings 那一块横跨两列，里面仍是原来的清单，或 `progress.guardian.empty` 那一句。
+- **任务行是一个按钮加一段详情**：`li.gw-progress-plan-row[data-open]` 里
+  `button.gw-progress-plan-toggle`（序号 + 标题 + 命中的链段，`aria-expanded`、
+  `aria-controls="gw-progress-task-detail-<index>"`、`title` = `progress.task.detail`）；状态词留在按钮**外面**，
+  所以行的可见文字与改造前逐字相同——按钮只多了一个**看的方式**，没有多一个**要读的词**。展开时
+  `ol.gw-progress-plan-detail[data-gw-progress-task-detail]` 挂在同一行里（`331f181` 把它从 `div` 改成真正的
+  `ol`：里面是 `li`，`li` 必须有列表父节点）。
+
+### 20.2 钩子表（`CONFIRMED`，测试与真机都按这些找）
+
+| 钩子 | 挂在谁身上 | 取值 / 作用 |
+| --- | --- | --- |
+| `data-gw-progress-columns` | `div.gw-progress-columns` | 有 Guardian 才出现；两栏网格容器 |
+| `data-gw-progress-main` | `div.gw-progress-main` | 左列：步骤清单、经过、交卷 |
+| `data-gw-progress-side` | `aside.gw-progress-side` | 右列：Guardian |
+| `data-gw-progress-guardian-blocks` | `div.gw-progress-guardian-blocks` | 四块瓦片的网格 |
+| `data-gw-progress-guardian-block` | `div.gw-progress-guardian-block` | `status` / `budget` / `count` / `findings` |
+| `data-gw-progress-plan-toggle` | `button.gw-progress-plan-toggle` | 每颗任务行一个；`aria-expanded` + `aria-controls` |
+| `data-gw-progress-task-detail` | `ol.gw-progress-plan-detail` | 值 = 该步的 step key；`id` = `gw-progress-task-detail-<index>` |
+| `data-gw-progress-task-chain` | 详情行里的链段 chip | `执行` / `检查` / `复核`；角色点不到槽位时不出现 |
+| `data-gw-progress-open` | 详情行末尾的胶囊 | 沿用既有胶囊；只在 `canOpen(childId)` 为真时出现 |
+| `data-gw-progress-log-toggle` | `button.gw-progress-log-toggle` | 超过 6 行才出现，落在「经过」标题同一行的右端 |
+| `data-expanded` | `ol.gw-progress-log` | `true` / `false`；折叠状态的唯一 DOM 读数 |
+| `id="gw-progress-log-list"` | `ol.gw-progress-log` | 折叠按钮 `aria-controls` 的目标 |
+
+详情行保留历史行的四个钩子（`data-gw-progress-log-row`、`data-state`、`data-gw-progress-log-time`、
+`data-gw-progress-log-word`），一行一条该任务的成员，按 `seq` 排。**历史行不加胶囊**：详情是同一条声明的第二种读法，
+不是它的替代。
+
+### 20.3 CSS 契约（`CONFIRMED`，测试逐条钉住）
+
+- 两栏：`.gw-progress-columns { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 16px; align-items: start; }`
+  ——右列固定 240px，左列 `minmax(0, 1fr)`（长标题只会自己省略，不会把网格撑破）。
+- 窄屏：`@media (max-width: 720px) { .gw-progress-columns { grid-template-columns: minmax(0, 1fr); } }`
+  ——一列，Guardian 落到步骤清单与经过之下，正是 DOM 本来的顺序。
+- 瓦片：`.gw-progress-guardian-blocks { grid-template-columns: repeat(2, minmax(0, 1fr)); }`，findings 那块
+  `grid-column: 1 / -1`。
+- 折叠：`.gw-progress-log[data-expanded="false"] { max-height: 264px; overflow-y: auto; }`，
+  `.gw-progress-log[data-expanded="true"] { max-height: none; overflow-y: visible; }`。
+- **仍然没有 `overflow-x: auto`**（既有断言继续钉）；**仍然没有字面色值**（`#hex` / `rgba()` 不出现），
+  也仍不出现 `--dsw-alias-state-error-primary`。
+
+### 20.4 折叠：阈值与上限（`CONFIRMED`）
+
+- `PROGRESS_LOG_FOLD_AT = 6`，判据是 `story.log.length > 6`：**六行及以下连按钮都不出现**，六行正好不折。
+- 折叠时列表高 264px、竖向滚动；展开时把上限拿掉。**没有一行被丢掉，也没有一行被概括**——上限是画的上限，
+  不是数据的摘要。
+- 按钮两个词，各管一个方向：`progress.log.more`（展开全部 / Show all）↔ `progress.log.less`（收起 / Collapse）。
+
+### 20.5 展开状态（`CONFIRMED`）
+
+- `ProgressView` 里两个 `useState`：`openTasks`（按 step key，**行与行独立**，默认全关，越界就 `delete`）与
+  `logOpen`（默认关）。这是页面上仅有的两处「读者自己打开的东西」。
+- **没有用原生 `<details>`**：行的可见文字必须逐字不变，而展开状态必须来自一个 `useState`——壳自己的渲染
+  不保证 `<details>` 的展开状态跨快照存活（D-157）。
+
+### 20.6 一条详情行说什么（`CONFIRMED`，`08018bf` 改，`d0c924a` 钉）
+
+- 详情行 = **时刻 · 门 · 结果 · [胶囊]**。链段 chip 站的是**角色的位置**（`memberLabel()` 写的正是链段的动词），
+  所以不再在 chip 旁边重复一遍角色词；任务标题上一行的行头已经写着，行里也不再印第二遍。
+- 一条展开的行在真机上读作（包工头的独立探针，行头是 `1 任务 1 · 建表 执行 → 检查 过了`）：
+
+  ```text
+  6:15 执行 做完
+  6:16 检查 过了 打开子会话
+  ```
+
+- **角色点不到槽位时词留下**：这时没有 chip 可以顶替它，一条「有时刻、有结果、不说谁跑的」行，比它替换掉的那行说得更少。
+- 历史行（不传 options）**一个字没动**：角色 + 任务名，仍照 `title === role` 那条规则去重。
+- 没有新钩子、新文案、新 CSS：chip 的规则与一行的四列本来就在。
+- `d0c924a` 把这条形状钉进守卫：整行逐字文本、一行只有一个门词、标题在行头出现 1 次而详情里 0 次、
+  无门的那行留角色词且没有 chip。
+
+### 20.7 文案（`CONFIRMED`）
+
+三个新键，中英各一份，`test/i18n-parity.spec.ts` 的 `REDESIGN_COPY` 表同步加三行：
+
+| 键 | 中文 | English | 用在哪 |
+| --- | --- | --- | --- |
+| `progress.task.detail` | 详情 | Detail | 任务行按钮的 `title` |
+| `progress.log.more` | 展开全部 | Show all | 经过折叠按钮（折叠态） |
+| `progress.log.less` | 收起 | Collapse | 经过折叠按钮（展开态） |
+
+没有第四句解释。**Guardian 没有新词**：四块里每一个字都是既有的 `progress.guardian.*`——状态块 = 标题 + 状态词，
+预算块 = `progress.guardian.budget`，计数块 = `progress.guardian.count`，findings 块 = 清单或
+`progress.guardian.empty`。
+
+### 20.8 两处偏差（照实记）
+
+1. **链段 chip 的 class 是 `gw-progress-plan-chain`，不是 `gw-progress-task-chain`**：`test/progress-connector.spec.ts`
+   禁止已退役的 `gw-progress-task` 这个子串，class 只能改名。身份仍在钩子上——`data-gw-progress-task-chain`。
+   class 只负责样式，钩子才是指纹。
+2. **行按钮的 `aria-controls` 指向的元素只在行展开时存在**。disclosure 模式允许这样（控件先声明它将要画的那块），
+   严格的校验器会把它挑出来。接受这个不完美，比给每一行常驻一个空容器更干净。
+
+### 20.9 没动的（`CONFIRMED`）
+
+- `src/progress-tab.ts`、fold、`src/records.ts`、四类 `tool-workflow/*` 事件、`summary-final`：零改动。
+- 页面上每一个数字：零改动。新布局不印百分比、不印估算、不印通过率（`test/progress-layout.spec.ts` 末条钉住）。
+- 步骤清单、经过、交卷的**词**：行的可见文字逐字相同；详情是同一批声明的第二次渲染，由 `progressStoryLogRow()`
+  一处供料（`deriveProgressStory` 的 log 也走它），所以详情不会把一次调用描述成与日志不同的样子。
+
+### 20.10 与 §16 / §17.1 / §19.4 的取代关系（重要）
+
+§16 的「成员卡 inert」、§17.1 的「卡与段都是 inert」、§19.4 的「按钮是页面上唯一的控件之一（另一个是行胶囊）；
+卡、段、日志行仍 inert」——这句话里**「页面除 dock 按钮与打开胶囊之外全惰性」的部分，本节起不再成立**。
+现在页面上的控件是四类：dock 按钮、行胶囊、**每颗计划任务行一个展开按钮**、
+**「经过」标题旁的折叠按钮**。
+
+三个变的是惰性口径、不是交互语义：
+
+- §16 的 Q2（点卡片空白处什么都不发生）不变：按钮是按钮，行的空白处仍然什么都不做。
+- 段的等分、琥珀条、`data-state` 语义不变；折叠与展开不改任何状态词。
+- 新控件都不写会话事件、不发网络请求、不调 `conversation.send`（§19.4 的机制一个字没改）。
+
+### 20.11 真机回填（2026-11-25，隔离档案；`CONFIRMED`）
+
+产物全部在 `.rsi/evidence/progress-layout-detail-2026-11-25/`（25 个文件 / 1.4 MB）：截图、逐字 `innerText`、
+钩子计数、时间线、两侧控制台、门禁原始输出、以及写清每条读数出处的 `README.md`。**这台浏览器是 soak agent
+开的，本轮读的是产物**，不是本节作者亲手敲的。
+
+**环境与安装身份。** Node v26.8.1 / npm 11.19.0 / DSH 0.2.2-rc.3；`web-clone` 从 live `~/.dsh/profiles/web`
+克隆（`files 7731 -> 7731 (88493399 bytes)`、`links 5`、`parity 5/5 equal after redaction`、
+`dependencies 17 declared, 0 unresolved`、`credentials redacted: 1 line(s) in 1 file(s)`），端口 3371，
+playwright 1.62 + `chromium_headless_shell-1248`，视口 1500×1600，poll 250 ms。克隆只动 soak 四类东西
+（删残留 `mode: triage`、角色与模型钉到 `bifrost-responses/opencode-go/muse-spark-1.3-contributor`、
+工作区重指、端口），**产品代码与 schema 一个字没动**。两侧都是真安装：
+
+| 侧 | tgz `sha256` | 版本读回 | `sha256(lib/client.js)` | 字节 |
+| --- | --- | --- | --- | --- |
+| 基线 `b0fbd20` | `28c5d8b4c7f7f0258be6205a3747bc28bfab04cf25eb327c914211d274bff88b` | `0.13.39` | `38702aa1e50bb483ecdddeba0050632dc627b874eee05958c57f17071063fa6c` | 334321 |
+| 本分支（产品 `d0c924a`） | `acf2476d08b6677ec8427a717c7e05526ca3306f8f0789f85005de7d680840d9` | `0.13.39` | `5745b15c379d28e99d1536cefce90154d3ebcc5d9d5c7d2a9c7b991ab6fced3a` | **347526** |
+
+**三态与前后对照。** 同一脚本、同一份克隆档案各跑一次真运行：基线 等你点头 **9.19 s** / 进行中 **9.79 s** /
+已完成 **197.83 s**，本分支 **15.84 s / 16.22 s / 170.00 s**；两侧完成页都写 `做好了` / `2 步全过`。
+完成态钩子（`querySelectorAll(...).length`）：`columns` **0 → 1**、`main`/`side` **0/0 → 1/1**、
+`guardian` 1 → 1、`guardian-blocks` **0 → 1**、`guardian-block` **0 → 4**（`status`/`budget`/`count`/`findings`）、
+`plan-toggle` **0 → 2**、`log-toggle` **0 → 1**、`task-detail` 0 → 0（点开后 1）、`log-row` **9 → 8**、
+`plan-row` 2 → 2。四条主断言（columns / plan-toggle / log-toggle / guardian-block）在真机上全部成立。
+
+**两处必须照实记。** ① **「等你点头」那一瞬还没有 Guardian**（事件还没写），所以那时 `guardian 0`、`columns 0`——
+「有 Guardian 才有两栏」这条规则在真机上正好对上，而不是被真机推翻（running 与 done 都是 1/1）。
+② 本分支这一轮的完成页是 **8** 条历史行（基线那轮是 9 条）且照样出现折叠按钮：条数是**这次运行**自己的性质，
+不是页面的性质；6 行阈值与 8 行的关系也说明按钮按的是条数、不是高度。
+
+**开一行、折历史、窄屏。** 点第一行 `[data-gw-progress-plan-toggle]`：`aria-expanded` `false → true`、
+`aria-controls="gw-progress-task-detail-0"`、`task-detail` 0 → 1，行内三行逐字是
+
+```text
+21:38  执行  做完  打开子会话
+21:38  检查  过了  打开子会话
+21:38  复核  通过  打开子会话
+```
+
+也就是 §20.6 那条形状（`时刻 门词 结果词 [入口]`，每个门词只出现一次）。折叠：`展开全部 → 收起`、
+`aria-expanded` `false → true`、`data-expanded` `false → true`、
+`max-height: 264px / overflow-y: auto` → `none / visible`、`id="gw-progress-log-list"` 始终在。
+1500 px：`grid-template-columns: 957px 240px`、gap 16 px、main 957 宽、side 240 在 x=1253、
+`scrollWidth 1500 = clientWidth`。**700 px**：单轨 `693px`、Guardian 落到历史下面（main `y=233…937`、side `y=953`）、
+`scrollWidth 700 = clientWidth 700`——没有横向滚动。
+
+**控制台与红线。** 两侧整轮 `{"consoleErrors": [], "pageErrors": []}`。`~/.dsh` 与 `~/.dsh/profiles` 的 mtime
+全程未变（`2026-11-22 23:40:20` / `2026-11-22 16:59:46`）、`touch ~/.dsh/.soak-probe` →
+`Read-only file system`、3080 开跑前与收尾后都是 401、3371 只在实例活着时 401、scratch `.tmp/soak-layout/`
+（140 MB）整棵删除。未 push、未打 tag、未 bump、未 publish。
+
+**仍然 `NOT_RUN` 的四条**（不要升级成「验过」）：发送前的基线页面快照（空会话不挂载进度 Tab，两侧都没有，
+早期那两张被删掉、没有补拍）、未通过 / 已取消两态（两次运行都 `completed`）、点「开工 / 收下这版」之后读输入框里的字
+（只验到按钮存在与文案）、live 档案升级 / 重载 / 重启（红线）。

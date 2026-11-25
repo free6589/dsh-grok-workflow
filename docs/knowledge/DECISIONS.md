@@ -4310,3 +4310,104 @@ spine 为空，pre-fix 形状会进脊柱。
   取数层新增 `deriveProgressStory` 纯函数并配手写镜像双份断言；`lib/client.js` 仍是唯一投递产物，需要重建。
   遗留：真机上「等你点头」这一态存在窗口极短（`run-start` 到第一条 `agent-start` 之间），C 组若截不到，照实
   报 `NOT_RUN`，不得用合成事件冒充真机读数。
+
+## D-157 · 进度页布局细化：Guardian 挪到右侧并拆成四块、任务行就地展开自己的调用、经过超过一屏折叠（2026-11-25，未发版）
+
+- **Status:** `CONFIRMED`（源码 `src/client/index.js`、`test/progress-layout.spec.ts` 的 20 条用例、门禁转录
+  `.rsi/evidence/progress-layout-detail-2026-11-25/gate-d0c924a.out` 都在本轮实读；**真机那半边也已跑过**——
+  隔离档案里两条构建各跑一次真实运行，三态、开行、折历史、700 px 单列、控制台与红线都有读数，
+  产物在同一个目录；仍然 `NOT_RUN` 的四条见 `VALIDATION.md`）
+- **Date:** 2026-11-25
+- **Decision:**
+  1. **躯体分两栏，且只有记录到 Guardian 时才分。** `div.gw-progress-columns[data-gw-progress-columns]` 内
+     左列 `div.gw-progress-main` 放步骤清单 → 「经过」→ 「交卷」，右列 `aside.gw-progress-side` 放 Guardian。
+     `run.guardian.started === true` 是唯一的开关；没有 Guardian 就三个 section 直接是页面的流——**没有包裹层，
+     也没有空列**。头部、「现在」、分段条、琥珀条、「后面还有」留在网格之上，dock 留在网格之下。
+  2. **Guardian 由一张卡改成一排瓦片**：同一个 `aside`（`data-gw-progress-guardian`、`data-state`、`aria-label`
+     全留）里 `data-gw-progress-guardian-block` = `status` / `budget` / `count` / `findings` 四块，两两一行，
+     findings 横跨整行。**没有新文案**：四块里每个字都是既有的 `progress.guardian.*`。
+  3. **任务行就地展开自己的调用**：每颗 `li.gw-progress-plan-row` 里一颗 `button.gw-progress-plan-toggle`
+     （序号 + 标题 + 命中的链段，`aria-expanded`、`aria-controls`、`title` = `progress.task.detail`），状态词留在
+     按钮外，行的可见文字逐字不变；展开时 `ol.gw-progress-plan-detail` 挂在同一行里，一行一条该任务的成员，由
+     **历史行同一个渲染器**（`ProgressLogRow` + `progressStoryLogRow()`）画出。**详情行只说行头说不出的四件事：
+     时刻 · 门 · 结果 · [胶囊]**——链段 chip 站的就是角色的位置（`memberLabel()` 写的正是链段的动词），所以不在
+     chip 旁边重复角色词；任务标题行头已经有，行里不再印第二遍；角色点不到槽位时没有 chip 可顶替，词留下。
+     历史行（不传 options）一个字不动，也不加胶囊。
+  4. **「经过」超过一屏就折叠**：`PROGRESS_LOG_FOLD_AT = 6`，多于 6 行才出现一颗按钮，两个词管两个方向
+     （`progress.log.more` ↔ `progress.log.less`）；折叠态 `max-height: 264px; overflow-y: auto`，展开态解除上限。
+     一行都不丢、一行都不概括。
+  5. **两个新控件都是 `useState`，不用原生 `<details>`**：`openTasks`（按 step key，行与行独立，默认全关）与
+     `logOpen`（默认关）。
+  6. **文案只加三个键**：`progress.task.detail`（详情 / Detail）、`progress.log.more`（展开全部 / Show all）、
+     `progress.log.less`（收起 / Collapse），中英两本字典与 `REDESIGN_COPY` 表同步；没有第四句解释。
+- **Evidence:**
+  - 门禁 `TMPDIR=$PWD/.tmp npm run ci` 在 `d0c924a` 的干净树上（包工头跑，本轮逐行核对转录
+    `.rsi/evidence/progress-layout-detail-2026-11-25/gate-d0c924a.out`，22429 字节、0 行 `FAIL`）：`EXIT=0`、`Found 15 warnings and 0 errors.`、
+    `client bundle: 347526 bytes → lib/client.js`、
+    `lib/ at d0c924a is the build of src/ at d0c924a (285 files, byte-identical)`、
+    `Test Files 101 passed (101)` / `Tests 1884 passed (1884)`、`Duration 88.19s`。
+  - 基线（`main` 的 `b0fbd20`，本轮在 `git archive b0fbd20` 的拷贝上自己跑了一遍全套）：
+    `100 files / 1855 tests`、`lib/client.js` **334321** 字节、warnings **15**、`Duration 85.98s`。
+    所以本分支 **+1 个 spec 文件 / +29 条用例 / +13205 字节**。
+  - 逐文件（本轮自己量的两棵树，不是抄总数）：`test/client.spec.ts` **132 → 139**、
+    `test/progress-hint-absent.spec.ts` **6 → 8**、`test/i18n-parity.spec.ts` **8 → 8**（表里多 3 行键，
+    diff 4 行含 1 行注释）、新增 `test/progress-layout.spec.ts` **20**；
+    `test/progress-tab.spec.ts` 57 与 `test/progress-connector.spec.ts` 11 一个没动，和总数对得上
+    （7 + 2 + 20 = 29）。派单给的 `121 → 139` / `7 → 8` 与实测不符，按实测记。
+  - 先红后绿，两轮：实现侧的 6 条断言在旧树上红（`no element carries data-gw-progress-columns`、
+    `no element carries data-gw-progress-guardian-blocks`、`expected undefined to be 'gw-progress-log-list'` 等）；
+    守卫侧在 `git archive b0fbd20` 的干净树上带新 spec 跑，`2 failed / 18 failed | 8 passed (26)`。
+    第二轮的守卫（`d0c924a`，对着 `08018bf` 之前的树）`Tests 2 failed | 18 passed (20)`，红在
+    `expected [ '8:04 执行 任务 1 · 修复登录 执行 做完', …(1) ] to deeply equal [ '8:04 执行 做完', '8:05 检查 过了 打开子会话' ]`
+    与 `expected [ '8:03', '执行', '任务 1 · 建表', …(2) ] to deeply equal [ '8:03', '执行', '做完' ]`。
+  - `lib/client.js` 与 `src/client/index.js` 在 `d0c924a` 上是同一个 blob
+    （`e14880c51767c616aff2d9697e41a7ddb97e22c2`，`347526` 字节）——这是「`lib/` 就是 `src/` 的构建」的最强自证。
+  - `npx tsc -p tsconfig.json --noEmit` 退出 0；`npx oxlint` 在这四个文件上 0 errors（warnings 与基线同数）。
+  - 包工头的独立探针（对着提交后的构建）读一条展开的行：`6:15 执行 做完` / `6:16 检查 过了 打开子会话`，
+    行头是 `1 任务 1 · 建表 执行 → 检查 过了`，下面的历史行不变；同时读到「有 Guardian 才有两栏、section 顺序是
+    plan/log/final、瓦片 `status,budget,count,findings` 用的是既有文案、关着时 `aria-expanded=false` 且没有详情块、
+    详情是 `ol` 且 `id` 等于控件的 `aria-controls`、5 行时没有折叠按钮、`id=gw-progress-log-list` 与
+    `data-expanded=false` 都在、两本字典都有那三个键、CSS 没有字面色值 / 没有 error token / 没有 `overflow-x: auto`、
+    有 720px 单列规则与 264px 上限」。这条是包工头的读数（本轮没有重跑那遍探针），与上面的用例互为旁证。
+  - **真机（隔离档案，soak agent 跑，本轮读产物）**：Node v26.8.1 / npm 11.19.0 / DSH 0.2.2-rc.3，`web-clone`
+    克隆自 live `~/.dsh/profiles/web`（`files 7731 -> 7731`、`parity 5/5 equal after redaction`），端口 3371，
+    视口 1500×1600。两条构建都是 `dsh plugin add file:…tgz` 的**真拷贝**：基线 tgz
+    `28c5d8b4…ff88b` / `sha256(lib/client.js)` `38702aa1…063fa6c` / **334321** 字节，本分支 tgz
+    `acf2476d…840d9` / `5745b15c…ced3a` / **347526** 字节（= 门禁那棵树）。
+  - **真机三态与前后对照**：基线 等你点头 **9.19 s** / 进行中 **9.79 s** / 已完成 **197.83 s**，
+    本分支 **15.84 s / 16.22 s / 170.00 s**；完成态钩子 **columns 0 → 1**、`main`/`side` **0/0 → 1/1**、
+    **guardian-block 0 → 4**、**plan-toggle 0 → 2**、**log-toggle 0 → 1**、`task-detail` 0 → 0（点开后 1）、
+    `log-row` 9 → 8、`plan-row` 2 → 2。**「等你点头」那一瞬 `guardian 0`、`columns 0`**——「有 Guardian 才有两栏」
+    在真机上正好对上。**开一行**读作 `21:38 执行 做完 打开子会话` / `21:38 检查 过了 打开子会话` /
+    `21:38 复核 通过 打开子会话`；**折历史** `展开全部 → 收起`、`data-expanded` `false → true`、
+    `264px/auto → none/visible`；**700 px** 单轨 `693px`、Guardian 落到历史下面、`scrollWidth 700 = clientWidth 700`；
+    两侧控制台 `{"consoleErrors": [], "pageErrors": []}`；红线：`~/.dsh` 与 `~/.dsh/profiles` 的 mtime 全程未变、
+    `touch ~/.dsh/.soak-probe` → `Read-only file system`、3080 前后都是 401。
+- **Alternatives rejected:**
+  - **Guardian 继续做「经过」下面的一张卡。** 否决：它是一条**边车**，与运行本身并列；放在日志下面，读者会把它当成
+    这次运行的又一段（「之后还发生了什么」），而它说的其实是另一件事——监控还活着没有。
+  - **第二列常驻，没有 Guardian 就留白。** 否决：空列是一句这一页兑不了的承诺（「这里本该有东西」）。所以
+    `started === true` 才渲染包裹层；没有就是纯一列，观感与改造前一致。
+  - **任务详情用弹窗/抽屉（modal / drawer）。** 否决：这一页的既有规矩是**没有浮层**（§16 删掉详情卡就是这条）。
+    行自己的调用就该长在行下面；而且复用历史行渲染器，能保证「同一条声明只有一种画法」。
+  - **不限高、让整页随浏览器滚。** 否决：dock（那一颗批准按钮）会被推出屏幕——它恰恰是这一页唯一要读者动手的东西。
+    上限 264px + 一个词展开，把「读得更长」变成读者自己的选择。
+  - **用原生 `<details>` 做折叠（不用 JS）。** 否决：行的可见文字必须逐字不动（`<summary>` 会接管那行文字），
+    展开状态也必须能从一个 `useState` 里读到、跨快照存活；壳自己的渲染不保证 `<details>` 的状态活下来。
+- **Consequences:**
+  - `DESIGN-progress-tab.md` 追加 §20（结构、钩子表、CSS 契约、折叠阈值与上限、展开状态、三键文案、两处偏差、
+    不变量、以及对 §16/§17.1/§19.4「除 dock 按钮与胶囊外全惰性」这句的明确取代——页面现在还有每行一颗展开按钮与
+    一颗折叠按钮）。
+  - **两处偏差留在代码里，照实记账**：链段 chip 的 class 必须叫 `gw-progress-plan-chain`（`progress-connector` 那条
+    spec 禁止 `gw-progress-task` 子串），身份靠 `data-gw-progress-task-chain`；行按钮的 `aria-controls` 指向一个只在
+    展开时存在的元素（disclosure 允许，严格校验器会挑）。
+  - 分支上一共有五颗提交，后两颗是打磨：`08018bf`（`fix(progress): an opened row's line names its gate once`）
+    把详情行改成「时刻 · 门 · 结果 · [胶囊]」——chip 顶替角色词、标题交给行头，角色点不到槽位时词留下，历史行不变；
+    `d0c924a`（`test(progress): pin the opened line to one gate word`）把这条形状钉进守卫（整行逐字文本、
+    一行一个门词、标题在行头 1 次而详情里 0 次、无门的那行留角色词且没有 chip，`+78` 行、2 条用例）。
+    门禁是打在 `d0c924a` 上的那一遍，所以 `08018bf` 没有一次属于它自己的门禁读数——它被下一颗提交的守卫与
+    同一遍门禁一起覆盖了。
+  - 真机那半边**已经跑过**（隔离档案、187 秒级的真实运行、两条构建各一次），读数与产物在
+    `.rsi/evidence/progress-layout-detail-2026-11-25/`；仍然 `NOT_RUN` 的只有四条：发送前的基线页面快照
+    （空会话不挂载进度 Tab）、未通过 / 已取消两态（两次都 `completed`）、点按钮后读输入框内容（只验了存在与文案）、
+    live 档案升级 / 重载 / 重启（红线）。

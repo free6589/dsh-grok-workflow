@@ -86,6 +86,8 @@ const REDESIGN_COPY: ReadonlyArray<readonly [key: string, zh: string, en: string
   ['progress.plan.done', '过了', 'Passed'],
   ['progress.plan.failed', '没过', 'Not passed'],
   ['progress.plan.cancelled', '没做', 'Cancelled'],
+  // The layout detail's own three keys: the row control's name, and the fold's two words.
+  ['progress.task.detail', '详情', 'Detail'],
   ['progress.log.title', '经过', 'History'],
   ['progress.log.done', '做完', 'Did it'],
   ['progress.log.passed', '过了', 'Passed'],
@@ -94,6 +96,8 @@ const REDESIGN_COPY: ReadonlyArray<readonly [key: string, zh: string, en: string
   ['progress.log.failed', '没过', 'Not passed'],
   ['progress.log.shipped', '交卷', 'Shipped'],
   ['progress.log.cancelled', '取消', 'Cancelled'],
+  ['progress.log.more', '展开全部', 'Show all'],
+  ['progress.log.less', '收起', 'Collapse'],
   ['progress.final.title', '交卷', 'Handed in'],
   ['progress.final.mark', '（定稿）', '(final)'],
   ['progress.final.missing', '这一轮没有交卷稿', 'This run handed in no draft'],
